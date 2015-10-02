@@ -1177,7 +1177,7 @@ Lumix::Material* TerrainEditor::getMaterial()
 }
 
 
-void TerrainEditor::onGui()
+void TerrainEditor::onGUI()
 {
 	if (m_decrease_brush_size->isRequested()) m_decrease_brush_size->func.invoke();
 	if (m_increase_brush_size->isRequested()) m_increase_brush_size->func.invoke();

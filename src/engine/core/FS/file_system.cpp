@@ -116,6 +116,13 @@ public:
 
 	BaseProxyAllocator& getAllocator() { return m_allocator; }
 
+
+	virtual bool hasWork() const override
+	{
+		return !m_in_progress.empty();
+	}
+
+
 	bool mount(IFileDevice* device) override
 	{
 		for (int i = 0; i < m_devices.size(); i++)

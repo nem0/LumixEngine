@@ -40,7 +40,7 @@ public:
 		int /*rel_y*/,
 		int /*mouse_flags*/) override;
 	virtual void onMouseUp(int, int, Lumix::MouseButton::Value) override;
-	void onGui();
+	void onGUI();
 	void setComponent(Lumix::ComponentUID cmp) { m_component = cmp; }
 
 private:

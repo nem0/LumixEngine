@@ -19,22 +19,29 @@ class IFile;
 struct Matrix;
 struct Vec3;
 class Renderer;
+class Shader;
+class ShaderBinary;
 
 
 class ShaderInstance
 {
 public:
-	ShaderInstance(IAllocator&)
+	ShaderInstance(Shader& shader)
+		: m_shader(shader)
 	{
 		for (int i = 0; i < lengthOf(m_program_handles); ++i)
 		{
 			m_program_handles[i] = BGFX_INVALID_HANDLE;
+			m_binaries[i * 2] = nullptr;
+			m_binaries[i * 2 + 1] = nullptr;
 		}
 	}
 	~ShaderInstance();
 
 	bgfx::ProgramHandle m_program_handles[16];
+	ShaderBinary* m_binaries[32];
 	uint32_t m_combination;
+	Shader& m_shader;
 };
 
 
@@ -66,9 +73,24 @@ public:
 };
 
 
+class LUMIX_RENDERER_API ShaderBinary : public Resource
+{
+public:
+	ShaderBinary(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
+	bgfx::ShaderHandle getHandle() { return m_handle; }
+
+private:
+	virtual void unload() override;
+	virtual bool load(FS::IFile& file) override;
+
+private:
+	bgfx::ShaderHandle m_handle;
+};
+
+
 class LUMIX_RENDERER_API Shader : public Resource
 {
-	friend struct ShaderLoader;
+	friend class ShaderInstance;
 
 public:
 	class TextureSlot
@@ -112,9 +134,9 @@ private:
 	void parseTextureSlots(lua_State* state);
 	bool generateInstances();
 
-	virtual void doUnload(void) override;
-	virtual void
-	loaded(FS::IFile& file, bool success, FS::FileSystem& fs) override;
+	virtual void onBeforeReady() override;
+	virtual void unload(void) override;
+	virtual bool load(FS::IFile& file) override;
 
 private:
 	IAllocator& m_allocator;

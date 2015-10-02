@@ -229,7 +229,7 @@ void Settings::showShortcutSettings(Action** actions, int actions_count)
 }
 
 
-void Settings::onGui(Action** actions, int actions_count)
+void Settings::onGUI(Action** actions, int actions_count)
 {
 	if (!m_is_opened) return;
 

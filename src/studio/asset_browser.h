@@ -34,7 +34,7 @@ public:
 public:
 	AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata);
 	~AssetBrowser();
-	void onGui();
+	void onGUI();
 	void update();
 	const Lumix::Array<Lumix::Path>& getResources(Type type) const;
 	Type getTypeFromResourceManagerType(uint32_t type) const;
@@ -47,12 +47,12 @@ private:
 	void findResources();
 	void processDir(const char* path);
 	void addResource(const char* path, const char* filename);
-	void onGuiResource();
-	void onGuiMaterial();
-	void onGuiShader();
-	void onGuiModel();
-	void onGuiTexture();
-	void onGuiLuaScript();
+	void onGUIResource();
+	void onGUIMaterial();
+	void onGUIShader();
+	void onGUIModel();
+	void onGUITexture();
+	void onGUILuaScript();
 	void saveMaterial(Lumix::Material* material);
 	bool resourceInput(const char* label, char* buf, int max_size, Type type);
 	void unloadResource();

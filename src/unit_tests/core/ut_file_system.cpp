@@ -49,7 +49,7 @@ void UT_file_events_device(const char* params)
 	Lumix::FS::IFile* file =
 		file_system->open(device_list,
 						  "unit_tests/file_system/selenitic.xml",
-						  Lumix::FS::Mode::OPEN | Lumix::FS::Mode::READ);
+						  Lumix::FS::Mode::OPEN_AND_READ);
 
 	LUMIX_EXPECT_NOT_NULL(file);
 	LUMIX_EXPECT_TRUE(

@@ -109,14 +109,12 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	virtual void doUnload(void) override
+	virtual void unload(void) override
 	{
-		if (m_lua_state)
-		{
-			lua_close(m_lua_state);
-			m_lua_state = nullptr;
-		}
-		onEmpty();
+		if (!m_lua_state) return;
+
+		lua_close(m_lua_state);
+		m_lua_state = nullptr;
 	}
 
 
@@ -189,42 +187,28 @@ struct PipelineImpl : public Pipeline
 	void registerCFunctions();
 
 
-	virtual void
-	loaded(FS::IFile& file, bool success, FS::FileSystem& fs) override
+	virtual bool load(FS::IFile& file) override
 	{
 		if (m_lua_state)
 		{
 			lua_close(m_lua_state);
 			m_lua_state = nullptr;
 		}
-		if (success)
+		m_lua_state = luaL_newstate();
+		luaL_openlibs(m_lua_state);
+		bool errors =
+			luaL_loadbuffer(m_lua_state, (const char*)file.getBuffer(), file.size(), "") != LUA_OK;
+		errors = errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
+		if (errors)
 		{
-			m_lua_state = luaL_newstate();
-			luaL_openlibs(m_lua_state);
-			bool errors = luaL_loadbuffer(m_lua_state,
-										  (const char*)file.getBuffer(),
-										  file.size(),
-										  "") != LUA_OK;
-			errors =
-				errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
-			if (errors)
-			{
-				g_log_error.log("lua") << getPath().c_str() << ": "
-									   << lua_tostring(m_lua_state, -1);
-				lua_pop(m_lua_state, 1);
-				onFailure();
-			}
-			else
-			{
-				parseFramebuffers(m_lua_state);
-				registerCFunctions();
-				decrementDepCount();
-			}
+			g_log_error.log("lua") << getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
+			lua_pop(m_lua_state, 1);
+			return false;
 		}
-		else
-		{
-			onFailure();
-		}
+
+		parseFramebuffers(m_lua_state);
+		registerCFunctions();
+		return true;
 	}
 
 	lua_State* m_lua_state;

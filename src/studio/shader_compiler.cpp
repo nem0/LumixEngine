@@ -127,7 +127,7 @@ void ShaderCompiler::makeUpToDate()
 			"shaders/", info.filename);
 		auto* file = fs.open(fs.getDiskDevice(),
 							 shd_path,
-							 Lumix::FS::Mode::OPEN | Lumix::FS::Mode::READ);
+							 Lumix::FS::Mode::OPEN_AND_READ);
 
 		if (!file)
 		{
@@ -492,7 +492,7 @@ void ShaderCompiler::compile(const char* path)
 	auto& fs = m_editor.getEngine().getFileSystem();
 	auto* file = fs.open(fs.getDiskDevice(),
 						 path,
-						 Lumix::FS::Mode::OPEN | Lumix::FS::Mode::READ);
+						 Lumix::FS::Mode::OPEN_AND_READ);
 	if (file)
 	{
 		int size = (int)file->size();

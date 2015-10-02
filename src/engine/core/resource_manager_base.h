@@ -27,7 +27,7 @@ public:
 
 public:
 	void create(uint32_t id, ResourceManager& owner);
-	void destroy(void);
+	void destroy();
 
 	Resource* get(const Path& path);
 	Resource* load(const Path& path);
@@ -46,7 +46,7 @@ public:
 	ResourceTable& getResourceTable() { return m_resources; }
 
 	ResourceManagerBase(IAllocator& allocator);
-	virtual ~ResourceManagerBase(void);
+	virtual ~ResourceManagerBase();
 
 protected:
 	virtual Resource* createResource(const Path& path) = 0;

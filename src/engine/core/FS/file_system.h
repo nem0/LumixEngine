@@ -55,6 +55,7 @@ public:
 
 	virtual void setDefaultDevice(const char* dev) = 0;
 	virtual void setSaveGameDevice(const char* dev) = 0;
+	virtual bool hasWork() const = 0;
 };
 
 

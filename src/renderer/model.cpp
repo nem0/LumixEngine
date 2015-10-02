@@ -252,7 +252,7 @@ void Model::create(const bgfx::VertexDecl& def,
 	m_vertices.resize(attributes_size / def.getStride());
 	computeRuntimeData((const uint8_t*)attributes_data);
 
-	onReady();
+	onCreated(State::READY);
 }
 
 
@@ -503,52 +503,38 @@ bool Model::parseLODs(FS::IFile& file)
 }
 
 
-void Model::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
+bool Model::load(FS::IFile& file)
 {
 	PROFILE_FUNCTION();
-	if (success)
+	FileHeader header;
+	file.read(&header, sizeof(header));
+	if (header.m_magic == FILE_MAGIC 
+		&& header.m_version <= (uint32_t)FileVersion::LATEST 
+		&& parseMeshes(file) 
+		&& parseGeometry(file) 
+		&& parseBones(file) 
+		&& parseLODs(file))
 	{
-		FileHeader header;
-		file.read(&header, sizeof(header));
-		if (header.m_magic == FILE_MAGIC &&
-			header.m_version <= (uint32_t)FileVersion::LATEST &&
-			parseMeshes(file) && parseGeometry(file) && parseBones(file) &&
-			parseLODs(file))
-		{
-			m_size = file.size();
-			decrementDepCount();
-		}
-		else
-		{
-			g_log_warning.log("renderer") << "Error loading model "
-										  << m_path.c_str();
-			onFailure();
-			return;
-		}
+		m_size = file.size();
+		return true;
 	}
-	else
-	{
-		g_log_warning.log("renderer") << "Error loading model "
-									  << m_path.c_str();
-		onFailure();
-	}
+
+	g_log_warning.log("renderer") << "Error loading model " << m_path.c_str();
+	return false;
 }
 
-void Model::doUnload(void)
+void Model::unload(void)
 {
+	auto* material_manager = m_resource_manager.get(ResourceManager::MATERIAL);
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
 		removeDependency(*m_meshes[i].getMaterial());
-		m_resource_manager.get(ResourceManager::MATERIAL)
-			->unload(*m_meshes[i].getMaterial());
+		material_manager->unload(*m_meshes[i].getMaterial());
 	}
 	m_meshes.clear();
 	m_bones.clear();
 	m_lods.clear();
 	m_geometry_buffer_object.clear();
-
-	m_size = 0;
-	onEmpty();
 }
 
 

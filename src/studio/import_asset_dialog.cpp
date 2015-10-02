@@ -1259,7 +1259,7 @@ void ImportAssetDialog::importTexture()
 }
 
 
-void ImportAssetDialog::onGui()
+void ImportAssetDialog::onGUI()
 {
 	if (!m_is_opened) return;
 

@@ -64,7 +64,6 @@ namespace Lumix
 		
 		if(resource->isEmpty())
 		{
-			resource->onLoading();
 			resource->doLoad();
 		}
 
@@ -76,7 +75,6 @@ namespace Lumix
 	{
 		if(resource.isEmpty())
 		{
-			resource.onLoading();
 			resource.doLoad();
 		}
 
@@ -96,11 +94,6 @@ namespace Lumix
 	{
 		if(0 == resource.remRef())
 		{
-			if (resource.isReady() || resource.isFailure() || resource.isEmpty())
-			{
-				resource.incrementDepCount();
-			}
-			resource.onUnloading();
 			resource.doUnload();
 		}
 	}
@@ -116,11 +109,6 @@ namespace Lumix
 
 	void ResourceManagerBase::forceUnload(Resource& resource)
 	{
-		if (resource.isReady() || resource.isFailure() || resource.isEmpty())
-		{
-			resource.incrementDepCount();
-		}
-		resource.onUnloading();
 		resource.doUnload();
 		resource.m_ref_count = 0;
 	}
@@ -136,17 +124,8 @@ namespace Lumix
 
 	void ResourceManagerBase::reload(Resource& resource)
 	{
-		if (resource.isReady() || resource.isFailure() || resource.isEmpty())
-		{
-			if (!resource.isFailure())
-			{
-				resource.incrementDepCount();
-			}
-			resource.onReloading();
-			resource.doUnload();
-			resource.onLoading();
-			resource.doLoad();
-		}
+		resource.doUnload();
+		resource.doLoad();
 	}
 
 	ResourceManagerBase::ResourceManagerBase(IAllocator& allocator)

@@ -12,7 +12,7 @@ class HierarchyUI
 {
 public:
 	HierarchyUI() { m_is_opened = false; }
-	void onGui();
+	void onGUI();
 	void setWorldEditor(Lumix::WorldEditor& editor) { m_editor = &editor; }
 
 public:

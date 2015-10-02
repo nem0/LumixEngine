@@ -152,7 +152,7 @@ void Material::enableShadowReceiving(bool enable)
 }
 
 
-void Material::doUnload(void)
+void Material::unload(void)
 {
 	setShader(nullptr);
 
@@ -166,9 +166,6 @@ void Material::doUnload(void)
 		}
 	}
 	m_texture_count = 0;
-
-	m_size = 0;
-	onEmpty();
 }
 
 
@@ -361,25 +358,22 @@ void Material::setShader(const Path& path)
 }
 
 
-void Material::onReady()
+void Material::onBeforeReady()
 {
-	Resource::onReady();
-	if (m_shader)
+	if (!m_shader) return;
+	m_alpha_cutout_define_idx =
+		m_shader->getRenderer().getShaderDefineIdx("ALPHA_CUTOUT");
+	m_shadow_receiver_define_idx =
+		m_shader->getRenderer().getShaderDefineIdx("SHADOW_RECEIVER");
+	for (int i = 0; i < m_shader->getTextureSlotCount(); ++i)
 	{
-		m_alpha_cutout_define_idx =
-			m_shader->getRenderer().getShaderDefineIdx("ALPHA_CUTOUT");
-		m_shadow_receiver_define_idx =
-			m_shader->getRenderer().getShaderDefineIdx("SHADOW_RECEIVER");
-		for (int i = 0; i < m_shader->getTextureSlotCount(); ++i)
+		if (m_shader->getTextureSlot(i).m_define_idx >= 0 && m_textures[i])
 		{
-			if (m_shader->getTextureSlot(i).m_define_idx >= 0 && m_textures[i])
-			{
-				m_shader_mask |= m_shader->getDefineMask(
-					m_shader->getTextureSlot(i).m_define_idx);
-			}
+			m_shader_mask |= m_shader->getDefineMask(
+				m_shader->getTextureSlot(i).m_define_idx);
 		}
-		m_shader_instance = &m_shader->getInstance(m_shader_mask);
 	}
+	m_shader_instance = &m_shader->getInstance(m_shader_mask);
 }
 
 
@@ -465,8 +459,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 				copyString(texture_path, material_dir);
 				catString(texture_path, path);
 				m_textures[m_texture_count] = static_cast<Texture*>(
-					m_resource_manager.get(ResourceManager::TEXTURE)
-						->load(Path(texture_path)));
+					m_resource_manager.get(ResourceManager::TEXTURE)->load(Path(texture_path)));
 				addDependency(*m_textures[m_texture_count]);
 			}
 		}
@@ -571,17 +564,11 @@ void Material::setRenderState(bool value, uint64_t state, uint64_t mask)
 }
 
 
-void Material::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
+bool Material::load(FS::IFile& file)
 {
-	m_render_states = BGFX_STATE_DEPTH_TEST_LEQUAL | BGFX_STATE_CULL_CW;
 	PROFILE_FUNCTION();
-	if (!success)
-	{
-		g_log_warning.log("renderer") << "Failed to load material " << m_path.c_str();
-		onFailure();
-		return;
-	}
 
+	m_render_states = BGFX_STATE_DEPTH_TEST_LEQUAL | BGFX_STATE_CULL_CW;
 	m_uniforms.clear();
 	JsonSerializer serializer(file, JsonSerializer::READ, m_path.c_str(), m_allocator);
 	serializer.deserializeObjectBegin();
@@ -601,8 +588,7 @@ void Material::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 		{
 			if (!deserializeTexture(serializer, material_dir))
 			{
-				onFailure();
-				return;
+				return false;
 			}
 				
 		}
@@ -685,12 +671,11 @@ void Material::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 	if (!m_shader)
 	{
 		g_log_error.log("renderer") << "Material " << m_path.c_str() << " without a shader";
-		onFailure();
-		return;
+		return false;
 	}
 
 	m_size = file.size();
-	decrementDepCount();
+	return true;
 }
 
 

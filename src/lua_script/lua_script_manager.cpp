@@ -26,12 +26,10 @@ LuaScript::~LuaScript()
 }
 
 
-void LuaScript::doUnload()
+void LuaScript::unload()
 {
 	m_properties.clear();
 	m_source_code = "";
-	m_size = 0;
-	onEmpty();
 }
 
 
@@ -93,22 +91,13 @@ void LuaScript::parseProperties()
 }
 
 
-void LuaScript::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
+bool LuaScript::load(FS::IFile& file)
 {
-	if (success)
-	{
-		m_properties.clear();
-		m_source_code.set((const char*)file.getBuffer(), (int)file.size());
-		parseProperties();
-		m_size = file.size();
-		decrementDepCount();
-	}
-	else
-	{
-		g_log_error.log("lua_script") << "Could not load script "
-									  << m_path.c_str();
-		onFailure();
-	}
+	m_properties.clear();
+	m_source_code.set((const char*)file.getBuffer(), (int)file.size());
+	parseProperties();
+	m_size = file.size();
+	return true;
 }
 
 

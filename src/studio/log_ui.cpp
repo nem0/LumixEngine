@@ -135,7 +135,7 @@ void LogUI::update(float time_delta)
 }
 
 
-void LogUI::onGui()
+void LogUI::onGUI()
 {
 	showNotifications();
 

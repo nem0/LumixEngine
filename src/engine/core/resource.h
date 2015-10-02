@@ -17,21 +17,17 @@ namespace Lumix
 		enum class State : uint32_t
 		{
 			EMPTY = 0,
-			LOADING,
 			READY,
-			UNLOADING,
 			FAILURE,
 		};
 
 		typedef DelegateList<void (State, State)> ObserverCallback;
 
-		State getState() const { return m_state; }
+		State getState() const { return m_current_state; }
 
-		bool isEmpty()		const { return State::EMPTY		== m_state; }
-		bool isLoading()	const { return State::LOADING	== m_state; }
-		bool isReady()		const { return State::READY		== m_state; }
-		bool isUnloading()	const { return State::UNLOADING	== m_state; }
-		bool isFailure()	const { return State::FAILURE	== m_state; }
+		bool isEmpty()		const { return State::EMPTY		== m_current_state; }
+		bool isReady()		const { return State::READY		== m_current_state; }
+		bool isFailure()	const { return State::FAILURE	== m_current_state; }
 		uint32_t getRefCount() const { return m_ref_count; }
 
 		template <typename C, void (C::*Function)(State, State)>
@@ -54,16 +50,13 @@ namespace Lumix
 		Resource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 		virtual ~Resource();
 
-		virtual void onReady(void);
-		void onEmpty(void);
-		void onLoading(void);
-		void onUnloading(void);
-		void onReloading(void);
-		void onFailure(void);
+		virtual void onBeforeReady() {}
 
-		void doLoad(void);
-		virtual void doUnload(void) = 0;
-		virtual void loaded(FS::IFile& file, bool success, FS::FileSystem& fs) = 0;
+		void onCreated(State state);
+		void doLoad();
+		void doUnload();
+		virtual void unload(void) = 0;
+		virtual bool load(FS::IFile& file) = 0;
 
 		uint32_t addRef(void) { return ++m_ref_count; }
 		uint32_t remRef(void) { return --m_ref_count; }
@@ -74,18 +67,18 @@ namespace Lumix
 		void removeDependency(Resource& dependent_resource);
 
 		void onStateChanged(State old_state, State new_state);
-		void incrementDepCount();
-		void decrementDepCount();
 
 	private:
 		void fileLoaded(FS::IFile& file, bool success, FS::FileSystem& fs);
+		void checkState();
 
 		Resource(const Resource&);
 		void operator=(const Resource&);
 		uint16_t m_ref_count;
-		uint16_t m_dep_count;
-		State m_state;
-		bool m_is_waiting_for_file;
+		uint16_t m_empty_dep_count;
+		uint16_t m_failed_dep_count;
+		State m_current_state;
+		State m_desired_state;
 
 	protected:
 		Path m_path;

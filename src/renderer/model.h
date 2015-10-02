@@ -51,10 +51,7 @@ public:
 	int getAttributeArraySize() const { return m_attribute_array_size; }
 	uint32_t getNameHash() const { return m_name_hash; }
 	const char* getName() const { return m_name.c_str(); }
-	void setVertexDefinition(const bgfx::VertexDecl& def)
-	{
-		m_vertex_def = def;
-	}
+	void setVertexDefinition(const bgfx::VertexDecl& def) { m_vertex_def = def; }
 	const bgfx::VertexDecl& getVertexDefinition() const { return m_vertex_def; }
 	int getInstanceIdx() const { return m_instance_idx; }
 	void setInstanceIdx(int value) { m_instance_idx = value; }
@@ -141,9 +138,7 @@ public:
 	};
 
 public:
-	Model(const Path& path,
-		  ResourceManager& resource_manager,
-		  IAllocator& allocator)
+	Model(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 		: Resource(path, resource_manager, allocator)
 		, m_bounding_radius()
 		, m_allocator(allocator)
@@ -159,11 +154,11 @@ public:
 	~Model();
 
 	void create(const bgfx::VertexDecl& def,
-				Material* material,
-				const int* indices_data,
-				int indices_size,
-				const void* attributes_data,
-				int attributes_size);
+		Material* material,
+		const int* indices_data,
+		int indices_size,
+		const void* attributes_data,
+		int attributes_size);
 
 	LODMeshIndices getLODMeshIndices(float squared_distance) const;
 	const Geometry& getGeometry() const { return m_geometry_buffer_object; }
@@ -174,14 +169,10 @@ public:
 	int getBoneCount() const { return m_bones.size(); }
 	const Bone& getBone(int i) const { return m_bones[i]; }
 	int getFirstNonrootBoneIndex() const { return m_first_nonroot_bone_index; }
-	BoneMap::iterator getBoneIndex(uint32_t hash)
-	{
-		return m_bone_map.find(hash);
-	}
+	BoneMap::iterator getBoneIndex(uint32_t hash) { return m_bone_map.find(hash); }
 	void getPose(Pose& pose);
 	float getBoundingRadius() const { return m_bounding_radius; }
-	RayCastModelHit
-	castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
+	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
 	const AABB& getAABB() const { return m_aabb; }
 
 public:
@@ -199,9 +190,8 @@ private:
 	int getBoneIdx(const char* name);
 	void computeRuntimeData(const uint8_t* vertices);
 
-	virtual void doUnload(void) override;
-	virtual void
-	loaded(FS::IFile& file, bool success, FS::FileSystem& fs) override;
+	virtual void unload(void) override;
+	virtual bool load(FS::IFile& file) override;
 
 private:
 	IAllocator& m_allocator;

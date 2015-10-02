@@ -248,7 +248,7 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 	if (cmp.type == Lumix::crc32("terrain"))
 	{
 		m_terrain_editor->setComponent(cmp);
-		m_terrain_editor->onGui();
+		m_terrain_editor->onGUI();
 	}
 }
 
@@ -283,7 +283,7 @@ void PropertyGrid::showCoreProperties(Lumix::Entity entity)
 }
 
 
-void PropertyGrid::onGui()
+void PropertyGrid::onGUI()
 {
 	if (!m_is_opened) return;
 

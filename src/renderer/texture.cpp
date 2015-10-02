@@ -93,15 +93,7 @@ bool Texture::create(int w, int h, void* data)
 
 
 	bool isReady = bgfx::isValid(m_texture_handle);
-
-	if (isReady)
-	{
-		onReady();
-	}
-	else
-	{
-		onFailure();
-	}
+	onCreated(isReady ? State::READY : State::FAILURE);
 
 	return isReady;
 }
@@ -503,48 +495,37 @@ bool Texture::loadDDS(FS::IFile& file)
 }
 
 
-void Texture::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
+bool Texture::load(FS::IFile& file)
 {
 	PROFILE_FUNCTION();
-	if (success)
+
+	const char* path = m_path.c_str();
+	size_t len = m_path.length();
+	bool loaded = false;
+	if (len > 3 && strcmp(path + len - 4, ".dds") == 0)
 	{
-		const char* path = m_path.c_str();
-		size_t len = m_path.length();
-		bool loaded = false;
-		if (len > 3 && strcmp(path + len - 4, ".dds") == 0)
-		{
-			loaded = loadDDS(file);
-		}
-		else if (len > 3 && strcmp(path + len - 4, ".raw") == 0)
-		{
-			loaded = loadRaw(file);
-		}
-		else
-		{
-			loaded = loadTGA(file);
-		}
-		if (!loaded)
-		{
-			g_log_warning.log("renderer") << "Error loading texture "
-										  << m_path.c_str();
-			onFailure();
-		}
-		else
-		{
-			m_size = file.size();
-			decrementDepCount();
-		}
+		loaded = loadDDS(file);
+	}
+	else if (len > 3 && strcmp(path + len - 4, ".raw") == 0)
+	{
+		loaded = loadRaw(file);
 	}
 	else
 	{
-		g_log_warning.log("renderer") << "Error loading texture "
-									  << m_path.c_str();
-		onFailure();
+		loaded = loadTGA(file);
 	}
+	if (!loaded)
+	{
+		g_log_warning.log("renderer") << "Error loading texture " << m_path.c_str();
+		return false;
+	}
+
+	m_size = file.size();
+	return true;
 }
 
 
-void Texture::doUnload(void)
+void Texture::unload(void)
 {
 	if (bgfx::isValid(m_texture_handle))
 	{
@@ -552,8 +533,6 @@ void Texture::doUnload(void)
 		m_texture_handle = BGFX_INVALID_HANDLE;
 	}
 	m_data.clear();
-	m_size = 0;
-	onEmpty();
 }
 
 

@@ -45,7 +45,7 @@ void ModelInstance::modelUpdate(Resource::State, Resource::State new_state)
 		m_pose.resize(m_model->getBoneCount());
 		m_model->getPose(m_pose);
 	}
-	else if(new_state == Resource::State::UNLOADING)
+	else if(new_state == Resource::State::EMPTY)
 	{
 		m_pose.resize(0);
 	}

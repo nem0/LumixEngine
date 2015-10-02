@@ -70,7 +70,7 @@ private:
 };
 
 
-void HierarchyUI::onGui()
+void HierarchyUI::onGUI()
 {
 	if (!m_is_opened) return;
 
