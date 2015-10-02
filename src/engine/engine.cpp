@@ -137,6 +137,8 @@ public:
 			m_allocator.deleteObject(m_mem_file_device);
 			m_allocator.deleteObject(m_disk_file_device);
 		}
+
+		m_resource_manager.destroy();
 	}
 
 

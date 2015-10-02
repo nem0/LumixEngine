@@ -11,7 +11,7 @@ class LogUI
 		LogUI(Lumix::IAllocator& allocator);
 		~LogUI();
 
-		void onGui();
+		void onGUI();
 		void update(float time_delta);
 		int addNotification(const char* text);
 		void setNotificationTime(int uid, float time);

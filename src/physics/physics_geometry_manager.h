@@ -68,8 +68,8 @@ class LUMIX_PHYSICS_API PhysicsGeometry : public Resource
 	private:
 		IAllocator& getAllocator();
 
-		virtual void doUnload(void) override;
-		virtual void loaded(FS::IFile& file, bool success, FS::FileSystem& fs) override;
+		virtual void unload(void) override;
+		virtual bool load(FS::IFile& file) override;
 
 	private:
 		physx::PxGeometry* m_geometry;

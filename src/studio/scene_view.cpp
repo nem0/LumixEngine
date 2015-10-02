@@ -145,7 +145,7 @@ void SceneView::onMouseMove(int mouse_screen_x, int mouse_screen_y, int rel_x, i
 }
 
 
-void SceneView::onGui()
+void SceneView::onGUI()
 {
 	PROFILE_FUNCTION();
 	m_is_opened = false;

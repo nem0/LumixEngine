@@ -22,9 +22,8 @@ public:
 			  IAllocator& allocator);
 	virtual ~LuaScript();
 	
-	virtual void doUnload() override;
-	virtual void
-	loaded(FS::IFile& file, bool success, FS::FileSystem& fs) override;
+	virtual void unload() override;
+	virtual bool load(FS::IFile& file) override;
 	const char* getSourceCode() const { return m_source_code.c_str(); }
 	const char* getPropertyName(uint32_t hash) const;
 	const Array<PropertyName>& getPropertiesNames() const

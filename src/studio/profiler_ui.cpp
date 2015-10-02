@@ -229,16 +229,14 @@ static const char* getResourceStateString(Lumix::Resource::State state)
 	{
 		case Lumix::Resource::State::EMPTY: return "Empty"; break;
 		case Lumix::Resource::State::FAILURE: return "Failure"; break;
-		case Lumix::Resource::State::LOADING: return "Loading"; break;
 		case Lumix::Resource::State::READY: return "Ready"; break;
-		case Lumix::Resource::State::UNLOADING: return "Unloading"; break;
 	}
 
 	return "Unknown";
 }
 
 
-void ProfilerUI::onGuiResources()
+void ProfilerUI::onGUIResources()
 {
 	if (!m_resource_manager) return;
 	if (!ImGui::CollapsingHeader("Resources")) return;
@@ -417,7 +415,7 @@ void ProfilerUI::showAllocationTree(AllocationStackNode* node, int column)
 }
 
 
-void ProfilerUI::onGuiMemoryProfiler()
+void ProfilerUI::onGUIMemoryProfiler()
 {
 	if (!m_main_allocator) return;
 	if (!ImGui::CollapsingHeader("Memory")) return;
@@ -448,7 +446,7 @@ void ProfilerUI::onGuiMemoryProfiler()
 }
 
 
-void ProfilerUI::onGuiCPUProfiler()
+void ProfilerUI::onGUICPUProfiler()
 {
 	if (!ImGui::CollapsingHeader("CPU")) return;
 
@@ -509,16 +507,16 @@ void ProfilerUI::onGuiCPUProfiler()
 }
 
 
-void ProfilerUI::onGui()
+void ProfilerUI::onGUI()
 {
 	PROFILE_FUNCTION();
 	if (!m_is_opened) return;
 
 	if (ImGui::Begin("Profiler", &m_is_opened))
 	{
-		onGuiCPUProfiler();
-		onGuiMemoryProfiler();
-		onGuiResources();
+		onGUICPUProfiler();
+		onGUIMemoryProfiler();
+		onGUIResources();
 	}
 	ImGui::End();
 }

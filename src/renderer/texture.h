@@ -49,8 +49,8 @@ class LUMIX_RENDERER_API Texture : public Resource
 		bool loadRaw(FS::IFile& file);
 		void saveTGA();
 
-		virtual void doUnload(void) override;
-		virtual void loaded(FS::IFile& file, bool success, FS::FileSystem& fs) override;
+		virtual void unload(void) override;
+		virtual bool load(FS::IFile& file) override;
 
 	private:
 		IAllocator& m_allocator;

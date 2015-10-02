@@ -30,12 +30,14 @@ public:
 	static const uint32_t PIPELINE = 0xbbcf4595; // PIPELINE
 	static const uint32_t ANIMATION = 0xc9909a33; // ANIMATION
 	static const uint32_t PHYSICS = 0xE77419F9; // PHYSICS
+	static const uint32_t FILE = 0xBA0ADBA4; // FILE
+	static const uint32_t SHADER_BINARY = 0xDC8D194B; // SHADER_BINARY
 
 	ResourceManager(IAllocator& allocator);
 	~ResourceManager();
 
 	void create(FS::FileSystem& fs);
-	void destroy(void);
+	void destroy();
 
 	IAllocator& getAllocator() { return m_allocator; }
 	ResourceManagerBase* get(uint32_t id);
@@ -43,9 +45,6 @@ public:
 	void add(uint32_t id, ResourceManagerBase* rm);
 	void remove(uint32_t id);
 	void reload(const char* path);
-	bool isLoading() const;
-	void incrementLoadingResources();
-	void decrementLoadingResources();
 
 	FS::FileSystem& getFileSystem() { return *m_file_system; }
 
@@ -53,7 +52,6 @@ private:
 	IAllocator& m_allocator;
 	ResourceManagerTable m_resource_managers;
 	FS::FileSystem* m_file_system;
-	int m_loading_resources_count;
 };
 
 

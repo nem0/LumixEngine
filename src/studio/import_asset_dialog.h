@@ -36,7 +36,7 @@ class ImportAssetDialog
 		void setErrorMessage(const char* message);
 		void setImportMessage(const char* message);
 
-		void onGui();
+		void onGUI();
 
 	public:
 		bool m_is_opened;

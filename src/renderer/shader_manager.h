@@ -7,6 +7,23 @@ namespace Lumix
 
 	class Renderer;
 
+	class LUMIX_RENDERER_API ShaderBinaryManager : public ResourceManagerBase
+	{
+	public:
+		ShaderBinaryManager(Renderer& renderer, IAllocator& allocator);
+		~ShaderBinaryManager();
+
+		Renderer& getRenderer() { return m_renderer; }
+
+	protected:
+		virtual Resource* createResource(const Path& path) override;
+		virtual void destroyResource(Resource& resource) override;
+
+	private:
+		IAllocator& m_allocator;
+		Renderer& m_renderer;
+	};
+
 	class LUMIX_RENDERER_API ShaderManager : public ResourceManagerBase
 	{
 	public:

@@ -100,9 +100,9 @@ public:
 	void unsetUserDefine(int define_idx);
 
 private:
-	virtual void onReady(void) override;
-	virtual void doUnload(void) override;
-	virtual void loaded(FS::IFile& file, bool success, FS::FileSystem& fs) override;
+	virtual void onBeforeReady() override;
+	virtual void unload(void) override;
+	virtual bool load(FS::IFile& file) override;
 
 	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);
 

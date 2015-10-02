@@ -2,6 +2,7 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/default_allocator.h"
+#include "core/fs/file_system.h"
 #include "core/input_system.h"
 #include "core/log.h"
 #include "core/mt/thread.h"
@@ -95,10 +96,7 @@ public:
 		float time_delta = m_editor->getEngine().getLastTimeDelta();
 
 		m_time_to_autosave -= time_delta;
-		if (m_time_to_autosave < 0)
-		{
-			autosave();
-		}
+		if (m_time_to_autosave < 0) autosave();
 
 		m_editor->update();
 		m_sceneview.update();
@@ -120,6 +118,9 @@ public:
 	void onGUI()
 	{
 		PROFILE_FUNCTION();
+
+		if (!m_gui_pipeline_source->isReady() || !m_game_pipeline_source->isReady()) return;
+
 		ImGuiIO& io = ImGui::GetIO();
 
 		RECT rect;
@@ -145,18 +146,18 @@ public:
 
 		showMainMenu();
 
-		m_profiler_ui->onGui();
-		m_asset_browser->onGui();
-		m_log_ui->onGui();
-		m_import_asset_dialog->onGui();
-		m_property_grid->onGui();
+		m_profiler_ui->onGUI();
+		m_asset_browser->onGUI();
+		m_log_ui->onGUI();
+		m_import_asset_dialog->onGUI();
+		m_property_grid->onGUI();
 		showEntityList();
 		showEntityTemplateList();
-		m_sceneview.onGui();
-		m_hierarchy_ui.onGui();
+		m_sceneview.onGUI();
+		m_hierarchy_ui.onGUI();
 		showGameView();
 		if (m_is_style_editor_opened) ImGui::ShowStyleEditor();
-		m_settings.onGui(&m_actions[0], m_actions.size());
+		m_settings.onGUI(&m_actions[0], m_actions.size());
 
 		ImGui::Render();
 	}
@@ -675,7 +676,7 @@ public:
 													   .get(Lumix::ResourceManager::MATERIAL)
 													   ->load(Lumix::Path("models/imgui.mat")));
 
-		Lumix::Texture* texture = m_allocator.newObject<Lumix::Texture>(
+		Lumix::Texture* texture = LUMIX_NEW(m_allocator, Lumix::Texture)(
 			Lumix::Path("font"), m_engine->getResourceManager(), m_allocator);
 
 		texture->create(width, height, pixels);
@@ -990,10 +991,7 @@ StudioApp g_app;
 static void imGuiCallback(ImDrawData* draw_data)
 {
 	PROFILE_FUNCTION();
-	if (!g_app.m_material || !g_app.m_material->isReady())
-	{
-		return;
-	}
+	if (!g_app.m_material || !g_app.m_material->isReady()) return;
 
 	const float width = ImGui::GetIO().DisplaySize.x;
 	const float height = ImGui::GetIO().DisplaySize.y;
@@ -1082,11 +1080,6 @@ INT WINAPI WinMain(HINSTANCE hInst, HINSTANCE ignoreMe0, LPSTR ignoreMe1, INT ig
 	g_app.m_instance = hInst;
 	g_app.init(hwnd);
 	timeBeginPeriod(1);
-
-	while (g_app.m_engine->getResourceManager().isLoading())
-	{
-		g_app.m_engine->update(*g_app.m_editor->getUniverseContext());
-	}
 
 	Lumix::Timer* timer = Lumix::Timer::create(g_app.m_allocator);
 	while (!g_app.m_finished)

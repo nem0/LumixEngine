@@ -24,7 +24,7 @@ class SceneView
 		bool init(Lumix::WorldEditor& editor);
 		void setScene(Lumix::RenderScene* scene);
 		void shutdown();
-		void onGui();
+		void onGUI();
 		void onMouseUp(Lumix::MouseButton::Value button);
 		bool onMouseDown(int screen_x, int screen_y, Lumix::MouseButton::Value button);
 		void onMouseMove(int screen_x, int screen_y, int rel_x, int rel_y);

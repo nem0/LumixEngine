@@ -92,50 +92,41 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 }
 
 
-void Animation::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
+bool Animation::load(FS::IFile& file)
 {
-	if (success)
+	IAllocator& allocator = getAllocator();
+	allocator.deallocate(m_positions);
+	allocator.deallocate(m_rotations);
+	allocator.deallocate(m_bones);
+	m_positions = nullptr;
+	m_rotations = nullptr;
+	m_bones = 0;
+	m_frame_count = m_bone_count = 0;
+	Header header;
+	file.read(&header, sizeof(header));
+	if (header.magic != HEADER_MAGIC)
 	{
-		IAllocator& allocator = getAllocator();
-		allocator.deallocate(m_positions);
-		allocator.deallocate(m_rotations);
-		allocator.deallocate(m_bones);
-		m_positions = nullptr;
-		m_rotations = nullptr;
-		m_bones = 0;
-		m_frame_count = m_bone_count = 0;
-		Header header;
-		file.read(&header, sizeof(header));
-		if (header.magic != HEADER_MAGIC)
-		{
-			onFailure();
-			g_log_error.log("animation") << m_path.c_str() << " is not an animation file";
-			return;
-		}
-		if (header.version > 1)
-		{
-			onFailure();
-			g_log_error.log("animation") << "Unsupported animation version " << header.version << " (" << m_path.c_str() << ")";
-			return;
-		}
-		m_fps = header.fps;
-		file.read(&m_frame_count, sizeof(m_frame_count));
-		file.read(&m_bone_count, sizeof(m_bone_count));
+		g_log_error.log("animation") << m_path.c_str() << " is not an animation file";
+		return false;
+	}
+	if (header.version > 1)
+	{
+		g_log_error.log("animation") << "Unsupported animation version " << header.version << " (" << m_path.c_str() << ")";
+		return false;
+	}
+	m_fps = header.fps;
+	file.read(&m_frame_count, sizeof(m_frame_count));
+	file.read(&m_bone_count, sizeof(m_bone_count));
 
-		m_positions = static_cast<Vec3*>(allocator.allocate(sizeof(Vec3) * m_frame_count * m_bone_count));
-		m_rotations = static_cast<Quat*>(allocator.allocate(sizeof(Quat) * m_frame_count * m_bone_count));
-		m_bones = static_cast<uint32_t*>(allocator.allocate(sizeof(uint32_t) * m_bone_count));
-		file.read(&m_positions[0], sizeof(Vec3)* m_bone_count * m_frame_count);
-		file.read(&m_rotations[0], sizeof(Quat)* m_bone_count * m_frame_count);
-		file.read(m_bones, sizeof(m_bones[0]) * m_bone_count);
+	m_positions = static_cast<Vec3*>(allocator.allocate(sizeof(Vec3) * m_frame_count * m_bone_count));
+	m_rotations = static_cast<Quat*>(allocator.allocate(sizeof(Quat) * m_frame_count * m_bone_count));
+	m_bones = static_cast<uint32_t*>(allocator.allocate(sizeof(uint32_t) * m_bone_count));
+	file.read(&m_positions[0], sizeof(Vec3)* m_bone_count * m_frame_count);
+	file.read(&m_rotations[0], sizeof(Quat)* m_bone_count * m_frame_count);
+	file.read(m_bones, sizeof(m_bones[0]) * m_bone_count);
 		
-		m_size = file.size();
-		decrementDepCount();
-	}
-	else
-	{
-		onFailure();
-	}
+	m_size = file.size();
+	return true;
 }
 
 
@@ -145,7 +136,7 @@ IAllocator& Animation::getAllocator()
 }
 
 
-void Animation::doUnload(void)
+void Animation::unload(void)
 {
 	IAllocator& allocator = getAllocator();
 	allocator.deallocate(m_positions);
@@ -155,8 +146,6 @@ void Animation::doUnload(void)
 	m_positions = nullptr;
 	m_bones = nullptr;
 	m_frame_count = 0;
-	m_size = 0;
-	onEmpty();
 }
 
 

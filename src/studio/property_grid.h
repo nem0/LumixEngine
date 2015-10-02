@@ -25,7 +25,7 @@ class PropertyGrid
 			Lumix::Array<Action*>& actions);
 		~PropertyGrid();
 
-		void onGui();
+		void onGUI();
 	
 	public:
 		bool m_is_opened;

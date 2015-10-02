@@ -148,7 +148,7 @@ void AssetBrowser::update()
 }
 
 
-void AssetBrowser::onGui()
+void AssetBrowser::onGUI()
 {
 	if (!m_is_opened) return;
 
@@ -180,7 +180,7 @@ void AssetBrowser::onGui()
 		}
 	}
 	ImGui::ListBoxFooter();
-	onGuiResource();
+	onGUIResource();
 	ImGui::End();
 }
 
@@ -274,7 +274,7 @@ bool AssetBrowser::resourceInput(const char* label, char* buf, int max_size, Typ
 }
 
 
-void AssetBrowser::onGuiMaterial()
+void AssetBrowser::onGUIMaterial()
 {
 	auto* material = static_cast<Lumix::Material*>(m_selected_resource);
 
@@ -357,7 +357,7 @@ void AssetBrowser::onGuiMaterial()
 }
 
 
-void AssetBrowser::onGuiTexture()
+void AssetBrowser::onGUITexture()
 {
 	auto* texture = static_cast<Lumix::Texture*>(m_selected_resource);
 
@@ -374,7 +374,7 @@ void AssetBrowser::onGuiTexture()
 }
 
 
-void AssetBrowser::onGuiLuaScript()
+void AssetBrowser::onGUILuaScript()
 {
 	auto* script = static_cast<Lumix::LuaScript*>(m_selected_resource);
 
@@ -416,7 +416,7 @@ void AssetBrowser::openInExternalEditor(Lumix::Resource* resource)
 }
 
 
-void AssetBrowser::onGuiShader()
+void AssetBrowser::onGUIShader()
 {
 	auto* shader = static_cast<Lumix::Shader*>(m_selected_resource);
 	StringBuilder<Lumix::MAX_PATH_LENGTH> path(m_editor.getBasePath());
@@ -586,7 +586,7 @@ static void insertInScene(Lumix::WorldEditor& editor, Lumix::Model* model)
 }
 
 
-void AssetBrowser::onGuiModel()
+void AssetBrowser::onGUIModel()
 {
 	auto* model = static_cast<Lumix::Model*>(m_selected_resource);
 	if (ImGui::Button("Insert in scene"))
@@ -620,7 +620,7 @@ void AssetBrowser::onGuiModel()
 }
 
 
-void AssetBrowser::onGuiResource()
+void AssetBrowser::onGUIResource()
 {
 	if (!m_selected_resource) return;
 
@@ -630,18 +630,11 @@ void AssetBrowser::onGuiResource()
 	ImGui::LabelText("Selected resource", path);
 	ImGui::Separator();
 
-	if (m_selected_resource->isLoading())
-	{
-		ImGui::Text("Loading...");
-		return;
-	}
-
 	if (!m_selected_resource->isReady() && !m_selected_resource->isFailure())
 	{
 		ImGui::Text("Not ready");
 		return;
 	}
-
 
 	char source[Lumix::MAX_PATH_LENGTH];
 	if (m_metadata.getString(
@@ -653,14 +646,14 @@ void AssetBrowser::onGuiResource()
 	auto resource_type = getResourceType(path);
 	switch (resource_type)
 	{
-		case Lumix::ResourceManager::MATERIAL: onGuiMaterial(); break;
-		case Lumix::ResourceManager::TEXTURE: onGuiTexture(); break;
-		case Lumix::ResourceManager::MODEL: onGuiModel(); break;
-		case Lumix::ResourceManager::SHADER: onGuiShader(); break;
+		case Lumix::ResourceManager::MATERIAL: onGUIMaterial(); break;
+		case Lumix::ResourceManager::TEXTURE: onGUITexture(); break;
+		case Lumix::ResourceManager::MODEL: onGUIModel(); break;
+		case Lumix::ResourceManager::SHADER: onGUIShader(); break;
 		default:
 			if (resource_type == LUA_SCRIPT_HASH)
 			{
-				onGuiLuaScript();
+				onGUILuaScript();
 			}
 			else if (resource_type != UNIVERSE_HASH)
 			{

@@ -28,7 +28,7 @@ public:
 	ProfilerUI(Lumix::Debug::Allocator* allocator, Lumix::ResourceManager* resource_manager);
 	~ProfilerUI();
 
-	void onGui();
+	void onGUI();
 
 public:
 	bool m_is_opened;
@@ -76,9 +76,9 @@ private:
 	};
 
 private:
-	void onGuiCPUProfiler();
-	void onGuiMemoryProfiler();
-	void onGuiResources();
+	void onGUICPUProfiler();
+	void onGUIMemoryProfiler();
+	void onGUIResources();
 	void onFrame();
 	void showProfileBlock(ProfilerUI::Block* block, int column);
 	void cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_block);
