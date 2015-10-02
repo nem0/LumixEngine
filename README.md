@@ -35,6 +35,7 @@ Videos
 * [Minecraft-like world](https://www.youtube.com/watch?v=Chux7v1AX8k)
 * [Hot-reload](https://www.youtube.com/watch?v=BVE7x3Su9qA)
 * [Atmospheric scattering](https://www.youtube.com/watch?v=VJppE0E4auc)
+* [New UI](https://youtu.be/otNtPetjFek)
 
 ![Editor screenshot](https://cloud.githubusercontent.com/assets/153526/10109455/450c51be-63c7-11e5-9c87-96d9d00efe02.png)
 
