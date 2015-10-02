@@ -319,12 +319,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 			bgfx::destroyUniform(m_uniforms[i]);
 		}
 
-		m_source.getObserverCb()
-			.unbind<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(
-				this);
-		m_source.getResourceManager()
-			.get(ResourceManager::PIPELINE)
-			->unload(m_source);
+		m_source.getObserverCb().unbind<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(
+			this);
+		m_source.getResourceManager().get(ResourceManager::PIPELINE)->unload(m_source);
 		for (int i = 0; i < m_framebuffers.size(); ++i)
 		{
 			m_allocator.deleteObject(m_framebuffers[i]);

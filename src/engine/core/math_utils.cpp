@@ -28,7 +28,6 @@ namespace Lumix
 			if (d2 > radius * radius) return false;
 			float thc = sqrt(radius * radius - d2);
 			float t0 = tca - thc;
-			//float t1 = tca + thc;
 			out = origin + dir * t0;
 			return true;
 		}

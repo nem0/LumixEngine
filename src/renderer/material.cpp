@@ -476,9 +476,8 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 			}
 			else
 			{
-				g_log_error.log("Renderer") << "Unknown texture filter \""
-											<< label << "\" in material "
-											<< m_path.c_str();
+				g_log_error.log("Renderer") << "Unknown texture filter \"" << label
+											<< "\" in material " << getPath().c_str();
 			}
 		}
 		else if (strcmp(label, "mag_filter") == 0)
@@ -494,9 +493,8 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 			}
 			else
 			{
-				g_log_error.log("Renderer") << "Unknown texture filter \""
-					<< label << "\" in material "
-					<< m_path.c_str();
+				g_log_error.log("Renderer") << "Unknown texture filter \"" << label
+											<< "\" in material " << getPath().c_str();
 			}
 		}
 		else if (strcmp(label, "u_clamp") == 0)
@@ -532,7 +530,8 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 		}
 		else
 		{
-			g_log_warning.log("Renderer") << "Unknown data \"" << label << "\" in material " << m_path.c_str();
+			g_log_warning.log("Renderer") << "Unknown data \"" << label << "\" in material "
+										  << getPath().c_str();
 			return false;
 		}
 	}
@@ -570,12 +569,12 @@ bool Material::load(FS::IFile& file)
 
 	m_render_states = BGFX_STATE_DEPTH_TEST_LEQUAL | BGFX_STATE_CULL_CW;
 	m_uniforms.clear();
-	JsonSerializer serializer(file, JsonSerializer::READ, m_path.c_str(), m_allocator);
+	JsonSerializer serializer(file, JsonSerializer::READ, getPath().c_str(), m_allocator);
 	serializer.deserializeObjectBegin();
 	char path[MAX_PATH_LENGTH];
 	char label[256];
 	char material_dir[MAX_PATH_LENGTH];
-	PathUtils::getDir(material_dir, MAX_PATH_LENGTH, m_path.c_str());
+	PathUtils::getDir(material_dir, MAX_PATH_LENGTH, getPath().c_str());
 	bool b_value;
 	while (!serializer.isObjectEnd())
 	{
@@ -658,19 +657,21 @@ bool Material::load(FS::IFile& file)
 			}
 			else
 			{
-				g_log_warning.log("Renderer") << "Unknown depth function " << tmp << " in material " << m_path.c_str();
+				g_log_warning.log("Renderer") << "Unknown depth function " << tmp << " in material "
+											  << getPath().c_str();
 			}
 		}
 		else
 		{
-			g_log_warning.log("renderer") << "Unknown parameter " << label << " in material " << m_path.c_str();
+			g_log_warning.log("renderer") << "Unknown parameter " << label << " in material "
+										  << getPath().c_str();
 		}
 	}
 	serializer.deserializeObjectEnd();
 
 	if (!m_shader)
 	{
-		g_log_error.log("renderer") << "Material " << m_path.c_str() << " without a shader";
+		g_log_error.log("renderer") << "Material " << getPath().c_str() << " without a shader";
 		return false;
 	}
 

@@ -66,8 +66,6 @@ namespace
 			culling_system->cullToFrustum(clipping_frustum, 1);
 			const Lumix::CullingSystem::Results& result = culling_system->getResult();
 
-			//Lumix::g_log_info.log("unit") << "Culling system test took: " << timer.getTimeSinceStart();
-
 			for (int i = 0; i < result.size(); i++)
 			{
 				const Lumix::CullingSystem::Subresults& subresult = result[i];

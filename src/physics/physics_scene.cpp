@@ -412,31 +412,24 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	virtual void setHeightmap(ComponentIndex cmp, const char* str) override
 	{
+		auto& resource_manager = m_engine->getResourceManager();
 		if (m_terrains[cmp]->m_heightmap)
 		{
-			m_engine->getResourceManager()
-				.get(ResourceManager::TEXTURE)
-				->unload(*m_terrains[cmp]->m_heightmap);
+			resource_manager.get(ResourceManager::TEXTURE)->unload(*m_terrains[cmp]->m_heightmap);
 			m_terrains[cmp]
 				->m_heightmap->getObserverCb()
 				.unbind<Terrain, &Terrain::heightmapLoaded>(m_terrains[cmp]);
 		}
-		m_terrains[cmp]->m_heightmap =
-			static_cast<Texture*>(m_engine->getResourceManager()
-									  .get(ResourceManager::TEXTURE)
-									  ->load(Path(str)));
-		m_terrains[cmp]
-			->m_heightmap->onLoaded<Terrain, &Terrain::heightmapLoaded>(
-				m_terrains[cmp]);
+		auto* texture_manager = resource_manager.get(ResourceManager::TEXTURE);
+		m_terrains[cmp]->m_heightmap = static_cast<Texture*>(texture_manager->load(Path(str)));
+		m_terrains[cmp]->m_heightmap->onLoaded<Terrain, &Terrain::heightmapLoaded>(m_terrains[cmp]);
 		m_terrains[cmp]->m_heightmap->addDataReference();
 	}
 
 
 	virtual const char* getShapeSource(ComponentIndex cmp) override
 	{
-		return m_actors[cmp]->getResource()
-				   ? m_actors[cmp]->getResource()->getPath().c_str()
-				   : "";
+		return m_actors[cmp]->getResource() ? m_actors[cmp]->getResource()->getPath().c_str() : "";
 	}
 
 
@@ -730,8 +723,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 				}
 			}
 		}
-
-		// terrain->m_heightmap->removeDataReference();
 
 		{ // PROFILE_BLOCK scope
 			PROFILE_BLOCK("PhysX");
@@ -1329,21 +1320,13 @@ void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* resource)
 {
 	if (m_resource)
 	{
-		m_resource->getObserverCb()
-			.unbind<RigidActor, &RigidActor::onStateChanged>(this);
-		m_resource->getResourceManager()
-			.get(ResourceManager::PHYSICS)
-			->unload(*m_resource);
+		m_resource->getObserverCb().unbind<RigidActor, &RigidActor::onStateChanged>(this);
+		m_resource->getResourceManager().get(ResourceManager::PHYSICS)->unload(*m_resource);
 	}
 	m_resource = resource;
 	if (resource)
 	{
-		m_resource->getObserverCb()
-			.bind<RigidActor, &RigidActor::onStateChanged>(this);
-		if (resource->isReady())
-		{
-			onStateChanged(Resource::State::READY, Resource::State::READY);
-		}
+		m_resource->onLoaded<RigidActor, &RigidActor::onStateChanged>(this);
 	}
 }
 

@@ -196,7 +196,6 @@ unsigned int Texture::compareTGA(IAllocator& allocator,
 		return 0;
 	}
 
-	// Targa is BGR, swap to RGB, add alpha and flip Y axis
 	int different_pixel_count = 0;
 	size_t pixel_count = header1.width * header1.height;
 	uint8_t* img1 = (uint8_t*)allocator.allocate(pixel_count * color_mode);
@@ -394,15 +393,13 @@ bool Texture::loadTGA(FS::IFile& file)
 	int image_size = header.width * header.height * 4;
 	if (header.dataType != 2)
 	{
-		g_log_error.log("renderer") << "Unsupported texture format "
-									<< m_path.c_str();
+		g_log_error.log("renderer") << "Unsupported texture format " << getPath().c_str();
 		return false;
 	}
 
 	if (color_mode < 3)
 	{
-		g_log_error.log("renderer") << "Unsupported color mode "
-									<< m_path.c_str();
+		g_log_error.log("renderer") << "Unsupported color mode " << getPath().c_str();
 		return false;
 	}
 
@@ -499,8 +496,8 @@ bool Texture::load(FS::IFile& file)
 {
 	PROFILE_FUNCTION();
 
-	const char* path = m_path.c_str();
-	size_t len = m_path.length();
+	const char* path = getPath().c_str();
+	size_t len = getPath().length();
 	bool loaded = false;
 	if (len > 3 && strcmp(path + len - 4, ".dds") == 0)
 	{
@@ -516,7 +513,7 @@ bool Texture::load(FS::IFile& file)
 	}
 	if (!loaded)
 	{
-		g_log_warning.log("renderer") << "Error loading texture " << m_path.c_str();
+		g_log_warning.log("renderer") << "Error loading texture " << getPath().c_str();
 		return false;
 	}
 
