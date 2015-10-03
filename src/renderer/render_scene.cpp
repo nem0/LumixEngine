@@ -1123,7 +1123,6 @@ public:
 
 	void mergeTemporaryInfos(Array<const RenderableMesh*>& all_infos)
 	{
-		TODO("we do not really need this, we can work with m_temporary_infos");
 		PROFILE_FUNCTION();
 		all_infos.reserve(m_renderables.size() * 2);
 		for (int i = 0; i < m_temporary_infos.size(); ++i)
