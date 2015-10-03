@@ -2396,7 +2396,7 @@ public:
 		file_read_cb.bind<WorldEditorImpl, &WorldEditorImpl::loadMap>(this);
 		fs.openAsync(fs.getDefaultDevice(),
 					 path,
-					 FS::Mode::OPEN | FS::Mode::READ,
+					 FS::Mode::OPEN_AND_READ,
 					 file_read_cb);
 	}
 
@@ -3153,7 +3153,7 @@ public:
 		FS::IFile* file = m_engine->getFileSystem().open(
 			m_engine->getFileSystem().getDiskDevice(),
 			path.c_str(),
-			FS::Mode::OPEN | FS::Mode::READ);
+			FS::Mode::OPEN_AND_READ);
 		if (file)
 		{
 			JsonSerializer serializer(
@@ -3203,7 +3203,7 @@ public:
 		FS::IFile* result_file = m_engine->getFileSystem().open(
 			m_engine->getFileSystem().getDefaultDevice(),
 			result_universe_path.c_str(),
-			FS::Mode::OPEN | FS::Mode::READ);
+			FS::Mode::OPEN_AND_READ);
 		if (!result_file)
 		{
 			return false;
