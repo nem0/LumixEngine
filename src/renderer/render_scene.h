@@ -132,7 +132,7 @@ public:
 							  float life) = 0;
 	virtual void addDebugCross(const Vec3& center,
 							   float size,
-							   const Vec3& color,
+							   uint32_t color,
 							   float life) = 0;
 	virtual void addDebugCube(const Vec3& pos,
 							  const Vec3& dir,

@@ -112,7 +112,7 @@ void Resource::doLoad()
 	FS::FileSystem& fs = m_resource_manager.getFileSystem();
 	FS::ReadCallback cb;
 	cb.bind<Resource, &Resource::fileLoaded>(this);
-	fs.openAsync(fs.getDefaultDevice(), m_path, FS::Mode::OPEN | FS::Mode::READ, cb);
+	fs.openAsync(fs.getDefaultDevice(), m_path, FS::Mode::OPEN_AND_READ, cb);
 }
 
 

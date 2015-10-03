@@ -1697,7 +1697,7 @@ public:
 
 	virtual void addDebugCross(const Vec3& center,
 							   float size,
-							   const Vec3& color,
+							   uint32_t color,
 							   float life) override
 	{
 		addDebugLine(

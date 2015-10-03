@@ -268,6 +268,7 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 		Lumix::BinaryArray& mask,
 		float radius,
 		float rel_amount,
+		float flat_height,
 		Lumix::Vec3 color,
 		Lumix::ComponentUID terrain,
 		bool can_be_merged)
@@ -280,6 +281,7 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 		, m_type(type)
 		, m_texture_idx(texture_idx)
 		, m_mask(editor.getAllocator())
+		, m_flat_height(flat_height)
 	{
 		m_mask.resize(mask.size());
 		for (int i = 0; i < mask.size(); ++i)
@@ -604,9 +606,7 @@ private:
 	}
 
 
-	void rasterSmoothHeightItem(Lumix::Texture* texture,
-								Lumix::Array<uint8_t>& data,
-								Item& item)
+	void rasterSmoothHeightItem(Lumix::Texture* texture, Lumix::Array<uint8_t>& data, Item& item)
 	{
 		ASSERT(texture->getBytesPerPixel() == 2);
 
@@ -615,20 +615,15 @@ private:
 		rect = item.getBoundingRectangle(texture_width, texture->getHeight());
 
 		float amount = Lumix::Math::maxValue(item.m_amount * item.m_amount * 256.0f, 1.0f);
-		float avg = computeAverage16(texture,
-									rect.m_from_x,
-									rect.m_to_x,
-									rect.m_from_y,
-									rect.m_to_y);
+		float avg =
+			computeAverage16(texture, rect.m_from_x, rect.m_to_x, rect.m_from_y, rect.m_to_y);
 		for (int i = rect.m_from_x, end = rect.m_to_x; i < end; ++i)
 		{
 			for (int j = rect.m_from_y, end2 = rect.m_to_y; j < end2; ++j)
 			{
 				float attenuation = getAttenuation(item, i, j);
 				int offset = i - m_x + (j - m_y) * m_width;
-				uint16_t x =
-					((uint16_t*)
-							texture->getData())[(i + j * texture_width)];
+				uint16_t x = ((uint16_t*)texture->getData())[(i + j * texture_width)];
 				x += uint16_t((avg - x) * item.m_amount * attenuation);
 				((uint16_t*)&data[0])[offset] = x;
 			}
@@ -636,8 +631,28 @@ private:
 	}
 
 
-	void
-	rasterItem(Lumix::Texture* texture, Lumix::Array<uint8_t>& data, Item& item)
+	void rasterFlatHeightItem(Lumix::Texture* texture, Lumix::Array<uint8_t>& data, Item& item)
+	{
+		ASSERT(texture->getBytesPerPixel() == 2);
+
+		int texture_width = texture->getWidth();
+		Rectangle rect;
+		rect = item.getBoundingRectangle(texture_width, texture->getHeight());
+
+		uint16_t x = m_flat_height; TODO("Todo");
+
+		for (int i = rect.m_from_x, end = rect.m_to_x; i < end; ++i)
+		{
+			for (int j = rect.m_from_y, end2 = rect.m_to_y; j < end2; ++j)
+			{
+				int offset = i - m_x + (j - m_y) * m_width;
+				((uint16_t*)&data[0])[offset] = x;
+			}
+		}
+	}
+
+
+	void rasterItem(Lumix::Texture* texture, Lumix::Array<uint8_t>& data, Item& item)
 	{
 		if (m_type == TerrainEditor::COLOR)
 		{
@@ -654,7 +669,12 @@ private:
 			rasterSmoothHeightItem(texture, data, item);
 			return;
 		}
-		
+		else if (m_type == TerrainEditor::FLAT_HEIGHT)
+		{
+			rasterFlatHeightItem(texture, data, item);
+			return;		
+		}
+
 		ASSERT(texture->getBytesPerPixel() == 2);
 
 		int texture_width = texture->getWidth();
@@ -673,11 +693,9 @@ private:
 				int offset = i - m_x + (j - m_y) * m_width;
 
 				int add = int(attenuation * amount);
-				uint16_t x =
-					((uint16_t*)texture->getData())[(i + j * texture_width)];
-				x += m_type == TerrainEditor::RAISE_HEIGHT
-						 ? Lumix::Math::minValue(add, 0xFFFF - x)
-						 : Lumix::Math::maxValue(-add, -x);
+				uint16_t x = ((uint16_t*)texture->getData())[(i + j * texture_width)];
+				x += m_type == TerrainEditor::RAISE_HEIGHT ? Lumix::Math::minValue(add, 0xFFFF - x)
+														   : Lumix::Math::maxValue(-add, -x);
 				((uint16_t*)&data[0])[offset] = x;
 			}
 		}
@@ -840,6 +858,7 @@ private:
 	Lumix::ComponentUID m_terrain;
 	Lumix::WorldEditor& m_world_editor;
 	Lumix::BinaryArray m_mask;
+	float m_flat_height;
 	bool m_can_be_merged;
 };
 
@@ -863,6 +882,7 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	, m_selected_entity_template(0)
 	, m_brush_mask(editor.getAllocator())
 	, m_brush_texture(nullptr)
+	, m_flat_height(0)
 {
 	m_increase_brush_size =
 		LUMIX_NEW(editor.getAllocator(), Action)("Increase brush size", "increaseBrushSize");
@@ -939,16 +959,17 @@ void TerrainEditor::drawCursor(Lumix::RenderScene& scene,
 							   const Lumix::Vec3& center)
 {
 	static const int SLICE_COUNT = 30;
-
-	Lumix::Matrix terrain_matrix =
-		m_world_editor.getUniverse()->getMatrix(m_component.entity);
-	Lumix::Matrix inv_terrain_matrix = terrain_matrix;
-	inv_terrain_matrix.inverse();
+	if (m_type == TerrainEditor::FLAT_HEIGHT && ImGui::GetIO().KeyCtrl)
+	{
+		scene.addDebugCross(center, 1.0f, 0xff0000ff, 0);
+		return;
+	}
 
 	float w, h;
 	scene.getTerrainSize(terrain.index, &w, &h);
 	float brush_size = m_terrain_brush_size;
-	Lumix::Vec3 local_center = inv_terrain_matrix.multiplyPosition(center);
+	Lumix::Vec3 local_center = getRelativePosition(center);
+	Lumix::Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix(m_component.entity);
 
 	for (int i = 0; i < SLICE_COUNT + 1; ++i)
 	{
@@ -1068,9 +1089,34 @@ void TerrainEditor::detectModifiers()
 }
 
 
-bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit,
-									  int,
-									  int)
+Lumix::Vec3& TerrainEditor::getRelativePosition(const Lumix::Vec3& world_pos) const
+{
+	Lumix::Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix(m_component.entity);
+	Lumix::Matrix inv_terrain_matrix = terrain_matrix;
+	inv_terrain_matrix.inverse();
+
+	return inv_terrain_matrix.multiplyPosition(world_pos);
+}
+
+
+Lumix::Texture* TerrainEditor::getHeightmap()
+{
+	return getMaterial()->getTextureByUniform(HEIGHTMAP_UNIFORM);
+}
+
+
+float TerrainEditor::getHeight(const Lumix::Vec3& world_pos)
+{
+	auto rel_pos = getRelativePosition(world_pos);
+	auto* heightmap = getHeightmap();
+	if (!heightmap) return 0;
+
+	auto* data = (uint16_t*)heightmap->getData();
+	return data[int(rel_pos.x) + int(rel_pos.z) * heightmap->getWidth()];
+}
+
+
+bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int)
 {
 	if (m_type == NOT_SET || !m_component.isValid()) return false;
 
@@ -1078,31 +1124,30 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit,
 
 	for (int i = m_world_editor.getSelectedEntities().size() - 1; i >= 0; --i)
 	{
-		if (m_world_editor.getSelectedEntities()[i] == hit.m_entity)
+		if (m_world_editor.getSelectedEntities()[i] == hit.m_entity && m_component.isValid())
 		{
-			Lumix::ComponentUID terrain = m_world_editor.getComponent(
-				hit.m_entity, Lumix::crc32("terrain"));
-			if (terrain.isValid())
+			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
+			switch (m_type)
 			{
-				Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
-				switch (m_type)
-				{
-					case RAISE_HEIGHT:
-					case LOWER_HEIGHT:
-					case SMOOTH_HEIGHT:
-					case COLOR:
-					case LAYER:
+				case FLAT_HEIGHT:
+					if (ImGui::GetIO().KeyCtrl)
+					{
+						m_flat_height = getHeight(hit_pos);
+					}
+					else
+					{
 						paint(hit, m_type, false);
-						break;
-					case ENTITY:
-						paintEntities(hit);
-						break;
-					default:
-						ASSERT(false);
-						break;
-				}
-				return true;
+					}
+					break;
+				case RAISE_HEIGHT:
+				case LOWER_HEIGHT:
+				case SMOOTH_HEIGHT:
+				case COLOR:
+				case LAYER: paint(hit, m_type, false); break;
+				case ENTITY: paintEntities(hit); break;
+				default: ASSERT(false); break;
 			}
+			return true;
 		}
 	}
 	return false;
@@ -1140,6 +1185,7 @@ void TerrainEditor::onMouseMove(int x, int y, int, int, int)
 		{
 			switch (m_type)
 			{
+				case FLAT_HEIGHT:
 				case RAISE_HEIGHT:
 				case LOWER_HEIGHT:
 				case SMOOTH_HEIGHT:
@@ -1204,19 +1250,24 @@ void TerrainEditor::onGUI()
 	{
 		case HEIGHT:
 		{
-			if (ImGui::Button("Raise"))
-			{
-				m_type = TerrainEditor::RAISE_HEIGHT;
-			}
+			bool b = m_type == TerrainEditor::RAISE_HEIGHT;
+			if (ImGui::Checkbox("Raise", &b)) m_type = TerrainEditor::RAISE_HEIGHT;
+
 			ImGui::SameLine();
-			if (ImGui::Button("Lower"))
-			{
-				m_type = TerrainEditor::LOWER_HEIGHT;
-			}
+			b = m_type == TerrainEditor::LOWER_HEIGHT;
+			if (ImGui::Checkbox("Lower", &b)) m_type = TerrainEditor::LOWER_HEIGHT;
+
 			ImGui::SameLine();
-			if (ImGui::Button("Smooth"))
+			b = m_type == TerrainEditor::SMOOTH_HEIGHT;
+			if (ImGui::Checkbox("Smooth", &b)) m_type = TerrainEditor::SMOOTH_HEIGHT;
+
+			ImGui::SameLine();
+			b = m_type == TerrainEditor::FLAT_HEIGHT;
+			if (ImGui::Checkbox("Flat", &b)) m_type = TerrainEditor::FLAT_HEIGHT;
+
+			if (m_type == TerrainEditor::FLAT_HEIGHT)
 			{
-				m_type = TerrainEditor::SMOOTH_HEIGHT;
+				ImGui::Text("Press Ctrl to pick height");
 			}
 			break;
 		}
@@ -1229,8 +1280,7 @@ void TerrainEditor::onGUI()
 		case LAYER:
 		{
 			m_type = TerrainEditor::LAYER;
-			auto* material = scene->getTerrainMaterial(m_component.index);
-			Lumix::Texture* tex = material->getTextureByUniform(TEX_COLOR_UNIFORM);
+			Lumix::Texture* tex = getHeightmap();
 			if (tex)
 			{
 				for (int i = 0; i < tex->getDepth(); ++i)
@@ -1335,6 +1385,7 @@ void TerrainEditor::paint(const Lumix::RayCastModelHit& hit,
 			m_brush_mask,
 			m_terrain_brush_size,
 			m_terrain_brush_strength,
+			m_flat_height,
 			m_color,
 			m_component,
 			old_stroke);

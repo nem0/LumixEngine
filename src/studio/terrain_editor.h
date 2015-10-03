@@ -23,6 +23,7 @@ public:
 		RAISE_HEIGHT,
 		LOWER_HEIGHT,
 		SMOOTH_HEIGHT,
+		FLAT_HEIGHT,
 		LAYER,
 		ENTITY,
 		COLOR,
@@ -60,6 +61,9 @@ private:
 	void decreaseBrushSize();
 	void nextTerrainTexture();
 	void prevTerrainTexture();
+	float getHeight(const Lumix::Vec3& world_pos);
+	Lumix::Texture* getHeightmap();
+	Lumix::Vec3& getRelativePosition(const Lumix::Vec3& world_pos) const;
 
 private:
 	Lumix::WorldEditor& m_world_editor;
@@ -68,6 +72,7 @@ private:
 	float m_terrain_brush_strength;
 	float m_terrain_brush_size;
 	int m_texture_idx;
+	float m_flat_height;
 	Lumix::Vec3 m_color;
 	int m_current_brush;
 	int m_selected_entity_template;
