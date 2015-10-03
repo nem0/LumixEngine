@@ -269,7 +269,7 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 		Lumix::BinaryArray& mask,
 		float radius,
 		float rel_amount,
-		float flat_height,
+		uint16_t flat_height,
 		Lumix::Vec3 color,
 		Lumix::ComponentUID terrain,
 		bool can_be_merged)

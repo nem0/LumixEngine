@@ -92,6 +92,14 @@ namespace Lumix
 	}
 
 
+	bool dirExists(const char* path)
+	{
+		DWORD dwAttrib = GetFileAttributes(path);
+		return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
+			(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+	}
+
+
 	void messageBox(const char* text)
 	{
 		MessageBox(NULL, text, "Message", MB_OK);
