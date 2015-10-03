@@ -148,8 +148,7 @@ void ShaderCompiler::makeUpToDate()
 			getRenderer(), &data[0], &combinations);
 
 		const char* bin_base_path =
-			StringBuilder<Lumix::MAX_PATH_LENGTH>(
-				"shaders/compiled/", basename, "_");
+			StringBuilder<Lumix::MAX_PATH_LENGTH>("shaders/compiled/", basename, "_");
 		if (isChanged(combinations, bin_base_path, shd_path))
 		{
 			src_list.emplace(shd_path, m_editor.getAllocator());
@@ -228,8 +227,7 @@ static bool readLine(Lumix::FS::IFile* file, char* out, int max_size)
 void ShaderCompiler::parseDependencies()
 {
 	m_dependencies.clear();
-	auto* iter = Lumix::FS::createFileIterator("shaders/compiled",
-											   m_editor.getAllocator());
+	auto* iter = Lumix::FS::createFileIterator("shaders/compiled", m_editor.getAllocator());
 
 	auto& fs = m_editor.getEngine().getFileSystem();
 	Lumix::FS::FileInfo info;
@@ -238,13 +236,11 @@ void ShaderCompiler::parseDependencies()
 		if (!Lumix::PathUtils::hasExtension(info.filename, "d")) continue;
 
 		auto* file = fs.open(fs.getDiskDevice(),
-							 StringBuilder<Lumix::MAX_PATH_LENGTH>(
-								 "shaders/compiled/", info.filename),
-							 Lumix::FS::Mode::READ | Lumix::FS::Mode::OPEN);
+			StringBuilder<Lumix::MAX_PATH_LENGTH>("shaders/compiled/", info.filename),
+			Lumix::FS::Mode::READ | Lumix::FS::Mode::OPEN);
 		if (!file)
 		{
-			Lumix::g_log_error.log("shader compiler") << "Could not open "
-													  << info.filename;
+			Lumix::g_log_error.log("shader compiler") << "Could not open " << info.filename;
 			continue;
 		}
 
@@ -265,26 +261,22 @@ void ShaderCompiler::parseDependencies()
 		{
 			char* trimmed_line = Lumix::trimmed(line);
 			char* c = trimmed_line;
-			while(*c)
+			while (*c)
 			{
-				if (*c == ' ')
-				{
-					break;
-				}
+				if (*c == ' ') break;
 				++c;
 			}
 			*c = '\0';
 
 			addDependency(trimmed_line, first_line);
 		}
-	
+
 		char basename[Lumix::MAX_PATH_LENGTH];
 		char src[Lumix::MAX_PATH_LENGTH];
 		Lumix::PathUtils::getBasename(basename, sizeof(basename), first_line);
 		getSourceFromBinaryBasename(src, sizeof(src), basename);
 
-		addDependency(StringBuilder<Lumix::MAX_PATH_LENGTH>(
-			"shaders/", src, ".sc"), first_line);
+		addDependency(StringBuilder<Lumix::MAX_PATH_LENGTH>("shaders/", src, ".sc"), first_line);
 
 		fs.close(*file);
 	}
@@ -487,6 +479,16 @@ void ShaderCompiler::compileAllPasses(
 
 void ShaderCompiler::compile(const char* path)
 {
+	StringBuilder<Lumix::MAX_PATH_LENGTH> compiled_dir(m_editor.getBasePath(), "/shaders/compiled");
+	if (!Lumix::makePath(compiled_dir))
+	{
+		if (!Lumix::dirExists(compiled_dir))
+		{
+			Lumix::messageBox("Could not create directory shaders/compiled. Please create it and "
+							  "restart the editor");
+		}
+	}
+
 	m_to_reload.emplace(path, m_editor.getAllocator());
 	
 	auto& fs = m_editor.getEngine().getFileSystem();

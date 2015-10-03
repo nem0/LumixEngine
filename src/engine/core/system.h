@@ -14,6 +14,7 @@ namespace Lumix
 	LUMIX_ENGINE_API bool moveFile(const char* from, const char* to);
 	LUMIX_ENGINE_API bool copyFile(const char* from, const char* to);
 	LUMIX_ENGINE_API bool fileExists(const char* path);
+	LUMIX_ENGINE_API bool dirExists(const char* path);
 	LUMIX_ENGINE_API bool getOpenFilename(char* out, int max_size, const char* filter);
 	LUMIX_ENGINE_API bool getSaveFilename(
 		char* out, int max_size, const char* filter, const char* default_extension);
@@ -28,5 +29,4 @@ namespace Lumix
 	LUMIX_ENGINE_API bool isProcessFinished(Process& process);
 	LUMIX_ENGINE_API int getProcessExitCode(Process& process);
 	LUMIX_ENGINE_API bool makePath(const char* path);
-
 }

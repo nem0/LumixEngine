@@ -72,7 +72,7 @@ private:
 	float m_terrain_brush_strength;
 	float m_terrain_brush_size;
 	int m_texture_idx;
-	float m_flat_height;
+	uint16_t m_flat_height;
 	Lumix::Vec3 m_color;
 	int m_current_brush;
 	int m_selected_entity_template;
