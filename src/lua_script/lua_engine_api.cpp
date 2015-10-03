@@ -18,44 +18,6 @@ namespace LuaAPI
 {
 
 
-static int setTextureData(lua_State* L)
-{
-	if (!LuaWrapper::isType<Texture*>(L, 1) || !lua_istable(L, 2))
-	{
-		return 0;
-	}
-
-	auto* texture = (Texture*)lua_touserdata(L, 1);
-	int len = (int)lua_rawlen(L, 2);
-	
-	if (!texture || texture->getBytesPerPixel() != 2) return 0;
-
-	uint16_t* data = (uint16_t*)texture->getData();
-	for (int i = 0; i < len; ++i)
-	{
-		if (lua_rawgeti(L, 2, 1 + i) == LUA_TNUMBER)
-		{
-			data[i] = (uint16_t)lua_tonumber(L, -1);
-		}
-		lua_pop(L, 1);
-	}
-
-	texture->onDataUpdated();
-
-	return 0;
-}
-
-
-static void
-setTexturePixel(Texture* texture, int x, int y, int r, int g, int b, int a)
-{
-	if (!texture) return;
-
-	uint32_t color = (r & 0xff) << 24 | (g & 0xff) << 16 | (b & 0xff) << 8 | (a & 0xff);
-	texture->setPixel(x, y, color);
-}
-
-
 static Texture* getMaterialTexture(Material* material, int texture_index)
 {
 	if (!material) return nullptr;
@@ -214,13 +176,6 @@ void registerEngineLuaAPI(Engine& engine, lua_State* L)
 {
 	lua_pushlightuserdata(L, &engine);
 	lua_setglobal(L, "g_engine");
-
-	registerCFunction(L, "API_setTextureData", &LuaAPI::setTextureData);
-
-	registerCFunction(L,
-					  "API_setTexturePixel",
-					  LuaWrapper::wrap<decltype(&LuaAPI::setTexturePixel),
-									   LuaAPI::setTexturePixel>);
 
 	registerCFunction(L,
 					  "API_getMaterialTexture",

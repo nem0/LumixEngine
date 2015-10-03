@@ -99,24 +99,6 @@ bool Texture::create(int w, int h, void* data)
 }
 
 
-void Texture::setPixel(int x, int y, uint32_t color)
-{
-	if (m_data.empty() || x >= m_width || y >= m_height || x < 0 || y < 0)
-	{
-		return;
-	}
-
-	if (getBytesPerPixel() == 4)
-	{
-		*(uint32_t*)&m_data[(x + y * m_width) * 4] = color;
-	}
-	else if(getBytesPerPixel() == 2)
-	{
-		*(uint16_t*)&m_data[(x + y * m_width) * 2] = color >> 16;
-	}
-	onDataUpdated();
-}
-
 uint32_t Texture::getPixelNearest(int x, int y) const
 {
 	if (m_data.empty() || x >= m_width || y >= m_height || x < 0 || y < 0 ||
@@ -322,26 +304,41 @@ void Texture::save()
 }
 
 
-void Texture::onDataUpdated()
+void Texture::onDataUpdated(int x, int y, int w, int h)
 {
 	const bgfx::Memory* mem = nullptr;
 
 	if (m_BPP == 2)
 	{
 		const uint16_t* src_mem = (const uint16_t*)&m_data[0];
-		mem = bgfx::alloc(m_width * m_height * sizeof(float));
+		mem = bgfx::alloc(w * h * sizeof(float));
 		float* dst_mem = (float*)mem->data;
 
-		for (int i = 0; i < m_width * m_height; ++i)
+		for (int j = 0; j < h; ++j)
 		{
-			dst_mem[i] = src_mem[i] / 65535.0f;
+			for (int i = 0; i < w; ++i)
+			{
+				dst_mem[i + j * w] = src_mem[x + i + (y + j) * m_width] / 65535.0f;
+			}
 		}
 	}
 	else
 	{
-		mem = bgfx::copy(&m_data[0], m_data.size() * sizeof(m_data[0]));
+		const uint8_t* src_mem = (const uint8_t*)&m_data[0];
+		mem = bgfx::alloc(w * h * m_BPP);
+		uint8_t* dst_mem = mem->data;
+
+		for (int j = 0; j < h; ++j)
+		{
+			for (int i = 0; i < w; ++i)
+			{
+				memcpy(&dst_mem[(i + j * w) * m_BPP],
+					&src_mem[(x + i + (y + j) * m_width) * m_BPP],
+					m_BPP);
+			}
+		}
 	}
-	bgfx::updateTexture2D(m_texture_handle, 0, 0, 0, m_width, m_height, mem);
+	bgfx::updateTexture2D(m_texture_handle, 0, x, y, w, h, mem);
 }
 
 

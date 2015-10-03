@@ -767,7 +767,7 @@ private:
 				}
 			}
 		}
-		texture->onDataUpdated();
+		texture->onDataUpdated(m_x, m_y, m_width, m_height);
 	}
 
 

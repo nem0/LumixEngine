@@ -30,11 +30,10 @@ class LUMIX_RENDERER_API Texture : public Resource
 		uint8_t* getData() { return m_data.empty() ? nullptr : &m_data[0]; }
 		void addDataReference();
 		void removeDataReference();
-		void onDataUpdated();
+		void onDataUpdated(int x, int y, int w, int h);
 		void save();
 		void setFlags(uint32_t flags);
 		uint32_t getFlags() const { return m_flags; }
-		void setPixel(int x, int y, uint32_t color);
 		uint32_t getPixelNearest(int x, int y) const;
 		uint32_t getPixel(float x, float y) const;
 		bgfx::TextureHandle getTextureHandle() const { return m_texture_handle; }
