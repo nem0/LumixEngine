@@ -1286,6 +1286,7 @@ void TerrainEditor::onGUI()
 				{
 					char tmp[4];
 					Lumix::toCString(i, tmp, sizeof(tmp));
+					if (i % 4 != 0) ImGui::SameLine();
 					if (ImGui::RadioButton(tmp, m_texture_idx == i))
 					{
 						m_texture_idx = i;
@@ -1328,10 +1329,18 @@ void TerrainEditor::onGUI()
 		{
 			static auto th = m_brush_texture->getTextureHandle();
 			ImGui::Image(&th, ImVec2(100, 100));
+			if (ImGui::Button("Clear mask"))
+			{
+				m_brush_texture->destroy();
+				m_world_editor.getAllocator().deleteObject(m_brush_texture);
+				m_brush_mask.clear();
+				m_brush_texture = nullptr;
+			}
 			ImGui::SameLine();
 		}
 
-		if (ImGui::Button("Choose mask"))
+
+		if (ImGui::Button("Select mask"))
 		{
 			char filename[Lumix::MAX_PATH_LENGTH];
 			if (Lumix::getOpenFilename(filename, Lumix::lengthOf(filename), "All\0*.*\0"))
