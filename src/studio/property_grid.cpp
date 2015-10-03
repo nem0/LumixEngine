@@ -46,18 +46,22 @@ bool PropertyGrid::getResourcePath(char* buf, int max_size, uint32_t resource_ty
 {
 	ImGui::InputText("Filter", m_filter, sizeof(m_filter));
 
-	auto type = m_asset_browser.getTypeFromResourceManagerType(resource_type);
-	for (auto unv : m_asset_browser.getResources(type))
+	if (ImGui::BeginChild("list", ImVec2(0, 300)))
 	{
-		if (m_filter[0] != '\0' && strstr(unv.c_str(), m_filter) == nullptr) continue;
-
-		if (ImGui::Selectable(unv.c_str(), false))
+		auto type = m_asset_browser.getTypeFromResourceManagerType(resource_type);
+		for (auto unv : m_asset_browser.getResources(type))
 		{
-			Lumix::copyString(buf, max_size, unv.c_str());
-			ImGui::EndPopup();
-			return true;
+			if (m_filter[0] != '\0' && strstr(unv.c_str(), m_filter) == nullptr) continue;
+
+			if (ImGui::Selectable(unv.c_str(), false))
+			{
+				Lumix::copyString(buf, max_size, unv.c_str());
+				ImGui::EndPopup();
+				return true;
+			}
 		}
 	}
+	ImGui::EndChild();
 
 	ImGui::EndPopup();
 	return false;
@@ -155,7 +159,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 			m_editor.setProperty(cmp.type, index, desc, buf, (int)strlen(buf) + 1);
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("Select"))
+		if (ImGui::Button("..."))
 			ImGui::OpenPopup("SelectResourcePopup");
 		if (ImGui::BeginPopup("SelectResourcePopup"))
 		{
