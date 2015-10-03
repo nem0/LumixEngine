@@ -111,8 +111,8 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 			2 * m_brush_size,
 			-m_brush_size,
 			m_brush_size);
-		TODO("get rid of static");
-		static Lumix::Array<const Lumix::RenderableMesh*> meshes(m_world_editor.getAllocator());
+
+		Lumix::Array<const Lumix::RenderableMesh*> meshes(m_world_editor.getAllocator());
 		meshes.clear();
 		scene->getRenderableInfos(frustum, meshes, ~0);
 
@@ -130,6 +130,7 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 				terrain_pos.z <= h)
 			{
 				pos.y = scene->getTerrainHeightAt(m_component.index, terrain_pos.x, terrain_pos.z);
+				pos.y += terrain_matrix.getTranslation().y;
 				if (!isOBBCollision(meshes, pos, model, scale))
 				{
 					auto entity = template_system.createInstanceNoCommand(template_name_hash, pos);
@@ -551,7 +552,7 @@ private:
 	{
 		if (m_mask.size() == 0) return true;
 
-		int s = int(sqrt(m_mask.size())); TODO("todo sqrt");
+		int s = int(sqrt(m_mask.size()));
 		int ix = int(x * s);
 		int iy = int(y * s);
 
@@ -639,14 +640,12 @@ private:
 		Rectangle rect;
 		rect = item.getBoundingRectangle(texture_width, texture->getHeight());
 
-		uint16_t x = m_flat_height; TODO("Todo");
-
 		for (int i = rect.m_from_x, end = rect.m_to_x; i < end; ++i)
 		{
 			for (int j = rect.m_from_y, end2 = rect.m_to_y; j < end2; ++j)
 			{
 				int offset = i - m_x + (j - m_y) * m_width;
-				((uint16_t*)&data[0])[offset] = x;
+				((uint16_t*)&data[0])[offset] = m_flat_height;
 			}
 		}
 	}
@@ -858,7 +857,7 @@ private:
 	Lumix::ComponentUID m_terrain;
 	Lumix::WorldEditor& m_world_editor;
 	Lumix::BinaryArray m_mask;
-	float m_flat_height;
+	uint16_t m_flat_height;
 	bool m_can_be_merged;
 };
 
@@ -1105,7 +1104,7 @@ Lumix::Texture* TerrainEditor::getHeightmap()
 }
 
 
-float TerrainEditor::getHeight(const Lumix::Vec3& world_pos)
+uint16_t TerrainEditor::getHeight(const Lumix::Vec3& world_pos)
 {
 	auto rel_pos = getRelativePosition(world_pos);
 	auto* heightmap = getHeightmap();
@@ -1280,7 +1279,7 @@ void TerrainEditor::onGUI()
 		case LAYER:
 		{
 			m_type = TerrainEditor::LAYER;
-			Lumix::Texture* tex = getHeightmap();
+			Lumix::Texture* tex = getMaterial()->getTextureByUniform(TEX_COLOR_UNIFORM);
 			if (tex)
 			{
 				for (int i = 0; i < tex->getDepth(); ++i)
