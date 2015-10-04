@@ -1,12 +1,11 @@
-version: 0.14.{build}
+version: 0.17.{build}
 os: Windows Server 2012 R2
 configuration: Release
 environment:
-  QTDIR: C:\Qt\5.5\msvc2013
-  CMAKE_PREFIX_PATH: C:\Qt\5.5\msvc2013
+
 before_build:
   - cd projects
-  - cmake -G "Visual Studio 12" -DCMAKE_PREFIX_PATH=C:\Qt\5.5\msvc2013
+  - cmake -G "Visual Studio 12"
   - cd ..
 build:
   project: projects\LumixEngine.sln
