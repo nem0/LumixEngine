@@ -1512,10 +1512,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 		const Geometry& geometry = *info.m_terrain->getGeometry();
 		const Mesh& mesh = *info.m_terrain->getMesh();
 
-
 		Vec4 terrain_params(info.m_terrain->getRootSize(),
 							(float)detail_texture->getWidth(),
-							(float)detail_texture->getDepth(),
+							(float)detail_texture->getAtlasSize(),
 							0);
 		bgfx::setUniform(m_terrain_params_uniform, &terrain_params);
 

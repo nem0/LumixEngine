@@ -40,6 +40,8 @@ class LUMIX_RENDERER_API Texture : public Resource
 
 		static bool saveTGA(IAllocator& allocator, FS::IFile* file, int width, int height, int bits_per_pixel, const uint8_t* data, const Path& path);
 		static unsigned int compareTGA(IAllocator& allocator, FS::IFile* file1, FS::IFile* file2, int difference);
+		int getAtlasSize() const { return m_atlas_size; }
+		void setAtlasSize(int size) { m_atlas_size = size; }
 
 	private:
 		bool load3D(FS::IFile& file);
@@ -53,6 +55,7 @@ class LUMIX_RENDERER_API Texture : public Resource
 
 	private:
 		IAllocator& m_allocator;
+		int m_atlas_size;
 		int m_width;
 		int m_height;
 		int m_BPP;

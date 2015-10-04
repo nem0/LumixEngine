@@ -447,6 +447,8 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 	char label[256];
 	bool keep_data = false;
 	uint32_t flags = 0;
+	int atlas_size = -1;
+
 	while (!serializer.isObjectEnd())
 	{
 		serializer.deserializeLabel(label, sizeof(label));
@@ -462,6 +464,10 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 					m_resource_manager.get(ResourceManager::TEXTURE)->load(Path(texture_path)));
 				addDependency(*m_textures[m_texture_count]);
 			}
+		}
+		else if (strcmp(label, "atlas_size") == 0)
+		{
+			serializer.deserialize(atlas_size, -1);
 		}
 		else if (strcmp(label, "min_filter") == 0)
 		{
@@ -526,7 +532,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 		}
 		else if (strcmp(label, "keep_data") == 0)
 		{
-			keep_data = true;
+			serializer.deserialize(keep_data, false);
 		}
 		else
 		{
@@ -537,6 +543,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 	}
 	if (m_textures[m_texture_count])
 	{
+		m_textures[m_texture_count]->setAtlasSize(atlas_size);
 		m_textures[m_texture_count]->setFlags(flags);
 
 		if (keep_data)

@@ -44,6 +44,7 @@ Texture::Texture(const Path& path,
 	, m_BPP(-1)
 	, m_depth(-1)
 {
+	m_atlas_size = -1;
 	m_flags = 0;
 	m_texture_handle = BGFX_INVALID_HANDLE;
 }
