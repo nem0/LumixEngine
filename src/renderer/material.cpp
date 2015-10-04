@@ -177,10 +177,12 @@ bool Material::save(JsonSerializer& serializer)
 	{
 		char path[MAX_PATH_LENGTH];
 		int flags = 0;
+		int atlas_size = -1;
 		if (m_textures[i])
 		{
 			flags = m_textures[i]->getFlags();
 			PathUtils::getFilename(path, MAX_PATH_LENGTH, m_textures[i]->getPath().c_str());
+			atlas_size = m_textures[i]->getAtlasSize();
 		}
 		else
 		{
@@ -188,6 +190,7 @@ bool Material::save(JsonSerializer& serializer)
 		}
 		serializer.beginObject("texture");
 		serializer.serialize("source", path);
+		if (atlas_size > 0) serializer.serialize("atlas_size", atlas_size);
 		if (flags & BGFX_TEXTURE_U_CLAMP) serializer.serialize("u_clamp", true);
 		if (flags & BGFX_TEXTURE_V_CLAMP) serializer.serialize("v_clamp", true);
 		if (flags & BGFX_TEXTURE_W_CLAMP) serializer.serialize("w_clamp", true);
