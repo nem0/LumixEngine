@@ -110,6 +110,11 @@ void Shader::parseTextureSlots(lua_State* L)
 						lua_tostring(L, -1));
 				}
 				lua_pop(L, 1);
+				if (lua_getfield(L, -1, "is_atlas") == LUA_TBOOLEAN)
+				{
+					m_texture_slots[i].m_is_atlas = lua_toboolean(L, -1) != 0;
+				}
+				lua_pop(L, 1);
 				if (lua_getfield(L, -1, "uniform") == LUA_TSTRING)
 				{
 					copyString(m_texture_slots[i].m_uniform,

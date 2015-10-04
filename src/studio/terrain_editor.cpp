@@ -24,6 +24,7 @@ static const char* HEIGHTMAP_UNIFORM = "u_texHeightmap";
 static const char* SPLATMAP_UNIFORM = "u_texSplatmap";
 static const char* COLORMAP_UNIFORM = "u_texColormap";
 static const char* TEX_COLOR_UNIFORM = "u_texColor";
+static const float MIN_BRUSH_SIZE = 0.5f;
 
 
 struct PaintEntitiesCommand : public Lumix::IEditorCommand
@@ -946,10 +947,10 @@ void TerrainEditor::decreaseBrushSize()
 {
 	if (m_terrain_brush_size < 10)
 	{
-		m_terrain_brush_size = Lumix::Math::maxValue(1.0f, m_terrain_brush_size - 1.0f);
+		m_terrain_brush_size = Lumix::Math::maxValue(MIN_BRUSH_SIZE, m_terrain_brush_size - 1.0f);
 		return;
 	}
-	m_terrain_brush_size = Lumix::Math::maxValue(1.0f, m_terrain_brush_size - 10.0f);
+	m_terrain_brush_size = Lumix::Math::maxValue(MIN_BRUSH_SIZE, m_terrain_brush_size - 10.0f);
 }
 
 
@@ -1226,9 +1227,7 @@ void TerrainEditor::onGUI()
 	auto* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
 	if (!ImGui::CollapsingHeader("Terrain editor", nullptr, true, true)) return;
 
-	
-
-	ImGui::SliderFloat("Brush size", &m_terrain_brush_size, 1, 100);
+	ImGui::SliderFloat("Brush size", &m_terrain_brush_size, MIN_BRUSH_SIZE, 100);
 	ImGui::SliderFloat("Brush strength", &m_terrain_brush_strength, 0, 1.0f);
 
 	enum BrushType
@@ -1244,6 +1243,77 @@ void TerrainEditor::onGUI()
 	{
 		m_type = m_current_brush == HEIGHT ? TerrainEditor::RAISE_HEIGHT : m_type;
 	}
+
+	switch (m_current_brush)
+	{
+		case HEIGHT:
+			if (ImGui::Button("Save heightmap"))
+				getMaterial()->getTextureByUniform(HEIGHTMAP_UNIFORM)->save();
+			break;
+		case LAYER:
+			if (ImGui::Button("Save layermap"))
+				getMaterial()->getTextureByUniform(SPLATMAP_UNIFORM)->save();
+			break;
+		case COLOR:
+			if (ImGui::Button("Save colormap"))
+				getMaterial()->getTextureByUniform(COLORMAP_UNIFORM)->save();
+			break;
+	}
+
+	if (m_current_brush == LAYER || m_current_brush == COLOR)
+	{
+		if (m_brush_texture)
+		{
+			static auto th = m_brush_texture->getTextureHandle();
+			ImGui::Image(&th, ImVec2(100, 100));
+			if (ImGui::Button("Clear mask"))
+			{
+				m_brush_texture->destroy();
+				m_world_editor.getAllocator().deleteObject(m_brush_texture);
+				m_brush_mask.clear();
+				m_brush_texture = nullptr;
+			}
+			ImGui::SameLine();
+		}
+
+		ImGui::SameLine();
+		if (ImGui::Button("Select mask"))
+		{
+			char filename[Lumix::MAX_PATH_LENGTH];
+			if (Lumix::getOpenFilename(filename, Lumix::lengthOf(filename), "All\0*.*\0"))
+			{
+				int image_width;
+				int image_height;
+				int image_comp;
+				auto* data = stbi_load(filename, &image_width, &image_height, &image_comp, 4);
+				if (data)
+				{
+					m_brush_mask.resize(image_width * image_height);
+					for (int j = 0; j < image_width; ++j)
+					{
+						for (int i = 0; i < image_width; ++i)
+						{
+							m_brush_mask[i + j * image_width] =
+								data[image_comp * (i + j * image_width)] > 128;
+						}
+					}
+
+					auto& rm = m_world_editor.getEngine().getResourceManager();
+					if (m_brush_texture)
+					{
+						m_brush_texture->destroy();
+						m_world_editor.getAllocator().deleteObject(m_brush_texture);
+					}
+					m_brush_texture = LUMIX_NEW(m_world_editor.getAllocator(), Lumix::Texture)(
+						Lumix::Path("brush_texture"), rm, m_world_editor.getAllocator());
+					m_brush_texture->create(image_width, image_height, data);
+
+					stbi_image_free(data);
+				}
+			}
+		}
+	}
+
 
 	switch (m_current_brush)
 	{
@@ -1282,7 +1352,7 @@ void TerrainEditor::onGUI()
 			Lumix::Texture* tex = getMaterial()->getTextureByUniform(TEX_COLOR_UNIFORM);
 			if (tex)
 			{
-				for (int i = 0; i < tex->getDepth(); ++i)
+				for (int i = 0; i < tex->getAtlasSize() * tex->getAtlasSize(); ++i)
 				{
 					char tmp[4];
 					Lumix::toCString(i, tmp, sizeof(tmp));
@@ -1321,60 +1391,7 @@ void TerrainEditor::onGUI()
 		}
 		break;
 		default: ASSERT(false); break;
-	}
-
-	if (m_current_brush == LAYER || m_current_brush == COLOR)
-	{
-		if (m_brush_texture)
-		{
-			static auto th = m_brush_texture->getTextureHandle();
-			ImGui::Image(&th, ImVec2(100, 100));
-			if (ImGui::Button("Clear mask"))
-			{
-				m_brush_texture->destroy();
-				m_world_editor.getAllocator().deleteObject(m_brush_texture);
-				m_brush_mask.clear();
-				m_brush_texture = nullptr;
-			}
-			ImGui::SameLine();
-		}
-
-
-		if (ImGui::Button("Select mask"))
-		{
-			char filename[Lumix::MAX_PATH_LENGTH];
-			if (Lumix::getOpenFilename(filename, Lumix::lengthOf(filename), "All\0*.*\0"))
-			{
-				int image_width;
-				int image_height;
-				int image_comp;
-				auto* data = stbi_load(filename, &image_width, &image_height, &image_comp, 4);
-				if (data)
-				{
-					m_brush_mask.resize(image_width * image_height);
-					for (int j = 0; j < image_width; ++j)
-					{
-						for (int i = 0; i < image_width; ++i)
-						{
-							m_brush_mask[i + j * image_width] = data[image_comp * (i + j * image_width)] > 128;
-						}
-					}
-
-					auto& rm = m_world_editor.getEngine().getResourceManager();
-					if (m_brush_texture)
-					{
-						m_brush_texture->destroy();
-						m_world_editor.getAllocator().deleteObject(m_brush_texture);
-					}
-					m_brush_texture = LUMIX_NEW(m_world_editor.getAllocator(), Lumix::Texture)(
-						Lumix::Path("brush_texture"), rm, m_world_editor.getAllocator());
-					m_brush_texture->create(image_width, image_height, data);
-
-					stbi_image_free(data);
-				}
-			}
-		}
-	}
+	}	
 }
 
 

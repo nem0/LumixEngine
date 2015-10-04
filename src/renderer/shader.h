@@ -98,11 +98,12 @@ public:
 	public:
 		TextureSlot() { reset(); }
 
-		void reset() { m_name[0] = m_uniform[0] = '\0'; m_define_idx = -1; }
+		void reset() { m_name[0] = m_uniform[0] = '\0'; m_define_idx = -1; m_is_atlas = false; }
 
 		char m_name[30];
 		char m_uniform[30];
 		int m_define_idx;
+		bool m_is_atlas;
 		uint32_t m_uniform_hash;
 		bgfx::UniformHandle m_uniform_handle;
 	};
