@@ -394,6 +394,7 @@ ShaderBinary::ShaderBinary(const Path& path,
 void ShaderBinary::unload()
 {
 	if (bgfx::isValid(m_handle)) bgfx::destroyShader(m_handle);
+	m_handle = BGFX_INVALID_HANDLE;
 }
 
 
