@@ -85,6 +85,7 @@ private:
 	uint16_t m_failed_dep_count;
 	State m_current_state;
 	State m_desired_state;
+	bool m_is_waiting_for_load;
 }; // class Resource
 
 

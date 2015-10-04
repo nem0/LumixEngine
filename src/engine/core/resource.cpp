@@ -18,6 +18,7 @@ Resource::Resource(const Path& path, ResourceManager& resource_manager, IAllocat
 	, m_size()
 	, m_cb(allocator)
 	, m_resource_manager(resource_manager)
+	, m_is_waiting_for_load(false)
 {
 }
 
@@ -38,7 +39,8 @@ void Resource::checkState()
 
 	if (m_failed_dep_count == 0)
 	{
-		if (m_empty_dep_count == 0 && m_current_state != State::READY)
+		if (m_empty_dep_count == 0 && m_current_state != State::READY &&
+			m_desired_state != State::EMPTY)
 		{
 			onBeforeReady();
 			m_current_state = State::READY;
@@ -56,10 +58,11 @@ void Resource::checkState()
 
 void Resource::fileLoaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 {
+	m_is_waiting_for_load = false;
+	if (m_desired_state != State::READY) return;
+	
 	ASSERT(m_current_state != State::READY);
 	ASSERT(m_empty_dep_count == 1);
-
-	if (m_desired_state != State::READY) return;
 
 	if (!success)
 	{
@@ -67,6 +70,7 @@ void Resource::fileLoaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 		--m_empty_dep_count;
 		++m_failed_dep_count;
 		checkState();
+		m_is_waiting_for_load = false;
 		return;
 	}
 
@@ -77,6 +81,7 @@ void Resource::fileLoaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 
 	--m_empty_dep_count;
 	checkState();
+	m_is_waiting_for_load = false;
 }
 
 
@@ -109,6 +114,8 @@ void Resource::doLoad()
 	if (m_desired_state == State::READY) return;
 	m_desired_state = State::READY;
 
+	if (m_is_waiting_for_load) return;
+	m_is_waiting_for_load = true;
 	FS::FileSystem& fs = m_resource_manager.getFileSystem();
 	FS::ReadCallback cb;
 	cb.bind<Resource, &Resource::fileLoaded>(this);
@@ -118,6 +125,8 @@ void Resource::doLoad()
 
 void Resource::addDependency(Resource& dependent_resource)
 {
+	ASSERT(m_desired_state != State::EMPTY);
+
 	dependent_resource.m_cb.bind<Resource, &Resource::onStateChanged>(this);
 	if (dependent_resource.isEmpty()) ++m_empty_dep_count;
 	if (dependent_resource.isFailure()) ++m_failed_dep_count;
@@ -128,6 +137,8 @@ void Resource::addDependency(Resource& dependent_resource)
 
 void Resource::removeDependency(Resource& dependent_resource)
 {
+	ASSERT(m_desired_state != State::EMPTY || m_current_state != State::EMPTY);
+
 	dependent_resource.m_cb.unbind<Resource, &Resource::onStateChanged>(this);
 	if (dependent_resource.isEmpty()) --m_empty_dep_count;
 	if (dependent_resource.isFailure()) --m_failed_dep_count;
@@ -139,6 +150,7 @@ void Resource::removeDependency(Resource& dependent_resource)
 void Resource::onStateChanged(State old_state, State new_state)
 {
 	ASSERT(old_state != new_state);
+	ASSERT(m_current_state != State::EMPTY || m_desired_state != State::EMPTY);
 
 	if (old_state == State::EMPTY) --m_empty_dep_count;
 	if (old_state == State::FAILURE) --m_failed_dep_count;

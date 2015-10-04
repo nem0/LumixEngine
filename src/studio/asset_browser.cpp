@@ -344,7 +344,7 @@ void AssetBrowser::onGUIMaterial()
 		if (slot.m_is_atlas)
 		{
 			int size = texture->getAtlasSize() - 2;
-			const char values[] = { '2', 0, '3', 0, '4', 0, 0 };
+			const char values[] = { '2', 'x', '2', 0, '3', 'x', '3', 0, '4', 'x', '4', 0, 0 };
 			if (ImGui::Combo(StringBuilder<30>("Atlas size##", i), &size, values))
 			{
 				texture->setAtlasSize(size + 2);
