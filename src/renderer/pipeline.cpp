@@ -234,6 +234,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		, m_debug_flags(BGFX_DEBUG_TEXT)
 		, m_point_light_shadowmaps(allocator)
 		, m_materials(allocator)
+		, m_is_rendering_in_shadowmap(false)
 	{
 		m_is_wireframe = false;
 		m_view_x = m_view_y = 0;
@@ -740,6 +741,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		float camera_ratio = m_scene->getCameraWidth(camera) / m_scene->getCameraHeight(camera);
 		Vec4 cascades = m_scene->getShadowmapCascades(light_cmp);
 		float split_distances[] = {0.01f, cascades.x, cascades.y, cascades.z, cascades.w};
+		m_is_rendering_in_shadowmap = true;
 		for (int split_index = 0; split_index < 4; ++split_index)
 		{
 			if (split_index > 0) beginNewView(m_current_framebuffer);
@@ -790,6 +792,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				SHADOW_CAM_FAR);
 			renderAll(shadow_camera_frustum, layer_mask, false);
 		}
+		m_is_rendering_in_shadowmap = false;
 	}
 
 
@@ -1414,15 +1417,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 		bgfx::setUniform(m_specular_shininess_uniform, &specular_shininess);
 
 		int texture_offset = shader->getTextureSlotCount();
-		if (m_is_current_light_global)
+		if (m_is_current_light_global && !m_is_rendering_in_shadowmap)
 		{
 			auto handle = m_global_light_shadowmap->getRenderbufferHandle(1);
 			bgfx::setTexture(texture_offset, m_tex_shadowmap_uniform, handle);
 			++texture_offset;
-		}
-		else
-		{
-		
 		}
 	}
 
@@ -1715,6 +1714,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	ComponentIndex m_current_light;
 	bool m_is_current_light_global;
 	bool m_is_wireframe;
+	bool m_is_rendering_in_shadowmap;
 	Frustum m_camera_frustum;
 
 	Matrix m_shadow_viewprojection[4];

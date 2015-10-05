@@ -511,6 +511,7 @@ void Engine::destroy(Engine* engine, IAllocator& allocator)
 	allocator.deleteObject(engine);
 
 	fclose(g_error_file);
+	g_error_file = nullptr;
 }
 
 
