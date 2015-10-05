@@ -360,31 +360,24 @@ void ShaderCompiler::compilePass(
 			Lumix::catString(out_path, "_");
 			Lumix::catString(out_path, StringBuilder<30>(pass, mask));
 			Lumix::catString(out_path, is_vertex_shader ? "_vs.shb" : "_fs.shb");
-			char cmd[1024];
-			Lumix::copyString(cmd, "/C \"");
 			
-			Lumix::catString(cmd, m_editor.getBasePath());
-			Lumix::catString(cmd, "/shaders/shaderc.exe\" -f ");
-			Lumix::catString(cmd, source_path);
+			StringBuilder<1024> args(" -f ");
 
-			Lumix::catString(cmd, " -o ");
-			Lumix::catString(cmd, out_path);
-			
-			Lumix::catString(cmd, " --depends --platform windows --type ");
-			Lumix::catString(cmd, is_vertex_shader ? "vertex --profile vs_4_0" : "fragment --profile ps_4_0");
-			Lumix::catString(cmd, " -D ");
-			Lumix::catString(cmd, pass);
+			args << source_path << " -o " << out_path << " --depends --platform windows --type "
+				 << (is_vertex_shader ? "vertex --profile vs_4_0" : "fragment --profile ps_4_0")
+				 << " -D " << pass;
 			for (int i = 0; i < Lumix::lengthOf(all_defines); ++i)
 			{
 				if (mask & (1 << i))
 				{
-					Lumix::catString(cmd, " -D ");
-					Lumix::catString(cmd, getRenderer().getShaderDefine(all_defines[i]));
+					args << " -D " << getRenderer().getShaderDefine(all_defines[i]);
 				}
 			}
 
+			StringBuilder<Lumix::MAX_PATH_LENGTH> cmd(m_editor.getBasePath(), "/shaders/shaderc.exe");
+
 			Lumix::deleteFile(out_path);
-			auto* process = Lumix::createProcess("c:\\windows\\system32\\cmd.exe", cmd, m_editor.getAllocator());
+			auto* process = Lumix::createProcess(cmd, args, m_editor.getAllocator());
 			if (!process)
 			{
 				Lumix::g_log_error.log("shader compiler") << "Could not execute command: " << cmd;
@@ -438,10 +431,22 @@ void ShaderCompiler::update(float time_delta)
 	{
 		if (Lumix::isProcessFinished(*m_processes[i].process))
 		{
+
 			bool failed = Lumix::getProcessExitCode(*m_processes[i].process) != 0;
-			if (failed && strstr(m_processes[i].path, "imgui") != nullptr)
+			if (failed)
 			{
-				Lumix::messageBox("Could not compile imgui shader");
+				if (strstr(m_processes[i].path, "imgui") != nullptr)
+				{
+					Lumix::messageBox("Could not compile imgui shader");
+				}
+
+				char buf[1024];
+				int read;
+				while ((read = Lumix::getProcessOutput(*m_processes[i].process, buf, sizeof(buf) - 1)) > 0)
+				{
+					buf[read] = 0;
+					Lumix::g_log_error.log("shader compiler") << buf;
+				}
 			}
 
 			Lumix::destroyProcess(*m_processes[i].process);

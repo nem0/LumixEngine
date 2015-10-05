@@ -20,6 +20,7 @@
 #include "universe/hierarchy.h"
 #include "universe/universe.h"
 
+#include <cstdio>
 
 namespace Lumix
 {
@@ -467,10 +468,20 @@ private:
 };
 
 
-void showLogInVS(const char*, const char* message)
+static void showLogInVS(const char*, const char* message)
 {
 	Debug::debugOutput(message);
 	Debug::debugOutput("\n");
+}
+
+
+static FILE* g_error_file = nullptr;
+
+
+static void logErrorToFile(const char*, const char* message)
+{
+	fputs(message, g_error_file);
+	fflush(g_error_file);
 }
 
 
@@ -478,6 +489,9 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 {
 	installUnhandledExceptionHandler();
 
+	g_error_file = fopen("error.log", "wb");
+
+	g_log_error.getCallback().bind<logErrorToFile>();
 	g_log_info.getCallback().bind<showLogInVS>();
 	g_log_warning.getCallback().bind<showLogInVS>();
 	g_log_error.getCallback().bind<showLogInVS>();
@@ -495,6 +509,8 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 void Engine::destroy(Engine* engine, IAllocator& allocator)
 {
 	allocator.deleteObject(engine);
+
+	fclose(g_error_file);
 }
 
 
