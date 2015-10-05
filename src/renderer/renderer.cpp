@@ -377,7 +377,7 @@ struct RendererImpl : public Renderer
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>("attenuation",
 				&RenderScene::getLightAttenuation,
 				&RenderScene::setLightAttenuation,
-				-1.0f,
+				0.0f,
 				1000.0f,
 				0.1f,
 				allocator));

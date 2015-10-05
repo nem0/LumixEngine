@@ -228,7 +228,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		, m_tmp_meshes(allocator)
 		, m_framebuffers(allocator)
 		, m_uniforms(allocator)
-		, m_global_textures(allocator)
 		, m_renderer(static_cast<PipelineImpl&>(pipeline).getRenderer())
 		, m_default_framebuffer(nullptr)
 		, m_debug_line_material(nullptr)
@@ -240,40 +239,30 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_view_x = m_view_y = 0;
 		m_has_shadowmap_define_idx = m_renderer.getShaderDefineIdx("HAS_SHADOWMAP");
 
-		m_cam_view_uniform =
-			bgfx::createUniform("u_camView", bgfx::UniformType::Mat4);
-		m_cam_inv_proj_uniform =
-			bgfx::createUniform("u_camInvProj", bgfx::UniformType::Mat4);
-		m_tex_shadowmap_uniform =
-			bgfx::createUniform("u_texShadowmap", bgfx::UniformType::Int1);
+		m_cam_view_uniform = bgfx::createUniform("u_camView", bgfx::UniformType::Mat4);
+		m_cam_inv_proj_uniform = bgfx::createUniform("u_camInvProj", bgfx::UniformType::Mat4);
+		m_tex_shadowmap_uniform = bgfx::createUniform("u_texShadowmap", bgfx::UniformType::Int1);
 		m_attenuation_params_uniform =
 			bgfx::createUniform("u_attenuationParams", bgfx::UniformType::Vec4);
-		m_terrain_scale_uniform =
-			bgfx::createUniform("u_terrainScale", bgfx::UniformType::Vec4);
-		m_rel_camera_pos_uniform =
-			bgfx::createUniform("u_relCamPos", bgfx::UniformType::Vec4);
-		m_terrain_params_uniform =
-			bgfx::createUniform("u_terrainParams", bgfx::UniformType::Vec4);
+		m_terrain_scale_uniform = bgfx::createUniform("u_terrainScale", bgfx::UniformType::Vec4);
+		m_rel_camera_pos_uniform = bgfx::createUniform("u_relCamPos", bgfx::UniformType::Vec4);
+		m_terrain_params_uniform = bgfx::createUniform("u_terrainParams", bgfx::UniformType::Vec4);
 		m_fog_color_density_uniform =
 			bgfx::createUniform("u_fogColorDensity", bgfx::UniformType::Vec4);
 		m_light_pos_radius_uniform =
 			bgfx::createUniform("u_lightPosRadius", bgfx::UniformType::Vec4);
-		m_light_color_uniform =
-			bgfx::createUniform("u_lightRgbInnerR", bgfx::UniformType::Vec4);
-		m_light_dir_fov_uniform =
-			bgfx::createUniform("u_lightDirFov", bgfx::UniformType::Vec4);
+		m_light_color_uniform = bgfx::createUniform("u_lightRgbInnerR", bgfx::UniformType::Vec4);
+		m_light_dir_fov_uniform = bgfx::createUniform("u_lightDirFov", bgfx::UniformType::Vec4);
 		m_light_specular_uniform =
 			bgfx::createUniform("u_lightSpecular", bgfx::UniformType::Mat4, 64);
-		m_ambient_color_uniform =
-			bgfx::createUniform("u_ambientColor", bgfx::UniformType::Vec4);
-		m_shadowmap_matrices_uniform = bgfx::createUniform(
-			"u_shadowmapMatrices", bgfx::UniformType::Mat4, 4);
+		m_ambient_color_uniform = bgfx::createUniform("u_ambientColor", bgfx::UniformType::Vec4);
+		m_shadowmap_matrices_uniform =
+			bgfx::createUniform("u_shadowmapMatrices", bgfx::UniformType::Mat4, 4);
 		m_bone_matrices_uniform =
 			bgfx::createUniform("u_boneMatrices", bgfx::UniformType::Mat4, 64);
-		m_specular_shininess_uniform = bgfx::createUniform(
-			"u_materialSpecularShininess", bgfx::UniformType::Vec4);
-		m_terrain_matrix_uniform =
-			bgfx::createUniform("u_terrainMatrix", bgfx::UniformType::Mat4);
+		m_specular_shininess_uniform =
+			bgfx::createUniform("u_materialSpecularShininess", bgfx::UniformType::Vec4);
+		m_terrain_matrix_uniform = bgfx::createUniform("u_terrainMatrix", bgfx::UniformType::Mat4);
 
 		ResourceManagerBase* material_manager =
 			pipeline.getResourceManager().get(ResourceManager::MATERIAL);
@@ -408,8 +397,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void setPass(const char* name)
 	{
-		m_global_textures.clear();
-
 		m_pass_idx = m_renderer.getPassIdx(name);
 		bool found = false;
 		for (int i = 0; i < m_view2pass_map.size(); ++i)
@@ -475,19 +462,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 			g_log_warning.log("renderer") << "Framebuffer " << framebuffer_name
 										  << " not found";
 		}
-	}
-
-
-	void bindFramebufferTexture(const char* framebuffer_name,
-								int renderbuffer_idx,
-								int uniform_idx)
-	{
-		FrameBuffer* fb = getFramebuffer(framebuffer_name);
-		if (!fb) return;
-
-		GlobalTexture& t = m_global_textures.pushEmpty();
-		t.m_texture = fb->getRenderbufferHandle(renderbuffer_idx);
-		t.m_uniform = m_uniforms[uniform_idx];
 	}
 
 
@@ -709,10 +683,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_scene->getPointLightInfluencedGeometry(
 			light, frustum, m_tmp_meshes, layer_mask);
 
-		int global_textures_count = m_global_textures.size();
-
 		renderMeshes(m_tmp_meshes);
-		m_global_textures.resize(global_textures_count);
 		m_current_light = -1;
 	}
 
@@ -760,6 +731,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		if (light_cmp < 0 || camera < 0) return;
 
 		Matrix light_mtx = universe.getMatrix(m_scene->getGlobalLightEntity(light_cmp));
+		m_global_light_shadowmap = m_current_framebuffer;
 		float shadowmap_height = (float)m_current_framebuffer->getHeight();
 		float shadowmap_width = (float)m_current_framebuffer->getWidth();
 		float viewports[] = {0, 0, 0.5f, 0, 0, 0.5f, 0.5f, 0.5f};
@@ -916,10 +888,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void setPointLightUniforms(Material* material, ComponentIndex light_cmp)
 	{
-		if (light_cmp < 0)
-		{
-			return;
-		}
+		if (light_cmp < 0) return;
 
 		Universe& universe = m_scene->getUniverse();
 		Entity light_entity = m_scene->getPointLightEntity(light_cmp);
@@ -967,9 +936,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 								 &info.m_matrices[0].m11,
 								 m_scene->getLightFOV(light) > 180 ? 4 : 1);
 
-				GlobalTexture& t = m_global_textures.pushEmpty();
-				t.m_texture = info.m_framebuffer->getRenderbufferHandle(0);
-				t.m_uniform = m_tex_shadowmap_uniform;
+				int texture_offset = material->getTextureCount();
+				bgfx::setTexture(texture_offset,
+					m_tex_shadowmap_uniform,
+					info.m_framebuffer->getRenderbufferHandle(0));
 				return;
 			}
 		}
@@ -1030,9 +1000,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_scene->getPointLightInfluencedGeometry(
 			light, m_tmp_meshes, layer_mask);
 
-		int global_textures_count = m_global_textures.size();
 		renderMeshes(m_tmp_meshes);
-		m_global_textures.resize(global_textures_count);
 	}
 
 
@@ -1064,12 +1032,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 			m_scene->getGrassInfos(
 				frustum, m_tmp_grasses, layer_mask, m_applied_camera);
-			int global_textures_count = m_global_textures.size();
-
 			renderMeshes(m_tmp_meshes);
 			renderTerrains(m_tmp_terrains);
 			renderGrasses(m_tmp_grasses);
-			m_global_textures.resize(global_textures_count);
 		}
 		m_current_light = -1;
 	}
@@ -1174,13 +1139,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 					shader->getTextureSlot(i).m_uniform_handle,
 					texture->getTextureHandle());
 			}
-		}/*
-
-		for (int i = 0; i < m_global_textures.size(); ++i)
-		{
-			const GlobalTexture& t = m_global_textures[i];
-			bgfx::setTexture(i, t.m_uniform, t.m_texture);
-		}*/
+		}
 
 		if (m_applied_camera >= 0)
 		{
@@ -1454,12 +1413,16 @@ struct PipelineInstanceImpl : public PipelineInstance
 								material->getShininess());
 		bgfx::setUniform(m_specular_shininess_uniform, &specular_shininess);
 
-		int global_texture_offset = shader->getTextureSlotCount();
-		for (int i = 0; i < m_global_textures.size(); ++i)
+		int texture_offset = shader->getTextureSlotCount();
+		if (m_is_current_light_global)
 		{
-			const GlobalTexture& t = m_global_textures[i];
-			bgfx::setTexture(
-				i + global_texture_offset, t.m_uniform, t.m_texture);
+			auto handle = m_global_light_shadowmap->getRenderbufferHandle(1);
+			bgfx::setTexture(texture_offset, m_tex_shadowmap_uniform, handle);
+			++texture_offset;
+		}
+		else
+		{
+		
 		}
 	}
 
@@ -1664,7 +1627,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_pass_idx = -1;
 		m_current_framebuffer = m_default_framebuffer;
 		m_current_light = -1;
-		m_global_textures.clear();
 		m_view2pass_map.assign(0xFF);
 		m_instance_data_idx = 0;
 		m_point_light_shadowmaps.clear();
@@ -1743,10 +1705,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 	FrameBuffer* m_current_framebuffer;
 	FrameBuffer* m_default_framebuffer;
 	Array<FrameBuffer*> m_framebuffers;
-	Array<GlobalTexture> m_global_textures;
 	Array<bgfx::UniformHandle> m_uniforms;
 	Array<Material*> m_materials;
 	Array<PointLightShadowmap> m_point_light_shadowmaps;
+	FrameBuffer* m_global_light_shadowmap;
 	InstanceData m_instances_data[128];
 	int m_instance_data_idx;
 	ComponentIndex m_applied_camera;
@@ -1939,16 +1901,6 @@ void renderModels(PipelineInstanceImpl* pipeline,
 }
 
 
-void bindFramebufferTexture(PipelineInstanceImpl* pipeline,
-							const char* framebuffer_name,
-							int renderbuffer_index,
-							int uniform_idx)
-{
-	pipeline->bindFramebufferTexture(
-		framebuffer_name, renderbuffer_index, uniform_idx);
-}
-
-
 void executeCustomCommand(PipelineInstanceImpl* pipeline, const char* command)
 {
 	pipeline->executeCustomCommand(crc32(command));
@@ -2060,76 +2012,35 @@ void print(int x, int y, const char* text)
 
 void PipelineImpl::registerCFunctions()
 {
-	registerCFunction(
-		"drawQuad",
-		LuaWrapper::wrap<decltype(&LuaAPI::drawQuad), LuaAPI::drawQuad>);
-	registerCFunction(
-		"print", LuaWrapper::wrap<decltype(&LuaAPI::print), LuaAPI::print>);
-	registerCFunction("loadMaterial",
-					  LuaWrapper::wrap<decltype(&LuaAPI::loadMaterial),
-									   LuaAPI::loadMaterial>);
-	registerCFunction("createUniform",
-					  LuaWrapper::wrap<decltype(&LuaAPI::createUniform),
-									   LuaAPI::createUniform>);
-	registerCFunction("setFramebuffer",
-					  LuaWrapper::wrap<decltype(&LuaAPI::setFramebuffer),
-									   LuaAPI::setFramebuffer>);
-	registerCFunction("enableBlending",
-					  LuaWrapper::wrap<decltype(&LuaAPI::enableBlending),
-									   LuaAPI::enableBlending>);
-	registerCFunction("disableBlending",
-					  LuaWrapper::wrap<decltype(&LuaAPI::disableBlending),
-									   LuaAPI::disableBlending>);
-	registerCFunction("enableAlphaWrite",
-					  LuaWrapper::wrap<decltype(&LuaAPI::enableAlphaWrite),
-									   LuaAPI::enableAlphaWrite>);
-	registerCFunction("disableAlphaWrite",
-					  LuaWrapper::wrap<decltype(&LuaAPI::disableAlphaWrite),
-									   LuaAPI::disableAlphaWrite>);
-	registerCFunction("enableRGBWrite",
-					  LuaWrapper::wrap<decltype(&LuaAPI::enableRGBWrite),
-									   LuaAPI::enableRGBWrite>);
-	registerCFunction("disableRGBWrite",
-					  LuaWrapper::wrap<decltype(&LuaAPI::disableRGBWrite),
-									   LuaAPI::disableRGBWrite>);
-	registerCFunction("enableDepthWrite",
-					  LuaWrapper::wrap<decltype(&LuaAPI::enableDepthWrite),
-									   LuaAPI::enableDepthWrite>);
-	registerCFunction("disableDepthWrite",
-					  LuaWrapper::wrap<decltype(&LuaAPI::disableDepthWrite),
-									   LuaAPI::disableDepthWrite>);
-	registerCFunction(
-		"setPass",
-		LuaWrapper::wrap<decltype(&LuaAPI::setPass), LuaAPI::setPass>);
-	registerCFunction(
-		"applyCamera",
-		LuaWrapper::wrap<decltype(&LuaAPI::applyCamera), LuaAPI::applyCamera>);
-	registerCFunction(
-		"clear", LuaWrapper::wrap<decltype(&LuaAPI::clear), LuaAPI::clear>);
-	registerCFunction("renderModels",
-					  LuaWrapper::wrap<decltype(&LuaAPI::renderModels),
-									   LuaAPI::renderModels>);
-	registerCFunction("renderShadowmap",
-					  LuaWrapper::wrap<decltype(&LuaAPI::renderShadowmap),
-									   LuaAPI::renderShadowmap>);
-	registerCFunction("renderLocalLightsShadowmaps",
-					  &LuaAPI::renderLocalLightsShadowmaps);
-	registerCFunction(
-		"bindFramebufferTexture",
-		LuaWrapper::wrap<decltype(&LuaAPI::bindFramebufferTexture),
-						 LuaAPI::bindFramebufferTexture>);
-	registerCFunction("executeCustomCommand",
-					  LuaWrapper::wrap<decltype(&LuaAPI::executeCustomCommand),
-									   LuaAPI::executeCustomCommand>);
-	registerCFunction("renderDebugShapes",
-					  LuaWrapper::wrap<decltype(&LuaAPI::renderDebugShapes),
-									   LuaAPI::renderDebugShapes>);
-	registerCFunction(
-		"getFPS", LuaWrapper::wrap<decltype(&LuaAPI::getFPS), LuaAPI::getFPS>);
-	registerCFunction(
-		"cameraExists", LuaWrapper::wrap<decltype(&LuaAPI::cameraExists), LuaAPI::cameraExists>);
-	registerCFunction(
-		"hasScene", LuaWrapper::wrap<decltype(&LuaAPI::hasScene), LuaAPI::hasScene>);
+	#define REGISTER_FUNCTION(name) \
+		registerCFunction(#name, LuaWrapper::wrap<decltype(&LuaAPI::name), LuaAPI::name>)
+
+	REGISTER_FUNCTION(drawQuad);
+	REGISTER_FUNCTION(print);
+	REGISTER_FUNCTION(loadMaterial);
+	REGISTER_FUNCTION(createUniform);
+	REGISTER_FUNCTION(setFramebuffer);
+	REGISTER_FUNCTION(enableBlending);
+	REGISTER_FUNCTION(disableBlending);
+	REGISTER_FUNCTION(enableAlphaWrite);
+	REGISTER_FUNCTION(disableAlphaWrite);
+	REGISTER_FUNCTION(enableRGBWrite);
+	REGISTER_FUNCTION(disableRGBWrite);
+	REGISTER_FUNCTION(enableDepthWrite);
+	REGISTER_FUNCTION(disableDepthWrite);
+	REGISTER_FUNCTION(setPass);
+	REGISTER_FUNCTION(applyCamera);
+	REGISTER_FUNCTION(clear);
+	REGISTER_FUNCTION(renderModels);
+	REGISTER_FUNCTION(renderShadowmap);
+	REGISTER_FUNCTION(renderLocalLightsShadowmaps);
+	REGISTER_FUNCTION(executeCustomCommand);
+	REGISTER_FUNCTION(renderDebugShapes);
+	REGISTER_FUNCTION(getFPS);
+	REGISTER_FUNCTION(cameraExists);
+	REGISTER_FUNCTION(hasScene);
+
+	#undef REGISTER_FUNCTION
 }
 
 
