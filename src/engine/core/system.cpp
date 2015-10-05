@@ -1,5 +1,6 @@
 #include "system.h"
 #include "core/iallocator.h"
+#include "core/string.h"
 #include <ShlObj.h>
 #include <Windows.h>
 
@@ -14,6 +15,8 @@ namespace Lumix
 		}
 
 		PROCESS_INFORMATION process_info;
+		HANDLE output_read_pipe;
+		HANDLE output_write_pipe;
 		IAllocator& allocator;
 	};
 
@@ -21,7 +24,7 @@ namespace Lumix
 	bool isProcessFinished(Process& process)
 	{
 		DWORD exit_code;
-		if (GetExitCodeProcess(process.process_info.hProcess, &exit_code) == FALSE) return false;
+		if (GetExitCodeProcess(process.process_info.hProcess, &exit_code) == FALSE) return true;
 		return exit_code != STILL_ACTIVE;
 	}
 
@@ -36,33 +39,71 @@ namespace Lumix
 
 	void destroyProcess(Process& process)
 	{
+		CloseHandle(process.output_read_pipe);
 		CloseHandle(process.process_info.hProcess);
 		CloseHandle(process.process_info.hThread);
 		process.allocator.deleteObject(&process);
 	}
 
 
-	Process* createProcess(const char* cmd, char* args, IAllocator& allocator)
+	Process* createProcess(const char* cmd, const char* args, IAllocator& allocator)
 	{
-		auto* process = allocator.newObject<Process>(allocator);
+		auto* process = LUMIX_NEW(allocator, Process)(allocator);
+
+		SECURITY_ATTRIBUTES sec_attrs;
+		sec_attrs.nLength = sizeof(SECURITY_ATTRIBUTES);
+		sec_attrs.bInheritHandle = TRUE;
+		sec_attrs.lpSecurityDescriptor = NULL;
+		if (CreatePipe(&process->output_read_pipe, &process->output_write_pipe, &sec_attrs, 0) ==
+			FALSE)
+		{
+			allocator.deleteObject(process);
+			return nullptr;
+		}
+		if (SetHandleInformation(process->output_read_pipe, HANDLE_FLAG_INHERIT, 0) == FALSE)
+		{
+			allocator.deleteObject(process);
+			return nullptr;
+		}
 
 		STARTUPINFO suinfo;
 		ZeroMemory(&suinfo, sizeof(suinfo));
 		suinfo.cb = sizeof(suinfo);
-		suinfo.dwFlags = STARTF_USESHOWWINDOW;
+		suinfo.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
 		suinfo.wShowWindow = SW_HIDE;
+		suinfo.hStdOutput = process->output_write_pipe;
+		suinfo.hStdError = process->output_write_pipe;
 
-		CreateProcess(cmd,
-					  args,
-					  NULL,
-					  NULL,
-					  TRUE,
-					  NORMAL_PRIORITY_CLASS,
-					  NULL,
-					  NULL,
-					  &suinfo,
-					  &process->process_info);
+		char rw_args[1024];
+		copyString(rw_args, args);
+		auto create_process_ret = CreateProcess(
+			cmd,
+			rw_args,
+			NULL,
+			NULL,
+			TRUE,
+			NORMAL_PRIORITY_CLASS,
+			NULL,
+			NULL,
+			&suinfo,
+			&process->process_info);
+		
+		if (create_process_ret == FALSE)
+		{
+			allocator.deleteObject(process);
+			return nullptr;
+		}
+
+		CloseHandle(process->output_write_pipe);
+
 		return process;
+	}
+
+	int getProcessOutput(Process& process, char* buf, int buf_size)
+	{
+		DWORD read;
+		if (ReadFile(process.output_read_pipe, buf, buf_size, &read, NULL) == FALSE) return -1;
+		return read;
 	}
 
 
