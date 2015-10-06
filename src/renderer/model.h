@@ -9,7 +9,6 @@
 #include "core/string.h"
 #include "core/vec3.h"
 #include "core/resource.h"
-#include "renderer/geometry.h"
 #include "renderer/ray_cast_model_hit.h"
 #include <bgfx/bgfx.h>
 
@@ -138,19 +137,7 @@ public:
 	};
 
 public:
-	Model(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
-		: Resource(path, resource_manager, allocator)
-		, m_bounding_radius()
-		, m_allocator(allocator)
-		, m_bone_map(m_allocator)
-		, m_meshes(m_allocator)
-		, m_bones(m_allocator)
-		, m_indices(m_allocator)
-		, m_vertices(m_allocator)
-		, m_lods(m_allocator)
-	{
-	}
-
+	Model(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	~Model();
 
 	void create(const bgfx::VertexDecl& def,
@@ -161,8 +148,9 @@ public:
 		int attributes_size);
 
 	LODMeshIndices getLODMeshIndices(float squared_distance) const;
-	const Geometry& getGeometry() const { return m_geometry_buffer_object; }
 	Mesh& getMesh(int index) { return m_meshes[index]; }
+	bgfx::VertexBufferHandle getVerticesHandle() const { return m_vertices_handle; }
+	bgfx::IndexBufferHandle getIndicesHandle() const { return m_indices_handle; }
 	const Mesh& getMesh(int index) const { return m_meshes[index]; }
 	const Mesh* getMeshPtr(int index) const { return &m_meshes[index]; }
 	int getMeshCount() const { return m_meshes.size(); }
@@ -195,7 +183,10 @@ private:
 
 private:
 	IAllocator& m_allocator;
-	Geometry m_geometry_buffer_object;
+	bgfx::IndexBufferHandle m_indices_handle;
+	bgfx::VertexBufferHandle m_vertices_handle;
+	int m_indices_size;
+	int m_vertices_size;
 	Array<Mesh> m_meshes;
 	Array<Bone> m_bones;
 	Array<int32_t> m_indices;

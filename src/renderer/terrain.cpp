@@ -10,7 +10,6 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "engine.h"
-#include "renderer/geometry.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
@@ -194,6 +193,8 @@ Terrain::Terrain(Renderer& renderer, Entity entity, RenderScene& scene, IAllocat
 	, m_grass_types(m_allocator)
 	, m_free_grass_quads(m_allocator)
 	, m_renderer(renderer)
+	, m_vertices_handle(BGFX_INVALID_HANDLE)
+	, m_indices_handle(BGFX_INVALID_HANDLE)
 {
 	generateGeometry();
 }
@@ -830,8 +831,8 @@ void Terrain::generateGeometry()
 		.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
 		.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
 		.end();
-	m_geometry.setAttributesData(&points[0], sizeof(points[0]) * points.size(), vertex_def);
-	m_geometry.setIndicesData(&indices[0], sizeof(indices[0]) * indices.size());
+	m_vertices_handle = bgfx::createVertexBuffer(bgfx::copy(&points[0], sizeof(points[0]) * points.size()), vertex_def);
+	m_indices_handle = bgfx::createIndexBuffer(bgfx::copy(&indices[0], sizeof(indices[0]) * indices.size()));
 	m_mesh = m_allocator.newObject<Mesh>(vertex_def,
 		m_material,
 		0,

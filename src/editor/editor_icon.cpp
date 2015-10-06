@@ -5,7 +5,6 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "engine.h"
-#include "renderer/geometry.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"

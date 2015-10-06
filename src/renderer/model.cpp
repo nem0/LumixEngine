@@ -11,7 +11,6 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/vec3.h"
-#include "renderer/geometry.h"
 #include "renderer/material.h"
 #include "renderer/model_manager.h"
 #include "renderer/pose.h"
@@ -42,6 +41,22 @@ Mesh::Mesh(const bgfx::VertexDecl& def,
 	m_name_hash = crc32(name);
 	m_name = name;
 	m_instance_idx = -1;
+}
+
+
+Model::Model(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+	: Resource(path, resource_manager, allocator)
+	, m_bounding_radius()
+	, m_allocator(allocator)
+	, m_bone_map(m_allocator)
+	, m_meshes(m_allocator)
+	, m_bones(m_allocator)
+	, m_indices(m_allocator)
+	, m_vertices(m_allocator)
+	, m_lods(m_allocator)
+	, m_vertices_handle(BGFX_INVALID_HANDLE)
+	, m_indices_handle(BGFX_INVALID_HANDLE)
+{
 }
 
 
@@ -227,9 +242,13 @@ void Model::create(const bgfx::VertexDecl& def,
 				   const void* attributes_data,
 				   int attributes_size)
 {
-	m_geometry_buffer_object.setAttributesData(
-		attributes_data, attributes_size, def);
-	m_geometry_buffer_object.setIndicesData(indices_data, indices_size);
+	ASSERT(!bgfx::isValid(m_vertices_handle));
+	m_vertices_handle = bgfx::createVertexBuffer(bgfx::copy(attributes_data, attributes_size), def);
+	m_vertices_size = attributes_size;
+
+	ASSERT(!bgfx::isValid(m_indices_handle));
+	m_indices_handle = bgfx::createIndexBuffer(bgfx::copy(indices_data, indices_size));
+	m_indices_size = indices_size;
 
 	m_meshes.emplace(def,
 					 material,
@@ -316,14 +335,17 @@ bool Model::parseGeometry(FS::IFile& file)
 		return false;
 	}
 
-	Array<uint8_t> vertices(m_allocator);
-	vertices.resize(vertices_size);
-	file.read(&vertices[0], sizeof(vertices[0]) * vertices.size());
+	ASSERT(!bgfx::isValid(m_vertices_handle));
+	const bgfx::Memory* vertices_mem = bgfx::alloc(vertices_size);
+	file.read(vertices_mem->data, vertices_size);
+	m_vertices_handle = bgfx::createVertexBuffer(vertices_mem, m_meshes[0].getVertexDefinition());
+	m_vertices_size = vertices_size;
 
-	m_geometry_buffer_object.setAttributesData(
-		&vertices[0], vertices.size(), m_meshes[0].getVertexDefinition());
-	m_geometry_buffer_object.setIndicesData(
-		&m_indices[0], m_indices.size() * sizeof(m_indices[0]));
+	ASSERT(!bgfx::isValid(m_indices_handle));
+	m_indices_size = sizeof(m_indices[0]) * indices_count;
+	const bgfx::Memory* mem = bgfx::alloc(m_indices_size);
+	memcpy(mem->data, &m_indices[0], m_indices_size);
+	m_indices_handle = bgfx::createIndexBuffer(mem);
 
 	int vertex_count = 0;
 	for (int i = 0; i < m_meshes.size(); ++i)
@@ -333,7 +355,7 @@ bool Model::parseGeometry(FS::IFile& file)
 	}
 	m_vertices.resize(vertex_count);
 
-	computeRuntimeData(&vertices[0]);
+	computeRuntimeData(vertices_mem->data);
 
 	return true;
 }
@@ -534,7 +556,11 @@ void Model::unload(void)
 	m_meshes.clear();
 	m_bones.clear();
 	m_lods.clear();
-	m_geometry_buffer_object.clear();
+
+	if(bgfx::isValid(m_vertices_handle)) bgfx::destroyVertexBuffer(m_vertices_handle);
+	if(bgfx::isValid(m_indices_handle)) bgfx::destroyIndexBuffer(m_indices_handle);
+	m_indices_handle = BGFX_INVALID_HANDLE;
+	m_vertices_handle = BGFX_INVALID_HANDLE;
 }
 
 

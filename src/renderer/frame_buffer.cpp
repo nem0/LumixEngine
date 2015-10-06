@@ -46,19 +46,14 @@ FrameBuffer::FrameBuffer(const char* name, int width, int height, void* window_h
 
 FrameBuffer::~FrameBuffer()
 {
-	if (m_autodestroy_handle)
-	{
-		bgfx::destroyFrameBuffer(m_handle);
-	}
+	if (m_autodestroy_handle) bgfx::destroyFrameBuffer(m_handle);
 }
 
 
 void FrameBuffer::resize(int width, int height)
 {
-	if (bgfx::isValid(m_handle))
-	{
-		bgfx::destroyFrameBuffer(m_handle);
-	}
+	if (bgfx::isValid(m_handle)) bgfx::destroyFrameBuffer(m_handle);
+
 	m_declaration.m_width = width;
 	m_declaration.m_height = height;
 	if (m_window_handle)
