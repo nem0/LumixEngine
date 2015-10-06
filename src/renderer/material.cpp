@@ -599,7 +599,6 @@ bool Material::load(FS::IFile& file)
 			{
 				return false;
 			}
-				
 		}
 		else if (strcmp(label, "alpha_cutout") == 0)
 		{

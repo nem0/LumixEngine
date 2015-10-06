@@ -105,8 +105,6 @@ private:
 	virtual bool load(FS::IFile& file) override;
 
 	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);
-
-private:
 	void deserializeUniforms(JsonSerializer& serializer);
 	void setRenderState(bool value, uint64_t state, uint64_t mask);
 

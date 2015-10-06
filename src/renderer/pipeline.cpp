@@ -19,10 +19,9 @@
 #include "engine.h"
 #include "plugin_manager.h"
 #include "renderer/frame_buffer.h"
-#include "renderer/geometry.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
-#include "renderer/model_instance.h"
+#include "renderer/pose.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/terrain.h"
@@ -336,15 +335,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 		const RenderableMesh& info = data.m_mesh;
 		const Mesh& mesh = *info.m_mesh;
 		const Model& model = *info.m_model;
-		const Geometry& geometry = model.getGeometry();
 		Material* material = mesh.getMaterial();
 		const uint16_t stride = mesh.getVertexDefinition().getStride();
 
 		setMaterial(material);
-		bgfx::setVertexBuffer(geometry.getAttributesArrayID(),
+		bgfx::setVertexBuffer(model.getVerticesHandle(),
 							  mesh.getAttributeArrayOffset() / stride,
 							  mesh.getAttributeArraySize() / stride);
-		bgfx::setIndexBuffer(geometry.getIndicesArrayID(),
+		bgfx::setIndexBuffer(model.getIndicesHandle(),
 							 mesh.getIndicesOffset(),
 							 mesh.getIndexCount());
 		bgfx::setState(m_render_state | material->getRenderStates());
@@ -352,7 +350,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		ShaderInstance& shader_instance =
 			info.m_mesh->getMaterial()->getShaderInstance();
 		bgfx::submit(m_view_idx, shader_instance.m_program_handles[m_pass_idx]);
-		
+
 		data.m_buffer = nullptr;
 		data.m_instance_count = 0;
 		data.m_mesh.m_mesh->setInstanceIdx(-1);
@@ -900,11 +898,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 		float fov = Math::degreesToRadians(m_scene->getLightFOV(light_cmp));
 		Vec3 color = m_scene->getPointLightColor(light_cmp) *
 					 m_scene->getPointLightIntensity(light_cmp);
-		Vec4 attenuation_params(m_scene->getLightRange(light_cmp),
-								m_scene->getLightAttenuation(light_cmp),
-								0,
-								1);
-		Vec4 light_pos_radius(light_pos, m_scene->getLightRange(light_cmp));
+		float range = m_scene->getLightRange(light_cmp);
+		float attenuation = m_scene->getLightAttenuation(light_cmp);
+		Vec4 attenuation_params(range, attenuation, 0, 1);
+		Vec4 light_pos_radius(light_pos, range);
 		Vec4 light_color(color, 0);
 		Vec4 light_dir_fov(light_dir, fov);
 		Vec4 light_specular(m_scene->getPointLightSpecularColor(light_cmp), 1);
@@ -1252,23 +1249,20 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderSkinnedMesh(const RenderableMesh& info)
 	{
-		if (!info.m_model->isReady())
-		{
-			return;
-		}
+		if (!info.m_model->isReady()) return;
+
 		const Mesh& mesh = *info.m_mesh;
-		const Geometry& geometry = info.m_model->getGeometry();
 		Material* material = mesh.getMaterial();
 
 		setPoseUniform(info);
 		setMaterial(material);
 		bgfx::setTransform(info.m_matrix);
-		bgfx::setVertexBuffer(geometry.getAttributesArrayID(),
+		bgfx::setVertexBuffer(info.m_model->getVerticesHandle(),
 							  mesh.getAttributeArrayOffset() /
 								  mesh.getVertexDefinition().getStride(),
 							  mesh.getAttributeArraySize() /
 								  mesh.getVertexDefinition().getStride());
-		bgfx::setIndexBuffer(geometry.getIndicesArrayID(),
+		bgfx::setIndexBuffer(info.m_model->getIndicesHandle(),
 							 mesh.getIndicesOffset(),
 							 mesh.getIndexCount());
 		bgfx::setState(m_render_state | material->getRenderStates());
@@ -1308,10 +1302,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderRigidMesh(const RenderableMesh& info)
 	{
-		if (!info.m_model->isReady())
-		{
-			return;
-		}
+		if (!info.m_model->isReady()) return;
+
 		int instance_idx = info.m_mesh->getInstanceIdx();
 		if (instance_idx == -1)
 		{
@@ -1339,16 +1331,15 @@ struct PipelineInstanceImpl : public PipelineInstance
 		if (data.m_instance_count == InstanceData::MAX_INSTANCE_COUNT)
 		{
 			const Mesh& mesh = *info.m_mesh;
-			const Geometry& geometry = info.m_model->getGeometry();
 			Material* material = mesh.getMaterial();
 
 			setMaterial(material);
-			bgfx::setVertexBuffer(geometry.getAttributesArrayID(),
+			bgfx::setVertexBuffer(info.m_model->getVerticesHandle(),
 								  mesh.getAttributeArrayOffset() /
 									  mesh.getVertexDefinition().getStride(),
 								  mesh.getAttributeArraySize() /
 									  mesh.getVertexDefinition().getStride());
-			bgfx::setIndexBuffer(geometry.getIndicesArrayID(),
+			bgfx::setIndexBuffer(info.m_model->getIndicesHandle(),
 								 mesh.getIndicesOffset(),
 								 mesh.getIndexCount());
 			bgfx::setState(m_render_state | material->getRenderStates());
@@ -1412,16 +1403,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 			}
 		}
 
-		Vec4 specular_shininess(material->getSpecular(),
-								material->getShininess());
+		Vec4 specular_shininess(material->getSpecular(), material->getShininess());
 		bgfx::setUniform(m_specular_shininess_uniform, &specular_shininess);
 
-		int texture_offset = shader->getTextureSlotCount();
 		if (m_is_current_light_global && !m_is_rendering_in_shadowmap)
 		{
 			auto handle = m_global_light_shadowmap->getRenderbufferHandle(1);
-			bgfx::setTexture(texture_offset, m_tex_shadowmap_uniform, handle);
-			++texture_offset;
+			bgfx::setTexture(shader->getTextureSlotCount(), m_tex_shadowmap_uniform, handle);
 		}
 	}
 
@@ -1446,21 +1434,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void finishTerrainInstances(int index)
 	{
-		if (m_terrain_instances[index].m_count == 0)
-		{
-			return;
-		}
+		if (m_terrain_instances[index].m_count == 0) return;
+
 		const TerrainInfo& info = *m_terrain_instances[index].m_infos[0];
 		Material* material = info.m_terrain->getMaterial();
-		if (!material->isReady())
-		{
-			return;
-		}
+		if (!material->isReady()) return;
+
 		Texture* detail_texture = info.m_terrain->getDetailTexture();
-		if (!detail_texture)
-		{
-			return;
-		}
+		if (!detail_texture) return;
 
 		Matrix inv_world_matrix;
 		inv_world_matrix = info.m_world_matrix;
@@ -1471,7 +1452,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Vec3 rel_cam_pos = inv_world_matrix.multiplyPosition(camera_pos) /
 						   info.m_terrain->getXZScale();
 
-		const Geometry& geometry = *info.m_terrain->getGeometry();
 		const Mesh& mesh = *info.m_terrain->getMesh();
 
 		Vec4 terrain_params(info.m_terrain->getRootSize(),
@@ -1479,10 +1459,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 							(float)detail_texture->getAtlasSize(),
 							0);
 		bgfx::setUniform(m_terrain_params_uniform, &terrain_params);
-
 		bgfx::setUniform(m_rel_camera_pos_uniform, &Vec4(rel_cam_pos, 0));
-		bgfx::setUniform(m_terrain_scale_uniform,
-						 &Vec4(info.m_terrain->getScale(), 0));
+		bgfx::setUniform(m_terrain_scale_uniform, &Vec4(info.m_terrain->getScale(), 0));
 		bgfx::setUniform(m_terrain_matrix_uniform, &info.m_world_matrix.m11);
 
 		setMaterial(material);
@@ -1493,10 +1471,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 			Vec4 m_morph_const;
 		};
 		const bgfx::InstanceDataBuffer* instance_buffer =
-			bgfx::allocInstanceDataBuffer(m_terrain_instances[index].m_count,
-										  sizeof(TerrainInstanceData));
-		TerrainInstanceData* instance_data =
-			(TerrainInstanceData*)instance_buffer->data;
+			bgfx::allocInstanceDataBuffer(m_terrain_instances[index].m_count, sizeof(TerrainInstanceData));
+		TerrainInstanceData* instance_data = (TerrainInstanceData*)instance_buffer->data;
+
 		for (int i = 0; i < m_terrain_instances[index].m_count; ++i)
 		{
 			const TerrainInfo& info = *m_terrain_instances[index].m_infos[i];
@@ -1508,21 +1485,20 @@ struct PipelineInstanceImpl : public PipelineInstance
 											   0);
 		}
 
-		bgfx::setVertexBuffer(geometry.getAttributesArrayID(),
+		bgfx::setVertexBuffer(info.m_terrain->getVerticesHandle(),
 							  mesh.getAttributeArrayOffset() /
 								  mesh.getVertexDefinition().getStride(),
 							  mesh.getAttributeArraySize() /
 								  mesh.getVertexDefinition().getStride());
 		int mesh_part_indices_count = mesh.getIndexCount() / 4;
-		bgfx::setIndexBuffer(geometry.getIndicesArrayID(),
+		bgfx::setIndexBuffer(info.m_terrain->getIndicesHandle(),
 							 info.m_index * mesh_part_indices_count,
 							 mesh_part_indices_count);
 		bgfx::setState(m_render_state | mesh.getMaterial()->getRenderStates());
 		bgfx::setInstanceDataBuffer(instance_buffer,
 									m_terrain_instances[index].m_count);
-		bgfx::submit(
-			m_view_idx,
-			material->getShaderInstance().m_program_handles[m_pass_idx]);
+		auto shader_instance = material->getShaderInstance().m_program_handles[m_pass_idx];
+		bgfx::submit(m_view_idx, shader_instance);
 		m_terrain_instances[index].m_count = 0;
 	}
 
@@ -1535,16 +1511,15 @@ struct PipelineInstanceImpl : public PipelineInstance
 			   &grass.m_matrices[0],
 			   grass.m_matrix_count * sizeof(Matrix));
 		const Mesh& mesh = grass.m_model->getMesh(0);
-		const Geometry& geometry = grass.m_model->getGeometry();
 		Material* material = mesh.getMaterial();
 
 		setMaterial(material);
-		bgfx::setVertexBuffer(geometry.getAttributesArrayID(),
+		bgfx::setVertexBuffer(grass.m_model->getVerticesHandle(),
 							  mesh.getAttributeArrayOffset() /
 								  mesh.getVertexDefinition().getStride(),
 							  mesh.getAttributeArraySize() /
 								  mesh.getVertexDefinition().getStride());
-		bgfx::setIndexBuffer(geometry.getIndicesArrayID(),
+		bgfx::setIndexBuffer(grass.m_model->getIndicesHandle(),
 							 mesh.getIndicesOffset(),
 							 mesh.getIndexCount());
 		bgfx::setState(m_render_state | material->getRenderStates());

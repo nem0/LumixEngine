@@ -1,20 +1,13 @@
 #pragma once
 
-// usefull compile time messages
 
 #define STRINGIZE_2( _ ) #_
 #define STRINGIZE( _ ) STRINGIZE_2( _ )
 
+
 #define JOIN_STRINGS_2(A, B) A ## B
 #define JOIN_STRINGS(A, B) JOIN_STRINGS_2(A, B)
 
-#ifdef _WIN64
-	#define LUMIX_FORCE_SYMBOL(symbol) \
-		__pragma(comment(linker, "/INCLUDE:" STRINGIZE(symbol)))
-#else
-	#define LUMIX_FORCE_SYMBOL(symbol) \
-		__pragma(comment(linker, "/INCLUDE:_" STRINGIZE(symbol)))
-#endif
 
 #define NOTE(msg)\
 	__pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : NOTE: " msg))
@@ -26,7 +19,7 @@
 	__pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : WARNING: " msg))
 
 
-#include <type_traits>	
+#include <type_traits>
 #include <cstdint>
 #include <cassert>
 
@@ -61,10 +54,12 @@ namespace Lumix
 
 
 #define LUMIX_NEW(allocator, type) new ((allocator).allocate(sizeof(type))) type
+#define LUMIX_DELETE(allocator, var) (allocator).deleteObject(var);
 #define LUMIX_LIBRARY_EXPORT __declspec(dllexport)
 #define LUMIX_LIBRARY_IMPORT __declspec(dllimport)
 #define LUMIX_ALIGN_OF(T) __alignof(T)
 #define LUMIX_FORCE_INLINE __forceinline
+#define LUMIX_RESTRICT __restrict
 
 
 #ifdef BUILDING_PHYSICS
@@ -103,15 +98,8 @@ namespace Lumix
 	#define LUMIX_ANIMATION_API LUMIX_LIBRARY_IMPORT
 #endif
 
-#ifdef BUILDING_STUDIO_LIB
-	#define LUMIX_STUDIO_LIB_API LUMIX_LIBRARY_EXPORT
-#else
-	#define LUMIX_STUDIO_LIB_API LUMIX_LIBRARY_IMPORT
-#endif
-
-
-#define LUMIX_RESTRICT __restrict
 
 #pragma warning(disable : 4251)
 #pragma warning(disable : 4512)
 #pragma warning(disable : 4996)
+

@@ -6,8 +6,8 @@
 #include "core/matrix.h"
 #include "core/resource.h"
 #include "core/vec3.h"
-#include "renderer/geometry.h"
 #include "renderer/render_scene.h"
+#include <bgfx/bgfx.h>
 
 
 namespace Lumix
@@ -74,7 +74,8 @@ class Terrain
 		Terrain(Renderer& renderer, Entity entity, RenderScene& scene, IAllocator& allocator);
 		~Terrain();
 
-		Geometry* getGeometry() { return &m_geometry; }
+		bgfx::VertexBufferHandle getVerticesHandle() const { return m_vertices_handle; }
+		bgfx::IndexBufferHandle getIndicesHandle() const { return m_indices_handle; }
 		Material* getMaterial() const { return m_material; }
 		Texture* getDetailTexture() const { return m_detail_texture; }
 		int64_t getLayerMask() const { return m_layer_mask; }
@@ -126,9 +127,10 @@ class Terrain
 
 	private:
 		IAllocator& m_allocator;
+		bgfx::VertexBufferHandle m_vertices_handle;
+		bgfx::IndexBufferHandle m_indices_handle;
 		Mesh* m_mesh;
 		TerrainQuad* m_root;
-		Geometry m_geometry;
 		int32_t m_width;
 		int32_t m_height;
 		int64_t m_layer_mask;

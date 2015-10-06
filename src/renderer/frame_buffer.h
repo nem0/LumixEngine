@@ -45,12 +45,12 @@ class FrameBuffer
 		explicit FrameBuffer(const Declaration& decl);
 		FrameBuffer(const char* name, int width, int height, void* window_handle);
 		~FrameBuffer();
-		
+
 		bgfx::FrameBufferHandle getHandle() const { return m_handle; }
 		int getWidth() const { return m_declaration.m_width; }
 		int getHeight() const { return m_declaration.m_height; }
 		void resize(int width, int height);
-		const char* getName() { return m_declaration.m_name; }
+		const char* getName() const { return m_declaration.m_name; }
 		bgfx::TextureHandle getRenderbufferHandle(int idx) const { return m_declaration.m_renderbuffers[idx].m_handle; }
 
 	private:

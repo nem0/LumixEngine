@@ -22,11 +22,10 @@
 #include "engine.h"
 
 #include "renderer/culling_system.h"
-#include "renderer/geometry.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
-#include "renderer/model_instance.h"
 #include "renderer/pipeline.h"
+#include "renderer/pose.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/terrain.h"
@@ -63,6 +62,7 @@ struct Renderable
 
 private:
 	Renderable(const Renderable&);
+	void operator=(const Renderable&);
 };
 
 

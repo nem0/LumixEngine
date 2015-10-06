@@ -15,12 +15,10 @@ namespace Lumix
 
 class Engine;
 class Frustum;
-class Geometry;
 class LIFOAllocator;
 class Material;
 class Mesh;
 class Model;
-class ModelInstance;
 class Path;
 class PipelineInstance;
 class Pose;

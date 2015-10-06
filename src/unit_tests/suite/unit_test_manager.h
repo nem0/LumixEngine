@@ -57,6 +57,14 @@ namespace Lumix
 	} //~UnitTest
 } //~Lumix
 
+#ifdef _WIN64
+#define LUMIX_FORCE_SYMBOL(symbol) \
+		__pragma(comment(linker, "/INCLUDE:" STRINGIZE(symbol)))
+#else
+#define LUMIX_FORCE_SYMBOL(symbol) \
+		__pragma(comment(linker, "/INCLUDE:_" STRINGIZE(symbol)))
+#endif
+
 #define REGISTER_TEST(name, method, params) \
 namespace { extern "C" Lumix::UnitTest::Helper JOIN_STRINGS(JOIN_STRINGS(test_register_, method), __LINE__)(name, method, params); } \
 	LUMIX_FORCE_SYMBOL(JOIN_STRINGS(test_register_ ,JOIN_STRINGS(method, __LINE__)))
