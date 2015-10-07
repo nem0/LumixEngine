@@ -41,6 +41,7 @@ static uint32_t getResourceType(const char* path)
 	if (strcmp(ext, "mat") == 0) return Lumix::ResourceManager::MATERIAL;
 	if (strcmp(ext, "msh") == 0) return Lumix::ResourceManager::MODEL;
 	if (strcmp(ext, "dds") == 0) return Lumix::ResourceManager::TEXTURE;
+	if (strcmp(ext, "raw") == 0) return Lumix::ResourceManager::TEXTURE;
 	if (strcmp(ext, "tga") == 0) return Lumix::ResourceManager::TEXTURE;
 	if (strcmp(ext, "shd") == 0) return Lumix::ResourceManager::SHADER;
 	if (strcmp(ext, "unv") == 0) return UNIVERSE_HASH;

@@ -123,8 +123,8 @@ private:
 	Vec3 m_specular;
 	float m_shininess;
 	uint32_t m_shader_mask;
-	int m_alpha_cutout_define_idx;
-	int m_shadow_receiver_define_idx;
+	static int s_alpha_cutout_define_idx;
+	static int s_shadow_receiver_define_idx;
 };
 
 } // ~namespace Lumix
