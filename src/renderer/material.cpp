@@ -10,6 +10,7 @@
 #include "core/resource_manager_base.h"
 #include "core/timer.h"
 #include "renderer/frame_buffer.h"
+#include "renderer/material_manager.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
@@ -21,6 +22,8 @@ namespace Lumix
 
 
 static const uint32_t SHADOWMAP_HASH = crc32("shadowmap");
+int Material::s_alpha_cutout_define_idx = -1;
+int Material::s_shadow_receiver_define_idx = -1;
 
 
 Material::Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
@@ -36,6 +39,12 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 	, m_shader_instance(nullptr)
 	, m_shader_mask(0)
 {
+	auto* manager = resource_manager.get(ResourceManager::MATERIAL);
+	auto* mat_manager = static_cast<MaterialManager*>(manager);
+
+	s_alpha_cutout_define_idx = mat_manager->getRenderer().getShaderDefineIdx("ALPHA_CUTOUT");
+	s_shadow_receiver_define_idx = mat_manager->getRenderer().getShaderDefineIdx("SHADOW_RECEIVER");
+
 	enableZTest(true);
 	enableBackfaceCulling(true);
 	enableShadowReceiving(true);
@@ -87,14 +96,13 @@ bool Material::isAlphaCutout() const
 	if (!isReady()) return false;
 	if (!m_shader)	return false;
 
-	return (m_shader_mask &
-			m_shader->getDefineMask(m_alpha_cutout_define_idx)) != 0;
+	return (m_shader_mask & m_shader->getDefineMask(s_alpha_cutout_define_idx)) != 0;
 }
 
 
 bool Material::hasAlphaCutoutDefine() const
 {
-	return m_shader->getDefineMask(m_alpha_cutout_define_idx) != 0;
+	return m_shader->getDefineMask(s_alpha_cutout_define_idx) != 0;
 }
 
 
@@ -103,7 +111,7 @@ void Material::enableAlphaCutout(bool enable)
 	if (!isReady()) return;
 	if (!m_shader)	return;
 
-	uint32_t mask = m_shader->getDefineMask(m_alpha_cutout_define_idx);
+	uint32_t mask = m_shader->getDefineMask(s_alpha_cutout_define_idx);
 	if (enable)
 	{
 		m_shader_mask |= mask;
@@ -122,14 +130,13 @@ bool Material::isShadowReceiver() const
 	if (!isReady()) return false;
 	if (!m_shader)	return false;
 
-	return (m_shader_mask &
-			m_shader->getDefineMask(m_shadow_receiver_define_idx)) != 0;
+	return (m_shader_mask & m_shader->getDefineMask(s_shadow_receiver_define_idx)) != 0;
 }
 
 
 bool Material::hasShadowReceivingDefine() const
 {
-	return m_shader->getDefineMask(m_shadow_receiver_define_idx) != 0;
+	return m_shader->getDefineMask(s_shadow_receiver_define_idx) != 0;
 }
 
 
@@ -138,7 +145,7 @@ void Material::enableShadowReceiving(bool enable)
 	if (!isReady()) return;
 	if (!m_shader)	return;
 
-	uint32_t mask = m_shader->getDefineMask(m_shadow_receiver_define_idx);
+	uint32_t mask = m_shader->getDefineMask(s_shadow_receiver_define_idx);
 	if (enable)
 	{
 		m_shader_mask |= mask;
@@ -323,15 +330,11 @@ void Material::setTexturePath(int i, const Path& path)
 void Material::setTexture(int i, Texture* texture)
 { 
 	Texture* old_texture = i < m_texture_count ? m_textures[i] : nullptr;
-	if (texture)
-	{
-		addDependency(*texture);
-	}
+
+	if (texture) addDependency(*texture);
 	m_textures[i] = texture;
-	if (i >= m_texture_count)
-	{
-		m_texture_count = i + 1;
-	}
+	if (i >= m_texture_count) m_texture_count = i + 1;
+
 	if (old_texture)
 	{
 		if (texture) texture->setAtlasSize(old_texture->getAtlasSize());
@@ -365,10 +368,7 @@ void Material::setShader(const Path& path)
 void Material::onBeforeReady()
 {
 	if (!m_shader) return;
-	m_alpha_cutout_define_idx =
-		m_shader->getRenderer().getShaderDefineIdx("ALPHA_CUTOUT");
-	m_shadow_receiver_define_idx =
-		m_shader->getRenderer().getShaderDefineIdx("SHADOW_RECEIVER");
+
 	for (int i = 0; i < m_shader->getTextureSlotCount(); ++i)
 	{
 		if (m_shader->getTextureSlot(i).m_define_idx >= 0 && m_textures[i])
