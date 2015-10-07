@@ -78,6 +78,7 @@ class Terrain
 		bgfx::IndexBufferHandle getIndicesHandle() const { return m_indices_handle; }
 		Material* getMaterial() const { return m_material; }
 		Texture* getDetailTexture() const { return m_detail_texture; }
+		Texture* getSplatmap() const { return m_splatmap; }
 		int64_t getLayerMask() const { return m_layer_mask; }
 		Entity getEntity() const { return m_entity; }
 		float getRootSize() const;
