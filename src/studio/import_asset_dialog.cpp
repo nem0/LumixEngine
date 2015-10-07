@@ -109,7 +109,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 	void* data = crn_compress(comp_params, mipmap_params, size);
 	if (!data)
 	{
-		dialog.setErrorMessage(
+		dialog.setMessage(
 			StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Could not convert ")
 			<< source_path);
 		return false;
@@ -120,7 +120,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 		Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE);
 	if (!file)
 	{
-		dialog.setErrorMessage(
+		dialog.setMessage(
 			StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Could not save ")
 			<< dest_path);
 		crn_free_block(data);
@@ -178,7 +178,7 @@ struct ImportTextureTask : public Lumix::MT::Task
 
 		if (!data)
 		{
-			m_dialog.setErrorMessage(
+			m_dialog.setMessage(
 				StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Could not load ") << m_dialog.m_source);
 			return -1;
 		}
@@ -208,7 +208,7 @@ struct ImportTextureTask : public Lumix::MT::Task
 
 			if (!Lumix::copyFile(m_dialog.m_source, dest_path))
 			{
-				m_dialog.setErrorMessage(
+				m_dialog.setMessage(
 					StringBuilder<Lumix::MAX_PATH_LENGTH * 2 + 30>("Could not copy ")
 					<< m_dialog.m_source
 					<< " to "
@@ -262,20 +262,25 @@ struct ImportTask : public Lumix::MT::Task
 		m_dialog.m_importer.SetPropertyInteger(
 			AI_CONFIG_PP_RVC_FLAGS, aiComponent_LIGHTS | aiComponent_CAMERAS);
 		unsigned int flags = aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent |
-			aiProcess_GenUVCoords | aiProcess_RemoveRedundantMaterials |
-			aiProcess_Triangulate | aiProcess_LimitBoneWeights |
-			aiProcess_OptimizeGraph | aiProcess_OptimizeMeshes |
-			aiProcess_CalcTangentSpace;
-		flags |= m_dialog.m_gen_smooth_normal ? aiProcess_GenSmoothNormals
-											  : aiProcess_GenNormals;
+							 aiProcess_GenUVCoords | aiProcess_RemoveRedundantMaterials |
+							 aiProcess_Triangulate | aiProcess_LimitBoneWeights |
+							 aiProcess_OptimizeGraph | aiProcess_CalcTangentSpace;
+		flags |= m_dialog.m_gen_smooth_normal ? aiProcess_GenSmoothNormals : aiProcess_GenNormals;
+		flags |= m_dialog.m_optimize_mesh_on_import ? aiProcess_OptimizeMeshes : 0;
 		const aiScene* scene =
 			m_dialog.m_importer.ReadFile(m_dialog.m_source, flags);
 		if (!scene || !scene->mMeshes || !scene->mMeshes[0]->mTangents)
 		{
-			m_dialog.setErrorMessage(m_dialog.m_importer.GetErrorString());
+			m_dialog.setMessage(m_dialog.m_importer.GetErrorString());
 			Lumix::g_log_error.log("import")
 				<< m_dialog.m_importer.GetErrorString();
 		}
+		m_dialog.m_mesh_mask.resize(scene->mNumMeshes);
+		for (int i = 0; i < m_dialog.m_mesh_mask.size(); ++i)
+		{
+			m_dialog.m_mesh_mask[i] = true;
+		}
+
 		Lumix::enableFloatingPointTraps(true);
 
 		return 0;
@@ -319,7 +324,7 @@ struct ConvertTask : public Lumix::MT::Task
 			const aiTexture* texture = scene->mTextures[i];
 			if (texture->mHeight != 0)
 			{
-				m_dialog.setErrorMessage(
+				m_dialog.setMessage(
 					"Uncompressed texture embedded. This is not supported.");
 				return false;
 			}
@@ -386,6 +391,14 @@ struct ConvertTask : public Lumix::MT::Task
 			dest << "/" << texture_info.m_basename << ".dds";
 			int image_width, image_height, dummy;
 			auto data = stbi_load(source, &image_width, &image_height, &dummy, 4);
+			if (!data)
+			{
+				StringBuilder<Lumix::MAX_PATH_LENGTH + 20> error_msg(
+					"Could not load image ", source);
+				m_dialog.setMessage(error_msg);
+				return false;
+			}
+
 			if (!saveAsDDS(m_dialog,
 						   m_dialog.m_editor.getEngine().getFileSystem(),
 						   source,
@@ -395,7 +408,7 @@ struct ConvertTask : public Lumix::MT::Task
 						   dest))
 			{
 				stbi_image_free(data);
-				m_dialog.setErrorMessage(
+				m_dialog.setMessage(
 					StringBuilder<Lumix::MAX_PATH_LENGTH * 2 + 20>(
 						"Error converting ", source, " to ", dest));
 				return false;
@@ -409,7 +422,7 @@ struct ConvertTask : public Lumix::MT::Task
 				 << texture_info.m_extension;
 			if (strcmp(source, dest) != 0 && !Lumix::copyFile(source, dest))
 			{
-				m_dialog.setErrorMessage(
+				m_dialog.setMessage(
 					StringBuilder<Lumix::MAX_PATH_LENGTH * 2 + 20>(
 						"Error copying ", source, " to ", dest));
 				return false;
@@ -470,7 +483,7 @@ struct ConvertTask : public Lumix::MT::Task
 			Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
 		if (!file)
 		{
-			m_dialog.setErrorMessage(
+			m_dialog.setMessage(
 				StringBuilder<20 + Lumix::MAX_PATH_LENGTH>(
 				"Could not create ",
 				output_material_name));
@@ -510,7 +523,7 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 		else if (material->GetTextureCount(aiTextureType_NORMALS) > 1)
 		{
-			m_dialog.setErrorMessage(
+			m_dialog.setMessage(
 				StringBuilder<Lumix::MAX_PATH_LENGTH + 20>(
 				"Too many normal maps in ", material_name.C_Str()));
 			fs.close(*file);
@@ -524,9 +537,9 @@ struct ConvertTask : public Lumix::MT::Task
 
 	virtual int task() override
 	{
-		if (saveLumixPhysics() && saveLumixModel())
+		if (saveLumixPhysics() && saveLumixModel() && saveLumixMaterials())
 		{
-			saveLumixMaterials();
+			m_dialog.setMessage("Success.");
 		}
 		return 0;
 	}
@@ -585,7 +598,9 @@ struct ConvertTask : public Lumix::MT::Task
 		int offset = 0;
 		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 		{
+			if (!m_dialog.m_mesh_mask[i]) continue;
 			const aiMesh* mesh = scene->mMeshes[i];
+
 			for (unsigned int j = 0; j < mesh->mNumBones; ++j)
 			{
 				const aiBone* bone = mesh->mBones[j];
@@ -638,6 +653,8 @@ struct ConvertTask : public Lumix::MT::Task
 		int32_t vertices_size = 0;
 		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 		{
+			if (!m_dialog.m_mesh_mask[i]) continue;
+
 			indices_count += scene->mMeshes[i]->mNumFaces * 3;
 			vertices_count += scene->mMeshes[i]->mNumVertices;
 			vertices_size +=
@@ -648,6 +665,8 @@ struct ConvertTask : public Lumix::MT::Task
 		int32_t polygon_idx = 0;
 		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 		{
+			if (!m_dialog.m_mesh_mask[i]) continue;
+
 			const aiMesh* mesh = scene->mMeshes[i];
 			for (unsigned int j = 0; j < mesh->mNumFaces; ++j)
 			{
@@ -668,6 +687,8 @@ struct ConvertTask : public Lumix::MT::Task
 		int skin_index = 0;
 		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 		{
+			if (!m_dialog.m_mesh_mask[i]) continue;
+
 			const aiMesh* mesh = scene->mMeshes[i];
 			bool is_skinned = isSkinned(mesh);
 			for (unsigned int j = 0; j < mesh->mNumVertices; ++j)
@@ -720,7 +741,7 @@ struct ConvertTask : public Lumix::MT::Task
 	{
 		int count = 3; // position, normal, uv
 		if (isSkinned(mesh)) count += 2;
-		if (mesh->mColors) ++count;
+		if (mesh->mColors[0]) ++count;
 		if (mesh->mTangents) ++count;
 		return count;
 	}
@@ -746,13 +767,19 @@ struct ConvertTask : public Lumix::MT::Task
 	void writeMeshes(Lumix::FS::IFile& file) const
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
-		int32_t mesh_count = (int32_t)scene->mNumMeshes;
+		int32_t mesh_count = 0;
+		for (int i = 0; i < m_dialog.m_mesh_mask.size(); ++i)
+		{
+			if (m_dialog.m_mesh_mask[i]) ++mesh_count;
+		}
 
 		file.write((const char*)&mesh_count, sizeof(mesh_count));
 		int32_t attribute_array_offset = 0;
 		int32_t indices_offset = 0;
 		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 		{
+			if (!m_dialog.m_mesh_mask[i]) continue;
+
 			const aiMesh* mesh = scene->mMeshes[i];
 			int vertex_size = getVertexSize(mesh);
 			aiString material_name;
@@ -847,6 +874,17 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
+	void writeLods(Lumix::FS::IFile& file) const
+	{
+		int32_t lod_count = 1;
+		file.write((const char*)&lod_count, sizeof(lod_count));
+		int32_t to_mesh = m_dialog.m_importer.GetScene()->mNumMeshes - 1;
+		file.write((const char*)&to_mesh, sizeof(to_mesh));
+		float distance = FLT_MAX;
+		file.write((const char*)&distance, sizeof(distance));
+	}
+
+
 	void writeSkeleton(Lumix::FS::IFile& file) const
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
@@ -886,13 +924,10 @@ struct ConvertTask : public Lumix::MT::Task
 		PathBuilder phy_path(m_dialog.m_editor.getBasePath());
 		phy_path << "/" << filename;
 		Lumix::FS::IFile* file =
-			fs.open(fs.getDiskDevice(),
-					phy_path,
-					Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
+			fs.open(fs.getDiskDevice(), phy_path, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
 		if (!file)
 		{
-			Lumix::g_log_error.log("import") << "Could not create file "
-											 << phy_path;
+			Lumix::g_log_error.log("import") << "Could not create file " << phy_path;
 			return false;
 		}
 
@@ -902,22 +937,23 @@ struct ConvertTask : public Lumix::MT::Task
 		int32_t count = 0;
 		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 		{
+			if (!m_dialog.m_mesh_mask[i]) continue;
+
 			count += (int32_t)scene->mMeshes[i]->mNumVertices;
 		}
 		file->write((const char*)&count, sizeof(count));
 		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 		{
+			if (!m_dialog.m_mesh_mask[i]) continue;
+
 			const aiMesh* mesh = scene->mMeshes[i];
-			file->write((const char*)mesh->mVertices,
-				sizeof(mesh->mVertices[0]) * mesh->mNumVertices);
+			file->write(
+				(const char*)mesh->mVertices, sizeof(mesh->mVertices[0]) * mesh->mNumVertices);
 		}
 
-		if (!m_dialog.m_make_convex)
-		{
-			writePhysiscTriMesh(*file);
-		}
+		if (!m_dialog.m_make_convex) writePhysiscTriMesh(*file);
 		fs.close(*file);
-		
+
 		return true;
 	}
 
@@ -928,12 +964,16 @@ struct ConvertTask : public Lumix::MT::Task
 		const aiScene* scene = m_dialog.m_importer.GetScene();
 		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 		{
+			if (!m_dialog.m_mesh_mask[i]) continue;
+
 			count += (int32_t)scene->mMeshes[i]->mNumFaces * 3;
 		}
 		file.write((const char*)&count, sizeof(count));
 		int offset = 0;
 		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 		{
+			if (!m_dialog.m_mesh_mask[i]) continue;
+
 			const aiMesh* mesh = scene->mMeshes[i];
 			for (unsigned int j = 0; j < mesh->mNumFaces; ++j)
 			{
@@ -955,22 +995,24 @@ struct ConvertTask : public Lumix::MT::Task
 		const aiScene* scene = m_dialog.m_importer.GetScene();
 		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 		{
+			if (!m_dialog.m_mesh_mask[i]) continue;
+
 			const aiMesh* mesh = scene->mMeshes[i];
 			if (!mesh->HasNormals())
 			{
-				m_dialog.setErrorMessage(StringBuilder<256>(
+				m_dialog.setMessage(StringBuilder<256>(
 					"Mesh ", mesh->mName.C_Str(), " has no normals."));
 				return false;
 			}
 			if (!mesh->HasPositions())
 			{
-				m_dialog.setErrorMessage(StringBuilder<256>(
+				m_dialog.setMessage(StringBuilder<256>(
 					"Mesh ", mesh->mName.C_Str(), " has no positions."));
 				return false;
 			}
 			if (!mesh->HasTextureCoords(0))
 			{
-				m_dialog.setErrorMessage(StringBuilder<256>(
+				m_dialog.setMessage(StringBuilder<256>(
 					"Mesh ", mesh->mName.C_Str(), " has no texture coords."));
 				return false;
 			}
@@ -1008,7 +1050,7 @@ struct ConvertTask : public Lumix::MT::Task
 					Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
 		if (!file)
 		{
-			m_dialog.setErrorMessage(
+			m_dialog.setMessage(
 				StringBuilder<Lumix::MAX_PATH_LENGTH + 15>(
 					"Failed to open ", path));
 			return false;
@@ -1018,13 +1060,7 @@ struct ConvertTask : public Lumix::MT::Task
 		writeMeshes(*file);
 		writeGeometry(*file);
 		writeSkeleton(*file);
-
-		int32_t lod_count = 1;
-		file->write((const char*)&lod_count, sizeof(lod_count));
-		int32_t to_mesh = m_dialog.m_importer.GetScene()->mNumMeshes - 1;
-		file->write((const char*)&to_mesh, sizeof(to_mesh));
-		float distance = FLT_MAX;
-		file->write((const char*)&distance, sizeof(distance));
+		writeLods(*file);
 
 		fs.close(*file);
 		return true;
@@ -1049,9 +1085,10 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	, m_saved_textures(editor.getAllocator())
 	, m_saved_embedded_textures(editor.getAllocator())
 	, m_path_mapping(editor.getAllocator())
+	, m_mesh_mask(editor.getAllocator())
 {
 	m_is_opened = false;
-	m_error_message[0] = '\0';
+	m_message[0] = '\0';
 	m_import_message[0] = '\0';
 	m_task = nullptr;
 	m_source[0] = '\0';
@@ -1075,24 +1112,22 @@ bool ImportAssetDialog::checkTexture(const char* source_dir, const char* texture
 						   ? texture_path
 						   : PathBuilder(source_dir) << "/" << texture_path;
 
-	if (!Lumix::fileExists(path))
-	{
-		char new_path[Lumix::MAX_PATH_LENGTH];
-		Lumix::messageBox(
-			message
-				? message
-				: StringBuilder<Lumix::MAX_PATH_LENGTH + 40>("Texture ")
-					  << path
-					  << " not found, please locate it");
-		if (Lumix::getOpenFilename(new_path, sizeof(new_path), "All\0*.*\0"))
-		{
-			Lumix::string old_path_str(path, m_editor.getAllocator());
-			Lumix::string new_path_str(new_path, m_editor.getAllocator());
-			m_path_mapping.insert(old_path_str, new_path_str);
-			return true;
-		}
-		return false;
-	}
+	if (Lumix::fileExists(path)) return true;
+
+	char new_path[Lumix::MAX_PATH_LENGTH];
+	Lumix::messageBox(
+		message
+			? message
+			: StringBuilder<Lumix::MAX_PATH_LENGTH + 40>("Texture ")
+					<< path
+					<< " not found, please locate it");
+
+	if (!Lumix::getOpenFilename(new_path, sizeof(new_path), "All\0*.*\0")) return false;
+
+	Lumix::string old_path_str(path, m_editor.getAllocator());
+	Lumix::string new_path_str(new_path, m_editor.getAllocator());
+	m_path_mapping.erase(old_path_str);
+	m_path_mapping.insert(old_path_str, new_path_str);
 	return true;
 }
 
@@ -1195,10 +1230,10 @@ void ImportAssetDialog::checkSource()
 }
 
 
-void ImportAssetDialog::setErrorMessage(const char* message)
+void ImportAssetDialog::setMessage(const char* message)
 {
 	Lumix::MT::SpinLock lock(m_mutex);
-	Lumix::copyString(m_error_message, message);
+	Lumix::copyString(m_message, message);
 }
 
 
@@ -1209,17 +1244,17 @@ void ImportAssetDialog::setImportMessage(const char* message)
 }
 
 
-void ImportAssetDialog::getErrorMessage(char* msg, int max_size)
+void ImportAssetDialog::getMessage(char* msg, int max_size)
 {
 	Lumix::MT::SpinLock lock(m_mutex);
-	Lumix::copyString(msg, max_size, m_error_message);
+	Lumix::copyString(msg, max_size, m_message);
 }
 
 
-bool ImportAssetDialog::hasErrorMessage()
+bool ImportAssetDialog::hasMessage()
 {
 	Lumix::MT::SpinLock lock(m_mutex);
-	return m_error_message[0] != '\0';
+	return m_message[0] != '\0';
 }
 
 
@@ -1265,14 +1300,14 @@ void ImportAssetDialog::onGUI()
 
 	if (ImGui::Begin("Import asset", &m_is_opened))
 	{
-		if (hasErrorMessage())
+		if (hasMessage())
 		{
 			char msg[1024];
-			getErrorMessage(msg, sizeof(msg));
+			getMessage(msg, sizeof(msg));
 			ImGui::Text(msg);
 			if (ImGui::Button("OK"))
 			{
-				setErrorMessage("");
+				setMessage("");
 			}
 			ImGui::End();
 			return;
@@ -1298,10 +1333,9 @@ void ImportAssetDialog::onGUI()
 			return;
 		}
 
-		if (ImGui::Checkbox("Smooth normals", &m_gen_smooth_normal))
-		{
-			checkSource();
-		}
+		if (ImGui::Checkbox("Optimize meshes", &m_optimize_mesh_on_import)) checkSource();
+		ImGui::SameLine();
+		if (ImGui::Checkbox("Smooth normals", &m_gen_smooth_normal)) checkSource();
 
 		if (ImGui::InputText("Source", m_source, sizeof(m_source))) checkSource();
 
@@ -1333,7 +1367,6 @@ void ImportAssetDialog::onGUI()
 		if (m_importer.GetScene())
 		{
 			auto* scene = m_importer.GetScene();
-			ImGui::Checkbox("Create directory", &m_create_directory);
 			if (scene->HasMaterials())
 			{
 				ImGui::Checkbox(StringBuilder<50>("Import materials (",
@@ -1368,8 +1401,9 @@ void ImportAssetDialog::onGUI()
 					for (int i = 0; i < (int)scene->mNumMeshes; ++i)
 					{
 						const char* name = scene->mMeshes[i]->mName.C_Str();
-						bool b;
+						bool b = m_mesh_mask[i];
 						ImGui::Checkbox(name[0] == '\0' ? "N/A" : name, &b);
+						m_mesh_mask[i] = b;
 					}
 				}
 			}
