@@ -247,7 +247,8 @@ void Model::create(const bgfx::VertexDecl& def,
 	m_vertices_size = attributes_size;
 
 	ASSERT(!bgfx::isValid(m_indices_handle));
-	m_indices_handle = bgfx::createIndexBuffer(bgfx::copy(indices_data, indices_size));
+	auto* mem = bgfx::copy(indices_data, indices_size);
+	m_indices_handle = bgfx::createIndexBuffer(mem, BGFX_BUFFER_INDEX32);
 	m_indices_size = indices_size;
 
 	m_meshes.emplace(def,
@@ -321,19 +322,14 @@ bool Model::parseGeometry(FS::IFile& file)
 {
 	int32_t indices_count = 0;
 	file.read(&indices_count, sizeof(indices_count));
-	if (indices_count <= 0)
-	{
-		return false;
-	}
+	if (indices_count <= 0) return false;
+
 	m_indices.resize(indices_count);
 	file.read(&m_indices[0], sizeof(m_indices[0]) * indices_count);
 
 	int32_t vertices_size = 0;
 	file.read(&vertices_size, sizeof(vertices_size));
-	if (vertices_size <= 0)
-	{
-		return false;
-	}
+	if (vertices_size <= 0) return false;
 
 	ASSERT(!bgfx::isValid(m_vertices_handle));
 	const bgfx::Memory* vertices_mem = bgfx::alloc(vertices_size);
@@ -343,9 +339,8 @@ bool Model::parseGeometry(FS::IFile& file)
 
 	ASSERT(!bgfx::isValid(m_indices_handle));
 	m_indices_size = sizeof(m_indices[0]) * indices_count;
-	const bgfx::Memory* mem = bgfx::alloc(m_indices_size);
-	memcpy(mem->data, &m_indices[0], m_indices_size);
-	m_indices_handle = bgfx::createIndexBuffer(mem);
+	const bgfx::Memory* mem = bgfx::copy(&m_indices[0], m_indices_size);
+	m_indices_handle = bgfx::createIndexBuffer(mem, BGFX_BUFFER_INDEX32);
 
 	int vertex_count = 0;
 	for (int i = 0; i < m_meshes.size(); ++i)
