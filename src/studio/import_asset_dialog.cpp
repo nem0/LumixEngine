@@ -312,6 +312,7 @@ struct ConvertTask : public Lumix::MT::Task
 	ConvertTask(ImportAssetDialog& dialog)
 		: Task(dialog.m_editor.getAllocator())
 		, m_dialog(dialog)
+		, m_filtered_meshes(dialog.m_editor.getAllocator())
 	{
 	}
 
@@ -596,11 +597,8 @@ struct ConvertTask : public Lumix::MT::Task
 		infos.resize(vertices_count);
 
 		int offset = 0;
-		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		for (auto* mesh : m_filtered_meshes)
 		{
-			if (!m_dialog.m_mesh_mask[i]) continue;
-			const aiMesh* mesh = scene->mMeshes[i];
-
 			for (unsigned int j = 0; j < mesh->mNumBones; ++j)
 			{
 				const aiBone* bone = mesh->mBones[j];
@@ -651,23 +649,17 @@ struct ConvertTask : public Lumix::MT::Task
 		int32_t indices_count = 0;
 		int vertices_count = 0;
 		int32_t vertices_size = 0;
-		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		for (auto* mesh : m_filtered_meshes)
 		{
-			if (!m_dialog.m_mesh_mask[i]) continue;
-
-			indices_count += scene->mMeshes[i]->mNumFaces * 3;
-			vertices_count += scene->mMeshes[i]->mNumVertices;
-			vertices_size +=
-				scene->mMeshes[i]->mNumVertices * getVertexSize(scene->mMeshes[i]);
+			indices_count += mesh->mNumFaces * 3;
+			vertices_count += mesh->mNumVertices;
+			vertices_size += mesh->mNumVertices * getVertexSize(mesh);
 		}
 
 		file.write((const char*)&indices_count, sizeof(indices_count));
 		int32_t polygon_idx = 0;
-		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		for (auto* mesh : m_filtered_meshes)
 		{
-			if (!m_dialog.m_mesh_mask[i]) continue;
-
-			const aiMesh* mesh = scene->mMeshes[i];
 			for (unsigned int j = 0; j < mesh->mNumFaces; ++j)
 			{
 				polygon_idx = mesh->mFaces[j].mIndices[0];
@@ -685,11 +677,8 @@ struct ConvertTask : public Lumix::MT::Task
 		fillSkinInfo(scene, skin_infos, vertices_count);
 		
 		int skin_index = 0;
-		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		for (auto* mesh : m_filtered_meshes)
 		{
-			if (!m_dialog.m_mesh_mask[i]) continue;
-
-			const aiMesh* mesh = scene->mMeshes[i];
 			bool is_skinned = isSkinned(mesh);
 			for (unsigned int j = 0; j < mesh->mNumVertices; ++j)
 			{
@@ -776,11 +765,8 @@ struct ConvertTask : public Lumix::MT::Task
 		file.write((const char*)&mesh_count, sizeof(mesh_count));
 		int32_t attribute_array_offset = 0;
 		int32_t indices_offset = 0;
-		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		for (auto* mesh : m_filtered_meshes)
 		{
-			if (!m_dialog.m_mesh_mask[i]) continue;
-
-			const aiMesh* mesh = scene->mMeshes[i];
 			int vertex_size = getVertexSize(mesh);
 			aiString material_name;
 			scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_NAME,
@@ -824,7 +810,6 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-
 	static void writeAttribute(const char* attribute_name,
 		VertexAttributeDef attribute_type,
 		Lumix::FS::IFile& file)
@@ -838,8 +823,7 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	static void
-		writeNode(Lumix::FS::IFile& file, const aiNode* node, aiMatrix4x4 parent_transform)
+	static void writeNode(Lumix::FS::IFile& file, const aiNode* node, aiMatrix4x4 parent_transform)
 	{
 		int32_t len = (int32_t)strlen(node->mName.C_Str());
 		file.write((const char*)&len, sizeof(len));
@@ -876,12 +860,38 @@ struct ConvertTask : public Lumix::MT::Task
 
 	void writeLods(Lumix::FS::IFile& file) const
 	{
-		int32_t lod_count = 1;
-		file.write((const char*)&lod_count, sizeof(lod_count));
-		int32_t to_mesh = m_dialog.m_importer.GetScene()->mNumMeshes - 1;
-		file.write((const char*)&to_mesh, sizeof(to_mesh));
-		float distance = FLT_MAX;
-		file.write((const char*)&distance, sizeof(distance));
+		int32_t lods[] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+		int32_t lod_count = -1;
+		float factors[8];
+		for (int i = 0; i < m_filtered_meshes.size(); ++i)
+		{
+			int lod = getMeshLOD(&m_filtered_meshes[i]);
+			if (lod < 0 || lod >= Lumix::lengthOf(lods)) break;
+			lods[lod] = i;
+			factors[lod] = getMeshLODFactor(m_filtered_meshes[i]);
+			lod_count = Lumix::Math::maxValue(lod_count, lod + 1);
+		}
+
+		if (lods[0] < 0)
+		{
+			lod_count = 1;
+			file.write((const char*)&lod_count, sizeof(lod_count));
+			int32_t to_mesh = m_filtered_meshes.size() - 1;
+			file.write((const char*)&to_mesh, sizeof(to_mesh));
+			float distance = FLT_MAX;
+			file.write((const char*)&distance, sizeof(distance));
+		}
+		else
+		{
+			file.write((const char*)&lod_count, sizeof(lod_count));
+			for (int i = 0; i < lod_count; ++i)
+			{
+				int32_t to_mesh = lods[i];
+				file.write((const char*)&to_mesh, sizeof(to_mesh));
+				float factor = i == lod_count - 1 ? FLT_MAX : factors[i];
+				file.write((const char*)&factor, sizeof(factor));
+			}
+		}
 	}
 
 
@@ -935,18 +945,13 @@ struct ConvertTask : public Lumix::MT::Task
 
 		writePhysicsHeader(*file);
 		int32_t count = 0;
-		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		for (auto* mesh : m_filtered_meshes)
 		{
-			if (!m_dialog.m_mesh_mask[i]) continue;
-
-			count += (int32_t)scene->mMeshes[i]->mNumVertices;
+			count += (int32_t)mesh->mNumVertices;
 		}
 		file->write((const char*)&count, sizeof(count));
-		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		for (auto* mesh : m_filtered_meshes)
 		{
-			if (!m_dialog.m_mesh_mask[i]) continue;
-
-			const aiMesh* mesh = scene->mMeshes[i];
 			file->write(
 				(const char*)mesh->mVertices, sizeof(mesh->mVertices[0]) * mesh->mNumVertices);
 		}
@@ -962,19 +967,14 @@ struct ConvertTask : public Lumix::MT::Task
 	{
 		int count = 0;
 		const aiScene* scene = m_dialog.m_importer.GetScene();
-		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		for (auto* mesh : m_filtered_meshes)
 		{
-			if (!m_dialog.m_mesh_mask[i]) continue;
-
-			count += (int32_t)scene->mMeshes[i]->mNumFaces * 3;
+			count += (int32_t)mesh->mNumFaces * 3;
 		}
 		file.write((const char*)&count, sizeof(count));
 		int offset = 0;
-		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		for (auto* mesh : m_filtered_meshes)
 		{
-			if (!m_dialog.m_mesh_mask[i]) continue;
-
-			const aiMesh* mesh = scene->mMeshes[i];
 			for (unsigned int j = 0; j < mesh->mNumFaces; ++j)
 			{
 				ASSERT(mesh->mFaces[j].mNumIndices == 3);
@@ -993,11 +993,8 @@ struct ConvertTask : public Lumix::MT::Task
 	bool checkModel() const
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
-		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		for (auto* mesh : m_filtered_meshes)
 		{
-			if (!m_dialog.m_mesh_mask[i]) continue;
-
-			const aiMesh* mesh = scene->mMeshes[i];
 			if (!mesh->HasNormals())
 			{
 				m_dialog.setMessage(StringBuilder<256>(
@@ -1030,6 +1027,81 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
+	static float getMeshLODFactor(const aiMesh* mesh)
+	{
+		const char* mesh_name = mesh->mName.C_Str();
+		int len = int(strlen(mesh_name));
+		if (len < 5) return FLT_MAX;
+
+		const char* last = mesh_name + len - 1;
+		while (last > mesh_name && *last >= '0' && *last <= '9')
+		{
+			--last;
+		}
+		++last;
+		if (last < mesh_name + 4) FLT_MAX;
+		if (strncmp(last - 4, "_LOD", 4) != 0) return FLT_MAX;
+		const char* end_of_factor = last - 4;
+		const char* begin_factor = end_of_factor - 1;
+		if (begin_factor <= mesh_name) return FLT_MAX;
+		
+		while (*begin_factor != '_' && begin_factor > mesh_name)
+		{
+			--begin_factor;
+		}
+		++begin_factor;
+
+		if (begin_factor == end_of_factor) return FLT_MAX;
+		int factor;
+		Lumix::fromCString(begin_factor, end_of_factor - begin_factor, &factor);
+
+		return float(factor);
+	}
+
+
+	static int getMeshLOD(const aiMesh* const * mesh_ptr)
+	{
+		const aiMesh* const mesh = *mesh_ptr;
+
+		const char* mesh_name = mesh->mName.C_Str();
+		int len = int(strlen(mesh_name));
+		if (len < 5) return -1;
+
+		const char* last = mesh_name + len - 1;
+		while (last > mesh_name && *last >= '0' && *last <= '9')
+		{
+			--last;
+		}
+		++last;
+		if (last < mesh_name + 4) return -1;
+		if (strncmp(last - 4, "_LOD", 4) != 0) return -1;
+
+		int lod;
+		Lumix::fromCString(last, len - (last - mesh_name), &lod);
+
+		return lod;
+	}
+
+
+	void filterMeshes()
+	{
+		const aiScene* scene = m_dialog.m_importer.GetScene();
+		m_filtered_meshes.clear();
+		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		{
+			if (m_dialog.m_mesh_mask[i]) m_filtered_meshes.push(scene->mMeshes[i]);
+		}
+
+		auto cmpMeshes = [](const void* a, const void* b) -> int {
+			auto a_mesh = static_cast<aiMesh* const *>(a);
+			auto b_mesh = static_cast<aiMesh* const *>(b);
+			return getMeshLOD(a_mesh) - getMeshLOD(b_mesh);
+		};
+
+		qsort(&m_filtered_meshes[0], m_filtered_meshes.size(), sizeof(m_filtered_meshes[0]), cmpMeshes);
+	}
+
+
 	bool saveLumixModel()
 	{
 		ASSERT(m_dialog.m_output_dir[0] != '\0');
@@ -1056,6 +1128,8 @@ struct ConvertTask : public Lumix::MT::Task
 			return false;
 		}
 
+		filterMeshes();
+
 		writeModelHeader(*file);
 		writeMeshes(*file);
 		writeGeometry(*file);
@@ -1066,6 +1140,7 @@ struct ConvertTask : public Lumix::MT::Task
 		return true;
 	}
 
+	Lumix::Array<aiMesh*> m_filtered_meshes;
 	ImportAssetDialog& m_dialog;
 
 }; // struct ConvertTask
