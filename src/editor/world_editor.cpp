@@ -3299,13 +3299,13 @@ private:
 
 WorldEditor* WorldEditor::create(const char* base_path, Engine& engine, IAllocator& allocator)
 {
-	return allocator.newObject<WorldEditorImpl>(base_path, engine, allocator);
+	return LUMIX_NEW(allocator, WorldEditorImpl)(base_path, engine, allocator);
 }
 
 
 void WorldEditor::destroy(WorldEditor* editor, IAllocator& allocator)
 {
-	allocator.deleteObject(static_cast<WorldEditorImpl*>(editor));
+	LUMIX_DELETE(allocator, static_cast<WorldEditorImpl*>(editor));
 }
 
 

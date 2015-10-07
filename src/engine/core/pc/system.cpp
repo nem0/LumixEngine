@@ -260,4 +260,10 @@ namespace Lumix
 		return SHCreateDirectoryEx(NULL, path, NULL) == ERROR_SUCCESS;
 	}
 
+
+	bool getCommandLine(char* output, int max_size)
+	{
+		return copyString(output, max_size, GetCommandLine());
+	}
+
 }
