@@ -30,4 +30,6 @@ namespace Lumix
 	LUMIX_ENGINE_API int getProcessExitCode(Process& process);
 	LUMIX_ENGINE_API int getProcessOutput(Process& process, char* buf, int buf_size);
 	LUMIX_ENGINE_API bool makePath(const char* path);
+
+	LUMIX_ENGINE_API bool getCommandLine(char* output, int max_size);
 }
