@@ -47,10 +47,37 @@ public:
 	void getCurrent(char* output, int max_size)
 	{
 		ASSERT(*m_current);
-		/*if (*m_current != '"')
+		ASSERT(max_size > 0);
+		const char* rhs = m_current;
+		char* end = output + max_size;
+		char* lhs = output;
+		if (*m_current == '"')
 		{
-		while(*m_current && !isWhitespace(*m_current))
-		}*/
+			*lhs = '"';
+			++rhs;
+			++lhs;
+			while (*rhs && *rhs != '"' && lhs != end)
+			{
+				*lhs = *rhs;
+				++lhs;
+				++rhs;
+			}
+			if (lhs != end)
+			{
+				*lhs = '"';
+				++lhs;
+			}
+			*lhs = 0;
+			return;
+		}
+		
+		while (*lhs && *rhs && !isWhitespace(*rhs) && lhs != end)
+		{
+			*lhs = *rhs;
+			++lhs;
+			++rhs;
+		}
+		*lhs = 0;
 	}
 
 
