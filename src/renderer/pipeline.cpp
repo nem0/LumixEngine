@@ -1442,6 +1442,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		Texture* detail_texture = info.m_terrain->getDetailTexture();
 		if (!detail_texture) return;
+		Texture* splat_texture = info.m_terrain->getSplatmap();
+		if (!splat_texture) return;
 
 		Matrix inv_world_matrix;
 		inv_world_matrix = info.m_world_matrix;
@@ -1457,7 +1459,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Vec4 terrain_params(info.m_terrain->getRootSize(),
 							(float)detail_texture->getWidth(),
 							(float)detail_texture->getAtlasSize(),
-							0);
+							(float)splat_texture->getWidth());
 		bgfx::setUniform(m_terrain_params_uniform, &terrain_params);
 		bgfx::setUniform(m_rel_camera_pos_uniform, &Vec4(rel_cam_pos, 0));
 		bgfx::setUniform(m_terrain_scale_uniform, &Vec4(info.m_terrain->getScale(), 0));
