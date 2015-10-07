@@ -1,5 +1,6 @@
 #include "asset_browser.h"
 #include "core/blob.h"
+#include "core/command_line_parser.h"
 #include "core/crc32.h"
 #include "core/default_allocator.h"
 #include "core/fs/file_system.h"
@@ -761,6 +762,30 @@ public:
 	}
 
 
+	void loadUserPlugins()
+	{
+		char cmd_line[2048];
+		Lumix::getCommandLine(cmd_line, Lumix::lengthOf(cmd_line));
+
+		Lumix::CommandLineParser parser(cmd_line);
+		auto& plugin_manager = m_editor->getEngine().getPluginManager();
+		while (parser.next())
+		{
+			if (!parser.currentEquals("-plugin")) continue;
+			if (!parser.next()) break;
+	
+			char tmp[Lumix::MAX_PATH_LENGTH];
+			parser.getCurrent(tmp, Lumix::lengthOf(tmp));
+			bool loaded = plugin_manager.load(tmp) != nullptr;
+			if (!loaded)
+			{
+				Lumix::g_log_error.log("init") << "Could not load plugin " << tmp
+											   << " requested by command line";
+			}
+		}
+	}
+
+
 	void init(HWND win)
 	{
 		Lumix::Renderer::setInitData(win);
@@ -768,6 +793,8 @@ public:
 		char current_dir[MAX_PATH];
 		GetCurrentDirectory(sizeof(current_dir), current_dir);
 		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine, m_allocator);
+
+		loadUserPlugins();
 
 		addActions();
 
