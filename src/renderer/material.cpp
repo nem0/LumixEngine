@@ -334,6 +334,7 @@ void Material::setTexture(int i, Texture* texture)
 	}
 	if (old_texture)
 	{
+		if (texture) texture->setAtlasSize(old_texture->getAtlasSize());
 		removeDependency(*old_texture);
 		m_resource_manager.get(ResourceManager::TEXTURE)->unload(*old_texture);
 	}
