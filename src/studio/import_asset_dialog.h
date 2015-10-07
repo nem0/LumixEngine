@@ -4,6 +4,7 @@
 #include "assimp/Importer.hpp"
 #include "core/array.h"
 #include "core/associative_array.h"
+#include "core/binary_array.h"
 #include "core/mt/spin_mutex.h"
 #include "core/string.h"
 #include "lumix.h"
@@ -33,7 +34,7 @@ class ImportAssetDialog
 	public:
 		ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metadata);
 		~ImportAssetDialog();
-		void setErrorMessage(const char* message);
+		void setMessage(const char* message);
 		void setImportMessage(const char* message);
 
 		void onGUI();
@@ -44,8 +45,8 @@ class ImportAssetDialog
 	private:
 		void checkSource();
 		void convert();
-		void getErrorMessage(char* msg, int max_size);
-		bool hasErrorMessage();
+		void getMessage(char* msg, int max_size);
+		bool hasMessage();
 		bool checkTextures();
 		bool checkTexture(const char* source_dir, const char* path, const char* message);
 		void importTexture();
@@ -56,13 +57,14 @@ class ImportAssetDialog
 		Lumix::Array<Lumix::string> m_saved_embedded_textures;
 		Assimp::Importer m_importer;
 		Lumix::AssociativeArray<Lumix::string, Lumix::string> m_path_mapping;
+		Lumix::BinaryArray m_mesh_mask;
 		char m_import_message[1024];
-		char m_error_message[1024];
+		char m_message[1024];
 		char m_source[Lumix::MAX_PATH_LENGTH];
 		char m_output_dir[Lumix::MAX_PATH_LENGTH];
 		bool m_source_exists;
+		bool m_optimize_mesh_on_import;
 		bool m_gen_smooth_normal;
-		bool m_create_directory;
 		bool m_import_materials;
 		bool m_convert_to_dds;
 		bool m_import_animations;

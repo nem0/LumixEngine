@@ -440,10 +440,8 @@ bool Model::parseMeshes(FS::IFile& file)
 {
 	int object_count = 0;
 	file.read(&object_count, sizeof(object_count));
-	if (object_count <= 0)
-	{
-		return false;
-	}
+	if (object_count <= 0) return false;
+
 	m_meshes.reserve(object_count);
 	char model_dir[MAX_PATH_LENGTH];
 	PathUtils::getDir(model_dir, MAX_PATH_LENGTH, getPath().c_str());
@@ -453,10 +451,8 @@ bool Model::parseMeshes(FS::IFile& file)
 		file.read(&str_size, sizeof(str_size));
 		char material_name[MAX_PATH_LENGTH];
 		file.read(material_name, str_size);
-		if (str_size >= MAX_PATH_LENGTH)
-		{
-			return false;
-		}
+		if (str_size >= MAX_PATH_LENGTH) return false;
+
 		material_name[str_size] = 0;
 
 		char material_path[MAX_PATH_LENGTH];
@@ -479,8 +475,10 @@ bool Model::parseMeshes(FS::IFile& file)
 		file.read(&str_size, sizeof(str_size));
 		if (str_size >= MAX_PATH_LENGTH)
 		{
+			m_resource_manager.get(ResourceManager::MATERIAL)->unload(*material);
 			return false;
 		}
+		
 		char mesh_name[MAX_PATH_LENGTH];
 		mesh_name[str_size] = 0;
 		file.read(mesh_name, str_size);

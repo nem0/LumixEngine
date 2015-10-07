@@ -1394,13 +1394,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 		for (int i = 0; i < material->getTextureCount(); ++i)
 		{
 			Texture* texture = material->getTexture(i);
-			if (texture)
-			{
-				bgfx::setTexture(
-					i,
-					shader->getTextureSlot(i).m_uniform_handle,
-					texture->getTextureHandle());
-			}
+			if (!texture) continue;
+
+			bgfx::setTexture(
+				i, shader->getTextureSlot(i).m_uniform_handle, texture->getTextureHandle());
 		}
 
 		Vec4 specular_shininess(material->getSpecular(), material->getShininess());
@@ -1472,8 +1469,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 			Vec4 m_quad_min_and_size;
 			Vec4 m_morph_const;
 		};
-		const bgfx::InstanceDataBuffer* instance_buffer =
-			bgfx::allocInstanceDataBuffer(m_terrain_instances[index].m_count, sizeof(TerrainInstanceData));
+		const bgfx::InstanceDataBuffer* instance_buffer = bgfx::allocInstanceDataBuffer(
+			m_terrain_instances[index].m_count, sizeof(TerrainInstanceData));
 		TerrainInstanceData* instance_data = (TerrainInstanceData*)instance_buffer->data;
 
 		for (int i = 0; i < m_terrain_instances[index].m_count; ++i)
@@ -1481,26 +1478,22 @@ struct PipelineInstanceImpl : public PipelineInstance
 			const TerrainInfo& info = *m_terrain_instances[index].m_infos[i];
 			instance_data[i].m_quad_min_and_size.set(
 				info.m_min.x, info.m_min.y, info.m_min.z, info.m_size);
-			instance_data[i].m_morph_const.set(info.m_morph_const.x,
-											   info.m_morph_const.y,
-											   info.m_morph_const.z,
-											   0);
+			instance_data[i].m_morph_const.set(
+				info.m_morph_const.x, info.m_morph_const.y, info.m_morph_const.z, 0);
 		}
 
 		bgfx::setVertexBuffer(info.m_terrain->getVerticesHandle(),
-							  mesh.getAttributeArrayOffset() /
-								  mesh.getVertexDefinition().getStride(),
-							  mesh.getAttributeArraySize() /
-								  mesh.getVertexDefinition().getStride());
+			mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(),
+			mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
 		int mesh_part_indices_count = mesh.getIndexCount() / 4;
 		bgfx::setIndexBuffer(info.m_terrain->getIndicesHandle(),
-							 info.m_index * mesh_part_indices_count,
-							 mesh_part_indices_count);
+			info.m_index * mesh_part_indices_count,
+			mesh_part_indices_count);
 		bgfx::setState(m_render_state | mesh.getMaterial()->getRenderStates());
-		bgfx::setInstanceDataBuffer(instance_buffer,
-									m_terrain_instances[index].m_count);
+		bgfx::setInstanceDataBuffer(instance_buffer, m_terrain_instances[index].m_count);
 		auto shader_instance = material->getShaderInstance().m_program_handles[m_pass_idx];
 		bgfx::submit(m_view_idx, shader_instance);
+		
 		m_terrain_instances[index].m_count = 0;
 	}
 
