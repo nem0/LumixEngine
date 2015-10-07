@@ -245,6 +245,7 @@ struct ImportTask : public Lumix::MT::Task
 		: Task(dialog.m_editor.getAllocator())
 		, m_dialog(dialog)
 	{
+		m_dialog.m_importer.SetProgressHandler(&m_progress_handler);
 	}
 
 
@@ -258,7 +259,6 @@ struct ImportTask : public Lumix::MT::Task
 	{
 		m_progress_handler.m_task = this;
 		Lumix::enableFloatingPointTraps(false);
-		m_dialog.m_importer.SetProgressHandler(&m_progress_handler);
 		m_dialog.m_importer.SetPropertyInteger(
 			AI_CONFIG_PP_RVC_FLAGS, aiComponent_LIGHTS | aiComponent_CAMERAS);
 		unsigned int flags = aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent |

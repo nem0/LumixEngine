@@ -12,7 +12,7 @@ namespace Lumix
 		{
 		public:
 			Task(IAllocator& allocator);
-			~Task();
+			virtual ~Task();
 
 			virtual int task() = 0;
 
