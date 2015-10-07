@@ -1406,7 +1406,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Vec4 specular_shininess(material->getSpecular(), material->getShininess());
 		bgfx::setUniform(m_specular_shininess_uniform, &specular_shininess);
 
-		if (m_is_current_light_global && !m_is_rendering_in_shadowmap)
+		if (m_is_current_light_global && !m_is_rendering_in_shadowmap && m_global_light_shadowmap)
 		{
 			auto handle = m_global_light_shadowmap->getRenderbufferHandle(1);
 			bgfx::setTexture(shader->getTextureSlotCount(), m_tex_shadowmap_uniform, handle);
@@ -1598,6 +1598,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE |
 						 BGFX_STATE_DEPTH_WRITE | BGFX_STATE_MSAA;
+		m_global_light_shadowmap = nullptr;
 		m_render_state |= m_is_wireframe ? BGFX_STATE_PT_LINESTRIP : 0;
 		m_view_idx = m_renderer.getViewCounter();
 		m_pass_idx = -1;

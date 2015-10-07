@@ -832,7 +832,8 @@ void Terrain::generateGeometry()
 		.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
 		.end();
 	m_vertices_handle = bgfx::createVertexBuffer(bgfx::copy(&points[0], sizeof(points[0]) * points.size()), vertex_def);
-	m_indices_handle = bgfx::createIndexBuffer(bgfx::copy(&indices[0], sizeof(indices[0]) * indices.size()));
+	auto* indices_mem = bgfx::copy(&indices[0], sizeof(indices[0]) * indices.size());
+	m_indices_handle = bgfx::createIndexBuffer(indices_mem);
 	m_mesh = m_allocator.newObject<Mesh>(vertex_def,
 		m_material,
 		0,
