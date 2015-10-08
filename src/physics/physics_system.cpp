@@ -178,21 +178,21 @@ void PhysicsSystemImpl::registerProperties()
 	IAllocator& allocator = m_engine.getAllocator();
 	m_engine.registerProperty(
 		"box_rigid_actor",
-		allocator.newObject<BoolPropertyDescriptor<PhysicsScene>>(
+		LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
 			"dynamic",
 			&PhysicsScene::isDynamic,
 			&PhysicsScene::setIsDynamic,
 			allocator));
 	m_engine.registerProperty(
 		"box_rigid_actor",
-		allocator.newObject<Vec3PropertyDescriptor<PhysicsScene>>(
+		LUMIX_NEW(allocator, Vec3PropertyDescriptor<PhysicsScene>)(
 			"size",
 			&PhysicsScene::getHalfExtents,
 			&PhysicsScene::setHalfExtents,
 			allocator));
 	m_engine.registerProperty(
 		"mesh_rigid_actor",
-		allocator.newObject<FilePropertyDescriptor<PhysicsScene>>(
+		LUMIX_NEW(allocator, FilePropertyDescriptor<PhysicsScene>)(
 			"source",
 			&PhysicsScene::getShapeSource,
 			&PhysicsScene::setShapeSource,
@@ -200,15 +200,16 @@ void PhysicsSystemImpl::registerProperties()
 			allocator));
 	m_engine.registerProperty(
 		"physical_heightfield",
-		allocator.newObject<FilePropertyDescriptor<PhysicsScene>>(
+		LUMIX_NEW(allocator, ResourcePropertyDescriptor<PhysicsScene>)(
 			"heightmap",
 			&PhysicsScene::getHeightmap,
 			&PhysicsScene::setHeightmap,
 			"Image (*.raw)",
+			Lumix::ResourceManager::TEXTURE,
 			allocator));
 	m_engine.registerProperty(
 		"physical_heightfield",
-		allocator.newObject<DecimalPropertyDescriptor<PhysicsScene>>(
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
 			"xz_scale",
 			&PhysicsScene::getHeightmapXZScale,
 			&PhysicsScene::setHeightmapXZScale,
@@ -218,7 +219,7 @@ void PhysicsSystemImpl::registerProperties()
 			allocator));
 	m_engine.registerProperty(
 		"physical_heightfield",
-		allocator.newObject<DecimalPropertyDescriptor<PhysicsScene>>(
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
 			"y_scale",
 			&PhysicsScene::getHeightmapYScale,
 			&PhysicsScene::setHeightmapYScale,

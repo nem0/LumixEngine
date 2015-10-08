@@ -151,6 +151,12 @@ void AssetBrowser::update()
 
 void AssetBrowser::onGUI()
 {
+	if (m_wanted_resource.isValid())
+	{
+		selectResource(m_wanted_resource);
+		m_wanted_resource = "";
+	}
+
 	if (!m_is_opened) return;
 
 	if (!ImGui::Begin("AssetBrowser", &m_is_opened))
@@ -189,6 +195,7 @@ void AssetBrowser::onGUI()
 void AssetBrowser::selectResource(Lumix::Resource* resource)
 {
 	m_text_buffer[0] = '\0';
+	m_wanted_resource = "";
 	unloadResource();
 	m_selected_resource = resource;
 	ASSERT(m_selected_resource->getRefCount() > 0);
@@ -243,15 +250,30 @@ void AssetBrowser::saveMaterial(Lumix::Material* material)
 
 bool AssetBrowser::resourceInput(const char* label, char* buf, int max_size, Type type)
 {
-	if (ImGui::InputText(label, buf, max_size)) return true;
+	float item_w = ImGui::CalcItemWidth();
+	auto& style = ImGui::GetStyle();
+	ImGui::PushItemWidth(item_w - ImGui::CalcTextSize("...->").x - style.FramePadding.x * 4 -
+						 style.ItemSpacing.x * 2);
+
+	if (ImGui::InputText("", buf, max_size)) return true;
 
 	ImGui::SameLine();
-	if (ImGui::Button(StringBuilder<30>("...##", label)))
+	StringBuilder<50> popup_name("pu", label);
+	if (ImGui::Button(StringBuilder<30>("...##browse", label)))
 	{
-		ImGui::OpenPopup(label);
+		ImGui::OpenPopup(popup_name);
 	}
 
-	if (ImGui::BeginPopup(label))
+	ImGui::SameLine();
+	if (ImGui::Button(StringBuilder<30>("->##go", label)))
+	{
+		m_wanted_resource = buf;
+	}
+	ImGui::SameLine();
+	ImGui::Text(label);
+	ImGui::PopItemWidth();
+
+	if (ImGui::BeginPopup(popup_name))
 	{
 		static char filter[128] = "";
 		ImGui::InputText("Filter", filter, sizeof(filter));
@@ -320,12 +342,6 @@ void AssetBrowser::onGUIMaterial()
 	{
 		material->setShader(Lumix::Path(buf));
 	}
-	ImGui::SameLine();
-	if (ImGui::Button(StringBuilder<30>("->##", "shader")))
-	{
-		selectResource(Lumix::Path(buf));
-		return;
-	}
 
 	for (int i = 0; i < material->getShader()->getTextureSlotCount(); ++i)
 	{
@@ -335,12 +351,6 @@ void AssetBrowser::onGUIMaterial()
 		if (resourceInput(slot.m_name, buf, sizeof(buf), TEXTURE))
 		{
 			material->setTexturePath(i, Lumix::Path(buf));
-		}
-		ImGui::SameLine();
-		if (ImGui::Button(StringBuilder<30>("->##", slot.m_name)))
-		{
-			selectResource(Lumix::Path(buf));
-			return;
 		}
 		if (slot.m_is_atlas)
 		{
@@ -615,12 +625,12 @@ void AssetBrowser::onGUIModel()
 	for (int i = 0; i < model->getMeshCount(); ++i)
 	{
 		auto& mesh = model->getMesh(i);
-		if (ImGui::TreeNode(&mesh, mesh.getName()))
+		if (ImGui::TreeNode(&mesh, mesh.getName()[0] != 0 ? mesh.getName() : "N/A"))
 		{
 			ImGui::LabelText("Triangle count", "%d", mesh.getTriangleCount());
-			ImGui::Text(mesh.getMaterial()->getPath().c_str());
+			ImGui::LabelText("Material", mesh.getMaterial()->getPath().c_str());
 			ImGui::SameLine();
-			if (ImGui::Button("View material"))
+			if (ImGui::Button("->"))
 			{
 				selectResource(mesh.getMaterial()->getPath());
 			}
@@ -691,7 +701,7 @@ void AssetBrowser::addResource(const char* path, const char* filename)
 	Lumix::catString(fullpath, filename);
 
 	int index = -1;
-	if (strcmp(ext, "dds") == 0 || strcmp(ext, "tga") == 0) index = TEXTURE;
+	if (strcmp(ext, "dds") == 0 || strcmp(ext, "tga") == 0 || strcmp(ext, "raw") == 0) index = TEXTURE;
 	if (strcmp(ext, "msh") == 0) index = MODEL;
 	if (strcmp(ext, "mat") == 0) index = MATERIAL;
 	if (strcmp(ext, "unv") == 0) index = UNIVERSE;
@@ -715,7 +725,6 @@ void AssetBrowser::processDir(const char* dir)
 	Lumix::FS::FileInfo info;
 	while (Lumix::FS::getNextFile(iter, &info))
 	{
-
 		if (info.filename[0] == '.') continue;
 
 		if (info.is_directory)
