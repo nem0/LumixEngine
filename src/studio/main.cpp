@@ -618,6 +618,8 @@ public:
 		m_gui_pipeline_source = nullptr;
 		m_game_pipeline_source = nullptr;
 		m_editor = nullptr;
+
+		UnregisterClassA("lmxa", m_instance);
 	}
 
 
@@ -634,12 +636,11 @@ public:
 	}
 
 
-	void initIMGUI(HWND hwnd)
+	void initIMGUI()
 	{
 		ImGuiIO& io = ImGui::GetIO();
 		io.Fonts->AddFontFromFileTTF("editor/VeraMono.ttf", 13);
 
-		m_hwnd = hwnd;
 		m_decl.begin()
 			.add(bgfx::Attrib::Position, 2, bgfx::AttribType::Float)
 			.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
@@ -667,14 +668,15 @@ public:
 		io.KeyMap[ImGuiKey_Z] = 'Z';
 
 		io.RenderDrawListsFn = imGuiCallback;
-		io.ImeWindowHandle = hwnd;
+		io.ImeWindowHandle = m_hwnd;
 
 		unsigned char* pixels;
 		int width, height;
 		io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-		m_material = static_cast<Lumix::Material*>(m_engine->getResourceManager()
-													   .get(Lumix::ResourceManager::MATERIAL)
-													   ->load(Lumix::Path("models/imgui.mat")));
+		auto* material_manager =
+			m_engine->getResourceManager().get(Lumix::ResourceManager::MATERIAL);
+		auto* resource = material_manager->load(Lumix::Path("models/imgui.mat"));
+		m_material = static_cast<Lumix::Material*>(resource);
 
 		Lumix::Texture* texture = LUMIX_NEW(m_allocator, Lumix::Texture)(
 			Lumix::Path("font"), m_engine->getResourceManager(), m_allocator);
@@ -786,9 +788,91 @@ public:
 	}
 
 
-	void init(HWND win)
+	void processSystemEvents()
 	{
-		Lumix::Renderer::setInitData(win);
+		MSG msg;
+		while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+
+			if (msg.message == WM_QUIT)
+			{
+				m_finished = true;
+			}
+		}
+	}
+
+
+	void run()
+	{
+		Lumix::Timer* timer = Lumix::Timer::create(m_allocator);
+		while (!m_finished)
+		{
+			{
+				timer->tick();
+				PROFILE_BLOCK("all");
+				float frame_time;
+				{
+					PROFILE_BLOCK("tick");
+					processSystemEvents();
+					update();
+					frame_time = timer->tick();
+				}
+
+				if (frame_time < 1 / 60.0f)
+				{
+					PROFILE_BLOCK("sleep");
+					Lumix::MT::sleep(uint32_t(1000 / 60.0f - frame_time * 1000));
+				}
+			}
+			Lumix::g_profiler.frame();
+			Lumix::g_profiler.checkRecording();
+		}
+		Lumix::Timer::destroy(timer);
+	}
+
+
+	void checkWorkingDirector()
+	{
+		if (!Lumix::dirExists("shaders"))
+		{
+			Lumix::messageBox("Shaders directory not found, please check working directory.");
+		}
+		else if (!Lumix::dirExists("bin"))
+		{
+			Lumix::messageBox("Bin directory not found, please check working directory.");
+		}
+		else if (!Lumix::dirExists("pipelines"))
+		{
+			Lumix::messageBox("Pipelines directory not found, please check working directory.");
+		}
+	}
+
+
+	void init(HINSTANCE hInst)
+	{
+		checkWorkingDirector();
+
+		m_instance = hInst;
+
+		WNDCLASSEX wnd;
+		memset(&wnd, 0, sizeof(wnd));
+		wnd.cbSize = sizeof(wnd);
+		wnd.style = CS_HREDRAW | CS_VREDRAW;
+		wnd.lpfnWndProc = msgProc;
+		wnd.hInstance = hInst;
+		wnd.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+		wnd.hCursor = LoadCursor(NULL, IDC_ARROW);
+		wnd.lpszClassName = "lmxa";
+		wnd.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
+		auto x = RegisterClassExA(&wnd);
+		m_hwnd = CreateWindowA(
+			"lmxa", "lmxa", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 800, 600, NULL, NULL, hInst, 0);
+		ASSERT(m_hwnd);
+		SetWindowTextA(m_hwnd, "Lumix Studio");
+
+		Lumix::Renderer::setInitData(m_hwnd);
 		m_engine = Lumix::Engine::create(nullptr, m_allocator);
 		char current_dir[MAX_PATH];
 		GetCurrentDirectory(sizeof(current_dir), current_dir);
@@ -826,20 +910,18 @@ public:
 			Lumix::PipelineInstance::create(*m_game_pipeline_source, m_engine->getAllocator());
 
 		RECT rect;
-		GetClientRect(win, &rect);
+		GetClientRect(m_hwnd, &rect);
 		m_gui_pipeline->setViewport(0, 0, rect.right, rect.bottom);
 		auto& plugin_manager = m_editor->getEngine().getPluginManager();
 		auto* renderer = static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
 		renderer->resize(rect.right, rect.bottom);
 		onUniverseCreated();
-		initIMGUI(win);
+		initIMGUI();
 
 		loadSettings();
 
-		if (!m_metadata.load())
-		{
-			Lumix::g_log_info.log("studio") << "Could not load metadata";
-		}
+		if (!m_metadata.load()) Lumix::g_log_info.log("studio") << "Could not load metadata";
+		timeBeginPeriod(1);
 	}
 
 	void checkShortcuts()
@@ -1011,13 +1093,13 @@ public:
 };
 
 
-StudioApp g_app;
+StudioApp* g_app;
 
 
 static void imGuiCallback(ImDrawData* draw_data)
 {
 	PROFILE_FUNCTION();
-	if (!g_app.m_material || !g_app.m_material->isReady()) return;
+	if (!g_app->m_material || !g_app->m_material->isReady()) return;
 
 	const float width = ImGui::GetIO().DisplaySize.x;
 	const float height = ImGui::GetIO().DisplaySize.y;
@@ -1025,7 +1107,7 @@ static void imGuiCallback(ImDrawData* draw_data)
 	Lumix::Matrix ortho;
 	ortho.setOrtho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
 
-	g_app.m_gui_pipeline->setViewProjection(ortho, (int)width, (int)height);
+	g_app->m_gui_pipeline->setViewProjection(ortho, (int)width, (int)height);
 
 	for (int32_t ii = 0; ii < draw_data->CmdListsCount; ++ii)
 	{
@@ -1033,7 +1115,7 @@ static void imGuiCallback(ImDrawData* draw_data)
 
 		Lumix::TransientGeometry geom(&cmd_list->VtxBuffer[0],
 			cmd_list->VtxBuffer.size(),
-			g_app.m_decl,
+			g_app->m_decl,
 			&cmd_list->IdxBuffer[0],
 			cmd_list->IdxBuffer.size());
 
@@ -1058,7 +1140,7 @@ static void imGuiCallback(ImDrawData* draw_data)
 				continue;
 			}
 
-			g_app.m_gui_pipeline->setScissor(
+			g_app->m_gui_pipeline->setScissor(
 				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
 				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)),
 				uint16_t(Lumix::Math::minValue(pcmd->ClipRect.z, 65535.0f) -
@@ -1066,12 +1148,12 @@ static void imGuiCallback(ImDrawData* draw_data)
 				uint16_t(Lumix::Math::minValue(pcmd->ClipRect.w, 65535.0f) -
 						 Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)));
 
-			g_app.m_gui_pipeline->render(geom,
+			g_app->m_gui_pipeline->render(geom,
 				elem_offset,
 				pcmd->ElemCount,
-				*g_app.m_material,
+				*g_app->m_material,
 				pcmd->TextureId ? (bgfx::TextureHandle*)pcmd->TextureId
-								: &g_app.m_material->getTexture(0)->getTextureHandle());
+								: &g_app->m_material->getTexture(0)->getTextureHandle());
 
 			elem_offset += pcmd->ElemCount;
 		}
@@ -1081,70 +1163,20 @@ static void imGuiCallback(ImDrawData* draw_data)
 
 LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-	return g_app.windowProc(hWnd, msg, wParam, lParam);
+	return g_app->windowProc(hWnd, msg, wParam, lParam);
 }
 
 
 INT WINAPI WinMain(HINSTANCE hInst, HINSTANCE ignoreMe0, LPSTR ignoreMe1, INT ignoreMe2)
 {
-	WNDCLASSEX wnd;
-	memset(&wnd, 0, sizeof(wnd));
-	wnd.cbSize = sizeof(wnd);
-	wnd.style = CS_HREDRAW | CS_VREDRAW;
-	wnd.lpfnWndProc = msgProc;
-	wnd.hInstance = hInst;
-	wnd.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-	wnd.hCursor = LoadCursor(NULL, IDC_ARROW);
-	wnd.lpszClassName = "lmxa";
-	wnd.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
-	auto x = RegisterClassExA(&wnd);
+	StudioApp app;
+	g_app = &app;
 
-	HWND hwnd = CreateWindowA(
-		"lmxa", "lmxa", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 800, 600, NULL, NULL, hInst, 0);
-	ASSERT(hwnd);
-	SetWindowTextA(hwnd, "Lumix Studio");
-	g_app.m_instance = hInst;
-	g_app.init(hwnd);
-	timeBeginPeriod(1);
-
-	Lumix::Timer* timer = Lumix::Timer::create(g_app.m_allocator);
-	while (!g_app.m_finished)
-	{
-		{
-			timer->tick();
-			PROFILE_BLOCK("all");
-			float frame_time;
-			{
-				PROFILE_BLOCK("tick");
-				MSG msg = {0};
-				while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
-				{
-					TranslateMessage(&msg);
-					DispatchMessage(&msg);
-
-					if (msg.message == WM_QUIT)
-					{
-						g_app.m_finished = true;
-					}
-				}
-
-				g_app.update();
-				frame_time = timer->tick();
-			}
-
-			if (frame_time < 0.016f)
-			{
-				PROFILE_BLOCK("sleep");
-				Lumix::MT::sleep(uint32_t(16 - frame_time * 1000));
-			}
-		}
-		Lumix::g_profiler.frame();
-		Lumix::g_profiler.checkRecording();
-	}
-
-	Lumix::Timer::destroy(timer);
-	g_app.shutdown();
-	UnregisterClassA("lmxa", wnd.hInstance);
+	app.init(hInst);
+	app.run();
+	app.shutdown();
+	
+	g_app = nullptr;
 
 	return 0;
 }
