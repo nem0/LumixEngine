@@ -4,6 +4,7 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/property_descriptor.h"
+#include "lua_script/lua_script_system.h"
 #include "ocornut-imgui/imgui.h"
 #include "terrain_editor.h"
 #include "utils.h"
@@ -249,10 +250,32 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 		showProperty(*desc, -1, cmp);
 	}
 
+	if (cmp.type == Lumix::crc32("lua_script"))
+	{
+		onLuaScriptGui(cmp);
+	}
+
 	if (cmp.type == Lumix::crc32("terrain"))
 	{
 		m_terrain_editor->setComponent(cmp);
 		m_terrain_editor->onGUI();
+	}
+}
+
+
+void PropertyGrid::onLuaScriptGui(Lumix::ComponentUID cmp)
+{
+	auto* scene = static_cast<Lumix::LuaScriptScene*>(cmp.scene);
+
+	for (int i = 0; i < scene->getPropertyCount(cmp.index); ++i)
+	{
+		char buf[256];
+		Lumix::copyString(buf, scene->getPropertyValue(cmp.index, i));
+		const char* property_name = scene->getPropertyName(cmp.index, i);
+		if (ImGui::InputText(property_name, buf, sizeof(buf)))
+		{
+			scene->setPropertyValue(cmp.index, property_name, buf);
+		}
 	}
 }
 
