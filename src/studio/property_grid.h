@@ -31,6 +31,7 @@ class PropertyGrid
 		bool m_is_opened;
 
 	private:
+		void onLuaScriptGui(Lumix::ComponentUID cmp);
 		void showProperty(Lumix::IPropertyDescriptor& desc, int index, Lumix::ComponentUID cmp);
 		void showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescriptor& desc);
 		void showComponentProperties(Lumix::ComponentUID cmp);

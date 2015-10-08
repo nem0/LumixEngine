@@ -1,3 +1,4 @@
+#include "lua_script_system.h"
 #include "core/array.h"
 #include "core/base_proxy_allocator.h"
 #include "core/binary_array.h"
@@ -59,20 +60,9 @@ public:
 };
 
 
-class LuaScriptScene : public IScene
+class LuaScriptSceneImpl : public LuaScriptScene
 {
 public:
-	struct Property
-	{
-		Property(IAllocator& allocator)
-			: m_value(allocator)
-		{
-		}
-
-		string m_value;
-		uint32_t m_name_hash;
-	};
-
 	struct Script
 	{
 		Script(IAllocator& allocator)
@@ -89,7 +79,7 @@ public:
 
 
 public:
-	LuaScriptScene(LuaScriptSystem& system, Engine& engine, UniverseContext& ctx)
+	LuaScriptSceneImpl(LuaScriptSystem& system, Engine& engine, UniverseContext& ctx)
 		: m_system(system)
 		, m_universe_context(ctx)
 		, m_scripts(system.getAllocator())
@@ -99,7 +89,7 @@ public:
 	}
 
 
-	~LuaScriptScene()
+	~LuaScriptSceneImpl()
 	{
 		unloadAllScripts();
 	}
@@ -135,10 +125,7 @@ public:
 
 	void applyProperty(Script& script, Property& prop)
 	{
-		if (prop.m_value.length() == 0)
-		{
-			return;
-		}
+		if (prop.m_value.length() == 0) return;
 
 		lua_State* state = script.m_state;
 		const char* name = script.m_script->getPropertyName(prop.m_name_hash);
@@ -166,12 +153,57 @@ public:
 	}
 
 
+	virtual const char* getPropertyValue(Lumix::ComponentIndex cmp, int index) const override
+	{
+		auto& script = getScript(cmp);
+		uint32_t hash = crc32(getPropertyName(cmp, index));
+
+		for (auto& value : script.m_properties)
+		{
+			if (value.m_name_hash == hash)
+			{
+				return value.m_value.c_str();
+			}
+		}
+
+		return "";
+	}
+
+
+	virtual void setPropertyValue(Lumix::ComponentIndex cmp,
+		const char* name,
+		const char* value) override
+	{
+		Property& prop = getScriptProperty(cmp, name);
+		prop.m_value = value;
+
+		if (m_scripts[cmp].m_state)
+		{
+			applyProperty(m_scripts[cmp], prop);
+		}
+	}
+
+
+	virtual const char* getPropertyName(Lumix::ComponentIndex cmp, int index) const override
+	{
+		auto& script = getScript(cmp);
+
+		return script.m_script ? script.m_script->getPropertiesNames()[index] : "";
+	}
+
+
+	virtual int getPropertyCount(Lumix::ComponentIndex cmp) const override
+	{
+		auto& script = getScript(cmp);
+
+		return script.m_script ? script.m_script->getPropertiesNames().size() : 0;
+	}
+
+
 	void applyProperties(Script& script)
 	{
-		if (!script.m_script)
-		{
-			return;
-		}
+		if (!script.m_script) return;
+
 		lua_State* state = script.m_state;
 		for (Property& prop : script.m_properties)
 		{
@@ -188,10 +220,8 @@ public:
 			allocator.deallocate(ptr);
 			return nullptr;
 		}
-		if (nsize > 0 && ptr == nullptr)
-		{
-			return allocator.allocate(nsize);
-		}
+		if (nsize > 0 && ptr == nullptr) return allocator.allocate(nsize);
+
 		void* new_mem = allocator.allocate(nsize);
 		memcpy(new_mem, ptr, Math::minValue(osize, nsize));
 		allocator.deallocate(ptr);
@@ -265,7 +295,7 @@ public:
 	{
 		if (type == LUA_SCRIPT_HASH)
 		{
-			LuaScriptScene::Script& script =
+			LuaScriptSceneImpl::Script& script =
 				m_scripts.emplace(m_system.getAllocator());
 			script.m_entity = entity;
 			script.m_script = nullptr;
@@ -386,19 +416,6 @@ public:
 	const Script& getScript(ComponentIndex cmp) const { return m_scripts[cmp]; }
 
 
-	void
-	setPropertyValue(ComponentIndex cmp, const char* name, const char* value)
-	{
-		Property& prop = getScriptProperty(cmp, name);
-		prop.m_value = value;
-
-		if (m_scripts[cmp].m_state)
-		{
-			applyProperty(m_scripts[cmp], prop);
-		}
-	}
-
-
 	Property& getScriptProperty(ComponentIndex cmp, const char* name)
 	{
 		uint32_t name_hash = crc32(name);
@@ -471,7 +488,7 @@ IAllocator& LuaScriptSystem::getAllocator()
 
 IScene* LuaScriptSystem::createScene(UniverseContext& ctx)
 {
-	return m_allocator.newObject<LuaScriptScene>(*this, m_engine, ctx);
+	return LUMIX_NEW(m_allocator, LuaScriptSceneImpl)(*this, m_engine, ctx);
 }
 
 
@@ -493,10 +510,10 @@ void LuaScriptSystem::registerProperties()
 	m_engine.registerComponentType("lua_script", "Lua script");
 	m_engine.registerProperty(
 		"lua_script",
-		allocator.newObject<FilePropertyDescriptor<LuaScriptScene>>(
+		allocator.newObject<FilePropertyDescriptor<LuaScriptSceneImpl>>(
 			"source",
-			&LuaScriptScene::getScriptPath,
-			&LuaScriptScene::setScriptPath,
+			&LuaScriptSceneImpl::getScriptPath,
+			&LuaScriptSceneImpl::setScriptPath,
 			"Lua (*.lua)",
 			allocator));
 }
