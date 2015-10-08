@@ -38,6 +38,8 @@ public:
 	void update();
 	const Lumix::Array<Lumix::Path>& getResources(Type type) const;
 	Type getTypeFromResourceManagerType(uint32_t type) const;
+	void selectResource(const Lumix::Path& resource);
+	bool resourceInput(const char* label, char* buf, int max_size, Type type);
 
 public:
 	bool m_is_opened;
@@ -54,9 +56,7 @@ private:
 	void onGUITexture();
 	void onGUILuaScript();
 	void saveMaterial(Lumix::Material* material);
-	bool resourceInput(const char* label, char* buf, int max_size, Type type);
 	void unloadResource();
-	void selectResource(const Lumix::Path& resource);
 	void selectResource(Lumix::Resource* resource);
 	void openInExternalEditor(Lumix::Resource* resource);
 
@@ -70,6 +70,7 @@ private:
 	int m_current_type;
 	char m_filter[128];
 	char m_text_buffer[8192];
+	Lumix::Path m_wanted_resource;
 	bool m_autoreload_changed_resource;
 	bgfx::TextureHandle m_texture_handle;
 };

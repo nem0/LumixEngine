@@ -57,14 +57,12 @@ bool PropertyGrid::getResourcePath(char* buf, int max_size, uint32_t resource_ty
 			if (ImGui::Selectable(unv.c_str(), false))
 			{
 				Lumix::copyString(buf, max_size, unv.c_str());
-				ImGui::EndPopup();
+				ImGui::EndChild();
 				return true;
 			}
 		}
 	}
 	ImGui::EndChild();
-
-	ImGui::EndPopup();
 	return false;
 }
 
@@ -155,21 +153,44 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	{
 		char buf[1024];
 		Lumix::copyString(buf, (const char*)stream.getData());
+		auto& resource_descriptor = dynamic_cast<Lumix::ResourcePropertyDescriptorBase&>(desc);
+		auto rm_type = resource_descriptor.getResourceType();
+		auto asset_type = m_asset_browser.getTypeFromResourceManagerType(rm_type);
+		if (m_asset_browser.resourceInput(desc.getName(), buf, sizeof(buf), asset_type))
+		{
+			m_editor.setProperty(cmp.type, index, desc, buf, (int)strlen(buf) + 1);
+		}
+
+		/*float item_w = ImGui::CalcItemWidth();
+		auto& style = ImGui::GetStyle();
+		ImGui::PushItemWidth(
+			item_w - ImGui::CalcTextSize("...->").x - style.FramePadding.x * 4 - style.ItemSpacing.x * 2);
 		if (ImGui::InputText("", buf, sizeof(buf)))
 		{
 			m_editor.setProperty(cmp.type, index, desc, buf, (int)strlen(buf) + 1);
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("..."))
-			ImGui::OpenPopup("SelectResourcePopup");
-		if (ImGui::BeginPopup("SelectResourcePopup"))
+		StringBuilder<50> popup_name("srp", (uint64_t)&desc);
+		if (ImGui::Button(StringBuilder<50>("...##b", (uint64_t)&desc)))
+			ImGui::OpenPopup(popup_name);
+		if (ImGui::BeginPopup(popup_name))
 		{
 			auto& resource_descriptor = dynamic_cast<Lumix::ResourcePropertyDescriptorBase&>(desc);
 			if (getResourcePath(buf, sizeof(buf), resource_descriptor.getResourceType()))
 			{
 				m_editor.setProperty(cmp.type, index, desc, buf, (int)strlen(buf) + 1);
+				ImGui::CloseCurrentPopup();
 			}
+			ImGui::EndPopup();
 		}
+		ImGui::SameLine();
+		if (ImGui::Button(StringBuilder<30>("->##go", (uint64_t)&desc)))
+		{
+			m_asset_browser.selectResource(Lumix::Path((const char*)stream.getData()));
+		}
+		ImGui::SameLine();
+		ImGui::Text(desc.getName());
+		ImGui::PopItemWidth();*/
 		break;
 	}
 	case Lumix::IPropertyDescriptor::STRING:
