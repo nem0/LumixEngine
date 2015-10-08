@@ -352,15 +352,50 @@ void AssetBrowser::onGUIMaterial()
 		{
 			material->setTexturePath(i, Lumix::Path(buf));
 		}
-		if (slot.m_is_atlas)
+		if (!texture) continue;
+
+		ImGui::SameLine();
+		StringBuilder<100> popup_name("pu", (uint64_t)texture, slot.m_name);
+		if (ImGui::Button(StringBuilder<100>("Advanced##adv", (uint64_t)texture, slot.m_name)))
 		{
-			int size = texture->getAtlasSize() - 2;
-			const char values[] = { '2', 'x', '2', 0, '3', 'x', '3', 0, '4', 'x', '4', 0, 0 };
-			if (ImGui::Combo(StringBuilder<30>("Atlas size##", i), &size, values))
-			{
-				texture->setAtlasSize(size + 2);
-			}
+			ImGui::OpenPopup(popup_name);
 		}
+
+		if (ImGui::BeginPopup(popup_name))
+		{
+			bool u_clamp = (texture->getFlags() & BGFX_TEXTURE_U_CLAMP) != 0;
+			if (ImGui::Checkbox("u clamp", &u_clamp))
+			{
+				texture->setFlag(BGFX_TEXTURE_U_CLAMP, u_clamp);
+			}
+			bool v_clamp = (texture->getFlags() & BGFX_TEXTURE_V_CLAMP) != 0;
+			if (ImGui::Checkbox("v clamp", &v_clamp))
+			{
+				texture->setFlag(BGFX_TEXTURE_V_CLAMP, v_clamp);
+			}
+			bool min_point = (texture->getFlags() & BGFX_TEXTURE_MIN_POINT) != 0;
+			if (ImGui::Checkbox("Min point", &min_point))
+			{
+				texture->setFlag(BGFX_TEXTURE_MIN_POINT, min_point);
+			}
+			bool mag_point = (texture->getFlags() & BGFX_TEXTURE_MAG_POINT) != 0;
+			if (ImGui::Checkbox("Mag point", &mag_point))
+			{
+				texture->setFlag(BGFX_TEXTURE_MAG_POINT, mag_point);
+			}
+			if (slot.m_is_atlas)
+			{
+				int size = texture->getAtlasSize() - 2;
+				const char values[] = { '2', 'x', '2', 0, '3', 'x', '3', 0, '4', 'x', '4', 0, 0 };
+				if (ImGui::Combo(StringBuilder<30>("Atlas size##", i), &size, values))
+				{
+					texture->setAtlasSize(size + 2);
+				}
+			}
+			ImGui::EndPopup();
+
+		}
+
 	}
 
 	for (int i = 0; i < material->getUniformCount(); ++i)
