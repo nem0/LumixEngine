@@ -56,6 +56,16 @@ Texture::~Texture()
 }
 
 
+void Texture::setFlag(uint32_t flag, bool value)
+{
+	uint32_t new_flags = m_flags & ~flag;
+	new_flags |= value ? flag : 0;
+	m_flags = new_flags;
+
+	getResourceManager().get(ResourceManager::TEXTURE)->reload(*this);
+}
+
+
 void Texture::setFlags(uint32_t flags)
 {
 	if (isReady() && m_flags != flags)
