@@ -232,7 +232,7 @@ file(GLOB STUDIO_FILES ${SRC_PATH}studio/*.cpp ${SRC_PATH}studio/pc/*.cpp ${SRC_
 file(GLOB OCORNUT_IMGUI_FILES ${SRC_PATH}studio/ocornut-imgui/*.cpp ${SRC_PATH}studio/ocornut-imgui/*.h)
 file(GLOB STB_FILES ${SRC_PATH}studio/stb/*.cpp ${SRC_PATH}studio/stb/*.c ${SRC_PATH}studio/stb/*.h)
 
-source_group("" FILES ${studio_FILES})
+source_group("" FILES ${STUDIO_FILES})
 source_group("ocornut-imgui" FILES ${OCORNUT_IMGUI_FILES})
 source_group("stb" FILES ${STB_FILES})
 

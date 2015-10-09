@@ -18,6 +18,7 @@
 #include "editor/world_editor.h"
 #include "engine.h"
 #include "engine/plugin_manager.h"
+#include "game_view.h"
 #include "hierarchy_ui.h"
 #include "import_asset_dialog.h"
 #include "log_ui.h"
@@ -46,8 +47,6 @@
 // http://prideout.net/blog/?p=36
 
 
-
-
 void imGuiCallback(ImDrawData* draw_data);
 LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -67,14 +66,12 @@ public:
 		, m_is_wireframe(false)
 		, m_is_entity_template_list_opened(false)
 		, m_selected_template_name(m_allocator)
-		, m_is_gameview_opened(true)
 		, m_profiler_ui(nullptr)
 		, m_asset_browser(nullptr)
 		, m_property_grid(nullptr)
 		, m_actions(m_allocator)
 		, m_metadata(m_allocator)
 		, m_gui_pipeline(nullptr)
-		, m_game_pipeline(nullptr)
 	{
 		m_entity_list_search[0] = '\0';
 	}
@@ -122,7 +119,7 @@ public:
 	{
 		PROFILE_FUNCTION();
 
-		if (!m_gui_pipeline_source->isReady() || !m_game_pipeline_source->isReady()) return;
+		if (!m_gui_pipeline_source->isReady()) return;
 
 		ImGuiIO& io = ImGui::GetIO();
 
@@ -158,38 +155,11 @@ public:
 		showEntityTemplateList();
 		m_sceneview.onGUI();
 		m_hierarchy_ui.onGUI();
-		showGameView();
+		m_gameview.onGui();
 		if (m_is_style_editor_opened) ImGui::ShowStyleEditor();
 		m_settings.onGUI(&m_actions[0], m_actions.size());
 
 		ImGui::Render();
-	}
-
-
-	void showGameView()
-	{
-		PROFILE_FUNCTION();
-		if (!m_is_gameview_opened) return;
-
-		if (ImGui::Begin("Game view", &m_is_gameview_opened))
-		{
-			m_is_gameview_hovered = ImGui::IsWindowHovered();
-			auto size = ImGui::GetContentRegionAvail();
-			if (size.x > 0 && size.y > 0)
-			{
-				auto pos = ImGui::GetWindowPos();
-				auto cp = ImGui::GetCursorPos();
-				int gameview_x = int(pos.x + cp.x);
-				int gameview_y = int(pos.y + cp.y);
-				m_game_pipeline->setViewport(0, 0, int(size.x), int(size.y));
-
-				auto* fb = m_game_pipeline->getFramebuffer("default");
-				m_gameview_texture_handle = fb->getRenderbufferHandle(0);
-				ImGui::Image(&m_gameview_texture_handle, size);
-				m_game_pipeline->render();
-			}
-		}
-		ImGui::End();
 	}
 
 
@@ -453,7 +423,7 @@ public:
 					ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
 					ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
 					ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
-					ImGui::MenuItem("Game view", nullptr, &m_is_gameview_opened);
+					ImGui::MenuItem("Game view", nullptr, &m_gameview.m_is_opened);
 					ImGui::MenuItem("Hierarchy", nullptr, &m_hierarchy_ui.m_is_opened);
 					ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
 					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
@@ -569,7 +539,7 @@ public:
 		m_settings.m_is_asset_browser_opened = m_asset_browser->m_is_opened;
 		m_settings.m_is_entity_list_opened = m_is_entity_list_opened;
 		m_settings.m_is_entity_template_list_opened = m_is_entity_template_list_opened;
-		m_settings.m_is_gameview_opened = m_is_gameview_opened;
+		m_settings.m_is_gameview_opened = m_gameview.m_is_opened;
 		m_settings.m_is_hierarchy_opened = m_hierarchy_ui.m_is_opened;
 		m_settings.m_is_log_opened = m_log_ui->m_is_opened;
 		m_settings.m_is_profiler_opened = m_profiler_ui->m_is_opened;
@@ -605,20 +575,15 @@ public:
 		delete m_shader_compiler;
 		Lumix::WorldEditor::destroy(m_editor, m_allocator);
 		m_sceneview.shutdown();
+		m_gameview.shutdown();
 		Lumix::PipelineInstance::destroy(m_gui_pipeline);
-		Lumix::PipelineInstance::destroy(m_game_pipeline);
 		m_gui_pipeline_source->getResourceManager()
 			.get(Lumix::ResourceManager::PIPELINE)
 			->unload(*m_gui_pipeline_source);
-		m_game_pipeline_source->getResourceManager()
-			.get(Lumix::ResourceManager::PIPELINE)
-			->unload(*m_game_pipeline_source);
 		Lumix::Engine::destroy(m_engine, m_allocator);
 		m_engine = nullptr;
 		m_gui_pipeline = nullptr;
-		m_game_pipeline = nullptr;
 		m_gui_pipeline_source = nullptr;
-		m_game_pipeline_source = nullptr;
 		m_editor = nullptr;
 
 		UnregisterClassA("lmxa", m_instance);
@@ -695,7 +660,7 @@ public:
 
 		m_sceneview.setScene(scene);
 		m_gui_pipeline->setScene(scene);
-		m_game_pipeline->setScene(scene);
+		m_gameview.setScene(scene);
 	}
 
 
@@ -703,7 +668,7 @@ public:
 	{
 		m_sceneview.setScene(nullptr);
 		m_gui_pipeline->setScene(nullptr);
-		m_game_pipeline->setScene(nullptr);
+		m_gameview.setScene(nullptr);
 	}
 
 
@@ -714,7 +679,7 @@ public:
 		m_asset_browser->m_is_opened = m_settings.m_is_asset_browser_opened;
 		m_is_entity_list_opened = m_settings.m_is_entity_list_opened;
 		m_is_entity_template_list_opened = m_settings.m_is_entity_template_list_opened;
-		m_is_gameview_opened = m_settings.m_is_gameview_opened;
+		m_gameview.m_is_opened = m_settings.m_is_gameview_opened;
 		m_hierarchy_ui.m_is_opened = m_settings.m_is_hierarchy_opened;
 		m_log_ui->m_is_opened = m_settings.m_is_log_opened;
 		m_profiler_ui->m_is_opened = m_settings.m_is_profiler_opened;
@@ -905,11 +870,7 @@ public:
 			Lumix::PipelineInstance::create(*m_gui_pipeline_source, m_engine->getAllocator());
 
 		m_sceneview.init(*m_editor);
-
-		m_game_pipeline_source = static_cast<Lumix::Pipeline*>(
-			pipeline_manager->load(Lumix::Path("pipelines/game_view.lua")));
-		m_game_pipeline =
-			Lumix::PipelineInstance::create(*m_game_pipeline_source, m_engine->getAllocator());
+		m_gameview.init(*m_editor);
 
 		RECT rect;
 		GetClientRect(m_hwnd, &rect);
@@ -1061,13 +1022,10 @@ public:
 	Lumix::Engine* m_engine;
 
 	SceneView m_sceneview;
+	GameView m_gameview;
 
 	Lumix::Pipeline* m_gui_pipeline_source;
 	Lumix::PipelineInstance* m_gui_pipeline;
-
-	Lumix::Pipeline* m_game_pipeline_source;
-	Lumix::PipelineInstance* m_game_pipeline;
-	bgfx::TextureHandle m_gameview_texture_handle;
 
 	float m_time_to_autosave;
 	Lumix::Array<Action*> m_actions;
@@ -1086,8 +1044,6 @@ public:
 
 	bool m_finished;
 
-	bool m_is_gameview_hovered;
-	bool m_is_gameview_opened;
 	bool m_is_entity_list_opened;
 	bool m_is_entity_template_list_opened;
 	bool m_is_style_editor_opened;
