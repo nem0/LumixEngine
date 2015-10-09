@@ -73,6 +73,8 @@ public:
 		, m_property_grid(nullptr)
 		, m_actions(m_allocator)
 		, m_metadata(m_allocator)
+		, m_gui_pipeline(nullptr)
+		, m_game_pipeline(nullptr)
 	{
 		m_entity_list_search[0] = '\0';
 	}
