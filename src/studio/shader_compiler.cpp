@@ -350,9 +350,9 @@ void ShaderCompiler::compilePass(
 			Lumix::PathUtils::getBasename(basename, sizeof(basename), shd_path);
 			const char* source_path =
 				StringBuilder<Lumix::MAX_PATH_LENGTH>(
-					"shaders/",
+					"\"shaders/",
 					basename,
-					is_vertex_shader ? "_vs.sc" : "_fs.sc");
+					is_vertex_shader ? "_vs.sc\"" : "_fs.sc\"");
 			char out_path[Lumix::MAX_PATH_LENGTH];
 			Lumix::copyString(out_path, m_editor.getBasePath());
 			Lumix::catString(out_path, "/shaders/compiled/");
@@ -363,7 +363,7 @@ void ShaderCompiler::compilePass(
 			
 			StringBuilder<1024> args(" -f ");
 
-			args << source_path << " -o " << out_path << " --depends --platform windows --type "
+			args << source_path << " -o \"" << out_path << "\" --depends --platform windows --type "
 				 << (is_vertex_shader ? "vertex --profile vs_4_0" : "fragment --profile ps_4_0")
 				 << " -D " << pass;
 			for (int i = 0; i < Lumix::lengthOf(all_defines); ++i)
