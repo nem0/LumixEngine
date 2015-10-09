@@ -10,7 +10,6 @@ namespace Lumix
 	class Pipeline;
 	class PipelineInstance;
 	class RenderScene;
-	class WorldEditor;
 }
 
 
