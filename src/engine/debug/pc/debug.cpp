@@ -8,6 +8,10 @@
 
 #pragma comment(lib, "DbgHelp.lib")
 
+
+static bool g_is_crash_reporting_enabled = true;
+
+
 namespace Lumix
 {
 
@@ -96,9 +100,15 @@ BOOL SendFile(LPCSTR lpszSubject,
 
 static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 {
+	if (!g_is_crash_reporting_enabled) return EXCEPTION_CONTINUE_SEARCH;
+
+	char minidump_path[Lumix::MAX_PATH_LENGTH];
+	GetCurrentDirectory(sizeof(minidump_path), minidump_path);
+	Lumix::catString(minidump_path, "\\minidump.dmp");
+
 	HANDLE process = GetCurrentProcess();
 	DWORD process_id = GetProcessId(process);
-	HANDLE file = CreateFile("minidump.dmp",
+	HANDLE file = CreateFile(minidump_path,
 							 GENERIC_WRITE,
 							 0,
 							 nullptr,
@@ -128,7 +138,7 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 			 "SMTP:mikulas.florek@gamedev.sk",
 			 "Lumix Studio",
 			 "Lumix Studio crashed, minidump attached",
-			 "minidump.dmp");
+			 minidump_path);
 
 	minidump_type =
 		(MINIDUMP_TYPE)(MiniDumpWithFullMemory | MiniDumpWithFullMemoryInfo |
@@ -151,6 +161,12 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 	CloseHandle(file);
 
 	return EXCEPTION_CONTINUE_SEARCH;
+}
+
+
+void enableCrashReporting(bool enable)
+{
+	g_is_crash_reporting_enabled = enable;
 }
 
 

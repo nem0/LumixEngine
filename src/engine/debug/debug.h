@@ -13,6 +13,7 @@ namespace Lumix
 		void LUMIX_ENGINE_API debugOutput(const char* message);
 	}
 
+	void LUMIX_ENGINE_API enableCrashReporting(bool enable);
 	void LUMIX_ENGINE_API installUnhandledExceptionHandler();
 
 
