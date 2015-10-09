@@ -109,7 +109,7 @@ public:
 			m_data[index].~T();
 			if (index != m_size - 1)
 			{
-				new ((char*)(m_data + index)) T(m_data[m_size - 1]);
+				memmove(m_data + index, m_data + m_size - 1, sizeof(T));
 			}
 			--m_size;
 		}
