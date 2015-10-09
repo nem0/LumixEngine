@@ -1053,7 +1053,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 		if (begin_factor == end_of_factor) return FLT_MAX;
 		int factor;
-		Lumix::fromCString(begin_factor, end_of_factor - begin_factor, &factor);
+		Lumix::fromCString(begin_factor, int(end_of_factor - begin_factor), &factor);
 
 		return float(factor);
 	}
@@ -1077,7 +1077,7 @@ struct ConvertTask : public Lumix::MT::Task
 		if (strncmp(last - 4, "_LOD", 4) != 0) return -1;
 
 		int lod;
-		Lumix::fromCString(last, len - (last - mesh_name), &lod);
+		Lumix::fromCString(last, len - int(last - mesh_name), &lod);
 
 		return lod;
 	}
