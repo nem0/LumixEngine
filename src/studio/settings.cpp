@@ -1,5 +1,6 @@
 #include "settings.h"
 #include "core/log.h"
+#include "debug/debug.h"
 #include "ocornut-imgui/imgui.h"
 #include "utils.h"
 #include <cstdio>
@@ -88,6 +89,7 @@ Settings::Settings()
 	m_is_log_opened = false;
 	m_is_profiler_opened = false;
 	m_is_properties_opened = false;
+	m_is_crash_reporting_enabled = true;
 
 	m_autosave_time = 300;
 }
@@ -127,6 +129,8 @@ bool Settings::load(Action** actions, int actions_count)
 	m_is_profiler_opened = getBoolean(L, "profiler_opened", false);
 	m_is_properties_opened = getBoolean(L, "properties_opened", false);
 	m_is_style_editor_opened = getBoolean(L, "style_editor_opened", false);
+	m_is_crash_reporting_enabled = getBoolean(L, "error_reporting_enabled", true);
+	Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
 	m_autosave_time = getInteger(L, "autosave_time", 300);
 
 	if (lua_getglobal(L, "actions") == LUA_TTABLE)
@@ -183,6 +187,7 @@ bool Settings::save(Action** actions, int actions_count)
 	writeBool("profiler_opened", m_is_profiler_opened);
 	writeBool("properties_opened", m_is_properties_opened);
 	writeBool("style_editor_opened", m_is_style_editor_opened);
+	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
 	fprintf(fp, "autosave_time = %d\n", m_autosave_time);
 
 	fputs("actions = {\n", fp);
@@ -242,6 +247,10 @@ void Settings::onGUI(Action** actions, int actions_count)
 		ImGui::Text("Settings are saved when the application closes");
 
 		ImGui::DragInt("Autosave time (seconds)", &m_autosave_time);
+		if (ImGui::Checkbox("Crash reporting", &m_is_crash_reporting_enabled))
+		{
+			Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
+		}
 
 		if (ImGui::CollapsingHeader("Shortcuts")) showShortcutSettings(actions, actions_count);
 	}

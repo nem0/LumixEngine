@@ -29,6 +29,7 @@ struct Settings
 	bool m_is_profiler_opened;
 	bool m_is_properties_opened;
 	bool m_is_style_editor_opened;
+	bool m_is_crash_reporting_enabled;
 
 	int m_autosave_time;
 
