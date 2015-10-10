@@ -247,6 +247,8 @@ add_executable(studio
 	${STB_FILES}
 )
 
+add_dependencies(studio engine animation physics renderer lua_script editor)
+
 set_target_properties(studio PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
 target_link_libraries(studio engine)
 target_link_libraries(studio renderer)
