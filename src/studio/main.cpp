@@ -54,9 +54,6 @@ LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 class StudioApp
 {
 public:
-	
-
-public:
 	StudioApp()
 		: m_is_entity_list_opened(true)
 		, m_finished(false)
@@ -140,7 +137,7 @@ public:
 		// io.MouseDown : filled by WM_*BUTTON* events
 		// io.MouseWheel : filled by WM_MOUSEWHEEL events
 
-		SetCursor(io.MouseDrawCursor ? NULL : LoadCursor(NULL, IDC_ARROW));
+		//SetCursor(io.MouseDrawCursor ? NULL : LoadCursor(NULL, IDC_ARROW));
 
 		ImGui::NewFrame();
 
@@ -870,7 +867,7 @@ public:
 			Lumix::PipelineInstance::create(*m_gui_pipeline_source, m_engine->getAllocator());
 
 		m_sceneview.init(*m_editor);
-		m_gameview.init(*m_editor);
+		m_gameview.init(m_hwnd, *m_editor);
 
 		RECT rect;
 		GetClientRect(m_hwnd, &rect);
@@ -885,6 +882,13 @@ public:
 
 		if (!m_metadata.load()) Lumix::g_log_info.log("studio") << "Could not load metadata";
 		timeBeginPeriod(1);
+
+		RAWINPUTDEVICE Rid;
+		Rid.usUsagePage = 0x01;
+		Rid.usUsage = 0x02;
+		Rid.dwFlags = 0;   
+		Rid.hwndTarget = 0;
+		RegisterRawInputDevices(&Rid, 1, sizeof(Rid));
 	}
 
 	void checkShortcuts()
@@ -928,6 +932,27 @@ public:
 	}
 
 
+	void handleRawInput(LPARAM lParam)
+	{
+		UINT dwSize;
+		char data[sizeof(RAWINPUT) * 10];
+
+		GetRawInputData((HRAWINPUT)lParam, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER));
+		if (dwSize > sizeof(data)) return;
+
+		if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, data, &dwSize, sizeof(RAWINPUTHEADER)) !=
+			dwSize) return;
+		
+		RAWINPUT* raw = (RAWINPUT*)data;
+		if (raw->header.dwType == RIM_TYPEMOUSE &&
+			raw->data.mouse.usFlags == MOUSE_MOVE_RELATIVE)
+		{
+			m_editor->getEngine().getInputSystem().injectMouseXMove(float(raw->data.mouse.lLastX));
+			m_editor->getEngine().getInputSystem().injectMouseYMove(float(raw->data.mouse.lLastY));
+		}
+	}
+
+
 	LRESULT windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
 		int x = LOWORD(lParam);
@@ -941,10 +966,9 @@ public:
 
 		switch (msg)
 		{
+			case WM_INPUT: handleRawInput(lParam); break;
 			case WM_CLOSE: PostQuitMessage(0); break;
-			case WM_MOVE:
-				onWindowTransformed();
-				break;
+			case WM_MOVE: onWindowTransformed(); break;
 			case WM_SIZE:
 			{
 				onWindowTransformed();
@@ -968,13 +992,15 @@ public:
 				ImGui::GetIO().MouseDown[0] = false;
 				break;
 			case WM_LBUTTONDOWN:
-				if (!m_sceneview.onMouseDown(old_x, old_y, Lumix::MouseButton::LEFT))
+				if (!m_sceneview.onMouseDown(old_x, old_y, Lumix::MouseButton::LEFT) &&
+					!m_gameview.isMouseCaptured())
 				{
 					ImGui::GetIO().MouseDown[0] = true;
 				}
 				break;
 			case WM_RBUTTONDOWN:
-				if (!m_sceneview.onMouseDown(old_x, old_y, Lumix::MouseButton::RIGHT))
+				if (!m_sceneview.onMouseDown(old_x, old_y, Lumix::MouseButton::RIGHT) &&
+					!m_gameview.isMouseCaptured())
 				{
 					ImGui::GetIO().MouseDown[1] = true;
 				}
@@ -985,17 +1011,22 @@ public:
 				break;
 			case WM_MOUSEMOVE:
 			{
-				m_sceneview.onMouseMove(x, y, x - old_x, y - old_y);
+				if (!m_gameview.isMouseCaptured())
+				{
+					POINT p;
+					p.x = x;
+					p.y = y;
+					ClientToScreen(m_hwnd, &p);
 
-				auto& input_system = m_engine->getInputSystem();
-				input_system.injectMouseXMove(float(old_x - x));
-				input_system.injectMouseYMove(float(old_y - y));
-				old_x = x;
-				old_y = y;
+					m_sceneview.onMouseMove(p.x, p.y, x - old_x, y - old_y);
 
-				ImGuiIO& io = ImGui::GetIO();
-				io.MousePos.x = (float)x;
-				io.MousePos.y = (float)y;
+					old_x = x;
+					old_y = y;
+
+					ImGuiIO& io = ImGui::GetIO();
+					io.MousePos.x = (float)x;
+					io.MousePos.y = (float)y;
+				}
 			}
 			break;
 			case WM_CHAR: ImGui::GetIO().AddInputCharacter((ImWchar)wParam); break;
