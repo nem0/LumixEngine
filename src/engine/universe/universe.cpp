@@ -204,6 +204,15 @@ void Universe::destroyEntity(Entity entity)
 	m_id_map[last_item_id] = m_id_map[entity];
 	m_transformations.eraseFast(m_id_map[entity]);
 	m_id_map[entity] = m_first_free_slot >= 0 ? -m_first_free_slot : INT_MIN;
+
+	int name_index = m_id_to_name_map.find(entity);
+	if (name_index >= 0)
+	{
+		uint32_t name_hash = crc32(m_id_to_name_map.at(name_index).c_str());
+		m_name_to_id_map.erase(name_hash);
+		m_id_to_name_map.eraseAt(name_index);
+	}
+
 	m_first_free_slot = entity;
 	m_entity_destroyed.invoke(entity);
 }
