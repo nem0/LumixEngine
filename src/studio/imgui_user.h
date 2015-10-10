@@ -22,4 +22,6 @@ bool ListBox(const char* label,
 	int items_count,
 	int height_in_items);
 
+void ResetActiveID();
+
 } // namespace ImGui

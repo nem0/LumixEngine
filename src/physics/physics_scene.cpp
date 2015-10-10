@@ -402,7 +402,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		if (scale != m_terrains[cmp]->m_y_scale)
 		{
 			m_terrains[cmp]->m_y_scale = scale;
-			if (m_terrains[cmp]->m_heightmap)
+			if (m_terrains[cmp]->m_heightmap && m_terrains[cmp]->m_heightmap->isReady())
 			{
 				heightmapLoaded(m_terrains[cmp]);
 			}

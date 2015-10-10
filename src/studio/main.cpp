@@ -314,7 +314,7 @@ public:
 		return *m_actions[0];
 	}
 
-
+	
 	void showMainMenu()
 	{
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
