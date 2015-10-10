@@ -1474,7 +1474,7 @@ public:
 		float range = scene->getLightRange(light.index);
 
 		Vec3 pos = universe.getPosition(light.entity);
-		scene->addDebugSphere(pos, range, Vec3(1, 0, 0), 0);
+		scene->addDebugSphere(pos, range, 0xff0000ff, 0);
 	}
 
 
@@ -1543,8 +1543,7 @@ public:
 	}
 
 
-	void
-	showGlobalLightGizmo(ComponentUID light)
+	void showGlobalLightGizmo(ComponentUID light)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(light.scene);
 		Universe& universe = scene->getUniverse();
@@ -1560,16 +1559,12 @@ public:
 		scene->addDebugLine(pos + up, pos + dir + up, 0xff0000ff, 0);
 		scene->addDebugLine(pos - up, pos + dir - up, 0xff0000ff, 0);
 
-		scene->addDebugLine(
-			pos + right + up, pos + dir + right + up, 0xff0000ff, 0);
-		scene->addDebugLine(
-			pos + right - up, pos + dir + right - up, 0xff0000ff, 0);
-		scene->addDebugLine(
-			pos - right - up, pos + dir - right - up, 0xff0000ff, 0);
-		scene->addDebugLine(
-			pos - right + up, pos + dir - right + up, 0xff0000ff, 0);
+		scene->addDebugLine(pos + right + up, pos + dir + right + up, 0xff0000ff, 0);
+		scene->addDebugLine(pos + right - up, pos + dir + right - up, 0xff0000ff, 0);
+		scene->addDebugLine(pos - right - up, pos + dir - right - up, 0xff0000ff, 0);
+		scene->addDebugLine(pos - right + up, pos + dir - right + up, 0xff0000ff, 0);
 
-		scene->addDebugSphere(pos - dir, 0.1f, Vec3(1, 0, 0), 0);
+		scene->addDebugSphere(pos - dir, 0.1f, 0xff0000ff, 0);
 	}
 
 
