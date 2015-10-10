@@ -149,7 +149,7 @@ public:
 								float life) = 0;
 	virtual void addDebugSphere(const Vec3& center,
 								float radius,
-								const Vec3& color,
+								uint32_t color,
 								float life) = 0;
 	virtual void addDebugFrustum(const Vec3& position,
 								 const Vec3& direction,
@@ -164,11 +164,17 @@ public:
 	virtual void
 	addDebugFrustum(const Frustum& frustum, const Vec3& color, float life) = 0;
 
+	virtual void addDebugCapsule(const Vec3& position,
+		float height,
+		float radius,
+		uint32_t color,
+		float life) = 0;
+
 	virtual void addDebugCylinder(const Vec3& position,
-								  const Vec3& up,
-								  float radius,
-								  const Vec3& color,
-								  float life) = 0;
+		const Vec3& up,
+		float radius,
+		const Vec3& color,
+		float life) = 0;
 
 	virtual const Array<DebugLine>& getDebugLines() const = 0;
 	virtual const Array<DebugPoint>& getDebugPoints() const = 0;
