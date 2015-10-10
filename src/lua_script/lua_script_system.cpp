@@ -508,14 +508,13 @@ void LuaScriptSystem::registerProperties()
 {
 	IAllocator& allocator = m_engine.getAllocator();
 	m_engine.registerComponentType("lua_script", "Lua script");
-	m_engine.registerProperty(
-		"lua_script",
-		allocator.newObject<FilePropertyDescriptor<LuaScriptSceneImpl>>(
-			"source",
-			&LuaScriptSceneImpl::getScriptPath,
-			&LuaScriptSceneImpl::setScriptPath,
-			"Lua (*.lua)",
-			allocator));
+	m_engine.registerProperty("lua_script",
+		LUMIX_NEW(allocator, ResourcePropertyDescriptor<LuaScriptSceneImpl>)("source",
+								  &LuaScriptSceneImpl::getScriptPath,
+								  &LuaScriptSceneImpl::setScriptPath,
+								  "Lua (*.lua)",
+								  crc32("lua_script"),
+								  allocator));
 }
 
 

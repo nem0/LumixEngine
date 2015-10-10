@@ -120,6 +120,7 @@ bool Settings::load(Action** actions, int actions_count)
 
 	m_is_maximized = getBoolean(L, "maximized", true);
 	
+	m_is_opened = getBoolean(L, "settings_opened", false);
 	m_is_asset_browser_opened = getBoolean(L, "asset_browser_opened", false);
 	m_is_entity_list_opened = getBoolean(L, "entity_list_opened", false);
 	m_is_entity_template_list_opened = getBoolean(L, "entity_template_list_opened", false);
@@ -178,6 +179,7 @@ bool Settings::save(Action** actions, int actions_count)
 		fputs(value ? "true\n" : "false\n", fp);
 	};
 
+	writeBool("settings_opened", m_is_opened);
 	writeBool("asset_browser_opened", m_is_asset_browser_opened);
 	writeBool("entity_list_opened", m_is_entity_list_opened);
 	writeBool("entity_template_list_opened", m_is_entity_template_list_opened);
