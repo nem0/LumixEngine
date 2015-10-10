@@ -14,6 +14,7 @@
 #include "core/fs/ifile.h"
 #include "core/input_system.h"
 #include "core/json_serializer.h"
+#include "core/library.h"
 #include "core/log.h"
 #include "core/matrix.h"
 #include "core/mt/mutex.h"
@@ -2688,6 +2689,13 @@ public:
 			&WorldEditorImpl::constructEditorCommand<AddEntityCommand>);
 
 		EditorIcon::loadIcons(*m_engine);
+
+		const auto& libs = m_engine->getPluginManager().getLibraries();
+		for (auto* lib : libs)
+		{
+			auto* callback = static_cast<void(*)(WorldEditor&)>(lib->resolve("setWorldEditor"));
+			if (callback) (*callback)(*this);
+		}
 	}
 
 

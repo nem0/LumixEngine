@@ -74,7 +74,7 @@ struct PhysicsSystemImpl : public PhysicsSystem
 
 extern "C" LUMIX_PHYSICS_API IPlugin* createPlugin(Engine& engine)
 {
-	return engine.getAllocator().newObject<PhysicsSystemImpl>(engine);
+	return LUMIX_NEW(engine.getAllocator(), PhysicsSystemImpl)(engine);
 }
 
 
@@ -282,6 +282,13 @@ bool PhysicsSystemImpl::connect2VisualDebugger()
 void CustomErrorCallback::reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line)
 {
 	g_log_error.log("PhysX") << message;
+}
+
+
+extern "C" LUMIX_PHYSICS_API void setWorldEditor(Lumix::WorldEditor& editor)
+{
+	auto* plugin = LUMIX_NEW(editor.getAllocator(), EditorPlugin)(editor);
+	editor.addPlugin(*plugin);
 }
 
 
