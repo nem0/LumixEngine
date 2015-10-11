@@ -22,7 +22,7 @@ I think that creating great UI library is extremely hard and maybe it is even an
 * Docking and multimonitor support - must have, 
 * Skinnable - I could live without this.
 
-Ofcourse I did not have all this requirements all at once, rather they changed with time. In the last two years I've tried at least 8 different UI frameworks. 
+Of course I did not have all this requirements all at once, rather they changed with time. In the last two years I've tried at least 8 different UI frameworks. 
 
 * Gwen
 * CEGUI
@@ -57,29 +57,29 @@ The last solution and the one I am currently using is ImGui. It's the only repre
 [ImGui](https://github.com/ocornut/imgui) is an open source library created by Omar Cornut. I hasitated at first to switch to ImGui from Qt because I was afraid that immediate mode GUI is very limited and I will encounter something I will not be able to do. In fact I am still afraid even though the experience so far was very pleasant. Yes, ImGui does not have many features Qt has, which in some cases is a good thing (Qt can do almost anything, even things I do not need and never will, however I have to pay the price in form of huge dll). In other cases it's a disadvantage. ImGui misses a lot of basic widgets, such as a progress bar or advanced color picker. Saying that I must add that while ImGui does not have advanced color pickers, it is extremely easy to add, which [I did](https://github.com/nem0/LumixEngine/commit/c0ea1a8a754344856c0b039cfd4b4b7e030505ae). And so did [other people](https://github.com/ApoorvaJ/Papaya). I can not even imagine how difficult this is in Qt. Things are in general much easier to do in ImGui than in other UI toolkits:
 
 ```cpp
-if(ImGui::Button("OK")) showMessage("OK");
+  if(ImGui::Button("OK")) showMessage("OK");
 ``` 
 
 vs
 
 
 ```cpp
-<!-- somewhere in ui file -->
+  <!-- somewhere in ui file -->
       <widget class="QPushButton" name="browseSourceButton">
        <property name="text">
         <string>Browse</string>
        </property>
       </widget>
 	  
-// somwhere in .h	  
+  // somwhere in .h	  
 	  
-void on_browseSourceButton_clicked();
+  void on_browseSourceButton_clicked();
 	  
-// somewhere in .cpp
-void ImportAssetDialog::on_browseSourceButton_clicked()
-{
+  // somewhere in .cpp
+  void ImportAssetDialog::on_browseSourceButton_clicked()
+  {
 	showMessage("OK");
-}
+  }
 ```
 
 To be honest a button in Qt is much more powerful than a button in ImGui, but do I really need all that power for a simple button and pay the price for it?
