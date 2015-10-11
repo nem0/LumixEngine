@@ -63,12 +63,12 @@ The last solution and the one I am currently using is ImGui. It's the only repre
 vs
 
 ```
-  	<!-- somewhere in ui file -->
-	  <widget class="QPushButton" name="browseSourceButton">
-	   <property name="text">
-		<string>Browse</string>
-	   </property>
-	  </widget>
+  	&lt;!-- somewhere in ui file --&gt;
+	  &lt;widget class="QPushButton" name="browseSourceButton"&gt;
+	   &lt;property name="text"&gt;
+		&lt;string&gt;Browse&lt;/string&gt;
+	   &lt;/property&gt;
+	  &lt;/widget&gt;
 	  
 	// somwhere in .h	  
 	void on_browseSourceButton_clicked();
