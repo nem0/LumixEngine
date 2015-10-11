@@ -548,4 +548,18 @@ char* trimmed(char* str)
 }
 
 
+bool startsWith(const char* str, const char* prefix)
+{
+	const char* lhs = str;
+	const char* rhs = prefix;
+	while (*rhs && *lhs && *lhs == *rhs)
+	{
+		++lhs;
+		++rhs;
+	}
+
+	return *rhs == 0;
+}
+
+
 } // ~namespace Lumix
