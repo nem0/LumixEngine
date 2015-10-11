@@ -63,17 +63,17 @@ The last solution and the one I am currently using is ImGui. It's the only repre
 vs
 
 ```
-	// somwhere in .ui, some xml 
-	....
-
-	// somwhere in .h	  
-	void on_browseSourceButton_clicked();
-	  
-	// somewhere in .cpp
-	void ImportAssetDialog::on_browseSourceButton_clicked()
-	{
-		showMessage("OK");
-	}
+  // somwhere in .ui, some xml 
+  ....
+  
+  // somwhere in .h	  
+  void on_browseSourceButton_clicked();
+    
+  // somewhere in .cpp
+  void ImportAssetDialog::on_browseSourceButton_clicked()
+  {
+  	showMessage("OK");
+  }
 ```
 
 To be honest a button in Qt is much more powerful than a button in ImGui, but do I really need all that power for a simple button and pay the price for it?
