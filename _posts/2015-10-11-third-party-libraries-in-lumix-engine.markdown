@@ -1,13 +1,11 @@
 ---
 layout:     post
-title:      Third party libraries in Lumix Engine - part #1
+title:      Third party libraries in Lumix Engine - part 1
 date:       2015-10-11 22:04:00
 summary:    As it is a waste of time to reinvent the wheel I also used some 3rd party libraries to develop Lumix Engine. Here you can find out about the reasons I ended up using ImGui.
 categories: editor, GUI, library
 comments: true
 ---
-
-# Third party libraries in Lumix Engine - part #1
 
 ## Editor GUI
 
