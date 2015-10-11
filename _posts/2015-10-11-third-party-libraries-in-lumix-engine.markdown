@@ -63,7 +63,7 @@ The last solution and the one I am currently using is ImGui. It's the only repre
 vs
 
 ```
-	// some xml un .ui 
+	// somwhere in .ui, some xml 
 	....
 
 	// somwhere in .h	  
