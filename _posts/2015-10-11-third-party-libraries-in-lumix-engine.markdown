@@ -63,13 +63,9 @@ The last solution and the one I am currently using is ImGui. It's the only repre
 vs
 
 ```
-  	&lt;!-- somewhere in ui file --&gt;
-	  &lt;widget class="QPushButton" name="browseSourceButton"&gt;
-	   &lt;property name="text"&gt;
-		&lt;string&gt;Browse&lt;/string&gt;
-	   &lt;/property&gt;
-	  &lt;/widget&gt;
-	  
+	// some xml un .ui 
+	....
+
 	// somwhere in .h	  
 	void on_browseSourceButton_clicked();
 	  
