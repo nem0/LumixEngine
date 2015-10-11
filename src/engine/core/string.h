@@ -39,6 +39,8 @@ catNString(char* destination, int length, const char* source, int source_len);
 LUMIX_ENGINE_API bool
 makeLowercase(char* destination, int length, const char* source);
 LUMIX_ENGINE_API char* trimmed(char* str);
+LUMIX_ENGINE_API bool startsWith(const char* str, const char* prefix);
+
 
 
 template <int SIZE> bool copyString(char(&destination)[SIZE], const char* source)
