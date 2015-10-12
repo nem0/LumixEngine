@@ -45,6 +45,19 @@ void UT_binary_array(const char* params)
 	array.erase(2);
 	LUMIX_EXPECT_EQ(array.getRaw()[0], 0);
 	LUMIX_EXPECT_EQ(array.getRaw()[1], 0);
+
+
+	Lumix::BinaryArray array2(allocator);
+	for (int i = 0; i < 128; ++i)
+	{
+		array2.push(true);
+	}
+	for (int i = 0; i < 64; ++i)
+	{
+		array2.erase((i * 13) % array2.size());
+		LUMIX_EXPECT_EQ(array2.getRaw()[0], 0xffffFFFF);
+		LUMIX_EXPECT_EQ(array2.getRaw()[1], 0xffffFFFF);
+	}
 }
 
 REGISTER_TEST("unit_tests/core/binary_array", UT_binary_array, "")

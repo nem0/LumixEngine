@@ -137,7 +137,7 @@ public:
 		// io.MouseDown : filled by WM_*BUTTON* events
 		// io.MouseWheel : filled by WM_MOUSEWHEEL events
 
-		//SetCursor(io.MouseDrawCursor ? NULL : LoadCursor(NULL, IDC_ARROW));
+		SetCursor(io.MouseDrawCursor ? NULL : LoadCursor(NULL, IDC_ARROW));
 
 		ImGui::NewFrame();
 

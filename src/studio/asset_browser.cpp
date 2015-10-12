@@ -255,7 +255,7 @@ bool AssetBrowser::resourceInput(const char* label, char* buf, int max_size, Typ
 	ImGui::PushItemWidth(item_w - ImGui::CalcTextSize("...->").x - style.FramePadding.x * 4 -
 						 style.ItemSpacing.x * 2);
 
-	if (ImGui::InputText("", buf, max_size)) return true;
+	if (ImGui::InputText(StringBuilder<30>("##", (uint64_t)label), buf, max_size)) return true;
 
 	ImGui::SameLine();
 	StringBuilder<50> popup_name("pu", label);

@@ -59,7 +59,6 @@ void GameView::setScene(Lumix::RenderScene* scene)
 void GameView::captureMouse(bool capture)
 {
 	m_is_mouse_captured = capture;
-	if (m_is_mouse_captured) SetCursor(NULL);
 	m_editor->getEngine().getInputSystem().enable(m_is_mouse_captured);
 	ShowCursor(!m_is_mouse_captured);
 	if (!m_is_mouse_captured) ClipCursor(NULL);
