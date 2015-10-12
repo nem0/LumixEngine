@@ -139,12 +139,11 @@ void Resource::addDependency(Resource& dependent_resource)
 
 void Resource::removeDependency(Resource& dependent_resource)
 {
-	ASSERT(m_desired_state != State::EMPTY || m_current_state != State::EMPTY ||
-		   m_empty_dep_count > 1 || m_failed_dep_count > 0);
-
 	dependent_resource.m_cb.unbind<Resource, &Resource::onStateChanged>(this);
 	if (dependent_resource.isEmpty()) --m_empty_dep_count;
 	if (dependent_resource.isFailure()) --m_failed_dep_count;
+
+	ASSERT(m_empty_dep_count >= 0 && m_failed_dep_count >= 0)
 
 	checkState();
 }

@@ -156,6 +156,7 @@ public:
 			if (ImGui::BeginChild("right", half_size, true))
 			{
 				ImGui::Text("Version 0.17. - News");
+				ImGui::BulletText("Orbit camera");
 				ImGui::BulletText("Welcome screen");
 				ImGui::BulletText("Visualization of physical contorller");
 				ImGui::BulletText("Game view fixed");
@@ -315,6 +316,7 @@ public:
 	void redo() { m_editor->redo(); }
 	void copy() { m_editor->copyEntity(); }
 	void paste() { m_editor->pasteEntity(); }
+	void toggleOrbitCamera() { m_editor->setOrbitCamera(!m_editor->isOrbitCamera()); }
 	void togglePivotMode() { m_editor->getGizmo().togglePivotMode(); }
 	void toggleCoordSystem() { m_editor->getGizmo().toggleCoordSystem(); }
 	void createEntity() { m_editor->addEntity(); }
@@ -429,6 +431,9 @@ public:
 				doMenuItem(getAction("copy"), false, is_any_entity_selected);
 				doMenuItem(getAction("paste"), false, m_editor->canPasteEntity());
 				ImGui::Separator();
+				doMenuItem(getAction("orbitCamera"),
+					m_editor->isOrbitCamera(),
+					is_any_entity_selected || m_editor->isOrbitCamera());
 				doMenuItem(getAction("togglePivotMode"), false, is_any_entity_selected);
 				doMenuItem(getAction("toggleCoordSystem"), false, m_editor->canPasteEntity());
 				if (ImGui::BeginMenu("Select"))
@@ -787,6 +792,7 @@ public:
 		addAction<&StudioApp::undo>("Undo", "undo", VK_CONTROL, 'Z', -1);
 		addAction<&StudioApp::copy>("Copy", "copy", VK_CONTROL, 'C', -1);
 		addAction<&StudioApp::paste>("Paste", "paste", VK_CONTROL, 'V', -1);
+		addAction<&StudioApp::toggleOrbitCamera>("Orbit camera", "orbitCamera");
 		addAction<&StudioApp::togglePivotMode>("Center/Pivot", "togglePivotMode");
 		addAction<&StudioApp::toggleCoordSystem>("Local/Global", "toggleCoordSystem");
 
