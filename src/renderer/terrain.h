@@ -85,9 +85,7 @@ class Terrain
 		float getHeight(float x, float z);
 		float getXZScale() const { return m_scale.x; }
 		float getYScale() const { return m_scale.y; }
-		float getBrushSize() const { return m_brush_size; }
 		Mesh* getMesh() { return m_mesh; }
-		Vec3 getBrushPosition() const { return m_brush_position; }
 		Path getGrassTypePath(int index);
 		Vec3 getScale() const { return m_scale; }
 		void getSize(float* width, float* height) const { ASSERT(width); ASSERT(height); *width = m_width * m_scale.x; *height = m_height * m_scale.z; }
@@ -101,7 +99,6 @@ class Terrain
 		void setGrassTypeGround(int index, int ground);
 		void setGrassTypeDensity(int index, int density);
 		void setMaterial(Material* material);
-		void setBrush(const Vec3& position, float size) { m_brush_position = position; m_brush_size = size; }
 
 		void getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos, LIFOAllocator& allocator);
 		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentIndex camera);
@@ -146,8 +143,6 @@ class Terrain
 		Array<GrassQuad*> m_free_grass_quads;
 		AssociativeArray<ComponentIndex, Array<GrassQuad*> > m_grass_quads;
 		AssociativeArray<ComponentIndex, Vec3> m_last_camera_position;
-		Vec3 m_brush_position;
-		float m_brush_size;
 		bool m_force_grass_update;
 		Renderer& m_renderer;
 };
