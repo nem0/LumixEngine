@@ -176,6 +176,7 @@ public:
 		, m_is_forward_rendered(is_forward_rendered)
 		, m_renderable_created(m_allocator)
 		, m_renderable_destroyed(m_allocator)
+		, m_is_grass_enabled(true)
 	{
 		m_universe.entityTransformed()
 			.bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
@@ -994,6 +995,9 @@ public:
 							   ComponentIndex camera) override
 	{
 		PROFILE_FUNCTION();
+
+		if (!m_is_grass_enabled) return;
+
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
 			if (m_terrains[i] &&
@@ -1003,6 +1007,18 @@ public:
 					frustum, infos, camera);
 			}
 		}
+	}
+
+
+	virtual bool isGrassEnabled() const override
+	{
+		return m_is_grass_enabled;
+	}
+	
+	
+	virtual void enableGrass(bool enabled) override
+	{
+		m_is_grass_enabled = enabled;
 	}
 
 
@@ -2347,6 +2363,7 @@ private:
 	Array<MTJD::Job*> m_jobs;
 	float m_time;
 	bool m_is_forward_rendered;
+	bool m_is_grass_enabled;
 	DelegateList<void(ComponentIndex)> m_renderable_created;
 	DelegateList<void(ComponentIndex)> m_renderable_destroyed;
 };

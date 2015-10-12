@@ -1238,6 +1238,10 @@ void TerrainEditor::onGUI()
 		COLOR
 	};
 
+	bool is_grass_enabled = scene->isGrassEnabled();
+
+	if (ImGui::Checkbox("Enable grass", &is_grass_enabled)) scene->enableGrass(is_grass_enabled);
+
 	if (ImGui::Combo(
 			"Brush type", &m_current_brush, "Height\0Layer\0Entity\0Color\0"))
 	{
