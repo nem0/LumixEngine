@@ -76,6 +76,8 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		desc.get(cmp, index, stream);
 	Lumix::InputBlob tmp(stream);
 
+	StringBuilder<100> desc_name(desc.getName(), "###", (uint64_t)&desc);
+
 	switch (desc.getType())
 	{
 	case Lumix::IPropertyDescriptor::DECIMAL:
@@ -85,14 +87,14 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		auto& d = static_cast<Lumix::IDecimalPropertyDescriptor&>(desc);
 		if ((d.getMax() - d.getMin()) / d.getStep() <= 100)
 		{
-			if (ImGui::SliderFloat(desc.getName(), &f, d.getMin(), d.getMax()))
+			if (ImGui::SliderFloat(desc_name, &f, d.getMin(), d.getMax()))
 			{
 				m_editor.setProperty(cmp.type, index, desc, &f, sizeof(f));
 			}
 		}
 		else
 		{
-			if (ImGui::DragFloat(desc.getName(), &f, d.getStep(), d.getMin(), d.getMax()))
+			if (ImGui::DragFloat(desc_name, &f, d.getStep(), d.getMin(), d.getMax()))
 			{
 				m_editor.setProperty(cmp.type, index, desc, &f, sizeof(f));
 			}
@@ -103,7 +105,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	{
 		int i;
 		tmp.read(i);
-		if (ImGui::DragInt(desc.getName(), &i))
+		if (ImGui::DragInt(desc_name, &i))
 		{
 			m_editor.setProperty(cmp.type, index, desc, &i, sizeof(i));
 		}
@@ -113,7 +115,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	{
 		bool b;
 		tmp.read(b);
-		if (ImGui::Checkbox(desc.getName(), &b))
+		if (ImGui::Checkbox(desc_name, &b))
 		{
 			m_editor.setProperty(cmp.type, index, desc, &b, sizeof(b));
 		}
@@ -123,7 +125,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	{
 		Lumix::Vec3 v;
 		tmp.read(v);
-		if (ImGui::ColorEdit3(desc.getName(), &v.x))
+		if (ImGui::ColorEdit3(desc_name, &v.x))
 		{
 			m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
 		}
@@ -133,7 +135,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	{
 		Lumix::Vec3 v;
 		tmp.read(v);
-		if (ImGui::DragFloat3(desc.getName(), &v.x))
+		if (ImGui::DragFloat3(desc_name, &v.x))
 		{
 			m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
 		}
@@ -143,7 +145,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	{
 		Lumix::Vec4 v;
 		tmp.read(v);
-		if (ImGui::DragFloat4(desc.getName(), &v.x))
+		if (ImGui::DragFloat4(desc_name, &v.x))
 		{
 			m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
 		}
@@ -156,41 +158,10 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		auto& resource_descriptor = dynamic_cast<Lumix::ResourcePropertyDescriptorBase&>(desc);
 		auto rm_type = resource_descriptor.getResourceType();
 		auto asset_type = m_asset_browser.getTypeFromResourceManagerType(rm_type);
-		if (m_asset_browser.resourceInput(desc.getName(), buf, sizeof(buf), asset_type))
+		if (m_asset_browser.resourceInput(desc_name, buf, sizeof(buf), asset_type))
 		{
 			m_editor.setProperty(cmp.type, index, desc, buf, (int)strlen(buf) + 1);
 		}
-
-		/*float item_w = ImGui::CalcItemWidth();
-		auto& style = ImGui::GetStyle();
-		ImGui::PushItemWidth(
-			item_w - ImGui::CalcTextSize("...->").x - style.FramePadding.x * 4 - style.ItemSpacing.x * 2);
-		if (ImGui::InputText("", buf, sizeof(buf)))
-		{
-			m_editor.setProperty(cmp.type, index, desc, buf, (int)strlen(buf) + 1);
-		}
-		ImGui::SameLine();
-		StringBuilder<50> popup_name("srp", (uint64_t)&desc);
-		if (ImGui::Button(StringBuilder<50>("...##b", (uint64_t)&desc)))
-			ImGui::OpenPopup(popup_name);
-		if (ImGui::BeginPopup(popup_name))
-		{
-			auto& resource_descriptor = dynamic_cast<Lumix::ResourcePropertyDescriptorBase&>(desc);
-			if (getResourcePath(buf, sizeof(buf), resource_descriptor.getResourceType()))
-			{
-				m_editor.setProperty(cmp.type, index, desc, buf, (int)strlen(buf) + 1);
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::EndPopup();
-		}
-		ImGui::SameLine();
-		if (ImGui::Button(StringBuilder<30>("->##go", (uint64_t)&desc)))
-		{
-			m_asset_browser.selectResource(Lumix::Path((const char*)stream.getData()));
-		}
-		ImGui::SameLine();
-		ImGui::Text(desc.getName());
-		ImGui::PopItemWidth();*/
 		break;
 	}
 	case Lumix::IPropertyDescriptor::STRING:
@@ -198,7 +169,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	{
 		char buf[1024];
 		Lumix::copyString(buf, (const char*)stream.getData());
-		if (ImGui::InputText(desc.getName(), buf, sizeof(buf)))
+		if (ImGui::InputText(desc_name, buf, sizeof(buf)))
 		{
 			m_editor.setProperty(cmp.type, index, desc, buf, (int)strlen(buf) + 1);
 		}
@@ -216,7 +187,9 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 
 void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescriptor& desc)
 {
-	if (!ImGui::CollapsingHeader(desc.getName(), nullptr, true, true)) return;
+	StringBuilder<100> desc_name(desc.getName(), "###", (uint64_t)&desc);
+
+	if (!ImGui::CollapsingHeader(desc_name, nullptr, true, true)) return;
 
 	int count = desc.getCount(cmp);
 	if (ImGui::Button("Add"))
