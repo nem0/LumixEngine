@@ -1054,12 +1054,9 @@ void TerrainEditor::tick()
 				if (hit.m_is_hit)
 				{
 					Lumix::Vec3 center = hit.m_origin + hit.m_dir * hit.m_t;
-					scene->setTerrainBrush(
-						terrain.index, center, m_terrain_brush_size);
 					drawCursor(*scene, terrain, center);
 					return;
 				}
-				scene->setTerrainBrush(terrain.index, Lumix::Vec3(0, 0, 0), 1);
 			}
 		}
 	}

@@ -816,14 +816,6 @@ public:
 	virtual Engine& getEngine() const override { return m_engine; }
 
 
-	virtual void setTerrainBrush(ComponentIndex cmp,
-								 const Vec3& position,
-								 float size) override
-	{
-		m_terrains[cmp]->setBrush(position, size);
-	}
-
-
 	virtual ComponentIndex getTerrainComponent(Entity entity) override
 	{
 		for (int i = 0; i < m_terrains.size(); ++i)

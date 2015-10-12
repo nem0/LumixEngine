@@ -226,7 +226,6 @@ public:
 	virtual float getTerrainXZScale(ComponentIndex cmp) = 0;
 	virtual void setTerrainYScale(ComponentIndex cmp, float scale) = 0;
 	virtual float getTerrainYScale(ComponentIndex cmp) = 0;
-	virtual void setTerrainBrush(ComponentIndex cmp, const Vec3& position, float size) = 0;
 	virtual void getTerrainSize(ComponentIndex cmp, float* width, float* height) = 0;
 	virtual ComponentIndex getTerrainComponent(Entity entity) = 0;
 
