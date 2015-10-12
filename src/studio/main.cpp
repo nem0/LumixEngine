@@ -69,6 +69,7 @@ public:
 		, m_actions(m_allocator)
 		, m_metadata(m_allocator)
 		, m_gui_pipeline(nullptr)
+		, m_is_welcome_screen_opened(true)
 	{
 		m_entity_list_search[0] = '\0';
 	}
@@ -112,6 +113,84 @@ public:
 	}
 
 
+	void showWelcomeScreen()
+	{
+		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+								 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
+		RECT client_rect;
+		GetClientRect(m_hwnd, &client_rect);
+		ImVec2 size(float(client_rect.right - client_rect.left),
+			float(client_rect.bottom - client_rect.top));
+		if (ImGui::Begin("Welcome", nullptr, size, -1, flags))
+		{
+			ImGui::Text("Welcome to Lumix Studio");
+
+			ImVec2 half_size = ImGui::GetContentRegionAvail();
+			half_size.x = half_size.x * 0.5f - ImGui::GetStyle().FramePadding.x;
+			half_size.y *= 0.75f;
+			auto right_pos = ImGui::GetCursorPos();
+			right_pos.x += half_size.x + ImGui::GetStyle().FramePadding.x;
+			if (ImGui::BeginChild("left", half_size, true))
+			{
+				if (ImGui::Button("New Universe")) m_is_welcome_screen_opened = false;
+
+				ImGui::Separator();
+				ImGui::Text("Open universe:");
+				ImGui::Indent();
+				auto& universes = m_asset_browser->getResources(AssetBrowser::UNIVERSE);
+				for (auto& univ : universes)
+				{
+					if (ImGui::MenuItem(univ.c_str()))
+					{
+						m_editor->loadUniverse(univ);
+						setTitle(univ.c_str());
+						m_is_welcome_screen_opened = false;
+					}
+				}
+				ImGui::Unindent();
+			}
+			ImGui::EndChild();
+
+			ImGui::SetCursorPos(right_pos);
+
+			if (ImGui::BeginChild("right", half_size, true))
+			{
+				ImGui::Text("Version 0.17. - News");
+				ImGui::BulletText("Orbit camera");
+				ImGui::BulletText("Welcome screen");
+				ImGui::BulletText("Visualization of physical contorller");
+				ImGui::BulletText("Game view fixed");
+				ImGui::Separator();
+				if (ImGui::Button("Download new version"))
+				{
+					Lumix::shellExecuteOpen(
+						"https://github.com/nem0/lumixengine_data/archive/master.zip");
+				}
+
+				if (ImGui::Button("Show major releases"))
+				{
+					Lumix::shellExecuteOpen("https://github.com/nem0/LumixEngine/releases");
+				}
+
+				if (ImGui::Button("Show latest commits"))
+				{
+					Lumix::shellExecuteOpen("https://github.com/nem0/LumixEngine/commits/master");
+				}
+
+				if (ImGui::Button("Show issues"))
+				{
+					Lumix::shellExecuteOpen("https://github.com/nem0/lumixengine/issues");
+				}
+
+			}
+			ImGui::EndChild();
+
+			if (ImGui::Button("Close")) m_is_welcome_screen_opened = false;
+		}
+		ImGui::End();
+	}
+
+
 	void onGUI()
 	{
 		PROFILE_FUNCTION();
@@ -119,42 +198,41 @@ public:
 		if (!m_gui_pipeline_source->isReady()) return;
 
 		ImGuiIO& io = ImGui::GetIO();
-
 		RECT rect;
 		GetClientRect(m_hwnd, &rect);
 		io.DisplaySize = ImVec2((float)(rect.right - rect.left), (float)(rect.bottom - rect.top));
-
 		io.DeltaTime = m_engine->getLastTimeDelta();
-
 		io.KeyCtrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
 		io.KeyShift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
 		io.KeyAlt = (GetKeyState(VK_MENU) & 0x8000) != 0;
 		io.KeysDown[VK_MENU] = io.KeyAlt;
 		io.KeysDown[VK_SHIFT] = io.KeyShift;
 		io.KeysDown[VK_CONTROL] = io.KeyCtrl;
-		// io.KeysDown : filled by WM_KEYDOWN/WM_KEYUP events
-		// io.MousePos : filled by WM_MOUSEMOVE events
-		// io.MouseDown : filled by WM_*BUTTON* events
-		// io.MouseWheel : filled by WM_MOUSEWHEEL events
 
 		SetCursor(io.MouseDrawCursor ? NULL : LoadCursor(NULL, IDC_ARROW));
 
 		ImGui::NewFrame();
 
-		showMainMenu();
-
-		m_profiler_ui->onGUI();
-		m_asset_browser->onGUI();
-		m_log_ui->onGUI();
-		m_import_asset_dialog->onGUI();
-		m_property_grid->onGUI();
-		showEntityList();
-		showEntityTemplateList();
-		m_sceneview.onGUI();
-		m_hierarchy_ui.onGUI();
-		m_gameview.onGui();
-		if (m_is_style_editor_opened) ImGui::ShowStyleEditor();
-		m_settings.onGUI(&m_actions[0], m_actions.size());
+		if (m_is_welcome_screen_opened)
+		{
+			showWelcomeScreen();
+		}
+		else
+		{
+			showMainMenu();
+			m_profiler_ui->onGUI();
+			m_asset_browser->onGUI();
+			m_log_ui->onGUI();
+			m_import_asset_dialog->onGUI();
+			m_property_grid->onGUI();
+			showEntityList();
+			showEntityTemplateList();
+			m_sceneview.onGUI();
+			m_hierarchy_ui.onGUI();
+			m_gameview.onGui();
+			if (m_is_style_editor_opened) ImGui::ShowStyleEditor();
+			m_settings.onGUI(&m_actions[0], m_actions.size());
+		}
 
 		ImGui::Render();
 	}
@@ -238,6 +316,7 @@ public:
 	void redo() { m_editor->redo(); }
 	void copy() { m_editor->copyEntity(); }
 	void paste() { m_editor->pasteEntity(); }
+	void toggleOrbitCamera() { m_editor->setOrbitCamera(!m_editor->isOrbitCamera()); }
 	void togglePivotMode() { m_editor->getGizmo().togglePivotMode(); }
 	void toggleCoordSystem() { m_editor->getGizmo().toggleCoordSystem(); }
 	void createEntity() { m_editor->addEntity(); }
@@ -314,7 +393,7 @@ public:
 		return *m_actions[0];
 	}
 
-
+	
 	void showMainMenu()
 	{
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
@@ -352,6 +431,9 @@ public:
 				doMenuItem(getAction("copy"), false, is_any_entity_selected);
 				doMenuItem(getAction("paste"), false, m_editor->canPasteEntity());
 				ImGui::Separator();
+				doMenuItem(getAction("orbitCamera"),
+					m_editor->isOrbitCamera(),
+					is_any_entity_selected || m_editor->isOrbitCamera());
 				doMenuItem(getAction("togglePivotMode"), false, is_any_entity_selected);
 				doMenuItem(getAction("toggleCoordSystem"), false, m_editor->canPasteEntity());
 				if (ImGui::BeginMenu("Select"))
@@ -710,6 +792,7 @@ public:
 		addAction<&StudioApp::undo>("Undo", "undo", VK_CONTROL, 'Z', -1);
 		addAction<&StudioApp::copy>("Copy", "copy", VK_CONTROL, 'C', -1);
 		addAction<&StudioApp::paste>("Paste", "paste", VK_CONTROL, 'V', -1);
+		addAction<&StudioApp::toggleOrbitCamera>("Orbit camera", "orbitCamera");
 		addAction<&StudioApp::togglePivotMode>("Center/Pivot", "togglePivotMode");
 		addAction<&StudioApp::toggleCoordSystem>("Local/Global", "toggleCoordSystem");
 
@@ -1075,6 +1158,7 @@ public:
 
 	bool m_finished;
 
+	bool m_is_welcome_screen_opened;
 	bool m_is_entity_list_opened;
 	bool m_is_entity_template_list_opened;
 	bool m_is_style_editor_opened;

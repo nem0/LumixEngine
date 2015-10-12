@@ -305,7 +305,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		cDesc.behaviorCallback = nullptr;
 		Vec3 position = m_universe.getPosition(entity);
 		cDesc.position.set(position.x, position.y, position.z);
-		PhysicsSceneImpl::Controller c;
+		PhysicsSceneImpl::Controller& c = m_controllers.pushEmpty();
 		c.m_controller = m_system->getControllerManager()->createController(
 			*m_system->getPhysics(), m_scene, cDesc);
 		c.m_entity = entity;
@@ -314,10 +314,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		c.m_radius = cDesc.radius;
 		c.m_height = cDesc.height;
 
-		m_controllers.push(c);
-
-		m_universe.addComponent(
-			entity, CONTROLLER_HASH, this, m_controllers.size() - 1);
+		m_universe.addComponent(entity, CONTROLLER_HASH, this, m_controllers.size() - 1);
 		return m_controllers.size() - 1;
 	}
 
@@ -402,7 +399,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		if (scale != m_terrains[cmp]->m_y_scale)
 		{
 			m_terrains[cmp]->m_y_scale = scale;
-			if (m_terrains[cmp]->m_heightmap)
+			if (m_terrains[cmp]->m_heightmap && m_terrains[cmp]->m_heightmap->isReady())
 			{
 				heightmapLoaded(m_terrains[cmp]);
 			}
@@ -525,22 +522,18 @@ struct PhysicsSceneImpl : public PhysicsScene
 		Vec3 g(0, time_delta * -9.8f, 0);
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
-			if (!m_controllers[i].m_is_free)
-			{
-				Vec3 dif = g + m_controllers[i].m_frame_change;
-				m_controllers[i].m_frame_change.set(0, 0, 0);
-				const physx::PxExtendedVec3& p =
-					m_controllers[i].m_controller->getPosition();
-				m_controllers[i].m_controller->move(
-					physx::PxVec3(dif.x, dif.y, dif.z),
-					0.01f,
-					time_delta,
-					physx::PxControllerFilters());
-				m_universe.setPosition(m_controllers[i].m_entity,
-									   (float)p.x,
-									   (float)p.y,
-									   (float)p.z);
-			}
+			if (m_controllers[i].m_is_free) continue;
+
+			Vec3 dif = g + m_controllers[i].m_frame_change;
+			m_controllers[i].m_frame_change.set(0, 0, 0);
+			const physx::PxExtendedVec3& p = m_controllers[i].m_controller->getPosition();
+			m_controllers[i].m_controller->move(physx::PxVec3(dif.x, dif.y, dif.z),
+				0.01f,
+				time_delta,
+				physx::PxControllerFilters());
+
+			float y = (float)p.y - m_controllers[i].m_height * 0.5f - m_controllers[i].m_radius;
+			m_universe.setPosition(m_controllers[i].m_entity, (float)p.x, y, (float)p.z);
 		}
 	}
 
@@ -656,6 +649,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			if (m_controllers[i].m_entity == entity)
 			{
 				Vec3 pos = m_universe.getPosition(entity);
+				pos.y += m_controllers[i].m_height * 0.5f;
+				pos.y += m_controllers[i].m_radius;
 				physx::PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
 				m_controllers[i].m_controller->setPosition(pvec);
 				return;
@@ -1114,7 +1109,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				cDesc.callback = nullptr;
 				cDesc.behaviorCallback = nullptr;
 				Vec3 position = m_universe.getPosition(e);
-				cDesc.position.set(position.x, position.y, position.z);
+				cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
 				c.m_controller =
 					m_system->getControllerManager()->createController(
 						*m_system->getPhysics(), m_scene, cDesc);

@@ -149,7 +149,7 @@ public:
 								float life) = 0;
 	virtual void addDebugSphere(const Vec3& center,
 								float radius,
-								const Vec3& color,
+								uint32_t color,
 								float life) = 0;
 	virtual void addDebugFrustum(const Vec3& position,
 								 const Vec3& direction,
@@ -164,11 +164,17 @@ public:
 	virtual void
 	addDebugFrustum(const Frustum& frustum, const Vec3& color, float life) = 0;
 
+	virtual void addDebugCapsule(const Vec3& position,
+		float height,
+		float radius,
+		uint32_t color,
+		float life) = 0;
+
 	virtual void addDebugCylinder(const Vec3& position,
-								  const Vec3& up,
-								  float radius,
-								  const Vec3& color,
-								  float life) = 0;
+		const Vec3& up,
+		float radius,
+		const Vec3& color,
+		float life) = 0;
 
 	virtual const Array<DebugLine>& getDebugLines() const = 0;
 	virtual const Array<DebugPoint>& getDebugPoints() const = 0;
@@ -209,9 +215,9 @@ public:
 							   int64_t layer_mask,
 							   ComponentIndex camera) = 0;
 	virtual void getTerrainInfos(Array<const TerrainInfo*>& infos,
-								 int64_t layer_mask,
-								 const Vec3& camera_pos,
-								 LIFOAllocator& allocator) = 0;
+		int64_t layer_mask,
+		const Vec3& camera_pos,
+		LIFOAllocator& allocator) = 0;
 	virtual float getTerrainHeightAt(ComponentIndex cmp, float x, float z) = 0;
 	virtual void setTerrainMaterialPath(ComponentIndex cmp, const char* path) = 0;
 	virtual const char* getTerrainMaterialPath(ComponentIndex cmp) = 0;
@@ -220,38 +226,30 @@ public:
 	virtual float getTerrainXZScale(ComponentIndex cmp) = 0;
 	virtual void setTerrainYScale(ComponentIndex cmp, float scale) = 0;
 	virtual float getTerrainYScale(ComponentIndex cmp) = 0;
-	virtual void
-	setTerrainBrush(ComponentIndex cmp, const Vec3& position, float size) = 0;
-	virtual void
-	getTerrainSize(ComponentIndex cmp, float* width, float* height) = 0;
+	virtual void getTerrainSize(ComponentIndex cmp, float* width, float* height) = 0;
 	virtual ComponentIndex getTerrainComponent(Entity entity) = 0;
 
-	virtual void
-	setGrassPath(ComponentIndex cmp, int index, const char* path) = 0;
+	virtual bool isGrassEnabled() const = 0;
+	virtual void enableGrass(bool enabled) = 0;
+	virtual void setGrassPath(ComponentIndex cmp, int index, const char* path) = 0;
 	virtual const char* getGrassPath(ComponentIndex cmp, int index) = 0;
 	virtual void setGrassGround(ComponentIndex cmp, int index, int ground) = 0;
 	virtual int getGrassGround(ComponentIndex cmp, int index) = 0;
-	virtual void
-	setGrassDensity(ComponentIndex cmp, int index, int density) = 0;
+	virtual void setGrassDensity(ComponentIndex cmp, int index, int density) = 0;
 	virtual int getGrassDensity(ComponentIndex cmp, int index) = 0;
 	virtual int getGrassCount(ComponentIndex cmp) = 0;
 	virtual void addGrass(ComponentIndex cmp, int index) = 0;
 	virtual void removeGrass(ComponentIndex cmp, int index) = 0;
 
-	virtual int getClosestPointLights(const Vec3& pos,
-									   ComponentIndex* lights,
-									   int max_lights) = 0;
-	virtual void getPointLights(const Frustum& frustum,
-								Array<ComponentIndex>& lights) = 0;
-	virtual void
-	getPointLightInfluencedGeometry(ComponentIndex light_cmp,
-									Array<const RenderableMesh*>& infos,
-									int64_t layer_mask) = 0;
-	virtual void
-	getPointLightInfluencedGeometry(ComponentIndex light_cmp,
-									const Frustum& frustum,
-									Array<const RenderableMesh*>& infos,
-									int64_t layer_mask) = 0;
+	virtual int getClosestPointLights(const Vec3& pos, ComponentIndex* lights, int max_lights) = 0;
+	virtual void getPointLights(const Frustum& frustum, Array<ComponentIndex>& lights) = 0;
+	virtual void getPointLightInfluencedGeometry(ComponentIndex light_cmp,
+		Array<const RenderableMesh*>& infos,
+		int64_t layer_mask) = 0;
+	virtual void getPointLightInfluencedGeometry(ComponentIndex light_cmp,
+		const Frustum& frustum,
+		Array<const RenderableMesh*>& infos,
+		int64_t layer_mask) = 0;
 	virtual void setLightCastShadows(ComponentIndex cmp, bool cast_shadows) = 0;
 	virtual bool getLightCastShadows(ComponentIndex cmp) = 0;
 	virtual float getLightAttenuation(ComponentIndex cmp) = 0;

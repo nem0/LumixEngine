@@ -176,6 +176,7 @@ public:
 		, m_is_forward_rendered(is_forward_rendered)
 		, m_renderable_created(m_allocator)
 		, m_renderable_destroyed(m_allocator)
+		, m_is_grass_enabled(true)
 	{
 		m_universe.entityTransformed()
 			.bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
@@ -815,14 +816,6 @@ public:
 	virtual Engine& getEngine() const override { return m_engine; }
 
 
-	virtual void setTerrainBrush(ComponentIndex cmp,
-								 const Vec3& position,
-								 float size) override
-	{
-		m_terrains[cmp]->setBrush(position, size);
-	}
-
-
 	virtual ComponentIndex getTerrainComponent(Entity entity) override
 	{
 		for (int i = 0; i < m_terrains.size(); ++i)
@@ -994,6 +987,9 @@ public:
 							   ComponentIndex camera) override
 	{
 		PROFILE_FUNCTION();
+
+		if (!m_is_grass_enabled) return;
+
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
 			if (m_terrains[i] &&
@@ -1003,6 +999,18 @@ public:
 					frustum, infos, camera);
 			}
 		}
+	}
+
+
+	virtual bool isGrassEnabled() const override
+	{
+		return m_is_grass_enabled;
+	}
+	
+	
+	virtual void enableGrass(bool enabled) override
+	{
+		m_is_grass_enabled = enabled;
 	}
 
 
@@ -1447,9 +1455,9 @@ public:
 
 
 	virtual void addDebugSphere(const Vec3& center,
-								float radius,
-								const Vec3& color,
-								float life) override
+		float radius,
+		uint32_t color,
+		float life) override
 	{
 		static const int COLS = 36;
 		static const int ROWS = COLS >> 1;
@@ -1496,6 +1504,89 @@ public:
 				prev_ci = ci;
 				prev_si = si;
 			}
+		}
+	}
+
+
+	void addDebugHalfSphere(const Vec3& center, float radius, bool top, uint32_t color, float life)
+	{
+		static const int COLS = 36;
+		static const int ROWS = COLS >> 1;
+		static const float STEP = (Math::PI / 180.0f) * 360.0f / COLS;
+		int p2 = COLS >> 1;
+		int yfrom = top ? 0 : -(ROWS >> 1);
+		int yto = top ? ROWS >> 1 : 0;
+		for (int y = yfrom; y < yto; ++y)
+		{
+			float cy = cos(y * STEP);
+			float cy1 = cos((y + 1) * STEP);
+			float sy = sin(y * STEP);
+			float sy1 = sin((y + 1) * STEP);
+			float prev_ci = cos((-p2 - 1) * STEP);
+			float prev_si = sin((-p2 - 1) * STEP);
+
+			for (int i = -p2; i < p2; ++i)
+			{
+				float ci = cos(i * STEP);
+				float si = sin(i * STEP);
+				addDebugLine(Vec3(center.x + radius * ci * cy,
+					center.y + radius * sy,
+					center.z + radius * si * cy),
+					Vec3(center.x + radius * ci * cy1,
+					center.y + radius * sy1,
+					center.z + radius * si * cy1),
+					color,
+					life);
+				addDebugLine(Vec3(center.x + radius * ci * cy,
+					center.y + radius * sy,
+					center.z + radius * si * cy),
+					Vec3(center.x + radius * prev_ci * cy,
+					center.y + radius * sy,
+					center.z + radius * prev_si * cy),
+					color,
+					life);
+				addDebugLine(Vec3(center.x + radius * prev_ci * cy1,
+					center.y + radius * sy1,
+					center.z + radius * prev_si * cy1),
+					Vec3(center.x + radius * ci * cy1,
+					center.y + radius * sy1,
+					center.z + radius * si * cy1),
+					color,
+					life);
+				prev_ci = ci;
+				prev_si = si;
+			}
+		}
+	}
+
+
+
+	virtual void addDebugCapsule(const Vec3& position,
+		float height,
+		float radius,
+		uint32_t color,
+		float life) override
+	{
+		addDebugHalfSphere(position + Vec3(0, radius, 0), radius, false, color, life);
+		addDebugHalfSphere(position + Vec3(0, radius + height, 0), radius, true, color, life);
+
+		Vec3 z_vec(0, 0, 1.0f);
+		Vec3 x_vec(1.0f, 0, 0);
+		float prevx = radius;
+		float prevz = 0;
+		z_vec.normalize();
+		x_vec.normalize();
+		Vec3 bottom = position + Vec3(0, radius, 0);
+		Vec3 top = bottom + Vec3(0, height, 0);
+		for (int i = 1; i <= 32; ++i)
+		{
+			float a = i / 32.0f * 2 * Math::PI;
+			float x = cosf(a) * radius;
+			float z = sinf(a) * radius;
+			addDebugLine(bottom + x_vec * x + z_vec * z,
+				top + x_vec * x + z_vec * z,
+				color,
+				life);
 		}
 	}
 
@@ -2264,6 +2355,7 @@ private:
 	Array<MTJD::Job*> m_jobs;
 	float m_time;
 	bool m_is_forward_rendered;
+	bool m_is_grass_enabled;
 	DelegateList<void(ComponentIndex)> m_renderable_created;
 	DelegateList<void(ComponentIndex)> m_renderable_destroyed;
 };

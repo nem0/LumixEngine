@@ -128,6 +128,7 @@ bool SceneView::onMouseDown(int screen_x, int screen_y, Lumix::MouseButton::Valu
 
 	if (!is_inside) return false;
 
+	ImGui::ResetActiveID();
 	ImGui::SetWindowFocus(WINDOW_NAME);
 	m_editor->onMouseDown(screen_x - m_screen_x, screen_y - m_screen_y, button);
 

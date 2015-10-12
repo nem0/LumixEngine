@@ -136,6 +136,8 @@ public:
 	virtual float getMouseX() const = 0;
 	virtual float getMouseY() const = 0;
 	virtual void lookAtSelected() = 0;
+	virtual bool isOrbitCamera() const = 0;
+	virtual void setOrbitCamera(bool enable) = 0;
 	virtual const char* getBasePath() = 0;
 	virtual const Array<Entity>& getSelectedEntities() const = 0;
 	virtual bool isEntitySelected(Entity entity) const = 0;

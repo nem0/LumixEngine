@@ -74,7 +74,7 @@ struct PhysicsSystemImpl : public PhysicsSystem
 
 extern "C" LUMIX_PHYSICS_API IPlugin* createPlugin(Engine& engine)
 {
-	return engine.getAllocator().newObject<PhysicsSystemImpl>(engine);
+	return LUMIX_NEW(engine.getAllocator(), PhysicsSystemImpl)(engine);
 }
 
 
@@ -90,34 +90,30 @@ struct EditorPlugin : public WorldEditor::Plugin
 		PhysicsScene* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
 		if (cmp.type == CONTROLLER_HASH)
 		{
-			auto* scene =
-				static_cast<RenderScene*>(m_editor.getScene(crc32("renderer")));
+			auto* scene = static_cast<RenderScene*>(m_editor.getScene(crc32("renderer")));
 			float height = phy_scene->getControllerHeight(cmp.index);
 			float radius = phy_scene->getControllerRadius(cmp.index);
 
 			Universe& universe = scene->getUniverse();
 			Vec3 pos = universe.getPosition(cmp.entity);
-			Vec3 up(0, (height + 2 * radius), 0);
-			scene->addDebugCylinder(
-				pos - up * 0.5f, up, radius, Vec3(1, 0, 0), 0);
+			scene->addDebugCapsule(pos, height, radius, 0xff0000ff, 0);
 			return true;
 		}
 
 		if (cmp.type == BOX_ACTOR_HASH)
 		{
-			auto* scene =
-				static_cast<RenderScene*>(m_editor.getScene(crc32("renderer")));
+			auto* scene = static_cast<RenderScene*>(m_editor.getScene(crc32("renderer")));
 			Vec3 extents = phy_scene->getHalfExtents(cmp.index);
 
 			Universe& universe = scene->getUniverse();
 			Matrix mtx = universe.getMatrix(cmp.entity);
 
 			scene->addDebugCube(mtx.getTranslation(),
-								mtx.getXVector() * extents.x,
-								mtx.getYVector() * extents.y,
-								mtx.getZVector() * extents.z,
-								Vec3(1, 0, 0),
-								0);
+				mtx.getXVector() * extents.x,
+				mtx.getYVector() * extents.y,
+				mtx.getZVector() * extents.z,
+				Vec3(1, 0, 0),
+				0);
 			return true;
 
 		}
@@ -282,6 +278,13 @@ bool PhysicsSystemImpl::connect2VisualDebugger()
 void CustomErrorCallback::reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line)
 {
 	g_log_error.log("PhysX") << message;
+}
+
+
+extern "C" LUMIX_PHYSICS_API void setWorldEditor(Lumix::WorldEditor& editor)
+{
+	auto* plugin = LUMIX_NEW(editor.getAllocator(), EditorPlugin)(editor);
+	editor.addPlugin(*plugin);
 }
 
 
