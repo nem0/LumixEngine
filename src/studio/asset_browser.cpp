@@ -743,6 +743,11 @@ void AssetBrowser::addResource(const char* path, const char* filename)
 	if (strcmp(ext, "shd") == 0) index = SHADER;
 	if (strcmp(ext, "lua") == 0) index = LUA_SCRIPT;
 
+	if (Lumix::startsWith(path, "./render_tests") != 0 || Lumix::startsWith(path, "./unit_tests") != 0)
+	{
+		return;
+	}
+
 	if (index >= 0)
 	{
 		Lumix::Path path_obj(fullpath);

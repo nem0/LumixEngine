@@ -14,6 +14,7 @@
 #include "core/fs/ifile.h"
 #include "core/input_system.h"
 #include "core/json_serializer.h"
+#include "core/library.h"
 #include "core/log.h"
 #include "core/matrix.h"
 #include "core/mt/mutex.h"
@@ -1473,7 +1474,7 @@ public:
 		float range = scene->getLightRange(light.index);
 
 		Vec3 pos = universe.getPosition(light.entity);
-		scene->addDebugSphere(pos, range, Vec3(1, 0, 0), 0);
+		scene->addDebugSphere(pos, range, 0xff0000ff, 0);
 	}
 
 
@@ -1542,8 +1543,7 @@ public:
 	}
 
 
-	void
-	showGlobalLightGizmo(ComponentUID light)
+	void showGlobalLightGizmo(ComponentUID light)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(light.scene);
 		Universe& universe = scene->getUniverse();
@@ -1559,16 +1559,12 @@ public:
 		scene->addDebugLine(pos + up, pos + dir + up, 0xff0000ff, 0);
 		scene->addDebugLine(pos - up, pos + dir - up, 0xff0000ff, 0);
 
-		scene->addDebugLine(
-			pos + right + up, pos + dir + right + up, 0xff0000ff, 0);
-		scene->addDebugLine(
-			pos + right - up, pos + dir + right - up, 0xff0000ff, 0);
-		scene->addDebugLine(
-			pos - right - up, pos + dir - right - up, 0xff0000ff, 0);
-		scene->addDebugLine(
-			pos - right + up, pos + dir - right + up, 0xff0000ff, 0);
+		scene->addDebugLine(pos + right + up, pos + dir + right + up, 0xff0000ff, 0);
+		scene->addDebugLine(pos + right - up, pos + dir + right - up, 0xff0000ff, 0);
+		scene->addDebugLine(pos - right - up, pos + dir - right - up, 0xff0000ff, 0);
+		scene->addDebugLine(pos - right + up, pos + dir - right + up, 0xff0000ff, 0);
 
-		scene->addDebugSphere(pos - dir, 0.1f, Vec3(1, 0, 0), 0);
+		scene->addDebugSphere(pos - dir, 0.1f, 0xff0000ff, 0);
 	}
 
 
@@ -2621,6 +2617,7 @@ public:
 		, m_is_loading(false)
 		, m_universe_path("")
 		, m_universe_context(nullptr)
+		, m_is_orbit(false)
 	{
 		m_go_to_parameters.m_is_active = false;
 		m_undo_index = -1;
@@ -2688,6 +2685,13 @@ public:
 			&WorldEditorImpl::constructEditorCommand<AddEntityCommand>);
 
 		EditorIcon::loadIcons(*m_engine);
+
+		const auto& libs = m_engine->getPluginManager().getLibraries();
+		for (auto* lib : libs)
+		{
+			auto* callback = static_cast<void(*)(WorldEditor&)>(lib->resolve("setWorldEditor"));
+			if (callback) (*callback)(*this);
+		}
 	}
 
 
@@ -2696,7 +2700,9 @@ public:
 		Universe* universe = getUniverse();
 		Vec3 pos = universe->getPosition(m_camera);
 		Quat rot = universe->getRotation(m_camera);
-		;
+
+		right = m_is_orbit ? 0 : right;
+
 		pos += rot * Vec3(0, 0, -1) * forward * speed;
 		pos += rot * Vec3(1, 0, 0) * right * speed;
 		universe->setPosition(m_camera, pos);
@@ -2768,6 +2774,19 @@ public:
 		}
 	}
 
+
+	virtual bool isOrbitCamera() const override
+	{
+		return m_is_orbit;
+	}
+
+
+	virtual void setOrbitCamera(bool enable) override
+	{
+		m_is_orbit = enable;
+	}
+
+
 	void rotateCamera(int x, int y)
 	{
 		Universe* universe = getUniverse();
@@ -2778,10 +2797,18 @@ public:
 		rot = rot * yaw_rot;
 		rot.normalize();
 
-		Vec3 axis = rot * Vec3(1, 0, 0);
-		Quat pitch_rot(axis, -y / 200.0f);
+		Vec3 pitch_axis = rot * Vec3(1, 0, 0);
+		Quat pitch_rot(pitch_axis, -y / 200.0f);
 		rot = rot * pitch_rot;
 		rot.normalize();
+
+		if (m_is_orbit && !m_selected_entities.empty())
+		{
+			Vec3 dir = rot * Vec3(0, 0, 1);
+			Vec3 entity_pos = universe->getPosition(m_selected_entities[0]);
+			float dist = (entity_pos - pos).length();
+			pos = entity_pos + dir * dist;
+		}
 
 		Matrix camera_mtx;
 		rot.toMatrix(camera_mtx);
@@ -3270,6 +3297,7 @@ private:
 	Array<EditorIcon*> m_editor_icons;
 	AssociativeArray<int32_t, Array<ComponentUID>> m_components;
 	bool m_is_game_mode;
+	bool m_is_orbit;
 	FS::IFile* m_game_mode_file;
 	Engine* m_engine;
 	Entity m_camera;

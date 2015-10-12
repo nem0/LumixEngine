@@ -1,4 +1,5 @@
 #include "ocornut-imgui/imgui.h"
+#include "ocornut-imgui/imgui_internal.h"
 
 
 namespace ImGui
@@ -151,6 +152,12 @@ bool ImGui::ListBox(const char* label,
 	clipper.End();
 	ImGui::ListBoxFooter();
 	return value_changed;
+}
+
+
+void ResetActiveID()
+{
+	SetActiveID(0);
 }
 
 

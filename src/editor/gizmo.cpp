@@ -38,10 +38,7 @@ Gizmo::~Gizmo()
 
 void Gizmo::destroy()
 {
-	m_editor.getEngine()
-		.getResourceManager()
-		.get(ResourceManager::MODEL)
-		->unload(*m_model);
+	m_editor.getEngine().getResourceManager().get(ResourceManager::MODEL)->unload(*m_model);
 }
 
 
