@@ -162,6 +162,7 @@ public:
 	float getBoundingRadius() const { return m_bounding_radius; }
 	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
 	const AABB& getAABB() const { return m_aabb; }
+	Array<LOD>& getLODs() { return m_lods; }
 
 public:
 	static const uint32_t FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
