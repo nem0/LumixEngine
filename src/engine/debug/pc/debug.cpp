@@ -1,5 +1,8 @@
 #include "debug/debug.h"
 #include "core/string.h"
+#include "core/string.h"
+#include "core/system.h"
+#include "debug/stack_tree.h"
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <DbgHelp.h>
@@ -98,9 +101,73 @@ BOOL SendFile(LPCSTR lpszSubject,
 }
 
 
+static void getStack(CONTEXT& context, char* out, int max_size)
+{
+	BOOL result;
+	HANDLE process;
+	HANDLE thread;
+	STACKFRAME64 stack;
+	char symbol_mem[sizeof(IMAGEHLP_SYMBOL64) + 256];
+	IMAGEHLP_SYMBOL64* symbol = (IMAGEHLP_SYMBOL64*)symbol_mem;
+	DWORD64 displacement;
+	char name[256];
+	copyString(out, max_size, "Crash callstack:\n");
+	memset(&stack, 0, sizeof(STACKFRAME64));
+
+	process = GetCurrentProcess();
+	thread = GetCurrentThread();
+	displacement = 0;
+	DWORD machineType;
+	#ifdef _WIN64
+		machineType = IMAGE_FILE_MACHINE_IA64;
+		stack.AddrPC.Offset = context.Rip;
+		stack.AddrPC.Mode = AddrModeFlat;
+		stack.AddrStack.Offset = context.Rsp;
+		stack.AddrStack.Mode = AddrModeFlat;
+		stack.AddrFrame.Offset = context.Rbp;
+		stack.AddrFrame.Mode = AddrModeFlat;
+	#else
+		machineType = IMAGE_FILE_MACHINE_I386;
+		stack.AddrPC.Offset = context.Eip;
+		stack.AddrPC.Mode = AddrModeFlat;
+		stack.AddrStack.Offset = context.Esp;
+		stack.AddrStack.Mode = AddrModeFlat;
+		stack.AddrFrame.Offset = context.Ebp;
+		stack.AddrFrame.Mode = AddrModeFlat;
+	#endif
+
+	do
+	{
+		result = StackWalk64(machineType,
+			process,
+			thread,
+			&stack,
+			&context,
+			NULL,
+			SymFunctionTableAccess64,
+			SymGetModuleBase64,
+			NULL);
+
+		symbol->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
+		symbol->MaxNameLength = 255;
+
+		SymGetSymFromAddr64(process, (ULONG64)stack.AddrPC.Offset, &displacement, symbol);
+		UnDecorateSymbolName(symbol->Name, (PSTR)name, 256, UNDNAME_COMPLETE);
+
+		catString(out, max_size, symbol->Name);
+		catString(out, max_size, "\n");
+
+	} while (result);
+}
+
+
 static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 {
 	if (!g_is_crash_reporting_enabled) return EXCEPTION_CONTINUE_SEARCH;
+
+	char message[4096];
+	getStack(*info->ContextRecord, message, sizeof(message));
+	messageBox(message);
 
 	char minidump_path[Lumix::MAX_PATH_LENGTH];
 	GetCurrentDirectory(sizeof(minidump_path), minidump_path);
