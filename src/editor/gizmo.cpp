@@ -212,7 +212,6 @@ void Gizmo::setCameraRay(const Vec3& origin, const Vec3& cursor_dir)
 			origin, cursor_dir, pos, pos + mtx.getXVector() * 0.5f, pos + mtx.getZVector() * 0.5f, &t);
 		if (hit && t < tmin)
 		{
-			tmin = t;
 			m_transform_axis = Axis::XZ;
 		}
 
@@ -375,7 +374,6 @@ void Gizmo::renderQuarterRing(PipelineInstance& pipeline, const Matrix& mtx, con
 {
 	Vertex vertices[1200];
 	uint16_t indices[1200];
-	const float INNER_MULTIPLICATOR = 0.9f;
 	const float ANGLE_STEP = Math::degreesToRadians(1.0f / 100.0f * 360.0f);
 	Vec3 n = crossProduct(a, b) * 0.05f;
 	int offset = -1;

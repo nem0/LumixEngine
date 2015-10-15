@@ -204,7 +204,6 @@ public:
 	{
 		if (!script.m_script) return;
 
-		lua_State* state = script.m_state;
 		for (Property& prop : script.m_properties)
 		{
 			applyProperty(script, prop);

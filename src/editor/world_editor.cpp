@@ -1577,7 +1577,6 @@ public:
 		{
 			RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 			Model* model = scene->getRenderableModel(cmp.index);
-			Vec3 points[8];
 			if (!model) return aabb;
 
 			aabb = model->getAABB();
@@ -1814,15 +1813,6 @@ public:
 		}
 		else
 		{
-			bool entity_already_selected = false;
-			for (int i = 0, c = m_selected_entities.size(); i < c; ++i)
-			{
-				if (m_selected_entities[i] == entity)
-				{
-					entity_already_selected = true;
-					break;
-				}
-			}
 			selectEntities(&entity, 1);
 		}
 	}
@@ -2049,7 +2039,6 @@ public:
 	{
 		if (count <= 0) return;
 
-		Universe* universe = getUniverse();
 		IEditorCommand* command =
 			m_allocator.newObject<ScaleEntityCommand>(*this, entities, scales, count, m_allocator);
 		executeCommand(command);

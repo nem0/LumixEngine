@@ -93,8 +93,6 @@ void GameView::onGui()
 		{
 			auto pos = ImGui::GetWindowPos();
 			auto cp = ImGui::GetCursorPos();
-			int gameview_x = int(pos.x + cp.x);
-			int gameview_y = int(pos.y + cp.y);
 			m_pipeline->setViewport(0, 0, int(size.x), int(size.y));
 
 			auto* fb = m_pipeline->getFramebuffer("default");

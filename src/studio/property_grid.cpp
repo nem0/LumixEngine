@@ -43,30 +43,6 @@ PropertyGrid::~PropertyGrid()
 }
 
 
-bool PropertyGrid::getResourcePath(char* buf, int max_size, uint32_t resource_type)
-{
-	ImGui::InputText("Filter", m_filter, sizeof(m_filter));
-
-	if (ImGui::BeginChild("list", ImVec2(0, 300)))
-	{
-		auto type = m_asset_browser.getTypeFromResourceManagerType(resource_type);
-		for (auto unv : m_asset_browser.getResources(type))
-		{
-			if (m_filter[0] != '\0' && strstr(unv.c_str(), m_filter) == nullptr) continue;
-
-			if (ImGui::Selectable(unv.c_str(), false))
-			{
-				Lumix::copyString(buf, max_size, unv.c_str());
-				ImGui::EndChild();
-				return true;
-			}
-		}
-	}
-	ImGui::EndChild();
-	return false;
-}
-
-
 void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lumix::ComponentUID cmp)
 {
 	Lumix::OutputBlob stream(m_editor.getAllocator());

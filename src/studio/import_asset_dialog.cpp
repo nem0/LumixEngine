@@ -274,11 +274,11 @@ struct ImportTask : public Lumix::MT::Task
 			m_dialog.setMessage(m_dialog.m_importer.GetErrorString());
 			Lumix::g_log_error.log("import")
 				<< m_dialog.m_importer.GetErrorString();
-		}
-		m_dialog.m_mesh_mask.resize(scene->mNumMeshes);
-		for (int i = 0; i < m_dialog.m_mesh_mask.size(); ++i)
-		{
-			m_dialog.m_mesh_mask[i] = true;
+			m_dialog.m_mesh_mask.resize(scene->mNumMeshes);
+			for (int i = 0; i < m_dialog.m_mesh_mask.size(); ++i)
+			{
+				m_dialog.m_mesh_mask[i] = true;
+			}
 		}
 
 		Lumix::enableFloatingPointTraps(true);
@@ -941,8 +941,6 @@ struct ConvertTask : public Lumix::MT::Task
 			return false;
 		}
 
-		const aiScene* scene = m_dialog.m_importer.GetScene();
-
 		writePhysicsHeader(*file);
 		int32_t count = 0;
 		for (auto* mesh : m_filtered_meshes)
@@ -966,7 +964,6 @@ struct ConvertTask : public Lumix::MT::Task
 	void writePhysiscTriMesh(Lumix::FS::IFile& file)
 	{
 		int count = 0;
-		const aiScene* scene = m_dialog.m_importer.GetScene();
 		for (auto* mesh : m_filtered_meshes)
 		{
 			count += (int32_t)mesh->mNumFaces * 3;
@@ -992,7 +989,6 @@ struct ConvertTask : public Lumix::MT::Task
 
 	bool checkModel() const
 	{
-		const aiScene* scene = m_dialog.m_importer.GetScene();
 		for (auto* mesh : m_filtered_meshes)
 		{
 			if (!mesh->HasNormals())

@@ -92,7 +92,7 @@ namespace Lumix
 			switch(value.type)
 			{
 				case InputType::PRESSED:
-					return GetAsyncKeyState(value.key) >> 8 ? 1.0f : 0;
+					return (GetAsyncKeyState(value.key) >> 8) ? 1.0f : 0;
 					break;
 				case InputType::DOWN:
 					return GetAsyncKeyState(value.key) & 1 ? 1.0f : 0;

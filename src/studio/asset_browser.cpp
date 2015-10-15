@@ -580,7 +580,6 @@ void InsertMeshCommand::deserialize(Lumix::JsonSerializer& serializer)
 
 void InsertMeshCommand::execute()
 {
-	Lumix::Engine& engine = m_editor.getEngine();
 	Lumix::Universe* universe = m_editor.getUniverse();
 	m_entity = universe->createEntity(Lumix::Vec3(0, 0, 0), Lumix::Quat(0, 0, 0, 1));
 	universe->setPosition(m_entity, m_position);

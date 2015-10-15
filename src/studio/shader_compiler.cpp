@@ -244,7 +244,6 @@ void ShaderCompiler::parseDependencies()
 			continue;
 		}
 
-		int end = 0;
 		char first_line[100];
 		readLine(file, first_line, sizeof(first_line));
 		for (int i = 0; i < sizeof(first_line); ++i)

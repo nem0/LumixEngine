@@ -1050,8 +1050,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 				m_allocator.newObject<RigidActor>(*this, m_allocator);
 			m_actors[i] = actor;
 		}
-		ResourceManagerBase* manager =
-			m_engine->getResourceManager().get(ResourceManager::PHYSICS);
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
 			bool is_dynamic;
