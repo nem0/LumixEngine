@@ -84,6 +84,10 @@ class LUMIX_RENDERER_API PipelineInstance abstract
 		setViewProjection(const Matrix& mtx, int width, int height) = 0;
 		virtual void setScissor(int x, int y, int width, int height) = 0;
 		virtual void render(TransientGeometry& geom,
+			const Matrix& mtx,
+			uint64_t render_states,
+			bgfx::ProgramHandle program_handle) = 0;
+		virtual void render(TransientGeometry& geom,
 							int first_index,
 							int num_indices,
 							Material& material,
@@ -92,6 +96,7 @@ class LUMIX_RENDERER_API PipelineInstance abstract
 		virtual void renderModel(Model& model, const Matrix& mtx) = 0;
 		virtual void toggleStats() = 0;
 		virtual void setWindowHandle(void* data) = 0;
+		virtual int getPassIdx() const = 0;
 };
 
 

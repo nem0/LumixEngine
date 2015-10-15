@@ -317,7 +317,7 @@ public:
 	void copy() { m_editor->copyEntity(); }
 	void paste() { m_editor->pasteEntity(); }
 	void toggleOrbitCamera() { m_editor->setOrbitCamera(!m_editor->isOrbitCamera()); }
-	void togglePivotMode() { m_editor->getGizmo().togglePivotMode(); }
+	void togglePivotMode() { m_editor->getGizmo().togglePivot(); }
 	void toggleCoordSystem() { m_editor->getGizmo().toggleCoordSystem(); }
 	void createEntity() { m_editor->addEntity(); }
 	void showEntities() { m_editor->showEntities(); }
@@ -328,6 +328,20 @@ public:
 	void toggleStats() { m_gui_pipeline->toggleStats(); }
 
 
+	void toggleGizmoMode() 
+	{
+		auto& gizmo = m_editor->getGizmo();
+		if (gizmo.getMode() == Lumix::Gizmo::Mode::TRANSLATE)
+		{
+			gizmo.setMode(Lumix::Gizmo::Mode::ROTATE);
+		}
+		else
+		{
+			gizmo.setMode(Lumix::Gizmo::Mode::TRANSLATE);
+		}
+	}
+
+	
 	void setWireframe()
 	{
 		m_is_wireframe = !m_is_wireframe;
@@ -434,8 +448,9 @@ public:
 				doMenuItem(getAction("orbitCamera"),
 					m_editor->isOrbitCamera(),
 					is_any_entity_selected || m_editor->isOrbitCamera());
+				doMenuItem(getAction("toggleGizmoMode"), false, is_any_entity_selected);
 				doMenuItem(getAction("togglePivotMode"), false, is_any_entity_selected);
-				doMenuItem(getAction("toggleCoordSystem"), false, m_editor->canPasteEntity());
+				doMenuItem(getAction("toggleCoordSystem"), false, is_any_entity_selected);
 				if (ImGui::BeginMenu("Select"))
 				{
 					if (ImGui::MenuItem("Same mesh", nullptr, nullptr, is_any_entity_selected))
@@ -793,6 +808,7 @@ public:
 		addAction<&StudioApp::copy>("Copy", "copy", VK_CONTROL, 'C', -1);
 		addAction<&StudioApp::paste>("Paste", "paste", VK_CONTROL, 'V', -1);
 		addAction<&StudioApp::toggleOrbitCamera>("Orbit camera", "orbitCamera");
+		addAction<&StudioApp::toggleGizmoMode>("Translate/Rotate", "toggleGizmoMode");
 		addAction<&StudioApp::togglePivotMode>("Center/Pivot", "togglePivotMode");
 		addAction<&StudioApp::toggleCoordSystem>("Local/Global", "toggleCoordSystem");
 
@@ -1101,7 +1117,7 @@ public:
 					p.y = y;
 					ClientToScreen(m_hwnd, &p);
 
-					m_sceneview.onMouseMove(p.x, p.y, x - old_x, y - old_y);
+					m_sceneview.onMouseMove(old_x, old_y, x - old_x, y - old_y);
 
 					old_x = x;
 					old_y = y;

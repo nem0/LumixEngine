@@ -63,14 +63,18 @@ protected:
 	void removeDependency(Resource& dependent_resource);
 
 protected:
+	State m_desired_state;
+	uint16_t m_empty_dep_count;
 	size_t m_size;
 	ResourceManager& m_resource_manager;
+
+protected:
+	void checkState();
 
 private:
 	void doLoad();
 	void fileLoaded(FS::IFile& file, bool success, FS::FileSystem& fs);
 	void onStateChanged(State old_state, State new_state);
-	void checkState();
 	uint32_t addRef(void) { return ++m_ref_count; }
 	uint32_t remRef(void) { return --m_ref_count; }
 
@@ -81,10 +85,8 @@ private:
 	ObserverCallback m_cb;
 	Path m_path;
 	uint16_t m_ref_count;
-	uint16_t m_empty_dep_count;
 	uint16_t m_failed_dep_count;
 	State m_current_state;
-	State m_desired_state;
 	bool m_is_waiting_for_load;
 }; // class Resource
 

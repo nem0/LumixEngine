@@ -27,7 +27,7 @@ TransientGeometry::TransientGeometry(const void* vertex_data,
 		bgfx::allocTransientVertexBuffer(&m_vertex_buffer, num_vertices, decl);
 		bgfx::allocTransientIndexBuffer(&m_index_buffer, num_indices);
 
-		memcpy(m_vertex_buffer.data, vertex_data, num_vertices * sizeof(Vertex));
+		memcpy(m_vertex_buffer.data, vertex_data, num_vertices * decl.getStride());
 		memcpy(m_index_buffer.data, index_data, num_indices * sizeof(uint16_t));
 		m_num_vertices = num_vertices;
 	}

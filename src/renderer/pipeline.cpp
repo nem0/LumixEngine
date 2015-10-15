@@ -887,6 +887,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	virtual int getPassIdx() const override
+	{
+		return m_pass_idx;
+	}
+
+
 	void setPointLightUniforms(Material* material, ComponentIndex light_cmp)
 	{
 		if (light_cmp < 0) return;
@@ -1298,6 +1304,20 @@ struct PipelineInstanceImpl : public PipelineInstance
 			m_view_idx,
 			material.getShaderInstance().m_program_handles[m_pass_idx]);
 	}
+
+
+	virtual void render(TransientGeometry& geom,
+		const Matrix& mtx,
+		uint64_t render_states,
+		bgfx::ProgramHandle program_handle) override
+	{
+		bgfx::setState(m_render_state | render_states);
+		bgfx::setTransform(&mtx.m11);
+		bgfx::setVertexBuffer(&geom.getVertexBuffer());
+		bgfx::setIndexBuffer(&geom.getIndexBuffer());
+		bgfx::submit(m_view_idx, program_handle);
+	}
+
 
 
 	void renderRigidMesh(const RenderableMesh& info)

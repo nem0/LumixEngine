@@ -171,14 +171,18 @@ void LogUI::onGUI()
 		char filter[128] = "";
 		ImGui::InputText("Filter", filter, sizeof(filter));
 
-		for (int i = 0; i < messages->size(); ++i)
+		if (ImGui::BeginChild("log_messages"))
 		{
-			const char* msg = (*messages)[i].c_str();
-			if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
+			for (int i = 0; i < messages->size(); ++i)
 			{
-				ImGui::Text(msg);
+				const char* msg = (*messages)[i].c_str();
+				if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
+				{
+					ImGui::Text(msg);
+				}
 			}
 		}
+		ImGui::EndChild();
 	}
 	ImGui::End();
 }

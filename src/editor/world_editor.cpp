@@ -1680,6 +1680,15 @@ public:
 		PROFILE_FUNCTION();
 		updateGoTo();
 
+		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
+		if (camera_cmp.isValid())
+		{
+			Vec3 origin, cursor_dir;
+			RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
+			scene->getRay(camera_cmp.index, m_mouse_x, m_mouse_y, origin, cursor_dir);
+			m_gizmo.setCameraRay(origin, cursor_dir);
+		}
+
 		for (int i = 0; i < m_plugins.size(); ++i)
 		{
 			m_plugins[i]->tick();
@@ -1747,36 +1756,14 @@ public:
 					camera_cmp.index, (float)x, (float)y, origin, dir);
 				RayCastModelHit hit =
 					scene->castRay(origin, dir, INVALID_COMPONENT);
-				RayCastModelHit gizmo_hit = m_gizmo.castRay(origin, dir);
+				bool gizmo_hit = m_gizmo.castRay(origin, dir);
 				EditorIconHit icon_hit = raycastEditorIcons(origin, dir);
-				if (gizmo_hit.m_is_hit &&
-					(icon_hit.m_t < 0 || gizmo_hit.m_t < icon_hit.m_t))
+				if (gizmo_hit)
 				{
 					if (!m_selected_entities.empty())
 					{
 						m_mouse_mode = MouseMode::TRANSFORM;
-						if (gizmo_hit.m_mesh->getNameHash() == crc32("x_axis"))
-						{
-							m_gizmo.startTransform(camera_cmp.index,
-												   x,
-												   y,
-												   Gizmo::TransformMode::X);
-						}
-						else if (gizmo_hit.m_mesh->getNameHash() ==
-								 crc32("y_axis"))
-						{
-							m_gizmo.startTransform(camera_cmp.index,
-												   x,
-												   y,
-												   Gizmo::TransformMode::Y);
-						}
-						else
-						{
-							m_gizmo.startTransform(camera_cmp.index,
-												   x,
-												   y,
-												   Gizmo::TransformMode::Z);
-						}
+						m_gizmo.startTransform(camera_cmp.index, x, y);
 					}
 				}
 				else if (icon_hit.m_t >= 0)
@@ -1836,63 +1823,36 @@ public:
 					break;
 				}
 			}
-			if (entity_already_selected)
-			{
-				m_mouse_mode = MouseMode::TRANSFORM;
-				m_gizmo.startTransform(
-					getComponent(m_camera, CAMERA_HASH).index,
-					x,
-					y,
-					Gizmo::TransformMode::CAMERA_XZ);
-			}
-			else
-			{
-				selectEntities(&entity, 1);
-			}
+			selectEntities(&entity, 1);
 		}
 	}
 
 
-	virtual void
-	onMouseMove(int x, int y, int relx, int rely, int mouse_flags) override
+	virtual void onMouseMove(int x, int y, int relx, int rely, int mouse_flags) override
 	{
 		PROFILE_FUNCTION();
 		m_mouse_x = (float)x;
 		m_mouse_y = (float)y;
+
 		switch (m_mouse_mode)
 		{
 			case MouseMode::CUSTOM:
 			{
 				if (m_mouse_handling_plugin)
 				{
-					m_mouse_handling_plugin->onMouseMove(
-						x, y, relx, rely, mouse_flags);
+					m_mouse_handling_plugin->onMouseMove(x, y, relx, rely, mouse_flags);
 				}
 			}
 			break;
-			case MouseMode::NAVIGATE:
-				rotateCamera(relx, rely);
-				break;
+			case MouseMode::NAVIGATE: rotateCamera(relx, rely); break;
 			case MouseMode::TRANSFORM:
 			{
-				Gizmo::TransformOperation tmode =
-					mouse_flags & (int)MouseFlags::ALT /*GetKeyState(VK_MENU) &
-														  0x8000*/
-						? Gizmo::TransformOperation::ROTATE
-						: Gizmo::TransformOperation::TRANSLATE;
 				int flags =
-					mouse_flags &
-							(int)MouseFlags::
-								CONTROL /*GetKeyState(VK_LCONTROL) & 0x8000*/
+					mouse_flags & (int)MouseFlags::CONTROL /*GetKeyState(VK_LCONTROL) & 0x8000*/
 						? (int)Gizmo::Flags::FIXED_STEP
 						: 0;
-				m_gizmo.transform(getComponent(m_camera, CAMERA_HASH).index,
-								  tmode,
-								  x,
-								  y,
-								  relx,
-								  rely,
-								  flags);
+				m_gizmo.transform(
+					getComponent(m_camera, CAMERA_HASH).index, x, y, relx, rely, flags);
 			}
 			break;
 		}
@@ -1901,6 +1861,7 @@ public:
 
 	virtual void onMouseUp(int x, int y, MouseButton::Value button) override
 	{
+		m_gizmo.stopTransform();
 		if (m_mouse_handling_plugin)
 		{
 			m_mouse_handling_plugin->onMouseUp(x, y, button);
