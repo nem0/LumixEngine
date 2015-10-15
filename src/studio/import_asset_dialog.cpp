@@ -274,6 +274,9 @@ struct ImportTask : public Lumix::MT::Task
 			m_dialog.setMessage(m_dialog.m_importer.GetErrorString());
 			Lumix::g_log_error.log("import")
 				<< m_dialog.m_importer.GetErrorString();
+		}
+		else
+		{
 			m_dialog.m_mesh_mask.resize(scene->mNumMeshes);
 			for (int i = 0; i < m_dialog.m_mesh_mask.size(); ++i)
 			{
