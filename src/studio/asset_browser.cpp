@@ -657,25 +657,27 @@ void AssetBrowser::onGUIModel()
 
 	ImGui::LabelText("Bounding radius", "%f", model->getBoundingRadius());
 	
-	ImGui::Separator();
 	auto& lods = model->getLODs();
-	ImGui::Columns(3);
-	ImGui::Text("LOD"); ImGui::NextColumn();
-	ImGui::Text("Distance"); ImGui::NextColumn();
-	ImGui::Text("# of meshes"); ImGui::NextColumn();
-	ImGui::Separator();
-	for (int i = 0; i < lods.size() - 1; ++i)
+	if (!lods.empty())
 	{
-		ImGui::Text("%d", i); ImGui::NextColumn();
-		ImGui::DragFloat("", &lods[i].m_distance); ImGui::NextColumn();
-		ImGui::Text("%d", lods[i].m_to_mesh - lods[i].m_from_mesh + 1); ImGui::NextColumn();
+		ImGui::Separator();
+		ImGui::Columns(3);
+		ImGui::Text("LOD"); ImGui::NextColumn();
+		ImGui::Text("Distance"); ImGui::NextColumn();
+		ImGui::Text("# of meshes"); ImGui::NextColumn();
+		ImGui::Separator();
+		for (int i = 0; i < lods.size() - 1; ++i)
+		{
+			ImGui::Text("%d", i); ImGui::NextColumn();
+			ImGui::DragFloat("", &lods[i].m_distance); ImGui::NextColumn();
+			ImGui::Text("%d", lods[i].m_to_mesh - lods[i].m_from_mesh + 1); ImGui::NextColumn();
+		}
+
+		ImGui::Text("%d", lods.size() - 1); ImGui::NextColumn();
+		ImGui::Text("INFINITE"); ImGui::NextColumn();
+		ImGui::Text("%d", lods.back().m_to_mesh - lods.back().m_from_mesh + 1);
+		ImGui::Columns(1);
 	}
-
-	ImGui::Text("%d", lods.size() - 1); ImGui::NextColumn();
-	ImGui::Text("INFINITE"); ImGui::NextColumn();
-	ImGui::Text("%d", lods.back().m_to_mesh - lods.back().m_from_mesh + 1);
-
-	ImGui::Columns(1);
 
 	ImGui::Separator();
 	for (int i = 0; i < model->getMeshCount(); ++i)

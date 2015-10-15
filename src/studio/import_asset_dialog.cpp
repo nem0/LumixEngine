@@ -678,8 +678,10 @@ struct ConvertTask : public Lumix::MT::Task
 		
 		Lumix::Array<SkinInfo> skin_infos(m_dialog.m_editor.getAllocator());
 		fillSkinInfo(scene, skin_infos, vertices_count);
-		
+
 		int skin_index = 0;
+		aiMatrix3x3 normal_matrix(scene->mRootNode->mTransformation);
+
 		for (auto* mesh : m_filtered_meshes)
 		{
 			bool is_skinned = isSkinned(mesh);
@@ -694,9 +696,9 @@ struct ConvertTask : public Lumix::MT::Task
 				}
 				++skin_index;
 
-				Lumix::Vec3 position(mesh->mVertices[j].x,
-					mesh->mVertices[j].y,
-					mesh->mVertices[j].z);
+				auto v = scene->mRootNode->mTransformation * mesh->mVertices[j];
+
+				Lumix::Vec3 position(v.x, v.y, v.z);
 				file.write((const char*)&position, sizeof(position));
 
 				if (mesh->mColors[0])
@@ -710,7 +712,7 @@ struct ConvertTask : public Lumix::MT::Task
 					file.write(color, sizeof(color));
 				}
 
-				auto normal = mesh->mNormals[j];
+				auto normal = normal_matrix * mesh->mNormals[j];
 				uint32_t int_normal = packF4u(normal);
 				file.write((const char*)&int_normal, sizeof(int_normal));
 
@@ -756,6 +758,52 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
+	static const aiNode* getOwner(const aiNode* node, int mesh_index)
+	{
+		for (int i = 0; i < (int)node->mNumMeshes; ++i)
+		{
+			if (node->mMeshes[i] == mesh_index) return node;
+		}
+
+		for(int i = 0; i < (int)node->mNumChildren; ++i)
+		{
+			auto* child = node->mChildren[i];
+			auto* owner = getOwner(child, mesh_index);
+			if (owner) return owner;
+		}
+
+		return nullptr;
+	}
+
+
+	const aiNode* getOwner(const aiMesh* mesh) const
+	{
+		const aiScene* scene = m_dialog.m_importer.GetScene();
+		for (int i = 0; i < int(scene->mNumMeshes); ++i)
+		{
+			if (scene->mMeshes[i] == mesh) return getOwner(scene->mRootNode, i);
+		}
+		return nullptr;
+	}
+
+
+	aiString getMeshName(const aiMesh* mesh) const
+	{
+		aiString mesh_name = mesh->mName;
+		int length = (int)strlen(mesh_name.C_Str());
+		if (length == 0)
+		{
+			const auto* node = getOwner(mesh);
+			if (node)
+			{
+				mesh_name = node->mName;
+			}
+		}
+		return mesh_name;
+	}
+
+
+
 	void writeMeshes(Lumix::FS::IFile& file) const
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
@@ -790,8 +838,9 @@ struct ConvertTask : public Lumix::MT::Task
 			indices_offset += mesh->mNumFaces * 3;
 			file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
-			aiString mesh_name = mesh->mName;
+			aiString mesh_name = getMeshName(mesh);
 			length = (int)strlen(mesh_name.C_Str());
+
 			file.write((const char*)&length, sizeof(length));
 			file.write((const char*)mesh_name.C_Str(), length);
 
@@ -997,19 +1046,19 @@ struct ConvertTask : public Lumix::MT::Task
 			if (!mesh->HasNormals())
 			{
 				m_dialog.setMessage(StringBuilder<256>(
-					"Mesh ", mesh->mName.C_Str(), " has no normals."));
+					"Mesh ", getMeshName(mesh).C_Str(), " has no normals."));
 				return false;
 			}
 			if (!mesh->HasPositions())
 			{
 				m_dialog.setMessage(StringBuilder<256>(
-					"Mesh ", mesh->mName.C_Str(), " has no positions."));
+					"Mesh ", getMeshName(mesh).C_Str(), " has no positions."));
 				return false;
 			}
 			if (!mesh->HasTextureCoords(0))
 			{
 				m_dialog.setMessage(StringBuilder<256>(
-					"Mesh ", mesh->mName.C_Str(), " has no texture coords."));
+					"Mesh ", getMeshName(mesh).C_Str(), " has no texture coords."));
 				return false;
 			}
 		}
@@ -1026,9 +1075,9 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	static float getMeshLODFactor(const aiMesh* mesh)
+	float getMeshLODFactor(const aiMesh* mesh) const
 	{
-		const char* mesh_name = mesh->mName.C_Str();
+		const char* mesh_name = getMeshName(mesh).C_Str();
 		int len = int(strlen(mesh_name));
 		if (len < 5) return FLT_MAX;
 
@@ -1058,11 +1107,11 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	static int getMeshLOD(const aiMesh* const * mesh_ptr)
+	int getMeshLOD(const aiMesh* const * mesh_ptr) const
 	{
 		const aiMesh* const mesh = *mesh_ptr;
 
-		const char* mesh_name = mesh->mName.C_Str();
+		const char* mesh_name = getMeshName(mesh).C_Str();
 		int len = int(strlen(mesh_name));
 		if (len < 5) return -1;
 
@@ -1091,10 +1140,11 @@ struct ConvertTask : public Lumix::MT::Task
 			if (m_dialog.m_mesh_mask[i]) m_filtered_meshes.push(scene->mMeshes[i]);
 		}
 
+		static ConvertTask* that = this;
 		auto cmpMeshes = [](const void* a, const void* b) -> int {
 			auto a_mesh = static_cast<aiMesh* const *>(a);
 			auto b_mesh = static_cast<aiMesh* const *>(b);
-			return getMeshLOD(a_mesh) - getMeshLOD(b_mesh);
+			return that->getMeshLOD(a_mesh) - that->getMeshLOD(b_mesh);
 		};
 
 		qsort(&m_filtered_meshes[0], m_filtered_meshes.size(), sizeof(m_filtered_meshes[0]), cmpMeshes);
