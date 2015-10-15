@@ -155,7 +155,6 @@ bool Shader::generateInstances()
 	m_instances.clear();
 
 	int count = 1 << m_combintions.m_define_count;
-	Renderer& renderer = getRenderer();
 
 	auto* binary_manager = m_resource_manager.get(ResourceManager::SHADER_BINARY);
 	char basename[MAX_PATH_LENGTH];

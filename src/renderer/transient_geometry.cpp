@@ -8,14 +8,6 @@ namespace Lumix
 {
 
 
-struct Vertex
-{
-	float positions[2];
-	float uv[2];
-	uint8_t color[4];
-};
-
-
 TransientGeometry::TransientGeometry(const void* vertex_data,
 									 int num_vertices,
 									 const bgfx::VertexDecl& decl,

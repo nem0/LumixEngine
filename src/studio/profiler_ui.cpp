@@ -348,7 +348,6 @@ void ProfilerUI::refreshAllocations()
 	m_main_allocator->lock();
 	auto* current_info = m_main_allocator->getFirstAllocationInfo();
 
-	int allocation_count = 0;
 	while (current_info)
 	{
 		addToTree(current_info);
@@ -469,12 +468,6 @@ void ProfilerUI::onGUICPUProfiler()
 
 	if (m_root)
 	{
-		float times[MAX_FRAMES];
-		for (int i = 0; i < m_root->m_frames.size(); ++i)
-		{
-			times[i] = m_root->m_frames[i];
-		}
-
 		auto* block = m_current_block ? m_current_block : m_root;
 		float width = ImGui::GetWindowContentRegionWidth();
 		int count = Lumix::Math::minValue(int(width / 5), block->m_hit_counts.size());

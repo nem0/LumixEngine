@@ -798,9 +798,7 @@ public:
 				}
 				Renderable* r = m_renderables[renderable_index];
 				Vec3 pos = m_universe.getPosition(r->m_entity);
-				float dist = (pos - frustum.getCenter()).length();
-				if (frustum.isSphereInside(pos,
-										   r->m_model->getBoundingRadius()))
+				if (frustum.isSphereInside(pos, r->m_model->getBoundingRadius()))
 				{
 					m_light_influenced_geometry[i].push(renderable_index);
 				}
@@ -1572,8 +1570,6 @@ public:
 
 		Vec3 z_vec(0, 0, 1.0f);
 		Vec3 x_vec(1.0f, 0, 0);
-		float prevx = radius;
-		float prevz = 0;
 		z_vec.normalize();
 		x_vec.normalize();
 		Vec3 bottom = position + Vec3(0, radius, 0);

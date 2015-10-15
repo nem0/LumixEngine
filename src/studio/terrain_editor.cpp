@@ -526,12 +526,12 @@ private:
 			ASSERT(false);
 			return;
 		}
-		float fx = 0, fy = 0;
+		float fx = 0;
 		float fstepx = 1.0f / (r.m_to_x - r.m_from_x);
 		float fstepy = 1.0f / (r.m_to_y - r.m_from_y);
 		for (int i = r.m_from_x, end = r.m_to_x; i < end; ++i, fx += fstepx)
 		{
-			fy = 0;
+			float fy = 0;
 			for (int j = r.m_from_y, end2 = r.m_to_y; j < end2; ++j, fy += fstepy)
 			{
 				if (isMasked(fx, fy))
@@ -575,12 +575,12 @@ private:
 			return;
 		}
 
-		float fx = 0, fy = 0;
+		float fx = 0;
 		float fstepx = 1.0f / (r.m_to_x - r.m_from_x);
 		float fstepy = 1.0f / (r.m_to_y - r.m_from_y);
 		for (int i = r.m_from_x, end = r.m_to_x; i < end; ++i, fx += fstepx)
 		{
-			fy = 0;
+			float fy = 0;
 			for (int j = r.m_from_y, end2 = r.m_to_y; j < end2; ++j, fy += fstepy)
 			{
 				if (isMasked(fx, fy))
@@ -616,9 +616,7 @@ private:
 		Rectangle rect;
 		rect = item.getBoundingRectangle(texture_width, texture->getHeight());
 
-		float amount = Lumix::Math::maxValue(item.m_amount * item.m_amount * 256.0f, 1.0f);
-		float avg =
-			computeAverage16(texture, rect.m_from_x, rect.m_to_x, rect.m_from_y, rect.m_to_y);
+		float avg = computeAverage16(texture, rect.m_from_x, rect.m_to_x, rect.m_from_y, rect.m_to_y);
 		for (int i = rect.m_from_x, end = rect.m_to_x; i < end; ++i)
 		{
 			for (int j = rect.m_from_y, end2 = rect.m_to_y; j < end2; ++j)
