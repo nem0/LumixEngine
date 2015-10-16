@@ -983,7 +983,7 @@ struct ConvertTask : public Lumix::MT::Task
 		Lumix::PathUtils::getBasename(filename, sizeof(filename), m_dialog.m_source);
 		Lumix::catString(filename, ".phy");
 		auto& fs = m_dialog.m_editor.getEngine().getFileSystem();
-		PathBuilder phy_path(m_dialog.m_editor.getBasePath());
+		PathBuilder phy_path(m_dialog.m_output_dir);
 		phy_path << "/" << filename;
 		Lumix::FS::IFile* file =
 			fs.open(fs.getDiskDevice(), phy_path, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
@@ -1154,6 +1154,7 @@ struct ConvertTask : public Lumix::MT::Task
 	bool saveLumixModel()
 	{
 		ASSERT(m_dialog.m_output_dir[0] != '\0');
+		if (!m_dialog.m_import_model) return true;
 		if (!checkModel()) return false;
 
 		m_dialog.setImportMessage("Importing model...");
@@ -1201,6 +1202,7 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	, m_task(nullptr)
 	, m_editor(editor)
 	, m_import_physics(false)
+	, m_import_model(true)
 	, m_is_converting(false)
 	, m_is_importing(false)
 	, m_is_importing_texture(false)
@@ -1491,6 +1493,8 @@ void ImportAssetDialog::onGUI()
 		if (m_importer.GetScene())
 		{
 			auto* scene = m_importer.GetScene();
+			ImGui::Checkbox("Import model", &m_import_model);
+
 			if (scene->HasMaterials())
 			{
 				ImGui::Checkbox(StringBuilder<50>("Import materials (",
