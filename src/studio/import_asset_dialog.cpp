@@ -72,6 +72,50 @@ crn_bool ddsConvertCallback(crn_uint32 phase_index,
 }
 
 
+
+static bool saveAsRaw(ImportAssetDialog& dialog,
+	Lumix::FS::FileSystem& fs,
+	const char* source_path,
+	const uint8_t* image_data,
+	int image_width,
+	int image_height,
+	const char* dest_path,
+	float scale,
+	Lumix::IAllocator& allocator)
+{
+	ASSERT(image_data);
+
+	dialog.setImportMessage(
+		StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Saving ")
+		<< dest_path);
+
+	auto* file = fs.open(fs.getDiskDevice(),
+		dest_path,
+		Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE);
+	if (!file)
+	{
+		dialog.setMessage(
+			StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Could not save ")
+			<< dest_path);
+		return false;
+	}
+
+	Lumix::Array<uint16_t> data(allocator);
+	data.resize(image_width * image_height);
+	for (int j = 0; j < image_height; ++j)
+	{
+		for (int i = 0; i < image_width; ++i)
+		{
+			data[i + j * image_width] = uint16_t(scale * image_data[(i + j * image_width) * 4]);
+		}
+	}
+
+	file->write((const char*)&data[0], data.size() * sizeof(data[0]));
+	fs.close(*file);
+	return true;
+}
+
+
 static bool saveAsDDS(ImportAssetDialog& dialog,
 					  Lumix::FS::FileSystem& fs,
 					  const char* source_path,
@@ -146,6 +190,7 @@ struct ImportTextureTask : public Lumix::MT::Task
 	static void getDestinationPath(const char* output_dir,
 		const char* source,
 		bool to_dds,
+		bool to_raw,
 		char* out,
 		int max_size)
 	{
@@ -156,6 +201,14 @@ struct ImportTextureTask : public Lumix::MT::Task
 		{
 			PathBuilder dest_path(output_dir);
 			dest_path << "/" << basename << ".dds";
+			Lumix::copyString(out, max_size, dest_path);
+			return;
+		}
+
+		if (to_raw)
+		{
+			PathBuilder dest_path(output_dir);
+			dest_path << "/" << basename << ".raw";
 			Lumix::copyString(out, max_size, dest_path);
 			return;
 		}
@@ -187,6 +240,7 @@ struct ImportTextureTask : public Lumix::MT::Task
 		getDestinationPath(m_dialog.m_output_dir,
 			m_dialog.m_source,
 			m_dialog.m_convert_to_dds,
+			m_dialog.m_convert_to_raw,
 			dest_path,
 			Lumix::lengthOf(dest_path));
 
@@ -201,6 +255,20 @@ struct ImportTextureTask : public Lumix::MT::Task
 				image_width,
 				image_height,
 				dest_path);
+		}
+		else if (m_dialog.m_convert_to_raw)
+		{
+			m_dialog.setImportMessage("Converting to RAW...");
+
+			saveAsRaw(m_dialog,
+				m_dialog.m_editor.getEngine().getFileSystem(),
+				m_dialog.m_source,
+				data,
+				image_width,
+				image_height,
+				dest_path,
+				m_dialog.m_raw_texture_scale,
+				m_dialog.m_editor.getAllocator());
 		}
 		else
 		{
@@ -1212,6 +1280,9 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	, m_saved_embedded_textures(editor.getAllocator())
 	, m_path_mapping(editor.getAllocator())
 	, m_mesh_mask(editor.getAllocator())
+	, m_convert_to_dds(false)
+	, m_convert_to_raw(false)
+	, m_raw_texture_scale(1)
 {
 	m_is_opened = false;
 	m_message[0] = '\0';
@@ -1403,9 +1474,13 @@ void ImportAssetDialog::importTexture()
 	setImportMessage("Importing texture...");
 
 	char dest_path[Lumix::MAX_PATH_LENGTH];
-	ImportTextureTask::getDestinationPath(
-		m_output_dir, m_source, m_convert_to_dds, dest_path, Lumix::lengthOf(dest_path));
-	
+	ImportTextureTask::getDestinationPath(m_output_dir,
+		m_source,
+		m_convert_to_dds,
+		m_convert_to_raw,
+		dest_path,
+		Lumix::lengthOf(dest_path));
+
 	char tmp[Lumix::MAX_PATH_LENGTH];
 	Lumix::PathUtils::normalize(dest_path, tmp, Lumix::lengthOf(tmp));
 	m_editor.getRelativePath(dest_path, Lumix::lengthOf(dest_path), tmp);
@@ -1474,7 +1549,19 @@ void ImportAssetDialog::onGUI()
 
 		if (isImage(m_source))
 		{
-			ImGui::Checkbox("Convert to DDS", &m_convert_to_dds);
+			if (ImGui::Checkbox("Convert to raw", &m_convert_to_raw))
+			{
+				if (m_convert_to_raw) m_convert_to_dds = false;
+			}
+			if (m_convert_to_raw)
+			{
+				ImGui::SameLine();
+				ImGui::DragFloat("Scale", &m_raw_texture_scale, 1.0f, 0.01f, 256.0f);
+			}
+			if (ImGui::Checkbox("Convert to DDS", &m_convert_to_dds))
+			{
+				if (m_convert_to_dds) m_convert_to_raw = false;
+			}
 			ImGui::InputText("Output directory", m_output_dir, sizeof(m_output_dir));
 			ImGui::SameLine();
 			if (ImGui::Button("...##browseoutput"))
