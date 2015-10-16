@@ -248,24 +248,24 @@ void AssetBrowser::saveMaterial(Lumix::Material* material)
 }
 
 
-bool AssetBrowser::resourceInput(const char* label, char* buf, int max_size, Type type)
+bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* buf, int max_size, Type type)
 {
 	float item_w = ImGui::CalcItemWidth();
 	auto& style = ImGui::GetStyle();
 	ImGui::PushItemWidth(item_w - ImGui::CalcTextSize("...->").x - style.FramePadding.x * 4 -
 						 style.ItemSpacing.x * 2);
 
-	if (ImGui::InputText(StringBuilder<30>("##", (uint64_t)label), buf, max_size)) return true;
+	if (ImGui::InputText(StringBuilder<30>("##", str_id), buf, max_size)) return true;
 
 	ImGui::SameLine();
-	StringBuilder<50> popup_name("pu", label);
-	if (ImGui::Button(StringBuilder<30>("...##browse", label)))
+	StringBuilder<50> popup_name("pu", str_id);
+	if (ImGui::Button(StringBuilder<30>("...##browse", str_id)))
 	{
 		ImGui::OpenPopup(popup_name);
 	}
 
 	ImGui::SameLine();
-	if (ImGui::Button(StringBuilder<30>("->##go", label)))
+	if (ImGui::Button(StringBuilder<30>("->##go", str_id)))
 	{
 		m_wanted_resource = buf;
 	}
@@ -338,7 +338,7 @@ void AssetBrowser::onGUIMaterial()
 
 	char buf[256];
 	Lumix::copyString(buf, material->getShader() ? material->getShader()->getPath().c_str() : "");
-	if (resourceInput("Shader", buf, sizeof(buf), SHADER))
+	if (resourceInput("Shader", "shader", buf, sizeof(buf), SHADER))
 	{
 		material->setShader(Lumix::Path(buf));
 	}
@@ -348,7 +348,8 @@ void AssetBrowser::onGUIMaterial()
 		auto& slot = material->getShader()->getTextureSlot(i);
 		auto* texture = material->getTexture(i);
 		Lumix::copyString(buf, texture ? texture->getPath().c_str() : "");
-		if (resourceInput(slot.m_name, buf, sizeof(buf), TEXTURE))
+		if (resourceInput(
+				slot.m_name, StringBuilder<30>("", (uint64_t)&slot), buf, sizeof(buf), TEXTURE))
 		{
 			material->setTexturePath(i, Lumix::Path(buf));
 		}
