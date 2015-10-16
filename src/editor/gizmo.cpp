@@ -546,31 +546,26 @@ void Gizmo::startTransform(ComponentIndex camera, int x, int y)
 
 float Gizmo::computeRotateAngle(int relx, int rely, bool use_step)
 {
-	float angle = 0;
 	if (use_step)
 	{
 		m_relx_accum += relx;
 		m_rely_accum += rely;
 		if (m_relx_accum + m_rely_accum > 50)
 		{
-			angle = (float)Math::PI / 4;
 			m_relx_accum = m_rely_accum = 0;
+			return Math::degreesToRadians(float(getStep()));
 		}
 		else if (m_relx_accum + m_rely_accum < -50)
 		{
-			angle = -(float)Math::PI / 4;
 			m_relx_accum = m_rely_accum = 0;
+			return -Math::degreesToRadians(float(getStep()));
 		}
 		else
 		{
-			angle = 0;
+			return 0;
 		}
 	}
-	else
-	{
-		angle = (relx + rely) / 100.0f;
-	}
-	return angle;
+	return (relx + rely) / 100.0f;
 }
 
 void Gizmo::rotate(int relx, int rely, bool use_step)
@@ -586,15 +581,9 @@ void Gizmo::rotate(int relx, int rely, bool use_step)
 		Vec3 axis;
 		switch (m_transform_axis)
 		{
-			case Axis::X:
-				axis = gizmo_mtx.getXVector();
-				break;
-			case Axis::Y:
-				axis = gizmo_mtx.getYVector();
-				break;
-			case Axis::Z:
-				axis = gizmo_mtx.getZVector();
-				break;
+			case Axis::X: axis = gizmo_mtx.getXVector(); break;
+			case Axis::Y: axis = gizmo_mtx.getYVector(); break;
+			case Axis::Z: axis = gizmo_mtx.getZVector(); break;
 		}
 		float angle = computeRotateAngle(relx, rely, use_step);
 
