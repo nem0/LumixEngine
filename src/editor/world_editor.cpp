@@ -2436,7 +2436,7 @@ public:
 			Universe* universe = getUniverse();
 			for (int i = 0; i < universe->getEntityCount(); ++i)
 			{
-				Entity e(i);
+				Entity e = universe->getEntityFromDenseIdx(i);
 				createEditorIcon(e);
 			}
 		}
