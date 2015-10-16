@@ -967,7 +967,7 @@ public:
 		m_gui_pipeline =
 			Lumix::PipelineInstance::create(*m_gui_pipeline_source, m_engine->getAllocator());
 
-		m_sceneview.init(*m_editor);
+		m_sceneview.init(*m_editor, m_actions);
 		m_gameview.init(m_hwnd, *m_editor);
 
 		RECT rect;

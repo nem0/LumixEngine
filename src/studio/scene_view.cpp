@@ -42,13 +42,13 @@ void SceneView::setScene(Lumix::RenderScene* scene)
 void SceneView::shutdown()
 {
 	Lumix::PipelineInstance::destroy(m_pipeline);
-	m_pipeline_source->getResourceManager()
-		.get(Lumix::ResourceManager::PIPELINE)
-		->unload(*m_pipeline_source);
+	auto* pipeline_manager =
+		m_pipeline_source->getResourceManager().get(Lumix::ResourceManager::PIPELINE);
+	pipeline_manager->unload(*m_pipeline_source);
 }
 
 
-bool SceneView::init(Lumix::WorldEditor& editor)
+bool SceneView::init(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
 {
 	m_editor = &editor;
 	auto& engine = editor.getEngine();
@@ -61,6 +61,12 @@ bool SceneView::init(Lumix::WorldEditor& editor)
 	m_pipeline->addCustomCommandHandler("render_gizmos")
 		.bind<SceneView, &SceneView::renderGizmos>(this);
 
+	m_toggle_gizmo_step_action =
+		LUMIX_NEW(editor.getAllocator(), Action)("Enable/disable gizmo step", "toggleGizmoStep");
+	m_toggle_gizmo_step_action->is_global = false;
+
+	actions.push(m_toggle_gizmo_step_action);
+
 	return true;
 }
 
@@ -68,16 +74,17 @@ bool SceneView::init(Lumix::WorldEditor& editor)
 void SceneView::update()
 {
 	PROFILE_FUNCTION();
-	if(ImGui::IsAnyItemActive()) return;
+	if (ImGui::IsAnyItemActive()) return;
 	if (!m_is_opened) return;
 	if (ImGui::GetIO().KeysDown[VK_CONTROL]) return;
 
-	m_camera_speed = Lumix::Math::maxValue(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
+	m_camera_speed =
+		Lumix::Math::maxValue(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
 
 	int screen_x = int(ImGui::GetIO().MousePos.x);
 	int screen_y = int(ImGui::GetIO().MousePos.y);
 	bool is_inside = screen_x >= m_screen_x && screen_y >= m_screen_y &&
-		screen_x <= m_screen_x + m_width && screen_y <= m_screen_y + m_height;
+					 screen_x <= m_screen_x + m_width && screen_y <= m_screen_y + m_height;
 	if (!is_inside) return;
 
 	float speed = m_camera_speed;
@@ -138,9 +145,9 @@ bool SceneView::onMouseDown(int screen_x, int screen_y, Lumix::MouseButton::Valu
 
 void SceneView::onMouseMove(int mouse_screen_x, int mouse_screen_y, int rel_x, int rel_y)
 {
-	int flags = ImGui::GetIO().KeysDown[VK_MENU]
-		? (int)Lumix::WorldEditor::MouseFlags::ALT
-		: 0;
+	int flags = ImGui::GetIO().KeysDown[VK_MENU] ? (int)Lumix::WorldEditor::MouseFlags::ALT : 0;
+	flags |= ImGui::GetIO().KeysDown[VK_CONTROL] ? (int)Lumix::WorldEditor::MouseFlags::CONTROL : 0;
+	m_editor->setGizmoUseStep(m_toggle_gizmo_step_action->isActive());
 	m_editor->onMouseMove(
 		mouse_screen_x - m_screen_x, mouse_screen_y - m_screen_y, rel_x, rel_y, flags);
 }
@@ -181,6 +188,13 @@ void SceneView::onGUI()
 	if (m_editor->isMeasureToolActive())
 	{
 		ImGui::Text("| Measured distance: %f", m_editor->getMeasuredDistance());
+	}
+
+	ImGui::SameLine();
+	int step = m_editor->getGizmo().getStep();
+	if (ImGui::DragInt("Gizmo step", &step, 1.0f, 0, 200))
+	{
+		m_editor->getGizmo().setStep(step);
 	}
 
 	ImGui::End();
