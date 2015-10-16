@@ -62,7 +62,7 @@ public:
 		}
 		virtual void onMouseUp(int x, int y, MouseButton::Value button) {}
 		virtual void
-		onMouseMove(int x, int y, int rel_x, int rel_y, int mouse_flags) {}
+		onMouseMove(int x, int y, int rel_x, int rel_y) {}
 
 		virtual bool showGizmo(ComponentUID cmp) { return false; }
 	};
@@ -132,7 +132,7 @@ public:
 		int index,
 		IArrayDescriptor& property) = 0;
 	virtual void onMouseDown(int x, int y, MouseButton::Value button) = 0;
-	virtual void onMouseMove(int x, int y, int relx, int rely, int mouse_flags) = 0;
+	virtual void onMouseMove(int x, int y, int relx, int rely) = 0;
 	virtual void onMouseUp(int x, int y, MouseButton::Value button) = 0;
 	virtual float getMouseX() const = 0;
 	virtual float getMouseY() const = 0;

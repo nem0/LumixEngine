@@ -1818,7 +1818,7 @@ public:
 	}
 
 
-	virtual void onMouseMove(int x, int y, int relx, int rely, int mouse_flags) override
+	virtual void onMouseMove(int x, int y, int relx, int rely) override
 	{
 		PROFILE_FUNCTION();
 		m_mouse_x = (float)x;
@@ -1830,7 +1830,7 @@ public:
 			{
 				if (m_mouse_handling_plugin)
 				{
-					m_mouse_handling_plugin->onMouseMove(x, y, relx, rely, mouse_flags);
+					m_mouse_handling_plugin->onMouseMove(x, y, relx, rely);
 				}
 			}
 			break;

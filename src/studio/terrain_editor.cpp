@@ -1161,7 +1161,7 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 }
 
 
-void TerrainEditor::onMouseMove(int x, int y, int, int, int)
+void TerrainEditor::onMouseMove(int x, int y, int, int)
 {
 	detectModifiers();
 
