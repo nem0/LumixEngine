@@ -1705,6 +1705,9 @@ public:
 
 	virtual ~WorldEditorImpl()
 	{
+		auto& library_loaded_callback = m_engine->getPluginManager().libraryLoaded();
+		library_loaded_callback.unbind<WorldEditorImpl, &WorldEditorImpl::onPluginLibraryLoaded>(this);
+
 		EditorIcon::unloadIcons();
 		removePlugin(*m_measure_tool);
 		m_allocator.deleteObject(m_measure_tool);
@@ -2584,18 +2587,14 @@ public:
 
 		m_engine = &engine;
 
-		const char* plugins[] = {"renderer.dll",
-								 "animation.dll",
-								 "physics.dll",
-								 "lua_script.dll",
-								 "script.dll"};
+		const char* plugins[] = {"renderer.dll", "animation.dll", "physics.dll", "lua_script.dll"};
 
+		PluginManager& plugin_manager = m_engine->getPluginManager();
 		for (auto* plugin_name : plugins)
 		{
-			if (!m_engine->loadPlugin(plugin_name))
+			if (!plugin_manager.load(plugin_name))
 			{
-				g_log_info.log("plugins") << plugin_name
-										  << " plugin has not been loaded";
+				g_log_info.log("plugins") << plugin_name << " plugin has not been loaded";
 			}
 		}
 
@@ -2640,12 +2639,20 @@ public:
 
 		EditorIcon::loadIcons(*m_engine);
 
-		const auto& libs = m_engine->getPluginManager().getLibraries();
+		plugin_manager.libraryLoaded().bind<WorldEditorImpl, &WorldEditorImpl::onPluginLibraryLoaded>(this);
+		const auto& libs = plugin_manager.getLibraries();
 		for (auto* lib : libs)
 		{
-			auto* callback = static_cast<void(*)(WorldEditor&)>(lib->resolve("setWorldEditor"));
+			auto* callback = static_cast<void (*)(WorldEditor&)>(lib->resolve("setWorldEditor"));
 			if (callback) (*callback)(*this);
 		}
+	}
+
+
+	void onPluginLibraryLoaded(Library& lib)
+	{
+		auto* callback = static_cast<void(*)(WorldEditor&)>(lib.resolve("setWorldEditor"));
+		if (callback) (*callback)(*this);
 	}
 
 
