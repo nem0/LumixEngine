@@ -69,6 +69,7 @@ class ImportAssetDialog
 		bool m_convert_to_dds;
 		bool m_import_animations;
 		bool m_import_physics;
+		bool m_import_model;
 		bool m_is_converting;
 		bool m_is_importing;
 		bool m_make_convex;
