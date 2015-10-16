@@ -156,6 +156,8 @@ public:
 			if (ImGui::BeginChild("right", half_size, true))
 			{
 				ImGui::Text("Version 0.17. - News");
+				ImGui::BulletText("Fog height");
+				ImGui::BulletText("Bitmap to heightmap convertor");
 				ImGui::BulletText("LOD preview");
 				ImGui::BulletText("New gizmo");
 				ImGui::BulletText("Orbit camera");
