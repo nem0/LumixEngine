@@ -1837,16 +1837,19 @@ public:
 			case MouseMode::NAVIGATE: rotateCamera(relx, rely); break;
 			case MouseMode::TRANSFORM:
 			{
-				int flags =
-					mouse_flags & (int)MouseFlags::CONTROL /*GetKeyState(VK_LCONTROL) & 0x8000*/
-						? (int)Gizmo::Flags::FIXED_STEP
-						: 0;
-				m_gizmo.transform(
-					getComponent(m_camera, CAMERA_HASH).index, x, y, relx, rely, flags);
+				int camera_cmp = getComponent(m_camera, CAMERA_HASH).index;
+				m_gizmo.transform(camera_cmp, x, y, relx, rely, m_gizmo_use_step);
 			}
 			break;
 		}
 	}
+
+
+	virtual void setGizmoUseStep(bool use) override
+	{
+		m_gizmo_use_step = use;
+	}
+
 
 
 	virtual void onMouseUp(int x, int y, MouseButton::Value button) override
@@ -2568,6 +2571,7 @@ public:
 		, m_universe_path("")
 		, m_universe_context(nullptr)
 		, m_is_orbit(false)
+		, m_gizmo_use_step(false)
 	{
 		m_go_to_parameters.m_is_active = false;
 		m_undo_index = -1;
@@ -3244,6 +3248,7 @@ private:
 	MouseMode::Value m_mouse_mode;
 	float m_mouse_x;
 	float m_mouse_y;
+	bool m_gizmo_use_step;
 	Array<EditorIcon*> m_editor_icons;
 	AssociativeArray<int32_t, Array<ComponentUID>> m_components;
 	bool m_is_game_mode;

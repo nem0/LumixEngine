@@ -2,6 +2,7 @@
 
 
 #include "editor/world_editor.h"
+#include "utils.h"
 #include <bgfx/bgfx.h>
 
 
@@ -20,7 +21,7 @@ class SceneView
 		~SceneView();
 
 		void update();
-		bool init(Lumix::WorldEditor& editor);
+		bool init(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions);
 		void setScene(Lumix::RenderScene* scene);
 		void shutdown();
 		void onGUI();
@@ -33,6 +34,7 @@ class SceneView
 		void renderGizmos();
 
 	private:
+		Action* m_toggle_gizmo_step_action;
 		bool m_is_mouse_hovering_window;
 		bool m_is_opened;
 		int m_screen_x;

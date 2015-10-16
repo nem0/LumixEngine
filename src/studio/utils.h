@@ -109,6 +109,27 @@ struct Action
 	}
 
 
+	bool isActive()
+	{
+		if (ImGui::IsAnyItemActive()) return false;
+
+		bool* keysDown = ImGui::GetIO().KeysDown;
+		float* keysDownDuration = ImGui::GetIO().KeysDownDuration;
+		if (shortcut[0] == -1) return false;
+
+		for (int i = 0; i < Lumix::lengthOf(shortcut) + 1; ++i)
+		{
+			if (shortcut[i] == -1 || i == Lumix::lengthOf(shortcut))
+			{
+				return true;
+			}
+
+			if (!keysDown[shortcut[i]]) return false;
+		}
+		return false;
+	}
+
+
 	bool isRequested()
 	{
 		if (ImGui::IsAnyItemActive()) return false;

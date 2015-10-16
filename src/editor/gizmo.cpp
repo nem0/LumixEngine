@@ -46,6 +46,8 @@ Gizmo::Gizmo(WorldEditor& editor)
 	m_coord_system = CoordSystem::LOCAL;
 	m_is_transforming = false;
 	m_mode = Mode::TRANSLATE;
+	m_step[int(Mode::TRANSLATE)] = 10;
+	m_step[int(Mode::ROTATE)] = 45;
 }
 
 
@@ -385,9 +387,9 @@ void Gizmo::renderQuarterRing(PipelineInstance& pipeline, const Matrix& mtx, con
 		float sn = sinf(angle + ANGLE_STEP);
 		float cn = cosf(angle + ANGLE_STEP);
 
-		Vec3 p0 = a * s + b * c - n;
-		Vec3 p1 = a * sn + b * cn - n;
-		
+		Vec3 p0 = a * s + b * c - n * 0.5f;
+		Vec3 p1 = a * sn + b * cn - n * 0.5f;
+
 		++offset;
 		vertices[offset].position = p0;
 		vertices[offset].color = color;
@@ -422,7 +424,7 @@ void Gizmo::renderQuarterRing(PipelineInstance& pipeline, const Matrix& mtx, con
 	Lumix::TransientGeometry ring_geom(vertices, offset, m_vertex_decl, indices, offset);
 	pipeline.render(ring_geom,
 		mtx,
-		BGFX_STATE_DEPTH_TEST_LEQUAL | BGFX_STATE_CULL_CCW,
+		BGFX_STATE_DEPTH_TEST_LEQUAL,
 		m_shader->getInstance(0).m_program_handles[pipeline.getPassIdx()]);
 
 	const int GRID_SIZE = 5;
@@ -482,9 +484,35 @@ void Gizmo::renderRotateGizmo(PipelineInstance& pipeline)
 
 	const uint32_t SELECTED_COLOR = 0xff00ffff;
 
-	renderQuarterRing(pipeline, mtx, right, up, m_transform_axis == Axis::Z ? SELECTED_COLOR : 0xffff0000);
-	renderQuarterRing(pipeline, mtx, up, dir, m_transform_axis == Axis::X ? SELECTED_COLOR : 0xff0000ff);
-	renderQuarterRing(pipeline, mtx, right, dir, m_transform_axis == Axis::Y ? SELECTED_COLOR : 0xff00ff00);
+	if (!m_is_transforming)
+	{
+		renderQuarterRing(pipeline, mtx, right, up, m_transform_axis == Axis::Z ? SELECTED_COLOR : 0xffff0000);
+		renderQuarterRing(pipeline, mtx, up, dir, m_transform_axis == Axis::X ? SELECTED_COLOR : 0xff0000ff);
+		renderQuarterRing(pipeline, mtx, right, dir, m_transform_axis == Axis::Y ? SELECTED_COLOR : 0xff00ff00);
+	}
+	else
+	{
+		Vec3 axis1, axis2;
+		switch (m_transform_axis)
+		{
+		case Axis::X:
+			axis1 = up;
+			axis2 = dir;
+			break;
+		case Axis::Y:
+			axis1 = right;
+			axis2 = dir;
+			break;
+		case Axis::Z:
+			axis1 = right;
+			axis2 = up;
+			break;
+		}
+		renderQuarterRing(pipeline, mtx, axis1, axis2, SELECTED_COLOR);
+		renderQuarterRing(pipeline, mtx, -axis1, axis2, SELECTED_COLOR);
+		renderQuarterRing(pipeline, mtx, -axis1, -axis2, SELECTED_COLOR);
+		renderQuarterRing(pipeline, mtx, axis1, -axis2, SELECTED_COLOR);
+	}
 }
 
 
@@ -516,10 +544,10 @@ void Gizmo::startTransform(ComponentIndex camera, int x, int y)
 }
 
 
-float Gizmo::computeRotateAngle(int relx, int rely, int flags)
+float Gizmo::computeRotateAngle(int relx, int rely, bool use_step)
 {
 	float angle = 0;
-	if (flags & (int)Flags::FIXED_STEP)
+	if (use_step)
 	{
 		m_relx_accum += relx;
 		m_rely_accum += rely;
@@ -545,7 +573,7 @@ float Gizmo::computeRotateAngle(int relx, int rely, int flags)
 	return angle;
 }
 
-void Gizmo::rotate(int relx, int rely, int flags)
+void Gizmo::rotate(int relx, int rely, bool use_step)
 {
 	Universe* universe = m_editor.getUniverse();
 	Array<Vec3> new_positions(m_editor.getAllocator());
@@ -568,7 +596,7 @@ void Gizmo::rotate(int relx, int rely, int flags)
 				axis = gizmo_mtx.getZVector();
 				break;
 		}
-		float angle = computeRotateAngle(relx, rely, flags);
+		float angle = computeRotateAngle(relx, rely, use_step);
 
 		Quat old_rot = universe->getRotation(m_editor.getSelectedEntities()[i]);
 		Quat new_rot = old_rot * Quat(axis, angle);
@@ -591,29 +619,34 @@ void Gizmo::rotate(int relx, int rely, int flags)
 }
 
 
-void Gizmo::transform(ComponentIndex camera, int x, int y, int relx, int rely, int flags)
+void Gizmo::transform(ComponentIndex camera, int x, int y, int relx, int rely, bool use_step)
 {
 	if (!m_is_transforming) return;
 
 	if (m_mode == Mode::ROTATE)
 	{
-		rotate(relx, rely, flags);
+		rotate(relx, rely, use_step);
 	}
 	else
 	{
 		Vec3 intersection = getMousePlaneIntersection(camera, x, y);
 		Vec3 delta = intersection - m_transform_point;
-		Array<Vec3> new_positions(m_editor.getAllocator());
-		for (int i = 0, ci = m_editor.getSelectedEntities().size(); i < ci; ++i)
+		if (!use_step || delta.length() > float(getStep()))
 		{
-			Vec3 pos = m_editor.getUniverse()->getPosition(m_editor.getSelectedEntities()[i]);
-			pos += delta;
-			new_positions.push(pos);
+			if (use_step) delta = delta.normalized() * float(getStep());
+
+			Array<Vec3> new_positions(m_editor.getAllocator());
+			for (int i = 0, ci = m_editor.getSelectedEntities().size(); i < ci; ++i)
+			{
+				Vec3 pos = m_editor.getUniverse()->getPosition(m_editor.getSelectedEntities()[i]);
+				pos += delta;
+				new_positions.push(pos);
+			}
+			m_editor.setEntitiesPositions(&m_editor.getSelectedEntities()[0],
+				&new_positions[0],
+				new_positions.size());
+			m_transform_point = intersection;
 		}
-		m_editor.setEntitiesPositions(&m_editor.getSelectedEntities()[0],
-									  &new_positions[0],
-									  new_positions.size());
-		m_transform_point = intersection;
 	}
 }
 

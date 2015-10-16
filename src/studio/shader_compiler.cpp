@@ -526,10 +526,8 @@ void ShaderCompiler::compile(const char* path)
 
 void ShaderCompiler::compileAll()
 {
-	if (m_is_compiling)
-	{
-		return;
-	}
+	if (m_is_compiling) return;
+
 	m_is_compiling = true;
 
 	Lumix::FS::FileInfo info;
