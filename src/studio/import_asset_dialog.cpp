@@ -72,7 +72,6 @@ crn_bool ddsConvertCallback(crn_uint32 phase_index,
 }
 
 
-
 static bool saveAsRaw(ImportAssetDialog& dialog,
 	Lumix::FS::FileSystem& fs,
 	const char* source_path,
