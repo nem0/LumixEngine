@@ -944,7 +944,6 @@ public:
 		char current_dir[MAX_PATH];
 		GetCurrentDirectory(sizeof(current_dir), current_dir);
 		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine, m_allocator);
-
 		loadUserPlugins();
 
 		addActions();

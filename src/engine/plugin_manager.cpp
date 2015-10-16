@@ -23,6 +23,7 @@ class PluginManagerImpl : public PluginManager
 			, m_libraries(allocator)
 			, m_allocator(allocator)
 			, m_engine(engine)
+			, m_library_loaded(allocator)
 		{ }
 
 
@@ -93,6 +94,12 @@ class PluginManagerImpl : public PluginManager
 		}
 
 
+		virtual DelegateList<void(Library&)>& libraryLoaded() override
+		{
+			return m_library_loaded;
+		}
+
+
 		IPlugin* load(const char* path) override
 		{
 			g_log_info.log("plugins") << "loading plugin " << path;
@@ -113,6 +120,7 @@ class PluginManagerImpl : public PluginManager
 					}
 					m_plugins.push(plugin);
 					m_libraries.push(lib);
+					m_library_loaded.invoke(*lib);
 					g_log_info.log("plugins") << "plugin loaded";
 					return plugin;
 				}
@@ -133,6 +141,7 @@ class PluginManagerImpl : public PluginManager
 
 	private:
 		Engine& m_engine;
+		DelegateList<void(Library&)> m_library_loaded;
 		LibraryList m_libraries;
 		PluginList m_plugins;
 		IAllocator& m_allocator;

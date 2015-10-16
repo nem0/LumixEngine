@@ -316,12 +316,6 @@ public:
 	}
 
 
-	virtual IPlugin* loadPlugin(const char* name) override
-	{
-		return m_plugin_manager->load(name);
-	}
-
-
 	virtual InputSystem& getInputSystem() override { return m_input_system; }
 
 

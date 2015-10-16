@@ -61,7 +61,6 @@ public:
 	virtual FS::FileSystem& getFileSystem() = 0;
 	virtual InputSystem& getInputSystem() = 0;
 	virtual PluginManager& getPluginManager() = 0;
-	virtual IPlugin* loadPlugin(const char* name) = 0;
 	virtual MTJD::Manager& getMTJDManager() = 0;
 	virtual ResourceManager& getResourceManager() = 0;
 	virtual IAllocator& getAllocator() = 0;

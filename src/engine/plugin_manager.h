@@ -3,6 +3,7 @@
 
 #include "lumix.h"
 #include "core/array.h"
+#include "core/delegate_list.h"
 
 
 namespace Lumix
@@ -32,6 +33,7 @@ namespace Lumix
 			virtual IPlugin* getPlugin(const char* name) = 0;
 			virtual const Array<IPlugin*>& getPlugins() const = 0;
 			virtual const Array<Library*>& getLibraries() const = 0;
+			virtual DelegateList<void(Library&)>& libraryLoaded() = 0;
 	};
 
 
