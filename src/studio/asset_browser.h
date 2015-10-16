@@ -39,7 +39,7 @@ public:
 	const Lumix::Array<Lumix::Path>& getResources(Type type) const;
 	Type getTypeFromResourceManagerType(uint32_t type) const;
 	void selectResource(const Lumix::Path& resource);
-	bool resourceInput(const char* label, char* buf, int max_size, Type type);
+	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, Type type);
 
 public:
 	bool m_is_opened;

@@ -134,7 +134,11 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		auto& resource_descriptor = dynamic_cast<Lumix::ResourcePropertyDescriptorBase&>(desc);
 		auto rm_type = resource_descriptor.getResourceType();
 		auto asset_type = m_asset_browser.getTypeFromResourceManagerType(rm_type);
-		if (m_asset_browser.resourceInput(desc_name, buf, sizeof(buf), asset_type))
+		if (m_asset_browser.resourceInput(desc.getName(),
+				StringBuilder<20>("", (uint64_t)&desc),
+				buf,
+				sizeof(buf),
+				asset_type))
 		{
 			m_editor.setProperty(cmp.type, index, desc, buf, (int)strlen(buf) + 1);
 		}
