@@ -13,7 +13,7 @@ namespace Lumix
 
 			virtual void tick() override {}
 			virtual bool onEntityMouseDown(const RayCastModelHit& hit, int x, int y) override;
-			virtual void onMouseMove(int, int, int, int, int) override {}
+			virtual void onMouseMove(int, int, int, int) override {}
 			virtual void onMouseUp(int, int, MouseButton::Value) override {}
 			void enable(bool is_enabled) { m_is_enabled = is_enabled; m_is_from_set = false; }
 			bool isEnabled() const { return m_is_enabled; }

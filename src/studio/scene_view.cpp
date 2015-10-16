@@ -145,11 +145,8 @@ bool SceneView::onMouseDown(int screen_x, int screen_y, Lumix::MouseButton::Valu
 
 void SceneView::onMouseMove(int mouse_screen_x, int mouse_screen_y, int rel_x, int rel_y)
 {
-	int flags = ImGui::GetIO().KeysDown[VK_MENU] ? (int)Lumix::WorldEditor::MouseFlags::ALT : 0;
-	flags |= ImGui::GetIO().KeysDown[VK_CONTROL] ? (int)Lumix::WorldEditor::MouseFlags::CONTROL : 0;
 	m_editor->setGizmoUseStep(m_toggle_gizmo_step_action->isActive());
-	m_editor->onMouseMove(
-		mouse_screen_x - m_screen_x, mouse_screen_y - m_screen_y, rel_x, rel_y, flags);
+	m_editor->onMouseMove(mouse_screen_x - m_screen_x, mouse_screen_y - m_screen_y, rel_x, rel_y);
 }
 
 
