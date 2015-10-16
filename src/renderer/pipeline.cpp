@@ -247,6 +247,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_terrain_scale_uniform = bgfx::createUniform("u_terrainScale", bgfx::UniformType::Vec4);
 		m_rel_camera_pos_uniform = bgfx::createUniform("u_relCamPos", bgfx::UniformType::Vec4);
 		m_terrain_params_uniform = bgfx::createUniform("u_terrainParams", bgfx::UniformType::Vec4);
+		m_fog_params_uniform = bgfx::createUniform("u_fogParams", bgfx::UniformType::Vec4);
 		m_fog_color_density_uniform =
 			bgfx::createUniform("u_fogColorDensity", bgfx::UniformType::Vec4);
 		m_light_pos_radius_uniform =
@@ -293,6 +294,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		bgfx::destroyUniform(m_terrain_scale_uniform);
 		bgfx::destroyUniform(m_rel_camera_pos_uniform);
 		bgfx::destroyUniform(m_terrain_params_uniform);
+		bgfx::destroyUniform(m_fog_params_uniform);
 		bgfx::destroyUniform(m_fog_color_density_uniform);
 		bgfx::destroyUniform(m_light_pos_radius_uniform);
 		bgfx::destroyUniform(m_light_color_uniform);
@@ -955,10 +957,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void setDirectionalLightUniforms(ComponentIndex light_cmp) const
 	{
-		if (light_cmp < 0)
-		{
-			return;
-		}
+		if (light_cmp < 0) return;
 
 		Universe& universe = m_scene->getUniverse();
 		Entity light_entity = m_scene->getGlobalLightEntity(light_cmp);
@@ -974,13 +973,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Vec4 light_dir_fov(light_dir, 0);
 		fog_density *= fog_density * fog_density;
 		Vec4 fog_color_density(fog_color, fog_density);
+		Vec4 fog_params(m_scene->getFogBottom(light_cmp), m_scene->getFogHeight(light_cmp), 0, 0);
 
 		bgfx::setUniform(m_light_color_uniform, &diffuse_light_color);
 		bgfx::setUniform(m_ambient_color_uniform, &ambient_light_color);
 		bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
 		bgfx::setUniform(m_fog_color_density_uniform, &fog_color_density);
-		bgfx::setUniform(
-			m_shadowmap_matrices_uniform, &m_shadow_viewprojection, 4);
+		bgfx::setUniform(m_fog_params_uniform, &fog_params);
+		bgfx::setUniform(m_shadowmap_matrices_uniform, &m_shadow_viewprojection, 4);
 	}
 
 
@@ -1724,6 +1724,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	bgfx::UniformHandle m_rel_camera_pos_uniform;
 	bgfx::UniformHandle m_terrain_params_uniform;
 	bgfx::UniformHandle m_fog_color_density_uniform;
+	bgfx::UniformHandle m_fog_params_uniform;
 	bgfx::UniformHandle m_light_pos_radius_uniform;
 	bgfx::UniformHandle m_light_color_uniform;
 	bgfx::UniformHandle m_ambient_color_uniform;

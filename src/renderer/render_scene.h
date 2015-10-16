@@ -279,6 +279,10 @@ public:
 	virtual float getLightAmbientIntensity(ComponentIndex cmp) = 0;
 	virtual Vec3 getLightAmbientColor(ComponentIndex cmp) = 0;
 	virtual float getFogDensity(ComponentIndex cmp) = 0;
+	virtual float getFogBottom(ComponentIndex cmp) = 0;
+	virtual float getFogHeight(ComponentIndex cmp) = 0;
+	virtual void setFogBottom(ComponentIndex cmp, float value) = 0;
+	virtual void setFogHeight(ComponentIndex cmp, float value) = 0;
 	virtual Vec3 getFogColor(ComponentIndex cmp) = 0;
 	virtual Vec3 getPointLightSpecularColor(ComponentIndex cmp) = 0;
 	virtual void setPointLightSpecularColor(ComponentIndex cmp,

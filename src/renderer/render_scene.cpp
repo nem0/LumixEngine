@@ -89,6 +89,8 @@ struct GlobalLight
 	float m_ambient_intensity;
 	Vec3 m_fog_color;
 	float m_fog_density;
+	float m_fog_bottom;
+	float m_fog_height;
 	Entity m_entity;
 	Vec4 m_cascades;
 };
@@ -367,6 +369,8 @@ public:
 			serializer.write(global_light.m_fog_color);
 			serializer.write(global_light.m_fog_density);
 			serializer.write(global_light.m_cascades);
+			serializer.write(global_light.m_fog_bottom);
+			serializer.write(global_light.m_fog_height);
 		}
 		serializer.write((int32_t)m_global_light_last_uid);
 		serializer.write((int32_t)m_active_global_light_uid);
@@ -513,6 +517,8 @@ public:
 			serializer.read(light.m_fog_color);
 			serializer.read(light.m_fog_density);
 			serializer.read(light.m_cascades);
+			serializer.read(light.m_fog_bottom);
+			serializer.read(light.m_fog_height);
 			m_universe.addComponent(
 				light.m_entity, GLOBAL_LIGHT_HASH, this, light.m_uid);
 		}
@@ -1971,6 +1977,26 @@ public:
 		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_density;
 	}
 
+	virtual float getFogBottom(ComponentIndex cmp) override
+	{
+		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_bottom;
+	}
+
+	virtual void setFogBottom(ComponentIndex cmp, float bottom) override
+	{
+		m_global_lights[getGlobalLightIndex(cmp)].m_fog_bottom = bottom;
+	}
+
+	virtual float getFogHeight(ComponentIndex cmp) override
+	{
+		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_height;
+	}
+
+	virtual void setFogHeight(ComponentIndex cmp, float height) override
+	{
+		m_global_lights[getGlobalLightIndex(cmp)].m_fog_height = height;
+	}
+
 	virtual Vec3 getFogColor(ComponentIndex cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_color;
@@ -2271,6 +2297,8 @@ private:
 		light.m_fog_density = 0;
 		light.m_uid = ++m_global_light_last_uid;
 		light.m_cascades.set(3, 8, 100, 300);
+		light.m_fog_bottom = 0.0f;
+		light.m_fog_height = 10.0f;
 
 		if (m_global_lights.size() == 1)
 		{

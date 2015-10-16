@@ -32,6 +32,7 @@ enum class SerializedEngineVersion : int32_t
 {
 	BASE,
 	SPARSE_TRANFORMATIONS,
+	FOG_PARAMS,
 
 	LATEST // must be the last one
 };
