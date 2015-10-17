@@ -904,6 +904,15 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	actions.push(m_increase_texture_idx);
 	actions.push(m_decrease_texture_idx);
 
+	m_smooth_terrain_action =
+		LUMIX_NEW(editor.getAllocator(), Action)("Smooth terrain", "smoothTerrain");
+	m_smooth_terrain_action->is_global = false;
+	m_lower_terrain_action =
+		LUMIX_NEW(editor.getAllocator(), Action)("Lower terrain", "lowerTerrain");
+	m_lower_terrain_action->is_global = false;
+	actions.push(m_smooth_terrain_action);
+	actions.push(m_lower_terrain_action);
+
 	editor.addPlugin(*this);
 	m_terrain_brush_size = 10;
 	m_terrain_brush_strength = 0.1f;
@@ -1067,11 +1076,11 @@ void TerrainEditor::detectModifiers()
 						  m_type == SMOOTH_HEIGHT;
 	if (is_height_tool)
 	{
-		if (ImGui::GetIO().KeyShift)
+		if (m_lower_terrain_action->isActive())
 		{
 			m_type = LOWER_HEIGHT;
 		}
-		else if (ImGui::GetIO().KeyCtrl)
+		else if (m_smooth_terrain_action->isActive())
 		{
 			m_type = SMOOTH_HEIGHT;
 		}
@@ -1318,24 +1327,16 @@ void TerrainEditor::onGUI()
 	{
 		case HEIGHT:
 		{
-			bool b = m_type == TerrainEditor::RAISE_HEIGHT;
-			if (ImGui::Checkbox("Raise", &b)) m_type = TerrainEditor::RAISE_HEIGHT;
-
-			ImGui::SameLine();
-			b = m_type == TerrainEditor::LOWER_HEIGHT;
-			if (ImGui::Checkbox("Lower", &b)) m_type = TerrainEditor::LOWER_HEIGHT;
-
-			ImGui::SameLine();
-			b = m_type == TerrainEditor::SMOOTH_HEIGHT;
-			if (ImGui::Checkbox("Smooth", &b)) m_type = TerrainEditor::SMOOTH_HEIGHT;
-
-			ImGui::SameLine();
-			b = m_type == TerrainEditor::FLAT_HEIGHT;
-			if (ImGui::Checkbox("Flat", &b)) m_type = TerrainEditor::FLAT_HEIGHT;
+			bool is_flat_tool = m_type == TerrainEditor::FLAT_HEIGHT;
+			if (ImGui::Checkbox("Flat", &is_flat_tool))
+			{
+				m_type = is_flat_tool ? TerrainEditor::FLAT_HEIGHT : TerrainEditor::RAISE_HEIGHT;
+			}
 
 			if (m_type == TerrainEditor::FLAT_HEIGHT)
 			{
-				ImGui::Text("Press Ctrl to pick height");
+				ImGui::SameLine();
+				ImGui::Text("- Press Ctrl to pick height");
 			}
 			break;
 		}
