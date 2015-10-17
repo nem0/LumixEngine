@@ -77,6 +77,8 @@ private:
 	Action* m_decrease_brush_size;
 	Action* m_increase_texture_idx;
 	Action* m_decrease_texture_idx;
+	Action* m_lower_terrain_action;
+	Action* m_smooth_terrain_action;
 	Lumix::BinaryArray m_brush_mask;
 	Lumix::Texture* m_brush_texture;
 };

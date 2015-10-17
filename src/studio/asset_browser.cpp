@@ -58,6 +58,7 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 	, m_selected_resource(nullptr)
 	, m_autoreload_changed_resource(true)
 	, m_changed_files(editor.getAllocator())
+	, m_is_focus_requested(false)
 {
 	m_filter[0] = '\0';
 	m_current_type = 0;
@@ -165,6 +166,12 @@ void AssetBrowser::onGUI()
 		return;
 	}
 
+	if (m_is_focus_requested)
+	{
+		m_is_focus_requested = false;
+		ImGui::SetWindowFocus();
+	}
+
 	if (ImGui::Button("Refresh")) findResources();
 	ImGui::SameLine();
 	ImGui::Checkbox("Autoreload", &m_autoreload_changed_resource);
@@ -263,10 +270,11 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	{
 		ImGui::OpenPopup(popup_name);
 	}
-
 	ImGui::SameLine();
 	if (ImGui::Button(StringBuilder<30>("->##go", str_id)))
 	{
+		m_is_focus_requested = true;
+		m_is_opened = true;
 		m_wanted_resource = buf;
 	}
 	ImGui::SameLine();

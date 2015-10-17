@@ -72,5 +72,6 @@ private:
 	char m_text_buffer[8192];
 	Lumix::Path m_wanted_resource;
 	bool m_autoreload_changed_resource;
+	bool m_is_focus_requested;
 	bgfx::TextureHandle m_texture_handle;
 };
