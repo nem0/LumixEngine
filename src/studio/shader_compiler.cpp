@@ -161,7 +161,7 @@ void ShaderCompiler::makeUpToDate()
 	{
 		auto& key = m_dependencies.getKey(i);
 		auto& value = m_dependencies.at(i);
-		for (auto bin : value)
+		for (auto& bin : value)
 		{
 			auto x = Lumix::getLastModified(bin.c_str());
 			auto y = Lumix::getLastModified(key.c_str());
@@ -275,7 +275,7 @@ void ShaderCompiler::parseDependencies()
 		Lumix::PathUtils::getBasename(basename, sizeof(basename), first_line);
 		getSourceFromBinaryBasename(src, sizeof(src), basename);
 
-		addDependency(StringBuilder<Lumix::MAX_PATH_LENGTH>("shaders/", src, ".sc"), first_line);
+		addDependency(src, first_line);
 
 		fs.close(*file);
 	}
@@ -402,22 +402,52 @@ void ShaderCompiler::processChangedFiles()
 		if (m_changed_files.empty()) return;
 
 		m_changed_files.removeDuplicates();
-		m_changed_files.back();
-		Lumix::copyString(changed_file_path,
-			sizeof(changed_file_path),
-			m_changed_files.back().c_str());
+		const char* tmp = m_changed_files.back().c_str();
+		Lumix::copyString(changed_file_path, sizeof(changed_file_path), tmp);
 		m_changed_files.pop();
 	}
 	Lumix::string tmp_string(changed_file_path, m_editor.getAllocator());
-	if (m_dependencies.find(tmp_string))
+	int find_idx = m_dependencies.find(tmp_string);
+	if (find_idx < 0)
 	{
 		int len = (int)strlen(changed_file_path);
-		if (len > 6)
+		if (len <= 6) return;
+
+		if (strcmp(changed_file_path + len - 6, "_fs.sc") == 0 ||
+			strcmp(changed_file_path + len - 6, "_vs.sc") == 0)
 		{
-			Lumix::copyString(changed_file_path + len - 6,
-				sizeof(changed_file_path) - len + 6,
-				".shd");
+			Lumix::copyString(
+				changed_file_path + len - 6, Lumix::lengthOf(changed_file_path) - len + 6, ".shd");
+			tmp_string = changed_file_path;
+			find_idx = m_dependencies.find(tmp_string);
+		}
+	}
+	if (find_idx >= 0)
+	{
+		if (Lumix::PathUtils::hasExtension(changed_file_path, "shd"))
+		{
 			compile(changed_file_path);
+		}
+		else
+		{
+			Lumix::Array<Lumix::string> src_list(m_editor.getAllocator());
+
+			for (auto& bin : m_dependencies.at(find_idx))
+			{
+				char basename[Lumix::MAX_PATH_LENGTH];
+				Lumix::PathUtils::getBasename(basename, sizeof(basename), bin.c_str());
+				char tmp[Lumix::MAX_PATH_LENGTH];
+				getSourceFromBinaryBasename(tmp, sizeof(tmp), basename);
+				Lumix::string src(tmp, m_editor.getAllocator());
+				src_list.push(src);
+			}
+
+			src_list.removeDuplicates();
+
+			for (auto& src : src_list)
+			{
+				compile(src.c_str());
+			}
 		}
 	}
 }

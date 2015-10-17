@@ -259,7 +259,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 {
 	float item_w = ImGui::CalcItemWidth();
 	auto& style = ImGui::GetStyle();
-	ImGui::PushItemWidth(item_w - ImGui::CalcTextSize("...->").x - style.FramePadding.x * 4 -
+	ImGui::PushItemWidth(item_w - ImGui::CalcTextSize("...View").x - style.FramePadding.x * 4 -
 						 style.ItemSpacing.x * 2);
 
 	if (ImGui::InputText(StringBuilder<30>("##", str_id), buf, max_size)) return true;
@@ -271,7 +271,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 		ImGui::OpenPopup(popup_name);
 	}
 	ImGui::SameLine();
-	if (ImGui::Button(StringBuilder<30>("->##go", str_id)))
+	if (ImGui::Button(StringBuilder<30>("View##go", str_id)))
 	{
 		m_is_focus_requested = true;
 		m_is_opened = true;
