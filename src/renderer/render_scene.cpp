@@ -1011,6 +1011,18 @@ public:
 		return m_is_grass_enabled;
 	}
 	
+
+	virtual int getGrassDistance(ComponentIndex cmp) override
+	{
+		return m_terrains[cmp]->getGrassDistance();
+	}
+
+
+	virtual void setGrassDistance(ComponentIndex cmp, int value) override
+	{
+		m_terrains[cmp]->setGrassDistance(value);
+	}
+
 	
 	virtual void enableGrass(bool enabled) override
 	{

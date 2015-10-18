@@ -233,6 +233,8 @@ public:
 	virtual ComponentIndex getTerrainComponent(Entity entity) = 0;
 
 	virtual bool isGrassEnabled() const = 0;
+	virtual int getGrassDistance(ComponentIndex cmp) = 0;
+	virtual void setGrassDistance(ComponentIndex cmp, int value) = 0;
 	virtual void enableGrass(bool enabled) = 0;
 	virtual void setGrassPath(ComponentIndex cmp, int index, const char* path) = 0;
 	virtual const char* getGrassPath(ComponentIndex cmp, int index) = 0;

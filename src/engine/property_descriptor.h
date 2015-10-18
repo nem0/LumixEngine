@@ -428,35 +428,51 @@ template <class S>
 class IntPropertyDescriptor : public IIntPropertyDescriptor
 {
 	public:
-		typedef int (S::*IntegerGetter)(ComponentIndex);
-		typedef void (S::*IntegerSetter)(ComponentIndex, int);
+		typedef int (S::*Getter)(ComponentIndex);
+		typedef void (S::*Setter)(ComponentIndex, int);
 
 	public:
-		IntPropertyDescriptor(const char* name, IntegerGetter _getter, IntegerSetter _setter) { setName(name); m_integer_getter = _getter; m_integer_setter = _setter; m_type = INTEGER; }
+		IntPropertyDescriptor() {}
+
+		IntPropertyDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
+			: IIntPropertyDescriptor(allocator)
+		{
+			setName(name);
+			m_integer_getter = _getter;
+			m_integer_setter = _setter;
+			m_type = INTEGER;
+		}
 
 
-		virtual void set(ComponentUID cmp, OutputBlob& stream) const override
+		virtual void set(ComponentUID cmp, InputBlob& stream) const override
 		{
 			int32_t i;
 			stream.read(&i, sizeof(i));
-			(static_cast<S*>(cmp.scene)->*m_integer_setter)(cmp, i);
+			(static_cast<S*>(cmp.scene)->*m_integer_setter)(cmp.index, i);
 		}
 
 
 		virtual void get(ComponentUID cmp, OutputBlob& stream) const override
 		{
-			int32_t i = (static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp);
-			len = sizeof(i);
-			stream.write(&i, len);
+			int32_t i = (static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp.index);
+			stream.write(i);
 		}
 
 
-		virtual void set(ComponentUID cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); set(cmp, stream); };
-		virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); get(cmp, stream); };
+		virtual void set(ComponentUID cmp, int index, InputBlob& stream) const override
+		{
+			ASSERT(index == -1);
+			set(cmp, stream);
+		};
+		virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+		{
+			ASSERT(index == -1);
+			get(cmp, stream);
+		};
 
 	private:
-		IntegerGetter m_integer_getter;
-		IntegerSetter m_integer_setter;
+		Getter m_integer_getter;
+		Setter m_integer_setter;
 };
 
 
