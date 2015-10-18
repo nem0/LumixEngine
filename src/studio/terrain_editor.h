@@ -26,6 +26,7 @@ public:
 		FLAT_HEIGHT,
 		LAYER,
 		ENTITY,
+		REMOVE_ENTITY,
 		COLOR,
 		NOT_SET
 	};
@@ -53,6 +54,7 @@ private:
 		const Lumix::Vec3 vertices[8],
 		float& min,
 		float& max);
+	void removeEntities(const Lumix::RayCastModelHit& hit);
 	void paintEntities(const Lumix::RayCastModelHit& hit);
 	void increaseBrushSize();
 	void decreaseBrushSize();
@@ -79,6 +81,7 @@ private:
 	Action* m_decrease_texture_idx;
 	Action* m_lower_terrain_action;
 	Action* m_smooth_terrain_action;
+	Action* m_remove_entity_action;
 	Lumix::BinaryArray m_brush_mask;
 	Lumix::Texture* m_brush_texture;
 };

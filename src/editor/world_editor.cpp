@@ -90,10 +90,11 @@ public:
 	}
 
 
-	virtual void execute() override
+	virtual bool execute() override
 	{
 		m_editor.getUniverse()->setEntityName(m_entity, m_new_name.c_str());
 		m_editor.entityNameSet().invoke(m_entity, m_new_name.c_str());
+		return true;
 	}
 
 
@@ -151,7 +152,7 @@ public:
 	}
 
 
-	virtual void execute() override;
+	virtual bool execute() override;
 
 
 	virtual void serialize(JsonSerializer& serializer)
@@ -312,7 +313,7 @@ public:
 	}
 
 
-	virtual void execute() override
+	virtual bool execute() override
 	{
 		Universe* universe = m_editor.getUniverse();
 		for (int i = 0, c = m_entities.size(); i < c; ++i)
@@ -321,6 +322,7 @@ public:
 			universe->setPosition(entity, m_new_positions[i]);
 			universe->setRotation(entity, m_new_rotations[i]);
 		}
+		return true;
 	}
 
 
@@ -444,7 +446,7 @@ public:
 	}
 
 
-	virtual void execute() override
+	virtual bool execute() override
 	{
 		Universe* universe = m_editor.getUniverse();
 		for (int i = 0, c = m_entities.size(); i < c; ++i)
@@ -452,6 +454,7 @@ public:
 			Entity entity = m_entities[i];
 			universe->setScale(entity, m_new_scales[i]);
 		}
+		return true;
 	}
 
 
@@ -559,9 +562,10 @@ public:
 	}
 
 
-	virtual void execute() override
+	virtual bool execute() override
 	{
 		m_descriptor->removeArrayItem(m_component, m_index);
+		return true;
 	}
 
 
@@ -640,10 +644,11 @@ public:
 	}
 
 
-	virtual void execute() override
+	virtual bool execute() override
 	{
 		m_descriptor->addArrayItem(m_component, -1);
 		m_index = m_descriptor->getCount(m_component) - 1;
+		return true;
 	}
 
 
@@ -760,10 +765,11 @@ public:
 	}
 
 
-	virtual void execute() override
+	virtual bool execute() override
 	{
 		InputBlob blob(m_new_value);
 		set(blob);
+		return true;
 	}
 
 
@@ -943,7 +949,7 @@ private:
 		}
 
 
-		virtual void execute() override
+		virtual bool execute() override
 		{
 			const Array<IScene*>& scenes = m_editor.getScenes();
 
@@ -963,6 +969,7 @@ private:
 					}
 				}
 			}
+			return true;
 		}
 
 
@@ -1069,7 +1076,7 @@ private:
 		}
 
 
-		virtual void execute() override
+		virtual bool execute() override
 		{
 			Universe* universe = m_editor.getUniverse();
 			m_positons_rotations.clear();
@@ -1099,6 +1106,7 @@ private:
 
 				universe->destroyEntity(Entity(m_entities[i]));
 			}
+			return true;
 		}
 
 
@@ -1281,7 +1289,7 @@ private:
 		}
 
 
-		virtual void execute() override
+		virtual bool execute() override
 		{
 			Array<IPropertyDescriptor*>& props =
 				m_editor.getEngine().getPropertyDescriptors(m_component.type);
@@ -1313,6 +1321,7 @@ private:
 				m_component.scene->destroyComponent(m_component.index,
 													m_component.type);
 			}
+			return true;
 		}
 
 	private:
@@ -1340,7 +1349,7 @@ private:
 		}
 
 
-		virtual void execute() override
+		virtual bool execute() override
 		{
 			if (m_entity < 0)
 			{
@@ -1352,6 +1361,7 @@ private:
 				m_editor.getUniverse()->setPosition(m_entity, m_position);
 			}
 			m_editor.selectEntities(&m_entity, 1);
+			return true;
 		}
 
 
@@ -2115,32 +2125,33 @@ public:
 
 	virtual void executeCommand(IEditorCommand* command) override
 	{
-		static bool b = false;
-		ASSERT(!b);
-		b = true;
-		if (m_undo_index < m_undo_stack.size() - 1)
-		{
-			for (int i = m_undo_stack.size() - 1; i > m_undo_index; --i)
-			{
-				m_allocator.deleteObject(m_undo_stack[i]);
-			}
-			m_undo_stack.resize(m_undo_index + 1);
-		}
-		if (m_undo_index >= 0 &&
-			command->getType() == m_undo_stack[m_undo_index]->getType())
+		if (m_undo_index >= 0 && command->getType() == m_undo_stack[m_undo_index]->getType())
 		{
 			if (command->merge(*m_undo_stack[m_undo_index]))
 			{
 				m_undo_stack[m_undo_index]->execute();
 				m_allocator.deleteObject(command);
-				b = false;
 				return;
 			}
 		}
-		m_undo_stack.push(command);
-		++m_undo_index;
-		command->execute();
-		b = false;
+
+		if (command->execute())
+		{
+			if (m_undo_index < m_undo_stack.size() - 1)
+			{
+				for (int i = m_undo_stack.size() - 1; i > m_undo_index; --i)
+				{
+					m_allocator.deleteObject(m_undo_stack[i]);
+				}
+				m_undo_stack.resize(m_undo_index + 1);
+			}
+			m_undo_stack.push(command);
+			++m_undo_index;
+		}
+		else
+		{
+			LUMIX_DELETE(m_allocator, command);
+		}
 	}
 
 
@@ -3299,7 +3310,7 @@ void WorldEditor::destroy(WorldEditor* editor, IAllocator& allocator)
 }
 
 
-void PasteEntityCommand::execute()
+bool PasteEntityCommand::execute()
 {
 	InputBlob blob(m_blob.getData(), m_blob.getSize());
 	Universe* universe = m_editor.getUniverse();
@@ -3320,6 +3331,7 @@ void PasteEntityCommand::execute()
 		}
 	}
 	m_entity = new_entity;
+	return true;
 }
 
 

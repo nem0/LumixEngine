@@ -529,7 +529,7 @@ public:
 
 	virtual void serialize(Lumix::JsonSerializer& serializer) override;
 	virtual void deserialize(Lumix::JsonSerializer& serializer) override;
-	virtual void execute() override;
+	virtual bool execute() override;
 	virtual void undo() override;
 	virtual uint32_t getType() override;
 	virtual bool merge(IEditorCommand&);
@@ -587,7 +587,7 @@ void InsertMeshCommand::deserialize(Lumix::JsonSerializer& serializer)
 }
 
 
-void InsertMeshCommand::execute()
+bool InsertMeshCommand::execute()
 {
 	Lumix::Universe* universe = m_editor.getUniverse();
 	m_entity = universe->createEntity(Lumix::Vec3(0, 0, 0), Lumix::Quat(0, 0, 0, 1));
@@ -611,6 +611,7 @@ void InsertMeshCommand::execute()
 		m_editor.getRelativePath(rel_path, Lumix::MAX_PATH_LENGTH, m_mesh_path.c_str());
 		static_cast<Lumix::RenderScene*>(scene)->setRenderablePath(cmp, rel_path);
 	}
+	return true;
 }
 
 

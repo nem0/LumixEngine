@@ -67,7 +67,7 @@ private:
 		}
 
 
-		virtual void execute() override
+		virtual bool execute() override
 		{
 			uint32_t name_hash = crc32(m_name.c_str());
 			if (m_entity_system.m_instances.find(name_hash) < 0)
@@ -82,6 +82,7 @@ private:
 			{
 				ASSERT(false);
 			}
+			return true;
 		}
 
 
@@ -167,7 +168,7 @@ private:
 		}
 
 
-		virtual void execute() override
+		virtual bool execute() override
 		{
 			int instance_index =
 				m_entity_system.m_instances.find(m_template_name_hash);
@@ -191,6 +192,7 @@ private:
 			{
 				ASSERT(false);
 			}
+			return true;
 		}
 
 

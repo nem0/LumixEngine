@@ -1,4 +1,5 @@
 #include "terrain_editor.h"
+#include "core/blob.h"
 #include "core/crc32.h"
 #include "core/frustum.h"
 #include "core/json_serializer.h"
@@ -9,6 +10,7 @@
 #include "editor/entity_template_system.h"
 #include "editor/ieditor_command.h"
 #include "engine.h"
+#include "engine/property_descriptor.h"
 #include "ocornut-imgui/imgui.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -20,6 +22,7 @@
 
 
 static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");
+static const uint32_t TERRAIN_HASH = Lumix::crc32("terrain");
 static const char* HEIGHTMAP_UNIFORM = "u_texHeightmap";
 static const char* SPLATMAP_UNIFORM = "u_texSplatmap";
 static const char* COLORMAP_UNIFORM = "u_texColormap";
@@ -31,7 +34,7 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 {
 	PaintEntitiesCommand(Lumix::WorldEditor& editor,
 		Lumix::ComponentUID component,
-		int entity_template,
+		uint32_t entity_template,
 		float brush_strength,
 		float brush_size,
 		const Lumix::RayCastModelHit& hit)
@@ -39,9 +42,12 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 		, m_component(component)
 		, m_brush_size(brush_size)
 		, m_brush_strength(brush_strength)
-		, m_selected_entity_template(entity_template)
 		, m_entities(editor.getAllocator())
 	{
+		auto& template_system = m_world_editor.getEntityTemplateSystem();
+		auto& template_names = template_system.getTemplateNames();
+		m_template_name_hash = Lumix::crc32(template_names[entity_template].c_str());
+
 		m_center = hit.m_origin + hit.m_dir * hit.m_t;
 	}
 
@@ -63,11 +69,29 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 
 	virtual void serialize(Lumix::JsonSerializer& serializer) 
 	{
+		serializer.serialize("brush_size", m_brush_size);
+		serializer.serialize("brush_strength", m_brush_strength);
+		serializer.serialize("center_x", m_center.x);
+		serializer.serialize("center_y", m_center.y);
+		serializer.serialize("center_z", m_center.z);
+		serializer.serialize("cmp_index", m_component.index);
+		serializer.serialize("entity", m_component.entity);
+		serializer.serialize("template", m_template_name_hash);
 	}
 
 
 	virtual void deserialize(Lumix::JsonSerializer& serializer) 
 	{
+		serializer.deserialize("brush_size", m_brush_size, 0.0f);
+		serializer.deserialize("brush_strength", m_brush_strength, 0.0f);
+		serializer.deserialize("center_x", m_center.x, 0.0f);
+		serializer.deserialize("center_y", m_center.y, 0.0f);
+		serializer.deserialize("center_z", m_center.z, 0.0f);
+		serializer.deserialize("cmp_index", m_component.index, 0);
+		serializer.deserialize("entity", m_component.entity, 0);
+		serializer.deserialize("template", m_template_name_hash, 0);
+		m_component.type = TERRAIN_HASH;
+		m_component.scene = m_world_editor.getSceneByComponentType(TERRAIN_HASH);
 	}
 	
 
@@ -81,7 +105,7 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 	virtual bool merge(IEditorCommand& command) { return false; }
 
 
-	virtual void execute() override
+	virtual bool execute() override
 	{
 		PROFILE_FUNCTION();
 		m_entities.clear();
@@ -90,19 +114,12 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 		Lumix::Matrix inv_terrain_matrix = terrain_matrix;
 		inv_terrain_matrix.inverse();
 		auto& template_system = m_world_editor.getEntityTemplateSystem();
-		auto& template_names = template_system.getTemplateNames();
-		if (m_selected_entity_template < 0 || m_selected_entity_template >= template_names.size())
-		{
-			return;
-		}
 
-		const char* template_name = template_names[m_selected_entity_template].c_str();
-		uint32_t template_name_hash = Lumix::crc32(template_name);
-		Lumix::Entity tpl = template_system.getInstances(template_name_hash)[0];
-		if (tpl < 0) return;
+		Lumix::Entity tpl = template_system.getInstances(m_template_name_hash)[0];
+		if (tpl < 0) return false;
 
 		Lumix::ComponentUID renderable = m_world_editor.getComponent(tpl, RENDERABLE_HASH);
-		if (!renderable.isValid()) return;
+		if (!renderable.isValid()) return false;
 
 		Lumix::Frustum frustum;
 		frustum.computeOrtho(m_center,
@@ -134,11 +151,13 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 				pos.y += terrain_matrix.getTranslation().y;
 				if (!isOBBCollision(meshes, pos, model, scale))
 				{
-					auto entity = template_system.createInstanceNoCommand(template_name_hash, pos);
+					auto entity = template_system.createInstanceNoCommand(m_template_name_hash, pos);
 					m_entities.push(entity);
 				}
 			}
 		}
+
+		return !m_entities.empty();
 	}
 
 
@@ -247,7 +266,167 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 	Lumix::Array<Lumix::Entity> m_entities;
 	float m_brush_strength;
 	float m_brush_size;
-	int m_selected_entity_template;
+	uint32_t m_template_name_hash;
+	Lumix::Vec3 m_center;
+};
+
+
+
+struct RemoveEntitiesCommand : public Lumix::IEditorCommand
+{
+	RemoveEntitiesCommand(Lumix::WorldEditor& editor,
+		Lumix::ComponentUID component,
+		int entity_template,
+		float brush_size,
+		const Lumix::RayCastModelHit& hit)
+		: m_editor(editor)
+		, m_component(component)
+		, m_brush_size(brush_size)
+		, m_removed_entities(editor.getAllocator())
+	{
+		auto& template_system = m_editor.getEntityTemplateSystem();
+		auto& template_names = template_system.getTemplateNames();
+		m_template_name_hash = Lumix::crc32(template_names[entity_template].c_str());
+
+		m_center = hit.m_origin + hit.m_dir * hit.m_t;
+	}
+
+
+	virtual void undo()
+	{
+		Lumix::Universe* universe = m_editor.getUniverse();
+		const auto& scenes = m_editor.getScenes();
+		Lumix::InputBlob blob(m_removed_entities);
+		bool is_entity;
+		blob.read(is_entity);
+		while(is_entity)
+		{
+			Lumix::Vec3 pos;
+			Lumix::Quat rot;
+			float scale;
+			blob.read(pos);
+			blob.read(rot);
+			blob.read(scale);
+			Lumix::Entity new_entity = universe->createEntity(pos, rot);
+			universe->setScale(new_entity, scale);
+			
+			int cmps_count;
+			blob.read(cmps_count);
+			for (int j = cmps_count - 1; j >= 0; --j)
+			{
+				Lumix::ComponentUID::Type cmp_type;
+				blob.read(cmp_type);
+				Lumix::ComponentUID new_component;
+				for (int i = 0; i < scenes.size(); ++i)
+				{
+					new_component.index =
+						scenes[i]->createComponent(cmp_type, new_entity);
+					new_component.entity = new_entity;
+					new_component.scene = scenes[i];
+					new_component.type = cmp_type;
+					if (new_component.isValid()) break;
+				}
+
+				auto& props = m_editor.getEngine().getPropertyDescriptors(cmp_type);
+				for (int k = 0; k < props.size(); ++k)
+				{
+					props[k]->set(new_component, blob);
+				}
+			}
+			blob.read(is_entity);
+		}
+	}
+
+
+	virtual void serialize(Lumix::JsonSerializer& serializer)
+	{
+		serializer.serialize("brush_size", m_brush_size);
+		serializer.serialize("center_x", m_center.x);
+		serializer.serialize("center_y", m_center.y);
+		serializer.serialize("center_z", m_center.z);
+		serializer.serialize("cmp_index", m_component.index);
+		serializer.serialize("entity", m_component.entity);
+		serializer.serialize("template", m_template_name_hash);
+	}
+
+
+	virtual void deserialize(Lumix::JsonSerializer& serializer)
+	{
+		serializer.deserialize("brush_size", m_brush_size, 0.0f);
+		serializer.deserialize("center_x", m_center.x, 0.0f);
+		serializer.deserialize("center_y", m_center.y, 0.0f);
+		serializer.deserialize("center_z", m_center.z, 0.0f);
+		serializer.deserialize("cmp_index", m_component.index, 0);
+		serializer.deserialize("entity", m_component.entity, 0);
+		serializer.deserialize("template", m_template_name_hash, 0);
+		m_component.type = TERRAIN_HASH;
+		m_component.scene = m_editor.getSceneByComponentType(TERRAIN_HASH);
+	}
+
+
+	virtual uint32_t getType()
+	{
+		static const uint32_t type = Lumix::crc32("remove_entities_on_terrain");
+		return type;
+	}
+
+
+	virtual bool merge(IEditorCommand& command) { return false; }
+
+
+	virtual bool execute() override
+	{
+		PROFILE_FUNCTION();
+
+		Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
+		Lumix::Frustum frustum;
+		frustum.computeOrtho(m_center,
+			Lumix::Vec3(0, 0, 1),
+			Lumix::Vec3(0, 1, 0),
+			2 * m_brush_size,
+			2 * m_brush_size,
+			-m_brush_size,
+			m_brush_size);
+
+		Lumix::Array<Lumix::Entity> entities(m_editor.getAllocator());
+		scene->getRenderableEntities(frustum, entities, ~0);
+		auto& template_system = m_editor.getEntityTemplateSystem();
+		m_removed_entities.clear();
+		Lumix::Universe* universe = m_editor.getUniverse();
+		for (Lumix::Entity entity : entities)
+		{
+			if (template_system.getTemplate(entity) != m_template_name_hash) continue;
+
+			m_removed_entities.write(true);
+			m_removed_entities.write(universe->getPosition(entity));
+			m_removed_entities.write(universe->getRotation(entity));
+			m_removed_entities.write(universe->getScale(entity));
+
+			const auto& cmps = m_editor.getComponents(entity);
+			m_removed_entities.write((int)cmps.size());
+			for (const auto& cmp : cmps)
+			{
+				m_removed_entities.write(cmp.type);
+				auto& props = m_editor.getEngine().getPropertyDescriptors(cmp.type);
+				for (int k = 0; k < props.size(); ++k)
+				{
+					props[k]->get(cmp, m_removed_entities);
+				}
+				cmp.scene->destroyComponent(cmp.index, cmp.type);
+			}
+
+			m_editor.getUniverse()->destroyEntity(entity);
+		}
+		m_removed_entities.write(false);
+		return m_removed_entities.getSize() > sizeof(bool);
+	}
+
+
+	Lumix::WorldEditor& m_editor;
+	Lumix::ComponentUID m_component;
+	Lumix::OutputBlob m_removed_entities;
+	float m_brush_size;
+	uint32_t m_template_name_hash;
 	Lumix::Vec3 m_center;
 };
 
@@ -371,7 +550,7 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 	}
 
 
-	virtual void execute() override
+	virtual bool execute() override
 	{
 		if (m_new_data.empty())
 		{
@@ -379,6 +558,7 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 			generateNewData();
 		}
 		applyData(m_new_data);
+		return true;
 	}
 
 
@@ -913,6 +1093,11 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	actions.push(m_smooth_terrain_action);
 	actions.push(m_lower_terrain_action);
 
+	m_remove_entity_action = LUMIX_NEW(editor.getAllocator(), Action)(
+		"Remove entities from terrain", "removeEntitiesFromTerrain");
+	m_remove_entity_action->is_global = false;
+	actions.push(m_remove_entity_action);
+
 	editor.addPlugin(*this);
 	m_terrain_brush_size = 10;
 	m_terrain_brush_strength = 0.1f;
@@ -1090,6 +1275,18 @@ void TerrainEditor::detectModifiers()
 		}
 	}
 
+	bool is_entity_tool = m_type == ENTITY || m_type == REMOVE_ENTITY;
+	if (is_entity_tool)
+	{
+		if (m_remove_entity_action->isActive())
+		{
+			m_type = REMOVE_ENTITY;
+		}
+		else
+		{
+			m_type = ENTITY;
+		}
+	}
 }
 
 
@@ -1149,6 +1346,7 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, in
 				case COLOR:
 				case LAYER: paint(hit, m_type, false); break;
 				case ENTITY: paintEntities(hit); break;
+				case REMOVE_ENTITY: removeEntities(hit); break;
 				default: ASSERT(false); break;
 			}
 			return true;
@@ -1157,8 +1355,27 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, in
 	return false;
 }
 
+void TerrainEditor::removeEntities(const Lumix::RayCastModelHit& hit)
+{
+	if (m_selected_entity_template < 0) return;
+	int templates_count = m_world_editor.getEntityTemplateSystem().getTemplateNames().size();
+	if (m_selected_entity_template >= templates_count) return;
+
+	RemoveEntitiesCommand* command =
+		LUMIX_NEW(m_world_editor.getAllocator(), RemoveEntitiesCommand)(m_world_editor,
+		m_component,
+		m_selected_entity_template,
+		m_terrain_brush_size,
+		hit);
+	m_world_editor.executeCommand(command);
+}
+
 void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 {
+	if (m_selected_entity_template < 0) return;
+	int templates_count = m_world_editor.getEntityTemplateSystem().getTemplateNames().size();
+	if (m_selected_entity_template >= templates_count) return;
+
 	PaintEntitiesCommand* command =
 		LUMIX_NEW(m_world_editor.getAllocator(), PaintEntitiesCommand)(m_world_editor,
 			m_component,
@@ -1197,12 +1414,9 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 				case LAYER:
 					paint(hit, m_type, true);
 					break;
-				case ENTITY:
-					paintEntities(hit);
-					break;
-				default:
-					ASSERT(false);
-					break;
+				case ENTITY: paintEntities(hit); break;
+				case REMOVE_ENTITY: removeEntities(hit); break;
+				default: ASSERT(false); break;
 			}
 		}
 	}
