@@ -4,6 +4,7 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/property_descriptor.h"
+#include "lua_script/lua_script_manager.h"
 #include "lua_script/lua_script_system.h"
 #include "ocornut-imgui/imgui.h"
 #include "terrain_editor.h"
@@ -245,6 +246,66 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 }
 
 
+bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Entity& entity) const
+{
+	const auto& style = ImGui::GetStyle();
+	float item_w = ImGui::CalcItemWidth();
+	ImGui::PushItemWidth(
+		item_w - ImGui::CalcTextSize("...").x - style.FramePadding.x * 2 - style.ItemSpacing.x);
+	char buf[50];
+	getEntityListDisplayName(m_editor, buf, sizeof(buf), entity);
+	ImGui::LabelText("", buf);
+	ImGui::SameLine();
+	StringBuilder<30> popup_name("pu", str_id);
+	if (ImGui::Button(StringBuilder<30>("...###br", str_id)))
+	{
+		ImGui::OpenPopup(popup_name);
+	}
+
+	ImGui::SameLine();
+	ImGui::Text(label);
+	ImGui::PopItemWidth();
+
+	if (ImGui::BeginPopup(popup_name))
+	{
+		struct ListBoxData
+		{
+			Lumix::WorldEditor* m_editor;
+			Lumix::Universe* universe;
+			char buffer[1024];
+			static bool itemsGetter(void* data, int idx, const char** txt)
+			{
+				auto* d = static_cast<ListBoxData*>(data);
+				auto entity = d->universe->getEntityFromDenseIdx(idx);
+				getEntityListDisplayName(*d->m_editor, d->buffer, sizeof(d->buffer), entity);
+				*txt = d->buffer;
+				return true;
+			}
+		};
+		ListBoxData data;
+		Lumix::Universe* universe = m_editor.getUniverse();
+		data.universe = universe;
+		data.m_editor = &m_editor;
+		static int current_item;
+		if (ImGui::ListBox("Entities",
+			&current_item,
+			&ListBoxData::itemsGetter,
+			&data,
+			universe->getEntityCount(),
+			15))
+		{
+			entity = universe->getEntityFromDenseIdx(current_item);
+			ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+			return true;
+		};
+
+		ImGui::EndPopup();
+	}
+	return false;
+}
+
+
 void PropertyGrid::onLuaScriptGui(Lumix::ComponentUID cmp)
 {
 	auto* scene = static_cast<Lumix::LuaScriptScene*>(cmp.scene);
@@ -254,9 +315,37 @@ void PropertyGrid::onLuaScriptGui(Lumix::ComponentUID cmp)
 		char buf[256];
 		Lumix::copyString(buf, scene->getPropertyValue(cmp.index, i));
 		const char* property_name = scene->getPropertyName(cmp.index, i);
-		if (ImGui::InputText(property_name, buf, sizeof(buf)))
+		auto* script_res = scene->getScriptResource(cmp.index);
+		switch (script_res->getProperties()[i].type)
 		{
-			scene->setPropertyValue(cmp.index, property_name, buf);
+			case Lumix::LuaScript::Property::FLOAT:
+			{
+				float f = (float)atof(buf);
+				if (ImGui::DragFloat(property_name, &f))
+				{
+					Lumix::toCString(f, buf, sizeof(buf), 5);
+					scene->setPropertyValue(cmp.index, property_name, buf);
+				}
+			}
+			break;
+			case Lumix::LuaScript::Property::ENTITY:
+			{
+				Lumix::Entity e;
+				Lumix::fromCString(buf, sizeof(buf), &e);
+				if (entityInput(property_name, StringBuilder<20>("", cmp.index), e))
+				{
+					Lumix::toCString(e, buf, sizeof(buf));
+					scene->setPropertyValue(cmp.index, property_name, buf);
+				}
+				
+			}
+			break;
+			case Lumix::LuaScript::Property::ANY:
+				if (ImGui::InputText(property_name, buf, sizeof(buf)))
+				{
+					scene->setPropertyValue(cmp.index, property_name, buf);
+				}
+				break;
 		}
 	}
 }

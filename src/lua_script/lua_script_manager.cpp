@@ -35,11 +35,11 @@ void LuaScript::unload()
 
 const char* LuaScript::getPropertyName(uint32_t hash) const
 {
-	for (const char* name : m_properties)
+	for (auto& property : m_properties)
 	{
-		if (crc32(name) == hash)
+		if (crc32(property.name) == hash)
 		{
-			return name;
+			return property.name;
 		}
 	}
 	return nullptr;
@@ -52,7 +52,7 @@ static bool isWhitespace(char c)
 }
 
 
-static void getToken(const char* src, char* dest, int size)
+static const char* getToken(const char* src, char* dest, int size)
 {
 	const char* in = src;
 	char* out = dest;
@@ -70,6 +70,7 @@ static void getToken(const char* src, char* dest, int size)
 		--size;
 	}
 	*out = '\0';
+	return in;
 }
 
 
@@ -81,10 +82,24 @@ void LuaScript::parseProperties()
 	const char* prop = strstr(str, PROPERTY_MARK);
 	while (prop)
 	{
-		const char* prop_name = prop + PROPERTY_MARK_LENGTH + 1;
+		const char* token = prop + PROPERTY_MARK_LENGTH + 1;
 
-		PropertyName& token = m_properties.pushEmpty();
-		getToken(prop_name, token, sizeof(token));
+		Property& property = m_properties.pushEmpty();
+		token = getToken(token, property.name, sizeof(property.name));
+		char type[50];
+		token = getToken(token, type, sizeof(type));
+		if (strcmp(type, "entity") == 0)
+		{
+			property.type = Property::ENTITY;
+		}
+		else if (strcmp(type, "float") == 0)
+		{
+			property.type = Property::FLOAT;
+		}
+		else
+		{
+			property.type = Property::ANY;
+		}
 
 		prop = strstr(prop + 1, PROPERTY_MARK);
 	}

@@ -94,7 +94,7 @@ class Terrain
 		void setGrassTypePath(int index, const Path& path);
 		void setGrassTypeGround(int index, int ground);
 		void setGrassTypeDensity(int index, int density);
-		void setGrassDistance(int value) { m_grass_distance = value; }
+		void setGrassDistance(int value) { m_grass_distance = value; forceGrassUpdate(); }
 		void setMaterial(Material* material);
 
 		void getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos, LIFOAllocator& allocator);

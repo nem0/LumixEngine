@@ -37,6 +37,7 @@ class PropertyGrid
 		void showComponentProperties(Lumix::ComponentUID cmp);
 		void showCoreProperties(Lumix::Entity entity);
 		const char* getComponentTypeName(Lumix::ComponentUID cmp) const;
+		bool entityInput(const char* label, const char* str_id, Lumix::Entity& entity) const;
 
 	private:
 		Lumix::WorldEditor& m_editor;
