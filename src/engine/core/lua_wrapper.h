@@ -125,6 +125,23 @@ template <> inline void pushLua(lua_State* L, void* value)
 }
 
 
+inline const char* luaTypeToString(int type)
+{
+	switch (type)
+	{
+		case LUA_TNUMBER: return "number";
+		case LUA_TBOOLEAN: return "boolean";
+		case LUA_TFUNCTION: return "function";
+		case LUA_TLIGHTUSERDATA: return "light userdata";
+		case LUA_TNIL: return "nil";
+		case LUA_TSTRING: return "string";
+		case LUA_TTABLE: return "table";
+		case LUA_TUSERDATA: return "userdata";
+	}
+	return "Unknown";
+}
+
+
 template <int N> struct FunctionCaller
 {
 	template <typename R, typename... ArgsF, typename... Args>
@@ -140,7 +157,17 @@ template <int N> struct FunctionCaller
 			int depth = 0;
 
 			auto er = g_log_error.log("lua");
-			er << "Wrong argument " << sizeof...(ArgsF)-N << " in\n";
+			int type = lua_type(L, sizeof...(ArgsF)-N + 1);
+
+			if (type == LUA_TNONE)
+			{
+				er << "Argument " << sizeof...(ArgsF)-N + 1  << " not found in:\n";
+			}
+			else
+			{
+				er << "Wrong argument " << sizeof...(ArgsF)-N + 1 << " of type "
+				   << luaTypeToString(type) << " in:\n";
+			}
 			while (lua_getstack(L, depth, &entry))
 			{
 				int status = lua_getinfo(L, "Sln", &entry);
@@ -149,8 +176,7 @@ template <int N> struct FunctionCaller
 				   << "): " << (entry.name ? entry.name : "?") << "\n";
 				depth++;
 			}
-			er << " " << typeToString<T>() << " expected";
-
+			er << typeToString<T>() << " expected\n";
 			return R();
 		}
 		T a = toType<T>(L, sizeof...(ArgsF)-N + 1);
@@ -170,7 +196,11 @@ template <int N> struct FunctionCaller
 			int depth = 0;
 
 			auto er = g_log_error.log("lua");
-			er << "Wrong arguments in\n";
+			auto er = g_log_error.log("lua");
+			int type = lua_type(L, sizeof...(ArgsF)-N + 1);
+
+			er << "Wrong argument " << sizeof...(ArgsF)-N + 1 << " of type " << luaTypeToString(type)
+				<< " in\n";
 			while (lua_getstack(L, depth, &entry))
 			{
 				int status = lua_getinfo(L, "Sln", &entry);

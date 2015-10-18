@@ -105,6 +105,14 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		{
 			m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
 		}
+		if (ImGui::BeginPopupContextItem(StringBuilder<50>(desc_name, "pu")))
+		{
+			if (ColorPicker(StringBuilder<50>(desc_name, "cp"), &v.x))
+			{
+				m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
+			}
+			ImGui::EndPopup();
+		}
 		break;
 	}
 	case Lumix::IPropertyDescriptor::VEC3:
