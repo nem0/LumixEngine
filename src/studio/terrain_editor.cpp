@@ -1113,7 +1113,8 @@ void TerrainEditor::nextTerrainTexture()
 	Lumix::Texture* tex = material->getTextureByUniform(TEX_COLOR_UNIFORM);
 	if (tex)
 	{
-		m_texture_idx = Lumix::Math::minValue(tex->getDepth() - 1, m_texture_idx + 1);
+		m_texture_idx =
+			Lumix::Math::minValue(tex->getAtlasSize() * tex->getAtlasSize() - 1, m_texture_idx + 1);
 	}
 }
 
