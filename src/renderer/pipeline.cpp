@@ -727,6 +727,22 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	static Vec3 shadowmapTexelAlign(const Vec3& shadow_cam_pos,
+		float shadowmap_width,
+		float frustum_radius,
+		const Matrix& light_mtx)
+	{
+		Matrix inv = light_mtx;
+		inv.fastInverse();
+		Vec3 out = inv.multiplyPosition(shadow_cam_pos);
+		float align = 2 * frustum_radius / (shadowmap_width * 0.5f - 2);
+		out.x -= fmodf(out.x, align);
+		out.y -= fmodf(out.y, align);
+		out = light_mtx.multiplyPosition(out);
+		return out;
+	}
+
+
 	void renderShadowmap(ComponentIndex camera, int64_t layer_mask)
 	{
 		Universe& universe = m_scene->getUniverse();
@@ -771,6 +787,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 			Vec3 shadow_cam_pos = camera_matrix.getTranslation();
 			float bb_size = frustum.getRadius();
+			shadow_cam_pos =
+				shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
+
 			Matrix projection_matrix;
 			projection_matrix.setOrtho(
 				bb_size, -bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
