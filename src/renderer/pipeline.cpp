@@ -48,8 +48,8 @@ static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
 static const uint32_t BRUSH_SIZE_HASH = crc32("brush_size");
 static const uint32_t BRUSH_POSITION_HASH = crc32("brush_position");
 static const char* TEX_COLOR_UNIFORM = "u_texColor";
-static const float SHADOW_CAM_NEAR = 0.5f;
-static const float SHADOW_CAM_FAR = 10000.0f;
+static const float SHADOW_CAM_NEAR = 50.0f;
+static const float SHADOW_CAM_FAR = 5000.0f;
 
 class InstanceData
 {
@@ -196,7 +196,9 @@ struct PipelineImpl : public Pipeline
 		m_lua_state = luaL_newstate();
 		luaL_openlibs(m_lua_state);
 		bool errors =
-			luaL_loadbuffer(m_lua_state, (const char*)file.getBuffer(), file.size(), "") != LUA_OK;
+			luaL_loadbuffer(
+				m_lua_state, (const char*)file.getBuffer(), file.size(), getPath().c_str()) !=
+			LUA_OK;
 		errors = errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
 		if (errors)
 		{
@@ -1185,8 +1187,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_tmp_terrains.clear();
 
 		m_scene->getRenderableInfos(frustum, m_tmp_meshes, layer_mask);
-		m_scene->getTerrainInfos(
-			m_tmp_terrains, layer_mask, frustum.getPosition(), m_renderer.getFrameAllocator());
+		Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
+		Vec3 camera_pos = m_scene->getUniverse().getPosition(camera_entity);
+		LIFOAllocator& frame_allocator = m_renderer.getFrameAllocator();
+		m_scene->getTerrainInfos(m_tmp_terrains, layer_mask, camera_pos, frame_allocator);
+		
 		m_is_current_light_global = true;
 		m_current_light = m_scene->getActiveGlobalLight();
 		
@@ -1635,8 +1640,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			lua_pushlightuserdata(m_source.m_lua_state, this);
 			if (lua_pcall(m_source.m_lua_state, 1, 0, 0) != LUA_OK)
 			{
-				g_log_error.log("lua")
-					<< lua_tostring(m_source.m_lua_state, -1);
+				g_log_error.log("lua") << lua_tostring(m_source.m_lua_state, -1);
 				lua_pop(m_source.m_lua_state, 1);
 			}
 		}
@@ -1861,7 +1865,7 @@ void applyCamera(PipelineInstanceImpl* pipeline, const char* slot)
 }
 
 
-void clear(PipelineInstanceImpl* pipeline, const char* buffers)
+void clear(PipelineInstanceImpl* pipeline, const char* buffers, int color)
 {
 	uint16_t flags = 0;
 	if (strcmp(buffers, "all") == 0)
@@ -1872,7 +1876,7 @@ void clear(PipelineInstanceImpl* pipeline, const char* buffers)
 	{
 		flags = BGFX_CLEAR_DEPTH;
 	}
-	bgfx::setViewClear(pipeline->m_view_idx, flags, 0x303030ff, 1.0f, 0);
+	bgfx::setViewClear(pipeline->m_view_idx, flags, color, 1.0f, 0);
 	bgfx::touch(pipeline->m_view_idx);
 }
 
