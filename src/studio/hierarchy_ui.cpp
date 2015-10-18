@@ -39,9 +39,10 @@ public:
 	}
 
 
-	virtual void execute() override
+	virtual bool execute() override
 	{
 		m_hierarchy.setParent(m_child, m_new_parent);
+		return true;
 	}
 
 

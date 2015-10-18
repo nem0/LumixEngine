@@ -205,6 +205,9 @@ public:
 	virtual void getRenderableInfos(const Frustum& frustum,
 		Array<const RenderableMesh*>& meshes,
 		int64_t layer_mask) = 0;
+	virtual void getRenderableEntities(const Frustum& frustum,
+		Array<Entity>& entities,
+		int64_t layer_mask) = 0;
 	virtual Entity getRenderableEntity(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getFirstRenderable() = 0;
 	virtual ComponentIndex getNextRenderable(ComponentIndex cmp) = 0;

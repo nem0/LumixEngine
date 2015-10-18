@@ -156,6 +156,8 @@ public:
 			if (ImGui::BeginChild("right", half_size, true))
 			{
 				ImGui::Text("Version 0.17. - News");
+				ImGui::BulletText("Terrain brush for removing entities");
+				ImGui::BulletText("Improved shadows on terrain");
 				ImGui::BulletText("Fog height");
 				ImGui::BulletText("Bitmap to heightmap convertor");
 				ImGui::BulletText("LOD preview");

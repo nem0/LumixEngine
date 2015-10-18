@@ -1367,6 +1367,25 @@ public:
 	}
 
 
+	virtual void getRenderableEntities(const Frustum& frustum,
+		Array<Entity>& entities,
+		int64_t layer_mask) override
+	{
+		PROFILE_FUNCTION();
+
+		const CullingSystem::Results* results = cull(frustum, layer_mask);
+		if (!results) return;
+
+		for (auto& subresults : *results)
+		{
+			for (int renderable_index : subresults)
+			{
+				entities.push(m_renderables[renderable_index]->m_entity);
+			}
+		}
+	}
+
+
 	virtual void getRenderableInfos(const Frustum& frustum,
 									Array<const RenderableMesh*>& meshes,
 									int64_t layer_mask) override
@@ -1374,10 +1393,7 @@ public:
 		PROFILE_FUNCTION();
 
 		const CullingSystem::Results* results = cull(frustum, layer_mask);
-		if (!results)
-		{
-			return;
-		}
+		if (!results) return;
 
 		fillTemporaryInfos(*results, frustum, layer_mask);
 		mergeTemporaryInfos(meshes);
@@ -2334,19 +2350,15 @@ private:
 
 	ComponentIndex createRenderable(Entity entity)
 	{
-		int new_index = m_renderables.empty()
-							? 0
-							: m_renderables.back()->m_component_index + 1;
+		int new_index = m_renderables.empty() ? 0 : m_renderables.back()->m_component_index + 1;
 		Renderable& r = *m_allocator.newObject<Renderable>(m_allocator);
 		m_renderables.push(&r);
 		r.m_entity = entity;
 		r.m_model = nullptr;
 		r.m_component_index = new_index;
 		r.m_matrix = m_universe.getMatrix(entity);
-		m_universe.addComponent(
-			entity, RENDERABLE_HASH, this, r.m_component_index);
-		m_culling_system->addStatic(
-			Sphere(m_universe.getPosition(entity), 1.0f));
+		m_universe.addComponent(entity, RENDERABLE_HASH, this, r.m_component_index);
+		m_culling_system->addStatic(Sphere(m_universe.getPosition(entity), 1.0f));
 		m_renderable_created.invoke(r.m_component_index);
 		return r.m_component_index;
 	}
