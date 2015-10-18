@@ -66,11 +66,6 @@ class Terrain
 		};
 
 	public:
-		static const int GRASS_QUADS_COLUMNS = 5;
-		static const int GRASS_QUADS_ROWS = 5;
-		static const int GRASS_QUAD_SIZE = 10;
-
-	public:
 		Terrain(Renderer& renderer, Entity entity, RenderScene& scene, IAllocator& allocator);
 		~Terrain();
 
@@ -92,12 +87,14 @@ class Terrain
 		int getGrassTypeGround(int index);
 		int getGrassTypeDensity(int index);
 		int getGrassTypeCount() const { return m_grass_types.size(); }
+		int getGrassDistance() const { return m_grass_distance; }
 
 		void setXZScale(float scale) { m_scale.x = scale; m_scale.z = scale; }
 		void setYScale(float scale) { m_scale.y = scale; }
 		void setGrassTypePath(int index, const Path& path);
 		void setGrassTypeGround(int index, int ground);
 		void setGrassTypeDensity(int index, int density);
+		void setGrassDistance(int value) { m_grass_distance = value; }
 		void setMaterial(Material* material);
 
 		void getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos, LIFOAllocator& allocator);
@@ -131,6 +128,7 @@ class Terrain
 		TerrainQuad* m_root;
 		int32_t m_width;
 		int32_t m_height;
+		int32_t m_grass_distance;
 		int64_t m_layer_mask;
 		Vec3 m_scale;
 		Entity m_entity;

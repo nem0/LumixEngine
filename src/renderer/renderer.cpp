@@ -431,6 +431,12 @@ struct RendererImpl : public Renderer
 									  0.0f,
 									  allocator));
 
+		m_engine.registerProperty("terrain",
+			LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)("Grass distance",
+									  &RenderScene::getGrassDistance,
+									  &RenderScene::setGrassDistance,
+									  allocator));
+
 		auto grass = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Grass",
 			&RenderScene::getGrassCount,
 			&RenderScene::addGrass,
