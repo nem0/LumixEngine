@@ -156,6 +156,8 @@ public:
 			if (ImGui::BeginChild("right", half_size, true))
 			{
 				ImGui::Text("Version 0.17. - News");
+				ImGui::BulletText("Lua properties with types");
+				ImGui::BulletText("Moving the Light Texel-Sized Increments");
 				ImGui::BulletText("Terrain brush for removing entities");
 				ImGui::BulletText("Improved shadows on terrain");
 				ImGui::BulletText("Fog height");
@@ -597,8 +599,6 @@ public:
 				}
 			}
 			ImGui::Separator();
-
-			auto entity = universe->getFirstEntity();
 
 			struct ListBoxData
 			{

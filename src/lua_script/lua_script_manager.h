@@ -14,7 +14,17 @@ namespace Lumix
 class LuaScript : public Resource
 {
 public:
-	typedef char PropertyName[50];
+	struct Property
+	{
+		char name[50];
+		enum Type
+		{
+			ENTITY,
+			FLOAT,
+			ANY
+		};
+		Type type;
+	};
 
 public:
 	LuaScript(const Path& path,
@@ -26,7 +36,7 @@ public:
 	virtual bool load(FS::IFile& file) override;
 	const char* getSourceCode() const { return m_source_code.c_str(); }
 	const char* getPropertyName(uint32_t hash) const;
-	const Array<PropertyName>& getPropertiesNames() const
+	const Array<Property>& getProperties() const
 	{
 		return m_properties;
 	}
@@ -36,7 +46,7 @@ private:
 
 private:
 	string m_source_code;
-	Array<PropertyName> m_properties;
+	Array<Property> m_properties;
 };
 
 

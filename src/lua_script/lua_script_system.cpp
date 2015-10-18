@@ -153,6 +153,12 @@ public:
 	}
 
 
+	virtual LuaScript* getScriptResource(ComponentIndex cmp) const override
+	{
+		return getScript(cmp).m_script;
+	}
+
+
 	virtual const char* getPropertyValue(Lumix::ComponentIndex cmp, int index) const override
 	{
 		auto& script = getScript(cmp);
@@ -188,7 +194,7 @@ public:
 	{
 		auto& script = getScript(cmp);
 
-		return script.m_script ? script.m_script->getPropertiesNames()[index] : "";
+		return script.m_script ? script.m_script->getProperties()[index].name : "";
 	}
 
 
@@ -196,7 +202,7 @@ public:
 	{
 		auto& script = getScript(cmp);
 
-		return script.m_script ? script.m_script->getPropertiesNames().size() : 0;
+		return script.m_script ? script.m_script->getProperties().size() : 0;
 	}
 
 
