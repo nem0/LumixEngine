@@ -194,24 +194,29 @@ void Gizmo::setCameraRay(const Vec3& origin, const Vec3& cursor_dir)
 
 	if (m_mode == Mode::TRANSLATE)
 	{
+		Matrix triangle_mtx = mtx;
+
+		if (dotProduct(gizmo_mtx.getXVector(), m_camera_dir) < 0) triangle_mtx.setXVector(-triangle_mtx.getXVector());
+		if (dotProduct(gizmo_mtx.getYVector(), m_camera_dir) < 0) triangle_mtx.setYVector(-triangle_mtx.getYVector());
+		if (dotProduct(gizmo_mtx.getZVector(), m_camera_dir) < 0) triangle_mtx.setZVector(-triangle_mtx.getZVector());
 
 		float t, tmin = FLT_MAX;
 		bool hit = Math::getRayTriangleIntersection(
-			origin, cursor_dir, pos, pos + mtx.getXVector() * 0.5f, pos + mtx.getYVector() * 0.5f, &t);
+			origin, cursor_dir, pos, pos + triangle_mtx.getXVector() * 0.5f, pos + triangle_mtx.getYVector() * 0.5f, &t);
 		if (hit)
 		{
 			tmin = t;
 			m_transform_axis = Axis::XY;
 		}
 		hit = Math::getRayTriangleIntersection(
-			origin, cursor_dir, pos, pos + mtx.getYVector() * 0.5f, pos + mtx.getZVector() * 0.5f, &t);
+			origin, cursor_dir, pos, pos + triangle_mtx.getYVector() * 0.5f, pos + triangle_mtx.getZVector() * 0.5f, &t);
 		if (hit && t < tmin)
 		{
 			tmin = t;
 			m_transform_axis = Axis::YZ;
 		}
 		hit = Math::getRayTriangleIntersection(
-			origin, cursor_dir, pos, pos + mtx.getXVector() * 0.5f, pos + mtx.getZVector() * 0.5f, &t);
+			origin, cursor_dir, pos, pos + triangle_mtx.getXVector() * 0.5f, pos + triangle_mtx.getZVector() * 0.5f, &t);
 		if (hit && t < tmin)
 		{
 			m_transform_axis = Axis::XZ;
@@ -335,6 +340,9 @@ void Gizmo::renderTranslateGizmo(PipelineInstance& pipeline)
 		BGFX_STATE_PT_LINES | BGFX_STATE_DEPTH_TEST_LEQUAL,
 		m_shader->getInstance(0).m_program_handles[pipeline.getPassIdx()]);
 
+	if (dotProduct(gizmo_mtx.getXVector(), m_camera_dir) < 0) mtx.setXVector(-mtx.getXVector());
+	if (dotProduct(gizmo_mtx.getYVector(), m_camera_dir) < 0) mtx.setYVector(-mtx.getYVector());
+	if (dotProduct(gizmo_mtx.getZVector(), m_camera_dir) < 0) mtx.setZVector(-mtx.getZVector());
 
 	vertices[0].position = Vec3(0, 0, 0);
 	vertices[0].color = m_transform_axis == Axis::XY ? 0xff00ffff : 0xffff0000;
