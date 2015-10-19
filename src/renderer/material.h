@@ -116,7 +116,6 @@ private:
 	Texture* m_textures[MAX_TEXTURE_COUNT];
 	int m_texture_count;
 	Array<Uniform> m_uniforms;
-	DepthFunc m_depth_func;
 	IAllocator& m_allocator;
 	bgfx::ProgramHandle m_program_id;
 	uint64_t m_render_states;

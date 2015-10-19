@@ -29,7 +29,6 @@ int Material::s_shadow_receiver_define_idx = -1;
 Material::Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_shader(nullptr)
-	, m_depth_func(DepthFunc::LEQUAL)
 	, m_uniforms(allocator)
 	, m_allocator(allocator)
 	, m_texture_count(0)
@@ -652,24 +651,6 @@ bool Material::load(FS::IFile& file)
 		{
 			serializer.deserialize(b_value, true);
 			enableBackfaceCulling(b_value);
-		}
-		else if (strcmp(label, "depth_func") == 0)
-		{
-			char tmp[30];
-			serializer.deserialize(tmp, 30, "lequal");
-			if (strcmp(tmp, "lequal") == 0)
-			{
-				m_depth_func = DepthFunc::LEQUAL;
-			}
-			else if (strcmp(tmp, "less") == 0)
-			{
-				m_depth_func = DepthFunc::LESS;
-			}
-			else
-			{
-				g_log_warning.log("Renderer") << "Unknown depth function " << tmp << " in material "
-											  << getPath().c_str();
-			}
 		}
 		else
 		{
