@@ -74,6 +74,8 @@ class LUMIX_EDITOR_API Gizmo
 		void toggleCoordSystem();
 		int getStep() const { return m_step[int(m_mode)]; }
 		void setStep(int step) { m_step[int(m_mode)] = step; }
+		bool isAutosnapDown() const { return m_is_autosnap_down; }
+		void setAutosnapDown(bool snap) { m_is_autosnap_down = snap; }
 
 	private:
 		void getMatrix(Matrix& mtx);
@@ -100,6 +102,7 @@ class LUMIX_EDITOR_API Gizmo
 		Mode m_mode;
 		CoordSystem m_coord_system;
 		bool m_is_transforming;
+		bool m_is_autosnap_down;
 		Vec3 m_camera_dir;
 		bgfx::VertexDecl m_vertex_decl;
 };

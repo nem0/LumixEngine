@@ -1917,39 +1917,40 @@ public:
 	}
 
 
-	virtual void snapToTerrain() override
+	virtual void snapDown() override
 	{
-		if (!m_selected_entities.empty())
+		if (m_selected_entities.empty()) return;
+
+		Array<Vec3> new_positions(m_allocator);
+		RenderScene* scene = static_cast<RenderScene*>(getScene(crc32("renderer")));
+		Universe* universe = getUniverse();
+
+		for (int i = 0; i < m_selected_entities.size(); ++i)
 		{
-			Array<Vec3> new_positions(m_allocator);
-			RenderScene* scene =
-				static_cast<RenderScene*>(getScene(crc32("renderer")));
-			Universe* universe = getUniverse();
+			Entity entity = m_selected_entities[i];
 
-			for (int i = 0; i < m_selected_entities.size(); ++i)
+			ComponentUID renderable = getComponent(m_selected_entities[i], RENDERABLE_HASH);
+			RayCastModelHit hit =
+				scene->castRay(universe->getPosition(entity), Vec3(0, -1, 0), renderable.index);
+			if (hit.m_is_hit)
 			{
-				Entity entity = m_selected_entities[i];
-
-				ComponentUID renderable =
-					getComponent(m_selected_entities[i], RENDERABLE_HASH);
+				new_positions.push(hit.m_origin + hit.m_dir * hit.m_t);
+			}
+			else
+			{
 				RayCastModelHit hit =
-					scene->castRay(universe->getPosition(entity),
-								   Vec3(0, -1, 0),
-								   renderable.index);
+					scene->castRay(universe->getPosition(entity), Vec3(0, 1, 0), renderable.index);
 				if (hit.m_is_hit)
 				{
 					new_positions.push(hit.m_origin + hit.m_dir * hit.m_t);
 				}
 				else
 				{
-					new_positions.push(
-						universe->getPosition(m_selected_entities[i]));
+					new_positions.push(universe->getPosition(m_selected_entities[i]));
 				}
 			}
-			setEntitiesPositions(&m_selected_entities[0],
-								 &new_positions[0],
-								 new_positions.size());
 		}
+		setEntitiesPositions(&m_selected_entities[0], &new_positions[0], new_positions.size());
 	}
 
 
