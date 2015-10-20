@@ -41,6 +41,7 @@ Gizmo::Gizmo(WorldEditor& editor)
 		.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
 		.end();
 
+	m_is_autosnap_down = false;
 	m_shader = nullptr;
 	m_pivot = Pivot::OBJECT_PIVOT;
 	m_coord_system = CoordSystem::LOCAL;
@@ -276,30 +277,7 @@ bool Gizmo::castRay(const Vec3& origin, const Vec3& dir)
 	if (m_transform_axis == Axis::NONE) return false;
 	if (m_editor.getSelectedEntities().empty()) return false;
 
-	Matrix scale_mtx = Matrix::IDENTITY;
-	scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = m_scale;
-	Matrix gizmo_mtx;
-	getMatrix(gizmo_mtx);
-	Matrix mtx = gizmo_mtx * scale_mtx;
-	Vec3 pos = mtx.getTranslation();
-
-	if (m_mode == Mode::TRANSLATE)
-	{
-		float x_dist = Math::getLineSegmentDistance(origin, dir, pos, pos + mtx.getXVector());
-		float y_dist = Math::getLineSegmentDistance(origin, dir, pos, pos + mtx.getYVector());
-		float z_dist = Math::getLineSegmentDistance(origin, dir, pos, pos + mtx.getZVector());
-
-		float influenced_dist = m_scale * INFLUENCE_DISTANCE;
-		return x_dist < influenced_dist || y_dist < influenced_dist || z_dist < influenced_dist;
-	}
-
-	if (m_mode == Mode::ROTATE)
-	{
-		Vec3 hit;
-		return Math::getRaySphereIntersection(origin, dir, pos, m_scale * 1.1f, hit);
-	}
-
-	return false;
+	return true;
 }
 
 
@@ -642,6 +620,8 @@ void Gizmo::transform(ComponentIndex camera, int x, int y, int relx, int rely, b
 			m_editor.setEntitiesPositions(&m_editor.getSelectedEntities()[0],
 				&new_positions[0],
 				new_positions.size());
+			if (m_is_autosnap_down) m_editor.snapDown();
+
 			m_transform_point = intersection;
 		}
 	}

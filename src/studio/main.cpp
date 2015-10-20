@@ -333,10 +333,15 @@ public:
 	void showEntities() { m_editor->showEntities(); }
 	void hideEntities() { m_editor->hideEntities(); }
 	void toggleMeasure() { m_editor->toggleMeasure(); }
-	void snapToTerrain() { m_editor->snapToTerrain(); }
+	void snapDown() { m_editor->snapDown(); }
 	void lookAtSelected() { m_editor->lookAtSelected(); }
 	void toggleStats() { m_gui_pipeline->toggleStats(); }
 
+	void autosnapDown() 
+	{
+		auto& gizmo = m_editor->getGizmo();
+		gizmo.setAutosnapDown(!gizmo.isAutosnapDown());
+	}
 
 	void toggleGizmoMode() 
 	{
@@ -508,7 +513,8 @@ public:
 			{
 				doMenuItem(getAction("toggleGameMode"), m_editor->isGameMode(), true);
 				doMenuItem(getAction("toggleMeasure"), m_editor->isMeasureToolActive(), true);
-				doMenuItem(getAction("snapToTerrain"), false, is_any_entity_selected);
+				doMenuItem(getAction("snapDown"), false, is_any_entity_selected);
+				doMenuItem(getAction("autosnapDown"), m_editor->getGizmo().isAutosnapDown(), true);
 				if (ImGui::MenuItem("Save commands")) saveUndoStack();
 				if (ImGui::MenuItem("Load commands")) loadAndExecuteCommands();
 
@@ -852,7 +858,8 @@ public:
 
 		addAction<&StudioApp::toggleGameMode>("Game Mode", "toggleGameMode");
 		addAction<&StudioApp::toggleMeasure>("Toggle measure", "toggleMeasure");
-		addAction<&StudioApp::snapToTerrain>("Snap to terrain", "snapToTerrain");
+		addAction<&StudioApp::autosnapDown>("Autosnap down", "autosnapDown");
+		addAction<&StudioApp::snapDown>("Snap down", "snapDown");
 		addAction<&StudioApp::lookAtSelected>("Look at selected", "lookAtSelected");
 
 		addAction<&StudioApp::setWireframe>("Wireframe", "setWireframe");

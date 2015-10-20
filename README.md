@@ -6,6 +6,8 @@
        src="https://scan.coverity.com/projects/5919/badge.svg"/>
 </a>
 <img src="https://ci.appveyor.com/api/projects/status/7tcoign219kb5bny" />
+[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/nem0/LumixEngine?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+
 
 3D Game Engine
 
