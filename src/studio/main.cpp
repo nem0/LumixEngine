@@ -72,6 +72,7 @@ public:
 		, m_is_welcome_screen_opened(true)
 	{
 		m_entity_list_search[0] = '\0';
+		m_template_name[0] = '\0';
 	}
 
 
@@ -556,6 +557,19 @@ public:
 
 		if (ImGui::Begin("Entity templates", &m_is_entity_template_list_opened))
 		{
+			if (m_editor->getSelectedEntities().size() == 1)
+			{
+				ImGui::InputText("Template name", m_template_name, Lumix::lengthOf(m_template_name));
+
+				if (ImGui::Button("Create from selected"))
+				{
+					auto entity = m_editor->getSelectedEntities()[0];
+					auto& system = m_editor->getEntityTemplateSystem();
+					system.createTemplateFromEntity(m_template_name, entity);
+				}
+				ImGui::Separator();
+			}
+			ImGui::Text("Templates:");
 			auto& template_system = m_editor->getEntityTemplateSystem();
 
 			for (auto& template_name : template_system.getTemplateNames())
@@ -1176,6 +1190,7 @@ public:
 	Settings m_settings;
 	Metadata m_metadata;
 	char m_entity_list_search[100];
+	char m_template_name[100];
 
 	bool m_finished;
 

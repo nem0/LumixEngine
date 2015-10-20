@@ -80,7 +80,7 @@ private:
 			}
 			else
 			{
-				ASSERT(false);
+				return false;
 			}
 			return true;
 		}
