@@ -29,7 +29,7 @@ class PluginManagerImpl : public PluginManager
 
 		~PluginManagerImpl()
 		{
-			for (int i = 0; i < m_plugins.size(); ++i)
+			for (int i = m_plugins.size() - 1; i >= 0; --i)
 			{
 				m_plugins[i]->destroy();
 				m_engine.getAllocator().deleteObject(m_plugins[i]);
