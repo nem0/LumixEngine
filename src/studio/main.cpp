@@ -70,6 +70,7 @@ public:
 		, m_metadata(m_allocator)
 		, m_gui_pipeline(nullptr)
 		, m_is_welcome_screen_opened(true)
+		, m_is_mouse_tracked(false)
 	{
 		m_entity_list_search[0] = '\0';
 		m_template_name[0] = '\0';
@@ -717,8 +718,20 @@ public:
 	}
 
 
+	void trackMouse()
+	{
+		TRACKMOUSEEVENT track_event;
+		track_event.cbSize = sizeof(TRACKMOUSEEVENT);
+		track_event.dwFlags = TME_LEAVE;
+		track_event.hwndTrack = m_hwnd;
+		m_is_mouse_tracked = TrackMouseEvent(&track_event) == TRUE;
+	}
+
+
 	void initIMGUI()
 	{
+		trackMouse();
+
 		ImGuiIO& io = ImGui::GetIO();
 		io.Fonts->AddFontFromFileTTF("editor/VeraMono.ttf", 13);
 
@@ -1129,6 +1142,11 @@ public:
 				break;
 			case WM_MOUSEMOVE:
 			{
+				if (!m_is_mouse_tracked)
+				{
+					trackMouse();
+				}
+
 				if (!m_gameview.isMouseCaptured())
 				{
 					POINT p;
@@ -1147,6 +1165,9 @@ public:
 				}
 			}
 			break;
+			case WM_MOUSELEAVE:
+				clearInputs();
+				break;
 			case WM_CHAR: ImGui::GetIO().AddInputCharacter((ImWchar)wParam); break;
 			case WM_KEYUP: ImGui::GetIO().KeysDown[wParam] = false; break;
 			case WM_SYSKEYDOWN: ImGui::GetIO().KeysDown[wParam] = true; break;
@@ -1160,6 +1181,18 @@ public:
 		}
 
 		return DefWindowProc(hWnd, msg, wParam, lParam);
+	}
+
+
+	void clearInputs()
+	{
+		m_is_mouse_tracked = false;
+		auto& io = ImGui::GetIO();
+		io.KeyAlt = false;
+		io.KeyCtrl = false;
+		io.KeyShift = false;
+		memset(io.KeysDown, 0, sizeof(io.KeysDown));
+		memset(io.MouseDown, 0, sizeof(io.MouseDown));
 	}
 
 
@@ -1199,6 +1232,7 @@ public:
 	bool m_is_entity_template_list_opened;
 	bool m_is_style_editor_opened;
 	bool m_is_wireframe;
+	bool m_is_mouse_tracked;
 };
 
 
