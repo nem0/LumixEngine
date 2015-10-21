@@ -18,6 +18,8 @@ Features:
   * component based
   * data driven
 
+[News on twitter](https://twitter.com/mikulasflorek)
+  
 [Getting started](https://github.com/nem0/LumixEngine/wiki/Getting-started)
 
 [Download latest executables](https://ci.appveyor.com/project/nem0/lumixengine/build/artifacts)

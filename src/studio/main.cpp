@@ -158,6 +158,8 @@ public:
 			if (ImGui::BeginChild("right", half_size, true))
 			{
 				ImGui::Text("Version 0.17. - News");
+				ImGui::BulletText("Painting entities - align with normal");
+				ImGui::BulletText("Painting entities - random x and z rotation");
 				ImGui::BulletText("Lua properties with types");
 				ImGui::BulletText("Moving the Light Texel-Sized Increments");
 				ImGui::BulletText("Terrain brush for removing entities");

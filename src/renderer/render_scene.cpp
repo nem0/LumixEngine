@@ -836,9 +836,7 @@ public:
 
 	virtual Vec3 getTerrainNormalAt(ComponentIndex cmp, float x, float z)
 	{
-		Vec3 normal = m_terrains[cmp]->getNormal(x, z);
-		ASSERT(normal.y > 0);
-		return normal;
+		return m_terrains[cmp]->getNormal(x, z);
 	}
 
 
