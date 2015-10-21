@@ -77,6 +77,7 @@ class Terrain
 		int64_t getLayerMask() const { return m_layer_mask; }
 		Entity getEntity() const { return m_entity; }
 		float getRootSize() const;
+		Vec3 getNormal(float x, float z);
 		float getHeight(float x, float z);
 		float getXZScale() const { return m_scale.x; }
 		float getYScale() const { return m_scale.y; }

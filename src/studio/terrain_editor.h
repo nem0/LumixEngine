@@ -84,4 +84,5 @@ private:
 	Action* m_remove_entity_action;
 	Lumix::BinaryArray m_brush_mask;
 	Lumix::Texture* m_brush_texture;
+	bool m_is_align_with_normal;
 };

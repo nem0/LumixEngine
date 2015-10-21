@@ -616,6 +616,29 @@ void Terrain::getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos,
 	}
 }
 
+
+Vec3 Terrain::getNormal(float x, float z)
+{
+	int int_x = (int)(x / m_scale.x);
+	int int_z = (int)(z / m_scale.x);
+	float dec_x = (x - (int_x * m_scale.x)) / m_scale.x;
+	float dec_z = (z - (int_z * m_scale.x)) / m_scale.x;
+	if (dec_x > dec_z)
+	{
+		float h0 = getHeight(int_x, int_z);
+		float h1 = getHeight(int_x + 1, int_z);
+		float h2 = getHeight(int_x + 1, int_z + 1);
+		return crossProduct(Vec3(m_scale.x, h2 - h0, m_scale.x), Vec3(m_scale.x, h1 - h0, 0)).normalized();
+	}
+	else
+	{
+		float h0 = getHeight(int_x, int_z);
+		float h1 = getHeight(int_x + 1, int_z + 1);
+		float h2 = getHeight(int_x, int_z + 1);
+		return crossProduct(Vec3(0, h2 - h0, m_scale.x), Vec3(m_scale.x, h1 - h0, m_scale.x)).normalized();
+	}
+}
+
 	
 float Terrain::getHeight(float x, float z)
 {

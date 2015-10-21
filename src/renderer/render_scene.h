@@ -222,6 +222,7 @@ public:
 		const Vec3& camera_pos,
 		LIFOAllocator& allocator) = 0;
 	virtual float getTerrainHeightAt(ComponentIndex cmp, float x, float z) = 0;
+	virtual Vec3 getTerrainNormalAt(ComponentIndex cmp, float x, float z) = 0;
 	virtual void setTerrainMaterialPath(ComponentIndex cmp, const char* path) = 0;
 	virtual const char* getTerrainMaterialPath(ComponentIndex cmp) = 0;
 	virtual Material* getTerrainMaterial(ComponentIndex cmp) = 0;
