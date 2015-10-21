@@ -38,6 +38,49 @@ Quat::Quat(const Vec3& axis, float angle)
 }
 
 
+void Quat::fromEuler(const Vec3& euler)
+{
+	float ex = euler.x * 0.5f;
+	float ey = euler.y * 0.5f;
+	float ez = euler.z * 0.5f;
+	float sinX = sinf(ex);
+	float cosX = cosf(ex);
+	float sinY = sinf(ey);
+	float cosY = cosf(ey);
+	float sinZ = sinf(ez);
+	float cosZ = cosf(ez);
+
+	w = cosY * cosX * cosZ + sinY * sinX * sinZ;
+	x = cosY * sinX * cosZ + sinY * cosX * sinZ;
+	y = sinY * cosX * cosZ - cosY * sinX * sinZ;
+	z = cosY * cosX * sinZ - sinY * sinX * cosZ;
+}
+
+
+Vec3 Quat::toEuler() const
+{
+	// from urho3d
+	float check = 2.0f * (-y * z + w * x);
+
+	if (check < -0.995f)
+	{
+		return Vec3(
+			-Math::PI * 0.5f, 0.0f, -atan2f(2.0f * (x * z - w * y), 1.0f - 2.0f * (y * y + z * z)));
+	}
+	else if (check > 0.995f)
+	{
+		return Vec3(
+			Math::PI * 0.5f, 0.0f, atan2f(2.0f * (x * z - w * y), 1.0f - 2.0f * (y * y + z * z)));
+	}
+	else
+	{
+		return Vec3(asinf(check),
+			atan2f(2.0f * (x * z + w * y), 1.0f - 2.0f * (x * x + y * y)),
+			atan2f(2.0f * (x * y + w * z), 1.0f - 2.0f * (x * x + z * z)));
+	}
+}
+
+
 void Quat::conjugate()
 {
 	w = -w;
