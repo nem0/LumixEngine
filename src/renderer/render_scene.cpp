@@ -834,27 +834,30 @@ public:
 	}
 
 
-	virtual float
-	getTerrainHeightAt(ComponentIndex cmp, float x, float z) override
+	virtual Vec3 getTerrainNormalAt(ComponentIndex cmp, float x, float z)
+	{
+		Vec3 normal = m_terrains[cmp]->getNormal(x, z);
+		ASSERT(normal.y > 0);
+		return normal;
+	}
+
+
+	virtual float getTerrainHeightAt(ComponentIndex cmp, float x, float z) override
 	{
 		return m_terrains[cmp]->getHeight(x, z);
 	}
 
 
-	virtual void
-	getTerrainSize(ComponentIndex cmp, float* width, float* height) override
+	virtual void getTerrainSize(ComponentIndex cmp, float* width, float* height) override
 	{
 		m_terrains[cmp]->getSize(width, height);
 	}
 
 
-	virtual void setTerrainMaterialPath(ComponentIndex cmp,
-										const char* path) override
+	virtual void setTerrainMaterialPath(ComponentIndex cmp, const char* path) override
 	{
-		Material* material =
-			static_cast<Material*>(m_engine.getResourceManager()
-									   .get(ResourceManager::MATERIAL)
-									   ->load(Path(path)));
+		Material* material = static_cast<Material*>(
+			m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path)));
 		m_terrains[cmp]->setMaterial(material);
 	}
 

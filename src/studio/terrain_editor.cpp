@@ -37,12 +37,14 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 		uint32_t entity_template,
 		float brush_strength,
 		float brush_size,
+		bool align_with_normal,
 		const Lumix::RayCastModelHit& hit)
 		: m_world_editor(editor)
 		, m_component(component)
 		, m_brush_size(brush_size)
 		, m_brush_strength(brush_strength)
 		, m_entities(editor.getAllocator())
+		, m_align_with_normal(align_with_normal)
 	{
 		auto& template_system = m_world_editor.getEntityTemplateSystem();
 		auto& template_names = template_system.getTemplateNames();
@@ -77,6 +79,7 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 		serializer.serialize("cmp_index", m_component.index);
 		serializer.serialize("entity", m_component.entity);
 		serializer.serialize("template", m_template_name_hash);
+		serializer.serialize("align_with_normal", m_align_with_normal);
 	}
 
 
@@ -90,6 +93,7 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 		serializer.deserialize("cmp_index", m_component.index, 0);
 		serializer.deserialize("entity", m_component.entity, 0);
 		serializer.deserialize("template", m_template_name_hash, 0);
+		serializer.deserialize("align_with_normal", m_align_with_normal, false);
 		m_component.type = TERRAIN_HASH;
 		m_component.scene = m_world_editor.getSceneByComponentType(TERRAIN_HASH);
 	}
@@ -152,12 +156,29 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 				if (!isOBBCollision(meshes, pos, model, scale))
 				{
 					auto entity = template_system.createInstanceNoCommand(m_template_name_hash, pos);
+					if (m_align_with_normal)
+					{
+						alignWithNormal(entity, pos);
+					}
 					m_entities.push(entity);
 				}
 			}
 		}
 
 		return !m_entities.empty();
+	}
+
+
+	void alignWithNormal(Lumix::Entity entity, const Lumix::Vec3& pos) const
+	{
+		Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
+		Lumix::Vec3 normal = scene->getTerrainNormalAt(m_component.index, pos.x, pos.z);
+		Lumix::Matrix mtx = m_world_editor.getUniverse()->getMatrix(entity);
+		Lumix::Vec3 dir = Lumix::crossProduct(normal, mtx.getXVector()).normalized();
+		mtx.setXVector(Lumix::crossProduct(normal, dir));
+		mtx.setYVector(normal);
+		mtx.setXVector(dir);
+		m_world_editor.getUniverse()->setMatrix(entity, mtx);
 	}
 
 
@@ -268,6 +289,7 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 	float m_brush_size;
 	uint32_t m_template_name_hash;
 	Lumix::Vec3 m_center;
+	bool m_align_with_normal;
 };
 
 
@@ -1103,6 +1125,7 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	m_terrain_brush_strength = 0.1f;
 	m_type = RAISE_HEIGHT;
 	m_texture_idx = 0;
+	m_is_align_with_normal = false;
 }
 
 
@@ -1383,6 +1406,7 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 			m_selected_entity_template,
 			m_terrain_brush_strength,
 			m_terrain_brush_size,
+			m_is_align_with_normal,
 			hit);
 	m_world_editor.executeCommand(command);
 }
@@ -1601,6 +1625,7 @@ void TerrainEditor::onGUI()
 					&template_names,
 					template_names.size());
 			}
+			ImGui::Checkbox("Align with normal", &m_is_align_with_normal);
 		}
 		break;
 		default: ASSERT(false); break;
