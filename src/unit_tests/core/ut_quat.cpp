@@ -57,6 +57,26 @@ void UT_quat(const char* params)
 	LUMIX_EXPECT_CLOSE_EQ(q1.y, q2.y, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(q1.z, q2.z, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(q1.w, q2.w, 0.001f);
+
+	Lumix::Quat qeuler;
+	for (float x = -Lumix::Math::PI + 0.01f; x < Lumix::Math::PI; x += 0.1f)
+	{
+		for (float y = -Lumix::Math::PI + 0.01f; y < Lumix::Math::PI; y += 0.1f)
+		{
+			float x = 0;
+			for (float z = -Lumix::Math::PI + 0.01f; z < Lumix::Math::PI; z += 0.1f)
+			{
+				qeuler.fromEuler(Lumix::Vec3(x, y, z));
+				Lumix::Vec3 u(0, 1, 0);
+				u = qeuler * u;
+				Lumix::Vec3 euler = qeuler.toEuler();
+
+				LUMIX_EXPECT_CLOSE_EQ(euler.x, x, 0.001f);
+				LUMIX_EXPECT_CLOSE_EQ(euler.y, y, 0.001f);
+				LUMIX_EXPECT_CLOSE_EQ(euler.z, z, 0.001f);
+			}
+		}
+	}
 }
 
 REGISTER_TEST("unit_tests/core/quat", UT_quat, "")

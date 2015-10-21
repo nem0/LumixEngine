@@ -25,9 +25,8 @@ struct LUMIX_ENGINE_API Quat
 	Quat(const Vec3& axis, float angle);
 	Quat(float _x, float _y, float _z, float _w) { x = _x; y = _y; z = _z; w = _w; } 
 
-
-	float x, y, z, w;
-
+	void fromEuler(const Vec3& euler);
+	Vec3 toEuler() const;
 	AxisAngle getAxisAngle() const;
 	void set(float _x, float _y, float _z, float _w) { x = _x; y = _y; z = _z; w = _w; } 
 	void conjugate();
@@ -38,6 +37,8 @@ struct LUMIX_ENGINE_API Quat
 	inline Vec3 operator *(const Vec3& v) const;
 	inline Quat operator *(const Quat& q) const;
 	Quat operator -() const;
+
+	float x, y, z, w;
 };
 
 

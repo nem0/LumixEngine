@@ -368,8 +368,16 @@ void PropertyGrid::showCoreProperties(Lumix::Entity entity)
 	}
 
 	auto rot = m_editor.getUniverse()->getRotation(entity);
-	if (ImGui::DragFloat4("Rotation", &rot.x))
+	auto euler = rot.toEuler();
+	euler.x = Lumix::Math::radiansToDegrees(fmodf(euler.x, Lumix::Math::PI));
+	euler.y = Lumix::Math::radiansToDegrees(fmodf(euler.y, Lumix::Math::PI));
+	euler.z = Lumix::Math::radiansToDegrees(fmodf(euler.z, Lumix::Math::PI));
+	if (ImGui::DragFloat3("Rotation", &euler.x))
 	{
+		euler.x = Lumix::Math::degreesToRadians(fmodf(euler.x, 180));
+		euler.y = Lumix::Math::degreesToRadians(fmodf(euler.y, 180));
+		euler.z = Lumix::Math::degreesToRadians(fmodf(euler.z, 180));
+		rot.fromEuler(euler);
 		m_editor.setEntitiesRotations(&entity, &rot, 1);
 	}
 
