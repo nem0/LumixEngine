@@ -85,4 +85,6 @@ private:
 	Lumix::BinaryArray m_brush_mask;
 	Lumix::Texture* m_brush_texture;
 	bool m_is_align_with_normal;
+	bool m_is_rotate_x;
+	bool m_is_rotate_z;
 };

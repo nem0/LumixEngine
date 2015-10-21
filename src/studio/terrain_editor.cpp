@@ -38,6 +38,8 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 		float brush_strength,
 		float brush_size,
 		bool align_with_normal,
+		bool rotate_x,
+		bool rotate_z,
 		const Lumix::RayCastModelHit& hit)
 		: m_world_editor(editor)
 		, m_component(component)
@@ -45,7 +47,11 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 		, m_brush_strength(brush_strength)
 		, m_entities(editor.getAllocator())
 		, m_align_with_normal(align_with_normal)
+		, m_rotate_x(rotate_x)
+		, m_rotate_z(rotate_z)
 	{
+		ASSERT(!m_align_with_normal || (!rotate_x && !rotate_z));
+
 		auto& template_system = m_world_editor.getEntityTemplateSystem();
 		auto& template_names = template_system.getTemplateNames();
 		m_template_name_hash = Lumix::crc32(template_names[entity_template].c_str());
@@ -80,6 +86,8 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 		serializer.serialize("entity", m_component.entity);
 		serializer.serialize("template", m_template_name_hash);
 		serializer.serialize("align_with_normal", m_align_with_normal);
+		serializer.serialize("rotate_x", m_rotate_x);
+		serializer.serialize("rotate_z", m_rotate_z);
 	}
 
 
@@ -94,6 +102,8 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 		serializer.deserialize("entity", m_component.entity, 0);
 		serializer.deserialize("template", m_template_name_hash, 0);
 		serializer.deserialize("align_with_normal", m_align_with_normal, false);
+		serializer.deserialize("rotate_x", m_rotate_x, false);
+		serializer.deserialize("rotate_z", m_rotate_z, false);
 		m_component.type = TERRAIN_HASH;
 		m_component.scene = m_world_editor.getSceneByComponentType(TERRAIN_HASH);
 	}
@@ -144,7 +154,7 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 		Lumix::Model* model = scene->getRenderableModel(renderable.index);
 		for (int i = 0; i <= m_brush_size * m_brush_size / 1000.0f; ++i)
 		{
-			float angle = (float)(rand() % 360);
+			float angle = Lumix::Math::degreesToRadians((float)(rand() % 360));
 			float dist = (rand() % 100 / 100.0f) * m_brush_size;
 			Lumix::Vec3 pos(m_center.x + cos(angle) * dist, 0, m_center.z + sin(angle) * dist);
 			Lumix::Vec3 terrain_pos = inv_terrain_matrix.multiplyPosition(pos);
@@ -160,12 +170,41 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 					{
 						alignWithNormal(entity, pos);
 					}
+					else if (m_rotate_x || m_rotate_z)
+					{
+						rotateRandom(entity);
+					}
 					m_entities.push(entity);
 				}
 			}
 		}
 
 		return !m_entities.empty();
+	}
+
+
+	void rotateRandom(Lumix::Entity entity) const
+	{
+		Lumix::Matrix mtx = m_world_editor.getUniverse()->getMatrix(entity);
+		Lumix::Vec3 x = mtx.getXVector();
+		Lumix::Vec3 z = mtx.getZVector();
+		Lumix::Quat rot = m_world_editor.getUniverse()->getRotation(entity);
+
+		if (m_rotate_x)
+		{
+			float angle = Lumix::Math::degreesToRadians((float)(rand() % 360));
+			Lumix::Quat q(x, angle);
+			rot = rot * q;
+		}
+
+		if (m_rotate_z)
+		{
+			float angle = Lumix::Math::degreesToRadians((float)(rand() % 360));
+			Lumix::Quat q(z, angle);
+			rot = rot * q;
+		}
+
+		m_world_editor.getUniverse()->setRotation(entity, rot);
 	}
 
 
@@ -290,6 +329,8 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 	uint32_t m_template_name_hash;
 	Lumix::Vec3 m_center;
 	bool m_align_with_normal;
+	bool m_rotate_x;
+	bool m_rotate_z;
 };
 
 
@@ -1126,6 +1167,8 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	m_type = RAISE_HEIGHT;
 	m_texture_idx = 0;
 	m_is_align_with_normal = false;
+	m_is_rotate_x = false;
+	m_is_rotate_z = false;
 }
 
 
@@ -1407,6 +1450,8 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 			m_terrain_brush_strength,
 			m_terrain_brush_size,
 			m_is_align_with_normal,
+			m_is_rotate_x,
+			m_is_rotate_z,
 			hit);
 	m_world_editor.executeCommand(command);
 }
@@ -1625,7 +1670,19 @@ void TerrainEditor::onGUI()
 					&template_names,
 					template_names.size());
 			}
-			ImGui::Checkbox("Align with normal", &m_is_align_with_normal);
+			if (ImGui::Checkbox("Align with normal", &m_is_align_with_normal))
+			{
+				if (m_is_align_with_normal) m_is_rotate_x = m_is_rotate_z = false;
+			}
+			if (ImGui::Checkbox("Rotate around X", &m_is_rotate_x))
+			{
+				if (m_is_rotate_x) m_is_align_with_normal = false;
+			}
+			ImGui::SameLine();
+			if (ImGui::Checkbox("Rotate around Z", &m_is_rotate_z))
+			{
+				if (m_is_rotate_z) m_is_align_with_normal = false;
+			}
 		}
 		break;
 		default: ASSERT(false); break;
