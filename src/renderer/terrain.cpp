@@ -494,10 +494,7 @@ void Terrain::updateGrass(ComponentIndex camera)
 
 void Terrain::GrassType::grassLoaded(Resource::State, Resource::State)
 {
-	if (m_grass_model->isReady())
-	{
-		m_terrain.forceGrassUpdate();
-	}
+	m_terrain.forceGrassUpdate();
 }
 
 
