@@ -389,6 +389,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 	bool saveEmbeddedTextures(const aiScene* scene)
 	{
+		bool success = true;
 		m_dialog.m_saved_embedded_textures.clear();
 		for (unsigned int i = 0; i < scene->mNumTextures; ++i)
 		{
@@ -399,19 +400,26 @@ struct ConvertTask : public Lumix::MT::Task
 					"Uncompressed texture embedded. This is not supported.");
 				return false;
 			}
-			PathBuilder texture_name("texture"); 
+			PathBuilder texture_name("texture");
 			texture_name << i << ".dds";
+			int width, height, comp;
+			auto data = stbi_load_from_memory((stbi_uc*)texture->pcData, texture->mWidth, &width, &height, &comp, 4);
+			if (!data) continue;
+
 			m_dialog.m_saved_embedded_textures.push(
 				Lumix::string(texture_name, m_dialog.m_editor.getAllocator()));
-			saveAsDDS(m_dialog,
-					  m_dialog.m_editor.getEngine().getFileSystem(),
-					  "Embedded texture",
-					  (const uint8_t*)texture->pcData,
-					  texture->mWidth,
-					  texture->mHeight,
-					  PathBuilder(m_dialog.m_output_dir) << "/" << texture_name);
+			bool saved = saveAsDDS(m_dialog,
+				m_dialog.m_editor.getEngine().getFileSystem(),
+				"Embedded texture",
+				data,
+				width,
+				height,
+				PathBuilder(m_dialog.m_output_dir) << "/" << texture_name);
+			success = success && saved;
+
+			stbi_image_free(data);
 		}
-		return true;
+		return success;
 	}
 
 
@@ -512,7 +520,10 @@ struct ConvertTask : public Lumix::MT::Task
 		m_dialog.setImportMessage("Importing materials...");
 		const aiScene* scene = m_dialog.m_importer.GetScene();
 		
-		if (!saveEmbeddedTextures(scene)) return false;
+		if (!saveEmbeddedTextures(scene))
+		{
+			m_dialog.setMessage("Failed to import embedded texture");
+		}
 		
 		m_dialog.m_saved_textures.clear();
 		
@@ -1304,6 +1315,8 @@ ImportAssetDialog::~ImportAssetDialog()
 
 bool ImportAssetDialog::checkTexture(const char* source_dir, const char* texture_path, const char* message)
 {
+	if (texture_path[0] == '*') return true;
+
 	const char* path = Lumix::PathUtils::isAbsolute(texture_path) || !source_dir
 						   ? texture_path
 						   : PathBuilder(source_dir) << "/" << texture_path;
@@ -1616,7 +1629,10 @@ void ImportAssetDialog::onGUI()
 					{
 						const char* name = scene->mMeshes[i]->mName.C_Str();
 						bool b = m_mesh_mask[i];
-						ImGui::Checkbox(name[0] == '\0' ? "N/A" : name, &b);
+						ImGui::Checkbox(name[0] == '\0'
+							? StringBuilder<30>("N/A###na", (uint64_t)&scene->mMeshes[i])
+											: name,
+							&b);
 						m_mesh_mask[i] = b;
 					}
 				}
