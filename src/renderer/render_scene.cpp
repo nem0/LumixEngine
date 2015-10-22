@@ -968,6 +968,13 @@ public:
 	}
 
 
+
+	virtual void forceGrassUpdate(ComponentIndex cmp) override
+	{
+		m_terrains[cmp]->forceGrassUpdate();
+	}
+
+
 	virtual void getTerrainInfos(Array<const TerrainInfo*>& infos,
 								 int64_t layer_mask,
 								 const Vec3& camera_pos,

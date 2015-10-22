@@ -107,6 +107,7 @@ class Terrain
 
 		void addGrassType(int index);
 		void removeGrassType(int index);
+		void forceGrassUpdate();
 
 	private: 
 		Array<Terrain::GrassQuad*>& getQuads(ComponentIndex camera);
@@ -119,7 +120,6 @@ class Terrain
 								   float quad_z);
 		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state);
-		void forceGrassUpdate();
 
 	private:
 		IAllocator& m_allocator;
