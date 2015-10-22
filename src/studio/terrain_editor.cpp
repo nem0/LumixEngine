@@ -1010,6 +1010,7 @@ private:
 			}
 		}
 		texture->onDataUpdated(m_x, m_y, m_width, m_height);
+		static_cast<Lumix::RenderScene*>(m_terrain.scene)->forceGrassUpdate(m_terrain.index);
 	}
 
 

@@ -217,6 +217,7 @@ public:
 							   Array<GrassInfo>& infos,
 							   int64_t layer_mask,
 							   ComponentIndex camera) = 0;
+	virtual void forceGrassUpdate(ComponentIndex cmp) = 0;
 	virtual void getTerrainInfos(Array<const TerrainInfo*>& infos,
 		int64_t layer_mask,
 		const Vec3& camera_pos,
