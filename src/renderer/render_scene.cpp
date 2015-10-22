@@ -1004,11 +1004,9 @@ public:
 
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
-			if (m_terrains[i] &&
-				(m_terrains[i]->getLayerMask() & layer_mask) != 0)
+			if (m_terrains[i] && (m_terrains[i]->getLayerMask() & layer_mask) != 0)
 			{
-				m_terrains[i]->getGrassInfos(
-					frustum, infos, camera);
+				m_terrains[i]->getGrassInfos(frustum, infos, camera);
 			}
 		}
 	}
