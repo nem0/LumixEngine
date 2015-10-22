@@ -93,8 +93,7 @@ void getFilename(char* filename, int /*max_length*/, const char* src)
 }
 
 
-void
-getExtension(char* extension, int max_length, const char* src)
+void getExtension(char* extension, int max_length, const char* src)
 {
 	ASSERT(max_length > 0);
 	for (int i = (int)strlen(src) - 1; i >= 0; --i)

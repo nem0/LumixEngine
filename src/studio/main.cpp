@@ -1252,6 +1252,7 @@ static void imGuiCallback(ImDrawData* draw_data)
 {
 	PROFILE_FUNCTION();
 	if (!g_app->m_material || !g_app->m_material->isReady()) return;
+	if (!g_app->m_material->getTexture(0)) return;
 
 	const float width = ImGui::GetIO().DisplaySize.x;
 	const float height = ImGui::GetIO().DisplaySize.y;
