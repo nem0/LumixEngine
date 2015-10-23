@@ -514,9 +514,13 @@ void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Com
 {
 	updateGrass(camera);
 	Array<GrassQuad*>& quads = getQuads(camera);
+	
+	Universe& universe = m_scene.getUniverse();
+	Matrix mtx = universe.getMatrix(m_entity);
 	for (auto* quad : quads)
 	{
 		Vec3 quad_center(quad->pos.x + GRASS_QUAD_SIZE * 0.5f, quad->pos.y, quad->pos.z + GRASS_QUAD_SIZE * 0.5f);
+		quad_center = mtx.multiplyPosition(quad_center);
 		if(frustum.isSphereInside(quad_center, quad->radius)) 
 		{
 			for(int patch_idx = 0; patch_idx < quad->m_patches.size(); ++patch_idx)
