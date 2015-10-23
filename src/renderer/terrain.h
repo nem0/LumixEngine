@@ -61,8 +61,8 @@ class Terrain
 				{}
 
 				Array<GrassPatch> m_patches;
-				float m_x;
-				float m_z;
+				Vec3 pos;
+				float radius;
 		};
 
 	public:

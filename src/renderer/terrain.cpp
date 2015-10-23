@@ -439,12 +439,12 @@ void Terrain::updateGrass(ComponentIndex camera)
 	for (int i = quads.size() - 1; i >= 0; --i)
 	{
 		GrassQuad* quad = quads[i];
-		old_bounds[0] = Math::minValue(old_bounds[0], quad->m_x);
-		old_bounds[1] = Math::maxValue(old_bounds[1], quad->m_x);
-		old_bounds[2] = Math::minValue(old_bounds[2], quad->m_z);
-		old_bounds[3] = Math::maxValue(old_bounds[3], quad->m_z);
-		if (quad->m_x < from_quad_x || quad->m_x > to_quad_x || quad->m_z < from_quad_z ||
-			quad->m_z > to_quad_z)
+		old_bounds[0] = Math::minValue(old_bounds[0], quad->pos.x);
+		old_bounds[1] = Math::maxValue(old_bounds[1], quad->pos.x);
+		old_bounds[2] = Math::minValue(old_bounds[2], quad->pos.z);
+		old_bounds[3] = Math::maxValue(old_bounds[3], quad->pos.z);
+		if (quad->pos.x < from_quad_x || quad->pos.x > to_quad_x || quad->pos.z < from_quad_z ||
+			quad->pos.z > to_quad_z)
 		{
 			m_free_grass_quads.push(quads[i]);
 			quads.eraseFast(i);
@@ -473,10 +473,13 @@ void Terrain::updateGrass(ComponentIndex camera)
 				quad = LUMIX_NEW(m_allocator, GrassQuad)(m_allocator);
 			}
 			quads.push(quad);
-			quad->m_x = quad_x;
-			quad->m_z = quad_z;
+			quad->pos.x = quad_x;
+			quad->pos.z = quad_z;
 			quad->m_patches.clear();
 			srand((int)quad_x + (int)quad_z * m_grass_distance);
+
+			float min_y = FLT_MAX;
+			float max_y = -FLT_MAX;
 			for (auto* grass_type : m_grass_types)
 			{
 				Model* model = grass_type->m_grass_model;
@@ -486,7 +489,16 @@ void Terrain::updateGrass(ComponentIndex camera)
 				patch.m_type = grass_type;
 
 				generateGrassTypeQuad(patch, mtx, quad_x, quad_z);
+				for (auto mtx : patch.m_matrices)
+				{
+					min_y = Math::minValue(mtx.getTranslation().y, min_y);
+					max_y = Math::maxValue(mtx.getTranslation().y, max_y);
+				}
 			}
+
+			quad->pos.y = (max_y + min_y) * 0.5f;
+			quad->radius = Math::maxValue((max_y - min_y) * 0.5f, (float)GRASS_QUAD_SIZE) * 1.42f;
+
 		}
 	}
 }
@@ -498,18 +510,18 @@ void Terrain::GrassType::grassLoaded(Resource::State, Resource::State)
 }
 
 
-void Terrain::getGrassInfos(const Frustum&, Array<GrassInfo>& infos, ComponentIndex camera)
+void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentIndex camera)
 {
 	updateGrass(camera);
 	Array<GrassQuad*>& quads = getQuads(camera);
-	for (int i = 0; i < quads.size(); ++i)
+	for (auto* quad : quads)
 	{
-		//Vec3 quad_center(quads[i]->m_x + GRASS_QUAD_SIZE * 0.5f, 0, quads[i]->m_z + GRASS_QUAD_SIZE * 0.5f);
-		//if(frustum.isSphereInside(quad_center, GRASS_QUAD_RADIUS)) 
+		Vec3 quad_center(quad->pos.x + GRASS_QUAD_SIZE * 0.5f, quad->pos.y, quad->pos.z + GRASS_QUAD_SIZE * 0.5f);
+		if(frustum.isSphereInside(quad_center, quad->radius)) 
 		{
-			for(int patch_idx = 0; patch_idx < quads[i]->m_patches.size(); ++patch_idx)
+			for(int patch_idx = 0; patch_idx < quad->m_patches.size(); ++patch_idx)
 			{
-				const GrassPatch& patch = quads[i]->m_patches[patch_idx];
+				const GrassPatch& patch = quad->m_patches[patch_idx];
 				if (!patch.m_matrices.empty())
 				{
 					GrassInfo& info = infos.pushEmpty();
