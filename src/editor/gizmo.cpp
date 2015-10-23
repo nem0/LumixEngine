@@ -82,28 +82,32 @@ void Gizmo::getMatrix(Matrix& mtx)
 
 void Gizmo::getEnityMatrix(Matrix& mtx, int selection_index)
 {
+	Entity entity = m_editor.getSelectedEntities()[selection_index];
+
 	if (m_pivot == Pivot::OBJECT_PIVOT)
 	{
-		mtx = m_universe->getMatrix(
-			m_editor.getSelectedEntities()[selection_index]);
+		mtx = m_universe->getMatrix(entity);
 	}
 	else if (m_pivot == Pivot::CENTER)
 	{
-		mtx = m_universe->getMatrix(
-			m_editor.getSelectedEntities()[selection_index]);
-		ComponentIndex cmp = m_scene->getRenderableComponent(
-			m_editor.getSelectedEntities()[selection_index]);
+		mtx = m_universe->getMatrix(entity);
+		ComponentIndex cmp = m_scene->getRenderableComponent(entity);
 		if (cmp >= 0)
 		{
 			Model* model = m_scene->getRenderableModel(cmp);
-			Vec3 center =
-				(model->getAABB().getMin() + model->getAABB().getMax()) * 0.5f;
-			mtx.translate(mtx * center);
+			if (model && model->isReady())
+			{
+				Vec3 center = (model->getAABB().getMin() + model->getAABB().getMax()) * 0.5f;
+				mtx.setTranslation(mtx.multiplyPosition(center));
+			}
+			else
+			{
+				mtx = m_universe->getMatrix(entity);
+			}
 		}
 		else
 		{
-			mtx = m_universe->getMatrix(
-				m_editor.getSelectedEntities()[selection_index]);
+			mtx = m_universe->getMatrix(entity);
 		}
 	}
 	else

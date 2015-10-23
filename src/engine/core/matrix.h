@@ -40,15 +40,6 @@ struct LUMIX_ENGINE_API Matrix
 
 	Matrix operator *(const Matrix& rhs) const;
 
-	Vec3 operator *(const Vec3& rhs) const
-	{
-		return Vec3(
-			m11 * rhs.x + m21 * rhs.y + m31 * rhs.z,	
-			m12 * rhs.x + m22 * rhs.y + m32 * rhs.z,	
-			m13 * rhs.x + m23 * rhs.y + m33 * rhs.z
-		);
-	}
-
 	Vec4 operator *(const Vec4& rhs) const
 	{
 		return Vec4(
