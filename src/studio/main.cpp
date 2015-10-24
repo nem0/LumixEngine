@@ -1135,6 +1135,7 @@ public:
 				ImGui::GetIO().MouseDown[0] = false;
 				break;
 			case WM_LBUTTONDOWN:
+				m_editor->setAdditiveSelection(ImGui::GetIO().KeyCtrl);
 				if (!m_sceneview.onMouseDown(old_x, old_y, Lumix::MouseButton::LEFT) &&
 					!m_gameview.isMouseCaptured())
 				{

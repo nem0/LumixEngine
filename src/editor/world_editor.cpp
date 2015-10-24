@@ -39,8 +39,6 @@
 #include "renderer/texture.h"
 #include "ieditor_command.h"
 #include "universe/universe.h"
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
 
 
 namespace Lumix
@@ -1781,7 +1779,7 @@ public:
 				else if (icon_hit.m_t >= 0)
 				{
 					Entity e = icon_hit.m_icon->getEntity();
-					if (GetAsyncKeyState(VK_LCONTROL) >> 8)
+					if (m_is_additive_selection)
 					{
 						addEntitiesToSelection(&e, 1);
 					}
@@ -1820,7 +1818,7 @@ public:
 				return;
 			}
 		}
-		if (GetAsyncKeyState(VK_LCONTROL) >> 8)
+		if (m_is_additive_selection)
 		{
 			addEntitiesToSelection(&entity, 1);
 		}
@@ -2587,6 +2585,7 @@ public:
 		, m_universe_context(nullptr)
 		, m_is_orbit(false)
 		, m_gizmo_use_step(false)
+		, m_is_additive_selection(false)
 	{
 		m_go_to_parameters.m_is_active = false;
 		m_undo_index = -1;
@@ -2691,6 +2690,12 @@ public:
 	virtual const Array<Entity>& getSelectedEntities() const override
 	{
 		return m_selected_entities;
+	}
+
+
+	virtual void setAdditiveSelection(bool additive) override
+	{
+		m_is_additive_selection = additive;
 	}
 
 
@@ -3272,6 +3277,7 @@ private:
 	AssociativeArray<int32_t, Array<ComponentUID>> m_components;
 	bool m_is_game_mode;
 	bool m_is_orbit;
+	bool m_is_additive_selection;
 	FS::IFile* m_game_mode_file;
 	Engine* m_engine;
 	Entity m_camera;
