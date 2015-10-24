@@ -112,7 +112,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 				mtx.getXVector() * extents.x,
 				mtx.getYVector() * extents.y,
 				mtx.getZVector() * extents.z,
-				Vec3(1, 0, 0),
+				0xffff0000,
 				0);
 			return true;
 

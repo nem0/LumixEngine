@@ -120,49 +120,32 @@ public:
 
 	virtual void addDebugPoint(const Vec3& pos, uint32_t color, float life) = 0;
 
-	virtual void addDebugLine(const Vec3& from,
-							  const Vec3& to,
-							  const Vec3& color,
-							  float life) = 0;
-	virtual void addDebugLine(const Vec3& from,
-							  const Vec3& to,
-							  uint32_t color,
-							  float life) = 0;
-	virtual void addDebugCross(const Vec3& center,
-							   float size,
-							   uint32_t color,
-							   float life) = 0;
+	virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32_t color, float life) = 0;
+	virtual void addDebugCross(const Vec3& center, float size, uint32_t color, float life) = 0;
 	virtual void addDebugCube(const Vec3& pos,
-							  const Vec3& dir,
-							  const Vec3& up,
-							  const Vec3& right,
-							  const Vec3& color,
-							  float life) = 0;
-	virtual void addDebugCube(const Vec3& from,
-							  const Vec3& max,
-							  const Vec3& color,
-							  float life) = 0;
+		const Vec3& dir,
+		const Vec3& up,
+		const Vec3& right,
+		uint32_t color,
+		float life) = 0;
+	virtual void addDebugCube(const Vec3& from, const Vec3& max, uint32_t color, float life) = 0;
 	virtual void addDebugCircle(const Vec3& center,
-								const Vec3& up,
-								float radius,
-								const Vec3& color,
-								float life) = 0;
-	virtual void addDebugSphere(const Vec3& center,
-								float radius,
-								uint32_t color,
-								float life) = 0;
+		const Vec3& up,
+		float radius,
+		uint32_t color,
+		float life) = 0;
+	virtual void addDebugSphere(const Vec3& center, float radius, uint32_t color, float life) = 0;
 	virtual void addDebugFrustum(const Vec3& position,
-								 const Vec3& direction,
-								 const Vec3& up,
-								 float fov,
-								 float ratio,
-								 float near_distance,
-								 float far_distance,
-								 const Vec3& color,
-								 float life) = 0;
+		const Vec3& direction,
+		const Vec3& up,
+		float fov,
+		float ratio,
+		float near_distance,
+		float far_distance,
+		uint32_t color,
+		float life) = 0;
 
-	virtual void
-	addDebugFrustum(const Frustum& frustum, const Vec3& color, float life) = 0;
+	virtual void addDebugFrustum(const Frustum& frustum, uint32_t color, float life) = 0;
 
 	virtual void addDebugCapsule(const Vec3& position,
 		float height,
@@ -173,7 +156,7 @@ public:
 	virtual void addDebugCylinder(const Vec3& position,
 		const Vec3& up,
 		float radius,
-		const Vec3& color,
+		uint32_t color,
 		float life) = 0;
 
 	virtual const Array<DebugLine>& getDebugLines() const = 0;

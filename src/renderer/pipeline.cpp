@@ -863,10 +863,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 	void renderDebugLines()
 	{
 		const Array<DebugLine>& lines = m_scene->getDebugLines();
-		if (lines.empty() || !m_debug_line_material->isReady())
-		{
-			return;
-		}
+		if (lines.empty() || !m_debug_line_material->isReady()) return;
+
 		bgfx::TransientVertexBuffer tvb;
 		bgfx::TransientIndexBuffer tib;
 		if (bgfx::allocTransientBuffers(&tvb,
@@ -900,12 +898,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 			bgfx::setVertexBuffer(&tvb);
 			bgfx::setIndexBuffer(&tib);
-			bgfx::setState(m_render_state |
-						   m_debug_line_material->getRenderStates() |
-						   BGFX_STATE_PT_LINES);
+			bgfx::setState(
+				m_render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_LINES);
 			bgfx::submit(m_view_idx,
-						 m_debug_line_material->getShaderInstance()
-							 .m_program_handles[m_pass_idx]);
+				m_debug_line_material->getShaderInstance().m_program_handles[m_pass_idx]);
 		}
 	}
 
@@ -1775,14 +1771,11 @@ Pipeline::Pipeline(const Path& path,
 {
 	if (BaseVertex::s_vertex_decl.getStride() == 0)
 	{
-		BaseVertex::s_vertex_decl.begin();
-		BaseVertex::s_vertex_decl.add(
-			bgfx::Attrib::Position, 3, bgfx::AttribType::Float);
-		BaseVertex::s_vertex_decl.add(
-			bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8);
-		BaseVertex::s_vertex_decl.add(
-			bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float);
-		BaseVertex::s_vertex_decl.end();
+		BaseVertex::s_vertex_decl.begin()
+			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
+			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
+			.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
+			.end();
 	}
 }
 
