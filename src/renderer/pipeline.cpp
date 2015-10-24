@@ -1260,14 +1260,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Quat* rots = pose.getRotations();
 
 		ASSERT(pose.getCount() <= lengthOf(bone_mtx));
-		for (int bone_index = 0, bone_count = pose.getCount();
-			 bone_index < bone_count;
+		for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count;
 			 ++bone_index)
 		{
 			rots[bone_index].toMatrix(bone_mtx[bone_index]);
 			bone_mtx[bone_index].translate(poss[bone_index]);
-			bone_mtx[bone_index] = bone_mtx[bone_index] *
-								   model.getBone(bone_index).inv_bind_matrix;
+			bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
 		}
 		bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.getCount());
 	}
@@ -1284,18 +1282,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 		setMaterial(material);
 		bgfx::setTransform(info.m_matrix);
 		bgfx::setVertexBuffer(info.m_model->getVerticesHandle(),
-							  mesh.getAttributeArrayOffset() /
-								  mesh.getVertexDefinition().getStride(),
-							  mesh.getAttributeArraySize() /
-								  mesh.getVertexDefinition().getStride());
-		bgfx::setIndexBuffer(info.m_model->getIndicesHandle(),
-							 mesh.getIndicesOffset(),
-							 mesh.getIndexCount());
+			mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(),
+			mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
+		bgfx::setIndexBuffer(
+			info.m_model->getIndicesHandle(), mesh.getIndicesOffset(), mesh.getIndexCount());
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::submit(m_view_idx,
-					 info.m_mesh->getMaterial()
-						 ->getShaderInstance()
-						 .m_program_handles[m_pass_idx]);
+			info.m_mesh->getMaterial()->getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
 
@@ -1305,39 +1298,27 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	virtual void render(TransientGeometry& geom,
-						int first_index,
-						int num_indices,
-						Material& material,
-						bgfx::TextureHandle* texture) override
+	virtual void setTexture(int slot,
+		bgfx::TextureHandle texture,
+		bgfx::UniformHandle uniform) override
 	{
-		bgfx::setState(m_render_state | material.getRenderStates());
-		bgfx::setTransform(nullptr);
-		if (texture)
-		{
-			auto handle = material.getShader()->getTextureSlot(0).m_uniform_handle;
-			bgfx::setTexture(0, handle, *texture);
-		}
-		bgfx::setVertexBuffer(&geom.getVertexBuffer(), 0, geom.getNumVertices());
-		bgfx::setIndexBuffer(&geom.getIndexBuffer(), first_index, num_indices);
-		bgfx::submit(
-			m_view_idx,
-			material.getShaderInstance().m_program_handles[m_pass_idx]);
+		bgfx::setTexture(0, uniform, texture);
 	}
 
 
 	virtual void render(TransientGeometry& geom,
 		const Matrix& mtx,
+		int first_index,
+		int num_indices,
 		uint64_t render_states,
 		bgfx::ProgramHandle program_handle) override
 	{
 		bgfx::setState(m_render_state | render_states);
 		bgfx::setTransform(&mtx.m11);
 		bgfx::setVertexBuffer(&geom.getVertexBuffer());
-		bgfx::setIndexBuffer(&geom.getIndexBuffer());
+		bgfx::setIndexBuffer(&geom.getIndexBuffer(), first_index, num_indices);
 		bgfx::submit(m_view_idx, program_handle);
 	}
-
 
 
 	void renderRigidMesh(const RenderableMesh& info)
