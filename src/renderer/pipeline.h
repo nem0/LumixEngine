@@ -80,18 +80,17 @@ class LUMIX_RENDERER_API PipelineInstance abstract
 		virtual int getWidth() = 0;
 		virtual int getHeight() = 0;
 		virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;
-		virtual void
-		setViewProjection(const Matrix& mtx, int width, int height) = 0;
+		virtual void setViewProjection(const Matrix& mtx, int width, int height) = 0;
 		virtual void setScissor(int x, int y, int width, int height) = 0;
+		virtual void setTexture(int slot,
+			bgfx::TextureHandle texture,
+			bgfx::UniformHandle uniform) = 0;
 		virtual void render(TransientGeometry& geom,
 			const Matrix& mtx,
+			int first_index,
+			int num_indices,
 			uint64_t render_states,
 			bgfx::ProgramHandle program_handle) = 0;
-		virtual void render(TransientGeometry& geom,
-							int first_index,
-							int num_indices,
-							Material& material,
-							bgfx::TextureHandle* texture) = 0;
 		virtual void setWireframe(bool wireframe) = 0;
 		virtual void renderModel(Model& model, const Matrix& mtx) = 0;
 		virtual void toggleStats() = 0;

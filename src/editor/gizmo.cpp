@@ -322,6 +322,8 @@ void Gizmo::renderTranslateGizmo(PipelineInstance& pipeline)
 	Lumix::TransientGeometry geom(vertices, 6, m_vertex_decl, indices, 6);
 	pipeline.render(geom,
 		mtx,
+		0,
+		6,
 		BGFX_STATE_PT_LINES | BGFX_STATE_DEPTH_TEST_LEQUAL,
 		m_shader->getInstance(0).m_program_handles[pipeline.getPassIdx()]);
 
@@ -361,7 +363,7 @@ void Gizmo::renderTranslateGizmo(PipelineInstance& pipeline)
 
 	Lumix::TransientGeometry geom2(vertices, 9, m_vertex_decl, indices, 9);
 	auto program_handle = m_shader->getInstance(0).m_program_handles[pipeline.getPassIdx()];
-	pipeline.render(geom2, mtx, BGFX_STATE_DEPTH_TEST_LEQUAL, program_handle);
+	pipeline.render(geom2, mtx, 0, 9, BGFX_STATE_DEPTH_TEST_LEQUAL, program_handle);
 }
 
 
@@ -417,6 +419,8 @@ void Gizmo::renderQuarterRing(PipelineInstance& pipeline, const Matrix& mtx, con
 	Lumix::TransientGeometry ring_geom(vertices, offset, m_vertex_decl, indices, offset);
 	pipeline.render(ring_geom,
 		mtx,
+		0,
+		offset,
 		BGFX_STATE_DEPTH_TEST_LEQUAL,
 		m_shader->getInstance(0).m_program_handles[pipeline.getPassIdx()]);
 
@@ -450,9 +454,10 @@ void Gizmo::renderQuarterRing(PipelineInstance& pipeline, const Matrix& mtx, con
 	Lumix::TransientGeometry plane_geom(vertices, offset, m_vertex_decl, indices, offset);
 	pipeline.render(plane_geom,
 		mtx,
+		0,
+		offset,
 		BGFX_STATE_DEPTH_TEST_LEQUAL | BGFX_STATE_PT_LINES,
 		m_shader->getInstance(0).m_program_handles[pipeline.getPassIdx()]);
-
 };
 
 

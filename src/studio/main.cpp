@@ -769,7 +769,7 @@ public:
 		io.KeyMap[ImGuiKey_Y] = 'Y';
 		io.KeyMap[ImGuiKey_Z] = 'Z';
 
-		io.RenderDrawListsFn = imGuiCallback;
+		io.RenderDrawListsFn = ::imGuiCallback;
 		io.ImeWindowHandle = m_hwnd;
 
 		unsigned char* pixels;
@@ -1205,6 +1205,84 @@ public:
 	}
 
 
+	void setGUIProjection()
+	{
+		float width = ImGui::GetIO().DisplaySize.x;
+		float height = ImGui::GetIO().DisplaySize.y;
+		Lumix::Matrix ortho;
+		ortho.setOrtho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
+		m_gui_pipeline->setViewProjection(ortho, (int)width, (int)height);
+	}
+
+
+	void drawGUICmdList(ImDrawList* cmd_list)
+	{
+		Lumix::TransientGeometry geom(&cmd_list->VtxBuffer[0],
+			cmd_list->VtxBuffer.size(),
+			m_decl,
+			&cmd_list->IdxBuffer[0],
+			cmd_list->IdxBuffer.size());
+
+		if (geom.getNumVertices() < 0) return;
+
+		uint32_t elem_offset = 0;
+		const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
+		const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
+		for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
+		{
+			if (pcmd->UserCallback)
+			{
+				pcmd->UserCallback(cmd_list, pcmd);
+				elem_offset += pcmd->ElemCount;
+				continue;
+			}
+
+			if (0 == pcmd->ElemCount) continue;
+
+			m_gui_pipeline->setScissor(
+				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
+				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)),
+				uint16_t(Lumix::Math::minValue(pcmd->ClipRect.z, 65535.0f) -
+				Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
+				uint16_t(Lumix::Math::minValue(pcmd->ClipRect.w, 65535.0f) -
+				Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)));
+
+			auto material = m_material;
+			int pass_idx = m_gui_pipeline->getPassIdx();
+			auto& texture_id = pcmd->TextureId
+				? *(bgfx::TextureHandle*)pcmd->TextureId
+				: material->getTexture(0)->getTextureHandle();
+			auto texture_uniform = material->getShader()->getTextureSlot(0).m_uniform_handle;
+			m_gui_pipeline->setTexture(0, texture_id, texture_uniform);
+			m_gui_pipeline->render(geom,
+				Lumix::Matrix::IDENTITY,
+				elem_offset,
+				pcmd->ElemCount,
+				material->getRenderStates(),
+				material->getShaderInstance().m_program_handles[pass_idx]);
+
+			elem_offset += pcmd->ElemCount;
+		}
+	}
+
+
+	void imGuiCallback(ImDrawData* draw_data)
+	{
+		PROFILE_FUNCTION();
+		if (!m_material || !m_material->isReady()) return;
+		if (!m_material->getTexture(0)) return;
+
+		setGUIProjection();
+
+		for (int32_t i = 0; i < draw_data->CmdListsCount; ++i)
+		{
+			ImDrawList* cmd_list = draw_data->CmdLists[i];
+
+			drawGUICmdList(cmd_list);
+		}
+	}
+
+
 	Lumix::DefaultAllocator m_allocator;
 	HWND m_hwnd;
 	HINSTANCE m_instance;
@@ -1250,77 +1328,17 @@ StudioApp* g_app;
 
 static void imGuiCallback(ImDrawData* draw_data)
 {
-	PROFILE_FUNCTION();
-	if (!g_app->m_material || !g_app->m_material->isReady()) return;
-	if (!g_app->m_material->getTexture(0)) return;
-
-	const float width = ImGui::GetIO().DisplaySize.x;
-	const float height = ImGui::GetIO().DisplaySize.y;
-
-	Lumix::Matrix ortho;
-	ortho.setOrtho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
-
-	g_app->m_gui_pipeline->setViewProjection(ortho, (int)width, (int)height);
-
-	for (int32_t ii = 0; ii < draw_data->CmdListsCount; ++ii)
-	{
-		ImDrawList* cmd_list = draw_data->CmdLists[ii];
-
-		Lumix::TransientGeometry geom(&cmd_list->VtxBuffer[0],
-			cmd_list->VtxBuffer.size(),
-			g_app->m_decl,
-			&cmd_list->IdxBuffer[0],
-			cmd_list->IdxBuffer.size());
-
-		if (geom.getNumVertices() < 0)
-		{
-			break;
-		}
-
-		uint32_t elem_offset = 0;
-		const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
-		const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
-		for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
-		{
-			if (pcmd->UserCallback)
-			{
-				pcmd->UserCallback(cmd_list, pcmd);
-				elem_offset += pcmd->ElemCount;
-				continue;
-			}
-			if (0 == pcmd->ElemCount)
-			{
-				continue;
-			}
-
-			g_app->m_gui_pipeline->setScissor(
-				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
-				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)),
-				uint16_t(Lumix::Math::minValue(pcmd->ClipRect.z, 65535.0f) -
-						 Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
-				uint16_t(Lumix::Math::minValue(pcmd->ClipRect.w, 65535.0f) -
-						 Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)));
-
-			g_app->m_gui_pipeline->render(geom,
-				elem_offset,
-				pcmd->ElemCount,
-				*g_app->m_material,
-				pcmd->TextureId ? (bgfx::TextureHandle*)pcmd->TextureId
-								: &g_app->m_material->getTexture(0)->getTextureHandle());
-
-			elem_offset += pcmd->ElemCount;
-		}
-	}
+	g_app->imGuiCallback(draw_data);
 }
 
 
-LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+static LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	return g_app->windowProc(hWnd, msg, wParam, lParam);
 }
 
 
-INT WINAPI WinMain(HINSTANCE hInst, HINSTANCE ignoreMe0, LPSTR ignoreMe1, INT ignoreMe2)
+INT WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, INT)
 {
 	StudioApp app;
 	g_app = &app;
