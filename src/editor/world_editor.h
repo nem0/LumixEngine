@@ -127,6 +127,7 @@ public:
 		IPropertyDescriptor& property,
 		const void* data,
 		int size) = 0;
+	virtual void setAdditiveSelection(bool additive) = 0;
 	virtual void addArrayPropertyItem(const ComponentUID& cmp, IArrayDescriptor& property) = 0;
 	virtual void removeArrayPropertyItem(const ComponentUID& cmp,
 		int index,
