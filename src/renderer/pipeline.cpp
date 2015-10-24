@@ -35,21 +35,9 @@ namespace Lumix
 {
 
 
-struct PipelineImpl;
-struct PipelineInstanceImpl;
-
-
-static const uint32_t LIGHT_DIR_HASH = crc32("light_dir");
-static const uint32_t TERRAIN_SCALE_HASH = crc32("terrain_scale");
-static const uint32_t BONE_MATRICES_HASH = crc32("bone_matrices");
-static const uint32_t CAMERA_POS_HASH = crc32("camera_pos");
-static const uint32_t MAP_SIZE_HASH = crc32("map_size");
-static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
-static const uint32_t BRUSH_SIZE_HASH = crc32("brush_size");
-static const uint32_t BRUSH_POSITION_HASH = crc32("brush_position");
-static const char* TEX_COLOR_UNIFORM = "u_texColor";
 static const float SHADOW_CAM_NEAR = 50.0f;
 static const float SHADOW_CAM_FAR = 5000.0f;
+
 
 class InstanceData
 {
@@ -62,19 +50,6 @@ public:
 	RenderableMesh m_mesh;
 };
 
-class BaseVertex
-{
-public:
-	float m_x, m_y, m_z;
-	uint32_t m_rgba;
-	float m_u;
-	float m_v;
-
-	static bgfx::VertexDecl s_vertex_decl;
-};
-
-
-bgfx::VertexDecl BaseVertex::s_vertex_decl;
 
 
 struct PipelineImpl : public Pipeline
@@ -92,9 +67,8 @@ struct PipelineImpl : public Pipeline
 
 	Renderer& getRenderer()
 	{
-		return static_cast<PipelineManager*>(
-				   m_resource_manager.get(ResourceManager::PIPELINE))
-			->getRenderer();
+		auto* manager = m_resource_manager.get(ResourceManager::PIPELINE);
+		return static_cast<PipelineManager*>(manager)->getRenderer();
 	}
 
 
@@ -237,10 +211,31 @@ struct PipelineInstanceImpl : public PipelineInstance
 		, m_materials(allocator)
 		, m_is_rendering_in_shadowmap(false)
 	{
+		m_base_vertex_decl.begin()
+			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
+			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
+			.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
+			.end();
+
 		m_is_wireframe = false;
 		m_view_x = m_view_y = 0;
 		m_has_shadowmap_define_idx = m_renderer.getShaderDefineIdx("HAS_SHADOWMAP");
 
+		createUniforms();
+
+		ResourceManagerBase* material_manager =
+			pipeline.getResourceManager().get(ResourceManager::MATERIAL);
+		m_debug_line_material = static_cast<Material*>(
+			material_manager->load(Lumix::Path("models/editor/debug_line.mat")));
+
+		m_scene = nullptr;
+		m_width = m_height = -1;
+		pipeline.onLoaded<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
+	}
+
+
+	void createUniforms()
+	{
 		m_cam_view_uniform = bgfx::createUniform("u_camView", bgfx::UniformType::Mat4);
 		m_cam_inv_proj_uniform = bgfx::createUniform("u_camInvProj", bgfx::UniformType::Mat4);
 		m_tex_shadowmap_uniform = bgfx::createUniform("u_texShadowmap", bgfx::UniformType::Int1);
@@ -266,28 +261,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_specular_shininess_uniform =
 			bgfx::createUniform("u_materialSpecularShininess", bgfx::UniformType::Vec4);
 		m_terrain_matrix_uniform = bgfx::createUniform("u_terrainMatrix", bgfx::UniformType::Mat4);
-
-		ResourceManagerBase* material_manager =
-			pipeline.getResourceManager().get(ResourceManager::MATERIAL);
-		m_debug_line_material = static_cast<Material*>(material_manager->load(
-			Lumix::Path("models/editor/debug_line.mat")));
-
-		m_scene = nullptr;
-		m_width = m_height = -1;
-		pipeline.onLoaded<PipelineInstanceImpl,
-						  &PipelineInstanceImpl::sourceLoaded>(this);
 	}
 
 
-	~PipelineInstanceImpl()
+	void destroyUniforms()
 	{
-		ResourceManagerBase* material_manager =
-			m_source.getResourceManager().get(ResourceManager::MATERIAL);
-		for (auto* material : m_materials)
-		{
-			material_manager->unload(*material);
-		}
-		material_manager->unload(*m_debug_line_material);
 		bgfx::destroyUniform(m_tex_shadowmap_uniform);
 		bgfx::destroyUniform(m_attenuation_params_uniform);
 		bgfx::destroyUniform(m_terrain_matrix_uniform);
@@ -306,6 +284,20 @@ struct PipelineInstanceImpl : public PipelineInstance
 		bgfx::destroyUniform(m_light_specular_uniform);
 		bgfx::destroyUniform(m_cam_inv_proj_uniform);
 		bgfx::destroyUniform(m_cam_view_uniform);
+	}
+
+
+	~PipelineInstanceImpl()
+	{
+		ResourceManagerBase* material_manager =
+			m_source.getResourceManager().get(ResourceManager::MATERIAL);
+		for (auto* material : m_materials)
+		{
+			material_manager->unload(*material);
+		}
+		material_manager->unload(*m_debug_line_material);
+		
+		destroyUniforms();
 
 		for (int i = 0; i < m_uniforms.size(); ++i)
 		{
@@ -401,21 +393,16 @@ struct PipelineInstanceImpl : public PipelineInstance
 	void setPass(const char* name)
 	{
 		m_pass_idx = m_renderer.getPassIdx(name);
-		bool found = false;
 		for (int i = 0; i < m_view2pass_map.size(); ++i)
 		{
 			if (m_view2pass_map[i] == m_pass_idx)
 			{
 				m_view_idx = i;
-				found = true;
-				break;
+				return;
 			}
 		}
 
-		if (!found)
-		{
-			beginNewView(m_current_framebuffer);
-		}
+		beginNewView(m_current_framebuffer);
 	}
 
 
@@ -549,6 +536,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 		bgfx::setViewClear(m_view_idx, 0);
 	}
+
 
 	void renderSpotLightShadowmap(FrameBuffer* fb,
 								  ComponentIndex light,
@@ -783,7 +771,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 				camera_ratio,
 				split_distances[split_index],
 				split_distances[split_index + 1]);
-			(&m_shadowmap_splits.x)[split_index] = split_distances[split_index + 1];
 
 			Vec3 shadow_cam_pos = camera_matrix.getTranslation();
 			float bb_size = frustum.getRadius();
@@ -826,11 +813,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 		bgfx::TransientVertexBuffer tvb;
 		bgfx::TransientIndexBuffer tib;
-		if (bgfx::allocTransientBuffers(&tvb,
-			BaseVertex::s_vertex_decl,
-			points.size(),
-			&tib,
-			points.size()))
+		if (bgfx::allocTransientBuffers(
+				&tvb, m_base_vertex_decl, points.size(), &tib, points.size()))
 		{
 			BaseVertex* vertex = (BaseVertex*)tvb.data;
 			uint16_t* indices = (uint16_t*)tib.data;
@@ -850,12 +834,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 			bgfx::setVertexBuffer(&tvb);
 			bgfx::setIndexBuffer(&tib);
-			bgfx::setState(m_render_state |
-				m_debug_line_material->getRenderStates() |
-				BGFX_STATE_PT_POINTS);
+			bgfx::setState(
+				m_render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_POINTS);
 			bgfx::submit(m_view_idx,
-				m_debug_line_material->getShaderInstance()
-				.m_program_handles[m_pass_idx]);
+				m_debug_line_material->getShaderInstance().m_program_handles[m_pass_idx]);
 		}
 	}
 
@@ -867,11 +849,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		bgfx::TransientVertexBuffer tvb;
 		bgfx::TransientIndexBuffer tib;
-		if (bgfx::allocTransientBuffers(&tvb,
-										BaseVertex::s_vertex_decl,
-										lines.size() * 2,
-										&tib,
-										lines.size() * 2))
+		if (bgfx::allocTransientBuffers(
+				&tvb, m_base_vertex_decl, lines.size() * 2, &tib, lines.size() * 2))
 		{
 			BaseVertex* vertex = (BaseVertex*)tvb.data;
 			uint16_t* indices = (uint16_t*)tib.data;
@@ -948,8 +927,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void setPointLightShadowmapUniforms(Material* material,
-										ComponentIndex light)
+	void setPointLightShadowmapUniforms(Material* material, ComponentIndex light)
 	{
 		for (auto& info : m_point_light_shadowmaps)
 		{
@@ -958,8 +936,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 				material->setUserDefine(m_has_shadowmap_define_idx);
 
 				bgfx::setUniform(m_shadowmap_matrices_uniform,
-								 &info.m_matrices[0].m11,
-								 m_scene->getLightFOV(light) > 180 ? 4 : 1);
+					&info.m_matrices[0].m11,
+					m_scene->getLightFOV(light) > 180 ? 4 : 1);
 
 				int texture_offset = material->getTextureCount();
 				bgfx::setTexture(texture_offset,
@@ -1013,15 +991,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 	void enableRGBWrite() { m_render_state |= BGFX_STATE_RGB_WRITE; }
 	void disableRGBWrite() { m_render_state &= ~BGFX_STATE_RGB_WRITE; }
 
-	void renderPointLightInfluencedGeometry(ComponentIndex light,
-											int64_t layer_mask)
+
+	void renderPointLightInfluencedGeometry(ComponentIndex light, int64_t layer_mask)
 	{
 		PROFILE_FUNCTION();
 
 		m_tmp_meshes.clear();
 
-		m_scene->getPointLightInfluencedGeometry(
-			light, m_tmp_meshes, layer_mask);
+		m_scene->getPointLightInfluencedGeometry(light, m_tmp_meshes, layer_mask);
 
 		renderMeshes(m_tmp_meshes);
 	}
@@ -1043,18 +1020,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 			ComponentIndex light = lights[i];
 			m_current_light = light;
 			m_is_current_light_global = false;
-			m_scene->getPointLightInfluencedGeometry(
-				light, frustum, m_tmp_meshes, layer_mask);
+			m_scene->getPointLightInfluencedGeometry(light, frustum, m_tmp_meshes, layer_mask);
 
-			m_scene->getTerrainInfos(
-				m_tmp_terrains,
+			m_scene->getTerrainInfos(m_tmp_terrains,
 				layer_mask,
-				m_scene->getUniverse().getPosition(
-					m_scene->getCameraEntity(m_applied_camera)),
+				m_scene->getUniverse().getPosition(m_scene->getCameraEntity(m_applied_camera)),
 				m_renderer.getFrameAllocator());
 
-			m_scene->getGrassInfos(
-				frustum, m_tmp_grasses, layer_mask, m_applied_camera);
+			m_scene->getGrassInfos(frustum, m_tmp_grasses, layer_mask, m_applied_camera);
 			renderMeshes(m_tmp_meshes);
 			renderTerrains(m_tmp_terrains);
 			renderGrasses(m_tmp_grasses);
@@ -1066,21 +1039,19 @@ struct PipelineInstanceImpl : public PipelineInstance
 	void drawQuad(float x, float y, float w, float h, int material_index)
 	{
 		Material* material = m_materials[material_index];
-		if (!material->isReady() ||
-			!bgfx::checkAvailTransientVertexBuffer(3,
-												   BaseVertex::s_vertex_decl))
+		if (!material->isReady() || !bgfx::checkAvailTransientVertexBuffer(3, m_base_vertex_decl))
+		{
 			return;
+		}
 
 		Matrix projection_mtx;
 		projection_mtx.setOrtho(-1, 1, 1, -1, 0, 30);
 
-		bgfx::setViewTransform(
-			m_view_idx, &Matrix::IDENTITY.m11, &projection_mtx.m11);
-		bgfx::setViewRect(
-			m_view_idx, m_view_x, m_view_y, (uint16_t)m_width, (uint16_t)m_height);
+		bgfx::setViewTransform(m_view_idx, &Matrix::IDENTITY.m11, &projection_mtx.m11);
+		bgfx::setViewRect(m_view_idx, m_view_x, m_view_y, (uint16_t)m_width, (uint16_t)m_height);
 
 		bgfx::TransientVertexBuffer vb;
-		bgfx::allocTransientVertexBuffer(&vb, 6, BaseVertex::s_vertex_decl);
+		bgfx::allocTransientVertexBuffer(&vb, 6, m_base_vertex_decl);
 		BaseVertex* vertex = (BaseVertex*)vb.data;
 		float x2 = x + w;
 		float y2 = y + h;
@@ -1133,21 +1104,19 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 			switch (uniform.m_type)
 			{
-			case Material::Uniform::FLOAT:
-			{
-				Vec4 v(uniform.m_float, 0, 0, 0);
-				bgfx::setUniform(uniform.m_handle, &v);
-			}
-			break;
-			case Material::Uniform::TIME:
-			{
-				Vec4 v(m_scene->getTime(), 0, 0, 0);
-				bgfx::setUniform(uniform.m_handle, &v);
-			}
-			break;
-			default:
-				ASSERT(false);
+				case Material::Uniform::FLOAT:
+				{
+					Vec4 v(uniform.m_float, 0, 0, 0);
+					bgfx::setUniform(uniform.m_handle, &v);
+				}
 				break;
+				case Material::Uniform::TIME:
+				{
+					Vec4 v(m_scene->getTime(), 0, 0, 0);
+					bgfx::setUniform(uniform.m_handle, &v);
+				}
+				break;
+				default: ASSERT(false); break;
 			}
 		}
 
@@ -1158,9 +1127,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			if (texture)
 			{
 				bgfx::setTexture(
-					i,
-					shader->getTextureSlot(i).m_uniform_handle,
-					texture->getTextureHandle());
+					i, shader->getTextureSlot(i).m_uniform_handle, texture->getTextureHandle());
 			}
 		}
 
@@ -1185,9 +1152,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::setVertexBuffer(&vb);
-		bgfx::submit(
-			m_view_idx,
-			material->getShaderInstance().m_program_handles[m_pass_idx]);
+		bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
 
@@ -1206,10 +1171,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Vec3 camera_pos = m_scene->getUniverse().getPosition(camera_entity);
 		LIFOAllocator& frame_allocator = m_renderer.getFrameAllocator();
 		m_scene->getTerrainInfos(m_tmp_terrains, layer_mask, camera_pos, frame_allocator);
-		
+
 		m_is_current_light_global = true;
 		m_current_light = m_scene->getActiveGlobalLight();
-		
+
 		renderMeshes(m_tmp_meshes);
 		renderTerrains(m_tmp_terrains);
 		if (render_grass)
@@ -1329,8 +1294,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		if (instance_idx == -1)
 		{
 			instance_idx = m_instance_data_idx;
-			m_instance_data_idx =
-				(m_instance_data_idx + 1) % lengthOf(m_instances_data);
+			m_instance_data_idx = (m_instance_data_idx + 1) % lengthOf(m_instances_data);
 			if (m_instances_data[instance_idx].m_buffer)
 			{
 				finishInstances(instance_idx);
@@ -1340,8 +1304,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 		InstanceData& data = m_instances_data[instance_idx];
 		if (!data.m_buffer)
 		{
-			data.m_buffer = bgfx::allocInstanceDataBuffer(
-				InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
+			data.m_buffer =
+				bgfx::allocInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
 			data.m_instance_count = 0;
 			data.m_mesh = info;
 		}
@@ -1351,27 +1315,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		if (data.m_instance_count == InstanceData::MAX_INSTANCE_COUNT)
 		{
-			const Mesh& mesh = *info.m_mesh;
-			Material* material = mesh.getMaterial();
-
-			setMaterial(material);
-			bgfx::setVertexBuffer(info.m_model->getVerticesHandle(),
-								  mesh.getAttributeArrayOffset() /
-									  mesh.getVertexDefinition().getStride(),
-								  mesh.getAttributeArraySize() /
-									  mesh.getVertexDefinition().getStride());
-			bgfx::setIndexBuffer(info.m_model->getIndicesHandle(),
-								 mesh.getIndicesOffset(),
-								 mesh.getIndexCount());
-			bgfx::setState(m_render_state | material->getRenderStates());
-			bgfx::setInstanceDataBuffer(data.m_buffer, data.m_instance_count);
-			bgfx::submit(m_view_idx,
-						 info.m_mesh->getMaterial()
-							 ->getShaderInstance()
-							 .m_program_handles[m_pass_idx]);
-			data.m_mesh.m_mesh->setInstanceIdx(-1);
-			data.m_buffer = nullptr;
-			data.m_instance_count = 0;
+			finishInstances(instance_idx);
 		}
 	}
 
@@ -1405,9 +1349,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 					bgfx::setUniform(uniform.m_handle, &v);
 				}
 				break;
-				default:
-					ASSERT(false);
-					break;
+				default: ASSERT(false); break;
 			}
 		}
 
@@ -1434,13 +1376,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderTerrain(const TerrainInfo& info)
 	{
-		if (!info.m_terrain->getMaterial()->isReady())
-		{
-			return;
-		}
+		if (!info.m_terrain->getMaterial()->isReady()) return;
+
 		auto& inst = m_terrain_instances[info.m_index];
-		if ((inst.m_count > 0 &&
-			 inst.m_infos[0]->m_terrain != info.m_terrain) ||
+		if ((inst.m_count > 0 && inst.m_infos[0]->m_terrain != info.m_terrain) ||
 			inst.m_count == lengthOf(inst.m_infos))
 		{
 			finishTerrainInstances(info.m_index);
@@ -1466,18 +1405,18 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Matrix inv_world_matrix;
 		inv_world_matrix = info.m_world_matrix;
 		inv_world_matrix.fastInverse();
-		Vec3 camera_pos = m_scene->getUniverse().getPosition(
-			m_scene->getCameraEntity(m_applied_camera));
+		Vec3 camera_pos =
+			m_scene->getUniverse().getPosition(m_scene->getCameraEntity(m_applied_camera));
 
-		Vec3 rel_cam_pos = inv_world_matrix.multiplyPosition(camera_pos) /
-						   info.m_terrain->getXZScale();
+		Vec3 rel_cam_pos =
+			inv_world_matrix.multiplyPosition(camera_pos) / info.m_terrain->getXZScale();
 
 		const Mesh& mesh = *info.m_terrain->getMesh();
 
 		Vec4 terrain_params(info.m_terrain->getRootSize(),
-							(float)detail_texture->getWidth(),
-							(float)detail_texture->getAtlasSize(),
-							(float)splat_texture->getWidth());
+			(float)detail_texture->getWidth(),
+			(float)detail_texture->getAtlasSize(),
+			(float)splat_texture->getWidth());
 		bgfx::setUniform(m_terrain_params_uniform, &terrain_params);
 		bgfx::setUniform(m_rel_camera_pos_uniform, &Vec4(rel_cam_pos, 0));
 		bgfx::setUniform(m_terrain_scale_uniform, &Vec4(info.m_terrain->getScale(), 0));
@@ -1503,9 +1442,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				info.m_morph_const.x, info.m_morph_const.y, info.m_morph_const.z, 0);
 		}
 
-		bgfx::setVertexBuffer(info.m_terrain->getVerticesHandle(),
-			mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(),
-			mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
+		bgfx::setVertexBuffer(info.m_terrain->getVerticesHandle());
 		int mesh_part_indices_count = mesh.getIndexCount() / 4;
 		bgfx::setIndexBuffer(info.m_terrain->getIndicesHandle(),
 			info.m_index * mesh_part_indices_count,
@@ -1514,7 +1451,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		bgfx::setInstanceDataBuffer(instance_buffer, m_terrain_instances[index].m_count);
 		auto shader_instance = material->getShaderInstance().m_program_handles[m_pass_idx];
 		bgfx::submit(m_view_idx, shader_instance);
-		
+
 		m_terrain_instances[index].m_count = 0;
 	}
 
@@ -1523,21 +1460,16 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		const bgfx::InstanceDataBuffer* idb =
 			bgfx::allocInstanceDataBuffer(grass.m_matrix_count, sizeof(Matrix));
-		memcpy(idb->data,
-			   &grass.m_matrices[0],
-			   grass.m_matrix_count * sizeof(Matrix));
+		memcpy(idb->data, &grass.m_matrices[0], grass.m_matrix_count * sizeof(Matrix));
 		const Mesh& mesh = grass.m_model->getMesh(0);
 		Material* material = mesh.getMaterial();
 
 		setMaterial(material);
 		bgfx::setVertexBuffer(grass.m_model->getVerticesHandle(),
-							  mesh.getAttributeArrayOffset() /
-								  mesh.getVertexDefinition().getStride(),
-							  mesh.getAttributeArraySize() /
-								  mesh.getVertexDefinition().getStride());
-		bgfx::setIndexBuffer(grass.m_model->getIndicesHandle(),
-							 mesh.getIndicesOffset(),
-							 mesh.getIndexCount());
+			mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(),
+			mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
+		bgfx::setIndexBuffer(
+			grass.m_model->getIndicesHandle(), mesh.getIndicesOffset(), mesh.getIndexCount());
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(idb, grass.m_matrix_count);
 		bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
@@ -1605,13 +1537,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		PROFILE_FUNCTION();
 
-		if (!m_source.isReady())
-		{
-			return;
-		}
+		if (!m_source.isReady()) return;
 
-		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE |
-						 BGFX_STATE_DEPTH_WRITE | BGFX_STATE_MSAA;
+		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE |
+						 BGFX_STATE_MSAA;
 		m_global_light_shadowmap = nullptr;
 		m_render_state |= m_is_wireframe ? BGFX_STATE_PT_LINESTRIP : 0;
 		m_view_idx = m_renderer.getViewCounter();
@@ -1651,22 +1580,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 
 	virtual void setScene(RenderScene* scene) override { m_scene = scene; }
-
-
 	virtual RenderScene* getScene() override { return m_scene; }
-
-
-	virtual void setWireframe(bool wireframe) override
-	{
-		m_is_wireframe = wireframe;
-	}
-
-
-	struct GlobalTexture
-	{
-		bgfx::TextureHandle m_texture;
-		bgfx::UniformHandle m_uniform;
-	};
+	virtual void setWireframe(bool wireframe) override { m_is_wireframe = wireframe; }
 
 
 	struct TerrainInstance
@@ -1675,6 +1590,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		const TerrainInfo* m_infos[64];
 	};
 
+
 	struct PointLightShadowmap
 	{
 		ComponentIndex m_light;
@@ -1682,6 +1598,17 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Matrix m_matrices[4];
 	};
 
+
+	struct BaseVertex
+	{
+		float m_x, m_y, m_z;
+		uint32_t m_rgba;
+		float m_u;
+		float m_v;
+	};
+
+
+	bgfx::VertexDecl m_base_vertex_decl;
 	TerrainInstance m_terrain_instances[4];
 	uint32_t m_debug_flags;
 	uint8_t m_view_idx;
@@ -1709,7 +1636,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Frustum m_camera_frustum;
 
 	Matrix m_shadow_viewprojection[4];
-	Vec4 m_shadowmap_splits;
 	int m_view_x;
 	int m_view_y;
 	int m_width;
@@ -1718,6 +1644,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Array<const RenderableMesh*> m_tmp_meshes;
 	Array<const TerrainInfo*> m_tmp_terrains;
 	Array<GrassInfo> m_tmp_grasses;
+
 	bgfx::UniformHandle m_specular_shininess_uniform;
 	bgfx::UniformHandle m_bone_matrices_uniform;
 	bgfx::UniformHandle m_terrain_scale_uniform;
@@ -1736,6 +1663,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	bgfx::UniformHandle m_tex_shadowmap_uniform;
 	bgfx::UniformHandle m_cam_view_uniform;
 	bgfx::UniformHandle m_cam_inv_proj_uniform;
+
 	Material* m_debug_line_material;
 	int m_has_shadowmap_define_idx;
 
@@ -1745,24 +1673,13 @@ private:
 };
 
 
-Pipeline::Pipeline(const Path& path,
-				   ResourceManager& resource_manager,
-				   IAllocator& allocator)
+Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 {
-	if (BaseVertex::s_vertex_decl.getStride() == 0)
-	{
-		BaseVertex::s_vertex_decl.begin()
-			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
-			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
-			.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
-			.end();
-	}
 }
 
 
-PipelineInstance* PipelineInstance::create(Pipeline& pipeline,
-										   IAllocator& allocator)
+PipelineInstance* PipelineInstance::create(Pipeline& pipeline, IAllocator& allocator)
 {
 	return allocator.newObject<PipelineInstanceImpl>(pipeline, allocator);
 }
@@ -1770,8 +1687,7 @@ PipelineInstance* PipelineInstance::create(Pipeline& pipeline,
 
 void PipelineInstance::destroy(PipelineInstance* pipeline)
 {
-	static_cast<PipelineInstanceImpl*>(pipeline)
-		->m_allocator.deleteObject(pipeline);
+	static_cast<PipelineInstanceImpl*>(pipeline)->m_allocator.deleteObject(pipeline);
 }
 
 
@@ -1797,8 +1713,7 @@ void setPass(PipelineInstanceImpl* pipeline, const char* pass)
 }
 
 
-void setFramebuffer(PipelineInstanceImpl* pipeline,
-					const char* framebuffer_name)
+void setFramebuffer(PipelineInstanceImpl* pipeline, const char* framebuffer_name)
 {
 	pipeline->setCurrentFramebuffer(framebuffer_name);
 }
@@ -1880,8 +1795,7 @@ void renderModels(PipelineInstanceImpl* pipeline,
 {
 	if (is_point_light_render)
 	{
-		pipeline->renderPointLightInfluencedGeometry(pipeline->m_camera_frustum,
-													 layer_mask);
+		pipeline->renderPointLightInfluencedGeometry(pipeline->m_camera_frustum, layer_mask);
 	}
 	else
 	{
@@ -1952,19 +1866,15 @@ int renderLocalLightsShadowmaps(lua_State* L)
 }
 
 
-void renderShadowmap(PipelineInstanceImpl* pipeline,
-					 int64_t layer_mask,
-					 const char* slot)
+void renderShadowmap(PipelineInstanceImpl* pipeline, int64_t layer_mask, const char* slot)
 {
-	pipeline->renderShadowmap(pipeline->getScene()->getCameraInSlot(slot),
-							  layer_mask);
+	pipeline->renderShadowmap(pipeline->getScene()->getCameraInSlot(slot), layer_mask);
 }
 
 
 int createUniform(PipelineInstanceImpl* pipeline, const char* name)
 {
-	bgfx::UniformHandle handle =
-		bgfx::createUniform(name, bgfx::UniformType::Int1);
+	bgfx::UniformHandle handle = bgfx::createUniform(name, bgfx::UniformType::Int1);
 	pipeline->m_uniforms.push(handle);
 	return pipeline->m_uniforms.size() - 1;
 }
@@ -1974,17 +1884,19 @@ int loadMaterial(PipelineInstanceImpl* pipeline, const char* path)
 {
 	ResourceManagerBase* material_manager =
 		pipeline->m_source.getResourceManager().get(ResourceManager::MATERIAL);
-	auto* material =
-		static_cast<Material*>(material_manager->load(Lumix::Path(path)));
+	auto* material = static_cast<Material*>(material_manager->load(Lumix::Path(path)));
 
 	pipeline->m_materials.push(material);
 	return pipeline->m_materials.size() - 1;
 }
 
 
-
-void drawQuad(
-	PipelineInstanceImpl* pipeline, float x, float y, float w, float h, int material_index)
+void drawQuad(PipelineInstanceImpl* pipeline,
+	float x,
+	float y,
+	float w,
+	float h,
+	int material_index)
 {
 	pipeline->drawQuad(x, y, w, h, material_index);
 }
