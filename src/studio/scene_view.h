@@ -32,6 +32,8 @@ class SceneView
 
 	private:
 		void renderGizmos();
+		void onUniverseCreated();
+		void onUniverseDestroyed();
 
 	private:
 		Action* m_toggle_gizmo_step_action;
