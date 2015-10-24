@@ -793,17 +793,13 @@ public:
 		auto* scene =
 			static_cast<Lumix::RenderScene*>(m_editor->getScene(Lumix::crc32("renderer")));
 
-		m_sceneview.setScene(scene);
 		m_gui_pipeline->setScene(scene);
-		m_gameview.setScene(scene);
 	}
 
 
 	void onUniverseDestroyed()
 	{
-		m_sceneview.setScene(nullptr);
 		m_gui_pipeline->setScene(nullptr);
-		m_gameview.setScene(nullptr);
 	}
 
 
@@ -955,12 +951,8 @@ public:
 	}
 
 
-	void init(HINSTANCE hInst)
+	void createWindow(HINSTANCE hInst)
 	{
-		checkWorkingDirector();
-
-		m_instance = hInst;
-
 		WNDCLASSEX wnd;
 		memset(&wnd, 0, sizeof(wnd));
 		wnd.cbSize = sizeof(wnd);
@@ -976,6 +968,16 @@ public:
 			"lmxa", "lmxa", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 800, 600, NULL, NULL, hInst, 0);
 		ASSERT(m_hwnd);
 		SetWindowTextA(m_hwnd, "Lumix Studio");
+	}
+
+
+
+	void init(HINSTANCE hInst)
+	{
+		checkWorkingDirector();
+
+		m_instance = hInst;
+		createWindow(hInst);
 
 		Lumix::Renderer::setInitData(m_hwnd);
 		m_engine = Lumix::Engine::create(nullptr, m_allocator);
@@ -1030,6 +1032,7 @@ public:
 		Rid.hwndTarget = 0;
 		RegisterRawInputDevices(&Rid, 1, sizeof(Rid));
 	}
+
 
 	void checkShortcuts()
 	{
@@ -1151,10 +1154,7 @@ public:
 				break;
 			case WM_MOUSEMOVE:
 			{
-				if (!m_is_mouse_tracked)
-				{
-					trackMouse();
-				}
+				if (!m_is_mouse_tracked) trackMouse();
 
 				if (!m_gameview.isMouseCaptured())
 				{
@@ -1277,7 +1277,6 @@ public:
 		for (int32_t i = 0; i < draw_data->CmdListsCount; ++i)
 		{
 			ImDrawList* cmd_list = draw_data->CmdLists[i];
-
 			drawGUICmdList(cmd_list);
 		}
 	}

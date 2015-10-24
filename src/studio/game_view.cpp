@@ -1,4 +1,5 @@
 #include "game_view.h"
+#include "core/crc32.h"
 #include "core/input_system.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -6,6 +7,7 @@
 #include "ocornut-imgui/imgui.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
+#include "renderer/render_scene.h"
 #include "renderer/texture.h"
 
 
@@ -26,6 +28,19 @@ GameView::~GameView()
 }
 
 
+void GameView::onUniverseCreated()
+{
+	auto* scene = m_editor->getScene(Lumix::crc32("renderer"));
+	m_pipeline->setScene(static_cast<Lumix::RenderScene*>(scene));
+}
+
+
+void GameView::onUniverseDestroyed()
+{
+	m_pipeline->setScene(nullptr);
+}
+
+
 void GameView::init(HWND hwnd, Lumix::WorldEditor& editor)
 {
 	m_hwnd = hwnd;
@@ -36,6 +51,10 @@ void GameView::init(HWND hwnd, Lumix::WorldEditor& editor)
 
 	m_pipeline_source = static_cast<Lumix::Pipeline*>(resource);
 	m_pipeline = Lumix::PipelineInstance::create(*m_pipeline_source, engine.getAllocator());
+
+	editor.universeCreated().bind<GameView, &GameView::onUniverseCreated>(this);
+	editor.universeDestroyed().bind<GameView, &GameView::onUniverseDestroyed>(this);
+	onUniverseCreated();
 }
 
 

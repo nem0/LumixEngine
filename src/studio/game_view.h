@@ -32,6 +32,8 @@ public:
 
 private:
 	void captureMouse(bool capture);
+	void onUniverseCreated();
+	void onUniverseDestroyed();
 
 private:
 	bool m_is_mouse_captured;

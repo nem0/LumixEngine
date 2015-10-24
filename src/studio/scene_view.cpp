@@ -1,4 +1,5 @@
 #include "scene_view.h"
+#include "core/crc32.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "editor/gizmo.h"
@@ -7,6 +8,7 @@
 #include "ocornut-imgui/imgui.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
+#include "renderer/render_scene.h"
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
@@ -48,6 +50,19 @@ void SceneView::shutdown()
 }
 
 
+void SceneView::onUniverseCreated()
+{
+	auto* scene = m_editor->getScene(Lumix::crc32("renderer"));
+	m_pipeline->setScene(static_cast<Lumix::RenderScene*>(scene));
+}
+
+
+void SceneView::onUniverseDestroyed()
+{
+	m_pipeline->setScene(nullptr);
+}
+
+
 bool SceneView::init(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
 {
 	m_editor = &editor;
@@ -60,6 +75,10 @@ bool SceneView::init(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
 	m_pipeline = Lumix::PipelineInstance::create(*m_pipeline_source, allocator);
 	m_pipeline->addCustomCommandHandler("render_gizmos")
 		.bind<SceneView, &SceneView::renderGizmos>(this);
+
+	editor.universeCreated().bind<SceneView, &SceneView::onUniverseCreated>(this);
+	editor.universeDestroyed().bind<SceneView, &SceneView::onUniverseDestroyed>(this);
+	onUniverseCreated();
 
 	m_toggle_gizmo_step_action =
 		LUMIX_NEW(editor.getAllocator(), Action)("Enable/disable gizmo step", "toggleGizmoStep");
