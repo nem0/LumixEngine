@@ -1521,7 +1521,7 @@ public:
 			this_max = maxCoords(points[j], this_max);
 		}
 			
-		scene->addDebugCube(this_min, this_max, Vec3(1, 0, 0), 0);
+		scene->addDebugCube(this_min, this_max, 0xffff0000, 0);
 	}
 
 
@@ -1548,7 +1548,7 @@ public:
 							   ratio,
 							   near_distance,
 							   far_distance,
-							   Vec3(1, 0, 0),
+							   0xffff0000,
 							   0);
 	}
 
@@ -1620,7 +1620,7 @@ public:
 				aabb.merge(entity_aabb);
 			}
 
-			scene->addDebugCube(aabb.getMin(), aabb.getMax(), Vec3(1, 1, 0), 0);
+			scene->addDebugCube(aabb.getMin(), aabb.getMax(), 0xffffff00, 0);
 			return;
 		}
 

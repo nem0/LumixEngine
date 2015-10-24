@@ -22,7 +22,10 @@ namespace Lumix
 
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
 static const float INFLUENCE_DISTANCE = 0.3f;
-
+static const uint32_t X_COLOR = 0xff6363cf;
+static const uint32_t Y_COLOR = 0xff63cf63;
+static const uint32_t Z_COLOR = 0xffcf6363;
+static const uint32_t SELECTED_COLOR = 0xff63cfcf;
 
 struct Vertex
 {
@@ -298,22 +301,22 @@ void Gizmo::renderTranslateGizmo(PipelineInstance& pipeline)
 	Vertex vertices[9];
 	uint16_t indices[9];
 	vertices[0].position = Vec3(0, 0, 0);
-	vertices[0].color = m_transform_axis == Axis::X ? 0xff00ffff : 0xff0000ff;
+	vertices[0].color = m_transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR;
 	indices[0] = 0;
 	vertices[1].position = Vec3(1, 0, 0);
-	vertices[1].color = m_transform_axis == Axis::X ? 0xff00ffff : 0xff0000ff;
+	vertices[1].color = m_transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR;
 	indices[1] = 1;
 	vertices[2].position = Vec3(0, 0, 0);
-	vertices[2].color = m_transform_axis == Axis::Y ? 0xff00ffff : 0xff00ff00;
+	vertices[2].color = m_transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR;
 	indices[2] = 2;
 	vertices[3].position = Vec3(0, 1, 0);
-	vertices[3].color = m_transform_axis == Axis::Y ? 0xff00ffff : 0xff00ff00;
+	vertices[3].color = m_transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR;
 	indices[3] = 3;
 	vertices[4].position = Vec3(0, 0, 0);
-	vertices[4].color = m_transform_axis == Axis::Z ? 0xff00ffff : 0xffff0000;
+	vertices[4].color = m_transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
 	indices[4] = 4;
 	vertices[5].position = Vec3(0, 0, 1);
-	vertices[5].color = m_transform_axis == Axis::Z ? 0xff00ffff : 0xffff0000;
+	vertices[5].color = m_transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
 	indices[5] = 5;
 
 	Lumix::TransientGeometry geom(vertices, 6, m_vertex_decl, indices, 6);
@@ -327,33 +330,33 @@ void Gizmo::renderTranslateGizmo(PipelineInstance& pipeline)
 	if (dotProduct(gizmo_mtx.getZVector(), m_camera_dir) < 0) mtx.setZVector(-mtx.getZVector());
 
 	vertices[0].position = Vec3(0, 0, 0);
-	vertices[0].color = m_transform_axis == Axis::XY ? 0xff00ffff : 0xffff0000;
+	vertices[0].color = m_transform_axis == Axis::XY ? SELECTED_COLOR : Z_COLOR;
 	indices[0] = 0;
 	vertices[1].position = Vec3(0.5f, 0, 0);
-	vertices[1].color = m_transform_axis == Axis::XY ? 0xff00ffff : 0xffff0000;
+	vertices[1].color = m_transform_axis == Axis::XY ? SELECTED_COLOR : Z_COLOR;
 	indices[1] = 1;
 	vertices[2].position = Vec3(0, 0.5f, 0);
-	vertices[2].color = m_transform_axis == Axis::XY ? 0xff00ffff : 0xffff0000;
+	vertices[2].color = m_transform_axis == Axis::XY ? SELECTED_COLOR : Z_COLOR;
 	indices[2] = 2;
 
 	vertices[3].position = Vec3(0, 0, 0);
-	vertices[3].color = m_transform_axis == Axis::YZ ? 0xff00ffff : 0xff0000ff;
+	vertices[3].color = m_transform_axis == Axis::YZ ? SELECTED_COLOR : X_COLOR;
 	indices[3] = 3;
 	vertices[4].position = Vec3(0, 0.5f, 0);
-	vertices[4].color = m_transform_axis == Axis::YZ ? 0xff00ffff : 0xff0000ff;
+	vertices[4].color = m_transform_axis == Axis::YZ ? SELECTED_COLOR : X_COLOR;
 	indices[4] = 4;
 	vertices[5].position = Vec3(0, 0, 0.5f);
-	vertices[5].color = m_transform_axis == Axis::YZ ? 0xff00ffff : 0xff0000ff;
+	vertices[5].color = m_transform_axis == Axis::YZ ? SELECTED_COLOR : X_COLOR;
 	indices[5] = 5;
 
 	vertices[6].position = Vec3(0, 0, 0);
-	vertices[6].color = m_transform_axis == Axis::XZ ? 0xff00ffff : 0xff00ff00;
+	vertices[6].color = m_transform_axis == Axis::XZ ? SELECTED_COLOR : Y_COLOR;
 	indices[6] = 6;
 	vertices[7].position = Vec3(0.5f, 0, 0);
-	vertices[7].color = m_transform_axis == Axis::XZ ? 0xff00ffff : 0xff00ff00;
+	vertices[7].color = m_transform_axis == Axis::XZ ? SELECTED_COLOR : Y_COLOR;
 	indices[7] = 7;
 	vertices[8].position = Vec3(0, 0, 0.5f);
-	vertices[8].color = m_transform_axis == Axis::XZ ? 0xff00ffff : 0xff00ff00;
+	vertices[8].color = m_transform_axis == Axis::XZ ? SELECTED_COLOR : Y_COLOR;
 	indices[8] = 8;
 
 	Lumix::TransientGeometry geom2(vertices, 9, m_vertex_decl, indices, 9);
@@ -472,13 +475,11 @@ void Gizmo::renderRotateGizmo(PipelineInstance& pipeline)
 	if (dotProduct(gizmo_mtx.getYVector(), m_camera_dir) < 0) up = -up;
 	if (dotProduct(gizmo_mtx.getZVector(), m_camera_dir) < 0) dir = -dir;
 
-	const uint32_t SELECTED_COLOR = 0xff00ffff;
-
 	if (!m_is_transforming)
 	{
-		renderQuarterRing(pipeline, mtx, right, up, m_transform_axis == Axis::Z ? SELECTED_COLOR : 0xffff0000);
-		renderQuarterRing(pipeline, mtx, up, dir, m_transform_axis == Axis::X ? SELECTED_COLOR : 0xff0000ff);
-		renderQuarterRing(pipeline, mtx, right, dir, m_transform_axis == Axis::Y ? SELECTED_COLOR : 0xff00ff00);
+		renderQuarterRing(pipeline, mtx, right, up, m_transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR);
+		renderQuarterRing(pipeline, mtx, up, dir, m_transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR);
+		renderQuarterRing(pipeline, mtx, right, dir, m_transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR);
 	}
 	else
 	{

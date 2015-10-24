@@ -1630,7 +1630,7 @@ public:
 	virtual void addDebugCylinder(const Vec3& position,
 								  const Vec3& up,
 								  float radius,
-								  const Vec3& color,
+								  uint32_t color,
 								  float life) override
 	{
 		Vec3 z_vec(-up.y, up.x, 0);
@@ -1664,11 +1664,11 @@ public:
 
 
 	virtual void addDebugCube(const Vec3& pos,
-							  const Vec3& dir,
-							  const Vec3& up,
-							  const Vec3& right,
-							  const Vec3& color,
-							  float life) override
+		const Vec3& dir,
+		const Vec3& up,
+		const Vec3& right,
+		uint32_t color,
+		float life) override
 	{
 		addDebugLine(pos + dir + up + right, pos + dir + up - right, color, life);
 		addDebugLine(pos - dir + up + right, pos - dir + up - right, color, life);
@@ -1690,7 +1690,7 @@ public:
 
 	virtual void addDebugCube(const Vec3& min,
 							  const Vec3& max,
-							  const Vec3& color,
+							  uint32_t color,
 							  float life) override
 	{
 		Vec3 a = min;
@@ -1732,9 +1732,7 @@ public:
 	}
 
 
-	virtual void addDebugFrustum(const Frustum& frustum,
-								 const Vec3& color,
-								 float life) override
+	virtual void addDebugFrustum(const Frustum& frustum, uint32_t color, float life) override
 	{
 		addDebugFrustum(frustum.getPosition(),
 						frustum.getDirection(),
@@ -1755,7 +1753,7 @@ public:
 								 float ratio,
 								 float near_distance,
 								 float far_distance,
-								 const Vec3& color,
+								 uint32_t color,
 								 float life) override
 	{
 		Vec3 points[8];
@@ -1796,10 +1794,10 @@ public:
 	}
 
 	virtual void addDebugCircle(const Vec3& center,
-								const Vec3& up,
-								float radius,
-								const Vec3& color,
-								float life) override
+		const Vec3& up,
+		float radius,
+		uint32_t color,
+		float life) override
 	{
 		Vec3 z_vec(-up.y, up.x, 0);
 		Vec3 x_vec = crossProduct(up, z_vec);
@@ -1813,9 +1811,9 @@ public:
 			float x = cosf(a) * radius;
 			float z = sinf(a) * radius;
 			addDebugLine(center + x_vec * x + z_vec * z,
-						 center + x_vec * prevx + z_vec * prevz,
-						 color,
-						 life);
+				center + x_vec * prevx + z_vec * prevz,
+				color,
+				life);
 			prevx = x;
 			prevz = z;
 		}
@@ -1841,47 +1839,35 @@ public:
 	}
 
 
-	virtual void
-	addDebugPoint(const Vec3& pos, uint32_t color, float life) override
+	virtual void addDebugPoint(const Vec3& pos, uint32_t color, float life) override
 	{
 		DebugPoint& point = m_debug_points.pushEmpty();
 		point.m_pos = pos;
-		point.m_color = color;
+		point.m_color = ARGBToABGR(color);
 		point.m_life = life;
 	}
 
 
-	virtual void addDebugLine(const Vec3& from,
-							  const Vec3& to,
-							  const Vec3& color,
-							  float life) override
+	static uint32_t ARGBToABGR(uint32_t color)
 	{
-		DebugLine& line = m_debug_lines.pushEmpty();
-		line.m_from = from;
-		line.m_to = to;
-		line.m_color = ((uint8_t)(color.x * 255) << 24) |
-					   ((uint8_t)(color.y * 255) << 16) |
-					   ((uint8_t)(color.z * 255) << 8) | 255;
-		line.m_life = life;
+		return ((color & 0xff) << 16) | (color & 0xff00) | ((color & 0xff0000) >> 16) |
+			   (color & 0xff000000);
 	}
 
 
-	virtual void addDebugLine(const Vec3& from,
-							  const Vec3& to,
-							  uint32_t color,
-							  float life) override
+	virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32_t color, float life) override
 	{
 		DebugLine& line = m_debug_lines.pushEmpty();
 		line.m_from = from;
 		line.m_to = to;
-		line.m_color = color;
+		line.m_color = ARGBToABGR(color);
 		line.m_life = life;
 	}
 
 
 	virtual RayCastModelHit castRayTerrain(ComponentIndex terrain,
-										   const Vec3& origin,
-										   const Vec3& dir) override
+		const Vec3& origin,
+		const Vec3& dir) override
 	{
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
