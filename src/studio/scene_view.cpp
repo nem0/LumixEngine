@@ -9,8 +9,6 @@
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
 
 
 static const char* WINDOW_NAME = "Scene view";
@@ -95,7 +93,7 @@ void SceneView::update()
 	PROFILE_FUNCTION();
 	if (ImGui::IsAnyItemActive()) return;
 	if (!m_is_opened) return;
-	if (ImGui::GetIO().KeysDown[VK_CONTROL]) return;
+	if (ImGui::GetIO().KeyCtrl) return;
 
 	m_camera_speed =
 		Lumix::Math::maxValue(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
@@ -107,7 +105,7 @@ void SceneView::update()
 	if (!is_inside) return;
 
 	float speed = m_camera_speed;
-	if (ImGui::GetIO().KeysDown[VK_SHIFT])
+	if (ImGui::GetIO().KeyShift)
 	{
 		speed *= 10;
 	}
