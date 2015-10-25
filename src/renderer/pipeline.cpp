@@ -316,6 +316,17 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	void bindFramebufferTexture(const char* framebuffer_name,
+		int renderbuffer_idx,
+		int uniform_idx)
+	{
+		FrameBuffer* fb = getFramebuffer(framebuffer_name);
+		if (!fb) return;
+
+		bgfx::setTexture(0, m_uniforms[uniform_idx], fb->getRenderbufferHandle(renderbuffer_idx));
+	}
+
+
 	virtual void setViewProjection(const Matrix& mtx, int width, int height) override
 	{
 		bgfx::setViewRect(m_view_idx, 0, 0, width, height);
@@ -1891,6 +1902,15 @@ int loadMaterial(PipelineInstanceImpl* pipeline, const char* path)
 }
 
 
+void bindFramebufferTexture(PipelineInstanceImpl* pipeline,
+	const char* framebuffer_name,
+	int renderbuffer_index,
+	int uniform_idx)
+{
+	pipeline->bindFramebufferTexture(framebuffer_name, renderbuffer_index, uniform_idx);
+}
+
+
 void drawQuad(PipelineInstanceImpl* pipeline,
 	float x,
 	float y,
@@ -1940,6 +1960,7 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(getFPS);
 	REGISTER_FUNCTION(cameraExists);
 	REGISTER_FUNCTION(hasScene);
+	REGISTER_FUNCTION(bindFramebufferTexture);
 
 	#undef REGISTER_FUNCTION
 }
