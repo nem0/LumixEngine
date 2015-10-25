@@ -408,13 +408,16 @@ struct ConvertTask : public Lumix::MT::Task
 
 			m_dialog.m_saved_embedded_textures.push(
 				Lumix::string(texture_name, m_dialog.m_editor.getAllocator()));
+			PathBuilder dest(m_dialog.m_texture_output_dir[0] ? m_dialog.m_texture_output_dir
+															  : m_dialog.m_output_dir);
+			dest << "/" << texture_name;
 			bool saved = saveAsDDS(m_dialog,
 				m_dialog.m_editor.getEngine().getFileSystem(),
 				"Embedded texture",
 				data,
 				width,
 				height,
-				PathBuilder(m_dialog.m_output_dir) << "/" << texture_name);
+				dest);
 			success = success && saved;
 
 			stbi_image_free(data);
@@ -446,11 +449,25 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 
 		Lumix::PathUtils::FileInfo texture_info(texture_source_path.c_str());
-		material_file << "\t, \"texture\" : {\n\t\t\"source\" : \""
-					  << texture_info.m_basename << ".";
-		material_file << (m_dialog.m_convert_to_dds ? "dds"
-													: texture_info.m_extension);
-		material_file << "\"\n }\n";
+		if (!m_dialog.m_texture_output_dir[0])
+		{
+			material_file << "\t, \"texture\" : {\n\t\t\"source\" : \"" << texture_info.m_basename
+						  << ".";
+			material_file << (m_dialog.m_convert_to_dds ? "dds" : texture_info.m_extension);
+			material_file << "\"\n }\n";
+		}
+		else
+		{
+			material_file << "\t, \"texture\" : {\n\t\t\"source\" : \"";
+			char from_root_path[Lumix::MAX_PATH_LENGTH];
+			m_dialog.m_editor.getRelativePath(from_root_path,
+				Lumix::lengthOf(from_root_path),
+				m_dialog.m_texture_output_dir);
+			material_file << "/" << from_root_path;
+			material_file << texture_info.m_basename << ".";
+			material_file << (m_dialog.m_convert_to_dds ? "dds" : texture_info.m_extension);
+			material_file << "\"\n }\n";
+		}
 
 		bool is_already_saved =
 			m_dialog.m_saved_textures.indexOf(texture_source_path) >= 0;
@@ -466,7 +483,8 @@ struct ConvertTask : public Lumix::MT::Task
 		if (m_dialog.m_convert_to_dds &&
 			strcmp(texture_info.m_extension, "dds") != 0)
 		{
-			PathBuilder dest(m_dialog.m_output_dir);
+			PathBuilder dest(m_dialog.m_texture_output_dir[0] ? m_dialog.m_texture_output_dir
+															  : m_dialog.m_output_dir);
 			dest << "/" << texture_info.m_basename << ".dds";
 			int image_width, image_height, dummy;
 			auto data = stbi_load(source, &image_width, &image_height, &dummy, 4);
@@ -1237,6 +1255,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 		m_dialog.setImportMessage("Importing model...");
 		Lumix::makePath(m_dialog.m_output_dir);
+		if (m_dialog.m_texture_output_dir[0]) Lumix::makePath(m_dialog.m_texture_output_dir);
 
 		char basename[Lumix::MAX_PATH_LENGTH];
 		Lumix::PathUtils::getBasename(basename, sizeof(basename), m_dialog.m_source);
@@ -1300,6 +1319,7 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	m_task = nullptr;
 	m_source[0] = '\0';
 	m_output_dir[0] = '\0';
+	m_texture_output_dir[0] = '\0';
 }
 
 
@@ -1507,6 +1527,17 @@ void ImportAssetDialog::importTexture()
 }
 
 
+bool ImportAssetDialog::isTextureDirValid() const
+{
+	if (!m_texture_output_dir[0]) return true;
+	char normalized_path[Lumix::MAX_PATH_LENGTH];
+	Lumix::PathUtils::normalize(
+		m_texture_output_dir, normalized_path, Lumix::lengthOf(normalized_path));
+
+	return (m_editor.isRelativePath(normalized_path));
+}
+
+
 void ImportAssetDialog::onGUI()
 {
 	if (!m_is_opened) return;
@@ -1644,9 +1675,26 @@ void ImportAssetDialog::onGUI()
 			{
 				Lumix::getOpenDirectory(m_output_dir, sizeof(m_output_dir));
 			}
-			if (m_output_dir[0] != '\0' && ImGui::Button("Convert"))
+
+			ImGui::InputText(
+				"Texture output directory", m_texture_output_dir, sizeof(m_texture_output_dir));
+			ImGui::SameLine();
+			if (ImGui::Button("...##browsetextureoutput"))
 			{
-				convert();
+				Lumix::getOpenDirectory(m_texture_output_dir, sizeof(m_texture_output_dir));
+			}
+
+			if (m_output_dir[0] != '\0')
+			{
+				if (!isTextureDirValid())
+				{
+					ImGui::Text("Texture output directory must be an ancestor of the working "
+								"directory or empty.");
+				}
+				else if (ImGui::Button("Convert"))
+				{
+					convert();
+				}
 			}
 		}
 	}

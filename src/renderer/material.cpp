@@ -187,7 +187,8 @@ bool Material::save(JsonSerializer& serializer)
 		if (m_textures[i])
 		{
 			flags = m_textures[i]->getFlags();
-			PathUtils::getFilename(path, MAX_PATH_LENGTH, m_textures[i]->getPath().c_str());
+			path[0] = '/';
+			Lumix::copyString(path + 1, MAX_PATH_LENGTH - 1, m_textures[i]->getPath().c_str());
 			atlas_size = m_textures[i]->getAtlasSize();
 		}
 		else
@@ -320,7 +321,8 @@ void Material::setTexturePath(int i, const Path& path)
 	}
 	else
 	{
-		Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(path));
+		Texture* texture =
+			static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(path));
 		setTexture(i, texture);
 	}
 }
@@ -461,8 +463,15 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 			if (path[0] != '\0')
 			{
 				char texture_path[MAX_PATH_LENGTH];
-				copyString(texture_path, material_dir);
-				catString(texture_path, path);
+				if (path[0] != '/' && path[0] != '\\')
+				{
+					copyString(texture_path, material_dir);
+					catString(texture_path, path);
+				}
+				else
+				{
+					copyString(texture_path, path);
+				}
 				m_textures[m_texture_count] = static_cast<Texture*>(
 					m_resource_manager.get(ResourceManager::TEXTURE)->load(Path(texture_path)));
 				addDependency(*m_textures[m_texture_count]);
@@ -640,7 +649,8 @@ bool Material::load(FS::IFile& file)
 		else if (strcmp(label, "shader") == 0)
 		{
 			serializer.deserialize(path, MAX_PATH_LENGTH, "");
-			setShader(static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(Path(path))));
+			setShader(static_cast<Shader*>(
+				m_resource_manager.get(ResourceManager::SHADER)->load(Path(path))));
 		}
 		else if (strcmp(label, "z_test") == 0)
 		{

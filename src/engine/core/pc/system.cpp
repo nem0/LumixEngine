@@ -192,7 +192,8 @@ namespace Lumix
 	{
 		bool ret = false;
 		IFileDialog *pfd;
-		if (SUCCEEDED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd))))
+		if (SUCCEEDED(CoCreateInstance(
+				CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd))))
 		{
 			DWORD dwOptions;
 			if (SUCCEEDED(pfd->GetOptions(&dwOptions)))
@@ -201,7 +202,7 @@ namespace Lumix
 			}
 			if (SUCCEEDED(pfd->Show(NULL)))
 			{
-				IShellItem *psi;
+				IShellItem* psi;
 				if (SUCCEEDED(pfd->GetResult(&psi)))
 				{
 					WCHAR* tmp;
