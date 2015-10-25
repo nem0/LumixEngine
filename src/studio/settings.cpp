@@ -2,6 +2,7 @@
 #include "core/log.h"
 #include "debug/debug.h"
 #include "ocornut-imgui/imgui.h"
+#include "platform_interface.h"
 #include "utils.h"
 #include <cstdio>
 #include <lua.hpp>
@@ -16,7 +17,7 @@ static void shortcutInput(int& shortcut)
 	popup_name << (int64_t)&shortcut;
 
 	char key_string[30];
-	getKeyName(shortcut, key_string, 30);
+	PlatformInterface::getKeyName(shortcut, key_string, 30);
 
 	StringBuilder<50> button_label(key_string);
 	button_label << "##" << (int64_t)&shortcut;

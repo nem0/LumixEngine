@@ -3,8 +3,9 @@
 
 #include "editor/world_editor.h"
 #include <bgfx/bgfx.h>
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+
+
+struct PlatformData;
 
 
 namespace Lumix
@@ -21,7 +22,7 @@ public:
 	GameView();
 	~GameView();
 
-	void init(HWND hwnd, Lumix::WorldEditor& editor);
+	void init(Lumix::WorldEditor& editor);
 	void shutdown();
 	void onGui();
 	void setScene(Lumix::RenderScene* scene);
@@ -42,5 +43,4 @@ private:
 	bgfx::TextureHandle m_texture_handle;
 	Lumix::WorldEditor* m_editor;
 	bool m_is_mouse_hovering_window;
-	HWND m_hwnd;
 };

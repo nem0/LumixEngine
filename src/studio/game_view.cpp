@@ -5,6 +5,7 @@
 #include "core/resource_manager.h"
 #include "engine/engine.h"
 #include "ocornut-imgui/imgui.h"
+#include "platform_interface.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
@@ -18,7 +19,6 @@ GameView::GameView()
 	, m_is_mouse_captured(false)
 	, m_editor(nullptr)
 	, m_is_mouse_hovering_window(false)
-	, m_hwnd(NULL)
 {
 }
 
@@ -41,9 +41,8 @@ void GameView::onUniverseDestroyed()
 }
 
 
-void GameView::init(HWND hwnd, Lumix::WorldEditor& editor)
+void GameView::init(Lumix::WorldEditor& editor)
 {
-	m_hwnd = hwnd;
 	m_editor = &editor;
 	auto& engine = editor.getEngine();
 	auto* pipeline_manager = engine.getResourceManager().get(Lumix::ResourceManager::PIPELINE);
@@ -79,8 +78,8 @@ void GameView::captureMouse(bool capture)
 {
 	m_is_mouse_captured = capture;
 	m_editor->getEngine().getInputSystem().enable(m_is_mouse_captured);
-	ShowCursor(!m_is_mouse_captured);
-	if (!m_is_mouse_captured) ClipCursor(NULL);
+	PlatformInterface::showCursor(!m_is_mouse_captured);
+	if (!m_is_mouse_captured) PlatformInterface::unclipCursor();
 }
 
 
@@ -92,9 +91,9 @@ void GameView::onGui()
 
 	auto& io = ImGui::GetIO();
 
-	HWND foreground_win = GetForegroundWindow();
-	if (m_is_mouse_captured &&
-		(io.KeysDown[VK_ESCAPE] || !m_editor->isGameMode() || foreground_win != m_hwnd))
+	bool is_foreground_win = PlatformInterface::isForegroundWindow();
+	if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] ||
+								   !m_editor->isGameMode() || !is_foreground_win))
 	{
 		captureMouse(false);
 	}
@@ -122,21 +121,13 @@ void GameView::onGui()
 
 		if (m_is_mouse_captured)
 		{
-			POINT min;
-			POINT max;
-			min.x = LONG(content_min.x);
-			min.y = LONG(content_min.y);
-			max.x = LONG(content_max.x);
-			max.y = LONG(content_max.y);
-			ClientToScreen(m_hwnd, &min);
-			ClientToScreen(m_hwnd, &max);
-			RECT rect;
-			rect.left = min.x;
-			rect.right = max.x;
-			rect.top = min.y;
-			rect.bottom = max.y;
-			ClipCursor(&rect);
-			if (io.KeysDown[VK_ESCAPE] || !m_editor->isGameMode()) captureMouse(false);
+			PlatformInterface::clipCursor(
+				content_min.x, content_min.y, content_max.x, content_max.y);
+
+			if (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor->isGameMode())
+			{
+				captureMouse(false);
+			}
 		}
 
 		if (ImGui::IsMouseHoveringRect(content_min, content_max) && m_is_mouse_hovering_window &&
