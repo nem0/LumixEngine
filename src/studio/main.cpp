@@ -24,6 +24,7 @@
 #include "log_ui.h"
 #include "metadata.h"
 #include "ocornut-imgui/imgui.h"
+#include "platform_interface.h"
 #include "profiler_ui.h"
 #include "property_grid.h"
 #include "renderer/frame_buffer.h"
@@ -39,16 +40,12 @@
 #include "utils.h"
 
 #include <bgfx/bgfx.h>
-#include <cstdio>
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <mmsystem.h>
+
 
 // http://prideout.net/blog/?p=36
 
 
 void imGuiCallback(ImDrawData* draw_data);
-LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 
 class StudioApp
@@ -70,7 +67,6 @@ public:
 		, m_metadata(m_allocator)
 		, m_gui_pipeline(nullptr)
 		, m_is_welcome_screen_opened(true)
-		, m_is_mouse_tracked(false)
 	{
 		m_entity_list_search[0] = '\0';
 		m_template_name[0] = '\0';
@@ -119,10 +115,8 @@ public:
 	{
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
 								 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
-		RECT client_rect;
-		GetClientRect(m_hwnd, &client_rect);
-		ImVec2 size(float(client_rect.right - client_rect.left),
-			float(client_rect.bottom - client_rect.top));
+		ImVec2 size((float)PlatformInterface::getWindowWidth(),
+			(float)PlatformInterface::getWindowHeight());
 		if (ImGui::Begin("Welcome", nullptr, size, -1, flags))
 		{
 			ImGui::Text("Welcome to Lumix Studio");
@@ -210,18 +204,18 @@ public:
 		if (!m_gui_pipeline_source->isReady()) return;
 
 		ImGuiIO& io = ImGui::GetIO();
-		RECT rect;
-		GetClientRect(m_hwnd, &rect);
-		io.DisplaySize = ImVec2((float)(rect.right - rect.left), (float)(rect.bottom - rect.top));
+		io.DisplaySize = ImVec2((float)PlatformInterface::getWindowWidth(),
+			(float)PlatformInterface::getWindowHeight());
 		io.DeltaTime = m_engine->getLastTimeDelta();
-		io.KeyCtrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
-		io.KeyShift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
-		io.KeyAlt = (GetKeyState(VK_MENU) & 0x8000) != 0;
-		io.KeysDown[VK_MENU] = io.KeyAlt;
-		io.KeysDown[VK_SHIFT] = io.KeyShift;
-		io.KeysDown[VK_CONTROL] = io.KeyCtrl;
+		io.KeyCtrl = PlatformInterface::isPressed((int)PlatformInterface::Keys::CONTROL);
+		io.KeyShift = PlatformInterface::isPressed((int)PlatformInterface::Keys::SHIFT);
+		io.KeyAlt = PlatformInterface::isPressed((int)PlatformInterface::Keys::ALT);
+		io.KeysDown[(int)PlatformInterface::Keys::ALT] = io.KeyAlt;
+		io.KeysDown[(int)PlatformInterface::Keys::SHIFT] = io.KeyShift;
+		io.KeysDown[(int)PlatformInterface::Keys::CONTROL] = io.KeyCtrl;
 
-		SetCursor(io.MouseDrawCursor ? NULL : LoadCursor(NULL, IDC_ARROW));
+		PlatformInterface::setCursor(io.MouseDrawCursor ? PlatformInterface::Cursor::NONE
+														: PlatformInterface::Cursor::DEFAULT);
 
 		ImGui::NewFrame();
 
@@ -255,7 +249,7 @@ public:
 		char tmp[100];
 		Lumix::copyString(tmp, "Lumix Studio - ");
 		Lumix::catString(tmp, title);
-		SetWindowTextA(m_hwnd, tmp);
+		PlatformInterface::setWindowTitle(tmp);
 	}
 
 
@@ -265,7 +259,7 @@ public:
 		for (int i = 0; i < Lumix::lengthOf(action.shortcut); ++i)
 		{
 			char str[30];
-			getKeyName(action.shortcut[i], str, Lumix::lengthOf(str));
+			PlatformInterface::getKeyName(action.shortcut[i], str, Lumix::lengthOf(str));
 			if (str[0] == 0) return;
 			if (i > 0) Lumix::catString(buf, max_size, " - ");
 			Lumix::catString(buf, max_size, str);
@@ -316,7 +310,7 @@ public:
 	}
 
 
-	void exit() { PostQuitMessage(0); }
+	void exit() { m_finished = true; }
 
 	void newUniverse()
 	{
@@ -709,7 +703,7 @@ public:
 		m_gui_pipeline_source = nullptr;
 		m_editor = nullptr;
 
-		UnregisterClassA("lmxa", m_instance);
+		PlatformInterface::shutdown();
 	}
 
 
@@ -726,20 +720,8 @@ public:
 	}
 
 
-	void trackMouse()
-	{
-		TRACKMOUSEEVENT track_event;
-		track_event.cbSize = sizeof(TRACKMOUSEEVENT);
-		track_event.dwFlags = TME_LEAVE;
-		track_event.hwndTrack = m_hwnd;
-		m_is_mouse_tracked = TrackMouseEvent(&track_event) == TRUE;
-	}
-
-
 	void initIMGUI()
 	{
-		trackMouse();
-
 		ImGuiIO& io = ImGui::GetIO();
 		io.Fonts->AddFontFromFileTTF("editor/VeraMono.ttf", 13);
 
@@ -749,19 +731,19 @@ public:
 			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
 			.end();
 
-		io.KeyMap[ImGuiKey_Tab] = VK_TAB;
-		io.KeyMap[ImGuiKey_LeftArrow] = VK_LEFT;
-		io.KeyMap[ImGuiKey_RightArrow] = VK_RIGHT;
-		io.KeyMap[ImGuiKey_UpArrow] = VK_UP;
-		io.KeyMap[ImGuiKey_DownArrow] = VK_DOWN;
-		io.KeyMap[ImGuiKey_PageUp] = VK_PRIOR;
-		io.KeyMap[ImGuiKey_PageDown] = VK_NEXT;
-		io.KeyMap[ImGuiKey_Home] = VK_HOME;
-		io.KeyMap[ImGuiKey_End] = VK_END;
-		io.KeyMap[ImGuiKey_Delete] = VK_DELETE;
-		io.KeyMap[ImGuiKey_Backspace] = VK_BACK;
-		io.KeyMap[ImGuiKey_Enter] = VK_RETURN;
-		io.KeyMap[ImGuiKey_Escape] = VK_ESCAPE;
+		io.KeyMap[ImGuiKey_Tab] = (int)PlatformInterface::Keys::TAB;
+		io.KeyMap[ImGuiKey_LeftArrow] = (int)PlatformInterface::Keys::LEFT;
+		io.KeyMap[ImGuiKey_RightArrow] = (int)PlatformInterface::Keys::RIGHT;
+		io.KeyMap[ImGuiKey_UpArrow] = (int)PlatformInterface::Keys::UP;
+		io.KeyMap[ImGuiKey_DownArrow] = (int)PlatformInterface::Keys::DOWN;
+		io.KeyMap[ImGuiKey_PageUp] = (int)PlatformInterface::Keys::PAGE_UP;
+		io.KeyMap[ImGuiKey_PageDown] = (int)PlatformInterface::Keys::PAGE_DOWN;
+		io.KeyMap[ImGuiKey_Home] = (int)PlatformInterface::Keys::HOME;
+		io.KeyMap[ImGuiKey_End] = (int)PlatformInterface::Keys::END;
+		io.KeyMap[ImGuiKey_Delete] = (int)PlatformInterface::Keys::DEL;
+		io.KeyMap[ImGuiKey_Backspace] = (int)PlatformInterface::Keys::BACKSPACE;
+		io.KeyMap[ImGuiKey_Enter] = (int)PlatformInterface::Keys::ENTER;
+		io.KeyMap[ImGuiKey_Escape] = (int)PlatformInterface::Keys::ESCAPE;
 		io.KeyMap[ImGuiKey_A] = 'A';
 		io.KeyMap[ImGuiKey_C] = 'C';
 		io.KeyMap[ImGuiKey_V] = 'V';
@@ -770,7 +752,6 @@ public:
 		io.KeyMap[ImGuiKey_Z] = 'Z';
 
 		io.RenderDrawListsFn = ::imGuiCallback;
-		io.ImeWindowHandle = m_hwnd;
 
 		unsigned char* pixels;
 		int width, height;
@@ -819,16 +800,14 @@ public:
 
 		if (m_settings.m_is_maximized)
 		{
-			ShowWindow(m_hwnd, SW_MAXIMIZE);
+			PlatformInterface::maximizeWindow();
 		}
 		else if (m_settings.m_window.w > 0)
 		{
-			MoveWindow(m_hwnd,
-				m_settings.m_window.x,
+			PlatformInterface::moveWindow(m_settings.m_window.x,
 				m_settings.m_window.y,
 				m_settings.m_window.w,
-				m_settings.m_window.h,
-				FALSE);
+				m_settings.m_window.h);
 		}
 	}
 
@@ -836,21 +815,31 @@ public:
 	void addActions()
 	{
 		addAction<&StudioApp::newUniverse>("New", "newUniverse");
-		addAction<&StudioApp::save>("Save", "save", VK_CONTROL, 'S', -1);
-		addAction<&StudioApp::saveAs>("Save As", "saveAs", VK_CONTROL, VK_SHIFT, 'S');
-		addAction<&StudioApp::exit>("Exit", "exit", VK_CONTROL, 'X', -1);
+		addAction<&StudioApp::save>("Save", "save", (int)PlatformInterface::Keys::CONTROL, 'S', -1);
+		addAction<&StudioApp::saveAs>("Save As",
+			"saveAs",
+			(int)PlatformInterface::Keys::CONTROL,
+			(int)PlatformInterface::Keys::SHIFT,
+			'S');
+		addAction<&StudioApp::exit>("Exit", "exit", (int)PlatformInterface::Keys::CONTROL, 'X', -1);
 
-		addAction<&StudioApp::redo>("Redo", "redo", VK_CONTROL, VK_SHIFT, 'Z');
-		addAction<&StudioApp::undo>("Undo", "undo", VK_CONTROL, 'Z', -1);
-		addAction<&StudioApp::copy>("Copy", "copy", VK_CONTROL, 'C', -1);
-		addAction<&StudioApp::paste>("Paste", "paste", VK_CONTROL, 'V', -1);
+		addAction<&StudioApp::redo>("Redo",
+			"redo",
+			(int)PlatformInterface::Keys::CONTROL,
+			(int)PlatformInterface::Keys::SHIFT,
+			'Z');
+		addAction<&StudioApp::undo>("Undo", "undo", (int)PlatformInterface::Keys::CONTROL, 'Z', -1);
+		addAction<&StudioApp::copy>("Copy", "copy", (int)PlatformInterface::Keys::CONTROL, 'C', -1);
+		addAction<&StudioApp::paste>(
+			"Paste", "paste", (int)PlatformInterface::Keys::CONTROL, 'V', -1);
 		addAction<&StudioApp::toggleOrbitCamera>("Orbit camera", "orbitCamera");
 		addAction<&StudioApp::toggleGizmoMode>("Translate/Rotate", "toggleGizmoMode");
 		addAction<&StudioApp::togglePivotMode>("Center/Pivot", "togglePivotMode");
 		addAction<&StudioApp::toggleCoordSystem>("Local/Global", "toggleCoordSystem");
 
 		addAction<&StudioApp::createEntity>("Create", "createEntity");
-		addAction<&StudioApp::destroyEntity>("Destroy", "destroyEntity", VK_DELETE, -1, -1);
+		addAction<&StudioApp::destroyEntity>(
+			"Destroy", "destroyEntity", (int)PlatformInterface::Keys::DEL, -1, -1);
 		addAction<&StudioApp::showEntities>("Show", "showEntities");
 		addAction<&StudioApp::hideEntities>("Hide", "hideEntities");
 
@@ -889,22 +878,6 @@ public:
 	}
 
 
-	void processSystemEvents()
-	{
-		MSG msg;
-		while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
-		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-
-			if (msg.message == WM_QUIT)
-			{
-				m_finished = true;
-			}
-		}
-	}
-
-
 	void run()
 	{
 		Lumix::Timer* timer = Lumix::Timer::create(m_allocator);
@@ -916,7 +889,7 @@ public:
 				float frame_time;
 				{
 					PROFILE_BLOCK("tick");
-					processSystemEvents();
+					m_finished = !PlatformInterface::processSystemEvents();
 					update();
 					frame_time = timer->tick();
 				}
@@ -951,38 +924,119 @@ public:
 	}
 
 
-	void createWindow(HINSTANCE hInst)
+	struct SystemEventHandler : public PlatformInterface::SystemEventHandler
 	{
-		WNDCLASSEX wnd;
-		memset(&wnd, 0, sizeof(wnd));
-		wnd.cbSize = sizeof(wnd);
-		wnd.style = CS_HREDRAW | CS_VREDRAW;
-		wnd.lpfnWndProc = msgProc;
-		wnd.hInstance = hInst;
-		wnd.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-		wnd.hCursor = LoadCursor(NULL, IDC_ARROW);
-		wnd.lpszClassName = "lmxa";
-		wnd.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
-		auto x = RegisterClassExA(&wnd);
-		m_hwnd = CreateWindowA(
-			"lmxa", "lmxa", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 800, 600, NULL, NULL, hInst, 0);
-		ASSERT(m_hwnd);
-		SetWindowTextA(m_hwnd, "Lumix Studio");
-	}
+		void onWindowTransformed(int x, int y, int w, int h) override
+		{
+			m_app->onWindowTransformed(x, y, w, h);
+		}
 
 
+		void onMouseLeftWindow() override { m_app->clearInputs(); }
+		
 
-	void init(HINSTANCE hInst)
+		void onMouseMove(int x, int y, int rel_x, int rel_y) override
+		{
+			m_mouse_x = x;
+			m_mouse_y = y;
+			auto& input_system = m_app->m_editor->getEngine().getInputSystem();
+			input_system.injectMouseXMove(float(rel_x));
+			input_system.injectMouseYMove(float(rel_y));
+
+			if (m_app->m_gameview.isMouseCaptured()) return;
+
+			m_app->m_sceneview.onMouseMove(x, y, rel_x, rel_y);
+
+			ImGuiIO& io = ImGui::GetIO();
+			io.MousePos.x = (float)x;
+			io.MousePos.y = (float)y;
+		}
+
+
+		void onMouseWheel(int amount) override
+		{
+			ImGui::GetIO().MouseWheel = amount / 600.0f;
+		}
+
+
+		void onMouseButtonDown(MouseButton button) override
+		{
+			switch (button)
+			{
+				case PlatformInterface::SystemEventHandler::MouseButton::LEFT:
+					m_app->m_editor->setAdditiveSelection(ImGui::GetIO().KeyCtrl);
+					if (!m_app->m_sceneview.onMouseDown(
+							m_mouse_x, m_mouse_y, Lumix::MouseButton::LEFT) &&
+						!m_app->m_gameview.isMouseCaptured())
+					{
+						ImGui::GetIO().MouseDown[0] = true;
+					}
+					break;
+				case PlatformInterface::SystemEventHandler::MouseButton::RIGHT:
+					if (!m_app->m_sceneview.onMouseDown(
+							m_mouse_x, m_mouse_y, Lumix::MouseButton::RIGHT) &&
+						!m_app->m_gameview.isMouseCaptured())
+					{
+						ImGui::GetIO().MouseDown[1] = true;
+					}
+					break;
+			}
+		}
+
+
+		void onMouseButtonUp(MouseButton button) override
+		{
+			switch (button)
+			{
+				case PlatformInterface::SystemEventHandler::MouseButton::LEFT:
+					m_app->m_sceneview.onMouseUp(Lumix::MouseButton::LEFT);
+					ImGui::GetIO().MouseDown[0] = false;
+					break;
+				case PlatformInterface::SystemEventHandler::MouseButton::RIGHT:
+					m_app->m_sceneview.onMouseUp(Lumix::MouseButton::RIGHT);
+					ImGui::GetIO().MouseDown[1] = false;
+					break;
+			}
+		}
+
+
+		void onKeyDown(int key) override
+		{
+			ImGui::GetIO().KeysDown[key] = true;
+			m_app->checkShortcuts();
+		}
+
+
+		void onKeyUp(int key) override
+		{
+			ImGui::GetIO().KeysDown[key] = false;
+		}
+
+
+		void onChar(int key)
+		{
+			ImGui::GetIO().AddInputCharacter(key);
+		}
+
+
+		int m_mouse_x;
+		int m_mouse_y;
+		StudioApp* m_app;
+	};
+
+
+	SystemEventHandler m_handler;
+
+
+	void init()
 	{
 		checkWorkingDirector();
+		m_handler.m_app = this;
+		PlatformInterface::createWindow(&m_handler);
 
-		m_instance = hInst;
-		createWindow(hInst);
-
-		Lumix::Renderer::setInitData(m_hwnd);
 		m_engine = Lumix::Engine::create(nullptr, m_allocator);
-		char current_dir[MAX_PATH];
-		GetCurrentDirectory(sizeof(current_dir), current_dir);
+		char current_dir[Lumix::MAX_PATH_LENGTH];
+		PlatformInterface::getCurrentDirectory(current_dir, Lumix::lengthOf(current_dir));
 		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine, m_allocator);
 		loadUserPlugins();
 
@@ -1009,28 +1063,20 @@ public:
 			Lumix::PipelineInstance::create(*m_gui_pipeline_source, m_engine->getAllocator());
 
 		m_sceneview.init(*m_editor, m_actions);
-		m_gameview.init(m_hwnd, *m_editor);
+		m_gameview.init(*m_editor);
 
-		RECT rect;
-		GetClientRect(m_hwnd, &rect);
-		m_gui_pipeline->setViewport(0, 0, rect.right, rect.bottom);
+		int w = PlatformInterface::getWindowWidth();
+		int h = PlatformInterface::getWindowHeight();
+		m_gui_pipeline->setViewport(0, 0, w, h);
 		auto& plugin_manager = m_editor->getEngine().getPluginManager();
 		auto* renderer = static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
-		renderer->resize(rect.right, rect.bottom);
+		renderer->resize(w, h);
 		onUniverseCreated();
 		initIMGUI();
 
 		loadSettings();
 
 		if (!m_metadata.load()) Lumix::g_log_info.log("studio") << "Could not load metadata";
-		timeBeginPeriod(1);
-
-		RAWINPUTDEVICE Rid;
-		Rid.usUsagePage = 0x01;
-		Rid.usUsage = 0x02;
-		Rid.dwFlags = 0;   
-		Rid.hwndTarget = 0;
-		RegisterRawInputDevices(&Rid, 1, sizeof(Rid));
 	}
 
 
@@ -1057,146 +1103,25 @@ public:
 	}
 
 
-	void onWindowTransformed()
+	void onWindowTransformed(int x, int y, int width, int height)
 	{
-		RECT rect;
-		GetWindowRect(m_hwnd, &rect);
-		m_settings.m_window.x = rect.left;
-		m_settings.m_window.y = rect.top;
-		m_settings.m_window.w = rect.right - rect.left;
-		m_settings.m_window.h = rect.bottom - rect.top;
-		
-		WINDOWPLACEMENT wndpl;
-		wndpl.length = sizeof(wndpl);
-		if (GetWindowPlacement(m_hwnd, &wndpl))
-		{
-			m_settings.m_is_maximized = wndpl.showCmd == SW_MAXIMIZE;
-		}
-	}
+		m_settings.m_window.x = x;
+		m_settings.m_window.y = y;
+		m_settings.m_window.w = width;
+		m_settings.m_window.h = height;
 
+		m_settings.m_is_maximized = PlatformInterface::isMaximized();
 
-	void handleRawInput(LPARAM lParam)
-	{
-		UINT dwSize;
-		char data[sizeof(RAWINPUT) * 10];
-
-		GetRawInputData((HRAWINPUT)lParam, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER));
-		if (dwSize > sizeof(data)) return;
-
-		if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, data, &dwSize, sizeof(RAWINPUTHEADER)) !=
-			dwSize) return;
-		
-		RAWINPUT* raw = (RAWINPUT*)data;
-		if (raw->header.dwType == RIM_TYPEMOUSE &&
-			raw->data.mouse.usFlags == MOUSE_MOVE_RELATIVE)
-		{
-			m_editor->getEngine().getInputSystem().injectMouseXMove(float(raw->data.mouse.lLastX));
-			m_editor->getEngine().getInputSystem().injectMouseYMove(float(raw->data.mouse.lLastY));
-		}
-	}
-
-
-	LRESULT windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
-	{
-		int x = LOWORD(lParam);
-		int y = HIWORD(lParam);
-		static int old_x = x;
-		static int old_y = y;
-		if (!m_gui_pipeline)
-		{
-			return DefWindowProc(hWnd, msg, wParam, lParam);
-		}
-
-		switch (msg)
-		{
-			case WM_INPUT: handleRawInput(lParam); break;
-			case WM_CLOSE: PostQuitMessage(0); break;
-			case WM_MOVE: onWindowTransformed(); break;
-			case WM_SIZE:
-			{
-				onWindowTransformed();
-
-				uint32_t width = ((int)(short)LOWORD(lParam));
-				uint32_t height = ((int)(short)HIWORD(lParam));
-
-				m_gui_pipeline->setViewport(0, 0, width, height);
-				auto& plugin_manager = m_editor->getEngine().getPluginManager();
-				auto* renderer =
-					static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
-				renderer->resize(width, height);
-			}
-			break;
-			case WM_MOUSEWHEEL:
-				ImGui::GetIO().MouseWheel = GET_WHEEL_DELTA_WPARAM(wParam) / 600.0f;
-				break;
-			case WM_ERASEBKGND: return 1;
-			case WM_LBUTTONUP:
-				m_sceneview.onMouseUp(Lumix::MouseButton::LEFT);
-				ImGui::GetIO().MouseDown[0] = false;
-				break;
-			case WM_LBUTTONDOWN:
-				m_editor->setAdditiveSelection(ImGui::GetIO().KeyCtrl);
-				if (!m_sceneview.onMouseDown(old_x, old_y, Lumix::MouseButton::LEFT) &&
-					!m_gameview.isMouseCaptured())
-				{
-					ImGui::GetIO().MouseDown[0] = true;
-				}
-				break;
-			case WM_RBUTTONDOWN:
-				if (!m_sceneview.onMouseDown(old_x, old_y, Lumix::MouseButton::RIGHT) &&
-					!m_gameview.isMouseCaptured())
-				{
-					ImGui::GetIO().MouseDown[1] = true;
-				}
-				break;
-			case WM_RBUTTONUP:
-				m_sceneview.onMouseUp(Lumix::MouseButton::RIGHT);
-				ImGui::GetIO().MouseDown[1] = false;
-				break;
-			case WM_MOUSEMOVE:
-			{
-				if (!m_is_mouse_tracked) trackMouse();
-
-				if (!m_gameview.isMouseCaptured())
-				{
-					POINT p;
-					p.x = x;
-					p.y = y;
-					ClientToScreen(m_hwnd, &p);
-
-					m_sceneview.onMouseMove(old_x, old_y, x - old_x, y - old_y);
-
-					old_x = x;
-					old_y = y;
-
-					ImGuiIO& io = ImGui::GetIO();
-					io.MousePos.x = (float)x;
-					io.MousePos.y = (float)y;
-				}
-			}
-			break;
-			case WM_MOUSELEAVE:
-				clearInputs();
-				break;
-			case WM_CHAR: ImGui::GetIO().AddInputCharacter((ImWchar)wParam); break;
-			case WM_KEYUP: ImGui::GetIO().KeysDown[wParam] = false; break;
-			case WM_SYSKEYDOWN: ImGui::GetIO().KeysDown[wParam] = true; break;
-			case WM_SYSKEYUP: ImGui::GetIO().KeysDown[wParam] = false; break;
-			case WM_KEYDOWN:
-			{
-				ImGui::GetIO().KeysDown[wParam] = true;
-				checkShortcuts();
-				break;
-			}
-		}
-
-		return DefWindowProc(hWnd, msg, wParam, lParam);
+		m_gui_pipeline->setViewport(0, 0, width, height);
+		auto& plugin_manager = m_editor->getEngine().getPluginManager();
+		auto* renderer =
+			static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
+		renderer->resize(width, height);
 	}
 
 
 	void clearInputs()
 	{
-		m_is_mouse_tracked = false;
 		auto& io = ImGui::GetIO();
 		io.KeyAlt = false;
 		io.KeyCtrl = false;
@@ -1284,8 +1209,6 @@ public:
 
 
 	Lumix::DefaultAllocator m_allocator;
-	HWND m_hwnd;
-	HINSTANCE m_instance;
 	bgfx::VertexDecl m_decl;
 	Lumix::Material* m_material;
 	Lumix::Engine* m_engine;
@@ -1319,7 +1242,6 @@ public:
 	bool m_is_entity_template_list_opened;
 	bool m_is_style_editor_opened;
 	bool m_is_wireframe;
-	bool m_is_mouse_tracked;
 };
 
 
@@ -1332,18 +1254,12 @@ static void imGuiCallback(ImDrawData* draw_data)
 }
 
 
-static LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
-{
-	return g_app->windowProc(hWnd, msg, wParam, lParam);
-}
-
-
-INT WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, INT)
+int studioMain()
 {
 	StudioApp app;
 	g_app = &app;
 
-	app.init(hInst);
+	app.init();
 	app.run();
 	app.shutdown();
 	

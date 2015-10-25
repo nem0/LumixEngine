@@ -27,8 +27,6 @@
 #include "renderer/texture_manager.h"
 #include "universe/universe.h"
 #include <bgfx/bgfx.h>
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
 #include <cstdio>
 
 
@@ -198,10 +196,10 @@ struct RendererImpl : public Renderer
 		, m_frame_allocator(m_allocator, 10 * 1024 * 1024)
 	{
 		bgfx::PlatformData d;
-		if (s_hwnd)
+		if (s_platform_data)
 		{
 			memset(&d, 0, sizeof(d));
-			d.nwh = s_hwnd;
+			d.nwh = s_platform_data;
 			bgfx::setPlatformData(d);
 		}
 		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub/*, &m_bgfx_allocator*/);
@@ -569,16 +567,16 @@ struct RendererImpl : public Renderer
 	int m_view_counter;
 	BGFXAllocator m_bgfx_allocator;
 
-	static HWND s_hwnd;
+	static void* s_platform_data;
 };
 
 
-HWND RendererImpl::s_hwnd = nullptr;
+void* RendererImpl::s_platform_data = nullptr;
 
 
 void Renderer::setInitData(void* data)
 {
-	RendererImpl::s_hwnd = (HWND)data;
+	RendererImpl::s_platform_data = data;
 }
 
 

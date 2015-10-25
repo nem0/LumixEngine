@@ -165,7 +165,6 @@ namespace Lumix
 }
 
 bool ColorPicker(const char* label, float col[3]);
-void getKeyName(int virtualKey, char* out, int max_size);
 void getEntityListDisplayName(Lumix::WorldEditor& editor,
 	char* buf,
 	int max_size,
