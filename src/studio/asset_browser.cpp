@@ -424,16 +424,22 @@ void AssetBrowser::onGUIMaterial()
 void AssetBrowser::onGUITexture()
 {
 	auto* texture = static_cast<Lumix::Texture*>(m_selected_resource);
-
-	ASSERT(texture->isReady() && bgfx::isValid(texture->getTextureHandle()));
+	if (texture->isFailure())
+	{
+		ImGui::Text("Texture failed to load");
+		return;
+	}
 
 	ImGui::LabelText("Size", "%dx%d", texture->getWidth(), texture->getHeight());
 	ImGui::LabelText("BPP", "%d", texture->getBytesPerPixel());
 	m_texture_handle = texture->getTextureHandle();
-	ImGui::Image(&m_texture_handle, ImVec2(200, 200));
-	if (ImGui::Button("Open"))
+	if (bgfx::isValid(m_texture_handle))
 	{
-		openInExternalEditor(m_selected_resource);
+		ImGui::Image(&m_texture_handle, ImVec2(200, 200));
+		if (ImGui::Button("Open"))
+		{
+			openInExternalEditor(m_selected_resource);
+		}
 	}
 }
 

@@ -156,6 +156,7 @@ public:
 
 	virtual void addPlugin(Plugin& plugin) = 0;
 	virtual void removePlugin(Plugin& plugin) = 0;
+	virtual bool isRelativePath(const char* path) = 0;
 	virtual void getRelativePath(char* relative_path,
 								 int max_length,
 								 const char* source) = 0;

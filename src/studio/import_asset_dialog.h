@@ -50,6 +50,7 @@ class ImportAssetDialog
 		bool checkTextures();
 		bool checkTexture(const char* source_dir, const char* path, const char* message);
 		void importTexture();
+		bool isTextureDirValid() const;
 
 	private:
 		Lumix::WorldEditor& m_editor;
@@ -62,6 +63,7 @@ class ImportAssetDialog
 		char m_message[1024];
 		char m_source[Lumix::MAX_PATH_LENGTH];
 		char m_output_dir[Lumix::MAX_PATH_LENGTH];
+		char m_texture_output_dir[Lumix::MAX_PATH_LENGTH];
 		bool m_source_exists;
 		bool m_optimize_mesh_on_import;
 		bool m_gen_smooth_normal;

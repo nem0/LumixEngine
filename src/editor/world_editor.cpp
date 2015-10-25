@@ -18,6 +18,7 @@
 #include "core/log.h"
 #include "core/matrix.h"
 #include "core/mt/mutex.h"
+#include "core/path_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
@@ -2376,12 +2377,19 @@ public:
 		m_universe_loaded.invoke();
 	}
 
+
+	virtual bool isRelativePath(const char* path) override
+	{
+		return strncmp(m_base_path.c_str(), path, m_base_path.length()) == 0;
+	}
+
+
 	virtual void getRelativePath(char* relative_path,
 								 int max_length,
 								 const char* source) override
 	{
 		char tmp[MAX_PATH_LENGTH];
-		makeLowercase(tmp, sizeof(tmp), source);
+		Lumix::PathUtils::normalize(source, tmp, sizeof(tmp));
 
 		if (strncmp(m_base_path.c_str(), tmp, m_base_path.length()) == 0)
 		{

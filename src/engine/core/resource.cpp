@@ -87,7 +87,7 @@ void Resource::fileLoaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 
 void Resource::doUnload()
 {
-	ASSERT(m_desired_state != State::EMPTY);
+	ASSERT(m_desired_state != State::EMPTY || m_current_state != State::EMPTY);
 	m_desired_state = State::EMPTY;
 	unload();
 	ASSERT(m_empty_dep_count <= 1);
