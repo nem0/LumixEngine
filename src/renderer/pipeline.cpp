@@ -1059,7 +1059,18 @@ struct PipelineInstanceImpl : public PipelineInstance
 		projection_mtx.setOrtho(-1, 1, 1, -1, 0, 30);
 
 		bgfx::setViewTransform(m_view_idx, &Matrix::IDENTITY.m11, &projection_mtx.m11);
-		bgfx::setViewRect(m_view_idx, m_view_x, m_view_y, (uint16_t)m_width, (uint16_t)m_height);
+		if (m_current_framebuffer)
+		{
+			bgfx::setViewRect(m_view_idx,
+				m_view_x,
+				m_view_y,
+				(uint16_t)m_current_framebuffer->getWidth(),
+				(uint16_t)m_current_framebuffer->getHeight());
+		}
+		else
+		{
+			bgfx::setViewRect(m_view_idx, m_view_x, m_view_y, (uint16_t)m_width, (uint16_t)m_height);
+		}
 
 		bgfx::TransientVertexBuffer vb;
 		bgfx::allocTransientVertexBuffer(&vb, 6, m_base_vertex_decl);
