@@ -1391,7 +1391,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		if (m_is_current_light_global && !m_is_rendering_in_shadowmap && m_global_light_shadowmap)
 		{
-			auto handle = m_global_light_shadowmap->getRenderbufferHandle(1);
+			auto handle = m_global_light_shadowmap->getRenderbufferHandle(0);
 			bgfx::setTexture(shader->getTextureSlotCount(), m_tex_shadowmap_uniform, handle);
 		}
 	}
