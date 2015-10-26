@@ -477,6 +477,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		if (old_state != Resource::State::READY &&
 			new_state == Resource::State::READY)
 		{
+			m_width = m_height = -1;
 			for (int i = 0; i < m_framebuffers.size(); ++i)
 			{
 				m_allocator.deleteObject(m_framebuffers[i]);
