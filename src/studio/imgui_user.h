@@ -24,4 +24,15 @@ bool ListBox(const char* label,
 
 void ResetActiveID();
 
+ImVec2 GetWindowSizeContents();
+
+void BeginNode(ImGuiID id, ImVec2 screen_pos);
+void EndNode(ImVec2& pos);
+bool NodePin(ImGuiID id, ImVec2 screen_pos);
+void NodeLink(ImVec2 from, ImVec2 to);
+ImVec2 GetNodeInputPos(ImGuiID node_id, int input);
+ImVec2 GetNodeOutputPos(ImGuiID node_id, int output);
+
+void NodeSlots(int count, bool input);
+
 } // namespace ImGui

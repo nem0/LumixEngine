@@ -1,5 +1,10 @@
 #include "ocornut-imgui/imgui.h"
 #include "ocornut-imgui/imgui_internal.h"
+#include "core/delegate.h"
+
+
+static const ImVec2 NODE_WINDOW_PADDING(8.0f, 8.0f);
+static const float NODE_SLOT_RADIUS = 4.0f;
 
 
 namespace ImGui
@@ -158,6 +163,140 @@ bool ImGui::ListBox(const char* label,
 void ResetActiveID()
 {
 	SetActiveID(0);
+}
+
+
+ImVec2 GetWindowSizeContents()
+{
+	ImGuiWindow* window = GetCurrentWindowRead();
+	return window->SizeContents;
+}
+
+
+static ImVec2 node_pos;
+static ImGuiID last_node_id;
+
+
+void BeginNode(ImGuiID id, ImVec2 screen_pos)
+{
+	PushID(id);
+	last_node_id = id;
+	node_pos = screen_pos;
+	ImGui::SetCursorScreenPos(screen_pos + ImGui::GetStyle().WindowPadding);
+	ImGui::PushItemWidth(200);
+	ImDrawList* draw_list = ImGui::GetWindowDrawList();
+	draw_list->ChannelsSplit(2);
+	draw_list->ChannelsSetCurrent(1);
+	ImGui::BeginGroup();
+}
+
+
+void EndNode(ImVec2& pos)
+{
+	ImDrawList* draw_list = ImGui::GetWindowDrawList();
+
+	ImGui::EndGroup();
+	ImGui::PopItemWidth();
+
+	float height = ImGui::GetCursorScreenPos().y - node_pos.y;
+	ImVec2 size(200, height + ImGui::GetStyle().WindowPadding.y);
+	ImGui::SetCursorScreenPos(node_pos);
+
+	ImGui::SetNextWindowPos(node_pos);
+	ImGui::SetNextWindowSize(size);
+	ImGui::BeginChild((ImGuiID)last_node_id, size, false , ImGuiWindowFlags_NoInputs);
+	ImGui::EndChild();
+
+	ImGui::SetCursorScreenPos(node_pos);
+	ImGui::InvisibleButton("bg", size);
+	if(ImGui::IsItemActive() && ImGui::IsMouseDragging(0))
+	{
+		pos += ImGui::GetIO().MouseDelta;
+	}
+
+	draw_list->ChannelsSetCurrent(0);
+	draw_list->AddRectFilled(node_pos, node_pos + size, ImColor(60, 60, 60), 4.0f);
+	draw_list->AddRect(node_pos, node_pos + size, ImColor(100, 100, 100), 4.0f);
+
+	PopID();
+	draw_list->ChannelsMerge();
+}
+
+
+ImVec2 GetNodeInputPos(ImGuiID id, int input)
+{
+	ImGui::PushID(id);
+
+	auto* parent_win = ImGui::GetCurrentWindow();
+	char title[256];
+	ImFormatString(title, IM_ARRAYSIZE(title), "%s.child_%08x", parent_win->Name, id);
+	auto* win = FindWindowByName(title);
+
+	ImVec2 pos = win->Pos;
+	pos.x -= NODE_SLOT_RADIUS;
+	auto& style = ImGui::GetStyle();
+	pos.y += (ImGui::GetTextLineHeight() + style.ItemSpacing.y) * input;
+	pos.y += style.WindowPadding.y + ImGui::GetTextLineHeight() * 0.5f;
+
+
+	ImGui::PopID();
+	return pos;
+}
+
+
+ImVec2 GetNodeOutputPos(ImGuiID id, int output)
+{
+	ImGui::PushID(id);
+
+	auto* parent_win = ImGui::GetCurrentWindow();
+	char title[256];
+	ImFormatString(title, IM_ARRAYSIZE(title), "%s.child_%08x", parent_win->Name, id);
+	auto* win = FindWindowByName(title);
+
+	ImVec2 pos = win->Pos;
+	pos.x += win->Size.x + NODE_SLOT_RADIUS;
+	auto& style = ImGui::GetStyle();
+	pos.y += (ImGui::GetTextLineHeight() + style.ItemSpacing.y) * output;
+	pos.y += style.WindowPadding.y + ImGui::GetTextLineHeight() * 0.5f;
+
+	ImGui::PopID();
+	return pos;
+}
+
+
+bool NodePin(ImGuiID id, ImVec2 screen_pos)
+{
+	ImDrawList* draw_list = ImGui::GetWindowDrawList();
+	ImGui::SetCursorScreenPos(screen_pos - ImVec2(NODE_SLOT_RADIUS, NODE_SLOT_RADIUS));
+	ImGui::PushID(id);
+	ImGui::InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
+	bool hovered = ImGui::IsItemHovered();
+	ImGui::PopID();
+	draw_list->AddCircleFilled(screen_pos,
+		NODE_SLOT_RADIUS,
+		hovered ? ImColor(0, 150, 0, 150) : ImColor(150, 150, 150, 150));
+	return hovered;
+}
+
+
+void NodeLink(ImVec2 from, ImVec2 to)
+{
+	ImVec2 p1 = from;
+	ImVec2 t1 = ImVec2(+80.0f, 0.0f);
+	ImVec2 p2 = to;
+	ImVec2 t2 = ImVec2(+80.0f, 0.0f);
+	const int STEPS = 12;
+	ImDrawList* draw_list = ImGui::GetWindowDrawList();
+	for(int step = 0; step <= STEPS; step++)
+	{
+		float t = (float)step / (float)STEPS;
+		float h1 = +2 * t*t*t - 3 * t*t + 1.0f;
+		float h2 = -2 * t*t*t + 3 * t*t;
+		float h3 = t*t*t - 2 * t*t + t;
+		float h4 = t*t*t - t*t;
+		draw_list->PathLineTo(ImVec2(h1*p1.x + h2*p2.x + h3*t1.x + h4*t2.x, h1*p1.y + h2*p2.y + h3*t1.y + h4*t2.y));
+	}
+	draw_list->PathStroke(ImColor(200, 200, 100), false, 3.0f);
 }
 
 
