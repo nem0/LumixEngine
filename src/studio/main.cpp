@@ -36,13 +36,11 @@
 #include "scene_view.h"
 #include "settings.h"
 #include "shader_compiler.h"
+#include "shader_editor.h"
 #include "universe/hierarchy.h"
 #include "utils.h"
 
 #include <bgfx/bgfx.h>
-
-
-// http://prideout.net/blog/?p=36
 
 
 void imGuiCallback(ImDrawData* draw_data);
@@ -67,6 +65,7 @@ public:
 		, m_metadata(m_allocator)
 		, m_gui_pipeline(nullptr)
 		, m_is_welcome_screen_opened(true)
+		, m_shader_editor(nullptr)
 	{
 		m_entity_list_search[0] = '\0';
 		m_template_name[0] = '\0';
@@ -236,6 +235,7 @@ public:
 			m_sceneview.onGUI();
 			m_hierarchy_ui.onGUI();
 			m_gameview.onGui();
+			//m_shader_editor->onGUI();
 			if (m_is_style_editor_opened) ImGui::ShowStyleEditor();
 			m_settings.onGUI(&m_actions[0], m_actions.size());
 		}
@@ -1050,6 +1050,7 @@ public:
 		m_import_asset_dialog = new ImportAssetDialog(*m_editor, m_metadata);
 		m_shader_compiler = new ShaderCompiler(*m_editor, *m_log_ui);
 		m_hierarchy_ui.setWorldEditor(*m_editor);
+		m_shader_editor = new ShaderEditor(m_editor->getAllocator());
 
 		m_editor->universeCreated().bind<StudioApp, &StudioApp::onUniverseCreated>(this);
 		m_editor->universeDestroyed().bind<StudioApp, &StudioApp::onUniverseDestroyed>(this);
@@ -1232,6 +1233,7 @@ public:
 	HierarchyUI m_hierarchy_ui;
 	Settings m_settings;
 	Metadata m_metadata;
+	ShaderEditor* m_shader_editor;
 	char m_entity_list_search[100];
 	char m_template_name[100];
 
