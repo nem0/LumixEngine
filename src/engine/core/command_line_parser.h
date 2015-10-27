@@ -71,7 +71,7 @@ public:
 			return;
 		}
 		
-		while (*lhs && *rhs && !isWhitespace(*rhs) && lhs != end)
+		while (*rhs && !isWhitespace(*rhs) && lhs != end)
 		{
 			*lhs = *rhs;
 			++lhs;
