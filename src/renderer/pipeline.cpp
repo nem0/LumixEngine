@@ -1053,6 +1053,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Material* material = m_materials[material_index];
 		if (!material->isReady() || !bgfx::checkAvailTransientVertexBuffer(3, m_base_vertex_decl))
 		{
+			bgfx::touch(m_view_idx);
 			return;
 		}
 
