@@ -231,6 +231,11 @@ ImVec2 GetNodeInputPos(ImGuiID id, int input)
 	char title[256];
 	ImFormatString(title, IM_ARRAYSIZE(title), "%s.child_%08x", parent_win->Name, id);
 	auto* win = FindWindowByName(title);
+	if (!win)
+	{
+		ImGui::PopID();
+		return ImVec2(0, 0);
+	}
 
 	ImVec2 pos = win->Pos;
 	pos.x -= NODE_SLOT_RADIUS;
@@ -252,6 +257,11 @@ ImVec2 GetNodeOutputPos(ImGuiID id, int output)
 	char title[256];
 	ImFormatString(title, IM_ARRAYSIZE(title), "%s.child_%08x", parent_win->Name, id);
 	auto* win = FindWindowByName(title);
+	if (!win)
+	{
+		ImGui::PopID();
+		return ImVec2(0, 0);
+	}
 
 	ImVec2 pos = win->Pos;
 	pos.x += win->Size.x + NODE_SLOT_RADIUS;
