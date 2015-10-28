@@ -790,27 +790,27 @@ void ShaderEditor::onGUI()
 			{
 				if(ImGui::MenuItem("LERP"))
 				{
-					addNode(new LerpNode(*this), add_pos);
+					addNode(LUMIX_NEW(m_allocator, LerpNode)(*this), add_pos);
 				}
 				if (ImGui::MenuItem("Sample"))
 				{
-					addNode(new SampleNode(*this), add_pos);
+					addNode(LUMIX_NEW(m_allocator, SampleNode)(*this), add_pos);
 				}
 				if (ImGui::MenuItem("Attribute"))
 				{
-					addNode(new AttributeNode(*this), add_pos);
+					addNode(LUMIX_NEW(m_allocator, AttributeNode)(*this), add_pos);
 				}
 				if (ImGui::MenuItem("Color constant"))
 				{
-					addNode(new ColorConstNode(*this), add_pos);
+					addNode(LUMIX_NEW(m_allocator, ColorConstNode)(*this), add_pos);
 				}
 				if (ImGui::MenuItem("Float constant"))
 				{
-					addNode(new FloatConstNode(*this), add_pos);
+					addNode(LUMIX_NEW(m_allocator, FloatConstNode)(*this), add_pos);
 				}
 				if (ImGui::MenuItem("Uniform"))
 				{
-					addNode(new UniformNode(*this), add_pos);
+					addNode(LUMIX_NEW(m_allocator, UniformNode)(*this), add_pos);
 				}
 				ImGui::EndMenu();
 			}
