@@ -352,7 +352,7 @@ ShaderEditor::ShaderEditor(Lumix::IAllocator& allocator)
 	m_last_node_id = 0;
 	m_new_link_info.is_active = false;
 
-	m_nodes.push(new OutputNode(*this));
+	m_nodes.push(LUMIX_NEW(allocator, OutputNode)(*this));
 	m_nodes.back()->pos.x = 250;
 	m_nodes.back()->pos.y = 50;
 	m_nodes.back()->id = ++m_last_node_id;
@@ -361,7 +361,7 @@ ShaderEditor::ShaderEditor(Lumix::IAllocator& allocator)
 
 ShaderEditor::~ShaderEditor()
 {
-	TODO("todo");
+	clear();
 }
 
 
@@ -535,7 +535,7 @@ void ShaderEditor::clear()
 {
 	for (auto* node : m_nodes)
 	{
-		delete node;
+		m_allocator.deleteObject(node);
 	}
 	m_nodes.clear();
 	m_last_node_id = 0;
@@ -547,19 +547,19 @@ ShaderEditor::Node* ShaderEditor::createNode(int type)
 	switch ((NodeTypes)type)
 	{
 		case NodeTypes::OUTPUT:
-			return new OutputNode(*this); TODO("new");
+			return LUMIX_NEW(m_allocator, OutputNode)(*this);
 		case NodeTypes::ATTRIBUTE:
-			return new AttributeNode(*this); TODO("new");
+			return LUMIX_NEW(m_allocator, AttributeNode)(*this);
 		case NodeTypes::COLOR_CONST:
-			return new ColorConstNode(*this); TODO("new");
+			return LUMIX_NEW(m_allocator, ColorConstNode)(*this);
 		case NodeTypes::FLOAT_CONST:
-			return new FloatConstNode(*this); TODO("new");
+			return LUMIX_NEW(m_allocator, FloatConstNode)(*this);
 		case NodeTypes::LERP:
-			return new LerpNode(*this); TODO("new");
+			return LUMIX_NEW(m_allocator, LerpNode)(*this);
 		case NodeTypes::SAMPLE:
-			return new SampleNode(*this); TODO("new");
+			return LUMIX_NEW(m_allocator, SampleNode)(*this);
 		case NodeTypes::UNIFORM:
-			return new UniformNode(*this); TODO("new");
+			return LUMIX_NEW(m_allocator, UniformNode)(*this);
 	}
 
 	return nullptr;
@@ -571,7 +571,7 @@ void ShaderEditor::load()
 	char path[Lumix::MAX_PATH_LENGTH];
 	if (!Lumix::getOpenFilename(path, Lumix::lengthOf(path), "Shader edit data\0*.sed\0"))
 	{
-		return; TODO("todo");
+		return;
 	}
 	m_path = path;
 	

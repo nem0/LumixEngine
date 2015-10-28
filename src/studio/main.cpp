@@ -684,12 +684,13 @@ public:
 
 		shutdownImGui();
 
-		delete m_profiler_ui;
-		delete m_asset_browser;
-		delete m_log_ui;
-		delete m_property_grid;
-		delete m_import_asset_dialog;
-		delete m_shader_compiler;
+		m_allocator.deleteObject(m_profiler_ui);
+		m_allocator.deleteObject(m_asset_browser);
+		m_allocator.deleteObject(m_log_ui);
+		m_allocator.deleteObject(m_property_grid);
+		m_allocator.deleteObject(m_import_asset_dialog);
+		m_allocator.deleteObject(m_shader_compiler);
+		m_allocator.deleteObject(m_shader_editor);
 		Lumix::WorldEditor::destroy(m_editor, m_allocator);
 		m_sceneview.shutdown();
 		m_gameview.shutdown();
@@ -702,6 +703,7 @@ public:
 		m_gui_pipeline = nullptr;
 		m_gui_pipeline_source = nullptr;
 		m_editor = nullptr;
+		m_shader_editor = nullptr;
 
 		PlatformInterface::shutdown();
 	}
@@ -1042,15 +1044,15 @@ public:
 
 		addActions();
 
-		m_asset_browser = new AssetBrowser(*m_editor, m_metadata);
-		m_property_grid = new PropertyGrid(*m_editor, *m_asset_browser, m_actions);
+		m_asset_browser = LUMIX_NEW(m_allocator, AssetBrowser)(*m_editor, m_metadata);
+		m_property_grid = LUMIX_NEW(m_allocator, PropertyGrid)(*m_editor, *m_asset_browser, m_actions);
 		auto engine_allocator = static_cast<Lumix::Debug::Allocator*>(&m_engine->getAllocator());
-		m_profiler_ui = new ProfilerUI(engine_allocator, &m_engine->getResourceManager());
-		m_log_ui = new LogUI(m_editor->getAllocator());
-		m_import_asset_dialog = new ImportAssetDialog(*m_editor, m_metadata);
-		m_shader_compiler = new ShaderCompiler(*m_editor, *m_log_ui);
+		m_profiler_ui = LUMIX_NEW(m_allocator, ProfilerUI)(engine_allocator, &m_engine->getResourceManager());
+		m_log_ui = LUMIX_NEW(m_allocator, LogUI)(m_editor->getAllocator());
+		m_import_asset_dialog = LUMIX_NEW(m_allocator, ImportAssetDialog)(*m_editor, m_metadata);
+		m_shader_compiler = LUMIX_NEW(m_allocator, ShaderCompiler)(*m_editor, *m_log_ui);
 		m_hierarchy_ui.setWorldEditor(*m_editor);
-		m_shader_editor = new ShaderEditor(m_editor->getAllocator());
+		m_shader_editor = LUMIX_NEW(m_allocator, ShaderEditor)(m_editor->getAllocator());
 
 		m_editor->universeCreated().bind<StudioApp, &StudioApp::onUniverseCreated>(this);
 		m_editor->universeDestroyed().bind<StudioApp, &StudioApp::onUniverseDestroyed>(this);
