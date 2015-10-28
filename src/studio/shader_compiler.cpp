@@ -485,6 +485,7 @@ void ShaderCompiler::update(float time_delta)
 			if (m_processes.empty() && m_changed_files.empty())
 			{
 				reloadShaders();
+				parseDependencies();
 			}
 		}
 	}
