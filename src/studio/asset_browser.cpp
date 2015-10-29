@@ -59,6 +59,7 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 	, m_autoreload_changed_resource(true)
 	, m_changed_files(editor.getAllocator())
 	, m_is_focus_requested(false)
+	, m_changed_files_mutex(false)
 {
 	m_filter[0] = '\0';
 	m_current_type = 0;
@@ -88,6 +89,7 @@ void AssetBrowser::onFileChanged(const char* path)
 	uint32_t resource_type = getResourceType(path);
 	if (resource_type == 0) return;
 
+	Lumix::MT::SpinLock lock(m_changed_files_mutex);
 	m_changed_files.push(Lumix::Path(path));
 }
 
@@ -123,8 +125,23 @@ AssetBrowser::Type AssetBrowser::getTypeFromResourceManagerType(uint32_t type) c
 void AssetBrowser::update()
 {
 	PROFILE_FUNCTION();
-	for (const auto& path_obj : m_changed_files)
+	bool is_empty;
 	{
+		Lumix::MT::SpinLock lock(m_changed_files_mutex);
+		is_empty = m_changed_files.empty();
+	}
+
+	while (!is_empty)
+	{
+		Lumix::Path path_obj;
+		{
+			Lumix::MT::SpinLock lock(m_changed_files_mutex);
+			
+			path_obj = m_changed_files.back();
+			m_changed_files.pop();
+			is_empty = m_changed_files.empty();
+		}
+
 		const char* path = path_obj.c_str();
 		
 		uint32_t resource_type = getResourceType(path);
@@ -132,7 +149,6 @@ void AssetBrowser::update()
 
 		if (m_autoreload_changed_resource) m_editor.getEngine().getResourceManager().reload(path);
 
-		Lumix::Path path_obj(path);
 		if (!Lumix::fileExists(path))
 		{
 			int index = getTypeFromResourceManagerType(resource_type);
