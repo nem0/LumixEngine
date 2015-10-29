@@ -60,6 +60,7 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 	, m_changed_files(editor.getAllocator())
 	, m_is_focus_requested(false)
 	, m_changed_files_mutex(false)
+	, m_history(editor.getAllocator())
 {
 	m_filter[0] = '\0';
 	m_current_type = 0;
@@ -217,6 +218,10 @@ void AssetBrowser::onGUI()
 
 void AssetBrowser::selectResource(Lumix::Resource* resource)
 {
+	if (m_selected_resource) m_history.push(m_selected_resource->getPath());
+	if (m_history.size() > 20) m_history.erase(0);
+
+
 	m_text_buffer[0] = '\0';
 	m_wanted_resource = "";
 	unloadResource();
@@ -734,10 +739,16 @@ void AssetBrowser::onGUIResource()
 {
 	if (!m_selected_resource) return;
 
-
 	const char* path = m_selected_resource->getPath().c_str();
 	ImGui::Separator();
 	ImGui::LabelText("Selected resource", path);
+	if (!m_history.empty() && ImGui::Button("Back"))
+	{
+		selectResource(m_history.back());
+		m_history.pop();
+		m_history.pop();
+		return;
+	}
 	ImGui::Separator();
 
 	if (!m_selected_resource->isReady() && !m_selected_resource->isFailure())
