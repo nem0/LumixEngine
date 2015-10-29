@@ -89,11 +89,11 @@ void Gizmo::getEnityMatrix(Matrix& mtx, int selection_index)
 
 	if (m_pivot == Pivot::OBJECT_PIVOT)
 	{
-		mtx = m_universe->getMatrix(entity);
+		mtx = m_universe->getPositionAndRotation(entity);
 	}
 	else if (m_pivot == Pivot::CENTER)
 	{
-		mtx = m_universe->getMatrix(entity);
+		mtx = m_universe->getPositionAndRotation(entity);
 		ComponentIndex cmp = m_scene->getRenderableComponent(entity);
 		if (cmp >= 0)
 		{
@@ -105,12 +105,12 @@ void Gizmo::getEnityMatrix(Matrix& mtx, int selection_index)
 			}
 			else
 			{
-				mtx = m_universe->getMatrix(entity);
+				mtx = m_universe->getPositionAndRotation(entity);
 			}
 		}
 		else
 		{
-			mtx = m_universe->getMatrix(entity);
+			mtx = m_universe->getPositionAndRotation(entity);
 		}
 	}
 	else
@@ -139,7 +139,7 @@ void Gizmo::updateScale(ComponentIndex camera)
 		float fov = m_scene->getCameraFOV(camera);
 		float scale = tanf(fov * Math::PI / 180 * 0.5f) *
 					  (mtx.getTranslation() - camera_pos).length() * 2;
-		scale /= 10 * mtx.getXVector().length();
+		scale /= 10 / mtx.getXVector().length();
 		m_scale = scale;
 	}
 }
@@ -644,7 +644,7 @@ Vec3 Gizmo::getMousePlaneIntersection(ComponentIndex camera, int x, int y)
 	m_scene->getRay(camera, (float)x, (float)y, origin, dir);
 	dir.normalize();
 	Entity camera_entity = m_scene->getCameraEntity(camera);
-	Matrix camera_mtx = m_universe->getMatrix(camera_entity);
+	Matrix camera_mtx = m_universe->getPositionAndRotation(camera_entity);
 	Matrix gizmo_mtx;
 	getMatrix(gizmo_mtx);
 	bool is_two_axed = m_transform_axis == Axis::XZ || m_transform_axis == Axis::XY ||
