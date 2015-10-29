@@ -129,19 +129,18 @@ void Gizmo::getEnityMatrix(Matrix& mtx, int selection_index)
 
 void Gizmo::updateScale(ComponentIndex camera)
 {
-	if (!m_editor.getSelectedEntities().empty())
-	{
-		Entity entity = m_scene->getCameraEntity(camera);
-		Vec3 camera_pos = m_universe->getPosition(entity);
-		Matrix mtx;
-		getMatrix(mtx);
-		Vec3 pos = mtx.getTranslation();
-		float fov = m_scene->getCameraFOV(camera);
-		float scale = tanf(fov * Math::PI / 180 * 0.5f) *
-					  (mtx.getTranslation() - camera_pos).length() * 2;
-		scale /= 10 / mtx.getXVector().length();
-		m_scale = scale;
-	}
+	if (m_editor.getSelectedEntities().empty()) return;
+
+	Entity entity = m_scene->getCameraEntity(camera);
+	Vec3 camera_pos = m_universe->getPosition(entity);
+	Matrix mtx;
+	getMatrix(mtx);
+	Vec3 pos = mtx.getTranslation();
+	float fov = m_scene->getCameraFOV(camera);
+	float scale = tanf(fov * Math::PI / 180 * 0.5f) *
+					(mtx.getTranslation() - camera_pos).length() * 2;
+	scale /= 10 / mtx.getXVector().length();
+	m_scale = scale;
 }
 
 

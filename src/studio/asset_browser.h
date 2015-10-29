@@ -64,6 +64,7 @@ private:
 private:
 	Metadata& m_metadata;
 	Lumix::Array<Lumix::Path> m_changed_files;
+	Lumix::Array<Lumix::Path> m_history;
 	Lumix::MT::SpinMutex m_changed_files_mutex;
 	Lumix::Array<Lumix::Array<Lumix::Path> > m_resources;
 	Lumix::Resource* m_selected_resource;
