@@ -39,7 +39,6 @@ namespace Lumix
 
 
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
-static const uint32_t PARTICLE_EMITTER_HASH = crc32("particle_emitter");
 static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
 static const uint32_t GLOBAL_LIGHT_HASH = crc32("global_light");
 static const uint32_t CAMERA_HASH = crc32("camera");
@@ -180,18 +179,19 @@ public:
 		, m_renderable_created(m_allocator)
 		, m_renderable_destroyed(m_allocator)
 		, m_is_grass_enabled(true)
-		, m_particle_emitters(m_allocator)
 	{
-		m_universe.entityTransformed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
-		m_culling_system = CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
+		m_universe.entityTransformed()
+			.bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
+		m_culling_system =
+			CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
 		m_time = 0;
 	}
 
 
 	~RenderSceneImpl()
 	{
-		m_universe.entityTransformed().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(
-			this);
+		m_universe.entityTransformed()
+			.unbind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 
 		for (int i = 0; i < m_model_loaded_callbacks.size(); ++i)
 		{
@@ -207,8 +207,10 @@ public:
 		{
 			if (m_renderables[i]->m_model)
 			{
-				auto& manager = m_renderables[i]->m_model->getResourceManager();
-				manager.get(ResourceManager::MODEL)->unload(*m_renderables[i]->m_model);
+				m_renderables[i]
+					->m_model->getResourceManager()
+					.get(ResourceManager::MODEL)
+					->unload(*m_renderables[i]->m_model);
 			}
 			m_allocator.deleteObject(m_renderables[i]);
 		}
@@ -288,12 +290,6 @@ public:
 	}
 
 
-	virtual const Array<Particles::EmitterHandle>& getParticleEmitters() override
-	{
-		return m_particle_emitters;
-	}
-
-
 	void update(float dt) override
 	{
 		PROFILE_FUNCTION();
@@ -324,11 +320,6 @@ public:
 				life -= dt;
 				m_debug_points[i].m_life = life;
 			}
-		}
-
-		for(auto handle : m_particle_emitters)
-		{
-			Particles::update(handle, dt);
 		}
 	}
 
@@ -664,11 +655,6 @@ public:
 			m_terrains[component] = nullptr;
 			m_universe.destroyComponent(entity, type, this, component);
 		}
-		else if(type == PARTICLE_EMITTER_HASH)
-		{
-			m_particle_emitters.eraseFast(component);
-			Particles::destroyEmitter(component);
-		}
 		else
 		{
 			ASSERT(false);
@@ -714,10 +700,6 @@ public:
 		else if (type == POINT_LIGHT_HASH)
 		{
 			return createPointLight(entity);
-		}
-		else if(type == PARTICLE_EMITTER_HASH)
-		{
-			return createParticleEmitter(entity);
 		}
 		return INVALID_COMPONENT;
 	}
@@ -2348,18 +2330,10 @@ private:
 	}
 
 
-	ComponentIndex createParticleEmitter(Entity entity)
-	{
-		Particles::EmitterHandle handle = Particles::createEmitter(entity, m_universe);
-		m_particle_emitters.push(handle);
-		return handle;
-	}
-
-
 	ComponentIndex createPointLight(Entity entity)
 	{
 		PointLight& light = m_point_lights.pushEmpty();
-		m_light_influenced_geometry.emplace(m_allocator);
+		m_light_influenced_geometry.push(Array<int>(m_allocator));
 		light.m_entity = entity;
 		light.m_diffuse_color.set(1, 1, 1);
 		light.m_intensity = 1;
@@ -2400,7 +2374,6 @@ private:
 	Array<Renderable*> m_renderables;
 
 	int m_point_light_last_uid;
-	Array<Particles::EmitterHandle> m_particle_emitters;
 	Array<PointLight> m_point_lights;
 	Array<Array<int>> m_light_influenced_geometry;
 	int m_active_global_light_uid;
