@@ -116,6 +116,16 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		}
 		break;
 	}
+	case Lumix::IPropertyDescriptor::VEC2:
+	{
+		Lumix::Vec2 v;
+		tmp.read(v);
+		if (ImGui::DragFloat2(desc_name, &v.x))
+		{
+			m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
+		}
+		break;
+	}
 	case Lumix::IPropertyDescriptor::VEC3:
 	{
 		Lumix::Vec3 v;

@@ -255,8 +255,20 @@ struct RendererImpl : public Renderer
 		m_engine.registerComponentType("camera", "Camera");
 		m_engine.registerComponentType("global_light", "Global light");
 		m_engine.registerComponentType("renderable", "Mesh");
+		m_engine.registerComponentType("particle_emitter", "Particle emitter");
 		m_engine.registerComponentType("point_light", "Point light");
 		m_engine.registerComponentType("terrain", "Terrain");
+
+		m_engine.registerProperty("particle_emitter",
+			LUMIX_NEW(allocator, Vec2PropertyDescriptor<RenderScene>)("Initial life",
+			&RenderScene::getParticleEmitterInitialLife,
+			&RenderScene::setParticleEmitterInitialLife,
+			allocator));
+		m_engine.registerProperty("particle_emitter",
+			LUMIX_NEW(allocator, Vec2PropertyDescriptor<RenderScene>)("Spawn period",
+			&RenderScene::getParticleEmitterSpawnPeriod,
+			&RenderScene::setParticleEmitterSpawnPeriod,
+			allocator));
 
 		m_engine.registerProperty("camera",
 			LUMIX_NEW(allocator, StringPropertyDescriptor<RenderScene>)("Slot",
