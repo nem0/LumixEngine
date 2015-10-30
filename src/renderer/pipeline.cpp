@@ -21,6 +21,7 @@
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
+#include "renderer/particle_system.h"
 #include "renderer/pose.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
@@ -644,7 +645,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 			Matrix projection_matrix;
 			projection_matrix.setPerspective(fovx, aspect, 0.01f, range);
-			
+
 			Matrix view_matrix;
 			view_matrix.fromEuler(YPR[i][0], YPR[i][1], YPR[i][2]);
 			view_matrix.setTranslation(light_pos);
@@ -656,7 +657,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				aspect,
 				0.01f,
 				range);
-			
+
 			view_matrix.fastInverse();
 
 			bgfx::setViewTransform(
@@ -674,17 +675,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void renderModels(ComponentIndex light,
-					  const Frustum& frustum,
-					  int64_t layer_mask)
+	void renderModels(ComponentIndex light, const Frustum& frustum, int64_t layer_mask)
 	{
 		PROFILE_FUNCTION();
 
 		m_tmp_meshes.clear();
 		m_current_light = light;
 		m_is_current_light_global = false;
-		m_scene->getPointLightInfluencedGeometry(
-			light, frustum, m_tmp_meshes, layer_mask);
+		m_scene->getPointLightInfluencedGeometry(light, frustum, m_tmp_meshes, layer_mask);
 
 		renderMeshes(m_tmp_meshes);
 		m_current_light = -1;
@@ -1013,6 +1011,17 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_scene->getPointLightInfluencedGeometry(light, m_tmp_meshes, layer_mask);
 
 		renderMeshes(m_tmp_meshes);
+	}
+
+
+	void renderParticles()
+	{
+		auto& particles = m_scene->getParticleEmitters();
+
+		for(auto particle : particles)
+		{
+			Particles::render(particle);
+		}
 	}
 
 
@@ -1813,9 +1822,13 @@ void clear(PipelineInstanceImpl* pipeline, const char* buffers, int color)
 }
 
 
-void renderModels(PipelineInstanceImpl* pipeline,
-				  int64_t layer_mask,
-				  bool is_point_light_render)
+void renderParticles(PipelineInstanceImpl* pipeline)
+{
+	pipeline->renderParticles();
+}
+
+
+void renderModels(PipelineInstanceImpl* pipeline, int64_t layer_mask, bool is_point_light_render)
 {
 	if (is_point_light_render)
 	{
@@ -1966,6 +1979,7 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(applyCamera);
 	REGISTER_FUNCTION(clear);
 	REGISTER_FUNCTION(renderModels);
+	REGISTER_FUNCTION(renderParticles);
 	REGISTER_FUNCTION(renderShadowmap);
 	REGISTER_FUNCTION(renderLocalLightsShadowmaps);
 	REGISTER_FUNCTION(executeCustomCommand);

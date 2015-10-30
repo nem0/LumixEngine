@@ -6,6 +6,7 @@
 #include "core/matrix.h"
 #include "core/string.h"
 #include "iplugin.h"
+#include "renderer/particle_system.h"
 #include "renderer/ray_cast_model_hit.h"
 #include "universe/component.h"
 
@@ -230,6 +231,8 @@ public:
 	virtual int getGrassCount(ComponentIndex cmp) = 0;
 	virtual void addGrass(ComponentIndex cmp, int index) = 0;
 	virtual void removeGrass(ComponentIndex cmp, int index) = 0;
+
+	virtual const Array<Particles::EmitterHandle>& getParticleEmitters() = 0;
 
 	virtual int getClosestPointLights(const Vec3& pos, ComponentIndex* lights, int max_lights) = 0;
 	virtual void getPointLights(const Frustum& frustum, Array<ComponentIndex>& lights) = 0;
