@@ -1,4 +1,5 @@
 #include "particle_system.h"
+#include "core/math_utils.h"
 #include "universe/universe.h"
 
 
@@ -26,6 +27,13 @@ Interval::Interval()
 	: from(0)
 	, to(0)
 {
+}
+
+
+void Interval::check()
+{
+	from = Math::maxValue(from, 0.0f);
+	to = Math::maxValue(from + 0.001f, to);
 }
 
 

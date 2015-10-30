@@ -24,6 +24,9 @@ struct Interval
 	Interval();
 	float getRandom() const;
 
+
+	void check();
+
 	void operator=(const Vec2& value)
 	{
 		from = value.x;

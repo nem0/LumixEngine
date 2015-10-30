@@ -327,6 +327,11 @@ public:
 				m_debug_points[i].m_life = life;
 			}
 		}
+
+		for (auto* emitter : m_particle_emitters)
+		{
+			emitter->update(dt);
+		}
 	}
 
 	void serializeCameras(OutputBlob& serializer)
@@ -690,12 +695,14 @@ public:
 	virtual void setParticleEmitterInitialLife(ComponentIndex cmp, const Vec2& value) override
 	{
 		m_particle_emitters[cmp]->m_initial_life = value;
+		m_particle_emitters[cmp]->m_initial_life.check();
 	}
 
 
 	virtual void setParticleEmitterSpawnPeriod(ComponentIndex cmp, const Vec2& value) override
 	{
 		m_particle_emitters[cmp]->m_spawn_period = value;
+		m_particle_emitters[cmp]->m_spawn_period.check();
 	}
 
 
