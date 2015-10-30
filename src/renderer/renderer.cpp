@@ -19,6 +19,7 @@
 #include "renderer/material_manager.h"
 #include "renderer/model.h"
 #include "renderer/model_manager.h"
+#include "renderer/particle_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/shader.h"
@@ -217,11 +218,15 @@ struct RendererImpl : public Renderer
 		m_current_pass_hash = crc32("MAIN");
 		m_view_counter = 0;
 
+		Particles::init(m_allocator);
+
 		registerPropertyDescriptors();
 	}
 
 	~RendererImpl()
 	{
+		Particles::shutdown();
+
 		m_texture_manager.destroy();
 		m_model_manager.destroy();
 		m_material_manager.destroy();
@@ -255,6 +260,7 @@ struct RendererImpl : public Renderer
 		m_engine.registerComponentType("camera", "Camera");
 		m_engine.registerComponentType("global_light", "Global light");
 		m_engine.registerComponentType("renderable", "Mesh");
+		m_engine.registerComponentType("particle_emitter", "Particle emitter");
 		m_engine.registerComponentType("point_light", "Point light");
 		m_engine.registerComponentType("terrain", "Terrain");
 
