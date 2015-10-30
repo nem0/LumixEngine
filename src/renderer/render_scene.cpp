@@ -24,6 +24,7 @@
 #include "renderer/culling_system.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
+#include "renderer/particle_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/pose.h"
 #include "renderer/renderer.h"
@@ -40,6 +41,7 @@ namespace Lumix
 
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
 static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
+static const uint32_t PARTICLE_EMITTER_HASH = crc32("particle_emitter");
 static const uint32_t GLOBAL_LIGHT_HASH = crc32("global_light");
 static const uint32_t CAMERA_HASH = crc32("camera");
 static const uint32_t TERRAIN_HASH = crc32("terrain");
@@ -179,6 +181,7 @@ public:
 		, m_renderable_created(m_allocator)
 		, m_renderable_destroyed(m_allocator)
 		, m_is_grass_enabled(true)
+		, m_particle_emitters(m_allocator)
 	{
 		m_universe.entityTransformed()
 			.bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
@@ -195,22 +198,25 @@ public:
 
 		for (int i = 0; i < m_model_loaded_callbacks.size(); ++i)
 		{
-			m_allocator.deleteObject(m_model_loaded_callbacks[i]);
+			LUMIX_DELETE(m_allocator, m_model_loaded_callbacks[i]);
 		}
 
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
-			m_allocator.deleteObject(m_terrains[i]);
+			LUMIX_DELETE(m_allocator, m_terrains[i]);
+		}
+
+		for (int i = 0; i < m_particle_emitters.size(); ++i)
+		{
+			LUMIX_DELETE(m_allocator, m_particle_emitters[i]);
 		}
 
 		for (int i = 0; i < m_renderables.size(); ++i)
 		{
 			if (m_renderables[i]->m_model)
 			{
-				m_renderables[i]
-					->m_model->getResourceManager()
-					.get(ResourceManager::MODEL)
-					->unload(*m_renderables[i]->m_model);
+				auto& manager = m_renderables[i]->m_model->getResourceManager();
+				manager.get(ResourceManager::MODEL)->unload(*m_renderables[i]->m_model);
 			}
 			m_allocator.deleteObject(m_renderables[i]);
 		}
@@ -655,10 +661,41 @@ public:
 			m_terrains[component] = nullptr;
 			m_universe.destroyComponent(entity, type, this, component);
 		}
+		else if (type == PARTICLE_EMITTER_HASH)
+		{
+			Entity entity = m_particle_emitters[component]->m_entity;
+			LUMIX_DELETE(m_allocator, m_particle_emitters[component]);
+			m_particle_emitters[component] = nullptr;
+			m_universe.destroyComponent(entity, type, this, component);
+		}
 		else
 		{
 			ASSERT(false);
 		}
+	}
+
+
+	virtual Vec2 getParticleEmitterInitialLife(ComponentIndex cmp) override
+	{
+		return m_particle_emitters[cmp]->m_initial_life;
+	}
+
+
+	virtual Vec2 getParticleEmitterSpawnPeriod(ComponentIndex cmp) override
+	{
+		return m_particle_emitters[cmp]->m_spawn_period;
+	}
+
+
+	virtual void setParticleEmitterInitialLife(ComponentIndex cmp, const Vec2& value) override
+	{
+		m_particle_emitters[cmp]->m_initial_life = value;
+	}
+
+
+	virtual void setParticleEmitterSpawnPeriod(ComponentIndex cmp, const Vec2& value) override
+	{
+		m_particle_emitters[cmp]->m_spawn_period = value;
 	}
 
 
@@ -701,7 +738,38 @@ public:
 		{
 			return createPointLight(entity);
 		}
+		else if (type == PARTICLE_EMITTER_HASH)
+		{
+			return createParticleEmitter(entity);
+		}
 		return INVALID_COMPONENT;
+	}
+
+
+	ComponentIndex createParticleEmitter(Entity entity)
+	{
+		int index = -1;
+		for (int i = 0, c = m_particle_emitters.size(); i < c; ++i)
+		{
+			if (!m_particle_emitters[i])
+			{
+				index = i;
+				break;
+			}
+		}
+
+		if (index == -1)
+		{
+			index = m_particle_emitters.size();
+			m_particle_emitters.push(nullptr);
+		}
+
+		m_particle_emitters[index] =
+			LUMIX_NEW(m_allocator, ParticleEmitter)(entity, m_universe, m_allocator);
+
+		m_universe.addComponent(entity, PARTICLE_EMITTER_HASH, this, index);
+
+		return index;
 	}
 
 
@@ -2390,6 +2458,7 @@ private:
 	Array<DebugPoint> m_debug_points;
 	CullingSystem* m_culling_system;
 	DynamicRenderableCache m_dynamic_renderable_cache;
+	Array<ParticleEmitter*> m_particle_emitters;
 	Array<Array<const RenderableMesh*>> m_temporary_infos;
 	MTJD::Group m_sync_point;
 	Array<MTJD::Job*> m_jobs;

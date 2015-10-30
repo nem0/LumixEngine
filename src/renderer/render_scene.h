@@ -176,6 +176,11 @@ public:
 	virtual const char* getCameraSlot(ComponentIndex camera) = 0;
 	virtual void setCameraSize(ComponentIndex camera, int w, int h) = 0;
 
+	virtual Vec2 getParticleEmitterInitialLife(ComponentIndex cmp) = 0;
+	virtual Vec2 getParticleEmitterSpawnPeriod(ComponentIndex cmp) = 0;
+	virtual void setParticleEmitterInitialLife(ComponentIndex cmp, const Vec2& value) = 0;
+	virtual void setParticleEmitterSpawnPeriod(ComponentIndex cmp, const Vec2& value) = 0;
+
 	virtual DelegateList<void(ComponentIndex)>& renderableCreated() = 0;
 	virtual DelegateList<void(ComponentIndex)>& renderableDestroyed() = 0;
 	virtual void showRenderable(ComponentIndex cmp) = 0;
