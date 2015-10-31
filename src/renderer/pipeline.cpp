@@ -951,7 +951,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 					&info.m_matrices[0].m11,
 					m_scene->getLightFOV(light) > 180 ? 4 : 1);
 
-				int texture_offset = material->getTextureCount();
+				int texture_offset = material->getShader()->getTextureSlotCount();
 				bgfx::setTexture(texture_offset,
 					m_tex_shadowmap_uniform,
 					info.m_framebuffer->getRenderbufferHandle(0));
