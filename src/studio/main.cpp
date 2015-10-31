@@ -151,6 +151,11 @@ public:
 			if (ImGui::BeginChild("right", half_size, true))
 			{
 				ImGui::Text("Version 0.17. - News");
+				ImGui::BulletText("Back button in the asset browser");
+				ImGui::BulletText("Grass culling");
+				ImGui::BulletText("Importing compressed embedded textures");
+				ImGui::BulletText("Euler angles");
+				ImGui::BulletText("Textures relative to root");
 				ImGui::BulletText("Painting entities - align with normal");
 				ImGui::BulletText("Painting entities - random x and z rotation");
 				ImGui::BulletText("Lua properties with types");
