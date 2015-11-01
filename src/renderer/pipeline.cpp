@@ -236,6 +236,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void createUniforms()
 	{
+		m_texture_size_uniform = bgfx::createUniform("u_textureSize", bgfx::UniformType::Vec4);
 		m_cam_view_uniform = bgfx::createUniform("u_camView", bgfx::UniformType::Mat4);
 		m_cam_inv_proj_uniform = bgfx::createUniform("u_camInvProj", bgfx::UniformType::Mat4);
 		m_tex_shadowmap_uniform = bgfx::createUniform("u_texShadowmap", bgfx::UniformType::Int1);
@@ -284,6 +285,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		bgfx::destroyUniform(m_light_specular_uniform);
 		bgfx::destroyUniform(m_cam_inv_proj_uniform);
 		bgfx::destroyUniform(m_cam_view_uniform);
+		bgfx::destroyUniform(m_texture_size_uniform);
 	}
 
 
@@ -323,6 +325,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 		FrameBuffer* fb = getFramebuffer(framebuffer_name);
 		if (!fb) return;
 
+		Vec4 size;
+		size.x = (float)fb->getWidth();
+		size.y = (float)fb->getHeight();
+		bgfx::setUniform(m_texture_size_uniform, &size);
 		bgfx::setTexture(0, m_uniforms[uniform_idx], fb->getRenderbufferHandle(renderbuffer_idx));
 	}
 
@@ -951,7 +957,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 					&info.m_matrices[0].m11,
 					m_scene->getLightFOV(light) > 180 ? 4 : 1);
 
-				int texture_offset = material->getTextureCount();
+				int texture_offset = material->getShader()->getTextureSlotCount();
 				bgfx::setTexture(texture_offset,
 					m_tex_shadowmap_uniform,
 					info.m_framebuffer->getRenderbufferHandle(0));
@@ -1687,6 +1693,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	bgfx::UniformHandle m_tex_shadowmap_uniform;
 	bgfx::UniformHandle m_cam_view_uniform;
 	bgfx::UniformHandle m_cam_inv_proj_uniform;
+	bgfx::UniformHandle m_texture_size_uniform;
 
 	Material* m_debug_line_material;
 	int m_has_shadowmap_define_idx;
