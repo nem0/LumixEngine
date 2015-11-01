@@ -60,6 +60,7 @@ public:
 
 	Interval m_spawn_period;
 	Interval m_initial_life;
+	Interval m_initial_size;
 	Entity m_entity;
 
 private:

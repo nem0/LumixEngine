@@ -265,6 +265,11 @@ struct RendererImpl : public Renderer
 			&RenderScene::setParticleEmitterInitialLife,
 			allocator));
 		m_engine.registerProperty("particle_emitter",
+			LUMIX_NEW(allocator, Vec2PropertyDescriptor<RenderScene>)("Initial size",
+			&RenderScene::getParticleEmitterInitialSize,
+			&RenderScene::setParticleEmitterInitialSize,
+			allocator));
+		m_engine.registerProperty("particle_emitter",
 			LUMIX_NEW(allocator, Vec2PropertyDescriptor<RenderScene>)("Spawn period",
 			&RenderScene::getParticleEmitterSpawnPeriod,
 			&RenderScene::setParticleEmitterSpawnPeriod,

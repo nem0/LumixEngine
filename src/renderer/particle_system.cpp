@@ -58,6 +58,8 @@ ParticleEmitter::ParticleEmitter(Entity entity, Universe& universe, IAllocator& 
 	m_spawn_period.to = 2;
 	m_initial_life.from = 1;
 	m_initial_life.to = 2;
+	m_initial_size.from = 1;
+	m_initial_size.to = 1;
 }
 
 
@@ -75,7 +77,7 @@ void ParticleEmitter::spawnParticle()
 	m_position.push(m_universe.getPosition(m_entity));
 	m_life.push(m_initial_life.getRandom());
 	m_velocity.push(Vec3(0, 0, 0));
-	m_size.push(1);
+	m_size.push(m_initial_size.getRandom());
 	for (auto* module : m_modules)
 	{
 		module->spawnParticle(m_life.size() - 1);
