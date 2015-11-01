@@ -699,6 +699,18 @@ public:
 	}
 
 
+	virtual void setParticleEmitterInitialSize(ComponentIndex cmp, const Vec2& value) override
+	{
+		m_particle_emitters[cmp]->m_initial_size = value;
+	}
+
+
+	virtual Vec2 getParticleEmitterInitialSize(ComponentIndex cmp) override
+	{
+		return m_particle_emitters[cmp]->m_initial_size;
+	}
+
+
 	virtual void setParticleEmitterSpawnPeriod(ComponentIndex cmp, const Vec2& value) override
 	{
 		m_particle_emitters[cmp]->m_spawn_period = value;
