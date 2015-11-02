@@ -20,6 +20,16 @@ enum class NodeTypes
 };
 
 
+static const struct { const char* name; NodeTypes type; } NODE_TYPES[] = {
+	{"LERP",						NodeTypes::LERP},
+	{"Sample",					NodeTypes::SAMPLE},
+	{"Attribute",				NodeTypes::ATTRIBUTE},
+	{"Color constant",	NodeTypes::COLOR_CONST},
+	{"Float Const",			NodeTypes::FLOAT_CONST},
+	{"Uniform",					NodeTypes::UNIFORM}
+};
+
+
 struct ShaderEditor::ICommand
 {
 	ICommand(ShaderEditor& editor)
@@ -1151,29 +1161,12 @@ void ShaderEditor::onGUI()
 
 			if (ImGui::BeginMenu("Add"))
 			{
-				if (ImGui::MenuItem("LERP"))
+				for(auto node_type : NODE_TYPES)
 				{
-					execute(LUMIX_NEW(m_allocator, CreateNodeCommand)(-1, NodeTypes::LERP, add_pos, *this));
-				}
-				if (ImGui::MenuItem("Sample"))
-				{
-					execute(LUMIX_NEW(m_allocator, CreateNodeCommand)(-1, NodeTypes::SAMPLE, add_pos, *this));
-				}
-				if (ImGui::MenuItem("Attribute"))
-				{
-					execute(LUMIX_NEW(m_allocator, CreateNodeCommand)(-1, NodeTypes::ATTRIBUTE, add_pos, *this));
-				}
-				if (ImGui::MenuItem("Color constant"))
-				{
-					execute(LUMIX_NEW(m_allocator, CreateNodeCommand)(-1, NodeTypes::COLOR_CONST, add_pos, *this));
-				}
-				if (ImGui::MenuItem("Float constant"))
-				{
-					execute(LUMIX_NEW(m_allocator, CreateNodeCommand)(-1, NodeTypes::FLOAT_CONST, add_pos, *this));
-				}
-				if (ImGui::MenuItem("Uniform"))
-				{
-					execute(LUMIX_NEW(m_allocator, CreateNodeCommand)(-1, NodeTypes::UNIFORM, add_pos, *this));
+					if (ImGui::MenuItem(node_type.name))
+					{
+						execute(LUMIX_NEW(m_allocator, CreateNodeCommand)(-1, node_type.type, add_pos, *this));
+					}
 				}
 				ImGui::EndMenu();
 			}
