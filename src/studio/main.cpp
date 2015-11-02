@@ -150,6 +150,8 @@ public:
 
 			if (ImGui::BeginChild("right", half_size, true))
 			{
+				ImGui::Text("Version 0.18. - News");
+				ImGui::Separator();
 				ImGui::Text("Version 0.17. - News");
 				ImGui::BulletText("Back button in the asset browser");
 				ImGui::BulletText("Grass culling");
@@ -323,8 +325,8 @@ public:
 		m_time_to_autosave = float(m_settings.m_autosave_time);
 	}
 
-	void undo() { m_editor->undo(); }
-	void redo() { m_editor->redo(); }
+	void undo() { m_shader_editor->isFocused() ? m_shader_editor->undo() : m_editor->undo(); }
+	void redo() { m_shader_editor->isFocused() ? m_shader_editor->redo() :m_editor->redo(); }
 	void copy() { m_editor->copyEntity(); }
 	void paste() { m_editor->pasteEntity(); }
 	void toggleOrbitCamera() { m_editor->setOrbitCamera(!m_editor->isOrbitCamera()); }
@@ -412,7 +414,6 @@ public:
 	}
 
 
-
 	Action& getAction(const char* name)
 	{
 		for (auto* a : m_actions)
@@ -423,7 +424,7 @@ public:
 		return *m_actions[0];
 	}
 
-	
+
 	void showMainMenu()
 	{
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
