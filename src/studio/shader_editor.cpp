@@ -2,6 +2,7 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/log.h"
+#include "core/math_utils.h"
 #include "core/path_utils.h"
 #include "core/string.h"
 #include "core/system.h"
@@ -16,7 +17,9 @@ enum class NodeTypes
 	SAMPLE,
 	ATTRIBUTE,
 	LERP,
-	UNIFORM
+	UNIFORM,
+	VEC4_MERGE,
+	MULTIPLY
 };
 
 
@@ -26,7 +29,9 @@ static const struct { const char* name; NodeTypes type; } NODE_TYPES[] = {
 	{"Attribute",				NodeTypes::ATTRIBUTE},
 	{"Color constant",	NodeTypes::COLOR_CONST},
 	{"Float Const",			NodeTypes::FLOAT_CONST},
-	{"Uniform",					NodeTypes::UNIFORM}
+	{"Uniform",					NodeTypes::UNIFORM},
+	{"Vec4 merge",			NodeTypes::VEC4_MERGE},
+	{"Multiply",				NodeTypes::MULTIPLY}
 };
 
 
@@ -91,6 +96,96 @@ void ShaderEditor::Node::onNodeGUI()
 	if (m_can_have_name) ImGui::InputText("Name", m_name, Lumix::lengthOf(m_name));
 	ImGui::PopItemWidth();
 }
+
+
+struct MultiplyNode : public ShaderEditor::Node
+{
+	MultiplyNode(ShaderEditor& editor)
+		: Node((int)NodeTypes::MULTIPLY, editor)
+	{
+		m_inputs.push(nullptr);
+		m_inputs.push(nullptr);
+		m_outputs.push(nullptr);
+	}
+
+	void save(Lumix::OutputBlob& blob) override {}
+	void load(Lumix::InputBlob& blob) override {}
+
+	void generate(FILE* fp) override
+	{
+		if(!m_inputs[0]) return;
+		if(!m_inputs[1]) return;
+
+		m_inputs[0]->generate(fp);
+		m_inputs[1]->generate(fp);
+
+		fprintf(fp, "\tvec4 %s = %s * %s;\n", m_name, m_inputs[0]->m_name, m_inputs[1]->m_name);
+	}
+
+	void onGUI() override
+	{
+		ImGui::Text("A");
+		ImGui::Text("B");
+	}
+};
+
+
+struct Vec4MergeNode : public ShaderEditor::Node
+{
+	Vec4MergeNode(ShaderEditor& editor)
+		: Node((int)NodeTypes::VEC4_MERGE, editor)
+	{
+		m_inputs.push(nullptr);
+		m_inputs.push(nullptr);
+		m_inputs.push(nullptr);
+		m_inputs.push(nullptr);
+		m_inputs.push(nullptr);
+		m_outputs.push(nullptr);
+	}
+
+	void save(Lumix::OutputBlob& blob) override {}
+	void load(Lumix::InputBlob& blob) override {}
+
+	void generate(FILE* fp) override 
+	{
+		fprintf(fp, "\tvec4 %s;\n", m_name);
+
+		if (m_inputs[0]) 
+		{
+			m_inputs[0]->generate(fp);
+			fprintf(fp, "\t%s.xyz = %s;\n", m_name, m_inputs[0]->m_name);
+		}
+		if (m_inputs[1])
+		{
+			m_inputs[1]->generate(fp);
+			fprintf(fp, "\t%s.x = %s;\n", m_name, m_inputs[1]->m_name);
+		}
+		if (m_inputs[2])
+		{
+			m_inputs[2]->generate(fp);
+			fprintf(fp, "\t%s.y = %s;\n", m_name, m_inputs[2]->m_name);
+		}
+		if (m_inputs[3])
+		{
+			m_inputs[3]->generate(fp);
+			fprintf(fp, "\t%s.z = %s;\n", m_name, m_inputs[3]->m_name);
+		}
+		if (m_inputs[4])
+		{
+			m_inputs[4]->generate(fp);
+			fprintf(fp, "\t%s.w = %s;\n", m_name, m_inputs[4]->m_name);
+		}
+	}
+
+	void onGUI() override 
+	{
+		ImGui::Text("xyz");
+		ImGui::Text("x");
+		ImGui::Text("y");
+		ImGui::Text("z");
+		ImGui::Text("w");
+	}
+};
 
 
 struct FloatConstNode : public ShaderEditor::Node
@@ -783,6 +878,7 @@ void ShaderEditor::clear()
 		LUMIX_DELETE(m_allocator, command);
 	}
 	m_undo_stack.clear();
+	m_undo_stack_idx = -1;
 
 	m_last_node_id = 0;
 }
@@ -799,6 +895,8 @@ ShaderEditor::Node* ShaderEditor::createNode(int type)
 		case NodeTypes::LERP: return LUMIX_NEW(m_allocator, LerpNode)(*this);
 		case NodeTypes::SAMPLE: return LUMIX_NEW(m_allocator, SampleNode)(*this);
 		case NodeTypes::UNIFORM: return LUMIX_NEW(m_allocator, UniformNode)(*this);
+		case NodeTypes::VEC4_MERGE: return LUMIX_NEW(m_allocator, Vec4MergeNode)(*this);
+		case NodeTypes::MULTIPLY: return LUMIX_NEW(m_allocator, MultiplyNode)(*this);
 	}
 
 	return nullptr;
@@ -893,6 +991,7 @@ void ShaderEditor::load()
 	for (auto* node : m_fragment_nodes)
 	{
 		loadNodeConnections(blob, *node);
+		m_last_node_id = Lumix::Math::maxValue(int(node->id + 1), int(m_last_node_id));
 	}
 
 	fclose(fp);
