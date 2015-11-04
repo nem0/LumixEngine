@@ -941,7 +941,7 @@ public:
 
 
 		void onMouseLeftWindow() override { m_app->clearInputs(); }
-		
+
 
 		void onMouseMove(int x, int y, int rel_x, int rel_y) override
 		{
@@ -981,11 +981,19 @@ public:
 					}
 					break;
 				case PlatformInterface::SystemEventHandler::MouseButton::RIGHT:
-					if (!m_app->m_sceneview.onMouseDown(
-							m_mouse_x, m_mouse_y, Lumix::MouseButton::RIGHT) &&
+					if(!m_app->m_sceneview.onMouseDown(
+						m_mouse_x, m_mouse_y, Lumix::MouseButton::RIGHT) &&
 						!m_app->m_gameview.isMouseCaptured())
 					{
 						ImGui::GetIO().MouseDown[1] = true;
+					}
+					break;
+				case PlatformInterface::SystemEventHandler::MouseButton::MIDDLE:
+					if(!m_app->m_sceneview.onMouseDown(
+						m_mouse_x, m_mouse_y, Lumix::MouseButton::MIDDLE) &&
+						!m_app->m_gameview.isMouseCaptured())
+					{
+						ImGui::GetIO().MouseDown[2] = true;
 					}
 					break;
 			}
@@ -1003,6 +1011,10 @@ public:
 				case PlatformInterface::SystemEventHandler::MouseButton::RIGHT:
 					m_app->m_sceneview.onMouseUp(Lumix::MouseButton::RIGHT);
 					ImGui::GetIO().MouseDown[1] = false;
+					break;
+				case PlatformInterface::SystemEventHandler::MouseButton::MIDDLE:
+					m_app->m_sceneview.onMouseUp(Lumix::MouseButton::MIDDLE);
+					ImGui::GetIO().MouseDown[2] = false;
 					break;
 			}
 		}

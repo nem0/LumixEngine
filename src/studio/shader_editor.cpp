@@ -11,7 +11,8 @@
 
 enum class NodeTypes
 {
-	OUTPUT,
+	FRAGMENT_OUTPUT,
+	VERTEX_OUTPUT,
 	FLOAT_CONST,
 	COLOR_CONST,
 	SAMPLE,
@@ -319,10 +320,40 @@ struct AttributeNode : public ShaderEditor::Node
 };
 
 
-struct OutputNode : public ShaderEditor::Node
+struct VertexOutputNode : public ShaderEditor::Node
 {
-	OutputNode(ShaderEditor& editor)
-		: Node((int)NodeTypes::OUTPUT, editor)
+	VertexOutputNode(ShaderEditor& editor)
+		: Node((int)NodeTypes::VERTEX_OUTPUT, editor)
+	{
+		m_can_have_name = false;
+		m_inputs.push(nullptr);
+	}
+
+
+	void generate(FILE* fp) override
+	{
+		if(!m_inputs[0])
+		{
+			fputs("\tgl_Position = vec4(1, 0, 1, 1);\n", fp);
+			return;
+		}
+
+		m_inputs[0]->generate(fp);
+		fputs("\tgl_Position = ", fp);
+		fputs(m_inputs[0]->m_name, fp);
+		fputs(";\n", fp);
+	}
+
+
+	void onGUI() override { ImGui::Text("OUTPUT"); }
+};
+
+
+
+struct FragmentOutputNode : public ShaderEditor::Node
+{
+	FragmentOutputNode(ShaderEditor& editor)
+		: Node((int)NodeTypes::FRAGMENT_OUTPUT, editor)
 	{
 		m_can_have_name = false;
 		m_inputs.push(nullptr);
@@ -589,10 +620,11 @@ struct CreateConnectionCommand : public ShaderEditor::ICommand
 
 struct RemoveNodeCommand : public ShaderEditor::ICommand
 {
-	RemoveNodeCommand(int node_id, ShaderEditor& editor)
+	RemoveNodeCommand(int node_id, ShaderEditor::ShaderType shader_type, ShaderEditor& editor)
 		: ICommand(editor)
 		, m_node_id(node_id)
 		, m_blob(editor.getAllocator())
+		, m_shader_type(shader_type)
 	{
 	}
 
@@ -616,11 +648,12 @@ struct RemoveNodeCommand : public ShaderEditor::ICommand
 	void undo() override
 	{
 		Lumix::InputBlob blob(m_blob);
-		auto& node = m_editor.loadNode(blob);
+		auto& node = m_editor.loadNode(blob, m_shader_type);
 		m_editor.loadNodeConnections(blob, node);
 	}
 
 
+	ShaderEditor::ShaderType m_shader_type;
 	Lumix::OutputBlob m_blob;
 	int m_node_id;
 };
@@ -628,10 +661,11 @@ struct RemoveNodeCommand : public ShaderEditor::ICommand
 
 struct CreateNodeCommand : public ShaderEditor::ICommand
 {
-	CreateNodeCommand(int id, NodeTypes type, ImVec2 pos, ShaderEditor& editor)
+	CreateNodeCommand(int id, NodeTypes type, ShaderEditor::ShaderType shader_type, ImVec2 pos, ShaderEditor& editor)
 		: m_type(type)
 		, m_pos(pos)
 		, m_id(id)
+		, m_shader_type(shader_type)
 		, ICommand(editor)
 	{
 	}
@@ -647,7 +681,7 @@ struct CreateNodeCommand : public ShaderEditor::ICommand
 	void execute() override
 	{
 		m_node = m_editor.createNode((int)m_type);
-		m_editor.addNode(m_node, m_pos);
+		m_editor.addNode(m_node, m_pos, m_shader_type);
 		if(m_id >= 0) m_node->id = m_id;
 	}
 
@@ -660,6 +694,7 @@ struct CreateNodeCommand : public ShaderEditor::ICommand
 
 
 	int m_id;
+	ShaderEditor::ShaderType m_shader_type;
 	ShaderEditor::Node* m_node;
 	NodeTypes m_type;
 	ImVec2 m_pos;
@@ -668,11 +703,13 @@ struct CreateNodeCommand : public ShaderEditor::ICommand
 
 ShaderEditor::ShaderEditor(Lumix::IAllocator& allocator)
 	: m_fragment_nodes(allocator)
+	, m_vertex_nodes(allocator)
 	, m_allocator(allocator)
 	, m_undo_stack(allocator)
 	, m_undo_stack_idx(-1)
 	, m_current_node_id(-1)
 	, m_is_focused(false)
+	, m_current_shader_type(ShaderType::VERTEX)
 {
 	for (int i = 0; i < Lumix::lengthOf(m_textures); ++i)
 	{
@@ -685,10 +722,15 @@ ShaderEditor::ShaderEditor(Lumix::IAllocator& allocator)
 	m_last_node_id = 0;
 	m_new_link_info.is_active = false;
 
-	m_fragment_nodes.push(LUMIX_NEW(allocator, OutputNode)(*this));
-	m_fragment_nodes.back()->pos.x = 250;
+	m_fragment_nodes.push(LUMIX_NEW(allocator, FragmentOutputNode)(*this));
+	m_fragment_nodes.back()->pos.x = 50;
 	m_fragment_nodes.back()->pos.y = 50;
 	m_fragment_nodes.back()->id = ++m_last_node_id;
+
+	m_vertex_nodes.push(LUMIX_NEW(allocator, FragmentOutputNode)(*this));
+	m_vertex_nodes.back()->pos.x = 50;
+	m_vertex_nodes.back()->pos.y = 50;
+	m_vertex_nodes.back()->id = ++m_last_node_id;
 }
 
 
@@ -705,18 +747,29 @@ ShaderEditor::Node* ShaderEditor::getNodeByID(int id)
 		if(node->id == id) return node;
 	}
 
+	for(auto* node : m_vertex_nodes)
+	{
+		if(node->id == id) return node;
+	}
+
 	return nullptr;
 }
 
 
-void ShaderEditor::generate(const char* path)
+void ShaderEditor::generate(const char* path, ShaderType shader_type)
 {
 	char sc_path[Lumix::MAX_PATH_LENGTH];
 	Lumix::PathUtils::FileInfo info(path);
 	Lumix::copyString(sc_path, info.m_dir);
 	Lumix::catString(sc_path, info.m_basename);
-	Lumix::catString(sc_path, ".sc");
-
+	if(shader_type == ShaderType::FRAGMENT)
+	{
+		Lumix::catString(sc_path, "_fs.sc");
+	}
+	else
+	{
+		Lumix::catString(sc_path, "_vs.sc");
+	}
 
 	FILE* fp = fopen(sc_path, "wb");
 	if (!fp) return;
@@ -741,22 +794,31 @@ void ShaderEditor::generate(const char* path)
 		fprintf(fp, "SAMPLER2D(%s, %d);\n", m_textures[i], i);
 	}
 
-	for (auto* node : m_fragment_nodes)
+	auto& nodes = shader_type == ShaderType::FRAGMENT ? m_fragment_nodes : m_vertex_nodes;
+	for (auto* node : nodes)
 	{
 		node->generateBeforeMain(fp);
 	}
 
 	fputs("void main() {\n", fp);
-	m_fragment_nodes[0]->generate(fp);
+	nodes[0]->generate(fp);
 	fputs("}\n", fp);
 
 	fclose(fp);
 }
 
 
-void ShaderEditor::addNode(Node* node, const ImVec2& pos)
+void ShaderEditor::addNode(Node* node, const ImVec2& pos, ShaderType type)
 {
-	m_fragment_nodes.push(node);
+	if(type == ShaderType::FRAGMENT)
+	{
+		m_fragment_nodes.push(node);
+	}
+	else
+	{
+		m_vertex_nodes.push(node);
+	}
+
 	node->pos = pos;
 	node->id = ++m_last_node_id;
 }
@@ -847,13 +909,24 @@ void ShaderEditor::save(const char* path)
 		blob.writeString(m_vertex_outputs[i]);
 	}
 
-	int nodes_count = m_fragment_nodes.size();
+	int nodes_count = m_vertex_nodes.size();
+	blob.write(nodes_count);
+	for(auto* node : m_vertex_nodes)
+	{
+		saveNode(blob, *node);
+	}
+
+	for(auto* node : m_vertex_nodes)
+	{
+		saveNodeConnections(blob, *node);
+	}
+
+	nodes_count = m_fragment_nodes.size();
 	blob.write(nodes_count);
 	for (auto* node : m_fragment_nodes)
 	{
 		saveNode(blob, *node);
 	}
-
 
 	for (auto* node : m_fragment_nodes)
 	{
@@ -869,9 +942,15 @@ void ShaderEditor::clear()
 {
 	for (auto* node : m_fragment_nodes)
 	{
-		m_allocator.deleteObject(node);
+		LUMIX_DELETE(m_allocator, node);
 	}
 	m_fragment_nodes.clear();
+
+	for(auto* node : m_vertex_nodes)
+	{
+		LUMIX_DELETE(m_allocator, node);
+	}
+	m_vertex_nodes.clear();
 
 	for(auto* command : m_undo_stack)
 	{
@@ -888,7 +967,8 @@ ShaderEditor::Node* ShaderEditor::createNode(int type)
 {
 	switch ((NodeTypes)type)
 	{
-		case NodeTypes::OUTPUT: return LUMIX_NEW(m_allocator, OutputNode)(*this);
+		case NodeTypes::FRAGMENT_OUTPUT: return LUMIX_NEW(m_allocator, FragmentOutputNode)(*this);
+		case NodeTypes::VERTEX_OUTPUT: return LUMIX_NEW(m_allocator, VertexOutputNode)(*this);
 		case NodeTypes::ATTRIBUTE: return LUMIX_NEW(m_allocator, AttributeNode)(*this);
 		case NodeTypes::COLOR_CONST: return LUMIX_NEW(m_allocator, ColorConstNode)(*this);
 		case NodeTypes::FLOAT_CONST: return LUMIX_NEW(m_allocator, FloatConstNode)(*this);
@@ -903,7 +983,7 @@ ShaderEditor::Node* ShaderEditor::createNode(int type)
 }
 
 
-ShaderEditor::Node& ShaderEditor::loadNode(Lumix::InputBlob& blob)
+ShaderEditor::Node& ShaderEditor::loadNode(Lumix::InputBlob& blob, ShaderType shader_type)
 {
 	int type;
 	int id;
@@ -911,7 +991,14 @@ ShaderEditor::Node& ShaderEditor::loadNode(Lumix::InputBlob& blob)
 	blob.read(type);
 	Node* node = createNode(type);
 	node->id = id;
-	m_fragment_nodes.push(node);
+	if(shader_type == ShaderType::FRAGMENT)
+	{
+		m_fragment_nodes.push(node);
+	}
+	else
+	{
+		m_vertex_nodes.push(node);
+	}
 	blob.read(node->pos);
 	blob.readString(node->m_name, Lumix::lengthOf(node->m_name));
 
@@ -983,9 +1070,21 @@ void ShaderEditor::load()
 
 	int size;
 	blob.read(size);
+	for(int i = 0; i < size; ++i)
+	{
+		loadNode(blob, ShaderType::VERTEX);
+	}
+
+	for(auto* node : m_vertex_nodes)
+	{
+		loadNodeConnections(blob, *node);
+		m_last_node_id = Lumix::Math::maxValue(int(node->id + 1), int(m_last_node_id));
+	}
+
+	blob.read(size);
 	for (int i = 0; i < size; ++i)
 	{
-		loadNode(blob);
+		loadNode(blob, ShaderType::FRAGMENT);
 	}
 
 	for (auto* node : m_fragment_nodes)
@@ -1003,6 +1102,149 @@ void ShaderEditor::getSavePath()
 	char path[Lumix::MAX_PATH_LENGTH];
 	Lumix::getSaveFilename(path, Lumix::lengthOf(path), "Shader edit data\0*.sed\0", "sed");
 	m_path = path;
+}
+
+
+static ImVec2 operator+(const ImVec2& a, const ImVec2& b)
+{
+	return ImVec2(a.x + b.x, a.y + b.y);
+}
+
+
+static ImVec2 operator-(const ImVec2& a, const ImVec2& b)
+{
+	return ImVec2(a.x - b.x, a.y - b.y);
+}
+
+
+void ShaderEditor::onGUIRightColumn()
+{
+	ImGui::BeginChild("right_col");
+
+	if(ImGui::IsWindowHovered() && !ImGui::IsAnyItemActive() && ImGui::IsMouseDragging(2, 0.0f))
+	{
+		m_canvas_pos = m_canvas_pos + ImGui::GetIO().MouseDelta;
+	}
+
+	int current_shader = (int)m_current_shader_type;
+	if(ImGui::Combo("Shader", &current_shader, "Vertex\0Fragment\0"))
+	{
+		m_current_shader_type = (ShaderType)current_shader;
+	}
+
+	auto cursor_screen_pos = ImGui::GetCursorScreenPos();
+
+	auto& nodes = m_current_shader_type == ShaderType::FRAGMENT ? m_fragment_nodes : m_vertex_nodes;
+	for(auto* node : nodes)
+	{
+		auto node_screen_pos = cursor_screen_pos + node->pos + m_canvas_pos;
+
+		ImGui::BeginNode(node->id, node_screen_pos);
+		node->onNodeGUI();
+		ImGui::EndNode(node_screen_pos);
+		if(ImGui::IsItemHovered() && ImGui::IsMouseDown(1))
+		{
+			m_current_node_id = node->id;
+		}
+
+		for(int i = 0; i < node->m_outputs.size(); ++i)
+		{
+			Node* output = node->m_outputs[i];
+			if(!output) continue;
+
+			auto output_screen_pos = cursor_screen_pos + output->pos + m_canvas_pos;
+
+			auto output_pos = ImGui::GetNodeOutputPos(node->id, i);
+			auto input_pos = ImGui::GetNodeInputPos(output->id, output->m_inputs.indexOf(node));
+			ImGui::NodeLink(output_pos, input_pos);
+		}
+
+		for(int i = 0; i < node->m_outputs.size(); ++i)
+		{
+			auto pin_pos = ImGui::GetNodeOutputPos(node->id, i);
+			if(ImGui::NodePin(i, pin_pos))
+			{
+				if(ImGui::IsMouseReleased(0) && m_new_link_info.is_active)
+				{
+					createConnection(node, i, false);
+				}
+				if(ImGui::IsMouseClicked(0)) nodePinMouseDown(node, i, false);
+			}
+		}
+
+		for(int i = 0; i < node->m_inputs.size(); ++i)
+		{
+			auto pin_pos = ImGui::GetNodeInputPos(node->id, i);
+			if(ImGui::NodePin(i + node->m_outputs.size(), pin_pos))
+			{
+				if(ImGui::IsMouseReleased(0) && m_new_link_info.is_active)
+				{
+					createConnection(node, i, true);
+				}
+				if(ImGui::IsMouseClicked(0)) nodePinMouseDown(node, i, true);
+			}
+		}
+
+		ImVec2 new_pos = node_screen_pos - cursor_screen_pos - m_canvas_pos;
+		if(new_pos.x != node->pos.x || new_pos.y != node->pos.y)
+		{
+			execute(LUMIX_NEW(m_allocator, MoveNodeCommand)(node->id, new_pos, *this));
+		}
+	}
+
+	if(m_new_link_info.is_active && ImGui::IsMouseDown(0))
+	{
+		if(m_new_link_info.is_from_input)
+		{
+			auto pos = ImGui::GetNodeInputPos(
+				m_new_link_info.from->id, m_new_link_info.from_pin_index);
+			ImGui::NodeLink(ImGui::GetMousePos(), pos);
+		}
+		else
+		{
+			auto pos = ImGui::GetNodeOutputPos(
+				m_new_link_info.from->id, m_new_link_info.from_pin_index);
+			ImGui::NodeLink(pos, ImGui::GetMousePos());
+		}
+	}
+	else
+	{
+		m_new_link_info.is_active = false;
+	}
+
+	if(ImGui::IsMouseClicked(1))
+	{
+		ImGui::OpenPopup("context_menu");
+	}
+
+	if(ImGui::BeginPopup("context_menu"))
+	{
+		ImVec2 add_pos(ImGui::GetMousePos().x - cursor_screen_pos.x,
+			ImGui::GetMousePos().y - cursor_screen_pos.y);
+		if(m_current_node_id >= 0)
+		{
+			if(ImGui::MenuItem("Remove"))
+			{
+				execute(LUMIX_NEW(m_allocator, RemoveNodeCommand)(m_current_node_id, m_current_shader_type, *this));
+			}
+		}
+
+		if (ImGui::BeginMenu("Add"))
+		{
+			for (auto node_type : NODE_TYPES)
+			{
+				if (ImGui::MenuItem(node_type.name))
+				{
+					execute(LUMIX_NEW(m_allocator, CreateNodeCommand)(
+						-1, node_type.type, m_current_shader_type, add_pos, *this));
+				}
+			}
+			ImGui::EndMenu();
+		}
+
+		ImGui::EndPopup();
+	}
+	ImGui::EndChild();
 }
 
 
@@ -1103,6 +1345,52 @@ void ShaderEditor::destroyNode(Node* node)
 
 	LUMIX_DELETE(m_allocator, node);
 	m_fragment_nodes.eraseItem(node);
+	m_vertex_nodes.eraseItem(node);
+}
+
+
+void ShaderEditor::onGUIMenu()
+{
+	if(ImGui::BeginMenuBar())
+	{
+		if(ImGui::BeginMenu("File"))
+		{
+			ImGui::MenuItem("New");
+			if(ImGui::MenuItem("Open"))
+			{
+				load();
+			}
+			if(ImGui::MenuItem("Save", nullptr, false, m_path.isValid()))
+			{
+				save(m_path.c_str());
+			}
+			if(ImGui::MenuItem("Save as"))
+			{
+				getSavePath();
+				if(m_path.isValid()) save(m_path.c_str());
+			}
+			ImGui::EndMenu();
+		}
+		if(ImGui::BeginMenu("Edit"))
+		{
+			if(ImGui::MenuItem("Undo", nullptr, false, canUndo()))
+			{
+				undo();
+			}
+			if(ImGui::MenuItem("Redo", nullptr, false, canRedo()))
+			{
+				redo();
+			}
+			ImGui::EndMenu();
+		}
+		if(ImGui::MenuItem("Generate", nullptr, false, m_path.isValid()))
+		{
+			generate(m_path.c_str(), ShaderType::VERTEX);
+			generate(m_path.c_str(), ShaderType::FRAGMENT);
+		}
+
+		ImGui::EndMenuBar();
+	}
 }
 
 
@@ -1111,168 +1399,11 @@ void ShaderEditor::onGUI()
 	if (ImGui::Begin("Shader editor", nullptr, ImGuiWindowFlags_MenuBar))
 	{
 		m_is_focused = ImGui::IsRootWindowOrAnyChildFocused();
-		if (ImGui::BeginMenuBar())
-		{
-			if (ImGui::BeginMenu("File"))
-			{
-				ImGui::MenuItem("New");
-				if (ImGui::MenuItem("Open"))
-				{
-					load();
-				}
-				if (ImGui::MenuItem("Save", nullptr, false, m_path.isValid()))
-				{
-					save(m_path.c_str());
-				}
-				if (ImGui::MenuItem("Save as"))
-				{
-					getSavePath();
-					if (m_path.isValid()) save(m_path.c_str());
-				}
-				ImGui::EndMenu();
-			}
-			if (ImGui::BeginMenu("Edit"))
-			{
-				if (ImGui::MenuItem("Undo", nullptr, false, canUndo()))
-				{
-					undo();
-				}
-				if (ImGui::MenuItem("Redo", nullptr, false, canRedo()))
-				{
-					redo();
-				}
-				ImGui::EndMenu();
-			}
-			if (ImGui::MenuItem("Generate", nullptr, false, m_path.isValid()))
-			{
-				generate(m_path.c_str());
-			}
 
-			ImGui::EndMenuBar();
-		}
-
+		onGUIMenu();
 		onGUILeftColumn();
 		ImGui::SameLine();
-
-		ImGui::BeginChild("right_col");
-		auto cursor_screen_pos = ImGui::GetCursorScreenPos();
-
-		for (auto* node : m_fragment_nodes)
-		{
-			auto node_screen_pos = cursor_screen_pos;
-			node_screen_pos.x = cursor_screen_pos.x + node->pos.x;
-			node_screen_pos.y = cursor_screen_pos.y + node->pos.y;
-
-			ImGui::BeginNode(node->id, node_screen_pos);
-			node->onNodeGUI();
-			ImGui::EndNode(node_screen_pos);
-			if(ImGui::IsItemHovered() && ImGui::IsMouseDown(1))
-			{
-				m_current_node_id = node->id;
-			}
-
-			for (int i = 0; i < node->m_outputs.size(); ++i)
-			{
-				Node* output = node->m_outputs[i];
-				if (!output) continue;
-
-				auto output_screen_pos = cursor_screen_pos;
-				output_screen_pos.x = cursor_screen_pos.x + output->pos.x;
-				output_screen_pos.y = cursor_screen_pos.y + output->pos.y;
-
-				auto output_pos = ImGui::GetNodeOutputPos(node->id, i);
-				auto input_pos = ImGui::GetNodeInputPos(output->id, output->m_inputs.indexOf(node));
-				ImGui::NodeLink(output_pos, input_pos);
-			}
-
-			for (int i = 0; i < node->m_outputs.size(); ++i)
-			{
-				auto pin_pos = ImGui::GetNodeOutputPos(node->id, i);
-				if (ImGui::NodePin(i, pin_pos))
-				{
-					if (ImGui::IsMouseReleased(0) && m_new_link_info.is_active)
-					{
-						createConnection(node, i, false);
-					}
-					if (ImGui::IsMouseClicked(0)) nodePinMouseDown(node, i, false);
-				}
-			}
-
-			for (int i = 0; i < node->m_inputs.size(); ++i)
-			{
-				auto pin_pos = ImGui::GetNodeInputPos(node->id, i);
-				if (ImGui::NodePin(i + node->m_outputs.size(), pin_pos))
-				{
-					if (ImGui::IsMouseReleased(0) && m_new_link_info.is_active)
-					{
-						createConnection(node, i, true);
-					}
-					if (ImGui::IsMouseClicked(0)) nodePinMouseDown(node, i, true);
-				}
-			}
-
-			ImVec2 new_pos;
-			new_pos.x = node_screen_pos.x - cursor_screen_pos.x;
-			new_pos.y = node_screen_pos.y - cursor_screen_pos.y;
-
-			if(new_pos.x != node->pos.x || new_pos.y != node->pos.y)
-			{
-				execute(LUMIX_NEW(m_allocator, MoveNodeCommand)(node->id, new_pos, *this));
-			}
-		}
-
-		if (m_new_link_info.is_active && ImGui::IsMouseDown(0))
-		{
-			if (m_new_link_info.is_from_input)
-			{
-				auto pos = ImGui::GetNodeInputPos(
-					m_new_link_info.from->id, m_new_link_info.from_pin_index);
-				ImGui::NodeLink(ImGui::GetMousePos(), pos);
-			}
-			else
-			{
-				auto pos = ImGui::GetNodeOutputPos(
-					m_new_link_info.from->id, m_new_link_info.from_pin_index);
-				ImGui::NodeLink(pos, ImGui::GetMousePos());
-			}
-		}
-		else
-		{
-			m_new_link_info.is_active = false;
-		}
-
-		if (ImGui::IsMouseClicked(1))
-		{
-			ImGui::OpenPopup("context_menu");
-		}
-
-		if (ImGui::BeginPopup("context_menu"))
-		{
-			ImVec2 add_pos(ImGui::GetMousePos().x - cursor_screen_pos.x,
-				ImGui::GetMousePos().y - cursor_screen_pos.y);
-			if(m_current_node_id >= 0)
-			{
-				if(ImGui::MenuItem("Remove"))
-				{
-					execute(LUMIX_NEW(m_allocator, RemoveNodeCommand)(m_current_node_id, *this));
-				}
-			}
-
-			if (ImGui::BeginMenu("Add"))
-			{
-				for(auto node_type : NODE_TYPES)
-				{
-					if (ImGui::MenuItem(node_type.name))
-					{
-						execute(LUMIX_NEW(m_allocator, CreateNodeCommand)(-1, node_type.type, add_pos, *this));
-					}
-				}
-				ImGui::EndMenu();
-			}
-
-			ImGui::EndPopup();
-		}
-		ImGui::EndChild();
+		onGUIRightColumn();
 	}
 	ImGui::End();
 }
