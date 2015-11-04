@@ -21,6 +21,7 @@
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
+#include "renderer/particle_system.h"
 #include "renderer/pose.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
@@ -231,6 +232,26 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_scene = nullptr;
 		m_width = m_height = -1;
 		pipeline.onLoaded<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
+
+		createParticleBuffers();
+	}
+
+
+	void createParticleBuffers()
+	{
+		BaseVertex vertices[] = {
+			{ -1, -1, 1, 0xffffffff, 0, 0},
+			{ -1,  1, 1, 0xffffffff, 0, 1},
+			{  1,  1, 1, 0xffffffff, 1, 1},
+			{  1, -1, 1, 0xffffffff, 1, 0},
+		};
+
+		const bgfx::Memory* vertex_mem = bgfx::copy(vertices, sizeof(vertices));
+		m_particle_vertex_buffer = bgfx::createVertexBuffer(vertex_mem, m_base_vertex_decl);
+
+		uint16_t indices[] = { 0, 1, 2, 0, 2, 3 };
+		const bgfx::Memory* index_mem = bgfx::copy(indices, sizeof(indices));
+		m_particle_index_buffer = bgfx::createIndexBuffer(index_mem);
 	}
 
 
@@ -315,6 +336,71 @@ struct PipelineInstanceImpl : public PipelineInstance
 			if (m_framebuffers[i] == m_default_framebuffer) m_default_framebuffer = nullptr;
 		}
 		m_allocator.deleteObject(m_default_framebuffer);
+
+		bgfx::destroyIndexBuffer(m_particle_index_buffer);
+		bgfx::destroyVertexBuffer(m_particle_vertex_buffer);
+	}
+
+
+	void renderParticles(const ParticleEmitter& emitter)
+	{
+		static const int PARTICLE_BATCH_SIZE = 256;
+
+		if (emitter.m_life.empty()) return;
+		if (!emitter.getMaterial()) return;
+		if (!emitter.getMaterial()->isReady()) return;
+
+		Material* material = emitter.getMaterial();
+
+		const bgfx::InstanceDataBuffer* instance_buffer = nullptr;
+		struct Instance
+		{
+			Vec4 pos;
+		};
+		Instance* instance = nullptr;
+
+		for (int i = 0, c = emitter.m_life.size(); i < c; ++i)
+		{
+			if (i % PARTICLE_BATCH_SIZE == 0)
+			{
+				if (instance_buffer)
+				{
+					setMaterial(material);
+					bgfx::setInstanceDataBuffer(instance_buffer, PARTICLE_BATCH_SIZE);
+					bgfx::setVertexBuffer(m_particle_vertex_buffer);
+					bgfx::setIndexBuffer(m_particle_index_buffer);
+					bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
+				}
+
+				instance_buffer = bgfx::allocInstanceDataBuffer(PARTICLE_BATCH_SIZE, sizeof(Instance));
+				instance = (Instance*)instance_buffer->data;
+			}
+
+			instance->pos = Vec4(emitter.m_position[i], emitter.m_size[i]);
+			++instance;
+		}
+
+		if (emitter.m_life.size() % PARTICLE_BATCH_SIZE)
+		{
+			setMaterial(material);
+			bgfx::setInstanceDataBuffer(instance_buffer, emitter.m_life.size() % PARTICLE_BATCH_SIZE);
+			bgfx::setVertexBuffer(m_particle_vertex_buffer);
+			bgfx::setIndexBuffer(m_particle_index_buffer);
+			bgfx::setState(m_render_state | material->getRenderStates());
+			bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
+		}
+	}
+
+
+	void renderParticles()
+	{
+		const auto& emitters = m_scene->getParticleEmitters();
+		for (const auto* emitter : emitters)
+		{
+			if (!emitter) continue;
+
+			renderParticles(*emitter);
+		}
 	}
 
 
@@ -419,7 +505,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			}
 		}
 
-		beginNewView(m_current_framebuffer);
+		beginNewView(m_current_framebuffer, name);
 	}
 
 
@@ -537,7 +623,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void beginNewView(FrameBuffer* framebuffer)
+	void beginNewView(FrameBuffer* framebuffer, const char* debug_name)
 	{
 		m_renderer.viewCounterAdd();
 		m_view_idx = m_renderer.getViewCounter();
@@ -553,6 +639,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			bgfx::setViewFrameBuffer(m_view_idx, BGFX_INVALID_HANDLE);
 		}
 		bgfx::setViewClear(m_view_idx, 0);
+		bgfx::setViewName(m_view_idx, debug_name);
 	}
 
 
@@ -561,7 +648,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 								  int64_t layer_mask)
 	{
 		ASSERT(fb);
-		beginNewView(fb);
+		beginNewView(fb, "point_light");
 
 		Entity light_entity = m_scene->getPointLightEntity(light);
 		Matrix mtx = m_scene->getUniverse().getMatrix(light_entity);
@@ -632,7 +719,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		for (int i = 0; i < 4; ++i)
 		{
 			ASSERT(fb);
-			beginNewView(fb);
+			beginNewView(fb, "omnilight");
 
 			bgfx::setViewClear(m_view_idx, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
 			bgfx::touch(m_view_idx);
@@ -768,7 +855,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_is_rendering_in_shadowmap = true;
 		for (int split_index = 0; split_index < 4; ++split_index)
 		{
-			if (split_index > 0) beginNewView(m_current_framebuffer);
+			if (split_index > 0) beginNewView(m_current_framebuffer, "shadowmap");
 
 			bgfx::setViewClear(
 				m_view_idx, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
@@ -997,7 +1084,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void enableBlending() { m_render_state |= BGFX_STATE_BLEND_ADD; }
+	void enableBlending() { m_render_state |= BGFX_STATE_BLEND_ALPHA; }
 	void disableBlending() { m_render_state &= ~BGFX_STATE_BLEND_MASK; }
 
 	void enableDepthWrite() { m_render_state |= BGFX_STATE_DEPTH_WRITE; }
@@ -1670,6 +1757,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 	int m_view_y;
 	int m_width;
 	int m_height;
+	bgfx::VertexBufferHandle m_particle_vertex_buffer;
+	bgfx::IndexBufferHandle m_particle_index_buffer;
 	AssociativeArray<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
 	Array<const RenderableMesh*> m_tmp_meshes;
 	Array<const TerrainInfo*> m_tmp_terrains;
@@ -1922,6 +2011,12 @@ int loadMaterial(PipelineInstanceImpl* pipeline, const char* path)
 }
 
 
+void renderParticles(PipelineInstanceImpl* pipeline)
+{
+	pipeline->renderParticles();
+}
+
+
 void bindFramebufferTexture(PipelineInstanceImpl* pipeline,
 	const char* framebuffer_name,
 	int renderbuffer_index,
@@ -1981,6 +2076,7 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(cameraExists);
 	REGISTER_FUNCTION(hasScene);
 	REGISTER_FUNCTION(bindFramebufferTexture);
+	REGISTER_FUNCTION(renderParticles);
 
 	#undef REGISTER_FUNCTION
 }

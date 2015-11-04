@@ -1,5 +1,9 @@
 #include "particle_system.h"
+#include "core/crc32.h"
 #include "core/math_utils.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
+#include "renderer/material.h"
 #include "universe/universe.h"
 
 
@@ -7,20 +11,27 @@ namespace Lumix
 {
 
 
-struct ParticleEmitter::ModuleBase
+ParticleEmitter::ModuleBase::ModuleBase(ParticleEmitter& emitter)
+	: m_emitter(emitter)
 {
-	ModuleBase(ParticleEmitter& emitter)
-		: m_emitter(emitter)
-	{
-	}
+}
 
-	virtual ~ModuleBase() {}
-	virtual void spawnParticle(int index) {}
-	virtual void destoryParticle(int index) {}
-	virtual void update(float time_delta) {}
 
-	ParticleEmitter& m_emitter;
-};
+ParticleEmitter::LinearMovementModule::LinearMovementModule(ParticleEmitter& emitter)
+	: ModuleBase(emitter)
+{
+}
+
+
+void ParticleEmitter::LinearMovementModule::spawnParticle(int index)
+{
+	m_emitter.m_velocity[index].x = m_x.getRandom();
+	m_emitter.m_velocity[index].y = m_y.getRandom();
+	m_emitter.m_velocity[index].z = m_z.getRandom();
+}
+
+
+const uint32_t ParticleEmitter::LinearMovementModule::s_type = Lumix::crc32("linear_movement");
 
 
 Interval::Interval()
@@ -33,7 +44,7 @@ Interval::Interval()
 void Interval::check()
 {
 	from = Math::maxValue(from, 0.0f);
-	to = Math::maxValue(from + 0.001f, to);
+	to = Math::maxValue(from, to);
 }
 
 
@@ -53,6 +64,7 @@ ParticleEmitter::ParticleEmitter(Entity entity, Universe& universe, IAllocator& 
 	, m_universe(universe)
 	, m_entity(entity)
 	, m_size(allocator)
+	, m_material(nullptr)
 {
 	m_spawn_period.from = 1;
 	m_spawn_period.to = 2;
@@ -65,10 +77,23 @@ ParticleEmitter::ParticleEmitter(Entity entity, Universe& universe, IAllocator& 
 
 ParticleEmitter::~ParticleEmitter()
 {
+	setMaterial(nullptr);
+
 	for (auto* module : m_modules)
 	{
 		LUMIX_DELETE(m_allocator, module);
 	}
+}
+
+
+void ParticleEmitter::setMaterial(Material* material)
+{
+	if (m_material)
+	{
+		auto* manager = m_material->getResourceManager().get(ResourceManager::MATERIAL);
+		manager->unload(*m_material);
+	}
+	m_material = material;
 }
 
 
@@ -82,6 +107,13 @@ void ParticleEmitter::spawnParticle()
 	{
 		module->spawnParticle(m_life.size() - 1);
 	}
+}
+
+
+void ParticleEmitter::addModule(ModuleBase* module)
+{
+	m_modules.push(module);
+	TODO("todo check whether anything else is necessary to do here");
 }
 
 
@@ -120,7 +152,7 @@ void ParticleEmitter::updatePositions(float time_delta)
 {
 	for (int i = 0, c = m_position.size(); i < c; ++i)
 	{
-		m_position[i] = m_velocity[i] * time_delta;
+		m_position[i] += m_velocity[i] * time_delta;
 	}
 }
 
@@ -134,13 +166,6 @@ void ParticleEmitter::update(float time_delta)
 	{
 		module->update(time_delta);
 	}
-}
-
-
-void ParticleEmitter::render()
-{
-	ASSERT(false);
-	TODO("todo");
 }
 
 
