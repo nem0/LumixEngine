@@ -36,7 +36,8 @@ namespace PlatformInterface
 		enum class MouseButton
 		{
 			LEFT,
-			RIGHT
+			RIGHT,
+			MIDDLE
 		};
 
 		virtual void onWindowTransformed(int x, int y, int w, int h) = 0;

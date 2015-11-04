@@ -19,6 +19,14 @@ class ShaderEditor
 public:
 	struct ICommand;
 
+	enum class ShaderType
+	{
+		VERTEX,
+		FRAGMENT,
+
+		COUNT
+	};
+
 	struct Node
 	{
 		Node(int type, ShaderEditor& editor);
@@ -54,10 +62,10 @@ public:
 	const char* getVertexOutputName(int index) const { return m_vertex_outputs[index]; }
 	Lumix::IAllocator& getAllocator() { return m_allocator; }
 	Node* createNode(int type);
-	void addNode(Node* node, const ImVec2& pos);
+	void addNode(Node* node, const ImVec2& pos, ShaderType type);
 	void destroyNode(Node* node);
 	Node* getNodeByID(int id);
-	Node& loadNode(Lumix::InputBlob& blob);
+	Node& loadNode(Lumix::InputBlob& blob, ShaderType type);
 	void loadNodeConnections(Lumix::InputBlob& blob, Node& node);
 	void saveNode(Lumix::OutputBlob& blob, Node& node);
 	void saveNodeConnections(Lumix::OutputBlob& blob, Node& node);
@@ -70,7 +78,7 @@ public:
 	static const int MAX_VERTEX_OUTPUTS_COUNT = 16;
 
 private:
-	void generate(const char* path);
+	void generate(const char* path, ShaderType shader_type);
 	void save(const char* path);
 	void load();
 	void execute(ICommand* command);
@@ -82,6 +90,8 @@ private:
 	void getSavePath();
 	void clear();
 	void onGUILeftColumn();
+	void onGUIRightColumn();
+	void onGUIMenu();
 
 private:
 	struct NewLinkInfo
@@ -101,7 +111,10 @@ private:
 	int m_undo_stack_idx;
 	Lumix::Array<ICommand*> m_undo_stack;
 	Lumix::Array<Node*> m_fragment_nodes;
+	Lumix::Array<Node*> m_vertex_nodes;
 	Lumix::IAllocator& m_allocator;
 	int m_current_node_id;
+	ShaderType m_current_shader_type;
 	bool m_is_focused;
+	ImVec2 m_canvas_pos;
 };
