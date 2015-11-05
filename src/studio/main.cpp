@@ -66,6 +66,7 @@ public:
 		, m_gui_pipeline(nullptr)
 		, m_is_welcome_screen_opened(true)
 		, m_shader_editor(nullptr)
+		, m_editor(nullptr)
 	{
 		m_entity_list_search[0] = '\0';
 		m_template_name[0] = '\0';
@@ -1052,7 +1053,7 @@ public:
 	{
 		checkWorkingDirector();
 		m_handler.m_app = this;
-		PlatformInterface::createWindow(&m_handler);
+		PlatformInterface::createWindow(nullptr);
 
 		m_engine = Lumix::Engine::create(nullptr, m_allocator);
 		char current_dir[Lumix::MAX_PATH_LENGTH];
@@ -1095,6 +1096,7 @@ public:
 		onUniverseCreated();
 		initIMGUI();
 
+		PlatformInterface::setSystemEventHandler(&m_handler);
 		loadSettings();
 
 		if (!m_metadata.load()) Lumix::g_log_info.log("studio") << "Could not load metadata";
@@ -1130,14 +1132,15 @@ public:
 		m_settings.m_window.y = y;
 		m_settings.m_window.w = width;
 		m_settings.m_window.h = height;
-
 		m_settings.m_is_maximized = PlatformInterface::isMaximized();
 
-		m_gui_pipeline->setViewport(0, 0, width, height);
+		if (m_gui_pipeline) m_gui_pipeline->setViewport(0, 0, width, height);
+		if (!m_editor) return;
+
 		auto& plugin_manager = m_editor->getEngine().getPluginManager();
 		auto* renderer =
 			static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
-		renderer->resize(width, height);
+		if(renderer) renderer->resize(width, height);
 	}
 
 

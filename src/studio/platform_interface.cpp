@@ -334,6 +334,12 @@ namespace PlatformInterface
 	}
 
 
+	void setSystemEventHandler(SystemEventHandler* handler)
+	{
+		g_platform_data.m_handler = handler;
+	}
+
+
 	void createWindow(SystemEventHandler* handler)
 	{
 		g_platform_data.m_handler = handler;
