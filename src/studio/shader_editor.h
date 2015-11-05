@@ -93,6 +93,7 @@ public:
 	static const int MAX_VERTEX_OUTPUTS_COUNT = 16;
 
 private:
+	void generateMain(const char* path);
 	void generate(const char* path, ShaderType shader_type);
 	void newGraph();
 	void save(const char* path);
