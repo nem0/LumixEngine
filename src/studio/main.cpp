@@ -242,7 +242,7 @@ public:
 			m_sceneview.onGUI();
 			m_hierarchy_ui.onGUI();
 			m_gameview.onGui();
-			//m_shader_editor->onGUI();
+			m_shader_editor->onGUI();
 			if (m_is_style_editor_opened) ImGui::ShowStyleEditor();
 			m_settings.onGUI(&m_actions[0], m_actions.size());
 		}
