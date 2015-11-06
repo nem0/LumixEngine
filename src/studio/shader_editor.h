@@ -19,6 +19,7 @@ class ShaderEditor
 public:
 	struct ICommand;
 
+
 	enum class ShaderType
 	{
 		VERTEX,
@@ -26,6 +27,7 @@ public:
 
 		COUNT
 	};
+
 
 	enum class VertexInput
 	{
@@ -42,6 +44,21 @@ public:
 		COUNT
 	};
 
+
+	enum class ValueType
+	{
+		FLOAT,
+		VEC2,
+		VEC3,
+		VEC4,
+		MATRIX3,
+		MATRIX4,
+
+		COUNT,
+		NONE
+	};
+
+
 	struct Node
 	{
 		Node(int type, ShaderEditor& editor);
@@ -50,8 +67,10 @@ public:
 		virtual void load(Lumix::InputBlob& blob) {}
 		virtual void generate(FILE* fp) = 0;
 		virtual void generateBeforeMain(FILE* fp) {}
+		virtual ValueType getOutputType(int index) const { return ValueType::FLOAT; }
 		virtual ~Node();
 
+		ValueType getInputType(int index) const;
 		void onNodeGUI();
 
 		ImGuiID id;
