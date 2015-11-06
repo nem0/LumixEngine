@@ -25,6 +25,11 @@ namespace Lumix
 			template <> void write<bool>(bool value) { uint8_t v = value; write(&v, sizeof(v)); }
 			void clear() { m_data.clear(); }
 
+			OutputBlob& operator << (const char* str);
+			OutputBlob& operator << (int value);
+			OutputBlob& operator << (uint32_t value);
+			OutputBlob& operator << (float value);
+
 		private:
 			Array<uint8_t> m_data;
 	};
