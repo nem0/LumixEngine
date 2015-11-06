@@ -4,7 +4,6 @@
 #include "core/array.h"
 #include "core/path.h"
 #include "ocornut-imgui/imgui.h"
-#include <cstdio>
 
 
 namespace Lumix
@@ -65,26 +64,25 @@ public:
 
 		virtual void save(Lumix::OutputBlob& blob) {}
 		virtual void load(Lumix::InputBlob& blob) {}
-		virtual void generate(FILE* fp) = 0;
-		virtual void generateBeforeMain(FILE* fp) {}
+		virtual void generate(Lumix::OutputBlob& blob) = 0;
+		virtual void printReference(Lumix::OutputBlob& blob);
+		virtual void generateBeforeMain(Lumix::OutputBlob& blob) {}
 		virtual ValueType getOutputType(int index) const { return ValueType::FLOAT; }
 		virtual ~Node();
 
 		ValueType getInputType(int index) const;
 		void onNodeGUI();
 
-		ImGuiID id;
-		ImVec2 pos;
+		ImGuiID m_id;
+		ImVec2 m_pos;
 
 		Lumix::Array<Node*> m_inputs;
 		Lumix::Array<Node*> m_outputs;
-		char m_name[50];
 		int m_type;
 		ShaderEditor& m_editor;
 
 	protected:
 		virtual void onGUI() = 0;
-		bool m_can_have_name;
 	};
 
 public:
