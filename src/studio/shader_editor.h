@@ -109,6 +109,8 @@ public:
 	static const int MAX_TEXTURES_COUNT = 16;
 	static const int MAX_VERTEX_OUTPUTS_COUNT = 16;
 
+	bool m_is_opened;
+
 private:
 	void generateMain(const char* path);
 	void generate(const char* path, ShaderType shader_type);

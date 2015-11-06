@@ -1043,6 +1043,7 @@ ShaderEditor::ShaderEditor(Lumix::IAllocator& allocator)
 	, m_undo_stack_idx(-1)
 	, m_current_node_id(-1)
 	, m_is_focused(false)
+	, m_is_opened(false)
 	, m_current_shader_type(ShaderType::VERTEX)
 {
 	newGraph();
@@ -1562,8 +1563,7 @@ void ShaderEditor::onGUIRightColumn()
 
 	if(ImGui::BeginPopup("context_menu"))
 	{
-		ImVec2 add_pos(ImGui::GetMousePos().x - cursor_screen_pos.x,
-			ImGui::GetMousePos().y - cursor_screen_pos.y);
+		ImVec2 add_pos(ImGui::GetMousePos() - cursor_screen_pos - m_canvas_pos);
 		if(m_current_node_id >= 0)
 		{
 			if(ImGui::MenuItem("Remove"))
@@ -1806,6 +1806,8 @@ void ShaderEditor::onGUIMenu()
 
 void ShaderEditor::onGUI()
 {
+	if (!m_is_opened) return;
+
 	if (ImGui::Begin("Shader editor", nullptr, ImGuiWindowFlags_MenuBar))
 	{
 		m_is_focused = ImGui::IsRootWindowOrAnyChildFocused();

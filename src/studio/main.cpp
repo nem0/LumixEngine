@@ -243,7 +243,7 @@ public:
 			m_sceneview.onGUI();
 			m_hierarchy_ui.onGUI();
 			m_gameview.onGui();
-			//m_shader_editor->onGUI();
+			m_shader_editor->onGUI();
 			if (m_is_style_editor_opened) ImGui::ShowStyleEditor();
 			m_settings.onGUI(&m_actions[0], m_actions.size());
 		}
@@ -542,6 +542,7 @@ public:
 					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
 					ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
 					ImGui::MenuItem("Settings", nullptr, &m_settings.m_is_opened);
+					ImGui::MenuItem("Shader editor", nullptr, &m_shader_editor->m_is_opened);
 					ImGui::MenuItem("Style editor", nullptr, &m_is_style_editor_opened);
 					ImGui::EndMenu();
 				}
@@ -668,6 +669,7 @@ public:
 		m_settings.m_is_log_opened = m_log_ui->m_is_opened;
 		m_settings.m_is_profiler_opened = m_profiler_ui->m_is_opened;
 		m_settings.m_is_properties_opened = m_property_grid->m_is_opened;
+		m_settings.m_is_shader_editor_opened = m_shader_editor->m_is_opened;
 		m_settings.m_is_style_editor_opened = m_is_style_editor_opened;
 
 		m_settings.save(&m_actions[0], m_actions.size());
@@ -805,6 +807,7 @@ public:
 		m_log_ui->m_is_opened = m_settings.m_is_log_opened;
 		m_profiler_ui->m_is_opened = m_settings.m_is_profiler_opened;
 		m_property_grid->m_is_opened = m_settings.m_is_properties_opened;
+		m_shader_editor->m_is_opened = m_settings.m_is_shader_editor_opened;
 		m_is_style_editor_opened = m_settings.m_is_style_editor_opened;
 
 		if (m_settings.m_is_maximized)
