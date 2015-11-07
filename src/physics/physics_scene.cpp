@@ -1163,7 +1163,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void deserialize(InputBlob& serializer) override
+	virtual void deserialize(InputBlob& serializer, int) override
 	{
 		deserializeActors(serializer);
 		deserializeControllers(serializer);

@@ -12,7 +12,6 @@ namespace FS
 class FileSystem;
 }
 
-class Hierarchy;
 namespace MTJD
 {
 class Manager;
@@ -20,6 +19,7 @@ class Manager;
 
 class InputBlob;
 class EditorServer;
+class Hierarchy;
 class InputSystem;
 class IPlugin;
 class IPropertyDescriptor;

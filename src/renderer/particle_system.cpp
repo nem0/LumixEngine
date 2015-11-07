@@ -1,4 +1,5 @@
 #include "particle_system.h"
+#include "core/blob.h"
 #include "core/crc32.h"
 #include "core/math_utils.h"
 #include "core/resource_manager.h"
@@ -9,6 +10,25 @@
 
 namespace Lumix
 {
+
+
+static ParticleEmitter::ModuleBase* createModule(uint32_t type, ParticleEmitter& emitter)
+{
+	if (type == ParticleEmitter::LinearMovementModule::s_type)
+	{
+		return LUMIX_NEW(emitter.getAllocator(), ParticleEmitter::LinearMovementModule)(emitter);
+	}
+	if (type == ParticleEmitter::AlphaModule::s_type)
+	{
+		return LUMIX_NEW(emitter.getAllocator(), ParticleEmitter::AlphaModule)(emitter);
+	}
+	if (type == ParticleEmitter::RandomRotationModule::s_type)
+	{
+		return LUMIX_NEW(emitter.getAllocator(), ParticleEmitter::RandomRotationModule)(emitter);
+	}
+
+	return nullptr;
+}
 
 
 ParticleEmitter::ModuleBase::ModuleBase(ParticleEmitter& emitter)
@@ -28,6 +48,22 @@ void ParticleEmitter::LinearMovementModule::spawnParticle(int index)
 	m_emitter.m_velocity[index].x = m_x.getRandom();
 	m_emitter.m_velocity[index].y = m_y.getRandom();
 	m_emitter.m_velocity[index].z = m_z.getRandom();
+}
+
+
+void ParticleEmitter::LinearMovementModule::serialize(OutputBlob& blob)
+{
+	blob.write(m_x);
+	blob.write(m_y);
+	blob.write(m_z);
+}
+
+
+void ParticleEmitter::LinearMovementModule::deserialize(InputBlob& blob)
+{
+	blob.read(m_x);
+	blob.read(m_y);
+	blob.read(m_z);
 }
 
 
@@ -190,6 +226,52 @@ void ParticleEmitter::updateLives(float time_delta)
 			--i;
 			--c;
 		}
+	}
+}
+
+
+void ParticleEmitter::serialize(OutputBlob& blob)
+{
+	blob.write(m_spawn_period);
+	blob.write(m_initial_life);
+	blob.write(m_initial_size);
+	blob.write(m_entity);
+	blob.writeString(m_material ? m_material->getPath().c_str() : "");
+	blob.write(m_modules.size());
+	for (auto* module : m_modules)
+	{
+		blob.write(module->getType());
+		module->serialize(blob);
+	}
+}
+
+
+void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager)
+{
+	blob.read(m_spawn_period);
+	blob.read(m_initial_life);
+	blob.read(m_initial_size);
+	blob.read(m_entity);
+	char path[MAX_PATH_LENGTH];
+	blob.readString(path, lengthOf(path));
+	auto material_manager = manager.get(ResourceManager::MATERIAL);
+	auto material = static_cast<Material*>(material_manager->load(Lumix::Path(path)));
+	setMaterial(material);
+
+	int size;
+	blob.read(size);
+	for (auto* module : m_modules)
+	{
+		LUMIX_DELETE(m_allocator, module);
+	}
+	m_modules.clear();
+	for (int i = 0; i < size; ++i)
+	{
+		uint32_t type;
+		blob.read(type);
+		auto* module = createModule(type, *this);
+		m_modules.push(module);
+		module->deserialize(blob);
 	}
 }
 

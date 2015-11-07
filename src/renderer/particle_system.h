@@ -12,7 +12,10 @@ namespace Lumix
 
 class ParticleEmitter;
 class IAllocator;
+class InputBlob;
 class Material;
+class OutputBlob;
+class ResourceManager;
 class Universe;
 
 
@@ -52,6 +55,8 @@ public:
 		virtual void spawnParticle(int index) {}
 		virtual void destoryParticle(int index) {}
 		virtual void update(float time_delta) {}
+		virtual void serialize(OutputBlob& blob) = 0;
+		virtual void deserialize(InputBlob& blob) = 0;
 		virtual uint32_t getType() const = 0;
 
 		ParticleEmitter& m_emitter;
@@ -62,6 +67,8 @@ public:
 	{
 		LinearMovementModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
+		void serialize(OutputBlob& blob) override;
+		void deserialize(InputBlob& blob) override;
 		uint32_t getType() const override { return s_type; }
 
 		static const uint32_t s_type;
@@ -75,6 +82,8 @@ public:
 	{
 		AlphaModule(ParticleEmitter& emitter);
 		void update(float time_delta) override;
+		void serialize(OutputBlob& blob) override {}
+		void deserialize(InputBlob& blob) override {}
 		uint32_t getType() const override { return s_type; }
 
 		static const uint32_t s_type;
@@ -85,6 +94,8 @@ public:
 	{
 		RandomRotationModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
+		void serialize(OutputBlob& blob) override {}
+		void deserialize(InputBlob& blob) override {}
 		uint32_t getType() const override { return s_type; }
 
 		static const uint32_t s_type;
@@ -95,6 +106,8 @@ public:
 	ParticleEmitter(Entity entity, Universe& universe, IAllocator& allocator);
 	~ParticleEmitter();
 
+	void serialize(OutputBlob& blob);
+	void deserialize(InputBlob& blob, ResourceManager& manager);
 	void update(float time_delta);
 	Material* getMaterial() const { return m_material; }
 	void setMaterial(Material* material);
