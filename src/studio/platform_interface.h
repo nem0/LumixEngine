@@ -36,7 +36,8 @@ namespace PlatformInterface
 		enum class MouseButton
 		{
 			LEFT,
-			RIGHT
+			RIGHT,
+			MIDDLE
 		};
 
 		virtual void onWindowTransformed(int x, int y, int w, int h) = 0;
@@ -61,6 +62,7 @@ namespace PlatformInterface
 	int getWindowWidth();
 	int getWindowHeight();
 	void createWindow(SystemEventHandler* handler);
+	void setSystemEventHandler(SystemEventHandler* handler);
 	void setWindowTitle(const char* title);
 	bool isMaximized();
 	void maximizeWindow();
