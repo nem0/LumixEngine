@@ -7,6 +7,8 @@
 #include "lua_script/lua_script_manager.h"
 #include "lua_script/lua_script_system.h"
 #include "ocornut-imgui/imgui.h"
+#include "renderer/particle_system.h"
+#include "renderer/render_scene.h"
 #include "terrain_editor.h"
 #include "utils.h"
 
@@ -248,6 +250,12 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 		onLuaScriptGui(cmp);
 	}
 
+	if (cmp.type == Lumix::crc32("particle_emitter"))
+	{
+		onParticleEmitterGUI(cmp);
+	}
+
+
 	if (cmp.type == Lumix::crc32("terrain"))
 	{
 		m_terrain_editor->setComponent(cmp);
@@ -313,6 +321,87 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 		ImGui::EndPopup();
 	}
 	return false;
+}
+
+
+void PropertyGrid::onParticleEmitterGUI(Lumix::ComponentUID cmp)
+{
+	auto* scene = static_cast<Lumix::RenderScene*>(cmp.scene);
+
+	auto& emitter = scene->getParticleEmitter(cmp.index);
+
+	if (ImGui::Button("Add module"))
+	{
+		ImGui::OpenPopup("add module");
+	}
+
+	if (ImGui::BeginPopup("add module"))
+	{
+		if (ImGui::Selectable("Alpha"))
+		{
+			auto* module =
+				LUMIX_NEW(emitter.getAllocator(), Lumix::ParticleEmitter::AlphaModule)(emitter);
+			emitter.addModule(module);
+		}
+		if (ImGui::Selectable("Linear movement"))
+		{
+			auto* module = LUMIX_NEW(
+				emitter.getAllocator(), Lumix::ParticleEmitter::LinearMovementModule)(emitter);
+			emitter.addModule(module);
+		}
+		if (ImGui::Selectable("Random rotation"))
+		{
+			auto* module = LUMIX_NEW(
+				emitter.getAllocator(), Lumix::ParticleEmitter::RandomRotationModule)(emitter);
+			emitter.addModule(module);
+		}
+		ImGui::EndPopup();
+	}
+
+	for (auto* module : emitter.m_modules)
+	{
+		if (module->getType() == Lumix::ParticleEmitter::LinearMovementModule::s_type)
+		{
+			ImGui::Text("Linear movement");
+			ImGui::SameLine();
+			if (ImGui::Button("Remove"))
+			{
+				emitter.m_modules.eraseItem(module);
+				LUMIX_DELETE(emitter.getAllocator(), module);
+				break;
+			}
+			auto* linear_movement = static_cast<Lumix::ParticleEmitter::LinearMovementModule*>(module);
+			ImGui::DragFloat2("x", &linear_movement->m_x.from);
+			ImGui::DragFloat2("y", &linear_movement->m_y.from);
+			ImGui::DragFloat2("z", &linear_movement->m_z.from);
+		}
+
+		if (module->getType() == Lumix::ParticleEmitter::AlphaModule::s_type)
+		{
+			ImGui::Text("Alpha");
+			ImGui::SameLine();
+			if (ImGui::Button("Remove"))
+			{
+				emitter.m_modules.eraseItem(module);
+				LUMIX_DELETE(emitter.getAllocator(), module);
+				break;
+			}
+		}
+
+		if (module->getType() == Lumix::ParticleEmitter::RandomRotationModule::s_type)
+		{
+			ImGui::Text("Random rotation");
+			ImGui::SameLine();
+			if (ImGui::Button("Remove"))
+			{
+				emitter.m_modules.eraseItem(module);
+				LUMIX_DELETE(emitter.getAllocator(), module);
+				break;
+			}
+		}
+
+
+	}
 }
 
 

@@ -1,4 +1,5 @@
 #include "core/blob.h"
+#include "core/string.h"
 
 
 namespace Lumix
@@ -13,6 +14,40 @@ namespace Lumix
 		: m_data(allocator)
 	{
 		m_data = blob.m_data;
+	}
+
+
+	OutputBlob& OutputBlob::operator << (const char* str)
+	{
+		write(str, strlen(str));
+		return *this;
+	}
+
+
+	OutputBlob& OutputBlob::operator << (int value)
+	{
+		char tmp[20];
+		Lumix::toCString(value, tmp, Lumix::lengthOf(tmp));
+		write(tmp, strlen(tmp));
+		return *this;
+	}
+
+
+	OutputBlob& OutputBlob::operator << (uint32_t value)
+	{
+		char tmp[20];
+		Lumix::toCString(value, tmp, Lumix::lengthOf(tmp));
+		write(tmp, strlen(tmp));
+		return *this;
+	}
+
+
+	OutputBlob& OutputBlob::operator << (float value)
+	{
+		char tmp[30];
+		Lumix::toCString(value, tmp, Lumix::lengthOf(tmp), 6);
+		write(tmp, strlen(tmp));
+		return *this;
 	}
 
 

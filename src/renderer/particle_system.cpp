@@ -1,5 +1,9 @@
 #include "particle_system.h"
+#include "core/crc32.h"
 #include "core/math_utils.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
+#include "renderer/material.h"
 #include "universe/universe.h"
 
 
@@ -7,20 +11,64 @@ namespace Lumix
 {
 
 
-struct ParticleEmitter::ModuleBase
+ParticleEmitter::ModuleBase::ModuleBase(ParticleEmitter& emitter)
+	: m_emitter(emitter)
 {
-	ModuleBase(ParticleEmitter& emitter)
-		: m_emitter(emitter)
+}
+
+
+ParticleEmitter::LinearMovementModule::LinearMovementModule(ParticleEmitter& emitter)
+	: ModuleBase(emitter)
+{
+}
+
+
+void ParticleEmitter::LinearMovementModule::spawnParticle(int index)
+{
+	m_emitter.m_velocity[index].x = m_x.getRandom();
+	m_emitter.m_velocity[index].y = m_y.getRandom();
+	m_emitter.m_velocity[index].z = m_z.getRandom();
+}
+
+
+const uint32_t ParticleEmitter::LinearMovementModule::s_type = Lumix::crc32("linear_movement");
+
+
+ParticleEmitter::AlphaModule::AlphaModule(ParticleEmitter& emitter)
+	: ModuleBase(emitter)
+{
+}
+
+
+void ParticleEmitter::AlphaModule::update(float time_delta)
+{
+	if (m_emitter.m_alpha.empty()) return;
+
+	float* alpha = &m_emitter.m_alpha[0];
+	for (int i = 0, c = m_emitter.m_alpha.size(); i < c; ++i)
 	{
+		alpha[i] = Math::minValue(m_emitter.m_life[i], 1.0f);
 	}
+}
 
-	virtual ~ModuleBase() {}
-	virtual void spawnParticle(int index) {}
-	virtual void destoryParticle(int index) {}
-	virtual void update(float time_delta) {}
 
-	ParticleEmitter& m_emitter;
-};
+const uint32_t ParticleEmitter::AlphaModule::s_type = Lumix::crc32("alpha");
+
+
+ParticleEmitter::RandomRotationModule::RandomRotationModule(ParticleEmitter& emitter)
+	: ModuleBase(emitter)
+{
+}
+
+
+void ParticleEmitter::RandomRotationModule::spawnParticle(int index)
+{
+	m_emitter.m_rotation[index] = Math::degreesToRadians(float(rand() % 360));
+}
+
+
+const uint32_t ParticleEmitter::RandomRotationModule::s_type = Lumix::crc32("random_rotation");
+
 
 
 Interval::Interval()
@@ -33,7 +81,7 @@ Interval::Interval()
 void Interval::check()
 {
 	from = Math::maxValue(from, 0.0f);
-	to = Math::maxValue(from + 0.001f, to);
+	to = Math::maxValue(from, to);
 }
 
 
@@ -50,19 +98,27 @@ ParticleEmitter::ParticleEmitter(Entity entity, Universe& universe, IAllocator& 
 	, m_modules(allocator)
 	, m_position(allocator)
 	, m_velocity(allocator)
+	, m_rotation(allocator)
+	, m_rotational_speed(allocator)
+	, m_alpha(allocator)
 	, m_universe(universe)
 	, m_entity(entity)
 	, m_size(allocator)
+	, m_material(nullptr)
 {
 	m_spawn_period.from = 1;
 	m_spawn_period.to = 2;
 	m_initial_life.from = 1;
 	m_initial_life.to = 2;
+	m_initial_size.from = 1;
+	m_initial_size.to = 1;
 }
 
 
 ParticleEmitter::~ParticleEmitter()
 {
+	setMaterial(nullptr);
+
 	for (auto* module : m_modules)
 	{
 		LUMIX_DELETE(m_allocator, module);
@@ -70,16 +126,37 @@ ParticleEmitter::~ParticleEmitter()
 }
 
 
+void ParticleEmitter::setMaterial(Material* material)
+{
+	if (m_material)
+	{
+		auto* manager = m_material->getResourceManager().get(ResourceManager::MATERIAL);
+		manager->unload(*m_material);
+	}
+	m_material = material;
+}
+
+
 void ParticleEmitter::spawnParticle()
 {
 	m_position.push(m_universe.getPosition(m_entity));
+	m_rotation.push(0);
+	m_rotational_speed.push(0);
 	m_life.push(m_initial_life.getRandom());
+	m_alpha.push(1);
 	m_velocity.push(Vec3(0, 0, 0));
-	m_size.push(1);
+	m_size.push(m_initial_size.getRandom());
 	for (auto* module : m_modules)
 	{
 		module->spawnParticle(m_life.size() - 1);
 	}
+}
+
+
+void ParticleEmitter::addModule(ModuleBase* module)
+{
+	m_modules.push(module);
+	TODO("todo check whether anything else is necessary to do here");
 }
 
 
@@ -92,6 +169,9 @@ void ParticleEmitter::destroyParticle(int index)
 	m_life.eraseFast(index);
 	m_position.eraseFast(index);
 	m_velocity.eraseFast(index);
+	m_rotation.eraseFast(index);
+	m_rotational_speed.eraseFast(index);
+	m_alpha.eraseFast(index);
 	m_size.eraseFast(index);
 }
 
@@ -118,7 +198,16 @@ void ParticleEmitter::updatePositions(float time_delta)
 {
 	for (int i = 0, c = m_position.size(); i < c; ++i)
 	{
-		m_position[i] = m_velocity[i] * time_delta;
+		m_position[i] += m_velocity[i] * time_delta;
+	}
+}
+
+
+void ParticleEmitter::updateRotations(float time_delta)
+{
+	for (int i = 0, c = m_rotation.size(); i < c; ++i)
+	{
+		m_rotation[i] += m_rotational_speed[i] * time_delta;
 	}
 }
 
@@ -128,17 +217,11 @@ void ParticleEmitter::update(float time_delta)
 	spawnParticles(time_delta);
 	updateLives(time_delta);
 	updatePositions(time_delta);
+	updateRotations(time_delta);
 	for (auto* module : m_modules)
 	{
 		module->update(time_delta);
 	}
-}
-
-
-void ParticleEmitter::render()
-{
-	ASSERT(false);
-	TODO("todo");
 }
 
 
