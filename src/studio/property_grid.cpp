@@ -362,42 +362,51 @@ void PropertyGrid::onParticleEmitterGUI(Lumix::ComponentUID cmp)
 	{
 		if (module->getType() == Lumix::ParticleEmitter::LinearMovementModule::s_type)
 		{
+			ImGui::PushID(1);
 			ImGui::Text("Linear movement");
 			ImGui::SameLine();
 			if (ImGui::Button("Remove"))
 			{
 				emitter.m_modules.eraseItem(module);
 				LUMIX_DELETE(emitter.getAllocator(), module);
+				ImGui::PopID();
 				break;
 			}
 			auto* linear_movement = static_cast<Lumix::ParticleEmitter::LinearMovementModule*>(module);
 			ImGui::DragFloat2("x", &linear_movement->m_x.from);
 			ImGui::DragFloat2("y", &linear_movement->m_y.from);
 			ImGui::DragFloat2("z", &linear_movement->m_z.from);
+			ImGui::PopID();
 		}
 
 		if (module->getType() == Lumix::ParticleEmitter::AlphaModule::s_type)
 		{
+			ImGui::PushID(2);
 			ImGui::Text("Alpha");
 			ImGui::SameLine();
 			if (ImGui::Button("Remove"))
 			{
 				emitter.m_modules.eraseItem(module);
 				LUMIX_DELETE(emitter.getAllocator(), module);
+				ImGui::PopID();
 				break;
 			}
+			ImGui::PopID();
 		}
 
 		if (module->getType() == Lumix::ParticleEmitter::RandomRotationModule::s_type)
 		{
+			ImGui::PushID(3);
 			ImGui::Text("Random rotation");
 			ImGui::SameLine();
 			if (ImGui::Button("Remove"))
 			{
 				emitter.m_modules.eraseItem(module);
 				LUMIX_DELETE(emitter.getAllocator(), module);
+				ImGui::PopID();
 				break;
 			}
+			ImGui::PopID();
 		}
 
 

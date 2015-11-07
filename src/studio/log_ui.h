@@ -55,4 +55,5 @@ class LogUI
 		int m_new_message_count[Count];
 		int m_current_tab;
 		int m_last_uid;
+		bool m_move_notifications_to_front;
 };

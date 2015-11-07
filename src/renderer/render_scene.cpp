@@ -47,6 +47,14 @@ static const uint32_t CAMERA_HASH = crc32("camera");
 static const uint32_t TERRAIN_HASH = crc32("terrain");
 
 
+enum class RenderSceneVersion : int32_t
+{
+	PARTICLES,
+
+	LATEST
+};
+
+
 struct Renderable
 {
 	Renderable(IAllocator& allocator)
@@ -418,13 +426,56 @@ public:
 		}
 	}
 
+
+	void deserializeParticleEmitters(InputBlob& serializer)
+	{
+		int count;
+		serializer.read(count);
+		m_particle_emitters.resize(count);
+		for(int i = 0; i < count; ++i)
+		{
+			bool is_emitter;
+			serializer.read(is_emitter);
+			ParticleEmitter* emitter = nullptr;
+			if (is_emitter)
+			{
+				emitter = LUMIX_NEW(m_allocator, ParticleEmitter)(
+					INVALID_ENTITY, m_universe, m_allocator);
+				emitter->deserialize(serializer, m_engine.getResourceManager());
+				m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_HASH, this, i);
+			}
+			m_particle_emitters[i] = emitter;
+		}
+	}
+
+
+	void serializeParticleEmitters(OutputBlob& serializer)
+	{
+		serializer.write(m_particle_emitters.size());
+		for (auto* emitter : m_particle_emitters)
+		{
+			if (emitter)
+			{
+				serializer.write(true);
+				emitter->serialize(serializer);
+			}
+			else
+			{
+				serializer.write(false);
+			}
+		}
+	}
+
+
 	virtual void serialize(OutputBlob& serializer) override
 	{
 		serializeCameras(serializer);
 		serializeRenderables(serializer);
 		serializeLights(serializer);
 		serializeTerrains(serializer);
+		serializeParticleEmitters(serializer);
 	}
+
 
 	void deserializeCameras(InputBlob& serializer)
 	{
@@ -444,8 +495,7 @@ public:
 
 			if (!camera.m_is_free)
 			{
-				m_universe.addComponent(
-					m_cameras[i].m_entity, CAMERA_HASH, this, i);
+				m_universe.addComponent(m_cameras[i].m_entity, CAMERA_HASH, this, i);
 			}
 		}
 	}
@@ -575,12 +625,20 @@ public:
 		}
 	}
 
-	virtual void deserialize(InputBlob& serializer) override
+
+	int getVersion() const override
+	{
+		return (int)RenderSceneVersion::LATEST;
+	}
+
+
+	void deserialize(InputBlob& serializer, int version) override
 	{
 		deserializeCameras(serializer);
 		deserializeRenderables(serializer);
 		deserializeLights(serializer);
 		deserializeTerrains(serializer);
+		if (version >= 0) deserializeParticleEmitters(serializer);
 	}
 
 

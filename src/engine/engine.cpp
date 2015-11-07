@@ -33,6 +33,7 @@ enum class SerializedEngineVersion : int32_t
 	BASE,
 	SPARSE_TRANFORMATIONS,
 	FOG_PARAMS,
+	SCENE_VERSION,
 
 	LATEST // must be the last one
 };
@@ -374,6 +375,7 @@ public:
 		for (int i = 0; i < ctx.m_scenes.size(); ++i)
 		{
 			serializer.writeString(ctx.m_scenes[i]->getPlugin().getName());
+			serializer.write(ctx.m_scenes[i]->getVersion());
 			ctx.m_scenes[i]->serialize(serializer);
 		}
 		uint32_t crc = crc32((const uint8_t*)serializer.getData() + pos,
@@ -392,7 +394,7 @@ public:
 			g_log_error.log("engine") << "Wrong or corrupted file";
 			return false;
 		}
-		if (header.m_version != SerializedEngineVersion::LATEST)
+		if (header.m_version > SerializedEngineVersion::LATEST)
 		{
 			g_log_error.log("engine") << "Unsupported version";
 			return false;
@@ -412,7 +414,12 @@ public:
 			char tmp[32];
 			serializer.readString(tmp, sizeof(tmp));
 			IScene* scene = ctx.getScene(crc32(tmp));
-			scene->deserialize(serializer);
+			int scene_version = -1;
+			if (header.m_version > SerializedEngineVersion::SCENE_VERSION)
+			{
+				serializer.read(scene_version);
+			}
+			scene->deserialize(serializer, scene_version);
 		}
 		g_path_manager.clear();
 		return true;

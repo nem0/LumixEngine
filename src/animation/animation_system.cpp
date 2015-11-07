@@ -130,7 +130,7 @@ public:
 	}
 
 
-	virtual void deserialize(InputBlob& serializer) override
+	virtual void deserialize(InputBlob& serializer, int) override
 	{
 		int32_t count;
 		serializer.read(count);
