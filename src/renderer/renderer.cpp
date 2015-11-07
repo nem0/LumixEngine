@@ -260,14 +260,26 @@ struct RendererImpl : public Renderer
 		m_engine.registerComponentType("terrain", "Terrain");
 
 		m_engine.registerProperty("particle_emitter",
-			LUMIX_NEW(allocator, Vec2PropertyDescriptor<RenderScene>)("Initial life",
+			LUMIX_NEW(allocator, Vec2PropertyDescriptor<RenderScene>)("Life",
 			&RenderScene::getParticleEmitterInitialLife,
 			&RenderScene::setParticleEmitterInitialLife,
+			allocator));
+		m_engine.registerProperty("particle_emitter",
+			LUMIX_NEW(allocator, Vec2PropertyDescriptor<RenderScene>)("Initial size",
+			&RenderScene::getParticleEmitterInitialSize,
+			&RenderScene::setParticleEmitterInitialSize,
 			allocator));
 		m_engine.registerProperty("particle_emitter",
 			LUMIX_NEW(allocator, Vec2PropertyDescriptor<RenderScene>)("Spawn period",
 			&RenderScene::getParticleEmitterSpawnPeriod,
 			&RenderScene::setParticleEmitterSpawnPeriod,
+			allocator));
+		m_engine.registerProperty("particle_emitter",
+			LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",
+			&RenderScene::getParticleEmitterMaterialPath,
+			&RenderScene::setParticleEmitterMaterialPath,
+			"Material (*.mat)",
+			Lumix::ResourceManager::MATERIAL,
 			allocator));
 
 		m_engine.registerProperty("camera",

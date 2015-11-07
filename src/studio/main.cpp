@@ -66,6 +66,7 @@ public:
 		, m_gui_pipeline(nullptr)
 		, m_is_welcome_screen_opened(true)
 		, m_shader_editor(nullptr)
+		, m_editor(nullptr)
 	{
 		m_entity_list_search[0] = '\0';
 		m_template_name[0] = '\0';
@@ -150,6 +151,8 @@ public:
 
 			if (ImGui::BeginChild("right", half_size, true))
 			{
+				ImGui::Text("Version 0.18. - News");
+				ImGui::Separator();
 				ImGui::Text("Version 0.17. - News");
 				ImGui::BulletText("Back button in the asset browser");
 				ImGui::BulletText("Grass culling");
@@ -240,7 +243,7 @@ public:
 			m_sceneview.onGUI();
 			m_hierarchy_ui.onGUI();
 			m_gameview.onGui();
-			//m_shader_editor->onGUI();
+			m_shader_editor->onGUI();
 			if (m_is_style_editor_opened) ImGui::ShowStyleEditor();
 			m_settings.onGUI(&m_actions[0], m_actions.size());
 		}
@@ -323,8 +326,8 @@ public:
 		m_time_to_autosave = float(m_settings.m_autosave_time);
 	}
 
-	void undo() { m_editor->undo(); }
-	void redo() { m_editor->redo(); }
+	void undo() { m_shader_editor->isFocused() ? m_shader_editor->undo() : m_editor->undo(); }
+	void redo() { m_shader_editor->isFocused() ? m_shader_editor->redo() :m_editor->redo(); }
 	void copy() { m_editor->copyEntity(); }
 	void paste() { m_editor->pasteEntity(); }
 	void toggleOrbitCamera() { m_editor->setOrbitCamera(!m_editor->isOrbitCamera()); }
@@ -412,7 +415,6 @@ public:
 	}
 
 
-
 	Action& getAction(const char* name)
 	{
 		for (auto* a : m_actions)
@@ -423,7 +425,7 @@ public:
 		return *m_actions[0];
 	}
 
-	
+
 	void showMainMenu()
 	{
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
@@ -540,6 +542,7 @@ public:
 					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
 					ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
 					ImGui::MenuItem("Settings", nullptr, &m_settings.m_is_opened);
+					ImGui::MenuItem("Shader editor", nullptr, &m_shader_editor->m_is_opened);
 					ImGui::MenuItem("Style editor", nullptr, &m_is_style_editor_opened);
 					ImGui::EndMenu();
 				}
@@ -666,6 +669,7 @@ public:
 		m_settings.m_is_log_opened = m_log_ui->m_is_opened;
 		m_settings.m_is_profiler_opened = m_profiler_ui->m_is_opened;
 		m_settings.m_is_properties_opened = m_property_grid->m_is_opened;
+		m_settings.m_is_shader_editor_opened = m_shader_editor->m_is_opened;
 		m_settings.m_is_style_editor_opened = m_is_style_editor_opened;
 
 		m_settings.save(&m_actions[0], m_actions.size());
@@ -803,6 +807,7 @@ public:
 		m_log_ui->m_is_opened = m_settings.m_is_log_opened;
 		m_profiler_ui->m_is_opened = m_settings.m_is_profiler_opened;
 		m_property_grid->m_is_opened = m_settings.m_is_properties_opened;
+		m_shader_editor->m_is_opened = m_settings.m_is_shader_editor_opened;
 		m_is_style_editor_opened = m_settings.m_is_style_editor_opened;
 
 		if (m_settings.m_is_maximized)
@@ -940,7 +945,7 @@ public:
 
 
 		void onMouseLeftWindow() override { m_app->clearInputs(); }
-		
+
 
 		void onMouseMove(int x, int y, int rel_x, int rel_y) override
 		{
@@ -980,11 +985,19 @@ public:
 					}
 					break;
 				case PlatformInterface::SystemEventHandler::MouseButton::RIGHT:
-					if (!m_app->m_sceneview.onMouseDown(
-							m_mouse_x, m_mouse_y, Lumix::MouseButton::RIGHT) &&
+					if(!m_app->m_sceneview.onMouseDown(
+						m_mouse_x, m_mouse_y, Lumix::MouseButton::RIGHT) &&
 						!m_app->m_gameview.isMouseCaptured())
 					{
 						ImGui::GetIO().MouseDown[1] = true;
+					}
+					break;
+				case PlatformInterface::SystemEventHandler::MouseButton::MIDDLE:
+					if(!m_app->m_sceneview.onMouseDown(
+						m_mouse_x, m_mouse_y, Lumix::MouseButton::MIDDLE) &&
+						!m_app->m_gameview.isMouseCaptured())
+					{
+						ImGui::GetIO().MouseDown[2] = true;
 					}
 					break;
 			}
@@ -1002,6 +1015,10 @@ public:
 				case PlatformInterface::SystemEventHandler::MouseButton::RIGHT:
 					m_app->m_sceneview.onMouseUp(Lumix::MouseButton::RIGHT);
 					ImGui::GetIO().MouseDown[1] = false;
+					break;
+				case PlatformInterface::SystemEventHandler::MouseButton::MIDDLE:
+					m_app->m_sceneview.onMouseUp(Lumix::MouseButton::MIDDLE);
+					ImGui::GetIO().MouseDown[2] = false;
 					break;
 			}
 		}
@@ -1039,7 +1056,7 @@ public:
 	{
 		checkWorkingDirector();
 		m_handler.m_app = this;
-		PlatformInterface::createWindow(&m_handler);
+		PlatformInterface::createWindow(nullptr);
 
 		m_engine = Lumix::Engine::create(nullptr, m_allocator);
 		char current_dir[Lumix::MAX_PATH_LENGTH];
@@ -1082,6 +1099,7 @@ public:
 		onUniverseCreated();
 		initIMGUI();
 
+		PlatformInterface::setSystemEventHandler(&m_handler);
 		loadSettings();
 
 		if (!m_metadata.load()) Lumix::g_log_info.log("studio") << "Could not load metadata";
@@ -1117,14 +1135,15 @@ public:
 		m_settings.m_window.y = y;
 		m_settings.m_window.w = width;
 		m_settings.m_window.h = height;
-
 		m_settings.m_is_maximized = PlatformInterface::isMaximized();
 
-		m_gui_pipeline->setViewport(0, 0, width, height);
+		if (m_gui_pipeline) m_gui_pipeline->setViewport(0, 0, width, height);
+		if (!m_editor) return;
+
 		auto& plugin_manager = m_editor->getEngine().getPluginManager();
 		auto* renderer =
 			static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
-		renderer->resize(width, height);
+		if(renderer) renderer->resize(width, height);
 	}
 
 

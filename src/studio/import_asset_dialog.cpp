@@ -1344,12 +1344,9 @@ bool ImportAssetDialog::checkTexture(const char* source_dir, const char* texture
 	if (Lumix::fileExists(path)) return true;
 
 	char new_path[Lumix::MAX_PATH_LENGTH];
-	Lumix::messageBox(
-		message
-			? message
-			: StringBuilder<Lumix::MAX_PATH_LENGTH + 40>("Texture ")
-					<< path
-					<< " not found, please locate it");
+	Lumix::messageBox(message ? message : StringBuilder<Lumix::MAX_PATH_LENGTH + 40>("Texture ")
+											  << path
+											  << " not found, please locate it");
 
 	if (!Lumix::getOpenFilename(new_path, sizeof(new_path), "All\0*.*\0")) return false;
 

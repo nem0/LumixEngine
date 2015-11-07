@@ -243,6 +243,12 @@ namespace PlatformInterface
 			case WM_RBUTTONUP:
 				g_platform_data.m_handler->onMouseButtonUp(SystemEventHandler::MouseButton::RIGHT);
 				break;
+			case WM_MBUTTONUP:
+				g_platform_data.m_handler->onMouseButtonUp(SystemEventHandler::MouseButton::MIDDLE);
+				break;
+			case WM_MBUTTONDOWN:
+				g_platform_data.m_handler->onMouseButtonDown(SystemEventHandler::MouseButton::MIDDLE);
+				break;
 			case WM_MOUSEWHEEL:
 				g_platform_data.m_handler->onMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
 				break;
@@ -325,6 +331,12 @@ namespace PlatformInterface
 			}
 		}
 		return !want_quit;
+	}
+
+
+	void setSystemEventHandler(SystemEventHandler* handler)
+	{
+		g_platform_data.m_handler = handler;
 	}
 
 

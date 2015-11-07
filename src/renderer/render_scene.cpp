@@ -330,6 +330,8 @@ public:
 
 		for (auto* emitter : m_particle_emitters)
 		{
+			if (!emitter) continue;
+			
 			emitter->update(dt);
 		}
 	}
@@ -699,9 +701,24 @@ public:
 	}
 
 
+	virtual void setParticleEmitterInitialSize(ComponentIndex cmp, const Vec2& value) override
+	{
+		m_particle_emitters[cmp]->m_initial_size = value;
+		m_particle_emitters[cmp]->m_initial_size.check();
+	}
+
+
+	virtual Vec2 getParticleEmitterInitialSize(ComponentIndex cmp) override
+	{
+		return m_particle_emitters[cmp]->m_initial_size;
+	}
+
+
 	virtual void setParticleEmitterSpawnPeriod(ComponentIndex cmp, const Vec2& value) override
 	{
 		m_particle_emitters[cmp]->m_spawn_period = value;
+		m_particle_emitters[cmp]->m_spawn_period.from =
+			Math::maxValue(0.01f, m_particle_emitters[cmp]->m_spawn_period.from);
 		m_particle_emitters[cmp]->m_spawn_period.check();
 	}
 
@@ -2441,6 +2458,39 @@ private:
 		m_renderable_created.invoke(r.m_component_index);
 		return r.m_component_index;
 	}
+
+
+	void setParticleEmitterMaterialPath(ComponentIndex cmp, const char* path) override
+	{
+		if (!m_particle_emitters[cmp]) return;
+
+		auto* manager = m_engine.getResourceManager().get(ResourceManager::MATERIAL);
+		Material* material = static_cast<Material*>(manager->load(Path(path)));
+		m_particle_emitters[cmp]->setMaterial(material);
+	}
+
+
+	const char* getParticleEmitterMaterialPath(ComponentIndex cmp) override
+	{
+		ParticleEmitter* emitter = m_particle_emitters[cmp];
+		if (!emitter) return "";
+		if (!emitter->getMaterial()) return "";
+
+		return emitter->getMaterial()->getPath().c_str();
+	}
+
+
+	ParticleEmitter& getParticleEmitter(ComponentIndex cmp) const override
+	{
+		return *m_particle_emitters[cmp];
+	}
+
+
+	const Array<ParticleEmitter*>& getParticleEmitters() const override
+	{
+		return m_particle_emitters;
+	}
+
 
 private:
 	IAllocator& m_allocator;
