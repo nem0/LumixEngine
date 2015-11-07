@@ -338,18 +338,19 @@ public:
 		m_data = p;
 	}
 
-	int indexOf(const T& item) const
+	template <typename R>
+	int indexOf(R item) const
 	{
-		for (int i = 0; i < m_size; ++i)
+		for(int i = 0; i < m_size; ++i)
 		{
-			if (m_data[i] == item)
+			if(m_data[i] == item)
 			{
 				return i;
 			}
 		}
 		return -1;
 	}
-
+	
 	void eraseFast(int index)
 	{
 		if (index >= 0 && index < m_size)
