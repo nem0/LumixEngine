@@ -356,6 +356,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		struct Instance
 		{
 			Vec4 pos;
+			Vec4 alpha_and_rotation;
 		};
 		Instance* instance = nullptr;
 
@@ -377,6 +378,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			}
 
 			instance->pos = Vec4(emitter.m_position[i], emitter.m_size[i]);
+			instance->alpha_and_rotation = Vec4(emitter.m_alpha[i], emitter.m_rotation[i], 0, 0);
 			++instance;
 		}
 

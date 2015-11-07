@@ -71,6 +71,26 @@ public:
 	};
 
 
+	struct LUMIX_RENDERER_API AlphaModule : public ModuleBase
+	{
+		AlphaModule(ParticleEmitter& emitter);
+		void update(float time_delta) override;
+		uint32_t getType() const override { return s_type; }
+
+		static const uint32_t s_type;
+	};
+
+
+	struct LUMIX_RENDERER_API RandomRotationModule : public ModuleBase
+	{
+		RandomRotationModule(ParticleEmitter& emitter);
+		void spawnParticle(int index) override;
+		uint32_t getType() const override { return s_type; }
+
+		static const uint32_t s_type;
+	};
+
+
 public:
 	ParticleEmitter(Entity entity, Universe& universe, IAllocator& allocator);
 	~ParticleEmitter();
@@ -86,6 +106,9 @@ public:
 	Array<float> m_size;
 	Array<Vec3> m_position;
 	Array<Vec3> m_velocity;
+	Array<float> m_alpha;
+	Array<float> m_rotation;
+	Array<float> m_rotational_speed;
 
 	Interval m_spawn_period;
 	Interval m_initial_life;
@@ -99,6 +122,7 @@ private:
 	void spawnParticles(float time_delta);
 	void updateLives(float time_delta);
 	void updatePositions(float time_delta);
+	void updateRotations(float time_delta);
 
 private:
 	IAllocator& m_allocator;
