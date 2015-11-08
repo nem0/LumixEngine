@@ -46,6 +46,7 @@ void LogUI::setNotificationTime(int uid, float time)
 
 int LogUI::addNotification(const char* text)
 {
+	m_move_notifications_to_front = true;
 	auto& notif = m_notifications.emplace(m_allocator);
 	notif.time = 10.0f;
 	notif.message = text;
@@ -111,6 +112,8 @@ void LogUI::showNotifications()
 		ImGui::End();
 		return;
 	}
+	if (m_move_notifications_to_front) ImGui::SetWindowFocus();
+	m_move_notifications_to_front = false;
 	for (int i = 0; i < m_notifications.size(); ++i)
 	{
 		if (i > 0) ImGui::Separator();

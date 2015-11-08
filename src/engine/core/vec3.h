@@ -9,6 +9,15 @@ namespace Lumix
 {
 
 
+struct LUMIX_ENGINE_API Vec2
+{
+	Vec2() {}
+	Vec2(float a, float b) : x(a), y(b) {}
+
+	float x, y;
+};
+
+
 struct LUMIX_ENGINE_API Vec3
 {
 	Vec3() {}

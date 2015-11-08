@@ -260,6 +260,15 @@ void JsonSerializer::serializeArrayItem(bool value)
 #pragma region deserialization
 
 
+bool JsonSerializer::isNextBoolean() const
+{
+	if (m_is_string_token) return false;
+	if (m_token_size == 4 && strncmp(m_token, "true", 4) == 0) return true;
+	if (m_token_size == 5 && strncmp(m_token, "false", 5) == 0) return true;
+	return false;
+}
+
+
 void JsonSerializer::deserialize(bool& value, bool default_value)
 {
 	value = !m_is_string_token
