@@ -192,7 +192,6 @@ void ParticleEmitter::spawnParticle()
 void ParticleEmitter::addModule(ModuleBase* module)
 {
 	m_modules.push(module);
-	TODO("todo check whether anything else is necessary to do here");
 }
 
 
