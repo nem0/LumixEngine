@@ -26,5 +26,5 @@ namespace Lumix
 			Manager::JobTransQueue*	m_trans_queue;
 			Manager* m_manager;
 		};
-	} // ~namepsace MTJD
-} // ~namepsace Lumix
+	} // namepsace MTJD
+} // namepsace Lumix

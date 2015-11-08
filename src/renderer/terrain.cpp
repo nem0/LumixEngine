@@ -142,16 +142,14 @@ struct TerrainQuad
 	{
 		float squared_dist = getSquaredDistance(camera_pos);
 		float r = getRadiusOuter(m_size);
-		if (squared_dist > r*r && m_lod > 1)
-		{
-			return false;
-		}
-			
+		if (squared_dist > r * r && m_lod > 1) return false;
+
 		Vec3 morph_const(r, getRadiusInner(m_size), 0);
 		Shader& shader = *terrain->getMesh()->getMaterial()->getShader();
 		for (int i = 0; i < CHILD_COUNT; ++i)
 		{
-			if (!m_children[i] || !m_children[i]->getInfos(infos, camera_pos, terrain, world_matrix, allocator))
+			if (!m_children[i] ||
+				!m_children[i]->getInfos(infos, camera_pos, terrain, world_matrix, allocator))
 			{
 				TerrainInfo* data = (TerrainInfo*)allocator.allocate(sizeof(TerrainInfo));
 				data->m_morph_const = morph_const;

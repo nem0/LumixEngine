@@ -35,5 +35,5 @@ namespace Lumix
 		{
 			m_data_event.trigger();
 		}
-	} // ~namepsace MTJD
-} // ~namepsace Lumix
+	} // namepsace MTJD
+} // namepsace Lumix

@@ -6,11 +6,12 @@
 
 #define TYPE MULTI_THREAD
 
-#include "core/mtjd/enums.h"
-#include "core/mtjd/scheduler.h"
+#include "core/array.h"
 #include "core/mt/lock_free_fixed_queue.h"
 #include "core/mt/transaction.h"
-#include "core/array.h"
+#include "core/mtjd/enums.h"
+#include "core/mtjd/scheduler.h"
+
 
 namespace Lumix
 {
@@ -59,5 +60,5 @@ namespace Lumix
 
 			volatile int32_t m_scheduling_counter;
 		};
-	} // ~namepsace MTJD
-} // ~namepsace Lumix
+	} // namepsace MTJD
+} // namepsace Lumix
