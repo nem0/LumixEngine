@@ -27,6 +27,8 @@ public:
 	};
 
 public:
+	virtual const char* getScriptPath(ComponentIndex cmp) = 0;	
+	virtual void setScriptPath(ComponentIndex cmp, const char* path) = 0;
 	virtual int getPropertyCount(ComponentIndex cmp) const = 0;
 	virtual const char* getPropertyName(ComponentIndex cmp, int index) const = 0;
 	virtual const char* getPropertyValue(ComponentIndex cmp, int index) const = 0;

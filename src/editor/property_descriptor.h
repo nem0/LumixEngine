@@ -1,12 +1,12 @@
 #pragma once
 
-#include "universe\universe.h"
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/delegate.h"
 #include "core/stack_allocator.h"
 #include "core/string.h"
 #include "core/vec4.h"
+#include "universe\universe.h"
 #include <cfloat>
 
 

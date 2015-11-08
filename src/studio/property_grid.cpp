@@ -1,9 +1,10 @@
 #include "property_grid.h"
 #include "asset_browser.h"
 #include "core/crc32.h"
+#include "editor/property_descriptor.h"
+#include "editor/property_register.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "engine/property_descriptor.h"
 #include "lua_script/lua_script_manager.h"
 #include "lua_script/lua_script_system.h"
 #include "ocornut-imgui/imgui.h"
@@ -14,12 +15,12 @@
 const char* PropertyGrid::getComponentTypeName(Lumix::ComponentUID cmp) const
 {
 	auto& engine = m_editor.getEngine();
-	for (int i = 0; i < engine.getComponentTypesCount(); ++i)
+	for (int i = 0; i < Lumix::PropertyRegister::getComponentTypesCount(); ++i)
 	{
 		if (cmp.type ==
-			Lumix::crc32(engine.getComponentTypeID(i)))
+			Lumix::crc32(Lumix::PropertyRegister::getComponentTypeID(i)))
 		{
-			return engine.getComponentTypeName(i);
+			return Lumix::PropertyRegister::getComponentTypeName(i);
 		}
 	}
 	return "Unknown";
@@ -241,7 +242,7 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 		return;
 	}
 
-	auto& descs = m_editor.getEngine().getPropertyDescriptors(cmp.type);
+	auto& descs = Lumix::PropertyRegister::getDescriptors(cmp.type);
 
 	for (auto* desc : descs)
 	{
@@ -417,15 +418,12 @@ void PropertyGrid::onGUI()
 		}
 		if (ImGui::BeginPopup("AddComponentPopup"))
 		{
-			for (int i = 0;
-				i < m_editor.getEngine().getComponentTypesCount();
-				++i)
+			for (int i = 0; i < Lumix::PropertyRegister::getComponentTypesCount(); ++i)
 			{
-				if (ImGui::Selectable(
-					m_editor.getEngine().getComponentTypeName(i)))
+				if (ImGui::Selectable(Lumix::PropertyRegister::getComponentTypeName(i)))
 				{
-					m_editor.addComponent(Lumix::crc32(
-						m_editor.getEngine().getComponentTypeID(i)));
+					m_editor.addComponent(
+						Lumix::crc32(Lumix::PropertyRegister::getComponentTypeID(i)));
 				}
 			}
 			ImGui::EndPopup();

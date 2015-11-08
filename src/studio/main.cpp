@@ -152,6 +152,7 @@ public:
 			if (ImGui::BeginChild("right", half_size, true))
 			{
 				ImGui::Text("Version 0.18. - News");
+				ImGui::BulletText("Basic particle system");
 				ImGui::Separator();
 				ImGui::Text("Version 0.17. - News");
 				ImGui::BulletText("Back button in the asset browser");
@@ -1103,6 +1104,9 @@ public:
 		loadSettings();
 
 		if (!m_metadata.load()) Lumix::g_log_info.log("studio") << "Could not load metadata";
+
+		void registerProperties(Lumix::WorldEditor&);
+		registerProperties(*m_editor);
 	}
 
 

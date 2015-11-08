@@ -9,8 +9,9 @@
 #include "core/system.h"
 #include "editor/entity_template_system.h"
 #include "editor/ieditor_command.h"
+#include "editor/property_descriptor.h"
+#include "editor/property_register.h"
 #include "engine.h"
-#include "engine/property_descriptor.h"
 #include "ocornut-imgui/imgui.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -390,7 +391,7 @@ struct RemoveEntitiesCommand : public Lumix::IEditorCommand
 					if (new_component.isValid()) break;
 				}
 
-				auto& props = m_editor.getEngine().getPropertyDescriptors(cmp_type);
+				auto& props = Lumix::PropertyRegister::getDescriptors(cmp_type);
 				for (int k = 0; k < props.size(); ++k)
 				{
 					props[k]->set(new_component, blob);
@@ -470,7 +471,7 @@ struct RemoveEntitiesCommand : public Lumix::IEditorCommand
 			for (const auto& cmp : cmps)
 			{
 				m_removed_entities.write(cmp.type);
-				auto& props = m_editor.getEngine().getPropertyDescriptors(cmp.type);
+				auto& props = Lumix::PropertyRegister::getDescriptors(cmp.type);
 				for (int k = 0; k < props.size(); ++k)
 				{
 					props[k]->get(cmp, m_removed_entities);
@@ -1215,8 +1216,8 @@ void TerrainEditor::decreaseBrushSize()
 
 
 void TerrainEditor::drawCursor(Lumix::RenderScene& scene,
-							   const Lumix::ComponentUID& terrain,
-							   const Lumix::Vec3& center)
+	const Lumix::ComponentUID& terrain,
+	const Lumix::Vec3& center)
 {
 	static const int SLICE_COUNT = 30;
 	if (m_type == TerrainEditor::FLAT_HEIGHT && ImGui::GetIO().KeyCtrl)
@@ -1236,16 +1237,12 @@ void TerrainEditor::drawCursor(Lumix::RenderScene& scene,
 		float angle_step = Lumix::Math::PI * 2 / SLICE_COUNT;
 		float angle = i * angle_step;
 		float next_angle = i * angle_step + angle_step;
-		Lumix::Vec3 local_from =
-			local_center + Lumix::Vec3(cos(angle), 0, sin(angle)) * brush_size;
-		local_from.y =
-			scene.getTerrainHeightAt(terrain.index, local_from.x, local_from.z);
+		Lumix::Vec3 local_from = local_center + Lumix::Vec3(cos(angle), 0, sin(angle)) * brush_size;
+		local_from.y = scene.getTerrainHeightAt(terrain.index, local_from.x, local_from.z);
 		local_from.y += 0.25f;
 		Lumix::Vec3 local_to =
-			local_center +
-			Lumix::Vec3(cos(next_angle), 0, sin(next_angle)) * brush_size;
-		local_to.y =
-			scene.getTerrainHeightAt(terrain.index, local_to.x, local_to.z);
+			local_center + Lumix::Vec3(cos(next_angle), 0, sin(next_angle)) * brush_size;
+		local_to.y = scene.getTerrainHeightAt(terrain.index, local_to.x, local_to.z);
 		local_to.y += 0.25f;
 
 		Lumix::Vec3 from = terrain_matrix.multiplyPosition(local_from);
@@ -1267,11 +1264,9 @@ void TerrainEditor::drawCursor(Lumix::RenderScene& scene,
 			float dz = local_center.z - local_pos.z;
 			if (dx * dx + dz * dz < brush_size2)
 			{
-				local_pos.y = scene.getTerrainHeightAt(
-					terrain.index, local_pos.x, local_pos.z);
+				local_pos.y = scene.getTerrainHeightAt(terrain.index, local_pos.x, local_pos.z);
 				local_pos.y += 0.05f;
-				Lumix::Vec3 world_pos =
-						terrain_matrix.multiplyPosition(local_pos);
+				Lumix::Vec3 world_pos = terrain_matrix.multiplyPosition(local_pos);
 				scene.addDebugPoint(world_pos, 0xffff0000, 0);
 			}
 			++local_pos.z;
@@ -1286,38 +1281,27 @@ void TerrainEditor::drawCursor(Lumix::RenderScene& scene,
 void TerrainEditor::tick()
 {
 	if (!m_component.isValid()) return;
+	if (m_type == NOT_SET) return;
 
 	float mouse_x = m_world_editor.getMouseX();
 	float mouse_y = m_world_editor.getMouseY();
 
-	if (m_type != NOT_SET)
+	for (auto entity : m_world_editor.getSelectedEntities())
 	{
-		for (int i = m_world_editor.getSelectedEntities().size() - 1; i >= 0;
-			 --i)
+		Lumix::ComponentUID terrain = m_world_editor.getComponent(entity, TERRAIN_HASH);
+		if (!terrain.isValid()) continue;
+
+		Lumix::ComponentUID camera_cmp = m_world_editor.getEditCamera();
+		Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.scene);
+		Lumix::Vec3 origin, dir;
+		scene->getRay(camera_cmp.index, (float)mouse_x, (float)mouse_y, origin, dir);
+		Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::INVALID_COMPONENT);
+		
+		if (hit.m_is_hit)
 		{
-			Lumix::ComponentUID terrain = m_world_editor.getComponent(
-				m_world_editor.getSelectedEntities()[i],
-				Lumix::crc32("terrain"));
-			if (terrain.isValid())
-			{
-				Lumix::ComponentUID camera_cmp = m_world_editor.getEditCamera();
-				Lumix::RenderScene* scene =
-					static_cast<Lumix::RenderScene*>(camera_cmp.scene);
-				Lumix::Vec3 origin, dir;
-				scene->getRay(camera_cmp.index,
-							  (float)mouse_x,
-							  (float)mouse_y,
-							  origin,
-							  dir);
-				Lumix::RayCastModelHit hit =
-					scene->castRay(origin, dir, Lumix::INVALID_COMPONENT);
-				if (hit.m_is_hit)
-				{
-					Lumix::Vec3 center = hit.m_origin + hit.m_dir * hit.m_t;
-					drawCursor(*scene, terrain, center);
-					return;
-				}
-			}
+			Lumix::Vec3 center = hit.m_origin + hit.m_dir * hit.m_t;
+			drawCursor(*scene, terrain, center);
+			return;
 		}
 	}
 }
@@ -1516,6 +1500,11 @@ void TerrainEditor::onGUI()
 	auto* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
 	if (!ImGui::CollapsingHeader("Terrain editor", nullptr, true, true)) return;
 
+	if (!getMaterial())
+	{
+		ImGui::Text("No heightmap");
+		return;
+	}
 	ImGui::SliderFloat("Brush size", &m_terrain_brush_size, MIN_BRUSH_SIZE, 100);
 	ImGui::SliderFloat("Brush strength", &m_terrain_brush_strength, 0, 1.0f);
 

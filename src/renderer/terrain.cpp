@@ -181,6 +181,8 @@ Terrain::Terrain(Renderer& renderer, Entity entity, RenderScene& scene, IAllocat
 	, m_material(nullptr)
 	, m_root(nullptr)
 	, m_detail_texture(nullptr)
+	, m_heightmap(nullptr)
+	, m_splatmap(nullptr)
 	, m_width(0)
 	, m_height(0)
 	, m_layer_mask(1)
@@ -682,6 +684,8 @@ float Terrain::getHeight(float x, float z)
 
 float Terrain::getHeight(int x, int z)
 {
+	if (!m_heightmap) return 0;
+
 	int texture_x = x;
 	int texture_y = z;
 	Texture* t = m_heightmap;
