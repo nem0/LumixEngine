@@ -24,5 +24,5 @@ namespace Lumix
 
 			DependencyTable m_static_dependency_table;
 		};
-	} // ~namepsace MTJD
-} // ~namepsace Lumix
+	} // namepsace MTJD
+} // namepsace Lumix

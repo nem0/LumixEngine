@@ -267,8 +267,7 @@ public:
 	}
 
 
-	uint32_t serialize(UniverseContext& ctx,
-							   OutputBlob& serializer) override
+	uint32_t serialize(UniverseContext& ctx, OutputBlob& serializer) override
 	{
 		SerializedEngineHeader header;
 		header.m_magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'

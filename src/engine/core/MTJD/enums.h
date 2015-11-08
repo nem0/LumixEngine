@@ -34,5 +34,5 @@ namespace Lumix
 			Clipper,
 			Count,
 		};
-	} // ~namepsace MTJD
-} // ~namepsace Lumix
+	} // namepsace MTJD
+} // namepsace Lumix

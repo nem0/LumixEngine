@@ -14,7 +14,9 @@ namespace Lumix
 		{
 #if TYPE == MULTI_THREAD
 
-			m_sync_event = sync_event ? m_allocator.newObject<MT::Event>(MT::EventFlags::MANUAL_RESET) : nullptr;
+			m_sync_event = sync_event
+							   ? m_allocator.newObject<MT::Event>(MT::EventFlags::MANUAL_RESET)
+							   : nullptr;
 
 #endif // TYPE == MULTI_THREAD
 		}
@@ -69,5 +71,5 @@ namespace Lumix
 
 #endif // TYPE == MULTI_THREAD
 		}
-	} // ~namepsace MTJD
-} // ~namepsace Lumix
+	} // namepsace MTJD
+} // namepsace Lumix

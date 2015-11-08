@@ -200,5 +200,5 @@ namespace Lumix
 #error "Not Supported!"
 #endif
 		}
-	} // ~namepsace MTJD
-} // ~namepsace Lumix
+	} // namepsace MTJD
+} // namepsace Lumix

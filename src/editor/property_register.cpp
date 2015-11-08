@@ -104,11 +104,27 @@ const IPropertyDescriptor& getDescriptor(const char* component_type, const char*
 
 void registerComponentDependency(const char* id, const char* dependency_id)
 {
+	for (ComponentType& cmp_type : *g_component_types)
+	{
+		if (cmp_type.m_id == id)
+		{
+			cmp_type.m_dependency = crc32(dependency_id);
+			return;
+		}
+	}
+	ASSERT(false);
 }
 
 
 bool componentDepends(uint32_t dependent, uint32_t dependency)
 {
+	for (ComponentType& cmp_type : *g_component_types)
+	{
+		if (cmp_type.m_id_hash == dependent)
+		{
+			return cmp_type.m_dependency == dependency;
+		}
+	}
 	return false;
 }
 

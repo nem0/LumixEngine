@@ -27,5 +27,5 @@ namespace Lumix
 			MT::Event	m_abort_event;
 			Manager&	m_manager;
 		};
-	} // ~namepsace MTJD
-} // ~namepsace Lumix
+	} // namepsace MTJD
+} // namepsace Lumix
