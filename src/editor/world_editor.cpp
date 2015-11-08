@@ -72,14 +72,14 @@ public:
 	}
 
 
-	virtual void serialize(JsonSerializer& serializer) override
+	void serialize(JsonSerializer& serializer) override
 	{
 		serializer.serialize("name", m_new_name.c_str());
 		serializer.serialize("entity", m_entity);
 	}
 
 
-	virtual void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonSerializer& serializer) override
 	{
 		char name[100];
 		serializer.deserialize("name", name, sizeof(name), "");
@@ -89,7 +89,7 @@ public:
 	}
 
 
-	virtual bool execute() override
+	bool execute() override
 	{
 		m_editor.getUniverse()->setEntityName(m_entity, m_new_name.c_str());
 		m_editor.entityNameSet().invoke(m_entity, m_new_name.c_str());
@@ -97,21 +97,21 @@ public:
 	}
 
 
-	virtual void undo() override
+	void undo() override
 	{
 		m_editor.getUniverse()->setEntityName(m_entity, m_old_name.c_str());
 		m_editor.entityNameSet().invoke(m_entity, m_old_name.c_str());
 	}
 
 
-	virtual uint32_t getType() override
+	uint32_t getType() override
 	{
 		static const uint32_t type = crc32("set_entity_name");
 		return type;
 	}
 
 
-	virtual bool merge(IEditorCommand& command)
+	bool merge(IEditorCommand& command)
 	{
 		ASSERT(command.getType() == getType());
 		if (static_cast<SetEntityNameCommand&>(command).m_entity == m_entity)
@@ -151,10 +151,10 @@ public:
 	}
 
 
-	virtual bool execute() override;
+	bool execute() override;
 
 
-	virtual void serialize(JsonSerializer& serializer)
+	void serialize(JsonSerializer& serializer)
 	{
 		serializer.serialize("pos_x", m_position.x);
 		serializer.serialize("pos_y", m_position.y);
@@ -171,7 +171,7 @@ public:
 	}
 
 
-	virtual void deserialize(JsonSerializer& serializer)
+	void deserialize(JsonSerializer& serializer)
 	{
 		serializer.deserialize("pos_x", m_position.x, 0);
 		serializer.deserialize("pos_y", m_position.y, 0);
@@ -191,7 +191,7 @@ public:
 	}
 
 
-	virtual void undo() override
+	void undo() override
 	{
 		const WorldEditor::ComponentList& cmps =
 			m_editor.getComponents(m_entity);
@@ -204,14 +204,14 @@ public:
 	}
 
 
-	virtual uint32_t getType() override
+	uint32_t getType() override
 	{
 		static const uint32_t type = crc32("paste_entity");
 		return type;
 	}
 
 
-	virtual bool merge(IEditorCommand& command)
+	bool merge(IEditorCommand& command)
 	{
 		ASSERT(command.getType() == getType());
 		return false;
@@ -265,7 +265,7 @@ public:
 	}
 
 
-	virtual void serialize(JsonSerializer& serializer) override
+	void serialize(JsonSerializer& serializer) override
 	{
 		serializer.serialize("count", m_entities.size());
 		serializer.beginArray("entities");
@@ -284,7 +284,7 @@ public:
 	}
 
 
-	virtual void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonSerializer& serializer) override
 	{
 		Universe* universe = m_editor.getUniverse();
 		int count;
@@ -312,7 +312,7 @@ public:
 	}
 
 
-	virtual bool execute() override
+	bool execute() override
 	{
 		Universe* universe = m_editor.getUniverse();
 		for (int i = 0, c = m_entities.size(); i < c; ++i)
@@ -325,7 +325,7 @@ public:
 	}
 
 
-	virtual void undo() override
+	void undo() override
 	{
 		Universe* universe = m_editor.getUniverse();
 		for (int i = 0, c = m_entities.size(); i < c; ++i)
@@ -337,14 +337,14 @@ public:
 	}
 
 
-	virtual uint32_t getType() override
+	uint32_t getType() override
 	{
 		static const uint32_t type = crc32("move_entity");
 		return type;
 	}
 
 
-	virtual bool merge(IEditorCommand& command)
+	bool merge(IEditorCommand& command)
 	{
 		ASSERT(command.getType() == getType());
 		MoveEntityCommand& my_command =
@@ -413,7 +413,7 @@ public:
 	}
 
 
-	virtual void serialize(JsonSerializer& serializer) override
+	void serialize(JsonSerializer& serializer) override
 	{
 		serializer.serialize("count", m_entities.size());
 		serializer.beginArray("entities");
@@ -426,7 +426,7 @@ public:
 	}
 
 
-	virtual void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonSerializer& serializer) override
 	{
 		Universe* universe = m_editor.getUniverse();
 		int count;
@@ -445,7 +445,7 @@ public:
 	}
 
 
-	virtual bool execute() override
+	bool execute() override
 	{
 		Universe* universe = m_editor.getUniverse();
 		for (int i = 0, c = m_entities.size(); i < c; ++i)
@@ -457,7 +457,7 @@ public:
 	}
 
 
-	virtual void undo() override
+	void undo() override
 	{
 		Universe* universe = m_editor.getUniverse();
 		for (int i = 0, c = m_entities.size(); i < c; ++i)
@@ -468,14 +468,14 @@ public:
 	}
 
 
-	virtual uint32_t getType() override
+	uint32_t getType() override
 	{
 		static const uint32_t type = crc32("scale_entity");
 		return type;
 	}
 
 
-	virtual bool merge(IEditorCommand& command)
+	bool merge(IEditorCommand& command)
 	{
 		ASSERT(command.getType() == getType());
 		auto& my_command = static_cast<ScaleEntityCommand&>(command);
@@ -536,7 +536,7 @@ public:
 	}
 
 
-	virtual void serialize(JsonSerializer& serializer) override
+	void serialize(JsonSerializer& serializer) override
 	{
 		serializer.serialize("inedx", m_index);
 		serializer.serialize("entity_index", m_component.entity);
@@ -546,7 +546,7 @@ public:
 	}
 
 
-	virtual void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonSerializer& serializer) override
 	{
 		serializer.deserialize("inedx", m_index, 0);
 		serializer.deserialize("entity_index", m_component.entity, 0);
@@ -561,14 +561,14 @@ public:
 	}
 
 
-	virtual bool execute() override
+	bool execute() override
 	{
 		m_descriptor->removeArrayItem(m_component, m_index);
 		return true;
 	}
 
 
-	virtual void undo() override
+	void undo() override
 	{
 		m_descriptor->addArrayItem(m_component, m_index);
 		InputBlob old_values(m_old_values.getData(), m_old_values.getSize());
@@ -580,14 +580,14 @@ public:
 	}
 
 
-	virtual uint32_t getType() override
+	uint32_t getType() override
 	{
 		static const uint32_t hash = crc32("remove_array_property_item");
 		return hash;
 	}
 
 
-	virtual bool merge(IEditorCommand&) { return false; }
+	bool merge(IEditorCommand&) { return false; }
 
 private:
 	WorldEditor& m_editor;
@@ -618,7 +618,7 @@ public:
 	}
 
 
-	virtual void serialize(JsonSerializer& serializer) override
+	void serialize(JsonSerializer& serializer) override
 	{
 		serializer.serialize("inedx", m_index);
 		serializer.serialize("entity_index", m_component.entity);
@@ -628,7 +628,7 @@ public:
 	}
 
 
-	virtual void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonSerializer& serializer) override
 	{
 		serializer.deserialize("inedx", m_index, 0);
 		serializer.deserialize("entity_index", m_component.entity, 0);
@@ -643,7 +643,7 @@ public:
 	}
 
 
-	virtual bool execute() override
+	bool execute() override
 	{
 		m_descriptor->addArrayItem(m_component, -1);
 		m_index = m_descriptor->getCount(m_component) - 1;
@@ -651,20 +651,20 @@ public:
 	}
 
 
-	virtual void undo() override
+	void undo() override
 	{
 		m_descriptor->removeArrayItem(m_component, m_index);
 	}
 
 
-	virtual uint32_t getType() override
+	uint32_t getType() override
 	{
 		static const uint32_t hash = crc32("add_array_property_item");
 		return hash;
 	}
 
 
-	virtual bool merge(IEditorCommand&) { return false; }
+	bool merge(IEditorCommand&) { return false; }
 
 private:
 	ComponentUID m_component;
@@ -726,7 +726,7 @@ public:
 	}
 
 
-	virtual void serialize(JsonSerializer& serializer) override
+	void serialize(JsonSerializer& serializer) override
 	{
 		serializer.serialize("index", m_index);
 		serializer.serialize("entity_index", m_entity);
@@ -743,7 +743,7 @@ public:
 	}
 
 
-	virtual void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonSerializer& serializer) override
 	{
 		serializer.deserialize("index", m_index, 0);
 		serializer.deserialize("entity_index", m_entity, 0);
@@ -764,7 +764,7 @@ public:
 	}
 
 
-	virtual bool execute() override
+	bool execute() override
 	{
 		InputBlob blob(m_new_value);
 		set(blob);
@@ -772,21 +772,21 @@ public:
 	}
 
 
-	virtual void undo() override
+	void undo() override
 	{
 		InputBlob blob(m_old_value);
 		set(blob);
 	}
 
 
-	virtual uint32_t getType() override
+	uint32_t getType() override
 	{
 		static const uint32_t hash = crc32("set_property");
 		return hash;
 	}
 
 
-	virtual bool merge(IEditorCommand& command)
+	bool merge(IEditorCommand& command)
 	{
 		ASSERT(command.getType() == getType());
 		SetPropertyCommand& src = static_cast<SetPropertyCommand&>(command);
@@ -912,7 +912,7 @@ private:
 		}
 
 
-		virtual void serialize(JsonSerializer& serializer) override
+		void serialize(JsonSerializer& serializer) override
 		{
 			serializer.serialize("component_type", m_type);
 			serializer.beginArray("entities");
@@ -924,7 +924,7 @@ private:
 		}
 
 
-		virtual void deserialize(JsonSerializer& serializer) override
+		void deserialize(JsonSerializer& serializer) override
 		{
 			serializer.deserialize("component_type", m_type, 0);
 			m_entities.clear();
@@ -938,17 +938,17 @@ private:
 		}
 
 
-		virtual bool merge(IEditorCommand&) override { return false; }
+		bool merge(IEditorCommand&) override { return false; }
 
 
-		virtual uint32_t getType() override
+		uint32_t getType() override
 		{
 			static const uint32_t hash = crc32("add_component");
 			return hash;
 		}
 
 
-		virtual bool execute() override
+		bool execute() override
 		{
 			const Array<IScene*>& scenes = m_editor.getScenes();
 
@@ -963,7 +963,6 @@ private:
 						scenes[i]->createComponent(m_type, m_entities[j]));
 					if (cmp.isValid())
 					{
-						m_editor.componentAdded().invoke(cmp);
 						break;
 					}
 				}
@@ -972,13 +971,12 @@ private:
 		}
 
 
-		virtual void undo() override
+		void undo() override
 		{
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
 				const ComponentUID& cmp =
 					m_editor.getComponent(m_entities[i], m_type);
-				m_editor.componentDestroyed().invoke(cmp);
 				cmp.scene->destroyComponent(cmp.index, cmp.type);
 			}
 		}
@@ -1020,7 +1018,7 @@ private:
 		}
 
 
-		virtual void serialize(JsonSerializer& serializer) override
+		void serialize(JsonSerializer& serializer) override
 		{
 			serializer.serialize("count", m_entities.size());
 			serializer.beginArray("entities");
@@ -1046,7 +1044,7 @@ private:
 		}
 
 
-		virtual void deserialize(JsonSerializer& serializer) override
+		void deserialize(JsonSerializer& serializer) override
 		{
 			int count;
 			serializer.deserialize("count", count, 0);
@@ -1075,7 +1073,7 @@ private:
 		}
 
 
-		virtual bool execute() override
+		bool execute() override
 		{
 			Universe* universe = m_editor.getUniverse();
 			m_positons_rotations.clear();
@@ -1109,10 +1107,10 @@ private:
 		}
 
 
-		virtual bool merge(IEditorCommand&) override { return false; }
+		bool merge(IEditorCommand&) override { return false; }
 
 
-		virtual void undo() override
+		void undo() override
 		{
 			Universe* universe = m_editor.getUniverse();
 			const Array<IScene*>& scenes = m_editor.getScenes();
@@ -1153,7 +1151,7 @@ private:
 		}
 
 
-		virtual uint32_t getType() override
+		uint32_t getType() override
 		{
 			static const uint32_t hash = crc32("destroy_entities");
 			return hash;
@@ -1196,7 +1194,7 @@ private:
 		}
 
 
-		virtual void serialize(JsonSerializer& serializer)
+		void serialize(JsonSerializer& serializer)
 		{
 			serializer.serialize("entity", m_component.entity);
 			serializer.serialize("component", m_component.index);
@@ -1204,7 +1202,7 @@ private:
 		}
 
 
-		virtual void deserialize(JsonSerializer& serializer)
+		void deserialize(JsonSerializer& serializer)
 		{
 			serializer.deserialize("entity", m_component.entity, 0);
 			serializer.deserialize("component", m_component.index, 0);
@@ -1214,7 +1212,7 @@ private:
 		}
 
 
-		virtual void undo() override
+		void undo() override
 		{
 			uint32_t template_hash =
 				m_editor.m_template_system->getTemplate(m_component.entity);
@@ -1241,7 +1239,6 @@ private:
 				{
 					props[i]->set(m_component, blob);
 				}
-				m_editor.componentAdded().invoke(m_component);
 			}
 			else
 			{
@@ -1270,7 +1267,6 @@ private:
 							{
 								props[i]->set(cmp_new, blob);
 							}
-							m_editor.componentAdded().invoke(cmp_new);
 						}
 					}
 				}
@@ -1278,17 +1274,17 @@ private:
 		}
 
 
-		virtual bool merge(IEditorCommand&) override { return false; }
+		bool merge(IEditorCommand&) override { return false; }
 
 
-		virtual uint32_t getType() override
+		uint32_t getType() override
 		{
 			static const uint32_t hash = crc32("destroy_component");
 			return hash;
 		}
 
 
-		virtual bool execute() override
+		bool execute() override
 		{
 			Array<IPropertyDescriptor*>& props =
 				m_editor.getEngine().getPropertyDescriptors(m_component.type);
@@ -1297,28 +1293,23 @@ private:
 				props[i]->get(m_component, m_old_values);
 			}
 			uint32_t template_hash =
-				m_editor.getEntityTemplateSystem().getTemplate(
-					m_component.entity);
+				m_editor.getEntityTemplateSystem().getTemplate(m_component.entity);
 			if (template_hash)
 			{
 				const Array<Entity>& instances =
 					m_editor.m_template_system->getInstances(template_hash);
 				for (int i = 0; i < instances.size(); ++i)
 				{
-					ComponentUID cmp =
-						m_editor.getComponent(instances[i], m_component.type);
+					ComponentUID cmp = m_editor.getComponent(instances[i], m_component.type);
 					if (cmp.isValid())
 					{
-						m_editor.componentDestroyed().invoke(cmp);
 						cmp.scene->destroyComponent(cmp.index, cmp.type);
 					}
 				}
 			}
 			else
 			{
-				m_editor.componentDestroyed().invoke(m_component);
-				m_component.scene->destroyComponent(m_component.index,
-													m_component.type);
+				m_component.scene->destroyComponent(m_component.index, m_component.type);
 			}
 			return true;
 		}
@@ -1348,7 +1339,7 @@ private:
 		}
 
 
-		virtual bool execute() override
+		bool execute() override
 		{
 			if (m_entity < 0)
 			{
@@ -1364,7 +1355,7 @@ private:
 		}
 
 
-		virtual void serialize(JsonSerializer& serializer) override
+		void serialize(JsonSerializer& serializer) override
 		{
 			serializer.serialize("pos_x", m_position.x);
 			serializer.serialize("pos_y", m_position.y);
@@ -1372,7 +1363,7 @@ private:
 		}
 
 
-		virtual void deserialize(JsonSerializer& serializer) override
+		void deserialize(JsonSerializer& serializer) override
 		{
 			serializer.deserialize("pos_x", m_position.x, 0);
 			serializer.deserialize("pos_y", m_position.y, 0);
@@ -1380,16 +1371,16 @@ private:
 		}
 
 
-		virtual void undo() override
+		void undo() override
 		{
 			m_editor.getUniverse()->destroyEntity(m_entity);
 		}
 
 
-		virtual bool merge(IEditorCommand&) override { return false; }
+		bool merge(IEditorCommand&) override { return false; }
 
 
-		virtual uint32_t getType() override
+		uint32_t getType() override
 		{
 			static const uint32_t hash = crc32("add_entity");
 			return hash;
@@ -1406,13 +1397,13 @@ private:
 	};
 
 public:
-	virtual const char* getBasePath() override { return m_base_path.c_str(); }
+	const char* getBasePath() override { return m_base_path.c_str(); }
 
 
-	virtual IAllocator& getAllocator() override { return m_allocator; }
+	IAllocator& getAllocator() override { return m_allocator; }
 
 
-	virtual IScene* getSceneByComponentType(uint32_t hash) override
+	IScene* getSceneByComponentType(uint32_t hash) override
 	{
 		for (auto* scene : m_universe_context->m_scenes)
 		{
@@ -1425,7 +1416,7 @@ public:
 	}
 
 
-	virtual IScene* getScene(uint32_t hash) override
+	IScene* getScene(uint32_t hash) override
 	{
 		for (auto* scene : m_universe_context->m_scenes)
 		{
@@ -1438,25 +1429,25 @@ public:
 	}
 
 
-	virtual Hierarchy* getHierarchy() override
+	Hierarchy* getHierarchy() override
 	{
 		return m_universe_context->m_hierarchy;
 	}
 
 
-	virtual UniverseContext* getUniverseContext() override
+	UniverseContext* getUniverseContext() override
 	{
 		return m_universe_context;
 	}
 
 
-	virtual Universe* getUniverse() override
+	Universe* getUniverse() override
 	{
 		return m_universe_context->m_universe;
 	}
 
 
-	virtual Engine& getEngine() override { return *m_engine; }
+	Engine& getEngine() override { return *m_engine; }
 
 
 	Vec3 minCoords(const Vec3& a, const Vec3& b)
@@ -1683,7 +1674,7 @@ public:
 	}
 
 
-	virtual void update() override
+	void update() override
 	{
 		PROFILE_FUNCTION();
 		updateGoTo();
@@ -1705,14 +1696,14 @@ public:
 	}
 
 
-	virtual void updateEngine() override
+	void updateEngine() override
 	{
 		ASSERT(m_universe_context);
 		m_engine->update(*m_universe_context);
 	}
 
 
-	virtual ~WorldEditorImpl()
+	~WorldEditorImpl()
 	{
 		auto& library_loaded_callback = m_engine->getPluginManager().libraryLoaded();
 		library_loaded_callback.unbind<WorldEditorImpl, &WorldEditorImpl::onPluginLibraryLoaded>(this);
@@ -1749,7 +1740,7 @@ public:
 	}
 
 
-	virtual void onMouseDown(int x, int y, MouseButton::Value button) override
+	void onMouseDown(int x, int y, MouseButton::Value button) override
 	{
 		if (button == MouseButton::RIGHT)
 		{
@@ -1798,10 +1789,10 @@ public:
 	}
 
 
-	virtual void addPlugin(Plugin& plugin) override { m_plugins.push(&plugin); }
+	void addPlugin(Plugin& plugin) override { m_plugins.push(&plugin); }
 
 
-	virtual void removePlugin(Plugin& plugin) override
+	void removePlugin(Plugin& plugin) override
 	{
 		m_plugins.eraseItemFast(&plugin);
 	}
@@ -1830,7 +1821,7 @@ public:
 	}
 
 
-	virtual void onMouseMove(int x, int y, int relx, int rely) override
+	void onMouseMove(int x, int y, int relx, int rely) override
 	{
 		PROFILE_FUNCTION();
 		m_mouse_x = (float)x;
@@ -1857,14 +1848,14 @@ public:
 	}
 
 
-	virtual void setGizmoUseStep(bool use) override
+	void setGizmoUseStep(bool use) override
 	{
 		m_gizmo_use_step = use;
 	}
 
 
 
-	virtual void onMouseUp(int x, int y, MouseButton::Value button) override
+	void onMouseUp(int x, int y, MouseButton::Value button) override
 	{
 		m_gizmo.stopTransform();
 		if (m_mouse_handling_plugin)
@@ -1876,13 +1867,13 @@ public:
 	}
 
 
-	virtual float getMouseX() const override { return m_mouse_x; }
+	float getMouseX() const override { return m_mouse_x; }
 
 
-	virtual float getMouseY() const override { return m_mouse_y; }
+	float getMouseY() const override { return m_mouse_y; }
 
 
-	virtual void saveUniverse(const Path& path, bool save_path) override
+	void saveUniverse(const Path& path, bool save_path) override
 	{
 		g_log_info.log("editor") << "saving universe " << path.c_str() << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
@@ -1916,7 +1907,7 @@ public:
 	}
 
 
-	virtual void snapDown() override
+	void snapDown() override
 	{
 		if (m_selected_entities.empty()) return;
 
@@ -1953,7 +1944,7 @@ public:
 	}
 
 
-	virtual void destroyEntities(const Entity* entities, int count) override
+	void destroyEntities(const Entity* entities, int count) override
 	{
 		for (int i = 0; i < count; ++i)
 		{
@@ -1971,7 +1962,7 @@ public:
 	}
 
 
-	virtual Entity addEntity() override
+	Entity addEntity() override
 	{
 		ComponentUID cmp = getComponent(m_camera, CAMERA_HASH);
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
@@ -1981,7 +1972,7 @@ public:
 	}
 
 
-	virtual Entity addEntityAt(int camera_x, int camera_y) override
+	Entity addEntityAt(int camera_x, int camera_y) override
 	{
 		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
 		RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
@@ -2010,7 +2001,7 @@ public:
 	}
 
 
-	virtual Vec3 getCameraRaycastHit() override
+	Vec3 getCameraRaycastHit() override
 	{
 		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
 		RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
@@ -2051,7 +2042,7 @@ public:
 	}
 
 
-	virtual void setEntitiesScales(const Entity* entities, const float* scales, int count) override
+	void setEntitiesScales(const Entity* entities, const float* scales, int count) override
 	{
 		if (count <= 0) return;
 
@@ -2061,7 +2052,7 @@ public:
 	}
 
 
-	virtual void setEntitiesRotations(const Entity* entities,
+	void setEntitiesRotations(const Entity* entities,
 		const Quat* rotations,
 		int count) override
 	{
@@ -2080,7 +2071,7 @@ public:
 	}
 
 
-	virtual void setEntitiesPositions(const Entity* entities,
+	void setEntitiesPositions(const Entity* entities,
 		const Vec3* positions,
 		int count) override
 	{
@@ -2099,7 +2090,7 @@ public:
 	}
 
 
-	virtual void setEntitiesPositionsAndRotations(const Entity* entities,
+	void setEntitiesPositionsAndRotations(const Entity* entities,
 		const Vec3* positions,
 		const Quat* rotations,
 		int count) override
@@ -2111,7 +2102,7 @@ public:
 	}
 
 
-	virtual void setEntityName(Entity entity, const char* name) override
+	void setEntityName(Entity entity, const char* name) override
 	{
 		if (entity >= 0)
 		{
@@ -2123,7 +2114,7 @@ public:
 	}
 
 
-	virtual void executeCommand(IEditorCommand* command) override
+	void executeCommand(IEditorCommand* command) override
 	{
 		if (m_undo_index >= 0 && command->getType() == m_undo_stack[m_undo_index]->getType())
 		{
@@ -2155,10 +2146,10 @@ public:
 	}
 
 
-	virtual bool isGameMode() const override { return m_is_game_mode; }
+	bool isGameMode() const override { return m_is_game_mode; }
 
 
-	virtual void toggleGameMode() override
+	void toggleGameMode() override
 	{
 		ASSERT(m_universe_context);
 		if (m_is_game_mode)
@@ -2195,13 +2186,13 @@ public:
 	}
 
 
-	virtual EntityTemplateSystem& getEntityTemplateSystem() override
+	EntityTemplateSystem& getEntityTemplateSystem() override
 	{
 		return *m_template_system;
 	}
 
 
-	virtual void showEntities() override
+	void showEntities() override
 	{
 		for (int i = 0, c = m_selected_entities.size(); i < c; ++i)
 		{
@@ -2215,7 +2206,7 @@ public:
 	}
 
 
-	virtual void hideEntities() override
+	void hideEntities() override
 	{
 		for (int i = 0, c = m_selected_entities.size(); i < c; ++i)
 		{
@@ -2229,7 +2220,7 @@ public:
 	}
 
 
-	virtual void copyEntity() override
+	void copyEntity() override
 	{
 		if (!m_selected_entities.empty())
 		{
@@ -2254,13 +2245,13 @@ public:
 	}
 
 
-	virtual bool canPasteEntity() const override
+	bool canPasteEntity() const override
 	{
 		return m_copy_buffer.getSize() > 0;
 	}
 
 
-	virtual void pasteEntity() override
+	void pasteEntity() override
 	{
 		PasteEntityCommand* command =
 			m_allocator.newObject<PasteEntityCommand>(*this, m_copy_buffer);
@@ -2268,7 +2259,7 @@ public:
 	}
 
 
-	virtual void cloneComponent(const ComponentUID& src, Entity entity) override
+	void cloneComponent(const ComponentUID& src, Entity entity) override
 	{
 		ComponentUID clone = ComponentUID::INVALID;
 
@@ -2285,8 +2276,7 @@ public:
 			}
 		}
 
-		const Array<IPropertyDescriptor*>& properties =
-			getEngine().getPropertyDescriptors(src.type);
+		const auto& properties = getEngine().getPropertyDescriptors(src.type);
 		OutputBlob stream(m_allocator);
 		for (int i = 0; i < properties.size(); ++i)
 		{
@@ -2298,7 +2288,18 @@ public:
 	}
 
 
-	virtual void destroyComponent(const ComponentUID& component) override
+	bool canRemove(const ComponentUID& cmp) override
+	{
+		auto& cmps = getComponents(cmp.entity);
+		for (auto& possible_dependent : cmps)
+		{
+			if (m_engine->componentDepends(possible_dependent.type, cmp.type)) return false;
+		}
+		return true;
+	}
+
+
+	void destroyComponent(const ComponentUID& component) override
 	{
 		if (component.entity == m_camera)
 		{
@@ -2317,7 +2318,7 @@ public:
 	}
 
 
-	virtual void addComponent(uint32_t type_crc) override
+	void addComponent(uint32_t type_crc) override
 	{
 		if (!m_selected_entities.empty())
 		{
@@ -2329,7 +2330,7 @@ public:
 	}
 
 
-	virtual void lookAtSelected() override
+	void lookAtSelected() override
 	{
 		Universe* universe = getUniverse();
 		if (!m_selected_entities.empty())
@@ -2349,7 +2350,7 @@ public:
 	}
 
 
-	virtual void loadUniverse(const Path& path) override
+	void loadUniverse(const Path& path) override
 	{
 		m_universe_path = path;
 		g_log_info.log("editor") << "Loading universe " << path.c_str()
@@ -2378,13 +2379,13 @@ public:
 	}
 
 
-	virtual bool isRelativePath(const char* path) override
+	bool isRelativePath(const char* path) override
 	{
 		return strncmp(m_base_path.c_str(), path, m_base_path.length()) == 0;
 	}
 
 
-	virtual void getRelativePath(char* relative_path,
+	void getRelativePath(char* relative_path,
 								 int max_length,
 								 const char* source) override
 	{
@@ -2407,14 +2408,14 @@ public:
 	}
 
 
-	virtual void getRelativePath(char* relative_path,
+	void getRelativePath(char* relative_path,
 								 int max_length,
 								 const Path& source) override
 	{
 		getRelativePath(relative_path, max_length, source.c_str());
 	}
 
-	virtual void newUniverse() override
+	void newUniverse() override
 	{
 		m_universe_path = "";
 		destroyUniverse();
@@ -2470,7 +2471,7 @@ public:
 	}
 
 
-	virtual Array<ComponentUID>& getComponents(Entity entity) override
+	Array<ComponentUID>& getComponents(Entity entity) override
 	{
 		int cmps_index = m_components.find(entity);
 		if (cmps_index < 0)
@@ -2481,7 +2482,7 @@ public:
 		return m_components.at(cmps_index);
 	}
 
-	virtual ComponentUID getComponent(Entity entity, uint32_t type) override
+	ComponentUID getComponent(Entity entity, uint32_t type) override
 	{
 		const Array<ComponentUID>& cmps = getComponents(entity);
 		for (int i = 0; i < cmps.size(); ++i)
@@ -2548,16 +2549,16 @@ public:
 	}
 
 
-	virtual Gizmo& getGizmo() override { return m_gizmo; }
+	Gizmo& getGizmo() override { return m_gizmo; }
 
 
-	virtual ComponentUID getEditCamera() override
+	ComponentUID getEditCamera() override
 	{
 		return getComponent(m_camera, CAMERA_HASH);
 	}
 
 
-	virtual void renderIcons(PipelineInstance& pipeline) override
+	void renderIcons(PipelineInstance& pipeline) override
 	{
 		PROFILE_FUNCTION();
 		for (int i = 0, c = m_editor_icons.size(); i < c; ++i)
@@ -2579,8 +2580,6 @@ public:
 		, m_universe_created(m_allocator)
 		, m_universe_loaded(m_allocator)
 		, m_property_set(m_allocator)
-		, m_component_added(m_allocator)
-		, m_component_destroyed(m_allocator)
 		, m_selected_entities(m_allocator)
 		, m_editor_icons(m_allocator)
 		, m_plugins(m_allocator)
@@ -2639,7 +2638,7 @@ public:
 		m_editor_command_creators.insert(
 			crc32("add_array_property_item"),
 			&WorldEditorImpl::constructEditorCommand<
-				AddArrayPropertyItemCommand>);
+			AddArrayPropertyItemCommand>);
 		m_editor_command_creators.insert(
 			crc32("set_property"),
 			&WorldEditorImpl::constructEditorCommand<SetPropertyCommand>);
@@ -2675,7 +2674,7 @@ public:
 	}
 
 
-	virtual void navigate(float forward, float right, float speed) override
+	void navigate(float forward, float right, float speed) override
 	{
 		Universe* universe = getUniverse();
 		Vec3 pos = universe->getPosition(m_camera);
@@ -2689,25 +2688,25 @@ public:
 	}
 
 
-	virtual bool isEntitySelected(Entity entity) const override
+	bool isEntitySelected(Entity entity) const override
 	{
 		return m_selected_entities.indexOf(entity) >= 0;
 	}
 
 
-	virtual const Array<Entity>& getSelectedEntities() const override
+	const Array<Entity>& getSelectedEntities() const override
 	{
 		return m_selected_entities;
 	}
 
 
-	virtual void setAdditiveSelection(bool additive) override
+	void setAdditiveSelection(bool additive) override
 	{
 		m_is_additive_selection = additive;
 	}
 
 
-	virtual void addArrayPropertyItem(const ComponentUID& cmp,
+	void addArrayPropertyItem(const ComponentUID& cmp,
 									  IArrayDescriptor& property) override
 	{
 		if (cmp.isValid())
@@ -2720,7 +2719,7 @@ public:
 	}
 
 
-	virtual void removeArrayPropertyItem(const ComponentUID& cmp,
+	void removeArrayPropertyItem(const ComponentUID& cmp,
 										 int index,
 										 IArrayDescriptor& property) override
 	{
@@ -2734,7 +2733,7 @@ public:
 	}
 
 
-	virtual void setProperty(uint32_t component,
+	void setProperty(uint32_t component,
 							 int index,
 							 IPropertyDescriptor& property,
 							 const void* data,
@@ -2761,13 +2760,13 @@ public:
 	}
 
 
-	virtual bool isOrbitCamera() const override
+	bool isOrbitCamera() const override
 	{
 		return m_is_orbit;
 	}
 
 
-	virtual void setOrbitCamera(bool enable) override
+	void setOrbitCamera(bool enable) override
 	{
 		m_is_orbit = enable;
 	}
@@ -2814,14 +2813,14 @@ public:
 	}
 
 
-	virtual void addEntityToSelection(Entity entity) override
+	void addEntityToSelection(Entity entity) override
 	{
 		if (m_selected_entities.indexOf(entity) >= 0) return;
 		m_selected_entities.push(entity);
 	}
 
 
-	virtual void selectEntities(const Entity* entities, int count) override
+	void selectEntities(const Entity* entities, int count) override
 	{
 		m_selected_entities.clear();
 		for (int i = 0; i < count; ++i)
@@ -2832,7 +2831,7 @@ public:
 	}
 
 
-	virtual void selectEntitiesWithSameMesh() override
+	void selectEntitiesWithSameMesh() override
 	{
 		if (m_selected_entities.size() == 1)
 		{
@@ -2930,53 +2929,41 @@ public:
 	}
 
 
-	virtual Path getUniversePath() const override { return m_universe_path; }
+	Path getUniversePath() const override { return m_universe_path; }
 
 
-	virtual DelegateList<void()>& universeCreated() override
+	DelegateList<void()>& universeCreated() override
 	{
 		return m_universe_created;
 	}
 
 
-	virtual DelegateList<void(const Array<Entity>&)>& entitySelected() override
+	DelegateList<void(const Array<Entity>&)>& entitySelected() override
 	{
 		return m_entity_selected;
 	}
 
 
-	virtual DelegateList<void()>& universeDestroyed() override
+	DelegateList<void()>& universeDestroyed() override
 	{
 		return m_universe_destroyed;
 	}
 
 
-	virtual DelegateList<void()>& universeLoaded() override
+	DelegateList<void()>& universeLoaded() override
 	{
 		return m_universe_loaded;
 	}
 
-
-	virtual DelegateList<void(ComponentUID)>& componentAdded() override
-	{
-		return m_component_added;
-	}
-
-
-	virtual DelegateList<void(ComponentUID)>& componentDestroyed() override
-	{
-		return m_component_destroyed;
-	}
-
-
-	virtual DelegateList<void(ComponentUID, const IPropertyDescriptor&)>&
+	
+	DelegateList<void(ComponentUID, const IPropertyDescriptor&)>&
 	propertySet() override
 	{
 		return m_property_set;
 	}
 
 
-	virtual DelegateList<void(Entity, const char*)>& entityNameSet() override
+	DelegateList<void(Entity, const char*)>& entityNameSet() override
 	{
 		return m_entity_name_set;
 	}
@@ -3048,19 +3035,19 @@ public:
 	}
 
 
-	virtual bool canUndo() const override
+	bool canUndo() const override
 	{
 		return m_undo_index < m_undo_stack.size() && m_undo_index >= 0;
 	}
 
 
-	virtual bool canRedo() const override
+	bool canRedo() const override
 	{
 		return m_undo_index + 1 < m_undo_stack.size();
 	}
 
 
-	virtual void undo() override
+	void undo() override
 	{
 		if (m_undo_index < m_undo_stack.size() && m_undo_index >= 0)
 		{
@@ -3070,7 +3057,7 @@ public:
 	}
 
 
-	virtual void redo() override
+	void redo() override
 	{
 		if (m_undo_index + 1 < m_undo_stack.size())
 		{
@@ -3080,31 +3067,31 @@ public:
 	}
 
 
-	virtual MeasureTool* getMeasureTool() const override
+	MeasureTool* getMeasureTool() const override
 	{
 		return m_measure_tool;
 	}
 
 
-	virtual float getMeasuredDistance() const override
+	float getMeasuredDistance() const override
 	{
 		return m_measure_tool->getDistance();
 	}
 
 
-	virtual bool isMeasureToolActive() const override
+	bool isMeasureToolActive() const override
 	{
 		return m_measure_tool->isEnabled();
 	}
 
 
-	virtual void toggleMeasure() override
+	void toggleMeasure() override
 	{
 		m_measure_tool->enable(!m_measure_tool->isEnabled());
 	}
 
 
-	virtual void saveUndoStack(const Path& path) override
+	void saveUndoStack(const Path& path) override
 	{
 		if (m_undo_stack.empty())
 		{
@@ -3140,7 +3127,7 @@ public:
 	}
 
 
-	virtual IEditorCommand* createEditorCommand(uint32_t command_type) override
+	IEditorCommand* createEditorCommand(uint32_t command_type) override
 	{
 		int index = m_editor_command_creators.find(command_type);
 		if (index >= 0)
@@ -3151,7 +3138,7 @@ public:
 	}
 
 
-	virtual void
+	void
 	registerEditorCommandCreator(const char* command_type,
 								 EditorCommandCreator creator) override
 	{
@@ -3159,7 +3146,7 @@ public:
 	}
 
 
-	virtual bool executeUndoStack(const Path& path) override
+	bool executeUndoStack(const Path& path) override
 	{
 		destroyUndoStack();
 		m_undo_index = -1;
@@ -3200,7 +3187,7 @@ public:
 	}
 
 
-	virtual bool runTest(const Path& undo_stack_path,
+	bool runTest(const Path& undo_stack_path,
 						 const Path& result_universe_path) override
 	{
 		newUniverse();
@@ -3232,7 +3219,7 @@ public:
 	}
 
 
-	virtual const Array<IScene*>& getScenes() const override
+	const Array<IScene*>& getScenes() const override
 	{
 		return m_universe_context->m_scenes;
 	}
@@ -3292,8 +3279,6 @@ private:
 	DelegateList<void()> m_universe_destroyed;
 	DelegateList<void()> m_universe_created;
 	DelegateList<void()> m_universe_loaded;
-	DelegateList<void(ComponentUID)> m_component_added;
-	DelegateList<void(ComponentUID)> m_component_destroyed;
 	DelegateList<void(ComponentUID, const IPropertyDescriptor&)> m_property_set;
 	DelegateList<void(const Array<Entity>&)> m_entity_selected;
 	DelegateList<void(Entity, const char*)> m_entity_name_set;

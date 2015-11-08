@@ -1086,7 +1086,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void enableBlending() { m_render_state |= BGFX_STATE_BLEND_ALPHA; }
+	void enableBlending() { m_render_state |= BGFX_STATE_BLEND_ADD; }
 	void disableBlending() { m_render_state &= ~BGFX_STATE_BLEND_MASK; }
 
 	void enableDepthWrite() { m_render_state |= BGFX_STATE_DEPTH_WRITE; }
