@@ -9,10 +9,10 @@
 #include "core/resource_manager.h"
 #include "editor/world_editor.h"
 #include "engine.h"
-#include "engine/property_descriptor.h"
-#include "renderer/render_scene.h"
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
+#include "renderer/render_scene.h"
+#include "universe/universe.h"
 
 
 namespace Lumix
@@ -34,7 +34,6 @@ struct PhysicsSystemImpl : public PhysicsSystem
 		, m_manager(*this, engine.getAllocator())
 	{
 		m_manager.create(ResourceManager::PHYSICS, engine.getResourceManager());
-		registerProperties();
 	}
 
 	virtual bool create() override;
@@ -58,7 +57,6 @@ struct PhysicsSystemImpl : public PhysicsSystem
 	}
 	
 	bool connect2VisualDebugger();
-	void registerProperties();
 
 	physx::PxPhysics*			m_physics;
 	physx::PxFoundation*		m_foundation;
@@ -160,70 +158,6 @@ class AssertNullAllocator : public physx::PxAllocatorCallback
 			_aligned_free(ptr);
 		}
 };
-
-
-void PhysicsSystemImpl::registerProperties()
-{
-	m_engine.registerComponentType("box_rigid_actor", "Physics Box");
-	m_engine.registerComponentType("physical_controller",
-									"Physics Controller");
-	m_engine.registerComponentType("mesh_rigid_actor", "Physics Mesh");
-	m_engine.registerComponentType("physical_heightfield",
-									"Physics Heightfield");
-
-	IAllocator& allocator = m_engine.getAllocator();
-	m_engine.registerProperty(
-		"box_rigid_actor",
-		LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
-			"dynamic",
-			&PhysicsScene::isDynamic,
-			&PhysicsScene::setIsDynamic,
-			allocator));
-	m_engine.registerProperty(
-		"box_rigid_actor",
-		LUMIX_NEW(allocator, Vec3PropertyDescriptor<PhysicsScene>)(
-			"size",
-			&PhysicsScene::getHalfExtents,
-			&PhysicsScene::setHalfExtents,
-			allocator));
-	m_engine.registerProperty(
-		"mesh_rigid_actor",
-		LUMIX_NEW(allocator, FilePropertyDescriptor<PhysicsScene>)(
-			"source",
-			&PhysicsScene::getShapeSource,
-			&PhysicsScene::setShapeSource,
-			"Physics (*.pda)",
-			allocator));
-	m_engine.registerProperty(
-		"physical_heightfield",
-		LUMIX_NEW(allocator, ResourcePropertyDescriptor<PhysicsScene>)(
-			"heightmap",
-			&PhysicsScene::getHeightmap,
-			&PhysicsScene::setHeightmap,
-			"Image (*.raw)",
-			Lumix::ResourceManager::TEXTURE,
-			allocator));
-	m_engine.registerProperty(
-		"physical_heightfield",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
-			"xz_scale",
-			&PhysicsScene::getHeightmapXZScale,
-			&PhysicsScene::setHeightmapXZScale,
-			0.0f,
-			FLT_MAX,
-			0.0f,
-			allocator));
-	m_engine.registerProperty(
-		"physical_heightfield",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
-			"y_scale",
-			&PhysicsScene::getHeightmapYScale,
-			&PhysicsScene::setHeightmapYScale,
-			0.0f,
-			FLT_MAX,
-			0.0f,
-			allocator));
-}
 
 
 bool PhysicsSystemImpl::create()

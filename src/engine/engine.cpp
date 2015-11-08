@@ -15,7 +15,6 @@
 #include "debug/allocator.h"
 #include "debug/debug.h"
 #include "engine/iplugin.h"
-#include "engine/property_descriptor.h"
 #include "plugin_manager.h"
 #include "universe/hierarchy.h"
 #include "universe/universe.h"
@@ -72,7 +71,6 @@ public:
 		, m_mtjd_manager(m_allocator)
 		, m_fps(0)
 		, m_is_game_running(false)
-		, m_component_properties(m_allocator)
 		, m_component_types(m_allocator)
 	{
 		if (!fs)
@@ -121,15 +119,6 @@ public:
 
 	~EngineImpl()
 	{
-		for (int j = 0; j < m_component_properties.size(); ++j)
-		{
-			Array<IPropertyDescriptor*>& props = m_component_properties.at(j);
-			for (int i = 0, c = props.size(); i < c; ++i)
-			{
-				m_allocator.deleteObject(props[i]);
-			}
-		}
-
 		Timer::destroy(m_timer);
 		Timer::destroy(m_fps_timer);
 		PluginManager::destroy(m_plugin_manager);
@@ -146,111 +135,6 @@ public:
 
 
 	IAllocator& getAllocator() override { return m_allocator; }
-
-
-	const char* getComponentTypeName(int index) override
-	{
-		return m_component_types[index].m_name.c_str();
-	}
-
-
-	const char* getComponentTypeID(int index) override
-	{
-		return m_component_types[index].m_id.c_str();
-	}
-
-
-	int getComponentTypesCount() const override
-	{
-		return m_component_types.size();
-	}
-
-
-	Array<IPropertyDescriptor*>& getPropertyDescriptors(uint32_t type)
-	{
-		int props_index = m_component_properties.find(type);
-		if (props_index < 0)
-		{
-			m_component_properties.insert(
-				type, Array<IPropertyDescriptor*>(m_allocator));
-			props_index = m_component_properties.find(type);
-		}
-		return m_component_properties.at(props_index);
-	}
-
-
-	const IPropertyDescriptor&
-	getPropertyDescriptor(uint32_t type, uint32_t name_hash) override
-	{
-		Array<IPropertyDescriptor*>& props = getPropertyDescriptors(type);
-		for (int i = 0; i < props.size(); ++i)
-		{
-			if (props[i]->getNameHash() == name_hash)
-			{
-				return *props[i];
-			}
-		}
-		ASSERT(false);
-		return *props[0];
-	}
-
-
-	IPropertyDescriptor* getProperty(const char* component_type,
-		const char* property_name) override
-	{
-		auto& props = getPropertyDescriptors(crc32(component_type));
-		auto name_hash = crc32(property_name);
-		for (int i = 0; i < props.size(); ++i)
-		{
-			if (props[i]->getNameHash() == name_hash)
-			{
-				return props[i];
-			}
-		}
-		return nullptr;
-	}
-
-
-	virtual bool componentDepends(uint32_t dependent, uint32_t dependency) const override
-	{
-		for (ComponentType& cmp_type : m_component_types)
-		{
-			if (cmp_type.m_id_hash == dependent)
-			{
-				return cmp_type.m_dependency == dependency;
-			}
-		}
-		return false;
-	}
-
-	void registerComponentDependency(const char* id, const char* dependency_id) override
-	{
-		for (ComponentType& cmp_type : m_component_types)
-		{
-			if (cmp_type.m_id == id)
-			{
-				cmp_type.m_dependency = crc32(dependency_id);
-				return;
-			}
-		}
-		ASSERT(false);
-	}
-
-
-	void registerComponentType(const char* id, const char* name) override
-	{
-		ComponentType& type = m_component_types.emplace(m_allocator);
-		type.m_name = name;
-		type.m_id = id;
-		type.m_id_hash = crc32(id);
-	}
-
-
-	void registerProperty(const char* component_type, IPropertyDescriptor* descriptor) override
-	{
-		ASSERT(descriptor);
-		getPropertyDescriptors(crc32(component_type)).push(descriptor);
-	}
 
 
 	UniverseContext& createUniverse() override
@@ -481,8 +365,6 @@ private:
 	
 	MTJD::Manager m_mtjd_manager;
 
-	AssociativeArray<uint32_t, Array<IPropertyDescriptor*>>
-		m_component_properties;
 	Array<ComponentType> m_component_types;
 	PluginManager* m_plugin_manager;
 	InputSystem m_input_system;

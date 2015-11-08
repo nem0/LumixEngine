@@ -14,7 +14,6 @@
 #include "core/resource_manager.h"
 #include "debug/allocator.h"
 #include "engine.h"
-#include "engine/property_descriptor.h"
 #include "iplugin.h"
 #include "plugin_manager.h"
 #include "lua_script/lua_script_manager.h"
@@ -51,7 +50,6 @@ public:
 	virtual bool create() override;
 	virtual void destroy() override;
 	virtual const char* getName() const override;
-	void registerProperties();
 	LuaScriptManager& getScriptManager() { return m_script_manager; }
 
 	Engine& m_engine;
@@ -439,7 +437,7 @@ public:
 	}
 
 
-	const char* getScriptPath(ComponentIndex cmp)
+	const char* getScriptPath(ComponentIndex cmp) override
 	{
 		return m_scripts[cmp].m_script
 				   ? m_scripts[cmp].m_script->getPath().c_str()
@@ -447,7 +445,7 @@ public:
 	}
 
 
-	void setScriptPath(ComponentIndex cmp, const char* path)
+	void setScriptPath(ComponentIndex cmp, const char* path) override
 	{
 		if (m_scripts[cmp].m_script)
 		{
@@ -475,7 +473,6 @@ LuaScriptSystem::LuaScriptSystem(Engine& engine)
 	, m_script_manager(m_allocator)
 {
 	m_script_manager.create(crc32("lua_script"), engine.getResourceManager());
-	registerProperties();
 }
 
 
@@ -506,20 +503,6 @@ void LuaScriptSystem::destroyScene(IScene* scene)
 bool LuaScriptSystem::create()
 {
 	return true;
-}
-
-
-void LuaScriptSystem::registerProperties()
-{
-	IAllocator& allocator = m_engine.getAllocator();
-	m_engine.registerComponentType("lua_script", "Lua script");
-	m_engine.registerProperty("lua_script",
-		LUMIX_NEW(allocator, ResourcePropertyDescriptor<LuaScriptSceneImpl>)("source",
-								  &LuaScriptSceneImpl::getScriptPath,
-								  &LuaScriptSceneImpl::setScriptPath,
-								  "Lua (*.lua)",
-								  crc32("lua_script"),
-								  allocator));
 }
 
 

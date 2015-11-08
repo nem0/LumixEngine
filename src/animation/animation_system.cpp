@@ -8,7 +8,6 @@
 #include "core/resource_manager.h"
 #include "editor/world_editor.h"
 #include "engine.h"
-#include "engine/property_descriptor.h"
 #include "renderer/render_scene.h"
 #include "universe/universe.h"
 
@@ -292,7 +291,6 @@ public:
 		, m_engine(engine)
 		, m_animation_manager(m_allocator)
 	{
-		registerPropertyDescriptors();
 	}
 
 	virtual IScene* createScene(UniverseContext& ctx) override
@@ -309,21 +307,6 @@ public:
 
 
 	virtual const char* getName() const override { return "animation"; }
-
-
-	void registerPropertyDescriptors()
-	{
-		IAllocator& allocator = m_engine.getAllocator();
-		m_engine.registerComponentType("animable", "Animable");
-		m_engine.registerProperty(
-			"animable",
-			allocator.newObject<FilePropertyDescriptor<AnimationSceneImpl>>(
-				"preview",
-				&AnimationSceneImpl::getPreview,
-				&AnimationSceneImpl::setPreview,
-				"Animation (*.ani)",
-				allocator));
-	}
 
 
 	virtual bool create() override
