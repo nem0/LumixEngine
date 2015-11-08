@@ -104,7 +104,8 @@ public:
 	virtual ComponentList& getComponents(Entity entity) = 0;
 	virtual void addComponent(uint32_t type_crc) = 0;
 	virtual void cloneComponent(const ComponentUID& src, Entity entity) = 0;
-	virtual void destroyComponent(const ComponentUID& crc) = 0;
+	virtual void destroyComponent(const ComponentUID& cmp) = 0;
+	virtual bool canRemove(const ComponentUID& cmp) = 0;
 	virtual Entity addEntity() = 0;
 	virtual void destroyEntities(const Entity* entities, int count) = 0;
 	virtual void addEntityToSelection(Entity entity) = 0;
@@ -151,9 +152,7 @@ public:
 	virtual DelegateList<void(Entity, const char*)>& entityNameSet() = 0;
 	virtual DelegateList<void(ComponentUID, const IPropertyDescriptor&)>&
 	propertySet() = 0;
-	virtual DelegateList<void(ComponentUID)>& componentAdded() = 0; 
-	virtual DelegateList<void(ComponentUID)>& componentDestroyed() = 0;
-
+	
 	virtual void addPlugin(Plugin& plugin) = 0;
 	virtual void removePlugin(Plugin& plugin) = 0;
 	virtual bool isRelativePath(const char* path) = 0;

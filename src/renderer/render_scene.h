@@ -178,9 +178,15 @@ public:
 
 	virtual class ParticleEmitter& getParticleEmitter(ComponentIndex cmp) const = 0;
 	virtual const Array<ParticleEmitter*>& getParticleEmitters() const = 0;
+	virtual Vec2 getParticleEmitterLinearMovementX(ComponentIndex cmp) = 0;
+	virtual Vec2 getParticleEmitterLinearMovementY(ComponentIndex cmp) = 0;
+	virtual Vec2 getParticleEmitterLinearMovementZ(ComponentIndex cmp) = 0;
 	virtual Vec2 getParticleEmitterInitialLife(ComponentIndex cmp) = 0;
 	virtual Vec2 getParticleEmitterSpawnPeriod(ComponentIndex cmp) = 0;
 	virtual Vec2 getParticleEmitterInitialSize(ComponentIndex cmp) = 0;
+	virtual void setParticleEmitterLinearMovementX(ComponentIndex cmp, const Vec2& value) = 0;
+	virtual void setParticleEmitterLinearMovementY(ComponentIndex cmp, const Vec2& value) = 0;
+	virtual void setParticleEmitterLinearMovementZ(ComponentIndex cmp, const Vec2& value) = 0;
 	virtual void setParticleEmitterInitialLife(ComponentIndex cmp, const Vec2& value) = 0;
 	virtual void setParticleEmitterSpawnPeriod(ComponentIndex cmp, const Vec2& value) = 0;
 	virtual void setParticleEmitterInitialSize(ComponentIndex cmp, const Vec2& value) = 0;
