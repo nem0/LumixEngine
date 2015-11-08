@@ -12,7 +12,6 @@ namespace FS
 class FileSystem;
 }
 
-class Hierarchy;
 namespace MTJD
 {
 class Manager;
@@ -20,6 +19,7 @@ class Manager;
 
 class InputBlob;
 class EditorServer;
+class Hierarchy;
 class InputSystem;
 class IPlugin;
 class IPropertyDescriptor;
@@ -73,14 +73,14 @@ public:
 	virtual bool deserialize(UniverseContext& ctx, InputBlob& serializer) = 0;
 	virtual float getFPS() const = 0;
 	virtual float getLastTimeDelta() = 0;
-	
-	virtual const IPropertyDescriptor&
-		getPropertyDescriptor(uint32_t type, uint32_t name_hash) = 0;
-	virtual Array<IPropertyDescriptor*>&
-		getPropertyDescriptors(uint32_t type) = 0;
+
+	virtual const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash) = 0;
+	virtual Array<IPropertyDescriptor*>& getPropertyDescriptors(uint32_t type) = 0;
 	virtual void registerProperty(const char* name, IPropertyDescriptor* desc) = 0;
 	virtual IPropertyDescriptor* getProperty(const char* component_type,
-											 const char* property_name) = 0;
+		const char* property_name) = 0;
+	virtual void registerComponentDependency(const char* id, const char* dependency_id) = 0;
+	virtual bool componentDepends(uint32_t dependent, uint32_t dependency) const = 0;
 	virtual void registerComponentType(const char* name, const char* title) = 0;
 	virtual int getComponentTypesCount() const = 0;
 	virtual const char* getComponentTypeName(int index) = 0;

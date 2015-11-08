@@ -33,6 +33,7 @@ enum class SerializedEngineVersion : int32_t
 	BASE,
 	SPARSE_TRANFORMATIONS,
 	FOG_PARAMS,
+	SCENE_VERSION,
 
 	LATEST // must be the last one
 };
@@ -118,7 +119,7 @@ public:
 	}
 
 
-	virtual ~EngineImpl()
+	~EngineImpl()
 	{
 		for (int j = 0; j < m_component_properties.size(); ++j)
 		{
@@ -144,22 +145,22 @@ public:
 	}
 
 
-	virtual IAllocator& getAllocator() override { return m_allocator; }
+	IAllocator& getAllocator() override { return m_allocator; }
 
 
-	virtual const char* getComponentTypeName(int index) override
+	const char* getComponentTypeName(int index) override
 	{
 		return m_component_types[index].m_name.c_str();
 	}
 
 
-	virtual const char* getComponentTypeID(int index) override
+	const char* getComponentTypeID(int index) override
 	{
 		return m_component_types[index].m_id.c_str();
 	}
 
 
-	virtual int getComponentTypesCount() const override
+	int getComponentTypesCount() const override
 	{
 		return m_component_types.size();
 	}
@@ -178,7 +179,7 @@ public:
 	}
 
 
-	virtual const IPropertyDescriptor&
+	const IPropertyDescriptor&
 	getPropertyDescriptor(uint32_t type, uint32_t name_hash) override
 	{
 		Array<IPropertyDescriptor*>& props = getPropertyDescriptors(type);
@@ -194,7 +195,7 @@ public:
 	}
 
 
-	virtual IPropertyDescriptor* getProperty(const char* component_type,
+	IPropertyDescriptor* getProperty(const char* component_type,
 		const char* property_name) override
 	{
 		auto& props = getPropertyDescriptors(crc32(component_type));
@@ -210,23 +211,49 @@ public:
 	}
 
 
-	virtual void registerComponentType(const char* id, const char* name) override
+	virtual bool componentDepends(uint32_t dependent, uint32_t dependency) const override
+	{
+		for (ComponentType& cmp_type : m_component_types)
+		{
+			if (cmp_type.m_id_hash == dependent)
+			{
+				return cmp_type.m_dependency == dependency;
+			}
+		}
+		return false;
+	}
+
+	void registerComponentDependency(const char* id, const char* dependency_id) override
+	{
+		for (ComponentType& cmp_type : m_component_types)
+		{
+			if (cmp_type.m_id == id)
+			{
+				cmp_type.m_dependency = crc32(dependency_id);
+				return;
+			}
+		}
+		ASSERT(false);
+	}
+
+
+	void registerComponentType(const char* id, const char* name) override
 	{
 		ComponentType& type = m_component_types.emplace(m_allocator);
 		type.m_name = name;
 		type.m_id = id;
+		type.m_id_hash = crc32(id);
 	}
 
 
-	virtual void registerProperty(const char* component_type,
-								  IPropertyDescriptor* descriptor) override
+	void registerProperty(const char* component_type, IPropertyDescriptor* descriptor) override
 	{
 		ASSERT(descriptor);
 		getPropertyDescriptors(crc32(component_type)).push(descriptor);
 	}
 
 
-	virtual UniverseContext& createUniverse() override
+	UniverseContext& createUniverse() override
 	{
 		UniverseContext* context =
 			m_allocator.newObject<UniverseContext>(m_allocator);
@@ -247,10 +274,10 @@ public:
 	}
 
 
-	virtual MTJD::Manager& getMTJDManager() override { return m_mtjd_manager; }
+	MTJD::Manager& getMTJDManager() override { return m_mtjd_manager; }
 
 
-	virtual void destroyUniverse(UniverseContext& context) override
+	void destroyUniverse(UniverseContext& context) override
 	{
 		for (int i = context.m_scenes.size() - 1; i >= 0; --i)
 		{
@@ -263,16 +290,16 @@ public:
 	}
 
 
-	virtual PluginManager& getPluginManager() override
+	PluginManager& getPluginManager() override
 	{
 		return *m_plugin_manager;
 	}
 
 
-	virtual FS::FileSystem& getFileSystem() override { return *m_file_system; }
+	FS::FileSystem& getFileSystem() override { return *m_file_system; }
 
 
-	virtual void startGame(UniverseContext& context) override
+	void startGame(UniverseContext& context) override
 	{
 		ASSERT(!m_is_game_running);
 		m_is_game_running = true;
@@ -283,7 +310,7 @@ public:
 	}
 
 
-	virtual void stopGame(UniverseContext& context) override
+	void stopGame(UniverseContext& context) override
 	{
 		ASSERT(m_is_game_running);
 		m_is_game_running = false;
@@ -294,7 +321,7 @@ public:
 	}
 
 
-	virtual void update(UniverseContext& context) override
+	void update(UniverseContext& context) override
 	{
 		PROFILE_FUNCTION();
 		float dt;
@@ -316,16 +343,16 @@ public:
 	}
 
 
-	virtual InputSystem& getInputSystem() override { return m_input_system; }
+	InputSystem& getInputSystem() override { return m_input_system; }
 
 
-	virtual ResourceManager& getResourceManager() override
+	ResourceManager& getResourceManager() override
 	{
 		return m_resource_manager;
 	}
 
 
-	virtual float getFPS() const override { return m_fps; }
+	float getFPS() const override { return m_fps; }
 
 
 	void serializePluginList(OutputBlob& serializer)
@@ -356,7 +383,7 @@ public:
 	}
 
 
-	virtual uint32_t serialize(UniverseContext& ctx,
+	uint32_t serialize(UniverseContext& ctx,
 							   OutputBlob& serializer) override
 	{
 		SerializedEngineHeader header;
@@ -374,6 +401,7 @@ public:
 		for (int i = 0; i < ctx.m_scenes.size(); ++i)
 		{
 			serializer.writeString(ctx.m_scenes[i]->getPlugin().getName());
+			serializer.write(ctx.m_scenes[i]->getVersion());
 			ctx.m_scenes[i]->serialize(serializer);
 		}
 		uint32_t crc = crc32((const uint8_t*)serializer.getData() + pos,
@@ -382,7 +410,7 @@ public:
 	}
 
 
-	virtual bool deserialize(UniverseContext& ctx,
+	bool deserialize(UniverseContext& ctx,
 							 InputBlob& serializer) override
 	{
 		SerializedEngineHeader header;
@@ -392,7 +420,7 @@ public:
 			g_log_error.log("engine") << "Wrong or corrupted file";
 			return false;
 		}
-		if (header.m_version != SerializedEngineVersion::LATEST)
+		if (header.m_version > SerializedEngineVersion::LATEST)
 		{
 			g_log_error.log("engine") << "Unsupported version";
 			return false;
@@ -412,14 +440,19 @@ public:
 			char tmp[32];
 			serializer.readString(tmp, sizeof(tmp));
 			IScene* scene = ctx.getScene(crc32(tmp));
-			scene->deserialize(serializer);
+			int scene_version = -1;
+			if (header.m_version > SerializedEngineVersion::SCENE_VERSION)
+			{
+				serializer.read(scene_version);
+			}
+			scene->deserialize(serializer, scene_version);
 		}
 		g_path_manager.clear();
 		return true;
 	}
 
 
-	virtual float getLastTimeDelta() override { return m_last_time_delta; }
+	float getLastTimeDelta() override { return m_last_time_delta; }
 
 private:
 	struct ComponentType
@@ -432,6 +465,9 @@ private:
 
 		string m_name;
 		string m_id;
+
+		uint32_t m_id_hash;
+		uint32_t m_dependency;
 	};
 
 private:

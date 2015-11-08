@@ -255,8 +255,59 @@ struct RendererImpl : public Renderer
 		m_engine.registerComponentType("camera", "Camera");
 		m_engine.registerComponentType("global_light", "Global light");
 		m_engine.registerComponentType("renderable", "Mesh");
+		m_engine.registerComponentType("particle_emitter", "Particle emitter");
+		m_engine.registerComponentType("particle_emitter_fade", "Particle emitter - fade");
+		m_engine.registerComponentType(
+			"particle_emitter_linear_movement", "Particle emitter - linear movement");
+		m_engine.registerComponentType(
+			"particle_emitter_random_rotation", "Particle emitter - random rotation");
 		m_engine.registerComponentType("point_light", "Point light");
 		m_engine.registerComponentType("terrain", "Terrain");
+
+		m_engine.registerComponentDependency("particle_emitter_fade", "particle_emitter");
+		m_engine.registerComponentDependency(
+			"particle_emitter_linear_movement", "particle_emitter");
+		m_engine.registerComponentDependency(
+			"particle_emitter_random_rotation", "particle_emitter");
+
+		m_engine.registerProperty("particle_emitter_linear_movement",
+			LUMIX_NEW(allocator, Vec2PropertyDescriptor<RenderScene>)("x",
+			&RenderScene::getParticleEmitterLinearMovementX,
+			&RenderScene::setParticleEmitterLinearMovementX,
+			allocator));
+		m_engine.registerProperty("particle_emitter_linear_movement",
+			LUMIX_NEW(allocator, Vec2PropertyDescriptor<RenderScene>)("y",
+			&RenderScene::getParticleEmitterLinearMovementY,
+			&RenderScene::setParticleEmitterLinearMovementY,
+			allocator));
+		m_engine.registerProperty("particle_emitter_linear_movement",
+			LUMIX_NEW(allocator, Vec2PropertyDescriptor<RenderScene>)("z",
+			&RenderScene::getParticleEmitterLinearMovementZ,
+			&RenderScene::setParticleEmitterLinearMovementZ,
+			allocator));
+
+		m_engine.registerProperty("particle_emitter",
+			LUMIX_NEW(allocator, Vec2PropertyDescriptor<RenderScene>)("Life",
+			&RenderScene::getParticleEmitterInitialLife,
+			&RenderScene::setParticleEmitterInitialLife,
+			allocator));
+		m_engine.registerProperty("particle_emitter",
+			LUMIX_NEW(allocator, Vec2PropertyDescriptor<RenderScene>)("Initial size",
+			&RenderScene::getParticleEmitterInitialSize,
+			&RenderScene::setParticleEmitterInitialSize,
+			allocator));
+		m_engine.registerProperty("particle_emitter",
+			LUMIX_NEW(allocator, Vec2PropertyDescriptor<RenderScene>)("Spawn period",
+			&RenderScene::getParticleEmitterSpawnPeriod,
+			&RenderScene::setParticleEmitterSpawnPeriod,
+			allocator));
+		m_engine.registerProperty("particle_emitter",
+			LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",
+			&RenderScene::getParticleEmitterMaterialPath,
+			&RenderScene::setParticleEmitterMaterialPath,
+			"Material (*.mat)",
+			Lumix::ResourceManager::MATERIAL,
+			allocator));
 
 		m_engine.registerProperty("camera",
 			LUMIX_NEW(allocator, StringPropertyDescriptor<RenderScene>)("Slot",

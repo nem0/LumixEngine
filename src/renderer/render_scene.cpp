@@ -24,6 +24,7 @@
 #include "renderer/culling_system.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
+#include "renderer/particle_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/pose.h"
 #include "renderer/renderer.h"
@@ -40,9 +41,25 @@ namespace Lumix
 
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
 static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
+static const uint32_t PARTICLE_EMITTER_HASH = crc32("particle_emitter");
+static const uint32_t PARTICLE_EMITTER_FADE_HASH = crc32("particle_emitter_fade");
+static const uint32_t PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH =
+	crc32("particle_emitter_linear_movement");
+static const uint32_t PARTICLE_EMITTER_RANDOM_ROTATION_HASH =
+	crc32("particle_emitter_random_rotation");
 static const uint32_t GLOBAL_LIGHT_HASH = crc32("global_light");
 static const uint32_t CAMERA_HASH = crc32("camera");
 static const uint32_t TERRAIN_HASH = crc32("terrain");
+
+
+enum class RenderSceneVersion : int32_t
+{
+	PARTICLES,
+	WHOLE_LIGHTS,
+
+	LATEST,
+	INVALID = -1,
+};
 
 
 struct Renderable
@@ -179,6 +196,7 @@ public:
 		, m_renderable_created(m_allocator)
 		, m_renderable_destroyed(m_allocator)
 		, m_is_grass_enabled(true)
+		, m_particle_emitters(m_allocator)
 	{
 		m_universe.entityTransformed()
 			.bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
@@ -195,22 +213,25 @@ public:
 
 		for (int i = 0; i < m_model_loaded_callbacks.size(); ++i)
 		{
-			m_allocator.deleteObject(m_model_loaded_callbacks[i]);
+			LUMIX_DELETE(m_allocator, m_model_loaded_callbacks[i]);
 		}
 
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
-			m_allocator.deleteObject(m_terrains[i]);
+			LUMIX_DELETE(m_allocator, m_terrains[i]);
+		}
+
+		for (int i = 0; i < m_particle_emitters.size(); ++i)
+		{
+			LUMIX_DELETE(m_allocator, m_particle_emitters[i]);
 		}
 
 		for (int i = 0; i < m_renderables.size(); ++i)
 		{
 			if (m_renderables[i]->m_model)
 			{
-				m_renderables[i]
-					->m_model->getResourceManager()
-					.get(ResourceManager::MODEL)
-					->unload(*m_renderables[i]->m_model);
+				auto& manager = m_renderables[i]->m_model->getResourceManager();
+				manager.get(ResourceManager::MODEL)->unload(*m_renderables[i]->m_model);
 			}
 			m_allocator.deleteObject(m_renderables[i]);
 		}
@@ -219,10 +240,10 @@ public:
 	}
 
 
-	virtual Universe& getUniverse() override { return m_universe; }
+	Universe& getUniverse() override { return m_universe; }
 
 
-	virtual bool ownComponentType(uint32_t type) const override
+	bool ownComponentType(uint32_t type) const override
 	{
 		return type == RENDERABLE_HASH || type == POINT_LIGHT_HASH ||
 			type == GLOBAL_LIGHT_HASH || type == CAMERA_HASH ||
@@ -230,10 +251,10 @@ public:
 	}
 
 
-	virtual IPlugin& getPlugin() const override { return m_renderer; }
+	IPlugin& getPlugin() const override { return m_renderer; }
 
 
-	virtual void getRay(ComponentIndex camera,
+	void getRay(ComponentIndex camera,
 		float x,
 		float y,
 		Vec3& origin,
@@ -273,7 +294,7 @@ public:
 	}
 
 
-	virtual Frustum getCameraFrustum(ComponentIndex camera) const override
+	Frustum getCameraFrustum(ComponentIndex camera) const override
 	{
 		Matrix mtx = m_universe.getMatrix(m_cameras[camera].m_entity);
 		Frustum ret;
@@ -321,6 +342,13 @@ public:
 				m_debug_points[i].m_life = life;
 			}
 		}
+
+		for (auto* emitter : m_particle_emitters)
+		{
+			if (!emitter) continue;
+			
+			emitter->update(dt);
+		}
 	}
 
 	void serializeCameras(OutputBlob& serializer)
@@ -344,33 +372,14 @@ public:
 		serializer.write((int32_t)m_point_lights.size());
 		for (int i = 0, c = m_point_lights.size(); i < c; ++i)
 		{
-			PointLight& point_light = m_point_lights[i];
-			serializer.write(point_light.m_uid);
-			serializer.write(point_light.m_diffuse_color);
-			serializer.write(point_light.m_intensity);
-			serializer.write(point_light.m_entity);
-			serializer.write(point_light.m_attenuation_param);
-			serializer.write(point_light.m_fov);
-			serializer.write(point_light.m_specular_color);
-			serializer.write(point_light.m_cast_shadows);
+			serializer.write(m_point_lights[i]);
 		}
 		serializer.write(m_point_light_last_uid);
 
 		serializer.write((int32_t)m_global_lights.size());
 		for (int i = 0, c = m_global_lights.size(); i < c; ++i)
 		{
-			GlobalLight& global_light = m_global_lights[i];
-			serializer.write(global_light.m_uid);
-			serializer.write(global_light.m_color);
-			serializer.write(global_light.m_intensity);
-			serializer.write(global_light.m_entity);
-			serializer.write(global_light.m_ambient_color);
-			serializer.write(global_light.m_ambient_intensity);
-			serializer.write(global_light.m_fog_color);
-			serializer.write(global_light.m_fog_density);
-			serializer.write(global_light.m_cascades);
-			serializer.write(global_light.m_fog_bottom);
-			serializer.write(global_light.m_fog_height);
+			serializer.write(m_global_lights[i]);
 		}
 		serializer.write((int32_t)m_global_light_last_uid);
 		serializer.write((int32_t)m_active_global_light_uid);
@@ -405,13 +414,74 @@ public:
 		}
 	}
 
-	virtual void serialize(OutputBlob& serializer) override
+
+	void deserializeParticleEmitters(InputBlob& serializer)
+	{
+		int count;
+		serializer.read(count);
+		m_particle_emitters.resize(count);
+		for(int i = 0; i < count; ++i)
+		{
+			bool is_emitter;
+			serializer.read(is_emitter);
+			ParticleEmitter* emitter = nullptr;
+			if (is_emitter)
+			{
+				emitter = LUMIX_NEW(m_allocator, ParticleEmitter)(
+					INVALID_ENTITY, m_universe, m_allocator);
+				emitter->deserialize(serializer, m_engine.getResourceManager());
+				m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_HASH, this, i);
+				for (auto* module : emitter->m_modules)
+				{
+					if (module->getType() == ParticleEmitter::AlphaModule::s_type)
+					{
+						m_universe.addComponent(
+							emitter->m_entity, PARTICLE_EMITTER_FADE_HASH, this, i);
+					}
+					else if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
+					{
+						m_universe.addComponent(
+							emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH, this, i);
+					}
+					else if (module->getType() == ParticleEmitter::RandomRotationModule::s_type)
+					{
+						m_universe.addComponent(
+							emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_HASH, this, i);
+					}
+				}
+			}
+			m_particle_emitters[i] = emitter;
+		}
+	}
+
+
+	void serializeParticleEmitters(OutputBlob& serializer)
+	{
+		serializer.write(m_particle_emitters.size());
+		for (auto* emitter : m_particle_emitters)
+		{
+			if (emitter)
+			{
+				serializer.write(true);
+				emitter->serialize(serializer);
+			}
+			else
+			{
+				serializer.write(false);
+			}
+		}
+	}
+
+
+	void serialize(OutputBlob& serializer) override
 	{
 		serializeCameras(serializer);
 		serializeRenderables(serializer);
 		serializeLights(serializer);
 		serializeTerrains(serializer);
+		serializeParticleEmitters(serializer);
 	}
+
 
 	void deserializeCameras(InputBlob& serializer)
 	{
@@ -431,8 +501,7 @@ public:
 
 			if (!camera.m_is_free)
 			{
-				m_universe.addComponent(
-					m_cameras[i].m_entity, CAMERA_HASH, this, i);
+				m_universe.addComponent(m_cameras[i].m_entity, CAMERA_HASH, this, i);
 			}
 		}
 	}
@@ -480,7 +549,7 @@ public:
 		}
 	}
 
-	void deserializeLights(InputBlob& serializer)
+	void deserializeLights(InputBlob& serializer, RenderSceneVersion version)
 	{
 		int32_t size = 0;
 		serializer.read(size);
@@ -490,16 +559,24 @@ public:
 		{
 			m_light_influenced_geometry.push(Array<int>(m_allocator));
 			PointLight& light = m_point_lights[i];
-			serializer.read(light.m_uid);
-			serializer.read(light.m_diffuse_color);
-			serializer.read(light.m_intensity);
-			serializer.read(light.m_entity);
-			serializer.read(light.m_attenuation_param);
-			serializer.read(light.m_fov);
-			serializer.read(light.m_specular_color);
-			serializer.read(light.m_cast_shadows);
-			m_universe.addComponent(
-				light.m_entity, POINT_LIGHT_HASH, this, light.m_uid);
+			if (version > RenderSceneVersion::WHOLE_LIGHTS)
+			{
+				serializer.read(light);
+			}
+			else
+			{
+				serializer.read(light.m_uid);
+				serializer.read(light.m_diffuse_color);
+				serializer.read(light.m_intensity);
+				serializer.read(light.m_entity);
+				serializer.read(light.m_attenuation_param);
+				serializer.read(light.m_fov);
+				serializer.read(light.m_specular_color);
+				serializer.read(light.m_cast_shadows);
+				light.m_range = 10;
+			}
+
+			m_universe.addComponent(light.m_entity, POINT_LIGHT_HASH, this, light.m_uid);
 		}
 		serializer.read(m_point_light_last_uid);
 
@@ -508,19 +585,25 @@ public:
 		for (int i = 0; i < size; ++i)
 		{
 			GlobalLight& light = m_global_lights[i];
-			serializer.read(light.m_uid);
-			serializer.read(light.m_color);
-			serializer.read(light.m_intensity);
-			serializer.read(light.m_entity);
-			serializer.read(light.m_ambient_color);
-			serializer.read(light.m_ambient_intensity);
-			serializer.read(light.m_fog_color);
-			serializer.read(light.m_fog_density);
-			serializer.read(light.m_cascades);
-			serializer.read(light.m_fog_bottom);
-			serializer.read(light.m_fog_height);
-			m_universe.addComponent(
-				light.m_entity, GLOBAL_LIGHT_HASH, this, light.m_uid);
+			if (version > RenderSceneVersion::WHOLE_LIGHTS)
+			{
+				serializer.read(light);
+			}
+			else
+			{
+				serializer.read(light.m_uid);
+				serializer.read(light.m_color);
+				serializer.read(light.m_intensity);
+				serializer.read(light.m_entity);
+				serializer.read(light.m_ambient_color);
+				serializer.read(light.m_ambient_intensity);
+				serializer.read(light.m_fog_color);
+				serializer.read(light.m_fog_density);
+				serializer.read(light.m_cascades);
+				serializer.read(light.m_fog_bottom);
+				serializer.read(light.m_fog_height);
+			}
+			m_universe.addComponent(light.m_entity, GLOBAL_LIGHT_HASH, this, light.m_uid);
 		}
 		serializer.read(m_global_light_last_uid);
 		serializer.read(m_active_global_light_uid);
@@ -562,12 +645,20 @@ public:
 		}
 	}
 
-	virtual void deserialize(InputBlob& serializer) override
+
+	int getVersion() const override
+	{
+		return (int)RenderSceneVersion::LATEST;
+	}
+
+
+	void deserialize(InputBlob& serializer, int version) override
 	{
 		deserializeCameras(serializer);
 		deserializeRenderables(serializer);
-		deserializeLights(serializer);
+		deserializeLights(serializer, (RenderSceneVersion)version);
 		deserializeTerrains(serializer);
+		if (version >= 0) deserializeParticleEmitters(serializer);
 	}
 
 
@@ -613,8 +704,7 @@ public:
 		m_dynamic_renderable_cache.erase(entity);
 	}
 
-	virtual void destroyComponent(ComponentIndex component,
-		uint32_t type) override
+	void destroyComponent(ComponentIndex component, uint32_t type) override
 	{
 		if (type == RENDERABLE_HASH)
 		{
@@ -622,8 +712,7 @@ public:
 		}
 		else if (type == GLOBAL_LIGHT_HASH)
 		{
-			Entity entity =
-				m_global_lights[getGlobalLightIndex(component)].m_entity;
+			Entity entity = m_global_lights[getGlobalLightIndex(component)].m_entity;
 
 			m_universe.destroyComponent(entity, type, this, component);
 
@@ -636,8 +725,7 @@ public:
 		else if (type == POINT_LIGHT_HASH)
 		{
 			int index = getPointLightIndex(component);
-			Entity entity =
-				m_point_lights[getPointLightIndex(component)].m_entity;
+			Entity entity = m_point_lights[getPointLightIndex(component)].m_entity;
 			m_point_lights.eraseFast(index);
 			m_light_influenced_geometry.eraseFast(index);
 			m_universe.destroyComponent(entity, type, this, component);
@@ -655,6 +743,55 @@ public:
 			m_terrains[component] = nullptr;
 			m_universe.destroyComponent(entity, type, this, component);
 		}
+		else if (type == PARTICLE_EMITTER_HASH)
+		{
+			Entity entity = m_particle_emitters[component]->m_entity;
+			LUMIX_DELETE(m_allocator, m_particle_emitters[component]);
+			m_particle_emitters[component] = nullptr;
+			m_universe.destroyComponent(entity, type, this, component);
+		}
+		else if (type == PARTICLE_EMITTER_FADE_HASH)
+		{
+			auto* emitter = m_particle_emitters[component];
+			for (auto* module : emitter->m_modules)
+			{
+				if (module->getType() == ParticleEmitter::AlphaModule::s_type)
+				{
+					LUMIX_DELETE(m_allocator, module);
+					emitter->m_modules.eraseItem(module);
+					m_universe.destroyComponent(emitter->m_entity, type, this, component);
+					break;
+				}
+			}
+		}
+		else if (type == PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH)
+		{
+			auto* emitter = m_particle_emitters[component];
+			for (auto* module : emitter->m_modules)
+			{
+				if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
+				{
+					LUMIX_DELETE(m_allocator, module);
+					emitter->m_modules.eraseItem(module);
+					m_universe.destroyComponent(emitter->m_entity, type, this, component);
+					break;
+				}
+			}
+		}
+		else if (type == PARTICLE_EMITTER_RANDOM_ROTATION_HASH)
+		{
+			auto* emitter = m_particle_emitters[component];
+			for (auto* module : emitter->m_modules)
+			{
+				if (module->getType() == ParticleEmitter::RandomRotationModule::s_type)
+				{
+					LUMIX_DELETE(m_allocator, module);
+					emitter->m_modules.eraseItem(module);
+					m_universe.destroyComponent(emitter->m_entity, type, this, component);
+					break;
+				}
+			}
+		}
 		else
 		{
 			ASSERT(false);
@@ -662,7 +799,132 @@ public:
 	}
 
 
-	virtual ComponentIndex createComponent(uint32_t type,
+	Vec2 getParticleEmitterLinearMovementX(ComponentIndex cmp) override
+	{
+		auto& modules = m_particle_emitters[cmp]->m_modules;
+		for (auto* module : modules)
+		{
+			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
+			{
+				return static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_x;
+			}
+		}
+		return Vec2(0, 0);
+	}
+
+
+	void setParticleEmitterLinearMovementX(ComponentIndex cmp, const Vec2& value) override
+	{
+		auto& modules = m_particle_emitters[cmp]->m_modules;
+		for (auto* module : modules)
+		{
+			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
+			{
+				static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_x = value; 
+				break;
+			}
+		}
+	}
+
+
+	Vec2 getParticleEmitterLinearMovementY(ComponentIndex cmp) override
+	{
+		auto& modules = m_particle_emitters[cmp]->m_modules;
+		for (auto* module : modules)
+		{
+			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
+			{
+				return static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_y;
+			}
+		}
+		return Vec2(0, 0);
+	}
+
+
+	void setParticleEmitterLinearMovementY(ComponentIndex cmp, const Vec2& value) override
+	{
+		auto& modules = m_particle_emitters[cmp]->m_modules;
+		for (auto* module : modules)
+		{
+			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
+			{
+				static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_y = value;
+				break;
+			}
+		}
+	}
+
+
+	Vec2 getParticleEmitterLinearMovementZ(ComponentIndex cmp) override
+	{
+		auto& modules = m_particle_emitters[cmp]->m_modules;
+		for (auto* module : modules)
+		{
+			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
+			{
+				return static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_z;
+			}
+		}
+		return Vec2(0, 0);
+	}
+
+
+	void setParticleEmitterLinearMovementZ(ComponentIndex cmp, const Vec2& value) override
+	{
+		auto& modules = m_particle_emitters[cmp]->m_modules;
+		for (auto* module : modules)
+		{
+			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
+			{
+				static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_z = value;
+				break;
+			}
+		}
+	}
+
+
+	Vec2 getParticleEmitterInitialLife(ComponentIndex cmp) override
+	{
+		return m_particle_emitters[cmp]->m_initial_life;
+	}
+
+
+	Vec2 getParticleEmitterSpawnPeriod(ComponentIndex cmp) override
+	{
+		return m_particle_emitters[cmp]->m_spawn_period;
+	}
+
+
+	void setParticleEmitterInitialLife(ComponentIndex cmp, const Vec2& value) override
+	{
+		m_particle_emitters[cmp]->m_initial_life = value;
+		m_particle_emitters[cmp]->m_initial_life.check();
+	}
+
+
+	void setParticleEmitterInitialSize(ComponentIndex cmp, const Vec2& value) override
+	{
+		m_particle_emitters[cmp]->m_initial_size = value;
+		m_particle_emitters[cmp]->m_initial_size.check();
+	}
+
+
+	Vec2 getParticleEmitterInitialSize(ComponentIndex cmp) override
+	{
+		return m_particle_emitters[cmp]->m_initial_size;
+	}
+
+
+	void setParticleEmitterSpawnPeriod(ComponentIndex cmp, const Vec2& value) override
+	{
+		m_particle_emitters[cmp]->m_spawn_period = value;
+		m_particle_emitters[cmp]->m_spawn_period.from =
+			Math::maxValue(0.01f, m_particle_emitters[cmp]->m_spawn_period.from);
+		m_particle_emitters[cmp]->m_spawn_period.check();
+	}
+
+
+	ComponentIndex createComponent(uint32_t type,
 		Entity entity) override
 	{
 		if (type == TERRAIN_HASH)
@@ -701,11 +963,105 @@ public:
 		{
 			return createPointLight(entity);
 		}
+		else if (type == PARTICLE_EMITTER_HASH)
+		{
+			return createParticleEmitter(entity);
+		}
+		else if (type == PARTICLE_EMITTER_FADE_HASH)
+		{
+			return createParticleEmitterFade(entity);
+		}
+		else if (type == PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH)
+		{
+			return createParticleEmitterLinearMovement(entity);
+		}
+		else if (type == PARTICLE_EMITTER_RANDOM_ROTATION_HASH)
+		{
+			return createParticleEmitterRandomRotation(entity);
+		}
 		return INVALID_COMPONENT;
 	}
 
 
-	virtual ComponentIndex getRenderableComponent(Entity entity) override
+	ComponentIndex createParticleEmitterRandomRotation(Entity entity)
+	{
+		for (int i = 0; i < m_particle_emitters.size(); ++i)
+		{
+			auto* emitter = m_particle_emitters[i];
+			if (emitter->m_entity == entity)
+			{
+				auto module = LUMIX_NEW(m_allocator, ParticleEmitter::RandomRotationModule)(*emitter);
+				emitter->addModule(module);
+				m_universe.addComponent(entity, PARTICLE_EMITTER_RANDOM_ROTATION_HASH, this, i);
+				return i;
+			}
+		}
+		return INVALID_COMPONENT;
+	}
+
+
+	ComponentIndex createParticleEmitterLinearMovement(Entity entity)
+	{
+		for (int i = 0; i < m_particle_emitters.size(); ++i)
+		{
+			auto* emitter = m_particle_emitters[i];
+			if (emitter->m_entity == entity)
+			{
+				auto module = LUMIX_NEW(m_allocator, ParticleEmitter::LinearMovementModule)(*emitter);
+				emitter->addModule(module);
+				m_universe.addComponent(entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH, this, i);
+				return i;
+			}
+		}
+		return INVALID_COMPONENT;
+	}
+	
+
+	ComponentIndex createParticleEmitterFade(Entity entity)
+	{
+		for (int i = 0; i < m_particle_emitters.size(); ++i)
+		{
+			auto* emitter = m_particle_emitters[i];
+			if (emitter->m_entity == entity)
+			{
+				auto module = LUMIX_NEW(m_allocator, ParticleEmitter::AlphaModule)(*emitter);
+				emitter->addModule(module);
+				m_universe.addComponent(entity, PARTICLE_EMITTER_FADE_HASH, this, i);
+				return i;
+			}
+		}
+		return INVALID_COMPONENT;
+	}
+
+
+	ComponentIndex createParticleEmitter(Entity entity)
+	{
+		int index = -1;
+		for (int i = 0, c = m_particle_emitters.size(); i < c; ++i)
+		{
+			if (!m_particle_emitters[i])
+			{
+				index = i;
+				break;
+			}
+		}
+
+		if (index == -1)
+		{
+			index = m_particle_emitters.size();
+			m_particle_emitters.push(nullptr);
+		}
+
+		m_particle_emitters[index] =
+			LUMIX_NEW(m_allocator, ParticleEmitter)(entity, m_universe, m_allocator);
+
+		m_universe.addComponent(entity, PARTICLE_EMITTER_HASH, this, index);
+
+		return index;
+	}
+
+
+	ComponentIndex getRenderableComponent(Entity entity) override
 	{
 		DynamicRenderableCache::iterator iter =
 			m_dynamic_renderable_cache.find(entity);
@@ -817,10 +1173,10 @@ public:
 		}
 	}
 
-	virtual Engine& getEngine() const override { return m_engine; }
+	Engine& getEngine() const override { return m_engine; }
 
 
-	virtual ComponentIndex getTerrainComponent(Entity entity) override
+	ComponentIndex getTerrainComponent(Entity entity) override
 	{
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
@@ -834,25 +1190,25 @@ public:
 	}
 
 
-	virtual Vec3 getTerrainNormalAt(ComponentIndex cmp, float x, float z)
+	Vec3 getTerrainNormalAt(ComponentIndex cmp, float x, float z)
 	{
 		return m_terrains[cmp]->getNormal(x, z);
 	}
 
 
-	virtual float getTerrainHeightAt(ComponentIndex cmp, float x, float z) override
+	float getTerrainHeightAt(ComponentIndex cmp, float x, float z) override
 	{
 		return m_terrains[cmp]->getHeight(x, z);
 	}
 
 
-	virtual void getTerrainSize(ComponentIndex cmp, float* width, float* height) override
+	void getTerrainSize(ComponentIndex cmp, float* width, float* height) override
 	{
 		m_terrains[cmp]->getSize(width, height);
 	}
 
 
-	virtual void setTerrainMaterialPath(ComponentIndex cmp, const char* path) override
+	void setTerrainMaterialPath(ComponentIndex cmp, const char* path) override
 	{
 		Material* material = static_cast<Material*>(
 			m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path)));
@@ -860,13 +1216,13 @@ public:
 	}
 
 
-	virtual Material* getTerrainMaterial(ComponentIndex cmp) override
+	Material* getTerrainMaterial(ComponentIndex cmp) override
 	{
 		return m_terrains[cmp]->getMaterial();
 	}
 
 
-	virtual const char* getTerrainMaterialPath(ComponentIndex cmp) override
+	const char* getTerrainMaterialPath(ComponentIndex cmp) override
 	{
 		if (m_terrains[cmp]->getMaterial())
 		{
@@ -879,60 +1235,60 @@ public:
 	}
 
 
-	virtual void setTerrainXZScale(ComponentIndex cmp, float scale) override
+	void setTerrainXZScale(ComponentIndex cmp, float scale) override
 	{
 		m_terrains[cmp]->setXZScale(scale);
 	}
 
-	virtual float getTerrainXZScale(ComponentIndex cmp) override
+	float getTerrainXZScale(ComponentIndex cmp) override
 	{
 		return m_terrains[cmp]->getXZScale();
 	}
 
 
-	virtual void setTerrainYScale(ComponentIndex cmp, float scale) override
+	void setTerrainYScale(ComponentIndex cmp, float scale) override
 	{
 		m_terrains[cmp]->setYScale(scale);
 	}
 
-	virtual float getTerrainYScale(ComponentIndex cmp)
+	float getTerrainYScale(ComponentIndex cmp)
 	{
 		return m_terrains[cmp]->getYScale();
 	}
 
 
-	virtual Pose& getPose(ComponentIndex cmp) override
+	Pose& getPose(ComponentIndex cmp) override
 	{
 		return m_renderables[getRenderable(cmp)]->m_pose;
 	}
 
 
-	virtual Entity getRenderableEntity(ComponentIndex cmp) override
+	Entity getRenderableEntity(ComponentIndex cmp) override
 	{
 		return m_renderables[getRenderable(cmp)]->m_entity;
 	}
 
 
-	virtual Model* getRenderableModel(ComponentIndex cmp) override
+	Model* getRenderableModel(ComponentIndex cmp) override
 	{
 		return m_renderables[getRenderable(cmp)]->m_model;
 	}
 
 
-	virtual void showRenderable(ComponentIndex cmp) override
+	void showRenderable(ComponentIndex cmp) override
 	{
 		m_culling_system->enableStatic(getRenderable(cmp));
 	}
 
 
-	virtual void hideRenderable(ComponentIndex cmp) override
+	void hideRenderable(ComponentIndex cmp) override
 	{
 		int renderable_index = getRenderable(cmp);
 		m_culling_system->disableStatic(renderable_index);
 	}
 
 
-	virtual const char* getRenderablePath(ComponentIndex cmp) override
+	const char* getRenderablePath(ComponentIndex cmp) override
 	{
 		int index = getRenderable(cmp);
 		if (index >= 0 && m_renderables[index]->m_model)
@@ -946,7 +1302,7 @@ public:
 	}
 
 
-	virtual void setRenderableLayer(ComponentIndex cmp,
+	void setRenderableLayer(ComponentIndex cmp,
 									const int32_t& layer) override
 	{
 		m_culling_system->setLayerMask(getRenderable(cmp),
@@ -954,7 +1310,7 @@ public:
 	}
 
 
-	virtual void setRenderablePath(ComponentIndex cmp,
+	void setRenderablePath(ComponentIndex cmp,
 								   const char* path) override
 	{
 		int renderable_index = getRenderable(cmp);
@@ -969,13 +1325,13 @@ public:
 
 
 
-	virtual void forceGrassUpdate(ComponentIndex cmp) override
+	void forceGrassUpdate(ComponentIndex cmp) override
 	{
 		m_terrains[cmp]->forceGrassUpdate();
 	}
 
 
-	virtual void getTerrainInfos(Array<const TerrainInfo*>& infos,
+	void getTerrainInfos(Array<const TerrainInfo*>& infos,
 								 int64_t layer_mask,
 								 const Vec3& camera_pos,
 								 LIFOAllocator& frame_allocator) override
@@ -993,7 +1349,7 @@ public:
 	}
 
 
-	virtual void getGrassInfos(const Frustum& frustum,
+	void getGrassInfos(const Frustum& frustum,
 							   Array<GrassInfo>& infos,
 							   int64_t layer_mask,
 							   ComponentIndex camera) override
@@ -1012,88 +1368,88 @@ public:
 	}
 
 
-	virtual bool isGrassEnabled() const override
+	bool isGrassEnabled() const override
 	{
 		return m_is_grass_enabled;
 	}
 	
 
-	virtual int getGrassDistance(ComponentIndex cmp) override
+	int getGrassDistance(ComponentIndex cmp) override
 	{
 		return m_terrains[cmp]->getGrassDistance();
 	}
 
 
-	virtual void setGrassDistance(ComponentIndex cmp, int value) override
+	void setGrassDistance(ComponentIndex cmp, int value) override
 	{
 		m_terrains[cmp]->setGrassDistance(value);
 	}
 
 	
-	virtual void enableGrass(bool enabled) override
+	void enableGrass(bool enabled) override
 	{
 		m_is_grass_enabled = enabled;
 	}
 
 
-	virtual void
+	void
 	setGrassDensity(ComponentIndex cmp, int index, int density) override
 	{
 		m_terrains[cmp]->setGrassTypeDensity(index, density);
 	}
 
 
-	virtual int getGrassDensity(ComponentIndex cmp, int index) override
+	int getGrassDensity(ComponentIndex cmp, int index) override
 	{
 		return m_terrains[cmp]->getGrassTypeDensity(index);
 	}
 
 
-	virtual void
+	void
 	setGrassGround(ComponentIndex cmp, int index, int ground) override
 	{
 		m_terrains[cmp]->setGrassTypeGround(index, ground);
 	}
 
 
-	virtual int getGrassGround(ComponentIndex cmp, int index) override
+	int getGrassGround(ComponentIndex cmp, int index) override
 	{
 		return m_terrains[cmp]->getGrassTypeGround(index);
 	}
 
 
-	virtual void
+	void
 	setGrassPath(ComponentIndex cmp, int index, const char* path) override
 	{
 		m_terrains[cmp]->setGrassTypePath(index, Path(path));
 	}
 
 
-	virtual const char* getGrassPath(ComponentIndex cmp, int index) override
+	const char* getGrassPath(ComponentIndex cmp, int index) override
 	{
 		return m_terrains[cmp]->getGrassTypePath(index).c_str();
 	}
 
 
-	virtual int getGrassCount(ComponentIndex cmp) override
+	int getGrassCount(ComponentIndex cmp) override
 	{
 		return m_terrains[cmp]->getGrassTypeCount();
 	}
 
 
-	virtual void addGrass(ComponentIndex cmp, int index) override
+	void addGrass(ComponentIndex cmp, int index) override
 	{
 		m_terrains[cmp]->addGrassType(index);
 	}
 
 
-	virtual void removeGrass(ComponentIndex cmp, int index) override
+	void removeGrass(ComponentIndex cmp, int index) override
 	{
 		m_terrains[cmp]->removeGrassType(index);
 	}
 
 
-	virtual ComponentIndex getFirstRenderable() override
+	ComponentIndex getFirstRenderable() override
 	{
 		if (m_renderables.empty())
 		{
@@ -1128,7 +1484,7 @@ public:
 	}
 
 
-	virtual ComponentIndex getNextRenderable(ComponentIndex cmp) override
+	ComponentIndex getNextRenderable(ComponentIndex cmp) override
 	{
 		int i = getRenderable(cmp);
 		if (i + 1 < m_renderables.size())
@@ -1233,7 +1589,7 @@ public:
 	}
 
 
-	virtual int getClosestPointLights(const Vec3& reference_pos,
+	int getClosestPointLights(const Vec3& reference_pos,
 									   ComponentIndex* lights,
 									   int max_lights) override
 	{
@@ -1298,7 +1654,7 @@ public:
 	}
 
 
-	virtual void getPointLights(const Frustum& frustum,
+	void getPointLights(const Frustum& frustum,
 								Array<ComponentIndex>& lights) override
 	{
 		for (int i = 0, ci = m_point_lights.size(); i < ci; ++i)
@@ -1314,26 +1670,26 @@ public:
 	}
 
 
-	virtual Entity getCameraEntity(ComponentIndex camera) const override
+	Entity getCameraEntity(ComponentIndex camera) const override
 	{
 		return m_cameras[camera].m_entity;
 	}
 
 
-	virtual void setLightCastShadows(ComponentIndex cmp,
+	void setLightCastShadows(ComponentIndex cmp,
 									 bool cast_shadows) override
 	{
 		m_point_lights[getPointLightIndex(cmp)].m_cast_shadows = cast_shadows;
 	}
 
 
-	virtual bool getLightCastShadows(ComponentIndex cmp) override 
+	bool getLightCastShadows(ComponentIndex cmp) override 
 	{
 		return m_point_lights[getPointLightIndex(cmp)].m_cast_shadows;
 	}
 
 
-	virtual void
+	void
 	getPointLightInfluencedGeometry(ComponentIndex light_cmp,
 									const Frustum& frustum,
 									Array<const RenderableMesh*>& infos,
@@ -1365,7 +1721,7 @@ public:
 	}
 
 
-	virtual void
+	void
 		getPointLightInfluencedGeometry(ComponentIndex light_cmp,
 		Array<const RenderableMesh*>& infos,
 		int64_t layer_mask) override
@@ -1385,7 +1741,7 @@ public:
 	}
 
 
-	virtual void getRenderableEntities(const Frustum& frustum,
+	void getRenderableEntities(const Frustum& frustum,
 		Array<Entity>& entities,
 		int64_t layer_mask) override
 	{
@@ -1404,7 +1760,7 @@ public:
 	}
 
 
-	virtual void getRenderableInfos(const Frustum& frustum,
+	void getRenderableInfos(const Frustum& frustum,
 									Array<const RenderableMesh*>& meshes,
 									int64_t layer_mask) override
 	{
@@ -1418,61 +1774,61 @@ public:
 	}
 
 
-	virtual void setCameraSlot(ComponentIndex camera, const char* slot) override
+	void setCameraSlot(ComponentIndex camera, const char* slot) override
 	{
 		copyString(m_cameras[camera].m_slot, Camera::MAX_SLOT_LENGTH, slot);
 	}
 
-	virtual const char* getCameraSlot(ComponentIndex camera) override
+	const char* getCameraSlot(ComponentIndex camera) override
 	{
 		return m_cameras[camera].m_slot;
 	}
 
-	virtual float getCameraFOV(ComponentIndex camera) override
+	float getCameraFOV(ComponentIndex camera) override
 	{
 		return m_cameras[camera].m_fov;
 	}
 
-	virtual void setCameraFOV(ComponentIndex camera, float fov) override
+	void setCameraFOV(ComponentIndex camera, float fov) override
 	{
 		m_cameras[camera].m_fov = fov;
 	}
 
-	virtual void setCameraNearPlane(ComponentIndex camera,
+	void setCameraNearPlane(ComponentIndex camera,
 									float near_plane) override
 	{
 		m_cameras[camera].m_near = near_plane;
 	}
 
-	virtual float getCameraNearPlane(ComponentIndex camera) override
+	float getCameraNearPlane(ComponentIndex camera) override
 	{
 		return m_cameras[camera].m_near;
 	}
 
-	virtual void setCameraFarPlane(ComponentIndex camera,
+	void setCameraFarPlane(ComponentIndex camera,
 								   float far_plane) override
 	{
 		m_cameras[camera].m_far = far_plane;
 	}
 
-	virtual float getCameraFarPlane(ComponentIndex camera) override
+	float getCameraFarPlane(ComponentIndex camera) override
 	{
 		return m_cameras[camera].m_far;
 	}
 
-	virtual float getCameraWidth(ComponentIndex camera) override
+	float getCameraWidth(ComponentIndex camera) override
 	{
 		return m_cameras[camera].m_width;
 	}
 
 
-	virtual float getCameraHeight(ComponentIndex camera) override
+	float getCameraHeight(ComponentIndex camera) override
 	{
 		return m_cameras[camera].m_height;
 	}
 
 
-	virtual void setCameraSize(ComponentIndex camera, int w, int h) override
+	void setCameraSize(ComponentIndex camera, int w, int h) override
 	{
 		m_cameras[camera].m_width = (float)w;
 		m_cameras[camera].m_height = (float)h;
@@ -1480,19 +1836,19 @@ public:
 	}
 
 
-	virtual const Array<DebugLine>& getDebugLines() const override
+	const Array<DebugLine>& getDebugLines() const override
 	{
 		return m_debug_lines;
 	}
 
 
-	virtual const Array<DebugPoint>& getDebugPoints() const override
+	const Array<DebugPoint>& getDebugPoints() const override
 	{
 		return m_debug_points;
 	}
 
 
-	virtual void addDebugSphere(const Vec3& center,
+	void addDebugSphere(const Vec3& center,
 		float radius,
 		uint32_t color,
 		float life) override
@@ -1599,7 +1955,7 @@ public:
 
 
 
-	virtual void addDebugCapsule(const Vec3& position,
+	void addDebugCapsule(const Vec3& position,
 		float height,
 		float radius,
 		uint32_t color,
@@ -1627,7 +1983,7 @@ public:
 	}
 
 
-	virtual void addDebugCylinder(const Vec3& position,
+	void addDebugCylinder(const Vec3& position,
 								  const Vec3& up,
 								  float radius,
 								  uint32_t color,
@@ -1663,7 +2019,7 @@ public:
 	}
 
 
-	virtual void addDebugCube(const Vec3& pos,
+	void addDebugCube(const Vec3& pos,
 		const Vec3& dir,
 		const Vec3& up,
 		const Vec3& right,
@@ -1688,7 +2044,7 @@ public:
 	}
 
 
-	virtual void addDebugCube(const Vec3& min,
+	void addDebugCube(const Vec3& min,
 							  const Vec3& max,
 							  uint32_t color,
 							  float life) override
@@ -1732,7 +2088,7 @@ public:
 	}
 
 
-	virtual void addDebugFrustum(const Frustum& frustum, uint32_t color, float life) override
+	void addDebugFrustum(const Frustum& frustum, uint32_t color, float life) override
 	{
 		addDebugFrustum(frustum.getPosition(),
 						frustum.getDirection(),
@@ -1746,7 +2102,7 @@ public:
 	}
 
 
-	virtual void addDebugFrustum(const Vec3& position,
+	void addDebugFrustum(const Vec3& position,
 								 const Vec3& direction,
 								 const Vec3& up,
 								 float fov,
@@ -1793,7 +2149,7 @@ public:
 		addDebugLine(points[3], points[7], color, life);
 	}
 
-	virtual void addDebugCircle(const Vec3& center,
+	void addDebugCircle(const Vec3& center,
 		const Vec3& up,
 		float radius,
 		uint32_t color,
@@ -1819,7 +2175,7 @@ public:
 		}
 	}
 
-	virtual void addDebugCross(const Vec3& center,
+	void addDebugCross(const Vec3& center,
 							   float size,
 							   uint32_t color,
 							   float life) override
@@ -1839,7 +2195,7 @@ public:
 	}
 
 
-	virtual void addDebugPoint(const Vec3& pos, uint32_t color, float life) override
+	void addDebugPoint(const Vec3& pos, uint32_t color, float life) override
 	{
 		DebugPoint& point = m_debug_points.pushEmpty();
 		point.m_pos = pos;
@@ -1855,7 +2211,7 @@ public:
 	}
 
 
-	virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32_t color, float life) override
+	void addDebugLine(const Vec3& from, const Vec3& to, uint32_t color, float life) override
 	{
 		DebugLine& line = m_debug_lines.pushEmpty();
 		line.m_from = from;
@@ -1865,7 +2221,7 @@ public:
 	}
 
 
-	virtual RayCastModelHit castRayTerrain(ComponentIndex terrain,
+	RayCastModelHit castRayTerrain(ComponentIndex terrain,
 		const Vec3& origin,
 		const Vec3& dir) override
 	{
@@ -1882,7 +2238,7 @@ public:
 	}
 
 
-	virtual RayCastModelHit castRay(const Vec3& origin,
+	RayCastModelHit castRay(const Vec3& origin,
 									const Vec3& dir,
 									ComponentIndex ignored_renderable) override
 	{
@@ -1950,13 +2306,13 @@ public:
 	}
 
 
-	virtual Vec4 getShadowmapCascades(ComponentIndex cmp) override
+	Vec4 getShadowmapCascades(ComponentIndex cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_cascades;
 	}
 
 
-	virtual void setShadowmapCascades(ComponentIndex cmp,
+	void setShadowmapCascades(ComponentIndex cmp,
 									  const Vec4& value) override
 	{
 		Vec4 valid_value = value;
@@ -1982,171 +2338,171 @@ public:
 	}
 
 
-	virtual void setFogDensity(ComponentIndex cmp, float density) override
+	void setFogDensity(ComponentIndex cmp, float density) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_fog_density = density;
 	}
 
-	virtual void setFogColor(ComponentIndex cmp, const Vec3& color) override
+	void setFogColor(ComponentIndex cmp, const Vec3& color) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_fog_color = color;
 	}
 
-	virtual float getFogDensity(ComponentIndex cmp) override
+	float getFogDensity(ComponentIndex cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_density;
 	}
 
-	virtual float getFogBottom(ComponentIndex cmp) override
+	float getFogBottom(ComponentIndex cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_bottom;
 	}
 
-	virtual void setFogBottom(ComponentIndex cmp, float bottom) override
+	void setFogBottom(ComponentIndex cmp, float bottom) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_fog_bottom = bottom;
 	}
 
-	virtual float getFogHeight(ComponentIndex cmp) override
+	float getFogHeight(ComponentIndex cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_height;
 	}
 
-	virtual void setFogHeight(ComponentIndex cmp, float height) override
+	void setFogHeight(ComponentIndex cmp, float height) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_fog_height = height;
 	}
 
-	virtual Vec3 getFogColor(ComponentIndex cmp) override
+	Vec3 getFogColor(ComponentIndex cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_color;
 	}
 
-	virtual float getLightAttenuation(ComponentIndex cmp) override
+	float getLightAttenuation(ComponentIndex cmp) override
 	{
 		return m_point_lights[getPointLightIndex(cmp)].m_attenuation_param;
 	}
 
-	virtual void setLightAttenuation(ComponentIndex cmp,
+	void setLightAttenuation(ComponentIndex cmp,
 									 float attenuation) override
 	{
 		int index = getPointLightIndex(cmp);
 		m_point_lights[index].m_attenuation_param = attenuation;
 	}
 
-	virtual float getLightRange(ComponentIndex cmp) override
+	float getLightRange(ComponentIndex cmp) override
 	{
 		return m_point_lights[getPointLightIndex(cmp)].m_range;
 	}
 
-	virtual void setLightRange(ComponentIndex cmp, float value) override
+	void setLightRange(ComponentIndex cmp, float value) override
 	{
 		m_point_lights[getPointLightIndex(cmp)].m_range = value;
 	}
 
-	virtual void setPointLightIntensity(ComponentIndex cmp,
+	void setPointLightIntensity(ComponentIndex cmp,
 										float intensity) override
 	{
 		m_point_lights[getPointLightIndex(cmp)].m_intensity = intensity;
 	}
 
-	virtual void setGlobalLightIntensity(ComponentIndex cmp,
+	void setGlobalLightIntensity(ComponentIndex cmp,
 										 float intensity) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_intensity = intensity;
 	}
 
-	virtual void setPointLightColor(ComponentIndex cmp,
+	void setPointLightColor(ComponentIndex cmp,
 									const Vec3& color) override
 	{
 		m_point_lights[getPointLightIndex(cmp)].m_diffuse_color = color;
 	}
 
-	virtual void setGlobalLightColor(ComponentIndex cmp,
+	void setGlobalLightColor(ComponentIndex cmp,
 									 const Vec3& color) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_color = color;
 	}
 
-	virtual void setLightAmbientIntensity(ComponentIndex cmp,
+	void setLightAmbientIntensity(ComponentIndex cmp,
 										  float intensity) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_ambient_intensity =
 			intensity;
 	}
 
-	virtual void setLightAmbientColor(ComponentIndex cmp,
+	void setLightAmbientColor(ComponentIndex cmp,
 									  const Vec3& color) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_ambient_color = color;
 	}
 
-	virtual float getPointLightIntensity(ComponentIndex cmp) override
+	float getPointLightIntensity(ComponentIndex cmp) override
 	{
 		return m_point_lights[getPointLightIndex(cmp)].m_intensity;
 	}
 
-	virtual float getGlobalLightIntensity(ComponentIndex cmp) override
+	float getGlobalLightIntensity(ComponentIndex cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_intensity;
 	}
 
-	virtual Vec3 getPointLightColor(ComponentIndex cmp) override
+	Vec3 getPointLightColor(ComponentIndex cmp) override
 	{
 		return m_point_lights[getPointLightIndex(cmp)].m_diffuse_color;
 	}
 
-	virtual void setPointLightSpecularColor(ComponentIndex cmp,
+	void setPointLightSpecularColor(ComponentIndex cmp,
 											const Vec3& color) override
 	{
 		m_point_lights[getPointLightIndex(cmp)].m_specular_color = color;
 	}
 
-	virtual Vec3 getPointLightSpecularColor(ComponentIndex cmp) override
+	Vec3 getPointLightSpecularColor(ComponentIndex cmp) override
 	{
 		return m_point_lights[getPointLightIndex(cmp)].m_specular_color;
 	}
 
-	virtual Vec3 getGlobalLightColor(ComponentIndex cmp) override
+	Vec3 getGlobalLightColor(ComponentIndex cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_color;
 	}
 
-	virtual float getLightAmbientIntensity(ComponentIndex cmp) override
+	float getLightAmbientIntensity(ComponentIndex cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_ambient_intensity;
 	}
 
-	virtual Vec3 getLightAmbientColor(ComponentIndex cmp) override
+	Vec3 getLightAmbientColor(ComponentIndex cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_ambient_color;
 	}
 
-	virtual void setActiveGlobalLight(ComponentIndex cmp) override
+	void setActiveGlobalLight(ComponentIndex cmp) override
 	{
 		ASSERT(cmp == GLOBAL_LIGHT_HASH);
 		m_active_global_light_uid = cmp;
 	}
 
-	virtual ComponentIndex getActiveGlobalLight() override
+	ComponentIndex getActiveGlobalLight() override
 	{
 		return m_active_global_light_uid;
 	};
 
 
-	virtual Entity getPointLightEntity(ComponentIndex cmp) const override
+	Entity getPointLightEntity(ComponentIndex cmp) const override
 	{
 		return m_point_lights[getPointLightIndex(cmp)].m_entity;
 	}
 
 
-	virtual Entity getGlobalLightEntity(ComponentIndex cmp) const override
+	Entity getGlobalLightEntity(ComponentIndex cmp) const override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_entity;
 	}
 
 
-	virtual ComponentIndex getCameraInSlot(const char* slot) override
+	ComponentIndex getCameraInSlot(const char* slot) override
 	{
 		for (int i = 0, c = m_cameras.size(); i < c; ++i)
 		{
@@ -2159,7 +2515,7 @@ public:
 		return INVALID_COMPONENT;
 	}
 
-	virtual float getTime() const override { return m_time; }
+	float getTime() const override { return m_time; }
 
 
 private:
@@ -2254,7 +2610,7 @@ private:
 		}
 	}
 
-	virtual IAllocator& getAllocator() override { return m_allocator; }
+	IAllocator& getAllocator() override { return m_allocator; }
 
 
 	void detectLightInfluencedGeometry(int light_index)
@@ -2281,25 +2637,25 @@ private:
 	}
 
 
-	virtual DelegateList<void(ComponentIndex)>& renderableCreated() override
+	DelegateList<void(ComponentIndex)>& renderableCreated() override
 	{
 		return m_renderable_created;
 	}
 
 
-	virtual DelegateList<void(ComponentIndex)>& renderableDestroyed() override
+	DelegateList<void(ComponentIndex)>& renderableDestroyed() override
 	{
 		return m_renderable_destroyed;
 	}
 
 
-	virtual float getLightFOV(ComponentIndex cmp) override
+	float getLightFOV(ComponentIndex cmp) override
 	{
 		return m_point_lights[getPointLightIndex(cmp)].m_fov;
 	}
 
 
-	virtual void setLightFOV(ComponentIndex cmp, float fov) override
+	void setLightFOV(ComponentIndex cmp, float fov) override
 	{
 		m_point_lights[getPointLightIndex(cmp)].m_fov = fov;
 	}
@@ -2367,6 +2723,39 @@ private:
 		return r.m_component_index;
 	}
 
+
+	void setParticleEmitterMaterialPath(ComponentIndex cmp, const char* path) override
+	{
+		if (!m_particle_emitters[cmp]) return;
+
+		auto* manager = m_engine.getResourceManager().get(ResourceManager::MATERIAL);
+		Material* material = static_cast<Material*>(manager->load(Path(path)));
+		m_particle_emitters[cmp]->setMaterial(material);
+	}
+
+
+	const char* getParticleEmitterMaterialPath(ComponentIndex cmp) override
+	{
+		ParticleEmitter* emitter = m_particle_emitters[cmp];
+		if (!emitter) return "";
+		if (!emitter->getMaterial()) return "";
+
+		return emitter->getMaterial()->getPath().c_str();
+	}
+
+
+	ParticleEmitter& getParticleEmitter(ComponentIndex cmp) const override
+	{
+		return *m_particle_emitters[cmp];
+	}
+
+
+	const Array<ParticleEmitter*>& getParticleEmitters() const override
+	{
+		return m_particle_emitters;
+	}
+
+
 private:
 	IAllocator& m_allocator;
 	Array<ModelLoadedCallback*> m_model_loaded_callbacks;
@@ -2390,6 +2779,7 @@ private:
 	Array<DebugPoint> m_debug_points;
 	CullingSystem* m_culling_system;
 	DynamicRenderableCache m_dynamic_renderable_cache;
+	Array<ParticleEmitter*> m_particle_emitters;
 	Array<Array<const RenderableMesh*>> m_temporary_infos;
 	MTJD::Group m_sync_point;
 	Array<MTJD::Job*> m_jobs;

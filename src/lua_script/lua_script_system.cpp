@@ -349,7 +349,7 @@ public:
 	}
 
 
-	virtual void deserialize(InputBlob& serializer) override
+	virtual void deserialize(InputBlob& serializer, int) override
 	{
 		int len = serializer.read<int>();
 		unloadAllScripts();

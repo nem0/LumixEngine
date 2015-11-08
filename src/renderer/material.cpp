@@ -617,15 +617,34 @@ bool Material::load(FS::IFile& file)
 		}
 		else if (strcmp(label, "alpha_blending") == 0)
 		{
-			bool is_alpha_blending;
-			serializer.deserialize(is_alpha_blending, false);
-			if (is_alpha_blending)
+			if (serializer.isNextBoolean())
 			{
-				m_render_states |= BGFX_STATE_BLEND_ALPHA;
+				bool is_alpha_blending;
+				serializer.deserialize(is_alpha_blending, false);
+				if (is_alpha_blending)
+				{
+					m_render_states |= BGFX_STATE_BLEND_ADD;
+				}
+				else
+				{
+					m_render_states &= ~BGFX_STATE_BLEND_MASK;
+				}
 			}
 			else
 			{
-				m_render_states &= ~BGFX_STATE_BLEND_MASK;
+				serializer.deserialize(label, 255, "alpha");
+				if (strcmp(label, "alpha") == 0)
+				{
+					m_render_states |= BGFX_STATE_BLEND_ALPHA;
+				}
+				else if (strcmp(label, "add") == 0)
+				{
+					m_render_states |= BGFX_STATE_BLEND_ADD;
+				}
+				else if (strcmp(label, "disabled") == 0)
+				{
+					m_render_states &= ~BGFX_STATE_BLEND_MASK;
+				}
 			}
 		}
 		else if (strcmp(label, "specular") == 0)
