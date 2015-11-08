@@ -6,7 +6,6 @@
 #include "core/json_serializer.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
-#include "editor/world_editor.h"
 #include "engine.h"
 #include "renderer/render_scene.h"
 #include "universe/universe.h"

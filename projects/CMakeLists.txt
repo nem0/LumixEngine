@@ -104,7 +104,6 @@ set_target_properties (physics PROPERTIES COMPILE_DEFINITIONS "BUILDING_PHYSICS"
 
 target_link_libraries(physics engine)
 target_link_libraries(physics renderer)
-target_link_libraries(physics editor)
 target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysXVisualDebuggerSDKCHECKED.lib)
 if(${IS64})
 	target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysX3CHECKED_x64.lib)
@@ -278,7 +277,6 @@ set_target_properties (lua_script PROPERTIES COMPILE_DEFINITIONS "BUILDING_LUA_S
 target_link_libraries(lua_script ${EXTERNAL_PATH}lua/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
 target_link_libraries(lua_script engine)
 target_link_libraries(lua_script renderer)
-target_link_libraries(lua_script editor)
 
 
 ###################### COPY_DLLS ######################

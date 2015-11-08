@@ -12,7 +12,6 @@
 #include "core/vec4.h"
 #include "debug/allocator.h"
 #include "debug/debug.h"
-#include "editor/world_editor.h"
 #include "engine.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
@@ -363,15 +362,6 @@ void Renderer::setInitData(void* data)
 {
 	RendererImpl::s_platform_data = data;
 }
-
-
-struct EditorPlugin : public WorldEditor::Plugin
-{
-	virtual bool showGizmo(ComponentUID cmp) override
-	{
-	
-	}
-};
 
 
 extern "C"
