@@ -162,6 +162,8 @@ namespace Lumix
 				
 				if (m_fails > 0)
 				{
+					ASSERT(false);
+
 					g_log_info.log("unit") << "----------Fails----------";
 					for (int i = 0; i < m_failed_tests.size(); i++) 
 					{
