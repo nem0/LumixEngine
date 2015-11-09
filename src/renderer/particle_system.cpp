@@ -72,7 +72,19 @@ const uint32_t ParticleEmitter::LinearMovementModule::s_type = Lumix::crc32("lin
 
 ParticleEmitter::AlphaModule::AlphaModule(ParticleEmitter& emitter)
 	: ModuleBase(emitter)
+	, m_values(emitter.getAllocator())
 {
+	m_values.resize(10);
+	m_values[0] = 0.33f;
+	m_values[1] = 0.66f;
+	m_values[2] = 0.8f;
+	m_values[3] = 0.7f;
+	m_values[4] = 0.6f;
+	m_values[5] = 0.5f;
+	m_values[6] = 0.4f;
+	m_values[7] = 0.3f;
+	m_values[8] = 0.15f;
+	m_values[9] = 0.0f;
 }
 
 
@@ -81,9 +93,16 @@ void ParticleEmitter::AlphaModule::update(float time_delta)
 	if (m_emitter.m_alpha.empty()) return;
 
 	float* alpha = &m_emitter.m_alpha[0];
+	float* rel_life = &m_emitter.m_rel_life[0];
+	int size = m_values.size() - 1;
+	float float_size = (float)size;
 	for (int i = 0, c = m_emitter.m_alpha.size(); i < c; ++i)
 	{
-		alpha[i] = Math::minValue(m_emitter.m_life[i], 1.0f);
+		float float_idx = float_size * rel_life[i];
+		int idx = (int)float_idx;
+		int next_idx = Math::minValue(idx + 1, size);
+		float w = float_idx - idx;
+		alpha[i] = m_values[idx] * (1 - w) + m_values[next_idx] * w;
 	}
 }
 
@@ -130,6 +149,7 @@ float Interval::getRandom() const
 ParticleEmitter::ParticleEmitter(Entity entity, Universe& universe, IAllocator& allocator)
 	: m_next_spawn_time(0)
 	, m_allocator(allocator)
+	, m_rel_life(allocator)
 	, m_life(allocator)
 	, m_modules(allocator)
 	, m_position(allocator)
@@ -179,6 +199,7 @@ void ParticleEmitter::spawnParticle()
 	m_rotation.push(0);
 	m_rotational_speed.push(0);
 	m_life.push(m_initial_life.getRandom());
+	m_rel_life.push(0.0f);
 	m_alpha.push(1);
 	m_velocity.push(Vec3(0, 0, 0));
 	m_size.push(m_initial_size.getRandom());
@@ -202,6 +223,7 @@ void ParticleEmitter::destroyParticle(int index)
 		module->destoryParticle(index);
 	}
 	m_life.eraseFast(index);
+	m_rel_life.eraseFast(index);
 	m_position.eraseFast(index);
 	m_velocity.eraseFast(index);
 	m_rotation.eraseFast(index);
@@ -213,13 +235,13 @@ void ParticleEmitter::destroyParticle(int index)
 
 void ParticleEmitter::updateLives(float time_delta)
 {
-	for (int i = 0, c = m_life.size(); i < c; ++i)
+	for (int i = 0, c = m_rel_life.size(); i < c; ++i)
 	{
-		float life = m_life[i];
-		life -= time_delta;
-		m_life[i] = life;
+		float rel_life = m_rel_life[i];
+		rel_life += time_delta / m_life[i];
+		m_rel_life[i] = rel_life;
 
-		if (life < 0)
+		if (rel_life > 1)
 		{
 			destroyParticle(i);
 			--i;

@@ -87,6 +87,8 @@ public:
 		uint32_t getType() const override { return s_type; }
 
 		static const uint32_t s_type;
+		
+		Array<float> m_values;
 	};
 
 
@@ -115,6 +117,7 @@ public:
 	void addModule(ModuleBase* module);
 
 public:
+	Array<float> m_rel_life;
 	Array<float> m_life;
 	Array<float> m_size;
 	Array<Vec3> m_position;
