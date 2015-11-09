@@ -30,6 +30,22 @@ enum class NodeType
 };
 
 
+enum class VertexInput
+{
+	POSITION,
+	COLOR,
+	NORMAL,
+	TANGENT,
+	TEXCOORD0,
+	INSTANCE_DATA0,
+	INSTANCE_DATA1,
+	INSTANCE_DATA2,
+	INSTANCE_DATA3,
+
+	COUNT
+};
+
+
 static const struct { const char* name; NodeType type; bool is_frag; bool is_vert; } NODE_TYPES[] = {
 	{"Mix",								NodeType::MIX,							 true,		true},
 	{"Sample",						NodeType::SAMPLE,						 true,		true},
@@ -47,20 +63,20 @@ static const struct { const char* name; NodeType type; bool is_frag; bool is_ver
 
 
 static const struct {
-	ShaderEditor::VertexInput input;
+	VertexInput input;
 	const char* gui_name;
 	const char* system_name;
 	ShaderEditor::ValueType type; }
 VERTEX_INPUTS[] = {
-	{ ShaderEditor::VertexInput::POSITION,				"Position",					"a_position",		ShaderEditor::ValueType::VEC4},
-	{ ShaderEditor::VertexInput::NORMAL,					"Normal",						"a_normal",			ShaderEditor::ValueType::VEC3},
-	{ ShaderEditor::VertexInput::COLOR,						"Color",						"a_color",			ShaderEditor::ValueType::VEC4},
-	{ ShaderEditor::VertexInput::TANGENT,					"Tangent",					"a_tangent",		ShaderEditor::ValueType::VEC3},
-	{ ShaderEditor::VertexInput::TEXCOORD0,				"Texture coord 0",	"a_texcoord0",	ShaderEditor::ValueType::VEC4},
-	{ ShaderEditor::VertexInput::INSTANCE_DATA0,	"Instance data 0",	"i_data0",			ShaderEditor::ValueType::VEC4},
-	{ ShaderEditor::VertexInput::INSTANCE_DATA1,	"Instance data 1",	"i_data1",			ShaderEditor::ValueType::VEC4},
-	{ ShaderEditor::VertexInput::INSTANCE_DATA2,	"Instance data 2",	"i_data2",			ShaderEditor::ValueType::VEC4},
-	{ ShaderEditor::VertexInput::INSTANCE_DATA3,	"Instance data 3",	"i_data3",			ShaderEditor::ValueType::VEC4}
+	{ VertexInput::POSITION,				"Position",					"a_position",		ShaderEditor::ValueType::VEC4},
+	{ VertexInput::NORMAL,					"Normal",						"a_normal",			ShaderEditor::ValueType::VEC3},
+	{ VertexInput::COLOR,						"Color",						"a_color",			ShaderEditor::ValueType::VEC4},
+	{ VertexInput::TANGENT,					"Tangent",					"a_tangent",		ShaderEditor::ValueType::VEC3},
+	{ VertexInput::TEXCOORD0,				"Texture coord 0",	"a_texcoord0",	ShaderEditor::ValueType::VEC4},
+	{ VertexInput::INSTANCE_DATA0,	"Instance data 0",	"i_data0",			ShaderEditor::ValueType::VEC4},
+	{ VertexInput::INSTANCE_DATA1,	"Instance data 1",	"i_data1",			ShaderEditor::ValueType::VEC4},
+	{ VertexInput::INSTANCE_DATA2,	"Instance data 2",	"i_data2",			ShaderEditor::ValueType::VEC4},
+	{ VertexInput::INSTANCE_DATA3,	"Instance data 3",	"i_data3",			ShaderEditor::ValueType::VEC4}
 };
 
 
@@ -95,7 +111,7 @@ static const char* getValueTypeName(ShaderEditor::ValueType type)
 }
 
 
-static const char* getVertexInputBGFXName(ShaderEditor::VertexInput input)
+static const char* getVertexInputBGFXName(VertexInput input)
 {
 	for(auto& tmp : VERTEX_INPUTS)
 	{
@@ -107,7 +123,7 @@ static const char* getVertexInputBGFXName(ShaderEditor::VertexInput input)
 }
 
 
-static const char* getVertexInputName(ShaderEditor::VertexInput input)
+static const char* getVertexInputName(VertexInput input)
 {
 	for(auto& tmp : VERTEX_INPUTS)
 	{
@@ -119,20 +135,99 @@ static const char* getVertexInputName(ShaderEditor::VertexInput input)
 }
 
 
+struct VertexInputNode : public ShaderEditor::Node
+{
+	VertexInputNode(ShaderEditor& editor)
+		: Node((int)NodeType::VERTEX_INPUT, editor)
+	{
+		m_outputs.push(nullptr);
+		m_input = VertexInput::POSITION;
+	}
+
+
+	void save(Lumix::OutputBlob& blob) override { blob.write((int)m_input); }
+
+
+	void load(Lumix::InputBlob& blob) override
+	{
+		int tmp;
+		blob.read(tmp);
+		m_input = (VertexInput)tmp;
+	}
+
+
+	void printReference(Lumix::OutputBlob& blob) override
+	{
+		for (auto& i : VERTEX_INPUTS)
+		{
+			if (i.input == m_input)
+			{
+				blob << i.system_name;
+				return;
+			}
+		}
+	}
+
+
+	ShaderEditor::ValueType getOutputType(int index) const override
+	{
+		for (auto& input : VERTEX_INPUTS)
+		{
+			if (input.input == m_input)
+			{
+				return input.type;
+			}
+		}
+
+		return ShaderEditor::ValueType::FLOAT;
+	}
+
+
+	void generate(Lumix::OutputBlob& blob) override {}
+
+
+	void onGUI() override
+	{
+		auto getter = [](void* data, int idx, const char** out) -> bool
+		{
+			*out = getVertexInputBGFXName((VertexInput)idx);
+			return true;
+		};
+		int input = (int)m_input;
+		ImGui::Combo("Input", &input, getter, this, (int)VertexInput::COUNT);
+		m_input = (VertexInput)input;
+	}
+
+	VertexInput m_input;
+};
+
+
 static void writeVertexShaderHeader(Lumix::OutputBlob& blob,
-	const bool(&inputs)[(int)ShaderEditor::VertexInput::COUNT],
+	const Lumix::Array<ShaderEditor::Node*>& vertex_nodes,
 	const char(&outputs)[ShaderEditor::MAX_VERTEX_OUTPUTS_COUNT][50])
 {
 	blob << "$input ";
 	bool first = true;
-	for(int i = 0; i < (int)ShaderEditor::VertexInput::COUNT; ++i)
+
+	bool inputs[(int)VertexInput::COUNT];
+	memset(inputs, 0, sizeof(inputs));
+	for (auto* node : vertex_nodes)
+	{
+		if (node->m_type == (int)NodeType::VERTEX_INPUT)
+		{
+			auto* input_node = static_cast<VertexInputNode*>(node);
+			inputs[(int)input_node->m_input] = true;
+		}
+	}
+
+	for(int i = 0; i < (int)VertexInput::COUNT; ++i)
 	{
 		if(!inputs[i]) continue;
 
 		if(!first) blob << ", ";
 		first = false;
 
-		blob << getVertexInputBGFXName((ShaderEditor::VertexInput)i);
+		blob << getVertexInputBGFXName((VertexInput)i);
 	}
 	blob << "\n";
 
@@ -446,72 +541,6 @@ struct SampleNode : public ShaderEditor::Node
 	int m_texture;
 };
 
-
-struct VertexInputNode : public ShaderEditor::Node
-{
-	VertexInputNode(ShaderEditor& editor)
-		: Node((int)NodeType::VERTEX_INPUT, editor)
-	{
-		m_outputs.push(nullptr);
-		m_input = ShaderEditor::VertexInput::POSITION;
-	}
-
-
-	void save(Lumix::OutputBlob& blob) override { blob.write((int)m_input); }
-
-
-	void load(Lumix::InputBlob& blob) override
-	{
-		int tmp;
-		blob.read(tmp);
-		m_input = (ShaderEditor::VertexInput)tmp;
-	}
-
-
-	void printReference(Lumix::OutputBlob& blob) override
-	{
-		for (auto& i : VERTEX_INPUTS)
-		{
-			if (i.input == m_input)
-			{
-				blob << i.system_name;
-				return;
-			}
-		}
-	}
-
-
-	ShaderEditor::ValueType getOutputType(int index) const override
-	{
-		for (auto& input : VERTEX_INPUTS)
-		{
-			if (input.input == m_input)
-			{
-				return input.type;
-			}
-		}
-
-		return ShaderEditor::ValueType::FLOAT;
-	}
-
-
-	void generate(Lumix::OutputBlob& blob) override {}
-
-
-	void onGUI() override
-	{
-		auto getter = [](void* data, int idx, const char** out) -> bool
-		{
-			*out = getVertexInputBGFXName((ShaderEditor::VertexInput)idx);
-			return true;
-		};
-		int input = (int)m_input;
-		ImGui::Combo("Input", &input, getter, this, (int)ShaderEditor::VertexInput::COUNT);
-		m_input = (ShaderEditor::VertexInput)input;
-	}
-
-	ShaderEditor::VertexInput m_input;
-};
 
 
 struct FragmentInputNode : public ShaderEditor::Node
@@ -1112,7 +1141,7 @@ void ShaderEditor::generate(const char* path, ShaderType shader_type)
 	}
 	else
 	{
-		writeVertexShaderHeader(blob, m_vertex_inputs, m_vertex_outputs);
+		writeVertexShaderHeader(blob, m_vertex_nodes, m_vertex_outputs);
 	}
 
 	blob << "#include \"common.sh\"\n";
@@ -1245,8 +1274,6 @@ void ShaderEditor::save(const char* path)
 	{
 		blob.writeString(m_vertex_outputs[i]);
 	}
-
-	blob.write(m_vertex_inputs, sizeof(m_vertex_inputs));
 
 	int nodes_count = m_vertex_nodes.size();
 	blob.write(nodes_count);
@@ -1409,8 +1436,6 @@ void ShaderEditor::load()
 	{
 		blob.readString(m_vertex_outputs[i], Lumix::lengthOf(m_vertex_outputs[i]));
 	}
-
-	blob.read(m_vertex_inputs, sizeof(m_vertex_inputs));
 
 	int size;
 	blob.read(size);
@@ -1599,12 +1624,6 @@ void ShaderEditor::onGUILeftColumn()
 	ImGui::BeginChild("left_col", ImVec2(120, 0));
 	ImGui::PushItemWidth(120);
 
-	ImGui::Text("Vertex inputs");
-	for(int i = 0; i < (int)VertexInput::COUNT; ++i)
-	{
-		ImGui::Checkbox(getVertexInputName((VertexInput)i), &m_vertex_inputs[i]);
-	}
-
 	ImGui::Separator();
 
 	ImGui::Text("Vertex outputs");
@@ -1709,10 +1728,6 @@ void ShaderEditor::newGraph()
 	for (int i = 0; i < Lumix::lengthOf(m_textures); ++i)
 	{
 		m_textures[i][0] = 0;
-	}
-	for (auto& input : m_vertex_inputs)
-	{
-		input = false;
 	}
 	for (int i = 0; i < Lumix::lengthOf(m_vertex_outputs); ++i)
 	{
