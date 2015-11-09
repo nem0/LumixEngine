@@ -28,22 +28,6 @@ public:
 	};
 
 
-	enum class VertexInput
-	{
-		POSITION,
-		COLOR,
-		NORMAL,
-		TANGENT,
-		TEXCOORD0,
-		INSTANCE_DATA0,
-		INSTANCE_DATA1,
-		INSTANCE_DATA2,
-		INSTANCE_DATA3,
-
-		COUNT
-	};
-
-
 	enum class ValueType
 	{
 		FLOAT,
@@ -142,7 +126,6 @@ private:
 private:
 	char m_textures[MAX_TEXTURES_COUNT][50];
 	char m_vertex_outputs[MAX_VERTEX_OUTPUTS_COUNT][50];
-	bool m_vertex_inputs[(int)VertexInput::COUNT];
 	Lumix::Path m_path;
 	int m_last_node_id;
 	int m_undo_stack_idx;
