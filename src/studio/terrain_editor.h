@@ -87,4 +87,5 @@ private:
 	bool m_is_align_with_normal;
 	bool m_is_rotate_x;
 	bool m_is_rotate_z;
+	bool m_is_enabled;
 };
