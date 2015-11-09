@@ -1126,6 +1126,7 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	, m_brush_mask(editor.getAllocator())
 	, m_brush_texture(nullptr)
 	, m_flat_height(0)
+	, m_is_enabled(false)
 {
 	m_increase_brush_size =
 		LUMIX_NEW(editor.getAllocator(), Action)("Increase brush size", "increaseBrushSize");
@@ -1282,6 +1283,7 @@ void TerrainEditor::tick()
 {
 	if (!m_component.isValid()) return;
 	if (m_type == NOT_SET) return;
+	if (!m_is_enabled) return;
 
 	float mouse_x = m_world_editor.getMouseX();
 	float mouse_y = m_world_editor.getMouseY();
@@ -1499,6 +1501,9 @@ void TerrainEditor::onGUI()
 
 	auto* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
 	if (!ImGui::CollapsingHeader("Terrain editor", nullptr, true, true)) return;
+
+	ImGui::Checkbox("Editor enabled", &m_is_enabled);
+	if (!m_is_enabled) return;
 
 	if (!getMaterial())
 	{
