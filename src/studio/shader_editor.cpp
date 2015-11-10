@@ -1699,7 +1699,6 @@ void ShaderEditor::onGUIRightColumn()
 
 void ShaderEditor::onGUILeftColumn()
 {
-#error todo get rid of this
 	ImGui::BeginChild("left_col", ImVec2(120, 0));
 	ImGui::PushItemWidth(120);
 
@@ -1801,6 +1800,7 @@ void ShaderEditor::newGraph()
 	}
 	m_last_node_id = 0;
 	m_new_link_info.is_active = false;
+	m_path = "";
 
 	m_fragment_nodes.push(LUMIX_NEW(m_allocator, FragmentOutputNode)(*this));
 	m_fragment_nodes.back()->m_pos.x = 50;
@@ -1888,8 +1888,10 @@ void ShaderEditor::onGUIMenu()
 void ShaderEditor::onGUI()
 {
 	if (!m_is_opened) return;
-#error put filename in titlebar
-	if (ImGui::Begin("Shader editor", &m_is_opened, ImGuiWindowFlags_MenuBar))
+	StringBuilder<Lumix::MAX_PATH_LENGTH + 25> title("Shader editor");
+	if (m_path.isValid()) title << " - " << m_path.c_str();
+	title << "###Shader editor";
+	if (ImGui::Begin(title, &m_is_opened, ImGuiWindowFlags_MenuBar))
 	{
 		m_is_focused = ImGui::IsRootWindowOrAnyChildFocused();
 
