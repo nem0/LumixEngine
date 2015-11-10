@@ -62,6 +62,7 @@ struct PipelineImpl : public Pipeline
 		, m_allocator(allocator)
 		, m_framebuffers(allocator)
 		, m_lua_state(nullptr)
+		, m_parameters(allocator)
 	{
 	}
 
@@ -73,7 +74,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	virtual ~PipelineImpl() override
+	~PipelineImpl() override
 	{
 		if (m_lua_state)
 		{
@@ -83,7 +84,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	virtual void unload(void) override
+	void unload(void) override
 	{
 		if (!m_lua_state) return;
 
@@ -107,6 +108,23 @@ struct PipelineImpl : public Pipeline
 			}
 			lua_pop(L, 1);
 		}
+	}
+
+
+	void parseParameters(lua_State* L)
+	{
+		m_parameters.clear();
+		if (lua_getglobal(L, "parameters") == LUA_TTABLE)
+		{
+			lua_pushnil(L);
+			while (lua_next(L, -2) != 0)
+			{
+				const char* parameter_name = luaL_checkstring(L, -2);
+				m_parameters.push(Lumix::string(parameter_name, m_allocator));
+				lua_pop(L, 1);
+			}
+		}
+		lua_pop(L, 1);
 	}
 
 
@@ -161,7 +179,7 @@ struct PipelineImpl : public Pipeline
 	void registerCFunctions();
 
 
-	virtual bool load(FS::IFile& file) override
+	bool load(FS::IFile& file) override
 	{
 		if (m_lua_state)
 		{
@@ -182,6 +200,7 @@ struct PipelineImpl : public Pipeline
 			return false;
 		}
 
+		parseParameters(m_lua_state);
 		parseFramebuffers(m_lua_state);
 		registerCFunctions();
 		return true;
@@ -190,6 +209,7 @@ struct PipelineImpl : public Pipeline
 	lua_State* m_lua_state;
 	IAllocator& m_allocator;
 	Array<FrameBuffer::Declaration> m_framebuffers;
+	Array<string> m_parameters;
 };
 
 
@@ -234,6 +254,52 @@ struct PipelineInstanceImpl : public PipelineInstance
 		pipeline.onLoaded<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
 
 		createParticleBuffers();
+	}
+
+
+	int getParameterCount() const override
+	{
+		return m_source.m_parameters.size();
+	}
+
+
+	const char* getParameterName(int index) const override
+	{
+		if (index >= m_source.m_parameters.size()) return false;
+		return m_source.m_parameters[index].c_str();
+	}
+
+
+	bool getParameter(int index) override
+	{
+		if (!m_source.m_lua_state) return false;
+		if (index >= m_source.m_parameters.size()) return false;
+
+		bool ret = false;
+		lua_State* L = m_source.m_lua_state;
+		if (lua_getglobal(L, "parameters") == LUA_TTABLE)
+		{
+			lua_getfield(L, -1, m_source.m_parameters[index].c_str());
+			ret = lua_toboolean(L, -1) != 0;
+			lua_pop(L, -1);
+		}
+		lua_pop(L, -1);
+		return ret;
+	}
+
+
+	void setParameter(int index, bool value) override
+	{
+		if (!m_source.m_lua_state) return;
+		if (index >= m_source.m_parameters.size()) return;
+		
+		lua_State* L = m_source.m_lua_state;
+		if (lua_getglobal(L, "parameters") == LUA_TTABLE)
+		{
+			lua_pushboolean(L, value);
+			lua_setfield(L, -2, m_source.m_parameters[index].c_str());
+		}
+		lua_pop(L, -1);
 	}
 
 
@@ -421,7 +487,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	virtual void setViewProjection(const Matrix& mtx, int width, int height) override
+	void setViewProjection(const Matrix& mtx, int width, int height) override
 	{
 		bgfx::setViewRect(m_view_idx, 0, 0, width, height);
 		bgfx::setViewTransform(m_view_idx, nullptr, &mtx.m11);
@@ -517,7 +583,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	virtual FrameBuffer* getFramebuffer(const char* framebuffer_name) override
+	FrameBuffer* getFramebuffer(const char* framebuffer_name) override
 	{
 		for (int i = 0, c = m_framebuffers.size(); i < c; ++i)
 		{
@@ -560,10 +626,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	virtual int getWidth() override { return m_width; }
+	int getWidth() override { return m_width; }
 
 
-	virtual int getHeight() override { return m_height; }
+	int getHeight() override { return m_height; }
 
 
 	void sourceLoaded(Resource::State old_state, Resource::State new_state)
@@ -992,7 +1058,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	virtual int getPassIdx() const override
+	int getPassIdx() const override
 	{
 		return m_pass_idx;
 	}
@@ -1306,21 +1372,21 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	virtual void toggleStats() override
+	void toggleStats() override
 	{
 		m_debug_flags ^= BGFX_DEBUG_STATS;
 		bgfx::setDebug(m_debug_flags);
 	}
 
 
-	virtual void setWindowHandle(void* data) override
+	void setWindowHandle(void* data) override
 	{
 		m_default_framebuffer =
 			m_allocator.newObject<FrameBuffer>("default", m_width, m_height, data);
 	}
 
 
-	virtual void renderModel(Model& model, const Matrix& mtx) override
+	void renderModel(Model& model, const Matrix& mtx) override
 	{
 		RenderableMesh mesh;
 		mesh.m_matrix = &mtx;
@@ -1376,13 +1442,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	virtual void setScissor(int x, int y, int width, int height) override
+	void setScissor(int x, int y, int width, int height) override
 	{
 		bgfx::setScissor(x, y, width, height);
 	}
 
 
-	virtual void setTexture(int slot,
+	void setTexture(int slot,
 		bgfx::TextureHandle texture,
 		bgfx::UniformHandle uniform) override
 	{
@@ -1390,7 +1456,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	virtual void render(TransientGeometry& geom,
+	void render(TransientGeometry& geom,
 		const Matrix& mtx,
 		int first_index,
 		int num_indices,
@@ -1637,7 +1703,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	virtual void setViewport(int x, int y, int w, int h) override
+	void setViewport(int x, int y, int w, int h) override
 	{
 		m_view_x = x;
 		m_view_y = y;
@@ -1652,7 +1718,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	virtual void render() override
+	void render() override
 	{
 		PROFILE_FUNCTION();
 
@@ -1698,9 +1764,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	virtual void setScene(RenderScene* scene) override { m_scene = scene; }
-	virtual RenderScene* getScene() override { return m_scene; }
-	virtual void setWireframe(bool wireframe) override { m_is_wireframe = wireframe; }
+	void setScene(RenderScene* scene) override { m_scene = scene; }
+	RenderScene* getScene() override { return m_scene; }
+	void setWireframe(bool wireframe) override { m_is_wireframe = wireframe; }
 
 
 	struct TerrainInstance

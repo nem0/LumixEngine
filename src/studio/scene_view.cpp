@@ -211,5 +211,29 @@ void SceneView::onGUI()
 		m_editor->getGizmo().setStep(step);
 	}
 
+	ImGui::SameLine();
+	int count = m_pipeline->getParameterCount();
+	if (count)
+	{
+		if (ImGui::Button("Pipeline"))
+		{
+			ImGui::OpenPopup("pipeline_parameters_popup");
+		}
+
+		if (ImGui::BeginPopup("pipeline_parameters_popup"))
+		{
+			for (int i = 0; i < count; ++i)
+			{
+				bool b = m_pipeline->getParameter(i);
+				if (ImGui::Checkbox(m_pipeline->getParameterName(i), &b))
+				{
+					m_pipeline->setParameter(i, b);
+				}
+			}
+
+			ImGui::EndPopup();
+		}
+	}
+
 	ImGui::End();
 }
