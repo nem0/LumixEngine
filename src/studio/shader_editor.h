@@ -75,7 +75,6 @@ public:
 
 	void onGUI();
 	const char* getTextureName(int index) const { return m_textures[index]; }
-	const char* getVertexOutputName(int index) const { return m_vertex_outputs[index]; }
 	Lumix::IAllocator& getAllocator() { return m_allocator; }
 	Node* createNode(int type);
 	void addNode(Node* node, const ImVec2& pos, ShaderType type);
@@ -91,7 +90,6 @@ public:
 
 public:
 	static const int MAX_TEXTURES_COUNT = 16;
-	static const int MAX_VERTEX_OUTPUTS_COUNT = 16;
 
 	bool m_is_opened;
 
@@ -125,7 +123,6 @@ private:
 
 private:
 	char m_textures[MAX_TEXTURES_COUNT][50];
-	char m_vertex_outputs[MAX_VERTEX_OUTPUTS_COUNT][50];
 	Lumix::Path m_path;
 	int m_last_node_id;
 	int m_undo_stack_idx;
