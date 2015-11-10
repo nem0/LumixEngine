@@ -1829,6 +1829,12 @@ namespace LuaAPI
 {
 
 
+void beginNewView(PipelineInstanceImpl* pipeline, const char* debug_name)
+{
+	pipeline->beginNewView(pipeline->m_current_framebuffer, debug_name);
+}
+
+
 void setPass(PipelineInstanceImpl* pipeline, const char* pass)
 {
 	pipeline->setPass(pass);
@@ -2067,6 +2073,7 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(enableDepthWrite);
 	REGISTER_FUNCTION(disableDepthWrite);
 	REGISTER_FUNCTION(setPass);
+	REGISTER_FUNCTION(beginNewView);
 	REGISTER_FUNCTION(applyCamera);
 	REGISTER_FUNCTION(clear);
 	REGISTER_FUNCTION(renderModels);
