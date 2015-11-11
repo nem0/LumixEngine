@@ -35,7 +35,7 @@ namespace Lumix
 		struct Event
 		{
 			EventType type;
-			uintptr_t handle;
+			uintptr handle;
 			const char* path;
 			int32 ret;
 			int32 param;
