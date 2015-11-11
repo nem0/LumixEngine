@@ -32,9 +32,9 @@ namespace Lumix
 	typedef unsigned long long		uint64;
 
 #ifdef _WIN64
-	typedef uint64_t uintptr_t;
+	typedef uint64 uintptr;
 #else
-	typedef uint32 uintptr_t;
+	typedef uint32 uintptr;
 #endif
 
 	static_assert(sizeof(int64) == 8, "Incorrect size of int64");

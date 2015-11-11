@@ -21,7 +21,7 @@ namespace Lumix
 
 		private:
 			IAllocator& m_allocator;
-			uintptr_t m_socket;
+			uintptr m_socket;
 		};
 	} // ~namespace Net
 } // ~namespace Lumix

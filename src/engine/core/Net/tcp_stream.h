@@ -10,7 +10,7 @@ namespace Lumix
 		class LUMIX_ENGINE_API TCPStream
 		{
 		public:
-			TCPStream(uintptr_t socket) : m_socket(socket) { } 
+			TCPStream(uintptr socket) : m_socket(socket) { } 
 			~TCPStream();
 
 			LUMIX_FORCE_INLINE bool read(bool& val)
@@ -112,7 +112,7 @@ namespace Lumix
 		private:
 			TCPStream();
 
-			uintptr_t m_socket;
+			uintptr m_socket;
 		};
 	} // ~namespace Net
 } // ~namespace Lumix
