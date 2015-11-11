@@ -9,15 +9,7 @@
 #define STRINGIZE( _ ) STRINGIZE_2( _ )
 
 
-#define JOIN_STRINGS_2(A, B) A ## B
-#define JOIN_STRINGS(A, B) JOIN_STRINGS_2(A, B)
-
-
-#define NOTE(msg) __pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : NOTE: " msg))
-
 #define TODO(msg) __pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : TODO: " msg))
-
-#define WARN(msg) __pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : WARNING: " msg))
 
 
 namespace Lumix
@@ -67,17 +59,12 @@ namespace Lumix
 		#else
 			#define ASSERT(x) { const volatile bool lumix_assert_b____ = !(x); if(lumix_assert_b____) __debugbreak(); } 
 		#endif
-	#else
-		#define ASSERT(x) assert(x)
 	#endif
 #endif
 
 
-#define LUMIX_NEW(allocator, type) new ((allocator).allocate(sizeof(type))) type
-#define LUMIX_DELETE(allocator, var) (allocator).deleteObject(var);
 #define LUMIX_LIBRARY_EXPORT __declspec(dllexport)
 #define LUMIX_LIBRARY_IMPORT __declspec(dllimport)
-#define LUMIX_ALIGN_OF(T) __alignof(T)
 #define LUMIX_FORCE_INLINE __forceinline
 #define LUMIX_RESTRICT __restrict
 
