@@ -33,7 +33,7 @@ void LuaScript::unload()
 }
 
 
-const char* LuaScript::getPropertyName(uint32_t hash) const
+const char* LuaScript::getPropertyName(uint32 hash) const
 {
 	for (auto& property : m_properties)
 	{

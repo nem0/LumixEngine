@@ -121,7 +121,7 @@ bool Animation::load(FS::IFile& file)
 
 	m_positions = static_cast<Vec3*>(allocator.allocate(sizeof(Vec3) * m_frame_count * m_bone_count));
 	m_rotations = static_cast<Quat*>(allocator.allocate(sizeof(Quat) * m_frame_count * m_bone_count));
-	m_bones = static_cast<uint32_t*>(allocator.allocate(sizeof(uint32_t) * m_bone_count));
+	m_bones = static_cast<uint32*>(allocator.allocate(sizeof(uint32) * m_bone_count));
 	file.read(&m_positions[0], sizeof(Vec3)* m_bone_count * m_frame_count);
 	file.read(&m_rotations[0], sizeof(Quat)* m_bone_count * m_frame_count);
 	file.read(m_bones, sizeof(m_bones[0]) * m_bone_count);

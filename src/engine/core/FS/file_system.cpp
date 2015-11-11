@@ -35,10 +35,10 @@ struct AsyncItem
 	ReadCallback m_cb;
 	Mode m_mode;
 	char m_path[MAX_PATH_LENGTH];
-	uint8_t m_flags;
+	uint8 m_flags;
 };
 
-static const int32_t C_MAX_TRANS = 16;
+static const int32 C_MAX_TRANS = 16;
 
 typedef MT::Transaction<AsyncItem> AsynTrans;
 typedef MT::LockFreeFixedQueue<AsynTrans, C_MAX_TRANS> TransQueue;
@@ -312,7 +312,7 @@ public:
 			}
 		}
 
-		int32_t can_add = C_MAX_TRANS - m_in_progress.size();
+		int32 can_add = C_MAX_TRANS - m_in_progress.size();
 		while (can_add && !m_pending.empty())
 		{
 			AsynTrans* tr = m_transaction_queue.alloc(false);

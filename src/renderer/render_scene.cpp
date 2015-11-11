@@ -39,20 +39,20 @@ namespace Lumix
 {
 
 
-static const uint32_t RENDERABLE_HASH = crc32("renderable");
-static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
-static const uint32_t PARTICLE_EMITTER_HASH = crc32("particle_emitter");
-static const uint32_t PARTICLE_EMITTER_FADE_HASH = crc32("particle_emitter_fade");
-static const uint32_t PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH =
+static const uint32 RENDERABLE_HASH = crc32("renderable");
+static const uint32 POINT_LIGHT_HASH = crc32("point_light");
+static const uint32 PARTICLE_EMITTER_HASH = crc32("particle_emitter");
+static const uint32 PARTICLE_EMITTER_FADE_HASH = crc32("particle_emitter_fade");
+static const uint32 PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH =
 	crc32("particle_emitter_linear_movement");
-static const uint32_t PARTICLE_EMITTER_RANDOM_ROTATION_HASH =
+static const uint32 PARTICLE_EMITTER_RANDOM_ROTATION_HASH =
 	crc32("particle_emitter_random_rotation");
-static const uint32_t GLOBAL_LIGHT_HASH = crc32("global_light");
-static const uint32_t CAMERA_HASH = crc32("camera");
-static const uint32_t TERRAIN_HASH = crc32("terrain");
+static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
+static const uint32 CAMERA_HASH = crc32("camera");
+static const uint32 TERRAIN_HASH = crc32("terrain");
 
 
-enum class RenderSceneVersion : int32_t
+enum class RenderSceneVersion : int32
 {
 	PARTICLES,
 	WHOLE_LIGHTS,
@@ -71,7 +71,7 @@ struct Renderable
 	}
 
 	Array<RenderableMesh> m_meshes;
-	int32_t m_component_index;
+	int32 m_component_index;
 	Pose m_pose;
 	Model* m_model;
 	Matrix m_matrix;
@@ -133,7 +133,7 @@ struct Camera
 class RenderSceneImpl : public RenderScene
 {
 private:
-	typedef HashMap<int32_t, int> DynamicRenderableCache;
+	typedef HashMap<int32, int> DynamicRenderableCache;
 
 	class ModelLoadedCallback
 	{
@@ -243,7 +243,7 @@ public:
 	Universe& getUniverse() override { return m_universe; }
 
 
-	bool ownComponentType(uint32_t type) const override
+	bool ownComponentType(uint32 type) const override
 	{
 		return type == RENDERABLE_HASH || type == POINT_LIGHT_HASH ||
 			type == GLOBAL_LIGHT_HASH || type == CAMERA_HASH ||
@@ -353,7 +353,7 @@ public:
 
 	void serializeCameras(OutputBlob& serializer)
 	{
-		serializer.write((int32_t)m_cameras.size());
+		serializer.write((int32)m_cameras.size());
 		for (int i = 0, c = m_cameras.size(); i < c; ++i)
 		{
 			Camera& camera = m_cameras[i];
@@ -369,25 +369,25 @@ public:
 
 	void serializeLights(OutputBlob& serializer)
 	{
-		serializer.write((int32_t)m_point_lights.size());
+		serializer.write((int32)m_point_lights.size());
 		for (int i = 0, c = m_point_lights.size(); i < c; ++i)
 		{
 			serializer.write(m_point_lights[i]);
 		}
 		serializer.write(m_point_light_last_uid);
 
-		serializer.write((int32_t)m_global_lights.size());
+		serializer.write((int32)m_global_lights.size());
 		for (int i = 0, c = m_global_lights.size(); i < c; ++i)
 		{
 			serializer.write(m_global_lights[i]);
 		}
-		serializer.write((int32_t)m_global_light_last_uid);
-		serializer.write((int32_t)m_active_global_light_uid);
+		serializer.write((int32)m_global_light_last_uid);
+		serializer.write((int32)m_active_global_light_uid);
 	}
 
 	void serializeRenderables(OutputBlob& serializer)
 	{
-		serializer.write((int32_t)m_renderables.size());
+		serializer.write((int32)m_renderables.size());
 		for (int i = 0; i < m_renderables.size(); ++i)
 		{
 			serializer.write(m_renderables[i]->m_component_index);
@@ -399,7 +399,7 @@ public:
 
 	void serializeTerrains(OutputBlob& serializer)
 	{
-		serializer.write((int32_t)m_terrains.size());
+		serializer.write((int32)m_terrains.size());
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
 			if (m_terrains[i])
@@ -485,7 +485,7 @@ public:
 
 	void deserializeCameras(InputBlob& serializer)
 	{
-		int32_t size;
+		int32 size;
 		serializer.read(size);
 		m_cameras.resize(size);
 		for (int i = 0; i < size; ++i)
@@ -508,7 +508,7 @@ public:
 
 	void deserializeRenderables(InputBlob& serializer)
 	{
-		int32_t size = 0;
+		int32 size = 0;
 		serializer.read(size);
 		for (int i = 0; i < m_renderables.size(); ++i)
 		{
@@ -524,13 +524,13 @@ public:
 			m_renderables.push(m_allocator.newObject<Renderable>(m_allocator));
 			serializer.read(m_renderables[i]->m_component_index);
 			serializer.read(m_renderables[i]->m_entity);
-			int64_t layer_mask;
+			int64 layer_mask;
 			serializer.read(layer_mask);
 			m_renderables[i]->m_model = nullptr;
 			m_renderables[i]->m_matrix =
 				m_universe.getMatrix(m_renderables[i]->m_entity);
 
-			uint32_t path;
+			uint32 path;
 			serializer.read(path);
 			m_culling_system->addStatic(Sphere(
 				m_universe.getPosition(m_renderables[i]->m_entity), 1.0f));
@@ -551,7 +551,7 @@ public:
 
 	void deserializeLights(InputBlob& serializer, RenderSceneVersion version)
 	{
-		int32_t size = 0;
+		int32 size = 0;
 		serializer.read(size);
 		m_point_lights.resize(size);
 		m_light_influenced_geometry.clear();
@@ -611,7 +611,7 @@ public:
 
 	void deserializeTerrains(InputBlob& serializer)
 	{
-		int32_t size = 0;
+		int32 size = 0;
 		serializer.read(size);
 		int old_size = m_terrains.size();
 		for (int i = size; i < m_terrains.size(); ++i)
@@ -690,7 +690,7 @@ public:
 		m_culling_system->removeStatic(renderable_index);
 		m_universe.destroyComponent(entity, RENDERABLE_HASH, this, component);
 
-		Lumix::HashMap<int32_t, int>::iterator
+		Lumix::HashMap<int32, int>::iterator
 			iter = m_dynamic_renderable_cache.begin(),
 			end = m_dynamic_renderable_cache.end();
 		while (iter != end)
@@ -704,7 +704,7 @@ public:
 		m_dynamic_renderable_cache.erase(entity);
 	}
 
-	void destroyComponent(ComponentIndex component, uint32_t type) override
+	void destroyComponent(ComponentIndex component, uint32 type) override
 	{
 		if (type == RENDERABLE_HASH)
 		{
@@ -924,7 +924,7 @@ public:
 	}
 
 
-	ComponentIndex createComponent(uint32_t type,
+	ComponentIndex createComponent(uint32 type,
 		Entity entity) override
 	{
 		if (type == TERRAIN_HASH)
@@ -1303,10 +1303,10 @@ public:
 
 
 	void setRenderableLayer(ComponentIndex cmp,
-									const int32_t& layer) override
+									const int32& layer) override
 	{
 		m_culling_system->setLayerMask(getRenderable(cmp),
-									   (int64_t)1 << (int64_t)layer);
+									   (int64)1 << (int64)layer);
 	}
 
 
@@ -1332,7 +1332,7 @@ public:
 
 
 	void getTerrainInfos(Array<const TerrainInfo*>& infos,
-								 int64_t layer_mask,
+								 int64 layer_mask,
 								 const Vec3& camera_pos,
 								 LIFOAllocator& frame_allocator) override
 	{
@@ -1351,7 +1351,7 @@ public:
 
 	void getGrassInfos(const Frustum& frustum,
 							   Array<GrassInfo>& infos,
-							   int64_t layer_mask,
+							   int64 layer_mask,
 							   ComponentIndex camera) override
 	{
 		PROFILE_FUNCTION();
@@ -1496,7 +1496,7 @@ public:
 
 
 	const CullingSystem::Results* cull(const Frustum& frustum,
-									   int64_t layer_mask)
+									   int64 layer_mask)
 	{
 		PROFILE_FUNCTION();
 		if (m_renderables.empty())
@@ -1542,7 +1542,7 @@ public:
 
 	void fillTemporaryInfos(const CullingSystem::Results& results,
 							const Frustum& frustum,
-							int64_t layer_mask)
+							int64 layer_mask)
 	{
 		PROFILE_FUNCTION();
 		m_jobs.clear();
@@ -1693,7 +1693,7 @@ public:
 	getPointLightInfluencedGeometry(ComponentIndex light_cmp,
 									const Frustum& frustum,
 									Array<const RenderableMesh*>& infos,
-									int64_t layer_mask) override
+									int64 layer_mask) override
 	{
 		PROFILE_FUNCTION();
 
@@ -1724,7 +1724,7 @@ public:
 	void
 		getPointLightInfluencedGeometry(ComponentIndex light_cmp,
 		Array<const RenderableMesh*>& infos,
-		int64_t layer_mask) override
+		int64 layer_mask) override
 	{
 		PROFILE_FUNCTION();
 
@@ -1743,7 +1743,7 @@ public:
 
 	void getRenderableEntities(const Frustum& frustum,
 		Array<Entity>& entities,
-		int64_t layer_mask) override
+		int64 layer_mask) override
 	{
 		PROFILE_FUNCTION();
 
@@ -1762,7 +1762,7 @@ public:
 
 	void getRenderableInfos(const Frustum& frustum,
 									Array<const RenderableMesh*>& meshes,
-									int64_t layer_mask) override
+									int64 layer_mask) override
 	{
 		PROFILE_FUNCTION();
 
@@ -1850,7 +1850,7 @@ public:
 
 	void addDebugSphere(const Vec3& center,
 		float radius,
-		uint32_t color,
+		uint32 color,
 		float life) override
 	{
 		static const int COLS = 36;
@@ -1902,7 +1902,7 @@ public:
 	}
 
 
-	void addDebugHalfSphere(const Vec3& center, float radius, bool top, uint32_t color, float life)
+	void addDebugHalfSphere(const Vec3& center, float radius, bool top, uint32 color, float life)
 	{
 		static const int COLS = 36;
 		static const int ROWS = COLS >> 1;
@@ -1958,7 +1958,7 @@ public:
 	void addDebugCapsule(const Vec3& position,
 		float height,
 		float radius,
-		uint32_t color,
+		uint32 color,
 		float life) override
 	{
 		addDebugHalfSphere(position + Vec3(0, radius, 0), radius, false, color, life);
@@ -1986,7 +1986,7 @@ public:
 	void addDebugCylinder(const Vec3& position,
 								  const Vec3& up,
 								  float radius,
-								  uint32_t color,
+								  uint32 color,
 								  float life) override
 	{
 		Vec3 z_vec(-up.y, up.x, 0);
@@ -2023,7 +2023,7 @@ public:
 		const Vec3& dir,
 		const Vec3& up,
 		const Vec3& right,
-		uint32_t color,
+		uint32 color,
 		float life) override
 	{
 		addDebugLine(pos + dir + up + right, pos + dir + up - right, color, life);
@@ -2046,7 +2046,7 @@ public:
 
 	void addDebugCube(const Vec3& min,
 							  const Vec3& max,
-							  uint32_t color,
+							  uint32 color,
 							  float life) override
 	{
 		Vec3 a = min;
@@ -2088,7 +2088,7 @@ public:
 	}
 
 
-	void addDebugFrustum(const Frustum& frustum, uint32_t color, float life) override
+	void addDebugFrustum(const Frustum& frustum, uint32 color, float life) override
 	{
 		addDebugFrustum(frustum.getPosition(),
 						frustum.getDirection(),
@@ -2109,7 +2109,7 @@ public:
 								 float ratio,
 								 float near_distance,
 								 float far_distance,
-								 uint32_t color,
+								 uint32 color,
 								 float life) override
 	{
 		Vec3 points[8];
@@ -2152,7 +2152,7 @@ public:
 	void addDebugCircle(const Vec3& center,
 		const Vec3& up,
 		float radius,
-		uint32_t color,
+		uint32 color,
 		float life) override
 	{
 		Vec3 z_vec(-up.y, up.x, 0);
@@ -2177,7 +2177,7 @@ public:
 
 	void addDebugCross(const Vec3& center,
 							   float size,
-							   uint32_t color,
+							   uint32 color,
 							   float life) override
 	{
 		addDebugLine(
@@ -2195,7 +2195,7 @@ public:
 	}
 
 
-	void addDebugPoint(const Vec3& pos, uint32_t color, float life) override
+	void addDebugPoint(const Vec3& pos, uint32 color, float life) override
 	{
 		DebugPoint& point = m_debug_points.pushEmpty();
 		point.m_pos = pos;
@@ -2204,14 +2204,14 @@ public:
 	}
 
 
-	static uint32_t ARGBToABGR(uint32_t color)
+	static uint32 ARGBToABGR(uint32 color)
 	{
 		return ((color & 0xff) << 16) | (color & 0xff00) | ((color & 0xff0000) >> 16) |
 			   (color & 0xff000000);
 	}
 
 
-	void addDebugLine(const Vec3& from, const Vec3& to, uint32_t color, float life) override
+	void addDebugLine(const Vec3& from, const Vec3& to, uint32 color, float life) override
 	{
 		DebugLine& line = m_debug_lines.pushEmpty();
 		line.m_from = from;

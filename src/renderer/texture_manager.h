@@ -10,7 +10,7 @@ namespace Lumix
 		TextureManager(IAllocator& allocator);
 		~TextureManager();
 
-		uint8_t* getBuffer(int32_t size);
+		uint8* getBuffer(int32 size);
 
 	protected:
 		virtual Resource* createResource(const Path& path) override;
@@ -18,7 +18,7 @@ namespace Lumix
 
 	private:
 		IAllocator& m_allocator;
-		uint8_t* m_buffer;
-		int32_t m_buffer_size;
+		uint8* m_buffer;
+		int32 m_buffer_size;
 	};
 }

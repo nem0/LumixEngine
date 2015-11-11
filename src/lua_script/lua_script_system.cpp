@@ -20,11 +20,11 @@
 #include "universe/universe.h"
 
 
-static const uint32_t SCRIPT_HASH = Lumix::crc32("script");
-
-
 namespace Lumix
 {
+
+
+static const uint32 SCRIPT_HASH = Lumix::crc32("script");
 
 
 class LuaScriptSystemImpl;
@@ -35,7 +35,7 @@ void registerUniverse(UniverseContext*, lua_State* L);
 void registerPhysicsLuaAPI(Engine&, Universe&, lua_State* L);
 
 
-static const uint32_t LUA_SCRIPT_HASH = crc32("lua_script");
+static const uint32 LUA_SCRIPT_HASH = crc32("lua_script");
 
 
 class LuaScriptSystem : public IPlugin
@@ -160,7 +160,7 @@ public:
 	virtual const char* getPropertyValue(Lumix::ComponentIndex cmp, int index) const override
 	{
 		auto& script = getScript(cmp);
-		uint32_t hash = crc32(getPropertyName(cmp, index));
+		uint32 hash = crc32(getPropertyName(cmp, index));
 
 		for (auto& value : script.m_properties)
 		{
@@ -293,7 +293,7 @@ public:
 	}
 
 	
-	virtual ComponentIndex createComponent(uint32_t type,
+	virtual ComponentIndex createComponent(uint32 type,
 										   Entity entity) override
 	{
 		if (type == LUA_SCRIPT_HASH)
@@ -313,7 +313,7 @@ public:
 
 
 	virtual void destroyComponent(ComponentIndex component,
-								  uint32_t type) override
+								  uint32 type) override
 	{
 		if (type == LUA_SCRIPT_HASH)
 		{
@@ -410,7 +410,7 @@ public:
 	}
 
 
-	virtual bool ownComponentType(uint32_t type) const override
+	virtual bool ownComponentType(uint32 type) const override
 	{
 		return type == LUA_SCRIPT_HASH;
 	}
@@ -421,7 +421,7 @@ public:
 
 	Property& getScriptProperty(ComponentIndex cmp, const char* name)
 	{
-		uint32_t name_hash = crc32(name);
+		uint32 name_hash = crc32(name);
 		for (auto& prop : m_scripts[cmp].m_properties)
 		{
 			if (prop.m_name_hash == name_hash)

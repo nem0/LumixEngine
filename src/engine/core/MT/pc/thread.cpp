@@ -7,24 +7,24 @@ namespace Lumix
 {
 	namespace MT
 	{
-		static uint32_t s_main_thread_id = 0;
+		static uint32 s_main_thread_id = 0;
 
-		void sleep(uint32_t milliseconds) { ::Sleep(milliseconds); }
+		void sleep(uint32 milliseconds) { ::Sleep(milliseconds); }
 
-		uint32_t getCPUsCount()
+		uint32 getCPUsCount()
 		{
 			SYSTEM_INFO sys_info;
 			GetSystemInfo(&sys_info);
 
-			uint32_t num = sys_info.dwNumberOfProcessors;
+			uint32 num = sys_info.dwNumberOfProcessors;
 			num = num > 0 ? num : 1;
 
 			return num;
 		}
 
-		uint32_t getCurrentThreadID() { return ::GetCurrentThreadId(); }
+		uint32 getCurrentThreadID() { return ::GetCurrentThreadId(); }
 
-		uint32_t getProccessAffinityMask()
+		uint32 getProccessAffinityMask()
 		{
 			PROCESSOR_NUMBER proc_number;
 			BOOL ret = ::GetThreadIdealProcessorEx(::GetCurrentThread(), &proc_number);
@@ -47,7 +47,7 @@ namespace Lumix
 		} THREADNAME_INFO;
 #pragma pack(pop)
 
-		void setThreadName(uint32_t thread_id, const char* thread_name)
+		void setThreadName(uint32 thread_id, const char* thread_name)
 		{
 			THREADNAME_INFO info;
 			info.type = 0x1000;

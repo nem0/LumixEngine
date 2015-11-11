@@ -18,7 +18,7 @@ class LUMIX_ENGINE_API Resource
 public:
 	friend class ResourceManagerBase;
 
-	enum class State : uint32_t
+	enum class State : uint32
 	{
 		EMPTY = 0,
 		READY,
@@ -33,7 +33,7 @@ public:
 	bool isEmpty() const { return State::EMPTY == m_current_state; }
 	bool isReady() const { return State::READY == m_current_state; }
 	bool isFailure() const { return State::FAILURE == m_current_state; }
-	uint32_t getRefCount() const { return m_ref_count; }
+	uint32 getRefCount() const { return m_ref_count; }
 	ObserverCallback& getObserverCb() { return m_cb; }
 	size_t size() const { return m_size; }
 	const Path& getPath() const { return m_path; }
@@ -64,7 +64,7 @@ protected:
 
 protected:
 	State m_desired_state;
-	uint16_t m_empty_dep_count;
+	uint16 m_empty_dep_count;
 	size_t m_size;
 	ResourceManager& m_resource_manager;
 
@@ -75,8 +75,8 @@ private:
 	void doLoad();
 	void fileLoaded(FS::IFile& file, bool success, FS::FileSystem& fs);
 	void onStateChanged(State old_state, State new_state);
-	uint32_t addRef(void) { return ++m_ref_count; }
-	uint32_t remRef(void) { return --m_ref_count; }
+	uint32 addRef(void) { return ++m_ref_count; }
+	uint32 remRef(void) { return --m_ref_count; }
 
 	Resource(const Resource&);
 	void operator=(const Resource&);
@@ -84,8 +84,8 @@ private:
 private:
 	ObserverCallback m_cb;
 	Path m_path;
-	uint16_t m_ref_count;
-	uint16_t m_failed_dep_count;
+	uint16 m_ref_count;
+	uint16 m_failed_dep_count;
 	State m_current_state;
 	bool m_is_waiting_for_load;
 }; // class Resource

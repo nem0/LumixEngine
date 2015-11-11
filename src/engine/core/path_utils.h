@@ -8,7 +8,7 @@ namespace Lumix
 {
 namespace PathUtils
 {
-	LUMIX_ENGINE_API void normalize(const char* path, char* out, uint32_t max_size);
+	LUMIX_ENGINE_API void normalize(const char* path, char* out, uint32 max_size);
 	LUMIX_ENGINE_API void getDir(char* dir, int max_length, const char* src);
 	LUMIX_ENGINE_API void getBasename(char* basename, int max_length, const char* src);
 	LUMIX_ENGINE_API void getFilename(char* filename, int max_length, const char* src);

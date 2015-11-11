@@ -57,19 +57,19 @@ LogProxy& LogProxy::operator<<(float message)
 	return *this;
 }
 
-LogProxy& LogProxy::operator<<(uint32_t message)
+LogProxy& LogProxy::operator<<(uint32 message)
 {
 	m_message.cat(message);
 	return *this;
 }
 
-LogProxy& LogProxy::operator<<(uint64_t message)
+LogProxy& LogProxy::operator<<(uint64 message)
 {
 	m_message.cat(message);
 	return *this;
 }
 
-LogProxy& LogProxy::operator<<(int32_t message)
+LogProxy& LogProxy::operator<<(int32 message)
 {
 	m_message.cat(message);
 	return *this;

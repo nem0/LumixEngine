@@ -27,9 +27,9 @@ namespace Lumix
 
 			Mode() : value(0) {}
 			Mode(Value _value) : value(_value) { }
-			Mode(int32_t _value) : value(_value) { }
+			Mode(int32 _value) : value(_value) { }
 			operator Value() const { return (Value)value; }
-			int32_t value;
+			int32 value;
 		};
 
 		struct SeekMode
@@ -41,9 +41,9 @@ namespace Lumix
 				CURRENT,
 			};
 			SeekMode(Value _value) : value(_value) {}
-			SeekMode(uint32_t _value) : value(_value) {}
+			SeekMode(uint32 _value) : value(_value) {}
 			operator Value() { return (Value)value; }
-			uint32_t value;
+			uint32 value;
 		};
 	} // ~namespace FS
 } // ~namespace Lumix

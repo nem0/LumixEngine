@@ -12,7 +12,7 @@ namespace Lumix
 			::closesocket(m_socket);
 		}
 
-		bool TCPAcceptor::start(const char* ip, uint16_t port)
+		bool TCPAcceptor::start(const char* ip, uint16 port)
 		{
 			WORD sockVer;
 			WSADATA wsaData;

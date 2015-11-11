@@ -40,14 +40,14 @@ private:
 class LUMIX_ANIMATION_API Animation : public Resource
 {
 	public:
-		static const uint32_t HEADER_MAGIC = 0x5f4c4146; // '_LAF'
+		static const uint32 HEADER_MAGIC = 0x5f4c4146; // '_LAF'
 
 	public:
 		struct Header
 		{
-			uint32_t magic;
-			uint32_t version;
-			uint32_t fps;
+			uint32 magic;
+			uint32 version;
+			uint32 fps;
 		};
 
 	public:
@@ -70,7 +70,7 @@ class LUMIX_ANIMATION_API Animation : public Resource
 		int	m_bone_count;
 		Vec3* m_positions;
 		Quat* m_rotations;
-		uint32_t* m_bones;
+		uint32* m_bones;
 		int m_fps;
 };
 

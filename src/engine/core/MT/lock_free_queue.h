@@ -6,14 +6,14 @@ namespace Lumix
 {
 	namespace MT
 	{
-		template <class T, int32_t size> class LockFreeQueue
+		template <class T, int32 size> class LockFreeQueue
 		{
 		public:
 
 			LockFreeQueue();
 			~LockFreeQueue();
 
-			int32_t		push(T* data);
+			int32		push(T* data);
 			T*			pop();
 			bool		isEmpty() const;
 
@@ -24,53 +24,53 @@ namespace Lumix
 				{
 					struct
 					{
-						int32_t key;
+						int32 key;
 						T*	el;
 					};
-					int64_t		val;
+					int64		val;
 				};
 
 				Node()
 				{}
 
-				Node(int32_t k, T* el)
+				Node(int32 k, T* el)
 					: key(k)
 					, el(el)
 				{}
 			};
 
-			volatile int32_t	m_rd;
-			volatile int32_t	m_wr;
-			volatile int32_t	m_rd_alloc;
-			volatile int32_t	m_wr_alloc;
+			volatile int32	m_rd;
+			volatile int32	m_wr;
+			volatile int32	m_rd_alloc;
+			volatile int32	m_wr_alloc;
 			T*					m_pool[size];
 			Node				m_queue[size];
 		};
 
-		template <class T, int32_t size>		LockFreeQueue<T, size>::LockFreeQueue()
+		template <class T, int32 size>		LockFreeQueue<T, size>::LockFreeQueue()
 			: m_rd(0)
 			, m_wr(0)
 		{
 			ASSERT(size > 0);
 			ASSERT((size & (size - 1)) == 0); // power of two
 
-			for (int32_t i = 0; i < size; ++i)
+			for (int32 i = 0; i < size; ++i)
 			{
 				m_queue[i].key = i;
 				m_queue[i].el = nullptr;
 			}
 		}
 
-		template <class T, int32_t size>		LockFreeQueue<T, size>::~LockFreeQueue()
+		template <class T, int32 size>		LockFreeQueue<T, size>::~LockFreeQueue()
 		{
 		}
 
-		template <class T, int32_t size> bool LockFreeQueue<T, size>::isEmpty() const
+		template <class T, int32 size> bool LockFreeQueue<T, size>::isEmpty() const
 		{
 			return m_wr == m_rd;
 		}
 
-		template <class T, int32_t size> int32_t LockFreeQueue<T, size>::push(T* data)
+		template <class T, int32 size> int32 LockFreeQueue<T, size>::push(T* data)
 		{
 			ASSERT(data);
 
@@ -79,8 +79,8 @@ namespace Lumix
 
 			while ((m_wr - m_rd) < size)
 			{
-				int32_t cur_write_idx = m_wr;
-				int32_t idx = cur_write_idx & (size - 1);
+				int32 cur_write_idx = m_wr;
+				int32 idx = cur_write_idx & (size - 1);
 
 				cur_node.key = cur_write_idx;
 				new_node.key = cur_write_idx;
@@ -95,12 +95,12 @@ namespace Lumix
 			return -1;
 		}
 
-		template <class T, int32_t size> T* LockFreeQueue<T, size>::pop()
+		template <class T, int32 size> T* LockFreeQueue<T, size>::pop()
 		{
 			while (m_rd != m_wr)
 			{
 				int cur_read_idx = m_rd;
-				int32_t idx = cur_read_idx & (size - 1);
+				int32 idx = cur_read_idx & (size - 1);
 
 				Node cur_node(cur_read_idx, m_queue[idx].el);
 				Node new_node(cur_read_idx + size, nullptr);

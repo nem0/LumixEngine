@@ -56,9 +56,9 @@ Texture::~Texture()
 }
 
 
-void Texture::setFlag(uint32_t flag, bool value)
+void Texture::setFlag(uint32 flag, bool value)
 {
-	uint32_t new_flags = m_flags & ~flag;
+	uint32 new_flags = m_flags & ~flag;
 	new_flags |= value ? flag : 0;
 	m_flags = new_flags;
 
@@ -66,7 +66,7 @@ void Texture::setFlag(uint32_t flag, bool value)
 }
 
 
-void Texture::setFlags(uint32_t flags)
+void Texture::setFlags(uint32 flags)
 {
 	if (isReady() && m_flags != flags)
 	{
@@ -110,7 +110,7 @@ bool Texture::create(int w, int h, void* data)
 }
 
 
-uint32_t Texture::getPixelNearest(int x, int y) const
+uint32 Texture::getPixelNearest(int x, int y) const
 {
 	if (m_data.empty() || x >= m_width || y >= m_height || x < 0 || y < 0 ||
 		getBytesPerPixel() != 4)
@@ -118,11 +118,11 @@ uint32_t Texture::getPixelNearest(int x, int y) const
 		return 0;
 	}
 
-	return *(uint32_t*)&m_data[(x + y * m_width) * 4];
+	return *(uint32*)&m_data[(x + y * m_width) * 4];
 }
 
 
-uint32_t Texture::getPixel(float x, float y) const
+uint32 Texture::getPixel(float x, float y) const
 {
 	if (m_data.empty() || x >= m_width || y >= m_height || x < 0 || y < 0)
 	{
@@ -132,12 +132,12 @@ uint32_t Texture::getPixel(float x, float y) const
 	// http://fastcpp.blogspot.sk/2011/06/bilinear-pixel-interpolation-using-sse.html
 	int px = (int)x;
 	int py = (int)y;
-	const uint32_t* p0 = (uint32_t*)&m_data[(px + py * m_width) * 4];
+	const uint32* p0 = (uint32*)&m_data[(px + py * m_width) * 4];
 
-	const uint8_t* p1 = (uint8_t*)p0;
-	const uint8_t* p2 = (uint8_t*)(p0 + 1);
-	const uint8_t* p3 = (uint8_t*)(p0 + m_width);
-	const uint8_t* p4 = (uint8_t*)(p0 + 1 + m_width);
+	const uint8* p1 = (uint8*)p0;
+	const uint8* p2 = (uint8*)(p0 + 1);
+	const uint8* p3 = (uint8*)(p0 + m_width);
+	const uint8* p4 = (uint8*)(p0 + 1 + m_width);
 
 	float fx = x - px;
 	float fy = y - py;
@@ -149,17 +149,17 @@ uint32_t Texture::getPixel(float x, float y) const
 	int w3 = (int)(fx1 * fy * 256.0f);
 	int w4 = (int)(fx * fy * 256.0f);
 
-	uint8_t res[4];
+	uint8 res[4];
 	res[0] =
-		(uint8_t)((p1[0] * w1 + p2[0] * w2 + p3[0] * w3 + p4[0] * w4) >> 8);
+		(uint8)((p1[0] * w1 + p2[0] * w2 + p3[0] * w3 + p4[0] * w4) >> 8);
 	res[1] =
-		(uint8_t)((p1[1] * w1 + p2[1] * w2 + p3[1] * w3 + p4[1] * w4) >> 8);
+		(uint8)((p1[1] * w1 + p2[1] * w2 + p3[1] * w3 + p4[1] * w4) >> 8);
 	res[2] =
-		(uint8_t)((p1[2] * w1 + p2[2] * w2 + p3[2] * w3 + p4[2] * w4) >> 8);
+		(uint8)((p1[2] * w1 + p2[2] * w2 + p3[2] * w3 + p4[2] * w4) >> 8);
 	res[3] =
-		(uint8_t)((p1[3] * w1 + p2[3] * w2 + p3[3] * w3 + p4[3] * w4) >> 8);
+		(uint8)((p1[3] * w1 + p2[3] * w2 + p3[3] * w3 + p4[3] * w4) >> 8);
 
-	return *(uint32_t*)res;
+	return *(uint32*)res;
 }
 
 
@@ -191,8 +191,8 @@ unsigned int Texture::compareTGA(IAllocator& allocator,
 
 	int different_pixel_count = 0;
 	size_t pixel_count = header1.width * header1.height;
-	uint8_t* img1 = (uint8_t*)allocator.allocate(pixel_count * color_mode);
-	uint8_t* img2 = (uint8_t*)allocator.allocate(pixel_count * color_mode);
+	uint8* img1 = (uint8*)allocator.allocate(pixel_count * color_mode);
+	uint8* img2 = (uint8*)allocator.allocate(pixel_count * color_mode);
 
 	file1->read(img1, pixel_count * color_mode);
 	file2->read(img2, pixel_count * color_mode);
@@ -221,7 +221,7 @@ bool Texture::saveTGA(IAllocator& allocator,
 					  int width,
 					  int height,
 					  int bytes_per_pixel,
-					  const uint8_t* image_dest,
+					  const uint8* image_dest,
 					  const Path& path)
 {
 	if (bytes_per_pixel != 4)
@@ -232,7 +232,7 @@ bool Texture::saveTGA(IAllocator& allocator,
 		return false;
 	}
 
-	uint8_t* data = (uint8_t*)allocator.allocate(width * height * 4);
+	uint8* data = (uint8*)allocator.allocate(width * height * 4);
 
 	TGAHeader header;
 	memset(&header, 0, sizeof(header));
@@ -321,7 +321,7 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 
 	if (m_BPP == 2)
 	{
-		const uint16_t* src_mem = (const uint16_t*)&m_data[0];
+		const uint16* src_mem = (const uint16*)&m_data[0];
 		mem = bgfx::alloc(w * h * sizeof(float));
 		float* dst_mem = (float*)mem->data;
 
@@ -335,9 +335,9 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 	}
 	else
 	{
-		const uint8_t* src_mem = (const uint8_t*)&m_data[0];
+		const uint8* src_mem = (const uint8*)&m_data[0];
 		mem = bgfx::alloc(w * h * m_BPP);
-		uint8_t* dst_mem = mem->data;
+		uint8* dst_mem = mem->data;
 
 		for (int j = 0; j < h; ++j)
 		{
@@ -367,7 +367,7 @@ bool Texture::loadRaw(FS::IFile& file)
 		file.read(&m_data[0], size);
 	}
 
-	const uint16_t* src_mem = (const uint16_t*)file.getBuffer();
+	const uint16* src_mem = (const uint16*)file.getBuffer();
 	const bgfx::Memory* mem = bgfx::alloc(m_width * m_height * sizeof(float));
 	float* dst_mem = (float*)mem->data;
 
@@ -419,9 +419,9 @@ bool Texture::loadTGA(FS::IFile& file)
 	{
 		m_data.resize(image_size);
 	}
-	uint8_t* image_dest = m_data_reference
+	uint8* image_dest = m_data_reference
 							  ? &m_data[0]
-							  : (uint8_t*)manager->getBuffer(image_size);
+							  : (uint8*)manager->getBuffer(image_size);
 
 	// Targa is BGR, swap to RGB, add alpha and flip Y axis
 	for (long y = 0; y < header.height; y++)
@@ -432,11 +432,11 @@ bool Texture::loadTGA(FS::IFile& file)
 							   : y * header.width * 4;
 		for (long x = 0; x < header.width; x++)
 		{
-			file.read(&image_dest[write_index + 2], sizeof(uint8_t));
-			file.read(&image_dest[write_index + 1], sizeof(uint8_t));
-			file.read(&image_dest[write_index + 0], sizeof(uint8_t));
+			file.read(&image_dest[write_index + 2], sizeof(uint8));
+			file.read(&image_dest[write_index + 1], sizeof(uint8));
+			file.read(&image_dest[write_index + 0], sizeof(uint8));
 			if (color_mode == 4)
-				file.read(&image_dest[write_index + 3], sizeof(uint8_t));
+				file.read(&image_dest[write_index + 3], sizeof(uint8));
 			else
 				image_dest[write_index + 3] = 255;
 			write_index += 4;
@@ -488,7 +488,7 @@ bool Texture::loadDDS(FS::IFile& file)
 {
 	bgfx::TextureInfo info;
 	m_texture_handle =
-		bgfx::createTexture(bgfx::copy(file.getBuffer(), (uint32_t)file.size()),
+		bgfx::createTexture(bgfx::copy(file.getBuffer(), (uint32)file.size()),
 							m_flags,
 							0,
 							&info);

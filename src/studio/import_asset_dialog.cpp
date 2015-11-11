@@ -26,7 +26,7 @@
 typedef StringBuilder<Lumix::MAX_PATH_LENGTH> PathBuilder;
 
 
-enum class VertexAttributeDef : uint32_t
+enum class VertexAttributeDef : Lumix::uint32
 {
 	POSITION,
 	FLOAT1,
@@ -75,7 +75,7 @@ crn_bool ddsConvertCallback(crn_uint32 phase_index,
 static bool saveAsRaw(ImportAssetDialog& dialog,
 	Lumix::FS::FileSystem& fs,
 	const char* source_path,
-	const uint8_t* image_data,
+	const Lumix::uint8* image_data,
 	int image_width,
 	int image_height,
 	const char* dest_path,
@@ -99,13 +99,13 @@ static bool saveAsRaw(ImportAssetDialog& dialog,
 		return false;
 	}
 
-	Lumix::Array<uint16_t> data(allocator);
+	Lumix::Array<Lumix::uint16> data(allocator);
 	data.resize(image_width * image_height);
 	for (int j = 0; j < image_height; ++j)
 	{
 		for (int i = 0; i < image_width; ++i)
 		{
-			data[i + j * image_width] = uint16_t(scale * image_data[(i + j * image_width) * 4]);
+			data[i + j * image_width] = Lumix::uint16(scale * image_data[(i + j * image_width) * 4]);
 		}
 	}
 
@@ -118,7 +118,7 @@ static bool saveAsRaw(ImportAssetDialog& dialog,
 static bool saveAsDDS(ImportAssetDialog& dialog,
 					  Lumix::FS::FileSystem& fs,
 					  const char* source_path,
-					  const uint8_t* image_data,
+					  const Lumix::uint8* image_data,
 					  int image_width,
 					  int image_height,
 					  const char* dest_path)
@@ -145,7 +145,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 	comp_params.m_pProgress_func = ddsConvertCallback;
 	comp_params.m_pProgress_func_data = &callback_data;
 	comp_params.m_num_helper_threads = 3;
-	comp_params.m_pImages[0][0] = (uint32_t*)image_data;
+	comp_params.m_pImages[0][0] = (Lumix::uint32*)image_data;
 	crn_mipmap_params mipmap_params;
 	mipmap_params.m_mode = cCRNMipModeGenerateMips;
 
@@ -374,7 +374,7 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 
 		float weights[4];
-		uint16_t bone_indices[4];
+		Lumix::uint16 bone_indices[4];
 		int index;
 	};
 
@@ -715,12 +715,12 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	static uint32_t packUint32(uint8_t _x, uint8_t _y, uint8_t _z, uint8_t _w)
+	static Lumix::uint32 packuint32(Lumix::uint8 _x, Lumix::uint8 _y, Lumix::uint8 _z, Lumix::uint8 _w)
 	{
 		union
 		{
-			uint32_t ui32;
-			uint8_t arr[4];
+			Lumix::uint32 ui32;
+			Lumix::uint8 arr[4];
 		} un;
 
 		un.arr[0] = _x;
@@ -732,22 +732,22 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	static uint32_t packF4u(const aiVector3D& vec)
+	static Lumix::uint32 packF4u(const aiVector3D& vec)
 	{
-		const uint8_t xx = uint8_t(vec.x * 127.0f + 128.0f);
-		const uint8_t yy = uint8_t(vec.y * 127.0f + 128.0f);
-		const uint8_t zz = uint8_t(vec.z * 127.0f + 128.0f);
-		const uint8_t ww = uint8_t(0);
-		return packUint32(xx, yy, zz, ww);
+		const Lumix::uint8 xx = Lumix::uint8(vec.x * 127.0f + 128.0f);
+		const Lumix::uint8 yy = Lumix::uint8(vec.y * 127.0f + 128.0f);
+		const Lumix::uint8 zz = Lumix::uint8(vec.z * 127.0f + 128.0f);
+		const Lumix::uint8 ww = Lumix::uint8(0);
+		return packuint32(xx, yy, zz, ww);
 	}
 
 
 	void writeGeometry(Lumix::FS::IFile& file) const
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
-		int32_t indices_count = 0;
+		Lumix::int32 indices_count = 0;
 		int vertices_count = 0;
-		int32_t vertices_size = 0;
+		Lumix::int32 vertices_size = 0;
 		for (auto* mesh : m_filtered_meshes)
 		{
 			indices_count += mesh->mNumFaces * 3;
@@ -756,7 +756,7 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 
 		file.write((const char*)&indices_count, sizeof(indices_count));
-		int32_t polygon_idx = 0;
+		Lumix::int32 polygon_idx = 0;
 		for (auto* mesh : m_filtered_meshes)
 		{
 			for (unsigned int j = 0; j < mesh->mNumFaces; ++j)
@@ -800,22 +800,22 @@ struct ConvertTask : public Lumix::MT::Task
 				if (mesh->mColors[0])
 				{
 					auto assimp_color = mesh->mColors[0][j];
-					uint8_t color[4];
-					color[0] = uint8_t(assimp_color.r * 255);
-					color[1] = uint8_t(assimp_color.g * 255);
-					color[2] = uint8_t(assimp_color.b * 255);
-					color[3] = uint8_t(assimp_color.a * 255);
+					Lumix::uint8 color[4];
+					color[0] = Lumix::uint8(assimp_color.r * 255);
+					color[1] = Lumix::uint8(assimp_color.g * 255);
+					color[2] = Lumix::uint8(assimp_color.b * 255);
+					color[3] = Lumix::uint8(assimp_color.a * 255);
 					file.write(color, sizeof(color));
 				}
 
 				auto normal = normal_matrix * mesh->mNormals[j];
-				uint32_t int_normal = packF4u(normal);
+				Lumix::uint32 int_normal = packF4u(normal);
 				file.write((const char*)&int_normal, sizeof(int_normal));
 
 				if (mesh->mTangents)
 				{
 					auto tangent = mesh->mTangents[j];
-					uint32_t int_tangent = packF4u(tangent);
+					Lumix::uint32 int_tangent = packF4u(tangent);
 					file.write((const char*)&int_tangent, sizeof(int_tangent));
 				}
 
@@ -840,12 +840,12 @@ struct ConvertTask : public Lumix::MT::Task
 	static int getVertexSize(const aiMesh* mesh)
 	{
 		static const int POSITION_SIZE = sizeof(float) * 3;
-		static const int NORMAL_SIZE = sizeof(uint8_t) * 4;
-		static const int TANGENT_SIZE = sizeof(uint8_t) * 4;
+		static const int NORMAL_SIZE = sizeof(Lumix::uint8) * 4;
+		static const int TANGENT_SIZE = sizeof(Lumix::uint8) * 4;
 		static const int UV_SIZE = sizeof(float) * 2;
-		static const int COLOR_SIZE = sizeof(uint8_t) * 4;
+		static const int COLOR_SIZE = sizeof(Lumix::uint8) * 4;
 		static const int BONE_INDICES_WEIGHTS_SIZE =
-			sizeof(float) * 4 + sizeof(uint16_t) * 4;
+			sizeof(float) * 4 + sizeof(Lumix::uint16) * 4;
 		int size = POSITION_SIZE + NORMAL_SIZE + UV_SIZE;
 		if (mesh->mTangents) size += TANGENT_SIZE;
 		if (mesh->mColors[0]) size += COLOR_SIZE;
@@ -903,34 +903,34 @@ struct ConvertTask : public Lumix::MT::Task
 	void writeMeshes(Lumix::FS::IFile& file) const
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
-		int32_t mesh_count = 0;
+		Lumix::int32 mesh_count = 0;
 		for (int i = 0; i < m_dialog.m_mesh_mask.size(); ++i)
 		{
 			if (m_dialog.m_mesh_mask[i]) ++mesh_count;
 		}
 
 		file.write((const char*)&mesh_count, sizeof(mesh_count));
-		int32_t attribute_array_offset = 0;
-		int32_t indices_offset = 0;
+		Lumix::int32 attribute_array_offset = 0;
+		Lumix::int32 indices_offset = 0;
 		for (auto* mesh : m_filtered_meshes)
 		{
 			int vertex_size = getVertexSize(mesh);
 			aiString material_name;
 			scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_NAME,
 				material_name);
-			int32_t length = (int)strlen(material_name.C_Str());
+			Lumix::int32 length = (int)strlen(material_name.C_Str());
 			file.write((const char*)&length, sizeof(length));
 			file.write((const char*)material_name.C_Str(), length);
 
 			file.write((const char*)&attribute_array_offset,
 				sizeof(attribute_array_offset));
-			int32_t attribute_array_size = mesh->mNumVertices * vertex_size;
+			Lumix::int32 attribute_array_size = mesh->mNumVertices * vertex_size;
 			attribute_array_offset += attribute_array_size;
 			file.write((const char*)&attribute_array_size,
 				sizeof(attribute_array_size));
 
 			file.write((const char*)&indices_offset, sizeof(indices_offset));
-			int32_t mesh_tri_count = mesh->mNumFaces;
+			Lumix::int32 mesh_tri_count = mesh->mNumFaces;
 			indices_offset += mesh->mNumFaces * 3;
 			file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
@@ -940,7 +940,7 @@ struct ConvertTask : public Lumix::MT::Task
 			file.write((const char*)&length, sizeof(length));
 			file.write((const char*)mesh_name.C_Str(), length);
 
-			int32_t attribute_count = getAttributeCount(mesh);
+			Lumix::int32 attribute_count = getAttributeCount(mesh);
 			file.write((const char*)&attribute_count, sizeof(attribute_count));
 
 			if (isSkinned(mesh))
@@ -962,30 +962,30 @@ struct ConvertTask : public Lumix::MT::Task
 		VertexAttributeDef attribute_type,
 		Lumix::FS::IFile& file)
 	{
-		uint32_t length = (int)strlen(attribute_name);
+		Lumix::uint32 length = (int)strlen(attribute_name);
 		file.write((const char*)&length, sizeof(length));
 		file.write(attribute_name, length);
 
-		uint32_t type = (uint32_t)attribute_type;
+		Lumix::uint32 type = (Lumix::uint32)attribute_type;
 		file.write((const char*)&type, sizeof(type));
 	}
 
 
 	static void writeNode(Lumix::FS::IFile& file, const aiNode* node, aiMatrix4x4 parent_transform)
 	{
-		int32_t len = (int32_t)strlen(node->mName.C_Str());
+		Lumix::int32 len = (Lumix::int32)strlen(node->mName.C_Str());
 		file.write((const char*)&len, sizeof(len));
 		file.write(node->mName.C_Str(), node->mName.length + 1);
 
 		if (node->mParent)
 		{
-			int32_t len = (int32_t)strlen(node->mParent->mName.C_Str());
+			Lumix::int32 len = (Lumix::int32)strlen(node->mParent->mName.C_Str());
 			file.write((const char*)&len, sizeof(len));
 			file.write(node->mParent->mName.C_Str(), node->mParent->mName.length);
 		}
 		else
 		{
-			int32_t len = 0;
+			Lumix::int32 len = 0;
 			file.write((const char*)&len, sizeof(len));
 		}
 
@@ -1008,8 +1008,8 @@ struct ConvertTask : public Lumix::MT::Task
 
 	void writeLods(Lumix::FS::IFile& file) const
 	{
-		int32_t lods[] = { -1, -1, -1, -1, -1, -1, -1, -1 };
-		int32_t lod_count = -1;
+		Lumix::int32 lods[] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+		Lumix::int32 lod_count = -1;
 		float factors[8];
 		for (int i = 0; i < m_filtered_meshes.size(); ++i)
 		{
@@ -1024,7 +1024,7 @@ struct ConvertTask : public Lumix::MT::Task
 		{
 			lod_count = 1;
 			file.write((const char*)&lod_count, sizeof(lod_count));
-			int32_t to_mesh = m_filtered_meshes.size() - 1;
+			Lumix::int32 to_mesh = m_filtered_meshes.size() - 1;
 			file.write((const char*)&to_mesh, sizeof(to_mesh));
 			float distance = FLT_MAX;
 			file.write((const char*)&distance, sizeof(distance));
@@ -1034,7 +1034,7 @@ struct ConvertTask : public Lumix::MT::Task
 			file.write((const char*)&lod_count, sizeof(lod_count));
 			for (int i = 0; i < lod_count; ++i)
 			{
-				int32_t to_mesh = lods[i];
+				Lumix::int32 to_mesh = lods[i];
 				file.write((const char*)&to_mesh, sizeof(to_mesh));
 				float factor = i == lod_count - 1 ? FLT_MAX : factors[i];
 				file.write((const char*)&factor, sizeof(factor));
@@ -1046,7 +1046,7 @@ struct ConvertTask : public Lumix::MT::Task
 	void writeSkeleton(Lumix::FS::IFile& file) const
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
-		int32_t count = countNodes(scene->mRootNode);
+		Lumix::int32 count = countNodes(scene->mRootNode);
 
 		if (count == 1)
 		{
@@ -1064,8 +1064,8 @@ struct ConvertTask : public Lumix::MT::Task
 	{
 		Lumix::PhysicsGeometry::Header header;
 		header.m_magic = Lumix::PhysicsGeometry::HEADER_MAGIC;
-		header.m_version = (uint32_t)Lumix::PhysicsGeometry::Versions::LAST;
-		header.m_convex = (uint32_t)m_dialog.m_make_convex;
+		header.m_version = (Lumix::uint32)Lumix::PhysicsGeometry::Versions::LAST;
+		header.m_convex = (Lumix::uint32)m_dialog.m_make_convex;
 		file.write((const char*)&header, sizeof(header));
 	}
 
@@ -1090,10 +1090,10 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 
 		writePhysicsHeader(*file);
-		int32_t count = 0;
+		Lumix::int32 count = 0;
 		for (auto* mesh : m_filtered_meshes)
 		{
-			count += (int32_t)mesh->mNumVertices;
+			count += (Lumix::int32)mesh->mNumVertices;
 		}
 		file->write((const char*)&count, sizeof(count));
 		for (auto* mesh : m_filtered_meshes)
@@ -1114,7 +1114,7 @@ struct ConvertTask : public Lumix::MT::Task
 		int count = 0;
 		for (auto* mesh : m_filtered_meshes)
 		{
-			count += (int32_t)mesh->mNumFaces * 3;
+			count += (int)mesh->mNumFaces * 3;
 		}
 		file.write((const char*)&count, sizeof(count));
 		int offset = 0;
@@ -1123,7 +1123,7 @@ struct ConvertTask : public Lumix::MT::Task
 			for (unsigned int j = 0; j < mesh->mNumFaces; ++j)
 			{
 				ASSERT(mesh->mFaces[j].mNumIndices == 3);
-				uint32_t index = mesh->mFaces[j].mIndices[0] + offset;
+				Lumix::uint32 index = mesh->mFaces[j].mIndices[0] + offset;
 				file.write((const char*)&index, sizeof(index));
 				index = mesh->mFaces[j].mIndices[1] + offset;
 				file.write((const char*)&index, sizeof(index));
@@ -1166,7 +1166,7 @@ struct ConvertTask : public Lumix::MT::Task
 	{
 		Lumix::Model::FileHeader header;
 		header.m_magic = Lumix::Model::FILE_MAGIC;
-		header.m_version = (uint32_t)Lumix::Model::FileVersion::LATEST;
+		header.m_version = (Lumix::uint32)Lumix::Model::FileVersion::LATEST;
 		file.write((const char*)&header, sizeof(header));
 	}
 
@@ -1513,7 +1513,7 @@ void ImportAssetDialog::importTexture()
 	char tmp[Lumix::MAX_PATH_LENGTH];
 	Lumix::PathUtils::normalize(dest_path, tmp, Lumix::lengthOf(tmp));
 	m_editor.getRelativePath(dest_path, Lumix::lengthOf(dest_path), tmp);
-	uint32_t hash = Lumix::crc32(dest_path);
+	Lumix::uint32 hash = Lumix::crc32(dest_path);
 
 	m_metadata.setString(hash, Lumix::crc32("source"), m_source);
 
@@ -1658,7 +1658,7 @@ void ImportAssetDialog::onGUI()
 						const char* name = scene->mMeshes[i]->mName.C_Str();
 						bool b = m_mesh_mask[i];
 						ImGui::Checkbox(name[0] == '\0'
-							? StringBuilder<30>("N/A###na", (uint64_t)&scene->mMeshes[i])
+							? StringBuilder<30>("N/A###na", (Lumix::uint64)&scene->mMeshes[i])
 											: name,
 							&b);
 						m_mesh_mask[i] = b;

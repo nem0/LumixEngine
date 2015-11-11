@@ -34,7 +34,7 @@ namespace Lumix
 		{
 #if TYPE == MULTI_THREAD
 
-			int32_t count = MT::atomicIncrement(&m_dependency_count);
+			int32 count = MT::atomicIncrement(&m_dependency_count);
 			if (1 == count)
 			{
 				dependencyNotReady();
@@ -47,7 +47,7 @@ namespace Lumix
 		{
 #if TYPE == MULTI_THREAD
 
-			int32_t count = MT::atomicDecrement(&m_dependency_count);
+			int32 count = MT::atomicDecrement(&m_dependency_count);
 			if (0 == count)
 			{
 				dependencyReady();
@@ -62,12 +62,12 @@ namespace Lumix
 		{
 #if TYPE == MULTI_THREAD
 
-			for (uint32_t i = 0, c = m_static_dependency_table.size(); c > i; ++i)
+			for (uint32 i = 0, c = m_static_dependency_table.size(); c > i; ++i)
 			{
 				m_static_dependency_table[i]->incrementDependency();
 			}
 
-			for (uint32_t i = 0, c = m_dependency_table.size(); c > i; ++i)
+			for (uint32 i = 0, c = m_dependency_table.size(); c > i; ++i)
 			{
 				m_dependency_table[i]->incrementDependency();
 			}
@@ -86,7 +86,7 @@ namespace Lumix
 
 			BaseEntry::dependencyReady();
 
-			for (uint32_t i = 0, c = m_static_dependency_table.size(); c > i; ++i)
+			for (uint32 i = 0, c = m_static_dependency_table.size(); c > i; ++i)
 			{
 				m_static_dependency_table[i]->decrementDependency();
 			}

@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "lumix.h"
 #include <bgfx/bgfx.h>
 
 
@@ -34,10 +35,10 @@ class FrameBuffer
 
 			static const int MAX_RENDERBUFFERS = 16;
 
-			int32_t m_width;
-			int32_t m_height;
+			int32 m_width;
+			int32 m_height;
 			RenderBuffer m_renderbuffers[MAX_RENDERBUFFERS];
-			int32_t m_renderbuffers_count;
+			int32 m_renderbuffers_count;
 			char m_name[64];
 		};
 

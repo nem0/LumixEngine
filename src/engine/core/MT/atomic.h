@@ -8,16 +8,16 @@ namespace MT
 {
 
 
-LUMIX_ENGINE_API int32_t atomicIncrement(int32_t volatile* value);
-LUMIX_ENGINE_API int32_t atomicDecrement(int32_t volatile* value);
-LUMIX_ENGINE_API int32_t atomicAdd(int32_t volatile* addend, int32_t value);
-LUMIX_ENGINE_API int32_t atomicSubtract(int32_t volatile* addend,
-										int32_t value);
+LUMIX_ENGINE_API int32 atomicIncrement(int32 volatile* value);
+LUMIX_ENGINE_API int32 atomicDecrement(int32 volatile* value);
+LUMIX_ENGINE_API int32 atomicAdd(int32 volatile* addend, int32 value);
+LUMIX_ENGINE_API int32 atomicSubtract(int32 volatile* addend,
+										int32 value);
 LUMIX_ENGINE_API bool
-compareAndExchange(int32_t volatile* dest, int32_t exchange, int32_t comperand);
-LUMIX_ENGINE_API bool compareAndExchange64(int64_t volatile* dest,
-										   int64_t exchange,
-										   int64_t comperand);
+compareAndExchange(int32 volatile* dest, int32 exchange, int32 comperand);
+LUMIX_ENGINE_API bool compareAndExchange64(int64 volatile* dest,
+										   int64 exchange,
+										   int64 comperand);
 
 
 } // ~namespace MT

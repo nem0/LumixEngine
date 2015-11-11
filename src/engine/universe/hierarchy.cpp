@@ -16,7 +16,7 @@ class HierarchyImpl : public Hierarchy
 {
 private:
 	
-	typedef HashMap<int32_t, int32_t> Parents;
+	typedef HashMap<int32, int32> Parents;
 
 public:
 	HierarchyImpl(Universe& universe, IAllocator& allocator)
@@ -34,7 +34,7 @@ public:
 
 	~HierarchyImpl()
 	{
-		PODHashMap<int32_t, Array<Child> *>::iterator iter = m_children.begin(),
+		PODHashMap<int32, Array<Child> *>::iterator iter = m_children.begin(),
 													  end = m_children.end();
 		while (iter != end)
 		{
@@ -170,7 +170,7 @@ public:
 	virtual void serialize(OutputBlob& serializer) override
 	{
 		int size = m_parents.size();
-		serializer.write((int32_t)size);
+		serializer.write((int32)size);
 		Parents::iterator iter = m_parents.begin(), end = m_parents.end();
 		while (iter != end)
 		{
@@ -183,11 +183,11 @@ public:
 
 	virtual void deserialize(InputBlob& serializer) override
 	{
-		int32_t size;
+		int32 size;
 		serializer.read(size);
 		for (int i = 0; i < size; ++i)
 		{
-			int32_t child, parent;
+			int32 child, parent;
 			serializer.read(child);
 			serializer.read(parent);
 			setParent(Entity(child), Entity(parent));

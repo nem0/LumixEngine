@@ -18,8 +18,8 @@ class PathInternal
 {
 public:
 	char m_path[MAX_PATH_LENGTH];
-	uint32_t m_id;
-	volatile int32_t m_ref_count;
+	uint32 m_id;
+	volatile int32 m_ref_count;
 };
 
 
@@ -37,16 +37,16 @@ public:
 	void clear();
 
 private:
-	PathInternal* getPath(uint32_t hash, const char* path);
-	PathInternal* getPath(uint32_t hash);
-	PathInternal* getPathMultithreadUnsafe(uint32_t hash, const char* path);
+	PathInternal* getPath(uint32 hash, const char* path);
+	PathInternal* getPath(uint32 hash);
+	PathInternal* getPathMultithreadUnsafe(uint32 hash, const char* path);
 	void incrementRefCount(PathInternal* path);
 	void decrementRefCount(PathInternal* path);
 
 private:
 	DefaultAllocator m_src_allocator;
 	BaseProxyAllocator m_allocator;
-	AssociativeArray<uint32_t, PathInternal*> m_paths;
+	AssociativeArray<uint32, PathInternal*> m_paths;
 	MT::SpinMutex m_mutex;
 	PathInternal* m_empty_path;
 };
@@ -60,7 +60,7 @@ class LUMIX_ENGINE_API Path
 public:
 	Path();
 	Path(const Path& rhs);
-	explicit Path(uint32_t hash);
+	explicit Path(uint32 hash);
 	explicit Path(const char* path);
 	void operator=(const Path& rhs);
 	void operator=(const char* rhs);
@@ -72,8 +72,8 @@ public:
 	~Path();
 
 	operator const char*() const { return m_data->m_path; }
-	operator uint32_t() const { return m_data->m_id; }
-	uint32_t getHash() const { return m_data->m_id; }
+	operator uint32() const { return m_data->m_id; }
+	uint32 getHash() const { return m_data->m_id; }
 
 	const char* c_str() const { return m_data->m_path; }
 	size_t length() const { return strlen(m_data->m_path); }

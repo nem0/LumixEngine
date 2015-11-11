@@ -17,7 +17,7 @@ namespace Lumix
 			::closesocket(m_socket);
 		}
 
-		TCPStream* TCPConnector::connect(const char* ip, uint16_t port)
+		TCPStream* TCPConnector::connect(const char* ip, uint16 port)
 		{
 			WORD sockVer;
 			WSADATA wsaData;

@@ -4,7 +4,6 @@
 #include "core/log.h"
 #include "core/math_utils.h"
 #include "core/path.h"
-#include <inttypes.h>
 
 
 namespace Lumix
@@ -96,8 +95,8 @@ void JsonSerializer::serialize(const char* label, unsigned int value)
 	char tmp[20];
 	writeString(label);
 	toCString(value, tmp, 20);
-	m_file.write(" : ", (int32_t)strlen(" : "));
-	m_file.write(tmp, (int32_t)strlen(tmp));
+	m_file.write(" : ", (int32)strlen(" : "));
+	m_file.write(tmp, (int32)strlen(tmp));
 	m_is_first_in_block = false;
 }
 
@@ -108,8 +107,8 @@ void JsonSerializer::serialize(const char* label, float value)
 	char tmp[20];
 	writeString(label);
 	toCString(value, tmp, 20, 8);
-	m_file.write(" : ", (int32_t)strlen(" : "));
-	m_file.write(tmp, (int32_t)strlen(tmp));
+	m_file.write(" : ", (int32)strlen(" : "));
+	m_file.write(tmp, (int32)strlen(tmp));
 	m_is_first_in_block = false;
 }
 
@@ -120,8 +119,8 @@ void JsonSerializer::serialize(const char* label, int value)
 	char tmp[20];
 	writeString(label);
 	toCString(value, tmp, 20);
-	m_file.write(" : ", (int32_t)strlen(" : "));
-	m_file.write(tmp, (int32_t)strlen(tmp));
+	m_file.write(" : ", (int32)strlen(" : "));
+	m_file.write(tmp, (int32)strlen(tmp));
 	m_is_first_in_block = false;
 }
 
@@ -137,7 +136,7 @@ void JsonSerializer::serialize(const char* label, const char* value)
 	}
 	else
 	{
-		m_file.write(value, (int32_t)strlen(value));
+		m_file.write(value, (int32)strlen(value));
 	}
 	m_file.write("\"", 1);
 	m_is_first_in_block = false;
@@ -212,7 +211,7 @@ void JsonSerializer::serializeArrayItem(unsigned int value)
 	writeBlockComma();
 	char tmp[20];
 	toCString(value, tmp, 20);
-	m_file.write(tmp, (int32_t)strlen(tmp));
+	m_file.write(tmp, (int32)strlen(tmp));
 	m_is_first_in_block = false;
 }
 
@@ -222,17 +221,17 @@ void JsonSerializer::serializeArrayItem(int value)
 	writeBlockComma();
 	char tmp[20];
 	toCString(value, tmp, 20);
-	m_file.write(tmp, (int32_t)strlen(tmp));
+	m_file.write(tmp, (int32)strlen(tmp));
 	m_is_first_in_block = false;
 }
 
 
-void JsonSerializer::serializeArrayItem(int64_t value)
+void JsonSerializer::serializeArrayItem(int64 value)
 {
 	writeBlockComma();
 	char tmp[30];
 	toCString(value, tmp, 30);
-	m_file.write(tmp, (int32_t)strlen(tmp));
+	m_file.write(tmp, (int32)strlen(tmp));
 	m_is_first_in_block = false;
 }
 
@@ -242,7 +241,7 @@ void JsonSerializer::serializeArrayItem(float value)
 	writeBlockComma();
 	char tmp[20];
 	toCString(value, tmp, 20, 8);
-	m_file.write(tmp, (int32_t)strlen(tmp));
+	m_file.write(tmp, (int32)strlen(tmp));
 	m_is_first_in_block = false;
 }
 
@@ -292,7 +291,7 @@ void JsonSerializer::deserialize(float& value, float default_value)
 }
 
 
-void JsonSerializer::deserialize(int32_t& value, int32_t default_value)
+void JsonSerializer::deserialize(int32& value, int32 default_value)
 {
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
 	{
@@ -338,8 +337,8 @@ void JsonSerializer::deserialize(const char* label,
 
 
 void JsonSerializer::deserialize(const char* label,
-								 uint32_t& value,
-								 uint32_t default_value)
+								 uint32& value,
+								 uint32 default_value)
 {
 	deserializeLabel(label);
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -367,8 +366,8 @@ bool JsonSerializer::isObjectEnd()
 
 
 void JsonSerializer::deserialize(const char* label,
-								 int32_t& value,
-								 int32_t default_value)
+								 int32& value,
+								 int32 default_value)
 {
 	deserializeLabel(label);
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -494,8 +493,8 @@ void JsonSerializer::deserializeArrayItem(char* value,
 }
 
 
-void JsonSerializer::deserializeArrayItem(uint32_t& value,
-										  uint32_t default_value)
+void JsonSerializer::deserializeArrayItem(uint32& value,
+										  uint32 default_value)
 {
 	deserializeArrayComma();
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -506,7 +505,7 @@ void JsonSerializer::deserializeArrayItem(uint32_t& value,
 }
 
 
-void JsonSerializer::deserializeArrayItem(int32_t& value, int32_t default_value)
+void JsonSerializer::deserializeArrayItem(int32& value, int32 default_value)
 {
 	deserializeArrayComma();
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -517,7 +516,7 @@ void JsonSerializer::deserializeArrayItem(int32_t& value, int32_t default_value)
 }
 
 
-void JsonSerializer::deserializeArrayItem(int64_t& value, int64_t default_value)
+void JsonSerializer::deserializeArrayItem(int64& value, int64 default_value)
 {
 	deserializeArrayComma();
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -708,7 +707,7 @@ void JsonSerializer::writeString(const char* str)
 	m_file.write("\"", 1);
 	if (str)
 	{
-		m_file.write(str, (int32_t)strlen(str));
+		m_file.write(str, (int32)strlen(str));
 	}
 	m_file.write("\"", 1);
 }

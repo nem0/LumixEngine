@@ -5,9 +5,9 @@
 
 namespace
 {
-const int32_t BUFFER_SIZE = 10000;
-const int32_t TESTS_COUNT = 10;
-const int32_t TEST_RUNS = 100;
+const int32 BUFFER_SIZE = 10000;
+const int32 TESTS_COUNT = 10;
+const int32 TEST_RUNS = 100;
 
 float IN1_BUFFER[TESTS_COUNT][BUFFER_SIZE];
 float IN2_BUFFER[TESTS_COUNT][BUFFER_SIZE];
@@ -25,7 +25,7 @@ public:
 	TestJob(float* buffer_in1,
 		float* buffer_in2,
 		float* buffer_out,
-		int32_t size,
+		int32 size,
 		bool auto_destroy,
 		Lumix::MTJD::Manager& manager,
 		Lumix::IAllocator& allocator)
@@ -52,7 +52,7 @@ public:
 
 	virtual void execute() override
 	{
-		for (int32_t i = 0; i < m_size; i++)
+		for (int32 i = 0; i < m_size; i++)
 		{
 			m_buffer_out[i] = m_buffer_in1[i] + m_buffer_in2[i];
 		}
@@ -62,7 +62,7 @@ private:
 	float* m_buffer_in1;
 	float* m_buffer_in2;
 	float* m_buffer_out;
-	int32_t m_size;
+	int32 m_size;
 };
 
 void UT_MTJDFrameworkTest(const char* params)
@@ -72,9 +72,9 @@ void UT_MTJDFrameworkTest(const char* params)
 
 	for (size_t x = 0; x < TEST_RUNS; x++)
 	{
-		for (int32_t i = 0; i < TESTS_COUNT; i++)
+		for (int32 i = 0; i < TESTS_COUNT; i++)
 		{
-			for (int32_t j = 0; j < BUFFER_SIZE; j++)
+			for (int32 j = 0; j < BUFFER_SIZE; j++)
 			{
 				IN1_BUFFER[i][j] = (float)j;
 				IN2_BUFFER[i][j] = (float)j;
@@ -84,7 +84,7 @@ void UT_MTJDFrameworkTest(const char* params)
 
 		TestJob** jobs = (TestJob**)allocator.allocate(sizeof(TestJob*) * TESTS_COUNT);
 
-		for (int32_t i = 0; i < TESTS_COUNT; i++)
+		for (int32 i = 0; i < TESTS_COUNT; i++)
 		{
 			jobs[i] = allocator.newObject<TestJob>(IN1_BUFFER[i],
 				IN2_BUFFER[i],
@@ -95,30 +95,30 @@ void UT_MTJDFrameworkTest(const char* params)
 				allocator);
 		}
 
-		for (int32_t i = 0; i < TESTS_COUNT / 2; i += 2)
+		for (int32 i = 0; i < TESTS_COUNT / 2; i += 2)
 		{
 			jobs[i]->addDependency(jobs[i + 1]);
 		}
 
-		for (int32_t i = TESTS_COUNT - 1; i > -1; i--)
+		for (int32 i = TESTS_COUNT - 1; i > -1; i--)
 		{
 			manager.schedule(jobs[i]);
 		}
 
-		for (int32_t i = 0; i < TESTS_COUNT; i++)
+		for (int32 i = 0; i < TESTS_COUNT; i++)
 		{
 			jobs[i]->sync();
 		}
 
-		for (int32_t i = 0; i < TESTS_COUNT; i++)
+		for (int32 i = 0; i < TESTS_COUNT; i++)
 		{
-			for (int32_t j = 0; j < BUFFER_SIZE; j++)
+			for (int32 j = 0; j < BUFFER_SIZE; j++)
 			{
 				LUMIX_EXPECT_EQ(OUT_BUFFER[i][j], (float)j + (float)j);
 			}
 		}
 
-		for (int32_t i = 0; i < TESTS_COUNT; i++)
+		for (int32 i = 0; i < TESTS_COUNT; i++)
 		{
 			allocator.deleteObject(jobs[i]);
 		}
@@ -130,9 +130,9 @@ void UT_MTJDFrameworkTest(const char* params)
 void UT_MTJDFrameworkDependencyTest(const char* params)
 {
 	Lumix::DefaultAllocator allocator;
-	for (int32_t i = 0; i < TESTS_COUNT; i++)
+	for (int32 i = 0; i < TESTS_COUNT; i++)
 	{
-		for (int32_t j = 0; j < BUFFER_SIZE; j++)
+		for (int32 j = 0; j < BUFFER_SIZE; j++)
 		{
 			IN1_BUFFER[i][j] = (float)j;
 			IN2_BUFFER[i][j] = (float)j;
@@ -144,7 +144,7 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 
 	TestJob** jobs = (TestJob**)allocator.allocate(sizeof(TestJob*) * TESTS_COUNT);
 
-	for (int32_t i = 0; i < TESTS_COUNT - 1; i++)
+	for (int32 i = 0; i < TESTS_COUNT - 1; i++)
 	{
 		jobs[i] = allocator.newObject<TestJob>(IN1_BUFFER[i],
 			IN2_BUFFER[i],
@@ -163,27 +163,27 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 		manager,
 		allocator);
 
-	for (int32_t i = 0; i < TESTS_COUNT - 1; i++)
+	for (int32 i = 0; i < TESTS_COUNT - 1; i++)
 	{
 		jobs[i]->addDependency(jobs[i + 1]);
 	}
 
-	for (int32_t i = 0; i < TESTS_COUNT; i++)
+	for (int32 i = 0; i < TESTS_COUNT; i++)
 	{
 		manager.schedule(jobs[i]);
 	}
 
-	for (int32_t i = 0; i < TESTS_COUNT; i++)
+	for (int32 i = 0; i < TESTS_COUNT; i++)
 	{
 		jobs[i]->sync();
 	}
 
-	for (int32_t i = 0; i < BUFFER_SIZE; i++)
+	for (int32 i = 0; i < BUFFER_SIZE; i++)
 	{
 		LUMIX_EXPECT_EQ(OUT_BUFFER[0][i], (float)i * (float)(TESTS_COUNT + 1));
 	}
 
-	for (int32_t i = 0; i < TESTS_COUNT; i++)
+	for (int32 i = 0; i < TESTS_COUNT; i++)
 	{
 		allocator.deleteObject(jobs[i]);
 	}

@@ -33,7 +33,7 @@ namespace Lumix
 	}
 
 
-	OutputBlob& OutputBlob::operator << (uint32_t value)
+	OutputBlob& OutputBlob::operator << (uint32 value)
 	{
 		char tmp[20];
 		Lumix::toCString(value, tmp, Lumix::lengthOf(tmp));
@@ -77,26 +77,26 @@ namespace Lumix
 	{
 		if (string)
 		{
-			int32_t size = (int32_t)strlen(string) + 1;
+			int32 size = (int32)strlen(string) + 1;
 			write(size);
 			write(string, size);
 		}
 		else
 		{
-			write((int32_t)0);
+			write((int32)0);
 		}
 	}
 
 
 	InputBlob::InputBlob(const void* data, int size)
-		: m_data((const uint8_t*)data)
+		: m_data((const uint8*)data)
 		, m_size(size)
 		, m_pos(0)
 	{}
 
 
 	InputBlob::InputBlob(const OutputBlob& blob)
-		: m_data((const uint8_t*)blob.getData())
+		: m_data((const uint8*)blob.getData())
 		, m_size(blob.getSize())
 		, m_pos(0)
 	{}
@@ -106,7 +106,7 @@ namespace Lumix
 	{
 		if (m_pos + (int)size > m_size)
 		{
-			for (int32_t i = 0; i < size; ++i)
+			for (int32 i = 0; i < size; ++i)
 				((unsigned char*)data)[i] = 0;
 			return false;
 		}
@@ -121,7 +121,7 @@ namespace Lumix
 	
 	bool InputBlob::readString(char* data, int max_size)
 	{
-		int32_t size;
+		int32 size;
 		read(size);
 		ASSERT(size <= max_size);
 		return read(data, size < max_size ? size : max_size);

@@ -20,7 +20,7 @@ namespace Lumix
 	{
 		Manager* Manager::s_instance = NULL;
 
-		static const int32_t C_MAX_TRANS = 16;
+		static const int32 C_MAX_TRANS = 16;
 
 		struct UnitTestPair
 		{
@@ -32,7 +32,7 @@ namespace Lumix
 		struct FailInfo
 		{
 			const char* m_file_name;
-			uint32_t m_line;
+			uint32 m_line;
 		};
 
 		typedef MT::Transaction<UnitTestPair> AsynTest;
@@ -192,7 +192,7 @@ namespace Lumix
 				g_log_info.log("unit") << "---------------------------";
 			}
 
-			void handleFail(const char* file_name, uint32_t line)
+			void handleFail(const char* file_name, uint32 line)
 			{	
 				FailInfo& fi = m_failed_tests.pushEmpty();
 				fi.m_file_name = file_name;
@@ -265,7 +265,7 @@ namespace Lumix
 			}
 			
 			IAllocator& m_allocator;
-			uint32_t m_fails;
+			uint32 m_fails;
 
 			UnitTestTable	m_unit_tests;
 			FailedTestTable m_failed_tests;
@@ -300,7 +300,7 @@ namespace Lumix
 			m_impl->dumpResults();
 		}
 
-		void Manager::handleFail(const char* file_name, uint32_t line)
+		void Manager::handleFail(const char* file_name, uint32 line)
 		{
 			m_impl->handleFail(file_name, line);
 		}

@@ -57,7 +57,7 @@ public:
 		virtual void update(float time_delta) {}
 		virtual void serialize(OutputBlob& blob) = 0;
 		virtual void deserialize(InputBlob& blob) = 0;
-		virtual uint32_t getType() const = 0;
+		virtual uint32 getType() const = 0;
 
 		ParticleEmitter& m_emitter;
 	};
@@ -69,9 +69,9 @@ public:
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob& blob) override;
 		void deserialize(InputBlob& blob) override;
-		uint32_t getType() const override { return s_type; }
+		uint32 getType() const override { return s_type; }
 
-		static const uint32_t s_type;
+		static const uint32 s_type;
 		Interval m_x;
 		Interval m_y;
 		Interval m_z;
@@ -84,9 +84,9 @@ public:
 		void update(float time_delta) override;
 		void serialize(OutputBlob& blob) override {}
 		void deserialize(InputBlob& blob) override {}
-		uint32_t getType() const override { return s_type; }
+		uint32 getType() const override { return s_type; }
 
-		static const uint32_t s_type;
+		static const uint32 s_type;
 		
 		Array<float> m_values;
 	};
@@ -98,9 +98,9 @@ public:
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob& blob) override {}
 		void deserialize(InputBlob& blob) override {}
-		uint32_t getType() const override { return s_type; }
+		uint32 getType() const override { return s_type; }
 
-		static const uint32_t s_type;
+		static const uint32 s_type;
 	};
 
 

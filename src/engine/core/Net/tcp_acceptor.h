@@ -16,7 +16,7 @@ namespace Lumix
 			TCPAcceptor(IAllocator& allocator) : m_allocator(allocator) {}
 			~TCPAcceptor();
 
-			bool start(const char* ip, uint16_t port);
+			bool start(const char* ip, uint16 port);
 			TCPStream* accept();
 			void close(TCPStream* stream);
 			

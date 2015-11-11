@@ -20,17 +20,17 @@ namespace Lumix
 {
 
 
-static const uint32_t RENDERABLE_HASH = crc32("renderable");
+static const uint32 RENDERABLE_HASH = crc32("renderable");
 static const float INFLUENCE_DISTANCE = 0.3f;
-static const uint32_t X_COLOR = 0xff6363cf;
-static const uint32_t Y_COLOR = 0xff63cf63;
-static const uint32_t Z_COLOR = 0xffcf6363;
-static const uint32_t SELECTED_COLOR = 0xff63cfcf;
+static const uint32 X_COLOR = 0xff6363cf;
+static const uint32 Y_COLOR = 0xff63cf63;
+static const uint32 Z_COLOR = 0xffcf6363;
+static const uint32 SELECTED_COLOR = 0xff63cfcf;
 
 struct Vertex
 {
 	Vec3 position;
-	uint32_t color;
+	uint32 color;
 	float u, v;
 };
 
@@ -298,7 +298,7 @@ void Gizmo::renderTranslateGizmo(PipelineInstance& pipeline)
 	Matrix mtx = gizmo_mtx * scale_mtx;
 	
 	Vertex vertices[9];
-	uint16_t indices[9];
+	uint16 indices[9];
 	vertices[0].position = Vec3(0, 0, 0);
 	vertices[0].color = m_transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR;
 	indices[0] = 0;
@@ -366,10 +366,10 @@ void Gizmo::renderTranslateGizmo(PipelineInstance& pipeline)
 }
 
 
-void Gizmo::renderQuarterRing(PipelineInstance& pipeline, const Matrix& mtx, const Vec3& a, const Vec3& b, uint32_t color)
+void Gizmo::renderQuarterRing(PipelineInstance& pipeline, const Matrix& mtx, const Vec3& a, const Vec3& b, uint32 color)
 {
 	Vertex vertices[1200];
-	uint16_t indices[1200];
+	uint16 indices[1200];
 	const float ANGLE_STEP = Math::degreesToRadians(1.0f / 100.0f * 360.0f);
 	Vec3 n = crossProduct(a, b) * 0.05f;
 	int offset = -1;

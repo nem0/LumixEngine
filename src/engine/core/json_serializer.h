@@ -40,9 +40,9 @@ namespace Lumix
 			~JsonSerializer();
 
 			// serialize
-			void serialize(const char* label, uint32_t value);
+			void serialize(const char* label, uint32 value);
 			void serialize(const char* label, float value);
-			void serialize(const char* label, int32_t value);
+			void serialize(const char* label, int32 value);
 			void serialize(const char* label, const char* value);
 			void serialize(const char* label, bool value);
 			void beginObject();
@@ -50,30 +50,30 @@ namespace Lumix
 			void endObject();
 			void beginArray(const char* label);
 			void endArray();
-			void serializeArrayItem(uint32_t value);
-			void serializeArrayItem(int32_t value);
-			void serializeArrayItem(int64_t value);
+			void serializeArrayItem(uint32 value);
+			void serializeArrayItem(int32 value);
+			void serializeArrayItem(int64 value);
 			void serializeArrayItem(float value);
 			void serializeArrayItem(bool value);
 			void serializeArrayItem(const char* value);
 
 			// deserialize		
-			void deserialize(const char* label, uint32_t& value, uint32_t default_value);
+			void deserialize(const char* label, uint32& value, uint32 default_value);
 			void deserialize(const char* label, float& value, float default_value);
-			void deserialize(const char* label, int32_t& value, int32_t default_value);
+			void deserialize(const char* label, int32& value, int32 default_value);
 			void deserialize(const char* label, char* value, int max_length, const char* default_value);
 			void deserialize(const char* label, bool& value, bool default_value);
 			void deserialize(char* value, int max_length, const char* default_value);
 			void deserialize(bool& value, bool default_value);
 			void deserialize(float& value, float default_value);
-			void deserialize(int32_t& value, int32_t default_value);
+			void deserialize(int32& value, int32 default_value);
 			void deserializeArrayBegin(const char* label);
 			void deserializeArrayBegin();
 			void deserializeArrayEnd();
 			bool isArrayEnd();
-			void deserializeArrayItem(uint32_t& value, uint32_t default_value);
-			void deserializeArrayItem(int32_t& value, int32_t default_value);
-			void deserializeArrayItem(int64_t& value, int64_t default_value);
+			void deserializeArrayItem(uint32& value, uint32 default_value);
+			void deserializeArrayItem(int32& value, int32 default_value);
+			void deserializeArrayItem(int64& value, int64 default_value);
 			void deserializeArrayItem(float& value, float default_value);
 			void deserializeArrayItem(bool& value, bool default_value);
 			void deserializeArrayItem(char* value, int max_length, const char* default_value);

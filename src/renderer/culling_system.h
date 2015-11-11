@@ -27,14 +27,14 @@ namespace Lumix
 		virtual void clear() = 0;
 		virtual const Results& getResult() = 0;
 
-		virtual void cullToFrustum(const Frustum& frustum, int64_t layer_mask) = 0;
-		virtual void cullToFrustumAsync(const Frustum& frustum, int64_t layer_mask) = 0;
+		virtual void cullToFrustum(const Frustum& frustum, int64 layer_mask) = 0;
+		virtual void cullToFrustumAsync(const Frustum& frustum, int64 layer_mask) = 0;
 
 		virtual void addStatic(const Sphere& sphere) = 0;
 		virtual void removeStatic(int index) = 0;
 
-		virtual void setLayerMask(int index, int64_t layer) = 0;
-		virtual int64_t getLayerMask(int index) = 0;
+		virtual void setLayerMask(int index, int64 layer) = 0;
+		virtual int64 getLayerMask(int index) = 0;
 
 		virtual void enableStatic(int index) = 0;
 		virtual void disableStatic(int index) = 0;

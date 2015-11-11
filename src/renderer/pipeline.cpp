@@ -315,7 +315,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		const bgfx::Memory* vertex_mem = bgfx::copy(vertices, sizeof(vertices));
 		m_particle_vertex_buffer = bgfx::createVertexBuffer(vertex_mem, m_base_vertex_decl);
 
-		uint16_t indices[] = { 0, 1, 2, 0, 2, 3 };
+		uint16 indices[] = { 0, 1, 2, 0, 2, 3 };
 		const bgfx::Memory* index_mem = bgfx::copy(indices, sizeof(indices));
 		m_particle_index_buffer = bgfx::createIndexBuffer(index_mem);
 	}
@@ -503,7 +503,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		const Mesh& mesh = *info.m_mesh;
 		const Model& model = *info.m_model;
 		Material* material = mesh.getMaterial();
-		const uint16_t stride = mesh.getVertexDefinition().getStride();
+		const uint16 stride = mesh.getVertexDefinition().getStride();
 
 		setMaterial(material);
 		bgfx::setVertexBuffer(model.getVerticesHandle(),
@@ -547,7 +547,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		bgfx::setViewTransform(m_view_idx, &mtx.m11, &projection_matrix.m11);
 		
 		bgfx::setViewRect(
-			m_view_idx, m_view_x, m_view_y, (uint16_t)m_width, (uint16_t)m_height);
+			m_view_idx, m_view_x, m_view_y, (uint16)m_width, (uint16)m_height);
 	}
 
 
@@ -671,7 +671,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void executeCustomCommand(uint32_t name)
+	void executeCustomCommand(uint32 name)
 	{
 		CustomCommandHandler handler;
 		if (m_custom_commands_handlers.find(name, handler))
@@ -685,7 +685,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	void renderPointLightShadowmaps(ComponentIndex camera, ComponentIndex light)
 	{
 		Frustum light_frustum;
-		int64_t mask = 0;
+		int64 mask = 0;
 		mask = ~mask;
 		renderPointLightInfluencedGeometry(light_frustum, mask);
 	}
@@ -713,7 +713,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderSpotLightShadowmap(FrameBuffer* fb,
 								  ComponentIndex light,
-								  int64_t layer_mask)
+								  int64 layer_mask)
 	{
 		ASSERT(fb);
 		beginNewView(fb, "point_light");
@@ -722,8 +722,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Matrix mtx = m_scene->getUniverse().getMatrix(light_entity);
 		float fov = m_scene->getLightFOV(light);
 		float range = m_scene->getLightRange(light);
-		uint16_t shadowmap_height = (uint16_t)m_current_framebuffer->getHeight();
-		uint16_t shadowmap_width = (uint16_t)m_current_framebuffer->getWidth();
+		uint16 shadowmap_height = (uint16)m_current_framebuffer->getHeight();
+		uint16 shadowmap_width = (uint16)m_current_framebuffer->getWidth();
 		Vec3 pos = mtx.getTranslation();
 		
 		bgfx::setViewClear(m_view_idx, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
@@ -754,13 +754,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderOmniLightShadowmap(FrameBuffer* fb,
 								  ComponentIndex light,
-								  int64_t layer_mask)
+								  int64 layer_mask)
 	{
 		Entity light_entity = m_scene->getPointLightEntity(light);
 		Vec3 light_pos = m_scene->getUniverse().getPosition(light_entity);
 		float range = m_scene->getLightRange(light);
-		uint16_t shadowmap_height = (uint16_t)fb->getHeight();
-		uint16_t shadowmap_width = (uint16_t)fb->getWidth();
+		uint16 shadowmap_height = (uint16)fb->getHeight();
+		uint16 shadowmap_width = (uint16)fb->getWidth();
 
 		float viewports[] = {0, 0, 0.5, 0, 0, 0.5, 0.5, 0.5};
 
@@ -791,8 +791,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 			bgfx::setViewClear(m_view_idx, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
 			bgfx::touch(m_view_idx);
-			uint16_t view_x = uint16_t(shadowmap_width * viewports[i * 2]);
-			uint16_t view_y = uint16_t(shadowmap_height * viewports[i * 2 + 1]);
+			uint16 view_x = uint16(shadowmap_width * viewports[i * 2]);
+			uint16 view_y = uint16(shadowmap_height * viewports[i * 2 + 1]);
 			bgfx::setViewRect(m_view_idx,
 							  view_x,
 							  view_y,
@@ -837,7 +837,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderModels(ComponentIndex light,
 					  const Frustum& frustum,
-					  int64_t layer_mask)
+					  int64 layer_mask)
 	{
 		PROFILE_FUNCTION();
 
@@ -855,7 +855,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	void renderLocalLightShadowmaps(ComponentIndex camera,
 									FrameBuffer** fbs,
 									int framebuffers_count,
-									int64_t layer_mask)
+									int64 layer_mask)
 	{
 		Universe& universe = m_scene->getUniverse();
 		Entity camera_entity = m_scene->getCameraEntity(camera);
@@ -904,7 +904,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void renderShadowmap(ComponentIndex camera, int64_t layer_mask)
+	void renderShadowmap(ComponentIndex camera, int64 layer_mask)
 	{
 		Universe& universe = m_scene->getUniverse();
 		ComponentIndex light_cmp = m_scene->getActiveGlobalLight();
@@ -930,10 +930,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 			bgfx::touch(m_view_idx);
 			float* viewport = viewports + split_index * 2;
 			bgfx::setViewRect(m_view_idx,
-				(uint16_t)(1 + shadowmap_width * viewport[0]),
-				(uint16_t)(1 + shadowmap_height * viewport[1]),
-				(uint16_t)(0.5f * shadowmap_width - 2),
-				(uint16_t)(0.5f * shadowmap_height - 2));
+				(uint16)(1 + shadowmap_width * viewport[0]),
+				(uint16)(1 + shadowmap_height * viewport[1]),
+				(uint16)(0.5f * shadowmap_width - 2),
+				(uint16)(0.5f * shadowmap_height - 2));
 
 			Frustum frustum;
 			Matrix camera_matrix = universe.getMatrix(m_scene->getCameraEntity(camera));
@@ -990,7 +990,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				&tvb, m_base_vertex_decl, points.size(), &tib, points.size()))
 		{
 			BaseVertex* vertex = (BaseVertex*)tvb.data;
-			uint16_t* indices = (uint16_t*)tib.data;
+			uint16* indices = (uint16*)tib.data;
 			for (int i = 0; i < points.size(); ++i)
 			{
 				const DebugPoint& point = points[i];
@@ -1026,7 +1026,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				&tvb, m_base_vertex_decl, lines.size() * 2, &tib, lines.size() * 2))
 		{
 			BaseVertex* vertex = (BaseVertex*)tvb.data;
-			uint16_t* indices = (uint16_t*)tib.data;
+			uint16* indices = (uint16*)tib.data;
 			for (int i = 0; i < lines.size(); ++i)
 			{
 				const DebugLine& line = lines[i];
@@ -1165,7 +1165,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	void disableRGBWrite() { m_render_state &= ~BGFX_STATE_RGB_WRITE; }
 
 
-	void renderPointLightInfluencedGeometry(ComponentIndex light, int64_t layer_mask)
+	void renderPointLightInfluencedGeometry(ComponentIndex light, int64 layer_mask)
 	{
 		PROFILE_FUNCTION();
 
@@ -1178,7 +1178,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 
 	void renderPointLightInfluencedGeometry(const Frustum& frustum,
-											int64_t layer_mask)
+											int64 layer_mask)
 	{
 		PROFILE_FUNCTION();
 
@@ -1227,12 +1227,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 			bgfx::setViewRect(m_view_idx,
 				m_view_x,
 				m_view_y,
-				(uint16_t)m_current_framebuffer->getWidth(),
-				(uint16_t)m_current_framebuffer->getHeight());
+				(uint16)m_current_framebuffer->getWidth(),
+				(uint16)m_current_framebuffer->getHeight());
 		}
 		else
 		{
-			bgfx::setViewRect(m_view_idx, m_view_x, m_view_y, (uint16_t)m_width, (uint16_t)m_height);
+			bgfx::setViewRect(m_view_idx, m_view_x, m_view_y, (uint16)m_width, (uint16)m_height);
 		}
 
 		bgfx::TransientVertexBuffer vb;
@@ -1341,7 +1341,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void renderAll(const Frustum& frustum, int64_t layer_mask, bool render_grass)
+	void renderAll(const Frustum& frustum, int64 layer_mask, bool render_grass)
 	{
 		PROFILE_FUNCTION();
 
@@ -1460,7 +1460,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		const Matrix& mtx,
 		int first_index,
 		int num_indices,
-		uint64_t render_states,
+		uint64 render_states,
 		bgfx::ProgramHandle program_handle) override
 	{
 		bgfx::setState(m_render_state | render_states);
@@ -1787,7 +1787,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	struct BaseVertex
 	{
 		float m_x, m_y, m_z;
-		uint32_t m_rgba;
+		uint32 m_rgba;
 		float m_u;
 		float m_v;
 	};
@@ -1795,11 +1795,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	bgfx::VertexDecl m_base_vertex_decl;
 	TerrainInstance m_terrain_instances[4];
-	uint32_t m_debug_flags;
-	uint8_t m_view_idx;
+	uint32 m_debug_flags;
+	uint8 m_view_idx;
 	int m_pass_idx;
-	StaticArray<uint8_t, 256> m_view2pass_map;
-	uint64_t m_render_state;
+	StaticArray<uint8, 256> m_view2pass_map;
+	uint64 m_render_state;
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
 	PipelineImpl& m_source;
@@ -1827,7 +1827,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	int m_height;
 	bgfx::VertexBufferHandle m_particle_vertex_buffer;
 	bgfx::IndexBufferHandle m_particle_index_buffer;
-	AssociativeArray<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
+	AssociativeArray<uint32, CustomCommandHandler> m_custom_commands_handlers;
 	Array<const RenderableMesh*> m_tmp_meshes;
 	Array<const TerrainInfo*> m_tmp_terrains;
 	Array<GrassInfo> m_tmp_grasses;
@@ -1969,7 +1969,7 @@ void applyCamera(PipelineInstanceImpl* pipeline, const char* slot)
 
 void clear(PipelineInstanceImpl* pipeline, const char* buffers, int color)
 {
-	uint16_t flags = 0;
+	uint16 flags = 0;
 	if (strcmp(buffers, "all") == 0)
 	{
 		flags = BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH;
@@ -1984,7 +1984,7 @@ void clear(PipelineInstanceImpl* pipeline, const char* buffers, int color)
 
 
 void renderModels(PipelineInstanceImpl* pipeline,
-				  int64_t layer_mask,
+				  int64 layer_mask,
 				  bool is_point_light_render)
 {
 	if (is_point_light_render)
@@ -2052,7 +2052,7 @@ int renderLocalLightsShadowmaps(lua_State* L)
 	}
 
 	RenderScene* scene = pipeline->m_scene;
-	int64_t layer_mask = (int64_t)lua_tonumber(L, 2);
+	int64 layer_mask = (int64)lua_tonumber(L, 2);
 	ComponentIndex camera = scene->getCameraInSlot(lua_tostring(L, 4));
 	pipeline->renderLocalLightShadowmaps(camera, fbs, len, layer_mask);
 
@@ -2060,7 +2060,7 @@ int renderLocalLightsShadowmaps(lua_State* L)
 }
 
 
-void renderShadowmap(PipelineInstanceImpl* pipeline, int64_t layer_mask, const char* slot)
+void renderShadowmap(PipelineInstanceImpl* pipeline, int64 layer_mask, const char* slot)
 {
 	pipeline->renderShadowmap(pipeline->getScene()->getCameraInSlot(slot), layer_mask);
 }

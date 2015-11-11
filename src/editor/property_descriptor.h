@@ -67,7 +67,7 @@ class IPropertyDescriptor
 		}
 
 		Type getType() const { return m_type; }
-		uint32_t getNameHash() const { return m_name_hash; }
+		uint32 getNameHash() const { return m_name_hash; }
 		const char* getName() const { return m_name.c_str(); }
 		void setName(const char* name) { m_name = name; m_name_hash = crc32(name); }
 		void addChild(IPropertyDescriptor* child) { m_children.push(child); }
@@ -75,7 +75,7 @@ class IPropertyDescriptor
 		Array<IPropertyDescriptor*>& getChildren() { return m_children; }
 
 	protected:
-		uint32_t m_name_hash;
+		uint32 m_name_hash;
 		string m_name;
 		Type m_type;
 		Array<IPropertyDescriptor*> m_children;
@@ -122,7 +122,7 @@ class IntArrayObjectDescriptor : public IIntPropertyDescriptor
 
 		virtual void set(ComponentUID cmp, int index, InputBlob& stream) const override
 		{
-			int32_t i;
+			int32 i;
 			stream.read(&i, sizeof(i));
 			(static_cast<S*>(cmp.scene)->*m_integer_setter)(cmp.index, index, i);
 		}
@@ -130,7 +130,7 @@ class IntArrayObjectDescriptor : public IIntPropertyDescriptor
 
 		virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 		{
-			int32_t i = (static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp.index, index);
+			int32 i = (static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp.index, index);
 			int len = sizeof(i);
 			stream.write(&i, len);
 		}
@@ -266,14 +266,14 @@ class FileArrayObjectDescriptor : public StringArrayObjectDescriptor<S>, public 
 class ResourcePropertyDescriptorBase
 {
 	public:
-		ResourcePropertyDescriptorBase(uint32_t resource_type)
+		ResourcePropertyDescriptorBase(uint32 resource_type)
 		{
 			m_resource_type = resource_type;
 		}
 
-		uint32_t getResourceType() { return m_resource_type; }
+		uint32 getResourceType() { return m_resource_type; }
 
-		uint32_t m_resource_type;
+		uint32 m_resource_type;
 };
 
 
@@ -285,7 +285,7 @@ class ResourceArrayObjectDescriptor : public FileArrayObjectDescriptor<S>, publi
 			Getter getter,
 			Setter setter,
 			const char* file_type,
-			uint32_t resource_type,
+			uint32 resource_type,
 			IAllocator& allocator)
 			: FileArrayObjectDescriptor(name, getter, setter, file_type, allocator)
 			, ResourcePropertyDescriptorBase(resource_type)
@@ -446,7 +446,7 @@ class IntPropertyDescriptor : public IIntPropertyDescriptor
 
 		virtual void set(ComponentUID cmp, InputBlob& stream) const override
 		{
-			int32_t i;
+			int32 i;
 			stream.read(&i, sizeof(i));
 			(static_cast<S*>(cmp.scene)->*m_integer_setter)(cmp.index, i);
 		}
@@ -454,7 +454,7 @@ class IntPropertyDescriptor : public IIntPropertyDescriptor
 
 		virtual void get(ComponentUID cmp, OutputBlob& stream) const override
 		{
-			int32_t i = (static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp.index);
+			int32 i = (static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp.index);
 			stream.write(i);
 		}
 
@@ -773,7 +773,7 @@ class ResourcePropertyDescriptor : public FilePropertyDescriptor<T>, public Reso
 			Getter getter,
 			Setter setter,
 			const char* file_type,
-			uint32_t resource_type,
+			uint32 resource_type,
 			IAllocator& allocator)
 			: FilePropertyDescriptor(name, getter, setter, file_type, allocator)
 			, ResourcePropertyDescriptorBase(resource_type)

@@ -272,7 +272,7 @@ const char anim_test_valid[] = "unit_tests/resource_managers/blender.ani";
 const char anim_test_fail[] = "unit_tests/resource_managers/failure.ani";
 const char anim_test_invalid[] = "unit_tests/resource_managers/cisla.tga";
 
-uint8_t buffer[512 * 1024 * 1024];
+uint8 buffer[512 * 1024 * 1024];
 
 void UT_failure_reload(const char* params)
 {

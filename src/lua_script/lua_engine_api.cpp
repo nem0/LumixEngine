@@ -38,7 +38,7 @@ static void* getScene(UniverseContext* ctx, const char* name)
 {
 	if (ctx)
 	{
-		uint32_t hash = crc32(name);
+		uint32 hash = crc32(name);
 		for (auto* scene : ctx->m_scenes)
 		{
 			if (crc32(scene->getPlugin().getName()) == hash)
@@ -137,14 +137,14 @@ static void setRenderablePath(IScene* scene, int component, const char* path)
 }
 
 
-static float getInputActionValue(Engine* engine, uint32_t action)
+static float getInputActionValue(Engine* engine, uint32 action)
 {
 	auto v = engine->getInputSystem().getActionValue(action);
 	return v;
 }
 
 
-static void addInputAction(Engine* engine, uint32_t action, int type, int key)
+static void addInputAction(Engine* engine, uint32 action, int type, int key)
 {
 	engine->getInputSystem().addAction(
 		action, Lumix::InputSystem::InputType(type), key);

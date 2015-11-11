@@ -10,24 +10,24 @@ namespace Lumix
 
 
 LUMIX_ENGINE_API const char* stristr(const char* haystack, const char* needle);
-LUMIX_ENGINE_API bool toCStringHex(uint8_t value, char* output, int length);
-LUMIX_ENGINE_API bool toCStringPretty(int32_t value, char* output, int length);
-LUMIX_ENGINE_API bool toCStringPretty(uint32_t value, char* output, int length);
-LUMIX_ENGINE_API bool toCStringPretty(uint64_t value, char* output, int length);
-LUMIX_ENGINE_API bool toCString(int32_t value, char* output, int length);
-LUMIX_ENGINE_API bool toCString(int64_t value, char* output, int length);
-LUMIX_ENGINE_API bool toCString(uint64_t value, char* output, int length);
-LUMIX_ENGINE_API bool toCString(uint32_t value, char* output, int length);
+LUMIX_ENGINE_API bool toCStringHex(uint8 value, char* output, int length);
+LUMIX_ENGINE_API bool toCStringPretty(int32 value, char* output, int length);
+LUMIX_ENGINE_API bool toCStringPretty(uint32 value, char* output, int length);
+LUMIX_ENGINE_API bool toCStringPretty(uint64 value, char* output, int length);
+LUMIX_ENGINE_API bool toCString(int32 value, char* output, int length);
+LUMIX_ENGINE_API bool toCString(int64 value, char* output, int length);
+LUMIX_ENGINE_API bool toCString(uint64 value, char* output, int length);
+LUMIX_ENGINE_API bool toCString(uint32 value, char* output, int length);
 LUMIX_ENGINE_API bool
 toCString(float value, char* output, int length, int after_point);
 LUMIX_ENGINE_API const char*
 reverseFind(const char* str, const char* from, char c);
 LUMIX_ENGINE_API const char*
-fromCString(const char* input, int length, int32_t* value);
+fromCString(const char* input, int length, int32* value);
 LUMIX_ENGINE_API const char*
-fromCString(const char* input, int length, int64_t* value);
+fromCString(const char* input, int length, int64* value);
 LUMIX_ENGINE_API const char*
-fromCString(const char* input, int length, uint32_t* value);
+fromCString(const char* input, int length, uint32* value);
 LUMIX_ENGINE_API bool
 copyString(char* destination, int length, const char* source);
 LUMIX_ENGINE_API bool
@@ -40,7 +40,6 @@ LUMIX_ENGINE_API bool
 makeLowercase(char* destination, int length, const char* source);
 LUMIX_ENGINE_API char* trimmed(char* str);
 LUMIX_ENGINE_API bool startsWith(const char* str, const char* prefix);
-
 
 
 template <int SIZE> bool copyString(char(&destination)[SIZE], const char* source)
@@ -63,7 +62,7 @@ public:
 		m_size = 0;
 	}
 
-	base_string(const base_string<T>& rhs, int start, int32_t length)
+	base_string(const base_string<T>& rhs, int start, int32 length)
 		: m_allocator(rhs.m_allocator)
 	{
 		m_size = length - start <= rhs.m_size ? length : rhs.m_size - start;
@@ -72,7 +71,7 @@ public:
 		m_cstr[m_size] = 0;
 	}
 
-	base_string(const T* rhs, int32_t length, IAllocator& allocator)
+	base_string(const T* rhs, int32 length, IAllocator& allocator)
 		: m_allocator(allocator)
 	{
 		m_size = length;
@@ -182,7 +181,7 @@ public:
 
 	int rfind(T c) const
 	{
-		int32_t i = m_size - 1;
+		int32 i = m_size - 1;
 		while (i >= 0 && m_cstr[i] != c)
 		{
 			--i;
@@ -205,7 +204,7 @@ public:
 		{
 			if (m_cstr)
 			{
-				int32_t new_size = m_size + length;
+				int32 new_size = m_size + length;
 				T* new_cstr = (T*)m_allocator.allocate(new_size + 1);
 				memcpy(new_cstr, m_cstr, sizeof(T) * m_size + 1);
 				m_allocator.deallocate(m_cstr);
@@ -292,7 +291,7 @@ public:
 		{
 			if (m_cstr)
 			{
-				int32_t new_size = m_size + base_string<T>::strlen(rhs);
+				int32 new_size = m_size + base_string<T>::strlen(rhs);
 				T* new_cstr = (T*)m_allocator.allocate(new_size + 1);
 				memcpy(new_cstr, m_cstr, sizeof(T) * m_size + 1);
 				m_allocator.deallocate(m_cstr);
@@ -317,7 +316,7 @@ public:
 		}
 		if (m_cstr)
 		{
-			int32_t new_size = m_size + rhs.length();
+			int32 new_size = m_size + rhs.length();
 			T* new_cstr = (T*)m_allocator.allocate(new_size + 1);
 			memcpy(new_cstr, m_cstr, sizeof(T) * m_size + 1);
 			m_allocator.deallocate(m_cstr);
@@ -332,7 +331,7 @@ public:
 		}
 	}
 
-	void erase(int32_t pos)
+	void erase(int32 pos)
 	{
 		if (pos >= 0 && pos < m_size)
 		{
@@ -345,14 +344,14 @@ public:
 	static const int npos = 0xffFFffFF;
 
 private:
-	static int32_t strlen(const T* rhs)
+	static int32 strlen(const T* rhs)
 	{
 		const T* c = rhs;
 		while (*c)
 		{
 			++c;
 		}
-		return (int32_t)(c - rhs);
+		return (int32)(c - rhs);
 	}
 
 	int strcmp(const T* rhs) const
@@ -374,7 +373,7 @@ private:
 
 
 private:
-	int32_t m_size;
+	int32 m_size;
 	T* m_cstr;
 	IAllocator& m_allocator;
 };

@@ -7,14 +7,14 @@ void UT_string(const char* params)
 {
 	char tmp[100];
 	char tmp2[100];
-	for (int32_t i = -100; i < 100; ++i)
+	for (int32 i = -100; i < 100; ++i)
 	{
 		Lumix::toCString(i, tmp, 100);
 		sprintf(tmp2, "%d", i);
 		LUMIX_EXPECT_EQ((const char*)tmp, (const char*)tmp2);
 	}
 	
-	for (uint32_t i = 0; i < 100; ++i)
+	for (uint32 i = 0; i < 100; ++i)
 	{
 		Lumix::toCString(i, tmp, 100);
 		sprintf(tmp2, "%u", i);

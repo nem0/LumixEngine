@@ -34,8 +34,8 @@ namespace Lumix
 
 			virtual void* allocate(size_t size) override
 			{
-				uint8_t* new_address = (uint8_t*)m_current;
-				ASSERT(new_address + size <= (uint8_t*)m_bucket + m_bucket_size);
+				uint8* new_address = (uint8*)m_current;
+				ASSERT(new_address + size <= (uint8*)m_bucket + m_bucket_size);
 				m_current = new_address + size;
 				return new_address;
 			}

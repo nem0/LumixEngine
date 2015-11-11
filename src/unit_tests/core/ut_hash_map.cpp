@@ -8,20 +8,20 @@ namespace
 	void UT_insert(const char* params)
 	{
 		Lumix::DefaultAllocator allocator;
-		Lumix::HashMap<int32_t, int32_t> hash_table(allocator);
+		Lumix::HashMap<int32, int32> hash_table(allocator);
 
 		LUMIX_EXPECT_TRUE(hash_table.empty());
 
-		int32_t values[10] = {
+		int32 values[10] = {
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 		};
 
-		for (int32_t val : values)
+		for (int32 val : values)
 		{
 			hash_table.insert(val, val);
 		}
 
-		for (int32_t val : values)
+		for (int32 val : values)
 		{
 			LUMIX_EXPECT_EQ(hash_table[val], val);
 		}
@@ -30,7 +30,7 @@ namespace
 	void UT_array(const char* params)
 	{
 		Lumix::DefaultAllocator allocator;
-		Lumix::HashMap<int32_t, Lumix::Array<int> > hash_table(allocator);
+		Lumix::HashMap<int32, Lumix::Array<int> > hash_table(allocator);
 
 		LUMIX_EXPECT_TRUE(hash_table.empty());
 	};
@@ -38,18 +38,18 @@ namespace
 	void UT_clear(const char* params)
 	{
 		Lumix::DefaultAllocator allocator;
-		Lumix::HashMap<int32_t, int32_t> hash_table(allocator);
+		Lumix::HashMap<int32, int32> hash_table(allocator);
 
 		LUMIX_EXPECT_TRUE(hash_table.empty());
 
-		const int32_t COUNT = 20;
+		const int32 COUNT = 20;
 
-		for (int32_t i = 0; i < COUNT; i++)
+		for (int32 i = 0; i < COUNT; i++)
 		{
 			hash_table.insert(i, i);
 		}
 
-		for (int32_t i = 0; i < COUNT; i++)
+		for (int32 i = 0; i < COUNT; i++)
 		{
 			LUMIX_EXPECT_EQ(hash_table[i], i);
 		}
@@ -62,7 +62,7 @@ namespace
 
 		hash_table.rehash(8);
 
-		for (int32_t i = 0; i < COUNT; i++)
+		for (int32 i = 0; i < COUNT; i++)
 		{
 			hash_table.insert(i, i);
 		}
@@ -70,23 +70,23 @@ namespace
 
 	void UT_constIterator(const char* params)
 	{
-		typedef Lumix::HashMap<int32_t, int32_t> HashTableType;
+		typedef Lumix::HashMap<int32, int32> HashTableType;
 
 		Lumix::DefaultAllocator allocator;
 		HashTableType hash_table(allocator);
 
 		LUMIX_EXPECT_TRUE(hash_table.empty());
 
-		int32_t values[10] = {
+		int32 values[10] = {
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 		};
 
-		for (int32_t val : values)
+		for (int32 val : values)
 		{
 			hash_table.insert(val, val);
 		}
 
-		for (int32_t val : values)
+		for (int32 val : values)
 		{
 			LUMIX_EXPECT_EQ(hash_table[val], val);
 		}

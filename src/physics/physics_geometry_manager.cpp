@@ -16,7 +16,7 @@ namespace Lumix
 		OutputStream(IAllocator& allocator)
 			: allocator(allocator)
 		{
-			data = (uint8_t*)allocator.allocate(sizeof(uint8_t) * 4096);
+			data = (uint8*)allocator.allocate(sizeof(uint8) * 4096);
 			capacity = 4096;
 			size = 0;
 		}
@@ -32,7 +32,7 @@ namespace Lumix
 			if (size + (int)count > capacity)
 			{
 				int new_capacity = Math::maxValue(size + (int)count, capacity + 4096);
-				uint8_t* new_data = (uint8_t*)allocator.allocate(sizeof(uint8_t) * new_capacity);
+				uint8* new_data = (uint8*)allocator.allocate(sizeof(uint8) * new_capacity);
 				memcpy(new_data, data, size);
 				allocator.deallocate(data);
 				data = new_data;
@@ -43,7 +43,7 @@ namespace Lumix
 			return count;
 		}
 
-		uint8_t* data;
+		uint8* data;
 		IAllocator& allocator;
 		int capacity;
 		int size;
@@ -112,7 +112,7 @@ namespace Lumix
 	{
 		Header header;
 		file.read(&header, sizeof(header));
-		if (header.m_magic != HEADER_MAGIC || header.m_version > (uint32_t)Versions::LAST)
+		if (header.m_magic != HEADER_MAGIC || header.m_version > (uint32)Versions::LAST)
 		{
 			return false;
 		}
@@ -120,7 +120,7 @@ namespace Lumix
 		auto* phy_manager = m_resource_manager.get(ResourceManager::PHYSICS);
 		PhysicsSystem& system = static_cast<PhysicsGeometryManager*>(phy_manager)->getSystem();
 
-		uint32_t num_verts;
+		uint32 num_verts;
 		Array<Vec3> verts(getAllocator());
 		file.read(&num_verts, sizeof(num_verts));
 		verts.resize(num_verts);
@@ -132,8 +132,8 @@ namespace Lumix
 			physx::PxTriangleMeshGeometry* geom =
 				getAllocator().newObject<physx::PxTriangleMeshGeometry>();
 			m_geometry = geom;
-			uint32_t num_indices;
-			Array<uint32_t> tris(getAllocator());
+			uint32 num_indices;
+			Array<uint32> tris(getAllocator());
 			file.read(&num_indices, sizeof(num_indices));
 			tris.resize(num_indices);
 			file.read(&tris[0], sizeof(tris[0]) * tris.size());

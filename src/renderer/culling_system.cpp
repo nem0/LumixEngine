@@ -14,7 +14,7 @@
 namespace Lumix
 {
 typedef BinaryArray VisibilityFlags;
-typedef Array<int64_t> LayerMasks;
+typedef Array<int64> LayerMasks;
 
 static const int MIN_ENTITIES_PER_THREAD = 50;
 
@@ -23,8 +23,8 @@ static void doCulling(int start_index,
 	const Sphere* LUMIX_RESTRICT end,
 	const VisibilityFlags& visiblity_flags,
 	const Frustum* LUMIX_RESTRICT frustum,
-	const int64_t* LUMIX_RESTRICT layer_masks,
-	int64_t layer_mask,
+	const int64* LUMIX_RESTRICT layer_masks,
+	int64 layer_mask,
 	CullingSystem::Subresults& results)
 {
 	int i = start_index;
@@ -45,7 +45,7 @@ public:
 	CullingJob(const CullingSystem::InputSpheres& spheres,
 		const VisibilityFlags& visibility_flags,
 		const LayerMasks& layer_masks,
-		int64_t layer_mask,
+		int64 layer_mask,
 		CullingSystem::Subresults& results,
 		int start,
 		int end,
@@ -90,7 +90,7 @@ private:
 	CullingSystem::Subresults& m_results;
 	const VisibilityFlags& m_visibility_flags;
 	const LayerMasks& m_layer_masks;
-	int64_t m_layer_mask;
+	int64 m_layer_mask;
 	int m_start;
 	int m_end;
 	const Frustum& m_frustum;
@@ -143,7 +143,7 @@ public:
 	}
 
 
-	void cullToFrustum(const Frustum& frustum, int64_t layer_mask) override
+	void cullToFrustum(const Frustum& frustum, int64 layer_mask) override
 	{
 		for (int i = 0; i < m_result.size(); ++i)
 		{
@@ -164,7 +164,7 @@ public:
 	}
 
 
-	void cullToFrustumAsync(const Frustum& frustum, int64_t layer_mask) override
+	void cullToFrustumAsync(const Frustum& frustum, int64 layer_mask) override
 	{
 		int count = m_spheres.size();
 
@@ -222,10 +222,10 @@ public:
 	}
 
 
-	void setLayerMask(int index, int64_t layer) override { m_layer_masks[index] = layer; }
+	void setLayerMask(int index, int64 layer) override { m_layer_masks[index] = layer; }
 
 
-	int64_t getLayerMask(int index) override { return m_layer_masks[index]; }
+	int64 getLayerMask(int index) override { return m_layer_masks[index]; }
 
 
 	void enableStatic(int index) override { m_visibility_flags[index] = true; }

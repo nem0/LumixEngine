@@ -37,7 +37,7 @@ namespace Lumix
 					return false;
 				}
 
-				int32_t op = TCPCommand::OpenFile;
+				int32 op = TCPCommand::OpenFile;
 
 				MT::SpinLock lock(m_spin_mutex);
 				m_stream->write(op);
@@ -52,7 +52,7 @@ namespace Lumix
 			{
 				if(-1 != m_file)
 				{
-					int32_t op = TCPCommand::Close;
+					int32 op = TCPCommand::Close;
 
 					MT::SpinLock lock(m_spin_mutex);
 					m_stream->write(op);
@@ -62,7 +62,7 @@ namespace Lumix
 
 			virtual bool read(void* buffer, size_t size) override
 			{
-				int32_t op = TCPCommand::Read;
+				int32 op = TCPCommand::Read;
 
 				MT::SpinLock lock(m_spin_mutex);
 				m_stream->write(op);
@@ -78,7 +78,7 @@ namespace Lumix
 
 			virtual bool write(const void* buffer, size_t size) override
 			{
-				int32_t op = TCPCommand::Write;
+				int32 op = TCPCommand::Write;
 
 				MT::SpinLock lock(m_spin_mutex);
 				m_stream->write(op);
@@ -99,8 +99,8 @@ namespace Lumix
 
 			virtual size_t size() override
 			{
-				int32_t op = TCPCommand::Size;
-				uint32_t size = 0;
+				int32 op = TCPCommand::Size;
+				uint32 size = 0;
 
 				MT::SpinLock lock(m_spin_mutex);
 				m_stream->write(op);
@@ -113,7 +113,7 @@ namespace Lumix
 
 			virtual size_t seek(SeekMode base, size_t pos) override
 			{
-				int32_t op = TCPCommand::Seek;
+				int32 op = TCPCommand::Seek;
 
 				MT::SpinLock lock(m_spin_mutex);
 				m_stream->write(op);
@@ -121,7 +121,7 @@ namespace Lumix
 				m_stream->write(base);
 				m_stream->write(pos);
 
-				int32_t ret = 0;
+				int32 ret = 0;
 				m_stream->read(ret);
 
 				return (size_t)ret;
@@ -129,8 +129,8 @@ namespace Lumix
 
 			virtual size_t pos() override
 			{
-				int32_t op = TCPCommand::Seek;
-				int32_t pos = 0;
+				int32 op = TCPCommand::Seek;
+				int32 pos = 0;
 
 				MT::SpinLock lock(m_spin_mutex);
 				m_stream->write(op);
@@ -148,7 +148,7 @@ namespace Lumix
 			TCPFileDevice& m_device;
 			Net::TCPStream* m_stream;
 			MT::SpinMutex& m_spin_mutex;
-			uint32_t m_file;
+			uint32 m_file;
 		};
 
 		struct TCPImpl
@@ -176,7 +176,7 @@ namespace Lumix
 			m_impl->m_allocator.deleteObject(file);
 		}
 
-		void TCPFileDevice::connect(const char* ip, uint16_t port, IAllocator& allocator)
+		void TCPFileDevice::connect(const char* ip, uint16 port, IAllocator& allocator)
 		{
 			m_impl = allocator.newObject<TCPImpl>(allocator);
 			m_impl->m_stream = m_impl->m_connector.connect(ip, port);

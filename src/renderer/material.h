@@ -49,12 +49,12 @@ public:
 		static const int MAX_NAME_LENGTH = 32;
 		
 		char m_name[MAX_NAME_LENGTH + 1];
-		uint32_t m_name_hash;
+		uint32 m_name_hash;
 		Type m_type;
 		bgfx::UniformHandle m_handle;
 		union
 		{
-			int32_t m_int;
+			int32 m_int;
 			float m_float;
 			float m_matrix[16];
 		};
@@ -78,7 +78,7 @@ public:
 	void setShininess(float value) { m_shininess = value; }
 	Vec3 getSpecular() const { return m_specular; }
 	void setSpecular(const Vec3& specular) { m_specular = specular; }
-	uint64_t getRenderStates() const { return m_render_states; }
+	uint64 getRenderStates() const { return m_render_states; }
 
 	void setShader(Shader* shader);
 	void setShader(const Path& path);
@@ -106,7 +106,7 @@ private:
 
 	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);
 	void deserializeUniforms(JsonSerializer& serializer);
-	void setRenderState(bool value, uint64_t state, uint64_t mask);
+	void setRenderState(bool value, uint64 state, uint64 mask);
 
 private:
 	static const int MAX_TEXTURE_COUNT = 16;
@@ -118,10 +118,10 @@ private:
 	Array<Uniform> m_uniforms;
 	IAllocator& m_allocator;
 	bgfx::ProgramHandle m_program_id;
-	uint64_t m_render_states;
+	uint64 m_render_states;
 	Vec3 m_specular;
 	float m_shininess;
-	uint32_t m_shader_mask;
+	uint32 m_shader_mask;
 	static int s_alpha_cutout_define_idx;
 	static int s_shadow_receiver_define_idx;
 };

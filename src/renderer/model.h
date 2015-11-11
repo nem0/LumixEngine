@@ -48,7 +48,7 @@ public:
 	int getTriangleCount() const { return m_index_count / 3; }
 	int getAttributeArrayOffset() const { return m_attribute_array_offset; }
 	int getAttributeArraySize() const { return m_attribute_array_size; }
-	uint32_t getNameHash() const { return m_name_hash; }
+	uint32 getNameHash() const { return m_name_hash; }
 	const char* getName() const { return m_name.c_str(); }
 	void setVertexDefinition(const bgfx::VertexDecl& def) { m_vertex_def = def; }
 	const bgfx::VertexDecl& getVertexDefinition() const { return m_vertex_def; }
@@ -61,12 +61,12 @@ private:
 
 private:
 	bgfx::VertexDecl m_vertex_def;
-	int32_t m_instance_idx;
-	int32_t m_attribute_array_offset;
-	int32_t m_attribute_array_size;
-	int32_t m_indices_offset;
-	int32_t m_index_count;
-	uint32_t m_name_hash;
+	int32 m_instance_idx;
+	int32 m_attribute_array_offset;
+	int32 m_attribute_array_size;
+	int32 m_indices_offset;
+	int32 m_index_count;
+	uint32 m_name_hash;
 	Material* m_material;
 	string m_name;
 };
@@ -93,18 +93,18 @@ private:
 class LUMIX_RENDERER_API Model : public Resource
 {
 public:
-	typedef HashMap<uint32_t, int> BoneMap;
+	typedef HashMap<uint32, int> BoneMap;
 
 #pragma pack(1)
 	class FileHeader
 	{
 	public:
-		uint32_t m_magic;
-		uint32_t m_version;
+		uint32 m_magic;
+		uint32 m_version;
 	};
 #pragma pack()
 
-	enum class FileVersion : uint32_t
+	enum class FileVersion : uint32
 	{
 		FIRST,
 
@@ -157,7 +157,7 @@ public:
 	int getBoneCount() const { return m_bones.size(); }
 	const Bone& getBone(int i) const { return m_bones[i]; }
 	int getFirstNonrootBoneIndex() const { return m_first_nonroot_bone_index; }
-	BoneMap::iterator getBoneIndex(uint32_t hash) { return m_bone_map.find(hash); }
+	BoneMap::iterator getBoneIndex(uint32 hash) { return m_bone_map.find(hash); }
 	void getPose(Pose& pose);
 	float getBoundingRadius() const { return m_bounding_radius; }
 	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
@@ -165,7 +165,7 @@ public:
 	Array<LOD>& getLODs() { return m_lods; }
 
 public:
-	static const uint32_t FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
+	static const uint32 FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
 
 private:
 	Model(const Model&);
@@ -177,7 +177,7 @@ private:
 	bool parseMeshes(FS::IFile& file);
 	bool parseLODs(FS::IFile& file);
 	int getBoneIdx(const char* name);
-	void computeRuntimeData(const uint8_t* vertices);
+	void computeRuntimeData(const uint8* vertices);
 
 	virtual void unload(void) override;
 	virtual bool load(FS::IFile& file) override;
@@ -190,7 +190,7 @@ private:
 	int m_vertices_size;
 	Array<Mesh> m_meshes;
 	Array<Bone> m_bones;
-	Array<int32_t> m_indices;
+	Array<int32> m_indices;
 	Array<Vec3> m_vertices;
 	Array<LOD> m_lods;
 	float m_bounding_radius;

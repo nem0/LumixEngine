@@ -51,7 +51,7 @@ namespace Lumix
 						if(mode & Mode::READ)
 						{
 							m_capacity = m_size = m_file->size();
-							m_buffer = (uint8_t*)m_allocator.allocate(sizeof(uint8_t) * m_size);
+							m_buffer = (uint8*)m_allocator.allocate(sizeof(uint8) * m_size);
 							m_file->read(m_buffer, m_size);
 							m_pos = 0;
 						}
@@ -102,7 +102,7 @@ namespace Lumix
 				if(pos + size > cap)
 				{
 					size_t new_cap = Math::maxValue(cap * 2, pos + size);
-					uint8_t* new_data = (uint8_t*)m_allocator.allocate(sizeof(uint8_t) * new_cap);
+					uint8* new_data = (uint8*)m_allocator.allocate(sizeof(uint8) * new_cap);
 					memcpy(new_data, m_buffer, sz);
 					m_allocator.deallocate(m_buffer);
 					m_buffer = new_data;
@@ -131,15 +131,15 @@ namespace Lumix
 				switch(base)
 				{
 				case SeekMode::BEGIN:
-					ASSERT(pos <= (int32_t)m_size);
+					ASSERT(pos <= (int32)m_size);
 					m_pos = pos;
 					break;
 				case SeekMode::CURRENT:
-					ASSERT(0 <= (int32_t)m_pos + pos && (int32_t)m_pos + pos <= (int32_t)m_size);
+					ASSERT(0 <= (int32)m_pos + pos && (int32)m_pos + pos <= (int32)m_size);
 					m_pos += pos;
 					break;
 				case SeekMode::END:
-					ASSERT(pos <= (int32_t)m_size);
+					ASSERT(pos <= (int32)m_size);
 					m_pos = m_size - pos;
 					break;
 				default:
@@ -159,7 +159,7 @@ namespace Lumix
 		private:
 			IAllocator& m_allocator;
 			MemoryFileDevice& m_device;
-			uint8_t* m_buffer;
+			uint8* m_buffer;
 			size_t m_size;
 			size_t m_capacity;
 			size_t m_pos;

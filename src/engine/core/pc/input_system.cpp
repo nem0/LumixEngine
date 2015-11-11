@@ -23,7 +23,7 @@ namespace Lumix
 		};
 		
 		IAllocator& m_allocator;
-		AssociativeArray<uint32_t, Action> m_actions;
+		AssociativeArray<uint32, Action> m_actions;
 		float m_mouse_rel_x;
 		float m_mouse_rel_y;
 		bool m_is_enabled;
@@ -71,7 +71,7 @@ namespace Lumix
 	}
 
 
-	void InputSystem::addAction(uint32_t action, InputType type, int key)
+	void InputSystem::addAction(uint32 action, InputType type, int key)
 	{
 		InputSystemImpl::Action value;
 		value.key = key;
@@ -80,7 +80,7 @@ namespace Lumix
 	}
 
 
-	float InputSystem::getActionValue(uint32_t action)
+	float InputSystem::getActionValue(uint32 action)
 	{
 		if (!m_impl->m_is_enabled)
 		{

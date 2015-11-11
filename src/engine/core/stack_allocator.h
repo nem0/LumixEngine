@@ -30,7 +30,7 @@ namespace Lumix
 				if(p != nullptr)
 				{
 					ASSERT(p >= m_data && p < m_data + SIZE);
-					m_end = ((uint8_t*)p) - m_data;
+					m_end = ((uint8*)p) - m_data;
 				}
 			}
 
@@ -42,7 +42,7 @@ namespace Lumix
 
 		private:
 			size_t m_end;
-			uint8_t m_data[SIZE];
+			uint8 m_data[SIZE];
 	};
 
 

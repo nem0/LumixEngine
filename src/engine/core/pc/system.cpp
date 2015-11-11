@@ -233,7 +233,7 @@ namespace Lumix
 	}
 
 
-	uint64_t getLastModified(const char* file)
+	uint64 getLastModified(const char* file)
 	{
 		FILETIME ft;
 		HANDLE handle = CreateFile(file,

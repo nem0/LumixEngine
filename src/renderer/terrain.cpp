@@ -28,15 +28,15 @@ static const int GRASS_QUAD_SIZE = 10;
 static const float GRASS_QUAD_RADIUS = GRASS_QUAD_SIZE * 0.7072f;
 static const int GRID_SIZE = 16;
 static const int COPY_COUNT = 50;
-static const uint32_t TERRAIN_HASH = crc32("terrain");
-static const uint32_t MORPH_CONST_HASH = crc32("morph_const");
-static const uint32_t QUAD_SIZE_HASH = crc32("quad_size");
-static const uint32_t QUAD_MIN_HASH = crc32("quad_min");
+static const uint32 TERRAIN_HASH = crc32("terrain");
+static const uint32 MORPH_CONST_HASH = crc32("morph_const");
+static const uint32 QUAD_SIZE_HASH = crc32("quad_size");
+static const uint32 QUAD_MIN_HASH = crc32("quad_min");
 
-static const uint32_t BRUSH_POSITION_HASH = crc32("brush_position");
-static const uint32_t BRUSH_SIZE_HASH = crc32("brush_size");
-static const uint32_t MAP_SIZE_HASH = crc32("map_size");
-static const uint32_t CAMERA_POS_HASH = crc32("camera_pos");
+static const uint32 BRUSH_POSITION_HASH = crc32("brush_position");
+static const uint32 BRUSH_SIZE_HASH = crc32("brush_size");
+static const uint32 MAP_SIZE_HASH = crc32("map_size");
+static const uint32 CAMERA_POS_HASH = crc32("camera_pos");
 static const char* TEX_COLOR_UNIFORM = "u_texColor";
 
 struct Sample
@@ -370,7 +370,7 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch,
 	{
 		for (float dz = 0; dz < GRASS_QUAD_SIZE; dz += step)
 		{
-			uint32_t pixel_value = splat_map->getPixelNearest(
+			uint32 pixel_value = splat_map->getPixelNearest(
 				int(splat_map->getWidth() * (quad_x + dx) /
 					(m_width * m_scale.x)),
 				int(splat_map->getHeight() * (quad_z + dz) /
@@ -378,7 +378,7 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch,
 
 			int ground_index = pixel_value & 0xff;
 			int weight = (pixel_value >> 8) & 0xff;
-			uint8_t count = ground_index == patch.m_type->m_ground ? weight : 0;
+			uint8 count = ground_index == patch.m_type->m_ground ? weight : 0;
 			float density = count / 255.0f;
 
 			if (density < 0.25f) continue;
@@ -573,7 +573,7 @@ void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene
 	serializer.read(m_scale.x);
 	serializer.read(m_scale.y);
 	m_scale.z = m_scale.x;
-	int32_t count;
+	int32 count;
 	serializer.read(m_grass_distance);
 	serializer.read(count);
 	while(m_grass_types.size() > count)
@@ -604,7 +604,7 @@ void Terrain::serialize(OutputBlob& serializer)
 	serializer.write(m_scale.x);
 	serializer.write(m_scale.y);
 	serializer.write(m_grass_distance);
-	serializer.write((int32_t)m_grass_types.size());
+	serializer.write((int32)m_grass_types.size());
 	for(int i = 0; i < m_grass_types.size(); ++i)
 	{
 		GrassType& type = *m_grass_types[i];
@@ -690,11 +690,11 @@ float Terrain::getHeight(int x, int z)
 	int idx = Math::clamp(texture_x, 0, m_width) + Math::clamp(texture_y, 0, m_height) * m_width;
 	if (t->getBytesPerPixel() == 2)
 	{
-		return m_scale.y / 65535.0f * ((uint16_t*)t->getData())[idx];
+		return m_scale.y / 65535.0f * ((uint16*)t->getData())[idx];
 	}
 	else if(t->getBytesPerPixel() == 4)
 	{
-		return ((m_scale.y / 255.0f) * ((uint8_t*)t->getData())[idx * 4]);
+		return ((m_scale.y / 255.0f) * ((uint8*)t->getData())[idx * 4]);
 	}
 	else
 	{

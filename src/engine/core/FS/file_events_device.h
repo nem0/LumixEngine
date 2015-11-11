@@ -37,8 +37,8 @@ namespace Lumix
 			EventType type;
 			uintptr_t handle;
 			const char* path;
-			int32_t ret;
-			int32_t param;
+			int32 ret;
+			int32 param;
 		};	
 
 		class LUMIX_ENGINE_API FileEventsDevice : public IFileDevice

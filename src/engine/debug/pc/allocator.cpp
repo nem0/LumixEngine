@@ -14,9 +14,9 @@ namespace Debug
 {
 
 
-	static const uint32_t UNINITIALIZED_MEMORY_PATTERN = 0xCD;
-	static const uint32_t FREED_MEMORY_PATTERN = 0xDD;
-	static const uint32_t ALLOCATION_GUARD = 0xFDFDFDFD;
+	static const uint32 UNINITIALIZED_MEMORY_PATTERN = 0xCD;
+	static const uint32 FREED_MEMORY_PATTERN = 0xDD;
+	static const uint32 ALLOCATION_GUARD = 0xFDFDFDFD;
 
 
 	Allocator::Allocator(IAllocator& source)
@@ -85,8 +85,8 @@ namespace Debug
 		{
 			auto user_ptr = getUserPtrFromAllocationInfo(info);
 			void* system_ptr = getSystemFromUser(user_ptr);
-			ASSERT(*(uint32_t*)system_ptr == ALLOCATION_GUARD);
-			ASSERT(*(uint32_t*)((uint8_t*)user_ptr + info->m_size) == ALLOCATION_GUARD);
+			ASSERT(*(uint32*)system_ptr == ALLOCATION_GUARD);
+			ASSERT(*(uint32*)((uint8*)user_ptr + info->m_size) == ALLOCATION_GUARD);
 
 			info = info->m_next;
 		}
@@ -107,31 +107,31 @@ namespace Debug
 
 	Allocator::AllocationInfo* Allocator::getAllocationInfoFromSystem(void* system_ptr)
 	{
-		return (AllocationInfo*)(m_are_guards_enabled ? (uint8_t*)system_ptr + sizeof(ALLOCATION_GUARD) : system_ptr);
+		return (AllocationInfo*)(m_are_guards_enabled ? (uint8*)system_ptr + sizeof(ALLOCATION_GUARD) : system_ptr);
 	}
 
 
 	void* Allocator::getUserPtrFromAllocationInfo(AllocationInfo* info)
 	{
-		return ((uint8_t*)info + sizeof(AllocationInfo));
+		return ((uint8*)info + sizeof(AllocationInfo));
 	}
 
 
 	Allocator::AllocationInfo* Allocator::getAllocationInfoFromUser(void* user_ptr)
 	{
-		return (AllocationInfo*)((uint8_t*)user_ptr - sizeof(AllocationInfo));
+		return (AllocationInfo*)((uint8*)user_ptr - sizeof(AllocationInfo));
 	}
 
 
 	void* Allocator::getUserFromSystem(void* system_ptr)
 	{
-		return (uint8_t*)system_ptr + (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0) + sizeof(AllocationInfo);
+		return (uint8*)system_ptr + (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0) + sizeof(AllocationInfo);
 	}
 
 
 	void* Allocator::getSystemFromUser(void* user_ptr)
 	{
-		return (uint8_t*)user_ptr - (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0) - sizeof(AllocationInfo);
+		return (uint8*)user_ptr - (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0) - sizeof(AllocationInfo);
 	}
 
 
@@ -190,8 +190,8 @@ namespace Debug
 
 			if (m_are_guards_enabled)
 			{
-				*(uint32_t*)system_ptr = ALLOCATION_GUARD;
-				*(uint32_t*)((uint8_t*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) = ALLOCATION_GUARD;
+				*(uint32*)system_ptr = ALLOCATION_GUARD;
+				*(uint32*)((uint8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) = ALLOCATION_GUARD;
 			}
 
 			return user_ptr;
@@ -214,8 +214,8 @@ namespace Debug
 				
 				if (m_are_guards_enabled)
 				{
-					ASSERT(*(uint32_t*)system_ptr == ALLOCATION_GUARD);
-					ASSERT(*(uint32_t*)((uint8_t*)user_ptr + info->m_size) == ALLOCATION_GUARD);
+					ASSERT(*(uint32*)system_ptr == ALLOCATION_GUARD);
+					ASSERT(*(uint32*)((uint8*)user_ptr + info->m_size) == ALLOCATION_GUARD);
 				}
 
 				{

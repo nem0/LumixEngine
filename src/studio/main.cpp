@@ -910,7 +910,7 @@ public:
 				if (frame_time < 1 / 60.0f)
 				{
 					PROFILE_BLOCK("sleep");
-					Lumix::MT::sleep(uint32_t(1000 / 60.0f - frame_time * 1000));
+					Lumix::MT::sleep(Lumix::uint32(1000 / 60.0f - frame_time * 1000));
 				}
 			}
 			Lumix::g_profiler.frame();
@@ -1182,7 +1182,7 @@ public:
 
 		if (geom.getNumVertices() < 0) return;
 
-		uint32_t elem_offset = 0;
+		Lumix::uint32 elem_offset = 0;
 		const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
 		const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
 		for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
@@ -1197,11 +1197,11 @@ public:
 			if (0 == pcmd->ElemCount) continue;
 
 			m_gui_pipeline->setScissor(
-				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
-				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)),
-				uint16_t(Lumix::Math::minValue(pcmd->ClipRect.z, 65535.0f) -
+				Lumix::uint16(Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
+				Lumix::uint16(Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)),
+				Lumix::uint16(Lumix::Math::minValue(pcmd->ClipRect.z, 65535.0f) -
 				Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
-				uint16_t(Lumix::Math::minValue(pcmd->ClipRect.w, 65535.0f) -
+				Lumix::uint16(Lumix::Math::minValue(pcmd->ClipRect.w, 65535.0f) -
 				Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)));
 
 			auto material = m_material;
@@ -1231,7 +1231,7 @@ public:
 
 		setGUIProjection();
 
-		for (int32_t i = 0; i < draw_data->CmdListsCount; ++i)
+		for (int i = 0; i < draw_data->CmdListsCount; ++i)
 		{
 			ImDrawList* cmd_list = draw_data->CmdLists[i];
 			drawGUICmdList(cmd_list);

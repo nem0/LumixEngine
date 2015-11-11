@@ -20,13 +20,13 @@ namespace Lumix
 			, m_pending_trans(allocator)
 		{
 #if TYPE == MULTI_THREAD
-			uint32_t threads_num = getCpuThreadsCount();
+			uint32 threads_num = getCpuThreadsCount();
 
 			m_scheduler.create("MTJD::Scheduler");
 			m_scheduler.run();
 
 			m_worker_tasks.reserve(threads_num);
-			for (uint32_t i = 0; i < threads_num; ++i)
+			for (uint32 i = 0; i < threads_num; ++i)
 			{
 				m_worker_tasks.push(m_allocator.newObject<WorkerTask>(m_allocator));
 				m_worker_tasks[i]->create("MTJD::WorkerTask", this, &m_trans_queue);
@@ -41,13 +41,13 @@ namespace Lumix
 		{
 #if TYPE == MULTI_THREAD
 
-			uint32_t threads_num = getCpuThreadsCount();
-			for (uint32_t i = 0; i < threads_num; ++i)
+			uint32 threads_num = getCpuThreadsCount();
+			for (uint32 i = 0; i < threads_num; ++i)
 			{
 				m_trans_queue.abort();
 			}
 
-			for (uint32_t i = 0; i < threads_num; ++i)
+			for (uint32 i = 0; i < threads_num; ++i)
 			{
 				m_worker_tasks[i]->destroy();
 				m_allocator.deleteObject(m_worker_tasks[i]);
@@ -60,7 +60,7 @@ namespace Lumix
 #endif //TYPE == MULTI_THREAD
 		}
 
-		uint32_t Manager::getCpuThreadsCount() const
+		uint32 Manager::getCpuThreadsCount() const
 		{
 #if TYPE == MULTI_THREAD
 			
@@ -121,7 +121,7 @@ namespace Lumix
 		{
 #if TYPE == MULTI_THREAD
 
-			uint32_t count = MT::atomicIncrement(&m_scheduling_counter);
+			uint32 count = MT::atomicIncrement(&m_scheduling_counter);
 			if (1 == count)
 			{
 				do
@@ -158,7 +158,7 @@ namespace Lumix
 		{
 #if TYPE == MULTI_THREAD
 
-			for (int32_t i = 0; i < (int32_t)Priority::Count; ++i)
+			for (int32 i = 0; i < (int32)Priority::Count; ++i)
 			{
 				if (!m_ready_to_execute[i].isEmpty())
 				{
@@ -181,17 +181,17 @@ namespace Lumix
 
 #if TYPE == MULTI_THREAD
 
-			Job** jobEntry = m_ready_to_execute[(int32_t)job->getPriority()].alloc(true);
+			Job** jobEntry = m_ready_to_execute[(int32)job->getPriority()].alloc(true);
 			if (jobEntry)
 			{
 				*jobEntry = job;
-				m_ready_to_execute[(int32_t)job->getPriority()].push(jobEntry, true);
+				m_ready_to_execute[(int32)job->getPriority()].push(jobEntry, true);
 			}
 
 #endif //TYPE == MULTI_THREAD
 		}
 
-		uint32_t Manager::getAffinityMask(uint32_t idx) const
+		uint32 Manager::getAffinityMask(uint32 idx) const
 		{
 #if defined(_WIN32) || defined(_WIN64)
 			idx = 0;

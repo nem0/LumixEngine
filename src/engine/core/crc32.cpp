@@ -5,7 +5,7 @@ namespace Lumix
 {
 
 
-static uint32_t crc32Table[256] = {
+static uint32 crc32Table[256] = {
 	0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
 	0xe963a535, 0x9e6495a3, 0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
 	0x09b64c2b, 0x7eb17cbd, 0xe7b82d07, 0x90bf1d91, 0x1db71064, 0x6ab020f2,
@@ -51,10 +51,10 @@ static uint32_t crc32Table[256] = {
 	0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d};
 
 
-uint32_t crc32(const void* data, int length)
+uint32 crc32(const void* data, int length)
 {
-	const uint8_t* c = static_cast<const uint8_t*>(data);
-	uint32_t crc = 0xffffFFFF;
+	const uint8* c = static_cast<const uint8*>(data);
+	uint32 crc = 0xffffFFFF;
 	int len = length;
 	while (len)
 	{
@@ -66,10 +66,10 @@ uint32_t crc32(const void* data, int length)
 }
 
 
-uint32_t crc32(const char str[])
+uint32 crc32(const char str[])
 {
-	const uint8_t* c = reinterpret_cast<const uint8_t*>(str);
-	uint32_t crc = 0xffffFFFF;
+	const uint8* c = reinterpret_cast<const uint8*>(str);
+	uint32 crc = 0xffffFFFF;
 	while (*c)
 	{
 		crc = (crc >> 8) ^ crc32Table[crc & 0xFF ^ *c];
@@ -79,10 +79,10 @@ uint32_t crc32(const char str[])
 }
 
 
-uint32_t continueCrc32(uint32_t original_crc, const char str[])
+uint32 continueCrc32(uint32 original_crc, const char str[])
 {
-	const uint8_t* c = reinterpret_cast<const uint8_t*>(str);
-	uint32_t crc = ~original_crc;
+	const uint8* c = reinterpret_cast<const uint8*>(str);
+	uint32 crc = ~original_crc;
 	while (*c)
 	{
 		crc = (crc >> 8) ^ crc32Table[crc & 0xFF ^ *c];

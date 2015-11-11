@@ -22,9 +22,9 @@ namespace Lumix
 		
 		private:
 			size_t m_buffer_size;
-			uint8_t* m_buffer;
-			int32_t m_start;
-			int32_t m_end;
+			uint8* m_buffer;
+			int32 m_start;
+			int32 m_end;
 			MT::SpinMutex m_mutex;
 	};
 

@@ -28,12 +28,12 @@
 #include "utils.h"
 
 
-static const uint32_t UNIVERSE_HASH = Lumix::crc32("universe");
-static const uint32_t SOURCE_HASH = Lumix::crc32("source");
-static const uint32_t LUA_SCRIPT_HASH = Lumix::crc32("lua_script");
+static const Lumix::uint32 UNIVERSE_HASH = Lumix::crc32("universe");
+static const Lumix::uint32 SOURCE_HASH = Lumix::crc32("source");
+static const Lumix::uint32 LUA_SCRIPT_HASH = Lumix::crc32("lua_script");
 
 
-static uint32_t getResourceType(const char* path)
+static Lumix::uint32 getResourceType(const char* path)
 {
 	char ext[10];
 	Lumix::PathUtils::getExtension(ext, sizeof(ext), path);
@@ -87,7 +87,7 @@ AssetBrowser::~AssetBrowser()
 
 void AssetBrowser::onFileChanged(const char* path)
 {
-	uint32_t resource_type = getResourceType(path);
+	Lumix::uint32 resource_type = getResourceType(path);
 	if (resource_type == 0) return;
 
 	Lumix::MT::SpinLock lock(m_changed_files_mutex);
@@ -107,7 +107,7 @@ void AssetBrowser::unloadResource()
 }
 
 
-AssetBrowser::Type AssetBrowser::getTypeFromResourceManagerType(uint32_t type) const
+AssetBrowser::Type AssetBrowser::getTypeFromResourceManagerType(Lumix::uint32 type) const
 {
 	switch (type)
 	{
@@ -145,7 +145,7 @@ void AssetBrowser::update()
 
 		const char* path = path_obj.c_str();
 		
-		uint32_t resource_type = getResourceType(path);
+		Lumix::uint32 resource_type = getResourceType(path);
 		if (resource_type == 0) continue;
 
 		if (m_autoreload_changed_resource) m_editor.getEngine().getResourceManager().reload(path);
@@ -378,15 +378,15 @@ void AssetBrowser::onGUIMaterial()
 		auto* texture = material->getTexture(i);
 		Lumix::copyString(buf, texture ? texture->getPath().c_str() : "");
 		if (resourceInput(
-				slot.m_name, StringBuilder<30>("", (uint64_t)&slot), buf, sizeof(buf), TEXTURE))
+				slot.m_name, StringBuilder<30>("", (Lumix::uint64)&slot), buf, sizeof(buf), TEXTURE))
 		{
 			material->setTexturePath(i, Lumix::Path(buf));
 		}
 		if (!texture) continue;
 
 		ImGui::SameLine();
-		StringBuilder<100> popup_name("pu", (uint64_t)texture, slot.m_name);
-		if (ImGui::Button(StringBuilder<100>("Advanced##adv", (uint64_t)texture, slot.m_name)))
+		StringBuilder<100> popup_name("pu", (Lumix::uint64)texture, slot.m_name);
+		if (ImGui::Button(StringBuilder<100>("Advanced##adv", (Lumix::uint64)texture, slot.m_name)))
 		{
 			ImGui::OpenPopup(popup_name);
 		}
@@ -558,7 +558,7 @@ public:
 	virtual void deserialize(Lumix::JsonSerializer& serializer) override;
 	virtual bool execute() override;
 	virtual void undo() override;
-	virtual uint32_t getType() override;
+	virtual Lumix::uint32 getType() override;
 	virtual bool merge(IEditorCommand&);
 	Lumix::Entity getEntity() const { return m_entity; }
 
@@ -571,7 +571,7 @@ private:
 
 
 
-static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");
+static const Lumix::uint32 RENDERABLE_HASH = Lumix::crc32("renderable");
 
 
 InsertMeshCommand::InsertMeshCommand(Lumix::WorldEditor& editor)
@@ -655,9 +655,9 @@ void InsertMeshCommand::undo()
 }
 
 
-uint32_t InsertMeshCommand::getType()
+Lumix::uint32 InsertMeshCommand::getType()
 {
-	static const uint32_t type = Lumix::crc32("insert_mesh");
+	static const Lumix::uint32 type = Lumix::crc32("insert_mesh");
 	return type;
 }
 

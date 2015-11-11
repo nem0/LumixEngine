@@ -73,10 +73,10 @@ namespace Lumix
 {
 
 
-static const uint32_t GLOBAL_LIGHT_HASH = crc32("global_light");
-static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
-static const uint32_t RENDERABLE_HASH = crc32("renderable");
-static const uint32_t CAMERA_HASH = crc32("camera");
+static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
+static const uint32 POINT_LIGHT_HASH = crc32("point_light");
+static const uint32 RENDERABLE_HASH = crc32("renderable");
+static const uint32 CAMERA_HASH = crc32("camera");
 
 
 struct BGFXAllocator : public bx::ReallocatorI
@@ -93,13 +93,13 @@ struct BGFXAllocator : public bx::ReallocatorI
 	}
 
 
-	virtual void* alloc(size_t _size, size_t _align, const char* _file, uint32_t _line) override 
+	virtual void* alloc(size_t _size, size_t _align, const char* _file, uint32 _line) override 
 	{
 		return m_source.allocate(_size);
 	}
 
 
-	virtual void free(void* _ptr, size_t _align, const char* _file, uint32_t _line) override 
+	virtual void free(void* _ptr, size_t _align, const char* _file, uint32 _line) override 
 	{
 		m_source.deallocate(_ptr);
 	}
@@ -109,7 +109,7 @@ struct BGFXAllocator : public bx::ReallocatorI
 		size_t _size,
 		size_t _align,
 		const char* _file,
-		uint32_t _line) override
+		uint32 _line) override
 	{
 		return m_source.reallocate(_ptr, _size);
 	}
@@ -139,7 +139,7 @@ struct RendererImpl : public Renderer
 
 
 		virtual void traceVargs(const char* _filePath,
-			uint16_t _line,
+			uint16 _line,
 			const char* _format,
 			va_list _argList) override
 		{
@@ -150,20 +150,20 @@ struct RendererImpl : public Renderer
 
 
 		virtual void screenShot(const char*,
-			uint32_t,
-			uint32_t,
-			uint32_t,
+			uint32,
+			uint32,
+			uint32,
 			const void*,
-			uint32_t,
+			uint32,
 			bool) override
 		{
 			ASSERT(false);
 		}
 
 
-		virtual void captureBegin(uint32_t,
-			uint32_t,
-			uint32_t,
+		virtual void captureBegin(uint32,
+			uint32,
+			uint32,
 			bgfx::TextureFormat::Enum,
 			bool) override
 		{
@@ -171,11 +171,11 @@ struct RendererImpl : public Renderer
 		}
 
 
-		virtual uint32_t cacheReadSize(uint64_t) override { return 0; }
-		virtual bool cacheRead(uint64_t, void*, uint32_t) override { return false; }
-		virtual void cacheWrite(uint64_t, const void*, uint32_t) override {}
+		virtual uint32 cacheReadSize(uint64) override { return 0; }
+		virtual bool cacheRead(uint64, void*, uint32) override { return false; }
+		virtual void cacheWrite(uint64, const void*, uint32) override {}
 		virtual void captureEnd() override { ASSERT(false); }
-		virtual void captureFrame(const void*, uint32_t) override { ASSERT(false); }
+		virtual void captureFrame(const void*, uint32) override { ASSERT(false); }
 	};
 
 
@@ -347,7 +347,7 @@ struct RendererImpl : public Renderer
 	ShaderBinaryManager m_shader_binary_manager;
 	ModelManager m_model_manager;
 	PipelineManager m_pipeline_manager;
-	uint32_t m_current_pass_hash;
+	uint32 m_current_pass_hash;
 	int m_view_counter;
 	BGFXAllocator m_bgfx_allocator;
 

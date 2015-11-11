@@ -24,10 +24,10 @@
 namespace Lumix
 {
 
-static const uint32_t SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
+static const uint32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
 
 
-enum class SerializedEngineVersion : int32_t
+enum class SerializedEngineVersion : int32
 {
 	BASE,
 	SPARSE_TRANFORMATIONS,
@@ -42,14 +42,14 @@ enum class SerializedEngineVersion : int32_t
 class SerializedEngineHeader
 {
 public:
-	uint32_t m_magic;
+	uint32 m_magic;
 	SerializedEngineVersion m_version;
-	uint32_t m_reserved; // for crc
+	uint32 m_reserved; // for crc
 };
 #pragma pack()
 
 
-IScene* UniverseContext::getScene(uint32_t hash) const
+IScene* UniverseContext::getScene(uint32 hash) const
 {
 	for (auto* scene : m_scenes)
 	{
@@ -241,7 +241,7 @@ public:
 
 	void serializePluginList(OutputBlob& serializer)
 	{
-		serializer.write((int32_t)m_plugin_manager->getPlugins().size());
+		serializer.write((int32)m_plugin_manager->getPlugins().size());
 		for (auto* plugin : m_plugin_manager->getPlugins())
 		{
 			serializer.writeString(plugin->getName());
@@ -251,7 +251,7 @@ public:
 
 	bool hasSerializedPlugins(InputBlob& serializer)
 	{
-		int32_t count;
+		int32 count;
 		serializer.read(count);
 		for (int i = 0; i < count; ++i)
 		{
@@ -267,7 +267,7 @@ public:
 	}
 
 
-	uint32_t serialize(UniverseContext& ctx, OutputBlob& serializer) override
+	uint32 serialize(UniverseContext& ctx, OutputBlob& serializer) override
 	{
 		SerializedEngineHeader header;
 		header.m_magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
@@ -280,14 +280,14 @@ public:
 		ctx.m_universe->serialize(serializer);
 		ctx.m_hierarchy->serialize(serializer);
 		m_plugin_manager->serialize(serializer);
-		serializer.write((int32_t)ctx.m_scenes.size());
+		serializer.write((int32)ctx.m_scenes.size());
 		for (int i = 0; i < ctx.m_scenes.size(); ++i)
 		{
 			serializer.writeString(ctx.m_scenes[i]->getPlugin().getName());
 			serializer.write(ctx.m_scenes[i]->getVersion());
 			ctx.m_scenes[i]->serialize(serializer);
 		}
-		uint32_t crc = crc32((const uint8_t*)serializer.getData() + pos,
+		uint32 crc = crc32((const uint8*)serializer.getData() + pos,
 							 serializer.getSize() - pos);
 		return crc;
 	}
@@ -316,7 +316,7 @@ public:
 		ctx.m_universe->deserialize(serializer);
 		ctx.m_hierarchy->deserialize(serializer);
 		m_plugin_manager->deserialize(serializer);
-		int32_t scene_count;
+		int32 scene_count;
 		serializer.read(scene_count);
 		for (int i = 0; i < scene_count; ++i)
 		{
@@ -349,8 +349,8 @@ private:
 		string m_name;
 		string m_id;
 
-		uint32_t m_id_hash;
-		uint32_t m_dependency;
+		uint32 m_id_hash;
+		uint32 m_dependency;
 	};
 
 private:
