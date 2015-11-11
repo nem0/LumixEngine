@@ -279,7 +279,7 @@ namespace PlatformInterface
 			case WM_SYSKEYUP: g_platform_data.m_handler->onKeyUp(getKeyFromSystem(wParam)); break;
 			case WM_KEYDOWN:
 			case WM_SYSKEYDOWN: g_platform_data.m_handler->onKeyDown(getKeyFromSystem(wParam)); break;
-			case WM_CHAR: g_platform_data.m_handler->onChar(getKeyFromSystem(wParam)); break;
+			case WM_CHAR: g_platform_data.m_handler->onChar(wParam); break;
 		}
 
 		return DefWindowProc(hWnd, msg, wParam, lParam);
