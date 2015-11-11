@@ -294,14 +294,14 @@ public:
 
 	virtual IScene* createScene(UniverseContext& ctx) override
 	{
-		return m_allocator.newObject<AnimationSceneImpl>(
+		return LUMIX_NEW(m_allocator, AnimationSceneImpl)(
 			*this, m_engine, ctx, m_allocator);
 	}
 
 
 	virtual void destroyScene(IScene* scene) override
 	{
-		m_allocator.deleteObject(scene);
+		LUMIX_DELETE(m_allocator, scene);
 	}
 
 
@@ -330,7 +330,7 @@ private:
 
 extern "C" IPlugin* createPlugin(Engine& engine)
 {
-	return engine.getAllocator().newObject<AnimationSystemImpl>(engine);
+	return LUMIX_NEW(engine.getAllocator(), AnimationSystemImpl)(engine);
 }
 
 

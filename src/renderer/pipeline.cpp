@@ -398,10 +398,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_source.getResourceManager().get(ResourceManager::PIPELINE)->unload(m_source);
 		for (int i = 0; i < m_framebuffers.size(); ++i)
 		{
-			m_allocator.deleteObject(m_framebuffers[i]);
+			LUMIX_DELETE(m_allocator, m_framebuffers[i]);
 			if (m_framebuffers[i] == m_default_framebuffer) m_default_framebuffer = nullptr;
 		}
-		m_allocator.deleteObject(m_default_framebuffer);
+		LUMIX_DELETE(m_allocator, m_default_framebuffer);
 
 		bgfx::destroyIndexBuffer(m_particle_index_buffer);
 		bgfx::destroyVertexBuffer(m_particle_vertex_buffer);
@@ -640,7 +640,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			m_width = m_height = -1;
 			for (int i = 0; i < m_framebuffers.size(); ++i)
 			{
-				m_allocator.deleteObject(m_framebuffers[i]);
+				LUMIX_DELETE(m_allocator, m_framebuffers[i]);
 			}
 			m_framebuffers.clear();
 
@@ -648,7 +648,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			for (int i = 0; i < m_source.m_framebuffers.size(); ++i)
 			{
 				FrameBuffer::Declaration& decl = m_source.m_framebuffers[i];
-				auto* fb = m_allocator.newObject<FrameBuffer>(decl);
+				auto* fb = LUMIX_NEW(m_allocator, FrameBuffer)(decl);
 				m_framebuffers.push(fb);
 				if (strcmp(decl.m_name, "default") == 0) m_default_framebuffer = fb;
 			}
@@ -909,15 +909,16 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Universe& universe = m_scene->getUniverse();
 		ComponentIndex light_cmp = m_scene->getActiveGlobalLight();
 		if (light_cmp < 0 || camera < 0) return;
+		float camera_height = m_scene->getCameraHeight(camera);
+		if (!camera_height) return;
 
 		Matrix light_mtx = universe.getMatrix(m_scene->getGlobalLightEntity(light_cmp));
 		m_global_light_shadowmap = m_current_framebuffer;
 		float shadowmap_height = (float)m_current_framebuffer->getHeight();
 		float shadowmap_width = (float)m_current_framebuffer->getWidth();
 		float viewports[] = {0, 0, 0.5f, 0, 0, 0.5f, 0.5f, 0.5f};
-
 		float camera_fov = Math::degreesToRadians(m_scene->getCameraFOV(camera));
-		float camera_ratio = m_scene->getCameraWidth(camera) / m_scene->getCameraHeight(camera);
+		float camera_ratio = m_scene->getCameraWidth(camera) / camera_height;
 		Vec4 cascades = m_scene->getShadowmapCascades(light_cmp);
 		float split_distances[] = {0.01f, cascades.x, cascades.y, cascades.z, cascades.w};
 		m_is_rendering_in_shadowmap = true;
@@ -1382,7 +1383,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	void setWindowHandle(void* data) override
 	{
 		m_default_framebuffer =
-			m_allocator.newObject<FrameBuffer>("default", m_width, m_height, data);
+			LUMIX_NEW(m_allocator, FrameBuffer)("default", m_width, m_height, data);
 	}
 
 
@@ -1869,25 +1870,25 @@ Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager, IAllocat
 
 PipelineInstance* PipelineInstance::create(Pipeline& pipeline, IAllocator& allocator)
 {
-	return allocator.newObject<PipelineInstanceImpl>(pipeline, allocator);
+	return LUMIX_NEW(allocator, PipelineInstanceImpl)(pipeline, allocator);
 }
 
 
 void PipelineInstance::destroy(PipelineInstance* pipeline)
 {
-	static_cast<PipelineInstanceImpl*>(pipeline)->m_allocator.deleteObject(pipeline);
+	LUMIX_DELETE(static_cast<PipelineInstanceImpl*>(pipeline)->m_allocator, pipeline);
 }
 
 
 Resource* PipelineManager::createResource(const Path& path)
 {
-	return m_allocator.newObject<PipelineImpl>(path, getOwner(), m_allocator);
+	return LUMIX_NEW(m_allocator, PipelineImpl)(path, getOwner(), m_allocator);
 }
 
 
 void PipelineManager::destroyResource(Resource& resource)
 {
-	m_allocator.deleteObject(static_cast<PipelineImpl*>(&resource));
+	LUMIX_DELETE(m_allocator, static_cast<PipelineImpl*>(&resource));
 }
 
 

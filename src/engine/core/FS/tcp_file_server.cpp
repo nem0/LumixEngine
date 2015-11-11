@@ -45,7 +45,7 @@ public:
 		int32 id = m_ids.alloc();
 		if (id > 0)
 		{
-			OsFile* file = getAllocator().newObject<OsFile>();
+			OsFile* file = LUMIX_NEW(getAllocator(), OsFile)();
 			m_files[id] = file;
 
 			char path[MAX_PATH_LENGTH];
@@ -65,7 +65,7 @@ public:
 			{
 				m_ids.release(id);
 				file->close();
-				getAllocator().deleteObject(file);
+				LUMIX_DELETE(getAllocator(), file);
 			}
 		}
 		stream->write(ret);
@@ -103,7 +103,7 @@ public:
 		m_ids.release(id);
 
 		file->close();
-		getAllocator().deleteObject(file);
+		LUMIX_DELETE(getAllocator(), file);
 	}
 
 
@@ -265,14 +265,14 @@ TCPFileServer::~TCPFileServer()
 {
 	if (m_impl)
 	{
-		m_impl->m_allocator.deleteObject(m_impl);
+		LUMIX_DELETE(m_impl->m_allocator, m_impl);
 	}
 }
 
 
 void TCPFileServer::start(const char* base_path, IAllocator& allocator)
 {
-	m_impl = allocator.newObject<TCPFileServerImpl>(allocator);
+	m_impl = LUMIX_NEW(allocator, TCPFileServerImpl)(allocator);
 	m_impl->m_task.setBasePath(base_path);
 	m_impl->m_task.create("TCP File Server Task");
 	m_impl->m_task.run();
@@ -283,7 +283,7 @@ void TCPFileServer::stop()
 {
 	m_impl->m_task.stop();
 	m_impl->m_task.destroy();
-	m_impl->m_allocator.deleteObject(m_impl);
+	LUMIX_DELETE(m_impl->m_allocator, m_impl);
 	m_impl = nullptr;
 }
 

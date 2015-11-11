@@ -56,13 +56,13 @@ class TimerImpl : public Timer
 
 Timer* Timer::create(IAllocator& allocator)
 {
-	return allocator.newObject<TimerImpl>(allocator);
+	return LUMIX_NEW(allocator, TimerImpl)(allocator);
 }
 
 
 void Timer::destroy(Timer* timer)
 {
-	static_cast<TimerImpl*>(timer)->m_allocator.deleteObject(timer);
+	LUMIX_DELETE(static_cast<TimerImpl*>(timer)->m_allocator, timer);
 }
 
 

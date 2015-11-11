@@ -98,7 +98,7 @@ namespace Lumix
 		{
 			if (m_paths.at(i)->m_ref_count == 0)
 			{
-				m_allocator.deleteObject(m_paths.at(i));
+				LUMIX_DELETE(m_allocator, m_paths.at(i));
 				m_paths.eraseAt(i);
 			}
 		}
@@ -110,7 +110,7 @@ namespace Lumix
 		int index = m_paths.find(hash);
 		if (index < 0)
 		{
-			PathInternal* internal = m_allocator.newObject<PathInternal>();
+			PathInternal* internal = LUMIX_NEW(m_allocator, PathInternal);
 			internal->m_ref_count = 1;
 			internal->m_id = hash;
 			copyString(internal->m_path, path);
@@ -139,7 +139,7 @@ namespace Lumix
 		if (path->m_ref_count == 0)
 		{
 			m_paths.erase(path->m_id);
-			m_allocator.deleteObject(path);
+			LUMIX_DELETE(m_allocator, path);
 		}
 	}
 

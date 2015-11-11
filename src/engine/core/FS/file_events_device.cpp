@@ -131,13 +131,13 @@ namespace Lumix
 
 		void FileEventsDevice::destroyFile(IFile* file)
 		{
-			m_allocator.deleteObject(file);
+			LUMIX_DELETE(m_allocator, file);
 		}
 
 
 		IFile* FileEventsDevice::createFile(IFile* child)
 		{
-			return m_allocator.newObject<EventsFile>(*child, *this, OnEvent);
+			return LUMIX_NEW(m_allocator, EventsFile)(*child, *this, OnEvent);
 		}
 	} // namespace FS
 } // ~namespace Lumix

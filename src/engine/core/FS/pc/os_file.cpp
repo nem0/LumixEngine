@@ -47,7 +47,7 @@ bool OsFile::open(const char* path, Mode mode, IAllocator& allocator)
 
 	if (INVALID_HANDLE_VALUE != hnd)
 	{
-		OsFileImpl* impl = allocator.newObject<OsFileImpl>(allocator);
+		OsFileImpl* impl = LUMIX_NEW(allocator, OsFileImpl)(allocator);
 		impl->m_file = hnd;
 		m_impl = impl;
 
@@ -62,7 +62,7 @@ void OsFile::close()
 	if (nullptr != m_impl)
 	{
 		::CloseHandle(m_impl->m_file);
-		m_impl->m_allocator.deleteObject(m_impl);
+		LUMIX_DELETE(m_impl->m_allocator, m_impl);
 		m_impl = nullptr;
 	}
 }

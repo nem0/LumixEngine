@@ -20,19 +20,19 @@ ShaderManager::ShaderManager(Renderer& renderer, IAllocator& allocator)
 
 ShaderManager::~ShaderManager()
 {
-	m_allocator.deleteObject(m_buffer);
+	LUMIX_DELETE(m_allocator, m_buffer);
 }
 
 
 Resource* ShaderManager::createResource(const Path& path)
 {
-	return m_allocator.newObject<Shader>(path, getOwner(), m_allocator);
+	return LUMIX_NEW(m_allocator, Shader)(path, getOwner(), m_allocator);
 }
 
 
 void ShaderManager::destroyResource(Resource& resource)
 {
-	m_allocator.deleteObject(static_cast<Shader*>(&resource));
+	LUMIX_DELETE(m_allocator, static_cast<Shader*>(&resource));
 }
 
 
@@ -40,7 +40,7 @@ uint8* ShaderManager::getBuffer(int32 size)
 {
 	if (m_buffer_size < size)
 	{
-		m_allocator.deleteObject(m_buffer);
+		LUMIX_DELETE(m_allocator, m_buffer);
 		m_buffer = nullptr;
 		m_buffer_size = -1;
 	}
@@ -74,7 +74,7 @@ Resource* ShaderBinaryManager::createResource(const Path& path)
 
 void ShaderBinaryManager::destroyResource(Resource& resource)
 {
-	m_allocator.deleteObject(static_cast<ShaderBinary*>(&resource));
+	LUMIX_DELETE(m_allocator, static_cast<ShaderBinary*>(&resource));
 }
 
 

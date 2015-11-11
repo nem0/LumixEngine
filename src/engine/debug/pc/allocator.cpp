@@ -23,7 +23,7 @@ namespace Debug
 		: m_source(source)
 		, m_root(nullptr)
 		, m_mutex(false)
-		, m_stack_tree(m_source.newObject<Debug::StackTree>())
+		, m_stack_tree(LUMIX_NEW(m_source, Debug::StackTree))
 		, m_total_size(0)
 		, m_is_fill_enabled(true)
 		, m_are_guards_enabled(true)
@@ -59,7 +59,7 @@ namespace Debug
 			}
 			ASSERT(false);
 		}
-		m_source.deleteObject(m_stack_tree);
+		LUMIX_DELETE(m_source, m_stack_tree);
 	}
 
 

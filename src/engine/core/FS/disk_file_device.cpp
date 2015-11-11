@@ -70,12 +70,12 @@ namespace Lumix
 
 		void DiskFileDevice::destroyFile(IFile* file)
 		{
-			m_allocator.deleteObject(file);
+			LUMIX_DELETE(m_allocator, file);
 		}
 
 		IFile* DiskFileDevice::createFile(IFile*)
 		{
-			return m_allocator.newObject<DiskFile>(*this, m_allocator);
+			return LUMIX_NEW(m_allocator, DiskFile)(*this, m_allocator);
 		}
 	} // namespace FS
 } // ~namespace Lumix

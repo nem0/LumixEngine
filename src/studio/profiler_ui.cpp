@@ -34,7 +34,7 @@ void ProfilerUI::AllocationStackNode::clear(Lumix::IAllocator& allocator)
 	for (auto* child : m_children)
 	{
 		child->clear(allocator);
-		allocator.deleteObject(child);
+		LUMIX_DELETE(allocator, child);
 	}
 	m_children.clear();
 }
@@ -57,7 +57,7 @@ ProfilerUI::ProfilerUI(Lumix::Debug::Allocator* allocator, Lumix::ResourceManage
 	m_is_opened = false;
 	m_current_block = nullptr;
 	Lumix::g_profiler.getFrameListeners().bind<ProfilerUI, &ProfilerUI::onFrame>(this);
-	m_allocation_root = m_allocator.newObject<AllocationStackNode>(m_allocator);
+	m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(m_allocator);
 	m_allocation_root->m_stack_node = nullptr;
 }
 
@@ -65,7 +65,7 @@ ProfilerUI::ProfilerUI(Lumix::Debug::Allocator* allocator, Lumix::ResourceManage
 ProfilerUI::~ProfilerUI()
 {
 	m_allocation_root->clear(m_allocator);
-	m_allocator.deleteObject(m_allocation_root);
+	LUMIX_DELETE(m_allocator, m_allocation_root);
 	Lumix::g_profiler.getFrameListeners().unbind<ProfilerUI, &ProfilerUI::onFrame>(this);
 }
 
@@ -316,7 +316,7 @@ ProfilerUI::AllocationStackNode* ProfilerUI::getOrCreate(AllocationStackNode* my
 		}
 	}
 
-	auto new_node = m_allocator.newObject<AllocationStackNode>(m_allocator);
+	auto new_node = LUMIX_NEW(m_allocator, AllocationStackNode)(m_allocator);
 	my_node->m_children.push(new_node);
 	new_node->m_stack_node = external_node;
 	new_node->m_inclusive_size = size;
@@ -341,8 +341,8 @@ void ProfilerUI::addToTree(Lumix::Debug::Allocator::AllocationInfo* info)
 void ProfilerUI::refreshAllocations()
 {
 	m_allocation_root->clear(m_allocator);
-	m_allocator.deleteObject(m_allocation_root);
-	m_allocation_root = m_allocator.newObject<AllocationStackNode>(m_allocator);
+	LUMIX_DELETE(m_allocator, m_allocation_root);
+	m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(m_allocator);
 	m_allocation_root->m_stack_node = nullptr;
 
 	m_main_allocator->lock();

@@ -32,7 +32,7 @@ class PluginManagerImpl : public PluginManager
 			for (int i = m_plugins.size() - 1; i >= 0; --i)
 			{
 				m_plugins[i]->destroy();
-				m_engine.getAllocator().deleteObject(m_plugins[i]);
+				LUMIX_DELETE(m_engine.getAllocator(), m_plugins[i]);
 			}
 
 			for (int i = 0; i < m_libraries.size(); ++i)
@@ -114,7 +114,7 @@ class PluginManagerImpl : public PluginManager
 					IPlugin* plugin = creator(m_engine);
 					if (!plugin->create())
 					{
-						m_engine.getAllocator().deleteObject(plugin);
+						LUMIX_DELETE(m_engine.getAllocator(), plugin);
 						ASSERT(false);
 						return nullptr;
 					}
@@ -150,13 +150,13 @@ class PluginManagerImpl : public PluginManager
 
 PluginManager* PluginManager::create(Engine& engine)
 {
-	return engine.getAllocator().newObject<PluginManagerImpl>(engine, engine.getAllocator());
+	return LUMIX_NEW(engine.getAllocator(), PluginManagerImpl)(engine, engine.getAllocator());
 }
 
 
 void PluginManager::destroy(PluginManager* manager)
 {
-	static_cast<PluginManagerImpl*>(manager)->getAllocator().deleteObject(manager);
+	LUMIX_DELETE(static_cast<PluginManagerImpl*>(manager)->getAllocator(), manager);
 }
 
 

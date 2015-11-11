@@ -168,17 +168,17 @@ namespace Lumix
 
 		IFile* TCPFileDevice::createFile(IFile*)
 		{
-			return m_impl->m_allocator.newObject<TCPFile>(m_impl->m_stream, *this, m_impl->m_spin_mutex);
+			return LUMIX_NEW(m_impl->m_allocator, TCPFile)(m_impl->m_stream, *this, m_impl->m_spin_mutex);
 		}
 
 		void TCPFileDevice::destroyFile(IFile* file)
 		{
-			m_impl->m_allocator.deleteObject(file);
+			LUMIX_DELETE(m_impl->m_allocator, file);
 		}
 
 		void TCPFileDevice::connect(const char* ip, uint16 port, IAllocator& allocator)
 		{
-			m_impl = allocator.newObject<TCPImpl>(allocator);
+			m_impl = LUMIX_NEW(allocator, TCPImpl)(allocator);
 			m_impl->m_stream = m_impl->m_connector.connect(ip, port);
 		}
 
@@ -186,7 +186,7 @@ namespace Lumix
 		{
 			m_impl->m_stream->write(TCPCommand::Disconnect);
 			m_impl->m_connector.close(m_impl->m_stream);
-			m_impl->m_allocator.deleteObject(m_impl);
+			LUMIX_DELETE(m_impl->m_allocator, m_impl);
 		}
 	} // namespace FS
 } // ~namespace Lumix

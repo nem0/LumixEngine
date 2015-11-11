@@ -47,7 +47,7 @@ namespace Lumix
 
 		Task::Task(IAllocator& allocator)
 		{
-			TaskImpl* impl = allocator.newObject<TaskImpl>(allocator);
+			TaskImpl* impl = LUMIX_NEW(allocator, TaskImpl)(allocator);
 			impl->m_handle = nullptr;
 			impl->m_affinity_mask = getProccessAffinityMask();
 			impl->m_priority = ::GetThreadPriority(GetCurrentThread());
@@ -63,7 +63,7 @@ namespace Lumix
 		Task::~Task()
 		{
 			ASSERT(!m_implementation->m_handle);
-			m_implementation->m_allocator.deleteObject(m_implementation);
+			LUMIX_DELETE(m_implementation->m_allocator, m_implementation);
 		}
 
 		bool Task::create(const char* name)

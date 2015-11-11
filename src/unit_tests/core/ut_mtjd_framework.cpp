@@ -86,7 +86,7 @@ void UT_MTJDFrameworkTest(const char* params)
 
 		for (int32 i = 0; i < TESTS_COUNT; i++)
 		{
-			jobs[i] = allocator.newObject<TestJob>(IN1_BUFFER[i],
+			jobs[i] = LUMIX_NEW(allocator, TestJob)(IN1_BUFFER[i],
 				IN2_BUFFER[i],
 				OUT_BUFFER[i],
 				BUFFER_SIZE,
@@ -120,7 +120,7 @@ void UT_MTJDFrameworkTest(const char* params)
 
 		for (int32 i = 0; i < TESTS_COUNT; i++)
 		{
-			allocator.deleteObject(jobs[i]);
+			LUMIX_DELETE(allocator, jobs[i]);
 		}
 
 		allocator.deallocate(jobs);
@@ -146,7 +146,7 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 
 	for (int32 i = 0; i < TESTS_COUNT - 1; i++)
 	{
-		jobs[i] = allocator.newObject<TestJob>(IN1_BUFFER[i],
+		jobs[i] = LUMIX_NEW(allocator, TestJob)(IN1_BUFFER[i],
 			IN2_BUFFER[i],
 			IN2_BUFFER[i + 1],
 			BUFFER_SIZE,
@@ -155,7 +155,7 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 			allocator);
 	}
 
-	jobs[TESTS_COUNT - 1] = allocator.newObject<TestJob>(IN1_BUFFER[TESTS_COUNT - 1],
+	jobs[TESTS_COUNT - 1] = LUMIX_NEW(allocator, TestJob)(IN1_BUFFER[TESTS_COUNT - 1],
 		IN2_BUFFER[TESTS_COUNT - 1],
 		OUT_BUFFER[0],
 		BUFFER_SIZE,
@@ -185,7 +185,7 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 
 	for (int32 i = 0; i < TESTS_COUNT; i++)
 	{
-		allocator.deleteObject(jobs[i]);
+		LUMIX_DELETE(allocator, jobs[i]);
 	}
 
 	allocator.deallocate(jobs);

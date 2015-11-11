@@ -69,7 +69,7 @@ struct TerrainQuad
 	{
 		for (int i = 0; i < CHILD_COUNT; ++i)
 		{
-			m_allocator.deleteObject(m_children[i]);
+			LUMIX_DELETE(m_allocator, m_children[i]);
 		}
 	}
 
@@ -79,7 +79,7 @@ struct TerrainQuad
 		{
 			for (int i = 0; i < CHILD_COUNT; ++i)
 			{
-				m_children[i] = m_allocator.newObject<TerrainQuad>(m_allocator);
+				m_children[i] = LUMIX_NEW(m_allocator, TerrainQuad)(m_allocator);
 				m_children[i]->m_lod = m_lod + 1;
 				m_children[i]->m_size = m_size / 2;
 			}
@@ -212,23 +212,23 @@ Terrain::GrassType::~GrassType()
 Terrain::~Terrain()
 {
 	setMaterial(nullptr);
-	m_allocator.deleteObject(m_mesh);
-	m_allocator.deleteObject(m_root);
+	LUMIX_DELETE(m_allocator, m_mesh);
+	LUMIX_DELETE(m_allocator, m_root);
 	for(int i = 0; i < m_grass_types.size(); ++i)
 	{
-		m_allocator.deleteObject(m_grass_types[i]);
+		LUMIX_DELETE(m_allocator, m_grass_types[i]);
 	}
 	for (int j = 0; j < m_grass_quads.size(); ++j)
 	{
 		Array<GrassQuad*>& quads = m_grass_quads.at(j);
 		for (int i = 0; i < quads.size(); ++i)
 		{
-			m_allocator.deleteObject(quads[i]);
+			LUMIX_DELETE(m_allocator, quads[i]);
 		}
 	}
 	for (int i = 0; i < m_free_grass_quads.size(); ++i)
 	{
-		m_allocator.deleteObject(m_free_grass_quads[i]);
+		LUMIX_DELETE(m_allocator, m_free_grass_quads[i]);
 	}
 }
 
@@ -264,7 +264,7 @@ void Terrain::addGrassType(int index)
 void Terrain::removeGrassType(int index)
 {
 	forceGrassUpdate();
-	m_allocator.deleteObject(m_grass_types[index]);
+	LUMIX_DELETE(m_allocator, m_grass_types[index]);
 	m_grass_types.erase(index);
 }
 
@@ -850,7 +850,7 @@ static void generateSubgrid(Array<Sample>& samples, Array<short>& indices, int& 
 
 void Terrain::generateGeometry()
 {
-	m_allocator.deleteObject(m_mesh);
+	LUMIX_DELETE(m_allocator, m_mesh);
 	m_mesh = nullptr;
 	Array<Sample> points(m_allocator);
 	points.resize(GRID_SIZE * GRID_SIZE * 4);
@@ -870,7 +870,7 @@ void Terrain::generateGeometry()
 	m_vertices_handle = bgfx::createVertexBuffer(bgfx::copy(&points[0], sizeof(points[0]) * points.size()), vertex_def);
 	auto* indices_mem = bgfx::copy(&indices[0], sizeof(indices[0]) * indices.size());
 	m_indices_handle = bgfx::createIndexBuffer(indices_mem);
-	m_mesh = m_allocator.newObject<Mesh>(vertex_def,
+	m_mesh = LUMIX_NEW(m_allocator, Mesh)(vertex_def,
 		m_material,
 		0,
 		int(points.size() * sizeof(points[0])),
@@ -882,7 +882,7 @@ void Terrain::generateGeometry()
 
 TerrainQuad* Terrain::generateQuadTree(float size)
 {
-	TerrainQuad* root = m_allocator.newObject<TerrainQuad>(m_allocator);
+	TerrainQuad* root = LUMIX_NEW(m_allocator, TerrainQuad)(m_allocator);
 	root->m_lod = 1;
 	root->m_min.set(0, 0, 0);
 	root->m_size = size;
@@ -920,7 +920,7 @@ void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state)
 
 		if (is_data_ready)
 		{
-			m_allocator.deleteObject(m_root);
+			LUMIX_DELETE(m_allocator, m_root);
 			if (m_heightmap && m_splatmap)
 			{
 				m_width = m_heightmap->getWidth();
@@ -931,7 +931,7 @@ void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state)
 	}
 	else
 	{
-		m_allocator.deleteObject(m_root);
+		LUMIX_DELETE(m_allocator, m_root);
 		m_root = nullptr;
 	}
 }

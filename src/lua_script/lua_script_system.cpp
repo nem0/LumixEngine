@@ -298,8 +298,7 @@ public:
 	{
 		if (type == LUA_SCRIPT_HASH)
 		{
-			LuaScriptSceneImpl::Script& script =
-				m_scripts.emplace(m_system.getAllocator());
+			LuaScriptSceneImpl::Script& script = m_scripts.emplace(m_system.getAllocator());
 			script.m_entity = entity;
 			script.m_script = nullptr;
 			script.m_state = nullptr;
@@ -496,7 +495,7 @@ IScene* LuaScriptSystem::createScene(UniverseContext& ctx)
 
 void LuaScriptSystem::destroyScene(IScene* scene)
 {
-	m_allocator.deleteObject(scene);
+	LUMIX_DELETE(m_allocator, scene);
 }
 
 
@@ -519,7 +518,7 @@ const char* LuaScriptSystem::getName() const
 
 extern "C" LUMIX_LIBRARY_EXPORT IPlugin* createPlugin(Engine& engine)
 {
-	return engine.getAllocator().newObject<LuaScriptSystem>(engine);
+	return LUMIX_NEW(engine.getAllocator(), LuaScriptSystem)(engine);
 }
 
 

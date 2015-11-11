@@ -24,7 +24,7 @@ FileIterator* createFileIterator(const char* path, IAllocator& allocator)
 	char tmp[MAX_PATH_LENGTH];
 	copyString(tmp, path);
 	catString(tmp, "/*");
-	auto* iter = allocator.newObject<FileIterator>();
+	auto* iter = LUMIX_NEW(allocator, FileIterator);
 	iter->allocator = &allocator;
 	iter->handle = FindFirstFile(tmp, &iter->ffd);
 	iter->is_valid = iter->handle != NULL;
@@ -35,7 +35,7 @@ FileIterator* createFileIterator(const char* path, IAllocator& allocator)
 void destroyFileIterator(FileIterator* iterator)
 {
 	FindClose(iterator->handle);
-	iterator->allocator->deleteObject(iterator);
+	LUMIX_DELETE(*iterator->allocator, iterator);
 }
 
 

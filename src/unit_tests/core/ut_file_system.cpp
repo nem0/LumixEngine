@@ -30,10 +30,8 @@ void UT_file_events_device(const char* params)
 	Lumix::DefaultAllocator allocator;
 	file_system = Lumix::FS::FileSystem::create(allocator);
 
-	disk_file_device =
-		allocator.newObject<Lumix::FS::DiskFileDevice>(allocator);
-	file_event_device =
-		allocator.newObject<Lumix::FS::FileEventsDevice>(allocator);
+	disk_file_device = LUMIX_NEW(allocator, Lumix::FS::DiskFileDevice)(allocator);
+	file_event_device = LUMIX_NEW(allocator, Lumix::FS::FileEventsDevice)(allocator);
 	file_event_device->OnEvent.bind<fs_event_cb>();
 
 	file_system->mount(file_event_device);
@@ -166,8 +164,8 @@ void UT_file_events_device(const char* params)
 	LUMIX_EXPECT_TRUE(!!(1 << (uint32)Lumix::FS::EventType::CLOSE_FINISHED &
 						 occured_event));
 
-	allocator.deleteObject(disk_file_device);
-	allocator.deleteObject(file_event_device);
+	LUMIX_DELETE(allocator, disk_file_device);
+	LUMIX_DELETE(allocator, file_event_device);
 
 	Lumix::FS::FileSystem::destroy(file_system);
 };

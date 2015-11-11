@@ -38,7 +38,7 @@ public:
 													  end = m_children.end();
 		while (iter != end)
 		{
-			m_allocator.deleteObject(iter.value());
+			LUMIX_DELETE(m_allocator, iter.value());
 			++iter;
 		}
 	}
@@ -141,9 +141,7 @@ public:
 			Children::iterator child_iter = m_children.find(parent);
 			if (!child_iter.isValid())
 			{
-				m_children.insert(
-					parent,
-					m_allocator.newObject<Array<Child>>(m_allocator));
+				m_children.insert(parent, LUMIX_NEW(m_allocator, Array<Child>)(m_allocator));
 				child_iter = m_children.find(parent);
 			}
 			Child& c = child_iter.value()->pushEmpty();
@@ -224,14 +222,13 @@ private:
 
 Hierarchy* Hierarchy::create(Universe& universe, IAllocator& allocator)
 {
-	return allocator.newObject<HierarchyImpl>(universe, allocator);
+	return LUMIX_NEW(allocator, HierarchyImpl)(universe, allocator);
 }
 
 
 void Hierarchy::destroy(Hierarchy* hierarchy)
 {
-	static_cast<HierarchyImpl*>(hierarchy)->getAllocator().deleteObject(
-		hierarchy);
+	LUMIX_DELETE(static_cast<HierarchyImpl*>(hierarchy)->getAllocator(), hierarchy);
 }
 
 

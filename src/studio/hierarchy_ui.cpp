@@ -88,7 +88,7 @@ void HierarchyUI::onGUI()
 		if (ImGui::Button("Connect selected entities"))
 		{
 			auto* command =
-				m_editor->getAllocator().newObject<SetParentEditorCommand>(*m_editor,
+				LUMIX_NEW(m_editor->getAllocator(), SetParentEditorCommand)(*m_editor,
 				*hierarchy,
 				m_editor->getSelectedEntities()[0],
 				m_editor->getSelectedEntities()[1]);
@@ -130,7 +130,7 @@ void HierarchyUI::showHierarchy(Lumix::Entity entity, bool has_parent)
 
 		if (ImGui::Button(StringBuilder<50>("Remove##r") << entity))
 		{
-			auto* command = m_editor->getAllocator().newObject<SetParentEditorCommand>(
+			auto* command = LUMIX_NEW(m_editor->getAllocator(), SetParentEditorCommand)(
 				*m_editor, *hierarchy, entity, -1);
 			m_editor->executeCommand(command);
 		}

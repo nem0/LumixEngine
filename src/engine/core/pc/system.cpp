@@ -42,7 +42,7 @@ namespace Lumix
 		CloseHandle(process.output_read_pipe);
 		CloseHandle(process.process_info.hProcess);
 		CloseHandle(process.process_info.hThread);
-		process.allocator.deleteObject(&process);
+		LUMIX_DELETE(process.allocator, &process);
 	}
 
 
@@ -57,12 +57,12 @@ namespace Lumix
 		if (CreatePipe(&process->output_read_pipe, &process->output_write_pipe, &sec_attrs, 0) ==
 			FALSE)
 		{
-			allocator.deleteObject(process);
+			LUMIX_DELETE(allocator, process);
 			return nullptr;
 		}
 		if (SetHandleInformation(process->output_read_pipe, HANDLE_FLAG_INHERIT, 0) == FALSE)
 		{
-			allocator.deleteObject(process);
+			LUMIX_DELETE(allocator, process);
 			return nullptr;
 		}
 
@@ -90,7 +90,7 @@ namespace Lumix
 		
 		if (create_process_ret == FALSE)
 		{
-			allocator.deleteObject(process);
+			LUMIX_DELETE(allocator, process);
 			return nullptr;
 		}
 

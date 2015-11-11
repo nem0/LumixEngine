@@ -19,13 +19,13 @@ namespace Lumix
 			{
 				if (NULL == s_instance)
 				{
-					s_instance = getAllocator().newObject<Manager>(getAllocator());
+					s_instance = LUMIX_NEW(getAllocator(), Manager)(getAllocator());
 				}
 
 				return *s_instance;
 			}
 
-			static void release() { getAllocator().deleteObject(s_instance); s_instance = NULL; }
+			static void release() { LUMIX_DELETE(getAllocator(), s_instance); s_instance = NULL; }
 
 
 			void registerFunction(const char* name, unitTestFunc func, const char* params);

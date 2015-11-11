@@ -688,19 +688,19 @@ public:
 
 		for (auto* a : m_actions)
 		{
-			m_editor->getAllocator().deleteObject(a);
+			LUMIX_DELETE(m_editor->getAllocator(), a);
 		}
 		m_actions.clear();
 
 		shutdownImGui();
 
-		m_allocator.deleteObject(m_profiler_ui);
-		m_allocator.deleteObject(m_asset_browser);
-		m_allocator.deleteObject(m_log_ui);
-		m_allocator.deleteObject(m_property_grid);
-		m_allocator.deleteObject(m_import_asset_dialog);
-		m_allocator.deleteObject(m_shader_compiler);
-		m_allocator.deleteObject(m_shader_editor);
+		LUMIX_DELETE(m_allocator, m_profiler_ui);
+		LUMIX_DELETE(m_allocator, m_asset_browser);
+		LUMIX_DELETE(m_allocator, m_log_ui);
+		LUMIX_DELETE(m_allocator, m_property_grid);
+		LUMIX_DELETE(m_allocator, m_import_asset_dialog);
+		LUMIX_DELETE(m_allocator, m_shader_compiler);
+		LUMIX_DELETE(m_allocator, m_shader_editor);
 		Lumix::WorldEditor::destroy(m_editor, m_allocator);
 		m_sceneview.shutdown();
 		m_gameview.shutdown();
@@ -726,7 +726,7 @@ public:
 		Lumix::Texture* texture = m_material->getTexture(0);
 		m_material->setTexture(0, nullptr);
 		texture->destroy();
-		m_allocator.deleteObject(texture);
+		LUMIX_DELETE(m_allocator, texture);
 
 		m_material->getResourceManager().get(Lumix::ResourceManager::MATERIAL)->unload(*m_material);
 	}

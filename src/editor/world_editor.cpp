@@ -1697,10 +1697,10 @@ public:
 
 		EditorIcon::unloadIcons();
 		removePlugin(*m_measure_tool);
-		m_allocator.deleteObject(m_measure_tool);
+		LUMIX_DELETE(m_allocator, m_measure_tool);
 		for (auto* plugin : m_plugins)
 		{
-			getAllocator().deleteObject(plugin);
+			LUMIX_DELETE(getAllocator(), plugin);
 		}
 		destroyUndoStack();
 
@@ -1944,8 +1944,7 @@ public:
 		}
 
 		DestroyEntitiesCommand* command =
-			m_allocator.newObject<DestroyEntitiesCommand>(
-				*this, entities, count);
+			LUMIX_NEW(m_allocator, DestroyEntitiesCommand)(*this, entities, count);
 		executeCommand(command);
 	}
 
@@ -1981,8 +1980,7 @@ public:
 			pos = universe->getPosition(m_camera) +
 				  universe->getRotation(m_camera) * Vec3(0, 0, -2);
 		}
-		AddEntityCommand* command =
-			m_allocator.newObject<AddEntityCommand>(*this, pos);
+		AddEntityCommand* command = LUMIX_NEW(m_allocator, AddEntityCommand)(*this, pos);
 		executeCommand(command);
 
 		return command->getEntity();
@@ -2022,7 +2020,7 @@ public:
 	{
 		if (m_camera >= 0)
 		{
-			EditorIcon* er = m_allocator.newObject<EditorIcon>(*this,
+			EditorIcon* er = LUMIX_NEW(m_allocator, EditorIcon)(*this,
 				*static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene),
 				entity);
 			m_editor_icons.push(er);
@@ -2035,7 +2033,7 @@ public:
 		if (count <= 0) return;
 
 		IEditorCommand* command =
-			m_allocator.newObject<ScaleEntityCommand>(*this, entities, scales, count, m_allocator);
+			LUMIX_NEW(m_allocator, ScaleEntityCommand)(*this, entities, scales, count, m_allocator);
 		executeCommand(command);
 	}
 
@@ -2053,7 +2051,7 @@ public:
 		{
 			positions.push(universe->getPosition(entities[i]));
 		}
-		IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
+		IEditorCommand* command = LUMIX_NEW(m_allocator, MoveEntityCommand)(
 			*this, entities, &positions[0], rotations, count, m_allocator);
 		executeCommand(command);
 	}
@@ -2072,7 +2070,7 @@ public:
 		{
 			rots.push(universe->getRotation(entities[i]));
 		}
-		IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
+		IEditorCommand* command = LUMIX_NEW(m_allocator, MoveEntityCommand)(
 			*this, entities, positions, &rots[0], count, m_allocator);
 		executeCommand(command);
 	}
@@ -2084,7 +2082,7 @@ public:
 		int count) override
 	{
 		if (count <= 0) return;
-		IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
+		IEditorCommand* command = LUMIX_NEW(m_allocator, MoveEntityCommand)(
 			*this, entities, positions, rotations, count, m_allocator);
 		executeCommand(command);
 	}
@@ -2095,8 +2093,7 @@ public:
 		if (entity >= 0)
 		{
 			IEditorCommand* command =
-				m_allocator.newObject<SetEntityNameCommand>(
-					*this, entity, name);
+				LUMIX_NEW(m_allocator, SetEntityNameCommand)(*this, entity, name);
 			executeCommand(command);
 		}
 	}
@@ -2109,7 +2106,7 @@ public:
 			if (command->merge(*m_undo_stack[m_undo_index]))
 			{
 				m_undo_stack[m_undo_index]->execute();
-				m_allocator.deleteObject(command);
+				LUMIX_DELETE(m_allocator, command);
 				return;
 			}
 		}
@@ -2120,7 +2117,7 @@ public:
 			{
 				for (int i = m_undo_stack.size() - 1; i > m_undo_index; --i)
 				{
-					m_allocator.deleteObject(m_undo_stack[i]);
+					LUMIX_DELETE(m_allocator, m_undo_stack[i]);
 				}
 				m_undo_stack.resize(m_undo_index + 1);
 			}
@@ -2162,7 +2159,7 @@ public:
 		selectEntities(nullptr, 0);
 		for (int i = 0; i < m_editor_icons.size(); ++i)
 		{
-			m_allocator.deleteObject(m_editor_icons[i]);
+			LUMIX_DELETE(m_allocator, m_editor_icons[i]);
 		}
 		m_editor_icons.clear();
 		m_is_game_mode = false;
@@ -2242,7 +2239,7 @@ public:
 	void pasteEntity() override
 	{
 		PasteEntityCommand* command =
-			m_allocator.newObject<PasteEntityCommand>(*this, m_copy_buffer);
+			LUMIX_NEW(m_allocator, PasteEntityCommand)(*this, m_copy_buffer);
 		executeCommand(command);
 	}
 
@@ -2299,8 +2296,7 @@ public:
 		if (component.isValid())
 		{
 			IEditorCommand* command =
-				m_allocator.newObject<DestroyComponentCommand>(*this,
-															   component);
+				LUMIX_NEW(m_allocator, DestroyComponentCommand)(*this, component);
 			executeCommand(command);
 		}
 	}
@@ -2311,8 +2307,7 @@ public:
 		if (!m_selected_entities.empty())
 		{
 			IEditorCommand* command =
-				m_allocator.newObject<AddComponentCommand>(
-					*this, m_selected_entities, type_crc);
+				LUMIX_NEW(m_allocator, AddComponentCommand)(*this, m_selected_entities, type_crc);
 			executeCommand(command);
 		}
 	}
@@ -2328,12 +2323,9 @@ public:
 			m_go_to_parameters.m_from = universe->getPosition(m_camera);
 			Quat camera_rot = universe->getRotation(m_camera);
 			Vec3 dir = camera_rot * Vec3(0, 0, 1);
-			m_go_to_parameters.m_to =
-				universe->getPosition(m_selected_entities[0]) + dir * 10;
-			float len =
-				(m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
-			m_go_to_parameters.m_speed =
-				Math::maxValue(100.0f / (len > 0 ? len : 1), 2.0f);
+			m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + dir * 10;
+			float len = (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
+			m_go_to_parameters.m_speed = Math::maxValue(100.0f / (len > 0 ? len : 1), 2.0f);
 		}
 	}
 
@@ -2341,15 +2333,11 @@ public:
 	void loadUniverse(const Path& path) override
 	{
 		m_universe_path = path;
-		g_log_info.log("editor") << "Loading universe " << path.c_str()
-								 << "...";
+		g_log_info.log("editor") << "Loading universe " << path.c_str() << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
 		FS::ReadCallback file_read_cb;
 		file_read_cb.bind<WorldEditorImpl, &WorldEditorImpl::loadMap>(this);
-		fs.openAsync(fs.getDefaultDevice(),
-					 path,
-					 FS::Mode::OPEN_AND_READ,
-					 file_read_cb);
+		fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN_AND_READ, file_read_cb);
 	}
 
 	void loadMap(FS::IFile& file, bool success, FS::FileSystem& fs)
@@ -2506,17 +2494,15 @@ public:
 		{
 			if (m_editor_icons[i]->getEntity() == entity)
 			{
-				m_allocator.deleteObject(m_editor_icons[i]);
+				LUMIX_DELETE(m_allocator, m_editor_icons[i]);
 				m_editor_icons.eraseFast(i);
 				break;
 			}
 		}
 		if (!found_renderable)
 		{
-			EditorIcon* er = m_allocator.newObject<EditorIcon>(
-				*this,
-				*static_cast<RenderScene*>(
-					getComponent(m_camera, CAMERA_HASH).scene),
+			EditorIcon* er = LUMIX_NEW(m_allocator, EditorIcon)(*this,
+				*static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene),
 				entity);
 			m_editor_icons.push(er);
 		}
@@ -2533,7 +2519,7 @@ public:
 	template <typename T>
 	static IEditorCommand* constructEditorCommand(WorldEditor& editor)
 	{
-		return editor.getAllocator().newObject<T>(editor);
+		return LUMIX_NEW(editor.getAllocator(), T)(editor);
 	}
 
 
@@ -2587,7 +2573,7 @@ public:
 		m_undo_index = -1;
 		m_mouse_handling_plugin = nullptr;
 		m_is_game_mode = false;
-		m_measure_tool = m_allocator.newObject<MeasureTool>();
+		m_measure_tool = LUMIX_NEW(m_allocator, MeasureTool)();
 		addPlugin(*m_measure_tool);
 
 		m_base_path = base_path;
@@ -2701,8 +2687,7 @@ public:
 		if (cmp.isValid())
 		{
 			IEditorCommand* command =
-				m_allocator.newObject<AddArrayPropertyItemCommand>(
-					*this, cmp, property);
+				LUMIX_NEW(m_allocator, AddArrayPropertyItemCommand)(*this, cmp, property);
 			executeCommand(command);
 		}
 	}
@@ -2715,8 +2700,7 @@ public:
 		if (cmp.isValid())
 		{
 			IEditorCommand* command =
-				m_allocator.newObject<RemoveArrayPropertyItemCommand>(
-					*this, cmp, index, property);
+				LUMIX_NEW(m_allocator, RemoveArrayPropertyItemCommand)(*this, cmp, index, property);
 			executeCommand(command);
 		}
 	}
@@ -2735,14 +2719,8 @@ public:
 				getComponent(m_selected_entities[0], component_hash);
 			if (cmp.isValid())
 			{
-				IEditorCommand* command =
-					m_allocator.newObject<SetPropertyCommand>(*this,
-															  cmp.entity,
-															  cmp.type,
-															  index,
-															  property,
-															  data,
-															  size);
+				IEditorCommand* command = LUMIX_NEW(m_allocator, SetPropertyCommand)(
+					*this, cmp.entity, cmp.type, index, property, data, size);
 				executeCommand(command);
 			}
 		}
@@ -2865,7 +2843,7 @@ public:
 		{
 			if (m_editor_icons[i]->getEntity() == cmp.entity)
 			{
-				m_allocator.deleteObject(m_editor_icons[i]);
+				LUMIX_DELETE(m_allocator, m_editor_icons[i]);
 				m_editor_icons.eraseFast(i);
 				break;
 			}
@@ -2873,10 +2851,8 @@ public:
 		if (getUniverse()->hasEntity(cmp.entity) &&
 			getComponents(cmp.entity).empty())
 		{
-			EditorIcon* er = m_allocator.newObject<EditorIcon>(
-				*this,
-				*static_cast<RenderScene*>(
-					getComponent(m_camera, CAMERA_HASH).scene),
+			EditorIcon* er = LUMIX_NEW(m_allocator, EditorIcon)(*this,
+				*static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene),
 				cmp.entity);
 			m_editor_icons.push(er);
 		}
@@ -2890,7 +2866,7 @@ public:
 		{
 			if (m_editor_icons[i]->getEntity() == entity)
 			{
-				m_allocator.deleteObject(m_editor_icons[i]);
+				LUMIX_DELETE(m_allocator, m_editor_icons[i]);
 				m_editor_icons.eraseFast(i);
 				break;
 			}
@@ -2907,7 +2883,7 @@ public:
 		m_gizmo.destroy();
 		for (int i = 0; i < m_editor_icons.size(); ++i)
 		{
-			m_allocator.deleteObject(m_editor_icons[i]);
+			LUMIX_DELETE(m_allocator, m_editor_icons[i]);
 		}
 		m_components.clear();
 		selectEntities(nullptr, 0);
@@ -2963,7 +2939,7 @@ public:
 		m_undo_index = -1;
 		for (int i = 0; i < m_undo_stack.size(); ++i)
 		{
-			m_allocator.deleteObject(m_undo_stack[i]);
+			LUMIX_DELETE(m_allocator, m_undo_stack[i]);
 		}
 		m_undo_stack.clear();
 	}
