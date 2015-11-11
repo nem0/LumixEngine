@@ -47,13 +47,13 @@ namespace Lumix
 
 		void TCPAcceptor::close(TCPStream* stream)
 		{
-			m_allocator.deleteObject(stream);
+			LUMIX_DELETE(m_allocator, stream);
 		}
 
 		TCPStream* TCPAcceptor::accept()
 		{
 			SOCKET socket = ::accept(m_socket, nullptr, nullptr);
-			return m_allocator.newObject<TCPStream>(socket);
+			return LUMIX_NEW(m_allocator, TCPStream)(socket);
 		}
 	} // ~namespace Net
 } // ~namespace Lumix

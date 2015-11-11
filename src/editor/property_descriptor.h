@@ -368,7 +368,7 @@ class ArrayDescriptor : public IArrayDescriptor
 		{
 			for(int i = 0; i < m_children.size(); ++i)
 			{
-				m_allocator.deleteObject(m_children[i]);
+				LUMIX_DELETE(m_allocator, m_children[i]);
 			}
 		}
 

@@ -77,10 +77,8 @@ public:
 		{
 			m_file_system = FS::FileSystem::create(m_allocator);
 
-			m_mem_file_device =
-				m_allocator.newObject<FS::MemoryFileDevice>(m_allocator);
-			m_disk_file_device =
-				m_allocator.newObject<FS::DiskFileDevice>(m_allocator);
+			m_mem_file_device = LUMIX_NEW(m_allocator, FS::MemoryFileDevice)(m_allocator);
+			m_disk_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)(m_allocator);
 
 			m_file_system->mount(m_mem_file_device);
 			m_file_system->mount(m_disk_file_device);
@@ -126,8 +124,8 @@ public:
 		if (m_disk_file_device)
 		{
 			FS::FileSystem::destroy(m_file_system);
-			m_allocator.deleteObject(m_mem_file_device);
-			m_allocator.deleteObject(m_disk_file_device);
+			LUMIX_DELETE(m_allocator, m_mem_file_device);
+			LUMIX_DELETE(m_allocator, m_disk_file_device);
 		}
 
 		m_resource_manager.destroy();
@@ -139,9 +137,8 @@ public:
 
 	UniverseContext& createUniverse() override
 	{
-		UniverseContext* context =
-			m_allocator.newObject<UniverseContext>(m_allocator);
-		context->m_universe = m_allocator.newObject<Universe>(m_allocator);
+		UniverseContext* context = LUMIX_NEW(m_allocator, UniverseContext)(m_allocator);
+		context->m_universe = LUMIX_NEW(m_allocator, Universe)(m_allocator);
 		context->m_hierarchy =
 			Hierarchy::create(*context->m_universe, m_allocator);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
@@ -168,9 +165,9 @@ public:
 			context.m_scenes[i]->getPlugin().destroyScene(context.m_scenes[i]);
 		}
 		Hierarchy::destroy(context.m_hierarchy);
-		m_allocator.deleteObject(context.m_universe);
+		LUMIX_DELETE(m_allocator, context.m_universe);
 
-		m_allocator.deleteObject(&context);
+		LUMIX_DELETE(m_allocator, &context);
 	}
 
 
@@ -408,10 +405,10 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 	g_log_warning.getCallback().bind<showLogInVS>();
 	g_log_error.getCallback().bind<showLogInVS>();
 
-	EngineImpl* engine = allocator.newObject<EngineImpl>(fs, allocator);
+	EngineImpl* engine = LUMIX_NEW(allocator, EngineImpl)(fs, allocator);
 	if (!engine->create())
 	{
-		allocator.deleteObject(engine);
+		LUMIX_DELETE(allocator, engine);
 		return nullptr;
 	}
 	return engine;
@@ -420,7 +417,7 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 
 void Engine::destroy(Engine* engine, IAllocator& allocator)
 {
-	allocator.deleteObject(engine);
+	LUMIX_DELETE(allocator, engine);
 
 	fclose(g_error_file);
 	g_error_file = nullptr;

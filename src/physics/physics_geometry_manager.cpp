@@ -85,13 +85,13 @@ namespace Lumix
 
 	Resource* PhysicsGeometryManager::createResource(const Path& path)
 	{
-		return m_allocator.newObject<PhysicsGeometry>(path, getOwner(), m_allocator);
+		return LUMIX_NEW(m_allocator, PhysicsGeometry)(path, getOwner(), m_allocator);
 	}
 
 
 	void PhysicsGeometryManager::destroyResource(Resource& resource)
 	{
-		m_allocator.deleteObject(static_cast<PhysicsGeometry*>(&resource));
+		LUMIX_DELETE(m_allocator, static_cast<PhysicsGeometry*>(&resource));
 	}
 
 
@@ -104,7 +104,7 @@ namespace Lumix
 
 	PhysicsGeometry::~PhysicsGeometry()
 	{
-		getAllocator().deleteObject(m_geometry);
+		LUMIX_DELETE(getAllocator(), m_geometry);
 	}
 
 
@@ -130,7 +130,7 @@ namespace Lumix
 		if (!m_is_convex)
 		{
 			physx::PxTriangleMeshGeometry* geom =
-				getAllocator().newObject<physx::PxTriangleMeshGeometry>();
+				LUMIX_NEW(getAllocator(), physx::PxTriangleMeshGeometry)();
 			m_geometry = geom;
 			uint32 num_indices;
 			Array<uint32> tris(getAllocator());
@@ -156,7 +156,7 @@ namespace Lumix
 		else
 		{
 			physx::PxConvexMeshGeometry* geom =
-				getAllocator().newObject<physx::PxConvexMeshGeometry>();
+				LUMIX_NEW(getAllocator(), physx::PxConvexMeshGeometry)();
 			m_geometry = geom;
 			physx::PxConvexMeshDesc meshDesc;
 			meshDesc.points.count = verts.size();
@@ -168,7 +168,7 @@ namespace Lumix
 			bool status = system.getCooking()->cookConvexMesh(meshDesc, writeBuffer);
 			if (!status)
 			{
-				getAllocator().deleteObject(geom);
+				LUMIX_DELETE(getAllocator(), geom);
 				m_geometry = nullptr;
 				return false;
 			}
@@ -191,7 +191,7 @@ namespace Lumix
 
 	void PhysicsGeometry::unload(void)
 	{
-		getAllocator().deleteObject(m_geometry);
+		LUMIX_DELETE(getAllocator(), m_geometry);
 		m_geometry = nullptr;
 	}
 

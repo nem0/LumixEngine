@@ -368,12 +368,12 @@ extern "C"
 {
 	LUMIX_RENDERER_API IPlugin* createPlugin(Engine& engine)
 	{
-		RendererImpl* r = engine.getAllocator().newObject<RendererImpl>(engine);
+		RendererImpl* r = LUMIX_NEW(engine.getAllocator(), RendererImpl)(engine);
 		if (r->create())
 		{
 			return r;
 		}
-		engine.getAllocator().deleteObject(r);
+		LUMIX_DELETE(engine.getAllocator(), r);
 		return nullptr;
 	}
 }

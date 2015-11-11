@@ -60,7 +60,7 @@ void Job::onExecuted()
 
 	if (auto_destroy)
 	{
-		m_job_allocator.deleteObject(this);
+		LUMIX_DELETE(m_job_allocator, this);
 	}
 }
 } // namepsace MTJD

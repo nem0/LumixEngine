@@ -32,7 +32,7 @@ private:
 
 template <class T> MTJD::Job* makeJob(MTJD::Manager& manager, T function, IAllocator& allocator)
 {
-	return allocator.newObject<GenericJob<T>>(manager, function, allocator);
+	return LUMIX_NEW(allocator, GenericJob<T>)(manager, function, allocator);
 }
 
 

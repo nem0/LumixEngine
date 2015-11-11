@@ -2,6 +2,7 @@
 
 
 #include "lumix.h"
+#include <new>
 
 
 namespace Lumix
@@ -16,15 +17,6 @@ namespace Lumix
 			virtual void* allocate(size_t size) = 0;
 			virtual void deallocate(void* ptr) = 0;
 			virtual void* reallocate(void* ptr, size_t size) = 0;
-
-			template <class T, typename... Args>
-			T* newObject(Args&&... params)
-			{
-				auto mem = allocate(sizeof(T));
-				return new (mem) T(std::forward<Args>(params)...);
-			}
-
-
 
 			template <class T>
 			void deleteObject(T* ptr)

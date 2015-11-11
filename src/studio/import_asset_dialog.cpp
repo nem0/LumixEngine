@@ -1328,7 +1328,7 @@ ImportAssetDialog::~ImportAssetDialog()
 	if (m_task)
 	{
 		m_task->destroy();
-		m_editor.getAllocator().deleteObject(m_task);
+		LUMIX_DELETE(m_editor.getAllocator(), m_task);
 	}
 }
 
@@ -1450,7 +1450,7 @@ void ImportAssetDialog::checkSource()
 	ASSERT(!m_task);
 	setImportMessage("Importing...");
 	m_is_importing = true;
-	m_task = m_editor.getAllocator().newObject<ImportTask>(*this);
+	m_task = LUMIX_NEW(m_editor.getAllocator(), ImportTask)(*this);
 	m_task->create("ImportAssetTask");
 	m_task->run();
 }
@@ -1491,7 +1491,7 @@ void ImportAssetDialog::convert()
 
 	setImportMessage("Converting...");
 	m_is_converting = true;
-	m_task = m_editor.getAllocator().newObject<ConvertTask>(*this);
+	m_task = LUMIX_NEW(m_editor.getAllocator(), ConvertTask)(*this);
 	m_task->create("ConvertAssetTask");
 	m_task->run();
 }
@@ -1518,7 +1518,7 @@ void ImportAssetDialog::importTexture()
 	m_metadata.setString(hash, Lumix::crc32("source"), m_source);
 
 	m_is_importing_texture = true;
-	m_task = m_editor.getAllocator().newObject<ImportTextureTask>(*this);
+	m_task = LUMIX_NEW(m_editor.getAllocator(), ImportTextureTask)(*this);
 	m_task->create("ImportTextureTask");
 	m_task->run();
 }
@@ -1559,7 +1559,7 @@ void ImportAssetDialog::onGUI()
 			if (m_task && m_task->isFinished())
 			{
 				m_task->destroy();
-				m_editor.getAllocator().deleteObject(m_task);
+				LUMIX_DELETE(m_editor.getAllocator(), m_task);
 				m_task = nullptr;
 				m_is_importing = false;
 				m_is_converting = false;

@@ -45,7 +45,7 @@ namespace Lumix
 
 	bool InputSystem::create(IAllocator& allocator)
 	{
-		m_impl = allocator.newObject<InputSystemImpl>(allocator);
+		m_impl = LUMIX_NEW(allocator, InputSystemImpl)(allocator);
 		m_impl->m_mouse_rel_x = 0;
 		m_impl->m_mouse_rel_y = 0;
 		return true;
@@ -54,7 +54,7 @@ namespace Lumix
 
 	void InputSystem::destroy()
 	{
-		m_impl->m_allocator.deleteObject(m_impl);
+		LUMIX_DELETE(m_impl->m_allocator, m_impl);
 		m_impl = nullptr;
 	}
 

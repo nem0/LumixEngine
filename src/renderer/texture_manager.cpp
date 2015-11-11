@@ -23,12 +23,12 @@ namespace Lumix
 
 	Resource* TextureManager::createResource(const Path& path)
 	{
-		return m_allocator.newObject<Texture>(path, getOwner(), m_allocator);
+		return LUMIX_NEW(m_allocator, Texture)(path, getOwner(), m_allocator);
 	}
 
 	void TextureManager::destroyResource(Resource& resource)
 	{
-		m_allocator.deleteObject(static_cast<Texture*>(&resource));
+		LUMIX_DELETE(m_allocator, static_cast<Texture*>(&resource));
 	}
 
 	uint8* TextureManager::getBuffer(int32 size)

@@ -3,6 +3,7 @@
 #include "core/fs/ifile.h"
 #include "core/fs/ifile_system_defines.h"
 #include "core/math_utils.h"
+#include "core/string.h"
 
 
 namespace Lumix
@@ -169,12 +170,12 @@ namespace Lumix
 
 		void MemoryFileDevice::destroyFile(IFile* file)
 		{
-			m_allocator.deleteObject(file);
+			LUMIX_DELETE(m_allocator, file);
 		}
 
 		IFile* MemoryFileDevice::createFile(IFile* child)
 		{
-			return m_allocator.newObject<MemoryFile>(child, *this, m_allocator);
+			return LUMIX_NEW(m_allocator, MemoryFile)(child, *this, m_allocator);
 		}
 	} // ~namespace FS
 } // ~namespace Lumix

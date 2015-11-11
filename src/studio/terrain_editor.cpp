@@ -1111,7 +1111,7 @@ TerrainEditor::~TerrainEditor()
 	if (m_brush_texture)
 	{
 		m_brush_texture->destroy();
-		m_world_editor.getAllocator().deleteObject(m_brush_texture);
+		LUMIX_DELETE(m_world_editor.getAllocator(), m_brush_texture);
 	}
 
 	m_world_editor.removePlugin(*this);
@@ -1556,7 +1556,7 @@ void TerrainEditor::onGUI()
 			if (ImGui::Button("Clear mask"))
 			{
 				m_brush_texture->destroy();
-				m_world_editor.getAllocator().deleteObject(m_brush_texture);
+				LUMIX_DELETE(m_world_editor.getAllocator(), m_brush_texture);
 				m_brush_mask.clear();
 				m_brush_texture = nullptr;
 			}
@@ -1589,7 +1589,7 @@ void TerrainEditor::onGUI()
 					if (m_brush_texture)
 					{
 						m_brush_texture->destroy();
-						m_world_editor.getAllocator().deleteObject(m_brush_texture);
+						LUMIX_DELETE(m_world_editor.getAllocator(), m_brush_texture);
 					}
 					m_brush_texture = LUMIX_NEW(m_world_editor.getAllocator(), Lumix::Texture)(
 						Lumix::Path("brush_texture"), rm, m_world_editor.getAllocator());
@@ -1692,7 +1692,7 @@ void TerrainEditor::paint(const Lumix::RayCastModelHit& hit,
 	Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
 
 	PaintTerrainCommand* command =
-		m_world_editor.getAllocator().newObject<PaintTerrainCommand>(
+		LUMIX_NEW(m_world_editor.getAllocator(), PaintTerrainCommand)(
 			m_world_editor,
 			type,
 			m_texture_idx,

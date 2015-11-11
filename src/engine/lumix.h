@@ -20,10 +20,6 @@
 #define WARN(msg) __pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : WARNING: " msg))
 
 
-#include <type_traits>
-#include <new>
-
-
 namespace Lumix
 {
 	typedef char					int8;
@@ -35,23 +31,17 @@ namespace Lumix
 	typedef long long				int64;
 	typedef unsigned long long		uint64;
 
+#ifdef _WIN64
+	typedef uint64_t uintptr_t;
+#else
+	typedef uint32 uintptr_t;
+#endif
+
 	static_assert(sizeof(int64) == 8, "Incorrect size of int64");
 	static_assert(sizeof(int32) == 4, "Incorrect size of int32");
 	static_assert(sizeof(int16) == 2, "Incorrect size of int16");
 	static_assert(sizeof(int8) == 1, "Incorrect size of int8");
 }
-
-
-/*
-inline void* operator new(size_t, void* where)
-{
-	return where;
-}
-
-
-void operator delete[](void* p, void* m)
-{
-}*/
 
 
 namespace Lumix

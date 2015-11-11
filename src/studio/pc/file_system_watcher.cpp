@@ -56,24 +56,24 @@ public:
 			CloseHandle(m_task->m_handle);
 
 			m_task->destroy();
-			m_allocator.deleteObject(m_task);
+			LUMIX_DELETE(m_allocator, m_task);
 		}
 	}
 
 
 	bool start(LPCSTR path)
 	{
-		m_task = m_allocator.newObject<FileSystemWatcherTask>(path, *this, m_allocator);
+		m_task = LUMIX_NEW(m_allocator, FileSystemWatcherTask)(path, *this, m_allocator);
 		if (!m_task->create("FileSystemWatcher"))
 		{
-			m_allocator.deleteObject(m_task);
+			LUMIX_DELETE(m_allocator, m_task);
 			m_task = nullptr;
 			return false;
 		}
 		if (!m_task->run())
 		{
 			m_task->destroy();
-			m_allocator.deleteObject(m_task);
+			LUMIX_DELETE(m_allocator, m_task);
 			m_task = nullptr;
 			return false;
 		}
@@ -95,10 +95,10 @@ public:
 
 FileSystemWatcher* FileSystemWatcher::create(const char* path, Lumix::IAllocator& allocator)
 {
-	FileSystemWatcherPC* watcher = allocator.newObject<FileSystemWatcherPC>(allocator);
+	FileSystemWatcherPC* watcher = LUMIX_NEW(allocator, FileSystemWatcherPC)(allocator);
 	if (!watcher->start(path))
 	{
-		allocator.deleteObject(watcher);
+		LUMIX_DELETE(allocator, watcher);
 		return nullptr;
 	}
 	return watcher;
@@ -109,7 +109,7 @@ void FileSystemWatcher::destroy(FileSystemWatcher* watcher)
 {
 	if (!watcher) return;
 	FileSystemWatcherPC* pc_watcher = (FileSystemWatcherPC*)watcher;
-	pc_watcher->m_allocator.deleteObject(pc_watcher);
+	LUMIX_DELETE(pc_watcher->m_allocator, pc_watcher);
 }
 
 

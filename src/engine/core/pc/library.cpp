@@ -56,13 +56,13 @@ class LibraryPC : public Library
 
 Library* Library::create(const Path& path, IAllocator& allocator)
 {
-	return allocator.newObject<LibraryPC>(path, allocator);
+	return LUMIX_NEW(allocator, LibraryPC)(path, allocator);
 }
 
 
 void Library::destroy(Library* library)
 {
-	static_cast<LibraryPC*>(library)->getAllocator().deleteObject(library);
+	LUMIX_DELETE(static_cast<LibraryPC*>(library)->getAllocator(), library);
 }
 
 

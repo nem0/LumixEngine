@@ -150,7 +150,7 @@ bool Shader::generateInstances()
 {
 	for (int i = 0; i < m_instances.size(); ++i)
 	{
-		m_allocator.deleteObject(m_instances[i]);
+		LUMIX_DELETE(m_allocator, m_instances[i]);
 	}
 	m_instances.clear();
 
@@ -162,7 +162,7 @@ bool Shader::generateInstances()
 
 	for (int mask = 0; mask < count; ++mask)
 	{
-		ShaderInstance* instance = m_allocator.newObject<ShaderInstance>(*this);
+		ShaderInstance* instance = LUMIX_NEW(m_allocator, ShaderInstance)(*this);
 		m_instances.push(instance);
 
 		instance->m_combination = mask;
@@ -268,7 +268,7 @@ void Shader::unload(void)
 {
 	for (int i = 0; i < m_instances.size(); ++i)
 	{
-		m_allocator.deleteObject(m_instances[i]);
+		LUMIX_DELETE(m_allocator, m_instances[i]);
 	}
 	m_instances.clear();
 }

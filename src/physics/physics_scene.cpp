@@ -186,11 +186,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
-			m_allocator.deleteObject(m_actors[i]);
+			LUMIX_DELETE(m_allocator, m_actors[i]);
 		}
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
-			m_allocator.deleteObject(m_terrains[i]);
+			LUMIX_DELETE(m_allocator, m_terrains[i]);
 		}
 	}
 
@@ -253,7 +253,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		if (type == HEIGHTFIELD_HASH)
 		{
 			Entity entity = m_terrains[cmp]->m_entity;
-			m_allocator.deleteObject(m_terrains[cmp]);
+			LUMIX_DELETE(m_allocator, m_terrains[cmp]);
 			m_terrains[cmp] = nullptr;
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
@@ -280,7 +280,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentIndex createHeightfield(Entity entity)
 	{
-		Terrain* terrain = m_allocator.newObject<Terrain>();
+		Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)();
 		m_terrains.push(terrain);
 		terrain->m_heightmap = nullptr;
 		terrain->m_scene = this;
@@ -321,8 +321,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentIndex createBoxRigidActor(Entity entity)
 	{
-		RigidActor* actor =
-			m_allocator.newObject<RigidActor>(*this, m_allocator);
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, m_allocator);
 		m_actors.push(actor);
 		actor->setEntity(entity);
 
@@ -349,8 +348,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentIndex createMeshRigidActor(Entity entity)
 	{
-		RigidActor* actor =
-			m_allocator.newObject<RigidActor>(*this, m_allocator);
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, m_allocator);
 		m_actors.push(actor);
 		actor->setEntity(entity);
 
@@ -1046,8 +1044,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_actors.resize(count);
 		for (int i = old_size; i < count; ++i)
 		{
-			RigidActor* actor =
-				m_allocator.newObject<RigidActor>(*this, m_allocator);
+			RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, m_allocator);
 			m_actors[i] = actor;
 		}
 		for (int i = 0; i < m_actors.size(); ++i)
@@ -1124,7 +1121,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		serializer.read(count);
 		for (int i = count; i < m_terrains.size(); ++i)
 		{
-			m_allocator.deleteObject(m_terrains[i]);
+			LUMIX_DELETE(m_allocator, m_terrains[i]);
 			m_terrains[i] = nullptr;
 		}
 		int old_size = m_terrains.size();
@@ -1141,7 +1138,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				if (!m_terrains[i])
 				{
-					m_terrains[i] = m_allocator.newObject<Terrain>();
+					m_terrains[i] = LUMIX_NEW(m_allocator, Terrain);
 				}
 				m_terrains[i]->m_scene = this;
 				serializer.read(m_terrains[i]->m_entity);
@@ -1205,8 +1202,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
 								   Engine& engine,
 								   IAllocator& allocator)
 {
-	PhysicsSceneImpl* impl =
-		allocator.newObject<PhysicsSceneImpl>(universe, allocator);
+	PhysicsSceneImpl* impl = LUMIX_NEW(allocator, PhysicsSceneImpl)(universe, allocator);
 	impl->m_universe.entityTransformed()
 		.bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityMoved>(impl);
 	impl->m_engine = &engine;
@@ -1231,7 +1227,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
 	impl->m_scene = system.getPhysics()->createScene(sceneDesc);
 	if (!impl->m_scene)
 	{
-		allocator.deleteObject(impl);
+		LUMIX_DELETE(allocator, impl);
 		return nullptr;
 	}
 
@@ -1247,7 +1243,7 @@ void PhysicsScene::destroy(PhysicsScene* scene)
 	PhysicsSceneImpl* impl = static_cast<PhysicsSceneImpl*>(scene);
 	impl->m_default_material->release();
 	impl->m_scene->release();
-	impl->m_allocator.deleteObject(scene);
+	LUMIX_DELETE(impl->m_allocator, scene);
 }
 
 

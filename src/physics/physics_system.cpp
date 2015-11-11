@@ -162,8 +162,8 @@ class AssertNullAllocator : public physx::PxAllocatorCallback
 
 bool PhysicsSystemImpl::create()
 {
-	m_physx_allocator = m_allocator.newObject<AssertNullAllocator>();
-	m_error_callback = m_allocator.newObject<CustomErrorCallback>();
+	m_physx_allocator = LUMIX_NEW(m_allocator, AssertNullAllocator);
+	m_error_callback = LUMIX_NEW(m_allocator, CustomErrorCallback);
 	m_foundation = PxCreateFoundation(
 		PX_PHYSICS_VERSION,
 		*m_physx_allocator,
@@ -189,8 +189,8 @@ void PhysicsSystemImpl::destroy()
 	m_cooking->release();
 	m_physics->release();
 	m_foundation->release();
-	m_allocator.deleteObject(m_physx_allocator);
-	m_allocator.deleteObject(m_error_callback);
+	LUMIX_DELETE(m_allocator, m_physx_allocator);
+	LUMIX_DELETE(m_allocator, m_error_callback);
 }
 
 

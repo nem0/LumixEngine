@@ -41,7 +41,7 @@ PropertyGrid::PropertyGrid(Lumix::WorldEditor& editor,
 
 PropertyGrid::~PropertyGrid()
 {
-	m_editor.getAllocator().deleteObject(m_terrain_editor);
+	LUMIX_DELETE(m_editor.getAllocator(), m_terrain_editor);
 }
 
 

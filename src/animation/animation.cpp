@@ -17,13 +17,13 @@ namespace Lumix
 
 Resource* AnimationManager::createResource(const Path& path)
 {
-	return m_allocator.newObject<Animation>(path, getOwner(), m_allocator);
+	return LUMIX_NEW(m_allocator, Animation)(path, getOwner(), m_allocator);
 }
 
 
 void AnimationManager::destroyResource(Resource& resource)
 {
-	m_allocator.deleteObject(static_cast<Animation*>(&resource));
+	LUMIX_DELETE(m_allocator, static_cast<Animation*>(&resource));
 }
 
 

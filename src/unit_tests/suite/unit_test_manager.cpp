@@ -307,12 +307,12 @@ namespace Lumix
 
 		Manager::Manager(IAllocator& allocator)
 		{
-			m_impl = allocator.newObject<ManagerImpl>(allocator);
+			m_impl = LUMIX_NEW(allocator, ManagerImpl)(allocator);
 		}
 
 		Manager::~Manager()
 		{
-			m_impl->getAllocator().deleteObject(m_impl);
+			LUMIX_DELETE(m_impl->getAllocator(), m_impl);
 		}
 	} //~UnitTest
 } //~UnitTest

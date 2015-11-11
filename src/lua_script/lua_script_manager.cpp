@@ -130,13 +130,13 @@ LuaScriptManager::~LuaScriptManager()
 
 Resource* LuaScriptManager::createResource(const Path& path)
 {
-	return m_allocator.newObject<LuaScript>(path, getOwner(), m_allocator);
+	return LUMIX_NEW(m_allocator, LuaScript)(path, getOwner(), m_allocator);
 }
 
 
 void LuaScriptManager::destroyResource(Resource& resource)
 {
-	m_allocator.deleteObject(static_cast<LuaScript*>(&resource));
+	LUMIX_DELETE(m_allocator, static_cast<LuaScript*>(&resource));
 }
 
 

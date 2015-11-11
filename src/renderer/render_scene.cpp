@@ -233,7 +233,7 @@ public:
 				auto& manager = m_renderables[i]->m_model->getResourceManager();
 				manager.get(ResourceManager::MODEL)->unload(*m_renderables[i]->m_model);
 			}
-			m_allocator.deleteObject(m_renderables[i]);
+			LUMIX_DELETE(m_allocator, m_renderables[i]);
 		}
 
 		CullingSystem::destroy(*m_culling_system);
@@ -513,7 +513,7 @@ public:
 		for (int i = 0; i < m_renderables.size(); ++i)
 		{
 			setModel(i, nullptr);
-			m_allocator.deleteObject(m_renderables[i]);
+			LUMIX_DELETE(m_allocator, m_renderables[i]);
 		}
 		m_culling_system->clear();
 		m_renderables.clear();
@@ -521,7 +521,7 @@ public:
 		m_dynamic_renderable_cache = DynamicRenderableCache(m_allocator);
 		for (int i = 0; i < size; ++i)
 		{
-			m_renderables.push(m_allocator.newObject<Renderable>(m_allocator));
+			m_renderables.push(LUMIX_NEW(m_allocator, Renderable)(m_allocator));
 			serializer.read(m_renderables[i]->m_component_index);
 			serializer.read(m_renderables[i]->m_entity);
 			int64 layer_mask;
@@ -616,7 +616,7 @@ public:
 		int old_size = m_terrains.size();
 		for (int i = size; i < m_terrains.size(); ++i)
 		{
-			m_allocator.deleteObject(m_terrains[i]);
+			LUMIX_DELETE(m_allocator, m_terrains[i]);
 			m_terrains[i] = nullptr;
 		}
 		m_terrains.resize(size);
@@ -632,7 +632,7 @@ public:
 			{
 				if (!m_terrains[i])
 				{
-					m_terrains[i] = m_allocator.newObject<Terrain>(
+					m_terrains[i] = LUMIX_NEW(m_allocator, Terrain)(
 						m_renderer, INVALID_ENTITY, *this, m_allocator);
 				}
 				Terrain* terrain = m_terrains[i];
@@ -685,7 +685,7 @@ public:
 		}
 
 		setModel(renderable_index, nullptr);
-		m_allocator.deleteObject(m_renderables[renderable_index]);
+		LUMIX_DELETE(m_allocator, m_renderables[renderable_index]);
 		m_renderables.erase(renderable_index);
 		m_culling_system->removeStatic(renderable_index);
 		m_universe.destroyComponent(entity, RENDERABLE_HASH, this, component);
@@ -739,7 +739,7 @@ public:
 		else if (type == TERRAIN_HASH)
 		{
 			Entity entity = m_terrains[component]->getEntity();
-			m_allocator.deleteObject(m_terrains[component]);
+			LUMIX_DELETE(m_allocator, m_terrains[component]);
 			m_terrains[component] = nullptr;
 			m_universe.destroyComponent(entity, type, this, component);
 		}
@@ -929,7 +929,7 @@ public:
 	{
 		if (type == TERRAIN_HASH)
 		{
-			Terrain* terrain = m_allocator.newObject<Terrain>(
+			Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)(
 				m_renderer, entity, *this, m_allocator);
 			m_terrains.push(terrain);
 			m_universe.addComponent(entity, type, this, m_terrains.size() - 1);
@@ -2576,7 +2576,7 @@ private:
 			}
 		}
 		ModelLoadedCallback* new_callback =
-			m_allocator.newObject<ModelLoadedCallback>(*this, model);
+			LUMIX_NEW(m_allocator, ModelLoadedCallback)(*this, model);
 		m_model_loaded_callbacks.push(new_callback);
 		return new_callback;
 	}
@@ -2711,7 +2711,7 @@ private:
 	ComponentIndex createRenderable(Entity entity)
 	{
 		int new_index = m_renderables.empty() ? 0 : m_renderables.back()->m_component_index + 1;
-		Renderable& r = *m_allocator.newObject<Renderable>(m_allocator);
+		Renderable& r = *LUMIX_NEW(m_allocator, Renderable)(m_allocator);
 		m_renderables.push(&r);
 		r.m_entity = entity;
 		r.m_model = nullptr;
@@ -2797,13 +2797,13 @@ RenderScene* RenderScene::createInstance(Renderer& renderer,
 										 bool is_forward_rendered,
 										 IAllocator& allocator)
 {
-	return allocator.newObject<RenderSceneImpl>(
+	return LUMIX_NEW(allocator, RenderSceneImpl)(
 		renderer, engine, universe, is_forward_rendered, allocator);
 }
 
 
 void RenderScene::destroyInstance(RenderScene* scene)
 {
-	scene->getAllocator().deleteObject(static_cast<RenderSceneImpl*>(scene));
+	LUMIX_DELETE(scene->getAllocator(), static_cast<RenderSceneImpl*>(scene));
 }
 }

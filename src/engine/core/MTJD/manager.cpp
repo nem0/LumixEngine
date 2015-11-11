@@ -28,7 +28,7 @@ namespace Lumix
 			m_worker_tasks.reserve(threads_num);
 			for (uint32 i = 0; i < threads_num; ++i)
 			{
-				m_worker_tasks.push(m_allocator.newObject<WorkerTask>(m_allocator));
+				m_worker_tasks.push(LUMIX_NEW(m_allocator, WorkerTask)(m_allocator));
 				m_worker_tasks[i]->create("MTJD::WorkerTask", this, &m_trans_queue);
 				m_worker_tasks[i]->setAffinityMask(getAffinityMask(i));
 				m_worker_tasks[i]->run();
@@ -50,7 +50,7 @@ namespace Lumix
 			for (uint32 i = 0; i < threads_num; ++i)
 			{
 				m_worker_tasks[i]->destroy();
-				m_allocator.deleteObject(m_worker_tasks[i]);
+				LUMIX_DELETE(m_allocator, m_worker_tasks[i]);
 			}
 
 			m_scheduler.forceExit(false);

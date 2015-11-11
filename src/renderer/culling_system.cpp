@@ -185,7 +185,7 @@ public:
 		for (; i < cpu_count - 1; i++)
 		{
 			m_result[i].clear();
-			CullingJob* cj = m_job_allocator.newObject<CullingJob>(m_spheres,
+			CullingJob* cj = LUMIX_NEW(m_job_allocator, CullingJob)(m_spheres,
 				m_visibility_flags,
 				m_layer_masks,
 				layer_mask,
@@ -201,7 +201,7 @@ public:
 		}
 
 		m_result[i].clear();
-		CullingJob* cj = m_job_allocator.newObject<CullingJob>(m_spheres,
+		CullingJob* cj = LUMIX_NEW(m_job_allocator, CullingJob)(m_spheres,
 			m_visibility_flags,
 			m_layer_masks,
 			layer_mask,
@@ -294,12 +294,12 @@ private:
 
 CullingSystem* CullingSystem::create(MTJD::Manager& mtjd_manager, IAllocator& allocator)
 {
-	return allocator.newObject<CullingSystemImpl>(mtjd_manager, allocator);
+	return LUMIX_NEW(allocator, CullingSystemImpl)(mtjd_manager, allocator);
 }
 
 
 void CullingSystem::destroy(CullingSystem& culling_system)
 {
-	static_cast<CullingSystemImpl&>(culling_system).getAllocator().deleteObject(&culling_system);
+	LUMIX_DELETE(static_cast<CullingSystemImpl&>(culling_system).getAllocator(), &culling_system);
 }
 }

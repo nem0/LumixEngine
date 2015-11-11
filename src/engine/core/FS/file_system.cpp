@@ -102,7 +102,7 @@ public:
 		, m_devices(m_allocator)
 	{
 		m_task =
-			m_allocator.newObject<FSTask>(&m_transaction_queue, m_allocator);
+			LUMIX_NEW(m_allocator, FSTask)(&m_transaction_queue, m_allocator);
 		m_task->create("FSTask");
 		m_task->run();
 	}
@@ -111,7 +111,7 @@ public:
 	{
 		m_task->stop();
 		m_task->destroy();
-		m_allocator.deleteObject(m_task);
+		LUMIX_DELETE(m_allocator, m_task);
 	}
 
 	BaseProxyAllocator& getAllocator() { return m_allocator; }
@@ -380,15 +380,12 @@ private:
 
 FileSystem* FileSystem::create(IAllocator& allocator)
 {
-	return allocator.newObject<FileSystemImpl>(allocator);
+	return LUMIX_NEW(allocator, FileSystemImpl)(allocator);
 }
 
 void FileSystem::destroy(FileSystem* fs)
 {
-	static_cast<FileSystemImpl*>(fs)
-		->getAllocator()
-		.getSourceAllocator()
-		.deleteObject(fs);
+	LUMIX_DELETE(static_cast<FileSystemImpl*>(fs)->getAllocator().getSourceAllocator(), fs);
 }
 
 

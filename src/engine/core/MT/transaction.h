@@ -1,6 +1,8 @@
 #pragma once
 
 #include "core/mt/event.h"
+#include <type_traits>
+
 
 namespace Lumix
 {

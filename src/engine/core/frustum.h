@@ -40,9 +40,15 @@ namespace Lumix
 				m_radius = sqrt(width * width + height * height + z_diff * z_diff) * 0.5f;
 				m_position = position;
 			}
-		
 
-			void computePerspective(const Vec3& position, const Vec3& direction, const Vec3& up, float fov, float ratio, float near_distance, float far_distance)
+
+			void computePerspective(const Vec3& position,
+				const Vec3& direction,
+				const Vec3& up,
+				float fov,
+				float ratio,
+				float near_distance,
+				float far_distance)
 			{
 				ASSERT(near_distance > 0);
 				ASSERT(far_distance > 0);

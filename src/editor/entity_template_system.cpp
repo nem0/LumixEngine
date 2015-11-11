@@ -492,10 +492,8 @@ EntityTemplateSystem* EntityTemplateSystem::create(WorldEditor& editor)
 
 void EntityTemplateSystem::destroy(EntityTemplateSystem* system)
 {
-	static_cast<EntityTemplateSystemImpl*>(system)
-		->getEditor()
-		.getAllocator()
-		.deleteObject(system);
+	LUMIX_DELETE(
+		static_cast<EntityTemplateSystemImpl*>(system)->getEditor().getAllocator(), system);
 }
 
 
