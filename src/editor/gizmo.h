@@ -23,7 +23,7 @@ class WorldEditor;
 class LUMIX_EDITOR_API Gizmo
 {
 	public:
-		enum class Mode : uint32_t
+		enum class Mode : uint32
 		{
 			ROTATE,
 			TRANSLATE,
@@ -31,7 +31,7 @@ class LUMIX_EDITOR_API Gizmo
 			COUNT
 		};
 
-		enum class Axis: uint32_t
+		enum class Axis: uint32
 		{
 			NONE,
 			X,
@@ -85,7 +85,7 @@ class LUMIX_EDITOR_API Gizmo
 		float computeRotateAngle(int relx, int rely, bool use_step);
 		void renderTranslateGizmo(PipelineInstance& pipeline);
 		void renderRotateGizmo(PipelineInstance& pipeline);
-		void renderQuarterRing(PipelineInstance& pipeline, const Matrix& mtx, const Vec3& a, const Vec3& b, uint32_t color);
+		void renderQuarterRing(PipelineInstance& pipeline, const Matrix& mtx, const Vec3& a, const Vec3& b, uint32 color);
 
 	private:
 		WorldEditor& m_editor;

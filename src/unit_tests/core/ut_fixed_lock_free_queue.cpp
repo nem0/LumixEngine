@@ -17,7 +17,7 @@ namespace
 			value = 2;
 		}
 
-		int32_t value;
+		int32 value;
 	};
 
 	typedef Lumix::MT::LockFreeFixedQueue<Test, 16> Queue;
@@ -51,11 +51,11 @@ namespace
 			return 0;
 		}
 
-		int32_t getSum() { return m_sum; }
+		int32 getSum() { return m_sum; }
 
 	private:
 		Queue* m_queue;
-		int32_t m_sum;
+		int32 m_sum;
 	};
 
 	void UT_fixed_lock_queue_non_trivial_constructors(const char* params)
@@ -113,11 +113,11 @@ namespace
 			return 0;
 		}
 
-		int32_t getSum() { return m_sum; }
+		int32 getSum() { return m_sum; }
 
 	private:
 		PodQueue* m_queue;
-		int32_t m_sum;
+		int32 m_sum;
 	};
 
 	void UT_fixed_lock_queue_trivial_constructors(const char* params)

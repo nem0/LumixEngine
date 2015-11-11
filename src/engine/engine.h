@@ -39,7 +39,7 @@ struct LUMIX_ENGINE_API UniverseContext
 	{
 	}
 
-	IScene* getScene(uint32_t hash) const;
+	IScene* getScene(uint32 hash) const;
 
 	Universe* m_universe;
 	Hierarchy* m_hierarchy;
@@ -69,7 +69,7 @@ public:
 	virtual void stopGame(UniverseContext& context) = 0;
 
 	virtual void update(UniverseContext& context) = 0;
-	virtual uint32_t serialize(UniverseContext& ctx, OutputBlob& serializer) = 0;
+	virtual uint32 serialize(UniverseContext& ctx, OutputBlob& serializer) = 0;
 	virtual bool deserialize(UniverseContext& ctx, InputBlob& serializer) = 0;
 	virtual float getFPS() const = 0;
 	virtual float getLastTimeDelta() = 0;

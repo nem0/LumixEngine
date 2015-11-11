@@ -89,7 +89,7 @@ class LUMIX_RENDERER_API PipelineInstance abstract
 			const Matrix& mtx,
 			int first_index,
 			int num_indices,
-			uint64_t render_states,
+			uint64 render_states,
 			bgfx::ProgramHandle program_handle) = 0;
 		virtual void setWireframe(bool wireframe) = 0;
 		virtual void renderModel(Model& model, const Matrix& mtx) = 0;

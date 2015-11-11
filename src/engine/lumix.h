@@ -1,6 +1,10 @@
 #pragma once
 
 
+#ifndef _WIN32
+#error Platform not supported
+#endif
+
 #define STRINGIZE_2( _ ) #_
 #define STRINGIZE( _ ) STRINGIZE_2( _ )
 
@@ -9,24 +13,50 @@
 #define JOIN_STRINGS(A, B) JOIN_STRINGS_2(A, B)
 
 
-#define NOTE(msg)\
-	__pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : NOTE: " msg))
+#define NOTE(msg) __pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : NOTE: " msg))
 
-#define TODO(msg)\
-	__pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : TODO: " msg))
+#define TODO(msg) __pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : TODO: " msg))
 
-#define WARN(msg)\
-	__pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : WARNING: " msg))
+#define WARN(msg) __pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : WARNING: " msg))
 
 
 #include <type_traits>
-#include <cstdint>
-#include <cassert>
+#include <new>
 
 
 namespace Lumix
 {
-	const uint32_t MAX_PATH_LENGTH = 260;
+	typedef char					int8;
+	typedef unsigned char			uint8;
+	typedef short					int16;
+	typedef unsigned short			uint16;
+	typedef int						int32;
+	typedef unsigned int			uint32;
+	typedef long long				int64;
+	typedef unsigned long long		uint64;
+
+	static_assert(sizeof(int64) == 8, "Incorrect size of int64");
+	static_assert(sizeof(int32) == 4, "Incorrect size of int32");
+	static_assert(sizeof(int16) == 2, "Incorrect size of int16");
+	static_assert(sizeof(int8) == 1, "Incorrect size of int8");
+}
+
+
+/*
+inline void* operator new(size_t, void* where)
+{
+	return where;
+}
+
+
+void operator delete[](void* p, void* m)
+{
+}*/
+
+
+namespace Lumix
+{
+	const uint32 MAX_PATH_LENGTH = 260;
 	typedef int ComponentIndex;
 	typedef int Entity;
 	const int INVALID_ENTITY = -1;

@@ -34,8 +34,8 @@ public:
 	void createEntity(Entity entity);
 	Entity createEntity(const Vec3& position, const Quat& rotation);
 	void destroyEntity(Entity entity);
-	void addComponent(Entity entity, uint32_t component_type, IScene* scene, int index);
-	void destroyComponent(Entity entity, uint32_t component_type, IScene* scene, int index);
+	void addComponent(Entity entity, uint32 component_type, IScene* scene, int index);
+	void destroyComponent(Entity entity, uint32 component_type, IScene* scene, int index);
 	int getEntityCount() const { return m_transformations.size(); }
 
 	Entity getEntityFromDenseIdx(int idx);
@@ -80,8 +80,8 @@ private:
 	IAllocator& m_allocator;
 	Array<Transformation> m_transformations;
 	Array<int> m_id_map;
-	AssociativeArray<uint32_t, uint32_t> m_name_to_id_map;
-	AssociativeArray<uint32_t, string> m_id_to_name_map;
+	AssociativeArray<uint32, uint32> m_name_to_id_map;
+	AssociativeArray<uint32, string> m_id_to_name_map;
 	DelegateList<void(Entity)> m_entity_moved;
 	DelegateList<void(Entity)> m_entity_created;
 	DelegateList<void(Entity)> m_entity_destroyed;

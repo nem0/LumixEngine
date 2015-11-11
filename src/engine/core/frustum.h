@@ -26,14 +26,14 @@ namespace Lumix
 				x.normalize();
 				Vec3 y = crossProduct(z, x);
 
-				m_plane[(uint32_t)Sides::NEAR_PLANE].set(-z, near_center);
-				m_plane[(uint32_t)Sides::FAR_PLANE].set(z, far_center);
+				m_plane[(uint32)Sides::NEAR_PLANE].set(-z, near_center);
+				m_plane[(uint32)Sides::FAR_PLANE].set(z, far_center);
 			
-				m_plane[(uint32_t)Sides::TOP_PLANE].set(-y, near_center + y * (height * 0.5f));
-				m_plane[(uint32_t)Sides::BOTTOM_PLANE].set(y, near_center - y * (height * 0.5f));
+				m_plane[(uint32)Sides::TOP_PLANE].set(-y, near_center + y * (height * 0.5f));
+				m_plane[(uint32)Sides::BOTTOM_PLANE].set(y, near_center - y * (height * 0.5f));
 			
-				m_plane[(uint32_t)Sides::LEFT_PLANE].set(x, near_center - x * (width * 0.5f));
-				m_plane[(uint32_t)Sides::RIGHT_PLANE].set(-x, near_center + x * (width * 0.5f));
+				m_plane[(uint32)Sides::LEFT_PLANE].set(x, near_center - x * (width * 0.5f));
+				m_plane[(uint32)Sides::RIGHT_PLANE].set(-x, near_center + x * (width * 0.5f));
 
 				m_center = (near_center + far_center) * 0.5f;
 				float z_diff = far_distance - near_distance;
@@ -65,28 +65,28 @@ namespace Lumix
 				Vec3 far_center = position - z * far_distance;
 				m_center = position - z * ((near_distance + far_distance)* 0.5f);
 
-				m_plane[(uint32_t)Sides::NEAR_PLANE].set(-z, near_center);
-				m_plane[(uint32_t)Sides::FAR_PLANE].set(z, far_center);
+				m_plane[(uint32)Sides::NEAR_PLANE].set(-z, near_center);
+				m_plane[(uint32)Sides::FAR_PLANE].set(z, far_center);
 
 				Vec3 aux = (near_center + y * near_height) - position;
 				aux.normalize();
 				Vec3 normal = crossProduct(aux, x);
-				m_plane[(uint32_t)Sides::TOP_PLANE].set(normal, near_center + y * near_height);
+				m_plane[(uint32)Sides::TOP_PLANE].set(normal, near_center + y * near_height);
 
 				aux = (near_center - y * near_height) - position;
 				aux.normalize();
 				normal = crossProduct(x, aux);
-				m_plane[(uint32_t)Sides::BOTTOM_PLANE].set(normal, near_center - y * near_height);
+				m_plane[(uint32)Sides::BOTTOM_PLANE].set(normal, near_center - y * near_height);
 
 				aux = (near_center - x * near_width) - position;
 				aux.normalize();
 				normal = crossProduct(aux, y);
-				m_plane[(uint32_t)Sides::LEFT_PLANE].set(normal, near_center - x * near_width);
+				m_plane[(uint32)Sides::LEFT_PLANE].set(normal, near_center - x * near_width);
 
 				aux = (near_center + x * near_width) - position;
 				aux.normalize();
 				normal = crossProduct(y, aux);
-				m_plane[(uint32_t)Sides::RIGHT_PLANE].set(normal, near_center + x * near_width);
+				m_plane[(uint32)Sides::RIGHT_PLANE].set(normal, near_center + x * near_width);
 
 				float far_height = far_distance * tang;
 				float far_width = far_height * ratio;
@@ -145,10 +145,10 @@ namespace Lumix
 			float getRadius() const { return m_radius; }
 
 		private:
-			enum class Sides : uint32_t	{ NEAR_PLANE, FAR_PLANE, LEFT_PLANE, RIGHT_PLANE, TOP_PLANE, BOTTOM_PLANE, COUNT };
+			enum class Sides : uint32	{ NEAR_PLANE, FAR_PLANE, LEFT_PLANE, RIGHT_PLANE, TOP_PLANE, BOTTOM_PLANE, COUNT };
 		
 		private:
-			Plane m_plane[(uint32_t)Sides::COUNT];
+			Plane m_plane[(uint32)Sides::COUNT];
 			Vec3 m_center;
 			Vec3 m_position;
 			Vec3 m_direction;

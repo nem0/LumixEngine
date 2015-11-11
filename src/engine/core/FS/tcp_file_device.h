@@ -36,7 +36,7 @@ namespace Lumix
 			TCPCommand(Value _value) : value(_value) { }
 			TCPCommand(int _value) : value(_value) { }
 			operator Value() const { return (Value)value; }
-			int32_t value;
+			int32 value;
 		};
 
 		class LUMIX_ENGINE_API TCPFileDevice : public IFileDevice
@@ -46,7 +46,7 @@ namespace Lumix
 			virtual IFile* createFile(IFile* child) override;
 			virtual const char* name() const override { return "tcp"; }
 
-			void connect(const char* ip, uint16_t port, IAllocator& allocator);
+			void connect(const char* ip, uint16 port, IAllocator& allocator);
 			void disconnect();
 
 			Net::TCPStream* getStream();

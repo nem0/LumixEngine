@@ -12,16 +12,16 @@
 #include "universe/universe.h"
 
 
-static const uint32_t CAMERA_HASH = Lumix::crc32("camera");
-static const uint32_t GLOBAL_LIGHT_HASH = Lumix::crc32("global_light");
-static const uint32_t POINT_LIGHT_HASH = Lumix::crc32("point_light");
-static const uint32_t SCRIPT_HASH = Lumix::crc32("script");
-static const uint32_t ANIMABLE_HASH = Lumix::crc32("animable");
-static const uint32_t TERRAIN_HASH = Lumix::crc32("terrain");
-
-
 namespace Lumix
 {
+
+
+static const uint32 CAMERA_HASH = Lumix::crc32("camera");
+static const uint32 GLOBAL_LIGHT_HASH = Lumix::crc32("global_light");
+static const uint32 POINT_LIGHT_HASH = Lumix::crc32("point_light");
+static const uint32 SCRIPT_HASH = Lumix::crc32("script");
+static const uint32 ANIMABLE_HASH = Lumix::crc32("animable");
+static const uint32 TERRAIN_HASH = Lumix::crc32("terrain");
 
 
 class EntityTemplateSystemImpl : public EntityTemplateSystem
@@ -69,7 +69,7 @@ private:
 
 		virtual bool execute() override
 		{
-			uint32_t name_hash = crc32(m_name.c_str());
+			uint32 name_hash = crc32(m_name.c_str());
 			if (m_entity_system.m_instances.find(name_hash) < 0)
 			{
 				m_entity_system.m_template_names.push(m_name);
@@ -89,7 +89,7 @@ private:
 		virtual void undo() override
 		{
 			m_entity_system.m_template_names.eraseItem(m_name);
-			uint32_t name_hash = crc32(m_name.c_str());
+			uint32 name_hash = crc32(m_name.c_str());
 			m_entity_system.m_instances.erase(name_hash);
 			m_entity_system.m_updated.invoke();
 		}
@@ -98,9 +98,9 @@ private:
 		virtual bool merge(IEditorCommand&) override { return false; }
 
 
-		virtual uint32_t getType() override
+		virtual uint32 getType() override
 		{
-			static const uint32_t hash = crc32("create_entity_template");
+			static const uint32 hash = crc32("create_entity_template");
 			return hash;
 		}
 
@@ -212,9 +212,9 @@ private:
 		virtual bool merge(IEditorCommand&) override { return false; }
 
 
-		virtual uint32_t getType() override
+		virtual uint32 getType() override
 		{
-			static const uint32_t hash =
+			static const uint32 hash =
 				crc32("create_entity_template_instance");
 			return hash;
 		}
@@ -225,7 +225,7 @@ private:
 	private:
 		EntityTemplateSystemImpl& m_entity_system;
 		WorldEditor& m_editor;
-		uint32_t m_template_name_hash;
+		uint32 m_template_name_hash;
 		Entity m_entity;
 		Vec3 m_position;
 		Quat m_rotation;
@@ -318,7 +318,7 @@ public:
 
 	void onEntityDestroyed(Entity entity)
 	{
-		uint32_t tpl = getTemplate(entity);
+		uint32 tpl = getTemplate(entity);
 		if (tpl != 0)
 		{
 			Array<Entity>& instances = m_instances.get(tpl);
@@ -339,7 +339,7 @@ public:
 	}
 
 
-	virtual Entity createInstanceNoCommand(uint32_t name_hash, const Vec3& position) override
+	virtual Entity createInstanceNoCommand(uint32 name_hash, const Vec3& position) override
 	{
 		int instance_index = m_instances.find(name_hash);
 		ASSERT(instance_index >= 0);
@@ -370,7 +370,7 @@ public:
 	}
 
 
-	virtual uint32_t getTemplate(Entity entity) override
+	virtual uint32 getTemplate(Entity entity) override
 	{
 		for (int j = 0; j < m_instances.size(); ++j)
 		{
@@ -388,7 +388,7 @@ public:
 
 
 	virtual const Array<Entity>&
-	getInstances(uint32_t template_name_hash) override
+	getInstances(uint32 template_name_hash) override
 	{
 		int instances_index = m_instances.find(template_name_hash);
 		if (instances_index < 0)
@@ -413,17 +413,17 @@ public:
 
 	virtual void serialize(OutputBlob& serializer) override
 	{
-		serializer.write((int32_t)m_template_names.size());
+		serializer.write((int32)m_template_names.size());
 		for (int i = 0, c = m_template_names.size(); i < c; ++i)
 		{
 			serializer.writeString(m_template_names[i].c_str());
 		}
-		serializer.write((int32_t)m_instances.size());
+		serializer.write((int32)m_instances.size());
 		for (int i = 0; i < m_instances.size(); ++i)
 		{
 			serializer.write(m_instances.getKey(i));
 			Array<Entity>& entities = m_instances.at(i);
-			serializer.write((int32_t)entities.size());
+			serializer.write((int32)entities.size());
 			for (int j = 0, c = entities.size(); j < c; ++j)
 			{
 				serializer.write(entities[j]);
@@ -436,7 +436,7 @@ public:
 	{
 		m_template_names.clear();
 		m_instances.clear();
-		int32_t count;
+		int32 count;
 		serializer.read(count);
 		for (int i = 0; i < count; ++i)
 		{
@@ -448,15 +448,15 @@ public:
 		serializer.read(count);
 		for (int i = 0; i < count; ++i)
 		{
-			uint32_t hash;
+			uint32 hash;
 			serializer.read(hash);
-			int32_t instances_per_template;
+			int32 instances_per_template;
 			serializer.read(instances_per_template);
 			m_instances.insert(hash, Array<Entity>(m_editor.getAllocator()));
 			Array<Entity>& entities = m_instances.get(hash);
 			for (int j = 0; j < instances_per_template; ++j)
 			{
-				int32_t entity_index;
+				int32 entity_index;
 				serializer.read(entity_index);
 				entities.push(Entity(entity_index));
 			}
@@ -475,7 +475,7 @@ public:
 
 
 private:
-	AssociativeArray<uint32_t, Array<Entity>> m_instances;
+	AssociativeArray<uint32, Array<Entity>> m_instances;
 	Array<string> m_template_names;
 	Universe* m_universe;
 	WorldEditor& m_editor;

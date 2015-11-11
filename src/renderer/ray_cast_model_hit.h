@@ -18,7 +18,7 @@ namespace Lumix
 			class Mesh* m_mesh;
 			ComponentIndex m_component;
 			Entity m_entity;
-			uint32_t m_component_type;
+			uint32 m_component_type;
 	};
 
 } // ~ namespace Lumix

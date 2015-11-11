@@ -9,10 +9,10 @@ namespace Lumix
 namespace PathUtils
 {
 
-void normalize(const char* path, char* out, uint32_t max_size)
+void normalize(const char* path, char* out, uint32 max_size)
 {
 	ASSERT(max_size > 0);
-	uint32_t i = 0;
+	uint32 i = 0;
 
 	bool is_prev_slash = false;
 

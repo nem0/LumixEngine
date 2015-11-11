@@ -10,7 +10,7 @@ namespace Lumix
 {
 	namespace MT
 	{
-		const uint32_t STACK_SIZE = 0x8000;
+		const uint32 STACK_SIZE = 0x8000;
 
 		struct TaskImpl
 		{
@@ -21,8 +21,8 @@ namespace Lumix
 			IAllocator& m_allocator;
 			HANDLE m_handle;
 			DWORD m_thread_id;
-			uint32_t m_affinity_mask;
-			uint32_t m_priority;
+			uint32 m_affinity_mask;
+			uint32 m_priority;
 			volatile bool m_is_running;
 			volatile bool m_force_exit;
 			volatile bool m_exited;
@@ -32,7 +32,7 @@ namespace Lumix
 
 		static DWORD WINAPI threadFunction(LPVOID ptr)
 		{
-			uint32_t ret = 0xffffFFFF;
+			uint32 ret = 0xffffFFFF;
 			struct TaskImpl* impl = reinterpret_cast<TaskImpl*>(ptr);
 			setThreadName(impl->m_thread_id, impl->m_thread_name);
 			if (!impl->m_force_exit)
@@ -96,7 +96,7 @@ namespace Lumix
 			return true;
 		}
 
-		void Task::setAffinityMask(uint32_t affinity_mask)
+		void Task::setAffinityMask(uint32 affinity_mask)
 		{
 			m_implementation->m_affinity_mask = affinity_mask;
 			if (m_implementation->m_handle)
@@ -105,7 +105,7 @@ namespace Lumix
 			}
 		}
 
-		void Task::setPriority(uint32_t priority)
+		void Task::setPriority(uint32 priority)
 		{
 			m_implementation->m_priority = priority;
 			if (m_implementation->m_handle)
@@ -114,19 +114,19 @@ namespace Lumix
 			}
 		}
 
-		uint32_t Task::getAffinityMask() const
+		uint32 Task::getAffinityMask() const
 		{
 			return m_implementation->m_affinity_mask;
 		}
 
-		uint32_t Task::getPriority() const
+		uint32 Task::getPriority() const
 		{
 			return m_implementation->m_priority;
 		}
 
-		uint32_t Task::getExitCode() const
+		uint32 Task::getExitCode() const
 		{
-			uint32_t exit_code = 0xffffFFFF;
+			uint32 exit_code = 0xffffFFFF;
 			::GetExitCodeThread(m_implementation->m_handle, (LPDWORD)&exit_code);
 			return exit_code;
 		}
@@ -161,7 +161,7 @@ namespace Lumix
 			}
 		}
 
-		void Task::exit(int32_t exit_code)
+		void Task::exit(int32 exit_code)
 		{
 			m_implementation->m_exited = true;
 			m_implementation->m_is_running = false;

@@ -14,13 +14,13 @@ static const char SETTINGS_PATH[] = "studio.ini";
 static void shortcutInput(int& shortcut)
 {
 	StringBuilder<50> popup_name("");
-	popup_name << (int64_t)&shortcut;
+	popup_name << (Lumix::int64)&shortcut;
 
 	char key_string[30];
 	PlatformInterface::getKeyName(shortcut, key_string, 30);
 
 	StringBuilder<50> button_label(key_string);
-	button_label << "##" << (int64_t)&shortcut;
+	button_label << "##" << (Lumix::int64)&shortcut;
 
 	if (ImGui::Button(button_label, ImVec2(50, 0))) shortcut = -1;
 

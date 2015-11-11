@@ -5,7 +5,7 @@ namespace Lumix
 {
 	namespace MT
 	{
-		typedef volatile int32_t SpinMutexHandle;
+		typedef volatile int32 SpinMutexHandle;
 
 		class LUMIX_ENGINE_API SpinMutex
 		{

@@ -45,7 +45,7 @@ public:
 
 private:
 	IAllocator& m_source;
-	volatile int32_t m_allocation_count;
+	volatile int32 m_allocation_count;
 };
 
 

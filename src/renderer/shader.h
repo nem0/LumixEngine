@@ -40,7 +40,7 @@ public:
 
 	bgfx::ProgramHandle m_program_handles[16];
 	ShaderBinary* m_binaries[32];
-	uint32_t m_combination;
+	uint32 m_combination;
 	Shader& m_shader;
 };
 
@@ -104,7 +104,7 @@ public:
 		char m_uniform[30];
 		int m_define_idx;
 		bool m_is_atlas;
-		uint32_t m_uniform_hash;
+		uint32 m_uniform_hash;
 		bgfx::UniformHandle m_uniform_handle;
 	};
 
@@ -118,8 +118,8 @@ public:
 		   IAllocator& allocator);
 	~Shader();
 
-	uint32_t getDefineMask(int define_idx) const;
-	ShaderInstance& getInstance(uint32_t mask);
+	uint32 getDefineMask(int define_idx) const;
+	ShaderInstance& getInstance(uint32 mask);
 	const TextureSlot& getTextureSlot(int index) const
 	{
 		return m_texture_slots[index];

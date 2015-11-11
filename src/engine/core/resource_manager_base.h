@@ -23,10 +23,10 @@ class LUMIX_ENGINE_API ResourceManagerBase
 {
 	friend class Resource;
 public:
-	typedef PODHashMap<uint32_t, Resource*> ResourceTable;
+	typedef PODHashMap<uint32, Resource*> ResourceTable;
 
 public:
-	void create(uint32_t id, ResourceManager& owner);
+	void create(uint32 id, ResourceManager& owner);
 	void destroy();
 
 	Resource* get(const Path& path);
@@ -54,7 +54,7 @@ protected:
 
 	ResourceManager& getOwner() const { return *m_owner; }
 private:
-	uint32_t m_size;
+	uint32 m_size;
 	ResourceTable m_resources;
 	ResourceManager* m_owner;
 };

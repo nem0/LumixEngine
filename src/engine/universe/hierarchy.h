@@ -27,7 +27,7 @@ namespace Lumix
 					Matrix m_local_matrix;
 			};
 
-			typedef PODHashMap<int32_t, Array<Child>*> Children;
+			typedef PODHashMap<int32, Array<Child>*> Children;
 
 		public:
 			static Hierarchy* create(Universe& universe, IAllocator& allocator);

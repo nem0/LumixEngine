@@ -32,15 +32,15 @@ namespace Lumix
 	template<class Key> 
 	struct HashFunc
 	{
-		static uint32_t get(const Key& key);
+		static uint32 get(const Key& key);
 	};
 
 	template<>
-	struct HashFunc<int32_t>
+	struct HashFunc<int32>
 	{
-		static uint32_t get(const int32_t& key)
+		static uint32 get(const int32& key)
 		{
-			uint32_t x = ((key >> 16) ^ key) * 0x45d9f3b;
+			uint32 x = ((key >> 16) ^ key) * 0x45d9f3b;
 			x = ((x >> 16) ^ x) * 0x45d9f3b;
 			x = ((x >> 16) ^ x);
 			return x;
@@ -48,11 +48,11 @@ namespace Lumix
 	};
 
 	template<>
-	struct HashFunc<uint32_t>
+	struct HashFunc<uint32>
 	{
-		static uint32_t get(const uint32_t& key)
+		static uint32 get(const uint32& key)
 		{
-			uint32_t x = ((key >> 16) ^ key) * 0x45d9f3b;
+			uint32 x = ((key >> 16) ^ key) * 0x45d9f3b;
 			x = ((x >> 16) ^ x) * 0x45d9f3b;
 			x = ((x >> 16) ^ x);
 			return x;
@@ -64,7 +64,7 @@ namespace Lumix
 	{
 		static size_t get(const void* key)
 		{
-			size_t x = ((int32_t(key) >> 16) ^ int32_t(key)) * 0x45d9f3b;
+			size_t x = ((int32(key) >> 16) ^ int32(key)) * 0x45d9f3b;
 			x = ((x >> 16) ^ x) * 0x45d9f3b;
 			x = ((x >> 16) ^ x);
 			return x;
@@ -74,9 +74,9 @@ namespace Lumix
 	template<>
 	struct HashFunc<char*>
 	{
-		static uint32_t get(const char* key)
+		static uint32 get(const char* key)
 		{
-			uint32_t result = 0x55555555;
+			uint32 result = 0x55555555;
 
 			while (*key) 
 			{ 
@@ -97,7 +97,7 @@ namespace Lumix
 		typedef Hasher hasher_type;
 		typedef HashMap<key_type, value_type, hasher_type> my_type;
 		typedef HashNode<key_type, value_type> node_type;
-		typedef uint32_t size_type;
+		typedef uint32 size_type;
 
 		friend class HashMapIterator;
 		friend class ConstHashMapIterator;

@@ -13,11 +13,11 @@ public:
 
 	bool load();
 	bool save();
-	bool setInt(uint32_t file, uint32_t key, int value);
-	bool setString(uint32_t file, uint32_t key, const char* value);
-	int getInt(uint32_t file, uint32_t key) const;
-	bool getString(uint32_t file, uint32_t key, char* out, int max_size) const;
-	bool hasKey(uint32_t file, uint32_t key) const;
+	bool setInt(Lumix::uint32 file, Lumix::uint32 key, int value);
+	bool setString(Lumix::uint32 file, Lumix::uint32 key, const char* value);
+	int getInt(Lumix::uint32 file, Lumix::uint32 key) const;
+	bool getString(Lumix::uint32 file, Lumix::uint32 key, char* out, int max_size) const;
+	bool hasKey(Lumix::uint32 file, Lumix::uint32 key) const;
 
 private:
 	struct DataItem
@@ -37,9 +37,9 @@ private:
 		};
 	};
 
-	const DataItem* getData(uint32_t file, uint32_t key) const;
-	DataItem* getOrCreateData(uint32_t file, uint32_t key);
+	const DataItem* getData(Lumix::uint32 file, Lumix::uint32 key) const;
+	DataItem* getOrCreateData(Lumix::uint32 file, Lumix::uint32 key);
 
-	Lumix::AssociativeArray<uint32_t, Lumix::AssociativeArray<uint32_t, DataItem> > m_data;
+	Lumix::AssociativeArray<Lumix::uint32, Lumix::AssociativeArray<Lumix::uint32, DataItem> > m_data;
 	Lumix::IAllocator& m_allocator;
 };

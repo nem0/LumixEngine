@@ -83,7 +83,7 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 	Vec3 local_dir = static_cast<Vec3>(inv * Vec4(dir.x, dir.y, dir.z, 0));
 
 	const Array<Vec3>& vertices = m_vertices;
-	const Array<int32_t>& indices = m_indices;
+	const Array<int32>& indices = m_indices;
 	int vertex_offset = 0;
 	for (int mesh_index = 0; mesh_index < m_meshes.size(); ++mesh_index)
 	{
@@ -177,13 +177,13 @@ bool Model::parseVertexDef(FS::IFile& file, bgfx::VertexDecl* vertex_definition)
 {
 	vertex_definition->begin();
 
-	uint32_t attribute_count;
+	uint32 attribute_count;
 	file.read(&attribute_count, sizeof(attribute_count));
 
-	for (uint32_t i = 0; i < attribute_count; ++i)
+	for (uint32 i = 0; i < attribute_count; ++i)
 	{
 		char tmp[50];
-		uint32_t len;
+		uint32 len;
 		file.read(&len, sizeof(len));
 		if (len > sizeof(tmp) - 1)
 		{
@@ -226,7 +226,7 @@ bool Model::parseVertexDef(FS::IFile& file, bgfx::VertexDecl* vertex_definition)
 			return false;
 		}
 
-		uint32_t type;
+		uint32 type;
 		file.read(&type, sizeof(type));
 	}
 
@@ -270,13 +270,13 @@ void Model::create(const bgfx::VertexDecl& def,
 	memcpy(&m_indices[0], indices_data, indices_size);
 
 	m_vertices.resize(attributes_size / def.getStride());
-	computeRuntimeData((const uint8_t*)attributes_data);
+	computeRuntimeData((const uint8*)attributes_data);
 
 	onCreated(State::READY);
 }
 
 
-void Model::computeRuntimeData(const uint8_t* vertices)
+void Model::computeRuntimeData(const uint8* vertices)
 {
 	int index = 0;
 	float bounding_radius_squared = 0;
@@ -320,14 +320,14 @@ void Model::computeRuntimeData(const uint8_t* vertices)
 
 bool Model::parseGeometry(FS::IFile& file)
 {
-	int32_t indices_count = 0;
+	int32 indices_count = 0;
 	file.read(&indices_count, sizeof(indices_count));
 	if (indices_count <= 0) return false;
 
 	m_indices.resize(indices_count);
 	file.read(&m_indices[0], sizeof(m_indices[0]) * indices_count);
 
-	int32_t vertices_size = 0;
+	int32 vertices_size = 0;
 	file.read(&vertices_size, sizeof(vertices_size));
 	if (vertices_size <= 0) return false;
 
@@ -447,7 +447,7 @@ bool Model::parseMeshes(FS::IFile& file)
 	PathUtils::getDir(model_dir, MAX_PATH_LENGTH, getPath().c_str());
 	for (int i = 0; i < object_count; ++i)
 	{
-		int32_t str_size;
+		int32 str_size;
 		file.read(&str_size, sizeof(str_size));
 		char material_name[MAX_PATH_LENGTH];
 		file.read(material_name, str_size);
@@ -463,13 +463,13 @@ bool Model::parseMeshes(FS::IFile& file)
 			m_resource_manager.get(ResourceManager::MATERIAL)
 				->load(Path(material_path)));
 
-		int32_t attribute_array_offset = 0;
+		int32 attribute_array_offset = 0;
 		file.read(&attribute_array_offset, sizeof(attribute_array_offset));
-		int32_t attribute_array_size = 0;
+		int32 attribute_array_size = 0;
 		file.read(&attribute_array_size, sizeof(attribute_array_size));
-		int32_t indices_offset = 0;
+		int32 indices_offset = 0;
 		file.read(&indices_offset, sizeof(indices_offset));
-		int32_t mesh_tri_count = 0;
+		int32 mesh_tri_count = 0;
 		file.read(&mesh_tri_count, sizeof(mesh_tri_count));
 
 		file.read(&str_size, sizeof(str_size));
@@ -501,7 +501,7 @@ bool Model::parseMeshes(FS::IFile& file)
 
 bool Model::parseLODs(FS::IFile& file)
 {
-	int32_t lod_count;
+	int32 lod_count;
 	file.read(&lod_count, sizeof(lod_count));
 	if (lod_count <= 0)
 	{
@@ -524,7 +524,7 @@ bool Model::load(FS::IFile& file)
 	FileHeader header;
 	file.read(&header, sizeof(header));
 	if (header.m_magic == FILE_MAGIC 
-		&& header.m_version <= (uint32_t)FileVersion::LATEST 
+		&& header.m_version <= (uint32)FileVersion::LATEST 
 		&& parseMeshes(file) 
 		&& parseGeometry(file) 
 		&& parseBones(file) 

@@ -31,7 +31,7 @@ enum class NodeType
 };
 
 
-enum class VertexOutput : int32_t
+enum class VertexOutput : Lumix::int32
 {
 	TEXCOORD0,
 	TEXCOORD1,
@@ -403,7 +403,7 @@ struct ShaderEditor::ICommand
 	virtual void execute() = 0;
 	virtual void undo() = 0;
 	virtual bool merge(ICommand& command) { return false; }
-	virtual uint32_t getType() const = 0;
+	virtual Lumix::uint32 getType() const = 0;
 
 	ShaderEditor& m_editor;
 };
@@ -985,9 +985,9 @@ struct MoveNodeCommand : public ShaderEditor::ICommand
 	}
 
 
-	virtual uint32_t getType() const override
+	virtual Lumix::uint32 getType() const override
 	{
-		static const uint32_t crc = Lumix::crc32("move_node");
+		static const Lumix::uint32 crc = Lumix::crc32("move_node");
 		return crc;
 	}
 
@@ -1061,9 +1061,9 @@ struct CreateConnectionCommand : public ShaderEditor::ICommand
 	}
 
 
-	virtual uint32_t getType() const override
+	virtual Lumix::uint32 getType() const override
 	{
-		static const uint32_t crc = Lumix::crc32("create_connection");
+		static const Lumix::uint32 crc = Lumix::crc32("create_connection");
 		return crc;
 	}
 
@@ -1127,9 +1127,9 @@ struct RemoveNodeCommand : public ShaderEditor::ICommand
 	}
 
 
-	virtual uint32_t getType() const override
+	virtual Lumix::uint32 getType() const override
 	{
-		static const uint32_t crc = Lumix::crc32("remove_node");
+		static const Lumix::uint32 crc = Lumix::crc32("remove_node");
 		return crc;
 	}
 
@@ -1169,9 +1169,9 @@ struct CreateNodeCommand : public ShaderEditor::ICommand
 	}
 
 
-	virtual uint32_t getType() const override
+	virtual Lumix::uint32 getType() const override
 	{
-		static const uint32_t crc = Lumix::crc32("create_node");
+		static const Lumix::uint32 crc = Lumix::crc32("create_node");
 		return crc;
 	}
 
@@ -1563,7 +1563,7 @@ void ShaderEditor::load()
 
 	fseek(fp, 0, SEEK_END);
 	int data_size = (int)ftell(fp);
-	Lumix::Array<uint8_t> data(m_allocator);
+	Lumix::Array<Lumix::uint8> data(m_allocator);
 	data.resize(data_size);
 	fseek(fp, 0, SEEK_SET);
 	fread(&data[0], 1, data_size, fp);

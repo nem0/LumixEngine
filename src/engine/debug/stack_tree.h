@@ -31,7 +31,7 @@ namespace Debug
 
 		private:
 			StackNode* m_root;
-			static int32_t s_instances;
+			static int32 s_instances;
 	};
 
 

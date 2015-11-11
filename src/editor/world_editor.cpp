@@ -47,10 +47,10 @@ namespace Lumix
 {
 
 
-static const uint32_t RENDERABLE_HASH = crc32("renderable");
-static const uint32_t CAMERA_HASH = crc32("camera");
-static const uint32_t GLOBAL_LIGHT_HASH = crc32("global_light");
-static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
+static const uint32 RENDERABLE_HASH = crc32("renderable");
+static const uint32 CAMERA_HASH = crc32("camera");
+static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
+static const uint32 POINT_LIGHT_HASH = crc32("point_light");
 
 
 class SetEntityNameCommand : public IEditorCommand
@@ -105,9 +105,9 @@ public:
 	}
 
 
-	uint32_t getType() override
+	uint32 getType() override
 	{
-		static const uint32_t type = crc32("set_entity_name");
+		static const uint32 type = crc32("set_entity_name");
 		return type;
 	}
 
@@ -166,7 +166,7 @@ public:
 		for (int i = 0; i < m_blob.getSize(); ++i)
 		{
 			serializer.serializeArrayItem(
-				(int32_t)((const uint8_t*)m_blob.getData())[i]);
+				(int32)((const uint8*)m_blob.getData())[i]);
 		}
 		serializer.endArray();
 	}
@@ -184,9 +184,9 @@ public:
 		m_blob.clear();
 		for (int i = 0; i < m_blob.getSize(); ++i)
 		{
-			int32_t data;
+			int32 data;
 			serializer.deserializeArrayItem(data, 0);
-			m_blob.write((uint8_t)data);
+			m_blob.write((uint8)data);
 		}
 		serializer.deserializeArrayEnd();
 	}
@@ -205,9 +205,9 @@ public:
 	}
 
 
-	uint32_t getType() override
+	uint32 getType() override
 	{
-		static const uint32_t type = crc32("paste_entity");
+		static const uint32 type = crc32("paste_entity");
 		return type;
 	}
 
@@ -338,9 +338,9 @@ public:
 	}
 
 
-	uint32_t getType() override
+	uint32 getType() override
 	{
-		static const uint32_t type = crc32("move_entity");
+		static const uint32 type = crc32("move_entity");
 		return type;
 	}
 
@@ -469,9 +469,9 @@ public:
 	}
 
 
-	uint32_t getType() override
+	uint32 getType() override
 	{
-		static const uint32_t type = crc32("scale_entity");
+		static const uint32 type = crc32("scale_entity");
 		return type;
 	}
 
@@ -554,7 +554,7 @@ public:
 		serializer.deserialize("component_index", m_component.index, 0);
 		serializer.deserialize("component_type", m_component.type, 0);
 		m_component.scene = m_editor.getSceneByComponentType(m_component.type);
-		uint32_t property_name_hash;
+		uint32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_descriptor = static_cast<const IArrayDescriptor*>(
 			&PropertyRegister::getDescriptor(m_component.type, property_name_hash));
@@ -580,9 +580,9 @@ public:
 	}
 
 
-	uint32_t getType() override
+	uint32 getType() override
 	{
-		static const uint32_t hash = crc32("remove_array_property_item");
+		static const uint32 hash = crc32("remove_array_property_item");
 		return hash;
 	}
 
@@ -635,7 +635,7 @@ public:
 		serializer.deserialize("component_index", m_component.index, 0);
 		serializer.deserialize("component_type", m_component.type, 0);
 		m_component.scene = m_editor.getSceneByComponentType(m_component.type);
-		uint32_t property_name_hash;
+		uint32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_descriptor = static_cast<const IArrayDescriptor*>(
 			&PropertyRegister::getDescriptor(m_component.type, property_name_hash));
@@ -656,9 +656,9 @@ public:
 	}
 
 
-	uint32_t getType() override
+	uint32 getType() override
 	{
-		static const uint32_t hash = crc32("add_array_property_item");
+		static const uint32 hash = crc32("add_array_property_item");
 		return hash;
 	}
 
@@ -686,7 +686,7 @@ public:
 
 	SetPropertyCommand(WorldEditor& editor,
 					   Entity entity,
-					   uint32_t component_type,
+					   uint32 component_type,
 					   const IPropertyDescriptor& property_descriptor,
 					   const void* data,
 					   int size)
@@ -706,7 +706,7 @@ public:
 
 	SetPropertyCommand(WorldEditor& editor,
 					   Entity entity,
-					   uint32_t component_type,
+					   uint32 component_type,
 					   int index,
 					   const IPropertyDescriptor& property_descriptor,
 					   const void* data,
@@ -734,7 +734,7 @@ public:
 		for (int i = 0; i < m_new_value.getSize(); ++i)
 		{
 			serializer.serializeArrayItem(
-				(int)((const uint8_t*)m_new_value.getData())[i]);
+				(int)((const uint8*)m_new_value.getData())[i]);
 		}
 		serializer.endArray();
 		serializer.serialize("property_name_hash",
@@ -753,10 +753,10 @@ public:
 		{
 			int data;
 			serializer.deserializeArrayItem(data, 0);
-			m_new_value.write((uint8_t)data);
+			m_new_value.write((uint8)data);
 		}
 		serializer.deserializeArrayEnd();
-		uint32_t property_name_hash;
+		uint32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_property_descriptor =
 			&PropertyRegister::getDescriptor(m_component_type, property_name_hash);
@@ -778,9 +778,9 @@ public:
 	}
 
 
-	uint32_t getType() override
+	uint32 getType() override
 	{
-		static const uint32_t hash = crc32("set_property");
+		static const uint32 hash = crc32("set_property");
 		return hash;
 	}
 
@@ -805,7 +805,7 @@ public:
 	{
 		ComponentUID component =
 			m_editor.getComponent(m_entity, m_component_type);
-		uint32_t template_hash =
+		uint32 template_hash =
 			m_editor.getEntityTemplateSystem().getTemplate(m_entity);
 		if (template_hash)
 		{
@@ -851,7 +851,7 @@ public:
 
 private:
 	WorldEditor& m_editor;
-	uint32_t m_component_type;
+	uint32 m_component_type;
 	Entity m_entity;
 	OutputBlob m_new_value;
 	OutputBlob m_old_value;
@@ -881,7 +881,7 @@ private:
 
 		AddComponentCommand(WorldEditorImpl& editor,
 							const Array<Entity>& entities,
-							uint32_t type)
+							uint32 type)
 			: m_editor(editor)
 			, m_entities(editor.getAllocator())
 		{
@@ -891,7 +891,7 @@ private:
 			{
 				if (!m_editor.getComponent(entities[i], type).isValid())
 				{
-					uint32_t tpl = editor.getEntityTemplateSystem().getTemplate(
+					uint32 tpl = editor.getEntityTemplateSystem().getTemplate(
 						entities[i]);
 					if (tpl == 0)
 					{
@@ -940,9 +940,9 @@ private:
 		bool merge(IEditorCommand&) override { return false; }
 
 
-		uint32_t getType() override
+		uint32 getType() override
 		{
-			static const uint32_t hash = crc32("add_component");
+			static const uint32 hash = crc32("add_component");
 			return hash;
 		}
 
@@ -982,7 +982,7 @@ private:
 
 
 	private:
-		uint32_t m_type;
+		uint32 m_type;
 		Array<Entity> m_entities;
 		WorldEditorImpl& m_editor;
 	};
@@ -1146,9 +1146,9 @@ private:
 		}
 
 
-		uint32_t getType() override
+		uint32 getType() override
 		{
-			static const uint32_t hash = crc32("destroy_entities");
+			static const uint32 hash = crc32("destroy_entities");
 			return hash;
 		}
 
@@ -1209,7 +1209,7 @@ private:
 
 		void undo() override
 		{
-			uint32_t template_hash = m_editor.m_template_system->getTemplate(m_component.entity);
+			uint32 template_hash = m_editor.m_template_system->getTemplate(m_component.entity);
 			const Array<IScene*>& scenes = m_editor.getScenes();
 
 			if (template_hash == 0)
@@ -1265,9 +1265,9 @@ private:
 		bool merge(IEditorCommand&) override { return false; }
 
 
-		uint32_t getType() override
+		uint32 getType() override
 		{
-			static const uint32_t hash = crc32("destroy_component");
+			static const uint32 hash = crc32("destroy_component");
 			return hash;
 		}
 
@@ -1279,7 +1279,7 @@ private:
 			{
 				props[i]->get(m_component, m_old_values);
 			}
-			uint32_t template_hash =
+			uint32 template_hash =
 				m_editor.getEntityTemplateSystem().getTemplate(m_component.entity);
 			if (template_hash)
 			{
@@ -1367,9 +1367,9 @@ private:
 		bool merge(IEditorCommand&) override { return false; }
 
 
-		uint32_t getType() override
+		uint32 getType() override
 		{
-			static const uint32_t hash = crc32("add_entity");
+			static const uint32 hash = crc32("add_entity");
 			return hash;
 		}
 
@@ -1390,7 +1390,7 @@ public:
 	IAllocator& getAllocator() override { return m_allocator; }
 
 
-	IScene* getSceneByComponentType(uint32_t hash) override
+	IScene* getSceneByComponentType(uint32 hash) override
 	{
 		for (auto* scene : m_universe_context->m_scenes)
 		{
@@ -1403,7 +1403,7 @@ public:
 	}
 
 
-	IScene* getScene(uint32_t hash) override
+	IScene* getScene(uint32 hash) override
 	{
 		for (auto* scene : m_universe_context->m_scenes)
 		{
@@ -1882,14 +1882,14 @@ public:
 
 		OutputBlob blob(m_allocator);
 		blob.reserve(m_universe_context->m_universe->getEntityCount() * 100);
-		uint32_t hash = 0;
+		uint32 hash = 0;
 		blob.write(hash);
 		blob.write(hash);
-		uint32_t engine_hash = m_engine->serialize(*m_universe_context, blob);
-		(*(((uint32_t*)blob.getData()) + 1)) = engine_hash;
+		uint32 engine_hash = m_engine->serialize(*m_universe_context, blob);
+		(*(((uint32*)blob.getData()) + 1)) = engine_hash;
 		m_template_system->serialize(blob);
-		hash = crc32((const uint8_t*)blob.getData() + sizeof(hash), blob.getSize() - sizeof(hash));
-		(*(uint32_t*)blob.getData()) = hash;
+		hash = crc32((const uint8*)blob.getData() + sizeof(hash), blob.getSize() - sizeof(hash));
+		(*(uint32*)blob.getData()) = hash;
 		g_log_info.log("editor") << "universe saved";
 		file.write(blob.getData(), blob.getSize());
 	}
@@ -2215,15 +2215,15 @@ public:
 			Entity entity = m_selected_entities[0];
 			m_copy_buffer.clear();
 			const WorldEditor::ComponentList& cmps = getComponents(entity);
-			int32_t count = cmps.size();
+			int32 count = cmps.size();
 			m_copy_buffer.write(count);
 			for (int i = 0; i < count; ++i)
 			{
-				uint32_t cmp_type = cmps[i].type;
+				uint32 cmp_type = cmps[i].type;
 				m_copy_buffer.write(cmp_type);
 				Array<IPropertyDescriptor*>& props =
 					PropertyRegister::getDescriptors(cmps[i].type);
-				int32_t prop_count = props.size();
+				int32 prop_count = props.size();
 				for (int j = 0; j < prop_count; ++j)
 				{
 					props[j]->get(cmps[i], m_copy_buffer);
@@ -2306,7 +2306,7 @@ public:
 	}
 
 
-	void addComponent(uint32_t type_crc) override
+	void addComponent(uint32 type_crc) override
 	{
 		if (!m_selected_entities.empty())
 		{
@@ -2420,11 +2420,11 @@ public:
 		Timer* timer = Timer::create(m_allocator);
 		g_log_info.log("editor") << "Parsing universe...";
 		InputBlob blob(file.getBuffer(), (int)file.size());
-		uint32_t hash = 0;
+		uint32 hash = 0;
 		blob.read(hash);
-		uint32_t engine_hash = 0;
+		uint32 engine_hash = 0;
 		blob.read(engine_hash);
-		if (crc32((const uint8_t*)blob.getData() + sizeof(hash), blob.getSize() - sizeof(hash)) !=
+		if (crc32((const uint8*)blob.getData() + sizeof(hash), blob.getSize() - sizeof(hash)) !=
 			hash)
 		{
 			Timer::destroy(timer);
@@ -2470,7 +2470,7 @@ public:
 		return m_components.at(cmps_index);
 	}
 
-	ComponentUID getComponent(Entity entity, uint32_t type) override
+	ComponentUID getComponent(Entity entity, uint32 type) override
 	{
 		const Array<ComponentUID>& cmps = getComponents(entity);
 		for (int i = 0; i < cmps.size(); ++i)
@@ -2722,7 +2722,7 @@ public:
 	}
 
 
-	void setProperty(uint32_t component,
+	void setProperty(uint32 component,
 							 int index,
 							 IPropertyDescriptor& property,
 							 const void* data,
@@ -2730,7 +2730,7 @@ public:
 	{
 		if (m_selected_entities.size() == 1)
 		{
-			uint32_t component_hash = component;
+			uint32 component_hash = component;
 			ComponentUID cmp =
 				getComponent(m_selected_entities[0], component_hash);
 			if (cmp.isValid())
@@ -2969,7 +2969,7 @@ public:
 	}
 
 
-	ComponentUID createComponent(uint32_t hash, Entity entity)
+	ComponentUID createComponent(uint32 hash, Entity entity)
 	{
 		const Array<IScene*>& scenes = getScenes();
 		ComponentUID cmp;
@@ -3116,7 +3116,7 @@ public:
 	}
 
 
-	IEditorCommand* createEditorCommand(uint32_t command_type) override
+	IEditorCommand* createEditorCommand(uint32 command_type) override
 	{
 		int index = m_editor_command_creators.find(command_type);
 		if (index >= 0)
@@ -3153,7 +3153,7 @@ public:
 			{
 				serializer.nextArrayItem();
 				serializer.deserializeObjectBegin();
-				uint32_t type;
+				uint32 type;
 				serializer.deserialize("undo_command_type", type, 0);
 				IEditorCommand* command = createEditorCommand(type);
 				if (!command)
@@ -3199,8 +3199,8 @@ public:
 		}
 		save(*file);
 		bool is_same = file->size() > 8 && result_file->size() > 8 &&
-					   *((const uint32_t*)result_file->getBuffer() + 1) ==
-						   *((const uint32_t*)file->getBuffer() + 1);
+					   *((const uint32*)result_file->getBuffer() + 1) ==
+						   *((const uint32*)file->getBuffer() + 1);
 		m_engine->getFileSystem().close(*result_file);
 		m_engine->getFileSystem().close(*file);
 
@@ -3258,7 +3258,7 @@ private:
 	float m_mouse_y;
 	bool m_gizmo_use_step;
 	Array<EditorIcon*> m_editor_icons;
-	AssociativeArray<int32_t, Array<ComponentUID>> m_components;
+	AssociativeArray<int32, Array<ComponentUID>> m_components;
 	bool m_is_game_mode;
 	bool m_is_orbit;
 	bool m_is_additive_selection;
@@ -3279,7 +3279,7 @@ private:
 	Plugin* m_mouse_handling_plugin;
 	EntityTemplateSystem* m_template_system;
 	Array<IEditorCommand*> m_undo_stack;
-	AssociativeArray<uint32_t, EditorCommandCreator> m_editor_command_creators;
+	AssociativeArray<uint32, EditorCommandCreator> m_editor_command_creators;
 	int m_undo_index;
 	OutputBlob m_copy_buffer;
 	bool m_is_loading;
@@ -3304,11 +3304,11 @@ bool PasteEntityCommand::execute()
 	InputBlob blob(m_blob.getData(), m_blob.getSize());
 	Universe* universe = m_editor.getUniverse();
 	Entity new_entity = universe->createEntity(m_position, Quat(0, 0, 0, 1));
-	int32_t count;
+	int32 count;
 	blob.read(count);
 	for (int i = 0; i < count; ++i)
 	{
-		uint32_t type;
+		uint32 type;
 		blob.read(type);
 		ComponentUID cmp =
 			static_cast<WorldEditorImpl&>(m_editor).createComponent(type, new_entity);

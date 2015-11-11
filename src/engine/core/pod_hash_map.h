@@ -20,15 +20,15 @@ namespace Lumix
 	template<class Key> 
 	struct PODHashFunc
 	{
-		static uint32_t get(const Key& key);
+		static uint32 get(const Key& key);
 	};
 
 	template<>
-	struct PODHashFunc<int32_t>
+	struct PODHashFunc<int32>
 	{
-		static uint32_t get(const int32_t& key)
+		static uint32 get(const int32& key)
 		{
-			uint32_t x = ((key >> 16) ^ key) * 0x45d9f3b;
+			uint32 x = ((key >> 16) ^ key) * 0x45d9f3b;
 			x = ((x >> 16) ^ x) * 0x45d9f3b;
 			x = ((x >> 16) ^ x);
 			return x;
@@ -36,11 +36,11 @@ namespace Lumix
 	};
 
 	template<>
-	struct PODHashFunc<uint32_t>
+	struct PODHashFunc<uint32>
 	{
-		static uint32_t get(const uint32_t& key)
+		static uint32 get(const uint32& key)
 		{
-			uint32_t x = ((key >> 16) ^ key) * 0x45d9f3b;
+			uint32 x = ((key >> 16) ^ key) * 0x45d9f3b;
 			x = ((x >> 16) ^ x) * 0x45d9f3b;
 			x = ((x >> 16) ^ x);
 			return x;
@@ -52,7 +52,7 @@ namespace Lumix
 	{
 		static size_t get(const void* key)
 		{
-			size_t x = ((int32_t(key) >> 16) ^ int32_t(key)) * 0x45d9f3b;
+			size_t x = ((int32(key) >> 16) ^ int32(key)) * 0x45d9f3b;
 			x = ((x >> 16) ^ x) * 0x45d9f3b;
 			x = ((x >> 16) ^ x);
 			return x;
@@ -62,9 +62,9 @@ namespace Lumix
 	template<>
 	struct PODHashFunc<char*>
 	{
-		static uint32_t get(const char* key)
+		static uint32 get(const char* key)
 		{
-			uint32_t result = 0x55555555;
+			uint32 result = 0x55555555;
 
 			while (*key) 
 			{ 
@@ -85,7 +85,7 @@ namespace Lumix
 		typedef Hasher hasher_type;
 		typedef PODHashMap<key_type, value_type, hasher_type> my_type;
 		typedef PODHashNode<key_type, value_type> node_type;
-		typedef uint32_t size_type;
+		typedef uint32 size_type;
 
 		friend class HashMapIterator;
 
@@ -621,7 +621,7 @@ namespace Lumix
 				node_type* n = &src[i];
 				while(nullptr != n && src_sentinel != n->m_next)
 				{
-					int32_t pos = getPosition(n->m_key);
+					int32 pos = getPosition(n->m_key);
 					node_type* new_node = getEmptyNode(pos);
 					copy(n, new_node);
 					new_node->m_next = nullptr;

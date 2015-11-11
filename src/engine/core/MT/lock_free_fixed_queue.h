@@ -8,9 +8,9 @@ namespace Lumix
 {
 	namespace MT
 	{
-		template <class T, int32_t size, bool is_trivial = std::is_trivial<T>::value> class LockFreeFixedQueue;
+		template <class T, int32 size, bool is_trivial = std::is_trivial<T>::value> class LockFreeFixedQueue;
 
-		template <class T, int32_t size, bool is_trivial>
+		template <class T, int32 size, bool is_trivial>
 		class LockFreeFixedQueue
 		{
 		public:
@@ -22,7 +22,7 @@ namespace Lumix
 				, m_aborted(false)
 				, m_data_signal(0, size)
 			{
-				for (int32_t i = 0; i < size; i++)
+				for (int32 i = 0; i < size; i++)
 				{
 					m_alloc[i].data.pair.key = i;
 					m_alloc[i].data.pair.el = i;
@@ -41,8 +41,8 @@ namespace Lumix
 				{
 					if ((m_al - m_fr) < size)
 					{
-						int32_t alloc_ptr = m_al;
-						int32_t alloc_idx = alloc_ptr & (size - 1);
+						int32 alloc_ptr = m_al;
+						int32 alloc_idx = alloc_ptr & (size - 1);
 
 						Node cur_val(alloc_ptr, m_alloc[alloc_idx].data.pair.el);
 
@@ -64,7 +64,7 @@ namespace Lumix
 
 			void dealoc(T* tr, bool wait)
 			{
-				int32_t idx = int32_t(tr - m_pool);
+				int32 idx = int32(tr - m_pool);
 				ASSERT(idx >= 0 && idx < size);
 
 				Node cur_val(0, -1);
@@ -72,8 +72,8 @@ namespace Lumix
 
 				do
 				{
-					int32_t free_ptr = m_fr;
-					int32_t free_idx = free_ptr & (size - 1);
+					int32 free_ptr = m_fr;
+					int32 free_idx = free_ptr & (size - 1);
 
 					cur_val.data.pair.key = free_ptr;
 					new_val.data.pair.key = free_ptr + size;
@@ -87,7 +87,7 @@ namespace Lumix
 
 			bool push(const T* tr, bool wait)
 			{
-				int32_t idx = int32_t(tr - m_pool);
+				int32 idx = int32(tr - m_pool);
 				ASSERT(idx >= 0 && idx < size);
 
 				do
@@ -97,8 +97,8 @@ namespace Lumix
 					Node cur_node(0, -1);
 					Node new_node(0, idx);
 
-					int32_t cur_write_idx = m_wr;
-					int32_t idx = cur_write_idx & (size - 1);
+					int32 cur_write_idx = m_wr;
+					int32 idx = cur_write_idx & (size - 1);
 
 					cur_node.data.pair.key = cur_write_idx;
 					new_node.data.pair.key = cur_write_idx;
@@ -127,8 +127,8 @@ namespace Lumix
 				{
 					if (m_rd != m_wr)
 					{
-						int32_t cur_read_idx = m_rd;
-						int32_t idx = cur_read_idx & (size - 1);
+						int32 cur_read_idx = m_rd;
+						int32 idx = cur_read_idx & (size - 1);
 
 						Node cur_node(cur_read_idx, m_queue[idx].data.pair.el);
 
@@ -173,27 +173,27 @@ namespace Lumix
 				{
 					struct
 					{
-						int32_t key;
-						int32_t	el;
+						int32 key;
+						int32	el;
 					} pair;
-					int64_t		val;
+					int64		val;
 				} data;
 
 				Node()
 				{
 				}
 
-				Node(int32_t k, int32_t i)
+				Node(int32 k, int32 i)
 				{
 					data.pair.key = k;
 					data.pair.el = i;
 				}
 			};
 
-			volatile int32_t	m_al;
-			volatile int32_t	m_fr;
-			volatile int32_t	m_rd;
-			volatile int32_t	m_wr;
+			volatile int32	m_al;
+			volatile int32	m_fr;
+			volatile int32	m_rd;
+			volatile int32	m_wr;
 			Node				m_alloc[size];
 			Node				m_queue[size];
 			T					m_pool[size];
@@ -201,7 +201,7 @@ namespace Lumix
 			MT::Semaphore		m_data_signal;
 		};
 
-		template <class T, int32_t size>
+		template <class T, int32 size>
 		class LockFreeFixedQueue<T, size, false>
 		{
 		public:
@@ -216,7 +216,7 @@ namespace Lumix
 			{
 				m_pool = (T*)m_allocator.allocate(sizeof(T) * size);
 
-				for (int32_t i = 0; i < size; i++)
+				for (int32 i = 0; i < size; i++)
 				{
 					m_alloc[i].data.pair.key = i;
 					m_alloc[i].data.pair.el = i;
@@ -236,8 +236,8 @@ namespace Lumix
 				{
 					if ((m_al - m_fr) < size)
 					{
-						int32_t alloc_ptr = m_al;
-						int32_t alloc_idx = alloc_ptr & (size - 1);
+						int32 alloc_ptr = m_al;
+						int32 alloc_idx = alloc_ptr & (size - 1);
 
 						Node cur_val(alloc_ptr, m_alloc[alloc_idx].data.pair.el);
 
@@ -261,7 +261,7 @@ namespace Lumix
 			void dealoc(T* tr)
 			{
 				tr->~T();
-				int32_t idx = int32_t(tr - m_pool);
+				int32 idx = int32(tr - m_pool);
 				ASSERT(idx >= 0 && idx < size);
 
 				Node cur_val(0, -1);
@@ -269,8 +269,8 @@ namespace Lumix
 
 				for (;;)
 				{
-					int32_t free_ptr = m_fr;
-					int32_t free_idx = free_ptr & (size - 1);
+					int32 free_ptr = m_fr;
+					int32 free_idx = free_ptr & (size - 1);
 
 					cur_val.data.pair.key = free_ptr;
 					new_val.data.pair.key = free_ptr + size;
@@ -284,7 +284,7 @@ namespace Lumix
 
 			bool push(const T* tr, bool wait)
 			{
-				int32_t idx = int32_t(tr - m_pool);
+				int32 idx = int32(tr - m_pool);
 				ASSERT(idx >= 0 && idx < size);
 
 				do
@@ -294,8 +294,8 @@ namespace Lumix
 					Node cur_node(0, -1);
 					Node new_node(0, idx);
 
-					int32_t cur_write_idx = m_wr;
-					int32_t idx = cur_write_idx & (size - 1);
+					int32 cur_write_idx = m_wr;
+					int32 idx = cur_write_idx & (size - 1);
 
 					cur_node.data.pair.key = cur_write_idx;
 					new_node.data.pair.key = cur_write_idx;
@@ -324,8 +324,8 @@ namespace Lumix
 				{
 					if (m_rd != m_wr)
 					{
-						int32_t cur_read_idx = m_rd;
-						int32_t idx = cur_read_idx & (size - 1);
+						int32 cur_read_idx = m_rd;
+						int32 idx = cur_read_idx & (size - 1);
 
 						Node cur_node(cur_read_idx, m_queue[idx].data.pair.el);
 
@@ -370,17 +370,17 @@ namespace Lumix
 				{
 					struct
 					{
-						int32_t key;
-						int32_t	el;
+						int32 key;
+						int32	el;
 					} pair;
-					int64_t		val;
+					int64		val;
 				} data;
 
 				Node()
 				{
 				}
 
-				Node(int32_t k, int32_t i)
+				Node(int32 k, int32 i)
 				{
 					data.pair.key = k;
 					data.pair.el = i;
@@ -388,10 +388,10 @@ namespace Lumix
 			};
 
 			IAllocator&			m_allocator;
-			volatile int32_t	m_al;
-			volatile int32_t	m_fr;
-			volatile int32_t	m_rd;
-			volatile int32_t	m_wr;
+			volatile int32	m_al;
+			volatile int32	m_fr;
+			volatile int32	m_rd;
+			volatile int32	m_wr;
 			Node				m_alloc[size];
 			Node				m_queue[size];
 			T*					m_pool;

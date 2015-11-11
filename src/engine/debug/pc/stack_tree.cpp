@@ -81,7 +81,7 @@ StackNode* StackTree::getParent(StackNode* node)
 bool StackTree::getFunction(StackNode* node, char* out, int max_size, int* line)
 {
 	HANDLE process = GetCurrentProcess();
-	uint8_t symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)];
+	uint8 symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)];
 	SYMBOL_INFO* symbol = reinterpret_cast<SYMBOL_INFO*>(symbol_mem);
 	memset(symbol_mem, 0, sizeof(symbol_mem));
 	symbol->MaxNameLen = 255;
@@ -108,7 +108,7 @@ void StackTree::printCallstack(StackNode* node)
 	while (node)
 	{
 		HANDLE process = GetCurrentProcess();
-		uint8_t symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)];
+		uint8 symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)];
 		SYMBOL_INFO* symbol = reinterpret_cast<SYMBOL_INFO*>(symbol_mem);
 		memset(symbol_mem, 0, sizeof(symbol_mem));
 		symbol->MaxNameLen = 255;
@@ -126,7 +126,7 @@ void StackTree::printCallstack(StackNode* node)
 				OutputDebugString(line.FileName);
 				OutputDebugString("(");
 				char tmp[20];
-				toCString((uint32_t)line.LineNumber, tmp, sizeof(tmp));
+				toCString((uint32)line.LineNumber, tmp, sizeof(tmp));
 				OutputDebugString(tmp);
 				OutputDebugString("):");
 			}

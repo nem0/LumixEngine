@@ -31,7 +31,7 @@ namespace Lumix
 		m_allocator.deleteObject(static_cast<Texture*>(&resource));
 	}
 
-	uint8_t* TextureManager::getBuffer(int32_t size)
+	uint8* TextureManager::getBuffer(int32 size)
 	{
 		if (m_buffer_size < size)
 		{
@@ -41,7 +41,7 @@ namespace Lumix
 		}
 		if (m_buffer == nullptr)
 		{
-			m_buffer = (uint8_t*)m_allocator.allocate(sizeof(uint8_t) * size);
+			m_buffer = (uint8*)m_allocator.allocate(sizeof(uint8) * size);
 			m_buffer_size = size;
 		}
 		return m_buffer;

@@ -37,7 +37,7 @@ class LUMIX_RENDERER_API Pose
 	private:
 		IAllocator& m_allocator;
 		bool m_is_absolute;
-		int32_t m_count;
+		int32 m_count;
 		Vec3* m_positions;
 		Quat* m_rotations;
 };

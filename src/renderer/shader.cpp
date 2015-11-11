@@ -35,7 +35,7 @@ Shader::~Shader()
 }
 
 
-uint32_t Shader::getDefineMask(int define_idx) const
+uint32 Shader::getDefineMask(int define_idx) const
 {
 	ASSERT(define_idx < lengthOf(m_combintions.m_define_idx_map));
 	if (m_combintions.m_define_idx_map[define_idx] >= 0)
@@ -46,7 +46,7 @@ uint32_t Shader::getDefineMask(int define_idx) const
 }
 
 
-ShaderInstance& Shader::getInstance(uint32_t mask)
+ShaderInstance& Shader::getInstance(uint32 mask)
 {
 	for (int i = 0; i < m_instances.size(); ++i)
 	{
@@ -399,7 +399,7 @@ void ShaderBinary::unload()
 
 bool ShaderBinary::load(FS::IFile& file)
 {
-	auto* mem = bgfx::alloc((uint32_t)file.size() + 1);
+	auto* mem = bgfx::alloc((uint32)file.size() + 1);
 	file.read(mem->data, file.size());
 	mem->data[file.size()] = '\0';
 	m_handle = bgfx::createShader(mem);

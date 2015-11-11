@@ -2,7 +2,6 @@
 
 
 #include "core/iallocator.h"
-#include <new>
 
 
 namespace Lumix

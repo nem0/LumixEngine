@@ -36,7 +36,7 @@ namespace Lumix
 			Manager(IAllocator& allocator);
 			~Manager();
 
-			uint32_t getCpuThreadsCount() const;
+			uint32 getCpuThreadsCount() const;
 
 			void schedule(Job* job);
 
@@ -49,7 +49,7 @@ namespace Lumix
 
 			void pushReadyJob(Job* job);
 
-			uint32_t getAffinityMask(uint32_t idx) const;
+			uint32 getAffinityMask(uint32 idx) const;
 
 			IAllocator&		m_allocator;
 			JobsTable		m_ready_to_execute[(size_t)Priority::Count];
@@ -58,7 +58,7 @@ namespace Lumix
 			Array<WorkerTask*> m_worker_tasks;
 			Scheduler		m_scheduler;
 
-			volatile int32_t m_scheduling_counter;
+			volatile int32 m_scheduling_counter;
 		};
 	} // namepsace MTJD
 } // namepsace Lumix

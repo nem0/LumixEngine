@@ -12,9 +12,9 @@ namespace Lumix
 			::closesocket(m_socket);
 		}
 
-		bool TCPStream::readString(char* string, uint32_t max_size)
+		bool TCPStream::readString(char* string, uint32 max_size)
 		{
-			uint32_t len = 0;
+			uint32 len = 0;
 			bool ret = true;
 			ret &= read(len);
 			ASSERT(len < max_size);
@@ -25,7 +25,7 @@ namespace Lumix
 
 		bool TCPStream::writeString(const char* string)
 		{
-			uint32_t len = (uint32_t)strlen(string) + 1;
+			uint32 len = (uint32)strlen(string) + 1;
 			bool ret = write(len);
 			ret &= write((const void*)string, len);
 
@@ -34,7 +34,7 @@ namespace Lumix
 
 		bool TCPStream::read(void* buffer, size_t size)
 		{
-			int32_t to_receive = (int32_t)size;
+			int32 to_receive = (int32)size;
 			char* ptr = static_cast<char*>(buffer);
 
 			do

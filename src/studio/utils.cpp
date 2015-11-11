@@ -14,7 +14,7 @@ void getEntityListDisplayName(Lumix::WorldEditor& editor,
 	Lumix::Entity entity)
 {
 	const char* name = editor.getUniverse()->getEntityName(entity);
-	static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");
+	static const Lumix::uint32 RENDERABLE_HASH = Lumix::crc32("renderable");
 	Lumix::ComponentUID renderable = editor.getComponent(entity, RENDERABLE_HASH);
 	if (renderable.isValid())
 	{

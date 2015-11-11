@@ -24,10 +24,10 @@ namespace Lumix
 {
 
 
-static const uint32_t BOX_ACTOR_HASH = crc32("box_rigid_actor");
-static const uint32_t MESH_ACTOR_HASH = crc32("mesh_rigid_actor");
-static const uint32_t CONTROLLER_HASH = crc32("physical_controller");
-static const uint32_t HEIGHTFIELD_HASH = crc32("physical_heightfield");
+static const uint32 BOX_ACTOR_HASH = crc32("box_rigid_actor");
+static const uint32 MESH_ACTOR_HASH = crc32("mesh_rigid_actor");
+static const uint32 CONTROLLER_HASH = crc32("physical_controller");
+static const uint32 HEIGHTFIELD_HASH = crc32("physical_heightfield");
 
 
 struct OutputStream : public physx::PxOutputStream
@@ -35,7 +35,7 @@ struct OutputStream : public physx::PxOutputStream
 	OutputStream(IAllocator& allocator)
 		: allocator(allocator)
 	{
-		data = (uint8_t*)allocator.allocate(sizeof(uint8_t) * 4096);
+		data = (uint8*)allocator.allocate(sizeof(uint8) * 4096);
 		capacity = 4096;
 		size = 0;
 	}
@@ -49,8 +49,8 @@ struct OutputStream : public physx::PxOutputStream
 		{
 			int new_capacity =
 				Math::maxValue(size + (int)count, capacity + 4096);
-			uint8_t* new_data =
-				(uint8_t*)allocator.allocate(sizeof(uint8_t) * new_capacity);
+			uint8* new_data =
+				(uint8*)allocator.allocate(sizeof(uint8) * new_capacity);
 			memcpy(new_data, data, size);
 			allocator.deallocate(data);
 			data = new_data;
@@ -61,7 +61,7 @@ struct OutputStream : public physx::PxOutputStream
 		return count;
 	}
 
-	uint8_t* data;
+	uint8* data;
 	IAllocator& allocator;
 	int capacity;
 	int size;
@@ -215,7 +215,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	virtual Universe& getUniverse() override { return m_universe; }
 
 
-	virtual bool ownComponentType(uint32_t type) const override
+	virtual bool ownComponentType(uint32 type) const override
 	{
 		return type == BOX_ACTOR_HASH || type == MESH_ACTOR_HASH ||
 			   type == HEIGHTFIELD_HASH || type == CONTROLLER_HASH;
@@ -225,7 +225,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	virtual IPlugin& getPlugin() const override { return *m_system; }
 
 
-	virtual ComponentIndex createComponent(uint32_t component_type,
+	virtual ComponentIndex createComponent(uint32 component_type,
 										   Entity entity) override
 	{
 		if (component_type == HEIGHTFIELD_HASH)
@@ -248,7 +248,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void destroyComponent(ComponentIndex cmp, uint32_t type) override
+	virtual void destroyComponent(ComponentIndex cmp, uint32 type) override
 	{
 		if (type == HEIGHTFIELD_HASH)
 		{
@@ -685,8 +685,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		if (bytes_per_pixel == 2)
 		{
 			PROFILE_BLOCK("copyData");
-			const uint16_t* LUMIX_RESTRICT data =
-				(const uint16_t*)terrain->m_heightmap->getData();
+			const uint16* LUMIX_RESTRICT data =
+				(const uint16*)terrain->m_heightmap->getData();
 			for (int j = 0; j < height; ++j)
 			{
 				int idx = j * width;
@@ -704,7 +704,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		else
 		{
 			PROFILE_BLOCK("copyData");
-			const uint8_t* data = terrain->m_heightmap->getData();
+			const uint8* data = terrain->m_heightmap->getData();
 			for (int j = 0; j < height; ++j)
 			{
 				for (int i = 0; i < width; ++i)
@@ -899,14 +899,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 			physx::PxTriangleMeshGeometry trimesh_geom;
 			if (shapes->getBoxGeometry(geom))
 			{
-				serializer.write((int32_t)BOX);
+				serializer.write((int32)BOX);
 				serializer.write(geom.halfExtents.x);
 				serializer.write(geom.halfExtents.y);
 				serializer.write(geom.halfExtents.z);
 			}
 			else if (shapes->getConvexMeshGeometry(convex_geom))
 			{
-				serializer.write((int32_t)CONVEX);
+				serializer.write((int32)CONVEX);
 				serializer.writeString(
 					m_actors[idx]->getResource()
 						? m_actors[idx]->getResource()->getPath().c_str()
@@ -914,7 +914,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 			else if (shapes->getTriangleMeshGeometry(trimesh_geom))
 			{
-				serializer.write((int32_t)TRIMESH);
+				serializer.write((int32)TRIMESH);
 				serializer.writeString(
 					m_actors[idx]->getResource()
 						? m_actors[idx]->getResource()->getPath().c_str()
@@ -935,7 +935,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void deserializeActor(InputBlob& serializer, int idx)
 	{
 		ActorType type;
-		serializer.read((int32_t&)type);
+		serializer.read((int32&)type);
 
 		ResourceManagerBase* manager =
 			m_engine->getResourceManager().get(ResourceManager::PHYSICS);
@@ -995,7 +995,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	virtual void serialize(OutputBlob& serializer) override
 	{
-		serializer.write((int32_t)m_actors.size());
+		serializer.write((int32)m_actors.size());
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
 			serializer.write(isDynamic(i));
@@ -1005,13 +1005,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 				serializeActor(serializer, i);
 			}
 		}
-		serializer.write((int32_t)m_controllers.size());
+		serializer.write((int32)m_controllers.size());
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
 			serializer.write(m_controllers[i].m_entity);
 			serializer.write(m_controllers[i].m_is_free);
 		}
-		serializer.write((int32_t)m_terrains.size());
+		serializer.write((int32)m_terrains.size());
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
 			if (m_terrains[i])
@@ -1035,7 +1035,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void deserializeActors(InputBlob& serializer)
 	{
-		int32_t count;
+		int32 count;
 		m_dynamic_actors.clear();
 		serializer.read(count);
 		for (int i = count; i < m_actors.size(); ++i)
@@ -1073,7 +1073,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void deserializeControllers(InputBlob& serializer)
 	{
-		int32_t count;
+		int32 count;
 		serializer.read(count);
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
@@ -1085,7 +1085,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_controllers.clear();
 		for (int i = 0; i < count; ++i)
 		{
-			int32_t index;
+			int32 index;
 			bool is_free;
 			serializer.read(index);
 			serializer.read(is_free);
@@ -1120,7 +1120,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void deserializeTerrains(InputBlob& serializer)
 	{
-		int32_t count;
+		int32 count;
 		serializer.read(count);
 		for (int i = count; i < m_terrains.size(); ++i)
 		{

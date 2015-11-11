@@ -22,12 +22,12 @@ struct ComponentType
 	string m_name;
 	string m_id;
 
-	uint32_t m_id_hash;
-	uint32_t m_dependency;
+	uint32 m_id_hash;
+	uint32 m_dependency;
 };
 
 
-typedef AssociativeArray<uint32_t, Array<IPropertyDescriptor*>> PropertyMap;
+typedef AssociativeArray<uint32, Array<IPropertyDescriptor*>> PropertyMap;
 
 
 static PropertyMap* g_properties = nullptr;
@@ -69,7 +69,7 @@ void add(const char* component_type, IPropertyDescriptor* descriptor)
 }
 
 
-Array<IPropertyDescriptor*>& getDescriptors(uint32_t type)
+Array<IPropertyDescriptor*>& getDescriptors(uint32 type)
 {
 	int props_index = g_properties->find(type);
 	if (props_index < 0)
@@ -81,7 +81,7 @@ Array<IPropertyDescriptor*>& getDescriptors(uint32_t type)
 }
 
 
-const IPropertyDescriptor& getDescriptor(uint32_t type, uint32_t name_hash)
+const IPropertyDescriptor& getDescriptor(uint32 type, uint32 name_hash)
 {
 	Array<IPropertyDescriptor*>& props = getDescriptors(type);
 	for (int i = 0; i < props.size(); ++i)
@@ -116,7 +116,7 @@ void registerComponentDependency(const char* id, const char* dependency_id)
 }
 
 
-bool componentDepends(uint32_t dependent, uint32_t dependency)
+bool componentDepends(uint32 dependent, uint32 dependency)
 {
 	for (ComponentType& cmp_type : *g_component_types)
 	{

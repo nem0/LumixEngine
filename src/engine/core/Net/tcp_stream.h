@@ -18,42 +18,42 @@ namespace Lumix
 				return read(&val, sizeof(val));
 			}
 
-			LUMIX_FORCE_INLINE bool read(uint8_t& val)
+			LUMIX_FORCE_INLINE bool read(uint8& val)
 			{
 				return read(&val, sizeof(val));
 			}
 
-			LUMIX_FORCE_INLINE bool read(int8_t& val)
+			LUMIX_FORCE_INLINE bool read(int8& val)
 			{
 				return read(&val, sizeof(val));
 			}
 
-			LUMIX_FORCE_INLINE bool read(uint16_t& val)
+			LUMIX_FORCE_INLINE bool read(uint16& val)
 			{
 				return read(&val, sizeof(val));
 			}
 
-			LUMIX_FORCE_INLINE bool read(int16_t& val)
+			LUMIX_FORCE_INLINE bool read(int16& val)
 			{
 				return read(&val, sizeof(val));
 			}
 
-			LUMIX_FORCE_INLINE bool read(uint32_t& val)
+			LUMIX_FORCE_INLINE bool read(uint32& val)
 			{
 				return read(&val, sizeof(val));
 			}
 
-			LUMIX_FORCE_INLINE bool read(int32_t& val)
+			LUMIX_FORCE_INLINE bool read(int32& val)
 			{
 				return read(&val, sizeof(val));
 			}
 
-			LUMIX_FORCE_INLINE bool read(uint64_t& val)
+			LUMIX_FORCE_INLINE bool read(uint64& val)
 			{
 				return read(&val, sizeof(val));
 			}
 
-			LUMIX_FORCE_INLINE bool read(int64_t& val)
+			LUMIX_FORCE_INLINE bool read(int64& val)
 			{
 				return read(&val, sizeof(val));
 			}
@@ -63,47 +63,47 @@ namespace Lumix
 				return write(&val, sizeof(val));
 			}
 
-			LUMIX_FORCE_INLINE bool write(uint8_t val)
+			LUMIX_FORCE_INLINE bool write(uint8 val)
 			{
 				return write(&val, sizeof(val));
 			}
 
-			LUMIX_FORCE_INLINE bool write(int8_t val)
+			LUMIX_FORCE_INLINE bool write(int8 val)
 			{
 				return write(&val, sizeof(val));
 			}
 
-			LUMIX_FORCE_INLINE bool write(uint16_t val)
+			LUMIX_FORCE_INLINE bool write(uint16 val)
 			{
 				return write(&val, sizeof(val));
 			}
 
-			LUMIX_FORCE_INLINE bool write(int16_t val)
+			LUMIX_FORCE_INLINE bool write(int16 val)
 			{
 				return write(&val, sizeof(val));
 			}
 
-			LUMIX_FORCE_INLINE bool write(uint32_t val)
+			LUMIX_FORCE_INLINE bool write(uint32 val)
 			{
 				return write(&val, sizeof(val));
 			}
 
-			LUMIX_FORCE_INLINE bool write(int32_t val)
+			LUMIX_FORCE_INLINE bool write(int32 val)
 			{
 				return write(&val, sizeof(val));
 			}
 
-			LUMIX_FORCE_INLINE bool write(uint64_t val)
+			LUMIX_FORCE_INLINE bool write(uint64 val)
 			{
 				return write(&val, sizeof(val));
 			}
 
-			LUMIX_FORCE_INLINE bool write(int64_t val)
+			LUMIX_FORCE_INLINE bool write(int64 val)
 			{
 				return write(&val, sizeof(val));
 			}
 
-			bool readString(char* string, uint32_t max_size);
+			bool readString(char* string, uint32 max_size);
 			bool writeString(const char* string);
 
 			bool read(void* buffer, size_t size);

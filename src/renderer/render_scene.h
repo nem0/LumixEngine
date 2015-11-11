@@ -62,7 +62,7 @@ struct DebugLine
 {
 	Vec3 m_from;
 	Vec3 m_to;
-	uint32_t m_color;
+	uint32 m_color;
 	float m_life;
 };
 
@@ -70,7 +70,7 @@ struct DebugLine
 struct DebugPoint
 {
 	Vec3 m_pos;
-	uint32_t m_color;
+	uint32 m_color;
 	float m_life;
 };
 
@@ -118,23 +118,23 @@ public:
 									  const Vec4& value) = 0;
 
 
-	virtual void addDebugPoint(const Vec3& pos, uint32_t color, float life) = 0;
+	virtual void addDebugPoint(const Vec3& pos, uint32 color, float life) = 0;
 
-	virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32_t color, float life) = 0;
-	virtual void addDebugCross(const Vec3& center, float size, uint32_t color, float life) = 0;
+	virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32 color, float life) = 0;
+	virtual void addDebugCross(const Vec3& center, float size, uint32 color, float life) = 0;
 	virtual void addDebugCube(const Vec3& pos,
 		const Vec3& dir,
 		const Vec3& up,
 		const Vec3& right,
-		uint32_t color,
+		uint32 color,
 		float life) = 0;
-	virtual void addDebugCube(const Vec3& from, const Vec3& max, uint32_t color, float life) = 0;
+	virtual void addDebugCube(const Vec3& from, const Vec3& max, uint32 color, float life) = 0;
 	virtual void addDebugCircle(const Vec3& center,
 		const Vec3& up,
 		float radius,
-		uint32_t color,
+		uint32 color,
 		float life) = 0;
-	virtual void addDebugSphere(const Vec3& center, float radius, uint32_t color, float life) = 0;
+	virtual void addDebugSphere(const Vec3& center, float radius, uint32 color, float life) = 0;
 	virtual void addDebugFrustum(const Vec3& position,
 		const Vec3& direction,
 		const Vec3& up,
@@ -142,21 +142,21 @@ public:
 		float ratio,
 		float near_distance,
 		float far_distance,
-		uint32_t color,
+		uint32 color,
 		float life) = 0;
 
-	virtual void addDebugFrustum(const Frustum& frustum, uint32_t color, float life) = 0;
+	virtual void addDebugFrustum(const Frustum& frustum, uint32 color, float life) = 0;
 
 	virtual void addDebugCapsule(const Vec3& position,
 		float height,
 		float radius,
-		uint32_t color,
+		uint32 color,
 		float life) = 0;
 
 	virtual void addDebugCylinder(const Vec3& position,
 		const Vec3& up,
 		float radius,
-		uint32_t color,
+		uint32 color,
 		float life) = 0;
 
 	virtual const Array<DebugLine>& getDebugLines() const = 0;
@@ -200,14 +200,14 @@ public:
 	virtual ComponentIndex getRenderableComponent(Entity entity) = 0;
 	virtual const char* getRenderablePath(ComponentIndex cmp) = 0;
 	virtual void setRenderableLayer(ComponentIndex cmp,
-									const int32_t& layer) = 0;
+									const int32& layer) = 0;
 	virtual void setRenderablePath(ComponentIndex cmp, const char* path) = 0;
 	virtual void getRenderableInfos(const Frustum& frustum,
 		Array<const RenderableMesh*>& meshes,
-		int64_t layer_mask) = 0;
+		int64 layer_mask) = 0;
 	virtual void getRenderableEntities(const Frustum& frustum,
 		Array<Entity>& entities,
-		int64_t layer_mask) = 0;
+		int64 layer_mask) = 0;
 	virtual Entity getRenderableEntity(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getFirstRenderable() = 0;
 	virtual ComponentIndex getNextRenderable(ComponentIndex cmp) = 0;
@@ -215,11 +215,11 @@ public:
 
 	virtual void getGrassInfos(const Frustum& frustum,
 							   Array<GrassInfo>& infos,
-							   int64_t layer_mask,
+							   int64 layer_mask,
 							   ComponentIndex camera) = 0;
 	virtual void forceGrassUpdate(ComponentIndex cmp) = 0;
 	virtual void getTerrainInfos(Array<const TerrainInfo*>& infos,
-		int64_t layer_mask,
+		int64 layer_mask,
 		const Vec3& camera_pos,
 		LIFOAllocator& allocator) = 0;
 	virtual float getTerrainHeightAt(ComponentIndex cmp, float x, float z) = 0;
@@ -252,11 +252,11 @@ public:
 	virtual void getPointLights(const Frustum& frustum, Array<ComponentIndex>& lights) = 0;
 	virtual void getPointLightInfluencedGeometry(ComponentIndex light_cmp,
 		Array<const RenderableMesh*>& infos,
-		int64_t layer_mask) = 0;
+		int64 layer_mask) = 0;
 	virtual void getPointLightInfluencedGeometry(ComponentIndex light_cmp,
 		const Frustum& frustum,
 		Array<const RenderableMesh*>& infos,
-		int64_t layer_mask) = 0;
+		int64 layer_mask) = 0;
 	virtual void setLightCastShadows(ComponentIndex cmp, bool cast_shadows) = 0;
 	virtual bool getLightCastShadows(ComponentIndex cmp) = 0;
 	virtual float getLightAttenuation(ComponentIndex cmp) = 0;

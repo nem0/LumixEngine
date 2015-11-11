@@ -55,9 +55,9 @@ public:
 	virtual bool merge(IEditorCommand&) override { return false; }
 
 
-	virtual uint32_t getType() override
+	virtual Lumix::uint32 getType() override
 	{
-		static const uint32_t hash = Lumix::crc32("set_entity_parent");
+		static const Lumix::uint32 hash = Lumix::crc32("set_entity_parent");
 		return hash;
 	}
 

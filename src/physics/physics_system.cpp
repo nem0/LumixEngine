@@ -19,10 +19,10 @@ namespace Lumix
 {
 
 
-static const uint32_t BOX_ACTOR_HASH = crc32("box_rigid_actor");
-static const uint32_t MESH_ACTOR_HASH = crc32("mesh_rigid_actor");
-static const uint32_t CONTROLLER_HASH = crc32("physical_controller");
-static const uint32_t HEIGHTFIELD_HASH = crc32("physical_heightfield");
+static const uint32 BOX_ACTOR_HASH = crc32("box_rigid_actor");
+static const uint32 MESH_ACTOR_HASH = crc32("mesh_rigid_actor");
+static const uint32 CONTROLLER_HASH = crc32("physical_controller");
+static const uint32 HEIGHTFIELD_HASH = crc32("physical_heightfield");
 
 
 

@@ -19,13 +19,13 @@ namespace Lumix
 		public:
 			virtual ~IScene() {}
 
-			virtual ComponentIndex createComponent(uint32_t, Entity) = 0;
-			virtual void destroyComponent(ComponentIndex component, uint32_t type) = 0;
+			virtual ComponentIndex createComponent(uint32, Entity) = 0;
+			virtual void destroyComponent(ComponentIndex component, uint32 type) = 0;
 			virtual void serialize(OutputBlob& serializer) = 0;
 			virtual void deserialize(InputBlob& serializer, int version) = 0;
 			virtual IPlugin& getPlugin() const = 0;
 			virtual void update(float time_delta) = 0;
-			virtual bool ownComponentType(uint32_t type) const = 0;
+			virtual bool ownComponentType(uint32 type) const = 0;
 			virtual Universe& getUniverse() = 0;
 			virtual void startGame() {}
 			virtual void stopGame() {}

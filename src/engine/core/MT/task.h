@@ -20,19 +20,19 @@ namespace Lumix
 			bool run();
 			bool destroy();
 
-			void setAffinityMask(uint32_t affinity_mask);
-			void setPriority(uint32_t priority);
+			void setAffinityMask(uint32 affinity_mask);
+			void setPriority(uint32 priority);
 
-			uint32_t getAffinityMask() const;
-			uint32_t getPriority() const;
-			uint32_t getExitCode() const;
+			uint32 getAffinityMask() const;
+			uint32 getPriority() const;
+			uint32 getExitCode() const;
 
 			bool isRunning() const;
 			bool isFinished() const;
 			bool isForceExit() const;
 
 			void forceExit(bool wait);
-			void exit(int32_t exit_code);
+			void exit(int32 exit_code);
 
 		protected:
 			IAllocator& getAllocator();

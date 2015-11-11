@@ -26,10 +26,10 @@ namespace Lumix
 
 			void enable(bool enabled);
 			void update(float dt);
-			float getActionValue(uint32_t action);
+			float getActionValue(uint32 action);
 			void injectMouseXMove(float value);
 			void injectMouseYMove(float value);
-			void addAction(uint32_t action, InputType type, int key);
+			void addAction(uint32 action, InputType type, int key);
 
 		private:
 			struct InputSystemImpl* m_impl;

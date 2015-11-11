@@ -74,14 +74,14 @@ public:
 	virtual void update() = 0;
 	virtual void updateEngine() = 0;
 	virtual void executeCommand(IEditorCommand* command) = 0;
-	virtual IEditorCommand* createEditorCommand(uint32_t command_type) = 0;
+	virtual IEditorCommand* createEditorCommand(uint32 command_type) = 0;
 	virtual Engine& getEngine() = 0;
 	virtual UniverseContext* getUniverseContext() = 0;
 	virtual Universe* getUniverse() = 0;
 	virtual Hierarchy* getHierarchy() = 0;
 	virtual const Array<IScene*>& getScenes() const = 0;
-	virtual IScene* getScene(uint32_t hash) = 0;
-	virtual IScene* getSceneByComponentType(uint32_t hash) = 0;
+	virtual IScene* getScene(uint32 hash) = 0;
+	virtual IScene* getSceneByComponentType(uint32 hash) = 0;
 	virtual IAllocator& getAllocator() = 0;
 	virtual void renderIcons(PipelineInstance& pipeline) = 0;
 	virtual ComponentUID getEditCamera() = 0;
@@ -100,9 +100,9 @@ public:
 	virtual void copyEntity() = 0;
 	virtual bool canPasteEntity() const = 0;
 	virtual void pasteEntity() = 0;
-	virtual ComponentUID getComponent(Entity entity, uint32_t type) = 0;
+	virtual ComponentUID getComponent(Entity entity, uint32 type) = 0;
 	virtual ComponentList& getComponents(Entity entity) = 0;
-	virtual void addComponent(uint32_t type_crc) = 0;
+	virtual void addComponent(uint32 type_crc) = 0;
 	virtual void cloneComponent(const ComponentUID& src, Entity entity) = 0;
 	virtual void destroyComponent(const ComponentUID& cmp) = 0;
 	virtual bool canRemove(const ComponentUID& cmp) = 0;
@@ -123,7 +123,7 @@ public:
 	virtual void snapDown() = 0;
 	virtual void toggleGameMode() = 0;
 	virtual void navigate(float forward, float right, float speed) = 0;
-	virtual void setProperty(uint32_t component,
+	virtual void setProperty(uint32 component,
 		int index,
 		IPropertyDescriptor& property,
 		const void* data,

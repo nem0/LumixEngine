@@ -118,7 +118,7 @@ void Universe::setEntityName(Entity entity, const char* name)
 	int name_index = m_id_to_name_map.find(entity);
 	if (name_index >= 0)
 	{
-		uint32_t hash = crc32(m_id_to_name_map.at(name_index).c_str());
+		uint32 hash = crc32(m_id_to_name_map.at(name_index).c_str());
 		m_name_to_id_map.erase(hash);
 		m_id_to_name_map.eraseAt(name_index);
 	}
@@ -208,7 +208,7 @@ void Universe::destroyEntity(Entity entity)
 	int name_index = m_id_to_name_map.find(entity);
 	if (name_index >= 0)
 	{
-		uint32_t name_hash = crc32(m_id_to_name_map.at(name_index).c_str());
+		uint32 name_hash = crc32(m_id_to_name_map.at(name_index).c_str());
 		m_name_to_id_map.erase(name_hash);
 		m_id_to_name_map.eraseAt(name_index);
 	}
@@ -252,10 +252,10 @@ Entity Universe::getNextEntity(Entity entity)
 
 void Universe::serialize(OutputBlob& serializer)
 {
-	serializer.write((int32_t)m_transformations.size());
+	serializer.write((int32)m_transformations.size());
 	serializer.write(
 		&m_transformations[0], sizeof(m_transformations[0]) * m_transformations.size());
-	serializer.write((int32_t)m_id_to_name_map.size());
+	serializer.write((int32)m_id_to_name_map.size());
 	for (int i = 0, c = m_id_to_name_map.size(); i < c; ++i)
 	{
 		serializer.write(m_id_to_name_map.getKey(i));
@@ -263,7 +263,7 @@ void Universe::serialize(OutputBlob& serializer)
 	}
 
 	serializer.write(m_first_free_slot);
-	serializer.write((int32_t)m_id_map.size());
+	serializer.write((int32)m_id_map.size());
 	if (!m_id_map.empty())
 	{
 		serializer.write(&m_id_map[0], sizeof(m_id_map[0]) * m_id_map.size());
@@ -273,7 +273,7 @@ void Universe::serialize(OutputBlob& serializer)
 
 void Universe::deserialize(InputBlob& serializer)
 {
-	int32_t count;
+	int32 count;
 	serializer.read(count);
 	m_transformations.resize(count);
 
@@ -284,7 +284,7 @@ void Universe::deserialize(InputBlob& serializer)
 	m_name_to_id_map.clear();
 	for (int i = 0; i < count; ++i)
 	{
-		uint32_t key;
+		uint32 key;
 		char name[50];
 		serializer.read(key);
 		serializer.readString(name, sizeof(name));
@@ -317,13 +317,13 @@ float Universe::getScale(Entity entity)
 }
 
 
-void Universe::destroyComponent(Entity entity, uint32_t component_type, IScene* scene, int index)
+void Universe::destroyComponent(Entity entity, uint32 component_type, IScene* scene, int index)
 {
 	m_component_destroyed.invoke(ComponentUID(entity, component_type, scene, index));
 }
 
 
-void Universe::addComponent(Entity entity, uint32_t component_type, IScene* scene, int index)
+void Universe::addComponent(Entity entity, uint32 component_type, IScene* scene, int index)
 {
 	ComponentUID cmp(entity, component_type, scene, index);
 	if (m_component_added.isValid())

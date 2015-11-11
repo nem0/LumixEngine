@@ -23,7 +23,7 @@ public:
 		}
 
 		string m_value;
-		uint32_t m_name_hash;
+		uint32 m_name_hash;
 	};
 
 public:

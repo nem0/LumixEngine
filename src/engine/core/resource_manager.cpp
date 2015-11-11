@@ -24,17 +24,17 @@ namespace Lumix
 	{
 	}
 	
-	ResourceManagerBase* ResourceManager::get(uint32_t id)
+	ResourceManagerBase* ResourceManager::get(uint32 id)
 	{
 		return m_resource_managers[id]; 
 	}
 
-	void ResourceManager::add(uint32_t id, ResourceManagerBase* rm)
+	void ResourceManager::add(uint32 id, ResourceManagerBase* rm)
 	{ 
 		m_resource_managers.insert(id, rm);
 	}
 
-	void ResourceManager::remove(uint32_t id) 
+	void ResourceManager::remove(uint32 id) 
 	{ 
 		m_resource_managers.erase(id); 
 	}

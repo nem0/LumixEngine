@@ -165,15 +165,15 @@ static void reverse(char* str, int length)
 	}
 }
 
-const char* fromCString(const char* input, int length, int32_t* value)
+const char* fromCString(const char* input, int length, int32* value)
 {
-	int64_t val;
+	int64 val;
 	const char* ret = fromCString(input, length, &val);
-	*value = (int32_t)val;
+	*value = (int32)val;
 	return ret;
 }
 
-const char* fromCString(const char* input, int length, int64_t* value)
+const char* fromCString(const char* input, int length, int64* value)
 {
 	if (length > 0)
 	{
@@ -204,7 +204,7 @@ const char* fromCString(const char* input, int length, int64_t* value)
 	return nullptr;
 }
 
-const char* fromCString(const char* input, int length, uint32_t* value)
+const char* fromCString(const char* input, int length, uint32* value)
 {
 	if (length > 0)
 	{
@@ -227,7 +227,7 @@ const char* fromCString(const char* input, int length, uint32_t* value)
 }
 
 
-bool toCStringPretty(int32_t value, char* output, int length)
+bool toCStringPretty(int32 value, char* output, int length)
 {
 	char* c = output;
 	if (length > 0)
@@ -245,13 +245,13 @@ bool toCStringPretty(int32_t value, char* output, int length)
 }
 
 
-bool toCStringPretty(uint32_t value, char* output, int length)
+bool toCStringPretty(uint32 value, char* output, int length)
 {
-	return toCStringPretty(uint64_t(value), output, length);
+	return toCStringPretty(uint64(value), output, length);
 }
 
 
-bool toCStringPretty(uint64_t value, char* output, int length)
+bool toCStringPretty(uint64 value, char* output, int length)
 {
 	char* c = output;
 	char* num_start = output;
@@ -296,7 +296,7 @@ bool toCStringPretty(uint64_t value, char* output, int length)
 }
 
 
-bool toCString(int32_t value, char* output, int length)
+bool toCString(int32 value, char* output, int length)
 {
 	char* c = output;
 	if (length > 0)
@@ -313,7 +313,7 @@ bool toCString(int32_t value, char* output, int length)
 	return false;
 }
 
-bool toCString(int64_t value, char* output, int length)
+bool toCString(int64 value, char* output, int length)
 {
 	char* c = output;
 	if (length > 0)
@@ -325,12 +325,12 @@ bool toCString(int64_t value, char* output, int length)
 			*c = '-';
 			++c;
 		}
-		return toCString((uint64_t)value, c, length);
+		return toCString((uint64)value, c, length);
 	}
 	return false;
 }
 
-bool toCString(uint64_t value, char* output, int length)
+bool toCString(uint64 value, char* output, int length)
 {
 	char* c = output;
 	char* num_start = output;
@@ -363,13 +363,13 @@ bool toCString(uint64_t value, char* output, int length)
 	return false;
 }
 
-bool toCStringHex(uint8_t value, char* output, int length)
+bool toCStringHex(uint8 value, char* output, int length)
 {
 	if (length < 2)
 	{
 		return false;
 	}
-	uint8_t first = value / 16;
+	uint8 first = value / 16;
 	if (first > 9)
 	{
 		output[0] = 'A' + first - 10;
@@ -378,7 +378,7 @@ bool toCStringHex(uint8_t value, char* output, int length)
 	{
 		output[0] = '0' + first;
 	}
-	uint8_t second = value % 16;
+	uint8 second = value % 16;
 	if (second > 9)
 	{
 		output[1] = 'A' + second - 10;
@@ -390,7 +390,7 @@ bool toCStringHex(uint8_t value, char* output, int length)
 	return true;
 }
 
-bool toCString(uint32_t value, char* output, int length)
+bool toCString(uint32 value, char* output, int length)
 {
 	char* c = output;
 	char* num_start = output;

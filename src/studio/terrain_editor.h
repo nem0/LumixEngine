@@ -60,7 +60,7 @@ private:
 	void decreaseBrushSize();
 	void nextTerrainTexture();
 	void prevTerrainTexture();
-	uint16_t getHeight(const Lumix::Vec3& world_pos);
+	Lumix::uint16 getHeight(const Lumix::Vec3& world_pos);
 	Lumix::Texture* getHeightmap();
 	Lumix::Vec3& getRelativePosition(const Lumix::Vec3& world_pos) const;
 
@@ -71,7 +71,7 @@ private:
 	float m_terrain_brush_strength;
 	float m_terrain_brush_size;
 	int m_texture_idx;
-	uint16_t m_flat_height;
+	Lumix::uint16 m_flat_height;
 	Lumix::Vec3 m_color;
 	int m_current_brush;
 	int m_selected_entity_template;

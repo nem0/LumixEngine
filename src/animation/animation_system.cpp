@@ -14,8 +14,8 @@
 namespace Lumix
 {
 
-static const uint32_t RENDERABLE_HASH = crc32("renderable");
-static const uint32_t ANIMABLE_HASH = crc32("animable");
+static const uint32 RENDERABLE_HASH = crc32("renderable");
+static const uint32 ANIMABLE_HASH = crc32("animable");
 
 namespace FS
 {
@@ -51,7 +51,7 @@ public:
 		, m_animables(allocator)
 	{
 		m_render_scene = nullptr;
-		uint32_t hash = crc32("renderer");
+		uint32 hash = crc32("renderer");
 		for (auto* scene : ctx.m_scenes)
 		{
 			if (crc32(scene->getPlugin().getName()) == hash)
@@ -84,13 +84,13 @@ public:
 	virtual Universe& getUniverse() override { return m_universe; }
 
 
-	virtual bool ownComponentType(uint32_t type) const override
+	virtual bool ownComponentType(uint32 type) const override
 	{
 		return type == ANIMABLE_HASH;
 	}
 
 
-	virtual ComponentIndex createComponent(uint32_t type,
+	virtual ComponentIndex createComponent(uint32 type,
 										   Entity entity) override
 	{
 		if (type == ANIMABLE_HASH)
@@ -101,7 +101,7 @@ public:
 	}
 
 
-	virtual void destroyComponent(ComponentIndex component, uint32_t type)
+	virtual void destroyComponent(ComponentIndex component, uint32 type)
 	{
 		if (type == ANIMABLE_HASH)
 		{
@@ -114,7 +114,7 @@ public:
 
 	virtual void serialize(OutputBlob& serializer) override
 	{
-		serializer.write((int32_t)m_animables.size());
+		serializer.write((int32)m_animables.size());
 		for (int i = 0; i < m_animables.size(); ++i)
 		{
 			serializer.write(m_animables[i].m_entity);
@@ -130,7 +130,7 @@ public:
 
 	virtual void deserialize(InputBlob& serializer, int) override
 	{
-		int32_t count;
+		int32 count;
 		serializer.read(count);
 		m_animables.resize(count);
 		for (int i = 0; i < count; ++i)

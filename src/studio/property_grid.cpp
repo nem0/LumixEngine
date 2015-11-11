@@ -54,7 +54,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		desc.get(cmp, index, stream);
 	Lumix::InputBlob tmp(stream);
 
-	StringBuilder<100> desc_name(desc.getName(), "###", (uint64_t)&desc);
+	StringBuilder<100> desc_name(desc.getName(), "###", (Lumix::uint64)&desc);
 
 	switch (desc.getType())
 	{
@@ -155,7 +155,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		auto rm_type = resource_descriptor.getResourceType();
 		auto asset_type = m_asset_browser.getTypeFromResourceManagerType(rm_type);
 		if (m_asset_browser.resourceInput(desc.getName(),
-				StringBuilder<20>("", (uint64_t)&desc),
+				StringBuilder<20>("", (Lumix::uint64)&desc),
 				buf,
 				sizeof(buf),
 				asset_type))
@@ -187,7 +187,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 
 void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescriptor& desc)
 {
-	StringBuilder<100> desc_name(desc.getName(), "###", (uint64_t)&desc);
+	StringBuilder<100> desc_name(desc.getName(), "###", (Lumix::uint64)&desc);
 
 	if (!ImGui::CollapsingHeader(desc_name, nullptr, true, true)) return;
 

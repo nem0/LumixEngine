@@ -12,7 +12,7 @@ namespace Lumix
 {
 
 
-static ParticleEmitter::ModuleBase* createModule(uint32_t type, ParticleEmitter& emitter)
+static ParticleEmitter::ModuleBase* createModule(uint32 type, ParticleEmitter& emitter)
 {
 	if (type == ParticleEmitter::LinearMovementModule::s_type)
 	{
@@ -67,7 +67,7 @@ void ParticleEmitter::LinearMovementModule::deserialize(InputBlob& blob)
 }
 
 
-const uint32_t ParticleEmitter::LinearMovementModule::s_type = Lumix::crc32("linear_movement");
+const uint32 ParticleEmitter::LinearMovementModule::s_type = Lumix::crc32("linear_movement");
 
 
 ParticleEmitter::AlphaModule::AlphaModule(ParticleEmitter& emitter)
@@ -107,7 +107,7 @@ void ParticleEmitter::AlphaModule::update(float time_delta)
 }
 
 
-const uint32_t ParticleEmitter::AlphaModule::s_type = Lumix::crc32("alpha");
+const uint32 ParticleEmitter::AlphaModule::s_type = Lumix::crc32("alpha");
 
 
 ParticleEmitter::RandomRotationModule::RandomRotationModule(ParticleEmitter& emitter)
@@ -122,7 +122,7 @@ void ParticleEmitter::RandomRotationModule::spawnParticle(int index)
 }
 
 
-const uint32_t ParticleEmitter::RandomRotationModule::s_type = Lumix::crc32("random_rotation");
+const uint32 ParticleEmitter::RandomRotationModule::s_type = Lumix::crc32("random_rotation");
 
 
 
@@ -288,7 +288,7 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager)
 	m_modules.clear();
 	for (int i = 0; i < size; ++i)
 	{
-		uint32_t type;
+		uint32 type;
 		blob.read(type);
 		auto* module = createModule(type, *this);
 		m_modules.push(module);

@@ -38,7 +38,7 @@ public:
 	void onGUI();
 	void update();
 	const Lumix::Array<Lumix::Path>& getResources(Type type) const;
-	Type getTypeFromResourceManagerType(uint32_t type) const;
+	Type getTypeFromResourceManagerType(Lumix::uint32 type) const;
 	void selectResource(const Lumix::Path& resource);
 	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, Type type);
 

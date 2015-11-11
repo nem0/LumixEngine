@@ -21,7 +21,7 @@ namespace Lumix
 {
 
 
-static const uint32_t SHADOWMAP_HASH = crc32("shadowmap");
+static const uint32 SHADOWMAP_HASH = crc32("shadowmap");
 int Material::s_alpha_cutout_define_idx = -1;
 int Material::s_shadow_receiver_define_idx = -1;
 
@@ -65,7 +65,7 @@ void Material::setUserDefine(int define_idx)
 	if (!isReady()) return;
 	if (!m_shader) return;
 
-	uint32_t old_mask = m_shader_mask;
+	uint32 old_mask = m_shader_mask;
 	m_shader_mask |= m_shader->getDefineMask(define_idx);
 
 	if (old_mask != m_shader_mask)
@@ -80,7 +80,7 @@ void Material::unsetUserDefine(int define_idx)
 	if (!isReady()) return;
 	if (!m_shader) return;
 
-	uint32_t old_mask = m_shader_mask;
+	uint32 old_mask = m_shader_mask;
 	m_shader_mask &= ~m_shader->getDefineMask(define_idx);
 
 	if (old_mask != m_shader_mask)
@@ -110,7 +110,7 @@ void Material::enableAlphaCutout(bool enable)
 	if (!isReady()) return;
 	if (!m_shader)	return;
 
-	uint32_t mask = m_shader->getDefineMask(s_alpha_cutout_define_idx);
+	uint32 mask = m_shader->getDefineMask(s_alpha_cutout_define_idx);
 	if (enable)
 	{
 		m_shader_mask |= mask;
@@ -144,7 +144,7 @@ void Material::enableShadowReceiving(bool enable)
 	if (!isReady()) return;
 	if (!m_shader)	return;
 
-	uint32_t mask = m_shader->getDefineMask(s_shadow_receiver_define_idx);
+	uint32 mask = m_shader->getDefineMask(s_shadow_receiver_define_idx);
 	if (enable)
 	{
 		m_shader_mask |= mask;
@@ -451,7 +451,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 	serializer.deserializeObjectBegin();
 	char label[256];
 	bool keep_data = false;
-	uint32_t flags = 0;
+	uint32 flags = 0;
 	int atlas_size = -1;
 
 	while (!serializer.isObjectEnd())
@@ -569,7 +569,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 }
 
 
-void Material::setRenderState(bool value, uint64_t state, uint64_t mask)
+void Material::setRenderState(bool value, uint64 state, uint64 mask)
 {
 	if (value)
 	{

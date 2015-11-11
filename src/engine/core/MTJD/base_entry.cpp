@@ -7,7 +7,7 @@ namespace Lumix
 {
 	namespace MTJD
 	{
-		BaseEntry::BaseEntry(int32_t depend_count, bool sync_event, IAllocator& allocator)
+		BaseEntry::BaseEntry(int32 depend_count, bool sync_event, IAllocator& allocator)
 			: m_dependency_count(depend_count)
 			, m_allocator(allocator)
 			, m_dependency_table(m_allocator)
@@ -59,7 +59,7 @@ namespace Lumix
 			DependencyTable dependency_table(m_dependency_table);
 			m_dependency_table.clear();
 
-			for (uint32_t i = 0, c = dependency_table.size(); c > i; ++i)
+			for (uint32 i = 0, c = dependency_table.size(); c > i; ++i)
 			{
 				dependency_table[i]->decrementDependency();
 			}

@@ -22,8 +22,8 @@
 #include "utils.h"
 
 
-static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");
-static const uint32_t TERRAIN_HASH = Lumix::crc32("terrain");
+static const Lumix::uint32 RENDERABLE_HASH = Lumix::crc32("renderable");
+static const Lumix::uint32 TERRAIN_HASH = Lumix::crc32("terrain");
 static const char* HEIGHTMAP_UNIFORM = "u_texHeightmap";
 static const char* SPLATMAP_UNIFORM = "u_texSplatmap";
 static const char* COLORMAP_UNIFORM = "u_texColormap";
@@ -35,7 +35,7 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 {
 	PaintEntitiesCommand(Lumix::WorldEditor& editor,
 		Lumix::ComponentUID component,
-		uint32_t entity_template,
+		Lumix::uint32 entity_template,
 		float brush_strength,
 		float brush_size,
 		bool align_with_normal,
@@ -110,9 +110,9 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 	}
 	
 
-	virtual uint32_t getType()
+	virtual Lumix::uint32 getType()
 	{
-		static const uint32_t type = Lumix::crc32("paint_entities_on_terrain");
+		static const Lumix::uint32 type = Lumix::crc32("paint_entities_on_terrain");
 		return type;
 	}
 	
@@ -327,7 +327,7 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 	Lumix::Array<Lumix::Entity> m_entities;
 	float m_brush_strength;
 	float m_brush_size;
-	uint32_t m_template_name_hash;
+	Lumix::uint32 m_template_name_hash;
 	Lumix::Vec3 m_center;
 	bool m_align_with_normal;
 	bool m_rotate_x;
@@ -428,9 +428,9 @@ struct RemoveEntitiesCommand : public Lumix::IEditorCommand
 	}
 
 
-	virtual uint32_t getType()
+	virtual Lumix::uint32 getType()
 	{
-		static const uint32_t type = Lumix::crc32("remove_entities_on_terrain");
+		static const Lumix::uint32 type = Lumix::crc32("remove_entities_on_terrain");
 		return type;
 	}
 
@@ -490,7 +490,7 @@ struct RemoveEntitiesCommand : public Lumix::IEditorCommand
 	Lumix::ComponentUID m_component;
 	Lumix::OutputBlob m_removed_entities;
 	float m_brush_size;
-	uint32_t m_template_name_hash;
+	Lumix::uint32 m_template_name_hash;
 	Lumix::Vec3 m_center;
 };
 
@@ -513,7 +513,7 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 		Lumix::BinaryArray& mask,
 		float radius,
 		float rel_amount,
-		uint16_t flat_height,
+		Lumix::uint16 flat_height,
 		Lumix::Vec3 color,
 		Lumix::ComponentUID terrain,
 		bool can_be_merged)
@@ -629,9 +629,9 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 	virtual void undo() override { applyData(m_old_data); }
 
 
-	virtual uint32_t getType() override
+	virtual Lumix::uint32 getType() override
 	{
-		static const uint32_t type = Lumix::crc32("paint_terrain");
+		static const Lumix::uint32 type = Lumix::crc32("paint_terrain");
 		return type;
 	}
 
@@ -715,7 +715,7 @@ private:
 						 int to_y)
 	{
 		ASSERT(texture->getBytesPerPixel() == 4);
-		uint64_t sum = 0;
+		Lumix::uint64 sum = 0;
 		int texture_width = texture->getWidth();
 		for (int i = from_x, end = to_x; i < end; ++i)
 		{
@@ -728,23 +728,23 @@ private:
 	}
 
 
-	uint16_t computeAverage16(const Lumix::Texture* texture,
+	Lumix::uint16 computeAverage16(const Lumix::Texture* texture,
 							  int from_x,
 							  int to_x,
 							  int from_y,
 							  int to_y)
 	{
 		ASSERT(texture->getBytesPerPixel() == 2);
-		uint32_t sum = 0;
+		Lumix::uint32 sum = 0;
 		int texture_width = texture->getWidth();
 		for (int i = from_x, end = to_x; i < end; ++i)
 		{
 			for (int j = from_y, end2 = to_y; j < end2; ++j)
 			{
-				sum += ((uint16_t*)texture->getData())[(i + j * texture_width)];
+				sum += ((Lumix::uint16*)texture->getData())[(i + j * texture_width)];
 			}
 		}
-		return uint16_t(sum / (to_x - from_x) / (to_y - from_y));
+		return Lumix::uint16(sum / (to_x - from_x) / (to_y - from_y));
 	}
 
 
@@ -758,7 +758,7 @@ private:
 
 
 	void rasterColorItem(Lumix::Texture* texture,
-						 Lumix::Array<uint8_t>& data,
+						 Lumix::Array<Lumix::uint8>& data,
 						 Item& item)
 	{
 		int texture_width = texture->getWidth();
@@ -782,10 +782,10 @@ private:
 				{
 					float attenuation = getAttenuation(item, i, j);
 					int offset = 4 * (i - m_x + (j - m_y) * m_width);
-					uint8_t* d = &data[offset];
-					d[0] += uint8_t((item.m_color.x * 255 - d[0]) * attenuation);
-					d[1] += uint8_t((item.m_color.y * 255 - d[1]) * attenuation);
-					d[2] += uint8_t((item.m_color.z * 255 - d[2]) * attenuation);
+					Lumix::uint8* d = &data[offset];
+					d[0] += Lumix::uint8((item.m_color.x * 255 - d[0]) * attenuation);
+					d[1] += Lumix::uint8((item.m_color.y * 255 - d[1]) * attenuation);
+					d[2] += Lumix::uint8((item.m_color.z * 255 - d[2]) * attenuation);
 					d[3] = 255;
 				}
 			}
@@ -806,7 +806,7 @@ private:
 
 
 	void rasterLayerItem(Lumix::Texture* texture,
-						 Lumix::Array<uint8_t>& data,
+						 Lumix::Array<Lumix::uint8>& data,
 						 Item& item)
 	{
 		int texture_width = texture->getWidth();
@@ -852,7 +852,7 @@ private:
 	}
 
 
-	void rasterSmoothHeightItem(Lumix::Texture* texture, Lumix::Array<uint8_t>& data, Item& item)
+	void rasterSmoothHeightItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item)
 	{
 		ASSERT(texture->getBytesPerPixel() == 2);
 
@@ -867,15 +867,15 @@ private:
 			{
 				float attenuation = getAttenuation(item, i, j);
 				int offset = i - m_x + (j - m_y) * m_width;
-				uint16_t x = ((uint16_t*)texture->getData())[(i + j * texture_width)];
-				x += uint16_t((avg - x) * item.m_amount * attenuation);
-				((uint16_t*)&data[0])[offset] = x;
+				Lumix::uint16 x = ((Lumix::uint16*)texture->getData())[(i + j * texture_width)];
+				x += Lumix::uint16((avg - x) * item.m_amount * attenuation);
+				((Lumix::uint16*)&data[0])[offset] = x;
 			}
 		}
 	}
 
 
-	void rasterFlatHeightItem(Lumix::Texture* texture, Lumix::Array<uint8_t>& data, Item& item)
+	void rasterFlatHeightItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item)
 	{
 		ASSERT(texture->getBytesPerPixel() == 2);
 
@@ -888,13 +888,13 @@ private:
 			for (int j = rect.m_from_y, end2 = rect.m_to_y; j < end2; ++j)
 			{
 				int offset = i - m_x + (j - m_y) * m_width;
-				((uint16_t*)&data[0])[offset] = m_flat_height;
+				((Lumix::uint16*)&data[0])[offset] = m_flat_height;
 			}
 		}
 	}
 
 
-	void rasterItem(Lumix::Texture* texture, Lumix::Array<uint8_t>& data, Item& item)
+	void rasterItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item)
 	{
 		if (m_type == TerrainEditor::COLOR)
 		{
@@ -935,10 +935,10 @@ private:
 				int offset = i - m_x + (j - m_y) * m_width;
 
 				int add = int(attenuation * amount);
-				uint16_t x = ((uint16_t*)texture->getData())[(i + j * texture_width)];
+				Lumix::uint16 x = ((Lumix::uint16*)texture->getData())[(i + j * texture_width)];
 				x += m_type == TerrainEditor::RAISE_HEIGHT ? Lumix::Math::minValue(add, 0xFFFF - x)
 														   : Lumix::Math::maxValue(-add, -x);
-				((uint16_t*)&data[0])[offset] = x;
+				((Lumix::uint16*)&data[0])[offset] = x;
 			}
 		}
 	}
@@ -993,7 +993,7 @@ private:
 	}
 
 
-	void applyData(Lumix::Array<uint8_t>& data)
+	void applyData(Lumix::Array<Lumix::uint8>& data)
 	{
 		auto texture = getDestinationTexture();
 		int bpp = texture->getBytesPerPixel();
@@ -1017,8 +1017,8 @@ private:
 
 	void resizeData()
 	{
-		Lumix::Array<uint8_t> new_data(m_world_editor.getAllocator());
-		Lumix::Array<uint8_t> old_data(m_world_editor.getAllocator());
+		Lumix::Array<Lumix::uint8> new_data(m_world_editor.getAllocator());
+		Lumix::Array<Lumix::uint8> old_data(m_world_editor.getAllocator());
 		auto texture = getDestinationTexture();
 		Rectangle rect;
 		getBoundingRectangle(texture, rect);
@@ -1089,8 +1089,8 @@ private:
 
 
 private:
-	Lumix::Array<uint8_t> m_new_data;
-	Lumix::Array<uint8_t> m_old_data;
+	Lumix::Array<Lumix::uint8> m_new_data;
+	Lumix::Array<Lumix::uint8> m_old_data;
 	int m_texture_idx;
 	int m_width;
 	int m_height;
@@ -1101,7 +1101,7 @@ private:
 	Lumix::ComponentUID m_terrain;
 	Lumix::WorldEditor& m_world_editor;
 	Lumix::BinaryArray m_mask;
-	uint16_t m_flat_height;
+	Lumix::uint16 m_flat_height;
 	bool m_can_be_merged;
 };
 
@@ -1360,13 +1360,13 @@ Lumix::Texture* TerrainEditor::getHeightmap()
 }
 
 
-uint16_t TerrainEditor::getHeight(const Lumix::Vec3& world_pos)
+Lumix::uint16 TerrainEditor::getHeight(const Lumix::Vec3& world_pos)
 {
 	auto rel_pos = getRelativePosition(world_pos);
 	auto* heightmap = getHeightmap();
 	if (!heightmap) return 0;
 
-	auto* data = (uint16_t*)heightmap->getData();
+	auto* data = (Lumix::uint16*)heightmap->getData();
 	return data[int(rel_pos.x) + int(rel_pos.z) * heightmap->getWidth()];
 }
 

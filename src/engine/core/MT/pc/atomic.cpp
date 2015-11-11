@@ -6,32 +6,32 @@ namespace Lumix
 {
 	namespace MT
 	{
-		int32_t atomicIncrement(int32_t volatile *value)
+		int32 atomicIncrement(int32 volatile *value)
 		{
 			return InterlockedIncrement((LONG*)value);
 		}
 
-		int32_t atomicDecrement(int32_t volatile *value)
+		int32 atomicDecrement(int32 volatile *value)
 		{
 			return InterlockedDecrement((LONG*)value);
 		}
 
-		int32_t atomicAdd(int32_t volatile *addend, int32_t value)
+		int32 atomicAdd(int32 volatile *addend, int32 value)
 		{
 			return InterlockedExchangeAdd((LONG*)addend, value);
 		}
 
-		int32_t atomicSubtract(int32_t volatile *addend, int32_t value)
+		int32 atomicSubtract(int32 volatile *addend, int32 value)
 		{
 			return InterlockedExchangeAdd((LONG*)addend, -value);
 		}
 
-		bool compareAndExchange(int32_t volatile* dest, int32_t exchange, int32_t comperand)
+		bool compareAndExchange(int32 volatile* dest, int32 exchange, int32 comperand)
 		{
 			return InterlockedCompareExchange((LONG*)dest, exchange, comperand) == comperand;
 		}
 
-		bool compareAndExchange64(int64_t volatile* dest, int64_t exchange, int64_t comperand)
+		bool compareAndExchange64(int64 volatile* dest, int64 exchange, int64 comperand)
 		{
 			return InterlockedCompareExchange64(dest, exchange, comperand) == comperand;
 		}

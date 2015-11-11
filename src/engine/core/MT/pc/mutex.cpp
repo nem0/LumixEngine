@@ -25,7 +25,7 @@ namespace Lumix
 
 		bool Mutex::poll()
 		{
-			uint32_t res = ::WaitForSingleObject(m_id, 0);
+			uint32 res = ::WaitForSingleObject(m_id, 0);
 			return res > 0;
 		}
 
