@@ -26,7 +26,8 @@ enum class NodeType
 	UNIFORM,
 	VEC4_MERGE,
 	MULTIPLY,
-	BUILTIN_UNIFORM
+	BUILTIN_UNIFORM,
+	PASS,
 };
 
 
@@ -75,7 +76,8 @@ static const struct { const char* name; NodeType type; bool is_frag; bool is_ver
 	{"Uniform",				NodeType::UNIFORM,			true,		true},
 	{"Vec4 merge",			NodeType::VEC4_MERGE,		true,		true},
 	{"Multiply",			NodeType::MULTIPLY,			true,		true},
-	{"Builtin uniforms",	NodeType::BUILTIN_UNIFORM,	true,		true}
+	{"Builtin uniforms",	NodeType::BUILTIN_UNIFORM,	true,		true},
+	{"Pass",				NodeType::PASS,				true,		true}
 };
 
 
@@ -802,6 +804,62 @@ struct MixNode : public ShaderEditor::Node
 };
 
 
+struct PassNode : public ShaderEditor::Node
+{
+	PassNode(ShaderEditor& editor)
+		: Node((int)NodeType::PASS, editor)
+	{
+		m_outputs.push(nullptr);
+		m_inputs.push(nullptr);
+		m_inputs.push(nullptr);
+		m_pass[0] = 0;
+	}
+
+
+	void save(Lumix::OutputBlob& blob) override { blob.writeString(m_pass); }
+	void load(Lumix::InputBlob& blob) override { blob.readString(m_pass, Lumix::lengthOf(m_pass)); }
+
+
+	ShaderEditor::ValueType getOutputType(int) const override
+	{
+		if (!m_inputs[0]) return ShaderEditor::ValueType::NONE;
+		
+		int idx = m_inputs[0]->m_outputs.indexOf(this);
+		if (idx == -1) return ShaderEditor::ValueType::NONE;
+
+		return m_inputs[0]->getOutputType(idx);
+	}
+
+
+	void generateBeforeMain(Lumix::OutputBlob& blob) override {}
+
+	void generate(Lumix::OutputBlob& blob) override 
+	{
+		const char* defs[] = { "#ifdef ", "#ifndef " };
+		for (int i = 0; i < 2; ++i)
+		{
+			if (!m_inputs[i]) continue;
+
+			blob << defs[i] << m_pass << "\n";
+			m_inputs[i]->generate(blob);
+			blob << "\t" << getValueTypeName(getOutputType(0)) << " v" << m_id << " = ";
+			m_inputs[i]->printReference(blob);
+			blob << ";\n";
+			blob << "#endif // " << m_pass << "\n";
+		}
+	}
+
+	void onGUI() override
+	{
+		ImGui::Text("if defined");
+		ImGui::Text("if not defined");
+		ImGui::InputText("Pass", m_pass, sizeof(m_pass));
+	}
+
+	char m_pass[50];
+};
+
+
 struct BuiltinUniformNode : public ShaderEditor::Node
 {
 	BuiltinUniformNode(ShaderEditor& editor)
@@ -1417,18 +1475,19 @@ ShaderEditor::Node* ShaderEditor::createNode(int type)
 	switch ((NodeType)type)
 	{
 		case NodeType::FRAGMENT_OUTPUT:				return LUMIX_NEW(m_allocator, FragmentOutputNode)(*this);
-		case NodeType::VERTEX_OUTPUT:					return LUMIX_NEW(m_allocator, VertexOutputNode)(*this);
+		case NodeType::VERTEX_OUTPUT:				return LUMIX_NEW(m_allocator, VertexOutputNode)(*this);
 		case NodeType::FRAGMENT_INPUT:				return LUMIX_NEW(m_allocator, FragmentInputNode)(*this);
 		case NodeType::POSITION_OUTPUT:				return LUMIX_NEW(m_allocator, PositionOutputNode)(*this);
-		case NodeType::VERTEX_INPUT:					return LUMIX_NEW(m_allocator, VertexInputNode)(*this);
-		case NodeType::COLOR_CONST:						return LUMIX_NEW(m_allocator, ColorConstNode)(*this);
-		case NodeType::FLOAT_CONST:						return LUMIX_NEW(m_allocator, FloatConstNode)(*this);
-		case NodeType::MIX:										return LUMIX_NEW(m_allocator, MixNode)(*this);
-		case NodeType::SAMPLE:								return LUMIX_NEW(m_allocator, SampleNode)(*this);
-		case NodeType::UNIFORM:								return LUMIX_NEW(m_allocator, UniformNode)(*this);
-		case NodeType::VEC4_MERGE:						return LUMIX_NEW(m_allocator, Vec4MergeNode)(*this);
-		case NodeType::MULTIPLY:							return LUMIX_NEW(m_allocator, MultiplyNode)(*this);
+		case NodeType::VERTEX_INPUT:				return LUMIX_NEW(m_allocator, VertexInputNode)(*this);
+		case NodeType::COLOR_CONST:					return LUMIX_NEW(m_allocator, ColorConstNode)(*this);
+		case NodeType::FLOAT_CONST:					return LUMIX_NEW(m_allocator, FloatConstNode)(*this);
+		case NodeType::MIX:							return LUMIX_NEW(m_allocator, MixNode)(*this);
+		case NodeType::SAMPLE:						return LUMIX_NEW(m_allocator, SampleNode)(*this);
+		case NodeType::UNIFORM:						return LUMIX_NEW(m_allocator, UniformNode)(*this);
+		case NodeType::VEC4_MERGE:					return LUMIX_NEW(m_allocator, Vec4MergeNode)(*this);
+		case NodeType::MULTIPLY:					return LUMIX_NEW(m_allocator, MultiplyNode)(*this);
 		case NodeType::BUILTIN_UNIFORM:				return LUMIX_NEW(m_allocator, BuiltinUniformNode)(*this);
+		case NodeType::PASS:						return LUMIX_NEW(m_allocator, PassNode)(*this);
 	}
 
 	ASSERT(false);
