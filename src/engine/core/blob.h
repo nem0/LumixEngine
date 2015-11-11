@@ -21,8 +21,8 @@ namespace Lumix
 			int getSize() const { return m_data.size(); }
 			void write(const void* data, int size);
 			void writeString(const char* string);
-			template <class T> void write(T value) { write(&value, sizeof(T)); }
-			template <> void write<bool>(bool value) { uint8_t v = value; write(&v, sizeof(v)); }
+			template <class T> void write(const T& value) { write(&value, sizeof(T)); }
+			template <> void write<bool>(const bool& value) { uint8_t v = value; write(&v, sizeof(v)); }
 			void clear() { m_data.clear(); }
 
 			OutputBlob& operator << (const char* str);
