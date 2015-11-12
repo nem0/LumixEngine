@@ -294,7 +294,7 @@ public:
 			uint8* dest8 = (uint8*)dest + count - 1;
 			const uint8* src8 = (const uint8*)src + count - 1;
 
-			while(src8 > src)
+			while(src8 >= src)
 			{
 				*dest8 = *src8;
 				--src8;

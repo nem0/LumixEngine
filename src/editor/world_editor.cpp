@@ -16,7 +16,6 @@
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/matrix.h"
-#include "core/mt/mutex.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -2540,7 +2539,6 @@ public:
 	WorldEditorImpl(const char* base_path, Engine& engine, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_engine(nullptr)
-		, m_universe_mutex(false)
 		, m_gizmo(*this)
 		, m_components(m_allocator)
 		, m_entity_name_set(m_allocator)
@@ -3221,7 +3219,6 @@ private:
 
 	Debug::Allocator m_allocator;
 	GoToParameters m_go_to_parameters;
-	MT::Mutex m_universe_mutex;
 	Gizmo m_gizmo;
 	Array<Entity> m_selected_entities;
 	MouseMode::Value m_mouse_mode;
