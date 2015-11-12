@@ -1518,7 +1518,7 @@ public:
 			{
 				int size = all_infos.size();
 				all_infos.resize(size + subinfos.size());
-				memcpy(&all_infos[0] + size,
+				copyMemory(&all_infos[0] + size,
 					   &subinfos[0],
 					   sizeof(subinfos[0]) * subinfos.size());
 			}

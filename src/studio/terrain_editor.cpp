@@ -953,7 +953,7 @@ private:
 		m_new_data.resize(bpp * Lumix::Math::maxValue(1,
 									 (rect.m_to_x - rect.m_from_x) *
 										 (rect.m_to_y - rect.m_from_y)));
-		memcpy(&m_new_data[0], &m_old_data[0], m_new_data.size());
+		Lumix::copyMemory(&m_new_data[0], &m_old_data[0], m_new_data.size());
 
 		for (int item_index = 0; item_index < m_items.size(); ++item_index)
 		{
@@ -1031,10 +1031,10 @@ private:
 		// original
 		for (int row = rect.m_from_y; row < rect.m_to_y; ++row)
 		{
-			memcpy(&new_data[(row - rect.m_from_y) * new_w * bpp],
+			Lumix::copyMemory(&new_data[(row - rect.m_from_y) * new_w * bpp],
 				&texture->getData()[row * bpp * texture->getWidth() + rect.m_from_x * bpp],
 				bpp * new_w);
-			memcpy(&old_data[(row - rect.m_from_y) * new_w * bpp],
+			Lumix::copyMemory(&old_data[(row - rect.m_from_y) * new_w * bpp],
 				&texture->getData()[row * bpp * texture->getWidth() + rect.m_from_x * bpp],
 				bpp * new_w);
 		}
@@ -1042,10 +1042,10 @@ private:
 		// new
 		for (int row = 0; row < m_height; ++row)
 		{
-			memcpy(&new_data[((row + m_y - rect.m_from_y) * new_w + m_x - rect.m_from_x) * bpp],
+			Lumix::copyMemory(&new_data[((row + m_y - rect.m_from_y) * new_w + m_x - rect.m_from_x) * bpp],
 				&m_new_data[row * bpp * m_width],
 				bpp * m_width);
-			memcpy(&old_data[((row + m_y - rect.m_from_y) * new_w + m_x - rect.m_from_x) * bpp],
+			Lumix::copyMemory(&old_data[((row + m_y - rect.m_from_y) * new_w + m_x - rect.m_from_x) * bpp],
 				&m_old_data[row * bpp * m_width],
 				bpp * m_width);
 		}

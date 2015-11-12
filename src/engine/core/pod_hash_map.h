@@ -505,7 +505,7 @@ namespace Lumix
 
 		void copy(node_type* src, node_type* dst)
 		{
-			memcpy(dst, src, sizeof(node_type));
+			copyMemory(dst, src, sizeof(node_type));
 		}
 
 		node_type* getEmptyNode(size_type pos)
@@ -603,7 +603,7 @@ namespace Lumix
 			if(nullptr == prev)
 			{
 				node_type* next = n->m_next;
-				memcpy(n, next ? next : &m_sentinel, sizeof(node_type));
+				copyMemory(n, next ? next : &m_sentinel, sizeof(node_type));
 				m_allocator.deallocate(next);
 			}
 			else

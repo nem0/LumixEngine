@@ -312,7 +312,7 @@ void JsonSerializer::deserialize(char* value,
 	else
 	{
 		int size = Math::minValue(max_length - 1, m_token_size);
-		memcpy(value, m_token, size);
+		copyMemory(value, m_token, size);
 		value[size] = '\0';
 		deserializeToken();
 	}
@@ -391,7 +391,7 @@ void JsonSerializer::deserialize(const char* label,
 	else
 	{
 		int size = Math::minValue(max_length - 1, m_token_size);
-		memcpy(value, m_token, size);
+		copyMemory(value, m_token, size);
 		value[size] = '\0';
 		deserializeToken();
 	}
@@ -433,7 +433,7 @@ void JsonSerializer::deserializeArrayBegin()
 void JsonSerializer::deserializeRawString(char* buffer, int max_length)
 {
 	int size = Math::minValue(max_length - 1, m_token_size);
-	memcpy(buffer, m_token, size);
+	copyMemory(buffer, m_token, size);
 	buffer[size] = '\0';
 	deserializeToken();
 }
@@ -478,7 +478,7 @@ void JsonSerializer::deserializeArrayItem(char* value,
 	if (m_is_string_token)
 	{
 		int size = Math::minValue(max_length - 1, m_token_size);
-		memcpy(value, m_token, size);
+		copyMemory(value, m_token, size);
 		value[size] = '\0';
 		deserializeToken();
 	}
@@ -766,7 +766,7 @@ float JsonSerializer::tokenToFloat()
 {
 	char tmp[64];
 	int size = Math::minValue((int)sizeof(tmp) - 1, m_token_size);
-	memcpy(tmp, m_token, size);
+	copyMemory(tmp, m_token, size);
 	tmp[size] = '\0';
 	return (float)atof(tmp);
 }

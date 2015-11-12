@@ -226,7 +226,7 @@ public:
 		if (nsize > 0 && ptr == nullptr) return allocator.allocate(nsize);
 
 		void* new_mem = allocator.allocate(nsize);
-		memcpy(new_mem, ptr, Math::minValue(osize, nsize));
+		copyMemory(new_mem, ptr, Math::minValue(osize, nsize));
 		allocator.deallocate(ptr);
 		return new_mem;
 	}

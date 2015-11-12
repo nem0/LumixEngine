@@ -1,4 +1,5 @@
 #include "debug/allocator.h"
+#include "core/string.h"
 #include "debug/stack_tree.h"
 
 #define WIN32_LEAN_AND_MEAN
@@ -147,7 +148,7 @@ namespace Debug
 			if (!new_data) return nullptr;
 
 			AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
-			memcpy(new_data, user_ptr, info->m_size < size ? info->m_size : size);
+			copyMemory(new_data, user_ptr, info->m_size < size ? info->m_size : size);
 
 			deallocate(user_ptr);
 

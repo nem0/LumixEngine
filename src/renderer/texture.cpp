@@ -343,7 +343,7 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 		{
 			for (int i = 0; i < w; ++i)
 			{
-				memcpy(&dst_mem[(i + j * w) * m_BPP],
+				copyMemory(&dst_mem[(i + j * w) * m_BPP],
 					&src_mem[(x + i + (y + j) * m_width) * m_BPP],
 					m_BPP);
 			}
