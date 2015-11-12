@@ -1,7 +1,6 @@
 #include "core/system.h"
 #include "core/iallocator.h"
 #include "core/string.h"
-//#include "core/pc/simple_win.h"
 #include <ShlObj.h>
 #include <Windows.h>
 
@@ -268,4 +267,21 @@ namespace Lumix
 		return copyString(output, max_size, GetCommandLine());
 	}
 
+
+	void* loadLibrary(const char* path)
+	{
+		return LoadLibrary(path);
+	}
+
+
+	void unloadLibrary(void* handle)
+	{
+		FreeLibrary((HMODULE)handle);
+	}
+
+
+	void* getLibrarySymbol(void* handle, const char* name)
+	{
+		return GetProcAddress((HMODULE)handle, name);
+	}
 }

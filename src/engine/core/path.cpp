@@ -7,7 +7,6 @@
 #include "core/path_utils.h"
 #include "core/string.h"
 
-#include <string>
 
 namespace Lumix
 {

@@ -38,5 +38,20 @@ bool compareAndExchange64(int64 volatile* dest, int64 exchange, int64 comperand)
 }
 
 
+LUMIX_ENGINE_API bool memoryBarrier()
+{
+#ifdef _AMD64_
+	__faststorefence();
+#elif defined _IA64_
+	__mf();
+#else
+	int Barrier;
+	__asm {
+		xchg Barrier, eax
+	}
+#endif
+}
+
+
 } // ~namespace MT
 } // ~namespace Lumix

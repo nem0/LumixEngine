@@ -13,7 +13,6 @@ namespace Lumix
 	class InputBlob;
 	class IPlugin;
 	class JsonSerializer;
-	class Library;
 	class OutputBlob;
 	class Universe;
 
@@ -32,8 +31,8 @@ namespace Lumix
 			virtual void deserialize(InputBlob& serializer) = 0;
 			virtual IPlugin* getPlugin(const char* name) = 0;
 			virtual const Array<IPlugin*>& getPlugins() const = 0;
-			virtual const Array<Library*>& getLibraries() const = 0;
-			virtual DelegateList<void(Library&)>& libraryLoaded() = 0;
+			virtual const Array<void*>& getLibraries() const = 0;
+			virtual DelegateList<void(void*)>& libraryLoaded() = 0;
 	};
 
 
