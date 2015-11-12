@@ -1153,7 +1153,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void enableBlending() { m_render_state |= BGFX_STATE_BLEND_ADD; }
+	void enableBlending(uint64 value) { m_render_state |= value; }
 	void disableBlending() { m_render_state &= ~BGFX_STATE_BLEND_MASK; }
 
 	void enableDepthWrite() { m_render_state |= BGFX_STATE_DEPTH_WRITE; }
@@ -1950,9 +1950,14 @@ void disableRGBWrite(PipelineInstanceImpl* pipeline)
 }
 
 
-void enableBlending(PipelineInstanceImpl* pipeline)
+void enableBlending(PipelineInstanceImpl* pipeline, const char* mode)
 {
-	pipeline->enableBlending();
+	uint64 mode_value = 0;
+	if (compareString(mode, "alpha") == 0) mode_value = BGFX_STATE_BLEND_ALPHA;
+	else if (compareString(mode, "add") == 0) mode_value = BGFX_STATE_BLEND_ADD;
+	else if (compareString(mode, "multiply") == 0) mode_value = BGFX_STATE_BLEND_MULTIPLY;
+
+	pipeline->enableBlending(mode_value);
 }
 
 
