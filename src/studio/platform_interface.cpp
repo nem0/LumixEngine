@@ -2,7 +2,16 @@
 #include "ocornut-imgui/imgui.h"
 #include "renderer/renderer.h"
 
-#define WIN32_LEAN_AND_MEAN
+#include "core/pc/simple_win.h"
+#undef NOVIRTUALKEYCODES
+#undef NOWINMESSAGES
+#undef NOWINSTYLES
+#undef NOICONS
+#undef NOSHOWWINDOW
+#undef NOGDI
+#undef NOKERNEL
+#undef NOUSER
+#undef NOMSG
 #include <Windows.h>
 #include <mmsystem.h>
 

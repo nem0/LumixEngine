@@ -2,7 +2,7 @@
 #include "core/string.h"
 #include "debug/stack_tree.h"
 
-#define WIN32_LEAN_AND_MEAN
+#include "core/pc/simple_win.h"
 #include <Windows.h>
 #include <cstdio>
 
