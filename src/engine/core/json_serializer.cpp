@@ -262,17 +262,16 @@ void JsonSerializer::serializeArrayItem(bool value)
 bool JsonSerializer::isNextBoolean() const
 {
 	if (m_is_string_token) return false;
-	if (m_token_size == 4 && strncmp(m_token, "true", 4) == 0) return true;
-	if (m_token_size == 5 && strncmp(m_token, "false", 5) == 0) return true;
+	if (m_token_size == 4 && compareStringN(m_token, "true", 4) == 0) return true;
+	if (m_token_size == 5 && compareStringN(m_token, "false", 5) == 0) return true;
 	return false;
 }
 
 
 void JsonSerializer::deserialize(bool& value, bool default_value)
 {
-	value = !m_is_string_token
-				? m_token_size == 4 && (strncmp(m_token, "true", 4) == 0)
-				: default_value;
+	value = !m_is_string_token ? m_token_size == 4 && (compareStringN(m_token, "true", 4) == 0)
+							   : default_value;
 	deserializeToken();
 }
 
@@ -552,7 +551,7 @@ void JsonSerializer::deserializeArrayItem(bool& value, bool default_value)
 	else
 	{
 		value =
-			m_token_size == 4 && strncmp("true", m_token, m_token_size) == 0;
+			m_token_size == 4 && compareStringN("true", m_token, m_token_size) == 0;
 	}
 	deserializeToken();
 }
@@ -565,7 +564,7 @@ void JsonSerializer::deserialize(const char* label,
 	deserializeLabel(label);
 	if (!m_is_string_token)
 	{
-		value = m_token_size == 4 && strncmp("true", m_token, 4) == 0;
+		value = m_token_size == 4 && compareStringN("true", m_token, 4) == 0;
 	}
 	else
 	{
@@ -740,7 +739,7 @@ void JsonSerializer::deserializeLabel(const char* label)
 					  << "\", expected string.";
 		deserializeToken();
 	}
-	if (strncmp(label, m_token, m_token_size) != 0)
+	if (compareStringN(label, m_token, m_token_size) != 0)
 	{
 		error().log() << "Unexpected label \""
 					  << string(m_token, m_token_size, m_allocator)

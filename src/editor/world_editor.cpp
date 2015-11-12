@@ -2357,7 +2357,7 @@ public:
 
 	bool isRelativePath(const char* path) override
 	{
-		return strncmp(m_base_path.c_str(), path, m_base_path.length()) == 0;
+		return compareStringN(m_base_path.c_str(), path, m_base_path.length()) == 0;
 	}
 
 
@@ -2368,7 +2368,7 @@ public:
 		char tmp[MAX_PATH_LENGTH];
 		Lumix::PathUtils::normalize(source, tmp, sizeof(tmp));
 
-		if (strncmp(m_base_path.c_str(), tmp, m_base_path.length()) == 0)
+		if (compareStringN(m_base_path.c_str(), tmp, m_base_path.length()) == 0)
 		{
 			const char* rel_path_start = tmp + m_base_path.length();
 			if (rel_path_start[0] == '/')

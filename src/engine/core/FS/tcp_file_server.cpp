@@ -49,9 +49,7 @@ public:
 			m_files[id] = file;
 
 			char path[MAX_PATH_LENGTH];
-			if (strncmp(m_buffer.data(),
-						m_base_path.c_str(),
-						m_base_path.length()) != 0)
+			if (compareStringN(m_buffer.data(), m_base_path.c_str(), m_base_path.length()) != 0)
 			{
 				copyString(path, m_base_path.c_str());
 				catString(path, m_buffer.data());

@@ -35,6 +35,7 @@ LUMIX_ENGINE_API char* trimmed(char* str);
 LUMIX_ENGINE_API bool startsWith(const char* str, const char* prefix);
 LUMIX_ENGINE_API int stringLength(const char* str);
 LUMIX_ENGINE_API int compareString(const char* lhs, const char* rhs);
+LUMIX_ENGINE_API int compareStringN(const char* lhs, const char* rhs, int length);
 LUMIX_ENGINE_API void copyMemory(void* dest, const void* src, size_t count);
 
 

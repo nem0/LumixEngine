@@ -2,7 +2,7 @@
 
 
 #include "lumix.h"
-//#include <new>
+#include <new>
 
 
 namespace Lumix
