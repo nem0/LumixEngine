@@ -63,7 +63,7 @@ ShaderInstance& Shader::getInstance(uint32 mask)
 
 ShaderCombinations::ShaderCombinations()
 {
-	memset(this, 0, sizeof(*this));
+	setMemory(this, 0, sizeof(*this));
 	for (int i = 0; i < lengthOf(m_define_idx_map); ++i)
 	{
 		m_define_idx_map[i] = -1;

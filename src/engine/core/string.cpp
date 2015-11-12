@@ -1,4 +1,5 @@
 #include "string.h"
+#include <cstring>
 #include <cmath>
 
 namespace Lumix
@@ -13,52 +14,37 @@ static char makeLowercase(char c)
 
 int compareStringN(const char* lhs, const char* rhs, int length)
 {
-	while(*lhs && *lhs == *rhs && length)
-	{
-		++lhs;
-		++rhs;
-		--length;
-	}
-	if(length == 0) return 0;
-	return *lhs - *rhs;
-
+	return strncmp(lhs, rhs, length);
 }
 
 
 int compareString(const char* lhs, const char* rhs)
 {
-	while(*lhs && *lhs == *rhs)
-	{
-		++lhs;
-		++rhs;
-	}
-	return *lhs - *rhs;
+	return strcmp(lhs, rhs);
 }
 
 
 int stringLength(const char* str)
 {
-	const char* c = str;
-	while(*c)
-	{
-		++c;
-	}
-	return int(c - str);
+	return (int)strlen(str);
 }
 
 
-void copyMemory(void* dest, const void* src, size_t count)
+void moveMemory(void* dest, const void* src, int count)
 {
-	uint8* dest8 = (uint8*)dest;
-	const uint8* src8 = (const uint8*)src;
+	memmove(dest, src, count);
+}
 
-	const uint8* src_end = src8 + count;
-	while(src8 != src_end)
-	{
-		*dest8 = *src8;
-		++src8;
-		++dest8;
-	}
+
+void setMemory(void* ptr, uint8 value, int num)
+{
+	memset(ptr, value, num);
+}
+
+
+void copyMemory(void* dest, const void* src, int count)
+{
+	memcpy(dest, src, count);
 }
 
 
@@ -105,6 +91,12 @@ bool makeLowercase(char* destination, int length, const char* source)
 		return true;
 	}
 	return false;
+}
+
+
+const char* findSubstring(const char* haystack, const char* needle)
+{
+	return strstr(haystack, needle);
 }
 
 

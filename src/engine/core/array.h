@@ -81,7 +81,7 @@ public:
 			m_size = rhs.m_size;
 			for (int i = 0; i < m_size; ++i)
 			{
-				new ((char*)(m_data + i)) T(rhs.m_data[i]);
+				new (Lumix::NewPlaceholder(), (char*)(m_data + i)) T(rhs.m_data[i]);
 			}
 		}
 	}
@@ -136,7 +136,7 @@ public:
 			m_data[index].~T();
 			if (index != m_size - 1)
 			{
-				memmove(m_data + index, m_data + m_size - 1, sizeof(T));
+				moveMemory(m_data + index, m_data + m_size - 1, sizeof(T));
 			}
 			--m_size;
 		}
@@ -161,9 +161,8 @@ public:
 		{
 			grow();
 		}
-		memmove(
-			m_data + index + 1, m_data + index, sizeof(T) * (m_size - index));
-		new (&m_data[index]) T(value);
+		moveMemory(m_data + index + 1, m_data + index, sizeof(T) * (m_size - index));
+		new (NewPlaceholder(), &m_data[index]) T(value);
 		++m_size;
 	}
 
@@ -175,9 +174,7 @@ public:
 			m_data[index].~T();
 			if (index < m_size - 1)
 			{
-				memmove(m_data + index,
-						m_data + index + 1,
-						sizeof(T) * (m_size - index - 1));
+				moveMemory(m_data + index, m_data + index + 1, sizeof(T) * (m_size - index - 1));
 			}
 			--m_size;
 		}
@@ -190,7 +187,7 @@ public:
 		{
 			grow();
 		}
-		new ((char*)(m_data + size)) T(value);
+		new (NewPlaceholder(), (char*)(m_data + size)) T(value);
 		++size;
 		m_size = size;
 	}
@@ -201,7 +198,7 @@ public:
 		{
 			grow();
 		}
-		new ((char*)(m_data + m_size)) T(std::forward<Params>(params)...);
+		new (NewPlaceholder(), (char*)(m_data + m_size)) T(std::forward<Params>(params)...);
 		++m_size;
 		return m_data[m_size - 1];
 	}
@@ -220,7 +217,7 @@ public:
 		{
 			grow();
 		}
-		new ((char*)(m_data + m_size)) T();
+		new (NewPlaceholder(), (char*)(m_data + m_size)) T();
 		++m_size;
 		return m_data[m_size - 1];
 	}
@@ -248,10 +245,41 @@ public:
 		}
 		for (int i = m_size; i < size; ++i)
 		{
-			new ((char*)(m_data + i)) T();
+			new (NewPlaceholder(), (char*)(m_data + i)) T();
 		}
 		callDestructors(m_data + size, m_data + m_size);
 		m_size = size;
+	}
+
+	void moveMemory(void* dest, const void* src, size_t count)
+	{
+		if(dest == src) return;
+
+		if(dest < src || dest >= (uint8*)src + count)
+		{
+			uint8* dest8 = (uint8*)dest;
+			const uint8* src8 = (const uint8*)src;
+
+			const uint8* src_end = src8 + count;
+			while(src8 != src_end)
+			{
+				*dest8 = *src8;
+				++src8;
+				++dest8;
+			}
+		}
+		else
+		{
+			uint8* dest8 = (uint8*)dest + count - 1;
+			const uint8* src8 = (const uint8*)src + count - 1;
+
+			while(src8 > src)
+			{
+				*dest8 = *src8;
+				--src8;
+				--dest8;
+			}
+		}
 	}
 
 	void copyMemory(void* dest, const void* src, size_t count)

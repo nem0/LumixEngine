@@ -196,7 +196,7 @@ struct RendererImpl : public Renderer
 		bgfx::PlatformData d;
 		if (s_platform_data)
 		{
-			memset(&d, 0, sizeof(d));
+			setMemory(&d, 0, sizeof(d));
 			d.nwh = s_platform_data;
 			bgfx::setPlatformData(d);
 		}

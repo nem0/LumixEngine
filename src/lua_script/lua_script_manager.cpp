@@ -79,7 +79,7 @@ void LuaScript::parseProperties()
 	static const char* PROPERTY_MARK = "-- LUMIX PROPERTY";
 	const int PROPERTY_MARK_LENGTH = stringLength(PROPERTY_MARK);
 	const char* str = m_source_code.c_str();
-	const char* prop = strstr(str, PROPERTY_MARK);
+	const char* prop = findSubstring(str, PROPERTY_MARK);
 	while (prop)
 	{
 		const char* token = prop + PROPERTY_MARK_LENGTH + 1;
@@ -101,7 +101,7 @@ void LuaScript::parseProperties()
 			property.type = Property::ANY;
 		}
 
-		prop = strstr(prop + 1, PROPERTY_MARK);
+		prop = findSubstring(prop + 1, PROPERTY_MARK);
 	}
 }
 

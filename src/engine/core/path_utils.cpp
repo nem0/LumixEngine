@@ -79,14 +79,14 @@ void getBasename(char* basename, int /*max_length*/, const char* src)
 	}
 }
 
-void getFilename(char* filename, int /*max_length*/, const char* src)
+void getFilename(char* filename, int max_length, const char* src)
 {
 	for (int i = stringLength(src) - 1; i >= 0; --i)
 	{
 		if (src[i] == '\\' || src[i] == '/')
 		{
 			++i;
-			strcpy(filename, src + i);
+			copyString(filename, max_length, src + i);
 			break;
 		}
 	}

@@ -493,7 +493,7 @@ namespace Lumix
 		{
 			where->m_key = key;
 			where->m_next = nullptr;
-			memmove(&where->m_value, &val, sizeof(val));
+			moveMemory(&where->m_value, &val, sizeof(val));
 			return where;
 		}
 
