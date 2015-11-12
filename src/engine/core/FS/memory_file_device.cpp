@@ -90,7 +90,7 @@ namespace Lumix
 			virtual bool read(void* buffer, size_t size) override
 			{
 				size_t amount = m_pos + size < m_size ? size : m_size - m_pos;
-				memcpy(buffer, m_buffer + m_pos, amount);
+				copyMemory(buffer, m_buffer + m_pos, amount);
 				m_pos += amount;
 				return amount == size;
 			}
@@ -104,13 +104,13 @@ namespace Lumix
 				{
 					size_t new_cap = Math::maxValue(cap * 2, pos + size);
 					uint8* new_data = (uint8*)m_allocator.allocate(sizeof(uint8) * new_cap);
-					memcpy(new_data, m_buffer, sz);
+					copyMemory(new_data, m_buffer, sz);
 					m_allocator.deallocate(m_buffer);
 					m_buffer = new_data;
 					m_capacity = new_cap;
 				}
 
-				memcpy(m_buffer + pos, buffer, size);
+				copyMemory(m_buffer + pos, buffer, size);
 				m_pos += size;
 				m_size = pos + size > sz ? pos + size : sz;
 

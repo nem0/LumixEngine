@@ -69,7 +69,7 @@ public:
 	{
 		m_size = length - start <= rhs.m_size ? length : rhs.m_size - start;
 		m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
-		memcpy(m_cstr, rhs.m_cstr + start, m_size * sizeof(T));
+		copyMemory(m_cstr, rhs.m_cstr + start, m_size * sizeof(T));
 		m_cstr[m_size] = 0;
 	}
 
@@ -78,7 +78,7 @@ public:
 	{
 		m_size = length;
 		m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
-		memcpy(m_cstr, rhs, m_size * sizeof(T));
+		copyMemory(m_cstr, rhs, m_size * sizeof(T));
 		m_cstr[m_size] = 0;
 	}
 
@@ -87,7 +87,7 @@ public:
 	{
 		m_cstr = (T*)m_allocator.allocate((rhs.m_size + 1) * sizeof(T));
 		m_size = rhs.m_size;
-		memcpy(m_cstr, rhs.m_cstr, m_size * sizeof(T));
+		copyMemory(m_cstr, rhs.m_cstr, m_size * sizeof(T));
 		m_cstr[m_size] = 0;
 	}
 
@@ -96,7 +96,7 @@ public:
 	{
 		m_size = stringLength(rhs);
 		m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
-		memcpy(m_cstr, rhs, sizeof(T) * (m_size + 1));
+		copyMemory(m_cstr, rhs, sizeof(T) * (m_size + 1));
 	}
 
 	~base_string() { m_allocator.deallocate(m_cstr); }
@@ -122,7 +122,7 @@ public:
 			m_allocator.deallocate(m_cstr);
 			m_size = size;
 			m_cstr = (T*)m_allocator.allocate(m_size + 1);
-			memcpy(m_cstr, rhs, size);
+			copyMemory(m_cstr, rhs, size);
 			m_cstr[size] = '\0';
 		}
 	}
@@ -134,7 +134,7 @@ public:
 			m_allocator.deallocate(m_cstr);
 			m_cstr = (T*)m_allocator.allocate((rhs.m_size + 1) * sizeof(T));
 			m_size = rhs.m_size;
-			memcpy(m_cstr, rhs.m_cstr, sizeof(T) * (m_size + 1));
+			copyMemory(m_cstr, rhs.m_cstr, sizeof(T) * (m_size + 1));
 		}
 	}
 
@@ -147,7 +147,7 @@ public:
 			{
 				m_size = stringLength(rhs);
 				m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
-				memcpy(m_cstr, rhs, sizeof(T) * (m_size + 1));
+				copyMemory(m_cstr, rhs, sizeof(T) * (m_size + 1));
 			}
 			else
 			{
@@ -208,7 +208,7 @@ public:
 			{
 				int32 new_size = m_size + length;
 				T* new_cstr = (T*)m_allocator.allocate(new_size + 1);
-				memcpy(new_cstr, m_cstr, sizeof(T) * m_size + 1);
+				copyMemory(new_cstr, m_cstr, sizeof(T) * m_size + 1);
 				m_allocator.deallocate(m_cstr);
 				m_cstr = new_cstr;
 				m_size = new_size;
@@ -295,7 +295,7 @@ public:
 			{
 				int32 new_size = m_size + base_string<T>::stringLength(rhs);
 				T* new_cstr = (T*)m_allocator.allocate(new_size + 1);
-				memcpy(new_cstr, m_cstr, sizeof(T) * m_size + 1);
+				copyMemory(new_cstr, m_cstr, sizeof(T) * m_size + 1);
 				m_allocator.deallocate(m_cstr);
 				m_cstr = new_cstr;
 				m_size = new_size;
@@ -320,7 +320,7 @@ public:
 		{
 			int32 new_size = m_size + rhs.length();
 			T* new_cstr = (T*)m_allocator.allocate(new_size + 1);
-			memcpy(new_cstr, m_cstr, sizeof(T) * m_size + 1);
+			copyMemory(new_cstr, m_cstr, sizeof(T) * m_size + 1);
 			m_allocator.deallocate(m_cstr);
 			m_cstr = new_cstr;
 			m_size = new_size;

@@ -267,7 +267,7 @@ void Model::create(const bgfx::VertexDecl& def,
 	m_lods.push(lod);
 
 	m_indices.resize(indices_size / sizeof(m_indices[0]));
-	memcpy(&m_indices[0], indices_data, indices_size);
+	copyMemory(&m_indices[0], indices_data, indices_size);
 
 	m_vertices.resize(attributes_size / def.getStride());
 	computeRuntimeData((const uint8*)attributes_data);

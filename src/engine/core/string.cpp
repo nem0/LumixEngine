@@ -13,7 +13,7 @@ static char makeLowercase(char c)
 
 int stringLength(const char* str)
 {
-	const char* c = 0;
+	const char* c = str;
 	while(*c)
 	{
 		++c;

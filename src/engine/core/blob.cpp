@@ -68,7 +68,7 @@ namespace Lumix
 		{
 			int pos = m_data.size();
 			m_data.resize(m_data.size() + size);
-			memcpy(&m_data[0] + pos, data, size);
+			copyMemory(&m_data[0] + pos, data, size);
 		}
 	}
 
@@ -112,7 +112,7 @@ namespace Lumix
 		}
 		if (size)
 		{
-			memcpy(data, ((char*)m_data) + m_pos, size);
+			copyMemory(data, ((char*)m_data) + m_pos, size);
 		}
 		m_pos += size;
 		return true;

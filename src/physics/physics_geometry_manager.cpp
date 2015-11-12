@@ -33,12 +33,12 @@ namespace Lumix
 			{
 				int new_capacity = Math::maxValue(size + (int)count, capacity + 4096);
 				uint8* new_data = (uint8*)allocator.allocate(sizeof(uint8) * new_capacity);
-				memcpy(new_data, data, size);
+				copyMemory(new_data, data, size);
 				allocator.deallocate(data);
 				data = new_data;
 				capacity = new_capacity;
 			}
-			memcpy(data + size, src, count);
+			copyMemory(data + size, src, count);
 			size += count;
 			return count;
 		}
@@ -63,13 +63,13 @@ namespace Lumix
 		{
 			if (pos + (int)count <= size)
 			{
-				memcpy(dest, data + pos, count);
+				copyMemory(dest, data + pos, count);
 				pos += count;
 				return count;
 			}
 			else
 			{
-				memcpy(dest, data + pos, size - pos);
+				copyMemory(dest, data + pos, size - pos);
 				int real_count = size - pos;
 				pos = size;
 				return real_count;

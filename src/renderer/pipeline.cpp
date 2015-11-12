@@ -1646,7 +1646,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		const bgfx::InstanceDataBuffer* idb =
 			bgfx::allocInstanceDataBuffer(grass.m_matrix_count, sizeof(Matrix));
-		memcpy(idb->data, &grass.m_matrices[0], grass.m_matrix_count * sizeof(Matrix));
+		copyMemory(idb->data, &grass.m_matrices[0], grass.m_matrix_count * sizeof(Matrix));
 		const Mesh& mesh = grass.m_model->getMesh(0);
 		Material* material = mesh.getMaterial();
 

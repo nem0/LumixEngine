@@ -254,12 +254,26 @@ public:
 		m_size = size;
 	}
 
+	void copyMemory(void* dest, const void* src, size_t count)
+	{
+		uint8* dest8 = (uint8*)dest;
+		const uint8* src8 = (const uint8*)src;
+
+		const uint8* src_end = src8 + count;
+		while(src8 != src_end)
+		{
+			*dest8 = *src8;
+			++src8;
+			++dest8;
+		}
+	}
+
 	void reserve(int capacity)
 	{
 		if (capacity > m_capacity)
 		{
 			T* newData = (T*)m_allocator.allocate(capacity * sizeof(T));
-			memcpy(newData, m_data, sizeof(T) * m_size);
+			copyMemory(newData, m_data, sizeof(T) * m_size);
 			m_allocator.deallocate(m_data);
 			m_data = newData;
 			m_capacity = capacity;
@@ -284,7 +298,7 @@ private:
 	{
 		int newCapacity = m_capacity == 0 ? 4 : m_capacity * 2;
 		T* new_data = (T*)m_allocator.allocate(newCapacity * sizeof(T));
-		memcpy(new_data, m_data, sizeof(T) * m_size);
+		copyMemory(new_data, m_data, sizeof(T) * m_size);
 		m_allocator.deallocate(m_data);
 		m_data = new_data;
 		m_capacity = newCapacity;
