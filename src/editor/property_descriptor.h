@@ -7,6 +7,7 @@
 #include "core/vec4.h"
 #include "universe\universe.h"
 #include <cfloat>
+#include <cstdint>
 
 
 namespace Lumix
@@ -88,8 +89,8 @@ class IIntPropertyDescriptor : public IPropertyDescriptor
 		IIntPropertyDescriptor(IAllocator& allocator)
 			: IPropertyDescriptor(allocator)
 		{
-			m_min = INT_MIN;
-			m_max = INT_MAX;
+			m_min = INT32_MIN;
+			m_max = INT32_MAX;
 		}
 
 		void setLimit(int min, int max) { m_min = min; m_max = max; }

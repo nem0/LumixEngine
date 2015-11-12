@@ -3,6 +3,7 @@
 #include "core/crc32.h"
 #include "core/matrix.h"
 #include "core/json_serializer.h"
+#include <cstdint>
 
 
 namespace Lumix
@@ -203,7 +204,7 @@ void Universe::destroyEntity(Entity entity)
 	int last_item_id = m_transformations.back().id;
 	m_id_map[last_item_id] = m_id_map[entity];
 	m_transformations.eraseFast(m_id_map[entity]);
-	m_id_map[entity] = m_first_free_slot >= 0 ? -m_first_free_slot : INT_MIN;
+	m_id_map[entity] = m_first_free_slot >= 0 ? -m_first_free_slot : INT32_MIN;
 
 	int name_index = m_id_to_name_map.find(entity);
 	if (name_index >= 0)

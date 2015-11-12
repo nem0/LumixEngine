@@ -14,7 +14,6 @@ namespace Lumix
 		Manager::Manager(IAllocator& allocator)
 			: m_scheduling_counter(0)
 			, m_scheduler(*this, allocator)
-			, m_trans_queue(allocator)
 			, m_worker_tasks(allocator)
 			, m_allocator(allocator)
 			, m_pending_trans(allocator)
@@ -164,7 +163,7 @@ namespace Lumix
 				{
 					Job** entry = m_ready_to_execute[i].pop(true);
 					Job* ret = *entry;
-					m_ready_to_execute[i].dealoc(entry, true);
+					m_ready_to_execute[i].dealoc(entry);
 
 					return ret;
 				}

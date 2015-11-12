@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/mt/event.h"
-#include <type_traits>
 
 
 namespace Lumix
@@ -10,7 +9,6 @@ namespace Lumix
 	{
 		template <class T> struct Transaction 
 		{
-			static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable!");
 			void setCompleted()		{ m_event.trigger();		}
 			bool isCompleted()		{ return m_event.poll();	}
 			void waitForCompletion() { return m_event.wait();	}
