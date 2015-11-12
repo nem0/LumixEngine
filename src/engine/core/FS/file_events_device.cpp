@@ -115,7 +115,7 @@ namespace Lumix
 			{
 				Event event;
 				event.type = type;
-				event.handle = uintptr_t(this);
+				event.handle = uintptr(this);
 				event.path = path;
 				event.ret = ret;
 				event.param = param;

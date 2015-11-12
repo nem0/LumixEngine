@@ -1486,7 +1486,7 @@ void ImGui::ShowStyleEditor(ImGuiStyle* ref)
                 const ImVec4& col = style.Colors[i];
                 const char* name = ImGui::GetStyleColName(i);
                 if (!output_only_modified || memcmp(&col, (ref ? &ref->Colors[i] : &def.Colors[i]), sizeof(ImVec4)) != 0)
-                    ImGui::LogText("style.Colors[ImGuiCol_%s]%*s= ImVec4(%.2ff, %.2ff, %.2ff, %.2ff);" IM_NEWLINE, name, 22 - (int)strlen(name), "", col.x, col.y, col.z, col.w);
+                    ImGui::LogText("style.Colors[ImGuiCol_%s]%*s= ImVec4(%.2ff, %.2ff, %.2ff, %.2ff);" IM_NEWLINE, name, 22 - strlen(name), "", col.x, col.y, col.z, col.w);
             }
             ImGui::LogFinish();
         }
@@ -1991,7 +1991,7 @@ struct ExampleAppConsole
                 {
                     snprintf(data->Buf, data->BufSize, "%s", (HistoryPos >= 0) ? History[HistoryPos] : "");
                     data->BufDirty = true;
-                    data->CursorPos = data->SelectionStart = data->SelectionEnd = (int)strlen(data->Buf);
+                    data->CursorPos = data->SelectionStart = data->SelectionEnd = strlen(data->Buf);
                 }
             }
         }

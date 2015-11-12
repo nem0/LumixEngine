@@ -367,7 +367,7 @@ void ProfilerUI::showAllocationTree(AllocationStackNode* node, int column)
 		{
 			if (line >= 0)
 			{
-				int len = (int)strlen(fn_name);
+				int len = Lumix::stringLength(fn_name);
 				if (len + 2 < sizeof(fn_name))
 				{
 					fn_name[len] = ' ';

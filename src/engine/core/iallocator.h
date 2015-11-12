@@ -7,8 +7,25 @@
 
 namespace Lumix
 {
+	struct NewPlaceholder {};
+}
 
-#define LUMIX_NEW(allocator, type) new ((allocator).allocate(sizeof(type))) type
+
+inline void* operator new(size_t, Lumix::NewPlaceholder, void* where)
+{
+	return where;
+}
+
+
+inline void operator delete(void*, Lumix::NewPlaceholder,  void*)
+{
+}
+
+
+namespace Lumix
+{
+
+#define LUMIX_NEW(allocator, type) new (Lumix::NewPlaceholder(), (allocator).allocate(sizeof(type))) type
 #define LUMIX_DELETE(allocator, var) (allocator).deleteObject(var);
 
 

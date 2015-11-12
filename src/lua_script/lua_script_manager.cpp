@@ -77,7 +77,7 @@ static const char* getToken(const char* src, char* dest, int size)
 void LuaScript::parseProperties()
 {
 	static const char* PROPERTY_MARK = "-- LUMIX PROPERTY";
-	const int PROPERTY_MARK_LENGTH = (int)strlen(PROPERTY_MARK);
+	const int PROPERTY_MARK_LENGTH = stringLength(PROPERTY_MARK);
 	const char* str = m_source_code.c_str();
 	const char* prop = strstr(str, PROPERTY_MARK);
 	while (prop)

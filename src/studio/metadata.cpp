@@ -80,7 +80,7 @@ bool Metadata::save()
 				case DataItem::INT: fwrite(&value.m_int, sizeof(value.m_int), 1, fp); break;
 				case DataItem::STRING:
 				{
-					int len = (int)strlen(value.m_string);
+					int len = Lumix::stringLength(value.m_string);
 					fwrite(&len, sizeof(len), 1, fp);
 					fwrite(value.m_string, len, 1, fp);
 				}

@@ -886,7 +886,7 @@ struct ConvertTask : public Lumix::MT::Task
 	aiString getMeshName(const aiMesh* mesh) const
 	{
 		aiString mesh_name = mesh->mName;
-		int length = (int)strlen(mesh_name.C_Str());
+		int length = Lumix::stringLength(mesh_name.C_Str());
 		if (length == 0)
 		{
 			const auto* node = getOwner(mesh);
@@ -918,7 +918,7 @@ struct ConvertTask : public Lumix::MT::Task
 			aiString material_name;
 			scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_NAME,
 				material_name);
-			Lumix::int32 length = (int)strlen(material_name.C_Str());
+			Lumix::int32 length = Lumix::stringLength(material_name.C_Str());
 			file.write((const char*)&length, sizeof(length));
 			file.write((const char*)material_name.C_Str(), length);
 
@@ -935,7 +935,7 @@ struct ConvertTask : public Lumix::MT::Task
 			file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
 			aiString mesh_name = getMeshName(mesh);
-			length = (int)strlen(mesh_name.C_Str());
+			length = Lumix::stringLength(mesh_name.C_Str());
 
 			file.write((const char*)&length, sizeof(length));
 			file.write((const char*)mesh_name.C_Str(), length);
@@ -962,7 +962,7 @@ struct ConvertTask : public Lumix::MT::Task
 		VertexAttributeDef attribute_type,
 		Lumix::FS::IFile& file)
 	{
-		Lumix::uint32 length = (int)strlen(attribute_name);
+		Lumix::uint32 length = Lumix::stringLength(attribute_name);
 		file.write((const char*)&length, sizeof(length));
 		file.write(attribute_name, length);
 
@@ -973,13 +973,13 @@ struct ConvertTask : public Lumix::MT::Task
 
 	static void writeNode(Lumix::FS::IFile& file, const aiNode* node, aiMatrix4x4 parent_transform)
 	{
-		Lumix::int32 len = (Lumix::int32)strlen(node->mName.C_Str());
+		Lumix::int32 len = Lumix::stringLength(node->mName.C_Str());
 		file.write((const char*)&len, sizeof(len));
 		file.write(node->mName.C_Str(), node->mName.length + 1);
 
 		if (node->mParent)
 		{
-			Lumix::int32 len = (Lumix::int32)strlen(node->mParent->mName.C_Str());
+			Lumix::int32 len = Lumix::stringLength(node->mParent->mName.C_Str());
 			file.write((const char*)&len, sizeof(len));
 			file.write(node->mParent->mName.C_Str(), node->mParent->mName.length);
 		}
@@ -1174,7 +1174,7 @@ struct ConvertTask : public Lumix::MT::Task
 	float getMeshLODFactor(const aiMesh* mesh) const
 	{
 		const char* mesh_name = getMeshName(mesh).C_Str();
-		int len = int(strlen(mesh_name));
+		int len = Lumix::stringLength(mesh_name);
 		if (len < 5) return FLT_MAX;
 
 		const char* last = mesh_name + len - 1;
@@ -1188,7 +1188,7 @@ struct ConvertTask : public Lumix::MT::Task
 		const char* end_of_factor = last - 4;
 		const char* begin_factor = end_of_factor - 1;
 		if (begin_factor <= mesh_name) return FLT_MAX;
-		
+
 		while (*begin_factor != '_' && begin_factor > mesh_name)
 		{
 			--begin_factor;
@@ -1208,7 +1208,7 @@ struct ConvertTask : public Lumix::MT::Task
 		const aiMesh* const mesh = *mesh_ptr;
 
 		const char* mesh_name = getMeshName(mesh).C_Str();
-		int len = int(strlen(mesh_name));
+		int len = Lumix::stringLength(mesh_name);
 		if (len < 5) return -1;
 
 		const char* last = mesh_name + len - 1;

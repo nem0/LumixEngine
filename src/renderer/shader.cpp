@@ -364,7 +364,7 @@ bool Shader::getShaderCombinations(Renderer& renderer,
 	lua_State* L = luaL_newstate();
 	luaL_openlibs(L);
 
-	bool errors = luaL_loadbuffer(L, shader_content, strlen(shader_content), "") != LUA_OK;
+	bool errors = luaL_loadbuffer(L, shader_content, stringLength(shader_content), "") != LUA_OK;
 	errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
 	if (errors)
 	{

@@ -1157,7 +1157,7 @@ ImFont* ImFontAtlas::AddFontFromMemoryCompressedTTF(const void* compressed_ttf_d
 
 ImFont* ImFontAtlas::AddFontFromMemoryCompressedBase85TTF(const char* compressed_ttf_data_base85, float size_pixels, const ImFontConfig* font_cfg, const ImWchar* glyph_ranges)
 {
-    int compressed_ttf_size = (((int)strlen(compressed_ttf_data_base85) + 4) / 5) * 4;
+    int compressed_ttf_size = ((strlen(compressed_ttf_data_base85) + 4) / 5) * 4;
     void* compressed_ttf = ImGui::MemAlloc(compressed_ttf_size);
     Decode85((const unsigned char*)compressed_ttf_data_base85, (unsigned int*)compressed_ttf);
     ImFont* font = AddFontFromMemoryCompressedTTF(compressed_ttf, compressed_ttf_size, size_pixels, font_cfg, glyph_ranges);

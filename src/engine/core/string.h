@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "core/default_allocator.h"
 #include "lumix.h"
+#include "core/default_allocator.h"
 
 
 namespace Lumix
@@ -40,6 +40,8 @@ LUMIX_ENGINE_API bool
 makeLowercase(char* destination, int length, const char* source);
 LUMIX_ENGINE_API char* trimmed(char* str);
 LUMIX_ENGINE_API bool startsWith(const char* str, const char* prefix);
+LUMIX_ENGINE_API int stringLength(const char* str);
+LUMIX_ENGINE_API void copyMemory(void* dest, const void* src, size_t count);
 
 
 template <int SIZE> bool copyString(char(&destination)[SIZE], const char* source)
@@ -92,7 +94,7 @@ public:
 	base_string(const T* rhs, IAllocator& allocator)
 		: m_allocator(allocator)
 	{
-		m_size = strlen(rhs);
+		m_size = stringLength(rhs);
 		m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
 		memcpy(m_cstr, rhs, sizeof(T) * (m_size + 1));
 	}
@@ -143,7 +145,7 @@ public:
 			m_allocator.deallocate(m_cstr);
 			if (rhs)
 			{
-				m_size = strlen(rhs);
+				m_size = stringLength(rhs);
 				m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
 				memcpy(m_cstr, rhs, sizeof(T) * (m_size + 1));
 			}
@@ -291,7 +293,7 @@ public:
 		{
 			if (m_cstr)
 			{
-				int32 new_size = m_size + base_string<T>::strlen(rhs);
+				int32 new_size = m_size + base_string<T>::stringLength(rhs);
 				T* new_cstr = (T*)m_allocator.allocate(new_size + 1);
 				memcpy(new_cstr, m_cstr, sizeof(T) * m_size + 1);
 				m_allocator.deallocate(m_cstr);
@@ -301,7 +303,7 @@ public:
 			}
 			else
 			{
-				m_size = base_string<T>::strlen(rhs);
+				m_size = base_string<T>::stringLength(rhs);
 				m_cstr = (T*)m_allocator.allocate(m_size + 1);
 				copyString(m_cstr, m_size + 1, rhs);
 			}
@@ -344,7 +346,7 @@ public:
 	static const int npos = 0xffFFffFF;
 
 private:
-	static int32 strlen(const T* rhs)
+	static int32 stringLength(const T* rhs)
 	{
 		const T* c = rhs;
 		while (*c)

@@ -154,7 +154,7 @@ namespace Lumix
 	Path::Path(const char* path)
 	{
 		char tmp[MAX_PATH_LENGTH];
-		size_t len = strlen(path);
+		size_t len = stringLength(path);
 		ASSERT(len < MAX_PATH_LENGTH);
 		PathUtils::normalize(path, tmp, (uint32)len + 1);
 		uint32 hash = crc32(tmp);
@@ -179,7 +179,7 @@ namespace Lumix
 	void Path::operator =(const char* rhs)
 	{
 		char tmp[MAX_PATH_LENGTH];
-		size_t len = strlen(rhs);
+		size_t len = stringLength(rhs);
 		ASSERT(len < MAX_PATH_LENGTH);
 		PathUtils::normalize(rhs, tmp, (uint32)len + 1);
 		uint32 hash = crc32(tmp);

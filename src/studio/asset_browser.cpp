@@ -488,7 +488,7 @@ void AssetBrowser::onGUILuaScript()
 			return;
 		}
 
-		file->write(m_text_buffer, strlen(m_text_buffer));
+		file->write(m_text_buffer, Lumix::stringLength(m_text_buffer));
 		fs.close(*file);
 	}
 	ImGui::SameLine();

@@ -4,7 +4,7 @@
 #include "core/base_proxy_allocator.h"
 #include "core/default_allocator.h"
 #include "core/MT/spin_mutex.h"
-
+#include "core/string.h"
 
 namespace Lumix
 {
@@ -76,7 +76,7 @@ public:
 	uint32 getHash() const { return m_data->m_id; }
 
 	const char* c_str() const { return m_data->m_path; }
-	size_t length() const { return strlen(m_data->m_path); }
+	size_t length() const { return stringLength(m_data->m_path); }
 	bool isValid() const { return m_data->m_path[0] != '\0'; }
 
 private:
