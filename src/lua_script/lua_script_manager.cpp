@@ -88,11 +88,11 @@ void LuaScript::parseProperties()
 		token = getToken(token, property.name, sizeof(property.name));
 		char type[50];
 		token = getToken(token, type, sizeof(type));
-		if (strcmp(type, "entity") == 0)
+		if (compareString(type, "entity") == 0)
 		{
 			property.type = Property::ENTITY;
 		}
-		else if (strcmp(type, "float") == 0)
+		else if (compareString(type, "float") == 0)
 		{
 			property.type = Property::FLOAT;
 		}

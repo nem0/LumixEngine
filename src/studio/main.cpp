@@ -420,7 +420,7 @@ public:
 	{
 		for (auto* a : m_actions)
 		{
-			if (strcmp(a->name, name) == 0) return *a;
+			if (Lumix::compareString(a->name, name) == 0) return *a;
 		}
 		ASSERT(false);
 		return *m_actions[0];

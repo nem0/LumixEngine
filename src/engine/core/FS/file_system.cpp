@@ -133,12 +133,12 @@ public:
 			}
 		}
 
-		if (strcmp(device->name(), "memory") == 0)
+		if (compareString(device->name(), "memory") == 0)
 		{
 			m_memory_device.m_devices[0] = device;
 			m_memory_device.m_devices[1] = nullptr;
 		}
-		else if (strcmp(device->name(), "disk") == 0)
+		else if (compareString(device->name(), "disk") == 0)
 		{
 			m_disk_device.m_devices[0] = device;
 			m_disk_device.m_devices[1] = nullptr;
@@ -348,7 +348,7 @@ public:
 	{
 		for (int i = 0; i < m_devices.size(); ++i)
 		{
-			if (strcmp(m_devices[i]->name(), device) == 0)
+			if (compareString(m_devices[i]->name(), device) == 0)
 				return m_devices[i];
 		}
 

@@ -266,7 +266,7 @@ struct RendererImpl : public Renderer
 	{
 		for (int i = 0; i < m_shader_defines.size(); ++i)
 		{
-			if (strcmp(m_shader_defines[i], define) == 0)
+			if (compareString(m_shader_defines[i], define) == 0)
 			{
 				return i;
 			}
@@ -282,7 +282,7 @@ struct RendererImpl : public Renderer
 	{
 		for (int i = 0; i < m_passes.size(); ++i)
 		{
-			if (strcmp(m_passes[i], pass) == 0)
+			if (compareString(m_passes[i], pass) == 0)
 			{
 				return i;
 			}

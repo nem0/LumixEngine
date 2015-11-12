@@ -18,29 +18,23 @@ LUMIX_ENGINE_API bool toCString(int32 value, char* output, int length);
 LUMIX_ENGINE_API bool toCString(int64 value, char* output, int length);
 LUMIX_ENGINE_API bool toCString(uint64 value, char* output, int length);
 LUMIX_ENGINE_API bool toCString(uint32 value, char* output, int length);
-LUMIX_ENGINE_API bool
-toCString(float value, char* output, int length, int after_point);
-LUMIX_ENGINE_API const char*
-reverseFind(const char* str, const char* from, char c);
-LUMIX_ENGINE_API const char*
-fromCString(const char* input, int length, int32* value);
-LUMIX_ENGINE_API const char*
-fromCString(const char* input, int length, int64* value);
-LUMIX_ENGINE_API const char*
-fromCString(const char* input, int length, uint32* value);
-LUMIX_ENGINE_API bool
-copyString(char* destination, int length, const char* source);
-LUMIX_ENGINE_API bool
-copyNString(char* destination, int length, const char* source, int source_len);
-LUMIX_ENGINE_API bool
-catString(char* destination, int length, const char* source);
-LUMIX_ENGINE_API bool
-catNString(char* destination, int length, const char* source, int source_len);
-LUMIX_ENGINE_API bool
-makeLowercase(char* destination, int length, const char* source);
+LUMIX_ENGINE_API bool toCString(float value, char* output, int length, int after_point);
+LUMIX_ENGINE_API const char* reverseFind(const char* str, const char* from, char c);
+LUMIX_ENGINE_API const char* fromCString(const char* input, int length, int32* value);
+LUMIX_ENGINE_API const char* fromCString(const char* input, int length, int64* value);
+LUMIX_ENGINE_API const char* fromCString(const char* input, int length, uint32* value);
+LUMIX_ENGINE_API bool copyString(char* destination, int length, const char* source);
+LUMIX_ENGINE_API bool copyNString(char* destination,
+	int length,
+	const char* source,
+	int source_len);
+LUMIX_ENGINE_API bool catString(char* destination, int length, const char* source);
+LUMIX_ENGINE_API bool catNString(char* destination, int length, const char* source, int source_len);
+LUMIX_ENGINE_API bool makeLowercase(char* destination, int length, const char* source);
 LUMIX_ENGINE_API char* trimmed(char* str);
 LUMIX_ENGINE_API bool startsWith(const char* str, const char* prefix);
 LUMIX_ENGINE_API int stringLength(const char* str);
+LUMIX_ENGINE_API int compareString(const char* lhs, const char* rhs);
 LUMIX_ENGINE_API void copyMemory(void* dest, const void* src, size_t count);
 
 
@@ -159,26 +153,26 @@ public:
 
 	bool operator!=(const base_string<T>& rhs) const
 	{
-		return this->strcmp(rhs.m_cstr) != 0;
+		return this->compareString(rhs.m_cstr) != 0;
 	}
 
-	bool operator!=(const T* rhs) const { return this->strcmp(rhs) != 0; }
+	bool operator!=(const T* rhs) const { return this->compareString(rhs) != 0; }
 
 	bool operator==(const base_string<T>& rhs) const
 	{
-		return this->strcmp(rhs.m_cstr) == 0;
+		return this->compareString(rhs.m_cstr) == 0;
 	}
 
-	bool operator==(const T* rhs) const { return this->strcmp(rhs) == 0; }
+	bool operator==(const T* rhs) const { return this->compareString(rhs) == 0; }
 
 	bool operator<(const base_string<T>& rhs) const
 	{
-		return this->strcmp(rhs.m_cstr) < 0;
+		return this->compareString(rhs.m_cstr) < 0;
 	}
 
 	bool operator>(const base_string<T>& rhs) const
 	{
-		return this->strcmp(rhs.m_cstr) > 0;
+		return this->compareString(rhs.m_cstr) > 0;
 	}
 
 	int rfind(T c) const
@@ -356,7 +350,7 @@ private:
 		return (int32)(c - rhs);
 	}
 
-	int strcmp(const T* rhs) const
+	int compareString(const T* rhs) const
 	{
 		if (!m_cstr)
 		{

@@ -481,7 +481,7 @@ struct ConvertTask : public Lumix::MT::Task
 				: source_absolute;
 
 		if (m_dialog.m_convert_to_dds &&
-			strcmp(texture_info.m_extension, "dds") != 0)
+			Lumix::compareString(texture_info.m_extension, "dds") != 0)
 		{
 			PathBuilder dest(m_dialog.m_texture_output_dir[0] ? m_dialog.m_texture_output_dir
 															  : m_dialog.m_output_dir);
@@ -517,7 +517,7 @@ struct ConvertTask : public Lumix::MT::Task
 			PathBuilder dest(m_dialog.m_output_dir);
 			dest << "/" << texture_info.m_basename << "."
 				 << texture_info.m_extension;
-			if (strcmp(source, dest) != 0 && !Lumix::copyFile(source, dest))
+			if (Lumix::compareString(source, dest) != 0 && !Lumix::copyFile(source, dest))
 			{
 				m_dialog.setMessage(
 					StringBuilder<Lumix::MAX_PATH_LENGTH * 2 + 20>(
@@ -1417,7 +1417,7 @@ static bool isImage(const char* path)
 		"jpg", "jpeg", "png", "tga", "bmp", "psd", "gif", "hdr", "pic", "pnm"};
 	for (auto image_ext : image_extensions)
 	{
-		if (strcmp(ext, image_ext) == 0)
+		if (Lumix::compareString(ext, image_ext) == 0)
 		{
 			return true;
 		}

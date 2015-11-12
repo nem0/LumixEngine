@@ -293,7 +293,7 @@ void Texture::save()
 	char ext[5];
 	ext[0] = 0;
 	PathUtils::getExtension(ext, 5, getPath().c_str());
-	if (strcmp(ext, "raw") == 0 && m_BPP == 2)
+	if (compareString(ext, "raw") == 0 && m_BPP == 2)
 	{
 		FS::FileSystem& fs = m_resource_manager.getFileSystem();
 		FS::IFile* file = fs.open(fs.getDefaultDevice(),
@@ -303,7 +303,7 @@ void Texture::save()
 		file->write(&m_data[0], m_data.size() * sizeof(m_data[0]));
 		fs.close(*file);
 	}
-	else if (strcmp(ext, "tga") == 0 && m_BPP == 4)
+	else if (compareString(ext, "tga") == 0 && m_BPP == 4)
 	{
 		saveTGA();
 	}
@@ -507,11 +507,11 @@ bool Texture::load(FS::IFile& file)
 	const char* path = getPath().c_str();
 	size_t len = getPath().length();
 	bool loaded = false;
-	if (len > 3 && strcmp(path + len - 4, ".dds") == 0)
+	if (len > 3 && compareString(path + len - 4, ".dds") == 0)
 	{
 		loaded = loadDDS(file);
 	}
-	else if (len > 3 && strcmp(path + len - 4, ".raw") == 0)
+	else if (len > 3 && compareString(path + len - 4, ".raw") == 0)
 	{
 		loaded = loadRaw(file);
 	}

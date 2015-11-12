@@ -92,19 +92,19 @@ bool FrameBuffer::RenderBuffer::isDepth() const
 
 static bgfx::TextureFormat::Enum getFormat(const char* name) 
 {
-	if (strcmp(name, "depth32") == 0)
+	if (compareString(name, "depth32") == 0)
 	{
 		return bgfx::TextureFormat::D32;
 	}
-	else if (strcmp(name, "depth24") == 0)
+	else if (compareString(name, "depth24") == 0)
 	{
 		return bgfx::TextureFormat::D24;
 	}
-	else if (strcmp(name, "rgba8") == 0)
+	else if (compareString(name, "rgba8") == 0)
 	{
 		return bgfx::TextureFormat::RGBA8;
 	}
-	else if (strcmp(name, "r32f") == 0)
+	else if (compareString(name, "r32f") == 0)
 	{
 		return bgfx::TextureFormat::R32F;
 	}
