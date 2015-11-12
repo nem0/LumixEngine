@@ -1,5 +1,5 @@
 #include "core/net/tcp_stream.h"
-
+#include "core/string.h"
 #include <Windows.h>
 
 
@@ -25,7 +25,7 @@ namespace Lumix
 
 		bool TCPStream::writeString(const char* string)
 		{
-			uint32 len = (uint32)strlen(string) + 1;
+			uint32 len = (uint32)stringLength(string) + 1;
 			bool ret = write(len);
 			ret &= write((const void*)string, len);
 

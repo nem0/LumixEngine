@@ -11,7 +11,33 @@ static char makeLowercase(char c)
 }
 
 
-LUMIX_ENGINE_API const char* stristr(const char* haystack, const char* needle)
+int stringLength(const char* str)
+{
+	const char* c = 0;
+	while(*c)
+	{
+		++c;
+	}
+	return int(c - str);
+}
+
+
+void copyMemory(void* dest, const void* src, size_t count)
+{
+	uint8* dest8 = (uint8*)dest;
+	const uint8* src8 = (const uint8*)src;
+
+	const uint8* src_end = src8 + count;
+	while(src8 != src_end)
+	{
+		*dest8 = *src8;
+		++src8;
+		++dest8;
+	}
+}
+
+
+const char* stristr(const char* haystack, const char* needle)
 {
 	const char* c = haystack;
 	while (*c)

@@ -160,7 +160,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 				sizeof(buf),
 				asset_type))
 		{
-			m_editor.setProperty(cmp.type, index, desc, buf, (int)strlen(buf) + 1);
+			m_editor.setProperty(cmp.type, index, desc, buf, Lumix::stringLength(buf) + 1);
 		}
 		break;
 	}
@@ -171,7 +171,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		Lumix::copyString(buf, (const char*)stream.getData());
 		if (ImGui::InputText(desc_name, buf, sizeof(buf)))
 		{
-			m_editor.setProperty(cmp.type, index, desc, buf, (int)strlen(buf) + 1);
+			m_editor.setProperty(cmp.type, index, desc, buf, Lumix::stringLength(buf) + 1);
 		}
 		break;
 	}

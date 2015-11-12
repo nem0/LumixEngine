@@ -45,14 +45,14 @@ static void getSourceFromBinaryBasename(char* out, int max_size, const char* bin
 {
 	const char* cin = binary_basename;
 	Lumix::copyString(out, max_size, "shaders/");
-	char* cout = out + strlen(out);
+	char* cout = out + Lumix::stringLength(out);
 	while (*cin && *cin != '_')
 	{
 		*cout = *cin;
 		++cout;
 		++cin;
 	}
-	cin = binary_basename + strlen(binary_basename) - 3;
+	cin = binary_basename + Lumix::stringLength(binary_basename) - 3;
 	if (cin > binary_basename)
 	{
 		Lumix::copyString(cout, max_size - int(cout - out), ".shd");
@@ -410,7 +410,7 @@ void ShaderCompiler::processChangedFiles()
 	int find_idx = m_dependencies.find(tmp_string);
 	if (find_idx < 0)
 	{
-		int len = (int)strlen(changed_file_path);
+		int len = Lumix::stringLength(changed_file_path);
 		if (len <= 6) return;
 
 		if (strcmp(changed_file_path + len - 6, "_fs.sc") == 0 ||

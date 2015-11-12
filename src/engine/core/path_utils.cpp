@@ -45,7 +45,7 @@ void normalize(const char* path, char* out, uint32 max_size)
 void getDir(char* dir, int max_length, const char* src)
 {
 	copyString(dir, max_length, src);
-	for (int i = (int)strlen(dir) - 1; i >= 0; --i)
+	for (int i = stringLength(dir) - 1; i >= 0; --i)
 	{
 		if (dir[i] == '\\' || dir[i] == '/')
 		{
@@ -60,7 +60,7 @@ void getDir(char* dir, int max_length, const char* src)
 void getBasename(char* basename, int /*max_length*/, const char* src)
 {
 	basename[0] = '\0';
-	for (int i = (int)strlen(src) - 1; i >= 0; --i)
+	for (int i = stringLength(src) - 1; i >= 0; --i)
 	{
 		if (src[i] == '\\' || src[i] == '/' || i == 0)
 		{
@@ -81,7 +81,7 @@ void getBasename(char* basename, int /*max_length*/, const char* src)
 
 void getFilename(char* filename, int /*max_length*/, const char* src)
 {
-	for (int i = (int)strlen(src) - 1; i >= 0; --i)
+	for (int i = stringLength(src) - 1; i >= 0; --i)
 	{
 		if (src[i] == '\\' || src[i] == '/')
 		{
@@ -96,7 +96,7 @@ void getFilename(char* filename, int /*max_length*/, const char* src)
 void getExtension(char* extension, int max_length, const char* src)
 {
 	ASSERT(max_length > 0);
-	for (int i = (int)strlen(src) - 1; i >= 0; --i)
+	for (int i = stringLength(src) - 1; i >= 0; --i)
 	{
 		if (src[i] == '.')
 		{

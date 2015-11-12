@@ -7024,7 +7024,7 @@ void ImGuiTextEditCallbackData::DeleteChars(int pos, int bytes_count)
 
 void ImGuiTextEditCallbackData::InsertChars(int pos, const char* new_text, const char* new_text_end)
 {
-	const int text_len = (int)strlen(Buf);
+	const int text_len = strlen(Buf);
 	if (!new_text_end)
 		new_text_end = new_text + strlen(new_text);
 	const int new_text_len = (int)(new_text_end - new_text);
@@ -7342,7 +7342,7 @@ bool ImGui::InputTextEx(const char* label, char* buf, int buf_size, const ImVec2
 				if (const char* clipboard = g.IO.GetClipboardTextFn())
 				{
 					// Remove new-line from pasted buffer
-					const int clipboard_len = (int)strlen(clipboard);
+					const int clipboard_len = strlen(clipboard);
 					ImWchar* clipboard_filtered = (ImWchar*)ImGui::MemAlloc((clipboard_len + 1) * sizeof(ImWchar));
 					int clipboard_filtered_len = 0;
 					for (const char* s = clipboard; *s;)
@@ -7443,7 +7443,7 @@ bool ImGui::InputTextEx(const char* label, char* buf, int buf_size, const ImVec2
 					if (callback_data.BufDirty)
 					{
 						edit_state.CurLenW = ImTextStrFromUtf8(text, edit_state.Text.Size, edit_state.TempTextBuffer.Data, NULL);
-						edit_state.CurLenA = (int)strlen(edit_state.TempTextBuffer.Data);
+						edit_state.CurLenA = strlen(edit_state.TempTextBuffer.Data);
 						edit_state.CursorAnimReset();
 					}
 				}

@@ -15,7 +15,7 @@ namespace Lumix
 
 		IFile& IFile::operator<<(const char* text)
 		{
-			write(text, strlen(text));
+			write(text, stringLength(text));
 			return *this;
 		}
 

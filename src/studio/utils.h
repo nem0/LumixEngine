@@ -65,14 +65,14 @@ struct StringBuilder
 
 	void add(float value)
 	{
-		int len = (int)strlen(data);
+		int len = Lumix::stringLength(data);
 		Lumix::toCString(value, data + len, size - len, 3);
 	}
 
 	template <typename T>
 	void add(T value)
 	{
-		int len = (int)strlen(data);
+		int len = Lumix::stringLength(data);
 		Lumix::toCString(value, data + len, size - len);
 	}
 

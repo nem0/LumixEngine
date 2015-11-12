@@ -83,7 +83,7 @@ size_t JsonSerializer::getRestOfFileSize() const
 	const size_t NEW_LINE_AND_NULL_TERMINATION_SIZE =
 		sizeof(char) + sizeof(char);
 	return m_file.size() - m_file.pos() + NEW_LINE_AND_NULL_TERMINATION_SIZE +
-		   strlen(m_token);
+		   stringLength(m_token);
 }
 
 
@@ -95,8 +95,8 @@ void JsonSerializer::serialize(const char* label, unsigned int value)
 	char tmp[20];
 	writeString(label);
 	toCString(value, tmp, 20);
-	m_file.write(" : ", (int32)strlen(" : "));
-	m_file.write(tmp, (int32)strlen(tmp));
+	m_file.write(" : ", stringLength(" : "));
+	m_file.write(tmp, stringLength(tmp));
 	m_is_first_in_block = false;
 }
 
@@ -107,8 +107,8 @@ void JsonSerializer::serialize(const char* label, float value)
 	char tmp[20];
 	writeString(label);
 	toCString(value, tmp, 20, 8);
-	m_file.write(" : ", (int32)strlen(" : "));
-	m_file.write(tmp, (int32)strlen(tmp));
+	m_file.write(" : ", stringLength(" : "));
+	m_file.write(tmp, stringLength(tmp));
 	m_is_first_in_block = false;
 }
 
@@ -119,8 +119,8 @@ void JsonSerializer::serialize(const char* label, int value)
 	char tmp[20];
 	writeString(label);
 	toCString(value, tmp, 20);
-	m_file.write(" : ", (int32)strlen(" : "));
-	m_file.write(tmp, (int32)strlen(tmp));
+	m_file.write(" : ", stringLength(" : "));
+	m_file.write(tmp, stringLength(tmp));
 	m_is_first_in_block = false;
 }
 
@@ -136,7 +136,7 @@ void JsonSerializer::serialize(const char* label, const char* value)
 	}
 	else
 	{
-		m_file.write(value, (int32)strlen(value));
+		m_file.write(value, stringLength(value));
 	}
 	m_file.write("\"", 1);
 	m_is_first_in_block = false;
@@ -211,7 +211,7 @@ void JsonSerializer::serializeArrayItem(unsigned int value)
 	writeBlockComma();
 	char tmp[20];
 	toCString(value, tmp, 20);
-	m_file.write(tmp, (int32)strlen(tmp));
+	m_file.write(tmp, stringLength(tmp));
 	m_is_first_in_block = false;
 }
 
@@ -221,7 +221,7 @@ void JsonSerializer::serializeArrayItem(int value)
 	writeBlockComma();
 	char tmp[20];
 	toCString(value, tmp, 20);
-	m_file.write(tmp, (int32)strlen(tmp));
+	m_file.write(tmp, stringLength(tmp));
 	m_is_first_in_block = false;
 }
 
@@ -231,7 +231,7 @@ void JsonSerializer::serializeArrayItem(int64 value)
 	writeBlockComma();
 	char tmp[30];
 	toCString(value, tmp, 30);
-	m_file.write(tmp, (int32)strlen(tmp));
+	m_file.write(tmp, stringLength(tmp));
 	m_is_first_in_block = false;
 }
 
@@ -241,7 +241,7 @@ void JsonSerializer::serializeArrayItem(float value)
 	writeBlockComma();
 	char tmp[20];
 	toCString(value, tmp, 20, 8);
-	m_file.write(tmp, (int32)strlen(tmp));
+	m_file.write(tmp, stringLength(tmp));
 	m_is_first_in_block = false;
 }
 
@@ -707,7 +707,7 @@ void JsonSerializer::writeString(const char* str)
 	m_file.write("\"", 1);
 	if (str)
 	{
-		m_file.write(str, (int32)strlen(str));
+		m_file.write(str, stringLength(str));
 	}
 	m_file.write("\"", 1);
 }

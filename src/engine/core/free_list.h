@@ -33,7 +33,7 @@ namespace Lumix
 
 		void deallocate(void* ptr) override
 		{
-			ASSERT(((uintptr_t)ptr >= (uintptr_t)&m_heap[0]) && ((uintptr_t)ptr < (uintptr_t)&m_heap[chunk_size]));
+			ASSERT(((uintptr)ptr >= (uintptr)&m_heap[0]) && ((uintptr)ptr < (uintptr)&m_heap[chunk_size]));
 			m_pool[m_pool_index++] = reinterpret_cast<T*>(ptr);
 		}
 

@@ -19,7 +19,7 @@ namespace Lumix
 
 	OutputBlob& OutputBlob::operator << (const char* str)
 	{
-		write(str, strlen(str));
+		write(str, stringLength(str));
 		return *this;
 	}
 
@@ -28,7 +28,7 @@ namespace Lumix
 	{
 		char tmp[20];
 		Lumix::toCString(value, tmp, Lumix::lengthOf(tmp));
-		write(tmp, strlen(tmp));
+		write(tmp, stringLength(tmp));
 		return *this;
 	}
 
@@ -37,7 +37,7 @@ namespace Lumix
 	{
 		char tmp[20];
 		Lumix::toCString(value, tmp, Lumix::lengthOf(tmp));
-		write(tmp, strlen(tmp));
+		write(tmp, stringLength(tmp));
 		return *this;
 	}
 
@@ -46,7 +46,7 @@ namespace Lumix
 	{
 		char tmp[30];
 		Lumix::toCString(value, tmp, Lumix::lengthOf(tmp), 6);
-		write(tmp, strlen(tmp));
+		write(tmp, stringLength(tmp));
 		return *this;
 	}
 
@@ -77,7 +77,7 @@ namespace Lumix
 	{
 		if (string)
 		{
-			int32 size = (int32)strlen(string) + 1;
+			int32 size = stringLength(string) + 1;
 			write(size);
 			write(string, size);
 		}

@@ -89,7 +89,7 @@ void fillLabel(char* output, int max_size, const char* label, int count)
 {
 	Lumix::copyString(output, max_size, label);
 	Lumix::catString(output, max_size, "(");
-	int len = (int)strlen(output);
+	int len = Lumix::stringLength(output);
 	Lumix::toCString(count, output + len, max_size - len);
 	Lumix::catString(output, max_size, ")");
 }

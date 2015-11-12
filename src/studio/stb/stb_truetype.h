@@ -414,7 +414,7 @@ int main(int arg, char **argv)
 
    #ifndef STBTT_strlen
    #include <string.h>
-   #define STBTT_strlen(x)    strlen(x)
+   #define STBTT_stringLength(x)    stringLength(x)
    #endif
 
    #ifndef STBTT_memcpy
@@ -3136,7 +3136,7 @@ static int stbtt__matchpair(stbtt_uint8 *fc, stbtt_uint32 nm, stbtt_uint8 *name,
 
 static int stbtt__matches(stbtt_uint8 *fc, stbtt_uint32 offset, stbtt_uint8 *name, stbtt_int32 flags)
 {
-   stbtt_int32 nlen = (stbtt_int32) STBTT_strlen((char *) name);
+   stbtt_int32 nlen = (stbtt_int32) STBTT_stringLength((char *) name);
    stbtt_uint32 nm,hd;
    if (!stbtt__isfont(fc+offset)) return 0;
 

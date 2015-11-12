@@ -232,7 +232,7 @@ public:
 		const char* token = nullptr;
 
 		int device_index = 0;
-		const char* end = dev + strlen(dev);
+		const char* end = dev + stringLength(dev);
 
 		while (end > dev)
 		{

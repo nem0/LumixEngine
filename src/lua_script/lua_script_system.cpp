@@ -139,7 +139,7 @@ public:
 		catString(tmp, prop.m_value.c_str());
 
 		bool errors =
-			luaL_loadbuffer(state, tmp, strlen(tmp), nullptr) != LUA_OK;
+			luaL_loadbuffer(state, tmp, stringLength(tmp), nullptr) != LUA_OK;
 		errors = errors || lua_pcall(state, 0, LUA_MULTRET, 0) != LUA_OK;
 
 		if (errors)
@@ -255,7 +255,7 @@ public:
 						luaL_loadbuffer(
 							script.m_state,
 							script.m_script->getSourceCode(),
-							strlen(script.m_script->getSourceCode()),
+							stringLength(script.m_script->getSourceCode()),
 							script.m_script->getPath().c_str()) != LUA_OK;
 					errors =
 						errors ||
