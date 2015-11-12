@@ -1,7 +1,7 @@
 #include "plugin_manager.h"
-#include "core/library.h"
-#include "core/log.h"
 #include "core/array.h"
+#include "core/log.h"
+#include "core/system.h"
 #include "engine.h"
 #include "iplugin.h"
 
@@ -14,7 +14,7 @@ class PluginManagerImpl : public PluginManager
 {
 	private:
 		typedef Array<IPlugin*> PluginList;
-		typedef Array<Library*> LibraryList;
+		typedef Array<void*> LibraryList;
 
 
 	public:
@@ -37,7 +37,7 @@ class PluginManagerImpl : public PluginManager
 
 			for (int i = 0; i < m_libraries.size(); ++i)
 			{
-				Library::destroy(m_libraries[i]);
+				unloadLibrary(m_libraries[i]);
 			}
 		}
 
@@ -69,7 +69,7 @@ class PluginManagerImpl : public PluginManager
 		}
 
 
-		virtual const Array<Library*>& getLibraries() const override
+		virtual const Array<void*>& getLibraries() const override
 		{
 			return m_libraries;
 		}
@@ -94,7 +94,7 @@ class PluginManagerImpl : public PluginManager
 		}
 
 
-		virtual DelegateList<void(Library&)>& libraryLoaded() override
+		virtual DelegateList<void(void*)>& libraryLoaded() override
 		{
 			return m_library_loaded;
 		}
@@ -105,10 +105,10 @@ class PluginManagerImpl : public PluginManager
 			g_log_info.log("plugins") << "loading plugin " << path;
 			typedef IPlugin* (*PluginCreator)(Engine&);
 
-			Library* lib = Library::create(Path(path), m_engine.getAllocator());
-			if (lib->load())
+			auto* lib = loadLibrary(path);
+			if (lib)
 			{
-				PluginCreator creator = (PluginCreator)lib->resolve("createPlugin");
+				PluginCreator creator = (PluginCreator)getLibrarySymbol(lib, "createPlugin");
 				if (creator)
 				{
 					IPlugin* plugin = creator(m_engine);
@@ -120,12 +120,12 @@ class PluginManagerImpl : public PluginManager
 					}
 					m_plugins.push(plugin);
 					m_libraries.push(lib);
-					m_library_loaded.invoke(*lib);
+					m_library_loaded.invoke(lib);
 					g_log_info.log("plugins") << "plugin loaded";
 					return plugin;
 				}
 			}
-			Library::destroy(lib);
+			unloadLibrary(lib);
 			return 0;
 		}
 
@@ -141,7 +141,7 @@ class PluginManagerImpl : public PluginManager
 
 	private:
 		Engine& m_engine;
-		DelegateList<void(Library&)> m_library_loaded;
+		DelegateList<void(void*)> m_library_loaded;
 		LibraryList m_libraries;
 		PluginList m_plugins;
 		IAllocator& m_allocator;

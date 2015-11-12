@@ -1,5 +1,4 @@
 #include "shader_compiler.h"
-#include "core/FS/file_iterator.h"
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
 #include "core/FS/os_file.h"
@@ -16,6 +15,7 @@
 #include "engine/plugin_manager.h"
 #include "file_system_watcher.h"
 #include "log_ui.h"
+#include "platform_interface.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "utils.h"
@@ -112,13 +112,12 @@ bool ShaderCompiler::isChanged(const Lumix::ShaderCombinations& combinations,
 
 void ShaderCompiler::makeUpToDate()
 {
-	auto* iter =
-		Lumix::FS::createFileIterator("shaders", m_editor.getAllocator());
+	auto* iter = PlatformInterface::createFileIterator("shaders", m_editor.getAllocator());
 
 	Lumix::Array<Lumix::string> src_list(m_editor.getAllocator());
 	auto& fs = m_editor.getEngine().getFileSystem();
-	Lumix::FS::FileInfo info;
-	while (Lumix::FS::getNextFile(iter, &info))
+	PlatformInterface::FileInfo info;
+	while (getNextFile(iter, &info))
 	{
 		char basename[Lumix::MAX_PATH_LENGTH];
 		Lumix::PathUtils::getBasename(basename, sizeof(basename), info.filename);
@@ -155,7 +154,7 @@ void ShaderCompiler::makeUpToDate()
 		}
 	}
 
-	Lumix::FS::destroyFileIterator(iter);
+	PlatformInterface::destroyFileIterator(iter);
 
 	for (int i = 0; i < m_dependencies.size(); ++i)
 	{
@@ -227,11 +226,11 @@ static bool readLine(Lumix::FS::IFile* file, char* out, int max_size)
 void ShaderCompiler::parseDependencies()
 {
 	m_dependencies.clear();
-	auto* iter = Lumix::FS::createFileIterator("shaders/compiled", m_editor.getAllocator());
+	auto* iter = PlatformInterface::createFileIterator("shaders/compiled", m_editor.getAllocator());
 
 	auto& fs = m_editor.getEngine().getFileSystem();
-	Lumix::FS::FileInfo info;
-	while (Lumix::FS::getNextFile(iter, &info))
+	PlatformInterface::FileInfo info;
+	while (PlatformInterface::getNextFile(iter, &info))
 	{
 		if (!Lumix::PathUtils::hasExtension(info.filename, "d")) continue;
 
@@ -280,7 +279,7 @@ void ShaderCompiler::parseDependencies()
 		fs.close(*file);
 	}
 
-	Lumix::FS::destroyFileIterator(iter);
+	PlatformInterface::destroyFileIterator(iter);
 }
 
 
@@ -561,12 +560,12 @@ void ShaderCompiler::compileAll()
 
 	m_is_compiling = true;
 
-	Lumix::FS::FileInfo info;
-	auto* iter = Lumix::FS::createFileIterator("shaders",
+	PlatformInterface::FileInfo info;
+	auto* iter = PlatformInterface::createFileIterator("shaders",
 											   m_editor.getAllocator());
 
 	auto& fs = m_editor.getEngine().getFileSystem();
-	while(Lumix::FS::getNextFile(iter, &info))
+	while (PlatformInterface::getNextFile(iter, &info))
 	{
 		if (!Lumix::PathUtils::hasExtension(info.filename, "shd")) return;
 
@@ -601,5 +600,5 @@ void ShaderCompiler::compileAll()
 		}
 	}
 
-	Lumix::FS::destroyFileIterator(iter);
+	PlatformInterface::destroyFileIterator(iter);
 }

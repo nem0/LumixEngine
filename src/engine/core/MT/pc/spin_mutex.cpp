@@ -1,6 +1,7 @@
 #include "core/mt/spin_mutex.h"
-#include "core/pc/simple_win.h"
-#include <Windows.h>
+#include "core/mt/atomic.h"
+#include "core/mt/thread.h"
+
 
 namespace Lumix
 {
@@ -22,24 +23,24 @@ namespace Lumix
 		{
 			for (;;)
 			{
-				if(InterlockedCompareExchange((LONG*)&m_id, 1, 0) == 0)
+				if(compareAndExchange(&m_id, 1, 0) == 0)
 				{
-					::MemoryBarrier();
+					memoryBarrier();
 					return;
 				}
 
 				while(m_id)
 				{
-					Sleep(0);
+					yield();
 				}
 			}
 		}
 
 		bool SpinMutex::poll()
 		{
-			if(InterlockedCompareExchange((LONG*)&m_id, 1, 0) == 0)
+			if (compareAndExchange(&m_id, 1, 0) == 0)
 			{
-				::MemoryBarrier();
+				memoryBarrier();
 				return true;
 			}
 			return false;
@@ -47,7 +48,7 @@ namespace Lumix
 
 		void SpinMutex::unlock()
 		{
-			::MemoryBarrier();
+			memoryBarrier();
 			m_id = 0;
 		}
 	} // ~namespace MT

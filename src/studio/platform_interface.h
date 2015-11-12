@@ -1,6 +1,15 @@
 #pragma once
 
 
+#include "lumix.h"
+
+
+namespace Lumix
+{
+	class IAllocator;
+}
+
+
 namespace PlatformInterface
 {
 	enum class Keys
@@ -29,6 +38,19 @@ namespace PlatformInterface
 		NONE,
 		DEFAULT
 	};
+
+
+	struct FileInfo
+	{
+		bool is_directory;
+		char filename[Lumix::MAX_PATH_LENGTH];
+	};
+
+	struct FileIterator;
+
+	FileIterator* createFileIterator(const char* path, Lumix::IAllocator& allocator);
+	void destroyFileIterator(FileIterator* iterator);
+	bool getNextFile(FileIterator* iterator, FileInfo* info);
 
 
 	struct SystemEventHandler

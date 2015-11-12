@@ -1,6 +1,5 @@
 #include "asset_browser.h"
 #include "core/crc32.h"
-#include "core/FS/file_iterator.h"
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
 #include "core/json_serializer.h"
@@ -19,6 +18,7 @@
 #include "lua_script/lua_script_manager.h"
 #include "metadata.h"
 #include "ocornut-imgui/imgui.h"
+#include "platform_interface.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
@@ -827,9 +827,9 @@ void AssetBrowser::addResource(const char* path, const char* filename)
 
 void AssetBrowser::processDir(const char* dir)
 {
-	auto* iter = Lumix::FS::createFileIterator(dir, m_editor.getAllocator());
-	Lumix::FS::FileInfo info;
-	while (Lumix::FS::getNextFile(iter, &info))
+	auto* iter = PlatformInterface::createFileIterator(dir, m_editor.getAllocator());
+	PlatformInterface::FileInfo info;
+	while (getNextFile(iter, &info))
 	{
 		if (info.filename[0] == '.') continue;
 
@@ -847,7 +847,7 @@ void AssetBrowser::processDir(const char* dir)
 		}
 	}
 
-	Lumix::FS::destroyFileIterator(iter);
+	destroyFileIterator(iter);
 }
 
 

@@ -14,7 +14,6 @@
 #include "core/fs/ifile.h"
 #include "core/input_system.h"
 #include "core/json_serializer.h"
-#include "core/library.h"
 #include "core/log.h"
 #include "core/matrix.h"
 #include "core/mt/mutex.h"
@@ -2632,15 +2631,15 @@ public:
 		const auto& libs = plugin_manager.getLibraries();
 		for (auto* lib : libs)
 		{
-			auto* callback = static_cast<void (*)(WorldEditor&)>(lib->resolve("setWorldEditor"));
+			auto* callback = static_cast<void (*)(WorldEditor&)>(getLibrarySymbol(lib, "setWorldEditor"));
 			if (callback) (*callback)(*this);
 		}
 	}
 
 
-	void onPluginLibraryLoaded(Library& lib)
+	void onPluginLibraryLoaded(void* lib)
 	{
-		auto* callback = static_cast<void(*)(WorldEditor&)>(lib.resolve("setWorldEditor"));
+		auto* callback = static_cast<void(*)(WorldEditor&)>(getLibrarySymbol(lib, "setWorldEditor"));
 		if (callback) (*callback)(*this);
 	}
 

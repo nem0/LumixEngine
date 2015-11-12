@@ -8,7 +8,6 @@
 #include "core/fs/ifile.h"
 #include "core/iallocator.h"
 #include "core/json_serializer.h"
-#include "core/library.h"
 #include "core/log.h"
 #include "core/lua_wrapper.h"
 #include "core/resource_manager.h"
