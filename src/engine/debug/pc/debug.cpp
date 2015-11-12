@@ -3,7 +3,7 @@
 #include "core/string.h"
 #include "core/system.h"
 #include "debug/stack_tree.h"
-#define WIN32_LEAN_AND_MEAN
+#include "core/pc/simple_win.h"
 #include <Windows.h>
 #include <DbgHelp.h>
 #include <mapi.h>

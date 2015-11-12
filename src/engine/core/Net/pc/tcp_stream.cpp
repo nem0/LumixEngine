@@ -1,5 +1,7 @@
 #include "core/net/tcp_stream.h"
 #include "core/string.h"
+#include "core/pc/simple_win.h"
+#undef WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 

@@ -2,7 +2,7 @@
 #include "lumix.h"
 #include "core/MT/atomic.h"
 #include "core/string.h"
-#define WIN32_LEAN_AND_MEAN
+#include "core/pc/simple_win.h"
 #include <Windows.h>
 #include <Dbghelp.h>
 

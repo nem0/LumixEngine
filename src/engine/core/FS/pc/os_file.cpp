@@ -2,6 +2,7 @@
 #include "core/iallocator.h"
 #include "lumix.h"
 
+#include "core/pc/simple_win.h"
 #include <windows.h>
 
 

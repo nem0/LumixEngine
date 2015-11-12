@@ -1,6 +1,8 @@
 #include "core/net/tcp_acceptor.h"
 #include "core/iallocator.h"
 #include "core/net/tcp_stream.h"
+#include "core/pc/simple_win.h"
+#undef WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 namespace Lumix
