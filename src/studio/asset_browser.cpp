@@ -38,14 +38,14 @@ static Lumix::uint32 getResourceType(const char* path)
 	char ext[10];
 	Lumix::PathUtils::getExtension(ext, sizeof(ext), path);
 
-	if (strcmp(ext, "mat") == 0) return Lumix::ResourceManager::MATERIAL;
-	if (strcmp(ext, "msh") == 0) return Lumix::ResourceManager::MODEL;
-	if (strcmp(ext, "dds") == 0) return Lumix::ResourceManager::TEXTURE;
-	if (strcmp(ext, "raw") == 0) return Lumix::ResourceManager::TEXTURE;
-	if (strcmp(ext, "tga") == 0) return Lumix::ResourceManager::TEXTURE;
-	if (strcmp(ext, "shd") == 0) return Lumix::ResourceManager::SHADER;
-	if (strcmp(ext, "unv") == 0) return UNIVERSE_HASH;
-	if (strcmp(ext, "lua") == 0) return LUA_SCRIPT_HASH;
+	if (Lumix::compareString(ext, "mat") == 0) return Lumix::ResourceManager::MATERIAL;
+	if (Lumix::compareString(ext, "msh") == 0) return Lumix::ResourceManager::MODEL;
+	if (Lumix::compareString(ext, "dds") == 0) return Lumix::ResourceManager::TEXTURE;
+	if (Lumix::compareString(ext, "raw") == 0) return Lumix::ResourceManager::TEXTURE;
+	if (Lumix::compareString(ext, "tga") == 0) return Lumix::ResourceManager::TEXTURE;
+	if (Lumix::compareString(ext, "shd") == 0) return Lumix::ResourceManager::SHADER;
+	if (Lumix::compareString(ext, "unv") == 0) return UNIVERSE_HASH;
+	if (Lumix::compareString(ext, "lua") == 0) return LUA_SCRIPT_HASH;
 
 	return 0;
 }
@@ -234,7 +234,7 @@ void AssetBrowser::selectResource(const Lumix::Path& resource)
 {
 	char ext[30];
 	Lumix::PathUtils::getExtension(ext, Lumix::lengthOf(ext), resource.c_str());
-	if (strcmp(ext, "unv") == 0) return;
+	if (Lumix::compareString(ext, "unv") == 0) return;
 
 	auto& manager = m_editor.getEngine().getResourceManager();
 	auto* resource_manager = manager.get(getResourceType(resource.c_str()));
@@ -802,12 +802,12 @@ void AssetBrowser::addResource(const char* path, const char* filename)
 	Lumix::catString(fullpath, filename);
 
 	int index = -1;
-	if (strcmp(ext, "dds") == 0 || strcmp(ext, "tga") == 0 || strcmp(ext, "raw") == 0) index = TEXTURE;
-	if (strcmp(ext, "msh") == 0) index = MODEL;
-	if (strcmp(ext, "mat") == 0) index = MATERIAL;
-	if (strcmp(ext, "unv") == 0) index = UNIVERSE;
-	if (strcmp(ext, "shd") == 0) index = SHADER;
-	if (strcmp(ext, "lua") == 0) index = LUA_SCRIPT;
+	if (Lumix::compareString(ext, "dds") == 0 || Lumix::compareString(ext, "tga") == 0 || Lumix::compareString(ext, "raw") == 0) index = TEXTURE;
+	if (Lumix::compareString(ext, "msh") == 0) index = MODEL;
+	if (Lumix::compareString(ext, "mat") == 0) index = MATERIAL;
+	if (Lumix::compareString(ext, "unv") == 0) index = UNIVERSE;
+	if (Lumix::compareString(ext, "shd") == 0) index = SHADER;
+	if (Lumix::compareString(ext, "lua") == 0) index = LUA_SCRIPT;
 
 	if (Lumix::startsWith(path, "./render_tests") != 0 || Lumix::startsWith(path, "./unit_tests") != 0)
 	{

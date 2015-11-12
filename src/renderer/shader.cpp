@@ -299,7 +299,7 @@ static int indexOf(const ShaderCombinations::Passes& passes, const char* pass)
 {
 	for (int i = 0; i < lengthOf(passes); ++i)
 	{
-		if (strcmp(passes[i], pass) == 0)
+		if (compareString(passes[i], pass) == 0)
 		{
 			return i;
 		}

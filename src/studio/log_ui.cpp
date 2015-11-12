@@ -69,19 +69,19 @@ void LogUI::push(Type type, const char* message)
 
 void LogUI::onInfo(const char* system, const char* message)
 {
-	push(strcmp(system, "bgfx") == 0 ? BGFX : Info, message);
+	push(Lumix::compareString(system, "bgfx") == 0 ? BGFX : Info, message);
 }
 
 
 void LogUI::onWarning(const char* system, const char* message)
 {
-	push(strcmp(system, "bgfx") == 0 ? BGFX : Warning, message);
+	push(Lumix::compareString(system, "bgfx") == 0 ? BGFX : Warning, message);
 }
 
 
 void LogUI::onError(const char* system, const char* message)
 {
-	push(strcmp(system, "bgfx") == 0 ? BGFX : Error, message);
+	push(Lumix::compareString(system, "bgfx") == 0 ? BGFX : Error, message);
 }
 
 

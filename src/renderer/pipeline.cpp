@@ -587,7 +587,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		for (int i = 0, c = m_framebuffers.size(); i < c; ++i)
 		{
-			if (strcmp(m_framebuffers[i]->getName(), framebuffer_name) == 0)
+			if (compareString(m_framebuffers[i]->getName(), framebuffer_name) == 0)
 			{
 				return m_framebuffers[i];
 			}
@@ -598,7 +598,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void setCurrentFramebuffer(const char* framebuffer_name)
 	{
-		if (strcmp(framebuffer_name, "default") == 0)
+		if (compareString(framebuffer_name, "default") == 0)
 		{
 			m_current_framebuffer = m_default_framebuffer;
 			if (m_current_framebuffer)
@@ -650,7 +650,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				FrameBuffer::Declaration& decl = m_source.m_framebuffers[i];
 				auto* fb = LUMIX_NEW(m_allocator, FrameBuffer)(decl);
 				m_framebuffers.push(fb);
-				if (strcmp(decl.m_name, "default") == 0) m_default_framebuffer = fb;
+				if (compareString(decl.m_name, "default") == 0) m_default_framebuffer = fb;
 			}
 
 			if (lua_getglobal(m_source.m_lua_state, "init") == LUA_TFUNCTION)
@@ -1971,11 +1971,11 @@ void applyCamera(PipelineInstanceImpl* pipeline, const char* slot)
 void clear(PipelineInstanceImpl* pipeline, const char* buffers, int color)
 {
 	uint16 flags = 0;
-	if (strcmp(buffers, "all") == 0)
+	if (compareString(buffers, "all") == 0)
 	{
 		flags = BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH;
 	}
-	else if (strcmp(buffers, "depth") == 0)
+	else if (compareString(buffers, "depth") == 0)
 	{
 		flags = BGFX_CLEAR_DEPTH;
 	}

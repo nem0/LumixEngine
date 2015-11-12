@@ -267,23 +267,23 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 		while (!serializer.isObjectEnd())
 		{
 			serializer.deserializeLabel(label, 255);
-			if (strcmp(label, "name") == 0)
+			if (compareString(label, "name") == 0)
 			{
 				serializer.deserialize(uniform.m_name, Uniform::MAX_NAME_LENGTH, "");
 				uniform.m_name_hash = crc32(uniform.m_name);
 			}
-			else if (strcmp(label, "int_value") == 0)
+			else if (compareString(label, "int_value") == 0)
 			{
 				uniform_type = bgfx::UniformType::Int1;
 				uniform.m_type = Uniform::INT;
 				serializer.deserialize(uniform.m_int, 0);
 			}
-			else if (strcmp(label, "float_value") == 0)
+			else if (compareString(label, "float_value") == 0)
 			{
 				uniform.m_type = Uniform::FLOAT;
 				serializer.deserialize(uniform.m_float, 0);
 			}
-			else if (strcmp(label, "matrix_value") == 0)
+			else if (compareString(label, "matrix_value") == 0)
 			{
 				uniform_type = bgfx::UniformType::Mat4;
 				uniform.m_type = Uniform::MATRIX;
@@ -295,7 +295,7 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 				}
 				serializer.deserializeArrayEnd();
 			}
-			else if (strcmp(label, "time") == 0)
+			else if (compareString(label, "time") == 0)
 			{
 				uniform.m_type = Uniform::TIME;
 				serializer.deserialize(uniform.m_float, 0);
@@ -437,7 +437,7 @@ Texture* Material::getTextureByUniform(const char* uniform) const
 
 	for (int i = 0, c = m_shader->getTextureSlotCount(); i < c; ++i)
 	{
-		if (strcmp(m_shader->getTextureSlot(i).m_uniform, uniform) == 0)
+		if (compareString(m_shader->getTextureSlot(i).m_uniform, uniform) == 0)
 		{
 			return m_textures[i];
 		}
@@ -457,7 +457,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 	while (!serializer.isObjectEnd())
 	{
 		serializer.deserializeLabel(label, sizeof(label));
-		if (strcmp(label, "source") == 0)
+		if (compareString(label, "source") == 0)
 		{
 			serializer.deserialize(path, MAX_PATH_LENGTH, "");
 			if (path[0] != '\0')
@@ -477,18 +477,18 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 				addDependency(*m_textures[m_texture_count]);
 			}
 		}
-		else if (strcmp(label, "atlas_size") == 0)
+		else if (compareString(label, "atlas_size") == 0)
 		{
 			serializer.deserialize(atlas_size, -1);
 		}
-		else if (strcmp(label, "min_filter") == 0)
+		else if (compareString(label, "min_filter") == 0)
 		{
 			serializer.deserialize(label, sizeof(label), "");
-			if (strcmp(label, "point") == 0)
+			if (compareString(label, "point") == 0)
 			{
 				flags |= BGFX_TEXTURE_MIN_POINT;
 			}
-			else if (strcmp(label, "anisotropic") == 0)
+			else if (compareString(label, "anisotropic") == 0)
 			{
 				flags |= BGFX_TEXTURE_MIN_ANISOTROPIC;
 			}
@@ -498,14 +498,14 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 											<< "\" in material " << getPath().c_str();
 			}
 		}
-		else if (strcmp(label, "mag_filter") == 0)
+		else if (compareString(label, "mag_filter") == 0)
 		{
 			serializer.deserialize(label, sizeof(label), "");
-			if (strcmp(label, "point") == 0)
+			if (compareString(label, "point") == 0)
 			{
 				flags |= BGFX_TEXTURE_MAG_POINT;
 			}
-			else if (strcmp(label, "anisotropic") == 0)
+			else if (compareString(label, "anisotropic") == 0)
 			{
 				flags |= BGFX_TEXTURE_MAG_ANISOTROPIC;
 			}
@@ -515,7 +515,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 											<< "\" in material " << getPath().c_str();
 			}
 		}
-		else if (strcmp(label, "u_clamp") == 0)
+		else if (compareString(label, "u_clamp") == 0)
 		{
 			bool b;
 			serializer.deserialize(b, false);
@@ -524,7 +524,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 				flags |= BGFX_TEXTURE_U_CLAMP;
 			}
 		}
-		else if (strcmp(label, "v_clamp") == 0)
+		else if (compareString(label, "v_clamp") == 0)
 		{
 			bool b;
 			serializer.deserialize(b, false);
@@ -533,7 +533,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 				flags |= BGFX_TEXTURE_V_CLAMP;
 			}
 		}
-		else if (strcmp(label, "w_clamp") == 0)
+		else if (compareString(label, "w_clamp") == 0)
 		{
 			bool b;
 			serializer.deserialize(b, false);
@@ -542,7 +542,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 				flags |= BGFX_TEXTURE_W_CLAMP;
 			}
 		}
-		else if (strcmp(label, "keep_data") == 0)
+		else if (compareString(label, "keep_data") == 0)
 		{
 			serializer.deserialize(keep_data, false);
 		}
@@ -598,24 +598,24 @@ bool Material::load(FS::IFile& file)
 	while (!serializer.isObjectEnd())
 	{
 		serializer.deserializeLabel(label, 255);
-		if (strcmp(label, "uniforms") == 0)
+		if (compareString(label, "uniforms") == 0)
 		{
 			deserializeUniforms(serializer);
 		}
-		else if (strcmp(label, "texture") == 0)
+		else if (compareString(label, "texture") == 0)
 		{
 			if (!deserializeTexture(serializer, material_dir))
 			{
 				return false;
 			}
 		}
-		else if (strcmp(label, "alpha_cutout") == 0)
+		else if (compareString(label, "alpha_cutout") == 0)
 		{
 			bool b;
 			serializer.deserialize(b, false);
 			enableAlphaCutout(b);
 		}
-		else if (strcmp(label, "alpha_blending") == 0)
+		else if (compareString(label, "alpha_blending") == 0)
 		{
 			if (serializer.isNextBoolean())
 			{
@@ -633,21 +633,21 @@ bool Material::load(FS::IFile& file)
 			else
 			{
 				serializer.deserialize(label, 255, "alpha");
-				if (strcmp(label, "alpha") == 0)
+				if (compareString(label, "alpha") == 0)
 				{
 					m_render_states |= BGFX_STATE_BLEND_ALPHA;
 				}
-				else if (strcmp(label, "add") == 0)
+				else if (compareString(label, "add") == 0)
 				{
 					m_render_states |= BGFX_STATE_BLEND_ADD;
 				}
-				else if (strcmp(label, "disabled") == 0)
+				else if (compareString(label, "disabled") == 0)
 				{
 					m_render_states &= ~BGFX_STATE_BLEND_MASK;
 				}
 			}
 		}
-		else if (strcmp(label, "specular") == 0)
+		else if (compareString(label, "specular") == 0)
 		{
 			serializer.deserializeArrayBegin();
 			serializer.deserializeArrayItem(m_specular.x, 1.0f);
@@ -655,28 +655,28 @@ bool Material::load(FS::IFile& file)
 			serializer.deserializeArrayItem(m_specular.z, 1.0f);
 			serializer.deserializeArrayEnd();
 		}
-		else if (strcmp(label, "shininess") == 0)
+		else if (compareString(label, "shininess") == 0)
 		{
 			serializer.deserialize(m_shininess, 4.0f);
 		}
-		else if (strcmp(label, "shadow_receiver") == 0)
+		else if (compareString(label, "shadow_receiver") == 0)
 		{
 			bool b;
 			serializer.deserialize(b, true);
 			enableShadowReceiving(b);
 		}
-		else if (strcmp(label, "shader") == 0)
+		else if (compareString(label, "shader") == 0)
 		{
 			serializer.deserialize(path, MAX_PATH_LENGTH, "");
 			setShader(static_cast<Shader*>(
 				m_resource_manager.get(ResourceManager::SHADER)->load(Path(path))));
 		}
-		else if (strcmp(label, "z_test") == 0)
+		else if (compareString(label, "z_test") == 0)
 		{
 			serializer.deserialize(b_value, true);
 			enableZTest(b_value);
 		}
-		else if (strcmp(label, "backface_culling") == 0)
+		else if (compareString(label, "backface_culling") == 0)
 		{
 			serializer.deserialize(b_value, true);
 			enableBackfaceCulling(b_value);

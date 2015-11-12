@@ -1148,13 +1148,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 				serializer.read(m_terrains[i]->m_y_scale);
 
 				if (m_terrains[i]->m_heightmap == nullptr ||
-					strcmp(tmp,
-						   m_terrains[i]->m_heightmap->getPath().c_str()) != 0)
+					compareString(tmp, m_terrains[i]->m_heightmap->getPath().c_str()) != 0)
 				{
 					setHeightmap(i, tmp);
 				}
-				m_universe.addComponent(
-					m_terrains[i]->m_entity, HEIGHTFIELD_HASH, this, i);
+				m_universe.addComponent(m_terrains[i]->m_entity, HEIGHTFIELD_HASH, this, i);
 			}
 		}
 	}

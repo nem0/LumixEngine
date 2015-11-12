@@ -2507,7 +2507,7 @@ public:
 		for (int i = 0, c = m_cameras.size(); i < c; ++i)
 		{
 			if (!m_cameras[i].m_is_free &&
-				strcmp(m_cameras[i].m_slot, slot) == 0)
+				compareString(m_cameras[i].m_slot, slot) == 0)
 			{
 				return i;
 			}

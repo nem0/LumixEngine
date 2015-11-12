@@ -19,7 +19,7 @@ namespace Lumix
 		template<>
 		LUMIX_FORCE_INLINE void expectEq<const char*>(const char* p1, const char* p2, const char* file, uint32 line)
 		{
-			if(strcmp(p1, p2) != 0)
+			if(Lumix::compareString(p1, p2) != 0)
 			{
 				Manager::instance().handleFail(file, line);
 			}
@@ -37,7 +37,7 @@ namespace Lumix
 		template<>
 		LUMIX_FORCE_INLINE void expectNe<const char*>(const char* p1, const char* p2, const char* file, uint32 line)
 		{
-			if(strcmp(p1, p2) == 0)
+			if(Lumix::compareString(p1, p2) == 0)
 			{
 				Manager::instance().handleFail(file, line);
 			}
@@ -55,7 +55,7 @@ namespace Lumix
 		template<>
 		LUMIX_FORCE_INLINE void expectLt<const char*>(const char* p1, const char* p2, const char* file, uint32 line)
 		{
-			if(strcmp(p1, p2) >= 0)
+			if(Lumix::compareString(p1, p2) >= 0)
 			{
 				Manager::instance().handleFail(file, line);
 			}
@@ -73,7 +73,7 @@ namespace Lumix
 		template<>
 		LUMIX_FORCE_INLINE void expectGt<const char*>(const char* p1, const char* p2, const char* file, uint32 line)
 		{
-			if(strcmp(p1, p2) <= 0)
+			if(Lumix::compareString(p1, p2) <= 0)
 			{
 				Manager::instance().handleFail(file, line);
 			}
@@ -91,7 +91,7 @@ namespace Lumix
 		template<>
 		LUMIX_FORCE_INLINE void expectLe<const char*>(const char* p1, const char* p2, const char* file, uint32 line)
 		{
-			if(strcmp(p1, p2) > 0)
+			if(Lumix::compareString(p1, p2) > 0)
 			{
 				Manager::instance().handleFail(file, line);
 			}
@@ -109,7 +109,7 @@ namespace Lumix
 		template<>
 		LUMIX_FORCE_INLINE void expectGe<const char*>(const char* p1, const char* p2, const char* file, uint32 line)
 		{
-			if(strcmp(p1, p2) < 0)
+			if(Lumix::compareString(p1, p2) < 0)
 			{
 				Manager::instance().handleFail(file, line);
 			}
