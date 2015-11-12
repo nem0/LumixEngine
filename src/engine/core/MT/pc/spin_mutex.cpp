@@ -23,7 +23,7 @@ namespace Lumix
 		{
 			for (;;)
 			{
-				if(compareAndExchange(&m_id, 1, 0) == 0)
+				if(compareAndExchange(&m_id, 1, 0))
 				{
 					memoryBarrier();
 					return;
@@ -38,7 +38,7 @@ namespace Lumix
 
 		bool SpinMutex::poll()
 		{
-			if (compareAndExchange(&m_id, 1, 0) == 0)
+			if (compareAndExchange(&m_id, 1, 0))
 			{
 				memoryBarrier();
 				return true;
