@@ -11,6 +11,20 @@ static char makeLowercase(char c)
 }
 
 
+int compareStringN(const char* lhs, const char* rhs, int length)
+{
+	while(*lhs && *lhs == *rhs && length)
+	{
+		++lhs;
+		++rhs;
+		--length;
+	}
+	if(length == 0) return 0;
+	return *lhs - *rhs;
+
+}
+
+
 int compareString(const char* lhs, const char* rhs)
 {
 	while(*lhs && *lhs == *rhs)
