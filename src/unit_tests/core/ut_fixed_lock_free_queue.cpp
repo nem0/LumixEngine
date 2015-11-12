@@ -21,7 +21,6 @@ namespace
 	};
 
 	typedef Lumix::MT::LockFreeFixedQueue<Test, 16> Queue;
-	typedef Lumix::MT::LockFreeFixedQueue<Test, 16, true> PodQueue;
 
 	class TestTaskConsumer : public Lumix::MT::Task
 	{
@@ -61,7 +60,7 @@ namespace
 	void UT_fixed_lock_queue_non_trivial_constructors(const char* params)
 	{
 		Lumix::DefaultAllocator allocator;
-		Queue queue(allocator);
+		Queue queue;
 		TestTaskConsumer testTaskConsumer(&queue, allocator);
 		testTaskConsumer.create("TestTaskConsumer_Task");
 		testTaskConsumer.run();
@@ -88,7 +87,7 @@ namespace
 	class TestTaskPodConsumer : public Lumix::MT::Task
 	{
 	public:
-		TestTaskPodConsumer(PodQueue* queue, Lumix::IAllocator& allocator)
+		TestTaskPodConsumer(Queue* queue, Lumix::IAllocator& allocator)
 			: Lumix::MT::Task(allocator)
 			, m_queue(queue)
 			, m_sum(0)
@@ -108,7 +107,7 @@ namespace
 				m_sum += test->value;
 				test->value++;
 
-				m_queue->dealoc(test, true);
+				m_queue->dealoc(test);
 			}
 			return 0;
 		}
@@ -116,14 +115,14 @@ namespace
 		int32 getSum() { return m_sum; }
 
 	private:
-		PodQueue* m_queue;
+		Queue* m_queue;
 		int32 m_sum;
 	};
 
 	void UT_fixed_lock_queue_trivial_constructors(const char* params)
 	{
-		PodQueue queue;
 		Lumix::DefaultAllocator allocator;
+		Queue queue;
 		TestTaskPodConsumer testTaskPodConsumer(&queue, allocator);
 		testTaskPodConsumer.create("TestTaskPodConsumer_Task");
 		testTaskPodConsumer.run();

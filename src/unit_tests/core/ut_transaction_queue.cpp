@@ -96,7 +96,7 @@ namespace
 			testItems[i].thread_id = Lumix::MT::getCurrentThreadID();
 		}
 
-		TransQueue trans_queue(allocator);
+		TransQueue trans_queue;
 
 		TestTaskConsumer cons1(&trans_queue, testItems, allocator);
 		TestTaskConsumer cons2(&trans_queue, testItems, allocator);
@@ -177,7 +177,7 @@ namespace
 			testItems[i].thread_id = Lumix::MT::getCurrentThreadID();
 		}
 
-		TransQueue trans_queue(allocator);
+		TransQueue trans_queue;
 
 		TestTaskProducer prod(&trans_queue, &testItems[0], itemsCount, allocator);
 		TestTaskConsumer cons(&trans_queue, testItems, allocator);

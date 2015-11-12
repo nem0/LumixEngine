@@ -51,12 +51,12 @@ namespace Lumix
 
 			uint32 getAffinityMask(uint32 idx) const;
 
-			IAllocator&		m_allocator;
-			JobsTable		m_ready_to_execute[(size_t)Priority::Count];
-			JobTransQueue	m_trans_queue;
-			TransTable		m_pending_trans;
-			Array<WorkerTask*> m_worker_tasks;
-			Scheduler		m_scheduler;
+			IAllocator&			m_allocator;
+			JobsTable			m_ready_to_execute[(size_t)Priority::Count];
+			JobTransQueue		m_trans_queue;
+			TransTable			m_pending_trans;
+			Array<WorkerTask*>	m_worker_tasks;
+			Scheduler			m_scheduler;
 
 			volatile int32 m_scheduling_counter;
 		};

@@ -17,7 +17,7 @@ namespace Lumix
 
 			static Manager& instance()
 			{
-				if (NULL == s_instance)
+				if (nullptr == s_instance)
 				{
 					s_instance = LUMIX_NEW(getAllocator(), Manager)(getAllocator());
 				}
@@ -25,7 +25,7 @@ namespace Lumix
 				return *s_instance;
 			}
 
-			static void release() { LUMIX_DELETE(getAllocator(), s_instance); s_instance = NULL; }
+			static void release() { LUMIX_DELETE(getAllocator(), s_instance); s_instance = nullptr; }
 
 
 			void registerFunction(const char* name, unitTestFunc func, const char* params);

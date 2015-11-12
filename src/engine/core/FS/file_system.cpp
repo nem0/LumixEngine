@@ -97,7 +97,6 @@ public:
 	FileSystemImpl(IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_in_progress(m_allocator)
-		, m_transaction_queue(m_allocator)
 		, m_pending(m_allocator)
 		, m_devices(m_allocator)
 	{

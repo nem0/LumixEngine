@@ -4,6 +4,7 @@
 #include "core/log.h"
 #include "core/math_utils.h"
 #include "core/path.h"
+#include <cstdlib>
 
 
 namespace Lumix

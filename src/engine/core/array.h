@@ -2,7 +2,6 @@
 
 
 #include "core/iallocator.h"
-#include <type_traits>
 
 
 namespace Lumix
@@ -192,13 +191,35 @@ public:
 		m_size = size;
 	}
 
+
+	template <class _Ty> struct remove_reference
+	{ // remove rvalue reference
+		typedef _Ty type;
+	};
+
+
+	template <class _Ty> struct remove_reference<_Ty&>
+	{ // remove rvalue reference
+		typedef _Ty type;
+	};
+
+	template <class _Ty> struct remove_reference<_Ty&&>
+	{ // remove rvalue reference
+		typedef _Ty type;
+	};
+
+	template <class _Ty> inline _Ty&& myforward(typename remove_reference<_Ty>::type& _Arg)
+	{
+		return (static_cast<_Ty&&>(_Arg));
+	}
+
 	template <typename... Params> T& emplace(Params&&... params)
 	{
 		if (m_size == m_capacity)
 		{
 			grow();
 		}
-		new (NewPlaceholder(), (char*)(m_data + m_size)) T(std::forward<Params>(params)...);
+		new (NewPlaceholder(), (char*)(m_data + m_size)) T(myforward<Params>(params)...);
 		++m_size;
 		return m_data[m_size - 1];
 	}

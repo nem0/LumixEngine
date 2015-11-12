@@ -10,6 +10,7 @@
 #include "engine.h"
 #include "iplugin.h"
 #include "universe/universe.h"
+#include <cstdlib>
 
 
 namespace Lumix
