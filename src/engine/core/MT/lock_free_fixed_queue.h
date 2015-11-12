@@ -248,7 +248,7 @@ namespace Lumix
 							if (compareAndExchange64(&m_alloc[alloc_idx].data.val, new_val.data.val, cur_val.data.val))
 							{
 								atomicIncrement(&m_al);
-								new (&m_pool[cur_val.data.pair.el]) T();
+								new (NewPlaceholder(), &m_pool[cur_val.data.pair.el]) T();
 								return &m_pool[cur_val.data.pair.el];
 							}
 						}

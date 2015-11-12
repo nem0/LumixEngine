@@ -30,7 +30,7 @@ namespace Lumix
 			ASSERT(m_wr - m_rd < count);
 
 			uint32 idx = m_wr & (count - 1);
-			::new (&m_buffer[idx]) T(item);
+			::new (NewPlaceholder(), &m_buffer[idx]) T(item);
 			++m_wr;
 		}
 

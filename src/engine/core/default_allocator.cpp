@@ -1,4 +1,5 @@
 #include "core/default_allocator.h"
+#include <cstdlib>
 
 
 namespace Lumix

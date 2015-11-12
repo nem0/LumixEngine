@@ -2361,9 +2361,7 @@ public:
 	}
 
 
-	void getRelativePath(char* relative_path,
-								 int max_length,
-								 const char* source) override
+	void getRelativePath(char* relative_path, int max_length, const char* source) override
 	{
 		char tmp[MAX_PATH_LENGTH];
 		Lumix::PathUtils::normalize(source, tmp, sizeof(tmp));
@@ -2375,18 +2373,16 @@ public:
 			{
 				++rel_path_start;
 			}
-			strncpy(relative_path, rel_path_start, max_length);
+			copyString(relative_path, max_length, rel_path_start);
 		}
 		else
 		{
-			strncpy(relative_path, tmp, max_length);
+			copyString(relative_path, max_length, tmp);
 		}
 	}
 
 
-	void getRelativePath(char* relative_path,
-								 int max_length,
-								 const Path& source) override
+	void getRelativePath(char* relative_path, int max_length, const Path& source) override
 	{
 		getRelativePath(relative_path, max_length, source.c_str());
 	}

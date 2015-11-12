@@ -168,7 +168,7 @@ namespace Debug
 			{
 				MT::SpinLock lock(m_mutex);
 				system_ptr = m_source.allocate(system_size);
-				info = new (getAllocationInfoFromSystem(system_ptr)) AllocationInfo();
+				info = new (NewPlaceholder(), getAllocationInfoFromSystem(system_ptr)) AllocationInfo();
 
 				info->m_previous = m_root->m_previous;
 				m_root->m_previous->m_next = info;

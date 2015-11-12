@@ -235,7 +235,7 @@ bool Texture::saveTGA(IAllocator& allocator,
 	uint8* data = (uint8*)allocator.allocate(width * height * 4);
 
 	TGAHeader header;
-	memset(&header, 0, sizeof(header));
+	setMemory(&header, 0, sizeof(header));
 	header.bitsPerPixel = (char)(bytes_per_pixel * 8);
 	header.height = (short)height;
 	header.width = (short)width;

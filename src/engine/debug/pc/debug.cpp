@@ -7,6 +7,7 @@
 #include <Windows.h>
 #include <DbgHelp.h>
 #include <mapi.h>
+#include <cstdlib>
 
 
 #pragma comment(lib, "DbgHelp.lib")
