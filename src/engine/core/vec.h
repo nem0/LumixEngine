@@ -38,7 +38,7 @@ struct LUMIX_ENGINE_API Vec3
 
 	Vec3 operator-(const Vec3& rhs) const { return Vec3(x - rhs.x, y - rhs.y, z - rhs.z); }
 
-	void operator+=(const Vec3 rhs)
+	void operator+=(const Vec3& rhs)
 	{
 		float x = this->x;
 		float y = this->y;
@@ -51,7 +51,7 @@ struct LUMIX_ENGINE_API Vec3
 		this->z = z;
 	}
 
-	void operator-=(const Vec3 rhs)
+	void operator-=(const Vec3& rhs)
 	{
 		float x = this->x;
 		float y = this->y;
@@ -147,7 +147,7 @@ struct LUMIX_ENGINE_API Vec4
 		return Vec4(x - rhs.x, y - rhs.y, z - rhs.z, w - rhs.w);
 	}
 
-	void operator+=(const Vec4 rhs)
+	void operator+=(const Vec4& rhs)
 	{
 		float x = this->x;
 		float y = this->y;
@@ -163,7 +163,7 @@ struct LUMIX_ENGINE_API Vec4
 		this->w = w;
 	}
 
-	void operator-=(const Vec4 rhs)
+	void operator-=(const Vec4& rhs)
 	{
 		float x = this->x;
 		float y = this->y;

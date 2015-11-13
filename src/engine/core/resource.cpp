@@ -143,8 +143,6 @@ void Resource::removeDependency(Resource& dependent_resource)
 	if (dependent_resource.isEmpty()) --m_empty_dep_count;
 	if (dependent_resource.isFailure()) --m_failed_dep_count;
 
-	ASSERT(m_empty_dep_count >= 0 && m_failed_dep_count >= 0)
-
 	checkState();
 }
 

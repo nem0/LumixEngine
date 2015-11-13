@@ -60,7 +60,7 @@ class LUMIX_RENDERER_API Pipeline : public Resource
 
 
 
-class LUMIX_RENDERER_API PipelineInstance abstract
+class LUMIX_RENDERER_API PipelineInstance
 {
 	public:
 		typedef Delegate<void> CustomCommandHandler; 

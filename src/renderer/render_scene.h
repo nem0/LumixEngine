@@ -176,8 +176,7 @@ public:
 	virtual const char* getCameraSlot(ComponentIndex camera) = 0;
 	virtual void setCameraSize(ComponentIndex camera, int w, int h) = 0;
 
-	virtual class ParticleEmitter& getParticleEmitter(ComponentIndex cmp) const = 0;
-	virtual const Array<ParticleEmitter*>& getParticleEmitters() const = 0;
+	virtual const Array<class ParticleEmitter*>& getParticleEmitters() const = 0;
 	virtual Vec2 getParticleEmitterLinearMovementX(ComponentIndex cmp) = 0;
 	virtual Vec2 getParticleEmitterLinearMovementY(ComponentIndex cmp) = 0;
 	virtual Vec2 getParticleEmitterLinearMovementZ(ComponentIndex cmp) = 0;

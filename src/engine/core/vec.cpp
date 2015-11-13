@@ -84,7 +84,7 @@ float Vec4::length() const
 	float y = this->y;
 	float z = this->z;
 	float w = this->w;
-	return sqrt(x * x + y * y + z * z);
+	return sqrt(x * x + y * y + z * z + w * w);
 }
 
 

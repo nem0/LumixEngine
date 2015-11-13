@@ -71,7 +71,6 @@ int PlotHistogramEx(const char* label,
 		IM_ASSERT(v_idx >= 0 && v_idx < values_count);
 
 		const float v0 = values_getter(data, (v_idx + values_offset) % values_count);
-		const float v1 = values_getter(data, (v_idx + 1 + values_offset) % values_count);
 		ImGui::SetTooltip("%d: %8.4g", v_idx, v0);
 		v_hovered = v_idx;
 	}

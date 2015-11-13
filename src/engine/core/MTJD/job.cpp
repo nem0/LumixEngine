@@ -18,7 +18,6 @@ Job::Job(int flags,
 	, m_auto_destroy((flags & AUTO_DESTROY) != 0)
 	, m_scheduled(false)
 	, m_executed(false)
-	, m_allocator(allocator)
 	, m_job_allocator(job_allocator)
 {
 	setJobName("Unknown Job");

@@ -276,9 +276,6 @@ namespace PlatformInterface
 	{
 		if (!g_platform_data.m_handler) return DefWindowProc(hWnd, msg, wParam, lParam);
 
-		int x = LOWORD(lParam);
-		int y = HIWORD(lParam);
-
 		switch (msg)
 		{
 			case WM_LBUTTONUP:

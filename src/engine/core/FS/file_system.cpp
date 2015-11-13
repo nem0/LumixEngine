@@ -354,7 +354,7 @@ public:
 		return nullptr;
 	}
 
-	static void closeAsync(IFile& file, bool, FileSystem&) { }
+	static void closeAsync(IFile&, bool, FileSystem&) { }
 
 	void destroy()
 	{

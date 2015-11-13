@@ -39,7 +39,6 @@ protected:
 	virtual void execute() = 0;
 	virtual void onExecuted();
 
-	IAllocator& m_allocator;
 	IAllocator& m_job_allocator;
 
 	Manager& m_manager;

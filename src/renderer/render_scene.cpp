@@ -2744,12 +2744,6 @@ private:
 	}
 
 
-	ParticleEmitter& getParticleEmitter(ComponentIndex cmp) const override
-	{
-		return *m_particle_emitters[cmp];
-	}
-
-
 	const Array<ParticleEmitter*>& getParticleEmitters() const override
 	{
 		return m_particle_emitters;

@@ -114,7 +114,6 @@ struct Action
 		if (ImGui::IsAnyItemActive()) return false;
 
 		bool* keysDown = ImGui::GetIO().KeysDown;
-		float* keysDownDuration = ImGui::GetIO().KeysDownDuration;
 		if (shortcut[0] == -1) return false;
 
 		for (int i = 0; i < Lumix::lengthOf(shortcut) + 1; ++i)
