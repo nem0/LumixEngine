@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/vec3.h"
+#include "core/vec.h"
 #include "lumix.h"
 
 

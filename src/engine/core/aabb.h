@@ -3,7 +3,7 @@
 
 #include "math_utils.h"
 #include "matrix.h"
-#include "vec3.h"
+#include "vec.h"
 
 
 namespace Lumix

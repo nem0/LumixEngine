@@ -24,7 +24,7 @@ namespace Lumix
 			InputSystem::InputType type;
 			int key;
 		};
-		
+
 		IAllocator& m_allocator;
 		AssociativeArray<uint32, Action> m_actions;
 		float m_mouse_rel_x;

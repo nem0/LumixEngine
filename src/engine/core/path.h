@@ -3,7 +3,7 @@
 #include "core/associative_array.h"
 #include "core/base_proxy_allocator.h"
 #include "core/default_allocator.h"
-#include "core/MT/spin_mutex.h"
+#include "core/mt/sync.h"
 #include "core/string.h"
 
 namespace Lumix

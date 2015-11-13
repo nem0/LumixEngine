@@ -1,5 +1,6 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "core/vec3.h"
+#include "core/vec.h"
+#include <cmath>
 
 
 void UT_vec3(const char* params)

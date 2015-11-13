@@ -5,7 +5,7 @@
 #include "core/associative_array.h"
 #include "core/matrix.h"
 #include "core/resource.h"
-#include "core/vec3.h"
+#include "core/vec.h"
 #include "renderer/render_scene.h"
 #include <bgfx/bgfx.h>
 

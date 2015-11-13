@@ -10,12 +10,13 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
-#include "core/vec3.h"
+#include "core/vec.h"
 #include "renderer/material.h"
 #include "renderer/model_manager.h"
 #include "renderer/pose.h"
 
 #include <cfloat>
+#include <cmath>
 
 
 namespace Lumix

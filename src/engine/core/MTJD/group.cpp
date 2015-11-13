@@ -1,7 +1,7 @@
 #include "lumix.h"
 #include "core/MTJD/group.h"
 #include "core/mt/atomic.h"
-#include "core/mt/event.h"
+#include "core/mt/sync.h"
 
 namespace Lumix
 {

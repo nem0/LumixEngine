@@ -30,6 +30,7 @@
 #include "renderer/transient_geometry.h"
 #include "universe/universe.h"
 #include <bgfx/bgfx.h>
+#include <cmath>
 
 
 namespace Lumix

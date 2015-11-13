@@ -8,7 +8,7 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
-#include "core/vec3.h"
+#include "core/vec.h"
 #include "renderer/renderer.h"
 #include "renderer/shader_manager.h"
 #include <bgfx/bgfx.h>

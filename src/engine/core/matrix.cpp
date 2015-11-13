@@ -1,6 +1,7 @@
 #include "core/matrix.h"
 #include "core/quat.h"
-#include "core/vec3.h"
+#include "core/vec.h"
+#include <cmath>
 
 
 namespace Lumix
@@ -13,6 +14,48 @@ const Matrix Matrix::IDENTITY(
 	0, 0, 1, 0,
 	0, 0, 0, 1
 );
+
+
+void Matrix::fromEuler(float yaw, float pitch, float roll)
+{
+	float sroll = sinf(roll);
+	float croll = cosf(roll);
+	float spitch = sinf(pitch);
+	float cpitch = cosf(pitch);
+	float syaw = sinf(yaw);
+	float cyaw = cosf(yaw);
+
+	m11 = sroll * spitch * syaw + croll * cyaw;
+	m12 = sroll * cpitch;
+	m13 = sroll * spitch * cyaw - croll * syaw;
+	m14 = 0.0f;
+	m21 = croll * spitch * syaw - sroll * cyaw;
+	m22 = croll * cpitch;
+	m23 = croll * spitch * cyaw + sroll * syaw;
+	m24 = 0.0f;
+	m31 = cpitch * syaw;
+	m32 = -spitch;
+	m33 = cpitch * cyaw;
+	m34 = 0.0f;
+	m41 = 0.0f;
+	m42 = 0.0f;
+	m43 = 0.0f;
+	m44 = 1.0f;
+}
+
+
+void Matrix::setPerspective(float fov, float ratio, float near_plane, float far_plane)
+{
+	*this = Matrix::IDENTITY;
+	float f = 1 / tanf(fov * 0.5f);
+	m11 = f / ratio;
+	m22 = f;
+	m33 = (far_plane + near_plane) / (near_plane - far_plane);
+	m44 = 0;
+	m43 = (2 * far_plane * near_plane) / (near_plane - far_plane);
+	m34 = -1;
+}
+
 
 
 void multiplicate(Matrix& result, const Matrix& op1, const Matrix& op2)

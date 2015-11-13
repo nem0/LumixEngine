@@ -18,6 +18,7 @@
 #include "renderer/texture.h"
 #include "universe/universe.h"
 #include <cfloat>
+#include <cmath>
 
 
 namespace Lumix
@@ -745,7 +746,7 @@ bool getRayTriangleIntersection(const Vec3& local_origin, const Vec3& local_dir,
 	return true;
 }
 
-	
+
 RayCastModelHit Terrain::castRay(const Vec3& origin, const Vec3& dir)
 {
 	RayCastModelHit hit;

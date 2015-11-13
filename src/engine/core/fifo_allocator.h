@@ -3,7 +3,7 @@
 
 #include "lumix.h"
 #include "core/iallocator.h"
-#include "core/mt/spin_mutex.h"
+#include "core/mt/sync.h"
 
 
 namespace Lumix
@@ -19,7 +19,7 @@ namespace Lumix
 
 			void* allocate(size_t n);
 			void deallocate(void* p);
-		
+
 		private:
 			size_t m_buffer_size;
 			uint8* m_buffer;

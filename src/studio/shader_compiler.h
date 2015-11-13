@@ -2,7 +2,7 @@
 
 
 #include "core/associative_array.h"
-#include "core/mt/spin_mutex.h"
+#include "core/mt/sync.h"
 #include "core/string.h"
 #include "renderer/shader.h"
 

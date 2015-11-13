@@ -6,7 +6,7 @@
 #include "core/profiler.h"
 #include "core/quat.h"
 #include "core/resource_manager.h"
-#include "core/vec3.h"
+#include "core/vec.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 

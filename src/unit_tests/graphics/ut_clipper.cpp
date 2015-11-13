@@ -1,7 +1,7 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
 #include "core/sphere.h"
-#include "core/vec3.h"
+#include "core/vec.h"
 #include "core/frustum.h"
 #include "core/timer.h"
 #include "core/log.h"

@@ -7,7 +7,7 @@
 #include "core/delegate_list.h"
 #include "core/quat.h"
 #include "core/string.h"
-#include "core/vec3.h"
+#include "core/vec.h"
 #include "universe/component.h"
 
 
@@ -24,7 +24,7 @@ class Universe;
 struct Vec3;
 
 
-class LUMIX_ENGINE_API Universe final
+class LUMIX_ENGINE_API Universe
 {
 public:
 	Universe(IAllocator& allocator);

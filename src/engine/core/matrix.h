@@ -2,8 +2,7 @@
 
 
 #include "lumix.h"
-#include "core/vec3.h"
-#include "core/vec4.h"
+#include "core/vec.h"
 
 
 namespace Lumix
@@ -79,10 +78,11 @@ struct LUMIX_ENGINE_API Matrix
 	{
 		m31 = v.x; m32 = v.y; m33 = v.z;
 	}
-	
+
+
 	float determinant()
 	{
-		return 
+		return
 			m14 * m23 * m32 * m41  -  m13 * m24 * m32 * m41  -  m14 * m22 * m33 * m41  +  m12 * m24 * m33 * m41 +
 			m13 * m22 * m34 * m41  -  m12 * m23 * m34 * m41  -  m14 * m23 * m31 * m42  +  m13 * m24 * m31 * m42 +
 			m14 * m21 * m33 * m42  -  m11 * m24 * m33 * m42  -  m13 * m21 * m34 * m42  +  m11 * m23 * m34 * m42 +
@@ -176,45 +176,10 @@ struct LUMIX_ENGINE_API Matrix
 	}
 
 
-	void setPerspective(float fov, float ratio, float near_plane, float far_plane)
-	{
-		*this = Matrix::IDENTITY;
-		float f = 1 / tanf(fov * 0.5f);
-		m11 = f / ratio;
-		m22 = f;
-		m33 = (far_plane + near_plane) / (near_plane - far_plane);
-		m44 = 0;
-		m43 = (2 * far_plane * near_plane) / (near_plane - far_plane);
-		m34 = -1;
-	}
+	void setPerspective(float fov, float ratio, float near_plane, float far_plane);
 
 
-	void fromEuler(float yaw, float pitch, float roll)
-	{
-		float sroll = sinf(roll);
-		float croll = cosf(roll);
-		float spitch = sinf(pitch);
-		float cpitch = cosf(pitch);
-		float syaw = sinf(yaw);
-		float cyaw = cosf(yaw);
-
-		m11 = sroll * spitch * syaw + croll * cyaw;
-		m12 = sroll * cpitch;
-		m13 = sroll * spitch * cyaw - croll * syaw;
-		m14 = 0.0f;
-		m21 = croll * spitch * syaw - sroll * cyaw;
-		m22 = croll * cpitch;
-		m23 = croll * spitch * cyaw + sroll * syaw;
-		m24 = 0.0f;
-		m31 = cpitch * syaw;
-		m32 = -spitch;
-		m33 = cpitch * cyaw;
-		m34 = 0.0f;
-		m41 = 0.0f;
-		m42 = 0.0f;
-		m43 = 0.0f;
-		m44 = 1.0f;
-	}
+	void fromEuler(float yaw, float pitch, float roll);
 
 
 	void lookAt(const Vec3& pos, const Vec3& center, const Vec3& up)

@@ -33,15 +33,12 @@ OsFile::~OsFile()
 
 bool OsFile::open(const char* path, Mode mode, IAllocator& allocator)
 {
-	HANDLE hnd = ::CreateFile(
-		path,
-		Mode::WRITE & mode ? GENERIC_WRITE
-						   : 0 | Mode::READ & mode ? GENERIC_READ : 0,
+	HANDLE hnd = ::CreateFile(path,
+		Mode::WRITE & mode ? GENERIC_WRITE : 0 | Mode::READ & mode ? GENERIC_READ : 0,
 		Mode::WRITE & mode ? 0 : FILE_SHARE_READ,
 		nullptr,
-		Mode::OPEN_OR_CREATE & mode
-			? OPEN_ALWAYS
-			: (Mode::CREATE & mode ? CREATE_ALWAYS : OPEN_EXISTING),
+		Mode::OPEN_OR_CREATE & mode ? OPEN_ALWAYS
+									: (Mode::CREATE & mode ? CREATE_ALWAYS : OPEN_EXISTING),
 		FILE_ATTRIBUTE_NORMAL,
 		nullptr);
 
@@ -124,5 +121,5 @@ void OsFile::writeEOF()
 }
 
 
-} // ~namespace FS
-} // ~namespace Lumix
+} // namespace FS
+} // namespace Lumix

@@ -3,7 +3,7 @@
 
 #include "core/blob.h"
 #include "core/crc32.h"
-#include "core/mt/spin_mutex.h"
+#include "core/mt/sync.h"
 #include "core/path_utils.h"
 #include "core/string.h"
 

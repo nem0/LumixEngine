@@ -1,8 +1,7 @@
 #pragma once
 
 #include "core/mt/Task.h"
-#include "core/mt/event.h"
-#include "core/mt/semaphore.h"
+#include "core/mt/sync.h"
 
 namespace Lumix
 {

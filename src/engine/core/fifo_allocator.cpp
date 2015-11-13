@@ -13,17 +13,19 @@ namespace Lumix
 		m_start = m_end = 0;
 	}
 
+
 	FIFOAllocator::~FIFOAllocator()
 	{
 		ASSERT(m_start == m_end);
 		free(m_buffer);
 	}
 
+
 	void* FIFOAllocator::allocate(size_t n)
 	{
 		ASSERT(n + 4 < m_buffer_size);
 		MT::SpinLock lock(m_mutex);
-		
+
 		int32 size = (int32)n + 4;
 		int32 old_end = m_end;
 		int32 new_end;
@@ -44,6 +46,7 @@ namespace Lumix
 		m_end = new_end;
 		return m_buffer + (new_end - size) + 4;
 	}
+
 
 	void FIFOAllocator::deallocate(void* p)
 	{

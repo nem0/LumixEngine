@@ -9,7 +9,7 @@
 #include "core/system.h"
 #include "editor/entity_template_system.h"
 #include "editor/ieditor_command.h"
-#include "editor/property_descriptor.h"
+#include "editor/iproperty_descriptor.h"
 #include "editor/property_register.h"
 #include "engine.h"
 #include "ocornut-imgui/imgui.h"
@@ -20,6 +20,7 @@
 #include "stb/stb_image.h"
 #include "universe/universe.h"
 #include "utils.h"
+#include <cmath>
 
 
 static const Lumix::uint32 RENDERABLE_HASH = Lumix::crc32("renderable");

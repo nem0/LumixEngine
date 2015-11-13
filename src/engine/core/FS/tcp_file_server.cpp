@@ -9,8 +9,8 @@
 #include "core/fs/os_file.h"
 #include "core/fs/tcp_file_device.h"
 #include "core/mt/task.h"
-#include "core/net/tcp_acceptor.h"
-#include "core/net/tcp_stream.h"
+#include "core/network.h"
+
 
 namespace Lumix
 {

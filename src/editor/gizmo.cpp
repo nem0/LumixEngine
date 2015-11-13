@@ -14,6 +14,7 @@
 #include "renderer/transient_geometry.h"
 #include "universe/universe.h"
 #include <cfloat>
+#include <cmath>
 
 
 namespace Lumix

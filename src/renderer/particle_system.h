@@ -3,7 +3,7 @@
 
 #include "lumix.h"
 #include "core/array.h"
-#include "core/vec3.h"
+#include "core/vec.h"
 
 
 namespace Lumix

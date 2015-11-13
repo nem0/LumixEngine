@@ -2,7 +2,7 @@
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/resource_manager.h"
-#include "core/vec3.h"
+#include "core/vec.h"
 #include "physics/physics_system.h"
 #include <PxPhysicsAPI.h>
 

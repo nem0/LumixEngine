@@ -1,7 +1,9 @@
 #include "property_grid.h"
 #include "asset_browser.h"
+#include "core/blob.h"
 #include "core/crc32.h"
-#include "editor/property_descriptor.h"
+#include "core/vec.h"
+#include "editor/iproperty_descriptor.h"
 #include "editor/property_register.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
@@ -10,6 +12,7 @@
 #include "ocornut-imgui/imgui.h"
 #include "terrain_editor.h"
 #include "utils.h"
+#include <cmath>
 
 
 const char* PropertyGrid::getComponentTypeName(Lumix::ComponentUID cmp) const
@@ -17,8 +20,7 @@ const char* PropertyGrid::getComponentTypeName(Lumix::ComponentUID cmp) const
 	auto& engine = m_editor.getEngine();
 	for (int i = 0; i < Lumix::PropertyRegister::getComponentTypesCount(); ++i)
 	{
-		if (cmp.type ==
-			Lumix::crc32(Lumix::PropertyRegister::getComponentTypeID(i)))
+		if (cmp.type == Lumix::crc32(Lumix::PropertyRegister::getComponentTypeID(i)))
 		{
 			return Lumix::PropertyRegister::getComponentTypeName(i);
 		}
