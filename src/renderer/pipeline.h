@@ -63,7 +63,7 @@ class LUMIX_RENDERER_API Pipeline : public Resource
 class LUMIX_RENDERER_API PipelineInstance
 {
 	public:
-		typedef Delegate<void> CustomCommandHandler; 
+		typedef Delegate<void> CustomCommandHandler;
 
 	public:
 		virtual ~PipelineInstance() {}
@@ -101,6 +101,4 @@ class LUMIX_RENDERER_API PipelineInstance
 		virtual void setParameter(int index, bool value) = 0;
 		virtual bool getParameter(int index) = 0;
 };
-
-
 }

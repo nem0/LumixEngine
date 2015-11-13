@@ -74,7 +74,6 @@ crn_bool ddsConvertCallback(crn_uint32 phase_index,
 
 static bool saveAsRaw(ImportAssetDialog& dialog,
 	Lumix::FS::FileSystem& fs,
-	const char* source_path,
 	const Lumix::uint8* image_data,
 	int image_width,
 	int image_height,
@@ -261,7 +260,6 @@ struct ImportTextureTask : public Lumix::MT::Task
 
 			saveAsRaw(m_dialog,
 				m_dialog.m_editor.getEngine().getFileSystem(),
-				m_dialog.m_source,
 				data,
 				image_width,
 				image_height,

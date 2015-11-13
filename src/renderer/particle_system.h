@@ -52,9 +52,9 @@ public:
 		ModuleBase(ParticleEmitter& emitter);
 
 		virtual ~ModuleBase() {}
-		virtual void spawnParticle(int index) {}
-		virtual void destoryParticle(int index) {}
-		virtual void update(float time_delta) {}
+		virtual void spawnParticle(int /*index*/) {}
+		virtual void destoryParticle(int /*index*/) {}
+		virtual void update(float /*time_delta*/) {}
 		virtual void serialize(OutputBlob& blob) = 0;
 		virtual void deserialize(InputBlob& blob) = 0;
 		virtual uint32 getType() const = 0;
@@ -82,8 +82,8 @@ public:
 	{
 		AlphaModule(ParticleEmitter& emitter);
 		void update(float time_delta) override;
-		void serialize(OutputBlob& blob) override {}
-		void deserialize(InputBlob& blob) override {}
+		void serialize(OutputBlob&) override {}
+		void deserialize(InputBlob&) override {}
 		uint32 getType() const override { return s_type; }
 
 		static const uint32 s_type;
@@ -96,8 +96,8 @@ public:
 	{
 		RandomRotationModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
-		void serialize(OutputBlob& blob) override {}
-		void deserialize(InputBlob& blob) override {}
+		void serialize(OutputBlob&) override {}
+		void deserialize(InputBlob&) override {}
 		uint32 getType() const override { return s_type; }
 
 		static const uint32 s_type;

@@ -1721,10 +1721,9 @@ public:
 	}
 
 
-	void
-		getPointLightInfluencedGeometry(ComponentIndex light_cmp,
+	void getPointLightInfluencedGeometry(ComponentIndex light_cmp,
 		Array<const RenderableMesh*>& infos,
-		int64 layer_mask) override
+		int64) override
 	{
 		PROFILE_FUNCTION();
 

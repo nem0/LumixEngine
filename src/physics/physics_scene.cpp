@@ -144,7 +144,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	class RigidActor
 	{
 	public:
-		RigidActor(PhysicsSceneImpl& scene, IAllocator& allocator)
+		RigidActor(PhysicsSceneImpl& scene)
 			: m_resource(nullptr)
 			, m_physx_actor(nullptr)
 			, m_scene(scene)
@@ -321,7 +321,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentIndex createBoxRigidActor(Entity entity)
 	{
-		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, m_allocator);
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this);
 		m_actors.push(actor);
 		actor->setEntity(entity);
 
@@ -348,7 +348,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentIndex createMeshRigidActor(Entity entity)
 	{
-		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, m_allocator);
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this);
 		m_actors.push(actor);
 		actor->setEntity(entity);
 
@@ -470,8 +470,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_scene->getNbActors(physx::PxActorTypeSelectionFlag::eRIGID_STATIC);
 		const physx::PxRenderBuffer& rb = m_scene->getRenderBuffer();
 		const physx::PxU32 num_lines = rb.getNbLines();
-		const physx::PxU32 num_points = rb.getNbPoints();
-		const physx::PxU32 num_tri = rb.getNbTriangles();
 		if (num_lines)
 		{
 			const physx::PxDebugLine* PX_RESTRICT lines = rb.getLines();
@@ -585,8 +583,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void
-	moveController(ComponentIndex cmp, const Vec3& v, float dt) override
+	void moveController(ComponentIndex cmp, const Vec3& v, float) override
 	{
 		m_controllers[cmp].m_frame_change += v;
 	}
@@ -1044,7 +1041,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_actors.resize(count);
 		for (int i = old_size; i < count; ++i)
 		{
-			RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, m_allocator);
+			RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this);
 			m_actors[i] = actor;
 		}
 		for (int i = 0; i < m_actors.size(); ++i)
@@ -1245,8 +1242,7 @@ void PhysicsScene::destroy(PhysicsScene* scene)
 }
 
 
-void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State old_state,
-												  Resource::State new_state)
+void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::State new_state)
 {
 	if (new_state == Resource::State::READY)
 	{

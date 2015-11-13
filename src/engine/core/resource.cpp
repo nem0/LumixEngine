@@ -56,7 +56,7 @@ void Resource::checkState()
 }
 
 
-void Resource::fileLoaded(FS::IFile& file, bool success, FS::FileSystem& fs)
+void Resource::fileLoaded(FS::IFile& file, bool success)
 {
 	m_is_waiting_for_load = false;
 	if (m_desired_state != State::READY) return;

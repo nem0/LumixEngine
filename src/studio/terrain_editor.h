@@ -36,8 +36,7 @@ public:
 
 	virtual void tick() override;
 	virtual bool onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int) override;
-	virtual void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/
-		) override;
+	virtual void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/) override;
 	virtual void onMouseUp(int, int, Lumix::MouseButton::Value) override;
 	void onGUI();
 	void setComponent(Lumix::ComponentUID cmp) { m_component = cmp; }
@@ -62,7 +61,7 @@ private:
 	void prevTerrainTexture();
 	Lumix::uint16 getHeight(const Lumix::Vec3& world_pos);
 	Lumix::Texture* getHeightmap();
-	Lumix::Vec3& getRelativePosition(const Lumix::Vec3& world_pos) const;
+	Lumix::Vec3 getRelativePosition(const Lumix::Vec3& world_pos) const;
 
 private:
 	Lumix::WorldEditor& m_world_editor;

@@ -144,9 +144,8 @@ void PhysicsSystemImpl::destroyScene(IScene* scene)
 class AssertNullAllocator : public physx::PxAllocatorCallback
 {
 	public:
-		virtual void* allocate(size_t size, const char* typeName, const char* filename, int line) override
+		virtual void* allocate(size_t size, const char*, const char*, int) override
 		{
-			
 			void* ret = _aligned_malloc(size, 16);
 			// g_log_info.log("PhysX") << "Allocated " << size << " bytes for " << typeName << "
 			// from " << filename << "(" << line << ")";
@@ -209,7 +208,10 @@ bool PhysicsSystemImpl::connect2VisualDebugger()
 }
 
 
-void CustomErrorCallback::reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line)
+void CustomErrorCallback::reportError(physx::PxErrorCode::Enum,
+	const char* message,
+	const char*,
+	int)
 {
 	g_log_error.log("PhysX") << message;
 }

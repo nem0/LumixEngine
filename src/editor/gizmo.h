@@ -69,7 +69,7 @@ class LUMIX_EDITOR_API Gizmo
 		Mode getMode() const { return m_mode; }
 		void transform(ComponentIndex camera, int x, int y, int relx, int rely, bool use_step);
 		void render(PipelineInstance& pipeline);
-		bool castRay(const Vec3& origin, const Vec3& dir);
+		bool isHit();
 		void togglePivot();
 		void toggleCoordSystem();
 		int getStep() const { return m_step[int(m_mode)]; }

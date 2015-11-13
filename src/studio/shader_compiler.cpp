@@ -162,15 +162,11 @@ void ShaderCompiler::makeUpToDate()
 		auto& value = m_dependencies.at(i);
 		for (auto& bin : value)
 		{
-			auto x = Lumix::getLastModified(bin.c_str());
-			auto y = Lumix::getLastModified(key.c_str());
 			if (!Lumix::fileExists(bin.c_str()) ||
-				Lumix::getLastModified(bin.c_str()) <
-					Lumix::getLastModified(key.c_str()))
+				Lumix::getLastModified(bin.c_str()) < Lumix::getLastModified(key.c_str()))
 			{
 				char basename[Lumix::MAX_PATH_LENGTH];
-				Lumix::PathUtils::getBasename(
-					basename, sizeof(basename), bin.c_str());
+				Lumix::PathUtils::getBasename(basename, sizeof(basename), bin.c_str());
 				char tmp[Lumix::MAX_PATH_LENGTH];
 				getSourceFromBinaryBasename(tmp, sizeof(tmp), basename);
 				Lumix::string src(tmp, m_editor.getAllocator());
@@ -452,7 +448,7 @@ void ShaderCompiler::processChangedFiles()
 }
 
 
-void ShaderCompiler::update(float time_delta)
+void ShaderCompiler::update(float)
 {
 	PROFILE_FUNCTION();
 	for (int i = 0; i < m_processes.size(); ++i)

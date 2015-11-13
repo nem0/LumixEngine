@@ -118,7 +118,7 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 	}
 	
 
-	virtual bool merge(IEditorCommand& command) { return false; }
+	virtual bool merge(IEditorCommand& /*command*/) { return false; }
 
 
 	virtual bool execute() override
@@ -436,7 +436,7 @@ struct RemoveEntitiesCommand : public Lumix::IEditorCommand
 	}
 
 
-	virtual bool merge(IEditorCommand& command) { return false; }
+	virtual bool merge(IEditorCommand& /*command*/) { return false; }
 
 
 	virtual bool execute() override
@@ -544,8 +544,6 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 							 ->getTerrainXZScale(terrain.index);
 		local_pos = local_pos / xz_scale;
 		local_pos.y = -1;
-		auto hm = getMaterial()->getTextureByUniform(HEIGHTMAP_UNIFORM);
-		auto texture = getDestinationTexture();
 
 		Item& item = m_items.pushEmpty();
 		item.m_local_pos = local_pos;
@@ -1325,7 +1323,7 @@ void TerrainEditor::detectModifiers()
 }
 
 
-Lumix::Vec3& TerrainEditor::getRelativePosition(const Lumix::Vec3& world_pos) const
+Lumix::Vec3 TerrainEditor::getRelativePosition(const Lumix::Vec3& world_pos) const
 {
 	Lumix::Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix(m_component.entity);
 	Lumix::Matrix inv_terrain_matrix = terrain_matrix;

@@ -76,7 +76,7 @@ public:
 
 
 public:
-	LuaScriptSceneImpl(LuaScriptSystem& system, Engine& engine, UniverseContext& ctx)
+	LuaScriptSceneImpl(LuaScriptSystem& system, UniverseContext& ctx)
 		: m_system(system)
 		, m_universe_context(ctx)
 		, m_scripts(system.getAllocator())
@@ -488,7 +488,7 @@ IAllocator& LuaScriptSystem::getAllocator()
 
 IScene* LuaScriptSystem::createScene(UniverseContext& ctx)
 {
-	return LUMIX_NEW(m_allocator, LuaScriptSceneImpl)(*this, m_engine, ctx);
+	return LUMIX_NEW(m_allocator, LuaScriptSceneImpl)(*this, ctx);
 }
 
 

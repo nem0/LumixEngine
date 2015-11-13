@@ -92,23 +92,16 @@ struct BGFXAllocator : public bx::ReallocatorI
 	}
 
 
-	virtual void* alloc(size_t _size, size_t _align, const char* _file, uint32 _line) override 
+	void* alloc(size_t _size, size_t, const char*, uint32) override
 	{
 		return m_source.allocate(_size);
 	}
 
 
-	virtual void free(void* _ptr, size_t _align, const char* _file, uint32 _line) override 
-	{
-		m_source.deallocate(_ptr);
-	}
+	void free(void* _ptr, size_t, const char*, uint32) override { m_source.deallocate(_ptr); }
 
 
-	virtual void* realloc(void* _ptr,
-		size_t _size,
-		size_t _align,
-		const char* _file,
-		uint32 _line) override
+	void* realloc(void* _ptr, size_t _size, size_t, const char*, uint32) override
 	{
 		return m_source.reallocate(_ptr, _size);
 	}

@@ -31,19 +31,19 @@ int stringLength(const char* str)
 }
 
 
-void moveMemory(void* dest, const void* src, int count)
+void moveMemory(void* dest, const void* src, size_t count)
 {
 	memmove(dest, src, count);
 }
 
 
-void setMemory(void* ptr, uint8 value, int num)
+void setMemory(void* ptr, uint8 value, size_t num)
 {
 	memset(ptr, value, num);
 }
 
 
-void copyMemory(void* dest, const void* src, int count)
+void copyMemory(void* dest, const void* src, size_t count)
 {
 	memcpy(dest, src, count);
 }

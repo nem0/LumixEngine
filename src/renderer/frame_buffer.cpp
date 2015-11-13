@@ -19,16 +19,16 @@ FrameBuffer::FrameBuffer(const Declaration& decl)
 	for (int i = 0; i < decl.m_renderbuffers_count; ++i)
 	{
 		const RenderBuffer& renderbuffer = decl.m_renderbuffers[i];
-		texture_handles[i] = bgfx::createTexture2D(decl.m_width,
-												   decl.m_height,
-												   1,
-												   renderbuffer.m_format,
-												   BGFX_TEXTURE_RT);
+		texture_handles[i] = bgfx::createTexture2D((uint16_t)decl.m_width,
+			(uint16_t)decl.m_height,
+			1,
+			renderbuffer.m_format,
+			BGFX_TEXTURE_RT);
 		m_declaration.m_renderbuffers[i].m_handle = texture_handles[i];
 	}
 
 	m_window_handle = nullptr;
-	m_handle = bgfx::createFrameBuffer(decl.m_renderbuffers_count, texture_handles);
+	m_handle = bgfx::createFrameBuffer((uint8_t)decl.m_renderbuffers_count, texture_handles);
 }
 
 
@@ -40,7 +40,7 @@ FrameBuffer::FrameBuffer(const char* name, int width, int height, void* window_h
 	m_declaration.m_height = height;
 	m_declaration.m_renderbuffers_count = 0;
 	m_window_handle = window_handle;
-	m_handle = bgfx::createFrameBuffer(window_handle, width, height);
+	m_handle = bgfx::createFrameBuffer(window_handle, (uint16_t)width, (uint16_t)height);
 }
 
 
@@ -58,7 +58,7 @@ void FrameBuffer::resize(int width, int height)
 	m_declaration.m_height = height;
 	if (m_window_handle)
 	{
-		m_handle = bgfx::createFrameBuffer(m_window_handle, width, height);
+		m_handle = bgfx::createFrameBuffer(m_window_handle, (uint16_t)width, (uint16_t)height);
 	}
 	else
 	{
@@ -68,12 +68,12 @@ void FrameBuffer::resize(int width, int height)
 		{
 			const RenderBuffer& renderbuffer = m_declaration.m_renderbuffers[i];
 			texture_handles[i] =
-				bgfx::createTexture2D(width, height, 1, renderbuffer.m_format, BGFX_TEXTURE_RT);
+				bgfx::createTexture2D((uint16_t)width, (uint16_t)height, 1, renderbuffer.m_format, BGFX_TEXTURE_RT);
 			m_declaration.m_renderbuffers[i].m_handle = texture_handles[i];
 		}
 
 		m_window_handle = nullptr;
-		m_handle = bgfx::createFrameBuffer(m_declaration.m_renderbuffers_count, texture_handles);
+		m_handle = bgfx::createFrameBuffer((uint8_t)m_declaration.m_renderbuffers_count, texture_handles);
 	}
 }
 

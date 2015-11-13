@@ -46,12 +46,12 @@ public:
 	{
 		Node(int type, ShaderEditor& editor);
 
-		virtual void save(Lumix::OutputBlob& blob) {}
-		virtual void load(Lumix::InputBlob& blob) {}
+		virtual void save(Lumix::OutputBlob& /*blob*/) {}
+		virtual void load(Lumix::InputBlob& /*blob*/) {}
 		virtual void generate(Lumix::OutputBlob& blob) = 0;
 		virtual void printReference(Lumix::OutputBlob& blob);
-		virtual void generateBeforeMain(Lumix::OutputBlob& blob) {}
-		virtual ValueType getOutputType(int index) const { return ValueType::FLOAT; }
+		virtual void generateBeforeMain(Lumix::OutputBlob& /*blob*/) {}
+		virtual ValueType getOutputType(int /*index*/) const { return ValueType::FLOAT; }
 		virtual ~Node();
 
 		ValueType getInputType(int index) const;

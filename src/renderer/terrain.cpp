@@ -824,7 +824,7 @@ static void generateSubgrid(Array<Sample>& samples, Array<short>& indices, int& 
 	{
 		for (int i = start_x; i < start_x + 8; ++i)
 		{
-			short idx = 4 * (i + j * GRID_SIZE);
+			short idx = short(4 * (i + j * GRID_SIZE));
 			samples[idx].pos.set((float)(i) / GRID_SIZE, 0, (float)(j) / GRID_SIZE);
 			samples[idx + 1].pos.set((float)(i + 1) / GRID_SIZE, 0, (float)(j) / GRID_SIZE);
 			samples[idx + 2].pos.set((float)(i + 1) / GRID_SIZE, 0, (float)(j + 1) / GRID_SIZE);
