@@ -11,7 +11,7 @@
 #include "core/log.h"
 #include "core/lua_wrapper.h"
 #include "core/resource_manager.h"
-#include "debug/allocator.h"
+#include "debug/debug.h"
 #include "engine.h"
 #include "iplugin.h"
 #include "plugin_manager.h"

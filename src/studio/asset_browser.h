@@ -1,7 +1,7 @@
 #pragma once
 #include "core/array.h"
 #include "core/path.h"
-#include "core/MT/spin_mutex.h"
+#include "core/mt/sync.h"
 #include <bgfx/bgfx.h>
 
 

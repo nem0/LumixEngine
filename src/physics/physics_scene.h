@@ -3,7 +3,7 @@
 
 #include "lumix.h"
 #include "core/iallocator.h"
-#include "core/vec3.h"
+#include "core/vec.h"
 #include "iplugin.h"
 
 

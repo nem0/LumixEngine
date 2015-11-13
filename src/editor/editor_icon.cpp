@@ -10,6 +10,8 @@
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "world_editor.h"
+#include <cmath>
+
 
 namespace Lumix
 {
@@ -140,20 +142,16 @@ void EditorIcon::render(PipelineInstance& pipeline)
 	{
 		const Universe& universe = m_scene->getUniverse();
 		ComponentIndex camera = m_scene->getCameraInSlot("editor");
-		Lumix::Matrix mtx =
-			universe.getMatrix(m_scene->getCameraEntity(camera));
+		Lumix::Matrix mtx = universe.getMatrix(m_scene->getCameraEntity(camera));
 
 		float fov = m_scene->getCameraFOV(camera);
 		Vec3 position = universe.getPosition(m_entity);
-		float distance =
-			(position - mtx.getTranslation()).length();
+		float distance = (position - mtx.getTranslation()).length();
 
 		float scaleFactor = MIN_SCALE_FACTOR + distance;
-		scaleFactor =
-			Math::clamp(scaleFactor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
+		scaleFactor = Math::clamp(scaleFactor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
 
-		float scale =
-			tan(Math::degreesToRadians(fov) * 0.5f) * distance / scaleFactor;
+		float scale = tan(Math::degreesToRadians(fov) * 0.5f) * distance / scaleFactor;
 
 		mtx.setTranslation(position);
 		Matrix scale_mtx = Matrix::IDENTITY;

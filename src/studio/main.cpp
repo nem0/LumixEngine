@@ -12,7 +12,7 @@
 #include "core/resource_manager.h"
 #include "core/system.h"
 #include "core/timer.h"
-#include "debug/allocator.h"
+#include "debug/debug.h"
 #include "editor/gizmo.h"
 #include "editor/entity_template_system.h"
 #include "editor/world_editor.h"

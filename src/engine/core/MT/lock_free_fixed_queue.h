@@ -2,7 +2,7 @@
 
 #include "core/iallocator.h"
 #include "core/mt/atomic.h"
-#include "core/mt/semaphore.h"
+#include "core/mt/sync.h"
 
 
 namespace Lumix

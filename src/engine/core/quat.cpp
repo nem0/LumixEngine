@@ -1,6 +1,6 @@
 #include "core/quat.h"
 #include <cmath>
-#include "core/vec3.h"
+#include "core/vec.h"
 #include "core/math_utils.h"
 #include "core/matrix.h"
 

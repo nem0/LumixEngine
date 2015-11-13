@@ -24,7 +24,7 @@ namespace Lumix
 				public:
 					ErrorProxy(JsonSerializer& serializer);
 					LogProxy& log() { return m_log; }
-				
+
 				private:
 					LogProxy m_log;
 			};
@@ -34,7 +34,7 @@ namespace Lumix
 				READ,
 				WRITE
 			};
-			
+
 		public:
 			JsonSerializer(FS::IFile& file, AccessMode access_mode, const char* path, IAllocator& allocator);
 			~JsonSerializer();
@@ -57,7 +57,7 @@ namespace Lumix
 			void serializeArrayItem(bool value);
 			void serializeArrayItem(const char* value);
 
-			// deserialize		
+			// deserialize
 			void deserialize(const char* label, uint32& value, uint32 default_value);
 			void deserialize(const char* label, float& value, float default_value);
 			void deserialize(const char* label, int32& value, int32 default_value);
@@ -111,7 +111,7 @@ namespace Lumix
 			Path m_path;
 			IAllocator& m_allocator;
 			string m_error_message;
-			
+
 			const char* m_data;
 			int m_data_size;
 			bool m_own_data;

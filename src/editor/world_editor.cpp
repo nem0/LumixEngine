@@ -22,14 +22,14 @@
 #include "core/resource_manager_base.h"
 #include "core/system.h"
 #include "core/timer.h"
-#include "debug/allocator.h"
+#include "debug/debug.h"
 #include "editor/editor_icon.h"
 #include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
 #include "editor/measure_tool.h"
+#include "editor/iproperty_descriptor.h"
 #include "editor/property_register.h"
 #include "engine.h"
-#include "editor/property_descriptor.h"
 #include "iplugin.h"
 #include "plugin_manager.h"
 #include "renderer/material.h"
@@ -39,6 +39,7 @@
 #include "renderer/texture.h"
 #include "ieditor_command.h"
 #include "universe/universe.h"
+
 
 
 namespace Lumix
@@ -518,9 +519,9 @@ public:
 	}
 
 	RemoveArrayPropertyItemCommand(WorldEditor& editor,
-								   const ComponentUID& component,
-								   int index,
-								   IArrayDescriptor& descriptor)
+		const ComponentUID& component,
+		int index,
+		IArrayDescriptor& descriptor)
 		: m_component(component)
 		, m_index(index)
 		, m_descriptor(&descriptor)
@@ -529,8 +530,7 @@ public:
 	{
 		for (int i = 0, c = m_descriptor->getChildren().size(); i < c; ++i)
 		{
-			m_descriptor->getChildren()[i]->get(
-				component, m_index, m_old_values);
+			m_descriptor->getChildren()[i]->get(component, m_index, m_old_values);
 		}
 	}
 
@@ -1495,7 +1495,7 @@ public:
 			this_min = minCoords(points[j], this_min);
 			this_max = maxCoords(points[j], this_max);
 		}
-			
+
 		scene->addDebugCube(this_min, this_max, 0xffff0000, 0);
 	}
 
@@ -1514,7 +1514,7 @@ public:
 		Vec3 up = universe.getRotation(camera.entity) * Vec3(0, 1, 0);
 		float w = scene->getCameraWidth(camera.index);
 		float h = scene->getCameraHeight(camera.index);
-		float ratio = h <= FLT_MIN ? 1 : w / h;
+		float ratio = h < 1.0f ? 1 : w / h;
 
 		scene->addDebugFrustum(pos,
 							   dir,
@@ -2588,40 +2588,27 @@ public:
 		m_template_system = EntityTemplateSystem::create(*this);
 
 		m_editor_command_creators.insert(
-			crc32("scale_entity"),
-			&WorldEditorImpl::constructEditorCommand<ScaleEntityCommand>);
+			crc32("scale_entity"), &WorldEditorImpl::constructEditorCommand<ScaleEntityCommand>);
 		m_editor_command_creators.insert(
-			crc32("move_entity"),
-			&WorldEditorImpl::constructEditorCommand<MoveEntityCommand>);
-		m_editor_command_creators.insert(
-			crc32("set_entity_name"),
+			crc32("move_entity"), &WorldEditorImpl::constructEditorCommand<MoveEntityCommand>);
+		m_editor_command_creators.insert(crc32("set_entity_name"),
 			&WorldEditorImpl::constructEditorCommand<SetEntityNameCommand>);
 		m_editor_command_creators.insert(
-			crc32("paste_entity"),
-			&WorldEditorImpl::constructEditorCommand<PasteEntityCommand>);
+			crc32("paste_entity"), &WorldEditorImpl::constructEditorCommand<PasteEntityCommand>);
+		m_editor_command_creators.insert(crc32("remove_array_property_item"),
+			&WorldEditorImpl::constructEditorCommand<RemoveArrayPropertyItemCommand>);
+		m_editor_command_creators.insert(crc32("add_array_property_item"),
+			&WorldEditorImpl::constructEditorCommand<AddArrayPropertyItemCommand>);
 		m_editor_command_creators.insert(
-			crc32("remove_array_property_item"),
-			&WorldEditorImpl::constructEditorCommand<
-				RemoveArrayPropertyItemCommand>);
+			crc32("set_property"), &WorldEditorImpl::constructEditorCommand<SetPropertyCommand>);
 		m_editor_command_creators.insert(
-			crc32("add_array_property_item"),
-			&WorldEditorImpl::constructEditorCommand<
-			AddArrayPropertyItemCommand>);
-		m_editor_command_creators.insert(
-			crc32("set_property"),
-			&WorldEditorImpl::constructEditorCommand<SetPropertyCommand>);
-		m_editor_command_creators.insert(
-			crc32("add_component"),
-			&WorldEditorImpl::constructEditorCommand<AddComponentCommand>);
-		m_editor_command_creators.insert(
-			crc32("destroy_entities"),
+			crc32("add_component"), &WorldEditorImpl::constructEditorCommand<AddComponentCommand>);
+		m_editor_command_creators.insert(crc32("destroy_entities"),
 			&WorldEditorImpl::constructEditorCommand<DestroyEntitiesCommand>);
-		m_editor_command_creators.insert(
-			crc32("destroy_component"),
+		m_editor_command_creators.insert(crc32("destroy_component"),
 			&WorldEditorImpl::constructEditorCommand<DestroyComponentCommand>);
 		m_editor_command_creators.insert(
-			crc32("add_entity"),
-			&WorldEditorImpl::constructEditorCommand<AddEntityCommand>);
+			crc32("add_entity"), &WorldEditorImpl::constructEditorCommand<AddEntityCommand>);
 
 		EditorIcon::loadIcons(*m_engine);
 
@@ -2687,8 +2674,8 @@ public:
 
 
 	void removeArrayPropertyItem(const ComponentUID& cmp,
-										 int index,
-										 IArrayDescriptor& property) override
+		int index,
+		IArrayDescriptor& property) override
 	{
 		if (cmp.isValid())
 		{

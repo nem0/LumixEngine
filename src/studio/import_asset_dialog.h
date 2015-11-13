@@ -5,7 +5,7 @@
 #include "core/array.h"
 #include "core/associative_array.h"
 #include "core/binary_array.h"
-#include "core/mt/spin_mutex.h"
+#include "core/mt/sync.h"
 #include "core/string.h"
 #include "lumix.h"
 

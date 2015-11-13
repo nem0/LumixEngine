@@ -7,7 +7,7 @@
 #include "core/matrix.h"
 #include "core/quat.h"
 #include "core/string.h"
-#include "core/vec3.h"
+#include "core/vec.h"
 #include "core/resource.h"
 #include "renderer/ray_cast_model_hit.h"
 #include <bgfx/bgfx.h>

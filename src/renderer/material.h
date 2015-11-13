@@ -3,7 +3,7 @@
 
 #include "core/array.h"
 #include "core/resource.h"
-#include "core/vec3.h"
+#include "core/vec.h"
 #include <bgfx/bgfx.h>
 
 

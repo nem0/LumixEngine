@@ -2,7 +2,7 @@
 
 
 #include "lumix.h"
-#include "core/vec3.h"
+#include "core/vec.h"
 #include "universe/universe.h"
 #include "renderer/model.h"
 #include <bgfx/bgfx.h>

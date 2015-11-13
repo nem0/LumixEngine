@@ -2,7 +2,7 @@
 
 
 #include "core/array.h"
-#include "debug/allocator.h"
+#include "debug/debug.h"
 #include "core/default_allocator.h"
 #include "core/profiler.h"
 

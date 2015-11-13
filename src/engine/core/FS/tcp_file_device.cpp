@@ -4,9 +4,8 @@
 #include "core/fs/ifile.h"
 #include "core/fs/ifile_system_defines.h"
 #include "core/fs/file_system.h"
-#include "core/net/tcp_connector.h"
-#include "core/net/tcp_stream.h"
-#include "core/mt/spin_mutex.h"
+#include "core/mt/sync.h"
+#include "core/network.h"
 
 
 namespace Lumix

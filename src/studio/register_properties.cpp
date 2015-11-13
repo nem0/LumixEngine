@@ -1,10 +1,12 @@
 #include "editor/property_register.h"
+#include "core/crc32.h"
 #include "core/resource_manager.h"
 #include "editor/property_descriptor.h"
 #include "editor/world_editor.h"
 #include "lua_script/lua_script_system.h"
 #include "physics/physics_scene.h"
 #include "renderer/render_scene.h"
+#include <cfloat>
 
 
 using namespace Lumix;

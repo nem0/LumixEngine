@@ -12,7 +12,6 @@
 #include "core/fs/file_system.h"
 #include "core/fs/memory_file_device.h"
 #include "core/mtjd/manager.h"
-#include "debug/allocator.h"
 #include "debug/debug.h"
 #include "engine/iplugin.h"
 #include "plugin_manager.h"
