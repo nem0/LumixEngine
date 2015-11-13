@@ -56,9 +56,9 @@ namespace
 
 		Lumix::CullingSystem* culling_system;
 		{
-			Lumix::MTJD::Manager mtjd_manager(allocator);
+			Lumix::MTJD::Manager* mtjd_manager = Lumix::MTJD::Manager::create(allocator);
 
-			culling_system = Lumix::CullingSystem::create(mtjd_manager, allocator);
+			culling_system = Lumix::CullingSystem::create(*mtjd_manager, allocator);
 			culling_system->insert(spheres);
 
 			Lumix::ScopedTimer timer("Culling System", allocator);
@@ -75,6 +75,7 @@ namespace
 				}
 			}
 
+			Lumix::MTJD::Manager::destroy(*mtjd_manager);
 		}
 
 		Lumix::CullingSystem::destroy(*culling_system);
@@ -101,9 +102,9 @@ namespace
 
 		Lumix::CullingSystem* culling_system;
 		{
-			Lumix::MTJD::Manager mtjd_manager(allocator);
+			Lumix::MTJD::Manager* mtjd_manager = Lumix::MTJD::Manager::create(allocator);
 
-			culling_system = Lumix::CullingSystem::create(mtjd_manager, allocator);
+			culling_system = Lumix::CullingSystem::create(*mtjd_manager, allocator);
 			culling_system->insert(spheres);
 
 			Lumix::ScopedTimer timer("Culling System Async", allocator);
@@ -121,6 +122,7 @@ namespace
 				}
 			}
 
+			Lumix::MTJD::Manager::destroy(*mtjd_manager);
 		}
 
 		Lumix::CullingSystem::destroy(*culling_system);
