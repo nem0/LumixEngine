@@ -490,7 +490,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void setViewProjection(const Matrix& mtx, int width, int height) override
 	{
-		bgfx::setViewRect(m_view_idx, 0, 0, width, height);
+		bgfx::setViewRect(m_view_idx, 0, 0, (uint16_t)width, (uint16_t)height);
 		bgfx::setViewTransform(m_view_idx, nullptr, &mtx.m11);
 	}
 
@@ -546,9 +546,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Matrix mtx = universe.getMatrix(getScene()->getCameraEntity(cmp));
 		mtx.fastInverse();
 		bgfx::setViewTransform(m_view_idx, &mtx.m11, &projection_matrix.m11);
-		
+
 		bgfx::setViewRect(
-			m_view_idx, m_view_x, m_view_y, (uint16)m_width, (uint16)m_height);
+			m_view_idx, (uint16_t)m_view_x, (uint16_t)m_view_y, (uint16)m_width, (uint16)m_height);
 	}
 
 
@@ -569,7 +569,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			if (m_view2pass_map[i] == m_pass_idx)
 			{
-				m_view_idx = i;
+				m_view_idx = (uint8)i;
 				return;
 			}
 		}
@@ -683,19 +683,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void renderPointLightShadowmaps(ComponentIndex camera, ComponentIndex light)
-	{
-		Frustum light_frustum;
-		int64 mask = 0;
-		mask = ~mask;
-		renderPointLightInfluencedGeometry(light_frustum, mask);
-	}
-
-
 	void beginNewView(FrameBuffer* framebuffer, const char* debug_name)
 	{
 		m_renderer.viewCounterAdd();
-		m_view_idx = m_renderer.getViewCounter();
+		m_view_idx = (uint8)m_renderer.getViewCounter();
 		m_view2pass_map[m_view_idx] = m_pass_idx;
 		m_current_framebuffer = framebuffer;
 		if (framebuffer)
@@ -1450,11 +1441,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void setTexture(int slot,
-		bgfx::TextureHandle texture,
-		bgfx::UniformHandle uniform) override
+	void setTexture(int slot, bgfx::TextureHandle texture, bgfx::UniformHandle uniform) override
 	{
-		bgfx::setTexture(0, uniform, texture);
+		bgfx::setTexture(slot, uniform, texture);
 	}
 
 
@@ -1595,9 +1584,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Vec3 camera_pos =
 			m_scene->getUniverse().getPosition(m_scene->getCameraEntity(m_applied_camera));
 
-		Vec3 rel_cam_pos =
-			inv_world_matrix.multiplyPosition(camera_pos) / info.m_terrain->getXZScale();
-
+		Vec4 rel_cam_pos(
+			inv_world_matrix.multiplyPosition(camera_pos) / info.m_terrain->getXZScale(), 1);
+		Vec4 terrain_scale(info.m_terrain->getScale(), 0);
 		const Mesh& mesh = *info.m_terrain->getMesh();
 
 		Vec4 terrain_params(info.m_terrain->getRootSize(),
@@ -1605,8 +1594,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 			(float)detail_texture->getAtlasSize(),
 			(float)splat_texture->getWidth());
 		bgfx::setUniform(m_terrain_params_uniform, &terrain_params);
-		bgfx::setUniform(m_rel_camera_pos_uniform, &Vec4(rel_cam_pos, 0));
-		bgfx::setUniform(m_terrain_scale_uniform, &Vec4(info.m_terrain->getScale(), 0));
+		bgfx::setUniform(m_rel_camera_pos_uniform, &rel_cam_pos);
+		bgfx::setUniform(m_terrain_scale_uniform, &terrain_scale);
 		bgfx::setUniform(m_terrain_matrix_uniform, &info.m_world_matrix.m11);
 
 		setMaterial(material);

@@ -1744,7 +1744,7 @@ public:
 					camera_cmp.index, (float)x, (float)y, origin, dir);
 				RayCastModelHit hit =
 					scene->castRay(origin, dir, INVALID_COMPONENT);
-				bool gizmo_hit = m_gizmo.castRay(origin, dir);
+				bool gizmo_hit = m_gizmo.isHit();
 				EditorIconHit icon_hit = raycastEditorIcons(origin, dir);
 				if (gizmo_hit)
 				{
@@ -2338,7 +2338,7 @@ public:
 		fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN_AND_READ, file_read_cb);
 	}
 
-	void loadMap(FS::IFile& file, bool success, FS::FileSystem& fs)
+	void loadMap(FS::IFile& file, bool success)
 	{
 		ASSERT(success);
 		if (success)

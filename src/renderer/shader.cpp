@@ -295,19 +295,6 @@ ShaderInstance::~ShaderInstance()
 }
 
 
-static int indexOf(const ShaderCombinations::Passes& passes, const char* pass)
-{
-	for (int i = 0; i < lengthOf(passes); ++i)
-	{
-		if (compareString(passes[i], pass) == 0)
-		{
-			return i;
-		}
-	}
-	return 0;
-}
-
-
 static int indexOf(Renderer& renderer, ShaderCombinations& combination, const char* define)
 {
 	int define_idx = renderer.getShaderDefineIdx(define);

@@ -38,9 +38,9 @@ bool compareAndExchange64(int64 volatile* dest, int64 exchange, int64 comperand)
 }
 
 
-LUMIX_ENGINE_API bool memoryBarrier()
+LUMIX_ENGINE_API void memoryBarrier()
 {
-#ifdef _AMD64_
+#ifdef _M_AMD64
 	__faststorefence();
 #elif defined _IA64_
 	__mf();

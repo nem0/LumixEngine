@@ -323,10 +323,10 @@ namespace PlatformInterface
 			}
 			break;
 			case WM_KEYUP:
-			case WM_SYSKEYUP: g_platform_data.m_handler->onKeyUp(getKeyFromSystem(wParam)); break;
+			case WM_SYSKEYUP: g_platform_data.m_handler->onKeyUp(getKeyFromSystem((int)wParam)); break;
 			case WM_KEYDOWN:
-			case WM_SYSKEYDOWN: g_platform_data.m_handler->onKeyDown(getKeyFromSystem(wParam)); break;
-			case WM_CHAR: g_platform_data.m_handler->onChar(wParam); break;
+			case WM_SYSKEYDOWN: g_platform_data.m_handler->onKeyDown(getKeyFromSystem((int)wParam)); break;
+			case WM_CHAR: g_platform_data.m_handler->onChar((int)wParam); break;
 		}
 
 		return DefWindowProc(hWnd, msg, wParam, lParam);
@@ -402,7 +402,7 @@ namespace PlatformInterface
 		wnd.hCursor = LoadCursor(NULL, IDC_ARROW);
 		wnd.lpszClassName = "lmxa";
 		wnd.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
-		auto x = RegisterClassExA(&wnd);
+		RegisterClassExA(&wnd);
 		g_platform_data.m_hwnd = CreateWindowA(
 			"lmxa", "lmxa", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 800, 600, NULL, NULL, hInst, 0);
 		SetWindowTextA(g_platform_data.m_hwnd, "Lumix Studio");

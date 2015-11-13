@@ -88,7 +88,7 @@ ParticleEmitter::AlphaModule::AlphaModule(ParticleEmitter& emitter)
 }
 
 
-void ParticleEmitter::AlphaModule::update(float time_delta)
+void ParticleEmitter::AlphaModule::update(float)
 {
 	if (m_emitter.m_alpha.empty()) return;
 

@@ -186,18 +186,6 @@ static const char* getVertexInputBGFXName(VertexInput input)
 }
 
 
-static const char* getVertexInputName(VertexInput input)
-{
-	for(auto& tmp : VERTEX_INPUTS)
-	{
-		if(tmp.input == input) return tmp.gui_name;
-	}
-
-	ASSERT(false);
-	return "Error";
-}
-
-
 struct VertexOutputNode : public ShaderEditor::Node
 {
 	VertexOutputNode(ShaderEditor& editor)
@@ -238,7 +226,7 @@ struct VertexOutputNode : public ShaderEditor::Node
 	void onGUI() override
 	{
 		int idx = (int)m_output;
-		auto getter = [](void* data, int idx, const char** out_text) -> bool
+		auto getter = [](void*, int idx, const char** out_text) -> bool
 		{
 			*out_text = getVertexOutputGUIName((VertexOutput)idx);
 			return true;
@@ -288,7 +276,7 @@ struct VertexInputNode : public ShaderEditor::Node
 	}
 
 
-	ShaderEditor::ValueType getOutputType(int index) const override
+	ShaderEditor::ValueType getOutputType(int) const override
 	{
 		for (auto& input : VERTEX_INPUTS)
 		{
@@ -302,12 +290,12 @@ struct VertexInputNode : public ShaderEditor::Node
 	}
 
 
-	void generate(Lumix::OutputBlob& blob) override {}
+	void generate(Lumix::OutputBlob&) override {}
 
 
 	void onGUI() override
 	{
-		auto getter = [](void* data, int idx, const char** out) -> bool
+		auto getter = [](void*, int idx, const char** out) -> bool
 		{
 			*out = getVertexInputBGFXName((VertexInput)idx);
 			return true;
@@ -402,7 +390,7 @@ struct ShaderEditor::ICommand
 
 	virtual void execute() = 0;
 	virtual void undo() = 0;
-	virtual bool merge(ICommand& command) { return false; }
+	virtual bool merge(ICommand& /*command*/) { return false; }
 	virtual Lumix::uint32 getType() const = 0;
 
 	ShaderEditor& m_editor;
@@ -452,8 +440,8 @@ struct MultiplyNode : public ShaderEditor::Node
 	}
 
 
-	void save(Lumix::OutputBlob& blob) override {}
-	void load(Lumix::InputBlob& blob) override {}
+	void save(Lumix::OutputBlob&) override {}
+	void load(Lumix::InputBlob&) override {}
 
 
 	ShaderEditor::ValueType getOutputType(int) const override
@@ -505,8 +493,8 @@ struct Vec4MergeNode : public ShaderEditor::Node
 	}
 
 
-	void save(Lumix::OutputBlob& blob) override {}
-	void load(Lumix::InputBlob& blob) override {}
+	void save(Lumix::OutputBlob&) override {}
+	void load(Lumix::InputBlob&) override {}
 	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::VEC4; }
 
 
@@ -579,9 +567,9 @@ struct FloatConstNode : public ShaderEditor::Node
 
 	void save(Lumix::OutputBlob& blob) override { blob.write(m_value); }
 	void load(Lumix::InputBlob& blob) override { blob.read(m_value); }
-	ShaderEditor::ValueType getOutputType(int index) const override { return ShaderEditor::ValueType::FLOAT; }
+	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::FLOAT; }
 
-	void generate(Lumix::OutputBlob& blob) override	{}
+	void generate(Lumix::OutputBlob&) override	{}
 
 	void printReference(Lumix::OutputBlob& blob)
 	{
@@ -605,7 +593,7 @@ struct ColorConstNode : public ShaderEditor::Node
 
 	void save(Lumix::OutputBlob& blob) override { blob.write(m_color); }
 	void load(Lumix::InputBlob& blob) override { blob.read(m_color); }
-	ShaderEditor::ValueType getOutputType(int index) const override { return ShaderEditor::ValueType::VEC4; }
+	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::VEC4; }
 
 	void generate(Lumix::OutputBlob& blob) override
 	{
@@ -631,7 +619,7 @@ struct SampleNode : public ShaderEditor::Node
 
 	void save(Lumix::OutputBlob& blob) override { blob.write(m_texture); }
 	void load(Lumix::InputBlob& blob) override { blob.read(m_texture); }
-	ShaderEditor::ValueType getOutputType(int index) const override { return ShaderEditor::ValueType::VEC4; }
+	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::VEC4; }
 
 	void generate(Lumix::OutputBlob& blob) override
 	{
@@ -674,7 +662,7 @@ struct FragmentInputNode : public ShaderEditor::Node
 
 	void save(Lumix::OutputBlob& blob) override { blob.write(m_vertex_output); }
 	void load(Lumix::InputBlob& blob) override { blob.read(m_vertex_output); }
-	void generate(Lumix::OutputBlob& blob) override {}
+	void generate(Lumix::OutputBlob&) override {}
 
 
 	void printReference(Lumix::OutputBlob& blob) override
@@ -685,7 +673,7 @@ struct FragmentInputNode : public ShaderEditor::Node
 
 	void onGUI() override
 	{
-		auto getter = [](void* data, int idx, const char** out) -> bool
+		auto getter = [](void*, int idx, const char** out) -> bool
 		{
 			*out = getVertexOutputGUIName((VertexOutput)idx);
 			return true;
@@ -769,7 +757,7 @@ struct MixNode : public ShaderEditor::Node
 		m_outputs.push(nullptr);
 	}
 
-	ShaderEditor::ValueType getOutputType(int index) const override 
+	ShaderEditor::ValueType getOutputType(int) const override 
 	{
 		return getInputType(1);
 	}
@@ -831,7 +819,7 @@ struct PassNode : public ShaderEditor::Node
 	}
 
 
-	void generateBeforeMain(Lumix::OutputBlob& blob) override {}
+	void generateBeforeMain(Lumix::OutputBlob&) override {}
 
 	void generate(Lumix::OutputBlob& blob) override 
 	{
@@ -898,9 +886,9 @@ struct BuiltinUniformNode : public ShaderEditor::Node
 	}
 
 
-	void generateBeforeMain(Lumix::OutputBlob& blob) override {}
+	void generateBeforeMain(Lumix::OutputBlob&) override {}
 
-	void generate(Lumix::OutputBlob& blob) override {}
+	void generate(Lumix::OutputBlob&) override {}
 
 	void onGUI() override
 	{
@@ -939,7 +927,7 @@ struct UniformNode : public ShaderEditor::Node
 	}
 
 
-	void generate(Lumix::OutputBlob& blob) override {}
+	void generate(Lumix::OutputBlob&) override {}
 
 
 	void onGUI() override

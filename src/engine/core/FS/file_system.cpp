@@ -298,7 +298,7 @@ public:
 				PROFILE_BLOCK("processAsyncTransaction");
 				m_in_progress.pop();
 
-				tr->data.m_cb.invoke(*tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS), *this);
+				tr->data.m_cb.invoke(*tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS));
 				if ((tr->data.m_flags & (E_SUCCESS | E_FAIL)) != 0)
 				{
 					closeAsync(*tr->data.m_file);
@@ -338,6 +338,7 @@ public:
 	{
 		return m_default_device;
 	}
+
 	const DeviceList& getSaveGameDevice() const override
 	{
 		return m_save_game_device;
@@ -354,7 +355,7 @@ public:
 		return nullptr;
 	}
 
-	static void closeAsync(IFile&, bool, FileSystem&) { }
+	static void closeAsync(IFile&, bool) { }
 
 	void destroy()
 	{

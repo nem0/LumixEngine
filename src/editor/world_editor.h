@@ -56,15 +56,14 @@ public:
 		virtual ~Plugin() {}
 
 		virtual void tick() {}
-		virtual bool onEntityMouseDown(const RayCastModelHit& hit, int x, int y)
+		virtual bool onEntityMouseDown(const RayCastModelHit& /*hit*/, int /*x*/, int /*y*/)
 		{
 			return false;
 		}
-		virtual void onMouseUp(int x, int y, MouseButton::Value button) {}
-		virtual void
-		onMouseMove(int x, int y, int rel_x, int rel_y) {}
+		virtual void onMouseUp(int /*x*/, int /*y*/, MouseButton::Value /*button*/) {}
+		virtual void onMouseMove(int /*x*/, int /*y*/, int /*rel_x*/, int /*rel_y*/) {}
 
-		virtual bool showGizmo(ComponentUID cmp) { return false; }
+		virtual bool showGizmo(ComponentUID /*cmp*/) { return false; }
 	};
 
 public:

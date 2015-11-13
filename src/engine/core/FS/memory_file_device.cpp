@@ -35,12 +35,12 @@ namespace Lumix
 			}
 
 
-			virtual IFileDevice& getDevice() override
+			IFileDevice& getDevice() override
 			{
 				return m_device;
 			}
 
-			virtual bool open(const char* path, Mode mode) override
+			bool open(const char* path, Mode mode) override
 			{
 				ASSERT(!m_buffer); // reopen is not supported currently
 
@@ -71,7 +71,7 @@ namespace Lumix
 				return false;
 			}
 
-			virtual void close() override
+			void close() override
 			{
 				if(m_file)
 				{
@@ -87,15 +87,15 @@ namespace Lumix
 				m_buffer = nullptr;
 			}
 
-			virtual bool read(void* buffer, size_t size) override
+			bool read(void* buffer, size_t size) override
 			{
 				size_t amount = m_pos + size < m_size ? size : m_size - m_pos;
-				copyMemory(buffer, m_buffer + m_pos, amount);
+				copyMemory(buffer, m_buffer + m_pos, (int)amount);
 				m_pos += amount;
 				return amount == size;
 			}
 
-			virtual bool write(const void* buffer, size_t size) override
+			bool write(const void* buffer, size_t size) override
 			{
 				size_t pos = m_pos;
 				size_t cap = m_capacity;
@@ -104,30 +104,30 @@ namespace Lumix
 				{
 					size_t new_cap = Math::maxValue(cap * 2, pos + size);
 					uint8* new_data = (uint8*)m_allocator.allocate(sizeof(uint8) * new_cap);
-					copyMemory(new_data, m_buffer, sz);
+					copyMemory(new_data, m_buffer, (int)sz);
 					m_allocator.deallocate(m_buffer);
 					m_buffer = new_data;
 					m_capacity = new_cap;
 				}
 
-				copyMemory(m_buffer + pos, buffer, size);
+				copyMemory(m_buffer + pos, buffer, (int)size);
 				m_pos += size;
 				m_size = pos + size > sz ? pos + size : sz;
 
 				return true;
 			}
 
-			virtual const void* getBuffer() const override
+			const void* getBuffer() const override
 			{
 				return m_buffer;
 			}
 
-			virtual size_t size() override
+			size_t size() override
 			{
 				return m_size;
 			}
 
-			virtual size_t seek(SeekMode base, size_t pos) override
+			size_t seek(SeekMode base, size_t pos) override
 			{
 				switch(base)
 				{
@@ -152,7 +152,7 @@ namespace Lumix
 				return m_pos;
 			}
 
-			virtual size_t pos() override
+			size_t pos() override
 			{
 				return m_pos;
 			}

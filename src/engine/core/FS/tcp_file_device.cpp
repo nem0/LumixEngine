@@ -12,6 +12,8 @@ namespace Lumix
 {
 	namespace FS
 	{
+		static const uint32 INVALID_FILE = 0xffffFFFF;
+
 		class TCPFile : public IFile
 		{
 		public:
@@ -19,17 +21,17 @@ namespace Lumix
 				: m_device(device)
 				, m_stream(stream)
 				, m_spin_mutex(spin_mutex)
-				, m_file(-1)
+				, m_file(INVALID_FILE)
 			{}
 
 			~TCPFile() {}
 
-			virtual IFileDevice& getDevice() override
+			IFileDevice& getDevice() override
 			{
 				return m_device;
 			}
 
-			virtual bool open(const char* path, Mode mode) override
+			bool open(const char* path, Mode mode) override
 			{
 				if (!m_stream)
 				{
@@ -44,12 +46,12 @@ namespace Lumix
 				m_stream->writeString(path);
 				m_stream->read(m_file);
 
-				return -1 != m_file;
+				return INVALID_FILE != m_file;
 			}
 
-			virtual void close() override
+			void close() override
 			{
-				if(-1 != m_file)
+				if (INVALID_FILE != m_file)
 				{
 					int32 op = TCPCommand::Close;
 
@@ -59,7 +61,7 @@ namespace Lumix
 				}
 			}
 
-			virtual bool read(void* buffer, size_t size) override
+			bool read(void* buffer, size_t size) override
 			{
 				int32 op = TCPCommand::Read;
 
@@ -75,7 +77,7 @@ namespace Lumix
 				return successful;
 			}
 
-			virtual bool write(const void* buffer, size_t size) override
+			bool write(const void* buffer, size_t size) override
 			{
 				int32 op = TCPCommand::Write;
 
@@ -91,12 +93,12 @@ namespace Lumix
 				return successful;
 			}
 
-			virtual const void* getBuffer() const override
+			const void* getBuffer() const override
 			{
 				return nullptr;
 			}
 
-			virtual size_t size() override
+			size_t size() override
 			{
 				int32 op = TCPCommand::Size;
 				uint32 size = 0;
@@ -110,7 +112,7 @@ namespace Lumix
 				return (size_t)size;
 			}
 
-			virtual size_t seek(SeekMode base, size_t pos) override
+			size_t seek(SeekMode base, size_t pos) override
 			{
 				int32 op = TCPCommand::Seek;
 
@@ -126,7 +128,7 @@ namespace Lumix
 				return (size_t)ret;
 			}
 
-			virtual size_t pos() override
+			size_t pos() override
 			{
 				int32 op = TCPCommand::Seek;
 				int32 pos = 0;

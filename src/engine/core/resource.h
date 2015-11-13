@@ -73,7 +73,7 @@ protected:
 
 private:
 	void doLoad();
-	void fileLoaded(FS::IFile& file, bool success, FS::FileSystem& fs);
+	void fileLoaded(FS::IFile& file, bool success);
 	void onStateChanged(State old_state, State new_state);
 	uint32 addRef(void) { return ++m_ref_count; }
 	uint32 remRef(void) { return --m_ref_count; }

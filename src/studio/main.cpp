@@ -43,7 +43,7 @@
 #include <bgfx/bgfx.h>
 
 
-void imGuiCallback(ImDrawData* draw_data);
+static void imGuiCallback(ImDrawData* draw_data);
 
 
 class StudioApp
@@ -1206,7 +1206,7 @@ public:
 
 			auto material = m_material;
 			int pass_idx = m_gui_pipeline->getPassIdx();
-			auto& texture_id = pcmd->TextureId
+			const auto& texture_id = pcmd->TextureId
 				? *(bgfx::TextureHandle*)pcmd->TextureId
 				: material->getTexture(0)->getTextureHandle();
 			auto texture_uniform = material->getShader()->getTextureSlot(0).m_uniform_handle;

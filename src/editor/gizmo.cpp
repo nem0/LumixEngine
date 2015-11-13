@@ -279,7 +279,7 @@ void Gizmo::setCameraRay(const Vec3& origin, const Vec3& cursor_dir)
 }
 
 
-bool Gizmo::castRay(const Vec3& origin, const Vec3& dir)
+bool Gizmo::isHit()
 {
 	if (m_transform_axis == Axis::NONE) return false;
 	if (m_editor.getSelectedEntities().empty()) return false;

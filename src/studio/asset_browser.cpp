@@ -620,7 +620,7 @@ bool InsertMeshCommand::execute()
 	m_entity = universe->createEntity(Lumix::Vec3(0, 0, 0), Lumix::Quat(0, 0, 0, 1));
 	universe->setPosition(m_entity, m_position);
 	const Lumix::Array<Lumix::IScene*>& scenes = m_editor.getScenes();
-	Lumix::ComponentIndex cmp;
+	Lumix::ComponentIndex cmp = -1;
 	Lumix::IScene* scene = nullptr;
 	for (int i = 0; i < scenes.size(); ++i)
 	{
