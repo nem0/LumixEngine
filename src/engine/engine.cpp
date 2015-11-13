@@ -67,11 +67,12 @@ public:
 	EngineImpl(FS::FileSystem* fs, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_resource_manager(m_allocator)
-		, m_mtjd_manager(m_allocator)
+		, m_mtjd_manager(nullptr)
 		, m_fps(0)
 		, m_is_game_running(false)
 		, m_component_types(m_allocator)
 	{
+		m_mtjd_manager = MTJD::Manager::create(m_allocator);
 		if (!fs)
 		{
 			m_file_system = FS::FileSystem::create(m_allocator);
@@ -128,6 +129,7 @@ public:
 		}
 
 		m_resource_manager.destroy();
+		MTJD::Manager::destroy(*m_mtjd_manager);
 	}
 
 
@@ -154,7 +156,7 @@ public:
 	}
 
 
-	MTJD::Manager& getMTJDManager() override { return m_mtjd_manager; }
+	MTJD::Manager& getMTJDManager() override { return *m_mtjd_manager; }
 
 
 	void destroyUniverse(UniverseContext& context) override
@@ -358,7 +360,7 @@ private:
 
 	ResourceManager m_resource_manager;
 	
-	MTJD::Manager m_mtjd_manager;
+	MTJD::Manager* m_mtjd_manager;
 
 	Array<ComponentType> m_component_types;
 	PluginManager* m_plugin_manager;

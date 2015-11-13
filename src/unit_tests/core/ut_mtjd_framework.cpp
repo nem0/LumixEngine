@@ -68,7 +68,7 @@ private:
 void UT_MTJDFrameworkTest(const char* params)
 {
 	Lumix::DefaultAllocator allocator;
-	Lumix::MTJD::Manager manager(allocator);
+	Lumix::MTJD::Manager* manager = Lumix::MTJD::Manager::create(allocator);
 
 	for (size_t x = 0; x < TEST_RUNS; x++)
 	{
@@ -91,7 +91,7 @@ void UT_MTJDFrameworkTest(const char* params)
 				OUT_BUFFER[i],
 				BUFFER_SIZE,
 				false,
-				manager,
+				*manager,
 				allocator);
 		}
 
@@ -102,7 +102,7 @@ void UT_MTJDFrameworkTest(const char* params)
 
 		for (int32 i = TESTS_COUNT - 1; i > -1; i--)
 		{
-			manager.schedule(jobs[i]);
+			manager->schedule(jobs[i]);
 		}
 
 		for (int32 i = 0; i < TESTS_COUNT; i++)
@@ -124,6 +124,7 @@ void UT_MTJDFrameworkTest(const char* params)
 		}
 
 		allocator.deallocate(jobs);
+		Lumix::MTJD::Manager::destroy(*manager);
 	}
 }
 
@@ -140,7 +141,7 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 		}
 	}
 
-	Lumix::MTJD::Manager manager(allocator);
+	Lumix::MTJD::Manager* manager = Lumix::MTJD::Manager::create(allocator);
 
 	TestJob** jobs = (TestJob**)allocator.allocate(sizeof(TestJob*) * TESTS_COUNT);
 
@@ -151,7 +152,7 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 			IN2_BUFFER[i + 1],
 			BUFFER_SIZE,
 			false,
-			manager,
+			*manager,
 			allocator);
 	}
 
@@ -160,7 +161,7 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 		OUT_BUFFER[0],
 		BUFFER_SIZE,
 		false,
-		manager,
+		*manager,
 		allocator);
 
 	for (int32 i = 0; i < TESTS_COUNT - 1; i++)
@@ -170,7 +171,7 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 
 	for (int32 i = 0; i < TESTS_COUNT; i++)
 	{
-		manager.schedule(jobs[i]);
+		manager->schedule(jobs[i]);
 	}
 
 	for (int32 i = 0; i < TESTS_COUNT; i++)
@@ -188,6 +189,7 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 		LUMIX_DELETE(allocator, jobs[i]);
 	}
 
+	Lumix::MTJD::Manager::destroy(*manager);
 	allocator.deallocate(jobs);
 }
 

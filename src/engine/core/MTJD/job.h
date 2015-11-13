@@ -12,7 +12,7 @@ class Manager;
 
 class LUMIX_ENGINE_API Job : public BaseEntry
 {
-	friend class Manager;
+	friend struct ManagerImpl;
 	friend class WorkerTask;
 
 public:
