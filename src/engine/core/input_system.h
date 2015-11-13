@@ -21,6 +21,8 @@ namespace Lumix
 			};
 
 		public:
+			InputSystem();
+
 			bool create(IAllocator& allocator);
 			void destroy();
 

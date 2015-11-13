@@ -190,10 +190,9 @@ namespace Lumix
 #endif //TYPE == MULTI_THREAD
 		}
 
-		uint32 Manager::getAffinityMask(uint32 idx) const
+		uint32 Manager::getAffinityMask(uint32) const
 		{
 #if defined(_WIN32) || defined(_WIN64)
-			idx = 0;
 			return MT::getProccessAffinityMask();
 #else 
 #error "Not Supported!"

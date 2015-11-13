@@ -14,7 +14,7 @@ namespace Lumix
 	struct UniverseContext;
 
 
-	class LUMIX_ENGINE_API IScene abstract
+	class LUMIX_ENGINE_API IScene
 	{
 		public:
 			virtual ~IScene() {}
@@ -33,7 +33,7 @@ namespace Lumix
 	};
 
 
-	class LUMIX_ENGINE_API IPlugin abstract
+	class LUMIX_ENGINE_API IPlugin
 	{
 		public:
 			virtual ~IPlugin();

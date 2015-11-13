@@ -165,6 +165,11 @@ namespace Lumix
 			MT::SpinMutex m_spin_mutex;
 		};
 
+		TCPFileDevice::TCPFileDevice()
+			: m_impl(nullptr)
+		{
+		}
+
 		IFile* TCPFileDevice::createFile(IFile*)
 		{
 			return LUMIX_NEW(m_impl->m_allocator, TCPFile)(m_impl->m_stream, *this, m_impl->m_spin_mutex);

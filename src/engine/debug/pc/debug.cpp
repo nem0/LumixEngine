@@ -272,7 +272,7 @@ Allocator::~Allocator()
 		while (info != last_sentinel)
 		{
 			char tmp[2048];
-			sprintf(tmp, "\nAllocation size : %d, memory %p\n", info->m_size, info + sizeof(info));
+			sprintf(tmp, "\nAllocation size : %Iu, memory %p\n", info->m_size, info + sizeof(info));
 			OutputDebugString(tmp);
 			m_stack_tree->printCallstack(info->m_stack_leaf);
 			info = info->m_next;

@@ -42,6 +42,8 @@ namespace Lumix
 		class LUMIX_ENGINE_API TCPFileDevice : public IFileDevice
 		{
 		public:
+			TCPFileDevice();
+
 			virtual void destroyFile(IFile* file) override;
 			virtual IFile* createFile(IFile* child) override;
 			virtual const char* name() const override { return "tcp"; }

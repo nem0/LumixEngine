@@ -17,7 +17,6 @@
 
 const char* PropertyGrid::getComponentTypeName(Lumix::ComponentUID cmp) const
 {
-	auto& engine = m_editor.getEngine();
 	for (int i = 0; i < Lumix::PropertyRegister::getComponentTypesCount(); ++i)
 	{
 		if (cmp.type == Lumix::crc32(Lumix::PropertyRegister::getComponentTypeID(i)))

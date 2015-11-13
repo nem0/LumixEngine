@@ -22,7 +22,7 @@ struct LUMIX_ENGINE_API DeviceList
 };
 
 
-class LUMIX_ENGINE_API FileSystem abstract
+class LUMIX_ENGINE_API FileSystem
 {
 public:
 	static FileSystem* create(IAllocator& allocator);

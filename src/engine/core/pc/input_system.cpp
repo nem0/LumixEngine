@@ -46,6 +46,12 @@ namespace Lumix
 	}
 
 
+	InputSystem::InputSystem()
+		: m_impl(nullptr)
+	{
+	}
+
+
 	bool InputSystem::create(IAllocator& allocator)
 	{
 		m_impl = LUMIX_NEW(allocator, InputSystemImpl)(allocator);

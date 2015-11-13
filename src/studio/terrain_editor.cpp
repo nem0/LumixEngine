@@ -709,26 +709,6 @@ private:
 	}
 
 
-	int computeAverage32(const Lumix::Texture* texture,
-						 int from_x,
-						 int to_x,
-						 int from_y,
-						 int to_y)
-	{
-		ASSERT(texture->getBytesPerPixel() == 4);
-		Lumix::uint64 sum = 0;
-		int texture_width = texture->getWidth();
-		for (int i = from_x, end = to_x; i < end; ++i)
-		{
-			for (int j = from_y, end2 = to_y; j < end2; ++j)
-			{
-				sum += texture->getData()[4 * (i + j * texture_width)];
-			}
-		}
-		return int(sum / (to_x - from_x) / (to_y - from_y));
-	}
-
-
 	Lumix::uint16 computeAverage16(const Lumix::Texture* texture,
 							  int from_x,
 							  int to_x,
