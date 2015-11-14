@@ -15,47 +15,47 @@ namespace Lumix
 		public:
 			DiskFile(DiskFileDevice& device, IAllocator& allocator) : m_device(device), m_allocator(allocator) {}
 
-			virtual IFileDevice& getDevice() override
+			IFileDevice& getDevice() override
 			{ 
 				return m_device;
 			}
 
-			virtual bool open(const char* path, Mode mode) override
+			bool open(const char* path, Mode mode) override
 			{
 				return m_file.open(path, mode, m_allocator);
 			}
 
-			virtual void close() override
+			void close() override
 			{
 				m_file.close();
 			}
 
-			virtual bool read(void* buffer, size_t size) override
+			bool read(void* buffer, size_t size) override
 			{
 				return m_file.read(buffer, size);
 			}
 
-			virtual bool write(const void* buffer, size_t size) override
+			bool write(const void* buffer, size_t size) override
 			{
 				return m_file.write(buffer, size);
 			}
 
-			virtual const void* getBuffer() const override
+			const void* getBuffer() const override
 			{
 				return nullptr;
 			}
 
-			virtual size_t size() override
+			size_t size() override
 			{
 				return m_file.size();
 			}
 
-			virtual size_t seek(SeekMode base, size_t pos) override
+			size_t seek(SeekMode base, size_t pos) override
 			{
 				return m_file.seek(base, pos);
 			}
 
-			virtual size_t pos() override
+			size_t pos() override
 			{
 				return m_file.pos();
 			}
