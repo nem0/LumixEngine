@@ -63,7 +63,7 @@ add_library(engine SHARED
 set_target_properties (engine PROPERTIES COMPILE_DEFINITIONS "BUILDING_ENGINE")
 
 target_link_libraries(engine psapi)
-target_link_libraries(engine ${EXTERNAL_PATH}lua/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
+target_link_libraries(engine ${EXTERNAL_PATH}lua/lib/vs2013/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
 
 ###################### RENDERER ######################
 
@@ -83,7 +83,7 @@ add_library(renderer SHARED
 set_target_properties (renderer PROPERTIES COMPILE_DEFINITIONS "BUILDING_RENDERER")
 
 target_link_libraries(renderer engine)
-target_link_libraries(renderer ${EXTERNAL_PATH}lua/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
+target_link_libraries(renderer ${EXTERNAL_PATH}lua/lib/vs2013/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
 target_link_libraries(renderer ${EXTERNAL_PATH}bgfx/lib/vs2013/${PLATFORM_DIR}/bgfx${CMAKE_CFG_INTDIR}.lib)
 
 
@@ -274,7 +274,7 @@ add_library(lua_script SHARED
 
 set_target_properties (lua_script PROPERTIES COMPILE_DEFINITIONS "BUILDING_LUA_SCRIPT")
 
-target_link_libraries(lua_script ${EXTERNAL_PATH}lua/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
+target_link_libraries(lua_script ${EXTERNAL_PATH}lua/lib/vs2013/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
 target_link_libraries(lua_script engine)
 target_link_libraries(lua_script renderer)
 
