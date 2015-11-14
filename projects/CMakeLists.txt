@@ -84,7 +84,7 @@ set_target_properties (renderer PROPERTIES COMPILE_DEFINITIONS "BUILDING_RENDERE
 
 target_link_libraries(renderer engine)
 target_link_libraries(renderer ${EXTERNAL_PATH}lua/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
-target_link_libraries(renderer ${EXTERNAL_PATH}bgfx/lib/${PLATFORM_DIR}/bgfx${CMAKE_CFG_INTDIR}.lib)
+target_link_libraries(renderer ${EXTERNAL_PATH}bgfx/lib/vs2013/${PLATFORM_DIR}/bgfx${CMAKE_CFG_INTDIR}.lib)
 
 
 ###################### PHYSICS ######################
