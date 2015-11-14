@@ -32,20 +32,17 @@ namespace bx
 
 	struct AllocatorI
 	{
-		virtual ~AllocatorI() = 0;
-		virtual void* alloc(size_t _size, size_t _align, const char* _file, uint32_t _line) = 0;
-		virtual void free(void* _ptr, size_t _align, const char* _file, uint32_t _line) = 0;
-	};
+		virtual ~AllocatorI() {}
 
-	inline AllocatorI::~AllocatorI()
-	{
-	}
-
-	struct ReallocatorI : public AllocatorI
-	{
+		/// Allocated, resizes memory block or frees memory.
+		///
+		/// @param[in] _ptr If _ptr is NULL new block will be allocated.
+		/// @param[in] _size If _ptr is set, and _size is 0, memory will be freed.
+		/// @param[in] _align Alignment.
+		/// @param[in] _file Debug file path info.
+		/// @param[in] _line Debug file line info.
 		virtual void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) = 0;
 	};
-
 
 } // namespace bx
 
@@ -78,7 +75,7 @@ static const uint32 RENDERABLE_HASH = crc32("renderable");
 static const uint32 CAMERA_HASH = crc32("camera");
 
 
-struct BGFXAllocator : public bx::ReallocatorI
+struct BGFXAllocator : public bx::AllocatorI
 {
 
 	BGFXAllocator(Lumix::IAllocator& source)
@@ -91,18 +88,20 @@ struct BGFXAllocator : public bx::ReallocatorI
 	{
 	}
 
-
-	void* alloc(size_t _size, size_t, const char*, uint32) override
-	{
-		return m_source.allocate(_size);
-	}
-
-
-	void free(void* _ptr, size_t, const char*, uint32) override { m_source.deallocate(_ptr); }
-
-
+	
 	void* realloc(void* _ptr, size_t _size, size_t, const char*, uint32) override
 	{
+		if (!_ptr)
+		{
+			return m_source.allocate(_size);
+		}
+		
+		if (_ptr && _size == 0)
+		{
+			m_source.deallocate(_ptr);
+			return nullptr;
+		}
+
 		return m_source.reallocate(_ptr, _size);
 	}
 
@@ -192,7 +191,7 @@ struct RendererImpl : public Renderer
 			d.nwh = s_platform_data;
 			bgfx::setPlatformData(d);
 		}
-		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub/*, &m_bgfx_allocator*/);
+		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub, &m_bgfx_allocator);
 		bgfx::reset(800, 600);
 		bgfx::setDebug(BGFX_DEBUG_TEXT);
 
