@@ -1861,6 +1861,39 @@ void ShaderEditor::newGraph()
 }
 
 
+void ShaderEditor::generatePasses(Lumix::OutputBlob& blob)
+{
+	const char* passes[16];
+	int pass = 0;
+
+	auto process = [&](Lumix::Array<Node*>& nodes){
+		for (auto* node : nodes)
+		{
+			if (node->m_type != (int)NodeType::PASS) continue;
+
+			auto* pass_node = static_cast<PassNode*>(node);
+			passes[pass] = pass_node->m_pass;
+			++pass;
+		}
+	};
+
+	process(m_vertex_nodes);
+	process(m_fragment_nodes);
+
+	if (pass == 0)
+	{
+		passes[0] = "MAIN";
+		++pass;
+	}
+
+	for (int i = 0; i < pass; ++i)
+	{
+		if (i > 0) blob << ", ";
+		blob << "\"" << passes[i] << "\"";
+	}
+}
+
+
 void ShaderEditor::generateMain(const char* path)
 {
 	char shd_path[Lumix::MAX_PATH_LENGTH];
@@ -1869,32 +1902,37 @@ void ShaderEditor::generateMain(const char* path)
 	Lumix::catString(shd_path, info.m_basename);
 	Lumix::catString(shd_path, ".shd");
 
-	FILE* blob = fopen(shd_path, "wb");
-	if(!blob) 
+	FILE* fp = fopen(shd_path, "wb");
+	if (!fp)
 	{
 		Lumix::g_log_error.log("Shader editor") << "Could not generate " << shd_path;
 		return;
 	}
 
-	fputs("passes = {\"MAIN\"}\n"
+	fputs("passes = {", fp);
+
+	Lumix::OutputBlob blob(m_allocator);
+	generatePasses(blob);
+	fwrite(blob.getData(), 1, blob.getSize(), fp);
+	fputs("}\n"
 		  "vs_combinations = {\"\"}\n"
 		  "fs_combinations = {\"\"}\n"
 		  "texture_slots = {\n",
-		blob);
+		  fp);
 
 	bool first = true;
 	for(const auto& texture : m_textures)
 	{
 		if(!texture[0]) continue;
 
-		if(!first) fputs(", ", blob);
+		if (!first) fputs(", ", fp);
 		first = false;
-		fprintf(blob, "{ name = \"%s\", uniform = \"%s\" }", texture, texture);
+		fprintf(fp, "{ name = \"%s\", uniform = \"%s\" }", texture, texture);
 	}
 
-	fputs("}\n", blob);
+	fputs("}\n", fp);
 
-	fclose(blob);
+	fclose(fp);
 }
 
 

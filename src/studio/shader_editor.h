@@ -95,6 +95,7 @@ public:
 
 private:
 	void generateMain(const char* path);
+	void generatePasses(Lumix::OutputBlob& blob);
 	void generate(const char* path, ShaderType shader_type);
 	void newGraph();
 	void save(const char* path);
