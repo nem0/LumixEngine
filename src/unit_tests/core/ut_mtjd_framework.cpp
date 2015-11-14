@@ -122,10 +122,9 @@ void UT_MTJDFrameworkTest(const char* params)
 		{
 			LUMIX_DELETE(allocator, jobs[i]);
 		}
-
 		allocator.deallocate(jobs);
-		Lumix::MTJD::Manager::destroy(*manager);
 	}
+	Lumix::MTJD::Manager::destroy(*manager);
 }
 
 void UT_MTJDFrameworkDependencyTest(const char* params)
