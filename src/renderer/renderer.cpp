@@ -191,7 +191,7 @@ struct RendererImpl : public Renderer
 			d.nwh = s_platform_data;
 			bgfx::setPlatformData(d);
 		}
-		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub, &m_bgfx_allocator);
+		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub/*, &m_bgfx_allocator*/);
 		bgfx::reset(800, 600);
 		bgfx::setDebug(BGFX_DEBUG_TEXT);
 
