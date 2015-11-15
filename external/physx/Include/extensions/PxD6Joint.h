@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -141,11 +141,11 @@ struct PxD6JointDriveFlag
 {
 	enum Enum
 	{
-		eACCELERATION	= 1,	//!< drive spring is for the acceleration at the joint (rather than the force) 
+		eACCELERATION	= 1	//!< drive spring is for the acceleration at the joint (rather than the force) 
 	};
 };
 typedef PxFlags<PxD6JointDriveFlag::Enum, PxU32> PxD6JointDriveFlags;
-PX_FLAGS_OPERATORS(PxD6JointDriveFlag::Enum, PxU32);
+PX_FLAGS_OPERATORS(PxD6JointDriveFlag::Enum, PxU32)
 
 
 /** 
@@ -154,22 +154,40 @@ PX_FLAGS_OPERATORS(PxD6JointDriveFlag::Enum, PxU32);
 @see PxD6Joint
 */
 
-class PxD6JointDrive
+class PxD6JointDrive : public PxSpring
 {
+//= ATTENTION! =====================================================================================
+// Changing the data layout of this class breaks the binary serialization format.  See comments for 
+// PX_BINARY_SERIAL_VERSION.  If a modification is required, please adjust the getBinaryMetaData 
+// function.  If the modification is made on a custom branch, please change PX_BINARY_SERIAL_VERSION
+// accordingly.
+//==================================================================================================
+
 public:
-	PxReal					spring;
-	PxReal					damping;
-	PxReal					forceLimit;
-	PxD6JointDriveFlags		flags;
+	PxReal					forceLimit;			//!< the force limit of the drive - may be an impulse or a force depending on PxConstraintFlag::eDRIVE_LIMITS_ARE_FORCES
+	PxD6JointDriveFlags		flags;				//!< the joint drive flags 
 
-	// only needed for deprecated PxD6JointDesc
-	PX_DEPRECATED PxD6JointDrive(): spring(0), damping(0), forceLimit(PX_MAX_F32), flags(0) {}
 
-	PxD6JointDrive(PxReal driveSpring, PxReal driveDamping, PxReal _forceLimit, bool isAcceleration = false)
-	: spring(driveSpring)
-	, damping(driveDamping)
-	, forceLimit(_forceLimit)
-	, flags(isAcceleration?PxD6JointDriveFlag::eACCELERATION : 0) 
+	/**
+	\brief default constructor for PxD6JointDrive.
+	*/
+
+	PxD6JointDrive(): PxSpring(0,0), forceLimit(PX_MAX_F32), flags(0) {}
+
+	/**
+	\brief constructor a PxD6JointDrive.
+
+	\param[in] driveStiffness the stiffness of the drive spring.
+	\param[in] driveDamping the damping of the drive spring
+	\param[in] driveForceLimit the maximum impulse or force that can be exerted by the drive
+	\param[in] isAcceleration whether the drive is an acceleration drive or a force drive
+	*/
+
+
+	PxD6JointDrive(PxReal driveStiffness, PxReal driveDamping, PxReal driveForceLimit, bool isAcceleration = false)
+	: PxSpring(driveStiffness, driveDamping)
+	, forceLimit(driveForceLimit)
+	, flags(isAcceleration?(PxU32)PxD6JointDriveFlag::eACCELERATION : 0) 
 	{}
 
 	/** 
@@ -178,11 +196,9 @@ public:
 
 	bool isValid() const
 	{
-		return PxIsFinite(spring) && 
-			   PxIsFinite(damping) && 
-			   PxIsFinite(forceLimit) &&
-			   spring >= 0 && 
-			   damping >= 0;
+		return PxIsFinite(stiffness) && stiffness>=0 &&
+			   PxIsFinite(damping) && damping >=0 &&
+			   PxIsFinite(forceLimit) && forceLimit >=0;
 	}
 };
 
@@ -219,10 +235,9 @@ public:
 @see PxD6JointCreate() PxJoint 
 */
 
-class PxD6Joint: public PxJoint
+class PxD6Joint : public PxJoint
 {
 public:
-	static const PxJointType::Enum Type = PxJointType::eD6;
 
 	/**
 	\brief Set the motion type around the specified axis.
@@ -253,6 +268,25 @@ public:
 	virtual PxD6Motion::Enum	getMotion(PxD6Axis::Enum axis)			const					= 0;
 
 	/**
+	\brief get the twist angle of the joint
+	*/
+
+	virtual PxReal				getTwist()								const					= 0;
+
+	/**
+	\brief get the swing angle of the joint from the Y axis
+	*/
+
+	virtual PxReal				getSwingYAngle()						const					= 0;
+
+	/**
+	\brief get the swing angle of the joint from the Z axis
+	*/
+
+	virtual PxReal				getSwingZAngle()						const					= 0;
+
+
+	/**
 	\brief Set the linear limit for the joint. 
 
 	A single limit constraints all linear limited degrees of freedom, forming a linear, circular 
@@ -262,17 +296,17 @@ public:
 
 	@see getLinearLimit() 
 	*/
-	virtual	void				setLinearLimit(const PxJointLimit &limit)							= 0;
+	virtual	void				setLinearLimit(const PxJointLinearLimit& limit)						= 0;
 
 	/**
 	\brief Get the linear limit for the joint. 
 
 	\return the linear limit structure
 
-	@see setLinearLimit() PxJointLimit
+	@see setLinearLimit() PxJointLinearLimit
 	*/
 
-	virtual	PxJointLimit		getLinearLimit()						const					= 0;
+	virtual	PxJointLinearLimit	getLinearLimit()						const					= 0;
 
 
 	/**
@@ -280,11 +314,13 @@ public:
 
 	The twist limit controls the range of motion around the twist axis. 
 
+	The limit angle range is (-2*PI, 2*PI) and the extent of the limit must be strictly less than 2*PI
+
 	\param[in] limit the twist limit structure
 
-	@see getTwistLimit() PxJointLimitPair
+	@see getTwistLimit() PxJointAngularLimitPair
 	*/
-	virtual	void				setTwistLimit(const PxJointLimitPair &limit)					= 0;
+	virtual	void				setTwistLimit(const PxJointAngularLimitPair& limit)				= 0;
 
 
 	/**
@@ -292,9 +328,9 @@ public:
 
 	\return the twist limit structure
 
-	@see setTwistLimit() PxJointLimitPair
+	@see setTwistLimit() PxJointAngularLimitPair
 	*/
-	virtual	PxJointLimitPair	getTwistLimit()							const					= 0;
+	virtual	PxJointAngularLimitPair	getTwistLimit()							const					= 0;
 
 	/**
 	\brief Set the swing cone limit for the joint. 
@@ -307,7 +343,7 @@ public:
 
 	@see getLimitCone() PxJointLimitCone 
 	*/
-	virtual	void				setSwingLimit(const PxJointLimitCone &limit)						= 0;
+	virtual	void				setSwingLimit(const PxJointLimitCone& limit)						= 0;
 
 	/**
 	\brief Get the cone limit for the joint. 
@@ -400,7 +436,7 @@ public:
 
 	Sometimes it is not possible to project (for example when the joints form a cycle).
 
-	<b>Range:</b> [0,inf)<br>
+	<b>Range:</b> [0, PX_MAX_F32)<br>
 	<b>Default:</b> 1e10f
 
 	\param[in] tolerance the linear tolerance threshold
@@ -452,13 +488,32 @@ public:
 
 	virtual PxReal				getProjectionAngularTolerance()			const					= 0;
 
-	virtual	const char*			getConcreteTypeName() const					{	return "PxD6Joint";	}
+	/**
+	\brief Returns string name of PxD6Joint, used for serialization
+	*/
+	virtual	const char*			getConcreteTypeName() const { return "PxD6Joint"; }
 
 
 protected:
-	PxD6Joint(PxRefResolver& v)	: PxJoint(v)	{}
-	PxD6Joint()									{}
-	virtual	bool				isKindOf(const char* name)	const		{	return !strcmp("PxD6Joint", name) || PxJoint::isKindOf(name); }
+
+	//serialization
+
+	/**
+	\brief Constructor
+	*/
+	PX_INLINE					PxD6Joint(PxType concreteType, PxBaseFlags baseFlags) : PxJoint(concreteType, baseFlags) {}
+
+	/**
+	\brief Deserialization constructor
+	*/
+	PX_INLINE					PxD6Joint(PxBaseFlags baseFlags) : PxJoint(baseFlags) {}
+
+	/**
+	\brief Returns whether a given type name matches with the type of this instance
+	*/
+	virtual	bool				isKindOf(const char* name) const { return !strcmp("PxD6Joint", name) || PxJoint::isKindOf(name); }
+
+	//~serialization
 };
 
 #ifndef PX_DOXYGEN

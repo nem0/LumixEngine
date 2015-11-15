@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -65,13 +65,24 @@ public:
 	{
 	}
 
-	PX_CUDA_CALLABLE PX_FORCE_INLINE explicit PxTransform(const PxVec3& position): q(0, 0, 0, 1), p(position)
+	PX_CUDA_CALLABLE PX_FORCE_INLINE explicit PxTransform(const PxVec3& position): q(PxIdentity), p(position)
 	{
 	}
 
-	PX_CUDA_CALLABLE PX_FORCE_INLINE explicit PxTransform(const PxQuat& orientation): q(orientation), p(0, 0, 0)
+	PX_CUDA_CALLABLE PX_FORCE_INLINE explicit PxTransform(PxIDENTITY r)
+		: q(PxIdentity), p(PxZero)
+	{
+		PX_UNUSED(r);
+	}
+
+	PX_CUDA_CALLABLE PX_FORCE_INLINE explicit PxTransform(const PxQuat& orientation): q(orientation), p(0)
 	{
 		PX_ASSERT(orientation.isSane());
+	}
+
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxTransform(PxReal x, PxReal y, PxReal z, PxQuat aQ = PxQuat(PxIdentity))
+		: q(aQ), p(x, y, z)
+	{
 	}
 
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxTransform(const PxVec3& p0, const PxQuat& q0): q(q0), p(p0) 
@@ -81,11 +92,25 @@ public:
 
 	PX_CUDA_CALLABLE PX_FORCE_INLINE explicit PxTransform(const PxMat44& m);	// defined in PxMat44.h
 	
+	/**
+	\brief returns true if the two transforms are exactly equal
+	*/
+	PX_CUDA_CALLABLE PX_INLINE bool operator==(const PxTransform& t) const	{ return p == t.p && q == t.q; }
+
+
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxTransform operator*(const PxTransform& x) const
 	{
 		PX_ASSERT(x.isSane());
 		return transform(x);
 	}
+
+	//! Equals matrix multiplication
+	PX_CUDA_CALLABLE PX_INLINE PxTransform& operator*=(PxTransform &other)
+	{
+		*this = *this * other;
+		return *this;
+	}
+
 
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxTransform getInverse() const
 	{
@@ -161,9 +186,16 @@ public:
 		return PxTransform(qinv.rotate(src.p - p), qinv*src.q);
 	}
 
-	PX_CUDA_CALLABLE static PX_FORCE_INLINE PxTransform createIdentity() 
+
+	
+	/**
+	\deprecated
+	\brief deprecated - use PxTransform(PxIdentity)
+	*/
+
+	PX_DEPRECATED static PX_CUDA_CALLABLE PX_FORCE_INLINE PxTransform createIdentity() 
 	{ 
-		return PxTransform(PxVec3(0)); 
+		return PxTransform(PxIdentity); 
 	}
 
 	/**
@@ -186,6 +218,14 @@ public:
 		return PxPlane(transformedNormal, plane.d + p.dot(plane.n));
 	}
 
+
+	/**
+	\brief return a normalized transform (i.e. one in which the quaternion has unit magnitude)
+	*/
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxTransform getNormalized() const
+	{
+		return PxTransform(p, q.getNormalized());
+	}
 
 };
 

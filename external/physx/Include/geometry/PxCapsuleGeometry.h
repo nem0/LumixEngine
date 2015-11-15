@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -46,6 +46,10 @@ namespace physx
 Capsules are shaped as the union of a cylinder of length 2 * halfHeight and with the 
 given radius centered at the origin and extending along the x axis, and two hemispherical ends.
 \note The scaling of the capsule is expected to be baked into these values, there is no additional scaling parameter.
+
+The function PxTransformFromSegment is a helper for generating an appropriate transform for the capsule from the capsule's interior line segment.
+
+@see PxTransformFromSegment
 */
 class PxCapsuleGeometry : public PxGeometry      
 {
@@ -64,6 +68,11 @@ public:
 	\brief Returns true if the geometry is valid.
 
 	\return True if the current settings are valid.
+
+	\note A valid capsule has radius > 0, halfHeight > 0.
+	It is illegal to call PxRigidActor::createShape and PxPhysics::createShape with a capsule that has zero radius or height.
+
+	@see PxRigidActor::createShape, PxPhysics::createShape
 	*/
 	PX_INLINE bool isValid() const;
 
@@ -72,9 +81,9 @@ public:
 	\brief The radius of the capsule.
 	*/
 	PxReal radius;
+
 	/**
 	\brief half of the capsule's height, measured between the centers of the hemispherical ends.
-	/
 	*/
 	PxReal halfHeight;
 };
@@ -93,7 +102,7 @@ PX_INLINE bool PxCapsuleGeometry::isValid() const
 }
 
 
-/* \brief creates a transform from the endpoints of a segment, suitable for an actor transform for a PxCapsuleGeometry
+/** \brief creates a transform from the endpoints of a segment, suitable for an actor transform for a PxCapsuleGeometry
 
 \param[in] p0 one end of major axis of the capsule
 \param[in] p1 the other end of the axis of the capsule

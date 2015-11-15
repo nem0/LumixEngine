@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -59,14 +59,34 @@ public:
 	PX_CUDA_CALLABLE PX_INLINE PxMat44()
 	{}
 
+	//! identity constructor
+	PX_CUDA_CALLABLE PX_INLINE PxMat44(PxIDENTITY r)
+		: column0(1.0f,0.0f,0.0f,0.0f), column1(0.0f,1.0f,0.0f,0.0f), column2(0.0f,0.0f,1.0f,0.0f), column3(0.0f,0.0f,0.0f,1.0f)
+	{
+		PX_UNUSED(r);
+	}
+
+	//! zero constructor
+	PX_CUDA_CALLABLE PX_INLINE PxMat44(PxZERO r)
+		: column0(PxZero), column1(PxZero), column2(PxZero), column3(PxZero)
+	{
+		PX_UNUSED(r);
+	}
+
 	//! Construct from four 4-vectors
 	PX_CUDA_CALLABLE PxMat44(const PxVec4& col0, const PxVec4& col1, const PxVec4& col2, const PxVec4 &col3)
 		: column0(col0), column1(col1), column2(col2), column3(col3)
 	{}
 
+	//! constructor that generates a multiple of the identity matrix
+	explicit PX_CUDA_CALLABLE PX_INLINE PxMat44(PxReal r)
+		: column0(r,0.0f,0.0f,0.0f), column1(0.0f,r,0.0f,0.0f), column2(0.0f,0.0f,r,0.0f), column3(0.0f,0.0f,0.0f,r)
+	{}
+
+
 	//! Construct from three base vectors and a translation
-	PX_CUDA_CALLABLE PxMat44(const PxVec3& column0, const PxVec3& column1, const PxVec3& column2, const PxVec3& column3)
-		: column0(column0,0), column1(column1,0), column2(column2,0), column3(column3,1)
+	PX_CUDA_CALLABLE PxMat44(const PxVec3& col0, const PxVec3& col1, const PxVec3& col2, const PxVec3& col3)
+		: column0(col0,0), column1(col1,0), column2(col2,0), column3(col3,1.0f)
 	{}
 
 	//! Construct from float[16]
@@ -121,7 +141,7 @@ public:
 		column0(orientation.column0,0.0f),
 		column1(orientation.column1,0.0f),
 		column2(orientation.column2,0.0f),
-		column3(position,1)
+		column3(position,1.0f)
 	{
 	}
 		
@@ -129,6 +149,12 @@ public:
 	{
 		*this = PxMat44(PxMat33(t.q), t.p);
 	}
+
+
+	/**
+	\brief returns true if the two matrices are exactly equal
+	*/
+	PX_CUDA_CALLABLE PX_INLINE bool operator==(const PxMat44& m) const	{ return column0 == m.column0 && column1 == m.column1 && column2 == m.column2 && column3 == m.column3; }
 
 	//! Copy constructor
 	PX_CUDA_CALLABLE PX_INLINE PxMat44(const PxMat44& other)
@@ -145,19 +171,17 @@ public:
 		return *this;
 	}
 
-	PX_CUDA_CALLABLE PX_INLINE static PxMat44 createIdentity()
+	//! \deprecated Set to identity matrix. Deprecated. use PxMat44(PxIdentity).
+	PX_DEPRECATED PX_CUDA_CALLABLE PX_INLINE static PxMat44 createIdentity()
 	{
-		return PxMat44(
-			PxVec4(1.0f,0.0f,0.0f,0.0f),
-			PxVec4(0.0f,1.0f,0.0f,0.0f),
-			PxVec4(0.0f,0.0f,1.0f,0.0f),
-			PxVec4(0.0f,0.0f,0.0f,1.0f));
+		return PxMat44(PxIdentity);
 	}
 
 
-	PX_CUDA_CALLABLE PX_INLINE static PxMat44 createZero()
+	//! \deprecated Set to zero matrix. Deprecated. use PxMat44(PxZero).
+	PX_DEPRECATED PX_CUDA_CALLABLE PX_INLINE static PxMat44 createZero()
 	{
-		return PxMat44(PxVec4(0.0f), PxVec4(0.0f), PxVec4(0.0f), PxVec4(0.0f));
+		return PxMat44(PxZero); 
 	}
 
 	//! Get transposed matrix
@@ -241,6 +265,14 @@ public:
 		return *this;
 	}
 
+	//! Equals matrix multiplication
+	PX_CUDA_CALLABLE PX_INLINE PxMat44& operator*=(const PxMat44 &other)
+	{
+		*this = *this * other;
+		return *this;
+	}
+
+
 	//! Element access, mathematical way!
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal operator()(unsigned int row, unsigned int col) const
 	{
@@ -262,19 +294,19 @@ public:
 	//! Transform vector by matrix, equal to v' = M*v
 	PX_CUDA_CALLABLE PX_INLINE PxVec3 transform(const PxVec3& other) const
 	{
-		return transform(PxVec4(other,1)).getXYZ();
+		return transform(PxVec4(other,1.0f)).getXYZ();
 	}
 
 	//! Rotate vector by matrix, equal to v' = M*v
-	PX_CUDA_CALLABLE PX_INLINE PxVec4 rotate(const PxVec4& other) const
+	PX_CUDA_CALLABLE PX_INLINE const PxVec4 rotate(const PxVec4& other) const
 	{
 		return column0*other.x + column1*other.y + column2*other.z;// + column3*0;
 	}
 
 	//! Rotate vector by matrix, equal to v' = M*v
-	PX_CUDA_CALLABLE PX_INLINE PxVec3 rotate(const PxVec3& other) const
+	PX_CUDA_CALLABLE PX_INLINE const PxVec3 rotate(const PxVec3& other) const
 	{
-		return rotate(PxVec4(other,1)).getXYZ();
+		return rotate(PxVec4(other,1.0f)).getXYZ();
 	}
 
 
@@ -301,8 +333,11 @@ public:
 		return &column0.x;
 	}
 
-	PX_CUDA_CALLABLE PX_FORCE_INLINE			PxVec4& operator[](int num)			{return (&column0)[num];}
-	PX_CUDA_CALLABLE PX_FORCE_INLINE const	PxVec4& operator[](int num)	const	{return (&column0)[num];}
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxVec4& operator[](unsigned int num) {return (&column0)[num];}
+	PX_CUDA_CALLABLE PX_FORCE_INLINE const PxVec4& operator[](unsigned int num) const {return (&column0)[num];}
+
+	PX_DEPRECATED PX_CUDA_CALLABLE PX_FORCE_INLINE PxVec4& operator[](int num) {return (&column0)[num];}
+	PX_DEPRECATED PX_CUDA_CALLABLE PX_FORCE_INLINE const PxVec4& operator[](int num) const {return (&column0)[num];}
 
 	PX_CUDA_CALLABLE PX_INLINE void	scale(const PxVec4& p)
 	{

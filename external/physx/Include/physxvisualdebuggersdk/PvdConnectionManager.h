@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,13 +23,14 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 #ifndef PVD_CONNECTION_MANAGER_H
 #define PVD_CONNECTION_MANAGER_H
-#include "physxvisualdebuggersdk/PvdObjectModelBaseTypes.h"
+
 #include "physxvisualdebuggersdk/PvdConnectionFlags.h"
 #include "physxvisualdebuggersdk/PvdNetworkStreams.h"
 #include "physxvisualdebuggersdk/PvdConnection.h"
+#include "foundation/PxErrors.h"
 
 namespace physx {
 	class PxProfileZoneManager;
@@ -39,6 +40,8 @@ namespace physx { namespace debugger {
 
 	class PvdNetworkInStream;
 	class PvdNetworkOutStream;
+	struct PvdColor;
+	typedef const char* String;
 }}
 
 namespace physx { namespace debugger { namespace comm {
@@ -92,10 +95,19 @@ namespace physx { namespace debugger { namespace comm {
 		virtual void setPickable( const void* instance, bool pickable ) = 0;
 		virtual void setColor( const void* instance, const PvdColor& color ) = 0;
 		virtual void setCamera( String name, const PxVec3& position, const PxVec3& up, const PxVec3& target ) = 0;
+
+		//Send error message to PVD
+		virtual void sendErrorMessage(PxErrorCode::Enum code, String message, String file, PxU32 line) = 0;
+
 		//Is top level indicates that this object will be shown at the root of the object graph
 		//in the AllObjects display.  The only object this should be set for would be the
 		//PhysX SDK object.  All other objects this should be false.
 		virtual void setIsTopLevelUIElement( const void* instance, bool isTopLevel ) = 0;
+
+		/*
+		send a stream end event to pvd, pvd will do disconnect and store data when received this event.
+		*/
+		virtual void sendStreamEnd() = 0;
 
 		/**
 		 *	Handler will be notified every time there is a new connection.
@@ -179,9 +191,16 @@ namespace physx { namespace debugger { namespace comm {
 
 		virtual void release() = 0;
 
-		static PvdConnectionManager& create( PxAllocatorCallback& allocator, bool trackMemoryEvents = true );
+		static PvdConnectionManager& create( PxAllocatorCallback& allocator, PxAllocatorCallback& nonBroadcastingAlloc, bool trackMemoryEvents = true );
 	};
 
-}}}
+}}
+
+/** \brief Convenience typedef for the PvdConnectionHandler. */
+typedef debugger::comm::PvdConnectionHandler PxVisualDebuggerConnectionHandler;
+
+/** \brief Convenience typedef for the PvdConnectionManager. */
+typedef debugger::comm::PvdConnectionManager PxVisualDebuggerConnectionManager;
+}
 
 #endif

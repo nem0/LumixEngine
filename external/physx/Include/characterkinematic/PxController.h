@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -37,7 +37,10 @@
 
 #include "characterkinematic/PxCharacter.h"
 #include "characterkinematic/PxExtended.h"
-#include "PxSceneQueryFiltering.h"
+#include "characterkinematic/PxControllerObstacles.h"
+#include "PxQueryFiltering.h"
+#include "foundation/PxFoundation.h"
+#include "foundation/PxErrorCallback.h"
 
 #ifndef PX_DOXYGEN
 namespace physx
@@ -75,81 +78,69 @@ class PxController;
 class PxRigidDynamic;
 class PxMaterial;
 struct PxFilterData;
-class PxSceneQueryFilterCallback;
+class PxQueryFilterCallback;
 class PxControllerBehaviorCallback;
 class PxObstacleContext;
 class PxObstacle;
 
 /**
-\brief specifies how a CCT interacts with other CCTs.
-
-This member controls if a character controller will collide with another controller. There are 3 options:
-always collide, never collide and collide based on the shape group.
-This flag only affects other controllers when they move; when this controller moves, the flag is ignored
-and the flags of the other controllers determine collision.
-*/
-struct PxCCTInteractionMode
-{
-	enum Enum
-	{
-		eINCLUDE,		//!< Always collide character controllers.
-		eEXCLUDE,		//!< Never collide character controllers.
-
-		/**
-		\brief Collide based on a group bitmask stored in the controller.
-
-		The groups to collide against are passed in the activeGroups member of #PxController::move(). The active
-		groups flags work on top of the Physics SDK filtering logic of the controllers kinematic actor to determine if a 
-		collision should occur:
-
-		activeGroups & controller->getGroupsBitmask()
-
-		@see PxController.move() PxController.getGroupsBitmask() PxController.setGroupsBitmask()
-		*/
-		eUSE_FILTER,	
-	};
-};
-
-/**
 \brief specifies how a CCT interacts with non-walkable parts.
 
-This is only used when slopeLimit is non zero.
-
+This is only used when slopeLimit is non zero. It is currently enabled for static actors only, and not supported for spheres or capsules.
 */
-struct PxCCTNonWalkableMode
+struct PxControllerNonWalkableMode
 {
 	enum Enum
 	{
-		ePREVENT_CLIMBING,	//!< Stops character from climbing up a slope, but doesn't move it otherwise
-		eFORCE_SLIDING,		//!< Forces character to slide down non-walkable slopes
+		ePREVENT_CLIMBING,						//!< Stops character from climbing up non-walkable slopes, but doesn't move it otherwise
+		ePREVENT_CLIMBING_AND_FORCE_SLIDING,	//!< Stops character from climbing up non-walkable slopes, and forces it to slide down those slopes
+
+		eFORCE_SLIDING = ePREVENT_CLIMBING_AND_FORCE_SLIDING	//!< \deprecated PX_DEPRECATED
 	};
 };
+/** \deprecated Deprecated definition for backwards compatibility with PhysX 3.2 */
+typedef PX_DEPRECATED PxControllerNonWalkableMode PxCCTNonWalkableMode;
 
 /**
 \brief specifies which sides a character is colliding with.
 */
-struct PxControllerFlag
+struct PxControllerCollisionFlag
 {
 	enum Enum
 	{
 		eCOLLISION_SIDES	= (1<<0),	//!< Character is colliding to the sides.
 		eCOLLISION_UP		= (1<<1),	//!< Character has collision above.
-		eCOLLISION_DOWN		= (1<<2),	//!< Character has collision below.
+		eCOLLISION_DOWN		= (1<<2)	//!< Character has collision below.
 	};
 };
+
+/**
+\brief Bitfield that contains a set of raised flags defined in PxControllerCollisionFlag.
+
+@see PxControllerCollisionFlag
+*/
+typedef PxFlags<PxControllerCollisionFlag::Enum, PxU8> PxControllerCollisionFlags;
+PX_FLAGS_OPERATORS(PxControllerCollisionFlag::Enum, PxU8)
+
+/** \deprecated Deprecated definition for backwards compatibility with PhysX 3.2 */
+typedef PX_DEPRECATED PxControllerCollisionFlag PxControllerFlag;
+/** \deprecated Deprecated definition for backwards compatibility with PhysX 3.2 */
+typedef PX_DEPRECATED PxControllerCollisionFlags PxControllerFlags;
+
 
 /**
 \brief Describes a controller's internal state.
 */
 struct PxControllerState
 {
-	PxVec3			deltaXP;
-	PxShape*		touchedShape;		// Shape on which the CCT is standing
-	PxObstacle*		touchedObstacle;	// Obstacle on which the CCT is standing
-	PxU32			collisionFlags;		// Last known collision flags (PxControllerFlag)
-	bool			standOnAnotherCCT;	// Are we standing on another CCT?
-	bool			standOnObstacle;	// Are we standing on a user-defined obstacle?
-	bool			isMovingUp;			// is CCT moving up or not? (i.e. explicit jumping)
+	PxVec3			deltaXP;			//!< delta position vector for the object the CCT is standing/riding on. Not always match the CCT delta when variable timesteps are used.
+	PxShape*		touchedShape;		//!< Shape on which the CCT is standing
+	PxRigidActor*	touchedActor;		//!< Actor owning 'touchedShape'
+	ObstacleHandle	touchedObstacleHandle;	// Obstacle on which the CCT is standing
+	PxU32			collisionFlags;		//!< Last known collision flags (PxControllerCollisionFlag)
+	bool			standOnAnotherCCT;	//!< Are we standing on another CCT?
+	bool			standOnObstacle;	//!< Are we standing on a user-defined obstacle?
+	bool			isMovingUp;			//!< is CCT moving up or not? (i.e. explicit jumping)
 };
 
 /**
@@ -160,12 +151,13 @@ struct PxControllerStats
 	PxU16			nbIterations;
 	PxU16			nbFullUpdates;
 	PxU16			nbPartialUpdates;
+	PxU16			nbTessellation;
 };
 
 /**
 \brief Describes a generic CCT hit.
 */
-struct PxCCTHit
+struct PxControllerHit
 {
 	PxController*	controller;		//!< Current controller
 	PxExtendedVec3	worldPos;		//!< Contact position in world space
@@ -173,15 +165,18 @@ struct PxCCTHit
 	PxVec3			dir;			//!< Motion direction
 	PxF32			length;			//!< Motion length
 };
+/** \deprecated Deprecated definition for backwards compatibility with PhysX 3.2 */
+typedef PX_DEPRECATED PxControllerHit PxCCTHit;
 
 /**
 \brief Describes a hit between a CCT and a shape. Passed to onShapeHit()
 
 @see PxUserControllerHitReport.onShapeHit()
 */
-struct PxControllerShapeHit : PxCCTHit
+struct PxControllerShapeHit : PxControllerHit
 {
 	PxShape*		shape;			//!< Touched shape
+	PxRigidActor*	actor;			//!< Touched actor
 	PxU32			triangleIndex;	//!< touched triangle index (only for meshes/heightfields)
 };
 
@@ -190,7 +185,7 @@ struct PxControllerShapeHit : PxCCTHit
 
 @see PxUserControllerHitReport.onControllerHit()
 */
-struct PxControllersHit : PxCCTHit
+struct PxControllersHit : PxControllerHit
 {
 	PxController*	other;			//!< Touched controller
 };
@@ -200,7 +195,7 @@ struct PxControllersHit : PxCCTHit
 
 @see PxUserControllerHitReport.onObstacleHit() PxObstacleContext
 */
-struct PxControllerObstacleHit : PxCCTHit
+struct PxControllerObstacleHit : PxControllerHit
 {
 	const void*		userData;
 };
@@ -218,6 +213,8 @@ public:
 
 	/**
 	\brief Called when current controller hits a shape.
+
+	This is called when the CCT moves and hits a shape. This will not be called when a moving shape hits a non-moving CCT.
 
 	\param[in] hit Provides information about the hit.
 
@@ -249,24 +246,76 @@ protected:
 
 
 /**
-\brief Filtering data for "move" call
+\brief Dedicated filtering callback for CCT vs CCT.
 
-@see PxController.move()
+This controls collisions between CCTs (one CCT vs anoter CCT).
+
+To make each CCT collide against all other CCTs, just return true - or simply avoid defining a callback.
+To make each CCT freely go through all other CCTs, just return false.
+Otherwise create a custom filtering logic in this callback.
+
+@see PxControllerFilters
+*/
+class PxControllerFilterCallback
+{
+public:
+	virtual ~PxControllerFilterCallback(){}
+
+	/**
+	\brief Filtering method for CCT-vs-CCT.
+
+	\param[in] a	First CCT
+	\param[in] b	Second CCT
+	\return true to keep the pair, false to filter it out
+	*/
+	virtual bool filter(const PxController& a, const PxController& b) = 0;
+};
+
+/**
+\brief Filtering data for "move" call.
+
+This class contains all filtering-related parameters for the PxController::move() call.
+
+Collisions between a CCT and the world are filtered using the mFilterData, mFilterCallback and mFilterFlags
+members. These parameters are internally passed to PxScene::overlap() to find objects touched by the CCT.
+Please refer to the PxScene::overlap() documentation for details.
+
+Collisions between a CCT and another CCT are filtered using the mCCTFilterCallback member. If this filter
+callback is not defined, none of the CCT-vs-CCT collisions are filtered, and each CCT will collide against
+all other CCTs.
+
+\note PxQueryFlag::eANY_HIT and PxQueryFlag::eNO_BLOCK are ignored in mFilterFlags.
+
+@see PxController.move() PxControllerFilterCallback
 */
 class PxControllerFilters
 {
 	public:
-	PX_INLINE					PxControllerFilters(PxU32 groups=0xffffffff, const PxFilterData* filterData=NULL, PxSceneQueryFilterCallback* cb=NULL) :
-									mActiveGroups	(groups),
-									mFilterData		(filterData),
-									mFilterCallback	(cb),
-									mFilterFlags	(PxSceneQueryFilterFlag::eSTATIC|PxSceneQueryFilterFlag::eDYNAMIC|PxSceneQueryFilterFlag::ePREFILTER)
+	//*********************************************************************
+	// DEPRECATED MEMBERS:
+	//
+	//	PX_DEPRECATED PxU32		mActiveGroups;
+	//
+	//	=> replaced with:
+	//
+	//	PxControllerFilters::mCCTFilterCallback. Please define a PxControllerFilterCallback object and emulate the old interaction mode there.
+	//
+	//*********************************************************************
+
+	PX_INLINE					PxControllerFilters(const PxFilterData* filterData=NULL, PxQueryFilterCallback* cb=NULL, PxControllerFilterCallback* cctFilterCb=NULL) :
+									mFilterData			(filterData),
+									mFilterCallback		(cb),
+									mFilterFlags		(PxQueryFlag::eSTATIC|PxQueryFlag::eDYNAMIC|PxQueryFlag::ePREFILTER),
+									mCCTFilterCallback	(cctFilterCb)
 								{}
 
-	PxU32						mActiveGroups;			//!< a filtering mask for collision groups. If a bit is set, corresponding group is active.
-	const PxFilterData*			mFilterData;			//!< alternative filter data used to filter shapes
-	PxSceneQueryFilterCallback*	mFilterCallback;		//!< custom filter logic to filter out colliding objects.
-	PxSceneQueryFilterFlags		mFilterFlags;			//!< filter flags
+	// CCT-vs-shapes:
+	const PxFilterData*			mFilterData;			//!< Data for internal PxQueryFilterData structure. Passed to PxScene::overlap() call.
+														//!< This can be NULL, in which case a default PxFilterData is used.
+	PxQueryFilterCallback*		mFilterCallback;		//!< Custom filter logic (can be NULL). Passed to PxScene::overlap() call.
+	PxQueryFlags				mFilterFlags;			//!< Flags for internal PxQueryFilterData structure. Passed to PxScene::overlap() call.
+	// CCT-vs-CCT:
+	PxControllerFilterCallback*	mCCTFilterCallback;		//!< CCT-vs-CCT filter callback. If NULL, all CCT-vs-CCT collisions are kept.
 };
 
 
@@ -287,6 +336,25 @@ protected:
 	PX_INLINE										PxControllerDesc(PxControllerShapeType::Enum);
 	PX_INLINE virtual								~PxControllerDesc();
 public:
+	//*********************************************************************
+	// DEPRECATED MEMBERS:
+	//
+	//	PX_DEPRECATED PxUserControllerHitReport*	callback;
+	//
+	//	=> replaced with:
+	//
+	//	PxUserControllerHitReport*	reportCallback;
+	//
+	// ----------------------------
+	//
+	//	PX_DEPRECATED PxCCTInteractionMode::Enum	interactionMode;
+	//	PX_DEPRECATED PxU32							groupsBitmask;
+	//
+	//	=> replaced with:
+	//
+	//	PxControllerFilters::mCCTFilterCallback. Please define a PxControllerFilterCallback object and emulate the old interaction mode there.
+	//
+	//*********************************************************************
 
 	/**
 	\brief returns true if the current settings are valid
@@ -306,6 +374,8 @@ public:
 
 	/**
 	\brief The position of the character
+
+	\note The character's initial position must be such that it does not overlap the static geometry.
 
 	<b>Default:</b> Zero
 	*/
@@ -328,6 +398,8 @@ public:
 	for the character to be able to climb arbitary slopes.
 
 	The limit is expressed as the cosine of desired limit angle. A value of 0 disables this feature.
+
+	\warning It is currently enabled for static actors only (not for dynamic/kinematic actors), and not supported for spheres or capsules.
 
 	<b>Default:</b> 0.707
 
@@ -439,7 +511,8 @@ public:
 
 	@see PxUserControllerHitReport
 	*/
-	PxUserControllerHitReport*	callback;
+	PxUserControllerHitReport*	reportCallback;
+	PX_DEPRECATED PxUserControllerHitReport*	callback;  //!< \deprecated
 
 	/**
 	\brief Specifies a user behavior callback.
@@ -455,35 +528,15 @@ public:
 	PxControllerBehaviorCallback*	behaviorCallback;
 
 	/**
-	\brief The interaction mode controls if a character controller collides with other controllers.
-
-	The default is to collide controllers.
-
-	<b>Default:</b> PxCCTInteractionMode::eINCLUDE
-
-	@see PxCCTInteractionMode
-	*/
-	PxCCTInteractionMode::Enum	interactionMode;
-
-	/**
 	\brief The non-walkable mode controls if a character controller slides or not on a non-walkable part.
 
 	This is only used when slopeLimit is non zero.
 
-	<b>Default:</b> PxCCTNonWalkableMode::ePREVENT_CLIMBING
+	<b>Default:</b> PxControllerNonWalkableMode::ePREVENT_CLIMBING
 
-	@see PxCCTNonWalkableMode
+	@see PxControllerNonWalkableMode
 	*/
-	PxCCTNonWalkableMode::Enum	nonWalkableMode;
-
-	/**
-	\brief The group bitmasks defines collision filtering when PxCCTInteractionMode::eUSE_FILTER is used.
-
-	<b>Default:</b> 0xffffffff
-
-	@see PxCCTInteractionMode
-	*/
-	PxU32						groupsBitmask;
+	PxControllerNonWalkableMode::Enum	nonWalkableMode;
 
 	/**
 	\brief The material for the actor associated with the controller.
@@ -513,12 +566,11 @@ PX_INLINE PxControllerDesc::PxControllerDesc(PxControllerShapeType::Enum t) : ty
 	density				= 10.0f;
 	scaleCoeff			= 0.8f;
 	volumeGrowth		= 1.5f;
+	reportCallback		= NULL;
 	callback			= NULL;
 	behaviorCallback	= NULL;
 	userData			= NULL;
-	interactionMode		= PxCCTInteractionMode::eINCLUDE;
-	nonWalkableMode		= PxCCTNonWalkableMode::ePREVENT_CLIMBING;
-	groupsBitmask		= 0xffffffff;
+	nonWalkableMode		= PxControllerNonWalkableMode::ePREVENT_CLIMBING;
 	position.x			= PxExtended(0.0);
 	position.y			= PxExtended(0.0);
 	position.z			= PxExtended(0.0);
@@ -533,13 +585,22 @@ PX_INLINE PxControllerDesc::~PxControllerDesc()
 
 PX_INLINE bool PxControllerDesc::isValid() const
 {
+	if(		type!=PxControllerShapeType::eBOX
+		&&	type!=PxControllerShapeType::eCAPSULE)
+		return false;
 	if(scaleCoeff<0.0f)		return false;
 	if(volumeGrowth<1.0f)	return false;
 	if(density<0.0f)		return false;
 	if(slopeLimit<0.0f)		return false;
 	if(stepOffset<0.0f)		return false;
-	if(contactOffset<0.0f)	return false;
+	if(contactOffset<=0.0f)	return false;
 	if(!material)			return false;
+
+	if(callback && !reportCallback)
+	{
+		(const_cast<PxControllerDesc*>(this))->reportCallback = callback;
+		PxGetFoundation().getErrorCallback().reportError(PxErrorCode::eDEBUG_WARNING, "PxControllerDesc::callback is deprecated, please use PxControllerDesc::reportCallback instead.", __FILE__, __LINE__);
+	}
 	return true;
 }
 
@@ -556,13 +617,26 @@ protected:
 	virtual								~PxController()					{}
 
 public:
+	//*********************************************************************
+	// DEPRECATED FUNCTIONS:
+	//
+	//	PX_DEPRECATED virtual	void						setInteraction(PxCCTInteractionMode::Enum flag)	= 0;
+	//	PX_DEPRECATED virtual	PxCCTInteractionMode::Enum	getInteraction()					const		= 0;
+	//	PX_DEPRECATED virtual	void						setGroupsBitmask(PxU32 bitmask)					= 0;
+	//	PX_DEPRECATED virtual	PxU32						getGroupsBitmask()					const		= 0;
+	//
+	//	=> replaced with:
+	//
+	//	PxControllerFilters::mCCTFilterCallback. Please define a PxControllerFilterCallback object and emulate the old interaction mode there.
+	//
+	//*********************************************************************
 
 	/**
 	\brief Return the type of controller
 
 	@see PxControllerType
 	*/
-	virtual		PxControllerShapeType::Enum	getType()						= 0;
+	virtual		PxControllerShapeType::Enum	getType()		const			= 0;
 
 	/**
 	\brief Releases the controller.
@@ -573,47 +647,73 @@ public:
 	\brief Moves the character using a "collide-and-slide" algorithm.
 
 	\param[in] disp	Displacement vector
-	\param[in] minDist The minimum travelled distance to consider. If travelled distance is smaller, the character doesn't move. 
+	\param[in] minDist The minimum travelled distance to consider. If travelled distance is smaller, the character doesn't move.
 	This is used to stop the recursive motion algorithm when remaining distance to travel is small.
 	\param[in] elapsedTime Time elapsed since last call
 	\param[in] filters User-defined filters for this move
 	\param[in] obstacles Potential additional obstacles the CCT should collide with.
-	\return Collision flags, collection of ::PxControllerFlag
+	\return Collision flags, collection of ::PxControllerCollisionFlags
 	*/
-	virtual		PxU32					move(const PxVec3& disp, PxF32 minDist, PxF32 elapsedTime, const PxControllerFilters& filters, const PxObstacleContext* obstacles=NULL) = 0;
+	virtual		PxControllerCollisionFlags	move(const PxVec3& disp, PxF32 minDist, PxF32 elapsedTime, const PxControllerFilters& filters, const PxObstacleContext* obstacles=NULL) = 0;
 
 	/**
-	\brief Resets controller's position.
+	\brief Sets controller's position.
 
-	\warning this is a 'teleport' function, it doesn't check for collisions.
+	The position controlled by this function is the center of the collision shape.
+
+	\warning This is a 'teleport' function, it doesn't check for collisions.
+	\warning The character's position must be such that it does not overlap the static geometry.
 
 	To move the character under normal conditions use the #move() function.
 
-	\param[in] position The new positon for the controller.
+	\param[in] position The new (center) positon for the controller.
 	\return Currently always returns true.
 
-	@see PxControllerDesc.position getPosition() getFootPosition() move()
+	@see PxControllerDesc.position getPosition() getFootPosition() setFootPosition() move()
 	*/
 	virtual		bool					setPosition(const PxExtendedVec3& position) = 0;
 
 	/**
 	\brief Retrieve the raw position of the controller.
 
+	The position retrieved by this function is the center of the collision shape. To retrieve the bottom position of the shape,
+	a.k.a. the foot position, use the getFootPosition() function.
+
 	The position is updated by calls to move(). Calling this method without calling
 	move() will return the last position or the initial position of the controller.
 
-	\return The controllers position
+	\return The controller's center position
 
-	@see PxControllerDesc.position setPositon() getFootPosition() move()
+	@see PxControllerDesc.position setPosition() getFootPosition() setFootPosition() move()
 	*/
 	virtual		const PxExtendedVec3&	getPosition()			const	= 0;
 
 	/**
+	\brief Set controller's foot position.
+
+	The position controlled by this function is the bottom of the collision shape, a.k.a. the foot position.
+
+	\note The foot position takes the contact offset into account
+
+	\warning This is a 'teleport' function, it doesn't check for collisions.
+
+	To move the character under normal conditions use the #move() function.
+
+	\param[in] position The new (bottom) positon for the controller.
+	\return Currently always returns true.
+
+	@see PxControllerDesc.position setPosition() getPosition() getFootPosition() move()
+	*/
+	virtual		bool					setFootPosition(const PxExtendedVec3& position) = 0;
+
+	/**
 	\brief Retrieve the "foot" position of the controller, i.e. the position of the bottom of the CCT's shape.
 
-	\return The controllers foot position
+	\note The foot position takes the contact offset into account
 
-	@see PxControllerDesc.position setPositon() getPosition() move()
+	\return The controller's foot position
+
+	@see PxControllerDesc.position setPosition() getPosition() setFootPosition() move()
 	*/
 	virtual		PxExtendedVec3			getFootPosition()		const	= 0;
 
@@ -645,58 +745,22 @@ public:
 	virtual	    PxF32					getStepOffset()						const		=0;
 
 	/**
-	\brief Sets the interaction mode for the CCT.
-
-	\param[in] flag The new value of the interaction mode.
-
-	\see PxCCTInteractionMode
-	*/
-	virtual		void					setInteraction(PxCCTInteractionMode::Enum flag)	= 0;
-
-	/**
-	\brief Retrieves the interaction mode for the CCT.
-
-	\return The current interaction mode.
-
-	\see PxCCTInteractionMode
-	*/
-	virtual		PxCCTInteractionMode::Enum	getInteraction()				const		= 0;
-
-	/**
 	\brief Sets the non-walkable mode for the CCT.
 
 	\param[in] flag The new value of the non-walkable mode.
 
-	\see PxCCTNonWalkableMode
+	\see PxControllerNonWalkableMode
 	*/
-	virtual		void						setNonWalkableMode(PxCCTNonWalkableMode::Enum flag)	= 0;
+	virtual		void						setNonWalkableMode(PxControllerNonWalkableMode::Enum flag)	= 0;
 
 	/**
 	\brief Retrieves the non-walkable mode for the CCT.
 
 	\return The current non-walkable mode.
 
-	\see PxCCTNonWalkableMode
+	\see PxControllerNonWalkableMode
 	*/
-	virtual		PxCCTNonWalkableMode::Enum	getNonWalkableMode()				const		= 0;
-
-	/**
-	\brief Sets the groups bitmask.
-
-	\param[in] bitmask The new groups bitmask value
-
-	\see PxCCTInteractionMode
-	*/
-	virtual		void					setGroupsBitmask(PxU32 bitmask)	= 0;
-
-	/**
-	\brief Retrieves the groups bitmask
-
-	\return The current groups bitmask
-
-	\see PxCCTInteractionMode
-	*/
-	virtual		PxU32					getGroupsBitmask()				const		= 0;
+	virtual		PxControllerNonWalkableMode::Enum	getNonWalkableMode()				const		= 0;
 
 	/**
 	\brief Retrieve the contact offset.
@@ -706,6 +770,15 @@ public:
 	@see PxControllerDesc.contactOffset
 	*/
 	virtual	    PxF32					getContactOffset()					const		=0;
+
+	/**
+	\brief Sets the contact offset.
+
+	\param[in] offset	The contact offset for the controller.
+
+	@see PxControllerDesc.contactOffset
+	*/
+	virtual	    void					setContactOffset(PxF32 offset)					=0;
 
 	/**
 	\brief Retrieve the 'up' direction.
@@ -735,9 +808,34 @@ public:
 	virtual	    PxF32					getSlopeLimit()						const		=0;
 
 	/**
-	\brief The character controller uses caching in order to speed up collision testing, this caching can not detect when objects have changed in the scene. You need to call this method when such changes have been made.
+	\brief Sets the slope limit.
+
+	\note	This feature can not be enabled at runtime, i.e. if the slope limit is zero when creating the CCT
+	(which disables the feature) then changing the slope limit at runtime will not have any effect, and the call
+	will be ignored.
+
+	\param[in]	slopeLimit	The slope limit for the controller.
+
+	@see PxControllerDesc.slopeLimit
 	*/
-	virtual		void					reportSceneChanged()			= 0;
+	virtual	    void					setSlopeLimit(PxF32 slopeLimit)					=0;
+
+	/**
+	\brief Flushes internal geometry cache.
+	
+	The character controller uses caching in order to speed up collision testing. The cache is
+	automatically flushed when a change to static objects is detected in the scene. For example when a
+	static shape is added, updated, or removed from the scene, the cache is automatically invalidated.
+	
+	However there may be situations that cannot be automatically detected, and those require manual
+	invalidation of the cache. Currently the user must call this when the filtering behavior changes (the
+	PxControllerFilters parameter of the PxController::move call).  While the controller in principle 
+	could detect a change in these parameters, it cannot detect a change in the behavior of the filtering 
+	function.
+
+	@see PxController.move
+	*/
+	virtual		void					invalidateCache()			= 0;
 
 	/**
 	\brief Retrieve the scene associated with the controller.
@@ -756,6 +854,15 @@ public:
 	virtual		void*					getUserData()		const		= 0;
 
 	/**
+	\brief Sets the user data associated with this controller.
+
+	\param[in] userData The user pointer associated with the controller.
+
+	@see PxControllerDesc.userData
+	*/
+	virtual		void					setUserData(void* userData)		= 0;
+
+	/**
 	\brief Returns information about the controller's internal state.
 
 	\param[out] state The controller's internal state
@@ -772,6 +879,18 @@ public:
 	@see PxControllerStats
 	*/
 	virtual		void					getStats(PxControllerStats& stats)	const		= 0;
+
+	/**
+	\brief Resizes the controller.
+
+	This function attempts to resize the controller to a given size, while making sure the bottom
+	position of the controller remains constant. In other words the function modifies both the
+	height and the (center) position of the controller. This is a helper function that can be used
+	to implement a 'crouch' functionality for example.
+
+	\param[in] height Desired controller's height
+	*/
+	virtual		void					resize(PxReal height)	= 0;
 };
 
 #ifndef PX_DOXYGEN

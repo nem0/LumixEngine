@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 
 #ifndef PX_SPU_TASK_H
 #define PX_SPU_TASK_H
@@ -31,25 +31,24 @@
 #include "pxtask/PxTask.h"
 #include "pxtask/PxSpuDispatcher.h"
 
+#include "physxprofilesdk/PxProfileZone.h"
+
 #ifndef PX_DOXYGEN
 namespace physx
 {
 #endif
 
-namespace pxtask
-{
-
 /** 
  \brief A task to be executed on one or more SPUs
 
- Each SpuTask can run in a data parallel fashion on up to 6 SPUs. To coordinate the
- workers, each SPU will be passed it's own set of arguments.
+ Each PxSpuTask can run in a data parallel fashion on up to 6 SPUs. To coordinate the
+ workers, each SPU will be passed its own set of arguments.
 
  When all SPU workers have completed their work, the task is considered complete and the
  SpuDispatcher will call release on the task, this in turn will call removeReference() 
  on the task's continuation.
 
- In this way LightCpuTasks may be launched automatically at SpuTask completion and vice versa.
+ In this way LightCpuTasks may be launched automatically at PxSpuTask completion and vice versa.
 
  Users should not need to implement or create SpuTasks directly. The SDK creates the tasks
  internally and will submit them to the TaskManager's SpuDispatcher for execution. The
@@ -58,7 +57,7 @@ namespace pxtask
  @see SpuDispatcher
  @see PxSceneDesc
 */
-class SpuTask : public LightCpuTask
+class PxSpuTask : public PxLightCpuTask
 {
 public:
 
@@ -66,32 +65,33 @@ public:
 	static const PxU32 kArgsPerSpu = 2;	//!< Arguments per SPU
 
 	/**
-	\brief Construct a new SpuTask object
+	\brief Construct a new PxSpuTask object
 	\param[in] elfStart The starting address of the embedded SPU binary
 	\param[in] elfSize The size in bytes of the embedded SPU binary
 	\param[in] numSpus The number of SPU workers this task will run across
 	\param[in] args A pointer to an array of arguments, must be at least kArgsPerSpu*numSpus big
 	*/
-	SpuTask(const void* elfStart, PxU32 elfSize, PxU32 numSpus=1, const PxU32* args=NULL) 
+	PxSpuTask(const void* elfStart, PxU32 elfSize, PxU32 numSpus=1, const PxU32* args=NULL) 
 		: mElfStart(elfStart)
 		, mElfSize(elfSize)
-		, mNumSpusToRun(numSpus)
-		, mNumSpusFinished(0) 
+		, mNbSpusToRun(numSpus)
+		, mNbSpusFinished(0)
+		, mEmitProfile(false)
 	{
 		if (args)
 		{
-			memcpy(mArgs, args, mNumSpusToRun*kArgsPerSpu*sizeof(PxU32));
+			memcpy(mArgs, args, mNbSpusToRun*kArgsPerSpu*sizeof(PxU32));
 		}		
 	}
 
-	virtual ~SpuTask() {}
+	virtual ~PxSpuTask() {}
 
 	/**
 	\brief Return the number of SPUs used to run this task
 	*/
 	PX_INLINE PxU32 getSpuCount() const
 	{
-		return mNumSpusToRun; 
+		return mNbSpusToRun; 
 	}
 
 	/**
@@ -100,7 +100,7 @@ public:
 	PX_INLINE void setSpuCount(PxU32 numSpusToRun)  
 	{ 
 		PX_ASSERT(numSpusToRun);
-		mNumSpusToRun = numSpusToRun; 
+		mNbSpusToRun = numSpusToRun; 
 	}
 
 	/**
@@ -118,15 +118,15 @@ public:
 	/**
 	\brief Set the arguments for a given SPU worker
 	\param[in] spuIndex The index of the SPU worker whose arguments are to be set
-	\param[in] arg1 The first argument to be passed to this worker
-	\param[in] arg2 The second argument to be passed to this worker	
+	\param[in] arg0 The first argument to be passed to this worker
+	\param[in] arg1 The second argument to be passed to this worker	
 	*/
-	PX_INLINE void setArgs(PxU32 spuIndex, PxU32 arg1, PxU32 arg2)
+	PX_INLINE void setArgs(PxU32 spuIndex, PxU32 arg0, PxU32 arg1)
 	{
 		PX_ASSERT(spuIndex < kMaxSpus);
 		PxU32* arguments = mArgs[spuIndex];
-		arguments[0]=arg1;
-		arguments[1]=arg2;
+		arguments[0]=arg0;
+		arguments[1]=arg1;
 	}
 
 	/**
@@ -152,18 +152,25 @@ public:
 	*/
 	PX_INLINE void notifySpuFinish()
 	{
-		++mNumSpusFinished;
+		++mNbSpusFinished;
 
 		// if all SPU tasks have finished clean-up and release
-		if (mNumSpusFinished == mNumSpusToRun)
+		if (mNbSpusFinished == mNbSpusToRun)
 		{
-			mNumSpusFinished = 0;
+			// emit profiling event
+			if (mEmitProfile)
+			{
+				getTaskManager()->emitStopEvent(*this, PxProfileEventSender::CrossThreadId);
+				mEmitProfile = false;
+			}			
+
+			mNbSpusFinished = 0;
 			release();			
 		}
 	}
 
 	/**
-	\brief Modifies LightCpuTask's behavior by submitting to the SpuDispatcher
+	\brief Modifies PxLightCpuTask's behavior by submitting to the SpuDispatcher
 	*/
 	virtual void removeReference()
 	{
@@ -176,26 +183,32 @@ public:
 	scheduled to the SPUs.
 	
 	This should be called by the SpuDispatcher from whichever thread calls
-	submitTask(); the task should be scheduled to SPURS immediately 
+	submitTask(); the task should be scheduled to the SPUs immediately 
 	following this function returning.
 	*/
 	virtual void run() {}
 
-	/** \brief Called by the SpuDispatcher after scheduling a task to the SPUs.
-	
-	This virtual method allows the task to perform PPU side work while the SPU
-	task is running, for example using the PPU as a producer and the SPUs as 
-	a consumer.
+	/**
+	\brief The same as run() but will emit PVD profile events.
 	*/
-	virtual void runAfterDispatch() {}
+	void runProfiled() 
+	{
+		// emit profiling event
+		getTaskManager()->emitStartEvent(*this, PxProfileEventSender::CrossThreadId);
+		mEmitProfile = true;
+
+		run();
+	}
+
 
 protected:
 
 	const void* mElfStart;				//!< A pointer to the start of the ELF image	
 	PxU32 mElfSize;						//!< The size of the ELF image
-	PxU32 mNumSpusToRun;				//!< The number of SPUs to run
-	PxU32 mNumSpusFinished;				//!< The number of SPUs finished
+	PxU32 mNbSpusToRun;				//!< The number of SPUs to run
+	PxU32 mNbSpusFinished;				//!< The number of SPUs finished
 	PxU32 mArgs[kMaxSpus][kArgsPerSpu];	//!< The arguments for the SPUs
+	bool mEmitProfile;					//!< Stores the profile event state if runProfiled() is used
 
 } 
 // wrap this in a macro so Doxygen doesn't get confused and output it
@@ -203,8 +216,6 @@ protected:
 PX_ALIGN_SUFFIX(16)
 #endif
 ;
-
-} // end pxtask namespace
 
 #ifndef PX_DOXYGEN
 } // end physx namespace

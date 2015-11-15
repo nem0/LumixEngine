@@ -289,6 +289,11 @@ if(${IS64})
 	
 	add_custom_command(TARGET studio POST_BUILD        
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/nvToolsExt64_1.dll"
+			$<TARGET_FILE_DIR:studio>)
+
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
 			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CommonCHECKED_x64.dll"
 			$<TARGET_FILE_DIR:studio>)
 
@@ -308,6 +313,11 @@ if(${IS64})
 			$<TARGET_FILE_DIR:studio>)
 
 else(${IS64})
+
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/nvToolsExt32_1.dll"
+			$<TARGET_FILE_DIR:studio>)
 
 	add_custom_command(TARGET studio POST_BUILD        
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different  

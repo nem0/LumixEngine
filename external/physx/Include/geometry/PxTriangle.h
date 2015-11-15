@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -34,7 +34,7 @@
   @{
 */
 
-#include "common/PxPhysXCommon.h"
+#include "common/PxPhysXCommonConfig.h"
 #include "foundation/PxVec3.h"
 
 #ifndef PX_DOXYGEN
@@ -87,7 +87,7 @@ class PxTriangle
 	/**
 	\brief Array of Vertices.
 	*/
-			PxVec3		verts[3];
+	PxVec3		verts[3];
 
 	/**
 	\brief Compute the normal of the Triangle.
@@ -105,7 +105,11 @@ class PxTriangle
 
 	\param[out] _normal Triangle normal (not normalized).
 	*/
+#ifdef __SPU__
+	void	denormalizedNormal(PxVec3& _normal) const
+#else
 	PX_FORCE_INLINE	void	denormalizedNormal(PxVec3& _normal) const
+#endif
 	{
 		_normal = (verts[1]-verts[0]).cross(verts[2]-verts[0]);
 	}

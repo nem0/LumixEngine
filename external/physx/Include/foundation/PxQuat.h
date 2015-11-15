@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -56,6 +56,21 @@ public:
 	*/
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxQuat()	{	}
 
+
+	//! identity constructor
+	PX_CUDA_CALLABLE PX_INLINE PxQuat(PxIDENTITY r)
+		: x(0.0f), y(0.0f), z(0.0f), w(1.0f)
+	{
+		PX_UNUSED(r);
+	}
+
+	/**
+	\brief Constructor from a scalar: sets the real part w to the scalar value, and the imaginary parts (x,y,z) to zero
+	*/
+	explicit PX_CUDA_CALLABLE PX_FORCE_INLINE PxQuat(PxReal r)
+		: x(0.0f), y(0.0f), z(0.0f), w(r)
+	{
+	}
 
 	/**
 	\brief Constructor.  Take note of the order of the elements!
@@ -112,7 +127,7 @@ public:
 
 	PX_CUDA_CALLABLE bool isUnit() const
 	{
-		const PxReal unitTolerance = PxReal(1e-4);
+		const PxReal unitTolerance = 1e-4f;
 		return isFinite() && PxAbs(magnitude()-1)<unitTolerance;
 	}
 
@@ -123,9 +138,15 @@ public:
 
 	PX_CUDA_CALLABLE bool isSane() const
 	{
-	      const PxReal unitTolerance = PxReal(1e-2);
+	      const PxReal unitTolerance = 1e-2f;
 	      return isFinite() && PxAbs(magnitude()-1)<unitTolerance;
 	}
+
+	/**
+	\brief returns true if the two quaternions are exactly equal
+	*/
+	PX_CUDA_CALLABLE PX_INLINE bool operator==(const PxQuat&q) const	{ return x == q.x && y == q.y && z == q.z && w == q.w; }
+
 
 	/**
 	\brief converts this quaternion to angle-axis representation
@@ -133,18 +154,18 @@ public:
 
 	PX_CUDA_CALLABLE PX_INLINE void toRadiansAndUnitAxis(PxReal& angle, PxVec3& axis) const
 	{
-		const PxReal quatEpsilon = (PxReal(1.0e-8f));
+		const PxReal quatEpsilon = 1.0e-8f;
 		const PxReal s2 = x*x+y*y+z*z;
 		if(s2<quatEpsilon*quatEpsilon)  // can't extract a sensible axis
 		{
-			angle = 0;
-			axis = PxVec3(1,0,0);
+			angle = 0.0f;
+			axis = PxVec3(1.0f,0.0f,0.0f);
 		}
 		else
 		{
 			const PxReal s = PxRecipSqrt(s2);
 			axis = PxVec3(x,y,z) * s; 
-			angle = w<quatEpsilon ? PxPi : PxAtan2(s2*s, w) * 2;
+			angle = PxAbs(w)<quatEpsilon ? PxPi : PxAtan2(s2*s, w) * 2.0f;
 		}
 
 	}
@@ -156,7 +177,7 @@ public:
 	*/
 	PX_CUDA_CALLABLE PX_INLINE PxReal getAngle() const
 	{
-		return PxAcos(w) * PxReal(2);
+		return PxAcos(w) * 2.0f;
 	}
 
 
@@ -167,7 +188,7 @@ public:
 	*/
 	PX_CUDA_CALLABLE PX_INLINE PxReal getAngle(const PxQuat& q) const
 	{
-		return PxAcos(dot(q)) * PxReal(2);
+		return PxAcos(dot(q)) * 2.0f;
 	}
 
 
@@ -208,7 +229,7 @@ public:
 		const PxReal mag = magnitude();
 		if (mag)
 		{
-			const PxReal imag = PxReal(1) / mag;
+			const PxReal imag = 1.0f / mag;
 
 			x *= imag;
 			y *= imag;
@@ -239,7 +260,6 @@ public:
 	/** brief computes rotation of x-axis */
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxVec3 getBasisVector0()	const
 	{	
-//		return rotate(PxVec3(1,0,0));
 		const PxF32 x2 = x*2.0f;
 		const PxF32 w2 = w*2.0f;
 		return PxVec3(	(w * w2) - 1.0f + x*x2,
@@ -250,7 +270,6 @@ public:
 	/** brief computes rotation of y-axis */
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxVec3 getBasisVector1()	const 
 	{	
-//		return rotate(PxVec3(0,1,0));
 		const PxF32 y2 = y*2.0f;
 		const PxF32 w2 = w*2.0f;
 		return PxVec3(	(-z * w2)       + x*y2,
@@ -262,7 +281,6 @@ public:
 	/** brief computes rotation of z-axis */
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxVec3 getBasisVector2() const	
 	{	
-//		return rotate(PxVec3(0,0,1));
 		const PxF32 z2 = z*2.0f;
 		const PxF32 w2 = w*2.0f;
 		return PxVec3(	(y * w2)        + x*z2,
@@ -274,7 +292,6 @@ public:
 	rotates passed vec by this (assumed unitary)
 	*/
 	PX_CUDA_CALLABLE PX_FORCE_INLINE const PxVec3 rotate(const PxVec3& v) const
-//	PX_CUDA_CALLABLE PX_INLINE const PxVec3 rotate(const PxVec3& v) const
 	{
 		const PxF32 vx = 2.0f*v.x;
 		const PxF32 vy = 2.0f*v.y;
@@ -287,17 +304,12 @@ public:
 			(vy*w2 + (z * vx - x * vz)*w + y*dot2), 
 			(vz*w2 + (x * vy - y * vx)*w + z*dot2)
 		);
-		/*
-		const PxVec3 qv(x,y,z);
-		return (v*(w*w-0.5f) + (qv.cross(v))*w + qv*(qv.dot(v)))*2;
-		*/
 	}
 
 	/**
 	inverse rotates passed vec by this (assumed unitary)
 	*/
 	PX_CUDA_CALLABLE PX_FORCE_INLINE const PxVec3 rotateInv(const PxVec3& v) const
-//	PX_CUDA_CALLABLE PX_INLINE const PxVec3 rotateInv(const PxVec3& v) const
 	{
 		const PxF32 vx = 2.0f*v.x;
 		const PxF32 vy = 2.0f*v.y;
@@ -310,8 +322,6 @@ public:
 			(vy*w2 - (z * vx - x * vz)*w + y*dot2), 
 			(vz*w2 - (x * vy - y * vx)*w + z*dot2)
 		);
-//		const PxVec3 qv(x,y,z);
-//		return (v*(w*w-0.5f) - (qv.cross(v))*w + qv*(qv.dot(v)))*2;
 	}
 
 	/**
@@ -393,7 +403,9 @@ public:
 		return PxQuat(x*r,y*r,z*r,w*r);
 	}
 
-	static PX_CUDA_CALLABLE PX_INLINE PxQuat createIdentity() { return PxQuat(0,0,0,1); }
+	
+	/** \deprecated use PxQuat(PxIdentity) */
+	PX_DEPRECATED static PX_CUDA_CALLABLE PX_INLINE PxQuat createIdentity() { return PxQuat(PxIdentity); }
 
 	/** the quaternion elements */
 	PxReal x,y,z,w;

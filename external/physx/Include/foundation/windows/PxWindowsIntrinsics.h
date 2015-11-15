@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -32,9 +32,10 @@
 #define PX_FOUNDATION_PX_WINDOWS_INTRINSICS_H
 
 #include "foundation/Px.h"
+#include "foundation/PxAssert.h"
 
-#ifndef PX_WINDOWS
-	#error "This file should only be included by Windows builds!!"
+#if !(defined PX_WINDOWS || defined PX_WINMODERN)
+	#error "This file should only be included by Windows or WIN8ARM builds!!"
 #endif
 
 #include <math.h>
@@ -101,6 +102,47 @@ namespace intrinsics
 #else
 		return (0 == ((_FPCLASS_SNAN | _FPCLASS_QNAN | _FPCLASS_NINF | _FPCLASS_PINF) & _fpclass(a) ));
 #endif
+	}
+
+	/*!
+	Sets \c count bytes starting at \c dst to zero.
+	*/
+	PX_FORCE_INLINE void* memZero(void* PX_RESTRICT dest, PxU32 count)
+	{
+		return memset(dest, 0, count);
+	}
+
+	/*!
+	Sets \c count bytes starting at \c dst to \c c.
+	*/
+	PX_FORCE_INLINE void* memSet(void* PX_RESTRICT dest, PxI32 c, PxU32 count)
+	{
+		return memset(dest, c, count);
+	}
+
+	/*!
+	Copies \c count bytes from \c src to \c dst. User memMove if regions overlap.
+	*/
+	PX_FORCE_INLINE void* memCopy(void* PX_RESTRICT dest, const void* PX_RESTRICT src, PxU32 count)
+	{
+		return memcpy(dest, src, count);
+	}
+
+	/*!
+	Copies \c count bytes from \c src to \c dst. Supports overlapping regions.
+	*/
+	PX_FORCE_INLINE void* memMove(void* PX_RESTRICT dest, const void* PX_RESTRICT src, PxU32 count)
+	{
+		return memmove(dest, src, count);
+	}
+
+	/*!
+	Set 128B to zero starting at \c dst+offset. Must be aligned.
+	*/
+	PX_FORCE_INLINE void memZero128(void* PX_RESTRICT dest, PxU32 offset = 0)
+	{
+		PX_ASSERT(((size_t(dest)+offset) & 0x7f) == 0);
+		memSet((char* PX_RESTRICT)dest+offset, 0, 128);
 	}
 
 #ifndef PX_DOXYGEN

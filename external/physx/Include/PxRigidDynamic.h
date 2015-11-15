@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -40,44 +40,6 @@
 namespace physx
 {
 #endif
-
-/**
-\brief Collection of flags describing the behavior of a dynamic rigid body.
-
-@see PxRigidDynamic.setRigidDynamicFlag(), PxRigidDynamic.getRigidDynamicFlags()
-*/
-struct PxRigidDynamicFlag
-{
-	enum Enum
-	{
-
-		/**
-		\brief Enables kinematic mode for the actor.
-
-		Kinematic actors are special dynamic actors that are not 
-		influenced by forces (such as gravity), and have no momentum. They are considered to have infinite
-		mass and can be moved around the world using the setKinematicTarget() method. They will push 
-		regular dynamic actors out of the way. Kinematics will not collide with static or other kinematic objects.
-
-		Kinematic actors are great for moving platforms or characters, where direct motion control is desired.
-
-		You can not connect Reduced joints to kinematic actors. Lagrange joints work ok if the platform
-		is moving with a relatively low, uniform velocity.
-
-		@see PxRigidDynamic.setKinematicTarget()
-		*/
-		eKINEMATIC				= (1<<0),		//!< Enable kinematic mode for the body.
-
-	};
-};
-
-/**
-\brief collection of set bits defined in PxRigidDynamicFlag.
-
-@see PxRigidDynamicFlag
-*/
-typedef PxFlags<PxRigidDynamicFlag::Enum,PxU16> PxRigidDynamicFlags;
-PX_FLAGS_OPERATORS(PxRigidDynamicFlag::Enum,PxU16);
 
 /**
 \brief PxRigidDynamic represents a dynamic rigid simulation object in the physics SDK.
@@ -110,8 +72,8 @@ public:
 	/**
 	\brief Moves kinematically controlled dynamic actors through the game world.
 
-	You set a dynamic actor to be kinematic using the PxRigidDynamicFlag::eKINEMATIC flag,
-	used either in the PxRigidDynamicDesc or with setRigidDynamicFlag().
+	You set a dynamic actor to be kinematic using the PxRigidBodyFlag::eKINEMATIC flag
+	with setRigidBodyFlag().
 	
 	The move command will result in a velocity that will move the body into 
 	the desired pose. After the move is carried out during a single time step, 
@@ -123,13 +85,25 @@ public:
 
 	The motion is always fully carried out.	
 
-	<b>Sleeping:</b> This call wakes the actor if it is sleeping.
+	\note It is invalid to use this method if the actor has not been added to a scene already or if PxActorFlag::eDISABLE_SIMULATION is set.
+
+	<b>Sleeping:</b> This call wakes the actor if it is sleeping and will set the wake counter to #PxSceneDesc::wakeCounterResetValue.
 
 	\param[in] destination The desired pose for the kinematic actor, in the global frame. <b>Range:</b> rigid body transform.
 
-	@see PxRigidDynamicFlag setRigidDynamicFlag()
+	@see getKinematicTarget() PxRigidBodyFlag setRigidBodyFlag()
 	*/
 	virtual		void				setKinematicTarget(const PxTransform& destination) = 0;
+
+	/**
+	\brief Get target pose of a kinematically controlled dynamic actor.
+
+	\param[out] target Transform to write the target pose to. Only valid if the method returns true.
+	\return True if the actor is a kinematically controlled dynamic and the target has been set, else False.
+
+	@see setKinematicTarget() PxRigidBodyFlag setRigidBodyFlag()
+	*/
+	virtual		bool				getKinematicTarget(PxTransform& target) = 0;
 
 /************************************************************************************************/
 /** @name Damping
@@ -142,7 +116,7 @@ public:
 
 	<b>Default:</b> 0.0
 	
-	\param[in] linDamp Linear damping coefficient. <b>Range:</b> [0,inf)
+	\param[in] linDamp Linear damping coefficient. <b>Range:</b> [0, PX_MAX_F32)
 
 	@see getLinearDamping() setAngularDamping()
 	*/
@@ -166,7 +140,7 @@ public:
 
 	<b>Default:</b> 0.05
 
-	\param[in] angDamp Angular damping coefficient. <b>Range:</b> [0,inf)
+	\param[in] angDamp Angular damping coefficient. <b>Range:</b> [0, PX_MAX_F32)
 
 	@see getAngularDamping() setLinearDamping()
 	*/
@@ -199,7 +173,7 @@ public:
 
 	<b>Default:</b> 7.0
 
-	\param[in] maxAngVel Max allowable angular velocity for actor. <b>Range:</b> (0,inf)
+	\param[in] maxAngVel Max allowable angular velocity for actor. <b>Range:</b> [0, PX_MAX_F32)
 
 	@see getMaxAngularVelocity()
 	*/
@@ -224,9 +198,29 @@ public:
 	When an actor does not move for a period of time, it is no longer simulated in order to save time. This state
 	is called sleeping. However, because the object automatically wakes up when it is either touched by an awake object,
 	or one of its properties is changed by the user, the entire sleep mechanism should be transparent to the user.
+
+	In general, a dynamic rigid actor is guaranteed to be awake if at least one of the following holds:
+
+	\li The wake counter is positive (see #setWakeCounter()).
+	\li The linear or angular velocity is non-zero.
+	\li A non-zero force or torque has been applied.
+
+	If a dynamic rigid actor is sleeping, the following state is guaranteed:
+
+	\li The wake counter is zero.
+	\li The linear and angular velocity is zero.
+	\li There is no force update pending.
+
+	When an actor gets inserted into a scene, it will be considered asleep if all the points above hold, else it will be treated as awake.
 	
 	If an actor is asleep after the call to PxScene::fetchResults() returns, it is guaranteed that the pose of the actor 
-	was not changed. You can use this information to avoid updating the transforms of associated of dependent objects.
+	was not changed. You can use this information to avoid updating the transforms of associated objects.
+
+	\note A kinematic actor is asleep unless a target pose has been set (in which case it will stay awake until the end of the next 
+	simulation step where no target pose has been set anymore). The wake counter will get set to zero or to the reset value 
+	#PxSceneDesc::wakeCounterResetValue in the case where a target pose has been set to be consistent with the definitions above.
+
+	\note It is invalid to use this method if the actor has not been added to a scene already.
 
 	\return True if the actor is sleeping.
 
@@ -238,11 +232,11 @@ public:
     /**
 	\brief Sets the mass-normalized kinetic energy threshold below which an actor may go to sleep.
 
-	Actors whose kinetic energy divided by their mass is above this threshold will not be put to sleep.
+	Actors whose kinetic energy divided by their mass is below this threshold will be candidates for sleeping.
 
-	<b>Default:</b> 0.05 * PxTolerancesScale::speed * PxTolerancesScale::speed
+	<b>Default:</b> 5e-5f * PxTolerancesScale::speed * PxTolerancesScale::speed
 
-	\param[in] threshold Energy below which an actor may go to sleep. <b>Range:</b> (0,inf]
+	\param[in] threshold Energy below which an actor may go to sleep. <b>Range:</b> [0, PX_MAX_F32)
 
 	@see isSleeping() getSleepThreshold() wakeUp() putToSleep() PxTolerancesScale
 	*/
@@ -251,36 +245,101 @@ public:
 	/**
 	\brief Returns the mass-normalized kinetic energy below which an actor may go to sleep.
 
-	Actors whose kinetic energy divided by their mass is above this threshold will not be put to sleep. 
-
 	\return The energy threshold for sleeping.
 
 	@see isSleeping() wakeUp() putToSleep() setSleepThreshold()
 	*/
 	virtual		PxReal				getSleepThreshold() const = 0;
 
+	 /**
+	\brief Sets the mass-normalized kinetic energy threshold below which an actor may participate in stabilization.
+
+	Actors whose kinetic energy divided by their mass is above this threshold will not participate in stabilization.
+
+	This value has no effect if PxSceneFlag::eENABLE_STABILIZATION was not enabled on the PxSceneDesc.
+
+	<b>Default:</b> 1e-5f * PxTolerancesScale::speed * PxTolerancesScale::speed
+
+	\param[in] threshold Energy below which an actor may participate in stabilization. <b>Range:</b> (0,inf]
+
+	@see  getStabilizationThreshold() PxSceneFlag::eENABLE_STABILIZATION
+	*/
+	virtual		void				setStabilizationThreshold(PxReal threshold) = 0;
+
 	/**
-	\brief Wakes up the actor if it is sleeping.  
+	\brief Returns the mass-normalized kinetic energy below which an actor may participate in stabilization.
 
-	The wakeCounterValue determines how long until the body is put to sleep, a value of zero means 
-	that the body is sleeping. wakeUp(0) is equivalent to PxRigidDynamic::putToSleep().
+	Actors whose kinetic energy divided by their mass is above this threshold will not participate in stabilization. 
 
-	\param[in] wakeCounterValue New sleep counter value. <b>Range:</b> [0,inf]
+	\return The energy threshold for participating in stabilization.
+
+	@see setStabilizationThreshold() PxSceneFlag::eENABLE_STABILIZATION
+	*/
+	virtual		PxReal				getStabilizationThreshold() const = 0;
+
+
+	/**
+	\brief Sets the wake counter for the actor.
+
+	The wake counter value determines the minimum amount of time until the body can be put to sleep. Please note
+	that a body will not be put to sleep if the energy is above the specified threshold (see #setSleepThreshold())
+	or if other awake bodies are touching it.
+
+	\note Passing in a positive value will wake the actor up automatically.
+
+	\note It is invalid to use this method for kinematic actors since the wake counter for kinematics is defined
+	based on whether a target pose has been set (see the comment in #isSleeping()).
+
+	\note It is invalid to use this method if PxActorFlag::eDISABLE_SIMULATION is set.
+
+	<b>Default:</b> 0.4 (which corresponds to 20 frames for a time step of 0.02)
+
+	\param[in] wakeCounterValue Wake counter value. <b>Range:</b> [0, PX_MAX_F32)
+
+	@see isSleeping() getWakeCounter()
+	*/
+	virtual		void				setWakeCounter(PxReal wakeCounterValue) = 0;
+
+	/**
+	\brief Returns the wake counter of the actor.
+
+	\return The wake counter of the actor.
+
+	@see isSleeping() setWakeCounter()
+	*/
+	virtual		PxReal				getWakeCounter() const = 0;
+
+	/**
+	\brief Wakes up the actor if it is sleeping.
+
+	The actor will get woken up and might cause other touching actors to wake up as well during the next simulation step.
+
+	\note This will set the wake counter of the actor to the value specified in #PxSceneDesc::wakeCounterResetValue.
+
+	\note It is invalid to use this method if the actor has not been added to a scene already or if PxActorFlag::eDISABLE_SIMULATION is set.
+
+	\note It is invalid to use this method for kinematic actors since the sleep state for kinematics is defined
+	based on whether a target pose has been set (see the comment in #isSleeping()).
 
 	@see isSleeping() putToSleep()
 	*/
-	virtual		void				wakeUp(PxReal wakeCounterValue=PX_SLEEP_INTERVAL)	= 0;
+	virtual		void				wakeUp() = 0;
 
 	/**
 	\brief Forces the actor to sleep. 
 	
 	The actor will stay asleep during the next simulation step if not touched by another non-sleeping actor.
 	
-	\note This will set the velocity of the actor to 0.
+	\note Any applied force will be cleared and the velocity and the wake counter of the actor will be set to 0.
+
+	\note It is invalid to use this method if the actor has not been added to a scene already or if PxActorFlag::eDISABLE_SIMULATION is set.
+
+	\note It is invalid to use this method for kinematic actors since the sleep state for kinematics is defined
+	based on whether a target pose has been set (see the comment in #isSleeping()).
 
 	@see isSleeping() wakeUp()
 	*/
-	virtual		void				putToSleep()	= 0;
+	virtual		void				putToSleep() = 0;
 
 /************************************************************************************************/
 
@@ -291,7 +350,9 @@ public:
 	If you are having trouble with jointed bodies oscillating and behaving erratically, then
 	setting a higher position iteration count may improve their stability.
 
-	If intersecting bodies are being depenetrated too violently, increase the number of velocity iterations.
+	If intersecting bodies are being depenetrated too violently, increase the number of velocity 
+	iterations. More velocity iterations will drive the relative exit velocity of the intersecting 
+	objects closer to the correct value given the restitution.
 
 	<b>Default:</b> 4 position iterations, 1 velocity iteration
 
@@ -335,52 +396,24 @@ public:
 
 	See #getContactReportThreshold().
 
-	\param[in] threshold Force threshold for contact reports. <b>Range:</b> (0,inf)
+	\param[in] threshold Force threshold for contact reports. <b>Range:</b> [0, PX_MAX_F32)
 
 	@see getContactReportThreshold PxPairFlag
 	*/
 	virtual     void				setContactReportThreshold(PxReal threshold) = 0;
 
-    /**
-	\brief Raises or clears a particular dynamic rigid body flag.
-	
-	See the list of flags #PxRigidDynamicFlag
-
-	<b>Default:</b> no flags are set
-
-	<b>Sleeping:</b> Does <b>NOT</b> wake the actor up automatically.
-
-	\param[in] flag		The PxRigidDynamic flag to raise(set) or clear. See #PxRigidDynamicFlag.
-	\param[in] value	The new boolean value for the flag.
-
-	@see PxRigidDynamicFlag getRigidDynamicFlags() 
-	*/
-	virtual		void				setRigidDynamicFlag(PxRigidDynamicFlag::Enum flag, bool value) = 0;
-	virtual		void				setRigidDynamicFlags(PxRigidDynamicFlags inFlags) = 0;
-
-	/**
-	\brief Reads the PxRigidDynamic flags.
-	
-	See the list of flags #PxRigidDynamicFlag
-
-	\return The values of the PxRigidDynamic flags.
-
-	@see PxRigidDynamicFlag setRigidDynamicFlag()
-	*/
-	virtual		PxRigidDynamicFlags	getRigidDynamicFlags()	const = 0;
-
-	virtual		const char*		getConcreteTypeName() const					{	return "PxRigidDynamic"; }
+	virtual		const char*			getConcreteTypeName() const { return "PxRigidDynamic"; }
 
 protected:
-								PxRigidDynamic(PxRefResolver& v) : PxRigidBody(v)		{}
-	PX_INLINE					PxRigidDynamic() : PxRigidBody() {}
-	virtual						~PxRigidDynamic()	{}
-	virtual		bool			isKindOf(const char* name)	const		{	return !strcmp("PxRigidDynamic", name) || PxRigidBody::isKindOf(name); }
+	PX_INLINE						PxRigidDynamic(PxType concreteType, PxBaseFlags baseFlags) : PxRigidBody(concreteType, baseFlags) {}
+	PX_INLINE						PxRigidDynamic(PxBaseFlags baseFlags) : PxRigidBody(baseFlags) {}
+	virtual							~PxRigidDynamic() {}
+	virtual		bool				isKindOf(const char* name) const { return !strcmp("PxRigidDynamic", name) || PxRigidBody::isKindOf(name); }
 
 };
 
-PX_INLINE	PxRigidDynamic*			PxActor::isRigidDynamic()				{ return is<PxRigidDynamic>();		}
-PX_INLINE	const PxRigidDynamic*	PxActor::isRigidDynamic()		const	{ return is<PxRigidDynamic>();		}
+PX_DEPRECATED PX_INLINE	PxRigidDynamic*			PxActor::isRigidDynamic()				{ return is<PxRigidDynamic>();		}
+PX_DEPRECATED PX_INLINE	const PxRigidDynamic*	PxActor::isRigidDynamic()		const	{ return is<PxRigidDynamic>();		}
 
 
 #ifndef PX_DOXYGEN

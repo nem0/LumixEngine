@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -34,7 +34,7 @@
 @{
 */
 
-#include "PxPhysX.h"
+#include "PxPhysXConfig.h"
 #include "foundation/PxFlags.h"
 
 #ifndef PX_DOXYGEN
@@ -60,7 +60,7 @@ struct PxPairFlag
 
 		\note Only takes effect if the colliding actors are rigid bodies.
 		*/
-		eRESOLVE_CONTACTS					= (1<<0),
+		eSOLVE_CONTACT						= (1<<0),
 
 		/**
 		\brief Call contact modification callback for this collision pair
@@ -81,23 +81,27 @@ struct PxPairFlag
 
 		\note Only takes effect if the colliding actors are rigid bodies.
 
+		\note Only takes effect if eDETECT_DISCRETE_CONTACT or eDETECT_CCD_CONTACT is raised
+
 		@see PxSimulationEventCallback.onContact() PxSimulationEventCallback.onTrigger()
 		*/
 		eNOTIFY_TOUCH_FOUND					= (1<<2),
 
 		/**
-		\brief Call contact report callback or trigger callback while this collision pair is in contact
+		\brief Call contact report callback while this collision pair is in contact
 
-		If one of the two collision objects is a trigger shape (see #PxShapeFlag::eTRIGGER_SHAPE) 
-		then the trigger callback will get called as long as the other object stays within the trigger volume. 
 		If none of the two collision objects is a trigger shape then the contact report callback will get 
 		called while the actors of this collision pair are in contact.
 
-		\note For trigger reports, this functionality is deprecated and will be removed in the next release.
+		\note Triggers do not support this event. Persistent trigger contacts need to be tracked separately by observing eNOTIFY_TOUCH_FOUND/eNOTIFY_TOUCH_LOST events.
 
 		\note Only takes effect if the colliding actors are rigid bodies.
 
 		\note No report will get sent if the objects in contact are sleeping.
+
+		\note Only takes effect if eDETECT_DISCRETE_CONTACT or eDETECT_CCD_CONTACT is raised
+
+		\note If this flag gets enabled while a pair is in touch already, there will be no eNOTIFY_TOUCH_PERSISTS events until the pair loses and regains touch.
 
 		@see PxSimulationEventCallback.onContact() PxSimulationEventCallback.onTrigger()
 		*/
@@ -115,18 +119,42 @@ struct PxPairFlag
 
 		\note This event will also get triggered if one of the colliding objects gets deleted.
 
+		\note Only takes effect if eDETECT_DISCRETE_CONTACT or eDETECT_CCD_CONTACT is raised
+
 		@see PxSimulationEventCallback.onContact() PxSimulationEventCallback.onTrigger()
 		*/
 		eNOTIFY_TOUCH_LOST					= (1<<4),
+
+		/**
+		\brief Call contact report callback when this collision pair is in contact during CCD passes.
+
+		If CCD with multiple passes is enabled, then a fast moving object might bounce on and off the same
+		object multiple times. Hence, the same pair might be in contact multiple times during a simulation step.
+		This flag will make sure that all the detected collision during CCD will get reported. For performance
+		reasons, the system can not always tell whether the contact pair lost touch in one of the previous CCD 
+		passes and thus can also not always tell whether the contact is new or has persisted. eNOTIFY_TOUCH_CCD
+		just reports when the two collision objects were detected as being in contact during a CCD pass.
+
+		\note Only takes effect if the colliding actors are rigid bodies.
+
+		\note Trigger shapes are not supported.
+
+		\note Only takes effect if eDETECT_CCD_CONTACT is raised
+
+		@see PxSimulationEventCallback.onContact() PxSimulationEventCallback.onTrigger()
+		*/
+		eNOTIFY_TOUCH_CCD					= (1<<5),
 
 		/**
 		\brief Call contact report callback when the contact force between the actors of this collision pair exceeds one of the actor-defined force thresholds.
 
 		\note Only takes effect if the colliding actors are rigid bodies.
 
+		\note Only takes effect if eDETECT_DISCRETE_CONTACT or eDETECT_CCD_CONTACT is raised
+
 		@see PxSimulationEventCallback.onContact()
 		*/
-		eNOTIFY_THRESHOLD_FORCE_FOUND		= (1<<5),
+		eNOTIFY_THRESHOLD_FORCE_FOUND		= (1<<6),
 
 		/**
 		\brief Call contact report callback when the contact force between the actors of this collision pair continues to exceed one of the actor-defined force thresholds.
@@ -136,9 +164,11 @@ struct PxPairFlag
 		\note If a pair gets re-filtered and this flag has previously been disabled, then the report will not get fired in the same frame even if the force threshold has been reached in the
 		previous one (unless #eNOTIFY_THRESHOLD_FORCE_FOUND has been set in the previous frame).
 
+		\note Only takes effect if eDETECT_DISCRETE_CONTACT or eDETECT_CCD_CONTACT is raised
+
 		@see PxSimulationEventCallback.onContact()
 		*/
-		eNOTIFY_THRESHOLD_FORCE_PERSISTS	= (1<<6),
+		eNOTIFY_THRESHOLD_FORCE_PERSISTS	= (1<<7),
 
 		/**
 		\brief Call contact report callback when the contact force between the actors of this collision pair falls below one of the actor-defined force thresholds (includes the case where this collision pair stops being in contact).
@@ -148,39 +178,111 @@ struct PxPairFlag
 		\note If a pair gets re-filtered and this flag has previously been disabled, then the report will not get fired in the same frame even if the force threshold has been reached in the
 		previous one (unless #eNOTIFY_THRESHOLD_FORCE_FOUND or #eNOTIFY_THRESHOLD_FORCE_PERSISTS has been set in the previous frame).
 
+		\note Only takes effect if eDETECT_DISCRETE_CONTACT or eDETECT_CCD_CONTACT is raised
+
 		@see PxSimulationEventCallback.onContact()
 		*/
-		eNOTIFY_THRESHOLD_FORCE_LOST		= (1<<7),
+		eNOTIFY_THRESHOLD_FORCE_LOST		= (1<<8),
 
 		/**
 		\brief Provide contact points in contact reports for this collision pair.
 
 		\note Only takes effect if the colliding actors are rigid bodies and if used in combination with the flags eNOTIFY_TOUCH_... or eNOTIFY_THRESHOLD_FORCE_...
 
-		@see PxSimulationEventCallback.onContact() PxConstContactStream PxContactStreamIterator PxContactStreamIterator.getPoint()
+		\note Only takes effect if eDETECT_DISCRETE_CONTACT or eDETECT_CCD_CONTACT is raised
+
+		@see PxSimulationEventCallback.onContact() PxContactPair PxContactPair.extractContacts()
 		*/
-		eNOTIFY_CONTACT_POINTS				= (1<<8),
+		eNOTIFY_CONTACT_POINTS				= (1<<9),
 
 		/**
-		\brief This flag is used to indicate that per-pair CCD is enabled. Currently only linear sweep is supported.
+		\brief This flag is used to indicate whether this pair generates discrete collision detection contacts. 
 
-		\note The scene must have PxSceneFlag::eENABLE_SWEPT_INTEGRATION enabled to use this feature.
-		\note Non-static shapes of the pair should have PxShapeFlag::eUSE_SWEPT_BOUNDS specified for this feature to work correctly.
-
-		@see PxShapeFlag::eUSE_SWEPT_BOUNDS
-		@see PxSceneFlag::eENABLE_SWEPT_INTEGRATION
+		\note Contacts are only responded to if eSOLVE_CONTACT is enabled.
 		*/
-		eSWEPT_INTEGRATION_LINEAR			= (1<<9),
+
+		eDETECT_DISCRETE_CONTACT			= (1<<10),
+		
+
+		/**
+		\brief This flag is used to indicate whether this pair generates CCD contacts. 
+
+		\note The contacts will only be responded to if eSOLVE_CONTACT is enabled on this pair.
+		\note The scene must have PxSceneFlag::eENABLE_CCD enabled to use this feature.
+		\note Non-static bodies of the pair should have PxRigidBodyFlag::eENABLE_CCD specified for this feature to work correctly.
+		\note This flag is not supported with trigger shapes. However, CCD trigger events can be emulated using non-trigger shapes 
+		and requesting eNOTIFY_TOUCH_FOUND and eNOTIFY_TOUCH_LOST and not raising eSOLVE_CONTACT on the pair.
+
+		@see PxRigidBodyFlag::eENABLE_CCD
+		@see PxSceneFlag::eENABLE_CCD
+		*/
+
+		eDETECT_CCD_CONTACT					= (1<<11),
+
+		/**
+		\brief Provide pre solver velocities in contact reports for this collision pair.
+		
+		If the collision pair has contact reports enabled, the velocities of the rigid bodies before contacts have been solved
+		will be provided in the contact report callback unless the pair lost touch in which case no data will be provided.
+		
+		\note Usually it is not necessary to request these velocities as they will be available by querying the velocity from the provided
+		PxRigidActor object directly. However, it might be the case that the velocity of a rigid body gets set while the simulation is running
+		in which case the PxRigidActor would return this new velocity in the contact report callback and not the velocity the simulation used.
+		
+		@see PxSimulationEventCallback.onContact(), PxContactPairVelocity, PxContactPairHeader.extraDataStream
+		*/
+		ePRE_SOLVER_VELOCITY				= (1<<12),
+		
+		/**
+		\brief Provide post solver velocities in contact reports for this collision pair.
+		
+		If the collision pair has contact reports enabled, the velocities of the rigid bodies after contacts have been solved
+		will be provided in the contact report callback unless the pair lost touch in which case no data will be provided.
+		
+		@see PxSimulationEventCallback.onContact(), PxContactPairVelocity, PxContactPairHeader.extraDataStream
+		*/
+		ePOST_SOLVER_VELOCITY				= (1<<13),
+		
+		/**
+		\brief Provide rigid body poses in contact reports for this collision pair.
+		
+		If the collision pair has contact reports enabled, the rigid body poses at the contact event will be provided 
+		in the contact report callback unless the pair lost touch in which case no data will be provided.
+		
+		\note Usually it is not necessary to request these poses as they will be available by querying the pose from the provided
+		PxRigidActor object directly. However, it might be the case that the pose of a rigid body gets set while the simulation is running
+		in which case the PxRigidActor would return this new pose in the contact report callback and not the pose the simulation used.
+		Another use case is related to CCD with multiple passes enabled, A fast moving object might bounce on and off the same 
+		object multiple times. This flag can be used to request the rigid body poses at the time of impact for each such collision event.
+		
+		@see PxSimulationEventCallback.onContact(), PxContactPairPose, PxContactPairHeader.extraDataStream
+		*/
+		eCONTACT_EVENT_POSE					= (1<<14),
+
+		eNEXT_FREE							= (1<<15),        //!< For internal use only.
+
+		/**
+		\deprecated
+		\brief Provides default flag for resolving contacts
+		*/
+
+		PX_DEPRECATED eRESOLVE_CONTACTS		= eSOLVE_CONTACT | eDETECT_DISCRETE_CONTACT,
+
+		/**
+		\deprecated
+		\brief Provided default flag to enable performing linear CCD sweeps and response for this collision pair.
+		*/
+		PX_DEPRECATED eCCD_LINEAR			= eSOLVE_CONTACT | eDETECT_CCD_CONTACT,
 
 		/**
 		\brief Provided default flag to do simple contact processing for this collision pair.
 		*/
-		eCONTACT_DEFAULT					= eRESOLVE_CONTACTS,
+		eCONTACT_DEFAULT					= eSOLVE_CONTACT | eDETECT_DISCRETE_CONTACT,
 
 		/**
 		\brief Provided default flag to get commonly used trigger behavior for this collision pair.
 		*/
-		eTRIGGER_DEFAULT					= eNOTIFY_TOUCH_FOUND | eNOTIFY_TOUCH_LOST
+		eTRIGGER_DEFAULT					= eNOTIFY_TOUCH_FOUND | eNOTIFY_TOUCH_LOST | eDETECT_DISCRETE_CONTACT
 	};
 };
 
@@ -190,7 +292,7 @@ struct PxPairFlag
 @see PxPairFlag
 */
 typedef PxFlags<PxPairFlag::Enum, PxU16> PxPairFlags;
-PX_FLAGS_OPERATORS(PxPairFlag::Enum, PxU16);
+PX_FLAGS_OPERATORS(PxPairFlag::Enum, PxU16)
 
 
 
@@ -210,9 +312,9 @@ struct PxFilterFlag
 		of the following occurs:
 
 		\li The bounding volumes of the two objects overlap again (after being separated)
-		\li The user enforces a re-filtering (see #PxShape::resetFiltering(), #PxParticleSystem::resetFiltering())
+		\li The user enforces a re-filtering (see #PxScene::resetFiltering())
 
-		@see PxShape::resetFiltering() PxParticleBase::resetFiltering()
+		@see PxScene::resetFiltering()
 		*/
 		eKILL				= (1<<0),
 
@@ -224,6 +326,8 @@ struct PxFilterFlag
 
 		\li Same conditions as for killed pairs (see #eKILL)
 		\li The filter data or the filter object attributes change for one of the collision objects
+
+		\note For PxCloth objects, eSUPPRESS will be treated as eKILL.
 
 		@see PxFilterData PxFilterObjectAttributes
 		*/
@@ -268,7 +372,7 @@ struct PxFilterFlag
 @see PxFilterFlag
 */
 typedef PxFlags<PxFilterFlag::Enum, PxU16> PxFilterFlags;
-PX_FLAGS_OPERATORS(PxFilterFlag::Enum, PxU16);
+PX_FLAGS_OPERATORS(PxFilterFlag::Enum, PxU16)
 
 
 /**
@@ -278,7 +382,14 @@ PX_FLAGS_OPERATORS(PxFilterFlag::Enum, PxU16);
 */
 struct PxFilterData
 {
-	PX_INLINE PxFilterData(const PxEmpty&)
+//= ATTENTION! =====================================================================================
+// Changing the data layout of this class breaks the binary serialization format.  See comments for 
+// PX_BINARY_SERIAL_VERSION.  If a modification is required, please adjust the getBinaryMetaData 
+// function.  If the modification is made on a custom branch, please change PX_BINARY_SERIAL_VERSION
+// accordingly.
+//==================================================================================================
+
+	PX_INLINE PxFilterData(const PxEMPTY&)
 	{
 	}
 
@@ -348,6 +459,12 @@ struct PxFilterObjectType
 		@see PxArticulation
 		*/
 		eARTICULATION,
+		
+		/**
+		\brief A cloth object
+		@see PxCloth
+		*/
+		eCLOTH,
 
 		//brief internal use only!
 		eMAX_TYPE_COUNT = 16,
@@ -359,7 +476,7 @@ struct PxFilterObjectType
 
 
 // For internal use only
-struct PxFilterObjectFlags
+struct PxFilterObjectFlag
 {
 	enum Enum
 	{
@@ -397,11 +514,11 @@ PX_INLINE PxFilterObjectType::Enum PxGetFilterObjectType(PxFilterObjectAttribute
 \param[in] attr The filter attribute of a collision pair object
 \return True if the object belongs to a kinematic rigid body, else false
 
-@see PxRigidDynamicFlag::eKINEMATIC
+@see PxRigidBodyFlag::eKINEMATIC
 */
 PX_INLINE bool PxFilterObjectIsKinematic(PxFilterObjectAttributes attr)
 {
-	return ((attr & PxFilterObjectFlags::eKINEMATIC) != 0);
+	return ((attr & PxFilterObjectFlag::eKINEMATIC) != 0);
 }
 
 
@@ -415,7 +532,7 @@ PX_INLINE bool PxFilterObjectIsKinematic(PxFilterObjectAttributes attr)
 */
 PX_INLINE bool PxFilterObjectIsTrigger(PxFilterObjectAttributes attr)
 {
-	return ((attr & PxFilterObjectFlags::eTRIGGER) != 0);
+	return ((attr & PxFilterObjectFlag::eTRIGGER) != 0);
 }
 
 
@@ -441,7 +558,7 @@ Return the PxFilterFlag flags and set the PxPairFlag flags to define what the si
 This methods gets called when:
 \li The bounding volumes of two objects start to overlap.
 \li The bounding volumes of two objects overlap and the filter data or filter attributes of one of the objects changed
-\li A re-filtering was forced through resetFiltering() (see #PxShape::resetFiltering(), #PxParticleBase::resetFiltering())
+\li A re-filtering was forced through resetFiltering() (see #PxScene::resetFiltering())
 \li Filtering is requested in scene queries
 
 \note Certain pairs of objects are always ignored and this method does not get called. This is the case for the
@@ -453,6 +570,7 @@ following pairs:
 \li Pair of particle systems
 \li Two jointed rigid bodies and the joint was defined to disable collision
 \li Two articulation links if connected through an articulation joint
+\li Cloth objects and rigid body actors
 
 \note This is a performance critical method and should be stateless. You should neither access external objects 
 from within this method nor should you call external methods that are not inlined. If you need a more complex
@@ -488,6 +606,10 @@ pairs and update their filter state.
 
 You might want to check the documentation on #PxSimulationFilterShader as well since it includes more general information
 on filtering.
+
+\note SDK state should not be modified from within the callbacks. In particular objects should not
+be created or destroyed. If state modification is needed then the changes should be stored to a buffer
+and performed after the simulation step.
 
 \note The callbacks may execute in user threads or simulation threads, possibly simultaneously. The corresponding objects 
 may have been deleted by the application earlier in the frame. It is the application's responsibility to prevent race conditions
@@ -525,8 +647,8 @@ public:
 	@see PxSimulationFilterShader PxFilterData PxFilterObjectAttributes PxFilterFlag PxPairFlag
 	*/
 	virtual		PxFilterFlags	pairFound(	PxU32 pairID,
-		PxFilterObjectAttributes attributes0, PxFilterData filterData0, PxActor* a0, PxShape* s0,
-		PxFilterObjectAttributes attributes1, PxFilterData filterData1, PxActor* a1, PxShape* s1,
+		PxFilterObjectAttributes attributes0, PxFilterData filterData0, const PxActor* a0, const PxShape* s0,
+		PxFilterObjectAttributes attributes1, PxFilterData filterData1, const PxActor* a1, const PxShape* s1,
 		PxPairFlags& pairFlags) = 0;
 
 	/**

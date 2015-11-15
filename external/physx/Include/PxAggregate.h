@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -35,8 +35,8 @@
 @{
 */
 
-#include "PxPhysX.h"
-#include "common/PxSerialFramework.h"
+#include "PxPhysXConfig.h"
+#include "common/PxBase.h"
 
 
 #ifndef PX_DOXYGEN
@@ -62,10 +62,10 @@ broad-phase structures. This has 3 main benefits:
    filtering once and for all, for the aggregate containing the ragdoll, rather than filtering
    out each bone-bone collision in the filter shader.
 
-@see PxActor
+@see PxActor, PxPhysics.createAggregate
 */
 
-class PxAggregate : public PxSerializable
+class PxAggregate : public PxBase
 {
 public:
 
@@ -187,13 +187,13 @@ public:
 	*/
 	virtual	bool		getSelfCollision()	const	= 0;
 
-	virtual	const char*			getConcreteTypeName() const				{	return "PxAggregate"; }
+	virtual	const char*	getConcreteTypeName() const	{ return "PxAggregate"; }
 
 protected:
-						PxAggregate(PxRefResolver& v) : PxSerializable(v) {}
-						PxAggregate()	{}
-	virtual				~PxAggregate()	{}
-	virtual	bool		isKindOf(const char* name)	const		{	return !strcmp("PxAggregate", name) || PxSerializable::isKindOf(name); }
+	PX_INLINE			PxAggregate(PxType concreteType, PxBaseFlags baseFlags) : PxBase(concreteType, baseFlags) {}
+	PX_INLINE			PxAggregate(PxBaseFlags baseFlags) : PxBase(baseFlags) {}
+	virtual				~PxAggregate() {}
+	virtual	bool		isKindOf(const char* name) const { return !strcmp("PxAggregate", name) || PxBase::isKindOf(name); }
 };
 
 #ifndef PX_DOXYGEN

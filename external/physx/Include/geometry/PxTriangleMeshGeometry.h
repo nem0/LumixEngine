@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -54,7 +54,9 @@ struct PxMeshGeometryFlag
 {
 	enum Enum
 	{
-		eDOUBLE_SIDED				= (1<<1)	//!< The mesh is double-sided. This is currently only used for raycasting.
+		eDOUBLE_SIDED = (1<<1)	//!< Meshes with this flag set are treated as double-sided.
+								//!< This flag is currently only used for raycasts and sweeps (it is ignored for overlap queries).
+								//!< For detailed specifications of this flag for meshes and heightfields please refer to the Geometry Query section of the user guide.
 	};
 };
 
@@ -64,7 +66,7 @@ struct PxMeshGeometryFlag
 @see PxMeshGeometryFlag
 */
 typedef PxFlags<PxMeshGeometryFlag::Enum,PxU8> PxMeshGeometryFlags;
-PX_FLAGS_OPERATORS(PxMeshGeometryFlag::Enum,PxU8);
+PX_FLAGS_OPERATORS(PxMeshGeometryFlag::Enum,PxU8)
 
 /**
 \brief Triangle mesh geometry class.
@@ -98,6 +100,11 @@ public:
 	\brief Returns true if the geometry is valid.
 
 	\return True if the current settings are valid.
+
+	\note A valid triangle mesh has a positive scale value in each direction (scale.scale.x > 0, scale.scale.y > 0, scale.scale.z > 0).
+	It is illegal to call PxRigidActor::createShape and PxPhysics::createShape with a triangle mesh that has zero extents in any direction.
+
+	@see PxRigidActor::createShape, PxPhysics::createShape
 	*/
 	PX_INLINE bool isValid() const;
 

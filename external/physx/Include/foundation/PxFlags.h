@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -69,16 +69,21 @@ namespace physx
 			doSomething();
 		}
 	*/
+
 	template<typename enumtype, typename storagetype=PxU32>
 	class PxFlags
 	{
 	public:
-		PX_INLINE	explicit	PxFlags(const PxEmpty&)	{}
+		typedef storagetype InternalType;
+
+		PX_INLINE	explicit	PxFlags(const PxEMPTY&)	{}
 		PX_INLINE				PxFlags(void);
 		PX_INLINE				PxFlags(enumtype e);
 		PX_INLINE				PxFlags(const PxFlags<enumtype,storagetype> &f);
-		PX_INLINE	explicit	PxFlags(storagetype b);
+		PX_INLINE	explicit	PxFlags(storagetype b);		
 		
+		PX_INLINE bool							 isSet     (enumtype e) const;
+		PX_INLINE PxFlags<enumtype,storagetype> &set       (enumtype e);
 		PX_INLINE bool                           operator==(enumtype e) const;
 		PX_INLINE bool                           operator==(const PxFlags<enumtype,storagetype> &f) const;
 		PX_INLINE bool                           operator==(bool b) const;
@@ -128,8 +133,8 @@ namespace physx
 		PX_INLINE PxFlags<enumtype, storagetype> operator&(enumtype a, enumtype b) { PxFlags<enumtype, storagetype> r(a); r &= b; return r; } \
 		PX_INLINE PxFlags<enumtype, storagetype> operator~(enumtype a)             { return ~PxFlags<enumtype, storagetype>(a);             }
 
-
-
+	#define PX_FLAGS_TYPEDEF(x, y)	typedef PxFlags<x::Enum, y> x##s;	\
+	PX_FLAGS_OPERATORS(x::Enum, y)
 
 	template<typename enumtype, typename storagetype>
 	PX_INLINE PxFlags<enumtype,storagetype>::PxFlags(void)
@@ -153,6 +158,19 @@ namespace physx
 	PX_INLINE PxFlags<enumtype,storagetype>::PxFlags(storagetype b)
 	{
 		mBits = b;
+	}
+
+	template<typename enumtype, typename storagetype>
+	PX_INLINE bool PxFlags<enumtype,storagetype>::isSet(enumtype e) const
+	{
+		return (mBits & static_cast<storagetype>(e)) == static_cast<storagetype>(e);
+	}
+
+	template<typename enumtype, typename storagetype>
+	PX_INLINE PxFlags<enumtype,storagetype> &PxFlags<enumtype,storagetype>::set(enumtype e)
+	{
+		mBits = static_cast<storagetype>(e);
+		return *this;
 	}
 	
 	template<typename enumtype, typename storagetype>
@@ -286,7 +304,7 @@ namespace physx
 	PX_INLINE PxFlags<enumtype,storagetype> PxFlags<enumtype,storagetype>::operator~ (void) const
 	{
 		PxFlags<enumtype,storagetype> out;
-		out.mBits = ~mBits;
+		out.mBits = (storagetype)~mBits;
 		return out;
 	}
 	

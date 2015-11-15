@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -71,12 +71,12 @@ struct PxPrismaticJointFlag
 {
 	enum Enum
 	{
-		eLIMIT_ENABLED	= 1<<1,
+		eLIMIT_ENABLED	= 1<<1
 	};
 };
 
 typedef PxFlags<PxPrismaticJointFlag::Enum, PxU16> PxPrismaticJointFlags;
-PX_FLAGS_OPERATORS(PxPrismaticJointFlag::Enum, PxU16);
+PX_FLAGS_OPERATORS(PxPrismaticJointFlag::Enum, PxU16)
 
 
 /**
@@ -91,25 +91,38 @@ PX_FLAGS_OPERATORS(PxPrismaticJointFlag::Enum, PxU16);
  @see PxPrismaticJointCreate() PxJoint
 */
 
-class PxPrismaticJoint: public PxJoint
+class PxPrismaticJoint : public PxJoint
 {
 public:
-	static const PxJointType::Enum Type = PxJointType::ePRISMATIC;
+	
 
+	/** 
+	\brief returns the displacement of the joint along its axis.
+	*/
+
+	virtual PxReal			getPosition()				const				= 0;
+
+	/** 
+	\brief returns the velocity of the joint along its axis
+	*/
+	virtual PxReal			getVelocity()				const				= 0;
 
 	/**
-	\brief sets the joint upper limit  parameters.
+	\brief sets the joint limit  parameters.
 
-	@see PxJointLimit getLowerLimit()
+	The limit range is [-PX_MAX_F32, PX_MAX_F32], but note that the width of the limit (upper-lower) must also be
+	a valid float.
+
+	@see PxJointLinearLimitPair getLimit()
 	*/
-	virtual void			setLimit(const PxJointLimitPair&)			= 0;
+	virtual void			setLimit(const PxJointLinearLimitPair&)		= 0;
 
 	/**
-	\brief gets the joint upper limit  parameters.
+	\brief gets the joint limit  parameters.
 
-	@see PxJointLimit getLowerLimit()
+	@see PxJointLinearLimit getLimit()
 	*/
-	virtual PxJointLimitPair getLimit()					const			= 0;
+	virtual PxJointLinearLimitPair getLimit()			const			= 0;
 
 
 	/**
@@ -157,7 +170,7 @@ public:
 
 	This value must be nonnegative.
 
-	<b>Range:</b> [0,inf)<br>
+	<b>Range:</b> [0, PX_MAX_F32)<br>
 	<b>Default:</b> 1e10f
 
 	\param[in] tolerance the linear tolerance threshold
@@ -187,8 +200,8 @@ public:
 
 	Sometimes it is not possible to project (for example when the joints form a cycle).
 
-	<b>Range:</b> [0,inf)<br>
-	<b>Default:</b> 1e10f
+	<b>Range:</b> [0, PX_MAX_F32)<br>
+	<b>Default:</b> Pi
 
 	\param[in] tolerance the linear tolerance threshold
 
@@ -204,13 +217,30 @@ public:
 	*/
 	virtual PxReal			getProjectionAngularTolerance()			const					= 0;
 
-
-	virtual	const char*		getConcreteTypeName() const				{	return "PxPrismaticJoint"; }
+	/**
+	\brief Returns string name of PxPrismaticJoint, used for serialization
+	*/
+	virtual	const char*		getConcreteTypeName() const { return "PxPrismaticJoint"; }
 
 protected:
-	PxPrismaticJoint(PxRefResolver& v)	: PxJoint(v)	{}
-	PxPrismaticJoint()									{}
-	virtual	bool			isKindOf(const char* name)	const		{	return !strcmp("PxPrismaticJoint", name) || PxJoint::isKindOf(name); }
+	//serialization
+	
+	/**
+	\brief Constructor
+	*/
+	PX_INLINE				PxPrismaticJoint(PxType concreteType, PxBaseFlags baseFlags) : PxJoint(concreteType, baseFlags) {}
+
+	/**
+	\brief Deserialization constructor
+	*/		
+	PX_INLINE				PxPrismaticJoint(PxBaseFlags baseFlags) : PxJoint(baseFlags) {}
+	
+	/**
+	\brief Returns whether a given type name matches with the type of this instance
+	*/
+	virtual	bool			isKindOf(const char* name) const {	return !strcmp("PxPrismaticJoint", name) || PxJoint::isKindOf(name); }
+	
+	//~serialization
 };
 
 #ifndef PX_DOXYGEN

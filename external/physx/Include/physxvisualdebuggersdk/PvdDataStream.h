@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,15 +23,16 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 #ifndef PVD_DATA_STREAM_H
 #define PVD_DATA_STREAM_H
-#include "physxvisualdebuggersdk/PvdObjectModelBaseTypes.h"
-#include "physxvisualdebuggersdk/PvdErrorCodes.h"
-#include "physxvisualdebuggersdk/PvdObjectModelMetaData.h"
+#include "PvdErrorCodes.h"
+#include "PvdObjectModelBaseTypes.h"
 
 namespace physx { namespace debugger {
 	class PvdObjectModelMetaData;
+	struct PropertyMessageArg;
+	struct NamespacedName;
 }}
 
 namespace physx { namespace debugger { namespace comm {
@@ -169,6 +170,35 @@ namespace physx { namespace debugger { namespace comm {
 		//Profiling hooks
 		virtual PvdError beginSection( const void* instance, String name ) = 0;
 		virtual PvdError endSection( const void* instance, String name ) = 0;
+
+		//Origin Shift
+		virtual PvdError originShift( const void* scene, PxVec3 shift ) = 0;
+
+	public:
+		/*For some cases, pvd command cannot be run immediately. For example, when create joints, while the actors may still pending for insert,
+		*the joints update commands can be run deffered.
+		*/
+		class PvdCommand
+		{
+		public:
+			//Assigned is needed for copying
+			PvdCommand(const PvdCommand &){}
+			PvdCommand &operator=(const PvdCommand &){return *this;}
+		public:
+			PvdCommand(){}
+			virtual ~PvdCommand(){}
+
+			//Not pure virtual so can have default PvdCommand obj
+			virtual bool canRun(PvdInstanceDataStream & ){return false;}
+			virtual void run(PvdInstanceDataStream&){}
+		};
+
+		//PVD SDK provide this helper function to allocate cmd's memory and release them at after flush the command queue
+		virtual void* allocateMemForCmd( PxU32 length ) = 0;
+
+		//PVD will call the destructor of PvdCommand object at the end fo flushPvdCommand
+		virtual void pushPvdCommand( PvdCommand& cmd ) = 0;
+		virtual void flushPvdCommand() = 0;
 	};
 
 	class PvdDataStream : public PvdInstanceDataStream, public PvdMetaDataStream

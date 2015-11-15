@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -35,6 +35,7 @@
 */
 
 #include "PxActor.h"
+#include "PxShape.h"
 
 #ifndef PX_DOXYGEN
 namespace physx
@@ -42,14 +43,15 @@ namespace physx
 #endif
 
 class PxConstraint;
-class PxShape;
+class PxMaterial;
+class PxGeometry;
 
 /**
 \brief PxRigidActor represents a base class shared between dynamic and static rigid bodies in the physics SDK.
 
 PxRigidActor objects specify the geometry of the object by defining a set of attached shapes (see #PxShape, #createShape()).
 
-@see PxActor PxRigidActorDesc
+@see PxActor
 */
 
 class PxRigidActor : public PxActor
@@ -64,6 +66,8 @@ public:
 	Such connected objects will be deleted upon scene deletion, or explicitly by the user by calling release()
 	on these objects. It is recommended to always remove all objects that reference actors before the actors
 	themselves are removed. It is not possible to retrieve list of dead connected objects.
+
+	<b>Sleeping:</b> This call will awaken any sleeping actors contacting the deleted actor (directly or indirectly).
 
 	Calls #PxActor::release() so you might want to check the documentation of that method as well.
 
@@ -97,22 +101,22 @@ public:
 	recomputed. In addition, moving static actors will not interact correctly with dynamic actors or joints. 
 	
 	To directly control an actor's position and have it correctly interact with dynamic bodies and joints, create a dynamic 
-	body with the PxRigidDynamicFlag::eKINEMATIC flag, then use the setKinematicTarget() commands to define its path.
+	body with the PxRigidBodyFlag::eKINEMATIC flag, then use the setKinematicTarget() commands to define its path.
 
 	Even when moving dynamic actors, exercise restraint in making use of this method. Where possible, avoid:
 	
-	\li moving actors into other actors, thus causing interpenetration (an invalid physical state)
+	\li moving actors into other actors, thus causing overlap (an invalid physical state)
 	
 	\li moving an actor that is connected by a joint to another away from the other (thus causing joint error)
 
-	<b>Sleeping:</b> This call wakes dynamic actors if they are sleeping and the wake parameter is true (default).
+	<b>Sleeping:</b> This call wakes dynamic actors if they are sleeping and the autowake parameter is true (default).
 
 	\param[in] pose Transformation from the actors local frame to the global frame. <b>Range:</b> rigid body transform.
-	\param[in] wake whether to wake the object if it is dynamic. This parameter has no effect for static actors
+	\param[in] autowake whether to wake the object if it is dynamic. This parameter has no effect for static or kinematic actors. If true and the current wake counter value is smaller than #PxSceneDesc::wakeCounterResetValue it will get increased to the reset value.
 
 	@see getGlobalPose()
 	*/
-	virtual		void			setGlobalPose(const PxTransform& pose, bool wake = true) = 0;
+	virtual		void			setGlobalPose(const PxTransform& pose, bool autowake = true) = 0;
 
 
 /************************************************************************************************/
@@ -123,60 +127,142 @@ public:
 	/**
 	\brief Creates a new shape with default properties and a list of materials and adds it to the list of shapes of this actor.
 	
-	\note Mass properties of dynamic rigid actors will not automatically be recomputed
-	to reflect the new mass distribution implied by the shape. Follow this call with a call to 
-	the PhysX extensions method #PxRigidBodyExt::updateMassAndInertia() to do that.
+	This is equivalent to the following
+
+	PxShape* shape(...) = PxGetPhysics().createShape(...);	// reference count is 1
+	actor->attachShape(shape);								// increments reference count
+	shape->release();										// releases user reference, leaving reference count at 1
+
+	As a consequence, detachShape() will result in the release of the last reference, and the shape will be deleted.
 
 	\note The default shape flags to be set are: eVISUALIZATION, eSIMULATION_SHAPE, eSCENE_QUERY_SHAPE (see #PxShapeFlag).
-	The only exception are triangle mesh, heightfield or plane geometry shapes if the actor is not a PxRigidStatic. In these
-	cases the eSIMULATION_SHAPE flag is omitted.
+	Triangle mesh, heightfield or plane geometry shapes configured as eSIMULATION_SHAPE are not supported for 
+	non-kinematic PxRigidDynamic instances.
 
-	\note Creating compounds with a very large number of shapes may adversly affect performance and stability.
+	\note Creating compounds with a very large number of shapes may adversely affect performance and stability.
 
 	<b>Sleeping:</b> Does <b>NOT</b> wake the actor up automatically.
 
-	\param[in] geometry	the geometry of the shape.
-	\param[in] materials a pointer to an array of material pointers.
+	\param[in] geometry	the geometry of the shape
+	\param[in] materials a pointer to an array of material pointers
 	\param[in] materialCount the count of materials
-	\param[in] localPose optional actor-relative pose of the shape 
+	\param[in] shapeFlags optional PxShapeFlags
 
 	\return The newly created shape.
 
 	@see PxShape PxShape::release()
 	*/
 
-	virtual		PxShape*		createShape(const PxGeometry& geometry, PxMaterial*const* materials, PxU32 materialCount, const PxTransform& localPose = PxTransform::createIdentity()) = 0;
+	virtual		PxShape*		createShape(const PxGeometry& geometry, PxMaterial*const* materials, PxU16 materialCount, PxShapeFlags shapeFlags = PxShapeFlag::eVISUALIZATION | PxShapeFlag::eSCENE_QUERY_SHAPE | PxShapeFlag::eSIMULATION_SHAPE) = 0;
 
+	/**
+	\deprecated
+	\brief Deprecated function to create shapes with an initial transform. 
+	
+	Use this instead:
+	PxShape* shape = actor->createShape(geometry, materials, materialCount);
+	if (shape)
+		shape->setLocalPose(transform);
+
+	@see PxShape, createShape(const PxGeometry& geometry, PxMaterial*const* materials, PxU16 materialCount, PxShapeFlags shapeFlags = PxShapeFlag::eVISUALIZATION | PxShapeFlag::eSCENE_QUERY_SHAPE | PxShapeFlag::eSIMULATION_SHAPE)
+	*/
+	PX_DEPRECATED PX_INLINE	PxShape* createShape(const PxGeometry& geometry, PxMaterial*const* materials, PxU32 materialCount, const PxTransform& localPose)
+	{
+		PxShape* shape = createShape(geometry, materials, PxU16(materialCount));
+		if (shape)
+			shape->setLocalPose(localPose);
+		return shape;
+	}
 
 	/**
 	\brief Creates a new shape with default properties and a single material adds it to the list of shapes of this actor.
-	
-	\note Mass properties of dynamic rigid actors will not automatically be recomputed
-	to reflect the new mass distribution implied by the shape. Follow this call with a call to 
-	the PhysX extensions method #PxRigidBodyExt::updateMassAndInertia() to do that.
+
+	This is equivalent to the following
+
+	PxShape* shape(...) = PxGetPhysics().createShape(...);	// reference count is 1
+	actor->attachShape(shape);								// increments reference count
+	shape->release();										// releases user reference, leaving reference count at 1
+
+	As a consequence, detachShape() will result in the release of the last reference, and the shape will be deleted.
 
 	\note The default shape flags to be set are: eVISUALIZATION, eSIMULATION_SHAPE, eSCENE_QUERY_SHAPE (see #PxShapeFlag).
-	The only exception are triangle mesh, heightfield or plane geometry shapes if the actor is not a PxRigidStatic. In these
-	cases the eSIMULATION_SHAPE flag is omitted.
+	Triangle mesh, heightfield or plane geometry shapes configured as eSIMULATION_SHAPE are not supported for 
+	non-kinematic PxRigidDynamic instances.
 
-	\note Creating compounds with a very large number of shapes may adversly affect performance and stability.
+	\note Creating compounds with a very large number of shapes may adversely affect performance and stability.
 
 	<b>Sleeping:</b> Does <b>NOT</b> wake the actor up automatically.
 
-	\param[in] geometry	the geometry of the shape.
+	\param[in] geometry	the geometry of the shape
 	\param[in] material	the material for the shape
-	\param[in] localPose optional actor-relative pose of the shape 
+	\param[in] shapeFlags optional PxShapeFlags
 
 	\return The newly created shape.
 
-	@see PxShape PxShape::release()
+	@see PxShape PxShape::release() detachShape()
 	*/
 
-	PX_FORCE_INLINE	PxShape*	createShape(const PxGeometry& geometry, const PxMaterial& material, const PxTransform& localPose = PxTransform::createIdentity())
+	PX_FORCE_INLINE	PxShape*	createShape(const PxGeometry& geometry, const PxMaterial& material, PxShapeFlags shapeFlags = PxShapeFlag::eVISUALIZATION | PxShapeFlag::eSCENE_QUERY_SHAPE | PxShapeFlag::eSIMULATION_SHAPE)
 	{
 		PxMaterial* materialPtr = const_cast<PxMaterial*>(&material);
-		return createShape(geometry, &materialPtr, 1, localPose);
+		return createShape(geometry, &materialPtr, 1, shapeFlags);
 	}
+
+	/**
+	\deprecated
+	\brief Deprecated function to create shapes with an initial transform. 
+	
+	Use this instead:
+	PxShape* shape = actor->createShape(geometry, material);
+	if (shape)
+		shape->setLocalPose(transform);
+
+	@see PxShape, createShape(const PxGeometry& geometry, const PxMaterial& material, PxShapeFlags shapeFlags = PxShapeFlag::eVISUALIZATION | PxShapeFlag::eSCENE_QUERY_SHAPE | PxShapeFlag::eSIMULATION_SHAPE)
+	*/
+	PX_DEPRECATED PX_INLINE	PxShape* createShape(const PxGeometry& geometry, const PxMaterial& material, const PxTransform& localPose)
+	{
+		PxShape* shape = createShape(geometry, material);
+		if (shape)
+			shape->setLocalPose(localPose);
+		return shape;
+	}
+
+
+	/** attach a shared shape to an actor 
+
+	This call will increment the reference count of the shape.
+
+	\note Mass properties of dynamic rigid actors will not automatically be recomputed 
+	to reflect the new mass distribution implied by the shape. Follow this call with a call to 
+	the PhysX extensions method #PxRigidBodyExt::updateMassAndInertia() to do that.
+
+	Attaching a triangle mesh, heightfield or plane geometry shape configured as eSIMULATION_SHAPE is not supported for 
+	non-kinematic PxRigidDynamic instances.
+
+
+	<b>Sleeping:</b> Does <b>NOT</b> wake the actor up automatically.
+
+	\param[in] shape	the shape to attach.
+
+	*/
+	virtual void				attachShape(PxShape& shape) = 0;
+
+
+	/** detach a shape from an actor. 
+	
+	This will also decrement the reference count of the PxShape, and if the reference count is zero, will cause it to be deleted.
+
+	For static rigid actors it is not possible to detach all shapes associated with the actor.
+	An attempt to remove the last shape will be ignored.
+
+	<b>Sleeping:</b> Does <b>NOT</b> wake the actor up automatically.
+
+	\param[in] shape	the shape to detach.
+	\param[in] wakeOnLostTouch Specifies whether touching objects from the previous frame should get woken up in the next frame. Only applies to PxArticulation and PxRigidActor types.
+
+	*/
+	virtual void				detachShape(PxShape& shape, bool wakeOnLostTouch = true) = 0;
+
 
 	/**
 	\brief Returns the number of shapes assigned to the actor.
@@ -241,14 +327,14 @@ public:
 	virtual		PxU32			getConstraints(PxConstraint** userBuffer, PxU32 bufferSize, PxU32 startIndex=0)		const	= 0;
 
 protected:
-								PxRigidActor(PxRefResolver& v) : PxActor(v)		{}
-	PX_INLINE					PxRigidActor() : PxActor() {}
+	PX_INLINE					PxRigidActor(PxType concreteType, PxBaseFlags baseFlags) : PxActor(concreteType, baseFlags) {}
+	PX_INLINE					PxRigidActor(PxBaseFlags baseFlags) : PxActor(baseFlags) {}
 	virtual						~PxRigidActor()	{}
 	virtual		bool			isKindOf(const char* name)	const	{	return !strcmp("PxRigidActor", name) || PxActor::isKindOf(name); }
 };
 
-PX_INLINE PxRigidActor*			PxActor::isRigidActor()				{ return is<PxRigidActor>();			}
-PX_INLINE const PxRigidActor*	PxActor::isRigidActor()		const	{ return is<PxRigidActor>();			}
+PX_DEPRECATED PX_INLINE PxRigidActor*		PxActor::isRigidActor()				{ return is<PxRigidActor>();			}
+PX_DEPRECATED PX_INLINE const PxRigidActor*	PxActor::isRigidActor()		const	{ return is<PxRigidActor>();			}
 
 
 #ifndef PX_DOXYGEN

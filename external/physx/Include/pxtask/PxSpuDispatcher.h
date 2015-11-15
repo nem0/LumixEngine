@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 
 #ifndef PX_SPU_DISPATCHER_H
 #define PX_SPU_DISPATCHER_H
@@ -35,20 +35,17 @@ namespace physx
 {
 #endif
 
-namespace pxtask
-{
-
-class SpuTask;
+class PxSpuTask;
 
 /** 
- \brief A SpuDispatcher 
+ \brief A PxSpuDispatcher 
  
- A SpuDispatcher is responsible for scheduling the execution of SPU tasks passed to it by the SDK.
+ A PxSpuDispatcher is responsible for scheduling the execution of SPU tasks passed to it by the SDK.
  
- @see SpuTask
- @see TaskManager
+ @see PxSpuTask
+ @see PxTaskManager
 */
-class SpuDispatcher
+class PxSpuDispatcher
 {
 public:
 	/**
@@ -60,14 +57,12 @@ public:
 
 	\param[in] task The task to be run.
 
-	@see SpuTask
+	@see PxSpuTask
 	*/
-	virtual void submitTask( SpuTask& task ) = 0;
+	virtual void submitTask( PxSpuTask& task ) = 0;
 
-	virtual ~SpuDispatcher() {}
+	virtual ~PxSpuDispatcher() {}
 };
-
-} // end pxtask namespace
 
 #ifndef PX_DOXYGEN
 } // end physx namespace

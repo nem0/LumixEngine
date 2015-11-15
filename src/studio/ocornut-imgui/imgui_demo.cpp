@@ -1991,7 +1991,7 @@ struct ExampleAppConsole
                 {
                     snprintf(data->Buf, data->BufSize, "%s", (HistoryPos >= 0) ? History[HistoryPos] : "");
                     data->BufDirty = true;
-                    data->CursorPos = data->SelectionStart = data->SelectionEnd = strlen(data->Buf);
+                    data->CursorPos = data->SelectionStart = data->SelectionEnd = (int)strlen(data->Buf);
                 }
             }
         }

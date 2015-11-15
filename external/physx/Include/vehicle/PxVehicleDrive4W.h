@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -37,6 +37,7 @@
 #include "vehicle/PxVehicleWheels.h"
 #include "vehicle/PxVehicleComponents.h"
 
+
 #ifndef PX_DOXYGEN
 namespace physx
 {
@@ -46,26 +47,36 @@ struct PxFilterData;
 class PxGeometry;
 class PxPhysics;
 class PxBatchQuery;
-struct PxRaycastQueryResult;
 class PxVehicleDrivableSurfaceToTireFrictionPairs;
 class PxShape;
 class PxMaterial;
 class PxRigidDynamic;
 
 /**
-\brief Data structure describing configuration data of a vehicle with up to 4 driven wheels,
-\brief up to 16 undriven wheels,
-\brief and engine, clutch, gears, autobox, differential, and Ackermann steer correction.
+\brief Data structure describing the drive model components of a vehicle with up to 4 driven wheels and up to 16 un-driven wheels.
+The drive model incorporates engine, clutch, gears, autobox, differential, and Ackermann steer correction.
 @see PxVehicleDriveSimData
 */
 class PxVehicleDriveSimData4W : public PxVehicleDriveSimData
 {
+//= ATTENTION! =====================================================================================
+// Changing the data layout of this class breaks the binary serialization format.  See comments for 
+// PX_BINARY_SERIAL_VERSION.  If a modification is required, please adjust the getBinaryMetaData 
+// function.  If the modification is made on a custom branch, please change PX_BINARY_SERIAL_VERSION
+// accordingly.
+//==================================================================================================
 public:
 
 	friend class PxVehicleDrive4W;
 
+	PxVehicleDriveSimData4W() 
+		: PxVehicleDriveSimData()
+	{
+	}
+
 	/**
-	\brief Return the data describing the differential of a vehicle with up to 4 driven wheels.
+	\brief Return the data describing the differential.
+	@see PxVehicleDifferential4WData
 	*/
 	PX_FORCE_INLINE const PxVehicleDifferential4WData& getDiffData() const 
 	{
@@ -73,7 +84,8 @@ public:
 	}
 
 	/**
-	\brief Return the data describing the Ackerkmann steer-correction of a vehicle with up to 4 driven wheels.
+	\brief Return the data describing the Ackermann steer-correction.
+	@see PxVehicleAckermannGeometryData
 	*/
 	PX_FORCE_INLINE const PxVehicleAckermannGeometryData& getAckermannGeometryData() const 
 	{
@@ -81,12 +93,14 @@ public:
 	}
 
 	/**
-	\brief Set the data describing the differential of a vehicle with up to 4 driven wheels.
+	\brief Set the data describing the differential.
+	@see PxVehicleDifferential4WData
 	*/
 	void setDiffData(const PxVehicleDifferential4WData& diff);
 
 	/**
-	\brief Set the data describing the Ackerkmann steer-correction of a vehicle with up to 4 driven wheels.
+	\brief Set the data describing the Ackermann steer-correction.
+	@see PxVehicleAckermannGeometryData
 	*/
 	void setAckermannGeometryData(const PxVehicleAckermannGeometryData& ackermannData);
 
@@ -110,49 +124,77 @@ private:
 	@see setEnginedata, setClutchData, setGearsData, setAutoboxData, setDiffData, setAckermannGeometryData 
 	*/
 	bool isValid() const;
+
+//serialization
+public:
+	PxVehicleDriveSimData4W(const PxEMPTY&) : PxVehicleDriveSimData(PxEmpty), mDiff(PxEmpty), mAckermannGeometry(PxEmpty)  {}
+	static void getBinaryMetaData(PxOutputStream& stream);
+//~serialization
 };
 PX_COMPILE_TIME_ASSERT(0==(sizeof(PxVehicleDriveSimData4W) & 15));
 
 
+
 /**
-\brief Data structure with instanced dynamics data and configuration data of a vehicle with up to 4 driven wheels.
-\brief and up to 16 non-driven wheels.
+\brief The ordering of the driven and steered wheels of a PxVehicleDrive4W.
+
+@see PxVehicleWheelsSimData, PxVehicleWheelsDynData
 */
-class PxVehicleDrive4W : public PxVehicleDrive
+
+struct PxVehicleDrive4WWheelOrder
 {
-public:
-
-	friend class PxVehicleUpdate;
-
-	/**
-	\brief The ordering of the driven and steered wheels
-	*/
-	enum eWheelOrdering
+	enum Enum
 	{
-		eFRONT_LEFT_WHEEL=0,
-		eFRONT_RIGHT_WHEEL,
-		eREAR_LEFT_WHEEL,
-		eREAR_RIGHT_WHEEL
+		eFRONT_LEFT=0,
+		eFRONT_RIGHT,
+		eREAR_LEFT,
+		eREAR_RIGHT
 	};
+};
 
-	/**
-	@see PxVehicleDrive::setAnalogInput, PxVehicleDrive::getAnalogInput
-	*/
-	enum
+/**
+\brief The control inputs for a PxVehicleDrive4W.
+
+@see PxVehicleDriveDynData::setAnalogInput, PxVehicleDriveDynData::getAnalogInput
+*/
+
+struct PxVehicleDrive4WControl
+{
+	enum Enum
 	{
-		eANALOG_INPUT_ACCEL=PxVehicleDriveDynData::eANALOG_INPUT_ACCEL,		
+		eANALOG_INPUT_ACCEL=0,
 		eANALOG_INPUT_BRAKE,		
 		eANALOG_INPUT_HANDBRAKE,	
 		eANALOG_INPUT_STEER_LEFT,	
 		eANALOG_INPUT_STEER_RIGHT,	
-		eMAX_NUM_DRIVE4W_ANALOG_INPUTS
+		eMAX_NB_DRIVE4W_ANALOG_INPUTS
 	};
+};
 
+/**
+\brief Data structure with instanced dynamics data and configuration data of a vehicle with up to 4 driven wheels and up to 16 non-driven wheels.
+*/
+class PxVehicleDrive4W : public PxVehicleDrive
+{
+//= ATTENTION! =====================================================================================
+// Changing the data layout of this class breaks the binary serialization format.  See comments for 
+// PX_BINARY_SERIAL_VERSION.  If a modification is required, please adjust the getBinaryMetaData 
+// function.  If the modification is made on a custom branch, please change PX_BINARY_SERIAL_VERSION
+// accordingly.
+//==================================================================================================
+public:
+	friend class PxVehicleUpdate;
+		
 	/**
-	\brief Allocate a PxVehicleDrive4W instance for a 4WDrive vehicle with numWheels (= num driven wheels + num undriven wheels)
+	\brief Allocate a PxVehicleDrive4W instance for a 4WDrive vehicle with nbWheels (= 4 + number of un-driven wheels)
+
+	\param[in] nbWheels is the number of vehicle wheels  (= 4 + number of un-driven wheels)
+
+	\return The instantiated vehicle.
+
 	@see free, setup
 	*/
-	static PxVehicleDrive4W* allocate(const PxU32 numWheels);
+	static PxVehicleDrive4W* allocate(const PxU32 nbWheels);
 
 	/**
 	\brief Deallocate a PxVehicleDrive4W instance.
@@ -161,77 +203,71 @@ public:
 	void free();
 
 	/**
-	\brief Set up a vehicle with 
-	\brief(i)	a PxPhysics instance - needed to setup special vehicle constraints maintained by the vehicle.
-	\brief(ii)	a PxRigidDynamic instance - the rigid body representation of the vehicle in the physx sdk.
-	\brief(iii)	a PxVehicleWheelsSimData instance describing the wheel/suspension/tires - the vehicle instance takes a copy of this input data.
-	\brief(iv)	a PxVehicle4WDriveSimData instance describing the drive data (engine/Ackermann steer correction/differential etc) - the vehicle instance takes a copy of this input data.
-	\brief(v)	the number of non-driven wheels (it is assumed that the vehicle has up to 4 wheels that could be driven by the engine).
-	\brief(vi)	it is assumed that the first shapes of the actor are the wheel shapes, followed by the chassis shapes.
-	\brief(viii)it is assumed that the front-left wheel shape is shape 0 of the actor
-	\brief(ix)	it is assumed that the front-right wheel shape is shape 1 of the actor
-	\brief(x)	it is assumed that the rear-left wheel shape is shape 2 of the actor
-	\brief(xi)	it is assumed that the rear-right wheel shape is shape 3 of the actor
-	\brief(xii)  it is assumed that the N non-driven wheel shapes are shapes 4 -> 4+N-1 of the actor.
-	\brief(xiii)it is assumed that the wheel shapes ordered in the actor match the wheels specified in PxVehicleWheelsSimData.
-	\brief(xiv)	to break assumptions (vi)-(xiii) and have arbitary shape ordering see PxVehicleWheels::setWheelShapeMapping
-	\brief(xiv)	only the first four wheels (the driven wheels) are connected to the steering.
-	@see allocate, free, setToRestState, eWheelOrdering
+	\brief Set up a vehicle using simulation data for the wheels and drive model.
+	\param[in] physics is a PxPhysics instance that is needed to create special vehicle constraints that are maintained by the vehicle.
+	\param[in] vehActor is a PxRigidDynamic instance that is used to represent the vehicle in the PhysX SDK.
+	\param[in] wheelsData describes the configuration of all suspension/tires/wheels of the vehicle. The vehicle instance takes a copy of this data.
+	\param[in] driveData describes the properties of the vehicle's drive model (gears/engine/clutch/differential/autobox).  The vehicle instance takes a copy of this data.
+	\param[in] nbNonDrivenWheels is the number of wheels on the vehicle that cannot be connected to the differential (= numWheels - 4).
+	\note It is assumed that the first shapes of the actor are the wheel shapes, followed by the chassis shapes.  To break this assumption use PxVehicleWheelsSimData::setWheelShapeMapping.
+	\note wheelsData must contain data for at least 4 wheels.  Unwanted wheels can be disabled with PxVehicleWheelsSimData::disableWheel after calling setup.
+	@see allocate, free, setToRestState, PxVehicleWheelsSimData::setWheelShapeMapping
 	*/
 	void setup
 		(PxPhysics* physics, PxRigidDynamic* vehActor,
 		 const PxVehicleWheelsSimData& wheelsData, const PxVehicleDriveSimData4W& driveData,
-		 const PxU32 numNonDrivenWheels);
+		 const PxU32 nbNonDrivenWheels);
 
 	/**
-	\brief Set up a vehicle with 
-	\brief(i)	a PxPhysics instance - needed to setup special vehicle constraints maintained by the vehicle.
-	\brief(ii)	a PxRigidDynamic instance - the rigid body representation of the vehicle in the physx sdk.
-	\brief(iii)	a PxVehicleWheelsSimData instance describing the wheel/suspension/tires - the vehicle instance takes a copy of this input data.
-	\brief(iv)	a PxVehicle4WDriveSimData instance describing the drive data (engine/Ackermann steer correction/differential etc) - the vehicle instance takes a copy of this input data.
-	\brief(v)	the number of non-driven wheels (it is assumed that the vehicle has up to 4 wheels that could be driven by the engine).
-	\brief(vi)	it is assumed that the first shapes of the actor are the wheel shapes, followed by the chassis shapes.
-	\brief(viii)it is assumed that the front-left wheel shape is shape 0 of the actor
-	\brief(ix)	it is assumed that the front-right wheel shape is shape 1 of the actor
-	\brief(x)	it is assumed that the rear-left wheel shape is shape 2 of the actor
-	\brief(xi)	it is assumed that the rear-right wheel shape is shape 3 of the actor
-	\brief(xii) it is assumed that the N non-driven wheel shapes are shapes 4 -> 4+N-1 of the actor.
-	\brief(xiii)it is assumed that the wheel shapes ordered in the actor match the wheels specified in PxVehicleWheelsSimData.
-	\brief(xiv)	to break assumptions (vi)-(xiii) and have arbitary shape ordering see PxVehicleWheels::setWheelShapeMapping
-	\brief(xv)	only the first four wheels (the driven wheels) are connected to the steering.
-	@see free, setToRestState, setup, eWheelOrdering
+	\brief Allocate and set up a vehicle using simulation data for the wheels and drive model.
+	\param[in] physics is a PxPhysics instance that is needed to create special vehicle constraints that are maintained by the vehicle.
+	\param[in] vehActor is a PxRigidDynamic instance that is used to represent the vehicle in the PhysX SDK.
+	\param[in] wheelsData describes the configuration of all suspension/tires/wheels of the vehicle. The vehicle instance takes a copy of this data.
+	\param[in] driveData describes the properties of the vehicle's drive model (gears/engine/clutch/differential/autobox).  The vehicle instance takes a copy of this data.
+	\param[in] nbNonDrivenWheels is the number of wheels on the vehicle that cannot be connected to the differential (= numWheels - 4).
+	\note It is assumed that the first shapes of the actor are the wheel shapes, followed by the chassis shapes.  To break this assumption use PxVehicleWheelsSimData::setWheelShapeMapping.
+	\note wheelsData must contain data for at least 4 wheels.  Unwanted wheels can be disabled with PxVehicleWheelsSimData::disableWheel after calling setup.
+	\return The instantiated vehicle.
+	@see allocate, free, setToRestState, PxVehicleWheelsSimData::setWheelShapeMapping
 	*/
 	static PxVehicleDrive4W* create
 		(PxPhysics* physics, PxRigidDynamic* vehActor,
 		 const PxVehicleWheelsSimData& wheelsData, const PxVehicleDriveSimData4W& driveData,
-		 const PxU32 numNonDrivenWheels);
+		 const PxU32 nbNonDrivenWheels);
 
 	/**
-	\brief Set a vehicle to its rest state.
-	@see setup
+	\brief Set a vehicle to its rest state.  Aside from the rigid body transform, this will set the vehicle and rigid body 
+	to the state they were in immediately after setup or create.
+	\note Calling setToRestState invalidates the cached raycast hit planes under each wheel meaning that suspension line
+	raycasts need to be performed at least once with PxVehicleSuspensionRaycasts before calling PxVehicleUpdates. 
+	@see setup, create, PxVehicleSuspensionRaycasts, PxVehicleUpdates
 	*/
 	void setToRestState();
 
 	/**
-	\brief Simulation data that models vehicle components
-	@see setup
+	\brief Simulation data that describes the configuration of the vehicle's drive model.
+	@see setup, create
 	*/
 	PxVehicleDriveSimData4W mDriveSimData;
 
 private:
 
-	PxVehicleDrive4W()
-	{
-	}
-
-	~PxVehicleDrive4W()
-	{
-	}
-
 	/**
 	\brief Test if the instanced dynamics and configuration data has legal values.
 	*/
-	bool isValid() const;
+	bool isValid() const;	
+
+//serialization
+protected:
+									PxVehicleDrive4W();
+									~PxVehicleDrive4W(){}
+	virtual		bool				isKindOf(const char* name)	const	{ return !strcmp("PxVehicleDrive4W", name) || PxBase::isKindOf(name); }
+public:
+	static		PxVehicleDrive4W*	createObject(PxU8*& address, PxDeserializationContext& context);
+	static		void				getBinaryMetaData(PxOutputStream& stream);
+									PxVehicleDrive4W(PxBaseFlags baseFlags) : PxVehicleDrive(baseFlags), mDriveSimData(PxEmpty)	{}
+	virtual		const char*			getConcreteTypeName() const			{ return "PxVehicleDrive4W";	}
+//~serialization	
 };
 PX_COMPILE_TIME_ASSERT(0==(sizeof(PxVehicleDrive4W) & 15));
 

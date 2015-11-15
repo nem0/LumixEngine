@@ -26,7 +26,6 @@ class LUMIX_PHYSICS_API PhysicsSystem : public IPlugin
 	public:
 		virtual const char* getName() const override { return "physics"; }
 		
-		virtual physx::PxControllerManager* getControllerManager() = 0;
 		virtual physx::PxPhysics* getPhysics() = 0;
 		virtual physx::PxCooking* getCooking() = 0;
 

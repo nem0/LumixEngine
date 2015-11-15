@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -78,7 +78,7 @@ struct PxRevoluteJointFlag
 };
 
 typedef PxFlags<PxRevoluteJointFlag::Enum, PxU16> PxRevoluteJointFlags;
-PX_FLAGS_OPERATORS(PxRevoluteJointFlag::Enum, PxU16);
+PX_FLAGS_OPERATORS(PxRevoluteJointFlag::Enum, PxU16)
 
 
 /**
@@ -104,31 +104,45 @@ PX_FLAGS_OPERATORS(PxRevoluteJointFlag::Enum, PxU16);
  @see PxRevoluteJointCreate() PxJoint
 */
 
-class PxRevoluteJoint: public PxJoint
+class PxRevoluteJoint : public PxJoint
 {
 public:
-	static const PxJointType::Enum Type = PxJointType::eREVOLUTE;
+
+	/**
+	\brief return the angle of the joint, in the range (-Pi, Pi]
+	*/
+	virtual PxReal getAngle()							const			= 0;
+
+
+	/**
+	\brief return the velocity of the joint
+	*/
+	virtual PxReal getVelocity()						const			= 0;
 
 	/**
 	\brief set the joint limit parameters. 
 
 	The limit is activated using the flag PxRevoluteJointFlag::eLIMIT_ENABLED
 
+	The limit angle range is (-2*PI, 2*PI) and the extent of the limit must be strictly less than 2*PI
+
 	\param[in] limits The joint limit parameters. 
 
-	@see PxJointLimitPair getLimit()
+
+	@see PxJointAngularLimitPair getLimit()
 	*/
 
-	virtual void			setLimit(const PxJointLimitPair& limits)			= 0;
+	virtual void			setLimit(const PxJointAngularLimitPair& limits)			= 0;
 
 	/**
 	\brief get the joint limit parameters.
 
 	\return the joint limit parameters
 
-	@see PxJointLimitPair setLimit()
+	@see PxJointAngularLimitPair setLimit()
 	*/
-	virtual PxJointLimitPair getLimit()					const			= 0;
+	virtual PxJointAngularLimitPair getLimit()			const			= 0;
+
 
 
 	/**
@@ -144,7 +158,7 @@ public:
 
 	\param[in] velocity the drive target velocity
 
-	<b>Range:</b> [0,inf)<br>
+	<b>Range:</b> [0, PX_MAX_F32)<br>
 	<b>Default:</b> 0.0
 
 	@see PxRevoluteFlags::eDRIVE_FREESPIN
@@ -167,7 +181,9 @@ public:
 	
 	Setting this to a very large value if velTarget is also very large may cause unexpected results.
 
-	<b>Range:</b> [0,inf)<br>
+	The value set here may be used either as an impulse limit or a force limit, depending on the flag PxConstraintFlag::eDRIVE_LIMITS_ARE_FORCES
+
+	<b>Range:</b> [0, PX_MAX_F32)<br>
 	<b>Default:</b> PX_MAX_F32
 
 	@see setDriveVelocity()
@@ -190,7 +206,7 @@ public:
 	When setting up the drive constraint, the velocity of the first actor is scaled by this value, and its response to drive torque is scaled down.
 	So if the drive target velocity is zero, the second actor will be driven to the velocity of the first scaled by the gear ratio
 
-	<b>Range:</b> [0,inf)<br>
+	<b>Range:</b> [0, PX_MAX_F32)<br>
 	<b>Default:</b> 1.0
 
 	\param[in] ratio the drive gear ratio
@@ -253,7 +269,7 @@ public:
 
 	Sometimes it is not possible to project (for example when the joints form a cycle).
 
-	<b>Range:</b> [0,inf)<br>
+	<b>Range:</b> [0, PX_MAX_F32)<br>
 	<b>Default:</b> 1e10f
 
 	\param[in] tolerance the linear tolerance threshold
@@ -305,13 +321,31 @@ public:
 
 	virtual PxReal				getProjectionAngularTolerance()			const					= 0;
 
-
-	virtual	const char*			getConcreteTypeName() const				{	return "PxRevoluteJoint"; }
+	/**
+	\brief Returns string name of PxRevoluteJoint, used for serialization
+	*/
+	virtual	const char*			getConcreteTypeName() const { return "PxRevoluteJoint"; }
 
 protected:
-	PxRevoluteJoint(PxRefResolver& v)	: PxJoint(v)	{}
-	PxRevoluteJoint()									{}
-	virtual	bool				isKindOf(const char* name)	const		{	return !strcmp("PxRevoluteJoint", name) || PxJoint::isKindOf(name);	}
+
+	//serialization
+
+	/**
+	\brief Constructor
+	*/
+	PX_INLINE					PxRevoluteJoint(PxType concreteType, PxBaseFlags baseFlags) : PxJoint(concreteType, baseFlags) {}
+
+	/**
+	\brief Deserialization constructor
+	*/
+	PX_INLINE					PxRevoluteJoint(PxBaseFlags baseFlags) : PxJoint(baseFlags) {}
+
+	/**
+	\brief Returns whether a given type name matches with the type of this instance
+	*/
+	virtual	bool				isKindOf(const char* name) const { return !strcmp("PxRevoluteJoint", name) || PxJoint::isKindOf(name); }
+	
+	//~serialization
 };
 
 #ifndef PX_DOXYGEN

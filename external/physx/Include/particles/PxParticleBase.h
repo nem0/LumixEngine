@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -34,12 +34,11 @@
   @{
 */
 
-#include "PxPhysX.h"
+#include "PxPhysXConfig.h"
 #include "foundation/PxBounds3.h"
 #include "PxFiltering.h"
 #include "particles/PxParticleBaseFlag.h"
 #include "PxActor.h"
-#include "PxPhysics.h"
 #include "particles/PxParticleCreationData.h"
 #include "particles/PxParticleReadData.h"
 #include "PxForceMode.h"
@@ -79,6 +78,17 @@ class PxParticleBase : public PxActor
 	SDK operation can access the buffers. Particularly the buffers need to be unlocked before calling 
 	PxParticleBase::lockParticleReadData(), PxParticleBase::createParticles(), PxParticleBase::releaseParticles(),
 	PxScene::fetchResults().
+
+	\param flags If PxDataAccessFlag::eDEVICE is specified for GPU particles then pointers to GPU memory will be returned otherwise it will be ignored.
+	\note PxDataAccessFlag::eWRITEABLE is not supported and will be ignored
+	\note If using PxDataAccessFlag::eDEVICE, newly created particles will not become visible in the GPU buffers until a subsequent simulation step has completed
+	@see PxParticleReadData
+	*/
+	virtual		PxParticleReadData*			lockParticleReadData(PxDataAccessFlags flags) = 0;
+
+	/** 
+	\brief Locks the particle read data and provides the data descriptor for accessing the particles
+	\note This method does the same as lockParticleReadData(PxDataAccessFlags::eREADABLE)
 	@see PxParticleReadData
 	*/
 	virtual		PxParticleReadData*			lockParticleReadData() = 0;
@@ -325,13 +335,12 @@ class PxParticleBase : public PxActor
 	virtual		PxFilterData				getSimulationFilterData()									const	= 0;
 
 	/**
+	\deprecated
 	\brief Marks the object to reset interactions and re-run collision filters in the next simulation step.
 	
-	See #PxShape::resetFiltering() for more details.
-
-	@see PxSimulationFilterShader PxSimulationFilterCallback
+	\note This method has been deprecated. Please use #PxScene::resetFiltering() instead.
 	*/
-	virtual		void						resetFiltering()													= 0;
+	PX_DEPRECATED virtual void				resetFiltering() = 0;
 
 //@}
 /************************************************************************************************/
@@ -444,17 +453,17 @@ class PxParticleBase : public PxActor
 	virtual		void						setParticleReadDataFlag(PxParticleReadDataFlag::Enum flag, bool val)= 0;
 
 protected:
-											PxParticleBase(PxRefResolver& v) : PxActor(v)		{}
-	PX_INLINE								PxParticleBase() : PxActor() {}
+	PX_INLINE								PxParticleBase(PxType concreteType, PxBaseFlags baseFlags) : PxActor(concreteType, baseFlags) {}
+	PX_INLINE								PxParticleBase(PxBaseFlags baseFlags) : PxActor(baseFlags) {}
 	virtual									~PxParticleBase() {}
-	virtual		bool						isKindOf(const char* name)	const		{	return !strcmp("PxParticleBase", name) || PxActor::isKindOf(name);  }
+	virtual		bool						isKindOf(const char* name) const { return !strcmp("PxParticleBase", name) || PxActor::isKindOf(name); }
 
 //@}
 /************************************************************************************************/
 };
 
-PX_INLINE PxParticleBase*		PxActor::isParticleBase()			{ return is<PxParticleBase>();			}
-PX_INLINE const PxParticleBase*	PxActor::isParticleBase()	const	{ return is<PxParticleBase>();			}
+PX_DEPRECATED PX_INLINE PxParticleBase*			PxActor::isParticleBase()			{ return is<PxParticleBase>();			}
+PX_DEPRECATED PX_INLINE const PxParticleBase*	PxActor::isParticleBase()	const	{ return is<PxParticleBase>();			}
 
 
 #ifndef PX_DOXYGEN
