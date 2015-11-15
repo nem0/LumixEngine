@@ -25,9 +25,10 @@ enum class NodeType
 	MIX,
 	UNIFORM,
 	VEC4_MERGE,
-	MULTIPLY,
+	OPERATOR,
 	BUILTIN_UNIFORM,
 	PASS,
+	INSTANCE_MATRIX
 };
 
 
@@ -75,9 +76,10 @@ static const struct { const char* name; NodeType type; bool is_frag; bool is_ver
 	{"Float Const",			NodeType::FLOAT_CONST,		true,		true},
 	{"Uniform",				NodeType::UNIFORM,			true,		true},
 	{"Vec4 merge",			NodeType::VEC4_MERGE,		true,		true},
-	{"Multiply",			NodeType::MULTIPLY,			true,		true},
+	{"Operator",			NodeType::OPERATOR,			true,		true},
 	{"Builtin uniforms",	NodeType::BUILTIN_UNIFORM,	true,		true},
-	{"Pass",				NodeType::PASS,				true,		true}
+	{"Pass",				NodeType::PASS,				true,		true},
+	{"Instance matrix",		NodeType::INSTANCE_MATRIX,	false,		true}
 };
 
 
@@ -155,6 +157,16 @@ static const char* getVertexOutputGUIName(VertexOutput output)
 	return "";
 }
 
+
+static ShaderEditor::ValueType getVertexOutputType(VertexOutput output)
+{
+	for (auto& v : VERTEX_OUTPUTS)
+	{
+		if (v.output == output) return v.type;
+	}
+
+	return ShaderEditor::ValueType::FLOAT;
+}
 
 
 static const char* getValueTypeName(ShaderEditor::ValueType type)
@@ -324,6 +336,13 @@ static void writeVertexShaderHeader(Lumix::OutputBlob& blob,
 			auto* input_node = static_cast<VertexInputNode*>(node);
 			inputs[(int)input_node->m_input] = true;
 		}
+		else if (node->m_type == (int)NodeType::INSTANCE_MATRIX)
+		{
+			inputs[(int)VertexInput::INSTANCE_DATA0] = true;
+			inputs[(int)VertexInput::INSTANCE_DATA1] = true;
+			inputs[(int)VertexInput::INSTANCE_DATA2] = true;
+			inputs[(int)VertexInput::INSTANCE_DATA3] = true;
+		}
 	}
 
 	for(int i = 0; i < (int)VertexInput::COUNT; ++i)
@@ -429,19 +448,28 @@ void ShaderEditor::Node::onNodeGUI()
 }
 
 
-struct MultiplyNode : public ShaderEditor::Node
+struct OperatorNode : public ShaderEditor::Node
 {
-	MultiplyNode(ShaderEditor& editor)
-		: Node((int)NodeType::MULTIPLY, editor)
+	enum Operation
+	{
+		ADDITION,
+		SUBTRACTION,
+		MULTIPLICATION,
+		DIVISION
+	};
+
+	OperatorNode(ShaderEditor& editor)
+		: Node((int)NodeType::OPERATOR, editor)
 	{
 		m_inputs.push(nullptr);
 		m_inputs.push(nullptr);
 		m_outputs.push(nullptr);
+		m_operation = MULTIPLICATION;
 	}
 
 
-	void save(Lumix::OutputBlob&) override {}
-	void load(Lumix::InputBlob&) override {}
+	void save(Lumix::OutputBlob& blob) override { int o = m_operation; blob.write(o); }
+	void load(Lumix::InputBlob& blob) override { int o; blob.read(o); m_operation = (Operation)o; }
 
 
 	ShaderEditor::ValueType getOutputType(int) const override
@@ -463,19 +491,45 @@ struct MultiplyNode : public ShaderEditor::Node
 						 input0_type == ShaderEditor::ValueType::MATRIX4;
 		blob << "\t" << getValueTypeName(getInputType(1)) << " v" << m_id << " = ";
 
-		if(is_matrix) blob << "mul(";
-
-		m_inputs[0]->printReference(blob);
-		blob << (is_matrix ? ", " : " * ");
-		m_inputs[1]->printReference(blob);
-		blob << (is_matrix ? ");\n" : ";\n");
+		if (m_operation == MULTIPLICATION && is_matrix)
+		{
+			blob << "mul(";
+			m_inputs[0]->printReference(blob);
+			blob << (", ");
+			m_inputs[1]->printReference(blob);
+			blob << (");\n");
+		}
+		else
+		{
+			m_inputs[0]->printReference(blob);
+			switch (m_operation)
+			{
+				case MULTIPLICATION: blob << " * "; break;
+				case DIVISION: blob << " / "; break;
+				case ADDITION: blob << " + "; break;
+				case SUBTRACTION: blob << " - "; break;
+				default:
+					ASSERT(false);
+					blob << " * ";
+					break;
+			}
+			m_inputs[1]->printReference(blob);
+			blob << (";\n");
+		}
 	}
 
 	void onGUI() override
 	{
 		ImGui::Text("A");
 		ImGui::Text("B");
+		int o = m_operation;
+		if (ImGui::Combo("Operation", &o, "Addition\0Subtraction\0Multiplication\0Division\0"))
+		{
+			m_operation = (Operation)o;
+		}
 	}
+
+	Operation m_operation;
 };
 
 
@@ -552,6 +606,40 @@ struct Vec4MergeNode : public ShaderEditor::Node
 		ImGui::Text("y");
 		ImGui::Text("z");
 		ImGui::Text("w");
+	}
+};
+
+
+struct InstanceMatrixNode : public ShaderEditor::Node
+{
+	InstanceMatrixNode(ShaderEditor& editor)
+		: Node((int)NodeType::INSTANCE_MATRIX, editor)
+	{
+		m_outputs.push(nullptr);
+	}
+
+
+	void save(Lumix::OutputBlob&) override {}
+	void load(Lumix::InputBlob&) override {}
+	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::MATRIX4; }
+
+
+	void generate(Lumix::OutputBlob& blob) override
+	{
+		blob << "\tmat4 v" << m_id << ";\n";
+
+		blob << "\tv" << m_id << "[0] = i_data0;\n";
+		blob << "\tv" << m_id << "[1] = i_data1;\n";
+		blob << "\tv" << m_id << "[2] = i_data2;\n";
+		blob << "\tv" << m_id << "[3] = i_data3;\n";
+
+		blob << "\tv" << m_id << " = transpose(v" << m_id << ");\n";
+	}
+
+
+	void onGUI() override
+	{
+		ImGui::Text("Instance matrix");
 	}
 };
 
@@ -663,6 +751,12 @@ struct FragmentInputNode : public ShaderEditor::Node
 	void save(Lumix::OutputBlob& blob) override { blob.write(m_vertex_output); }
 	void load(Lumix::InputBlob& blob) override { blob.read(m_vertex_output); }
 	void generate(Lumix::OutputBlob&) override {}
+
+
+	ShaderEditor::ValueType getOutputType(int index) const override
+	{
+		return getVertexOutputType(m_vertex_output);
+	}
 
 
 	void printReference(Lumix::OutputBlob& blob) override
@@ -1473,9 +1567,10 @@ ShaderEditor::Node* ShaderEditor::createNode(int type)
 		case NodeType::SAMPLE:						return LUMIX_NEW(m_allocator, SampleNode)(*this);
 		case NodeType::UNIFORM:						return LUMIX_NEW(m_allocator, UniformNode)(*this);
 		case NodeType::VEC4_MERGE:					return LUMIX_NEW(m_allocator, Vec4MergeNode)(*this);
-		case NodeType::MULTIPLY:					return LUMIX_NEW(m_allocator, MultiplyNode)(*this);
+		case NodeType::OPERATOR:					return LUMIX_NEW(m_allocator, OperatorNode)(*this);
 		case NodeType::BUILTIN_UNIFORM:				return LUMIX_NEW(m_allocator, BuiltinUniformNode)(*this);
 		case NodeType::PASS:						return LUMIX_NEW(m_allocator, PassNode)(*this);
+		case NodeType::INSTANCE_MATRIX:				return LUMIX_NEW(m_allocator, InstanceMatrixNode)(*this);
 	}
 
 	ASSERT(false);
@@ -1719,6 +1814,7 @@ void ShaderEditor::onGUIRightColumn()
 			if(ImGui::MenuItem("Remove"))
 			{
 				execute(LUMIX_NEW(m_allocator, RemoveNodeCommand)(m_current_node_id, m_current_shader_type, *this));
+				m_current_node_id = -1;
 			}
 		}
 
