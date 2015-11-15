@@ -23,6 +23,11 @@ namespace Lumix
 					Accessor(BinaryArray& array, int index);
 
 
+					Accessor& operator =(const Accessor& value)
+					{
+						return *this = (bool)value;
+					}
+
 					Accessor& operator =(bool value)
 					{
 						if (value)
@@ -37,7 +42,7 @@ namespace Lumix
 					}
 
 
-					operator bool()
+					operator bool() const
 					{
 						return (m_array.m_data[m_index >> 5] & m_array.INDEX_BIT[m_index & 31]) > 0;
 					}
