@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 #ifndef PVD_NETWORK_STREAMS_H
 #define PVD_NETWORK_STREAMS_H
 #include "foundation/PxSimpleTypes.h"
@@ -75,6 +75,11 @@ namespace physx { namespace debugger {
 		 */
 		virtual PvdError flush() = 0;
 
+		/**
+		*	Return the size of data have been written to target
+		*/
+		virtual PxU64 getWrittenDataSize() = 0;
+
 		static PvdNetworkOutStream& createDoubleBuffered( PxAllocatorCallback& alloc, PvdNetworkOutStream& stream, PxU32 bufSize );
 		static PvdNetworkOutStream* createFromFile( PxAllocatorCallback& alloc, const char* fname );
 	};
@@ -111,6 +116,11 @@ namespace physx { namespace debugger {
 		 *	release any resources related to this stream.
 		 */
 		virtual void release() = 0;
+
+		/**
+		 *	Return the number of bytes the stream has read.
+		 */
+		virtual PxU64 getLoadedDataSize() = 0;
 	};
 
 	//Create an object responsible for a pair of instream/outstream

@@ -306,8 +306,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		Vec3 position = m_universe.getPosition(entity);
 		cDesc.position.set(position.x, position.y, position.z);
 		PhysicsSceneImpl::Controller& c = m_controllers.pushEmpty();
-		c.m_controller = m_system->getControllerManager()->createController(
-			*m_system->getPhysics(), m_scene, cDesc);
+		c.m_controller =
+			m_controller_manager->createController(*m_system->getPhysics(), m_scene, cDesc);
 		c.m_entity = entity;
 		c.m_is_free = false;
 		c.m_frame_change.set(0, 0, 0);
@@ -590,33 +590,32 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 
 	virtual bool raycast(const Vec3& origin,
-						 const Vec3& dir,
-						 float distance,
-						 RaycastHit& result) override
+		const Vec3& dir,
+		float distance,
+		RaycastHit& result) override
 	{
 		physx::PxVec3 physx_origin(origin.x, origin.y, origin.z);
 		physx::PxVec3 unit_dir(dir.x, dir.y, dir.z);
 		physx::PxReal max_distance = distance;
 		physx::PxRaycastHit hit;
 
-		const physx::PxSceneQueryFlags outputFlags =
-			physx::PxSceneQueryFlag::eDISTANCE |
-			physx::PxSceneQueryFlag::eIMPACT | physx::PxSceneQueryFlag::eNORMAL;
+		const physx::PxSceneQueryFlags outputFlags = physx::PxSceneQueryFlag::eDISTANCE |
+													 physx::PxSceneQueryFlag::eIMPACT |
+													 physx::PxSceneQueryFlag::eNORMAL;
 
-		bool status = m_scene->raycastSingle(
-			physx_origin, unit_dir, max_distance, outputFlags, hit);
+		bool status =
+			m_scene->raycastSingle(physx_origin, unit_dir, max_distance, outputFlags, hit);
 		result.normal.x = hit.normal.x;
 		result.normal.y = hit.normal.y;
 		result.normal.z = hit.normal.z;
-		result.position.x = hit.impact.x;
-		result.position.y = hit.impact.y;
-		result.position.z = hit.impact.z;
+		result.position.x = hit.position.x;
+		result.position.y = hit.position.y;
+		result.position.z = hit.position.z;
 		result.entity = -1;
 		if (hit.shape)
 		{
-			physx::PxRigidActor& actor = hit.shape->getActor();
-			if (actor.userData)
-				result.entity = (int)actor.userData;
+			physx::PxRigidActor* actor = hit.shape->getActor();
+			if (actor && actor->userData) result.entity = (int)actor->userData;
 		}
 		return status;
 	}
@@ -1103,8 +1102,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				Vec3 position = m_universe.getPosition(e);
 				cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
 				c.m_controller =
-					m_system->getControllerManager()->createController(
-						*m_system->getPhysics(), m_scene, cDesc);
+					m_controller_manager->createController(*m_system->getPhysics(), m_scene, cDesc);
 				c.m_entity = e;
 				m_universe.addComponent(e, CONTROLLER_HASH, this, i);
 			}
@@ -1182,6 +1180,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	Engine* m_engine;
 	physx::PxScene* m_scene;
 	PhysicsSystem* m_system;
+	physx::PxControllerManager* m_controller_manager;
 	physx::PxMaterial* m_default_material;
 	Array<RigidActor*> m_actors;
 	Array<RigidActor*> m_dynamic_actors;
@@ -1226,6 +1225,8 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
 		return nullptr;
 	}
 
+	impl->m_controller_manager = PxCreateControllerManager(*impl->m_scene);
+
 	impl->m_system = &system;
 	impl->m_default_material =
 		impl->m_system->getPhysics()->createMaterial(0.5, 0.5, 0.5);
@@ -1236,6 +1237,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
 void PhysicsScene::destroy(PhysicsScene* scene)
 {
 	PhysicsSceneImpl* impl = static_cast<PhysicsSceneImpl*>(scene);
+	impl->m_controller_manager->release();
 	impl->m_default_material->release();
 	impl->m_scene->release();
 	LUMIX_DELETE(impl->m_allocator, scene);

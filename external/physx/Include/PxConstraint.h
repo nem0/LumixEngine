@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -35,9 +35,9 @@
 @{
 */
 
-#include "PxPhysX.h"
+#include "PxPhysXConfig.h"
 #include "PxConstraintDesc.h"
-#include "common/PxSerialFramework.h"
+#include "common/PxBase.h"
 
 #ifndef PX_DOXYGEN
 namespace physx
@@ -54,6 +54,38 @@ class PxConstraintConnector;
 @see PxConstraint
 */
 
+/**
+\brief constraint flags
+
+\note eBROKEN is a read only flag
+*/
+
+struct PxConstraintFlag
+{
+	enum Enum
+	{
+		eBROKEN						= 1<<0,			//!< whether the constraint is broken
+		ePROJECT_TO_ACTOR0			= 1<<1,			//!< whether actor1 should get projected to actor0 for this constraint (note: projection of a static/kinematic actor to a dynamic actor will be ignored)
+		ePROJECT_TO_ACTOR1			= 1<<2,			//!< whether actor0 should get projected to actor1 for this constraint (note: projection of a static/kinematic actor to a dynamic actor will be ignored)
+		ePROJECTION					= ePROJECT_TO_ACTOR0 | ePROJECT_TO_ACTOR1,	//!< whether the actors should get projected for this constraint (the direction will be chosen by PhysX)
+		eCOLLISION_ENABLED			= 1<<3,			//!< whether contacts should be generated between the objects this constraint constrains
+		eREPORTING					= 1<<4,			//!< whether this constraint should generate force reports. DEPRECATED, as constraints always generate reports
+		eVISUALIZATION				= 1<<5,			//!< whether this constraint should be visualized, if constraint visualization is turned on
+		eDRIVE_LIMITS_ARE_FORCES	= 1<<6,			//!< limits for drive strength are forces rather than impulses
+		eDEPRECATED_32_COMPATIBILITY= 1<<7,			//!< legacy compatibility flag for 3.3; see user guide. This flag must not be set in order for drives to conform to an implicit spring model
+		eIMPROVED_SLERP				= 1<<8			//!< perform preprocessing for improved accuracy on D6 Slerp Drive (this flag will be removed in a future release when preprocessing is no longer required)
+	};
+};
+
+/**
+\brief constraint flags
+@see PxConstraintFlag
+*/
+
+typedef PxFlags<PxConstraintFlag::Enum, PxU16> PxConstraintFlags;
+PX_FLAGS_OPERATORS(PxConstraintFlag::Enum, PxU16)
+
+
 struct PxConstraintShaderTable
 {
 	enum
@@ -63,7 +95,7 @@ struct PxConstraintShaderTable
 
 	enum
 	{
-		eMAX_SOLVERPRPEP_DATASIZE=364
+		eMAX_SOLVERPRPEP_DATASIZE=400
 	};
 
 	PxConstraintSolverPrep			solverPrep;					//< solver constraint generation function
@@ -75,14 +107,22 @@ struct PxConstraintShaderTable
 
 
 /**
-\brief a plugin class for implementing constraints
+\brief A plugin class for implementing constraints
 
-@see PxConstraint
+@see PxPhysics.createConstraint
 */
 
-class PxConstraint : public PxSerializable
+class PxConstraint : public PxBase
 {
 public:
+
+	/**
+	\brief Releases a PxConstraint instance.
+
+	\note This call does not wake up the connected rigid bodies.
+
+	@see PxPhysics.createConstraint, PxBase.release()
+	*/
 	virtual void				release()														= 0;
 
 	/**
@@ -127,6 +167,9 @@ public:
 	\brief Set the flags for this constraint
 
 	\param[in] flags the new constraint flags
+
+	default: PxConstraintFlag::eDRIVE_LIMITS_ARE_FORCES
+
 	@see PxConstraintFlags
 	*/
 
@@ -141,6 +184,18 @@ public:
 
 	virtual PxConstraintFlags	getFlags()												const	= 0;
 
+
+	/**
+	\brief Set a flag for this constraint
+
+	\param[in] flag the constraint flag
+	\param[in] value the new value of the flag
+
+	@see PxConstraintFlags
+	*/
+
+	virtual void				setFlag(PxConstraintFlag::Enum flag, bool value)						= 0;
+
 	/**
 	\brief Retrieve the constraint force most recently applied to maintain this constraint.
 	
@@ -151,6 +206,18 @@ public:
 
 
 	/**
+	\brief whether the constraint is valid. 
+	
+	A constraint is valid if it has at least one dynamic rigid body or articulation link. A constraint that
+	is not valid may not be inserted into a scene, and therefore a static actor to which an invalid constraint
+	is attached may not be inserted into a scene.
+
+	Invalid constraints arise only when an actor to which the constraint is attached has been deleted.
+
+	*/
+	virtual bool				isValid() const													= 0;
+
+	/**
 	\brief Set the break force and torque thresholds for this constraint. 
 	
 	If either the force or torque measured at the constraint exceed these thresholds the constraint will break.
@@ -158,6 +225,7 @@ public:
 	\param[in] linear the linear break threshold
 	\param[in] angular the angular break threshold
 	*/
+
 
 	virtual	void				setBreakForce(PxReal linear, PxReal angular)					= 0;
 
@@ -193,13 +261,13 @@ public:
 	virtual	void				setConstraintFunctions(PxConstraintConnector& connector,
 													   const PxConstraintShaderTable& shaders)		= 0;
 
-	virtual		const char*		getConcreteTypeName() const					{	return "PxConstraint"; }
+	virtual	const char*			getConcreteTypeName() const { return "PxConstraint"; }
 
 protected:
-								PxConstraint()											{}
-								PxConstraint(PxRefResolver& v) :	PxSerializable(v)	{}
+	PX_INLINE					PxConstraint(PxType concreteType, PxBaseFlags baseFlags) : PxBase(concreteType, baseFlags) {}
+	PX_INLINE					PxConstraint(PxBaseFlags baseFlags) : PxBase(baseFlags) {}
 	virtual						~PxConstraint() {}
-	virtual		bool			isKindOf(const char* name)	const		{	return !strcmp("PxConstraint", name) || PxSerializable::isKindOf(name);		}
+	virtual	bool				isKindOf(const char* name) const { return !strcmp("PxConstraint", name) || PxBase::isKindOf(name); }
 
 };
 

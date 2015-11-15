@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -33,8 +33,8 @@
 /** \addtogroup physics 
 @{ */
 
-#include "PxPhysX.h"
-#include "common/PxSerialFramework.h"
+#include "PxPhysXConfig.h"
+#include "common/PxBase.h"
 
 #ifndef PX_DOXYGEN
 namespace physx
@@ -44,14 +44,17 @@ namespace physx
 class PxArticulationLink;
 
 /**
-\brief articulation drive cache
+\brief Articulation drive cache
 
 This cache is used for making one or more impulse applications to the articulation.
 
-@see PxArticulation
+@see PxArticulation PxArticulation.createDriveCache
 */
-
-class PxArticulationDriveCache;
+class PxArticulationDriveCache
+{
+protected:
+	PxArticulationDriveCache();
+};
 
 /**
 \brief a tree structure of bodies connected by joints that is treated as a unit by the dynamics solver
@@ -61,10 +64,9 @@ PxRigidDynamic and PxJoint structures, but because the dynamics solver treats
 each articulation as a single object, they are much less prone to separation and
 have better support for actuation.
 
-@see PxArticulationJoint PxArticulationLink
+@see PxArticulationJoint PxArticulationLink PxPhysics.createArticulation
 */
-
-class PxArticulation : public PxSerializable
+class PxArticulation : public PxBase
 {
 public:
 	/**
@@ -72,7 +74,7 @@ public:
 	
 	Do not keep a reference to the deleted instance.
 
-	@see PxScene::createArticulation()
+	@see PxPhysics.createArticulation()
 	*/
 	virtual		void			release() = 0;
 
@@ -193,7 +195,9 @@ public:
 	If you are having trouble with jointed bodies oscillating and behaving erratically, then
 	setting a higher position iteration count may improve their stability.
 
-	If intersecting bodies are being depenetrated too violently, increase the number of velocity iterations.
+	If intersecting bodies are being depenetrated too violently, increase the number of velocity 
+	iterations. More velocity iterations will drive the relative exit velocity of the intersecting 
+	objects closer to the correct value given the restitution.
 
 	\param[in] minPositionIters Number of position iterations the solver should perform for this articulation. <b>Range:</b> [1,255]
 	\param[in] minVelocityIters Number of velocity iterations the solver should perform for this articulation. <b>Range:</b> [1,255]
@@ -214,10 +218,28 @@ public:
 
 	When an actor does not move for a period of time, it is no longer simulated in order to save time. This state
 	is called sleeping. However, because the object automatically wakes up when it is either touched by an awake object,
-	or one of its properties is changed by the user, the entire sleep mechanism should be transparent to the user.
+	or a sleep-affecting property is changed by the user, the entire sleep mechanism should be transparent to the user.
 	
+	An articulation can only go to sleep if all links are ready for sleeping. An articulation is guaranteed to be awake 
+	if at least one of the following holds:
+
+	\li The wake counter is positive (see #setWakeCounter()).
+	\li The linear or angular velocity of any link is non-zero.
+	\li A non-zero force or torque has been applied to the articulation or any of its links.
+
+	If an articulation is sleeping, the following state is guaranteed:
+
+	\li The wake counter is zero.
+	\li The linear and angular velocity of all links is zero.
+	\li There is no force update pending.
+
+	When an articulation gets inserted into a scene, it will be considered asleep if all the points above hold, else it will 
+	be treated as awake.
+
 	If an articulation is asleep after the call to PxScene::fetchResults() returns, it is guaranteed that the poses of the
 	links were not changed. You can use this information to avoid updating the transforms of associated of dependent objects.
+
+	\note It is invalid to use this method if the articulation has not been added to a scene already.
 
 	\return True if the articulation is sleeping.
 
@@ -230,7 +252,7 @@ public:
 
 	The articulation will sleep if the energy of each body is below this threshold.
 
-	\param[in] threshold Energy below which an actor may go to sleep. <b>Range:</b> (0,inf]
+	\param[in] threshold Energy below which an actor may go to sleep. <b>Range:</b> [0, PX_MAX_F32)
 
 	@see isSleeping() getSleepThreshold() wakeUp() putToSleep()
 	*/
@@ -245,30 +267,83 @@ public:
 	*/
 	virtual		PxReal				getSleepThreshold() const = 0;
 
+	 /**
+	\brief Sets the mass-normalized kinetic energy threshold below which an articulation may participate in stabilization.
+
+	Articulation whose kinetic energy divided by their mass is above this threshold will not participate in stabilization.
+
+	This value has no effect if PxSceneFlag::eENABLE_STABILIZATION was not enabled on the PxSceneDesc.
+
+	<b>Default:</b> 0.01 * PxTolerancesScale::speed * PxTolerancesScale::speed
+
+	\param[in] threshold Energy below which an actor may participate in stabilization. <b>Range:</b> (0,inf]
+
+	@see  getStabilizationThreshold() PxSceneFlag::eENABLE_STABILIZATION
+	*/
+	virtual		void				setStabilizationThreshold(PxReal threshold) = 0;
+
 	/**
-	\brief Wakes up the articulation if it is sleeping.  
+	\brief Returns the mass-normalized kinetic energy below which an articulation may participate in stabilization.
 
-	The wakeCounterValue determines how long until the articulation is put to sleep, a value of zero means 
-	that the articulation is sleeping. wakeUp(0) is equivalent to PxRigidDynamic::putToSleep().
+	Articulations whose kinetic energy divided by their mass is above this threshold will not participate in stabilization. 
 
-	\param[in] wakeCounterValue New sleep counter value. <b>Range:</b> [0,inf]
+	\return The energy threshold for participating in stabilization.
+
+	@see setStabilizationThreshold() PxSceneFlag::eENABLE_STABILIZATION
+	*/
+	virtual		PxReal				getStabilizationThreshold() const = 0;
+
+	/**
+	\brief Sets the wake counter for the articulation.
+
+	The wake counter value determines the minimum amount of time until the articulation can be put to sleep. Please note
+	that an articulation will not be put to sleep if the energy is above the specified threshold (see #setSleepThreshold())
+	or if other awake objects are touching it.
+
+	\note Passing in a positive value will wake the articulation up automatically.
+
+	<b>Default:</b> 0.4 (which corresponds to 20 frames for a time step of 0.02)
+
+	\param[in] wakeCounterValue Wake counter value. <b>Range:</b> [0, PX_MAX_F32)
+
+	@see isSleeping() getWakeCounter()
+	*/
+	virtual		void				setWakeCounter(PxReal wakeCounterValue) = 0;
+
+	/**
+	\brief Returns the wake counter of the articulation.
+
+	\return The wake counter of the articulation.
+
+	@see isSleeping() setWakeCounter()
+	*/
+	virtual		PxReal				getWakeCounter() const = 0;
+
+	/**
+	\brief Wakes up the articulation if it is sleeping.
+
+	The articulation will get woken up and might cause other touching objects to wake up as well during the next simulation step.
+
+	\note This will set the wake counter of the articulation to the value specified in #PxSceneDesc::wakeCounterResetValue.
+
+	\note It is invalid to use this method if the articulation has not been added to a scene already.
 
 	@see isSleeping() putToSleep()
 	*/
-	virtual		void				wakeUp(PxReal wakeCounterValue=PX_SLEEP_INTERVAL)	= 0;
+	virtual		void				wakeUp()	= 0;
 
 	/**
 	\brief Forces the articulation to sleep. 
 	
 	The articulation will stay asleep during the next simulation step if not touched by another non-sleeping actor.
 	
-	\note This will set the velocity of all bodies in the articulation to zero.
+	\note This will set any applied force, the velocity and the wake counter of all bodies in the articulation to zero.
+
+	\note It is invalid to use this method if the articulation has not been added to a scene already.
 
 	@see isSleeping() wakeUp()
 	*/
 	virtual		void				putToSleep()	= 0;
-
-
 
 	/**
 	\brief adds a link to the articulation with default attribute values.
@@ -279,7 +354,7 @@ public:
 	\return the new link, or NULL if the link cannot be created because the articulation has reached
 	its maximum link count
 	
-	@see PxsArticulationLink
+	@see PxArticulationLink
 	*/
 
 	virtual			PxArticulationLink*			createLink(PxArticulationLink* parent, const PxTransform& pose) = 0;
@@ -329,11 +404,13 @@ public:
 	/**
 	\brief Retrieves the axis aligned bounding box enclosing the articulation.
 
+	\param[in] inflation  Scale factor for computed world bounds. Box extents are multiplied by this value.
+
 	\return The articulation's bounding box.
 
 	@see PxBounds3
 	*/
-	virtual		PxBounds3		getWorldBounds() const = 0;
+	virtual		PxBounds3		getWorldBounds(float inflation=1.01f) const = 0;
 
 	/**
 	\brief Retrieves the aggregate the articulation might be a part of.
@@ -344,38 +421,104 @@ public:
 	*/
 	virtual		PxAggregate*	getAggregate() const = 0;
 
-	/** \brief placeholder API for creating a drive cache */
+	/** 
+	\brief create a drive cache for applying impulses which are propagated to the entire articulation
+
+	\param[in] compliance the compliance value to use at all joints of the articulation. This is equivalent to the external compliance
+	parameter for articulation joints, as the impulse is treated as an external force
+	\param[in] driveIterations the number of iterations to use to evaluate the drive strengths
+
+	\return a drive cache
+
+	@see PxArticulationDriveCache updateDriveCache releaseDriveCache applyImpulse computeImpulseResponse
+	
+	\note this call may only be made on articulations that are in a scene, and may not be made during simulation
+
+	*/
 	virtual		PxArticulationDriveCache* 
-								createDriveCache(PxReal compliance) const = 0;
+								createDriveCache(PxReal compliance, PxU32 driveIterations) const = 0;
 
-	/** \brief placeholder API for releasing a drive cache */
-	virtual		void			releaseDriveCache(PxArticulationDriveCache*) const = 0;
 
-	/** \brief placeholder API for applying an impulse to an entire articulation */
-	virtual		void			applyImpulse(PxArticulationLink*,
+	/** 
+	\brief update a drive cache
+
+	\param[in] driveCache the drive cache to update
+	\param[in] compliance the compliance value to use at all joints of the articulation. 
+	\param[in] driveIterations the number of iterations to use to evaluate the drive strengths
+
+	\return a drive cache
+
+	@see releaseDriveCache createDriveCache applyImpulse computeImpulseResponse
+	
+	\note this call may only be made on articulations that are in a scene, and may not be made during simulation
+
+	*/
+	virtual		void			updateDriveCache(PxArticulationDriveCache& driveCache,
+												 PxReal compliance, 
+												 PxU32 driveIterations) const = 0;
+
+	/** 
+	\brief release a drive cache
+	
+	\param[in] driveCache the drive cache to release
+
+	@see createDriveCache updateDriveCache
+	*/
+	virtual		void			releaseDriveCache(PxArticulationDriveCache& driveCache) const = 0;
+
+	/** 
+	\brief apply an impulse to an entire articulation
+	
+	\param[in] link the link to which to apply the impulse
+	\param[in] driveCache the drive cache
+	\param[in] linearImpulse the linear impulse to apply
+	\param[in] angularImpulse the angular impulse to apply
+
+	@see computeImpulseResponse
+
+	\note this call may only be made on articulations that are in a scene, and may not be made during simulation
+
+	*/
+	virtual		void			applyImpulse(PxArticulationLink* link,
 											 const PxArticulationDriveCache& driveCache,
-											 const PxVec3& force,
-											 const PxVec3& torque) = 0;
+											 const PxVec3& linearImpulse,
+											 const PxVec3& angularImpulse) = 0;
 
-	/** \brief placeholder API for determining the response to an impulse applied to an entire articulation */
-	virtual		void			computeImpulseResponse(PxArticulationLink*,
+	/** 
+	\brief determine the effect of applying an impulse to an entire articulation, without applying the impulse
+	
+	\param[in] link the link to which to apply the impulse
+	\param[out] linearResponse the change in linear velocity of the articulation link
+	\param[out] angularResponse the change in angular velocity of the articulation link
+	\param[in] driveCache the drive cache
+	\param[in] linearImpulse the linear impulse to apply
+	\param[in] angularImpulse the angular impulse to apply
+
+	@see applyImpulse
+
+	This call will wake up the articulation if it is asleep.
+
+	\note this call may only be made on articulations that are in a scene, and may not be made during simulation
+	*/
+
+	virtual		void			computeImpulseResponse(PxArticulationLink*link,
 													   PxVec3& linearResponse, 
 													   PxVec3& angularResponse,
 													   const PxArticulationDriveCache& driveCache,
-													   const PxVec3& force,
-													   const PxVec3& torque) const = 0;
+													   const PxVec3& linearImpulse,
+													   const PxVec3& angularImpulse) const = 0;
 
 
 	//public variables:
 				void*			userData;	//!< user can assign this to whatever, usually to create a 1:1 relationship with a user object.
 
-	virtual		const char*		getConcreteTypeName() const					{	return "PxArticulation"; }
+	virtual		const char*		getConcreteTypeName() const { return "PxArticulation"; }
 
 protected:
-								PxArticulation(PxRefResolver& v) : PxSerializable(v)	{}
-	PX_INLINE					PxArticulation() {}
-	virtual						~PxArticulation()	{}
-	virtual		bool			isKindOf(const char* name)	const		{	return !strcmp("PxArticulation", name) || PxSerializable::isKindOf(name); }
+	PX_INLINE					PxArticulation(PxType concreteType, PxBaseFlags baseFlags) : PxBase(concreteType, baseFlags) {}
+	PX_INLINE					PxArticulation(PxBaseFlags baseFlags) : PxBase(baseFlags) {}
+	virtual						~PxArticulation() {}
+	virtual		bool			isKindOf(const char* name) const { return !strcmp("PxArticulation", name) || PxBase::isKindOf(name); }
 
 
 };

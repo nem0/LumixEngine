@@ -41,17 +41,12 @@ struct PhysicsSystemImpl : public PhysicsSystem
 	virtual void destroyScene(IScene* scene) override;
 	virtual void destroy() override;
 
-	virtual physx::PxControllerManager* getControllerManager() override
-	{
-		return m_controller_manager;
-	}
-
-	virtual physx::PxPhysics* getPhysics() override
+	physx::PxPhysics* getPhysics() override
 	{
 		return m_physics;
 	}
 
-	virtual physx::PxCooking* getCooking() override
+	physx::PxCooking* getCooking() override
 	{
 		return m_cooking;
 	}
@@ -175,8 +170,8 @@ bool PhysicsSystemImpl::create()
 		physx::PxTolerancesScale()
 	);
 	
-	m_controller_manager = PxCreateControllerManager(*m_foundation);
-	m_cooking = PxCreateCooking(PX_PHYSICS_VERSION, *m_foundation, physx::PxCookingParams());
+	physx::PxTolerancesScale scale;
+	m_cooking = PxCreateCooking(PX_PHYSICS_VERSION, *m_foundation, physx::PxCookingParams(scale));
 	connect2VisualDebugger();
 	return true;
 }
@@ -184,7 +179,6 @@ bool PhysicsSystemImpl::create()
 
 void PhysicsSystemImpl::destroy()
 {
-	m_controller_manager->release();
 	m_cooking->release();
 	m_physics->release();
 	m_foundation->release();
@@ -203,7 +197,7 @@ bool PhysicsSystemImpl::connect2VisualDebugger()
 	unsigned int timeout = 100; 
 	physx::PxVisualDebuggerConnectionFlags connectionFlags = physx::PxVisualDebuggerExt::getAllConnectionFlags();
 
-	PVD::PvdConnection* theConnection = physx::PxVisualDebuggerExt::createConnection(m_physics->getPvdConnectionManager(), pvd_host_ip, port, timeout, connectionFlags);
+	auto* theConnection = physx::PxVisualDebuggerExt::createConnection(m_physics->getPvdConnectionManager(), pvd_host_ip, port, timeout, connectionFlags);
 	return theConnection != nullptr;
 }
 

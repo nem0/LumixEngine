@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -41,82 +41,6 @@ namespace physx
 {
 #endif
 
-/** 
- *	An array of pointers.  Used for at least materials and shapes
- *	in the descriptor hierarchy.
- */
-template<typename TDataType>
-class PxPtrArray
-{
-	PxU32 count;
-	TDataType*const* items;
-	TDataType* singleItem;
-public:
-
-	PX_INLINE PxPtrArray()
-		: count ( 0 )
-		, items ( NULL )
-		, singleItem ( NULL )
-	{
-	}
-	PX_INLINE PxPtrArray( const PxPtrArray<TDataType>& inOther )
-	{
-		(*this) = inOther;
-	}
-
-	PX_INLINE PxPtrArray<TDataType>& operator=( const PxPtrArray<TDataType>& inOther )
-	{
-		//This is harder to get right than it would seem
-		//The problem is if you have a vector of these items
-		//and they are being copied around.  Then the pointer to
-		//a previous item's single item is probably bad.  Thus
-		//you need to reconstruct the single item chain.
-		//CN
-		count = inOther.count;
-		if ( count == 1 )
-		{
-			singleItem = inOther.items[0];
-			items = &singleItem;
-		}
-		else
-		{
-			singleItem = NULL;
-			items = inOther.items;
-		}
-		return *this;
-	}
-
-	/**
-	 * set the contents to be a list of ptr-to-ptr-to-items.
-	 */
-	PX_INLINE void set(TDataType*const* items_, PxU32 count_)
-	{
-		items = items_;
-		count = count_;
-	}
-
-	/**
-	\brief set a single item as the content of the reference array
-	*/
-	PX_INLINE void setSingle(TDataType* item_)
-	{
-		singleItem = item_;
-		items = &singleItem;
-		count = 1;
-	}
-
-	PX_INLINE bool isValid() const 
-	{ 
-		if ( count ) 
-			return items != NULL; 
-		return items == NULL;
-	}
-	
-	PX_INLINE PxU32 getCount() const { return count; }
-	PX_INLINE TDataType*const* getItems() const { return items; }
-
-	PX_INLINE TDataType* operator[]( PxU32 idx ) const { return items[idx]; }
-};
 
 struct PxStridedData
 {
@@ -172,26 +96,33 @@ struct PxPadding
 	}
 };
 
-
-template <PxU32 NUM_ELEMENTS> class PxFixedSizeLookupTable
+template <PxU32 NB_ELEMENTS> class PxFixedSizeLookupTable
 {
+//= ATTENTION! =====================================================================================
+// Changing the data layout of this class breaks the binary serialization format.  See comments for 
+// PX_BINARY_SERIAL_VERSION.  If a modification is required, please adjust the getBinaryMetaData 
+// function.  If the modification is made on a custom branch, please change PX_BINARY_SERIAL_VERSION
+// accordingly.
+//==================================================================================================
 public:
 	
 	PxFixedSizeLookupTable() 
-		: mNumDataPairs(0)
+		: mNbDataPairs(0)
 	{
 	}
+
+	PxFixedSizeLookupTable(const PxEMPTY&) {}
 
 	PxFixedSizeLookupTable(const PxReal* dataPairs, const PxU32 numDataPairs)
 	{
 		memcpy(mDataPairs,dataPairs,sizeof(PxReal)*2*numDataPairs);
-		mNumDataPairs=numDataPairs;
+		mNbDataPairs=numDataPairs;
 	}
 
 	PxFixedSizeLookupTable(const PxFixedSizeLookupTable& src)
 	{
-		memcpy(mDataPairs,src.mDataPairs,sizeof(PxReal)*2*src.mNumDataPairs);
-		mNumDataPairs=src.mNumDataPairs;
+		memcpy(mDataPairs,src.mDataPairs,sizeof(PxReal)*2*src.mNbDataPairs);
+		mNbDataPairs=src.mNbDataPairs;
 	}
 
 	~PxFixedSizeLookupTable()
@@ -200,28 +131,28 @@ public:
 
 	PxFixedSizeLookupTable& operator=(const PxFixedSizeLookupTable& src)
 	{
-		memcpy(mDataPairs,src.mDataPairs,sizeof(PxReal)*2*src.mNumDataPairs);
-		mNumDataPairs=src.mNumDataPairs;
+		memcpy(mDataPairs,src.mDataPairs,sizeof(PxReal)*2*src.mNbDataPairs);
+		mNbDataPairs=src.mNbDataPairs;
 		return *this;
 	}
 
 	PX_FORCE_INLINE void addPair(const PxReal x, const PxReal y)
 	{
-		PX_ASSERT(mNumDataPairs<NUM_ELEMENTS);
-		mDataPairs[2*mNumDataPairs+0]=x;
-		mDataPairs[2*mNumDataPairs+1]=y;
-		mNumDataPairs++;
+		PX_ASSERT(mNbDataPairs<NB_ELEMENTS);
+		mDataPairs[2*mNbDataPairs+0]=x;
+		mDataPairs[2*mNbDataPairs+1]=y;
+		mNbDataPairs++;
 	}
 
 	PX_FORCE_INLINE PxReal getYVal(const PxReal x) const
 	{
-		if(0==mNumDataPairs)
+		if(0==mNbDataPairs)
 		{
 			PX_ASSERT(false);
 			return 0;
 		}
 
-		if(1==mNumDataPairs || x<getX(0))
+		if(1==mNbDataPairs || x<getX(0))
 		{
 			return getY(0);
 		}
@@ -229,7 +160,7 @@ public:
 		PxReal x0=getX(0);
 		PxReal y0=getY(0);
 
-		for(PxU32 i=1;i<mNumDataPairs;i++)
+		for(PxU32 i=1;i<mNbDataPairs;i++)
 		{
 			const PxReal x1=getX(i);
 			const PxReal y1=getY(i);
@@ -243,17 +174,17 @@ public:
 			y0=y1;
 		}
 
-		PX_ASSERT(x>=getX(mNumDataPairs-1));
-		return getY(mNumDataPairs-1);
+		PX_ASSERT(x>=getX(mNbDataPairs-1));
+		return getY(mNbDataPairs-1);
 	}
 
-	PxU32 getNumDataPairs() const {return mNumDataPairs;}
-
-private:
-
-	PxReal mDataPairs[2*NUM_ELEMENTS];
-	PxU32 mNumDataPairs;
-	PxU32 mPad[3];
+	PxU32 getNbDataPairs() const {return mNbDataPairs;}
+	
+	void clear()
+	{
+		memset(mDataPairs, 0, NB_ELEMENTS*2*sizeof(PxReal));
+		mNbDataPairs = 0;
+	}
 
 	PX_FORCE_INLINE PxReal getX(const PxU32 i) const
 	{
@@ -263,6 +194,12 @@ private:
 	{
 		return mDataPairs[2*i+1];
 	}
+
+	PxReal mDataPairs[2*NB_ELEMENTS];
+	PxU32 mNbDataPairs;
+	PxU32 mPad[3];
+
+	
 };
 
 #ifndef PX_DOXYGEN

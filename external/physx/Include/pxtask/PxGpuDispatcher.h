@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 
 #ifndef PX_GPU_DISPATCHER_H
 #define PX_GPU_DISPATCHER_H
@@ -39,53 +39,50 @@ namespace physx
 {
 #endif
 
-namespace pxtask
-{
-
 PX_PUSH_PACK_DEFAULT
 
-class CudaContextManager;
-class TaskManager;
+class PxCudaContextManager;
+class PxTaskManager;
 
 /** \brief A GpuTask dispatcher
  *
- * A GpuDispatcher executes GpuTasks submitted by one or more TaskManagers (one
+ * A PxGpuDispatcher executes GpuTasks submitted by one or more TaskManagers (one
  * or more scenes).  It maintains a CPU worker thread which waits on GpuTask
  * "groups" to be submitted.  The submission API is explicitly sessioned so that
  * GpuTasks are dispatched together as a group whenever possible to improve
  * parallelism on the GPU.
  *
- * A GpuDispatcher cannot be allocated ad-hoc, they are created as a result of
- * creating a CudaContextManager.  Every CudaContextManager has a GpuDispatcher
- * instance that can be queried.  In this way, each GpuDispatcher is tied to
+ * A PxGpuDispatcher cannot be allocated ad-hoc, they are created as a result of
+ * creating a PxCudaContextManager.  Every PxCudaContextManager has a PxGpuDispatcher
+ * instance that can be queried.  In this way, each PxGpuDispatcher is tied to
  * exactly one CUDA context.
  *
- * A scene will use CPU fallback Tasks for GpuTasks if the TaskManager provided
- * to it does not have a GpuDispatcher.  For this reason, the GpuDispatcher must
- * be assigned to the TaskManager before the TaskManager is given to a scene.
+ * A scene will use CPU fallback Tasks for GpuTasks if the PxTaskManager provided
+ * to it does not have a PxGpuDispatcher.  For this reason, the PxGpuDispatcher must
+ * be assigned to the PxTaskManager before the PxTaskManager is given to a scene.
  *
- * Multiple TaskManagers may safely share a single GpuDispatcher instance, thus
+ * Multiple TaskManagers may safely share a single PxGpuDispatcher instance, thus
  * enabling scenes to share a CUDA context.
  *
  * Only failureDetected() is intended for use by the user.  The rest of the
- * GpuDispatcher public methods are reserved for internal use by only both
+ * PxGpuDispatcher public methods are reserved for internal use by only both
  * TaskManagers and GpuTasks.
  */
-class GpuDispatcher
+class PxGpuDispatcher
 {
 public:
 	/** \brief Record the start of a simulation step
 	 *
-	 * A TaskManager calls this function to record the beginning of a simulation
-	 * step.  The GpuDispatcher uses this notification to initialize the
+	 * A PxTaskManager calls this function to record the beginning of a simulation
+	 * step.  The PxGpuDispatcher uses this notification to initialize the
 	 * profiler state.
 	 */
 	virtual void                startSimulation() = 0;
 
 	/** \brief Record the start of a GpuTask batch submission
 	 *
-	 * A TaskManager calls this function to notify the GpuDispatcher that one or
-	 * more GpuTasks are about to be submitted for execution.  The GpuDispatcher
+	 * A PxTaskManager calls this function to notify the PxGpuDispatcher that one or
+	 * more GpuTasks are about to be submitted for execution.  The PxGpuDispatcher
 	 * will not read the incoming task queue until it receives one finishGroup()
 	 * call for each startGroup() call.  This is to ensure as many GpuTasks as
 	 * possible are executed together as a group, generating optimal parallelism
@@ -95,19 +92,19 @@ public:
 
 	/** \brief Submit a GpuTask for execution
 	 *
-	 * Submitted tasks are pushed onto an incoming queue.  The GpuDispatcher
+	 * Submitted tasks are pushed onto an incoming queue.  The PxGpuDispatcher
 	 * will take the contents of this queue every time the pending group count
 	 * reaches 0 and run the group of submitted GpuTasks as an interleaved
 	 * group.
 	 */
-	virtual void                submitTask(Task& task) = 0;
+	virtual void                submitTask(PxTask& task) = 0;
 
 	/** \brief Record the end of a GpuTask batch submission
 	 *
-	 * A TaskManager calls this function to notify the GpuDispatcher that it is
+	 * A PxTaskManager calls this function to notify the PxGpuDispatcher that it is
 	 * done submitting a group of GpuTasks (GpuTasks which were all make ready
 	 * to run by the same prerequisite dependency becoming resolved).  If no
-	 * other group submissions are in progress, the GpuDispatcher will execute
+	 * other group submissions are in progress, the PxGpuDispatcher will execute
 	 * the set of ready tasks.
 	 */
 	virtual void                finishGroup() = 0;
@@ -117,7 +114,7 @@ public:
 	 * A GpuTask calls this function to add a prerequisite dependency on another
 	 * task (usually a CpuTask) preventing that task from starting until all of
 	 * the CUDA kernels and copies already launched have been completed.  The
-	 * GpuDispatcher will increment that task's reference count, blocking its
+	 * PxGpuDispatcher will increment that task's reference count, blocking its
 	 * execution, until the CUDA work is complete.
 	 *
 	 * This is generally only required when a CPU task is expecting the results
@@ -129,26 +126,26 @@ public:
 	 * completion prerequisite if the task in question depends on a completed
 	 * GPU->Host DMA.
 	 *
-	 * The GpuDispatcher issues a blocking event record to CUDA for the purposes
+	 * The PxGpuDispatcher issues a blocking event record to CUDA for the purposes
 	 * of tracking the already submitted CUDA work.  When this event is
-	 * resolved, the GpuDispatcher manually decrements the reference count of
+	 * resolved, the PxGpuDispatcher manually decrements the reference count of
 	 * the specified task, allowing it to execute (assuming it does not have
 	 * other pending prerequisites).
 	 */
-	virtual void                addCompletionPrereq(BaseTask& task) = 0;
+	virtual void                addCompletionPrereq(PxBaseTask& task) = 0;
 
-	/** \brief Retrieve the CudaContextManager associated with this
-	 * GpuDispatcher
+	/** \brief Retrieve the PxCudaContextManager associated with this
+	 * PxGpuDispatcher
 	 *
-	 * Every CudaContextManager has one GpuDispatcher, and every GpuDispatcher
-	 * has one CudaContextManager.
+	 * Every PxCudaContextManager has one PxGpuDispatcher, and every PxGpuDispatcher
+	 * has one PxCudaContextManager.
 	 */
-	virtual CudaContextManager* getCudaContextManager() = 0;
+	virtual PxCudaContextManager* getCudaContextManager() = 0;
 
 	/** \brief Record the end of a simulation frame
 	 *
-	 * A TaskManager calls this function to record the completion of its
-	 * dependency graph.  If profiling is enabled, the GpuDispatcher will
+	 * A PxTaskManager calls this function to record the completion of its
+	 * dependency graph.  If profiling is enabled, the PxGpuDispatcher will
 	 * trigger the retrieval of profiling data from the GPU at this point.
 	 */
 	virtual void                stopSimulation() = 0;
@@ -156,7 +153,7 @@ public:
 	/** \brief Returns true if a CUDA call has returned a non-recoverable error
 	 *
 	 * A return value of true indicates a fatal error has occurred. To protect
-	 * itself, the GpuDispatcher enters a fall through mode that allows GpuTasks
+	 * itself, the PxGpuDispatcher enters a fall through mode that allows GpuTasks
 	 * to complete without being executed.  This allows simulations to continue
 	 * but leaves GPU content static or corrupted.
 	 *
@@ -174,10 +171,10 @@ public:
 	 */
 	virtual bool                failureDetected() const = 0;
 
-	/** \brief Force the GpuDispatcher into failure mode
+	/** \brief Force the PxGpuDispatcher into failure mode
 	 *
 	 * This API should be used if user code detects a non-recoverable CUDA
-	 * error.  This ensures the GpuDispatcher does not launch any further
+	 * error.  This ensures the PxGpuDispatcher does not launch any further
 	 * CUDA work.  Subsequent calls to failureDetected() will return true.
 	 */
 	virtual void                forceFailureMode() = 0;
@@ -216,19 +213,49 @@ public:
 	 * If your GPU does not support mapping of page locked memory (SM>=1.1),
 	 * this function degrades to calling CUDA copy methods.
 	 */
-	virtual void                launchCopyKernel(GpuCopyDesc* desc, PxU32 count, CUstream stream) = 0;
+	virtual void                launchCopyKernel(PxGpuCopyDesc* desc, PxU32 count, CUstream stream) = 0;
+
+	/** \brief Query pre launch task that runs before launching gpu kernels.
+	 *
+	 * This is part of an optional feature to schedule multiple gpu features 
+	 * at the same time to get kernels to run in parallel.
+	 * \note Do *not* set the continuation on the returned task, but use addPreLaunchDependent().
+	 */
+	virtual PxBaseTask&			getPreLaunchTask() = 0;
+
+	/** \brief Adds a gpu launch task that gets executed after the pre launch task.
+	 *
+	 * This is part of an optional feature to schedule multiple gpu features 
+	 * at the same time to get kernels to run in parallel.
+	 * \note Each call adds a reference to the pre-launch task. 
+	 */
+	virtual void				addPreLaunchDependent(PxBaseTask& dependent) = 0;
+
+	/** \brief Query post launch task that runs after the gpu is done.
+	 *
+	 * This is part of an optional feature to schedule multiple gpu features 
+	 * at the same time to get kernels to run in parallel.
+	 * \note Do *not* set the continuation on the returned task, but use addPostLaunchDependent().
+	 */
+	virtual PxBaseTask&			getPostLaunchTask() = 0;
+	
+	/** \brief Adds a task that gets executed after the post launch task.
+	 *
+	 * This is part of an optional feature to schedule multiple gpu features 
+	 * at the same time to get kernels to run in parallel.
+	 * \note Each call adds a reference to the pre-launch task. 
+	 */
+	virtual void				addPostLaunchDependent(PxBaseTask& dependent) = 0;
 
 protected:
 	/** \brief protected destructor
 	 *
-	 * GpuDispatchers are allocated and freed by their CudaContextManager.
+	 * GpuDispatchers are allocated and freed by their PxCudaContextManager.
 	 */
-	virtual ~GpuDispatcher() {};
+	virtual ~PxGpuDispatcher() {}
 };
 
 PX_POP_PACK
-
-} // end pxtask namespace
 
 #ifndef PX_DOXYGEN
 } // end physx namespace

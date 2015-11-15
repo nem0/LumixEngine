@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -35,12 +35,10 @@
   @{
 */
 
-#include "PxPhysX.h"
+#include "PxPhysXConfig.h"
 #include "foundation/PxBounds3.h"
-#include "PxPhysics.h"
-#include "PxObserver.h"
 #include "PxClient.h"
-#include "common/PxSerialFramework.h"
+#include "common/PxBase.h"
 
 #ifndef PX_DOXYGEN
 namespace physx
@@ -87,7 +85,25 @@ struct PxActorFlag
 
 		@see PxSimulationEventCallback::onWake() PxSimulationEventCallback::onSleep()
 		*/
-		eSEND_SLEEP_NOTIFIES			= (1<<2)
+		eSEND_SLEEP_NOTIFIES			= (1<<2),
+
+		/**
+		\brief Disables simulation for the actor.
+		
+		\note This is only supported by PxRigidStatic and PxRigidDynamic actors and can be used to reduce the memory footprint when rigid actors are
+		used for scene queries only.
+
+		\note Setting this flag will remove all constraints attached to the actor from the scene.
+
+		\note If this flag is set, the following calls are forbidden:
+		\li PxRigidBody: setLinearVelocity(), setAngularVelocity(), addForce(), addTorque(), clearForce(), clearTorque()
+		\li PxRigidDynamic: setKinematicTarget(), setWakeCounter(), wakeUp(), putToSleep()
+
+		\par <b>Sleeping:</b>
+		Raising this flag will set all velocities and the wake counter to 0, clear all forces, clear the kinematic target, put the actor
+		to sleep and wake up all touching actors from the previous frame.
+		*/
+		eDISABLE_SIMULATION				= (1<<3)
 
 	};
 };
@@ -98,7 +114,7 @@ struct PxActorFlag
 @see PxActorFlag
 */
 typedef PxFlags<PxActorFlag::Enum,PxU16> PxActorFlags;
-PX_FLAGS_OPERATORS(PxActorFlag::Enum,PxU16);
+PX_FLAGS_OPERATORS(PxActorFlag::Enum,PxU16)
 
 /**
 \brief Identifies each type of actor.
@@ -161,8 +177,7 @@ struct PxActorType
 The actor is owned by and contained in a PxScene.
 
 */
-
-class PxActor : public PxSerializable, public PxObservable
+class PxActor : public PxBase
 {
 public:
 	/**
@@ -170,12 +185,9 @@ public:
 	
 	Do not keep a reference to the deleted instance.
 
-	<b>Sleeping:</b> If this is a PxRigidDynamic, this call will awaken any sleeping actors contacting the deleted actor (directly or indirectly).
-
 	If the actor belongs to a #PxAggregate object, it is automatically removed from the aggregate.
 
-	@see PxScene::createRigidStatic(), PxScene::createRigidDynamic(), PxScene::createParticleSystem(), 
-	PxScene::createParticleFluid(), PxAggregate
+	@see PxBase.release(), PxAggregate
 	*/
 	virtual		void			release() = 0;
 
@@ -190,6 +202,7 @@ public:
 
 
 	/**
+	\deprecated
 	\brief Attempts to cast to specific actor type.
 
 	\return NULL if the actor is not of the appropriate type. Otherwise a pointer to the specific actor type.
@@ -256,11 +269,13 @@ public:
 	/**
 	\brief Retrieves the axis aligned bounding box enclosing the actor.
 
+	\param[in] inflation  Scale factor for computed world bounds. Box extents are multiplied by this value.
+
 	\return The actor's bounding box.
 
 	@see PxBounds3
 	*/
-	virtual		PxBounds3		getWorldBounds() const = 0;
+	virtual		PxBounds3		getWorldBounds(float inflation=1.01f) const = 0;
 
 	/**
 	\brief Raises or clears a particular actor flag.
@@ -329,9 +344,9 @@ public:
 
 	This cannot be done once the actor has been placed into a scene.
 
-	<b>Default:</b> 0
+	<b>Default:</b> PX_DEFAULT_CLIENT
 
-	@see PxClientID
+	@see PxClientID PxScene::createClient() 
 	*/
 	virtual		void			setOwnerClient( PxClientID inClient ) = 0;
 
@@ -340,7 +355,7 @@ public:
 
 	This value cannot be changed once the object is placed into the scene.
 
-	@see PxClientID
+	@see PxClientID PxScene::createClient()
 	*/
 	virtual		PxClientID		getOwnerClient() const = 0;
 
@@ -355,18 +370,18 @@ public:
 
 	<b>Default:</b> 0
 
-	@see PxClientID PxActorClientBehaviorBit PxScene::setClientBehaviorBits() 
+	@see PxClientID PxActorClientBehaviorFlag PxScene::setClientBehaviorFlags()
 	*/
-	virtual		void			setClientBehaviorBits(PxU32) = 0;
+	virtual		void			setClientBehaviorFlags(PxActorClientBehaviorFlags) = 0;
 
 	/**
 	\brief Retrieves the behavior bits of the actor.
 
 	The behavior bits determine which types of events the actor will broadcast to foreign clients.
 
-	@see PxActorClientBehaviorBit setClientBehaviorBits
+	@see PxActorClientBehaviorFlag setClientBehaviorFlags()
 	*/
-	virtual		PxU32			getClientBehaviorBits()	const = 0;
+	virtual		PxActorClientBehaviorFlags	getClientBehaviorFlags()	const = 0;
 
 	/**
 	\brief Retrieves the aggregate the actor might be a part of.
@@ -382,10 +397,10 @@ public:
 
 
 protected:
-								PxActor(PxRefResolver& v) : PxSerializable(v)	{}
-	PX_INLINE					PxActor() : userData(NULL) {}
+	PX_INLINE					PxActor(PxType concreteType, PxBaseFlags baseFlags) : PxBase(concreteType, baseFlags), userData(NULL) {}
+	PX_INLINE					PxActor(PxBaseFlags baseFlags) : PxBase(baseFlags) {}
 	virtual						~PxActor()	{}
-	virtual		bool			isKindOf(const char* name)	const		{	return !strcmp("PxActor", name) || PxSerializable::isKindOf(name); }
+	virtual		bool			isKindOf(const char* name)	const		{	return !strcmp("PxActor", name) || PxBase::isKindOf(name); }
 
 
 };

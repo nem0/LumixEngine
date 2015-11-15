@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -45,7 +45,7 @@
 namespace physx
 {
 #endif
-#if defined (PX_WINDOWS) || defined (DOXYGEN)
+#if defined (PX_WINDOWS) ||  defined(PX_WINMODERN) || defined (DOXYGEN) || defined(PX_XBOXONE)
 
 	typedef signed __int64		PxI64;
 	typedef signed int			PxI32;
@@ -129,8 +129,8 @@ namespace physx
 
 	typedef float				PxF32;
 	typedef double				PxF64;
-    
-#elif defined(PX_WII)
+
+#elif defined(PX_WIIU)
 	typedef signed long long	PxI64;
 	typedef signed int			PxI32;
 	typedef signed short		PxI16;
@@ -141,6 +141,20 @@ namespace physx
 	typedef unsigned short		PxU16;
 	typedef unsigned char		PxU8;
 
+	typedef float				PxF32;
+	typedef double				PxF64;
+
+#elif defined(PX_PS4)
+	typedef signed long long	PxI64;
+	typedef signed int			PxI32;
+	typedef signed short		PxI16;
+	typedef signed char			PxI8;
+	
+	typedef unsigned long long	PxU64;
+	typedef unsigned int		PxU32;
+	typedef unsigned short		PxU16;
+	typedef unsigned char		PxU8;
+	
 	typedef float				PxF32;
 	typedef double				PxF64;
 

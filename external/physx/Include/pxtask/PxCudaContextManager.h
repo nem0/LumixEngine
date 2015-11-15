@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 
 
 #ifndef PX_CUDA_CONTEXT_MANAGER_H
@@ -42,11 +42,8 @@ namespace physx
 
 class PxProfileZoneManager;
 
-namespace pxtask
-{
-
 /** \brief Possible graphic/CUDA interoperability modes for context */
-struct CudaInteropMode
+struct PxCudaInteropMode
 {
     /**
      * \brief Possible graphic/CUDA interoperability modes for context
@@ -63,29 +60,30 @@ struct CudaInteropMode
 	};
 };
 
-//! \brief Descriptor used to create a CudaContextManager
-class CudaContextManagerDesc
+
+//! \brief Descriptor used to create a PxCudaContextManager
+class PxCudaContextManagerDesc
 {
 public:
     /**
      * \brief The CUDA context to manage
      *
-     * If left NULL, the CudaContextManager will create a new context.  If
+     * If left NULL, the PxCudaContextManager will create a new context.  If
      * graphicsDevice is also not NULL, this new CUDA context will be bound to
      * that graphics device, enabling the use of CUDA/Graphics interop features.
      *
      * If ctx is not NULL, the specified context must be applied to the thread
-     * that is allocating the CudaContextManager at creation time (aka, it
-     * cannot be popped).  The CudaContextManager will take ownership of the
+     * that is allocating the PxCudaContextManager at creation time (aka, it
+     * cannot be popped).  The PxCudaContextManager will take ownership of the
      * context until the manager is released.  All access to the context must be
      * gated by lock acquisition.
      *
-     * If the user provides a context for the CudaContextManager, the context
+     * If the user provides a context for the PxCudaContextManager, the context
      * _must_ have either been created on the GPU ordinal returned by
-     * getSuggestedCudaDeviceOrdinal() or on your graphics device.
+     * PxGetSuggestedCudaDeviceOrdinal() or on your graphics device.
      *
      * It is perfectly acceptable to allocate device or host pinned memory from
-     * the context outside the scope of the CudaMemoryManager, so long as you
+     * the context outside the scope of the PxCudaMemoryManager, so long as you
      * manage its eventual cleanup.
      */
 	CUcontext            *ctx;
@@ -99,7 +97,7 @@ public:
      */
 	void	             *graphicsDevice;
 
-#if defined(PX_WINDOWS)
+#if PX_SUPPORT_GPU_PHYSX
 	/**
 	  * \brief Application-specific GUID
 	  *
@@ -116,22 +114,22 @@ public:
      * pointer provided by the user.  Else it describes the nature of the
      * context provided by the user.
      */
-	CudaInteropMode::Enum interopMode;
+	PxCudaInteropMode::Enum interopMode;
 
 
     /**
      * \brief Size of persistent memory
      *
      * This memory is allocated up front and stays allocated until the
-     * CudaContextManager is released.  Size is in bytes, has to be power of two
+     * PxCudaContextManager is released.  Size is in bytes, has to be power of two
      * and bigger than the page size.  Set to 0 to only use dynamic pages.
      *
      * Note: On Vista O/S and above, there is a per-memory allocation overhead
      * to every CUDA work submission, so we recommend that you carefully tune
-     * this initial base memory size to closely approximate the ammount of
+     * this initial base memory size to closely approximate the amount of
      * memory your application will consume.
      */
-	PxU32		memoryBaseSize[CudaBufferMemorySpace::COUNT];
+	PxU32		memoryBaseSize[PxCudaBufferMemorySpace::COUNT];
 
     /**
      * \brief Size of memory pages
@@ -139,22 +137,22 @@ public:
      * The memory manager will dynamically grow and shrink in blocks multiple of
      * this page size. Size has to be power of two and bigger than 0.
      */
-	PxU32		memoryPageSize[CudaBufferMemorySpace::COUNT];
+	PxU32		memoryPageSize[PxCudaBufferMemorySpace::COUNT];
 
     /**
      * \brief Maximum size of memory that the memory manager will allocate
      */
-	PxU32		maxMemorySize[CudaBufferMemorySpace::COUNT];
+	PxU32		maxMemorySize[PxCudaBufferMemorySpace::COUNT];
 
-	PX_INLINE CudaContextManagerDesc()
+	PX_INLINE PxCudaContextManagerDesc()
 	{
 		ctx = NULL;
-		interopMode = CudaInteropMode::NO_INTEROP;
+		interopMode = PxCudaInteropMode::NO_INTEROP;
 		graphicsDevice = 0;
-#if defined(PX_WINDOWS)
+#if PX_SUPPORT_GPU_PHYSX
 		appGUID  = NULL;
 #endif
-		for(PxU32 i = 0; i < CudaBufferMemorySpace::COUNT; i++)
+		for(PxU32 i = 0; i < PxCudaBufferMemorySpace::COUNT; i++)
 		{
 			memoryBaseSize[i] = 0;
 			memoryPageSize[i] = 2 * 1024*1024;
@@ -167,21 +165,21 @@ public:
 /**
  * \brief Manages memory, thread locks, and task scheduling for a CUDA context
  *
- * A CudaContextManager manages access to a single CUDA context, allowing it to
+ * A PxCudaContextManager manages access to a single CUDA context, allowing it to
  * be shared between multiple scenes.   Memory allocations are dynamic: starting
  * with an initial heap size and growing on demand by a configurable page size.
  * The context must be acquired from the manager before using any CUDA APIs.
  *
- * The CudaContextManager is based on the CUDA driver API and explictly does not
+ * The PxCudaContextManager is based on the CUDA driver API and explictly does not
  * support the the CUDA runtime API (aka, CUDART).
  *
- * To enable CUDA use by an APEX scene, a CudaContextManager must be created
+ * To enable CUDA use by an APEX scene, a PxCudaContextManager must be created
  * (supplying your own CUDA context, or allowing a new context to be allocated
- * for you), the GpuDispatcher for that context is retrieved via the
+ * for you), the PxGpuDispatcher for that context is retrieved via the
  * getGpuDispatcher() method, and this is assigned to the TaskManager that is
  * given to the scene via its NxApexSceneDesc.
  */
-class CudaContextManager
+class PxCudaContextManager
 {
 public:
     /**
@@ -194,7 +192,7 @@ public:
      * The context must be acquired before using most CUDA functions.
      *
      * It is not necessary to acquire the CUDA context inside GpuTask
-     * launch functions, because the GpuDispatcher will have already
+     * launch functions, because the PxGpuDispatcher will have already
      * acquired the context for its worker thread.  However it is not
      * harmfull to (re)acquire the context in code that is shared between
      * GpuTasks and non-task functions.
@@ -206,29 +204,29 @@ public:
      *
      * The CUDA context should be released as soon as practically
      * possible, to allow other CPU threads (including the
-     * GpuDispatcher) to work efficiently.
+     * PxGpuDispatcher) to work efficiently.
      */
     virtual void releaseContext() = 0;
 
     /**
-     * \brief Return the CudaMemoryManager instance associated with this
+     * \brief Return the PxCudaMemoryManager instance associated with this
      * CUDA context
      */
-	virtual CudaMemoryManager *getMemoryManager() = 0;
+	virtual PxCudaMemoryManager *getMemoryManager() = 0;
 
     /**
-     * \brief Return the GpuDispatcher instance associated with this
+     * \brief Return the PxGpuDispatcher instance associated with this
      * CUDA context
      */
-	virtual class GpuDispatcher *getGpuDispatcher() = 0;
+	virtual class PxGpuDispatcher *getGpuDispatcher() = 0;
 
     /**
      * \brief Context manager has a valid CUDA context
      *
-     * This method should be called after creating a CudaContextManager,
+     * This method should be called after creating a PxCudaContextManager,
      * especially if the manager was responsible for allocating its own
      * CUDA context (desc.ctx == NULL).  If it returns false, there is
-     * no point in assigning this manager's GpuDispatcher to a
+     * no point in assigning this manager's PxGpuDispatcher to a
      * TaskManager as it will be unable to execute GpuTasks.
      */
     virtual bool contextIsValid() const = 0;
@@ -241,17 +239,21 @@ public:
     virtual bool supportsArchSM13() const = 0;  //!< GT260
     virtual bool supportsArchSM20() const = 0;  //!< GF100
     virtual bool supportsArchSM30() const = 0;  //!< GK100
+	virtual bool supportsArchSM35() const = 0;  //!< GK110
+	virtual bool supportsArchSM50() const = 0;  //!< GM100
 	virtual bool isIntegrated() const = 0;      //!< true if GPU is an integrated (MCP) part
-	virtual bool hasDMAEngines() const = 0;     //!< true if GPU can overlap kernels and copies
 	virtual bool canMapHostMemory() const = 0;  //!< true if GPU map host memory to GPU (0-copy)
 	virtual int  getDriverVersion() const = 0;  //!< returns cached value of cuGetDriverVersion()
 	virtual size_t getDeviceTotalMemBytes() const = 0; //!< returns cached value of device memory size
 	virtual int	getMultiprocessorCount() const = 0; //!< returns cache value of SM unit count
     virtual unsigned int getClockRate() const = 0; //!< returns cached value of SM clock frequency
     virtual int  getSharedMemPerBlock() const = 0; //!< returns total amount of shared memory available per block in bytes
+	virtual unsigned int getMaxThreadsPerBlock() const = 0; //!< returns the maximum number of threads per block
     virtual const char *getDeviceName() const = 0; //!< returns device name retrieved from driver
-	virtual CudaInteropMode::Enum getInteropMode() const = 0; //!< interop mode the context was created with
+	virtual PxCudaInteropMode::Enum getInteropMode() const = 0; //!< interop mode the context was created with
 
+	virtual void setUsingConcurrentStreams(bool) = 0; //!< turn on/off using concurrent streams for GPU work
+	virtual bool getUsingConcurrentStreams() const = 0; //!< true if GPU work can run in concurrent streams
     /* End query methods that don't require context to be acquired */
 
     /**
@@ -315,17 +317,17 @@ public:
 	virtual int	usingDedicatedPhysXGPU() const = 0;
 
     /**
-     * \brief Release the CudaContextManager
+     * \brief Release the PxCudaContextManager
      *
      * When the manager instance is released, it also releases its
-     * GpuDispatcher instance and CudaMemoryManager.  Before the memory
+     * PxGpuDispatcher instance and PxCudaMemoryManager.  Before the memory
      * manager is released, it frees all allocated memory pages.  If the
-     * CudaContextManager created the CUDA context it was responsible
+     * PxCudaContextManager created the CUDA context it was responsible
      * for, it also frees that context.
      *
-     * Do not release the CudaContextManager if there are any scenes
-     * using its GpuDispatcher.  Those scenes must be released first
-     * since there is no safe way to remove a GpuDispatcher from a
+     * Do not release the PxCudaContextManager if there are any scenes
+     * using its PxGpuDispatcher.  Those scenes must be released first
+     * since there is no safe way to remove a PxGpuDispatcher from a
      * TaskManager once the TaskManager has been given to a scene.
      *
      */
@@ -336,19 +338,19 @@ protected:
     /**
      * \brief protected destructor, use release() method
      */
-    virtual ~CudaContextManager() {};
+    virtual ~PxCudaContextManager() {}
 };
 
 /**
  * \brief Convenience class for holding CUDA lock within a scope
  */
-class ScopedCudaLock
+class PxScopedCudaLock
 {
 public:
     /**
      * \brief ScopedCudaLock constructor
      */
-	ScopedCudaLock(CudaContextManager& ctx) : mCtx(&ctx)
+	PxScopedCudaLock(PxCudaContextManager& ctx) : mCtx(&ctx)
 	{
 		mCtx->acquireContext();
 	}
@@ -356,7 +358,7 @@ public:
     /**
      * \brief ScopedCudaLock destructor
      */
-	~ScopedCudaLock()
+	~PxScopedCudaLock()
 	{
 		mCtx->releaseContext();
 	}
@@ -366,32 +368,29 @@ protected:
     /**
      * \brief CUDA context manager pointer (initialized in the the constructor)
      */
-    CudaContextManager* mCtx;
+    PxCudaContextManager* mCtx;
 };
 
+#if PX_SUPPORT_GPU_PHYSX
 /**
  * \brief Ask the NVIDIA control panel which GPU has been selected for use by
  * PhysX.  Returns -1 if no PhysX capable GPU is found or GPU PhysX has
  * been disabled.
  */
-int                 getSuggestedCudaDeviceOrdinal(PxErrorCallback& errc);
+int PxGetSuggestedCudaDeviceOrdinal(PxErrorCallback& errc);
 
 /**
  * \brief Allocate a CUDA Context manager, complete with heaps and task dispatcher.
  * You only need one CUDA context manager per GPU device you intend to use for
  * CUDA tasks.  If mgr is NULL, no profiling of CUDA code will be possible.
  */
-CudaContextManager* createCudaContextManager(PxFoundation& foundation, const CudaContextManagerDesc& desc, physx::PxProfileZoneManager* mgr);
+PxCudaContextManager* PxCreateCudaContextManager(PxFoundation& foundation, const PxCudaContextManagerDesc& desc, physx::PxProfileZoneManager* mgr);
 
 /**
  * \brief get handle of physx GPU module
  */
-#if defined(PX_WINDOWS)
-void* loadPhysxGPUModule(const char* appGUID = NULL);
-#else
-void* loadPhysxGPUModule();
+void* PxLoadPhysxGPUModule(const char* appGUID = NULL);
 #endif
-} // end pxtask namespace
 
 #ifndef PX_DOXYGEN
 } // end physx namespace

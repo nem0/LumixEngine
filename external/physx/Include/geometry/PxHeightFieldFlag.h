@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -69,7 +69,7 @@ struct PxHeightFieldFormat
 
 		@see PxHeightFieldDesc.format PxHeightFieldDesc.samples
 		*/
-		eS16_TM = (1 << 0),
+		eS16_TM = (1 << 0)
 	};
 };
 
@@ -118,12 +118,6 @@ struct PxHeightFieldTessFlag
 		V row
 		</pre>
 		
-		<b>Platform:</b>
-		\li PC SW: Yes
-		\li PS3  : Yes
-		\li XB360: Yes
-		\li WII	 : Yes
-
 		@see PxHeightFieldDesc.format PxHeightFieldDesc.samples
 		*/
 		e0TH_VERTEX_SHARED = (1 << 0)
@@ -148,7 +142,7 @@ struct PxHeightFieldFlag
 
 		@see PxHeightFieldDesc.flags
 		*/
-		eNO_BOUNDARY_EDGES = (1 << 0),
+		eNO_BOUNDARY_EDGES = (1 << 0)
 	};
 };
 
@@ -157,12 +151,8 @@ struct PxHeightFieldFlag
 
 @see PxHeightFieldFlag
 */
-#if defined(PX_WINDOWS)
-template class PxFlags<PxHeightFieldFlag::Enum,PxU16>;  // needed for dll export
-#endif
-
 typedef PxFlags<PxHeightFieldFlag::Enum,PxU16> PxHeightFieldFlags;
-PX_FLAGS_OPERATORS(PxHeightFieldFlag::Enum,PxU16);
+PX_FLAGS_OPERATORS(PxHeightFieldFlag::Enum,PxU16)
 
 #ifndef PX_DOXYGEN
 } // namespace physx

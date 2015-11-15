@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -95,13 +95,35 @@ public:
 	PX_CUDA_CALLABLE PX_INLINE PxMat33()
 	{}
 
+	//! identity constructor
+	PX_CUDA_CALLABLE PX_INLINE PxMat33(PxIDENTITY r)
+		: column0(1.0f,0.0f,0.0f), column1(0.0f,1.0f,0.0f), column2(0.0f,0.0f,1.0f)
+	{
+		PX_UNUSED(r);
+	}
+
+	//! zero constructor
+	PX_CUDA_CALLABLE PX_INLINE PxMat33(PxZERO r)
+		: column0(0.0f), column1(0.0f), column2(0.0f)
+	{
+		PX_UNUSED(r);
+	}
+
+
 	//! Construct from three base vectors
 	PX_CUDA_CALLABLE PxMat33(const PxVec3& col0, const PxVec3& col1, const PxVec3& col2)
 		: column0(col0), column1(col1), column2(col2)
 	{}
 
+
+	//! constructor from a scalar, which generates a multiple of the identity matrix
+	explicit PX_CUDA_CALLABLE PX_INLINE PxMat33(PxReal r)
+		: column0(r,0.0f,0.0f), column1(0.0f,r,0.0f), column2(0.0f,0.0f,r)
+	{}
+
+
 	//! Construct from float[9]
-	PX_CUDA_CALLABLE explicit PX_INLINE PxMat33(PxReal values[]):
+	explicit PX_CUDA_CALLABLE PX_INLINE PxMat33(PxReal values[]):
 		column0(values[0],values[1],values[2]),
 		column1(values[3],values[4],values[5]),
 		column2(values[6],values[7],values[8])
@@ -109,7 +131,7 @@ public:
 	}
 
 	//! Construct from a quaternion
-	PX_CUDA_CALLABLE explicit PX_FORCE_INLINE PxMat33(const PxQuat& q)
+	explicit PX_CUDA_CALLABLE PX_FORCE_INLINE PxMat33(const PxQuat& q)
 	{
 		const PxReal x = q.x;
 		const PxReal y = q.y;
@@ -151,16 +173,16 @@ public:
 		return *this;
 	}
 
-	//! Set to identity matrix
-	PX_CUDA_CALLABLE PX_INLINE static PxMat33 createIdentity()
+	//! \deprecated Set to identity matrix. Deprecated. use PxMat33(PxIdentity)
+	PX_DEPRECATED PX_CUDA_CALLABLE PX_INLINE static PxMat33 createIdentity()
 	{
-		return PxMat33(PxVec3(1,0,0), PxVec3(0,1,0), PxVec3(0,0,1));
+		return PxMat33(PxIdentity);
 	}
 
-	//! Set to zero matrix
-	PX_CUDA_CALLABLE PX_INLINE static PxMat33 createZero()
+	//! \deprecated Set to zero matrix. Deprecated. use PxMat33(PxZero).
+	PX_DEPRECATED PX_CUDA_CALLABLE PX_INLINE static PxMat33 createZero()
 	{
-		return PxMat33(PxVec3(0.0f), PxVec3(0.0f), PxVec3(0.0f));
+		return PxMat33(PxZero);	// PxMat33(0) is ambiguous, it can either be the array constructor or the scalar constructor
 	}
 
 	//! Construct from diagonal, off-diagonals are zero.
@@ -168,6 +190,12 @@ public:
 	{
 		return PxMat33(PxVec3(d.x,0.0f,0.0f), PxVec3(0.0f,d.y,0.0f), PxVec3(0.0f,0.0f,d.z));
 	}
+
+	/**
+	\brief returns true if the two matrices are exactly equal
+	*/
+	PX_CUDA_CALLABLE PX_INLINE bool operator==(const PxMat33& m) const	{ return column0 == m.column0 && column1 == m.column1 && column2 == m.column2; }
+
 
 
 	//! Get transposed matrix
@@ -252,6 +280,9 @@ public:
 		return transform(vec);
 	}
 
+
+	// a <op>= b operators
+
 	//! Matrix multiplication
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxMat33 operator*(const PxMat33& other) const
 	{
@@ -259,8 +290,6 @@ public:
 		//column0 = transform(other.column0) etc
 		return PxMat33(transform(other.column0), transform(other.column1), transform(other.column2));
 	}
-
-	// a <op>= b operators
 
 	//! Equals-add
 	PX_CUDA_CALLABLE PX_INLINE PxMat33& operator+=(const PxMat33& other)
@@ -288,6 +317,14 @@ public:
 		column2 *= scalar;
 		return *this;
 	}
+
+	//! Equals matrix multiplication
+	PX_CUDA_CALLABLE PX_INLINE PxMat33& operator*=(const PxMat33 &other)
+	{
+		*this = *this * other;
+		return *this;
+	}
+
 
 	//! Element access, mathematical way!
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal operator()(unsigned int row, unsigned int col) const
@@ -322,8 +359,11 @@ public:
 		return &column0.x;
 	}
 
-	PX_CUDA_CALLABLE PX_FORCE_INLINE			PxVec3& operator[](int num)			{return (&column0)[num];}
-	PX_CUDA_CALLABLE PX_FORCE_INLINE const	PxVec3& operator[](int num) const	{return (&column0)[num];}
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxVec3& operator[](unsigned int num) {return (&column0)[num];}
+	PX_CUDA_CALLABLE PX_FORCE_INLINE const PxVec3& operator[](unsigned int num) const {return (&column0)[num];}
+
+	PX_DEPRECATED PX_CUDA_CALLABLE PX_FORCE_INLINE PxVec3& operator[](int num) {return (&column0)[num];}
+	PX_DEPRECATED PX_CUDA_CALLABLE PX_FORCE_INLINE const PxVec3& operator[](int num) const {return (&column0)[num];}
 
 	//Data, see above for format!
 
@@ -337,8 +377,8 @@ PX_CUDA_CALLABLE PX_INLINE PxQuat::PxQuat(const PxMat33& m)
 	if(tr >= 0)
 	{
 		h = PxSqrt(tr +1);
-		w = PxReal(0.5) * h;
-		h = PxReal(0.5) / h;
+		w = 0.5f * h;
+		h = 0.5f / h;
 
 		x = (m(2,1) - m(1,2)) * h;
 		y = (m(0,2) - m(2,0)) * h;
@@ -346,7 +386,7 @@ PX_CUDA_CALLABLE PX_INLINE PxQuat::PxQuat(const PxMat33& m)
 	}
 	else
 	{
-		int i = 0; 
+		unsigned int i = 0; 
 		if (m(1,1) > m(0,0))
 			i = 1; 
 		if (m(2,2) > m(i,i))
@@ -355,8 +395,8 @@ PX_CUDA_CALLABLE PX_INLINE PxQuat::PxQuat(const PxMat33& m)
 		{
 		case 0:
 			h = PxSqrt((m(0,0) - (m(1,1) + m(2,2))) + 1);
-			x = PxReal(0.5) * h;
-			h = PxReal(0.5) / h;
+			x = 0.5f * h;
+			h = 0.5f / h;
 
 			y = (m(0,1) + m(1,0)) * h; 
 			z = (m(2,0) + m(0,2)) * h;
@@ -364,8 +404,8 @@ PX_CUDA_CALLABLE PX_INLINE PxQuat::PxQuat(const PxMat33& m)
 			break;
 		case 1:
 			h = PxSqrt((m(1,1) - (m(2,2) + m(0,0))) + 1);
-			y = PxReal(0.5) * h;
-			h = PxReal(0.5) / h;
+			y = 0.5f * h;
+			h = 0.5f / h;
 
 			z = (m(1,2) + m(2,1)) * h;
 			x = (m(0,1) + m(1,0)) * h;
@@ -373,8 +413,8 @@ PX_CUDA_CALLABLE PX_INLINE PxQuat::PxQuat(const PxMat33& m)
 			break;
 		case 2:
 			h = PxSqrt((m(2,2) - (m(0,0) + m(1,1))) + 1);
-			z = PxReal(0.5) * h;
-			h = PxReal(0.5) / h;
+			z = 0.5f * h;
+			h = 0.5f / h;
 
 			x = (m(2,0) + m(0,2)) * h;
 			y = (m(1,2) + m(2,1)) * h;

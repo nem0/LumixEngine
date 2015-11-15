@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -46,11 +46,7 @@ namespace physx
 /**
 \brief 2 Element vector class.
 
-This is a vector class with public data members.
-This is not nice but it has become such a standard that hiding the xy data members
-makes it difficult to reuse external code that assumes that these are public in the library.
-The vector class can be made to use float or double precision by appropriately defining PxReal.
-This has been chosen as a cleaner alternative to a template class.
+This is a 2-dimensional vector class with public data members.
 */
 class PxVec2
 {
@@ -60,6 +56,15 @@ public:
 	\brief default constructor leaves data uninitialized.
 	*/
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxVec2() {}
+
+
+	/**
+	\brief zero constructor.
+	*/
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxVec2(PxZERO r): x(0.0f), y(0.0f) 
+	{
+		PX_UNUSED(r);
+	}
 
 	/**
 	\brief Assigns scalar parameter to all elements.
@@ -93,12 +98,22 @@ public:
 	/**
 	\brief element access
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal& operator[](int index)					{ PX_ASSERT(index>=0 && index<=1); return (&x)[index]; }
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal& operator[](int index)
+	{
+		PX_ASSERT(index>=0 && index<=1);
+
+		return reinterpret_cast<PxReal*>(this)[index];
+	}
 
 	/**
 	\brief element access
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE const PxReal& operator[](int index) const		{ PX_ASSERT(index>=0 && index<=1); return (&x)[index]; }
+	PX_CUDA_CALLABLE PX_FORCE_INLINE const PxReal& operator[](int index) const
+	{
+		PX_ASSERT(index>=0 && index<=1);
+
+		return reinterpret_cast<const PxReal*>(this)[index];
+	}
 
 	/**
 	\brief returns true if the two vectors are exactly equal.
@@ -128,7 +143,7 @@ public:
 	*/
 	PX_CUDA_CALLABLE PX_FORCE_INLINE bool isNormalized() const
 	{
-		const float unitTolerance = PxReal(1e-4);
+		const float unitTolerance = 1e-4f;
 		return isFinite() && PxAbs(magnitude()-1)<unitTolerance;
 	}
 
@@ -172,7 +187,7 @@ public:
 	*/
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxVec2 operator /(PxReal f) const
 	{
-		f = PxReal(1) / f;	// PT: inconsistent notation with operator /=
+		f = 1.0f / f;	// PT: inconsistent notation with operator /=
 		return PxVec2(x * f, y * f);
 	}
 
@@ -229,7 +244,7 @@ public:
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxVec2 getNormalized() const
 	{
 		const PxReal m = magnitudeSquared();
-		return m>0 ? *this * PxRecipSqrt(m) : PxVec2(0,0);
+		return m>0.0f ? *this * PxRecipSqrt(m) : PxVec2(0,0);
 	}
 
 	/**
@@ -238,7 +253,7 @@ public:
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal normalize()
 	{
 		const PxReal m = magnitude();
-		if (m>0) 
+		if (m>0.0f) 
 			*this /= m;
 		return m;
 	}

@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 
 #ifndef PX_PROFILE_EVENTS_H
 #define PX_PROFILE_EVENTS_H
@@ -83,7 +83,7 @@ namespace physx { namespace profile {
 			RelativeStartEvent, //reuses context,id from the earlier event.
 			RelativeStopEvent, //reuses context,id from the earlier event.
 			EventValue,
-			CUDAProfileBuffer,
+			CUDAProfileBuffer
 		};
 	};
 
@@ -95,7 +95,7 @@ namespace physx { namespace profile {
 			U16 = 1,
 			U32 = 2,
 			U64 = 3,
-			CompressionMask = 3,
+			CompressionMask = 3
 		};
 	};
 
@@ -118,6 +118,7 @@ namespace physx { namespace profile {
 		case EventStreamCompressionFlags::U32:
 			if ( inValue <= PX_MAX_U32 )
 				return EventStreamCompressionFlags::U32;
+		case EventStreamCompressionFlags::U64:
 		default:
 			return EventStreamCompressionFlags::U64;
 		}
@@ -138,6 +139,8 @@ namespace physx { namespace profile {
 		case EventStreamCompressionFlags::U16:
 			if ( inValue <= PX_MAX_U16 )
 				return EventStreamCompressionFlags::U16;
+		case EventStreamCompressionFlags::U32:
+		case EventStreamCompressionFlags::U64:
 		default:
 			return EventStreamCompressionFlags::U32;
 		}
@@ -193,7 +196,7 @@ namespace physx { namespace profile {
 		void setContextIdCompressionFlags( PxU64 inContextId )
 		{
 			PxU8 options = static_cast<PxU8>( findCompressionValue( inContextId ) );
-			mStreamOptions = mStreamOptions | options << 2;
+			mStreamOptions = PxU8(mStreamOptions | options << 2);
 		}
 
 		EventStreamCompressionFlags::Enum getContextIdCompressionFlags() const 
@@ -551,7 +554,7 @@ namespace physx { namespace profile {
 		TDataType& getValue() { PX_ASSERT( mHeader.mEventType == getEventType<TDataType>() ); return mData.toType<TDataType>(); }
 
 		template<typename TRetVal, typename TOperator>
-		TRetVal visit( TOperator inOp ) const;
+		inline TRetVal visit( TOperator inOp ) const;
 
 		bool operator==( const Event& inOther ) const
 		{
@@ -577,6 +580,7 @@ namespace physx { namespace profile {
 		case EventTypes::RelativeStopEvent:		return inOperator( inData.toType( Type2Type<RelativeStopEvent>() ) );
 		case EventTypes::EventValue:			return inOperator( inData.toType( Type2Type<EventValue>() ) );
 		case EventTypes::CUDAProfileBuffer:		return inOperator( inData.toType( Type2Type<CUDAProfileBuffer>() ) );
+		case EventTypes::Unknown:
 		default: 								return inOperator( static_cast<PxU8>( inEventType ) );
 		}
 	}

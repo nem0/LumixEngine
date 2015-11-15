@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 
 #ifndef PX_PROFILE_ZONE_MANAGER_H
 #define PX_PROFILE_ZONE_MANAGER_H
@@ -51,15 +51,12 @@ namespace physx {
 	class PxUserCustomProfiler
 	{
 	public:
-		virtual void onStartEvent( const char *eventName,PxU64 contextId,PxU32 threadId) = 0;
-		virtual void onStopEvent( const char *eventName,PxU64 contextId,PxU32 threadId) = 0;
-		virtual void onEventValue(const char *eventValue,PxI64 inValue) = 0;
+		virtual void onStartEvent( const char* eventName, PxU64 contextId, PxU32 threadId) = 0;
+		virtual void onStopEvent( const char* eventName, PxU64 contextId, PxU32 threadId) = 0;
+		virtual void onEventValue(const char* eventValue, PxI64 inValue) = 0;
 
 	protected:
-		virtual ~PxUserCustomProfiler(void)
-		{
-
-		}
+		virtual ~PxUserCustomProfiler(void) {}
 	};
 
 	/**
@@ -113,7 +110,7 @@ namespace physx {
 		 */ 
 		virtual PxProfileZone& createProfileZone( const char* inSDKName, PxProfileNameProvider* inProvider = NULL, PxU32 inEventBufferByteSize = 0x4000 /*16k*/ ) = 0;
 
-		virtual void setUserCustomProfiler(PxUserCustomProfiler *callback) = 0;
+		virtual void setUserCustomProfiler(PxUserCustomProfiler* callback) = 0;
 
 		virtual void release() = 0;
 		

@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -35,15 +35,19 @@
 @{
 */
 
-#include "PxPhysX.h"
+#include "PxPhysXConfig.h"
 #include "foundation/PxFlags.h"
 #include "foundation/PxMath.h"
 #include "foundation/PxVec3.h"
-#include "common/PxSerialFramework.h"
+#include "common/PxBase.h"
 
+#ifndef PX_DOXYGEN
 namespace physx { namespace debugger { namespace comm {
+#endif
 	class PvdDataStream;
+#ifndef PX_DOXYGEN
 }}}
+#endif
 
 #ifndef PX_DOXYGEN
 namespace physx
@@ -55,32 +59,7 @@ class PxRigidActor;
 class PxScene;
 class PxConstraintConnector;
 class PxRenderBuffer;
-
-/**
-\brief constraint flags
-
-\note eBROKEN is a read only flag
-*/
-
-struct PxConstraintFlag
-{
-	enum Type
-	{
-		eBROKEN					= 1<<0,			//< whether the constraint is broken
-		ePROJECTION				= 1<<1,			//< whether projection is enabled for this constraint
-		eCOLLISION_ENABLED		= 1<<2,			//< whether contacts should be generated between the objects this constraint constrains
-		eREPORTING				= 1<<3,			//< whether this constraint should generate force reports
-		eVISUALIZATION			= 1<<4,			//< whether this constraint should be visualized, if constraint visualization is turned on
-	};
-};
-
-/**
-\brief constraint flags
-@see PxConstraintFlag
-*/
-
-typedef PxFlags<PxConstraintFlag::Type, PxU16> PxConstraintFlags;
-PX_FLAGS_OPERATORS(PxConstraintFlag::Type, PxU16);
+class PxDeletionListener;
 
 
 /**
@@ -93,16 +72,35 @@ struct Px1DConstraintFlag
 {
 	enum Type
 	{
-		eSPRING					= 1<<0,		//< whether the constraint is a spring
-		eACCELERATION_SPRING	= 1<<1,		//< whether the constraint is a force or acceleration spring
-		eRESTITUTION			= 1<<2,		//< whether the restitution model should be applied to generate the target velocity
-		eKEEPBIAS				= 1<<3,		//< for hard constraints, whether to keep the error term when solving the error-free velocity equation
-		eOUTPUT_FORCE			= 1<<4		//< whether to accumulate the force value from this constraint for the reported constraint force.
+		eSPRING						= 1<<0,		//!< whether the constraint is a spring. Mutually exclusive with eRESTITUTION. If set, eKEEPBIAS is ignored.
+		eACCELERATION_SPRING		= 1<<1,		//!< whether the constraint is a force or acceleration spring. Only valid if eSPRING is set.
+		eRESTITUTION				= 1<<2,		//!< whether the restitution model should be applied to generate the target velocity. Mutually exclusive with eSPRING. If restitution causes a bounces, eKEEPBIAS is ignored
+		eKEEPBIAS					= 1<<3,		//!< whether to keep the error term when solving for velocity. Ignored if restitution generates bounce, or eSPRING is set.
+		eOUTPUT_FORCE				= 1<<4,		//!< whether to accumulate the force value from this constraint in the force total that is reported for the constraint and tested for breakage
+		eHAS_DRIVE_LIMIT			= 1<<5		//!< whether the constraint has a drive force limit (which will be scaled by dt unless PxConstraintFlag::eLIMITS_ARE_FORCES is set)
 	};
 };
 
 typedef PxFlags<Px1DConstraintFlag::Type, PxU16> Px1DConstraintFlags;
-PX_FLAGS_OPERATORS(Px1DConstraintFlag::Type, PxU16);
+PX_FLAGS_OPERATORS(Px1DConstraintFlag::Type, PxU16)
+
+/**
+\brief constraint type hints which the solver uses to optimize constraint handling
+*/
+
+struct PxConstraintSolveHint
+{
+	enum Enum
+	{
+		eNONE				=	0,			//!< no special properties
+		eACCELERATION1		=	256,		//!< a group of acceleration drive constraints with the same stiffness and drive parameters
+		eSLERP_SPRING		=	258,		//!< temporary special value to identify SLERP drive rows
+		eACCELERATION2		=	512,		//!< a group of acceleration drive constraints with the same stiffness and drive parameters
+		eACCELERATION3		=	768,		//!< a group of acceleration drive constraints with the same stiffness and drive parameters
+		eEQUALITY			=	1024,		//!< equality constraints with no force limit and no velocity target
+		eINEQUALITY			=	1025		//!< inequality constraints with (0, PX_MAX_FLT force limits)
+	};
+};
 
 /**
 \brief A constraint
@@ -110,79 +108,121 @@ PX_FLAGS_OPERATORS(Px1DConstraintFlag::Type, PxU16);
 A constraint is expressed as a set of 1-dimensional constraint rows which define the required constraint
 on the objects' velocities. 
 
-Given these definitions, the solver attempts to generate 
+Each constraint is either a hard constraint or a spring. We define the velocity at the constraint to be
+the quantity 
+
+ v = body0vel.dot(lin0,ang0) - body1vel.dot(lin1, ang1)
+
+For a hard constraint, the solver attempts to generate 
 
 1. a set of velocities for the objects which, when integrated, respect the constraint errors:
-body0vel.dot(lin0,ang0) - body1vel.dot(lin1, ang1) + (geometricError / timestep) = velocityTarget
+
+  v + (geometricError / timestep) = velocityTarget
 
 2. a set of velocities for the objects which respect the constraints:
-body0vel.dot(lin0,ang0) - body1vel.dot(lin1, ang1) = velocityTarget
+
+  v = velocityTarget
+
+Hard constraints support restitution: if the impact velocity exceeds the bounce threshold, then the target velocity
+of the constraint will be set to restitution * -v
 
 Alternatively, the solver can attempt to resolve the velocity constraint as an implicit spring:
 
-F = spring * -geometricError + damping * (velocityTarget - body0vel.dot(lin0,ang0) + body1vel.dot(lin1, ang1))
+  F = stiffness * -geometricError + damping * (velocityTarget - v)
 
-where F is the constraint force, or as an acceleration spring where acceleration replaces force.
+where F is the constraint force or acceleration. Springs are fully implicit: that is, the force or acceleration 
+is a function of the position and velocity after the solve.
+
+All constraints support limits on the minimum or maximum impulse applied.
+
+
 */
 
 PX_ALIGN_PREFIX(16)
 struct Px1DConstraint
 {
-	PxVec3				linear0;				//< linear component of velocity jacobian in world space
-	PxReal				geometricError;			//< geometric error of the constraint along this axis
-	PxVec3				angular0;				//< angular component of velocity jacobian in world space
-	PxReal				velocityTarget;			//< velocity target for the constraint along this axis
+	PxVec3				linear0;				//!< linear component of velocity jacobian in world space
+	PxReal				geometricError;			//!< geometric error of the constraint along this axis
+	PxVec3				angular0;				//!< angular component of velocity jacobian in world space
+	PxReal				velocityTarget;			//!< velocity target for the constraint along this axis
 
-	PxVec3				linear1;				//< linear component of velocity jacobian in world space
-	PxReal				minImpulse;				//< minimum impulse the solver may apply to enforce this constraint
-	PxVec3				angular1;				//< angular component of velocity jacobian in world space
-	PxReal				maxImpulse;				//< maximum impulse the solver may apply to enforce this constraint
+	PxVec3				linear1;				//!< linear component of velocity jacobian in world space
+	PxReal				minImpulse;				//!< minimum impulse the solver may apply to enforce this constraint
+	PxVec3				angular1;				//!< angular component of velocity jacobian in world space
+	PxReal				maxImpulse;				//!< maximum impulse the solver may apply to enforce this constraint
 
-	PxReal				spring;					//< spring parameter, for spring constraints
-	PxReal				damping;				//< damping parameter, for spring constraints
+	union
+	{
+		struct SpringModifiers
+		{
+			PxReal		stiffness;				//!< spring parameter, for spring constraints
+			PxReal		damping;				//!< damping parameter, for spring constraints
+		} spring;
+		struct RestitutionModifiers
+		{
+			PxReal		restitution;			//!< restitution parameter for determining additional "bounce"
+			PxReal		velocityThreshold;		//!< minimum impact velocity for bounce
+		} bounce;
+	} mods;
 
-	PxReal				restitution;			//< restitution parameter for determining additional "bounce"
-
-	Px1DConstraintFlags	flags;					//< a set of Px1DConstraintFlags
-	PxU16				solveGroup;				//< constraint optimization hint: make this 256 for hard constraints with unbounded force limits, 257 for hard unilateral constraints with [0, inf) force limits, and 0 otherwise
+	PxReal				forInternalUse;			//< for internal use only
+	PxU16				flags;					//!< a set of Px1DConstraintFlags
+	PxU16				solveHint;				//!< constraint optimization hint, should be an element of PxConstraintSolveHint
 } 
 PX_ALIGN_SUFFIX(16);
 
 
-/** \brief flags for determining which components of the constraint should be visualized 
- */
+/** 
+\brief Flags for determining which components of the constraint should be visualized.
 
+@see PxConstraintVisualize
+*/
 struct PxConstraintVisualizationFlag
 {
 	enum Enum
 	{
-		eLOCAL_FRAMES	= 1,	//< visualize constraint frames
-		eLIMITS			= 2		//< visualize constraint limits
+		eLOCAL_FRAMES	= 1,	//!< visualize constraint frames
+		eLIMITS			= 2		//!< visualize constraint limits
 	};
 };
 
+struct PxConstraintInvMassScale
+{
+//= ATTENTION! =====================================================================================
+// Changing the data layout of this class breaks the binary serialization format.  See comments for 
+// PX_BINARY_SERIAL_VERSION.  If a modification is required, please adjust the getBinaryMetaData 
+// function.  If the modification is made on a custom branch, please change PX_BINARY_SERIAL_VERSION
+// accordingly.
+//==================================================================================================
+
+	PxReal linear0;		//!< multiplier for inverse mass of body0
+	PxReal angular0;	//!< multiplier for inverse MoI of body0
+	PxReal linear1;		//!< multiplier for inverse mass of body1
+	PxReal angular1;	//!< multiplier for inverse MoI of body1
+};
 
 /** solver constraint generation shader
 
 This function is called by the constraint solver framework. The function must be reentrant, since it may be called simultaneously
 from multiple threads, and should access only the arguments passed into it, since on PS3 this function may execute on SPU. 
 
-Developers writing custom constraints are encouraged to read the implementation code in PhysXExtensions.
+Developers writing custom constraints are encouraged to read the documentation in the user guide and the implementation code in PhysXExtensions.
 
 \param[out] constraints an array of solver constraint rows to be filled in
-\param[out] body0WorldOffset the origin point at which the constraint is resolved. This value does not affect how constraints are solved, but the 
-force and torque reported for the constraint are resolved at this point
-\param[in] constantBlock the constant data block
+\param[out] bodyAWorldOffset the origin point (offset from the position vector of bodyA) at which the constraint is resolved. This value does not affect how constraints are solved, only the constraint force reported. 
 \param[in] maxConstraints the size of the constraint buffer. At most this many constraints rows may be written
-\param[in] bodyAToWorld The world transform of the first constrained body (the identity if the body is NULL)
-\param[in] bodyBToWorld The world transform of the second constrained body (the identity if the body is NULL)
+\param[out] invMassScale the inverse mass and inertia scales for the constraint
+\param[in] constantBlock the constant data block
+\param[in] bodyAToWorld The world transform of the first constrained body (the identity transform if the first actor is static, or if a NULL actor pointer was provided for it)
+\param[in] bodyBToWorld The world transform of the second constrained body (the identity transform if the second actor is static, or if a NULL actor pointer was provided for it)
 
 \return the number of constraint rows written.
 */
 
 typedef PxU32 (*PxConstraintSolverPrep)(Px1DConstraint* constraints,
-										PxVec3& body0WorldOffset,
+										PxVec3& bodyAWorldOffset,
 										PxU32 maxConstraints,
+										PxConstraintInvMassScale& invMassScale,
 										const void* constantBlock,
 										const PxTransform& bodyAToWorld,
 										const PxTransform& bodyBToWorld);
@@ -250,7 +290,7 @@ struct PxPvdUpdateType
 		CREATE_INSTANCE,
 		RELEASE_INSTANCE,
 		UPDATE_ALL_PROPERTIES,
-		UPDATE_SIM_PROPERTIES,
+		UPDATE_SIM_PROPERTIES
 	};
 };
 
@@ -291,6 +331,7 @@ public:
 	
 	This function is also called when a PxConstraint object is deleted on cleanup due to 
 	destruction of the PxPhysics object.
+
 	*/
 	
 	virtual void			onConstraintRelease()											= 0;
@@ -303,6 +344,20 @@ public:
 	*/
 
 	virtual void			onComShift(PxU32 actor)											= 0;
+
+	/** 
+	This function is called by the SDK when the scene origin gets shifted and allows to adjust
+	custom data which contains world space transforms.
+
+	\note If the adjustments affect constraint shader data, it is necessary to call PxConstraint::markDirty()
+	to make sure that the data gets synced at the beginning of the next simulation step.
+
+	\param[in] shift Translation vector the origin is shifted by.
+
+	@see PxScene.shiftOrigin()
+	*/
+
+	virtual void			onOriginShift(const PxVec3& shift)								= 0;
 
 	/**
 	\brief Fetches external data for a constraint.
@@ -318,10 +373,20 @@ public:
 	*/
 	virtual void*			getExternalReference(PxU32& typeID)								= 0;
 
+
+	/**
+	\brief Obtain a reference to a PxBase interface if the constraint has one.
+
+	If the constraint does not implement the PxBase interface, it should return NULL. 
+	*/
+
+	virtual PxBase* getSerializable()												= 0;
+
+
 	/**
 	\brief virtual destructor
 	*/
-	virtual ~PxConstraintConnector() {};
+	virtual ~PxConstraintConnector() {}
 };
 
 #ifndef PX_DOXYGEN

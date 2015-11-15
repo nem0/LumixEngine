@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,10 +23,9 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 #ifndef PVD_CONNECTION_H
 #define PVD_CONNECTION_H
-#include "physxvisualdebuggersdk/PvdObjectModelBaseTypes.h"
 #include "physxvisualdebuggersdk/PvdConnectionFlags.h"
 
 namespace physx { namespace debugger {
@@ -34,14 +33,14 @@ namespace physx { namespace debugger {
 }}
 
 namespace physx { namespace debugger { namespace renderer {
-	class PvdImmediateRenderer;
+	class PvdImmediateRenderer;	
 }}}
 
 namespace physx { namespace debugger { namespace comm {
 
 	class PvdMetaDataStream;
 	class PvdDataStream;
-
+	
 	class PvdConnection
 	{
 	protected:
@@ -84,5 +83,10 @@ namespace physx { namespace debugger { namespace comm {
 		virtual void unlockOutStream() = 0;
 	};
 
-}}}
+}}
+
+
+/** \brief Convenience typedef for the PvdConnection. */
+typedef debugger::comm::PvdConnection PxVisualDebuggerConnection;
+}
 #endif

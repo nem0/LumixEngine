@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -34,7 +34,7 @@
 @{
 */
 
-#include "common/PxPhysXCommon.h"
+#include "common/PxPhysXCommonConfig.h"
 #include "foundation/PxMat33.h"
 
 #ifndef PX_DOXYGEN
@@ -53,11 +53,24 @@ The scaling is along arbitrary axes that are specified by PxMeshScale::rotation.
 */
 class PxMeshScale
 {
+//= ATTENTION! =====================================================================================
+// Changing the data layout of this class breaks the binary serialization format.  See comments for 
+// PX_BINARY_SERIAL_VERSION.  If a modification is required, please adjust the getBinaryMetaData 
+// function.  If the modification is made on a custom branch, please change PX_BINARY_SERIAL_VERSION
+// accordingly.
+//==================================================================================================
 public:
 	/**
 	\brief Constructor initializes to identity scale.
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE PxMeshScale(): scale(PxVec3(1.0f, 1.0f, 1.0f)), rotation(PxQuat::createIdentity()) 
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxMeshScale(): scale(1.0f), rotation(PxIdentity) 
+	{
+	}
+
+	/**
+	\brief Constructor from scalar.
+	*/
+	explicit PX_CUDA_CALLABLE PX_FORCE_INLINE PxMeshScale(PxReal r): scale(r), rotation(PxIdentity) 
 	{
 	}
 
@@ -89,11 +102,12 @@ public:
 	}
 
 	/**
+	\deprecated
 	\brief Returns the identity scaling transformation.
 	*/
-	static PX_CUDA_CALLABLE PX_FORCE_INLINE PxMeshScale createIdentity()
+	PX_DEPRECATED static PX_CUDA_CALLABLE PX_FORCE_INLINE PxMeshScale createIdentity()
 	{
-		return PxMeshScale(PxVec3(1.0f, 1.0f, 1.0f),PxQuat::createIdentity());
+		return PxMeshScale(1.0f);
 	}
 
 	/**
@@ -110,8 +124,15 @@ public:
 	}
 
 
+	PxVec3		transform(const PxVec3& v) const
+	{
+		return rotation.rotateInv(scale.multiply(rotation.rotate(v)));
+	}
+
 	PxVec3		scale;		//!< A nonuniform scaling
 	PxQuat		rotation;	//!< The orientation of the scaling axes
+
+
 };
 
 #ifndef PX_DOXYGEN

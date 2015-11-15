@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -36,7 +36,7 @@
 
 // This needs to be included in Foundation just for the debug renderer
 
-#include "PxPhysX.h"
+#include "PxPhysXConfig.h"
 #include "foundation/PxTransform.h"
 
 #ifndef PX_DOXYGEN
@@ -119,11 +119,11 @@ struct PxExtendedVec3
 		if (z > v.z) z = v.z;
 	}
 
-	PX_INLINE	void	set(PxExtended x, PxExtended y, PxExtended z)
+	PX_INLINE	void	set(PxExtended x_, PxExtended y_, PxExtended z_)
 	{
-		this->x = x;
-		this->y = y;
-		this->z = z;
+		this->x = x_;
+		this->y = y_;
+		this->z = z_;
 	}
 
 	PX_INLINE void	setPlusInfinity()
@@ -237,14 +237,16 @@ struct PxExtendedVec3
 	PX_INLINE	PxExtended&			operator[](int index)
 	{
 		PX_ASSERT(index>=0 && index<=2);
-		return (&x)[index];
+
+		return reinterpret_cast<PxExtended*>(this)[index];
 	}
 
 
 	PX_INLINE	PxExtended			operator[](int index) const
 	{
 		PX_ASSERT(index>=0 && index<=2);
-		return (&x)[index];
+
+		return reinterpret_cast<const PxExtended*>(this)[index];
 	}
 
 	PxExtended x,y,z;

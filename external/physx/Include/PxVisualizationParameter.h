@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -52,7 +52,10 @@ eNUM_VALUES, which should be one higher than the maximum value in the enum.
 /**
 \brief Debug visualization parameters.
 
-@see PxScene.setVisualizationParameter() PxScene.getVisualizationParameter()
+#PxVisualizationParameter::eSCALE is the master switch for enabling visualization, please read the corresponding documentation
+for further details.
+
+@see PxScene.setVisualizationParameter() PxScene.getVisualizationParameter() PxScene.getRenderBuffer()
 */
 struct PxVisualizationParameter
 {
@@ -61,13 +64,13 @@ struct PxVisualizationParameter
 	/* RigidBody-related parameters  */
 
 		/**
-		\brief This overall visualization scale gets multiplied with the individual scales. Setting to zero turns ignores all visualizations. Default is 0.
+		\brief This overall visualization scale gets multiplied with the individual scales. Setting to zero ignores all visualizations. Default is 0.
 
 		The below settings permit the debug visualization of various simulation properties. 
 		The setting is either zero, in which case the property is not drawn. Otherwise it is a scaling factor
 		that determines the size of the visualization widgets.
 
-		Only objects for which visualization is turned on using setFlag(VISUALIZE) are visualized.
+		Only objects for which visualization is turned on using setFlag(eVISUALIZATION) are visualized (see #PxActorFlag::eVISUALIZATION, #PxShapeFlag::eVISUALIZATION, ...).
 		Contacts are visualized if they involve a body which is being visualized.
 		Default is 0.
 
@@ -82,7 +85,7 @@ struct PxVisualizationParameter
 		triangles & polygons themselves, and there's no point in scaling that. So the visualization widgets
 		are only scaled when it makes sense.
 
-		<b>Range:</b> [0, inf)<br>
+		<b>Range:</b> [0, PX_MAX_F32)<br>
 		<b>Default:</b> 0
 		*/
 		eSCALE,
@@ -226,7 +229,7 @@ struct PxVisualizationParameter
 		eJOINT_LOCAL_FRAMES,
 
 		/** 
-		brief Joint limits
+		\brief Joint limits
 		*/
 		eJOINT_LIMITS,
 
@@ -274,6 +277,32 @@ struct PxVisualizationParameter
 		\brief Debug visualization culling
 		*/
 		eCULL_BOX,
+
+		/**
+		\brief Cloth fabric vertical sets
+		*/
+		eCLOTH_VERTICAL,    
+		/**
+		\brief Cloth fabric horizontal sets
+		*/
+		eCLOTH_HORIZONTAL,  
+		/**
+		\brief Cloth fabric bending sets
+		*/
+		eCLOTH_BENDING,     
+		/**
+		\brief Cloth fabric shearing sets
+		*/
+		eCLOTH_SHEARING,    
+		/**
+		\brief Cloth virtual particles
+		*/
+		eCLOTH_VIRTUAL_PARTICLES,
+
+		/**
+		\brief MBP regions
+		*/
+		eMBP_REGIONS,
 
 		/**
 		\brief This is not a parameter, it just records the current number of parameters (as maximum(PxVisualizationParameter)+1) for use in loops.

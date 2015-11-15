@@ -1,13 +1,13 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you 
+// This code contains NVIDIA Confidential Information and is disclosed to you
 // under a form of NVIDIA software license agreement provided separately to you.
 //
 // Notice
 // NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and 
-// any modifications thereto. Any use, reproduction, disclosure, or 
-// distribution of this software and related documentation without an express 
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
 // license agreement from NVIDIA Corporation is strictly prohibited.
-// 
+//
 // ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
 // NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
 // THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
@@ -23,25 +23,17 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2008-2012 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
 
 #ifndef PX_GPU_COPY_DESC_H
 #define PX_GPU_COPY_DESC_H
 
 #include "foundation/Px.h"
 
-/*!
-\file
-\brief Descriptor for a CUDA Memory copy
-*/
-
 #ifndef PX_DOXYGEN
 namespace physx
 {
 #endif
-
-namespace pxtask
-{
 
 PX_PUSH_PACK_DEFAULT
 
@@ -52,7 +44,7 @@ PX_PUSH_PACK_DEFAULT
  * If more than one descriptor is passed to the copy kernel in one launch,
  * the descriptors themselves must be in page-locked memory.
  */
-struct GpuCopyDesc
+struct PxGpuCopyDesc
 {
 	/**
 	 * \brief Input descriptor for the GpuDispatcher's built-in copy kernel
@@ -62,7 +54,7 @@ struct GpuCopyDesc
 		HostToDevice,
 		DeviceToHost,
 		DeviceToDevice,
-		DeviceMemset32,
+		DeviceMemset32
 	};
 
 	size_t		dest;	//!< the destination 
@@ -85,8 +77,6 @@ struct GpuCopyDesc
 };
 
 PX_POP_PACK
-
-} // end pxtask namespace
 
 #ifndef PX_DOXYGEN
 } // end physx namespace
