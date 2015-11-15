@@ -254,7 +254,7 @@ target_link_libraries(studio renderer)
 target_link_libraries(studio editor)
 target_link_libraries(studio optimized ${EXTERNAL_PATH}assimp/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/assimp.lib)
 target_link_libraries(studio debug ${EXTERNAL_PATH}assimp/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/assimp.lib)
-target_link_libraries(studio ${EXTERNAL_PATH}crunch/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/crnlib.lib)
+target_link_libraries(studio ${EXTERNAL_PATH}crunch/lib/vs2013/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/crnlib.lib)
 target_link_libraries(studio winmm.lib)
 
 
