@@ -212,6 +212,9 @@ Terrain::GrassType::~GrassType()
 
 Terrain::~Terrain()
 {
+	bgfx::destroyIndexBuffer(m_indices_handle);
+	bgfx::destroyVertexBuffer(m_vertices_handle);
+
 	setMaterial(nullptr);
 	LUMIX_DELETE(m_allocator, m_mesh);
 	LUMIX_DELETE(m_allocator, m_root);

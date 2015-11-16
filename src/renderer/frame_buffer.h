@@ -55,6 +55,9 @@ class FrameBuffer
 		bgfx::TextureHandle getRenderbufferHandle(int idx) const { return m_declaration.m_renderbuffers[idx].m_handle; }
 
 	private:
+		void destroyRenderbuffers();
+
+	private:
 		bool m_autodestroy_handle;
 		void* m_window_handle;
 		bgfx::FrameBufferHandle m_handle;
