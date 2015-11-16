@@ -1135,6 +1135,8 @@ public:
 
 	void onWindowTransformed(int x, int y, int width, int height)
 	{
+		if (height == 0) return;
+
 		m_settings.m_window.x = x;
 		m_settings.m_window.y = y;
 		m_settings.m_window.w = width;
