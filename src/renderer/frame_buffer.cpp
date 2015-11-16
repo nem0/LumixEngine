@@ -46,7 +46,14 @@ FrameBuffer::FrameBuffer(const char* name, int width, int height, void* window_h
 
 FrameBuffer::~FrameBuffer()
 {
-	if (m_autodestroy_handle) bgfx::destroyFrameBuffer(m_handle);
+	if (m_autodestroy_handle)
+	{
+		for (int i = 0; i < m_declaration.m_renderbuffers_count; ++i)
+		{
+			bgfx::destroyTexture(m_declaration.m_renderbuffers[i].m_handle);
+		}
+		bgfx::destroyFrameBuffer(m_handle);
+	}
 }
 
 
