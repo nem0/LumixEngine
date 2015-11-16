@@ -160,6 +160,7 @@ void Material::enableShadowReceiving(bool enable)
 
 void Material::unload(void)
 {
+	clearUniforms();
 	setShader(nullptr);
 
 	ResourceManagerBase* texture_manager = m_resource_manager.get(ResourceManager::TEXTURE);
@@ -253,10 +254,21 @@ bool Material::save(JsonSerializer& serializer)
 	return true;
 }
 
+
+void Material::clearUniforms()
+{
+	for (auto& uniform : m_uniforms)
+	{
+		bgfx::destroyUniform(uniform.m_handle);
+	}
+	m_uniforms.clear();
+}
+
+
 void Material::deserializeUniforms(JsonSerializer& serializer)
 {
 	serializer.deserializeArrayBegin();
-	m_uniforms.clear();
+	clearUniforms();
 	while (!serializer.isArrayEnd())
 	{
 		Uniform& uniform = m_uniforms.pushEmpty();

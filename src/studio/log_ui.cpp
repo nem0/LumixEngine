@@ -9,6 +9,7 @@ LogUI::LogUI(Lumix::IAllocator& allocator)
 	, m_current_tab(0)
 	, m_notifications(allocator)
 	, m_last_uid(1)
+	, m_guard(false)
 {
 	m_is_opened = false;
 	Lumix::g_log_info.getCallback().bind<LogUI, &LogUI::onInfo>(this);
@@ -57,6 +58,7 @@ int LogUI::addNotification(const char* text)
 
 void LogUI::push(Type type, const char* message)
 {
+	Lumix::MT::SpinLock lock(m_guard);
 	++m_new_message_count[type];
 	m_messages[type].push(Lumix::string(message, m_allocator));
 
@@ -140,6 +142,7 @@ void LogUI::update(float time_delta)
 
 void LogUI::onGUI()
 {
+	Lumix::MT::SpinLock lock(m_guard);
 	showNotifications();
 
 	if (!m_is_opened) return;

@@ -2,6 +2,7 @@
 
 
 #include "core/array.h"
+#include "core/MT/sync.h"
 #include "core/string.h"
 
 
@@ -56,4 +57,5 @@ class LogUI
 		int m_current_tab;
 		int m_last_uid;
 		bool m_move_notifications_to_front;
+		Lumix::MT::SpinMutex m_guard;
 };
