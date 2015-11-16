@@ -266,6 +266,11 @@ void Shader::onBeforeReady()
 
 void Shader::unload(void)
 {
+	for (int i = 0; i < m_texture_slot_count; ++i)
+	{
+		bgfx::destroyUniform(m_texture_slots[i].m_uniform_handle);
+	}
+
 	for (int i = 0; i < m_instances.size(); ++i)
 	{
 		LUMIX_DELETE(m_allocator, m_instances[i]);
@@ -394,4 +399,4 @@ bool ShaderBinary::load(FS::IFile& file)
 }
 
 
-} // ~namespace Lumix
+} // namespace Lumix

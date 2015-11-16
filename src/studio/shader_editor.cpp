@@ -28,7 +28,8 @@ enum class NodeType
 	OPERATOR,
 	BUILTIN_UNIFORM,
 	PASS,
-	INSTANCE_MATRIX
+	INSTANCE_MATRIX,
+	FUNCTION
 };
 
 
@@ -79,7 +80,8 @@ static const struct { const char* name; NodeType type; bool is_frag; bool is_ver
 	{"Operator",			NodeType::OPERATOR,			true,		true},
 	{"Builtin uniforms",	NodeType::BUILTIN_UNIFORM,	true,		true},
 	{"Pass",				NodeType::PASS,				true,		true},
-	{"Instance matrix",		NodeType::INSTANCE_MATRIX,	false,		true}
+	{"Instance matrix",		NodeType::INSTANCE_MATRIX,	false,		true},
+	{"Function",			NodeType::FUNCTION,			true,		true}
 };
 
 
@@ -122,17 +124,33 @@ VERTEX_OUTPUTS[] = {
 };
 
 
-enum class BuiltinUniform
+static const struct { const char* gui_name;  const char* bgfx_name; ShaderEditor::ValueType type; } BUILTIN_UNIFORMS[] =
 {
-	MODEL_MTX,
-	VIEWPROJECTION_MTX
+	{ "Model matrix",		"u_model[0]", ShaderEditor::ValueType::MATRIX4 },
+	{ "View & Projection",	"u_viewProj", ShaderEditor::ValueType::MATRIX4 }
 };
 
 
-static const struct { BuiltinUniform uniform; const char* bgfx_name; ShaderEditor::ValueType type; } BUILTIN_UNIFORMS[] =
-{
-	{ BuiltinUniform::MODEL_MTX,			"u_model[0]", ShaderEditor::ValueType::MATRIX4 },
-	{ BuiltinUniform::VIEWPROJECTION_MTX,	"u_viewProj", ShaderEditor::ValueType::MATRIX4 }
+static const struct { const char* gui_name; const char* bgfx_name; } FUNCTIONS[] = {
+	{ "abs",		"abs"		},
+	{ "all",		"all"		},
+	{ "any",		"any"		},
+	{ "ceil",		"ceil"		},
+	{ "cos",		"cos"		},
+	{ "exp",		"exp"		},
+	{ "exp2",		"exp2"		},
+	{ "floor",		"floor"		},
+	{ "fract",		"fract"		},
+	{ "log",		"log"		},
+	{ "log2",		"log2"		},
+	{ "normalize",	"normalize"	},
+	{ "not",		"not"		},
+	{ "round",		"round"		},
+	{ "sin",		"sin"		},
+	{ "sqrt",		"sqrt"		},
+	{ "tan",		"tan"		},
+	{ "transpose",	"transpose"	},
+	{ "trunc",		"trunc"		}
 };
 
 
@@ -610,6 +628,57 @@ struct Vec4MergeNode : public ShaderEditor::Node
 };
 
 
+struct FunctionNode : public ShaderEditor::Node
+{
+	FunctionNode(ShaderEditor& editor)
+		: Node((int)NodeType::FUNCTION, editor)
+	{
+		m_inputs.push(nullptr);
+		m_outputs.push(nullptr);
+		m_function = 0;
+	}
+
+
+	void save(Lumix::OutputBlob& blob) override { blob.write(m_function); }
+	void load(Lumix::InputBlob& blob) override { blob.read(m_function); }
+	ShaderEditor::ValueType getOutputType(int) const override
+	{
+		if (m_inputs[0]) return getInputType(0);
+		return ShaderEditor::ValueType::VEC4;
+	}
+
+
+	void generate(Lumix::OutputBlob& blob) override
+	{
+		blob << "\t" << getValueTypeName(getOutputType(0)) << " v" << m_id << " = ";
+		blob << FUNCTIONS[m_function].bgfx_name << "(";
+		if (m_inputs[0])
+		{
+			m_inputs[0]->printReference(blob);
+		}
+		else
+		{
+			blob << "0";
+		}
+		blob << ");\n";
+	}
+
+
+	void onGUI() override
+	{
+		ImGui::Text("value");
+
+		auto getter = [](void* data, int idx, const char** out_text) -> bool {
+			*out_text = FUNCTIONS[idx].gui_name;
+			return true;
+		};
+		ImGui::Combo("Function", &m_function, getter, nullptr, Lumix::lengthOf(FUNCTIONS));
+	}
+
+	int m_function;
+};
+
+
 struct InstanceMatrixNode : public ShaderEditor::Node
 {
 	InstanceMatrixNode(ShaderEditor& editor)
@@ -948,7 +1017,7 @@ struct BuiltinUniformNode : public ShaderEditor::Node
 		: Node((int)NodeType::BUILTIN_UNIFORM, editor)
 	{
 		m_outputs.push(nullptr);
-		m_uniform = BuiltinUniform::MODEL_MTX;
+		m_uniform = 0;
 	}
 
 
@@ -958,25 +1027,13 @@ struct BuiltinUniformNode : public ShaderEditor::Node
 
 	void printReference(Lumix::OutputBlob& blob) override
 	{
-		for(auto& u : BUILTIN_UNIFORMS)
-		{
-			if(u.uniform == m_uniform)
-			{
-				blob << u.bgfx_name;
-				return;
-			}
-		}
+		blob << BUILTIN_UNIFORMS[m_uniform].bgfx_name;
 	}
 
 
 	ShaderEditor::ValueType getOutputType(int) const override
 	{
-		for(auto& unif : BUILTIN_UNIFORMS)
-		{
-			if (m_uniform == unif.uniform) return unif.type;
-		}
-
-		return ShaderEditor::ValueType::NONE;
+		return BUILTIN_UNIFORMS[m_uniform].type;
 	}
 
 
@@ -986,10 +1043,14 @@ struct BuiltinUniformNode : public ShaderEditor::Node
 
 	void onGUI() override
 	{
-		ImGui::Combo("Uniform", (int*)&m_uniform, "Model\0View & Projection\0");
+		auto getter = [](void* data, int index, const char** out_text) -> bool {
+			*out_text = BUILTIN_UNIFORMS[index].gui_name;
+			return true;
+		};
+		ImGui::Combo("Uniform", (int*)&m_uniform, getter, nullptr, Lumix::lengthOf(BUILTIN_UNIFORMS));
 	}
 
-	BuiltinUniform m_uniform;
+	int m_uniform;
 };
 
 
@@ -1571,6 +1632,7 @@ ShaderEditor::Node* ShaderEditor::createNode(int type)
 		case NodeType::BUILTIN_UNIFORM:				return LUMIX_NEW(m_allocator, BuiltinUniformNode)(*this);
 		case NodeType::PASS:						return LUMIX_NEW(m_allocator, PassNode)(*this);
 		case NodeType::INSTANCE_MATRIX:				return LUMIX_NEW(m_allocator, InstanceMatrixNode)(*this);
+		case NodeType::FUNCTION:					return LUMIX_NEW(m_allocator, FunctionNode)(*this);
 	}
 
 	ASSERT(false);
