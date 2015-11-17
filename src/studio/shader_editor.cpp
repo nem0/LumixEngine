@@ -29,7 +29,8 @@ enum class NodeType
 	BUILTIN_UNIFORM,
 	PASS,
 	INSTANCE_MATRIX,
-	FUNCTION
+	FUNCTION,
+	BINARY_FUNCTION,
 };
 
 
@@ -81,7 +82,8 @@ static const struct { const char* name; NodeType type; bool is_frag; bool is_ver
 	{"Builtin uniforms",	NodeType::BUILTIN_UNIFORM,	true,		true},
 	{"Pass",				NodeType::PASS,				true,		true},
 	{"Instance matrix",		NodeType::INSTANCE_MATRIX,	false,		true},
-	{"Function",			NodeType::FUNCTION,			true,		true}
+	{"Function",			NodeType::FUNCTION,			true,		true},
+	{"Binary function",		NodeType::BINARY_FUNCTION,	true,		true}
 };
 
 
@@ -131,6 +133,19 @@ static const struct { const char* gui_name;  const char* bgfx_name; ShaderEditor
 };
 
 
+static const struct
+{
+	const char* gui_name;
+	const char* bgfx_name;
+	ShaderEditor::ValueType(*output_type)(const ShaderEditor::Node& node);
+} BINARY_FUNCTIONS[] = {
+	{ "dot",		"dot",		[](const ShaderEditor::Node&){ return ShaderEditor::ValueType::FLOAT; } },
+	{ "cross",		"cross",	[](const ShaderEditor::Node& node){ return node.getInputType(0); } },
+	{ "min",		"min",		[](const ShaderEditor::Node& node){ return node.getInputType(0); } },
+	{ "max",		"max",		[](const ShaderEditor::Node& node){ return node.getInputType(0); } },
+	{ "distance",	"distance",	[](const ShaderEditor::Node&){ return ShaderEditor::ValueType::FLOAT; } }
+};
+
 static const struct { const char* gui_name; const char* bgfx_name; } FUNCTIONS[] = {
 	{ "abs",		"abs"		},
 	{ "all",		"all"		},
@@ -141,6 +156,7 @@ static const struct { const char* gui_name; const char* bgfx_name; } FUNCTIONS[]
 	{ "exp2",		"exp2"		},
 	{ "floor",		"floor"		},
 	{ "fract",		"fract"		},
+	{ "inverse",	"inverse"	},
 	{ "log",		"log"		},
 	{ "log2",		"log2"		},
 	{ "normalize",	"normalize"	},
@@ -650,6 +666,8 @@ struct FunctionNode : public ShaderEditor::Node
 
 	void generate(Lumix::OutputBlob& blob) override
 	{
+		m_inputs[0]->generate(blob);
+
 		blob << "\t" << getValueTypeName(getOutputType(0)) << " v" << m_id << " = ";
 		blob << FUNCTIONS[m_function].bgfx_name << "(";
 		if (m_inputs[0])
@@ -673,6 +691,70 @@ struct FunctionNode : public ShaderEditor::Node
 			return true;
 		};
 		ImGui::Combo("Function", &m_function, getter, nullptr, Lumix::lengthOf(FUNCTIONS));
+	}
+
+	int m_function;
+};
+
+
+struct BinaryFunctionNode : public ShaderEditor::Node
+{
+	BinaryFunctionNode(ShaderEditor& editor)
+		: Node((int)NodeType::BINARY_FUNCTION, editor)
+	{
+		m_inputs.push(nullptr);
+		m_inputs.push(nullptr);
+		m_outputs.push(nullptr);
+		m_function = 0;
+	}
+
+
+	void save(Lumix::OutputBlob& blob) override { blob.write(m_function); }
+	void load(Lumix::InputBlob& blob) override { blob.read(m_function); }
+	ShaderEditor::ValueType getOutputType(int) const override
+	{
+		return BINARY_FUNCTIONS[m_function].output_type(*this);
+	}
+
+
+	void generate(Lumix::OutputBlob& blob) override
+	{
+		m_inputs[0]->generate(blob);
+		m_inputs[1]->generate(blob);
+
+		blob << "\t" << getValueTypeName(getOutputType(0)) << " v" << m_id << " = ";
+		blob << BINARY_FUNCTIONS[m_function].bgfx_name << "(";
+		if (m_inputs[0])
+		{
+			m_inputs[0]->printReference(blob);
+		}
+		else
+		{
+			blob << "0";
+		}
+		blob << ", ";
+		if (m_inputs[1])
+		{
+			m_inputs[1]->printReference(blob);
+		}
+		else
+		{
+			blob << "0";
+		}
+		blob << ");\n";
+	}
+
+
+	void onGUI() override
+	{
+		ImGui::Text("argument 1");
+		ImGui::Text("argument 2");
+
+		auto getter = [](void* data, int idx, const char** out_text) -> bool {
+			*out_text = BINARY_FUNCTIONS[idx].gui_name;
+			return true;
+		};
+		ImGui::Combo("Function", &m_function, getter, nullptr, Lumix::lengthOf(BINARY_FUNCTIONS));
 	}
 
 	int m_function;
@@ -1633,6 +1715,7 @@ ShaderEditor::Node* ShaderEditor::createNode(int type)
 		case NodeType::PASS:						return LUMIX_NEW(m_allocator, PassNode)(*this);
 		case NodeType::INSTANCE_MATRIX:				return LUMIX_NEW(m_allocator, InstanceMatrixNode)(*this);
 		case NodeType::FUNCTION:					return LUMIX_NEW(m_allocator, FunctionNode)(*this);
+		case NodeType::BINARY_FUNCTION:				return LUMIX_NEW(m_allocator, BinaryFunctionNode)(*this);
 	}
 
 	ASSERT(false);
