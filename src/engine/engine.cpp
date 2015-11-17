@@ -107,7 +107,8 @@ public:
 		{
 			return false;
 		}
-		if (!m_input_system.create(m_allocator))
+		m_input_system = InputSystem::create(m_allocator);
+		if (!m_input_system)
 		{
 			return false;
 		}
@@ -121,7 +122,7 @@ public:
 		Timer::destroy(m_timer);
 		Timer::destroy(m_fps_timer);
 		PluginManager::destroy(m_plugin_manager);
-		m_input_system.destroy();
+		InputSystem::destroy(*m_input_system);
 		if (m_disk_file_device)
 		{
 			FS::FileSystem::destroy(m_file_system);
@@ -221,12 +222,12 @@ public:
 			context.m_scenes[i]->update(dt);
 		}
 		m_plugin_manager->update(dt);
-		m_input_system.update(dt);
+		m_input_system->update(dt);
 		getFileSystem().updateAsyncTransactions();
 	}
 
 
-	InputSystem& getInputSystem() override { return m_input_system; }
+	InputSystem& getInputSystem() override { return *m_input_system; }
 
 
 	ResourceManager& getResourceManager() override
@@ -365,7 +366,7 @@ private:
 
 	Array<ComponentType> m_component_types;
 	PluginManager* m_plugin_manager;
-	InputSystem m_input_system;
+	InputSystem* m_input_system;
 	Timer* m_timer;
 	Timer* m_fps_timer;
 	int m_fps_frame;

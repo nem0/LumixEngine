@@ -21,20 +21,17 @@ namespace Lumix
 			};
 
 		public:
-			InputSystem();
 
-			bool create(IAllocator& allocator);
-			void destroy();
+			static InputSystem* create(IAllocator& allocator);
+			static void destroy(InputSystem& system);
 
-			void enable(bool enabled);
-			void update(float dt);
-			float getActionValue(uint32 action);
-			void injectMouseXMove(float value);
-			void injectMouseYMove(float value);
-			void addAction(uint32 action, InputType type, int key);
-
-		private:
-			struct InputSystemImpl* m_impl;
+			virtual ~InputSystem() {}
+			virtual void enable(bool enabled) = 0;
+			virtual void update(float dt) = 0;
+			virtual float getActionValue(uint32 action) = 0;
+			virtual void injectMouseXMove(float value) = 0;
+			virtual void injectMouseYMove(float value) = 0;
+			virtual void addAction(uint32 action, InputType type, int key) = 0;
 	};
 
 
