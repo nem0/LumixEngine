@@ -849,6 +849,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 									int framebuffers_count,
 									int64 layer_mask)
 	{
+		if (camera < 0) return;
+
 		Universe& universe = m_scene->getUniverse();
 		Entity camera_entity = m_scene->getCameraEntity(camera);
 		Vec3 camera_pos = universe.getPosition(camera_entity);
