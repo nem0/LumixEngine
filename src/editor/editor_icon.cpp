@@ -140,8 +140,9 @@ void EditorIcon::render(PipelineInstance& pipeline)
 	static const float MAX_SCALE_FACTOR = 60;
 	if (m_is_visible)
 	{
-		const Universe& universe = m_scene->getUniverse();
 		ComponentIndex camera = m_scene->getCameraInSlot("editor");
+		if (camera < 0) return;
+		const Universe& universe = m_scene->getUniverse();
 		Lumix::Matrix mtx = universe.getMatrix(m_scene->getCameraEntity(camera));
 
 		float fov = m_scene->getCameraFOV(camera);
