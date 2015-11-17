@@ -71,6 +71,7 @@ public:
 		, m_fps(0)
 		, m_is_game_running(false)
 		, m_component_types(m_allocator)
+		, m_last_time_delta(0)
 	{
 		m_mtjd_manager = MTJD::Manager::create(m_allocator);
 		if (!fs)
