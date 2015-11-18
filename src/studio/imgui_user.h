@@ -32,7 +32,8 @@ bool NodePin(ImGuiID id, ImVec2 screen_pos);
 void NodeLink(ImVec2 from, ImVec2 to);
 ImVec2 GetNodeInputPos(ImGuiID node_id, int input);
 ImVec2 GetNodeOutputPos(ImGuiID node_id, int output);
-
 void NodeSlots(int count, bool input);
+
+bool SampledFunctionInput(const char* label, float* values, int count, float scale_min, float scale_max);
 
 } // namespace ImGui

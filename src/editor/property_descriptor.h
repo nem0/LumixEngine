@@ -723,6 +723,75 @@ public:
 };
 
 
+template <class S, int COUNT> class SampledFunctionDescriptor : public ISampledFunctionDescriptor
+{
+public:
+	typedef float (S::*Getter)(ComponentIndex, int);
+	typedef void (S::*Setter)(ComponentIndex, int, float);
+
+public:
+	SampledFunctionDescriptor(const char* name,
+		Getter _getter,
+		Setter _setter,
+		float min,
+		float max,
+		IAllocator& allocator)
+		: ISampledFunctionDescriptor(allocator)
+	{
+		setName(name);
+		m_getter = _getter;
+		m_setter = _setter;
+		m_min = min;
+		m_max = max;
+		m_type = SAMPLED_FUNCTION;
+	}
+
+
+	void set(ComponentUID cmp, InputBlob& stream) const override
+	{
+		for (int i = 0; i < COUNT; ++i)
+		{
+			float f;
+			stream.read(&f, sizeof(f));
+			(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, i, f);
+		}
+	}
+
+
+	void get(ComponentUID cmp, OutputBlob& stream) const override
+	{
+		for (int i = 0; i < COUNT; ++i)
+		{
+			float f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index, i);
+			int len = sizeof(f);
+			stream.write(&f, len);
+		}
+	}
+
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		ASSERT(index == -1);
+		set(cmp, stream);
+	};
+
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		ASSERT(index == -1);
+		get(cmp, stream);
+	};
+
+
+	float getMin() override { return m_min; }
+	float getMax() override { return m_max; }
+
+private:
+	Getter m_getter;
+	Setter m_setter;
+	float m_min;
+	float m_max;
+};
+
+
 template <class S> class DecimalPropertyDescriptor : public IDecimalPropertyDescriptor
 {
 public:

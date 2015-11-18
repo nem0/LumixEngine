@@ -88,6 +88,7 @@ void registerRendererProperties(Lumix::IAllocator& allocator)
 		"particle_emitter_linear_movement", "Particle emitter - linear movement");
 	PropertyRegister::registerComponentType(
 		"particle_emitter_random_rotation", "Particle emitter - random rotation");
+	PropertyRegister::registerComponentType("particle_emitter_size", "Particle emitter - size");
 	PropertyRegister::registerComponentType("point_light", "Point light");
 	PropertyRegister::registerComponentType("terrain", "Terrain");
 
@@ -96,6 +97,23 @@ void registerRendererProperties(Lumix::IAllocator& allocator)
 		"particle_emitter_linear_movement", "particle_emitter");
 	PropertyRegister::registerComponentDependency(
 		"particle_emitter_random_rotation", "particle_emitter");
+
+	typedef SampledFunctionDescriptor<RenderScene, 10> SampledFunctionDescT;
+	Lumix::PropertyRegister::add("particle_emitter_fade",
+		LUMIX_NEW(allocator, SampledFunctionDescT)("alpha",
+		&RenderScene::getParticleEmitterAlpha,
+		&RenderScene::setParticleEmitterAlpha,
+		0, 
+		1,
+		allocator));
+
+	Lumix::PropertyRegister::add("particle_emitter_size",
+		LUMIX_NEW(allocator, SampledFunctionDescT)("size",
+		&RenderScene::getParticleEmitterSize,
+		&RenderScene::setParticleEmitterSize,
+		0,
+		1,
+		allocator));
 
 	Lumix::PropertyRegister::add("particle_emitter_linear_movement",
 		LUMIX_NEW(allocator, Vec2PropertyDescriptor<RenderScene>)("x",

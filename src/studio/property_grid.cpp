@@ -179,9 +179,26 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	case Lumix::IPropertyDescriptor::ARRAY:
 		showArrayProperty(cmp, static_cast<Lumix::IArrayDescriptor&>(desc));
 		break;
+	case Lumix::IPropertyDescriptor::SAMPLED_FUNCTION:
+		showSampledFunctionProperty(cmp, static_cast<Lumix::ISampledFunctionDescriptor&>(desc));
+		break;
 	default:
 		ASSERT(false);
 		break;
+	}
+}
+
+
+void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::ISampledFunctionDescriptor& desc)
+{
+	Lumix::OutputBlob blob(m_editor.getAllocator());
+	desc.get(cmp, blob);
+	float* f = (float*)blob.getData();
+	int count = blob.getSize() / sizeof(float);
+
+	if (ImGui::SampledFunctionInput(desc.getName(), f, count, desc.getMin(), desc.getMax()))
+	{
+		m_editor.setProperty(cmp.type, -1, desc, f, sizeof(float) * count);
 	}
 }
 

@@ -24,7 +24,8 @@ public:
 		ARRAY,
 		COLOR,
 		VEC4,
-		VEC2
+		VEC2,
+		SAMPLED_FUNCTION
 	};
 
 public:
@@ -58,7 +59,7 @@ protected:
 
 class LUMIX_EDITOR_API IDecimalPropertyDescriptor : public IPropertyDescriptor
 {
-	public:
+public:
 	IDecimalPropertyDescriptor(IAllocator& allocator);
 
 	float getMin() const { return m_min; }
@@ -69,7 +70,7 @@ class LUMIX_EDITOR_API IDecimalPropertyDescriptor : public IPropertyDescriptor
 	void setMax(float value) { m_max = value; }
 	void setStep(float value) { m_step = value; }
 
-	protected:
+protected:
 	float m_min;
 	float m_max;
 	float m_step;
@@ -78,7 +79,7 @@ class LUMIX_EDITOR_API IDecimalPropertyDescriptor : public IPropertyDescriptor
 
 class ResourcePropertyDescriptorBase
 {
-	public:
+public:
 	ResourcePropertyDescriptorBase(uint32 resource_type) { m_resource_type = resource_type; }
 
 	uint32 getResourceType() { return m_resource_type; }
@@ -87,9 +88,22 @@ class ResourcePropertyDescriptorBase
 };
 
 
-class IArrayDescriptor : public IPropertyDescriptor
+class ISampledFunctionDescriptor : public IPropertyDescriptor
 {
 	public:
+		ISampledFunctionDescriptor(IAllocator& allocator)
+			: IPropertyDescriptor(allocator)
+		{
+		}
+
+		virtual float getMin() = 0;
+		virtual float getMax() = 0;
+};
+
+
+class IArrayDescriptor : public IPropertyDescriptor
+{
+public:
 	IArrayDescriptor(IAllocator& allocator)
 		: IPropertyDescriptor(allocator)
 	{

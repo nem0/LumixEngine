@@ -26,6 +26,10 @@ static ParticleEmitter::ModuleBase* createModule(uint32 type, ParticleEmitter& e
 	{
 		return LUMIX_NEW(emitter.getAllocator(), ParticleEmitter::RandomRotationModule)(emitter);
 	}
+	if (type == ParticleEmitter::SizeModule::s_type)
+	{
+		return LUMIX_NEW(emitter.getAllocator(), ParticleEmitter::SizeModule)(emitter);
+	}
 
 	return nullptr;
 }
@@ -108,6 +112,46 @@ void ParticleEmitter::AlphaModule::update(float)
 
 
 const uint32 ParticleEmitter::AlphaModule::s_type = Lumix::crc32("alpha");
+
+
+ParticleEmitter::SizeModule::SizeModule(ParticleEmitter& emitter)
+	: ModuleBase(emitter)
+	, m_values(emitter.getAllocator())
+{
+	m_values.resize(10);
+	m_values[0] = 0.33f;
+	m_values[1] = 0.66f;
+	m_values[2] = 0.8f;
+	m_values[3] = 0.7f;
+	m_values[4] = 0.6f;
+	m_values[5] = 0.5f;
+	m_values[6] = 0.4f;
+	m_values[7] = 0.3f;
+	m_values[8] = 0.15f;
+	m_values[9] = 0.0f;
+}
+
+
+void ParticleEmitter::SizeModule::update(float)
+{
+	if (m_emitter.m_size.empty()) return;
+
+	float* particle_size = &m_emitter.m_size[0];
+	float* rel_life = &m_emitter.m_rel_life[0];
+	int size = m_values.size() - 1;
+	float float_size = (float)size;
+	for (int i = 0, c = m_emitter.m_size.size(); i < c; ++i)
+	{
+		float float_idx = float_size * rel_life[i];
+		int idx = (int)float_idx;
+		int next_idx = Math::minValue(idx + 1, size);
+		float w = float_idx - idx;
+		particle_size[i] = m_values[idx] * (1 - w) + m_values[next_idx] * w;
+	}
+}
+
+
+const uint32 ParticleEmitter::SizeModule::s_type = Lumix::crc32("size");
 
 
 ParticleEmitter::RandomRotationModule::RandomRotationModule(ParticleEmitter& emitter)
