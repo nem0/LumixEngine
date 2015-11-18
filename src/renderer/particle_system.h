@@ -92,6 +92,20 @@ public:
 	};
 
 
+	struct LUMIX_RENDERER_API SizeModule : public ModuleBase
+	{
+		SizeModule(ParticleEmitter& emitter);
+		void update(float time_delta) override;
+		void serialize(OutputBlob&) override {}
+		void deserialize(InputBlob&) override {}
+		uint32 getType() const override { return s_type; }
+
+		static const uint32 s_type;
+
+		Array<float> m_values;
+	};
+
+
 	struct LUMIX_RENDERER_API RandomRotationModule : public ModuleBase
 	{
 		RandomRotationModule(ParticleEmitter& emitter);

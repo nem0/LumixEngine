@@ -227,7 +227,7 @@ target_link_libraries(unit_tests animation)
 
 ###################### STUDIO ######################
 
-file(GLOB STUDIO_FILES ${SRC_PATH}studio/*.cpp ${SRC_PATH}studio/pc/*.cpp ${SRC_PATH}studio/*.c ${SRC_PATH}studio/*.h)
+file(GLOB STUDIO_FILES ${SRC_PATH}studio/*.cpp ${SRC_PATH}studio/pc/*.cpp ${SRC_PATH}studio/*.c ${SRC_PATH}studio/*.h ${SRC_PATH}studio/*.inl)
 file(GLOB OCORNUT_IMGUI_FILES ${SRC_PATH}studio/ocornut-imgui/*.cpp ${SRC_PATH}studio/ocornut-imgui/*.h)
 file(GLOB STB_FILES ${SRC_PATH}studio/stb/*.cpp ${SRC_PATH}studio/stb/*.c ${SRC_PATH}studio/stb/*.h)
 

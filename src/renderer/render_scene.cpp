@@ -47,6 +47,7 @@ static const uint32 PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH =
 	crc32("particle_emitter_linear_movement");
 static const uint32 PARTICLE_EMITTER_RANDOM_ROTATION_HASH =
 	crc32("particle_emitter_random_rotation");
+static const uint32 PARTICLE_EMITTER_SIZE_HASH = crc32("particle_emitter_size");
 static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
 static const uint32 CAMERA_HASH = crc32("camera");
 static const uint32 TERRAIN_HASH = crc32("terrain");
@@ -448,6 +449,11 @@ public:
 						m_universe.addComponent(
 							emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_HASH, this, i);
 					}
+					else if (module->getType() == ParticleEmitter::SizeModule::s_type)
+					{
+						m_universe.addComponent(
+							emitter->m_entity, PARTICLE_EMITTER_SIZE_HASH, this, i);
+					}
 				}
 			}
 			m_particle_emitters[i] = emitter;
@@ -764,6 +770,20 @@ public:
 				}
 			}
 		}
+		else if (type == PARTICLE_EMITTER_SIZE_HASH)
+		{
+			auto* emitter = m_particle_emitters[component];
+			for (auto* module : emitter->m_modules)
+			{
+				if (module->getType() == ParticleEmitter::SizeModule::s_type)
+				{
+					LUMIX_DELETE(m_allocator, module);
+					emitter->m_modules.eraseItem(module);
+					m_universe.destroyComponent(emitter->m_entity, type, this, component);
+					break;
+				}
+			}
+		}
 		else if (type == PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH)
 		{
 			auto* emitter = m_particle_emitters[component];
@@ -796,6 +816,64 @@ public:
 		{
 			ASSERT(false);
 		}
+	}
+
+
+	void setParticleEmitterAlpha(ComponentIndex cmp, int index, float value) override
+	{
+		auto& modules = m_particle_emitters[cmp]->m_modules;
+		for (auto* module : modules)
+		{
+			if (module->getType() == ParticleEmitter::AlphaModule::s_type)
+			{
+				static_cast<ParticleEmitter::AlphaModule*>(module)->m_values[index] = value;
+				return;
+			}
+		}
+	}
+
+
+	float getParticleEmitterSize(ComponentIndex cmp, int index) override
+	{
+		auto& modules = m_particle_emitters[cmp]->m_modules;
+		for (auto* module : modules)
+		{
+			if (module->getType() == ParticleEmitter::SizeModule::s_type)
+			{
+				return static_cast<ParticleEmitter::SizeModule*>(module)->m_values[index];
+			}
+		}
+		return 0;
+	}
+
+
+
+
+	void setParticleEmitterSize(ComponentIndex cmp, int index, float value) override
+	{
+		auto& modules = m_particle_emitters[cmp]->m_modules;
+		for (auto* module : modules)
+		{
+			if (module->getType() == ParticleEmitter::SizeModule::s_type)
+			{
+				static_cast<ParticleEmitter::SizeModule*>(module)->m_values[index] = value;
+				return;
+			}
+		}
+	}
+
+
+	float getParticleEmitterAlpha(ComponentIndex cmp, int index) override
+	{
+		auto& modules = m_particle_emitters[cmp]->m_modules;
+		for (auto* module : modules)
+		{
+			if (module->getType() == ParticleEmitter::AlphaModule::s_type)
+			{
+				return static_cast<ParticleEmitter::AlphaModule*>(module)->m_values[index];
+			}
+		}
+		return 0;
 	}
 
 
@@ -971,6 +1049,10 @@ public:
 		{
 			return createParticleEmitterFade(entity);
 		}
+		else if (type == PARTICLE_EMITTER_SIZE_HASH)
+		{
+			return createParticleEmitterSize(entity);
+		}
 		else if (type == PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH)
 		{
 			return createParticleEmitterLinearMovement(entity);
@@ -1027,6 +1109,23 @@ public:
 				auto module = LUMIX_NEW(m_allocator, ParticleEmitter::AlphaModule)(*emitter);
 				emitter->addModule(module);
 				m_universe.addComponent(entity, PARTICLE_EMITTER_FADE_HASH, this, i);
+				return i;
+			}
+		}
+		return INVALID_COMPONENT;
+	}
+
+
+	ComponentIndex createParticleEmitterSize(Entity entity)
+	{
+		for (int i = 0; i < m_particle_emitters.size(); ++i)
+		{
+			auto* emitter = m_particle_emitters[i];
+			if (emitter->m_entity == entity)
+			{
+				auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SizeModule)(*emitter);
+				emitter->addModule(module);
+				m_universe.addComponent(entity, PARTICLE_EMITTER_SIZE_HASH, this, i);
 				return i;
 			}
 		}
