@@ -135,6 +135,19 @@ public:
 	}
 
 
+	void setPlatformData(const PlatformData& data) override
+	{
+		m_platform_data = data;
+	}
+
+
+	const PlatformData& getPlatformData() override
+	{
+		return m_platform_data;
+	}
+
+
+
 	IAllocator& getAllocator() override { return m_allocator; }
 
 
@@ -373,6 +386,7 @@ private:
 	float m_fps;
 	float m_last_time_delta;
 	bool m_is_game_running;
+	PlatformData m_platform_data;
 
 private:
 	void operator=(const EngineImpl&);

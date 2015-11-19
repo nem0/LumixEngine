@@ -1060,6 +1060,9 @@ public:
 		PlatformInterface::createWindow(nullptr);
 
 		m_engine = Lumix::Engine::create(nullptr, m_allocator);
+		Lumix::Engine::PlatformData platform_data;
+		platform_data.window_handle = PlatformInterface::getWindowHandle();
+		m_engine->setPlatformData(platform_data);
 		char current_dir[Lumix::MAX_PATH_LENGTH];
 		PlatformInterface::getCurrentDirectory(current_dir, Lumix::lengthOf(current_dir));
 		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine, m_allocator);

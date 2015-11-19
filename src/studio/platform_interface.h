@@ -94,5 +94,7 @@ namespace PlatformInterface
 	bool isPressed(int key);
 	void getKeyName(int key, char* out, int max_size);
 	void setCursor(Cursor cursor);
+	void* getWindowHandle();
+
 
 } // namespace PlatformInterface
