@@ -23,6 +23,9 @@ namespace Audio
 	void play(ClipHandle clip);
 	void stop(ClipHandle clip);
 	void pause(ClipHandle clip);
+	void setVolume(ClipHandle clip, float volume);
+	void setFrequency(ClipHandle clip, float frequency);
+	void setCurrentPosition(ClipHandle clip, float time_seconds);
 
 
 } // namespace Audio
