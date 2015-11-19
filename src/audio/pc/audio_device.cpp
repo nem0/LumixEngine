@@ -15,15 +15,6 @@ namespace Audio
 {
 
 
-extern "C" LUMIX_LIBRARY_EXPORT IPlugin* createPlugin(Engine& engine)
-{
-	init(engine, engine.getAllocator());
-	auto s = load(Lumix::Path("test.ogg"));
-	play(s);
-	return nullptr;
-}
-
-
 struct 
 {
 	HMODULE library;
@@ -128,15 +119,32 @@ ClipHandle load(const Path& path)
 
 	testdesc.lpwfxFormat = &wave_format;
 	auto result = SUCCEEDED(g_audio_device.direct_sound->CreateSoundBuffer(&testdesc, &buffer, nullptr));
+	if (!result) return nullptr;
 
 	void* p1;
 	void* p2;
 	DWORD s1, s2;
 	result = SUCCEEDED(buffer->Lock(0, res, &p1, &s1, &p2, &s2, 0));
+	if (!result)
+	{
+		free(output);
+		buffer->Release();
+		return nullptr;
+	}
 	memcpy(p1, output, s1);
-	result = SUCCEEDED(buffer->Unlock(p1, s1, p2, s2));
-	result = SUCCEEDED(buffer->SetCurrentPosition(0));
 	free(output);
+	result = SUCCEEDED(buffer->Unlock(p1, s1, p2, s2));
+	if (!result)
+	{
+		buffer->Release();
+		return nullptr;
+	}
+	result = SUCCEEDED(buffer->SetCurrentPosition(0));
+	if (!result)
+	{
+		buffer->Release();
+		return nullptr;
+	}
 
 	return buffer;
 }
@@ -146,8 +154,6 @@ void unload(ClipHandle clip)
 {
 	auto buffer = (LPDIRECTSOUNDBUFFER)clip;
 	buffer->Release();
-	ASSERT(false);
-	TODO("todo");
 }
 
 
@@ -169,6 +175,32 @@ void pause(ClipHandle clip)
 {
 	auto buffer = (LPDIRECTSOUNDBUFFER)clip;
 	buffer->Stop();
+}
+
+
+void setVolume(ClipHandle clip, float volume)
+{
+	auto buffer = (LPDIRECTSOUNDBUFFER)clip;
+	buffer->SetVolume(DSBVOLUME_MIN + LONG(volume * (DSBVOLUME_MAX - DSBVOLUME_MIN)));
+}
+
+
+void setFrequency(ClipHandle clip, float frequency)
+{
+	auto buffer = (LPDIRECTSOUNDBUFFER)clip;
+	buffer->SetFrequency(DSBFREQUENCY_MIN + DWORD(frequency * (DSBFREQUENCY_MAX - DSBFREQUENCY_MIN)));
+}
+
+
+void setCurrentPosition(ClipHandle clip, float time_seconds)
+{
+	auto buffer = (LPDIRECTSOUNDBUFFER)clip;
+	WAVEFORMATEX format;
+	if (SUCCEEDED(buffer->GetFormat(&format, sizeof(format), nullptr)))
+	{
+		DWORD pos = DWORD(format.nAvgBytesPerSec * time_seconds);
+		buffer->SetCurrentPosition(pos);
+	}
 }
 
 
