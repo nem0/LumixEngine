@@ -20,13 +20,13 @@ public:
 
 	virtual ~BaseProxyAllocator() { ASSERT(m_allocation_count == 0); }
 
-	virtual void* allocate(size_t size) override
+	void* allocate(size_t size) override
 	{
 		MT::atomicIncrement(&m_allocation_count);
 		return m_source.allocate(size);
 	}
 
-	virtual void deallocate(void* ptr) override
+	void deallocate(void* ptr) override
 	{
 		if (ptr)
 		{
@@ -35,7 +35,7 @@ public:
 		}
 	}
 
-	virtual void* reallocate(void* ptr, size_t size) override
+	void* reallocate(void* ptr, size_t size) override
 	{
 		return m_source.reallocate(ptr, size);
 	}

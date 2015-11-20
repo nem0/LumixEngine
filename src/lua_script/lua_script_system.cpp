@@ -44,11 +44,11 @@ public:
 	virtual ~LuaScriptSystem();
 
 	IAllocator& getAllocator();
-	virtual IScene* createScene(UniverseContext& universe) override;
-	virtual void destroyScene(IScene* scene) override;
-	virtual bool create() override;
-	virtual void destroy() override;
-	virtual const char* getName() const override;
+	IScene* createScene(UniverseContext& universe) override;
+	void destroyScene(IScene* scene) override;
+	bool create() override;
+	void destroy() override;
+	const char* getName() const override;
 	LuaScriptManager& getScriptManager() { return m_script_manager; }
 
 	Engine& m_engine;
@@ -106,7 +106,7 @@ public:
 	}
 
 
-	virtual Universe& getUniverse() override { return *m_universe_context.m_universe; }
+	Universe& getUniverse() override { return *m_universe_context.m_universe; }
 
 
 	void registerAPI(lua_State* L)
@@ -150,13 +150,13 @@ public:
 	}
 
 
-	virtual LuaScript* getScriptResource(ComponentIndex cmp) const override
+	LuaScript* getScriptResource(ComponentIndex cmp) const override
 	{
 		return getScript(cmp).m_script;
 	}
 
 
-	virtual const char* getPropertyValue(Lumix::ComponentIndex cmp, int index) const override
+	const char* getPropertyValue(Lumix::ComponentIndex cmp, int index) const override
 	{
 		auto& script = getScript(cmp);
 		uint32 hash = crc32(getPropertyName(cmp, index));
@@ -173,7 +173,7 @@ public:
 	}
 
 
-	virtual void setPropertyValue(Lumix::ComponentIndex cmp,
+	void setPropertyValue(Lumix::ComponentIndex cmp,
 		const char* name,
 		const char* value) override
 	{
@@ -187,7 +187,7 @@ public:
 	}
 
 
-	virtual const char* getPropertyName(Lumix::ComponentIndex cmp, int index) const override
+	const char* getPropertyName(Lumix::ComponentIndex cmp, int index) const override
 	{
 		auto& script = getScript(cmp);
 
@@ -195,7 +195,7 @@ public:
 	}
 
 
-	virtual int getPropertyCount(Lumix::ComponentIndex cmp) const override
+	int getPropertyCount(Lumix::ComponentIndex cmp) const override
 	{
 		auto& script = getScript(cmp);
 
@@ -231,7 +231,7 @@ public:
 	}
 
 
-	virtual void startGame() override
+	void startGame() override
 	{
 		m_global_state = lua_newstate(luaAllocator, &m_system.getAllocator());
 		luaL_openlibs(m_global_state);
@@ -280,7 +280,7 @@ public:
 	}
 
 
-	virtual void stopGame() override
+	void stopGame() override
 	{
 		for (Script& script : m_scripts)
 		{
@@ -292,7 +292,7 @@ public:
 	}
 
 	
-	virtual ComponentIndex createComponent(uint32 type,
+	ComponentIndex createComponent(uint32 type,
 										   Entity entity) override
 	{
 		if (type == LUA_SCRIPT_HASH)
@@ -310,7 +310,7 @@ public:
 	}
 
 
-	virtual void destroyComponent(ComponentIndex component,
+	void destroyComponent(ComponentIndex component,
 								  uint32 type) override
 	{
 		if (type == LUA_SCRIPT_HASH)
@@ -322,7 +322,7 @@ public:
 	}
 
 
-	virtual void serialize(OutputBlob& serializer) override
+	void serialize(OutputBlob& serializer) override
 	{
 		serializer.write(m_scripts.size());
 		for (int i = 0; i < m_scripts.size(); ++i)
@@ -345,7 +345,7 @@ public:
 	}
 
 
-	virtual void deserialize(InputBlob& serializer, int) override
+	void deserialize(InputBlob& serializer, int) override
 	{
 		int len = serializer.read<int>();
 		unloadAllScripts();
@@ -383,10 +383,10 @@ public:
 	}
 
 
-	virtual IPlugin& getPlugin() const override { return m_system; }
+	IPlugin& getPlugin() const override { return m_system; }
 
 
-	virtual void update(float time_delta) override
+	void update(float time_delta) override
 	{
 		if (!m_global_state)
 		{
@@ -408,7 +408,7 @@ public:
 	}
 
 
-	virtual bool ownComponentType(uint32 type) const override
+	bool ownComponentType(uint32 type) const override
 	{
 		return type == LUA_SCRIPT_HASH;
 	}

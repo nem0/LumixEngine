@@ -81,16 +81,16 @@ public:
 	}
 
 
-	virtual Universe& getUniverse() override { return m_universe; }
+	Universe& getUniverse() override { return m_universe; }
 
 
-	virtual bool ownComponentType(uint32 type) const override
+	bool ownComponentType(uint32 type) const override
 	{
 		return type == ANIMABLE_HASH;
 	}
 
 
-	virtual ComponentIndex createComponent(uint32 type,
+	ComponentIndex createComponent(uint32 type,
 										   Entity entity) override
 	{
 		if (type == ANIMABLE_HASH)
@@ -112,7 +112,7 @@ public:
 	}
 
 
-	virtual void serialize(OutputBlob& serializer) override
+	void serialize(OutputBlob& serializer) override
 	{
 		serializer.write((int32)m_animables.size());
 		for (int i = 0; i < m_animables.size(); ++i)
@@ -128,7 +128,7 @@ public:
 	}
 
 
-	virtual void deserialize(InputBlob& serializer, int) override
+	void deserialize(InputBlob& serializer, int) override
 	{
 		int32 count;
 		serializer.read(count);
@@ -175,7 +175,7 @@ public:
 	}
 
 
-	virtual void update(float time_delta) override
+	void update(float time_delta) override
 	{
 		PROFILE_FUNCTION();
 		if (m_animables.empty())
@@ -270,7 +270,7 @@ private:
 	}
 
 
-	virtual IPlugin& getPlugin() const override { return m_anim_system; }
+	IPlugin& getPlugin() const override { return m_anim_system; }
 
 
 private:
@@ -292,23 +292,23 @@ public:
 	{
 	}
 
-	virtual IScene* createScene(UniverseContext& ctx) override
+	IScene* createScene(UniverseContext& ctx) override
 	{
 		return LUMIX_NEW(m_allocator, AnimationSceneImpl)(
 			*this, m_engine, ctx, m_allocator);
 	}
 
 
-	virtual void destroyScene(IScene* scene) override
+	void destroyScene(IScene* scene) override
 	{
 		LUMIX_DELETE(m_allocator, scene);
 	}
 
 
-	virtual const char* getName() const override { return "animation"; }
+	const char* getName() const override { return "animation"; }
 
 
-	virtual bool create() override
+	bool create() override
 	{
 		m_animation_manager.create(ResourceManager::ANIMATION,
 								   m_engine.getResourceManager());
@@ -316,7 +316,7 @@ public:
 	}
 
 
-	virtual void destroy() override {}
+	void destroy() override {}
 
 	BaseProxyAllocator m_allocator;
 	Engine& m_engine;

@@ -116,7 +116,7 @@ public:
 	BaseProxyAllocator& getAllocator() { return m_allocator; }
 
 
-	virtual bool hasWork() const override
+	bool hasWork() const override
 	{
 		return !m_in_progress.empty();
 	}
