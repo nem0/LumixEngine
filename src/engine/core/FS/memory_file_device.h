@@ -16,8 +16,8 @@ namespace Lumix
 		public:
 			MemoryFileDevice(IAllocator& allocator) : m_allocator(allocator) {}
 
-			virtual void destroyFile(IFile* file) override;
-			virtual IFile* createFile(IFile* child) override;
+			void destroyFile(IFile* file) override;
+			IFile* createFile(IFile* child) override;
 
 			const char* name() const override { return "memory"; }
 

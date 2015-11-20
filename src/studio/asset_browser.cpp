@@ -554,11 +554,11 @@ public:
 	InsertMeshCommand(Lumix::WorldEditor& editor);
 	InsertMeshCommand(Lumix::WorldEditor& editor, const Lumix::Vec3& position, const Lumix::Path& mesh_path);
 
-	virtual void serialize(Lumix::JsonSerializer& serializer) override;
-	virtual void deserialize(Lumix::JsonSerializer& serializer) override;
-	virtual bool execute() override;
-	virtual void undo() override;
-	virtual Lumix::uint32 getType() override;
+	void serialize(Lumix::JsonSerializer& serializer) override;
+	void deserialize(Lumix::JsonSerializer& serializer) override;
+	bool execute() override;
+	void undo() override;
+	Lumix::uint32 getType() override;
 	virtual bool merge(IEditorCommand&);
 	Lumix::Entity getEntity() const { return m_entity; }
 

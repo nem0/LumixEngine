@@ -52,14 +52,14 @@ private:
 		}
 
 
-		virtual void serialize(JsonSerializer& serializer) override
+		void serialize(JsonSerializer& serializer) override
 		{
 			serializer.serialize("template_name", m_name.c_str());
 			serializer.serialize("entity", m_entity);
 		}
 
 
-		virtual void deserialize(JsonSerializer& serializer) override
+		void deserialize(JsonSerializer& serializer) override
 		{
 			char name[50];
 			serializer.deserialize("template_name", name, sizeof(name), "");
@@ -68,7 +68,7 @@ private:
 		}
 
 
-		virtual bool execute() override
+		bool execute() override
 		{
 			uint32 name_hash = crc32(m_name.c_str());
 			if (m_entity_system.m_instances.find(name_hash) < 0)
@@ -87,7 +87,7 @@ private:
 		}
 
 
-		virtual void undo() override
+		void undo() override
 		{
 			m_entity_system.m_template_names.eraseItem(m_name);
 			uint32 name_hash = crc32(m_name.c_str());
@@ -96,10 +96,10 @@ private:
 		}
 
 
-		virtual bool merge(IEditorCommand&) override { return false; }
+		bool merge(IEditorCommand&) override { return false; }
 
 
-		virtual uint32 getType() override
+		uint32 getType() override
 		{
 			static const uint32 hash = crc32("create_entity_template");
 			return hash;
@@ -140,7 +140,7 @@ private:
 		}
 
 
-		virtual void serialize(JsonSerializer& serializer) override
+		void serialize(JsonSerializer& serializer) override
 		{
 			serializer.serialize("template_name_hash", m_template_name_hash);
 			serializer.serialize("entity", m_entity);
@@ -154,7 +154,7 @@ private:
 		}
 
 
-		virtual void deserialize(JsonSerializer& serializer) override
+		void deserialize(JsonSerializer& serializer) override
 		{
 			serializer.deserialize(
 				"template_name_hash", m_template_name_hash, 0);
@@ -169,7 +169,7 @@ private:
 		}
 
 
-		virtual bool execute() override
+		bool execute() override
 		{
 			int instance_index =
 				m_entity_system.m_instances.find(m_template_name_hash);
@@ -197,7 +197,7 @@ private:
 		}
 
 
-		virtual void undo() override
+		void undo() override
 		{
 			const WorldEditor::ComponentList& cmps =
 				m_editor.getComponents(m_entity);
@@ -210,10 +210,10 @@ private:
 		}
 
 
-		virtual bool merge(IEditorCommand&) override { return false; }
+		bool merge(IEditorCommand&) override { return false; }
 
 
-		virtual uint32 getType() override
+		uint32 getType() override
 		{
 			static const uint32 hash =
 				crc32("create_entity_template_instance");
@@ -340,7 +340,7 @@ public:
 	}
 
 
-	virtual Entity createInstanceNoCommand(uint32 name_hash, const Vec3& position) override
+	Entity createInstanceNoCommand(uint32 name_hash, const Vec3& position) override
 	{
 		int instance_index = m_instances.find(name_hash);
 		ASSERT(instance_index >= 0);
@@ -362,7 +362,7 @@ public:
 	}
 
 
-	virtual void createTemplateFromEntity(const char* name,
+	void createTemplateFromEntity(const char* name,
 										  Entity entity) override
 	{
 		CreateTemplateCommand* command =
@@ -371,7 +371,7 @@ public:
 	}
 
 
-	virtual uint32 getTemplate(Entity entity) override
+	uint32 getTemplate(Entity entity) override
 	{
 		for (int j = 0; j < m_instances.size(); ++j)
 		{
@@ -388,7 +388,7 @@ public:
 	}
 
 
-	virtual const Array<Entity>&
+	const Array<Entity>&
 	getInstances(uint32 template_name_hash) override
 	{
 		int instances_index = m_instances.find(template_name_hash);
@@ -402,7 +402,7 @@ public:
 	}
 
 
-	virtual Entity createInstance(const char* name,
+	Entity createInstance(const char* name,
 								  const Vec3& position) override
 	{
 		CreateInstanceCommand* command = LUMIX_NEW(m_editor.getAllocator(), CreateInstanceCommand)(
@@ -412,7 +412,7 @@ public:
 	}
 
 
-	virtual void serialize(OutputBlob& serializer) override
+	void serialize(OutputBlob& serializer) override
 	{
 		serializer.write((int32)m_template_names.size());
 		for (int i = 0, c = m_template_names.size(); i < c; ++i)
@@ -433,7 +433,7 @@ public:
 	}
 
 
-	virtual void deserialize(InputBlob& serializer) override
+	void deserialize(InputBlob& serializer) override
 	{
 		m_template_names.clear();
 		m_instances.clear();
@@ -466,13 +466,13 @@ public:
 	}
 
 
-	virtual Array<string>& getTemplateNames() override
+	Array<string>& getTemplateNames() override
 	{
 		return m_template_names;
 	}
 
 
-	virtual DelegateList<void()>& updated() override { return m_updated; }
+	DelegateList<void()>& updated() override { return m_updated; }
 
 
 private:

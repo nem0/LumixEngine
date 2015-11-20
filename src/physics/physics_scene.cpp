@@ -212,20 +212,20 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual Universe& getUniverse() override { return m_universe; }
+	Universe& getUniverse() override { return m_universe; }
 
 
-	virtual bool ownComponentType(uint32 type) const override
+	bool ownComponentType(uint32 type) const override
 	{
 		return type == BOX_ACTOR_HASH || type == MESH_ACTOR_HASH ||
 			   type == HEIGHTFIELD_HASH || type == CONTROLLER_HASH;
 	}
 
 
-	virtual IPlugin& getPlugin() const override { return *m_system; }
+	IPlugin& getPlugin() const override { return *m_system; }
 
 
-	virtual ComponentIndex createComponent(uint32 component_type,
+	ComponentIndex createComponent(uint32 component_type,
 										   Entity entity) override
 	{
 		if (component_type == HEIGHTFIELD_HASH)
@@ -248,7 +248,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void destroyComponent(ComponentIndex cmp, uint32 type) override
+	void destroyComponent(ComponentIndex cmp, uint32 type) override
 	{
 		if (type == HEIGHTFIELD_HASH)
 		{
@@ -358,7 +358,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual const char* getHeightmap(ComponentIndex cmp) override
+	const char* getHeightmap(ComponentIndex cmp) override
 	{
 		return m_terrains[cmp]->m_heightmap
 				   ? m_terrains[cmp]->m_heightmap->getPath().c_str()
@@ -366,13 +366,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual float getHeightmapXZScale(ComponentIndex cmp) override
+	float getHeightmapXZScale(ComponentIndex cmp) override
 	{
 		return m_terrains[cmp]->m_xz_scale;
 	}
 
 
-	virtual void setHeightmapXZScale(ComponentIndex cmp, float scale) override
+	void setHeightmapXZScale(ComponentIndex cmp, float scale) override
 	{
 		if (scale != m_terrains[cmp]->m_xz_scale)
 		{
@@ -386,13 +386,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual float getHeightmapYScale(ComponentIndex cmp) override
+	float getHeightmapYScale(ComponentIndex cmp) override
 	{
 		return m_terrains[cmp]->m_y_scale;
 	}
 
 
-	virtual void setHeightmapYScale(ComponentIndex cmp, float scale) override
+	void setHeightmapYScale(ComponentIndex cmp, float scale) override
 	{
 		if (scale != m_terrains[cmp]->m_y_scale)
 		{
@@ -405,7 +405,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void setHeightmap(ComponentIndex cmp, const char* str) override
+	void setHeightmap(ComponentIndex cmp, const char* str) override
 	{
 		auto& resource_manager = m_engine->getResourceManager();
 		if (m_terrains[cmp]->m_heightmap)
@@ -422,13 +422,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual const char* getShapeSource(ComponentIndex cmp) override
+	const char* getShapeSource(ComponentIndex cmp) override
 	{
 		return m_actors[cmp]->getResource() ? m_actors[cmp]->getResource()->getPath().c_str() : "";
 	}
 
 
-	virtual void setShapeSource(ComponentIndex cmp, const char* str) override
+	void setShapeSource(ComponentIndex cmp, const char* str) override
 	{
 		ASSERT(m_actors[cmp]);
 		bool is_dynamic = isDynamic(cmp);
@@ -465,7 +465,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	static Vec3 toVec3(const physx::PxVec3& v) { return Vec3(v.x, v.y, v.z); }
 
 
-	virtual void render(RenderScene& render_scene) override
+	void render(RenderScene& render_scene) override
 	{
 		m_scene->getNbActors(physx::PxActorTypeSelectionFlag::eRIGID_STATIC);
 		const physx::PxRenderBuffer& rb = m_scene->getRenderBuffer();
@@ -534,7 +534,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void update(float time_delta) override
+	void update(float time_delta) override
 	{
 		if (!m_is_game_running) return;
 		
@@ -546,31 +546,31 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void startGame() override
+	void startGame() override
 	{
 		m_is_game_running = true;
 	}
 
 
-	virtual void stopGame() override
+	void stopGame() override
 	{
 		m_is_game_running = false;
 	}
 	
 
-	virtual float getControllerRadius(ComponentIndex cmp) override
+	float getControllerRadius(ComponentIndex cmp) override
 	{
 		return m_controllers[cmp].m_radius;
 	}
 
 
-	virtual float getControllerHeight(ComponentIndex cmp) override
+	float getControllerHeight(ComponentIndex cmp) override
 	{
 		return m_controllers[cmp].m_height;
 	}
 
 
-	virtual ComponentIndex getController(Entity entity) override
+	ComponentIndex getController(Entity entity) override
 	{
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
@@ -589,7 +589,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual bool raycast(const Vec3& origin,
+	bool raycast(const Vec3& origin,
 		const Vec3& dir,
 		float distance,
 		RaycastHit& result) override
@@ -768,7 +768,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual bool isDynamic(ComponentIndex cmp) override
+	bool isDynamic(ComponentIndex cmp) override
 	{
 		RigidActor* actor = m_actors[cmp];
 		return isDynamic(actor);
@@ -788,7 +788,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual Vec3 getHalfExtents(ComponentIndex cmp) override
+	Vec3 getHalfExtents(ComponentIndex cmp) override
 	{
 		Vec3 size;
 		physx::PxRigidActor* actor = m_actors[cmp]->getPhysxActor();
@@ -805,7 +805,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void setHalfExtents(ComponentIndex cmp, const Vec3& size) override
+	void setHalfExtents(ComponentIndex cmp, const Vec3& size) override
 	{
 		physx::PxRigidActor* actor = m_actors[cmp]->getPhysxActor();
 		physx::PxShape* shapes;
@@ -824,7 +824,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void setIsDynamic(ComponentIndex cmp, bool new_value) override
+	void setIsDynamic(ComponentIndex cmp, bool new_value) override
 	{
 		int dynamic_index = -1;
 		RigidActor* actor = m_actors[cmp];
@@ -987,7 +987,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void serialize(OutputBlob& serializer) override
+	void serialize(OutputBlob& serializer) override
 	{
 		serializer.write((int32)m_actors.size());
 		for (int i = 0; i < m_actors.size(); ++i)
@@ -1153,7 +1153,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void deserialize(InputBlob& serializer, int) override
+	void deserialize(InputBlob& serializer, int) override
 	{
 		deserializeActors(serializer);
 		deserializeControllers(serializer);
@@ -1161,7 +1161,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual PhysicsSystem& getSystem() const override { return *m_system; }
+	PhysicsSystem& getSystem() const override { return *m_system; }
 
 
 	struct Controller

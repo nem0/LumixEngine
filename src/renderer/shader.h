@@ -80,8 +80,8 @@ public:
 	bgfx::ShaderHandle getHandle() { return m_handle; }
 
 private:
-	virtual void unload() override;
-	virtual bool load(FS::IFile& file) override;
+	void unload() override;
+	bool load(FS::IFile& file) override;
 
 private:
 	bgfx::ShaderHandle m_handle;
@@ -135,9 +135,9 @@ private:
 	void parseTextureSlots(lua_State* state);
 	bool generateInstances();
 
-	virtual void onBeforeReady() override;
-	virtual void unload(void) override;
-	virtual bool load(FS::IFile& file) override;
+	void onBeforeReady() override;
+	void unload(void) override;
+	bool load(FS::IFile& file) override;
 
 private:
 	IAllocator& m_allocator;

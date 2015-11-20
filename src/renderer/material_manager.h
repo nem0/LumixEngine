@@ -20,8 +20,8 @@ namespace Lumix
 		Renderer& getRenderer() { return m_renderer; }
 
 	protected:
-		virtual Resource* createResource(const Path& path) override;
-		virtual void destroyResource(Resource& resource) override;
+		Resource* createResource(const Path& path) override;
+		void destroyResource(Resource& resource) override;
 
 	private:
 		IAllocator& m_allocator;

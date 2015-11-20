@@ -93,7 +93,7 @@ public:
 	}
 
 
-	virtual void setLocalRotation(Entity entity, const Quat& rotation) override
+	void setLocalRotation(Entity entity, const Quat& rotation) override
 	{
 		Parents::iterator parent_iter = m_parents.find(entity);
 
@@ -108,13 +108,13 @@ public:
 	}
 
 
-	virtual const Children& getAllChildren() const override
+	const Children& getAllChildren() const override
 	{
 		return m_children;
 	}
 
 
-	virtual void setParent(Entity child, Entity parent) override
+	void setParent(Entity child, Entity parent) override
 	{
 		Parents::iterator old_parent_iter = m_parents.find(child);
 		if (old_parent_iter.isValid())
@@ -154,7 +154,7 @@ public:
 	}
 
 
-	virtual Entity getParent(Entity child) override
+	Entity getParent(Entity child) override
 	{
 		Parents::iterator parent_iter = m_parents.find(child);
 		if (parent_iter.isValid())
@@ -165,7 +165,7 @@ public:
 	}
 
 
-	virtual void serialize(OutputBlob& serializer) override
+	void serialize(OutputBlob& serializer) override
 	{
 		int size = m_parents.size();
 		serializer.write((int32)size);
@@ -179,7 +179,7 @@ public:
 	}
 
 
-	virtual void deserialize(InputBlob& serializer) override
+	void deserialize(InputBlob& serializer) override
 	{
 		int32 size;
 		serializer.read(size);
@@ -193,14 +193,14 @@ public:
 	}
 
 
-	virtual DelegateList<void(Entity, Entity)>&
+	DelegateList<void(Entity, Entity)>&
 	parentSet() override
 	{
 		return m_parent_set;
 	}
 
 
-	virtual Array<Child>* getChildren(Entity parent) override
+	Array<Child>* getChildren(Entity parent) override
 	{
 		Children::iterator iter = m_children.find(parent);
 		if (iter.isValid())

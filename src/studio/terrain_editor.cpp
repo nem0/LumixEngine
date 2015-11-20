@@ -121,7 +121,7 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 	virtual bool merge(IEditorCommand& /*command*/) { return false; }
 
 
-	virtual bool execute() override
+	bool execute() override
 	{
 		PROFILE_FUNCTION();
 		m_entities.clear();
@@ -439,7 +439,7 @@ struct RemoveEntitiesCommand : public Lumix::IEditorCommand
 	virtual bool merge(IEditorCommand& /*command*/) { return false; }
 
 
-	virtual bool execute() override
+	bool execute() override
 	{
 		PROFILE_FUNCTION();
 
@@ -553,7 +553,7 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 	}
 
 
-	virtual void serialize(Lumix::JsonSerializer& serializer) override
+	void serialize(Lumix::JsonSerializer& serializer) override
 	{
 		serializer.serialize("type", (int)m_type);
 		serializer.serialize("texture_idx", m_texture_idx);
@@ -578,7 +578,7 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 	}
 
 
-	virtual void deserialize(Lumix::JsonSerializer& serializer) override
+	void deserialize(Lumix::JsonSerializer& serializer) override
 	{
 		m_items.clear();
 		int type;
@@ -613,7 +613,7 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 	}
 
 
-	virtual bool execute() override
+	bool execute() override
 	{
 		if (m_new_data.empty())
 		{
@@ -625,17 +625,17 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 	}
 
 
-	virtual void undo() override { applyData(m_old_data); }
+	void undo() override { applyData(m_old_data); }
 
 
-	virtual Lumix::uint32 getType() override
+	Lumix::uint32 getType() override
 	{
 		static const Lumix::uint32 type = Lumix::crc32("paint_terrain");
 		return type;
 	}
 
 
-	virtual bool merge(IEditorCommand& command) override
+	bool merge(IEditorCommand& command) override
 	{
 		if (!m_can_be_merged)
 		{

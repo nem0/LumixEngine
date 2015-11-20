@@ -32,8 +32,8 @@ public:
 			  IAllocator& allocator);
 	virtual ~LuaScript();
 	
-	virtual void unload() override;
-	virtual bool load(FS::IFile& file) override;
+	void unload() override;
+	bool load(FS::IFile& file) override;
 	const char* getSourceCode() const { return m_source_code.c_str(); }
 	const char* getPropertyName(uint32 hash) const;
 	const Array<Property>& getProperties() const
@@ -57,8 +57,8 @@ public:
 	~LuaScriptManager();
 
 protected:
-	virtual Resource* createResource(const Path& path) override;
-	virtual void destroyResource(Resource& resource) override;
+	Resource* createResource(const Path& path) override;
+	void destroyResource(Resource& resource) override;
 
 private:
 	IAllocator& m_allocator;

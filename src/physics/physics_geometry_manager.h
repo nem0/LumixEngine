@@ -32,8 +32,8 @@ class LUMIX_PHYSICS_API PhysicsGeometryManager : public ResourceManagerBase
 		PhysicsSystem& getSystem() { return m_system; }
 
 	protected:
-		virtual Resource* createResource(const Path& path) override;
-		virtual void destroyResource(Resource& resource) override;
+		Resource* createResource(const Path& path) override;
+		void destroyResource(Resource& resource) override;
 
 	private:
 		IAllocator& m_allocator;
@@ -68,8 +68,8 @@ class LUMIX_PHYSICS_API PhysicsGeometry : public Resource
 	private:
 		IAllocator& getAllocator();
 
-		virtual void unload(void) override;
-		virtual bool load(FS::IFile& file) override;
+		void unload(void) override;
+		bool load(FS::IFile& file) override;
 
 	private:
 		physx::PxGeometry* m_geometry;

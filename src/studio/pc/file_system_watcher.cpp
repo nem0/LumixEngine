@@ -26,7 +26,7 @@ struct FileSystemWatcherTask : public Lumix::MT::Task
 	}
 
 
-	virtual int task() override;
+	int task() override;
 
 
 	FILE_NOTIFY_INFORMATION m_info[10];

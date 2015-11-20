@@ -219,7 +219,7 @@ struct ImportTextureTask : public Lumix::MT::Task
 	}
 
 
-	virtual int task() override
+	int task() override
 	{
 		m_dialog.setImportMessage("Importing texture...");
 		int image_width;
@@ -295,7 +295,7 @@ struct ImportTask : public Lumix::MT::Task
 {
 	struct ProgressHandler : public Assimp::ProgressHandler
 	{
-		virtual bool Update(float percentage) override
+		bool Update(float percentage) override
 		{
 			m_task->m_dialog.setImportMessage(
 				StringBuilder<50>("Importing... ") << int(percentage*100) << "%%");
@@ -320,7 +320,7 @@ struct ImportTask : public Lumix::MT::Task
 	}
 
 
-	virtual int task() override
+	int task() override
 	{
 		m_progress_handler.m_task = this;
 		Lumix::enableFloatingPointTraps(false);
@@ -633,7 +633,7 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	virtual int task() override
+	int task() override
 	{
 		if (saveLumixPhysics() && saveLumixModel() && saveLumixMaterials())
 		{

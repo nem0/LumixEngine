@@ -27,13 +27,13 @@ namespace Lumix
 			}
 
 
-			virtual IFileDevice& getDevice() override
+			IFileDevice& getDevice() override
 			{
 				return m_device;
 			}
 
 
-			virtual bool open(const char* path, Mode mode) override
+			bool open(const char* path, Mode mode) override
 			{
 				invokeEvent(EventType::OPEN_BEGIN, path, -1, mode);
 				bool ret = m_file.open(path, mode);
@@ -43,7 +43,7 @@ namespace Lumix
 			}
 
 
-			virtual void close() override
+			void close() override
 			{
 				invokeEvent(EventType::CLOSE_BEGIN, "", -1, -1);
 				m_file.close();
@@ -52,7 +52,7 @@ namespace Lumix
 			}
 
 
-			virtual bool read(void* buffer, size_t size) override
+			bool read(void* buffer, size_t size) override
 			{
 				invokeEvent(EventType::READ_BEGIN, "", -1, (int32)size);
 				bool ret = m_file.read(buffer, size);
@@ -62,7 +62,7 @@ namespace Lumix
 			}
 
 
-			virtual bool write(const void* buffer, size_t size) override
+			bool write(const void* buffer, size_t size) override
 			{
 				invokeEvent(EventType::WRITE_BEGIN, "", -1, (int32)size);
 				bool ret = m_file.write(buffer, size);
@@ -72,13 +72,13 @@ namespace Lumix
 			}
 
 
-			virtual const void* getBuffer() const override
+			const void* getBuffer() const override
 			{
 				return nullptr;
 			}
 
 
-			virtual size_t size() override
+			size_t size() override
 			{
 				invokeEvent(EventType::SIZE_BEGIN, "", -1, -1);
 				size_t ret = m_file.size();
@@ -88,7 +88,7 @@ namespace Lumix
 			}
 
 
-			virtual size_t seek(SeekMode base, size_t pos) override
+			size_t seek(SeekMode base, size_t pos) override
 			{
 				invokeEvent(EventType::SEEK_BEGIN, "", (int32)pos, base);
 				size_t ret = m_file.seek(base, pos);
@@ -98,7 +98,7 @@ namespace Lumix
 			}
 
 
-			virtual size_t pos() override
+			size_t pos() override
 			{
 				invokeEvent(EventType::POS_BEGIN, "", -1, -1);
 				size_t ret = m_file.pos();

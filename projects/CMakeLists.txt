@@ -105,6 +105,7 @@ add_library(audio SHARED
 set_target_properties (audio PROPERTIES COMPILE_DEFINITIONS "BUILDING_AUDIO")
 
 target_link_libraries(audio engine)
+target_link_libraries(audio dxguid.lib)
 
 
 ###################### PHYSICS ######################
