@@ -73,6 +73,7 @@ public:
 		LuaScript* m_script;
 		int m_entity;
 		lua_State* m_state;
+		int m_environment;
 		Array<Property> m_properties;
 	};
 
@@ -84,6 +85,7 @@ public:
 		, m_scripts(system.getAllocator())
 		, m_valid(system.getAllocator())
 		, m_global_state(nullptr)
+		, m_updates(system.getAllocator())
 	{
 	}
 
@@ -136,8 +138,6 @@ public:
 		{
 			return;
 		}
-		lua_pushnil(state);
-		lua_setglobal(state, name);
 		char tmp[1024];
 		copyString(tmp, name);
 		catString(tmp, " = ");
@@ -145,6 +145,10 @@ public:
 
 		bool errors =
 			luaL_loadbuffer(state, tmp, stringLength(tmp), nullptr) != LUA_OK;
+
+		lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
+		lua_setupvalue(script.m_state, -2, 1);
+
 		errors = errors || lua_pcall(state, 0, LUA_MULTRET, 0) != LUA_OK;
 
 		if (errors)
@@ -244,50 +248,66 @@ public:
 		registerAPI(m_global_state);
 		for (int i = 0; i < m_scripts.size(); ++i)
 		{
-			if (m_valid[i] && m_scripts[i].m_script)
+			if (!m_valid[i] || !m_scripts[i].m_script) continue;
+
+			Script& script = m_scripts[i];
+
+			if (!script.m_script->isReady())
 			{
-				Script& script = m_scripts[i];
-
-				if (script.m_script->isReady())
-				{
-					script.m_state = lua_newthread(m_global_state);
-					lua_pushinteger(script.m_state, script.m_entity);
-					lua_setglobal(script.m_state, "this");
-
-					applyProperties(script);
-
-					bool errors =
-						luaL_loadbuffer(
-							script.m_state,
-							script.m_script->getSourceCode(),
-							stringLength(script.m_script->getSourceCode()),
-							script.m_script->getPath().c_str()) != LUA_OK;
-					errors =
-						errors ||
-						lua_pcall(script.m_state, 0, LUA_MULTRET, 0) != LUA_OK;
-					if (errors)
-					{
-						g_log_error.log("lua")
-							<< script.m_script->getPath().c_str() << ": "
-							<< lua_tostring(script.m_state, -1);
-						lua_pop(script.m_state, 1);
-					}
-				}
-				else
-				{
-					script.m_state = nullptr;
-					g_log_error.log("lua script")
-						<< "Script "
-						<< script.m_script->getPath().c_str()
-						<< " is not loaded";
-				}
+				script.m_state = nullptr;
+				g_log_error.log("lua script") << "Script " << script.m_script->getPath().c_str()
+											  << " is not loaded";
+				continue;
 			}
+
+			script.m_state = lua_newthread(m_global_state);
+			lua_newtable(script.m_state);
+			// reference environment
+			lua_pushvalue(script.m_state, -1);
+			script.m_environment = luaL_ref(script.m_state, LUA_REGISTRYINDEX);
+
+			// environment's metatable & __index
+			lua_pushvalue(script.m_state, -1);
+			lua_setmetatable(script.m_state, -2);
+			lua_pushglobaltable(script.m_state);
+			lua_setfield(script.m_state, -2, "__index");
+
+			// set this
+			lua_pushinteger(script.m_state, script.m_entity);
+			lua_setfield(script.m_state, -2, "this");
+
+			applyProperties(script);
+
+			bool errors = luaL_loadbuffer(script.m_state,
+							  script.m_script->getSourceCode(),
+							  stringLength(script.m_script->getSourceCode()),
+							  script.m_script->getPath().c_str()) != LUA_OK;
+			
+			lua_pushvalue(script.m_state, -2);
+			lua_setupvalue(script.m_state, -2, 1); // function's environment
+
+			errors = errors || lua_pcall(script.m_state, 0, LUA_MULTRET, 0) != LUA_OK;
+			if (errors)
+			{
+				g_log_error.log("lua") << script.m_script->getPath().c_str() << ": "
+									   << lua_tostring(script.m_state, -1);
+				lua_pop(script.m_state, 1);
+			}
+			lua_pop(script.m_state, 1);
+
+			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
+			if (lua_getfield(script.m_state, -1, "update") == LUA_TFUNCTION)
+			{
+				m_updates.push(i);
+			}
+			lua_pop(script.m_state, 1);
 		}
 	}
 
 
 	void stopGame() override
 	{
+		m_updates.clear();
 		for (Script& script : m_scripts)
 		{
 			script.m_state = nullptr;
@@ -321,6 +341,7 @@ public:
 	{
 		if (type == LUA_SCRIPT_HASH)
 		{
+			m_updates.eraseItem(component);
 			m_universe_context.m_universe->destroyComponent(
 				Entity(m_scripts[component].m_entity), type, this, component);
 			m_valid[component] = false;
@@ -394,22 +415,20 @@ public:
 
 	void update(float time_delta) override
 	{
-		if (!m_global_state)
-		{
-			return;
-		}
+		if (!m_global_state) { return; }
 
-		if (lua_getglobal(m_global_state, "update") == LUA_TFUNCTION)
+		for (auto i : m_updates)
 		{
-			lua_pushnumber(m_global_state, time_delta);
-			if (lua_pcall(m_global_state, 1, 0, 0) != LUA_OK)
+			auto& script = m_scripts[i];
+			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
+			lua_getfield(script.m_state, -1, "update");
+			lua_pushnumber(script.m_state, time_delta);
+			if (lua_pcall(script.m_state, 1, 0, 0) != LUA_OK)
 			{
 				g_log_error.log("lua") << lua_tostring(m_global_state, -1);
+				lua_pop(script.m_state, 1);
 			}
-		}
-		else
-		{
-			lua_pop(m_global_state, 1);
+			lua_pop(script.m_state, 1);
 		}
 	}
 
@@ -468,6 +487,7 @@ private:
 	Array<Script> m_scripts;
 	lua_State* m_global_state;
 	UniverseContext& m_universe_context;
+	Array<int> m_updates;
 };
 
 
