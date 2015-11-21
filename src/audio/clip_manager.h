@@ -10,11 +10,7 @@ namespace Lumix
 {
 
 
-namespace Audio
-{
-
-
-class LUMIX_LIBRARY_EXPORT Clip : public Resource
+class LUMIX_AUDIO_API Clip : public Resource
 {
 public:
 	Clip(const Path& path, ResourceManager& manager, IAllocator& allocator)
@@ -26,7 +22,8 @@ public:
 	void unload(void) override;
 	bool load(FS::IFile& file) override;
 	int getChannels() const { return m_channels; }
-	int getSamplerate() const { return m_sample_rate; }
+	int getSampleRate() const { return m_sample_rate; }
+	int getSize() const { return m_data.size() * sizeof(m_data[0]); }
 	uint16* getData() { return &m_data[0]; }
 
 private:
@@ -36,7 +33,7 @@ private:
 };
 
 
-class LUMIX_LIBRARY_EXPORT ClipManager : public ResourceManagerBase
+class LUMIX_AUDIO_API ClipManager : public ResourceManagerBase
 {
 public:
 	ClipManager(IAllocator& allocator)
@@ -54,9 +51,6 @@ protected:
 private:
 	IAllocator& m_allocator;
 };
-
-
-} // namespace Audio
 
 
 } // namespace Lumix

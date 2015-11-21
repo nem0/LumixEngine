@@ -28,6 +28,7 @@ public:
 		TEXTURE,
 		UNIVERSE,
 		LUA_SCRIPT,
+		AUDIO,
 
 		Count
 	};

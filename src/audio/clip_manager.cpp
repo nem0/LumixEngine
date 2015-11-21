@@ -12,10 +12,6 @@ namespace Lumix
 {
 
 
-namespace Audio
-{
-
-
 void Clip::unload()
 {
 	m_data.clear();
@@ -25,7 +21,8 @@ void Clip::unload()
 bool Clip::load(FS::IFile& file)
 {
 	short* output = nullptr;
-	auto res = stb_vorbis_decode_memory((unsigned char*)file.getBuffer(), file.size(), &m_channels, &m_sample_rate, &output);
+	auto res = stb_vorbis_decode_memory(
+		(unsigned char*)file.getBuffer(), (int)file.size(), &m_channels, &m_sample_rate, &output);
 	if (res <= 0) return false;
 
 	m_data.resize(res);
@@ -46,9 +43,6 @@ void ClipManager::destroyResource(Resource& resource)
 {
 	LUMIX_DELETE(m_allocator, static_cast<Clip*>(&resource));
 }
-
-
-} // namespace Audio
 
 
 } // namespace Lumix

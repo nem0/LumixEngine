@@ -26,6 +26,12 @@ void registerLuaScriptProperties(Lumix::IAllocator& allocator)
 }
 
 
+void registerAudioProperties(Lumix::IAllocator& allocator)
+{
+	PropertyRegister::registerComponentType("audio_listener", "Audio - listener");
+}
+
+
 void registerPhysicsProperties(Lumix::IAllocator& allocator)
 {
 	PropertyRegister::registerComponentType("box_rigid_actor", "Physics Box");
@@ -361,4 +367,5 @@ void registerProperties(Lumix::WorldEditor& editor)
 	registerRendererProperties(editor.getAllocator());
 	registerLuaScriptProperties(editor.getAllocator());
 	registerPhysicsProperties(editor.getAllocator());
+	registerAudioProperties(editor.getAllocator());
 }

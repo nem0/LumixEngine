@@ -5,6 +5,7 @@ namespace Lumix
 {
 
 
+class Clip;
 class Engine;
 class IAllocator;
 class Path;
@@ -13,28 +14,28 @@ class Path;
 namespace Audio
 {
 
-	enum class ClipFlags
-	{
-		IS3D,
+enum class BufferFlags
+{
+	IS3D = 1
+};
 
-		COUNT
-	};
+typedef void* BufferHandle;
+static const BufferHandle INVALID_BUFFER_HANDLE = nullptr;
 
+bool init(Engine& engine, IAllocator& allocator);
+void shutdown();
 
-	bool init(Engine& engine, IAllocator& allocator);
-	void shutdown();
-
-	typedef void* ClipHandle;
-	ClipHandle load(const Path& path, const void* data, int size, int channels, int sample_rate, int flags);
-	void unload(ClipHandle clip);
-	void play(ClipHandle clip);
-	void stop(ClipHandle clip);
-	void pause(ClipHandle clip);
-	void setVolume(ClipHandle clip, float volume);
-	void setFrequency(ClipHandle clip, float frequency);
-	void setCurrentPosition(ClipHandle clip, float time_seconds);
-	void setListenerPosition(int index, float x, float y, float z);
-	void setSourcePosition(ClipHandle clip, float x, float y, float z);
+BufferHandle createBuffer(const void* data, int size_bytes, int channels, int sample_rate, int flags);
+void destroyBuffer(BufferHandle buffer);
+void play(BufferHandle buffer);
+void stop(BufferHandle buffer);
+void pause(BufferHandle buffer);
+void setVolume(BufferHandle buffer, float volume);
+void setFrequency(BufferHandle buffer, float frequency);
+void setCurrentTime(BufferHandle buffer, float time_seconds);
+void setListenerPosition(int index, float x, float y, float z);
+void setSourcePosition(BufferHandle buffer, float x, float y, float z);
+void update(float time_delta);
 
 } // namespace Audio
 

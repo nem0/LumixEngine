@@ -14,19 +14,21 @@ namespace LuaAPI
 {
 
 
-static void moveController(
-	IScene* scene, int component, float x, float y, float z, float time_delta)
+static void moveController(IScene* scene,
+	int component,
+	float x,
+	float y,
+	float z,
+	float time_delta)
 {
-	static_cast<PhysicsScene*>(scene)
-		->moveController(component, Vec3(x, y, z), time_delta);
+	static_cast<PhysicsScene*>(scene)->moveController(component, Vec3(x, y, z), time_delta);
 }
 
 
 } // namespace LuaAPI
 
 
-static void
-registerCFunction(lua_State* L, const char* name, lua_CFunction func)
+static void registerCFunction(lua_State* L, const char* name, lua_CFunction func)
 {
 	lua_pushcfunction(L, func);
 	lua_setglobal(L, name);

@@ -1,5 +1,10 @@
+#include "audio_system.h"
 #include "audio_device.h"
+#include "audio_scene.h"
+#include "clip_manager.h"
+#include "core/crc32.h"
 #include "core/path.h"
+#include "core/resource_manager.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 
@@ -8,31 +13,46 @@ namespace Lumix
 {
 
 
-struct AudioSystemImpl : public IPlugin
+struct AudioSystemImpl : public AudioSystem
 {
 	AudioSystemImpl(Engine& engine)
 		: m_engine(engine)
+		, m_manager(engine.getAllocator())
 	{
 	}
 
 
+	ClipManager& getClipManager() override { return m_manager; }
+
+
 	bool create() override
 	{
-		return Audio::init(m_engine, m_engine.getAllocator());
+		bool result = Audio::init(m_engine, m_engine.getAllocator());
+		m_manager.create(crc32("CLIP"), m_engine.getResourceManager());
+		return result;
 	}
 
 
 	void destroy() override
 	{
 		Audio::shutdown();
+		m_manager.destroy();
 	}
 
 
 	const char* getName() const override { return "audio"; }
 
-	IScene* createScene(UniverseContext&) { return nullptr; }
-	void destroyScene(IScene* scene) { ASSERT(false); }
 
+	IScene* createScene(UniverseContext& ctx)
+	{
+		return AudioScene::createInstance(*this, m_engine, *ctx.m_universe, m_engine.getAllocator());
+	}
+
+
+	void destroyScene(IScene* scene) { AudioScene::destroyInstance(static_cast<AudioScene*>(scene)); }
+
+
+	ClipManager m_manager;
 	Engine& m_engine;
 };
 

@@ -30,6 +30,7 @@
 
 static const Lumix::uint32 UNIVERSE_HASH = Lumix::crc32("universe");
 static const Lumix::uint32 SOURCE_HASH = Lumix::crc32("source");
+static const Lumix::uint32 CLIP_HASH = Lumix::crc32("CLIP");
 static const Lumix::uint32 LUA_SCRIPT_HASH = Lumix::crc32("lua_script");
 
 
@@ -38,6 +39,7 @@ static Lumix::uint32 getResourceType(const char* path)
 	char ext[10];
 	Lumix::PathUtils::getExtension(ext, sizeof(ext), path);
 
+	if (Lumix::compareString(ext, "ogg") == 0) return CLIP_HASH;
 	if (Lumix::compareString(ext, "mat") == 0) return Lumix::ResourceManager::MATERIAL;
 	if (Lumix::compareString(ext, "msh") == 0) return Lumix::ResourceManager::MODEL;
 	if (Lumix::compareString(ext, "dds") == 0) return Lumix::ResourceManager::TEXTURE;
@@ -803,6 +805,7 @@ void AssetBrowser::addResource(const char* path, const char* filename)
 
 	int index = -1;
 	if (Lumix::compareString(ext, "dds") == 0 || Lumix::compareString(ext, "tga") == 0 || Lumix::compareString(ext, "raw") == 0) index = TEXTURE;
+	if (Lumix::compareString(ext, "ogg") == 0) index = AUDIO;
 	if (Lumix::compareString(ext, "msh") == 0) index = MODEL;
 	if (Lumix::compareString(ext, "mat") == 0) index = MATERIAL;
 	if (Lumix::compareString(ext, "unv") == 0) index = UNIVERSE;
