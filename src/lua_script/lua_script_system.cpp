@@ -32,6 +32,8 @@ class LuaScriptSystemImpl;
 void registerEngineLuaAPI(Engine&, lua_State* L);
 void registerUniverse(UniverseContext*, lua_State* L);
 void registerPhysicsLuaAPI(Engine&, Universe&, lua_State* L);
+void registerAudioLuaAPI(Engine&, Universe&, lua_State* L);
+
 
 
 static const uint32 LUA_SCRIPT_HASH = crc32("lua_script");
@@ -116,6 +118,10 @@ public:
 		if (m_system.m_engine.getPluginManager().getPlugin("physics"))
 		{
 			registerPhysicsLuaAPI(m_system.m_engine, *m_universe_context.m_universe, L);
+		}
+		if (m_system.m_engine.getPluginManager().getPlugin("audio"))
+		{
+			registerAudioLuaAPI(m_system.m_engine, *m_universe_context.m_universe, L);
 		}
 	}
 

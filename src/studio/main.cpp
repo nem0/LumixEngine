@@ -1,3 +1,5 @@
+#include "audio/audio_scene.h"
+#include "audio/clip_manager.h"
 #include "asset_browser.h"
 #include "core/blob.h"
 #include "core/command_line_parser.h"
@@ -239,6 +241,7 @@ public:
 			m_log_ui->onGUI();
 			m_import_asset_dialog->onGUI();
 			m_property_grid->onGUI();
+			showClipManager();
 			showEntityList();
 			showEntityTemplateList();
 			m_sceneview.onGUI();
@@ -591,6 +594,49 @@ public:
 				{
 					m_selected_template_name = template_name;
 				}
+			}
+		}
+		ImGui::End();
+	}
+
+
+	void showClipManager()
+	{
+		if (ImGui::Begin("Clip manager"))
+		{
+			auto* audio_scene = static_cast<Lumix::AudioScene*>(m_editor->getScene(Lumix::crc32("audio")));
+			int clip_count = audio_scene->getClipCount();
+			for (int clip_id = 0; clip_id < clip_count; ++clip_id)
+			{
+				if (!audio_scene->isClipIDValid(clip_id)) continue;
+				if (ImGui::TreeNode((const void*)clip_id, audio_scene->getClipName(clip_id)))
+				{
+					char buf[30];
+					Lumix::copyString(buf, Lumix::lengthOf(buf), audio_scene->getClipName(clip_id));
+					if (ImGui::InputText("Name", buf, sizeof(buf)))
+					{
+						audio_scene->setClipName(clip_id, buf);
+					}
+					auto* clip = audio_scene->getClip(clip_id);
+					char path[Lumix::MAX_PATH_LENGTH];
+					Lumix::copyString(path, clip ? clip->getPath().c_str() : "");
+					if (m_asset_browser->resourceInput(
+						"Clip", "", path, Lumix::lengthOf(path), AssetBrowser::Type::AUDIO))
+					{
+						audio_scene->setClip(clip_id, Lumix::Path(path));
+					}
+					if (ImGui::Button("Remove"))
+					{
+						audio_scene->removeClip(clip_id);
+						--clip_count;
+					}
+					ImGui::TreePop();
+				}
+			}
+
+			if (ImGui::Button("Add"))
+			{
+				audio_scene->addClip("test", Lumix::Path("test.ogg"));
 			}
 		}
 		ImGui::End();
