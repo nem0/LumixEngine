@@ -14,7 +14,7 @@ public:
 	DefaultAllocator() {}
 	~DefaultAllocator() {}
 
-	virtual void* allocate(size_t n) override;
+	void* allocate(size_t n) override;
 	void deallocate(void* p) override;
 	void* reallocate(void* ptr, size_t size) override;
 };

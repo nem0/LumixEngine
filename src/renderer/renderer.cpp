@@ -165,7 +165,7 @@ struct RendererImpl : public Renderer
 		uint32 cacheReadSize(uint64) override { return 0; }
 		bool cacheRead(uint64, void*, uint32) override { return false; }
 		void cacheWrite(uint64, const void*, uint32) override {}
-		virtual void captureEnd() override { ASSERT(false); }
+		void captureEnd() override { ASSERT(false); }
 		void captureFrame(const void*, uint32) override { ASSERT(false); }
 	};
 
@@ -241,7 +241,7 @@ struct RendererImpl : public Renderer
 	void destroy() override {}
 
 
-	virtual const char* getName() const override { return "renderer"; }
+	const char* getName() const override { return "renderer"; }
 
 
 	Engine& getEngine() override { return m_engine; }
