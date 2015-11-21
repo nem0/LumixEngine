@@ -12,9 +12,9 @@ namespace Lumix
 			MeasureTool();
 
 			void tick() override {}
-			virtual bool onEntityMouseDown(const RayCastModelHit& hit, int x, int y) override;
+			bool onEntityMouseDown(const RayCastModelHit& hit, int x, int y) override;
 			void onMouseMove(int, int, int, int) override {}
-			virtual void onMouseUp(int, int, MouseButton::Value) override {}
+			void onMouseUp(int, int, MouseButton::Value) override {}
 			void enable(bool is_enabled) { m_is_enabled = is_enabled; m_is_from_set = false; }
 			bool isEnabled() const { return m_is_enabled; }
 			const Vec3& getFrom() const { return m_from; }

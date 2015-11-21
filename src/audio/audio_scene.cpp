@@ -25,13 +25,6 @@ struct Listener
 };
 
 
-struct Source
-{
-	Entity entity;
-	ComponentIndex component;
-};
-
-
 struct PlayingSound
 {
 	Lumix::Audio::BufferHandle buffer_id;
@@ -53,7 +46,6 @@ struct AudioSceneImpl : public AudioScene
 	AudioSceneImpl(AudioSystem& system, Universe& universe, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_universe(universe)
-		, m_sources(allocator)
 		, m_clips(allocator)
 		, m_system(system)
 	{
@@ -104,16 +96,6 @@ struct AudioSceneImpl : public AudioScene
 			return createListener(entity);
 		}
 		return INVALID_COMPONENT;
-	}
-
-
-	int getSourceIndex(ComponentIndex component)
-	{
-		for (int i = 0, c = m_sources.size(); i < c; ++i)
-		{
-			if (m_sources[i].component == component) return i;
-		}
-		return -1;
 	}
 
 
@@ -312,7 +294,6 @@ struct AudioSceneImpl : public AudioScene
 	Universe& getUniverse() override { return m_universe; }
 	IPlugin& getPlugin() const override { return m_system; }
 
-	Lumix::Array<Source> m_sources;
 	Listener m_listener;
 	IAllocator& m_allocator;
 	Universe& m_universe;
