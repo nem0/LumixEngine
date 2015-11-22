@@ -129,7 +129,7 @@ struct AudioSceneImpl : public AudioScene
 	{
 		for (auto& i : m_ambient_sounds)
 		{
-			i.playing_sound = play(i.entity, i.clip_id);
+			if (i.clip_id >= 0) i.playing_sound = play(i.entity, i.clip_id);
 		}
 	}
 
@@ -162,13 +162,13 @@ struct AudioSceneImpl : public AudioScene
 
 	int getAmbientSoundClipId(ComponentIndex cmp) override
 	{
-		return m_ambient_sounds[cmp].clip_id;
+		return m_ambient_sounds[getAmbientSoundIdx(cmp)].clip_id;
 	}
 
 
 	void setAmbientSoundClipId(ComponentIndex cmp, int id) override
 	{
-		m_ambient_sounds[cmp].clip_id = id;;
+		m_ambient_sounds[getAmbientSoundIdx(cmp)].clip_id = id;;
 	}
 	
 
@@ -360,6 +360,15 @@ struct AudioSceneImpl : public AudioScene
 			{
 				Audio::stop(i.buffer_id);
 				i.buffer_id = Audio::INVALID_BUFFER_HANDLE;
+			}
+		}
+
+		for (auto& i : m_ambient_sounds)
+		{
+			if (i.clip_id == clip_id)
+			{
+				i.clip_id = -1;
+				i.playing_sound = -1;
 			}
 		}
 
