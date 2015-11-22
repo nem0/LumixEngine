@@ -307,7 +307,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		cDesc.position.set(position.x, position.y, position.z);
 		PhysicsSceneImpl::Controller& c = m_controllers.pushEmpty();
 		c.m_controller =
-			m_controller_manager->createController(*m_system->getPhysics(), m_scene, cDesc);
+			m_controller_manager->createController(cDesc);
 		c.m_entity = entity;
 		c.m_is_free = false;
 		c.m_frame_change.set(0, 0, 0);

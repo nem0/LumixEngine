@@ -271,6 +271,7 @@ add_dependencies(studio audio engine animation physics renderer lua_script edito
 
 set_target_properties(studio PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
 target_link_libraries(studio engine)
+target_link_libraries(studio audio)
 target_link_libraries(studio renderer)
 target_link_libraries(studio editor)
 target_link_libraries(studio ${EXTERNAL_PATH}assimp/lib/vs2013/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/assimp.lib)

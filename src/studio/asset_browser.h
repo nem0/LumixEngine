@@ -56,6 +56,7 @@ private:
 	void onGUIShader();
 	void onGUIModel();
 	void onGUITexture();
+	void onGUIClip();
 	void onGUILuaScript();
 	void saveMaterial(Lumix::Material* material);
 	void unloadResource();

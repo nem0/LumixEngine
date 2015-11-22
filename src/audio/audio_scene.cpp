@@ -5,6 +5,7 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/iallocator.h"
+#include "core/matrix.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "universe/universe.h"
@@ -29,6 +30,8 @@ struct PlayingSound
 {
 	Lumix::Audio::BufferHandle buffer_id;
 	Entity entity;
+	float time;
+	int clip_id;
 };
 
 
@@ -37,6 +40,7 @@ struct ClipInfo
 	Clip* clip;
 	char name[30];
 	uint32 name_hash;
+	bool looped;
 	int index;
 };
 
@@ -64,20 +68,61 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
+	bool isClipLooped(int clip_id) override
+	{
+		return m_clips[clip_id]->looped;
+	}
+
+
+	void setClipLooped(int clip_id, bool looped) override
+	{
+		m_clips[clip_id]->looped = looped;
+	}
+
+
 	void update(float time_delta) override
 	{
 		if (m_listener.entity != INVALID_ENTITY)
 		{
 			auto pos = m_universe.getPosition(m_listener.entity);
-			Audio::setListenerPosition(0, pos.x, pos.y, pos.z);
+			Audio::setListenerPosition(pos.x, pos.y, pos.z);
+			Matrix orientation;
+			m_universe.getRotation(m_listener.entity).toMatrix(orientation);
+			auto front = orientation.getZVector();
+			auto up = orientation.getYVector();
+			Audio::setListenerOrientation(front.x, front.y, front.z, up.x, up.y, up.z);
 		}
-		for (auto& i : m_playing_sounds)
+		
+		for (int i = 0; i < Lumix::lengthOf(m_playing_sounds); ++i)
 		{
-			if (i.buffer_id == Audio::INVALID_BUFFER_HANDLE) continue;
-			auto pos = m_universe.getPosition(i.entity);
-			Audio::setSourcePosition(i.buffer_id, pos.x, pos.y, pos.z);
+			auto& sound = m_playing_sounds[i];
+			if (sound.buffer_id == Audio::INVALID_BUFFER_HANDLE) continue;
+
+			auto pos = m_universe.getPosition(sound.entity);
+			Audio::setSourcePosition(sound.buffer_id, pos.x, pos.y, pos.z);
+			sound.time += time_delta;
+
+			auto* clip_info = m_clips[sound.clip_id];
+			if (!clip_info->looped && sound.time > clip_info->clip->getLengthSeconds())
+			{
+				Audio::stop(sound.buffer_id);
+				m_playing_sounds[i].buffer_id = Audio::INVALID_BUFFER_HANDLE;
+			}
 		}
 		Audio::update(time_delta);
+	}
+
+
+	void stopGame() override
+	{
+		for (auto& i : m_playing_sounds)
+		{
+			if (i.buffer_id != Audio::INVALID_BUFFER_HANDLE)
+			{
+				Audio::stop(i.buffer_id);
+				i.buffer_id = Audio::INVALID_BUFFER_HANDLE;
+			}
+		}
 	}
 
 
@@ -120,6 +165,7 @@ struct AudioSceneImpl : public AudioScene
 			serializer.write(clip != nullptr);
 			if (!clip) continue;
 			
+			serializer.write(clip->looped);
 			serializer.write(clip->index);
 			serializer.writeString(clip->name);
 			serializer.writeString(clip->clip->getPath().c_str());
@@ -164,6 +210,7 @@ struct AudioSceneImpl : public AudioScene
 			auto* clip = LUMIX_NEW(m_allocator, ClipInfo);
 			m_clips[i] = clip;
 
+			serializer.read(clip->looped);
 			serializer.read(clip->index);
 			serializer.readString(clip->name, Lumix::lengthOf(clip->name));
 			char path[MAX_PATH_LENGTH];
@@ -186,6 +233,15 @@ struct AudioSceneImpl : public AudioScene
 		copyString(clip->name, name);
 		clip->name_hash = crc32(name);
 		clip->clip = static_cast<Clip*>(m_system.getClipManager().load(path));
+		clip->looped = false;
+		for (int i = 0; i < m_clips.size(); ++i)
+		{
+			if (!m_clips[i])
+			{
+				m_clips[i] = clip;
+				return i;
+			}
+		}
 		m_clips.push(clip);
 		return m_clips.size() - 1;
 	}
@@ -202,12 +258,21 @@ struct AudioSceneImpl : public AudioScene
 
 	void removeClip(int clip_id) override
 	{
+		for (auto& i : m_playing_sounds)
+		{
+			if (i.clip_id == clip_id)
+			{
+				Audio::stop(i.buffer_id);
+				i.buffer_id = Audio::INVALID_BUFFER_HANDLE;
+			}
+		}
+
 		auto* clip = m_clips[clip_id]->clip;
 		if (clip)
 		{
 			clip->getResourceManager().get(CLIP_RESOURCE_HASH)->unload(*clip);
 		}
-		LUMIX_DELETE(m_allocator, clip);
+		LUMIX_DELETE(m_allocator, m_clips[clip_id]);
 		m_clips[clip_id] = nullptr;
 	}
 
@@ -247,27 +312,31 @@ struct AudioSceneImpl : public AudioScene
 
 	SoundHandle play(Entity entity, int clip_id) override
 	{
-		auto* clip = m_clips[clip_id]->clip;
-		if (!clip) return -1;
-
-		auto buffer = Audio::createBuffer(clip->getData(),
-			clip->getSize(),
-			clip->getChannels(),
-			clip->getSampleRate(),
-			(int)Audio::BufferFlags::IS3D);
-		if (!buffer) return -1;
-		Audio::play(buffer);
-
-		auto pos = m_universe.getPosition(entity);
-		Audio::setSourcePosition(buffer, pos.x, pos.y, pos.z);
-
 		for (int i = 0; i < Lumix::lengthOf(m_playing_sounds); ++i)
 		{
 			if (m_playing_sounds[i].buffer_id == Audio::INVALID_BUFFER_HANDLE)
 			{
+				if (!m_clips[clip_id]) return -1;
+				auto* clip = m_clips[clip_id]->clip;
+				if (!clip->isReady()) return -1;
+
+				int flags = (int)Audio::BufferFlags::IS3D;
+				auto buffer = Audio::createBuffer(clip->getData(),
+					clip->getSize(),
+					clip->getChannels(),
+					clip->getSampleRate(),
+					flags);
+				if (!buffer) return -1;
+				Audio::play(buffer, m_clips[clip_id]->looped);
+
+				auto pos = m_universe.getPosition(entity);
+				Audio::setSourcePosition(buffer, pos.x, pos.y, pos.z);
+
 				auto& sound = m_playing_sounds[i];
 				sound.buffer_id = buffer;
 				sound.entity = entity;
+				sound.time = 0;
+				sound.clip_id = clip_id;
 				return i;
 			}
 		}
