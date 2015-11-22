@@ -317,9 +317,8 @@ public:
 		m_global_state = nullptr;
 	}
 
-	
-	ComponentIndex createComponent(uint32 type,
-										   Entity entity) override
+
+	ComponentIndex createComponent(uint32 type, Entity entity) override
 	{
 		if (type == LUA_SCRIPT_HASH)
 		{
