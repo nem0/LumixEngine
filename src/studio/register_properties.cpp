@@ -1,4 +1,5 @@
 #include "editor/property_register.h"
+#include "audio/audio_scene.h"
 #include "core/crc32.h"
 #include "core/resource_manager.h"
 #include "editor/property_descriptor.h"
@@ -28,7 +29,8 @@ void registerLuaScriptProperties(Lumix::IAllocator& allocator)
 
 void registerAudioProperties(Lumix::IAllocator& allocator)
 {
-	PropertyRegister::registerComponentType("audio_listener", "Audio - listener");
+	PropertyRegister::registerComponentType("audio_listener", "Audio listener");
+	PropertyRegister::registerComponentType("ambient_sound", "Ambient sound");
 }
 
 

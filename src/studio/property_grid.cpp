@@ -267,6 +267,8 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 		showProperty(*desc, -1, cmp);
 	}
 
+	TODO("ambient sound");
+
 	if (cmp.type == Lumix::crc32("lua_script"))
 	{
 		onLuaScriptGui(cmp);

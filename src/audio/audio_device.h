@@ -26,7 +26,7 @@ enum class BufferFlags
 typedef void* BufferHandle;
 static const BufferHandle INVALID_BUFFER_HANDLE = nullptr;
 
-bool init(Engine& engine, IAllocator& allocator);
+bool init(Engine& engine);
 void shutdown();
 
 LUMIX_AUDIO_API BufferHandle createBuffer(const void* data, int size_bytes, int channels, int sample_rate, int flags);

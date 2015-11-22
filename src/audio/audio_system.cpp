@@ -27,7 +27,7 @@ struct AudioSystemImpl : public AudioSystem
 
 	bool create() override
 	{
-		bool result = Audio::init(m_engine, m_engine.getAllocator());
+		bool result = Audio::init(m_engine);
 		m_manager.create(crc32("CLIP"), m_engine.getResourceManager());
 		return result;
 	}
@@ -45,7 +45,7 @@ struct AudioSystemImpl : public AudioSystem
 
 	IScene* createScene(UniverseContext& ctx)
 	{
-		return AudioScene::createInstance(*this, m_engine, *ctx.m_universe, m_engine.getAllocator());
+		return AudioScene::createInstance(*this, *ctx.m_universe, m_engine.getAllocator());
 	}
 
 
