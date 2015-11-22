@@ -16,6 +16,7 @@ namespace Lumix
 
 
 static const uint32 LISTENER_HASH = crc32("audio_listener");
+static const uint32 AMBIENT_SOUND_HASH = crc32("ambient_sound");
 static const uint32 CLIP_RESOURCE_HASH = crc32("CLIP");
 static const int MAX_PLAYING_SOUNDS = 256;
 
@@ -23,6 +24,15 @@ static const int MAX_PLAYING_SOUNDS = 256;
 struct Listener
 {
 	Entity entity;
+};
+
+
+struct AmbientSound
+{
+	Entity entity;
+	ComponentIndex component;
+	int clip_id;
+	int playing_sound;
 };
 
 
@@ -52,7 +62,9 @@ struct AudioSceneImpl : public AudioScene
 		, m_universe(universe)
 		, m_clips(allocator)
 		, m_system(system)
+		, m_ambient_sounds(allocator)
 	{
+		m_last_ambient_sound_id = 0;
 		m_listener.entity = INVALID_ENTITY;
 		for (auto& i : m_playing_sounds)
 		{
@@ -113,6 +125,15 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
+	void startGame() override
+	{
+		for (auto& i : m_ambient_sounds)
+		{
+			i.playing_sound = play(i.entity, i.clip_id);
+		}
+	}
+
+
 	void stopGame() override
 	{
 		for (auto& i : m_playing_sounds)
@@ -122,6 +143,11 @@ struct AudioSceneImpl : public AudioScene
 				Audio::stop(i.buffer_id);
 				i.buffer_id = Audio::INVALID_BUFFER_HANDLE;
 			}
+		}
+
+		for (auto& i : m_ambient_sounds)
+		{
+			i.playing_sound = -1;
 		}
 	}
 
@@ -134,13 +160,51 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
+	int getAmbientSoundClipId(ComponentIndex cmp) override
+	{
+		return m_ambient_sounds[cmp].clip_id;
+	}
+
+
+	void setAmbientSoundClipId(ComponentIndex cmp, int id) override
+	{
+		m_ambient_sounds[cmp].clip_id = id;;
+	}
+	
+
+	ComponentIndex createAmbientSound(Entity entity)
+	{
+		auto& sound = m_ambient_sounds.pushEmpty();
+		sound.component = ++m_last_ambient_sound_id;
+		sound.entity = entity;
+		sound.clip_id = -1;
+		sound.playing_sound = -1;
+		m_universe.addComponent(entity, AMBIENT_SOUND_HASH, this, sound.component);
+		return sound.component;
+	}
+
+
 	ComponentIndex createComponent(uint32 type, Entity entity) override
 	{
 		if (type == LISTENER_HASH && m_listener.entity == INVALID_ENTITY)
 		{
 			return createListener(entity);
 		}
+		else if (type == AMBIENT_SOUND_HASH)
+		{
+			return createAmbientSound(entity);
+		}
 		return INVALID_COMPONENT;
+	}
+
+
+	int getAmbientSoundIdx(ComponentIndex component) const
+	{
+		for (int i = 0, c = m_ambient_sounds.size(); i < c; ++i)
+		{
+			if (m_ambient_sounds[i].component == component) return i;
+		}
+		return -1;
 	}
 
 
@@ -151,6 +215,13 @@ struct AudioSceneImpl : public AudioScene
 			ASSERT(component == 0);
 			auto entity = m_listener.entity;
 			m_listener.entity = INVALID_ENTITY;
+			m_universe.destroyComponent(entity, type, this, component);
+		}
+		else if (type == AMBIENT_SOUND_HASH)
+		{
+			int idx = getAmbientSoundIdx(component);
+			auto entity = m_ambient_sounds[idx].entity;
+			m_ambient_sounds.eraseFast(idx);
 			m_universe.destroyComponent(entity, type, this, component);
 		}
 	}
@@ -170,6 +241,15 @@ struct AudioSceneImpl : public AudioScene
 			serializer.writeString(clip->name);
 			serializer.writeString(clip->clip->getPath().c_str());
 		}
+
+		serializer.write(m_last_ambient_sound_id);
+		serializer.write(m_ambient_sounds.size());
+		for (auto& i : m_ambient_sounds)
+		{
+			serializer.write(i.clip_id);
+			serializer.write(i.component);
+			serializer.write(i.entity);
+		}
 	}
 
 
@@ -184,7 +264,7 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	void deserialize(InputBlob& serializer, int version) override
+	void deserialize(InputBlob& serializer, int) override
 	{
 		clearClips();
 
@@ -218,10 +298,26 @@ struct AudioSceneImpl : public AudioScene
 
 			clip->clip = static_cast<Clip*>(m_system.getClipManager().load(Lumix::Path(path)));
 		}
+		
+		serializer.read(m_last_ambient_sound_id);
+		serializer.read(count);
+		m_ambient_sounds.resize(count);
+		for (int i = 0; i < count; ++i)
+		{
+			auto& sound = m_ambient_sounds[i];
+
+			serializer.read(sound.clip_id);
+			serializer.read(sound.component);
+			serializer.read(sound.entity);
+			sound.clip_id = -1;
+		}
 	}
 
 
-	bool ownComponentType(uint32 type) const override { return type == LISTENER_HASH; }
+	bool ownComponentType(uint32 type) const override
+	{
+		return type == LISTENER_HASH || type == AMBIENT_SOUND_HASH;
+	}
 
 
 	int getClipCount() const override { return m_clips.size(); }
@@ -363,6 +459,8 @@ struct AudioSceneImpl : public AudioScene
 	Universe& getUniverse() override { return m_universe; }
 	IPlugin& getPlugin() const override { return m_system; }
 
+	int m_last_ambient_sound_id;
+	Array<AmbientSound> m_ambient_sounds;
 	Listener m_listener;
 	IAllocator& m_allocator;
 	Universe& m_universe;
@@ -373,7 +471,6 @@ struct AudioSceneImpl : public AudioScene
 
 
 AudioScene* AudioScene::createInstance(AudioSystem& system,
-	Engine& engine,
 	Universe& universe,
 	IAllocator& allocator)
 {

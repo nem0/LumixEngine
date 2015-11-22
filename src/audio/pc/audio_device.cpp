@@ -58,7 +58,7 @@ static bool initPrimaryBuffer()
 }
 
 
-bool init(Engine& engine, IAllocator& allocator)
+bool init(Engine& engine)
 {
 	ASSERT(!g_audio_device.initialized);
 
