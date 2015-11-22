@@ -625,6 +625,11 @@ public:
 					{
 						audio_scene->setClip(clip_id, Lumix::Path(path));
 					}
+					bool looped = audio_scene->isClipLooped(clip_id);
+					if (ImGui::Checkbox("Looped", &looped))
+					{
+						audio_scene->setClipLooped(clip_id, looped);
+					}
 					if (ImGui::Button("Remove"))
 					{
 						audio_scene->removeClip(clip_id);

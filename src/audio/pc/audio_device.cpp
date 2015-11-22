@@ -182,10 +182,10 @@ void destroyBuffer(BufferHandle clip)
 }
 
 
-void play(BufferHandle clip)
+void play(BufferHandle clip, bool looped)
 {
 	auto buffer = (LPDIRECTSOUNDBUFFER)clip;
-	buffer->Play(0, 0, DSBPLAY_LOOPING);
+	buffer->Play(0, 0, looped ? DSBPLAY_LOOPING : 0);
 }
 
 
@@ -193,6 +193,7 @@ void stop(BufferHandle clip)
 {
 	auto buffer = (LPDIRECTSOUNDBUFFER)clip;
 	buffer->Stop();
+	buffer->Release();
 }
 
 
@@ -238,6 +239,7 @@ void update(float)
 
 void setSourcePosition(BufferHandle clip, float x, float y, float z)
 {
+	TODO("cache QueryInterface");
 	LPDIRECTSOUND3DBUFFER8 source;
 	auto buffer = (LPDIRECTSOUNDBUFFER)clip;
 	if (SUCCEEDED(buffer->QueryInterface(IID_IDirectSound3DBuffer8, (void**)&source)))
@@ -247,7 +249,19 @@ void setSourcePosition(BufferHandle clip, float x, float y, float z)
 }
 
 
-void setListenerPosition(int index, float x, float y, float z)
+void setListenerOrientation(float front_x,
+	float front_y,
+	float front_z,
+	float up_x,
+	float up_y,
+	float up_z)
+{
+	g_audio_device.listener->SetOrientation(
+		front_x, front_y, front_z, up_x, up_y, up_z, DS3D_DEFERRED);
+}
+
+
+void setListenerPosition(float x, float y, float z)
 {
 	g_audio_device.listener->SetPosition(x, y, z, DS3D_DEFERRED);
 }

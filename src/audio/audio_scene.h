@@ -35,6 +35,8 @@ public:
 	virtual void setClip(int clip_id, const Lumix::Path& path) = 0;
 	virtual const char* getClipName(int clip_id) = 0;
 	virtual void setClipName(int clip_id, const char* clip_name) = 0;
+	virtual bool isClipLooped(int clip_id) = 0;
+	virtual void setClipLooped(int clip_id, bool looped) = 0;
 
 	virtual SoundHandle play(Entity entity, int clip_id) = 0;
 	virtual void stop(SoundHandle sound_id) = 0;

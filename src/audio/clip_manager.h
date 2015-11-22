@@ -25,6 +25,7 @@ public:
 	int getSampleRate() const { return m_sample_rate; }
 	int getSize() const { return m_data.size() * sizeof(m_data[0]); }
 	uint16* getData() { return &m_data[0]; }
+	float getLengthSeconds() const { return m_data.size() / float(m_channels * m_sample_rate); }
 
 private:
 	int m_channels;

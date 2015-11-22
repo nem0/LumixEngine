@@ -1,4 +1,6 @@
 #include "asset_browser.h"
+#include "audio/audio_device.h"
+#include "audio/clip_manager.h"
 #include "core/crc32.h"
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
@@ -467,6 +469,19 @@ void AssetBrowser::onGUITexture()
 }
 
 
+void AssetBrowser::onGUIClip()
+{
+	if (ImGui::Button("Play"))
+	{
+		auto* clip = static_cast<Lumix::Clip*>(m_selected_resource);
+		auto handle = Lumix::Audio::createBuffer(
+			clip->getData(), clip->getSize(), clip->getChannels(), clip->getSampleRate(), 0);
+		Lumix::Audio::play(handle, false);
+		TODO("stop");
+	}
+}
+
+
 void AssetBrowser::onGUILuaScript()
 {
 	auto* script = static_cast<Lumix::LuaScript*>(m_selected_resource);
@@ -777,6 +792,10 @@ void AssetBrowser::onGUIResource()
 			if (resource_type == LUA_SCRIPT_HASH)
 			{
 				onGUILuaScript();
+			}
+			else if (resource_type == CLIP_HASH)
+			{
+				onGUIClip();
 			}
 			else if (resource_type != UNIVERSE_HASH)
 			{
