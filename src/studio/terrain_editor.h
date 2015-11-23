@@ -34,10 +34,10 @@ public:
 	TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions);
 	~TerrainEditor();
 
-	virtual void tick() override;
-	virtual bool onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int) override;
-	virtual void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/) override;
-	virtual void onMouseUp(int, int, Lumix::MouseButton::Value) override;
+	void tick() override;
+	bool onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int) override;
+	void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/) override;
+	void onMouseUp(int, int, Lumix::MouseButton::Value) override;
 	void onGUI();
 	void setComponent(Lumix::ComponentUID cmp) { m_component = cmp; }
 

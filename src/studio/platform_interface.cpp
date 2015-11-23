@@ -449,6 +449,12 @@ namespace PlatformInterface
 	}
 
 
+	void* getWindowHandle()
+	{
+		return g_platform_data.m_hwnd;
+	}
+
+
 } // namespace PlatformInterface
 
 

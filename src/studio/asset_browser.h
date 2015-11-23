@@ -28,6 +28,7 @@ public:
 		TEXTURE,
 		UNIVERSE,
 		LUA_SCRIPT,
+		AUDIO,
 
 		Count
 	};
@@ -55,11 +56,13 @@ private:
 	void onGUIShader();
 	void onGUIModel();
 	void onGUITexture();
+	void onGUIClip();
 	void onGUILuaScript();
 	void saveMaterial(Lumix::Material* material);
 	void unloadResource();
 	void selectResource(Lumix::Resource* resource);
 	void openInExternalEditor(Lumix::Resource* resource);
+	void stopAudio();
 
 private:
 	Metadata& m_metadata;
@@ -77,4 +80,5 @@ private:
 	bool m_autoreload_changed_resource;
 	bool m_is_focus_requested;
 	bgfx::TextureHandle m_texture_handle;
+	void* m_playing_clip;
 };

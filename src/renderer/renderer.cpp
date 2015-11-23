@@ -84,7 +84,7 @@ struct BGFXAllocator : public bx::AllocatorI
 	}
 
 
-	virtual ~BGFXAllocator()
+	~BGFXAllocator()
 	{
 	}
 
@@ -115,7 +115,7 @@ struct RendererImpl : public Renderer
 {
 	struct CallbackStub : public bgfx::CallbackI
 	{
-		virtual void fatal(bgfx::Fatal::Enum _code, const char* _str) override
+		void fatal(bgfx::Fatal::Enum _code, const char* _str) override
 		{
 			Lumix::g_log_error.log("bgfx") << _str;
 			if (bgfx::Fatal::DebugCheck == _code)
@@ -129,7 +129,7 @@ struct RendererImpl : public Renderer
 		}
 
 
-		virtual void traceVargs(const char* _filePath,
+		void traceVargs(const char* _filePath,
 			uint16 _line,
 			const char* _format,
 			va_list _argList) override
@@ -140,7 +140,7 @@ struct RendererImpl : public Renderer
 		}
 
 
-		virtual void screenShot(const char*,
+		void screenShot(const char*,
 			uint32,
 			uint32,
 			uint32,
@@ -152,7 +152,7 @@ struct RendererImpl : public Renderer
 		}
 
 
-		virtual void captureBegin(uint32,
+		void captureBegin(uint32,
 			uint32,
 			uint32,
 			bgfx::TextureFormat::Enum,
@@ -162,11 +162,11 @@ struct RendererImpl : public Renderer
 		}
 
 
-		virtual uint32 cacheReadSize(uint64) override { return 0; }
-		virtual bool cacheRead(uint64, void*, uint32) override { return false; }
-		virtual void cacheWrite(uint64, const void*, uint32) override {}
-		virtual void captureEnd() override { ASSERT(false); }
-		virtual void captureFrame(const void*, uint32) override { ASSERT(false); }
+		uint32 cacheReadSize(uint64) override { return 0; }
+		bool cacheRead(uint64, void*, uint32) override { return false; }
+		void cacheWrite(uint64, const void*, uint32) override {}
+		void captureEnd() override { ASSERT(false); }
+		void captureFrame(const void*, uint32) override { ASSERT(false); }
 	};
 
 
@@ -222,38 +222,38 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual IScene* createScene(UniverseContext& ctx) override
+	IScene* createScene(UniverseContext& ctx) override
 	{
 		return RenderScene::createInstance(
 			*this, m_engine, *ctx.m_universe, true, m_allocator);
 	}
 
 
-	virtual void destroyScene(IScene* scene) override
+	void destroyScene(IScene* scene) override
 	{
 		RenderScene::destroyInstance(static_cast<RenderScene*>(scene));
 	}
 
 
-	virtual bool create() override { return true; }
+	bool create() override { return true; }
 
 
-	virtual void destroy() override {}
+	void destroy() override {}
 
 
-	virtual const char* getName() const override { return "renderer"; }
+	const char* getName() const override { return "renderer"; }
 
 
-	virtual Engine& getEngine() override { return m_engine; }
+	Engine& getEngine() override { return m_engine; }
 
 
-	virtual const char* getShaderDefine(int define_idx) override
+	const char* getShaderDefine(int define_idx) override
 	{
 		return m_shader_defines[define_idx];
 	}
 
 
-	virtual int getShaderDefineIdx(const char* define) override
+	int getShaderDefineIdx(const char* define) override
 	{
 		for (int i = 0; i < m_shader_defines.size(); ++i)
 		{
@@ -269,7 +269,7 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual int getPassIdx(const char* pass) override
+	int getPassIdx(const char* pass) override
 	{
 		for (int i = 0; i < m_passes.size(); ++i)
 		{
@@ -285,19 +285,19 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void makeScreenshot(const Path& filename) override
+	void makeScreenshot(const Path& filename) override
 	{
 		bgfx::saveScreenShot(filename.c_str());
 	}
 
 
-	virtual void resize(int w, int h) override
+	void resize(int w, int h) override
 	{
 		bgfx::reset(w, h);
 	}
 
 
-	virtual void frame() override
+	void frame() override
 	{
 		PROFILE_FUNCTION();
 		bgfx::frame();
@@ -305,19 +305,19 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual int getViewCounter() const override
+	int getViewCounter() const override
 	{
 		return m_view_counter;
 	}
 
 
-	virtual void viewCounterAdd() override
+	void viewCounterAdd() override
 	{
 		++m_view_counter;
 	}
 
 
-	virtual LIFOAllocator& getFrameAllocator() override
+	LIFOAllocator& getFrameAllocator() override
 	{
 		return m_frame_allocator;
 	}

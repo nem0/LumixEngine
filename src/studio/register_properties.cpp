@@ -1,4 +1,5 @@
 #include "editor/property_register.h"
+#include "audio/audio_scene.h"
 #include "core/crc32.h"
 #include "core/resource_manager.h"
 #include "editor/property_descriptor.h"
@@ -23,6 +24,19 @@ void registerLuaScriptProperties(Lumix::IAllocator& allocator)
 									 "Lua (*.lua)",
 									 crc32("lua_script"),
 									 allocator));
+}
+
+
+void registerAudioProperties(Lumix::IAllocator& allocator)
+{
+	PropertyRegister::registerComponentType("audio_listener", "Audio listener");
+	PropertyRegister::registerComponentType("ambient_sound", "Ambient sound");
+
+	Lumix::PropertyRegister::add("ambient_sound",
+		LUMIX_NEW(allocator, BoolPropertyDescriptor<AudioScene>)("3D",
+		&AudioScene::isAmbientSound3D,
+		&AudioScene::setAmbientSound3D,
+		allocator));
 }
 
 
@@ -361,4 +375,5 @@ void registerProperties(Lumix::WorldEditor& editor)
 	registerRendererProperties(editor.getAllocator());
 	registerLuaScriptProperties(editor.getAllocator());
 	registerPhysicsProperties(editor.getAllocator());
+	registerAudioProperties(editor.getAllocator());
 }

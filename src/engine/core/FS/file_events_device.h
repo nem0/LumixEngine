@@ -50,8 +50,8 @@ namespace Lumix
 
 			EventCallback OnEvent;
 
-			virtual void destroyFile(IFile* file) override;
-			virtual IFile* createFile(IFile* child) override;
+			void destroyFile(IFile* file) override;
+			IFile* createFile(IFile* child) override;
 
 			const char* name() const override { return "events"; }
 		

@@ -39,23 +39,23 @@ public:
 	}
 
 
-	virtual bool execute() override
+	bool execute() override
 	{
 		m_hierarchy.setParent(m_child, m_new_parent);
 		return true;
 	}
 
 
-	virtual void undo() override
+	void undo() override
 	{
 		m_hierarchy.setParent(m_child, m_old_parent);
 	}
 
 
-	virtual bool merge(IEditorCommand&) override { return false; }
+	bool merge(IEditorCommand&) override { return false; }
 
 
-	virtual Lumix::uint32 getType() override
+	Lumix::uint32 getType() override
 	{
 		static const Lumix::uint32 hash = Lumix::crc32("set_entity_parent");
 		return hash;

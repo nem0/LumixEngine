@@ -1,4 +1,7 @@
 #include "asset_browser.h"
+#include "audio/audio_device.h"
+#include "audio/audio_system.h"
+#include "audio/clip_manager.h"
 #include "core/crc32.h"
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
@@ -14,6 +17,7 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
+#include "engine/plugin_manager.h"
 #include "file_system_watcher.h"
 #include "lua_script/lua_script_manager.h"
 #include "metadata.h"
@@ -30,6 +34,7 @@
 
 static const Lumix::uint32 UNIVERSE_HASH = Lumix::crc32("universe");
 static const Lumix::uint32 SOURCE_HASH = Lumix::crc32("source");
+static const Lumix::uint32 CLIP_HASH = Lumix::crc32("CLIP");
 static const Lumix::uint32 LUA_SCRIPT_HASH = Lumix::crc32("lua_script");
 
 
@@ -38,6 +43,7 @@ static Lumix::uint32 getResourceType(const char* path)
 	char ext[10];
 	Lumix::PathUtils::getExtension(ext, sizeof(ext), path);
 
+	if (Lumix::compareString(ext, "ogg") == 0) return CLIP_HASH;
 	if (Lumix::compareString(ext, "mat") == 0) return Lumix::ResourceManager::MATERIAL;
 	if (Lumix::compareString(ext, "msh") == 0) return Lumix::ResourceManager::MODEL;
 	if (Lumix::compareString(ext, "dds") == 0) return Lumix::ResourceManager::TEXTURE;
@@ -61,6 +67,7 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 	, m_is_focus_requested(false)
 	, m_changed_files_mutex(false)
 	, m_history(editor.getAllocator())
+	, m_playing_clip(nullptr)
 {
 	m_filter[0] = '\0';
 	m_current_type = 0;
@@ -99,6 +106,7 @@ void AssetBrowser::unloadResource()
 {
 	if (!m_selected_resource) return;
 
+	stopAudio();
 	m_selected_resource->getResourceManager()
 		.get(getResourceType(m_selected_resource->getPath().c_str()))
 		->unload(*m_selected_resource);
@@ -193,7 +201,7 @@ void AssetBrowser::onGUI()
 	ImGui::SameLine();
 	ImGui::Checkbox("Autoreload", &m_autoreload_changed_resource);
 
-	const char* items = "Material\0Model\0Shader\0Texture\0Universe\0Lua Script\0";
+	const char* items = "Material\0Model\0Shader\0Texture\0Universe\0Lua Script\0Audio\0";
 	ImGui::Combo("Type", &m_current_type, items);
 	ImGui::InputText("Filter", m_filter, sizeof(m_filter));
 
@@ -465,6 +473,46 @@ void AssetBrowser::onGUITexture()
 }
 
 
+Lumix::AudioDevice& getAudioDevice(Lumix::Engine& engine)
+{
+	auto* audio = static_cast<Lumix::AudioSystem*>(engine.getPluginManager().getPlugin("audio"));
+	return audio->getDevice();
+}
+
+
+void AssetBrowser::stopAudio()
+{
+	if (m_playing_clip)
+	{
+		getAudioDevice(m_editor.getEngine()).stop(m_playing_clip);
+		m_playing_clip = nullptr;
+	}
+}
+
+
+void AssetBrowser::onGUIClip()
+{
+	auto* clip = static_cast<Lumix::Clip*>(m_selected_resource);
+	ImGui::LabelText("Length", "%f", clip->getLengthSeconds());
+
+	if (m_playing_clip && ImGui::Button("Stop"))
+	{
+		stopAudio();
+	}
+
+	if (!m_playing_clip && ImGui::Button("Play"))
+	{
+		stopAudio();
+
+		auto& device = getAudioDevice(m_editor.getEngine());
+		auto handle = device.createBuffer(
+			clip->getData(), clip->getSize(), clip->getChannels(), clip->getSampleRate(), 0);
+		device.play(handle, false);
+		m_playing_clip = handle;
+	}
+}
+
+
 void AssetBrowser::onGUILuaScript()
 {
 	auto* script = static_cast<Lumix::LuaScript*>(m_selected_resource);
@@ -554,11 +602,11 @@ public:
 	InsertMeshCommand(Lumix::WorldEditor& editor);
 	InsertMeshCommand(Lumix::WorldEditor& editor, const Lumix::Vec3& position, const Lumix::Path& mesh_path);
 
-	virtual void serialize(Lumix::JsonSerializer& serializer) override;
-	virtual void deserialize(Lumix::JsonSerializer& serializer) override;
-	virtual bool execute() override;
-	virtual void undo() override;
-	virtual Lumix::uint32 getType() override;
+	void serialize(Lumix::JsonSerializer& serializer) override;
+	void deserialize(Lumix::JsonSerializer& serializer) override;
+	bool execute() override;
+	void undo() override;
+	Lumix::uint32 getType() override;
 	virtual bool merge(IEditorCommand&);
 	Lumix::Entity getEntity() const { return m_entity; }
 
@@ -776,6 +824,10 @@ void AssetBrowser::onGUIResource()
 			{
 				onGUILuaScript();
 			}
+			else if (resource_type == CLIP_HASH)
+			{
+				onGUIClip();
+			}
 			else if (resource_type != UNIVERSE_HASH)
 			{
 				ASSERT(false); // unimplemented resource
@@ -802,12 +854,15 @@ void AssetBrowser::addResource(const char* path, const char* filename)
 	Lumix::catString(fullpath, filename);
 
 	int index = -1;
-	if (Lumix::compareString(ext, "dds") == 0 || Lumix::compareString(ext, "tga") == 0 || Lumix::compareString(ext, "raw") == 0) index = TEXTURE;
-	if (Lumix::compareString(ext, "msh") == 0) index = MODEL;
-	if (Lumix::compareString(ext, "mat") == 0) index = MATERIAL;
-	if (Lumix::compareString(ext, "unv") == 0) index = UNIVERSE;
-	if (Lumix::compareString(ext, "shd") == 0) index = SHADER;
-	if (Lumix::compareString(ext, "lua") == 0) index = LUA_SCRIPT;
+	if (Lumix::compareString(ext, "dds") == 0) index = TEXTURE;
+	else if (Lumix::compareString(ext, "tga") == 0) index = TEXTURE;
+	else if (Lumix::compareString(ext, "raw") == 0) index = TEXTURE;
+	else if (Lumix::compareString(ext, "ogg") == 0) index = AUDIO;
+	else if (Lumix::compareString(ext, "msh") == 0) index = MODEL;
+	else if (Lumix::compareString(ext, "mat") == 0) index = MATERIAL;
+	else if (Lumix::compareString(ext, "unv") == 0) index = UNIVERSE;
+	else if (Lumix::compareString(ext, "shd") == 0) index = SHADER;
+	else if (Lumix::compareString(ext, "lua") == 0) index = LUA_SCRIPT;
 
 	if (Lumix::startsWith(path, "./render_tests") != 0 || Lumix::startsWith(path, "./unit_tests") != 0)
 	{

@@ -2573,7 +2573,7 @@ public:
 
 		m_engine = &engine;
 
-		const char* plugins[] = {"renderer.dll", "animation.dll", "physics.dll", "lua_script.dll"};
+		const char* plugins[] = {"renderer.dll", "animation.dll", "audio.dll", "physics.dll", "lua_script.dll"};
 
 		PluginManager& plugin_manager = m_engine->getPluginManager();
 		for (auto* plugin_name : plugins)

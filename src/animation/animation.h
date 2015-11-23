@@ -29,8 +29,8 @@ public:
 	IAllocator& getAllocator() { return m_allocator; }
 
 protected:
-	virtual Resource* createResource(const Path& path) override;
-	virtual void destroyResource(Resource& resource) override;
+	Resource* createResource(const Path& path) override;
+	void destroyResource(Resource& resource) override;
 
 private:
 	IAllocator& m_allocator;
@@ -62,8 +62,8 @@ class LUMIX_ANIMATION_API Animation : public Resource
 	private:
 		IAllocator& getAllocator();
 
-		virtual void unload() override;
-		virtual bool load(FS::IFile& file) override;
+		void unload() override;
+		bool load(FS::IFile& file) override;
 
 	private:
 		int	m_frame_count;

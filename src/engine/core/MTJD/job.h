@@ -30,8 +30,8 @@ public:
 		IAllocator& job_allocator);
 	virtual ~Job();
 
-	virtual void incrementDependency() override;
-	virtual void decrementDependency() override;
+	void incrementDependency() override;
+	void decrementDependency() override;
 
 	Priority getPriority() const { return m_priority; }
 
