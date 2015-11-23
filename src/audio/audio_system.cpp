@@ -18,8 +18,12 @@ struct AudioSystemImpl : public AudioSystem
 	AudioSystemImpl(Engine& engine)
 		: m_engine(engine)
 		, m_manager(engine.getAllocator())
+		, m_device(nullptr)
 	{
 	}
+
+
+	AudioDevice& getDevice() override { return *m_device; }
 
 
 	ClipManager& getClipManager() override { return m_manager; }
@@ -27,15 +31,16 @@ struct AudioSystemImpl : public AudioSystem
 
 	bool create() override
 	{
-		bool result = Audio::init(m_engine);
+		m_device = AudioDevice::create(m_engine);
+		if (!m_device) return false;
 		m_manager.create(crc32("CLIP"), m_engine.getResourceManager());
-		return result;
+		return true;
 	}
 
 
 	void destroy() override
 	{
-		Audio::shutdown();
+		AudioDevice::destroy(*m_device);
 		m_manager.destroy();
 	}
 
@@ -54,6 +59,7 @@ struct AudioSystemImpl : public AudioSystem
 
 	ClipManager m_manager;
 	Engine& m_engine;
+	AudioDevice* m_device;
 };
 
 

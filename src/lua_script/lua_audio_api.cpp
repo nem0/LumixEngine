@@ -14,11 +14,9 @@ namespace LuaAPI
 {
 
 
-static int  playSound(IScene* scene,
-	int entity,
-	int clip_id)
+static int playSound(IScene* scene, int entity, AudioScene::ClipInfo* clip, bool is_3d)
 {
-	return static_cast<AudioScene*>(scene)->play(entity, clip_id);
+	return static_cast<AudioScene*>(scene)->play(entity, clip, is_3d);
 }
 
 

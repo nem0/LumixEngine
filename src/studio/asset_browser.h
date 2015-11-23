@@ -62,6 +62,7 @@ private:
 	void unloadResource();
 	void selectResource(Lumix::Resource* resource);
 	void openInExternalEditor(Lumix::Resource* resource);
+	void stopAudio();
 
 private:
 	Metadata& m_metadata;
@@ -79,4 +80,5 @@ private:
 	bool m_autoreload_changed_resource;
 	bool m_is_focus_requested;
 	bgfx::TextureHandle m_texture_handle;
+	void* m_playing_clip;
 };

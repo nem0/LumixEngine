@@ -19,6 +19,14 @@ public:
 	typedef int SoundHandle;
 	static const SoundHandle INVALID_SOUND_HANDLE = -1;
 
+	struct ClipInfo
+	{
+		Clip* clip;
+		char name[30];
+		uint32 name_hash;
+		bool looped;
+	};
+
 public:
 	static AudioScene* createInstance(AudioSystem& system,
 		Universe& universe,
@@ -26,21 +34,18 @@ public:
 	static void destroyInstance(AudioScene* scene);
 
 	virtual int getClipCount() const = 0;
-	virtual int addClip(const char* name, const Lumix::Path& path) = 0;
-	virtual void removeClip(int clip_id) = 0;
-	virtual int getClipID(const char* name) = 0;
-	virtual bool isClipIDValid(int clip_id) = 0;
-	virtual Clip* getClip(int clid_id) = 0;
+	virtual ClipInfo* getClipInfo(int index) = 0;
+	virtual int getClipInfoIndex(ClipInfo* info) = 0;
+	virtual void addClip(const char* name, const Lumix::Path& path) = 0;
+	virtual void removeClip(ClipInfo* clip) = 0;
 	virtual void setClip(int clip_id, const Lumix::Path& path) = 0;
-	virtual const char* getClipName(int clip_id) = 0;
-	virtual void setClipName(int clip_id, const char* clip_name) = 0;
-	virtual bool isClipLooped(int clip_id) = 0;
-	virtual void setClipLooped(int clip_id, bool looped) = 0;
 
-	virtual int getAmbientSoundClipId(ComponentIndex cmp) = 0;
-	virtual void setAmbientSoundClipId(ComponentIndex cmp, int id) = 0;
+	virtual ClipInfo* getAmbientSoundClip(ComponentIndex cmp) = 0;
+	virtual void setAmbientSoundClip(ComponentIndex cmp, ClipInfo* clip) = 0;
+	virtual bool isAmbientSound3D(ComponentIndex cmp) = 0;
+	virtual void setAmbientSound3D(ComponentIndex cmp, bool is_3d) = 0;
 
-	virtual SoundHandle play(Entity entity, int clip_id) = 0;
+	virtual SoundHandle play(Entity entity, ClipInfo* clip, bool is_3d) = 0;
 	virtual void stop(SoundHandle sound_id) = 0;
 	virtual void setVolume(SoundHandle sound_id, float volume) = 0;
 };
