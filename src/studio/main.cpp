@@ -53,6 +53,7 @@ class StudioApp
 public:
 	StudioApp()
 		: m_is_entity_list_opened(true)
+		, m_is_clip_manager_opened(false)
 		, m_finished(false)
 		, m_is_style_editor_opened(false)
 		, m_import_asset_dialog(nullptr)
@@ -543,6 +544,7 @@ public:
 				if (ImGui::BeginMenu("Windows"))
 				{
 					ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
+					ImGui::MenuItem("Clip manager", nullptr, &m_is_clip_manager_opened);
 					ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
 					ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
 					ImGui::MenuItem("Game view", nullptr, &m_gameview.m_is_opened);
@@ -607,7 +609,9 @@ public:
 
 	void showClipManager()
 	{
-		if (ImGui::Begin("Clip manager"))
+		if (!m_is_clip_manager_opened) return;
+
+		if (ImGui::Begin("Clip manager", &m_is_clip_manager_opened))
 		{
 			auto* audio_scene = static_cast<Lumix::AudioScene*>(m_editor->getScene(Lumix::crc32("audio")));
 			int clip_count = audio_scene->getClipCount();
@@ -622,6 +626,7 @@ public:
 					if (ImGui::InputText("Name", buf, sizeof(buf)))
 					{
 						Lumix::copyString(clip_info->name, buf);
+						clip_info->name_hash = Lumix::crc32(buf);
 					}
 					auto* clip = audio_scene->getClipInfo(clip_id)->clip;
 					char path[Lumix::MAX_PATH_LENGTH];
@@ -720,6 +725,7 @@ public:
 	void saveSettings()
 	{
 		m_settings.m_is_asset_browser_opened = m_asset_browser->m_is_opened;
+		m_settings.m_is_clip_manager_opened = m_is_clip_manager_opened;
 		m_settings.m_is_entity_list_opened = m_is_entity_list_opened;
 		m_settings.m_is_entity_template_list_opened = m_is_entity_template_list_opened;
 		m_settings.m_is_gameview_opened = m_gameview.m_is_opened;
@@ -859,6 +865,7 @@ public:
 
 		m_asset_browser->m_is_opened = m_settings.m_is_asset_browser_opened;
 		m_is_entity_list_opened = m_settings.m_is_entity_list_opened;
+		m_is_clip_manager_opened = m_settings.m_is_clip_manager_opened;
 		m_is_entity_template_list_opened = m_settings.m_is_entity_template_list_opened;
 		m_gameview.m_is_opened = m_settings.m_is_gameview_opened;
 		m_hierarchy_ui.m_is_opened = m_settings.m_is_hierarchy_opened;
@@ -1332,6 +1339,7 @@ public:
 	bool m_finished;
 
 	bool m_is_welcome_screen_opened;
+	bool m_is_clip_manager_opened;
 	bool m_is_entity_list_opened;
 	bool m_is_entity_template_list_opened;
 	bool m_is_style_editor_opened;
