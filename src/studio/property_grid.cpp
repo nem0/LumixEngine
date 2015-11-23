@@ -349,21 +349,20 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 
 void PropertyGrid::onAmbientSoundGUI(Lumix::ComponentUID cmp)
 {
-	TODO("clip array can contain 'holes'");
-
 	auto* scene = static_cast<Lumix::AudioScene*>(cmp.scene);
 
-	auto clip_id = scene->getAmbientSoundClipId(cmp.index);
-
+	auto clip_info = scene->getAmbientSoundClip(cmp.index);
 	auto getter = [](void* data, int index, const char** out_text) -> bool
 	{
 		auto* scene = static_cast<Lumix::AudioScene*>(data);
-		*out_text = scene->getClipName(index);
+		*out_text = scene->getClipInfo(index)->name;
 		return true;
 	};
+
+	int clip_id = scene->getClipInfoIndex(clip_info);
 	if(ImGui::Combo("Clip", &clip_id, getter, scene, scene->getClipCount()))
 	{
-		scene->setAmbientSoundClipId(cmp.index, clip_id);
+		scene->setAmbientSoundClip(cmp.index, scene->getClipInfo(clip_id));
 	}
 }
 

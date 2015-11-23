@@ -14,40 +14,44 @@ class IAllocator;
 class Path;
 
 
-namespace Audio
+class LUMIX_AUDIO_API AudioDevice
 {
+public:
+	enum class BufferFlags
+	{
+		IS3D = 1,
+		LOOPED = 1 << 1
+	};
 
-enum class BufferFlags
-{
-	IS3D = 1,
-	LOOPED = 1 << 1
+	typedef void* BufferHandle;
+	static const BufferHandle INVALID_BUFFER_HANDLE;
+
+public:
+	virtual ~AudioDevice() {}
+
+	static AudioDevice* create(Engine& engine);
+	static void destroy(AudioDevice& device);
+
+	virtual BufferHandle createBuffer(const void* data, int size_bytes, int channels, int sample_rate, int flags) = 0;
+	virtual void destroyBuffer(BufferHandle buffer) = 0;
+	virtual void play(BufferHandle buffer, bool looped) = 0;
+	virtual bool isPlaying(BufferHandle buffer) = 0;
+	virtual void stop(BufferHandle buffer) = 0;
+	virtual void pause(BufferHandle buffer) = 0;
+	virtual void setVolume(BufferHandle buffer, float volume) = 0;
+	virtual void setFrequency(BufferHandle buffer, float frequency) = 0;
+	virtual void setCurrentTime(BufferHandle buffer, float time_seconds) = 0;
+	virtual void setListenerPosition(float x, float y, float z) = 0;
+	virtual void setListenerOrientation(float front_x,
+		float front_y,
+		float front_z,
+		float up_x,
+		float up_y,
+		float up_z) = 0;
+	virtual void setSourcePosition(BufferHandle buffer, float x, float y, float z) = 0;
+	virtual void update(float time_delta) = 0;
+
 };
-
-typedef void* BufferHandle;
-static const BufferHandle INVALID_BUFFER_HANDLE = nullptr;
-
-bool init(Engine& engine);
-void shutdown();
-
-LUMIX_AUDIO_API BufferHandle createBuffer(const void* data, int size_bytes, int channels, int sample_rate, int flags);
-LUMIX_AUDIO_API void destroyBuffer(BufferHandle buffer);
-LUMIX_AUDIO_API void play(BufferHandle buffer, bool looped);
-LUMIX_AUDIO_API void stop(BufferHandle buffer);
-LUMIX_AUDIO_API void pause(BufferHandle buffer);
-LUMIX_AUDIO_API void setVolume(BufferHandle buffer, float volume);
-LUMIX_AUDIO_API void setFrequency(BufferHandle buffer, float frequency);
-LUMIX_AUDIO_API void setCurrentTime(BufferHandle buffer, float time_seconds);
-LUMIX_AUDIO_API void setListenerPosition(float x, float y, float z);
-LUMIX_AUDIO_API void setListenerOrientation(float front_x,
-	float front_y,
-	float front_z,
-	float up_x,
-	float up_y,
-	float up_z);
-LUMIX_AUDIO_API void setSourcePosition(BufferHandle buffer, float x, float y, float z);
-LUMIX_AUDIO_API void update(float time_delta);
-
-} // namespace Audio
 
 
 } // namespace Lumix

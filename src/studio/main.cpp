@@ -153,7 +153,33 @@ public:
 
 			if (ImGui::BeginChild("right", half_size, true))
 			{
+				if (ImGui::Button("Download new version"))
+				{
+					Lumix::shellExecuteOpen(
+						"https://github.com/nem0/lumixengine_data/archive/master.zip");
+				}
+
+				if (ImGui::Button("Show major releases"))
+				{
+					Lumix::shellExecuteOpen("https://github.com/nem0/LumixEngine/releases");
+				}
+
+				if (ImGui::Button("Show latest commits"))
+				{
+					Lumix::shellExecuteOpen("https://github.com/nem0/LumixEngine/commits/master");
+				}
+
+				if (ImGui::Button("Show issues"))
+				{
+					Lumix::shellExecuteOpen("https://github.com/nem0/lumixengine/issues");
+				}
+				ImGui::Separator();
+
 				ImGui::Text("Version 0.18. - News");
+				ImGui::BulletText("Each script component has its own environment");
+				ImGui::BulletText("Pipeline's features can be enabled/disabled in GUI");
+				ImGui::BulletText("Shader editor");
+				ImGui::BulletText("Audio system");
 				ImGui::BulletText("Basic particle system");
 				ImGui::Separator();
 				ImGui::Text("Version 0.17. - News");
@@ -176,27 +202,6 @@ public:
 				ImGui::BulletText("Welcome screen");
 				ImGui::BulletText("Visualization of physical contorller");
 				ImGui::BulletText("Game view fixed");
-				ImGui::Separator();
-				if (ImGui::Button("Download new version"))
-				{
-					Lumix::shellExecuteOpen(
-						"https://github.com/nem0/lumixengine_data/archive/master.zip");
-				}
-
-				if (ImGui::Button("Show major releases"))
-				{
-					Lumix::shellExecuteOpen("https://github.com/nem0/LumixEngine/releases");
-				}
-
-				if (ImGui::Button("Show latest commits"))
-				{
-					Lumix::shellExecuteOpen("https://github.com/nem0/LumixEngine/commits/master");
-				}
-
-				if (ImGui::Button("Show issues"))
-				{
-					Lumix::shellExecuteOpen("https://github.com/nem0/lumixengine/issues");
-				}
 
 			}
 			ImGui::EndChild();
@@ -608,16 +613,17 @@ public:
 			int clip_count = audio_scene->getClipCount();
 			for (int clip_id = 0; clip_id < clip_count; ++clip_id)
 			{
-				if (!audio_scene->isClipIDValid(clip_id)) continue;
-				if (ImGui::TreeNode((const void*)clip_id, audio_scene->getClipName(clip_id)))
+				auto* clip_info = audio_scene->getClipInfo(clip_id);
+
+				if (ImGui::TreeNode((const void*)clip_id, clip_info->name))
 				{
 					char buf[30];
-					Lumix::copyString(buf, Lumix::lengthOf(buf), audio_scene->getClipName(clip_id));
+					Lumix::copyString(buf, Lumix::lengthOf(buf), clip_info->name);
 					if (ImGui::InputText("Name", buf, sizeof(buf)))
 					{
-						audio_scene->setClipName(clip_id, buf);
+						Lumix::copyString(clip_info->name, buf);
 					}
-					auto* clip = audio_scene->getClip(clip_id);
+					auto* clip = audio_scene->getClipInfo(clip_id)->clip;
 					char path[Lumix::MAX_PATH_LENGTH];
 					Lumix::copyString(path, clip ? clip->getPath().c_str() : "");
 					if (m_asset_browser->resourceInput(
@@ -625,14 +631,14 @@ public:
 					{
 						audio_scene->setClip(clip_id, Lumix::Path(path));
 					}
-					bool looped = audio_scene->isClipLooped(clip_id);
+					bool looped = audio_scene->getClipInfo(clip_id)->looped;
 					if (ImGui::Checkbox("Looped", &looped))
 					{
-						audio_scene->setClipLooped(clip_id, looped);
+						clip_info->looped = looped;
 					}
 					if (ImGui::Button("Remove"))
 					{
-						audio_scene->removeClip(clip_id);
+						audio_scene->removeClip(clip_info);
 						--clip_count;
 					}
 					ImGui::TreePop();
