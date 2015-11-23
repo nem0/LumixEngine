@@ -367,6 +367,18 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
+	ClipInfo* getClipInfo(const char* name) override
+	{
+		auto hash = crc32(name);
+		for (auto* i : m_clips)
+		{
+			if (i->name_hash == hash) return i;
+		}
+
+		return nullptr;
+	}
+
+
 	ClipInfo* getClipInfo(int index) override
 	{
 		return m_clips[index];

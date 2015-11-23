@@ -35,6 +35,7 @@ public:
 
 	virtual int getClipCount() const = 0;
 	virtual ClipInfo* getClipInfo(int index) = 0;
+	virtual ClipInfo* getClipInfo(const char* name) = 0;
 	virtual int getClipInfoIndex(ClipInfo* info) = 0;
 	virtual void addClip(const char* name, const Lumix::Path& path) = 0;
 	virtual void removeClip(ClipInfo* clip) = 0;
