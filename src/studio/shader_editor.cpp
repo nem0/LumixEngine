@@ -1210,7 +1210,7 @@ struct MoveNodeCommand : public ShaderEditor::ICommand
 	}
 
 
-	virtual Lumix::uint32 getType() const override
+	Lumix::uint32 getType() const override
 	{
 		static const Lumix::uint32 crc = Lumix::crc32("move_node");
 		return crc;
@@ -1286,14 +1286,14 @@ struct CreateConnectionCommand : public ShaderEditor::ICommand
 	}
 
 
-	virtual Lumix::uint32 getType() const override
+	Lumix::uint32 getType() const override
 	{
 		static const Lumix::uint32 crc = Lumix::crc32("create_connection");
 		return crc;
 	}
 
 
-	virtual void execute() override
+	void execute() override
 	{
 		auto* from_node = m_editor.getNodeByID(m_from);
 		auto* to_node = m_editor.getNodeByID(m_to);
@@ -1306,7 +1306,7 @@ struct CreateConnectionCommand : public ShaderEditor::ICommand
 	}
 
 
-	virtual void undo() override
+	void undo() override
 	{
 		auto* node = m_editor.getNodeByID(m_from);
 		removeConnection(node, m_from_pin, false);
@@ -1352,7 +1352,7 @@ struct RemoveNodeCommand : public ShaderEditor::ICommand
 	}
 
 
-	virtual Lumix::uint32 getType() const override
+	Lumix::uint32 getType() const override
 	{
 		static const Lumix::uint32 crc = Lumix::crc32("remove_node");
 		return crc;
@@ -1394,7 +1394,7 @@ struct CreateNodeCommand : public ShaderEditor::ICommand
 	}
 
 
-	virtual Lumix::uint32 getType() const override
+	Lumix::uint32 getType() const override
 	{
 		static const Lumix::uint32 crc = Lumix::crc32("create_node");
 		return crc;

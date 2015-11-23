@@ -15,7 +15,7 @@ namespace Lumix
 			Scheduler(Manager& manager, IAllocator& allocator);
 			~Scheduler();
 
-			virtual int task() override;
+			int task() override;
 
 			void dataSignal();
 

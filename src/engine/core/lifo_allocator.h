@@ -32,7 +32,7 @@ namespace Lumix
 			}
 
 
-			virtual void* allocate(size_t size) override
+			void* allocate(size_t size) override
 			{
 				uint8* new_address = (uint8*)m_current;
 				ASSERT(new_address + size <= (uint8*)m_bucket + m_bucket_size);
@@ -41,13 +41,13 @@ namespace Lumix
 			}
 
 
-			virtual void deallocate(void*) override
+			void deallocate(void*) override
 			{
 				ASSERT(false);
 			}
 
 
-			virtual void* reallocate(void*, size_t) override
+			void* reallocate(void*, size_t) override
 			{
 				ASSERT(false);
 				return nullptr;

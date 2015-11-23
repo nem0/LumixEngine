@@ -32,7 +32,8 @@ public:
 	bool m_is_opened;
 
 private:
-	void onLuaScriptGui(Lumix::ComponentUID cmp);
+	void onAmbientSoundGUI(Lumix::ComponentUID cmp);
+	void onLuaScriptGUI(Lumix::ComponentUID cmp);
 	void showProperty(Lumix::IPropertyDescriptor& desc, int index, Lumix::ComponentUID cmp);
 	void showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescriptor& desc);
 	void showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::ISampledFunctionDescriptor& desc);

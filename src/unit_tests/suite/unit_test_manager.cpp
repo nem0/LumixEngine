@@ -48,7 +48,7 @@ namespace Lumix
 			{
 			}
 
-			virtual int task() override
+			int task() override
 			{
 				while(!m_tests_todo->isAborted())
 				{

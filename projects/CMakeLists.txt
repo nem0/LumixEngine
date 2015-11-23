@@ -86,6 +86,27 @@ target_link_libraries(renderer engine)
 target_link_libraries(renderer ${EXTERNAL_PATH}lua/lib/vs2013/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
 target_link_libraries(renderer ${EXTERNAL_PATH}bgfx/lib/vs2013/${PLATFORM_DIR}/bgfx${CMAKE_CFG_INTDIR}.lib)
 
+###################### AUDIO ######################
+
+set(AUDIO_ROOT_PATH ${SRC_PATH}audio/)
+
+file(GLOB AUDIO_ROOT_FILES ${AUDIO_ROOT_PATH}*.cpp ${AUDIO_ROOT_PATH}pc/*.cpp ${AUDIO_ROOT_PATH}*.h ${AUDIO_ROOT_PATH}*.c)
+
+source_group("" FILES ${AUDIO_ROOT_FILES})
+
+include_directories(${SRC_PATH})
+include_directories(${ENGINE_ROOT_PATH})
+include_directories(${AUDIO_ROOT_PATH})
+
+add_library(audio SHARED
+	${AUDIO_ROOT_FILES}
+)
+
+set_target_properties (audio PROPERTIES COMPILE_DEFINITIONS "BUILDING_AUDIO")
+
+target_link_libraries(audio engine)
+target_link_libraries(audio dxguid.lib)
+
 
 ###################### PHYSICS ######################
 
@@ -246,10 +267,11 @@ add_executable(studio
 	${STB_FILES}
 )
 
-add_dependencies(studio engine animation physics renderer lua_script editor)
+add_dependencies(studio audio engine animation physics renderer lua_script editor)
 
 set_target_properties(studio PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
 target_link_libraries(studio engine)
+target_link_libraries(studio audio)
 target_link_libraries(studio renderer)
 target_link_libraries(studio editor)
 target_link_libraries(studio ${EXTERNAL_PATH}assimp/lib/vs2013/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/assimp.lib)

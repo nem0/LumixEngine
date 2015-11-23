@@ -44,9 +44,9 @@ namespace Lumix
 		public:
 			TCPFileDevice();
 
-			virtual void destroyFile(IFile* file) override;
-			virtual IFile* createFile(IFile* child) override;
-			virtual const char* name() const override { return "tcp"; }
+			void destroyFile(IFile* file) override;
+			IFile* createFile(IFile* child) override;
+			const char* name() const override { return "tcp"; }
 
 			void connect(const char* ip, uint16 port, IAllocator& allocator);
 			void disconnect();

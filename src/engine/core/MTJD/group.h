@@ -14,8 +14,8 @@ namespace Lumix
 
 			void addStaticDependency(BaseEntry* entry);
 
-			virtual void incrementDependency() override;
-			virtual void decrementDependency() override;
+			void incrementDependency() override;
+			void decrementDependency() override;
 
 		protected:
 

@@ -47,8 +47,15 @@ struct LUMIX_ENGINE_API UniverseContext
 };
 
 
+
 class LUMIX_ENGINE_API Engine
 {
+public:
+	struct PlatformData
+	{
+		void* window_handle;
+	};
+
 public:
 	virtual ~Engine() {}
 
@@ -57,6 +64,8 @@ public:
 
 	virtual UniverseContext& createUniverse() = 0;
 	virtual void destroyUniverse(UniverseContext& context) = 0;
+	virtual void setPlatformData(const PlatformData& data) = 0;
+	virtual const PlatformData& getPlatformData() = 0;
 
 	virtual FS::FileSystem& getFileSystem() = 0;
 	virtual InputSystem& getInputSystem() = 0;

@@ -56,9 +56,9 @@ public:
 	Allocator(IAllocator& source);
 	virtual ~Allocator();
 
-	virtual void* allocate(size_t size) override;
-	virtual void deallocate(void* ptr) override;
-	virtual void* reallocate(void* ptr, size_t size) override;
+	void* allocate(size_t size) override;
+	void deallocate(void* ptr) override;
+	void* reallocate(void* ptr, size_t size) override;
 	size_t getTotalSize() const { return m_total_size; }
 	void checkGuards();
 

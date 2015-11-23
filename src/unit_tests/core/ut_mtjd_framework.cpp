@@ -50,7 +50,7 @@ public:
 		}
 	}
 
-	virtual void execute() override
+	void execute() override
 	{
 		for (int32 i = 0; i < m_size; i++)
 		{

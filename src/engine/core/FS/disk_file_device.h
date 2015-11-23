@@ -16,8 +16,8 @@ namespace Lumix
 		public:
 			DiskFileDevice(IAllocator& allocator) : m_allocator(allocator) {}
 
-			virtual IFile* createFile(IFile* child) override;
-			virtual void destroyFile(IFile* file) override;
+			IFile* createFile(IFile* child) override;
+			void destroyFile(IFile* file) override;
 
 			const char* name() const override { return "disk"; }
 		

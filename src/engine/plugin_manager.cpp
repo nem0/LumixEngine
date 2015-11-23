@@ -69,7 +69,7 @@ class PluginManagerImpl : public PluginManager
 		}
 
 
-		virtual const Array<void*>& getLibraries() const override
+		const Array<void*>& getLibraries() const override
 		{
 			return m_libraries;
 		}
@@ -94,7 +94,7 @@ class PluginManagerImpl : public PluginManager
 		}
 
 
-		virtual DelegateList<void(void*)>& libraryLoaded() override
+		DelegateList<void(void*)>& libraryLoaded() override
 		{
 			return m_library_loaded;
 		}
@@ -112,7 +112,7 @@ class PluginManagerImpl : public PluginManager
 				if (creator)
 				{
 					IPlugin* plugin = creator(m_engine);
-					if (!plugin->create())
+					if (!plugin || !plugin->create())
 					{
 						LUMIX_DELETE(m_engine.getAllocator(), plugin);
 						ASSERT(false);

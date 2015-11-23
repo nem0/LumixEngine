@@ -69,6 +69,12 @@ namespace Lumix
 #define LUMIX_RESTRICT __restrict
 
 
+#ifdef BUILDING_AUDIO
+	#define LUMIX_AUDIO_API LUMIX_LIBRARY_EXPORT
+#else
+	#define LUMIX_AUDIO_API LUMIX_LIBRARY_IMPORT
+#endif
+
 #ifdef BUILDING_PHYSICS
 	#define LUMIX_PHYSICS_API LUMIX_LIBRARY_EXPORT
 #else

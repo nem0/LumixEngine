@@ -36,10 +36,10 @@ struct PhysicsSystemImpl : public PhysicsSystem
 		m_manager.create(ResourceManager::PHYSICS, engine.getResourceManager());
 	}
 
-	virtual bool create() override;
-	virtual IScene* createScene(UniverseContext& universe) override;
-	virtual void destroyScene(IScene* scene) override;
-	virtual void destroy() override;
+	bool create() override;
+	IScene* createScene(UniverseContext& universe) override;
+	void destroyScene(IScene* scene) override;
+	void destroy() override;
 
 	physx::PxPhysics* getPhysics() override
 	{
@@ -78,7 +78,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 	{
 	}
 
-	virtual bool showGizmo(ComponentUID cmp) override
+	bool showGizmo(ComponentUID cmp) override
 	{
 		PhysicsScene* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
 		if (cmp.type == CONTROLLER_HASH)
@@ -139,7 +139,7 @@ void PhysicsSystemImpl::destroyScene(IScene* scene)
 class AssertNullAllocator : public physx::PxAllocatorCallback
 {
 	public:
-		virtual void* allocate(size_t size, const char*, const char*, int) override
+		void* allocate(size_t size, const char*, const char*, int) override
 		{
 			void* ret = _aligned_malloc(size, 16);
 			// g_log_info.log("PhysX") << "Allocated " << size << " bytes for " << typeName << "
@@ -147,7 +147,7 @@ class AssertNullAllocator : public physx::PxAllocatorCallback
 			ASSERT(ret);
 			return ret;
 		}
-		virtual void deallocate(void* ptr) override
+		void deallocate(void* ptr) override
 		{
 			_aligned_free(ptr);
 		}

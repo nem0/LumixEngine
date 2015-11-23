@@ -179,8 +179,8 @@ private:
 	int getBoneIdx(const char* name);
 	void computeRuntimeData(const uint8* vertices);
 
-	virtual void unload(void) override;
-	virtual bool load(FS::IFile& file) override;
+	void unload(void) override;
+	bool load(FS::IFile& file) override;
 
 private:
 	IAllocator& m_allocator;

@@ -17,7 +17,7 @@ namespace Lumix
 				m_end = 0;
 			}
 
-			virtual void* allocate(size_t n) override
+			void* allocate(size_t n) override
 			{
 				ASSERT(n + m_end <= SIZE);
 				size_t end = m_end;
@@ -25,7 +25,7 @@ namespace Lumix
 				return m_data + end;
 			}
 
-			virtual void deallocate(void* p) override
+			void deallocate(void* p) override
 			{
 				if(p != nullptr)
 				{
@@ -34,7 +34,7 @@ namespace Lumix
 				}
 			}
 
-			virtual void* reallocate(void*, size_t) override
+			void* reallocate(void*, size_t) override
 			{
 				ASSERT(false);
 				return nullptr;
