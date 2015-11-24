@@ -73,6 +73,7 @@ public:
 	{
 		m_entity_list_search[0] = '\0';
 		m_template_name[0] = '\0';
+		m_clip_manager_filter[0] = '\0';
 	}
 
 
@@ -613,11 +614,19 @@ public:
 
 		if (ImGui::Begin("Clip manager", &m_is_clip_manager_opened))
 		{
+			ImGui::InputText("Filter", m_clip_manager_filter, Lumix::lengthOf(m_clip_manager_filter));
+
 			auto* audio_scene = static_cast<Lumix::AudioScene*>(m_editor->getScene(Lumix::crc32("audio")));
 			int clip_count = audio_scene->getClipCount();
 			for (int clip_id = 0; clip_id < clip_count; ++clip_id)
 			{
 				auto* clip_info = audio_scene->getClipInfo(clip_id);
+
+				if (m_clip_manager_filter[0] != 0 &&
+					Lumix::stristr(clip_info->name, m_clip_manager_filter) == 0)
+				{
+					continue;
+				}
 
 				if (ImGui::TreeNode((const void*)clip_id, clip_info->name))
 				{
@@ -1344,6 +1353,7 @@ public:
 	bool m_is_entity_template_list_opened;
 	bool m_is_style_editor_opened;
 	bool m_is_wireframe;
+	char m_clip_manager_filter[50];
 };
 
 
