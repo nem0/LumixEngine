@@ -17,7 +17,13 @@ namespace Lumix
 				PRESSED,
 				DOWN,
 				MOUSE_X,
-				MOUSE_Y
+				MOUSE_Y,
+				LTHUMB_X,
+				LTHUMB_Y,
+				RTHUMB_X,
+				RTHUMB_Y,
+				RTRIGGER,
+				LTRIGGER
 			};
 
 		public:
@@ -31,7 +37,7 @@ namespace Lumix
 			virtual float getActionValue(uint32 action) = 0;
 			virtual void injectMouseXMove(float value) = 0;
 			virtual void injectMouseYMove(float value) = 0;
-			virtual void addAction(uint32 action, InputType type, int key) = 0;
+			virtual void addAction(uint32 action, InputType type, int key, int controller_id) = 0;
 	};
 
 
