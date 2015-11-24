@@ -6,20 +6,52 @@
 #undef NOKEYSTATES
 #undef NOUSER
 #include <Windows.h>
+#include <Xinput.h>
 
 
 namespace Lumix
 {
+	static const float DEADZONE = 0.2f;
 
 	struct InputSystemImpl : public InputSystem
 	{
+		typedef decltype(XInputGetState)* XInputGetState_fn_ptr;
+
 		InputSystemImpl(IAllocator& allocator)
 			: m_actions(allocator)
 			, m_allocator(allocator)
 			, m_is_enabled(false)
 			, m_mouse_rel_x(0)
 			, m_mouse_rel_y(0)
-		{}
+			, m_xinput_library(nullptr)
+			, m_xinput_get_state(nullptr)
+		{
+			for (int i = 0; i < Lumix::lengthOf(m_xinput_connected); ++i)
+			{
+				m_xinput_connected[i] = false;
+			}
+		}
+
+
+		~InputSystemImpl()
+		{
+			if (m_xinput_library) FreeLibrary(m_xinput_library);
+		}
+
+
+		bool create()
+		{
+			m_xinput_library = LoadLibrary("Xinput9_1_0.dll");
+			if (!m_xinput_library) return false;
+			m_xinput_get_state = (XInputGetState_fn_ptr)GetProcAddress(m_xinput_library, "XInputGetState");
+			if (!m_xinput_get_state)
+			{
+				FreeLibrary(m_xinput_library);
+				m_xinput_library = nullptr;
+				return false;
+			}
+			return true;
+		}
 
 
 		void enable(bool enabled) override
@@ -32,6 +64,11 @@ namespace Lumix
 		{
 			m_mouse_rel_x = 0;
 			m_mouse_rel_y = 0;
+			for (int i = 0; i < XUSER_MAX_COUNT; ++i)
+			{
+				auto status = m_xinput_get_state(i, &m_xinput_states[i]);
+				m_xinput_connected[i] = status == ERROR_SUCCESS;
+			}
 		}
 
 
@@ -47,12 +84,20 @@ namespace Lumix
 		}
 
 
-		void addAction(uint32 action, InputType type, int key) override
+		void addAction(uint32 action, InputType type, int key, int controller_id) override
 		{
 			InputSystemImpl::Action value;
 			value.key = key;
 			value.type = type;
+			value.controller_id = controller_id;
 			m_actions[action] = value;
+		}
+
+
+		float deadZone(float value, float dead_zone)
+		{
+			if (value < dead_zone && value > -dead_zone) return 0;
+			return value;
 		}
 
 
@@ -66,16 +111,31 @@ namespace Lumix
 				{
 				case InputType::PRESSED:
 					return (GetAsyncKeyState(value.key) >> 8) ? 1.0f : 0;
-					break;
 				case InputType::DOWN:
-					return GetAsyncKeyState(value.key) & 1 ? 1.0f : 0;
-					break;
+					if (value.controller_id < 0)
+					{
+						return GetAsyncKeyState(value.key) & 1 ? 1.0f : 0;
+					}
+					else
+					{
+						return m_xinput_states[value.controller_id].Gamepad.wButtons & value.key ? 1.0f : 0;
+					}
 				case InputType::MOUSE_X:
 					return m_mouse_rel_x;
-					break;
 				case InputType::MOUSE_Y:
 					return m_mouse_rel_y;
-					break;
+				case InputType::LTHUMB_X:
+					return deadZone(m_xinput_states[value.controller_id].Gamepad.sThumbLX / 32767.0f, DEADZONE);
+				case InputType::LTHUMB_Y:
+					return deadZone(m_xinput_states[value.controller_id].Gamepad.sThumbLY / 32767.0f, DEADZONE);
+				case InputType::RTHUMB_X:
+					return deadZone(m_xinput_states[value.controller_id].Gamepad.sThumbRX / 32767.0f, DEADZONE);
+				case InputType::RTHUMB_Y:
+					return deadZone(m_xinput_states[value.controller_id].Gamepad.sThumbRY / 32767.0f, DEADZONE);
+				case InputType::RTRIGGER:
+					return deadZone(m_xinput_states[value.controller_id].Gamepad.bRightTrigger / 255.0f, DEADZONE);
+				case InputType::LTRIGGER:
+					return deadZone(m_xinput_states[value.controller_id].Gamepad.bLeftTrigger / 255.0f, DEADZONE);
 				};
 			}
 			return -1;
@@ -86,6 +146,7 @@ namespace Lumix
 		{
 			InputSystem::InputType type;
 			int key;
+			int controller_id;
 		};
 
 
@@ -94,12 +155,22 @@ namespace Lumix
 		float m_mouse_rel_x;
 		float m_mouse_rel_y;
 		bool m_is_enabled;
+		HMODULE m_xinput_library;
+		XInputGetState_fn_ptr m_xinput_get_state;
+		XINPUT_STATE m_xinput_states[XUSER_MAX_COUNT];
+		bool m_xinput_connected[XUSER_MAX_COUNT];
 	};
 
 
 	InputSystem* InputSystem::create(IAllocator& allocator)
 	{
-		return LUMIX_NEW(allocator, InputSystemImpl)(allocator);
+		auto* system = LUMIX_NEW(allocator, InputSystemImpl)(allocator);
+		if (!system->create())
+		{
+			LUMIX_DELETE(allocator, system);
+			return nullptr;
+		}
+		return system;
 	}
 
 

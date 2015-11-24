@@ -178,6 +178,7 @@ public:
 				ImGui::Separator();
 
 				ImGui::Text("Version 0.18. - News");
+				ImGui::BulletText("XBox Controller support");
 				ImGui::BulletText("Each script component has its own environment");
 				ImGui::BulletText("Pipeline's features can be enabled/disabled in GUI");
 				ImGui::BulletText("Shader editor");

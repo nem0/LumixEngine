@@ -144,10 +144,10 @@ static float getInputActionValue(Engine* engine, uint32 action)
 }
 
 
-static void addInputAction(Engine* engine, uint32 action, int type, int key)
+static void addInputAction(Engine* engine, uint32 action, int type, int key, int controller_id)
 {
 	engine->getInputSystem().addAction(
-		action, Lumix::InputSystem::InputType(type), key);
+		action, Lumix::InputSystem::InputType(type), key, controller_id);
 }
 
 
