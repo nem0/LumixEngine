@@ -142,6 +142,33 @@ inline const char* luaTypeToString(int type)
 }
 
 
+template <typename T>
+bool checkParameterType(lua_State* L, int index)
+{
+	if (!isType<T>(L, index))
+	{
+		int depth = 0;
+		lua_Debug entry;
+
+		int type = lua_type(L, index);
+		auto er = g_log_error.log("lua");
+		er << "Wrong argument " << index << " of type " << LuaWrapper::luaTypeToString(type)
+			<< " in:\n";
+		while (lua_getstack(L, depth, &entry))
+		{
+			int status = lua_getinfo(L, "Sln", &entry);
+			ASSERT(status);
+			er << entry.short_src << "(" << entry.currentline
+				<< "): " << (entry.name ? entry.name : "?") << "\n";
+			depth++;
+		}
+		er << typeToString<T>() << " expected\n";
+		return false;
+	}
+	return true;
+}
+
+
 template <int N> struct FunctionCaller
 {
 	template <typename R, typename... ArgsF, typename... Args>
@@ -151,34 +178,7 @@ template <int N> struct FunctionCaller
 	{
 		typedef std::tuple_element<sizeof...(ArgsF)-N,
 								   std::tuple<ArgsF...>>::type T;
-		if (!isType<T>(L, sizeof...(ArgsF)-N + 1))
-		{
-			lua_Debug entry;
-			int depth = 0;
-
-			auto er = g_log_error.log("lua");
-			int type = lua_type(L, sizeof...(ArgsF)-N + 1);
-
-			if (type == LUA_TNONE)
-			{
-				er << "Argument " << sizeof...(ArgsF)-N + 1  << " not found in:\n";
-			}
-			else
-			{
-				er << "Wrong argument " << sizeof...(ArgsF)-N + 1 << " of type "
-				   << luaTypeToString(type) << " in:\n";
-			}
-			while (lua_getstack(L, depth, &entry))
-			{
-				int status = lua_getinfo(L, "Sln", &entry);
-				ASSERT(status);
-				er << entry.short_src << "(" << entry.currentline
-				   << "): " << (entry.name ? entry.name : "?") << "\n";
-				depth++;
-			}
-			er << typeToString<T>() << " expected\n";
-			return R();
-		}
+		if (!checkParameterType<T>(L, sizeof...(ArgsF)-N + 1)) return R();
 		T a = toType<T>(L, sizeof...(ArgsF)-N + 1);
 		return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
 	}
@@ -190,27 +190,7 @@ template <int N> struct FunctionCaller
 	{
 		typedef std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
-		if (!isType<T>(L, sizeof...(ArgsF)-N + 1))
-		{
-			lua_Debug entry;
-			int depth = 0;
-
-			auto er = g_log_error.log("lua");
-			auto er = g_log_error.log("lua");
-			int type = lua_type(L, sizeof...(ArgsF)-N + 1);
-
-			er << "Wrong argument " << sizeof...(ArgsF)-N + 1 << " of type " << luaTypeToString(type)
-				<< " in\n";
-			while (lua_getstack(L, depth, &entry))
-			{
-				int status = lua_getinfo(L, "Sln", &entry);
-				ASSERT(status);
-				er << entry.short_src << "(" << entry.currentline
-					<< "): " << (entry.name ? entry.name : "?") << "\n";
-				depth++;
-			}
-			return R();
-		}
+		if (!checkParameterType<T>(L, sizeof...(ArgsF)-N + 1)) return R();
 		T a = toType<T>(L, sizeof...(ArgsF)-N + 1);
 		return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
 	}

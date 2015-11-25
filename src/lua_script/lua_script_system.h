@@ -36,6 +36,7 @@ public:
 	virtual void setPropertyValue(ComponentIndex cmp,
 		const char* name,
 		const char* value) = 0;
+	virtual int getEnvironment(Entity entity) = 0;
 };
 
 
