@@ -128,6 +128,16 @@ public:
 	}
 
 
+	int getEnvironment(Entity entity) override
+	{
+		for (auto& i : m_scripts)
+		{
+			if (i.m_entity == entity) return i.m_environment;
+		}
+		return -1;
+	}
+
+
 	void applyProperty(Script& script, Property& prop)
 	{
 		if (prop.m_value.length() == 0) return;
@@ -251,12 +261,13 @@ public:
 			if (!m_valid[i] || !m_scripts[i].m_script) continue;
 
 			Script& script = m_scripts[i];
+			script.m_environment = -1;
 
 			if (!script.m_script->isReady())
 			{
 				script.m_state = nullptr;
 				g_log_error.log("lua script") << "Script " << script.m_script->getPath().c_str()
-											  << " is not loaded";
+					<< " is not loaded";
 				continue;
 			}
 
@@ -277,7 +288,16 @@ public:
 			lua_setfield(script.m_state, -2, "this");
 
 			applyProperties(script);
+			lua_pop(script.m_state, 1);
+		}
 
+		for (int i = 0; i < m_scripts.size(); ++i)
+		{
+			if (!m_valid[i] || !m_scripts[i].m_script) continue;
+			Script& script = m_scripts[i];
+			if (!script.m_script->isReady()) continue;
+
+			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
 			bool errors = luaL_loadbuffer(script.m_state,
 							  script.m_script->getSourceCode(),
 							  stringLength(script.m_script->getSourceCode()),

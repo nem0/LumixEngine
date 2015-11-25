@@ -3,6 +3,7 @@
 #include "core/lua_wrapper.h"
 #include "engine.h"
 #include "iplugin.h"
+#include "lua_script/lua_script_system.h"
 #include "renderer/material.h"
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
@@ -16,6 +17,31 @@ namespace Lumix
 
 namespace LuaAPI
 {
+
+
+static int getEnvironment(lua_State* L)
+{
+	if (!LuaWrapper::checkParameterType<void*>(L, 1) || !LuaWrapper::checkParameterType<int>(L, 2))
+	{
+		lua_pushnil(L);
+		return 1;
+	}
+
+	LuaScriptScene* scene = (LuaScriptScene*)lua_touserdata(L, 1);
+	Entity entity = (Entity)lua_tointeger(L, 2);
+
+	int env = scene->getEnvironment(entity);
+
+	if (env < 0)
+	{
+		lua_pushnil(L);
+	}
+	else
+	{
+		lua_rawgeti(L, LUA_REGISTRYINDEX, env);
+	}
+	return 1;
+}
 
 
 static Texture* getMaterialTexture(Material* material, int texture_index)
@@ -176,6 +202,9 @@ void registerEngineLuaAPI(Engine& engine, lua_State* L)
 {
 	lua_pushlightuserdata(L, &engine);
 	lua_setglobal(L, "g_engine");
+
+	registerCFunction(L, "API_getEnvironment", &LuaAPI::getEnvironment);
+
 
 	registerCFunction(L,
 					  "API_getMaterialTexture",
