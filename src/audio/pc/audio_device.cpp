@@ -189,7 +189,7 @@ struct AudioDeviceImpl : public AudioDevice
 		DWORD status;
 		if (FAILED(buffer->GetStatus(&status))) return false;
 
-
+		return status & DSBSTATUS_PLAYING;
 	}
 
 
@@ -247,7 +247,6 @@ struct AudioDeviceImpl : public AudioDevice
 
 	void setSourcePosition(BufferHandle clip, float x, float y, float z) override
 	{
-		TODO("cache QueryInterface");
 		LPDIRECTSOUND3DBUFFER8 source;
 		auto buffer = (LPDIRECTSOUNDBUFFER)clip;
 		if (SUCCEEDED(buffer->QueryInterface(IID_IDirectSound3DBuffer8, (void**)&source)))

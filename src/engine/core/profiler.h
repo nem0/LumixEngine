@@ -4,98 +4,50 @@
 #include "lumix.h"
 #include "core/delegate_list.h"
 #include "core/default_allocator.h"
+#include "core/hash_map.h"
 
 
 namespace Lumix
 {
 
 
-	class Timer;
+namespace Profiler
+{
 
 
-	class LUMIX_ENGINE_API Profiler
-	{
-		public: 
-			class Block;
+struct Block;
 
-		public:
-			Profiler();
-			~Profiler();
+LUMIX_ENGINE_API uint32 getThreadID(int index);
+LUMIX_ENGINE_API void setThreadName(const char* name);
+LUMIX_ENGINE_API const char* getThreadName(uint32 thread_id);
+LUMIX_ENGINE_API int getThreadIndex(uint32 id);
+LUMIX_ENGINE_API int getThreadCount();
 
-			void frame();
-			void toggleRecording();
-			bool isRecording() const { return m_is_recording; }
-			void checkRecording();
-			DelegateList<void ()>& getFrameListeners() { return m_frame_listeners; }
-			Block* getRootBlock() const { return m_root_block; }
+LUMIX_ENGINE_API Block* getRootBlock(uint32 thread_id);
+LUMIX_ENGINE_API Block* getBlockFirstChild(Block* block);
+LUMIX_ENGINE_API Block* getBlockNext(Block* block);
+LUMIX_ENGINE_API float getBlockLength(Block* block);
+LUMIX_ENGINE_API int getBlockHitCount(Block* block);
+LUMIX_ENGINE_API const char* getBlockName(Block* block);
 
-			void beginBlock(const char* name);
-			void endBlock();
-			
-
-		private:
-			DefaultAllocator m_allocator;
-			bool m_is_recording;
-			Block* m_current_block;
-			Block* m_root_block;
-			Timer* m_timer;
-			bool m_is_record_toggle_request;
-			DelegateList<void ()> m_frame_listeners;
-	};
-
-	class LUMIX_ENGINE_API Profiler::Block
-	{
-		public:
-			class Hit
-			{
-				public:
-					float m_length;
-					float m_start;
-			};
-		
-		public:
-			Block(Profiler& profiler)
-				: m_profiler(profiler)
-				, m_hits(profiler.m_allocator)
-			{ }
-
-			~Block();
-			void frame();
-			void frameHits(Lumix::Timer* timer);
-			float getLength();
-			int getHitCount() const { return m_hits.size(); }
-
-		public:
-			Block* m_parent;
-			Block* m_next;
-			Block* m_first_child;
-			const char* m_name;
-			Profiler& m_profiler;
-			Array<Hit> m_hits;
-	};
+LUMIX_ENGINE_API void beginBlock(const char* name);
+LUMIX_ENGINE_API void endBlock();
+LUMIX_ENGINE_API void frame();
+LUMIX_ENGINE_API DelegateList<void ()>& getFrameListeners();
 
 
-	extern LUMIX_ENGINE_API Profiler g_profiler;
+struct Scope
+{
+	Scope(const char* name) { beginBlock(name); }
+	~Scope() { endBlock(); }
+};
 
 
-	class ProfileScope
-	{
-		public:
-			ProfileScope(const char* name)
-			{
-				g_profiler.beginBlock(name);
-			}
-
-			~ProfileScope()
-			{
-				g_profiler.endBlock();
-			}
-	};
+} // namespace Profiler
 
 
-#define BEGIN_PROFILE_BLOCK(name) Lumix::g_profiler.beginBlock(name)
-#define END_PROFILE_BLOCK() Lumix::g_profiler.endBlock()
-#define PROFILE_FUNCTION() Lumix::ProfileScope profile_scope(__FUNCTION__);
-#define PROFILE_BLOCK(name) Lumix::ProfileScope profile_scope(name);
+#define PROFILE_FUNCTION() Lumix::Profiler::Scope profile_scope(__FUNCTION__);
+#define PROFILE_BLOCK(name) Lumix::Profiler::Scope profile_scope(name);
+
 
 } // namespace Lumix

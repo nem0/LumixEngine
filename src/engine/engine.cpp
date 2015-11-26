@@ -413,6 +413,7 @@ static void logErrorToFile(const char*, const char* message)
 
 Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 {
+	Profiler::setThreadName("Main");
 	installUnhandledExceptionHandler();
 
 	g_error_file = fopen("error.log", "wb");

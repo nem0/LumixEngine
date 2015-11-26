@@ -49,13 +49,15 @@ ProfilerUI::ProfilerUI(Lumix::Debug::Allocator* allocator, Lumix::ResourceManage
 	: m_main_allocator(allocator)
 	, m_resource_manager(resource_manager)
 {
+	m_viewed_thread_id = 0;
 	m_allocation_size_from = 0;
 	m_allocation_size_to = 1024 * 1024;
 	m_current_frame = -1;
 	m_root = nullptr;
 	m_is_opened = false;
+	m_is_paused = true;
 	m_current_block = nullptr;
-	Lumix::g_profiler.getFrameListeners().bind<ProfilerUI, &ProfilerUI::onFrame>(this);
+	Lumix::Profiler::getFrameListeners().bind<ProfilerUI, &ProfilerUI::onFrame>(this);
 	m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(m_allocator);
 	m_allocation_root->m_stack_node = nullptr;
 }
@@ -65,15 +67,15 @@ ProfilerUI::~ProfilerUI()
 {
 	m_allocation_root->clear(m_allocator);
 	LUMIX_DELETE(m_allocator, m_allocation_root);
-	Lumix::g_profiler.getFrameListeners().unbind<ProfilerUI, &ProfilerUI::onFrame>(this);
+	Lumix::Profiler::getFrameListeners().unbind<ProfilerUI, &ProfilerUI::onFrame>(this);
 }
 
 
 void ProfilerUI::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_block)
 {
-	ASSERT(my_block->m_name == remote_block->m_name);
-	my_block->m_frames.push(remote_block->getLength());
-	my_block->m_hit_counts.push(remote_block->getHitCount());
+	ASSERT(my_block->m_name == Lumix::Profiler::getBlockName(remote_block));
+	my_block->m_frames.push(Lumix::Profiler::getBlockLength(remote_block));
+	my_block->m_hit_counts.push(Lumix::Profiler::getBlockHitCount(remote_block));
 	if (my_block->m_frames.size() > MAX_FRAMES)
 	{
 		my_block->m_frames.erase(0);
@@ -83,11 +85,11 @@ void ProfilerUI::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bloc
 		my_block->m_hit_counts.erase(0);
 	}
 
-	if (!my_block->m_first_child && remote_block->m_first_child)
+	auto* remote_child = Lumix::Profiler::getBlockFirstChild(remote_block);
+	if (!my_block->m_first_child && remote_child)
 	{
-		Lumix::Profiler::Block* remote_child = remote_block->m_first_child;
 		Block* my_child = new Block(m_allocator);
-		my_child->m_name = remote_child->m_name;
+		my_child->m_name = Lumix::Profiler::getBlockName(remote_child);
 		my_child->m_parent = my_block;
 		my_child->m_next = nullptr;
 		my_child->m_first_child = nullptr;
@@ -96,12 +98,11 @@ void ProfilerUI::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bloc
 	}
 	else if (my_block->m_first_child)
 	{
-		Lumix::Profiler::Block* remote_child = remote_block->m_first_child;
 		Block* my_child = my_block->m_first_child;
-		if (my_child->m_name != remote_child->m_name)
+		if (my_child->m_name != Lumix::Profiler::getBlockName(remote_child))
 		{
 			Block* my_new_child = new Block(m_allocator);
-			my_new_child->m_name = remote_child->m_name;
+			my_new_child->m_name = Lumix::Profiler::getBlockName(remote_child);
 			my_new_child->m_parent = my_block;
 			my_new_child->m_next = my_child;
 			my_new_child->m_first_child = nullptr;
@@ -111,11 +112,11 @@ void ProfilerUI::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bloc
 		cloneBlock(my_child, remote_child);
 	}
 
-	if (!my_block->m_next && remote_block->m_next)
+	auto* remote_next = Lumix::Profiler::getBlockNext(remote_block);
+	if (!my_block->m_next && remote_next)
 	{
-		Lumix::Profiler::Block* remote_next = remote_block->m_next;
 		Block* my_next = new Block(m_allocator);
-		my_next->m_name = remote_next->m_name;
+		my_next->m_name = Lumix::Profiler::getBlockName(remote_next);
 		my_next->m_parent = my_block->m_parent;
 		my_next->m_next = nullptr;
 		my_next->m_first_child = nullptr;
@@ -124,17 +125,16 @@ void ProfilerUI::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bloc
 	}
 	else if (my_block->m_next)
 	{
-		if (my_block->m_next->m_name != remote_block->m_next->m_name)
+		if (my_block->m_next->m_name != Lumix::Profiler::getBlockName(remote_next))
 		{
 			Block* my_next = new Block(m_allocator);
-			Lumix::Profiler::Block* remote_next = remote_block->m_next;
-			my_next->m_name = remote_next->m_name;
+			my_next->m_name = Lumix::Profiler::getBlockName(remote_next);
 			my_next->m_parent = my_block->m_parent;
 			my_next->m_next = my_block->m_next;
 			my_next->m_first_child = nullptr;
 			my_block->m_next = my_next;
 		}
-		cloneBlock(my_block->m_next, remote_block->m_next);
+		cloneBlock(my_block->m_next, remote_next);
 	}
 }
 
@@ -142,23 +142,23 @@ void ProfilerUI::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bloc
 void ProfilerUI::onFrame()
 {
 	if (!m_is_opened) return;
+	if (m_is_paused) return;
 
-	if (!m_root && Lumix::g_profiler.getRootBlock())
+	auto* root = Lumix::Profiler::getRootBlock(m_viewed_thread_id);
+	if (!m_root && root)
 	{
 		m_root = new Block(m_allocator);
-		m_root->m_name = Lumix::g_profiler.getRootBlock()->m_name;
+		m_root->m_name = Lumix::Profiler::getBlockName(root);
 		m_root->m_parent = nullptr;
 		m_root->m_next = nullptr;
 		m_root->m_first_child = nullptr;
 	}
 	else
 	{
-		ASSERT(m_root->m_name == Lumix::g_profiler.getRootBlock()->m_name);
+		ASSERT(!root || m_root->m_name == Lumix::Profiler::getBlockName(root));
 	}
-	if (m_root)
-	{
-		cloneBlock(m_root, Lumix::g_profiler.getRootBlock());
-	}
+	
+	if (m_root) cloneBlock(m_root, root);
 }
 
 
@@ -448,11 +448,29 @@ void ProfilerUI::onGUICPUProfiler()
 {
 	if (!ImGui::CollapsingHeader("CPU")) return;
 
-	bool b = Lumix::g_profiler.isRecording();
-	if (ImGui::Checkbox("Recording", &b))
+	if (ImGui::Checkbox("Pause", &m_is_paused))
 	{
-		Lumix::g_profiler.toggleRecording();
+		if (m_viewed_thread_id == 0 && !m_root)
+		{
+			m_viewed_thread_id = Lumix::Profiler::getThreadID(0);
+		}
 	}
+	
+	auto getter = [](void* data, int index, const char** out) -> bool {
+		auto id = Lumix::Profiler::getThreadID(index);
+		*out = Lumix::Profiler::getThreadName(id); 
+		return true;
+	};
+	int thread_idx = Lumix::Profiler::getThreadIndex(m_viewed_thread_id);
+	ImGui::SameLine();
+	if (ImGui::Combo("Thread", &thread_idx, getter, nullptr, Lumix::Profiler::getThreadCount()))
+	{
+		m_viewed_thread_id = Lumix::Profiler::getThreadID(thread_idx);
+		LUMIX_DELETE(m_allocator, m_root);
+		m_root = nullptr;
+		m_current_frame = -1;
+	}
+
 	if (m_root)
 	{
 		ImGui::Columns(3, "cpuc");

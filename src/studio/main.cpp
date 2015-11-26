@@ -987,8 +987,7 @@ public:
 					Lumix::MT::sleep(Lumix::uint32(1000 / 60.0f - frame_time * 1000));
 				}
 			}
-			Lumix::g_profiler.frame();
-			Lumix::g_profiler.checkRecording();
+			Lumix::Profiler::frame();
 		}
 		Lumix::Timer::destroy(timer);
 	}

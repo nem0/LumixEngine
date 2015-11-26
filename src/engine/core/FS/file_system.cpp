@@ -64,6 +64,7 @@ public:
 	{
 		while (!m_trans_queue->isAborted())
 		{
+			PROFILE_BLOCK("transaction");
 			AsynTrans* tr = m_trans_queue->pop(true);
 			if (!tr)
 				break;
@@ -100,8 +101,7 @@ public:
 		, m_pending(m_allocator)
 		, m_devices(m_allocator)
 	{
-		m_task =
-			LUMIX_NEW(m_allocator, FSTask)(&m_transaction_queue, m_allocator);
+		m_task = LUMIX_NEW(m_allocator, FSTask)(&m_transaction_queue, m_allocator);
 		m_task->create("FSTask");
 		m_task->run();
 	}
