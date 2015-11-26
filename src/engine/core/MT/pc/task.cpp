@@ -3,6 +3,7 @@
 #include "core/mt/task.h"
 #include "core/mt/thread.h"
 #include "core/pc/simple_win.h"
+#include "core/profiler.h"
 #include <Windows.h>
 
 
@@ -35,6 +36,7 @@ namespace Lumix
 			uint32 ret = 0xffffFFFF;
 			struct TaskImpl* impl = reinterpret_cast<TaskImpl*>(ptr);
 			setThreadName(impl->m_thread_id, impl->m_thread_name);
+			Profiler::setThreadName(impl->m_thread_name);
 			if (!impl->m_force_exit)
 			{
 				ret = impl->m_owner->task();

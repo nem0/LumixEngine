@@ -39,7 +39,6 @@ namespace Lumix
 #pragma pack(push,8)
 		typedef struct tagTHREADNAME_INFO
 		{
-
 			DWORD type;
 			LPCSTR name;
 			DWORD thread_id;
