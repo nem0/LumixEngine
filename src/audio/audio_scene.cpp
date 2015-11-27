@@ -293,6 +293,7 @@ struct AudioSceneImpl : public AudioScene
 
 			serializer.read(clip->looped);
 			serializer.readString(clip->name, Lumix::lengthOf(clip->name));
+			clip->name_hash = crc32(clip->name);
 			char path[MAX_PATH_LENGTH];
 			serializer.readString(path, Lumix::lengthOf(path));
 
