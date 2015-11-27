@@ -2,13 +2,14 @@
 
 #include "core/array.h"
 #include "core/free_list.h"
-#include "core/path.h"
-#include "core/stack_allocator.h"
-#include "core/static_array.h"
-#include "core/string.h"
 #include "core/fs/os_file.h"
 #include "core/fs/tcp_file_device.h"
 #include "core/mt/task.h"
+#include "core/path.h"
+#include "core/profiler.h"
+#include "core/stack_allocator.h"
+#include "core/static_array.h"
+#include "core/string.h"
 #include "core/network.h"
 
 
@@ -175,6 +176,7 @@ public:
 
 		while (!quit)
 		{
+			PROFILE_BLOCK("File server operation")
 			int32 op = 0;
 			stream->read(op);
 			switch (op)

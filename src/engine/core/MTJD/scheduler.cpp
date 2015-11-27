@@ -1,7 +1,8 @@
 #include "lumix.h"
 #include "core/MTJD/scheduler.h"
-
 #include "core/MTJD/manager.h"
+#include "core/profiler.h"
+
 
 namespace Lumix
 {
@@ -25,6 +26,7 @@ namespace Lumix
 			{
 				m_data_event.wait();
 
+				PROFILE_BLOCK("Schedule")
 				m_manager.doScheduling();
 			}
 

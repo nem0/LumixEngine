@@ -1661,6 +1661,7 @@ public:
 			MTJD::Job* job = MTJD::makeJob(m_engine.getMTJDManager(),
 				[&subinfos, layer_mask, this, &results, subresult_index, &frustum]()
 				{
+					PROFILE_BLOCK("Temporary Info Job");
 					Vec3 frustum_position = frustum.getPosition();
 					const CullingSystem::Subresults& subresults = results[subresult_index];
 					for (int i = 0, c = subresults.size(); i < c; ++i)

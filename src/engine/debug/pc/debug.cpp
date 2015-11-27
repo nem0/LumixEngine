@@ -381,21 +381,19 @@ void* Allocator::reallocate(void* user_ptr, size_t size)
 
 void* Allocator::allocate_aligned(size_t size, size_t align)
 {
-	ASSERT(false);
-	return nullptr;
+	return m_source.allocate_aligned(size, align);
 }
 
 
 void Allocator::deallocate_aligned(void* ptr)
 {
-	ASSERT(false);
+	m_source.deallocate_aligned(ptr);
 }
 
 
 void* Allocator::reallocate_aligned(void* ptr, size_t size, size_t align)
 {
-	ASSERT(false);
-	return nullptr;
+	return m_source.reallocate_aligned(ptr, size, align);
 }
 
 
