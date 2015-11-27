@@ -1,5 +1,6 @@
 #include "file_system_watcher.h"
 #include "core/MT/task.h"
+#include "core/profiler.h"
 #include "core/string.h"
 
 #include "core/pc/simple_win.h"
@@ -138,6 +139,7 @@ int FileSystemWatcherTask::task()
 	bool finished = false;
 	while (!finished)
 	{
+		PROFILE_BLOCK("Change handling");
 		finished = ReadDirectoryChangesW(m_handle,
 										 m_info,
 										 sizeof(m_info),

@@ -5,6 +5,7 @@
 #include "core/binary_array.h"
 #include "core/free_list.h"
 #include "core/frustum.h"
+#include "core/profiler.h"
 #include "core/sphere.h"
 
 #include "core/mtjd/group.h"
@@ -27,6 +28,7 @@ static void doCulling(int start_index,
 	int64 layer_mask,
 	CullingSystem::Subresults& results)
 {
+	PROFILE_FUNCTION();
 	int i = start_index;
 	ASSERT(results.empty());
 	for (const Sphere *sphere = start; sphere <= end; sphere++, ++i)

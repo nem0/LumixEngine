@@ -89,17 +89,17 @@ struct BGFXAllocator : public bx::AllocatorI
 	}
 
 
-	void* realloc(void* _ptr, size_t _size, size_t, const char*, uint32) override
+	void* realloc(void* _ptr, size_t _size, size_t _alignment, const char*, uint32) override
 	{
-		if (!_ptr) return m_source.allocate(_size);
+		if (!_ptr) return m_source.allocate_aligned(_size, _alignment);
 
 		if (_ptr && _size == 0)
 		{
-			m_source.deallocate(_ptr);
+			m_source.deallocate_aligned(_ptr);
 			return nullptr;
 		}
 
-		return m_source.reallocate(_ptr, _size);
+		return m_source.reallocate_aligned(_ptr, _size, _alignment);
 	}
 
 
