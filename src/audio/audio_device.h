@@ -34,6 +34,11 @@ public:
 
 	virtual BufferHandle createBuffer(const void* data, int size_bytes, int channels, int sample_rate, int flags) = 0;
 	virtual void destroyBuffer(BufferHandle buffer) = 0;
+	virtual void setEcho(BufferHandle handle,
+		float wet_dry_mix,
+		float feedback,
+		float left_delay,
+		float right_delay) = 0;
 	virtual void play(BufferHandle buffer, bool looped) = 0;
 	virtual bool isPlaying(BufferHandle buffer) = 0;
 	virtual void stop(BufferHandle buffer) = 0;

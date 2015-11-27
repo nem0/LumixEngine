@@ -176,6 +176,42 @@ struct AudioDeviceImpl : public AudioDevice
 	}
 
 
+	void setEcho(BufferHandle handle,
+		float wet_dry_mix,
+		float feedback,
+		float left_delay,
+		float right_delay) override
+	{
+		auto buffer = (LPDIRECTSOUNDBUFFER)handle;
+		DSEFFECTDESC echo_effect;
+		memset(&echo_effect, 0, sizeof(DSEFFECTDESC));
+		echo_effect.dwSize = sizeof(DSEFFECTDESC);
+		echo_effect.guidDSFXClass = GUID_DSFX_STANDARD_ECHO;
+		IDirectSoundBuffer8* buffer8;
+		if (FAILED(buffer->QueryInterface(IID_IDirectSoundBuffer8, (void**)&buffer8))) return;
+
+		DWORD res = 0;
+		if (FAILED(buffer8->SetFX(1, &echo_effect, &res))) return;
+
+		IDirectSoundFXEcho8* echo = NULL;
+		DSFXEcho echo_params;
+		if (FAILED(buffer8->GetObjectInPath(
+			GUID_DSFX_STANDARD_ECHO, 0, IID_IDirectSoundFXEcho8, (LPVOID*)&echo)))
+		{
+			return;
+		}
+		if (FAILED(echo->GetAllParameters(&echo_params))) return;
+		
+		echo_params.fFeedback = feedback;
+		echo_params.fWetDryMix = wet_dry_mix;
+		echo_params.fRightDelay = right_delay;
+		echo_params.fLeftDelay = left_delay;
+		echo_params.lPanDelay = DSFXECHO_PANDELAY_MIN;
+
+		echo->SetAllParameters(&echo_params);
+	}
+
+
 	void destroyBuffer(BufferHandle clip) override
 	{
 		auto buffer = (LPDIRECTSOUNDBUFFER)clip;
