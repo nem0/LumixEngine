@@ -398,7 +398,6 @@ void PropertyGrid::onLuaScriptGUI(Lumix::ComponentUID cmp)
 					Lumix::toCString(e, buf, sizeof(buf));
 					scene->setPropertyValue(cmp.index, property_name, buf);
 				}
-				
 			}
 			break;
 			case Lumix::LuaScript::Property::ANY:
