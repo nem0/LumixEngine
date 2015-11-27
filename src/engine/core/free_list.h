@@ -1,6 +1,7 @@
 #pragma once
 
 #include "lumix.h"
+#include "core/iallocator.h"
 
 namespace Lumix
 {
@@ -42,6 +43,26 @@ namespace Lumix
 			ASSERT(false);
 			return nullptr;
 		}
+
+		void* allocate_aligned(size_t size, size_t align) override
+		{
+			ASSERT(size <= ALIGN_OF(T));
+			return allocate(size);
+		}
+
+
+		void deallocate_aligned(void* ptr) override
+		{
+			return deallocate(ptr);
+		}
+
+
+		void* reallocate_aligned(void* ptr, size_t size, size_t align) override
+		{
+			ASSERT(size <= ALIGN_OF(T));
+			return reallocate(ptr, size);
+		}
+
 
 	private:
 		IAllocator&	m_allocator;

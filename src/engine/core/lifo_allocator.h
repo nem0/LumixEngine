@@ -53,6 +53,27 @@ namespace Lumix
 				return nullptr;
 			}
 
+
+			void* allocate_aligned(size_t size, size_t align) override
+			{
+				ASSERT(false);
+				return nullptr;
+			}
+
+
+			void deallocate_aligned(void* ptr) override
+			{
+				ASSERT(false);
+			}
+
+
+			void* reallocate_aligned(void* ptr, size_t size, size_t align) override
+			{
+				ASSERT(false);
+				return nullptr;
+			}
+
+
 		private:
 			IAllocator& m_source;
 			size_t m_bucket_size;

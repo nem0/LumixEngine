@@ -88,14 +88,11 @@ struct BGFXAllocator : public bx::AllocatorI
 	{
 	}
 
-	
+
 	void* realloc(void* _ptr, size_t _size, size_t, const char*, uint32) override
 	{
-		if (!_ptr)
-		{
-			return m_source.allocate(_size);
-		}
-		
+		if (!_ptr) return m_source.allocate(_size);
+
 		if (_ptr && _size == 0)
 		{
 			m_source.deallocate(_ptr);
@@ -191,7 +188,7 @@ struct RendererImpl : public Renderer
 			d.nwh = s_platform_data;
 			bgfx::setPlatformData(d);
 		}
-		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub/*, &m_bgfx_allocator*/);
+		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub, &m_bgfx_allocator);
 		bgfx::reset(800, 600);
 		bgfx::setDebug(BGFX_DEBUG_TEXT);
 

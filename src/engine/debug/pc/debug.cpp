@@ -379,6 +379,26 @@ void* Allocator::reallocate(void* user_ptr, size_t size)
 }
 
 
+void* Allocator::allocate_aligned(size_t size, size_t align)
+{
+	ASSERT(false);
+	return nullptr;
+}
+
+
+void Allocator::deallocate_aligned(void* ptr)
+{
+	ASSERT(false);
+}
+
+
+void* Allocator::reallocate_aligned(void* ptr, size_t size, size_t align)
+{
+	ASSERT(false);
+	return nullptr;
+}
+
+
 void* Allocator::allocate(size_t size)
 {
 #ifndef _DEBUG
