@@ -2856,6 +2856,8 @@ public:
 
 	void destroyUniverse()
 	{
+		if (m_is_game_mode) stopGameMode();
+
 		ASSERT(m_universe_context);
 		destroyUndoStack();
 		m_universe_destroyed.invoke();

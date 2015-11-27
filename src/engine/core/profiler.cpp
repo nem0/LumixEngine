@@ -297,6 +297,8 @@ void endBlock()
 
 void frame()
 {
+	PROFILE_FUNCTION();
+
 	MT::SpinLock lock(g_instance.m_mutex);
 	g_instance.frame_listeners.invoke();
 	float now = g_instance.timer->getTimeSinceStart();
