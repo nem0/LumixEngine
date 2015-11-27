@@ -393,7 +393,7 @@ void PropertyGrid::onLuaScriptGUI(Lumix::ComponentUID cmp)
 			{
 				Lumix::Entity e;
 				Lumix::fromCString(buf, sizeof(buf), &e);
-				if (entityInput(property_name, StringBuilder<20>("", cmp.index), e))
+				if (entityInput(property_name, StringBuilder<50>(property_name, cmp.index), e))
 				{
 					Lumix::toCString(e, buf, sizeof(buf));
 					scene->setPropertyValue(cmp.index, property_name, buf);
