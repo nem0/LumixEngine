@@ -59,6 +59,9 @@ public:
 	void* allocate(size_t size) override;
 	void deallocate(void* ptr) override;
 	void* reallocate(void* ptr, size_t size) override;
+	void* allocate_aligned(size_t size, size_t align) override;
+	void deallocate_aligned(void* ptr) override;
+	void* reallocate_aligned(void* ptr, size_t size, size_t align) override;
 	size_t getTotalSize() const { return m_total_size; }
 	void checkGuards();
 
