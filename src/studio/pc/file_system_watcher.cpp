@@ -29,7 +29,7 @@ struct FileSystemWatcherTask : public Lumix::MT::Task
 
 	int task() override;
 
-
+	volatile bool m_finished;
 	FILE_NOTIFY_INFORMATION m_info[10];
 	HANDLE m_handle;
 	DWORD m_received;
@@ -124,6 +124,46 @@ static void wcharToCharArray(const WCHAR* src, char* dest, int len)
 }
 
 
+static void CALLBACK notif(DWORD status, DWORD tferred, LPOVERLAPPED over)
+{
+	auto* task = (FileSystemWatcherTask*)over->hEvent;
+	if (status == ERROR_OPERATION_ABORTED)
+	{
+		task->m_finished = true;
+		return;
+	}
+
+	FILE_NOTIFY_INFORMATION* info = &task->m_info[0];
+	while (info)
+	{
+		auto action = info->Action;
+		switch (action)
+		{
+		case FILE_ACTION_RENAMED_NEW_NAME:
+		case FILE_ACTION_ADDED:
+		case FILE_ACTION_MODIFIED:
+		case FILE_ACTION_REMOVED:
+		{
+			char tmp[MAX_PATH];
+			wcharToCharArray(
+				info->FileName, tmp, info->FileNameLength);
+			task->m_watcher.m_callback.invoke(tmp);
+		}
+		break;
+		case FILE_ACTION_RENAMED_OLD_NAME:
+			break;
+		default:
+			ASSERT(false);
+			break;
+		}
+		info = info->NextEntryOffset == 0
+			? nullptr
+			: (FILE_NOTIFY_INFORMATION*)(((char*)info) +
+			info->NextEntryOffset);
+	}
+}
+
+
 int FileSystemWatcherTask::task()
 {
 	m_handle =
@@ -136,48 +176,22 @@ int FileSystemWatcherTask::task()
 				   nullptr);
 	if (m_handle == INVALID_HANDLE_VALUE) return -1;
 
-	bool finished = false;
-	while (!finished)
+	Lumix::setMemory(&m_overlapped, 0, sizeof(m_overlapped));
+	m_overlapped.hEvent = this;
+	m_finished = false;
+	while (!m_finished)
 	{
 		PROFILE_BLOCK("Change handling");
-		finished = ReadDirectoryChangesW(m_handle,
-										 m_info,
-										 sizeof(m_info),
-										 TRUE,
-										 READ_DIR_CHANGE_FILTER,
-										 &m_received,
-										 NULL,
-										 NULL) == FALSE;
-
-		if (finished) break;
-
-		FILE_NOTIFY_INFORMATION* info = &m_info[0];
-		while (info)
-		{
-			switch (info->Action)
-			{
-			case FILE_ACTION_RENAMED_NEW_NAME:
-			case FILE_ACTION_ADDED:
-			case FILE_ACTION_MODIFIED:
-			case FILE_ACTION_REMOVED:
-			{
-				char tmp[MAX_PATH];
-				wcharToCharArray(
-					info->FileName, tmp, info->FileNameLength);
-				m_watcher.m_callback.invoke(tmp);
-			}
-			break;
-			case FILE_ACTION_RENAMED_OLD_NAME:
-				break;
-			default:
-				ASSERT(false);
-				break;
-			}
-			info = info->NextEntryOffset == 0
-				? nullptr
-				: (FILE_NOTIFY_INFORMATION*)(((char*)info) +
-				info->NextEntryOffset);
-		}
+		BOOL status = ReadDirectoryChangesW(m_handle,
+						   m_info,
+						   sizeof(m_info),
+						   TRUE,
+						   READ_DIR_CHANGE_FILTER,
+						   &m_received,
+						   &m_overlapped,
+						   &notif);
+		if (status == FALSE) break;
+		SleepEx(INFINITE, TRUE);
 	}
 	return 0;
 }
