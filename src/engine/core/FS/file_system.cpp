@@ -66,20 +66,18 @@ public:
 		{
 			PROFILE_BLOCK("transaction");
 			AsynTrans* tr = m_trans_queue->pop(true);
-			if (!tr)
-				break;
+			if (!tr) break;
 
 			if ((tr->data.m_flags & E_IS_OPEN) == E_IS_OPEN)
 			{
 				tr->data.m_flags |=
-					tr->data.m_file->open(tr->data.m_path, tr->data.m_mode)
-						? E_SUCCESS
-						: E_FAIL;
+					tr->data.m_file->open(tr->data.m_path, tr->data.m_mode) ? E_SUCCESS : E_FAIL;
 			}
 			else if ((tr->data.m_flags & E_CLOSE) == E_CLOSE)
 			{
 				tr->data.m_file->close();
 				tr->data.m_file->release();
+				tr->data.m_file = nullptr;
 			}
 			tr->setCompleted();
 		}
@@ -110,16 +108,23 @@ public:
 	{
 		m_task->stop();
 		m_task->destroy();
+		while (!m_in_progress.empty())
+		{
+			auto* trans = m_in_progress.front();
+			m_in_progress.pop();
+			if (trans->data.m_file) close(*trans->data.m_file);
+		}
+		for (auto& i : m_pending)
+		{
+			close(*i.m_file);
+		}
 		LUMIX_DELETE(m_allocator, m_task);
 	}
 
 	BaseProxyAllocator& getAllocator() { return m_allocator; }
 
 
-	bool hasWork() const override
-	{
-		return !m_in_progress.empty();
-	}
+	bool hasWork() const override { return !m_in_progress.empty(); }
 
 
 	bool mount(IFileDevice* device) override
@@ -177,8 +182,7 @@ public:
 	}
 
 
-	IFile*
-	open(const DeviceList& device_list, const char* file, Mode mode) override
+	IFile* open(const DeviceList& device_list, const char* file, Mode mode) override
 	{
 		IFile* prev = createFile(device_list);
 
@@ -199,9 +203,9 @@ public:
 
 
 	bool openAsync(const DeviceList& device_list,
-				   const char* file,
-				   int mode,
-				   const ReadCallback& call_back) override
+		const char* file,
+		int mode,
+		const ReadCallback& call_back) override
 	{
 		IFile* prev = createFile(device_list);
 
@@ -220,10 +224,7 @@ public:
 	}
 
 
-	void setDefaultDevice(const char* dev) override
-	{
-		fillDeviceList(dev, m_default_device);
-	}
+	void setDefaultDevice(const char* dev) override { fillDeviceList(dev, m_default_device); }
 
 
 	void fillDeviceList(const char* dev, DeviceList& device_list) override
@@ -254,19 +255,13 @@ public:
 	}
 
 
-	const DeviceList& getMemoryDevice() const override
-	{
-		return m_memory_device;
-	}
+	const DeviceList& getMemoryDevice() const override { return m_memory_device; }
 
 
 	const DeviceList& getDiskDevice() const override { return m_disk_device; }
 
 
-	void setSaveGameDevice(const char* dev) override
-	{
-		fillDeviceList(dev, m_save_game_device);
-	}
+	void setSaveGameDevice(const char* dev) override { fillDeviceList(dev, m_save_game_device); }
 
 
 	void close(IFile& file) override
@@ -293,22 +288,17 @@ public:
 		while (!m_in_progress.empty())
 		{
 			AsynTrans* tr = m_in_progress.front();
-			if (tr->isCompleted())
-			{
-				PROFILE_BLOCK("processAsyncTransaction");
-				m_in_progress.pop();
+			if (!tr->isCompleted()) break;
 
-				tr->data.m_cb.invoke(*tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS));
-				if ((tr->data.m_flags & (E_SUCCESS | E_FAIL)) != 0)
-				{
-					closeAsync(*tr->data.m_file);
-				}
-				m_transaction_queue.dealoc(tr);
-			}
-			else
+			PROFILE_BLOCK("processAsyncTransaction");
+			m_in_progress.pop();
+
+			tr->data.m_cb.invoke(*tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS));
+			if ((tr->data.m_flags & (E_SUCCESS | E_FAIL)) != 0)
 			{
-				break;
+				closeAsync(*tr->data.m_file);
 			}
+			m_transaction_queue.dealoc(tr);
 		}
 
 		int32 can_add = C_MAX_TRANS - m_in_progress.size();
@@ -321,8 +311,7 @@ public:
 				tr->data.m_file = item.m_file;
 				tr->data.m_cb = item.m_cb;
 				tr->data.m_mode = item.m_mode;
-				copyString(
-					tr->data.m_path, sizeof(tr->data.m_path), item.m_path);
+				copyString(tr->data.m_path, sizeof(tr->data.m_path), item.m_path);
 				tr->data.m_flags = item.m_flags;
 				tr->reset();
 
@@ -334,28 +323,21 @@ public:
 		}
 	}
 
-	const DeviceList& getDefaultDevice() const override
-	{
-		return m_default_device;
-	}
+	const DeviceList& getDefaultDevice() const override { return m_default_device; }
 
-	const DeviceList& getSaveGameDevice() const override
-	{
-		return m_save_game_device;
-	}
+	const DeviceList& getSaveGameDevice() const override { return m_save_game_device; }
 
 	IFileDevice* getDevice(const char* device)
 	{
 		for (int i = 0; i < m_devices.size(); ++i)
 		{
-			if (compareString(m_devices[i]->name(), device) == 0)
-				return m_devices[i];
+			if (compareString(m_devices[i]->name(), device) == 0) return m_devices[i];
 		}
 
 		return nullptr;
 	}
 
-	static void closeAsync(IFile&, bool) { }
+	static void closeAsync(IFile&, bool) {}
 
 	void destroy()
 	{
@@ -389,5 +371,5 @@ void FileSystem::destroy(FileSystem* fs)
 }
 
 
-} // ~namespace FS
-} // ~namespace Lumix
+} // namespace FS
+} // namespace Lumix
