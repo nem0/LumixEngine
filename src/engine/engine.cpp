@@ -184,6 +184,7 @@ public:
 		LUMIX_DELETE(m_allocator, context.m_universe);
 
 		LUMIX_DELETE(m_allocator, &context);
+		m_resource_manager.removeUnreferenced();
 	}
 
 

@@ -34,6 +34,7 @@ public:
 	void add(Resource* resource);
 	void remove(Resource* resource);
 	void load(Resource& resource);
+	void removeUnreferenced();
 
 	void unload(const Path& path);
 	void unload(Resource& resource);
@@ -54,6 +55,7 @@ protected:
 
 	ResourceManager& getOwner() const { return *m_owner; }
 private:
+	IAllocator& m_allocator;
 	uint32 m_size;
 	ResourceTable m_resources;
 	ResourceManager* m_owner;

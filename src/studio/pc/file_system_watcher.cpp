@@ -11,15 +11,16 @@ class FileSystemWatcherPC;
 
 
 static const DWORD READ_DIR_CHANGE_FILTER =
-	FILE_NOTIFY_CHANGE_SECURITY | FILE_NOTIFY_CHANGE_CREATION |
-	FILE_NOTIFY_CHANGE_LAST_ACCESS | FILE_NOTIFY_CHANGE_LAST_WRITE |
-	FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_ATTRIBUTES |
+	FILE_NOTIFY_CHANGE_SECURITY | FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_LAST_ACCESS |
+	FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_ATTRIBUTES |
 	FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_FILE_NAME;
 
 
 struct FileSystemWatcherTask : public Lumix::MT::Task
 {
-	FileSystemWatcherTask(const char* path, FileSystemWatcherPC& watcher, Lumix::IAllocator& allocator)
+	FileSystemWatcherTask(const char* path,
+		FileSystemWatcherPC& watcher,
+		Lumix::IAllocator& allocator)
 		: Task(allocator)
 		, m_watcher(watcher)
 	{
@@ -80,12 +81,9 @@ public:
 		}
 		return true;
 	}
-	
 
-	virtual Lumix::Delegate<void(const char*)>& getCallback()
-	{
-		return m_callback;
-	}
+
+	virtual Lumix::Delegate<void(const char*)>& getCallback() { return m_callback; }
 
 
 	Lumix::Delegate<void(const char*)> m_callback;
@@ -139,41 +137,35 @@ static void CALLBACK notif(DWORD status, DWORD tferred, LPOVERLAPPED over)
 		auto action = info->Action;
 		switch (action)
 		{
-		case FILE_ACTION_RENAMED_NEW_NAME:
-		case FILE_ACTION_ADDED:
-		case FILE_ACTION_MODIFIED:
-		case FILE_ACTION_REMOVED:
-		{
-			char tmp[MAX_PATH];
-			wcharToCharArray(
-				info->FileName, tmp, info->FileNameLength);
-			task->m_watcher.m_callback.invoke(tmp);
-		}
-		break;
-		case FILE_ACTION_RENAMED_OLD_NAME:
+			case FILE_ACTION_RENAMED_NEW_NAME:
+			case FILE_ACTION_ADDED:
+			case FILE_ACTION_MODIFIED:
+			case FILE_ACTION_REMOVED:
+			{
+				char tmp[MAX_PATH];
+				wcharToCharArray(info->FileName, tmp, info->FileNameLength);
+				task->m_watcher.m_callback.invoke(tmp);
+			}
 			break;
-		default:
-			ASSERT(false);
-			break;
+			case FILE_ACTION_RENAMED_OLD_NAME: break;
+			default: ASSERT(false); break;
 		}
 		info = info->NextEntryOffset == 0
-			? nullptr
-			: (FILE_NOTIFY_INFORMATION*)(((char*)info) +
-			info->NextEntryOffset);
+				   ? nullptr
+				   : (FILE_NOTIFY_INFORMATION*)(((char*)info) + info->NextEntryOffset);
 	}
 }
 
 
 int FileSystemWatcherTask::task()
 {
-	m_handle =
-		CreateFile(m_path,
-				   FILE_LIST_DIRECTORY,
-				   FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE,
-				   nullptr,
-				   OPEN_EXISTING,
-				   FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
-				   nullptr);
+	m_handle = CreateFile(m_path,
+		FILE_LIST_DIRECTORY,
+		FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE,
+		nullptr,
+		OPEN_EXISTING,
+		FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
+		nullptr);
 	if (m_handle == INVALID_HANDLE_VALUE) return -1;
 
 	Lumix::setMemory(&m_overlapped, 0, sizeof(m_overlapped));
@@ -183,13 +175,13 @@ int FileSystemWatcherTask::task()
 	{
 		PROFILE_BLOCK("Change handling");
 		BOOL status = ReadDirectoryChangesW(m_handle,
-						   m_info,
-						   sizeof(m_info),
-						   TRUE,
-						   READ_DIR_CHANGE_FILTER,
-						   &m_received,
-						   &m_overlapped,
-						   &notif);
+			m_info,
+			sizeof(m_info),
+			TRUE,
+			READ_DIR_CHANGE_FILTER,
+			&m_received,
+			&m_overlapped,
+			&notif);
 		if (status == FALSE) break;
 		SleepEx(INFINITE, TRUE);
 	}
