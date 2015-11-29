@@ -39,6 +39,14 @@ namespace Lumix
 		m_resource_managers.erase(id); 
 	}
 
+	void ResourceManager::removeUnreferenced()
+	{
+		for (auto* i : m_resource_managers)
+		{
+			i->removeUnreferenced();
+		}
+	}
+
 	void ResourceManager::reload(const char* path)
 	{
 		for (auto iter = m_resource_managers.begin(), end = m_resource_managers.end(); iter != end; ++iter)

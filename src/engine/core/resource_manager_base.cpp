@@ -71,6 +71,20 @@ namespace Lumix
 		return resource;
 	}
 
+	void ResourceManagerBase::removeUnreferenced()
+	{
+		Array<Resource*> to_remove(m_allocator);
+		for (auto* i : m_resources)
+		{
+			if (i->getRefCount() == 0) to_remove.push(i);
+		}
+
+		for (auto* i : to_remove)
+		{
+			remove(i);
+		}
+	}
+
 	void ResourceManagerBase::load(Resource& resource)
 	{
 		if(resource.isEmpty())
@@ -131,6 +145,7 @@ namespace Lumix
 	ResourceManagerBase::ResourceManagerBase(IAllocator& allocator)
 		: m_size(0)
 		, m_resources(allocator)
+		, m_allocator(allocator)
 	{ }
 
 	ResourceManagerBase::~ResourceManagerBase()
