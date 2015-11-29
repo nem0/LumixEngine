@@ -133,6 +133,51 @@ public:
 
 struct PhysicsSceneImpl : public PhysicsScene
 {
+	struct ContactCallback : public physx::PxSimulationEventCallback
+	{
+		ContactCallback(PhysicsSceneImpl& scene)
+			: m_scene(scene)
+		{
+		}
+
+
+		void onContact(const physx::PxContactPairHeader& pairHeader,
+			const physx::PxContactPair* pairs,
+			physx::PxU32 nbPairs) override
+		{
+			for (physx::PxU32 i = 0; i < nbPairs; i++)
+			{
+				const auto& cp = pairs[i];
+
+				if (!(cp.events & physx::PxPairFlag::eNOTIFY_TOUCH_FOUND)) continue;
+
+				m_scene.m_on_contact.invoke(
+					(Entity)pairHeader.actors[0]->userData, (Entity)pairHeader.actors[1]->userData);
+				/*
+				if ((pairHeader.actors[0] == mSubmarineActor) || (pairHeader.actors[1] == mSubmarineActor))
+				{
+					PxActor* otherActor = (mSubmarineActor == pairHeader.actors[0]) ? pairHeader.actors[1] : pairHeader.actors[0];
+					Seamine* mine = reinterpret_cast<Seamine*>(otherActor->userData);
+					// insert only once
+					if (std::find(mMinesToExplode.begin(), mMinesToExplode.end(), mine) == mMinesToExplode.end())
+						mMinesToExplode.push_back(mine);
+
+					break;
+				}*/
+			}
+		}
+
+
+		void onTrigger(physx::PxTriggerPair* pairs, physx::PxU32 count) override {}
+		void onConstraintBreak(physx::PxConstraintInfo*, physx::PxU32) override {}
+		void onWake(physx::PxActor**, physx::PxU32) override {}
+		void onSleep(physx::PxActor**, physx::PxU32) override {}
+
+
+		PhysicsSceneImpl& m_scene;
+	};
+
+
 	enum ActorType
 	{
 		BOX,
@@ -178,6 +223,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		, m_dynamic_actors(m_allocator)
 		, m_universe(universe)
 		, m_is_game_running(false)
+		, m_contact_callback(*this)
+		, m_on_contact(m_allocator)
 	{
 	}
 
@@ -1164,6 +1211,25 @@ struct PhysicsSceneImpl : public PhysicsScene
 	PhysicsSystem& getSystem() const override { return *m_system; }
 
 
+	static physx::PxFilterFlags filterShader(
+		physx::PxFilterObjectAttributes attributes0, physx::PxFilterData filterData0,
+		physx::PxFilterObjectAttributes attributes1, physx::PxFilterData filterData1,
+		physx::PxPairFlags& pairFlags, const void* constantBlock, physx::PxU32 constantBlockSize)
+	{
+		if (physx::PxFilterObjectIsTrigger(attributes0) || physx::PxFilterObjectIsTrigger(attributes1))
+		{
+			pairFlags = physx::PxPairFlag::eTRIGGER_DEFAULT;
+			return physx::PxFilterFlag::eDEFAULT;
+		}
+
+		pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT;
+
+		//if ((filterData0.word0 & filterData1.word1) && (filterData1.word0 & filterData0.word1))
+		pairFlags |= physx::PxPairFlag::eNOTIFY_TOUCH_FOUND;
+		return physx::PxFilterFlag::eDEFAULT;
+	}
+
+
 	struct Controller
 	{
 		physx::PxController* m_controller;
@@ -1178,6 +1244,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	Universe& m_universe;
 	Engine* m_engine;
+	ContactCallback m_contact_callback;
 	physx::PxScene* m_scene;
 	PhysicsSystem* m_system;
 	physx::PxControllerManager* m_controller_manager;
@@ -1185,6 +1252,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	Array<RigidActor*> m_actors;
 	Array<RigidActor*> m_dynamic_actors;
 	bool m_is_game_running;
+	DelegateList<void(Entity, Entity)> m_on_contact;
 
 	Array<Controller> m_controllers;
 	Array<Terrain*> m_terrains;
@@ -1192,24 +1260,22 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 
 PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
-								   Universe& universe,
-								   Engine& engine,
-								   IAllocator& allocator)
+	Universe& universe,
+	Engine& engine,
+	IAllocator& allocator)
 {
 	PhysicsSceneImpl* impl = LUMIX_NEW(allocator, PhysicsSceneImpl)(universe, allocator);
-	impl->m_universe.entityTransformed()
-		.bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityMoved>(impl);
+	impl->m_universe.entityTransformed().bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityMoved>(
+		impl);
 	impl->m_engine = &engine;
 	physx::PxSceneDesc sceneDesc(system.getPhysics()->getTolerancesScale());
 	sceneDesc.gravity = physx::PxVec3(0.0f, -9.8f, 0.0f);
 	if (!sceneDesc.cpuDispatcher)
 	{
-		physx::PxDefaultCpuDispatcher* cpu_dispatcher =
-			physx::PxDefaultCpuDispatcherCreate(1);
+		physx::PxDefaultCpuDispatcher* cpu_dispatcher = physx::PxDefaultCpuDispatcherCreate(1);
 		if (!cpu_dispatcher)
 		{
-			g_log_error.log("physics")
-				<< "PxDefaultCpuDispatcherCreate failed!";
+			g_log_error.log("physics") << "PxDefaultCpuDispatcherCreate failed!";
 		}
 		sceneDesc.cpuDispatcher = cpu_dispatcher;
 	}
@@ -1217,6 +1283,9 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
 	{
 		sceneDesc.filterShader = &physx::PxDefaultSimulationFilterShader;
 	}
+
+	sceneDesc.filterShader = impl->filterShader;
+	sceneDesc.simulationEventCallback = &impl->m_contact_callback;
 
 	impl->m_scene = system.getPhysics()->createScene(sceneDesc);
 	if (!impl->m_scene)
