@@ -81,7 +81,8 @@ namespace Lumix
 
 		for (auto* i : to_remove)
 		{
-			remove(i);
+			m_resources.erase(i->getPath());
+			destroyResource(*i);
 		}
 	}
 

@@ -153,17 +153,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 				m_scene.m_on_contact.invoke(
 					(Entity)pairHeader.actors[0]->userData, (Entity)pairHeader.actors[1]->userData);
-				/*
-				if ((pairHeader.actors[0] == mSubmarineActor) || (pairHeader.actors[1] == mSubmarineActor))
-				{
-					PxActor* otherActor = (mSubmarineActor == pairHeader.actors[0]) ? pairHeader.actors[1] : pairHeader.actors[0];
-					Seamine* mine = reinterpret_cast<Seamine*>(otherActor->userData);
-					// insert only once
-					if (std::find(mMinesToExplode.begin(), mMinesToExplode.end(), mine) == mMinesToExplode.end())
-						mMinesToExplode.push_back(mine);
-
-					break;
-				}*/
 			}
 		}
 
