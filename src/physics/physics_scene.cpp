@@ -1200,6 +1200,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 	PhysicsSystem& getSystem() const override { return *m_system; }
 
 
+	DelegateList<void(Entity, Entity)>& onContact() override
+	{
+		return m_on_contact;
+	}
+
+
 	static physx::PxFilterFlags filterShader(
 		physx::PxFilterObjectAttributes attributes0, physx::PxFilterData filterData0,
 		physx::PxFilterObjectAttributes attributes1, physx::PxFilterData filterData1,
