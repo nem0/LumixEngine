@@ -416,6 +416,7 @@ namespace Lumix
 			m_size = 0;
 			m_max_id = 0;
 			m_mask = 0;
+			init();
 		}
 
 		const_iterator begin() const { return const_iterator(first(), this); }

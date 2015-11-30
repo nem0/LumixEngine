@@ -14,6 +14,7 @@
 #include "debug/debug.h"
 #include "engine.h"
 #include "iplugin.h"
+#include "physics/physics_scene.h"
 #include "plugin_manager.h"
 #include "lua_script/lua_script_manager.h"
 #include "universe/universe.h"
@@ -21,6 +22,24 @@
 
 namespace Lumix
 {
+
+
+namespace LuaAPI
+{
+
+
+static void moveController(IScene* scene,
+	int component,
+	float x,
+	float y,
+	float z,
+	float time_delta)
+{
+	static_cast<PhysicsScene*>(scene)->moveController(component, Vec3(x, y, z), time_delta);
+}
+
+
+} // namespace LuaAPI
 
 
 static const uint32 SCRIPT_HASH = Lumix::crc32("script");
@@ -31,7 +50,6 @@ class LuaScriptSystemImpl;
 
 void registerEngineLuaAPI(Engine&, lua_State* L);
 void registerUniverse(UniverseContext*, lua_State* L);
-void registerPhysicsLuaAPI(Engine&, Universe&, lua_State* L);
 void registerAudioLuaAPI(Engine&, Universe&, lua_State* L);
 
 
@@ -62,9 +80,9 @@ public:
 class LuaScriptSceneImpl : public LuaScriptScene
 {
 public:
-	struct Script
+	struct ScriptComponent
 	{
-		Script(IAllocator& allocator)
+		ScriptComponent(IAllocator& allocator)
 			: m_properties(allocator)
 		{
 			m_script = nullptr;
@@ -83,16 +101,22 @@ public:
 		: m_system(system)
 		, m_universe_context(ctx)
 		, m_scripts(system.getAllocator())
-		, m_valid(system.getAllocator())
 		, m_global_state(nullptr)
 		, m_updates(system.getAllocator())
+		, m_entity_script_map(system.getAllocator())
 	{
+		auto* scene = m_universe_context.getScene(crc32("physics"));
+		auto* physics_scene = static_cast<PhysicsScene*>(scene);
+		physics_scene->onContact().bind<LuaScriptSceneImpl, &LuaScriptSceneImpl::onContact>(this);
 	}
 
 
 	~LuaScriptSceneImpl()
 	{
 		unloadAllScripts();
+		auto* scene = m_universe_context.getScene(crc32("physics"));
+		auto* physics_scene = static_cast<PhysicsScene*>(scene);
+		physics_scene->onContact().unbind<LuaScriptSceneImpl, &LuaScriptSceneImpl::onContact>(this);
 	}
 
 
@@ -100,17 +124,72 @@ public:
 	{
 		for (int i = 0; i < m_scripts.size(); ++i)
 		{
-			Script& script = m_scripts[i];
-			if (m_valid[i] && script.m_script)
-			{
-				m_system.getScriptManager().unload(*script.m_script);
-			}
+			if (!m_scripts[i]) continue;
+
+			ScriptComponent& script = *m_scripts[i];
+			if (script.m_script) m_system.getScriptManager().unload(*script.m_script);
+			LUMIX_DELETE(m_system.getAllocator(), &script);
 		}
+		m_entity_script_map.clear();
 		m_scripts.clear();
 	}
 
 
 	Universe& getUniverse() override { return *m_universe_context.m_universe; }
+
+
+	static void registerCFunction(lua_State* L, const char* name, lua_CFunction func)
+	{
+		lua_pushcfunction(L, func);
+		lua_setglobal(L, name);
+	}
+
+
+	void sendCollisionEvent(ScriptComponent* cmp, Entity entity)
+	{
+		ASSERT(m_global_state);
+		auto& script = *cmp;
+		lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
+		if (lua_getfield(script.m_state, -1, "onContact") != LUA_TFUNCTION)
+		{
+			lua_pop(script.m_state, 1);
+			return;
+		}
+
+		lua_pushinteger(script.m_state, entity);
+		if (lua_pcall(script.m_state, 1, 0, 0) != LUA_OK)
+		{
+			g_log_error.log("lua") << lua_tostring(script.m_state, -1);
+			lua_pop(script.m_state, 1);
+		}
+		lua_pop(script.m_state, 1);
+	}
+
+
+	void onContact(Entity e1, Entity e2)
+	{
+		if (!m_global_state) return;
+
+		TODO("recently created entity has incorrect value (e1|e2 is not correct)")
+		auto iter1 = m_entity_script_map.find(e1);
+		auto iter2 = m_entity_script_map.find(e2);
+		if (iter1 != m_entity_script_map.end())
+		{
+			sendCollisionEvent(iter1.value(), e2);
+		}
+		if (iter2 != m_entity_script_map.end())
+		{
+			sendCollisionEvent(iter2.value(), e1);
+		}
+	}
+
+
+	void registerPhysicsLuaAPI(lua_State* L)
+	{
+		registerCFunction(L,
+			"API_moveController",
+			LuaWrapper::wrap<decltype(&LuaAPI::moveController), LuaAPI::moveController>);
+	}
 
 
 	void registerAPI(lua_State* L)
@@ -119,7 +198,7 @@ public:
 		registerEngineLuaAPI(m_system.m_engine, L);
 		if (m_system.m_engine.getPluginManager().getPlugin("physics"))
 		{
-			registerPhysicsLuaAPI(m_system.m_engine, *m_universe_context.m_universe, L);
+			registerPhysicsLuaAPI(L);
 		}
 		if (m_system.m_engine.getPluginManager().getPlugin("audio"))
 		{
@@ -130,15 +209,14 @@ public:
 
 	int getEnvironment(Entity entity) override
 	{
-		for (auto& i : m_scripts)
-		{
-			if (i.m_entity == entity) return i.m_environment;
-		}
-		return -1;
+		auto iter = m_entity_script_map.find(entity);
+		if (iter == m_entity_script_map.end()) return -1;
+
+		return iter.value()->m_environment;
 	}
 
 
-	void applyProperty(Script& script, Property& prop)
+	void applyProperty(ScriptComponent& script, Property& prop)
 	{
 		if (prop.m_value.length() == 0) return;
 
@@ -172,13 +250,13 @@ public:
 
 	LuaScript* getScriptResource(ComponentIndex cmp) const override
 	{
-		return getScript(cmp).m_script;
+		return m_scripts[cmp]->m_script;
 	}
 
 
 	const char* getPropertyValue(Lumix::ComponentIndex cmp, int index) const override
 	{
-		auto& script = getScript(cmp);
+		auto& script = *m_scripts[cmp];
 		uint32 hash = crc32(getPropertyName(cmp, index));
 
 		for (auto& value : script.m_properties)
@@ -197,19 +275,21 @@ public:
 		const char* name,
 		const char* value) override
 	{
+		if (!m_scripts[cmp]) return;
+
 		Property& prop = getScriptProperty(cmp, name);
 		prop.m_value = value;
 
-		if (m_scripts[cmp].m_state)
+		if (m_scripts[cmp]->m_state)
 		{
-			applyProperty(m_scripts[cmp], prop);
+			applyProperty(*m_scripts[cmp], prop);
 		}
 	}
 
 
 	const char* getPropertyName(Lumix::ComponentIndex cmp, int index) const override
 	{
-		auto& script = getScript(cmp);
+		auto& script = *m_scripts[cmp];
 
 		return script.m_script ? script.m_script->getProperties()[index].name : "";
 	}
@@ -217,13 +297,13 @@ public:
 
 	int getPropertyCount(Lumix::ComponentIndex cmp) const override
 	{
-		auto& script = getScript(cmp);
+		auto& script = *m_scripts[cmp];
 
 		return script.m_script ? script.m_script->getProperties().size() : 0;
 	}
 
 
-	void applyProperties(Script& script)
+	void applyProperties(ScriptComponent& script)
 	{
 		if (!script.m_script) return;
 
@@ -258,16 +338,16 @@ public:
 		registerAPI(m_global_state);
 		for (int i = 0; i < m_scripts.size(); ++i)
 		{
-			if (!m_valid[i] || !m_scripts[i].m_script) continue;
+			if (!m_scripts[i] || !m_scripts[i]->m_script) continue;
 
-			Script& script = m_scripts[i];
+			ScriptComponent& script = *m_scripts[i];
 			script.m_environment = -1;
 
 			if (!script.m_script->isReady())
 			{
 				script.m_state = nullptr;
 				g_log_error.log("lua script") << "Script " << script.m_script->getPath().c_str()
-					<< " is not loaded";
+											  << " is not loaded";
 				continue;
 			}
 
@@ -293,8 +373,9 @@ public:
 
 		for (int i = 0; i < m_scripts.size(); ++i)
 		{
-			if (!m_valid[i] || !m_scripts[i].m_script) continue;
-			Script& script = m_scripts[i];
+			if (!m_scripts[i] || !m_scripts[i]->m_script) continue;
+
+			ScriptComponent& script = *m_scripts[i];
 			if (!script.m_script->isReady()) continue;
 
 			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
@@ -318,7 +399,7 @@ public:
 			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
 			if (lua_getfield(script.m_state, -1, "update") == LUA_TFUNCTION)
 			{
-				m_updates.push(i);
+				m_updates.push(m_scripts[i]);
 			}
 			lua_pop(script.m_state, 1);
 		}
@@ -328,9 +409,9 @@ public:
 	void stopGame() override
 	{
 		m_updates.clear();
-		for (Script& script : m_scripts)
+		for (ScriptComponent* script : m_scripts)
 		{
-			script.m_state = nullptr;
+			if(script) script->m_state = nullptr;
 		}
 
 		lua_close(m_global_state);
@@ -342,11 +423,12 @@ public:
 	{
 		if (type == LUA_SCRIPT_HASH)
 		{
-			LuaScriptSceneImpl::Script& script = m_scripts.emplace(m_system.getAllocator());
+			ScriptComponent& script = *LUMIX_NEW(m_system.getAllocator(), ScriptComponent)(m_system.getAllocator());
+			m_entity_script_map.insert(entity, &script);
+			m_scripts.push(&script);
 			script.m_entity = entity;
 			script.m_script = nullptr;
 			script.m_state = nullptr;
-			m_valid.push(true);
 			m_universe_context.m_universe->addComponent(
 				entity, type, this, m_scripts.size() - 1);
 			return m_scripts.size() - 1;
@@ -360,10 +442,14 @@ public:
 	{
 		if (type == LUA_SCRIPT_HASH)
 		{
-			m_updates.eraseItem(component);
+			m_updates.eraseItem(m_scripts[component]);
+			if (m_scripts[component]->m_script) m_system.getScriptManager().unload(*m_scripts[component]->m_script);
+			m_entity_script_map.erase(m_scripts[component]->m_entity);
+
+			LUMIX_DELETE(m_system.getAllocator(), m_scripts[component]);
+			m_scripts[component] = nullptr;
 			m_universe_context.m_universe->destroyComponent(
-				Entity(m_scripts[component].m_entity), type, this, component);
-			m_valid[component] = false;
+				Entity(m_scripts[component]->m_entity), type, this, component);
 		}
 	}
 
@@ -373,19 +459,17 @@ public:
 		serializer.write(m_scripts.size());
 		for (int i = 0; i < m_scripts.size(); ++i)
 		{
-			serializer.write(m_scripts[i].m_entity);
+			serializer.write(m_scripts[i] ? true : false);
+			if (!m_scripts[i]) continue;
+
+			serializer.write(m_scripts[i]->m_entity);
 			serializer.writeString(
-				m_scripts[i].m_script ? m_scripts[i].m_script->getPath().c_str()
-									  : "");
-			serializer.write((bool)m_valid[i]);
-			if (m_valid[i])
+				m_scripts[i]->m_script ? m_scripts[i]->m_script->getPath().c_str() : "");
+			serializer.write(m_scripts[i]->m_properties.size());
+			for (Property& prop : m_scripts[i]->m_properties)
 			{
-				serializer.write(m_scripts[i].m_properties.size());
-				for (Property& prop : m_scripts[i].m_properties)
-				{
-					serializer.write(prop.m_name_hash);
-					serializer.writeString(prop.m_value.c_str());
-				}
+				serializer.write(prop.m_name_hash);
+				serializer.writeString(prop.m_value.c_str());
 			}
 		}
 	}
@@ -396,35 +480,40 @@ public:
 		int len = serializer.read<int>();
 		unloadAllScripts();
 		m_scripts.reserve(len);
-		m_valid.resize(len);
 		for (int i = 0; i < len; ++i)
 		{
-			Script& script = m_scripts.emplace(m_system.getAllocator());
-			serializer.read(m_scripts[i].m_entity);
+			bool is_valid;
+			serializer.read(is_valid);
+			if(!is_valid)
+			{
+				m_scripts.push(nullptr);
+				continue;
+			}
+
+			ScriptComponent& script = *LUMIX_NEW(m_system.getAllocator(), ScriptComponent)(m_system.getAllocator());
+			m_scripts.push(&script);
+			serializer.read(m_scripts[i]->m_entity);
+			m_entity_script_map.insert(m_scripts[i]->m_entity, &script);
 			char tmp[MAX_PATH_LENGTH];
 			serializer.readString(tmp, MAX_PATH_LENGTH);
-			m_valid[i] = serializer.read<bool>();
 			script.m_script = static_cast<LuaScript*>(
 				m_system.getScriptManager().load(Lumix::Path(tmp)));
 			script.m_state = nullptr;
-			if (m_valid[i])
+			int prop_count;
+			serializer.read(prop_count);
+			script.m_properties.reserve(prop_count);
+			for (int j = 0; j < prop_count; ++j)
 			{
-				int prop_count;
-				serializer.read(prop_count);
-				script.m_properties.reserve(prop_count);
-				for (int j = 0; j < prop_count; ++j)
-				{
-					Property& prop =
-						script.m_properties.emplace(m_system.getAllocator());
-					serializer.read(prop.m_name_hash);
-					char tmp[1024];
-					tmp[0] = 0;
-					serializer.readString(tmp, sizeof(tmp));
-					prop.m_value = tmp;
-				}
-				m_universe_context.m_universe->addComponent(
-					Entity(m_scripts[i].m_entity), LUA_SCRIPT_HASH, this, i);
+				Property& prop =
+					script.m_properties.emplace(m_system.getAllocator());
+				serializer.read(prop.m_name_hash);
+				char tmp[1024];
+				tmp[0] = 0;
+				serializer.readString(tmp, sizeof(tmp));
+				prop.m_value = tmp;
 			}
+			m_universe_context.m_universe->addComponent(
+				Entity(m_scripts[i]->m_entity), LUA_SCRIPT_HASH, this, i);
 		}
 	}
 
@@ -436,15 +525,20 @@ public:
 	{
 		if (!m_global_state) { return; }
 
-		for (auto i : m_updates)
+		for (auto* i : m_updates)
 		{
-			auto& script = m_scripts[i];
+			auto& script = *i;
 			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
-			lua_getfield(script.m_state, -1, "update");
+			if (lua_getfield(script.m_state, -1, "update") != LUA_TFUNCTION)
+			{
+				lua_pop(script.m_state, 1);
+				continue;
+			}
+
 			lua_pushnumber(script.m_state, time_delta);
 			if (lua_pcall(script.m_state, 1, 0, 0) != LUA_OK)
 			{
-				g_log_error.log("lua") << lua_tostring(m_global_state, -1);
+				g_log_error.log("lua") << lua_tostring(script.m_state, -1);
 				lua_pop(script.m_state, 1);
 			}
 			lua_pop(script.m_state, 1);
@@ -458,13 +552,10 @@ public:
 	}
 
 
-	const Script& getScript(ComponentIndex cmp) const { return m_scripts[cmp]; }
-
-
 	Property& getScriptProperty(ComponentIndex cmp, const char* name)
 	{
 		uint32 name_hash = crc32(name);
-		for (auto& prop : m_scripts[cmp].m_properties)
+		for (auto& prop : m_scripts[cmp]->m_properties)
 		{
 			if (prop.m_name_hash == name_hash)
 			{
@@ -472,8 +563,8 @@ public:
 			}
 		}
 
-		m_scripts[cmp].m_properties.emplace(m_system.getAllocator());
-		auto& prop = m_scripts[cmp].m_properties.back();
+		m_scripts[cmp]->m_properties.emplace(m_system.getAllocator());
+		auto& prop = m_scripts[cmp]->m_properties.back();
 		prop.m_name_hash = name_hash;
 		return prop;
 	}
@@ -481,32 +572,30 @@ public:
 
 	const char* getScriptPath(ComponentIndex cmp) override
 	{
-		return m_scripts[cmp].m_script
-				   ? m_scripts[cmp].m_script->getPath().c_str()
-				   : "";
+		return m_scripts[cmp]->m_script ? m_scripts[cmp]->m_script->getPath().c_str() : "";
 	}
 
 
 	void setScriptPath(ComponentIndex cmp, const char* path) override
 	{
-		if (m_scripts[cmp].m_script)
+		if (m_scripts[cmp]->m_script)
 		{
-			m_system.getScriptManager().unload(*m_scripts[cmp].m_script);
+			m_system.getScriptManager().unload(*m_scripts[cmp]->m_script);
 		}
 
-		m_scripts[cmp].m_script = static_cast<LuaScript*>(
-			m_system.getScriptManager().load(Lumix::Path(path)));
+		m_scripts[cmp]->m_script =
+			static_cast<LuaScript*>(m_system.getScriptManager().load(Lumix::Path(path)));
 	}
 
 
 private:
 	LuaScriptSystem& m_system;
 
-	BinaryArray m_valid;
-	Array<Script> m_scripts;
+	Array<ScriptComponent*> m_scripts;
+	PODHashMap<Entity, ScriptComponent*> m_entity_script_map;
 	lua_State* m_global_state;
 	UniverseContext& m_universe_context;
-	Array<int> m_updates;
+	Array<ScriptComponent*> m_updates;
 };
 
 
