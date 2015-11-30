@@ -2,6 +2,7 @@
 #include "core/input_system.h"
 #include "core/lua_wrapper.h"
 #include "engine.h"
+#include "engine/plugin_manager.h"
 #include "iplugin.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/material.h"
@@ -192,6 +193,17 @@ void registerUniverse(UniverseContext* ctx, lua_State* L)
 {
 	lua_pushlightuserdata(L, ctx);
 	lua_setglobal(L, "g_universe_context");
+	
+	for (auto* scene : ctx->m_scenes)
+	{
+		const char* name = scene->getPlugin().getName();
+		char tmp[128];
+
+		copyString(tmp, "g_scene_");
+		catString(tmp, name);
+		lua_pushlightuserdata(L, scene);
+		lua_setglobal(L, tmp);
+	}
 
 	lua_pushlightuserdata(L, ctx ? ctx->m_universe : nullptr);
 	lua_setglobal(L, "g_universe");

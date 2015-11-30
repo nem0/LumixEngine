@@ -30,6 +30,12 @@ static void setSoundVolume(IScene* scene, int sound_id, float volume)
 }
 
 
+static void setEcho(IScene* scene, int sound_id, float feedback, float delay)
+{
+	static_cast<AudioScene*>(scene)->setEcho(sound_id, feedback, delay);
+}
+
+
 } // namespace LuaAPI
 
 
@@ -45,6 +51,9 @@ void registerAudioLuaAPI(Engine&, Universe&, lua_State* L)
 	registerCFunction(L,
 		"API_playSound",
 		LuaWrapper::wrap<decltype(&LuaAPI::playSound), LuaAPI::playSound>);
+	registerCFunction(L,
+		"API_setEcho",
+		LuaWrapper::wrap<decltype(&LuaAPI::setEcho), LuaAPI::setEcho>);
 	registerCFunction(L,
 		"API_setSoundVolume",
 		LuaWrapper::wrap<decltype(&LuaAPI::setSoundVolume), LuaAPI::setSoundVolume>);
