@@ -366,13 +366,13 @@ void registerRendererProperties(Lumix::IAllocator& allocator)
 		"Mesh (*.msh)",
 		crc32("model"),
 		allocator));
-	auto ground = LUMIX_NEW(allocator, IntArrayObjectDescriptor<RenderScene>)("Ground",
+	auto ground = LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)("Ground",
 		&RenderScene::getGrassGround,
 		&RenderScene::setGrassGround,
 		allocator);
 	ground->setLimit(0, 4);
 	grass->addChild(ground);
-	grass->addChild(LUMIX_NEW(allocator, IntArrayObjectDescriptor<RenderScene>)("Density",
+	grass->addChild(LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)("Density",
 		&RenderScene::getGrassDensity,
 		&RenderScene::setGrassDensity,
 		allocator));
