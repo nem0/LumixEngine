@@ -117,8 +117,8 @@ namespace Lumix
 		m_pos += size;
 		return true;
 	}
-	
-	
+
+
 	bool InputBlob::readString(char* data, int max_size)
 	{
 		int32 size;

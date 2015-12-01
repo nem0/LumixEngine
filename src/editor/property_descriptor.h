@@ -66,10 +66,6 @@ public:
 	}
 
 
-	void set(ComponentUID, InputBlob&) const override {};
-	void get(ComponentUID, OutputBlob&) const override {};
-
-
 private:
 	IntegerGetter m_integer_getter;
 	IntegerSetter m_integer_setter;
@@ -164,10 +160,6 @@ public:
 		int len = value.length() + 1;
 		stream.write(value.c_str(), len);
 	}
-
-
-	void set(ComponentUID, InputBlob&) const override { ASSERT(false); };
-	void get(ComponentUID, OutputBlob&) const override { ASSERT(false); };
 
 private:
 	Getter m_getter;
@@ -290,8 +282,10 @@ public:
 	}
 
 
-	void set(ComponentUID cmp, InputBlob& stream) const override
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
+		ASSERT(index == -1);
+
 		int count;
 		stream.read(count);
 		while (getCount(cmp) < count)
@@ -312,8 +306,9 @@ public:
 	}
 
 
-	void get(ComponentUID cmp, OutputBlob& stream) const override
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
+		ASSERT(index == -1);
 		int count = getCount(cmp);
 		stream.write(count);
 		for (int i = 0; i < count; ++i)
@@ -324,10 +319,6 @@ public:
 			}
 		}
 	}
-
-
-	void set(ComponentUID, int, InputBlob&) const override { ASSERT(false); };
-	void get(ComponentUID, int, OutputBlob&) const override { ASSERT(false); };
 
 
 	int getCount(ComponentUID cmp) const override
@@ -374,32 +365,20 @@ public:
 	}
 
 
-	void set(ComponentUID cmp, InputBlob& stream) const override
-	{
-		int32 i;
-		stream.read(&i, sizeof(i));
-		(static_cast<S*>(cmp.scene)->*m_integer_setter)(cmp.index, i);
-	}
-
-
-	void get(ComponentUID cmp, OutputBlob& stream) const override
-	{
-		int32 i = (static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp.index);
-		stream.write(i);
-	}
-
-
 	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		set(cmp, stream);
+		int32 i;
+		stream.read(&i, sizeof(i));
+		(static_cast<S*>(cmp.scene)->*m_integer_setter)(cmp.index, i);
 	};
 
 
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		get(cmp, stream);
+		int32 i = (static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp.index);
+		stream.write(i);
 	};
 
 private:
@@ -428,39 +407,30 @@ public:
 	}
 
 
-	void set(ComponentUID cmp, InputBlob& stream) const override
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
+		ASSERT(index == -1);
 		char tmp[MAX_STRING_SIZE];
 		char* c = tmp;
 		do
 		{
 			stream.read(c, 1);
 			++c;
-		} while (*(c - 1) && (c - 1) - tmp < MAX_STRING_SIZE);
+		} while(*(c - 1) && (c - 1) - tmp < MAX_STRING_SIZE);
 		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, tmp);
-	}
+	};
 
 
-	void get(ComponentUID cmp, OutputBlob& stream) const override
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
+		ASSERT(index == -1);
 		StackAllocator<MAX_STRING_SIZE> allocator;
 		string value(allocator);
 		value = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
 		int len = value.length() + 1;
 		stream.write(value.c_str(), len);
-	}
-
-
-	void set(ComponentUID cmp, int index, InputBlob& stream) const override
-	{
-		ASSERT(index == -1);
-		set(cmp, stream);
 	};
-	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
-	{
-		ASSERT(index == -1);
-		get(cmp, stream);
-	};
+
 
 private:
 	Getter m_getter;
@@ -485,31 +455,21 @@ public:
 	}
 
 
-	void set(ComponentUID cmp, InputBlob& stream) const override
-	{
-		bool b;
-		stream.read(&b, sizeof(b));
-		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, b);
-	}
-
-
-	void get(ComponentUID cmp, OutputBlob& stream) const override
-	{
-		bool b = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
-		int len = sizeof(b);
-		stream.write(&b, len);
-	}
-
-
 	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		set(cmp, stream);
+		bool b;
+		stream.read(&b, sizeof(b));
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, b);
 	};
+
+
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		get(cmp, stream);
+		bool b = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		int len = sizeof(b);
+		stream.write(&b, len);
 	};
 
 private:
@@ -535,31 +495,21 @@ public:
 	}
 
 
-	void set(ComponentUID cmp, InputBlob& stream) const override
-	{
-		Vec3 v;
-		stream.read(&v, sizeof(v));
-		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, v);
-	}
-
-
-	void get(ComponentUID cmp, OutputBlob& stream) const override
-	{
-		Vec3 v = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
-		int len = sizeof(v);
-		stream.write(&v, len);
-	}
-
-
 	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		set(cmp, stream);
+		Vec3 v;
+		stream.read(&v, sizeof(v));
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, v);
 	};
+
+
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		get(cmp, stream);
+		Vec3 v = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		int len = sizeof(v);
+		stream.write(&v, len);
 	};
 
 private:
@@ -585,33 +535,21 @@ public:
 	}
 
 
-	void set(ComponentUID cmp, InputBlob& stream) const override
-	{
-		Vec4 v;
-		stream.read(&v, sizeof(v));
-		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, v);
-	}
-
-
-	void get(ComponentUID cmp, OutputBlob& stream) const override
-	{
-		Vec4 v = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
-		int len = sizeof(v);
-		stream.write(&v, len);
-	}
-
-
 	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		set(cmp, stream);
+		Vec4 v;
+		stream.read(&v, sizeof(v));
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, v);
 	};
 
 
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		get(cmp, stream);
+		Vec4 v = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		int len = sizeof(v);
+		stream.write(&v, len);
 	};
 
 private:
@@ -637,33 +575,21 @@ public:
 	}
 
 
-	void set(ComponentUID cmp, InputBlob& stream) const override
-	{
-		Vec2 v;
-		stream.read(&v, sizeof(v));
-		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, v);
-	}
-
-
-	void get(ComponentUID cmp, OutputBlob& stream) const override
-	{
-		Vec2 v = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
-		int len = sizeof(v);
-		stream.write(&v, len);
-	}
-
-
 	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		set(cmp, stream);
+		Vec2 v;
+		stream.read(&v, sizeof(v));
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, v);
 	};
 
 
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		get(cmp, stream);
+		Vec2 v = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		int len = sizeof(v);
+		stream.write(&v, len);
 	};
 
 private:
@@ -747,37 +673,27 @@ public:
 	}
 
 
-	void set(ComponentUID cmp, InputBlob& stream) const override
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
-		for (int i = 0; i < COUNT; ++i)
+		ASSERT(index == -1);
+		for(int i = 0; i < COUNT; ++i)
 		{
 			float f;
 			stream.read(&f, sizeof(f));
 			(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, i, f);
 		}
-	}
+	};
 
 
-	void get(ComponentUID cmp, OutputBlob& stream) const override
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
-		for (int i = 0; i < COUNT; ++i)
+		ASSERT(index == -1);
+		for(int i = 0; i < COUNT; ++i)
 		{
 			float f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index, i);
 			int len = sizeof(f);
 			stream.write(&f, len);
 		}
-	}
-
-	void set(ComponentUID cmp, int index, InputBlob& stream) const override
-	{
-		ASSERT(index == -1);
-		set(cmp, stream);
-	};
-
-	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
-	{
-		ASSERT(index == -1);
-		get(cmp, stream);
 	};
 
 
@@ -818,30 +734,21 @@ public:
 	}
 
 
-	void set(ComponentUID cmp, InputBlob& stream) const override
-	{
-		float f;
-		stream.read(&f, sizeof(f));
-		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, f);
-	}
-
-
-	void get(ComponentUID cmp, OutputBlob& stream) const override
-	{
-		float f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
-		int len = sizeof(f);
-		stream.write(&f, len);
-	}
-
 	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		set(cmp, stream);
+		float f;
+		stream.read(&f, sizeof(f));
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, f);
 	};
+
+
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		get(cmp, stream);
+		float f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		int len = sizeof(f);
+		stream.write(&f, len);
 	};
 
 private:
@@ -867,31 +774,21 @@ public:
 	}
 
 
-	void set(ComponentUID cmp, InputBlob& stream) const override
-	{
-		Vec3 f;
-		stream.read(&f, sizeof(f));
-		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, f);
-	}
-
-
-	void get(ComponentUID cmp, OutputBlob& stream) const override
-	{
-		Vec3 f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
-		int len = sizeof(f);
-		stream.write(&f, len);
-	}
-
-
 	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		set(cmp, stream);
+		Vec3 f;
+		stream.read(&f, sizeof(f));
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, f);
 	};
+
+
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		get(cmp, stream);
+		Vec3 f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		int len = sizeof(f);
+		stream.write(&f, len);
 	};
 
 private:
@@ -926,33 +823,21 @@ public:
 	}
 
 
-	void set(ComponentUID cmp, InputBlob& stream) const override
-	{
-		int value;
-		stream.read(&value, sizeof(value));
-		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, value);
-	}
-
-
-	void get(ComponentUID cmp, OutputBlob& stream) const override
-	{
-		int value = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
-		int len = sizeof(value);
-		stream.write(&value, len);
-	}
-
-
 	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		set(cmp, stream);
+		int value;
+		stream.read(&value, sizeof(value));
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, value);
 	};
 
 
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		get(cmp, stream);
+		int value = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		int len = sizeof(value);
+		stream.write(&value, len);
 	};
 
 

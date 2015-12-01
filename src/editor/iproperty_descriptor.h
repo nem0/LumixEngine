@@ -37,8 +37,6 @@ public:
 	}
 	virtual ~IPropertyDescriptor() {}
 
-	virtual void set(ComponentUID cmp, InputBlob& stream) const = 0;
-	virtual void get(ComponentUID cmp, OutputBlob& stream) const = 0;
 	virtual void set(ComponentUID cmp, int index, InputBlob& stream) const = 0;
 	virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const = 0;
 
