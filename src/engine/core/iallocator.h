@@ -25,7 +25,7 @@ namespace Lumix
 {
 
 #define ALIGN_OF(T) __alignof(T)
-#define LUMIX_NEW(allocator, type) new (Lumix::NewPlaceholder(), (allocator).allocate(sizeof(type))) type
+#define LUMIX_NEW(allocator, ...) new (Lumix::NewPlaceholder(), (allocator).allocate(sizeof(__VA_ARGS__))) __VA_ARGS__
 #define LUMIX_DELETE(allocator, var) (allocator).deleteObject(var);
 
 
