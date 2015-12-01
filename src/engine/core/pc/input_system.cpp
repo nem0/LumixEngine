@@ -109,36 +109,53 @@ namespace Lumix
 			{
 				switch (value.type)
 				{
-				case InputType::PRESSED:
-					return (GetAsyncKeyState(value.key) >> 8) ? 1.0f : 0;
-				case InputType::DOWN:
-					if (value.controller_id < 0)
-					{
-						return GetAsyncKeyState(value.key) & 1 ? 1.0f : 0;
-					}
-					else
-					{
-						return m_xinput_states[value.controller_id].Gamepad.wButtons & value.key ? 1.0f : 0;
-					}
-				case InputType::MOUSE_X:
-					return m_mouse_rel_x;
-				case InputType::MOUSE_Y:
-					return m_mouse_rel_y;
-				case InputType::LTHUMB_X:
-					return deadZone(m_xinput_states[value.controller_id].Gamepad.sThumbLX / 32767.0f, DEADZONE);
-				case InputType::LTHUMB_Y:
-					return deadZone(m_xinput_states[value.controller_id].Gamepad.sThumbLY / 32767.0f, DEADZONE);
-				case InputType::RTHUMB_X:
-					return deadZone(m_xinput_states[value.controller_id].Gamepad.sThumbRX / 32767.0f, DEADZONE);
-				case InputType::RTHUMB_Y:
-					return deadZone(m_xinput_states[value.controller_id].Gamepad.sThumbRY / 32767.0f, DEADZONE);
-				case InputType::RTRIGGER:
-					return deadZone(m_xinput_states[value.controller_id].Gamepad.bRightTrigger / 255.0f, DEADZONE);
-				case InputType::LTRIGGER:
-					return deadZone(m_xinput_states[value.controller_id].Gamepad.bLeftTrigger / 255.0f, DEADZONE);
+					case InputType::PRESSED: return (GetAsyncKeyState(value.key) >> 8) ? 1.0f : 0;
+					case InputType::DOWN:
+						if (value.controller_id < 0)
+						{
+							return GetAsyncKeyState(value.key) & 1 ? 1.0f : 0;
+						}
+						else
+						{
+							return m_xinput_states[value.controller_id].Gamepad.wButtons & value.key
+									   ? 1.0f
+									   : 0;
+						}
+					case InputType::MOUSE_X: return m_mouse_rel_x;
+					case InputType::MOUSE_Y: return m_mouse_rel_y;
 				};
+
+				if (!m_xinput_connected[value.controller_id]) return 0;
+				switch (value.type)
+				{
+
+					case InputType::LTHUMB_X:
+						return deadZone(
+							m_xinput_states[value.controller_id].Gamepad.sThumbLX / 32767.0f,
+							DEADZONE);
+					case InputType::LTHUMB_Y:
+						return deadZone(
+							m_xinput_states[value.controller_id].Gamepad.sThumbLY / 32767.0f,
+							DEADZONE);
+					case InputType::RTHUMB_X:
+						return deadZone(
+							m_xinput_states[value.controller_id].Gamepad.sThumbRX / 32767.0f,
+							DEADZONE);
+					case InputType::RTHUMB_Y:
+						return deadZone(
+							m_xinput_states[value.controller_id].Gamepad.sThumbRY / 32767.0f,
+							DEADZONE);
+					case InputType::RTRIGGER:
+						return deadZone(
+							m_xinput_states[value.controller_id].Gamepad.bRightTrigger / 255.0f,
+							DEADZONE);
+					case InputType::LTRIGGER:
+						return deadZone(
+							m_xinput_states[value.controller_id].Gamepad.bLeftTrigger / 255.0f,
+							DEADZONE);
+				}
 			}
-			return -1;
+			return 0;
 		}
 
 

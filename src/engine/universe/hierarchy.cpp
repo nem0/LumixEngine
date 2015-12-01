@@ -15,7 +15,6 @@ namespace Lumix
 class HierarchyImpl : public Hierarchy
 {
 private:
-	
 	typedef HashMap<int32, int32> Parents;
 
 public:
@@ -27,15 +26,15 @@ public:
 		, m_parent_set(allocator)
 	{
 		m_is_processing = false;
-		universe.entityTransformed()
-			.bind<HierarchyImpl, &HierarchyImpl::onEntityMoved>(this);
+		universe.entityDestroyed().bind<HierarchyImpl, &HierarchyImpl::onEntityDestroyed>(this);
+		universe.entityTransformed().bind<HierarchyImpl, &HierarchyImpl::onEntityMoved>(this);
 	}
 
 
 	~HierarchyImpl()
 	{
 		PODHashMap<int32, Array<Child> *>::iterator iter = m_children.begin(),
-													  end = m_children.end();
+													end = m_children.end();
 		while (iter != end)
 		{
 			LUMIX_DELETE(m_allocator, iter.value());
@@ -45,6 +44,18 @@ public:
 
 
 	IAllocator& getAllocator() { return m_allocator; }
+
+
+	void onEntityDestroyed(Entity entity)
+	{
+		auto iter = m_children.find(entity);
+		if (iter != m_children.end())
+		{
+			LUMIX_DELETE(m_allocator, iter.value());
+			m_children.erase(iter);
+		}
+		m_parents.erase(entity);
+	}
 
 
 	void onEntityMoved(Entity entity)
@@ -58,9 +69,8 @@ public:
 			Array<Child>& children = *iter.value();
 			for (int i = 0, c = children.size(); i < c; ++i)
 			{
-				m_universe.setMatrix(children[i].m_entity,
-									 parent_matrix *
-										 children[i].m_local_matrix);
+				m_universe.setMatrix(
+					children[i].m_entity, parent_matrix * children[i].m_local_matrix);
 			}
 		}
 		m_is_processing = was_processing;
@@ -79,12 +89,10 @@ public:
 				{
 					if (children[i].m_entity == entity)
 					{
-						Matrix inv_parent_matrix =
-							m_universe.getPositionAndRotation(parent);
+						Matrix inv_parent_matrix = m_universe.getPositionAndRotation(parent);
 						inv_parent_matrix.inverse();
 						children[i].m_local_matrix =
-							inv_parent_matrix *
-							m_universe.getPositionAndRotation(entity);
+							inv_parent_matrix * m_universe.getPositionAndRotation(entity);
 						break;
 					}
 				}
@@ -108,10 +116,7 @@ public:
 	}
 
 
-	const Children& getAllChildren() const override
-	{
-		return m_children;
-	}
+	const Children& getAllChildren() const override { return m_children; }
 
 
 	void setParent(Entity child, Entity parent) override
@@ -119,8 +124,7 @@ public:
 		Parents::iterator old_parent_iter = m_parents.find(child);
 		if (old_parent_iter.isValid())
 		{
-			Children::iterator child_iter =
-				m_children.find(old_parent_iter.value());
+			Children::iterator child_iter = m_children.find(old_parent_iter.value());
 			ASSERT(child_iter.isValid());
 			Array<Child>& children = *child_iter.value();
 			for (int i = 0; i < children.size(); ++i)
@@ -193,11 +197,7 @@ public:
 	}
 
 
-	DelegateList<void(Entity, Entity)>&
-	parentSet() override
-	{
-		return m_parent_set;
-	}
+	DelegateList<void(Entity, Entity)>& parentSet() override { return m_parent_set; }
 
 
 	Array<Child>* getChildren(Entity parent) override
