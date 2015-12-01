@@ -30,102 +30,16 @@ private:
 };
 
 
-template <class S> class IntArrayObjectDescriptor : public IIntPropertyDescriptor
-{
-public:
-	typedef int (S::*IntegerGetter)(ComponentIndex, int);
-	typedef void (S::*IntegerSetter)(ComponentIndex, int, int);
-
-public:
-	IntArrayObjectDescriptor(const char* name,
-		IntegerGetter _getter,
-		IntegerSetter _setter,
-		IAllocator& allocator)
-		: IIntPropertyDescriptor(allocator)
-	{
-		setName(name);
-		m_integer_getter = _getter;
-		m_integer_setter = _setter;
-		m_type = INTEGER;
-	}
-
-
-	void set(ComponentUID cmp, int index, InputBlob& stream) const override
-	{
-		int32 i;
-		stream.read(&i, sizeof(i));
-		(static_cast<S*>(cmp.scene)->*m_integer_setter)(cmp.index, index, i);
-	}
-
-
-	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
-	{
-		int32 i = (static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp.index, index);
-		int len = sizeof(i);
-		stream.write(&i, len);
-	}
-
-
-private:
-	IntegerGetter m_integer_getter;
-	IntegerSetter m_integer_setter;
-};
-
-
-template <class S> class DecimalArrayObjectDescriptor : public IPropertyDescriptor
-{
-public:
-	typedef float (S::*Getter)(ComponentIndex, int);
-	typedef void (S::*Setter)(ComponentIndex, int, float);
-
-public:
-	DecimalArrayObjectDescriptor(const char* name,
-		Getter _getter,
-		Setter _setter,
-		IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
-	{
-		setName(name);
-		m_getter = _getter;
-		m_setter = _setter;
-		m_type = DECIMAL;
-	}
-
-
-	void set(ComponentUID cmp, int index, OutputBlob& stream) const override
-	{
-		float f;
-		stream.read(&f, sizeof(f));
-		(static_cast<S*>(cmp.scene)->*m_setter)(cmp, index, f);
-	}
-
-
-	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
-	{
-		float f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp, index);
-		stream.write(&f, sizeof(f));
-	}
-
-
-	void set(ComponentUID, OutputBlob&) const override { ASSERT(false); };
-	void get(ComponentUID, OutputBlob&) const override { ASSERT(false); };
-
-private:
-	Getter m_getter;
-	Setter m_setter;
-};
-
-
 template <class S> class StringArrayObjectDescriptor : public IPropertyDescriptor
 {
-private:
+	private:
 	static const int MAX_STRING_SIZE = 300;
 
-public:
+	public:
 	typedef const char* (S::*Getter)(ComponentIndex, int);
 	typedef void (S::*Setter)(ComponentIndex, int, const char*);
 
-public:
+	public:
 	StringArrayObjectDescriptor(const char* name,
 		Getter _getter,
 		Setter _setter,
@@ -147,7 +61,7 @@ public:
 		{
 			stream.read(c, 1);
 			++c;
-		} while (*(c - 1) && (c - 1) - tmp < MAX_STRING_SIZE);
+		} while(*(c - 1) && (c - 1) - tmp < MAX_STRING_SIZE);
 		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, index, tmp);
 	}
 
@@ -161,7 +75,7 @@ public:
 		stream.write(value.c_str(), len);
 	}
 
-private:
+	private:
 	Getter m_getter;
 	Setter m_setter;
 };
@@ -207,47 +121,6 @@ public:
 	{
 		m_type = IPropertyDescriptor::RESOURCE;
 	}
-};
-
-
-template <class S> class Vec3ArrayObjectDescriptor : public IPropertyDescriptor
-{
-public:
-	typedef Vec3 (S::*Getter)(ComponentIndex, int);
-	typedef void (S::*Setter)(ComponentIndex, int, const Vec3&);
-
-public:
-	Vec3ArrayObjectDescriptor(const char* name, Getter _getter, Setter _setter)
-	{
-		setName(name);
-		m_vec3_getter = _getter;
-		m_vec3_setter = _setter;
-		m_type = VEC3;
-	}
-
-
-	void set(ComponentUID cmp, int index, OutputBlob& stream) const override
-	{
-		Vec3 v;
-		stream.read(&v, sizeof(v));
-		(static_cast<S*>(cmp.scene)->*m_vec3_setter)(cmp, index, v);
-	}
-
-
-	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
-	{
-		Vec3 v = (static_cast<S*>(cmp.scene)->*m_vec3_getter)(cmp, index);
-		len = sizeof(v);
-		stream.write(&v, len);
-	}
-
-
-	void set(ComponentUID, OutputBlob&) const override{};
-	void get(ComponentUID, OutputBlob&) const override{};
-
-private:
-	Getter m_getter;
-	Setter m_setter;
 };
 
 
@@ -351,6 +224,8 @@ template <class S> class IntPropertyDescriptor : public IIntPropertyDescriptor
 public:
 	typedef int (S::*Getter)(ComponentIndex);
 	typedef void (S::*Setter)(ComponentIndex, int);
+	typedef int (S::*ArrayGetter)(ComponentIndex, int);
+	typedef void (S::*ArraySetter)(ComponentIndex, int, int);
 
 public:
 	IntPropertyDescriptor() {}
@@ -359,31 +234,65 @@ public:
 		: IIntPropertyDescriptor(allocator)
 	{
 		setName(name);
-		m_integer_getter = _getter;
-		m_integer_setter = _setter;
+		m_single.getter = _getter;
+		m_single.setter = _setter;
+		m_type = INTEGER;
+	}
+
+
+	IntPropertyDescriptor(const char* name, ArrayGetter _getter, ArraySetter _setter, IAllocator& allocator)
+		: IIntPropertyDescriptor(allocator)
+	{
+		setName(name);
+		m_array.getter = _getter;
+		m_array.setter = _setter;
 		m_type = INTEGER;
 	}
 
 
 	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
-		ASSERT(index == -1);
 		int32 i;
 		stream.read(&i, sizeof(i));
-		(static_cast<S*>(cmp.scene)->*m_integer_setter)(cmp.index, i);
+		if(index < 0)
+		{
+			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.index, i);
+		}
+		else
+		{
+			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.index, index, i);
+		}
 	};
 
 
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
-		ASSERT(index == -1);
-		int32 i = (static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp.index);
+		int32 i = 0;
+		if(index < 0)
+		{
+			i = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.index);
+		}
+		else
+		{
+			i = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.index, index);
+		}
 		stream.write(i);
 	};
 
 private:
-	Getter m_integer_getter;
-	Setter m_integer_setter;
+	union
+	{
+		struct Single
+		{
+			Getter getter;
+			Setter setter;
+		} m_single;
+		struct Array
+		{
+			ArrayGetter getter;
+			ArraySetter setter;
+		} m_array;
+	};
 };
 
 
@@ -713,6 +622,8 @@ template <class S> class DecimalPropertyDescriptor : public IDecimalPropertyDesc
 public:
 	typedef float (S::*Getter)(ComponentIndex);
 	typedef void (S::*Setter)(ComponentIndex, float);
+	typedef float (S::*ArrayGetter)(ComponentIndex, int);
+	typedef void (S::*ArraySetter)(ComponentIndex, int,float);
 
 public:
 	DecimalPropertyDescriptor(const char* name,
@@ -727,6 +638,8 @@ public:
 		setName(name);
 		m_getter = _getter;
 		m_setter = _setter;
+		m_array_getter = nullptr;
+		m_array_setter = nullptr;
 		m_min = min;
 		m_max = max;
 		m_step = step;
@@ -734,19 +647,54 @@ public:
 	}
 
 
+	DecimalPropertyDescriptor(const char* name,
+		ArrayGetter _getter,
+		ArraySetter _setter,
+		float min,
+		float max,
+		float step,
+		IAllocator& allocator)
+		: IDecimalPropertyDescriptor(allocator)
+	{
+		setName(name);
+		m_array_getter = _getter;
+		m_array_setter = _setter;
+		m_getter = nullptr;
+		m_setter = nullptr;
+		m_min = min;
+		m_max = max;
+		m_step = step;
+		m_type = DECIMAL;
+	}
+
+
+
 	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
-		ASSERT(index == -1);
 		float f;
 		stream.read(&f, sizeof(f));
-		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, f);
+		if(index >= 0)
+		{
+			(static_cast<S*>(cmp.scene)->*m_array_setter)(cmp.index, index, f);
+		}
+		else
+		{
+			(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, f);
+		}
 	};
 
 
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
-		ASSERT(index == -1);
-		float f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		float f = 0;
+		if(index >= 0)
+		{
+			(static_cast<S*>(cmp.scene)->*m_array_getter)(cmp.index, index);
+		}
+		else
+		{
+			(static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		}
 		int len = sizeof(f);
 		stream.write(&f, len);
 	};
@@ -754,6 +702,8 @@ public:
 private:
 	Getter m_getter;
 	Setter m_setter;
+	ArrayGetter m_array_getter;
+	ArraySetter m_array_setter;
 };
 
 
