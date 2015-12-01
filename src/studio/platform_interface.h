@@ -95,6 +95,22 @@ namespace PlatformInterface
 	void getKeyName(int key, char* out, int max_size);
 	void setCursor(Cursor cursor);
 	void* getWindowHandle();
+	
+	bool getOpenFilename(char* out, int max_size, const char* filter);
+	bool getSaveFilename(char* out,
+		int max_size,
+		const char* filter,
+		const char* default_extension);
+	bool getOpenDirectory(char* out, int max_size);
+	bool shellExecuteOpen(const char* path);
+
+	struct Process;
+
+	Process* createProcess(const char* cmd, const char* args, Lumix::IAllocator& allocator);
+	void destroyProcess(Process& process);
+	bool isProcessFinished(Process& process);
+	int getProcessExitCode(Process& process);
+	int getProcessOutput(Process& process, char* buf, int buf_size);
 
 
 } // namespace PlatformInterface

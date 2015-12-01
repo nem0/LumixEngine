@@ -6,13 +6,13 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
-#include "core/system.h"
 #include "editor/entity_template_system.h"
 #include "editor/ieditor_command.h"
 #include "editor/iproperty_descriptor.h"
 #include "editor/property_register.h"
 #include "engine.h"
 #include "ocornut-imgui/imgui.h"
+#include "platform_interface.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
@@ -1546,7 +1546,7 @@ void TerrainEditor::onGUI()
 		if (ImGui::Button("Select mask"))
 		{
 			char filename[Lumix::MAX_PATH_LENGTH];
-			if (Lumix::getOpenFilename(filename, Lumix::lengthOf(filename), "All\0*.*\0"))
+			if (PlatformInterface::getOpenFilename(filename, Lumix::lengthOf(filename), "All\0*.*\0"))
 			{
 				int image_width;
 				int image_height;

@@ -5,7 +5,7 @@
 #include "core/math_utils.h"
 #include "core/path_utils.h"
 #include "core/string.h"
-#include "core/system.h"
+#include "platform_interface.h"
 #include "utils.h"
 #include <cstdio>
 
@@ -1774,7 +1774,7 @@ void ShaderEditor::loadNodeConnections(Lumix::InputBlob& blob, Node& node)
 void ShaderEditor::load()
 {
 	char path[Lumix::MAX_PATH_LENGTH];
-	if (!Lumix::getOpenFilename(path, Lumix::lengthOf(path), "Shader edit data\0*.sed\0"))
+	if (!PlatformInterface::getOpenFilename(path, Lumix::lengthOf(path), "Shader edit data\0*.sed\0"))
 	{
 		return;
 	}
@@ -1834,7 +1834,7 @@ void ShaderEditor::load()
 void ShaderEditor::getSavePath()
 {
 	char path[Lumix::MAX_PATH_LENGTH];
-	Lumix::getSaveFilename(path, Lumix::lengthOf(path), "Shader edit data\0*.sed\0", "sed");
+	PlatformInterface::getSaveFilename(path, Lumix::lengthOf(path), "Shader edit data\0*.sed\0", "sed");
 	m_path = path;
 }
 

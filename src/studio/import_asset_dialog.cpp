@@ -16,6 +16,7 @@
 #include "engine/engine.h"
 #include "metadata.h"
 #include "ocornut-imgui/imgui.h"
+#include "platform_interface.h"
 #include "physics/physics_geometry_manager.h"
 #include "renderer/model.h"
 #define STB_IMAGE_IMPLEMENTATION
@@ -1346,7 +1347,7 @@ bool ImportAssetDialog::checkTexture(const char* source_dir, const char* texture
 											  << path
 											  << " not found, please locate it");
 
-	if (!Lumix::getOpenFilename(new_path, sizeof(new_path), "All\0*.*\0")) return false;
+	if (!PlatformInterface::getOpenFilename(new_path, sizeof(new_path), "All\0*.*\0")) return false;
 
 	Lumix::string old_path_str(path, m_editor.getAllocator());
 	Lumix::string new_path_str(new_path, m_editor.getAllocator());
@@ -1581,7 +1582,7 @@ void ImportAssetDialog::onGUI()
 		ImGui::SameLine();
 		if (ImGui::Button("..."))
 		{
-			Lumix::getOpenFilename(m_source, sizeof(m_source), "All\0*.*\0");
+			PlatformInterface::getOpenFilename(m_source, sizeof(m_source), "All\0*.*\0");
 			checkSource();
 		}
 
@@ -1604,7 +1605,7 @@ void ImportAssetDialog::onGUI()
 			ImGui::SameLine();
 			if (ImGui::Button("...##browseoutput"))
 			{
-				Lumix::getOpenDirectory(m_output_dir, sizeof(m_output_dir));
+				PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir));
 			}
 
 			if (ImGui::Button("Import texture"))
@@ -1668,7 +1669,7 @@ void ImportAssetDialog::onGUI()
 			ImGui::SameLine();
 			if (ImGui::Button("...##browseoutput"))
 			{
-				Lumix::getOpenDirectory(m_output_dir, sizeof(m_output_dir));
+				PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir));
 			}
 
 			ImGui::InputText(
@@ -1676,7 +1677,7 @@ void ImportAssetDialog::onGUI()
 			ImGui::SameLine();
 			if (ImGui::Button("...##browsetextureoutput"))
 			{
-				Lumix::getOpenDirectory(m_texture_output_dir, sizeof(m_texture_output_dir));
+				PlatformInterface::getOpenDirectory(m_texture_output_dir, sizeof(m_texture_output_dir));
 			}
 
 			if (m_output_dir[0] != '\0')
