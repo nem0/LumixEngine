@@ -900,4 +900,77 @@ private:
 };
 
 
+template <class S> class EnumPropertyDescriptor : public IEnumPropertyDescriptor
+{
+public:
+	typedef int (S::*Getter)(ComponentIndex);
+	typedef void (S::*Setter)(ComponentIndex, int);
+	typedef int (S::*EnumCountGetter)() const;
+	typedef const char* (S::*EnumNameGetter)(int);
+
+public:
+	EnumPropertyDescriptor(const char* name,
+		Getter _getter,
+		Setter _setter,
+		EnumCountGetter count_getter,
+		EnumNameGetter enum_name_getter,
+		IAllocator& allocator)
+		: IEnumPropertyDescriptor(allocator)
+	{
+		setName(name);
+		m_getter = _getter;
+		m_setter = _setter;
+		m_enum_count_getter = count_getter;
+		m_enum_name_getter = enum_name_getter;
+		m_type = ENUM;
+	}
+
+
+	void set(ComponentUID cmp, InputBlob& stream) const override
+	{
+		int value;
+		stream.read(&value, sizeof(value));
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, value);
+	}
+
+
+	void get(ComponentUID cmp, OutputBlob& stream) const override
+	{
+		int value = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		int len = sizeof(value);
+		stream.write(&value, len);
+	}
+
+
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		ASSERT(index == -1);
+		set(cmp, stream);
+	};
+
+
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		ASSERT(index == -1);
+		get(cmp, stream);
+	};
+
+
+	int getEnumCount(IScene* scene) override { return (static_cast<S*>(scene)->*m_enum_count_getter)(); }
+
+
+	const char* getEnumItemName(IScene* scene, int index) override
+	{
+		return (static_cast<S*>(scene)->*m_enum_name_getter)(index);
+	}
+
+private:
+	Getter m_getter;
+	Setter m_setter;
+	EnumCountGetter m_enum_count_getter;
+	EnumNameGetter m_enum_name_getter;
+
+};
+
+
 } // !namespace Lumix

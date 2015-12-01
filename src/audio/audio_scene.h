@@ -34,6 +34,7 @@ public:
 	static void destroyInstance(AudioScene* scene);
 
 	virtual int getClipCount() const = 0;
+	virtual const char* getClipName(int index) = 0;
 	virtual ClipInfo* getClipInfo(int index) = 0;
 	virtual ClipInfo* getClipInfo(const char* name) = 0;
 	virtual int getClipInfoIndex(ClipInfo* info) = 0;
@@ -42,6 +43,8 @@ public:
 	virtual void setClip(int clip_id, const Lumix::Path& path) = 0;
 
 	virtual ClipInfo* getAmbientSoundClip(ComponentIndex cmp) = 0;
+	virtual int getAmbientSoundClipIndex(ComponentIndex cmp) = 0;
+	virtual void setAmbientSoundClipIndex(ComponentIndex cmp, int index) = 0;
 	virtual void setAmbientSoundClip(ComponentIndex cmp, ClipInfo* clip) = 0;
 	virtual bool isAmbientSound3D(ComponentIndex cmp) = 0;
 	virtual void setAmbientSound3D(ComponentIndex cmp, bool is_3d) = 0;

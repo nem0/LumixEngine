@@ -308,6 +308,7 @@ namespace Lumix
 		~PODHashMap()
 		{
 			clear();
+			m_allocator.deallocate(m_table);
 		}
 
 		size_type size() const { return m_size; }

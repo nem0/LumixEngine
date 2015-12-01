@@ -84,7 +84,7 @@ struct AudioSceneImpl : public AudioScene
 			auto up = orientation.getYVector();
 			m_device.setListenerOrientation(front.x, front.y, front.z, up.x, up.y, up.z);
 		}
-		
+
 		for (int i = 0; i < Lumix::lengthOf(m_playing_sounds); ++i)
 		{
 			auto& sound = m_playing_sounds[i];
@@ -168,11 +168,23 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
+	int getAmbientSoundClipIndex(ComponentIndex cmp) override
+	{
+		return m_clips.indexOf(m_ambient_sounds[getAmbientSoundIdx(cmp)].clip);
+	}
+
+
+	void setAmbientSoundClipIndex(ComponentIndex cmp, int index) override
+	{
+		m_ambient_sounds[getAmbientSoundIdx(cmp)].clip = m_clips[index];
+	}
+
+
 	void setAmbientSoundClip(ComponentIndex cmp, ClipInfo* clip) override
 	{
 		m_ambient_sounds[getAmbientSoundIdx(cmp)].clip = clip;
 	}
-	
+
 
 	ComponentIndex createAmbientSound(Entity entity)
 	{
@@ -325,6 +337,12 @@ struct AudioSceneImpl : public AudioScene
 
 
 	int getClipCount() const override { return m_clips.size(); }
+
+
+	const char* getClipName(int index) override
+	{
+		return m_clips[index]->name;
+	}
 
 
 	void addClip(const char* name, const Lumix::Path& path) override

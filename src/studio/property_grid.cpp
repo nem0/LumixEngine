@@ -1,7 +1,5 @@
 #include "property_grid.h"
 #include "asset_browser.h"
-#include "audio/audio_scene.h"
-#include "audio/clip_manager.h"
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/vec.h"
@@ -184,9 +182,42 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	case Lumix::IPropertyDescriptor::SAMPLED_FUNCTION:
 		showSampledFunctionProperty(cmp, static_cast<Lumix::ISampledFunctionDescriptor&>(desc));
 		break;
+	case Lumix::IPropertyDescriptor::ENUM:
+		showEnumProperty(cmp, static_cast<Lumix::IEnumPropertyDescriptor&>(desc));
+		break;
 	default:
 		ASSERT(false);
 		break;
+	}
+}
+
+
+void PropertyGrid::showEnumProperty(Lumix::ComponentUID cmp, Lumix::IEnumPropertyDescriptor& desc)
+{
+	Lumix::OutputBlob blob(m_editor.getAllocator());
+	desc.get(cmp, blob);
+	int value = *(int*)blob.getData();
+	int count = desc.getEnumCount(cmp.scene);
+
+	struct Data
+	{
+		Lumix::IEnumPropertyDescriptor* descriptor;
+		Lumix::IScene* scene;
+	};
+
+	auto getter = [](void* data, int index, const char** out) -> bool {
+		auto* combo_data = static_cast<Data*>(data);
+		*out = combo_data->descriptor->getEnumItemName(combo_data->scene, index);
+		return true;
+	};
+
+	Data data;
+	data.scene = cmp.scene;
+	data.descriptor = &desc;
+
+	if(ImGui::Combo(desc.getName(), &value, getter, &data, count))
+	{
+		m_editor.setProperty(cmp.type, -1, desc, &value, sizeof(value));
 	}
 }
 
@@ -269,11 +300,6 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 		showProperty(*desc, -1, cmp);
 	}
 
-	if (cmp.type == Lumix::crc32("ambient_sound"))
-	{
-		onAmbientSoundGUI(cmp);
-	}
-
 	if (cmp.type == Lumix::crc32("lua_script"))
 	{
 		onLuaScriptGUI(cmp);
@@ -344,26 +370,6 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 		ImGui::EndPopup();
 	}
 	return false;
-}
-
-
-void PropertyGrid::onAmbientSoundGUI(Lumix::ComponentUID cmp)
-{
-	auto* scene = static_cast<Lumix::AudioScene*>(cmp.scene);
-
-	auto clip_info = scene->getAmbientSoundClip(cmp.index);
-	auto getter = [](void* data, int index, const char** out_text) -> bool
-	{
-		auto* scene = static_cast<Lumix::AudioScene*>(data);
-		*out_text = scene->getClipInfo(index)->name;
-		return true;
-	};
-
-	int clip_id = scene->getClipInfoIndex(clip_info);
-	if(ImGui::Combo("Clip", &clip_id, getter, scene, scene->getClipCount()))
-	{
-		scene->setAmbientSoundClip(cmp.index, scene->getClipInfo(clip_id));
-	}
 }
 
 
