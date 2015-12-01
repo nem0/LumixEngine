@@ -49,6 +49,12 @@ public:
 	virtual SoundHandle play(Entity entity, ClipInfo* clip, bool is_3d) = 0;
 	virtual void stop(SoundHandle sound_id) = 0;
 	virtual void setVolume(SoundHandle sound_id, float volume) = 0;
+
+	virtual void setEcho(SoundHandle sound_id,
+		float wet_dry_mix,
+		float feedback,
+		float left_delay,
+		float right_delay) = 0;
 };
 
 
