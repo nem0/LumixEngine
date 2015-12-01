@@ -445,10 +445,11 @@ public:
 			if (m_scripts[component]->m_script) m_system.getScriptManager().unload(*m_scripts[component]->m_script);
 			m_entity_script_map.erase(m_scripts[component]->m_entity);
 
-			LUMIX_DELETE(m_system.getAllocator(), m_scripts[component]);
+			auto* script = m_scripts[component];
 			m_scripts[component] = nullptr;
 			m_universe_context.m_universe->destroyComponent(
-				Entity(m_scripts[component]->m_entity), type, this, component);
+				script->m_entity, type, this, component);
+			LUMIX_DELETE(m_system.getAllocator(), script);
 		}
 	}
 
