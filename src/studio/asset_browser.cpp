@@ -551,7 +551,7 @@ void AssetBrowser::openInExternalEditor(Lumix::Resource* resource)
 {
 	StringBuilder<Lumix::MAX_PATH_LENGTH> path(m_editor.getBasePath());
 	path << "/" << resource->getPath().c_str();
-	Lumix::shellExecuteOpen(path);
+	PlatformInterface::shellExecuteOpen(path);
 }
 
 
@@ -566,13 +566,13 @@ void AssetBrowser::onGUIShader()
 	if (ImGui::Button("Open vertex shader"))
 	{
 		path << "_vs.sc";
-		Lumix::shellExecuteOpen(path);
+		PlatformInterface::shellExecuteOpen(path);
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("Open fragment shader"))
 	{
 		path << "_fs.sc";
-		Lumix::shellExecuteOpen(path);
+		PlatformInterface::shellExecuteOpen(path);
 	}
 
 	if (ImGui::CollapsingHeader("Texture slots", nullptr, true, true))

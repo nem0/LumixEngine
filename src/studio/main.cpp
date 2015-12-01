@@ -157,23 +157,23 @@ public:
 			{
 				if (ImGui::Button("Download new version"))
 				{
-					Lumix::shellExecuteOpen(
+					PlatformInterface::shellExecuteOpen(
 						"https://github.com/nem0/lumixengine_data/archive/master.zip");
 				}
 
 				if (ImGui::Button("Show major releases"))
 				{
-					Lumix::shellExecuteOpen("https://github.com/nem0/LumixEngine/releases");
+					PlatformInterface::shellExecuteOpen("https://github.com/nem0/LumixEngine/releases");
 				}
 
 				if (ImGui::Button("Show latest commits"))
 				{
-					Lumix::shellExecuteOpen("https://github.com/nem0/LumixEngine/commits/master");
+					PlatformInterface::shellExecuteOpen("https://github.com/nem0/LumixEngine/commits/master");
 				}
 
 				if (ImGui::Button("Show issues"))
 				{
-					Lumix::shellExecuteOpen("https://github.com/nem0/lumixengine/issues");
+					PlatformInterface::shellExecuteOpen("https://github.com/nem0/lumixengine/issues");
 				}
 				ImGui::Separator();
 
@@ -308,7 +308,7 @@ public:
 		else
 		{
 			char filename[Lumix::MAX_PATH_LENGTH];
-			if (Lumix::getSaveFilename(
+			if (PlatformInterface::getSaveFilename(
 				filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
 			{
 				m_editor->saveUniverse(Lumix::Path(filename), true);
@@ -323,7 +323,7 @@ public:
 	{
 		m_time_to_autosave = float(m_settings.m_autosave_time);
 		char filename[Lumix::MAX_PATH_LENGTH];
-		if (Lumix::getSaveFilename(filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
+		if (PlatformInterface::getSaveFilename(filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
 		{
 			m_editor->saveUniverse(Lumix::Path(filename), true);
 		}
@@ -391,7 +391,7 @@ public:
 	void loadAndExecuteCommands()
 	{
 		char filename[Lumix::MAX_PATH_LENGTH];
-		if (Lumix::getOpenFilename(filename, Lumix::lengthOf(filename), "JSON files\0*.json\0"))
+		if (PlatformInterface::getOpenFilename(filename, Lumix::lengthOf(filename), "JSON files\0*.json\0"))
 		{
 			m_editor->executeUndoStack(Lumix::Path(filename));
 		}
@@ -401,7 +401,7 @@ public:
 	void saveUndoStack()
 	{
 		char filename[Lumix::MAX_PATH_LENGTH];
-		if (Lumix::getSaveFilename(filename, Lumix::lengthOf(filename), "JSON files\0*.json\0", "json"))
+		if (PlatformInterface::getSaveFilename(filename, Lumix::lengthOf(filename), "JSON files\0*.json\0", "json"))
 		{
 			m_editor->saveUndoStack(Lumix::Path(filename));
 		}

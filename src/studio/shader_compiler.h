@@ -9,9 +9,13 @@
 
 namespace Lumix
 {
-struct Process;
 class ShaderCombinations;
 class WorldEditor;
+}
+
+namespace PlatformInterface
+{
+struct Process;
 }
 
 
@@ -56,7 +60,7 @@ private:
 private:
 	struct ProcessInfo
 	{
-		Lumix::Process* process;
+		PlatformInterface::Process* process;
 		char path[Lumix::MAX_PATH_LENGTH];
 	};
 

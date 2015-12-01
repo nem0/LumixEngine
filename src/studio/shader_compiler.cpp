@@ -371,7 +371,7 @@ void ShaderCompiler::compilePass(
 			StringBuilder<Lumix::MAX_PATH_LENGTH> cmd(m_editor.getBasePath(), "/shaders/shaderc.exe");
 
 			Lumix::deleteFile(out_path);
-			auto* process = Lumix::createProcess(cmd, args, m_editor.getAllocator());
+			auto* process = PlatformInterface::createProcess(cmd, args, m_editor.getAllocator());
 			if (!process)
 			{
 				Lumix::g_log_error.log("shader compiler") << "Could not execute command: " << cmd;
@@ -453,10 +453,10 @@ void ShaderCompiler::update(float)
 	PROFILE_FUNCTION();
 	for (int i = 0; i < m_processes.size(); ++i)
 	{
-		if (Lumix::isProcessFinished(*m_processes[i].process))
+		if (PlatformInterface::isProcessFinished(*m_processes[i].process))
 		{
 
-			bool failed = Lumix::getProcessExitCode(*m_processes[i].process) != 0;
+			bool failed = PlatformInterface::getProcessExitCode(*m_processes[i].process) != 0;
 			if (failed)
 			{
 				if (strstr(m_processes[i].path, "imgui") != nullptr)
@@ -466,14 +466,14 @@ void ShaderCompiler::update(float)
 
 				char buf[1024];
 				int read;
-				while ((read = Lumix::getProcessOutput(*m_processes[i].process, buf, sizeof(buf) - 1)) > 0)
+				while ((read = PlatformInterface::getProcessOutput(*m_processes[i].process, buf, sizeof(buf) - 1)) > 0)
 				{
 					buf[read] = 0;
 					Lumix::g_log_error.log("shader compiler") << buf;
 				}
 			}
 
-			Lumix::destroyProcess(*m_processes[i].process);
+			PlatformInterface::destroyProcess(*m_processes[i].process);
 			m_processes.eraseFast(i);
 
 			updateNotifications();
