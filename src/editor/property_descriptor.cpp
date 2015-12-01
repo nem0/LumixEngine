@@ -16,11 +16,15 @@ void IPropertyDescriptor::setName(const char* name)
 }
 
 
-IIntPropertyDescriptor::IIntPropertyDescriptor(IAllocator& allocator)
-	: IPropertyDescriptor(allocator)
+LUMIX_EDITOR_API int getIntPropertyMin()
 {
-	m_min = INT32_MIN;
-	m_max = INT32_MAX;
+	return INT32_MIN;
+}
+
+
+LUMIX_EDITOR_API int getIntPropertyMax()
+{
+	return INT32_MAX;
 }
 
 

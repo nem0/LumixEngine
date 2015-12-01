@@ -11,23 +11,9 @@ namespace Lumix
 {
 
 
-class LUMIX_EDITOR_API IIntPropertyDescriptor : public IPropertyDescriptor
-{
-public:
-	IIntPropertyDescriptor(IAllocator& allocator);
+LUMIX_EDITOR_API int getIntPropertyMin();
+LUMIX_EDITOR_API int getIntPropertyMax();
 
-	void setLimit(int min, int max)
-	{
-		m_min = min;
-		m_max = max;
-	}
-	int getMin() const { return m_min; }
-	int getMax() const { return m_max; }
-
-private:
-	int m_min;
-	int m_max;
-};
 
 
 template <class S> class StringArrayObjectDescriptor : public IPropertyDescriptor
@@ -219,7 +205,7 @@ private:
 };
 
 
-template <class S> class IntPropertyDescriptor : public IIntPropertyDescriptor
+template <class S> class IntPropertyDescriptor : public IPropertyDescriptor
 {
 public:
 	typedef int (S::*Getter)(ComponentIndex);
@@ -231,22 +217,26 @@ public:
 	IntPropertyDescriptor() {}
 
 	IntPropertyDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
-		: IIntPropertyDescriptor(allocator)
+		: IPropertyDescriptor(allocator)
 	{
 		setName(name);
 		m_single.getter = _getter;
 		m_single.setter = _setter;
 		m_type = INTEGER;
+		m_min = getIntPropertyMin();
+		m_max = getIntPropertyMax();
 	}
 
 
 	IntPropertyDescriptor(const char* name, ArrayGetter _getter, ArraySetter _setter, IAllocator& allocator)
-		: IIntPropertyDescriptor(allocator)
+		: IPropertyDescriptor(allocator)
 	{
 		setName(name);
 		m_array.getter = _getter;
 		m_array.setter = _setter;
 		m_type = INTEGER;
+		m_min = getIntPropertyMin();
+		m_max = getIntPropertyMax();
 	}
 
 
@@ -279,6 +269,18 @@ public:
 		stream.write(i);
 	};
 
+
+	void setLimit(int min, int max)
+	{
+		m_min = min;
+		m_max = max;
+	}
+
+
+	int getMin() const { return m_min; }
+	int getMax() const { return m_max; }
+
+
 private:
 	union
 	{
@@ -293,6 +295,9 @@ private:
 			ArraySetter setter;
 		} m_array;
 	};
+
+	int m_min;
+	int m_max;
 };
 
 
