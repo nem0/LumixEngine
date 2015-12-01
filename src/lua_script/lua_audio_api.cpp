@@ -30,9 +30,14 @@ static void setSoundVolume(IScene* scene, int sound_id, float volume)
 }
 
 
-static void setEcho(IScene* scene, int sound_id, float feedback, float delay)
+static void setEcho(IScene* scene,
+	int sound_id,
+	float wet_dry_mix,
+	float feedback,
+	float left_delay,
+	float right_delay)
 {
-	static_cast<AudioScene*>(scene)->setEcho(sound_id, feedback, delay);
+	static_cast<AudioScene*>(scene)->setEcho(sound_id, wet_dry_mix, feedback, left_delay, right_delay);
 }
 
 

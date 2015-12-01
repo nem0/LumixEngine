@@ -447,6 +447,16 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
+	void setEcho(SoundHandle sound_id,
+		float wet_dry_mix,
+		float feedback,
+		float left_delay,
+		float right_delay)
+	{
+		ASSERT(sound_id >= 0 && sound_id < Lumix::lengthOf(m_playing_sounds));
+		m_device.setEcho(m_playing_sounds[sound_id].buffer_id, wet_dry_mix, feedback, left_delay, right_delay);
+	}
+
 	Universe& getUniverse() override { return m_universe; }
 	IPlugin& getPlugin() const override { return m_system; }
 
