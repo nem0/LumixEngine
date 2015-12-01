@@ -8,6 +8,7 @@
 namespace Lumix
 {
 	class IArrayDescriptor;
+	class IEnumPropertyDescriptor;
 	class IPropertyDescriptor;
 	class ISampledFunctionDescriptor;
 	class WorldEditor;
@@ -37,6 +38,7 @@ private:
 	void showProperty(Lumix::IPropertyDescriptor& desc, int index, Lumix::ComponentUID cmp);
 	void showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescriptor& desc);
 	void showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::ISampledFunctionDescriptor& desc);
+	void showEnumProperty(Lumix::ComponentUID cmp, Lumix::IEnumPropertyDescriptor& desc);
 	void showComponentProperties(Lumix::ComponentUID cmp);
 	void showCoreProperties(Lumix::Entity entity);
 	const char* getComponentTypeName(Lumix::ComponentUID cmp) const;

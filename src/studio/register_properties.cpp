@@ -32,6 +32,16 @@ void registerAudioProperties(Lumix::IAllocator& allocator)
 	PropertyRegister::registerComponentType("audio_listener", "Audio listener");
 	PropertyRegister::registerComponentType("ambient_sound", "Ambient sound");
 
+
+	Lumix::PropertyRegister::add("ambient_sound",
+		LUMIX_NEW(allocator, EnumPropertyDescriptor<AudioScene>)("Sound",
+			&AudioScene::getAmbientSoundClipIndex,
+			&AudioScene::setAmbientSoundClipIndex,
+			&AudioScene::getClipCount,
+			&AudioScene::getClipName,
+			allocator
+		));
+
 	Lumix::PropertyRegister::add("ambient_sound",
 		LUMIX_NEW(allocator, BoolPropertyDescriptor<AudioScene>)("3D",
 		&AudioScene::isAmbientSound3D,

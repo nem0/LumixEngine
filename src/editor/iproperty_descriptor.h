@@ -25,7 +25,8 @@ public:
 		COLOR,
 		VEC4,
 		VEC2,
-		SAMPLED_FUNCTION
+		SAMPLED_FUNCTION,
+		ENUM
 	};
 
 public:
@@ -88,16 +89,29 @@ public:
 };
 
 
+class IEnumPropertyDescriptor : public IPropertyDescriptor
+{
+public:
+	IEnumPropertyDescriptor(IAllocator& allocator)
+		: IPropertyDescriptor(allocator)
+	{
+	}
+
+	virtual int getEnumCount(IScene* scene) = 0;
+	virtual const char* getEnumItemName(IScene* scene, int index) = 0;
+};
+
+
 class ISampledFunctionDescriptor : public IPropertyDescriptor
 {
-	public:
-		ISampledFunctionDescriptor(IAllocator& allocator)
-			: IPropertyDescriptor(allocator)
-		{
-		}
+public:
+	ISampledFunctionDescriptor(IAllocator& allocator)
+		: IPropertyDescriptor(allocator)
+	{
+	}
 
-		virtual float getMin() = 0;
-		virtual float getMax() = 0;
+	virtual float getMin() = 0;
+	virtual float getMax() = 0;
 };
 
 
