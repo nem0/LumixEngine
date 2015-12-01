@@ -369,15 +369,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 		Matrix mtx = m_universe.getMatrix(entity);
 		matrix2Transform(mtx, transform);
 
-		physx::PxRigidStatic* physx_actor = PxCreateStatic(
-			*m_system->getPhysics(), transform, geom, *m_default_material);
-		physx_actor->userData = (void*)entity;
-		m_scene->addActor(*physx_actor);
+		physx::PxRigidStatic* physx_actor =
+			PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
 		actor->setPhysxActor(physx_actor);
-		physx_actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 
-		m_universe.addComponent(
-			entity, BOX_ACTOR_HASH, this, m_actors.size() - 1);
+		m_universe.addComponent(entity, BOX_ACTOR_HASH, this, m_actors.size() - 1);
 		return m_actors.size() - 1;
 	}
 
@@ -476,18 +472,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 			return;
 		}
 
-		ResourceManagerBase* manager =
-			m_engine->getResourceManager().get(ResourceManager::PHYSICS);
-		PhysicsGeometry* geom_res = static_cast<PhysicsGeometry*>(
-			manager->load(Lumix::Path(str)));
+		ResourceManagerBase* manager = m_engine->getResourceManager().get(ResourceManager::PHYSICS);
+		PhysicsGeometry* geom_res = static_cast<PhysicsGeometry*>(manager->load(Lumix::Path(str)));
 
+		m_actors[cmp]->setPhysxActor(nullptr);
 		m_actors[cmp]->setResource(geom_res);
-
-		if (m_actors[cmp]->getPhysxActor())
-		{
-			m_scene->removeActor(*m_actors[cmp]->getPhysxActor());
-			m_actors[cmp]->setPhysxActor(nullptr);
-		}
 	}
 
 
@@ -911,6 +900,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 										   *m_default_material);
 				}
 				ASSERT(actor);
+				actor->userData = (void*)m_actors[cmp]->getEntity();
+				actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 				m_actors[cmp]->setPhysxActor(actor);
 			}
 		}
@@ -997,10 +988,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 										   box_geom,
 										   *m_default_material);
 				}
-				actor->userData = (void*)m_actors[idx]->getEntity();
-				m_scene->addActor(*actor);
 				m_actors[idx]->setPhysxActor(actor);
-				actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 				m_universe.addComponent(
 					m_actors[idx]->getEntity(), BOX_ACTOR_HASH, this, idx);
 			}
@@ -1337,8 +1325,6 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		}
 		if (actor)
 		{
-			actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
-			actor->userData = (void*)m_entity;
 			setPhysxActor(actor);
 		}
 		else
@@ -1361,6 +1347,8 @@ void PhysicsSceneImpl::RigidActor::setPhysxActor(physx::PxRigidActor* actor)
 	if (actor)
 	{
 		m_scene.m_scene->addActor(*actor);
+		actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+		actor->userData = (void*)m_entity;
 	}
 }
 

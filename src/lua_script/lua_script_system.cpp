@@ -170,7 +170,6 @@ public:
 	{
 		if (!m_global_state) return;
 
-		TODO("recently created entity has incorrect value (e1|e2 is not correct)")
 		auto iter1 = m_entity_script_map.find(e1);
 		auto iter2 = m_entity_script_map.find(e2);
 		if (iter1 != m_entity_script_map.end())
