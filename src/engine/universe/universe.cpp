@@ -23,6 +23,7 @@ Universe::Universe(IAllocator& allocator)
 	, m_name_to_id_map(m_allocator)
 	, m_id_to_name_map(m_allocator)
 	, m_transformations(m_allocator)
+	, m_component_added(m_allocator)
 	, m_component_destroyed(m_allocator)
 	, m_entity_created(m_allocator)
 	, m_entity_destroyed(m_allocator)
@@ -327,10 +328,7 @@ void Universe::destroyComponent(Entity entity, uint32 component_type, IScene* sc
 void Universe::addComponent(Entity entity, uint32 component_type, IScene* scene, int index)
 {
 	ComponentUID cmp(entity, component_type, scene, index);
-	if (m_component_added.isValid())
-	{
-		m_component_added.invoke(cmp);
-	}
+	m_component_added.invoke(cmp);
 }
 
 

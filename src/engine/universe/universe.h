@@ -62,7 +62,7 @@ public:
 	DelegateList<void(Entity)>& entityCreated() { return m_entity_created; }
 	DelegateList<void(Entity)>& entityDestroyed() { return m_entity_destroyed; }
 	DelegateList<void(const ComponentUID&)>& componentDestroyed() { return m_component_destroyed; }
-	Delegate<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
+	DelegateList<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
 
 	void serialize(OutputBlob& serializer);
 	void deserialize(InputBlob& serializer);
@@ -86,7 +86,7 @@ private:
 	DelegateList<void(Entity)> m_entity_created;
 	DelegateList<void(Entity)> m_entity_destroyed;
 	DelegateList<void(const ComponentUID&)> m_component_destroyed;
-	Delegate<void(const ComponentUID&)> m_component_added;
+	DelegateList<void(const ComponentUID&)> m_component_added;
 	int m_first_free_slot;
 };
 
