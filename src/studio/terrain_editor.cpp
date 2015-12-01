@@ -395,7 +395,7 @@ struct RemoveEntitiesCommand : public Lumix::IEditorCommand
 				auto& props = Lumix::PropertyRegister::getDescriptors(cmp_type);
 				for (int k = 0; k < props.size(); ++k)
 				{
-					props[k]->set(new_component, blob);
+					props[k]->set(new_component, -1, blob);
 				}
 			}
 			blob.read(is_entity);
@@ -475,7 +475,7 @@ struct RemoveEntitiesCommand : public Lumix::IEditorCommand
 				auto& props = Lumix::PropertyRegister::getDescriptors(cmp.type);
 				for (int k = 0; k < props.size(); ++k)
 				{
-					props[k]->get(cmp, m_removed_entities);
+					props[k]->get(cmp, -1, m_removed_entities);
 				}
 				cmp.scene->destroyComponent(cmp.index, cmp.type);
 			}

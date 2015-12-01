@@ -698,7 +698,7 @@ public:
 		m_index = -1;
 		m_new_value.write(data, size);
 		ComponentUID component = m_editor.getComponent(entity, component_type);
-		m_property_descriptor->get(component, m_old_value);
+		m_property_descriptor->get(component, -1, m_old_value);
 	}
 
 
@@ -801,10 +801,8 @@ public:
 
 	void set(InputBlob& stream)
 	{
-		ComponentUID component =
-			m_editor.getComponent(m_entity, m_component_type);
-		uint32 template_hash =
-			m_editor.getEntityTemplateSystem().getTemplate(m_entity);
+		ComponentUID component = m_editor.getComponent(m_entity, m_component_type);
+		uint32 template_hash = m_editor.getEntityTemplateSystem().getTemplate(m_entity);
 		if (template_hash)
 		{
 			const Array<Entity>& entities =
@@ -812,20 +810,18 @@ public:
 			for (int i = 0, c = entities.size(); i < c; ++i)
 			{
 				stream.rewind();
-				const WorldEditor::ComponentList& cmps =
-					m_editor.getComponents(entities[i]);
+				const WorldEditor::ComponentList& cmps = m_editor.getComponents(entities[i]);
 				for (int j = 0, cj = cmps.size(); j < cj; ++j)
 				{
 					if (cmps[j].type == m_component_type)
 					{
 						if (m_index >= 0)
 						{
-							m_property_descriptor->set(
-								cmps[j], m_index, stream);
+							m_property_descriptor->set(cmps[j], m_index, stream);
 						}
 						else
 						{
-							m_property_descriptor->set(cmps[j], stream);
+							m_property_descriptor->set(cmps[j], -1, stream);
 						}
 						break;
 					}
@@ -840,7 +836,7 @@ public:
 			}
 			else
 			{
-				m_property_descriptor->set(component, stream);
+				m_property_descriptor->set(component, -1, stream);
 			}
 		}
 		m_editor.propertySet().invoke(component, *m_property_descriptor);
@@ -1091,7 +1087,7 @@ private:
 						PropertyRegister::getDescriptors(cmps[j].type);
 					for (int k = 0; k < props.size(); ++k)
 					{
-						props[k]->get(cmps[j], m_old_values);
+						props[k]->get(cmps[j], -1, m_old_values);
 					}
 					cmps[j].scene->destroyComponent(cmps[j].index, cmps[j].type);
 				}
@@ -1137,7 +1133,7 @@ private:
 
 					for (int k = 0; k < props.size(); ++k)
 					{
-						props[k]->set(new_component, blob);
+						props[k]->set(new_component, -1, blob);
 					}
 				}
 			}
@@ -1228,7 +1224,7 @@ private:
 					PropertyRegister::getDescriptors(m_component.type);
 				for (int i = 0; i < props.size(); ++i)
 				{
-					props[i]->set(m_component, blob);
+					props[i]->set(m_component, -1, blob);
 				}
 			}
 			else
@@ -1251,7 +1247,7 @@ private:
 								PropertyRegister::getDescriptors(m_component.type);
 							for (int i = 0; i < props.size(); ++i)
 							{
-								props[i]->set(cmp_new, blob);
+								props[i]->set(cmp_new, -1, blob);
 							}
 						}
 					}
@@ -1275,7 +1271,7 @@ private:
 			Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(m_component.type);
 			for (int i = 0; i < props.size(); ++i)
 			{
-				props[i]->get(m_component, m_old_values);
+				props[i]->get(m_component, -1, m_old_values);
 			}
 			uint32 template_hash =
 				m_editor.getEntityTemplateSystem().getTemplate(m_component.entity);
@@ -2221,7 +2217,7 @@ public:
 				int32 prop_count = props.size();
 				for (int j = 0; j < prop_count; ++j)
 				{
-					props[j]->get(cmps[i], m_copy_buffer);
+					props[j]->get(cmps[i], -1, m_copy_buffer);
 				}
 			}
 		}
@@ -2264,9 +2260,9 @@ public:
 		for (int i = 0; i < properties.size(); ++i)
 		{
 			stream.clear();
-			properties[i]->get(src, stream);
+			properties[i]->get(src, -1, stream);
 			InputBlob blob(stream.getData(), stream.getSize());
-			properties[i]->set(clone, blob);
+			properties[i]->set(clone, -1, blob);
 		}
 	}
 
@@ -2692,17 +2688,14 @@ public:
 							 const void* data,
 							 int size) override
 	{
-		if (m_selected_entities.size() == 1)
+		ASSERT(m_selected_entities.size() == 1);
+		uint32 component_hash = component;
+		ComponentUID cmp = getComponent(m_selected_entities[0], component_hash);
+		if (cmp.isValid())
 		{
-			uint32 component_hash = component;
-			ComponentUID cmp =
-				getComponent(m_selected_entities[0], component_hash);
-			if (cmp.isValid())
-			{
-				IEditorCommand* command = LUMIX_NEW(m_allocator, SetPropertyCommand)(
-					*this, cmp.entity, cmp.type, index, property, data, size);
-				executeCommand(command);
-			}
+			IEditorCommand* command = LUMIX_NEW(m_allocator, SetPropertyCommand)(
+				*this, cmp.entity, cmp.type, index, property, data, size);
+			executeCommand(command);
 		}
 	}
 
@@ -3272,7 +3265,7 @@ bool PasteEntityCommand::execute()
 		Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(type);
 		for (int j = 0; j < props.size(); ++j)
 		{
-			props[j]->set(cmp, blob);
+			props[j]->set(cmp, -1, blob);
 		}
 	}
 	m_entity = new_entity;

@@ -49,10 +49,7 @@ PropertyGrid::~PropertyGrid()
 void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lumix::ComponentUID cmp)
 {
 	Lumix::OutputBlob stream(m_editor.getAllocator());
-	if (index < 0)
-		desc.get(cmp, stream);
-	else
-		desc.get(cmp, index, stream);
+	desc.get(cmp, index, stream);
 	Lumix::InputBlob tmp(stream);
 
 	StringBuilder<100> desc_name(desc.getName(), "###", (Lumix::uint64)&desc);
@@ -195,7 +192,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 void PropertyGrid::showEnumProperty(Lumix::ComponentUID cmp, Lumix::IEnumPropertyDescriptor& desc)
 {
 	Lumix::OutputBlob blob(m_editor.getAllocator());
-	desc.get(cmp, blob);
+	desc.get(cmp, -1, blob);
 	int value = *(int*)blob.getData();
 	int count = desc.getEnumCount(cmp.scene);
 
@@ -225,7 +222,7 @@ void PropertyGrid::showEnumProperty(Lumix::ComponentUID cmp, Lumix::IEnumPropert
 void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::ISampledFunctionDescriptor& desc)
 {
 	Lumix::OutputBlob blob(m_editor.getAllocator());
-	desc.get(cmp, blob);
+	desc.get(cmp, -1, blob);
 	float* f = (float*)blob.getData();
 	int count = blob.getSize() / sizeof(float);
 
