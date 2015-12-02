@@ -84,11 +84,6 @@ struct BGFXAllocator : public bx::AllocatorI
 	}
 
 
-	~BGFXAllocator()
-	{
-	}
-
-
 	static const size_t NATURAL_ALIGNEMENT = 8;
 
 
@@ -111,25 +106,18 @@ struct BGFXAllocator : public bx::AllocatorI
 		}
 		else if (!_ptr)
 		{
-			if (NATURAL_ALIGNEMENT >= _alignment)
-			{
-				return m_source.allocate(_size);
-			}
+			if (NATURAL_ALIGNEMENT >= _alignment) return m_source.allocate(_size);
 
 			return m_source.allocate_aligned(_size, _alignment);
 		}
 
-		if (NATURAL_ALIGNEMENT >= _alignment)
-		{
-			return m_source.reallocate(_ptr, _size);
-		}
+		if (NATURAL_ALIGNEMENT >= _alignment) return m_source.reallocate(_ptr, _size);
 
 		return m_source.reallocate_aligned(_ptr, _size, _alignment);
 	}
 
 
 	Lumix::IAllocator& m_source;
-
 };
 
 
