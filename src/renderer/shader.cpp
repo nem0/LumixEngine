@@ -268,8 +268,13 @@ void Shader::unload(void)
 {
 	for (int i = 0; i < m_texture_slot_count; ++i)
 	{
-		bgfx::destroyUniform(m_texture_slots[i].m_uniform_handle);
+		if (bgfx::isValid(m_texture_slots[i].m_uniform_handle))
+		{
+			bgfx::destroyUniform(m_texture_slots[i].m_uniform_handle);
+		}
+		m_texture_slots[i].m_uniform_handle = BGFX_INVALID_HANDLE;
 	}
+	m_texture_slot_count = 0;
 
 	for (int i = 0; i < m_instances.size(); ++i)
 	{
