@@ -89,14 +89,39 @@ struct BGFXAllocator : public bx::AllocatorI
 	}
 
 
+	static const size_t NATURAL_ALIGNEMENT = 8;
+
+
 	void* realloc(void* _ptr, size_t _size, size_t _alignment, const char*, uint32) override
 	{
-		if (!_ptr) return m_source.allocate_aligned(_size, _alignment);
-
-		if (_ptr && _size == 0)
+		if (0 == _size)
 		{
-			m_source.deallocate_aligned(_ptr);
+			if (_ptr)
+			{
+				if (NATURAL_ALIGNEMENT >= _alignment)
+				{
+					m_source.deallocate(_ptr);
+					return nullptr;
+				}
+
+				m_source.deallocate_aligned(_ptr);
+			}
+
 			return nullptr;
+		}
+		else if (!_ptr)
+		{
+			if (NATURAL_ALIGNEMENT >= _alignment)
+			{
+				return m_source.allocate(_size);
+			}
+
+			return m_source.allocate_aligned(_size, _alignment);
+		}
+
+		if (NATURAL_ALIGNEMENT >= _alignment)
+		{
+			return m_source.reallocate(_ptr, _size);
 		}
 
 		return m_source.reallocate_aligned(_ptr, _size, _alignment);
