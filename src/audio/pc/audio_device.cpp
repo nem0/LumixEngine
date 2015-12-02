@@ -105,6 +105,8 @@ struct AudioDeviceImpl : public AudioDevice
 
 	~AudioDeviceImpl()
 	{
+		if (m_listener) m_listener->Release();
+		if (m_primary_buffer) m_primary_buffer->Release();
 		if (m_direct_sound) m_direct_sound->Release();
 		if (m_library) FreeLibrary(m_library);
 	}
@@ -169,6 +171,7 @@ struct AudioDeviceImpl : public AudioDevice
 				source->SetMaxDistance(10000, DS3D_DEFERRED);
 				source->SetMinDistance(2, DS3D_DEFERRED);
 				source->SetMode(DS3DMODE_NORMAL, DS3D_DEFERRED);
+				source->Release();
 			}
 		}
 
@@ -191,13 +194,18 @@ struct AudioDeviceImpl : public AudioDevice
 		if (FAILED(buffer->QueryInterface(IID_IDirectSoundBuffer8, (void**)&buffer8))) return;
 
 		DWORD res = 0;
-		if (FAILED(buffer8->SetFX(1, &echo_effect, &res))) return;
+		if (FAILED(buffer8->SetFX(1, &echo_effect, &res)))
+		{
+			buffer8->Release();
+			return;
+		}
 
 		IDirectSoundFXEcho8* echo = NULL;
 		DSFXEcho echo_params;
 		if (FAILED(buffer8->GetObjectInPath(
 			GUID_DSFX_STANDARD_ECHO, 0, IID_IDirectSoundFXEcho8, (LPVOID*)&echo)))
 		{
+			buffer8->Release();
 			return;
 		}
 		if (FAILED(echo->GetAllParameters(&echo_params))) return;
@@ -288,6 +296,7 @@ struct AudioDeviceImpl : public AudioDevice
 		if (SUCCEEDED(buffer->QueryInterface(IID_IDirectSound3DBuffer8, (void**)&source)))
 		{
 			source->SetPosition(x, y, z, DS3D_DEFERRED);
+			source->Release();
 		}
 	}
 

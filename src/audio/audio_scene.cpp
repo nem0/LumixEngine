@@ -18,7 +18,6 @@ namespace Lumix
 static const uint32 LISTENER_HASH = crc32("audio_listener");
 static const uint32 AMBIENT_SOUND_HASH = crc32("ambient_sound");
 static const uint32 CLIP_RESOURCE_HASH = crc32("CLIP");
-static const int MAX_PLAYING_SOUNDS = 256;
 
 
 struct Listener
@@ -486,7 +485,7 @@ struct AudioSceneImpl : public AudioScene
 	Universe& m_universe;
 	Array<ClipInfo*> m_clips;
 	AudioSystem& m_system;
-	PlayingSound m_playing_sounds[MAX_PLAYING_SOUNDS];
+	PlayingSound m_playing_sounds[AudioDevice::MAX_PLAYING_SOUNDS];
 };
 
 

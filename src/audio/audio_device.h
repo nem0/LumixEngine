@@ -23,6 +23,8 @@ public:
 		LOOPED = 1 << 1
 	};
 
+	static const int MAX_PLAYING_SOUNDS = 256;
+
 	typedef void* BufferHandle;
 	static const BufferHandle INVALID_BUFFER_HANDLE;
 
