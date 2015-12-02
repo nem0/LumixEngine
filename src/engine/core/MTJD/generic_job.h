@@ -1,7 +1,6 @@
 #pragma once
 
 
-#include <functional>
 #include "job.h"
 #include "manager.h"
 
@@ -26,7 +25,7 @@ public:
 	void execute() override { m_function(); }
 
 private:
-	std::function<void()> m_function;
+	T m_function;
 };
 
 

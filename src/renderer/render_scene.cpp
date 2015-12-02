@@ -33,6 +33,7 @@
 #include "renderer/texture.h"
 
 #include "universe/universe.h"
+#include <cmath>
 
 
 namespace Lumix
