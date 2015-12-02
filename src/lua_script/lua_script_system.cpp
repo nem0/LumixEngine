@@ -149,6 +149,8 @@ public:
 	{
 		ASSERT(m_global_state);
 		auto& script = *cmp;
+		if (!script.m_state) return;
+
 		lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
 		if (lua_getfield(script.m_state, -1, "onContact") != LUA_TFUNCTION)
 		{

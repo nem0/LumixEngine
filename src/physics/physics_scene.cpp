@@ -841,9 +841,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 			bool is_box = shapes->getBoxGeometry(box);
 			ASSERT(is_box);
 			physx::PxVec3& half = box.halfExtents;
-			half.x = size.x;
-			half.y = size.y;
-			half.z = size.z;
+			half.x = Math::maxValue(0.01f, size.x);
+			half.y = Math::maxValue(0.01f, size.y);
+			half.z = Math::maxValue(0.01f, size.z);
 			shapes->setGeometry(box);
 		}
 	}
