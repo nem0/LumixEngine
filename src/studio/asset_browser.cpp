@@ -57,6 +57,34 @@ static Lumix::uint32 getResourceType(const char* path)
 }
 
 
+class InsertMeshCommand : public Lumix::IEditorCommand
+{
+public:
+	InsertMeshCommand(Lumix::WorldEditor& editor);
+	InsertMeshCommand(Lumix::WorldEditor& editor, const Lumix::Vec3& position, const Lumix::Path& mesh_path);
+
+	void serialize(Lumix::JsonSerializer& serializer) override;
+	void deserialize(Lumix::JsonSerializer& serializer) override;
+	bool execute() override;
+	void undo() override;
+	Lumix::uint32 getType() override;
+	virtual bool merge(IEditorCommand&);
+	Lumix::Entity getEntity() const { return m_entity; }
+
+private:
+	Lumix::Vec3 m_position;
+	Lumix::Path m_mesh_path;
+	Lumix::Entity m_entity;
+	Lumix::WorldEditor& m_editor;
+};
+
+
+static Lumix::IEditorCommand* createInsertMeshCommand(Lumix::WorldEditor& editor)
+{
+	return LUMIX_NEW(editor.getAllocator(), InsertMeshCommand)(editor);
+}
+
+
 AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 	: m_editor(editor)
 	, m_metadata(metadata)
@@ -82,6 +110,8 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 
 	m_watcher = FileSystemWatcher::create(editor.getBasePath(), editor.getAllocator());
 	m_watcher->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
+
+	m_editor.registerEditorCommandCreator("insert_mesh", createInsertMeshCommand);
 }
 
 
@@ -594,29 +624,6 @@ void AssetBrowser::onGUIShader()
 		ImGui::Columns(1);
 	}
 }
-
-
-class InsertMeshCommand : public Lumix::IEditorCommand
-{
-public:
-	InsertMeshCommand(Lumix::WorldEditor& editor);
-	InsertMeshCommand(Lumix::WorldEditor& editor, const Lumix::Vec3& position, const Lumix::Path& mesh_path);
-
-	void serialize(Lumix::JsonSerializer& serializer) override;
-	void deserialize(Lumix::JsonSerializer& serializer) override;
-	bool execute() override;
-	void undo() override;
-	Lumix::uint32 getType() override;
-	virtual bool merge(IEditorCommand&);
-	Lumix::Entity getEntity() const { return m_entity; }
-
-private:
-	Lumix::Vec3 m_position;
-	Lumix::Path m_mesh_path;
-	Lumix::Entity m_entity;
-	Lumix::WorldEditor& m_editor;
-};
-
 
 
 static const Lumix::uint32 RENDERABLE_HASH = Lumix::crc32("renderable");

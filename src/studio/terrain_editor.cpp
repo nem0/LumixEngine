@@ -34,6 +34,13 @@ static const float MIN_BRUSH_SIZE = 0.5f;
 
 struct PaintEntitiesCommand : public Lumix::IEditorCommand
 {
+	PaintEntitiesCommand(Lumix::WorldEditor& editor)
+		: m_world_editor(editor)
+		, m_entities(editor.getAllocator())
+	{
+	}
+
+
 	PaintEntitiesCommand(Lumix::WorldEditor& editor,
 		Lumix::ComponentUID component,
 		Lumix::uint32 entity_template,
@@ -339,6 +346,13 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 
 struct RemoveEntitiesCommand : public Lumix::IEditorCommand
 {
+	RemoveEntitiesCommand(Lumix::WorldEditor& editor)
+		: m_editor(editor)
+		, m_removed_entities(editor.getAllocator())
+	{
+	}
+
+
 	RemoveEntitiesCommand(Lumix::WorldEditor& editor,
 		Lumix::ComponentUID component,
 		int entity_template,
@@ -505,6 +519,16 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 		int m_to_x;
 		int m_to_y;
 	};
+
+
+	PaintTerrainCommand(Lumix::WorldEditor& editor)
+		: m_world_editor(editor)
+		, m_new_data(editor.getAllocator())
+		, m_old_data(editor.getAllocator())
+		, m_items(editor.getAllocator())
+		, m_mask(editor.getAllocator())
+	{
+	}
 
 
 	PaintTerrainCommand(Lumix::WorldEditor& editor,
@@ -1097,6 +1121,25 @@ TerrainEditor::~TerrainEditor()
 }
 
 
+static Lumix::IEditorCommand* createPaintEntitiesCommand(Lumix::WorldEditor& editor)
+{
+	return LUMIX_NEW(editor.getAllocator(), PaintEntitiesCommand)(editor);
+}
+
+
+static Lumix::IEditorCommand* createRemoveEntitiesCommand(Lumix::WorldEditor& editor)
+{
+	return LUMIX_NEW(editor.getAllocator(), RemoveEntitiesCommand)(editor);
+	
+}
+
+
+static Lumix::IEditorCommand* createPaintTerrainCommand(Lumix::WorldEditor& editor)
+{
+	return LUMIX_NEW(editor.getAllocator(), PaintTerrainCommand)(editor);
+}
+
+
 TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
 	: m_world_editor(editor)
 	, m_color(1, 1, 1)
@@ -1107,6 +1150,10 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	, m_flat_height(0)
 	, m_is_enabled(false)
 {
+	editor.registerEditorCommandCreator("paint_entities_on_terrain", createPaintEntitiesCommand);
+	editor.registerEditorCommandCreator("remove_entities_on_terrain", createRemoveEntitiesCommand);
+	editor.registerEditorCommandCreator("paint_terrain", createPaintTerrainCommand);
+
 	m_increase_brush_size =
 		LUMIX_NEW(editor.getAllocator(), Action)("Increase brush size", "increaseBrushSize");
 	m_increase_brush_size->is_global = false;

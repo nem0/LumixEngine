@@ -3061,8 +3061,7 @@ public:
 		}
 		else
 		{
-			g_log_error.log("editor") << "Could not save commands to "
-									  << path.c_str();
+			g_log_error.log("editor") << "Could not save commands to " << path.c_str();
 		}
 	}
 
@@ -3078,9 +3077,8 @@ public:
 	}
 
 
-	void
-	registerEditorCommandCreator(const char* command_type,
-								 EditorCommandCreator creator) override
+	void registerEditorCommandCreator(const char* command_type,
+		EditorCommandCreator creator) override
 	{
 		m_editor_command_creators.insert(crc32(command_type), creator);
 	}
@@ -3091,13 +3089,10 @@ public:
 		destroyUndoStack();
 		m_undo_index = -1;
 		FS::IFile* file = m_engine->getFileSystem().open(
-			m_engine->getFileSystem().getDiskDevice(),
-			path.c_str(),
-			FS::Mode::OPEN_AND_READ);
+			m_engine->getFileSystem().getDiskDevice(), path.c_str(), FS::Mode::OPEN_AND_READ);
 		if (file)
 		{
-			JsonSerializer serializer(
-				*file, JsonSerializer::READ, path.c_str(), m_allocator);
+			JsonSerializer serializer(*file, JsonSerializer::READ, path.c_str(), m_allocator);
 			serializer.deserializeObjectBegin();
 			serializer.deserializeArrayBegin("commands");
 			while (!serializer.isArrayEnd())
