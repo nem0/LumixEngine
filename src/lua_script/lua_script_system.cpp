@@ -108,6 +108,7 @@ public:
 		auto* scene = m_universe_context.getScene(crc32("physics"));
 		auto* physics_scene = static_cast<PhysicsScene*>(scene);
 		physics_scene->onContact().bind<LuaScriptSceneImpl, &LuaScriptSceneImpl::onContact>(this);
+		m_first_free_script = -1;
 	}
 
 
@@ -132,6 +133,7 @@ public:
 		}
 		m_entity_script_map.clear();
 		m_scripts.clear();
+		m_first_free_script = -1;
 	}
 
 
@@ -424,27 +426,39 @@ public:
 	{
 		if (type == LUA_SCRIPT_HASH)
 		{
-			ScriptComponent& script = *LUMIX_NEW(m_system.getAllocator(), ScriptComponent)(m_system.getAllocator());
+			ScriptComponent& script =
+				*LUMIX_NEW(m_system.getAllocator(), ScriptComponent)(m_system.getAllocator());
 			m_entity_script_map.insert(entity, &script);
-			m_scripts.push(&script);
+			ComponentIndex cmp = -1;
+			if (m_first_free_script >= 0)
+			{
+				int next_free = *(int*)&m_scripts[m_first_free_script];
+				m_scripts[m_first_free_script] = &script;
+				cmp = m_first_free_script;
+				m_first_free_script = next_free;
+			}
+			else
+			{
+				cmp = m_scripts.size();
+				m_scripts.push(&script);
+			}
 			script.m_entity = entity;
 			script.m_script = nullptr;
 			script.m_state = nullptr;
-			m_universe_context.m_universe->addComponent(
-				entity, type, this, m_scripts.size() - 1);
+			m_universe_context.m_universe->addComponent(entity, type, this, cmp);
 			return m_scripts.size() - 1;
 		}
 		return INVALID_COMPONENT;
 	}
 
 
-	void destroyComponent(ComponentIndex component,
-								  uint32 type) override
+	void destroyComponent(ComponentIndex component, uint32 type) override
 	{
 		if (type == LUA_SCRIPT_HASH)
 		{
 			m_updates.eraseItem(m_scripts[component]);
-			if (m_scripts[component]->m_script) m_system.getScriptManager().unload(*m_scripts[component]->m_script);
+			if (m_scripts[component]->m_script)
+				m_system.getScriptManager().unload(*m_scripts[component]->m_script);
 			m_entity_script_map.erase(m_scripts[component]->m_entity);
 
 			auto* script = m_scripts[component];
@@ -452,6 +466,16 @@ public:
 			m_universe_context.m_universe->destroyComponent(
 				script->m_entity, type, this, component);
 			LUMIX_DELETE(m_system.getAllocator(), script);
+			if (m_first_free_script >= 0)
+			{
+				*(int*)&m_scripts[component] = m_first_free_script;
+				m_first_free_script = component;
+			}
+			else
+			{
+				m_first_free_script = component;
+				*(int*)&m_scripts[m_first_free_script] = -1;
+			}
 		}
 	}
 
@@ -598,6 +622,7 @@ private:
 	lua_State* m_global_state;
 	UniverseContext& m_universe_context;
 	Array<ScriptComponent*> m_updates;
+	int m_first_free_script;
 };
 
 
