@@ -177,7 +177,11 @@ public:
 				}
 				ImGui::Separator();
 
+				ImGui::Text("Version 0.19. - News");
+				ImGui::Separator();
 				ImGui::Text("Version 0.18. - News");
+				ImGui::BulletText("Collision events are sent to scripts");
+				ImGui::BulletText("Multithread safe profiler");
 				ImGui::BulletText("XBox Controller support");
 				ImGui::BulletText("Each script component has its own environment");
 				ImGui::BulletText("Pipeline's features can be enabled/disabled in GUI");

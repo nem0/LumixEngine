@@ -32,8 +32,8 @@ private:
 	{
 	public:
 		CreateTemplateCommand(WorldEditor& editor)
-			: m_entity_system(static_cast<EntityTemplateSystemImpl&>(
-				  editor.getEntityTemplateSystem()))
+			: m_entity_system(
+				  static_cast<EntityTemplateSystemImpl&>(editor.getEntityTemplateSystem()))
 			, m_editor(editor)
 			, m_name(editor.getAllocator())
 		{
@@ -41,10 +41,10 @@ private:
 
 
 		CreateTemplateCommand(WorldEditor& editor,
-							  const char* template_name,
-							  Entity entity_template)
-			: m_entity_system(static_cast<EntityTemplateSystemImpl&>(
-				  editor.getEntityTemplateSystem()))
+			const char* template_name,
+			Entity entity_template)
+			: m_entity_system(
+				  static_cast<EntityTemplateSystemImpl&>(editor.getEntityTemplateSystem()))
 			, m_name(template_name, editor.getAllocator())
 			, m_entity(entity_template)
 			, m_editor(editor)
@@ -155,8 +155,7 @@ private:
 
 		void deserialize(JsonSerializer& serializer) override
 		{
-			serializer.deserialize(
-				"template_name_hash", m_template_name_hash, 0);
+			serializer.deserialize("template_name_hash", m_template_name_hash, 0);
 			serializer.deserialize("entity", m_entity, -1);
 			serializer.deserialize("position_x", m_position.x, 0);
 			serializer.deserialize("position_y", m_position.y, 0);
@@ -170,22 +169,19 @@ private:
 
 		bool execute() override
 		{
-			int instance_index =
-				m_entity_system.m_instances.find(m_template_name_hash);
+			int instance_index = m_entity_system.m_instances.find(m_template_name_hash);
 			if (instance_index >= 0)
 			{
 				Universe* universe = m_entity_system.m_editor.getUniverse();
 				m_entity = universe->createEntity(m_position, m_rotation);
 
 				m_entity_system.m_instances.at(instance_index).push(m_entity);
-				Entity template_entity =
-					m_entity_system.m_instances.at(instance_index)[0];
+				Entity template_entity = m_entity_system.m_instances.at(instance_index)[0];
 				const WorldEditor::ComponentList& template_cmps =
 					m_editor.getComponents(template_entity);
 				for (int i = 0; i < template_cmps.size(); ++i)
 				{
-					m_entity_system.m_editor.cloneComponent(template_cmps[i],
-															m_entity);
+					m_entity_system.m_editor.cloneComponent(template_cmps[i], m_entity);
 				}
 			}
 			else
@@ -198,8 +194,7 @@ private:
 
 		void undo() override
 		{
-			const WorldEditor::ComponentList& cmps =
-				m_editor.getComponents(m_entity);
+			const WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entity);
 			for (int i = 0; i < cmps.size(); ++i)
 			{
 				cmps[i].scene->destroyComponent(cmps[i].index, cmps[i].type);
@@ -214,8 +209,7 @@ private:
 
 		uint32 getType() override
 		{
-			static const uint32 hash =
-				crc32("create_entity_template_instance");
+			static const uint32 hash = crc32("create_entity_template_instance");
 			return hash;
 		}
 
@@ -240,18 +234,14 @@ public:
 		, m_template_names(editor.getAllocator())
 	{
 		editor.universeCreated()
-			.bind<EntityTemplateSystemImpl,
-				  &EntityTemplateSystemImpl::onUniverseCreated>(this);
+			.bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
 		editor.universeDestroyed()
-			.bind<EntityTemplateSystemImpl,
-				  &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
+			.bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
 		setUniverse(editor.getUniverse());
-		editor.registerEditorCommandCreator(
-			"create_entity_template_instance",
+		editor.registerEditorCommandCreator("create_entity_template_instance",
 			&EntityTemplateSystemImpl::createCreateInstanceCommand);
 		editor.registerEditorCommandCreator(
-			"create_entity_template",
-			&EntityTemplateSystemImpl::createCreateTemplateCommand);
+			"create_entity_template", &EntityTemplateSystemImpl::createCreateTemplateCommand);
 	}
 
 
@@ -270,11 +260,9 @@ public:
 	~EntityTemplateSystemImpl()
 	{
 		m_editor.universeCreated()
-			.unbind<EntityTemplateSystemImpl,
-					&EntityTemplateSystemImpl::onUniverseCreated>(this);
+			.unbind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
 		m_editor.universeDestroyed()
-			.unbind<EntityTemplateSystemImpl,
-					&EntityTemplateSystemImpl::onUniverseDestroyed>(this);
+			.unbind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
 		setUniverse(nullptr);
 	}
 
@@ -287,15 +275,14 @@ public:
 		if (m_universe)
 		{
 			m_universe->entityDestroyed()
-				.unbind<EntityTemplateSystemImpl,
-						&EntityTemplateSystemImpl::onEntityDestroyed>(this);
+				.unbind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onEntityDestroyed>(
+					this);
 		}
 		m_universe = universe;
 		if (m_universe)
 		{
 			m_universe->entityDestroyed()
-				.bind<EntityTemplateSystemImpl,
-					  &EntityTemplateSystemImpl::onEntityDestroyed>(this);
+				.bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onEntityDestroyed>(this);
 		}
 	}
 
@@ -361,8 +348,7 @@ public:
 	}
 
 
-	void createTemplateFromEntity(const char* name,
-										  Entity entity) override
+	void createTemplateFromEntity(const char* name, Entity entity) override
 	{
 		CreateTemplateCommand* command =
 			LUMIX_NEW(m_editor.getAllocator(), CreateTemplateCommand)(m_editor, name, entity);
@@ -387,22 +373,19 @@ public:
 	}
 
 
-	const Array<Entity>&
-	getInstances(uint32 template_name_hash) override
+	const Array<Entity>& getInstances(uint32 template_name_hash) override
 	{
 		int instances_index = m_instances.find(template_name_hash);
 		if (instances_index < 0)
 		{
-			m_instances.insert(template_name_hash,
-							   Array<Entity>(m_editor.getAllocator()));
+			m_instances.insert(template_name_hash, Array<Entity>(m_editor.getAllocator()));
 			instances_index = m_instances.find(template_name_hash);
 		}
 		return m_instances.at(instances_index);
 	}
 
 
-	Entity createInstance(const char* name,
-								  const Vec3& position) override
+	Entity createInstance(const char* name, const Vec3& position) override
 	{
 		CreateInstanceCommand* command = LUMIX_NEW(m_editor.getAllocator(), CreateInstanceCommand)(
 			*this, m_editor, name, position);
@@ -465,10 +448,7 @@ public:
 	}
 
 
-	Array<string>& getTemplateNames() override
-	{
-		return m_template_names;
-	}
+	Array<string>& getTemplateNames() override { return m_template_names; }
 
 
 	DelegateList<void()>& updated() override { return m_updated; }
