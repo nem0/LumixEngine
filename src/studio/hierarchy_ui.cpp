@@ -11,6 +11,14 @@
 class SetParentEditorCommand : public Lumix::IEditorCommand
 {
 public:
+	SetParentEditorCommand(Lumix::WorldEditor& editor)
+		: m_editor(editor)
+		, m_hierarchy(*editor.getHierarchy())
+
+	{
+	}
+
+
 	SetParentEditorCommand(Lumix::WorldEditor& editor,
 		Lumix::Hierarchy& hierarchy,
 		Lumix::Entity child,
@@ -116,6 +124,18 @@ void HierarchyUI::onGUI()
 	ImGui::End();
 }
 
+
+static Lumix::IEditorCommand* createSetParentEditorCommand(Lumix::WorldEditor& editor)
+{
+	return LUMIX_NEW(editor.getAllocator(), SetParentEditorCommand)(editor);
+}
+
+
+void HierarchyUI::setWorldEditor(Lumix::WorldEditor& editor)
+{
+	m_editor = &editor;
+	editor.registerEditorCommandCreator("set_entity_parent", createSetParentEditorCommand);
+}
 
 
 void HierarchyUI::showHierarchy(Lumix::Entity entity, bool has_parent)
