@@ -119,22 +119,21 @@ private:
 	{
 	public:
 		CreateInstanceCommand(WorldEditor& editor)
-			: m_entity_system(static_cast<EntityTemplateSystemImpl&>(
-				  editor.getEntityTemplateSystem()))
+			: m_entity_system(
+				  static_cast<EntityTemplateSystemImpl&>(editor.getEntityTemplateSystem()))
 			, m_editor(editor)
 		{
 		}
 
 
 		CreateInstanceCommand(EntityTemplateSystemImpl& entity_system,
-							  WorldEditor& editor,
-							  const char* template_name,
-							  const Vec3& position)
+			WorldEditor& editor,
+			const char* template_name,
+			const Vec3& position)
 			: m_entity_system(entity_system)
 			, m_template_name_hash(crc32(template_name))
 			, m_position(position)
-			, m_rotation(Vec3(0, 1, 0),
-						 Math::degreesToRadians((float)(rand() % 360)))
+			, m_rotation(Vec3(0, 1, 0), Math::degreesToRadians((float)(rand() % 360)))
 			, m_editor(editor)
 		{
 		}
