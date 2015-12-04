@@ -22,12 +22,21 @@ test_script:
 
 after_build:
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\animation.dll
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\audio.dll
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\editor.dll
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\engine.dll
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\lua_script.dll
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\physics.dll
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\renderer.dll
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\studio.exe
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\animation.pdb
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\audio.pdb
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\editor.pdb
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\engine.pdb
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\lua_script.pdb
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\physics.pdb
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\renderer.pdb
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\studio.pdb
 
 artifacts:
 - path: tests.xml
