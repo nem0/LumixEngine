@@ -18,6 +18,7 @@ project(LumixEngine)
 set(LUMIX_ROOT_PATH ${PROJECT_SOURCE_DIR}/../)
 set(SRC_PATH ${LUMIX_ROOT_PATH}src/)
 set(EXTERNAL_PATH ${LUMIX_ROOT_PATH}external/)
+set(CONFIG_DIR $<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>)
 
 ###################### ENGINE ######################
 
@@ -61,9 +62,11 @@ add_library(engine SHARED
 )
 
 set_target_properties (engine PROPERTIES COMPILE_DEFINITIONS "BUILDING_ENGINE")
+set_target_properties (engine PROPERTIES COMPILE_DEFINITIONS "BUILDING_ENGINE")
+
 
 target_link_libraries(engine psapi)
-target_link_libraries(engine ${EXTERNAL_PATH}lua/lib/vs2013/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
+target_link_libraries(engine ${EXTERNAL_PATH}lua/lib/vs2013/${PLATFORM_DIR}/${CONFIG_DIR}/lua.lib)
 
 ###################### RENDERER ######################
 
@@ -83,8 +86,9 @@ add_library(renderer SHARED
 set_target_properties (renderer PROPERTIES COMPILE_DEFINITIONS "BUILDING_RENDERER")
 
 target_link_libraries(renderer engine)
-target_link_libraries(renderer ${EXTERNAL_PATH}lua/lib/vs2013/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
-target_link_libraries(renderer ${EXTERNAL_PATH}bgfx/lib/vs2013/${PLATFORM_DIR}/bgfx${CMAKE_CFG_INTDIR}.lib)
+
+target_link_libraries(renderer ${EXTERNAL_PATH}lua/lib/vs2013/${PLATFORM_DIR}/${CONFIG_DIR}/lua.lib)
+target_link_libraries(renderer ${EXTERNAL_PATH}bgfx/lib/vs2013/${PLATFORM_DIR}/bgfx${CONFIG_DIR}.lib)
 
 ###################### AUDIO ######################
 
@@ -155,6 +159,7 @@ add_library(script SHARED
 
 set_target_properties (script PROPERTIES COMPILE_DEFINITIONS "BUILDING_SCRIPT")
 
+
 target_link_libraries(script engine)
 ]]
 
@@ -171,6 +176,7 @@ add_library(animation SHARED
 )
 
 set_target_properties (animation PROPERTIES COMPILE_DEFINITIONS "BUILDING_ANIMATION")
+
 
 target_link_libraries(animation engine)
 target_link_libraries(animation renderer)
@@ -189,6 +195,7 @@ add_library(editor SHARED
 )
 
 set_target_properties (editor PROPERTIES COMPILE_DEFINITIONS "BUILDING_EDITOR")
+
 
 target_link_libraries(editor engine)
 target_link_libraries(editor renderer)
@@ -220,6 +227,7 @@ add_executable(unit_tests
 )
 
 set_target_properties(unit_tests PROPERTIES LINK_FLAGS "/SUBSYSTEM:CONSOLE")
+
 
 target_link_libraries(unit_tests engine)
 target_link_libraries(unit_tests animation)
@@ -270,12 +278,16 @@ add_executable(studio
 add_dependencies(studio audio engine animation physics renderer lua_script editor)
 
 set_target_properties(studio PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
+
+
 target_link_libraries(studio engine)
 target_link_libraries(studio audio)
 target_link_libraries(studio renderer)
 target_link_libraries(studio editor)
-target_link_libraries(studio ${EXTERNAL_PATH}assimp/lib/vs2013/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/assimp.lib)
-target_link_libraries(studio ${EXTERNAL_PATH}crunch/lib/vs2013/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/crnlib.lib)
+
+target_link_libraries(studio ${EXTERNAL_PATH}assimp/lib/vs2013/${PLATFORM_DIR}/${CONFIG_DIR}/assimp.lib)
+target_link_libraries(studio ${EXTERNAL_PATH}crunch/lib/vs2013/${PLATFORM_DIR}/${CONFIG_DIR}/crnlib.lib)
+
 target_link_libraries(studio winmm.lib)
 
 
@@ -295,16 +307,18 @@ add_library(lua_script SHARED
 
 set_target_properties (lua_script PROPERTIES COMPILE_DEFINITIONS "BUILDING_LUA_SCRIPT")
 
-target_link_libraries(lua_script ${EXTERNAL_PATH}lua/lib/vs2013/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
+
+target_link_libraries(lua_script ${EXTERNAL_PATH}lua/lib/vs2013/${PLATFORM_DIR}/${CONFIG_DIR}/lua.lib)
 target_link_libraries(lua_script engine)
 target_link_libraries(lua_script renderer)
 
 
 ###################### COPY_DLLS ######################
 
+
 add_custom_command(TARGET studio POST_BUILD        
     COMMAND ${CMAKE_COMMAND} -E copy_if_different  
-        "${EXTERNAL_PATH}assimp/dll/vs2013/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/assimp.dll"
+        "${EXTERNAL_PATH}assimp/dll/vs2013/${PLATFORM_DIR}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/assimp.dll"
         $<TARGET_FILE_DIR:studio>)
 
 if(${IS64})
