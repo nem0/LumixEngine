@@ -5,6 +5,9 @@
 #include "engine/iplugin.h"
 
 
+struct lua_State;
+
+
 namespace Lumix
 {
 
@@ -26,6 +29,8 @@ public:
 		uint32 m_name_hash;
 	};
 
+	typedef int (*lua_CFunction) (lua_State *L);
+
 public:
 	virtual const char* getScriptPath(ComponentIndex cmp) = 0;	
 	virtual void setScriptPath(ComponentIndex cmp, const char* path) = 0;
@@ -33,6 +38,7 @@ public:
 	virtual const char* getPropertyName(ComponentIndex cmp, int index) const = 0;
 	virtual const char* getPropertyValue(ComponentIndex cmp, int index) const = 0;
 	virtual LuaScript* getScriptResource(ComponentIndex cmp) const = 0;
+	virtual void registerFunction(const char* name, lua_CFunction function) = 0;
 	virtual void setPropertyValue(ComponentIndex cmp,
 		const char* name,
 		const char* value) = 0;

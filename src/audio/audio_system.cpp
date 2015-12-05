@@ -50,7 +50,7 @@ struct AudioSystemImpl : public AudioSystem
 
 	IScene* createScene(UniverseContext& ctx)
 	{
-		return AudioScene::createInstance(*this, *ctx.m_universe, m_engine.getAllocator());
+		return AudioScene::createInstance(*this, ctx, m_engine.getAllocator());
 	}
 
 
