@@ -126,7 +126,7 @@ struct CustomErrorCallback : public physx::PxErrorCallback
 
 IScene* PhysicsSystemImpl::createScene(UniverseContext& ctx)
 {
-	return PhysicsScene::create(*this, *ctx.m_universe, m_engine, m_allocator);
+	return PhysicsScene::create(*this, ctx, m_engine, m_allocator);
 }
 
 

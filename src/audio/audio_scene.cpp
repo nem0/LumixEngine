@@ -110,6 +110,31 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
+	void sendMessage(uint32 type, void*) override
+	{
+		static const uint32 register_hash = crc32("registerLuaAPI");
+		if (type == register_hash)
+		{
+			registerLuaAPI();
+		}
+	}
+
+
+	void registerLuaAPI()
+	{
+		auto* scene = m_universe_context.getScene(crc32("lua_script"));
+		if (!scene) return;
+
+		auto* script_scene = static_cast<LuaScriptScene*>(scene);
+		script_scene->registerFunction(
+			"API_setEcho", LuaWrapper::wrap<decltype(&LuaAPI::setEcho), LuaAPI::setEcho>);
+		script_scene->registerFunction(
+			"API_playSound", LuaWrapper::wrap<decltype(&LuaAPI::playSound), LuaAPI::playSound>);
+		script_scene->registerFunction(
+			"API_setSoundVolume", LuaWrapper::wrap<decltype(&LuaAPI::setSoundVolume), LuaAPI::setSoundVolume>);
+	}
+
+
 	void update(float time_delta) override
 	{
 		if (m_listener.entity != INVALID_ENTITY)
@@ -155,25 +180,8 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	void registerLuaAPI()
-	{
-		auto* scene = m_universe_context.getScene(crc32("lua_script"));
-		if (!scene) return;
-
-		auto* script_scene = static_cast<LuaScriptScene*>(scene);
-		script_scene->registerFunction(
-			"API_setEcho", LuaWrapper::wrap<decltype(&LuaAPI::setEcho), LuaAPI::setEcho>);
-		script_scene->registerFunction(
-			"API_playSound", LuaWrapper::wrap<decltype(&LuaAPI::playSound), LuaAPI::playSound>);
-		script_scene->registerFunction(
-			"API_setSoundVolume", LuaWrapper::wrap<decltype(&LuaAPI::setSoundVolume), LuaAPI::setSoundVolume>);
-	}
-
-
 	void startGame() override
 	{
-		registerLuaAPI();
-
 		for (auto& i : m_ambient_sounds)
 		{
 			if (i.clip) i.playing_sound = play(i.entity, i.clip, i.is_3d);

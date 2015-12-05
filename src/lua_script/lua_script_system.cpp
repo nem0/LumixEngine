@@ -24,24 +24,6 @@ namespace Lumix
 {
 
 
-namespace LuaAPI
-{
-
-
-static void moveController(IScene* scene,
-	int component,
-	float x,
-	float y,
-	float z,
-	float time_delta)
-{
-	static_cast<PhysicsScene*>(scene)->moveController(component, Vec3(x, y, z), time_delta);
-}
-
-
-} // namespace LuaAPI
-
-
 static const uint32 SCRIPT_HASH = Lumix::crc32("script");
 
 
@@ -119,7 +101,7 @@ public:
 		physics_scene->onContact().unbind<LuaScriptSceneImpl, &LuaScriptSceneImpl::onContact>(this);
 	}
 
-
+	
 	void registerFunction(const char* name, lua_CFunction function) override
 	{
 		lua_pushcfunction(m_global_state, function);
@@ -193,21 +175,14 @@ public:
 	}
 
 
-	void registerPhysicsLuaAPI(lua_State* L)
-	{
-		registerCFunction(L,
-			"API_moveController",
-			LuaWrapper::wrap<decltype(&LuaAPI::moveController), LuaAPI::moveController>);
-	}
-
-
 	void registerAPI(lua_State* L)
 	{
 		registerUniverse(&m_universe_context, L);
 		registerEngineLuaAPI(m_system.m_engine, L);
-		if (m_system.m_engine.getPluginManager().getPlugin("physics"))
+		uint32 register_msg = crc32("registerLuaAPI");
+		for (auto* i : m_universe_context.m_scenes)
 		{
-			registerPhysicsLuaAPI(L);
+			i->sendMessage(register_msg, nullptr);
 		}
 	}
 
