@@ -29,7 +29,7 @@ public:
 
 public:
 	static AudioScene* createInstance(AudioSystem& system,
-		Universe& universe,
+		UniverseContext& universe,
 		class IAllocator& allocator);
 	static void destroyInstance(AudioScene* scene);
 

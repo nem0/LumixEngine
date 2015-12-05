@@ -50,7 +50,6 @@ class LuaScriptSystemImpl;
 
 void registerEngineLuaAPI(Engine&, lua_State* L);
 void registerUniverse(UniverseContext*, lua_State* L);
-void registerAudioLuaAPI(Engine&, Universe&, lua_State* L);
 
 
 
@@ -118,6 +117,13 @@ public:
 		auto* scene = m_universe_context.getScene(crc32("physics"));
 		auto* physics_scene = static_cast<PhysicsScene*>(scene);
 		physics_scene->onContact().unbind<LuaScriptSceneImpl, &LuaScriptSceneImpl::onContact>(this);
+	}
+
+
+	void registerFunction(const char* name, lua_CFunction function) override
+	{
+		lua_pushcfunction(m_global_state, function);
+		lua_setglobal(m_global_state, name);
 	}
 
 
@@ -202,10 +208,6 @@ public:
 		if (m_system.m_engine.getPluginManager().getPlugin("physics"))
 		{
 			registerPhysicsLuaAPI(L);
-		}
-		if (m_system.m_engine.getPluginManager().getPlugin("audio"))
-		{
-			registerAudioLuaAPI(m_system.m_engine, *m_universe_context.m_universe, L);
 		}
 	}
 

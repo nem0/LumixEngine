@@ -5,14 +5,52 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/iallocator.h"
+#include "core/lua_wrapper.h"
 #include "core/matrix.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "engine/engine.h"
+#include "lua_script/lua_script_system.h"
 #include "universe/universe.h"
 
 
 namespace Lumix
 {
+
+
+namespace LuaAPI
+{
+
+
+static int playSound(IScene* scene, int entity, const char* clip_name, bool is_3d)
+{
+	auto* audio_scene = static_cast<AudioScene*>(scene);
+	auto* clip = audio_scene->getClipInfo(clip_name);
+	if (clip) return audio_scene->play(entity, clip, is_3d);
+
+	return -1;
+}
+
+
+static void setSoundVolume(IScene* scene, int sound_id, float volume)
+{
+	static_cast<AudioScene*>(scene)->setVolume(sound_id, volume);
+}
+
+
+static void setEcho(IScene* scene,
+	int sound_id,
+	float wet_dry_mix,
+	float feedback,
+	float left_delay,
+	float right_delay)
+{
+	static_cast<AudioScene*>(scene)->setEcho(
+		sound_id, wet_dry_mix, feedback, left_delay, right_delay);
+}
+
+
+} // namespace LuaAPI
 
 
 static const uint32 LISTENER_HASH = crc32("audio_listener");
@@ -47,9 +85,10 @@ struct PlayingSound
 
 struct AudioSceneImpl : public AudioScene
 {
-	AudioSceneImpl(AudioSystem& system, Universe& universe, IAllocator& allocator)
+	AudioSceneImpl(AudioSystem& system, UniverseContext& context, IAllocator& allocator)
 		: m_allocator(allocator)
-		, m_universe(universe)
+		, m_universe(*context.m_universe)
+		, m_universe_context(context)
 		, m_clips(allocator)
 		, m_system(system)
 		, m_device(system.getDevice())
@@ -116,8 +155,25 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
+	void registerLuaAPI()
+	{
+		auto* scene = m_universe_context.getScene(crc32("lua_script"));
+		if (!scene) return;
+
+		auto* script_scene = static_cast<LuaScriptScene*>(scene);
+		script_scene->registerFunction(
+			"API_setEcho", LuaWrapper::wrap<decltype(&LuaAPI::setEcho), LuaAPI::setEcho>);
+		script_scene->registerFunction(
+			"API_playSound", LuaWrapper::wrap<decltype(&LuaAPI::playSound), LuaAPI::playSound>);
+		script_scene->registerFunction(
+			"API_setSoundVolume", LuaWrapper::wrap<decltype(&LuaAPI::setSoundVolume), LuaAPI::setSoundVolume>);
+	}
+
+
 	void startGame() override
 	{
+		registerLuaAPI();
+
 		for (auto& i : m_ambient_sounds)
 		{
 			if (i.clip) i.playing_sound = play(i.entity, i.clip, i.is_3d);
@@ -483,6 +539,7 @@ struct AudioSceneImpl : public AudioScene
 	Listener m_listener;
 	IAllocator& m_allocator;
 	Universe& m_universe;
+	UniverseContext& m_universe_context;
 	Array<ClipInfo*> m_clips;
 	AudioSystem& m_system;
 	PlayingSound m_playing_sounds[AudioDevice::MAX_PLAYING_SOUNDS];
@@ -490,10 +547,10 @@ struct AudioSceneImpl : public AudioScene
 
 
 AudioScene* AudioScene::createInstance(AudioSystem& system,
-	Universe& universe,
+	UniverseContext& universe_context,
 	IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, AudioSceneImpl)(system, universe, allocator);
+	return LUMIX_NEW(allocator, AudioSceneImpl)(system, universe_context, allocator);
 }
 
 
