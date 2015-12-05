@@ -6,12 +6,14 @@
 #include "core/fs/ifile.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
+#include "core/lua_wrapper.h"
 #include "core/matrix.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "engine.h"
+#include "lua_script/lua_script_system.h"
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
 #include "physics/physics_system.h"
@@ -28,6 +30,24 @@ static const uint32 BOX_ACTOR_HASH = crc32("box_rigid_actor");
 static const uint32 MESH_ACTOR_HASH = crc32("mesh_rigid_actor");
 static const uint32 CONTROLLER_HASH = crc32("physical_controller");
 static const uint32 HEIGHTFIELD_HASH = crc32("physical_heightfield");
+
+
+namespace LuaAPI
+{
+
+
+	static void moveController(IScene* scene,
+		int component,
+		float x,
+		float y,
+		float z,
+		float time_delta)
+	{
+		static_cast<PhysicsScene*>(scene)->moveController(component, Vec3(x, y, z), time_delta);
+	}
+
+
+} // namespace LuaAPI
 
 
 struct OutputStream : public physx::PxOutputStream
@@ -204,13 +224,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 	};
 
 
-	PhysicsSceneImpl(Universe& universe, IAllocator& allocator)
+	PhysicsSceneImpl(UniverseContext& context, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_controllers(m_allocator)
 		, m_actors(m_allocator)
 		, m_terrains(m_allocator)
 		, m_dynamic_actors(m_allocator)
-		, m_universe(universe)
+		, m_universe(*context.m_universe)
+		, m_universe_context(context)
 		, m_is_game_running(false)
 		, m_contact_callback(*this)
 		, m_on_contact(m_allocator)
@@ -227,6 +248,16 @@ struct PhysicsSceneImpl : public PhysicsScene
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
 			LUMIX_DELETE(m_allocator, m_terrains[i]);
+		}
+	}
+
+
+	void sendMessage(uint32 type, void*) override
+	{
+		static const uint32 register_hash = crc32("registerLuaAPI");
+		if (type == register_hash)
+		{
+			registerLuaAPI();
 		}
 	}
 
@@ -568,6 +599,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 		fetchResults();
 		updateDynamicActors();
 		updateControllers(time_delta);
+	}
+
+
+	void registerLuaAPI()
+	{
+		auto* scene = m_universe_context.getScene(crc32("lua_script"));
+		if (!scene) return;
+
+		auto* script_scene = static_cast<LuaScriptScene*>(scene);
+		script_scene->registerFunction("API_moveController",
+			LuaWrapper::wrap<decltype(&LuaAPI::moveController), LuaAPI::moveController>);
 	}
 
 
@@ -1226,6 +1268,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	IAllocator& m_allocator;
 
 	Universe& m_universe;
+	UniverseContext& m_universe_context;
 	Engine* m_engine;
 	ContactCallback m_contact_callback;
 	physx::PxScene* m_scene;
@@ -1243,11 +1286,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 
 PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
-	Universe& universe,
+	UniverseContext& context,
 	Engine& engine,
 	IAllocator& allocator)
 {
-	PhysicsSceneImpl* impl = LUMIX_NEW(allocator, PhysicsSceneImpl)(universe, allocator);
+	PhysicsSceneImpl* impl = LUMIX_NEW(allocator, PhysicsSceneImpl)(context, allocator);
 	impl->m_universe.entityTransformed().bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityMoved>(
 		impl);
 	impl->m_engine = &engine;

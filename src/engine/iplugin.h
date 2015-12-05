@@ -30,6 +30,7 @@ namespace Lumix
 			virtual void startGame() {}
 			virtual void stopGame() {}
 			virtual int getVersion() const { return -1; }
+			virtual void sendMessage(uint32 /*type*/, void* /*message*/) {}
 	};
 
 
@@ -44,7 +45,7 @@ namespace Lumix
 			virtual void deserialize(InputBlob&) {}
 			virtual void update(float) {}
 			virtual const char* getName() const = 0;
-			virtual void sendMessage(const char*) {};
+			virtual void sendMessage(const char*) {}
 
 			virtual IScene* createScene(UniverseContext&) { return nullptr; }
 			virtual void destroyScene(IScene*) { ASSERT(false); }

@@ -29,7 +29,7 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 {
 	friend class PhysicsSystem;
 	public:
-		static PhysicsScene* create(PhysicsSystem& system, Universe& universe, Engine& engine, IAllocator& allocator);
+		static PhysicsScene* create(PhysicsSystem& system, UniverseContext& context, Engine& engine, IAllocator& allocator);
 		static void destroy(PhysicsScene* scene);
 		
 		virtual ~PhysicsScene() {}
