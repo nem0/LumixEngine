@@ -36,15 +36,39 @@ namespace LuaAPI
 {
 
 
-	static void moveController(IScene* scene,
-		int component,
-		float x,
-		float y,
-		float z,
-		float time_delta)
-	{
-		static_cast<PhysicsScene*>(scene)->moveController(component, Vec3(x, y, z), time_delta);
-	}
+static float getActorSpeed(IScene* scene, ComponentIndex component)
+{
+	return static_cast<PhysicsScene*>(scene)->getActorSpeed(component);
+}
+
+
+static void moveController(IScene* scene,
+	ComponentIndex component,
+	float x,
+	float y,
+	float z,
+	float time_delta)
+{
+	static_cast<PhysicsScene*>(scene)->moveController(component, Vec3(x, y, z), time_delta);
+}
+
+
+static ComponentIndex getActorComponent(IScene* scene, Entity entity)
+{
+	return static_cast<PhysicsScene*>(scene)->getActorComponent(entity);
+}
+
+
+static void putToSleep(IScene* scene, Entity entity)
+{
+	static_cast<PhysicsScene*>(scene)->putToSleep(entity);
+}
+
+
+static void applyForceToActor(IScene* scene, int component, float x, float y, float z)
+{
+	static_cast<PhysicsScene*>(scene)->applyForceToActor(component, Vec3(x, y, z));
+}
 
 
 } // namespace LuaAPI
@@ -165,11 +189,15 @@ struct PhysicsSceneImpl : public PhysicsScene
 			const physx::PxContactPair* pairs,
 			physx::PxU32 nbPairs) override
 		{
+			physx::PxContactPairPoint contacts[32];
+
 			for (physx::PxU32 i = 0; i < nbPairs; i++)
 			{
 				const auto& cp = pairs[i];
 
 				if (!(cp.events & physx::PxPairFlag::eNOTIFY_TOUCH_FOUND)) continue;
+
+				auto contact_count = cp.extractContacts(contacts, Lumix::lengthOf(contacts));
 
 				m_scene.m_on_contact.invoke(
 					(Entity)pairHeader.actors[0]->userData, (Entity)pairHeader.actors[1]->userData);
@@ -202,6 +230,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			: m_resource(nullptr)
 			, m_physx_actor(nullptr)
 			, m_scene(scene)
+			, m_is_dynamic(false)
 		{
 		}
 
@@ -211,6 +240,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		void setPhysxActor(physx::PxRigidActor* actor);
 		physx::PxRigidActor* getPhysxActor() const { return m_physx_actor; }
 		PhysicsGeometry* getResource() const { return m_resource; }
+		bool isDynamic() const { return m_is_dynamic; }
+		void setDynamic(bool dynamic) { m_is_dynamic = dynamic; }
 
 	private:
 		void onStateChanged(Resource::State old_state,
@@ -221,6 +252,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		PhysicsGeometry* m_resource;
 		Entity m_entity;
 		PhysicsSceneImpl& m_scene;
+		bool m_is_dynamic;
 	};
 
 
@@ -235,7 +267,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		, m_is_game_running(false)
 		, m_contact_callback(*this)
 		, m_on_contact(m_allocator)
+		, m_queued_forces(m_allocator)
 	{
+		m_queued_forces.reserve(64);
+
 	}
 
 
@@ -292,8 +327,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	IPlugin& getPlugin() const override { return *m_system; }
 
 
-	ComponentIndex createComponent(uint32 component_type,
-										   Entity entity) override
+	ComponentIndex createComponent(uint32 component_type, Entity entity) override
 	{
 		if (component_type == HEIGHTFIELD_HASH)
 		{
@@ -590,15 +624,47 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	void applyQueuedForces()
+	{
+		for (auto& i : m_queued_forces)
+		{
+			auto* actor = m_actors[i.cmp];
+			if (!actor->isDynamic())
+			{
+				g_log_warning.log("physics") << "Trying to apply force to static object";
+				return;
+			}
+
+			auto* physx_actor = static_cast<physx::PxRigidDynamic*>(actor->getPhysxActor());
+			if (!physx_actor) return;
+			physx::PxVec3 f(i.force.x, i.force.y, i.force.z);
+			physx_actor->addForce(f);
+		}
+		m_queued_forces.clear();
+	}
+
+
 	void update(float time_delta) override
 	{
 		if (!m_is_game_running) return;
 		
+		applyQueuedForces();
+
 		time_delta = Math::minValue(0.01f, time_delta);
 		simulateScene(time_delta);
 		fetchResults();
 		updateDynamicActors();
 		updateControllers(time_delta);
+	}
+
+
+	ComponentIndex getActorComponent(Entity entity) override
+	{
+		for (int i = 0; i < m_actors.size(); ++i)
+		{
+			if (m_actors[i]->getEntity() == entity) return i;
+		}
+		return -1;
 	}
 
 
@@ -610,6 +676,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto* script_scene = static_cast<LuaScriptScene*>(scene);
 		script_scene->registerFunction("API_moveController",
 			LuaWrapper::wrap<decltype(&LuaAPI::moveController), LuaAPI::moveController>);
+		script_scene->registerFunction("API_applyForceToActor",
+			LuaWrapper::wrap<decltype(&LuaAPI::applyForceToActor), LuaAPI::applyForceToActor>);
+		script_scene->registerFunction("API_getActorComponent",
+			LuaWrapper::wrap<decltype(&LuaAPI::getActorComponent), LuaAPI::getActorComponent>);
+		script_scene->registerFunction("API_putToSleep",
+			LuaWrapper::wrap<decltype(&LuaAPI::putToSleep), LuaAPI::putToSleep>);
+		script_scene->registerFunction("API_getActorSpeed",
+			LuaWrapper::wrap<decltype(&LuaAPI::getActorSpeed), LuaAPI::getActorSpeed>);
 	}
 
 
@@ -893,19 +967,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void setIsDynamic(ComponentIndex cmp, bool new_value) override
 	{
-		int dynamic_index = -1;
 		RigidActor* actor = m_actors[cmp];
-		for (int i = 0, c = m_dynamic_actors.size(); i < c; ++i)
-		{
-			if (m_dynamic_actors[i] == actor)
-			{
-				dynamic_index = i;
-				break;
-			}
-		}
+		int dynamic_index = m_dynamic_actors.indexOf(actor);
 		bool is_dynamic = dynamic_index != -1;
 		if (is_dynamic != new_value)
 		{
+			m_actors[cmp]->setDynamic(new_value);
 			if (new_value)
 			{
 				m_dynamic_actors.push(actor);
@@ -1117,6 +1184,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				m_dynamic_actors.push(m_actors[i]);
 			}
+			m_actors[i]->setDynamic(is_dynamic);
 
 			Entity e;
 			serializer.read(e);
@@ -1236,6 +1304,44 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	float getActorSpeed(ComponentIndex cmp) override
+	{
+		auto* actor = m_actors[cmp];
+		if (!actor->isDynamic())
+		{
+			g_log_warning.log("physics") << "Trying to get speed of static object";
+			return 0;
+		}
+
+		auto* physx_actor = static_cast<physx::PxRigidDynamic*>(actor->getPhysxActor());
+		if (!physx_actor) return 0;
+		return physx_actor->getLinearVelocity().magnitude();
+	}
+
+
+	void putToSleep(ComponentIndex cmp) override
+	{
+		auto* actor = m_actors[cmp];
+		if (!actor->isDynamic())
+		{
+			g_log_warning.log("physics") << "Trying to put static object to sleep";
+			return;
+		}
+
+		auto* physx_actor = static_cast<physx::PxRigidDynamic*>(actor->getPhysxActor());
+		if (!physx_actor) return;
+		physx_actor->putToSleep();
+	}
+
+
+	void applyForceToActor(ComponentIndex cmp, const Vec3& force) override
+	{
+		auto& i = m_queued_forces.pushEmpty();
+		i.cmp = cmp;
+		i.force = force;
+	}
+
+
 	static physx::PxFilterFlags filterShader(
 		physx::PxFilterObjectAttributes attributes0, physx::PxFilterData filterData0,
 		physx::PxFilterObjectAttributes attributes1, physx::PxFilterData filterData1,
@@ -1247,12 +1353,19 @@ struct PhysicsSceneImpl : public PhysicsScene
 			return physx::PxFilterFlag::eDEFAULT;
 		}
 
-		pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT;
+		pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT | physx::PxPairFlag::eNOTIFY_CONTACT_POINTS;
 
 		//if ((filterData0.word0 & filterData1.word1) && (filterData1.word0 & filterData0.word1))
 		pairFlags |= physx::PxPairFlag::eNOTIFY_TOUCH_FOUND;
 		return physx::PxFilterFlag::eDEFAULT;
 	}
+
+
+	struct QueuedForce
+	{
+		ComponentIndex cmp;
+		Vec3 force;
+	};
 
 
 	struct Controller
@@ -1280,6 +1393,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	bool m_is_game_running;
 	DelegateList<void(Entity, Entity)> m_on_contact;
 
+	Array<QueuedForce> m_queued_forces;
 	Array<Controller> m_controllers;
 	Array<Terrain*> m_terrains;
 };
