@@ -135,7 +135,7 @@ public:
 	}
 
 
-	void sendCollisionEvent(ScriptComponent* cmp, Entity entity)
+	void sendCollisionEvent(ScriptComponent* cmp, Entity entity, const Vec3& position)
 	{
 		ASSERT(m_global_state);
 		auto& script = *cmp;
@@ -149,7 +149,10 @@ public:
 		}
 
 		lua_pushinteger(script.m_state, entity);
-		if (lua_pcall(script.m_state, 1, 0, 0) != LUA_OK)
+		lua_pushnumber(script.m_state, position.x);
+		lua_pushnumber(script.m_state, position.y);
+		lua_pushnumber(script.m_state, position.z);
+		if (lua_pcall(script.m_state, 4, 0, 0) != LUA_OK)
 		{
 			g_log_error.log("lua") << lua_tostring(script.m_state, -1);
 			lua_pop(script.m_state, 1);
@@ -158,7 +161,7 @@ public:
 	}
 
 
-	void onContact(Entity e1, Entity e2)
+	void onContact(Entity e1, Entity e2, const Vec3& position)
 	{
 		if (!m_global_state) return;
 
@@ -166,11 +169,11 @@ public:
 		auto iter2 = m_entity_script_map.find(e2);
 		if (iter1 != m_entity_script_map.end())
 		{
-			sendCollisionEvent(iter1.value(), e2);
+			sendCollisionEvent(iter1.value(), e2, position);
 		}
 		if (iter2 != m_entity_script_map.end())
 		{
-			sendCollisionEvent(iter2.value(), e1);
+			sendCollisionEvent(iter2.value(), e1, position);
 		}
 	}
 

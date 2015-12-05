@@ -189,18 +189,18 @@ struct PhysicsSceneImpl : public PhysicsScene
 			const physx::PxContactPair* pairs,
 			physx::PxU32 nbPairs) override
 		{
-			physx::PxContactPairPoint contacts[32];
-
 			for (physx::PxU32 i = 0; i < nbPairs; i++)
 			{
 				const auto& cp = pairs[i];
 
 				if (!(cp.events & physx::PxPairFlag::eNOTIFY_TOUCH_FOUND)) continue;
 
-				auto contact_count = cp.extractContacts(contacts, Lumix::lengthOf(contacts));
+				physx::PxContactPairPoint contact;
+				auto contact_count = cp.extractContacts(&contact, 1);
 
-				m_scene.m_on_contact.invoke(
-					(Entity)pairHeader.actors[0]->userData, (Entity)pairHeader.actors[1]->userData);
+				m_scene.m_on_contact.invoke((Entity)pairHeader.actors[0]->userData,
+					(Entity)pairHeader.actors[1]->userData,
+					toVec3(contact.position));
 			}
 		}
 
@@ -1298,7 +1298,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	PhysicsSystem& getSystem() const override { return *m_system; }
 
 
-	DelegateList<void(Entity, Entity)>& onContact() override
+	DelegateList<void(Entity, Entity, const Vec3&)>& onContact() override
 	{
 		return m_on_contact;
 	}
@@ -1391,7 +1391,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	Array<RigidActor*> m_actors;
 	Array<RigidActor*> m_dynamic_actors;
 	bool m_is_game_running;
-	DelegateList<void(Entity, Entity)> m_on_contact;
+	DelegateList<void(Entity, Entity, const Vec3&)> m_on_contact;
 
 	Array<QueuedForce> m_queued_forces;
 	Array<Controller> m_controllers;
