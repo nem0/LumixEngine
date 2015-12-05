@@ -51,6 +51,11 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 		virtual float getHeightmapYScale(ComponentIndex cmp) = 0;
 		virtual void setHeightmapYScale(ComponentIndex cmp, float scale) = 0;
 		virtual DelegateList<void(Entity, Entity)>& onContact() = 0;
+		virtual ComponentIndex getActorComponent(Entity entity) = 0;
+
+		virtual void applyForceToActor(ComponentIndex cmp, const Vec3& force) = 0;
+		virtual float getActorSpeed(ComponentIndex cmp) = 0;
+		virtual void putToSleep(ComponentIndex cmp) = 0;
 
 		virtual void moveController(ComponentIndex cmp, const Vec3& v, float dt) = 0;
 		virtual ComponentIndex getController(Entity entity) = 0;

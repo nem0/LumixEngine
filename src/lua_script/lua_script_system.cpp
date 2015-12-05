@@ -364,6 +364,14 @@ public:
 							  stringLength(script.m_script->getSourceCode()),
 							  script.m_script->getPath().c_str()) != LUA_OK;
 			
+			if (errors)
+			{
+				g_log_error.log("lua") << script.m_script->getPath().c_str() << ": "
+					<< lua_tostring(script.m_state, -1);
+				lua_pop(script.m_state, 1);
+				continue;
+			}
+
 			lua_pushvalue(script.m_state, -2);
 			lua_setupvalue(script.m_state, -2, 1); // function's environment
 
