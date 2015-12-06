@@ -2,7 +2,6 @@
 
 
 #include "lumix.h"
-#include "core/delegate_list.h"
 #include "core/iallocator.h"
 #include "core/vec.h"
 #include "iplugin.h"
@@ -50,7 +49,6 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 		virtual void setHeightmapXZScale(ComponentIndex cmp, float scale) = 0;
 		virtual float getHeightmapYScale(ComponentIndex cmp) = 0;
 		virtual void setHeightmapYScale(ComponentIndex cmp, float scale) = 0;
-		virtual DelegateList<void(Entity, Entity, const Vec3&)>& onContact() = 0;
 		virtual ComponentIndex getActorComponent(Entity entity) = 0;
 
 		virtual void applyForceToActor(ComponentIndex cmp, const Vec3& force) = 0;
