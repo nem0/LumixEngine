@@ -36,4 +36,12 @@ void NodeSlots(int count, bool input);
 
 bool SampledFunctionInput(const char* label, float* values, int count, float scale_min, float scale_max);
 
+void CurveEditor(const char* label,
+	void(*values_getter)(void* data, int idx, float* x, float* y),
+	void(*values_setter)(void* data, int idx, float x, float y),
+	const ImVec2& values_min,
+	const ImVec2& values_max,
+	void* data,
+	int values_count);
+
 } // namespace ImGui

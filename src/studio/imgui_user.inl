@@ -311,6 +311,20 @@ void NodeLink(ImVec2 from, ImVec2 to)
 
 bool SampledFunctionInput(const char* label, float* values, int values_count, float scale_min, float scale_max)
 {
+	auto getter = [](void* data, int index, float* x, float* y)
+	{
+		*y = ((float*)data)[index];
+		*x = (float)index;
+	};
+
+	auto setter = [](void* data, int index, float x, float y)
+	{
+		((float*)data)[index] = y;
+	};
+
+	CurveEditor(label, getter, setter, ImVec2(0, 0), ImVec2(9, 1), values, values_count);
+	return true;
+#if 0
 	ImGuiWindow* window = GetCurrentWindow();
 	if (window->SkipItems) return false;
 
@@ -398,6 +412,141 @@ bool SampledFunctionInput(const char* label, float* values, int values_count, fl
 		return true;
 	}
 	return false;
+#endif
+}
+
+
+ImVec2 operator *(float f, const ImVec2& v)
+{
+	return ImVec2(f * v.x, f * v.y);
+}
+
+
+static ImVec2 pointOnCurve(ImVec2* cp, float t)
+{
+	auto A = cp[0];
+	auto B = cp[1];
+	auto C = cp[2];
+	auto D = cp[3];
+
+	auto a = t;
+	auto b = 1 - t;
+
+	auto point = A * b * b * b + 3 * B * b * b * a + 3 * C * b * a * a + D * a * a * a;
+	return point;
+}
+
+
+void CurveEditor(const char* label,
+	void (*values_getter)(void* data, int idx, float* x, float* y),
+	void (*values_setter)(void* data, int idx, float x, float y),
+	const ImVec2& values_min,
+	const ImVec2& values_max,
+	void* data,
+	int values_count)
+{
+	ImGuiWindow* window = GetCurrentWindow();
+	if (window->SkipItems) return;
+
+	ImGuiState& g = *GImGui;
+	const ImGuiStyle& style = g.Style;
+
+	const ImVec2 label_size = ImGui::CalcTextSize(label, NULL, true);
+	ImVec2 graph_size;
+	graph_size.x = CalcItemWidth() + (style.FramePadding.x * 2);
+	graph_size.y = 100; // label_size.y + (style.FramePadding.y * 2);
+
+	const ImRect frame_bb(window->DC.CursorPos, window->DC.CursorPos + ImVec2(graph_size.x, graph_size.y));
+	const ImRect inner_bb(frame_bb.Min + style.FramePadding, frame_bb.Max - style.FramePadding);
+	const ImRect total_bb(frame_bb.Min, frame_bb.Max + ImVec2(label_size.x > 0.0f ? style.ItemInnerSpacing.x + label_size.x : 0.0f, 0));
+	ItemSize(total_bb, style.FramePadding.y);
+	if (!ItemAdd(total_bb, NULL))
+		return;
+
+	float scale_y_min = values_min.y;
+	float scale_y_max = values_max.y;
+	float scale_x_min = values_min.x;
+	float scale_x_max = values_max.x;
+
+	RenderFrame(frame_bb.Min, frame_bb.Max, window->Color(ImGuiCol_FrameBg), true, style.FrameRounding);
+
+	const ImU32 col_base = window->Color(ImGuiCol_PlotLines);
+	for (int i = 0; i < values_count - 1; ++i)
+	{
+		ImVec2 p0, p1;
+		values_getter(data, i, &p0.x, &p0.y);
+		p0.x = (p0.x - scale_x_min) / (scale_x_max - scale_x_min);
+		p0.y = (p0.y - scale_y_min) / (scale_y_max - scale_y_min);
+		p0.y = 1 - p0.y;
+
+		values_getter(data, i + 1, &p1.x, &p1.y);
+		p1.x = (p1.x - scale_x_min) / (scale_x_max - scale_x_min);
+		p1.y = (p1.y - scale_y_min) / (scale_y_max - scale_y_min);
+		p1.y = 1 - p1.y;
+
+		ImVec2 ps[] =
+		{
+			p0,
+			ImVec2(p0.x + 0.5f * (p1.x - p0.x), p0.y),
+			ImVec2(p1.x + 0.5f * (p0.x - p1.x), p1.y),
+			p1
+		};
+		auto lp0 = pointOnCurve(ps, 0);
+		ImVec2 pos0;
+		pos0.x = inner_bb.Min.x * (1 - lp0.x) + inner_bb.Max.x * lp0.x;
+		pos0.y = inner_bb.Min.y * (1 - lp0.y) + inner_bb.Max.y * lp0.y;
+
+		for (float t = 0.0f; t < 1.05f; t += 0.1f)
+		{
+			auto lp1 = pointOnCurve(ps, t);
+			ImVec2 pos1;
+			pos1.x = inner_bb.Min.x * (1 - lp1.x) + inner_bb.Max.x * lp1.x;
+			pos1.y = inner_bb.Min.y * (1 - lp1.y) + inner_bb.Max.y * lp1.y;
+
+			window->DrawList->AddLine(pos0, pos1, col_base);
+
+			pos0 = pos1;
+		}
+	}
+
+	auto cursor_pos = ImGui::GetCursorScreenPos();
+	for (int i = 0; i < values_count; ++i)
+	{
+		ImVec2 p;
+		values_getter(data, i, &p.x, &p.y);
+		p.x = (p.x - scale_x_min) / (scale_x_max - scale_x_min);
+		p.y = (p.y - scale_y_min) / (scale_y_max - scale_y_min);
+		p.y = 1 - p.y;
+
+		ImVec2 pos;
+		pos.x = inner_bb.Min.x * (1 - p.x) + inner_bb.Max.x * p.x;
+		pos.y = inner_bb.Min.y * (1 - p.y) + inner_bb.Max.y * p.y;
+
+		static const float SIZE = 3;
+
+		window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, SIZE), col_base);
+		window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, SIZE), col_base);
+		window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, -SIZE), col_base);
+		window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, -SIZE), col_base);
+
+		ImGui::SetCursorScreenPos(pos - ImVec2(SIZE, SIZE));
+		ImGui::PushID(i);
+		ImGui::InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
+		if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))
+		{
+			pos += ImGui::GetIO().MouseDelta;
+			ImVec2 v;
+			v.x = scale_x_min + ((pos.x - inner_bb.Min.x) / (inner_bb.Max.x - inner_bb.Min.x)) * (scale_x_max - scale_x_min);
+			v.y = scale_y_min + ((inner_bb.Max.y - pos.y) / (inner_bb.Max.y - inner_bb.Min.y)) * (scale_y_max - scale_y_min);
+			
+			v = ImClamp(v, values_min, values_max);
+			values_setter(data, i, v.x, v.y);
+		}
+		ImGui::PopID();
+	}
+	ImGui::SetCursorScreenPos(cursor_pos);
+
+	RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y), label);
 }
 
 
