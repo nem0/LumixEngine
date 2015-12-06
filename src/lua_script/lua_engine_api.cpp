@@ -61,23 +61,6 @@ static Material* getTerrainMaterial(RenderScene* scene, Entity entity)
 }
 
 
-static void* getScene(UniverseContext* ctx, const char* name)
-{
-	if (ctx)
-	{
-		uint32 hash = crc32(name);
-		for (auto* scene : ctx->m_scenes)
-		{
-			if (crc32(scene->getPlugin().getName()) == hash)
-			{
-				return scene;
-			}
-		}
-	}
-	return nullptr;
-}
-
-
 static int createComponent(IScene* scene, const char* type, int entity_idx)
 {
 	if (!scene)
@@ -187,8 +170,7 @@ static void addInputAction(Engine* engine, uint32 action, int type, int key, int
 } // namespace LuaAPI
 
 
-static void
-registerCFunction(lua_State* L, const char* name, lua_CFunction func)
+static void registerCFunction(lua_State* L, const char* name, lua_CFunction func)
 {
 	lua_pushcfunction(L, func);
 	lua_setglobal(L, name);
@@ -221,70 +203,26 @@ void registerEngineLuaAPI(Engine& engine, lua_State* L)
 	lua_pushlightuserdata(L, &engine);
 	lua_setglobal(L, "g_engine");
 
-	registerCFunction(L, "API_getEnvironment", &LuaAPI::getEnvironment);
+	#define REGISTER_FUNCTION(name) \
+		registerCFunction(L, "API_" #name, LuaWrapper::wrap<decltype(&LuaAPI::name), LuaAPI::name>)
 
-
-	registerCFunction(L,
-					  "API_getMaterialTexture",
-					  LuaWrapper::wrap<decltype(&LuaAPI::getMaterialTexture),
-									   LuaAPI::getMaterialTexture>);
-
-	registerCFunction(L,
-					  "API_getTerrainMaterial",
-					  LuaWrapper::wrap<decltype(&LuaAPI::getTerrainMaterial),
-									   LuaAPI::getTerrainMaterial>);
-
-	registerCFunction(
-		L,
-		"API_getScene",
-		LuaWrapper::wrap<decltype(&LuaAPI::getScene), LuaAPI::getScene>);
-
-	registerCFunction(L,
-					  "API_setEntityPosition",
-					  LuaWrapper::wrap<decltype(&LuaAPI::setEntityPosition),
-									   LuaAPI::setEntityPosition>);
-
-	registerCFunction(L,
-					  "API_setEntityRotation",
-					  LuaWrapper::wrap<decltype(&LuaAPI::setEntityRotation),
-									   LuaAPI::setEntityRotation>);
-
-	registerCFunction(
-		L,
-		"API_setEntityLocalRotation",
-		LuaWrapper::wrap<decltype(&LuaAPI::setEntityLocalRotation),
-						 LuaAPI::setEntityLocalRotation>);
-
-	registerCFunction(L,
-					  "API_createComponent",
-					  LuaWrapper::wrap<decltype(&LuaAPI::createComponent),
-									   LuaAPI::createComponent>);
-
-	registerCFunction(L,
-					  "API_setRenderablePath",
-					  LuaWrapper::wrap<decltype(&LuaAPI::setRenderablePath),
-									   LuaAPI::setRenderablePath>);
-
-	registerCFunction(L,
-					  "API_getInputActionValue",
-					  LuaWrapper::wrap<decltype(&LuaAPI::getInputActionValue),
-									   LuaAPI::getInputActionValue>);
-	registerCFunction(L,
-					  "API_addInputAction",
-					  LuaWrapper::wrap<decltype(&LuaAPI::addInputAction),
-									   LuaAPI::addInputAction>);
-
-	registerCFunction(
-		L,
-		"API_logError",
-		LuaWrapper::wrap<decltype(&LuaAPI::logError), LuaAPI::logError>);
-
-	registerCFunction(
-		L,
-		"API_logInfo",
-		LuaWrapper::wrap<decltype(&LuaAPI::logInfo), LuaAPI::logInfo>);
+	REGISTER_FUNCTION(createComponent);
+	REGISTER_FUNCTION(getEnvironment);
+	REGISTER_FUNCTION(getMaterialTexture);
+	REGISTER_FUNCTION(getTerrainMaterial);
+	REGISTER_FUNCTION(setEntityPosition);
+	REGISTER_FUNCTION(setEntityRotation);
+	REGISTER_FUNCTION(setEntityLocalRotation);
+	REGISTER_FUNCTION(setRenderablePath);
+	REGISTER_FUNCTION(getInputActionValue);
+	REGISTER_FUNCTION(addInputAction);
+	REGISTER_FUNCTION(logError);
+	REGISTER_FUNCTION(logInfo);
+	REGISTER_FUNCTION(logInfo);
 
 	registerCFunction(L, "API_multVecQuat", &LuaAPI::multVecQuat);
+
+	#undef REGISTER_FUNCTION
 }
 
 
