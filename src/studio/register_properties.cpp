@@ -42,7 +42,7 @@ public:
 		ASSERT(index == -1);
 		int value;
 		stream.read(&value, sizeof(value));
-		auto entity = m_editor.getUniverse()->getEntityFromDenseIdx(value);
+		auto entity = value < 0 ? INVALID_ENTITY : m_editor.getUniverse()->getEntityFromDenseIdx(value);
 		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, entity);
 	};
 
