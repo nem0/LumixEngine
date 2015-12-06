@@ -29,6 +29,14 @@ public:
 		uint32 m_name_hash;
 	};
 
+	class IFunctionCall
+	{
+	public:
+		virtual void add(int parameter) = 0;
+		virtual void add(float parameter) = 0;
+	};
+
+
 	typedef int (*lua_CFunction) (lua_State *L);
 
 public:
@@ -42,7 +50,10 @@ public:
 	virtual void setPropertyValue(ComponentIndex cmp,
 		const char* name,
 		const char* value) = 0;
+	virtual ComponentIndex getComponent(Entity entity) = 0;
 	virtual int getEnvironment(Entity entity) = 0;
+	virtual IFunctionCall* beginFunctionCall(ComponentIndex cmp, const char* function) = 0;
+	virtual void endFunctionCall(IFunctionCall& caller) = 0;
 };
 
 

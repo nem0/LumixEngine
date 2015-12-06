@@ -14,7 +14,6 @@
 #include "debug/debug.h"
 #include "engine.h"
 #include "iplugin.h"
-#include "physics/physics_scene.h"
 #include "plugin_manager.h"
 #include "lua_script/lua_script_manager.h"
 #include "universe/universe.h"
@@ -71,9 +70,33 @@ public:
 
 		LuaScript* m_script;
 		int m_entity;
+		ComponentIndex m_component;
 		lua_State* m_state;
 		int m_environment;
 		Array<Property> m_properties;
+	};
+
+
+	struct FunctionCall : IFunctionCall
+	{
+		void add(int parameter) override
+		{
+			lua_pushinteger(state, parameter);
+			++parameter_count;
+		}
+
+
+		void add(float parameter) override
+		{
+			lua_pushnumber(state, parameter);
+			++parameter_count;
+		}
+
+
+		int parameter_count;
+		lua_State* state;
+		bool is_in_progress;
+		ComponentIndex cmp;
 	};
 
 
@@ -87,18 +110,66 @@ public:
 		, m_entity_script_map(system.getAllocator())
 	{
 		auto* scene = m_universe_context.getScene(crc32("physics"));
-		auto* physics_scene = static_cast<PhysicsScene*>(scene);
-		physics_scene->onContact().bind<LuaScriptSceneImpl, &LuaScriptSceneImpl::onContact>(this);
 		m_first_free_script = -1;
+		m_function_call.is_in_progress = false;
+	}
+
+
+	ComponentIndex getComponent(Entity entity) override 
+	{
+		auto iter = m_entity_script_map.find(entity);
+		if (!iter.isValid()) return INVALID_COMPONENT;
+
+		return iter.value()->m_component;
+	}
+
+
+	IFunctionCall* beginFunctionCall(ComponentIndex cmp, const char* function) override
+	{
+		ASSERT(!m_function_call.is_in_progress);
+
+		auto& script = *m_scripts[cmp];
+		if (!script.m_state) return nullptr;
+
+		lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
+		if (lua_getfield(script.m_state, -1, function) != LUA_TFUNCTION)
+		{
+			lua_pop(script.m_state, 1);
+			return nullptr;
+		}
+
+		m_function_call.state = m_scripts[cmp]->m_state;
+		m_function_call.cmp = cmp;
+		m_function_call.is_in_progress = true;
+		m_function_call.parameter_count = 0;
+
+		return &m_function_call;
+	}
+
+
+	void endFunctionCall(IFunctionCall& caller)
+	{
+		ASSERT(&caller == &m_function_call);
+		ASSERT(m_global_state);
+		ASSERT(m_function_call.is_in_progress);
+
+		m_function_call.is_in_progress = false;
+
+		auto& script = *m_scripts[m_function_call.cmp];
+		if (!script.m_state) return;
+
+		if (lua_pcall(script.m_state, m_function_call.parameter_count, 0, 0) != LUA_OK)
+		{
+			g_log_error.log("lua") << lua_tostring(script.m_state, -1);
+			lua_pop(script.m_state, 1);
+		}
+		lua_pop(script.m_state, 1);
 	}
 
 
 	~LuaScriptSceneImpl()
 	{
 		unloadAllScripts();
-		auto* scene = m_universe_context.getScene(crc32("physics"));
-		auto* physics_scene = static_cast<PhysicsScene*>(scene);
-		physics_scene->onContact().unbind<LuaScriptSceneImpl, &LuaScriptSceneImpl::onContact>(this);
 	}
 
 	
@@ -132,49 +203,6 @@ public:
 	{
 		lua_pushcfunction(L, func);
 		lua_setglobal(L, name);
-	}
-
-
-	void sendCollisionEvent(ScriptComponent* cmp, Entity entity, const Vec3& position)
-	{
-		ASSERT(m_global_state);
-		auto& script = *cmp;
-		if (!script.m_state) return;
-
-		lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
-		if (lua_getfield(script.m_state, -1, "onContact") != LUA_TFUNCTION)
-		{
-			lua_pop(script.m_state, 1);
-			return;
-		}
-
-		lua_pushinteger(script.m_state, entity);
-		lua_pushnumber(script.m_state, position.x);
-		lua_pushnumber(script.m_state, position.y);
-		lua_pushnumber(script.m_state, position.z);
-		if (lua_pcall(script.m_state, 4, 0, 0) != LUA_OK)
-		{
-			g_log_error.log("lua") << lua_tostring(script.m_state, -1);
-			lua_pop(script.m_state, 1);
-		}
-		lua_pop(script.m_state, 1);
-	}
-
-
-	void onContact(Entity e1, Entity e2, const Vec3& position)
-	{
-		if (!m_global_state) return;
-
-		auto iter1 = m_entity_script_map.find(e1);
-		auto iter2 = m_entity_script_map.find(e2);
-		if (iter1 != m_entity_script_map.end())
-		{
-			sendCollisionEvent(iter1.value(), e2, position);
-		}
-		if (iter2 != m_entity_script_map.end())
-		{
-			sendCollisionEvent(iter2.value(), e1, position);
-		}
 	}
 
 
@@ -428,6 +456,7 @@ public:
 			else
 			{
 				cmp = m_scripts.size();
+				script.m_component = cmp;
 				m_scripts.push(&script);
 			}
 			script.m_entity = entity;
@@ -505,6 +534,7 @@ public:
 			}
 
 			ScriptComponent& script = *LUMIX_NEW(m_system.getAllocator(), ScriptComponent)(m_system.getAllocator());
+			script.m_component = m_scripts.size();
 			m_scripts.push(&script);
 			serializer.read(m_scripts[i]->m_entity);
 			m_entity_script_map.insert(m_scripts[i]->m_entity, &script);
@@ -611,6 +641,7 @@ private:
 	UniverseContext& m_universe_context;
 	Array<ScriptComponent*> m_updates;
 	int m_first_free_script;
+	FunctionCall m_function_call;
 };
 
 

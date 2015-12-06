@@ -198,9 +198,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 				physx::PxContactPairPoint contact;
 				auto contact_count = cp.extractContacts(&contact, 1);
 
-				m_scene.m_on_contact.invoke((Entity)pairHeader.actors[0]->userData,
-					(Entity)pairHeader.actors[1]->userData,
-					toVec3(contact.position));
+				auto pos = toVec3(contact.position);
+				auto e1 = (Entity)pairHeader.actors[0]->userData;
+				auto e2 = (Entity)pairHeader.actors[1]->userData;
+				m_scene.onContact(e1, e2, pos);
 			}
 		}
 
@@ -266,11 +267,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		, m_universe_context(context)
 		, m_is_game_running(false)
 		, m_contact_callback(*this)
-		, m_on_contact(m_allocator)
 		, m_queued_forces(m_allocator)
 	{
 		m_queued_forces.reserve(64);
-
+		m_script_scene = nullptr;
 	}
 
 
@@ -284,6 +284,30 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			LUMIX_DELETE(m_allocator, m_terrains[i]);
 		}
+	}
+
+
+	void onContact(Entity e1, Entity e2, const Vec3& position)
+	{
+		if (!m_script_scene) return;
+
+		auto send = [this](Entity e1, Entity e2, const Vec3& position)
+		{
+			auto cmp = m_script_scene->getComponent(e1);
+			if (cmp == INVALID_COMPONENT) return;
+
+			auto* call = m_script_scene->beginFunctionCall(cmp, "onContact");
+			if (!call) return;
+
+			call->add(e2);
+			call->add(position.x);
+			call->add(position.y);
+			call->add(position.z);
+			m_script_scene->endFunctionCall(*call);
+		};
+
+		send(e1, e2, position);
+		send(e2, e1, position);
 	}
 
 
@@ -673,24 +697,21 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto* scene = m_universe_context.getScene(crc32("lua_script"));
 		if (!scene) return;
 
-		auto* script_scene = static_cast<LuaScriptScene*>(scene);
-		script_scene->registerFunction("API_moveController",
+		m_script_scene = static_cast<LuaScriptScene*>(scene);
+		m_script_scene->registerFunction("API_moveController",
 			LuaWrapper::wrap<decltype(&LuaAPI::moveController), LuaAPI::moveController>);
-		script_scene->registerFunction("API_applyForceToActor",
+		m_script_scene->registerFunction("API_applyForceToActor",
 			LuaWrapper::wrap<decltype(&LuaAPI::applyForceToActor), LuaAPI::applyForceToActor>);
-		script_scene->registerFunction("API_getActorComponent",
+		m_script_scene->registerFunction("API_getActorComponent",
 			LuaWrapper::wrap<decltype(&LuaAPI::getActorComponent), LuaAPI::getActorComponent>);
-		script_scene->registerFunction("API_putToSleep",
-			LuaWrapper::wrap<decltype(&LuaAPI::putToSleep), LuaAPI::putToSleep>);
-		script_scene->registerFunction("API_getActorSpeed",
+		m_script_scene->registerFunction(
+			"API_putToSleep", LuaWrapper::wrap<decltype(&LuaAPI::putToSleep), LuaAPI::putToSleep>);
+		m_script_scene->registerFunction("API_getActorSpeed",
 			LuaWrapper::wrap<decltype(&LuaAPI::getActorSpeed), LuaAPI::getActorSpeed>);
 	}
 
 
-	void startGame() override
-	{
-		m_is_game_running = true;
-	}
+	void startGame() override { m_is_game_running = true; }
 
 
 	void stopGame() override
@@ -1298,12 +1319,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 	PhysicsSystem& getSystem() const override { return *m_system; }
 
 
-	DelegateList<void(Entity, Entity, const Vec3&)>& onContact() override
-	{
-		return m_on_contact;
-	}
-
-
 	float getActorSpeed(ComponentIndex cmp) override
 	{
 		auto* actor = m_actors[cmp];
@@ -1385,13 +1400,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	Engine* m_engine;
 	ContactCallback m_contact_callback;
 	physx::PxScene* m_scene;
+	LuaScriptScene* m_script_scene;
 	PhysicsSystem* m_system;
 	physx::PxControllerManager* m_controller_manager;
 	physx::PxMaterial* m_default_material;
 	Array<RigidActor*> m_actors;
 	Array<RigidActor*> m_dynamic_actors;
 	bool m_is_game_running;
-	DelegateList<void(Entity, Entity, const Vec3&)> m_on_contact;
 
 	Array<QueuedForce> m_queued_forces;
 	Array<Controller> m_controllers;
