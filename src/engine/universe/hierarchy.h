@@ -6,6 +6,7 @@
 #include "core/delegate_list.h"
 #include "core/matrix.h"
 #include "core/pod_hash_map.h"
+#include "engine/iplugin.h"
 
 
 namespace Lumix
@@ -17,7 +18,24 @@ namespace Lumix
 	class Universe;
 
 
-	class Hierarchy
+	class HierarchyPlugin : public IPlugin
+	{
+	public:
+		HierarchyPlugin(IAllocator& allocator) : m_allocator(allocator) {}
+
+		bool create() override { return true; }
+		void destroy() override {}
+		const char* getName() const override { return "hierarchy"; }
+
+		IScene* createScene(UniverseContext&) override;
+		void destroyScene(IScene*) override;
+	
+	private:
+		IAllocator& m_allocator;
+	};
+
+
+	class Hierarchy : public IScene
 	{
 		public:
 			class Child
@@ -30,16 +48,14 @@ namespace Lumix
 			typedef PODHashMap<int32, Array<Child>*> Children;
 
 		public:
-			static Hierarchy* create(Universe& universe, IAllocator& allocator);
+			static Hierarchy* create(IPlugin& system, Universe& universe, IAllocator& allocator);
 			static void destroy(Hierarchy* hierarchy);
 
 			virtual ~Hierarchy() {}
 
 			virtual void setLocalRotation(Entity entity, const Quat& rotation) = 0;
-			virtual void setParent(Entity child, Entity parent) = 0;
-			virtual Entity getParent(Entity child) = 0;
-			virtual void serialize(OutputBlob& serializer) = 0;
-			virtual void deserialize(InputBlob& serializer) = 0;
+			virtual void setParent(ComponentIndex cmp, Entity parent) = 0;
+			virtual Entity getParent(ComponentIndex cmp) = 0;
 			virtual Array<Child>* getChildren(Entity parent) = 0;
 			virtual DelegateList<void (Entity, Entity)>& parentSet() = 0;
 			virtual const Children& getAllChildren() const = 0;

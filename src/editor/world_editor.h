@@ -77,7 +77,6 @@ public:
 	virtual Engine& getEngine() = 0;
 	virtual UniverseContext* getUniverseContext() = 0;
 	virtual Universe* getUniverse() = 0;
-	virtual Hierarchy* getHierarchy() = 0;
 	virtual const Array<IScene*>& getScenes() const = 0;
 	virtual IScene* getScene(uint32 hash) = 0;
 	virtual IScene* getSceneByComponentType(uint32 hash) = 0;

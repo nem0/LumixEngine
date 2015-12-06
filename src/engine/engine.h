@@ -42,7 +42,6 @@ struct LUMIX_ENGINE_API UniverseContext
 	IScene* getScene(uint32 hash) const;
 
 	Universe* m_universe;
-	Hierarchy* m_hierarchy;
 	Array<IScene*> m_scenes;
 };
 
