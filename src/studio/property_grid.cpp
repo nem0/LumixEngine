@@ -230,27 +230,76 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 {
 	Lumix::OutputBlob blob(m_editor.getAllocator());
 	desc.get(cmp, -1, blob);
-	float* f = (float*)blob.getData();
-	int count = blob.getSize() / sizeof(float);
+	int count;
+	Lumix::InputBlob input(blob);
+	input.read(count);
+	Lumix::Vec2* f = (Lumix::Vec2*)input.skip(sizeof(Lumix::Vec2) * count);
 
 	bool changed = false;
+	auto cp = ImGui::GetCursorScreenPos();
 	if (ImGui::BeginCurveEditor(desc.getName()))
 	{
+		ImVec2 editor_size(ImGui::CalcItemWidth(), ImGui::GetItemRectSize().y);
 		for (int i = 0; i < count; ++i)
 		{
 			ImVec2 p;
-			p.x = (float)i;
-			p.y = f[i];
-			if (ImGui::CurvePoint(&p, ImVec2(0, 0), ImVec2((float)count - 1, 1)))
+			p.x = f[i].x;
+			p.y = f[i].y;
+			if (ImGui::CurvePoint(&p, ImVec2(0, 0), ImVec2(desc.getMaxX(), desc.getMaxY())))
 			{
 				changed = true;
-				f[i] = p.y;
+				f[i].x = p.x;
+				f[i].y = p.y;
+				if (i > 0)
+				{
+					f[i].x = Lumix::Math::maxValue(f[i - 1].x + 0.001f, f[i].x);
+				}
+				if (i < count - 1)
+				{
+					f[i].x = Lumix::Math::minValue(f[i + 1].x - 0.001f, f[i].x);
+				}
 			}
+			if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))
+			{
+				f[i] = f[count - 1];
+				--count;
+				*(int*)blob.getData() = count;
+				changed = true;
+			}
+		}
+
+		if (!changed && ImGui::IsMouseDoubleClicked(0))
+		{
+			auto mp = ImGui::GetMousePos();
+			mp.x -= cp.x;
+			mp.y -= cp.y;
+			mp.x /= editor_size.x;
+			mp.y /= editor_size.y;
+			mp.y = 1 - mp.y;
+			blob.write(mp);
+			++count;
+			*(int*)blob.getData() = count;
+			f = (Lumix::Vec2*)((int*)blob.getData() + 1);
+			changed = true;
+
+			auto compare = [](const void* a, const void* b) -> int
+			{
+				float fa = *(const float*)a;
+				float fb = *(const float*)b;
+				return fa < fb ? -1 : (fa > fb) ? 1 : 0;
+			};
+
+			qsort(f, count, sizeof(f[0]), compare);
 		}
 	}
 	ImGui::EndCurveEditor();
 
-	if (changed) m_editor.setProperty(cmp.type, -1, desc, f, sizeof(float) * count);
+	if (changed)
+	{
+		f[0].x = 0;
+		f[count - 1].x = desc.getMaxX();
+		m_editor.setProperty(cmp.type, -1, desc, blob.getData(), blob.getSize());
+	}
 }
 
 

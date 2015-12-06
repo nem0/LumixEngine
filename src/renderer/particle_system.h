@@ -99,10 +99,12 @@ public:
 		void serialize(OutputBlob&) override {}
 		void deserialize(InputBlob&) override {}
 		uint32 getType() const override { return s_type; }
+		void sample();
 
 		static const uint32 s_type;
 
-		Array<float> m_values;
+		Array<Vec2> m_values;
+		Array<float> m_sampled;
 	};
 
 

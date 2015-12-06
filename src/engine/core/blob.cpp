@@ -102,6 +102,19 @@ namespace Lumix
 	{}
 
 
+	const void* InputBlob::skip(int size)
+	{
+		auto* pos = m_data + m_pos;
+		m_pos += size;
+		if (m_pos > m_size)
+		{
+			m_pos = m_size;
+		}
+
+		return (const void*)pos;
+	}
+
+
 	bool InputBlob::read(void* data, int size)
 	{
 		if (m_pos + (int)size > m_size)
