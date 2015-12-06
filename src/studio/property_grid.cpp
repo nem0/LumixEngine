@@ -233,10 +233,24 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 	float* f = (float*)blob.getData();
 	int count = blob.getSize() / sizeof(float);
 
-	if (ImGui::SampledFunctionInput(desc.getName(), f, count, desc.getMin(), desc.getMax()))
+	bool changed = false;
+	if (ImGui::BeginCurveEditor(desc.getName()))
 	{
-		m_editor.setProperty(cmp.type, -1, desc, f, sizeof(float) * count);
+		for (int i = 0; i < count; ++i)
+		{
+			ImVec2 p;
+			p.x = (float)i;
+			p.y = f[i];
+			if (ImGui::CurvePoint(&p, ImVec2(0, 0), ImVec2((float)count - 1, 1)))
+			{
+				changed = true;
+				f[i] = p.y;
+			}
+		}
 	}
+	ImGui::EndCurveEditor();
+
+	if (changed) m_editor.setProperty(cmp.type, -1, desc, f, sizeof(float) * count);
 }
 
 

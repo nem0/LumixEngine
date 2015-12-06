@@ -309,113 +309,6 @@ void NodeLink(ImVec2 from, ImVec2 to)
 }
 
 
-bool SampledFunctionInput(const char* label, float* values, int values_count, float scale_min, float scale_max)
-{
-	auto getter = [](void* data, int index, float* x, float* y)
-	{
-		*y = ((float*)data)[index];
-		*x = (float)index;
-	};
-
-	auto setter = [](void* data, int index, float x, float y)
-	{
-		((float*)data)[index] = y;
-	};
-
-	CurveEditor(label, getter, setter, ImVec2(0, 0), ImVec2(9, 1), values, values_count);
-	return true;
-#if 0
-	ImGuiWindow* window = GetCurrentWindow();
-	if (window->SkipItems) return false;
-
-	ImGuiState& g = *GImGui;
-	const ImGuiStyle& style = g.Style;
-
-	const ImVec2 label_size = ImGui::CalcTextSize(label, NULL, true);
-	ImVec2 graph_size;
-	graph_size.x = CalcItemWidth() + (style.FramePadding.x * 2);
-	graph_size.y = 75;
-
-	const ImRect frame_bb(
-		window->DC.CursorPos, window->DC.CursorPos + ImVec2(graph_size.x, graph_size.y));
-	const ImRect inner_bb(frame_bb.Min + style.FramePadding, frame_bb.Max - style.FramePadding);
-	const ImRect total_bb(frame_bb.Min,
-		frame_bb.Max +
-		ImVec2(label_size.x > 0.0f ? style.ItemInnerSpacing.x + label_size.x : 0.0f, 0));
-	ItemSize(total_bb, style.FramePadding.y);
-	if (!ItemAdd(total_bb, NULL)) return false;
-
-	// Determine scale from values if not specified
-	if (scale_min == FLT_MAX || scale_max == FLT_MAX)
-	{
-		float v_min = FLT_MAX;
-		float v_max = -FLT_MAX;
-		for (int i = 0; i < values_count; i++)
-		{
-			const float v = values[i];
-			v_min = ImMin(v_min, v);
-			v_max = ImMax(v_max, v);
-		}
-		if (scale_min == FLT_MAX) scale_min = v_min;
-		if (scale_max == FLT_MAX) scale_max = v_max;
-	}
-
-	RenderFrame(
-		frame_bb.Min, frame_bb.Max, window->Color(ImGuiCol_FrameBg), true, style.FrameRounding);
-
-	int res_w = ImMin((int)graph_size.x, values_count);
-
-	// Tooltip on hover
-	int v_hovered = -1;
-	if (IsHovered(inner_bb, 0))
-	{
-		const float t = ImClamp(
-			(g.IO.MousePos.x - inner_bb.Min.x) / (inner_bb.Max.x - inner_bb.Min.x), 0.0f, 0.9999f);
-		const int v_idx = (int)(t * (values_count + 0));
-		IM_ASSERT(v_idx >= 0 && v_idx < values_count);
-
-		const float v0 = values[v_idx % values_count];
-		ImGui::SetTooltip("%d: %8.4g", v_idx, v0);
-		v_hovered = v_idx;
-	}
-
-	const float t_step = 1.0f / (float)res_w;
-
-	float v0 = values[0];
-	float t0 = 0.0f;
-	ImVec2 p0 = ImVec2(t0, 1.0f - ImSaturate((v0 - scale_min) / (scale_max - scale_min)));
-
-	const ImU32 col_base = window->Color(ImGuiCol_PlotHistogram);
-	const ImU32 col_hovered = window->Color(ImGuiCol_PlotHistogramHovered);
-
-	for (int n = 0; n < res_w; n++)
-	{
-		const float t1 = t0 + t_step;
-		const int v_idx = (int)(t0 * values_count + 0.5f);
-		IM_ASSERT(v_idx >= 0 && v_idx < values_count);
-		const float v1 = values[v_idx + 1 % values_count];
-		const ImVec2 p1 = ImVec2(t1, 1.0f - ImSaturate((v1 - scale_min) / (scale_max - scale_min)));
-
-		window->DrawList->AddRectFilled(ImLerp(inner_bb.Min, inner_bb.Max, p0),
-			ImLerp(inner_bb.Min, inner_bb.Max, ImVec2(p1.x, 1.0f)) + ImVec2(-1, 0),
-			col_base);
-
-		t0 = t1;
-		p0 = p1;
-	}
-	RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y), label);
-
-	if (v_hovered >= 0 && IsMouseClicked(0))
-	{
-		float rel = 1 - (GetMousePos().y - frame_bb.Min.y) / (frame_bb.Max.y - frame_bb.Min.y);
-		values[v_hovered] = scale_min + rel * (scale_max - scale_min);
-		return true;
-	}
-	return false;
-#endif
-}
-
-
 ImVec2 operator *(float f, const ImVec2& v)
 {
 	return ImVec2(f * v.x, f * v.y);
@@ -437,19 +330,19 @@ static ImVec2 pointOnCurve(ImVec2* cp, float t)
 }
 
 
-void CurveEditor(const char* label,
-	void (*values_getter)(void* data, int idx, float* x, float* y),
-	void (*values_setter)(void* data, int idx, float x, float y),
-	const ImVec2& values_min,
-	const ImVec2& values_max,
-	void* data,
-	int values_count)
+static ImVec2 end_pos;
+static ImVec2 prev_point;
+static int point_idx;
+
+
+bool BeginCurveEditor(const char* label)
 {
 	ImGuiWindow* window = GetCurrentWindow();
-	if (window->SkipItems) return;
+	if (window->SkipItems) return false;
 
 	ImGuiState& g = *GImGui;
 	const ImGuiStyle& style = g.Style;
+	auto cursor_pos = ImGui::GetCursorScreenPos();
 
 	const ImVec2 label_size = ImGui::CalcTextSize(label, NULL, true);
 	ImVec2 graph_size;
@@ -461,40 +354,63 @@ void CurveEditor(const char* label,
 	const ImRect total_bb(frame_bb.Min, frame_bb.Max + ImVec2(label_size.x > 0.0f ? style.ItemInnerSpacing.x + label_size.x : 0.0f, 0));
 	ItemSize(total_bb, style.FramePadding.y);
 	if (!ItemAdd(total_bb, NULL))
-		return;
+		return false;
 
-	float scale_y_min = values_min.y;
-	float scale_y_max = values_max.y;
-	float scale_x_min = values_min.x;
-	float scale_x_max = values_max.x;
 
 	RenderFrame(frame_bb.Min, frame_bb.Max, window->Color(ImGuiCol_FrameBg), true, style.FrameRounding);
+	RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y), label);
 
+	end_pos = ImGui::GetCursorScreenPos();
+	ImGui::SetCursorScreenPos(cursor_pos);
+
+	point_idx = -1;
+
+	return true;
+}
+
+void EndCurveEditor()
+{
+	ImGui::SetCursorScreenPos(end_pos);
+}
+
+
+bool CurvePoint(ImVec2* point, const ImVec2& values_min, const ImVec2& values_max)
+{
+	ImGuiWindow* window = GetCurrentWindow();
+	ImGuiState& g = *GImGui;
+	const ImGuiStyle& style = g.Style;
+
+	auto cursor_pos_backup = ImGui::GetCursorScreenPos();
+
+	ImVec2 graph_size;
+	graph_size.x = CalcItemWidth() + (style.FramePadding.x * 2);
+	graph_size.y = 100; // label_size.y + (style.FramePadding.y * 2);
+
+	const ImRect frame_bb(window->DC.CursorPos, window->DC.CursorPos + graph_size);
+	const ImRect inner_bb(frame_bb.Min + style.FramePadding, frame_bb.Max - style.FramePadding);
 	const ImU32 col_base = window->Color(ImGuiCol_PlotLines);
-	for (int i = 0; i < values_count - 1; ++i)
+
+	auto p = *point;
+	p.x = (p.x - values_min.x) / (values_max.x - values_min.x);
+	p.y = (p.y - values_min.y) / (values_max.y - values_min.y);
+	p.y = 1 - p.y;
+	ImVec2 pos;
+	pos.x = inner_bb.Min.x * (1 - p.x) + inner_bb.Max.x * p.x;
+	pos.y = inner_bb.Min.y * (1 - p.y) + inner_bb.Max.y * p.y;
+
+	if (point_idx >= 0)
 	{
-		ImVec2 p0, p1;
-		values_getter(data, i, &p0.x, &p0.y);
-		p0.x = (p0.x - scale_x_min) / (scale_x_max - scale_x_min);
-		p0.y = (p0.y - scale_y_min) / (scale_y_max - scale_y_min);
-		p0.y = 1 - p0.y;
-
-		values_getter(data, i + 1, &p1.x, &p1.y);
-		p1.x = (p1.x - scale_x_min) / (scale_x_max - scale_x_min);
-		p1.y = (p1.y - scale_y_min) / (scale_y_max - scale_y_min);
-		p1.y = 1 - p1.y;
-
 		ImVec2 ps[] =
 		{
-			p0,
-			ImVec2(p0.x + 0.5f * (p1.x - p0.x), p0.y),
-			ImVec2(p1.x + 0.5f * (p0.x - p1.x), p1.y),
-			p1
+			prev_point,
+			ImVec2(prev_point.x + 0.5f * (p.x - prev_point.x), prev_point.y),
+			ImVec2(p.x + 0.5f * (prev_point.x - p.x), p.y),
+			p
 		};
-		auto lp0 = pointOnCurve(ps, 0);
-		ImVec2 pos0;
-		pos0.x = inner_bb.Min.x * (1 - lp0.x) + inner_bb.Max.x * lp0.x;
-		pos0.y = inner_bb.Min.y * (1 - lp0.y) + inner_bb.Max.y * lp0.y;
+
+		ImVec2 pos0 = prev_point;
+		pos0.x = inner_bb.Min.x * (1 - pos0.x) + inner_bb.Max.x * pos0.x;
+		pos0.y = inner_bb.Min.y * (1 - pos0.y) + inner_bb.Max.y * pos0.y;
 
 		for (float t = 0.0f; t < 1.05f; t += 0.1f)
 		{
@@ -503,51 +419,41 @@ void CurveEditor(const char* label,
 			pos1.x = inner_bb.Min.x * (1 - lp1.x) + inner_bb.Max.x * lp1.x;
 			pos1.y = inner_bb.Min.y * (1 - lp1.y) + inner_bb.Max.y * lp1.y;
 
-			window->DrawList->AddLine(pos0, pos1, col_base);
+			window->DrawList->AddLine(pos1, pos0, col_base);
 
 			pos0 = pos1;
 		}
 	}
+	prev_point = p;
 
-	auto cursor_pos = ImGui::GetCursorScreenPos();
-	for (int i = 0; i < values_count; ++i)
+	static const float SIZE = 3;
+	window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, SIZE), col_base);
+	window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, SIZE), col_base);
+	window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, -SIZE), col_base);
+	window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, -SIZE), col_base);
+
+	ImGui::SetCursorScreenPos(pos - ImVec2(SIZE, SIZE));
+	ImGui::PushID(point_idx);
+	++point_idx;
+	ImGui::InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
+	bool changed = false;
+	if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))
 	{
-		ImVec2 p;
-		values_getter(data, i, &p.x, &p.y);
-		p.x = (p.x - scale_x_min) / (scale_x_max - scale_x_min);
-		p.y = (p.y - scale_y_min) / (scale_y_max - scale_y_min);
-		p.y = 1 - p.y;
+		pos += ImGui::GetIO().MouseDelta;
+		ImVec2 v;
+		v.x = values_min.x + ((pos.x - inner_bb.Min.x) / (inner_bb.Max.x - inner_bb.Min.x)) * (values_max.x - values_min.x);
+		v.y = values_min.y + ((inner_bb.Max.y - pos.y) / (inner_bb.Max.y - inner_bb.Min.y)) * (values_max.y - values_min.y);
 
-		ImVec2 pos;
-		pos.x = inner_bb.Min.x * (1 - p.x) + inner_bb.Max.x * p.x;
-		pos.y = inner_bb.Min.y * (1 - p.y) + inner_bb.Max.y * p.y;
-
-		static const float SIZE = 3;
-
-		window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, SIZE), col_base);
-		window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, SIZE), col_base);
-		window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, -SIZE), col_base);
-		window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, -SIZE), col_base);
-
-		ImGui::SetCursorScreenPos(pos - ImVec2(SIZE, SIZE));
-		ImGui::PushID(i);
-		ImGui::InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
-		if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))
-		{
-			pos += ImGui::GetIO().MouseDelta;
-			ImVec2 v;
-			v.x = scale_x_min + ((pos.x - inner_bb.Min.x) / (inner_bb.Max.x - inner_bb.Min.x)) * (scale_x_max - scale_x_min);
-			v.y = scale_y_min + ((inner_bb.Max.y - pos.y) / (inner_bb.Max.y - inner_bb.Min.y)) * (scale_y_max - scale_y_min);
-			
-			v = ImClamp(v, values_min, values_max);
-			values_setter(data, i, v.x, v.y);
-		}
-		ImGui::PopID();
+		v = ImClamp(v, values_min, values_max);
+		*point = v;
+		changed = true;
 	}
-	ImGui::SetCursorScreenPos(cursor_pos);
+	ImGui::PopID();
 
-	RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y), label);
+	ImGui::SetCursorScreenPos(cursor_pos_backup);
+	return changed;
 }
+
 
 
 } // namespace ImGui
