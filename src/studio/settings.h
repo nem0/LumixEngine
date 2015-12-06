@@ -24,7 +24,6 @@ struct Settings
 	bool m_is_entity_list_opened;
 	bool m_is_entity_template_list_opened;
 	bool m_is_gameview_opened;
-	bool m_is_hierarchy_opened;
 	bool m_is_log_opened;
 	bool m_is_profiler_opened;
 	bool m_is_properties_opened;

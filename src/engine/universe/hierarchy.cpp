@@ -1,10 +1,12 @@
 #include "hierarchy.h"
 #include "core/array.h"
 #include "core/blob.h"
+#include "core/crc32.h"
 #include "core/hash_map.h"
 #include "core/json_serializer.h"
 #include "core/matrix.h"
 #include "core/pod_hash_map.h"
+#include "engine/engine.h"
 #include "universe.h"
 
 
@@ -12,18 +14,22 @@ namespace Lumix
 {
 
 
+static const Lumix::uint32 HIERARCHY_HASH = Lumix::crc32("hierarchy");
+
+
 class HierarchyImpl : public Hierarchy
 {
 private:
-	typedef HashMap<int32, int32> Parents;
+	typedef PODHashMap<Entity, Entity> Parents;
 
 public:
-	HierarchyImpl(Universe& universe, IAllocator& allocator)
+	HierarchyImpl(IPlugin& system, Universe& universe, IAllocator& allocator)
 		: m_universe(universe)
 		, m_parents(allocator)
 		, m_children(allocator)
 		, m_allocator(allocator)
 		, m_parent_set(allocator)
+		, m_system(system)
 	{
 		m_is_processing = false;
 		universe.entityDestroyed().bind<HierarchyImpl, &HierarchyImpl::onEntityDestroyed>(this);
@@ -43,6 +49,43 @@ public:
 	}
 
 
+	ComponentIndex createComponent(uint32 type, Entity entity) override 
+	{
+		if (HIERARCHY_HASH == type)
+		{
+			m_parents.insert(entity, INVALID_ENTITY);
+			m_universe.addComponent(entity, type, this, entity);
+		}
+		return INVALID_COMPONENT;
+	}
+
+
+	void destroyComponent(ComponentIndex component, uint32 type) override 
+	{
+		if (HIERARCHY_HASH == type)
+		{
+			auto parent_iter = m_parents.find(component);
+
+			if (parent_iter.isValid())
+			{
+				auto iter = m_children.find(parent_iter.value());
+				if (iter != m_children.end())
+				{
+					LUMIX_DELETE(m_allocator, iter.value());
+					m_children.erase(iter);
+				}
+				m_parents.erase(parent_iter);
+			}
+			
+			m_universe.destroyComponent(component, type, this, component);
+		}
+	}
+
+
+	IPlugin& getPlugin() const override { return m_system; }
+	void update(float time_delta) override {}
+	bool ownComponentType(uint32 type) const override { return HIERARCHY_HASH == type; }
+	Universe& getUniverse() override { return m_universe; }
 	IAllocator& getAllocator() { return m_allocator; }
 
 
@@ -119,20 +162,23 @@ public:
 	const Children& getAllChildren() const override { return m_children; }
 
 
-	void setParent(Entity child, Entity parent) override
+	void setParent(ComponentIndex child, Entity parent) override
 	{
 		Parents::iterator old_parent_iter = m_parents.find(child);
 		if (old_parent_iter.isValid())
 		{
-			Children::iterator child_iter = m_children.find(old_parent_iter.value());
-			ASSERT(child_iter.isValid());
-			Array<Child>& children = *child_iter.value();
-			for (int i = 0; i < children.size(); ++i)
+			if (old_parent_iter.value() != INVALID_ENTITY)
 			{
-				if (children[i].m_entity == child)
+				Children::iterator child_iter = m_children.find(old_parent_iter.value());
+				ASSERT(child_iter.isValid());
+				Array<Child>& children = *child_iter.value();
+				for (int i = 0; i < children.size(); ++i)
 				{
-					children.erase(i);
-					break;
+					if (children[i].m_entity == child)
+					{
+						children.erase(i);
+						break;
+					}
 				}
 			}
 			m_parents.erase(old_parent_iter);
@@ -158,7 +204,7 @@ public:
 	}
 
 
-	Entity getParent(Entity child) override
+	Entity getParent(ComponentIndex child) override
 	{
 		Parents::iterator parent_iter = m_parents.find(child);
 		if (parent_iter.isValid())
@@ -183,7 +229,7 @@ public:
 	}
 
 
-	void deserialize(InputBlob& serializer) override
+	void deserialize(InputBlob& serializer, int /*version*/) override
 	{
 		int32 size;
 		serializer.read(size);
@@ -193,6 +239,7 @@ public:
 			serializer.read(child);
 			serializer.read(parent);
 			setParent(Entity(child), Entity(parent));
+			m_universe.addComponent(child, HIERARCHY_HASH, this, child);
 		}
 	}
 
@@ -210,19 +257,33 @@ public:
 		return nullptr;
 	}
 
+
 private:
 	IAllocator& m_allocator;
 	Universe& m_universe;
 	Parents m_parents;
 	Children m_children;
 	DelegateList<void(Entity, Entity)> m_parent_set;
+	IPlugin& m_system;
 	bool m_is_processing;
 };
 
 
-Hierarchy* Hierarchy::create(Universe& universe, IAllocator& allocator)
+IScene* HierarchyPlugin::createScene(UniverseContext& ctx)
 {
-	return LUMIX_NEW(allocator, HierarchyImpl)(universe, allocator);
+	return Hierarchy::create(*this, *ctx.m_universe, m_allocator);
+}
+
+
+void HierarchyPlugin::destroyScene(IScene* scene)
+{
+	Hierarchy::destroy(static_cast<Hierarchy*>(scene));
+}
+
+
+Hierarchy* Hierarchy::create(IPlugin& system, Universe& universe, IAllocator& allocator)
+{
+	return LUMIX_NEW(allocator, HierarchyImpl)(system, universe, allocator);
 }
 
 

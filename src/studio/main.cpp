@@ -21,7 +21,6 @@
 #include "engine.h"
 #include "engine/plugin_manager.h"
 #include "game_view.h"
-#include "hierarchy_ui.h"
 #include "import_asset_dialog.h"
 #include "log_ui.h"
 #include "metadata.h"
@@ -39,7 +38,6 @@
 #include "settings.h"
 #include "shader_compiler.h"
 #include "shader_editor.h"
-#include "universe/hierarchy.h"
 #include "utils.h"
 
 #include <bgfx/bgfx.h>
@@ -257,7 +255,6 @@ public:
 			showEntityList();
 			showEntityTemplateList();
 			m_sceneview.onGUI();
-			m_hierarchy_ui.onGUI();
 			m_gameview.onGui();
 			m_shader_editor->onGUI();
 			if (m_is_style_editor_opened) ImGui::ShowStyleEditor();
@@ -554,7 +551,6 @@ public:
 					ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
 					ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
 					ImGui::MenuItem("Game view", nullptr, &m_gameview.m_is_opened);
-					ImGui::MenuItem("Hierarchy", nullptr, &m_hierarchy_ui.m_is_opened);
 					ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
 					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
 					ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
@@ -743,7 +739,6 @@ public:
 		m_settings.m_is_entity_list_opened = m_is_entity_list_opened;
 		m_settings.m_is_entity_template_list_opened = m_is_entity_template_list_opened;
 		m_settings.m_is_gameview_opened = m_gameview.m_is_opened;
-		m_settings.m_is_hierarchy_opened = m_hierarchy_ui.m_is_opened;
 		m_settings.m_is_log_opened = m_log_ui->m_is_opened;
 		m_settings.m_is_profiler_opened = m_profiler_ui->m_is_opened;
 		m_settings.m_is_properties_opened = m_property_grid->m_is_opened;
@@ -882,7 +877,6 @@ public:
 		m_is_clip_manager_opened = m_settings.m_is_clip_manager_opened;
 		m_is_entity_template_list_opened = m_settings.m_is_entity_template_list_opened;
 		m_gameview.m_is_opened = m_settings.m_is_gameview_opened;
-		m_hierarchy_ui.m_is_opened = m_settings.m_is_hierarchy_opened;
 		m_log_ui->m_is_opened = m_settings.m_is_log_opened;
 		m_profiler_ui->m_is_opened = m_settings.m_is_profiler_opened;
 		m_property_grid->m_is_opened = m_settings.m_is_properties_opened;
@@ -1154,7 +1148,6 @@ public:
 		m_log_ui = LUMIX_NEW(m_allocator, LogUI)(m_editor->getAllocator());
 		m_import_asset_dialog = LUMIX_NEW(m_allocator, ImportAssetDialog)(*m_editor, m_metadata);
 		m_shader_compiler = LUMIX_NEW(m_allocator, ShaderCompiler)(*m_editor, *m_log_ui);
-		m_hierarchy_ui.setWorldEditor(*m_editor);
 		m_shader_editor = LUMIX_NEW(m_allocator, ShaderEditor)(m_editor->getAllocator());
 
 		m_editor->universeCreated().bind<StudioApp, &StudioApp::onUniverseCreated>(this);
@@ -1342,7 +1335,6 @@ public:
 	ImportAssetDialog* m_import_asset_dialog;
 	ShaderCompiler* m_shader_compiler;
 	Lumix::string m_selected_template_name;
-	HierarchyUI m_hierarchy_ui;
 	Settings m_settings;
 	Metadata m_metadata;
 	ShaderEditor* m_shader_editor;

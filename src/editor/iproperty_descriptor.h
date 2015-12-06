@@ -97,6 +97,7 @@ public:
 
 	virtual int getEnumCount(IScene* scene) = 0;
 	virtual const char* getEnumItemName(IScene* scene, int index) = 0;
+	virtual void getEnumItemName(IScene* scene, int index, char* buf, int max_size) {}
 };
 
 

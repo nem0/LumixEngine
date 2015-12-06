@@ -1410,12 +1410,6 @@ public:
 	}
 
 
-	Hierarchy* getHierarchy() override
-	{
-		return m_universe_context->m_hierarchy;
-	}
-
-
 	UniverseContext* getUniverseContext() override
 	{
 		return m_universe_context;
