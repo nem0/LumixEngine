@@ -24,6 +24,7 @@ namespace Lumix
 {
 
 static const uint32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
+static const uint32 HIERARCHY_HASH = crc32("hierarchy");
 
 
 enum class SerializedEngineVersion : int32
@@ -32,6 +33,7 @@ enum class SerializedEngineVersion : int32
 	SPARSE_TRANFORMATIONS,
 	FOG_PARAMS,
 	SCENE_VERSION,
+	HIERARCHY_COMPONENT,
 
 	LATEST // must be the last one
 };
@@ -107,6 +109,10 @@ public:
 		{
 			return false;
 		}
+		
+		HierarchyPlugin* hierarchy = LUMIX_NEW(m_allocator, HierarchyPlugin)(m_allocator);
+		m_plugin_manager->addPlugin(hierarchy);
+		
 		m_input_system = InputSystem::create(m_allocator);
 		if (!m_input_system)
 		{
@@ -155,8 +161,6 @@ public:
 	{
 		UniverseContext* context = LUMIX_NEW(m_allocator, UniverseContext)(m_allocator);
 		context->m_universe = LUMIX_NEW(m_allocator, Universe)(m_allocator);
-		context->m_hierarchy =
-			Hierarchy::create(*context->m_universe, m_allocator);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 		for (auto* plugin : plugins)
 		{
@@ -180,7 +184,6 @@ public:
 		{
 			context.m_scenes[i]->getPlugin().destroyScene(context.m_scenes[i]);
 		}
-		Hierarchy::destroy(context.m_hierarchy);
 		LUMIX_DELETE(m_allocator, context.m_universe);
 
 		LUMIX_DELETE(m_allocator, &context);
@@ -292,7 +295,6 @@ public:
 		g_path_manager.serialize(serializer);
 		int pos = serializer.getSize();
 		ctx.m_universe->serialize(serializer);
-		ctx.m_hierarchy->serialize(serializer);
 		m_plugin_manager->serialize(serializer);
 		serializer.write((int32)ctx.m_scenes.size());
 		for (int i = 0; i < ctx.m_scenes.size(); ++i)
@@ -328,7 +330,12 @@ public:
 		}
 		g_path_manager.deserialize(serializer);
 		ctx.m_universe->deserialize(serializer);
-		ctx.m_hierarchy->deserialize(serializer);
+
+		if (header.m_version <= SerializedEngineVersion::HIERARCHY_COMPONENT)
+		{
+			ctx.getScene(HIERARCHY_HASH)->deserialize(serializer, 0);
+		}
+
 		m_plugin_manager->deserialize(serializer);
 		int32 scene_count;
 		serializer.read(scene_count);

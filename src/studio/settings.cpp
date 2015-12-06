@@ -88,7 +88,6 @@ Settings::Settings()
 	m_is_shader_editor_opened = false;
 	m_is_clip_manager_opened = false;
 	m_is_asset_browser_opened = false;
-	m_is_hierarchy_opened = false;
 	m_is_log_opened = false;
 	m_is_profiler_opened = false;
 	m_is_properties_opened = false;
@@ -128,7 +127,6 @@ bool Settings::load(Action** actions, int actions_count)
 	m_is_entity_list_opened = getBoolean(L, "entity_list_opened", false);
 	m_is_entity_template_list_opened = getBoolean(L, "entity_template_list_opened", false);
 	m_is_gameview_opened = getBoolean(L, "gameview_opened", false);
-	m_is_hierarchy_opened = getBoolean(L, "hierarchy_opened", false);
 	m_is_log_opened = getBoolean(L, "log_opened", false);
 	m_is_profiler_opened = getBoolean(L, "profiler_opened", false);
 	m_is_properties_opened = getBoolean(L, "properties_opened", false);
@@ -189,7 +187,6 @@ bool Settings::save(Action** actions, int actions_count)
 	writeBool("entity_list_opened", m_is_entity_list_opened);
 	writeBool("entity_template_list_opened", m_is_entity_template_list_opened);
 	writeBool("gameview_opened", m_is_gameview_opened);
-	writeBool("hierarchy_opened", m_is_hierarchy_opened);
 	writeBool("log_opened", m_is_log_opened);
 	writeBool("profiler_opened", m_is_profiler_opened);
 	writeBool("properties_opened", m_is_properties_opened);

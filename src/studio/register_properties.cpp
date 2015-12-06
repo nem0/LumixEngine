@@ -4,13 +4,88 @@
 #include "core/resource_manager.h"
 #include "editor/property_descriptor.h"
 #include "editor/world_editor.h"
+#include "universe/hierarchy.h"
 #include "lua_script/lua_script_system.h"
 #include "physics/physics_scene.h"
 #include "renderer/render_scene.h"
+#include "utils.h"
 #include <cfloat>
 
 
 using namespace Lumix;
+
+
+template <class S> class EntityEnumPropertyDescriptor : public IEnumPropertyDescriptor
+{
+public:
+	typedef int (S::*Getter)(ComponentIndex);
+	typedef void (S::*Setter)(ComponentIndex, int);
+	
+public:
+	EntityEnumPropertyDescriptor(const char* name,
+		Getter _getter,
+		Setter _setter,
+		Lumix::WorldEditor& editor,
+		IAllocator& allocator)
+		: IEnumPropertyDescriptor(allocator)
+		, m_editor(editor)
+	{
+		setName(name);
+		m_getter = _getter;
+		m_setter = _setter;
+		m_type = ENUM;
+	}
+
+
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		ASSERT(index == -1);
+		int value;
+		stream.read(&value, sizeof(value));
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, value);
+	};
+
+
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		ASSERT(index == -1);
+		int value = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		int len = sizeof(value);
+		stream.write(&value, len);
+	};
+
+
+	int getEnumCount(IScene* scene) override { return scene->getUniverse().getEntityCount(); }
+
+
+	const char* getEnumItemName(IScene* scene, int index) override { return nullptr; }
+
+
+	void getEnumItemName(IScene* scene, int index, char* buf, int max_size) override
+	{
+		auto entity = scene->getUniverse().getEntityFromDenseIdx(index);
+		getEntityListDisplayName(m_editor, buf, max_size, entity);
+	}
+
+private:
+	Getter m_getter;
+	Setter m_setter;
+	Lumix::WorldEditor& m_editor;
+};
+
+
+
+void registerEngineProperties(Lumix::WorldEditor& editor)
+{
+	PropertyRegister::registerComponentType("hierarchy", "Hierarchy");
+	IAllocator& allocator = editor.getAllocator();
+	PropertyRegister::add("hierarchy",
+		LUMIX_NEW(allocator, EntityEnumPropertyDescriptor<Hierarchy>)("parent",
+									 &Hierarchy::getParent,
+									 &Hierarchy::setParent,
+									 editor,
+									 allocator));
+}
 
 
 void registerLuaScriptProperties(IAllocator& allocator)
@@ -19,11 +94,11 @@ void registerLuaScriptProperties(IAllocator& allocator)
 
 	PropertyRegister::add("lua_script",
 		LUMIX_NEW(allocator, ResourcePropertyDescriptor<LuaScriptScene>)("source",
-									 &LuaScriptScene::getScriptPath,
-									 &LuaScriptScene::setScriptPath,
-									 "Lua (*.lua)",
-									 crc32("lua_script"),
-									 allocator));
+		&LuaScriptScene::getScriptPath,
+		&LuaScriptScene::setScriptPath,
+		"Lua (*.lua)",
+		crc32("lua_script"),
+		allocator));
 }
 
 
@@ -382,6 +457,7 @@ void registerRendererProperties(IAllocator& allocator)
 
 void registerProperties(WorldEditor& editor)
 {
+	registerEngineProperties(editor);
 	registerRendererProperties(editor.getAllocator());
 	registerLuaScriptProperties(editor.getAllocator());
 	registerPhysicsProperties(editor.getAllocator());

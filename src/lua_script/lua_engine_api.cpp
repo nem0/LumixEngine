@@ -131,15 +131,18 @@ static void logInfo(const char* text)
 }
 
 
-static void
-setEntityPosition(Universe* univ, int entity_index, float x, float y, float z)
+static void setEntityPosition(Universe* univ, int entity_index, float x, float y, float z)
 {
 	univ->setPosition(entity_index, x, y, z);
 }
 
 
-static void setEntityRotation(
-	Universe* univ, int entity_index, float x, float y, float z, float angle)
+static void setEntityRotation(Universe* univ,
+	int entity_index,
+	float x,
+	float y,
+	float z,
+	float angle)
 {
 	if (entity_index < 0 || entity_index > univ->getEntityCount()) return;
 
@@ -147,14 +150,17 @@ static void setEntityRotation(
 }
 
 
-static void setEntityLocalRotation(
-	UniverseContext* univ, int entity_index, float x, float y, float z, float angle)
+static void setEntityLocalRotation(IScene* hierarchy,
+	Entity entity,
+	float x,
+	float y,
+	float z,
+	float angle)
 {
-	if (entity_index < 0 || entity_index >= univ->m_universe->getEntityCount()) return;
+	if (entity == INVALID_ENTITY) return;
 
-	univ->m_hierarchy->setLocalRotation(entity_index, Quat(Vec3(x, y, z), angle));
+	static_cast<Hierarchy*>(hierarchy)->setLocalRotation(entity, Quat(Vec3(x, y, z), angle));
 }
-
 
 
 static void setRenderablePath(IScene* scene, int component, const char* path)

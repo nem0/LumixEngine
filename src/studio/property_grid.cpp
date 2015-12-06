@@ -205,6 +205,13 @@ void PropertyGrid::showEnumProperty(Lumix::ComponentUID cmp, Lumix::IEnumPropert
 	auto getter = [](void* data, int index, const char** out) -> bool {
 		auto* combo_data = static_cast<Data*>(data);
 		*out = combo_data->descriptor->getEnumItemName(combo_data->scene, index);
+		if (!*out)
+		{
+			static char buf[100];
+			combo_data->descriptor->getEnumItemName(combo_data->scene, index, buf, Lumix::lengthOf(buf));
+			*out = buf;
+		}
+
 		return true;
 	};
 
