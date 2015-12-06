@@ -42,16 +42,18 @@ public:
 		ASSERT(index == -1);
 		int value;
 		stream.read(&value, sizeof(value));
-		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, value);
+		auto entity = m_editor.getUniverse()->getEntityFromDenseIdx(value);
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, entity);
 	};
 
 
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		int value = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
-		int len = sizeof(value);
-		stream.write(&value, len);
+		Entity value = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		auto dense_idx = m_editor.getUniverse()->getDenseIdx(value);
+		int len = sizeof(dense_idx);
+		stream.write(&dense_idx, len);
 	};
 
 

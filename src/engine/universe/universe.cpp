@@ -28,43 +28,43 @@ Universe::Universe(IAllocator& allocator)
 	, m_entity_created(m_allocator)
 	, m_entity_destroyed(m_allocator)
 	, m_entity_moved(m_allocator)
-	, m_id_map(m_allocator)
+	, m_entity_map(m_allocator)
 	, m_first_free_slot(-1)
 {
 	m_transformations.reserve(RESERVED_ENTITIES_COUNT);
-	m_id_map.reserve(RESERVED_ENTITIES_COUNT);
+	m_entity_map.reserve(RESERVED_ENTITIES_COUNT);
 }
 
 
 const Vec3& Universe::getPosition(Entity entity) const
 {
-	return m_transformations[m_id_map[entity]].position;
+	return m_transformations[m_entity_map[entity]].position;
 }
 
 
 const Quat& Universe::getRotation(Entity entity) const
 {
-	return m_transformations[m_id_map[entity]].rotation;
+	return m_transformations[m_entity_map[entity]].rotation;
 }
 
 
 void Universe::setRotation(Entity entity, const Quat& rot)
 {
-	m_transformations[m_id_map[entity]].rotation = rot;
+	m_transformations[m_entity_map[entity]].rotation = rot;
 	entityTransformed().invoke(entity);
 }
 
 
 void Universe::setRotation(Entity entity, float x, float y, float z, float w)
 {
-	m_transformations[m_id_map[entity]].rotation.set(x, y, z, w);
+	m_transformations[m_entity_map[entity]].rotation.set(x, y, z, w);
 	entityTransformed().invoke(entity);
 }
 
 
 bool Universe::hasEntity(Entity entity) const
 {
-	return entity >= 0 && entity < m_id_map.size() && m_id_map[entity] >= 0;
+	return entity >= 0 && entity < m_entity_map.size() && m_entity_map[entity] >= 0;
 }
 
 
@@ -72,8 +72,8 @@ void Universe::setMatrix(Entity entity, const Matrix& mtx)
 {
 	Quat rot;
 	mtx.getRotation(rot);
-	m_transformations[m_id_map[entity]].position = mtx.getTranslation();
-	m_transformations[m_id_map[entity]].rotation = rot;
+	m_transformations[m_entity_map[entity]].position = mtx.getTranslation();
+	m_transformations[m_entity_map[entity]].rotation = rot;
 	entityTransformed().invoke(entity);
 }
 
@@ -81,7 +81,7 @@ void Universe::setMatrix(Entity entity, const Matrix& mtx)
 Matrix Universe::getPositionAndRotation(Entity entity) const
 {
 	Matrix mtx;
-	auto& transform = m_transformations[m_id_map[entity]];
+	auto& transform = m_transformations[m_entity_map[entity]];
 	transform.rotation.toMatrix(mtx);
 	mtx.setTranslation(transform.position);
 	return mtx;
@@ -91,7 +91,7 @@ Matrix Universe::getPositionAndRotation(Entity entity) const
 Matrix Universe::getMatrix(Entity entity) const
 {
 	Matrix mtx;
-	auto& transform = m_transformations[m_id_map[entity]];
+	auto& transform = m_transformations[m_entity_map[entity]];
 	transform.rotation.toMatrix(mtx);
 	mtx.setTranslation(transform.position);
 	mtx.multiply3x3(transform.scale);
@@ -101,7 +101,7 @@ Matrix Universe::getMatrix(Entity entity) const
 
 void Universe::setPosition(Entity entity, float x, float y, float z)
 {
-	auto& transform = m_transformations[m_id_map[entity]];
+	auto& transform = m_transformations[m_entity_map[entity]];
 	transform.position.set(x, y, z);
 	entityTransformed().invoke(entity);
 }
@@ -109,7 +109,7 @@ void Universe::setPosition(Entity entity, float x, float y, float z)
 
 void Universe::setPosition(Entity entity, const Vec3& pos)
 {
-	auto& transform = m_transformations[m_id_map[entity]];
+	auto& transform = m_transformations[m_entity_map[entity]];
 	transform.position = pos;
 	entityTransformed().invoke(entity);
 }
@@ -148,25 +148,25 @@ void Universe::createEntity(Entity entity)
 	while (id >= 0 && id != entity)
 	{
 		prev_id = id;
-		id = -m_id_map[id];
+		id = -m_entity_map[id];
 	}
 
 	ASSERT(id == entity);
 	if (prev_id == -1)
 	{
-		m_first_free_slot = -m_id_map[entity];
+		m_first_free_slot = -m_entity_map[entity];
 	}
 	else
 	{
-		m_id_map[prev_id] = m_id_map[entity];
+		m_entity_map[prev_id] = m_entity_map[entity];
 	}
-	m_id_map[entity] = m_transformations.size();
+	m_entity_map[entity] = m_transformations.size();
 
 	Transformation& trans = m_transformations.pushEmpty();
 	trans.position.set(0, 0, 0);
 	trans.rotation.set(0, 0, 0, 1);
 	trans.scale = 1;
-	trans.id = entity;
+	trans.entity = entity;
 
 	m_entity_created.invoke(entity);
 }
@@ -178,20 +178,20 @@ Entity Universe::createEntity(const Vec3& position, const Quat& rotation)
 	if (m_first_free_slot >= 0)
 	{
 		global_id = m_first_free_slot;
-		m_first_free_slot = -m_id_map[m_first_free_slot];
-		m_id_map[global_id] = m_transformations.size();
+		m_first_free_slot = -m_entity_map[m_first_free_slot];
+		m_entity_map[global_id] = m_transformations.size();
 	}
 	else
 	{
-		global_id = m_id_map.size();
-		m_id_map.push(m_transformations.size());
+		global_id = m_entity_map.size();
+		m_entity_map.push(m_transformations.size());
 	}
 
 	Transformation& trans = m_transformations.pushEmpty();
 	trans.position = position;
 	trans.rotation = rotation;
 	trans.scale = 1;
-	trans.id = global_id;
+	trans.entity = global_id;
 	m_entity_created.invoke(global_id);
 
 	return global_id;
@@ -200,12 +200,12 @@ Entity Universe::createEntity(const Vec3& position, const Quat& rotation)
 
 void Universe::destroyEntity(Entity entity)
 {
-	if (entity < 0 || m_id_map[entity] < 0) return;
+	if (entity < 0 || m_entity_map[entity] < 0) return;
 
-	int last_item_id = m_transformations.back().id;
-	m_id_map[last_item_id] = m_id_map[entity];
-	m_transformations.eraseFast(m_id_map[entity]);
-	m_id_map[entity] = m_first_free_slot >= 0 ? -m_first_free_slot : INT32_MIN;
+	int last_item_id = m_transformations.back().entity;
+	m_entity_map[last_item_id] = m_entity_map[entity];
+	m_transformations.eraseFast(m_entity_map[entity]);
+	m_entity_map[entity] = m_first_free_slot >= 0 ? -m_first_free_slot : INT32_MIN;
 
 	int name_index = m_id_to_name_map.find(entity);
 	if (name_index >= 0)
@@ -220,17 +220,23 @@ void Universe::destroyEntity(Entity entity)
 }
 
 
+int Universe::getDenseIdx(Entity entity)
+{
+	return entity < 0 ? -1 : m_entity_map[entity];
+}
+
+
 Entity Universe::getEntityFromDenseIdx(int idx)
 {
-	return m_transformations[idx].id;
+	return m_transformations[idx].entity;
 }
 
 
 Entity Universe::getFirstEntity()
 {
-	for (int i = 0; i < m_id_map.size(); ++i)
+	for (int i = 0; i < m_entity_map.size(); ++i)
 	{
-		if (m_id_map[i] >= 0)
+		if (m_entity_map[i] >= 0)
 		{
 			return i;
 		}
@@ -241,9 +247,9 @@ Entity Universe::getFirstEntity()
 
 Entity Universe::getNextEntity(Entity entity)
 {
-	for (int i = entity + 1; i < m_id_map.size(); ++i)
+	for (int i = entity + 1; i < m_entity_map.size(); ++i)
 	{
-		if (m_id_map[i] >= 0)
+		if (m_entity_map[i] >= 0)
 		{
 			return i;
 		}
@@ -265,10 +271,10 @@ void Universe::serialize(OutputBlob& serializer)
 	}
 
 	serializer.write(m_first_free_slot);
-	serializer.write((int32)m_id_map.size());
-	if (!m_id_map.empty())
+	serializer.write((int32)m_entity_map.size());
+	if (!m_entity_map.empty())
 	{
-		serializer.write(&m_id_map[0], sizeof(m_id_map[0]) * m_id_map.size());
+		serializer.write(&m_entity_map[0], sizeof(m_entity_map[0]) * m_entity_map.size());
 	}
 }
 
@@ -296,17 +302,17 @@ void Universe::deserialize(InputBlob& serializer)
 
 	serializer.read(m_first_free_slot);
 	serializer.read(count);
-	m_id_map.resize(count);
-	if (!m_id_map.empty())
+	m_entity_map.resize(count);
+	if (!m_entity_map.empty())
 	{
-		serializer.read(&m_id_map[0], sizeof(m_id_map[0]) * count);
+		serializer.read(&m_entity_map[0], sizeof(m_entity_map[0]) * count);
 	}
 }
 
 
 void Universe::setScale(Entity entity, float scale)
 {
-	auto& transform = m_transformations[m_id_map[entity]];
+	auto& transform = m_transformations[m_entity_map[entity]];
 	transform.scale = scale;
 	entityTransformed().invoke(entity);
 }
@@ -314,7 +320,7 @@ void Universe::setScale(Entity entity, float scale)
 
 float Universe::getScale(Entity entity)
 {
-	auto& transform = m_transformations[m_id_map[entity]];
+	auto& transform = m_transformations[m_entity_map[entity]];
 	return transform.scale;
 }
 

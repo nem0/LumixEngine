@@ -38,6 +38,7 @@ public:
 	void destroyComponent(Entity entity, uint32 component_type, IScene* scene, int index);
 	int getEntityCount() const { return m_transformations.size(); }
 
+	int getDenseIdx(Entity entity);
 	Entity getEntityFromDenseIdx(int idx);
 	Entity getFirstEntity();
 	Entity getNextEntity(Entity entity);
@@ -70,7 +71,7 @@ public:
 private:
 	struct Transformation
 	{
-		int id;
+		Entity entity;
 		Vec3 position;
 		Quat rotation;
 		float scale;
@@ -79,7 +80,7 @@ private:
 private:
 	IAllocator& m_allocator;
 	Array<Transformation> m_transformations;
-	Array<int> m_id_map;
+	Array<int> m_entity_map;
 	AssociativeArray<uint32, uint32> m_name_to_id_map;
 	AssociativeArray<uint32, string> m_id_to_name_map;
 	DelegateList<void(Entity)> m_entity_moved;
