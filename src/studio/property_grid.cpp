@@ -237,62 +237,81 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 
 	bool changed = false;
 	auto cp = ImGui::GetCursorScreenPos();
+	
+	ImVec2 editor_size;
 	if (ImGui::BeginCurveEditor(desc.getName()))
 	{
-		ImVec2 editor_size(ImGui::CalcItemWidth(), ImGui::GetItemRectSize().y);
-		for (int i = 0; i < count; ++i)
+		editor_size = ImVec2(ImGui::CalcItemWidth(), ImGui::GetItemRectSize().y);
+
+		for (int i = 1; i < count; i += 3)
 		{
-			ImVec2 p;
-			p.x = f[i].x;
-			p.y = f[i].y;
-			if (ImGui::CurvePoint(&p, ImVec2(0, 0), ImVec2(desc.getMaxX(), desc.getMaxY())))
+			if (ImGui::CurvePoint((ImVec2*)(f + i - 1)))
 			{
 				changed = true;
-				f[i].x = p.x;
-				f[i].y = p.y;
-				if (i > 0)
+				if (i > 1)
 				{
-					f[i].x = Lumix::Math::maxValue(f[i - 1].x + 0.001f, f[i].x);
+					f[i].x = Lumix::Math::maxValue(f[i - 3].x + 0.001f, f[i].x);
 				}
-				if (i < count - 1)
+				if (i + 3 < count)
 				{
-					f[i].x = Lumix::Math::minValue(f[i + 1].x - 0.001f, f[i].x);
+					f[i].x = Lumix::Math::minValue(f[i + 3].x - 0.001f, f[i].x);
 				}
 			}
 			if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))
 			{
-				f[i] = f[count - 1];
-				--count;
+				for (int j = i - 1; j < count - 3; ++j)
+				{
+					f[j] = f[j + 3];
+				}
+				count -= 3;
 				*(int*)blob.getData() = count;
 				changed = true;
 			}
 		}
 
-		if (!changed && ImGui::IsMouseDoubleClicked(0))
-		{
-			auto mp = ImGui::GetMousePos();
-			mp.x -= cp.x;
-			mp.y -= cp.y;
-			mp.x /= editor_size.x;
-			mp.y /= editor_size.y;
-			mp.y = 1 - mp.y;
-			blob.write(mp);
-			++count;
-			*(int*)blob.getData() = count;
-			f = (Lumix::Vec2*)((int*)blob.getData() + 1);
-			changed = true;
-
-			auto compare = [](const void* a, const void* b) -> int
-			{
-				float fa = *(const float*)a;
-				float fb = *(const float*)b;
-				return fa < fb ? -1 : (fa > fb) ? 1 : 0;
-			};
-
-			qsort(f, count, sizeof(f[0]), compare);
-		}
+		f[count - 2].x = 1;
+		f[1].x = 0;
 	}
 	ImGui::EndCurveEditor();
+	if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))
+	{
+		auto mp = ImGui::GetMousePos();
+		mp.x -= cp.x;
+		mp.y -= cp.y;
+		mp.x /= editor_size.x;
+		mp.y /= editor_size.y;
+		mp.y = 1 - mp.y;
+		blob.write(ImVec2(-0.2f, 0));
+		blob.write(mp);
+		blob.write(ImVec2(0.2f, 0));
+		count += 3;
+		*(int*)blob.getData() = count;
+		f = (Lumix::Vec2*)((int*)blob.getData() + 1);
+		changed = true;
+
+		auto compare = [](const void* a, const void* b) -> int
+		{
+			float fa = ((const float*)a)[2];
+			float fb = ((const float*)b)[2];
+			return fa < fb ? -1 : (fa > fb) ? 1 : 0;
+		};
+
+		qsort(f, count / 3, 3 * sizeof(f[0]), compare);
+	}
+
+	if (changed)
+	{
+		for (int i = 2; i < count - 3; i += 3)
+		{
+			auto prev_p = ((Lumix::Vec2*)f)[i - 1];
+			auto next_p = ((Lumix::Vec2*)f)[i + 2];
+			auto& tangent = ((Lumix::Vec2*)f)[i];
+			auto& tangent2 = ((Lumix::Vec2*)f)[i + 1];
+			float half = 0.5f * (next_p.x - prev_p.x);
+			tangent = tangent.normalized() * half;
+			tangent2 = tangent2.normalized() * half;
+		}
+	}
 
 	if (changed)
 	{

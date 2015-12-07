@@ -6,6 +6,14 @@ namespace Lumix
 {
 
 
+float Vec2::length() const
+{
+	float x = this->x;
+	float y = this->y;
+	return sqrt(x * x + y * y);
+}
+
+
 void Vec3::normalize()
 {
 	float x = this->x;

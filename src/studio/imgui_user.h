@@ -35,7 +35,7 @@ ImVec2 GetNodeOutputPos(ImGuiID node_id, int output);
 void NodeSlots(int count, bool input);
 
 bool BeginCurveEditor(const char* label);
-bool CurvePoint(ImVec2* point, const ImVec2& values_min, const ImVec2& values_max);
+bool CurvePoint(ImVec2* point);
 void EndCurveEditor();
 
 

@@ -79,11 +79,16 @@ ParticleEmitter::AlphaModule::AlphaModule(ParticleEmitter& emitter)
 	, m_values(emitter.getAllocator())
 	, m_sampled(emitter.getAllocator())
 {
-	m_values.resize(4);
-	m_values[0].set(0, 0);
-	m_values[1].set(0.33f, 1.0f);
-	m_values[2].set(0.66f, 1.0f);
-	m_values[3].set(1.0f, 1.0f);
+	m_values.resize(9);
+	m_values[0].set(-0.2f, 0);
+	m_values[1].set(0, 0);
+	m_values[2].set(0.2f, 0.0f);
+	m_values[3].set(-0.2f, 0.0f);
+	m_values[4].set(0.5f, 1.0f);
+	m_values[5].set(0.2f, 0.0f);
+	m_values[6].set(-0.2f, 0.0f);
+	m_values[7].set(1, 0);
+	m_values[8].set(0.2f, 0);
 	sample();
 }
 
@@ -92,14 +97,14 @@ void ParticleEmitter::AlphaModule::sample()
 {
 	m_sampled.resize(20);
 	auto sampleAt = [this](float t) {
-		for(int i = 0; i < m_values.size(); ++i)
+		for(int i = 1; i < m_values.size(); i += 3)
 		{
 			if(m_values[i].x > t)
 			{
-				if(i == 0) return 0.0f;
+				if(i == 1) return 0.0f;
 
-				float r = (t - m_values[i - 1].x) / (m_values[i].x - m_values[i - 1].x);
-				return m_values[i - 1].y + r * (m_values[i].y - m_values[i - 1].y);
+				float r = (t - m_values[i - 3].x) / (m_values[i].x - m_values[i - 3].x);
+				return m_values[i - 3].y + r * (m_values[i].y - m_values[i - 3].y);
 			}
 		}
 
@@ -140,11 +145,16 @@ ParticleEmitter::SizeModule::SizeModule(ParticleEmitter& emitter)
 	, m_values(emitter.getAllocator())
 	, m_sampled(emitter.getAllocator())
 {
-	m_values.resize(4);
-	m_values[0].set(0, 0);
-	m_values[1].set(0.33f, 1.0f);
-	m_values[2].set(0.66f, 1.0f);
-	m_values[3].set(1.0f, 1.0f);
+	m_values.resize(9);
+	m_values[0].set(-0.2f, 0);
+	m_values[1].set(0, 0);
+	m_values[2].set(0.2f, 0.0f);
+	m_values[3].set(-0.2f, 0.0f);
+	m_values[4].set(0.5f, 1.0f);
+	m_values[5].set(0.2f, 0.0f);
+	m_values[6].set(-0.2f, 0.0f);
+	m_values[7].set(1, 0);
+	m_values[8].set(0.2f, 0);
 	sample();
 }
 
