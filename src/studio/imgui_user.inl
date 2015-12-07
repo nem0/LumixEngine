@@ -315,32 +315,13 @@ ImVec2 operator *(float f, const ImVec2& v)
 }
 
 
-static ImVec2 pointOnCurve(ImVec2* cp, float t)
+CurveEditor BeginCurveEditor(const char* label)
 {
-	auto A = cp[0];
-	auto B = cp[1];
-	auto C = cp[2];
-	auto D = cp[3];
+	CurveEditor editor;
+	editor.valid = false;
 
-	auto a = t;
-	auto b = 1 - t;
-
-	auto point = A * b * b * b + 3 * B * b * b * a + 3 * C * b * a * a + D * a * a * a;
-	return point;
-}
-
-
-static ImVec2 beg_pos;
-static ImVec2 prev_point;
-static ImVec2 prev_tangent;
-static int point_idx;
-TODO("todo");
-
-
-bool BeginCurveEditor(const char* label)
-{
 	ImGuiWindow* window = GetCurrentWindow();
-	if (window->SkipItems) return false;
+	if (window->SkipItems) return editor;
 
 	ImGuiState& g = *GImGui;
 	const ImGuiStyle& style = g.Style;
@@ -357,30 +338,33 @@ bool BeginCurveEditor(const char* label)
 
 	ItemSize(total_bb, style.FramePadding.y);
 	if (!ItemAdd(total_bb, NULL))
-		return false;
+		return editor;
+
+	editor.valid = true;
+	ImGui::PushID(label);
 
 	RenderFrame(frame_bb.Min, frame_bb.Max, window->Color(ImGuiCol_FrameBg), true, style.FrameRounding);
 	RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y), label);
 
-
-	beg_pos = cursor_pos;
+	editor.beg_pos = cursor_pos;
 	ImGui::SetCursorScreenPos(cursor_pos);
 
-	point_idx = -1;
+	editor.point_idx = -1;
 
-	return true;
+	return editor;
 }
 
 
-void EndCurveEditor()
+void EndCurveEditor(const CurveEditor& editor)
 {
-	ImGui::SetCursorScreenPos(beg_pos);
+	ImGui::SetCursorScreenPos(editor.beg_pos);
 
 	InvisibleButton("bg", ImVec2(ImGui::CalcItemWidth(), 100));
+	ImGui::PopID();
 }
 
 
-bool CurvePoint(ImVec2* points)
+bool CurvePoint(ImVec2* points, CurveEditor& editor)
 {
 	ImGuiWindow* window = GetCurrentWindow();
 	ImGuiState& g = *GImGui;
@@ -407,22 +391,22 @@ bool CurvePoint(ImVec2* points)
 	};
 
 	auto pos = transform(p);
-	if (point_idx >= 0)
+	if (editor.point_idx >= 0)
 	{
 		window->DrawList->AddBezierCurve(pos,
 			transform(p + left_tangent),
-			transform(prev_point + prev_tangent),
-			transform(prev_point),
+			transform(editor.prev_point + editor.prev_tangent),
+			transform(editor.prev_point),
 			col_base,
 			1.0f);
 	}
-	prev_point = p;
-	prev_tangent = right_tangent;
+	editor.prev_point = p;
+	editor.prev_tangent = right_tangent;
 
 	static const float SIZE = 3;
 	ImGui::SetCursorScreenPos(pos - ImVec2(SIZE, SIZE));
-	ImGui::PushID(point_idx);
-	++point_idx;
+	ImGui::PushID(editor.point_idx);
+	++editor.point_idx;
 	ImGui::InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
 
 	ImU32 col = ImGui::IsItemHovered() ? col_hovered : col_base;
