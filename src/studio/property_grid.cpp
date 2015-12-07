@@ -239,13 +239,14 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 	auto cp = ImGui::GetCursorScreenPos();
 	
 	ImVec2 editor_size;
-	if (ImGui::BeginCurveEditor(desc.getName()))
+	auto editor = ImGui::BeginCurveEditor(desc.getName());
+	if (editor.valid)
 	{
 		editor_size = ImVec2(ImGui::CalcItemWidth(), ImGui::GetItemRectSize().y);
 
 		for (int i = 1; i < count; i += 3)
 		{
-			if (ImGui::CurvePoint((ImVec2*)(f + i - 1)))
+			if (ImGui::CurvePoint((ImVec2*)(f + i - 1), editor))
 			{
 				changed = true;
 				if (i > 1)
@@ -272,7 +273,7 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 		f[count - 2].x = 1;
 		f[1].x = 0;
 	}
-	ImGui::EndCurveEditor();
+	ImGui::EndCurveEditor(editor);
 	if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))
 	{
 		auto mp = ImGui::GetMousePos();
