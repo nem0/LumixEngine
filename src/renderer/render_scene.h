@@ -177,7 +177,8 @@ public:
 	virtual void setCameraSize(ComponentIndex camera, int w, int h) = 0;
 
 	virtual const Array<class ParticleEmitter*>& getParticleEmitters() const = 0;
-	virtual float getParticleEmitterAlpha(ComponentIndex cmp, int index) = 0;
+	virtual const Vec2* getParticleEmitterAlpha(ComponentIndex cmp) = 0;
+	virtual int getParticleEmitterAlphaCount(ComponentIndex cmp) = 0;
 	virtual const Vec2* getParticleEmitterSize(ComponentIndex cmp) = 0;
 	virtual int getParticleEmitterSizeCount(ComponentIndex cmp) = 0;
 	virtual Vec2 getParticleEmitterLinearMovementX(ComponentIndex cmp) = 0;
@@ -186,7 +187,7 @@ public:
 	virtual Vec2 getParticleEmitterInitialLife(ComponentIndex cmp) = 0;
 	virtual Vec2 getParticleEmitterSpawnPeriod(ComponentIndex cmp) = 0;
 	virtual Vec2 getParticleEmitterInitialSize(ComponentIndex cmp) = 0;
-	virtual void setParticleEmitterAlpha(ComponentIndex cmp, int index, float value) = 0;
+	virtual void setParticleEmitterAlpha(ComponentIndex cmp, const Vec2* value, int count) = 0;
 	virtual void setParticleEmitterSize(ComponentIndex cmp, const Vec2* values, int count) = 0;
 	virtual void setParticleEmitterLinearMovementX(ComponentIndex cmp, const Vec2& value) = 0;
 	virtual void setParticleEmitterLinearMovementY(ComponentIndex cmp, const Vec2& value) = 0;

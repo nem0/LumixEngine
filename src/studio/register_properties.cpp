@@ -199,14 +199,14 @@ void registerRendererProperties(IAllocator& allocator)
 	PropertyRegister::registerComponentDependency(
 		"particle_emitter_random_rotation", "particle_emitter");
 
-	/*PropertyRegister::add("particle_emitter_fade",
+	PropertyRegister::add("particle_emitter_fade",
 		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("alpha",
 		&RenderScene::getParticleEmitterAlpha,
 		&RenderScene::setParticleEmitterAlpha,
-		0, 
+		&RenderScene::getParticleEmitterAlphaCount,
+		1, 
 		1,
-		allocator));*/
-	TODO("todo");
+		allocator));
 
 	PropertyRegister::add("particle_emitter_size",
 		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("size",
