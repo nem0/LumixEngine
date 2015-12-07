@@ -77,36 +77,62 @@ const uint32 ParticleEmitter::LinearMovementModule::s_type = Lumix::crc32("linea
 ParticleEmitter::AlphaModule::AlphaModule(ParticleEmitter& emitter)
 	: ModuleBase(emitter)
 	, m_values(emitter.getAllocator())
+	, m_sampled(emitter.getAllocator())
 {
-	m_values.resize(10);
-	m_values[0] = 0.33f;
-	m_values[1] = 0.66f;
-	m_values[2] = 0.8f;
-	m_values[3] = 0.7f;
-	m_values[4] = 0.6f;
-	m_values[5] = 0.5f;
-	m_values[6] = 0.4f;
-	m_values[7] = 0.3f;
-	m_values[8] = 0.15f;
-	m_values[9] = 0.0f;
+	m_values.resize(9);
+	m_values[0].set(-0.2f, 0);
+	m_values[1].set(0, 0);
+	m_values[2].set(0.2f, 0.0f);
+	m_values[3].set(-0.2f, 0.0f);
+	m_values[4].set(0.5f, 1.0f);
+	m_values[5].set(0.2f, 0.0f);
+	m_values[6].set(-0.2f, 0.0f);
+	m_values[7].set(1, 0);
+	m_values[8].set(0.2f, 0);
+	sample();
+}
+
+
+void ParticleEmitter::AlphaModule::sample()
+{
+	m_sampled.resize(20);
+	auto sampleAt = [this](float t) {
+		for(int i = 1; i < m_values.size(); i += 3)
+		{
+			if(m_values[i].x > t)
+			{
+				if(i == 1) return 0.0f;
+
+				float r = (t - m_values[i - 3].x) / (m_values[i].x - m_values[i - 3].x);
+				return m_values[i - 3].y + r * (m_values[i].y - m_values[i - 3].y);
+			}
+		}
+
+		return 0.0f;
+	};
+
+	for(int i = 0; i < m_sampled.size(); ++i)
+	{
+		m_sampled[i] = sampleAt(i / (float)m_sampled.size());
+	}
 }
 
 
 void ParticleEmitter::AlphaModule::update(float)
 {
-	if (m_emitter.m_alpha.empty()) return;
+	if(m_emitter.m_alpha.empty()) return;
 
-	float* alpha = &m_emitter.m_alpha[0];
+	float* particle_alpha = &m_emitter.m_alpha[0];
 	float* rel_life = &m_emitter.m_rel_life[0];
-	int size = m_values.size() - 1;
+	int size = m_sampled.size() - 1;
 	float float_size = (float)size;
-	for (int i = 0, c = m_emitter.m_alpha.size(); i < c; ++i)
+	for(int i = 0, c = m_emitter.m_size.size(); i < c; ++i)
 	{
 		float float_idx = float_size * rel_life[i];
 		int idx = (int)float_idx;
 		int next_idx = Math::minValue(idx + 1, size);
 		float w = float_idx - idx;
-		alpha[i] = m_values[idx] * (1 - w) + m_values[next_idx] * w;
+		particle_alpha[i] = m_sampled[idx] * (1 - w) + m_sampled[next_idx] * w;
 	}
 }
 
@@ -117,18 +143,44 @@ const uint32 ParticleEmitter::AlphaModule::s_type = Lumix::crc32("alpha");
 ParticleEmitter::SizeModule::SizeModule(ParticleEmitter& emitter)
 	: ModuleBase(emitter)
 	, m_values(emitter.getAllocator())
+	, m_sampled(emitter.getAllocator())
 {
-	m_values.resize(10);
-	m_values[0] = 0.33f;
-	m_values[1] = 0.66f;
-	m_values[2] = 0.8f;
-	m_values[3] = 0.7f;
-	m_values[4] = 0.6f;
-	m_values[5] = 0.5f;
-	m_values[6] = 0.4f;
-	m_values[7] = 0.3f;
-	m_values[8] = 0.15f;
-	m_values[9] = 0.0f;
+	m_values.resize(9);
+	m_values[0].set(-0.2f, 0);
+	m_values[1].set(0, 0);
+	m_values[2].set(0.2f, 0.0f);
+	m_values[3].set(-0.2f, 0.0f);
+	m_values[4].set(0.5f, 1.0f);
+	m_values[5].set(0.2f, 0.0f);
+	m_values[6].set(-0.2f, 0.0f);
+	m_values[7].set(1, 0);
+	m_values[8].set(0.2f, 0);
+	sample();
+}
+
+
+void ParticleEmitter::SizeModule::sample()
+{
+	m_sampled.resize(20);
+	auto sampleAt = [this](float t) {
+		for (int i = 0; i < m_values.size(); ++i)
+		{
+			if (m_values[i].x > t)
+			{
+				if (i == 0) return 0.0f;
+
+				float r = (t - m_values[i - 1].x) / (m_values[i].x - m_values[i - 1].x);
+				return m_values[i - 1].y + r * (m_values[i].y - m_values[i - 1].y);
+			}
+		}
+
+		return 0.0f;
+	};
+
+	for (int i = 0; i < m_sampled.size(); ++i)
+	{
+		m_sampled[i] = sampleAt(i / (float)m_sampled.size());
+	}
 }
 
 
@@ -138,7 +190,7 @@ void ParticleEmitter::SizeModule::update(float)
 
 	float* particle_size = &m_emitter.m_size[0];
 	float* rel_life = &m_emitter.m_rel_life[0];
-	int size = m_values.size() - 1;
+	int size = m_sampled.size() - 1;
 	float float_size = (float)size;
 	for (int i = 0, c = m_emitter.m_size.size(); i < c; ++i)
 	{
@@ -146,7 +198,7 @@ void ParticleEmitter::SizeModule::update(float)
 		int idx = (int)float_idx;
 		int next_idx = Math::minValue(idx + 1, size);
 		float w = float_idx - idx;
-		particle_size[i] = m_values[idx] * (1 - w) + m_values[next_idx] * w;
+		particle_size[i] = m_sampled[idx] * (1 - w) + m_sampled[next_idx] * w;
 	}
 }
 

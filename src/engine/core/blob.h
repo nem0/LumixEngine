@@ -46,6 +46,7 @@ namespace Lumix
 			template <class T> void read(T& value) { read(&value, sizeof(T)); }
 			template <class T> T read() { T v; read(&v, sizeof(v)); return v; }
 			template <> bool read<bool>() { uint8 v; read(&v, sizeof(v)); return v != 0; }
+			const void* skip(int size);
 			const void* getData() const { return (const void*)m_data; }
 			int getSize() const { return m_size; }
 			void setPosition(int pos) { m_pos = pos; }

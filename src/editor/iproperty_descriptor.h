@@ -109,8 +109,8 @@ public:
 	{
 	}
 
-	virtual float getMin() = 0;
-	virtual float getMax() = 0;
+	virtual float getMaxX() = 0;
+	virtual float getMaxY() = 0;
 };
 
 

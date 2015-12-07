@@ -42,7 +42,7 @@ public:
 		ASSERT(index == -1);
 		int value;
 		stream.read(&value, sizeof(value));
-		auto entity = m_editor.getUniverse()->getEntityFromDenseIdx(value);
+		auto entity = value < 0 ? INVALID_ENTITY : m_editor.getUniverse()->getEntityFromDenseIdx(value);
 		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, entity);
 	};
 
@@ -199,20 +199,21 @@ void registerRendererProperties(IAllocator& allocator)
 	PropertyRegister::registerComponentDependency(
 		"particle_emitter_random_rotation", "particle_emitter");
 
-	typedef SampledFunctionDescriptor<RenderScene, 10> SampledFunctionDescT;
 	PropertyRegister::add("particle_emitter_fade",
-		LUMIX_NEW(allocator, SampledFunctionDescT)("alpha",
+		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("alpha",
 		&RenderScene::getParticleEmitterAlpha,
 		&RenderScene::setParticleEmitterAlpha,
-		0, 
+		&RenderScene::getParticleEmitterAlphaCount,
+		1, 
 		1,
 		allocator));
 
 	PropertyRegister::add("particle_emitter_size",
-		LUMIX_NEW(allocator, SampledFunctionDescT)("size",
+		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("size",
 		&RenderScene::getParticleEmitterSize,
 		&RenderScene::setParticleEmitterSize,
-		0,
+		&RenderScene::getParticleEmitterSizeCount,
+		1,
 		1,
 		allocator));
 

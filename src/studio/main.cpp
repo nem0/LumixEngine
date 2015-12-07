@@ -176,6 +176,8 @@ public:
 				ImGui::Separator();
 
 				ImGui::Text("Version 0.19. - News");
+				ImGui::BulletText("Particle system using bezier curves");
+				ImGui::BulletText("Bezier curves in GUI");
 				ImGui::Separator();
 				ImGui::Text("Version 0.18. - News");
 				ImGui::BulletText("Collision events are sent to scripts");
