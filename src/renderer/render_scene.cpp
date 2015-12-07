@@ -101,7 +101,7 @@ struct PointLight
 
 struct GlobalLight
 {
-	int m_uid;
+	ComponentIndex m_uid;
 	Vec3 m_color;
 	float m_intensity;
 	Vec3 m_ambient_color;
@@ -823,8 +823,8 @@ public:
 	void setParticleEmitterAlpha(ComponentIndex cmp, const Vec2* values, int count) override
 	{
 		ASSERT(count > 0);
-		ASSERT(values[0].x < 0.001f);
-		ASSERT(values[count - 1].x > 0.999f);
+		ASSERT(values[1].x < 0.001f);
+		ASSERT(values[count - 2].x > 0.999f);
 
 		auto& modules = m_particle_emitters[cmp]->m_modules;
 		for(auto* module : modules)
