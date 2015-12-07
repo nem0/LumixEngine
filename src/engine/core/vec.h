@@ -17,6 +17,18 @@ struct LUMIX_ENGINE_API Vec2
 	{
 	}
 
+	void set(float a, float b)
+	{
+		x = a;
+		y = b;
+	}
+
+
+	Vec2 operator*(float f) const { return Vec2(x * f, y * f); }
+	Vec2 operator+(const Vec2& v) const { return Vec2(x * v.x, y * v.y); }
+	Vec2 normalized() const { return *this * (1 / length()); }
+	float length() const;
+
 	float x, y;
 };
 

@@ -34,6 +34,19 @@ ImVec2 GetNodeInputPos(ImGuiID node_id, int input);
 ImVec2 GetNodeOutputPos(ImGuiID node_id, int output);
 void NodeSlots(int count, bool input);
 
-bool SampledFunctionInput(const char* label, float* values, int count, float scale_min, float scale_max);
+
+struct CurveEditor
+{
+	bool valid;
+	ImVec2 beg_pos;
+	ImVec2 prev_point;
+	ImVec2 prev_tangent;
+	int point_idx;
+};
+
+CurveEditor BeginCurveEditor(const char* label);
+bool CurvePoint(ImVec2* point, CurveEditor& editor);
+void EndCurveEditor(const CurveEditor& editor);
+
 
 } // namespace ImGui

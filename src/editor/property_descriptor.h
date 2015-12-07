@@ -479,26 +479,29 @@ public:
 };
 
 
-template <class S, int COUNT> class SampledFunctionDescriptor : public ISampledFunctionDescriptor
+template <class S> class SampledFunctionDescriptor : public ISampledFunctionDescriptor
 {
 public:
-	typedef float (S::*Getter)(ComponentIndex, int);
-	typedef void (S::*Setter)(ComponentIndex, int, float);
+	typedef const Lumix::Vec2* (S::*Getter)(ComponentIndex);
+	typedef int (S::*CountGetter)(ComponentIndex);
+	typedef void (S::*Setter)(ComponentIndex, const Lumix::Vec2*, int);
 
 public:
 	SampledFunctionDescriptor(const char* name,
-		Getter _getter,
-		Setter _setter,
-		float min,
-		float max,
+		Getter getter,
+		Setter setter,
+		CountGetter count_getter,
+		float max_x,
+		float max_y,
 		IAllocator& allocator)
 		: ISampledFunctionDescriptor(allocator)
 	{
 		setName(name);
-		m_getter = _getter;
-		m_setter = _setter;
-		m_min = min;
-		m_max = max;
+		m_getter = getter;
+		m_setter = setter;
+		m_count_getter = count_getter;
+		m_max_x = max_x;
+		m_max_y = max_y;
 		m_type = SAMPLED_FUNCTION;
 	}
 
@@ -506,35 +509,32 @@ public:
 	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		for(int i = 0; i < COUNT; ++i)
-		{
-			float f;
-			stream.read(&f, sizeof(f));
-			(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, i, f);
-		}
+		int count;
+		stream.read(count);
+		auto* buf = (const Lumix::Vec2*)stream.skip(sizeof(Lumix::Vec2) * count);
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, buf, count);
 	};
 
 
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		for(int i = 0; i < COUNT; ++i)
-		{
-			float f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index, i);
-			int len = sizeof(f);
-			stream.write(&f, len);
-		}
+		int count = (static_cast<S*>(cmp.scene)->*m_count_getter)(cmp.index);
+		stream.write(count);
+		const Lumix::Vec2* values = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		stream.write(values, sizeof(values[0]) * count);
 	};
 
 
-	float getMin() override { return m_min; }
-	float getMax() override { return m_max; }
+	float getMaxX() override { return m_max_x; }
+	float getMaxY() override { return m_max_y; }
 
 private:
 	Getter m_getter;
 	Setter m_setter;
-	float m_min;
-	float m_max;
+	CountGetter m_count_getter;
+	float m_max_x;
+	float m_max_y;
 };
 
 
