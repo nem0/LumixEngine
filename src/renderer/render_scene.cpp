@@ -820,14 +820,24 @@ public:
 	}
 
 
-	void setParticleEmitterAlpha(ComponentIndex cmp, int index, float value) override
+	void setParticleEmitterAlpha(ComponentIndex cmp, const Vec2* values, int count) override
 	{
+		ASSERT(count > 0);
+		ASSERT(values[0].x < 0.001f);
+		ASSERT(values[count - 1].x > 0.999f);
+
 		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
+		for(auto* module : modules)
 		{
-			if (module->getType() == ParticleEmitter::AlphaModule::s_type)
+			if(module->getType() == ParticleEmitter::AlphaModule::s_type)
 			{
-				static_cast<ParticleEmitter::AlphaModule*>(module)->m_values[index] = value;
+				auto alpha_module = static_cast<ParticleEmitter::AlphaModule*>(module);
+				alpha_module->m_values.resize(count);
+				for(int i = 0; i < count; ++i)
+				{
+					alpha_module->m_values[i] = values[i];
+				}
+				alpha_module->sample();
 				return;
 			}
 		}
@@ -886,14 +896,28 @@ public:
 	}
 
 
-	float getParticleEmitterAlpha(ComponentIndex cmp, int index) override
+	int getParticleEmitterAlphaCount(ComponentIndex cmp) override 
+	{
+		auto& modules = m_particle_emitters[cmp]->m_modules;
+		for(auto* module : modules)
+		{
+			if(module->getType() == ParticleEmitter::AlphaModule::s_type)
+			{
+				return static_cast<ParticleEmitter::AlphaModule*>(module)->m_values.size();
+			}
+		}
+		return 0;
+	}
+
+
+	const Vec2* getParticleEmitterAlpha(ComponentIndex cmp) override
 	{
 		auto& modules = m_particle_emitters[cmp]->m_modules;
 		for (auto* module : modules)
 		{
 			if (module->getType() == ParticleEmitter::AlphaModule::s_type)
 			{
-				return static_cast<ParticleEmitter::AlphaModule*>(module)->m_values[index];
+				return &static_cast<ParticleEmitter::AlphaModule*>(module)->m_values[0];
 			}
 		}
 		return 0;
