@@ -61,8 +61,7 @@ EditorIcon::EditorIcon(WorldEditor& editor, RenderScene& scene, Entity entity)
 	m_scene = &scene;
 	m_entity = entity;
 	m_is_visible = true;
-	const WorldEditor::ComponentList& cmps =
-		editor.getComponents(entity);
+	const WorldEditor::ComponentList& cmps = editor.getComponents(entity);
 	m_type = ENTITY;
 	for (int i = 0; i < cmps.size(); ++i)
 	{
@@ -81,8 +80,7 @@ EditorIcon::EditorIcon(WorldEditor& editor, RenderScene& scene, Entity entity)
 			m_type = CAMERA;
 			break;
 		}
-		else if (cmps[i].type == crc32("global_light") ||
-				 cmps[i].type == crc32("point_light"))
+		else if (cmps[i].type == crc32("global_light") || cmps[i].type == crc32("point_light"))
 		{
 			m_type = LIGHT;
 			break;
