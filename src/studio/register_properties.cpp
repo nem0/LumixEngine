@@ -106,8 +106,9 @@ void registerLuaScriptProperties(IAllocator& allocator)
 
 void registerAudioProperties(IAllocator& allocator)
 {
-	PropertyRegister::registerComponentType("audio_listener", "Audio listener");
 	PropertyRegister::registerComponentType("ambient_sound", "Ambient sound");
+	PropertyRegister::registerComponentType("audio_listener", "Audio listener");
+	PropertyRegister::registerComponentType("echo_zone", "Echo zone");
 
 
 	PropertyRegister::add("ambient_sound",

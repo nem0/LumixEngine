@@ -410,7 +410,7 @@ bool CurvePoint(ImVec2* points, CurveEditor& editor)
 	ImGui::InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
 
 	ImU32 col = ImGui::IsItemHovered() ? col_hovered : col_base;
-	
+
 	window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, SIZE), col);
 	window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, SIZE), col);
 	window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, -SIZE), col);
