@@ -711,113 +711,124 @@ public:
 		m_dynamic_renderable_cache.erase(entity);
 	}
 
-	void destroyComponent(ComponentIndex component, uint32 type) override
+
+	void destroyGlobalLight(ComponentIndex component)
 	{
-		if (type == RENDERABLE_HASH)
-		{
-			destroyRenderable(component);
-		}
-		else if (type == GLOBAL_LIGHT_HASH)
-		{
-			Entity entity = m_global_lights[getGlobalLightIndex(component)].m_entity;
+		Entity entity = m_global_lights[getGlobalLightIndex(component)].m_entity;
 
-			m_universe.destroyComponent(entity, type, this, component);
+		m_universe.destroyComponent(entity, GLOBAL_LIGHT_HASH, this, component);
 
-			if (component == m_active_global_light_uid)
+		if (component == m_active_global_light_uid)
+		{
+			m_active_global_light_uid = -1;
+		}
+		m_global_lights.eraseFast(getGlobalLightIndex(component));
+	}
+
+
+	void destroyPointLight(ComponentIndex component)
+	{
+		int index = getPointLightIndex(component);
+		Entity entity = m_point_lights[getPointLightIndex(component)].m_entity;
+		m_point_lights.eraseFast(index);
+		m_light_influenced_geometry.eraseFast(index);
+		m_universe.destroyComponent(entity, POINT_LIGHT_HASH, this, component);
+	}
+
+
+	void destroyCamera(ComponentIndex component)
+	{
+		Entity entity = m_cameras[component].m_entity;
+		m_cameras[component].m_is_free = true;
+		m_universe.destroyComponent(entity, CAMERA_HASH, this, component);
+	}
+
+
+	void destroyTerrain(ComponentIndex component)
+	{
+		Entity entity = m_terrains[component]->getEntity();
+		LUMIX_DELETE(m_allocator, m_terrains[component]);
+		m_terrains[component] = nullptr;
+		m_universe.destroyComponent(entity, TERRAIN_HASH, this, component);
+	}
+
+
+	void destroyParticleEmitter(ComponentIndex component)
+	{
+		Entity entity = m_particle_emitters[component]->m_entity;
+		LUMIX_DELETE(m_allocator, m_particle_emitters[component]);
+		m_particle_emitters[component] = nullptr;
+		m_universe.destroyComponent(entity, PARTICLE_EMITTER_HASH, this, component);
+	}
+
+
+	void destroyParticleEmitterFade(ComponentIndex component)
+	{
+		auto* emitter = m_particle_emitters[component];
+		for (auto* module : emitter->m_modules)
+		{
+			if (module->getType() == ParticleEmitter::AlphaModule::s_type)
 			{
-				m_active_global_light_uid = -1;
+				LUMIX_DELETE(m_allocator, module);
+				emitter->m_modules.eraseItem(module);
+				m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_FADE_HASH, this, component);
+				break;
 			}
-			m_global_lights.eraseFast(getGlobalLightIndex(component));
-		}
-		else if (type == POINT_LIGHT_HASH)
-		{
-			int index = getPointLightIndex(component);
-			Entity entity = m_point_lights[getPointLightIndex(component)].m_entity;
-			m_point_lights.eraseFast(index);
-			m_light_influenced_geometry.eraseFast(index);
-			m_universe.destroyComponent(entity, type, this, component);
-		}
-		else if (type == CAMERA_HASH)
-		{
-			Entity entity = m_cameras[component].m_entity;
-			m_cameras[component].m_is_free = true;
-			m_universe.destroyComponent(entity, type, this, component);
-		}
-		else if (type == TERRAIN_HASH)
-		{
-			Entity entity = m_terrains[component]->getEntity();
-			LUMIX_DELETE(m_allocator, m_terrains[component]);
-			m_terrains[component] = nullptr;
-			m_universe.destroyComponent(entity, type, this, component);
-		}
-		else if (type == PARTICLE_EMITTER_HASH)
-		{
-			Entity entity = m_particle_emitters[component]->m_entity;
-			LUMIX_DELETE(m_allocator, m_particle_emitters[component]);
-			m_particle_emitters[component] = nullptr;
-			m_universe.destroyComponent(entity, type, this, component);
-		}
-		else if (type == PARTICLE_EMITTER_FADE_HASH)
-		{
-			auto* emitter = m_particle_emitters[component];
-			for (auto* module : emitter->m_modules)
-			{
-				if (module->getType() == ParticleEmitter::AlphaModule::s_type)
-				{
-					LUMIX_DELETE(m_allocator, module);
-					emitter->m_modules.eraseItem(module);
-					m_universe.destroyComponent(emitter->m_entity, type, this, component);
-					break;
-				}
-			}
-		}
-		else if (type == PARTICLE_EMITTER_SIZE_HASH)
-		{
-			auto* emitter = m_particle_emitters[component];
-			for (auto* module : emitter->m_modules)
-			{
-				if (module->getType() == ParticleEmitter::SizeModule::s_type)
-				{
-					LUMIX_DELETE(m_allocator, module);
-					emitter->m_modules.eraseItem(module);
-					m_universe.destroyComponent(emitter->m_entity, type, this, component);
-					break;
-				}
-			}
-		}
-		else if (type == PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH)
-		{
-			auto* emitter = m_particle_emitters[component];
-			for (auto* module : emitter->m_modules)
-			{
-				if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
-				{
-					LUMIX_DELETE(m_allocator, module);
-					emitter->m_modules.eraseItem(module);
-					m_universe.destroyComponent(emitter->m_entity, type, this, component);
-					break;
-				}
-			}
-		}
-		else if (type == PARTICLE_EMITTER_RANDOM_ROTATION_HASH)
-		{
-			auto* emitter = m_particle_emitters[component];
-			for (auto* module : emitter->m_modules)
-			{
-				if (module->getType() == ParticleEmitter::RandomRotationModule::s_type)
-				{
-					LUMIX_DELETE(m_allocator, module);
-					emitter->m_modules.eraseItem(module);
-					m_universe.destroyComponent(emitter->m_entity, type, this, component);
-					break;
-				}
-			}
-		}
-		else
-		{
-			ASSERT(false);
 		}
 	}
+
+
+	void destroyParticleEmitterSize(ComponentIndex component)
+	{
+		auto* emitter = m_particle_emitters[component];
+		for (auto* module : emitter->m_modules)
+		{
+			if (module->getType() == ParticleEmitter::SizeModule::s_type)
+			{
+				LUMIX_DELETE(m_allocator, module);
+				emitter->m_modules.eraseItem(module);
+				m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_SIZE_HASH, this, component);
+				break;
+			}
+		}
+	}
+
+
+	void destroyParticleEmitterLinearMovement(ComponentIndex component)
+	{
+		auto* emitter = m_particle_emitters[component];
+		for (auto* module : emitter->m_modules)
+		{
+			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
+			{
+				LUMIX_DELETE(m_allocator, module);
+				emitter->m_modules.eraseItem(module);
+				m_universe.destroyComponent(
+					emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH, this, component);
+				break;
+			}
+		}
+	}
+
+
+	void destroyParticleEmitterRandomRotation(ComponentIndex component)
+	{
+		auto* emitter = m_particle_emitters[component];
+		for (auto* module : emitter->m_modules)
+		{
+			if (module->getType() == ParticleEmitter::RandomRotationModule::s_type)
+			{
+				LUMIX_DELETE(m_allocator, module);
+				emitter->m_modules.eraseItem(module);
+				m_universe.destroyComponent(
+					emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_HASH, this, component);
+				break;
+			}
+		}
+	}
+
+
+	void destroyComponent(ComponentIndex component, uint32 type) override;
 
 
 	void setParticleEmitterAlpha(ComponentIndex cmp, const Vec2* values, int count) override
@@ -1049,67 +1060,35 @@ public:
 	}
 
 
-	ComponentIndex createComponent(uint32 type,
-		Entity entity) override
+	ComponentIndex createCamera(Entity entity)
 	{
-		if (type == TERRAIN_HASH)
-		{
-			Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)(
-				m_renderer, entity, *this, m_allocator);
-			m_terrains.push(terrain);
-			m_universe.addComponent(entity, type, this, m_terrains.size() - 1);
-			return m_terrains.size() - 1;
-		}
-		else if (type == CAMERA_HASH)
-		{
-			Camera& camera = m_cameras.pushEmpty();
-			camera.m_is_free = false;
-			camera.m_is_active = false;
-			camera.m_entity = entity;
-			camera.m_fov = 60;
-			camera.m_width = 800;
-			camera.m_height = 600;
-			camera.m_aspect = 800.0f / 600.0f;
-			camera.m_near = 0.1f;
-			camera.m_far = 10000.0f;
-			camera.m_slot[0] = '\0';
-			m_universe.addComponent(entity, type, this, m_cameras.size() - 1);
-			return m_cameras.size() - 1;
-		}
-		else if (type == RENDERABLE_HASH)
-		{
-			return createRenderable(entity);
-		}
-		else if (type == GLOBAL_LIGHT_HASH)
-		{
-			return createGlobalLight(entity);
-		}
-		else if (type == POINT_LIGHT_HASH)
-		{
-			return createPointLight(entity);
-		}
-		else if (type == PARTICLE_EMITTER_HASH)
-		{
-			return createParticleEmitter(entity);
-		}
-		else if (type == PARTICLE_EMITTER_FADE_HASH)
-		{
-			return createParticleEmitterFade(entity);
-		}
-		else if (type == PARTICLE_EMITTER_SIZE_HASH)
-		{
-			return createParticleEmitterSize(entity);
-		}
-		else if (type == PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH)
-		{
-			return createParticleEmitterLinearMovement(entity);
-		}
-		else if (type == PARTICLE_EMITTER_RANDOM_ROTATION_HASH)
-		{
-			return createParticleEmitterRandomRotation(entity);
-		}
-		return INVALID_COMPONENT;
+		Camera& camera = m_cameras.pushEmpty();
+		camera.m_is_free = false;
+		camera.m_is_active = false;
+		camera.m_entity = entity;
+		camera.m_fov = 60;
+		camera.m_width = 800;
+		camera.m_height = 600;
+		camera.m_aspect = 800.0f / 600.0f;
+		camera.m_near = 0.1f;
+		camera.m_far = 10000.0f;
+		camera.m_slot[0] = '\0';
+		m_universe.addComponent(entity, CAMERA_HASH, this, m_cameras.size() - 1);
+		return m_cameras.size() - 1;
 	}
+
+
+	ComponentIndex createTerrain(Entity entity)
+	{
+		Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)(
+			m_renderer, entity, *this, m_allocator);
+		m_terrains.push(terrain);
+		m_universe.addComponent(entity, TERRAIN_HASH, this, m_terrains.size() - 1);
+		return m_terrains.size() - 1;
+	}
+
+
+	ComponentIndex createComponent(uint32 type, Entity entity) override;
 
 
 	ComponentIndex createParticleEmitterRandomRotation(Entity entity)
@@ -2664,7 +2643,6 @@ public:
 	float getTime() const override { return m_time; }
 
 
-private:
 	void modelLoaded(Model* model, int renderable_index)
 	{
 		float bounding_radius =
@@ -2929,6 +2907,64 @@ private:
 	DelegateList<void(ComponentIndex)> m_renderable_created;
 	DelegateList<void(ComponentIndex)> m_renderable_destroyed;
 };
+
+
+
+static struct
+{
+	uint32 type;
+	ComponentIndex(RenderSceneImpl::*creator)(Entity);
+	void (RenderSceneImpl::*destroyer)(ComponentIndex);
+} COMPONENT_INFOS[] = {
+	{RENDERABLE_HASH, &RenderSceneImpl::createRenderable, &RenderSceneImpl::destroyRenderable},
+	{GLOBAL_LIGHT_HASH, &RenderSceneImpl::createGlobalLight, &RenderSceneImpl::destroyGlobalLight},
+	{POINT_LIGHT_HASH, &RenderSceneImpl::createPointLight, &RenderSceneImpl::destroyPointLight},
+	{CAMERA_HASH, &RenderSceneImpl::createCamera, &RenderSceneImpl::destroyCamera},
+	{TERRAIN_HASH, &RenderSceneImpl::createTerrain, &RenderSceneImpl::destroyTerrain},
+	{PARTICLE_EMITTER_HASH,
+		&RenderSceneImpl::createParticleEmitter,
+		&RenderSceneImpl::destroyParticleEmitter},
+	{PARTICLE_EMITTER_FADE_HASH,
+		&RenderSceneImpl::createParticleEmitterFade,
+		&RenderSceneImpl::destroyParticleEmitterFade},
+	{PARTICLE_EMITTER_SIZE_HASH,
+		&RenderSceneImpl::createParticleEmitterSize,
+		&RenderSceneImpl::destroyParticleEmitterSize},
+	{PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH,
+		&RenderSceneImpl::createParticleEmitterLinearMovement,
+		&RenderSceneImpl::destroyParticleEmitterLinearMovement},
+	{PARTICLE_EMITTER_RANDOM_ROTATION_HASH,
+		&RenderSceneImpl::createParticleEmitterRandomRotation,
+		&RenderSceneImpl::destroyParticleEmitterRandomRotation}
+};
+
+
+ComponentIndex RenderSceneImpl::createComponent(uint32 type, Entity entity)
+{
+	for (auto& i : COMPONENT_INFOS)
+	{
+		if (i.type == type)
+		{
+			return (this->*i.creator)(entity);
+		}
+	}
+
+	return INVALID_COMPONENT;
+}
+
+
+void RenderSceneImpl::destroyComponent(ComponentIndex component, uint32 type)
+{
+	for (auto& i : COMPONENT_INFOS)
+	{
+		if (i.type == type)
+		{
+			(this->*i.destroyer)(component);
+			return;
+		}
+	}
+	ASSERT(false);
+}
 
 
 RenderScene* RenderScene::createInstance(Renderer& renderer,

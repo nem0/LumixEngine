@@ -231,7 +231,11 @@ struct AudioSceneImpl : public AudioScene
 
 	ComponentIndex createListener(Entity entity)
 	{
-		if(m_listener.entity != INVALID_ENTITY) return INVALID_COMPONENT;
+		if (m_listener.entity != INVALID_ENTITY)
+		{
+			g_log_warning.log("audio") << "Listener already exists";
+			return INVALID_COMPONENT;
+		}
 
 		m_listener.entity = entity;
 		m_universe.addComponent(entity, LISTENER_HASH, this, 0);
