@@ -100,4 +100,5 @@ private:
 	int m_current_frame;
 	int m_viewed_thread_id;
 	bool m_is_paused;
+	char m_filter[100];
 };

@@ -60,6 +60,7 @@ ProfilerUI::ProfilerUI(Lumix::Debug::Allocator* allocator, Lumix::ResourceManage
 	Lumix::Profiler::getFrameListeners().bind<ProfilerUI, &ProfilerUI::onFrame>(this);
 	m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(m_allocator);
 	m_allocation_root->m_stack_node = nullptr;
+	m_filter[0] = 0;
 }
 
 
@@ -240,6 +241,8 @@ void ProfilerUI::onGUIResources()
 	if (!m_resource_manager) return;
 	if (!ImGui::CollapsingHeader("Resources")) return;
 
+	ImGui::InputText("filter", m_filter, Lumix::lengthOf(m_filter));
+
 	Lumix::uint32 manager_types[] = { Lumix::ResourceManager::ANIMATION,
 		Lumix::ResourceManager::MATERIAL,
 		Lumix::ResourceManager::MODEL,
@@ -278,6 +281,12 @@ void ProfilerUI::onGUIResources()
 		size_t sum = 0;
 		for (auto iter = resources.begin(), end = resources.end(); iter != end; ++iter)
 		{
+			if (m_filter[0] != '\0' &&
+				Lumix::stristr(iter.value()->getPath().c_str(), m_filter) == nullptr)
+			{
+				continue;
+			}
+
 			ImGui::Text(iter.value()->getPath().c_str());
 			ImGui::NextColumn();
 			ImGui::Text("%.3fKB", iter.value()->size() / 1024.0f);
