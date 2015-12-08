@@ -109,8 +109,7 @@ void registerAudioProperties(IAllocator& allocator)
 	PropertyRegister::registerComponentType("ambient_sound", "Ambient sound");
 	PropertyRegister::registerComponentType("audio_listener", "Audio listener");
 	PropertyRegister::registerComponentType("echo_zone", "Echo zone");
-
-
+	
 	PropertyRegister::add("ambient_sound",
 		LUMIX_NEW(allocator, EnumPropertyDescriptor<AudioScene>)("Sound",
 			&AudioScene::getAmbientSoundClipIndex,
@@ -124,6 +123,23 @@ void registerAudioProperties(IAllocator& allocator)
 		LUMIX_NEW(allocator, BoolPropertyDescriptor<AudioScene>)("3D",
 		&AudioScene::isAmbientSound3D,
 		&AudioScene::setAmbientSound3D,
+		allocator));
+
+	PropertyRegister::add("echo_zone",
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<AudioScene>)("Radius",
+		&AudioScene::getEchoZoneRadius,
+		&AudioScene::setEchoZoneRadius,
+		0.01f,
+		FLT_MAX,
+		0.1f,
+		allocator));
+	PropertyRegister::add("echo_zone",
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<AudioScene>)("Delay (ms)",
+		&AudioScene::getEchoZoneDelay,
+		&AudioScene::setEchoZoneDelay,
+		0.01f,
+		FLT_MAX,
+		100.0f,
 		allocator));
 }
 
