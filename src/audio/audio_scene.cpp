@@ -149,11 +149,11 @@ struct AudioSceneImpl : public AudioScene
 
 		auto* script_scene = static_cast<LuaScriptScene*>(scene);
 		script_scene->registerFunction(
-			"API_setEcho", LuaWrapper::wrap<decltype(&LuaAPI::setEcho), LuaAPI::setEcho>);
+			"Audio", "setEcho", LuaWrapper::wrap<decltype(&LuaAPI::setEcho), LuaAPI::setEcho>);
 		script_scene->registerFunction(
-			"API_playSound", LuaWrapper::wrap<decltype(&LuaAPI::playSound), LuaAPI::playSound>);
+			"Audio", "playSound", LuaWrapper::wrap<decltype(&LuaAPI::playSound), LuaAPI::playSound>);
 		script_scene->registerFunction(
-			"API_setSoundVolume", LuaWrapper::wrap<decltype(&LuaAPI::setSoundVolume), LuaAPI::setSoundVolume>);
+			"Audio", "setSoundVolume", LuaWrapper::wrap<decltype(&LuaAPI::setSoundVolume), LuaAPI::setSoundVolume>);
 	}
 
 

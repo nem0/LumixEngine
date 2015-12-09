@@ -698,15 +698,20 @@ struct PhysicsSceneImpl : public PhysicsScene
 		if (!scene) return;
 
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
-		m_script_scene->registerFunction("API_moveController",
+		m_script_scene->registerFunction("Physics",
+			"moveController",
 			LuaWrapper::wrap<decltype(&LuaAPI::moveController), LuaAPI::moveController>);
-		m_script_scene->registerFunction("API_applyForceToActor",
+		m_script_scene->registerFunction("Physics",
+			"applyForceToActor",
 			LuaWrapper::wrap<decltype(&LuaAPI::applyForceToActor), LuaAPI::applyForceToActor>);
-		m_script_scene->registerFunction("API_getActorComponent",
+		m_script_scene->registerFunction("Physics",
+			"getActorComponent",
 			LuaWrapper::wrap<decltype(&LuaAPI::getActorComponent), LuaAPI::getActorComponent>);
-		m_script_scene->registerFunction(
-			"API_putToSleep", LuaWrapper::wrap<decltype(&LuaAPI::putToSleep), LuaAPI::putToSleep>);
-		m_script_scene->registerFunction("API_getActorSpeed",
+		m_script_scene->registerFunction("Physics",
+			"putToSleep",
+			LuaWrapper::wrap<decltype(&LuaAPI::putToSleep), LuaAPI::putToSleep>);
+		m_script_scene->registerFunction("Physics",
+			"getActorSpeed",
 			LuaWrapper::wrap<decltype(&LuaAPI::getActorSpeed), LuaAPI::getActorSpeed>);
 	}
 
@@ -714,11 +719,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void startGame() override { m_is_game_running = true; }
 
 
-	void stopGame() override
-	{
-		m_is_game_running = false;
-	}
-	
+	void stopGame() override { m_is_game_running = false; }
+
 
 	float getControllerRadius(ComponentIndex cmp) override
 	{
