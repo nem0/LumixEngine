@@ -1,4 +1,5 @@
 #include "profiler_ui.h"
+#include "core/fs/os_file.h"
 #include "core/math_utils.h"
 #include "core/profiler.h"
 #include "core/resource.h"
@@ -236,6 +237,38 @@ static const char* getResourceStateString(Lumix::Resource::State state)
 }
 
 
+void ProfilerUI::saveResourceList()
+{
+	Lumix::FS::OsFile file;
+	if (file.open("resources.csv", Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_allocator))
+	{
+		auto& managers = m_resource_manager->getAll();
+		for (auto* i : managers)
+		{
+			auto& resources = i->getResourceTable();
+			for (auto& res : resources)
+			{
+				file.write(res->getPath().c_str(), res->getPath().length());
+				file.write(", ", 2);
+				char tmp[50];
+				Lumix::toCString(res->size() / 1024.0f, tmp, Lumix::lengthOf(tmp), 3);
+				file.write(tmp, Lumix::stringLength(tmp));
+				file.write("KB, ", 4);
+				
+				const char* state = getResourceStateString(res->getState());
+				file.write(state, Lumix::stringLength(state));
+				
+				file.write(", ", 4);
+				Lumix::toCString(res->getRefCount(), tmp, Lumix::lengthOf(tmp));
+				file.write(tmp, Lumix::stringLength(tmp));
+				file.write("\n", 4);
+			}
+		}
+		file.close();
+	}
+}
+
+
 void ProfilerUI::onGUIResources()
 {
 	if (!m_resource_manager) return;
@@ -306,6 +339,19 @@ void ProfilerUI::onGUIResources()
 
 		ImGui::Columns(1);
 		
+	}
+
+	static int saved_displayed = 0;
+
+	if (saved_displayed > 0)
+	{
+		--saved_displayed;
+		ImGui::Text("Saved");
+	}
+	else if (ImGui::Button("Save"))
+	{
+		saved_displayed = 180;
+		saveResourceList();
 	}
 	ImGui::Unindent();
 }
