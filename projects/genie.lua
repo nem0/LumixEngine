@@ -11,6 +11,11 @@ function defaultConfigurations()
 		targetdir(BINARY_DIR .. "Release")
 		defines { "NDEBUG" }
 		flags { "Optimize", "WinMain" }
+
+	configuration "RelWithDebInfo"
+		targetdir(BINARY_DIR .. "RelWithDebInfo")
+		defines { "NDEBUG" }
+		flags { "Symbols", "Optimize", "WinMain" }
 end
 
 function useLua()
@@ -23,36 +28,41 @@ function useLua()
 	configuration {"Release", "x32" }
 		libdirs {"../external/lua/lib/" .. ide_dir .. "/win32/release"}
 
+	configuration {"RelWithDebInfo", "x32" }
+		libdirs {"../external/lua/lib/" .. ide_dir .. "/win32/release"}
+		
 	configuration {"Debug", "x64" }
 		libdirs {"../external/lua/lib/" .. ide_dir .. "/win64/debug"}
 
 	configuration {"Release", "x64" }
 		libdirs {"../external/lua/lib/" .. ide_dir .. "/win64/release"}
+
+		configuration {"RelWithDebInfo", "x64" }
+		libdirs {"../external/lua/lib/" .. ide_dir .. "/win64/release"}
 end
 
-function copyDlls(myconfig, platform_bit, platform_dir)
+function copyDlls(src_dir, platform_bit, platform_dir, dest_dir)
 	local physx_suffix
 	if platform_bit == 32 then
-		configuration { "x32", myconfig }
+		configuration { "x32", dest_dir }
 		physx_suffix = "x86"
 	else
-		configuration { "x64", myconfig }
+		configuration { "x64", dest_dir }
 		physx_suffix = "x64"
 	end
 
-		postbuildcommands { 
-			"xcopy /Y \"$(SolutionDir)../../external/assimp/dll/" .. ide_dir .. "/" .. platform_dir .. "/" .. myconfig .. "\\assimp.dll\" \"$(SolutionDir)bin/" .. myconfig .. "\"",
-			"xcopy /Y \"$(SolutionDir)../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\nvToolsExt".. tostring(platform_bit) .. "_1.dll\" \"$(SolutionDir)bin/" .. myconfig .. "\"",
-			"xcopy /Y \"$(SolutionDir)../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CommonCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. myconfig .. "\"",
-			"xcopy /Y \"$(SolutionDir)../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CookingCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. myconfig .. "\"",
-			"xcopy /Y \"$(SolutionDir)../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CharacterKinematicCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. myconfig .. "\"",
-			"xcopy /Y \"$(SolutionDir)../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. myconfig .. "\""
-		}
-
+	postbuildcommands { 
+		"xcopy /Y \"$(SolutionDir)../../external/assimp/dll/" .. ide_dir .. "/" .. platform_dir .. "/" .. src_dir .. "\\assimp.dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\nvToolsExt".. tostring(platform_bit) .. "_1.dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CommonCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CookingCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CharacterKinematicCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\""
+	}
 end
 
 solution "LumixEngine"
-	configurations { "Debug", "Release" }
+	configurations { "Debug", "Release", "RelWithDebInfo" }
 	platforms { "x32", "x64" }
 	flags { "FatalWarnings", "NoPCH" }
 	includedirs {"../src", "../src/engine"}
@@ -92,6 +102,8 @@ project "physics"
 		links { "PhysX3ExtensionsDEBUG", "PhysXVisualDebuggerSDKDEBUG" }
 	configuration { "Release" }
 		links { "PhysX3ExtensionsCHECKED", "PhysXVisualDebuggerSDKCHECKED" }
+	configuration { "RelWithDebInfo" }
+		links { "PhysX3ExtensionsCHECKED", "PhysXVisualDebuggerSDKCHECKED" }
   
 	defaultConfigurations()
 
@@ -116,6 +128,9 @@ project "renderer"
 		links {"bgfxDebug"}
 
 	configuration "Release"
+		links {"bgfxRelease"}
+
+	configuration "RelWithDebInfo"
 		links {"bgfxRelease"}
 	
 project "animation"
@@ -184,10 +199,12 @@ project "studio"
 	useLua()
 	defaultConfigurations()
 
-	copyDlls("Debug", 32, "win32")
-	copyDlls("Debug", 64, "win64")
-	copyDlls("Release", 32, "win32")
-	copyDlls("Release", 64, "win64")
+	copyDlls("Debug", 32, "win32", "Debug")
+	copyDlls("Debug", 64, "win64", "Debug")
+	copyDlls("Release", 32, "win32", "Release")
+	copyDlls("Release", 64, "win64", "Release")
+	copyDlls("Release", 32, "win32", "RelWithDebInfo")
+	copyDlls("Release", 64, "win64", "RelWithDebInfo")
 	
 	configuration { "Debug", "x64" }
 		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win64/debug"}
@@ -201,5 +218,9 @@ project "studio"
 	configuration { "Release", "x32" }
 		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win32/release"}
 		libdirs {"../external/crunch/lib/" .. ide_dir .. "/win32/release"}
-
-	
+	configuration { "RelWithDebInfo", "x64" }
+		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win64/release"}
+		libdirs {"../external/crunch/lib/" .. ide_dir .. "/win64/release"}
+	configuration { "RelWithDebInfo", "x32" }
+		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win32/release"}
+		libdirs {"../external/crunch/lib/" .. ide_dir .. "/win32/release"}
