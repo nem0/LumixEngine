@@ -811,12 +811,6 @@ public:
 		ImGuiIO& io = ImGui::GetIO();
 		io.Fonts->AddFontFromFileTTF("editor/VeraMono.ttf", 13);
 
-		m_decl.begin()
-			.add(bgfx::Attrib::Position, 2, bgfx::AttribType::Float)
-			.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
-			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
-			.end();
-
 		io.KeyMap[ImGuiKey_Tab] = (int)PlatformInterface::Keys::TAB;
 		io.KeyMap[ImGuiKey_LeftArrow] = (int)PlatformInterface::Keys::LEFT;
 		io.KeyMap[ImGuiKey_RightArrow] = (int)PlatformInterface::Keys::RIGHT;
@@ -1251,9 +1245,12 @@ public:
 
 	void drawGUICmdList(ImDrawList* cmd_list)
 	{
+		Lumix::Renderer* renderer =
+			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+
 		Lumix::TransientGeometry geom(&cmd_list->VtxBuffer[0],
 			cmd_list->VtxBuffer.size(),
-			m_decl,
+			renderer->getBasic2DVertexDecl(),
 			&cmd_list->IdxBuffer[0],
 			cmd_list->IdxBuffer.size());
 
@@ -1317,7 +1314,6 @@ public:
 
 
 	Lumix::DefaultAllocator m_allocator;
-	bgfx::VertexDecl m_decl;
 	Lumix::Material* m_material;
 	Lumix::Engine* m_engine;
 
