@@ -170,13 +170,6 @@ static void addInputAction(Engine* engine, uint32 action, int type, int key, int
 } // namespace LuaAPI
 
 
-static void registerCFunction(lua_State* L, const char* name, lua_CFunction func)
-{
-	lua_pushcfunction(L, func);
-	lua_setglobal(L, name);
-}
-
-
 void registerUniverse(UniverseContext* ctx, lua_State* L)
 {
 	lua_pushlightuserdata(L, ctx);
@@ -198,13 +191,13 @@ void registerUniverse(UniverseContext* ctx, lua_State* L)
 }
 
 
-void registerEngineLuaAPI(Engine& engine, lua_State* L)
+void registerEngineLuaAPI(LuaScriptScene& scene, Engine& engine, lua_State* L)
 {
 	lua_pushlightuserdata(L, &engine);
 	lua_setglobal(L, "g_engine");
-
+	
 	#define REGISTER_FUNCTION(name) \
-		registerCFunction(L, "API_" #name, LuaWrapper::wrap<decltype(&LuaAPI::name), LuaAPI::name>)
+		scene.registerFunction("Engine", #name, LuaWrapper::wrap<decltype(&LuaAPI::name), LuaAPI::name>)
 
 	REGISTER_FUNCTION(createComponent);
 	REGISTER_FUNCTION(getEnvironment);
@@ -220,7 +213,7 @@ void registerEngineLuaAPI(Engine& engine, lua_State* L)
 	REGISTER_FUNCTION(logInfo);
 	REGISTER_FUNCTION(logInfo);
 
-	registerCFunction(L, "API_multVecQuat", &LuaAPI::multVecQuat);
+	scene.registerFunction("Engine", "multVecQuat", &LuaAPI::multVecQuat);
 
 	#undef REGISTER_FUNCTION
 }

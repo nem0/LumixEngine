@@ -2442,6 +2442,7 @@ public:
 		return m_components.at(cmps_index);
 	}
 
+
 	ComponentUID getComponent(Entity entity, uint32 type) override
 	{
 		const Array<ComponentUID>& cmps = getComponents(entity);
