@@ -215,6 +215,17 @@ struct RendererImpl : public Renderer
 
 		m_current_pass_hash = crc32("MAIN");
 		m_view_counter = 0;
+
+		m_basic_vertex_decl.begin()
+			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
+			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
+			.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
+			.end();
+		m_basic_2d_vertex_decl.begin()
+			.add(bgfx::Attrib::Position, 2, bgfx::AttribType::Float)
+			.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
+			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
+			.end();
 	}
 
 	~RendererImpl()
@@ -229,6 +240,18 @@ struct RendererImpl : public Renderer
 		bgfx::frame();
 		bgfx::frame();
 		bgfx::shutdown();
+	}
+
+
+	const bgfx::VertexDecl& getBasicVertexDecl() const override
+	{
+		return m_basic_vertex_decl;
+	}
+
+
+	const bgfx::VertexDecl& getBasic2DVertexDecl() const override
+	{
+		return m_basic_2d_vertex_decl;
 	}
 
 
@@ -351,6 +374,8 @@ struct RendererImpl : public Renderer
 	uint32 m_current_pass_hash;
 	int m_view_counter;
 	BGFXAllocator m_bgfx_allocator;
+	bgfx::VertexDecl m_basic_vertex_decl;
+	bgfx::VertexDecl m_basic_2d_vertex_decl;
 
 	static void* s_platform_data;
 };

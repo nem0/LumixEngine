@@ -10,6 +10,7 @@
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
+#include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/transient_geometry.h"
 #include "universe/universe.h"
@@ -39,12 +40,6 @@ struct Vertex
 Gizmo::Gizmo(WorldEditor& editor)
 	: m_editor(editor)
 {
-	m_vertex_decl.begin()
-		.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
-		.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
-		.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
-		.end();
-
 	m_is_autosnap_down = false;
 	m_shader = nullptr;
 	m_pivot = Pivot::OBJECT_PIVOT;
@@ -297,7 +292,7 @@ void Gizmo::renderTranslateGizmo(PipelineInstance& pipeline)
 	Matrix gizmo_mtx;
 	getMatrix(gizmo_mtx);
 	Matrix mtx = gizmo_mtx * scale_mtx;
-	
+
 	Vertex vertices[9];
 	uint16 indices[9];
 	vertices[0].position = Vec3(0, 0, 0);
@@ -319,7 +314,8 @@ void Gizmo::renderTranslateGizmo(PipelineInstance& pipeline)
 	vertices[5].color = m_transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
 	indices[5] = 5;
 
-	Lumix::TransientGeometry geom(vertices, 6, m_vertex_decl, indices, 6);
+	auto& renderer = static_cast<Lumix::Renderer&>(m_scene->getPlugin());
+	Lumix::TransientGeometry geom(vertices, 6, renderer.getBasicVertexDecl(), indices, 6);
 	pipeline.render(geom,
 		mtx,
 		0,
@@ -361,7 +357,7 @@ void Gizmo::renderTranslateGizmo(PipelineInstance& pipeline)
 	vertices[8].color = m_transform_axis == Axis::XZ ? SELECTED_COLOR : Y_COLOR;
 	indices[8] = 8;
 
-	Lumix::TransientGeometry geom2(vertices, 9, m_vertex_decl, indices, 9);
+	Lumix::TransientGeometry geom2(vertices, 9, renderer.getBasicVertexDecl(), indices, 9);
 	auto program_handle = m_shader->getInstance(0).m_program_handles[pipeline.getPassIdx()];
 	pipeline.render(geom2, mtx, 0, 9, BGFX_STATE_DEPTH_TEST_LEQUAL, program_handle);
 }
@@ -416,7 +412,8 @@ void Gizmo::renderQuarterRing(PipelineInstance& pipeline, const Matrix& mtx, con
 		indices[offset] = offset;
 	}
 
-	Lumix::TransientGeometry ring_geom(vertices, offset, m_vertex_decl, indices, offset);
+	auto& renderer = static_cast<Lumix::Renderer&>(m_scene->getPlugin());
+	Lumix::TransientGeometry ring_geom(vertices, offset, renderer.getBasicVertexDecl(), indices, offset);
 	pipeline.render(ring_geom,
 		mtx,
 		0,
@@ -451,7 +448,8 @@ void Gizmo::renderQuarterRing(PipelineInstance& pipeline, const Matrix& mtx, con
 		vertices[offset].color = color;
 		indices[offset] = offset;
 	}
-	Lumix::TransientGeometry plane_geom(vertices, offset, m_vertex_decl, indices, offset);
+
+	Lumix::TransientGeometry plane_geom(vertices, offset, renderer.getBasicVertexDecl(), indices, offset);
 	pipeline.render(plane_geom,
 		mtx,
 		0,
@@ -475,7 +473,7 @@ void Gizmo::renderRotateGizmo(PipelineInstance& pipeline)
 	Vec3 right(1, 0, 0);
 	Vec3 up(0, 1, 0);
 	Vec3 dir(0, 0, 1);
-	
+
 	if (dotProduct(gizmo_mtx.getXVector(), m_camera_dir) < 0) right = -right;
 	if (dotProduct(gizmo_mtx.getYVector(), m_camera_dir) < 0) up = -up;
 	if (dotProduct(gizmo_mtx.getZVector(), m_camera_dir) < 0) dir = -dir;

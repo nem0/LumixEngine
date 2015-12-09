@@ -104,7 +104,6 @@ class LUMIX_EDITOR_API Gizmo
 		bool m_is_transforming;
 		bool m_is_autosnap_down;
 		Vec3 m_camera_dir;
-		bgfx::VertexDecl m_vertex_decl;
 };
 
 
