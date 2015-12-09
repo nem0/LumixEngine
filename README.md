@@ -53,4 +53,7 @@ Videos
 * [PhysX](https://developer.nvidia.com/physx-sdk)
 * [ImGui](https://github.com/ocornut/imgui)
 
+Project generator
+* [Genie](https://github.com/bkaradzic/genie)
+
 Contact: mikulas.florek@gamedev.sk
