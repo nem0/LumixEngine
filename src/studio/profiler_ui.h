@@ -87,6 +87,7 @@ private:
 	void showAllocationTree(AllocationStackNode* node, int column);
 	AllocationStackNode* getOrCreate(AllocationStackNode* my_node,
 		Lumix::Debug::StackNode* external_node, size_t size);
+	void saveResourceList();
 
 private:
 	Lumix::DefaultAllocator m_allocator;
