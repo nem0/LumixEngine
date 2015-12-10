@@ -1190,7 +1190,8 @@ public:
 	{
 		ComponentIndex cmp = (ComponentIndex)entity;
 
-		if(cmp < m_renderables.size() && m_renderables[cmp].entity != INVALID_ENTITY)
+		if (cmp < m_renderables.size() && m_renderables[cmp].entity != INVALID_ENTITY &&
+			m_renderables[cmp].model && m_renderables[cmp].model->isReady())
 		{
 			Renderable& r = m_renderables[cmp];
 			r.matrix = m_universe.getMatrix(entity);
