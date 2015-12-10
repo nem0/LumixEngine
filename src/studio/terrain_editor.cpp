@@ -153,7 +153,7 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 			-m_brush_size,
 			m_brush_size);
 
-		Lumix::Array<const Lumix::RenderableMesh*> meshes(m_world_editor.getAllocator());
+		Lumix::Array<Lumix::RenderableMesh> meshes(m_world_editor.getAllocator());
 		meshes.clear();
 		scene->getRenderableInfos(frustum, meshes, ~0);
 
@@ -172,7 +172,7 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 			{
 				pos.y = scene->getTerrainHeightAt(m_component.index, terrain_pos.x, terrain_pos.z);
 				pos.y += terrain_matrix.getTranslation().y;
-				if (!isOBBCollision(meshes, pos, model, scale))
+				if (!isOBBCollision(*scene, meshes, pos, model, scale))
 				{
 					auto entity = template_system.createInstanceNoCommand(m_template_name_hash, pos);
 					if (m_align_with_normal)
@@ -305,23 +305,25 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 	}
 
 
-	bool isOBBCollision(const Lumix::Array<const Lumix::RenderableMesh*>& meshes,
+	bool isOBBCollision(Lumix::RenderScene& scene,
+		const Lumix::Array<Lumix::RenderableMesh>& meshes,
 		const Lumix::Vec3& pos_a,
 		Lumix::Model* model,
 		float scale)
 	{
 		float radius_a_squared = model->getBoundingRadius();
 		radius_a_squared = radius_a_squared * radius_a_squared;
-		for (auto* mesh : meshes)
+		for (auto& mesh : meshes)
 		{
-			Lumix::Vec3 pos_b = mesh->m_matrix->getTranslation();
-			float radius_b = mesh->m_model->getBoundingRadius();
+			auto* renderable = scene.getRenderable(mesh.renderable);
+			Lumix::Vec3 pos_b = renderable->matrix.getTranslation();
+			float radius_b = renderable->model->getBoundingRadius();
 			float radius_squared = radius_a_squared + radius_b * radius_b;
 			if ((pos_a - pos_b).squaredLength() < radius_squared * scale * scale)
 			{
 				Lumix::Matrix matrix = Lumix::Matrix::IDENTITY;
 				matrix.setTranslation(pos_a);
-				if (testOBBCollision(matrix, model, *mesh->m_matrix, mesh->m_model, scale))
+				if (testOBBCollision(matrix, model, renderable->matrix, renderable->model, scale))
 				{
 					return true;
 				}

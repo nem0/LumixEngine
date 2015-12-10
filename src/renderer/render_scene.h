@@ -41,12 +41,19 @@ struct TerrainInfo
 };
 
 
+struct Renderable
+{
+	Pose* pose;
+	Model* model;
+	Matrix matrix;
+	Entity entity;
+};
+
+
 struct RenderableMesh
 {
-	Mesh* m_mesh;
-	const Pose* m_pose;
-	const Matrix* m_matrix;
-	const Model* m_model;
+	ComponentIndex renderable;
+	Mesh* mesh;
 };
 
 
@@ -110,7 +117,7 @@ public:
 	virtual Engine& getEngine() const = 0;
 	virtual IAllocator& getAllocator() = 0;
 
-	virtual Pose& getPose(ComponentIndex cmp) = 0;
+	virtual Pose* getPose(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getActiveGlobalLight() = 0;
 	virtual void setActiveGlobalLight(ComponentIndex cmp) = 0;
 	virtual Vec4 getShadowmapCascades(ComponentIndex cmp) = 0;
@@ -203,12 +210,14 @@ public:
 	virtual void showRenderable(ComponentIndex cmp) = 0;
 	virtual void hideRenderable(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getRenderableComponent(Entity entity) = 0;
+	virtual Renderable* getRenderable(ComponentIndex cmp) = 0;
+	virtual Renderable* getRenderables() = 0;
 	virtual const char* getRenderablePath(ComponentIndex cmp) = 0;
 	virtual void setRenderableLayer(ComponentIndex cmp,
 									const int32& layer) = 0;
 	virtual void setRenderablePath(ComponentIndex cmp, const char* path) = 0;
 	virtual void getRenderableInfos(const Frustum& frustum,
-		Array<const RenderableMesh*>& meshes,
+		Array<RenderableMesh>& meshes,
 		int64 layer_mask) = 0;
 	virtual void getRenderableEntities(const Frustum& frustum,
 		Array<Entity>& entities,
@@ -256,11 +265,11 @@ public:
 	virtual int getClosestPointLights(const Vec3& pos, ComponentIndex* lights, int max_lights) = 0;
 	virtual void getPointLights(const Frustum& frustum, Array<ComponentIndex>& lights) = 0;
 	virtual void getPointLightInfluencedGeometry(ComponentIndex light_cmp,
-		Array<const RenderableMesh*>& infos,
+		Array<RenderableMesh>& infos,
 		int64 layer_mask) = 0;
 	virtual void getPointLightInfluencedGeometry(ComponentIndex light_cmp,
 		const Frustum& frustum,
-		Array<const RenderableMesh*>& infos,
+		Array<RenderableMesh>& infos,
 		int64 layer_mask) = 0;
 	virtual void setLightCastShadows(ComponentIndex cmp, bool cast_shadows) = 0;
 	virtual bool getLightCastShadows(ComponentIndex cmp) = 0;
