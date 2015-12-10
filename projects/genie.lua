@@ -1,5 +1,31 @@
 local BINARY_DIR = "tmp/bin/"
-local ide_dir = _ACTION
+local ide_dir = iif(_ACTION == nil, "vs2013", _ACTION)
+
+newaction {
+	trigger = "install",
+	description = "Install in ../../LumixEngine_data/bin",
+	execute = function()
+		local src_dir = path.join(BINARY_DIR, "RelWithDebInfo/")
+		local dst_dir = "../../LumixEngine_data/bin/"
+		
+		function installDll(filename)
+			os.copyfile(path.join(src_dir, filename .. ".dll"), path.join(dst_dir, filename .. ".dll"))
+			os.copyfile(path.join(src_dir, filename .. ".pdb"), path.join(dst_dir, filename .. ".pdb"))
+		end
+		
+		installDll "animation"
+		installDll "audio"
+		installDll "editor"
+		installDll "engine"
+		installDll "lua_script"
+		installDll "physics"
+		installDll "renderer"
+		
+		os.copyfile(path.join(src_dir, "studio.exe"), path.join(dst_dir, "studio.exe"))
+		os.copyfile(path.join(src_dir, "studio.pdb"), path.join(dst_dir, "studio.pdb"))
+	end
+}
+
 
 function defaultConfigurations()
 	configuration "Debug"

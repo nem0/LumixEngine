@@ -30,19 +30,16 @@ namespace Lumix
 		virtual void cullToFrustum(const Frustum& frustum, int64 layer_mask) = 0;
 		virtual void cullToFrustumAsync(const Frustum& frustum, int64 layer_mask) = 0;
 
-		virtual void addStatic(const Sphere& sphere) = 0;
-		virtual void removeStatic(int index) = 0;
+		virtual void addStatic(ComponentIndex renderable, const Sphere& sphere) = 0;
+		virtual void removeStatic(ComponentIndex renderable) = 0;
 
 		virtual void setLayerMask(int index, int64 layer) = 0;
 		virtual int64 getLayerMask(int index) = 0;
 
-		virtual void enableStatic(int index) = 0;
-		virtual void disableStatic(int index) = 0;
-
 		virtual void updateBoundingRadius(float radius, int index) = 0;
 		virtual void updateBoundingPosition(const Vec3& position, int index) = 0;
 
-		virtual void insert(const InputSpheres& spheres) = 0;
-		virtual const InputSpheres& getSpheres() = 0;
+		virtual void insert(const InputSpheres& spheres, const Array<ComponentIndex>& renderables) = 0;
+		virtual const Sphere& getSphere(ComponentIndex renderable) = 0;
 	};
 } // ~namespace Lux
