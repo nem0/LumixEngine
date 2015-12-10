@@ -809,7 +809,7 @@ public:
 	void initIMGUI()
 	{
 		ImGuiIO& io = ImGui::GetIO();
-		io.Fonts->AddFontFromFileTTF("editor/VeraMono.ttf", 13);
+		io.Fonts->AddFontFromFileTTF("bin/VeraMono.ttf", 13);
 
 		io.KeyMap[ImGuiKey_Tab] = (int)PlatformInterface::Keys::TAB;
 		io.KeyMap[ImGuiKey_LeftArrow] = (int)PlatformInterface::Keys::LEFT;
