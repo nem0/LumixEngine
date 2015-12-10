@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "core/vec.h"
 #include "engine/iplugin.h"
 
 
@@ -41,6 +42,11 @@ public:
 	virtual void addClip(const char* name, const Lumix::Path& path) = 0;
 	virtual void removeClip(ClipInfo* clip) = 0;
 	virtual void setClip(int clip_id, const Lumix::Path& path) = 0;
+
+	virtual float getEchoZoneRadius(ComponentIndex cmp) = 0;
+	virtual void setEchoZoneRadius(ComponentIndex cmp, float radius) = 0;
+	virtual float getEchoZoneDelay(ComponentIndex cmp) = 0;
+	virtual void setEchoZoneDelay(ComponentIndex cmp, float delay) = 0;
 
 	virtual ClipInfo* getAmbientSoundClip(ComponentIndex cmp) = 0;
 	virtual int getAmbientSoundClipIndex(ComponentIndex cmp) = 0;

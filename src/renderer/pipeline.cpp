@@ -41,15 +41,14 @@ static const float SHADOW_CAM_NEAR = 50.0f;
 static const float SHADOW_CAM_FAR = 5000.0f;
 
 
-class InstanceData
+struct InstanceData
 {
-public:
 	static const int MAX_INSTANCE_COUNT = 64;
 
-public:
-	const bgfx::InstanceDataBuffer* m_buffer;
-	int m_instance_count;
-	RenderableMesh m_mesh;
+	const bgfx::InstanceDataBuffer* buffer;
+	int instance_count;
+	Mesh* mesh;
+	Model* model;
 };
 
 
@@ -498,11 +497,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 	void finishInstances(int idx)
 	{
 		InstanceData& data = m_instances_data[idx];
-		if (!data.m_buffer)	return;
+		if (!data.buffer) return;
 
-		const RenderableMesh& info = data.m_mesh;
-		const Mesh& mesh = *info.m_mesh;
-		const Model& model = *info.m_model;
+		Mesh& mesh = *data.mesh;
+		const Model& model = *data.model;
 		Material* material = mesh.getMaterial();
 		const uint16 stride = mesh.getVertexDefinition().getStride();
 
@@ -514,14 +512,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 							 mesh.getIndicesOffset(),
 							 mesh.getIndexCount());
 		bgfx::setState(m_render_state | material->getRenderStates());
-		bgfx::setInstanceDataBuffer(data.m_buffer, data.m_instance_count);
+		bgfx::setInstanceDataBuffer(data.buffer, data.instance_count);
 		ShaderInstance& shader_instance =
-			info.m_mesh->getMaterial()->getShaderInstance();
+			mesh.getMaterial()->getShaderInstance();
 		bgfx::submit(m_view_idx, shader_instance.m_program_handles[m_pass_idx]);
 
-		data.m_buffer = nullptr;
-		data.m_instance_count = 0;
-		data.m_mesh.m_mesh->setInstanceIdx(-1);
+		data.buffer = nullptr;
+		data.instance_count = 0;
+		mesh.setInstanceIdx(-1);
 	}
 
 
@@ -1383,14 +1381,37 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderModel(Model& model, const Matrix& mtx) override
 	{
-		RenderableMesh mesh;
-		mesh.m_matrix = &mtx;
-		mesh.m_model = &model;
-		mesh.m_pose = nullptr;
 		for (int i = 0; i < model.getMeshCount(); ++i)
 		{
-			mesh.m_mesh = &model.getMesh(i);
-			renderRigidMesh(mesh);
+			auto& mesh = model.getMesh(i);
+			int instance_idx = mesh.getInstanceIdx();
+			if (instance_idx == -1)
+			{
+				instance_idx = m_instance_data_idx;
+				m_instance_data_idx = (m_instance_data_idx + 1) % lengthOf(m_instances_data);
+				if (m_instances_data[instance_idx].buffer)
+				{
+					finishInstances(instance_idx);
+				}
+				mesh.setInstanceIdx(instance_idx);
+			}
+			InstanceData& data = m_instances_data[instance_idx];
+			if (!data.buffer)
+			{
+				data.buffer =
+					bgfx::allocInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
+				data.instance_count = 0;
+				data.mesh = &mesh;
+				data.model = &model;
+			}
+			Matrix* mtcs = (Matrix*)data.buffer->data;
+			mtcs[data.instance_count] = mtx;
+			++data.instance_count;
+
+			if (data.instance_count == InstanceData::MAX_INSTANCE_COUNT)
+			{
+				finishInstances(instance_idx);
+			}
 		}
 	}
 
@@ -1398,9 +1419,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 	void setPoseUniform(const RenderableMesh& renderable_mesh) const
 	{
 		Matrix bone_mtx[64];
-
-		const Pose& pose = *renderable_mesh.m_pose;
-		const Model& model = *renderable_mesh.m_model;
+		
+		Renderable* renderable = m_scene->getRenderable(renderable_mesh.renderable);
+		const Pose& pose = *renderable->pose;
+		const Model& model = *renderable->model;
 		Vec3* poss = pose.getPositions();
 		Quat* rots = pose.getRotations();
 
@@ -1416,24 +1438,22 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void renderSkinnedMesh(const RenderableMesh& info)
+	void renderSkinnedMesh(const Renderable& renderable, const RenderableMesh& info)
 	{
-		if (!info.m_model->isReady()) return;
-
-		const Mesh& mesh = *info.m_mesh;
+		const Mesh& mesh = *info.mesh;
 		Material* material = mesh.getMaterial();
 
 		setPoseUniform(info);
 		setMaterial(material);
-		bgfx::setTransform(info.m_matrix);
-		bgfx::setVertexBuffer(info.m_model->getVerticesHandle(),
+		bgfx::setTransform(&renderable.matrix);
+		bgfx::setVertexBuffer(renderable.model->getVerticesHandle(),
 			mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(),
 			mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
 		bgfx::setIndexBuffer(
-			info.m_model->getIndicesHandle(), mesh.getIndicesOffset(), mesh.getIndexCount());
+			renderable.model->getIndicesHandle(), mesh.getIndicesOffset(), mesh.getIndexCount());
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::submit(m_view_idx,
-			info.m_mesh->getMaterial()->getShaderInstance().m_program_handles[m_pass_idx]);
+			mesh.getMaterial()->getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
 
@@ -1464,34 +1484,35 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void renderRigidMesh(const RenderableMesh& info)
+	void renderRigidMesh(const Renderable& renderable, const RenderableMesh& info)
 	{
-		if (!info.m_model->isReady()) return;
+		if (!info.mesh) return;
 
-		int instance_idx = info.m_mesh->getInstanceIdx();
+		int instance_idx = info.mesh->getInstanceIdx();
 		if (instance_idx == -1)
 		{
 			instance_idx = m_instance_data_idx;
 			m_instance_data_idx = (m_instance_data_idx + 1) % lengthOf(m_instances_data);
-			if (m_instances_data[instance_idx].m_buffer)
+			if (m_instances_data[instance_idx].buffer)
 			{
 				finishInstances(instance_idx);
 			}
-			info.m_mesh->setInstanceIdx(instance_idx);
+			info.mesh->setInstanceIdx(instance_idx);
 		}
 		InstanceData& data = m_instances_data[instance_idx];
-		if (!data.m_buffer)
+		if (!data.buffer)
 		{
-			data.m_buffer =
+			data.buffer =
 				bgfx::allocInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
-			data.m_instance_count = 0;
-			data.m_mesh = info;
+			data.instance_count = 0;
+			data.mesh = info.mesh;
+			data.model = renderable.model;
 		}
-		Matrix* mtcs = (Matrix*)data.m_buffer->data;
-		mtcs[data.m_instance_count] = *info.m_matrix;
-		++data.m_instance_count;
+		Matrix* mtcs = (Matrix*)data.buffer->data;
+		mtcs[data.instance_count] = renderable.matrix;
+		++data.instance_count;
 
-		if (data.m_instance_count == InstanceData::MAX_INSTANCE_COUNT)
+		if (data.instance_count == InstanceData::MAX_INSTANCE_COUNT)
 		{
 			finishInstances(instance_idx);
 		}
@@ -1678,18 +1699,22 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void renderMeshes(const Array<const RenderableMesh*>& meshes)
+	void renderMeshes(const Array<RenderableMesh>& meshes)
 	{
 		PROFILE_FUNCTION();
-		for (auto* mesh : meshes)
+		if (meshes.empty()) return;
+
+		Renderable* renderables = m_scene->getRenderables();
+		for (auto& mesh : meshes)
 		{
-			if (mesh->m_pose && mesh->m_pose->getCount() > 0)
+			Renderable& renderable = renderables[mesh.renderable];
+			if (renderable.pose && renderable.pose->getCount() > 0)
 			{
-				renderSkinnedMesh(*mesh);
+				renderSkinnedMesh(renderable, mesh);
 			}
 			else
 			{
-				renderRigidMesh(*mesh);
+				renderRigidMesh(renderable, mesh);
 			}
 		}
 		finishInstances();
@@ -1734,8 +1759,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 		for (int i = 0; i < lengthOf(m_instances_data); ++i)
 		{
-			m_instances_data[i].m_buffer = nullptr;
-			m_instances_data[i].m_instance_count = 0;
+			m_instances_data[i].buffer = nullptr;
+			m_instances_data[i].instance_count = 0;
 		}
 
 		if (lua_getglobal(m_source.m_lua_state, "render") == LUA_TFUNCTION)
@@ -1821,7 +1846,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	bgfx::VertexBufferHandle m_particle_vertex_buffer;
 	bgfx::IndexBufferHandle m_particle_index_buffer;
 	AssociativeArray<uint32, CustomCommandHandler> m_custom_commands_handlers;
-	Array<const RenderableMesh*> m_tmp_meshes;
+	Array<RenderableMesh> m_tmp_meshes;
 	Array<const TerrainInfo*> m_tmp_terrains;
 	Array<GrassInfo> m_tmp_grasses;
 

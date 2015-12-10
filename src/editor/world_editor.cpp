@@ -2442,6 +2442,7 @@ public:
 		return m_components.at(cmps_index);
 	}
 
+
 	ComponentUID getComponent(Entity entity, uint32 type) override
 	{
 		const Array<ComponentUID>& cmps = getComponents(entity);
@@ -2682,11 +2683,21 @@ public:
 							 const void* data,
 							 int size) override
 	{
+
 		ASSERT(m_selected_entities.size() == 1);
 		uint32 component_hash = component;
 		ComponentUID cmp = getComponent(m_selected_entities[0], component_hash);
 		if (cmp.isValid())
 		{
+			static const uint32 SLOT_HASH = crc32("Slot");
+			if (component == CAMERA_HASH && property.getNameHash() == SLOT_HASH)
+			{
+				if (static_cast<RenderScene*>(cmp.scene)->getCameraEntity(cmp.index) == m_camera)
+				{
+					return;
+				}
+			}
+
 			IEditorCommand* command = LUMIX_NEW(m_allocator, SetPropertyCommand)(
 				*this, cmp.entity, cmp.type, index, property, data, size);
 			executeCommand(command);

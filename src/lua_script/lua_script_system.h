@@ -46,7 +46,7 @@ public:
 	virtual const char* getPropertyName(ComponentIndex cmp, int index) const = 0;
 	virtual const char* getPropertyValue(ComponentIndex cmp, int index) const = 0;
 	virtual LuaScript* getScriptResource(ComponentIndex cmp) const = 0;
-	virtual void registerFunction(const char* name, lua_CFunction function) = 0;
+	virtual void registerFunction(const char* system, const char* name, lua_CFunction function) = 0;
 	virtual void setPropertyValue(ComponentIndex cmp,
 		const char* name,
 		const char* value) = 0;

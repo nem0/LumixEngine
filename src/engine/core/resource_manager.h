@@ -41,6 +41,7 @@ public:
 
 	IAllocator& getAllocator() { return m_allocator; }
 	ResourceManagerBase* get(uint32 id);
+	const ResourceManagerTable& getAll() const { return m_resource_managers; }
 
 	void add(uint32 id, ResourceManagerBase* rm);
 	void remove(uint32 id);

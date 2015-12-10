@@ -29,7 +29,7 @@ static const uint32 SCRIPT_HASH = Lumix::crc32("script");
 class LuaScriptSystemImpl;
 
 
-void registerEngineLuaAPI(Engine&, lua_State* L);
+void registerEngineLuaAPI(LuaScriptScene& scene, Engine& engine, lua_State* L);
 void registerUniverse(UniverseContext*, lua_State* L);
 
 
@@ -172,11 +172,19 @@ public:
 		unloadAllScripts();
 	}
 
-	
-	void registerFunction(const char* name, lua_CFunction function) override
+
+	void registerFunction(const char* system, const char* name, lua_CFunction function) override
 	{
+		if (lua_getglobal(m_global_state, system) == LUA_TNIL)
+		{
+			lua_pop(m_global_state, 1);
+			lua_newtable(m_global_state);
+			lua_setglobal(m_global_state, system);
+			lua_getglobal(m_global_state, system);
+		}
+
 		lua_pushcfunction(m_global_state, function);
-		lua_setglobal(m_global_state, name);
+		lua_setfield(m_global_state, -2, name);
 	}
 
 
@@ -198,18 +206,11 @@ public:
 
 	Universe& getUniverse() override { return *m_universe_context.m_universe; }
 
-
-	static void registerCFunction(lua_State* L, const char* name, lua_CFunction func)
-	{
-		lua_pushcfunction(L, func);
-		lua_setglobal(L, name);
-	}
-
-
+	
 	void registerAPI(lua_State* L)
 	{
 		registerUniverse(&m_universe_context, L);
-		registerEngineLuaAPI(m_system.m_engine, L);
+		registerEngineLuaAPI(*this, m_system.m_engine, L);
 		uint32 register_msg = crc32("registerLuaAPI");
 		for (auto* i : m_universe_context.m_scenes)
 		{

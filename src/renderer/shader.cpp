@@ -400,6 +400,7 @@ bool ShaderBinary::load(FS::IFile& file)
 	file.read(mem->data, file.size());
 	mem->data[file.size()] = '\0';
 	m_handle = bgfx::createShader(mem);
+	m_size = file.size();
 	return bgfx::isValid(m_handle);
 }
 

@@ -198,8 +198,16 @@ struct LUMIX_ENGINE_API Matrix
 	}
 
 
-	void getTranslation(Vec3& pos) const;
-	Vec3 getTranslation() const;
+	void getTranslation(Vec3& pos) const
+	{
+		pos.set(m41, m42, m43);
+	}
+
+	Vec3 getTranslation() const
+	{
+		return Vec3(m41, m42, m43);
+	}
+
 	void getRotation(Quat& rot) const;
 	void transpose();
 	Vec3 multiplyPosition(const Vec3& pos) const;

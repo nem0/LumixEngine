@@ -1,4 +1,5 @@
 #include "profiler_ui.h"
+#include "core/fs/os_file.h"
 #include "core/math_utils.h"
 #include "core/profiler.h"
 #include "core/resource.h"
@@ -60,6 +61,7 @@ ProfilerUI::ProfilerUI(Lumix::Debug::Allocator* allocator, Lumix::ResourceManage
 	Lumix::Profiler::getFrameListeners().bind<ProfilerUI, &ProfilerUI::onFrame>(this);
 	m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(m_allocator);
 	m_allocation_root->m_stack_node = nullptr;
+	m_filter[0] = 0;
 }
 
 
@@ -235,10 +237,44 @@ static const char* getResourceStateString(Lumix::Resource::State state)
 }
 
 
+void ProfilerUI::saveResourceList()
+{
+	Lumix::FS::OsFile file;
+	if (file.open("resources.csv", Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_allocator))
+	{
+		auto& managers = m_resource_manager->getAll();
+		for (auto* i : managers)
+		{
+			auto& resources = i->getResourceTable();
+			for (auto& res : resources)
+			{
+				file.write(res->getPath().c_str(), res->getPath().length());
+				file.write(", ", 2);
+				char tmp[50];
+				Lumix::toCString(res->size() / 1024.0f, tmp, Lumix::lengthOf(tmp), 3);
+				file.write(tmp, Lumix::stringLength(tmp));
+				file.write("KB, ", 4);
+				
+				const char* state = getResourceStateString(res->getState());
+				file.write(state, Lumix::stringLength(state));
+				
+				file.write(", ", 4);
+				Lumix::toCString(res->getRefCount(), tmp, Lumix::lengthOf(tmp));
+				file.write(tmp, Lumix::stringLength(tmp));
+				file.write("\n", 4);
+			}
+		}
+		file.close();
+	}
+}
+
+
 void ProfilerUI::onGUIResources()
 {
 	if (!m_resource_manager) return;
 	if (!ImGui::CollapsingHeader("Resources")) return;
+
+	ImGui::InputText("filter", m_filter, Lumix::lengthOf(m_filter));
 
 	Lumix::uint32 manager_types[] = { Lumix::ResourceManager::ANIMATION,
 		Lumix::ResourceManager::MATERIAL,
@@ -278,6 +314,12 @@ void ProfilerUI::onGUIResources()
 		size_t sum = 0;
 		for (auto iter = resources.begin(), end = resources.end(); iter != end; ++iter)
 		{
+			if (m_filter[0] != '\0' &&
+				Lumix::stristr(iter.value()->getPath().c_str(), m_filter) == nullptr)
+			{
+				continue;
+			}
+
 			ImGui::Text(iter.value()->getPath().c_str());
 			ImGui::NextColumn();
 			ImGui::Text("%.3fKB", iter.value()->size() / 1024.0f);
@@ -297,6 +339,19 @@ void ProfilerUI::onGUIResources()
 
 		ImGui::Columns(1);
 		
+	}
+
+	static int saved_displayed = 0;
+
+	if (saved_displayed > 0)
+	{
+		--saved_displayed;
+		ImGui::Text("Saved");
+	}
+	else if (ImGui::Button("Save"))
+	{
+		saved_displayed = 180;
+		saveResourceList();
 	}
 	ImGui::Unindent();
 }

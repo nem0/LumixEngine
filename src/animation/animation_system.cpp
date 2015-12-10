@@ -188,7 +188,7 @@ public:
 			{
 				animable.m_animation->getPose(
 					animable.m_time,
-					m_render_scene->getPose(animable.m_renderable),
+					*m_render_scene->getPose(animable.m_renderable),
 					*m_render_scene->getRenderableModel(animable.m_renderable));
 				float t = animable.m_time + time_delta;
 				float l = animable.m_animation->getLength();

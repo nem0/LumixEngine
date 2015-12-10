@@ -111,20 +111,6 @@ Matrix Matrix::operator *(const Matrix& rhs) const
 }
 
 
-void Matrix::getTranslation(Vec3& pos) const
-{
-	pos.x = m41;
-	pos.y = m42;
-	pos.z = m43;
-}
-
-
-Vec3 Matrix::getTranslation() const
-{
-	return Vec3(m41, m42, m43);
-}
-
-
 void Matrix::getRotation(Quat& rot) const
 {
 	float tr = m11 + m22 + m33;

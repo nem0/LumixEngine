@@ -1,12 +1,12 @@
-version: 0.17.{build}
+version: 0.18.{build}
 os: Windows Server 2012 R2
 configuration: RelWithDebInfo
 before_build:
   - cd projects
-  - cmake -G "Visual Studio 12"
+  - genie.bat
   - cd ..
 build:
-  project: projects\LumixEngine.sln
+  project: projects\tmp\LumixEngine.sln
   verbosity: minimal
 test_script:
 - ps: >-
@@ -14,29 +14,29 @@ test_script:
 
     cd LumixEngine_data
 
-    & "..\projects\RelWithDebInfo\unit_tests.exe" | Write-Output
+    & "..\projects\tmp\bin\RelWithDebInfo\unit_tests.exe" | Write-Output
 
     $wc = New-Object Net.WebClient
             $url = "https://ci.appveyor.com/api/testresults/nunit/$Env:APPVEYOR_JOB_ID"
             $wc.UploadFile($url, (Resolve-Path .\tests.xml))
 
 after_build:
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\RelWithDebInfo\animation.dll
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\RelWithDebInfo\audio.dll
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\RelWithDebInfo\editor.dll
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\RelWithDebInfo\engine.dll
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\RelWithDebInfo\lua_script.dll
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\RelWithDebInfo\physics.dll
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\RelWithDebInfo\renderer.dll
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\RelWithDebInfo\studio.exe
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\RelWithDebInfo\animation.pdb
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\RelWithDebInfo\audio.pdb
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\RelWithDebInfo\editor.pdb
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\RelWithDebInfo\engine.pdb
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\RelWithDebInfo\lua_script.pdb
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\RelWithDebInfo\physics.pdb
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\RelWithDebInfo\renderer.pdb
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\RelWithDebInfo\studio.pdb
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\animation.dll
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\audio.dll
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\editor.dll
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\engine.dll
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\lua_script.dll
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\physics.dll
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\renderer.dll
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\studio.exe
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\animation.pdb
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\audio.pdb
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\editor.pdb
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\engine.pdb
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\lua_script.pdb
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\physics.pdb
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\renderer.pdb
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\studio.pdb
 
 artifacts:
 - path: tests.xml

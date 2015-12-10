@@ -186,37 +186,47 @@ struct AudioDeviceImpl : public AudioDevice
 		float right_delay) override
 	{
 		auto buffer = (LPDIRECTSOUNDBUFFER)handle;
-		DSEFFECTDESC echo_effect;
-		memset(&echo_effect, 0, sizeof(DSEFFECTDESC));
+		DSEFFECTDESC echo_effect = {};
 		echo_effect.dwSize = sizeof(DSEFFECTDESC);
 		echo_effect.guidDSFXClass = GUID_DSFX_STANDARD_ECHO;
 		IDirectSoundBuffer8* buffer8;
 		if (FAILED(buffer->QueryInterface(IID_IDirectSoundBuffer8, (void**)&buffer8))) return;
 
+		DWORD buffer_status;
+		if(FAILED(buffer->GetStatus(&buffer_status))) return;
+		
+		buffer->Stop();
 		DWORD res = 0;
-		if (FAILED(buffer8->SetFX(1, &echo_effect, &res)))
-		{
-			buffer8->Release();
-			return;
-		}
 
 		IDirectSoundFXEcho8* echo = NULL;
-		DSFXEcho echo_params;
 		if (FAILED(buffer8->GetObjectInPath(
 			GUID_DSFX_STANDARD_ECHO, 0, IID_IDirectSoundFXEcho8, (LPVOID*)&echo)))
 		{
-			buffer8->Release();
-			return;
+			if (FAILED(buffer8->SetFX(1, &echo_effect, &res)))
+			{
+				if (buffer_status & DSBSTATUS_PLAYING) buffer->Play(0, 0, buffer_status & DSBSTATUS_LOOPING);
+				buffer8->Release();
+				return;
+			}
+			if (FAILED(buffer8->GetObjectInPath(
+				GUID_DSFX_STANDARD_ECHO, 0, IID_IDirectSoundFXEcho8, (LPVOID*)&echo)))
+			{
+				if (buffer_status & DSBSTATUS_PLAYING) buffer->Play(0, 0, buffer_status & DSBSTATUS_LOOPING);
+				buffer8->Release();
+				return;
+			}
 		}
-		if (FAILED(echo->GetAllParameters(&echo_params))) return;
+
+		DSFXEcho echo_params;
 		
-		echo_params.fFeedback = feedback;
-		echo_params.fWetDryMix = wet_dry_mix;
+		echo_params.fFeedback = DSFXECHO_FEEDBACK_MIN + feedback * DSFXECHO_FEEDBACK_MAX;
+		echo_params.fWetDryMix = DSFXECHO_WETDRYMIX_MIN + wet_dry_mix * DSFXECHO_WETDRYMIX_MAX;
 		echo_params.fRightDelay = right_delay;
 		echo_params.fLeftDelay = left_delay;
 		echo_params.lPanDelay = DSFXECHO_PANDELAY_MIN;
 
 		echo->SetAllParameters(&echo_params);
+		if (buffer_status & DSBSTATUS_PLAYING) buffer->Play(0, 0, buffer_status & DSBSTATUS_LOOPING);
 	}
 
 

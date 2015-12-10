@@ -272,8 +272,8 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 
 		f[count - 2].x = 1;
 		f[1].x = 0;
+		ImGui::EndCurveEditor(editor);
 	}
-	ImGui::EndCurveEditor(editor);
 	if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))
 	{
 		auto mp = ImGui::GetMousePos();
@@ -559,6 +559,7 @@ void PropertyGrid::onGUI()
 				{
 					m_editor.addComponent(
 						Lumix::crc32(Lumix::PropertyRegister::getComponentTypeID(i)));
+					break;
 				}
 			}
 			ImGui::EndPopup();
@@ -571,7 +572,6 @@ void PropertyGrid::onGUI()
 		{
 			showComponentProperties(cmp);
 		}
-
 	}
 	ImGui::End();
 }

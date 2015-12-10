@@ -87,6 +87,7 @@ private:
 	void showAllocationTree(AllocationStackNode* node, int column);
 	AllocationStackNode* getOrCreate(AllocationStackNode* my_node,
 		Lumix::Debug::StackNode* external_node, size_t size);
+	void saveResourceList();
 
 private:
 	Lumix::DefaultAllocator m_allocator;
@@ -100,4 +101,5 @@ private:
 	int m_current_frame;
 	int m_viewed_thread_id;
 	bool m_is_paused;
+	char m_filter[100];
 };

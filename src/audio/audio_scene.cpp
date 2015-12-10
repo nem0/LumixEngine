@@ -9,8 +9,10 @@
 #include "core/matrix.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "lua_script/lua_script_system.h"
+#include "renderer/render_scene.h"
 #include "universe/universe.h"
 
 
@@ -53,6 +55,14 @@ static void setEcho(IScene* scene,
 } // namespace LuaAPI
 
 
+enum class AudioSceneVersion : int
+{
+	ECHO_ZONES,
+
+	LAST
+};
+
+
 static const uint32 LISTENER_HASH = crc32("audio_listener");
 static const uint32 AMBIENT_SOUND_HASH = crc32("ambient_sound");
 static const uint32 ECHO_ZONE_HASH = crc32("echo_zone");
@@ -68,7 +78,8 @@ struct Listener
 struct EchoZone
 {
 	Entity entity;
-	Vec3 extents;
+	float radius;
+	float delay;
 	ComponentIndex component;
 };
 
@@ -138,11 +149,11 @@ struct AudioSceneImpl : public AudioScene
 
 		auto* script_scene = static_cast<LuaScriptScene*>(scene);
 		script_scene->registerFunction(
-			"API_setEcho", LuaWrapper::wrap<decltype(&LuaAPI::setEcho), LuaAPI::setEcho>);
+			"Audio", "setEcho", LuaWrapper::wrap<decltype(&LuaAPI::setEcho), LuaAPI::setEcho>);
 		script_scene->registerFunction(
-			"API_playSound", LuaWrapper::wrap<decltype(&LuaAPI::playSound), LuaAPI::playSound>);
+			"Audio", "playSound", LuaWrapper::wrap<decltype(&LuaAPI::playSound), LuaAPI::playSound>);
 		script_scene->registerFunction(
-			"API_setSoundVolume", LuaWrapper::wrap<decltype(&LuaAPI::setSoundVolume), LuaAPI::setSoundVolume>);
+			"Audio", "setSoundVolume", LuaWrapper::wrap<decltype(&LuaAPI::setSoundVolume), LuaAPI::setSoundVolume>);
 	}
 
 
@@ -220,7 +231,11 @@ struct AudioSceneImpl : public AudioScene
 
 	ComponentIndex createListener(Entity entity)
 	{
-		if(m_listener.entity != INVALID_ENTITY) return INVALID_COMPONENT;
+		if (m_listener.entity != INVALID_ENTITY)
+		{
+			g_log_warning.log("audio") << "Listener already exists";
+			return INVALID_COMPONENT;
+		}
 
 		m_listener.entity = entity;
 		m_universe.addComponent(entity, LISTENER_HASH, this, 0);
@@ -267,9 +282,34 @@ struct AudioSceneImpl : public AudioScene
 		auto& zone = m_echo_zones.pushEmpty();
 		zone.entity = entity;
 		zone.component = ++m_last_echo_zone_id;
-		zone.extents.set(10, 10, 10);
+		zone.delay = 500.0f;
+		zone.radius = 10;
 		m_universe.addComponent(entity, ECHO_ZONE_HASH, this, zone.component);
 		return zone.component;
+	}
+
+
+	float getEchoZoneDelay(ComponentIndex cmp) override
+	{
+		return m_echo_zones[getEchoZoneIdx(cmp)].delay;
+	}
+
+
+	void setEchoZoneDelay(ComponentIndex cmp, float delay) override
+	{
+		m_echo_zones[getEchoZoneIdx(cmp)].delay = delay;
+	}
+
+
+	float getEchoZoneRadius(ComponentIndex cmp) override
+	{
+		return m_echo_zones[getEchoZoneIdx(cmp)].radius;
+	}
+	
+	
+	void setEchoZoneRadius(ComponentIndex cmp, float radius) override
+	{
+		m_echo_zones[getEchoZoneIdx(cmp)].radius = radius;
 	}
 
 
@@ -277,7 +317,7 @@ struct AudioSceneImpl : public AudioScene
 	{
 		for(int i = 0, c = m_echo_zones.size(); i < c; ++i)
 		{
-			if(m_echo_zones[i].component == component) return i;
+			if (m_echo_zones[i].component == component) return i;
 		}
 		return -1;
 	}
@@ -361,6 +401,12 @@ struct AudioSceneImpl : public AudioScene
 			serializer.write(i.component);
 			serializer.write(i.entity);
 		}
+
+		serializer.write(m_echo_zones.size());
+		for (auto& i : m_echo_zones)
+		{
+			serializer.write(i);
+		}
 	}
 
 
@@ -375,7 +421,7 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	void deserialize(InputBlob& serializer, int) override
+	void deserialize(InputBlob& serializer, int version) override
 	{
 		clearClips();
 
@@ -425,7 +471,22 @@ struct AudioSceneImpl : public AudioScene
 
 			m_universe.addComponent(sound.entity, AMBIENT_SOUND_HASH, this, sound.component);
 		}
+
+		if (version > (int)AudioSceneVersion::ECHO_ZONES)
+		{
+			serializer.read(count);
+			m_echo_zones.resize(count);
+
+			for (auto& i : m_echo_zones)
+			{
+				serializer.read(i);
+				m_universe.addComponent(i.entity, ECHO_ZONE_HASH, this, i.component);
+			}
+		}
 	}
+
+
+	int getVersion() const override { return (int)AudioSceneVersion::LAST; }
 
 
 	bool ownComponentType(uint32 type) const override
@@ -537,6 +598,18 @@ struct AudioSceneImpl : public AudioScene
 				sound.entity = entity;
 				sound.time = 0;
 				sound.clip = clip_info;
+				
+				for (auto& zone : m_echo_zones)
+				{
+					float dist2 = (pos - m_universe.getPosition(zone.entity)).squaredLength();
+					float r2 = zone.radius * zone.radius;
+					if (dist2 > r2) continue;
+
+					float w = dist2 / r2;
+					m_device.setEcho(buffer, 1, 1 - w, zone.delay, zone.delay);
+					break;
+				}
+
 				return i;
 			}
 		}
@@ -638,6 +711,42 @@ AudioScene* AudioScene::createInstance(AudioSystem& system,
 void AudioScene::destroyInstance(AudioScene* scene)
 {
 	LUMIX_DELETE(static_cast<AudioSceneImpl*>(scene)->m_allocator, scene);
+}
+
+
+struct EditorPlugin : public WorldEditor::Plugin
+{
+	EditorPlugin(WorldEditor& editor)
+		: m_editor(editor)
+	{
+	}
+
+	bool showGizmo(ComponentUID cmp) override
+	{
+		if (cmp.type == ECHO_ZONE_HASH)
+		{
+			auto* audio_scene = static_cast<AudioSceneImpl*>(cmp.scene);
+			float radius = audio_scene->getEchoZoneRadius(cmp.index);
+			Universe& universe = audio_scene->getUniverse();
+			Vec3 pos = universe.getPosition(cmp.entity);
+
+			auto* scene = static_cast<RenderScene*>(m_editor.getScene(crc32("renderer")));
+			if (!scene) return true;
+			scene->addDebugSphere(pos, radius, 0xff0000ff, 0);
+			return true;
+		}
+		
+		return false;
+	}
+
+	WorldEditor& m_editor;
+};
+
+
+extern "C" LUMIX_AUDIO_API void setWorldEditor(Lumix::WorldEditor& editor)
+{
+	auto* plugin = LUMIX_NEW(editor.getAllocator(), EditorPlugin)(editor);
+	editor.addPlugin(*plugin);
 }
 
 

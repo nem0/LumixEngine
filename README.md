@@ -18,17 +18,13 @@ Features:
   * component based
   * data driven
 
-[News on twitter](https://twitter.com/mikulasflorek)
-  
-[Getting started](https://github.com/nem0/LumixEngine/wiki/Getting-started)
-
-[Download latest executables](https://ci.appveyor.com/project/nem0/lumixengine/build/artifacts)
-
-[Code rules](https://github.com/nem0/LumixEngine/wiki/Code-rules)
-
-[Data repository](https://github.com/nem0/lumixengine_data)
-
-[Mindmap](https://raw.githubusercontent.com/nem0/LumixEngine/gh-pages/images/lumix_mindmap.png)
+* [Getting started](https://github.com/nem0/LumixEngine/wiki/Getting-started)
+* [News on twitter](https://twitter.com/mikulasflorek)
+* [Download latest executables](https://ci.appveyor.com/project/nem0/lumixengine/build/artifacts)
+* [Code rules](https://github.com/nem0/LumixEngine/wiki/Code-rules)
+* [Data repository](https://github.com/nem0/lumixengine_data)
+* [Mindmap](https://raw.githubusercontent.com/nem0/LumixEngine/gh-pages/images/lumix_mindmap.png)
+* [Wiki](https://github.com/nem0/LumixEngine/wiki)
 
 Videos
 
@@ -52,5 +48,8 @@ Videos
 * [assimp](https://github.com/assimp/assimp)
 * [PhysX](https://developer.nvidia.com/physx-sdk)
 * [ImGui](https://github.com/ocornut/imgui)
+
+Project generator
+* [Genie](https://github.com/bkaradzic/genie)
 
 Contact: mikulas.florek@gamedev.sk
