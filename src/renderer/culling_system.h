@@ -33,8 +33,8 @@ namespace Lumix
 		virtual void addStatic(ComponentIndex renderable, const Sphere& sphere) = 0;
 		virtual void removeStatic(ComponentIndex renderable) = 0;
 
-		virtual void setLayerMask(int index, int64 layer) = 0;
-		virtual int64 getLayerMask(int index) = 0;
+		virtual void setLayerMask(ComponentIndex renderable, int64 layer) = 0;
+		virtual int64 getLayerMask(ComponentIndex renderable) = 0;
 
 		virtual void updateBoundingRadius(float radius, int index) = 0;
 		virtual void updateBoundingPosition(const Vec3& position, int index) = 0;

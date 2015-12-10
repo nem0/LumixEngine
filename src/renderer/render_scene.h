@@ -47,6 +47,7 @@ struct Renderable
 	Model* model;
 	Matrix matrix;
 	Entity entity;
+	int64 layer_mask;
 };
 
 

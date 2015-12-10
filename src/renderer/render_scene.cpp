@@ -517,8 +517,7 @@ public:
 
 			if(r.entity != INVALID_ENTITY)
 			{
-				int64 layer_mask;
-				serializer.read(layer_mask);
+				serializer.read(r.layer_mask);
 				r.matrix = m_universe.getMatrix(r.entity);
 
 				uint32 path;
@@ -526,10 +525,9 @@ public:
 
 				if(r.entity != INVALID_ENTITY)
 				{
-					m_culling_system->addStatic(r.entity, Sphere(m_universe.getPosition(r.entity), 1.0f));
-					m_culling_system->setLayerMask(r.entity, layer_mask);
-					auto* model = static_cast<Model*>(
-						m_engine.getResourceManager().get(ResourceManager::MODEL)->load(Path(path)));
+					auto* model = static_cast<Model*>(m_engine.getResourceManager()
+														  .get(ResourceManager::MODEL)
+														  ->load(Path(path)));
 					setModel(r.entity, model);
 					m_universe.addComponent(r.entity, RENDERABLE_HASH, this, r.entity);
 				}
@@ -674,7 +672,6 @@ public:
 		Entity entity = m_renderables[component].entity;
 		LUMIX_DELETE(m_allocator, m_renderables[component].pose);
 		m_renderables[component].entity = INVALID_ENTITY;
-		m_culling_system->removeStatic(component);
 		m_universe.destroyComponent(entity, RENDERABLE_HASH, this, component);
 	}
 
@@ -1323,8 +1320,10 @@ public:
 
 	void showRenderable(ComponentIndex cmp) override
 	{
+		if (!m_renderables[cmp].model || !m_renderables[cmp].model->isReady()) return;
+
 		Sphere sphere(m_universe.getPosition(m_renderables[cmp].entity),
-			m_renderables[cmp].model ? m_renderables[cmp].model->getBoundingRadius() : 1.0f);
+			m_renderables[cmp].model->getBoundingRadius());
 		m_culling_system->addStatic(cmp, sphere);
 	}
 
@@ -1560,28 +1559,29 @@ public:
 		{
 			Array<RenderableMesh>& subinfos = m_temporary_infos[subresult_index];
 			subinfos.clear();
+			if (results[subresult_index].empty()) continue;
+
 			MTJD::Job* job = MTJD::makeJob(m_engine.getMTJDManager(),
 				[&subinfos, layer_mask, this, &results, subresult_index, &frustum]()
 				{
 					PROFILE_BLOCK("Temporary Info Job");
 					Vec3 frustum_position = frustum.getPosition();
-					const CullingSystem::Subresults& subresults = results[subresult_index];
-					for (int i = 0, c = subresults.size(); i < c; ++i)
+					const int* LUMIX_RESTRICT raw_subresults = &results[subresult_index][0];
+					Renderable* LUMIX_RESTRICT renderables = &m_renderables[0];
+					for (int i = 0, c = results[subresult_index].size(); i < c; ++i)
 					{
-						const Renderable* LUMIX_RESTRICT renderable = &m_renderables[subresults[i]];
-						const Model* LUMIX_RESTRICT model = renderable->model;
+						Renderable* LUMIX_RESTRICT renderable = &renderables[raw_subresults[i]];
+						Model* LUMIX_RESTRICT model = renderable->model;
 						float squared_distance =
 							(renderable->matrix.getTranslation() - frustum_position)
 								.squaredLength();
-						if (model && model->isReady())
+
+						LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
+						for (int j = lod.getFrom(), c = lod.getTo(); j <= c; ++j)
 						{
-							LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
-							for (int j = lod.getFrom(), c = lod.getTo(); j <= c; ++j)
-							{
-								auto& info = subinfos.pushEmpty();
-								info.renderable = subresults[i];
-								info.mesh = &renderable->model->getMesh(j);
-							}
+							auto& info = subinfos.pushEmpty();
+							info.renderable = raw_subresults[i];
+							info.mesh = &model->getMesh(j);
 						}
 					}
 				},
@@ -2517,7 +2517,9 @@ public:
 		auto& r = m_renderables[component];
 		float bounding_radius = r.model->getBoundingRadius();
 		float scale = m_universe.getScale(r.entity);
-		m_culling_system->updateBoundingRadius(bounding_radius * scale, component);
+		Sphere sphere(r.matrix.getTranslation(), bounding_radius * scale);
+		m_culling_system->addStatic(component, sphere);
+		m_culling_system->setLayerMask(component, r.layer_mask);
 		if (model->getBoneCount() > 0)
 		{
 			r.pose = LUMIX_NEW(m_allocator, Pose)(m_allocator);
@@ -2575,7 +2577,8 @@ public:
 		ASSERT(m_renderables[component].entity != INVALID_ENTITY);
 
 		Model* old_model = m_renderables[component].model;
-		if (model == old_model && old_model)
+		bool no_change = model == old_model && old_model;
+		if (no_change)
 		{
 			old_model->getResourceManager().get(ResourceManager::MODEL)->unload(*old_model);
 			return;
@@ -2585,6 +2588,7 @@ public:
 			ModelLoadedCallback* callback = getModelLoadedCallback(old_model);
 			--callback->m_ref_count;
 			old_model->getResourceManager().get(ResourceManager::MODEL)->unload(*old_model);
+			m_culling_system->removeStatic(component);
 		}
 		m_renderables[component].model = model;
 		if (model)
@@ -2711,10 +2715,9 @@ public:
 		r.model = nullptr;
 		r.pose = nullptr;
 		r.matrix = m_universe.getMatrix(entity);
-		m_universe.addComponent(entity, RENDERABLE_HASH, this, m_renderables.size() - 1);
-		m_culling_system->addStatic(entity, Sphere(m_universe.getPosition(entity), 1.0f));
+		m_universe.addComponent(entity, RENDERABLE_HASH, this, entity);
 		m_renderable_created.invoke(m_renderables.size() - 1);
-		return m_renderables.size() - 1;
+		return entity;
 	}
 
 
