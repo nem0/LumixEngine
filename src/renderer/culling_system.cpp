@@ -180,7 +180,11 @@ public:
 			i.clear();
 		}
 
-		if (count == 0) return;
+		if (count == 0)
+		{
+			m_is_async_result = false;
+			return;
+		}
 
 		if (count < m_result.size() * MIN_ENTITIES_PER_THREAD)
 		{
@@ -248,7 +252,11 @@ public:
 
 	void addStatic(ComponentIndex renderable, const Sphere& sphere) override
 	{
-		if(renderable < m_renderable_to_sphere_map.size() && m_renderable_to_sphere_map[renderable] != -1) return;
+		if (renderable < m_renderable_to_sphere_map.size() && m_renderable_to_sphere_map[renderable] != -1)
+		{
+			ASSERT(false);
+			return;
+		}
 
 		m_spheres.push(sphere);
 		m_sphere_to_renderable_map.push(renderable);
@@ -264,10 +272,16 @@ public:
 	void removeStatic(ComponentIndex renderable) override
 	{
 		int index = m_renderable_to_sphere_map[renderable];
-		if(index < 0) return;
+		ASSERT(index >= 0);
+		ASSERT(index < m_spheres.size());
 
-		m_spheres.eraseFast(index);
-		m_sphere_to_renderable_map.eraseFast(index);
+		m_renderable_to_sphere_map[m_sphere_to_renderable_map.back()] = index;
+		m_spheres[index] = m_spheres.back();
+		m_sphere_to_renderable_map[index] = m_sphere_to_renderable_map.back();
+		m_layer_masks[index] = m_layer_masks.back();
+
+		m_spheres.pop();
+		m_sphere_to_renderable_map.pop();
 		m_layer_masks.eraseFast(index);
 		m_renderable_to_sphere_map[renderable] = -1;
 	}
