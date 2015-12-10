@@ -364,6 +364,50 @@ void EndCurveEditor(const CurveEditor& editor)
 }
 
 
+bool CurveNode(const int id, ImVec2& p, const ImRect& bb)
+{
+	ImGuiWindow* window = GetCurrentWindow();
+	static const float SIZE = 3;
+	const ImU32 col_base = window->Color(ImGuiCol_PlotLines);
+	const ImU32 col_hovered = window->Color(ImGuiCol_PlotLinesHovered);
+
+	auto transform = [bb](const ImVec2& p) -> ImVec2
+	{
+		return ImVec2(bb.Min.x * (1 - p.x) + bb.Max.x * p.x,
+					  bb.Min.y * p.y + bb.Max.y * (1 - p.y));
+	};
+
+	auto pos = transform(p);
+
+	ImGui::SetCursorScreenPos(pos - ImVec2(SIZE / 2.0f, SIZE / 2.0f));
+	ImGui::PushID(id);
+	ImGui::InvisibleButton("", ImVec2(2 * SIZE, 2 * SIZE));
+
+	ImU32 col = ImGui::IsItemHovered() ? col_hovered : col_base;
+
+	window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, SIZE), col);
+	window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, SIZE), col);
+	window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, -SIZE), col);
+	window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, -SIZE), col);
+
+	bool changed = false;
+	if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))
+	{
+		pos += ImGui::GetIO().MouseDelta;
+		ImVec2 v;
+		v.x = (pos.x - bb.Min.x) / (bb.Max.x - bb.Min.x);
+		v.y = (bb.Max.y - pos.y) / (bb.Max.y - bb.Min.y);
+
+		v = ImClamp(v, ImVec2(0, 0), ImVec2(1, 1));
+		p = v;
+		changed = true;
+	}
+	ImGui::PopID();
+
+	return changed;
+}
+
+
 bool CurvePoint(ImVec2* points, CurveEditor& editor)
 {
 	ImGuiWindow* window = GetCurrentWindow();
@@ -379,11 +423,10 @@ bool CurvePoint(ImVec2* points, CurveEditor& editor)
 	const ImRect frame_bb(window->DC.CursorPos, window->DC.CursorPos + graph_size);
 	const ImRect inner_bb(frame_bb.Min + style.FramePadding, frame_bb.Max - style.FramePadding);
 	const ImU32 col_base = window->Color(ImGuiCol_PlotLines);
-	const ImU32 col_hovered = window->Color(ImGuiCol_PlotLinesHovered);
 
 	auto left_tangent = points[0];
-	auto right_tangent = points[2];
 	auto p = points[1];
+
 	auto transform = [inner_bb](const ImVec2& p) -> ImVec2
 	{
 		return ImVec2(inner_bb.Min.x * (1 - p.x) + inner_bb.Max.x * p.x,
@@ -391,44 +434,48 @@ bool CurvePoint(ImVec2* points, CurveEditor& editor)
 	};
 
 	auto pos = transform(p);
+	bool changed = false;
+
 	if (editor.point_idx >= 0)
 	{
+		ImVec2 tan_pos_prev = transform(editor.prev_point + editor.prev_tangent);
+		ImVec2 tan_pos_current = transform(p + left_tangent);
+		ImVec2 pos_prev = transform(editor.prev_point);
+
 		window->DrawList->AddBezierCurve(pos,
-			transform(p + left_tangent),
-			transform(editor.prev_point + editor.prev_tangent),
-			transform(editor.prev_point),
+			tan_pos_current,
+			tan_pos_prev,
+			pos_prev,
 			col_base,
 			1.0f);
+
+		ImU32 col = col_base;
+
+		ImVec2 lt = p + left_tangent;
+		if (CurveNode(editor.point_idx, lt, inner_bb))
+		{
+			points[0] = lt - p;
+			changed = true;
+		}
+		++editor.point_idx;
+		window->DrawList->AddLine(tan_pos_current, pos, col_base);
+
+		ImVec2 rt = editor.prev_point + editor.prev_tangent;
+		if (CurveNode(editor.point_idx, rt, inner_bb))
+		{
+			//editor.prev_tangent = rt - editor.prev_point;
+		}
+		++editor.point_idx;
+		window->DrawList->AddLine(tan_pos_prev, pos_prev, col_base);
 	}
 	editor.prev_point = p;
-	editor.prev_tangent = right_tangent;
+	editor.prev_tangent = points[2];
 
-	static const float SIZE = 3;
-	ImGui::SetCursorScreenPos(pos - ImVec2(SIZE, SIZE));
-	ImGui::PushID(editor.point_idx);
-	++editor.point_idx;
-	ImGui::InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
-
-	ImU32 col = ImGui::IsItemHovered() ? col_hovered : col_base;
-
-	window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, SIZE), col);
-	window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, SIZE), col);
-	window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, -SIZE), col);
-	window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, -SIZE), col);
-
-	bool changed = false;
-	if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))
+	if (CurveNode(editor.point_idx, points[1], inner_bb))
 	{
-		pos += ImGui::GetIO().MouseDelta;
-		ImVec2 v;
-		v.x = (pos.x - inner_bb.Min.x) / (inner_bb.Max.x - inner_bb.Min.x);
-		v.y = (inner_bb.Max.y - pos.y) / (inner_bb.Max.y - inner_bb.Min.y);
-
-		v = ImClamp(v, ImVec2(0, 0), ImVec2(1, 1));
-		points[1] = v;
 		changed = true;
 	}
-	ImGui::PopID();
+	++editor.point_idx;
 
 	ImGui::SetCursorScreenPos(cursor_pos_backup);
 	return changed;
