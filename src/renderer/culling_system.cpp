@@ -282,7 +282,7 @@ public:
 
 		m_spheres.pop();
 		m_sphere_to_renderable_map.pop();
-		m_layer_masks.eraseFast(index);
+		m_layer_masks.pop();
 		m_renderable_to_sphere_map[renderable] = -1;
 	}
 
