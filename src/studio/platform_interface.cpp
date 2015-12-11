@@ -1,5 +1,6 @@
 #include "platform_interface.h"
 #include "core/iallocator.h"
+#include "core/string.h"
 #include "ocornut-imgui/imgui.h"
 #include "renderer/renderer.h"
 
