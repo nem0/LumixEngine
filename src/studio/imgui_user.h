@@ -42,6 +42,8 @@ struct CurveEditor
 	ImVec2 prev_point;
 	ImVec2 prev_tangent;
 	int point_idx;
+	int tangent_idx;
+	int point_count;
 };
 
 CurveEditor BeginCurveEditor(const char* label);

@@ -242,6 +242,7 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 	auto editor = ImGui::BeginCurveEditor(desc.getName());
 	if (editor.valid)
 	{
+		editor.point_count = count / 3;
 		editor_size = ImVec2(ImGui::CalcItemWidth(), ImGui::GetItemRectSize().y);
 
 		for (int i = 1; i < count; i += 3)
@@ -265,6 +266,7 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 					f[j] = f[j + 3];
 				}
 				count -= 3;
+				--editor.point_count;
 				*(int*)blob.getData() = count;
 				changed = true;
 			}
