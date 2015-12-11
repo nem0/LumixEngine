@@ -218,7 +218,7 @@ project "studio"
 
 	debugdir "../../LumixEngine_data"
 	
-	files { "../src/studio/**.h", "../src/studio/**.cpp" }
+	files { "../src/studio/**.h", "../src/studio/**.cpp", "../src/studio/**.inl" }
 	includedirs { "../src", "../src/studio", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
 	links { "lua_script", "animation", "physics", "editor", "engine", "renderer", "audio", "assimp", "crnlib", "winmm" }
 
