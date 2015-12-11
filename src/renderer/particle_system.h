@@ -19,6 +19,16 @@ class ResourceManager;
 class Universe;
 
 
+struct IntInterval
+{
+	int from;
+	int to;
+
+	IntInterval();
+	int getRandom() const;
+};
+
+
 struct Interval
 {
 	float from;
@@ -127,7 +137,7 @@ public:
 	~ParticleEmitter();
 
 	void serialize(OutputBlob& blob);
-	void deserialize(InputBlob& blob, ResourceManager& manager);
+	void deserialize(InputBlob& blob, ResourceManager& manager, bool has_version);
 	void update(float time_delta);
 	Material* getMaterial() const { return m_material; }
 	void setMaterial(Material* material);
@@ -147,6 +157,8 @@ public:
 	Interval m_spawn_period;
 	Interval m_initial_life;
 	Interval m_initial_size;
+	IntInterval m_spawn_count;
+
 	Array<ModuleBase*> m_modules;
 	Entity m_entity;
 

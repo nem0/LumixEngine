@@ -26,7 +26,8 @@ public:
 		VEC4,
 		VEC2,
 		SAMPLED_FUNCTION,
-		ENUM
+		ENUM,
+		INT2
 	};
 
 public:

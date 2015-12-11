@@ -10,6 +10,7 @@
 #include "lua_script/lua_script_manager.h"
 #include "lua_script/lua_script_system.h"
 #include "ocornut-imgui/imgui.h"
+#include "renderer/render_scene.h"
 #include "terrain_editor.h"
 #include "utils.h"
 #include <cmath>
@@ -35,6 +36,8 @@ PropertyGrid::PropertyGrid(Lumix::WorldEditor& editor,
 	, m_editor(editor)
 	, m_asset_browser(asset_browser)
 {
+	m_particle_emitter_updating = true;
+	m_particle_emitter_timescale = 1.0f;
 	m_filter[0] = '\0';
 	m_terrain_editor = LUMIX_NEW(editor.getAllocator(), TerrainEditor)(editor, actions);
 }
@@ -120,6 +123,16 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		Lumix::Vec2 v;
 		tmp.read(v);
 		if (ImGui::DragFloat2(desc_name, &v.x))
+		{
+			m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
+		}
+		break;
+	}
+	case Lumix::IPropertyDescriptor::INT2:
+	{
+		Lumix::Int2 v;
+		tmp.read(v);
+		if (ImGui::DragInt2(desc_name, &v.x))
 		{
 			m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
 		}
@@ -397,6 +410,11 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 		m_terrain_editor->setComponent(cmp);
 		m_terrain_editor->onGUI();
 	}
+
+	if (cmp.type == Lumix::crc32("particle_emitter"))
+	{
+		onParticleEmitterGUI(cmp);
+	}
 }
 
 
@@ -457,6 +475,21 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 		ImGui::EndPopup();
 	}
 	return false;
+}
+
+
+void PropertyGrid::onParticleEmitterGUI(Lumix::ComponentUID cmp)
+{
+	ImGui::Separator();
+	ImGui::Checkbox("Update", &m_particle_emitter_updating);
+
+	if (m_particle_emitter_updating)
+	{
+		ImGui::DragFloat("Timescale", &m_particle_emitter_timescale, 0.01f, 0.01f, 10000.0f);
+		float time_delta = m_editor.getEngine().getLastTimeDelta();
+		auto* scene = static_cast<Lumix::RenderScene*>(cmp.scene);
+		scene->updateEmitter(cmp.index, time_delta * m_particle_emitter_timescale);
+	}
 }
 
 

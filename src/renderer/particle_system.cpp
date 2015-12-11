@@ -8,6 +8,15 @@
 #include "universe/universe.h"
 
 
+enum class ParticleEmitterVersion : int
+{
+	SPAWN_COUNT,
+
+	LATEST,
+	INVALID
+};
+
+
 namespace Lumix
 {
 
@@ -229,6 +238,19 @@ Interval::Interval()
 }
 
 
+IntInterval::IntInterval()
+{
+	from = to = 1;
+}
+
+
+int IntInterval::getRandom() const
+{
+	if (from == to) return from;
+	return from + rand() % (to - from + 1);
+}
+
+
 void Interval::check()
 {
 	from = Math::maxValue(from, 0.0f);
@@ -349,6 +371,8 @@ void ParticleEmitter::updateLives(float time_delta)
 
 void ParticleEmitter::serialize(OutputBlob& blob)
 {
+	blob.write((int)ParticleEmitterVersion::LATEST);
+	blob.write(m_spawn_count);
 	blob.write(m_spawn_period);
 	blob.write(m_initial_life);
 	blob.write(m_initial_size);
@@ -363,8 +387,14 @@ void ParticleEmitter::serialize(OutputBlob& blob)
 }
 
 
-void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager)
+void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager, bool has_version)
 {
+	int version = (int)ParticleEmitterVersion::INVALID;
+	if (has_version)
+	{
+		blob.read(version);
+		if (version > (int)ParticleEmitterVersion::SPAWN_COUNT) blob.read(m_spawn_count);
+	}
 	blob.read(m_spawn_period);
 	blob.read(m_initial_life);
 	blob.read(m_initial_size);
@@ -432,7 +462,11 @@ void ParticleEmitter::spawnParticles(float time_delta)
 	{
 		m_next_spawn_time += m_spawn_period.getRandom();
 
-		spawnParticle();
+		int spawn_count = m_spawn_count.getRandom();
+		for (int i = 0; i < spawn_count; ++i)
+		{
+			spawnParticle();
+		}
 	}
 }
 
