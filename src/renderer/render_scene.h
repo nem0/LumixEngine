@@ -4,7 +4,6 @@
 #include "core/array.h"
 #include "core/delegate_list.h"
 #include "core/matrix.h"
-#include "core/string.h"
 #include "iplugin.h"
 #include "renderer/ray_cast_model_hit.h"
 #include "universe/component.h"
