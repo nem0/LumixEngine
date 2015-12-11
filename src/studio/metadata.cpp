@@ -1,4 +1,5 @@
 #include "metadata.h"
+#include "core/fs/os_file.h"
 #include <cstdio>
 
 
@@ -14,35 +15,35 @@ Metadata::Metadata(Lumix::IAllocator& allocator)
 
 bool Metadata::load()
 {
-	FILE* fp = fopen(METADATA_FILENAME, "rb");
-	if (!fp) return false;
+	Lumix::FS::OsFile file;
+	if (!file.open(METADATA_FILENAME, Lumix::FS::Mode::OPEN_AND_READ, m_allocator)) return false;
 
 	m_data.clear();
 	int count;
-	fread(&count, sizeof(count), 1, fp);
+	file.read(&count, sizeof(count));
 	for (int i = 0; i < count; ++i)
 	{
 		Lumix::uint32 key;
-		fread(&key, sizeof(key), 1, fp);
+		file.read(&key, sizeof(key));
 		int idx = m_data.insert(key, Lumix::AssociativeArray<Lumix::uint32, DataItem>(m_allocator));
 
 		auto& file_data = m_data.at(idx);
 		int inner_count;
-		fread(&inner_count, sizeof(inner_count), 1, fp);
+		file.read(&inner_count, sizeof(inner_count));
 		for (int j = 0; j < inner_count; ++j)
 		{
-			fread(&key, sizeof(key), 1, fp);
+			file.read(&key, sizeof(key));
 			int idx = file_data.insert(key, DataItem());
 			auto& value = file_data.at(idx);
-			fread(&value.m_type, sizeof(value.m_type), 1, fp);
+			file.read(&value.m_type, sizeof(value.m_type));
 			switch (value.m_type)
 			{
-				case DataItem::INT: fread(&value.m_int, sizeof(value.m_int), 1, fp); break;
+				case DataItem::INT: file.read(&value.m_int, sizeof(value.m_int)); break;
 				case DataItem::STRING:
 				{
 					int len;
-					fread(&len, sizeof(len), 1, fp);
-					fread(value.m_string, len, 1, fp);
+					file.read(&len, sizeof(len));
+					file.read(value.m_string, len);
 				}
 				break;
 				default: ASSERT(false); break;
@@ -50,39 +51,39 @@ bool Metadata::load()
 		}
 	}
 
-	fclose(fp);
+	file.close();
 	return true;
 }
 
 
 bool Metadata::save()
 {
-	FILE* fp = fopen(METADATA_FILENAME, "wb");
-	if (!fp) return false;
+	Lumix::FS::OsFile file;
+	if (!file.open(METADATA_FILENAME, Lumix::FS::Mode::OPEN | Lumix::FS::Mode::WRITE, m_allocator)) return false;
 
 	int count = m_data.size();
-	fwrite(&count, sizeof(count), 1, fp);
+	file.write(&count, sizeof(count));
 	for (int i = 0; i < m_data.size(); ++i)
 	{
 		auto key = m_data.getKey(i);
-		fwrite(&key, sizeof(key), 1, fp);
+		file.write(&key, sizeof(key));
 		auto& file_data = m_data.at(i);
 		count = file_data.size();
-		fwrite(&count, sizeof(count), 1, fp);
+		file.write(&count, sizeof(count));
 		for (int j = 0; j < file_data.size(); ++j)
 		{
 			key = file_data.getKey(j);
-			fwrite(&key, sizeof(key), 1, fp);
+			file.write(&key, sizeof(key));
 			auto& value = file_data.at(j);
-			fwrite(&value.m_type, sizeof(value.m_type), 1, fp);
+			file.write(&value.m_type, sizeof(value.m_type));
 			switch (value.m_type)
 			{
-				case DataItem::INT: fwrite(&value.m_int, sizeof(value.m_int), 1, fp); break;
+				case DataItem::INT: file.write(&value.m_int, sizeof(value.m_int)); break;
 				case DataItem::STRING:
 				{
 					int len = Lumix::stringLength(value.m_string);
-					fwrite(&len, sizeof(len), 1, fp);
-					fwrite(value.m_string, len, 1, fp);
+					file.write(&len, sizeof(len));
+					file.write(value.m_string, len);
 				}
 				break;
 				default: ASSERT(false); break;
@@ -90,7 +91,7 @@ bool Metadata::save()
 		}
 	}
 
-	fclose(fp);
+	file.close();
 	return true;
 }
 

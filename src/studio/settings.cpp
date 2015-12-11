@@ -1,4 +1,5 @@
 #include "settings.h"
+#include "core/fs/os_file.h"
 #include "core/log.h"
 #include "debug/debug.h"
 #include "ocornut-imgui/imgui.h"
@@ -77,6 +78,7 @@ static int getInteger(lua_State* L, const char* name, int default_value)
 
 Settings::Settings()
 {
+	m_allocator = nullptr;
 	m_filter[0] = 0;
 	m_is_maximized = true;
 	m_window.x = m_window.y = 0;
@@ -162,24 +164,28 @@ bool Settings::load(Action** actions, int actions_count)
 }
 
 
+void Settings::setAllocator(Lumix::IAllocator* allocator)
+{
+	m_allocator = allocator;
+}
+
+
 bool Settings::save(Action** actions, int actions_count)
 {
-	FILE* fp = fopen(SETTINGS_PATH, "wb");
-	if (!fp) return false;
+	ASSERT(m_allocator);
 
-	fprintf(fp,
-		"window = { x = %d, y = %d, w = %d, h = %d }\n",
-		m_window.x,
-		m_window.y,
-		m_window.w,
-		m_window.h);
+	Lumix::FS::OsFile file;
+	if (!file.open(SETTINGS_PATH, Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE, *m_allocator)) return false;
 
-	fprintf(fp, "maximized = %s\n", m_is_maximized ? "true" : "false");
+	file << "window = { x = " << m_window.x 
+		<< ", y = " << m_window.y 
+		<< ", w = " << m_window.w
+		<< ", h = " << m_window.h << " }\n";
 
-	auto writeBool = [fp](const char* name, bool value) {
-		fputs(name, fp);
-		fputs(" = ", fp);
-		fputs(value ? "true\n" : "false\n", fp);
+	file << "maximized = " << (m_is_maximized ? "true" : "false") << "\n";
+
+	auto writeBool = [&file](const char* name, bool value) {
+		file << name << " = " << (value ? "true\n" : "false\n");
 	};
 
 	writeBool("settings_opened", m_is_opened);
@@ -194,23 +200,18 @@ bool Settings::save(Action** actions, int actions_count)
 	writeBool("shader_editor_opened", m_is_shader_editor_opened);
 	writeBool("clip_manager_opened", m_is_clip_manager_opened);
 	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
-	fprintf(fp, "autosave_time = %d\n", m_autosave_time);
+	file << "autosave_time = " << m_autosave_time << "\n";
 
-	fputs("actions = {\n", fp);
+	file << "actions = {\n";
 	for (int i = 0; i < actions_count; ++i)
 	{
-		fputs("\t", fp);
-		fputs(actions[i]->name, fp);
-		fputs(" = {", fp);
-		fprintf(fp,
-			"%d, %d, %d",
-			actions[i]->shortcut[0],
-			actions[i]->shortcut[1],
-			actions[i]->shortcut[2]);
-		fputs("},\n", fp);
+		file << "\t" << actions[i]->name << " = {" 
+			<< actions[i]->shortcut[0] << ", "
+			<< actions[i]->shortcut[1] << ", " 
+			<< actions[i]->shortcut[2] << "},\n";
 	}
-	fputs("}\n", fp);
-	fclose(fp);
+	file << "}\n";
+	file.close();
 
 	return true;
 }

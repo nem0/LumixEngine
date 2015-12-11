@@ -2,6 +2,7 @@
 #include "engine.h"
 #include "core/blob.h"
 #include "core/crc32.h"
+#include "core/fs/os_file.h"
 #include "core/input_system.h"
 #include "core/log.h"
 #include "core/path.h"
@@ -409,13 +410,13 @@ static void showLogInVS(const char*, const char* message)
 }
 
 
-static FILE* g_error_file = nullptr;
+static FS::OsFile g_error_file;
 
 
 static void logErrorToFile(const char*, const char* message)
 {
-	fputs(message, g_error_file);
-	fflush(g_error_file);
+	g_error_file.write(message, stringLength(message));
+	g_error_file.flush();
 }
 
 
@@ -424,7 +425,7 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 	Profiler::setThreadName("Main");
 	installUnhandledExceptionHandler();
 
-	g_error_file = fopen("error.log", "wb");
+	g_error_file.open("error.log", FS::Mode::CREATE | FS::Mode::WRITE, allocator);
 
 	g_log_error.getCallback().bind<logErrorToFile>();
 	g_log_info.getCallback().bind<showLogInVS>();
@@ -445,8 +446,7 @@ void Engine::destroy(Engine* engine, IAllocator& allocator)
 {
 	LUMIX_DELETE(allocator, engine);
 
-	fclose(g_error_file);
-	g_error_file = nullptr;
+	g_error_file.close();
 }
 
 
