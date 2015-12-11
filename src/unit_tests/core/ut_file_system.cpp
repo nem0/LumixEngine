@@ -9,10 +9,6 @@ namespace
 {
 
 
-TODO("UT_disk_file_device");
-TODO("UT_tcp_file_device");
-TODO("UT_memory_file_device");
-
 uint32 occured_event = 0;
 
 void fs_event_cb(const Lumix::FS::Event& event)
