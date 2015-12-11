@@ -16,6 +16,7 @@ LUMIX_EDITOR_API int getIntPropertyMax();
 
 
 template <typename T> IPropertyDescriptor::Type toPropertyType();
+template <> IPropertyDescriptor::Type toPropertyType<Int2>() { return IPropertyDescriptor::INT2; }
 template <> IPropertyDescriptor::Type toPropertyType<Vec2>() { return IPropertyDescriptor::VEC2; }
 template <> IPropertyDescriptor::Type toPropertyType<Vec3>() { return IPropertyDescriptor::VEC3; }
 template <> IPropertyDescriptor::Type toPropertyType<Vec4>() { return IPropertyDescriptor::VEC4; }

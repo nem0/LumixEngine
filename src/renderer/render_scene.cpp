@@ -58,6 +58,7 @@ enum class RenderSceneVersion : int32
 {
 	PARTICLES,
 	WHOLE_LIGHTS,
+	PARTICLE_EMITTERS_SPAWN_COUNT,
 
 	LATEST,
 	INVALID = -1,
@@ -174,6 +175,7 @@ public:
 		, m_renderable_created(m_allocator)
 		, m_renderable_destroyed(m_allocator)
 		, m_is_grass_enabled(true)
+		, m_is_game_running(false)
 		, m_particle_emitters(m_allocator)
 	{
 		m_universe.entityTransformed()
@@ -219,6 +221,12 @@ public:
 	}
 
 
+	void updateEmitter(ComponentIndex cmp, float time_delta) override
+	{
+		m_particle_emitters[cmp]->update(time_delta);
+	}
+
+
 	Universe& getUniverse() override { return m_universe; }
 
 
@@ -231,6 +239,23 @@ public:
 
 
 	IPlugin& getPlugin() const override { return m_renderer; }
+
+
+	Int2 getParticleEmitterSpawnCount(ComponentIndex cmp) override
+	{
+		Int2 ret;
+		ret.x = m_particle_emitters[cmp]->m_spawn_count.from;
+		ret.y = m_particle_emitters[cmp]->m_spawn_count.to;
+		return ret;
+	}
+
+
+	void setParticleEmitterSpawnCount(ComponentIndex cmp, const Int2& value) override
+	{
+		m_particle_emitters[cmp]->m_spawn_count.from = value.x;
+		m_particle_emitters[cmp]->m_spawn_count.to = Math::max(value.x, value.y);
+	}
+
 
 
 	void getRay(ComponentIndex camera,
@@ -290,6 +315,18 @@ public:
 	}
 
 
+	void startGame() override
+	{
+		m_is_game_running = true;
+	}
+
+
+	void stopGame() override
+	{
+		m_is_game_running = false;
+	}
+
+
 	void update(float dt) override
 	{
 		PROFILE_FUNCTION();
@@ -322,11 +359,14 @@ public:
 			}
 		}
 
-		for (auto* emitter : m_particle_emitters)
+		if (m_is_game_running)
 		{
-			if (!emitter) continue;
-			
-			emitter->update(dt);
+			for (auto* emitter : m_particle_emitters)
+			{
+				if (!emitter) continue;
+
+				emitter->update(dt);
+			}
 		}
 	}
 
@@ -396,7 +436,7 @@ public:
 	}
 
 
-	void deserializeParticleEmitters(InputBlob& serializer)
+	void deserializeParticleEmitters(InputBlob& serializer, int version)
 	{
 		int count;
 		serializer.read(count);
@@ -410,7 +450,9 @@ public:
 			{
 				emitter = LUMIX_NEW(m_allocator, ParticleEmitter)(
 					INVALID_ENTITY, m_universe, m_allocator);
-				emitter->deserialize(serializer, m_engine.getResourceManager());
+				emitter->deserialize(serializer,
+					m_engine.getResourceManager(),
+					version > (int)RenderSceneVersion::PARTICLE_EMITTERS_SPAWN_COUNT);
 				m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_HASH, this, i);
 				for (auto* module : emitter->m_modules)
 				{
@@ -644,7 +686,7 @@ public:
 		deserializeRenderables(serializer);
 		deserializeLights(serializer, (RenderSceneVersion)version);
 		deserializeTerrains(serializer);
-		if (version >= 0) deserializeParticleEmitters(serializer);
+		if (version >= 0) deserializeParticleEmitters(serializer, version);
 	}
 
 
@@ -2779,6 +2821,7 @@ private:
 	float m_time;
 	bool m_is_forward_rendered;
 	bool m_is_grass_enabled;
+	bool m_is_game_running;
 	DelegateList<void(ComponentIndex)> m_renderable_created;
 	DelegateList<void(ComponentIndex)> m_renderable_destroyed;
 };

@@ -8,6 +8,13 @@ namespace Lumix
 {
 
 
+struct Int2
+{
+	int x;
+	int y;
+};
+
+
 struct LUMIX_ENGINE_API Vec2
 {
 	Vec2() {}
