@@ -1,6 +1,7 @@
 #include "shader_editor.h"
 #include "core/blob.h"
 #include "core/crc32.h"
+#include "core/fs/os_file.h"
 #include "core/log.h"
 #include "core/math_utils.h"
 #include "core/path_utils.h"
@@ -1476,10 +1477,10 @@ void ShaderEditor::generate(const char* path, ShaderType shader_type)
 		Lumix::catString(sc_path, "_vs.sc");
 	}
 
-	FILE* fp = fopen(sc_path, "wb");
-	if (!fp)
+	Lumix::FS::OsFile file;
+	if(!file.open(sc_path, Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE, m_allocator))
 	{
-		Lumix::g_log_error.log("Shader editor") << "Could not generate " << sc_path;
+		Lumix::g_log_error.log("Shader editor") << "Could not create file " << sc_path;
 		return;
 	}
 
@@ -1542,8 +1543,8 @@ void ShaderEditor::generate(const char* path, ShaderType shader_type)
 	}
 	blob << "}\n";
 
-	fwrite(blob.getData(), 1, blob.getSize(), fp);
-	fclose(fp);
+	file.write(blob.getData(), blob.getSize());
+	file.close();
 }
 
 

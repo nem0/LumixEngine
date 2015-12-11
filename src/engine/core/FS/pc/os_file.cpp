@@ -1,5 +1,6 @@
 #include "core/fs/os_file.h"
 #include "core/iallocator.h"
+#include "core/string.h"
 #include "lumix.h"
 
 #include "core/pc/simple_win.h"
@@ -53,6 +54,12 @@ bool OsFile::open(const char* path, Mode mode, IAllocator& allocator)
 	}
 
 	return false;
+}
+
+void OsFile::flush()
+{
+	ASSERT(nullptr != m_impl);
+	FlushFileBuffers(m_impl->m_file);
 }
 
 void OsFile::close()
@@ -111,6 +118,22 @@ size_t OsFile::seek(SeekMode base, size_t pos)
 	}
 
 	return ::SetFilePointer(m_impl->m_file, (DWORD)pos, nullptr, dir);
+}
+
+
+OsFile& OsFile::operator <<(const char* text)
+{
+	write(text, stringLength(text));
+	return *this;
+}
+
+
+OsFile& OsFile::operator <<(int value)
+{
+	char buf[20];
+	toCString(value, buf, lengthOf(buf));
+	write(buf, stringLength(buf));
+	return *this;
 }
 
 

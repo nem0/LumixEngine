@@ -1,6 +1,12 @@
 #pragma once
 
 
+namespace Lumix
+{
+	class IAllocator;
+}
+
+
 struct Action;
 
 
@@ -39,6 +45,10 @@ struct Settings
 	bool save(Action** actions, int actions_count);
 	bool load(Action** actions, int actions_count);
 	void onGUI(Action** actions, int actions_count);
+	void setAllocator(Lumix::IAllocator* allocator);
+
+private:
+	Lumix::IAllocator* m_allocator;
 
 private:
 	void showShortcutSettings(Action** actions, int actions_count);
