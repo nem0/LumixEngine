@@ -304,11 +304,13 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 	{
 		for (int i = 2; i < count - 3; i += 3)
 		{
+			/*auto prev_p = ((Lumix::Vec2*)f)[i - 1];
+			auto next_p = ((Lumix::Vec2*)f)[i + 2];
 			auto& tangent = ((Lumix::Vec2*)f)[i];
 			auto& tangent2 = ((Lumix::Vec2*)f)[i + 1];
-
-			tangent = tangent.normalized() * 0.1f;
-			tangent2 = tangent2.normalized() * 0.1f;
+			float half = 0.5f * (next_p.x - prev_p.x);
+			tangent = tangent.normalized() * half;
+			tangent2 = tangent2.normalized() * half;*/
 		}
 	}
 

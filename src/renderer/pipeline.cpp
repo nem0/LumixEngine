@@ -1744,6 +1744,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE |
 						 BGFX_STATE_MSAA;
+		m_applied_camera = INVALID_COMPONENT;
 		m_global_light_shadowmap = nullptr;
 		m_render_state |= m_is_wireframe ? BGFX_STATE_PT_LINESTRIP : 0;
 		m_view_idx = m_renderer.getViewCounter();
@@ -1984,6 +1985,12 @@ void disableBlending(PipelineInstanceImpl* pipeline)
 }
 
 
+void logError(const char* message)
+{
+	g_log_error.log("rendere") << message;
+}
+
+
 void applyCamera(PipelineInstanceImpl* pipeline, const char* slot)
 {
 	pipeline->applyCamera(slot);
@@ -2164,6 +2171,7 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(setPass);
 	REGISTER_FUNCTION(beginNewView);
 	REGISTER_FUNCTION(applyCamera);
+	REGISTER_FUNCTION(logError);
 	REGISTER_FUNCTION(clear);
 	REGISTER_FUNCTION(renderModels);
 	REGISTER_FUNCTION(renderShadowmap);

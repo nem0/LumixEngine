@@ -122,8 +122,8 @@ private:
 			, m_ref_count(0)
 			, m_model(model)
 		{
-			m_model->onLoaded < ModelLoadedCallback,
-				&ModelLoadedCallback::callback > (this);
+			m_model->getObserverCb().bind<ModelLoadedCallback, &ModelLoadedCallback::callback>(
+				this);
 		}
 
 		~ModelLoadedCallback()
@@ -1196,12 +1196,11 @@ public:
 			Renderable& r = m_renderables[cmp];
 			r.matrix = m_universe.getMatrix(entity);
 			m_culling_system->updateBoundingPosition(m_universe.getPosition(entity), cmp);
-			float bounding_radius = r.model ? r.model->getBoundingRadius() : 1;
-			m_culling_system->updateBoundingRadius(m_universe.getScale(entity) * bounding_radius, cmp);
 
 			if(m_is_forward_rendered)
 			{
-				for(int light_idx = 0, c = m_point_lights.size(); light_idx < c; ++light_idx)
+				float bounding_radius = r.model ? r.model->getBoundingRadius() : 1;
+				for (int light_idx = 0, c = m_point_lights.size(); light_idx < c; ++light_idx)
 				{
 					for (int j = 0, c2 = m_light_influenced_geometry[light_idx].size(); j < c2; ++j)
 					{
@@ -2588,8 +2587,11 @@ public:
 		{
 			ModelLoadedCallback* callback = getModelLoadedCallback(old_model);
 			--callback->m_ref_count;
+			if (old_model->isReady())
+			{
+				m_culling_system->removeStatic(component);
+			}
 			old_model->getResourceManager().get(ResourceManager::MODEL)->unload(*old_model);
-			m_culling_system->removeStatic(component);
 		}
 		m_renderables[component].model = model;
 		if (model)
