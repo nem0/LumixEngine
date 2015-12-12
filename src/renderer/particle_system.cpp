@@ -23,6 +23,10 @@ namespace Lumix
 
 static ParticleEmitter::ModuleBase* createModule(uint32 type, ParticleEmitter& emitter)
 {
+	if (type == ParticleEmitter::ForceModule::s_type)
+	{
+		return LUMIX_NEW(emitter.getAllocator(), ParticleEmitter::ForceModule)(emitter);
+	}
 	if (type == ParticleEmitter::LinearMovementModule::s_type)
 	{
 		return LUMIX_NEW(emitter.getAllocator(), ParticleEmitter::LinearMovementModule)(emitter);
@@ -48,6 +52,40 @@ ParticleEmitter::ModuleBase::ModuleBase(ParticleEmitter& emitter)
 	: m_emitter(emitter)
 {
 }
+
+
+ParticleEmitter::ForceModule::ForceModule(ParticleEmitter& emitter)
+	: ModuleBase(emitter)
+{
+	m_acceleration.set(0, 0, 0);
+}
+
+
+void ParticleEmitter::ForceModule::serialize(OutputBlob& blob)
+{
+	blob.write(m_acceleration);
+}
+
+
+void ParticleEmitter::ForceModule::deserialize(InputBlob& blob)
+{
+	blob.read(m_acceleration);
+}
+
+
+void ParticleEmitter::ForceModule::update(float time_delta)
+{
+	if (m_emitter.m_velocity.empty()) return;
+
+	Vec3* LUMIX_RESTRICT particle_velocity = &m_emitter.m_velocity[0];
+	for (int i = 0, c = m_emitter.m_velocity.size(); i < c; ++i)
+	{
+		particle_velocity[i] += m_acceleration * time_delta;
+	}
+}
+
+
+const uint32 ParticleEmitter::ForceModule::s_type = Lumix::crc32("force");
 
 
 ParticleEmitter::LinearMovementModule::LinearMovementModule(ParticleEmitter& emitter)
@@ -131,8 +169,8 @@ void ParticleEmitter::AlphaModule::update(float)
 {
 	if(m_emitter.m_alpha.empty()) return;
 
-	float* particle_alpha = &m_emitter.m_alpha[0];
-	float* rel_life = &m_emitter.m_rel_life[0];
+	float* LUMIX_RESTRICT particle_alpha = &m_emitter.m_alpha[0];
+	float* LUMIX_RESTRICT rel_life = &m_emitter.m_rel_life[0];
 	int size = m_sampled.size() - 1;
 	float float_size = (float)size;
 	for(int i = 0, c = m_emitter.m_size.size(); i < c; ++i)
@@ -197,8 +235,8 @@ void ParticleEmitter::SizeModule::update(float)
 {
 	if (m_emitter.m_size.empty()) return;
 
-	float* particle_size = &m_emitter.m_size[0];
-	float* rel_life = &m_emitter.m_rel_life[0];
+	float* LUMIX_RESTRICT particle_size = &m_emitter.m_size[0];
+	float* LUMIX_RESTRICT rel_life = &m_emitter.m_rel_life[0];
 	int size = m_sampled.size() - 1;
 	float float_size = (float)size;
 	for (int i = 0, c = m_emitter.m_size.size(); i < c; ++i)

@@ -35,6 +35,7 @@ enum class SerializedEngineVersion : int32
 	FOG_PARAMS,
 	SCENE_VERSION,
 	HIERARCHY_COMPONENT,
+	SCENE_VERSION_CHECK,
 
 	LATEST // must be the last one
 };
@@ -257,6 +258,17 @@ public:
 	float getFPS() const override { return m_fps; }
 
 
+	void serializerSceneVersions(OutputBlob& serializer, UniverseContext& ctx)
+	{
+		serializer.write(ctx.m_scenes.size());
+		for (auto* scene : ctx.m_scenes)
+		{
+			serializer.write(crc32(scene->getPlugin().getName()));
+			serializer.write(scene->getVersion());
+		}
+	}
+
+
 	void serializePluginList(OutputBlob& serializer)
 	{
 		serializer.write((int32)m_plugin_manager->getPlugins().size());
@@ -264,6 +276,27 @@ public:
 		{
 			serializer.writeString(plugin->getName());
 		}
+	}
+
+
+	bool hasSupportedSceneVersions(InputBlob& serializer, UniverseContext& ctx)
+	{
+		int32 count;
+		serializer.read(count);
+		for (int i = 0; i < count; ++i)
+		{
+			uint32 hash;
+			serializer.read(hash);
+			auto* scene = ctx.getScene(hash);
+			int version;
+			serializer.read(version);
+			if (version > scene->getVersion())
+			{
+				g_log_error.log("engine") << "Plugin " << scene->getPlugin().getName() << " is too old";
+				return false;
+			}
+		}
+		return true;
 	}
 
 
@@ -293,6 +326,7 @@ public:
 		header.m_reserved = 0;
 		serializer.write(header);
 		serializePluginList(serializer);
+		serializerSceneVersions(serializer, ctx);
 		g_path_manager.serialize(serializer);
 		int pos = serializer.getSize();
 		ctx.m_universe->serialize(serializer);
@@ -329,6 +363,12 @@ public:
 		{
 			return false;
 		}
+		if (header.m_version > SerializedEngineVersion::SCENE_VERSION_CHECK &&
+			!hasSupportedSceneVersions(serializer, ctx))
+		{
+			return false;
+		}
+
 		g_path_manager.deserialize(serializer);
 		ctx.m_universe->deserialize(serializer);
 
