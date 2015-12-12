@@ -51,6 +51,7 @@ namespace PlatformInterface
 		SystemEventHandler* m_handler;
 		int m_key_map[512];
 		int m_system_key_map[512];
+		bool m_is_window_active;
 	};
 
 
@@ -171,6 +172,12 @@ namespace PlatformInterface
 	}
 
 
+	bool isWindowActive()
+	{
+		return g_platform_data.m_is_window_active;
+	}
+
+
 	bool isForegroundWindow()
 	{
 		return GetForegroundWindow() == g_platform_data.m_hwnd;
@@ -272,6 +279,9 @@ namespace PlatformInterface
 
 		switch (msg)
 		{
+			case WM_ACTIVATE:
+				g_platform_data.m_is_window_active = LOWORD(wParam) == WA_ACTIVE;
+				break;
 			case WM_LBUTTONUP:
 				g_platform_data.m_handler->onMouseButtonUp(SystemEventHandler::MouseButton::LEFT);
 				break;
@@ -384,6 +394,7 @@ namespace PlatformInterface
 	void createWindow(SystemEventHandler* handler)
 	{
 		g_platform_data.m_handler = handler;
+		g_platform_data.m_is_window_active = true;
 
 		HINSTANCE hInst = GetModuleHandle(NULL);
 		WNDCLASSEX wnd;

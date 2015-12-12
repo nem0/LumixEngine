@@ -977,10 +977,11 @@ public:
 					frame_time = timer->tick();
 				}
 
-				if (frame_time < 1 / 60.0f)
+				float wanted_fps = PlatformInterface::isWindowActive() ? 60.0f : 5.0f;
+				if (frame_time < 1 / wanted_fps)
 				{
 					PROFILE_BLOCK("sleep");
-					Lumix::MT::sleep(Lumix::uint32(1000 / 60.0f - frame_time * 1000));
+					Lumix::MT::sleep(Lumix::uint32(1000 / wanted_fps - frame_time * 1000));
 				}
 			}
 			Lumix::Profiler::frame();
