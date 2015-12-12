@@ -167,6 +167,12 @@ namespace Lumix
 	}
 
 
+	int Path::length() const
+	{
+		return stringLength(m_data->m_path);
+	}
+
+
 	void Path::operator =(const Path& rhs)
 	{
 		g_path_manager.decrementRefCount(m_data);

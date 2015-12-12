@@ -6,6 +6,7 @@
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
 #include "core/json_serializer.h"
+#include "core/log.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
 #include "core/resource.h"
