@@ -2,13 +2,14 @@
 
 
 #include "lumix.h"
-#include "core/log.h"
-#include "core/path.h"
-#include "core/string.h"
 
 
 namespace Lumix
 {
+
+
+	class IAllocator;
+
 
 	namespace FS
 	{
@@ -18,17 +19,8 @@ namespace Lumix
 
 	class LUMIX_ENGINE_API JsonSerializer
 	{
+		friend class ErrorProxy;
 		public:
-			class ErrorProxy
-			{
-				public:
-					ErrorProxy(JsonSerializer& serializer);
-					LogProxy& log() { return m_log; }
-
-				private:
-					LogProxy m_log;
-			};
-
 			enum AccessMode
 			{
 				READ,
@@ -84,7 +76,7 @@ namespace Lumix
 			void nextArrayItem();
 			bool isNextBoolean() const;
 			bool isObjectEnd();
-			size_t getRestOfFileSize() const;
+
 			bool isError() const { return m_is_error; }
 
 		private:
@@ -92,7 +84,6 @@ namespace Lumix
 			void deserializeToken();
 			void deserializeArrayComma();
 			float tokenToFloat();
-			ErrorProxy error();
 			void expectToken(char expected_token);
 			void writeString(const char* str);
 			void writeBlockComma();
@@ -108,9 +99,8 @@ namespace Lumix
 			const char* m_token;
 			int m_token_size;
 			bool m_is_string_token;
-			Path m_path;
+			char m_path[MAX_PATH_LENGTH];
 			IAllocator& m_allocator;
-			string m_error_message;
 
 			const char* m_data;
 			int m_data_size;

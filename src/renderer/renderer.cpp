@@ -5,6 +5,7 @@
 #include "core/fs/file_system.h"
 #include "core/json_serializer.h"
 #include "core/lifo_allocator.h"
+#include "core/log.h"
 #include "core/math_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"

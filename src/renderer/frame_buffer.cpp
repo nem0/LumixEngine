@@ -1,5 +1,7 @@
 #include "renderer/frame_buffer.h"
 #include "core/json_serializer.h"
+#include "core/log.h"
+#include "core/string.h"
 #include "core/vec.h"
 #include <bgfx/bgfx.h>
 #include <lua.hpp>

@@ -1,8 +1,9 @@
 #pragma once
 
 #include "lumix.h"
-#include "core/math_utils.h"
 #include "core/default_allocator.h"
+#include "core/math_utils.h"
+#include "core/string.h"
 
 
 namespace Lumix

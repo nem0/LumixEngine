@@ -4,7 +4,7 @@
 #include "core/base_proxy_allocator.h"
 #include "core/default_allocator.h"
 #include "core/mt/sync.h"
-#include "core/string.h"
+
 
 namespace Lumix
 {
@@ -76,7 +76,7 @@ public:
 	uint32 getHash() const { return m_data->m_id; }
 
 	const char* c_str() const { return m_data->m_path; }
-	int length() const { return stringLength(m_data->m_path); }
+	int length() const;
 	bool isValid() const { return m_data->m_path[0] != '\0'; }
 
 private:
