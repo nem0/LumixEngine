@@ -88,6 +88,19 @@ public:
 	};
 
 
+	struct LUMIX_RENDERER_API ForceModule : public ModuleBase
+	{
+		ForceModule(ParticleEmitter& emitter);
+		void serialize(OutputBlob& blob) override;
+		void deserialize(InputBlob& blob) override;
+		void update(float time_delta) override;
+		uint32 getType() const override { return s_type; }
+
+		static const uint32 s_type;
+		Vec3 m_acceleration;
+	};
+
+
 	struct LUMIX_RENDERER_API AlphaModule : public ModuleBase
 	{
 		AlphaModule(ParticleEmitter& emitter);

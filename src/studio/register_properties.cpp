@@ -202,6 +202,7 @@ void registerRendererProperties(IAllocator& allocator)
 	PropertyRegister::registerComponentType("renderable", "Mesh");
 	PropertyRegister::registerComponentType("particle_emitter", "Particle emitter");
 	PropertyRegister::registerComponentType("particle_emitter_fade", "Particle emitter - fade");
+	PropertyRegister::registerComponentType("particle_emitter_force", "Particle emitter - force");
 	PropertyRegister::registerComponentType(
 		"particle_emitter_linear_movement", "Particle emitter - linear movement");
 	PropertyRegister::registerComponentType(
@@ -211,13 +212,14 @@ void registerRendererProperties(IAllocator& allocator)
 	PropertyRegister::registerComponentType("terrain", "Terrain");
 
 	PropertyRegister::registerComponentDependency("particle_emitter_fade", "particle_emitter");
+	PropertyRegister::registerComponentDependency("particle_emitter_force", "particle_emitter");
 	PropertyRegister::registerComponentDependency(
 		"particle_emitter_linear_movement", "particle_emitter");
 	PropertyRegister::registerComponentDependency(
 		"particle_emitter_random_rotation", "particle_emitter");
 
 	PropertyRegister::add("particle_emitter_fade",
-		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("alpha",
+		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Alpha",
 		&RenderScene::getParticleEmitterAlpha,
 		&RenderScene::setParticleEmitterAlpha,
 		&RenderScene::getParticleEmitterAlphaCount,
@@ -225,8 +227,14 @@ void registerRendererProperties(IAllocator& allocator)
 		1,
 		allocator));
 
+	PropertyRegister::add("particle_emitter_force",
+		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, RenderScene>)("Acceleration",
+		&RenderScene::getParticleEmitterAcceleration,
+		&RenderScene::setParticleEmitterAcceleration,
+		allocator));
+
 	PropertyRegister::add("particle_emitter_size",
-		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("size",
+		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Size",
 		&RenderScene::getParticleEmitterSize,
 		&RenderScene::setParticleEmitterSize,
 		&RenderScene::getParticleEmitterSizeCount,

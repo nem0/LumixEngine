@@ -44,6 +44,7 @@ static const uint32 RENDERABLE_HASH = crc32("renderable");
 static const uint32 POINT_LIGHT_HASH = crc32("point_light");
 static const uint32 PARTICLE_EMITTER_HASH = crc32("particle_emitter");
 static const uint32 PARTICLE_EMITTER_FADE_HASH = crc32("particle_emitter_fade");
+static const uint32 PARTICLE_EMITTER_FORCE_HASH = crc32("particle_emitter_force");
 static const uint32 PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH =
 	crc32("particle_emitter_linear_movement");
 static const uint32 PARTICLE_EMITTER_RANDOM_ROTATION_HASH =
@@ -59,6 +60,7 @@ enum class RenderSceneVersion : int32
 	PARTICLES,
 	WHOLE_LIGHTS,
 	PARTICLE_EMITTERS_SPAWN_COUNT,
+	PARTICLES_FORCE_MODULE,
 
 	LATEST,
 	INVALID = -1,
@@ -461,6 +463,11 @@ public:
 						m_universe.addComponent(
 							emitter->m_entity, PARTICLE_EMITTER_FADE_HASH, this, i);
 					}
+					else if (module->getType() == ParticleEmitter::ForceModule::s_type)
+					{
+						m_universe.addComponent(
+							emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this, i);
+					}
 					else if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
 					{
 						m_universe.addComponent(
@@ -784,6 +791,22 @@ public:
 	}
 
 
+	void destroyParticleEmitterForce(ComponentIndex component)
+	{
+		auto* emitter = m_particle_emitters[component];
+		for (auto* module : emitter->m_modules)
+		{
+			if (module->getType() == ParticleEmitter::ForceModule::s_type)
+			{
+				LUMIX_DELETE(m_allocator, module);
+				emitter->m_modules.eraseItem(module);
+				m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this, component);
+				break;
+			}
+		}
+	}
+
+
 	void destroyParticleEmitterSize(ComponentIndex component)
 	{
 		auto* emitter = m_particle_emitters[component];
@@ -858,6 +881,34 @@ public:
 				return;
 			}
 		}
+	}
+
+
+	void setParticleEmitterAcceleration(ComponentIndex cmp, const Vec3& value) override
+	{
+		auto& modules = m_particle_emitters[cmp]->m_modules;
+		for (auto* module : modules)
+		{
+			if (module->getType() == ParticleEmitter::ForceModule::s_type)
+			{
+				static_cast<ParticleEmitter::ForceModule*>(module)->m_acceleration = value;
+				break;
+			}
+		}
+	}
+
+
+	Vec3 getParticleEmitterAcceleration(ComponentIndex cmp) override
+	{
+		auto& modules = m_particle_emitters[cmp]->m_modules;
+		for (auto* module : modules)
+		{
+			if (module->getType() == ParticleEmitter::ForceModule::s_type)
+			{
+				return static_cast<ParticleEmitter::ForceModule*>(module)->m_acceleration;
+			}
+		}
+		return Vec3();
 	}
 
 
@@ -1141,6 +1192,23 @@ public:
 				auto module = LUMIX_NEW(m_allocator, ParticleEmitter::AlphaModule)(*emitter);
 				emitter->addModule(module);
 				m_universe.addComponent(entity, PARTICLE_EMITTER_FADE_HASH, this, i);
+				return i;
+			}
+		}
+		return INVALID_COMPONENT;
+	}
+
+
+	ComponentIndex createParticleEmitterForce(Entity entity)
+	{
+		for (int i = 0; i < m_particle_emitters.size(); ++i)
+		{
+			auto* emitter = m_particle_emitters[i];
+			if (emitter->m_entity == entity)
+			{
+				auto module = LUMIX_NEW(m_allocator, ParticleEmitter::ForceModule)(*emitter);
+				emitter->addModule(module);
+				m_universe.addComponent(entity, PARTICLE_EMITTER_FORCE_HASH, this, i);
 				return i;
 			}
 		}
@@ -2845,6 +2913,9 @@ static struct
 	{PARTICLE_EMITTER_FADE_HASH,
 		&RenderSceneImpl::createParticleEmitterFade,
 		&RenderSceneImpl::destroyParticleEmitterFade},
+	{PARTICLE_EMITTER_FORCE_HASH,
+		&RenderSceneImpl::createParticleEmitterForce,
+		&RenderSceneImpl::destroyParticleEmitterForce},
 	{PARTICLE_EMITTER_SIZE_HASH,
 		&RenderSceneImpl::createParticleEmitterSize,
 		&RenderSceneImpl::destroyParticleEmitterSize},
