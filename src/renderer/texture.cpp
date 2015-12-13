@@ -309,7 +309,7 @@ void Texture::save()
 	}
 	else
 	{
-		g_log_error.log("renderer") << "Texture " << getPath()
+		g_log_error.log("renderer") << "Texture " << getPath().c_str()
 									<< " can not be saved - unsupported format";
 	}
 }

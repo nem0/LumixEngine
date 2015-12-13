@@ -74,7 +74,7 @@ namespace Lumix
 
 			const void* getBuffer() const override
 			{
-				return nullptr;
+				return m_file.getBuffer();
 			}
 
 
