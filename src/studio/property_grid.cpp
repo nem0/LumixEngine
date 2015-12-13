@@ -284,6 +284,23 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 		mp.x /= editor_size.x;
 		mp.y /= editor_size.y;
 		mp.y = 1 - mp.y;
+
+		auto im_mp = (ImVec2)mp;
+
+		ImVec2* points = nullptr;
+		for (int i = 1; i < count - 3; i += 3)
+		{
+			if (f[i].x < mp.x && mp.x < f[i + 3].x)
+			{
+				points = (ImVec2*)(f + i);
+				break;
+			}
+		}
+		points[1] = points[0] + points[1];
+		points[2] = points[3] + points[2];
+		float p = ImGui::FindClosest(points, im_mp);
+		//move into fction AddPoint()
+
 		blob.write(ImVec2(-0.2f, 0));
 		blob.write(mp);
 		blob.write(ImVec2(0.2f, 0));

@@ -530,7 +530,11 @@ float FindClosestPointToCurve(const ImVec2* points, const ImVec2& point, float t
 		+ 3 * u*t*t * points[2]
 		+ t*t*t * points[3];
 
-	float delta = 1.0f / powf(2, iterCount + 2);
+	float d = 1.0f;
+	for (int i = 0; i < iterCount + 2; ++i)
+		d *= 2;
+
+	float delta = 1.0f / d;
 	if (pos.x < point.x)
 		return FindClosestPointToCurve(points, point, t + delta, iterCount + 1);
 	else
