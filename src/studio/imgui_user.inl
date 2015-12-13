@@ -165,6 +165,28 @@ void ResetActiveID()
 }
 
 
+void BringToFront()
+{
+	ImGuiState& g = *GImGui;
+
+	auto* window = GImGui->CurrentWindow;
+
+	if ((window->Flags & ImGuiWindowFlags_NoBringToFrontOnFocus) || g.Windows.back() == window)
+	{
+		return;
+	}
+	for (int i = 0; i < g.Windows.Size; i++)
+	{
+		if (g.Windows[i] == window)
+		{
+			g.Windows.erase(g.Windows.begin() + i);
+			break;
+		}
+	}
+	g.Windows.push_back(window);
+}
+
+
 ImVec2 GetWindowSizeContents()
 {
 	ImGuiWindow* window = GetCurrentWindowRead();
