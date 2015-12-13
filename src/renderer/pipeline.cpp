@@ -1705,6 +1705,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		if (meshes.empty()) return;
 
 		Renderable* renderables = m_scene->getRenderables();
+		PROFILE_INT("mesh count", meshes.size());
 		for (auto& mesh : meshes)
 		{
 			Renderable& renderable = renderables[mesh.renderable];
