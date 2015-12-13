@@ -3,6 +3,7 @@
 #include "core/fs/file_system.h"
 #include "core/fs/os_file.h"
 #include "core/math_utils.h"
+#include "core/mt/atomic.h"
 #include "core/mt/lock_free_fixed_queue.h"
 #include "core/profiler.h"
 #include "core/resource.h"
@@ -74,6 +75,10 @@ struct ProfilerUIImpl : public ProfilerUI
 		}
 		engine.getFileSystem().setDefaultDevice(tmp);
 		m_sort_order = NOT_SORTED;
+		Lumix::setMemory(m_transfer_rates, 0, sizeof(m_transfer_rates));
+		m_current_transfer_rate = 0;
+		m_bytes_read = 0;
+		m_next_transfer_rate_time = 0;
 	}
 
 
@@ -82,6 +87,7 @@ struct ProfilerUIImpl : public ProfilerUI
 		m_allocation_root->clear(m_allocator);
 		LUMIX_DELETE(m_allocator, m_allocation_root);
 		Lumix::Profiler::getFrameListeners().unbind<ProfilerUIImpl, &ProfilerUIImpl::onFrame>(this);
+		Lumix::Timer::destroy(m_timer);
 	}
 
 
@@ -114,6 +120,7 @@ struct ProfilerUIImpl : public ProfilerUI
 				if (m_opened_files[i].handle == event.handle)
 				{
 					m_opened_files[i].bytes += event.param;
+					Lumix::MT::atomicAdd(&m_bytes_read, event.param);
 					m_opened_files[i].last_read = m_timer->getTimeSinceStart();
 					return;
 				}
@@ -190,6 +197,22 @@ struct ProfilerUIImpl : public ProfilerUI
 	void onGUIFileSystem()
 	{
 		if (!ImGui::CollapsingHeader("File system")) return;
+		auto getter = [](void* data, int index) -> float {
+			auto* ui = (ProfilerUIImpl*)data;
+			int abs_index = (ui->m_current_transfer_rate + index) % Lumix::lengthOf(ui->m_transfer_rates);
+			return ui->m_transfer_rates[abs_index] / 1000.0f;
+		};
+
+		ImGui::PlotLines("kB/s",
+			getter,
+			this,
+			Lumix::lengthOf(m_transfer_rates),
+			0,
+			nullptr,
+			FLT_MAX,
+			FLT_MAX,
+			ImVec2(0, 100));
+
 		ImGui::InputText("filter", m_filter, Lumix::lengthOf(m_filter));
 
 		if (ImGui::Button("Clear")) m_logs.clear();
@@ -246,6 +269,16 @@ struct ProfilerUIImpl : public ProfilerUI
 			m_logs.push(*log);
 			m_queue.dealoc(log);
 			m_sort_order = NOT_SORTED;
+		}
+
+		m_next_transfer_rate_time -= m_engine.getLastTimeDelta();
+		if (m_next_transfer_rate_time < 0)
+		{
+			m_next_transfer_rate_time = 0.3f;
+			m_transfer_rates[m_current_transfer_rate] = m_bytes_read;
+			m_current_transfer_rate =
+				(m_current_transfer_rate + 1) % Lumix::lengthOf(m_transfer_rates);
+			m_bytes_read = 0;
 		}
 
 		if (!m_is_opened) return;
@@ -379,8 +412,11 @@ struct ProfilerUIImpl : public ProfilerUI
 	Lumix::FS::FileEventsDevice m_device;
 	Lumix::Engine& m_engine;
 	Lumix::Timer* m_timer;
+	int m_transfer_rates[100];
+	int m_current_transfer_rate;
+	volatile int m_bytes_read;
+	float m_next_transfer_rate_time;
 	SortOrder m_sort_order;
-
 };
 
 
@@ -945,5 +981,7 @@ ProfilerUI* ProfilerUI::create(Lumix::Engine& engine)
 
 void ProfilerUI::destroy(ProfilerUI& ui)
 {
+	auto& ui_impl = static_cast<ProfilerUIImpl&>(ui);
+	LUMIX_DELETE(ui_impl.m_engine.getAllocator(), &ui);
 }
 
