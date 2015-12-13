@@ -445,9 +445,9 @@ bool CurveTangent(int id, const ImVec2& point, ImVec2& tangent, const ImRect& bb
 		v.y = (bb.Max.y - pos.y) / (bb.Max.y - bb.Min.y);
 
 		if (tangent.x < 0)
-			v = ImClamp(v, ImVec2(0, 0), ImVec2(point.x, 1));
+			v = ImClamp(v, ImVec2(0, 0), ImVec2(point.x - 0.0001f, 1));
 		else
-			v = ImClamp(v, ImVec2(point.x, 0), ImVec2(1, 1));
+			v = ImClamp(v, ImVec2(point.x + 0.0001f, 0), ImVec2(1, 1));
 
 		tangent = v - point;
 		changed = true;
@@ -518,6 +518,29 @@ bool CurvePoint(ImVec2* points, CurveEditor& editor)
 	return changed;
 }
 
+
+float FindClosestPointToCurve(const ImVec2* points, const ImVec2& point, float t, int iterCount)
+{
+	if (iterCount >= 6)
+		return t;
+
+	float u = 1 - t;
+	ImVec2 pos = u*u*u * points[0]
+		+ 3 * u*u*t * points[1]
+		+ 3 * u*t*t * points[2]
+		+ t*t*t * points[3];
+
+	float delta = 1.0f / powf(2, iterCount + 2);
+	if (pos.x < point.x)
+		return FindClosestPointToCurve(points, point, t + delta, iterCount + 1);
+	else
+		return FindClosestPointToCurve(points, point, t - delta, iterCount + 1);
+}
+
+float FindClosest(const ImVec2* points, const ImVec2& point)
+{
+	return FindClosestPointToCurve(points, point, 0.5f, 1);
+}
 
 
 } // namespace ImGui
