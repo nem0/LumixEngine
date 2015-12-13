@@ -565,7 +565,9 @@ public:
 				}
 				ImGui::EndMenu();
 			}
-			StringBuilder<100> stats("FPS: ");
+			StringBuilder<100> stats("");
+			if (m_engine->getFileSystem().hasWork()) stats << "Loading... | ";
+			stats << "FPS: ";
 			stats << m_engine->getFPS();
 			auto stats_size = ImGui::CalcTextSize(stats);
 			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
