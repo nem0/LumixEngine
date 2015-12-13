@@ -20,7 +20,6 @@
 #include "editor/world_editor.h"
 #include "engine.h"
 #include "engine/plugin_manager.h"
-#include "file_system_ui.h"
 #include "game_view.h"
 #include "import_asset_dialog.h"
 #include "log_ui.h"
@@ -262,7 +261,6 @@ public:
 			showEntityTemplateList();
 			m_sceneview.onGUI();
 			m_gameview.onGui();
-			m_file_system_ui->onGUI();
 			m_shader_editor->onGUI();
 			if (m_is_style_editor_opened) ImGui::ShowStyleEditor();
 			m_settings.onGUI(&m_actions[0], m_actions.size());
@@ -557,7 +555,6 @@ public:
 					ImGui::MenuItem("Clip manager", nullptr, &m_is_clip_manager_opened);
 					ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
 					ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
-					ImGui::MenuItem("File system", nullptr, &m_file_system_ui->m_is_opened);
 					ImGui::MenuItem("Game view", nullptr, &m_gameview.m_is_opened);
 					ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
 					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
@@ -776,7 +773,7 @@ public:
 
 		shutdownImGui();
 
-		LUMIX_DELETE(m_allocator, m_profiler_ui);
+		ProfilerUI::destroy(*m_profiler_ui);
 		LUMIX_DELETE(m_allocator, m_asset_browser);
 		LUMIX_DELETE(m_allocator, m_log_ui);
 		LUMIX_DELETE(m_allocator, m_property_grid);
@@ -784,7 +781,6 @@ public:
 		LUMIX_DELETE(m_allocator, m_shader_compiler);
 		LUMIX_DELETE(m_allocator, m_shader_editor);
 		Lumix::WorldEditor::destroy(m_editor, m_allocator);
-		FileSystemUI::destroy(*m_file_system_ui);
 		m_sceneview.shutdown();
 		m_gameview.shutdown();
 		Lumix::PipelineInstance::destroy(m_gui_pipeline);
@@ -1150,7 +1146,7 @@ public:
 		m_asset_browser = LUMIX_NEW(m_allocator, AssetBrowser)(*m_editor, m_metadata);
 		m_property_grid = LUMIX_NEW(m_allocator, PropertyGrid)(*m_editor, *m_asset_browser, m_actions);
 		auto engine_allocator = static_cast<Lumix::Debug::Allocator*>(&m_engine->getAllocator());
-		m_profiler_ui = LUMIX_NEW(m_allocator, ProfilerUI)(engine_allocator, &m_engine->getResourceManager());
+		m_profiler_ui = ProfilerUI::create(*m_engine);
 		m_log_ui = LUMIX_NEW(m_allocator, LogUI)(m_editor->getAllocator());
 		m_import_asset_dialog = LUMIX_NEW(m_allocator, ImportAssetDialog)(*m_editor, m_metadata);
 		m_shader_compiler = LUMIX_NEW(m_allocator, ShaderCompiler)(*m_editor, *m_log_ui);
@@ -1169,7 +1165,6 @@ public:
 
 		m_sceneview.init(*m_editor, m_actions);
 		m_gameview.init(*m_editor);
-		m_file_system_ui = FileSystemUI::create(*m_engine);
 
 		int w = PlatformInterface::getWindowWidth();
 		int h = PlatformInterface::getWindowHeight();
@@ -1337,7 +1332,6 @@ public:
 	float m_time_to_autosave;
 	Lumix::Array<Action*> m_actions;
 	Lumix::WorldEditor* m_editor;
-	FileSystemUI* m_file_system_ui;
 	AssetBrowser* m_asset_browser;
 	PropertyGrid* m_property_grid;
 	LogUI* m_log_ui;

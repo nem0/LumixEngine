@@ -1,10 +1,14 @@
 #include "profiler_ui.h"
+#include "core/fs/file_events_device.h"
+#include "core/fs/file_system.h"
 #include "core/fs/os_file.h"
 #include "core/math_utils.h"
+#include "core/mt/lock_free_fixed_queue.h"
 #include "core/profiler.h"
 #include "core/resource.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/timer.h"
 #include "debug/debug.h"
 #include "engine/engine.h"
 #include "ocornut-imgui/imgui.h"
@@ -29,51 +33,358 @@ enum MemoryColumn
 };
 
 
-void ProfilerUI::AllocationStackNode::clear(Lumix::IAllocator& allocator)
+struct ProfilerUIImpl : public ProfilerUI
 {
-	for (auto* child : m_children)
+	ProfilerUIImpl(Lumix::Debug::Allocator& allocator, Lumix::Engine& engine)
+		: m_main_allocator(allocator)
+		, m_resource_manager(engine.getResourceManager())
+		, m_logs(allocator)
+		, m_opened_files(allocator)
+		, m_device(allocator)
+		, m_engine(engine)
 	{
-		child->clear(allocator);
-		LUMIX_DELETE(allocator, child);
+		m_viewed_thread_id = 0;
+		m_allocation_size_from = 0;
+		m_allocation_size_to = 1024 * 1024;
+		m_current_frame = -1;
+		m_root = nullptr;
+		m_is_opened = false;
+		m_is_paused = true;
+		m_current_block = nullptr;
+		Lumix::Profiler::getFrameListeners().bind<ProfilerUIImpl, &ProfilerUIImpl::onFrame>(this);
+		m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(m_allocator);
+		m_allocation_root->m_stack_node = nullptr;
+		m_filter[0] = 0;
+
+		m_timer = Lumix::Timer::create(engine.getAllocator());
+		m_device.OnEvent.bind<ProfilerUIImpl, &ProfilerUIImpl::onFileSystemEvent>(this);
+		engine.getFileSystem().mount(&m_device);
+		const auto& devices = engine.getFileSystem().getDefaultDevice();
+		char tmp[200] = "";
+		int count = 0;
+		while (devices.m_devices[count] != nullptr) ++count;
+		for (int i = count - 1; i >= 0; --i)
+		{
+			Lumix::catString(tmp, ":");
+			Lumix::catString(tmp, devices.m_devices[i]->name());
+			if (Lumix::compareString(devices.m_devices[i]->name(), "memory") == 0)
+			{
+				Lumix::catString(tmp, ":events");
+			}
+		}
+		engine.getFileSystem().setDefaultDevice(tmp);
+		m_sort_order = NOT_SORTED;
 	}
-	m_children.clear();
-}
 
 
-ProfilerUI::AllocationStackNode::~AllocationStackNode()
-{
-	ASSERT(m_children.empty());
-}
+	~ProfilerUIImpl()
+	{
+		m_allocation_root->clear(m_allocator);
+		LUMIX_DELETE(m_allocator, m_allocation_root);
+		Lumix::Profiler::getFrameListeners().unbind<ProfilerUIImpl, &ProfilerUIImpl::onFrame>(this);
+	}
 
 
-ProfilerUI::ProfilerUI(Lumix::Debug::Allocator* allocator, Lumix::ResourceManager* resource_manager)
-	: m_main_allocator(allocator)
-	, m_resource_manager(resource_manager)
-{
-	m_viewed_thread_id = 0;
-	m_allocation_size_from = 0;
-	m_allocation_size_to = 1024 * 1024;
-	m_current_frame = -1;
-	m_root = nullptr;
-	m_is_opened = false;
-	m_is_paused = true;
-	m_current_block = nullptr;
-	Lumix::Profiler::getFrameListeners().bind<ProfilerUI, &ProfilerUI::onFrame>(this);
-	m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(m_allocator);
-	m_allocation_root->m_stack_node = nullptr;
-	m_filter[0] = 0;
-}
+	void onFileSystemEvent(const Lumix::FS::Event& event)
+	{
+		if (event.type == Lumix::FS::EventType::OPEN_BEGIN)
+		{
+			auto& file = m_opened_files.pushEmpty();
+			file.start = m_timer->getTimeSinceStart();
+			file.last_read = file.start;
+			file.bytes = 0;
+			file.handle = event.handle;
+			Lumix::copyString(file.path, event.path);
+		}
+		else if (event.type == Lumix::FS::EventType::OPEN_FINISHED && event.ret == 0)
+		{
+			for (int i = 0; i < m_opened_files.size(); ++i)
+			{
+				if (m_opened_files[i].handle == event.handle)
+				{
+					m_opened_files.eraseFast(i);
+					break;
+				}
+			}
+		}
+		else if (event.type == Lumix::FS::EventType::READ_FINISHED)
+		{
+			for (int i = 0; i < m_opened_files.size(); ++i)
+			{
+				if (m_opened_files[i].handle == event.handle)
+				{
+					m_opened_files[i].bytes += event.param;
+					m_opened_files[i].last_read = m_timer->getTimeSinceStart();
+					return;
+				}
+			}
+			ASSERT(false);
+		}
+		else if (event.type == Lumix::FS::EventType::CLOSE_FINISHED)
+		{
+			for (int i = 0; i < m_opened_files.size(); ++i)
+			{
+				if (m_opened_files[i].handle == event.handle)
+				{
+					auto& log = *m_queue.alloc(true);
+					log.bytes = m_opened_files[i].bytes;
+					log.time = m_opened_files[i].last_read - m_opened_files[i].start;
+					Lumix::copyString(log.path, m_opened_files[i].path);
+					m_opened_files.eraseFast(i);
+					m_queue.push(&log, true);
+					break;
+				}
+			}
+		}
+	}
 
 
-ProfilerUI::~ProfilerUI()
-{
-	m_allocation_root->clear(m_allocator);
-	LUMIX_DELETE(m_allocator, m_allocation_root);
-	Lumix::Profiler::getFrameListeners().unbind<ProfilerUI, &ProfilerUI::onFrame>(this);
-}
+	void sortByDuration()
+	{
+		if (m_logs.empty()) return;
+
+		m_sort_order = m_sort_order == TIME_ASC ? TIME_DESC : TIME_ASC;
+		auto asc_comparer = [](const void* data1, const void* data2) -> int{
+			float t1 = static_cast<const Log*>(data1)->time;
+			float t2 = static_cast<const Log*>(data2)->time;
+			return t1 < t2 ? -1 : (t1 > t2 ? 1 : 0);
+		};
+		auto desc_comparer = [](const void* data1, const void* data2) -> int{
+			float t1 = static_cast<const Log*>(data1)->time;
+			float t2 = static_cast<const Log*>(data2)->time;
+			return t1 > t2 ? -1 : (t1 < t2 ? 1 : 0);
+		};
+		if (m_sort_order == TIME_ASC)
+		{
+			qsort(&m_logs[0], m_logs.size(), sizeof(m_logs[0]), asc_comparer);
+		}
+		else
+		{
+			qsort(&m_logs[0], m_logs.size(), sizeof(m_logs[0]), desc_comparer);
+		}
+	}
 
 
-void ProfilerUI::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_block)
+	void sortByBytesRead()
+	{
+		if (m_logs.empty()) return;
+
+		m_sort_order = m_sort_order == BYTES_READ_ASC ? BYTES_READ_DESC : BYTES_READ_ASC;
+		auto asc_comparer = [](const void* data1, const void* data2) -> int{
+			return static_cast<const Log*>(data1)->bytes - static_cast<const Log*>(data2)->bytes;
+		};
+		auto desc_comparer = [](const void* data1, const void* data2) -> int{
+			return static_cast<const Log*>(data2)->bytes - static_cast<const Log*>(data1)->bytes;
+		};
+		if (m_sort_order == BYTES_READ_ASC)
+		{
+			qsort(&m_logs[0], m_logs.size(), sizeof(m_logs[0]), asc_comparer);
+		}
+		else
+		{
+			qsort(&m_logs[0], m_logs.size(), sizeof(m_logs[0]), desc_comparer);
+		}
+	}
+
+
+	void onGUIFileSystem()
+	{
+		if (!ImGui::CollapsingHeader("File system")) return;
+		ImGui::InputText("filter", m_filter, Lumix::lengthOf(m_filter));
+
+		if (ImGui::Button("Clear")) m_logs.clear();
+
+		if (ImGui::BeginChild("list"))
+		{
+			ImGui::Columns(3);
+			ImGui::Text("File");
+			ImGui::NextColumn();
+			
+			const char* duration_label = "Duration (ms)";
+			if (m_sort_order == TIME_ASC) duration_label = "Duration (ms) < ";
+			else if (m_sort_order == TIME_DESC) duration_label = "Duration (ms) >";
+			if (ImGui::Selectable(duration_label))
+			{
+				sortByDuration();
+			}
+			ImGui::NextColumn();
+			
+			const char* bytes_read_label = "Bytes read (kB)";
+			if (m_sort_order == BYTES_READ_ASC) bytes_read_label = "Bytes read (kB) <";
+			else if (m_sort_order == BYTES_READ_DESC) bytes_read_label = "Bytes read (kB) >";
+			if (ImGui::Selectable(bytes_read_label))
+			{
+				sortByBytesRead();
+			}
+			ImGui::NextColumn();
+			ImGui::Separator();
+			for (auto& log : m_logs)
+			{
+				if (m_filter[0] == 0 || Lumix::stristr(log.path, m_filter) != 0)
+				{
+					ImGui::Text(log.path);
+					ImGui::NextColumn();
+					ImGui::Text("%f", log.time * 1000.0f);
+					ImGui::NextColumn();
+					ImGui::Text("%.3f", (float)((double)log.bytes / 1000.0f));
+					ImGui::NextColumn();
+				}
+			}
+			ImGui::Columns(1);
+		}
+		ImGui::EndChild();
+	}
+
+
+	void onGUI() override
+	{
+		PROFILE_FUNCTION();
+		while (!m_queue.isEmpty())
+		{
+			auto* log = m_queue.pop(false);
+			if (!log) break;
+			m_logs.push(*log);
+			m_queue.dealoc(log);
+			m_sort_order = NOT_SORTED;
+		}
+
+		if (!m_is_opened) return;
+
+		if (ImGui::Begin("Profiler", &m_is_opened))
+		{
+			onGUICPUProfiler();
+			onGUIMemoryProfiler();
+			onGUIResources();
+			onGUIFileSystem();
+		}
+		ImGui::End();
+	}
+
+
+	enum class Values
+	{
+		NAME,
+		LENGTH,
+		LENGTH_EXCLUSIVE,
+		HIT_COUNT,
+		COUNT
+	};
+
+
+	struct OpenedFile
+	{
+		Lumix::uintptr handle;
+		float start;
+		float last_read;
+		int bytes;
+		char path[Lumix::MAX_PATH_LENGTH];
+	};
+
+
+	struct Log
+	{
+		char path[Lumix::MAX_PATH_LENGTH];
+		float time;
+		int bytes;
+	};
+
+	enum SortOrder
+	{
+		NOT_SORTED,
+		TIME_ASC,
+		TIME_DESC,
+		BYTES_READ_ASC,
+		BYTES_READ_DESC
+	};
+
+
+	struct Block
+	{
+		Block(Lumix::IAllocator& allocator);
+		~Block() {}
+
+		const char* m_name;
+		Block* m_parent;
+		Block* m_first_child;
+		Block* m_next;
+		bool m_is_opened;
+		Lumix::Profiler::BlockType m_type;
+		Lumix::Array<float> m_frames;
+		Lumix::Array<int> m_int_values; // hit count in case of m_type == TIME
+	};
+
+
+	struct AllocationStackNode
+	{
+		AllocationStackNode(Lumix::IAllocator& allocator)
+			: m_children(allocator)
+			, m_allocations(allocator)
+		{
+		}
+
+
+		~AllocationStackNode()
+		{
+			ASSERT(m_children.empty());
+		}
+
+
+		void clear(Lumix::IAllocator& allocator)
+		{
+			for (auto* child : m_children)
+			{
+				child->clear(allocator);
+				LUMIX_DELETE(allocator, child);
+			}
+			m_children.clear();
+		}
+
+
+		size_t m_inclusive_size;
+		bool m_opened;
+		Lumix::Debug::StackNode* m_stack_node;
+		Lumix::Array<AllocationStackNode*> m_children;
+		Lumix::Array<Lumix::Debug::Allocator::AllocationInfo*> m_allocations;
+	};
+
+
+	void onGUICPUProfiler();
+	void onGUIMemoryProfiler();
+	void onGUIResources();
+	void onFrame();
+	void showProfileBlock(Block* block, int column);
+	void cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_block);
+	void addToTree(Lumix::Debug::Allocator::AllocationInfo* info);
+	void refreshAllocations();
+	void showAllocationTree(AllocationStackNode* node, int column);
+	AllocationStackNode* getOrCreate(AllocationStackNode* my_node,
+		Lumix::Debug::StackNode* external_node, size_t size);
+	void saveResourceList();
+
+	Lumix::DefaultAllocator m_allocator;
+	Block* m_root;
+	Block* m_current_block;
+	Lumix::Debug::Allocator& m_main_allocator;
+	Lumix::ResourceManager& m_resource_manager;
+	AllocationStackNode* m_allocation_root;
+	int m_allocation_size_from;
+	int m_allocation_size_to;
+	int m_current_frame;
+	int m_viewed_thread_id;
+	bool m_is_paused;
+	char m_filter[100];
+	Lumix::Array<OpenedFile> m_opened_files;
+	Lumix::MT::LockFreeFixedQueue<Log, 64> m_queue;
+	Lumix::Array<Log> m_logs;
+	Lumix::FS::FileEventsDevice m_device;
+	Lumix::Engine& m_engine;
+	Lumix::Timer* m_timer;
+	SortOrder m_sort_order;
+
+};
+
+
+void ProfilerUIImpl::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_block)
 {
 	ASSERT(my_block->m_name == Lumix::Profiler::getBlockName(remote_block));
 
@@ -154,7 +465,7 @@ void ProfilerUI::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bloc
 }
 
 
-void ProfilerUI::onFrame()
+void ProfilerUIImpl::onFrame()
 {
 	if (!m_is_opened) return;
 	if (m_is_paused) return;
@@ -177,7 +488,7 @@ void ProfilerUI::onFrame()
 }
 
 
-void ProfilerUI::showProfileBlock(Block* block, int column)
+void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 {
 	if (!block) return;
 
@@ -279,12 +590,12 @@ static const char* getResourceStateString(Lumix::Resource::State state)
 }
 
 
-void ProfilerUI::saveResourceList()
+void ProfilerUIImpl::saveResourceList()
 {
 	Lumix::FS::OsFile file;
 	if (file.open("resources.csv", Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_allocator))
 	{
-		auto& managers = m_resource_manager->getAll();
+		auto& managers = m_resource_manager.getAll();
 		for (auto* i : managers)
 		{
 			auto& resources = i->getResourceTable();
@@ -311,9 +622,8 @@ void ProfilerUI::saveResourceList()
 }
 
 
-void ProfilerUI::onGUIResources()
+void ProfilerUIImpl::onGUIResources()
 {
-	if (!m_resource_manager) return;
 	if (!ImGui::CollapsingHeader("Resources")) return;
 
 	ImGui::InputText("filter", m_filter, Lumix::lengthOf(m_filter));
@@ -340,7 +650,7 @@ void ProfilerUI::onGUIResources()
 	{
 		if (!ImGui::CollapsingHeader(manager_names[i])) continue;
 
-		auto* material_manager = m_resource_manager->get(manager_types[i]);
+		auto* material_manager = m_resource_manager.get(manager_types[i]);
 		auto& resources = material_manager->getResourceTable();
 
 		ImGui::Columns(4, "resc");
@@ -399,7 +709,7 @@ void ProfilerUI::onGUIResources()
 }
 
 
-ProfilerUI::AllocationStackNode* ProfilerUI::getOrCreate(AllocationStackNode* my_node,
+ProfilerUIImpl::AllocationStackNode* ProfilerUIImpl::getOrCreate(AllocationStackNode* my_node,
 	Lumix::Debug::StackNode* external_node,
 	size_t size)
 {
@@ -420,7 +730,7 @@ ProfilerUI::AllocationStackNode* ProfilerUI::getOrCreate(AllocationStackNode* my
 }
 
 
-void ProfilerUI::addToTree(Lumix::Debug::Allocator::AllocationInfo* info)
+void ProfilerUIImpl::addToTree(Lumix::Debug::Allocator::AllocationInfo* info)
 {
 	Lumix::Debug::StackNode* nodes[1024];
 	int count = Lumix::Debug::StackTree::getPath(info->m_stack_leaf, nodes, Lumix::lengthOf(nodes));
@@ -434,26 +744,26 @@ void ProfilerUI::addToTree(Lumix::Debug::Allocator::AllocationInfo* info)
 }
 
 
-void ProfilerUI::refreshAllocations()
+void ProfilerUIImpl::refreshAllocations()
 {
 	m_allocation_root->clear(m_allocator);
 	LUMIX_DELETE(m_allocator, m_allocation_root);
 	m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(m_allocator);
 	m_allocation_root->m_stack_node = nullptr;
 
-	m_main_allocator->lock();
-	auto* current_info = m_main_allocator->getFirstAllocationInfo();
+	m_main_allocator.lock();
+	auto* current_info = m_main_allocator.getFirstAllocationInfo();
 
 	while (current_info)
 	{
 		addToTree(current_info);
 		current_info = current_info->m_next;
 	}
-	m_main_allocator->unlock();
+	m_main_allocator.unlock();
 }
 
 
-void ProfilerUI::showAllocationTree(AllocationStackNode* node, int column)
+void ProfilerUIImpl::showAllocationTree(AllocationStackNode* node, int column)
 {
 	if (column == FUNCTION)
 	{
@@ -510,9 +820,8 @@ void ProfilerUI::showAllocationTree(AllocationStackNode* node, int column)
 }
 
 
-void ProfilerUI::onGUIMemoryProfiler()
+void ProfilerUIImpl::onGUIMemoryProfiler()
 {
-	if (!m_main_allocator) return;
 	if (!ImGui::CollapsingHeader("Memory")) return;
 
 	if (ImGui::Button("Refresh"))
@@ -523,9 +832,9 @@ void ProfilerUI::onGUIMemoryProfiler()
 	ImGui::SameLine();
 	if (ImGui::Button("Check memory"))
 	{
-		m_main_allocator->checkGuards();
+		m_main_allocator.checkGuards();
 	}
-	ImGui::Text("Total size: %.3fMB", (m_main_allocator->getTotalSize() / 1024) / 1024.0f);
+	ImGui::Text("Total size: %.3fMB", (m_main_allocator.getTotalSize() / 1024) / 1024.0f);
 
 	ImGui::Columns(2, "memc");
 	for (auto* child : m_allocation_root->m_children)
@@ -541,7 +850,7 @@ void ProfilerUI::onGUIMemoryProfiler()
 }
 
 
-void ProfilerUI::onGUICPUProfiler()
+void ProfilerUIImpl::onGUICPUProfiler()
 {
 	if (!ImGui::CollapsingHeader("CPU")) return;
 
@@ -618,24 +927,23 @@ void ProfilerUI::onGUICPUProfiler()
 }
 
 
-void ProfilerUI::onGUI()
-{
-	PROFILE_FUNCTION();
-	if (!m_is_opened) return;
 
-	if (ImGui::Begin("Profiler", &m_is_opened))
-	{
-		onGUICPUProfiler();
-		onGUIMemoryProfiler();
-		onGUIResources();
-	}
-	ImGui::End();
-}
-
-
-ProfilerUI::Block::Block(Lumix::IAllocator& allocator)
+ProfilerUIImpl::Block::Block(Lumix::IAllocator& allocator)
 	: m_frames(allocator)
 	, m_int_values(allocator)
 	, m_is_opened(false)
 {
 }
+
+
+ProfilerUI* ProfilerUI::create(Lumix::Engine& engine)
+{
+	auto& allocator = static_cast<Lumix::Debug::Allocator&>(engine.getAllocator());
+	return LUMIX_NEW(engine.getAllocator(), ProfilerUIImpl)(allocator, engine);
+}
+
+
+void ProfilerUI::destroy(ProfilerUI& ui)
+{
+}
+
