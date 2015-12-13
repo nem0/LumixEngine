@@ -89,6 +89,13 @@ public:
 	IAllocator& getAllocator() { return m_allocator; }
 
 
+	ComponentIndex getComponent(Entity entity, uint32 type) override
+	{
+		ASSERT(ownComponentType(type));
+		return m_parents.find(entity) != m_parents.end() ? entity : INVALID_COMPONENT;
+	}
+
+
 	void onEntityDestroyed(Entity entity)
 	{
 		auto iter = m_children.find(entity);

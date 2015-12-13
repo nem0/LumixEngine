@@ -591,6 +591,17 @@ public:
 	}
 
 
+	ComponentIndex getComponent(Entity entity, uint32 type) override
+	{
+		ASSERT(ownComponentType(type));
+		for (auto* i : m_scripts)
+		{
+			if (i && i->m_entity == entity) return i->m_component;
+		}
+		return INVALID_COMPONENT;
+	}
+
+
 	bool ownComponentType(uint32 type) const override
 	{
 		return type == LUA_SCRIPT_HASH;

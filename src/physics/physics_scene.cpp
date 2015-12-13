@@ -348,6 +348,37 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	ComponentIndex getComponent(Entity entity, uint32 type) override
+	{
+		ASSERT(ownComponentType(type));
+		if (type == BOX_ACTOR_HASH || type == MESH_ACTOR_HASH)
+		{
+			for (int i = 0; i < m_actors.size(); ++i)
+			{
+				if (m_actors[i] && m_actors[i]->getEntity() == entity) return i;
+			}
+			return INVALID_COMPONENT;
+		}
+		if (type == CONTROLLER_HASH)
+		{
+			for (int i = 0; i < m_controllers.size(); ++i)
+			{
+				if (!m_controllers[i].m_is_free && m_controllers[i].m_entity == entity) return i;
+			}
+			return INVALID_COMPONENT;
+		}
+		if (type == HEIGHTFIELD_HASH)
+		{
+			for (int i = 0; i < m_terrains.size(); ++i)
+			{
+				if (m_terrains[i] && m_terrains[i]->m_entity == entity) return i;
+			}
+			return INVALID_COMPONENT;
+		}
+		return INVALID_COMPONENT;
+	}
+
+
 	IPlugin& getPlugin() const override { return *m_system; }
 
 

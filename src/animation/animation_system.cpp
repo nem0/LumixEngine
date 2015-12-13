@@ -84,6 +84,17 @@ public:
 	Universe& getUniverse() override { return m_universe; }
 
 
+	ComponentIndex getComponent(Entity entity, uint32 type) override
+	{
+		ASSERT(ownComponentType(type));
+		for (int i = 0; i < m_animables.size(); ++i)
+		{
+			if (!m_animables[i].m_is_free && m_animables[i].m_entity == entity) return i;
+		}
+		return INVALID_COMPONENT;
+	}
+
+
 	bool ownComponentType(uint32 type) const override
 	{
 		return type == ANIMABLE_HASH;

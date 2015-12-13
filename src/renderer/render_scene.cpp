@@ -240,6 +240,48 @@ public:
 	}
 
 
+	ComponentIndex getComponent(Entity entity, uint32 type) override
+	{
+		if (type == RENDERABLE_HASH)
+		{
+			return m_renderables[entity].entity != INVALID_ENTITY ? entity : INVALID_COMPONENT;
+		}
+		if (type == POINT_LIGHT_HASH)
+		{
+			for (auto& i : m_point_lights)
+			{
+				if (i.m_entity == entity) return i.m_uid;
+			}
+			return INVALID_COMPONENT;
+		}
+		if (type == GLOBAL_LIGHT_HASH)
+		{
+			for (auto& i : m_global_lights)
+			{
+				if (i.m_entity == entity) return i.m_uid;
+			}
+			return INVALID_COMPONENT;
+		}
+		if (type == CAMERA_HASH)
+		{
+			for (int i = 0; i < m_cameras.size(); ++i)
+			{
+				if (!m_cameras[i].m_is_free && m_cameras[i].m_entity == entity) return i;
+			}
+			return INVALID_COMPONENT;
+		}
+		if (type == TERRAIN_HASH)
+		{
+			for (int i = 0; i < m_terrains.size(); ++i)
+			{
+				if (m_terrains[i] && m_terrains[i]->getEntity() == entity) return i;
+			}
+			return INVALID_COMPONENT;
+		}
+		return INVALID_COMPONENT;
+	}
+
+
 	IPlugin& getPlugin() const override { return m_renderer; }
 
 

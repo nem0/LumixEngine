@@ -63,12 +63,17 @@ static Material* getTerrainMaterial(RenderScene* scene, Entity entity)
 
 static int createComponent(IScene* scene, const char* type, int entity_idx)
 {
-	if (!scene)
+	if (!scene) return -1;
+	Entity e(entity_idx);
+	uint32 hash = crc32(type);
+	if (scene->getComponent(e, hash) != INVALID_COMPONENT)
 	{
+		g_log_error.log("script") << "Component " << type << " already exists in entity "
+								  << entity_idx;
 		return -1;
 	}
-	Entity e(entity_idx);
-	return scene->createComponent(crc32(type), e);
+	
+	return scene->createComponent(hash, e);
 }
 
 
