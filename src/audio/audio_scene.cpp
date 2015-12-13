@@ -495,6 +495,18 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
+	ComponentIndex getComponent(Entity entity, uint32 type) override
+	{
+		if (type == LISTENER_HASH) return m_listener.entity == entity ? 0 : INVALID_COMPONENT;
+
+		for (auto& i : m_ambient_sounds)
+		{
+			if (i.entity == entity) return i.component;
+		}
+		return INVALID_COMPONENT;
+	}
+
+
 	int getClipCount() const override { return m_clips.size(); }
 
 
