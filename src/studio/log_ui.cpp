@@ -114,7 +114,7 @@ void LogUI::showNotifications()
 		ImGui::End();
 		return;
 	}
-	if (m_move_notifications_to_front) ImGui::SetWindowFocus();
+	if (m_move_notifications_to_front) ImGui::BringToFront();
 	m_move_notifications_to_front = false;
 	for (int i = 0; i < m_notifications.size(); ++i)
 	{

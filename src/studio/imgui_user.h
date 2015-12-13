@@ -25,6 +25,7 @@ bool ListBox(const char* label,
 void ResetActiveID();
 
 ImVec2 GetWindowSizeContents();
+void BringToFront();
 
 void BeginNode(ImGuiID id, ImVec2 screen_pos);
 void EndNode(ImVec2& pos);
