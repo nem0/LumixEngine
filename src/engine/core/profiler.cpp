@@ -22,10 +22,11 @@ struct Block
 		float m_start;
 	};
 
-
+	
 	Block::Block(IAllocator& allocator)
 		: allocator(allocator)
 		, m_hits(allocator)
+		, m_type(BlockType::TIME)
 	{
 	}
 
@@ -43,6 +44,7 @@ struct Block
 
 	void frame()
 	{
+		m_values.int_value = 0;
 		m_hits.clear();
 		if (m_first_child)
 		{
@@ -61,12 +63,30 @@ struct Block
 	Block* m_first_child;
 	const char* m_name;
 	Array<Hit> m_hits;
+	BlockType m_type;
+	union
+	{
+		float float_value;
+		int int_value;
+	} m_values;
 };
 
 
 const char* getBlockName(Block* block)
 {
 	return block->m_name;
+}
+
+
+int getBlockInt(Block* block)
+{
+	return block->m_values.int_value;
+}
+
+
+BlockType getBlockType(Block* block)
+{
+	return block->m_type;
 }
 
 
@@ -146,8 +166,13 @@ struct Instance
 
 Instance g_instance;
 
+struct BlockInfo
+{
+	Block* block;
+	ThreadData* thread_data;
+};
 
-void beginBlock(const char* name)
+static BlockInfo getBlock(const char* name)
 {
 	auto thread_id = MT::getCurrentThreadID();
 
@@ -204,7 +229,38 @@ void beginBlock(const char* name)
 
 		thread_data->current_block = child;
 	}
-	Block::Hit& hit = thread_data->current_block->m_hits.pushEmpty();
+
+	return { thread_data->current_block, thread_data };
+}
+
+
+void record(const char* name, float value)
+{
+	auto data = getBlock(name);
+	data.block->m_type = BlockType::FLOAT;
+	data.block->m_values.float_value = value;
+	data.thread_data->current_block = data.block->m_parent;
+}
+
+
+void record(const char* name, int value)
+{
+	auto data = getBlock(name);
+	if (data.block->m_type != BlockType::INT)
+	{
+		data.block->m_values.int_value = 0;
+		data.block->m_type = BlockType::INT;
+	}
+	data.block->m_values.int_value += value;
+	data.thread_data->current_block = data.block->m_parent;
+}
+
+
+void beginBlock(const char* name)
+{
+	auto data = getBlock(name);
+
+	auto& hit = data.block->m_hits.pushEmpty();
 	hit.m_start = g_instance.timer->getTimeSinceStart();
 	hit.m_length = 0;
 }

@@ -76,15 +76,28 @@ ProfilerUI::~ProfilerUI()
 void ProfilerUI::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_block)
 {
 	ASSERT(my_block->m_name == Lumix::Profiler::getBlockName(remote_block));
-	my_block->m_frames.push(Lumix::Profiler::getBlockLength(remote_block));
-	my_block->m_hit_counts.push(Lumix::Profiler::getBlockHitCount(remote_block));
+
+	my_block->m_type = Lumix::Profiler::getBlockType(remote_block);
+	switch (my_block->m_type)
+	{
+		case Lumix::Profiler::BlockType::TIME:
+			my_block->m_frames.push(Lumix::Profiler::getBlockLength(remote_block));
+			my_block->m_int_values.push(Lumix::Profiler::getBlockHitCount(remote_block));
+			break;
+		case Lumix::Profiler::BlockType::INT:
+			my_block->m_int_values.push(Lumix::Profiler::getBlockInt(remote_block));
+			break;
+		default:
+			ASSERT(false);
+			break;
+	}
 	if (my_block->m_frames.size() > MAX_FRAMES)
 	{
 		my_block->m_frames.erase(0);
 	}
-	if (my_block->m_hit_counts.size() > MAX_FRAMES)
+	if (my_block->m_int_values.size() > MAX_FRAMES)
 	{
-		my_block->m_hit_counts.erase(0);
+		my_block->m_int_values.erase(0);
 	}
 
 	auto* remote_child = Lumix::Profiler::getBlockFirstChild(remote_block);
@@ -166,6 +179,8 @@ void ProfilerUI::onFrame()
 
 void ProfilerUI::showProfileBlock(Block* block, int column)
 {
+	if (!block) return;
+
 	switch(column)
 	{
 		case NAME:
@@ -188,36 +203,63 @@ void ProfilerUI::showProfileBlock(Block* block, int column)
 		case TIME:
 			while (block)
 			{
-				auto frame =
-					m_current_frame < 0 ? block->m_frames.back() : block->m_frames[m_current_frame];
+				switch (block->m_type)
+				{
+					case Lumix::Profiler::BlockType::TIME:
+					{
+						auto frame = m_current_frame < 0 ? block->m_frames.back()
+														 : block->m_frames[m_current_frame];
+						if (ImGui::Selectable(
+								StringBuilder<50>("") << frame << "##t" << (Lumix::int64)block,
+								m_current_block == block,
+								ImGuiSelectableFlags_SpanAllColumns))
+						{
+							m_current_block = block;
+						}
+						if (block->m_is_opened)
+						{
+							showProfileBlock(block->m_first_child, column);
+						}
+					}
+					break;
+					case Lumix::Profiler::BlockType::INT:
+					{
+						int int_value = m_current_frame < 0 ? block->m_int_values.back()
+															: block->m_int_values[m_current_frame];
+						if (ImGui::Selectable(
+							StringBuilder<50>("") << int_value << "##t" << (Lumix::int64)block,
+							m_current_block == block,
+							ImGuiSelectableFlags_SpanAllColumns))
+						{
+							m_current_block = block;
+						}
+					}
+					break;
+					default:
+						ASSERT(false);
+						break;
+				}
 
-				if (ImGui::Selectable(StringBuilder<50>("") << frame << "##t" << (Lumix::int64)block,
-					m_current_block == block,
-					ImGuiSelectableFlags_SpanAllColumns))
-				{
-					m_current_block = block;
-				}
-				if (block->m_is_opened)
-				{
-					showProfileBlock(block->m_first_child, column);
-				}
 
 				block = block->m_next;
 			}
 			return;
 		case HIT_COUNT:
-			while (block)
+			if (block->m_type == Lumix::Profiler::BlockType::TIME)
 			{
-				int hit_count = m_current_frame < 0 ? block->m_hit_counts.back()
-													: block->m_hit_counts[m_current_frame];
-
-				ImGui::Text("%d", hit_count);
-				if (block->m_is_opened)
+				while (block)
 				{
-					showProfileBlock(block->m_first_child, column);
-				}
+					int hit_count = m_current_frame < 0 ? block->m_int_values.back()
+						: block->m_int_values[m_current_frame];
 
-				block = block->m_next;
+					ImGui::Text("%d", hit_count);
+					if (block->m_is_opened)
+					{
+						showProfileBlock(block->m_first_child, column);
+					}
+
+					block = block->m_next;
+				}
 			}
 			return;
 	}
@@ -511,14 +553,14 @@ void ProfilerUI::onGUICPUProfiler()
 		}
 	}
 	
-	auto getter = [](void* data, int index, const char** out) -> bool {
+	auto thread_getter = [](void* data, int index, const char** out) -> bool {
 		auto id = Lumix::Profiler::getThreadID(index);
 		*out = Lumix::Profiler::getThreadName(id); 
 		return true;
 	};
 	int thread_idx = Lumix::Profiler::getThreadIndex(m_viewed_thread_id);
 	ImGui::SameLine();
-	if (ImGui::Combo("Thread", &thread_idx, getter, nullptr, Lumix::Profiler::getThreadCount()))
+	if (ImGui::Combo("Thread", &thread_idx, thread_getter, nullptr, Lumix::Profiler::getThreadCount()))
 	{
 		m_viewed_thread_id = Lumix::Profiler::getThreadID(thread_idx);
 		LUMIX_DELETE(m_allocator, m_root);
@@ -526,49 +568,53 @@ void ProfilerUI::onGUICPUProfiler()
 		m_current_frame = -1;
 	}
 
-	if (m_root)
-	{
-		ImGui::Columns(3, "cpuc");
-		showProfileBlock(m_root, NAME);
-		ImGui::NextColumn();
-		showProfileBlock(m_root, TIME);
-		ImGui::NextColumn();
-		showProfileBlock(m_root, HIT_COUNT);
-		ImGui::NextColumn();
-		ImGui::Columns(1);
-	}
+	if (!m_root) return;
 
-	if (m_root)
+	ImGui::Columns(3, "cpuc");
+	showProfileBlock(m_root, NAME);
+	ImGui::NextColumn();
+	showProfileBlock(m_root, TIME);
+	ImGui::NextColumn();
+	showProfileBlock(m_root, HIT_COUNT);
+	ImGui::NextColumn();
+	ImGui::Columns(1);
+
+	auto* block = m_current_block ? m_current_block : m_root;
+	float width = ImGui::GetWindowContentRegionWidth();
+	int count = Lumix::Math::minValue(int(width / 5), block->m_int_values.size());
+	int offset = block->m_int_values.size() - count;
+	struct PlotData
 	{
-		auto* block = m_current_block ? m_current_block : m_root;
-		float width = ImGui::GetWindowContentRegionWidth();
-		int count = Lumix::Math::minValue(int(width / 5), block->m_hit_counts.size());
-		int offset = block->m_hit_counts.size() - count;
-		struct PlotData
+		Block* block;
+		int offset;
+	};
+	auto getter = [](void* data, int idx) -> float
+	{
+		auto* plot_data = (PlotData*)data;
+		switch (plot_data->block->m_type)
 		{
-			Block* block;
-			int offset;
-		};
-		auto getter = [](void* data, int idx) -> float
-		{
-			auto* plot_data = (PlotData*)data;
-			return plot_data->block->m_frames[plot_data->offset + idx];
-		};
-		PlotData plot_data;
-		plot_data.block = block;
-		plot_data.offset = offset;
-		auto i = ImGui::PlotHistogramEx("",
-			getter,
-			&plot_data,
-			count,
-			0,
-			block->m_name,
-			0,
-			FLT_MAX,
-			ImVec2(width, 100),
-			m_current_frame - offset);
-		if (i != -1) m_current_frame = i + offset;
-	}
+			case Lumix::Profiler::BlockType::TIME:
+				return plot_data->block->m_frames[plot_data->offset + idx];
+			case Lumix::Profiler::BlockType::INT:
+				return (float)plot_data->block->m_int_values[plot_data->offset + idx];
+		}
+		return 0;
+	};
+
+	PlotData plot_data;
+	plot_data.block = block;
+	plot_data.offset = offset;
+	auto i = ImGui::PlotHistogramEx("",
+		getter,
+		&plot_data,
+		count,
+		0,
+		block->m_name,
+		0,
+		FLT_MAX,
+		ImVec2(width, 100),
+		m_current_frame - offset);
+	if (i != -1) m_current_frame = i + offset;
 }
 
 
@@ -589,6 +635,7 @@ void ProfilerUI::onGUI()
 
 ProfilerUI::Block::Block(Lumix::IAllocator& allocator)
 	: m_frames(allocator)
-	, m_hit_counts(allocator)
+	, m_int_values(allocator)
+	, m_is_opened(false)
 {
 }

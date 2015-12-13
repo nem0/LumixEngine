@@ -53,8 +53,9 @@ private:
 		Block* m_first_child;
 		Block* m_next;
 		bool m_is_opened;
+		Lumix::Profiler::BlockType m_type;
 		Lumix::Array<float> m_frames;
-		Lumix::Array<int> m_hit_counts;
+		Lumix::Array<int> m_int_values; // hit count in case of m_type == TIME
 	};
 
 	struct AllocationStackNode
