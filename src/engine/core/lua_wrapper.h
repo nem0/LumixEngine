@@ -2,6 +2,7 @@
 
 
 #include "core/log.h"
+#include "core/vec.h"
 #include <lua.hpp>
 #include <lauxlib.h>
 #include <tuple>
@@ -20,6 +21,20 @@ template <typename T> inline T toType(lua_State* L, int index)
 template <> inline int toType(lua_State* L, int index)
 {
 	return (int)lua_tointeger(L, index);
+}
+template <> inline Vec3 toType(lua_State* L, int index)
+{
+	Vec3 v;
+	lua_rawgeti(L, index, 1);
+	v.x = (float)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	lua_rawgeti(L, index, 2);
+	v.y = (float)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	lua_rawgeti(L, index, 3);
+	v.z = (float)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	return v;
 }
 template <> inline int64 toType(lua_State* L, int index)
 {
@@ -73,6 +88,10 @@ template <> inline bool isType<int>(lua_State* L, int index)
 {
 	return lua_isinteger(L, index) != 0;
 }
+template <> inline bool isType<Vec3>(lua_State* L, int index)
+{
+	return lua_istable(L, index) != 0;
+}
 template <> inline bool isType<uint32>(lua_State* L, int index)
 {
 	return lua_isinteger(L, index) != 0;
@@ -106,6 +125,22 @@ template <typename T> inline void pushLua(lua_State* L, T value)
 template <> inline void pushLua(lua_State* L, float value)
 {
 	lua_pushnumber(L, value);
+}
+inline void pushLua(lua_State* L, const Vec3& value)
+{
+	lua_createtable(L, 3, 0);
+	
+	lua_pushvalue(L, -1);
+	lua_pushnumber(L, value.x);
+	lua_rawseti(L, -2, 1);
+
+	lua_pushvalue(L, -1);
+	lua_pushnumber(L, value.y);
+	lua_rawseti(L, -2, 2);
+
+	lua_pushvalue(L, -1);
+	lua_pushnumber(L, value.z);
+	lua_rawseti(L, -2, 3);
 }
 template <> inline void pushLua(lua_State* L, bool value)
 {
