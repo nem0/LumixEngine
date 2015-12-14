@@ -607,55 +607,71 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 {
 	if (!g_is_crash_reporting_enabled) return EXCEPTION_CONTINUE_SEARCH;
 
-	char message[4096];
-	getStack(*info->ContextRecord, message, sizeof(message));
-	messageBox(message);
+	struct CrashInfo
+	{
+		LPEXCEPTION_POINTERS info;
+		DWORD thread_id;
+	};
 
-	char minidump_path[Lumix::MAX_PATH_LENGTH];
-	GetCurrentDirectory(sizeof(minidump_path), minidump_path);
-	Lumix::catString(minidump_path, "\\minidump.dmp");
+	auto dumper = [](void* data) -> DWORD {
 
-	HANDLE process = GetCurrentProcess();
-	DWORD process_id = GetProcessId(process);
-	HANDLE file = CreateFile(
-		minidump_path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-	MINIDUMP_TYPE minidump_type = (MINIDUMP_TYPE)(
-		/*MiniDumpWithFullMemory | MiniDumpWithFullMemoryInfo |*/ MiniDumpFilterMemory |
-		MiniDumpWithHandleData | MiniDumpWithThreadInfo | MiniDumpWithUnloadedModules);
+		auto info = ((CrashInfo*)data)->info;
+		char message[4096];
+		getStack(*info->ContextRecord, message, sizeof(message));
+		messageBox(message);
 
-	MINIDUMP_EXCEPTION_INFORMATION minidump_exception_info;
-	minidump_exception_info.ThreadId = GetCurrentThreadId();
-	minidump_exception_info.ExceptionPointers = info;
-	minidump_exception_info.ClientPointers = FALSE;
+		char minidump_path[Lumix::MAX_PATH_LENGTH];
+		GetCurrentDirectory(sizeof(minidump_path), minidump_path);
+		Lumix::catString(minidump_path, "\\minidump.dmp");
 
-	MiniDumpWriteDump(process,
-		process_id,
-		file,
-		minidump_type,
-		info ? &minidump_exception_info : nullptr,
-		nullptr,
-		nullptr);
-	CloseHandle(file);
+		HANDLE process = GetCurrentProcess();
+		DWORD process_id = GetProcessId(process);
+		HANDLE file = CreateFile(
+			minidump_path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+		MINIDUMP_TYPE minidump_type = (MINIDUMP_TYPE)(
+			MiniDumpWithFullMemoryInfo | MiniDumpFilterMemory | MiniDumpWithHandleData |
+			MiniDumpWithThreadInfo | MiniDumpWithUnloadedModules);
 
-	SendFile("Lumix Studio crash",
-		"SMTP:mikulas.florek@gamedev.sk",
-		"Lumix Studio",
-		"Lumix Studio crashed, minidump attached",
-		minidump_path);
+		MINIDUMP_EXCEPTION_INFORMATION minidump_exception_info;
+		minidump_exception_info.ThreadId = ((CrashInfo*)data)->thread_id;
+		minidump_exception_info.ExceptionPointers = info;
+		minidump_exception_info.ClientPointers = FALSE;
 
-	minidump_type = (MINIDUMP_TYPE)(MiniDumpWithFullMemory | MiniDumpWithFullMemoryInfo |
-									MiniDumpFilterMemory | MiniDumpWithHandleData |
-									MiniDumpWithThreadInfo | MiniDumpWithUnloadedModules);
-	file = CreateFile(
-		"fulldump.dmp", GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-	MiniDumpWriteDump(process,
-		process_id,
-		file,
-		minidump_type,
-		info ? &minidump_exception_info : nullptr,
-		nullptr,
-		nullptr);
-	CloseHandle(file);
+		MiniDumpWriteDump(process,
+			process_id,
+			file,
+			minidump_type,
+			info ? &minidump_exception_info : nullptr,
+			nullptr,
+			nullptr);
+		CloseHandle(file);
+
+		SendFile("Lumix Studio crash",
+			"SMTP:mikulas.florek@gamedev.sk",
+			"Lumix Studio",
+			message,
+			minidump_path);
+
+		minidump_type = (MINIDUMP_TYPE)(MiniDumpWithFullMemory | MiniDumpWithFullMemoryInfo |
+			MiniDumpFilterMemory | MiniDumpWithHandleData |
+			MiniDumpWithThreadInfo | MiniDumpWithUnloadedModules);
+		file = CreateFile(
+			"fulldump.dmp", GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+		MiniDumpWriteDump(process,
+			process_id,
+			file,
+			minidump_type,
+			info ? &minidump_exception_info : nullptr,
+			nullptr,
+			nullptr);
+		CloseHandle(file);
+		return 0;
+	};
+
+	DWORD thread_id;
+	CrashInfo crash_info = { info, GetCurrentThreadId() };
+	auto handle = CreateThread(0, 0x8000, dumper, &crash_info, 0, &thread_id);
+	WaitForSingleObject(handle, INFINITE);
 
 	return EXCEPTION_CONTINUE_SEARCH;
 }
