@@ -1,31 +1,58 @@
 local BINARY_DIR = "tmp/bin/"
 local ide_dir = iif(_ACTION == nil, "vs2013", _ACTION)
 
+function installAction(is64)
+	local src_dir = path.join(BINARY_DIR, "RelWithDebInfo/")
+	local dst_dir = "../../LumixEngine_data/bin/"
+
+	function installDll(filename)
+		os.copyfile(path.join(src_dir, filename .. ".dll"), path.join(dst_dir, filename .. ".dll"))
+	end
+
+	function installDllWithPdb(filename)
+		installDll(filename)
+		os.copyfile(path.join(src_dir, filename .. ".pdb"), path.join(dst_dir, filename .. ".pdb"))
+	end
+
+	
+	installDllWithPdb "animation"
+	installDllWithPdb "audio"
+	installDllWithPdb "editor"
+	installDllWithPdb "engine"
+	installDllWithPdb "lua_script"
+	installDllWithPdb "physics"
+	installDllWithPdb "renderer"
+	if is64 then
+		installDll "PhysX3CommonCHECKED_x64"
+		installDll "PhysX3CookingCHECKED_x64"
+		installDll "PhysX3CharacterKinematicCHECKED_x64"
+		installDll "PhysX3CHECKED_x64"
+		installDll "nvToolsExt64_1"
+		installDll "assimp"
+	else
+		installDll "PhysX3CommonCHECKED_x86"
+		installDll "PhysX3CookingCHECKED_x86"
+		installDll "PhysX3CharacterKinematicCHECKED_x86"
+		installDll "PhysX3CHECKED_x86"
+		installDll "nvToolsExt32_1"
+		installDll "assimp"
+	end
+	os.copyfile(path.join(src_dir, "studio.exe"), path.join(dst_dir, "studio.exe"))
+	os.copyfile(path.join(src_dir, "studio.pdb"), path.join(dst_dir, "studio.pdb"))
+end
+
+
+newaction {
+	trigger = "install64",
+	description = "Install 64bit in ../../LumixEngine_data/bin",
+	execute = function()  installAction(true) end
+}
+
 newaction {
 	trigger = "install",
 	description = "Install in ../../LumixEngine_data/bin",
-	execute = function()
-		local src_dir = path.join(BINARY_DIR, "RelWithDebInfo/")
-		local dst_dir = "../../LumixEngine_data/bin/"
-
-		function installDll(filename)
-			os.copyfile(path.join(src_dir, filename .. ".dll"), path.join(dst_dir, filename .. ".dll"))
-			os.copyfile(path.join(src_dir, filename .. ".pdb"), path.join(dst_dir, filename .. ".pdb"))
-		end
-
-		installDll "animation"
-		installDll "audio"
-		installDll "editor"
-		installDll "engine"
-		installDll "lua_script"
-		installDll "physics"
-		installDll "renderer"
-
-		os.copyfile(path.join(src_dir, "studio.exe"), path.join(dst_dir, "studio.exe"))
-		os.copyfile(path.join(src_dir, "studio.pdb"), path.join(dst_dir, "studio.pdb"))
-	end
+	execute = function()  installAction(false) end
 }
-
 
 function defaultConfigurations()
 	configuration "Debug"
