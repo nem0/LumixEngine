@@ -296,14 +296,14 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 				break;
 			}
 		}
-		points[1] = points[0] + points[1];
-		points[2] = points[3] + points[2];
-		float p = ImGui::FindClosest(points, im_mp);
+		//points[1] = points[0] + points[1];
+		//points[2] = points[3] + points[2];
+		auto point = ImGui::FindClosest(points, im_mp);
 		//move into fction AddPoint()
 
-		blob.write(ImVec2(-0.2f, 0));
-		blob.write(mp);
-		blob.write(ImVec2(0.2f, 0));
+		blob.write(point.left_tangent);
+		blob.write(point.point);
+		blob.write(point.right_tangent);
 		count += 3;
 		*(int*)blob.getData() = count;
 		f = (Lumix::Vec2*)((int*)blob.getData() + 1);

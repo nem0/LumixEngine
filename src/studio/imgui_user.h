@@ -46,9 +46,16 @@ struct CurveEditor
 	int point_count;
 };
 
+struct CurvePointData
+{
+	ImVec2 left_tangent;
+	ImVec2 point;
+	ImVec2 right_tangent;
+};
+
 CurveEditor BeginCurveEditor(const char* label);
 bool CurvePoint(ImVec2* point, CurveEditor& editor);
-float FindClosest(const ImVec2* points, const ImVec2& point);
+CurvePointData FindClosest(const ImVec2* points, const ImVec2& point);
 void EndCurveEditor(const CurveEditor& editor);
 
 

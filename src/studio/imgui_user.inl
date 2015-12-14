@@ -521,7 +521,7 @@ bool CurvePoint(ImVec2* points, CurveEditor& editor)
 
 float FindClosestPointToCurve(const ImVec2* points, const ImVec2& point, float t, int iterCount)
 {
-	if (iterCount >= 6)
+	if (iterCount >= 10)
 		return t;
 
 	float u = 1 - t;
@@ -541,9 +541,28 @@ float FindClosestPointToCurve(const ImVec2* points, const ImVec2& point, float t
 		return FindClosestPointToCurve(points, point, t - delta, iterCount + 1);
 }
 
-float FindClosest(const ImVec2* points, const ImVec2& point)
+CurvePointData FindClosest(const ImVec2* points, const ImVec2& point)
 {
-	return FindClosestPointToCurve(points, point, 0.5f, 1);
+	ImVec2 p[4] = { points[0], points[0] + points[1], points[3] + points[2], points[3] };
+	float t = FindClosestPointToCurve(p, point, 0.5f, 1);
+
+	float u = 1 - t;
+	
+	ImVec2 p10 = u * p[0] + t * p[1];
+	ImVec2 p11 = u * p[1] + t * p[2];
+	ImVec2 p12 = u * p[2] + t * p[3];
+
+	ImVec2 p20 = u * p10 + t * p11;
+	ImVec2 p21 = u * p11 + t * p12;
+
+	ImVec2 p30 = u * p20 + t * p21;
+
+	CurvePointData data;
+	data.left_tangent = p20 - p30;
+	data.point = p30;
+	data.right_tangent = p21 - p30;
+
+	return data;
 }
 
 
