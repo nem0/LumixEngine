@@ -56,6 +56,7 @@ struct ProfilerUIImpl : public ProfilerUI
 		m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(m_allocator);
 		m_allocation_root->m_stack_node = nullptr;
 		m_filter[0] = 0;
+		m_resource_filter[0] = 0;
 
 		m_timer = Lumix::Timer::create(engine.getAllocator());
 		m_device.OnEvent.bind<ProfilerUIImpl, &ProfilerUIImpl::onFileSystemEvent>(this);
@@ -213,7 +214,7 @@ struct ProfilerUIImpl : public ProfilerUI
 			FLT_MAX,
 			ImVec2(0, 100));
 
-		ImGui::InputText("filter", m_filter, Lumix::lengthOf(m_filter));
+		ImGui::InputText("filter##fs_filter", m_filter, Lumix::lengthOf(m_filter));
 
 		if (ImGui::Button("Clear")) m_logs.clear();
 
@@ -406,6 +407,7 @@ struct ProfilerUIImpl : public ProfilerUI
 	int m_viewed_thread_id;
 	bool m_is_paused;
 	char m_filter[100];
+	char m_resource_filter[100];
 	Lumix::Array<OpenedFile> m_opened_files;
 	Lumix::MT::LockFreeFixedQueue<Log, 64> m_queue;
 	Lumix::Array<Log> m_logs;
@@ -662,7 +664,7 @@ void ProfilerUIImpl::onGUIResources()
 {
 	if (!ImGui::CollapsingHeader("Resources")) return;
 
-	ImGui::InputText("filter", m_filter, Lumix::lengthOf(m_filter));
+	ImGui::InputText("filter##resource_filter", m_resource_filter, Lumix::lengthOf(m_resource_filter));
 
 	Lumix::uint32 manager_types[] = { Lumix::ResourceManager::ANIMATION,
 		Lumix::ResourceManager::MATERIAL,
@@ -702,8 +704,8 @@ void ProfilerUIImpl::onGUIResources()
 		size_t sum = 0;
 		for (auto iter = resources.begin(), end = resources.end(); iter != end; ++iter)
 		{
-			if (m_filter[0] != '\0' &&
-				Lumix::stristr(iter.value()->getPath().c_str(), m_filter) == nullptr)
+			if (m_resource_filter[0] != '\0' &&
+				Lumix::stristr(iter.value()->getPath().c_str(), m_resource_filter) == nullptr)
 			{
 				continue;
 			}
