@@ -36,6 +36,38 @@ namespace LuaAPI
 {
 
 
+static int raycast(lua_State* L)
+{
+	if (!LuaWrapper::checkParameterType<void*>(L, 1) ||
+		!LuaWrapper::checkParameterType<float>(L, 2) ||
+		!LuaWrapper::checkParameterType<float>(L, 3) ||
+		!LuaWrapper::checkParameterType<float>(L, 4) ||
+		!LuaWrapper::checkParameterType<float>(L, 5) ||
+		!LuaWrapper::checkParameterType<float>(L, 6) ||
+		!LuaWrapper::checkParameterType<float>(L, 7))
+	{
+		lua_pushnil(L);
+		return 1;
+	}
+
+	auto* scene = (PhysicsScene*)LuaWrapper::toType<void*>(L, 1);
+	Vec3 origin;
+	origin.x = LuaWrapper::toType<float>(L, 2);
+	origin.y = LuaWrapper::toType<float>(L, 3);
+	origin.z = LuaWrapper::toType<float>(L, 4);
+	Vec3 dir;
+	dir.x = LuaWrapper::toType<float>(L, 5);
+	dir.y = LuaWrapper::toType<float>(L, 6);
+	dir.z = LuaWrapper::toType<float>(L, 7);
+
+	RaycastHit hit;
+	scene->raycast(origin, dir, FLT_MAX, hit);
+
+	LuaWrapper::pushLua(L, hit.entity);
+	return 1;
+}
+
+
 static float getActorSpeed(IScene* scene, ComponentIndex component)
 {
 	return static_cast<PhysicsScene*>(scene)->getActorSpeed(component);
@@ -44,12 +76,10 @@ static float getActorSpeed(IScene* scene, ComponentIndex component)
 
 static void moveController(IScene* scene,
 	ComponentIndex component,
-	float x,
-	float y,
-	float z,
+	Vec3 dir,
 	float time_delta)
 {
-	static_cast<PhysicsScene*>(scene)->moveController(component, Vec3(x, y, z), time_delta);
+	static_cast<PhysicsScene*>(scene)->moveController(component, dir, time_delta);
 }
 
 
@@ -65,9 +95,9 @@ static void putToSleep(IScene* scene, Entity entity)
 }
 
 
-static void applyForceToActor(IScene* scene, int component, float x, float y, float z)
+static void applyForceToActor(IScene* scene, int component, Vec3 force)
 {
-	static_cast<PhysicsScene*>(scene)->applyForceToActor(component, Vec3(x, y, z));
+	static_cast<PhysicsScene*>(scene)->applyForceToActor(component, force);
 }
 
 
@@ -729,21 +759,19 @@ struct PhysicsSceneImpl : public PhysicsScene
 		if (!scene) return;
 
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
-		m_script_scene->registerFunction("Physics",
-			"moveController",
-			LuaWrapper::wrap<decltype(&LuaAPI::moveController), LuaAPI::moveController>);
-		m_script_scene->registerFunction("Physics",
-			"applyForceToActor",
-			LuaWrapper::wrap<decltype(&LuaAPI::applyForceToActor), LuaAPI::applyForceToActor>);
-		m_script_scene->registerFunction("Physics",
-			"getActorComponent",
-			LuaWrapper::wrap<decltype(&LuaAPI::getActorComponent), LuaAPI::getActorComponent>);
-		m_script_scene->registerFunction("Physics",
-			"putToSleep",
-			LuaWrapper::wrap<decltype(&LuaAPI::putToSleep), LuaAPI::putToSleep>);
-		m_script_scene->registerFunction("Physics",
-			"getActorSpeed",
-			LuaWrapper::wrap<decltype(&LuaAPI::getActorSpeed), LuaAPI::getActorSpeed>);
+
+#define REGISTER_FUNCTION(name)       \
+	m_script_scene->registerFunction( \
+		"Physics", #name, LuaWrapper::wrap<decltype(&LuaAPI::name), LuaAPI::name>)
+
+		REGISTER_FUNCTION(moveController);
+		REGISTER_FUNCTION(applyForceToActor);
+		REGISTER_FUNCTION(getActorComponent);
+		REGISTER_FUNCTION(putToSleep);
+		REGISTER_FUNCTION(getActorSpeed);
+		m_script_scene->registerFunction("Physics", "raycast", LuaAPI::raycast);
+
+#undef REGISTER_FUNCTION
 	}
 
 

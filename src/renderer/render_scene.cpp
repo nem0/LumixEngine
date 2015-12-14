@@ -1692,9 +1692,7 @@ public:
 	}
 
 
-	void fillTemporaryInfos(const CullingSystem::Results& results,
-							const Frustum& frustum,
-							int64 layer_mask)
+	void fillTemporaryInfos(const CullingSystem::Results& results, const Frustum& frustum)
 	{
 		PROFILE_FUNCTION();
 		m_jobs.clear();
@@ -1714,9 +1712,10 @@ public:
 			if (results[subresult_index].empty()) continue;
 
 			MTJD::Job* job = MTJD::makeJob(m_engine.getMTJDManager(),
-				[&subinfos, layer_mask, this, &results, subresult_index, &frustum]()
+				[&subinfos, this, &results, subresult_index, &frustum]()
 				{
 					PROFILE_BLOCK("Temporary Info Job");
+					PROFILE_INT("Renderable count", results[subresult_index].size());
 					Vec3 frustum_position = frustum.getPosition();
 					const int* LUMIX_RESTRICT raw_subresults = &results[subresult_index][0];
 					Renderable* LUMIX_RESTRICT renderables = &m_renderables[0];
@@ -1921,7 +1920,7 @@ public:
 		const CullingSystem::Results* results = cull(frustum, layer_mask);
 		if (!results) return;
 
-		fillTemporaryInfos(*results, frustum, layer_mask);
+		fillTemporaryInfos(*results, frustum);
 		mergeTemporaryInfos(meshes);
 	}
 
