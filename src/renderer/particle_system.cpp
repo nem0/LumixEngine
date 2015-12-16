@@ -5,6 +5,7 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "renderer/material.h"
+#include "renderer/render_scene.h"
 #include "universe/universe.h"
 
 
@@ -92,6 +93,15 @@ void ParticleEmitter::ForceModule::update(float time_delta)
 const uint32 ParticleEmitter::ForceModule::s_type = Lumix::crc32("force");
 
 
+void ParticleEmitter::drawGizmo(RenderScene& scene)
+{
+	for (auto* module : m_modules)
+	{
+		module->drawGizmo(scene);
+	}
+}
+
+
 ParticleEmitter::PlaneModule::PlaneModule(ParticleEmitter& emitter)
 : ModuleBase(emitter)
 {
@@ -99,6 +109,30 @@ ParticleEmitter::PlaneModule::PlaneModule(ParticleEmitter& emitter)
 	for (auto& e : m_entities)
 	{
 		e = INVALID_ENTITY;
+	}
+}
+
+
+void ParticleEmitter::PlaneModule::drawGizmo(RenderScene& scene)
+{
+	for (int i = 0; i < m_count; ++i)
+	{
+		Entity entity = m_entities[i];
+		if (entity == INVALID_ENTITY) continue;
+		
+		Matrix mtx = m_emitter.m_universe.getMatrix(entity);
+		Vec3 pos = mtx.getTranslation();
+		Vec3 right = mtx.getXVector();
+		Vec3 normal = mtx.getYVector();
+		Vec3 forward = mtx.getZVector();
+		uint32 color = 0xffff0000;
+		scene.addDebugLine(pos - right - forward, pos + right - forward, color, 0);
+		scene.addDebugLine(pos + right - forward, pos + right + forward, color, 0);
+		scene.addDebugLine(pos + right + forward, pos - right + forward, color, 0);
+		scene.addDebugLine(pos - right + forward, pos - right - forward, color, 0);
+		scene.addDebugLine(pos + right + forward, pos - right - forward, color, 0);
+		scene.addDebugLine(pos + right - forward, pos - right + forward, color, 0);
+		scene.addDebugLine(pos, pos + normal * 2, color, 0);
 	}
 }
 
@@ -114,7 +148,7 @@ void ParticleEmitter::PlaneModule::update(float time_delta)
 	{
 		auto entity = m_entities[i];
 		if (entity == INVALID_ENTITY) continue;
-		Vec3 normal = m_emitter.m_universe.getRotation(entity) * Vec3(0, 0, 1);
+		Vec3 normal = m_emitter.m_universe.getRotation(entity) * Vec3(0, 1, 0);
 		float D = -dotProduct(normal, m_emitter.m_universe.getPosition(entity));
 
 		for (int i = m_emitter.m_position.size() - 1; i >= 0; --i)

@@ -489,6 +489,7 @@ void PropertyGrid::onParticleEmitterGUI(Lumix::ComponentUID cmp)
 		float time_delta = m_editor.getEngine().getLastTimeDelta();
 		auto* scene = static_cast<Lumix::RenderScene*>(cmp.scene);
 		scene->updateEmitter(cmp.index, time_delta * m_particle_emitter_timescale);
+		scene->drawEmitterGizmo(cmp.index);
 	}
 }
 

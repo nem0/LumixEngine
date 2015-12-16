@@ -225,6 +225,12 @@ public:
 	}
 
 
+	void drawEmitterGizmo(ComponentIndex cmp) override
+	{
+		m_particle_emitters[cmp]->drawGizmo(*this);
+	}
+
+
 	void updateEmitter(ComponentIndex cmp, float time_delta) override
 	{
 		m_particle_emitters[cmp]->update(time_delta);
