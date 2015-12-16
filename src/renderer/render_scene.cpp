@@ -878,6 +878,34 @@ public:
 	}
 
 
+	float getParticleEmitterPlaneBounce(ComponentIndex cmp) override
+	{
+		auto* emitter = m_particle_emitters[cmp];
+		for (auto* module : emitter->m_modules)
+		{
+			if (module->getType() == ParticleEmitter::PlaneModule::s_type)
+			{
+				return static_cast<ParticleEmitter::PlaneModule*>(module)->m_bounce;
+			}
+		}
+		return 0;
+	}
+
+
+	void setParticleEmitterPlaneBounce(ComponentIndex cmp, float value) override
+	{
+		auto* emitter = m_particle_emitters[cmp];
+		for (auto* module : emitter->m_modules)
+		{
+			if (module->getType() == ParticleEmitter::PlaneModule::s_type)
+			{
+				static_cast<ParticleEmitter::PlaneModule*>(module)->m_bounce = value;
+				break;
+			}
+		}
+	}
+
+
 	void destroyParticleEmitterPlane(ComponentIndex component)
 	{
 		auto* emitter = m_particle_emitters[component];

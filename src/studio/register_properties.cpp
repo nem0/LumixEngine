@@ -263,18 +263,26 @@ void registerRendererProperties(Lumix::WorldEditor& editor)
 	PropertyRegister::registerComponentDependency(
 		"particle_emitter_random_rotation", "particle_emitter");
 
-	
-	auto plane_module = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Planes",
+	PropertyRegister::add("particle_emitter_plane",
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Bounce",
+		&RenderScene::getParticleEmitterPlaneBounce,
+		&RenderScene::setParticleEmitterPlaneBounce,
+		0.0f,
+		1.0f,
+		0.01f,
+		allocator));
+	auto plane_module_planes = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Planes",
 		&RenderScene::getParticleEmitterPlaneCount,
 		&RenderScene::addParticleEmitterPlane,
 		&RenderScene::removeParticleEmitterPlane,
 		allocator);
-	plane_module->addChild(LUMIX_NEW(allocator, EntityEnumPropertyDescriptor<RenderScene>)("Entity",
-		&RenderScene::getParticleEmitterPlaneEntity,
-		&RenderScene::setParticleEmitterPlaneEntity,
-		editor,
-		allocator));
-	PropertyRegister::add("particle_emitter_plane", plane_module);
+	plane_module_planes->addChild(
+		LUMIX_NEW(allocator, EntityEnumPropertyDescriptor<RenderScene>)("Entity",
+			&RenderScene::getParticleEmitterPlaneEntity,
+			&RenderScene::setParticleEmitterPlaneEntity,
+			editor,
+			allocator));
+	PropertyRegister::add("particle_emitter_plane", plane_module_planes);
 
 	PropertyRegister::add("particle_emitter_fade",
 		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Alpha",

@@ -103,7 +103,8 @@ void ParticleEmitter::drawGizmo(RenderScene& scene)
 
 
 ParticleEmitter::PlaneModule::PlaneModule(ParticleEmitter& emitter)
-: ModuleBase(emitter)
+	: ModuleBase(emitter)
+	, m_bounce(0.5f)
 {
 	m_count = 0;
 	for (auto& e : m_entities)
@@ -126,13 +127,13 @@ void ParticleEmitter::PlaneModule::drawGizmo(RenderScene& scene)
 		Vec3 normal = mtx.getYVector();
 		Vec3 forward = mtx.getZVector();
 		uint32 color = 0xffff0000;
-		scene.addDebugLine(pos - right - forward, pos + right - forward, color, 0);
-		scene.addDebugLine(pos + right - forward, pos + right + forward, color, 0);
-		scene.addDebugLine(pos + right + forward, pos - right + forward, color, 0);
-		scene.addDebugLine(pos - right + forward, pos - right - forward, color, 0);
-		scene.addDebugLine(pos + right + forward, pos - right - forward, color, 0);
-		scene.addDebugLine(pos + right - forward, pos - right + forward, color, 0);
-		scene.addDebugLine(pos, pos + normal * 2, color, 0);
+
+		for (int i = 0; i < 9; ++i)
+		{
+			float w = i / 4.0f - 1.0f;
+			scene.addDebugLine(pos - right - forward * w, pos + right - forward * w, color, 0);
+			scene.addDebugLine(pos - right * w - forward, pos - right * w + forward, color, 0);
+		}
 	}
 }
 
@@ -156,7 +157,8 @@ void ParticleEmitter::PlaneModule::update(float time_delta)
 			const auto& pos = particle_pos[i];
 			if (dotProduct(normal, pos) + D < 0)
 			{
-				particle_vel[i] = particle_vel[i] - normal * (2 * dotProduct(normal, particle_vel[i]));
+				float NdotV = dotProduct(normal, particle_vel[i]);
+				particle_vel[i] = (particle_vel[i] - normal * (2 * NdotV)) * m_bounce;
 			}
 		}
 	}
@@ -165,6 +167,7 @@ void ParticleEmitter::PlaneModule::update(float time_delta)
 
 void ParticleEmitter::PlaneModule::serialize(OutputBlob& blob)
 {
+	blob.write(m_bounce);
 	blob.write(m_count);
 	for (int i = 0; i < m_count; ++i)
 	{
@@ -175,6 +178,7 @@ void ParticleEmitter::PlaneModule::serialize(OutputBlob& blob)
 
 void ParticleEmitter::PlaneModule::deserialize(InputBlob& blob)
 {
+	blob.read(m_bounce);
 	blob.read(m_count);
 	for (int i = 0; i < m_count; ++i)
 	{

@@ -215,6 +215,8 @@ public:
 	virtual void removeParticleEmitterPlane(ComponentIndex cmp, int index) = 0;
 	virtual Entity getParticleEmitterPlaneEntity(ComponentIndex cmp, int index) = 0;
 	virtual void setParticleEmitterPlaneEntity(ComponentIndex cmp, int index, Entity entity) = 0;
+	virtual float getParticleEmitterPlaneBounce(ComponentIndex cmp) = 0;
+	virtual void setParticleEmitterPlaneBounce(ComponentIndex cmp, float value) = 0;
 
 	virtual DelegateList<void(ComponentIndex)>& renderableCreated() = 0;
 	virtual DelegateList<void(ComponentIndex)>& renderableDestroyed() = 0;
