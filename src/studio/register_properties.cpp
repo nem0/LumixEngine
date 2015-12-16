@@ -18,9 +18,11 @@ using namespace Lumix;
 template <class S> class EntityEnumPropertyDescriptor : public IEnumPropertyDescriptor
 {
 public:
-	typedef int (S::*Getter)(ComponentIndex);
-	typedef void (S::*Setter)(ComponentIndex, int);
-	
+	typedef Entity (S::*Getter)(ComponentIndex);
+	typedef void (S::*Setter)(ComponentIndex, Entity);
+	typedef Entity(S::*ArrayGetter)(ComponentIndex, int);
+	typedef void (S::*ArraySetter)(ComponentIndex, int, Entity);
+
 public:
 	EntityEnumPropertyDescriptor(const char* name,
 		Getter _getter,
@@ -31,26 +33,55 @@ public:
 		, m_editor(editor)
 	{
 		setName(name);
-		m_getter = _getter;
-		m_setter = _setter;
+		m_single.getter = _getter;
+		m_single.setter = _setter;
 		m_type = ENUM;
 	}
 
 
+	EntityEnumPropertyDescriptor(const char* name,
+		ArrayGetter _getter,
+		ArraySetter _setter,
+		Lumix::WorldEditor& editor,
+		IAllocator& allocator)
+		: IEnumPropertyDescriptor(allocator)
+		, m_editor(editor)
+	{
+		setName(name);
+		m_array.getter = _getter;
+		m_array.setter = _setter;
+		m_type = ENUM;
+	}
+
+
+
 	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
-		ASSERT(index == -1);
 		int value;
 		stream.read(&value, sizeof(value));
 		auto entity = value < 0 ? INVALID_ENTITY : m_editor.getUniverse()->getEntityFromDenseIdx(value);
-		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, entity);
+		if (index == -1)
+		{
+			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.index, entity);
+		}
+		else
+		{
+			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.index, index, entity);
+		}
 	};
 
 
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
-		ASSERT(index == -1);
-		Entity value = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		Entity value;
+		if (index == -1)
+		{
+			value = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.index);
+		}
+		else
+		{
+			value = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.index, index);
+		}
 		auto dense_idx = m_editor.getUniverse()->getDenseIdx(value);
 		int len = sizeof(dense_idx);
 		stream.write(&dense_idx, len);
@@ -70,8 +101,19 @@ public:
 	}
 
 private:
-	Getter m_getter;
-	Setter m_setter;
+	union
+	{
+		struct
+		{
+			Getter getter;
+			Setter setter;
+		} m_single;
+		struct
+		{
+			ArrayGetter getter;
+			ArraySetter setter;
+		} m_array;
+	};
 	Lumix::WorldEditor& m_editor;
 };
 
@@ -195,13 +237,16 @@ void registerPhysicsProperties(IAllocator& allocator)
 }
 
 
-void registerRendererProperties(IAllocator& allocator)
+void registerRendererProperties(Lumix::WorldEditor& editor)
 {
+	IAllocator& allocator = editor.getAllocator();
+
 	PropertyRegister::registerComponentType("camera", "Camera");
 	PropertyRegister::registerComponentType("global_light", "Global light");
 	PropertyRegister::registerComponentType("renderable", "Mesh");
 	PropertyRegister::registerComponentType("particle_emitter", "Particle emitter");
 	PropertyRegister::registerComponentType("particle_emitter_fade", "Particle emitter - fade");
+	PropertyRegister::registerComponentType("particle_emitter_plane", "Particle emitter - plane");
 	PropertyRegister::registerComponentType("particle_emitter_force", "Particle emitter - force");
 	PropertyRegister::registerComponentType(
 		"particle_emitter_linear_movement", "Particle emitter - linear movement");
@@ -217,6 +262,19 @@ void registerRendererProperties(IAllocator& allocator)
 		"particle_emitter_linear_movement", "particle_emitter");
 	PropertyRegister::registerComponentDependency(
 		"particle_emitter_random_rotation", "particle_emitter");
+
+	
+	auto plane_module = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Planes",
+		&RenderScene::getParticleEmitterPlaneCount,
+		&RenderScene::addParticleEmitterPlane,
+		&RenderScene::removeParticleEmitterPlane,
+		allocator);
+	plane_module->addChild(LUMIX_NEW(allocator, EntityEnumPropertyDescriptor<RenderScene>)("Entity",
+		&RenderScene::getParticleEmitterPlaneEntity,
+		&RenderScene::setParticleEmitterPlaneEntity,
+		editor,
+		allocator));
+	PropertyRegister::add("particle_emitter_plane", plane_module);
 
 	PropertyRegister::add("particle_emitter_fade",
 		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Alpha",
@@ -491,7 +549,7 @@ void registerRendererProperties(IAllocator& allocator)
 void registerProperties(WorldEditor& editor)
 {
 	registerEngineProperties(editor);
-	registerRendererProperties(editor.getAllocator());
+	registerRendererProperties(editor);
 	registerLuaScriptProperties(editor.getAllocator());
 	registerPhysicsProperties(editor.getAllocator());
 	registerAudioProperties(editor.getAllocator());
