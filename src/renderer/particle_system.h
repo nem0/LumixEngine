@@ -101,6 +101,7 @@ public:
 
 		static const uint32 s_type;
 		Entity m_entities[8];
+		float m_bounce;
 		int m_count;
 	};
 
