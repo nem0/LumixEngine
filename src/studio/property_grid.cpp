@@ -193,7 +193,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		showSampledFunctionProperty(cmp, static_cast<Lumix::ISampledFunctionDescriptor&>(desc));
 		break;
 	case Lumix::IPropertyDescriptor::ENUM:
-		showEnumProperty(cmp, static_cast<Lumix::IEnumPropertyDescriptor&>(desc));
+		showEnumProperty(cmp, index, static_cast<Lumix::IEnumPropertyDescriptor&>(desc));
 		break;
 	default:
 		ASSERT(false);
@@ -202,10 +202,10 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 }
 
 
-void PropertyGrid::showEnumProperty(Lumix::ComponentUID cmp, Lumix::IEnumPropertyDescriptor& desc)
+void PropertyGrid::showEnumProperty(Lumix::ComponentUID cmp, int index, Lumix::IEnumPropertyDescriptor& desc)
 {
 	Lumix::OutputBlob blob(m_editor.getAllocator());
-	desc.get(cmp, -1, blob);
+	desc.get(cmp, index, blob);
 	int value = *(int*)blob.getData();
 	int count = desc.getEnumCount(cmp.scene);
 
@@ -234,7 +234,7 @@ void PropertyGrid::showEnumProperty(Lumix::ComponentUID cmp, Lumix::IEnumPropert
 
 	if(ImGui::Combo(desc.getName(), &value, getter, &data, count))
 	{
-		m_editor.setProperty(cmp.type, -1, desc, &value, sizeof(value));
+		m_editor.setProperty(cmp.type, index, desc, &value, sizeof(value));
 	}
 }
 

@@ -209,6 +209,11 @@ public:
 	virtual void setParticleEmitterInitialSize(ComponentIndex cmp, const Vec2& value) = 0;
 	virtual void setParticleEmitterMaterialPath(ComponentIndex cmp, const char* path) = 0;
 	virtual const char* getParticleEmitterMaterialPath(ComponentIndex cmp) = 0;
+	virtual int getParticleEmitterPlaneCount(ComponentIndex cmp) = 0;
+	virtual void addParticleEmitterPlane(ComponentIndex cmp, int index) = 0;
+	virtual void removeParticleEmitterPlane(ComponentIndex cmp, int index) = 0;
+	virtual Entity getParticleEmitterPlaneEntity(ComponentIndex cmp, int index) = 0;
+	virtual void setParticleEmitterPlaneEntity(ComponentIndex cmp, int index, Entity entity) = 0;
 
 	virtual DelegateList<void(ComponentIndex)>& renderableCreated() = 0;
 	virtual DelegateList<void(ComponentIndex)>& renderableDestroyed() = 0;

@@ -27,6 +27,10 @@ static ParticleEmitter::ModuleBase* createModule(uint32 type, ParticleEmitter& e
 	{
 		return LUMIX_NEW(emitter.getAllocator(), ParticleEmitter::ForceModule)(emitter);
 	}
+	if (type == ParticleEmitter::PlaneModule::s_type)
+	{
+		return LUMIX_NEW(emitter.getAllocator(), ParticleEmitter::PlaneModule)(emitter);
+	}
 	if (type == ParticleEmitter::LinearMovementModule::s_type)
 	{
 		return LUMIX_NEW(emitter.getAllocator(), ParticleEmitter::LinearMovementModule)(emitter);
@@ -86,6 +90,66 @@ void ParticleEmitter::ForceModule::update(float time_delta)
 
 
 const uint32 ParticleEmitter::ForceModule::s_type = Lumix::crc32("force");
+
+
+ParticleEmitter::PlaneModule::PlaneModule(ParticleEmitter& emitter)
+: ModuleBase(emitter)
+{
+	m_count = 0;
+	for (auto& e : m_entities)
+	{
+		e = INVALID_ENTITY;
+	}
+}
+
+
+void ParticleEmitter::PlaneModule::update(float time_delta)
+{
+	if (m_emitter.m_alpha.empty()) return;
+
+	Vec3* LUMIX_RESTRICT particle_pos = &m_emitter.m_position[0];
+	Vec3* LUMIX_RESTRICT particle_vel = &m_emitter.m_velocity[0];
+
+	for (int i = 0; i < m_count; ++i)
+	{
+		auto entity = m_entities[i];
+		if (entity == INVALID_ENTITY) continue;
+		Vec3 normal = m_emitter.m_universe.getRotation(entity) * Vec3(0, 0, 1);
+		float D = -dotProduct(normal, m_emitter.m_universe.getPosition(entity));
+
+		for (int i = m_emitter.m_position.size() - 1; i >= 0; --i)
+		{
+			const auto& pos = particle_pos[i];
+			if (dotProduct(normal, pos) + D < 0)
+			{
+				particle_vel[i] = particle_vel[i] - normal * (2 * dotProduct(normal, particle_vel[i]));
+			}
+		}
+	}
+}
+
+
+void ParticleEmitter::PlaneModule::serialize(OutputBlob& blob)
+{
+	blob.write(m_count);
+	for (int i = 0; i < m_count; ++i)
+	{
+		blob.write(m_entities[i]);
+	}
+}
+
+
+void ParticleEmitter::PlaneModule::deserialize(InputBlob& blob)
+{
+	blob.read(m_count);
+	for (int i = 0; i < m_count; ++i)
+	{
+		blob.read(m_entities[i]);
+	}
+}
+
+
+const uint32 ParticleEmitter::PlaneModule::s_type = Lumix::crc32("plane");
 
 
 ParticleEmitter::LinearMovementModule::LinearMovementModule(ParticleEmitter& emitter)

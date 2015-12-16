@@ -88,6 +88,20 @@ public:
 	};
 
 
+	struct LUMIX_RENDERER_API PlaneModule : public ModuleBase
+	{
+		PlaneModule(ParticleEmitter& emitter);
+		void serialize(OutputBlob& blob) override;
+		void deserialize(InputBlob& blob) override;
+		void update(float time_delta) override;
+		uint32 getType() const override { return s_type; }
+
+		static const uint32 s_type;
+		Entity m_entities[8];
+		int m_count;
+	};
+
+
 	struct LUMIX_RENDERER_API ForceModule : public ModuleBase
 	{
 		ForceModule(ParticleEmitter& emitter);
