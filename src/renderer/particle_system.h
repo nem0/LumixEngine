@@ -15,6 +15,7 @@ class IAllocator;
 class InputBlob;
 class Material;
 class OutputBlob;
+class RenderScene;
 class ResourceManager;
 class Universe;
 
@@ -68,6 +69,7 @@ public:
 		virtual void serialize(OutputBlob& blob) = 0;
 		virtual void deserialize(InputBlob& blob) = 0;
 		virtual uint32 getType() const = 0;
+		virtual void drawGizmo(RenderScene& scene) {}
 
 		ParticleEmitter& m_emitter;
 	};
@@ -95,6 +97,7 @@ public:
 		void deserialize(InputBlob& blob) override;
 		void update(float time_delta) override;
 		uint32 getType() const override { return s_type; }
+		void drawGizmo(RenderScene& scene) override;
 
 		static const uint32 s_type;
 		Entity m_entities[8];
@@ -163,6 +166,7 @@ public:
 	ParticleEmitter(Entity entity, Universe& universe, IAllocator& allocator);
 	~ParticleEmitter();
 
+	void drawGizmo(RenderScene& scene);
 	void serialize(OutputBlob& blob);
 	void deserialize(InputBlob& blob, ResourceManager& manager, bool has_version);
 	void update(float time_delta);
