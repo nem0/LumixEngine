@@ -1022,77 +1022,43 @@ public:
 		ASSERT(values[1].x < 0.001f);
 		ASSERT(values[count - 2].x > 0.999f);
 
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for(auto* module : modules)
+		auto* alpha_module = getEmitterModule<ParticleEmitter::AlphaModule>(cmp);
+		if (!alpha_module) return;
+		
+		alpha_module->m_values.resize(count);
+		for (int i = 0; i < count; ++i)
 		{
-			if(module->getType() == ParticleEmitter::AlphaModule::s_type)
-			{
-				auto alpha_module = static_cast<ParticleEmitter::AlphaModule*>(module);
-				alpha_module->m_values.resize(count);
-				for(int i = 0; i < count; ++i)
-				{
-					alpha_module->m_values[i] = values[i];
-				}
-				alpha_module->sample();
-				return;
-			}
+			alpha_module->m_values[i] = values[i];
 		}
+		alpha_module->sample();
 	}
 
 
 	void setParticleEmitterAcceleration(ComponentIndex cmp, const Vec3& value) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::ForceModule::s_type)
-			{
-				static_cast<ParticleEmitter::ForceModule*>(module)->m_acceleration = value;
-				break;
-			}
-		}
+		auto* module = getEmitterModule<ParticleEmitter::ForceModule>(cmp);
+		if (module) module->m_acceleration = value;
 	}
 
 
 	Vec3 getParticleEmitterAcceleration(ComponentIndex cmp) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::ForceModule::s_type)
-			{
-				return static_cast<ParticleEmitter::ForceModule*>(module)->m_acceleration;
-			}
-		}
-		return Vec3();
+		auto* module = getEmitterModule<ParticleEmitter::ForceModule>(cmp);
+		return module ? module->m_acceleration : Vec3();
 	}
 
 
 	int getParticleEmitterSizeCount(ComponentIndex cmp) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::SizeModule::s_type)
-			{
-				return static_cast<ParticleEmitter::SizeModule*>(module)->m_values.size();
-			}
-		}
-		return 0;
+		auto* module = getEmitterModule<ParticleEmitter::SizeModule>(cmp);
+		return module ? module->m_values.size() : 0; 
 	}
 
 
 	const Vec2* getParticleEmitterSize(ComponentIndex cmp) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::SizeModule::s_type)
-			{
-				return &static_cast<ParticleEmitter::SizeModule*>(module)->m_values[0];
-			}
-		}
-		return 0;
+		auto* module = getEmitterModule<ParticleEmitter::SizeModule>(cmp);
+		return module ? &module->m_values[0] : nullptr;
 	}
 
 
@@ -1102,133 +1068,87 @@ public:
 		ASSERT(values[0].x < 0.001f);
 		ASSERT(values[count-1].x > 0.999f);
 
+		auto* module = getEmitterModule<ParticleEmitter::SizeModule>(cmp);
+		if (!module) return;
+
+		auto size_module = static_cast<ParticleEmitter::SizeModule*>(module);
+		size_module->m_values.resize(count);
+		for (int i = 0; i < count; ++i)
+		{
+			size_module->m_values[i] = values[i];
+		}
+		size_module->sample();
+	}
+
+
+	template <typename T>
+	T* getEmitterModule(ComponentIndex cmp) const
+	{
 		auto& modules = m_particle_emitters[cmp]->m_modules;
 		for (auto* module : modules)
 		{
-			if (module->getType() == ParticleEmitter::SizeModule::s_type)
+			if (module->getType() == T::s_type)
 			{
-				auto size_module = static_cast<ParticleEmitter::SizeModule*>(module);
-				size_module->m_values.resize(count);
-				for (int i = 0; i < count; ++i)
-				{
-					size_module->m_values[i] = values[i];
-				}
-				size_module->sample();
-				return;
+				return static_cast<T*>(module);
 			}
 		}
+		return nullptr;
 	}
 
 
 	int getParticleEmitterAlphaCount(ComponentIndex cmp) override 
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for(auto* module : modules)
-		{
-			if(module->getType() == ParticleEmitter::AlphaModule::s_type)
-			{
-				return static_cast<ParticleEmitter::AlphaModule*>(module)->m_values.size();
-			}
-		}
-		return 0;
+		auto* module = getEmitterModule<ParticleEmitter::AlphaModule>(cmp);
+		return module ? module->m_values.size() : 0;
 	}
 
 
 	const Vec2* getParticleEmitterAlpha(ComponentIndex cmp) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::AlphaModule::s_type)
-			{
-				return &static_cast<ParticleEmitter::AlphaModule*>(module)->m_values[0];
-			}
-		}
-		return 0;
+		auto* module = getEmitterModule<ParticleEmitter::AlphaModule>(cmp);
+		return module ? &module->m_values[0] : 0;
 	}
 
 
 	Vec2 getParticleEmitterLinearMovementX(ComponentIndex cmp) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
-			{
-				return static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_x;
-			}
-		}
-		return Vec2(0, 0);
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		return module ? Vec2(module->m_x.from, module->m_x.to) : Vec2(0, 0);
 	}
 
 
 	void setParticleEmitterLinearMovementX(ComponentIndex cmp, const Vec2& value) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
-			{
-				static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_x = value; 
-				break;
-			}
-		}
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		if(module) module->m_x = value;
 	}
 
 
 	Vec2 getParticleEmitterLinearMovementY(ComponentIndex cmp) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
-			{
-				return static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_y;
-			}
-		}
-		return Vec2(0, 0);
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		return module ? Vec2(module->m_y.from, module->m_y.to) : Vec2(0, 0);
 	}
 
 
 	void setParticleEmitterLinearMovementY(ComponentIndex cmp, const Vec2& value) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
-			{
-				static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_y = value;
-				break;
-			}
-		}
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		if (module) module->m_y = value;
 	}
 
 
 	Vec2 getParticleEmitterLinearMovementZ(ComponentIndex cmp) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
-			{
-				return static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_z;
-			}
-		}
-		return Vec2(0, 0);
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		return module ? Vec2(module->m_z.from, module->m_z.to) : Vec2(0, 0);
 	}
 
 
 	void setParticleEmitterLinearMovementZ(ComponentIndex cmp, const Vec2& value) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
-			{
-				static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_z = value;
-				break;
-			}
-		}
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		if (module) module->m_z = value;
 	}
 
 
@@ -2935,186 +2855,117 @@ public:
 
 	int getParticleEmitterAttractorCount(ComponentIndex cmp) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for(auto* module : modules)
-		{
-			if(module->getType() == ParticleEmitter::AttractorModule::s_type)
-			{
-				return static_cast<ParticleEmitter::AttractorModule*>(module)->m_count;
-			}
-		}
-		return 0;
+		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(cmp);
+		return module ? module->m_count : 0;
 	}
 
 
 	void addParticleEmitterAttractor(ComponentIndex cmp, int index) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for(auto* module : modules)
+		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(cmp);
+		if (!module) return;
+
+		auto* plane_module = static_cast<ParticleEmitter::AttractorModule*>(module);
+		if (plane_module->m_count == lengthOf(plane_module->m_entities)) return;
+
+		if (index < 0)
 		{
-			if(module->getType() == ParticleEmitter::AttractorModule::s_type)
-			{
-				auto* plane_module = static_cast<ParticleEmitter::AttractorModule*>(module);
-				if(plane_module->m_count == lengthOf(plane_module->m_entities)) return;
-
-				if(index < 0)
-				{
-					plane_module->m_entities[plane_module->m_count] = INVALID_ENTITY;
-					++plane_module->m_count;
-					return;
-				}
-
-				for(int i = plane_module->m_count - 1; i > index; --i)
-				{
-					plane_module->m_entities[i] = plane_module->m_entities[i - 1];
-				}
-				plane_module->m_entities[index] = INVALID_ENTITY;
-				++plane_module->m_count;
-				return;
-			}
+			plane_module->m_entities[plane_module->m_count] = INVALID_ENTITY;
+			++plane_module->m_count;
+			return;
 		}
+
+		for (int i = plane_module->m_count - 1; i > index; --i)
+		{
+			plane_module->m_entities[i] = plane_module->m_entities[i - 1];
+		}
+		plane_module->m_entities[index] = INVALID_ENTITY;
+		++plane_module->m_count;
 	}
 
 
 	void removeParticleEmitterAttractor(ComponentIndex cmp, int index) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for(auto* module : modules)
-		{
-			if(module->getType() == ParticleEmitter::AttractorModule::s_type)
-			{
-				auto* plane_module = static_cast<ParticleEmitter::AttractorModule*>(module);
+		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(cmp);
+		if (!module) return;
 
-				for(int i = index; i < plane_module->m_count - 1; ++i)
-				{
-					plane_module->m_entities[i] = plane_module->m_entities[i + 1];
-				}
-				--plane_module->m_count;
-				return;
-			}
+		for (int i = index; i < module->m_count - 1; ++i)
+		{
+			module->m_entities[i] = module->m_entities[i + 1];
 		}
+		--module->m_count;
 	}
 
 
 	Entity getParticleEmitterAttractorEntity(ComponentIndex cmp, int index) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for(auto* module : modules)
-		{
-			if(module->getType() == ParticleEmitter::AttractorModule::s_type)
-			{
-				auto* plane_module = static_cast<ParticleEmitter::AttractorModule*>(module);
-				return plane_module->m_entities[index];
-			}
-		}
-		return INVALID_ENTITY;
+		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(cmp);
+		return module ? module->m_entities[index] : INVALID_ENTITY;
 	}
 
 
 	void setParticleEmitterAttractorEntity(ComponentIndex cmp, int index, Entity entity) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for(auto* module : modules)
-		{
-			if(module->getType() == ParticleEmitter::AttractorModule::s_type)
-			{
-				static_cast<ParticleEmitter::AttractorModule*>(module)->m_entities[index] = entity;
-				break;
-			}
-		}
+		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(cmp);
+		if(module) module->m_entities[index] = entity;
 	}
 
 
 	int getParticleEmitterPlaneCount(ComponentIndex cmp) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::PlaneModule::s_type)
-			{
-				return static_cast<ParticleEmitter::PlaneModule*>(module)->m_count;
-			}
-		}
-		return 0;
+		auto* module = getEmitterModule<ParticleEmitter::PlaneModule>(cmp);
+		return module ? module->m_count : 0;
 	}
 
 
 	void addParticleEmitterPlane(ComponentIndex cmp, int index) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::PlaneModule::s_type)
-			{
-				auto* plane_module = static_cast<ParticleEmitter::PlaneModule*>(module);
-				if (plane_module->m_count == lengthOf(plane_module->m_entities)) return;
-				
-				if (index < 0)
-				{
-					plane_module->m_entities[plane_module->m_count] = INVALID_ENTITY;
-					++plane_module->m_count;
-					return;
-				}
+		auto* plane_module = getEmitterModule<ParticleEmitter::PlaneModule>(cmp);
+		if (!plane_module) return;
 
-				for (int i = plane_module->m_count - 1; i > index; --i)
-				{
-					plane_module->m_entities[i] = plane_module->m_entities[i - 1];
-				}
-				plane_module->m_entities[index] = INVALID_ENTITY;
-				++plane_module->m_count;
-				return;
-			}
+		if (plane_module->m_count == lengthOf(plane_module->m_entities)) return;
+
+		if (index < 0)
+		{
+			plane_module->m_entities[plane_module->m_count] = INVALID_ENTITY;
+			++plane_module->m_count;
+			return;
 		}
+
+		for (int i = plane_module->m_count - 1; i > index; --i)
+		{
+			plane_module->m_entities[i] = plane_module->m_entities[i - 1];
+		}
+		plane_module->m_entities[index] = INVALID_ENTITY;
+		++plane_module->m_count;
+			
 	}
 
 
 	void removeParticleEmitterPlane(ComponentIndex cmp, int index) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::PlaneModule::s_type)
-			{
-				auto* plane_module = static_cast<ParticleEmitter::PlaneModule*>(module);
+		auto* plane_module = getEmitterModule<ParticleEmitter::PlaneModule>(cmp);
+		if (!plane_module) return;
 
-				for (int i = index; i < plane_module->m_count - 1; ++i)
-				{
-					plane_module->m_entities[i] = plane_module->m_entities[i + 1];
-				}
-				--plane_module->m_count;
-				return;
-			}
+		for (int i = index; i < plane_module->m_count - 1; ++i)
+		{
+			plane_module->m_entities[i] = plane_module->m_entities[i + 1];
 		}
+		--plane_module->m_count;
 	}
 
 
 	Entity getParticleEmitterPlaneEntity(ComponentIndex cmp, int index) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::PlaneModule::s_type)
-			{
-				auto* plane_module = static_cast<ParticleEmitter::PlaneModule*>(module);
-				return plane_module->m_entities[index];
-			}
-		}
-		return INVALID_ENTITY;
+		auto* module = getEmitterModule<ParticleEmitter::PlaneModule>(cmp);
+		return module ? module->m_entities[index] : INVALID_ENTITY;
 	}
 
 
 	void setParticleEmitterPlaneEntity(ComponentIndex cmp, int index, Entity entity) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::PlaneModule::s_type)
-			{
-				auto* plane_module = static_cast<ParticleEmitter::PlaneModule*>(module);
-				plane_module->m_entities[index] = entity;
-				return;
-			}
-		}
+		auto* module = getEmitterModule<ParticleEmitter::PlaneModule>(cmp);
+		if (module) module->m_entities[index] = entity;
 	}
 
 
