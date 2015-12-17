@@ -106,6 +106,21 @@ public:
 	};
 
 
+	struct LUMIX_RENDERER_API AttractorModule : public ModuleBase
+	{
+		AttractorModule(ParticleEmitter& emitter);
+		void serialize(OutputBlob& blob) override;
+		void deserialize(InputBlob& blob) override;
+		void update(float time_delta) override;
+		uint32 getType() const override { return s_type; }
+
+		static const uint32 s_type;
+		Entity m_entities[8];
+		float m_force;
+		int m_count;
+	};
+
+
 	struct LUMIX_RENDERER_API ForceModule : public ModuleBase
 	{
 		ForceModule(ParticleEmitter& emitter);
@@ -167,6 +182,7 @@ public:
 	ParticleEmitter(Entity entity, Universe& universe, IAllocator& allocator);
 	~ParticleEmitter();
 
+	void reset();
 	void drawGizmo(RenderScene& scene);
 	void serialize(OutputBlob& blob);
 	void deserialize(InputBlob& blob, ResourceManager& manager, bool has_version);

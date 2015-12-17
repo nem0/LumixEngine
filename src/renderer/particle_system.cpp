@@ -7,6 +7,7 @@
 #include "renderer/material.h"
 #include "renderer/render_scene.h"
 #include "universe/universe.h"
+#include <cmath>
 
 
 enum class ParticleEmitterVersion : int
@@ -22,31 +23,32 @@ namespace Lumix
 {
 
 
+template <typename T>
+static ParticleEmitter::ModuleBase* create(ParticleEmitter& emitter)
+{
+	return LUMIX_NEW(emitter.getAllocator(), T)(emitter);
+}
+
+
 static ParticleEmitter::ModuleBase* createModule(uint32 type, ParticleEmitter& emitter)
 {
-	if (type == ParticleEmitter::ForceModule::s_type)
+	typedef ParticleEmitter::ModuleBase* (*Creator)(ParticleEmitter& emitter);
+	static const struct { uint32 hash; Creator creator; } creators[] = {
+		{ ParticleEmitter::ForceModule::s_type, create<ParticleEmitter::ForceModule> },
+		{ ParticleEmitter::PlaneModule::s_type, create<ParticleEmitter::PlaneModule> },
+		{ ParticleEmitter::LinearMovementModule::s_type, create<ParticleEmitter::LinearMovementModule> },
+		{ ParticleEmitter::AlphaModule::s_type, create<ParticleEmitter::AlphaModule> },
+		{ ParticleEmitter::RandomRotationModule::s_type, create<ParticleEmitter::RandomRotationModule> },
+		{ ParticleEmitter::SizeModule::s_type, create<ParticleEmitter::SizeModule> },
+		{ ParticleEmitter::AttractorModule::s_type, create<ParticleEmitter::AttractorModule> }
+	};
+
+	for(auto& i : creators)
 	{
-		return LUMIX_NEW(emitter.getAllocator(), ParticleEmitter::ForceModule)(emitter);
-	}
-	if (type == ParticleEmitter::PlaneModule::s_type)
-	{
-		return LUMIX_NEW(emitter.getAllocator(), ParticleEmitter::PlaneModule)(emitter);
-	}
-	if (type == ParticleEmitter::LinearMovementModule::s_type)
-	{
-		return LUMIX_NEW(emitter.getAllocator(), ParticleEmitter::LinearMovementModule)(emitter);
-	}
-	if (type == ParticleEmitter::AlphaModule::s_type)
-	{
-		return LUMIX_NEW(emitter.getAllocator(), ParticleEmitter::AlphaModule)(emitter);
-	}
-	if (type == ParticleEmitter::RandomRotationModule::s_type)
-	{
-		return LUMIX_NEW(emitter.getAllocator(), ParticleEmitter::RandomRotationModule)(emitter);
-	}
-	if (type == ParticleEmitter::SizeModule::s_type)
-	{
-		return LUMIX_NEW(emitter.getAllocator(), ParticleEmitter::SizeModule)(emitter);
+		if(i.hash == type)
+		{
+			return i.creator(emitter);
+		}
 	}
 
 	return nullptr;
@@ -100,6 +102,68 @@ void ParticleEmitter::drawGizmo(RenderScene& scene)
 		module->drawGizmo(scene);
 	}
 }
+
+
+ParticleEmitter::AttractorModule::AttractorModule(ParticleEmitter& emitter)
+	: ModuleBase(emitter)
+	, m_force(0)
+{
+	m_count = 0;
+	for(auto& e : m_entities)
+	{
+		e = INVALID_ENTITY;
+	}
+}
+
+
+void ParticleEmitter::AttractorModule::update(float time_delta)
+{
+	if(m_emitter.m_alpha.empty()) return;
+
+	Vec3* LUMIX_RESTRICT particle_pos = &m_emitter.m_position[0];
+	Vec3* LUMIX_RESTRICT particle_vel = &m_emitter.m_velocity[0];
+
+	for(int i = 0; i < m_count; ++i)
+	{
+		auto entity = m_entities[i];
+		if(entity == INVALID_ENTITY) continue;
+		Vec3 pos = m_emitter.m_universe.getPosition(entity);
+
+		for(int i = m_emitter.m_position.size() - 1; i >= 0; --i)
+		{
+			Vec3 to_center = pos - particle_pos[i];
+			float dist2 = to_center.squaredLength();
+			to_center *= 1 / sqrt(dist2);
+			particle_vel[i] = particle_vel[i] + to_center * (m_force / dist2) * time_delta;
+		}
+	}
+}
+
+
+void ParticleEmitter::AttractorModule::serialize(OutputBlob& blob)
+{
+	blob.write(m_force);
+	blob.write(m_count);
+	for(int i = 0; i < m_count; ++i)
+	{
+		blob.write(m_entities[i]);
+	}
+}
+
+
+void ParticleEmitter::AttractorModule::deserialize(InputBlob& blob)
+{
+	blob.read(m_force);
+	blob.read(m_count);
+	for(int i = 0; i < m_count; ++i)
+	{
+		blob.read(m_entities[i]);
+	}
+}
+
+
+const uint32 ParticleEmitter::AttractorModule::s_type = Lumix::crc32("attractor");
+
 
 
 ParticleEmitter::PlaneModule::PlaneModule(ParticleEmitter& emitter)
@@ -437,6 +501,19 @@ ParticleEmitter::~ParticleEmitter()
 	{
 		LUMIX_DELETE(m_allocator, module);
 	}
+}
+
+
+void ParticleEmitter::reset()
+{
+	m_rel_life.clear();
+	m_life.clear();
+	m_size.clear();
+	m_position.clear();
+	m_velocity.clear();
+	m_alpha.clear();
+	m_rotation.clear();
+	m_rotational_speed.clear();
 }
 
 

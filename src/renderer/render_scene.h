@@ -183,6 +183,7 @@ public:
 	virtual const char* getCameraSlot(ComponentIndex camera) = 0;
 	virtual void setCameraSize(ComponentIndex camera, int w, int h) = 0;
 
+	virtual void resetParticleEmitter(ComponentIndex cmp) = 0;
 	virtual void drawEmitterGizmo(ComponentIndex cmp) = 0;
 	virtual void updateEmitter(ComponentIndex cmp, float time_delta) = 0;
 	virtual const Array<class ParticleEmitter*>& getParticleEmitters() const = 0;
@@ -217,6 +218,14 @@ public:
 	virtual void setParticleEmitterPlaneEntity(ComponentIndex cmp, int index, Entity entity) = 0;
 	virtual float getParticleEmitterPlaneBounce(ComponentIndex cmp) = 0;
 	virtual void setParticleEmitterPlaneBounce(ComponentIndex cmp, float value) = 0;
+
+	virtual int getParticleEmitterAttractorCount(ComponentIndex cmp) = 0;
+	virtual void addParticleEmitterAttractor(ComponentIndex cmp, int index) = 0;
+	virtual void removeParticleEmitterAttractor(ComponentIndex cmp, int index) = 0;
+	virtual Entity getParticleEmitterAttractorEntity(ComponentIndex cmp, int index) = 0;
+	virtual void setParticleEmitterAttractorEntity(ComponentIndex cmp, int index, Entity entity) = 0;
+	virtual float getParticleEmitterAttractorForce(ComponentIndex cmp) = 0;
+	virtual void setParticleEmitterAttractorForce(ComponentIndex cmp, float value) = 0;
 
 	virtual DelegateList<void(ComponentIndex)>& renderableCreated() = 0;
 	virtual DelegateList<void(ComponentIndex)>& renderableDestroyed() = 0;
