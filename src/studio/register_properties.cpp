@@ -248,6 +248,7 @@ void registerRendererProperties(Lumix::WorldEditor& editor)
 	PropertyRegister::registerComponentType("particle_emitter_fade", "Particle emitter - fade");
 	PropertyRegister::registerComponentType("particle_emitter_plane", "Particle emitter - plane");
 	PropertyRegister::registerComponentType("particle_emitter_force", "Particle emitter - force");
+	PropertyRegister::registerComponentType("particle_emitter_attractor", "Particle emitter - attractor");
 	PropertyRegister::registerComponentType(
 		"particle_emitter_linear_movement", "Particle emitter - linear movement");
 	PropertyRegister::registerComponentType(
@@ -283,6 +284,27 @@ void registerRendererProperties(Lumix::WorldEditor& editor)
 			editor,
 			allocator));
 	PropertyRegister::add("particle_emitter_plane", plane_module_planes);
+
+	PropertyRegister::add("particle_emitter_attractor",
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Force",
+		&RenderScene::getParticleEmitterAttractorForce,
+		&RenderScene::setParticleEmitterAttractorForce,
+		-FLT_MAX,
+		FLT_MAX,
+		0.01f,
+		allocator));
+	auto attractor_module_planes = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Attractors",
+		&RenderScene::getParticleEmitterAttractorCount,
+		&RenderScene::addParticleEmitterAttractor,
+		&RenderScene::removeParticleEmitterAttractor,
+		allocator);
+	attractor_module_planes->addChild(
+		LUMIX_NEW(allocator, EntityEnumPropertyDescriptor<RenderScene>)("Entity",
+		&RenderScene::getParticleEmitterAttractorEntity,
+		&RenderScene::setParticleEmitterAttractorEntity,
+		editor,
+		allocator));
+	PropertyRegister::add("particle_emitter_attractor", attractor_module_planes);
 
 	PropertyRegister::add("particle_emitter_fade",
 		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Alpha",

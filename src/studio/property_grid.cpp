@@ -382,6 +382,8 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 		getComponentTypeName(cmp), nullptr, true, true))
 		return;
 
+	ImGui::PushID(cmp.type);
+
 	if (!m_editor.canRemove(cmp))
 	{
 		ImGui::Text("Remove dependents first.");
@@ -390,6 +392,7 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 		StringBuilder<30>("Remove component##", cmp.type)))
 	{
 		m_editor.destroyComponent(cmp);
+		ImGui::PopID();
 		return;
 	}
 
@@ -415,6 +418,7 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 	{
 		onParticleEmitterGUI(cmp);
 	}
+	ImGui::PopID();
 }
 
 
@@ -490,6 +494,10 @@ void PropertyGrid::onParticleEmitterGUI(Lumix::ComponentUID cmp)
 		auto* scene = static_cast<Lumix::RenderScene*>(cmp.scene);
 		scene->updateEmitter(cmp.index, time_delta * m_particle_emitter_timescale);
 		scene->drawEmitterGizmo(cmp.index);
+		if(ImGui::Button("Reset"))
+		{
+			scene->resetParticleEmitter(cmp.index);
+		}
 	}
 }
 
