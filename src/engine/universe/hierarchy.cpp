@@ -28,7 +28,6 @@ public:
 		, m_parents(allocator)
 		, m_children(allocator)
 		, m_allocator(allocator)
-		, m_parent_set(allocator)
 		, m_system(system)
 	{
 		m_is_processing = false;
@@ -207,7 +206,6 @@ public:
 			inv_parent_matrix.inverse();
 			c.m_local_matrix = inv_parent_matrix * m_universe.getPositionAndRotation(child);
 		}
-		m_parent_set.invoke(child, parent);
 	}
 
 
@@ -251,9 +249,6 @@ public:
 	}
 
 
-	DelegateList<void(Entity, Entity)>& parentSet() override { return m_parent_set; }
-
-
 	Array<Child>* getChildren(Entity parent) override
 	{
 		Children::iterator iter = m_children.find(parent);
@@ -270,7 +265,6 @@ private:
 	Universe& m_universe;
 	Parents m_parents;
 	Children m_children;
-	DelegateList<void(Entity, Entity)> m_parent_set;
 	IPlugin& m_system;
 	bool m_is_processing;
 };
