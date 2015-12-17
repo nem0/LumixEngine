@@ -127,6 +127,7 @@ void ParticleEmitter::AttractorModule::update(float time_delta)
 	{
 		auto entity = m_entities[i];
 		if(entity == INVALID_ENTITY) continue;
+		if (!m_emitter.m_universe.hasEntity(entity)) continue;
 		Vec3 pos = m_emitter.m_universe.getPosition(entity);
 
 		for(int i = m_emitter.m_position.size() - 1; i >= 0; --i)
@@ -184,7 +185,8 @@ void ParticleEmitter::PlaneModule::drawGizmo(RenderScene& scene)
 	{
 		Entity entity = m_entities[i];
 		if (entity == INVALID_ENTITY) continue;
-		
+		if (!m_emitter.m_universe.hasEntity(entity)) continue;
+
 		Matrix mtx = m_emitter.m_universe.getMatrix(entity);
 		Vec3 pos = mtx.getTranslation();
 		Vec3 right = mtx.getXVector();
@@ -213,6 +215,7 @@ void ParticleEmitter::PlaneModule::update(float time_delta)
 	{
 		auto entity = m_entities[i];
 		if (entity == INVALID_ENTITY) continue;
+		if (!m_emitter.m_universe.hasEntity(entity)) continue;
 		Vec3 normal = m_emitter.m_universe.getRotation(entity) * Vec3(0, 1, 0);
 		float D = -dotProduct(normal, m_emitter.m_universe.getPosition(entity));
 
