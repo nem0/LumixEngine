@@ -245,6 +245,7 @@ void registerRendererProperties(Lumix::WorldEditor& editor)
 	PropertyRegister::registerComponentType("global_light", "Global light");
 	PropertyRegister::registerComponentType("renderable", "Mesh");
 	PropertyRegister::registerComponentType("particle_emitter", "Particle emitter");
+	PropertyRegister::registerComponentType("particle_emitter_spawn_shape", "Particle emitter - spawn shape");
 	PropertyRegister::registerComponentType("particle_emitter_fade", "Particle emitter - fade");
 	PropertyRegister::registerComponentType("particle_emitter_plane", "Particle emitter - plane");
 	PropertyRegister::registerComponentType("particle_emitter_force", "Particle emitter - force");
@@ -263,6 +264,15 @@ void registerRendererProperties(Lumix::WorldEditor& editor)
 		"particle_emitter_linear_movement", "particle_emitter");
 	PropertyRegister::registerComponentDependency(
 		"particle_emitter_random_rotation", "particle_emitter");
+
+	PropertyRegister::add("particle_emitter_spawn_shape",
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Radius",
+		&RenderScene::getParticleEmitterShapeRadius,
+		&RenderScene::setParticleEmitterShapeRadius,
+		0.0f,
+		FLT_MAX,
+		0.01f,
+		allocator));
 
 	PropertyRegister::add("particle_emitter_plane",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Bounce",

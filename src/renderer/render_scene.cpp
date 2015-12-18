@@ -48,6 +48,8 @@ static const uint32 PARTICLE_EMITTER_FORCE_HASH = crc32("particle_emitter_force"
 static const uint32 PARTICLE_EMITTER_ATTRACTOR_HASH = crc32("particle_emitter_attractor");
 static const uint32 PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH =
 	crc32("particle_emitter_linear_movement");
+static const uint32 PARTICLE_EMITTER_SPAWN_SHAPE_HASH =
+	crc32("particle_emitter_spawn_shape");
 static const uint32 PARTICLE_EMITTER_PLANE_HASH =
 	crc32("particle_emitter_plane");
 static const uint32 PARTICLE_EMITTER_RANDOM_ROTATION_HASH =
@@ -520,12 +522,17 @@ public:
 						m_universe.addComponent(
 							emitter->m_entity, PARTICLE_EMITTER_FADE_HASH, this, i);
 					}
-					else if(module->getType() == ParticleEmitter::ForceModule::s_type)
+					else if (module->getType() == ParticleEmitter::ForceModule::s_type)
 					{
 						m_universe.addComponent(
 							emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this, i);
 					}
-					else if(module->getType() == ParticleEmitter::AttractorModule::s_type)
+					else if (module->getType() == ParticleEmitter::SpawnShapeModule::s_type)
+					{
+						m_universe.addComponent(
+							emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_HASH, this, i);
+					}
+					else if (module->getType() == ParticleEmitter::AttractorModule::s_type)
 					{
 						m_universe.addComponent(
 							emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_HASH, this, i);
@@ -996,6 +1003,23 @@ public:
 	}
 
 
+	void destroyParticleEmitterSpawnShape(ComponentIndex component)
+	{
+		auto* emitter = m_particle_emitters[component];
+		for (auto* module : emitter->m_modules)
+		{
+			if (module->getType() == ParticleEmitter::SpawnShapeModule::s_type)
+			{
+				LUMIX_DELETE(m_allocator, module);
+				emitter->m_modules.eraseItem(module);
+				m_universe.destroyComponent(
+					emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_HASH, this, component);
+				break;
+			}
+		}
+	}
+
+
 	void destroyParticleEmitterRandomRotation(ComponentIndex component)
 	{
 		auto* emitter = m_particle_emitters[component];
@@ -1274,6 +1298,23 @@ public:
 		return INVALID_COMPONENT;
 	}
 	
+
+	ComponentIndex createParticleEmitterSpawnShape(Entity entity)
+	{
+		for (int i = 0; i < m_particle_emitters.size(); ++i)
+		{
+			auto* emitter = m_particle_emitters[i];
+			if (emitter->m_entity == entity)
+			{
+				auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SpawnShapeModule)(*emitter);
+				emitter->addModule(module);
+				m_universe.addComponent(entity, PARTICLE_EMITTER_SPAWN_SHAPE_HASH, this, i);
+				return i;
+			}
+		}
+		return INVALID_COMPONENT;
+	}
+
 
 	ComponentIndex createParticleEmitterFade(Entity entity)
 	{
@@ -2911,6 +2952,20 @@ public:
 	}
 
 
+	float getParticleEmitterShapeRadius(ComponentIndex cmp) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::SpawnShapeModule>(cmp);
+		return module ? module->m_radius : 0.0f;
+	}
+
+
+	void setParticleEmitterShapeRadius(ComponentIndex cmp, float value) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::SpawnShapeModule>(cmp);
+		if (module) module->m_radius = value;
+	}
+
+
 	int getParticleEmitterPlaneCount(ComponentIndex cmp) override
 	{
 		auto* module = getEmitterModule<ParticleEmitter::PlaneModule>(cmp);
@@ -3151,6 +3206,9 @@ static struct
 	{PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH,
 		&RenderSceneImpl::createParticleEmitterLinearMovement,
 		&RenderSceneImpl::destroyParticleEmitterLinearMovement},
+	{PARTICLE_EMITTER_SPAWN_SHAPE_HASH,
+		&RenderSceneImpl::createParticleEmitterSpawnShape,
+		&RenderSceneImpl::destroyParticleEmitterSpawnShape },
 	{PARTICLE_EMITTER_RANDOM_ROTATION_HASH,
 		&RenderSceneImpl::createParticleEmitterRandomRotation,
 		&RenderSceneImpl::destroyParticleEmitterRandomRotation},
