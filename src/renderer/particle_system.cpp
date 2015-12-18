@@ -13,6 +13,7 @@
 enum class ParticleEmitterVersion : int
 {
 	SPAWN_COUNT,
+	SIZE_ALPHA_SAVE,
 
 	LATEST,
 	INVALID
@@ -75,7 +76,7 @@ void ParticleEmitter::ForceModule::serialize(OutputBlob& blob)
 }
 
 
-void ParticleEmitter::ForceModule::deserialize(InputBlob& blob)
+void ParticleEmitter::ForceModule::deserialize(InputBlob& blob, int)
 {
 	blob.read(m_acceleration);
 }
@@ -153,7 +154,7 @@ void ParticleEmitter::AttractorModule::serialize(OutputBlob& blob)
 }
 
 
-void ParticleEmitter::AttractorModule::deserialize(InputBlob& blob)
+void ParticleEmitter::AttractorModule::deserialize(InputBlob& blob, int)
 {
 	blob.read(m_force);
 	blob.read(m_count);
@@ -244,7 +245,7 @@ void ParticleEmitter::PlaneModule::serialize(OutputBlob& blob)
 }
 
 
-void ParticleEmitter::PlaneModule::deserialize(InputBlob& blob)
+void ParticleEmitter::PlaneModule::deserialize(InputBlob& blob, int)
 {
 	blob.read(m_bounce);
 	blob.read(m_count);
@@ -273,12 +274,9 @@ void ParticleEmitter::SpawnShapeModule::spawnParticle(int index)
 	float r2 = m_radius * m_radius;
 	for (int i = 0; i < 10; ++i)
 	{
-		Vec3 v
-			(
+		Vec3 v(m_radius * (2 * rand() * INV - 1.0f),
 			m_radius * (2 * rand() * INV - 1.0f),
-			m_radius * (2 * rand() * INV - 1.0f),
-			m_radius * (2 * rand() * INV - 1.0f)
-			);
+			m_radius * (2 * rand() * INV - 1.0f));
 
 		if (v.squaredLength() < r2)
 		{
@@ -296,7 +294,7 @@ void ParticleEmitter::SpawnShapeModule::serialize(OutputBlob& blob)
 }
 
 
-void ParticleEmitter::SpawnShapeModule::deserialize(InputBlob& blob)
+void ParticleEmitter::SpawnShapeModule::deserialize(InputBlob& blob, int)
 {
 	blob.read(m_shape);
 	blob.read(m_radius);
@@ -328,7 +326,7 @@ void ParticleEmitter::LinearMovementModule::serialize(OutputBlob& blob)
 }
 
 
-void ParticleEmitter::LinearMovementModule::deserialize(InputBlob& blob)
+void ParticleEmitter::LinearMovementModule::deserialize(InputBlob& blob, int)
 {
 	blob.read(m_x);
 	blob.read(m_y);
@@ -354,6 +352,25 @@ ParticleEmitter::AlphaModule::AlphaModule(ParticleEmitter& emitter)
 	m_values[6].set(-0.2f, 0.0f);
 	m_values[7].set(1, 0);
 	m_values[8].set(0.2f, 0);
+	sample();
+}
+
+
+void ParticleEmitter::AlphaModule::serialize(OutputBlob& blob)
+{
+	blob.write(m_values.size());
+	blob.write(&m_values[0], sizeof(m_values[0]) * m_values.size());
+}
+
+
+void ParticleEmitter::AlphaModule::deserialize(InputBlob& blob, int version)
+{
+	if (version <= (int)ParticleEmitterVersion::SIZE_ALPHA_SAVE) return;
+
+	int size;
+	blob.read(size);
+	m_values.resize(size);
+	blob.read(&m_values[0], sizeof(m_values[0]) * m_values.size());
 	sample();
 }
 
@@ -424,18 +441,37 @@ ParticleEmitter::SizeModule::SizeModule(ParticleEmitter& emitter)
 }
 
 
+void ParticleEmitter::SizeModule::serialize(OutputBlob& blob)
+{
+	blob.write(m_values.size());
+	blob.write(&m_values[0], sizeof(m_values[0]) * m_values.size());
+}
+
+
+void ParticleEmitter::SizeModule::deserialize(InputBlob& blob, int version)
+{
+	if (version <= (int)ParticleEmitterVersion::SIZE_ALPHA_SAVE) return;
+
+	int size;
+	blob.read(size);
+	m_values.resize(size);
+	blob.read(&m_values[0], sizeof(m_values[0]) * m_values.size());
+	sample();
+}
+
+
 void ParticleEmitter::SizeModule::sample()
 {
 	m_sampled.resize(20);
 	auto sampleAt = [this](float t) {
-		for (int i = 0; i < m_values.size(); ++i)
+		for (int i = 1; i < m_values.size(); i += 3)
 		{
 			if (m_values[i].x > t)
 			{
-				if (i == 0) return 0.0f;
+				if (i == 1) return 0.0f;
 
-				float r = (t - m_values[i - 1].x) / (m_values[i].x - m_values[i - 1].x);
-				return m_values[i - 1].y + r * (m_values[i].y - m_values[i - 1].y);
+				float r = (t - m_values[i - 3].x) / (m_values[i].x - m_values[i - 3].x);
+				return m_values[i - 3].y + r * (m_values[i].y - m_values[i - 3].y);
 			}
 		}
 
@@ -687,7 +723,7 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager, boo
 		blob.read(type);
 		auto* module = createModule(type, *this);
 		m_modules.push(module);
-		module->deserialize(blob);
+		module->deserialize(blob, version);
 	}
 }
 

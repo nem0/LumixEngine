@@ -67,7 +67,7 @@ public:
 		virtual void destoryParticle(int /*index*/) {}
 		virtual void update(float /*time_delta*/) {}
 		virtual void serialize(OutputBlob& blob) = 0;
-		virtual void deserialize(InputBlob& blob) = 0;
+		virtual void deserialize(InputBlob& blob, int version) = 0;
 		virtual uint32 getType() const = 0;
 		virtual void drawGizmo(RenderScene& scene) {}
 
@@ -80,7 +80,7 @@ public:
 		SpawnShapeModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob& blob) override;
-		void deserialize(InputBlob& blob) override;
+		void deserialize(InputBlob& blob, int version) override;
 		uint32 getType() const override { return s_type; }
 
 		static const uint32 s_type;
@@ -99,7 +99,7 @@ public:
 		LinearMovementModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob& blob) override;
-		void deserialize(InputBlob& blob) override;
+		void deserialize(InputBlob& blob, int version) override;
 		uint32 getType() const override { return s_type; }
 
 		static const uint32 s_type;
@@ -113,7 +113,7 @@ public:
 	{
 		PlaneModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
-		void deserialize(InputBlob& blob) override;
+		void deserialize(InputBlob& blob, int version) override;
 		void update(float time_delta) override;
 		uint32 getType() const override { return s_type; }
 		void drawGizmo(RenderScene& scene) override;
@@ -129,7 +129,7 @@ public:
 	{
 		AttractorModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
-		void deserialize(InputBlob& blob) override;
+		void deserialize(InputBlob& blob, int version) override;
 		void update(float time_delta) override;
 		uint32 getType() const override { return s_type; }
 
@@ -144,7 +144,7 @@ public:
 	{
 		ForceModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
-		void deserialize(InputBlob& blob) override;
+		void deserialize(InputBlob& blob, int version) override;
 		void update(float time_delta) override;
 		uint32 getType() const override { return s_type; }
 
@@ -157,8 +157,8 @@ public:
 	{
 		AlphaModule(ParticleEmitter& emitter);
 		void update(float time_delta) override;
-		void serialize(OutputBlob&) override {}
-		void deserialize(InputBlob&) override {}
+		void serialize(OutputBlob&) override;
+		void deserialize(InputBlob&, int) override;
 		uint32 getType() const override { return s_type; }
 		void sample();
 
@@ -173,8 +173,8 @@ public:
 	{
 		SizeModule(ParticleEmitter& emitter);
 		void update(float time_delta) override;
-		void serialize(OutputBlob&) override {}
-		void deserialize(InputBlob&) override {}
+		void serialize(OutputBlob&) override;
+		void deserialize(InputBlob&, int) override;
 		uint32 getType() const override { return s_type; }
 		void sample();
 
@@ -190,7 +190,7 @@ public:
 		RandomRotationModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob&) override {}
-		void deserialize(InputBlob&) override {}
+		void deserialize(InputBlob&, int) override {}
 		uint32 getType() const override { return s_type; }
 
 		static const uint32 s_type;
