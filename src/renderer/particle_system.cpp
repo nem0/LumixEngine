@@ -40,7 +40,8 @@ static ParticleEmitter::ModuleBase* createModule(uint32 type, ParticleEmitter& e
 		{ ParticleEmitter::AlphaModule::s_type, create<ParticleEmitter::AlphaModule> },
 		{ ParticleEmitter::RandomRotationModule::s_type, create<ParticleEmitter::RandomRotationModule> },
 		{ ParticleEmitter::SizeModule::s_type, create<ParticleEmitter::SizeModule> },
-		{ ParticleEmitter::AttractorModule::s_type, create<ParticleEmitter::AttractorModule> }
+		{ ParticleEmitter::AttractorModule::s_type, create<ParticleEmitter::AttractorModule> },
+		{ ParticleEmitter::SpawnShapeModule::s_type, create<ParticleEmitter::SpawnShapeModule> }
 	};
 
 	for(auto& i : creators)
@@ -255,6 +256,54 @@ void ParticleEmitter::PlaneModule::deserialize(InputBlob& blob)
 
 
 const uint32 ParticleEmitter::PlaneModule::s_type = Lumix::crc32("plane");
+
+
+ParticleEmitter::SpawnShapeModule::SpawnShapeModule(ParticleEmitter& emitter)
+	: ModuleBase(emitter)
+	, m_radius(1.0f)
+	, m_shape(SPHERE)
+{
+}
+
+
+void ParticleEmitter::SpawnShapeModule::spawnParticle(int index)
+{
+	static const float INV = 1.0f / RAND_MAX;
+	// ugly and ~0.1% from uniform distribution, but still faster than the correct solution
+	float r2 = m_radius * m_radius;
+	for (int i = 0; i < 10; ++i)
+	{
+		Vec3 v
+			(
+			m_radius * (2 * rand() * INV - 1.0f),
+			m_radius * (2 * rand() * INV - 1.0f),
+			m_radius * (2 * rand() * INV - 1.0f)
+			);
+
+		if (v.squaredLength() < r2)
+		{
+			m_emitter.m_position[index] += v;
+			return;
+		}
+	}
+}
+
+
+void ParticleEmitter::SpawnShapeModule::serialize(OutputBlob& blob)
+{
+	blob.write(m_shape);
+	blob.write(m_radius);
+}
+
+
+void ParticleEmitter::SpawnShapeModule::deserialize(InputBlob& blob)
+{
+	blob.read(m_shape);
+	blob.read(m_radius);
+}
+
+
+const uint32 ParticleEmitter::SpawnShapeModule::s_type = Lumix::crc32("spawn_shape");
 
 
 ParticleEmitter::LinearMovementModule::LinearMovementModule(ParticleEmitter& emitter)

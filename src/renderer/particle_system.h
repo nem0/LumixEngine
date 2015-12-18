@@ -75,6 +75,25 @@ public:
 	};
 
 
+	struct LUMIX_RENDERER_API SpawnShapeModule : public ModuleBase
+	{
+		SpawnShapeModule(ParticleEmitter& emitter);
+		void spawnParticle(int index) override;
+		void serialize(OutputBlob& blob) override;
+		void deserialize(InputBlob& blob) override;
+		uint32 getType() const override { return s_type; }
+
+		static const uint32 s_type;
+		enum Shape : uint8
+		{
+			SPHERE
+		};
+		float m_radius;
+		Shape m_shape;
+	};
+
+
+
 	struct LUMIX_RENDERER_API LinearMovementModule : public ModuleBase
 	{
 		LinearMovementModule(ParticleEmitter& emitter);

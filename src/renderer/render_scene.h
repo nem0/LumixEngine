@@ -218,6 +218,8 @@ public:
 	virtual void setParticleEmitterPlaneEntity(ComponentIndex cmp, int index, Entity entity) = 0;
 	virtual float getParticleEmitterPlaneBounce(ComponentIndex cmp) = 0;
 	virtual void setParticleEmitterPlaneBounce(ComponentIndex cmp, float value) = 0;
+	virtual float getParticleEmitterShapeRadius(ComponentIndex cmp) = 0;
+	virtual void setParticleEmitterShapeRadius(ComponentIndex cmp, float value) = 0;
 
 	virtual int getParticleEmitterAttractorCount(ComponentIndex cmp) = 0;
 	virtual void addParticleEmitterAttractor(ComponentIndex cmp, int index) = 0;
