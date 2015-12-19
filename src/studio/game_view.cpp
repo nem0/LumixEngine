@@ -91,7 +91,7 @@ void GameView::onGui()
 
 	auto& io = ImGui::GetIO();
 
-	bool is_foreground_win = PlatformInterface::isForegroundWindow();
+	bool is_foreground_win = PlatformInterface::isWindowActive();
 	if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] ||
 								   !m_editor->isGameMode() || !is_foreground_win))
 	{
