@@ -420,7 +420,7 @@ bool CurvePoint(ImVec2* points, CurveEditor& editor)
 			transform(editor.prev_point + editor.prev_tangent),
 			transform(editor.prev_point),
 			col_base,
-			1.0f);
+			1.0f, 20);
 	}
 	editor.prev_point = p;
 	editor.prev_tangent = right_tangent;
