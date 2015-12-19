@@ -2,6 +2,7 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/math_utils.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "renderer/material.h"
@@ -337,6 +338,41 @@ void ParticleEmitter::LinearMovementModule::deserialize(InputBlob& blob, int)
 const uint32 ParticleEmitter::LinearMovementModule::s_type = Lumix::crc32("linear_movement");
 
 
+static void sampleBezier(float max_life, const Array<Vec2>& values, Array<float>& sampled)
+{
+	ASSERT(values.size() >= 6);
+	ASSERT(values[values.size() - 2].x - values[1].x > 0);
+
+	static const int SAMPLES_PER_SECOND = 10;
+	sampled.resize(int(max_life * SAMPLES_PER_SECOND));
+
+	float x_range = values[values.size() - 2].x - values[1].x;
+	int last_idx = 0;
+	for (int i = 1; i < values.size() - 3; i += 3)
+	{
+		int step_count = int(5 * sampled.size() * ((values[i + 3].x - values[i].x) / x_range));
+		float t_step = 1.0f / (float)step_count;
+		for (int i_step = 1; i_step <= step_count; i_step++)
+		{
+			float t = t_step * i_step;
+			float u = 1.0f - t;
+			float w1 = u * u * u;
+			float w2 = 3 * u * u * t;
+			float w3 = 3 * u * t * t;
+			float w4 = t * t * t;
+			auto p = values[i] * (w1 + w2) + values[i + 1] * w2 + values[i + 2] * w3 +
+					 values[i + 3] * (w3 + w4);
+			int idx = int(sampled.size() * ((p.x - values[1].x) / x_range));
+			ASSERT(idx <= last_idx + 1);
+			last_idx = idx;
+			sampled[idx >= sampled.size() ? sampled.size() - 1 : idx] = p.y;
+		}
+	}
+	sampled[0] = values[0].y;
+	sampled.back() = values[values.size() - 2].y;
+}
+
+
 ParticleEmitter::AlphaModule::AlphaModule(ParticleEmitter& emitter)
 	: ModuleBase(emitter)
 	, m_values(emitter.getAllocator())
@@ -377,26 +413,7 @@ void ParticleEmitter::AlphaModule::deserialize(InputBlob& blob, int version)
 
 void ParticleEmitter::AlphaModule::sample()
 {
-	m_sampled.resize(20);
-	auto sampleAt = [this](float t) {
-		for(int i = 1; i < m_values.size(); i += 3)
-		{
-			if(m_values[i].x > t)
-			{
-				if(i == 1) return 0.0f;
-
-				float r = (t - m_values[i - 3].x) / (m_values[i].x - m_values[i - 3].x);
-				return m_values[i - 3].y + r * (m_values[i].y - m_values[i - 3].y);
-			}
-		}
-
-		return 0.0f;
-	};
-
-	for(int i = 0; i < m_sampled.size(); ++i)
-	{
-		m_sampled[i] = sampleAt(i / (float)m_sampled.size());
-	}
+	sampleBezier(m_emitter.m_initial_life.to, m_values, m_sampled);
 }
 
 
@@ -462,26 +479,7 @@ void ParticleEmitter::SizeModule::deserialize(InputBlob& blob, int version)
 
 void ParticleEmitter::SizeModule::sample()
 {
-	m_sampled.resize(20);
-	auto sampleAt = [this](float t) {
-		for (int i = 1; i < m_values.size(); i += 3)
-		{
-			if (m_values[i].x > t)
-			{
-				if (i == 1) return 0.0f;
-
-				float r = (t - m_values[i - 3].x) / (m_values[i].x - m_values[i - 3].x);
-				return m_values[i - 3].y + r * (m_values[i].y - m_values[i - 3].y);
-			}
-		}
-
-		return 0.0f;
-	};
-
-	for (int i = 0; i < m_sampled.size(); ++i)
-	{
-		m_sampled[i] = sampleAt(i / (float)m_sampled.size());
-	}
+	sampleBezier(m_emitter.m_initial_life.to, m_values, m_sampled);
 }
 
 
@@ -500,6 +498,7 @@ void ParticleEmitter::SizeModule::update(float)
 		int next_idx = Math::minValue(idx + 1, size);
 		float w = float_idx - idx;
 		particle_size[i] = m_sampled[idx] * (1 - w) + m_sampled[next_idx] * w;
+		PROFILE_INT("Test", int(particle_size[i] * 1000));
 	}
 }
 
