@@ -9,6 +9,7 @@
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
+#include "settings.h"
 
 
 static const char* WINDOW_NAME = "Scene view";
@@ -227,6 +228,11 @@ void SceneView::onGUI()
 				bool b = m_pipeline->getParameter(i);
 				if (ImGui::Checkbox(m_pipeline->getParameterName(i), &b))
 				{
+					auto* settings = Settings::getInstance();
+					if (settings)
+					{
+						settings->setValue(m_pipeline->getParameterName(i), b);
+					}
 					m_pipeline->setParameter(i, b);
 				}
 			}

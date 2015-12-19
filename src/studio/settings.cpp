@@ -10,6 +10,7 @@
 
 
 static const char SETTINGS_PATH[] = "studio.ini";
+static Settings* g_instance = nullptr;
 
 
 static void shortcutInput(int& shortcut)
@@ -76,9 +77,11 @@ static int getInteger(lua_State* L, const char* name, int default_value)
 }
 
 
-Settings::Settings()
+Settings::Settings(Lumix::IAllocator& allocator)
+	: m_allocator(allocator)
 {
-	m_allocator = nullptr;
+	ASSERT(!g_instance);
+	g_instance = this;
 	m_filter[0] = 0;
 	m_is_maximized = true;
 	m_window.x = m_window.y = 0;
@@ -96,14 +99,24 @@ Settings::Settings()
 	m_is_crash_reporting_enabled = true;
 
 	m_autosave_time = 300;
+
+	m_state = luaL_newstate();
+	luaL_openlibs(m_state);
+	lua_newtable(m_state);
+	lua_setglobal(m_state, "custom");
+}
+
+
+Settings::~Settings()
+{
+	g_instance = nullptr;
+	lua_close(m_state);
 }
 
 
 bool Settings::load(Action** actions, int actions_count)
 {
-	lua_State* L = luaL_newstate();
-	luaL_openlibs(L);
-
+	auto L = m_state;
 	bool errors = luaL_loadfile(L, SETTINGS_PATH) != LUA_OK;
 	errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
 	if (errors)
@@ -158,24 +171,58 @@ bool Settings::load(Action** actions, int actions_count)
 		}
 	}
 	lua_pop(L, 1);
-
-	lua_close(L);
 	return true;
 }
 
 
-void Settings::setAllocator(Lumix::IAllocator* allocator)
+void Settings::setValue(const char* name, bool value)
 {
-	m_allocator = allocator;
+	lua_getglobal(m_state, "custom");
+	lua_pushboolean(m_state, value);
+	lua_setfield(m_state, -2, name);
+}
+
+
+void Settings::setValue(const char* name, int value)
+{
+	lua_getglobal(m_state, "custom");
+	lua_pushinteger(m_state, value);
+	lua_setfield(m_state, -2, name);
+}
+
+
+int Settings::getIntValue(const char* name) const
+{
+	lua_getglobal(m_state, "custom");
+	int v = getIntegerField(m_state, name, 0);
+	lua_pop(m_state, 1);
+	return v;
+}
+
+
+bool Settings::getBoolValue(const char* name) const
+{
+	bool v = 0;
+	lua_getglobal(m_state, "custom");
+	if (lua_getfield(m_state, -1, name) == LUA_TNUMBER)
+	{
+		v = lua_toboolean(m_state, -1) != 0;
+	}
+	lua_pop(m_state, 1);
+	return v;
+}
+
+
+Settings* Settings::getInstance()
+{
+	return g_instance;
 }
 
 
 bool Settings::save(Action** actions, int actions_count)
 {
-	ASSERT(m_allocator);
-
 	Lumix::FS::OsFile file;
-	if (!file.open(SETTINGS_PATH, Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE, *m_allocator)) return false;
+	if (!file.open(SETTINGS_PATH, Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE, m_allocator)) return false;
 
 	file << "window = { x = " << m_window.x 
 		<< ", y = " << m_window.y 
@@ -201,6 +248,27 @@ bool Settings::save(Action** actions, int actions_count)
 	writeBool("clip_manager_opened", m_is_clip_manager_opened);
 	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
 	file << "autosave_time = " << m_autosave_time << "\n";
+
+	file << "custom = {";
+	lua_getglobal(m_state, "custom");
+	lua_pushnil(m_state);
+	while (lua_next(m_state, -2))
+	{
+		const char* name = lua_tostring(m_state, -2);
+		switch (lua_type(m_state, -1))
+		{
+			case LUA_TBOOLEAN:
+				file << name << " = " << (lua_toboolean(m_state, -1) != 0 ? "true" : "false");
+				break;
+			case LUA_TNUMBER:
+				file << name << " = " << (int)lua_tonumber(m_state, -1);
+				break;
+		}
+		file << "\n";
+		lua_pop(m_state, 1);
+	}
+	lua_pop(m_state, 1);
+	file << "}\n";
 
 	file << "actions = {\n";
 	for (int i = 0; i < actions_count; ++i)
