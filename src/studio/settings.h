@@ -1,6 +1,7 @@
 #pragma once
 
 
+
 namespace Lumix
 {
 	class IAllocator;
@@ -8,6 +9,7 @@ namespace Lumix
 
 
 struct Action;
+struct lua_State;
 
 
 struct Settings
@@ -40,15 +42,22 @@ struct Settings
 
 	int m_autosave_time;
 
-	Settings();
+	Settings(Lumix::IAllocator& allocator);
+	~Settings();
+
+	static Settings* getInstance();
 
 	bool save(Action** actions, int actions_count);
 	bool load(Action** actions, int actions_count);
 	void onGUI(Action** actions, int actions_count);
-	void setAllocator(Lumix::IAllocator* allocator);
+	void setValue(const char* name, bool value);
+	void setValue(const char* name, int value);
+	int getIntValue(const char* name) const;
+	bool getBoolValue(const char* name) const;
 
 private:
-	Lumix::IAllocator* m_allocator;
+	Lumix::IAllocator& m_allocator;
+	lua_State* m_state;
 
 private:
 	void showShortcutSettings(Action** actions, int actions_count);

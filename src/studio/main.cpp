@@ -68,8 +68,8 @@ public:
 		, m_is_welcome_screen_opened(true)
 		, m_shader_editor(nullptr)
 		, m_editor(nullptr)
+		, m_settings(m_allocator)
 	{
-		m_settings.setAllocator(&m_allocator);
 		m_entity_list_search[0] = '\0';
 		m_template_name[0] = '\0';
 		m_clip_manager_filter[0] = '\0';
