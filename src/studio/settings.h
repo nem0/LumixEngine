@@ -52,8 +52,8 @@ struct Settings
 	void onGUI(Action** actions, int actions_count);
 	void setValue(const char* name, bool value);
 	void setValue(const char* name, int value);
-	int getIntValue(const char* name) const;
-	bool getBoolValue(const char* name) const;
+	int getValue(const char* name, int default_value) const;
+	bool getValue(const char* name, bool default_value) const;
 
 private:
 	Lumix::IAllocator& m_allocator;

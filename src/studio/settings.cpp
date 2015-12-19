@@ -191,20 +191,20 @@ void Settings::setValue(const char* name, int value)
 }
 
 
-int Settings::getIntValue(const char* name) const
+int Settings::getValue(const char* name, int default_value) const
 {
 	lua_getglobal(m_state, "custom");
-	int v = getIntegerField(m_state, name, 0);
+	int v = getIntegerField(m_state, name, default_value);
 	lua_pop(m_state, 1);
 	return v;
 }
 
 
-bool Settings::getBoolValue(const char* name) const
+bool Settings::getValue(const char* name, bool default_value) const
 {
-	bool v = 0;
+	bool v = default_value;
 	lua_getglobal(m_state, "custom");
-	if (lua_getfield(m_state, -1, name) == LUA_TNUMBER)
+	if (lua_getfield(m_state, -1, name) == LUA_TBOOLEAN)
 	{
 		v = lua_toboolean(m_state, -1) != 0;
 	}
@@ -249,11 +249,13 @@ bool Settings::save(Action** actions, int actions_count)
 	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
 	file << "autosave_time = " << m_autosave_time << "\n";
 
-	file << "custom = {";
+	file << "custom = {\n";
 	lua_getglobal(m_state, "custom");
 	lua_pushnil(m_state);
+	bool first = true;
 	while (lua_next(m_state, -2))
 	{
+		if (!first) file << ",\n";
 		const char* name = lua_tostring(m_state, -2);
 		switch (lua_type(m_state, -1))
 		{
@@ -263,9 +265,12 @@ bool Settings::save(Action** actions, int actions_count)
 			case LUA_TNUMBER:
 				file << name << " = " << (int)lua_tonumber(m_state, -1);
 				break;
+			default:
+				ASSERT(false);
+				break;
 		}
-		file << "\n";
 		lua_pop(m_state, 1);
+		first = false;
 	}
 	lua_pop(m_state, 1);
 	file << "}\n";

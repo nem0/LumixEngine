@@ -53,6 +53,15 @@ void SceneView::onUniverseCreated()
 {
 	auto* scene = m_editor->getScene(Lumix::crc32("renderer"));
 	m_pipeline->setScene(static_cast<Lumix::RenderScene*>(scene));
+	auto* settings = Settings::getInstance();
+	if (!settings) return;
+
+	int count = m_pipeline->getParameterCount();
+	for (int i = 0; i < count; ++i)
+	{
+		bool b = settings->getValue(m_pipeline->getParameterName(i), m_pipeline->getParameter(i));
+		m_pipeline->setParameter(i, b);
+	}
 }
 
 
