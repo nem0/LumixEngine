@@ -2826,8 +2826,7 @@ public:
 				break;
 			}
 		}
-		if (getUniverse()->hasEntity(cmp.entity) &&
-			getComponents(cmp.entity).empty())
+		if (getUniverse()->hasEntity(cmp.entity) && !getComponents(cmp.entity).empty())
 		{
 			EditorIcon* er = LUMIX_NEW(m_allocator, EditorIcon)(*this,
 				*static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene),
