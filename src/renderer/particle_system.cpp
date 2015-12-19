@@ -17,7 +17,7 @@ enum class ParticleEmitterVersion : int
 	SIZE_ALPHA_SAVE,
 
 	LATEST,
-	INVALID
+	INVALID = -1
 };
 
 
