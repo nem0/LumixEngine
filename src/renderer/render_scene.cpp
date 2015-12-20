@@ -1632,8 +1632,7 @@ public:
 		infos.reserve(m_terrains.size());
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
-			if (m_terrains[i] &&
-				(m_terrains[i]->getLayerMask() & layer_mask) != 0)
+			if (m_terrains[i] && (m_terrains[i]->getLayerMask() & layer_mask) != 0)
 			{
 				m_terrains[i]->getInfos(infos, camera_pos, frame_allocator);
 			}

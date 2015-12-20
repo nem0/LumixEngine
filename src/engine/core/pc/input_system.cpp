@@ -1,5 +1,6 @@
 #include "core/input_system.h"
 #include "core/associative_array.h"
+#include "core/profiler.h"
 #include "core/string.h"
 
 #include "core/pc/simple_win.h"
@@ -62,6 +63,7 @@ namespace Lumix
 
 		void update(float) override
 		{
+			PROFILE_FUNCTION();
 			m_mouse_rel_x = 0;
 			m_mouse_rel_y = 0;
 			for (int i = 0; i < XUSER_MAX_COUNT; ++i)

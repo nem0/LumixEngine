@@ -32,6 +32,7 @@ static void doCulling(int start_index,
 	PROFILE_FUNCTION();
 	int i = start_index;
 	ASSERT(results.empty());
+	PROFILE_INT("objects", int(end - start));
 	for (const Sphere *sphere = start; sphere <= end; sphere++, ++i)
 	{
 		if (frustum->isSphereInside(sphere->m_position, sphere->m_radius) &&

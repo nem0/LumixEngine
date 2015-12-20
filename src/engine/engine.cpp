@@ -236,9 +236,12 @@ public:
 		}
 		dt = m_timer->tick();
 		m_last_time_delta = dt;
-		for (int i = 0; i < context.m_scenes.size(); ++i)
 		{
-			context.m_scenes[i]->update(dt);
+			PROFILE_BLOCK("update scenes");
+			for (int i = 0; i < context.m_scenes.size(); ++i)
+			{
+				context.m_scenes[i]->update(dt);
+			}
 		}
 		m_plugin_manager->update(dt);
 		m_input_system->update(dt);

@@ -621,16 +621,16 @@ void Terrain::serialize(OutputBlob& serializer)
 
 void Terrain::getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos, LIFOAllocator& allocator)
 {
-	if (m_root)
-	{
-		Matrix matrix = m_scene.getUniverse().getMatrix(m_entity);
-		Matrix inv_matrix = matrix;
-		inv_matrix.fastInverse();
-		Vec3 local_camera_pos = inv_matrix.multiplyPosition(camera_pos);
-		local_camera_pos.x /= m_scale.x;
-		local_camera_pos.z /= m_scale.z;
-		m_root->getInfos(infos, local_camera_pos, this, matrix, allocator);
-	}
+	if (!m_root) return;
+	if (!m_material || !m_material->isReady()) return;
+
+	Matrix matrix = m_scene.getUniverse().getMatrix(m_entity);
+	Matrix inv_matrix = matrix;
+	inv_matrix.fastInverse();
+	Vec3 local_camera_pos = inv_matrix.multiplyPosition(camera_pos);
+	local_camera_pos.x /= m_scale.x;
+	local_camera_pos.z /= m_scale.z;
+	m_root->getInfos(infos, local_camera_pos, this, matrix, allocator);
 }
 
 
