@@ -324,7 +324,7 @@ public:
 
 private:
 	IAllocator& m_allocator;
-	FreeList<CullingJob, 8> m_job_allocator;
+	FreeList<CullingJob, 16> m_job_allocator;
 	InputSpheres m_spheres;
 	Results m_result;
 	LayerMasks m_layer_masks;

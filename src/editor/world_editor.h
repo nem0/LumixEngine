@@ -174,6 +174,7 @@ public:
 	virtual void registerEditorCommandCreator(const char* command_type,
 											  EditorCommandCreator) = 0;
 	virtual bool isGameMode() const = 0;
+	virtual class EntityGroups& getEntityGroups() = 0;
 
 protected:
 	virtual ~WorldEditor() {}
