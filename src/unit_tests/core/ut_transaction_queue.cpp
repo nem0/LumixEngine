@@ -155,9 +155,9 @@ namespace
 
 		for (size_t i = 0; i < itemsCount; i++)
 		{
-			LUMIX_EXPECT_EQ(testItems[i].idx, i);
-			LUMIX_EXPECT_EQ(testItems[i].proc_count, 1);
-			LUMIX_EXPECT_NE(testItems[i].thread_id, Lumix::MT::getCurrentThreadID());
+			LUMIX_EXPECT(testItems[i].idx == i);
+			LUMIX_EXPECT(testItems[i].proc_count == 1);
+			LUMIX_EXPECT(testItems[i].thread_id != Lumix::MT::getCurrentThreadID());
 		}
 
 		allocator.deallocate(testItems);
@@ -202,9 +202,9 @@ namespace
 
 		for (size_t i = 0; i < itemsCount; i++)
 		{
-			LUMIX_EXPECT_EQ(testItems[i].idx, i);
-			LUMIX_EXPECT_EQ(testItems[i].proc_count, 1);
-			LUMIX_EXPECT_NE(testItems[i].thread_id, Lumix::MT::getCurrentThreadID());
+			LUMIX_EXPECT(testItems[i].idx == i);
+			LUMIX_EXPECT(testItems[i].proc_count == 1);
+			LUMIX_EXPECT(testItems[i].thread_id != Lumix::MT::getCurrentThreadID());
 		}
 
 		allocator.deallocate(testItems);

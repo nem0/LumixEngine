@@ -63,42 +63,42 @@ void UT_material_manager(const char* params)
 	Lumix::Resource* texture_tga3 =
 		texture_manager.get(Lumix::Path(texture_test_tga));
 
-	LUMIX_EXPECT_NOT_NULL(texture_tga1);
-	LUMIX_EXPECT_NOT_NULL(texture_tga2);
-	LUMIX_EXPECT_NOT_NULL(texture_tga3);
+	LUMIX_EXPECT(!texture_tga1);
+	LUMIX_EXPECT(!texture_tga2);
+	LUMIX_EXPECT(!texture_tga3);
 
-	LUMIX_EXPECT_EQ(texture_tga1, texture_tga2);
-	LUMIX_EXPECT_EQ(texture_tga2, texture_tga3);
+	LUMIX_EXPECT(texture_tga1 == texture_tga2);
+	LUMIX_EXPECT(texture_tga2 == texture_tga3);
 
-	LUMIX_EXPECT_FALSE(texture_tga1->isEmpty());
-	LUMIX_EXPECT_FALSE(texture_tga1->isReady());
-	LUMIX_EXPECT_FALSE(texture_tga1->isFailure());
+	LUMIX_EXPECT(!texture_tga1->isEmpty());
+	LUMIX_EXPECT(!texture_tga1->isReady());
+	LUMIX_EXPECT(!texture_tga1->isFailure());
 
-	LUMIX_EXPECT_EQ(0, texture_tga1->size());
+	LUMIX_EXPECT(0 == texture_tga1->size());
 
 	waitForFinishLoading(texture_tga1, file_system);
 
-	LUMIX_EXPECT_FALSE(texture_tga1->isEmpty());
-	LUMIX_EXPECT_TRUE(texture_tga1->isReady());
-	LUMIX_EXPECT_FALSE(texture_tga1->isFailure());
+	LUMIX_EXPECT(!texture_tga1->isEmpty());
+	LUMIX_EXPECT(texture_tga1->isReady());
+	LUMIX_EXPECT(!texture_tga1->isFailure());
 
-	LUMIX_EXPECT_EQ(texture_test_tga_size, texture_tga1->size());
+	LUMIX_EXPECT(texture_test_tga_size == texture_tga1->size());
 
 	Lumix::g_log_info.log("unit") << "unloading ...";
 
 	texture_manager.unload(Lumix::Path(texture_test_tga));
 
-	LUMIX_EXPECT_FALSE(texture_tga1->isEmpty());
-	LUMIX_EXPECT_TRUE(texture_tga1->isReady());
-	LUMIX_EXPECT_FALSE(texture_tga1->isFailure());
+	LUMIX_EXPECT(!texture_tga1->isEmpty());
+	LUMIX_EXPECT(texture_tga1->isReady());
+	LUMIX_EXPECT(!texture_tga1->isFailure());
 
 	texture_manager.unload(*texture_tga2);
 
-	LUMIX_EXPECT_TRUE(texture_tga1->isEmpty());
-	LUMIX_EXPECT_FALSE(texture_tga1->isReady());
-	LUMIX_EXPECT_FALSE(texture_tga1->isFailure());
+	LUMIX_EXPECT(texture_tga1->isEmpty());
+	LUMIX_EXPECT(texture_tga1->isReady());
+	LUMIX_EXPECT(!texture_tga1->isFailure());
 
-	LUMIX_EXPECT_EQ(0, texture_tga1->size());
+	LUMIX_EXPECT(0 == texture_tga1->size());
 
 	Lumix::g_log_info.log("unit") << "loading ...";
 
@@ -106,45 +106,45 @@ void UT_material_manager(const char* params)
 	texture_manager.load(*texture_tga2);
 	texture_manager.load(*texture_tga3);
 
-	LUMIX_EXPECT_FALSE(texture_tga1->isEmpty());
-	LUMIX_EXPECT_FALSE(texture_tga1->isReady());
-	LUMIX_EXPECT_FALSE(texture_tga1->isFailure());
+	LUMIX_EXPECT(!texture_tga1->isEmpty());
+	LUMIX_EXPECT(!texture_tga1->isReady());
+	LUMIX_EXPECT(!texture_tga1->isFailure());
 
 	waitForFinishLoading(texture_tga1, file_system);
 
-	LUMIX_EXPECT_FALSE(texture_tga1->isEmpty());
-	LUMIX_EXPECT_TRUE(texture_tga1->isReady());
-	LUMIX_EXPECT_FALSE(texture_tga1->isFailure());
+	LUMIX_EXPECT(!texture_tga1->isEmpty());
+	LUMIX_EXPECT(texture_tga1->isReady());
+	LUMIX_EXPECT(!texture_tga1->isFailure());
 
-	LUMIX_EXPECT_EQ(texture_test_tga_size, texture_tga1->size());
+	LUMIX_EXPECT(texture_test_tga_size == texture_tga1->size());
 
 
 	Lumix::g_log_info.log("unit") << "force unloading ...";
 
 	texture_manager.forceUnload(Lumix::Path(texture_test_tga));
 
-	LUMIX_EXPECT_TRUE(texture_tga1->isEmpty());
-	LUMIX_EXPECT_FALSE(texture_tga1->isReady());
-	LUMIX_EXPECT_FALSE(texture_tga1->isFailure());
+	LUMIX_EXPECT(texture_tga1->isEmpty());
+	LUMIX_EXPECT(!texture_tga1->isReady());
+	LUMIX_EXPECT(!texture_tga1->isFailure());
 
-	LUMIX_EXPECT_EQ(0, texture_tga1->size());
+	LUMIX_EXPECT(0 == texture_tga1->size());
 
 	Lumix::Resource* texture_fail =
 		texture_manager.load(Lumix::Path(texture_test_failure));
 
-	LUMIX_EXPECT_NOT_NULL(texture_fail);
+	LUMIX_EXPECT(!texture_fail);
 
-	LUMIX_EXPECT_FALSE(texture_fail->isEmpty());
-	LUMIX_EXPECT_FALSE(texture_fail->isReady());
-	LUMIX_EXPECT_FALSE(texture_fail->isFailure());
+	LUMIX_EXPECT(!texture_fail->isEmpty());
+	LUMIX_EXPECT(!texture_fail->isReady());
+	LUMIX_EXPECT(!texture_fail->isFailure());
 
-	LUMIX_EXPECT_EQ(0, texture_fail->size());
+	LUMIX_EXPECT(0 == texture_fail->size());
 
 	waitForFinishLoading(texture_fail, file_system);
 
-	LUMIX_EXPECT_FALSE(texture_fail->isEmpty());
-	LUMIX_EXPECT_FALSE(texture_fail->isReady());
-	LUMIX_EXPECT_TRUE(texture_fail->isFailure());
+	LUMIX_EXPECT(!texture_fail->isEmpty());
+	LUMIX_EXPECT(!texture_fail->isReady());
+	LUMIX_EXPECT(texture_fail->isFailure());
 
 	texture_manager.unload(*texture_fail);
 	texture_manager.destroy();
@@ -185,78 +185,78 @@ void UT_animation_manager(const char* params)
 	Lumix::Resource* animation_2 =
 		animation_manager.get(Lumix::Path(anim_test));
 
-	LUMIX_EXPECT_NOT_NULL(animation_1);
-	LUMIX_EXPECT_NOT_NULL(animation_2);
+	LUMIX_EXPECT(animation_1 != nullptr);
+	LUMIX_EXPECT(animation_2 != nullptr);
 
-	LUMIX_EXPECT_EQ(animation_1, animation_2);
+	LUMIX_EXPECT(animation_1 == animation_2);
 
-	LUMIX_EXPECT_TRUE(animation_1->isEmpty());
-	LUMIX_EXPECT_FALSE(animation_1->isReady());
-	LUMIX_EXPECT_FALSE(animation_1->isFailure());
+	LUMIX_EXPECT(animation_1->isEmpty());
+	LUMIX_EXPECT(!animation_1->isReady());
+	LUMIX_EXPECT(!animation_1->isFailure());
 
-	LUMIX_EXPECT_EQ(0, animation_1->size());
+	LUMIX_EXPECT(0 == animation_1->size());
 
 	waitForFinishLoading(animation_1, file_system);
 
-	LUMIX_EXPECT_FALSE(animation_2->isEmpty());
-	LUMIX_EXPECT_TRUE(animation_2->isReady());
-	LUMIX_EXPECT_FALSE(animation_2->isFailure());
+	LUMIX_EXPECT(!animation_2->isEmpty());
+	LUMIX_EXPECT(animation_2->isReady());
+	LUMIX_EXPECT(!animation_2->isFailure());
 
-	LUMIX_EXPECT_EQ(anim_test_size, animation_2->size());
+	LUMIX_EXPECT(anim_test_size == animation_2->size());
 
 	Lumix::g_log_info.log("unit") << "unloading ...";
 
 	animation_manager.unload(*animation_2);
 
-	LUMIX_EXPECT_TRUE(animation_1->isEmpty());
-	LUMIX_EXPECT_FALSE(animation_1->isReady());
-	LUMIX_EXPECT_FALSE(animation_1->isFailure());
+	LUMIX_EXPECT(animation_1->isEmpty());
+	LUMIX_EXPECT(!animation_1->isReady());
+	LUMIX_EXPECT(!animation_1->isFailure());
 
-	LUMIX_EXPECT_EQ(0, animation_1->size());
+	LUMIX_EXPECT(0 == animation_1->size());
 
 	Lumix::g_log_info.log("unit") << "loading ...";
 
 	animation_manager.load(*animation_1);
 	animation_manager.load(*animation_2);
 
-	LUMIX_EXPECT_TRUE(animation_1->isEmpty());
-	LUMIX_EXPECT_FALSE(animation_1->isReady());
-	LUMIX_EXPECT_FALSE(animation_1->isFailure());
+	LUMIX_EXPECT(animation_1->isEmpty());
+	LUMIX_EXPECT(!animation_1->isReady());
+	LUMIX_EXPECT(!animation_1->isFailure());
 
 	waitForFinishLoading(animation_1, file_system);
 
-	LUMIX_EXPECT_FALSE(animation_1->isEmpty());
-	LUMIX_EXPECT_TRUE(animation_1->isReady());
-	LUMIX_EXPECT_FALSE(animation_1->isFailure());
+	LUMIX_EXPECT(!animation_1->isEmpty());
+	LUMIX_EXPECT(animation_1->isReady());
+	LUMIX_EXPECT(!animation_1->isFailure());
 
-	LUMIX_EXPECT_EQ(anim_test_size, animation_1->size());
+	LUMIX_EXPECT(anim_test_size == animation_1->size());
 
 	Lumix::g_log_info.log("unit") << "force unloading ...";
 
 	animation_manager.forceUnload(*animation_2);
 
-	LUMIX_EXPECT_TRUE(animation_2->isEmpty());
-	LUMIX_EXPECT_FALSE(animation_2->isReady());
-	LUMIX_EXPECT_FALSE(animation_2->isFailure());
+	LUMIX_EXPECT(animation_2->isEmpty());
+	LUMIX_EXPECT(!animation_2->isReady());
+	LUMIX_EXPECT(!animation_2->isFailure());
 
-	LUMIX_EXPECT_EQ(0, animation_2->size());
+	LUMIX_EXPECT(0 == animation_2->size());
 
 	Lumix::Resource* animation_fail =
 		animation_manager.load(Lumix::Path(anim_test_failure));
 
-	LUMIX_EXPECT_NOT_NULL(animation_fail);
+	LUMIX_EXPECT(animation_fail != nullptr);
 
-	LUMIX_EXPECT_TRUE(animation_fail->isEmpty());
-	LUMIX_EXPECT_FALSE(animation_fail->isReady());
-	LUMIX_EXPECT_FALSE(animation_fail->isFailure());
+	LUMIX_EXPECT(animation_fail->isEmpty());
+	LUMIX_EXPECT(!animation_fail->isReady());
+	LUMIX_EXPECT(!animation_fail->isFailure());
 
-	LUMIX_EXPECT_EQ(0, animation_fail->size());
+	LUMIX_EXPECT(0 == animation_fail->size());
 
 	waitForFinishLoading(animation_fail, file_system);
 
-	LUMIX_EXPECT_FALSE(animation_fail->isEmpty());
-	LUMIX_EXPECT_FALSE(animation_fail->isReady());
-	LUMIX_EXPECT_TRUE(animation_fail->isFailure());
+	LUMIX_EXPECT(!animation_fail->isEmpty());
+	LUMIX_EXPECT(!animation_fail->isReady());
+	LUMIX_EXPECT(animation_fail->isFailure());
 
 	animation_manager.unload(*animation_fail);
 	animation_manager.destroy();
@@ -299,13 +299,13 @@ void UT_failure_reload(const char* params)
 			file_system->open(file_system->getDefaultDevice(),
 							  anim_test_valid,
 							  Lumix::FS::Mode::OPEN_AND_READ);
-		LUMIX_EXPECT_NOT_NULL(valid_file);
+		LUMIX_EXPECT(valid_file != nullptr);
 
 		Lumix::FS::IFile* error_file = file_system->open(
 			file_system->getDefaultDevice(),
 			anim_test_fail,
 			Lumix::FS::Mode::OPEN_OR_CREATE | Lumix::FS::Mode::WRITE);
-		LUMIX_EXPECT_NOT_NULL(error_file);
+		LUMIX_EXPECT(error_file != nullptr);
 
 		size_t size = valid_file->size();
 		valid_file->read(buffer, size);
@@ -319,32 +319,32 @@ void UT_failure_reload(const char* params)
 	Lumix::Resource* animation =
 		animation_manager.load(Lumix::Path(anim_test_fail));
 
-	LUMIX_EXPECT_NOT_NULL(animation);
+	LUMIX_EXPECT(animation != nullptr);
 
-	LUMIX_EXPECT_TRUE(animation->isEmpty());
-	LUMIX_EXPECT_FALSE(animation->isReady());
-	LUMIX_EXPECT_FALSE(animation->isFailure());
+	LUMIX_EXPECT(animation->isEmpty());
+	LUMIX_EXPECT(!animation->isReady());
+	LUMIX_EXPECT(!animation->isFailure());
 
-	LUMIX_EXPECT_EQ(0, animation->size());
+	LUMIX_EXPECT(0 == animation->size());
 
 	waitForFinishLoading(animation, file_system);
 
-	LUMIX_EXPECT_FALSE(animation->isEmpty());
-	LUMIX_EXPECT_TRUE(animation->isReady());
-	LUMIX_EXPECT_FALSE(animation->isFailure());
+	LUMIX_EXPECT(!animation->isEmpty());
+	LUMIX_EXPECT(animation->isReady());
+	LUMIX_EXPECT(!animation->isFailure());
 
 	{
 		Lumix::FS::IFile* invalid_file =
 			file_system->open(file_system->getDefaultDevice(),
 							  anim_test_invalid,
 							  Lumix::FS::Mode::OPEN_AND_READ);
-		LUMIX_EXPECT_NOT_NULL(invalid_file);
+		LUMIX_EXPECT(invalid_file != nullptr);
 
 		Lumix::FS::IFile* error_file = file_system->open(
 			file_system->getDefaultDevice(),
 			anim_test_fail,
 			Lumix::FS::Mode::OPEN_OR_CREATE | Lumix::FS::Mode::WRITE);
-		LUMIX_EXPECT_NOT_NULL(error_file);
+		LUMIX_EXPECT(error_file != nullptr);
 
 		size_t size = invalid_file->size();
 		invalid_file->read(buffer, size);
@@ -359,22 +359,22 @@ void UT_failure_reload(const char* params)
 
 	waitForFinishLoading(animation, file_system);
 
-	LUMIX_EXPECT_FALSE(animation->isEmpty());
-	LUMIX_EXPECT_FALSE(animation->isReady());
-	LUMIX_EXPECT_TRUE(animation->isFailure());
+	LUMIX_EXPECT(!animation->isEmpty());
+	LUMIX_EXPECT(!animation->isReady());
+	LUMIX_EXPECT(animation->isFailure());
 
 	{
 		Lumix::FS::IFile* valid_file =
 			file_system->open(file_system->getDefaultDevice(),
 							  anim_test_valid,
 							  Lumix::FS::Mode::OPEN_AND_READ);
-		LUMIX_EXPECT_NOT_NULL(valid_file);
+		LUMIX_EXPECT(valid_file != nullptr);
 
 		Lumix::FS::IFile* error_file = file_system->open(
 			file_system->getDefaultDevice(),
 			anim_test_fail,
 			Lumix::FS::Mode::OPEN_OR_CREATE | Lumix::FS::Mode::WRITE);
-		LUMIX_EXPECT_NOT_NULL(error_file);
+		LUMIX_EXPECT(error_file != nullptr);
 
 		size_t size = valid_file->size();
 		valid_file->read(buffer, size);
@@ -389,9 +389,9 @@ void UT_failure_reload(const char* params)
 
 	waitForFinishLoading(animation, file_system);
 
-	LUMIX_EXPECT_FALSE(animation->isEmpty());
-	LUMIX_EXPECT_TRUE(animation->isReady());
-	LUMIX_EXPECT_FALSE(animation->isFailure());
+	LUMIX_EXPECT(!animation->isEmpty());
+	LUMIX_EXPECT(animation->isReady());
+	LUMIX_EXPECT(!animation->isFailure());
 
 	animation_manager.unload(*animation);
 	animation_manager.destroy();
