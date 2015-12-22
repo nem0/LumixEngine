@@ -23,6 +23,7 @@
 #include "core/system.h"
 #include "core/timer.h"
 #include "debug/debug.h"
+#include "editor/entity_groups.h"
 #include "editor/editor_icon.h"
 #include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
@@ -1870,14 +1871,17 @@ public:
 
 		OutputBlob blob(m_allocator);
 		blob.reserve(m_universe_context->m_universe->getEntityCount() * 100);
-		uint32 hash = 0;
-		blob.write(hash);
-		blob.write(hash);
-		uint32 engine_hash = m_engine->serialize(*m_universe_context, blob);
-		(*(((uint32*)blob.getData()) + 1)) = engine_hash;
+
+		Header header = {0xffffFFFF, (int)SerializedVersion::LATEST, 0, 0};
+		blob.write(header);
+		int hashed_offset = sizeof(header);
+
+		header.engine_hash = m_engine->serialize(*m_universe_context, blob);
 		m_template_system->serialize(blob);
-		hash = crc32((const uint8*)blob.getData() + sizeof(hash), blob.getSize() - sizeof(hash));
-		(*(uint32*)blob.getData()) = hash;
+		m_entity_groups.serialize(blob);
+		header.hash = crc32((const uint8*)blob.getData() + hashed_offset, blob.getSize() - hashed_offset);
+		*(Header*)blob.getData() = header;
+
 		g_log_info.log("editor") << "universe saved";
 		file.write(blob.getData(), blob.getSize());
 	}
@@ -2383,6 +2387,26 @@ public:
 		g_log_info.log("editor") << "Universe created.";
 	}
 
+
+	enum class SerializedVersion : int
+	{
+		ENTITY_GROUPS,
+
+		LATEST
+	};
+
+
+	#pragma pack(1)
+		struct Header
+		{
+			uint32 magic;
+			int version;
+			uint32 hash;
+			uint32 engine_hash;
+		};
+	#pragma pack()
+
+
 	void load(FS::IFile& file)
 	{
 		m_is_loading = true;
@@ -2394,9 +2418,22 @@ public:
 		InputBlob blob(file.getBuffer(), (int)file.size());
 		uint32 hash = 0;
 		blob.read(hash);
-		uint32 engine_hash = 0;
-		blob.read(engine_hash);
-		if (crc32((const uint8*)blob.getData() + sizeof(hash), blob.getSize() - sizeof(hash)) !=
+		Header header;
+		header.version = -1;
+		int hashed_offset = sizeof(hash);
+		if(hash == 0xFFFFffff)
+		{
+			blob.rewind();
+			blob.read(header);
+			hashed_offset = sizeof(header);
+			hash = header.hash;
+		}
+		else
+		{
+			uint32 engine_hash = 0;
+			blob.read(engine_hash);
+		}
+		if (crc32((const uint8*)blob.getData() + hashed_offset, blob.getSize() - hashed_offset) !=
 			hash)
 		{
 			Timer::destroy(timer);
@@ -2408,6 +2445,14 @@ public:
 		if (m_engine->deserialize(*m_universe_context, blob))
 		{
 			m_template_system->deserialize(blob);
+			if(header.version > (int)SerializedVersion::ENTITY_GROUPS)
+			{
+				m_entity_groups.deserialize(blob);
+			}
+			else
+			{
+				m_entity_groups.allEntitiesToDefault();
+			}
 			auto* render_scene = static_cast<RenderScene*>(getScene(crc32("renderer")));
 
 			m_camera = render_scene->getCameraEntity(render_scene->getCameraInSlot("editor"));
@@ -2551,6 +2596,7 @@ public:
 		, m_is_orbit(false)
 		, m_gizmo_use_step(false)
 		, m_is_additive_selection(false)
+		, m_entity_groups(m_allocator)
 	{
 		PropertyRegister::init(m_allocator);
 		m_go_to_parameters.m_is_active = false;
@@ -2643,6 +2689,12 @@ public:
 	const Array<Entity>& getSelectedEntities() const override
 	{
 		return m_selected_entities;
+	}
+
+
+	EntityGroups& getEntityGroups() override
+	{
+		return m_entity_groups;
 	}
 
 
@@ -2855,6 +2907,7 @@ public:
 	{
 		if (m_is_game_mode) stopGameMode();
 
+		m_entity_groups.setUniverse(nullptr);
 		ASSERT(m_universe_context);
 		destroyUndoStack();
 		m_universe_destroyed.invoke();
@@ -2966,6 +3019,7 @@ public:
 
 		m_selected_entities.clear();
 		m_universe_created.invoke();
+		m_entity_groups.setUniverse(universe);
 
 		if (create_basic_entities)
 		{
@@ -3233,6 +3287,7 @@ private:
 	OutputBlob m_copy_buffer;
 	bool m_is_loading;
 	UniverseContext* m_universe_context;
+	EntityGroups m_entity_groups;
 };
 
 

@@ -16,6 +16,7 @@
 #include "core/timer.h"
 #include "debug/debug.h"
 #include "editor/gizmo.h"
+#include "editor/entity_groups.h"
 #include "editor/entity_template_system.h"
 #include "editor/world_editor.h"
 #include "engine.h"
@@ -70,7 +71,6 @@ public:
 		, m_editor(nullptr)
 		, m_settings(m_allocator)
 	{
-		m_entity_list_search[0] = '\0';
 		m_template_name[0] = '\0';
 		m_clip_manager_filter[0] = '\0';
 	}
@@ -682,58 +682,94 @@ public:
 
 		if (ImGui::Begin("Entity list", &m_is_entity_list_opened))
 		{
-			if (ImGui::Button("Create entity"))
-			{
-				m_editor->addEntity();
-			}
 			auto* universe = m_editor->getUniverse();
 			int scroll_to = -1;
 
-			if (ImGui::InputText("Search", m_entity_list_search, sizeof(m_entity_list_search)))
+			auto& groups = m_editor->getEntityGroups();
+			static char group_name[20] = "";
+			ImGui::InputText("New group name", group_name, Lumix::lengthOf(group_name));
+			if(ImGui::Button("Create group"))
 			{
-				for (int i = 0, c = universe->getEntityCount(); i < c; ++i)
+				if(group_name[0] == 0)
 				{
-					static char buf[1024];
-					auto entity = universe->getEntityFromDenseIdx(i);
-					getEntityListDisplayName(*m_editor, buf, sizeof(buf), entity);
-					if (Lumix::stristr(buf, m_entity_list_search) != nullptr)
-					{
-						scroll_to = i;
-						break;
-					}
+					Lumix::g_log_error.log("editor") << "Group name can not be empty";
 				}
+				else if(groups.getGroup(group_name) != -1)
+				{
+					Lumix::g_log_error.log("editor") << "Group with name " << group_name << " already exists";
+				}
+				else
+				{
+					groups.createGroup(group_name);
+				}
+				group_name[0] = 0;
 			}
 			ImGui::Separator();
 
-			struct ListBoxData
+			for(int i = 0; i < groups.getGroupCount(); ++i)
 			{
-				Lumix::WorldEditor* m_editor;
-				Lumix::Universe* universe;
-				char buffer[1024];
-				static bool itemsGetter(void* data, int idx, const char** txt)
+				auto* name = groups.getGroupName(i);
+				if(ImGui::TreeNode(name, "%s (%d)", name, groups.getGroupEntitiesCount(i)))
 				{
-					auto* d = static_cast<ListBoxData*>(data);
-					auto entity = d->universe->getEntityFromDenseIdx(idx);
-					getEntityListDisplayName(*d->m_editor, d->buffer, sizeof(d->buffer), entity);
-					*txt = d->buffer;
-					return true;
+					struct ListBoxData
+					{
+						Lumix::WorldEditor* m_editor;
+						Lumix::Universe* universe;
+						Lumix::EntityGroups* groups;
+						int group;
+						char buffer[1024];
+						static bool itemsGetter(void* data, int idx, const char** txt)
+						{
+							auto* d = static_cast<ListBoxData*>(data);
+							auto* entities = d->groups->getGroupEntities(d->group);
+							getEntityListDisplayName(*d->m_editor, d->buffer, sizeof(d->buffer), entities[idx]);
+							*txt = d->buffer;
+							return true;
+						}
+					};
+					ListBoxData data;
+					data.universe = universe;
+					data.m_editor = m_editor;
+					data.group = i;
+					data.groups = &groups;
+					int current_item = -1;
+					if(ImGui::ListBox("Entities",
+						&current_item,
+						&ListBoxData::itemsGetter,
+						&data,
+						groups.getGroupEntitiesCount(i),
+						15))
+					{
+						auto e = groups.getGroupEntities(i)[current_item];
+						m_editor->selectEntities(&e, 1);
+					};
+
+					if(groups.getGroupCount() == 1)
+					{
+						ImGui::Text("Can not delete - at least one group must exists");
+					}
+					else if(ImGui::Button("Delete group"))
+					{
+						groups.deleteGroup(i);
+					}
+
+					if(ImGui::Button("Select all entities in group"))
+					{
+						m_editor->selectEntities(groups.getGroupEntities(i), groups.getGroupEntitiesCount(i));
+					}
+
+					if(ImGui::Button("Assign selected entities to group"))
+					{
+						auto& selected = m_editor->getSelectedEntities();
+						for(auto e : selected)
+						{
+							groups.setGroup(e, i);
+						}
+					}
+
+					ImGui::TreePop();
 				}
-			};
-			ListBoxData data;
-			data.universe = universe;
-			data.m_editor = m_editor;
-			static int current_item;
-			if (ImGui::ListBox("Entities",
-					&current_item,
-					scroll_to,
-					&ListBoxData::itemsGetter,
-					&data,
-					universe->getEntityCount(),
-					15))
-			{
-				auto e = universe->getEntityFromDenseIdx(current_item);
-				m_editor->selectEntities(&e, 1);
-			};
+			}
 		}
 		ImGui::End();
 	}
@@ -851,6 +887,8 @@ public:
 
 		texture->create(width, height, pixels);
 		m_material->setTexture(0, texture);
+
+		ImGui::GetStyle().WindowFillAlphaDefault = 1.0f;
 	}
 
 
@@ -1342,7 +1380,6 @@ public:
 	Settings m_settings;
 	Metadata m_metadata;
 	ShaderEditor* m_shader_editor;
-	char m_entity_list_search[100];
 	char m_template_name[100];
 
 	bool m_finished;

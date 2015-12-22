@@ -347,8 +347,7 @@ public:
 	}
 
 
-	bool deserialize(UniverseContext& ctx,
-							 InputBlob& serializer) override
+	bool deserialize(UniverseContext& ctx, InputBlob& serializer) override
 	{
 		SerializedEngineHeader header;
 		serializer.read(header);
