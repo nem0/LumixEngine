@@ -81,7 +81,7 @@ namespace
 		queue.abort();
 		testTaskConsumer.destroy();
 
-		LUMIX_EXPECT_EQ(RUN_COUNT, testTaskConsumer.getSum());
+		LUMIX_EXPECT(RUN_COUNT == testTaskConsumer.getSum());
 	};
 }
 

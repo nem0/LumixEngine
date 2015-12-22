@@ -37,23 +37,23 @@ void UT_json_serializer(const char* params)
 		Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::READ, "", allocator);
 		serializer.deserializeObjectBegin();
 
-		LUMIX_EXPECT_FALSE(serializer.isObjectEnd());
-		LUMIX_EXPECT_FALSE(serializer.isArrayEnd());
+		LUMIX_EXPECT(!serializer.isObjectEnd());
+		LUMIX_EXPECT(!serializer.isArrayEnd());
 
 		serializer.deserializeArrayBegin("array");
-		LUMIX_EXPECT_FALSE(serializer.isObjectEnd());
+		LUMIX_EXPECT(!serializer.isObjectEnd());
 		int ar[3];
 		serializer.deserializeArrayItem(ar[0], -1);
-		LUMIX_EXPECT_FALSE(serializer.isObjectEnd());
-		LUMIX_EXPECT_FALSE(serializer.isArrayEnd());
+		LUMIX_EXPECT(!serializer.isObjectEnd());
+		LUMIX_EXPECT(!serializer.isArrayEnd());
 		serializer.deserializeArrayItem(ar[1], -1);
-		LUMIX_EXPECT_FALSE(serializer.isObjectEnd());
-		LUMIX_EXPECT_FALSE(serializer.isArrayEnd());
+		LUMIX_EXPECT(!serializer.isObjectEnd());
+		LUMIX_EXPECT(!serializer.isArrayEnd());
 		serializer.deserializeArrayItem(ar[2], -1);
-		LUMIX_EXPECT_EQ(ar[0], 10);
-		LUMIX_EXPECT_EQ(ar[1], 20);
-		LUMIX_EXPECT_EQ(ar[2], 30);
-		LUMIX_EXPECT_TRUE(serializer.isArrayEnd());
+		LUMIX_EXPECT(ar[0] == 10);
+		LUMIX_EXPECT(ar[1] == 20);
+		LUMIX_EXPECT(ar[2] == 30);
+		LUMIX_EXPECT(serializer.isArrayEnd());
 		
 		serializer.deserializeArrayEnd();
 
@@ -62,28 +62,28 @@ void UT_json_serializer(const char* params)
 		serializer.deserializeObjectBegin();
 		bool b;
 		serializer.deserialize("bool", b, true);
-		LUMIX_EXPECT_EQ(b, false);
+		LUMIX_EXPECT(!b);
 
 		int i;
 		serializer.deserialize("int", i, -1);
-		LUMIX_EXPECT_EQ(i, 1);
+		LUMIX_EXPECT(i == 1);
 
 		float f;
 		serializer.deserialize("float", f, -1);
-		LUMIX_EXPECT_EQ(f, 2);
+		LUMIX_EXPECT(f == 2);
 
 		char str[100];
 		serializer.deserialize("const_char", str, sizeof(str), "");
-		LUMIX_EXPECT_EQ(Lumix::compareString(str , "some string"), 0);
-		LUMIX_EXPECT_TRUE(serializer.isObjectEnd());
+		LUMIX_EXPECT(Lumix::compareString(str , "some string") == 0);
+		LUMIX_EXPECT(serializer.isObjectEnd());
 
 		serializer.deserializeObjectEnd();
 
-		LUMIX_EXPECT_TRUE(serializer.isObjectEnd());
+		LUMIX_EXPECT(serializer.isObjectEnd());
 
 		serializer.deserializeObjectEnd();
 
-		LUMIX_EXPECT_FALSE(serializer.isError());
+		LUMIX_EXPECT(!serializer.isError());
 	}
 
 	device.destroyFile(file);

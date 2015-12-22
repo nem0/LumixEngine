@@ -75,7 +75,7 @@ namespace
 				const Lumix::CullingSystem::Subresults& subresult = result[i];
 				for (int j = 0; j < subresult.size(); ++j)
 				{
-					LUMIX_EXPECT_TRUE(subresult[i] < 6);
+					LUMIX_EXPECT(subresult[i] < 6);
 				}
 			}
 
@@ -126,7 +126,7 @@ namespace
 				const Lumix::CullingSystem::Subresults& subresult = result[i];
 				for (int j = 0; j < subresult.size(); ++j)
 				{
-					LUMIX_EXPECT_TRUE(subresult[i] < 6);
+					LUMIX_EXPECT(subresult[i] < 6);
 				}
 			}
 

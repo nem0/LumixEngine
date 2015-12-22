@@ -8,11 +8,11 @@ namespace
 	{
 		Lumix::DefaultAllocator allocator;
 		Lumix::Universe universe(allocator);
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), 0);
-		LUMIX_EXPECT_FALSE(universe.hasEntity(-1));
-		LUMIX_EXPECT_FALSE(universe.hasEntity(0));
-		LUMIX_EXPECT_FALSE(universe.hasEntity(1));
-		LUMIX_EXPECT_FALSE(universe.hasEntity(100));
+		LUMIX_EXPECT(universe.getEntityCount() == 0);
+		LUMIX_EXPECT(!universe.hasEntity(-1));
+		LUMIX_EXPECT(!universe.hasEntity(0));
+		LUMIX_EXPECT(!universe.hasEntity(1));
+		LUMIX_EXPECT(!universe.hasEntity(100));
 
 		static const int ENTITY_COUNT = 5;
 
@@ -21,44 +21,44 @@ namespace
 		Lumix::Entity entities[ENTITY_COUNT];
 		for (int i = 0; i < ENTITY_COUNT; ++i)
 		{
-			LUMIX_EXPECT_EQ(universe.getEntityCount(), i);
+			LUMIX_EXPECT(universe.getEntityCount() == i);
 			entities[i] = universe.createEntity(p, r);
 		}
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), ENTITY_COUNT);
+		LUMIX_EXPECT(universe.getEntityCount() == ENTITY_COUNT);
 		universe.destroyEntity(entities[4]);
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), ENTITY_COUNT-1);
+		LUMIX_EXPECT(universe.getEntityCount() == ENTITY_COUNT-1);
 		entities[4] = universe.createEntity(p, r);
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), ENTITY_COUNT);
+		LUMIX_EXPECT(universe.getEntityCount() == ENTITY_COUNT);
 
 		universe.destroyEntity(entities[3]);
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), ENTITY_COUNT-1);
+		LUMIX_EXPECT(universe.getEntityCount() == ENTITY_COUNT-1);
 		entities[3] = universe.createEntity(p, r);
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), ENTITY_COUNT);
+		LUMIX_EXPECT(universe.getEntityCount() == ENTITY_COUNT);
 
 		universe.destroyEntity(entities[3]);
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), ENTITY_COUNT-1);
+		LUMIX_EXPECT(universe.getEntityCount() == ENTITY_COUNT-1);
 		universe.destroyEntity(entities[4]);
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), ENTITY_COUNT-2);
+		LUMIX_EXPECT(universe.getEntityCount() == ENTITY_COUNT-2);
 		entities[3] = universe.createEntity(p, r);
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), ENTITY_COUNT-1);
+		LUMIX_EXPECT(universe.getEntityCount() == ENTITY_COUNT-1);
 		entities[4] = universe.createEntity(p, r);
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), ENTITY_COUNT);
+		LUMIX_EXPECT(universe.getEntityCount() == ENTITY_COUNT);
 
 		universe.destroyEntity(entities[4]);
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), ENTITY_COUNT-1);
+		LUMIX_EXPECT(universe.getEntityCount() == ENTITY_COUNT-1);
 		universe.destroyEntity(entities[3]);
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), ENTITY_COUNT-2);
+		LUMIX_EXPECT(universe.getEntityCount() == ENTITY_COUNT-2);
 		entities[3] = universe.createEntity(p, r);
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), ENTITY_COUNT-1);
+		LUMIX_EXPECT(universe.getEntityCount() == ENTITY_COUNT-1);
 		entities[4] = universe.createEntity(p, r);
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), ENTITY_COUNT);
+		LUMIX_EXPECT(universe.getEntityCount() == ENTITY_COUNT);
 
 		universe.destroyEntity(entities[0]);
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), ENTITY_COUNT-1);
+		LUMIX_EXPECT(universe.getEntityCount() == ENTITY_COUNT-1);
 		universe.destroyEntity(entities[0]);
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), ENTITY_COUNT-1);
+		LUMIX_EXPECT(universe.getEntityCount() == ENTITY_COUNT-1);
 		entities[0] = universe.createEntity(p, r);
-		LUMIX_EXPECT_EQ(universe.getEntityCount(), ENTITY_COUNT);
+		LUMIX_EXPECT(universe.getEntityCount() == ENTITY_COUNT);
 
 		for (int i = 0; i < ENTITY_COUNT; ++i)
 		{
@@ -91,7 +91,7 @@ namespace
 		for (int i = 0; i < 5; ++i)
 		{
 			universe.destroyEntity(entities[i]);
-			LUMIX_EXPECT_EQ(universe.getEntityCount(), 4 - i);
+			LUMIX_EXPECT(universe.getEntityCount() == 4 - i);
 		}
 	}
 } // anonymous namespace
