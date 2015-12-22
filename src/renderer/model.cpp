@@ -375,7 +375,7 @@ bool Model::parseBones(FS::IFile& file)
 		{
 			return false;
 		}
-		file.read(tmp, len);
+		file.read(tmp, len + 1);
 		tmp[len] = 0;
 		b.name = tmp;
 		m_bone_map.insert(crc32(b.name.c_str()), m_bones.size() - 1);
@@ -384,9 +384,16 @@ bool Model::parseBones(FS::IFile& file)
 		{
 			return false;
 		}
-		file.read(tmp, len);
-		tmp[len] = 0;
-		b.parent = tmp;
+		if(len > 0)
+		{
+			file.read(tmp, len);
+			tmp[len] = 0;
+			b.parent = tmp;
+		}
+		else
+		{
+			b.parent = "";
+		}
 		file.read(&b.position.x, sizeof(float) * 3);
 		file.read(&b.rotation.x, sizeof(float) * 4);
 	}
