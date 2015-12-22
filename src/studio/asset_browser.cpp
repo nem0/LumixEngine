@@ -742,10 +742,12 @@ void AssetBrowser::onGUIModel()
 	}
 
 	ImGui::LabelText("Bone count", "%d", model->getBoneCount());
-	if (model->getBoneCount() > 0) ImGui::CollapsingHeader("Bones");
-	for (int i = 0; i < model->getBoneCount(); ++i)
+	if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones"))
 	{
-		ImGui::Text(model->getBone(i).name.c_str());
+		for (int i = 0; i < model->getBoneCount(); ++i)
+		{
+			ImGui::Text(model->getBone(i).name.c_str());
+		}
 	}
 
 	ImGui::LabelText("Bounding radius", "%f", model->getBoundingRadius());
