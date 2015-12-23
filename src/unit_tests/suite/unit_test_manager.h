@@ -34,7 +34,7 @@ namespace Lumix
 			void runTests(const char* filter_tests);
 			void dumpResults() const;
 
-			void handleFail(const char* file_name, uint32 line);
+			void handleFail(const char* msg, const char* file_name, uint32 line);
 
 			Manager(IAllocator& allocator);
 			~Manager();

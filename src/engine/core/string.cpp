@@ -13,6 +13,12 @@ static char makeLowercase(char c)
 }
 
 
+int compareMemory(const void* lhs, const void* rhs, size_t size)
+{
+	return memcmp(lhs, rhs, size);
+}
+
+
 int compareStringN(const char* lhs, const char* rhs, int length)
 {
 	return strncmp(lhs, rhs, length);

@@ -34,7 +34,7 @@ namespace
 			while (!m_trans_queue->isAborted())
 			{
 				AsynTrans* tr = m_trans_queue->pop(true);
-				if (NULL == tr)
+				if (nullptr == tr)
 					break;
 
 				tr->data.proc_count++;

@@ -41,7 +41,7 @@ void UT_file_events_device(const char* params)
 	Lumix::FS::IFile* file = file_system->open(
 		device_list, "unit_tests/file_system/selenitic.xml", Lumix::FS::Mode::OPEN_AND_READ);
 
-	LUMIX_EXPECT(file != NULL);
+	LUMIX_EXPECT(file != nullptr);
 	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN & occured_event));
 	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN & occured_event));
 
