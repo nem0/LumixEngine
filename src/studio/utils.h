@@ -4,7 +4,7 @@
 #include "lumix.h"
 #include "core/delegate.h"
 #include "core/string.h"
-#include "ocornut-imgui/imgui.h"
+#include "imgui/imgui.h"
 
 
 template <int size>

@@ -1,5 +1,5 @@
-#include "ocornut-imgui/imgui.h"
-#include "ocornut-imgui/imgui_internal.h"
+#include "imgui.h"
+#include "imgui_internal.h"
 #include "core/delegate.h"
 
 

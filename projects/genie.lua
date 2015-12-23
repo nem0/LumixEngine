@@ -106,6 +106,14 @@ solution "LumixEngine"
 	language "C++"
 	startproject "studio"
 
+project "imgui"
+	kind "SharedLib"
+	files { "../src/imgui/**.h", "../src/imgui/**.cpp" }
+
+	defines { "BUILDING_IMGUI" } 
+
+	defaultConfigurations()
+
 project "engine"
 	kind "SharedLib"
 
@@ -230,7 +238,7 @@ project "studio"
 
 	files { "../src/studio/**.h", "../src/studio/**.cpp" }
 	includedirs { "../src", "../src/studio", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
-	links { "lua_script", "animation", "physics", "editor", "engine", "renderer", "audio", "assimp", "crnlib", "winmm" }
+	links { "imgui", "lua_script", "animation", "physics", "editor", "engine", "renderer", "audio", "assimp", "crnlib", "winmm" }
 
 	useLua()
 	defaultConfigurations()

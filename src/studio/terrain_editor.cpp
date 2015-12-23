@@ -11,7 +11,7 @@
 #include "editor/iproperty_descriptor.h"
 #include "editor/property_register.h"
 #include "engine.h"
-#include "ocornut-imgui/imgui.h"
+#include "imgui/imgui.h"
 #include "platform_interface.h"
 #include "renderer/material.h"
 #include "renderer/model.h"

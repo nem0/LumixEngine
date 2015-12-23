@@ -25,7 +25,7 @@
 #include "import_asset_dialog.h"
 #include "log_ui.h"
 #include "metadata.h"
-#include "ocornut-imgui/imgui.h"
+#include "imgui/imgui.h"
 #include "platform_interface.h"
 #include "profiler_ui.h"
 #include "property_grid.h"

@@ -3,7 +3,7 @@
 #include "core/math_utils.h"
 #include "core/path_utils.h"
 #include "editor/world_editor.h"
-#include "ocornut-imgui/imgui.h"
+#include "imgui/imgui.h"
 #include "renderer/render_scene.h"
 #include "universe/universe.h"
 
