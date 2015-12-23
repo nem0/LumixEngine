@@ -15,7 +15,7 @@ void UT_binary_array(const char* params)
 	}
 	for (int i = 0; i < 100; ++i)
 	{
-		LUMIX_EXPECT(array[i]);
+		LUMIX_EXPECT((bool)array[i]);
 	}
 	LUMIX_EXPECT(array.getRaw()[0] == 0xffffFFFF);
 	for (int i = 0; i < 100; ++i)

@@ -1,5 +1,6 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 #include "core/blob.h"
+#include "core/string.h"
 
 
 void UT_blob(const char* params)
@@ -75,7 +76,7 @@ void UT_blob(const char* params)
 	LUMIX_EXPECT(ui == ui2);
 	LUMIX_EXPECT(f == f2);
 	LUMIX_EXPECT(Lumix::compareString(tmp, "test string") == 0);
-	LUMIX_EXPECT(memcmp(&s, &s2, sizeof(s)) == 0);
+	LUMIX_EXPECT(Lumix::compareMemory(&s, &s2, sizeof(s)) == 0);
 
 	input.rewind();
 	input.read(b2);
@@ -92,7 +93,7 @@ void UT_blob(const char* params)
 	LUMIX_EXPECT(ui == ui2);
 	LUMIX_EXPECT(f == f2);
 	LUMIX_EXPECT(Lumix::compareString(tmp, "test string") == 0);
-	LUMIX_EXPECT(memcmp(&s, &s2, sizeof(s)) == 0);
+	LUMIX_EXPECT(Lumix::compareMemory(&s, &s2, sizeof(s)) == 0);
 
 	LUMIX_EXPECT(input.getSize() == blob.getSize());
 	input.setPosition(sizeof(b2) + sizeof(c2) + sizeof(i2));

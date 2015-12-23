@@ -39,7 +39,7 @@ namespace
 			while (!m_queue->isAborted())
 			{
 				Test* test = m_queue->pop(true);
-				if (NULL == test)
+				if (nullptr == test)
 					break;
 
 				m_sum += test->value;
