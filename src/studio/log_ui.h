@@ -6,9 +6,6 @@
 #include "core/string.h"
 
 
-class GUIInterface;
-
-
 class LogUI
 {
 	public:
@@ -19,7 +16,6 @@ class LogUI
 		void update(float time_delta);
 		int addNotification(const char* text);
 		void setNotificationTime(int uid, float time);
-		void setGUIInterface(GUIInterface& gui);
 
 	public:
 		bool m_is_opened;
@@ -62,5 +58,4 @@ class LogUI
 		int m_last_uid;
 		bool m_move_notifications_to_front;
 		Lumix::MT::SpinMutex m_guard;
-		GUIInterface* m_gui;
 };

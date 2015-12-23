@@ -1,6 +1,6 @@
 #include "log_ui.h"
 #include "core/log.h"
-#include "gui_interface.h"
+#include "ocornut-imgui/imgui.h"
 
 
 LogUI::LogUI(Lumix::IAllocator& allocator)
@@ -10,7 +10,6 @@ LogUI::LogUI(Lumix::IAllocator& allocator)
 	, m_notifications(allocator)
 	, m_last_uid(1)
 	, m_guard(false)
-	, m_gui(nullptr)
 {
 	m_is_opened = false;
 	Lumix::g_log_info.getCallback().bind<LogUI, &LogUI::onInfo>(this);
@@ -30,12 +29,6 @@ LogUI::~LogUI()
 	Lumix::g_log_info.getCallback().unbind<LogUI, &LogUI::onInfo>(this);
 	Lumix::g_log_error.getCallback().unbind<LogUI, &LogUI::onError>(this);
 	Lumix::g_log_warning.getCallback().unbind<LogUI, &LogUI::onWarning>(this);
-}
-
-
-void LogUI::setGUIInterface(GUIInterface& gui)
-{
-	m_gui = &gui;
 }
 
 
@@ -110,7 +103,7 @@ void LogUI::showNotifications()
 
 	ImGui::SetNextWindowPos(ImVec2(10, 30));
 	bool opened;
-	if (!m_gui->begin("Notifications",
+	if (!ImGui::Begin("Notifications",
 					  &opened,
 					  ImVec2(200, 0),
 					  0.3f,
@@ -118,17 +111,17 @@ void LogUI::showNotifications()
 						  ImGuiWindowFlags_NoMove |
 						  ImGuiWindowFlags_NoSavedSettings))
 	{
-		m_gui->end();
+		ImGui::End();
 		return;
 	}
 	if (m_move_notifications_to_front) ImGui::BringToFront();
 	m_move_notifications_to_front = false;
 	for (int i = 0; i < m_notifications.size(); ++i)
 	{
-		if (i > 0) m_gui->separator();
-		m_gui->text(m_notifications[i].message.c_str());
+		if (i > 0) ImGui::Separator();
+		ImGui::Text(m_notifications[i].message.c_str());
 	}
-	m_gui->end();
+	ImGui::End();
 }
 
 
@@ -154,24 +147,24 @@ void LogUI::onGUI()
 
 	if (!m_is_opened) return;
 
-	if (m_gui->begin("Log", &m_is_opened))
+	if (ImGui::Begin("Log", &m_is_opened))
 	{
 		const char* labels[] = { "Info", "Warning", "Error", "BGFX" };
 		for (int i = 0; i < Lumix::lengthOf(labels); ++i)
 		{
 			char label[20];
 			fillLabel(label, sizeof(label), labels[i], m_new_message_count[i]);
-			if (i > 0) m_gui->sameLine();
-			if (m_gui->button(label))
+			if(i > 0) ImGui::SameLine();
+			if (ImGui::Button(label))
 			{
 				m_current_tab = i;
 				m_new_message_count[i] = 0;
 			}
 		}
-
+		
 		auto* messages = &m_messages[m_current_tab];
 
-		if (m_gui->button("Clear"))
+		if (ImGui::Button("Clear"))
 		{
 			for (int i = 0; i < m_messages.size(); ++i)
 			{
@@ -180,22 +173,22 @@ void LogUI::onGUI()
 			}
 		}
 
-		m_gui->sameLine();
+		ImGui::SameLine();
 		char filter[128] = "";
-		m_gui->inputText("Filter", filter, sizeof(filter));
+		ImGui::InputText("Filter", filter, sizeof(filter));
 
-		if (m_gui->beginChild("log_messages"))
+		if (ImGui::BeginChild("log_messages"))
 		{
 			for (int i = 0; i < messages->size(); ++i)
 			{
 				const char* msg = (*messages)[i].c_str();
 				if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
 				{
-					m_gui->text(msg);
+					ImGui::Text(msg);
 				}
 			}
 		}
-		m_gui->endChild();
+		ImGui::EndChild();
 	}
-	m_gui->end();
+	ImGui::End();
 }

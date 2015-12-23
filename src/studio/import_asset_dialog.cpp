@@ -14,10 +14,10 @@
 #include "debug/floating_points.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "gui_interface.h"
 #include "metadata.h"
-#include "physics/physics_geometry_manager.h"
+#include "ocornut-imgui/imgui.h"
 #include "platform_interface.h"
+#include "physics/physics_geometry_manager.h"
 #include "renderer/model.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
@@ -1311,7 +1311,6 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	, m_convert_to_dds(false)
 	, m_convert_to_raw(false)
 	, m_raw_texture_scale(1)
-	, m_gui(nullptr)
 {
 	m_is_opened = false;
 	m_message[0] = '\0';
@@ -1330,12 +1329,6 @@ ImportAssetDialog::~ImportAssetDialog()
 		m_task->destroy();
 		LUMIX_DELETE(m_editor.getAllocator(), m_task);
 	}
-}
-
-
-void ImportAssetDialog::setGUIInterface(GUIInterface& gui)
-{
-	m_gui = &gui;
 }
 
 
@@ -1545,18 +1538,18 @@ void ImportAssetDialog::onGUI()
 {
 	if (!m_is_opened) return;
 
-	if (m_gui->begin("Import asset", &m_is_opened))
+	if (ImGui::Begin("Import asset", &m_is_opened))
 	{
 		if (hasMessage())
 		{
 			char msg[1024];
 			getMessage(msg, sizeof(msg));
-			m_gui->text(msg);
-			if (m_gui->button("OK"))
+			ImGui::Text(msg);
+			if (ImGui::Button("OK"))
 			{
 				setMessage("");
 			}
-			m_gui->end();
+			ImGui::End();
 			return;
 		}
 
@@ -1574,20 +1567,20 @@ void ImportAssetDialog::onGUI()
 
 			{
 				Lumix::MT::SpinLock lock(m_mutex);
-				m_gui->text(m_import_message);
+				ImGui::Text(m_import_message);
 			}
-			m_gui->end();
+			ImGui::End();
 			return;
 		}
 
-		if (m_gui->checkbox("Optimize meshes", &m_optimize_mesh_on_import)) checkSource();
-		m_gui->sameLine();
-		if (m_gui->checkbox("Smooth normals", &m_gen_smooth_normal)) checkSource();
+		if (ImGui::Checkbox("Optimize meshes", &m_optimize_mesh_on_import)) checkSource();
+		ImGui::SameLine();
+		if (ImGui::Checkbox("Smooth normals", &m_gen_smooth_normal)) checkSource();
 
-		if (m_gui->inputText("Source", m_source, sizeof(m_source))) checkSource();
+		if (ImGui::InputText("Source", m_source, sizeof(m_source))) checkSource();
 
-		m_gui->sameLine();
-		if (m_gui->button("..."))
+		ImGui::SameLine();
+		if (ImGui::Button("..."))
 		{
 			PlatformInterface::getOpenFilename(m_source, sizeof(m_source), "All\0*.*\0");
 			checkSource();
@@ -1595,64 +1588,64 @@ void ImportAssetDialog::onGUI()
 
 		if (isImage(m_source))
 		{
-			if (m_gui->checkbox("Convert to raw", &m_convert_to_raw))
+			if (ImGui::Checkbox("Convert to raw", &m_convert_to_raw))
 			{
 				if (m_convert_to_raw) m_convert_to_dds = false;
 			}
 			if (m_convert_to_raw)
 			{
-				m_gui->sameLine();
-				m_gui->dragFloat("Scale", &m_raw_texture_scale, 1.0f, 0.01f, 256.0f);
+				ImGui::SameLine();
+				ImGui::DragFloat("Scale", &m_raw_texture_scale, 1.0f, 0.01f, 256.0f);
 			}
-			if (m_gui->checkbox("Convert to DDS", &m_convert_to_dds))
+			if (ImGui::Checkbox("Convert to DDS", &m_convert_to_dds))
 			{
 				if (m_convert_to_dds) m_convert_to_raw = false;
 			}
-			m_gui->inputText("Output directory", m_output_dir, sizeof(m_output_dir));
-			m_gui->sameLine();
-			if (m_gui->button("...##browseoutput"))
+			ImGui::InputText("Output directory", m_output_dir, sizeof(m_output_dir));
+			ImGui::SameLine();
+			if (ImGui::Button("...##browseoutput"))
 			{
 				PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir));
 			}
 
-			if (m_gui->button("Import texture"))
+			if (ImGui::Button("Import texture"))
 			{
 				importTexture();
 			}
-			m_gui->end();
+			ImGui::End();
 			return;
 		}
 
 		if (m_importer.GetScene())
 		{
 			auto* scene = m_importer.GetScene();
-			m_gui->checkbox("Import model", &m_import_model);
+			ImGui::Checkbox("Import model", &m_import_model);
 
 			if (scene->HasMaterials())
 			{
-				m_gui->checkbox(StringBuilder<50>("Import materials (",
+				ImGui::Checkbox(StringBuilder<50>("Import materials (",
 														 scene->mNumMaterials,
 														 ")"),
 								&m_import_materials);
-				m_gui->checkbox("Convert to DDS", &m_convert_to_dds);
+				ImGui::Checkbox("Convert to DDS", &m_convert_to_dds);
 			}
 			if (scene->HasAnimations())
 			{
-				m_gui->checkbox(StringBuilder<50>("Import animations (",
+				ImGui::Checkbox(StringBuilder<50>("Import animations (",
 															 scene->mNumAnimations,
 														 ")"),
 								&m_import_animations);
 			}
-			m_gui->checkbox("Import physics", &m_import_physics);
+			ImGui::Checkbox("Import physics", &m_import_physics);
 			if (m_import_physics)
 			{
-				m_gui->sameLine();
-				m_gui->checkbox("Make convex", &m_make_convex);
+				ImGui::SameLine();
+				ImGui::Checkbox("Make convex", &m_make_convex);
 			}
 
 			if (scene->mNumMeshes > 1)
 			{
-				if (m_gui->collapsingHeader(StringBuilder<30>("Meshes (")
+				if (ImGui::CollapsingHeader(StringBuilder<30>("Meshes (")
 												<< scene->mNumMeshes
 												<< ")##Meshes",
 											nullptr,
@@ -1663,7 +1656,7 @@ void ImportAssetDialog::onGUI()
 					{
 						const char* name = scene->mMeshes[i]->mName.C_Str();
 						bool b = m_mesh_mask[i];
-						m_gui->checkbox(name[0] == '\0'
+						ImGui::Checkbox(name[0] == '\0'
 							? StringBuilder<30>("N/A###na", (Lumix::uint64)&scene->mMeshes[i])
 											: name,
 							&b);
@@ -1672,17 +1665,17 @@ void ImportAssetDialog::onGUI()
 				}
 			}
 
-			m_gui->inputText("Output directory", m_output_dir, sizeof(m_output_dir));
-			m_gui->sameLine();
-			if (m_gui->button("...##browseoutput"))
+			ImGui::InputText("Output directory", m_output_dir, sizeof(m_output_dir));
+			ImGui::SameLine();
+			if (ImGui::Button("...##browseoutput"))
 			{
 				PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir));
 			}
 
-			m_gui->inputText(
+			ImGui::InputText(
 				"Texture output directory", m_texture_output_dir, sizeof(m_texture_output_dir));
-			m_gui->sameLine();
-			if (m_gui->button("...##browsetextureoutput"))
+			ImGui::SameLine();
+			if (ImGui::Button("...##browsetextureoutput"))
 			{
 				PlatformInterface::getOpenDirectory(m_texture_output_dir, sizeof(m_texture_output_dir));
 			}
@@ -1691,15 +1684,15 @@ void ImportAssetDialog::onGUI()
 			{
 				if (!isTextureDirValid())
 				{
-					m_gui->text("Texture output directory must be an ancestor of the working "
+					ImGui::Text("Texture output directory must be an ancestor of the working "
 								"directory or empty.");
 				}
-				else if (m_gui->button("Convert"))
+				else if (ImGui::Button("Convert"))
 				{
 					convert();
 				}
 			}
 		}
 	}
-	m_gui->end();
+	ImGui::End();
 }

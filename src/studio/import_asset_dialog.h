@@ -10,7 +10,6 @@
 #include "lumix.h"
 
 
-class GUIInterface;
 class Metadata;
 
 
@@ -37,7 +36,6 @@ class ImportAssetDialog
 		~ImportAssetDialog();
 		void setMessage(const char* message);
 		void setImportMessage(const char* message);
-		void setGUIInterface(GUIInterface& gui);
 
 		void onGUI();
 
@@ -83,5 +81,4 @@ class ImportAssetDialog
 		Lumix::MT::Task* m_task;
 		Lumix::MT::SpinMutex m_mutex;
 		Metadata& m_metadata;
-		GUIInterface* m_gui;
 };
