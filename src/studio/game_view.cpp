@@ -4,7 +4,7 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "engine/engine.h"
-#include "ocornut-imgui/imgui.h"
+#include "imgui/imgui.h"
 #include "platform_interface.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"

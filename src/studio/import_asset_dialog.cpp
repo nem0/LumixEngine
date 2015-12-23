@@ -15,7 +15,7 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "metadata.h"
-#include "ocornut-imgui/imgui.h"
+#include "imgui/imgui.h"
 #include "platform_interface.h"
 #include "physics/physics_geometry_manager.h"
 #include "renderer/model.h"

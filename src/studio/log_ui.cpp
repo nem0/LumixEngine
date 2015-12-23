@@ -1,6 +1,6 @@
 #include "log_ui.h"
 #include "core/log.h"
-#include "ocornut-imgui/imgui.h"
+#include "imgui/imgui.h"
 
 
 LogUI::LogUI(Lumix::IAllocator& allocator)

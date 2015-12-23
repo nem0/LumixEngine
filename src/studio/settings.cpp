@@ -2,7 +2,7 @@
 #include "core/fs/os_file.h"
 #include "core/log.h"
 #include "debug/debug.h"
-#include "ocornut-imgui/imgui.h"
+#include "imgui/imgui.h"
 #include "platform_interface.h"
 #include "utils.h"
 #include <cstdio>

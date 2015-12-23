@@ -10,8 +10,11 @@
 //#define IM_ASSERT(_EXPR)  MyAssert(_EXPR)
 
 //---- Define attributes of all API symbols declarations, e.g. for DLL under Windows.
-//#define IMGUI_API __declspec( dllexport )
-//#define IMGUI_API __declspec( dllimport )
+#ifdef BUILDING_IMGUI
+#define IMGUI_API __declspec( dllexport )
+#else
+#define IMGUI_API __declspec( dllimport )
+#endif
 
 //---- Include imgui_user.inl at the end of imgui.cpp so you can include code that extends ImGui using its private data/functions.
 #define IMGUI_INCLUDE_IMGUI_USER_INL
