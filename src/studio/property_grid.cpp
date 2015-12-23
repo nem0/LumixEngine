@@ -7,9 +7,9 @@
 #include "editor/property_register.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "gui_interface.h"
 #include "lua_script/lua_script_manager.h"
 #include "lua_script/lua_script_system.h"
-#include "ocornut-imgui/imgui.h"
 #include "renderer/render_scene.h"
 #include "terrain_editor.h"
 #include "utils.h"
@@ -66,14 +66,14 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		auto& d = static_cast<Lumix::IDecimalPropertyDescriptor&>(desc);
 		if ((d.getMax() - d.getMin()) / d.getStep() <= 100)
 		{
-			if (ImGui::SliderFloat(desc_name, &f, d.getMin(), d.getMax()))
+			if (m_gui->sliderFloat(desc_name, &f, d.getMin(), d.getMax()))
 			{
 				m_editor.setProperty(cmp.type, index, desc, &f, sizeof(f));
 			}
 		}
 		else
 		{
-			if (ImGui::DragFloat(desc_name, &f, d.getStep(), d.getMin(), d.getMax()))
+			if (m_gui->dragFloat(desc_name, &f, d.getStep(), d.getMin(), d.getMax()))
 			{
 				m_editor.setProperty(cmp.type, index, desc, &f, sizeof(f));
 			}
@@ -94,7 +94,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	{
 		bool b;
 		tmp.read(b);
-		if (ImGui::Checkbox(desc_name, &b))
+		if (m_gui->checkbox(desc_name, &b))
 		{
 			m_editor.setProperty(cmp.type, index, desc, &b, sizeof(b));
 		}
@@ -180,7 +180,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	{
 		char buf[1024];
 		Lumix::copyString(buf, (const char*)stream.getData());
-		if (ImGui::InputText(desc_name, buf, sizeof(buf)))
+		if (m_gui->inputText(desc_name, buf, sizeof(buf)))
 		{
 			m_editor.setProperty(cmp.type, index, desc, buf, Lumix::stringLength(buf) + 1);
 		}
@@ -336,14 +336,21 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 }
 
 
+void PropertyGrid::setGUIInterface(GUIInterface& gui)
+{
+	m_gui = &gui;
+	m_terrain_editor->setGUIInterface(gui);
+}
+
+
 void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescriptor& desc)
 {
 	StringBuilder<100> desc_name(desc.getName(), "###", (Lumix::uint64)&desc);
 
-	if (!ImGui::CollapsingHeader(desc_name, nullptr, true, true)) return;
+	if (!m_gui->collapsingHeader(desc_name, nullptr, true, true)) return;
 
 	int count = desc.getCount(cmp);
-	if (ImGui::Button("Add"))
+	if (m_gui->button("Add"))
 	{
 		m_editor.addArrayPropertyItem(cmp, desc);
 	}
@@ -355,8 +362,8 @@ void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescr
 		Lumix::toCString(i, tmp, sizeof(tmp));
 		if (ImGui::TreeNode(tmp))
 		{
-			ImGui::SameLine();
-			if (ImGui::Button("Remove"))
+			m_gui->sameLine();
+			if (m_gui->button("Remove"))
 			{
 				m_editor.removeArrayPropertyItem(cmp, i, desc);
 				--i;
@@ -378,7 +385,7 @@ void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescr
 
 void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 {
-	if (!ImGui::CollapsingHeader(
+	if (!m_gui->collapsingHeader(
 		getComponentTypeName(cmp), nullptr, true, true))
 		return;
 
@@ -386,9 +393,9 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 
 	if (!m_editor.canRemove(cmp))
 	{
-		ImGui::Text("Remove dependents first.");
+		m_gui->text("Remove dependents first.");
 	}
-	else if (ImGui::Button(
+	else if (m_gui->button(
 		StringBuilder<30>("Remove component##", cmp.type)))
 	{
 		m_editor.destroyComponent(cmp);
@@ -431,15 +438,15 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 	char buf[50];
 	getEntityListDisplayName(m_editor, buf, sizeof(buf), entity);
 	ImGui::LabelText("", buf);
-	ImGui::SameLine();
+	m_gui->sameLine();
 	StringBuilder<30> popup_name("pu", str_id);
-	if (ImGui::Button(StringBuilder<30>("...###br", str_id)))
+	if (m_gui->button(StringBuilder<30>("...###br", str_id)))
 	{
 		ImGui::OpenPopup(popup_name);
 	}
 
-	ImGui::SameLine();
-	ImGui::Text(label);
+	m_gui->sameLine();
+	m_gui->text(label);
 	ImGui::PopItemWidth();
 
 	if (ImGui::BeginPopup(popup_name))
@@ -484,20 +491,21 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 
 void PropertyGrid::onParticleEmitterGUI(Lumix::ComponentUID cmp)
 {
-	ImGui::Separator();
-	ImGui::Checkbox("Update", &m_particle_emitter_updating);
+	m_gui->separator();
+	m_gui->checkbox("Update", &m_particle_emitter_updating);
+	m_gui->sameLine();
+	auto* scene = static_cast<Lumix::RenderScene*>(cmp.scene);
+	if(m_gui->button("Reset"))
+	{
+		scene->resetParticleEmitter(cmp.index);
+	}
 
 	if (m_particle_emitter_updating)
 	{
-		ImGui::DragFloat("Timescale", &m_particle_emitter_timescale, 0.01f, 0.01f, 10000.0f);
+		m_gui->dragFloat("Timescale", &m_particle_emitter_timescale, 0.01f, 0.01f, 10000.0f);
 		float time_delta = m_editor.getEngine().getLastTimeDelta();
-		auto* scene = static_cast<Lumix::RenderScene*>(cmp.scene);
 		scene->updateEmitter(cmp.index, time_delta * m_particle_emitter_timescale);
 		scene->drawEmitterGizmo(cmp.index);
-		if(ImGui::Button("Reset"))
-		{
-			scene->resetParticleEmitter(cmp.index);
-		}
 	}
 }
 
@@ -517,7 +525,7 @@ void PropertyGrid::onLuaScriptGUI(Lumix::ComponentUID cmp)
 			case Lumix::LuaScript::Property::FLOAT:
 			{
 				float f = (float)atof(buf);
-				if (ImGui::DragFloat(property_name, &f))
+				if (m_gui->dragFloat(property_name, &f))
 				{
 					Lumix::toCString(f, buf, sizeof(buf), 5);
 					scene->setPropertyValue(cmp.index, property_name, buf);
@@ -536,7 +544,7 @@ void PropertyGrid::onLuaScriptGUI(Lumix::ComponentUID cmp)
 			}
 			break;
 			case Lumix::LuaScript::Property::ANY:
-				if (ImGui::InputText(property_name, buf, sizeof(buf)))
+				if (m_gui->inputText(property_name, buf, sizeof(buf)))
 				{
 					scene->setPropertyValue(cmp.index, property_name, buf);
 				}
@@ -551,7 +559,7 @@ void PropertyGrid::showCoreProperties(Lumix::Entity entity)
 	char name[256];
 	const char* tmp = m_editor.getUniverse()->getEntityName(entity);
 	Lumix::copyString(name, tmp);
-	if (ImGui::InputText("Name", name, sizeof(name)))
+	if (m_gui->inputText("Name", name, sizeof(name)))
 	{
 		m_editor.setEntityName(entity, name);
 	}
@@ -577,7 +585,7 @@ void PropertyGrid::showCoreProperties(Lumix::Entity entity)
 	}
 
 	float scale = m_editor.getUniverse()->getScale(entity);
-	if (ImGui::DragFloat("Scale", &scale, 0.1f))
+	if (m_gui->dragFloat("Scale", &scale, 0.1f))
 	{
 		m_editor.setEntitiesScales(&entity, &scale, 1);
 	}
@@ -589,9 +597,9 @@ void PropertyGrid::onGUI()
 	if (!m_is_opened) return;
 
 	auto& ents = m_editor.getSelectedEntities();
-	if (ImGui::Begin("Properties", &m_is_opened) && ents.size() == 1)
+	if (m_gui->begin("Properties", &m_is_opened) && ents.size() == 1)
 	{
-		if (ImGui::Button("Add component"))
+		if (m_gui->button("Add component"))
 		{
 			ImGui::OpenPopup("AddComponentPopup");
 		}
@@ -617,7 +625,7 @@ void PropertyGrid::onGUI()
 			showComponentProperties(cmp);
 		}
 	}
-	ImGui::End();
+	m_gui->end();
 }
 
 

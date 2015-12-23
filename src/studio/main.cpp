@@ -22,10 +22,10 @@
 #include "engine.h"
 #include "engine/plugin_manager.h"
 #include "game_view.h"
+#include "gui_interface.h"
 #include "import_asset_dialog.h"
 #include "log_ui.h"
 #include "metadata.h"
-#include "ocornut-imgui/imgui.h"
 #include "platform_interface.h"
 #include "profiler_ui.h"
 #include "property_grid.h"
@@ -70,6 +70,7 @@ public:
 		, m_shader_editor(nullptr)
 		, m_editor(nullptr)
 		, m_settings(m_allocator)
+		, m_gui(nullptr)
 	{
 		m_template_name[0] = '\0';
 		m_clip_manager_filter[0] = '\0';
@@ -120,105 +121,105 @@ public:
 								 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
 		ImVec2 size((float)PlatformInterface::getWindowWidth(),
 			(float)PlatformInterface::getWindowHeight());
-		if (ImGui::Begin("Welcome", nullptr, size, -1, flags))
+		if (m_gui->begin("Welcome", nullptr, size, -1, flags))
 		{
-			ImGui::Text("Welcome to Lumix Studio");
+			m_gui->text("Welcome to Lumix Studio");
 
 			ImVec2 half_size = ImGui::GetContentRegionAvail();
-			half_size.x = half_size.x * 0.5f - ImGui::GetStyle().FramePadding.x;
+			half_size.x = half_size.x * 0.5f - m_gui->getStyle().FramePadding.x;
 			half_size.y *= 0.75f;
 			auto right_pos = ImGui::GetCursorPos();
-			right_pos.x += half_size.x + ImGui::GetStyle().FramePadding.x;
-			if (ImGui::BeginChild("left", half_size, true))
+			right_pos.x += half_size.x + m_gui->getStyle().FramePadding.x;
+			if (m_gui->beginChild("left", half_size, true))
 			{
-				if (ImGui::Button("New Universe")) m_is_welcome_screen_opened = false;
+				if (m_gui->button("New Universe")) m_is_welcome_screen_opened = false;
 
-				ImGui::Separator();
-				ImGui::Text("Open universe:");
-				ImGui::Indent();
+				m_gui->separator();
+				m_gui->text("Open universe:");
+				m_gui->indent();
 				auto& universes = m_asset_browser->getResources(AssetBrowser::UNIVERSE);
 				for (auto& univ : universes)
 				{
-					if (ImGui::MenuItem(univ.c_str()))
+					if (m_gui->menuItem(univ.c_str()))
 					{
 						m_editor->loadUniverse(univ);
 						setTitle(univ.c_str());
 						m_is_welcome_screen_opened = false;
 					}
 				}
-				ImGui::Unindent();
+				m_gui->unindent();
 			}
-			ImGui::EndChild();
+			m_gui->endChild();
 
 			ImGui::SetCursorPos(right_pos);
 
-			if (ImGui::BeginChild("right", half_size, true))
+			if (m_gui->beginChild("right", half_size, true))
 			{
-				if (ImGui::Button("Download new version"))
+				if (m_gui->button("Download new version"))
 				{
 					PlatformInterface::shellExecuteOpen(
 						"https://github.com/nem0/lumixengine_data/archive/master.zip");
 				}
 
-				if (ImGui::Button("Show major releases"))
+				if (m_gui->button("Show major releases"))
 				{
 					PlatformInterface::shellExecuteOpen("https://github.com/nem0/LumixEngine/releases");
 				}
 
-				if (ImGui::Button("Show latest commits"))
+				if (m_gui->button("Show latest commits"))
 				{
 					PlatformInterface::shellExecuteOpen("https://github.com/nem0/LumixEngine/commits/master");
 				}
 
-				if (ImGui::Button("Show issues"))
+				if (m_gui->button("Show issues"))
 				{
 					PlatformInterface::shellExecuteOpen("https://github.com/nem0/lumixengine/issues");
 				}
-				ImGui::Separator();
+				m_gui->separator();
 
-				ImGui::Text("Version 0.19. - News");
-				ImGui::BulletText("File system UI");
-				ImGui::BulletText("Particle system player");
-				ImGui::BulletText("Particle system using bezier curves");
-				ImGui::BulletText("Bezier curves in GUI");
-				ImGui::Separator();
-				ImGui::Text("Version 0.18. - News");
-				ImGui::BulletText("Collision events are sent to scripts");
-				ImGui::BulletText("Multithread safe profiler");
-				ImGui::BulletText("XBox Controller support");
-				ImGui::BulletText("Each script component has its own environment");
-				ImGui::BulletText("Pipeline's features can be enabled/disabled in GUI");
-				ImGui::BulletText("Shader editor");
-				ImGui::BulletText("Audio system");
-				ImGui::BulletText("Basic particle system");
-				ImGui::Separator();
-				ImGui::Text("Version 0.17. - News");
-				ImGui::BulletText("Back button in the asset browser");
-				ImGui::BulletText("Grass culling");
-				ImGui::BulletText("Importing compressed embedded textures");
-				ImGui::BulletText("Euler angles");
-				ImGui::BulletText("Textures relative to root");
-				ImGui::BulletText("Painting entities - align with normal");
-				ImGui::BulletText("Painting entities - random x and z rotation");
-				ImGui::BulletText("Lua properties with types");
-				ImGui::BulletText("Moving the Light Texel-Sized Increments");
-				ImGui::BulletText("Terrain brush for removing entities");
-				ImGui::BulletText("Improved shadows on terrain");
-				ImGui::BulletText("Fog height");
-				ImGui::BulletText("Bitmap to heightmap convertor");
-				ImGui::BulletText("LOD preview");
-				ImGui::BulletText("New gizmo");
-				ImGui::BulletText("Orbit camera");
-				ImGui::BulletText("Welcome screen");
-				ImGui::BulletText("Visualization of physical contorller");
-				ImGui::BulletText("Game view fixed");
+				m_gui->text("Version 0.19. - News");
+				m_gui->bulletText("File system UI");
+				m_gui->bulletText("Particle system player");
+				m_gui->bulletText("Particle system using bezier curves");
+				m_gui->bulletText("Bezier curves in GUI");
+				m_gui->separator();
+				m_gui->text("Version 0.18. - News");
+				m_gui->bulletText("Collision events are sent to scripts");
+				m_gui->bulletText("Multithread safe profiler");
+				m_gui->bulletText("XBox Controller support");
+				m_gui->bulletText("Each script component has its own environment");
+				m_gui->bulletText("Pipeline's features can be enabled/disabled in GUI");
+				m_gui->bulletText("Shader editor");
+				m_gui->bulletText("Audio system");
+				m_gui->bulletText("Basic particle system");
+				m_gui->separator();
+				m_gui->text("Version 0.17. - News");
+				m_gui->bulletText("Back button in the asset browser");
+				m_gui->bulletText("Grass culling");
+				m_gui->bulletText("Importing compressed embedded textures");
+				m_gui->bulletText("Euler angles");
+				m_gui->bulletText("Textures relative to root");
+				m_gui->bulletText("Painting entities - align with normal");
+				m_gui->bulletText("Painting entities - random x and z rotation");
+				m_gui->bulletText("Lua properties with types");
+				m_gui->bulletText("Moving the Light Texel-Sized Increments");
+				m_gui->bulletText("Terrain brush for removing entities");
+				m_gui->bulletText("Improved shadows on terrain");
+				m_gui->bulletText("Fog height");
+				m_gui->bulletText("Bitmap to heightmap convertor");
+				m_gui->bulletText("LOD preview");
+				m_gui->bulletText("New gizmo");
+				m_gui->bulletText("Orbit camera");
+				m_gui->bulletText("Welcome screen");
+				m_gui->bulletText("Visualization of physical contorller");
+				m_gui->bulletText("Game view fixed");
 
 			}
-			ImGui::EndChild();
+			m_gui->endChild();
 
-			if (ImGui::Button("Close")) m_is_welcome_screen_opened = false;
+			if (m_gui->button("Close")) m_is_welcome_screen_opened = false;
 		}
-		ImGui::End();
+		m_gui->end();
 	}
 
 
@@ -228,7 +229,7 @@ public:
 
 		if (!m_gui_pipeline_source->isReady()) return;
 
-		ImGuiIO& io = ImGui::GetIO();
+		ImGuiIO& io = m_gui->getIO();
 		io.DisplaySize = ImVec2((float)PlatformInterface::getWindowWidth(),
 			(float)PlatformInterface::getWindowHeight());
 		io.DeltaTime = m_engine->getLastTimeDelta();
@@ -297,7 +298,7 @@ public:
 	{
 		char buf[20];
 		getShortcut(a, buf, sizeof(buf));
-		if (ImGui::MenuItem(a.label, buf, selected, enabled))
+		if (m_gui->menuItem(a.label, buf, selected, enabled))
 		{
 			a.func.invoke();
 		}
@@ -359,13 +360,13 @@ public:
 	void lookAtSelected() { m_editor->lookAtSelected(); }
 	void toggleStats() { m_gui_pipeline->toggleStats(); }
 
-	void autosnapDown() 
+	void autosnapDown()
 	{
 		auto& gizmo = m_editor->getGizmo();
 		gizmo.setAutosnapDown(!gizmo.isAutosnapDown());
 	}
 
-	void toggleGizmoMode() 
+	void toggleGizmoMode()
 	{
 		auto& gizmo = m_editor->getGizmo();
 		if (gizmo.getMode() == Lumix::Gizmo::Mode::TRANSLATE)
@@ -378,7 +379,7 @@ public:
 		}
 	}
 
-	
+
 	void setWireframe()
 	{
 		m_is_wireframe = !m_is_wireframe;
@@ -447,74 +448,74 @@ public:
 	void showMainMenu()
 	{
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
-		if (ImGui::BeginMainMenuBar())
+		if (m_gui->beginMainMenuBar())
 		{
-			if (ImGui::BeginMenu("File"))
+			if (m_gui->beginMenu("File"))
 			{
 				doMenuItem(getAction("newUniverse"), false, true);
-				if (ImGui::BeginMenu("Open"))
+				if (m_gui->beginMenu("Open"))
 				{
 					auto& universes = m_asset_browser->getResources(AssetBrowser::UNIVERSE);
 					for (auto& univ : universes)
 					{
-						if (ImGui::MenuItem(univ.c_str()))
+						if (m_gui->menuItem(univ.c_str()))
 						{
 							m_time_to_autosave = float(m_settings.m_autosave_time);
 							m_editor->loadUniverse(univ);
 							setTitle(univ.c_str());
 						}
 					}
-					ImGui::EndMenu();
+					m_gui->endMenu();
 				}
 				doMenuItem(getAction("save"), false, true);
 				doMenuItem(getAction("saveAs"), false, true);
 				doMenuItem(getAction("exit"), false, true);
 
-				ImGui::EndMenu();
+				m_gui->endMenu();
 			}
 
-			if (ImGui::BeginMenu("Edit"))
+			if (m_gui->beginMenu("Edit"))
 			{
 				doMenuItem(getAction("undo"), false, m_editor->canUndo());
 				doMenuItem(getAction("redo"), false, m_editor->canRedo());
-				ImGui::Separator();
+				m_gui->separator();
 				doMenuItem(getAction("copy"), false, is_any_entity_selected);
 				doMenuItem(getAction("paste"), false, m_editor->canPasteEntity());
-				ImGui::Separator();
+				m_gui->separator();
 				doMenuItem(getAction("orbitCamera"),
 					m_editor->isOrbitCamera(),
 					is_any_entity_selected || m_editor->isOrbitCamera());
 				doMenuItem(getAction("toggleGizmoMode"), false, is_any_entity_selected);
 				doMenuItem(getAction("togglePivotMode"), false, is_any_entity_selected);
 				doMenuItem(getAction("toggleCoordSystem"), false, is_any_entity_selected);
-				if (ImGui::BeginMenu("Select"))
+				if (m_gui->beginMenu("Select"))
 				{
-					if (ImGui::MenuItem("Same mesh", nullptr, nullptr, is_any_entity_selected))
+					if (m_gui->menuItem("Same mesh", nullptr, nullptr, is_any_entity_selected))
 						m_editor->selectEntitiesWithSameMesh();
-					ImGui::EndMenu();
+					m_gui->endMenu();
 				}
-				ImGui::EndMenu();
+				m_gui->endMenu();
 			}
 
-			if (ImGui::BeginMenu("Entity"))
+			if (m_gui->beginMenu("Entity"))
 			{
 				doMenuItem(getAction("createEntity"), false, true);
 				doMenuItem(getAction("destroyEntity"), false, is_any_entity_selected);
 
-				if (ImGui::BeginMenu("Create template", is_any_entity_selected))
+				if (m_gui->beginMenu("Create template", is_any_entity_selected))
 				{
 					static char name[255] = "";
-					ImGui::InputText("Name##templatename", name, sizeof(name));
-					if (ImGui::Button("Create"))
+					m_gui->inputText("Name##templatename", name, sizeof(name));
+					if (m_gui->button("Create"))
 					{
 						auto entity = m_editor->getSelectedEntities()[0];
 						auto& system = m_editor->getEntityTemplateSystem();
 						system.createTemplateFromEntity(name, entity);
 						ImGui::CloseCurrentPopup();
 					}
-					ImGui::EndMenu();
+					m_gui->endMenu();
 				}
-				if (ImGui::MenuItem("Instantiate template",
+				if (m_gui->menuItem("Instantiate template",
 						nullptr,
 						nullptr,
 						m_selected_template_name.length() > 0))
@@ -523,58 +524,58 @@ public:
 					m_editor->getEntityTemplateSystem().createInstance(
 						m_selected_template_name.c_str(), pos);
 				}
-				
+
 				doMenuItem(getAction("showEntities"), false, is_any_entity_selected);
 				doMenuItem(getAction("hideEntities"), false, is_any_entity_selected);
-				ImGui::EndMenu();
+				m_gui->endMenu();
 			}
 
 
-			if (ImGui::BeginMenu("Tools"))
+			if(m_gui->beginMenu("Tools"))
 			{
 				doMenuItem(getAction("toggleGameMode"), m_editor->isGameMode(), true);
 				doMenuItem(getAction("toggleMeasure"), m_editor->isMeasureToolActive(), true);
 				doMenuItem(getAction("snapDown"), false, is_any_entity_selected);
 				doMenuItem(getAction("autosnapDown"), m_editor->getGizmo().isAutosnapDown(), true);
-				if (ImGui::MenuItem("Save commands")) saveUndoStack();
-				if (ImGui::MenuItem("Load commands")) loadAndExecuteCommands();
+				if (m_gui->menuItem("Save commands")) saveUndoStack();
+				if (m_gui->menuItem("Load commands")) loadAndExecuteCommands();
 
-				ImGui::MenuItem("Import asset", nullptr, &m_import_asset_dialog->m_is_opened);
-				ImGui::EndMenu();
+				m_gui->menuItem("Import asset", nullptr, &m_import_asset_dialog->m_is_opened);
+				m_gui->endMenu();
 			}
 
 
-			if (ImGui::BeginMenu("View"))
+			if (m_gui->beginMenu("View"))
 			{
 				doMenuItem(getAction("lookAtSelected"), false, is_any_entity_selected);
 				doMenuItem(getAction("setWireframe"), m_is_wireframe, true);
 				doMenuItem(getAction("toggleStats"), false, true);
-				if (ImGui::BeginMenu("Windows"))
+				if (m_gui->beginMenu("Windows"))
 				{
-					ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
-					ImGui::MenuItem("Clip manager", nullptr, &m_is_clip_manager_opened);
-					ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
-					ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
-					ImGui::MenuItem("Game view", nullptr, &m_gameview.m_is_opened);
-					ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
-					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
-					ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
-					ImGui::MenuItem("Settings", nullptr, &m_settings.m_is_opened);
-					ImGui::MenuItem("Shader editor", nullptr, &m_shader_editor->m_is_opened);
-					ImGui::MenuItem("Style editor", nullptr, &m_is_style_editor_opened);
-					ImGui::EndMenu();
+					m_gui->menuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
+					m_gui->menuItem("Clip manager", nullptr, &m_is_clip_manager_opened);
+					m_gui->menuItem("Entity list", nullptr, &m_is_entity_list_opened);
+					m_gui->menuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
+					m_gui->menuItem("Game view", nullptr, &m_gameview.m_is_opened);
+					m_gui->menuItem("Log", nullptr, &m_log_ui->m_is_opened);
+					m_gui->menuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
+					m_gui->menuItem("Properties", nullptr, &m_property_grid->m_is_opened);
+					m_gui->menuItem("Settings", nullptr, &m_settings.m_is_opened);
+					m_gui->menuItem("Shader editor", nullptr, &m_shader_editor->m_is_opened);
+					m_gui->menuItem("Style editor", nullptr, &m_is_style_editor_opened);
+					m_gui->endMenu();
 				}
-				ImGui::EndMenu();
+				m_gui->endMenu();
 			}
 			StringBuilder<100> stats("");
 			if (m_engine->getFileSystem().hasWork()) stats << "Loading... | ";
 			stats << "FPS: ";
 			stats << m_engine->getFPS();
 			auto stats_size = ImGui::CalcTextSize(stats);
-			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
-			ImGui::Text(stats);
+			m_gui->sameLine(ImGui::GetContentRegionMax().x - stats_size.x);
+			m_gui->text(stats);
 
-			ImGui::EndMainMenuBar();
+			m_gui->endMainMenuBar();
 		}
 	}
 
@@ -586,21 +587,21 @@ public:
 	{
 		if (!m_is_entity_template_list_opened) return;
 
-		if (ImGui::Begin("Entity templates", &m_is_entity_template_list_opened))
+		if (m_gui->begin("Entity templates", &m_is_entity_template_list_opened))
 		{
 			if (m_editor->getSelectedEntities().size() == 1)
 			{
-				ImGui::InputText("Template name", m_template_name, Lumix::lengthOf(m_template_name));
+				m_gui->inputText("Template name", m_template_name, Lumix::lengthOf(m_template_name));
 
-				if (ImGui::Button("Create from selected"))
+				if (m_gui->button("Create from selected"))
 				{
 					auto entity = m_editor->getSelectedEntities()[0];
 					auto& system = m_editor->getEntityTemplateSystem();
 					system.createTemplateFromEntity(m_template_name, entity);
 				}
-				ImGui::Separator();
+				m_gui->separator();
 			}
-			ImGui::Text("Templates:");
+			m_gui->text("Templates:");
 			auto& template_system = m_editor->getEntityTemplateSystem();
 
 			for (auto& template_name : template_system.getTemplateNames())
@@ -612,7 +613,7 @@ public:
 				}
 			}
 		}
-		ImGui::End();
+		m_gui->end();
 	}
 
 
@@ -620,9 +621,9 @@ public:
 	{
 		if (!m_is_clip_manager_opened) return;
 
-		if (ImGui::Begin("Clip manager", &m_is_clip_manager_opened))
+		if (m_gui->begin("Clip manager", &m_is_clip_manager_opened))
 		{
-			ImGui::InputText("Filter", m_clip_manager_filter, Lumix::lengthOf(m_clip_manager_filter));
+			m_gui->inputText("Filter", m_clip_manager_filter, Lumix::lengthOf(m_clip_manager_filter));
 
 			auto* audio_scene = static_cast<Lumix::AudioScene*>(m_editor->getScene(Lumix::crc32("audio")));
 			int clip_count = audio_scene->getClipCount();
@@ -640,7 +641,7 @@ public:
 				{
 					char buf[30];
 					Lumix::copyString(buf, Lumix::lengthOf(buf), clip_info->name);
-					if (ImGui::InputText("Name", buf, sizeof(buf)))
+					if (m_gui->inputText("Name", buf, sizeof(buf)))
 					{
 						Lumix::copyString(clip_info->name, buf);
 						clip_info->name_hash = Lumix::crc32(buf);
@@ -654,11 +655,11 @@ public:
 						audio_scene->setClip(clip_id, Lumix::Path(path));
 					}
 					bool looped = audio_scene->getClipInfo(clip_id)->looped;
-					if (ImGui::Checkbox("Looped", &looped))
+					if (m_gui->checkbox("Looped", &looped))
 					{
 						clip_info->looped = looped;
 					}
-					if (ImGui::Button("Remove"))
+					if (m_gui->button("Remove"))
 					{
 						audio_scene->removeClip(clip_info);
 						--clip_count;
@@ -667,12 +668,12 @@ public:
 				}
 			}
 
-			if (ImGui::Button("Add"))
+			if (m_gui->button("Add"))
 			{
 				audio_scene->addClip("test", Lumix::Path("test.ogg"));
 			}
 		}
-		ImGui::End();
+		m_gui->end();
 	}
 
 
@@ -680,15 +681,15 @@ public:
 	{
 		if (!m_is_entity_list_opened) return;
 
-		if (ImGui::Begin("Entity list", &m_is_entity_list_opened))
+		if (m_gui->begin("Entity list", &m_is_entity_list_opened))
 		{
 			auto* universe = m_editor->getUniverse();
 			int scroll_to = -1;
 
 			auto& groups = m_editor->getEntityGroups();
 			static char group_name[20] = "";
-			ImGui::InputText("New group name", group_name, Lumix::lengthOf(group_name));
-			if(ImGui::Button("Create group"))
+			m_gui->inputText("New group name", group_name, Lumix::lengthOf(group_name));
+			if(m_gui->button("Create group"))
 			{
 				if(group_name[0] == 0)
 				{
@@ -704,7 +705,7 @@ public:
 				}
 				group_name[0] = 0;
 			}
-			ImGui::Separator();
+			m_gui->separator();
 
 			for(int i = 0; i < groups.getGroupCount(); ++i)
 			{
@@ -746,19 +747,19 @@ public:
 
 					if(groups.getGroupCount() == 1)
 					{
-						ImGui::Text("Can not delete - at least one group must exists");
+						m_gui->text("Can not delete - at least one group must exists");
 					}
-					else if(ImGui::Button("Delete group"))
+					else if(m_gui->button("Delete group"))
 					{
 						groups.deleteGroup(i);
 					}
 
-					if(ImGui::Button("Select all entities in group"))
+					if(m_gui->button("Select all entities in group"))
 					{
 						m_editor->selectEntities(groups.getGroupEntities(i), groups.getGroupEntitiesCount(i));
 					}
 
-					if(ImGui::Button("Assign selected entities to group"))
+					if(m_gui->button("Assign selected entities to group"))
 					{
 						auto& selected = m_editor->getSelectedEntities();
 						for(auto e : selected)
@@ -771,7 +772,7 @@ public:
 				}
 			}
 		}
-		ImGui::End();
+		m_gui->end();
 	}
 
 
@@ -809,7 +810,6 @@ public:
 
 		shutdownImGui();
 
-		ProfilerUI::destroy(*m_profiler_ui);
 		LUMIX_DELETE(m_allocator, m_asset_browser);
 		LUMIX_DELETE(m_allocator, m_log_ui);
 		LUMIX_DELETE(m_allocator, m_property_grid);
@@ -817,6 +817,7 @@ public:
 		LUMIX_DELETE(m_allocator, m_shader_compiler);
 		LUMIX_DELETE(m_allocator, m_shader_editor);
 		Lumix::WorldEditor::destroy(m_editor, m_allocator);
+		ProfilerUI::destroy(*m_profiler_ui);
 		m_sceneview.shutdown();
 		m_gameview.shutdown();
 		Lumix::PipelineInstance::destroy(m_gui_pipeline);
@@ -836,7 +837,7 @@ public:
 
 	void shutdownImGui()
 	{
-		ImGui::Shutdown();
+		GUIInterface::destroy(*m_gui);
 
 		Lumix::Texture* texture = m_material->getTexture(0);
 		m_material->setTexture(0, nullptr);
@@ -844,12 +845,16 @@ public:
 		LUMIX_DELETE(m_allocator, texture);
 
 		m_material->getResourceManager().get(Lumix::ResourceManager::MATERIAL)->unload(*m_material);
+
 	}
 
 
 	void initIMGUI()
 	{
-		ImGuiIO& io = ImGui::GetIO();
+		m_gui = GUIInterface::create(m_allocator);
+		m_handler.m_gui = m_gui;
+
+		ImGuiIO& io = m_gui->getIO();
 		io.Fonts->AddFontFromFileTTF("bin/VeraMono.ttf", 13);
 
 		io.KeyMap[ImGuiKey_Tab] = (int)PlatformInterface::Keys::TAB;
@@ -888,7 +893,17 @@ public:
 		texture->create(width, height, pixels);
 		m_material->setTexture(0, texture);
 
-		ImGui::GetStyle().WindowFillAlphaDefault = 1.0f;
+		m_gui->getStyle().WindowFillAlphaDefault = 1.0f;
+
+		m_asset_browser->setGUIInterface(*m_gui);
+		m_import_asset_dialog->setGUIInterface(*m_gui);
+		m_sceneview.setGUIInterface(*m_gui);
+		m_log_ui->setGUIInterface(*m_gui);
+		m_profiler_ui->setGUIInterface(*m_gui);
+		m_property_grid->setGUIInterface(*m_gui);
+		m_shader_editor->setGUIInterface(*m_gui);
+		m_gameview.setGUIInterface(*m_gui);
+		m_settings.setGUIInterface(*m_gui);
 	}
 
 
@@ -1071,7 +1086,7 @@ public:
 
 			m_app->m_sceneview.onMouseMove(x, y, rel_x, rel_y);
 
-			ImGuiIO& io = ImGui::GetIO();
+			ImGuiIO& io = m_gui->getIO();
 			io.MousePos.x = (float)x;
 			io.MousePos.y = (float)y;
 		}
@@ -1079,7 +1094,7 @@ public:
 
 		void onMouseWheel(int amount) override
 		{
-			ImGui::GetIO().MouseWheel = amount / 600.0f;
+			m_gui->getIO().MouseWheel = amount / 600.0f;
 		}
 
 
@@ -1088,12 +1103,12 @@ public:
 			switch (button)
 			{
 				case PlatformInterface::SystemEventHandler::MouseButton::LEFT:
-					m_app->m_editor->setAdditiveSelection(ImGui::GetIO().KeyCtrl);
+					m_app->m_editor->setAdditiveSelection(m_gui->getIO().KeyCtrl);
 					if (!m_app->m_sceneview.onMouseDown(
 							m_mouse_x, m_mouse_y, Lumix::MouseButton::LEFT) &&
 						!m_app->m_gameview.isMouseCaptured())
 					{
-						ImGui::GetIO().MouseDown[0] = true;
+						m_gui->getIO().MouseDown[0] = true;
 					}
 					break;
 				case PlatformInterface::SystemEventHandler::MouseButton::RIGHT:
@@ -1101,7 +1116,7 @@ public:
 						m_mouse_x, m_mouse_y, Lumix::MouseButton::RIGHT) &&
 						!m_app->m_gameview.isMouseCaptured())
 					{
-						ImGui::GetIO().MouseDown[1] = true;
+						m_gui->getIO().MouseDown[1] = true;
 					}
 					break;
 				case PlatformInterface::SystemEventHandler::MouseButton::MIDDLE:
@@ -1109,7 +1124,7 @@ public:
 						m_mouse_x, m_mouse_y, Lumix::MouseButton::MIDDLE) &&
 						!m_app->m_gameview.isMouseCaptured())
 					{
-						ImGui::GetIO().MouseDown[2] = true;
+						m_gui->getIO().MouseDown[2] = true;
 					}
 					break;
 			}
@@ -1122,15 +1137,15 @@ public:
 			{
 				case PlatformInterface::SystemEventHandler::MouseButton::LEFT:
 					m_app->m_sceneview.onMouseUp(Lumix::MouseButton::LEFT);
-					ImGui::GetIO().MouseDown[0] = false;
+					m_gui->getIO().MouseDown[0] = false;
 					break;
 				case PlatformInterface::SystemEventHandler::MouseButton::RIGHT:
 					m_app->m_sceneview.onMouseUp(Lumix::MouseButton::RIGHT);
-					ImGui::GetIO().MouseDown[1] = false;
+					m_gui->getIO().MouseDown[1] = false;
 					break;
 				case PlatformInterface::SystemEventHandler::MouseButton::MIDDLE:
 					m_app->m_sceneview.onMouseUp(Lumix::MouseButton::MIDDLE);
-					ImGui::GetIO().MouseDown[2] = false;
+					m_gui->getIO().MouseDown[2] = false;
 					break;
 			}
 		}
@@ -1138,26 +1153,27 @@ public:
 
 		void onKeyDown(int key) override
 		{
-			ImGui::GetIO().KeysDown[key] = true;
+			m_gui->getIO().KeysDown[key] = true;
 			m_app->checkShortcuts();
 		}
 
 
 		void onKeyUp(int key) override
 		{
-			ImGui::GetIO().KeysDown[key] = false;
+			m_gui->getIO().KeysDown[key] = false;
 		}
 
 
 		void onChar(int key)
 		{
-			ImGui::GetIO().AddInputCharacter(key);
+			m_gui->getIO().AddInputCharacter(key);
 		}
 
 
 		int m_mouse_x;
 		int m_mouse_y;
 		StudioApp* m_app;
+		GUIInterface* m_gui;
 	};
 
 
@@ -1227,7 +1243,7 @@ public:
 	{
 		if (ImGui::IsAnyItemActive()) return;
 
-		bool* keysDown = ImGui::GetIO().KeysDown;
+		bool* keysDown = m_gui->getIO().KeysDown;
 		for (auto* a : m_actions)
 		{
 			if (!a->is_global || a->shortcut[0] == -1) continue;
@@ -1268,7 +1284,7 @@ public:
 
 	void clearInputs()
 	{
-		auto& io = ImGui::GetIO();
+		auto& io = m_gui->getIO();
 		io.KeyAlt = false;
 		io.KeyCtrl = false;
 		io.KeyShift = false;
@@ -1279,8 +1295,8 @@ public:
 
 	void setGUIProjection()
 	{
-		float width = ImGui::GetIO().DisplaySize.x;
-		float height = ImGui::GetIO().DisplaySize.y;
+		float width = m_gui->getIO().DisplaySize.x;
+		float height = m_gui->getIO().DisplaySize.y;
 		Lumix::Matrix ortho;
 		ortho.setOrtho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
 		m_gui_pipeline->setViewProjection(ortho, (int)width, (int)height);
@@ -1378,6 +1394,7 @@ public:
 	ShaderCompiler* m_shader_compiler;
 	Lumix::string m_selected_template_name;
 	Settings m_settings;
+	GUIInterface* m_gui;
 	Metadata m_metadata;
 	ShaderEditor* m_shader_editor;
 	char m_template_name[100];

@@ -14,6 +14,7 @@ namespace Lumix
 
 
 class FileSystemWatcher;
+class GUIInterface;
 class Metadata;
 
 
@@ -36,6 +37,7 @@ public:
 public:
 	AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata);
 	~AssetBrowser();
+	void setGUIInterface(GUIInterface& gui);
 	void onGUI();
 	void update();
 	const Lumix::Array<Lumix::Path>& getResources(Type type) const;
@@ -81,4 +83,5 @@ private:
 	bool m_is_focus_requested;
 	bgfx::TextureHandle m_texture_handle;
 	void* m_playing_clip;
+	GUIInterface* m_gui;
 };

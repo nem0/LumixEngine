@@ -11,7 +11,7 @@
 #include "editor/iproperty_descriptor.h"
 #include "editor/property_register.h"
 #include "engine.h"
-#include "ocornut-imgui/imgui.h"
+#include "gui_interface.h"
 #include "platform_interface.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -1151,6 +1151,7 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	, m_brush_texture(nullptr)
 	, m_flat_height(0)
 	, m_is_enabled(false)
+	, m_gui(nullptr)
 {
 	editor.registerEditorCommandCreator("paint_entities_on_terrain", createPaintEntitiesCommand);
 	editor.registerEditorCommandCreator("remove_entities_on_terrain", createRemoveEntitiesCommand);
@@ -1200,6 +1201,12 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	m_is_align_with_normal = false;
 	m_is_rotate_x = false;
 	m_is_rotate_z = false;
+}
+
+
+void TerrainEditor::setGUIInterface(GUIInterface& gui)
+{
+	m_gui = &gui;
 }
 
 
@@ -1528,18 +1535,18 @@ void TerrainEditor::onGUI()
 	if (m_decrease_texture_idx->isRequested()) m_decrease_texture_idx->func.invoke();
 
 	auto* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
-	if (!ImGui::CollapsingHeader("Terrain editor", nullptr, true, true)) return;
+	if (!m_gui->collapsingHeader("Terrain editor", nullptr, true, true)) return;
 
-	ImGui::Checkbox("Editor enabled", &m_is_enabled);
+	m_gui->checkbox("Editor enabled", &m_is_enabled);
 	if (!m_is_enabled) return;
 
 	if (!getMaterial())
 	{
-		ImGui::Text("No heightmap");
+		m_gui->text("No heightmap");
 		return;
 	}
-	ImGui::SliderFloat("Brush size", &m_terrain_brush_size, MIN_BRUSH_SIZE, 100);
-	ImGui::SliderFloat("Brush strength", &m_terrain_brush_strength, 0, 1.0f);
+	m_gui->sliderFloat("Brush size", &m_terrain_brush_size, MIN_BRUSH_SIZE, 100);
+	m_gui->sliderFloat("Brush strength", &m_terrain_brush_strength, 0, 1.0f);
 
 	enum BrushType
 	{
@@ -1551,7 +1558,7 @@ void TerrainEditor::onGUI()
 
 	bool is_grass_enabled = scene->isGrassEnabled();
 
-	if (ImGui::Checkbox("Enable grass", &is_grass_enabled)) scene->enableGrass(is_grass_enabled);
+	if (m_gui->checkbox("Enable grass", &is_grass_enabled)) scene->enableGrass(is_grass_enabled);
 
 	if (ImGui::Combo(
 			"Brush type", &m_current_brush, "Height\0Layer\0Entity\0Color\0"))
@@ -1562,15 +1569,15 @@ void TerrainEditor::onGUI()
 	switch (m_current_brush)
 	{
 		case HEIGHT:
-			if (ImGui::Button("Save heightmap"))
+			if (m_gui->button("Save heightmap"))
 				getMaterial()->getTextureByUniform(HEIGHTMAP_UNIFORM)->save();
 			break;
 		case LAYER:
-			if (ImGui::Button("Save layermap"))
+			if (m_gui->button("Save layermap"))
 				getMaterial()->getTextureByUniform(SPLATMAP_UNIFORM)->save();
 			break;
 		case COLOR:
-			if (ImGui::Button("Save colormap"))
+			if (m_gui->button("Save colormap"))
 				getMaterial()->getTextureByUniform(COLORMAP_UNIFORM)->save();
 			break;
 	}
@@ -1581,18 +1588,18 @@ void TerrainEditor::onGUI()
 		{
 			static auto th = m_brush_texture->getTextureHandle();
 			ImGui::Image(&th, ImVec2(100, 100));
-			if (ImGui::Button("Clear mask"))
+			if (m_gui->button("Clear mask"))
 			{
 				m_brush_texture->destroy();
 				LUMIX_DELETE(m_world_editor.getAllocator(), m_brush_texture);
 				m_brush_mask.clear();
 				m_brush_texture = nullptr;
 			}
-			ImGui::SameLine();
+			m_gui->sameLine();
 		}
 
-		ImGui::SameLine();
-		if (ImGui::Button("Select mask"))
+		m_gui->sameLine();
+		if (m_gui->button("Select mask"))
 		{
 			char filename[Lumix::MAX_PATH_LENGTH];
 			if (PlatformInterface::getOpenFilename(filename, Lumix::lengthOf(filename), "All\0*.*\0"))
@@ -1635,15 +1642,15 @@ void TerrainEditor::onGUI()
 		case HEIGHT:
 		{
 			bool is_flat_tool = m_type == TerrainEditor::FLAT_HEIGHT;
-			if (ImGui::Checkbox("Flat", &is_flat_tool))
+			if (m_gui->checkbox("Flat", &is_flat_tool))
 			{
 				m_type = is_flat_tool ? TerrainEditor::FLAT_HEIGHT : TerrainEditor::RAISE_HEIGHT;
 			}
 
 			if (m_type == TerrainEditor::FLAT_HEIGHT)
 			{
-				ImGui::SameLine();
-				ImGui::Text("- Press Ctrl to pick height");
+				m_gui->sameLine();
+				m_gui->text("- Press Ctrl to pick height");
 			}
 			break;
 		}
@@ -1661,7 +1668,7 @@ void TerrainEditor::onGUI()
 			{
 				for (int i = 0; i < tex->getAtlasSize() * tex->getAtlasSize(); ++i)
 				{
-					if (i % 4 != 0) ImGui::SameLine();
+					if (i % 4 != 0) m_gui->sameLine();
 					if (ImGui::RadioButton(StringBuilder<20>("", i, "###rb", i), m_texture_idx == i))
 					{
 						m_texture_idx = i;
@@ -1677,7 +1684,7 @@ void TerrainEditor::onGUI()
 			auto& template_names = template_system.getTemplateNames();
 			if (template_names.empty())
 			{
-				ImGui::Text("No templates, please create one.");
+				m_gui->text("No templates, please create one.");
 			}
 			else
 			{
@@ -1693,16 +1700,16 @@ void TerrainEditor::onGUI()
 					&template_names,
 					template_names.size());
 			}
-			if (ImGui::Checkbox("Align with normal", &m_is_align_with_normal))
+			if (m_gui->checkbox("Align with normal", &m_is_align_with_normal))
 			{
 				if (m_is_align_with_normal) m_is_rotate_x = m_is_rotate_z = false;
 			}
-			if (ImGui::Checkbox("Rotate around X", &m_is_rotate_x))
+			if (m_gui->checkbox("Rotate around X", &m_is_rotate_x))
 			{
 				if (m_is_rotate_x) m_is_align_with_normal = false;
 			}
-			ImGui::SameLine();
-			if (ImGui::Checkbox("Rotate around Z", &m_is_rotate_z))
+			m_gui->sameLine();
+			if (m_gui->checkbox("Rotate around Z", &m_is_rotate_z))
 			{
 				if (m_is_rotate_z) m_is_align_with_normal = false;
 			}
