@@ -13,9 +13,6 @@ namespace Lumix
 }
 
 
-class GUIInterface;
-
-
 class ShaderEditor
 {
 public:
@@ -58,7 +55,7 @@ public:
 		virtual ~Node();
 
 		ValueType getInputType(int index) const;
-		void onNodeGUI(GUIInterface& gui);
+		void onNodeGUI();
 
 		ImGuiID m_id;
 		ImVec2 m_pos;
@@ -69,7 +66,7 @@ public:
 		ShaderEditor& m_editor;
 
 	protected:
-		virtual void onGUI(GUIInterface& gui) = 0;
+		virtual void onGUI() = 0;
 	};
 
 public:
@@ -77,7 +74,6 @@ public:
 	~ShaderEditor();
 
 	void onGUI();
-	void setGUIInterface(GUIInterface& gui);
 	const char* getTextureName(int index) const { return m_textures[index]; }
 	Lumix::IAllocator& getAllocator() { return m_allocator; }
 	Node* createNode(int type);
@@ -139,5 +135,4 @@ private:
 	ShaderType m_current_shader_type;
 	bool m_is_focused;
 	ImVec2 m_canvas_pos;
-	GUIInterface* m_gui;
 };

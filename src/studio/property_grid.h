@@ -17,7 +17,6 @@ namespace Lumix
 
 struct Action;
 class AssetBrowser;
-class GUIInterface;
 
 
 class PropertyGrid
@@ -29,7 +28,6 @@ public:
 	~PropertyGrid();
 
 	void onGUI();
-	void setGUIInterface(GUIInterface& gui);
 
 public:
 	bool m_is_opened;
@@ -55,5 +53,4 @@ private:
 
 	float m_particle_emitter_timescale;
 	bool m_particle_emitter_updating;
-	GUIInterface* m_gui;
 };

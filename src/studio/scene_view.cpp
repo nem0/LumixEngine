@@ -5,7 +5,7 @@
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "gui_interface.h"
+#include "ocornut-imgui/imgui.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
@@ -20,18 +20,11 @@ SceneView::SceneView()
 	m_pipeline = nullptr;
 	m_editor = nullptr;
 	m_camera_speed = 0.1f;
-	m_gui = nullptr;
 }
 
 
 SceneView::~SceneView()
 {
-}
-
-
-void SceneView::setGUIInterface(GUIInterface& gui)
-{
-	m_gui = &gui;
 }
 
 
@@ -189,7 +182,7 @@ void SceneView::onGUI()
 	PROFILE_FUNCTION();
 	m_is_opened = false;
 	m_is_mouse_hovering_window = false;
-	if (m_gui->begin(WINDOW_NAME))
+	if (ImGui::Begin(WINDOW_NAME))
 	{
 		m_is_mouse_hovering_window = ImGui::IsMouseHoveringWindow();
 		m_is_opened = true;
@@ -214,25 +207,25 @@ void SceneView::onGUI()
 	}
 
 	ImGui::PushItemWidth(60);
-	m_gui->dragFloat("Camera speed", &m_camera_speed, 0.1f, 0.01f, 999.0f, "%.2f");
-	m_gui->sameLine();
+	ImGui::DragFloat("Camera speed", &m_camera_speed, 0.1f, 0.01f, 999.0f, "%.2f");
+	ImGui::SameLine();
 	if (m_editor->isMeasureToolActive())
 	{
-		m_gui->text("| Measured distance: %f", m_editor->getMeasuredDistance());
+		ImGui::Text("| Measured distance: %f", m_editor->getMeasuredDistance());
 	}
 
-	m_gui->sameLine();
+	ImGui::SameLine();
 	int step = m_editor->getGizmo().getStep();
 	if (ImGui::DragInt("Gizmo step", &step, 1.0f, 0, 200))
 	{
 		m_editor->getGizmo().setStep(step);
 	}
 
-	m_gui->sameLine();
+	ImGui::SameLine();
 	int count = m_pipeline->getParameterCount();
 	if (count)
 	{
-		if (m_gui->button("Pipeline"))
+		if (ImGui::Button("Pipeline"))
 		{
 			ImGui::OpenPopup("pipeline_parameters_popup");
 		}
@@ -242,7 +235,7 @@ void SceneView::onGUI()
 			for (int i = 0; i < count; ++i)
 			{
 				bool b = m_pipeline->getParameter(i);
-				if (m_gui->checkbox(m_pipeline->getParameterName(i), &b))
+				if (ImGui::Checkbox(m_pipeline->getParameterName(i), &b))
 				{
 					auto* settings = Settings::getInstance();
 					if (settings)
@@ -257,5 +250,5 @@ void SceneView::onGUI()
 		}
 	}
 
-	m_gui->end();
+	ImGui::End();
 }

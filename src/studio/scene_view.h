@@ -14,16 +14,12 @@ namespace Lumix
 }
 
 
-class GUIInterface;
-
-
 class SceneView
 {
 	public:
 		SceneView();
 		~SceneView();
 
-		void setGUIInterface(GUIInterface& gui);
 		void update();
 		bool init(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions);
 		void setScene(Lumix::RenderScene* scene);
@@ -52,5 +48,4 @@ class SceneView
 		Lumix::PipelineInstance* m_pipeline;
 		Lumix::Pipeline* m_pipeline_source;
 		bgfx::TextureHandle m_texture_handle;
-		GUIInterface* m_gui;
 };

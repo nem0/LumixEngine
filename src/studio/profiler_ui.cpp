@@ -12,7 +12,7 @@
 #include "core/timer.h"
 #include "debug/debug.h"
 #include "engine/engine.h"
-#include "gui_interface.h"
+#include "ocornut-imgui/imgui.h"
 #include "utils.h"
 
 
@@ -34,9 +34,6 @@ enum MemoryColumn
 };
 
 
-class GUIInterface;
-
-
 struct ProfilerUIImpl : public ProfilerUI
 {
 	ProfilerUIImpl(Lumix::Debug::Allocator& allocator, Lumix::Engine& engine)
@@ -46,7 +43,6 @@ struct ProfilerUIImpl : public ProfilerUI
 		, m_opened_files(allocator)
 		, m_device(allocator)
 		, m_engine(engine)
-		, m_gui(nullptr)
 	{
 		m_viewed_thread_id = 0;
 		m_allocation_size_from = 0;
@@ -201,7 +197,7 @@ struct ProfilerUIImpl : public ProfilerUI
 
 	void onGUIFileSystem()
 	{
-		if (!m_gui->collapsingHeader("File system")) return;
+		if (!ImGui::CollapsingHeader("File system")) return;
 		auto getter = [](void* data, int index) -> float {
 			auto* ui = (ProfilerUIImpl*)data;
 			int abs_index = (ui->m_current_transfer_rate + index) % Lumix::lengthOf(ui->m_transfer_rates);
@@ -218,15 +214,15 @@ struct ProfilerUIImpl : public ProfilerUI
 			FLT_MAX,
 			ImVec2(0, 100));
 
-		m_gui->inputText("filter##fs_filter", m_filter, Lumix::lengthOf(m_filter));
+		ImGui::InputText("filter##fs_filter", m_filter, Lumix::lengthOf(m_filter));
 
-		if (m_gui->button("Clear")) m_logs.clear();
+		if (ImGui::Button("Clear")) m_logs.clear();
 
-		if (m_gui->beginChild("list"))
+		if (ImGui::BeginChild("list"))
 		{
-			m_gui->columns(3);
-			m_gui->text("File");
-			m_gui->nextColumn();
+			ImGui::Columns(3);
+			ImGui::Text("File");
+			ImGui::NextColumn();
 			
 			const char* duration_label = "Duration (ms)";
 			if (m_sort_order == TIME_ASC) duration_label = "Duration (ms) < ";
@@ -235,7 +231,7 @@ struct ProfilerUIImpl : public ProfilerUI
 			{
 				sortByDuration();
 			}
-			m_gui->nextColumn();
+			ImGui::NextColumn();
 			
 			const char* bytes_read_label = "Bytes read (kB)";
 			if (m_sort_order == BYTES_READ_ASC) bytes_read_label = "Bytes read (kB) <";
@@ -244,29 +240,23 @@ struct ProfilerUIImpl : public ProfilerUI
 			{
 				sortByBytesRead();
 			}
-			m_gui->nextColumn();
-			m_gui->separator();
+			ImGui::NextColumn();
+			ImGui::Separator();
 			for (auto& log : m_logs)
 			{
 				if (m_filter[0] == 0 || Lumix::stristr(log.path, m_filter) != 0)
 				{
-					m_gui->text(log.path);
-					m_gui->nextColumn();
-					m_gui->text("%f", log.time * 1000.0f);
-					m_gui->nextColumn();
-					m_gui->text("%.3f", (float)((double)log.bytes / 1000.0f));
-					m_gui->nextColumn();
+					ImGui::Text(log.path);
+					ImGui::NextColumn();
+					ImGui::Text("%f", log.time * 1000.0f);
+					ImGui::NextColumn();
+					ImGui::Text("%.3f", (float)((double)log.bytes / 1000.0f));
+					ImGui::NextColumn();
 				}
 			}
-			m_gui->columns(1);
+			ImGui::Columns(1);
 		}
-		m_gui->endChild();
-	}
-
-
-	void setGUIInterface(GUIInterface& gui) override
-	{
-		m_gui = &gui;
+		ImGui::EndChild();
 	}
 
 
@@ -294,14 +284,14 @@ struct ProfilerUIImpl : public ProfilerUI
 
 		if (!m_is_opened) return;
 
-		if (m_gui->begin("Profiler", &m_is_opened))
+		if (ImGui::Begin("Profiler", &m_is_opened))
 		{
 			onGUICPUProfiler();
 			onGUIMemoryProfiler();
 			onGUIResources();
 			onGUIFileSystem();
 		}
-		m_gui->end();
+		ImGui::End();
 	}
 
 
@@ -429,7 +419,6 @@ struct ProfilerUIImpl : public ProfilerUI
 	volatile int m_bytes_read;
 	float m_next_transfer_rate_time;
 	SortOrder m_sort_order;
-	GUIInterface* m_gui;
 };
 
 
@@ -612,7 +601,7 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 					int hit_count = m_current_frame < 0 ? block->m_int_values.back()
 						: block->m_int_values[m_current_frame];
 
-					m_gui->text("%d", hit_count);
+					ImGui::Text("%d", hit_count);
 					if (block->m_is_opened)
 					{
 						showProfileBlock(block->m_first_child, column);
@@ -673,9 +662,9 @@ void ProfilerUIImpl::saveResourceList()
 
 void ProfilerUIImpl::onGUIResources()
 {
-	if (!m_gui->collapsingHeader("Resources")) return;
+	if (!ImGui::CollapsingHeader("Resources")) return;
 
-	m_gui->inputText("filter##resource_filter", m_resource_filter, Lumix::lengthOf(m_resource_filter));
+	ImGui::InputText("filter##resource_filter", m_resource_filter, Lumix::lengthOf(m_resource_filter));
 
 	Lumix::uint32 manager_types[] = { Lumix::ResourceManager::ANIMATION,
 		Lumix::ResourceManager::MATERIAL,
@@ -697,21 +686,21 @@ void ProfilerUIImpl::onGUIResources()
 	ImGui::Indent();
 	for (int i = 0; i < Lumix::lengthOf(manager_types); ++i)
 	{
-		if (!m_gui->collapsingHeader(manager_names[i])) continue;
+		if (!ImGui::CollapsingHeader(manager_names[i])) continue;
 
 		auto* material_manager = m_resource_manager.get(manager_types[i]);
 		auto& resources = material_manager->getResourceTable();
 
-		m_gui->columns(4, "resc");
-		m_gui->text("Path");
-		m_gui->nextColumn();
-		m_gui->text("Size");
-		m_gui->nextColumn();
-		m_gui->text("Status");
-		m_gui->nextColumn();
-		m_gui->text("References");
-		m_gui->nextColumn();
-		m_gui->separator();
+		ImGui::Columns(4, "resc");
+		ImGui::Text("Path");
+		ImGui::NextColumn();
+		ImGui::Text("Size");
+		ImGui::NextColumn();
+		ImGui::Text("Status");
+		ImGui::NextColumn();
+		ImGui::Text("References");
+		ImGui::NextColumn();
+		ImGui::Separator();
 		size_t sum = 0;
 		for (auto iter = resources.begin(), end = resources.end(); iter != end; ++iter)
 		{
@@ -721,24 +710,24 @@ void ProfilerUIImpl::onGUIResources()
 				continue;
 			}
 
-			m_gui->text(iter.value()->getPath().c_str());
-			m_gui->nextColumn();
-			m_gui->text("%.3fKB", iter.value()->size() / 1024.0f);
+			ImGui::Text(iter.value()->getPath().c_str());
+			ImGui::NextColumn();
+			ImGui::Text("%.3fKB", iter.value()->size() / 1024.0f);
 			sum += iter.value()->size();
-			m_gui->nextColumn();
-			m_gui->text(getResourceStateString(iter.value()->getState()));
-			m_gui->nextColumn();
-			m_gui->text("%u", iter.value()->getRefCount());
-			m_gui->nextColumn();
+			ImGui::NextColumn();
+			ImGui::Text(getResourceStateString(iter.value()->getState()));
+			ImGui::NextColumn();
+			ImGui::Text("%u", iter.value()->getRefCount());
+			ImGui::NextColumn();
 		}
-		m_gui->separator();
-		m_gui->text("All");
-		m_gui->nextColumn();
-		m_gui->text("%.3fKB", sum / 1024.0f);
-		m_gui->nextColumn();
-		m_gui->nextColumn();
+		ImGui::Separator();
+		ImGui::Text("All");
+		ImGui::NextColumn();
+		ImGui::Text("%.3fKB", sum / 1024.0f);
+		ImGui::NextColumn();
+		ImGui::NextColumn();
 
-		m_gui->columns(1);
+		ImGui::Columns(1);
 		
 	}
 
@@ -747,9 +736,9 @@ void ProfilerUIImpl::onGUIResources()
 	if (saved_displayed > 0)
 	{
 		--saved_displayed;
-		m_gui->text("Saved");
+		ImGui::Text("Saved");
 	}
-	else if (m_gui->button("Save"))
+	else if (ImGui::Button("Save"))
 	{
 		saved_displayed = 180;
 		saveResourceList();
@@ -857,7 +846,7 @@ void ProfilerUIImpl::showAllocationTree(AllocationStackNode* node, int column)
 	#ifdef _MSC_VER
 		char size[50];
 		Lumix::toCStringPretty(node->m_inclusive_size, size, sizeof(size));
-		m_gui->text(size);
+		ImGui::Text(size);
 		if (node->m_opened)
 		{
 			for (auto* child : node->m_children)
@@ -871,39 +860,39 @@ void ProfilerUIImpl::showAllocationTree(AllocationStackNode* node, int column)
 
 void ProfilerUIImpl::onGUIMemoryProfiler()
 {
-	if (!m_gui->collapsingHeader("Memory")) return;
+	if (!ImGui::CollapsingHeader("Memory")) return;
 
-	if (m_gui->button("Refresh"))
+	if (ImGui::Button("Refresh"))
 	{
 		refreshAllocations();
 	}
 
-	m_gui->sameLine();
-	if (m_gui->button("Check memory"))
+	ImGui::SameLine();
+	if (ImGui::Button("Check memory"))
 	{
 		m_main_allocator.checkGuards();
 	}
-	m_gui->text("Total size: %.3fMB", (m_main_allocator.getTotalSize() / 1024) / 1024.0f);
+	ImGui::Text("Total size: %.3fMB", (m_main_allocator.getTotalSize() / 1024) / 1024.0f);
 
-	m_gui->columns(2, "memc");
+	ImGui::Columns(2, "memc");
 	for (auto* child : m_allocation_root->m_children)
 	{
 		showAllocationTree(child, FUNCTION);
 	}
-	m_gui->nextColumn();
+	ImGui::NextColumn();
 	for (auto* child : m_allocation_root->m_children)
 	{
 		showAllocationTree(child, SIZE);
 	}
-	m_gui->columns(1);
+	ImGui::Columns(1);
 }
 
 
 void ProfilerUIImpl::onGUICPUProfiler()
 {
-	if (!m_gui->collapsingHeader("CPU")) return;
+	if (!ImGui::CollapsingHeader("CPU")) return;
 
-	if (m_gui->checkbox("Pause", &m_is_paused))
+	if (ImGui::Checkbox("Pause", &m_is_paused))
 	{
 		if (m_viewed_thread_id == 0 && !m_root)
 		{
@@ -917,7 +906,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		return true;
 	};
 	int thread_idx = Lumix::Profiler::getThreadIndex(m_viewed_thread_id);
-	m_gui->sameLine();
+	ImGui::SameLine();
 	if (ImGui::Combo("Thread", &thread_idx, thread_getter, nullptr, Lumix::Profiler::getThreadCount()))
 	{
 		m_viewed_thread_id = Lumix::Profiler::getThreadID(thread_idx);
@@ -928,14 +917,14 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 	if (!m_root) return;
 
-	m_gui->columns(3, "cpuc");
+	ImGui::Columns(3, "cpuc");
 	showProfileBlock(m_root, NAME);
-	m_gui->nextColumn();
+	ImGui::NextColumn();
 	showProfileBlock(m_root, TIME);
-	m_gui->nextColumn();
+	ImGui::NextColumn();
 	showProfileBlock(m_root, HIT_COUNT);
-	m_gui->nextColumn();
-	m_gui->columns(1);
+	ImGui::NextColumn();
+	ImGui::Columns(1);
 
 	auto* block = m_current_block ? m_current_block : m_root;
 	float width = ImGui::GetWindowContentRegionWidth();

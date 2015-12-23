@@ -6,7 +6,6 @@
 #include "core/math_utils.h"
 #include "core/path_utils.h"
 #include "core/string.h"
-#include "gui_interface.h"
 #include "platform_interface.h"
 #include "utils.h"
 #include <cstdio>
@@ -271,7 +270,7 @@ struct VertexOutputNode : public ShaderEditor::Node
 	}
 
 
-	void onGUI(GUIInterface& gui) override
+	void onGUI() override
 	{
 		int idx = (int)m_output;
 		auto getter = [](void*, int idx, const char** out_text) -> bool
@@ -341,7 +340,7 @@ struct VertexInputNode : public ShaderEditor::Node
 	void generate(Lumix::OutputBlob&) override {}
 
 
-	void onGUI(GUIInterface& gui) override
+	void onGUI() override
 	{
 		auto getter = [](void*, int idx, const char** out) -> bool
 		{
@@ -476,10 +475,10 @@ ShaderEditor::ValueType ShaderEditor::Node::getInputType(int index) const
 }
 
 
-void ShaderEditor::Node::onNodeGUI(GUIInterface& gui)
+void ShaderEditor::Node::onNodeGUI()
 {
 	ImGui::PushItemWidth(120);
-	onGUI(gui);
+	onGUI();
 	ImGui::PopItemWidth();
 }
 
@@ -554,10 +553,10 @@ struct OperatorNode : public ShaderEditor::Node
 		}
 	}
 
-	void onGUI(GUIInterface& gui) override
+	void onGUI() override
 	{
-		gui.text("A");
-		gui.text("B");
+		ImGui::Text("A");
+		ImGui::Text("B");
 		int o = m_operation;
 		if (ImGui::Combo("Operation", &o, "Addition\0Subtraction\0Multiplication\0Division\0"))
 		{
@@ -635,13 +634,13 @@ struct Vec4MergeNode : public ShaderEditor::Node
 	}
 
 
-	void onGUI(GUIInterface& gui) override
+	void onGUI() override
 	{
-		gui.text("xyz");
-		gui.text("x");
-		gui.text("y");
-		gui.text("z");
-		gui.text("w");
+		ImGui::Text("xyz");
+		ImGui::Text("x");
+		ImGui::Text("y");
+		ImGui::Text("z");
+		ImGui::Text("w");
 	}
 };
 
@@ -684,9 +683,9 @@ struct FunctionNode : public ShaderEditor::Node
 	}
 
 
-	void onGUI(GUIInterface& gui) override
+	void onGUI() override
 	{
-		gui.text("value");
+		ImGui::Text("value");
 
 		auto getter = [](void* data, int idx, const char** out_text) -> bool {
 			*out_text = FUNCTIONS[idx].gui_name;
@@ -747,10 +746,10 @@ struct BinaryFunctionNode : public ShaderEditor::Node
 	}
 
 
-	void onGUI(GUIInterface& gui) override
+	void onGUI() override
 	{
-		gui.text("argument 1");
-		gui.text("argument 2");
+		ImGui::Text("argument 1");
+		ImGui::Text("argument 2");
 
 		auto getter = [](void* data, int idx, const char** out_text) -> bool {
 			*out_text = BINARY_FUNCTIONS[idx].gui_name;
@@ -790,9 +789,9 @@ struct InstanceMatrixNode : public ShaderEditor::Node
 	}
 
 
-	void onGUI(GUIInterface& gui) override
+	void onGUI() override
 	{
-		gui.text("Instance matrix");
+		ImGui::Text("Instance matrix");
 	}
 };
 
@@ -817,7 +816,7 @@ struct FloatConstNode : public ShaderEditor::Node
 		blob << m_value;
 	}
 
-	void onGUI(GUIInterface& gui) override { gui.dragFloat("value", &m_value, 0.1f); }
+	void onGUI() override { ImGui::DragFloat("value", &m_value, 0.1f); }
 
 	float m_value;
 };
@@ -842,7 +841,7 @@ struct ColorConstNode : public ShaderEditor::Node
 			 << m_color[2] << ", " << m_color[3] << ");\n";
 	}
 
-	void onGUI(GUIInterface& gui) override { ImGui::ColorEdit4("value", m_color); }
+	void onGUI() override { ImGui::ColorEdit4("value", m_color); }
 
 	float m_color[4];
 };
@@ -876,9 +875,9 @@ struct SampleNode : public ShaderEditor::Node
 		blob << ");\n";
 	}
 
-	void onGUI(GUIInterface& gui) override
+	void onGUI() override
 	{
-		gui.text("UV");
+		ImGui::Text("UV");
 		auto getter = [](void* data, int idx, const char** out) -> bool
 		{
 			*out = ((SampleNode*)data)->m_editor.getTextureName(idx);
@@ -918,7 +917,7 @@ struct FragmentInputNode : public ShaderEditor::Node
 	}
 
 
-	void onGUI(GUIInterface& gui) override
+	void onGUI() override
 	{
 		auto getter = [](void*, int idx, const char** out) -> bool
 		{
@@ -960,7 +959,7 @@ struct PositionOutputNode : public ShaderEditor::Node
 	}
 
 
-	void onGUI(GUIInterface& gui) override { gui.text("Output position"); }
+	void onGUI() override { ImGui::Text("Output position"); }
 };
 
 
@@ -989,7 +988,7 @@ struct FragmentOutputNode : public ShaderEditor::Node
 	}
 
 
-	void onGUI(GUIInterface& gui) override { gui.text("OUTPUT"); }
+	void onGUI() override { ImGui::Text("OUTPUT"); }
 };
 
 
@@ -1030,11 +1029,11 @@ struct MixNode : public ShaderEditor::Node
 		blob << ");";
 	}
 
-	void onGUI(GUIInterface& gui) override
+	void onGUI() override
 	{
-		gui.text("Input 1");
-		gui.text("Input 2");
-		gui.text("Weight");
+		ImGui::Text("Input 1");
+		ImGui::Text("Input 2");
+		ImGui::Text("Weight");
 	}
 };
 
@@ -1058,7 +1057,7 @@ struct PassNode : public ShaderEditor::Node
 	ShaderEditor::ValueType getOutputType(int) const override
 	{
 		if (!m_inputs[0]) return ShaderEditor::ValueType::NONE;
-
+		
 		int idx = m_inputs[0]->m_outputs.indexOf(this);
 		if (idx == -1) return ShaderEditor::ValueType::NONE;
 
@@ -1084,11 +1083,11 @@ struct PassNode : public ShaderEditor::Node
 		}
 	}
 
-	void onGUI(GUIInterface& gui) override
+	void onGUI() override
 	{
-		gui.text("if defined");
-		gui.text("if not defined");
-		gui.inputText("Pass", m_pass, sizeof(m_pass));
+		ImGui::Text("if defined");
+		ImGui::Text("if not defined");
+		ImGui::InputText("Pass", m_pass, sizeof(m_pass));
 	}
 
 	char m_pass[50];
@@ -1125,7 +1124,7 @@ struct BuiltinUniformNode : public ShaderEditor::Node
 
 	void generate(Lumix::OutputBlob&) override {}
 
-	void onGUI(GUIInterface& gui) override
+	void onGUI() override
 	{
 		auto getter = [](void* data, int index, const char** out_text) -> bool {
 			*out_text = BUILTIN_UNIFORMS[index].gui_name;
@@ -1169,7 +1168,7 @@ struct UniformNode : public ShaderEditor::Node
 	void generate(Lumix::OutputBlob&) override {}
 
 
-	void onGUI(GUIInterface& gui) override
+	void onGUI() override
 	{
 		auto getter = [](void*, int idx, const char** out_text) -> bool {
 			*out_text = getValueTypeName((ShaderEditor::ValueType)idx);
@@ -1178,7 +1177,7 @@ struct UniformNode : public ShaderEditor::Node
 		int tmp = (int)m_value_type;
 		ImGui::Combo("Type", &tmp, getter, this, (int)ShaderEditor::ValueType::COUNT);
 		m_value_type = (ShaderEditor::ValueType)tmp;
-		gui.inputText("Name", m_name, sizeof(m_name));
+		ImGui::InputText("Name", m_name, sizeof(m_name));
 	}
 
 	char m_name[50];
@@ -1436,7 +1435,6 @@ ShaderEditor::ShaderEditor(Lumix::IAllocator& allocator)
 	, m_is_focused(false)
 	, m_is_opened(false)
 	, m_current_shader_type(ShaderType::VERTEX)
-	, m_gui(nullptr)
 {
 	newGraph();
 }
@@ -1445,12 +1443,6 @@ ShaderEditor::ShaderEditor(Lumix::IAllocator& allocator)
 ShaderEditor::~ShaderEditor()
 {
 	clear();
-}
-
-
-void ShaderEditor::setGUIInterface(GUIInterface& gui)
-{
-	m_gui = &gui;
 }
 
 
@@ -1862,7 +1854,7 @@ static ImVec2 operator-(const ImVec2& a, const ImVec2& b)
 
 void ShaderEditor::onGUIRightColumn()
 {
-	m_gui->beginChild("right_col");
+	ImGui::BeginChild("right_col");
 
 	if(ImGui::IsWindowHovered() && !ImGui::IsAnyItemActive() && ImGui::IsMouseDragging(2, 0.0f))
 	{
@@ -1883,7 +1875,7 @@ void ShaderEditor::onGUIRightColumn()
 		auto node_screen_pos = cursor_screen_pos + node->m_pos + m_canvas_pos;
 
 		ImGui::BeginNode(node->m_id, node_screen_pos);
-		node->onNodeGUI(*m_gui);
+		node->onNodeGUI();
 		ImGui::EndNode(node_screen_pos);
 		if(ImGui::IsItemHovered() && ImGui::IsMouseDown(1))
 		{
@@ -1965,50 +1957,50 @@ void ShaderEditor::onGUIRightColumn()
 		ImVec2 add_pos(ImGui::GetMousePos() - cursor_screen_pos - m_canvas_pos);
 		if(m_current_node_id >= 0)
 		{
-			if(m_gui->menuItem("Remove"))
+			if(ImGui::MenuItem("Remove"))
 			{
 				execute(LUMIX_NEW(m_allocator, RemoveNodeCommand)(m_current_node_id, m_current_shader_type, *this));
 				m_current_node_id = -1;
 			}
 		}
 
-		if (m_gui->beginMenu("Add"))
+		if (ImGui::BeginMenu("Add"))
 		{
 			for (auto node_type : NODE_TYPES)
 			{
 				if (!node_type.is_frag && m_current_shader_type == ShaderType::FRAGMENT) continue;
 				if (!node_type.is_vert && m_current_shader_type == ShaderType::VERTEX) continue;
 
-				if (m_gui->menuItem(node_type.name))
+				if (ImGui::MenuItem(node_type.name))
 				{
 					execute(LUMIX_NEW(m_allocator, CreateNodeCommand)(
 						-1, node_type.type, m_current_shader_type, add_pos, *this));
 				}
 			}
-			m_gui->endMenu();
+			ImGui::EndMenu();
 		}
 
 		ImGui::EndPopup();
 	}
-	m_gui->endChild();
+	ImGui::EndChild();
 }
 
 
 void ShaderEditor::onGUILeftColumn()
 {
-	m_gui->beginChild("left_col", ImVec2(120, 0));
+	ImGui::BeginChild("left_col", ImVec2(120, 0));
 	ImGui::PushItemWidth(120);
 
-	m_gui->separator();
-	m_gui->text("Textures");
-	m_gui->separator();
+	ImGui::Separator();
+	ImGui::Text("Textures");
+	ImGui::Separator();
 	for (int i = 0; i < Lumix::lengthOf(m_textures); ++i)
 	{
-		m_gui->inputText(StringBuilder<10>("###tex", i), m_textures[i], sizeof(m_textures[i]));
+		ImGui::InputText(StringBuilder<10>("###tex", i), m_textures[i], sizeof(m_textures[i]));
 	}
 
 	ImGui::PopItemWidth();
-	m_gui->endChild();
+	ImGui::EndChild();
 }
 
 
@@ -2190,25 +2182,25 @@ void ShaderEditor::onGUIMenu()
 {
 	if(ImGui::BeginMenuBar())
 	{
-		if(m_gui->beginMenu("File"))
+		if(ImGui::BeginMenu("File"))
 		{
-			if (m_gui->menuItem("New")) newGraph();
-			if (m_gui->menuItem("Open")) load();
-			if (m_gui->menuItem("Save", nullptr, false, m_path.isValid())) save(m_path.c_str());
-			if (m_gui->menuItem("Save as"))
+			if (ImGui::MenuItem("New")) newGraph();
+			if (ImGui::MenuItem("Open")) load();
+			if (ImGui::MenuItem("Save", nullptr, false, m_path.isValid())) save(m_path.c_str());
+			if (ImGui::MenuItem("Save as"))
 			{
 				getSavePath();
 				if (m_path.isValid()) save(m_path.c_str());
 			}
-			m_gui->endMenu();
+			ImGui::EndMenu();
 		}
-		if (m_gui->beginMenu("Edit"))
+		if (ImGui::BeginMenu("Edit"))
 		{
-			if (m_gui->menuItem("Undo", nullptr, false, canUndo())) undo();
-			if (m_gui->menuItem("Redo", nullptr, false, canRedo())) redo();
-			m_gui->endMenu();
+			if (ImGui::MenuItem("Undo", nullptr, false, canUndo())) undo();
+			if (ImGui::MenuItem("Redo", nullptr, false, canRedo())) redo();
+			ImGui::EndMenu();
 		}
-		if (m_gui->menuItem("Generate", nullptr, false, m_path.isValid()))
+		if (ImGui::MenuItem("Generate", nullptr, false, m_path.isValid()))
 		{
 			generate(m_path.c_str(), ShaderType::VERTEX);
 			generate(m_path.c_str(), ShaderType::FRAGMENT);
@@ -2226,14 +2218,14 @@ void ShaderEditor::onGUI()
 	StringBuilder<Lumix::MAX_PATH_LENGTH + 25> title("Shader editor");
 	if (m_path.isValid()) title << " - " << m_path.c_str();
 	title << "###Shader editor";
-	if (m_gui->begin(title, &m_is_opened, ImGuiWindowFlags_MenuBar))
+	if (ImGui::Begin(title, &m_is_opened, ImGuiWindowFlags_MenuBar))
 	{
 		m_is_focused = ImGui::IsRootWindowOrAnyChildFocused();
 
 		onGUIMenu();
 		onGUILeftColumn();
-		m_gui->sameLine();
+		ImGui::SameLine();
 		onGUIRightColumn();
 	}
-	m_gui->end();
+	ImGui::End();
 }
