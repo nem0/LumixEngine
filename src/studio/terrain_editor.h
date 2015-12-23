@@ -15,6 +15,9 @@ class Texture;
 }
 
 
+class GUIInterface;
+
+
 class TerrainEditor : public Lumix::WorldEditor::Plugin
 {
 public:
@@ -34,6 +37,7 @@ public:
 	TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions);
 	~TerrainEditor();
 
+	void setGUIInterface(GUIInterface& gui);
 	void tick() override;
 	bool onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int) override;
 	void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/) override;
@@ -87,4 +91,5 @@ private:
 	bool m_is_rotate_x;
 	bool m_is_rotate_z;
 	bool m_is_enabled;
+	GUIInterface* m_gui;
 };

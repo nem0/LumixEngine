@@ -5,6 +5,7 @@
 #include <bgfx/bgfx.h>
 
 
+class GUIInterface;
 struct PlatformData;
 
 
@@ -22,6 +23,7 @@ public:
 	GameView();
 	~GameView();
 
+	void setGUIInterface(GUIInterface& gui);
 	void init(Lumix::WorldEditor& editor);
 	void shutdown();
 	void onGui();
@@ -43,4 +45,5 @@ private:
 	bgfx::TextureHandle m_texture_handle;
 	Lumix::WorldEditor* m_editor;
 	bool m_is_mouse_hovering_window;
+	GUIInterface* m_gui;
 };

@@ -2,7 +2,7 @@
 #include "core/fs/os_file.h"
 #include "core/log.h"
 #include "debug/debug.h"
-#include "ocornut-imgui/imgui.h"
+#include "gui_interface.h"
 #include "platform_interface.h"
 #include "utils.h"
 #include <cstdio>
@@ -13,7 +13,7 @@ static const char SETTINGS_PATH[] = "studio.ini";
 static Settings* g_instance = nullptr;
 
 
-static void shortcutInput(int& shortcut)
+static void shortcutInput(GUIInterface&gui, int& shortcut)
 {
 	StringBuilder<50> popup_name("");
 	popup_name << (Lumix::int64)&shortcut;
@@ -24,9 +24,9 @@ static void shortcutInput(int& shortcut)
 	StringBuilder<50> button_label(key_string);
 	button_label << "##" << (Lumix::int64)&shortcut;
 
-	if (ImGui::Button(button_label, ImVec2(50, 0))) shortcut = -1;
+	if (gui.button(button_label, ImVec2(50, 0))) shortcut = -1;
 
-	auto& io = ImGui::GetIO();
+	auto& io = gui.getIO();
 	if (ImGui::IsItemHovered())
 	{
 		for (int i = 0; i < Lumix::lengthOf(ImGui::GetIO().KeysDown); ++i)
@@ -81,6 +81,7 @@ Settings::Settings(Lumix::IAllocator& allocator)
 	: m_allocator(allocator)
 {
 	ASSERT(!g_instance);
+	m_gui = nullptr;
 	g_instance = this;
 	m_filter[0] = 0;
 	m_is_maximized = true;
@@ -111,6 +112,12 @@ Settings::~Settings()
 {
 	g_instance = nullptr;
 	lua_close(m_state);
+}
+
+
+void Settings::setGUIInterface(GUIInterface& gui)
+{
+	m_gui = &gui;
 }
 
 
@@ -278,9 +285,9 @@ bool Settings::save(Action** actions, int actions_count)
 	file << "actions = {\n";
 	for (int i = 0; i < actions_count; ++i)
 	{
-		file << "\t" << actions[i]->name << " = {" 
+		file << "\t" << actions[i]->name << " = {"
 			<< actions[i]->shortcut[0] << ", "
-			<< actions[i]->shortcut[1] << ", " 
+			<< actions[i]->shortcut[1] << ", "
 			<< actions[i]->shortcut[2] << "},\n";
 	}
 	file << "}\n";
@@ -293,24 +300,24 @@ bool Settings::save(Action** actions, int actions_count)
 
 void Settings::showShortcutSettings(Action** actions, int actions_count)
 {
-	ImGui::InputText("Filter", m_filter, Lumix::lengthOf(m_filter));
-	ImGui::Columns(4);
+	m_gui->inputText("Filter", m_filter, Lumix::lengthOf(m_filter));
+	m_gui->columns(4);
 	for (int i = 0; i < actions_count; ++i)
 	{
 		Action& a = *actions[i];
 		if (m_filter[0] == 0 || Lumix::stristr(a.label, m_filter) != 0)
 		{
-			ImGui::Text(a.label);
-			ImGui::NextColumn();
-			shortcutInput(a.shortcut[0]);
-			ImGui::NextColumn();
-			shortcutInput(a.shortcut[1]);
-			ImGui::NextColumn();
-			shortcutInput(a.shortcut[2]);
-			ImGui::NextColumn();
+			m_gui->text(a.label);
+			m_gui->nextColumn();
+			shortcutInput(*m_gui, a.shortcut[0]);
+			m_gui->nextColumn();
+			shortcutInput(*m_gui, a.shortcut[1]);
+			m_gui->nextColumn();
+			shortcutInput(*m_gui, a.shortcut[2]);
+			m_gui->nextColumn();
 		}
 	}
-	ImGui::Columns(1);
+	m_gui->columns(1);
 }
 
 
@@ -318,21 +325,21 @@ void Settings::onGUI(Action** actions, int actions_count)
 {
 	if (!m_is_opened) return;
 
-	if (ImGui::Begin("Settings", &m_is_opened))
+	if (m_gui->begin("Settings", &m_is_opened))
 	{
-		if (ImGui::Button("Save")) save(actions, actions_count);
-		ImGui::SameLine();
-		if (ImGui::Button("Reload")) load(actions, actions_count);
-		ImGui::SameLine();
-		ImGui::Text("Settings are saved when the application closes");
+		if (m_gui->button("Save")) save(actions, actions_count);
+		m_gui->sameLine();
+		if (m_gui->button("Reload")) load(actions, actions_count);
+		m_gui->sameLine();
+		m_gui->text("Settings are saved when the application closes");
 
 		ImGui::DragInt("Autosave time (seconds)", &m_autosave_time);
-		if (ImGui::Checkbox("Crash reporting", &m_is_crash_reporting_enabled))
+		if (m_gui->checkbox("Crash reporting", &m_is_crash_reporting_enabled))
 		{
 			Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
 		}
 
-		if (ImGui::CollapsingHeader("Shortcuts")) showShortcutSettings(actions, actions_count);
+		if (m_gui->collapsingHeader("Shortcuts")) showShortcutSettings(actions, actions_count);
 	}
-	ImGui::End();
+	m_gui->end();
 }

@@ -4,7 +4,7 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "engine/engine.h"
-#include "ocornut-imgui/imgui.h"
+#include "gui_interface.h"
 #include "platform_interface.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
@@ -19,12 +19,19 @@ GameView::GameView()
 	, m_is_mouse_captured(false)
 	, m_editor(nullptr)
 	, m_is_mouse_hovering_window(false)
+	, m_gui(nullptr)
 {
 }
 
 
 GameView::~GameView()
 {
+}
+
+
+void GameView::setGUIInterface(GUIInterface& gui)
+{
+	m_gui = &gui;
 }
 
 
@@ -89,7 +96,7 @@ void GameView::onGui()
 	if (!m_is_opened) return;
 	if (!m_pipeline_source->isReady()) return;
 
-	auto& io = ImGui::GetIO();
+	auto& io = m_gui->getIO();
 
 	bool is_foreground_win = PlatformInterface::isWindowActive();
 	if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] ||
@@ -100,7 +107,7 @@ void GameView::onGui()
 
 	const char* window_name = "Game view###game_view";
 	if (m_is_mouse_captured) window_name = "Game view (mouse captured)###game_view";
-	if (ImGui::Begin(window_name, &m_is_opened))
+	if (m_gui->begin(window_name, &m_is_opened))
 	{
 		m_is_mouse_hovering_window = ImGui::IsMouseHoveringWindow();
 
@@ -136,5 +143,5 @@ void GameView::onGui()
 			captureMouse(true);
 		}
 	}
-	ImGui::End();
+	m_gui->end();
 }

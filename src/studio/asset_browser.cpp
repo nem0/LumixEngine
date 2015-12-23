@@ -20,9 +20,9 @@
 #include "engine/iplugin.h"
 #include "engine/plugin_manager.h"
 #include "file_system_watcher.h"
+#include "gui_interface.h"
 #include "lua_script/lua_script_manager.h"
 #include "metadata.h"
-#include "ocornut-imgui/imgui.h"
 #include "platform_interface.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -97,6 +97,7 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 	, m_changed_files_mutex(false)
 	, m_history(editor.getAllocator())
 	, m_playing_clip(nullptr)
+	, m_gui(nullptr)
 {
 	m_filter[0] = '\0';
 	m_current_type = 0;
@@ -176,14 +177,14 @@ void AssetBrowser::update()
 		Lumix::Path path_obj;
 		{
 			Lumix::MT::SpinLock lock(m_changed_files_mutex);
-			
+
 			path_obj = m_changed_files.back();
 			m_changed_files.pop();
 			is_empty = m_changed_files.empty();
 		}
 
 		const char* path = path_obj.c_str();
-		
+
 		Lumix::uint32 resource_type = getResourceType(path);
 		if (resource_type == 0) continue;
 
@@ -206,6 +207,12 @@ void AssetBrowser::update()
 }
 
 
+void AssetBrowser::setGUIInterface(GUIInterface& gui)
+{
+	m_gui = &gui;
+}
+
+
 void AssetBrowser::onGUI()
 {
 	if (m_wanted_resource.isValid())
@@ -216,9 +223,9 @@ void AssetBrowser::onGUI()
 
 	if (!m_is_opened) return;
 
-	if (!ImGui::Begin("AssetBrowser", &m_is_opened))
+	if (!m_gui->begin("AssetBrowser", &m_is_opened))
 	{
-		ImGui::End();
+		m_gui->end();
 		return;
 	}
 
@@ -228,13 +235,13 @@ void AssetBrowser::onGUI()
 		ImGui::SetWindowFocus();
 	}
 
-	if (ImGui::Button("Refresh")) findResources();
-	ImGui::SameLine();
-	ImGui::Checkbox("Autoreload", &m_autoreload_changed_resource);
+	if (m_gui->button("Refresh")) findResources();
+	m_gui->sameLine();
+	m_gui->checkbox("Autoreload", &m_autoreload_changed_resource);
 
 	const char* items = "Material\0Model\0Shader\0Texture\0Universe\0Lua Script\0Audio\0";
 	ImGui::Combo("Type", &m_current_type, items);
-	ImGui::InputText("Filter", m_filter, sizeof(m_filter));
+	m_gui->inputText("Filter", m_filter, sizeof(m_filter));
 
 	ImGui::ListBoxHeader("Resources");
 	auto& resources = m_resources[m_current_type];
@@ -251,7 +258,7 @@ void AssetBrowser::onGUI()
 	}
 	ImGui::ListBoxFooter();
 	onGUIResource();
-	ImGui::End();
+	m_gui->end();
 }
 
 
@@ -322,29 +329,29 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	ImGui::PushItemWidth(item_w - ImGui::CalcTextSize("...View").x - style.FramePadding.x * 4 -
 						 style.ItemSpacing.x * 2);
 
-	if (ImGui::InputText(StringBuilder<30>("##", str_id), buf, max_size)) return true;
+	if (m_gui->inputText(StringBuilder<30>("##", str_id), buf, max_size)) return true;
 
-	ImGui::SameLine();
+	m_gui->sameLine();
 	StringBuilder<50> popup_name("pu", str_id);
-	if (ImGui::Button(StringBuilder<30>("...##browse", str_id)))
+	if (m_gui->button(StringBuilder<30>("...##browse", str_id)))
 	{
 		ImGui::OpenPopup(popup_name);
 	}
-	ImGui::SameLine();
-	if (ImGui::Button(StringBuilder<30>("View##go", str_id)))
+	m_gui->sameLine();
+	if (m_gui->button(StringBuilder<30>("View##go", str_id)))
 	{
 		m_is_focus_requested = true;
 		m_is_opened = true;
 		m_wanted_resource = buf;
 	}
-	ImGui::SameLine();
-	ImGui::Text(label);
+	m_gui->sameLine();
+	m_gui->text(label);
 	ImGui::PopItemWidth();
 
 	if (ImGui::BeginPopup(popup_name))
 	{
 		static char filter[128] = "";
-		ImGui::InputText("Filter", filter, sizeof(filter));
+		m_gui->inputText("Filter", filter, sizeof(filter));
 
 		for (auto unv : getResources(type))
 		{
@@ -369,28 +376,28 @@ void AssetBrowser::onGUIMaterial()
 {
 	auto* material = static_cast<Lumix::Material*>(m_selected_resource);
 
-	if (ImGui::Button("Save")) saveMaterial(material);
-	ImGui::SameLine();
-	if (ImGui::Button("Open in external editor")) openInExternalEditor(material);
+	if (m_gui->button("Save")) saveMaterial(material);
+	m_gui->sameLine();
+	if (m_gui->button("Open in external editor")) openInExternalEditor(material);
 
 	bool b;
 	if (material->hasAlphaCutoutDefine())
 	{
 		b = material->isAlphaCutout();
-		if (ImGui::Checkbox("Is alpha cutout", &b)) material->enableAlphaCutout(b);
+		if (m_gui->checkbox("Is alpha cutout", &b)) material->enableAlphaCutout(b);
 	}
 
 	b = material->isBackfaceCulling();
-	if (ImGui::Checkbox("Is backface culling", &b)) material->enableBackfaceCulling(b);
+	if (m_gui->checkbox("Is backface culling", &b)) material->enableBackfaceCulling(b);
 
 	if (material->hasShadowReceivingDefine())
 	{
 		b = material->isShadowReceiver();
-		if (ImGui::Checkbox("Is shadow receiver", &b)) material->enableShadowReceiving(b);
+		if (m_gui->checkbox("Is shadow receiver", &b)) material->enableShadowReceiving(b);
 	}
 
 	b = material->isZTest();
-	if (ImGui::Checkbox("Z test", &b)) material->enableZTest(b);
+	if (m_gui->checkbox("Z test", &b)) material->enableZTest(b);
 
 	Lumix::Vec3 specular = material->getSpecular();
 	if (ImGui::ColorEdit3("Specular", &specular.x))
@@ -399,7 +406,7 @@ void AssetBrowser::onGUIMaterial()
 	}
 
 	float shininess = material->getShininess();
-	if (ImGui::DragFloat("Shininess", &shininess))
+	if (m_gui->dragFloat("Shininess", &shininess))
 	{
 		material->setShininess(shininess);
 	}
@@ -423,9 +430,9 @@ void AssetBrowser::onGUIMaterial()
 		}
 		if (!texture) continue;
 
-		ImGui::SameLine();
+		m_gui->sameLine();
 		StringBuilder<100> popup_name("pu", (Lumix::uint64)texture, slot.m_name);
-		if (ImGui::Button(StringBuilder<100>("Advanced##adv", (Lumix::uint64)texture, slot.m_name)))
+		if (m_gui->button(StringBuilder<100>("Advanced##adv", (Lumix::uint64)texture, slot.m_name)))
 		{
 			ImGui::OpenPopup(popup_name);
 		}
@@ -433,22 +440,22 @@ void AssetBrowser::onGUIMaterial()
 		if (ImGui::BeginPopup(popup_name))
 		{
 			bool u_clamp = (texture->getFlags() & BGFX_TEXTURE_U_CLAMP) != 0;
-			if (ImGui::Checkbox("u clamp", &u_clamp))
+			if (m_gui->checkbox("u clamp", &u_clamp))
 			{
 				texture->setFlag(BGFX_TEXTURE_U_CLAMP, u_clamp);
 			}
 			bool v_clamp = (texture->getFlags() & BGFX_TEXTURE_V_CLAMP) != 0;
-			if (ImGui::Checkbox("v clamp", &v_clamp))
+			if (m_gui->checkbox("v clamp", &v_clamp))
 			{
 				texture->setFlag(BGFX_TEXTURE_V_CLAMP, v_clamp);
 			}
 			bool min_point = (texture->getFlags() & BGFX_TEXTURE_MIN_POINT) != 0;
-			if (ImGui::Checkbox("Min point", &min_point))
+			if (m_gui->checkbox("Min point", &min_point))
 			{
 				texture->setFlag(BGFX_TEXTURE_MIN_POINT, min_point);
 			}
 			bool mag_point = (texture->getFlags() & BGFX_TEXTURE_MAG_POINT) != 0;
-			if (ImGui::Checkbox("Mag point", &mag_point))
+			if (m_gui->checkbox("Mag point", &mag_point))
 			{
 				texture->setFlag(BGFX_TEXTURE_MAG_POINT, mag_point);
 			}
@@ -473,11 +480,11 @@ void AssetBrowser::onGUIMaterial()
 		switch (uniform.m_type)
 		{
 			case Lumix::Material::Uniform::FLOAT: 
-				ImGui::DragFloat(uniform.m_name, &uniform.m_float);
+				m_gui->dragFloat(uniform.m_name, &uniform.m_float);
 				break;
 		}
 	}
-	ImGui::Columns(1);
+	m_gui->columns(1);
 }
 
 
@@ -486,7 +493,7 @@ void AssetBrowser::onGUITexture()
 	auto* texture = static_cast<Lumix::Texture*>(m_selected_resource);
 	if (texture->isFailure())
 	{
-		ImGui::Text("Texture failed to load");
+		m_gui->text("Texture failed to load");
 		return;
 	}
 
@@ -496,7 +503,7 @@ void AssetBrowser::onGUITexture()
 	if (bgfx::isValid(m_texture_handle))
 	{
 		ImGui::Image(&m_texture_handle, ImVec2(200, 200));
-		if (ImGui::Button("Open"))
+		if (m_gui->button("Open"))
 		{
 			openInExternalEditor(m_selected_resource);
 		}
@@ -526,12 +533,12 @@ void AssetBrowser::onGUIClip()
 	auto* clip = static_cast<Lumix::Clip*>(m_selected_resource);
 	ImGui::LabelText("Length", "%f", clip->getLengthSeconds());
 
-	if (m_playing_clip && ImGui::Button("Stop"))
+	if (m_playing_clip && m_gui->button("Stop"))
 	{
 		stopAudio();
 	}
 
-	if (!m_playing_clip && ImGui::Button("Play"))
+	if (!m_playing_clip && m_gui->button("Play"))
 	{
 		stopAudio();
 
@@ -553,7 +560,7 @@ void AssetBrowser::onGUILuaScript()
 		Lumix::copyString(m_text_buffer, script->getSourceCode());
 	}
 	ImGui::InputTextMultiline("Code", m_text_buffer, sizeof(m_text_buffer), ImVec2(0, 300));
-	if (ImGui::Button("Save"))
+	if (m_gui->button("Save"))
 	{
 		auto& fs = m_editor.getEngine().getFileSystem();
 		auto* file = fs.open(fs.getDiskDevice(),
@@ -570,8 +577,8 @@ void AssetBrowser::onGUILuaScript()
 		file->write(m_text_buffer, Lumix::stringLength(m_text_buffer));
 		fs.close(*file);
 	}
-	ImGui::SameLine();
-	if (ImGui::Button("Open in external editor"))
+	m_gui->sameLine();
+	if (m_gui->button("Open in external editor"))
 	{
 		openInExternalEditor(m_selected_resource);
 	}
@@ -594,35 +601,35 @@ void AssetBrowser::onGUIShader()
 	Lumix::PathUtils::getBasename(
 		basename, Lumix::lengthOf(basename), m_selected_resource->getPath().c_str());
 	path << "/shaders/" << basename;
-	if (ImGui::Button("Open vertex shader"))
+	if (m_gui->button("Open vertex shader"))
 	{
 		path << "_vs.sc";
 		PlatformInterface::shellExecuteOpen(path);
 	}
-	ImGui::SameLine();
-	if (ImGui::Button("Open fragment shader"))
+	m_gui->sameLine();
+	if (m_gui->button("Open fragment shader"))
 	{
 		path << "_fs.sc";
 		PlatformInterface::shellExecuteOpen(path);
 	}
 
-	if (ImGui::CollapsingHeader("Texture slots", nullptr, true, true))
+	if (m_gui->collapsingHeader("Texture slots", nullptr, true, true))
 	{
-		ImGui::Columns(2);
-		ImGui::Text("name");
-		ImGui::NextColumn();
-		ImGui::Text("uniform");
-		ImGui::NextColumn();
-		ImGui::Separator();
+		m_gui->columns(2);
+		m_gui->text("name");
+		m_gui->nextColumn();
+		m_gui->text("uniform");
+		m_gui->nextColumn();
+		m_gui->separator();
 		for (int i = 0; i < shader->getTextureSlotCount(); ++i)
 		{
 			auto& slot = shader->getTextureSlot(i);
-			ImGui::Text(slot.m_name);
-			ImGui::NextColumn();
-			ImGui::Text(slot.m_uniform);
-			ImGui::NextColumn();
+			m_gui->text(slot.m_name);
+			m_gui->nextColumn();
+			m_gui->text(slot.m_uniform);
+			m_gui->nextColumn();
 		}
-		ImGui::Columns(1);
+		m_gui->columns(1);
 	}
 }
 
@@ -736,17 +743,17 @@ static void insertInScene(Lumix::WorldEditor& editor, Lumix::Model* model)
 void AssetBrowser::onGUIModel()
 {
 	auto* model = static_cast<Lumix::Model*>(m_selected_resource);
-	if (ImGui::Button("Insert in scene"))
+	if (m_gui->button("Insert in scene"))
 	{
 		insertInScene(m_editor, model);
 	}
 
 	ImGui::LabelText("Bone count", "%d", model->getBoneCount());
-	if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones"))
+	if (model->getBoneCount() > 0 && m_gui->collapsingHeader("Bones"))
 	{
 		for (int i = 0; i < model->getBoneCount(); ++i)
 		{
-			ImGui::Text(model->getBone(i).name.c_str());
+			m_gui->text(model->getBone(i).name.c_str());
 		}
 	}
 
@@ -755,26 +762,26 @@ void AssetBrowser::onGUIModel()
 	auto& lods = model->getLODs();
 	if (!lods.empty())
 	{
-		ImGui::Separator();
-		ImGui::Columns(3);
-		ImGui::Text("LOD"); ImGui::NextColumn();
-		ImGui::Text("Distance"); ImGui::NextColumn();
-		ImGui::Text("# of meshes"); ImGui::NextColumn();
-		ImGui::Separator();
+		m_gui->separator();
+		m_gui->columns(3);
+		m_gui->text("LOD"); m_gui->nextColumn();
+		m_gui->text("Distance"); m_gui->nextColumn();
+		m_gui->text("# of meshes"); m_gui->nextColumn();
+		m_gui->separator();
 		for (int i = 0; i < lods.size() - 1; ++i)
 		{
-			ImGui::Text("%d", i); ImGui::NextColumn();
-			ImGui::DragFloat("", &lods[i].m_distance); ImGui::NextColumn();
-			ImGui::Text("%d", lods[i].m_to_mesh - lods[i].m_from_mesh + 1); ImGui::NextColumn();
+			m_gui->text("%d", i); m_gui->nextColumn();
+			m_gui->dragFloat("", &lods[i].m_distance); m_gui->nextColumn();
+			m_gui->text("%d", lods[i].m_to_mesh - lods[i].m_from_mesh + 1); m_gui->nextColumn();
 		}
 
-		ImGui::Text("%d", lods.size() - 1); ImGui::NextColumn();
-		ImGui::Text("INFINITE"); ImGui::NextColumn();
-		ImGui::Text("%d", lods.back().m_to_mesh - lods.back().m_from_mesh + 1);
-		ImGui::Columns(1);
+		m_gui->text("%d", lods.size() - 1); m_gui->nextColumn();
+		m_gui->text("INFINITE"); m_gui->nextColumn();
+		m_gui->text("%d", lods.back().m_to_mesh - lods.back().m_from_mesh + 1);
+		m_gui->columns(1);
 	}
 
-	ImGui::Separator();
+	m_gui->separator();
 	for (int i = 0; i < model->getMeshCount(); ++i)
 	{
 		auto& mesh = model->getMesh(i);
@@ -782,8 +789,8 @@ void AssetBrowser::onGUIModel()
 		{
 			ImGui::LabelText("Triangle count", "%d", mesh.getTriangleCount());
 			ImGui::LabelText("Material", mesh.getMaterial()->getPath().c_str());
-			ImGui::SameLine();
-			if (ImGui::Button("->"))
+			m_gui->sameLine();
+			if (m_gui->button("->"))
 			{
 				selectResource(mesh.getMaterial()->getPath());
 			}
@@ -798,20 +805,20 @@ void AssetBrowser::onGUIResource()
 	if (!m_selected_resource) return;
 
 	const char* path = m_selected_resource->getPath().c_str();
-	ImGui::Separator();
+	m_gui->separator();
 	ImGui::LabelText("Selected resource", path);
-	if (!m_history.empty() && ImGui::Button("Back"))
+	if (!m_history.empty() && m_gui->button("Back"))
 	{
 		selectResource(m_history.back());
 		m_history.pop();
 		m_history.pop();
 		return;
 	}
-	ImGui::Separator();
+	m_gui->separator();
 
 	if (!m_selected_resource->isReady() && !m_selected_resource->isFailure())
 	{
-		ImGui::Text("Not ready");
+		m_gui->text("Not ready");
 		return;
 	}
 

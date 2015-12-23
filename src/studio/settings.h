@@ -9,6 +9,7 @@ namespace Lumix
 
 
 struct Action;
+class GUIInterface;
 struct lua_State;
 
 
@@ -47,6 +48,7 @@ struct Settings
 
 	static Settings* getInstance();
 
+	void setGUIInterface(GUIInterface& gui);
 	bool save(Action** actions, int actions_count);
 	bool load(Action** actions, int actions_count);
 	void onGUI(Action** actions, int actions_count);
@@ -58,6 +60,7 @@ struct Settings
 private:
 	Lumix::IAllocator& m_allocator;
 	lua_State* m_state;
+	GUIInterface* m_gui;
 
 private:
 	void showShortcutSettings(Action** actions, int actions_count);
