@@ -14,7 +14,7 @@ namespace Lumix
 }
 
 
-class SceneView
+class LUMIX_STUDIO_LIB_API SceneView
 {
 	public:
 		SceneView();

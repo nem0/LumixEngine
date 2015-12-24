@@ -12,10 +12,15 @@
 #include "core/lua_wrapper.h"
 #include "core/resource_manager.h"
 #include "debug/debug.h"
+#include "editor/world_editor.h"
 #include "engine.h"
 #include "iplugin.h"
-#include "plugin_manager.h"
 #include "lua_script/lua_script_manager.h"
+#include "plugin_manager.h"
+#include "studio_lib/imgui/imgui.h"
+#include "studio_lib/property_grid.h"
+#include "studio_lib/studio_app.h"
+#include "studio_lib/utils.h"
 #include "universe/universe.h"
 
 
@@ -704,6 +709,60 @@ void LuaScriptSystem::destroy()
 const char* LuaScriptSystem::getName() const
 {
 	return "lua_script";
+}
+
+
+struct PropertyGridPlugin : public PropertyGrid::Plugin
+{
+	void onGUI(PropertyGrid& grid, Lumix::ComponentUID cmp) override
+	{
+		auto* scene = static_cast<Lumix::LuaScriptScene*>(cmp.scene);
+
+		for (int i = 0; i < scene->getPropertyCount(cmp.index); ++i)
+		{
+			char buf[256];
+			Lumix::copyString(buf, scene->getPropertyValue(cmp.index, i));
+			const char* property_name = scene->getPropertyName(cmp.index, i);
+			auto* script_res = scene->getScriptResource(cmp.index);
+			switch (script_res->getProperties()[i].type)
+			{
+			case Lumix::LuaScript::Property::FLOAT:
+			{
+				float f = (float)atof(buf);
+				if (ImGui::DragFloat(property_name, &f))
+				{
+					Lumix::toCString(f, buf, sizeof(buf), 5);
+					scene->setPropertyValue(cmp.index, property_name, buf);
+				}
+			}
+			break;
+			case Lumix::LuaScript::Property::ENTITY:
+			{
+				Lumix::Entity e;
+				Lumix::fromCString(buf, sizeof(buf), &e);
+				if (grid.entityInput(property_name, StringBuilder<50>(property_name, cmp.index), e))
+				{
+					Lumix::toCString(e, buf, sizeof(buf));
+					scene->setPropertyValue(cmp.index, property_name, buf);
+				}
+			}
+			break;
+			case Lumix::LuaScript::Property::ANY:
+				if (ImGui::InputText(property_name, buf, sizeof(buf)))
+				{
+					scene->setPropertyValue(cmp.index, property_name, buf);
+				}
+				break;
+			}
+		}
+	}
+};
+
+
+extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
+{
+	auto* plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), PropertyGridPlugin);
+	app.getPropertyGrid()->addPlugin(*plugin);
 }
 
 

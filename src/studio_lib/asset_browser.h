@@ -17,7 +17,7 @@ class FileSystemWatcher;
 class Metadata;
 
 
-class AssetBrowser
+class LUMIX_STUDIO_LIB_API AssetBrowser
 {
 public:
 	enum Type
