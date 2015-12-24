@@ -11,12 +11,23 @@ namespace Lumix
 
 struct AudioDeviceImpl : public AudioDevice
 {
+	struct Buffer
+	{
+		LPDIRECTSOUNDBUFFER handle;
+		const void* data;
+		DWORD data_size;
+		DWORD written;
+		bool looped;
+	};
+
 	Engine* m_engine;
 	HMODULE m_library;
 	LPDIRECTSOUND8 m_direct_sound;
 	LPDIRECTSOUNDBUFFER m_primary_buffer;
 	LPDIRECTSOUND3DLISTENER8 m_listener;
+	Buffer m_buffers[256];
 
+	static const int STREAM_SIZE = 32768;
 
 	AudioDeviceImpl()
 	{
@@ -25,6 +36,10 @@ struct AudioDeviceImpl : public AudioDevice
 		m_direct_sound = nullptr;
 		m_primary_buffer = nullptr;
 		m_listener = nullptr;
+		for (auto& i : m_buffers)
+		{
+			i.handle = nullptr;
+		}
 	}
 
 
@@ -113,11 +128,12 @@ struct AudioDeviceImpl : public AudioDevice
 
 
 	BufferHandle createBuffer(const void* data,
-		int size_bytes,
+		int data_size,
 		int channels,
 		int sample_rate,
 		int flags) override
 	{
+		int buffer_size = data_size > STREAM_SIZE ? STREAM_SIZE : data_size;
 		DSBUFFERDESC desc = {};
 		LPDIRECTSOUNDBUFFER buffer;
 		desc.dwSize = sizeof(desc);
@@ -125,7 +141,7 @@ struct AudioDeviceImpl : public AudioDevice
 					   DSBCAPS_CTRLFX;
 		bool is_3d = (flags & (int)BufferFlags::IS3D) != 0;
 		if (is_3d) desc.dwFlags |= DSBCAPS_CTRL3D;
-		desc.dwBufferBytes = size_bytes;
+		desc.dwBufferBytes = buffer_size;
 
 		WAVEFORMATEX wave_format = {};
 		wave_format.cbSize = 0;
@@ -138,29 +154,29 @@ struct AudioDeviceImpl : public AudioDevice
 
 		desc.lpwfxFormat = &wave_format;
 		auto result = SUCCEEDED(m_direct_sound->CreateSoundBuffer(&desc, &buffer, nullptr));
-		if (!result) return nullptr;
+		if (!result) return INVALID_BUFFER_HANDLE;
 
 		void* p1;
 		void* p2;
 		DWORD s1, s2;
-		result = SUCCEEDED(buffer->Lock(0, size_bytes, &p1, &s1, &p2, &s2, 0));
+		result = SUCCEEDED(buffer->Lock(0, buffer_size, &p1, &s1, &p2, &s2, 0));
 		if (!result)
 		{
 			buffer->Release();
-			return nullptr;
+			return INVALID_BUFFER_HANDLE;
 		}
 		memcpy(p1, data, s1);
 		result = SUCCEEDED(buffer->Unlock(p1, s1, p2, s2));
 		if (!result)
 		{
 			buffer->Release();
-			return nullptr;
+			return INVALID_BUFFER_HANDLE;
 		}
 		result = SUCCEEDED(buffer->SetCurrentPosition(0));
 		if (!result)
 		{
 			buffer->Release();
-			return nullptr;
+			return INVALID_BUFFER_HANDLE;
 		}
 
 		if (is_3d)
@@ -175,7 +191,20 @@ struct AudioDeviceImpl : public AudioDevice
 			}
 		}
 
-		return buffer;
+		for (int i = 0; i < lengthOf(m_buffers); ++i)
+		{
+			if (!m_buffers[i].handle)
+			{
+				m_buffers[i].handle = buffer;
+				m_buffers[i].data = data;
+				m_buffers[i].data_size = data_size;
+				m_buffers[i].written = buffer_size;
+				return i;
+			}
+		}
+
+		buffer->Release();
+		return INVALID_BUFFER_HANDLE;
 	}
 
 
@@ -185,7 +214,7 @@ struct AudioDeviceImpl : public AudioDevice
 		float left_delay,
 		float right_delay) override
 	{
-		auto buffer = (LPDIRECTSOUNDBUFFER)handle;
+		auto buffer = m_buffers[handle].handle;
 		DSEFFECTDESC echo_effect = {};
 		echo_effect.dwSize = sizeof(DSEFFECTDESC);
 		echo_effect.guidDSFXClass = GUID_DSFX_STANDARD_ECHO;
@@ -229,17 +258,10 @@ struct AudioDeviceImpl : public AudioDevice
 		if (buffer_status & DSBSTATUS_PLAYING) buffer->Play(0, 0, buffer_status & DSBSTATUS_LOOPING);
 	}
 
-
-	void destroyBuffer(BufferHandle clip) override
+	
+	bool isPlaying(BufferHandle handle) override
 	{
-		auto buffer = (LPDIRECTSOUNDBUFFER)clip;
-		buffer->Release();
-	}
-
-
-	bool isPlaying(BufferHandle clip) override
-	{
-		auto buffer = (LPDIRECTSOUNDBUFFER)clip;
+		auto buffer = m_buffers[handle].handle;
 		DWORD status;
 		if (FAILED(buffer->GetStatus(&status))) return false;
 
@@ -247,62 +269,165 @@ struct AudioDeviceImpl : public AudioDevice
 	}
 
 
-	void play(BufferHandle clip, bool looped) override
+	void play(BufferHandle handle, bool looped) override
 	{
-		auto buffer = (LPDIRECTSOUNDBUFFER)clip;
-		buffer->Play(0, 0, looped ? DSBPLAY_LOOPING : 0);
+		auto buffer = m_buffers[handle].handle;
+		m_buffers[handle].looped = looped;
+		buffer->Play(0, 0, DSBPLAY_LOOPING);
 	}
 
 
-	void stop(BufferHandle clip) override
+	void stop(BufferHandle handle) override
 	{
-		auto buffer = (LPDIRECTSOUNDBUFFER)clip;
+		auto buffer = m_buffers[handle].handle;
 		buffer->Stop();
 		buffer->Release();
+		m_buffers[handle].handle = nullptr;
 	}
 
 
-	void pause(BufferHandle clip) override
+	void pause(BufferHandle handle) override
 	{
-		auto buffer = (LPDIRECTSOUNDBUFFER)clip;
-		buffer->Stop();
+		m_buffers[handle].handle->Stop();
 	}
 
 
-	void setVolume(BufferHandle clip, float volume) override
+	void setVolume(BufferHandle handle, float volume) override
 	{
-		auto buffer = (LPDIRECTSOUNDBUFFER)clip;
-		buffer->SetVolume(DSBVOLUME_MIN + LONG(volume * (DSBVOLUME_MAX - DSBVOLUME_MIN)));
+		m_buffers[handle].handle->SetVolume(DSBVOLUME_MIN + LONG(volume * (DSBVOLUME_MAX - DSBVOLUME_MIN)));
 	}
 
 
-	void setFrequency(BufferHandle clip, float frequency) override
+	void setFrequency(BufferHandle handle, float frequency) override
 	{
-		auto buffer = (LPDIRECTSOUNDBUFFER)clip;
-		buffer->SetFrequency(
+		m_buffers[handle].handle->SetFrequency(
 			DSBFREQUENCY_MIN + DWORD(frequency * (DSBFREQUENCY_MAX - DSBFREQUENCY_MIN)));
 	}
 
 
-	void setCurrentTime(BufferHandle clip, float time_seconds) override
+	float getCurrentTime(BufferHandle handle) override
 	{
-		auto buffer = (LPDIRECTSOUNDBUFFER)clip;
+		auto& buffer = m_buffers[handle];
+
 		WAVEFORMATEX format;
-		if (SUCCEEDED(buffer->GetFormat(&format, sizeof(format), nullptr)))
+		if (SUCCEEDED(buffer.handle->GetFormat(&format, sizeof(format), nullptr)))
+		{
+			if (buffer.data_size <= STREAM_SIZE)
+			{
+				DWORD pc, wc;
+				buffer.handle->GetCurrentPosition(&pc, &wc);
+				return pc / (float)format.nAvgBytesPerSec;
+			}
+			return buffer.written / (float)format.nAvgBytesPerSec;
+		}
+		return 0;
+	}
+	
+
+	void setCurrentTime(BufferHandle handle, float time_seconds) override
+	{
+		auto& buffer = m_buffers[handle];
+		WAVEFORMATEX format;
+		if (SUCCEEDED(buffer.handle->GetFormat(&format, sizeof(format), nullptr)))
 		{
 			DWORD pos = DWORD(format.nAvgBytesPerSec * time_seconds);
-			buffer->SetCurrentPosition(pos);
+			if (buffer.data_size <= STREAM_SIZE)
+			{
+				buffer.handle->SetCurrentPosition(pos);
+			}
+			else
+			{
+				buffer.written = pos;
+			}
 		}
 	}
 
 
-	void update(float) override { m_listener->CommitDeferredSettings(); }
+	void updateStreamData(Buffer& buffer, DWORD update_size)
+	{
+		DWORD s1, s2;
+		void* p1;
+		void* p2;
+		if (FAILED(buffer.handle->Lock(buffer.written % STREAM_SIZE, update_size, &p1, &s1, &p2, &s2, 0)))
+		{
+			return;
+		}
+		if (buffer.written + s1 > buffer.data_size)
+		{
+			memcpy(p1, (uint8*)buffer.data + buffer.written, buffer.data_size - buffer.written);
+			void* p1_2 = (uint8*)p1 + (buffer.data_size - buffer.written);
+			DWORD s1_2 = s1 - (buffer.data_size - buffer.written);
+			if (buffer.looped)
+			{
+				memcpy(p1_2, buffer.data, s1_2);
+			}
+			else
+			{
+				ZeroMemory(p1_2, s1_2);
+			}
+		}
+		else
+		{
+			memcpy(p1, (uint8*)buffer.data + buffer.written, s1);
+		}
+		buffer.written += s1;
+		if (p2)
+		{
+			if (buffer.written + s2 > buffer.data_size)
+			{
+				memcpy(p2, (uint8*)buffer.data + buffer.written, buffer.data_size - buffer.written);
+				void* p2_2 = (uint8*)p2 + (buffer.data_size - buffer.written);
+				DWORD s2_2 = s2 - (buffer.data_size - buffer.written);
+				if (buffer.looped)
+				{
+					memcpy(p2_2, buffer.data, s2_2);
+				}
+				else
+				{
+					ZeroMemory(p2_2, s2_2);
+				}
+			}
+			else
+			{
+				memcpy(p2, (uint8*)buffer.data + buffer.written, s2);
+			}
+			buffer.written += s2;
+		}
+		if (buffer.written > buffer.data_size) buffer.written = buffer.written % buffer.data_size;
+		if (FAILED(buffer.handle->Unlock(p1, s1, p2, s2)))
+		{
+			return;
+		}
+	}
 
 
-	void setSourcePosition(BufferHandle clip, float x, float y, float z) override
+	void update(float) override 
+	{
+		for (auto& i : m_buffers)
+		{
+			if (!i.handle) continue;
+			if (i.data_size <= STREAM_SIZE) continue;
+
+			DWORD rel_pc, rel_wc;
+			i.handle->GetCurrentPosition(&rel_pc, &rel_wc);
+
+			auto rel_written = DWORD(i.written % STREAM_SIZE);
+			DWORD abs_pc = i.written - (rel_written - rel_pc);
+			if (rel_pc >= rel_written) abs_pc -= STREAM_SIZE;
+			if (i.written - abs_pc < STREAM_SIZE / 2)
+			{
+				DWORD update_size = abs_pc + STREAM_SIZE - i.written;
+				updateStreamData(i, update_size);
+			}
+		}
+		m_listener->CommitDeferredSettings(); 
+	}
+
+
+	void setSourcePosition(BufferHandle handle, float x, float y, float z) override
 	{
 		LPDIRECTSOUND3DBUFFER8 source;
-		auto buffer = (LPDIRECTSOUNDBUFFER)clip;
+		auto buffer = m_buffers[handle].handle;
 		if (SUCCEEDED(buffer->QueryInterface(IID_IDirectSound3DBuffer8, (void**)&source)))
 		{
 			source->SetPosition(x, y, z, DS3D_DEFERRED);
@@ -347,7 +472,7 @@ void AudioDevice::destroy(AudioDevice& device)
 }
 
 
-const AudioDevice::BufferHandle AudioDevice::INVALID_BUFFER_HANDLE = nullptr;
+const AudioDevice::BufferHandle AudioDevice::INVALID_BUFFER_HANDLE = -1;
 
 
 } // namespace Lumix

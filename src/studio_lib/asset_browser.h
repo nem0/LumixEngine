@@ -80,5 +80,5 @@ private:
 	bool m_autoreload_changed_resource;
 	bool m_is_focus_requested;
 	bgfx::TextureHandle m_texture_handle;
-	void* m_playing_clip;
+	int m_playing_clip;
 };
