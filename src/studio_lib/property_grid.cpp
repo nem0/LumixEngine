@@ -45,7 +45,10 @@ PropertyGrid::PropertyGrid(Lumix::WorldEditor& editor,
 
 PropertyGrid::~PropertyGrid()
 {
-	ASSERT(m_plugins.empty());
+	for (auto* i : m_plugins)
+	{
+		LUMIX_DELETE(m_editor.getAllocator(), i);
+	}
 	LUMIX_DELETE(m_editor.getAllocator(), m_terrain_editor);
 }
 
