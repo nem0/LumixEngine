@@ -599,7 +599,7 @@ struct AudioSceneImpl : public AudioScene
 					clip->getChannels(),
 					clip->getSampleRate(),
 					flags);
-				if (!buffer) return -1;
+				if (buffer == AudioDevice::INVALID_BUFFER_HANDLE) return -1;
 				m_device.play(buffer, clip_info->looped);
 
 				auto pos = m_universe.getPosition(entity);

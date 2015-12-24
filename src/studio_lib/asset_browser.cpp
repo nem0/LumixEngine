@@ -96,7 +96,7 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 	, m_is_focus_requested(false)
 	, m_changed_files_mutex(false)
 	, m_history(editor.getAllocator())
-	, m_playing_clip(nullptr)
+	, m_playing_clip(-1)
 {
 	m_filter[0] = '\0';
 	m_current_type = 0;
@@ -513,10 +513,10 @@ Lumix::AudioDevice& getAudioDevice(Lumix::Engine& engine)
 
 void AssetBrowser::stopAudio()
 {
-	if (m_playing_clip)
+	if (m_playing_clip >= 0)
 	{
 		getAudioDevice(m_editor.getEngine()).stop(m_playing_clip);
-		m_playing_clip = nullptr;
+		m_playing_clip = -1;
 	}
 }
 
@@ -525,17 +525,26 @@ void AssetBrowser::onGUIClip()
 {
 	auto* clip = static_cast<Lumix::Clip*>(m_selected_resource);
 	ImGui::LabelText("Length", "%f", clip->getLengthSeconds());
+	auto& device = getAudioDevice(m_editor.getEngine());
 
-	if (m_playing_clip && ImGui::Button("Stop"))
+	if (m_playing_clip >= 0)
 	{
-		stopAudio();
+		if (ImGui::Button("Stop"))
+		{
+			stopAudio();
+			return;
+		}
+		float time = device.getCurrentTime(m_playing_clip);
+		if (ImGui::SliderFloat("Time", &time, 0, clip->getLengthSeconds(), "%.2fs"))
+		{
+			device.setCurrentTime(m_playing_clip, time);
+		}
 	}
 
-	if (!m_playing_clip && ImGui::Button("Play"))
+	if (m_playing_clip < 0 && ImGui::Button("Play"))
 	{
 		stopAudio();
 
-		auto& device = getAudioDevice(m_editor.getEngine());
 		auto handle = device.createBuffer(
 			clip->getData(), clip->getSize(), clip->getChannels(), clip->getSampleRate(), 0);
 		device.play(handle, false);
