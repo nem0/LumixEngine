@@ -111,6 +111,11 @@ namespace Lumix
 	#define LUMIX_ANIMATION_API LUMIX_LIBRARY_IMPORT
 #endif
 
+#ifdef BUILDING_STUDIO_LIB
+	#define LUMIX_STUDIO_LIB_API LUMIX_LIBRARY_EXPORT
+#else
+	#define LUMIX_STUDIO_LIB_API LUMIX_LIBRARY_IMPORT
+#endif
 
 #pragma warning(disable : 4251)
 #pragma warning(disable : 4365)

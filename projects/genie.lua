@@ -106,14 +106,6 @@ solution "LumixEngine"
 	language "C++"
 	startproject "studio"
 
-project "imgui"
-	kind "SharedLib"
-	files { "../src/imgui/**.h", "../src/imgui/**.cpp" }
-
-	defines { "BUILDING_IMGUI" } 
-
-	defaultConfigurations()
-
 project "engine"
 	kind "SharedLib"
 
@@ -158,7 +150,7 @@ project "renderer"
 	files { "../src/renderer/**.h", "../src/renderer/**.cpp" }
 	includedirs { "../external/bgfx/include" }
 	defines { "BUILDING_RENDERER" }
-	links {"engine", "psapi"}
+	links { "engine", "psapi" }
 	useLua()
 	defaultConfigurations()
 
@@ -215,7 +207,7 @@ project "lua_script"
 	files { "../src/lua_script/**.h", "../src/lua_script/**.cpp" }
 	includedirs { "../src", "../src/lua_script", "../external/lua/include", "../external/bgfx/include" }
 	defines { "BUILDING_LUA_SCRIPT" }
-	links { "engine", "renderer" }
+	links { "studio_lib", "engine", "renderer" }
 
 	useLua()
 	defaultConfigurations()
@@ -231,14 +223,13 @@ project "unit_tests"
 	defaultConfigurations()
 
 
-project "studio"
-	kind "WindowedApp"
+project "studio_lib"
+	kind "SharedLib"
 
-	debugdir "../../LumixEngine_data"
-
-	files { "../src/studio/**.h", "../src/studio/**.cpp" }
-	includedirs { "../src", "../src/studio", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
-	links { "imgui", "lua_script", "animation", "physics", "editor", "engine", "renderer", "audio", "assimp", "crnlib", "winmm" }
+	files { "../src/studio_lib/**.h", "../src/studio_lib/**.cpp" }
+	includedirs { "../src", "../src/studio_lib", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
+	links { "animation", "physics", "editor", "engine", "renderer", "audio", "assimp", "crnlib", "winmm" }
+	defines { "BUILDING_STUDIO_LIB" }
 
 	useLua()
 	defaultConfigurations()
@@ -268,3 +259,16 @@ project "studio"
 	configuration { "RelWithDebInfo", "x32" }
 		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win32/release"}
 		libdirs {"../external/crunch/lib/" .. ide_dir .. "/win32/release"}
+
+
+project "studio"
+	kind "WindowedApp"
+
+	debugdir "../../LumixEngine_data"
+
+	files { "../src/studio/**.cpp" }
+	includedirs { "../src", "../src/studio_lib", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
+	links { "studio_lib", "animation", "physics", "editor", "engine", "renderer", "audio", "winmm" }
+
+	useLua()
+	defaultConfigurations()

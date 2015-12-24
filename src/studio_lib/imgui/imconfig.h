@@ -10,7 +10,7 @@
 //#define IM_ASSERT(_EXPR)  MyAssert(_EXPR)
 
 //---- Define attributes of all API symbols declarations, e.g. for DLL under Windows.
-#ifdef BUILDING_IMGUI
+#ifdef BUILDING_STUDIO_LIB
 #define IMGUI_API __declspec( dllexport )
 #else
 #define IMGUI_API __declspec( dllimport )

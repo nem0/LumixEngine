@@ -12,6 +12,7 @@
 #include "core/resource_manager_base.h"
 #include "core/vec.h"
 #include "debug/debug.h"
+#include "editor/world_editor.h"
 #include "engine.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"

@@ -640,9 +640,3 @@ namespace PlatformInterface
 
 } // namespace PlatformInterface
 
-
-INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
-{
-	int studioMain();
-	return studioMain();
-}

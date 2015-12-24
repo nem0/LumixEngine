@@ -2,13 +2,12 @@
 #include "asset_browser.h"
 #include "core/blob.h"
 #include "core/crc32.h"
+#include "core/math_utils.h"
 #include "core/vec.h"
 #include "editor/iproperty_descriptor.h"
 #include "editor/property_register.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "lua_script/lua_script_manager.h"
-#include "lua_script/lua_script_system.h"
 #include "imgui/imgui.h"
 #include "renderer/render_scene.h"
 #include "terrain_editor.h"
@@ -35,6 +34,7 @@ PropertyGrid::PropertyGrid(Lumix::WorldEditor& editor,
 	: m_is_opened(true)
 	, m_editor(editor)
 	, m_asset_browser(asset_browser)
+	, m_plugins(editor.getAllocator())
 {
 	m_particle_emitter_updating = true;
 	m_particle_emitter_timescale = 1.0f;
@@ -45,6 +45,7 @@ PropertyGrid::PropertyGrid(Lumix::WorldEditor& editor,
 
 PropertyGrid::~PropertyGrid()
 {
+	ASSERT(m_plugins.empty());
 	LUMIX_DELETE(m_editor.getAllocator(), m_terrain_editor);
 }
 
@@ -403,10 +404,11 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 		showProperty(*desc, -1, cmp);
 	}
 
-	if (cmp.type == Lumix::crc32("lua_script"))
+	for (auto* i : m_plugins)
 	{
-		onLuaScriptGUI(cmp);
+		i->onGUI(*this, cmp);
 	}
+
 
 	if (cmp.type == Lumix::crc32("terrain"))
 	{
@@ -497,50 +499,6 @@ void PropertyGrid::onParticleEmitterGUI(Lumix::ComponentUID cmp)
 		if(ImGui::Button("Reset"))
 		{
 			scene->resetParticleEmitter(cmp.index);
-		}
-	}
-}
-
-
-void PropertyGrid::onLuaScriptGUI(Lumix::ComponentUID cmp)
-{
-	auto* scene = static_cast<Lumix::LuaScriptScene*>(cmp.scene);
-
-	for (int i = 0; i < scene->getPropertyCount(cmp.index); ++i)
-	{
-		char buf[256];
-		Lumix::copyString(buf, scene->getPropertyValue(cmp.index, i));
-		const char* property_name = scene->getPropertyName(cmp.index, i);
-		auto* script_res = scene->getScriptResource(cmp.index);
-		switch (script_res->getProperties()[i].type)
-		{
-			case Lumix::LuaScript::Property::FLOAT:
-			{
-				float f = (float)atof(buf);
-				if (ImGui::DragFloat(property_name, &f))
-				{
-					Lumix::toCString(f, buf, sizeof(buf), 5);
-					scene->setPropertyValue(cmp.index, property_name, buf);
-				}
-			}
-			break;
-			case Lumix::LuaScript::Property::ENTITY:
-			{
-				Lumix::Entity e;
-				Lumix::fromCString(buf, sizeof(buf), &e);
-				if (entityInput(property_name, StringBuilder<50>(property_name, cmp.index), e))
-				{
-					Lumix::toCString(e, buf, sizeof(buf));
-					scene->setPropertyValue(cmp.index, property_name, buf);
-				}
-			}
-			break;
-			case Lumix::LuaScript::Property::ANY:
-				if (ImGui::InputText(property_name, buf, sizeof(buf)))
-				{
-					scene->setPropertyValue(cmp.index, property_name, buf);
-				}
-				break;
 		}
 	}
 }

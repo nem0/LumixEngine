@@ -23,7 +23,7 @@ class FileSystemWatcher;
 class LogUI;
 
 
-class ShaderCompiler
+class LUMIX_STUDIO_LIB_API ShaderCompiler
 {
 public:
 	ShaderCompiler(Lumix::WorldEditor& editor, LogUI& log_ui);
