@@ -716,6 +716,8 @@ struct PropertyGridPlugin : public PropertyGrid::Plugin
 {
 	void onGUI(PropertyGrid& grid, Lumix::ComponentUID cmp) override
 	{
+		if (cmp.type != LUA_SCRIPT_HASH) return;
+
 		auto* scene = static_cast<Lumix::LuaScriptScene*>(cmp.scene);
 
 		for (int i = 0; i < scene->getPropertyCount(cmp.index); ++i)
