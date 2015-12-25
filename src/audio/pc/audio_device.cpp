@@ -14,9 +14,12 @@ struct AudioDeviceImpl : public AudioDevice
 	struct Buffer
 	{
 		LPDIRECTSOUNDBUFFER handle;
+		LPDIRECTSOUND3DBUFFER8 handle_3d;
+		IDirectSoundBuffer8* handle8;
 		const void* data;
 		DWORD data_size;
 		DWORD written;
+		int sparse_idx;
 		bool looped;
 	};
 
@@ -25,7 +28,9 @@ struct AudioDeviceImpl : public AudioDevice
 	LPDIRECTSOUND8 m_direct_sound;
 	LPDIRECTSOUNDBUFFER m_primary_buffer;
 	LPDIRECTSOUND3DLISTENER8 m_listener;
-	Buffer m_buffers[256];
+	Buffer m_buffers[MAX_PLAYING_SOUNDS];
+	int m_buffer_map[MAX_PLAYING_SOUNDS];
+	int m_buffer_count;
 
 	static const int STREAM_SIZE = 32768;
 
@@ -36,9 +41,10 @@ struct AudioDeviceImpl : public AudioDevice
 		m_direct_sound = nullptr;
 		m_primary_buffer = nullptr;
 		m_listener = nullptr;
-		for (auto& i : m_buffers)
+		m_buffer_count = 0;
+		for (auto& i : m_buffer_map)
 		{
-			i.handle = nullptr;
+			i = INVALID_BUFFER_HANDLE;
 		}
 	}
 
@@ -133,6 +139,8 @@ struct AudioDeviceImpl : public AudioDevice
 		int sample_rate,
 		int flags) override
 	{
+		if (m_buffer_count == MAX_PLAYING_SOUNDS) return INVALID_BUFFER_HANDLE;
+
 		int buffer_size = data_size > STREAM_SIZE ? STREAM_SIZE : data_size;
 		DSBUFFERDESC desc = {};
 		LPDIRECTSOUNDBUFFER buffer;
@@ -179,30 +187,37 @@ struct AudioDeviceImpl : public AudioDevice
 			return INVALID_BUFFER_HANDLE;
 		}
 
+		LPDIRECTSOUND3DBUFFER8 source = nullptr;
 		if (is_3d)
 		{
-			LPDIRECTSOUND3DBUFFER8 source;
 			if (SUCCEEDED(buffer->QueryInterface(IID_IDirectSound3DBuffer8, (void**)&source)))
 			{
 				source->SetMaxDistance(10000, DS3D_DEFERRED);
 				source->SetMinDistance(2, DS3D_DEFERRED);
 				source->SetMode(DS3DMODE_NORMAL, DS3D_DEFERRED);
-				source->Release();
 			}
 		}
 
-		for (int i = 0; i < lengthOf(m_buffers); ++i)
+		for (int i = 0; i < lengthOf(m_buffer_map); ++i)
 		{
-			if (!m_buffers[i].handle)
+			if (m_buffer_map[i] == INVALID_BUFFER_HANDLE)
 			{
-				m_buffers[i].handle = buffer;
-				m_buffers[i].data = data;
-				m_buffers[i].data_size = data_size;
-				m_buffers[i].written = buffer_size;
+				m_buffer_map[i] = m_buffer_count;
+				m_buffers[m_buffer_count].handle = buffer;
+				m_buffers[m_buffer_count].data = data;
+				m_buffers[m_buffer_count].data_size = data_size;
+				m_buffers[m_buffer_count].written = buffer_size;
+				m_buffers[m_buffer_count].sparse_idx = i;
+				m_buffers[m_buffer_count].handle_3d = source;
+				m_buffers[m_buffer_count].handle8 = nullptr;
+				buffer->QueryInterface(
+					IID_IDirectSoundBuffer8, (void**)&m_buffers[m_buffer_count].handle8);
+				++m_buffer_count;
 				return i;
 			}
 		}
 
+		ASSERT(false);
 		buffer->Release();
 		return INVALID_BUFFER_HANDLE;
 	}
@@ -214,34 +229,38 @@ struct AudioDeviceImpl : public AudioDevice
 		float left_delay,
 		float right_delay) override
 	{
-		auto buffer = m_buffers[handle].handle;
+		auto buffer = m_buffers[m_buffer_map[handle]];
 		DSEFFECTDESC echo_effect = {};
 		echo_effect.dwSize = sizeof(DSEFFECTDESC);
 		echo_effect.guidDSFXClass = GUID_DSFX_STANDARD_ECHO;
-		IDirectSoundBuffer8* buffer8;
-		if (FAILED(buffer->QueryInterface(IID_IDirectSoundBuffer8, (void**)&buffer8))) return;
+		if (!buffer.handle8) return;
 
 		DWORD buffer_status;
-		if(FAILED(buffer->GetStatus(&buffer_status))) return;
+		if(FAILED(buffer.handle->GetStatus(&buffer_status))) return;
 		
-		buffer->Stop();
+		buffer.handle->Stop();
 		DWORD res = 0;
 
 		IDirectSoundFXEcho8* echo = NULL;
-		if (FAILED(buffer8->GetObjectInPath(
-			GUID_DSFX_STANDARD_ECHO, 0, IID_IDirectSoundFXEcho8, (LPVOID*)&echo)))
+		if (FAILED(buffer.handle8->GetObjectInPath(
+				GUID_DSFX_STANDARD_ECHO, 0, IID_IDirectSoundFXEcho8, (LPVOID*)&echo)))
 		{
-			if (FAILED(buffer8->SetFX(1, &echo_effect, &res)))
+			if (FAILED(buffer.handle8->SetFX(1, &echo_effect, &res)))
 			{
-				if (buffer_status & DSBSTATUS_PLAYING) buffer->Play(0, 0, buffer_status & DSBSTATUS_LOOPING);
-				buffer8->Release();
+				if (buffer_status & DSBSTATUS_PLAYING)
+				{
+					buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING);
+
+				}
 				return;
 			}
-			if (FAILED(buffer8->GetObjectInPath(
-				GUID_DSFX_STANDARD_ECHO, 0, IID_IDirectSoundFXEcho8, (LPVOID*)&echo)))
+			if (FAILED(buffer.handle8->GetObjectInPath(
+					GUID_DSFX_STANDARD_ECHO, 0, IID_IDirectSoundFXEcho8, (LPVOID*)&echo)))
 			{
-				if (buffer_status & DSBSTATUS_PLAYING) buffer->Play(0, 0, buffer_status & DSBSTATUS_LOOPING);
-				buffer8->Release();
+				if (buffer_status & DSBSTATUS_PLAYING)
+				{
+					buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING);
+				}
 				return;
 			}
 		}
@@ -255,13 +274,16 @@ struct AudioDeviceImpl : public AudioDevice
 		echo_params.lPanDelay = DSFXECHO_PANDELAY_MIN;
 
 		echo->SetAllParameters(&echo_params);
-		if (buffer_status & DSBSTATUS_PLAYING) buffer->Play(0, 0, buffer_status & DSBSTATUS_LOOPING);
+		if (buffer_status & DSBSTATUS_PLAYING)
+		{
+			buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING);
+		}
 	}
 
 	
 	bool isPlaying(BufferHandle handle) override
 	{
-		auto buffer = m_buffers[handle].handle;
+		auto buffer = m_buffers[m_buffer_map[handle]].handle;
 		DWORD status;
 		if (FAILED(buffer->GetStatus(&status))) return false;
 
@@ -271,43 +293,51 @@ struct AudioDeviceImpl : public AudioDevice
 
 	void play(BufferHandle handle, bool looped) override
 	{
-		auto buffer = m_buffers[handle].handle;
-		m_buffers[handle].looped = looped;
-		buffer->Play(0, 0, DSBPLAY_LOOPING);
+		auto& buffer = m_buffers[m_buffer_map[handle]];
+		buffer.looped = looped;
+		buffer.handle->Play(0, 0, DSBPLAY_LOOPING);
 	}
 
 
 	void stop(BufferHandle handle) override
 	{
-		auto buffer = m_buffers[handle].handle;
-		buffer->Stop();
-		buffer->Release();
-		m_buffers[handle].handle = nullptr;
+		--m_buffer_count;
+		int dense_idx = m_buffer_map[handle];
+
+		auto& buffer = m_buffers[dense_idx];
+		buffer.handle->Stop();
+		if (buffer.handle_3d) buffer.handle_3d->Release();
+		if (buffer.handle8) buffer.handle8->Release();
+		buffer.handle->Release();
+
+		m_buffers[dense_idx] = m_buffers[m_buffer_count];
+		m_buffers[m_buffer_count].handle = nullptr;
+		
+		m_buffer_map[m_buffers[dense_idx].sparse_idx] = dense_idx;
+		m_buffer_map[handle] = -1;
 	}
 
 
-	void pause(BufferHandle handle) override
-	{
-		m_buffers[handle].handle->Stop();
-	}
+	void pause(BufferHandle handle) override { m_buffers[m_buffer_map[handle]].handle->Stop(); }
 
 
 	void setVolume(BufferHandle handle, float volume) override
 	{
-		m_buffers[handle].handle->SetVolume(DSBVOLUME_MIN + LONG(volume * (DSBVOLUME_MAX - DSBVOLUME_MIN)));
+		m_buffers[m_buffer_map[handle]].handle->SetVolume(
+			DSBVOLUME_MIN + LONG(volume * (DSBVOLUME_MAX - DSBVOLUME_MIN)));
 	}
 
 
 	void setFrequency(BufferHandle handle, float frequency) override
 	{
-		m_buffers[handle].handle->SetFrequency(
+		m_buffers[m_buffer_map[handle]].handle->SetFrequency(
 			DSBFREQUENCY_MIN + DWORD(frequency * (DSBFREQUENCY_MAX - DSBFREQUENCY_MIN)));
 	}
 
 
 	float getCurrentTime(BufferHandle handle) override
 	{
-		auto& buffer = m_buffers[handle];
+		auto& buffer = m_buffers[m_buffer_map[handle]];
 
 		WAVEFORMATEX format;
 		if (SUCCEEDED(buffer.handle->GetFormat(&format, sizeof(format), nullptr)))
@@ -326,7 +356,7 @@ struct AudioDeviceImpl : public AudioDevice
 
 	void setCurrentTime(BufferHandle handle, float time_seconds) override
 	{
-		auto& buffer = m_buffers[handle];
+		auto& buffer = m_buffers[m_buffer_map[handle]];
 		WAVEFORMATEX format;
 		if (SUCCEEDED(buffer.handle->GetFormat(&format, sizeof(format), nullptr)))
 		{
@@ -403,21 +433,21 @@ struct AudioDeviceImpl : public AudioDevice
 
 	void update(float) override 
 	{
-		for (auto& i : m_buffers)
+		for (int i = 0; i < m_buffer_count; ++i)
 		{
-			if (!i.handle) continue;
-			if (i.data_size <= STREAM_SIZE) continue;
+			auto& buffer = m_buffers[i];
+			if (buffer.data_size <= STREAM_SIZE) continue;
 
 			DWORD rel_pc, rel_wc;
-			i.handle->GetCurrentPosition(&rel_pc, &rel_wc);
+			buffer.handle->GetCurrentPosition(&rel_pc, &rel_wc);
 
-			auto rel_written = DWORD(i.written % STREAM_SIZE);
-			DWORD abs_pc = i.written - (rel_written - rel_pc);
+			auto rel_written = DWORD(buffer.written % STREAM_SIZE);
+			DWORD abs_pc = buffer.written - (rel_written - rel_pc);
 			if (rel_pc >= rel_written) abs_pc -= STREAM_SIZE;
-			if (i.written - abs_pc < STREAM_SIZE / 2)
+			if (buffer.written - abs_pc < STREAM_SIZE / 2)
 			{
-				DWORD update_size = abs_pc + STREAM_SIZE - i.written;
-				updateStreamData(i, update_size);
+				DWORD update_size = abs_pc + STREAM_SIZE - buffer.written;
+				updateStreamData(buffer, update_size);
 			}
 		}
 		m_listener->CommitDeferredSettings(); 
@@ -426,13 +456,8 @@ struct AudioDeviceImpl : public AudioDevice
 
 	void setSourcePosition(BufferHandle handle, float x, float y, float z) override
 	{
-		LPDIRECTSOUND3DBUFFER8 source;
-		auto buffer = m_buffers[handle].handle;
-		if (SUCCEEDED(buffer->QueryInterface(IID_IDirectSound3DBuffer8, (void**)&source)))
-		{
-			source->SetPosition(x, y, z, DS3D_DEFERRED);
-			source->Release();
-		}
+		auto buffer = m_buffers[m_buffer_map[handle]].handle_3d;
+		if (buffer) buffer->SetPosition(x, y, z, DS3D_DEFERRED);
 	}
 
 
