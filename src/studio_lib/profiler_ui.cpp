@@ -85,6 +85,21 @@ struct ProfilerUIImpl : public ProfilerUI
 
 	~ProfilerUIImpl()
 	{
+		m_engine.getFileSystem().unMount(&m_device);
+		const auto& devices = m_engine.getFileSystem().getDefaultDevice();
+		char tmp[200] = "";
+		int count = 0;
+		while (devices.m_devices[count] != nullptr) ++count;
+		for (int i = count - 1; i >= 0; --i)
+		{
+			if (Lumix::compareString(devices.m_devices[i]->name(), "events") != 0)
+			{
+				if(i < count - 1) Lumix::catString(tmp, ":");
+				Lumix::catString(tmp, devices.m_devices[i]->name());
+			}
+		}
+		m_engine.getFileSystem().setDefaultDevice(tmp);
+
 		m_allocation_root->clear(m_allocator);
 		LUMIX_DELETE(m_allocator, m_allocation_root);
 		Lumix::Profiler::getFrameListeners().unbind<ProfilerUIImpl, &ProfilerUIImpl::onFrame>(this);
