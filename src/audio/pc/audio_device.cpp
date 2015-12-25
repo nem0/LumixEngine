@@ -361,6 +361,7 @@ struct AudioDeviceImpl : public AudioDevice
 		if (SUCCEEDED(buffer.handle->GetFormat(&format, sizeof(format), nullptr)))
 		{
 			DWORD pos = DWORD(format.nAvgBytesPerSec * time_seconds);
+			if (pos >= buffer.data_size) pos = 0;
 			if (buffer.data_size <= STREAM_SIZE)
 			{
 				buffer.handle->SetCurrentPosition(pos);
