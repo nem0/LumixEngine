@@ -14,6 +14,7 @@
 #include "engine/engine.h"
 #include "imgui/imgui.h"
 #include "utils.h"
+#include <cstdlib>
 
 
 static const int MAX_FRAMES = 200;

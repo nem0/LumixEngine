@@ -57,7 +57,7 @@ int PlotHistogramEx(const char* label,
 	}
 
 	RenderFrame(
-		frame_bb.Min, frame_bb.Max, window->Color(ImGuiCol_FrameBg), true, style.FrameRounding);
+		frame_bb.Min, frame_bb.Max, GetColorU32(ImGuiCol_FrameBg), true, style.FrameRounding);
 
 	int res_w = ImMin((int)graph_size.x, values_count);
 
@@ -81,8 +81,8 @@ int PlotHistogramEx(const char* label,
 	float t0 = 0.0f;
 	ImVec2 p0 = ImVec2(t0, 1.0f - ImSaturate((v0 - scale_min) / (scale_max - scale_min)));
 
-	const ImU32 col_base = window->Color(ImGuiCol_PlotHistogram);
-	const ImU32 col_hovered = window->Color(ImGuiCol_PlotHistogramHovered);
+	const ImU32 col_base = GetColorU32(ImGuiCol_PlotHistogram);
+	const ImU32 col_hovered = GetColorU32(ImGuiCol_PlotHistogramHovered);
 
 	for (int n = 0; n < res_w; n++)
 	{
@@ -365,7 +365,7 @@ CurveEditor BeginCurveEditor(const char* label)
 	editor.valid = true;
 	ImGui::PushID(label);
 
-	RenderFrame(frame_bb.Min, frame_bb.Max, window->Color(ImGuiCol_FrameBg), true, style.FrameRounding);
+	RenderFrame(frame_bb.Min, frame_bb.Max, GetColorU32(ImGuiCol_FrameBg), true, style.FrameRounding);
 	RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y), label);
 
 	editor.beg_pos = cursor_pos;
@@ -400,8 +400,8 @@ bool CurvePoint(ImVec2* points, CurveEditor& editor)
 
 	const ImRect frame_bb(window->DC.CursorPos, window->DC.CursorPos + graph_size);
 	const ImRect inner_bb(frame_bb.Min + style.FramePadding, frame_bb.Max - style.FramePadding);
-	const ImU32 col_base = window->Color(ImGuiCol_PlotLines);
-	const ImU32 col_hovered = window->Color(ImGuiCol_PlotLinesHovered);
+	const ImU32 col_base = GetColorU32(ImGuiCol_PlotLines);
+	const ImU32 col_hovered = GetColorU32(ImGuiCol_PlotLinesHovered);
 
 	auto left_tangent = points[0];
 	auto right_tangent = points[2];
