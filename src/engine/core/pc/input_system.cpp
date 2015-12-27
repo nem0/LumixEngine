@@ -27,6 +27,7 @@ namespace Lumix
 			, m_xinput_library(nullptr)
 			, m_xinput_get_state(nullptr)
 		{
+			m_last_checked_controller = 0;
 			for (int i = 0; i < Lumix::lengthOf(m_xinput_connected); ++i)
 			{
 				m_xinput_connected[i] = false;
@@ -68,9 +69,13 @@ namespace Lumix
 			m_mouse_rel_y = 0;
 			for (int i = 0; i < XUSER_MAX_COUNT; ++i)
 			{
-				auto status = m_xinput_get_state(i, &m_xinput_states[i]);
-				m_xinput_connected[i] = status == ERROR_SUCCESS;
+				if (m_xinput_connected[i] || i == m_last_checked_controller)
+				{
+					auto status = m_xinput_get_state(i, &m_xinput_states[i]);
+					m_xinput_connected[i] = status == ERROR_SUCCESS;
+				}
 			}
+			m_last_checked_controller = (m_last_checked_controller + 1) % XUSER_MAX_COUNT;
 		}
 
 
@@ -178,6 +183,7 @@ namespace Lumix
 		XInputGetState_fn_ptr m_xinput_get_state;
 		XINPUT_STATE m_xinput_states[XUSER_MAX_COUNT];
 		bool m_xinput_connected[XUSER_MAX_COUNT];
+		uint32 m_last_checked_controller;
 	};
 
 
