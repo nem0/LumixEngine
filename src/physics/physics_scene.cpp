@@ -735,7 +735,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		
 		applyQueuedForces();
 
-		time_delta = Math::minValue(0.01f, time_delta);
+		time_delta = Math::minValue(1 / 20.0f, time_delta);
 		simulateScene(time_delta);
 		fetchResults();
 		updateDynamicActors();
