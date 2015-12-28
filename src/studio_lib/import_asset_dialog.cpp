@@ -1603,7 +1603,7 @@ void ImportAssetDialog::onGUI()
 			}
 			ImGui::InputText("Output directory", m_output_dir, sizeof(m_output_dir));
 			ImGui::SameLine();
-			if (ImGui::Button("...##browseoutput"))
+			if (ImGui::Button("...###browseoutput"))
 			{
 				PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir));
 			}
@@ -1647,7 +1647,7 @@ void ImportAssetDialog::onGUI()
 			{
 				if (ImGui::CollapsingHeader(StringBuilder<30>("Meshes (")
 												<< scene->mNumMeshes
-												<< ")##Meshes",
+												<< ")###Meshes",
 											nullptr,
 											true,
 											true))
@@ -1667,7 +1667,7 @@ void ImportAssetDialog::onGUI()
 
 			ImGui::InputText("Output directory", m_output_dir, sizeof(m_output_dir));
 			ImGui::SameLine();
-			if (ImGui::Button("...##browseoutput"))
+			if (ImGui::Button("...###browseoutput"))
 			{
 				PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir));
 			}
@@ -1675,7 +1675,7 @@ void ImportAssetDialog::onGUI()
 			ImGui::InputText(
 				"Texture output directory", m_texture_output_dir, sizeof(m_texture_output_dir));
 			ImGui::SameLine();
-			if (ImGui::Button("...##browsetextureoutput"))
+			if (ImGui::Button("...###browsetextureoutput"))
 			{
 				PlatformInterface::getOpenDirectory(m_texture_output_dir, sizeof(m_texture_output_dir));
 			}

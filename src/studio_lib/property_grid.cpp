@@ -393,7 +393,7 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 		ImGui::Text("Remove dependents first.");
 	}
 	else if (ImGui::Button(
-		StringBuilder<30>("Remove component##", cmp.type)))
+		StringBuilder<30>("Remove component###", cmp.type)))
 	{
 		m_editor.destroyComponent(cmp);
 		ImGui::PopID();

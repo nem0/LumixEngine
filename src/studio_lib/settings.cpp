@@ -22,7 +22,7 @@ static void shortcutInput(int& shortcut)
 	PlatformInterface::getKeyName(shortcut, key_string, 30);
 
 	StringBuilder<50> button_label(key_string);
-	button_label << "##" << (Lumix::int64)&shortcut;
+	button_label << "###" << (Lumix::int64)&shortcut;
 
 	if (ImGui::Button(button_label, ImVec2(50, 0))) shortcut = -1;
 

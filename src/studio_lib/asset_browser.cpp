@@ -322,16 +322,16 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	ImGui::PushItemWidth(item_w - ImGui::CalcTextSize("...View").x - style.FramePadding.x * 4 -
 						 style.ItemSpacing.x * 2);
 
-	if (ImGui::InputText(StringBuilder<30>("##", str_id), buf, max_size)) return true;
+	if (ImGui::InputText(StringBuilder<30>("###", str_id), buf, max_size)) return true;
 
 	ImGui::SameLine();
 	StringBuilder<50> popup_name("pu", str_id);
-	if (ImGui::Button(StringBuilder<30>("...##browse", str_id)))
+	if (ImGui::Button(StringBuilder<30>("...###browse", str_id)))
 	{
 		ImGui::OpenPopup(popup_name);
 	}
 	ImGui::SameLine();
-	if (ImGui::Button(StringBuilder<30>("View##go", str_id)))
+	if (ImGui::Button(StringBuilder<30>("View###go", str_id)))
 	{
 		m_is_focus_requested = true;
 		m_is_opened = true;
@@ -425,7 +425,7 @@ void AssetBrowser::onGUIMaterial()
 
 		ImGui::SameLine();
 		StringBuilder<100> popup_name("pu", (Lumix::uint64)texture, slot.m_name);
-		if (ImGui::Button(StringBuilder<100>("Advanced##adv", (Lumix::uint64)texture, slot.m_name)))
+		if (ImGui::Button(StringBuilder<100>("Advanced###adv", (Lumix::uint64)texture, slot.m_name)))
 		{
 			ImGui::OpenPopup(popup_name);
 		}
@@ -456,7 +456,7 @@ void AssetBrowser::onGUIMaterial()
 			{
 				int size = texture->getAtlasSize() - 2;
 				const char values[] = { '2', 'x', '2', 0, '3', 'x', '3', 0, '4', 'x', '4', 0, 0 };
-				if (ImGui::Combo(StringBuilder<30>("Atlas size##", i), &size, values))
+				if (ImGui::Combo(StringBuilder<30>("Atlas size###", i), &size, values))
 				{
 					texture->setAtlasSize(size + 2);
 				}
