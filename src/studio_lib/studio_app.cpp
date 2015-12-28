@@ -523,7 +523,7 @@ public:
 				if (ImGui::BeginMenu("Create template", is_any_entity_selected))
 				{
 					static char name[255] = "";
-					ImGui::InputText("Name##templatename", name, sizeof(name));
+					ImGui::InputText("Name###templatename", name, sizeof(name));
 					if (ImGui::Button("Create"))
 					{
 						auto entity = m_editor->getSelectedEntities()[0];

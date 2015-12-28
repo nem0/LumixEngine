@@ -230,7 +230,7 @@ struct ProfilerUIImpl : public ProfilerUI
 			FLT_MAX,
 			ImVec2(0, 100));
 
-		ImGui::InputText("filter##fs_filter", m_filter, Lumix::lengthOf(m_filter));
+		ImGui::InputText("filter###fs_filter", m_filter, Lumix::lengthOf(m_filter));
 
 		if (ImGui::Button("Clear")) m_logs.clear();
 
@@ -575,7 +575,7 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 						auto frame = m_current_frame < 0 ? block->m_frames.back()
 														 : block->m_frames[m_current_frame];
 						if (ImGui::Selectable(
-								StringBuilder<50>("") << frame << "##t" << (Lumix::int64)block,
+								StringBuilder<50>("") << frame << "###t" << (Lumix::int64)block,
 								m_current_block == block,
 								ImGuiSelectableFlags_SpanAllColumns))
 						{
@@ -592,7 +592,7 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 						int int_value = m_current_frame < 0 ? block->m_int_values.back()
 															: block->m_int_values[m_current_frame];
 						if (ImGui::Selectable(
-							StringBuilder<50>("") << int_value << "##t" << (Lumix::int64)block,
+							StringBuilder<50>("") << int_value << "###c" << (Lumix::int64)block,
 							m_current_block == block,
 							ImGuiSelectableFlags_SpanAllColumns))
 						{
@@ -680,7 +680,7 @@ void ProfilerUIImpl::onGUIResources()
 {
 	if (!ImGui::CollapsingHeader("Resources")) return;
 
-	ImGui::InputText("filter##resource_filter", m_resource_filter, Lumix::lengthOf(m_resource_filter));
+	ImGui::InputText("filter###resource_filter", m_resource_filter, Lumix::lengthOf(m_resource_filter));
 
 	Lumix::uint32 manager_types[] = { Lumix::ResourceManager::ANIMATION,
 		Lumix::ResourceManager::MATERIAL,

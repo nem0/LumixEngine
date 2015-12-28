@@ -338,17 +338,17 @@ namespace PlatformInterface
 		case VK_LEFT:
 		case VK_UP:
 		case VK_RIGHT:
-		case VK_DOWN: // arrow keys
+		case VK_DOWN:
 		case VK_PRIOR:
-		case VK_NEXT: // page up and page down
+		case VK_NEXT:
 		case VK_END:
 		case VK_HOME:
 		case VK_INSERT:
 		case VK_DELETE:
-		case VK_DIVIDE: // numpad slash
+		case VK_DIVIDE:
 		case VK_NUMLOCK:
 		{
-			scanCode |= 0x100; // set extended bit
+			scanCode |= 0x100;
 			break;
 		}
 		}
