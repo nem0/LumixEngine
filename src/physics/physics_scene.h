@@ -37,6 +37,9 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 		virtual bool raycast(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result) = 0;
 		virtual PhysicsSystem& getSystem() const = 0;
 		
+		virtual ComponentIndex getActorComponent(Entity entity) = 0;
+		virtual void setActorLayer(ComponentIndex cmp, int layer) = 0;
+		virtual int getActorLayer(ComponentIndex cmp) = 0;
 		virtual bool isDynamic(ComponentIndex cmp) = 0;
 		virtual void setIsDynamic(ComponentIndex cmp, bool) = 0;
 		virtual Vec3 getHalfExtents(ComponentIndex cmp) = 0;
@@ -49,7 +52,8 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 		virtual void setHeightmapXZScale(ComponentIndex cmp, float scale) = 0;
 		virtual float getHeightmapYScale(ComponentIndex cmp) = 0;
 		virtual void setHeightmapYScale(ComponentIndex cmp, float scale) = 0;
-		virtual ComponentIndex getActorComponent(Entity entity) = 0;
+		virtual int getHeightfieldLayer(ComponentIndex cmp) = 0;
+		virtual void setHeightfieldLayer(ComponentIndex cmp, int layer) = 0;
 
 		virtual void applyForceToActor(ComponentIndex cmp, const Vec3& force) = 0;
 		virtual float getActorSpeed(ComponentIndex cmp) = 0;
@@ -57,8 +61,18 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 
 		virtual void moveController(ComponentIndex cmp, const Vec3& v, float dt) = 0;
 		virtual ComponentIndex getController(Entity entity) = 0;
+		virtual int getControllerLayer(ComponentIndex cmp) = 0;
+		virtual void setControllerLayer(ComponentIndex cmp, int layer) = 0;
 		virtual float getControllerRadius(ComponentIndex cmp) = 0;
 		virtual float getControllerHeight(ComponentIndex cmp) = 0;
+
+		virtual const char* getCollisionLayerName(int index) = 0;
+		virtual void setCollisionLayerName(int index, const char* name) = 0;
+		virtual bool canLayersCollide(int layer1, int layer2) = 0;
+		virtual void setLayersCanCollide(int layer1, int layer2, bool can_collide) = 0;
+		virtual int getCollisionsLayersCount() const = 0;
+		virtual void addCollisionLayer() = 0;
+		virtual void removeCollisionLayer() = 0;
 };
 
 

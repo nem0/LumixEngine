@@ -32,6 +32,14 @@ static const uint32 CONTROLLER_HASH = crc32("physical_controller");
 static const uint32 HEIGHTFIELD_HASH = crc32("physical_heightfield");
 
 
+enum class PhysicsSceneVersion : int
+{
+	LAYERS,
+
+	LATEST
+};
+
+
 namespace LuaAPI
 {
 
@@ -189,11 +197,10 @@ static void matrix2Transform(const Matrix& mtx, physx::PxTransform& transform)
 }
 
 
-class Terrain
+struct Heightfield
 {
-public:
-	Terrain();
-	~Terrain();
+	Heightfield();
+	~Heightfield();
 	void heightmapLoaded(Resource::State, Resource::State new_state);
 
 	struct PhysicsSceneImpl* m_scene;
@@ -202,6 +209,7 @@ public:
 	Texture* m_heightmap;
 	float m_xz_scale;
 	float m_y_scale;
+	int m_layer;
 };
 
 
@@ -262,6 +270,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			, m_physx_actor(nullptr)
 			, m_scene(scene)
 			, m_is_dynamic(false)
+			, m_layer(0)
 		{
 		}
 
@@ -273,15 +282,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 		PhysicsGeometry* getResource() const { return m_resource; }
 		bool isDynamic() const { return m_is_dynamic; }
 		void setDynamic(bool dynamic) { m_is_dynamic = dynamic; }
+		int getLayer() const { return m_layer; }
+		void setLayer(int layer) { m_layer = layer; }
 
 	private:
-		void onStateChanged(Resource::State old_state,
-							Resource::State new_state);
+		void onStateChanged(Resource::State old_state, Resource::State new_state);
 
 	private:
 		physx::PxRigidActor* m_physx_actor;
 		PhysicsGeometry* m_resource;
 		Entity m_entity;
+		int m_layer;
 		PhysicsSceneImpl& m_scene;
 		bool m_is_dynamic;
 	};
@@ -298,7 +309,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 		, m_is_game_running(false)
 		, m_contact_callback(*this)
 		, m_queued_forces(m_allocator)
+		, m_layers_count(2)
 	{
+		for (int i = 0; i < lengthOf(m_layers_names); ++i)
+		{
+			copyString(m_layers_names[i], "Layer");
+			char tmp[3];
+			toCString(i, tmp, lengthOf(tmp));
+			catString(m_layers_names[i], tmp);
+			m_collision_filter[i] = 0xffffFFFF;
+		}
+
 		m_queued_forces.reserve(64);
 		m_script_scene = nullptr;
 	}
@@ -412,6 +433,60 @@ struct PhysicsSceneImpl : public PhysicsScene
 	IPlugin& getPlugin() const override { return *m_system; }
 
 
+	int getControllerLayer(ComponentIndex cmp) override
+	{
+		return m_controllers[cmp].m_layer;
+	}
+
+
+	void setControllerLayer(ComponentIndex cmp, int layer) override
+	{
+		ASSERT(layer < lengthOf(m_layers_names));
+		m_controllers[cmp].m_layer = layer;
+
+		physx::PxFilterData data;
+		data.word0 = 1 << layer;
+		data.word1 = m_collision_filter[layer];
+		physx::PxShape* shapes[8];
+		int shapes_count = m_controllers[cmp].m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
+		for (int i = 0; i < shapes_count; ++i)
+		{
+			shapes[i]->setSimulationFilterData(data);
+		}
+	}
+
+
+	void setActorLayer(ComponentIndex cmp, int layer) override
+	{
+		ASSERT(layer < lengthOf(m_layers_names));
+		m_actors[cmp]->setLayer(layer);
+		updateFilterData(m_actors[cmp]->getPhysxActor(), m_actors[cmp]->getLayer());
+	}
+
+
+	int getActorLayer(ComponentIndex cmp) override { return m_actors[cmp]->getLayer(); }
+	int getHeightfieldLayer(ComponentIndex cmp) override { return m_terrains[cmp]->m_layer; }
+	
+	void setHeightfieldLayer(ComponentIndex cmp, int layer) override
+	{
+		ASSERT(layer < lengthOf(m_layers_names));
+		m_terrains[cmp]->m_layer = layer;
+
+		if (m_terrains[cmp]->m_actor)
+		{
+			physx::PxFilterData data;
+			data.word0 = 1 << layer;
+			data.word1 = m_collision_filter[layer];
+			physx::PxShape* shapes[8];
+			int shapes_count = m_terrains[cmp]->m_actor->getShapes(shapes, lengthOf(shapes));
+			for (int i = 0; i < shapes_count; ++i)
+			{
+				shapes[i]->setSimulationFilterData(data);
+			}
+		}
+	}
+
+
 	ComponentIndex createComponent(uint32 component_type, Entity entity) override
 	{
 		if (component_type == HEIGHTFIELD_HASH)
@@ -466,7 +541,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentIndex createHeightfield(Entity entity)
 	{
-		Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)();
+		Heightfield* terrain = LUMIX_NEW(m_allocator, Heightfield)();
 		m_terrains.push(terrain);
 		terrain->m_heightmap = nullptr;
 		terrain->m_scene = this;
@@ -492,13 +567,24 @@ struct PhysicsSceneImpl : public PhysicsScene
 		Vec3 position = m_universe.getPosition(entity);
 		cDesc.position.set(position.x, position.y, position.z);
 		PhysicsSceneImpl::Controller& c = m_controllers.pushEmpty();
-		c.m_controller =
-			m_controller_manager->createController(cDesc);
+		c.m_controller = m_controller_manager->createController(cDesc);
 		c.m_entity = entity;
 		c.m_is_free = false;
 		c.m_frame_change.set(0, 0, 0);
 		c.m_radius = cDesc.radius;
 		c.m_height = cDesc.height;
+		c.m_layer = 0;
+
+		physx::PxFilterData data;
+		int controller_layer = c.m_layer;
+		data.word0 = 1 << controller_layer;
+		data.word1 = m_collision_filter[controller_layer];
+		physx::PxShape* shapes[8];
+		int shapes_count = c.m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
+		for (int i = 0; i < shapes_count; ++i)
+		{
+			shapes[i]->setSimulationFilterData(data);
+		}
 
 		m_universe.addComponent(entity, CONTROLLER_HASH, this, m_controllers.size() - 1);
 		return m_controllers.size() - 1;
@@ -518,7 +604,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		physx::PxTransform transform;
 		Matrix mtx = m_universe.getMatrix(entity);
 		matrix2Transform(mtx, transform);
-
+		
 		physx::PxRigidStatic* physx_actor =
 			PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
 		actor->setPhysxActor(physx_actor);
@@ -595,11 +681,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 			resource_manager.get(ResourceManager::TEXTURE)->unload(*m_terrains[cmp]->m_heightmap);
 			m_terrains[cmp]
 				->m_heightmap->getObserverCb()
-				.unbind<Terrain, &Terrain::heightmapLoaded>(m_terrains[cmp]);
+				.unbind<Heightfield, &Heightfield::heightmapLoaded>(m_terrains[cmp]);
 		}
 		auto* texture_manager = resource_manager.get(ResourceManager::TEXTURE);
 		m_terrains[cmp]->m_heightmap = static_cast<Texture*>(texture_manager->load(Path(str)));
-		m_terrains[cmp]->m_heightmap->onLoaded<Terrain, &Terrain::heightmapLoaded>(m_terrains[cmp]);
+		m_terrains[cmp]->m_heightmap->onLoaded<Heightfield, &Heightfield::heightmapLoaded>(
+			m_terrains[cmp]);
 		m_terrains[cmp]->m_heightmap->addDataReference();
 	}
 
@@ -890,7 +977,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void heightmapLoaded(Terrain* terrain)
+	void heightmapLoaded(Heightfield* terrain)
 	{
 		PROFILE_FUNCTION();
 		Array<physx::PxHeightFieldSample> heights(m_allocator);
@@ -980,6 +1067,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 				actor->userData = (void*)terrain->m_entity;
 				m_scene->addActor(*actor);
 				terrain->m_actor = actor;
+
+				physx::PxFilterData data;
+				int terrain_layer = terrain->m_layer;
+				data.word0 = 1 << terrain_layer;
+				data.word1 = m_collision_filter[terrain_layer];
+				physx::PxShape* shapes[8];
+				int shapes_count = actor->getShapes(shapes, lengthOf(shapes));
+				for (int i = 0; i < shapes_count; ++i)
+				{
+					shapes[i]->setSimulationFilterData(data);
+				}
 			}
 			else
 			{
@@ -988,6 +1086,146 @@ struct PhysicsSceneImpl : public PhysicsScene
 					<< terrain->m_heightmap->getPath().c_str();
 			}
 		}
+	}
+
+
+	void addCollisionLayer() override 
+	{
+		m_layers_count = Math::min(lengthOf(m_layers_names), m_layers_count + 1);
+	}
+
+
+	void removeCollisionLayer() override
+	{
+		m_layers_count = Math::max(0, m_layers_count - 1);
+		for (auto* actor : m_actors)
+		{
+			if (!actor->getPhysxActor()) continue;
+			if (actor->getEntity() == INVALID_ENTITY) continue;
+			actor->setLayer(Math::minValue(m_layers_count - 1, actor->getLayer()));
+		}
+		for (auto& controller : m_controllers)
+		{
+			if (controller.m_is_free) continue;
+			controller.m_layer = Math::minValue(m_layers_count - 1, controller.m_layer);
+		}
+		for (auto* terrain : m_terrains)
+		{
+			if (!terrain) continue;
+			if (!terrain->m_actor) continue;
+			terrain->m_layer = Math::minValue(m_layers_count - 1, terrain->m_layer);
+		}
+
+		updateFilterData();
+	}
+
+
+	void setCollisionLayerName(int index, const char* name) override
+	{
+		copyString(m_layers_names[index], name);
+	}
+
+
+	const char* getCollisionLayerName(int index) override
+	{
+		return m_layers_names[index];
+	}
+
+
+	bool canLayersCollide(int layer1, int layer2) override
+	{
+		return (m_collision_filter[layer1] & (1 << layer2)) != 0;
+	}
+
+
+	void setLayersCanCollide(int layer1, int layer2, bool can_collide) override
+	{
+		if (can_collide)
+		{
+			m_collision_filter[layer1] |= 1 << layer2;
+			m_collision_filter[layer2] |= 1 << layer1;
+		}
+		else
+		{
+			m_collision_filter[layer1] &= ~(1 << layer2);
+			m_collision_filter[layer2] &= ~(1 << layer1);
+		}
+
+		updateFilterData();
+	}
+
+
+	void updateFilterData(physx::PxRigidActor* actor, int layer)
+	{
+		physx::PxFilterData data;
+		data.word0 = 1 << layer;
+		data.word1 = m_collision_filter[layer];
+		physx::PxShape* shapes[8];
+		int shapes_count = actor->getShapes(shapes, lengthOf(shapes));
+		for (int i = 0; i < shapes_count; ++i)
+		{
+			shapes[i]->setSimulationFilterData(data);
+		}
+	}
+
+
+	void updateFilterData()
+	{
+		for (auto* actor : m_actors)
+		{
+			if (!actor->getPhysxActor()) continue;
+			if (actor->getEntity() == INVALID_ENTITY) continue;
+
+			physx::PxFilterData data;
+			int actor_layer = actor->getLayer();
+			data.word0 = 1 << actor_layer;
+			data.word1 = m_collision_filter[actor_layer];
+			physx::PxShape* shapes[8];
+			int shapes_count = actor->getPhysxActor()->getShapes(shapes, lengthOf(shapes));
+			for (int i = 0; i < shapes_count; ++i)
+			{
+				shapes[i]->setSimulationFilterData(data);
+			}
+		}
+
+		for (auto& controller : m_controllers)
+		{
+			if (controller.m_is_free) continue;
+
+			physx::PxFilterData data;
+			int controller_layer = controller.m_layer;
+			data.word0 = 1 << controller_layer;
+			data.word1 = m_collision_filter[controller_layer];
+			physx::PxShape* shapes[8];
+			int shapes_count = controller.m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
+			for (int i = 0; i < shapes_count; ++i)
+			{
+				shapes[i]->setSimulationFilterData(data);
+			}
+		}
+
+		for (auto* terrain : m_terrains)
+		{
+			if (!terrain) continue;
+			if (!terrain->m_actor) continue;
+
+			physx::PxFilterData data;
+			int terrain_layer = terrain->m_layer;
+			data.word0 = 1 << terrain_layer;
+			data.word1 = m_collision_filter[terrain_layer];
+			physx::PxShape* shapes[8];
+			int shapes_count = terrain->m_actor->getShapes(shapes, lengthOf(shapes));
+			for (int i = 0; i < shapes_count; ++i)
+			{
+				shapes[i]->setSimulationFilterData(data);
+			}
+		}
+	}
+
+
+	int getCollisionsLayersCount() const override
+	{
+		return m_layers_count;
 	}
 
 
@@ -1101,6 +1339,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void serializeActor(OutputBlob& serializer, int idx)
 	{
+		serializer.write(m_actors[idx]->getLayer());
 		physx::PxShape* shapes;
 		if (m_actors[idx]->getPhysxActor()->getNbShapes() == 1 &&
 			m_actors[idx]->getPhysxActor()->getShapes(&shapes, 1))
@@ -1144,8 +1383,15 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deserializeActor(InputBlob& serializer, int idx)
+	void deserializeActor(InputBlob& serializer, int idx, int version)
 	{
+		int layer = 0;
+		if (version > (int)PhysicsSceneVersion::LAYERS)
+		{
+			serializer.read(layer);
+		}
+		m_actors[idx]->setLayer(layer);
+
 		ActorType type;
 		serializer.read((int32&)type);
 
@@ -1204,6 +1450,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void serialize(OutputBlob& serializer) override
 	{
+		serializer.write(m_layers_count);
+		serializer.write(m_layers_names);
+		serializer.write(m_collision_filter);
 		serializer.write((int32)m_actors.size());
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
@@ -1219,6 +1468,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			serializer.write(m_controllers[i].m_entity);
 			serializer.write(m_controllers[i].m_is_free);
+			if (!m_controllers[i].m_is_free)
+			{
+				serializer.write(m_controllers[i].m_layer);
+			}
 		}
 		serializer.write((int32)m_terrains.size());
 		for (int i = 0; i < m_terrains.size(); ++i)
@@ -1227,12 +1480,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				serializer.write(true);
 				serializer.write(m_terrains[i]->m_entity);
-				serializer.writeString(
-					m_terrains[i]->m_heightmap
-						? m_terrains[i]->m_heightmap->getPath().c_str()
-						: "");
+				serializer.writeString(m_terrains[i]->m_heightmap
+										   ? m_terrains[i]->m_heightmap->getPath().c_str()
+										   : "");
 				serializer.write(m_terrains[i]->m_xz_scale);
 				serializer.write(m_terrains[i]->m_y_scale);
+				serializer.write(m_terrains[i]->m_layer);
 			}
 			else
 			{
@@ -1242,7 +1495,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deserializeActors(InputBlob& serializer)
+	void deserializeActors(InputBlob& serializer, int version)
 	{
 		int32 count;
 		m_dynamic_actors.clear();
@@ -1274,13 +1527,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 			if (m_actors[i]->getEntity() != -1)
 			{
-				deserializeActor(serializer, i);
+				deserializeActor(serializer, i, version);
 			}
 		}
 	}
 
 
-	void deserializeControllers(InputBlob& serializer)
+	void deserializeControllers(InputBlob& serializer, int version)
 	{
 		int32 count;
 		serializer.read(count);
@@ -1306,6 +1559,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 			if (!is_free)
 			{
+				if (version > (int)PhysicsSceneVersion::LAYERS)
+				{
+					serializer.read(c.m_layer);
+				}
+				else
+				{
+					c.m_layer = 0;
+				}
 				physx::PxCapsuleControllerDesc cDesc;
 				cDesc.material = m_default_material;
 				cDesc.height = 1.8f;
@@ -1326,7 +1587,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deserializeTerrains(InputBlob& serializer)
+	void deserializeTerrains(InputBlob& serializer, int version)
 	{
 		int32 count;
 		serializer.read(count);
@@ -1349,7 +1610,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				if (!m_terrains[i])
 				{
-					m_terrains[i] = LUMIX_NEW(m_allocator, Terrain);
+					m_terrains[i] = LUMIX_NEW(m_allocator, Heightfield);
 				}
 				m_terrains[i]->m_scene = this;
 				serializer.read(m_terrains[i]->m_entity);
@@ -1357,6 +1618,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 				serializer.readString(tmp, MAX_PATH_LENGTH);
 				serializer.read(m_terrains[i]->m_xz_scale);
 				serializer.read(m_terrains[i]->m_y_scale);
+				if (version > (int)PhysicsSceneVersion::LAYERS)
+				{
+					serializer.read(m_terrains[i]->m_layer);
+				}
+				else
+				{
+					m_terrains[i]->m_layer = 0;
+				}
 
 				if (m_terrains[i]->m_heightmap == nullptr ||
 					compareString(tmp, m_terrains[i]->m_heightmap->getPath().c_str()) != 0)
@@ -1369,15 +1638,27 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deserialize(InputBlob& serializer, int) override
+	void deserialize(InputBlob& serializer, int version) override
 	{
-		deserializeActors(serializer);
-		deserializeControllers(serializer);
-		deserializeTerrains(serializer);
+		if (version > (int)PhysicsSceneVersion::LAYERS)
+		{
+			serializer.read(m_layers_count);
+			serializer.read(m_layers_names);
+			serializer.read(m_collision_filter);
+		}
+
+		deserializeActors(serializer, version);
+		deserializeControllers(serializer, version);
+		deserializeTerrains(serializer, version);
+
+		updateFilterData();
 	}
 
 
 	PhysicsSystem& getSystem() const override { return *m_system; }
+
+
+	int getVersion() const override { return (int)PhysicsSceneVersion::LATEST; }
 
 
 	float getActorSpeed(ComponentIndex cmp) override
@@ -1429,10 +1710,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 			return physx::PxFilterFlag::eDEFAULT;
 		}
 
-		pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT | physx::PxPairFlag::eNOTIFY_CONTACT_POINTS;
-
-		//if ((filterData0.word0 & filterData1.word1) && (filterData1.word0 & filterData0.word1))
-		pairFlags |= physx::PxPairFlag::eNOTIFY_TOUCH_FOUND;
+		if (!(filterData0.word0 & filterData1.word1) || !(filterData1.word0 & filterData0.word1))
+		{
+			return physx::PxFilterFlag::eKILL;
+		}
+		pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT | physx::PxPairFlag::eNOTIFY_TOUCH_FOUND |
+					physx::PxPairFlag::eNOTIFY_CONTACT_POINTS;
 		return physx::PxFilterFlag::eDEFAULT;
 	}
 
@@ -1452,6 +1735,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		float m_radius;
 		float m_height;
 		bool m_is_free;
+		int m_layer;
 	};
 
 	IAllocator& m_allocator;
@@ -1471,7 +1755,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	Array<QueuedForce> m_queued_forces;
 	Array<Controller> m_controllers;
-	Array<Terrain*> m_terrains;
+	Array<Heightfield*> m_terrains;
+	uint32 m_collision_filter[32];
+	char m_layers_names[32][30];
+	int m_layers_count;
 };
 
 
@@ -1494,10 +1781,6 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
 			g_log_error.log("physics") << "PxDefaultCpuDispatcherCreate failed!";
 		}
 		sceneDesc.cpuDispatcher = cpu_dispatcher;
-	}
-	if (!sceneDesc.filterShader)
-	{
-		sceneDesc.filterShader = &physx::PxDefaultSimulationFilterShader;
 	}
 
 	sceneDesc.filterShader = impl->filterShader;
@@ -1582,6 +1865,7 @@ void PhysicsSceneImpl::RigidActor::setPhysxActor(physx::PxRigidActor* actor)
 		m_scene.m_scene->addActor(*actor);
 		actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 		actor->userData = (void*)m_entity;
+		m_scene.updateFilterData(actor, m_layer);
 	}
 }
 
@@ -1601,29 +1885,30 @@ void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* resource)
 }
 
 
-Terrain::Terrain()
+Heightfield::Heightfield()
 {
 	m_heightmap = nullptr;
 	m_xz_scale = 1.0f;
 	m_y_scale = 1.0f;
 	m_actor = nullptr;
+	m_layer = 0;
 }
 
 
-Terrain::~Terrain()
+Heightfield::~Heightfield()
 {
 	if (m_heightmap)
 	{
 		m_heightmap->getResourceManager()
 			.get(ResourceManager::TEXTURE)
 			->unload(*m_heightmap);
-		m_heightmap->getObserverCb().unbind<Terrain, &Terrain::heightmapLoaded>(
+		m_heightmap->getObserverCb().unbind<Heightfield, &Heightfield::heightmapLoaded>(
 			this);
 	}
 }
 
 
-void Terrain::heightmapLoaded(Resource::State, Resource::State new_state)
+void Heightfield::heightmapLoaded(Resource::State, Resource::State new_state)
 {
 	if (new_state == Resource::State::READY)
 	{

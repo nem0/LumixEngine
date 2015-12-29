@@ -123,7 +123,7 @@ project "physics"
 	excludes { "../src/engine/**/osx/*"}
 	includedirs { "../external/physx/include", "../external/bgfx/include" }
 	defines { "BUILDING_PHYSICS" }
-	links { "engine", "renderer" }
+	links { "engine", "renderer", "studio_lib" }
 
 	useLua()
 
@@ -228,7 +228,7 @@ project "studio_lib"
 
 	files { "../src/studio_lib/**.h", "../src/studio_lib/**.cpp" }
 	includedirs { "../src", "../src/studio_lib", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
-	links { "animation", "physics", "editor", "engine", "renderer", "audio", "assimp", "crnlib", "winmm" }
+	links { "animation", "editor", "engine", "renderer", "audio", "assimp", "crnlib", "winmm" }
 	defines { "BUILDING_STUDIO_LIB" }
 
 	useLua()
