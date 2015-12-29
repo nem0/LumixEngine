@@ -74,6 +74,7 @@ public:
 		, m_shader_editor(nullptr)
 		, m_editor(nullptr)
 		, m_settings(m_allocator)
+		, m_plugins(m_allocator)
 	{
 		g_app = this;
 		m_template_name[0] = '\0';
@@ -281,6 +282,10 @@ public:
 			m_sceneview.onGUI();
 			m_gameview.onGui();
 			m_shader_editor->onGUI();
+			for (auto* plugin : m_plugins)
+			{
+				plugin->onWindowGUI();
+			}
 			if (m_is_style_editor_opened) ImGui::ShowStyleEditor();
 			m_settings.onGUI(&m_actions[0], m_actions.size());
 		}
@@ -581,6 +586,14 @@ public:
 					ImGui::MenuItem("Settings", nullptr, &m_settings.m_is_opened);
 					ImGui::MenuItem("Shader editor", nullptr, &m_shader_editor->m_is_opened);
 					ImGui::MenuItem("Style editor", nullptr, &m_is_style_editor_opened);
+					ImGui::Separator();
+					for (auto* plugin : m_plugins)
+					{
+						if (plugin->m_action)
+						{
+							doMenuItem(*plugin->m_action, false, true);
+						}
+					}
 					ImGui::EndMenu();
 				}
 				ImGui::EndMenu();
@@ -818,6 +831,12 @@ public:
 
 	void shutdown()
 	{
+		for (auto* plugin : m_plugins)
+		{
+			LUMIX_DELETE(m_editor->getAllocator(), plugin);
+		}
+		m_plugins.clear();
+
 		saveSettings();
 
 		for (auto* a : m_actions)
@@ -1018,6 +1037,22 @@ public:
 											   << " requested by command line";
 			}
 		}
+	}
+
+
+	void addPlugin(IPlugin& plugin) override
+	{
+		m_plugins.push(&plugin);
+		if (plugin.m_action)
+		{
+			m_actions.push(plugin.m_action);
+		}
+	}
+
+
+	void removePlugin(IPlugin& plugin) override
+	{
+		m_plugins.eraseItemFast(&plugin);
 	}
 
 
@@ -1407,6 +1442,7 @@ public:
 
 	float m_time_to_autosave;
 	Lumix::Array<Action*> m_actions;
+	Lumix::Array<IPlugin*> m_plugins;
 	Lumix::WorldEditor* m_editor;
 	AssetBrowser* m_asset_browser;
 	PropertyGrid* m_property_grid;
