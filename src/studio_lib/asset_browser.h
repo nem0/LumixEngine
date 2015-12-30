@@ -27,7 +27,6 @@ public:
 		SHADER,
 		TEXTURE,
 		UNIVERSE,
-		LUA_SCRIPT,
 
 		Count
 	};
@@ -38,7 +37,7 @@ public:
 		virtual ~IPlugin() {}
 
 		virtual bool onGUI(Lumix::Resource* resource, Lumix::uint32 type) = 0;
-		virtual Lumix::uint32 getResourceType(const char* path) = 0;
+		virtual Lumix::uint32 getResourceType(const char* ext) = 0;
 		virtual void onResourceUnloaded(Lumix::Resource* resource) = 0;
 		virtual const char* getName() const = 0;
 		virtual bool hasResourceManager(Lumix::uint32 type) const = 0;
@@ -54,6 +53,7 @@ public:
 	void selectResource(const Lumix::Path& resource);
 	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, int type);
 	void addPlugin(IPlugin& plugin);
+	void openInExternalEditor(Lumix::Resource* resource);
 
 public:
 	bool m_is_opened;
@@ -68,11 +68,9 @@ private:
 	void onGUIShader();
 	void onGUIModel();
 	void onGUITexture();
-	void onGUILuaScript();
 	void saveMaterial(Lumix::Material* material);
 	void unloadResource();
 	void selectResource(Lumix::Resource* resource);
-	void openInExternalEditor(Lumix::Resource* resource);
 
 	Lumix::uint32 getResourceType(const char* path) const;
 
@@ -88,7 +86,6 @@ private:
 	FileSystemWatcher* m_watcher;
 	int m_current_type;
 	char m_filter[128];
-	char m_text_buffer[8192];
 	Lumix::Path m_wanted_resource;
 	bool m_autoreload_changed_resource;
 	bool m_is_focus_requested;
