@@ -17,7 +17,6 @@
 #include "engine/iplugin.h"
 #include "engine/plugin_manager.h"
 #include "file_system_watcher.h"
-#include "lua_script/lua_script_manager.h"
 #include "metadata.h"
 #include "imgui/imgui.h"
 #include "platform_interface.h"
@@ -32,7 +31,6 @@
 
 static const Lumix::uint32 UNIVERSE_HASH = Lumix::crc32("universe");
 static const Lumix::uint32 SOURCE_HASH = Lumix::crc32("source");
-static const Lumix::uint32 LUA_SCRIPT_HASH = Lumix::crc32("lua_script");
 
 
 Lumix::uint32 AssetBrowser::getResourceType(const char* path) const
@@ -52,7 +50,6 @@ Lumix::uint32 AssetBrowser::getResourceType(const char* path) const
 	if (Lumix::compareString(ext, "tga") == 0) return Lumix::ResourceManager::TEXTURE;
 	if (Lumix::compareString(ext, "shd") == 0) return Lumix::ResourceManager::SHADER;
 	if (Lumix::compareString(ext, "unv") == 0) return UNIVERSE_HASH;
-	if (Lumix::compareString(ext, "lua") == 0) return LUA_SCRIPT_HASH;
 
 	return 0;
 }
@@ -100,7 +97,6 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 {
 	m_filter[0] = '\0';
 	m_current_type = 0;
-	m_text_buffer[0] = '\0';
 	m_is_opened = false;
 	for (int i = 0; i < Count; ++i)
 	{
@@ -165,7 +161,6 @@ int AssetBrowser::getTypeFromResourceManagerType(Lumix::uint32 type) const
 		case Lumix::ResourceManager::MATERIAL: return MATERIAL;
 	}
 	if (type == UNIVERSE_HASH) return UNIVERSE;
-	if (type == LUA_SCRIPT_HASH) return LUA_SCRIPT;
 
 	for (int i = 0; i < m_plugins.size(); ++i)
 	{
@@ -256,7 +251,6 @@ void AssetBrowser::onGUI()
 			case SHADER: *out = "Shader"; break;
 			case TEXTURE: *out = "Texture"; break;
 			case UNIVERSE: *out = "Universe"; break;
-			case LUA_SCRIPT: *out = "Lua Script"; break;
 			default: *out = browser.m_plugins[idx - Count]->getName(); break;
 		}
 		return true;
@@ -290,7 +284,6 @@ void AssetBrowser::selectResource(Lumix::Resource* resource)
 	if (m_history.size() > 20) m_history.erase(0);
 
 
-	m_text_buffer[0] = '\0';
 	m_wanted_resource = "";
 	unloadResource();
 	m_selected_resource = resource;
@@ -537,40 +530,6 @@ void AssetBrowser::onGUITexture()
 		{
 			openInExternalEditor(m_selected_resource);
 		}
-	}
-}
-
-
-void AssetBrowser::onGUILuaScript()
-{
-	auto* script = static_cast<Lumix::LuaScript*>(m_selected_resource);
-
-	if (m_text_buffer[0] == '\0')
-	{
-		Lumix::copyString(m_text_buffer, script->getSourceCode());
-	}
-	ImGui::InputTextMultiline("Code", m_text_buffer, sizeof(m_text_buffer), ImVec2(0, 300));
-	if (ImGui::Button("Save"))
-	{
-		auto& fs = m_editor.getEngine().getFileSystem();
-		auto* file = fs.open(fs.getDiskDevice(),
-			m_selected_resource->getPath().c_str(),
-			Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
-
-		if (!file)
-		{
-			Lumix::g_log_warning.log("Asset browser") << "Could not save "
-													  << m_selected_resource->getPath().c_str();
-			return;
-		}
-
-		file->write(m_text_buffer, Lumix::stringLength(m_text_buffer));
-		fs.close(*file);
-	}
-	ImGui::SameLine();
-	if (ImGui::Button("Open in external editor"))
-	{
-		openInExternalEditor(m_selected_resource);
 	}
 }
 
@@ -831,14 +790,7 @@ void AssetBrowser::onGUIResource()
 		case Lumix::ResourceManager::MODEL: onGUIModel(); break;
 		case Lumix::ResourceManager::SHADER: onGUIShader(); break;
 		default:
-			if (resource_type == LUA_SCRIPT_HASH)
-			{
-				onGUILuaScript();
-			}
-			else if (resource_type != UNIVERSE_HASH)
-			{
-				ASSERT(false); // unimplemented resource
-			}
+			ASSERT(resource_type == UNIVERSE_HASH); // unimplemented resource
 			break;
 	}
 }
@@ -879,7 +831,6 @@ void AssetBrowser::addResource(const char* path, const char* filename)
 		else if (Lumix::compareString(ext, "mat") == 0) index = MATERIAL;
 		else if (Lumix::compareString(ext, "unv") == 0) index = UNIVERSE;
 		else if (Lumix::compareString(ext, "shd") == 0) index = SHADER;
-		else if (Lumix::compareString(ext, "lua") == 0) index = LUA_SCRIPT;
 	}
 
 	if (Lumix::startsWith(path, "./render_tests") != 0 || Lumix::startsWith(path, "./unit_tests") != 0)

@@ -91,7 +91,6 @@ Settings::Settings(Lumix::IAllocator& allocator)
 	m_is_entity_template_list_opened = false;
 	m_is_style_editor_opened = false;
 	m_is_shader_editor_opened = false;
-	m_is_clip_manager_opened = false;
 	m_is_asset_browser_opened = false;
 	m_is_log_opened = false;
 	m_is_profiler_opened = false;
@@ -147,7 +146,6 @@ bool Settings::load(Action** actions, int actions_count)
 	m_is_properties_opened = getBoolean(L, "properties_opened", false);
 	m_is_style_editor_opened = getBoolean(L, "style_editor_opened", false);
 	m_is_shader_editor_opened = getBoolean(L, "shader_editor_opened", false);
-	m_is_clip_manager_opened = getBoolean(L, "clip_manager_opened", false);
 	m_is_crash_reporting_enabled = getBoolean(L, "error_reporting_enabled", true);
 	Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
 	m_autosave_time = getInteger(L, "autosave_time", 300);
@@ -245,7 +243,6 @@ bool Settings::save(Action** actions, int actions_count)
 	writeBool("properties_opened", m_is_properties_opened);
 	writeBool("style_editor_opened", m_is_style_editor_opened);
 	writeBool("shader_editor_opened", m_is_shader_editor_opened);
-	writeBool("clip_manager_opened", m_is_clip_manager_opened);
 	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
 	file << "autosave_time = " << m_autosave_time << "\n";
 

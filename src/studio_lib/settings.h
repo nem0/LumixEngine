@@ -38,7 +38,6 @@ struct Settings
 	bool m_is_style_editor_opened;
 	bool m_is_crash_reporting_enabled;
 	bool m_is_shader_editor_opened;
-	bool m_is_clip_manager_opened;
 
 	int m_autosave_time;
 
