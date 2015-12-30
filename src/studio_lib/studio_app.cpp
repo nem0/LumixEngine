@@ -56,7 +56,6 @@ class StudioAppImpl : public StudioApp
 public:
 	StudioAppImpl()
 		: m_is_entity_list_opened(true)
-		, m_is_clip_manager_opened(false)
 		, m_finished(false)
 		, m_is_style_editor_opened(false)
 		, m_import_asset_dialog(nullptr)
@@ -78,7 +77,6 @@ public:
 	{
 		g_app = this;
 		m_template_name[0] = '\0';
-		m_clip_manager_filter[0] = '\0';
 		init();
 	}
 
@@ -125,6 +123,12 @@ public:
 			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 
 		renderer->frame();
+	}
+
+
+	AssetBrowser* getAssetBrowser() override
+	{
+		return m_asset_browser;
 	}
 
 	
@@ -276,7 +280,6 @@ public:
 			m_log_ui->onGUI();
 			m_import_asset_dialog->onGUI();
 			m_property_grid->onGUI();
-			showClipManager();
 			showEntityList();
 			showEntityTemplateList();
 			m_sceneview.onGUI();
@@ -576,7 +579,6 @@ public:
 				if (ImGui::BeginMenu("Windows"))
 				{
 					ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
-					ImGui::MenuItem("Clip manager", nullptr, &m_is_clip_manager_opened);
 					ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
 					ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
 					ImGui::MenuItem("Game view", nullptr, &m_gameview.m_is_opened);
@@ -642,66 +644,6 @@ public:
 				{
 					m_selected_template_name = template_name;
 				}
-			}
-		}
-		ImGui::End();
-	}
-
-
-	void showClipManager()
-	{
-		if (!m_is_clip_manager_opened) return;
-
-		if (ImGui::Begin("Clip manager", &m_is_clip_manager_opened))
-		{
-			ImGui::InputText("Filter", m_clip_manager_filter, Lumix::lengthOf(m_clip_manager_filter));
-
-			auto* audio_scene = static_cast<Lumix::AudioScene*>(m_editor->getScene(Lumix::crc32("audio")));
-			int clip_count = audio_scene->getClipCount();
-			for (int clip_id = 0; clip_id < clip_count; ++clip_id)
-			{
-				auto* clip_info = audio_scene->getClipInfo(clip_id);
-
-				if (m_clip_manager_filter[0] != 0 &&
-					Lumix::stristr(clip_info->name, m_clip_manager_filter) == 0)
-				{
-					continue;
-				}
-
-				if (ImGui::TreeNode((const void*)clip_id, clip_info->name))
-				{
-					char buf[30];
-					Lumix::copyString(buf, Lumix::lengthOf(buf), clip_info->name);
-					if (ImGui::InputText("Name", buf, sizeof(buf)))
-					{
-						Lumix::copyString(clip_info->name, buf);
-						clip_info->name_hash = Lumix::crc32(buf);
-					}
-					auto* clip = audio_scene->getClipInfo(clip_id)->clip;
-					char path[Lumix::MAX_PATH_LENGTH];
-					Lumix::copyString(path, clip ? clip->getPath().c_str() : "");
-					if (m_asset_browser->resourceInput(
-						"Clip", "", path, Lumix::lengthOf(path), AssetBrowser::Type::AUDIO))
-					{
-						audio_scene->setClip(clip_id, Lumix::Path(path));
-					}
-					bool looped = audio_scene->getClipInfo(clip_id)->looped;
-					if (ImGui::Checkbox("Looped", &looped))
-					{
-						clip_info->looped = looped;
-					}
-					if (ImGui::Button("Remove"))
-					{
-						audio_scene->removeClip(clip_info);
-						--clip_count;
-					}
-					ImGui::TreePop();
-				}
-			}
-
-			if (ImGui::Button("Add"))
-			{
-				audio_scene->addClip("test", Lumix::Path("test.ogg"));
 			}
 		}
 		ImGui::End();
@@ -810,7 +752,6 @@ public:
 	void saveSettings()
 	{
 		m_settings.m_is_asset_browser_opened = m_asset_browser->m_is_opened;
-		m_settings.m_is_clip_manager_opened = m_is_clip_manager_opened;
 		m_settings.m_is_entity_list_opened = m_is_entity_list_opened;
 		m_settings.m_is_entity_template_list_opened = m_is_entity_template_list_opened;
 		m_settings.m_is_gameview_opened = m_gameview.m_is_opened;
@@ -951,7 +892,6 @@ public:
 
 		m_asset_browser->m_is_opened = m_settings.m_is_asset_browser_opened;
 		m_is_entity_list_opened = m_settings.m_is_entity_list_opened;
-		m_is_clip_manager_opened = m_settings.m_is_clip_manager_opened;
 		m_is_entity_template_list_opened = m_settings.m_is_entity_template_list_opened;
 		m_gameview.m_is_opened = m_settings.m_is_gameview_opened;
 		m_log_ui->m_is_opened = m_settings.m_is_log_opened;
@@ -1459,12 +1399,10 @@ public:
 	bool m_finished;
 
 	bool m_is_welcome_screen_opened;
-	bool m_is_clip_manager_opened;
 	bool m_is_entity_list_opened;
 	bool m_is_entity_template_list_opened;
 	bool m_is_style_editor_opened;
 	bool m_is_wireframe;
-	char m_clip_manager_filter[50];
 };
 
 

@@ -194,9 +194,9 @@ project "audio"
 	kind "SharedLib"
 
 	files { "../src/audio/**.h", "../src/audio/**.cpp", "../src/audio/**.c" }
-	includedirs { "../src", "../src/audio" }
+	includedirs { "../src", "../src/audio", "../external/bgfx/include" }
 	defines { "BUILDING_AUDIO" }
-	links { "engine", "dxguid" }
+	links { "engine", "dxguid", "studio_lib" }
 
 	useLua()
 	defaultConfigurations()
@@ -228,7 +228,7 @@ project "studio_lib"
 
 	files { "../src/studio_lib/**.h", "../src/studio_lib/**.cpp" }
 	includedirs { "../src", "../src/studio_lib", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
-	links { "animation", "editor", "engine", "renderer", "audio", "assimp", "crnlib", "winmm" }
+	links { "animation", "editor", "engine", "renderer", "assimp", "crnlib", "winmm" }
 	defines { "BUILDING_STUDIO_LIB" }
 
 	useLua()
@@ -268,7 +268,7 @@ project "studio"
 
 	files { "../src/studio/**.cpp" }
 	includedirs { "../src", "../src/studio_lib", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
-	links { "studio_lib", "animation", "physics", "editor", "engine", "renderer", "audio", "winmm" }
+	links { "studio_lib", "animation", "physics", "editor", "engine", "renderer", "winmm" }
 
 	useLua()
 	defaultConfigurations()
