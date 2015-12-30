@@ -1,7 +1,4 @@
 #include "asset_browser.h"
-#include "audio/audio_device.h"
-#include "audio/audio_system.h"
-#include "audio/clip_manager.h"
 #include "core/crc32.h"
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
@@ -35,16 +32,19 @@
 
 static const Lumix::uint32 UNIVERSE_HASH = Lumix::crc32("universe");
 static const Lumix::uint32 SOURCE_HASH = Lumix::crc32("source");
-static const Lumix::uint32 CLIP_HASH = Lumix::crc32("CLIP");
 static const Lumix::uint32 LUA_SCRIPT_HASH = Lumix::crc32("lua_script");
 
 
-static Lumix::uint32 getResourceType(const char* path)
+Lumix::uint32 AssetBrowser::getResourceType(const char* path) const
 {
 	char ext[10];
 	Lumix::PathUtils::getExtension(ext, sizeof(ext), path);
 
-	if (Lumix::compareString(ext, "ogg") == 0) return CLIP_HASH;
+	for (auto* plugin : m_plugins)
+	{
+		auto type = plugin->getResourceType(ext);
+		if (type != 0) return type;
+	}
 	if (Lumix::compareString(ext, "mat") == 0) return Lumix::ResourceManager::MATERIAL;
 	if (Lumix::compareString(ext, "msh") == 0) return Lumix::ResourceManager::MODEL;
 	if (Lumix::compareString(ext, "dds") == 0) return Lumix::ResourceManager::TEXTURE;
@@ -96,7 +96,7 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 	, m_is_focus_requested(false)
 	, m_changed_files_mutex(false)
 	, m_history(editor.getAllocator())
-	, m_playing_clip(-1)
+	, m_plugins(editor.getAllocator())
 {
 	m_filter[0] = '\0';
 	m_current_type = 0;
@@ -118,6 +118,12 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 
 AssetBrowser::~AssetBrowser()
 {
+	for (auto* plugin : m_plugins)
+	{
+		LUMIX_DELETE(m_editor.getAllocator(), plugin);
+	}
+	m_plugins.clear();
+
 	unloadResource();
 	FileSystemWatcher::destroy(m_watcher);
 }
@@ -137,7 +143,10 @@ void AssetBrowser::unloadResource()
 {
 	if (!m_selected_resource) return;
 
-	stopAudio();
+	for (auto* plugin : m_plugins)
+	{
+		plugin->onResourceUnloaded(m_selected_resource);
+	}
 	m_selected_resource->getResourceManager()
 		.get(getResourceType(m_selected_resource->getPath().c_str()))
 		->unload(*m_selected_resource);
@@ -146,7 +155,7 @@ void AssetBrowser::unloadResource()
 }
 
 
-AssetBrowser::Type AssetBrowser::getTypeFromResourceManagerType(Lumix::uint32 type) const
+int AssetBrowser::getTypeFromResourceManagerType(Lumix::uint32 type) const
 {
 	switch (type)
 	{
@@ -157,6 +166,11 @@ AssetBrowser::Type AssetBrowser::getTypeFromResourceManagerType(Lumix::uint32 ty
 	}
 	if (type == UNIVERSE_HASH) return UNIVERSE;
 	if (type == LUA_SCRIPT_HASH) return LUA_SCRIPT;
+
+	for (int i = 0; i < m_plugins.size(); ++i)
+	{
+		if (m_plugins[i]->hasResourceManager(type)) return Count + i;
+	}
 
 	return MODEL;
 }
@@ -232,8 +246,23 @@ void AssetBrowser::onGUI()
 	ImGui::SameLine();
 	ImGui::Checkbox("Autoreload", &m_autoreload_changed_resource);
 
-	const char* items = "Material\0Model\0Shader\0Texture\0Universe\0Lua Script\0Audio\0";
-	ImGui::Combo("Type", &m_current_type, items);
+	auto getter = [](void* data, int idx, const char** out) -> bool
+	{
+		auto& browser = *static_cast<AssetBrowser*>(data);
+		switch (idx)
+		{
+			case MATERIAL: *out = "Material"; break;
+			case MODEL: *out = "Model"; break;
+			case SHADER: *out = "Shader"; break;
+			case TEXTURE: *out = "Texture"; break;
+			case UNIVERSE: *out = "Universe"; break;
+			case LUA_SCRIPT: *out = "Lua Script"; break;
+			default: *out = browser.m_plugins[idx - Count]->getName(); break;
+		}
+		return true;
+	};
+
+	ImGui::Combo("Type", &m_current_type, getter, this, Count + m_plugins.size());
 	ImGui::InputText("Filter", m_filter, sizeof(m_filter));
 
 	ImGui::ListBoxHeader("Resources");
@@ -266,6 +295,14 @@ void AssetBrowser::selectResource(Lumix::Resource* resource)
 	unloadResource();
 	m_selected_resource = resource;
 	ASSERT(m_selected_resource->getRefCount() > 0);
+}
+
+
+void AssetBrowser::addPlugin(IPlugin& plugin)
+{
+	m_plugins.push(&plugin);
+	m_resources.emplace(m_editor.getAllocator());
+	findResources();
 }
 
 
@@ -315,7 +352,7 @@ void AssetBrowser::saveMaterial(Lumix::Material* material)
 }
 
 
-bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* buf, int max_size, Type type)
+bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* buf, int max_size, int type)
 {
 	float item_w = ImGui::CalcItemWidth();
 	auto& style = ImGui::GetStyle();
@@ -500,55 +537,6 @@ void AssetBrowser::onGUITexture()
 		{
 			openInExternalEditor(m_selected_resource);
 		}
-	}
-}
-
-
-Lumix::AudioDevice& getAudioDevice(Lumix::Engine& engine)
-{
-	auto* audio = static_cast<Lumix::AudioSystem*>(engine.getPluginManager().getPlugin("audio"));
-	return audio->getDevice();
-}
-
-
-void AssetBrowser::stopAudio()
-{
-	if (m_playing_clip >= 0)
-	{
-		getAudioDevice(m_editor.getEngine()).stop(m_playing_clip);
-		m_playing_clip = -1;
-	}
-}
-
-
-void AssetBrowser::onGUIClip()
-{
-	auto* clip = static_cast<Lumix::Clip*>(m_selected_resource);
-	ImGui::LabelText("Length", "%f", clip->getLengthSeconds());
-	auto& device = getAudioDevice(m_editor.getEngine());
-
-	if (m_playing_clip >= 0)
-	{
-		if (ImGui::Button("Stop"))
-		{
-			stopAudio();
-			return;
-		}
-		float time = device.getCurrentTime(m_playing_clip);
-		if (ImGui::SliderFloat("Time", &time, 0, clip->getLengthSeconds(), "%.2fs"))
-		{
-			device.setCurrentTime(m_playing_clip, time);
-		}
-	}
-
-	if (m_playing_clip < 0 && ImGui::Button("Play"))
-	{
-		stopAudio();
-
-		auto handle = device.createBuffer(
-			clip->getData(), clip->getSize(), clip->getChannels(), clip->getSampleRate(), 0);
-		device.play(handle, false);
-		m_playing_clip = handle;
 	}
 }
 
@@ -832,6 +820,10 @@ void AssetBrowser::onGUIResource()
 	}
 
 	auto resource_type = getResourceType(path);
+	for (auto* plugin : m_plugins)
+	{
+		if (plugin->onGUI(m_selected_resource, resource_type)) return;
+	}
 	switch (resource_type)
 	{
 		case Lumix::ResourceManager::MATERIAL: onGUIMaterial(); break;
@@ -843,10 +835,6 @@ void AssetBrowser::onGUIResource()
 			{
 				onGUILuaScript();
 			}
-			else if (resource_type == CLIP_HASH)
-			{
-				onGUIClip();
-			}
 			else if (resource_type != UNIVERSE_HASH)
 			{
 				ASSERT(false); // unimplemented resource
@@ -856,7 +844,7 @@ void AssetBrowser::onGUIResource()
 }
 
 
-const Lumix::Array<Lumix::Path>& AssetBrowser::getResources(Type type) const
+const Lumix::Array<Lumix::Path>& AssetBrowser::getResources(int type) const
 {
 	return m_resources[type];
 }
@@ -873,15 +861,26 @@ void AssetBrowser::addResource(const char* path, const char* filename)
 	Lumix::catString(fullpath, filename);
 
 	int index = -1;
-	if (Lumix::compareString(ext, "dds") == 0) index = TEXTURE;
-	else if (Lumix::compareString(ext, "tga") == 0) index = TEXTURE;
-	else if (Lumix::compareString(ext, "raw") == 0) index = TEXTURE;
-	else if (Lumix::compareString(ext, "ogg") == 0) index = AUDIO;
-	else if (Lumix::compareString(ext, "msh") == 0) index = MODEL;
-	else if (Lumix::compareString(ext, "mat") == 0) index = MATERIAL;
-	else if (Lumix::compareString(ext, "unv") == 0) index = UNIVERSE;
-	else if (Lumix::compareString(ext, "shd") == 0) index = SHADER;
-	else if (Lumix::compareString(ext, "lua") == 0) index = LUA_SCRIPT;
+	for (int i = 0; i < m_plugins.size(); ++i)
+	{
+		if (m_plugins[i]->getResourceType(ext) != 0)
+		{
+			index = Count + i;
+			break;
+		}
+	}
+
+	if (index == -1)
+	{
+		if (Lumix::compareString(ext, "dds") == 0) index = TEXTURE;
+		else if (Lumix::compareString(ext, "tga") == 0) index = TEXTURE;
+		else if (Lumix::compareString(ext, "raw") == 0) index = TEXTURE;
+		else if (Lumix::compareString(ext, "msh") == 0) index = MODEL;
+		else if (Lumix::compareString(ext, "mat") == 0) index = MATERIAL;
+		else if (Lumix::compareString(ext, "unv") == 0) index = UNIVERSE;
+		else if (Lumix::compareString(ext, "shd") == 0) index = SHADER;
+		else if (Lumix::compareString(ext, "lua") == 0) index = LUA_SCRIPT;
+	}
 
 	if (Lumix::startsWith(path, "./render_tests") != 0 || Lumix::startsWith(path, "./unit_tests") != 0)
 	{
