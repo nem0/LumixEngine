@@ -226,7 +226,7 @@ project "unit_tests"
 project "studio_lib"
 	kind "SharedLib"
 
-	files { "../src/studio_lib/**.h", "../src/studio_lib/**.cpp" }
+	files { "../src/studio_lib/**.h", "../src/studio_lib/**.inl", "../src/studio_lib/**.cpp" }
 	includedirs { "../src", "../src/studio_lib", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
 	links { "animation", "editor", "engine", "renderer", "assimp", "crnlib", "winmm" }
 	defines { "BUILDING_STUDIO_LIB" }
