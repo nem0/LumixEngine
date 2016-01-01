@@ -29,7 +29,9 @@ namespace Lumix
 			void writeEOF();
 
 			OsFile& operator <<(const char* text);
-			OsFile& operator <<(int value);
+			OsFile& operator <<(int32 value);
+			OsFile& operator <<(uint32 value);
+			OsFile& operator <<(uint64 value);
 
 		private:
 			struct OsFileImpl* m_impl;

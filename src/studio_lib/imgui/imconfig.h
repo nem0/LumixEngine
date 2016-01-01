@@ -7,7 +7,7 @@
 #pragma once
 
 //---- Define assertion handler. Defaults to calling assert().
-//#define IM_ASSERT(_EXPR)  MyAssert(_EXPR)
+#define IM_ASSERT(_EXPR)  do { if(!(_EXPR)) __debugbreak(); } while(false)
 
 //---- Define attributes of all API symbols declarations, e.g. for DLL under Windows.
 #ifdef BUILDING_STUDIO_LIB

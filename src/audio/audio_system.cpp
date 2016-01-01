@@ -190,9 +190,7 @@ extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
 
 		void onWindowGUI() override
 		{
-			if (!m_is_opened) return;
-
-			if (ImGui::Begin("Clip manager", &m_is_opened))
+			if (ImGui::BeginDock("Clip manager", &m_is_opened))
 			{
 				ImGui::InputText("Filter", m_filter, Lumix::lengthOf(m_filter));
 
@@ -245,7 +243,7 @@ extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
 					audio_scene->addClip("test", Lumix::Path("test.ogg"));
 				}
 			}
-			ImGui::End();
+			ImGui::EndDock();
 		}
 
 

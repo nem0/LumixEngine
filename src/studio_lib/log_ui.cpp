@@ -106,7 +106,7 @@ void LogUI::showNotifications()
 	if (!ImGui::Begin("Notifications",
 					  &opened,
 					  ImVec2(200, 0),
-					  0.3f,
+					  1.0f,
 					  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
 						  ImGuiWindowFlags_NoMove |
 						  ImGuiWindowFlags_NoSavedSettings))
@@ -145,9 +145,7 @@ void LogUI::onGUI()
 	Lumix::MT::SpinLock lock(m_guard);
 	showNotifications();
 
-	if (!m_is_opened) return;
-
-	if (ImGui::Begin("Log", &m_is_opened))
+	if (ImGui::BeginDock("Log", &m_is_opened))
 	{
 		const char* labels[] = { "Info", "Warning", "Error", "BGFX" };
 		for (int i = 0; i < Lumix::lengthOf(labels); ++i)
@@ -190,5 +188,5 @@ void LogUI::onGUI()
 		}
 		ImGui::EndChild();
 	}
-	ImGui::End();
+	ImGui::EndDock();
 }

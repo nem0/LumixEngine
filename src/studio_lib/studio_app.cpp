@@ -289,11 +289,22 @@ public:
 			{
 				plugin->onWindowGUI();
 			}
-			if (m_is_style_editor_opened) ImGui::ShowStyleEditor();
+			showStyleEditor();
 			m_settings.onGUI(&m_actions[0], m_actions.size());
 		}
 
 		ImGui::Render();
+	}
+
+
+
+	void showStyleEditor()
+	{
+		if (ImGui::BeginDock("Style", &m_is_style_editor_opened))
+		{
+			ImGui::ShowStyleEditor();
+		}
+		ImGui::EndDock();
 	}
 
 
@@ -618,9 +629,7 @@ public:
 
 	void showEntityTemplateList()
 	{
-		if (!m_is_entity_template_list_opened) return;
-
-		if (ImGui::Begin("Entity templates", &m_is_entity_template_list_opened))
+		if (ImGui::BeginDock("Entity templates", &m_is_entity_template_list_opened))
 		{
 			if (m_editor->getSelectedEntities().size() == 1)
 			{
@@ -646,15 +655,13 @@ public:
 				}
 			}
 		}
-		ImGui::End();
+		ImGui::EndDock();
 	}
 
 
 	void showEntityList()
 	{
-		if (!m_is_entity_list_opened) return;
-
-		if (ImGui::Begin("Entity list", &m_is_entity_list_opened))
+		if (ImGui::BeginDock("Entity list", &m_is_entity_list_opened))
 		{
 			auto* universe = m_editor->getUniverse();
 			int scroll_to = -1;
@@ -745,7 +752,7 @@ public:
 				}
 			}
 		}
-		ImGui::End();
+		ImGui::EndDock();
 	}
 
 

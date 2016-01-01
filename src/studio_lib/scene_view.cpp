@@ -182,7 +182,7 @@ void SceneView::onGUI()
 	PROFILE_FUNCTION();
 	m_is_opened = false;
 	m_is_mouse_hovering_window = false;
-	if (ImGui::Begin(WINDOW_NAME))
+	if (ImGui::BeginDock(WINDOW_NAME))
 	{
 		m_is_mouse_hovering_window = ImGui::IsMouseHoveringWindow();
 		m_is_opened = true;
@@ -191,7 +191,6 @@ void SceneView::onGUI()
 		if (size.x > 0 && size.y > 0)
 		{
 			auto pos = ImGui::GetWindowPos();
-			auto cp = ImGui::GetCursorPos();
 			m_pipeline->setViewport(0, 0, int(size.x), int(size.y));
 			auto* fb = m_pipeline->getFramebuffer("default");
 			m_texture_handle = fb->getRenderbufferHandle(0);
@@ -204,51 +203,51 @@ void SceneView::onGUI()
 
 			m_pipeline->render();
 		}
-	}
 
-	ImGui::PushItemWidth(60);
-	ImGui::DragFloat("Camera speed", &m_camera_speed, 0.1f, 0.01f, 999.0f, "%.2f");
-	ImGui::SameLine();
-	if (m_editor->isMeasureToolActive())
-	{
-		ImGui::Text("| Measured distance: %f", m_editor->getMeasuredDistance());
-	}
-
-	ImGui::SameLine();
-	int step = m_editor->getGizmo().getStep();
-	if (ImGui::DragInt("Gizmo step", &step, 1.0f, 0, 200))
-	{
-		m_editor->getGizmo().setStep(step);
-	}
-
-	ImGui::SameLine();
-	int count = m_pipeline->getParameterCount();
-	if (count)
-	{
-		if (ImGui::Button("Pipeline"))
+		ImGui::PushItemWidth(60);
+		ImGui::DragFloat("Camera speed", &m_camera_speed, 0.1f, 0.01f, 999.0f, "%.2f");
+		ImGui::SameLine();
+		if (m_editor->isMeasureToolActive())
 		{
-			ImGui::OpenPopup("pipeline_parameters_popup");
+			ImGui::Text("| Measured distance: %f", m_editor->getMeasuredDistance());
 		}
 
-		if (ImGui::BeginPopup("pipeline_parameters_popup"))
+		ImGui::SameLine();
+		int step = m_editor->getGizmo().getStep();
+		if (ImGui::DragInt("Gizmo step", &step, 1.0f, 0, 200))
 		{
-			for (int i = 0; i < count; ++i)
+			m_editor->getGizmo().setStep(step);
+		}
+
+		ImGui::SameLine();
+		int count = m_pipeline->getParameterCount();
+		if (count)
+		{
+			if (ImGui::Button("Pipeline"))
 			{
-				bool b = m_pipeline->getParameter(i);
-				if (ImGui::Checkbox(m_pipeline->getParameterName(i), &b))
-				{
-					auto* settings = Settings::getInstance();
-					if (settings)
-					{
-						settings->setValue(m_pipeline->getParameterName(i), b);
-					}
-					m_pipeline->setParameter(i, b);
-				}
+				ImGui::OpenPopup("pipeline_parameters_popup");
 			}
 
-			ImGui::EndPopup();
+			if (ImGui::BeginPopup("pipeline_parameters_popup"))
+			{
+				for (int i = 0; i < count; ++i)
+				{
+					bool b = m_pipeline->getParameter(i);
+					if (ImGui::Checkbox(m_pipeline->getParameterName(i), &b))
+					{
+						auto* settings = Settings::getInstance();
+						if (settings)
+						{
+							settings->setValue(m_pipeline->getParameterName(i), b);
+						}
+						m_pipeline->setParameter(i, b);
+					}
+				}
+
+				ImGui::EndPopup();
+			}
 		}
 	}
 
-	ImGui::End();
+	ImGui::EndDock();
 }

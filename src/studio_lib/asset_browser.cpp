@@ -223,11 +223,9 @@ void AssetBrowser::onGUI()
 		m_wanted_resource = "";
 	}
 
-	if (!m_is_opened) return;
-
-	if (!ImGui::Begin("AssetBrowser", &m_is_opened))
+	if (!ImGui::BeginDock("AssetBrowser", &m_is_opened))
 	{
-		ImGui::End();
+		ImGui::EndDock();
 		return;
 	}
 
@@ -274,7 +272,7 @@ void AssetBrowser::onGUI()
 	}
 	ImGui::ListBoxFooter();
 	onGUIResource();
-	ImGui::End();
+	ImGui::EndDock();
 }
 
 

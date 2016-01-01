@@ -1536,9 +1536,7 @@ bool ImportAssetDialog::isTextureDirValid() const
 
 void ImportAssetDialog::onGUI()
 {
-	if (!m_is_opened) return;
-
-	if (ImGui::Begin("Import asset", &m_is_opened))
+	if (ImGui::BeginDock("Import asset", &m_is_opened))
 	{
 		if (hasMessage())
 		{
@@ -1694,5 +1692,5 @@ void ImportAssetDialog::onGUI()
 			}
 		}
 	}
-	ImGui::End();
+	ImGui::EndDock();
 }
