@@ -465,475 +465,569 @@ bool CurvePoint(ImVec2* points, CurveEditor& editor)
 }
 
 
-enum class DockSlot2
+
+
+struct DockContext
 {
-	LEFT,
-	RIGHT,
-	TOP,
-	BOTTOM,
-	TAB,
 
-	FLOAT,
-	NONE
-};
-
-
-struct Dock
-{
-	enum Status
+	enum class DockSlot2
 	{
-		DOCKED,
+		LEFT,
+		RIGHT,
+		TOP,
+		BOTTOM,
+		TAB,
+
 		FLOAT,
-		DRAGGED
+		NONE
 	};
 
-	Dock(const char* _label)
-		: id(ImHash(_label, 0))
-		, next(nullptr)
-		, prev(nullptr)
-		, parent(nullptr)
-	{
-		pos = ImVec2(0, 0);
-		size = ImVec2(-1, -1);
-		active = true;
-		children[0] = children[1] = nullptr;
-		status = FLOAT;
-		Lumix::copyString(label, _label);
-	}
 
-
-	void setParent(Dock* dock)
+	struct Dock
 	{
-		parent = dock;
-		for (auto* tmp = prev; tmp; tmp = tmp->prev) tmp->parent = dock;
-		for (auto* tmp = next; tmp; tmp = tmp->next) tmp->parent = dock;
-	}
-
-	Dock& getSibling()
-	{
-		ASSERT(parent);
-		if (parent->children[0] == &getFirst()) return *parent->children[1];
-		return *parent->children[0];
-	}
-
-	Dock& getFirst()
-	{
-		auto* tmp = this;
-		while (tmp->prev) tmp = tmp->prev;
-		return *tmp;
-	}
-
-	void setActive()
-	{
-		active = true;
-		for (auto* tmp = prev; tmp; tmp = tmp->prev) tmp->active = false;
-		for (auto* tmp = next; tmp; tmp = tmp->next) tmp->active = false;
-	}
-
-	void setPosSize(const ImVec2& _pos, const ImVec2& _size)
-	{
-		size = _size;
-		pos = _pos;
-		for (auto* tmp = prev; tmp; tmp = tmp->prev)
+		enum Status
 		{
-			tmp->size = _size;
-			tmp->pos = _pos;
-		}
-		for (auto* tmp = next; tmp; tmp = tmp->next)
+			DOCKED,
+			FLOAT,
+			DRAGGED
+		};
+
+		Dock(const char* _label)
+			: id(ImHash(_label, 0))
+			, next(nullptr)
+			, prev(nullptr)
+			, parent(nullptr)
 		{
-			tmp->size = _size;
-			tmp->pos = _pos;
+			pos = ImVec2(0, 0);
+			size = ImVec2(-1, -1);
+			active = true;
+			children[0] = children[1] = nullptr;
+			status = FLOAT;
+			Lumix::copyString(label, _label);
 		}
 
-		if (children[0])
+
+		void setParent(Dock* dock)
 		{
-			if (children[0]->pos.x < children[1]->pos.x)
-			{
-				auto s = children[0]->size;
-				s.y = _size.y;
-				children[0]->setPosSize(_pos, s);
-
-				s.x = _size.x - children[0]->size.x;
-				auto p = _pos;
-				p.x += children[0]->size.x;
-				children[1]->setPosSize(p, s);
-			}
-			else if (children[0]->pos.x > children[1]->pos.x)
-			{
-				auto s = children[1]->size;
-				s.y = _size.y;
-				children[1]->setPosSize(_pos, s);
-
-				s.x = _size.x - children[1]->size.x;
-				auto p = _pos;
-				p.x += children[1]->size.x;
-				children[0]->setPosSize(p, s);
-			}
-			else if(children[0]->pos.y < children[1]->pos.y)
-			{
-				auto s = children[0]->size;
-				s.x = _size.x;
-				children[0]->setPosSize(_pos, s);
-
-				s.y = _size.y - children[0]->size.y;
-				auto p = _pos;
-				p.y += children[0]->size.y;
-				children[1]->setPosSize(p, s);
-			}
-			else
-			{
-				auto s = children[1]->size;
-				s.x = _size.x;
-				children[1]->setPosSize(_pos, s);
-
-				s.y = _size.y - children[1]->size.y;
-				auto p = _pos;
-				p.y += children[1]->size.y;
-				children[0]->setPosSize(p, s);
-			}
+			parent = dock;
+			for (auto* tmp = prev; tmp; tmp = tmp->prev) tmp->parent = dock;
+			for (auto* tmp = next; tmp; tmp = tmp->next) tmp->parent = dock;
 		}
-	}
-	
-	char label[50];
-	ImU32 id;
-	Dock* next;
-	Dock* prev;
-	Dock* children[2];
-	Dock* parent;
-	bool active;
-	ImVec2 pos;
-	ImVec2 size;
-	Status status;
-};
 
-
-static Dock* g_docks[32];
-static int g_dock_count = 0;
-static Dock* g_current_dock = nullptr;
-static int g_dock_last_frame = 0;
-static int g_end_dock_action;
-
-
-static Dock& getDock(const char* label, bool opened)
-{
-	ImU32 id = ImHash(label, 0);
-	for (int i = 0; i < g_dock_count; ++i)
-	{
-		if (g_docks[i]->id == id) return *g_docks[i];
-	}
-
-	++g_dock_count;
-	g_docks[g_dock_count - 1] = (Dock*)ImGui::MemAlloc(sizeof(Dock));
-	new (g_docks[g_dock_count - 1]) Dock(label);
-	static Dock* q = nullptr;
-	g_docks[g_dock_count - 1]->id = id;
-	g_docks[g_dock_count - 1]->setActive();
-	if (opened)
-	{
-		if (q)
+		Dock& getSibling()
 		{
-			q->prev = g_docks[g_dock_count - 1];
-			g_docks[g_dock_count - 1]->next = q;
-			g_docks[g_dock_count - 1]->setPosSize(q->pos, q->size);
+			ASSERT(parent);
+			if (parent->children[0] == &getFirst()) return *parent->children[1];
+			return *parent->children[0];
 		}
-		g_docks[g_dock_count - 1]->status = Dock::DOCKED;
-		q = g_docks[g_dock_count - 1];
-	}
-	else
-	{
-		g_docks[g_dock_count - 1]->status = Dock::FLOAT;
-	}
-	return *g_docks[g_dock_count - 1];
-}
 
-
-static void drawSplits()
-{
-	auto* win = ImGui::GetCurrentWindow();
-	auto&g = *GImGui;
-	if (g.Windows[0] != win)
-	{
-		for (int i = 0; i < g.Windows.Size; i++)
+		Dock& getFirst()
 		{
-			if (g.Windows[i] == win)
+			auto* tmp = this;
+			while (tmp->prev) tmp = tmp->prev;
+			return *tmp;
+		}
+
+		void setActive()
+		{
+			active = true;
+			for (auto* tmp = prev; tmp; tmp = tmp->prev) tmp->active = false;
+			for (auto* tmp = next; tmp; tmp = tmp->next) tmp->active = false;
+		}
+
+		void setPosSize(const ImVec2& _pos, const ImVec2& _size)
+		{
+			size = _size;
+			pos = _pos;
+			for (auto* tmp = prev; tmp; tmp = tmp->prev)
 			{
-				for (int j = i - 1; j >= 0; --j)
+				tmp->size = _size;
+				tmp->pos = _pos;
+			}
+			for (auto* tmp = next; tmp; tmp = tmp->next)
+			{
+				tmp->size = _size;
+				tmp->pos = _pos;
+			}
+
+			if (children[0])
+			{
+				if (children[0]->pos.x < children[1]->pos.x)
 				{
-					g.Windows[j + 1] = g.Windows[j];
+					auto s = children[0]->size;
+					s.y = _size.y;
+					children[0]->setPosSize(_pos, s);
+
+					s.x = _size.x - children[0]->size.x;
+					auto p = _pos;
+					p.x += children[0]->size.x;
+					children[1]->setPosSize(p, s);
 				}
-				g.Windows[0] = win;
-				break;
+				else if (children[0]->pos.x > children[1]->pos.x)
+				{
+					auto s = children[1]->size;
+					s.y = _size.y;
+					children[1]->setPosSize(_pos, s);
+
+					s.x = _size.x - children[1]->size.x;
+					auto p = _pos;
+					p.x += children[1]->size.x;
+					children[0]->setPosSize(p, s);
+				}
+				else if (children[0]->pos.y < children[1]->pos.y)
+				{
+					auto s = children[0]->size;
+					s.x = _size.x;
+					children[0]->setPosSize(_pos, s);
+
+					s.y = _size.y - children[0]->size.y;
+					auto p = _pos;
+					p.y += children[0]->size.y;
+					children[1]->setPosSize(p, s);
+				}
+				else
+				{
+					auto s = children[1]->size;
+					s.x = _size.x;
+					children[1]->setPosSize(_pos, s);
+
+					s.y = _size.y - children[1]->size.y;
+					auto p = _pos;
+					p.y += children[1]->size.y;
+					children[0]->setPosSize(p, s);
+				}
 			}
 		}
-	}
 
-	ImU32 color = ImGui::GetColorU32(ImGuiCol_Button);
-	ImU32 color_hovered = ImGui::GetColorU32(ImGuiCol_ButtonHovered);
-	char str_id[20];
-	auto* draw_list = ImGui::GetWindowDrawList();
-	for (int i = 0; i < g_dock_count; ++i)
+		char label[50];
+		ImU32 id;
+		Dock* next;
+		Dock* prev;
+		Dock* children[2];
+		Dock* parent;
+		bool active;
+		ImVec2 pos;
+		ImVec2 size;
+		Status status;
+	};
+
+
+	Dock* docks[32];
+	int count = 0;
+	Dock* current = nullptr;
+	int last_frame = 0;
+	int end_action;
+
+
+	Dock& getDock(const char* label, bool opened)
 	{
-		if (!g_docks[i]->children[0]) continue;
-
-		Lumix::toCString(i, str_id, Lumix::lengthOf(str_id));
-		Lumix::catString(str_id, "split");
-
-		if (!ImGui::GetIO().MouseDown[0]) g_docks[i]->status = Dock::DOCKED;
-
-		auto p0 = g_docks[i]->children[0]->pos;
-		auto p1 = g_docks[i]->children[1]->pos;
-		auto size = g_docks[i]->children[0]->size;
-		if (p0.x < p1.x)
+		ImU32 id = ImHash(label, 0);
+		for (int i = 0; i < count; ++i)
 		{
-			ImGui::SetCursorScreenPos(p1);
-			ImGui::InvisibleButton(str_id, ImVec2(3, size.y));
-			if (g_docks[i]->status == Dock::DRAGGED)
-			{
-				g_docks[i]->children[0]->size.x += ImGui::GetIO().MouseDelta.x;
-				g_docks[i]->children[1]->size.x -= ImGui::GetIO().MouseDelta.x;
-				g_docks[i]->children[1]->pos.x += ImGui::GetIO().MouseDelta.x;
-			}
+			if (docks[i]->id == id) return *docks[i];
 		}
-		else if (p0.x > p1.x)
+
+		++count;
+		docks[count - 1] = (Dock*)ImGui::MemAlloc(sizeof(Dock));
+		new (docks[count - 1]) Dock(label);
+		static Dock* q = nullptr;
+		docks[count - 1]->id = id;
+		docks[count - 1]->setActive();
+		if (opened)
 		{
-			ImGui::SetCursorScreenPos(p0);
-			ImGui::InvisibleButton(str_id, ImVec2(3, size.y));
-			if (g_docks[i]->status == Dock::DRAGGED)
+			if (q)
 			{
-				g_docks[i]->children[1]->size.x += ImGui::GetIO().MouseDelta.x;
-				g_docks[i]->children[0]->size.x -= ImGui::GetIO().MouseDelta.x;
-				g_docks[i]->children[0]->pos.x += ImGui::GetIO().MouseDelta.x;
+				q->prev = docks[count - 1];
+				docks[count - 1]->next = q;
+				docks[count - 1]->setPosSize(q->pos, q->size);
 			}
-		}
-		else if (p0.y < p1.y)
-		{
-			ImGui::SetCursorScreenPos(p1);
-			ImGui::InvisibleButton(str_id, ImVec2(size.x, 3));
-			if (g_docks[i]->status == Dock::DRAGGED)
-			{
-				g_docks[i]->children[0]->size.y += ImGui::GetIO().MouseDelta.y;
-				g_docks[i]->children[1]->size.y -= ImGui::GetIO().MouseDelta.y;
-				g_docks[i]->children[1]->pos.y += ImGui::GetIO().MouseDelta.y;
-			}
+			docks[count - 1]->status = Dock::DOCKED;
+			q = docks[count - 1];
 		}
 		else
 		{
-			ImGui::SetCursorScreenPos(p0);
-			ImGui::InvisibleButton(str_id, ImVec2(size.x, 3));
-			if (g_docks[i]->status == Dock::DRAGGED)
-			{
-				g_docks[i]->children[1]->size.y += ImGui::GetIO().MouseDelta.y;
-				g_docks[i]->children[0]->size.y -= ImGui::GetIO().MouseDelta.y;
-				g_docks[i]->children[0]->pos.y += ImGui::GetIO().MouseDelta.y;
-			}
+			docks[count - 1]->status = Dock::FLOAT;
 		}
-
-		if (ImGui::IsItemHoveredRect() && ImGui::IsMouseClicked(0))
-		{
-			g_docks[i]->status = Dock::DRAGGED;
-		}
-		if (g_docks[i]->status == Dock::DRAGGED)
-		{
-			g_docks[i]->children[0]->setPosSize(
-				g_docks[i]->children[0]->pos, g_docks[i]->children[0]->size);
-			g_docks[i]->children[1]->setPosSize(
-				g_docks[i]->children[1]->pos, g_docks[i]->children[1]->size);
-		}
-
-		draw_list->AddRectFilled(ImGui::GetItemRectMin(),
-			ImGui::GetItemRectMax(),
-			ImGui::IsItemHoveredRect() ? color_hovered : color);
-	}
-}
-
-
-static void doUndock(Dock& dock)
-{
-	bool remove_container = false;
-	if (dock.prev) dock.prev->setActive();
-	else if (dock.next) dock.next->setActive();
-	else dock.active = false;
-
-	if (dock.parent)
-	{
-		if (dock.parent->children[0] == &dock)
-		{
-			if (dock.next)
-				dock.parent->children[0] = dock.next;
-			else
-			{
-				ASSERT(!dock.prev);
-				remove_container = true;
-			}
-		}
-		else if (dock.parent->children[1] == &dock)
-		{
-			if (dock.next)
-				dock.parent->children[1] = dock.next;
-			else
-			{
-				ASSERT(!dock.prev);
-				remove_container = true;
-			}
-		}
-		else
-		{
-			ASSERT(&dock.getFirst() == dock.parent->children[0] ||
-				   &dock.getFirst() == dock.parent->children[1]);
-		}
+		return *docks[count - 1];
 	}
 
-	if (remove_container)
+
+	void drawSplits()
 	{
-		auto* container = dock.parent;
-		if (container->parent)
+		if (ImGui::GetFrameCount() == last_frame) return;
+		last_frame = ImGui::GetFrameCount();
+
+		auto* win = ImGui::GetCurrentWindow();
+		auto&g = *GImGui;
+		if (g.Windows[0] != win)
 		{
-			if (container->parent->children[0] == container)
+			for (int i = 0; i < g.Windows.Size; i++)
 			{
-				container->parent->children[0] = &dock.getSibling();
-				container->parent->children[0]->setPosSize(container->pos, container->size);
-				container->parent->children[0]->setParent(container->parent);
-			}
-			else
-			{
-				ASSERT(container->parent->children[1] == container);
-				container->parent->children[1] = &dock.getSibling();
-				container->parent->children[1]->setPosSize(container->pos, container->size);
-				container->parent->children[1]->setParent(container->parent);
-			}
-		}
-		else
-		{
-			container->children[0]->setParent(nullptr);
-			container->children[0]->setPosSize(container->pos, container->size);
-			container->children[1]->setParent(nullptr);
-			container->children[1]->setPosSize(container->pos, container->size);
-		}
-		container->~Dock();
-		ImGui::MemFree(container);
-		for (int i = 0; i < g_dock_count; ++i)
-		{
-			if (g_docks[i] == container)
-			{
-				g_docks[i] = g_docks[g_dock_count - 1];
-				--g_dock_count;
-				break;
+				if (g.Windows[i] == win)
+				{
+					for (int j = i - 1; j >= 0; --j)
+					{
+						g.Windows[j + 1] = g.Windows[j];
+					}
+					g.Windows[0] = win;
+					break;
+				}
 			}
 		}
-	}
-	else if (dock.next)
-	{
-		if (dock.prev)
-		{
-			dock.next->prev = dock.prev;
-			dock.prev->next = dock.next;
-		}
-		else
-		{
-			dock.next->prev = nullptr;
-		}
-	}
-	else if (dock.prev)
-	{
-		dock.prev->next = nullptr;
-	}
-	dock.parent = nullptr;
-	dock.prev = dock.next = nullptr;
-}
 
-
-static void drawTabbar(Dock& dock)
-{
-	auto tabbar_height = 2 * ImGui::GetTextLineHeightWithSpacing();
-	auto size = ImVec2(dock.size.x, tabbar_height);
-
-	ImGui::SetCursorScreenPos(dock.pos);
-	char tmp[256];
-	Lumix::toCString(dock.id, tmp, Lumix::lengthOf(tmp));
-	Lumix::catString(tmp, "_tabs");
-	//ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-	if (ImGui::BeginChild(tmp, size, true))
-	{
-		auto* dock_tab = &dock;
-
+		ImU32 color = ImGui::GetColorU32(ImGuiCol_Button);
+		ImU32 color_hovered = ImGui::GetColorU32(ImGuiCol_ButtonHovered);
+		char str_id[20];
 		auto* draw_list = ImGui::GetWindowDrawList();
-		ImU32 color = ImGui::GetColorU32(ImGuiCol_FrameBg);
-		ImU32 color_active = ImGui::GetColorU32(ImGuiCol_FrameBgActive);
-		ImU32 color_hovered = ImGui::GetColorU32(ImGuiCol_FrameBgHovered);
-		ImU32 text_color = ImGui::GetColorU32(ImGuiCol_Text);
-		auto line_height = ImGui::GetTextLineHeightWithSpacing();
-		float tab_base;
-		while (dock_tab)
+		for (int i = 0; i < count; ++i)
 		{
-			ImGui::SameLine(0, 15);
+			if (!docks[i]->children[0]) continue;
 
-			ImVec2 size(ImGui::CalcTextSize(dock_tab->label).x, line_height);
-			if (ImGui::InvisibleButton(dock_tab->label, size))
+			Lumix::toCString(i, str_id, Lumix::lengthOf(str_id));
+			Lumix::catString(str_id, "split");
+
+			if (!ImGui::GetIO().MouseDown[0]) docks[i]->status = Dock::DOCKED;
+
+			auto p0 = docks[i]->children[0]->pos;
+			auto p1 = docks[i]->children[1]->pos;
+			auto size = docks[i]->children[0]->size;
+			if (p0.x < p1.x)
 			{
-				dock_tab->setActive();
+				ImGui::SetCursorScreenPos(p1);
+				ImGui::InvisibleButton(str_id, ImVec2(3, size.y));
+				if (docks[i]->status == Dock::DRAGGED)
+				{
+					docks[i]->children[0]->size.x += ImGui::GetIO().MouseDelta.x;
+					docks[i]->children[1]->size.x -= ImGui::GetIO().MouseDelta.x;
+					docks[i]->children[1]->pos.x += ImGui::GetIO().MouseDelta.x;
+				}
 			}
-			
-			if (ImGui::IsItemActive() && ImGui::IsMouseDragging())
+			else if (p0.x > p1.x)
 			{
-				doUndock(*dock_tab);
-				dock_tab->status = Dock::DRAGGED;
+				ImGui::SetCursorScreenPos(p0);
+				ImGui::InvisibleButton(str_id, ImVec2(3, size.y));
+				if (docks[i]->status == Dock::DRAGGED)
+				{
+					docks[i]->children[1]->size.x += ImGui::GetIO().MouseDelta.x;
+					docks[i]->children[0]->size.x -= ImGui::GetIO().MouseDelta.x;
+					docks[i]->children[0]->pos.x += ImGui::GetIO().MouseDelta.x;
+				}
+			}
+			else if (p0.y < p1.y)
+			{
+				ImGui::SetCursorScreenPos(p1);
+				ImGui::InvisibleButton(str_id, ImVec2(size.x, 3));
+				if (docks[i]->status == Dock::DRAGGED)
+				{
+					docks[i]->children[0]->size.y += ImGui::GetIO().MouseDelta.y;
+					docks[i]->children[1]->size.y -= ImGui::GetIO().MouseDelta.y;
+					docks[i]->children[1]->pos.y += ImGui::GetIO().MouseDelta.y;
+				}
+			}
+			else
+			{
+				ImGui::SetCursorScreenPos(p0);
+				ImGui::InvisibleButton(str_id, ImVec2(size.x, 3));
+				if (docks[i]->status == Dock::DRAGGED)
+				{
+					docks[i]->children[1]->size.y += ImGui::GetIO().MouseDelta.y;
+					docks[i]->children[0]->size.y -= ImGui::GetIO().MouseDelta.y;
+					docks[i]->children[0]->pos.y += ImGui::GetIO().MouseDelta.y;
+				}
 			}
 
-			bool hovered = ImGui::IsItemHovered();
-			auto pos = ImGui::GetItemRectMin();
-			tab_base = pos.y;
-			draw_list->PathClear();
-			draw_list->PathLineTo(pos + ImVec2(-15, size.y));
-			draw_list->PathBezierCurveTo(pos + ImVec2(-10, size.y),
-				pos + ImVec2(-5, 0),
-				pos + ImVec2(0, 0),
-				10);
-			draw_list->PathLineTo(pos + ImVec2(size.x, 0));
-			draw_list->PathBezierCurveTo(pos + ImVec2(size.x + 5, 0),
-				pos + ImVec2(size.x + 10, size.y),
-				pos + ImVec2(size.x + 15, size.y),
-				10);
-			draw_list->PathFill(hovered ? color_hovered : (dock_tab->active ? color_active : color));
-			draw_list->AddText(pos, text_color, dock_tab->label);
+			if (ImGui::IsItemHoveredRect() && ImGui::IsMouseClicked(0))
+			{
+				docks[i]->status = Dock::DRAGGED;
+			}
+			if (docks[i]->status == Dock::DRAGGED)
+			{
+				docks[i]->children[0]->setPosSize(
+					docks[i]->children[0]->pos, docks[i]->children[0]->size);
+				docks[i]->children[1]->setPosSize(
+					docks[i]->children[1]->pos, docks[i]->children[1]->size);
+			}
 
-			dock_tab = dock_tab->next;
-		}	
-		ImVec2 cp(dock.pos.x, tab_base + line_height);
-		draw_list->AddLine(cp, cp + ImVec2(dock.size.x, 0), color);
-	}
-	ImGui::EndChild();
-	//ImGui::PopStyleVar();
-}
-
-
-static Dock* getDockAt(const ImVec2& pos)
-{
-	for (int i = 0; i < g_dock_count; ++i)
-	{
-		auto& dock = *g_docks[i];
-		if (dock.children[0]) continue;
-		if (dock.status != Dock::DOCKED) continue;
-		if (ImGui::IsMouseHoveringRect(dock.pos, dock.pos + dock.size, false))
-		{
-			return &dock;
+			draw_list->AddRectFilled(ImGui::GetItemRectMin(),
+				ImGui::GetItemRectMax(),
+				ImGui::IsItemHoveredRect() ? color_hovered : color);
 		}
 	}
 
-	return nullptr;
-}
 
-
-static void setDockSizeAndPos(Dock& dest, Dock& dock, DockSlot2 dock_slot, Dock& container)
-{
-	ASSERT(!dock.prev && !dock.next && !dock.children[0] && !dock.children[1]);
-
-	dest.pos = container.pos;
-	dest.size = container.size;
-	dock.pos = container.pos;
-	dock.size = container.size;
-
-	switch (dock_slot)
+	void beginPanel()
 	{
+		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+			ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+			ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
+			ImGuiWindowFlags_NoScrollWithMouse;
+		ImVec2 pos(0, ImGui::GetTextLineHeightWithSpacing());
+		ImGui::SetNextWindowPos(pos);
+		ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize - pos);
+		ImGui::Begin("###DockPanel", nullptr, flags);
+		drawSplits();
+	}
+
+
+	void endPanel()
+	{
+		ImGui::End();
+	}
+
+
+	Dock* getDockAt(const ImVec2& pos) const
+	{
+		for (int i = 0; i < count; ++i)
+		{
+			auto& dock = *docks[i];
+			if (dock.children[0]) continue;
+			if (dock.status != Dock::DOCKED) continue;
+			if (ImGui::IsMouseHoveringRect(dock.pos, dock.pos + dock.size, false))
+			{
+				return &dock;
+			}
+		}
+
+		return nullptr;
+	}
+
+
+	void handleDrag(Dock& dock)
+	{
+		auto* dest_dock = getDockAt(ImGui::GetIO().MousePos);
+		if (!dest_dock)
+		{
+			if (!ImGui::GetIO().MouseDown[0]) dock.status = Dock::FLOAT;
+			return;
+		}
+
+		ImGui::Begin("##Overlay",
+			NULL,
+			ImVec2(0, 0),
+			0.f,
+			ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
+			ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+			ImGuiWindowFlags_AlwaysAutoResize);
+		auto* canvas = ImGui::GetWindowDrawList();
+		auto a = dest_dock->pos + dest_dock->size * 0.5f - ImVec2(20, 20);
+		auto b = a + ImVec2(40, 40);
+
+		auto dock_slot = getDockSlot(*dest_dock, ImGui::GetIO().MousePos);
+
+		canvas->PushClipRectFullScreen();
+
+		for (int i = 0; i < 5; ++i)
+		{
+			auto r = getDockSlotRect(*dest_dock, (DockSlot2)i);
+			canvas->AddRectFilled(r.Min, r.Max, (int)dock_slot == i ? 0xffff0000 : 0xffffffff);
+		}
+		canvas->PopClipRect();
+
+		if (!ImGui::GetIO().MouseDown[0])
+		{
+			doDock(dock, *dest_dock, dock_slot);
+		}
+		ImGui::End();
+	}
+
+
+	static ImRect getDockSlotRect(Dock& dock, DockSlot2 dock_slot)
+	{
+		auto center = dock.pos + dock.size * 0.5f;
+		switch (dock_slot)
+		{
+			default: return ImRect(center - ImVec2(20, 20), center + ImVec2(20, 20));
+			case DockSlot2::TOP: return ImRect(center + ImVec2(-20, -70), center + ImVec2(20, -30));
+			case DockSlot2::RIGHT: return ImRect(center + ImVec2(30, -20), center + ImVec2(70, 20));
+			case DockSlot2::BOTTOM:
+				return ImRect(center + ImVec2(-20, +30), center + ImVec2(20, 70));
+			case DockSlot2::LEFT:
+				return ImRect(center + ImVec2(-70, -20), center + ImVec2(-30, 20));
+		}
+	}
+
+
+	static DockSlot2 getDockSlot(Dock& dock, const ImVec2& pos)
+	{
+		for (int i = 0; i < 5; ++i)
+		{
+			auto r = getDockSlotRect(dock, (DockSlot2)i);
+			if (r.Contains(pos)) return (DockSlot2)i;
+		}
+		return DockSlot2::NONE;
+	}
+
+
+	void doUndock(Dock& dock)
+	{
+		bool remove_container = false;
+		if (dock.prev) dock.prev->setActive();
+		else if (dock.next) dock.next->setActive();
+		else dock.active = false;
+
+		if (dock.parent)
+		{
+			if (dock.parent->children[0] == &dock)
+			{
+				if (dock.next)
+					dock.parent->children[0] = dock.next;
+				else
+				{
+					ASSERT(!dock.prev);
+					remove_container = true;
+				}
+			}
+			else if (dock.parent->children[1] == &dock)
+			{
+				if (dock.next)
+					dock.parent->children[1] = dock.next;
+				else
+				{
+					ASSERT(!dock.prev);
+					remove_container = true;
+				}
+			}
+			else
+			{
+				ASSERT(&dock.getFirst() == dock.parent->children[0] ||
+					&dock.getFirst() == dock.parent->children[1]);
+			}
+		}
+
+		if (remove_container)
+		{
+			auto* container = dock.parent;
+			if (container->parent)
+			{
+				if (container->parent->children[0] == container)
+				{
+					container->parent->children[0] = &dock.getSibling();
+					container->parent->children[0]->setPosSize(container->pos, container->size);
+					container->parent->children[0]->setParent(container->parent);
+				}
+				else
+				{
+					ASSERT(container->parent->children[1] == container);
+					container->parent->children[1] = &dock.getSibling();
+					container->parent->children[1]->setPosSize(container->pos, container->size);
+					container->parent->children[1]->setParent(container->parent);
+				}
+			}
+			else
+			{
+				container->children[0]->setParent(nullptr);
+				container->children[0]->setPosSize(container->pos, container->size);
+				container->children[1]->setParent(nullptr);
+				container->children[1]->setPosSize(container->pos, container->size);
+			}
+			container->~Dock();
+			ImGui::MemFree(container);
+			for (int i = 0; i < count; ++i)
+			{
+				if (docks[i] == container)
+				{
+					docks[i] = docks[count - 1];
+					--count;
+					break;
+				}
+			}
+		}
+		else if (dock.next)
+		{
+			if (dock.prev)
+			{
+				dock.next->prev = dock.prev;
+				dock.prev->next = dock.next;
+			}
+			else
+			{
+				dock.next->prev = nullptr;
+			}
+		}
+		else if (dock.prev)
+		{
+			dock.prev->next = nullptr;
+		}
+		dock.parent = nullptr;
+		dock.prev = dock.next = nullptr;
+	}
+
+
+	void drawTabbar(Dock& dock)
+	{
+		auto tabbar_height = 2 * ImGui::GetTextLineHeightWithSpacing();
+		auto size = ImVec2(dock.size.x, tabbar_height);
+
+		ImGui::SetCursorScreenPos(dock.pos);
+		char tmp[256];
+		Lumix::toCString(dock.id, tmp, Lumix::lengthOf(tmp));
+		Lumix::catString(tmp, "_tabs");
+		//ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+		if (ImGui::BeginChild(tmp, size, true))
+		{
+			auto* dock_tab = &dock;
+
+			auto* draw_list = ImGui::GetWindowDrawList();
+			ImU32 color = ImGui::GetColorU32(ImGuiCol_FrameBg);
+			ImU32 color_active = ImGui::GetColorU32(ImGuiCol_FrameBgActive);
+			ImU32 color_hovered = ImGui::GetColorU32(ImGuiCol_FrameBgHovered);
+			ImU32 text_color = ImGui::GetColorU32(ImGuiCol_Text);
+			auto line_height = ImGui::GetTextLineHeightWithSpacing();
+			float tab_base;
+			while (dock_tab)
+			{
+				ImGui::SameLine(0, 15);
+
+				ImVec2 size(ImGui::CalcTextSize(dock_tab->label).x, line_height);
+				if (ImGui::InvisibleButton(dock_tab->label, size))
+				{
+					dock_tab->setActive();
+				}
+
+				if (ImGui::IsItemActive() && ImGui::IsMouseDragging())
+				{
+					doUndock(*dock_tab);
+					dock_tab->status = Dock::DRAGGED;
+				}
+
+				bool hovered = ImGui::IsItemHovered();
+				auto pos = ImGui::GetItemRectMin();
+				tab_base = pos.y;
+				draw_list->PathClear();
+				draw_list->PathLineTo(pos + ImVec2(-15, size.y));
+				draw_list->PathBezierCurveTo(pos + ImVec2(-10, size.y),
+					pos + ImVec2(-5, 0),
+					pos + ImVec2(0, 0),
+					10);
+				draw_list->PathLineTo(pos + ImVec2(size.x, 0));
+				draw_list->PathBezierCurveTo(pos + ImVec2(size.x + 5, 0),
+					pos + ImVec2(size.x + 10, size.y),
+					pos + ImVec2(size.x + 15, size.y),
+					10);
+				draw_list->PathFill(hovered ? color_hovered : (dock_tab->active ? color_active : color));
+				draw_list->AddText(pos, text_color, dock_tab->label);
+
+				dock_tab = dock_tab->next;
+			}
+			ImVec2 cp(dock.pos.x, tab_base + line_height);
+			draw_list->AddLine(cp, cp + ImVec2(dock.size.x, 0), color);
+		}
+		ImGui::EndChild();
+		//ImGui::PopStyleVar();
+	}
+
+
+	static void setDockSizeAndPos(Dock& dest, Dock& dock, DockSlot2 dock_slot, Dock& container)
+	{
+		ASSERT(!dock.prev && !dock.next && !dock.children[0] && !dock.children[1]);
+
+		dest.pos = container.pos;
+		dest.size = container.size;
+		dock.pos = container.pos;
+		dock.size = container.size;
+
+		switch (dock_slot)
+		{
 		case DockSlot2::BOTTOM:
 			dest.size.y *= 0.5f;
 			dock.size.y *= 0.5f;
@@ -955,372 +1049,312 @@ static void setDockSizeAndPos(Dock& dest, Dock& dock, DockSlot2 dock_slot, Dock&
 			dest.pos.y += dock.size.y;
 			break;
 		default: ASSERT(false); break;
-	}
-	dest.setPosSize(dest.pos, dest.size);
-}
-
-
-static void doDock(Dock& dock, Dock& dest, DockSlot2 dock_slot)
-{
-	ASSERT(!dock.parent);
-	if (dock_slot == DockSlot2::TAB)
-	{
-		auto* tmp = &dest;
-		while (tmp->next)
-		{
-			tmp = tmp->next;
 		}
+		dest.setPosSize(dest.pos, dest.size);
+	}
 
-		tmp->next = &dock;
-		dock.prev = tmp;
-		dock.size = tmp->size;
-		dock.pos = tmp->pos;
-		dock.parent = dest.parent;
-		dock.status = Dock::DOCKED;
-	}
-	else if (dock_slot == DockSlot2::NONE)
+
+	void doDock(Dock& dock, Dock& dest, DockSlot2 dock_slot)
 	{
-		dock.pos = ImGui::GetIO().MousePos;
-		dock.status = Dock::FLOAT;
-	}
-	else
-	{
-		g_docks[g_dock_count] = (Dock*)ImGui::MemAlloc(sizeof(Dock));
-		Dock* container = new (g_docks[g_dock_count]) Dock("");
-		++g_dock_count;
-		container->children[0] = &dest.getFirst();
-		container->children[1] = &dock;
-		container->next = nullptr;
-		container->prev = nullptr;
-		container->parent = dest.parent;
-		container->size = dest.size;
-		container->pos = dest.pos;
-		container->status = Dock::DOCKED;
-		
-		if (!dest.parent)
+		ASSERT(!dock.parent);
+		if (dock_slot == DockSlot2::TAB)
 		{
+			auto* tmp = &dest;
+			while (tmp->next)
+			{
+				tmp = tmp->next;
+			}
 
+			tmp->next = &dock;
+			dock.prev = tmp;
+			dock.size = tmp->size;
+			dock.pos = tmp->pos;
+			dock.parent = dest.parent;
+			dock.status = Dock::DOCKED;
 		}
-		else if (&dest.getFirst() == dest.parent->children[0])
+		else if (dock_slot == DockSlot2::NONE)
 		{
-			dest.parent->children[0] = container;
+			dock.pos = ImGui::GetIO().MousePos;
+			dock.status = Dock::FLOAT;
 		}
 		else
 		{
-			dest.parent->children[1] = container;
+			docks[count] = (Dock*)ImGui::MemAlloc(sizeof(Dock));
+			Dock* container = new (docks[count]) Dock("");
+			++count;
+			container->children[0] = &dest.getFirst();
+			container->children[1] = &dock;
+			container->next = nullptr;
+			container->prev = nullptr;
+			container->parent = dest.parent;
+			container->size = dest.size;
+			container->pos = dest.pos;
+			container->status = Dock::DOCKED;
+
+			if (!dest.parent)
+			{
+
+			}
+			else if (&dest.getFirst() == dest.parent->children[0])
+			{
+				dest.parent->children[0] = container;
+			}
+			else
+			{
+				dest.parent->children[1] = container;
+			}
+
+			dest.setParent(container);
+			dock.parent = container;
+			dock.status = Dock::DOCKED;
+
+			setDockSizeAndPos(dest, dock, dock_slot, *container);
+		}
+		dock.setActive();
+	}
+
+
+	bool begin(const char* label, bool* opened)
+	{
+		auto& dock = getDock(label, !opened || *opened);
+		end_action = -1;
+
+		if (opened && !*opened)
+		{
+			if (dock.status != Dock::FLOAT)
+			{
+				doUndock(dock);
+				dock.status = Dock::FLOAT;
+			}
+			return false;
 		}
 
-		dest.setParent(container);
-		dock.parent = container;
-		dock.status = Dock::DOCKED;
+		end_action = 0;
+		beginPanel();
 
-		setDockSizeAndPos(dest, dock, dock_slot, *container);
+		current = &dock;
+		if (dock.status == Dock::DRAGGED) handleDrag(dock);
+
+		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+			ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+			ImGuiWindowFlags_NoSavedSettings;
+		bool is_float = dock.status == Dock::FLOAT;
+
+		if (!dock.parent && dock.size.x < 0 && dock.status != Dock::DRAGGED)
+		{
+			dock.pos = ImVec2(0, ImGui::GetTextLineHeightWithSpacing() + 4);
+			dock.size = ImGui::GetIO().DisplaySize;
+			dock.size.y -= dock.pos.y;
+		}
+
+		if (is_float)
+		{
+			ImGui::SetNextWindowPos(dock.pos);
+			ImGui::SetNextWindowSize(dock.size);
+			bool ret = ImGui::Begin(label,
+				opened,
+				dock.size,
+				-1.0f,
+				ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+			end_action = 1;
+			dock.pos = ImGui::GetWindowPos();
+			dock.size = ImGui::GetWindowSize();
+
+			auto& g = *GImGui;
+
+			if (g.ActiveId == GetCurrentWindow()->MoveID && g.IO.MouseDown[0])
+			{
+				doUndock(dock);
+				dock.status = Dock::DRAGGED;
+			}
+			return ret;
+		}
+
+		if (!dock.active) return false;
+		end_action = 2;
+
+		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
+		auto tabbar_height = ImGui::GetTextLineHeightWithSpacing();
+		drawTabbar(dock.getFirst());
+		auto pos = dock.pos;
+		auto size = dock.size;
+		pos.y += tabbar_height + ImGui::GetStyle().WindowPadding.y * 2;
+		size.y -= tabbar_height + ImGui::GetStyle().WindowPadding.y * 2;
+
+		ImGui::SetCursorScreenPos(pos);
+		bool ret = ImGui::BeginChild(label, size, true, flags);
+		auto* draw_list = ImGui::GetWindowDrawList();
+		return ret;
 	}
-	dock.setActive();
-}
 
 
-static ImRect getDockSlotRect(Dock& dock, DockSlot2 dock_slot)
-{
-	auto center = dock.pos + dock.size * 0.5f;
-	switch (dock_slot)
+	void end()
 	{
-	default: return ImRect(center - ImVec2(20, 20), center + ImVec2(20, 20));
-	case DockSlot2::TOP: return ImRect(center + ImVec2(-20, -70), center + ImVec2(20, -30));
-	case DockSlot2::RIGHT: return ImRect(center + ImVec2(30, -20), center + ImVec2(70, 20));
-	case DockSlot2::BOTTOM: return ImRect(center + ImVec2(-20, +30), center + ImVec2(20, 70));
-	case DockSlot2::LEFT: return ImRect(center + ImVec2(-70, -20), center + ImVec2(-30, 20));
+		if (end_action == 1)
+		{
+			ImGui::End();
+		}
+		else if (end_action == 2)
+		{
+			ImGui::EndChild();
+			ImGui::PopStyleColor();
+		}
+		current = nullptr;
+		if (end_action != -1) endPanel();
 	}
-}
 
 
-static DockSlot2 getDockSlot(Dock& dock, const ImVec2& pos)
-{
-	for (int i = 0; i < 5; ++i)
+	void save(Lumix::FS::OsFile& file)
 	{
-		auto r = getDockSlotRect(dock, (DockSlot2)i);
-		if (r.Contains(pos)) return (DockSlot2)i;
+		auto getDockIndex = [this](Dock* dock) -> int {
+			if (!dock) return -1;
+
+			for (int i = 0; i < count; ++i)
+			{
+				if (dock == docks[i]) return i;
+			}
+
+			ASSERT(false);
+			return -1;
+		};
+
+		file << "docks = {\n";
+		for (int i = 0; i < count; ++i)
+		{
+			auto& dock = *docks[i];
+			file << "dock" << (Lumix::uint64)&dock << " = {\n";
+			file << "index = " << i << ",\n";
+			file << "label = \"" << dock.label << "\",\n";
+			file << "x = " << (int)dock.pos.x << ",\n";
+			file << "y = " << (int)dock.pos.y << ",\n";
+			file << "size_x = " << (int)dock.size.x << ",\n";
+			file << "size_y = " << (int)dock.size.y << ",\n";
+			file << "status = " << (int)dock.status << ",\n";
+			file << "active = " << (int)dock.active << ",\n";
+			file << "prev = " << (int)getDockIndex(dock.prev) << ",\n";
+			file << "next = " << (int)getDockIndex(dock.next) << ",\n";
+			file << "child0 = " << (int)getDockIndex(dock.children[0]) << ",\n";
+			file << "child1 = " << (int)getDockIndex(dock.children[1]) << ",\n";
+			file << "parent = " << (int)getDockIndex(dock.parent) << "\n";
+			if (i < count - 1) file << "},\n";
+			else file << "}\n";
+		}
+		file << "}\n";
 	}
-	return DockSlot2::NONE;
-}
 
 
-static void handleDockDrag(Dock& dock)
-{
-	auto* dest_dock = getDockAt(ImGui::GetIO().MousePos);
-	if (!dest_dock)
+	void load(lua_State* L)
 	{
-		if (!ImGui::GetIO().MouseDown[0]) dock.status = Dock::FLOAT;
-		return;
+		for (int i = 0; i < count; ++i)
+		{
+			docks[i]->~Dock();
+			ImGui::MemFree(docks[i]);
+		}
+		count = 0;
+
+		if (lua_getglobal(L, "docks") == LUA_TTABLE)
+		{
+			lua_pushnil(L);
+			while (lua_next(L, -2) != 0)
+			{
+				docks[count] = (Dock*)ImGui::MemAlloc(sizeof(Dock));
+				new (docks[count]) Dock("");
+				++count;
+				lua_pop(L, 1);
+			}
+		}
+		lua_pop(L, 1);
+
+		int i = 0;
+		if (lua_getglobal(L, "docks") == LUA_TTABLE)
+		{
+			lua_pushnil(L);
+			while (lua_next(L, -2) != 0)
+			{
+				if (lua_istable(L, -1))
+				{
+					int idx;
+					if (lua_getfield(L, -1, "index") == LUA_TNUMBER) idx = (int)lua_tointeger(L, -1);
+					auto& dock = *docks[idx];
+					lua_pop(L, 1);
+
+					if (lua_getfield(L, -1, "label") == LUA_TSTRING)
+					{
+						Lumix::copyString(dock.label, lua_tostring(L, -1));
+						dock.id = ImHash(dock.label, 0);
+					}
+					lua_pop(L, 1);
+
+					if (lua_getfield(L, -1, "x") == LUA_TNUMBER) dock.pos.x = (float)lua_tonumber(L, -1);
+					if (lua_getfield(L, -2, "y") == LUA_TNUMBER) dock.pos.y = (float)lua_tonumber(L, -1);
+					if (lua_getfield(L, -3, "size_x") == LUA_TNUMBER) dock.size.x = (float)lua_tonumber(L, -1);
+					if (lua_getfield(L, -4, "size_y") == LUA_TNUMBER) dock.size.y = (float)lua_tonumber(L, -1);
+					if (lua_getfield(L, -5, "active") == LUA_TNUMBER) dock.active = lua_tointeger(L, -1) != 0;
+					if (lua_getfield(L, -6, "status") == LUA_TNUMBER)
+					{
+						dock.status = (Dock::Status)lua_tointeger(L, -1);
+					}
+					lua_pop(L, 6);
+
+					auto getDockByIndex = [this](lua_Integer idx) -> Dock*
+					{
+						return idx < 0 ? nullptr : docks[idx];
+					};
+					if (lua_getfield(L, -1, "prev") == LUA_TNUMBER)
+					{
+						dock.prev = getDockByIndex(lua_tointeger(L, -1));
+					}
+					if (lua_getfield(L, -2, "next") == LUA_TNUMBER)
+					{
+						dock.next = getDockByIndex(lua_tointeger(L, -1));
+					}
+					if (lua_getfield(L, -3, "child0") == LUA_TNUMBER)
+					{
+						dock.children[0] = getDockByIndex(lua_tointeger(L, -1));
+					}
+					if (lua_getfield(L, -4, "child1") == LUA_TNUMBER)
+					{
+						dock.children[1] = getDockByIndex(lua_tointeger(L, -1));
+					}
+					if (lua_getfield(L, -5, "parent") == LUA_TNUMBER)
+					{
+						dock.parent = getDockByIndex(lua_tointeger(L, -1));
+					}
+					lua_pop(L, 5);
+				}
+				lua_pop(L, 1);
+				++i;
+			}
+		}
+		lua_pop(L, 1);
 	}
-
-	ImGui::Begin("##Overlay",
-		NULL,
-		ImVec2(0, 0),
-		0.f,
-		ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
-			ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
-			ImGuiWindowFlags_AlwaysAutoResize);
-	auto* canvas = ImGui::GetWindowDrawList();
-	auto a = dest_dock->pos + dest_dock->size * 0.5f - ImVec2(20, 20);
-	auto b = a + ImVec2(40, 40);
-
-	auto dock_slot = getDockSlot(*dest_dock, ImGui::GetIO().MousePos);
-
-	canvas->PushClipRectFullScreen();
-
-	for (int i = 0; i < 5; ++i)
-	{
-		auto r = getDockSlotRect(*dest_dock, (DockSlot2)i);
-		canvas->AddRectFilled(r.Min, r.Max, (int)dock_slot == i ? 0xffff0000 : 0xffffffff);
-	}
-	canvas->PopClipRect();
-
-	if (!ImGui::GetIO().MouseDown[0])
-	{
-		doDock(dock, *dest_dock, dock_slot);
-	}
-	ImGui::End();
-}
+};
 
 
-static void beginDockPanel()
-{
-	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-		ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
-		ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
-		ImGuiWindowFlags_NoScrollWithMouse;
-	ImVec2 pos(0, ImGui::GetTextLineHeightWithSpacing());
-	ImGui::SetNextWindowPos(pos);
-	ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize - pos);
-	ImGui::Begin("###DockPanel", nullptr, flags);
-}
-
-
-static void endDockPanel()
-{
-	ImGui::End();
-}
+static DockContext g_dock;
 
 
 bool BeginDock(const char* label, bool* opened)
 {
-	auto& dock = getDock(label, !opened || *opened);
-	g_end_dock_action = -1;
-
-	if (opened && !*opened)
-	{
-		if (dock.status != Dock::FLOAT)
-		{
-			doUndock(dock);
-			dock.status = Dock::FLOAT;
-		}
-		return false;
-	}
-		
-	g_end_dock_action = 0;
-	beginDockPanel();
-
-	if (ImGui::GetFrameCount() != g_dock_last_frame)
-	{
-		drawSplits();
-		g_dock_last_frame = ImGui::GetFrameCount();
-	}
-	g_current_dock = &dock;
-	if (dock.status == Dock::DRAGGED) handleDockDrag(dock);
-
-	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-							 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
-							 ImGuiWindowFlags_NoSavedSettings;
-	bool is_float = dock.status == Dock::FLOAT;
-
-	if (!dock.parent && dock.size.x < 0 && dock.status != Dock::DRAGGED)
-	{
-		dock.pos = ImVec2(0, ImGui::GetTextLineHeightWithSpacing() + 4);
-		dock.size = ImGui::GetIO().DisplaySize;
-		dock.size.y -= dock.pos.y;
-	}
-
-	if (is_float)
-	{
-		ImGui::SetNextWindowPos(dock.pos);
-		ImGui::SetNextWindowSize(dock.size);
-		bool ret = ImGui::Begin(label,
-			opened,
-			dock.size,
-			-1.0f,
-			ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
-		g_end_dock_action = 1;
-		dock.pos = ImGui::GetWindowPos();
-		dock.size = ImGui::GetWindowSize();
-
-		auto& g = *GImGui;
-
-		if (g.ActiveId == GetCurrentWindow()->MoveID && g.IO.MouseDown[0])
-		{
-			doUndock(dock);
-			dock.status = Dock::DRAGGED;
-		}
-		return ret;
-	}
-	
-	if (!dock.active) return false;
-	g_end_dock_action = 2;
-
-	ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
-	auto tabbar_height = ImGui::GetTextLineHeightWithSpacing();
-	drawTabbar(dock.getFirst());
-	auto pos = dock.pos;
-	auto size = dock.size;
-	pos.y += tabbar_height + ImGui::GetStyle().WindowPadding.y * 2;
-	size.y -= tabbar_height + ImGui::GetStyle().WindowPadding.y * 2;
-
-	ImGui::SetCursorScreenPos(pos);
-	bool ret = ImGui::BeginChild(label, size, true, flags);
-	auto* draw_list = ImGui::GetWindowDrawList();
-	return ret;
+	return g_dock.begin(label, opened);
 }
 
 
 void EndDock()
 {
-	if (g_end_dock_action == 1)
-	{
-		ImGui::End();
-	}
-	else if (g_end_dock_action == 2)
-	{
-		ImGui::EndChild();
-		ImGui::PopStyleColor();
-	}
-	g_current_dock = nullptr;
-	if (g_end_dock_action != -1) endDockPanel();
+	g_dock.end();
 }
 
 
 void saveDock(Lumix::FS::OsFile& file)
 {
-	auto getDockIndex = [](Dock* dock) -> int {
-		if (!dock) return -1;
-
-		for (int i = 0; i < g_dock_count; ++i)
-		{
-			if (dock == g_docks[i]) return i;
-		}
-
-		ASSERT(false);
-		return -1;
-	};
-
-	file << "docks = {\n";
-	for (int i = 0; i < g_dock_count; ++i)
-	{
-		auto& dock = *g_docks[i];
-		file << "dock" << (Lumix::uint64)&dock << " = {\n";
-		file << "index = " << i << ",\n";
-		file << "label = \"" << dock.label << "\",\n";
-		file << "x = " << (int)dock.pos.x << ",\n";
-		file << "y = " << (int)dock.pos.y << ",\n";
-		file << "size_x = " << (int)dock.size.x << ",\n";
-		file << "size_y = " << (int)dock.size.y << ",\n";
-		file << "status = " << (int)dock.status << ",\n";
-		file << "active = " << (int)dock.active << ",\n";
-		file << "prev = " << (int)getDockIndex(dock.prev) << ",\n";
-		file << "next = " << (int)getDockIndex(dock.next) << ",\n";
-		file << "child0 = " << (int)getDockIndex(dock.children[0]) << ",\n";
-		file << "child1 = " << (int)getDockIndex(dock.children[1]) << ",\n";
-		file << "parent = " << (int)getDockIndex(dock.parent) << "\n";
-		if (i < g_dock_count - 1) file << "},\n";
-		else file << "}\n";
-	}
-	file << "}\n";
+	g_dock.save(file);
 }
 
 
 void loadDock(lua_State* L)
 {
-	for (int i = 0; i < g_dock_count; ++i)
-	{
-		g_docks[i]->~Dock();
-		ImGui::MemFree(g_docks[i]);
-	}
-	g_dock_count = 0;
-
-	if (lua_getglobal(L, "docks") == LUA_TTABLE)
-	{
-		lua_pushnil(L);
-		while (lua_next(L, -2) != 0)
-		{
-			g_docks[g_dock_count] = (Dock*)ImGui::MemAlloc(sizeof(Dock));
-			new (g_docks[g_dock_count]) Dock("");
-			++g_dock_count;
-			lua_pop(L, 1);
-		}
-	}
-	lua_pop(L, 1);
-
-	int i = 0;
-	if (lua_getglobal(L, "docks") == LUA_TTABLE)
-	{
-		lua_pushnil(L);
-		while (lua_next(L, -2) != 0)
-		{
-			if (lua_istable(L, -1))
-			{
-				int idx;
-				if (lua_getfield(L, -1, "index") == LUA_TNUMBER) idx = (int)lua_tointeger(L, -1);
-				auto& dock = *g_docks[idx];
-				lua_pop(L, 1);
-
-				if (lua_getfield(L, -1, "label") == LUA_TSTRING)
-				{
-					Lumix::copyString(dock.label, lua_tostring(L, -1));
-					dock.id = ImHash(dock.label, 0);
-				}
-				lua_pop(L, 1);
-
-				if (lua_getfield(L, -1, "x") == LUA_TNUMBER) dock.pos.x = (float)lua_tonumber(L, -1);
-				if (lua_getfield(L, -2, "y") == LUA_TNUMBER) dock.pos.y = (float)lua_tonumber(L, -1);
-				if (lua_getfield(L, -3, "size_x") == LUA_TNUMBER) dock.size.x = (float)lua_tonumber(L, -1);
-				if (lua_getfield(L, -4, "size_y") == LUA_TNUMBER) dock.size.y = (float)lua_tonumber(L, -1);
-				if (lua_getfield(L, -5, "active") == LUA_TNUMBER) dock.active = lua_tointeger(L, -1) != 0;
-				if (lua_getfield(L, -6, "status") == LUA_TNUMBER)
-				{
-					dock.status = (Dock::Status)lua_tointeger(L, -1);
-				}
-				lua_pop(L, 6);
-
-				auto getDockByIndex = [](lua_Integer idx) -> Dock* 
-				{
-					return idx < 0 ? nullptr : g_docks[idx];
-				};
-				if (lua_getfield(L, -1, "prev") == LUA_TNUMBER)
-				{
-					dock.prev = getDockByIndex(lua_tointeger(L, -1));
-				}
-				if (lua_getfield(L, -2, "next") == LUA_TNUMBER)
-				{
-					dock.next = getDockByIndex(lua_tointeger(L, -1));
-				}
-				if (lua_getfield(L, -3, "child0") == LUA_TNUMBER)
-				{
-					dock.children[0] = getDockByIndex(lua_tointeger(L, -1));
-				}
-				if (lua_getfield(L, -4, "child1") == LUA_TNUMBER)
-				{
-					dock.children[1] = getDockByIndex(lua_tointeger(L, -1));
-				}
-				if (lua_getfield(L, -5, "parent") == LUA_TNUMBER)
-				{
-					dock.parent = getDockByIndex(lua_tointeger(L, -1));
-				}
-				lua_pop(L, 5);
-			}
-			lua_pop(L, 1);
-			++i;
-		}
-	}
-	lua_pop(L, 1);
+	g_dock.load(L);
 }
 
 
