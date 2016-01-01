@@ -35,7 +35,6 @@ struct Settings
 	bool m_is_log_opened;
 	bool m_is_profiler_opened;
 	bool m_is_properties_opened;
-	bool m_is_style_editor_opened;
 	bool m_is_crash_reporting_enabled;
 	bool m_is_shader_editor_opened;
 
