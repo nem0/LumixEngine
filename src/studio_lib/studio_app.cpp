@@ -57,7 +57,6 @@ public:
 	StudioAppImpl()
 		: m_is_entity_list_opened(true)
 		, m_finished(false)
-		, m_is_style_editor_opened(false)
 		, m_import_asset_dialog(nullptr)
 		, m_shader_compiler(nullptr)
 		, m_is_wireframe(false)
@@ -201,6 +200,8 @@ public:
 				ImGui::Separator();
 
 				ImGui::Text("Version 0.19. - News");
+				ImGui::BulletText("Editor UI - docking");
+				ImGui::BulletText("Physics - layers");
 				ImGui::BulletText("File system UI");
 				ImGui::BulletText("Particle system player");
 				ImGui::BulletText("Particle system using bezier curves");
@@ -289,22 +290,10 @@ public:
 			{
 				plugin->onWindowGUI();
 			}
-			showStyleEditor();
 			m_settings.onGUI(&m_actions[0], m_actions.size());
 		}
 
 		ImGui::Render();
-	}
-
-
-
-	void showStyleEditor()
-	{
-		if (ImGui::BeginDock("Style", &m_is_style_editor_opened))
-		{
-			ImGui::ShowStyleEditor();
-		}
-		ImGui::EndDock();
 	}
 
 
@@ -598,7 +587,6 @@ public:
 					ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
 					ImGui::MenuItem("Settings", nullptr, &m_settings.m_is_opened);
 					ImGui::MenuItem("Shader editor", nullptr, &m_shader_editor->m_is_opened);
-					ImGui::MenuItem("Style editor", nullptr, &m_is_style_editor_opened);
 					ImGui::Separator();
 					for (auto* plugin : m_plugins)
 					{
@@ -766,7 +754,6 @@ public:
 		m_settings.m_is_profiler_opened = m_profiler_ui->m_is_opened;
 		m_settings.m_is_properties_opened = m_property_grid->m_is_opened;
 		m_settings.m_is_shader_editor_opened = m_shader_editor->m_is_opened;
-		m_settings.m_is_style_editor_opened = m_is_style_editor_opened;
 
 		m_settings.save(&m_actions[0], m_actions.size());
 
@@ -905,7 +892,6 @@ public:
 		m_profiler_ui->m_is_opened = m_settings.m_is_profiler_opened;
 		m_property_grid->m_is_opened = m_settings.m_is_properties_opened;
 		m_shader_editor->m_is_opened = m_settings.m_is_shader_editor_opened;
-		m_is_style_editor_opened = m_settings.m_is_style_editor_opened;
 
 		if (m_settings.m_is_maximized)
 		{
@@ -1408,7 +1394,6 @@ public:
 	bool m_is_welcome_screen_opened;
 	bool m_is_entity_list_opened;
 	bool m_is_entity_template_list_opened;
-	bool m_is_style_editor_opened;
 	bool m_is_wireframe;
 };
 

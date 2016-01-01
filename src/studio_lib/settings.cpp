@@ -89,7 +89,6 @@ Settings::Settings(Lumix::IAllocator& allocator)
 	m_is_gameview_opened = false;
 	m_is_entity_list_opened = false;
 	m_is_entity_template_list_opened = false;
-	m_is_style_editor_opened = false;
 	m_is_shader_editor_opened = false;
 	m_is_asset_browser_opened = false;
 	m_is_log_opened = false;
@@ -144,7 +143,6 @@ bool Settings::load(Action** actions, int actions_count)
 	m_is_log_opened = getBoolean(L, "log_opened", false);
 	m_is_profiler_opened = getBoolean(L, "profiler_opened", false);
 	m_is_properties_opened = getBoolean(L, "properties_opened", false);
-	m_is_style_editor_opened = getBoolean(L, "style_editor_opened", false);
 	m_is_shader_editor_opened = getBoolean(L, "shader_editor_opened", false);
 	m_is_crash_reporting_enabled = getBoolean(L, "error_reporting_enabled", true);
 	Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
@@ -243,7 +241,6 @@ bool Settings::save(Action** actions, int actions_count)
 	writeBool("log_opened", m_is_log_opened);
 	writeBool("profiler_opened", m_is_profiler_opened);
 	writeBool("properties_opened", m_is_properties_opened);
-	writeBool("style_editor_opened", m_is_style_editor_opened);
 	writeBool("shader_editor_opened", m_is_shader_editor_opened);
 	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
 	file << "autosave_time = " << m_autosave_time << "\n";
@@ -333,6 +330,8 @@ void Settings::onGUI(Action** actions, int actions_count)
 		}
 
 		if (ImGui::CollapsingHeader("Shortcuts")) showShortcutSettings(actions, actions_count);
+
+		ImGui::ShowStyleEditor();
 	}
 	ImGui::EndDock();
 }
