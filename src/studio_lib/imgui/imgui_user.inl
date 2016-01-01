@@ -465,12 +465,10 @@ bool CurvePoint(ImVec2* points, CurveEditor& editor)
 }
 
 
-
-
 struct DockContext
 {
 
-	enum class DockSlot2
+	enum class Slot
 	{
 		LEFT,
 		RIGHT,
@@ -658,7 +656,7 @@ struct DockContext
 		last_frame = ImGui::GetFrameCount();
 
 		auto* win = ImGui::GetCurrentWindow();
-		auto&g = *GImGui;
+		auto& g = *GImGui;
 		if (g.Windows[0] != win)
 		{
 			for (int i = 0; i < g.Windows.Size; i++)
@@ -758,9 +756,9 @@ struct DockContext
 	void beginPanel()
 	{
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-			ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
-			ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
-			ImGuiWindowFlags_NoScrollWithMouse;
+								 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+								 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
+								 ImGuiWindowFlags_NoScrollWithMouse;
 		ImVec2 pos(0, ImGui::GetTextLineHeightWithSpacing());
 		ImGui::SetNextWindowPos(pos);
 		ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize - pos);
@@ -769,10 +767,7 @@ struct DockContext
 	}
 
 
-	void endPanel()
-	{
-		ImGui::End();
-	}
+	void endPanel() { ImGui::End(); }
 
 
 	Dock* getDockAt(const ImVec2& pos) const
@@ -792,6 +787,35 @@ struct DockContext
 	}
 
 
+	static ImRect getDockedRect(Dock& dock, Slot dock_slot)
+	{
+		auto half_size = dock.size * 0.5f;
+		switch (dock_slot)
+		{
+			default: return ImRect(dock.pos, dock.pos + dock.size);
+			case Slot::TOP: return ImRect(dock.pos, dock.pos + ImVec2(dock.size.x, half_size.y));
+			case Slot::RIGHT:
+				return ImRect(dock.pos + ImVec2(half_size.x, 0), dock.pos + dock.size);
+			case Slot::BOTTOM:
+				return ImRect(dock.pos + ImVec2(0, half_size.y), dock.pos + dock.size);
+			case Slot::LEFT: return ImRect(dock.pos, dock.pos + ImVec2(half_size.x, dock.size.y));
+		}
+	}
+
+	static ImRect getRect(Dock& dock, Slot dock_slot)
+	{
+		auto center = dock.pos + dock.size * 0.5f;
+		switch (dock_slot)
+		{
+			default: return ImRect(center - ImVec2(20, 20), center + ImVec2(20, 20));
+			case Slot::TOP: return ImRect(center + ImVec2(-20, -50), center + ImVec2(20, -30));
+			case Slot::RIGHT: return ImRect(center + ImVec2(30, -20), center + ImVec2(50, 20));
+			case Slot::BOTTOM: return ImRect(center + ImVec2(-20, +30), center + ImVec2(20, 50));
+			case Slot::LEFT: return ImRect(center + ImVec2(-50, -20), center + ImVec2(-30, 20));
+		}
+	}
+
+
 	void handleDrag(Dock& dock)
 	{
 		auto* dest_dock = getDockAt(ImGui::GetIO().MousePos);
@@ -806,66 +830,55 @@ struct DockContext
 			ImVec2(0, 0),
 			0.f,
 			ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
-			ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
-			ImGuiWindowFlags_AlwaysAutoResize);
+				ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+				ImGuiWindowFlags_AlwaysAutoResize);
 		auto* canvas = ImGui::GetWindowDrawList();
 		auto a = dest_dock->pos + dest_dock->size * 0.5f - ImVec2(20, 20);
 		auto b = a + ImVec2(40, 40);
 
-		auto dock_slot = getDockSlot(*dest_dock, ImGui::GetIO().MousePos);
-
+		auto mouse_pos = ImGui::GetIO().MousePos;
 		canvas->PushClipRectFullScreen();
 
 		auto color = ImGui::GetColorU32(ImGuiCol_Button);
 		auto color_hovered = ImGui::GetColorU32(ImGuiCol_ButtonHovered);
 		for (int i = 0; i < 5; ++i)
 		{
-			auto r = getDockSlotRect(*dest_dock, (DockSlot2)i);
-			canvas->AddRectFilled(r.Min, r.Max, (int)dock_slot == i ? color_hovered : color);
+			auto r = getRect(*dest_dock, (Slot)i);
+			bool hovered = r.Contains(mouse_pos);
+			canvas->AddRectFilled(r.Min, r.Max, hovered ? color_hovered : color);
+			if (hovered)
+			{
+				if (!ImGui::GetIO().MouseDown[0])
+				{
+					doDock(dock, *dest_dock, (Slot)i);
+					canvas->PopClipRect();
+					ImGui::End();
+					return;
+				}
+				auto docked_rect = getDockedRect(*dest_dock, (Slot)i);
+				auto color = ImGui::GetColorU32(ImGuiCol_FrameBg);
+				canvas->AddRectFilled(docked_rect.Min, docked_rect.Max, color);
+			}
 		}
 		canvas->PopClipRect();
 
 		if (!ImGui::GetIO().MouseDown[0])
 		{
-			doDock(dock, *dest_dock, dock_slot);
+			doDock(dock, *dest_dock, Slot::NONE);
 		}
 		ImGui::End();
-	}
-
-
-	static ImRect getDockSlotRect(Dock& dock, DockSlot2 dock_slot)
-	{
-		auto center = dock.pos + dock.size * 0.5f;
-		switch (dock_slot)
-		{
-			default: return ImRect(center - ImVec2(20, 20), center + ImVec2(20, 20));
-			case DockSlot2::TOP: return ImRect(center + ImVec2(-20, -70), center + ImVec2(20, -30));
-			case DockSlot2::RIGHT: return ImRect(center + ImVec2(30, -20), center + ImVec2(70, 20));
-			case DockSlot2::BOTTOM:
-				return ImRect(center + ImVec2(-20, +30), center + ImVec2(20, 70));
-			case DockSlot2::LEFT:
-				return ImRect(center + ImVec2(-70, -20), center + ImVec2(-30, 20));
-		}
-	}
-
-
-	static DockSlot2 getDockSlot(Dock& dock, const ImVec2& pos)
-	{
-		for (int i = 0; i < 5; ++i)
-		{
-			auto r = getDockSlotRect(dock, (DockSlot2)i);
-			if (r.Contains(pos)) return (DockSlot2)i;
-		}
-		return DockSlot2::NONE;
 	}
 
 
 	void doUndock(Dock& dock)
 	{
 		bool remove_container = false;
-		if (dock.prev) dock.prev->setActive();
-		else if (dock.next) dock.next->setActive();
-		else dock.active = false;
+		if (dock.prev)
+			dock.prev->setActive();
+		else if (dock.next)
+			dock.next->setActive();
+		else
+			dock.active = false;
 
 		if (dock.parent)
 		{
@@ -892,7 +905,7 @@ struct DockContext
 			else
 			{
 				ASSERT(&dock.getFirst() == dock.parent->children[0] ||
-					&dock.getFirst() == dock.parent->children[1]);
+					   &dock.getFirst() == dock.parent->children[1]);
 			}
 		}
 
@@ -996,16 +1009,15 @@ struct DockContext
 				tab_base = pos.y;
 				draw_list->PathClear();
 				draw_list->PathLineTo(pos + ImVec2(-15, size.y));
-				draw_list->PathBezierCurveTo(pos + ImVec2(-10, size.y),
-					pos + ImVec2(-5, 0),
-					pos + ImVec2(0, 0),
-					10);
+				draw_list->PathBezierCurveTo(
+					pos + ImVec2(-10, size.y), pos + ImVec2(-5, 0), pos + ImVec2(0, 0), 10);
 				draw_list->PathLineTo(pos + ImVec2(size.x, 0));
 				draw_list->PathBezierCurveTo(pos + ImVec2(size.x + 5, 0),
 					pos + ImVec2(size.x + 10, size.y),
 					pos + ImVec2(size.x + 15, size.y),
 					10);
-				draw_list->PathFill(hovered ? color_hovered : (dock_tab->active ? color_active : color));
+				draw_list->PathFill(
+					hovered ? color_hovered : (dock_tab->active ? color_active : color));
 				draw_list->AddText(pos, text_color, dock_tab->label);
 
 				dock_tab = dock_tab->next;
@@ -1017,7 +1029,7 @@ struct DockContext
 	}
 
 
-	static void setDockSizeAndPos(Dock& dest, Dock& dock, DockSlot2 dock_slot, Dock& container)
+	static void setDockSizeAndPos(Dock& dest, Dock& dock, Slot dock_slot, Dock& container)
 	{
 		ASSERT(!dock.prev && !dock.next && !dock.children[0] && !dock.children[1]);
 
@@ -1028,36 +1040,36 @@ struct DockContext
 
 		switch (dock_slot)
 		{
-		case DockSlot2::BOTTOM:
-			dest.size.y *= 0.5f;
-			dock.size.y *= 0.5f;
-			dock.pos.y += dest.size.y;
-			break;
-		case DockSlot2::RIGHT:
-			dest.size.x *= 0.5f;
-			dock.size.x *= 0.5f;
-			dock.pos.x += dest.size.x;
-			break;
-		case DockSlot2::LEFT:
-			dest.size.x *= 0.5f;
-			dock.size.x *= 0.5f;
-			dest.pos.x += dock.size.x;
-			break;
-		case DockSlot2::TOP:
-			dest.size.y *= 0.5f;
-			dock.size.y *= 0.5f;
-			dest.pos.y += dock.size.y;
-			break;
-		default: ASSERT(false); break;
+			case Slot::BOTTOM:
+				dest.size.y *= 0.5f;
+				dock.size.y *= 0.5f;
+				dock.pos.y += dest.size.y;
+				break;
+			case Slot::RIGHT:
+				dest.size.x *= 0.5f;
+				dock.size.x *= 0.5f;
+				dock.pos.x += dest.size.x;
+				break;
+			case Slot::LEFT:
+				dest.size.x *= 0.5f;
+				dock.size.x *= 0.5f;
+				dest.pos.x += dock.size.x;
+				break;
+			case Slot::TOP:
+				dest.size.y *= 0.5f;
+				dock.size.y *= 0.5f;
+				dest.pos.y += dock.size.y;
+				break;
+			default: ASSERT(false); break;
 		}
 		dest.setPosSize(dest.pos, dest.size);
 	}
 
 
-	void doDock(Dock& dock, Dock& dest, DockSlot2 dock_slot)
+	void doDock(Dock& dock, Dock& dest, Slot dock_slot)
 	{
 		ASSERT(!dock.parent);
-		if (dock_slot == DockSlot2::TAB)
+		if (dock_slot == Slot::TAB)
 		{
 			auto* tmp = &dest;
 			while (tmp->next)
@@ -1072,7 +1084,7 @@ struct DockContext
 			dock.parent = dest.parent;
 			dock.status = Dock::DOCKED;
 		}
-		else if (dock_slot == DockSlot2::NONE)
+		else if (dock_slot == Slot::NONE)
 		{
 			dock.pos = ImGui::GetIO().MousePos;
 			dock.status = Dock::FLOAT;
@@ -1093,7 +1105,6 @@ struct DockContext
 
 			if (!dest.parent)
 			{
-
 			}
 			else if (&dest.getFirst() == dest.parent->children[0])
 			{
@@ -1136,8 +1147,8 @@ struct DockContext
 		if (dock.status == Dock::DRAGGED) handleDrag(dock);
 
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-			ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
-			ImGuiWindowFlags_NoSavedSettings;
+								 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+								 ImGuiWindowFlags_NoSavedSettings;
 		bool is_float = dock.status == Dock::FLOAT;
 
 		if (!dock.parent && dock.size.x < 0 && dock.status != Dock::DRAGGED)
@@ -1206,7 +1217,8 @@ struct DockContext
 
 	void save(Lumix::FS::OsFile& file)
 	{
-		auto getDockIndex = [this](Dock* dock) -> int {
+		auto getDockIndex = [this](Dock* dock) -> int
+		{
 			if (!dock) return -1;
 
 			for (int i = 0; i < count; ++i)
@@ -1236,8 +1248,10 @@ struct DockContext
 			file << "child0 = " << (int)getDockIndex(dock.children[0]) << ",\n";
 			file << "child1 = " << (int)getDockIndex(dock.children[1]) << ",\n";
 			file << "parent = " << (int)getDockIndex(dock.parent) << "\n";
-			if (i < count - 1) file << "},\n";
-			else file << "}\n";
+			if (i < count - 1)
+				file << "},\n";
+			else
+				file << "}\n";
 		}
 		file << "}\n";
 	}
@@ -1274,7 +1288,8 @@ struct DockContext
 				if (lua_istable(L, -1))
 				{
 					int idx;
-					if (lua_getfield(L, -1, "index") == LUA_TNUMBER) idx = (int)lua_tointeger(L, -1);
+					if (lua_getfield(L, -1, "index") == LUA_TNUMBER)
+						idx = (int)lua_tointeger(L, -1);
 					auto& dock = *docks[idx];
 					lua_pop(L, 1);
 
@@ -1285,11 +1300,16 @@ struct DockContext
 					}
 					lua_pop(L, 1);
 
-					if (lua_getfield(L, -1, "x") == LUA_TNUMBER) dock.pos.x = (float)lua_tonumber(L, -1);
-					if (lua_getfield(L, -2, "y") == LUA_TNUMBER) dock.pos.y = (float)lua_tonumber(L, -1);
-					if (lua_getfield(L, -3, "size_x") == LUA_TNUMBER) dock.size.x = (float)lua_tonumber(L, -1);
-					if (lua_getfield(L, -4, "size_y") == LUA_TNUMBER) dock.size.y = (float)lua_tonumber(L, -1);
-					if (lua_getfield(L, -5, "active") == LUA_TNUMBER) dock.active = lua_tointeger(L, -1) != 0;
+					if (lua_getfield(L, -1, "x") == LUA_TNUMBER)
+						dock.pos.x = (float)lua_tonumber(L, -1);
+					if (lua_getfield(L, -2, "y") == LUA_TNUMBER)
+						dock.pos.y = (float)lua_tonumber(L, -1);
+					if (lua_getfield(L, -3, "size_x") == LUA_TNUMBER)
+						dock.size.x = (float)lua_tonumber(L, -1);
+					if (lua_getfield(L, -4, "size_y") == LUA_TNUMBER)
+						dock.size.y = (float)lua_tonumber(L, -1);
+					if (lua_getfield(L, -5, "active") == LUA_TNUMBER)
+						dock.active = lua_tointeger(L, -1) != 0;
 					if (lua_getfield(L, -6, "status") == LUA_TNUMBER)
 					{
 						dock.status = (Dock::Status)lua_tointeger(L, -1);
