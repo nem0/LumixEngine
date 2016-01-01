@@ -57,8 +57,8 @@ IMGUI_API void EndCurveEditor(const CurveEditor& editor);
 
 IMGUI_API bool BeginDock(const char* label, bool* opened = nullptr);
 IMGUI_API void EndDock();
-void saveDock(Lumix::FS::OsFile& file);
-void loadDock(lua_State* L);
+IMGUI_API void SaveDock(Lumix::FS::OsFile& file);
+IMGUI_API void LoadDock(lua_State* L);
 
 
 } // namespace ImGui

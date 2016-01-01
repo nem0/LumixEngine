@@ -1346,13 +1346,13 @@ void EndDock()
 }
 
 
-void saveDock(Lumix::FS::OsFile& file)
+void SaveDock(Lumix::FS::OsFile& file)
 {
 	g_dock.save(file);
 }
 
 
-void loadDock(lua_State* L)
+void LoadDock(lua_State* L)
 {
 	g_dock.load(L);
 }
