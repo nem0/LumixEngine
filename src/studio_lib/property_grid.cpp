@@ -547,10 +547,8 @@ void PropertyGrid::showCoreProperties(Lumix::Entity entity)
 
 void PropertyGrid::onGUI()
 {
-	if (!m_is_opened) return;
-
 	auto& ents = m_editor.getSelectedEntities();
-	if (ImGui::Begin("Properties", &m_is_opened) && ents.size() == 1)
+	if (ImGui::BeginDock("Properties", &m_is_opened) && ents.size() == 1)
 	{
 		if (ImGui::Button("Add component"))
 		{
@@ -578,7 +576,7 @@ void PropertyGrid::onGUI()
 			showComponentProperties(cmp);
 		}
 	}
-	ImGui::End();
+	ImGui::EndDock();
 }
 
 

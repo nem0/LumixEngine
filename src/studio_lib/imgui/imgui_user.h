@@ -1,5 +1,11 @@
 #pragma once
 
+namespace Lumix { namespace FS { class OsFile; } }
+
+
+struct lua_State;
+
+
 namespace ImGui
 {
 
@@ -48,6 +54,11 @@ struct CurveEditor
 IMGUI_API CurveEditor BeginCurveEditor(const char* label);
 IMGUI_API bool CurvePoint(ImVec2* point, CurveEditor& editor);
 IMGUI_API void EndCurveEditor(const CurveEditor& editor);
+
+IMGUI_API bool BeginDock(const char* label, bool* opened = nullptr);
+IMGUI_API void EndDock();
+void saveDock(Lumix::FS::OsFile& file);
+void loadDock(lua_State* L);
 
 
 } // namespace ImGui

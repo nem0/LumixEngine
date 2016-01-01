@@ -2214,11 +2214,11 @@ void ShaderEditor::onGUIMenu()
 
 void ShaderEditor::onGUI()
 {
-	if (!m_is_opened) return;
 	StringBuilder<Lumix::MAX_PATH_LENGTH + 25> title("Shader editor");
 	if (m_path.isValid()) title << " - " << m_path.c_str();
 	title << "###Shader editor";
-	if (ImGui::Begin(title, &m_is_opened, ImGuiWindowFlags_MenuBar))
+	TODO("todo");
+	if (ImGui::BeginDock(title, &m_is_opened/*, ImGuiWindowFlags_MenuBar*/))
 	{
 		m_is_focused = ImGui::IsRootWindowOrAnyChildFocused();
 
@@ -2227,5 +2227,5 @@ void ShaderEditor::onGUI()
 		ImGui::SameLine();
 		onGUIRightColumn();
 	}
-	ImGui::End();
+	ImGui::EndDock();
 }

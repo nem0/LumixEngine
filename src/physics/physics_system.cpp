@@ -234,10 +234,8 @@ extern "C" LUMIX_PHYSICS_API void setStudioApp(StudioApp& app)
 
 		void onWindowGUI() override
 		{
-			if (!m_is_window_opened) return;
-
 			auto* scene = static_cast<PhysicsScene*>(m_editor.getScene(crc32("physics")));
-			if (ImGui::Begin("Physics", &m_is_window_opened))
+			if (ImGui::BeginDock("Physics", &m_is_window_opened))
 			{
 				if (ImGui::CollapsingHeader("Layers"))
 				{
@@ -312,9 +310,8 @@ extern "C" LUMIX_PHYSICS_API void setStudioApp(StudioApp& app)
 					ImGui::Columns();
 				}
 			}
-			
 
-			ImGui::End();
+			ImGui::EndDock();
 		}
 
 

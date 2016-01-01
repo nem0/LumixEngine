@@ -128,9 +128,27 @@ OsFile& OsFile::operator <<(const char* text)
 }
 
 
-OsFile& OsFile::operator <<(int value)
+OsFile& OsFile::operator <<(int32 value)
 {
 	char buf[20];
+	toCString(value, buf, lengthOf(buf));
+	write(buf, stringLength(buf));
+	return *this;
+}
+
+
+OsFile& OsFile::operator <<(uint32 value)
+{
+	char buf[20];
+	toCString(value, buf, lengthOf(buf));
+	write(buf, stringLength(buf));
+	return *this;
+}
+
+
+OsFile& OsFile::operator <<(uint64 value)
+{
+	char buf[30];
 	toCString(value, buf, lengthOf(buf));
 	write(buf, stringLength(buf));
 	return *this;

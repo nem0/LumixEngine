@@ -169,6 +169,8 @@ bool Settings::load(Action** actions, int actions_count)
 		}
 	}
 	lua_pop(L, 1);
+
+	ImGui::loadDock(L);
 	return true;
 }
 
@@ -281,6 +283,9 @@ bool Settings::save(Action** actions, int actions_count)
 			<< actions[i]->shortcut[2] << "},\n";
 	}
 	file << "}\n";
+
+	ImGui::saveDock(file);
+
 	file.close();
 
 	return true;
@@ -313,9 +318,7 @@ void Settings::showShortcutSettings(Action** actions, int actions_count)
 
 void Settings::onGUI(Action** actions, int actions_count)
 {
-	if (!m_is_opened) return;
-
-	if (ImGui::Begin("Settings", &m_is_opened))
+	if (ImGui::BeginDock("Settings", &m_is_opened))
 	{
 		if (ImGui::Button("Save")) save(actions, actions_count);
 		ImGui::SameLine();
@@ -331,5 +334,5 @@ void Settings::onGUI(Action** actions, int actions_count)
 
 		if (ImGui::CollapsingHeader("Shortcuts")) showShortcutSettings(actions, actions_count);
 	}
-	ImGui::End();
+	ImGui::EndDock();
 }

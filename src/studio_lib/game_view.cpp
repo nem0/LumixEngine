@@ -86,7 +86,6 @@ void GameView::captureMouse(bool capture)
 void GameView::onGui()
 {
 	PROFILE_FUNCTION();
-	if (!m_is_opened) return;
 	if (!m_pipeline_source->isReady()) return;
 
 	auto& io = ImGui::GetIO();
@@ -100,7 +99,7 @@ void GameView::onGui()
 
 	const char* window_name = "Game view###game_view";
 	if (m_is_mouse_captured) window_name = "Game view (mouse captured)###game_view";
-	if (ImGui::Begin(window_name, &m_is_opened))
+	if (ImGui::BeginDock(window_name, &m_is_opened))
 	{
 		m_is_mouse_hovering_window = ImGui::IsMouseHoveringWindow();
 
@@ -136,5 +135,5 @@ void GameView::onGui()
 			captureMouse(true);
 		}
 	}
-	ImGui::End();
+	ImGui::EndDock();
 }
