@@ -170,7 +170,7 @@ bool Settings::load(Action** actions, int actions_count)
 	}
 	lua_pop(L, 1);
 
-	ImGui::loadDock(L);
+	ImGui::LoadDock(L);
 	return true;
 }
 
@@ -284,7 +284,7 @@ bool Settings::save(Action** actions, int actions_count)
 	}
 	file << "}\n";
 
-	ImGui::saveDock(file);
+	ImGui::SaveDock(file);
 
 	file.close();
 

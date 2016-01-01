@@ -816,10 +816,12 @@ struct DockContext
 
 		canvas->PushClipRectFullScreen();
 
+		auto color = ImGui::GetColorU32(ImGuiCol_Button);
+		auto color_hovered = ImGui::GetColorU32(ImGuiCol_ButtonHovered);
 		for (int i = 0; i < 5; ++i)
 		{
 			auto r = getDockSlotRect(*dest_dock, (DockSlot2)i);
-			canvas->AddRectFilled(r.Min, r.Max, (int)dock_slot == i ? 0xffff0000 : 0xffffffff);
+			canvas->AddRectFilled(r.Min, r.Max, (int)dock_slot == i ? color_hovered : color);
 		}
 		canvas->PopClipRect();
 
@@ -962,7 +964,6 @@ struct DockContext
 		char tmp[256];
 		Lumix::toCString(dock.id, tmp, Lumix::lengthOf(tmp));
 		Lumix::catString(tmp, "_tabs");
-		//ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 		if (ImGui::BeginChild(tmp, size, true))
 		{
 			auto* dock_tab = &dock;
@@ -1013,7 +1014,6 @@ struct DockContext
 			draw_list->AddLine(cp, cp + ImVec2(dock.size.x, 0), color);
 		}
 		ImGui::EndChild();
-		//ImGui::PopStyleVar();
 	}
 
 
@@ -1178,8 +1178,8 @@ struct DockContext
 		drawTabbar(dock.getFirst());
 		auto pos = dock.pos;
 		auto size = dock.size;
-		pos.y += tabbar_height + ImGui::GetStyle().WindowPadding.y * 2;
-		size.y -= tabbar_height + ImGui::GetStyle().WindowPadding.y * 2;
+		pos.y += tabbar_height + ImGui::GetStyle().WindowPadding.y;
+		size.y -= tabbar_height + ImGui::GetStyle().WindowPadding.y;
 
 		ImGui::SetCursorScreenPos(pos);
 		bool ret = ImGui::BeginChild(label, size, true, flags);
