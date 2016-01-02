@@ -883,15 +883,10 @@ struct DockContext
 					return;
 				}
 				auto docked_rect = getDockedRect(*dest_dock, (Slot)i);
-				canvas->AddRectFilled(docked_rect.Min, docked_rect.Max, docked_color);
-				canvas->AddText(docked_rect.Min, text_color, dock.label);
+				canvas->AddRectFilled(docked_rect.Min, docked_rect.Max, ImGui::GetColorU32(ImGuiCol_TitleBg));
 			}
 		}
-		if (!any_hovered)
-		{
-			canvas->AddRectFilled(dock.pos, dock.pos + dock.size, docked_color);
-			canvas->AddText(dock.pos, text_color, dock.label);
-		}
+		canvas->AddRectFilled(dock.pos, dock.pos + dock.size, docked_color);
 		canvas->PopClipRect();
 
 		if (!ImGui::IsMouseDown(0))
@@ -1224,7 +1219,7 @@ struct DockContext
 			return ret;
 		}
 
-		if (!dock.active) return false;
+		if (!dock.active && dock.status != Dock::DRAGGED) return false;
 		end_action = EndAction::END_CHILD;
 
 		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
