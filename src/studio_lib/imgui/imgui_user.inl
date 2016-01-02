@@ -514,7 +514,7 @@ struct DockContext
 
 		Dock& getSibling()
 		{
-			ASSERT(parent);
+			IM_ASSERT(parent);
 			if (parent->children[0] == &getFirst()) return *parent->children[1];
 			return *parent->children[0];
 		}
@@ -533,6 +533,59 @@ struct DockContext
 			for (auto* tmp = next; tmp; tmp = tmp->next) tmp->active = false;
 		}
 
+
+		bool isContainer() const { return children[0] != nullptr; }
+
+
+		void setChildrenPosSize(const ImVec2& _pos, const ImVec2& _size)
+		{
+			if (children[0]->pos.x < children[1]->pos.x)
+			{
+				auto s = children[0]->size;
+				s.y = _size.y;
+				children[0]->setPosSize(_pos, s);
+
+				s.x = _size.x - children[0]->size.x;
+				auto p = _pos;
+				p.x += children[0]->size.x;
+				children[1]->setPosSize(p, s);
+			}
+			else if (children[0]->pos.x > children[1]->pos.x)
+			{
+				auto s = children[1]->size;
+				s.y = _size.y;
+				children[1]->setPosSize(_pos, s);
+
+				s.x = _size.x - children[1]->size.x;
+				auto p = _pos;
+				p.x += children[1]->size.x;
+				children[0]->setPosSize(p, s);
+			}
+			else if (children[0]->pos.y < children[1]->pos.y)
+			{
+				auto s = children[0]->size;
+				s.x = _size.x;
+				children[0]->setPosSize(_pos, s);
+
+				s.y = _size.y - children[0]->size.y;
+				auto p = _pos;
+				p.y += children[0]->size.y;
+				children[1]->setPosSize(p, s);
+			}
+			else
+			{
+				auto s = children[1]->size;
+				s.x = _size.x;
+				children[1]->setPosSize(_pos, s);
+
+				s.y = _size.y - children[1]->size.y;
+				auto p = _pos;
+				p.y += children[1]->size.y;
+				children[0]->setPosSize(p, s);
+			}
+		}
+
+
 		void setPosSize(const ImVec2& _pos, const ImVec2& _size)
 		{
 			size = _size;
@@ -548,53 +601,8 @@ struct DockContext
 				tmp->pos = _pos;
 			}
 
-			if (children[0])
-			{
-				if (children[0]->pos.x < children[1]->pos.x)
-				{
-					auto s = children[0]->size;
-					s.y = _size.y;
-					children[0]->setPosSize(_pos, s);
-
-					s.x = _size.x - children[0]->size.x;
-					auto p = _pos;
-					p.x += children[0]->size.x;
-					children[1]->setPosSize(p, s);
-				}
-				else if (children[0]->pos.x > children[1]->pos.x)
-				{
-					auto s = children[1]->size;
-					s.y = _size.y;
-					children[1]->setPosSize(_pos, s);
-
-					s.x = _size.x - children[1]->size.x;
-					auto p = _pos;
-					p.x += children[1]->size.x;
-					children[0]->setPosSize(p, s);
-				}
-				else if (children[0]->pos.y < children[1]->pos.y)
-				{
-					auto s = children[0]->size;
-					s.x = _size.x;
-					children[0]->setPosSize(_pos, s);
-
-					s.y = _size.y - children[0]->size.y;
-					auto p = _pos;
-					p.y += children[0]->size.y;
-					children[1]->setPosSize(p, s);
-				}
-				else
-				{
-					auto s = children[1]->size;
-					s.x = _size.x;
-					children[1]->setPosSize(_pos, s);
-
-					s.y = _size.y - children[1]->size.y;
-					auto p = _pos;
-					p.y += children[1]->size.y;
-					children[0]->setPosSize(p, s);
-				}
-			}
+			if (!isContainer()) return;
+			setChildrenPosSize(_pos, _size);
 		}
 
 		char label[50];
@@ -624,6 +632,8 @@ struct DockContext
 		{
 			if (docks[i]->id == id) return *docks[i];
 		}
+
+		IM_ASSERT(count < IM_ARRAYSIZE(docks) - 1);
 
 		++count;
 		docks[count - 1] = (Dock*)ImGui::MemAlloc(sizeof(Dock));
@@ -679,9 +689,9 @@ struct DockContext
 		auto* draw_list = ImGui::GetWindowDrawList();
 		for (int i = 0; i < count; ++i)
 		{
-			if (!docks[i]->children[0]) continue;
+			if (!docks[i]->isContainer()) continue;
 
-			Lumix::toCString(i, str_id, Lumix::lengthOf(str_id));
+			Lumix::toCString(i, str_id, IM_ARRAYSIZE(str_id));
 			Lumix::catString(str_id, "split");
 
 			if (!ImGui::GetIO().MouseDown[0]) docks[i]->status = Dock::DOCKED;
@@ -775,7 +785,7 @@ struct DockContext
 		for (int i = 0; i < count; ++i)
 		{
 			auto& dock = *docks[i];
-			if (dock.children[0]) continue;
+			if (dock.isContainer()) continue;
 			if (dock.status != Dock::DOCKED) continue;
 			if (ImGui::IsMouseHoveringRect(dock.pos, dock.pos + dock.size, false))
 			{
@@ -839,8 +849,11 @@ struct DockContext
 		auto mouse_pos = ImGui::GetIO().MousePos;
 		canvas->PushClipRectFullScreen();
 
+		auto text_color = ImGui::GetColorU32(ImGuiCol_Text);
 		auto color = ImGui::GetColorU32(ImGuiCol_Button);
 		auto color_hovered = ImGui::GetColorU32(ImGuiCol_ButtonHovered);
+		auto docked_color = ImGui::GetColorU32(ImGuiCol_FrameBg);
+		bool any_hovered = false;
 		for (int i = 0; i < 5; ++i)
 		{
 			auto r = getRect(*dest_dock, (Slot)i);
@@ -848,6 +861,7 @@ struct DockContext
 			canvas->AddRectFilled(r.Min, r.Max, hovered ? color_hovered : color);
 			if (hovered)
 			{
+				any_hovered = true;
 				if (!ImGui::GetIO().MouseDown[0])
 				{
 					doDock(dock, *dest_dock, (Slot)i);
@@ -856,9 +870,15 @@ struct DockContext
 					return;
 				}
 				auto docked_rect = getDockedRect(*dest_dock, (Slot)i);
-				auto color = ImGui::GetColorU32(ImGuiCol_FrameBg);
-				canvas->AddRectFilled(docked_rect.Min, docked_rect.Max, color);
+				canvas->AddRectFilled(docked_rect.Min, docked_rect.Max, docked_color);
+				canvas->AddText(docked_rect.Min, text_color, dock.label);
 			}
+		}
+		if (!any_hovered)
+		{
+			auto mp = ImGui::GetMousePos();
+			canvas->AddRectFilled(mp, mp + dock.size, docked_color);
+			canvas->AddText(mp, text_color, dock.label);
 		}
 		canvas->PopClipRect();
 
@@ -888,7 +908,7 @@ struct DockContext
 					dock.parent->children[0] = dock.next;
 				else
 				{
-					ASSERT(!dock.prev);
+					IM_ASSERT(!dock.prev);
 					remove_container = true;
 				}
 			}
@@ -898,13 +918,13 @@ struct DockContext
 					dock.parent->children[1] = dock.next;
 				else
 				{
-					ASSERT(!dock.prev);
+					IM_ASSERT(!dock.prev);
 					remove_container = true;
 				}
 			}
 			else
 			{
-				ASSERT(&dock.getFirst() == dock.parent->children[0] ||
+				IM_ASSERT(&dock.getFirst() == dock.parent->children[0] ||
 					   &dock.getFirst() == dock.parent->children[1]);
 			}
 		}
@@ -922,7 +942,7 @@ struct DockContext
 				}
 				else
 				{
-					ASSERT(container->parent->children[1] == container);
+					IM_ASSERT(container->parent->children[1] == container);
 					container->parent->children[1] = &dock.getSibling();
 					container->parent->children[1]->setPosSize(container->pos, container->size);
 					container->parent->children[1]->setParent(container->parent);
@@ -968,6 +988,46 @@ struct DockContext
 	}
 
 
+	void drawTabbarListButton(Dock& dock)
+	{
+		if (!dock.next) return;
+		
+		auto* draw_list = ImGui::GetWindowDrawList();
+		if (ImGui::InvisibleButton("list", ImVec2(16, 16)))
+		{
+			ImGui::OpenPopup("tab_list_popup");
+		}
+		if (ImGui::BeginPopup("tab_list_popup"))
+		{
+			auto* tmp = &dock;
+			while (tmp)
+			{
+				bool dummy = false;
+				if (ImGui::Selectable(tmp->label, &dummy))
+				{
+					tmp->setActive();
+				}
+				tmp = tmp->next;
+			}
+			ImGui::EndPopup();
+		}
+
+		bool hovered = ImGui::IsItemHovered();
+		auto min = ImGui::GetItemRectMin();
+		auto max = ImGui::GetItemRectMax();
+		auto center = (min + max) * 0.5f;
+		ImU32 text_color = ImGui::GetColorU32(ImGuiCol_Text);
+		ImU32 color_active = ImGui::GetColorU32(ImGuiCol_FrameBgActive);
+		draw_list->AddRectFilled(ImVec2(center.x - 4, min.y + 3),
+			ImVec2(center.x + 4, min.y + 5),
+			hovered ? color_active : text_color);
+		draw_list->AddTriangleFilled(ImVec2(center.x - 4, min.y + 7),
+			ImVec2(center.x + 4, min.y + 7),
+			ImVec2(center.x, min.y + 12),
+			hovered ? color_active : text_color);
+	}
+
+
 	void drawTabbar(Dock& dock)
 	{
 		auto tabbar_height = 2 * ImGui::GetTextLineHeightWithSpacing();
@@ -975,7 +1035,7 @@ struct DockContext
 
 		ImGui::SetCursorScreenPos(dock.pos);
 		char tmp[256];
-		Lumix::toCString(dock.id, tmp, Lumix::lengthOf(tmp));
+		Lumix::toCString(dock.id, tmp, IM_ARRAYSIZE(tmp));
 		Lumix::catString(tmp, "_tabs");
 		if (ImGui::BeginChild(tmp, size, true))
 		{
@@ -989,38 +1049,7 @@ struct DockContext
 			auto line_height = ImGui::GetTextLineHeightWithSpacing();
 			float tab_base;
 			
-			if (dock_tab->next)
-			{
-				if (ImGui::InvisibleButton("list", ImVec2(16, 16)))
-				{
-					ImGui::OpenPopup("tab_list_popup");
-				}
-				if (ImGui::BeginPopup("tab_list_popup"))
-				{
-					auto* tmp = dock_tab;
-					while (tmp)
-					{
-						bool dummy = false;
-						if (ImGui::Selectable(tmp->label, &dummy))
-						{
-							tmp->setActive();
-						}
-						tmp = tmp->next;
-					}
-					ImGui::EndPopup();
-				}
-				bool hovered = ImGui::IsItemHovered();
-				auto min = ImGui::GetItemRectMin();
-				auto max = ImGui::GetItemRectMax();
-				auto center = (min + max) * 0.5f;
-				draw_list->AddRectFilled(ImVec2(center.x - 4, min.y + 3),
-					ImVec2(center.x + 4, min.y + 5),
-					hovered ? color_active : text_color);
-				draw_list->AddTriangleFilled(ImVec2(center.x - 4, min.y + 7),
-					ImVec2(center.x + 4, min.y + 7),
-					ImVec2(center.x, min.y + 12),
-					hovered ? color_active : text_color);
-			}
+			drawTabbarListButton(dock);
 
 			while (dock_tab)
 			{
@@ -1065,7 +1094,7 @@ struct DockContext
 
 	static void setDockSizeAndPos(Dock& dest, Dock& dock, Slot dock_slot, Dock& container)
 	{
-		ASSERT(!dock.prev && !dock.next && !dock.children[0] && !dock.children[1]);
+		IM_ASSERT(!dock.prev && !dock.next && !dock.children[0] && !dock.children[1]);
 
 		dest.pos = container.pos;
 		dest.size = container.size;
@@ -1094,7 +1123,7 @@ struct DockContext
 				dock.size.y *= 0.5f;
 				dest.pos.y += dock.size.y;
 				break;
-			default: ASSERT(false); break;
+			default: IM_ASSERT(false); break;
 		}
 		dest.setPosSize(dest.pos, dest.size);
 	}
@@ -1102,7 +1131,7 @@ struct DockContext
 
 	void doDock(Dock& dock, Dock& dest, Slot dock_slot)
 	{
-		ASSERT(!dock.parent);
+		IM_ASSERT(!dock.parent);
 		if (dock_slot == Slot::TAB)
 		{
 			auto* tmp = &dest;
@@ -1159,7 +1188,7 @@ struct DockContext
 	}
 
 
-	bool begin(const char* label, bool* opened)
+	bool begin(const char* label, bool* opened, ImGuiWindowFlags extra_flags)
 	{
 		auto& dock = getDock(label, !opened || *opened);
 		end_action = -1;
@@ -1180,9 +1209,6 @@ struct DockContext
 		current = &dock;
 		if (dock.status == Dock::DRAGGED) handleDrag(dock);
 
-		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-								 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
-								 ImGuiWindowFlags_NoSavedSettings;
 		bool is_float = dock.status == Dock::FLOAT;
 
 		if (!dock.parent && dock.size.x < 0 && dock.status != Dock::DRAGGED)
@@ -1200,7 +1226,7 @@ struct DockContext
 				opened,
 				dock.size,
 				-1.0f,
-				ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+				ImGuiWindowFlags_NoCollapse | extra_flags);
 			end_action = 1;
 			dock.pos = ImGui::GetWindowPos();
 			dock.size = ImGui::GetWindowSize();
@@ -1227,6 +1253,9 @@ struct DockContext
 		size.y -= tabbar_height + ImGui::GetStyle().WindowPadding.y;
 
 		ImGui::SetCursorScreenPos(pos);
+		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+			ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+			ImGuiWindowFlags_NoSavedSettings | extra_flags;
 		bool ret = ImGui::BeginChild(label, size, true, flags);
 		auto* draw_list = ImGui::GetWindowDrawList();
 		return ret;
@@ -1260,7 +1289,7 @@ struct DockContext
 				if (dock == docks[i]) return i;
 			}
 
-			ASSERT(false);
+			IM_ASSERT(false);
 			return -1;
 		};
 
@@ -1388,9 +1417,9 @@ struct DockContext
 static DockContext g_dock;
 
 
-bool BeginDock(const char* label, bool* opened)
+bool BeginDock(const char* label, bool* opened, ImGuiWindowFlags extra_flags)
 {
-	return g_dock.begin(label, opened);
+	return g_dock.begin(label, opened, extra_flags);
 }
 
 

@@ -55,7 +55,7 @@ IMGUI_API CurveEditor BeginCurveEditor(const char* label);
 IMGUI_API bool CurvePoint(ImVec2* point, CurveEditor& editor);
 IMGUI_API void EndCurveEditor(const CurveEditor& editor);
 
-IMGUI_API bool BeginDock(const char* label, bool* opened = nullptr);
+IMGUI_API bool BeginDock(const char* label, bool* opened = nullptr, ImGuiWindowFlags extra_flags = 0);
 IMGUI_API void EndDock();
 IMGUI_API void SaveDock(Lumix::FS::OsFile& file);
 IMGUI_API void LoadDock(lua_State* L);
