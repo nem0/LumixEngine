@@ -619,6 +619,7 @@ struct DockContext
 
 
 	Dock* docks[32];
+	ImVec2 drag_offset;
 	int count = 0;
 	Dock* current = nullptr;
 	int last_frame = 0;
@@ -855,7 +856,6 @@ struct DockContext
 				ImGuiWindowFlags_AlwaysAutoResize);
 		auto* canvas = ImGui::GetWindowDrawList();
 
-		auto mouse_pos = ImGui::GetIO().MousePos;
 		canvas->PushClipRectFullScreen();
 
 		auto text_color = ImGui::GetColorU32(ImGuiCol_Text);
@@ -863,6 +863,8 @@ struct DockContext
 		auto color_hovered = ImGui::GetColorU32(ImGuiCol_ButtonHovered);
 		auto docked_color = ImGui::GetColorU32(ImGuiCol_FrameBg);
 		bool any_hovered = false;
+		auto mouse_pos = ImGui::GetIO().MousePos;
+		dock.pos = mouse_pos - drag_offset;
 		if (dest_dock)
 		{
 			for (int i = 0; i < 5; ++i)
@@ -887,16 +889,15 @@ struct DockContext
 		}
 		if (!any_hovered)
 		{
-			auto mp = ImGui::GetMousePos();
-			canvas->AddRectFilled(mp, mp + dock.size, docked_color);
-			canvas->AddText(mp, text_color, dock.label);
+			canvas->AddRectFilled(dock.pos, dock.pos + dock.size, docked_color);
+			canvas->AddText(dock.pos, text_color, dock.label);
 		}
 		canvas->PopClipRect();
 
 		if (!ImGui::IsMouseDown(0))
 		{
-			if(dest_dock) doDock(dock, *dest_dock, Slot::NONE);
-			else dock.status = Dock::FLOAT;
+			dock.status = Dock::FLOAT;
+			dock.setActive();
 		}
 
 		ImGui::End();
@@ -1037,6 +1038,7 @@ struct DockContext
 
 				if (ImGui::IsItemActive() && ImGui::IsMouseDragging())
 				{
+					drag_offset = ImGui::GetMousePos() - dock_tab->pos;
 					doUndock(*dock_tab);
 					dock_tab->status = Dock::DRAGGED;
 				}
@@ -1133,7 +1135,6 @@ struct DockContext
 		}
 		else if (dock_slot == Slot::NONE)
 		{
-			dock.pos = ImGui::GetIO().MousePos;
 			dock.status = Dock::FLOAT;
 		}
 		else
@@ -1216,6 +1217,7 @@ struct DockContext
 
 			if (g.ActiveId == GetCurrentWindow()->MoveID && g.IO.MouseDown[0])
 			{
+				drag_offset = ImGui::GetMousePos() - dock.pos;
 				doUndock(dock);
 				dock.status = Dock::DRAGGED;
 			}
