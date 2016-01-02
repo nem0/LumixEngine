@@ -1001,10 +1001,11 @@ struct DockContext
 	}
 
 
-	void drawTabbar(Dock& dock)
+	bool tabbar(Dock& dock, bool close_button)
 	{
 		auto tabbar_height = 2 * ImGui::GetTextLineHeightWithSpacing();
 		auto size = ImVec2(dock.size.x, tabbar_height);
+		bool tab_closed = false;
 
 		ImGui::SetCursorScreenPos(dock.pos);
 		char tmp[256];
@@ -1042,6 +1043,15 @@ struct DockContext
 
 				bool hovered = ImGui::IsItemHovered();
 				auto pos = ImGui::GetItemRectMin();
+				if (dock_tab->active && close_button)
+				{
+					size.x += 16 + ImGui::GetStyle().ItemSpacing.x;
+					ImGui::SameLine();
+					tab_closed = ImGui::InvisibleButton("close", ImVec2(16, 16));
+					auto center = (ImGui::GetItemRectMin() + ImGui::GetItemRectMax()) * 0.5f;
+					draw_list->AddLine(center + ImVec2(-3.5f, -3.5f), center + ImVec2( 3.5f, 3.5f), text_color);
+					draw_list->AddLine(center + ImVec2( 3.5f, -3.5f), center + ImVec2(-3.5f, 3.5f), text_color);
+				}
 				tab_base = pos.y;
 				draw_list->PathClear();
 				draw_list->PathLineTo(pos + ImVec2(-15, size.y));
@@ -1062,6 +1072,7 @@ struct DockContext
 			draw_list->AddLine(cp, cp + ImVec2(dock.size.x, 0), color);
 		}
 		ImGui::EndChild();
+		return tab_closed;
 	}
 
 
@@ -1216,7 +1227,10 @@ struct DockContext
 
 		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
 		auto tabbar_height = ImGui::GetTextLineHeightWithSpacing();
-		drawTabbar(dock.getFirstTab());
+		if (tabbar(dock.getFirstTab(), opened != nullptr))
+		{
+			*opened = false;
+		}
 		auto pos = dock.pos;
 		auto size = dock.size;
 		pos.y += tabbar_height + ImGui::GetStyle().WindowPadding.y;
