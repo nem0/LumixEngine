@@ -1,12 +1,10 @@
 #include "imgui.h"
 #include "imgui_internal.h"
-#include "core/delegate.h"
 #include "core/fs/os_file.h"
 #include "core/string.h"
 #include <lua.hpp>
 
 
-static const ImVec2 NODE_WINDOW_PADDING(8.0f, 8.0f);
 static const float NODE_SLOT_RADIUS = 4.0f;
 
 
