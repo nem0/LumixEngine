@@ -38,7 +38,7 @@ Videos
 * [New UI](https://youtu.be/otNtPetjFek)
 * [Gizmo, welcome screen](https://youtu.be/xKaZHPDWUkY)
 
-![Editor screenshot](https://cloud.githubusercontent.com/assets/153526/10109455/450c51be-63c7-11e5-9c87-96d9d00efe02.png)
+![Editor screenshot](https://cloud.githubusercontent.com/assets/153526/12075414/6ec25fc4-b180-11e5-891d-42f6faaf0573.png)
 
 3rd party libraries
 
