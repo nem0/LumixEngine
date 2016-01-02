@@ -465,7 +465,6 @@ bool CurvePoint(ImVec2* points, CurveEditor& editor)
 
 struct DockContext
 {
-
 	enum class Slot
 	{
 		LEFT,
@@ -479,6 +478,15 @@ struct DockContext
 	};
 
 
+	enum class EndAction
+	{
+		NONE,
+		PANEL,
+		END,
+		END_CHILD
+	};
+
+
 	struct Dock
 	{
 		enum Status
@@ -487,6 +495,7 @@ struct DockContext
 			FLOAT,
 			DRAGGED
 		};
+
 
 		Dock(const char* _label)
 			: id(ImHash(_label, 0))
@@ -510,6 +519,7 @@ struct DockContext
 			for (auto* tmp = next_tab; tmp; tmp = tmp->next_tab) tmp->parent = dock;
 		}
 
+
 		Dock& getSibling()
 		{
 			IM_ASSERT(parent);
@@ -517,12 +527,14 @@ struct DockContext
 			return *parent->children[0];
 		}
 
+
 		Dock& getFirstTab()
 		{
 			auto* tmp = this;
 			while (tmp->prev_tab) tmp = tmp->prev_tab;
 			return *tmp;
 		}
+
 
 		void setActive()
 		{
@@ -603,6 +615,7 @@ struct DockContext
 			setChildrenPosSize(_pos, _size);
 		}
 
+
 		char label[50];
 		ImU32 id;
 		Dock* next_tab;
@@ -621,15 +634,6 @@ struct DockContext
 	int count = 0;
 	Dock* current = nullptr;
 	int last_frame = 0;
-
-	enum class EndAction
-	{
-		NONE,
-		PANEL,
-		END,
-		END_CHILD
-	};
-
 	EndAction end_action;
 
 
@@ -1023,7 +1027,8 @@ struct DockContext
 			{
 				ImGui::SameLine(0, 15);
 
-				ImVec2 size(ImGui::CalcTextSize(dock_tab->label).x, line_height);
+				auto* text_end = FindTextDisplayEnd(dock_tab->label);
+				ImVec2 size(ImGui::CalcTextSize(dock_tab->label, text_end).x, line_height);
 				if (ImGui::InvisibleButton(dock_tab->label, size))
 				{
 					dock_tab->setActive();
@@ -1059,7 +1064,7 @@ struct DockContext
 					10);
 				draw_list->PathFill(
 					hovered ? color_hovered : (dock_tab->active ? color_active : color));
-				draw_list->AddText(pos, text_color, dock_tab->label);
+				draw_list->AddText(pos, text_color, dock_tab->label, text_end);
 
 				dock_tab = dock_tab->next_tab;
 			}
