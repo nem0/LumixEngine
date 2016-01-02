@@ -988,6 +988,40 @@ struct DockContext
 			ImU32 text_color = ImGui::GetColorU32(ImGuiCol_Text);
 			auto line_height = ImGui::GetTextLineHeightWithSpacing();
 			float tab_base;
+			
+			if (dock_tab->next)
+			{
+				if (ImGui::InvisibleButton("list", ImVec2(16, 16)))
+				{
+					ImGui::OpenPopup("tab_list_popup");
+				}
+				if (ImGui::BeginPopup("tab_list_popup"))
+				{
+					auto* tmp = dock_tab;
+					while (tmp)
+					{
+						bool dummy = false;
+						if (ImGui::Selectable(tmp->label, &dummy))
+						{
+							tmp->setActive();
+						}
+						tmp = tmp->next;
+					}
+					ImGui::EndPopup();
+				}
+				bool hovered = ImGui::IsItemHovered();
+				auto min = ImGui::GetItemRectMin();
+				auto max = ImGui::GetItemRectMax();
+				auto center = (min + max) * 0.5f;
+				draw_list->AddRectFilled(ImVec2(center.x - 4, min.y + 3),
+					ImVec2(center.x + 4, min.y + 5),
+					hovered ? color_active : text_color);
+				draw_list->AddTriangleFilled(ImVec2(center.x - 4, min.y + 7),
+					ImVec2(center.x + 4, min.y + 7),
+					ImVec2(center.x, min.y + 12),
+					hovered ? color_active : text_color);
+			}
+
 			while (dock_tab)
 			{
 				ImGui::SameLine(0, 15);
