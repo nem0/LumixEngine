@@ -177,6 +177,12 @@ public:
 
 			if (ImGui::BeginChild("right", half_size, true))
 			{
+				if (ImGui::Button("Wiki"))
+				{
+					PlatformInterface::shellExecuteOpen(
+						"https://github.com/nem0/LumixEngine/wiki");
+				}
+
 				if (ImGui::Button("Download new version"))
 				{
 					PlatformInterface::shellExecuteOpen(
