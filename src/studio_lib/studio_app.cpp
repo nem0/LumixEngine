@@ -617,7 +617,7 @@ public:
 
 	void showEntityTemplateList()
 	{
-		if (ImGui::BeginDock("Entity templates", &m_is_entity_template_list_opened))
+		if (ImGui::BeginDock("Entity Templates", &m_is_entity_template_list_opened))
 		{
 			if (m_editor->getSelectedEntities().size() == 1)
 			{
@@ -649,7 +649,7 @@ public:
 
 	void showEntityList()
 	{
-		if (ImGui::BeginDock("Entity list", &m_is_entity_list_opened))
+		if (ImGui::BeginDock("Entity List", &m_is_entity_list_opened))
 		{
 			auto* universe = m_editor->getUniverse();
 			int scroll_to = -1;

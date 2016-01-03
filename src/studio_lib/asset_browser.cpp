@@ -223,7 +223,7 @@ void AssetBrowser::onGUI()
 		m_wanted_resource = "";
 	}
 
-	if (!ImGui::BeginDock("AssetBrowser", &m_is_opened))
+	if (!ImGui::BeginDock("Asset Browser", &m_is_opened))
 	{
 		ImGui::EndDock();
 		return;
