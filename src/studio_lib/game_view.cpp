@@ -97,8 +97,8 @@ void GameView::onGui()
 		captureMouse(false);
 	}
 
-	const char* window_name = "Game view###game_view";
-	if (m_is_mouse_captured) window_name = "Game view (mouse captured)###game_view";
+	const char* window_name = "Game View###game_view";
+	if (m_is_mouse_captured) window_name = "Game View (mouse captured)###game_view";
 	if (ImGui::BeginDock(window_name, &m_is_opened))
 	{
 		m_is_mouse_hovering_window = ImGui::IsMouseHoveringWindow();

@@ -190,7 +190,7 @@ extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
 
 		void onWindowGUI() override
 		{
-			if (ImGui::BeginDock("Clip manager", &m_is_opened))
+			if (ImGui::BeginDock("Clip Manager", &m_is_opened))
 			{
 				ImGui::InputText("Filter", m_filter, Lumix::lengthOf(m_filter));
 

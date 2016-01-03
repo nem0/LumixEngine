@@ -934,10 +934,16 @@ struct DockContext
 				}
 				else
 				{
-					container->children[0]->setParent(nullptr);
-					container->children[0]->setPosSize(container->pos, container->size);
-					container->children[1]->setParent(nullptr);
-					container->children[1]->setPosSize(container->pos, container->size);
+					if (container->children[0])
+					{
+						container->children[0]->setParent(nullptr);
+						container->children[0]->setPosSize(container->pos, container->size);
+					}
+					if (container->children[1])
+					{
+						container->children[1]->setParent(nullptr);
+						container->children[1]->setPosSize(container->pos, container->size);
+					}
 				}
 				container->~Dock();
 				ImGui::MemFree(container);

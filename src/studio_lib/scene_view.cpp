@@ -12,7 +12,7 @@
 #include "settings.h"
 
 
-static const char* WINDOW_NAME = "Scene view";
+static const char* WINDOW_NAME = "Scene View";
 
 
 SceneView::SceneView()

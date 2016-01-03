@@ -2214,9 +2214,9 @@ void ShaderEditor::onGUIMenu()
 
 void ShaderEditor::onGUI()
 {
-	StringBuilder<Lumix::MAX_PATH_LENGTH + 25> title("Shader editor");
+	StringBuilder<Lumix::MAX_PATH_LENGTH + 25> title("Shader Editor");
 	if (m_path.isValid()) title << " - " << m_path.c_str();
-	title << "###Shader editor";
+	title << "###Shader Editor";
 	if (ImGui::BeginDock(title, &m_is_opened, ImGuiWindowFlags_MenuBar))
 	{
 		m_is_focused = ImGui::IsRootWindowOrAnyChildFocused();
