@@ -491,18 +491,19 @@ void PropertyGrid::onParticleEmitterGUI(Lumix::ComponentUID cmp)
 {
 	ImGui::Separator();
 	ImGui::Checkbox("Update", &m_particle_emitter_updating);
+	auto* scene = static_cast<Lumix::RenderScene*>(cmp.scene);
+	ImGui::SameLine();
+	if (ImGui::Button("Reset"))
+	{
+		scene->resetParticleEmitter(cmp.index);
+	}
 
 	if (m_particle_emitter_updating)
 	{
 		ImGui::DragFloat("Timescale", &m_particle_emitter_timescale, 0.01f, 0.01f, 10000.0f);
 		float time_delta = m_editor.getEngine().getLastTimeDelta();
-		auto* scene = static_cast<Lumix::RenderScene*>(cmp.scene);
 		scene->updateEmitter(cmp.index, time_delta * m_particle_emitter_timescale);
 		scene->drawEmitterGizmo(cmp.index);
-		if(ImGui::Button("Reset"))
-		{
-			scene->resetParticleEmitter(cmp.index);
-		}
 	}
 }
 
