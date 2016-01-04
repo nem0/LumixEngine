@@ -1,7 +1,6 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "core/fs/os_file.h"
-#include "core/string.h"
 #include <lua.hpp>
 
 
@@ -29,7 +28,7 @@ int PlotHistogramEx(const char* label,
     ImGuiState& g = *GImGui;
     const ImGuiStyle& style = g.Style;
 
-    const ImVec2 label_size = ImGui::CalcTextSize(label, NULL, true);
+    const ImVec2 label_size = CalcTextSize(label, NULL, true);
     if (graph_size.x == 0.0f) graph_size.x = CalcItemWidth() + (style.FramePadding.x * 2);
     if (graph_size.y == 0.0f) graph_size.y = label_size.y + (style.FramePadding.y * 2);
 
@@ -72,7 +71,7 @@ int PlotHistogramEx(const char* label,
         IM_ASSERT(v_idx >= 0 && v_idx < values_count);
 
         const float v0 = values_getter(data, (v_idx + values_offset) % values_count);
-        ImGui::SetTooltip("%d: %8.4g", v_idx, v0);
+        SetTooltip("%d: %8.4g", v_idx, v0);
         v_hovered = v_idx;
     }
 
@@ -121,7 +120,7 @@ int PlotHistogramEx(const char* label,
 }
 
 
-bool ImGui::ListBox(const char* label,
+bool ListBox(const char* label,
     int* current_item,
     int scroll_to_item,
     bool (*items_getter)(void*, int, const char**),
@@ -129,7 +128,7 @@ bool ImGui::ListBox(const char* label,
     int items_count,
     int height_in_items)
 {
-    if (!ImGui::ListBoxHeader(label, items_count, height_in_items)) return false;
+    if (!ListBoxHeader(label, items_count, height_in_items)) return false;
 
     // Assume all items have even height (= 1 line of text). If you need items of different or
     // variable sizes you can create a custom version of ListBox() in your code without using the
@@ -137,25 +136,25 @@ bool ImGui::ListBox(const char* label,
     bool value_changed = false;
     if (scroll_to_item != -1)
     {
-        ImGui::SetScrollY(scroll_to_item * ImGui::GetTextLineHeightWithSpacing());
+        SetScrollY(scroll_to_item * GetTextLineHeightWithSpacing());
     }
-    ImGuiListClipper clipper(items_count, ImGui::GetTextLineHeightWithSpacing());
+    ImGuiListClipper clipper(items_count, GetTextLineHeightWithSpacing());
     for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
     {
         const bool item_selected = (i == *current_item);
         const char* item_text;
         if (!items_getter(data, i, &item_text)) item_text = "*Unknown item*";
 
-        ImGui::PushID(i);
-        if (ImGui::Selectable(item_text, item_selected))
+        PushID(i);
+        if (Selectable(item_text, item_selected))
         {
             *current_item = i;
             value_changed = true;
         }
-        ImGui::PopID();
+        PopID();
     }
     clipper.End();
-    ImGui::ListBoxFooter();
+    ListBoxFooter();
     return value_changed;
 }
 
@@ -204,36 +203,36 @@ void BeginNode(ImGuiID id, ImVec2 screen_pos)
     PushID(id);
     last_node_id = id;
     node_pos = screen_pos;
-    ImGui::SetCursorScreenPos(screen_pos + ImGui::GetStyle().WindowPadding);
-    ImGui::PushItemWidth(200);
-    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    SetCursorScreenPos(screen_pos + GetStyle().WindowPadding);
+    PushItemWidth(200);
+    ImDrawList* draw_list = GetWindowDrawList();
     draw_list->ChannelsSplit(2);
     draw_list->ChannelsSetCurrent(1);
-    ImGui::BeginGroup();
+    BeginGroup();
 }
 
 
 void EndNode(ImVec2& pos)
 {
-    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    ImDrawList* draw_list = GetWindowDrawList();
 
-    ImGui::EndGroup();
-    ImGui::PopItemWidth();
+    EndGroup();
+    PopItemWidth();
 
-    float height = ImGui::GetCursorScreenPos().y - node_pos.y;
-    ImVec2 size(200, height + ImGui::GetStyle().WindowPadding.y);
-    ImGui::SetCursorScreenPos(node_pos);
+    float height = GetCursorScreenPos().y - node_pos.y;
+    ImVec2 size(200, height + GetStyle().WindowPadding.y);
+    SetCursorScreenPos(node_pos);
 
-    ImGui::SetNextWindowPos(node_pos);
-    ImGui::SetNextWindowSize(size);
-    ImGui::BeginChild((ImGuiID)last_node_id, size, false, ImGuiWindowFlags_NoInputs);
-    ImGui::EndChild();
+    SetNextWindowPos(node_pos);
+    SetNextWindowSize(size);
+    BeginChild((ImGuiID)last_node_id, size, false, ImGuiWindowFlags_NoInputs);
+    EndChild();
 
-    ImGui::SetCursorScreenPos(node_pos);
-    ImGui::InvisibleButton("bg", size);
-    if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))
+    SetCursorScreenPos(node_pos);
+    InvisibleButton("bg", size);
+    if (IsItemActive() && IsMouseDragging(0))
     {
-        pos += ImGui::GetIO().MouseDelta;
+        pos += GetIO().MouseDelta;
     }
 
     draw_list->ChannelsSetCurrent(0);
@@ -247,63 +246,63 @@ void EndNode(ImVec2& pos)
 
 ImVec2 GetNodeInputPos(ImGuiID id, int input)
 {
-    ImGui::PushID(id);
+    PushID(id);
 
-    ImGuiWindow* parent_win = ImGui::GetCurrentWindow();
+    ImGuiWindow* parent_win = GetCurrentWindow();
     char title[256];
     ImFormatString(title, IM_ARRAYSIZE(title), "%s.child_%08x", parent_win->Name, id);
     ImGuiWindow* win = FindWindowByName(title);
     if (!win)
     {
-        ImGui::PopID();
+        PopID();
         return ImVec2(0, 0);
     }
 
     ImVec2 pos = win->Pos;
     pos.x -= NODE_SLOT_RADIUS;
-    ImGuiStyle& style = ImGui::GetStyle();
-    pos.y += (ImGui::GetTextLineHeight() + style.ItemSpacing.y) * input;
-    pos.y += style.WindowPadding.y + ImGui::GetTextLineHeight() * 0.5f;
+    ImGuiStyle& style = GetStyle();
+    pos.y += (GetTextLineHeight() + style.ItemSpacing.y) * input;
+    pos.y += style.WindowPadding.y + GetTextLineHeight() * 0.5f;
 
 
-    ImGui::PopID();
+    PopID();
     return pos;
 }
 
 
 ImVec2 GetNodeOutputPos(ImGuiID id, int output)
 {
-    ImGui::PushID(id);
+    PushID(id);
 
-    ImGuiWindow* parent_win = ImGui::GetCurrentWindow();
+    ImGuiWindow* parent_win = GetCurrentWindow();
     char title[256];
     ImFormatString(title, IM_ARRAYSIZE(title), "%s.child_%08x", parent_win->Name, id);
     ImGuiWindow* win = FindWindowByName(title);
     if (!win)
     {
-        ImGui::PopID();
+        PopID();
         return ImVec2(0, 0);
     }
 
     ImVec2 pos = win->Pos;
     pos.x += win->Size.x + NODE_SLOT_RADIUS;
-    ImGuiStyle& style = ImGui::GetStyle();
-    pos.y += (ImGui::GetTextLineHeight() + style.ItemSpacing.y) * output;
-    pos.y += style.WindowPadding.y + ImGui::GetTextLineHeight() * 0.5f;
+    ImGuiStyle& style = GetStyle();
+    pos.y += (GetTextLineHeight() + style.ItemSpacing.y) * output;
+    pos.y += style.WindowPadding.y + GetTextLineHeight() * 0.5f;
 
-    ImGui::PopID();
+    PopID();
     return pos;
 }
 
 
 bool NodePin(ImGuiID id, ImVec2 screen_pos)
 {
-    ImDrawList* draw_list = ImGui::GetWindowDrawList();
-    ImGui::SetCursorScreenPos(screen_pos - ImVec2(NODE_SLOT_RADIUS, NODE_SLOT_RADIUS));
-    ImGui::PushID(id);
-    ImGui::InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
-    bool hovered = ImGui::IsItemHovered();
-    ImGui::PopID();
+    ImDrawList* draw_list = GetWindowDrawList();
+    SetCursorScreenPos(screen_pos - ImVec2(NODE_SLOT_RADIUS, NODE_SLOT_RADIUS));
+    PushID(id);
+    InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
+    bool hovered = IsItemHovered();
+    PopID();
     draw_list->AddCircleFilled(screen_pos,
         NODE_SLOT_RADIUS,
         hovered ? ImColor(0, 150, 0, 150) : ImColor(150, 150, 150, 150));
@@ -318,7 +317,7 @@ void NodeLink(ImVec2 from, ImVec2 to)
     ImVec2 p2 = to;
     ImVec2 t2 = ImVec2(+80.0f, 0.0f);
     const int STEPS = 12;
-    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    ImDrawList* draw_list = GetWindowDrawList();
     for (int step = 0; step <= STEPS; step++)
     {
         float t = (float)step / (float)STEPS;
@@ -349,9 +348,9 @@ CurveEditor BeginCurveEditor(const char* label)
 
     ImGuiState& g = *GImGui;
     const ImGuiStyle& style = g.Style;
-    ImVec2 cursor_pos = ImGui::GetCursorScreenPos();
+    ImVec2 cursor_pos = GetCursorScreenPos();
 
-    const ImVec2 label_size = ImGui::CalcTextSize(label, NULL, true);
+    const ImVec2 label_size = CalcTextSize(label, NULL, true);
     ImVec2 graph_size;
     graph_size.x = CalcItemWidth() + (style.FramePadding.x * 2);
     graph_size.y = 100; // label_size.y + (style.FramePadding.y * 2);
@@ -367,14 +366,14 @@ CurveEditor BeginCurveEditor(const char* label)
     if (!ItemAdd(total_bb, NULL)) return editor;
 
     editor.valid = true;
-    ImGui::PushID(label);
+    PushID(label);
 
     RenderFrame(
         frame_bb.Min, frame_bb.Max, GetColorU32(ImGuiCol_FrameBg), true, style.FrameRounding);
     RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y), label);
 
     editor.beg_pos = cursor_pos;
-    ImGui::SetCursorScreenPos(cursor_pos);
+    SetCursorScreenPos(cursor_pos);
 
     editor.point_idx = -1;
 
@@ -384,10 +383,10 @@ CurveEditor BeginCurveEditor(const char* label)
 
 void EndCurveEditor(const CurveEditor& editor)
 {
-    ImGui::SetCursorScreenPos(editor.beg_pos);
+    SetCursorScreenPos(editor.beg_pos);
 
-    InvisibleButton("bg", ImVec2(ImGui::CalcItemWidth(), 100));
-    ImGui::PopID();
+    InvisibleButton("bg", ImVec2(CalcItemWidth(), 100));
+    PopID();
 }
 
 
@@ -397,7 +396,7 @@ bool CurvePoint(ImVec2* points, CurveEditor& editor)
     ImGuiState& g = *GImGui;
     const ImGuiStyle& style = g.Style;
 
-    ImVec2 cursor_pos_backup = ImGui::GetCursorScreenPos();
+    ImVec2 cursor_pos_backup = GetCursorScreenPos();
 
     ImVec2 graph_size;
     graph_size.x = CalcItemWidth() + (style.FramePadding.x * 2);
@@ -432,12 +431,12 @@ bool CurvePoint(ImVec2* points, CurveEditor& editor)
     editor.prev_tangent = right_tangent;
 
     static const float SIZE = 3;
-    ImGui::SetCursorScreenPos(pos - ImVec2(SIZE, SIZE));
-    ImGui::PushID(editor.point_idx);
+    SetCursorScreenPos(pos - ImVec2(SIZE, SIZE));
+    PushID(editor.point_idx);
     ++editor.point_idx;
-    ImGui::InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
+    InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
 
-    ImU32 col = ImGui::IsItemHovered() ? col_hovered : col_base;
+    ImU32 col = IsItemHovered() ? col_hovered : col_base;
 
     window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, SIZE), col);
     window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, SIZE), col);
@@ -445,9 +444,9 @@ bool CurvePoint(ImVec2* points, CurveEditor& editor)
     window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, -SIZE), col);
 
     bool changed = false;
-    if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))
+    if (IsItemActive() && IsMouseDragging(0))
     {
-        pos += ImGui::GetIO().MouseDelta;
+        pos += GetIO().MouseDelta;
         ImVec2 v;
         v.x = (pos.x - inner_bb.Min.x) / (inner_bb.Max.x - inner_bb.Min.x);
         v.y = (inner_bb.Max.y - pos.y) / (inner_bb.Max.y - inner_bb.Min.y);
@@ -456,9 +455,9 @@ bool CurvePoint(ImVec2* points, CurveEditor& editor)
         points[1] = v;
         changed = true;
     }
-    ImGui::PopID();
+    PopID();
 
-    ImGui::SetCursorScreenPos(cursor_pos_backup);
+    SetCursorScreenPos(cursor_pos_backup);
     return changed;
 }
 
@@ -497,18 +496,24 @@ struct DockContext
 
     struct Dock
     {
-        Dock(const char* _label)
-            : id(ImHash(_label, 0))
+        Dock()
+            : id(0)
             , next_tab(nullptr)
             , prev_tab(nullptr)
             , parent(nullptr)
+            , pos(0, 0)
+            , size(-1, -1)
+            , active(true)
+            , status(Status_Float)
+            , label(nullptr)
         {
-            pos = ImVec2(0, 0);
-            size = ImVec2(-1, -1);
-            active = true;
             children[0] = children[1] = nullptr;
-            status = Status_Float;
-            Lumix::copyString(label, _label);
+        }
+
+
+        ~Dock()
+        {
+            MemFree(label);
         }
 
 
@@ -616,7 +621,7 @@ struct DockContext
         }
 
 
-        char	label[50];
+        char*	label;
         ImU32	id;
         Dock*	next_tab;
         Dock*	prev_tab;
@@ -649,10 +654,11 @@ struct DockContext
             if (m_docks[i]->id == id) return *m_docks[i];
         }
 
-        Dock* new_dock = (Dock*)ImGui::MemAlloc(sizeof(Dock));
-        new (new_dock)Dock(label);
+        Dock* new_dock = (Dock*)MemAlloc(sizeof(Dock));
+        new (new_dock) Dock();
         m_docks.push_back(new_dock);
         static Dock* q = nullptr; // TODO
+        new_dock->label = ImStrdup(label);
         new_dock->id = id;
         new_dock->setActive();
         if (opened)
@@ -676,7 +682,7 @@ struct DockContext
 
     void putInBackground()
     {
-        ImGuiWindow* win = ImGui::GetCurrentWindow();
+        ImGuiWindow* win = GetCurrentWindow();
         ImGuiState& g = *GImGui;
         if (g.Windows[0] == win) return;
 
@@ -697,33 +703,30 @@ struct DockContext
 
     void drawSplits()
     {
-        if (ImGui::GetFrameCount() == m_last_frame) return;
-        m_last_frame = ImGui::GetFrameCount();
+        if (GetFrameCount() == m_last_frame) return;
+        m_last_frame = GetFrameCount();
 
         putInBackground();
 
-        ImU32 color = ImGui::GetColorU32(ImGuiCol_Button);
-        ImU32 color_hovered = ImGui::GetColorU32(ImGuiCol_ButtonHovered);
-        char str_id[20];
-        ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        ImGuiIO& io = ImGui::GetIO();
+        ImU32 color = GetColorU32(ImGuiCol_Button);
+        ImU32 color_hovered = GetColorU32(ImGuiCol_ButtonHovered);
+        ImDrawList* draw_list = GetWindowDrawList();
+        ImGuiIO& io = GetIO();
         for (int i = 0; i < m_docks.size(); ++i)
         {
             Dock& dock = *m_docks[i];
             if (!dock.isContainer()) continue;
 
-            Lumix::toCString(i, str_id, IM_ARRAYSIZE(str_id));
-            Lumix::catString(str_id, "split");
-
-            if (!ImGui::IsMouseDown(0)) dock.status = Status_Docked;
+            PushID(i);
+            if (!IsMouseDown(0)) dock.status = Status_Docked;
 
             ImVec2 p0 = dock.children[0]->pos;
             ImVec2 p1 = dock.children[1]->pos;
             ImVec2 size = dock.children[0]->size;
             if (p0.x < p1.x)
             {
-                ImGui::SetCursorScreenPos(p1);
-                ImGui::InvisibleButton(str_id, ImVec2(3, size.y));
+                SetCursorScreenPos(p1);
+                InvisibleButton("split", ImVec2(3, size.y));
                 if (dock.status == Status_Dragged)
                 {
                     dock.children[0]->size.x += io.MouseDelta.x;
@@ -733,8 +736,8 @@ struct DockContext
             }
             else if (p0.x > p1.x)
             {
-                ImGui::SetCursorScreenPos(p0);
-                ImGui::InvisibleButton(str_id, ImVec2(3, size.y));
+                SetCursorScreenPos(p0);
+                InvisibleButton("split", ImVec2(3, size.y));
                 if (dock.status == Status_Dragged)
                 {
                     dock.children[1]->size.x += io.MouseDelta.x;
@@ -744,8 +747,8 @@ struct DockContext
             }
             else if (p0.y < p1.y)
             {
-                ImGui::SetCursorScreenPos(p1);
-                ImGui::InvisibleButton(str_id, ImVec2(size.x, 3));
+                SetCursorScreenPos(p1);
+                InvisibleButton("split", ImVec2(size.x, 3));
                 if (dock.status == Status_Dragged)
                 {
                     dock.children[0]->size.y += io.MouseDelta.y;
@@ -755,8 +758,8 @@ struct DockContext
             }
             else
             {
-                ImGui::SetCursorScreenPos(p0);
-                ImGui::InvisibleButton(str_id, ImVec2(size.x, 3));
+                SetCursorScreenPos(p0);
+                InvisibleButton("split", ImVec2(size.x, 3));
                 if (dock.status == Status_Dragged)
                 {
                     dock.children[1]->size.y += io.MouseDelta.y;
@@ -765,7 +768,7 @@ struct DockContext
                 }
             }
 
-            if (ImGui::IsItemHoveredRect() && ImGui::IsMouseClicked(0))
+            if (IsItemHoveredRect() && IsMouseClicked(0))
             {
                 dock.status = Status_Dragged;
             }
@@ -775,9 +778,10 @@ struct DockContext
                 dock.children[1]->setPosSize(dock.children[1]->pos, dock.children[1]->size);
             }
 
-            draw_list->AddRectFilled(ImGui::GetItemRectMin(),
-                ImGui::GetItemRectMax(),
-                ImGui::IsItemHoveredRect() ? color_hovered : color);
+            draw_list->AddRectFilled(GetItemRectMin(),
+                GetItemRectMax(),
+                IsItemHoveredRect() ? color_hovered : color);
+            PopID();
         }
     }
 
@@ -788,15 +792,15 @@ struct DockContext
                                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
                                  ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
                                  ImGuiWindowFlags_NoScrollWithMouse;
-        ImVec2 pos(0, ImGui::GetTextLineHeightWithSpacing());
-        ImGui::SetNextWindowPos(pos);
-        ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize - pos);
-        ImGui::Begin("###DockPanel", nullptr, flags);
+        ImVec2 pos(0, GetTextLineHeightWithSpacing());
+        SetNextWindowPos(pos);
+        SetNextWindowSize(GetIO().DisplaySize - pos);
+        Begin("###DockPanel", nullptr, flags);
         drawSplits();
     }
 
 
-    void endPanel() { ImGui::End(); }
+    void endPanel() { End(); }
 
 
     Dock* getDockAt(const ImVec2& pos) const
@@ -806,7 +810,7 @@ struct DockContext
             Dock& dock = *m_docks[i];
             if (dock.isContainer()) continue;
             if (dock.status != Status_Docked) continue;
-            if (ImGui::IsMouseHoveringRect(dock.pos, dock.pos + dock.size, false))
+            if (IsMouseHoveringRect(dock.pos, dock.pos + dock.size, false))
             {
                 return &dock;
             }
@@ -848,25 +852,25 @@ struct DockContext
 
     void handleDrag(Dock& dock)
     {
-        Dock* dest_dock = getDockAt(ImGui::GetIO().MousePos);
+        Dock* dest_dock = getDockAt(GetIO().MousePos);
 
-        ImGui::Begin("##Overlay",
+        Begin("##Overlay",
             NULL,
             ImVec2(0, 0),
             0.f,
             ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
                 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
                 ImGuiWindowFlags_AlwaysAutoResize);
-        ImDrawList* canvas = ImGui::GetWindowDrawList();
+        ImDrawList* canvas = GetWindowDrawList();
 
         canvas->PushClipRectFullScreen();
 
-        ImU32 text_color = ImGui::GetColorU32(ImGuiCol_Text);
-        ImU32 color = ImGui::GetColorU32(ImGuiCol_Button);
-        ImU32 color_hovered = ImGui::GetColorU32(ImGuiCol_ButtonHovered);
-        ImU32 docked_color = ImGui::GetColorU32(ImGuiCol_FrameBg);
+        ImU32 text_color = GetColorU32(ImGuiCol_Text);
+        ImU32 color = GetColorU32(ImGuiCol_Button);
+        ImU32 color_hovered = GetColorU32(ImGuiCol_ButtonHovered);
+        ImU32 docked_color = GetColorU32(ImGuiCol_FrameBg);
         bool any_hovered = false;
-        ImVec2 mouse_pos = ImGui::GetIO().MousePos;
+        ImVec2 mouse_pos = GetIO().MousePos;
         dock.pos = mouse_pos - m_drag_offset;
         if (dest_dock)
         {
@@ -878,27 +882,27 @@ struct DockContext
                 if (!hovered) continue;
 
                 any_hovered = true;
-                if (!ImGui::IsMouseDown(0))
+                if (!IsMouseDown(0))
                 {
                     doDock(dock, *dest_dock, (Slot_)i);
                     canvas->PopClipRect();
-                    ImGui::End();
+                    End();
                     return;
                 }
                 ImRect docked_rect = getDockedRect(*dest_dock, (Slot_)i);
-                canvas->AddRectFilled(docked_rect.Min, docked_rect.Max, ImGui::GetColorU32(ImGuiCol_TitleBg));
+                canvas->AddRectFilled(docked_rect.Min, docked_rect.Max, GetColorU32(ImGuiCol_TitleBg));
             }
         }
         canvas->AddRectFilled(dock.pos, dock.pos + dock.size, docked_color);
         canvas->PopClipRect();
 
-        if (!ImGui::IsMouseDown(0))
+        if (!IsMouseDown(0))
         {
             dock.status = Status_Float;
             dock.setActive();
         }
 
-        ImGui::End();
+        End();
     }
 
 
@@ -955,7 +959,7 @@ struct DockContext
                     }
                 }
                 container->~Dock();
-                ImGui::MemFree(container);
+                MemFree(container);
             }
         }
         if (dock.prev_tab) dock.prev_tab->next_tab = dock.next_tab;
@@ -969,32 +973,32 @@ struct DockContext
     {
         if (!dock.next_tab) return;
 
-        ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        if (ImGui::InvisibleButton("list", ImVec2(16, 16)))
+        ImDrawList* draw_list = GetWindowDrawList();
+        if (InvisibleButton("list", ImVec2(16, 16)))
         {
-            ImGui::OpenPopup("tab_list_popup");
+            OpenPopup("tab_list_popup");
         }
-        if (ImGui::BeginPopup("tab_list_popup"))
+        if (BeginPopup("tab_list_popup"))
         {
             Dock* tmp = &dock;
             while (tmp)
             {
                 bool dummy = false;
-                if (ImGui::Selectable(tmp->label, &dummy))
+                if (Selectable(tmp->label, &dummy))
                 {
                     tmp->setActive();
                 }
                 tmp = tmp->next_tab;
             }
-            ImGui::EndPopup();
+            EndPopup();
         }
 
-        bool hovered = ImGui::IsItemHovered();
-        ImVec2 min = ImGui::GetItemRectMin();
-        ImVec2 max = ImGui::GetItemRectMax();
+        bool hovered = IsItemHovered();
+        ImVec2 min = GetItemRectMin();
+        ImVec2 max = GetItemRectMax();
         ImVec2 center = (min + max) * 0.5f;
-        ImU32 text_color = ImGui::GetColorU32(ImGuiCol_Text);
-        ImU32 color_active = ImGui::GetColorU32(ImGuiCol_FrameBgActive);
+        ImU32 text_color = GetColorU32(ImGuiCol_Text);
+        ImU32 color_active = GetColorU32(ImGuiCol_FrameBgActive);
         draw_list->AddRectFilled(ImVec2(center.x - 4, min.y + 3),
             ImVec2(center.x + 4, min.y + 5),
             hovered ? color_active : text_color);
@@ -1007,54 +1011,53 @@ struct DockContext
 
     bool tabbar(Dock& dock, bool close_button)
     {
-        float tabbar_height = 2 * ImGui::GetTextLineHeightWithSpacing();
+        float tabbar_height = 2 * GetTextLineHeightWithSpacing();
         ImVec2 size(dock.size.x, tabbar_height);
         bool tab_closed = false;
 
-        ImGui::SetCursorScreenPos(dock.pos);
-        char tmp[256];
-        Lumix::toCString(dock.id, tmp, IM_ARRAYSIZE(tmp));
-        Lumix::catString(tmp, "_tabs");
-        if (ImGui::BeginChild(tmp, size, true))
+        SetCursorScreenPos(dock.pos);
+		char tmp[20];
+		ImFormatString(tmp, IM_ARRAYSIZE(tmp), "tabs%d", (int)dock.id);
+        if (BeginChild(tmp, size, true))
         {
             Dock* dock_tab = &dock;
 
-            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-            ImU32 color = ImGui::GetColorU32(ImGuiCol_FrameBg);
-            ImU32 color_active = ImGui::GetColorU32(ImGuiCol_FrameBgActive);
-            ImU32 color_hovered = ImGui::GetColorU32(ImGuiCol_FrameBgHovered);
-            ImU32 text_color = ImGui::GetColorU32(ImGuiCol_Text);
-            float line_height = ImGui::GetTextLineHeightWithSpacing();
+            ImDrawList* draw_list = GetWindowDrawList();
+            ImU32 color = GetColorU32(ImGuiCol_FrameBg);
+            ImU32 color_active = GetColorU32(ImGuiCol_FrameBgActive);
+            ImU32 color_hovered = GetColorU32(ImGuiCol_FrameBgHovered);
+            ImU32 text_color = GetColorU32(ImGuiCol_Text);
+            float line_height = GetTextLineHeightWithSpacing();
             float tab_base;
 
             drawTabbarListButton(dock);
 
             while (dock_tab)
             {
-                ImGui::SameLine(0, 15);
+                SameLine(0, 15);
 
                 const char* text_end = FindTextDisplayEnd(dock_tab->label);
-                ImVec2 size(ImGui::CalcTextSize(dock_tab->label, text_end).x, line_height);
-                if (ImGui::InvisibleButton(dock_tab->label, size))
+                ImVec2 size(CalcTextSize(dock_tab->label, text_end).x, line_height);
+                if (InvisibleButton(dock_tab->label, size))
                 {
                     dock_tab->setActive();
                 }
 
-                if (ImGui::IsItemActive() && ImGui::IsMouseDragging())
+                if (IsItemActive() && IsMouseDragging())
                 {
-                    m_drag_offset = ImGui::GetMousePos() - dock_tab->pos;
+                    m_drag_offset = GetMousePos() - dock_tab->pos;
                     doUndock(*dock_tab);
                     dock_tab->status = Status_Dragged;
                 }
 
-                bool hovered = ImGui::IsItemHovered();
-                ImVec2 pos = ImGui::GetItemRectMin();
+                bool hovered = IsItemHovered();
+                ImVec2 pos = GetItemRectMin();
                 if (dock_tab->active && close_button)
                 {
-                    size.x += 16 + ImGui::GetStyle().ItemSpacing.x;
-                    ImGui::SameLine();
-                    tab_closed = ImGui::InvisibleButton("close", ImVec2(16, 16));
-                    ImVec2 center = (ImGui::GetItemRectMin() + ImGui::GetItemRectMax()) * 0.5f;
+                    size.x += 16 + GetStyle().ItemSpacing.x;
+                    SameLine();
+                    tab_closed = InvisibleButton("close", ImVec2(16, 16));
+                    ImVec2 center = (GetItemRectMin() + GetItemRectMax()) * 0.5f;
                     draw_list->AddLine(center + ImVec2(-3.5f, -3.5f), center + ImVec2( 3.5f, 3.5f), text_color);
                     draw_list->AddLine(center + ImVec2( 3.5f, -3.5f), center + ImVec2(-3.5f, 3.5f), text_color);
                 }
@@ -1077,8 +1080,8 @@ struct DockContext
             ImVec2 cp(dock.pos.x, tab_base + line_height);
             draw_list->AddLine(cp, cp + ImVec2(dock.size.x, 0), color);
         }
-        ImGui::EndChild();
-        return tab_closed;
+        EndChild();
+		return tab_closed;
     }
 
 
@@ -1143,8 +1146,8 @@ struct DockContext
         }
         else
         {
-            Dock* container = (Dock*)ImGui::MemAlloc(sizeof(Dock));
-            new (container) Dock("");
+            Dock* container = (Dock*)MemAlloc(sizeof(Dock));
+            new (container) Dock();
             m_docks.push_back(container);
             container->children[0] = &dest.getFirstTab();
             container->children[1] = &dock;
@@ -1202,26 +1205,26 @@ struct DockContext
 
         if (!dock.parent && dock.size.x < 0 && dock.status != Status_Dragged)
         {
-            dock.pos = ImVec2(0, ImGui::GetTextLineHeightWithSpacing() + 4);
-            dock.size = ImGui::GetIO().DisplaySize;
+            dock.pos = ImVec2(0, GetTextLineHeightWithSpacing() + 4);
+            dock.size = GetIO().DisplaySize;
             dock.size.y -= dock.pos.y;
         }
 
         if (is_float)
         {
-            ImGui::SetNextWindowPos(dock.pos);
-            ImGui::SetNextWindowSize(dock.size);
-            bool ret = ImGui::Begin(
+            SetNextWindowPos(dock.pos);
+            SetNextWindowSize(dock.size);
+            bool ret = Begin(
                 label, opened, dock.size, -1.0f, ImGuiWindowFlags_NoCollapse | extra_flags);
             m_end_action = EndAction_End;
-            dock.pos = ImGui::GetWindowPos();
-            dock.size = ImGui::GetWindowSize();
+            dock.pos = GetWindowPos();
+            dock.size = GetWindowSize();
 
             ImGuiState& g = *GImGui;
 
             if (g.ActiveId == GetCurrentWindow()->MoveID && g.IO.MouseDown[0])
             {
-                m_drag_offset = ImGui::GetMousePos() - dock.pos;
+                m_drag_offset = GetMousePos() - dock.pos;
                 doUndock(dock);
                 dock.status = Status_Dragged;
             }
@@ -1231,23 +1234,23 @@ struct DockContext
         if (!dock.active && dock.status != Status_Dragged) return false;
         m_end_action = EndAction_EndChild;
 
-        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
-        float tabbar_height = ImGui::GetTextLineHeightWithSpacing();
+        PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
+        float tabbar_height = GetTextLineHeightWithSpacing();
         if (tabbar(dock.getFirstTab(), opened != nullptr))
         {
             *opened = false;
         }
         ImVec2 pos = dock.pos;
         ImVec2 size = dock.size;
-        pos.y += tabbar_height + ImGui::GetStyle().WindowPadding.y;
-        size.y -= tabbar_height + ImGui::GetStyle().WindowPadding.y;
+        pos.y += tabbar_height + GetStyle().WindowPadding.y;
+        size.y -= tabbar_height + GetStyle().WindowPadding.y;
 
-        ImGui::SetCursorScreenPos(pos);
+        SetCursorScreenPos(pos);
         ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
                                  ImGuiWindowFlags_NoSavedSettings | extra_flags;
-        bool ret = ImGui::BeginChild(label, size, true, flags);
-        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        bool ret = BeginChild(label, size, true, flags);
+        ImDrawList* draw_list = GetWindowDrawList();
         return ret;
     }
 
@@ -1256,12 +1259,12 @@ struct DockContext
     {
         if (m_end_action == EndAction_End)
         {
-            ImGui::End();
+            End();
         }
         else if (m_end_action == EndAction_EndChild)
         {
-            ImGui::EndChild();
-            ImGui::PopStyleColor();
+            EndChild();
+            PopStyleColor();
         }
         m_current = nullptr;
         if (m_end_action > EndAction_None) endPanel();
@@ -1322,7 +1325,7 @@ struct DockContext
         for (int i = 0; i < m_docks.size(); ++i)
         {
             m_docks[i]->~Dock();
-            ImGui::MemFree(m_docks[i]);
+            MemFree(m_docks[i]);
         }
         m_docks.clear();
 
@@ -1331,8 +1334,8 @@ struct DockContext
             lua_pushnil(L);
             while (lua_next(L, -2) != 0)
             {
-                Dock* new_dock = (Dock*)ImGui::MemAlloc(sizeof(Dock));
-                m_docks.push_back(new (new_dock) Dock(""));
+                Dock* new_dock = (Dock*)MemAlloc(sizeof(Dock));
+                m_docks.push_back(new (new_dock) Dock());
                 lua_pop(L, 1);
             }
         }
@@ -1354,7 +1357,7 @@ struct DockContext
 
                     if (lua_getfield(L, -1, "label") == LUA_TSTRING)
                     {
-                        Lumix::copyString(dock.label, lua_tostring(L, -1));
+                        dock.label = ImStrdup(lua_tostring(L, -1));
                         dock.id = ImHash(dock.label, 0);
                     }
                     lua_pop(L, 1);
@@ -1414,7 +1417,7 @@ void ShutdownDock()
     for (int i = 0; i < g_dock.m_docks.size(); ++i)
     {
         g_dock.m_docks[i]->~Dock();
-        ImGui::MemFree(g_dock.m_docks[i]);
+        MemFree(g_dock.m_docks[i]);
     }
 }
 
