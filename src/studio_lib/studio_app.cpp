@@ -815,6 +815,7 @@ public:
 
 	void shutdownImGui()
 	{
+		ImGui::ShutdownDock();
 		ImGui::Shutdown();
 
 		Lumix::Texture* texture = m_material->getTexture(0);
