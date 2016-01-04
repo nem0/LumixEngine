@@ -558,6 +558,7 @@ struct DockContext
             {
                 ImVec2 s = children[0]->size;
                 s.y = _size.y;
+				s.x = (float)int(_size.x * children[0]->size.x / (children[0]->size.x + children[1]->size.x));
                 children[0]->setPosSize(_pos, s);
 
                 s.x = _size.x - children[0]->size.x;
@@ -569,7 +570,8 @@ struct DockContext
             {
                 ImVec2 s = children[1]->size;
                 s.y = _size.y;
-                children[1]->setPosSize(_pos, s);
+				s.x = (float)int(_size.x * children[1]->size.x / (children[0]->size.x + children[1]->size.x));
+				children[1]->setPosSize(_pos, s);
 
                 s.x = _size.x - children[1]->size.x;
                 ImVec2 p = _pos;
@@ -580,7 +582,8 @@ struct DockContext
             {
                 ImVec2 s = children[0]->size;
                 s.x = _size.x;
-                children[0]->setPosSize(_pos, s);
+				s.y = (float)int(_size.y * children[0]->size.y / (children[0]->size.y + children[1]->size.y));
+				children[0]->setPosSize(_pos, s);
 
                 s.y = _size.y - children[0]->size.y;
                 ImVec2 p = _pos;
@@ -591,7 +594,8 @@ struct DockContext
             {
                 ImVec2 s = children[1]->size;
                 s.x = _size.x;
-                children[1]->setPosSize(_pos, s);
+				s.y = (float)int(_size.y * children[1]->size.y / (children[0]->size.y + children[1]->size.y));
+				children[1]->setPosSize(_pos, s);
 
                 s.y = _size.y - children[1]->size.y;
                 ImVec2 p = _pos;
@@ -820,37 +824,101 @@ struct DockContext
     }
 
 
-    static ImRect getDockedRect(Dock& dock, Slot_ dock_slot)
+    static ImRect getDockedRect(const ImRect& rect, Slot_ dock_slot)
     {
-        ImVec2 half_size = dock.size * 0.5f;
+        ImVec2 half_size = rect.GetSize() * 0.5f;
         switch (dock_slot)
         {
-            default: return ImRect(dock.pos, dock.pos + dock.size);
-            case Slot_Top: return ImRect(dock.pos, dock.pos + ImVec2(dock.size.x, half_size.y));
+            default: return rect;
+			case Slot_Top: return ImRect(rect.Min, rect.Min + ImVec2(rect.Max.x, half_size.y));
             case Slot_Right:
-                return ImRect(dock.pos + ImVec2(half_size.x, 0), dock.pos + dock.size);
+				return ImRect(rect.Min + ImVec2(half_size.x, 0), rect.Max);
             case Slot_Bottom:
-                return ImRect(dock.pos + ImVec2(0, half_size.y), dock.pos + dock.size);
-            case Slot_Left: return ImRect(dock.pos, dock.pos + ImVec2(half_size.x, dock.size.y));
+				return ImRect(rect.Min + ImVec2(0, half_size.y), rect.Max);
+			case Slot_Left: return ImRect(rect.Min, rect.Min + ImVec2(half_size.x, rect.Max.y));
         }
     }
 
 
-    static ImRect getRect(Dock& dock, Slot_ dock_slot)
+    static ImRect getSlotRect(ImRect parent_rect, Slot_ dock_slot)
     {
-        ImVec2 center = dock.pos + dock.size * 0.5f;
-        switch (dock_slot)
-        {
-            default: return ImRect(center - ImVec2(20, 20), center + ImVec2(20, 20));
-            case Slot_Top: return ImRect(center + ImVec2(-20, -50), center + ImVec2(20, -30));
-            case Slot_Right: return ImRect(center + ImVec2(30, -20), center + ImVec2(50, 20));
-            case Slot_Bottom: return ImRect(center + ImVec2(-20, +30), center + ImVec2(20, 50));
-            case Slot_Left: return ImRect(center + ImVec2(-50, -20), center + ImVec2(-30, 20));
-        }
-    }
+		ImVec2 size = parent_rect.Max - parent_rect.Min;
+		ImVec2 center = parent_rect.Min + size * 0.5f;
+		switch (dock_slot)
+		{
+			default: return ImRect(center - ImVec2(20, 20), center + ImVec2(20, 20));
+			case Slot_Top: return ImRect(center + ImVec2(-20, -50), center + ImVec2(20, -30));
+			case Slot_Right: return ImRect(center + ImVec2(30, -20), center + ImVec2(50, 20));
+			case Slot_Bottom: return ImRect(center + ImVec2(-20, +30), center + ImVec2(20, 50));
+			case Slot_Left: return ImRect(center + ImVec2(-50, -20), center + ImVec2(-30, 20));
+		}
+	}
 
 
-    void handleDrag(Dock& dock)
+	static ImRect getSlotRectOnBorder(ImRect parent_rect, Slot_ dock_slot)
+	{
+		ImVec2 size = parent_rect.Max - parent_rect.Min;
+		ImVec2 center = parent_rect.Min + size * 0.5f;
+		switch (dock_slot)
+		{
+			case Slot_Top:
+				return ImRect(ImVec2(center.x - 20, parent_rect.Min.y + 10),
+					ImVec2(center.x + 20, parent_rect.Min.y + 30));
+			case Slot_Left:
+				return ImRect(ImVec2(parent_rect.Min.x + 10, center.y - 20),
+					ImVec2(parent_rect.Min.x + 30, center.y + 20));
+			case Slot_Bottom:
+				return ImRect(ImVec2(center.x - 20, parent_rect.Max.y - 30),
+					ImVec2(center.x + 20, parent_rect.Max.y - 10));
+			case Slot_Right:
+				return ImRect(ImVec2(parent_rect.Max.x - 30, center.y - 20),
+					ImVec2(parent_rect.Max.x - 10, center.y + 20));
+		}
+		IM_ASSERT(false);
+		return ImRect();
+	}
+
+
+	Dock* getRootDock()
+	{
+		for (int i = 0; i < m_docks.size(); ++i)
+		{
+			if (!m_docks[i]->parent && m_docks[i]->status == Status_Docked)
+			{
+				return m_docks[i];
+			}
+		}
+		return nullptr;
+	}
+
+
+	bool dockSlots(Dock& dock, Dock* dest_dock, const ImRect& rect, bool on_border)
+	{
+		ImDrawList* canvas = GetWindowDrawList();
+		ImU32 text_color = GetColorU32(ImGuiCol_Text);
+		ImU32 color = GetColorU32(ImGuiCol_Button);
+		ImU32 color_hovered = GetColorU32(ImGuiCol_ButtonHovered);
+		ImVec2 mouse_pos = GetIO().MousePos;
+		for (int i = 0; i < (on_border ? 4 : 5); ++i)
+		{
+			ImRect r = on_border ? getSlotRectOnBorder(rect, (Slot_)i) : getSlotRect(rect, (Slot_)i);
+			bool hovered = r.Contains(mouse_pos);
+			canvas->AddRectFilled(r.Min, r.Max, hovered ? color_hovered : color);
+			if (!hovered) continue;
+
+			if (!IsMouseDown(0))
+			{
+				doDock(dock, dest_dock ? dest_dock : getRootDock(), (Slot_)i);
+				return true;
+			}
+			ImRect docked_rect = getDockedRect(rect, (Slot_)i);
+			canvas->AddRectFilled(docked_rect.Min, docked_rect.Max, GetColorU32(ImGuiCol_TitleBg));
+		}
+		return false;
+	}
+
+
+	void handleDrag(Dock& dock)
     {
         Dock* dest_dock = getDockAt(GetIO().MousePos);
 
@@ -865,35 +933,24 @@ struct DockContext
 
         canvas->PushClipRectFullScreen();
 
-        ImU32 text_color = GetColorU32(ImGuiCol_Text);
-        ImU32 color = GetColorU32(ImGuiCol_Button);
-        ImU32 color_hovered = GetColorU32(ImGuiCol_ButtonHovered);
         ImU32 docked_color = GetColorU32(ImGuiCol_FrameBg);
-        bool any_hovered = false;
-        ImVec2 mouse_pos = GetIO().MousePos;
-        dock.pos = mouse_pos - m_drag_offset;
+		dock.pos = GetIO().MousePos - m_drag_offset;
         if (dest_dock)
         {
-            for (int i = 0; i < 5; ++i)
-            {
-                ImRect r = getRect(*dest_dock, (Slot_)i);
-                bool hovered = r.Contains(mouse_pos);
-                canvas->AddRectFilled(r.Min, r.Max, hovered ? color_hovered : color);
-                if (!hovered) continue;
-
-                any_hovered = true;
-                if (!IsMouseDown(0))
-                {
-                    doDock(dock, *dest_dock, (Slot_)i);
-                    canvas->PopClipRect();
-                    End();
-                    return;
-                }
-                ImRect docked_rect = getDockedRect(*dest_dock, (Slot_)i);
-                canvas->AddRectFilled(docked_rect.Min, docked_rect.Max, GetColorU32(ImGuiCol_TitleBg));
-            }
+			if (dockSlots(dock, dest_dock, ImRect(dest_dock->pos, dest_dock->pos + dest_dock->size), false))
+			{
+				canvas->PopClipRect();
+				End();
+				return;
+			}
         }
-        canvas->AddRectFilled(dock.pos, dock.pos + dock.size, docked_color);
+		if(dockSlots(dock, nullptr, ImRect(ImVec2(0, 0), GetIO().DisplaySize), true))
+		{
+			canvas->PopClipRect();
+			End();
+			return;
+		}
+		canvas->AddRectFilled(dock.pos, dock.pos + dock.size, docked_color);
         canvas->PopClipRect();
 
         if (!IsMouseDown(0))
@@ -1085,7 +1142,7 @@ struct DockContext
     }
 
 
-    static void setDockSizeAndPos(Dock& dest, Dock& dock, Slot_ dock_slot, Dock& container)
+    static void setDockPosSize(Dock& dest, Dock& dock, Slot_ dock_slot, Dock& container)
     {
         IM_ASSERT(!dock.prev_tab && !dock.next_tab && !dock.children[0] && !dock.children[1]);
 
@@ -1122,12 +1179,18 @@ struct DockContext
     }
 
 
-    void doDock(Dock& dock, Dock& dest, Slot_ dock_slot)
+    void doDock(Dock& dock, Dock* dest, Slot_ dock_slot)
     {
         IM_ASSERT(!dock.parent);
-        if (dock_slot == Slot_Tab)
+		if (!dest)
+		{
+			dock.status = Status_Docked;
+			ImVec2 pos = ImVec2(0, GetTextLineHeightWithSpacing());
+			dock.setPosSize(pos, GetIO().DisplaySize - pos);
+		}
+        else if (dock_slot == Slot_Tab)
         {
-            Dock* tmp = &dest;
+            Dock* tmp = dest;
             while (tmp->next_tab)
             {
                 tmp = tmp->next_tab;
@@ -1137,7 +1200,7 @@ struct DockContext
             dock.prev_tab = tmp;
             dock.size = tmp->size;
             dock.pos = tmp->pos;
-            dock.parent = dest.parent;
+            dock.parent = dest->parent;
             dock.status = Status_Docked;
         }
         else if (dock_slot == Slot_None)
@@ -1149,32 +1212,32 @@ struct DockContext
             Dock* container = (Dock*)MemAlloc(sizeof(Dock));
             new (container) Dock();
             m_docks.push_back(container);
-            container->children[0] = &dest.getFirstTab();
+            container->children[0] = &dest->getFirstTab();
             container->children[1] = &dock;
             container->next_tab = nullptr;
             container->prev_tab = nullptr;
-            container->parent = dest.parent;
-            container->size = dest.size;
-            container->pos = dest.pos;
+            container->parent = dest->parent;
+            container->size = dest->size;
+            container->pos = dest->pos;
             container->status = Status_Docked;
 
-            if (!dest.parent)
+            if (!dest->parent)
             {
             }
-            else if (&dest.getFirstTab() == dest.parent->children[0])
+            else if (&dest->getFirstTab() == dest->parent->children[0])
             {
-                dest.parent->children[0] = container;
+                dest->parent->children[0] = container;
             }
             else
             {
-                dest.parent->children[1] = container;
+                dest->parent->children[1] = container;
             }
 
-            dest.setParent(container);
+            dest->setParent(container);
             dock.parent = container;
             dock.status = Status_Docked;
 
-            setDockSizeAndPos(dest, dock, dock_slot, *container);
+			setDockPosSize(*dest, dock, dock_slot, *container);
         }
         dock.setActive();
     }
