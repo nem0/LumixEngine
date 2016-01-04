@@ -10,6 +10,7 @@ struct lua_State;
 namespace ImGui
 {
 
+
 IMGUI_API void ShutdownDock();
 IMGUI_API bool BeginDock(const char* label, bool* opened = nullptr, ImGuiWindowFlags extra_flags = 0);
 IMGUI_API void EndDock();
