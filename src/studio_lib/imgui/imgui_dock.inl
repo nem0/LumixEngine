@@ -207,25 +207,12 @@ struct DockContext
         Dock* new_dock = (Dock*)MemAlloc(sizeof(Dock));
         new (new_dock) Dock();
         m_docks.push_back(new_dock);
-        static Dock* q = nullptr; // TODO
         new_dock->label = ImStrdup(label);
         new_dock->id = id;
         new_dock->setActive();
-        if (opened)
-        {
-            if (q)
-            {
-                q->prev_tab = new_dock;
-                new_dock->next_tab = q;
-                new_dock->setPosSize(q->pos, q->size);
-            }
-            new_dock->status = Status_Docked;
-            q = new_dock;
-        }
-        else
-        {
-            new_dock->status = Status_Float;
-        }
+        new_dock->status = Status_Float;
+		new_dock->pos = ImVec2(0, 0);
+		new_dock->size = GetIO().DisplaySize;
         return *new_dock;
     }
 
