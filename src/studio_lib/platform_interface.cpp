@@ -638,5 +638,63 @@ namespace PlatformInterface
 	}
 
 
+	bool deleteFile(const char* path)
+	{
+		return DeleteFile(path) == TRUE;
+	}
+
+
+	bool moveFile(const char* from, const char* to)
+	{
+		return MoveFile(from, to) == TRUE;
+	}
+
+
+	bool fileExists(const char* path)
+	{
+		DWORD dwAttrib = GetFileAttributes(path);
+		return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
+			!(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+	}
+
+
+	bool dirExists(const char* path)
+	{
+		DWORD dwAttrib = GetFileAttributes(path);
+		return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
+			(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+	}
+
+	
+	Lumix::uint64 getLastModified(const char* file)
+	{
+		FILETIME ft;
+		HANDLE handle = CreateFile(file,
+			GENERIC_READ,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL,
+			NULL);
+		if (GetFileTime(handle, NULL, NULL, &ft) == FALSE)
+		{
+			return 0;
+		}
+		CloseHandle(handle);
+
+		ULARGE_INTEGER i;
+		i.LowPart = ft.dwLowDateTime;
+		i.HighPart = ft.dwHighDateTime;
+		return i.QuadPart;
+	}
+
+
+	bool makePath(const char* path)
+	{
+		return SHCreateDirectoryEx(NULL, path, NULL) == ERROR_SUCCESS;
+	}
+
+
+
 } // namespace PlatformInterface
 

@@ -198,7 +198,7 @@ void AssetBrowser::update()
 
 		if (m_autoreload_changed_resource) m_editor.getEngine().getResourceManager().reload(path);
 
-		if (!Lumix::fileExists(path))
+		if (!PlatformInterface::fileExists(path))
 		{
 			int index = getTypeFromResourceManagerType(resource_type);
 			m_resources[index].eraseItemFast(path_obj);
@@ -332,8 +332,8 @@ void AssetBrowser::saveMaterial(Lumix::Material* material)
 		}
 		fs.close(*file);
 
-		Lumix::deleteFile(material->getPath().c_str());
-		Lumix::moveFile(tmp_path, material->getPath().c_str());
+		PlatformInterface::deleteFile(material->getPath().c_str());
+		PlatformInterface::moveFile(tmp_path, material->getPath().c_str());
 	}
 	else
 	{

@@ -85,9 +85,9 @@ bool ShaderCompiler::isChanged(const Lumix::ShaderCombinations& combinations,
 				const char* vs_bin_info =
 					StringBuilder<Lumix::MAX_PATH_LENGTH>(
 					pass_path, j, "_vs.shb");
-				if (!Lumix::fileExists(vs_bin_info) ||
-					Lumix::getLastModified(vs_bin_info) <
-						Lumix::getLastModified(shd_path))
+				if (!PlatformInterface::fileExists(vs_bin_info) ||
+					PlatformInterface::getLastModified(vs_bin_info) <
+						PlatformInterface::getLastModified(shd_path))
 				{
 					return true;
 				}
@@ -97,9 +97,9 @@ bool ShaderCompiler::isChanged(const Lumix::ShaderCombinations& combinations,
 				const char* fs_bin_info =
 					StringBuilder<Lumix::MAX_PATH_LENGTH>(
 					pass_path, j, "_fs.shb");
-				if (!Lumix::fileExists(fs_bin_info) ||
-					Lumix::getLastModified(fs_bin_info) <
-						Lumix::getLastModified(shd_path))
+				if (!PlatformInterface::fileExists(fs_bin_info) ||
+					PlatformInterface::getLastModified(fs_bin_info) <
+						PlatformInterface::getLastModified(shd_path))
 				{
 					return true;
 				}
@@ -162,8 +162,8 @@ void ShaderCompiler::makeUpToDate()
 		auto& value = m_dependencies.at(i);
 		for (auto& bin : value)
 		{
-			if (!Lumix::fileExists(bin.c_str()) ||
-				Lumix::getLastModified(bin.c_str()) < Lumix::getLastModified(key.c_str()))
+			if (!PlatformInterface::fileExists(bin.c_str()) ||
+				PlatformInterface::getLastModified(bin.c_str()) < PlatformInterface::getLastModified(key.c_str()))
 			{
 				char basename[Lumix::MAX_PATH_LENGTH];
 				Lumix::PathUtils::getBasename(basename, sizeof(basename), bin.c_str());
@@ -370,7 +370,7 @@ void ShaderCompiler::compilePass(
 
 			StringBuilder<Lumix::MAX_PATH_LENGTH> cmd(m_editor.getBasePath(), "/shaders/shaderc.exe");
 
-			Lumix::deleteFile(out_path);
+			PlatformInterface::deleteFile(out_path);
 			auto* process = PlatformInterface::createProcess(cmd, args, m_editor.getAllocator());
 			if (!process)
 			{
@@ -510,9 +510,9 @@ void ShaderCompiler::compileAllPasses(
 void ShaderCompiler::compile(const char* path)
 {
 	StringBuilder<Lumix::MAX_PATH_LENGTH> compiled_dir(m_editor.getBasePath(), "/shaders/compiled");
-	if (!Lumix::makePath(compiled_dir))
+	if (!PlatformInterface::makePath(compiled_dir))
 	{
-		if (!Lumix::dirExists(compiled_dir))
+		if (!PlatformInterface::dirExists(compiled_dir))
 		{
 			Lumix::messageBox("Could not create directory shaders/compiled. Please create it and "
 							  "restart the editor");

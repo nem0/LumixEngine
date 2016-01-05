@@ -1253,8 +1253,8 @@ struct ConvertTask : public Lumix::MT::Task
 		if (!checkModel()) return false;
 
 		m_dialog.setImportMessage("Importing model...");
-		Lumix::makePath(m_dialog.m_output_dir);
-		if (m_dialog.m_texture_output_dir[0]) Lumix::makePath(m_dialog.m_texture_output_dir);
+		PlatformInterface::makePath(m_dialog.m_output_dir);
+		if (m_dialog.m_texture_output_dir[0]) PlatformInterface::makePath(m_dialog.m_texture_output_dir);
 
 		char basename[Lumix::MAX_PATH_LENGTH];
 		Lumix::PathUtils::getBasename(basename, sizeof(basename), m_dialog.m_source);
@@ -1340,7 +1340,7 @@ bool ImportAssetDialog::checkTexture(const char* source_dir, const char* texture
 						   ? texture_path
 						   : PathBuilder(source_dir) << "/" << texture_path;
 
-	if (Lumix::fileExists(path)) return true;
+	if (PlatformInterface::fileExists(path)) return true;
 
 	char new_path[Lumix::MAX_PATH_LENGTH];
 	Lumix::messageBox(message ? message : StringBuilder<Lumix::MAX_PATH_LENGTH + 40>("Texture ")
@@ -1432,7 +1432,7 @@ void ImportAssetDialog::checkSource()
 		Lumix::PathUtils::getDir(m_output_dir, sizeof(m_output_dir), m_source);
 	}
 	
-	m_source_exists = Lumix::fileExists(m_source);
+	m_source_exists = PlatformInterface::fileExists(m_source);
 
 	if (!m_source_exists)
 	{

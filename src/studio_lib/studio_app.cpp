@@ -1038,15 +1038,15 @@ public:
 
 	void checkWorkingDirector()
 	{
-		if (!Lumix::dirExists("shaders"))
+		if (!PlatformInterface::dirExists("shaders"))
 		{
 			Lumix::messageBox("Shaders directory not found, please check working directory.");
 		}
-		else if (!Lumix::dirExists("bin"))
+		else if (!PlatformInterface::dirExists("bin"))
 		{
 			Lumix::messageBox("Bin directory not found, please check working directory.");
 		}
-		else if (!Lumix::dirExists("pipelines"))
+		else if (!PlatformInterface::dirExists("pipelines"))
 		{
 			Lumix::messageBox("Pipelines directory not found, please check working directory.");
 		}
