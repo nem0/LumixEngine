@@ -208,11 +208,12 @@ struct DockContext
         new (new_dock) Dock();
         m_docks.push_back(new_dock);
         new_dock->label = ImStrdup(label);
+				IM_ASSERT(new_dock->label);
         new_dock->id = id;
         new_dock->setActive();
         new_dock->status = Status_Float;
-		new_dock->pos = ImVec2(0, 0);
-		new_dock->size = GetIO().DisplaySize;
+        new_dock->pos = ImVec2(0, 0);
+        new_dock->size = GetIO().DisplaySize;
         return *new_dock;
     }
 
@@ -753,6 +754,7 @@ struct DockContext
             container->size = dest->size;
             container->pos = dest->pos;
             container->status = Status_Docked;
+            container->label = ImStrdup("");
 
             if (!dest->parent)
             {
