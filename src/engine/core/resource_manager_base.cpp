@@ -28,7 +28,7 @@ namespace Lumix
 
 	Resource* ResourceManagerBase::get(const Path& path)
 	{
-		ResourceTable::iterator it = m_resources.find(path);
+		ResourceTable::iterator it = m_resources.find(path.getHash());
 
 		if(m_resources.end() != it)
 		{
@@ -41,14 +41,14 @@ namespace Lumix
 	void ResourceManagerBase::remove(Resource* resource)
 	{
 		ASSERT(resource->isEmpty());
-		m_resources.erase(resource->getPath());
+		m_resources.erase(resource->getPath().getHash());
 		resource->remRef();
 	}
 
 	void ResourceManagerBase::add(Resource* resource)
 	{
 		ASSERT(resource && resource->isReady());
-		m_resources.insert(resource->getPath(), resource);
+		m_resources.insert(resource->getPath().getHash(), resource);
 		resource->addRef();
 	}
 
@@ -59,7 +59,7 @@ namespace Lumix
 		if(nullptr == resource)
 		{
 			resource = createResource(path);
-			m_resources.insert(path, resource);
+			m_resources.insert(path.getHash(), resource);
 		}
 		
 		if(resource->isEmpty())
@@ -81,7 +81,7 @@ namespace Lumix
 
 		for (auto* i : to_remove)
 		{
-			m_resources.erase(i->getPath());
+			m_resources.erase(i->getPath().getHash());
 			destroyResource(*i);
 		}
 	}

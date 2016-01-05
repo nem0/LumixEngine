@@ -676,18 +676,18 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void setHeightmap(ComponentIndex cmp, const char* str) override
 	{
 		auto& resource_manager = m_engine->getResourceManager();
-		if (m_terrains[cmp]->m_heightmap)
+		auto* old_hm = m_terrains[cmp]->m_heightmap;
+		if (old_hm)
 		{
-			resource_manager.get(ResourceManager::TEXTURE)->unload(*m_terrains[cmp]->m_heightmap);
-			m_terrains[cmp]
-				->m_heightmap->getObserverCb()
-				.unbind<Heightfield, &Heightfield::heightmapLoaded>(m_terrains[cmp]);
+			resource_manager.get(ResourceManager::TEXTURE)->unload(*old_hm);
+			auto& cb = old_hm->getObserverCb();
+			cb.unbind<Heightfield, &Heightfield::heightmapLoaded>(m_terrains[cmp]);
 		}
 		auto* texture_manager = resource_manager.get(ResourceManager::TEXTURE);
-		m_terrains[cmp]->m_heightmap = static_cast<Texture*>(texture_manager->load(Path(str)));
-		m_terrains[cmp]->m_heightmap->onLoaded<Heightfield, &Heightfield::heightmapLoaded>(
-			m_terrains[cmp]);
-		m_terrains[cmp]->m_heightmap->addDataReference();
+		auto* new_hm = static_cast<Texture*>(texture_manager->load(Path(str)));
+		m_terrains[cmp]->m_heightmap = new_hm;
+		new_hm->onLoaded<Heightfield, &Heightfield::heightmapLoaded>(m_terrains[cmp]);
+		new_hm->addDataReference();
 	}
 
 
@@ -701,10 +701,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		ASSERT(m_actors[cmp]);
 		bool is_dynamic = isDynamic(cmp);
-		if (m_actors[cmp]->getResource() &&
-			m_actors[cmp]->getResource()->getPath() == str &&
-			(!m_actors[cmp]->getPhysxActor() ||
-			 is_dynamic == !m_actors[cmp]->getPhysxActor()->isRigidStatic()))
+		auto& actor = *m_actors[cmp];
+		if (actor.getResource() && compareString(actor.getResource()->getPath().c_str(), str) == 0 &&
+			(!actor.getPhysxActor() || is_dynamic == !actor.getPhysxActor()->isRigidStatic()))
 		{
 			return;
 		}
@@ -1386,17 +1385,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void deserializeActor(InputBlob& serializer, int idx, int version)
 	{
 		int layer = 0;
-		if (version > (int)PhysicsSceneVersion::LAYERS)
-		{
-			serializer.read(layer);
-		}
+		if (version > (int)PhysicsSceneVersion::LAYERS) serializer.read(layer);
 		m_actors[idx]->setLayer(layer);
 
 		ActorType type;
 		serializer.read((int32&)type);
-
-		ResourceManagerBase* manager =
-			m_engine->getResourceManager().get(ResourceManager::PHYSICS);
 
 		switch (type)
 		{
@@ -1412,22 +1405,16 @@ struct PhysicsSceneImpl : public PhysicsScene
 				physx::PxRigidActor* actor;
 				if (isDynamic(idx))
 				{
-					actor = PxCreateDynamic(*m_system->getPhysics(),
-											transform,
-											box_geom,
-											*m_default_material,
-											1.0f);
+					actor = PxCreateDynamic(
+						*m_system->getPhysics(), transform, box_geom, *m_default_material, 1.0f);
 				}
 				else
 				{
-					actor = PxCreateStatic(*m_system->getPhysics(),
-										   transform,
-										   box_geom,
-										   *m_default_material);
+					actor = PxCreateStatic(
+						*m_system->getPhysics(), transform, box_geom, *m_default_material);
 				}
 				m_actors[idx]->setPhysxActor(actor);
-				m_universe.addComponent(
-					m_actors[idx]->getEntity(), BOX_ACTOR_HASH, this, idx);
+				m_universe.addComponent(m_actors[idx]->getEntity(), BOX_ACTOR_HASH, this, idx);
 			}
 			break;
 			case TRIMESH:
@@ -1435,10 +1422,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				char tmp[MAX_PATH_LENGTH];
 				serializer.readString(tmp, sizeof(tmp));
-				m_actors[idx]->setResource(static_cast<PhysicsGeometry*>(
-					manager->load(Lumix::Path(tmp))));
-				m_universe.addComponent(
-					m_actors[idx]->getEntity(), MESH_ACTOR_HASH, this, idx);
+				ResourceManagerBase* manager = m_engine->getResourceManager().get(ResourceManager::PHYSICS);
+				auto* geometry = manager->load(Lumix::Path(tmp));
+				m_actors[idx]->setResource(static_cast<PhysicsGeometry*>(geometry));
+				m_universe.addComponent(m_actors[idx]->getEntity(), MESH_ACTOR_HASH, this, idx);
 			}
 			break;
 			default:

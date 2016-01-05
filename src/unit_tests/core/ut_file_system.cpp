@@ -4,6 +4,7 @@
 #include "core/fs/disk_file_device.h"
 #include "core/fs/file_events_device.h"
 #include "core/fs/ifile.h"
+#include "core/path.h"
 
 namespace
 {
@@ -24,6 +25,7 @@ void UT_file_events_device(const char* params)
 	Lumix::FS::FileEventsDevice* file_event_device;
 
 	Lumix::DefaultAllocator allocator;
+	Lumix::PathManager path_manager(allocator);
 	file_system = Lumix::FS::FileSystem::create(allocator);
 
 	disk_file_device = LUMIX_NEW(allocator, Lumix::FS::DiskFileDevice)(allocator);
@@ -39,7 +41,7 @@ void UT_file_events_device(const char* params)
 	Lumix::FS::DeviceList device_list;
 	file_system->fillDeviceList("events:disk", device_list);
 	Lumix::FS::IFile* file = file_system->open(
-		device_list, "unit_tests/file_system/selenitic.xml", Lumix::FS::Mode::OPEN_AND_READ);
+		device_list, Lumix::Path("unit_tests/file_system/selenitic.xml"), Lumix::FS::Mode::OPEN_AND_READ);
 
 	LUMIX_EXPECT(file != nullptr);
 	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN & occured_event));
@@ -96,7 +98,7 @@ void UT_file_events_device(const char* params)
 	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN & occured_event));
 
 	file = file_system->open(device_list,
-		"unit_tests/file_system/selenitic2.xml",
+		Lumix::Path("unit_tests/file_system/selenitic2.xml"),
 		Lumix::FS::Mode::OPEN_OR_CREATE | Lumix::FS::Mode::WRITE);
 
 	LUMIX_EXPECT(file != nullptr);

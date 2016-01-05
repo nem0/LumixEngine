@@ -5,6 +5,7 @@
 #include "core/fs/ifile_system_defines.h"
 #include "core/fs/file_system.h"
 #include "core/mt/sync.h"
+#include "core/path.h"
 #include "core/network.h"
 
 
@@ -31,7 +32,7 @@ namespace Lumix
 				return m_device;
 			}
 
-			bool open(const char* path, Mode mode) override
+			bool open(const Path& path, Mode mode) override
 			{
 				if (!m_stream)
 				{
@@ -43,7 +44,7 @@ namespace Lumix
 				MT::SpinLock lock(m_spin_mutex);
 				m_stream->write(op);
 				m_stream->write(mode);
-				m_stream->writeString(path);
+				m_stream->writeString(path.c_str());
 				m_stream->read(m_file);
 
 				return INVALID_FILE != m_file;

@@ -163,13 +163,12 @@ namespace Lumix
 				
 				if (m_fails > 0)
 				{
-					ASSERT(false);
-
 					g_log_info.log("unit") << "----------Fails----------";
 					for (auto& i : m_failed_tests) 
 					{
 						g_log_info.log("unit") << i.m_message << " : " << i.m_file_name << "(" << i.m_line << ")";
 					}
+					ASSERT(false);
 				}
 
 				FILE* fout = fopen("tests.xml", "w");

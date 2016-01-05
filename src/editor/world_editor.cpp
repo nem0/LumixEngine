@@ -1855,9 +1855,9 @@ public:
 		g_log_info.log("editor") << "saving universe " << path.c_str() << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
 		char bkp_path[MAX_PATH_LENGTH];
-		copyString(bkp_path, path);
+		copyString(bkp_path, path.c_str());
 		catString(bkp_path, ".bkp");
-		copyFile(path, bkp_path);
+		copyFile(path.c_str(), bkp_path);
 		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::CREATE | FS::Mode::WRITE);
 		save(*file);
 		fs.close(*file);
@@ -2136,7 +2136,7 @@ public:
 		else
 		{
 			m_game_mode_file = m_engine->getFileSystem().open(
-				m_engine->getFileSystem().getMemoryDevice(), "", FS::Mode::WRITE);
+				m_engine->getFileSystem().getMemoryDevice(), Lumix::Path(""), FS::Mode::WRITE);
 			save(*m_game_mode_file);
 			m_is_game_mode = true;
 			m_engine->startGame(*m_universe_context);
@@ -3097,7 +3097,7 @@ public:
 		}
 		FS::IFile* file = m_engine->getFileSystem().open(
 			m_engine->getFileSystem().getDiskDevice(),
-			path.c_str(),
+			path,
 			FS::Mode::CREATE | FS::Mode::WRITE);
 		if (file)
 		{
@@ -3147,7 +3147,7 @@ public:
 		destroyUndoStack();
 		m_undo_index = -1;
 		FS::IFile* file = m_engine->getFileSystem().open(
-			m_engine->getFileSystem().getDiskDevice(), path.c_str(), FS::Mode::OPEN_AND_READ);
+			m_engine->getFileSystem().getDiskDevice(), path, FS::Mode::OPEN_AND_READ);
 		if (file)
 		{
 			JsonSerializer serializer(*file, JsonSerializer::READ, path.c_str(), m_allocator);
@@ -3180,23 +3180,22 @@ public:
 	}
 
 
-	bool runTest(const Path& undo_stack_path,
-						 const Path& result_universe_path) override
+	bool runTest(const Path& undo_stack_path, const Path& result_universe_path) override
 	{
 		newUniverse();
 		executeUndoStack(undo_stack_path);
-		FS::IFile* file = m_engine->getFileSystem().open(
-			m_engine->getFileSystem().getMemoryDevice(),
-			"",
-			FS::Mode::CREATE | FS::Mode::WRITE);
+		FS::IFile* file =
+			m_engine->getFileSystem().open(m_engine->getFileSystem().getMemoryDevice(),
+				Lumix::Path(""),
+				FS::Mode::CREATE | FS::Mode::WRITE);
 		if (!file)
 		{
 			return false;
 		}
-		FS::IFile* result_file = m_engine->getFileSystem().open(
-			m_engine->getFileSystem().getDefaultDevice(),
-			result_universe_path.c_str(),
-			FS::Mode::OPEN_AND_READ);
+		FS::IFile* result_file =
+			m_engine->getFileSystem().open(m_engine->getFileSystem().getDefaultDevice(),
+				result_universe_path,
+				FS::Mode::OPEN_AND_READ);
 		if (!result_file)
 		{
 			return false;

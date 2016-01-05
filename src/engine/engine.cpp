@@ -76,6 +76,7 @@ public:
 		, m_is_game_running(false)
 		, m_component_types(m_allocator)
 		, m_last_time_delta(0)
+		, m_path_manager(m_allocator)
 	{
 		m_mtjd_manager = MTJD::Manager::create(m_allocator);
 		if (!fs)
@@ -330,7 +331,7 @@ public:
 		serializer.write(header);
 		serializePluginList(serializer);
 		serializerSceneVersions(serializer, ctx);
-		g_path_manager.serialize(serializer);
+		m_path_manager.serialize(serializer);
 		int pos = serializer.getSize();
 		ctx.m_universe->serialize(serializer);
 		m_plugin_manager->serialize(serializer);
@@ -371,7 +372,7 @@ public:
 			return false;
 		}
 
-		g_path_manager.deserialize(serializer);
+		m_path_manager.deserialize(serializer);
 		ctx.m_universe->deserialize(serializer);
 
 		if (header.m_version <= SerializedEngineVersion::HIERARCHY_COMPONENT)
@@ -394,7 +395,7 @@ public:
 			}
 			scene->deserialize(serializer, scene_version);
 		}
-		g_path_manager.clear();
+		m_path_manager.clear();
 		return true;
 	}
 
@@ -438,6 +439,7 @@ private:
 	float m_last_time_delta;
 	bool m_is_game_running;
 	PlatformData m_platform_data;
+	PathManager m_path_manager;
 
 private:
 	void operator=(const EngineImpl&);

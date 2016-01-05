@@ -7,6 +7,7 @@
 #include "core/mt/lock_free_fixed_queue.h"
 #include "core/mt/task.h"
 #include "core/mt/transaction.h"
+#include "core/path.h"
 #include "core/profiler.h"
 #include "core/queue.h"
 #include "core/stack_allocator.h"
@@ -71,7 +72,7 @@ public:
 			if ((tr->data.m_flags & E_IS_OPEN) == E_IS_OPEN)
 			{
 				tr->data.m_flags |=
-					tr->data.m_file->open(tr->data.m_path, tr->data.m_mode) ? E_SUCCESS : E_FAIL;
+					tr->data.m_file->open(Path(tr->data.m_path), tr->data.m_mode) ? E_SUCCESS : E_FAIL;
 			}
 			else if ((tr->data.m_flags & E_CLOSE) == E_CLOSE)
 			{
@@ -182,7 +183,7 @@ public:
 	}
 
 
-	IFile* open(const DeviceList& device_list, const char* file, Mode mode) override
+	IFile* open(const DeviceList& device_list, const Path& file, Mode mode) override
 	{
 		IFile* prev = createFile(device_list);
 
@@ -203,7 +204,7 @@ public:
 
 
 	bool openAsync(const DeviceList& device_list,
-		const char* file,
+		const Path& file,
 		int mode,
 		const ReadCallback& call_back) override
 	{
@@ -216,7 +217,7 @@ public:
 			item.m_file = prev;
 			item.m_cb = call_back;
 			item.m_mode = mode;
-			copyString(item.m_path, file);
+			copyString(item.m_path, file.c_str());
 			item.m_flags = E_IS_OPEN;
 		}
 

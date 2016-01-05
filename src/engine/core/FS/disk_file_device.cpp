@@ -4,6 +4,7 @@
 #include "core/fs/ifile.h"
 #include "core/fs/ifile_system_defines.h"
 #include "core/fs/os_file.h"
+#include "core/path.h"
 
 
 namespace Lumix
@@ -20,9 +21,9 @@ namespace Lumix
 				return m_device;
 			}
 
-			bool open(const char* path, Mode mode) override
+			bool open(const Path& path, Mode mode) override
 			{
-				return m_file.open(path, mode, m_allocator);
+				return m_file.open(path.c_str(), mode, m_allocator);
 			}
 
 			void close() override
