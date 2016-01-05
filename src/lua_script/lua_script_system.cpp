@@ -788,7 +788,7 @@ namespace Lumix
 			{
 				auto& fs = m_app.getWorldEditor()->getEngine().getFileSystem();
 				auto* file = fs.open(fs.getDiskDevice(),
-					resource->getPath().c_str(),
+					resource->getPath(),
 					Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
 
 				if (!file)

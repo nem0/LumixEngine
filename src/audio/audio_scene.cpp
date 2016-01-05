@@ -96,7 +96,7 @@ struct AmbientSound
 
 struct PlayingSound
 {
-	Lumix::AudioDevice::BufferHandle buffer_id;
+	AudioDevice::BufferHandle buffer_id;
 	Entity entity;
 	float time;
 	AudioScene::ClipInfo* clip;
@@ -170,7 +170,7 @@ struct AudioSceneImpl : public AudioScene
 			m_device.setListenerOrientation(front.x, front.y, front.z, up.x, up.y, up.z);
 		}
 
-		for (int i = 0; i < Lumix::lengthOf(m_playing_sounds); ++i)
+		for (int i = 0; i < lengthOf(m_playing_sounds); ++i)
 		{
 			auto& sound = m_playing_sounds[i];
 			if (sound.buffer_id == AudioDevice::INVALID_BUFFER_HANDLE) continue;
@@ -448,12 +448,12 @@ struct AudioSceneImpl : public AudioScene
 			m_clips[i] = clip;
 
 			serializer.read(clip->looped);
-			serializer.readString(clip->name, Lumix::lengthOf(clip->name));
+			serializer.readString(clip->name, lengthOf(clip->name));
 			clip->name_hash = crc32(clip->name);
 			char path[MAX_PATH_LENGTH];
-			serializer.readString(path, Lumix::lengthOf(path));
+			serializer.readString(path, lengthOf(path));
 
-			clip->clip = static_cast<Clip*>(m_system.getClipManager().load(Lumix::Path(path)));
+			clip->clip = static_cast<Clip*>(m_system.getClipManager().load(Path(path)));
 		}
 
 		serializer.read(m_last_ambient_sound_id);
@@ -513,7 +513,7 @@ struct AudioSceneImpl : public AudioScene
 	const char* getClipName(int index) override { return m_clips[index]->name; }
 
 
-	void addClip(const char* name, const Lumix::Path& path) override
+	void addClip(const char* name, const Path& path) override
 	{
 		auto* clip = LUMIX_NEW(m_allocator, ClipInfo);
 		copyString(clip->name, name);
@@ -572,7 +572,7 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	void setClip(int clip_id, const Lumix::Path& path) override
+	void setClip(int clip_id, const Path& path) override
 	{
 		auto* clip = m_clips[clip_id]->clip;
 		if (clip)
@@ -586,7 +586,7 @@ struct AudioSceneImpl : public AudioScene
 
 	SoundHandle play(Entity entity, ClipInfo* clip_info, bool is_3d) override
 	{
-		for (int i = 0; i < Lumix::lengthOf(m_playing_sounds); ++i)
+		for (int i = 0; i < lengthOf(m_playing_sounds); ++i)
 		{
 			if (m_playing_sounds[i].buffer_id == AudioDevice::INVALID_BUFFER_HANDLE)
 			{
@@ -632,7 +632,7 @@ struct AudioSceneImpl : public AudioScene
 
 	void stop(SoundHandle sound_id) override
 	{
-		ASSERT(sound_id >= 0 && sound_id < Lumix::lengthOf(m_playing_sounds));
+		ASSERT(sound_id >= 0 && sound_id < lengthOf(m_playing_sounds));
 		m_device.stop(m_playing_sounds[sound_id].buffer_id);
 		m_playing_sounds[sound_id].buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
 	}
@@ -640,7 +640,7 @@ struct AudioSceneImpl : public AudioScene
 
 	void setVolume(SoundHandle sound_id, float volume) override
 	{
-		ASSERT(sound_id >= 0 && sound_id < Lumix::lengthOf(m_playing_sounds));
+		ASSERT(sound_id >= 0 && sound_id < lengthOf(m_playing_sounds));
 		m_device.setVolume(m_playing_sounds[sound_id].buffer_id, volume);
 	}
 
@@ -651,7 +651,7 @@ struct AudioSceneImpl : public AudioScene
 		float left_delay,
 		float right_delay)
 	{
-		ASSERT(sound_id >= 0 && sound_id < Lumix::lengthOf(m_playing_sounds));
+		ASSERT(sound_id >= 0 && sound_id < lengthOf(m_playing_sounds));
 		m_device.setEcho(m_playing_sounds[sound_id].buffer_id, wet_dry_mix, feedback, left_delay, right_delay);
 	}
 

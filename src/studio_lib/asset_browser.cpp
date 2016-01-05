@@ -182,33 +182,31 @@ void AssetBrowser::update()
 
 	while (!is_empty)
 	{
-		Lumix::Path path_obj;
+		Lumix::Path path;
 		{
 			Lumix::MT::SpinLock lock(m_changed_files_mutex);
 			
-			path_obj = m_changed_files.back();
+			path = m_changed_files.back();
 			m_changed_files.pop();
 			is_empty = m_changed_files.empty();
 		}
 
-		const char* path = path_obj.c_str();
-		
-		Lumix::uint32 resource_type = getResourceType(path);
+		Lumix::uint32 resource_type = getResourceType(path.c_str());
 		if (resource_type == 0) continue;
 
 		if (m_autoreload_changed_resource) m_editor.getEngine().getResourceManager().reload(path);
 
-		if (!PlatformInterface::fileExists(path))
+		if (!PlatformInterface::fileExists(path.c_str()))
 		{
 			int index = getTypeFromResourceManagerType(resource_type);
-			m_resources[index].eraseItemFast(path_obj);
+			m_resources[index].eraseItemFast(path);
 			continue;
 		}
 
 		char dir[Lumix::MAX_PATH_LENGTH];
 		char filename[Lumix::MAX_PATH_LENGTH];
-		Lumix::PathUtils::getDir(dir, sizeof(dir), path);
-		Lumix::PathUtils::getFilename(filename, sizeof(filename), path);
+		Lumix::PathUtils::getDir(dir, sizeof(dir), path.c_str());
+		Lumix::PathUtils::getFilename(filename, sizeof(filename), path.c_str());
 		addResource(dir, filename);
 	}
 	m_changed_files.clear();
@@ -317,7 +315,7 @@ void AssetBrowser::saveMaterial(Lumix::Material* material)
 	strcpy(tmp_path, material->getPath().c_str());
 	strcat(tmp_path, ".tmp");
 	Lumix::FS::IFile* file =
-		fs.open(fs.getDefaultDevice(), tmp_path, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
+		fs.open(fs.getDefaultDevice(), Lumix::Path(tmp_path), Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
 	if (file)
 	{
 		Lumix::DefaultAllocator allocator;

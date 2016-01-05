@@ -279,7 +279,7 @@ void Texture::saveTGA()
 
 	FS::FileSystem& fs = m_resource_manager.getFileSystem();
 	FS::IFile* file = fs.open(fs.getDiskDevice(),
-							  getPath().c_str(),
+							  getPath(),
 							  FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
 
 	saveTGA(m_allocator, file, m_width, m_height, m_BPP, &m_data[0], getPath());
@@ -297,7 +297,7 @@ void Texture::save()
 	{
 		FS::FileSystem& fs = m_resource_manager.getFileSystem();
 		FS::IFile* file = fs.open(fs.getDefaultDevice(),
-								  getPath().c_str(),
+								  getPath(),
 								  FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
 
 		file->write(&m_data[0], m_data.size() * sizeof(m_data[0]));

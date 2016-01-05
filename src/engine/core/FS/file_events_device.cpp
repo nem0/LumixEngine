@@ -3,6 +3,7 @@
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/fs/ifile_system_defines.h"
+#include "core/path.h"
 
 #ifdef FILE_EVENT_DEVICE
 
@@ -33,11 +34,11 @@ namespace Lumix
 			}
 
 
-			bool open(const char* path, Mode mode) override
+			bool open(const Path& path, Mode mode) override
 			{
-				invokeEvent(EventType::OPEN_BEGIN, path, -1, mode);
+				invokeEvent(EventType::OPEN_BEGIN, path.c_str(), -1, mode);
 				bool ret = m_file.open(path, mode);
-				invokeEvent(EventType::OPEN_FINISHED, path, ret ? 1 : 0, mode);
+				invokeEvent(EventType::OPEN_FINISHED, path.c_str(), ret ? 1 : 0, mode);
 
 				return ret;
 			}

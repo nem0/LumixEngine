@@ -40,7 +40,7 @@ namespace Lumix
 				return m_device;
 			}
 
-			bool open(const char* path, Mode mode) override
+			bool open(const Path& path, Mode mode) override
 			{
 				ASSERT(!m_buffer); // reopen is not supported currently
 

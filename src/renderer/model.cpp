@@ -467,9 +467,9 @@ bool Model::parseMeshes(FS::IFile& file)
 		copyString(material_path, model_dir);
 		catString(material_path, material_name);
 		catString(material_path, ".mat");
-		Material* material = static_cast<Material*>(
-			m_resource_manager.get(ResourceManager::MATERIAL)
-				->load(Path(material_path)));
+
+		auto* material_manager = m_resource_manager.get(ResourceManager::MATERIAL);
+		Material* material = static_cast<Material*>(material_manager->load(Path(material_path)));
 
 		int32 attribute_array_offset = 0;
 		file.read(&attribute_array_offset, sizeof(attribute_array_offset));
@@ -483,7 +483,7 @@ bool Model::parseMeshes(FS::IFile& file)
 		file.read(&str_size, sizeof(str_size));
 		if (str_size >= MAX_PATH_LENGTH)
 		{
-			m_resource_manager.get(ResourceManager::MATERIAL)->unload(*material);
+			material_manager->unload(*material);
 			return false;
 		}
 		
