@@ -227,6 +227,7 @@ void SceneView::onGUI()
 			{
 				ImGui::OpenPopup("pipeline_parameters_popup");
 			}
+			ImGui::SameLine();
 
 			if (ImGui::BeginPopup("pipeline_parameters_popup"))
 			{
