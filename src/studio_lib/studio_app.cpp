@@ -382,6 +382,9 @@ public:
 	void copy() { m_editor->copyEntity(); }
 	void paste() { m_editor->pasteEntity(); }
 	void toggleOrbitCamera() { m_editor->setOrbitCamera(!m_editor->isOrbitCamera()); }
+	void setTopView() { m_editor->setTopView(); }
+	void setFrontView() { m_editor->setFrontView(); }
+	void setSideView() { m_editor->setSideView(); }
 	void togglePivotMode() { m_editor->getGizmo().togglePivot(); }
 	void toggleCoordSystem() { m_editor->getGizmo().toggleCoordSystem(); }
 	void createEntity() { m_editor->addEntity(); }
@@ -520,6 +523,13 @@ public:
 				doMenuItem(getAction("toggleGizmoMode"), false, is_any_entity_selected);
 				doMenuItem(getAction("togglePivotMode"), false, is_any_entity_selected);
 				doMenuItem(getAction("toggleCoordSystem"), false, is_any_entity_selected);
+				if (ImGui::BeginMenu("View", true))
+				{
+					doMenuItem(getAction("viewTop"), false, true);
+					doMenuItem(getAction("viewFront"), false, true);
+					doMenuItem(getAction("viewSide"), false, true);
+					ImGui::EndMenu();
+				}
 				if (ImGui::BeginMenu("Select"))
 				{
 					if (ImGui::MenuItem("Same mesh", nullptr, nullptr, is_any_entity_selected))
@@ -936,6 +946,9 @@ public:
 			"Paste", "paste", (int)PlatformInterface::Keys::CONTROL, 'V', -1);
 		addAction<&StudioAppImpl::toggleOrbitCamera>("Orbit camera", "orbitCamera");
 		addAction<&StudioAppImpl::toggleGizmoMode>("Translate/Rotate", "toggleGizmoMode");
+		addAction<&StudioAppImpl::setTopView>("Top", "viewTop");
+		addAction<&StudioAppImpl::setFrontView>("Front", "viewFront");
+		addAction<&StudioAppImpl::setSideView>("Side", "viewSide");
 		addAction<&StudioAppImpl::togglePivotMode>("Center/Pivot", "togglePivotMode");
 		addAction<&StudioAppImpl::toggleCoordSystem>("Local/Global", "toggleCoordSystem");
 

@@ -1633,20 +1633,20 @@ public:
 
 	void updateGoTo()
 	{
-		if (m_camera >= 0 && m_go_to_parameters.m_is_active)
+		if (m_camera < 0 || !m_go_to_parameters.m_is_active) return;
+
+		float t = Math::easeInOut(m_go_to_parameters.m_t);
+		m_go_to_parameters.m_t += m_engine->getLastTimeDelta() * m_go_to_parameters.m_speed;
+		Vec3 pos = m_go_to_parameters.m_from * (1 - t) + m_go_to_parameters.m_to * t;
+		Quat rot;
+		nlerp(m_go_to_parameters.m_from_rot, m_go_to_parameters.m_to_rot, &rot, t);
+		if (m_go_to_parameters.m_t >= 1)
 		{
-			float t = Math::easeInOut(m_go_to_parameters.m_t);
-			m_go_to_parameters.m_t +=
-				m_engine->getLastTimeDelta() * m_go_to_parameters.m_speed;
-			Vec3 pos = m_go_to_parameters.m_from * (1 - t) +
-					   m_go_to_parameters.m_to * t;
-			if (m_go_to_parameters.m_t >= 1)
-			{
-				pos = m_go_to_parameters.m_to;
-				m_go_to_parameters.m_is_active = false;
-			}
-			getUniverse()->setPosition(m_camera, pos);
+			pos = m_go_to_parameters.m_to;
+			m_go_to_parameters.m_is_active = false;
 		}
+		getUniverse()->setPosition(m_camera, pos);
+		getUniverse()->setRotation(m_camera, rot);
 	}
 
 
@@ -2308,17 +2308,17 @@ public:
 	void lookAtSelected() override
 	{
 		Universe* universe = getUniverse();
-		if (!m_selected_entities.empty())
-		{
-			m_go_to_parameters.m_is_active = true;
-			m_go_to_parameters.m_t = 0;
-			m_go_to_parameters.m_from = universe->getPosition(m_camera);
-			Quat camera_rot = universe->getRotation(m_camera);
-			Vec3 dir = camera_rot * Vec3(0, 0, 1);
-			m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + dir * 10;
-			float len = (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
-			m_go_to_parameters.m_speed = Math::maxValue(100.0f / (len > 0 ? len : 1), 2.0f);
-		}
+		if (m_selected_entities.empty()) return;
+
+		m_go_to_parameters.m_is_active = true;
+		m_go_to_parameters.m_t = 0;
+		m_go_to_parameters.m_from = universe->getPosition(m_camera);
+		Quat camera_rot = universe->getRotation(m_camera);
+		Vec3 dir = camera_rot * Vec3(0, 0, 1);
+		m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + dir * 10;
+		float len = (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
+		m_go_to_parameters.m_speed = Math::maxValue(100.0f / (len > 0 ? len : 1), 2.0f);
+		m_go_to_parameters.m_from_rot = m_go_to_parameters.m_to_rot = camera_rot;
 	}
 
 
@@ -3180,6 +3180,60 @@ public:
 	}
 
 
+	void setTopView() override
+	{
+		m_go_to_parameters.m_is_active = true;
+		m_go_to_parameters.m_t = 0;
+		auto* universe = m_universe_context->m_universe;
+		m_go_to_parameters.m_from = universe->getPosition(m_camera);
+		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
+		if (m_is_orbit && !m_selected_entities.empty())
+		{
+			m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + Vec3(0, 10, 0);
+		}
+		Quat camera_rot = universe->getRotation(m_camera);
+		m_go_to_parameters.m_speed = 2.0f;
+		m_go_to_parameters.m_from_rot = camera_rot;
+		m_go_to_parameters.m_to_rot = Quat(Vec3(1, 0, 0), -Math::PI * 0.5f);
+	}
+
+
+	void setFrontView() override
+	{
+		m_go_to_parameters.m_is_active = true;
+		m_go_to_parameters.m_t = 0;
+		auto* universe = m_universe_context->m_universe;
+		m_go_to_parameters.m_from = universe->getPosition(m_camera);
+		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
+		if (m_is_orbit && !m_selected_entities.empty())
+		{
+			m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + Vec3(0, 0, -10);
+		}
+		Quat camera_rot = universe->getRotation(m_camera);
+		m_go_to_parameters.m_speed = 2.0f;
+		m_go_to_parameters.m_from_rot = camera_rot;
+		m_go_to_parameters.m_to_rot = Quat(Vec3(0, 1, 0), Math::PI);
+	}
+
+
+	void setSideView() override
+	{
+		m_go_to_parameters.m_is_active = true;
+		m_go_to_parameters.m_t = 0;
+		auto* universe = m_universe_context->m_universe;
+		m_go_to_parameters.m_from = universe->getPosition(m_camera);
+		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
+		if (m_is_orbit && !m_selected_entities.empty())
+		{
+			m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + Vec3(-10, 0, 0);
+		}
+		Quat camera_rot = universe->getRotation(m_camera);
+		m_go_to_parameters.m_speed = 2.0f;
+		m_go_to_parameters.m_from_rot = camera_rot;
+		m_go_to_parameters.m_to_rot = Quat(Vec3(0, 1, 0), -Math::PI * 0.5f);
+	}
+
+
 	bool runTest(const Path& undo_stack_path, const Path& result_universe_path) override
 	{
 		newUniverse();
@@ -3235,6 +3289,8 @@ private:
 		bool m_is_active;
 		Vec3 m_from;
 		Vec3 m_to;
+		Quat m_from_rot;
+		Quat m_to_rot;
 		float m_t;
 		float m_speed;
 	};
