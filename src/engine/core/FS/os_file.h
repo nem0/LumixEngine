@@ -17,6 +17,7 @@ namespace Lumix
 
 			bool open(const char* path, Mode mode, IAllocator& allocator);
 			void close();
+			void flush();
 
 			bool write(const void* data, size_t size);
 			bool read(void* data, size_t size);
@@ -26,6 +27,11 @@ namespace Lumix
 
 			size_t seek(SeekMode base, size_t pos);
 			void writeEOF();
+
+			OsFile& operator <<(const char* text);
+			OsFile& operator <<(int32 value);
+			OsFile& operator <<(uint32 value);
+			OsFile& operator <<(uint64 value);
 
 		private:
 			struct OsFileImpl* m_impl;

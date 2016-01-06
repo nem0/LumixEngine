@@ -45,6 +45,12 @@ static int getEnvironment(lua_State* L)
 }
 
 
+static void addDebugCross(RenderScene* scene, Vec3 pos, float size, int color, float life)
+{
+	scene->addDebugCross(pos, size, color, life);
+}
+
+
 static Texture* getMaterialTexture(Material* material, int texture_index)
 {
 	if (!material) return nullptr;
@@ -63,41 +69,69 @@ static Material* getTerrainMaterial(RenderScene* scene, Entity entity)
 
 static int createComponent(IScene* scene, const char* type, int entity_idx)
 {
-	if (!scene)
+	if (!scene) return -1;
+	Entity e(entity_idx);
+	uint32 hash = crc32(type);
+	if (scene->getComponent(e, hash) != INVALID_COMPONENT)
 	{
+		g_log_error.log("script") << "Component " << type << " already exists in entity "
+								  << entity_idx;
 		return -1;
 	}
-	Entity e(entity_idx);
-	return scene->createComponent(crc32(type), e);
+
+	return scene->createComponent(hash, e);
+}
+
+
+static int getEntityPosition(lua_State* L)
+{
+	if (!LuaWrapper::checkParameterType<void*>(L, 1) ||
+		!LuaWrapper::checkParameterType<Entity>(L, 2))
+	{
+		lua_pushnil(L);
+		return 1;
+	}
+
+	auto* universe = LuaWrapper::toType<Universe*>(L, 1);
+	Entity entity = LuaWrapper::toType<Entity>(L, 2);
+	Vec3 pos = universe->getPosition(entity);
+	LuaWrapper::pushLua(L, pos);
+	return 1;
+}
+
+static int getEntityDirection(lua_State* L)
+{
+	if (!LuaWrapper::checkParameterType<void*>(L, 1) ||
+		!LuaWrapper::checkParameterType<float>(L, 2))
+	{
+		lua_pushnil(L);
+		return 1;
+	}
+
+	auto* universe = LuaWrapper::toType<Universe*>(L, 1);
+	Entity entity = LuaWrapper::toType<Entity>(L, 2);
+	Quat rot = universe->getRotation(entity);
+	LuaWrapper::pushLua(L, rot * Vec3(0, 0, 1));
+	return 1;
 }
 
 
 static int multVecQuat(lua_State* L)
 {
-	Vec3 v;
-	v.x = (float)lua_tonumber(L, 1);
-	v.y = (float)lua_tonumber(L, 2);
-	v.z = (float)lua_tonumber(L, 3);
-	Vec3 axis;
-	axis.x = (float)lua_tonumber(L, 4);
-	axis.y = (float)lua_tonumber(L, 5);
-	axis.z = (float)lua_tonumber(L, 6);
+	if (!LuaWrapper::checkParameterType<Vec3>(L, 1) ||
+		!LuaWrapper::checkParameterType<Vec3>(L, 2) ||
+		!LuaWrapper::checkParameterType<float>(L, 3))
+	{
+		lua_pushnil(L);
+		return 1;
+	}
+	Vec3 v = LuaWrapper::toType<Vec3>(L, 1);
+	Vec3 axis = LuaWrapper::toType<Vec3>(L, 2);
 	Quat q(axis, (float)lua_tonumber(L, 7));
 
 	Vec3 res = q * v;
 
-	lua_createtable(L, 3, 0);
-	int table_idx = lua_gettop(L);
-
-	lua_pushnumber(L, res.x);
-	lua_rawseti(L, table_idx, 0);
-
-	lua_pushnumber(L, res.y);
-	lua_rawseti(L, table_idx, 1);
-
-	lua_pushnumber(L, res.z);
-	lua_rawseti(L, table_idx, 2);
-
+	LuaWrapper::pushLua(L, res);
 	return 1;
 }
 
@@ -114,42 +148,38 @@ static void logInfo(const char* text)
 }
 
 
-static void setEntityPosition(Universe* univ, int entity_index, float x, float y, float z)
+static void setEntityPosition(Universe* univ, int entity_index, Vec3 pos)
 {
-	univ->setPosition(entity_index, x, y, z);
+	univ->setPosition(entity_index, pos);
 }
 
 
 static void setEntityRotation(Universe* univ,
 	int entity_index,
-	float x,
-	float y,
-	float z,
+	Vec3 axis,
 	float angle)
 {
 	if (entity_index < 0 || entity_index > univ->getEntityCount()) return;
 
-	univ->setRotation(entity_index, Quat(Vec3(x, y, z), angle));
+	univ->setRotation(entity_index, Quat(axis, angle));
 }
 
 
 static void setEntityLocalRotation(IScene* hierarchy,
 	Entity entity,
-	float x,
-	float y,
-	float z,
+	Vec3 axis,
 	float angle)
 {
 	if (entity == INVALID_ENTITY) return;
 
-	static_cast<Hierarchy*>(hierarchy)->setLocalRotation(entity, Quat(Vec3(x, y, z), angle));
+	static_cast<Hierarchy*>(hierarchy)->setLocalRotation(entity, Quat(axis, angle));
 }
 
 
 static void setRenderablePath(IScene* scene, int component, const char* path)
 {
 	RenderScene* render_scene = (RenderScene*)scene;
-	render_scene->setRenderablePath(component, path);
+	render_scene->setRenderablePath(component, Path(path));
 }
 
 
@@ -174,7 +204,7 @@ void registerUniverse(UniverseContext* ctx, lua_State* L)
 {
 	lua_pushlightuserdata(L, ctx);
 	lua_setglobal(L, "g_universe_context");
-	
+
 	for (auto* scene : ctx->m_scenes)
 	{
 		const char* name = scene->getPlugin().getName();
@@ -195,7 +225,7 @@ void registerEngineLuaAPI(LuaScriptScene& scene, Engine& engine, lua_State* L)
 {
 	lua_pushlightuserdata(L, &engine);
 	lua_setglobal(L, "g_engine");
-	
+
 	#define REGISTER_FUNCTION(name) \
 		scene.registerFunction("Engine", #name, LuaWrapper::wrap<decltype(&LuaAPI::name), LuaAPI::name>)
 
@@ -211,9 +241,11 @@ void registerEngineLuaAPI(LuaScriptScene& scene, Engine& engine, lua_State* L)
 	REGISTER_FUNCTION(addInputAction);
 	REGISTER_FUNCTION(logError);
 	REGISTER_FUNCTION(logInfo);
-	REGISTER_FUNCTION(logInfo);
+	REGISTER_FUNCTION(addDebugCross);
 
 	scene.registerFunction("Engine", "multVecQuat", &LuaAPI::multVecQuat);
+	scene.registerFunction("Engine", "getEntityPosition", &LuaAPI::getEntityPosition);
+	scene.registerFunction("Engine", "getEntityDirection", &LuaAPI::getEntityDirection);
 
 	#undef REGISTER_FUNCTION
 }

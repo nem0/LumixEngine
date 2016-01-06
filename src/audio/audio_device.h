@@ -25,7 +25,7 @@ public:
 
 	static const int MAX_PLAYING_SOUNDS = 256;
 
-	typedef void* BufferHandle;
+	typedef int BufferHandle;
 	static const BufferHandle INVALID_BUFFER_HANDLE;
 
 public:
@@ -35,7 +35,6 @@ public:
 	static void destroy(AudioDevice& device);
 
 	virtual BufferHandle createBuffer(const void* data, int size_bytes, int channels, int sample_rate, int flags) = 0;
-	virtual void destroyBuffer(BufferHandle buffer) = 0;
 	virtual void setEcho(BufferHandle handle,
 		float wet_dry_mix,
 		float feedback,
@@ -48,6 +47,7 @@ public:
 	virtual void setVolume(BufferHandle buffer, float volume) = 0;
 	virtual void setFrequency(BufferHandle buffer, float frequency) = 0;
 	virtual void setCurrentTime(BufferHandle buffer, float time_seconds) = 0;
+	virtual float getCurrentTime(BufferHandle buffer) = 0;
 	virtual void setListenerPosition(float x, float y, float z) = 0;
 	virtual void setListenerOrientation(float front_x,
 		float front_y,

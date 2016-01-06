@@ -3,7 +3,6 @@
 
 #include "lumix.h"
 #include "core/array.h"
-#include "core/delegate_list.h"
 #include "core/matrix.h"
 #include "core/pod_hash_map.h"
 #include "engine/iplugin.h"
@@ -57,7 +56,6 @@ namespace Lumix
 			virtual void setParent(ComponentIndex cmp, Entity parent) = 0;
 			virtual Entity getParent(ComponentIndex cmp) = 0;
 			virtual Array<Child>* getChildren(Entity parent) = 0;
-			virtual DelegateList<void (Entity, Entity)>& parentSet() = 0;
 			virtual const Children& getAllChildren() const = 0;
 	};
 

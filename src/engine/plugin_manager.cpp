@@ -1,6 +1,7 @@
 #include "plugin_manager.h"
 #include "core/array.h"
 #include "core/log.h"
+#include "core/profiler.h"
 #include "core/system.h"
 #include "engine.h"
 #include "iplugin.h"
@@ -44,6 +45,7 @@ class PluginManagerImpl : public PluginManager
 
 		void update(float dt) override
 		{
+			PROFILE_FUNCTION();
 			for (int i = 0, c = m_plugins.size(); i < c; ++i)
 			{
 				m_plugins[i]->update(dt);

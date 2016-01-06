@@ -375,7 +375,7 @@ bool Model::parseBones(FS::IFile& file)
 		{
 			return false;
 		}
-		file.read(tmp, len);
+		file.read(tmp, len + 1);
 		tmp[len] = 0;
 		b.name = tmp;
 		m_bone_map.insert(crc32(b.name.c_str()), m_bones.size() - 1);
@@ -384,9 +384,16 @@ bool Model::parseBones(FS::IFile& file)
 		{
 			return false;
 		}
-		file.read(tmp, len);
-		tmp[len] = 0;
-		b.parent = tmp;
+		if(len > 0)
+		{
+			file.read(tmp, len);
+			tmp[len] = 0;
+			b.parent = tmp;
+		}
+		else
+		{
+			b.parent = "";
+		}
 		file.read(&b.position.x, sizeof(float) * 3);
 		file.read(&b.rotation.x, sizeof(float) * 4);
 	}
@@ -460,9 +467,9 @@ bool Model::parseMeshes(FS::IFile& file)
 		copyString(material_path, model_dir);
 		catString(material_path, material_name);
 		catString(material_path, ".mat");
-		Material* material = static_cast<Material*>(
-			m_resource_manager.get(ResourceManager::MATERIAL)
-				->load(Path(material_path)));
+
+		auto* material_manager = m_resource_manager.get(ResourceManager::MATERIAL);
+		Material* material = static_cast<Material*>(material_manager->load(Path(material_path)));
 
 		int32 attribute_array_offset = 0;
 		file.read(&attribute_array_offset, sizeof(attribute_array_offset));
@@ -476,7 +483,7 @@ bool Model::parseMeshes(FS::IFile& file)
 		file.read(&str_size, sizeof(str_size));
 		if (str_size >= MAX_PATH_LENGTH)
 		{
-			m_resource_manager.get(ResourceManager::MATERIAL)->unload(*material);
+			material_manager->unload(*material);
 			return false;
 		}
 		

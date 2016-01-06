@@ -2,6 +2,7 @@
 #include "engine.h"
 #include "core/blob.h"
 #include "core/crc32.h"
+#include "core/fs/os_file.h"
 #include "core/input_system.h"
 #include "core/log.h"
 #include "core/path.h"
@@ -34,6 +35,7 @@ enum class SerializedEngineVersion : int32
 	FOG_PARAMS,
 	SCENE_VERSION,
 	HIERARCHY_COMPONENT,
+	SCENE_VERSION_CHECK,
 
 	LATEST // must be the last one
 };
@@ -74,6 +76,7 @@ public:
 		, m_is_game_running(false)
 		, m_component_types(m_allocator)
 		, m_last_time_delta(0)
+		, m_path_manager(m_allocator)
 	{
 		m_mtjd_manager = MTJD::Manager::create(m_allocator);
 		if (!fs)
@@ -234,9 +237,12 @@ public:
 		}
 		dt = m_timer->tick();
 		m_last_time_delta = dt;
-		for (int i = 0; i < context.m_scenes.size(); ++i)
 		{
-			context.m_scenes[i]->update(dt);
+			PROFILE_BLOCK("update scenes");
+			for (int i = 0; i < context.m_scenes.size(); ++i)
+			{
+				context.m_scenes[i]->update(dt);
+			}
 		}
 		m_plugin_manager->update(dt);
 		m_input_system->update(dt);
@@ -256,6 +262,17 @@ public:
 	float getFPS() const override { return m_fps; }
 
 
+	void serializerSceneVersions(OutputBlob& serializer, UniverseContext& ctx)
+	{
+		serializer.write(ctx.m_scenes.size());
+		for (auto* scene : ctx.m_scenes)
+		{
+			serializer.write(crc32(scene->getPlugin().getName()));
+			serializer.write(scene->getVersion());
+		}
+	}
+
+
 	void serializePluginList(OutputBlob& serializer)
 	{
 		serializer.write((int32)m_plugin_manager->getPlugins().size());
@@ -263,6 +280,27 @@ public:
 		{
 			serializer.writeString(plugin->getName());
 		}
+	}
+
+
+	bool hasSupportedSceneVersions(InputBlob& serializer, UniverseContext& ctx)
+	{
+		int32 count;
+		serializer.read(count);
+		for (int i = 0; i < count; ++i)
+		{
+			uint32 hash;
+			serializer.read(hash);
+			auto* scene = ctx.getScene(hash);
+			int version;
+			serializer.read(version);
+			if (version > scene->getVersion())
+			{
+				g_log_error.log("engine") << "Plugin " << scene->getPlugin().getName() << " is too old";
+				return false;
+			}
+		}
+		return true;
 	}
 
 
@@ -292,7 +330,8 @@ public:
 		header.m_reserved = 0;
 		serializer.write(header);
 		serializePluginList(serializer);
-		g_path_manager.serialize(serializer);
+		serializerSceneVersions(serializer, ctx);
+		m_path_manager.serialize(serializer);
 		int pos = serializer.getSize();
 		ctx.m_universe->serialize(serializer);
 		m_plugin_manager->serialize(serializer);
@@ -309,8 +348,7 @@ public:
 	}
 
 
-	bool deserialize(UniverseContext& ctx,
-							 InputBlob& serializer) override
+	bool deserialize(UniverseContext& ctx, InputBlob& serializer) override
 	{
 		SerializedEngineHeader header;
 		serializer.read(header);
@@ -328,7 +366,13 @@ public:
 		{
 			return false;
 		}
-		g_path_manager.deserialize(serializer);
+		if (header.m_version > SerializedEngineVersion::SCENE_VERSION_CHECK &&
+			!hasSupportedSceneVersions(serializer, ctx))
+		{
+			return false;
+		}
+
+		m_path_manager.deserialize(serializer);
 		ctx.m_universe->deserialize(serializer);
 
 		if (header.m_version <= SerializedEngineVersion::HIERARCHY_COMPONENT)
@@ -351,7 +395,7 @@ public:
 			}
 			scene->deserialize(serializer, scene_version);
 		}
-		g_path_manager.clear();
+		m_path_manager.clear();
 		return true;
 	}
 
@@ -395,6 +439,7 @@ private:
 	float m_last_time_delta;
 	bool m_is_game_running;
 	PlatformData m_platform_data;
+	PathManager m_path_manager;
 
 private:
 	void operator=(const EngineImpl&);
@@ -409,13 +454,13 @@ static void showLogInVS(const char*, const char* message)
 }
 
 
-static FILE* g_error_file = nullptr;
+static FS::OsFile g_error_file;
 
 
 static void logErrorToFile(const char*, const char* message)
 {
-	fputs(message, g_error_file);
-	fflush(g_error_file);
+	g_error_file.write(message, stringLength(message));
+	g_error_file.flush();
 }
 
 
@@ -424,7 +469,7 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 	Profiler::setThreadName("Main");
 	installUnhandledExceptionHandler();
 
-	g_error_file = fopen("error.log", "wb");
+	g_error_file.open("error.log", FS::Mode::CREATE | FS::Mode::WRITE, allocator);
 
 	g_log_error.getCallback().bind<logErrorToFile>();
 	g_log_info.getCallback().bind<showLogInVS>();
@@ -445,8 +490,7 @@ void Engine::destroy(Engine* engine, IAllocator& allocator)
 {
 	LUMIX_DELETE(allocator, engine);
 
-	fclose(g_error_file);
-	g_error_file = nullptr;
+	g_error_file.close();
 }
 
 

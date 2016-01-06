@@ -15,8 +15,19 @@ class IAllocator;
 class InputBlob;
 class Material;
 class OutputBlob;
+class RenderScene;
 class ResourceManager;
 class Universe;
+
+
+struct IntInterval
+{
+	int from;
+	int to;
+
+	IntInterval();
+	int getRandom() const;
+};
 
 
 struct Interval
@@ -56,11 +67,31 @@ public:
 		virtual void destoryParticle(int /*index*/) {}
 		virtual void update(float /*time_delta*/) {}
 		virtual void serialize(OutputBlob& blob) = 0;
-		virtual void deserialize(InputBlob& blob) = 0;
+		virtual void deserialize(InputBlob& blob, int version) = 0;
 		virtual uint32 getType() const = 0;
+		virtual void drawGizmo(RenderScene& scene) {}
 
 		ParticleEmitter& m_emitter;
 	};
+
+
+	struct LUMIX_RENDERER_API SpawnShapeModule : public ModuleBase
+	{
+		SpawnShapeModule(ParticleEmitter& emitter);
+		void spawnParticle(int index) override;
+		void serialize(OutputBlob& blob) override;
+		void deserialize(InputBlob& blob, int version) override;
+		uint32 getType() const override { return s_type; }
+
+		static const uint32 s_type;
+		enum Shape : uint8
+		{
+			SPHERE
+		};
+		float m_radius;
+		Shape m_shape;
+	};
+
 
 
 	struct LUMIX_RENDERER_API LinearMovementModule : public ModuleBase
@@ -68,7 +99,7 @@ public:
 		LinearMovementModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob& blob) override;
-		void deserialize(InputBlob& blob) override;
+		void deserialize(InputBlob& blob, int version) override;
 		uint32 getType() const override { return s_type; }
 
 		static const uint32 s_type;
@@ -78,12 +109,56 @@ public:
 	};
 
 
+	struct LUMIX_RENDERER_API PlaneModule : public ModuleBase
+	{
+		PlaneModule(ParticleEmitter& emitter);
+		void serialize(OutputBlob& blob) override;
+		void deserialize(InputBlob& blob, int version) override;
+		void update(float time_delta) override;
+		uint32 getType() const override { return s_type; }
+		void drawGizmo(RenderScene& scene) override;
+
+		static const uint32 s_type;
+		Entity m_entities[8];
+		float m_bounce;
+		int m_count;
+	};
+
+
+	struct LUMIX_RENDERER_API AttractorModule : public ModuleBase
+	{
+		AttractorModule(ParticleEmitter& emitter);
+		void serialize(OutputBlob& blob) override;
+		void deserialize(InputBlob& blob, int version) override;
+		void update(float time_delta) override;
+		uint32 getType() const override { return s_type; }
+
+		static const uint32 s_type;
+		Entity m_entities[8];
+		float m_force;
+		int m_count;
+	};
+
+
+	struct LUMIX_RENDERER_API ForceModule : public ModuleBase
+	{
+		ForceModule(ParticleEmitter& emitter);
+		void serialize(OutputBlob& blob) override;
+		void deserialize(InputBlob& blob, int version) override;
+		void update(float time_delta) override;
+		uint32 getType() const override { return s_type; }
+
+		static const uint32 s_type;
+		Vec3 m_acceleration;
+	};
+
+
 	struct LUMIX_RENDERER_API AlphaModule : public ModuleBase
 	{
 		AlphaModule(ParticleEmitter& emitter);
 		void update(float time_delta) override;
-		void serialize(OutputBlob&) override {}
-		void deserialize(InputBlob&) override {}
+		void serialize(OutputBlob&) override;
+		void deserialize(InputBlob&, int) override;
 		uint32 getType() const override { return s_type; }
 		void sample();
 
@@ -98,8 +173,8 @@ public:
 	{
 		SizeModule(ParticleEmitter& emitter);
 		void update(float time_delta) override;
-		void serialize(OutputBlob&) override {}
-		void deserialize(InputBlob&) override {}
+		void serialize(OutputBlob&) override;
+		void deserialize(InputBlob&, int) override;
 		uint32 getType() const override { return s_type; }
 		void sample();
 
@@ -115,7 +190,7 @@ public:
 		RandomRotationModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob&) override {}
-		void deserialize(InputBlob&) override {}
+		void deserialize(InputBlob&, int) override {}
 		uint32 getType() const override { return s_type; }
 
 		static const uint32 s_type;
@@ -126,8 +201,10 @@ public:
 	ParticleEmitter(Entity entity, Universe& universe, IAllocator& allocator);
 	~ParticleEmitter();
 
+	void reset();
+	void drawGizmo(RenderScene& scene);
 	void serialize(OutputBlob& blob);
-	void deserialize(InputBlob& blob, ResourceManager& manager);
+	void deserialize(InputBlob& blob, ResourceManager& manager, bool has_version);
 	void update(float time_delta);
 	Material* getMaterial() const { return m_material; }
 	void setMaterial(Material* material);
@@ -147,6 +224,8 @@ public:
 	Interval m_spawn_period;
 	Interval m_initial_life;
 	Interval m_initial_size;
+	IntInterval m_spawn_count;
+
 	Array<ModuleBase*> m_modules;
 	Entity m_entity;
 

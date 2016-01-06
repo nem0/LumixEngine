@@ -1,4 +1,5 @@
 #include "transient_geometry.h"
+#include "core/string.h"
 #include "renderer/material.h"
 #include "renderer/shader.h"
 #include <cstring>

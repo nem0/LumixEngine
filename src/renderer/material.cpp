@@ -484,8 +484,8 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 				{
 					copyString(texture_path, path);
 				}
-				m_textures[m_texture_count] = static_cast<Texture*>(
-					m_resource_manager.get(ResourceManager::TEXTURE)->load(Path(texture_path)));
+				auto* mng = m_resource_manager.get(ResourceManager::TEXTURE);
+				m_textures[m_texture_count] = static_cast<Texture*>(mng->load(Path(texture_path)));
 				addDependency(*m_textures[m_texture_count]);
 			}
 		}
@@ -600,7 +600,7 @@ bool Material::load(FS::IFile& file)
 
 	m_render_states = BGFX_STATE_DEPTH_TEST_LEQUAL | BGFX_STATE_CULL_CW;
 	m_uniforms.clear();
-	JsonSerializer serializer(file, JsonSerializer::READ, getPath().c_str(), m_allocator);
+	JsonSerializer serializer(file, JsonSerializer::READ, getPath(), m_allocator);
 	serializer.deserializeObjectBegin();
 	char path[MAX_PATH_LENGTH];
 	char label[256];
@@ -680,8 +680,8 @@ bool Material::load(FS::IFile& file)
 		else if (compareString(label, "shader") == 0)
 		{
 			serializer.deserialize(path, MAX_PATH_LENGTH, "");
-			setShader(static_cast<Shader*>(
-				m_resource_manager.get(ResourceManager::SHADER)->load(Path(path))));
+			auto* manager = m_resource_manager.get(ResourceManager::SHADER);
+			setShader(static_cast<Shader*>(manager->load(Path(path))));
 		}
 		else if (compareString(label, "z_test") == 0)
 		{

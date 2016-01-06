@@ -25,8 +25,8 @@ bool Clip::load(FS::IFile& file)
 		(unsigned char*)file.getBuffer(), (int)file.size(), &m_channels, &m_sample_rate, &output);
 	if (res <= 0) return false;
 
-	m_data.resize(res);
-	copyMemory(&m_data[0], output, res);
+	m_data.resize(res * m_channels);
+	copyMemory(&m_data[0], output, res * m_channels * sizeof(m_data[0]));
 	free(output);
 
 	return true;

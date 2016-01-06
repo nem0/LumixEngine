@@ -1486,8 +1486,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderRigidMesh(const Renderable& renderable, const RenderableMesh& info)
 	{
-		if (!info.mesh) return;
-
 		int instance_idx = info.mesh->getInstanceIdx();
 		if (instance_idx == -1)
 		{
@@ -1575,8 +1573,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderTerrain(const TerrainInfo& info)
 	{
-		if (!info.m_terrain->getMaterial()->isReady()) return;
-
 		auto& inst = m_terrain_instances[info.m_index];
 		if ((inst.m_count > 0 && inst.m_infos[0]->m_terrain != info.m_terrain) ||
 			inst.m_count == lengthOf(inst.m_infos))
@@ -1688,6 +1684,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	void renderTerrains(const Array<const TerrainInfo*>& terrains)
 	{
 		PROFILE_FUNCTION();
+		PROFILE_INT("terrain patches", terrains.size());
 		for (auto* info : terrains)
 		{
 			renderTerrain(*info);
@@ -1705,6 +1702,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		if (meshes.empty()) return;
 
 		Renderable* renderables = m_scene->getRenderables();
+		PROFILE_INT("mesh count", meshes.size());
 		for (auto& mesh : meshes)
 		{
 			Renderable& renderable = renderables[mesh.renderable];

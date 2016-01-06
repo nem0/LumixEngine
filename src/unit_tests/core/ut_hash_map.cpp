@@ -10,7 +10,7 @@ namespace
 		Lumix::DefaultAllocator allocator;
 		Lumix::HashMap<int32, int32> hash_table(allocator);
 
-		LUMIX_EXPECT_TRUE(hash_table.empty());
+		LUMIX_EXPECT(hash_table.empty());
 
 		int32 values[10] = {
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 10
@@ -23,7 +23,7 @@ namespace
 
 		for (int32 val : values)
 		{
-			LUMIX_EXPECT_EQ(hash_table[val], val);
+			LUMIX_EXPECT(hash_table[val] == val);
 		}
 	};
 
@@ -32,7 +32,7 @@ namespace
 		Lumix::DefaultAllocator allocator;
 		Lumix::HashMap<int32, Lumix::Array<int> > hash_table(allocator);
 
-		LUMIX_EXPECT_TRUE(hash_table.empty());
+		LUMIX_EXPECT(hash_table.empty());
 	};
 
 	void UT_clear(const char* params)
@@ -40,7 +40,7 @@ namespace
 		Lumix::DefaultAllocator allocator;
 		Lumix::HashMap<int32, int32> hash_table(allocator);
 
-		LUMIX_EXPECT_TRUE(hash_table.empty());
+		LUMIX_EXPECT(hash_table.empty());
 
 		const int32 COUNT = 20;
 
@@ -51,14 +51,14 @@ namespace
 
 		for (int32 i = 0; i < COUNT; i++)
 		{
-			LUMIX_EXPECT_EQ(hash_table[i], i);
+			LUMIX_EXPECT(hash_table[i] == i);
 		}
 
-		LUMIX_EXPECT_FALSE(hash_table.empty());
+		LUMIX_EXPECT(!hash_table.empty());
 
 		hash_table.clear();
 
-		LUMIX_EXPECT_TRUE(hash_table.empty());
+		LUMIX_EXPECT(hash_table.empty());
 
 		hash_table.rehash(8);
 
@@ -75,7 +75,7 @@ namespace
 		Lumix::DefaultAllocator allocator;
 		HashTableType hash_table(allocator);
 
-		LUMIX_EXPECT_TRUE(hash_table.empty());
+		LUMIX_EXPECT(hash_table.empty());
 
 		int32 values[10] = {
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 10
@@ -88,13 +88,13 @@ namespace
 
 		for (int32 val : values)
 		{
-			LUMIX_EXPECT_EQ(hash_table[val], val);
+			LUMIX_EXPECT(hash_table[val] == val);
 		}
 
 		const HashTableType& const_hash_table = hash_table;
 		for (HashTableType::constIterator const_it = const_hash_table.begin(); const_it != const_hash_table.end(); ++const_it)
 		{
-			LUMIX_EXPECT_EQ(const_it.value(), values[const_it.key() - 1]);
+			LUMIX_EXPECT(const_it.value() == values[const_it.key() - 1]);
 		}
 	}
 }

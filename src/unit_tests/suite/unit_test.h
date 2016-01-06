@@ -1,165 +1,188 @@
 #pragma once
 
+
 #include "core/math_utils.h"
-#include <string.h>
+#include "core/string.h"
+
 
 namespace Lumix
 {
 	namespace UnitTest
 	{
-		template<typename T1, typename T2>
-		LUMIX_FORCE_INLINE void expectEq(T1 p1, T2 p2, const char* file, uint32 line)
+		enum Operator
 		{
-			if(p1 != p2)
+			EQ,
+			LT,
+			GT,
+			GE,
+			LE,
+			NE
+		};
+
+
+		template <typename T1, typename T2>
+		struct Expression
+		{
+			Expression(const char* expr, Operator op, T1 t1, T2 t2, bool res)
+				: lhs(t1)
+				, rhs(t2)
+				, result(res)
+				, expression(expr)
+				, oper(op)
 			{
-				Manager::instance().handleFail(file, line);
+			}
+
+
+			template <int C, typename T>
+			static void getOperand(char(&str)[C], T value)
+			{
+				Lumix::catString(str, "Unknown type");
+			}
+
+
+			template<int C>
+			static void getOperand(char(&str)[C], int value)
+			{
+				char tmp[20];
+				Lumix::toCString(value, tmp, C);
+				Lumix::catString(str, tmp);
+			}
+
+
+			template<int C>
+			static void getOperand(char(&str)[C], float value)
+			{
+				char tmp[20];
+				Lumix::toCString(value, tmp, C, 5);
+				Lumix::catString(str, tmp);
+			}
+
+
+			template <int C>
+			void getOperator(char(&str)[C])
+			{
+				switch (oper)
+				{
+					case EQ: Lumix::catString(str, " == "); break;
+					case NE: Lumix::catString(str, " != "); break;
+					case LT: Lumix::catString(str, " < "); break;
+					case GT: Lumix::catString(str, " > "); break;
+					case GE: Lumix::catString(str, " >= "); break;
+					case LE: Lumix::catString(str, " <= "); break;
+					default: ASSERT(false); break;
+				}
+			}
+
+
+			T1 lhs;
+			T2 rhs;
+			bool result;
+			const char* expression;
+			Operator oper;
+		};
+
+
+		template <typename T>
+		struct ExpressionLHS
+		{
+			ExpressionLHS(const char* expression, T value)
+			{
+				this->value = value;
+				this->expression = expression;
+			}
+
+
+			template <typename T2>
+			Expression<T, T2> operator <= (T2 value)
+			{
+				return Expression<T, T2>(expression, LE, this->value, value, this->value <= value);
+			}
+
+
+			template <typename T2>
+			Expression<T, T2> operator == (T2 value)
+			{
+				return Expression<T, T2>(expression, EQ, this->value, value, this->value == value);
+			}
+
+
+			template <typename T2>
+			Expression<T, T2> operator >= (T2 value)
+			{
+				return Expression<T, T2>(expression, GE, this->value, value, this->value >= value);
+			}
+
+
+			template <typename T2>
+			Expression<T, T2> operator != (T2 value)
+			{
+				return Expression<T, T2>(expression, NE, this->value, value, this->value != value);
+			}
+
+
+			template <typename T2>
+			Expression<T, T2> operator > (T2 value)
+			{
+				return Expression<T, T2>(expression, GT, this->value, value, this->value > value);
+			}
+
+
+			template <typename T2>
+			Expression<T, T2> operator < (T2 value)
+			{
+				return Expression<T, T2>(expression, LT, this->value, value, this->value < value);
+			}
+
+
+			const char* expression;
+			T value;
+		};
+
+
+		struct Result
+		{
+			Result(const char* expression)
+			{
+				this->expression = expression;
+			}
+
+
+			template <typename T> ExpressionLHS<T> operator <= (T value)
+			{
+				return ExpressionLHS<T>(expression, value);
+			}
+
+
+			const char* expression;
+		};
+
+
+		LUMIX_FORCE_INLINE void expect(ExpressionLHS<bool> expr, const char* file, uint32 line)
+		{
+			if (!expr.value)
+			{
+				Manager::instance().handleFail(expr.expression, file, line);
 			}
 		}
 
-		template<>
-		LUMIX_FORCE_INLINE void expectEq<const char*>(const char* p1, const char* p2, const char* file, uint32 line)
-		{
-			if(Lumix::compareString(p1, p2) != 0)
-			{
-				Manager::instance().handleFail(file, line);
-			}
-		}
 
-		template<typename T1, typename T2>
-		LUMIX_FORCE_INLINE void expectNe(T1 p1, T2 p2, const char* file, uint32 line)
+		template <typename T1, typename T2>
+		LUMIX_FORCE_INLINE void expect(Expression<T1, T2> expr, const char* file, uint32 line)
 		{
-			if(p1 == p2)
+			if(!expr.result)
 			{
-				Manager::instance().handleFail(file, line);
-			}
-		}
-
-		template<>
-		LUMIX_FORCE_INLINE void expectNe<const char*>(const char* p1, const char* p2, const char* file, uint32 line)
-		{
-			if(Lumix::compareString(p1, p2) == 0)
-			{
-				Manager::instance().handleFail(file, line);
-			}
-		}
-
-		template<typename T1, typename T2>
-		LUMIX_FORCE_INLINE void expectLt(T1 p1, T2 p2, const char* file, uint32 line)
-		{
-			if(p1 >= p2)
-			{
-				Manager::instance().handleFail(file, line);
-			}
-		}
-
-		template<>
-		LUMIX_FORCE_INLINE void expectLt<const char*>(const char* p1, const char* p2, const char* file, uint32 line)
-		{
-			if(Lumix::compareString(p1, p2) >= 0)
-			{
-				Manager::instance().handleFail(file, line);
-			}
-		}
-
-		template<typename T1, typename T2>
-		LUMIX_FORCE_INLINE void expectGt(T1 p1, T2 p2, const char* file, uint32 line)
-		{
-			if(p1 <= p2)
-			{
-				Manager::instance().handleFail(file, line);
-			}
-		}
-
-		template<>
-		LUMIX_FORCE_INLINE void expectGt<const char*>(const char* p1, const char* p2, const char* file, uint32 line)
-		{
-			if(Lumix::compareString(p1, p2) <= 0)
-			{
-				Manager::instance().handleFail(file, line);
-			}
-		}
-
-		template<typename T1, typename T2>
-		LUMIX_FORCE_INLINE void expectLe(T1 p1, T2 p2, const char* file, uint32 line)
-		{
-			if(p1 > p2)
-			{
-				Manager::instance().handleFail(file, line);
-			}
-		}
-
-		template<>
-		LUMIX_FORCE_INLINE void expectLe<const char*>(const char* p1, const char* p2, const char* file, uint32 line)
-		{
-			if(Lumix::compareString(p1, p2) > 0)
-			{
-				Manager::instance().handleFail(file, line);
-			}
-		}
-
-		template<typename T1, typename T2>
-		LUMIX_FORCE_INLINE void expectGe(T1 p1, T2 p2, const char* file, uint32 line)
-		{
-			if(p1 < p2)
-			{
-				Manager::instance().handleFail(file, line);
-			}
-		}
-
-		template<>
-		LUMIX_FORCE_INLINE void expectGe<const char*>(const char* p1, const char* p2, const char* file, uint32 line)
-		{
-			if(Lumix::compareString(p1, p2) < 0)
-			{
-				Manager::instance().handleFail(file, line);
-			}
-		}
-
-		LUMIX_FORCE_INLINE void expectCloseEq(float p1, float p2, float t, const char* file, uint32 line)
-		{
-			ASSERT(t > 0);
-			if(Math::abs(p1 - p2) > t)
-			{
-				Manager::instance().handleFail(file, line);
-			}
-		}
-
-		LUMIX_FORCE_INLINE void expectCloseNe(float p1, float p2, float t, const char* file, uint32 line)
-		{
-			ASSERT(t > 0);
-			if(Math::abs(p1 - p2) <= t)
-			{
-				Manager::instance().handleFail(file, line);
-			}
-		}
-
-		LUMIX_FORCE_INLINE void expectTrue(bool b, const char* file, uint32 line)
-		{
-			if(!b)
-			{
-				Manager::instance().handleFail(file, line);
-			}
-		}
-
-		LUMIX_FORCE_INLINE void expectFalse(bool b, const char* file, uint32 line)
-		{
-			if(b)
-			{
-				Manager::instance().handleFail(file, line);
+				char tmp[1024];
+				Lumix::copyString(tmp, "\"");
+				Lumix::catString(tmp, expr.expression);
+				Lumix::catString(tmp, "\" evaluated to ");
+				expr.getOperand(tmp, expr.lhs);
+				expr.getOperator(tmp);
+				expr.getOperand(tmp, expr.rhs);
+				Manager::instance().handleFail(tmp, file, line);
 			}
 		}
 	} // ~UnitTest
 } // ~Lumix
 
-#define LUMIX_EXPECT_EQ(p1, p2)	Lumix::UnitTest::expectEq(p1, p2, __FILE__, __LINE__)
-#define LUMIX_EXPECT_NE(p1, p2)	Lumix::UnitTest::expectNe(p1, p2, __FILE__, __LINE__)
-#define LUMIX_EXPECT_GT(p1, p2)	Lumix::UnitTest::expectGt(p1, p2, __FILE__, __LINE__)
-#define LUMIX_EXPECT_LT(p1, p2)	Lumix::UnitTest::expectLt(p1, p2, __FILE__, __LINE__)
-#define LUMIX_EXPECT_GE(p1, p2)	Lumix::UnitTest::expectGe(p1, p2, __FILE__, __LINE__)
-#define LUMIX_EXPECT_LE(p1, p2)	Lumix::UnitTest::expectLe(p1, p2, __FILE__, __LINE__)
-#define LUMIX_EXPECT_CLOSE_EQ(p1, p2, t)	Lumix::UnitTest::expectCloseEq(p1, p2, t, __FILE__, __LINE__)
-#define LUMIX_EXPECT_CLOSE_NE(p1, p2,t )	Lumix::UnitTest::expectCloseNe(p1, p2, t, __FILE__, __LINE__)
-#define LUMIX_EXPECT_TRUE(p1)		Lumix::UnitTest::expectTrue(p1, __FILE__, __LINE__)
-#define LUMIX_EXPECT_FALSE(p1)	Lumix::UnitTest::expectFalse(p1, __FILE__, __LINE__)
-#define LUMIX_EXPECT_NULL(p1)		Lumix::UnitTest::expectTrue(p1 == NULL, __FILE__, __LINE__)
-#define LUMIX_EXPECT_NOT_NULL(p1)	Lumix::UnitTest::expectTrue(p1 != NULL, __FILE__, __LINE__)
+#define LUMIX_EXPECT(b)	Lumix::UnitTest::expect(Lumix::UnitTest::Result(#b) <= b, __FILE__, __LINE__)
+#define LUMIX_EXPECT_CLOSE_EQ(a, b, e)	Lumix::UnitTest::expect(Lumix::UnitTest::Result(#a " close equals " #b) <= (((a) - (e)) < (b) && ((a) + (e)) > (b)), __FILE__, __LINE__)

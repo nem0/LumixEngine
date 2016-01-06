@@ -5,6 +5,8 @@
 
 namespace Lumix
 {
+	class Path;
+
 	namespace FS
 	{
 		class IFileDevice;
@@ -16,7 +18,7 @@ namespace Lumix
 			IFile() {}
 			virtual ~IFile() {}
 
-			virtual bool open(const char* path, Mode mode) = 0;
+			virtual bool open(const Path& path, Mode mode) = 0;
 			virtual void close() = 0;
 
 			virtual bool read(void* buffer, size_t size) = 0;

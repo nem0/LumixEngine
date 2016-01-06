@@ -279,7 +279,7 @@ void Texture::saveTGA()
 
 	FS::FileSystem& fs = m_resource_manager.getFileSystem();
 	FS::IFile* file = fs.open(fs.getDiskDevice(),
-							  getPath().c_str(),
+							  getPath(),
 							  FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
 
 	saveTGA(m_allocator, file, m_width, m_height, m_BPP, &m_data[0], getPath());
@@ -297,7 +297,7 @@ void Texture::save()
 	{
 		FS::FileSystem& fs = m_resource_manager.getFileSystem();
 		FS::IFile* file = fs.open(fs.getDefaultDevice(),
-								  getPath().c_str(),
+								  getPath(),
 								  FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
 
 		file->write(&m_data[0], m_data.size() * sizeof(m_data[0]));
@@ -309,7 +309,7 @@ void Texture::save()
 	}
 	else
 	{
-		g_log_error.log("renderer") << "Texture " << getPath()
+		g_log_error.log("renderer") << "Texture " << getPath().c_str()
 									<< " can not be saved - unsupported format";
 	}
 }
@@ -522,7 +522,7 @@ bool Texture::load(FS::IFile& file)
 	}
 	if (!loaded)
 	{
-		g_log_warning.log("renderer") << "Error loading texture " << getPath().c_str();
+		g_log_warning.log("renderer") << "Error loading texture " << path;
 		return false;
 	}
 

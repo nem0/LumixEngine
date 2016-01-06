@@ -32,6 +32,7 @@ static void doCulling(int start_index,
 	PROFILE_FUNCTION();
 	int i = start_index;
 	ASSERT(results.empty());
+	PROFILE_INT("objects", int(end - start));
 	for (const Sphere *sphere = start; sphere <= end; sphere++, ++i)
 	{
 		if (frustum->isSphereInside(sphere->m_position, sphere->m_radius) &&
@@ -323,7 +324,7 @@ public:
 
 private:
 	IAllocator& m_allocator;
-	FreeList<CullingJob, 8> m_job_allocator;
+	FreeList<CullingJob, 16> m_job_allocator;
 	InputSpheres m_spheres;
 	Results m_result;
 	LayerMasks m_layer_masks;

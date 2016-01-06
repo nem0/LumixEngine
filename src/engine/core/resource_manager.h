@@ -6,6 +6,7 @@ namespace Lumix
 {
 
 
+class Path;
 class Resource;
 
 
@@ -45,7 +46,7 @@ public:
 
 	void add(uint32 id, ResourceManagerBase* rm);
 	void remove(uint32 id);
-	void reload(const char* path);
+	void reload(const Path& path);
 	void removeUnreferenced();
 
 	FS::FileSystem& getFileSystem() { return *m_file_system; }

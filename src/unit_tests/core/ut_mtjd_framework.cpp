@@ -114,7 +114,7 @@ void UT_MTJDFrameworkTest(const char* params)
 		{
 			for (int32 j = 0; j < BUFFER_SIZE; j++)
 			{
-				LUMIX_EXPECT_EQ(OUT_BUFFER[i][j], (float)j + (float)j);
+				LUMIX_EXPECT(OUT_BUFFER[i][j] == (float)j + (float)j);
 			}
 		}
 
@@ -180,7 +180,7 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 
 	for (int32 i = 0; i < BUFFER_SIZE; i++)
 	{
-		LUMIX_EXPECT_EQ(OUT_BUFFER[0][i], (float)i * (float)(TESTS_COUNT + 1));
+		LUMIX_EXPECT(OUT_BUFFER[0][i] == (float)i * (float)(TESTS_COUNT + 1));
 	}
 
 	for (int32 i = 0; i < TESTS_COUNT; i++)

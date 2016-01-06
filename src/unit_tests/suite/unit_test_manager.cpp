@@ -31,6 +31,7 @@ namespace Lumix
 
 		struct FailInfo
 		{
+			char m_message[1024];
 			const char* m_file_name;
 			uint32 m_line;
 		};
@@ -162,13 +163,12 @@ namespace Lumix
 				
 				if (m_fails > 0)
 				{
-					ASSERT(false);
-
 					g_log_info.log("unit") << "----------Fails----------";
-					for (int i = 0; i < m_failed_tests.size(); i++) 
+					for (auto& i : m_failed_tests) 
 					{
-						g_log_info.log("unit") << m_failed_tests[i].m_file_name << "(" << m_failed_tests[i].m_line << ")";
+						g_log_info.log("unit") << i.m_message << " : " << i.m_file_name << "(" << i.m_line << ")";
 					}
+					ASSERT(false);
 				}
 
 				FILE* fout = fopen("tests.xml", "w");
@@ -192,9 +192,10 @@ namespace Lumix
 				g_log_info.log("unit") << "---------------------------";
 			}
 
-			void handleFail(const char* file_name, uint32 line)
+			void handleFail(const char* msg, const char* file_name, uint32 line)
 			{	
 				FailInfo& fi = m_failed_tests.pushEmpty();
+				Lumix::copyString(fi.m_message, msg);
 				fi.m_file_name = file_name;
 				fi.m_line = line;
 				m_fails++;
@@ -299,9 +300,9 @@ namespace Lumix
 			m_impl->dumpResults();
 		}
 
-		void Manager::handleFail(const char* file_name, uint32 line)
+		void Manager::handleFail(const char* msg, const char* file_name, uint32 line)
 		{
-			m_impl->handleFail(file_name, line);
+			m_impl->handleFail(msg, file_name, line);
 		}
 
 		Manager::Manager(IAllocator& allocator)

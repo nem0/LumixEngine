@@ -4,7 +4,6 @@
 #include "core/array.h"
 #include "core/delegate_list.h"
 #include "core/matrix.h"
-#include "core/string.h"
 #include "iplugin.h"
 #include "renderer/ray_cast_model_hit.h"
 #include "universe/component.h"
@@ -184,27 +183,51 @@ public:
 	virtual const char* getCameraSlot(ComponentIndex camera) = 0;
 	virtual void setCameraSize(ComponentIndex camera, int w, int h) = 0;
 
+	virtual void resetParticleEmitter(ComponentIndex cmp) = 0;
+	virtual void drawEmitterGizmo(ComponentIndex cmp) = 0;
+	virtual void updateEmitter(ComponentIndex cmp, float time_delta) = 0;
 	virtual const Array<class ParticleEmitter*>& getParticleEmitters() const = 0;
 	virtual const Vec2* getParticleEmitterAlpha(ComponentIndex cmp) = 0;
 	virtual int getParticleEmitterAlphaCount(ComponentIndex cmp) = 0;
 	virtual const Vec2* getParticleEmitterSize(ComponentIndex cmp) = 0;
 	virtual int getParticleEmitterSizeCount(ComponentIndex cmp) = 0;
+	virtual Vec3 getParticleEmitterAcceleration(ComponentIndex cmp) = 0;
 	virtual Vec2 getParticleEmitterLinearMovementX(ComponentIndex cmp) = 0;
 	virtual Vec2 getParticleEmitterLinearMovementY(ComponentIndex cmp) = 0;
 	virtual Vec2 getParticleEmitterLinearMovementZ(ComponentIndex cmp) = 0;
 	virtual Vec2 getParticleEmitterInitialLife(ComponentIndex cmp) = 0;
+	virtual Int2 getParticleEmitterSpawnCount(ComponentIndex cmp) = 0;
 	virtual Vec2 getParticleEmitterSpawnPeriod(ComponentIndex cmp) = 0;
 	virtual Vec2 getParticleEmitterInitialSize(ComponentIndex cmp) = 0;
 	virtual void setParticleEmitterAlpha(ComponentIndex cmp, const Vec2* value, int count) = 0;
 	virtual void setParticleEmitterSize(ComponentIndex cmp, const Vec2* values, int count) = 0;
+	virtual void setParticleEmitterAcceleration(ComponentIndex cmp, const Vec3& value) = 0;
 	virtual void setParticleEmitterLinearMovementX(ComponentIndex cmp, const Vec2& value) = 0;
 	virtual void setParticleEmitterLinearMovementY(ComponentIndex cmp, const Vec2& value) = 0;
 	virtual void setParticleEmitterLinearMovementZ(ComponentIndex cmp, const Vec2& value) = 0;
 	virtual void setParticleEmitterInitialLife(ComponentIndex cmp, const Vec2& value) = 0;
+	virtual void setParticleEmitterSpawnCount(ComponentIndex cmp, const Int2& value) = 0;
 	virtual void setParticleEmitterSpawnPeriod(ComponentIndex cmp, const Vec2& value) = 0;
 	virtual void setParticleEmitterInitialSize(ComponentIndex cmp, const Vec2& value) = 0;
-	virtual void setParticleEmitterMaterialPath(ComponentIndex cmp, const char* path) = 0;
-	virtual const char* getParticleEmitterMaterialPath(ComponentIndex cmp) = 0;
+	virtual void setParticleEmitterMaterialPath(ComponentIndex cmp, const Path& path) = 0;
+	virtual Path getParticleEmitterMaterialPath(ComponentIndex cmp) = 0;
+	virtual int getParticleEmitterPlaneCount(ComponentIndex cmp) = 0;
+	virtual void addParticleEmitterPlane(ComponentIndex cmp, int index) = 0;
+	virtual void removeParticleEmitterPlane(ComponentIndex cmp, int index) = 0;
+	virtual Entity getParticleEmitterPlaneEntity(ComponentIndex cmp, int index) = 0;
+	virtual void setParticleEmitterPlaneEntity(ComponentIndex cmp, int index, Entity entity) = 0;
+	virtual float getParticleEmitterPlaneBounce(ComponentIndex cmp) = 0;
+	virtual void setParticleEmitterPlaneBounce(ComponentIndex cmp, float value) = 0;
+	virtual float getParticleEmitterShapeRadius(ComponentIndex cmp) = 0;
+	virtual void setParticleEmitterShapeRadius(ComponentIndex cmp, float value) = 0;
+
+	virtual int getParticleEmitterAttractorCount(ComponentIndex cmp) = 0;
+	virtual void addParticleEmitterAttractor(ComponentIndex cmp, int index) = 0;
+	virtual void removeParticleEmitterAttractor(ComponentIndex cmp, int index) = 0;
+	virtual Entity getParticleEmitterAttractorEntity(ComponentIndex cmp, int index) = 0;
+	virtual void setParticleEmitterAttractorEntity(ComponentIndex cmp, int index, Entity entity) = 0;
+	virtual float getParticleEmitterAttractorForce(ComponentIndex cmp) = 0;
+	virtual void setParticleEmitterAttractorForce(ComponentIndex cmp, float value) = 0;
 
 	virtual DelegateList<void(ComponentIndex)>& renderableCreated() = 0;
 	virtual DelegateList<void(ComponentIndex)>& renderableDestroyed() = 0;
@@ -213,10 +236,10 @@ public:
 	virtual ComponentIndex getRenderableComponent(Entity entity) = 0;
 	virtual Renderable* getRenderable(ComponentIndex cmp) = 0;
 	virtual Renderable* getRenderables() = 0;
-	virtual const char* getRenderablePath(ComponentIndex cmp) = 0;
+	virtual Path getRenderablePath(ComponentIndex cmp) = 0;
 	virtual void setRenderableLayer(ComponentIndex cmp,
 									const int32& layer) = 0;
-	virtual void setRenderablePath(ComponentIndex cmp, const char* path) = 0;
+	virtual void setRenderablePath(ComponentIndex cmp, const Path& path) = 0;
 	virtual void getRenderableInfos(const Frustum& frustum,
 		Array<RenderableMesh>& meshes,
 		int64 layer_mask) = 0;
@@ -239,8 +262,8 @@ public:
 		LIFOAllocator& allocator) = 0;
 	virtual float getTerrainHeightAt(ComponentIndex cmp, float x, float z) = 0;
 	virtual Vec3 getTerrainNormalAt(ComponentIndex cmp, float x, float z) = 0;
-	virtual void setTerrainMaterialPath(ComponentIndex cmp, const char* path) = 0;
-	virtual const char* getTerrainMaterialPath(ComponentIndex cmp) = 0;
+	virtual void setTerrainMaterialPath(ComponentIndex cmp, const Path& path) = 0;
+	virtual Path getTerrainMaterialPath(ComponentIndex cmp) = 0;
 	virtual Material* getTerrainMaterial(ComponentIndex cmp) = 0;
 	virtual void setTerrainXZScale(ComponentIndex cmp, float scale) = 0;
 	virtual float getTerrainXZScale(ComponentIndex cmp) = 0;
@@ -253,8 +276,8 @@ public:
 	virtual int getGrassDistance(ComponentIndex cmp) = 0;
 	virtual void setGrassDistance(ComponentIndex cmp, int value) = 0;
 	virtual void enableGrass(bool enabled) = 0;
-	virtual void setGrassPath(ComponentIndex cmp, int index, const char* path) = 0;
-	virtual const char* getGrassPath(ComponentIndex cmp, int index) = 0;
+	virtual void setGrassPath(ComponentIndex cmp, int index, const Path& path) = 0;
+	virtual Path getGrassPath(ComponentIndex cmp, int index) = 0;
 	virtual void setGrassGround(ComponentIndex cmp, int index, int ground) = 0;
 	virtual int getGrassGround(ComponentIndex cmp, int index) = 0;
 	virtual void setGrassDensity(ComponentIndex cmp, int index, int density) = 0;

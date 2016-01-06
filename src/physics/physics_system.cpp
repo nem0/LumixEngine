@@ -12,6 +12,8 @@
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
 #include "renderer/render_scene.h"
+#include "studio_lib/studio_app.h"
+#include "studio_lib/utils.h"
 #include "universe/universe.h"
 
 
@@ -208,6 +210,120 @@ void CustomErrorCallback::reportError(physx::PxErrorCode::Enum,
 	int)
 {
 	g_log_error.log("PhysX") << message;
+}
+
+
+extern "C" LUMIX_PHYSICS_API void setStudioApp(StudioApp& app)
+{
+	struct Plugin : public StudioApp::IPlugin
+	{
+		Plugin(Lumix::WorldEditor& editor)
+			: m_editor(editor)
+		{
+			m_action = LUMIX_NEW(m_editor.getAllocator(), Action)("Physics", "physics");
+			m_action->func.bind<Plugin, &Plugin::onAction>(this);
+			m_is_window_opened = false;
+		}
+
+
+		void onAction()
+		{
+			m_is_window_opened = !m_is_window_opened;
+		}
+
+
+		void onWindowGUI() override
+		{
+			auto* scene = static_cast<PhysicsScene*>(m_editor.getScene(crc32("physics")));
+			if (ImGui::BeginDock("Physics", &m_is_window_opened))
+			{
+				if (ImGui::CollapsingHeader("Layers"))
+				{
+					for (int i = 0; i < scene->getCollisionsLayersCount(); ++i)
+					{
+						char buf[30];
+						copyString(buf, scene->getCollisionLayerName(i));
+						char label[10];
+						toCString(i, label, lengthOf(label));
+						if (ImGui::InputText(label, buf, lengthOf(buf)))
+						{
+							scene->setCollisionLayerName(i, buf);
+						}
+					}
+					if (ImGui::Button("Add layer"))
+					{
+						scene->addCollisionLayer();
+					}
+					if (scene->getCollisionsLayersCount() > 1)
+					{
+						ImGui::SameLine();
+						if (ImGui::Button("Remove layer"))
+						{
+							scene->removeCollisionLayer();
+						}
+					}
+				}
+
+				if (ImGui::CollapsingHeader("Collision matrix", nullptr, true, true))
+				{
+					ImGui::Columns(1 + scene->getCollisionsLayersCount());
+					ImGui::NextColumn();
+					ImGui::PushTextWrapPos(1);
+					float basic_offset = 0;
+					for (int i = 0, c = scene->getCollisionsLayersCount(); i < c; ++i)
+					{
+						auto* layer_name = scene->getCollisionLayerName(i);
+						basic_offset = Math::maxValue(basic_offset, ImGui::CalcTextSize(layer_name).x);
+					}
+					basic_offset += ImGui::GetStyle().FramePadding.x * 2 + ImGui::GetStyle().WindowPadding.x;
+
+					for (int i = 0, c = scene->getCollisionsLayersCount(); i < c; ++i)
+					{
+						auto* layer_name = scene->getCollisionLayerName(i);
+						float offset = basic_offset + i * 35.0f;
+						ImGui::SetColumnOffset(-1, offset);
+						ImGui::Text(layer_name);
+						ImGui::NextColumn();
+					}
+					ImGui::PopTextWrapPos();
+
+					ImGui::Separator();
+					for (int i = 0, c = scene->getCollisionsLayersCount(); i < c; ++i)
+					{
+						ImGui::Text(scene->getCollisionLayerName(i));
+						ImGui::NextColumn();
+
+						for (int j = 0; j <= i; ++j)
+						{
+							bool b = scene->canLayersCollide(i, j);
+							if (ImGui::Checkbox(StringBuilder<10>("###", i, "-") << j, &b))
+							{
+								scene->setLayersCanCollide(i, j, b);
+							}
+							ImGui::NextColumn();
+						}
+						for (int j = i + 1; j < c; ++j)
+						{
+							ImGui::NextColumn();
+						}
+					}
+					ImGui::Columns();
+				}
+			}
+
+			ImGui::EndDock();
+		}
+
+
+		const char* getWindowName() override { return "Physics"; }
+
+
+		bool m_is_window_opened;
+		Lumix::WorldEditor& m_editor;
+	};
+
+	Plugin* plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Plugin)(*app.getWorldEditor());
+	app.addPlugin(*plugin);
 }
 
 

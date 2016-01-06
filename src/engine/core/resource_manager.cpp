@@ -47,7 +47,7 @@ namespace Lumix
 		}
 	}
 
-	void ResourceManager::reload(const char* path)
+	void ResourceManager::reload(const Path& path)
 	{
 		for (auto iter = m_resource_managers.begin(), end = m_resource_managers.end(); iter != end; ++iter)
 		{

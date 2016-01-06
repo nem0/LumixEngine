@@ -44,8 +44,14 @@ static const uint32 RENDERABLE_HASH = crc32("renderable");
 static const uint32 POINT_LIGHT_HASH = crc32("point_light");
 static const uint32 PARTICLE_EMITTER_HASH = crc32("particle_emitter");
 static const uint32 PARTICLE_EMITTER_FADE_HASH = crc32("particle_emitter_fade");
+static const uint32 PARTICLE_EMITTER_FORCE_HASH = crc32("particle_emitter_force");
+static const uint32 PARTICLE_EMITTER_ATTRACTOR_HASH = crc32("particle_emitter_attractor");
 static const uint32 PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH =
 	crc32("particle_emitter_linear_movement");
+static const uint32 PARTICLE_EMITTER_SPAWN_SHAPE_HASH =
+	crc32("particle_emitter_spawn_shape");
+static const uint32 PARTICLE_EMITTER_PLANE_HASH =
+	crc32("particle_emitter_plane");
 static const uint32 PARTICLE_EMITTER_RANDOM_ROTATION_HASH =
 	crc32("particle_emitter_random_rotation");
 static const uint32 PARTICLE_EMITTER_SIZE_HASH = crc32("particle_emitter_size");
@@ -58,6 +64,9 @@ enum class RenderSceneVersion : int32
 {
 	PARTICLES,
 	WHOLE_LIGHTS,
+	PARTICLE_EMITTERS_SPAWN_COUNT,
+	PARTICLES_FORCE_MODULE,
+	PARTICLES_SAVE_SIZE_ALPHA,
 
 	LATEST,
 	INVALID = -1,
@@ -174,6 +183,7 @@ public:
 		, m_renderable_created(m_allocator)
 		, m_renderable_destroyed(m_allocator)
 		, m_is_grass_enabled(true)
+		, m_is_game_running(false)
 		, m_particle_emitters(m_allocator)
 	{
 		m_universe.entityTransformed()
@@ -219,6 +229,24 @@ public:
 	}
 
 
+	void resetParticleEmitter(ComponentIndex cmp) override
+	{
+		m_particle_emitters[cmp]->reset();
+	}
+
+
+	void drawEmitterGizmo(ComponentIndex cmp) override
+	{
+		m_particle_emitters[cmp]->drawGizmo(*this);
+	}
+
+
+	void updateEmitter(ComponentIndex cmp, float time_delta) override
+	{
+		m_particle_emitters[cmp]->update(time_delta);
+	}
+
+
 	Universe& getUniverse() override { return m_universe; }
 
 
@@ -230,7 +258,66 @@ public:
 	}
 
 
+	ComponentIndex getComponent(Entity entity, uint32 type) override
+	{
+		if (type == RENDERABLE_HASH)
+		{
+			return m_renderables[entity].entity != INVALID_ENTITY ? entity : INVALID_COMPONENT;
+		}
+		if (type == POINT_LIGHT_HASH)
+		{
+			for (auto& i : m_point_lights)
+			{
+				if (i.m_entity == entity) return i.m_uid;
+			}
+			return INVALID_COMPONENT;
+		}
+		if (type == GLOBAL_LIGHT_HASH)
+		{
+			for (auto& i : m_global_lights)
+			{
+				if (i.m_entity == entity) return i.m_uid;
+			}
+			return INVALID_COMPONENT;
+		}
+		if (type == CAMERA_HASH)
+		{
+			for (int i = 0; i < m_cameras.size(); ++i)
+			{
+				if (!m_cameras[i].m_is_free && m_cameras[i].m_entity == entity) return i;
+			}
+			return INVALID_COMPONENT;
+		}
+		if (type == TERRAIN_HASH)
+		{
+			for (int i = 0; i < m_terrains.size(); ++i)
+			{
+				if (m_terrains[i] && m_terrains[i]->getEntity() == entity) return i;
+			}
+			return INVALID_COMPONENT;
+		}
+		return INVALID_COMPONENT;
+	}
+
+
 	IPlugin& getPlugin() const override { return m_renderer; }
+
+
+	Int2 getParticleEmitterSpawnCount(ComponentIndex cmp) override
+	{
+		Int2 ret;
+		ret.x = m_particle_emitters[cmp]->m_spawn_count.from;
+		ret.y = m_particle_emitters[cmp]->m_spawn_count.to;
+		return ret;
+	}
+
+
+	void setParticleEmitterSpawnCount(ComponentIndex cmp, const Int2& value) override
+	{
+		m_particle_emitters[cmp]->m_spawn_count.from = value.x;
+		m_particle_emitters[cmp]->m_spawn_count.to = Math::max(value.x, value.y);
+	}
+
 
 
 	void getRay(ComponentIndex camera,
@@ -290,6 +377,18 @@ public:
 	}
 
 
+	void startGame() override
+	{
+		m_is_game_running = true;
+	}
+
+
+	void stopGame() override
+	{
+		m_is_game_running = false;
+	}
+
+
 	void update(float dt) override
 	{
 		PROFILE_FUNCTION();
@@ -322,11 +421,14 @@ public:
 			}
 		}
 
-		for (auto* emitter : m_particle_emitters)
+		if (m_is_game_running)
 		{
-			if (!emitter) continue;
-			
-			emitter->update(dt);
+			for (auto* emitter : m_particle_emitters)
+			{
+				if (!emitter) continue;
+
+				emitter->update(dt);
+			}
 		}
 	}
 
@@ -396,7 +498,7 @@ public:
 	}
 
 
-	void deserializeParticleEmitters(InputBlob& serializer)
+	void deserializeParticleEmitters(InputBlob& serializer, int version)
 	{
 		int count;
 		serializer.read(count);
@@ -410,7 +512,9 @@ public:
 			{
 				emitter = LUMIX_NEW(m_allocator, ParticleEmitter)(
 					INVALID_ENTITY, m_universe, m_allocator);
-				emitter->deserialize(serializer, m_engine.getResourceManager());
+				emitter->deserialize(serializer,
+					m_engine.getResourceManager(),
+					version > (int)RenderSceneVersion::PARTICLE_EMITTERS_SPAWN_COUNT);
 				m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_HASH, this, i);
 				for (auto* module : emitter->m_modules)
 				{
@@ -419,10 +523,30 @@ public:
 						m_universe.addComponent(
 							emitter->m_entity, PARTICLE_EMITTER_FADE_HASH, this, i);
 					}
+					else if (module->getType() == ParticleEmitter::ForceModule::s_type)
+					{
+						m_universe.addComponent(
+							emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this, i);
+					}
+					else if (module->getType() == ParticleEmitter::SpawnShapeModule::s_type)
+					{
+						m_universe.addComponent(
+							emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_HASH, this, i);
+					}
+					else if (module->getType() == ParticleEmitter::AttractorModule::s_type)
+					{
+						m_universe.addComponent(
+							emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_HASH, this, i);
+					}
 					else if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
 					{
 						m_universe.addComponent(
 							emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH, this, i);
+					}
+					else if (module->getType() == ParticleEmitter::PlaneModule::s_type)
+					{
+						m_universe.addComponent(
+							emitter->m_entity, PARTICLE_EMITTER_PLANE_HASH, this, i);
 					}
 					else if (module->getType() == ParticleEmitter::RandomRotationModule::s_type)
 					{
@@ -644,7 +768,7 @@ public:
 		deserializeRenderables(serializer);
 		deserializeLights(serializer, (RenderSceneVersion)version);
 		deserializeTerrains(serializer);
-		if (version >= 0) deserializeParticleEmitters(serializer);
+		if (version >= 0) deserializeParticleEmitters(serializer, version);
 	}
 
 
@@ -742,6 +866,38 @@ public:
 	}
 
 
+	void destroyParticleEmitterForce(ComponentIndex component)
+	{
+		auto* emitter = m_particle_emitters[component];
+		for(auto* module : emitter->m_modules)
+		{
+			if(module->getType() == ParticleEmitter::ForceModule::s_type)
+			{
+				LUMIX_DELETE(m_allocator, module);
+				emitter->m_modules.eraseItem(module);
+				m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this, component);
+				break;
+			}
+		}
+	}
+
+
+	void destroyParticleEmitterAttractor(ComponentIndex component)
+	{
+		auto* emitter = m_particle_emitters[component];
+		for(auto* module : emitter->m_modules)
+		{
+			if(module->getType() == ParticleEmitter::AttractorModule::s_type)
+			{
+				LUMIX_DELETE(m_allocator, module);
+				emitter->m_modules.eraseItem(module);
+				m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_HASH, this, component);
+				break;
+			}
+		}
+	}
+
+
 	void destroyParticleEmitterSize(ComponentIndex component)
 	{
 		auto* emitter = m_particle_emitters[component];
@@ -752,6 +908,79 @@ public:
 				LUMIX_DELETE(m_allocator, module);
 				emitter->m_modules.eraseItem(module);
 				m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_SIZE_HASH, this, component);
+				break;
+			}
+		}
+	}
+
+
+	float getParticleEmitterPlaneBounce(ComponentIndex cmp) override
+	{
+		auto* emitter = m_particle_emitters[cmp];
+		for(auto* module : emitter->m_modules)
+		{
+			if(module->getType() == ParticleEmitter::PlaneModule::s_type)
+			{
+				return static_cast<ParticleEmitter::PlaneModule*>(module)->m_bounce;
+			}
+		}
+		return 0;
+	}
+
+
+	void setParticleEmitterPlaneBounce(ComponentIndex cmp, float value) override
+	{
+		auto* emitter = m_particle_emitters[cmp];
+		for(auto* module : emitter->m_modules)
+		{
+			if(module->getType() == ParticleEmitter::PlaneModule::s_type)
+			{
+				static_cast<ParticleEmitter::PlaneModule*>(module)->m_bounce = value;
+				break;
+			}
+		}
+	}
+
+
+	float getParticleEmitterAttractorForce(ComponentIndex cmp) override
+	{
+		auto* emitter = m_particle_emitters[cmp];
+		for(auto* module : emitter->m_modules)
+		{
+			if(module->getType() == ParticleEmitter::AttractorModule::s_type)
+			{
+				return static_cast<ParticleEmitter::AttractorModule*>(module)->m_force;
+			}
+		}
+		return 0;
+	}
+
+
+	void setParticleEmitterAttractorForce(ComponentIndex cmp, float value) override
+	{
+		auto* emitter = m_particle_emitters[cmp];
+		for(auto* module : emitter->m_modules)
+		{
+			if(module->getType() == ParticleEmitter::AttractorModule::s_type)
+			{
+				static_cast<ParticleEmitter::AttractorModule*>(module)->m_force = value;
+				break;
+			}
+		}
+	}
+
+
+	void destroyParticleEmitterPlane(ComponentIndex component)
+	{
+		auto* emitter = m_particle_emitters[component];
+		for (auto* module : emitter->m_modules)
+		{
+			if (module->getType() == ParticleEmitter::PlaneModule::s_type)
+			{
+				LUMIX_DELETE(m_allocator, module);
+				emitter->m_modules.eraseItem(module);
+				m_universe.destroyComponent(
+					emitter->m_entity, PARTICLE_EMITTER_PLANE_HASH, this, component);
 				break;
 			}
 		}
@@ -769,6 +998,23 @@ public:
 				emitter->m_modules.eraseItem(module);
 				m_universe.destroyComponent(
 					emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH, this, component);
+				break;
+			}
+		}
+	}
+
+
+	void destroyParticleEmitterSpawnShape(ComponentIndex component)
+	{
+		auto* emitter = m_particle_emitters[component];
+		for (auto* module : emitter->m_modules)
+		{
+			if (module->getType() == ParticleEmitter::SpawnShapeModule::s_type)
+			{
+				LUMIX_DELETE(m_allocator, module);
+				emitter->m_modules.eraseItem(module);
+				m_universe.destroyComponent(
+					emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_HASH, this, component);
 				break;
 			}
 		}
@@ -801,49 +1047,43 @@ public:
 		ASSERT(values[1].x < 0.001f);
 		ASSERT(values[count - 2].x > 0.999f);
 
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for(auto* module : modules)
+		auto* alpha_module = getEmitterModule<ParticleEmitter::AlphaModule>(cmp);
+		if (!alpha_module) return;
+		
+		alpha_module->m_values.resize(count);
+		for (int i = 0; i < count; ++i)
 		{
-			if(module->getType() == ParticleEmitter::AlphaModule::s_type)
-			{
-				auto alpha_module = static_cast<ParticleEmitter::AlphaModule*>(module);
-				alpha_module->m_values.resize(count);
-				for(int i = 0; i < count; ++i)
-				{
-					alpha_module->m_values[i] = values[i];
-				}
-				alpha_module->sample();
-				return;
-			}
+			alpha_module->m_values[i] = values[i];
 		}
+		alpha_module->sample();
+	}
+
+
+	void setParticleEmitterAcceleration(ComponentIndex cmp, const Vec3& value) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::ForceModule>(cmp);
+		if (module) module->m_acceleration = value;
+	}
+
+
+	Vec3 getParticleEmitterAcceleration(ComponentIndex cmp) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::ForceModule>(cmp);
+		return module ? module->m_acceleration : Vec3();
 	}
 
 
 	int getParticleEmitterSizeCount(ComponentIndex cmp) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::SizeModule::s_type)
-			{
-				return static_cast<ParticleEmitter::SizeModule*>(module)->m_values.size();
-			}
-		}
-		return 0;
+		auto* module = getEmitterModule<ParticleEmitter::SizeModule>(cmp);
+		return module ? module->m_values.size() : 0; 
 	}
 
 
 	const Vec2* getParticleEmitterSize(ComponentIndex cmp) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::SizeModule::s_type)
-			{
-				return &static_cast<ParticleEmitter::SizeModule*>(module)->m_values[0];
-			}
-		}
-		return 0;
+		auto* module = getEmitterModule<ParticleEmitter::SizeModule>(cmp);
+		return module ? &module->m_values[0] : nullptr;
 	}
 
 
@@ -853,133 +1093,87 @@ public:
 		ASSERT(values[0].x < 0.001f);
 		ASSERT(values[count-1].x > 0.999f);
 
+		auto* module = getEmitterModule<ParticleEmitter::SizeModule>(cmp);
+		if (!module) return;
+
+		auto size_module = static_cast<ParticleEmitter::SizeModule*>(module);
+		size_module->m_values.resize(count);
+		for (int i = 0; i < count; ++i)
+		{
+			size_module->m_values[i] = values[i];
+		}
+		size_module->sample();
+	}
+
+
+	template <typename T>
+	T* getEmitterModule(ComponentIndex cmp) const
+	{
 		auto& modules = m_particle_emitters[cmp]->m_modules;
 		for (auto* module : modules)
 		{
-			if (module->getType() == ParticleEmitter::SizeModule::s_type)
+			if (module->getType() == T::s_type)
 			{
-				auto size_module = static_cast<ParticleEmitter::SizeModule*>(module);
-				size_module->m_values.resize(count);
-				for (int i = 0; i < count; ++i)
-				{
-					size_module->m_values[i] = values[i];
-				}
-				size_module->sample();
-				return;
+				return static_cast<T*>(module);
 			}
 		}
+		return nullptr;
 	}
 
 
 	int getParticleEmitterAlphaCount(ComponentIndex cmp) override 
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for(auto* module : modules)
-		{
-			if(module->getType() == ParticleEmitter::AlphaModule::s_type)
-			{
-				return static_cast<ParticleEmitter::AlphaModule*>(module)->m_values.size();
-			}
-		}
-		return 0;
+		auto* module = getEmitterModule<ParticleEmitter::AlphaModule>(cmp);
+		return module ? module->m_values.size() : 0;
 	}
 
 
 	const Vec2* getParticleEmitterAlpha(ComponentIndex cmp) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::AlphaModule::s_type)
-			{
-				return &static_cast<ParticleEmitter::AlphaModule*>(module)->m_values[0];
-			}
-		}
-		return 0;
+		auto* module = getEmitterModule<ParticleEmitter::AlphaModule>(cmp);
+		return module ? &module->m_values[0] : 0;
 	}
 
 
 	Vec2 getParticleEmitterLinearMovementX(ComponentIndex cmp) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
-			{
-				return static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_x;
-			}
-		}
-		return Vec2(0, 0);
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		return module ? Vec2(module->m_x.from, module->m_x.to) : Vec2(0, 0);
 	}
 
 
 	void setParticleEmitterLinearMovementX(ComponentIndex cmp, const Vec2& value) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
-			{
-				static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_x = value; 
-				break;
-			}
-		}
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		if(module) module->m_x = value;
 	}
 
 
 	Vec2 getParticleEmitterLinearMovementY(ComponentIndex cmp) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
-			{
-				return static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_y;
-			}
-		}
-		return Vec2(0, 0);
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		return module ? Vec2(module->m_y.from, module->m_y.to) : Vec2(0, 0);
 	}
 
 
 	void setParticleEmitterLinearMovementY(ComponentIndex cmp, const Vec2& value) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
-			{
-				static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_y = value;
-				break;
-			}
-		}
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		if (module) module->m_y = value;
 	}
 
 
 	Vec2 getParticleEmitterLinearMovementZ(ComponentIndex cmp) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
-			{
-				return static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_z;
-			}
-		}
-		return Vec2(0, 0);
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		return module ? Vec2(module->m_z.from, module->m_z.to) : Vec2(0, 0);
 	}
 
 
 	void setParticleEmitterLinearMovementZ(ComponentIndex cmp, const Vec2& value) override
 	{
-		auto& modules = m_particle_emitters[cmp]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
-			{
-				static_cast<ParticleEmitter::LinearMovementModule*>(module)->m_z = value;
-				break;
-			}
-		}
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		if (module) module->m_z = value;
 	}
 
 
@@ -1072,6 +1266,23 @@ public:
 	}
 
 
+	ComponentIndex createParticleEmitterPlane(Entity entity)
+	{
+		for (int i = 0; i < m_particle_emitters.size(); ++i)
+		{
+			auto* emitter = m_particle_emitters[i];
+			if (emitter->m_entity == entity)
+			{
+				auto module = LUMIX_NEW(m_allocator, ParticleEmitter::PlaneModule)(*emitter);
+				emitter->addModule(module);
+				m_universe.addComponent(entity, PARTICLE_EMITTER_PLANE_HASH, this, i);
+				return i;
+			}
+		}
+		return INVALID_COMPONENT;
+	}
+
+
 	ComponentIndex createParticleEmitterLinearMovement(Entity entity)
 	{
 		for (int i = 0; i < m_particle_emitters.size(); ++i)
@@ -1089,6 +1300,23 @@ public:
 	}
 	
 
+	ComponentIndex createParticleEmitterSpawnShape(Entity entity)
+	{
+		for (int i = 0; i < m_particle_emitters.size(); ++i)
+		{
+			auto* emitter = m_particle_emitters[i];
+			if (emitter->m_entity == entity)
+			{
+				auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SpawnShapeModule)(*emitter);
+				emitter->addModule(module);
+				m_universe.addComponent(entity, PARTICLE_EMITTER_SPAWN_SHAPE_HASH, this, i);
+				return i;
+			}
+		}
+		return INVALID_COMPONENT;
+	}
+
+
 	ComponentIndex createParticleEmitterFade(Entity entity)
 	{
 		for (int i = 0; i < m_particle_emitters.size(); ++i)
@@ -1104,6 +1332,41 @@ public:
 		}
 		return INVALID_COMPONENT;
 	}
+
+
+	ComponentIndex createParticleEmitterForce(Entity entity)
+	{
+		for (int i = 0; i < m_particle_emitters.size(); ++i)
+		{
+			auto* emitter = m_particle_emitters[i];
+			if (emitter->m_entity == entity)
+			{
+				auto module = LUMIX_NEW(m_allocator, ParticleEmitter::ForceModule)(*emitter);
+				emitter->addModule(module);
+				m_universe.addComponent(entity, PARTICLE_EMITTER_FORCE_HASH, this, i);
+				return i;
+			}
+		}
+		return INVALID_COMPONENT;
+	}
+
+
+	ComponentIndex createParticleEmitterAttractor(Entity entity)
+	{
+		for(int i = 0; i < m_particle_emitters.size(); ++i)
+		{
+			auto* emitter = m_particle_emitters[i];
+			if(emitter->m_entity == entity)
+			{
+				auto module = LUMIX_NEW(m_allocator, ParticleEmitter::AttractorModule)(*emitter);
+				emitter->addModule(module);
+				m_universe.addComponent(entity, PARTICLE_EMITTER_ATTRACTOR_HASH, this, i);
+				return i;
+			}
+		}
+		return INVALID_COMPONENT;
+	}
+
 
 
 	ComponentIndex createParticleEmitterSize(Entity entity)
@@ -1266,7 +1529,7 @@ public:
 	}
 
 
-	void setTerrainMaterialPath(ComponentIndex cmp, const char* path) override
+	void setTerrainMaterialPath(ComponentIndex cmp, const Path& path) override
 	{
 		Material* material = static_cast<Material*>(
 			m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path)));
@@ -1280,15 +1543,15 @@ public:
 	}
 
 
-	const char* getTerrainMaterialPath(ComponentIndex cmp) override
+	Path getTerrainMaterialPath(ComponentIndex cmp) override
 	{
 		if (m_terrains[cmp]->getMaterial())
 		{
-			return m_terrains[cmp]->getMaterial()->getPath().c_str();
+			return m_terrains[cmp]->getMaterial()->getPath();
 		}
 		else
 		{
-			return "";
+			return Path("");
 		}
 	}
 
@@ -1334,9 +1597,9 @@ public:
 	}
 
 
-	const char* getRenderablePath(ComponentIndex cmp) override
+	Path getRenderablePath(ComponentIndex cmp) override
 	{
-		return m_renderables[cmp].model ? m_renderables[cmp].model->getPath().c_str() : "";
+		return m_renderables[cmp].model ? m_renderables[cmp].model->getPath() : Path("");
 	}
 
 
@@ -1346,12 +1609,12 @@ public:
 	}
 
 
-	void setRenderablePath(ComponentIndex cmp, const char* path) override
+	void setRenderablePath(ComponentIndex cmp, const Path& path) override
 	{
 		Renderable& r = m_renderables[cmp];
 
-		Model* model = static_cast<Model*>(
-			m_engine.getResourceManager().get(ResourceManager::MODEL)->load(Path(path)));
+		auto* manager = m_engine.getResourceManager().get(ResourceManager::MODEL);
+		Model* model = static_cast<Model*>(manager->load(path));
 		setModel(cmp, model);
 		r.matrix = m_universe.getMatrix(r.entity);
 	}
@@ -1369,8 +1632,7 @@ public:
 		infos.reserve(m_terrains.size());
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
-			if (m_terrains[i] &&
-				(m_terrains[i]->getLayerMask() & layer_mask) != 0)
+			if (m_terrains[i] && (m_terrains[i]->getLayerMask() & layer_mask) != 0)
 			{
 				m_terrains[i]->getInfos(infos, camera_pos, frame_allocator);
 			}
@@ -1447,16 +1709,15 @@ public:
 	}
 
 
-	void
-	setGrassPath(ComponentIndex cmp, int index, const char* path) override
+	void setGrassPath(ComponentIndex cmp, int index, const Path& path) override
 	{
-		m_terrains[cmp]->setGrassTypePath(index, Path(path));
+		m_terrains[cmp]->setGrassTypePath(index, path);
 	}
 
 
-	const char* getGrassPath(ComponentIndex cmp, int index) override
+	Path getGrassPath(ComponentIndex cmp, int index) override
 	{
-		return m_terrains[cmp]->getGrassTypePath(index).c_str();
+		return m_terrains[cmp]->getGrassTypePath(index);
 	}
 
 
@@ -1540,9 +1801,7 @@ public:
 	}
 
 
-	void fillTemporaryInfos(const CullingSystem::Results& results,
-							const Frustum& frustum,
-							int64 layer_mask)
+	void fillTemporaryInfos(const CullingSystem::Results& results, const Frustum& frustum)
 	{
 		PROFILE_FUNCTION();
 		m_jobs.clear();
@@ -1562,9 +1821,10 @@ public:
 			if (results[subresult_index].empty()) continue;
 
 			MTJD::Job* job = MTJD::makeJob(m_engine.getMTJDManager(),
-				[&subinfos, layer_mask, this, &results, subresult_index, &frustum]()
+				[&subinfos, this, &results, subresult_index, &frustum]()
 				{
 					PROFILE_BLOCK("Temporary Info Job");
+					PROFILE_INT("Renderable count", results[subresult_index].size());
 					Vec3 frustum_position = frustum.getPosition();
 					const int* LUMIX_RESTRICT raw_subresults = &results[subresult_index][0];
 					Renderable* LUMIX_RESTRICT renderables = &m_renderables[0];
@@ -1769,7 +2029,7 @@ public:
 		const CullingSystem::Results* results = cull(frustum, layer_mask);
 		if (!results) return;
 
-		fillTemporaryInfos(*results, frustum, layer_mask);
+		fillTemporaryInfos(*results, frustum);
 		mergeTemporaryInfos(meshes);
 	}
 
@@ -2633,6 +2893,136 @@ public:
 	}
 
 
+	int getParticleEmitterAttractorCount(ComponentIndex cmp) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(cmp);
+		return module ? module->m_count : 0;
+	}
+
+
+	void addParticleEmitterAttractor(ComponentIndex cmp, int index) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(cmp);
+		if (!module) return;
+
+		auto* plane_module = static_cast<ParticleEmitter::AttractorModule*>(module);
+		if (plane_module->m_count == lengthOf(plane_module->m_entities)) return;
+
+		if (index < 0)
+		{
+			plane_module->m_entities[plane_module->m_count] = INVALID_ENTITY;
+			++plane_module->m_count;
+			return;
+		}
+
+		for (int i = plane_module->m_count - 1; i > index; --i)
+		{
+			plane_module->m_entities[i] = plane_module->m_entities[i - 1];
+		}
+		plane_module->m_entities[index] = INVALID_ENTITY;
+		++plane_module->m_count;
+	}
+
+
+	void removeParticleEmitterAttractor(ComponentIndex cmp, int index) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(cmp);
+		if (!module) return;
+
+		for (int i = index; i < module->m_count - 1; ++i)
+		{
+			module->m_entities[i] = module->m_entities[i + 1];
+		}
+		--module->m_count;
+	}
+
+
+	Entity getParticleEmitterAttractorEntity(ComponentIndex cmp, int index) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(cmp);
+		return module ? module->m_entities[index] : INVALID_ENTITY;
+	}
+
+
+	void setParticleEmitterAttractorEntity(ComponentIndex cmp, int index, Entity entity) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(cmp);
+		if(module) module->m_entities[index] = entity;
+	}
+
+
+	float getParticleEmitterShapeRadius(ComponentIndex cmp) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::SpawnShapeModule>(cmp);
+		return module ? module->m_radius : 0.0f;
+	}
+
+
+	void setParticleEmitterShapeRadius(ComponentIndex cmp, float value) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::SpawnShapeModule>(cmp);
+		if (module) module->m_radius = value;
+	}
+
+
+	int getParticleEmitterPlaneCount(ComponentIndex cmp) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::PlaneModule>(cmp);
+		return module ? module->m_count : 0;
+	}
+
+
+	void addParticleEmitterPlane(ComponentIndex cmp, int index) override
+	{
+		auto* plane_module = getEmitterModule<ParticleEmitter::PlaneModule>(cmp);
+		if (!plane_module) return;
+
+		if (plane_module->m_count == lengthOf(plane_module->m_entities)) return;
+
+		if (index < 0)
+		{
+			plane_module->m_entities[plane_module->m_count] = INVALID_ENTITY;
+			++plane_module->m_count;
+			return;
+		}
+
+		for (int i = plane_module->m_count - 1; i > index; --i)
+		{
+			plane_module->m_entities[i] = plane_module->m_entities[i - 1];
+		}
+		plane_module->m_entities[index] = INVALID_ENTITY;
+		++plane_module->m_count;
+			
+	}
+
+
+	void removeParticleEmitterPlane(ComponentIndex cmp, int index) override
+	{
+		auto* plane_module = getEmitterModule<ParticleEmitter::PlaneModule>(cmp);
+		if (!plane_module) return;
+
+		for (int i = index; i < plane_module->m_count - 1; ++i)
+		{
+			plane_module->m_entities[i] = plane_module->m_entities[i + 1];
+		}
+		--plane_module->m_count;
+	}
+
+
+	Entity getParticleEmitterPlaneEntity(ComponentIndex cmp, int index) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::PlaneModule>(cmp);
+		return module ? module->m_entities[index] : INVALID_ENTITY;
+	}
+
+
+	void setParticleEmitterPlaneEntity(ComponentIndex cmp, int index, Entity entity) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::PlaneModule>(cmp);
+		if (module) module->m_entities[index] = entity;
+	}
+
+
 	DelegateList<void(ComponentIndex)>& renderableCreated() override
 	{
 		return m_renderable_created;
@@ -2724,23 +3114,23 @@ public:
 	}
 
 
-	void setParticleEmitterMaterialPath(ComponentIndex cmp, const char* path) override
+	void setParticleEmitterMaterialPath(ComponentIndex cmp, const Path& path) override
 	{
 		if (!m_particle_emitters[cmp]) return;
 
 		auto* manager = m_engine.getResourceManager().get(ResourceManager::MATERIAL);
-		Material* material = static_cast<Material*>(manager->load(Path(path)));
+		Material* material = static_cast<Material*>(manager->load(path));
 		m_particle_emitters[cmp]->setMaterial(material);
 	}
 
 
-	const char* getParticleEmitterMaterialPath(ComponentIndex cmp) override
+	Path getParticleEmitterMaterialPath(ComponentIndex cmp) override
 	{
 		ParticleEmitter* emitter = m_particle_emitters[cmp];
-		if (!emitter) return "";
-		if (!emitter->getMaterial()) return "";
+		if (!emitter) return Path("");
+		if (!emitter->getMaterial()) return Path("");
 
-		return emitter->getMaterial()->getPath().c_str();
+		return emitter->getMaterial()->getPath();
 	}
 
 
@@ -2779,6 +3169,7 @@ private:
 	float m_time;
 	bool m_is_forward_rendered;
 	bool m_is_grass_enabled;
+	bool m_is_game_running;
 	DelegateList<void(ComponentIndex)> m_renderable_created;
 	DelegateList<void(ComponentIndex)> m_renderable_destroyed;
 };
@@ -2802,15 +3193,27 @@ static struct
 	{PARTICLE_EMITTER_FADE_HASH,
 		&RenderSceneImpl::createParticleEmitterFade,
 		&RenderSceneImpl::destroyParticleEmitterFade},
+		{PARTICLE_EMITTER_FORCE_HASH,
+		&RenderSceneImpl::createParticleEmitterForce,
+		&RenderSceneImpl::destroyParticleEmitterForce},
+	{PARTICLE_EMITTER_ATTRACTOR_HASH,
+		&RenderSceneImpl::createParticleEmitterAttractor,
+		&RenderSceneImpl::destroyParticleEmitterAttractor},
 	{PARTICLE_EMITTER_SIZE_HASH,
 		&RenderSceneImpl::createParticleEmitterSize,
 		&RenderSceneImpl::destroyParticleEmitterSize},
 	{PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH,
 		&RenderSceneImpl::createParticleEmitterLinearMovement,
 		&RenderSceneImpl::destroyParticleEmitterLinearMovement},
+	{PARTICLE_EMITTER_SPAWN_SHAPE_HASH,
+		&RenderSceneImpl::createParticleEmitterSpawnShape,
+		&RenderSceneImpl::destroyParticleEmitterSpawnShape },
 	{PARTICLE_EMITTER_RANDOM_ROTATION_HASH,
 		&RenderSceneImpl::createParticleEmitterRandomRotation,
-		&RenderSceneImpl::destroyParticleEmitterRandomRotation}
+		&RenderSceneImpl::destroyParticleEmitterRandomRotation},
+	{PARTICLE_EMITTER_PLANE_HASH,
+		&RenderSceneImpl::createParticleEmitterPlane,
+		&RenderSceneImpl::destroyParticleEmitterPlane},
 };
 
 

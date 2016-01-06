@@ -4,14 +4,11 @@
 #include "core/fs/disk_file_device.h"
 #include "core/fs/file_events_device.h"
 #include "core/fs/ifile.h"
+#include "core/path.h"
 
 namespace
 {
 
-
-TODO("UT_disk_file_device");
-TODO("UT_tcp_file_device");
-TODO("UT_memory_file_device");
 
 uint32 occured_event = 0;
 
@@ -28,6 +25,7 @@ void UT_file_events_device(const char* params)
 	Lumix::FS::FileEventsDevice* file_event_device;
 
 	Lumix::DefaultAllocator allocator;
+	Lumix::PathManager path_manager(allocator);
 	file_system = Lumix::FS::FileSystem::create(allocator);
 
 	disk_file_device = LUMIX_NEW(allocator, Lumix::FS::DiskFileDevice)(allocator);
@@ -37,132 +35,93 @@ void UT_file_events_device(const char* params)
 	file_system->mount(file_event_device);
 	file_system->mount(disk_file_device);
 
-	LUMIX_EXPECT_FALSE(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN &
-					   occured_event);
-	LUMIX_EXPECT_FALSE(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN &
-					   occured_event);
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN & occured_event));
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN & occured_event));
 
 	Lumix::FS::DeviceList device_list;
 	file_system->fillDeviceList("events:disk", device_list);
-	Lumix::FS::IFile* file =
-		file_system->open(device_list,
-						  "unit_tests/file_system/selenitic.xml",
-						  Lumix::FS::Mode::OPEN_AND_READ);
+	Lumix::FS::IFile* file = file_system->open(
+		device_list, Lumix::Path("unit_tests/file_system/selenitic.xml"), Lumix::FS::Mode::OPEN_AND_READ);
 
-	LUMIX_EXPECT_NOT_NULL(file);
-	LUMIX_EXPECT_TRUE(
-		!!(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN & occured_event));
-	LUMIX_EXPECT_TRUE(
-		!!(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN & occured_event));
+	LUMIX_EXPECT(file != nullptr);
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN & occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN & occured_event));
 
-	LUMIX_EXPECT_FALSE(
-		!!(1 << (uint32)Lumix::FS::EventType::SIZE_BEGIN & occured_event));
-	LUMIX_EXPECT_FALSE(
-		!!(1 << (uint32)Lumix::FS::EventType::SIZE_FINISHED & occured_event));
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::SIZE_BEGIN & occured_event));
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::SIZE_FINISHED & occured_event));
 
 	size_t size = file->size();
-	LUMIX_EXPECT_GE(size, size_t(4));
+	LUMIX_EXPECT(size >= size_t(4));
 
-	LUMIX_EXPECT_TRUE(
-		!!(1 << (uint32)Lumix::FS::EventType::SIZE_BEGIN & occured_event));
-	LUMIX_EXPECT_TRUE(
-		!!(1 << (uint32)Lumix::FS::EventType::SIZE_FINISHED & occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::SIZE_BEGIN & occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::SIZE_FINISHED & occured_event));
 
-	LUMIX_EXPECT_FALSE(
-		!!(1 << (uint32)Lumix::FS::EventType::SEEK_BEGIN & occured_event));
-	LUMIX_EXPECT_FALSE(
-		!!(1 << (uint32)Lumix::FS::EventType::SEEK_FINISHED & occured_event));
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::SEEK_BEGIN & occured_event));
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::SEEK_FINISHED & occured_event));
 
 	size_t seek = file->seek(Lumix::FS::SeekMode::BEGIN, size - 4);
-	LUMIX_EXPECT_EQ(seek, size - 4);
+	LUMIX_EXPECT(seek == size - 4);
 
-	LUMIX_EXPECT_TRUE(
-		!!(1 << (uint32)Lumix::FS::EventType::SEEK_BEGIN & occured_event));
-	LUMIX_EXPECT_TRUE(
-		!!(1 << (uint32)Lumix::FS::EventType::SEEK_FINISHED & occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::SEEK_BEGIN & occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::SEEK_FINISHED & occured_event));
 
-	LUMIX_EXPECT_FALSE(
-		!!(1 << (uint32)Lumix::FS::EventType::POS_BEGIN & occured_event));
-	LUMIX_EXPECT_FALSE(
-		!!(1 << (uint32)Lumix::FS::EventType::POS_FINISHED & occured_event));
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::POS_BEGIN & occured_event));
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::POS_FINISHED & occured_event));
 
 	size_t pos = file->pos();
-	LUMIX_EXPECT_EQ(pos, size - 4);
+	LUMIX_EXPECT(pos == size - 4);
 
-	LUMIX_EXPECT_TRUE(
-		!!(1 << (uint32)Lumix::FS::EventType::POS_BEGIN & occured_event));
-	LUMIX_EXPECT_TRUE(
-		!!(1 << (uint32)Lumix::FS::EventType::POS_FINISHED & occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::POS_BEGIN & occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::POS_FINISHED & occured_event));
 
-	LUMIX_EXPECT_FALSE(
-		!!(1 << (uint32)Lumix::FS::EventType::READ_BEGIN & occured_event));
-	LUMIX_EXPECT_FALSE(
-		!!(1 << (uint32)Lumix::FS::EventType::READ_FINISHED & occured_event));
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::READ_BEGIN & occured_event));
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::READ_FINISHED & occured_event));
 
 	uint32 buff;
 	bool ret = file->read(&buff, sizeof(buff));
-	LUMIX_EXPECT_TRUE(ret);
+	LUMIX_EXPECT(ret);
 
-	LUMIX_EXPECT_TRUE(
-		!!(1 << (uint32)Lumix::FS::EventType::READ_BEGIN & occured_event));
-	LUMIX_EXPECT_TRUE(
-		!!(1 << (uint32)Lumix::FS::EventType::READ_FINISHED & occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::READ_BEGIN & occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::READ_FINISHED & occured_event));
 
-	LUMIX_EXPECT_FALSE(
-		!!(1 << (uint32)Lumix::FS::EventType::CLOSE_BEGIN & occured_event));
-	LUMIX_EXPECT_FALSE(!!(1 << (uint32)Lumix::FS::EventType::CLOSE_FINISHED &
-						  occured_event));
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::CLOSE_BEGIN & occured_event));
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::CLOSE_FINISHED & occured_event));
 
 	file_system->close(*file);
 
-	LUMIX_EXPECT_TRUE(
-		!!(1 << (uint32)Lumix::FS::EventType::CLOSE_BEGIN & occured_event));
-	LUMIX_EXPECT_TRUE(!!(1 << (uint32)Lumix::FS::EventType::CLOSE_FINISHED &
-						 occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::CLOSE_BEGIN & occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::CLOSE_FINISHED & occured_event));
 
 	occured_event = 0;
 
-	LUMIX_EXPECT_FALSE(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN &
-					   occured_event);
-	LUMIX_EXPECT_FALSE(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN &
-					   occured_event);
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN & occured_event));
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN & occured_event));
 
 	file = file_system->open(device_list,
-							 "unit_tests/file_system/selenitic2.xml",
-							 Lumix::FS::Mode::OPEN_OR_CREATE |
-								 Lumix::FS::Mode::WRITE);
+		Lumix::Path("unit_tests/file_system/selenitic2.xml"),
+		Lumix::FS::Mode::OPEN_OR_CREATE | Lumix::FS::Mode::WRITE);
 
-	LUMIX_EXPECT_NOT_NULL(file);
+	LUMIX_EXPECT(file != nullptr);
 
-	LUMIX_EXPECT_TRUE(
-		!!(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN & occured_event));
-	LUMIX_EXPECT_TRUE(
-		!!(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN & occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN & occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::OPEN_BEGIN & occured_event));
 
-	LUMIX_EXPECT_FALSE(
-		!!(1 << (uint32)Lumix::FS::EventType::WRITE_BEGIN & occured_event));
-	LUMIX_EXPECT_FALSE(!!(1 << (uint32)Lumix::FS::EventType::WRITE_FINISHED &
-						  occured_event));
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::WRITE_BEGIN & occured_event));
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::WRITE_FINISHED & occured_event));
 
 	ret = file->write(&buff, sizeof(buff));
-	LUMIX_EXPECT_TRUE(ret);
+	LUMIX_EXPECT(ret);
 
-	LUMIX_EXPECT_TRUE(
-		!!(1 << (uint32)Lumix::FS::EventType::WRITE_BEGIN & occured_event));
-	LUMIX_EXPECT_TRUE(!!(1 << (uint32)Lumix::FS::EventType::WRITE_FINISHED &
-						 occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::WRITE_BEGIN & occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::WRITE_FINISHED & occured_event));
 
-	LUMIX_EXPECT_FALSE(
-		!!(1 << (uint32)Lumix::FS::EventType::CLOSE_BEGIN & occured_event));
-	LUMIX_EXPECT_FALSE(!!(1 << (uint32)Lumix::FS::EventType::CLOSE_FINISHED &
-						  occured_event));
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::CLOSE_BEGIN & occured_event));
+	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::CLOSE_FINISHED & occured_event));
 
 	file_system->close(*file);
 
-	LUMIX_EXPECT_TRUE(
-		!!(1 << (uint32)Lumix::FS::EventType::CLOSE_BEGIN & occured_event));
-	LUMIX_EXPECT_TRUE(!!(1 << (uint32)Lumix::FS::EventType::CLOSE_FINISHED &
-						 occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::CLOSE_BEGIN & occured_event));
+	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::CLOSE_FINISHED & occured_event));
 
 	LUMIX_DELETE(allocator, disk_file_device);
 	LUMIX_DELETE(allocator, file_event_device);
@@ -173,6 +132,4 @@ void UT_file_events_device(const char* params)
 
 } // anonymous namespace
 
-REGISTER_TEST("unit_tests/core/file_system/file_events_device",
-			  UT_file_events_device,
-			  "")
+REGISTER_TEST("unit_tests/core/file_system/file_events_device", UT_file_events_device, "")

@@ -11,14 +11,15 @@
 namespace Lumix
 {
 
-	PathManager LUMIX_ENGINE_API g_path_manager;
+	static PathManager* g_path_manager = nullptr;
 
 
-	PathManager::PathManager()
-		: m_paths(m_allocator)
+	PathManager::PathManager(Lumix::IAllocator& allocator)
+		: m_paths(allocator)
 		, m_mutex(false)
-		, m_allocator(m_src_allocator)
+		, m_allocator(allocator)
 	{
+		g_path_manager = this;
 		m_empty_path = getPath(0, "");
 	}
 
@@ -28,6 +29,7 @@ namespace Lumix
 		decrementRefCount(m_empty_path);
 		m_empty_path = nullptr;
 		ASSERT(m_paths.size() == 0);
+		g_path_manager = nullptr;
 	}
 
 
@@ -60,13 +62,13 @@ namespace Lumix
 
 	Path::Path()
 	{
-		m_data = g_path_manager.getPath(0, "");
+		m_data = g_path_manager->getPath(0, "");
 	}
 
 
 	Path::Path(uint32 hash)
 	{
-		m_data = g_path_manager.getPath(hash);
+		m_data = g_path_manager->getPath(hash);
 		ASSERT(m_data);
 	}
 
@@ -146,7 +148,7 @@ namespace Lumix
 	Path::Path(const Path& rhs)
 		: m_data(rhs.m_data)
 	{
-		g_path_manager.incrementRefCount(m_data);
+		g_path_manager->incrementRefCount(m_data);
 	}
 	
 
@@ -157,21 +159,27 @@ namespace Lumix
 		ASSERT(len < MAX_PATH_LENGTH);
 		PathUtils::normalize(path, tmp, (uint32)len + 1);
 		uint32 hash = crc32(tmp);
-		m_data = g_path_manager.getPath(hash, tmp);
+		m_data = g_path_manager->getPath(hash, tmp);
 	}
 
 
 	Path::~Path()
 	{
-		g_path_manager.decrementRefCount(m_data);
+		g_path_manager->decrementRefCount(m_data);
+	}
+
+
+	int Path::length() const
+	{
+		return stringLength(m_data->m_path);
 	}
 
 
 	void Path::operator =(const Path& rhs)
 	{
-		g_path_manager.decrementRefCount(m_data);
+		g_path_manager->decrementRefCount(m_data);
 		m_data = rhs.m_data;
-		g_path_manager.incrementRefCount(m_data);
+		g_path_manager->incrementRefCount(m_data);
 	}
 
 
@@ -183,8 +191,8 @@ namespace Lumix
 		PathUtils::normalize(rhs, tmp, (uint32)len + 1);
 		uint32 hash = crc32(tmp);
 
-		g_path_manager.decrementRefCount(m_data);
-		m_data = g_path_manager.getPath(hash, tmp);
+		g_path_manager->decrementRefCount(m_data);
+		m_data = g_path_manager->getPath(hash, tmp);
 	}
 
 

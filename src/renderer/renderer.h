@@ -2,7 +2,6 @@
 
 #include "lumix.h"
 #include "core/array.h"
-#include "core/string.h"
 #include "iplugin.h"
 #include "renderer/ray_cast_model_hit.h"
 #include "renderer/render_scene.h"
