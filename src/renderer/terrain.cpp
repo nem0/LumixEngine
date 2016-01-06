@@ -389,14 +389,14 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch,
 
 			Matrix& grass_mtx = patch.m_matrices.pushEmpty();
 			grass_mtx = Matrix::IDENTITY;
-			float x = quad_x + dx + step * (rand() % 100 - 50) / 100.0f;
-			float z = quad_z + dz + step * (rand() % 100 - 50) / 100.0f;
+			float x = quad_x + dx + step * Math::randFloat(-0.5f, 0.5f);
+			float z = quad_z + dz + step * Math::randFloat(-0.5f, 0.5f);
 			grass_mtx.setTranslation(Vec3(x, getHeight(x, z), z));
-			Quat q(Vec3(0, 1, 0), Math::degreesToRadians((float)(rand() % 360)));
+			Quat q(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2));
 			Matrix rotMatrix;
 			q.toMatrix(rotMatrix);
 			grass_mtx = terrain_matrix * grass_mtx * rotMatrix;
-			grass_mtx.multiply3x3(density + (rand() % 20 - 10) / 100.0f);
+			grass_mtx.multiply3x3(density + Math::randFloat(-0.1f, 0.1f));
 		}
 	}
 }

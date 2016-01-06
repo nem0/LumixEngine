@@ -1090,13 +1090,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void addCollisionLayer() override 
 	{
-		m_layers_count = Math::min(lengthOf(m_layers_names), m_layers_count + 1);
+		m_layers_count = Math::minValue(lengthOf(m_layers_names), m_layers_count + 1);
 	}
 
 
 	void removeCollisionLayer() override
 	{
-		m_layers_count = Math::max(0, m_layers_count - 1);
+		m_layers_count = Math::maxValue(0, m_layers_count - 1);
 		for (auto* actor : m_actors)
 		{
 			if (!actor->getPhysxActor()) continue;

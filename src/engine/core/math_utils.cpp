@@ -1,6 +1,7 @@
 #include "core/math_utils.h"
 #include "core/vec.h"
 #include <cmath>
+#include <random>
 
 
 namespace Lumix
@@ -158,6 +159,42 @@ bool getRayTriangleIntersection(const Vec3& origin,
 
 	if (out_t) *out_t = t;
 	return true;
+}
+
+
+static std::mt19937& getRandomGenerator()
+{
+	static std::random_device seed;
+	static std::mt19937 gen(seed());
+
+	return gen;
+}
+
+
+uint32 rand()
+{
+	return getRandomGenerator()();
+}
+
+
+uint32 rand(uint32 from, uint32 to)
+{
+	std::uniform_int_distribution<> dist(from, to);
+	return dist(getRandomGenerator());
+}
+
+
+float randFloat()
+{
+	std::uniform_real_distribution<float> dist;
+	return dist(getRandomGenerator());
+}
+
+
+float randFloat(float from, float to)
+{
+	std::uniform_real_distribution<float> dist(from, to);
+	return dist(getRandomGenerator());
 }
 
 

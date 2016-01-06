@@ -133,7 +133,7 @@ private:
 			: m_entity_system(entity_system)
 			, m_template_name_hash(crc32(template_name))
 			, m_position(position)
-			, m_rotation(Vec3(0, 1, 0), Math::degreesToRadians((float)(rand() % 360)))
+			, m_rotation(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2))
 			, m_editor(editor)
 		{
 		}
@@ -333,7 +333,7 @@ public:
 		if (instance_index < 0) return INVALID_ENTITY;
 
 		Universe* universe = m_editor.getUniverse();
-		float random_angle = Math::degreesToRadians((float)(rand() % 360));
+		float random_angle = Math::randFloat(0, Math::PI * 2);
 		Lumix::Quat rotation(Lumix::Vec3(0, 1, 0), random_angle);
 		Entity entity = universe->createEntity(position, rotation);
 
