@@ -2,17 +2,19 @@
 #include "core/fs/ifile.h"
 #include "core/FS/memory_file_device.h"
 #include "core/json_serializer.h"
+#include "core/path.h"
 #include <cstdio>
 
 
 void UT_json_serializer(const char* params)
 {
 	Lumix::DefaultAllocator allocator;
+	Lumix::PathManager path_manager(allocator);
 
 	Lumix::FS::MemoryFileDevice device(allocator);
 	Lumix::FS::IFile* file = device.createFile(NULL);
 	{
-		Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::WRITE, "", allocator);
+		Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::WRITE, Lumix::Path(""), allocator);
 		serializer.beginObject();
 
 		serializer.beginArray("array");
@@ -34,7 +36,7 @@ void UT_json_serializer(const char* params)
 	file->seek(Lumix::FS::SeekMode::BEGIN, 0);
 
 	{
-		Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::READ, "", allocator);
+		Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::READ, Lumix::Path(""), allocator);
 		serializer.deserializeObjectBegin();
 
 		LUMIX_EXPECT(!serializer.isObjectEnd());

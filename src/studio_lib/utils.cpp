@@ -1,6 +1,7 @@
 #include "utils.h"
 #include "core/crc32.h"
 #include "core/math_utils.h"
+#include "core/path.h"
 #include "core/path_utils.h"
 #include "editor/world_editor.h"
 #include "imgui/imgui.h"
@@ -19,12 +20,12 @@ void getEntityListDisplayName(Lumix::WorldEditor& editor,
 	if (renderable.isValid())
 	{
 		auto* scene = static_cast<Lumix::RenderScene*>(renderable.scene);
-		const char* path = scene->getRenderablePath(renderable.index);
-		if (path && path[0] != 0)
+		auto path = scene->getRenderablePath(renderable.index);
+		if (path.isValid())
 		{
 			char basename[Lumix::MAX_PATH_LENGTH];
-			Lumix::copyString(buf, max_size, path);
-			Lumix::PathUtils::getBasename(basename, Lumix::MAX_PATH_LENGTH, path);
+			Lumix::copyString(buf, max_size, path.c_str());
+			Lumix::PathUtils::getBasename(basename, Lumix::MAX_PATH_LENGTH, path.c_str());
 			if (name && name[0] != '\0')
 				Lumix::copyString(buf, max_size, name);
 			else

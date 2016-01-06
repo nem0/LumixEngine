@@ -600,7 +600,7 @@ bool Material::load(FS::IFile& file)
 
 	m_render_states = BGFX_STATE_DEPTH_TEST_LEQUAL | BGFX_STATE_CULL_CW;
 	m_uniforms.clear();
-	JsonSerializer serializer(file, JsonSerializer::READ, getPath().c_str(), m_allocator);
+	JsonSerializer serializer(file, JsonSerializer::READ, getPath(), m_allocator);
 	serializer.deserializeObjectBegin();
 	char path[MAX_PATH_LENGTH];
 	char label[256];

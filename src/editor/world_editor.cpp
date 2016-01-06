@@ -3102,7 +3102,7 @@ public:
 		if (file)
 		{
 			JsonSerializer serializer(
-				*file, JsonSerializer::WRITE, path.c_str(), m_allocator);
+				*file, JsonSerializer::WRITE, path, m_allocator);
 			serializer.beginObject();
 			serializer.beginArray("commands");
 			for (int i = 0; i < m_undo_stack.size(); ++i)
@@ -3150,7 +3150,7 @@ public:
 			m_engine->getFileSystem().getDiskDevice(), path, FS::Mode::OPEN_AND_READ);
 		if (file)
 		{
-			JsonSerializer serializer(*file, JsonSerializer::READ, path.c_str(), m_allocator);
+			JsonSerializer serializer(*file, JsonSerializer::READ, path, m_allocator);
 			serializer.deserializeObjectBegin();
 			serializer.deserializeArrayBegin("commands");
 			while (!serializer.isArrayEnd())

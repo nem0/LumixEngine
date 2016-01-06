@@ -78,7 +78,7 @@ static int createComponent(IScene* scene, const char* type, int entity_idx)
 								  << entity_idx;
 		return -1;
 	}
-	
+
 	return scene->createComponent(hash, e);
 }
 
@@ -179,7 +179,7 @@ static void setEntityLocalRotation(IScene* hierarchy,
 static void setRenderablePath(IScene* scene, int component, const char* path)
 {
 	RenderScene* render_scene = (RenderScene*)scene;
-	render_scene->setRenderablePath(component, path);
+	render_scene->setRenderablePath(component, Path(path));
 }
 
 
@@ -204,7 +204,7 @@ void registerUniverse(UniverseContext* ctx, lua_State* L)
 {
 	lua_pushlightuserdata(L, ctx);
 	lua_setglobal(L, "g_universe_context");
-	
+
 	for (auto* scene : ctx->m_scenes)
 	{
 		const char* name = scene->getPlugin().getName();
@@ -225,7 +225,7 @@ void registerEngineLuaAPI(LuaScriptScene& scene, Engine& engine, lua_State* L)
 {
 	lua_pushlightuserdata(L, &engine);
 	lua_setglobal(L, "g_engine");
-	
+
 	#define REGISTER_FUNCTION(name) \
 		scene.registerFunction("Engine", #name, LuaWrapper::wrap<decltype(&LuaAPI::name), LuaAPI::name>)
 

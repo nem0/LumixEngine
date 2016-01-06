@@ -43,14 +43,14 @@ private:
 
 JsonSerializer::JsonSerializer(FS::IFile& file,
 							   AccessMode access_mode,
-							   const char* path,
+							   const Path& path,
 							   IAllocator& allocator)
 	: m_file(file)
 	, m_access_mode(access_mode)
 	, m_allocator(allocator)
 {
 	m_is_error = false;
-	copyString(m_path, path);
+	copyString(m_path, path.c_str());
 	m_is_first_in_block = true;
 	m_data = nullptr;
 	m_is_string_token = false;
