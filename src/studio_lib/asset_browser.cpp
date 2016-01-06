@@ -314,15 +314,14 @@ void AssetBrowser::saveMaterial(Lumix::Material* material)
 	char tmp_path[Lumix::MAX_PATH_LENGTH];
 	strcpy(tmp_path, material->getPath().c_str());
 	strcat(tmp_path, ".tmp");
-	Lumix::FS::IFile* file =
-		fs.open(fs.getDefaultDevice(), Lumix::Path(tmp_path), Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
+	Lumix::FS::IFile* file = fs.open(fs.getDefaultDevice(),
+		Lumix::Path(tmp_path),
+		Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
 	if (file)
 	{
 		Lumix::DefaultAllocator allocator;
-		Lumix::JsonSerializer serializer(*file,
-			Lumix::JsonSerializer::AccessMode::WRITE,
-			material->getPath().c_str(),
-			allocator);
+		Lumix::JsonSerializer serializer(
+			*file, Lumix::JsonSerializer::AccessMode::WRITE, material->getPath(), allocator);
 		if (!material->save(serializer))
 		{
 			Lumix::g_log_error.log("Material manager") << "Error saving "
@@ -644,7 +643,7 @@ bool InsertMeshCommand::execute()
 	{
 		char rel_path[Lumix::MAX_PATH_LENGTH];
 		m_editor.getRelativePath(rel_path, Lumix::MAX_PATH_LENGTH, m_mesh_path.c_str());
-		static_cast<Lumix::RenderScene*>(scene)->setRenderablePath(cmp, rel_path);
+		static_cast<Lumix::RenderScene*>(scene)->setRenderablePath(cmp, Lumix::Path(rel_path));
 	}
 	return true;
 }

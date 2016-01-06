@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/blob.h"
+#include "core/path.h"
 #include "core/stack_allocator.h"
 #include "core/string.h"
 #include "iproperty_descriptor.h"
@@ -417,33 +418,99 @@ private:
 };
 
 
-template <class T>
-class FilePropertyDescriptor : public StringPropertyDescriptor<T>
+template <class S>
+class FilePropertyDescriptor : public IPropertyDescriptor
 {
+public:
+	typedef Path (S::*Getter)(ComponentIndex);
+	typedef void (S::*Setter)(ComponentIndex, const Path&);
+	typedef Path (S::*ArrayGetter)(ComponentIndex, int);
+	typedef void (S::*ArraySetter)(ComponentIndex, int, const Path&);
+
 public:
 	FilePropertyDescriptor(const char* name,
 		Getter getter,
 		Setter setter,
 		const char* file_type,
 		IAllocator& allocator)
-		: StringPropertyDescriptor(name, getter, setter, allocator)
+		: IPropertyDescriptor(allocator)
 	{
+		setName(name);
+		m_single.getter = getter;
+		m_single.setter = setter;
 		m_type = IPropertyDescriptor::FILE;
 		copyString(m_file_type, file_type);
 	}
+
 
 	FilePropertyDescriptor(const char* name,
 		ArrayGetter getter,
 		ArraySetter setter,
 		const char* file_type,
 		IAllocator& allocator)
-		: StringPropertyDescriptor(name, getter, setter, allocator)
+		: IPropertyDescriptor(allocator)
 	{
+		setName(name);
+		m_array.getter = getter;
+		m_array.setter = setter;
 		m_type = IPropertyDescriptor::FILE;
 		copyString(m_file_type, file_type);
 	}
 
+
+
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		char tmp[MAX_PATH_LENGTH];
+		char* c = tmp;
+		do
+		{
+			stream.read(c, 1);
+			++c;
+		} while(*(c - 1) && (c - 1) - tmp < lengthOf(tmp));
+
+		if(index < 0)
+		{
+			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.index, Path(tmp));
+		}
+		else
+		{
+			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.index, index, Path(tmp));
+		}
+	}
+
+
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		Path value;
+		if(index < 0)
+		{
+			value = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.index);
+		}
+		else
+		{
+			value = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.index, index);
+		}
+		int len = value.length() + 1;
+		stream.write(value.c_str(), len);
+	}
+
+
+
 private:
+	union
+	{
+		struct Single
+		{
+			Getter getter;
+			Setter setter;
+		} m_single;
+		struct Array
+		{
+			ArrayGetter getter;
+			ArraySetter setter;
+		} m_array;
+	};
 	char m_file_type[MAX_PATH_LENGTH];
 };
 

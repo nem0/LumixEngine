@@ -629,13 +629,13 @@ namespace Lumix
 		}
 
 
-		const char* getScriptPath(ComponentIndex cmp) override
+		Path getScriptPath(ComponentIndex cmp) override
 		{
-			return m_scripts[cmp]->m_script ? m_scripts[cmp]->m_script->getPath().c_str() : "";
+			return m_scripts[cmp]->m_script ? m_scripts[cmp]->m_script->getPath() : Path("");
 		}
 
 
-		void setScriptPath(ComponentIndex cmp, const char* path) override
+		void setScriptPath(ComponentIndex cmp, const Path& path) override
 		{
 			if (m_scripts[cmp]->m_script)
 			{
@@ -643,7 +643,7 @@ namespace Lumix
 			}
 
 			m_scripts[cmp]->m_script =
-				static_cast<LuaScript*>(m_system.getScriptManager().load(Lumix::Path(path)));
+				static_cast<LuaScript*>(m_system.getScriptManager().load(path));
 		}
 
 

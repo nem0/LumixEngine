@@ -9,6 +9,7 @@ namespace Lumix
 
 
 	class IAllocator;
+	class Path;
 
 
 	namespace FS
@@ -28,7 +29,7 @@ namespace Lumix
 			};
 
 		public:
-			JsonSerializer(FS::IFile& file, AccessMode access_mode, const char* path, IAllocator& allocator);
+			JsonSerializer(FS::IFile& file, AccessMode access_mode, const Path& path, IAllocator& allocator);
 			~JsonSerializer();
 
 			// serialize

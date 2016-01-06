@@ -743,20 +743,20 @@ struct DockContext
         }
         else
         {
-            Dock* container = (Dock*)MemAlloc(sizeof(Dock));
-            new (container) Dock();
-            m_docks.push_back(container);
-            container->children[0] = &dest->getFirstTab();
-            container->children[1] = &dock;
-            container->next_tab = nullptr;
-            container->prev_tab = nullptr;
-            container->parent = dest->parent;
-            container->size = dest->size;
-            container->pos = dest->pos;
-            container->status = Status_Docked;
-            container->label = ImStrdup("");
+          Dock* container = (Dock*)MemAlloc(sizeof(Dock));
+          new (container)Dock();
+          m_docks.push_back(container);
+          container->children[0] = &dest->getFirstTab();
+          container->children[1] = &dock;
+          container->next_tab = nullptr;
+          container->prev_tab = nullptr;
+          container->parent = dest->parent;
+          container->size = dest->size;
+          container->pos = dest->pos;
+          container->status = Status_Docked;
+          container->label = ImStrdup("");
 
-            if (!dest->parent)
+          if(!dest->parent)
             {
             }
             else if (&dest->getFirstTab() == dest->parent->children[0])

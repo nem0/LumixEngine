@@ -522,7 +522,7 @@ bool Texture::load(FS::IFile& file)
 	}
 	if (!loaded)
 	{
-		g_log_warning.log("renderer") << "Error loading texture " << getPath().c_str();
+		g_log_warning.log("renderer") << "Error loading texture " << path;
 		return false;
 	}
 

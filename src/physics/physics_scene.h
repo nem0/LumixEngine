@@ -3,6 +3,7 @@
 
 #include "lumix.h"
 #include "core/iallocator.h"
+#include "core/path.h"
 #include "core/vec.h"
 #include "iplugin.h"
 
@@ -30,13 +31,16 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 	public:
 		static PhysicsScene* create(PhysicsSystem& system, UniverseContext& context, Engine& engine, IAllocator& allocator);
 		static void destroy(PhysicsScene* scene);
-		
+
 		virtual ~PhysicsScene() {}
 		virtual void update(float time_delta) = 0;
 		virtual void render(RenderScene& render_scene) = 0;
-		virtual bool raycast(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result) = 0;
+		virtual bool raycast(const Vec3& origin,
+			const Vec3& dir,
+			float distance,
+			RaycastHit& result) = 0;
 		virtual PhysicsSystem& getSystem() const = 0;
-		
+
 		virtual ComponentIndex getActorComponent(Entity entity) = 0;
 		virtual void setActorLayer(ComponentIndex cmp, int layer) = 0;
 		virtual int getActorLayer(ComponentIndex cmp) = 0;
@@ -44,10 +48,10 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 		virtual void setIsDynamic(ComponentIndex cmp, bool) = 0;
 		virtual Vec3 getHalfExtents(ComponentIndex cmp) = 0;
 		virtual void setHalfExtents(ComponentIndex cmp, const Vec3& size) = 0;
-		virtual const char* getShapeSource(ComponentIndex cmp) = 0;
-		virtual void setShapeSource(ComponentIndex cmp, const char* str) = 0;
-		virtual const char* getHeightmap(ComponentIndex cmp) = 0;
-		virtual void setHeightmap(ComponentIndex cmp, const char* str) = 0;
+		virtual Path getShapeSource(ComponentIndex cmp) = 0;
+		virtual void setShapeSource(ComponentIndex cmp, const Path& str) = 0;
+		virtual Path getHeightmap(ComponentIndex cmp) = 0;
+		virtual void setHeightmap(ComponentIndex cmp, const Path& path) = 0;
 		virtual float getHeightmapXZScale(ComponentIndex cmp) = 0;
 		virtual void setHeightmapXZScale(ComponentIndex cmp, float scale) = 0;
 		virtual float getHeightmapYScale(ComponentIndex cmp) = 0;

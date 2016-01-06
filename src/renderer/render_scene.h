@@ -209,8 +209,8 @@ public:
 	virtual void setParticleEmitterSpawnCount(ComponentIndex cmp, const Int2& value) = 0;
 	virtual void setParticleEmitterSpawnPeriod(ComponentIndex cmp, const Vec2& value) = 0;
 	virtual void setParticleEmitterInitialSize(ComponentIndex cmp, const Vec2& value) = 0;
-	virtual void setParticleEmitterMaterialPath(ComponentIndex cmp, const char* path) = 0;
-	virtual const char* getParticleEmitterMaterialPath(ComponentIndex cmp) = 0;
+	virtual void setParticleEmitterMaterialPath(ComponentIndex cmp, const Path& path) = 0;
+	virtual Path getParticleEmitterMaterialPath(ComponentIndex cmp) = 0;
 	virtual int getParticleEmitterPlaneCount(ComponentIndex cmp) = 0;
 	virtual void addParticleEmitterPlane(ComponentIndex cmp, int index) = 0;
 	virtual void removeParticleEmitterPlane(ComponentIndex cmp, int index) = 0;
@@ -236,10 +236,10 @@ public:
 	virtual ComponentIndex getRenderableComponent(Entity entity) = 0;
 	virtual Renderable* getRenderable(ComponentIndex cmp) = 0;
 	virtual Renderable* getRenderables() = 0;
-	virtual const char* getRenderablePath(ComponentIndex cmp) = 0;
+	virtual Path getRenderablePath(ComponentIndex cmp) = 0;
 	virtual void setRenderableLayer(ComponentIndex cmp,
 									const int32& layer) = 0;
-	virtual void setRenderablePath(ComponentIndex cmp, const char* path) = 0;
+	virtual void setRenderablePath(ComponentIndex cmp, const Path& path) = 0;
 	virtual void getRenderableInfos(const Frustum& frustum,
 		Array<RenderableMesh>& meshes,
 		int64 layer_mask) = 0;
@@ -262,8 +262,8 @@ public:
 		LIFOAllocator& allocator) = 0;
 	virtual float getTerrainHeightAt(ComponentIndex cmp, float x, float z) = 0;
 	virtual Vec3 getTerrainNormalAt(ComponentIndex cmp, float x, float z) = 0;
-	virtual void setTerrainMaterialPath(ComponentIndex cmp, const char* path) = 0;
-	virtual const char* getTerrainMaterialPath(ComponentIndex cmp) = 0;
+	virtual void setTerrainMaterialPath(ComponentIndex cmp, const Path& path) = 0;
+	virtual Path getTerrainMaterialPath(ComponentIndex cmp) = 0;
 	virtual Material* getTerrainMaterial(ComponentIndex cmp) = 0;
 	virtual void setTerrainXZScale(ComponentIndex cmp, float scale) = 0;
 	virtual float getTerrainXZScale(ComponentIndex cmp) = 0;
@@ -276,8 +276,8 @@ public:
 	virtual int getGrassDistance(ComponentIndex cmp) = 0;
 	virtual void setGrassDistance(ComponentIndex cmp, int value) = 0;
 	virtual void enableGrass(bool enabled) = 0;
-	virtual void setGrassPath(ComponentIndex cmp, int index, const char* path) = 0;
-	virtual const char* getGrassPath(ComponentIndex cmp, int index) = 0;
+	virtual void setGrassPath(ComponentIndex cmp, int index, const Path& path) = 0;
+	virtual Path getGrassPath(ComponentIndex cmp, int index) = 0;
 	virtual void setGrassGround(ComponentIndex cmp, int index, int ground) = 0;
 	virtual int getGrassGround(ComponentIndex cmp, int index) = 0;
 	virtual void setGrassDensity(ComponentIndex cmp, int index, int density) = 0;

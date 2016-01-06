@@ -1529,7 +1529,7 @@ public:
 	}
 
 
-	void setTerrainMaterialPath(ComponentIndex cmp, const char* path) override
+	void setTerrainMaterialPath(ComponentIndex cmp, const Path& path) override
 	{
 		Material* material = static_cast<Material*>(
 			m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path)));
@@ -1543,15 +1543,15 @@ public:
 	}
 
 
-	const char* getTerrainMaterialPath(ComponentIndex cmp) override
+	Path getTerrainMaterialPath(ComponentIndex cmp) override
 	{
 		if (m_terrains[cmp]->getMaterial())
 		{
-			return m_terrains[cmp]->getMaterial()->getPath().c_str();
+			return m_terrains[cmp]->getMaterial()->getPath();
 		}
 		else
 		{
-			return "";
+			return Path("");
 		}
 	}
 
@@ -1597,9 +1597,9 @@ public:
 	}
 
 
-	const char* getRenderablePath(ComponentIndex cmp) override
+	Path getRenderablePath(ComponentIndex cmp) override
 	{
-		return m_renderables[cmp].model ? m_renderables[cmp].model->getPath().c_str() : "";
+		return m_renderables[cmp].model ? m_renderables[cmp].model->getPath() : Path("");
 	}
 
 
@@ -1609,12 +1609,12 @@ public:
 	}
 
 
-	void setRenderablePath(ComponentIndex cmp, const char* path) override
+	void setRenderablePath(ComponentIndex cmp, const Path& path) override
 	{
 		Renderable& r = m_renderables[cmp];
 
-		Model* model = static_cast<Model*>(
-			m_engine.getResourceManager().get(ResourceManager::MODEL)->load(Path(path)));
+		auto* manager = m_engine.getResourceManager().get(ResourceManager::MODEL);
+		Model* model = static_cast<Model*>(manager->load(path));
 		setModel(cmp, model);
 		r.matrix = m_universe.getMatrix(r.entity);
 	}
@@ -1709,16 +1709,15 @@ public:
 	}
 
 
-	void
-	setGrassPath(ComponentIndex cmp, int index, const char* path) override
+	void setGrassPath(ComponentIndex cmp, int index, const Path& path) override
 	{
-		m_terrains[cmp]->setGrassTypePath(index, Path(path));
+		m_terrains[cmp]->setGrassTypePath(index, path);
 	}
 
 
-	const char* getGrassPath(ComponentIndex cmp, int index) override
+	Path getGrassPath(ComponentIndex cmp, int index) override
 	{
-		return m_terrains[cmp]->getGrassTypePath(index).c_str();
+		return m_terrains[cmp]->getGrassTypePath(index);
 	}
 
 
@@ -3115,23 +3114,23 @@ public:
 	}
 
 
-	void setParticleEmitterMaterialPath(ComponentIndex cmp, const char* path) override
+	void setParticleEmitterMaterialPath(ComponentIndex cmp, const Path& path) override
 	{
 		if (!m_particle_emitters[cmp]) return;
 
 		auto* manager = m_engine.getResourceManager().get(ResourceManager::MATERIAL);
-		Material* material = static_cast<Material*>(manager->load(Path(path)));
+		Material* material = static_cast<Material*>(manager->load(path));
 		m_particle_emitters[cmp]->setMaterial(material);
 	}
 
 
-	const char* getParticleEmitterMaterialPath(ComponentIndex cmp) override
+	Path getParticleEmitterMaterialPath(ComponentIndex cmp) override
 	{
 		ParticleEmitter* emitter = m_particle_emitters[cmp];
-		if (!emitter) return "";
-		if (!emitter->getMaterial()) return "";
+		if (!emitter) return Path("");
+		if (!emitter->getMaterial()) return Path("");
 
-		return emitter->getMaterial()->getPath().c_str();
+		return emitter->getMaterial()->getPath();
 	}
 
 
