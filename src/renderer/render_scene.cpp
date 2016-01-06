@@ -315,7 +315,7 @@ public:
 	void setParticleEmitterSpawnCount(ComponentIndex cmp, const Int2& value) override
 	{
 		m_particle_emitters[cmp]->m_spawn_count.from = value.x;
-		m_particle_emitters[cmp]->m_spawn_count.to = Math::max(value.x, value.y);
+		m_particle_emitters[cmp]->m_spawn_count.to = Math::maxValue(value.x, value.y);
 	}
 
 

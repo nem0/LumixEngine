@@ -148,7 +148,7 @@ namespace Lumix
 					break;
 				}
 
-				m_pos = Math::min(m_pos, m_size);
+				m_pos = Math::minValue(m_pos, m_size);
 				return m_pos;
 			}
 

@@ -270,14 +270,13 @@ ParticleEmitter::SpawnShapeModule::SpawnShapeModule(ParticleEmitter& emitter)
 
 void ParticleEmitter::SpawnShapeModule::spawnParticle(int index)
 {
-	static const float INV = 1.0f / RAND_MAX;
 	// ugly and ~0.1% from uniform distribution, but still faster than the correct solution
 	float r2 = m_radius * m_radius;
 	for (int i = 0; i < 10; ++i)
 	{
-		Vec3 v(m_radius * (2 * rand() * INV - 1.0f),
-			m_radius * (2 * rand() * INV - 1.0f),
-			m_radius * (2 * rand() * INV - 1.0f));
+		Vec3 v(m_radius * Math::randFloat(-1, 1),
+			m_radius * Math::randFloat(-1, 1),
+			m_radius * Math::randFloat(-1, 1));
 
 		if (v.squaredLength() < r2)
 		{
@@ -514,7 +513,7 @@ ParticleEmitter::RandomRotationModule::RandomRotationModule(ParticleEmitter& emi
 
 void ParticleEmitter::RandomRotationModule::spawnParticle(int index)
 {
-	m_emitter.m_rotation[index] = Math::degreesToRadians(float(rand() % 360));
+	m_emitter.m_rotation[index] = Math::randFloat(0, Math::PI * 2);
 }
 
 
@@ -538,7 +537,7 @@ IntInterval::IntInterval()
 int IntInterval::getRandom() const
 {
 	if (from == to) return from;
-	return from + rand() % (to - from + 1);
+	return Math::rand(from, to);
 }
 
 
@@ -551,7 +550,7 @@ void Interval::check()
 
 float Interval::getRandom() const
 {
-	return from + rand() * ((to - from) / RAND_MAX);
+	return Math::randFloat(from, to);
 }
 
 

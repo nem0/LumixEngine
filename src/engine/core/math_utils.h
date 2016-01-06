@@ -4,15 +4,6 @@
 #include "lumix.h"
 
 
-#ifdef max
-#undef max
-#endif
-
-#ifdef min
-#undef min
-#endif
-
-
 namespace Lumix
 {
 struct Vec3;
@@ -48,19 +39,9 @@ LUMIX_ENGINE_API bool getRayTriangleIntersection(const Vec3& origin,
 	const Vec3& c,
 	float* out_t);
 
-template <typename T> LUMIX_FORCE_INLINE T min(T a, T b)
-{
-	return a < b ? a : b;
-}
-
 template <typename T> LUMIX_FORCE_INLINE T minValue(T a, T b)
 {
 	return a < b ? a : b;
-}
-
-template <typename T> LUMIX_FORCE_INLINE T max(T a, T b)
-{
-	return a < b ? b : a;
 }
 
 template <typename T> LUMIX_FORCE_INLINE T maxValue(T a, T b)
@@ -86,7 +67,7 @@ template <typename T> LUMIX_FORCE_INLINE T signum(T a)
 template <typename T>
 LUMIX_FORCE_INLINE T clamp(T value, T min_value, T max_value)
 {
-	return min(max(value, min_value), max_value);
+	return minValue(maxValue(value, min_value), max_value);
 }
 
 template <typename T> bool isPowOfTwo(T n)
@@ -114,5 +95,13 @@ inline float easeInOut(float t)
 	--scaled_t;
 	return -0.5f * (scaled_t * (scaled_t - 2) - 1);
 }
-}
-}
+
+
+LUMIX_ENGINE_API uint32 rand();
+LUMIX_ENGINE_API uint32 rand(uint32 from, uint32 to);
+LUMIX_ENGINE_API float randFloat();
+LUMIX_ENGINE_API float randFloat(float from, float to);
+
+
+} // namespace Math
+} // namespace Lumix
