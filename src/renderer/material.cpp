@@ -179,7 +179,7 @@ void Material::unload(void)
 bool Material::save(JsonSerializer& serializer)
 {
 	serializer.beginObject();
-	serializer.serialize("shader", m_shader ? m_shader->getPath().c_str() : "");
+	serializer.serialize("shader", m_shader ? m_shader->getPath() : Path(""));
 	for (int i = 0; i < m_texture_count; ++i)
 	{
 		char path[MAX_PATH_LENGTH];
@@ -602,7 +602,6 @@ bool Material::load(FS::IFile& file)
 	m_uniforms.clear();
 	JsonSerializer serializer(file, JsonSerializer::READ, getPath(), m_allocator);
 	serializer.deserializeObjectBegin();
-	char path[MAX_PATH_LENGTH];
 	char label[256];
 	char material_dir[MAX_PATH_LENGTH];
 	PathUtils::getDir(material_dir, MAX_PATH_LENGTH, getPath().c_str());
@@ -679,7 +678,8 @@ bool Material::load(FS::IFile& file)
 		}
 		else if (compareString(label, "shader") == 0)
 		{
-			serializer.deserialize(path, MAX_PATH_LENGTH, "");
+			Path path;
+			serializer.deserialize(path, Path(""));
 			auto* manager = m_resource_manager.get(ResourceManager::SHADER);
 			setShader(static_cast<Shader*>(manager->load(Path(path))));
 		}
