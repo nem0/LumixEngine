@@ -1,29 +1,12 @@
-// This code contains NVIDIA Confidential Information and is disclosed to you
-// under a form of NVIDIA software license agreement provided separately to you.
-//
-// Notice
-// NVIDIA Corporation and its licensors retain all intellectual property and
-// proprietary rights in and to this software and related documentation and
-// any modifications thereto. Any use, reproduction, disclosure, or
-// distribution of this software and related documentation without an express
-// license agreement from NVIDIA Corporation is strictly prohibited.
-//
-// ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
-// NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
-// THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
-// MERCHANTABILITY, AND FITNESS FOR A PARTICULAR PURPOSE.
-//
-// Information and code furnished is believed to be accurate and reliable.
-// However, NVIDIA Corporation assumes no responsibility for the consequences of use of such
-// information or for any infringement of patents or other rights of third parties that may
-// result from its use. No license is granted by implication or otherwise under any patent
-// or patent rights of NVIDIA Corporation. Details are subject to change without notice.
-// This code supersedes and replaces all information previously supplied.
-// NVIDIA Corporation products are not authorized for use as critical
-// components in life support devices or systems without express written approval of
-// NVIDIA Corporation.
-//
-// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
+/*
+ * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * NVIDIA CORPORATION and its licensors retain all intellectual property
+ * and proprietary rights in and to this software, related documentation
+ * and any modifications thereto.  Any use, reproduction, disclosure or
+ * distribution of this software and related documentation without an express
+ * license agreement from NVIDIA CORPORATION is strictly prohibited.
+ */
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -152,7 +135,7 @@ namespace physx
 	\brief Tangent of an angle.
 	<b>Unit:</b> Radians
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE PxF32 PxTan(PxF32 a)						{ return ::tan(a);							}
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxF32 PxTan(PxF32 a)						{ return ::tanf(a);							}
 
 	/**
 	\brief Tangent of an angle.
@@ -165,7 +148,7 @@ namespace physx
 	Returns angle between -PI/2 and PI/2 in radians
 	<b>Unit:</b> Radians
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE PxF32 PxAsin(PxF32 f)						{ return ::asin(PxClamp(f,-1.0f,1.0f));	}
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxF32 PxAsin(PxF32 f)						{ return ::asinf(PxClamp(f,-1.0f,1.0f));	}
 
 	/**
 	\brief Arcsine.
@@ -179,7 +162,7 @@ namespace physx
 	Returns angle between 0 and PI in radians
 	<b>Unit:</b> Radians
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE PxF32 PxAcos(PxF32 f)						{ return ::acos(PxClamp(f,-1.0f,1.0f));			}
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxF32 PxAcos(PxF32 f)						{ return ::acosf(PxClamp(f,-1.0f,1.0f));			}
 
 	/**
 	\brief Arccosine.
@@ -193,7 +176,7 @@ namespace physx
 	Returns angle between -PI/2 and PI/2 in radians
 	<b>Unit:</b> Radians
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE PxF32 PxAtan(PxF32 a)						{ return ::atan(a);	}
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxF32 PxAtan(PxF32 a)						{ return ::atanf(a);	}
 
 	/**
 	\brief ArcTangent.
@@ -207,7 +190,7 @@ namespace physx
 	Returns angle between -PI and PI in radians
 	<b>Unit:</b> Radians
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE PxF32 PxAtan2(PxF32 x, PxF32 y)			{ return ::atan2(x,y);	}
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxF32 PxAtan2(PxF32 x, PxF32 y)			{ return ::atan2f(x,y);	}
 
 	/**
 	\brief Arctangent of (x/y) with correct sign.
@@ -232,7 +215,7 @@ namespace physx
 
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxF32 PxPow(PxF32 x,PxF32 y)				{ return ::powf(x,y); }
 
-	PX_CUDA_CALLABLE PX_FORCE_INLINE PxF32 PxLog(PxF32 x)						{ return ::log(x); }
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxF32 PxLog(PxF32 x)						{ return ::logf(x); }
 
 #ifndef PX_DOXYGEN
 } // namespace physx

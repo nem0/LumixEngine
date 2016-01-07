@@ -121,7 +121,7 @@ project "physics"
 
 	files { "../src/physics/**.h", "../src/physics/**.cpp" }
 	excludes { "../src/engine/**/osx/*"}
-	includedirs { "../external/physx/include", "../external/bgfx/include" }
+	includedirs { "../external/physx/include/" .. ide_dir, "../external/bgfx/include" }
 	defines { "BUILDING_PHYSICS" }
 	links { "engine", "renderer", "studio_lib", "editor" }
 
