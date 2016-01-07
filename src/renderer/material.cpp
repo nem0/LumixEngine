@@ -507,7 +507,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 			else
 			{
 				g_log_error.log("Renderer") << "Unknown texture filter \"" << label
-											<< "\" in material " << getPath().c_str();
+											<< "\" in material " << getPath();
 			}
 		}
 		else if (compareString(label, "mag_filter") == 0)
@@ -524,7 +524,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 			else
 			{
 				g_log_error.log("Renderer") << "Unknown texture filter \"" << label
-											<< "\" in material " << getPath().c_str();
+											<< "\" in material " << getPath();
 			}
 		}
 		else if (compareString(label, "u_clamp") == 0)
@@ -561,7 +561,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 		else
 		{
 			g_log_warning.log("Renderer") << "Unknown data \"" << label << "\" in material "
-										  << getPath().c_str();
+										  << getPath();
 			return false;
 		}
 	}
@@ -696,14 +696,14 @@ bool Material::load(FS::IFile& file)
 		else
 		{
 			g_log_warning.log("renderer") << "Unknown parameter " << label << " in material "
-										  << getPath().c_str();
+										  << getPath();
 		}
 	}
 	serializer.deserializeObjectEnd();
 
 	if (!m_shader)
 	{
-		g_log_error.log("renderer") << "Material " << getPath().c_str() << " without a shader";
+		g_log_error.log("renderer") << "Material " << getPath() << " without a shader";
 		return false;
 	}
 

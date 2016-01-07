@@ -9,6 +9,7 @@
 namespace Lumix
 {
 	class Log;
+	class Path;
 
 	class LUMIX_ENGINE_API LogProxy
 	{
@@ -24,6 +25,7 @@ namespace Lumix
 			LogProxy& operator <<(uint32 message);
 			LogProxy& operator <<(uint64 message);
 			LogProxy& operator <<(const string& path);
+			LogProxy& operator <<(const Path& path);
 			LogProxy& substring(const char* str, int start, int length);
 
 		private:
