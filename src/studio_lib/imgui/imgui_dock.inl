@@ -63,15 +63,15 @@ struct DockContext
         }
 
 
-				ImVec2 getMinSize() const
-				{
-						if(!children[0]) return ImVec2(16, 16 + GetTextLineHeightWithSpacing());
+                ImVec2 getMinSize() const
+                {
+                        if(!children[0]) return ImVec2(16, 16 + GetTextLineHeightWithSpacing());
 
-						ImVec2 s0 = children[0]->getMinSize();
-						ImVec2 s1 = children[1]->getMinSize();
-						return isHorizontal() ? ImVec2(s0.x + s1.x, ImMax(s0.y, s1.y))
-								: ImVec2(ImMax(s0.x, s1.x), s0.y + s1.y);
-				}
+                        ImVec2 s0 = children[0]->getMinSize();
+                        ImVec2 s1 = children[1]->getMinSize();
+                        return isHorizontal() ? ImVec2(s0.x + s1.x, ImMax(s0.y, s1.y))
+                                : ImVec2(ImMax(s0.x, s1.x), s0.y + s1.y);
+                }
 
 
         bool isHorizontal() const
@@ -117,20 +117,20 @@ struct DockContext
 
         void setChildrenPosSize(const ImVec2& _pos, const ImVec2& _size)
         {
-						ImVec2 s = children[0]->size;
+                        ImVec2 s = children[0]->size;
             if (isHorizontal())
             {
                 s.y = _size.y;
                 s.x = (float)int(_size.x * children[0]->size.x / (children[0]->size.x + children[1]->size.x));
                 if(s.x < children[0]->getMinSize().x)
-								{
-									s.x = children[0]->getMinSize().x;
-								}
-								else if(_size.x - s.x < children[1]->getMinSize().x)
-								{
-									s.x = _size.x - children[1]->getMinSize().x;
-								}
-								children[0]->setPosSize(_pos, s);
+                                {
+                                    s.x = children[0]->getMinSize().x;
+                                }
+                                else if(_size.x - s.x < children[1]->getMinSize().x)
+                                {
+                                    s.x = _size.x - children[1]->getMinSize().x;
+                                }
+                                children[0]->setPosSize(_pos, s);
 
                 s.x = _size.x - children[0]->size.x;
                 ImVec2 p = _pos;
@@ -141,14 +141,14 @@ struct DockContext
             {
                 s.x = _size.x;
                 s.y = (float)int(_size.y * children[0]->size.y / (children[0]->size.y + children[1]->size.y));
-								if(s.y < children[0]->getMinSize().y)
-								{
-									s.y = children[0]->getMinSize().y;
-								}
-								else if(_size.y - s.y < children[1]->getMinSize().y)
-								{
-									s.y = _size.y - children[1]->getMinSize().y;
-								}
+                                if(s.y < children[0]->getMinSize().y)
+                                {
+                                    s.y = children[0]->getMinSize().y;
+                                }
+                                else if(_size.y - s.y < children[1]->getMinSize().y)
+                                {
+                                    s.y = _size.y - children[1]->getMinSize().y;
+                                }
                 children[0]->setPosSize(_pos, s);
 
                 s.y = _size.y - children[0]->size.y;
@@ -269,27 +269,27 @@ struct DockContext
             ImVec2 size = dock.children[0]->size;
             ImVec2 dsize(0, 0);
             SetCursorScreenPos(dock.children[1]->pos);
-						ImVec2 min_size0 = dock.children[0]->getMinSize();
-						ImVec2 min_size1 = dock.children[1]->getMinSize();
+                        ImVec2 min_size0 = dock.children[0]->getMinSize();
+                        ImVec2 min_size1 = dock.children[1]->getMinSize();
             if (dock.isHorizontal())
             {
                 InvisibleButton("split", ImVec2(3, dock.size.y));
                 if (dock.status == Status_Dragged) dsize.x = io.MouseDelta.x;
-								dsize.x = -ImMin(-dsize.x, dock.children[0]->size.x - min_size0.x);
-								dsize.x = ImMin(dsize.x, dock.children[1]->size.x - min_size1.x);
+                                dsize.x = -ImMin(-dsize.x, dock.children[0]->size.x - min_size0.x);
+                                dsize.x = ImMin(dsize.x, dock.children[1]->size.x - min_size1.x);
             }
             else
             {
                 InvisibleButton("split", ImVec2(dock.size.x, 3));
                 if (dock.status == Status_Dragged) dsize.y = io.MouseDelta.y;
-								dsize.y = -ImMin(-dsize.y, dock.children[0]->size.y - min_size0.y);
-								dsize.y = ImMin(dsize.y, dock.children[1]->size.y - min_size1.y);
+                                dsize.y = -ImMin(-dsize.y, dock.children[0]->size.y - min_size0.y);
+                                dsize.y = ImMin(dsize.y, dock.children[1]->size.y - min_size1.y);
             }
-						ImVec2 new_size0 = dock.children[0]->size + dsize;
-						ImVec2 new_size1 = dock.children[1]->size - dsize;
-						ImVec2 new_pos1 = dock.children[1]->pos + dsize;
-						dock.children[0]->setPosSize(dock.children[0]->pos, new_size0);
-						dock.children[1]->setPosSize(new_pos1, new_size1);
+                        ImVec2 new_size0 = dock.children[0]->size + dsize;
+                        ImVec2 new_size1 = dock.children[1]->size - dsize;
+                        ImVec2 new_pos1 = dock.children[1]->pos + dsize;
+                        dock.children[0]->setPosSize(dock.children[0]->pos, new_size0);
+                        dock.children[1]->setPosSize(new_pos1, new_size1);
 
             if (IsItemHoveredRect() && IsMouseClicked(0))
             {
@@ -310,15 +310,28 @@ struct DockContext
                                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
                                  ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
                                  ImGuiWindowFlags_NoScrollWithMouse;
-        ImVec2 pos(0, GetTextLineHeightWithSpacing());
-        SetNextWindowPos(pos);
-        SetNextWindowSize(GetIO().DisplaySize - pos);
+        Dock* root = getRootDock();
+        if (root)
+        {
+            SetNextWindowPos(root->pos);
+            SetNextWindowSize(root->size);
+        }
+        else
+        {
+            SetNextWindowPos(ImVec2(0, 0));
+            SetNextWindowSize(GetIO().DisplaySize );
+        }
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
         Begin("###DockPanel", nullptr, flags);
         splits();
     }
 
 
-    void endPanel() { End(); }
+    void endPanel() 
+    {
+        End(); 
+		ImGui::PopStyleVar();
+	}
 
 
     Dock* getDockAt(const ImVec2& pos) const
@@ -397,7 +410,7 @@ struct DockContext
     {
         for (int i = 0; i < m_docks.size(); ++i)
         {
-            if (!m_docks[i]->parent && m_docks[i]->status == Status_Docked)
+            if (!m_docks[i]->parent && (m_docks[i]->status == Status_Docked || m_docks[i]->children[0]))
             {
                 return m_docks[i];
             }
@@ -707,8 +720,7 @@ struct DockContext
         if (!dest)
         {
             dock.status = Status_Docked;
-            ImVec2 pos = ImVec2(0, GetTextLineHeightWithSpacing());
-            dock.setPosSize(pos, GetIO().DisplaySize - pos);
+            dock.setPosSize(ImVec2(0, 0), GetIO().DisplaySize);
         }
         else if (dock_slot == Slot_Tab)
         {
@@ -766,6 +778,17 @@ struct DockContext
     }
 
 
+    void rootDock(const ImVec2& pos, const ImVec2& size)
+    {
+        Dock* root = getRootDock();
+        if (!root) return;
+
+        ImVec2 min_size = root->getMinSize();
+        ImVec2 requested_size = size;
+        root->setPosSize(pos, ImMax(min_size, requested_size));
+    }
+
+
     bool begin(const char* label, bool* opened, ImGuiWindowFlags extra_flags)
     {
         Dock& dock = getDock(label, !opened || *opened);
@@ -788,13 +811,6 @@ struct DockContext
         if (dock.status == Status_Dragged) handleDrag(dock);
 
         bool is_float = dock.status == Status_Float;
-
-        if (!dock.parent && dock.size.x < 0 && dock.status != Status_Dragged)
-        {
-            dock.pos = ImVec2(0, GetTextLineHeightWithSpacing() + 4);
-            dock.size = GetIO().DisplaySize;
-            dock.size.y -= dock.pos.y;
-        }
 
         if (is_float)
         {
@@ -873,7 +889,7 @@ struct DockContext
 
     void save(Lumix::FS::OsFile& file)
     {
-        file << "m_docks = {\n";
+        file << "docks = {\n";
         for (int i = 0; i < m_docks.size(); ++i)
         {
             Dock& dock = *m_docks[i];
@@ -915,7 +931,7 @@ struct DockContext
         }
         m_docks.clear();
 
-        if (lua_getglobal(L, "m_docks") == LUA_TTABLE)
+        if (lua_getglobal(L, "docks") == LUA_TTABLE)
         {
             lua_pushnil(L);
             while (lua_next(L, -2) != 0)
@@ -928,7 +944,7 @@ struct DockContext
         lua_pop(L, 1);
 
         int i = 0;
-        if (lua_getglobal(L, "m_docks") == LUA_TTABLE)
+        if (lua_getglobal(L, "docks") == LUA_TTABLE)
         {
             lua_pushnil(L);
             while (lua_next(L, -2) != 0)
@@ -1005,6 +1021,12 @@ void ShutdownDock()
         g_dock.m_docks[i]->~Dock();
         MemFree(g_dock.m_docks[i]);
     }
+}
+
+
+void RootDock(const ImVec2 & pos, const ImVec2 & size)
+{
+    g_dock.rootDock(pos, size);
 }
 
 

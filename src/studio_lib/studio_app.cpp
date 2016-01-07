@@ -282,6 +282,13 @@ public:
 		else
 		{
 			showMainMenu();
+			if (ImGui::GetIO().DisplaySize.y > 0)
+			{
+				auto pos = ImVec2(0, ImGui::GetWindowFontSize() + ImGui::GetStyle().FramePadding.y * 2);
+				auto size = ImGui::GetIO().DisplaySize;
+				size.y -= pos.y;
+				ImGui::RootDock(pos, size);
+			}
 			m_profiler_ui->onGUI();
 			m_asset_browser->onGUI();
 			m_log_ui->onGUI();
