@@ -338,125 +338,255 @@ ImVec2 operator*(float f, const ImVec2& v)
 
 CurveEditor BeginCurveEditor(const char* label)
 {
-    CurveEditor editor;
-    editor.valid = false;
+	CurveEditor editor;
+	editor.valid = false;
 
-    ImGuiWindow* window = GetCurrentWindow();
-    if (window->SkipItems) return editor;
+	ImGuiWindow* window = GetCurrentWindow();
+	if (window->SkipItems) return editor;
 
-    ImGuiState& g = *GImGui;
-    const ImGuiStyle& style = g.Style;
-    ImVec2 cursor_pos = GetCursorScreenPos();
+	ImGuiState& g = *GImGui;
+	const ImGuiStyle& style = g.Style;
+	auto cursor_pos = ImGui::GetCursorScreenPos();
 
-    const ImVec2 label_size = CalcTextSize(label, NULL, true);
-    ImVec2 graph_size;
-    graph_size.x = CalcItemWidth() + (style.FramePadding.x * 2);
-    graph_size.y = 100; // label_size.y + (style.FramePadding.y * 2);
+	const ImVec2 label_size = ImGui::CalcTextSize(label, NULL, true);
+	ImVec2 graph_size;
+	graph_size.x = CalcItemWidth() + (style.FramePadding.x * 2);
+	graph_size.y = 100; // label_size.y + (style.FramePadding.y * 2);
 
-    const ImRect frame_bb(
-        window->DC.CursorPos, window->DC.CursorPos + ImVec2(graph_size.x, graph_size.y));
-    const ImRect inner_bb(frame_bb.Min + style.FramePadding, frame_bb.Max - style.FramePadding);
-    const ImRect total_bb(frame_bb.Min,
-        frame_bb.Max +
-            ImVec2(label_size.x > 0.0f ? style.ItemInnerSpacing.x + label_size.x : 0.0f, 0));
+	const ImRect frame_bb(window->DC.CursorPos, window->DC.CursorPos + ImVec2(graph_size.x, graph_size.y));
+	const ImRect inner_bb(frame_bb.Min + style.FramePadding, frame_bb.Max - style.FramePadding);
+	const ImRect total_bb(frame_bb.Min, frame_bb.Max + ImVec2(label_size.x > 0.0f ? style.ItemInnerSpacing.x + label_size.x : 0.0f, 0));
 
-    ItemSize(total_bb, style.FramePadding.y);
-    if (!ItemAdd(total_bb, NULL)) return editor;
+	ItemSize(total_bb, style.FramePadding.y);
+	if (!ItemAdd(total_bb, NULL))
+		return editor;
 
-    editor.valid = true;
-    PushID(label);
+	editor.valid = true;
+	ImGui::PushID(label);
 
-    RenderFrame(
-        frame_bb.Min, frame_bb.Max, GetColorU32(ImGuiCol_FrameBg), true, style.FrameRounding);
-    RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y), label);
+	RenderFrame(frame_bb.Min, frame_bb.Max, GetColorU32(ImGuiCol_FrameBg), true, style.FrameRounding);
+	RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y), label);
 
-    editor.beg_pos = cursor_pos;
-    SetCursorScreenPos(cursor_pos);
+	editor.beg_pos = cursor_pos;
+	ImGui::SetCursorScreenPos(cursor_pos);
 
-    editor.point_idx = -1;
+	editor.point_idx = 0;
+	editor.tangent_idx = 1000000;
 
-    return editor;
+	return editor;
 }
 
 
 void EndCurveEditor(const CurveEditor& editor)
 {
-    SetCursorScreenPos(editor.beg_pos);
+	ImGui::SetCursorScreenPos(editor.beg_pos);
 
-    InvisibleButton("bg", ImVec2(CalcItemWidth(), 100));
-    PopID();
+	InvisibleButton("bg", ImVec2(ImGui::CalcItemWidth(), 100));
+	ImGui::PopID();
+}
+
+
+ImVec2 CurveTransform(const ImVec2& p, const ImRect& bb)
+{
+	return ImVec2(bb.Min.x * (1 - p.x) + bb.Max.x * p.x,
+				  bb.Min.y * p.y + bb.Max.y * (1 - p.y));
+}
+
+
+bool CurveNode(int id, ImVec2& point, const ImRect& bb)
+{
+	ImGuiWindow* window = GetCurrentWindow();
+	static const float SIZE = 3;
+	static const float BUTTON_SIZE = 5;
+	const ImU32 col_base = GetColorU32(ImGuiCol_PlotLines);
+	const ImU32 col_hovered = GetColorU32(ImGuiCol_PlotLinesHovered);
+
+	auto pos = CurveTransform(point, bb);
+
+	ImGui::SetCursorScreenPos(pos - ImVec2(BUTTON_SIZE / 2, BUTTON_SIZE / 2));
+	ImGui::PushID(id);
+	ImGui::InvisibleButton("", ImVec2(2 * BUTTON_SIZE, 2 * BUTTON_SIZE));
+
+	ImU32 col = ImGui::IsItemHovered() ? col_hovered : col_base;
+
+	window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, SIZE), col);
+	window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, SIZE), col);
+	window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, -SIZE), col);
+	window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, -SIZE), col);
+
+	bool changed = false;
+	if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))
+	{
+		pos += ImGui::GetIO().MouseDelta;
+		ImVec2 v;
+		v.x = (pos.x - bb.Min.x) / (bb.Max.x - bb.Min.x);
+		v.y = (bb.Max.y - pos.y) / (bb.Max.y - bb.Min.y);
+
+		v = ImClamp(v, ImVec2(0, 0), ImVec2(1, 1));
+		point = v;
+		changed = true;
+	}
+	ImGui::PopID();
+
+	return changed;
+}
+
+
+bool CurveTangent(int id, const ImVec2& point, ImVec2& tangent, const ImRect& bb)
+{
+	ImGuiWindow* window = GetCurrentWindow();
+	static const float SIZE = 2.6f;
+	static const float BUTTON_SIZE = 4.5f;
+	const ImU32 col_base = GetColorU32(ImGuiCol_PlotLines);
+	const ImU32 col_hovered = GetColorU32(ImGuiCol_PlotLinesHovered);
+
+	auto pos = CurveTransform(point + tangent, bb);
+
+	ImGui::SetCursorScreenPos(pos - ImVec2(BUTTON_SIZE / 2, BUTTON_SIZE / 2));
+	ImGui::PushID(id);
+	ImGui::InvisibleButton("", ImVec2(2 * BUTTON_SIZE, 2 * BUTTON_SIZE));
+
+	ImU32 col = ImGui::IsItemHovered() ? col_hovered : col_base;
+
+	window->DrawList->AddLine(pos + ImVec2(-SIZE, SIZE), pos + ImVec2(SIZE, SIZE), col);
+	window->DrawList->AddLine(pos + ImVec2(SIZE, SIZE), pos + ImVec2(SIZE, -SIZE), col);
+	window->DrawList->AddLine(pos + ImVec2(SIZE, -SIZE), pos + ImVec2(-SIZE, -SIZE), col);
+	window->DrawList->AddLine(pos + ImVec2(-SIZE, -SIZE), pos + ImVec2(-SIZE, SIZE), col);
+
+	auto point_pos = CurveTransform(point, bb);
+	window->DrawList->AddLine(point_pos, pos, col_base);
+
+	bool changed = false;
+	if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))
+	{
+		pos += ImGui::GetIO().MouseDelta;
+
+		ImVec2 v;
+		v.x = (pos.x - bb.Min.x) / (bb.Max.x - bb.Min.x);
+		v.y = (bb.Max.y - pos.y) / (bb.Max.y - bb.Min.y);
+
+		if (tangent.x < 0)
+			v = ImClamp(v, ImVec2(0, 0), ImVec2(point.x - 0.0001f, 1));
+		else
+			v = ImClamp(v, ImVec2(point.x + 0.0001f, 0), ImVec2(1, 1));
+
+		tangent = v - point;
+		changed = true;
+	}
+	ImGui::PopID();
+
+	return changed;
 }
 
 
 bool CurvePoint(ImVec2* points, CurveEditor& editor)
 {
-    ImGuiWindow* window = GetCurrentWindow();
-    ImGuiState& g = *GImGui;
-    const ImGuiStyle& style = g.Style;
+	ImGuiWindow* window = GetCurrentWindow();
+	ImGuiState& g = *GImGui;
+	const ImGuiStyle& style = g.Style;
 
-    ImVec2 cursor_pos_backup = GetCursorScreenPos();
+	auto cursor_pos_backup = ImGui::GetCursorScreenPos();
 
-    ImVec2 graph_size;
-    graph_size.x = CalcItemWidth() + (style.FramePadding.x * 2);
-    graph_size.y = 100; // label_size.y + (style.FramePadding.y * 2);
+	ImVec2 graph_size;
+	graph_size.x = CalcItemWidth() + (style.FramePadding.x * 2);
+	graph_size.y = 100; // label_size.y + (style.FramePadding.y * 2);
 
-    const ImRect frame_bb(window->DC.CursorPos, window->DC.CursorPos + graph_size);
-    const ImRect inner_bb(frame_bb.Min + style.FramePadding, frame_bb.Max - style.FramePadding);
-    const ImU32 col_base = GetColorU32(ImGuiCol_PlotLines);
-    const ImU32 col_hovered = GetColorU32(ImGuiCol_PlotLinesHovered);
+	const ImRect frame_bb(window->DC.CursorPos, window->DC.CursorPos + graph_size);
+	const ImRect inner_bb(frame_bb.Min + style.FramePadding, frame_bb.Max - style.FramePadding);
+	const ImU32 col_base = GetColorU32(ImGuiCol_PlotLines);
+	const ImU32 col_hovered = GetColorU32(ImGuiCol_PlotLinesHovered);
 
-    ImVec2 left_tangent = points[0];
-    ImVec2 right_tangent = points[2];
-    ImVec2 p = points[1];
-    auto transform = [inner_bb](const ImVec2& p) -> ImVec2
-    {
-        return ImVec2(inner_bb.Min.x * (1 - p.x) + inner_bb.Max.x * p.x,
-            inner_bb.Min.y * p.y + inner_bb.Max.y * (1 - p.y));
-    };
+	auto left_tangent = points[0];
+	auto right_tangent = points[2];
+	auto p = points[1];
 
-    ImVec2 pos = transform(p);
-    if (editor.point_idx >= 0)
-    {
-        window->DrawList->AddBezierCurve(pos,
-            transform(p + left_tangent),
-            transform(editor.prev_point + editor.prev_tangent),
-            transform(editor.prev_point),
-            col_base,
-            1.0f,
-            20);
-    }
-    editor.prev_point = p;
-    editor.prev_tangent = right_tangent;
+	bool changed = false;
 
-    static const float SIZE = 3;
-    SetCursorScreenPos(pos - ImVec2(SIZE, SIZE));
-    PushID(editor.point_idx);
-    ++editor.point_idx;
-    InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
+	if (editor.point_idx > 0)
+	{
+		window->DrawList->AddBezierCurve(CurveTransform(p, inner_bb),
+										 CurveTransform(p + left_tangent, inner_bb),
+										 CurveTransform(editor.prev_point + editor.prev_tangent, inner_bb),
+										 CurveTransform(editor.prev_point, inner_bb),
+										 col_base,
+										 1.0f, 20);
 
-    ImU32 col = IsItemHovered() ? col_hovered : col_base;
+		if (CurveTangent(editor.tangent_idx, p, points[0], inner_bb))
+		{
+			points[2] = -1 * points[0];
+			changed = true;
+		}
+		++editor.tangent_idx;
+	}
 
-    window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, SIZE), col);
-    window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, SIZE), col);
-    window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, -SIZE), col);
-    window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, -SIZE), col);
+	if (editor.point_idx < editor.point_count - 1)
+	{
+		if (CurveTangent(editor.tangent_idx, p, points[2], inner_bb))
+		{
+			points[0] = -1 * points[2];
+			changed = true;
+		}
+		++editor.tangent_idx;
+	}
 
-    bool changed = false;
-    if (IsItemActive() && IsMouseDragging(0))
-    {
-        pos += GetIO().MouseDelta;
-        ImVec2 v;
-        v.x = (pos.x - inner_bb.Min.x) / (inner_bb.Max.x - inner_bb.Min.x);
-        v.y = (inner_bb.Max.y - pos.y) / (inner_bb.Max.y - inner_bb.Min.y);
+	editor.prev_point = p;
+	editor.prev_tangent = right_tangent;
 
-        v = ImClamp(v, ImVec2(0, 0), ImVec2(1, 1));
-        points[1] = v;
-        changed = true;
-    }
-    PopID();
+	changed |= CurveNode(editor.point_idx, points[1], inner_bb);
+	++editor.point_idx;
 
-    SetCursorScreenPos(cursor_pos_backup);
-    return changed;
+	ImGui::SetCursorScreenPos(cursor_pos_backup);
+	return changed;
+}
+
+
+float FindClosestPointToCurve(const ImVec2* points, const ImVec2& point, float t, int iterCount)
+{
+	if (iterCount >= 10)
+		return t;
+
+	float u = 1 - t;
+	ImVec2 pos = u*u*u * points[0]
+		+ 3 * u*u*t * points[1]
+		+ 3 * u*t*t * points[2]
+		+ t*t*t * points[3];
+
+	float d = 1.0f;
+	for (int i = 0; i < iterCount + 2; ++i)
+		d *= 2;
+
+	float delta = 1.0f / d;
+	if (pos.x < point.x)
+		return FindClosestPointToCurve(points, point, t + delta, iterCount + 1);
+	else
+		return FindClosestPointToCurve(points, point, t - delta, iterCount + 1);
+}
+
+CurvePointData FindClosest(ImVec2* points, const ImVec2& point)
+{
+	ImVec2 p[4] = { points[0], points[0] + points[1], points[3] + points[2], points[3] };
+	float t = FindClosestPointToCurve(p, point, 0.5f, 1);
+
+	float u = 1 - t;
+
+	ImVec2 p10 = u * p[0] + t * p[1];
+	ImVec2 p11 = u * p[1] + t * p[2];
+	ImVec2 p12 = u * p[2] + t * p[3];
+
+	ImVec2 p20 = u * p10 + t * p11;
+	ImVec2 p21 = u * p11 + t * p12;
+
+	ImVec2 p30 = u * p20 + t * p21;
+
+	CurvePointData data;
+	data.left_tangent = p20 - p30;
+	data.point = p30;
+	data.right_tangent = p21 - p30;
+
+	points[1] = p10 - points[0];
+	points[2] = p12 - points[3];
+
+	return data;
 }
 
 

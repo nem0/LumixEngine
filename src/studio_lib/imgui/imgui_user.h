@@ -49,11 +49,21 @@ struct CurveEditor
     ImVec2 prev_point;
     ImVec2 prev_tangent;
     int point_idx;
+	int tangent_idx;
+	int point_count;
+};
+
+struct CurvePointData
+{
+	ImVec2 left_tangent;
+	ImVec2 point;
+	ImVec2 right_tangent;
 };
 
 IMGUI_API CurveEditor BeginCurveEditor(const char* label);
 IMGUI_API bool CurvePoint(ImVec2* point, CurveEditor& editor);
 IMGUI_API void EndCurveEditor(const CurveEditor& editor);
+IMGUI_API CurvePointData FindClosest(ImVec2* points, const ImVec2& point);
 
 
 } // namespace ImGui

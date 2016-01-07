@@ -266,7 +266,7 @@ project "studio"
 
 	debugdir "../../LumixEngine_data"
 
-	files { "../src/studio/**.h", "../src/studio/**.inl", "../src/studio/**.cpp" }
+	files { "../src/studio/**.cpp" }
 	includedirs { "../src", "../src/studio_lib", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
 	links { "studio_lib", "animation", "physics", "editor", "engine", "renderer", "winmm" }
 
