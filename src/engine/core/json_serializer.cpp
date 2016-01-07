@@ -42,9 +42,9 @@ private:
 
 
 JsonSerializer::JsonSerializer(FS::IFile& file,
-							   AccessMode access_mode,
-							   const Path& path,
-							   IAllocator& allocator)
+	AccessMode access_mode,
+	const Path& path,
+	IAllocator& allocator)
 	: m_file(file)
 	, m_access_mode(access_mode)
 	, m_allocator(allocator)
@@ -121,6 +121,17 @@ void JsonSerializer::serialize(const char* label, int value)
 	toCString(value, tmp, 20);
 	m_file.write(" : ", stringLength(" : "));
 	m_file.write(tmp, stringLength(tmp));
+	m_is_first_in_block = false;
+}
+
+
+void JsonSerializer::serialize(const char* label, const Path& value)
+{
+	writeBlockComma();
+	writeString(label);
+	m_file.write(" : \"", 4);
+	m_file.write(value.c_str(), value.length());
+	m_file.write("\"", 1);
 	m_is_first_in_block = false;
 }
 
@@ -300,9 +311,44 @@ void JsonSerializer::deserialize(int32& value, int32 default_value)
 }
 
 
-void JsonSerializer::deserialize(char* value,
-								 int max_length,
-								 const char* default_value)
+void JsonSerializer::deserialize(const char* label, Path& value, const Path& default_value)
+{
+	deserializeLabel(label);
+	if (!m_is_string_token)
+	{
+		value = default_value;
+	}
+	else
+	{
+		char tmp[MAX_PATH_LENGTH];
+		int size = Math::minValue(lengthOf(tmp) - 1, m_token_size);
+		copyMemory(tmp, m_token, size);
+		tmp[size] = '\0';
+		value = tmp;
+		deserializeToken();
+	}
+}
+
+
+void JsonSerializer::deserialize(Path& value, const Path& default_value)
+{
+	if (!m_is_string_token)
+	{
+		value = default_value;
+	}
+	else
+	{
+		char tmp[MAX_PATH_LENGTH];
+		int size = Math::minValue(lengthOf(tmp) - 1, m_token_size);
+		copyMemory(tmp, m_token, size);
+		tmp[size] = '\0';
+		value = tmp;
+		deserializeToken();
+	}
+}
+
+
+void JsonSerializer::deserialize(char* value, int max_length, const char* default_value)
 {
 	if (!m_is_string_token)
 	{
@@ -318,9 +364,7 @@ void JsonSerializer::deserialize(char* value,
 }
 
 
-void JsonSerializer::deserialize(const char* label,
-								 float& value,
-								 float default_value)
+void JsonSerializer::deserialize(const char* label, float& value, float default_value)
 {
 	deserializeLabel(label);
 	if (!m_is_string_token)
@@ -335,9 +379,7 @@ void JsonSerializer::deserialize(const char* label,
 }
 
 
-void JsonSerializer::deserialize(const char* label,
-								 uint32& value,
-								 uint32 default_value)
+void JsonSerializer::deserialize(const char* label, uint32& value, uint32 default_value)
 {
 	deserializeLabel(label);
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -355,8 +397,7 @@ bool JsonSerializer::isObjectEnd()
 {
 	if (m_token == m_data + m_data_size)
 	{
-		ErrorProxy(*this).log()
-			<< "Unexpected end of file while looking for the end of an object.";
+		ErrorProxy(*this).log() << "Unexpected end of file while looking for the end of an object.";
 		return true;
 	}
 
@@ -364,9 +405,7 @@ bool JsonSerializer::isObjectEnd()
 }
 
 
-void JsonSerializer::deserialize(const char* label,
-								 int32& value,
-								 int32 default_value)
+void JsonSerializer::deserialize(const char* label, int32& value, int32 default_value)
 {
 	deserializeLabel(label);
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -378,9 +417,9 @@ void JsonSerializer::deserialize(const char* label,
 
 
 void JsonSerializer::deserialize(const char* label,
-								 char* value,
-								 int max_length,
-								 const char* default_value)
+	char* value,
+	int max_length,
+	const char* default_value)
 {
 	deserializeLabel(label);
 	if (!m_is_string_token)
@@ -414,8 +453,8 @@ void JsonSerializer::expectToken(char expected_token)
 		tmp[0] = expected_token;
 		tmp[1] = 0;
 		ErrorProxy(*this).log() << "Unexpected token \""
-					  << string(m_token, m_token_size, m_allocator)
-					  << "\", expected " << tmp << ".";
+								<< string(m_token, m_token_size, m_allocator) << "\", expected "
+								<< tmp << ".";
 		deserializeToken();
 	}
 }
@@ -452,8 +491,7 @@ bool JsonSerializer::isArrayEnd()
 {
 	if (m_token == m_data + m_data_size)
 	{
-		ErrorProxy(*this).log()
-			<< "Unexpected end of file while looking for the end of an array.";
+		ErrorProxy(*this).log() << "Unexpected end of file while looking for the end of an array.";
 		return true;
 	}
 
@@ -469,9 +507,7 @@ void JsonSerializer::deserializeArrayEnd()
 }
 
 
-void JsonSerializer::deserializeArrayItem(char* value,
-										  int max_length,
-										  const char* default_value)
+void JsonSerializer::deserializeArrayItem(char* value, int max_length, const char* default_value)
 {
 	deserializeArrayComma();
 	if (m_is_string_token)
@@ -484,16 +520,15 @@ void JsonSerializer::deserializeArrayItem(char* value,
 	else
 	{
 		ErrorProxy(*this).log() << "Unexpected token \""
-					  << string(m_token, m_token_size, m_allocator)
-					  << "\", expected string.";
+								<< string(m_token, m_token_size, m_allocator)
+								<< "\", expected string.";
 		deserializeToken();
 		copyString(value, max_length, default_value);
 	}
 }
 
 
-void JsonSerializer::deserializeArrayItem(uint32& value,
-										  uint32 default_value)
+void JsonSerializer::deserializeArrayItem(uint32& value, uint32 default_value)
 {
 	deserializeArrayComma();
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -550,16 +585,13 @@ void JsonSerializer::deserializeArrayItem(bool& value, bool default_value)
 	}
 	else
 	{
-		value =
-			m_token_size == 4 && compareStringN("true", m_token, m_token_size) == 0;
+		value = m_token_size == 4 && compareStringN("true", m_token, m_token_size) == 0;
 	}
 	deserializeToken();
 }
 
 
-void JsonSerializer::deserialize(const char* label,
-								 bool& value,
-								 bool default_value)
+void JsonSerializer::deserialize(const char* label, bool& value, bool default_value)
 {
 	deserializeLabel(label);
 	if (!m_is_string_token)
@@ -613,8 +645,7 @@ void JsonSerializer::deserializeToken()
 	{
 		++m_token;
 	}
-	if (*m_token == '/' && m_token < m_data + m_data_size - 1 &&
-		m_token[1] == '/')
+	if (*m_token == '/' && m_token < m_data + m_data_size - 1 && m_token[1] == '/')
 	{
 		m_token_size = int((m_data + m_data_size) - m_token);
 		m_is_string_token = false;
@@ -683,8 +714,8 @@ void JsonSerializer::deserializeLabel(char* label, int max_length)
 	if (!m_is_string_token)
 	{
 		ErrorProxy(*this).log() << "Unexpected token \""
-					  << string(m_token, m_token_size, m_allocator)
-					  << "\", expected string.";
+								<< string(m_token, m_token_size, m_allocator)
+								<< "\", expected string.";
 		deserializeToken();
 	}
 	copyNString(label, max_length, m_token, m_token_size);
@@ -728,23 +759,23 @@ void JsonSerializer::deserializeLabel(const char* label)
 	if (!m_is_string_token)
 	{
 		ErrorProxy(*this).log() << "Unexpected token \""
-					  << string(m_token, m_token_size, m_allocator)
-					  << "\", expected string.";
+								<< string(m_token, m_token_size, m_allocator)
+								<< "\", expected string.";
 		deserializeToken();
 	}
 	if (compareStringN(label, m_token, m_token_size) != 0)
 	{
 		ErrorProxy(*this).log() << "Unexpected label \""
-					  << string(m_token, m_token_size, m_allocator)
-					  << "\", expected \"" << label << "\".";
+								<< string(m_token, m_token_size, m_allocator) << "\", expected \""
+								<< label << "\".";
 		deserializeToken();
 	}
 	deserializeToken();
 	if (m_is_string_token || m_token_size != 1 || m_token[0] != ':')
 	{
 		ErrorProxy(*this).log() << "Unexpected label \""
-					  << string(m_token, m_token_size, m_allocator)
-					  << "\", expected \"" << label << "\".";
+								<< string(m_token, m_token_size, m_allocator) << "\", expected \""
+								<< label << "\".";
 		deserializeToken();
 	}
 	deserializeToken();

@@ -37,6 +37,7 @@ namespace Lumix
 			void serialize(const char* label, float value);
 			void serialize(const char* label, int32 value);
 			void serialize(const char* label, const char* value);
+			void serialize(const char* label, const Path& value);
 			void serialize(const char* label, bool value);
 			void beginObject();
 			void beginObject(const char* label);
@@ -55,8 +56,10 @@ namespace Lumix
 			void deserialize(const char* label, float& value, float default_value);
 			void deserialize(const char* label, int32& value, int32 default_value);
 			void deserialize(const char* label, char* value, int max_length, const char* default_value);
+			void deserialize(const char* label, Path& value, const Path& default_value);
 			void deserialize(const char* label, bool& value, bool default_value);
 			void deserialize(char* value, int max_length, const char* default_value);
+			void deserialize(Path& path, const Path& default_value);
 			void deserialize(bool& value, bool default_value);
 			void deserialize(float& value, float default_value);
 			void deserialize(int32& value, int32 default_value);

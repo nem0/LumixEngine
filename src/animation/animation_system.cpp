@@ -132,9 +132,7 @@ public:
 			serializer.write(m_animables[i].m_time);
 			serializer.write(m_animables[i].m_is_free);
 			serializer.writeString(
-				m_animables[i].m_animation
-					? m_animables[i].m_animation->getPath().c_str()
-					: "");
+				m_animables[i].m_animation ? m_animables[i].m_animation->getPath().c_str() : "");
 		}
 	}
 
@@ -157,10 +155,8 @@ public:
 			serializer.read(m_animables[i].m_is_free);
 			char path[MAX_PATH_LENGTH];
 			serializer.readString(path, sizeof(path));
-			m_animables[i].m_animation =
-				path[0] == '\0' ? nullptr : loadAnimation(path);
-			m_universe.addComponent(
-				m_animables[i].m_entity, ANIMABLE_HASH, this, i);
+			m_animables[i].m_animation = path[0] == '\0' ? nullptr : loadAnimation(path);
+			m_universe.addComponent(m_animables[i].m_entity, ANIMABLE_HASH, this, i);
 		}
 	}
 
