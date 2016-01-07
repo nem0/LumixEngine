@@ -3,7 +3,7 @@ os: Windows Server 2012 R2
 configuration: RelWithDebInfo
 before_build:
   - cd projects
-  - genie.bat
+  - genie_vs13.bat
   - cd ..
 build:
   project: projects\tmp\LumixEngine.sln
