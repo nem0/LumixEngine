@@ -1,5 +1,6 @@
 #include "core/log.h"
 #include "core/array.h"
+#include "core/path.h"
 #include "core/string.h"
 
 
@@ -75,6 +76,12 @@ LogProxy& LogProxy::operator<<(int32 message)
 }
 
 LogProxy& LogProxy::operator<<(const string& path)
+{
+	m_message.cat(path.c_str());
+	return *this;
+}
+
+LogProxy& LogProxy::operator<<(const Path& path)
 {
 	m_message.cat(path.c_str());
 	return *this;

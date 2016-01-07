@@ -1082,7 +1082,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				g_log_error.log("PhysX")
 					<< "Could not create PhysX heightfield "
-					<< terrain->m_heightmap->getPath().c_str();
+					<< terrain->m_heightmap->getPath();
 			}
 		}
 	}

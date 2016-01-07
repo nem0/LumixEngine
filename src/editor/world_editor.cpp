@@ -1852,7 +1852,7 @@ public:
 
 	void saveUniverse(const Path& path, bool save_path) override
 	{
-		g_log_info.log("editor") << "saving universe " << path.c_str() << "...";
+		g_log_info.log("editor") << "saving universe " << path << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
 		char bkp_path[MAX_PATH_LENGTH];
 		copyString(bkp_path, path.c_str());
@@ -2325,7 +2325,7 @@ public:
 	void loadUniverse(const Path& path) override
 	{
 		m_universe_path = path;
-		g_log_info.log("editor") << "Loading universe " << path.c_str() << "...";
+		g_log_info.log("editor") << "Loading universe " << path << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
 		FS::ReadCallback file_read_cb;
 		file_read_cb.bind<WorldEditorImpl, &WorldEditorImpl::loadMap>(this);
@@ -3119,7 +3119,7 @@ public:
 		}
 		else
 		{
-			g_log_error.log("editor") << "Could not save commands to " << path.c_str();
+			g_log_error.log("editor") << "Could not save commands to " << path;
 		}
 	}
 
@@ -3162,8 +3162,7 @@ public:
 				IEditorCommand* command = createEditorCommand(type);
 				if (!command)
 				{
-					g_log_error.log("editor") << "Unknown command " << type
-											  << " in " << path.c_str();
+					g_log_error.log("editor") << "Unknown command " << type << " in " << path;
 					destroyUndoStack();
 					m_undo_index = -1;
 					return false;
