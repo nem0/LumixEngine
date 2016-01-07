@@ -12,6 +12,8 @@
 #include "core/lua_wrapper.h"
 #include "core/resource_manager.h"
 #include "debug/debug.h"
+#include "editor/property_register.h"
+#include "editor/property_descriptor.h"
 #include "editor/world_editor.h"
 #include "engine.h"
 #include "iplugin.h"
@@ -808,21 +810,16 @@ namespace Lumix
 			}
 			return true;
 		}
-		
-		
+
+
 		Lumix::uint32 getResourceType(const char* ext) override
 		{
 			if (compareString(ext, "lua") == 0) return LUA_SCRIPT_HASH;
 			return 0;
 		}
-		
-		
-		void onResourceUnloaded(Lumix::Resource*) override 
-		{
-			m_text_buffer[0] = 0;
-		}
 
 
+		void onResourceUnloaded(Lumix::Resource*) override { m_text_buffer[0] = 0; }
 		const char* getName() const override { return "Lua Script"; }
 
 
@@ -843,6 +840,17 @@ namespace Lumix
 
 extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
 {
+	auto& allocator = app.getWorldEditor()->getAllocator();
+	PropertyRegister::registerComponentType("lua_script", "Lua script");
+
+	PropertyRegister::add("lua_script",
+		LUMIX_NEW(allocator, ResourcePropertyDescriptor<LuaScriptScene>)("source",
+		&LuaScriptScene::getScriptPath,
+		&LuaScriptScene::setScriptPath,
+		"Lua (*.lua)",
+		crc32("lua_script"),
+		allocator));
+
 	auto* plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), PropertyGridPlugin);
 	app.getPropertyGrid()->addPlugin(*plugin);
 

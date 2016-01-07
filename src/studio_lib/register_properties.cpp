@@ -117,104 +117,6 @@ private:
 };
 
 
-
-class PhysicsLayerPropertyDescriptor : public IEnumPropertyDescriptor
-{
-public:
-	typedef int (PhysicsScene::*Getter)(ComponentIndex);
-	typedef void (PhysicsScene::*Setter)(ComponentIndex, int);
-	typedef int (PhysicsScene::*ArrayGetter)(ComponentIndex, int);
-	typedef void (PhysicsScene::*ArraySetter)(ComponentIndex, int, int);
-
-public:
-	PhysicsLayerPropertyDescriptor(const char* name,
-		Getter _getter,
-		Setter _setter,
-		IAllocator& allocator)
-		: IEnumPropertyDescriptor(allocator)
-	{
-		setName(name);
-		m_single.getter = _getter;
-		m_single.setter = _setter;
-		m_type = ENUM;
-	}
-
-
-	PhysicsLayerPropertyDescriptor(const char* name,
-		ArrayGetter _getter,
-		ArraySetter _setter,
-		IAllocator& allocator)
-		: IEnumPropertyDescriptor(allocator)
-	{
-		setName(name);
-		m_array.getter = _getter;
-		m_array.setter = _setter;
-		m_type = ENUM;
-	}
-
-
-	void set(ComponentUID cmp, int index, InputBlob& stream) const override
-	{
-		int value;
-		stream.read(&value, sizeof(value));
-		if (index == -1)
-		{
-			(static_cast<PhysicsScene*>(cmp.scene)->*m_single.setter)(cmp.index, value);
-		}
-		else
-		{
-			(static_cast<PhysicsScene*>(cmp.scene)->*m_array.setter)(cmp.index, index, value);
-		}
-	};
-
-
-	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
-	{
-		int value;
-		if (index == -1)
-		{
-			value = (static_cast<PhysicsScene*>(cmp.scene)->*m_single.getter)(cmp.index);
-		}
-		else
-		{
-			value = (static_cast<PhysicsScene*>(cmp.scene)->*m_array.getter)(cmp.index, index);
-		}
-		stream.write(&value, sizeof(value));
-	};
-
-
-	int getEnumCount(IScene* scene) override
-	{
-		return static_cast<PhysicsScene*>(scene)->getCollisionsLayersCount();
-	}
-
-
-	const char* getEnumItemName(IScene* scene, int index) override 
-	{
-		auto* phy_scene = static_cast<PhysicsScene*>(scene);
-		return phy_scene->getCollisionLayerName(index);
-	}
-
-
-	void getEnumItemName(IScene* scene, int index, char* buf, int max_size) override {}
-
-private:
-	union
-	{
-		struct
-		{
-			Getter getter;
-			Setter setter;
-		} m_single;
-		struct
-		{
-			ArrayGetter getter;
-			ArraySetter setter;
-		} m_array;
-	};
-};
-
-
 void registerEngineProperties(Lumix::WorldEditor& editor)
 {
 	PropertyRegister::registerComponentType("hierarchy", "Hierarchy");
@@ -225,130 +127,7 @@ void registerEngineProperties(Lumix::WorldEditor& editor)
 									 &Hierarchy::setParent,
 									 editor,
 									 allocator));
-}
 
-
-void registerLuaScriptProperties(IAllocator& allocator)
-{
-	PropertyRegister::registerComponentType("lua_script", "Lua script");
-
-	PropertyRegister::add("lua_script",
-		LUMIX_NEW(allocator, ResourcePropertyDescriptor<LuaScriptScene>)("source",
-		&LuaScriptScene::getScriptPath,
-		&LuaScriptScene::setScriptPath,
-		"Lua (*.lua)",
-		crc32("lua_script"),
-		allocator));
-}
-
-
-void registerAudioProperties(IAllocator& allocator)
-{
-	PropertyRegister::registerComponentType("ambient_sound", "Ambient sound");
-	PropertyRegister::registerComponentType("audio_listener", "Audio listener");
-	PropertyRegister::registerComponentType("echo_zone", "Echo zone");
-	
-	PropertyRegister::add("ambient_sound",
-		LUMIX_NEW(allocator, EnumPropertyDescriptor<AudioScene>)("Sound",
-			&AudioScene::getAmbientSoundClipIndex,
-			&AudioScene::setAmbientSoundClipIndex,
-			&AudioScene::getClipCount,
-			&AudioScene::getClipName,
-			allocator
-		));
-
-	PropertyRegister::add("ambient_sound",
-		LUMIX_NEW(allocator, BoolPropertyDescriptor<AudioScene>)("3D",
-		&AudioScene::isAmbientSound3D,
-		&AudioScene::setAmbientSound3D,
-		allocator));
-
-	PropertyRegister::add("echo_zone",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<AudioScene>)("Radius",
-		&AudioScene::getEchoZoneRadius,
-		&AudioScene::setEchoZoneRadius,
-		0.01f,
-		FLT_MAX,
-		0.1f,
-		allocator));
-	PropertyRegister::add("echo_zone",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<AudioScene>)("Delay (ms)",
-		&AudioScene::getEchoZoneDelay,
-		&AudioScene::setEchoZoneDelay,
-		0.01f,
-		FLT_MAX,
-		100.0f,
-		allocator));
-}
-
-
-void registerPhysicsProperties(Lumix::IAllocator& allocator)
-{
-	PropertyRegister::registerComponentType("box_rigid_actor", "Physics Box");
-	PropertyRegister::registerComponentType("physical_controller", "Physics Controller");
-	PropertyRegister::registerComponentType("mesh_rigid_actor", "Physics Mesh");
-	PropertyRegister::registerComponentType("physical_heightfield", "Physics Heightfield");
-
-	PropertyRegister::add("physical_controller",
-		LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
-		&PhysicsScene::getControllerLayer,
-		&PhysicsScene::setControllerLayer,
-		allocator));
-
-	PropertyRegister::add("box_rigid_actor",
-		LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)("Dynamic",
-							  &PhysicsScene::isDynamic,
-							  &PhysicsScene::setIsDynamic,
-							  allocator));
-	PropertyRegister::add("box_rigid_actor",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)("Size",
-							  &PhysicsScene::getHalfExtents,
-							  &PhysicsScene::setHalfExtents,
-							  allocator));
-	PropertyRegister::add("box_rigid_actor",
-		LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
-							  &PhysicsScene::getActorLayer,
-							  &PhysicsScene::setActorLayer,
-							  allocator));
-	PropertyRegister::add("mesh_rigid_actor",
-		LUMIX_NEW(allocator, FilePropertyDescriptor<PhysicsScene>)("Source",
-							  &PhysicsScene::getShapeSource,
-							  &PhysicsScene::setShapeSource,
-							  "Physics (*.pda)",
-							  allocator));
-	PropertyRegister::add("mesh_rigid_actor",
-		LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
-							  &PhysicsScene::getActorLayer,
-							  &PhysicsScene::setActorLayer,
-							  allocator));
-	PropertyRegister::add("physical_heightfield",
-		LUMIX_NEW(allocator, ResourcePropertyDescriptor<PhysicsScene>)("Heightmap",
-							  &PhysicsScene::getHeightmap,
-							  &PhysicsScene::setHeightmap,
-							  "Image (*.raw)",
-							  ResourceManager::TEXTURE,
-							  allocator));
-	PropertyRegister::add("physical_heightfield",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("XZ scale",
-							  &PhysicsScene::getHeightmapXZScale,
-							  &PhysicsScene::setHeightmapXZScale,
-							  0.0f,
-							  FLT_MAX,
-							  0.0f,
-							  allocator));
-	PropertyRegister::add("physical_heightfield",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Y scale",
-							  &PhysicsScene::getHeightmapYScale,
-							  &PhysicsScene::setHeightmapYScale,
-							  0.0f,
-							  FLT_MAX,
-							  0.0f,
-							  allocator));
-	PropertyRegister::add("physical_heightfield",
-		LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
-							  &PhysicsScene::getHeightfieldLayer,
-							  &PhysicsScene::setHeightfieldLayer,
-							  allocator));
 }
 
 
@@ -404,10 +183,10 @@ void registerRendererProperties(Lumix::WorldEditor& editor)
 		allocator);
 	plane_module_planes->addChild(
 		LUMIX_NEW(allocator, EntityEnumPropertyDescriptor<RenderScene>)("Entity",
-			&RenderScene::getParticleEmitterPlaneEntity,
-			&RenderScene::setParticleEmitterPlaneEntity,
-			editor,
-			allocator));
+		&RenderScene::getParticleEmitterPlaneEntity,
+		&RenderScene::setParticleEmitterPlaneEntity,
+		editor,
+		allocator));
 	PropertyRegister::add("particle_emitter_plane", plane_module_planes);
 
 	PropertyRegister::add("particle_emitter_attractor",
@@ -436,7 +215,7 @@ void registerRendererProperties(Lumix::WorldEditor& editor)
 		&RenderScene::getParticleEmitterAlpha,
 		&RenderScene::setParticleEmitterAlpha,
 		&RenderScene::getParticleEmitterAlphaCount,
-		1, 
+		1,
 		1,
 		allocator));
 
@@ -705,7 +484,4 @@ void registerProperties(WorldEditor& editor)
 {
 	registerEngineProperties(editor);
 	registerRendererProperties(editor);
-	registerLuaScriptProperties(editor.getAllocator());
-	registerPhysicsProperties(editor.getAllocator());
-	registerAudioProperties(editor.getAllocator());
 }
