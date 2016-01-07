@@ -222,6 +222,18 @@ project "unit_tests"
 	useLua()
 	defaultConfigurations()
 
+project "render_test"
+	kind "WindowedApp"
+
+	debugdir "../../LumixEngine_data"
+
+	files { "../src/render_test/**.h", "../src/render_test/**.cpp" }
+	includedirs { "../src", "../src/render_test", "../external/bgfx/include" }
+	links { "engine", "animation", "renderer" }
+
+	useLua()
+	defaultConfigurations()
+
 
 project "studio_lib"
 	kind "SharedLib"
