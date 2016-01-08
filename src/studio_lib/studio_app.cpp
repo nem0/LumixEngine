@@ -114,7 +114,7 @@ public:
 		m_engine->update(*m_editor->getUniverseContext());
 
 		m_asset_browser->update();
-		m_shader_compiler->update(time_delta);
+		m_shader_compiler->update();
 		m_log_ui->update(time_delta);
 
 		m_gui_pipeline->render();
@@ -808,11 +808,11 @@ public:
 
 		ProfilerUI::destroy(*m_profiler_ui);
 		LUMIX_DELETE(m_allocator, m_asset_browser);
-		LUMIX_DELETE(m_allocator, m_log_ui);
 		LUMIX_DELETE(m_allocator, m_property_grid);
 		LUMIX_DELETE(m_allocator, m_import_asset_dialog);
 		LUMIX_DELETE(m_allocator, m_shader_compiler);
 		LUMIX_DELETE(m_allocator, m_shader_editor);
+		LUMIX_DELETE(m_allocator, m_log_ui);
 		Lumix::WorldEditor::destroy(m_editor, m_allocator);
 		m_sceneview.shutdown();
 		m_gameview.shutdown();
@@ -1061,6 +1061,12 @@ public:
 	}
 
 
+	int getExitCode() const override
+	{
+		return m_editor->isExitRequested() ? m_editor->getExitCode() : 0;
+	}
+
+
 	void run()
 	{
 		checkScriptCommandLine();
@@ -1075,6 +1081,7 @@ public:
 				{
 					PROFILE_BLOCK("tick");
 					m_finished = !PlatformInterface::processSystemEvents();
+					if (m_editor->isExitRequested()) m_finished = true;
 					update();
 					frame_time = timer->tick();
 				}

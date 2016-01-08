@@ -474,7 +474,7 @@ public:
 			serializer.write(m_renderables[i].entity);
 			if(m_renderables[i].entity != INVALID_ENTITY)
 			{
-				serializer.write(m_culling_system->getLayerMask(i));
+				serializer.write(m_renderables[i].layer_mask);
 				serializer.write(m_renderables[i].model ? m_renderables[i].model->getPath().getHash() : 0);
 			}
 		}
@@ -3106,6 +3106,7 @@ public:
 		auto& r = m_renderables[entity];
 		r.entity = entity;
 		r.model = nullptr;
+		r.layer_mask = 0;
 		r.pose = nullptr;
 		r.matrix = m_universe.getMatrix(entity);
 		m_universe.addComponent(entity, RENDERABLE_HASH, this, entity);

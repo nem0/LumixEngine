@@ -6,6 +6,7 @@ INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
 {
 	auto* app = StudioApp::create();
 	app->run();
+	int exit_code = app->getExitCode();
 	StudioApp::destroy(*app);
-	return 0;
+	return exit_code;
 }

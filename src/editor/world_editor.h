@@ -179,6 +179,8 @@ public:
 											  EditorCommandCreator) = 0;
 	virtual bool isGameMode() const = 0;
 	virtual class EntityGroups& getEntityGroups() = 0;
+	virtual bool isExitRequested() const = 0;
+	virtual int getExitCode() const = 0;
 
 protected:
 	virtual ~WorldEditor() {}

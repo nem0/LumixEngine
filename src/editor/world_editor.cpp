@@ -1885,7 +1885,7 @@ public:
 		header.hash = crc32((const uint8*)blob.getData() + hashed_offset, blob.getSize() - hashed_offset);
 		*(Header*)blob.getData() = header;
 
-		g_log_info.log("editor") << "universe saved";
+		g_log_info.log("editor") << "Universe saved";
 		file.write(blob.getData(), blob.getSize());
 	}
 
@@ -2601,6 +2601,7 @@ public:
 		, m_is_additive_selection(false)
 		, m_entity_groups(m_allocator)
 	{
+		m_is_exit_requested = false;
 		createLua();
 
 		PropertyRegister::init(m_allocator);
@@ -3260,6 +3261,8 @@ public:
 
 		REGISTER_FUNCTION(LUA_runTest, "runTest");
 		REGISTER_FUNCTION(LUA_logError, "logError");
+		REGISTER_FUNCTION(LUA_logInfo, "logInfo");
+		REGISTER_FUNCTION(LUA_exit, "exit");
 
 		#undef REGISTER_FUNCTION
 
@@ -3267,9 +3270,34 @@ public:
 	}
 
 
+	bool isExitRequested() const override
+	{
+		return m_is_exit_requested;
+	}
+
+
+	int getExitCode() const override
+	{
+		return m_exit_code;
+	}
+
+
+	static void LUA_exit(WorldEditorImpl* editor, int exit_code)
+	{
+		editor->m_is_exit_requested = true;
+		editor->m_exit_code = exit_code;
+	}
+
+
 	static void LUA_logError(const char* message)
 	{
 		g_log_error.log("editor") << message;
+	}
+
+
+	static void LUA_logInfo(const char* message)
+	{
+		g_log_info.log("editor") << message;
 	}
 
 
@@ -3293,8 +3321,11 @@ public:
 
 	bool runTest(const Path& undo_stack_path, const Path& result_universe_path) override
 	{
+		while (m_engine->getFileSystem().hasWork()) m_engine->getFileSystem().updateAsyncTransactions();
 		newUniverse();
 		executeUndoStack(undo_stack_path);
+		while (m_engine->getFileSystem().hasWork()) m_engine->getFileSystem().updateAsyncTransactions();
+
 		FS::IFile* file =
 			m_engine->getFileSystem().open(m_engine->getFileSystem().getMemoryDevice(),
 				Lumix::Path(""),
@@ -3402,6 +3433,8 @@ private:
 	UniverseContext* m_universe_context;
 	EntityGroups m_entity_groups;
 	lua_State* m_lua_state;
+	bool m_is_exit_requested;
+	int m_exit_code;
 };
 
 
