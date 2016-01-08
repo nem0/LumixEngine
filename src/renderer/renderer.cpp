@@ -3,6 +3,7 @@
 #include "core/array.h"
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
+#include "core/fs/os_file.h"
 #include "core/json_serializer.h"
 #include "core/lifo_allocator.h"
 #include "core/log.h"
@@ -127,6 +128,11 @@ struct RendererImpl : public Renderer
 {
 	struct CallbackStub : public bgfx::CallbackI
 	{
+		CallbackStub(RendererImpl& renderer)
+			: m_renderer(renderer)
+		{}
+
+
 		void fatal(bgfx::Fatal::Enum _code, const char* _str) override
 		{
 			Lumix::g_log_error.log("bgfx") << _str;
@@ -152,15 +158,46 @@ struct RendererImpl : public Renderer
 		}
 
 
-		void screenShot(const char*,
-			uint32,
-			uint32,
-			uint32,
-			const void*,
-			uint32,
-			bool) override
+		void screenShot(const char* filePath,
+			uint32_t width,
+			uint32_t height,
+			uint32_t pitch,
+			const void* data,
+			uint32_t size,
+			bool yflip) override
 		{
-			ASSERT(false);
+			#pragma pack(1)
+				struct TGAHeader
+				{
+					char idLength;
+					char colourMapType;
+					char dataType;
+					short int colourMapOrigin;
+					short int colourMapLength;
+					char colourMapDepth;
+					short int xOrigin;
+					short int yOrigin;
+					short int width;
+					short int height;
+					char bitsPerPixel;
+					char imageDescriptor;
+				};
+			#pragma pack()
+
+			TGAHeader header;
+			setMemory(&header, 0, sizeof(header));
+			int bytes_per_pixel = 4;
+			header.bitsPerPixel = (char)(bytes_per_pixel * 8);
+			header.height = (short)height;
+			header.width = (short)width;
+			header.dataType = 2;
+
+			Lumix::FS::OsFile file;
+			file.open(filePath, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_renderer.m_allocator);
+			file.write(&header, sizeof(header));
+
+			file.write(data, size);
+			file.close();
 		}
 
 
@@ -179,6 +216,8 @@ struct RendererImpl : public Renderer
 		void cacheWrite(uint64, const void*, uint32) override {}
 		void captureEnd() override { ASSERT(false); }
 		void captureFrame(const void*, uint32) override { ASSERT(false); }
+
+		RendererImpl& m_renderer;
 	};
 
 
@@ -195,6 +234,7 @@ struct RendererImpl : public Renderer
 		, m_shader_defines(m_allocator)
 		, m_bgfx_allocator(m_allocator)
 		, m_frame_allocator(m_allocator, 10 * 1024 * 1024)
+		, m_callback_stub(*this)
 	{
 		bgfx::PlatformData d;
 		if (s_platform_data)
