@@ -285,6 +285,8 @@ void ShaderCompiler::addDependency(const char* ckey, const char* cvalue)
 
 ShaderCompiler::~ShaderCompiler()
 {
+	while (!m_processes.empty()) update();
+
 	FileSystemWatcher::destroy(m_watcher);
 }
 
@@ -436,7 +438,7 @@ void ShaderCompiler::processChangedFiles()
 }
 
 
-void ShaderCompiler::update(float)
+void ShaderCompiler::update()
 {
 	PROFILE_FUNCTION();
 	for (int i = 0; i < m_processes.size(); ++i)

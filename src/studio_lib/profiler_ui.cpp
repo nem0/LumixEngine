@@ -86,6 +86,11 @@ struct ProfilerUIImpl : public ProfilerUI
 
 	~ProfilerUIImpl()
 	{
+		while (m_engine.getFileSystem().hasWork())
+		{
+			m_engine.getFileSystem().updateAsyncTransactions();
+		}
+
 		m_engine.getFileSystem().unMount(&m_device);
 		const auto& devices = m_engine.getFileSystem().getDefaultDevice();
 		char tmp[200] = "";
@@ -150,12 +155,17 @@ struct ProfilerUIImpl : public ProfilerUI
 			{
 				if (m_opened_files[i].handle == event.handle)
 				{
-					auto& log = *m_queue.alloc(true);
-					log.bytes = m_opened_files[i].bytes;
-					log.time = m_opened_files[i].last_read - m_opened_files[i].start;
-					Lumix::copyString(log.path, m_opened_files[i].path);
+					auto* log = m_queue.alloc(false);
+					if (!log)
+					{
+						m_opened_files.eraseFast(i);
+						break;
+					}
+					log->bytes = m_opened_files[i].bytes;
+					log->time = m_opened_files[i].last_read - m_opened_files[i].start;
+					Lumix::copyString(log->path, m_opened_files[i].path);
 					m_opened_files.eraseFast(i);
-					m_queue.push(&log, true);
+					m_queue.push(log, true);
 					break;
 				}
 			}
@@ -423,7 +433,7 @@ struct ProfilerUIImpl : public ProfilerUI
 	char m_filter[100];
 	char m_resource_filter[100];
 	Lumix::Array<OpenedFile> m_opened_files;
-	Lumix::MT::LockFreeFixedQueue<Log, 64> m_queue;
+	Lumix::MT::LockFreeFixedQueue<Log, 512> m_queue;
 	Lumix::Array<Log> m_logs;
 	Lumix::FS::FileEventsDevice m_device;
 	Lumix::Engine& m_engine;
