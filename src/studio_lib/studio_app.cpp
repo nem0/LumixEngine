@@ -6,6 +6,7 @@
 #include "core/crc32.h"
 #include "core/default_allocator.h"
 #include "core/fs/file_system.h"
+#include "core/fs/os_file.h"
 #include "core/input_system.h"
 #include "core/log.h"
 #include "core/mt/thread.h"
@@ -1027,8 +1028,43 @@ public:
 	}
 
 
+	void checkScriptCommandLine()
+	{
+		char command_line[1024];
+		Lumix::getCommandLine(command_line, Lumix::lengthOf(command_line));
+		Lumix::CommandLineParser parser(command_line);
+		while (parser.next())
+		{
+			if (parser.currentEquals("-run_script"))
+			{
+				if (!parser.next()) break;
+				char tmp[Lumix::MAX_PATH_LENGTH];
+				parser.getCurrent(tmp, Lumix::lengthOf(tmp));
+				Lumix::FS::OsFile file;
+				if (file.open(tmp, Lumix::FS::Mode::OPEN_AND_READ, m_allocator))
+				{
+					auto size = file.size();
+					auto* src = (char*)m_allocator.allocate(size + 1);
+					file.read(src, size);
+					src[size] = 0;
+					m_editor->runScript((const char*)src, tmp);
+					m_allocator.deallocate(src);
+					file.close();
+				}
+				else
+				{
+					Lumix::g_log_error.log("editor") << "Could not open " << tmp;
+				}
+				break;
+			}
+		}
+	}
+
+
 	void run()
 	{
+		checkScriptCommandLine();
+
 		Lumix::Timer* timer = Lumix::Timer::create(m_allocator);
 		while (!m_finished)
 		{

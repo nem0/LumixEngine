@@ -447,8 +447,10 @@ private:
 };
 
 
-static void showLogInVS(const char*, const char* message)
+static void showLogInVS(const char* system, const char* message)
 {
+	Debug::debugOutput(system);
+	Debug::debugOutput(" : ");
 	Debug::debugOutput(message);
 	Debug::debugOutput("\n");
 }
