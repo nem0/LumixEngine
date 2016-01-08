@@ -3251,12 +3251,12 @@ public:
 		lua_setglobal(m_lua_state, "Editor");
 
 		#define REGISTER_FUNCTION(F, name) \
-			{ \
+			do { \
 				lua_pushvalue(m_lua_state, -1); \
-				auto* f = &LuaWrapper::wrap<decltype(F), F>; \
+				auto* f = &LuaWrapper::wrap<decltype(&F), F>; \
 				lua_pushcfunction(m_lua_state, f); \
 				lua_setfield(m_lua_state, -2, name); \
-			} \
+			} while(false) \
 
 		REGISTER_FUNCTION(LUA_runTest, "runTest");
 		REGISTER_FUNCTION(LUA_logError, "logError");
