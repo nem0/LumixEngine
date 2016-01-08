@@ -1,20 +1,21 @@
-#include "core/blob.h"
-#include "core/crc32.h"
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
+#include "core/blob.h"
+#include "core/crc32.h"
 #include "core/log.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
-#include "editor/world_editor.h"
 #include "editor/gizmo.h"
+#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include <Windows.h>
+#include <cstdio>
 
 
 class App
@@ -27,6 +28,7 @@ public:
 		m_is_test_universe_loaded = false;
 		m_universe_context = nullptr;
 	}
+
 
 	~App() { ASSERT(!m_universe_context); }
 
@@ -45,16 +47,19 @@ public:
 		if (Lumix::crc32((const uint8_t*)blob.getData() + sizeof(hash),
 				blob.getSize() - sizeof(hash)) != hash)
 		{
-			ASSERT(false);
+			Lumix::g_log_error.log("render_test") << "Universe corrupted";
 			return;
 		}
 		bool deserialize_succeeded = m_engine->deserialize(*m_universe_context, blob);
 		m_is_test_universe_loaded = true;
-		ASSERT(deserialize_succeeded);
+		if (!deserialize_succeeded)
+		{
+			Lumix::g_log_error.log("render_test") << "Failed to deserialize universe";
+		}
 	}
 
 
-	static LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
+	static LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
 		return DefWindowProc(hWnd, msg, wParam, lParam);
 	}
@@ -74,8 +79,17 @@ public:
 		wnd.lpszClassName = "render_test";
 		wnd.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 		RegisterClassExA(&wnd);
-		auto hwnd = CreateWindowA(
-			"render_test", "render_test", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 800, 600, NULL, NULL, hInst, 0);
+		auto hwnd = CreateWindowA("render_test",
+			"render_test",
+			WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+			0,
+			0,
+			800,
+			600,
+			NULL,
+			NULL,
+			hInst,
+			0);
 
 		Lumix::Renderer::setInitData(hwnd);
 
@@ -88,6 +102,15 @@ public:
 	{
 		auto hwnd = createWindow();
 		m_engine = Lumix::Engine::create(NULL, m_allocator);
+
+		Lumix::g_log_info.getCallback().bind<outputToVS>();
+		Lumix::g_log_warning.getCallback().bind<outputToVS>();
+		Lumix::g_log_error.getCallback().bind<outputToVS>();
+
+		Lumix::g_log_info.getCallback().bind<outputToConsole>();
+		Lumix::g_log_warning.getCallback().bind<outputToConsole>();
+		Lumix::g_log_error.getCallback().bind<outputToConsole>();
+
 		m_engine->getPluginManager().load("renderer.dll");
 		m_engine->getPluginManager().load("animation.dll");
 		m_engine->getPluginManager().load("audio.dll");
@@ -96,7 +119,7 @@ public:
 		Lumix::Pipeline* pipeline_object =
 			static_cast<Lumix::Pipeline*>(m_engine->getResourceManager()
 											  .get(Lumix::ResourceManager::PIPELINE)
-											  ->load(Lumix::Path("pipelines/imgui.lua")));
+											  ->load(Lumix::Path("pipelines/render_test.lua")));
 		ASSERT(pipeline_object);
 		if (pipeline_object)
 		{
@@ -108,8 +131,8 @@ public:
 		m_pipeline->setScene(
 			(Lumix::RenderScene*)m_universe_context->getScene(Lumix::crc32("renderer")));
 		m_pipeline->setViewport(0, 0, 600, 400);
-		Lumix::Renderer* renderer = static_cast<Lumix::Renderer*>(
-			m_engine->getPluginManager().getPlugin("renderer"));
+		Lumix::Renderer* renderer =
+			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 		renderer->resize(600, 400);
 
 		enumerateTests();
@@ -118,10 +141,12 @@ public:
 
 	void shutdown()
 	{
-		if (m_pipeline)
-		{
-			Lumix::PipelineInstance::destroy(m_pipeline);
-		}
+		m_engine->destroyUniverse(*m_universe_context);
+		Lumix::PipelineInstance::destroy(m_pipeline);
+		Lumix::Engine::destroy(m_engine, m_allocator);
+		m_engine = nullptr;
+		m_pipeline = nullptr;
+		m_universe_context = nullptr;
 	}
 
 
@@ -141,6 +166,24 @@ public:
 	}
 
 
+	static void outputToVS(const char* system, const char* message)
+	{
+		char tmp[2048];
+		Lumix::copyString(tmp, system);
+		Lumix::catString(tmp, ": ");
+		Lumix::catString(tmp, message);
+		Lumix::catString(tmp, "\r");
+
+		OutputDebugString(tmp);
+	}
+
+
+	static void outputToConsole(const char* system, const char* message)
+	{
+		printf("%s: %s\n", system, message);
+	}
+
+
 	void enumerateTests()
 	{
 		WIN32_FIND_DATAA data;
@@ -148,17 +191,16 @@ public:
 		GetCurrentDirectory(100, buf);
 
 		auto handle = FindFirstFile(".\\render_tests\\*.unv", &data);
-		
-		auto push_test = [&](const char* name) 
-		{
+
+		auto push_test = [&](const char* name) {
 			char basename[Lumix::MAX_PATH_LENGTH];
 			Lumix::PathUtils::getBasename(basename, Lumix::lengthOf(basename), name);
-			char tmp[Lumix::MAX_PATH_LENGTH];
-			Lumix::copyString(tmp, "render_tests/");
-			Lumix::catString(tmp, basename);
-			m_tests.push(Lumix::string(tmp, m_allocator));
+			auto& test = m_tests.pushEmpty();
+			Lumix::copyString(test.path, "render_tests/");
+			Lumix::catString(test.path, basename);
+			test.failed = false;
 		};
-		
+
 		if (handle != INVALID_HANDLE_VALUE)
 		{
 			push_test(data.cFileName);
@@ -168,6 +210,7 @@ public:
 			}
 			FindClose(handle);
 		}
+		Lumix::g_log_info.log("render_test") << "Found " << m_tests.size() << " tests";
 	}
 
 
@@ -182,36 +225,49 @@ public:
 			char path[Lumix::MAX_PATH_LENGTH];
 			if (m_current_test >= 0)
 			{
-				TODO("TODO");
-				return true;
 				Lumix::Renderer* renderer = static_cast<Lumix::Renderer*>(
 					m_engine->getPluginManager().getPlugin("renderer"));
 
-				Lumix::copyString(path, sizeof(path), m_tests[m_current_test].c_str());
+				Lumix::copyString(path, sizeof(path), m_tests[m_current_test].path);
 				Lumix::catString(path, sizeof(path), "_res.tga");
 				renderer->makeScreenshot(Lumix::Path(path));
 
 				char path_preimage[Lumix::MAX_PATH_LENGTH];
-				Lumix::copyString(
-					path_preimage, sizeof(path), m_tests[m_current_test].c_str());
+				Lumix::copyString(path_preimage, sizeof(path), m_tests[m_current_test].path);
 				Lumix::catString(path_preimage, sizeof(path), ".tga");
 
-				auto file1 = fs.open(
-					fs.getDefaultDevice(), Lumix::Path(path), Lumix::FS::Mode::OPEN | Lumix::FS::Mode::READ);
+				auto file1 = fs.open(fs.getDefaultDevice(),
+					Lumix::Path(path),
+					Lumix::FS::Mode::OPEN | Lumix::FS::Mode::READ);
 				auto file2 = fs.open(fs.getDefaultDevice(),
 					Lumix::Path(path_preimage),
 					Lumix::FS::Mode::OPEN | Lumix::FS::Mode::READ);
-				unsigned int diference = Lumix::Texture::compareTGA(m_allocator, file1, file2, 10);
-				fs.close(*file1);
-				fs.close(*file2);
-				ASSERT(diference < 100);
+				if(!file1)
+				{
+					Lumix::g_log_error.log("render_test") << "Failed to open " << path;
+				}
+				else if(!file2)
+				{
+					fs.close(*file1);
+					Lumix::g_log_error.log("render_test") << "Failed to open " << path_preimage;
+				}
+				else
+				{
+					unsigned int difference = Lumix::Texture::compareTGA(m_allocator, file1, file2, 10);
+					Lumix::g_log_info.log("render_test") << "Difference between " << path << " and "
+						<< path_preimage << " is " << difference;
+					fs.close(*file1);
+					fs.close(*file2);
+					m_tests[m_current_test].failed = difference > 100;
+				}
 			}
 
 			++m_current_test;
 			if (m_current_test < m_tests.size())
 			{
-				Lumix::copyString(path, sizeof(path), m_tests[m_current_test].c_str());
+				Lumix::copyString(path, sizeof(path), m_tests[m_current_test].path);
 				Lumix::catString(path, sizeof(path), ".unv");
+				Lumix::g_log_info.log("render_test") << "Loading " << path << "...";
 				Lumix::FS::ReadCallback file_read_cb;
 				file_read_cb.bind<App, &App::universeFileLoaded>(this);
 				fs.openAsync(fs.getDefaultDevice(),
@@ -235,7 +291,8 @@ public:
 			m_engine->update(*m_universe_context);
 			m_pipeline->setViewport(0, 0, 600, 400);
 			m_pipeline->render();
-			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"))->frame();
+			auto* renderer = m_engine->getPluginManager().getPlugin("renderer");
+			static_cast<Lumix::Renderer*>(renderer)->frame();
 			if (!m_engine->getFileSystem().hasWork())
 			{
 				if (!nextTest()) return;
@@ -243,14 +300,37 @@ public:
 			m_engine->getFileSystem().updateAsyncTransactions();
 			handleEvents();
 		}
+		int failed_count = getFailedCount();
+		if (failed_count)
+		{
+			Lumix::g_log_info.log("render_test") << failed_count << " tests failed";
+		}
 	}
 
+
+	int getFailedCount() const
+	{
+		int count = 0;
+		for (auto& test : m_tests)
+		{
+			if (test.failed) ++count;
+		}
+		return count;
+	}
+
+
 private:
+	struct Test
+	{
+		char path[Lumix::MAX_PATH_LENGTH];
+		bool failed;
+	};
+
 	Lumix::DefaultAllocator m_allocator;
 	Lumix::Engine* m_engine;
 	Lumix::UniverseContext* m_universe_context;
 	Lumix::PipelineInstance* m_pipeline;
-	Lumix::Array<Lumix::string> m_tests;
+	Lumix::Array<Test> m_tests;
 	int m_current_test;
 	bool m_is_test_universe_loaded;
 	bool m_finished;
@@ -263,6 +343,7 @@ INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
 	App app;
 	app.init();
 	app.run();
+	int failed_count = app.getFailedCount();
 	app.shutdown();
-	return 0;
+	return failed_count;
 }
