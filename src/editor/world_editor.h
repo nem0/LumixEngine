@@ -172,6 +172,7 @@ public:
 
 	virtual void saveUndoStack(const Path& path) = 0;
 	virtual bool executeUndoStack(const Path& path) = 0;
+	virtual void runScript(const char* src, const char* script_name) = 0;
 	virtual bool runTest(const Path& undo_stack_path,
 						 const Path& result_universe_path) = 0;
 	virtual void registerEditorCommandCreator(const char* command_type,

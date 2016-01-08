@@ -188,6 +188,7 @@ project "editor"
 	defines { "BUILDING_EDITOR" }
 	links { "renderer", "engine" }
 
+	useLua()
 	defaultConfigurations()
 
 project "audio"
