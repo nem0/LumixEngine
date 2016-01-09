@@ -1,5 +1,6 @@
 #include "audio_device.h"
 #include "clip_manager.h"
+#include "core/log.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include <dsound.h>
@@ -92,11 +93,16 @@ struct AudioDeviceImpl : public AudioDevice
 		ASSERT(result);
 
 		m_library = LoadLibrary("dsound.dll");
-		if (!m_library) return false;
+		if (!m_library)
+		{
+			g_log_error.log("audio") << "Failed to load dsound.dll.";
+			return false;
+		}
 		auto* dsoundCreate =
 			(decltype(DirectSoundCreate8)*)GetProcAddress(m_library, "DirectSoundCreate8");
 		if (!dsoundCreate)
 		{
+			g_log_error.log("audio") << "Failed to get DirectSoundCreate8 from dsound.dll.";
 			ASSERT(false);
 			FreeLibrary(m_library);
 			return false;
@@ -105,6 +111,7 @@ struct AudioDeviceImpl : public AudioDevice
 		result = SUCCEEDED(dsoundCreate(0, &m_direct_sound, nullptr));
 		if (!result)
 		{
+			g_log_error.log("audio") << "Failed to create DirectSound.";
 			ASSERT(false);
 			FreeLibrary(m_library);
 			return false;
@@ -114,6 +121,7 @@ struct AudioDeviceImpl : public AudioDevice
 		result = SUCCEEDED(m_direct_sound->SetCooperativeLevel(hwnd, DSSCL_PRIORITY));
 		if (!result || !initPrimaryBuffer())
 		{
+			g_log_error.log("audio") << "Failed to initialize the primary buffer.";
 			ASSERT(false);
 			m_direct_sound->Release();
 			FreeLibrary(m_library);
