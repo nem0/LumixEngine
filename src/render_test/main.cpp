@@ -244,6 +244,7 @@ public:
 					Lumix::FS::Mode::OPEN | Lumix::FS::Mode::READ);
 				if(!file1)
 				{
+					if (file2) fs.close(*file2);
 					Lumix::g_log_error.log("render_test") << "Failed to open " << path;
 				}
 				else if(!file2)
