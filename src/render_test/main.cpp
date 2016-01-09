@@ -110,9 +110,9 @@ public:
 		Lumix::g_log_warning.getCallback().bind<outputToConsole>();
 		Lumix::g_log_error.getCallback().bind<outputToConsole>();
 
-		m_engine = Lumix::Engine::create(NULL, m_allocator);
-
 		Lumix::enableCrashReporting(false);
+
+		m_engine = Lumix::Engine::create(NULL, m_allocator);
 
 		m_engine->getPluginManager().load("renderer.dll");
 		m_engine->getPluginManager().load("animation.dll");
