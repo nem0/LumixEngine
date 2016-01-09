@@ -41,12 +41,19 @@ public:
 
 		ASSERT(file.getBuffer());
 		Lumix::InputBlob blob(file.getBuffer(), (int)file.size());
-		uint32_t hash = 0;
-		blob.read(hash);
-		uint32_t engine_hash = 0;
-		blob.read(engine_hash);
-		if (Lumix::crc32((const uint8_t*)blob.getData() + sizeof(hash),
-				blob.getSize() - sizeof(hash)) != hash)
+		#pragma pack(1)
+			struct Header
+			{
+				Lumix::uint32 magic;
+				int version;
+				Lumix::uint32 hash;
+				Lumix::uint32 engine_hash;
+			};
+		#pragma pack()
+		Header header;
+		blob.read(header);
+		if (Lumix::crc32((const uint8_t*)blob.getData() + sizeof(header),
+				blob.getSize() - sizeof(header)) != header.hash)
 		{
 			Lumix::g_log_error.log("render_test") << "Universe corrupted";
 			return;
@@ -233,7 +240,13 @@ public:
 
 				Lumix::copyString(path, sizeof(path), m_tests[m_current_test].path);
 				Lumix::catString(path, sizeof(path), "_res.tga");
+				m_pipeline->setViewport(0, 0, 600, 400);
+				m_pipeline->render();
 				renderer->makeScreenshot(Lumix::Path(path));
+				renderer->frame();
+				m_pipeline->setViewport(0, 0, 600, 400);
+				m_pipeline->render();
+				renderer->frame();
 
 				char path_preimage[Lumix::MAX_PATH_LENGTH];
 				Lumix::copyString(path_preimage, sizeof(path), m_tests[m_current_test].path);
