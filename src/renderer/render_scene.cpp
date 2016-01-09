@@ -3106,7 +3106,7 @@ public:
 		auto& r = m_renderables[entity];
 		r.entity = entity;
 		r.model = nullptr;
-		r.layer_mask = 0;
+		r.layer_mask = 1;
 		r.pose = nullptr;
 		r.matrix = m_universe.getMatrix(entity);
 		m_universe.addComponent(entity, RENDERABLE_HASH, this, entity);
