@@ -40,7 +40,7 @@ public:
 		if (!success) return;
 
 		ASSERT(file.getBuffer());
-		Lumix::InputBlob blob(file.getBuffer(), file.size());
+		Lumix::InputBlob blob(file.getBuffer(), (int)file.size());
 		uint32_t hash = 0;
 		blob.read(hash);
 		uint32_t engine_hash = 0;
