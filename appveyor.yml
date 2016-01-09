@@ -13,13 +13,15 @@ test_script:
     git clone --depth=1  https://github.com/nem0/LumixEngine_data.git 2>&1 | % { $_.ToString() } 
 
     cd LumixEngine_data
-
-    & "..\projects\tmp\bin\RelWithDebInfo\render_test.exe" | Write-Output
-    & "..\projects\tmp\bin\RelWithDebInfo\unit_tests.exe" | Write-Output
+   
+	& "..\projects\tmp\bin\RelWithDebInfo\unit_tests.exe" | Write-Output
 
     $wc = New-Object Net.WebClient
             $url = "https://ci.appveyor.com/api/testresults/nunit/$Env:APPVEYOR_JOB_ID"
             $wc.UploadFile($url, (Resolve-Path .\tests.xml))
+
+- ps: >-
+    & "..\projects\tmp\bin\RelWithDebInfo\render_test.exe" | Write-Output
 
 after_build:
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\animation.dll
