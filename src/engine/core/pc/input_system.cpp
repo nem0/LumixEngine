@@ -44,13 +44,14 @@ namespace Lumix
 		bool create()
 		{
 			m_xinput_library = LoadLibrary("Xinput9_1_0.dll");
-			if (!m_xinput_library) return false;
-			m_xinput_get_state = (XInputGetState_fn_ptr)GetProcAddress(m_xinput_library, "XInputGetState");
-			if (!m_xinput_get_state)
+			if (m_xinput_library)
 			{
-				FreeLibrary(m_xinput_library);
-				m_xinput_library = nullptr;
-				return false;
+				m_xinput_get_state = (XInputGetState_fn_ptr)GetProcAddress(m_xinput_library, "XInputGetState");
+				if (!m_xinput_get_state)
+				{
+					FreeLibrary(m_xinput_library);
+					m_xinput_library = nullptr;
+				}
 			}
 			return true;
 		}
@@ -67,15 +68,19 @@ namespace Lumix
 			PROFILE_FUNCTION();
 			m_mouse_rel_x = 0;
 			m_mouse_rel_y = 0;
-			for (int i = 0; i < XUSER_MAX_COUNT; ++i)
+
+			if (m_xinput_get_state)
 			{
-				if (m_xinput_connected[i] || i == m_last_checked_controller)
+				for (int i = 0; i < XUSER_MAX_COUNT; ++i)
 				{
-					auto status = m_xinput_get_state(i, &m_xinput_states[i]);
-					m_xinput_connected[i] = status == ERROR_SUCCESS;
+					if (m_xinput_connected[i] || i == m_last_checked_controller)
+					{
+						auto status = m_xinput_get_state(i, &m_xinput_states[i]);
+						m_xinput_connected[i] = status == ERROR_SUCCESS;
+					}
 				}
+				m_last_checked_controller = (m_last_checked_controller + 1) % XUSER_MAX_COUNT;
 			}
-			m_last_checked_controller = (m_last_checked_controller + 1) % XUSER_MAX_COUNT;
 		}
 
 
