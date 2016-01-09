@@ -469,6 +469,7 @@ static void logErrorToFile(const char*, const char* message)
 
 Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 {
+	g_log_info.log("engine") << "Creating engine...";
 	Profiler::setThreadName("Main");
 	installUnhandledExceptionHandler();
 
@@ -482,9 +483,11 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 	EngineImpl* engine = LUMIX_NEW(allocator, EngineImpl)(fs, allocator);
 	if (!engine->create())
 	{
+		g_log_info.log("engine") << "Failed to create engine.";
 		LUMIX_DELETE(allocator, engine);
 		return nullptr;
 	}
+	g_log_info.log("engine") << "Engine created.";
 	return engine;
 }
 

@@ -102,10 +102,6 @@ public:
 	void init()
 	{
 		auto hwnd = createWindow();
-		m_engine = Lumix::Engine::create(NULL, m_allocator);
-
-		Lumix::enableCrashReporting(false);
-
 		Lumix::g_log_info.getCallback().bind<outputToVS>();
 		Lumix::g_log_warning.getCallback().bind<outputToVS>();
 		Lumix::g_log_error.getCallback().bind<outputToVS>();
@@ -113,6 +109,10 @@ public:
 		Lumix::g_log_info.getCallback().bind<outputToConsole>();
 		Lumix::g_log_warning.getCallback().bind<outputToConsole>();
 		Lumix::g_log_error.getCallback().bind<outputToConsole>();
+
+		m_engine = Lumix::Engine::create(NULL, m_allocator);
+
+		Lumix::enableCrashReporting(false);
 
 		m_engine->getPluginManager().load("renderer.dll");
 		m_engine->getPluginManager().load("animation.dll");
@@ -173,7 +173,7 @@ public:
 	{
 		char tmp[2048];
 		Lumix::copyString(tmp, system);
-		Lumix::catString(tmp, ": ");
+		Lumix::catString(tmp, " : ");
 		Lumix::catString(tmp, message);
 		Lumix::catString(tmp, "\r");
 
