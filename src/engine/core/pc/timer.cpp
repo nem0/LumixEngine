@@ -63,6 +63,8 @@ Timer* Timer::create(IAllocator& allocator)
 
 void Timer::destroy(Timer* timer)
 {
+	if (!timer) return;
+
 	LUMIX_DELETE(static_cast<TimerImpl*>(timer)->m_allocator, timer);
 }
 

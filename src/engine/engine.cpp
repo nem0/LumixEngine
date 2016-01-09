@@ -131,7 +131,7 @@ public:
 		Timer::destroy(m_timer);
 		Timer::destroy(m_fps_timer);
 		PluginManager::destroy(m_plugin_manager);
-		InputSystem::destroy(*m_input_system);
+		if (m_input_system) InputSystem::destroy(*m_input_system);
 		if (m_disk_file_device)
 		{
 			FS::FileSystem::destroy(m_file_system);
@@ -483,7 +483,7 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 	EngineImpl* engine = LUMIX_NEW(allocator, EngineImpl)(fs, allocator);
 	if (!engine->create())
 	{
-		g_log_info.log("engine") << "Failed to create engine.";
+		g_log_error.log("engine") << "Failed to create engine.";
 		LUMIX_DELETE(allocator, engine);
 		return nullptr;
 	}
