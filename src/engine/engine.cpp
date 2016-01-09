@@ -457,10 +457,11 @@ static void showLogInVS(const char* system, const char* message)
 
 
 static FS::OsFile g_error_file;
-
+static bool g_is_error_file_opened = false;
 
 static void logErrorToFile(const char*, const char* message)
 {
+	if (!g_is_error_file_opened) return;
 	g_error_file.write(message, stringLength(message));
 	g_error_file.flush();
 }
@@ -471,7 +472,7 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 	Profiler::setThreadName("Main");
 	installUnhandledExceptionHandler();
 
-	g_error_file.open("error.log", FS::Mode::CREATE | FS::Mode::WRITE, allocator);
+	g_is_error_file_opened = g_error_file.open("error.log", FS::Mode::CREATE | FS::Mode::WRITE, allocator);
 
 	g_log_error.getCallback().bind<logErrorToFile>();
 	g_log_info.getCallback().bind<showLogInVS>();

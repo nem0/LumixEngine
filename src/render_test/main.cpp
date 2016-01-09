@@ -2,6 +2,7 @@
 #include "core/FS/ifile.h"
 #include "core/blob.h"
 #include "core/crc32.h"
+#include "debug/debug.h"
 #include "core/log.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
@@ -102,6 +103,8 @@ public:
 	{
 		auto hwnd = createWindow();
 		m_engine = Lumix::Engine::create(NULL, m_allocator);
+
+		Lumix::enableCrashReporting(false);
 
 		Lumix::g_log_info.getCallback().bind<outputToVS>();
 		Lumix::g_log_warning.getCallback().bind<outputToVS>();
