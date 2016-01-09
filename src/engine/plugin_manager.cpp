@@ -116,6 +116,7 @@ class PluginManagerImpl : public PluginManager
 					IPlugin* plugin = creator(m_engine);
 					if (!plugin || !plugin->create())
 					{
+						g_log_error.log("plugins") << "createPlugin failed.";
 						LUMIX_DELETE(m_engine.getAllocator(), plugin);
 						ASSERT(false);
 						return nullptr;
@@ -123,9 +124,17 @@ class PluginManagerImpl : public PluginManager
 					m_plugins.push(plugin);
 					m_libraries.push(lib);
 					m_library_loaded.invoke(lib);
-					g_log_info.log("plugins") << "plugin loaded";
+					g_log_info.log("plugins") << "Plugin loaded.";
 					return plugin;
 				}
+				else
+				{
+					g_log_error.log("plugins") << "No createPlugin function in plugin.";
+				}
+			}
+			else
+			{
+				g_log_warning.log("plugins") << "Failed to load plugin.";
 			}
 			unloadLibrary(lib);
 			return 0;
