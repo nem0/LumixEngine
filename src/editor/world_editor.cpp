@@ -15,7 +15,6 @@
 #include "core/input_system.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
-#include "core/lua_wrapper.h"
 #include "core/matrix.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
@@ -41,7 +40,6 @@
 #include "renderer/texture.h"
 #include "ieditor_command.h"
 #include "universe/universe.h"
-#include <lua.hpp>
 
 
 namespace Lumix
@@ -1697,8 +1695,6 @@ public:
 		destroyUniverse();
 		EntityTemplateSystem::destroy(m_template_system);
 		PropertyRegister::shutdown();
-
-		lua_close(m_lua_state);
 	}
 
 
@@ -2601,9 +2597,6 @@ public:
 		, m_is_additive_selection(false)
 		, m_entity_groups(m_allocator)
 	{
-		m_is_exit_requested = false;
-		createLua();
-
 		PropertyRegister::init(m_allocator);
 		m_go_to_parameters.m_is_active = false;
 		m_undo_index = -1;
@@ -3239,86 +3232,6 @@ public:
 	}
 
 
-	void createLua()
-	{
-		m_lua_state = luaL_newstate();
-		luaL_openlibs(m_lua_state);
-
-		lua_pushlightuserdata(m_lua_state, this);
-		lua_setglobal(m_lua_state, "g_editor");
-
-		lua_newtable(m_lua_state);
-		lua_pushvalue(m_lua_state, -1);
-		lua_setglobal(m_lua_state, "Editor");
-
-		#define REGISTER_FUNCTION(F, name) \
-			do { \
-				lua_pushvalue(m_lua_state, -1); \
-				auto* f = &LuaWrapper::wrap<decltype(&F), F>; \
-				lua_pushcfunction(m_lua_state, f); \
-				lua_setfield(m_lua_state, -2, name); \
-			} while(false) \
-
-		REGISTER_FUNCTION(LUA_runTest, "runTest");
-		REGISTER_FUNCTION(LUA_logError, "logError");
-		REGISTER_FUNCTION(LUA_logInfo, "logInfo");
-		REGISTER_FUNCTION(LUA_exit, "exit");
-
-		#undef REGISTER_FUNCTION
-
-		lua_pop(m_lua_state, 1);
-	}
-
-
-	bool isExitRequested() const override
-	{
-		return m_is_exit_requested;
-	}
-
-
-	int getExitCode() const override
-	{
-		return m_exit_code;
-	}
-
-
-	static void LUA_exit(WorldEditorImpl* editor, int exit_code)
-	{
-		editor->m_is_exit_requested = true;
-		editor->m_exit_code = exit_code;
-	}
-
-
-	static void LUA_logError(const char* message)
-	{
-		g_log_error.log("editor") << message;
-	}
-
-
-	static void LUA_logInfo(const char* message)
-	{
-		g_log_info.log("editor") << message;
-	}
-
-
-	static bool LUA_runTest(WorldEditor* editor, const char* undo_stack_path, const char* result_universe_path)
-	{
-		return editor->runTest(Path(undo_stack_path), Path(result_universe_path));
-	}
-
-
-	void runScript(const char* src, const char* script_name) override
-	{
-		bool errors = luaL_loadbuffer(m_lua_state, src, stringLength(src), script_name) != LUA_OK;
-		errors = errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
-		if (errors)
-		{
-			g_log_error.log("editor") << script_name << ": " << lua_tostring(m_lua_state, -1);
-			lua_pop(m_lua_state, 1);
-		}
-	}
-
-
 	bool runTest(const Path& undo_stack_path, const Path& result_universe_path) override
 	{
 		while (m_engine->getFileSystem().hasWork()) m_engine->getFileSystem().updateAsyncTransactions();
@@ -3432,9 +3345,6 @@ private:
 	bool m_is_loading;
 	UniverseContext* m_universe_context;
 	EntityGroups m_entity_groups;
-	lua_State* m_lua_state;
-	bool m_is_exit_requested;
-	int m_exit_code;
 };
 
 
