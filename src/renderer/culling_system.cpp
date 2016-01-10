@@ -273,7 +273,7 @@ public:
 	void removeStatic(ComponentIndex renderable) override
 	{
 		int index = m_renderable_to_sphere_map[renderable];
-		ASSERT(index >= 0);
+		if (index < 0) return;
 		ASSERT(index < m_spheres.size());
 
 		m_renderable_to_sphere_map[m_sphere_to_renderable_map.back()] = index;
