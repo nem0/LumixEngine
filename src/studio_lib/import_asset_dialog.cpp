@@ -325,6 +325,7 @@ struct ImportTask : public Lumix::MT::Task
 		const aiScene* scene = m_dialog.m_importer.ReadFile(m_dialog.m_source, flags);
 		if (!scene || !scene->mMeshes || !scene->mMeshes[0]->mTangents)
 		{
+			m_dialog.m_importer.FreeScene();
 			m_dialog.setMessage(m_dialog.m_importer.GetErrorString());
 			Lumix::g_log_error.log("import") << m_dialog.m_importer.GetErrorString();
 		}
