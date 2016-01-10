@@ -89,8 +89,13 @@ struct AudioDeviceImpl : public AudioDevice
 	{
 		m_engine = &engine;
 
-		auto result = SUCCEEDED(CoInitialize(nullptr));
-		ASSERT(result);
+		auto coinitialize_result = CoInitialize(nullptr);
+		if (!SUCCEEDED(coinitialize_result))
+		{
+			g_log_error.log("audio") << "CoInitialize failed. Error code: " << coinitialize_result;
+			ASSERT(false);
+			return false;
+		}
 
 		m_library = LoadLibrary("dsound.dll");
 		if (!m_library)
@@ -108,17 +113,17 @@ struct AudioDeviceImpl : public AudioDevice
 			return false;
 		}
 
-		result = SUCCEEDED(dsoundCreate(0, &m_direct_sound, nullptr));
-		if (!result)
+		auto create_result = dsoundCreate(0, &m_direct_sound, nullptr);
+		if (!SUCCEEDED(create_result))
 		{
-			g_log_error.log("audio") << "Failed to create DirectSound.";
+			g_log_error.log("audio") << "Failed to create DirectSound. Error code: " << create_result;
 			ASSERT(false);
 			FreeLibrary(m_library);
 			return false;
 		}
 
 		HWND hwnd = (HWND)engine.getPlatformData().window_handle;
-		result = SUCCEEDED(m_direct_sound->SetCooperativeLevel(hwnd, DSSCL_PRIORITY));
+		auto result = SUCCEEDED(m_direct_sound->SetCooperativeLevel(hwnd, DSSCL_PRIORITY));
 		if (!result || !initPrimaryBuffer())
 		{
 			g_log_error.log("audio") << "Failed to initialize the primary buffer.";
