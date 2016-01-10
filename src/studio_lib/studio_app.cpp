@@ -1054,6 +1054,13 @@ public:
 	}
 
 
+	void LUA_compileShaders(bool wait)
+	{
+		m_shader_compiler->compileAll();
+		if (wait) m_shader_compiler->wait();
+	}
+
+
 	void LUA_logError(const char* message)
 	{
 		Lumix::g_log_error.log("editor") << message;
@@ -1092,6 +1099,7 @@ public:
 				lua_setfield(m_lua_state, -2, name); \
 						} while(false) \
 
+		REGISTER_FUNCTION(LUA_compileShaders, "compileShaders");
 		REGISTER_FUNCTION(LUA_runTest, "runTest");
 		REGISTER_FUNCTION(LUA_logError, "logError");
 		REGISTER_FUNCTION(LUA_logInfo, "logInfo");

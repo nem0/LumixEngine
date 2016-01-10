@@ -21,6 +21,9 @@ test_script:
             $wc.UploadFile($url, (Resolve-Path .\tests.xml))
 
 - ps: >-
+    & "..\projects\tmp\bin\RelWithDebInfo\studio.exe -run_script render_test/main.lua" | Write-Output
+
+- ps: >-
     & "..\projects\tmp\bin\RelWithDebInfo\render_test.exe" | Write-Output
 
 after_build:

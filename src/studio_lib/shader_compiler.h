@@ -31,6 +31,7 @@ public:
 
 	void compileAll();
 	void update();
+	void wait();
 
 private:
 	void reloadShaders();
