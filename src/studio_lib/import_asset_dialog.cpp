@@ -1514,7 +1514,7 @@ void ImportAssetDialog::onGUI()
 			{
 				setMessage("");
 			}
-			ImGui::End();
+			ImGui::EndDock();
 			return;
 		}
 
@@ -1534,7 +1534,7 @@ void ImportAssetDialog::onGUI()
 				Lumix::MT::SpinLock lock(m_mutex);
 				ImGui::Text(m_import_message);
 			}
-			ImGui::End();
+			ImGui::EndDock();
 			return;
 		}
 
@@ -1577,7 +1577,7 @@ void ImportAssetDialog::onGUI()
 			{
 				importTexture();
 			}
-			ImGui::End();
+			ImGui::EndDock();
 			return;
 		}
 

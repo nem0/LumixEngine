@@ -293,7 +293,6 @@ public:
 			m_profiler_ui->onGUI();
 			m_asset_browser->onGUI();
 			m_log_ui->onGUI();
-			m_import_asset_dialog->onGUI();
 			m_property_grid->onGUI();
 			showEntityList();
 			showEntityTemplateList();
@@ -305,6 +304,7 @@ public:
 				plugin->onWindowGUI();
 			}
 			m_settings.onGUI(&m_actions[0], m_actions.size());
+			m_import_asset_dialog->onGUI();
 		}
 
 		ImGui::Render();
