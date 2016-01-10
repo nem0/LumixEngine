@@ -141,11 +141,15 @@ private:
 				this);
 		}
 
-		void callback(Resource::State, Resource::State new_state)
+		void callback(Resource::State old_state, Resource::State new_state)
 		{
 			if (new_state == Resource::State::READY)
 			{
 				m_scene.modelLoaded(m_model);
+			}
+			else if (old_state == Resource::State::READY && new_state == Resource::State::EMPTY)
+			{
+				m_scene.modeUnloaded(m_model);
 			}
 		}
 
@@ -2772,6 +2776,12 @@ public:
 	float getTime() const override { return m_time; }
 
 
+	void modelUnloaded(Model*, ComponentIndex component)
+	{
+		m_culling_system->removeStatic(component);
+	}
+
+
 	void modelLoaded(Model* model, ComponentIndex component)
 	{
 		auto& r = m_renderables[component];
@@ -2803,6 +2813,19 @@ public:
 			}
 		}
 	}
+
+
+	void modeUnloaded(Model* model)
+	{
+		for (int i = 0, c = m_renderables.size(); i < c; ++i)
+		{
+			if (m_renderables[i].entity != INVALID_ENTITY && m_renderables[i].model == model)
+			{
+				modelUnloaded(model, i);
+			}
+		}
+	}
+
 
 	void modelLoaded(Model* model)
 	{
