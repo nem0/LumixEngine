@@ -1,6 +1,8 @@
 version: 0.19.{build}
 os: Windows Server 2012 R2
 configuration: RelWithDebInfo
+init:
+- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
 before_build:
   - cd projects
   - genie_vs13.bat
