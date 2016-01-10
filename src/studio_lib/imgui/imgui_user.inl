@@ -471,6 +471,7 @@ bool CurveTangent(int id, const ImVec2& point, ImVec2& tangent, const ImRect& bb
 			v = ImClamp(v, ImVec2(point.x + 0.0001f, 0), ImVec2(1, 1));
 
 		tangent = v - point;
+		//tangent /= sqrt(tangent.x*tangent.x + tangent.y*tangent.y);
 		changed = true;
 	}
 	ImGui::PopID();
@@ -542,7 +543,9 @@ bool CurvePoint(ImVec2* points, CurveEditor& editor)
 
 float FindClosestPointToCurve(const ImVec2* points, const ImVec2& point, float t, int iterCount)
 {
-	if (iterCount >= 10)
+	static const int MAX_ITERATIONS = 20;
+
+	if (iterCount >= MAX_ITERATIONS)
 		return t;
 
 	float u = 1 - t;
