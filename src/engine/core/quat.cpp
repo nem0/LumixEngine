@@ -109,6 +109,7 @@ void Quat::normalize()
 void nlerp(const Quat& q1, const Quat& q2, Quat* out, float t)
 {
 	float inv = 1.0f - t;
+	if (q1.x * q2.x + q1.y * q2.y + q1.z * q2.z + q1.w * q2.w < 0) t = -t;
 	float ox = q1.x * inv + q2.x * t;
 	float oy = q1.y * inv + q2.y * t;
 	float oz = q1.z * inv + q2.z * t;

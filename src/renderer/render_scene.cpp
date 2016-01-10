@@ -141,11 +141,15 @@ private:
 				this);
 		}
 
-		void callback(Resource::State, Resource::State new_state)
+		void callback(Resource::State old_state, Resource::State new_state)
 		{
 			if (new_state == Resource::State::READY)
 			{
 				m_scene.modelLoaded(m_model);
+			}
+			else if (old_state == Resource::State::READY && new_state == Resource::State::EMPTY)
+			{
+				m_scene.modeUnloaded(m_model);
 			}
 		}
 
@@ -315,7 +319,7 @@ public:
 	void setParticleEmitterSpawnCount(ComponentIndex cmp, const Int2& value) override
 	{
 		m_particle_emitters[cmp]->m_spawn_count.from = value.x;
-		m_particle_emitters[cmp]->m_spawn_count.to = Math::max(value.x, value.y);
+		m_particle_emitters[cmp]->m_spawn_count.to = Math::maxValue(value.x, value.y);
 	}
 
 
@@ -474,7 +478,7 @@ public:
 			serializer.write(m_renderables[i].entity);
 			if(m_renderables[i].entity != INVALID_ENTITY)
 			{
-				serializer.write(m_culling_system->getLayerMask(i));
+				serializer.write(m_renderables[i].layer_mask);
 				serializer.write(m_renderables[i].model ? m_renderables[i].model->getPath().getHash() : 0);
 			}
 		}
@@ -2772,6 +2776,12 @@ public:
 	float getTime() const override { return m_time; }
 
 
+	void modelUnloaded(Model*, ComponentIndex component)
+	{
+		m_culling_system->removeStatic(component);
+	}
+
+
 	void modelLoaded(Model* model, ComponentIndex component)
 	{
 		auto& r = m_renderables[component];
@@ -2803,6 +2813,19 @@ public:
 			}
 		}
 	}
+
+
+	void modeUnloaded(Model* model)
+	{
+		for (int i = 0, c = m_renderables.size(); i < c; ++i)
+		{
+			if (m_renderables[i].entity != INVALID_ENTITY && m_renderables[i].model == model)
+			{
+				modelUnloaded(model, i);
+			}
+		}
+	}
+
 
 	void modelLoaded(Model* model)
 	{
@@ -3106,6 +3129,7 @@ public:
 		auto& r = m_renderables[entity];
 		r.entity = entity;
 		r.model = nullptr;
+		r.layer_mask = 1;
 		r.pose = nullptr;
 		r.matrix = m_universe.getMatrix(entity);
 		m_universe.addComponent(entity, RENDERABLE_HASH, this, entity);

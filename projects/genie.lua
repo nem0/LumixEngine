@@ -121,9 +121,9 @@ project "physics"
 
 	files { "../src/physics/**.h", "../src/physics/**.cpp" }
 	excludes { "../src/engine/**/osx/*"}
-	includedirs { "../external/physx/include", "../external/bgfx/include" }
+	includedirs { "../external/physx/include/" .. ide_dir, "../external/bgfx/include" }
 	defines { "BUILDING_PHYSICS" }
-	links { "engine", "renderer", "studio_lib" }
+	links { "engine", "renderer", "studio_lib", "editor" }
 
 	useLua()
 
@@ -188,6 +188,7 @@ project "editor"
 	defines { "BUILDING_EDITOR" }
 	links { "renderer", "engine" }
 
+	useLua()
 	defaultConfigurations()
 
 project "audio"
@@ -196,7 +197,7 @@ project "audio"
 	files { "../src/audio/**.h", "../src/audio/**.cpp", "../src/audio/**.c" }
 	includedirs { "../src", "../src/audio", "../external/bgfx/include" }
 	defines { "BUILDING_AUDIO" }
-	links { "engine", "dxguid", "studio_lib" }
+	links { "engine", "dxguid", "studio_lib", "editor" }
 
 	useLua()
 	defaultConfigurations()
@@ -207,7 +208,7 @@ project "lua_script"
 	files { "../src/lua_script/**.h", "../src/lua_script/**.cpp" }
 	includedirs { "../src", "../src/lua_script", "../external/lua/include", "../external/bgfx/include" }
 	defines { "BUILDING_LUA_SCRIPT" }
-	links { "studio_lib", "engine", "renderer" }
+	links { "studio_lib", "engine", "renderer", "editor" }
 
 	useLua()
 	defaultConfigurations()
@@ -222,13 +223,25 @@ project "unit_tests"
 	useLua()
 	defaultConfigurations()
 
+project "render_test"
+	kind "WindowedApp"
+
+	debugdir "../../LumixEngine_data"
+
+	files { "../src/render_test/**.h", "../src/render_test/**.cpp" }
+	includedirs { "../src", "../src/render_test", "../external/bgfx/include" }
+	links { "engine", "animation", "renderer" }
+
+	useLua()
+	defaultConfigurations()
+
 
 project "studio_lib"
 	kind "SharedLib"
 
 	files { "../src/studio_lib/**.h", "../src/studio_lib/**.inl", "../src/studio_lib/**.cpp" }
 	includedirs { "../src", "../src/studio_lib", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
-	links { "animation", "editor", "engine", "renderer", "assimp", "crnlib", "winmm" }
+	links { "animation", "editor", "engine", "assimp", "crnlib", "winmm", "renderer" }
 	defines { "BUILDING_STUDIO_LIB" }
 
 	useLua()
@@ -268,7 +281,7 @@ project "studio"
 
 	files { "../src/studio/**.cpp" }
 	includedirs { "../src", "../src/studio_lib", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
-	links { "studio_lib", "animation", "physics", "editor", "engine", "renderer", "winmm" }
+	links { "studio_lib", "animation", "editor", "engine", "renderer", "winmm" }
 
 	useLua()
 	defaultConfigurations()

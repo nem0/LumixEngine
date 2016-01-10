@@ -3,7 +3,7 @@ os: Windows Server 2012 R2
 configuration: RelWithDebInfo
 before_build:
   - cd projects
-  - genie.bat
+  - genie_vs13.bat
   - cd ..
 build:
   project: projects\tmp\LumixEngine.sln
@@ -19,6 +19,9 @@ test_script:
     $wc = New-Object Net.WebClient
             $url = "https://ci.appveyor.com/api/testresults/nunit/$Env:APPVEYOR_JOB_ID"
             $wc.UploadFile($url, (Resolve-Path .\tests.xml))
+
+- ps: >-
+    & "..\projects\tmp\bin\RelWithDebInfo\render_test.exe" | Write-Output
 
 after_build:
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\animation.dll

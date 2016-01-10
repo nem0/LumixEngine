@@ -131,7 +131,7 @@ public:
 		Timer::destroy(m_timer);
 		Timer::destroy(m_fps_timer);
 		PluginManager::destroy(m_plugin_manager);
-		InputSystem::destroy(*m_input_system);
+		if (m_input_system) InputSystem::destroy(*m_input_system);
 		if (m_disk_file_device)
 		{
 			FS::FileSystem::destroy(m_file_system);
@@ -447,18 +447,21 @@ private:
 };
 
 
-static void showLogInVS(const char*, const char* message)
+static void showLogInVS(const char* system, const char* message)
 {
+	Debug::debugOutput(system);
+	Debug::debugOutput(" : ");
 	Debug::debugOutput(message);
 	Debug::debugOutput("\n");
 }
 
 
 static FS::OsFile g_error_file;
-
+static bool g_is_error_file_opened = false;
 
 static void logErrorToFile(const char*, const char* message)
 {
+	if (!g_is_error_file_opened) return;
 	g_error_file.write(message, stringLength(message));
 	g_error_file.flush();
 }
@@ -466,10 +469,11 @@ static void logErrorToFile(const char*, const char* message)
 
 Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 {
+	g_log_info.log("engine") << "Creating engine...";
 	Profiler::setThreadName("Main");
 	installUnhandledExceptionHandler();
 
-	g_error_file.open("error.log", FS::Mode::CREATE | FS::Mode::WRITE, allocator);
+	g_is_error_file_opened = g_error_file.open("error.log", FS::Mode::CREATE | FS::Mode::WRITE, allocator);
 
 	g_log_error.getCallback().bind<logErrorToFile>();
 	g_log_info.getCallback().bind<showLogInVS>();
@@ -479,9 +483,11 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 	EngineImpl* engine = LUMIX_NEW(allocator, EngineImpl)(fs, allocator);
 	if (!engine->create())
 	{
+		g_log_error.log("engine") << "Failed to create engine.";
 		LUMIX_DELETE(allocator, engine);
 		return nullptr;
 	}
+	g_log_info.log("engine") << "Engine created.";
 	return engine;
 }
 

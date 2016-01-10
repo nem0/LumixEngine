@@ -33,6 +33,7 @@ public:
 	virtual Lumix::WorldEditor* getWorldEditor() = 0;
 	virtual void addPlugin(IPlugin& plugin) = 0;
 	virtual void removePlugin(IPlugin& plugin) = 0;
+	virtual int getExitCode() const = 0;
 
 	virtual ~StudioApp() {}
 	virtual void run() = 0;

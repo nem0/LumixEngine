@@ -15,6 +15,7 @@
 #include "core/input_system.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
+#include "core/lua_wrapper.h"
 #include "core/matrix.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
@@ -40,7 +41,7 @@
 #include "renderer/texture.h"
 #include "ieditor_command.h"
 #include "universe/universe.h"
-
+#include <lua.hpp>
 
 
 namespace Lumix
@@ -1633,20 +1634,20 @@ public:
 
 	void updateGoTo()
 	{
-		if (m_camera >= 0 && m_go_to_parameters.m_is_active)
+		if (m_camera < 0 || !m_go_to_parameters.m_is_active) return;
+
+		float t = Math::easeInOut(m_go_to_parameters.m_t);
+		m_go_to_parameters.m_t += m_engine->getLastTimeDelta() * m_go_to_parameters.m_speed;
+		Vec3 pos = m_go_to_parameters.m_from * (1 - t) + m_go_to_parameters.m_to * t;
+		Quat rot;
+		nlerp(m_go_to_parameters.m_from_rot, m_go_to_parameters.m_to_rot, &rot, t);
+		if (m_go_to_parameters.m_t >= 1)
 		{
-			float t = Math::easeInOut(m_go_to_parameters.m_t);
-			m_go_to_parameters.m_t +=
-				m_engine->getLastTimeDelta() * m_go_to_parameters.m_speed;
-			Vec3 pos = m_go_to_parameters.m_from * (1 - t) +
-					   m_go_to_parameters.m_to * t;
-			if (m_go_to_parameters.m_t >= 1)
-			{
-				pos = m_go_to_parameters.m_to;
-				m_go_to_parameters.m_is_active = false;
-			}
-			getUniverse()->setPosition(m_camera, pos);
+			pos = m_go_to_parameters.m_to;
+			m_go_to_parameters.m_is_active = false;
 		}
+		getUniverse()->setPosition(m_camera, pos);
+		getUniverse()->setRotation(m_camera, rot);
 	}
 
 
@@ -1696,6 +1697,8 @@ public:
 		destroyUniverse();
 		EntityTemplateSystem::destroy(m_template_system);
 		PropertyRegister::shutdown();
+
+		lua_close(m_lua_state);
 	}
 
 
@@ -1852,7 +1855,7 @@ public:
 
 	void saveUniverse(const Path& path, bool save_path) override
 	{
-		g_log_info.log("editor") << "saving universe " << path.c_str() << "...";
+		g_log_info.log("editor") << "saving universe " << path << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
 		char bkp_path[MAX_PATH_LENGTH];
 		copyString(bkp_path, path.c_str());
@@ -1882,7 +1885,7 @@ public:
 		header.hash = crc32((const uint8*)blob.getData() + hashed_offset, blob.getSize() - hashed_offset);
 		*(Header*)blob.getData() = header;
 
-		g_log_info.log("editor") << "universe saved";
+		g_log_info.log("editor") << "Universe saved";
 		file.write(blob.getData(), blob.getSize());
 	}
 
@@ -2308,24 +2311,24 @@ public:
 	void lookAtSelected() override
 	{
 		Universe* universe = getUniverse();
-		if (!m_selected_entities.empty())
-		{
-			m_go_to_parameters.m_is_active = true;
-			m_go_to_parameters.m_t = 0;
-			m_go_to_parameters.m_from = universe->getPosition(m_camera);
-			Quat camera_rot = universe->getRotation(m_camera);
-			Vec3 dir = camera_rot * Vec3(0, 0, 1);
-			m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + dir * 10;
-			float len = (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
-			m_go_to_parameters.m_speed = Math::maxValue(100.0f / (len > 0 ? len : 1), 2.0f);
-		}
+		if (m_selected_entities.empty()) return;
+
+		m_go_to_parameters.m_is_active = true;
+		m_go_to_parameters.m_t = 0;
+		m_go_to_parameters.m_from = universe->getPosition(m_camera);
+		Quat camera_rot = universe->getRotation(m_camera);
+		Vec3 dir = camera_rot * Vec3(0, 0, 1);
+		m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + dir * 10;
+		float len = (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
+		m_go_to_parameters.m_speed = Math::maxValue(100.0f / (len > 0 ? len : 1), 2.0f);
+		m_go_to_parameters.m_from_rot = m_go_to_parameters.m_to_rot = camera_rot;
 	}
 
 
 	void loadUniverse(const Path& path) override
 	{
 		m_universe_path = path;
-		g_log_info.log("editor") << "Loading universe " << path.c_str() << "...";
+		g_log_info.log("editor") << "Loading universe " << path << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
 		FS::ReadCallback file_read_cb;
 		file_read_cb.bind<WorldEditorImpl, &WorldEditorImpl::loadMap>(this);
@@ -2598,6 +2601,9 @@ public:
 		, m_is_additive_selection(false)
 		, m_entity_groups(m_allocator)
 	{
+		m_is_exit_requested = false;
+		createLua();
+
 		PropertyRegister::init(m_allocator);
 		m_go_to_parameters.m_is_active = false;
 		m_undo_index = -1;
@@ -3119,7 +3125,7 @@ public:
 		}
 		else
 		{
-			g_log_error.log("editor") << "Could not save commands to " << path.c_str();
+			g_log_error.log("editor") << "Could not save commands to " << path;
 		}
 	}
 
@@ -3162,8 +3168,7 @@ public:
 				IEditorCommand* command = createEditorCommand(type);
 				if (!command)
 				{
-					g_log_error.log("editor") << "Unknown command " << type
-											  << " in " << path.c_str();
+					g_log_error.log("editor") << "Unknown command " << type << " in " << path;
 					destroyUndoStack();
 					m_undo_index = -1;
 					return false;
@@ -3180,10 +3185,147 @@ public:
 	}
 
 
+	void setTopView() override
+	{
+		m_go_to_parameters.m_is_active = true;
+		m_go_to_parameters.m_t = 0;
+		auto* universe = m_universe_context->m_universe;
+		m_go_to_parameters.m_from = universe->getPosition(m_camera);
+		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
+		if (m_is_orbit && !m_selected_entities.empty())
+		{
+			m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + Vec3(0, 10, 0);
+		}
+		Quat camera_rot = universe->getRotation(m_camera);
+		m_go_to_parameters.m_speed = 2.0f;
+		m_go_to_parameters.m_from_rot = camera_rot;
+		m_go_to_parameters.m_to_rot = Quat(Vec3(1, 0, 0), -Math::PI * 0.5f);
+	}
+
+
+	void setFrontView() override
+	{
+		m_go_to_parameters.m_is_active = true;
+		m_go_to_parameters.m_t = 0;
+		auto* universe = m_universe_context->m_universe;
+		m_go_to_parameters.m_from = universe->getPosition(m_camera);
+		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
+		if (m_is_orbit && !m_selected_entities.empty())
+		{
+			m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + Vec3(0, 0, -10);
+		}
+		Quat camera_rot = universe->getRotation(m_camera);
+		m_go_to_parameters.m_speed = 2.0f;
+		m_go_to_parameters.m_from_rot = camera_rot;
+		m_go_to_parameters.m_to_rot = Quat(Vec3(0, 1, 0), Math::PI);
+	}
+
+
+	void setSideView() override
+	{
+		m_go_to_parameters.m_is_active = true;
+		m_go_to_parameters.m_t = 0;
+		auto* universe = m_universe_context->m_universe;
+		m_go_to_parameters.m_from = universe->getPosition(m_camera);
+		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
+		if (m_is_orbit && !m_selected_entities.empty())
+		{
+			m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + Vec3(-10, 0, 0);
+		}
+		Quat camera_rot = universe->getRotation(m_camera);
+		m_go_to_parameters.m_speed = 2.0f;
+		m_go_to_parameters.m_from_rot = camera_rot;
+		m_go_to_parameters.m_to_rot = Quat(Vec3(0, 1, 0), -Math::PI * 0.5f);
+	}
+
+
+	void createLua()
+	{
+		m_lua_state = luaL_newstate();
+		luaL_openlibs(m_lua_state);
+
+		lua_pushlightuserdata(m_lua_state, this);
+		lua_setglobal(m_lua_state, "g_editor");
+
+		lua_newtable(m_lua_state);
+		lua_pushvalue(m_lua_state, -1);
+		lua_setglobal(m_lua_state, "Editor");
+
+		#define REGISTER_FUNCTION(F, name) \
+			do { \
+				lua_pushvalue(m_lua_state, -1); \
+				auto* f = &LuaWrapper::wrap<decltype(&F), F>; \
+				lua_pushcfunction(m_lua_state, f); \
+				lua_setfield(m_lua_state, -2, name); \
+			} while(false) \
+
+		REGISTER_FUNCTION(LUA_runTest, "runTest");
+		REGISTER_FUNCTION(LUA_logError, "logError");
+		REGISTER_FUNCTION(LUA_logInfo, "logInfo");
+		REGISTER_FUNCTION(LUA_exit, "exit");
+
+		#undef REGISTER_FUNCTION
+
+		lua_pop(m_lua_state, 1);
+	}
+
+
+	bool isExitRequested() const override
+	{
+		return m_is_exit_requested;
+	}
+
+
+	int getExitCode() const override
+	{
+		return m_exit_code;
+	}
+
+
+	static void LUA_exit(WorldEditorImpl* editor, int exit_code)
+	{
+		editor->m_is_exit_requested = true;
+		editor->m_exit_code = exit_code;
+	}
+
+
+	static void LUA_logError(const char* message)
+	{
+		g_log_error.log("editor") << message;
+	}
+
+
+	static void LUA_logInfo(const char* message)
+	{
+		g_log_info.log("editor") << message;
+	}
+
+
+	static bool LUA_runTest(WorldEditor* editor, const char* undo_stack_path, const char* result_universe_path)
+	{
+		return editor->runTest(Path(undo_stack_path), Path(result_universe_path));
+	}
+
+
+	void runScript(const char* src, const char* script_name) override
+	{
+		bool errors = luaL_loadbuffer(m_lua_state, src, stringLength(src), script_name) != LUA_OK;
+		errors = errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
+		if (errors)
+		{
+			g_log_error.log("editor") << script_name << ": " << lua_tostring(m_lua_state, -1);
+			lua_pop(m_lua_state, 1);
+		}
+	}
+
+
 	bool runTest(const Path& undo_stack_path, const Path& result_universe_path) override
 	{
+		while (m_engine->getFileSystem().hasWork()) m_engine->getFileSystem().updateAsyncTransactions();
 		newUniverse();
 		executeUndoStack(undo_stack_path);
+		while (m_engine->getFileSystem().hasWork()) m_engine->getFileSystem().updateAsyncTransactions();
+
 		FS::IFile* file =
 			m_engine->getFileSystem().open(m_engine->getFileSystem().getMemoryDevice(),
 				Lumix::Path(""),
@@ -3198,6 +3340,7 @@ public:
 				FS::Mode::OPEN_AND_READ);
 		if (!result_file)
 		{
+			m_engine->getFileSystem().close(*file);
 			return false;
 		}
 		save(*file);
@@ -3235,6 +3378,8 @@ private:
 		bool m_is_active;
 		Vec3 m_from;
 		Vec3 m_to;
+		Quat m_from_rot;
+		Quat m_to_rot;
 		float m_t;
 		float m_speed;
 	};
@@ -3287,6 +3432,9 @@ private:
 	bool m_is_loading;
 	UniverseContext* m_universe_context;
 	EntityGroups m_entity_groups;
+	lua_State* m_lua_state;
+	bool m_is_exit_requested;
+	int m_exit_code;
 };
 
 

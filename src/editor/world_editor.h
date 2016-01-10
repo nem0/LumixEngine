@@ -165,16 +165,22 @@ public:
 	virtual bool isMeasureToolActive() const = 0;
 	virtual float getMeasuredDistance() const = 0;
 	virtual void toggleMeasure() = 0;
+	virtual void setTopView() = 0;
+	virtual void setFrontView() = 0;
+	virtual void setSideView() = 0;
 	virtual class MeasureTool* getMeasureTool() const = 0;
 
 	virtual void saveUndoStack(const Path& path) = 0;
 	virtual bool executeUndoStack(const Path& path) = 0;
+	virtual void runScript(const char* src, const char* script_name) = 0;
 	virtual bool runTest(const Path& undo_stack_path,
 						 const Path& result_universe_path) = 0;
 	virtual void registerEditorCommandCreator(const char* command_type,
 											  EditorCommandCreator) = 0;
 	virtual bool isGameMode() const = 0;
 	virtual class EntityGroups& getEntityGroups() = 0;
+	virtual bool isExitRequested() const = 0;
+	virtual int getExitCode() const = 0;
 
 protected:
 	virtual ~WorldEditor() {}

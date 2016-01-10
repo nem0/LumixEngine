@@ -36,6 +36,7 @@ static int playSound(IScene* scene, int entity, const char* clip_name, bool is_3
 
 static void setSoundVolume(IScene* scene, int sound_id, float volume)
 {
+	if (sound_id == AudioScene::INVALID_SOUND_HANDLE) return;
 	static_cast<AudioScene*>(scene)->setVolume(sound_id, volume);
 }
 
@@ -47,6 +48,7 @@ static void setEcho(IScene* scene,
 	float left_delay,
 	float right_delay)
 {
+	if (sound_id == AudioScene::INVALID_SOUND_HANDLE) return;
 	static_cast<AudioScene*>(scene)->setEcho(
 		sound_id, wet_dry_mix, feedback, left_delay, right_delay);
 }

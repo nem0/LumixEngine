@@ -163,8 +163,8 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 		Lumix::Model* model = scene->getRenderableModel(renderable.index);
 		for (int i = 0; i <= m_brush_size * m_brush_size / 1000.0f; ++i)
 		{
-			float angle = Lumix::Math::degreesToRadians((float)(rand() % 360));
-			float dist = (rand() % 100 / 100.0f) * m_brush_size;
+			float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
+			float dist = Lumix::Math::randFloat(0, 1.0f) * m_brush_size;
 			Lumix::Vec3 pos(m_center.x + cos(angle) * dist, 0, m_center.z + sin(angle) * dist);
 			Lumix::Vec3 terrain_pos = inv_terrain_matrix.multiplyPosition(pos);
 			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= w &&
@@ -201,14 +201,14 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 
 		if (m_rotate_x)
 		{
-			float angle = Lumix::Math::degreesToRadians((float)(rand() % 360));
+			float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
 			Lumix::Quat q(x, angle);
 			rot = rot * q;
 		}
 
 		if (m_rotate_z)
 		{
-			float angle = Lumix::Math::degreesToRadians((float)(rand() % 360));
+			float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
 			Lumix::Quat q(z, angle);
 			rot = rot * q;
 		}

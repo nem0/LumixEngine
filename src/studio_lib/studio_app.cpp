@@ -6,6 +6,7 @@
 #include "core/crc32.h"
 #include "core/default_allocator.h"
 #include "core/fs/file_system.h"
+#include "core/fs/os_file.h"
 #include "core/input_system.h"
 #include "core/log.h"
 #include "core/mt/thread.h"
@@ -113,7 +114,7 @@ public:
 		m_engine->update(*m_editor->getUniverseContext());
 
 		m_asset_browser->update();
-		m_shader_compiler->update(time_delta);
+		m_shader_compiler->update();
 		m_log_ui->update(time_delta);
 
 		m_gui_pipeline->render();
@@ -130,7 +131,7 @@ public:
 		return m_asset_browser;
 	}
 
-	
+
 	PropertyGrid* getPropertyGrid() override
 	{
 		return m_property_grid;
@@ -282,10 +283,16 @@ public:
 		else
 		{
 			showMainMenu();
+			if (ImGui::GetIO().DisplaySize.y > 0)
+			{
+				auto pos = ImVec2(0, ImGui::GetWindowFontSize() + ImGui::GetStyle().FramePadding.y * 2);
+				auto size = ImGui::GetIO().DisplaySize;
+				size.y -= pos.y;
+				ImGui::RootDock(pos, size);
+			}
 			m_profiler_ui->onGUI();
 			m_asset_browser->onGUI();
 			m_log_ui->onGUI();
-			m_import_asset_dialog->onGUI();
 			m_property_grid->onGUI();
 			showEntityList();
 			showEntityTemplateList();
@@ -297,6 +304,7 @@ public:
 				plugin->onWindowGUI();
 			}
 			m_settings.onGUI(&m_actions[0], m_actions.size());
+			m_import_asset_dialog->onGUI();
 		}
 
 		ImGui::Render();
@@ -382,6 +390,9 @@ public:
 	void copy() { m_editor->copyEntity(); }
 	void paste() { m_editor->pasteEntity(); }
 	void toggleOrbitCamera() { m_editor->setOrbitCamera(!m_editor->isOrbitCamera()); }
+	void setTopView() { m_editor->setTopView(); }
+	void setFrontView() { m_editor->setFrontView(); }
+	void setSideView() { m_editor->setSideView(); }
 	void togglePivotMode() { m_editor->getGizmo().togglePivot(); }
 	void toggleCoordSystem() { m_editor->getGizmo().toggleCoordSystem(); }
 	void createEntity() { m_editor->addEntity(); }
@@ -520,6 +531,13 @@ public:
 				doMenuItem(getAction("toggleGizmoMode"), false, is_any_entity_selected);
 				doMenuItem(getAction("togglePivotMode"), false, is_any_entity_selected);
 				doMenuItem(getAction("toggleCoordSystem"), false, is_any_entity_selected);
+				if (ImGui::BeginMenu("View", true))
+				{
+					doMenuItem(getAction("viewTop"), false, true);
+					doMenuItem(getAction("viewFront"), false, true);
+					doMenuItem(getAction("viewSide"), false, true);
+					ImGui::EndMenu();
+				}
 				if (ImGui::BeginMenu("Select"))
 				{
 					if (ImGui::MenuItem("Same mesh", nullptr, nullptr, is_any_entity_selected))
@@ -790,11 +808,11 @@ public:
 
 		ProfilerUI::destroy(*m_profiler_ui);
 		LUMIX_DELETE(m_allocator, m_asset_browser);
-		LUMIX_DELETE(m_allocator, m_log_ui);
 		LUMIX_DELETE(m_allocator, m_property_grid);
 		LUMIX_DELETE(m_allocator, m_import_asset_dialog);
 		LUMIX_DELETE(m_allocator, m_shader_compiler);
 		LUMIX_DELETE(m_allocator, m_shader_editor);
+		LUMIX_DELETE(m_allocator, m_log_ui);
 		Lumix::WorldEditor::destroy(m_editor, m_allocator);
 		m_sceneview.shutdown();
 		m_gameview.shutdown();
@@ -936,6 +954,9 @@ public:
 			"Paste", "paste", (int)PlatformInterface::Keys::CONTROL, 'V', -1);
 		addAction<&StudioAppImpl::toggleOrbitCamera>("Orbit camera", "orbitCamera");
 		addAction<&StudioAppImpl::toggleGizmoMode>("Translate/Rotate", "toggleGizmoMode");
+		addAction<&StudioAppImpl::setTopView>("Top", "viewTop");
+		addAction<&StudioAppImpl::setFrontView>("Front", "viewFront");
+		addAction<&StudioAppImpl::setSideView>("Side", "viewSide");
 		addAction<&StudioAppImpl::togglePivotMode>("Center/Pivot", "togglePivotMode");
 		addAction<&StudioAppImpl::toggleCoordSystem>("Local/Global", "toggleCoordSystem");
 
@@ -1007,8 +1028,49 @@ public:
 	}
 
 
+	void checkScriptCommandLine()
+	{
+		char command_line[1024];
+		Lumix::getCommandLine(command_line, Lumix::lengthOf(command_line));
+		Lumix::CommandLineParser parser(command_line);
+		while (parser.next())
+		{
+			if (parser.currentEquals("-run_script"))
+			{
+				if (!parser.next()) break;
+				char tmp[Lumix::MAX_PATH_LENGTH];
+				parser.getCurrent(tmp, Lumix::lengthOf(tmp));
+				Lumix::FS::OsFile file;
+				if (file.open(tmp, Lumix::FS::Mode::OPEN_AND_READ, m_allocator))
+				{
+					auto size = file.size();
+					auto* src = (char*)m_allocator.allocate(size + 1);
+					file.read(src, size);
+					src[size] = 0;
+					m_editor->runScript((const char*)src, tmp);
+					m_allocator.deallocate(src);
+					file.close();
+				}
+				else
+				{
+					Lumix::g_log_error.log("editor") << "Could not open " << tmp;
+				}
+				break;
+			}
+		}
+	}
+
+
+	int getExitCode() const override
+	{
+		return m_editor->isExitRequested() ? m_editor->getExitCode() : 0;
+	}
+
+
 	void run()
 	{
+		checkScriptCommandLine();
+
 		Lumix::Timer* timer = Lumix::Timer::create(m_allocator);
 		while (!m_finished)
 		{
@@ -1019,6 +1081,7 @@ public:
 				{
 					PROFILE_BLOCK("tick");
 					m_finished = !PlatformInterface::processSystemEvents();
+					if (m_editor->isExitRequested()) m_finished = true;
 					update();
 					frame_time = timer->tick();
 				}

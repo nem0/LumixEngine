@@ -325,6 +325,7 @@ struct ImportTask : public Lumix::MT::Task
 		const aiScene* scene = m_dialog.m_importer.ReadFile(m_dialog.m_source, flags);
 		if (!scene || !scene->mMeshes || !scene->mMeshes[0]->mTangents)
 		{
+			m_dialog.m_importer.FreeScene();
 			m_dialog.setMessage(m_dialog.m_importer.GetErrorString());
 			Lumix::g_log_error.log("import") << m_dialog.m_importer.GetErrorString();
 		}
@@ -365,10 +366,11 @@ struct ConvertTask : public Lumix::MT::Task
 	};
 
 
-	ConvertTask(ImportAssetDialog& dialog)
+	ConvertTask(ImportAssetDialog& dialog, float scale)
 		: Task(dialog.m_editor.getAllocator())
 		, m_dialog(dialog)
 		, m_filtered_meshes(dialog.m_editor.getAllocator())
+		, m_scale(scale)
 	{
 	}
 
@@ -762,6 +764,7 @@ struct ConvertTask : public Lumix::MT::Task
 				auto v = scene->mRootNode->mTransformation * mesh->mVertices[j];
 
 				Lumix::Vec3 position(v.x, v.y, v.z);
+				position *= m_scale;
 				file.write((const char*)&position, sizeof(position));
 
 				if (mesh->mColors[0])
@@ -1254,6 +1257,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 	Lumix::Array<aiMesh*> m_filtered_meshes;
 	ImportAssetDialog& m_dialog;
+	float m_scale;
 
 }; // struct ConvertTask
 
@@ -1277,6 +1281,7 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	, m_convert_to_dds(false)
 	, m_convert_to_raw(false)
 	, m_raw_texture_scale(1)
+	, m_mesh_scale(1)
 {
 	m_is_opened = false;
 	m_message[0] = '\0';
@@ -1457,7 +1462,7 @@ void ImportAssetDialog::convert()
 
 	setImportMessage("Converting...");
 	m_is_converting = true;
-	m_task = LUMIX_NEW(m_editor.getAllocator(), ConvertTask)(*this);
+	m_task = LUMIX_NEW(m_editor.getAllocator(), ConvertTask)(*this, m_mesh_scale);
 	m_task->create("ConvertAssetTask");
 	m_task->run();
 }
@@ -1514,7 +1519,7 @@ void ImportAssetDialog::onGUI()
 			{
 				setMessage("");
 			}
-			ImGui::End();
+			ImGui::EndDock();
 			return;
 		}
 
@@ -1534,7 +1539,7 @@ void ImportAssetDialog::onGUI()
 				Lumix::MT::SpinLock lock(m_mutex);
 				ImGui::Text(m_import_message);
 			}
-			ImGui::End();
+			ImGui::EndDock();
 			return;
 		}
 
@@ -1577,7 +1582,7 @@ void ImportAssetDialog::onGUI()
 			{
 				importTexture();
 			}
-			ImGui::End();
+			ImGui::EndDock();
 			return;
 		}
 
@@ -1585,6 +1590,11 @@ void ImportAssetDialog::onGUI()
 		{
 			auto* scene = m_importer.GetScene();
 			ImGui::Checkbox("Import model", &m_import_model);
+			if (m_import_model)
+			{
+				ImGui::SameLine();
+				ImGui::DragFloat("Scale", &m_mesh_scale, 0.01f, 0.001f, 0);
+			}
 
 			if (scene->HasMaterials())
 			{

@@ -30,7 +30,7 @@ public:
 	~ShaderCompiler();
 
 	void compileAll();
-	void update(float time_delta);
+	void update();
 
 private:
 	void reloadShaders();

@@ -125,7 +125,7 @@ public:
 	BaseProxyAllocator& getAllocator() { return m_allocator; }
 
 
-	bool hasWork() const override { return !m_in_progress.empty(); }
+	bool hasWork() const override { return !m_in_progress.empty() || !m_pending.empty(); }
 
 
 	bool mount(IFileDevice* device) override

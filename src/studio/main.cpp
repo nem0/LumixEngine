@@ -2,17 +2,11 @@
 #include <Windows.h>
 
 
-int studioMain()
+INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
 {
 	auto* app = StudioApp::create();
 	app->run();
+	int exit_code = app->getExitCode();
 	StudioApp::destroy(*app);
-	return 0;
-}
-
-
-INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
-{
-	int studioMain();
-	return studioMain();
+	return exit_code;
 }

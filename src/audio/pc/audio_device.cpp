@@ -1,5 +1,6 @@
 #include "audio_device.h"
 #include "clip_manager.h"
+#include "core/log.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include <dsound.h>
@@ -88,32 +89,44 @@ struct AudioDeviceImpl : public AudioDevice
 	{
 		m_engine = &engine;
 
-		auto result = SUCCEEDED(CoInitialize(nullptr));
-		ASSERT(result);
+		auto coinitialize_result = CoInitialize(nullptr);
+		if (!SUCCEEDED(coinitialize_result))
+		{
+			g_log_error.log("audio") << "CoInitialize failed. Error code: " << coinitialize_result;
+			ASSERT(false);
+			return false;
+		}
 
 		m_library = LoadLibrary("dsound.dll");
-		if (!m_library) return false;
+		if (!m_library)
+		{
+			g_log_error.log("audio") << "Failed to load dsound.dll.";
+			return false;
+		}
 		auto* dsoundCreate =
 			(decltype(DirectSoundCreate8)*)GetProcAddress(m_library, "DirectSoundCreate8");
 		if (!dsoundCreate)
 		{
+			g_log_error.log("audio") << "Failed to get DirectSoundCreate8 from dsound.dll.";
 			ASSERT(false);
 			FreeLibrary(m_library);
 			return false;
 		}
 
-		result = SUCCEEDED(dsoundCreate(0, &m_direct_sound, nullptr));
-		if (!result)
+		auto create_result = dsoundCreate(0, &m_direct_sound, nullptr);
+		if (!SUCCEEDED(create_result))
 		{
+			g_log_error.log("audio") << "Failed to create DirectSound. Error code: " << create_result;
 			ASSERT(false);
 			FreeLibrary(m_library);
 			return false;
 		}
 
 		HWND hwnd = (HWND)engine.getPlatformData().window_handle;
-		result = SUCCEEDED(m_direct_sound->SetCooperativeLevel(hwnd, DSSCL_PRIORITY));
+		auto result = SUCCEEDED(m_direct_sound->SetCooperativeLevel(hwnd, DSSCL_PRIORITY));
 		if (!result || !initPrimaryBuffer())
 		{
+			g_log_error.log("audio") << "Failed to initialize the primary buffer.";
 			ASSERT(false);
 			m_direct_sound->Release();
 			FreeLibrary(m_library);
@@ -480,13 +493,53 @@ struct AudioDeviceImpl : public AudioDevice
 };
 
 
+class NullAudioDevice : public AudioDevice
+{
+public:
+	BufferHandle createBuffer(const void* data,
+		int size_bytes,
+		int channels,
+		int sample_rate,
+		int flags) override
+	{
+		return INVALID_BUFFER_HANDLE;
+	}
+	void setEcho(BufferHandle handle,
+		float wet_dry_mix,
+		float feedback,
+		float left_delay,
+		float right_delay) override {}
+	void play(BufferHandle buffer, bool looped) override {}
+	bool isPlaying(BufferHandle buffer) override { return false; }
+	void stop(BufferHandle buffer) override {}
+	void pause(BufferHandle buffer) override {}
+	void setVolume(BufferHandle buffer, float volume) override {}
+	void setFrequency(BufferHandle buffer, float frequency) override {}
+	void setCurrentTime(BufferHandle buffer, float time_seconds) override {}
+	float getCurrentTime(BufferHandle buffer) override { return -1; }
+	void setListenerPosition(float x, float y, float z) override {}
+	void setListenerOrientation(float front_x,
+		float front_y,
+		float front_z,
+		float up_x,
+		float up_y,
+		float up_z) override {}
+	void setSourcePosition(BufferHandle buffer, float x, float y, float z) override {}
+	void update(float time_delta) override {}
+};
+
+
+static NullAudioDevice g_null_device;
+
+
 AudioDevice* AudioDevice::create(Engine& engine)
 {
 	auto* device = LUMIX_NEW(engine.getAllocator(), AudioDeviceImpl);
 	if (!device->init(engine))
 	{
 		LUMIX_DELETE(engine.getAllocator(), device);
-		return nullptr;
+		g_log_warning.log("audio") << "Using null device";
+		return &g_null_device;
 	}
 	return device;
 }
@@ -494,6 +547,7 @@ AudioDevice* AudioDevice::create(Engine& engine)
 
 void AudioDevice::destroy(AudioDevice& device)
 {
+	if (&device == &g_null_device) return;
 	LUMIX_DELETE(static_cast<AudioDeviceImpl&>(device).m_engine->getAllocator(), &device);
 }
 
