@@ -440,7 +440,11 @@ void ShaderCompiler::processChangedFiles()
 
 void ShaderCompiler::wait()
 {
-	while (m_is_compiling) Lumix::MT::sleep(500);
+	while (m_is_compiling)
+	{
+		update();
+		Lumix::MT::sleep(500);
+	}
 }
 
 
