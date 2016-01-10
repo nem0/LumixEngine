@@ -438,6 +438,12 @@ void ShaderCompiler::processChangedFiles()
 }
 
 
+void ShaderCompiler::wait()
+{
+	while (m_is_compiling) Lumix::MT::sleep(500);
+}
+
+
 void ShaderCompiler::update()
 {
 	PROFILE_FUNCTION();
