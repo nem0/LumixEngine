@@ -57,7 +57,6 @@ public:
 		float up_z) = 0;
 	virtual void setSourcePosition(BufferHandle buffer, float x, float y, float z) = 0;
 	virtual void update(float time_delta) = 0;
-
 };
 
 
