@@ -11,7 +11,6 @@
 #include "core/timer.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material_manager.h"
-#include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"

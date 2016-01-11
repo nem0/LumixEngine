@@ -25,7 +25,6 @@
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/particle_system.h"
-#include "renderer/pipeline.h"
 #include "renderer/pose.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"

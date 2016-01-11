@@ -17,7 +17,6 @@ namespace FS
 }
 
 class JsonSerializer;
-class PipelineInstance;
 class ResourceManager;
 class Shader;
 class ShaderInstance;
