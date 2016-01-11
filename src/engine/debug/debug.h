@@ -30,6 +30,7 @@ public:
 	static bool getFunction(StackNode* node, char* out, int max_size, int* line);
 	static StackNode* getParent(StackNode* node);
 	static int getPath(StackNode* node, StackNode** output, int max_size);
+	static void refreshModuleList();
 
 private:
 	StackNode* insertChildren(StackNode* node, void** instruction, void** stack);

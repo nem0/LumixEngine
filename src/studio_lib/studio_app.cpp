@@ -457,7 +457,8 @@ public:
 	void saveUndoStack()
 	{
 		char filename[Lumix::MAX_PATH_LENGTH];
-		if (PlatformInterface::getSaveFilename(filename, Lumix::lengthOf(filename), "JSON files\0*.json\0", "json"))
+		if (PlatformInterface::getSaveFilename(
+				filename, Lumix::lengthOf(filename), "JSON files\0*.json\0", "json"))
 		{
 			m_editor->saveUndoStack(Lumix::Path(filename));
 		}
@@ -580,7 +581,7 @@ public:
 					m_editor->getEntityTemplateSystem().createInstance(
 						m_selected_template_name.c_str(), pos);
 				}
-				
+
 				doMenuItem(getAction("showEntities"), false, is_any_entity_selected);
 				doMenuItem(getAction("hideEntities"), false, is_any_entity_selected);
 				ImGui::EndMenu();
@@ -979,7 +980,7 @@ public:
 		addAction<&StudioAppImpl::lookAtSelected>("Look at selected", "lookAtSelected");
 
 		addAction<&StudioAppImpl::setWireframe>("Wireframe", "setWireframe");
-		addAction<&StudioAppImpl::toggleStats>("Stats", "toggleStats"); 
+		addAction<&StudioAppImpl::toggleStats>("Stats", "toggleStats");
 	}
 
 
@@ -994,7 +995,7 @@ public:
 		{
 			if (!parser.currentEquals("-plugin")) continue;
 			if (!parser.next()) break;
-	
+
 			char tmp[Lumix::MAX_PATH_LENGTH];
 			parser.getCurrent(tmp, Lumix::lengthOf(tmp));
 			bool loaded = plugin_manager.load(tmp) != nullptr;
@@ -1046,7 +1047,7 @@ public:
 		}
 	}
 
-	
+
 	void LUA_exit(int exit_code)
 	{
 		m_finished = true;
@@ -1097,7 +1098,7 @@ public:
 				auto* f = &Lumix::LuaWrapper::wrapMethod<StudioAppImpl, decltype(&StudioAppImpl::F), &StudioAppImpl::F>; \
 				lua_pushcfunction(m_lua_state, f); \
 				lua_setfield(m_lua_state, -2, name); \
-						} while(false) \
+			} while(false) \
 
 		REGISTER_FUNCTION(LUA_compileShaders, "compileShaders");
 		REGISTER_FUNCTION(LUA_runTest, "runTest");

@@ -79,6 +79,13 @@ StackTree::~StackTree()
 }
 
 
+void StackTree::refreshModuleList()
+{
+	ASSERT(s_instances > 0);
+	SymRefreshModuleList(GetCurrentProcess());
+}
+
+
 int StackTree::getPath(StackNode* node, StackNode** output, int max_size)
 {
 	int i = 0;

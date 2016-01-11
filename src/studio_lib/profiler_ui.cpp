@@ -2,6 +2,7 @@
 #include "core/fs/file_events_device.h"
 #include "core/fs/file_system.h"
 #include "core/fs/os_file.h"
+#include "core/log.h"
 #include "core/math_utils.h"
 #include "core/mt/atomic.h"
 #include "core/mt/lock_free_fixed_queue.h"
@@ -680,6 +681,10 @@ void ProfilerUIImpl::saveResourceList()
 			}
 		}
 		file.close();
+	}
+	else
+	{
+		Lumix::g_log_error.log("profiler") << "Failed to save resource list to resources.csv";
 	}
 }
 
