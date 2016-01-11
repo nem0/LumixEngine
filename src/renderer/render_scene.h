@@ -19,7 +19,6 @@ class Material;
 class Mesh;
 class Model;
 class Path;
-class PipelineInstance;
 class Pose;
 class Renderer;
 class Shader;

@@ -18,7 +18,6 @@ class LIFOAllocator;
 class Material;
 class Mesh;
 class OutputBlob;
-class PipelineInstance;
 class Renderer;
 class RenderScene;
 struct TerrainQuad;
