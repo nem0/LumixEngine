@@ -193,7 +193,11 @@ struct RendererImpl : public Renderer
 			header.dataType = 2;
 
 			Lumix::FS::OsFile file;
-			file.open(filePath, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_renderer.m_allocator);
+			if(!file.open(filePath, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_renderer.m_allocator))
+			{
+				g_log_error.log("renderer") << "Failed to save screenshot to " << filePath;
+				return;
+			}
 			file.write(&header, sizeof(header));
 
 			file.write(data, size);

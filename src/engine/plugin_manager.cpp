@@ -3,6 +3,7 @@
 #include "core/log.h"
 #include "core/profiler.h"
 #include "core/system.h"
+#include "debug/debug.h"
 #include "engine.h"
 #include "iplugin.h"
 
@@ -125,6 +126,7 @@ class PluginManagerImpl : public PluginManager
 					m_libraries.push(lib);
 					m_library_loaded.invoke(lib);
 					g_log_info.log("plugins") << "Plugin loaded.";
+					Lumix::Debug::StackTree::refreshModuleList();
 					return plugin;
 				}
 				else
