@@ -24,6 +24,9 @@ test_script:
     & "..\projects\tmp\bin\RelWithDebInfo\studio.exe" -run_script render_tests/main.lua | Write-Output
 
 - ps: >-
+    & "..\projects\tmp\bin\RelWithDebInfo\studio.exe" -run_script unit_tests/editor/main.lua | Write-Output
+
+- ps: >-
     & "..\projects\tmp\bin\RelWithDebInfo\render_test.exe" | Write-Output
 
 after_build:
