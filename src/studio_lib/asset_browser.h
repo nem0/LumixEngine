@@ -41,7 +41,7 @@ public:
 	const Lumix::Array<Lumix::Path>& getResources(int type) const;
 	int getTypeIndexFromManagerType(Lumix::uint32 type) const;
 	void selectResource(const Lumix::Path& resource);
-	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, int type);
+	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, Lumix::uint32 type);
 	void addPlugin(IPlugin& plugin);
 	void openInExternalEditor(Lumix::Resource* resource);
 

@@ -169,12 +169,11 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		Lumix::copyString(buf, (const char*)stream.getData());
 		auto& resource_descriptor = dynamic_cast<Lumix::ResourcePropertyDescriptorBase&>(desc);
 		auto rm_type = resource_descriptor.getResourceType();
-		auto asset_type = m_asset_browser.getTypeIndexFromManagerType(rm_type);
 		if (m_asset_browser.resourceInput(desc.getName(),
 				StringBuilder<20>("", (Lumix::uint64)&desc),
 				buf,
 				sizeof(buf),
-				asset_type))
+				rm_type))
 		{
 			m_editor.setProperty(cmp.type, index, desc, buf, Lumix::stringLength(buf) + 1);
 		}
