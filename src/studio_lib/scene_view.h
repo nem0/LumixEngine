@@ -9,7 +9,7 @@
 namespace Lumix
 {
 	class Pipeline;
-	class PipelineInstance;
+	class Pipeline;
 	class RenderScene;
 }
 
@@ -45,7 +45,6 @@ class LUMIX_STUDIO_LIB_API SceneView
 		int m_height;
 		float m_camera_speed;
 		Lumix::WorldEditor* m_editor;
-		Lumix::PipelineInstance* m_pipeline;
-		Lumix::Pipeline* m_pipeline_source;
+		Lumix::Pipeline* m_pipeline;
 		bgfx::TextureHandle m_texture_handle;
 };

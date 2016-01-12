@@ -126,23 +126,15 @@ public:
 		m_engine->getPluginManager().load("audio.dll");
 		m_engine->getPluginManager().load("lua_script.dll");
 		m_engine->getPluginManager().load("physics.dll");
-		Lumix::Pipeline* pipeline_object =
-			static_cast<Lumix::Pipeline*>(m_engine->getResourceManager()
-											  .get(Lumix::ResourceManager::PIPELINE)
-											  ->load(Lumix::Path("pipelines/render_test.lua")));
-		ASSERT(pipeline_object);
-		if (pipeline_object)
-		{
-			m_pipeline =
-				Lumix::PipelineInstance::create(*pipeline_object, m_engine->getAllocator());
-		}
+		Lumix::Renderer* renderer =
+			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+		m_pipeline = Lumix::Pipeline::create(
+			*renderer, Lumix::Path("pipelines/render_test.lua"), m_engine->getAllocator());
 
 		m_universe_context = &m_engine->createUniverse();
 		m_pipeline->setScene(
 			(Lumix::RenderScene*)m_universe_context->getScene(Lumix::crc32("renderer")));
 		m_pipeline->setViewport(0, 0, 600, 400);
-		Lumix::Renderer* renderer =
-			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 		renderer->resize(600, 400);
 
 		enumerateTests();
@@ -152,7 +144,7 @@ public:
 	void shutdown()
 	{
 		m_engine->destroyUniverse(*m_universe_context);
-		Lumix::PipelineInstance::destroy(m_pipeline);
+		Lumix::Pipeline::destroy(m_pipeline);
 		Lumix::Engine::destroy(m_engine, m_allocator);
 		m_engine = nullptr;
 		m_pipeline = nullptr;
@@ -346,7 +338,7 @@ private:
 	Lumix::DefaultAllocator m_allocator;
 	Lumix::Engine* m_engine;
 	Lumix::UniverseContext* m_universe_context;
-	Lumix::PipelineInstance* m_pipeline;
+	Lumix::Pipeline* m_pipeline;
 	Lumix::Array<Test> m_tests;
 	int m_current_test;
 	bool m_is_test_universe_loaded;

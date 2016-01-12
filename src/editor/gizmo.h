@@ -14,7 +14,7 @@ namespace Lumix
 
 class Event;
 struct Matrix;
-class PipelineInstance;
+class Pipeline;
 class RenderScene;
 class Universe;
 class WorldEditor;
@@ -68,7 +68,7 @@ class LUMIX_EDITOR_API Gizmo
 		void setMode(Mode mode) { m_mode = mode; }
 		Mode getMode() const { return m_mode; }
 		void transform(ComponentIndex camera, int x, int y, int relx, int rely, bool use_step);
-		void render(PipelineInstance& pipeline);
+		void render(Pipeline& pipeline);
 		bool isHit();
 		void togglePivot();
 		void toggleCoordSystem();
@@ -83,9 +83,9 @@ class LUMIX_EDITOR_API Gizmo
 		Vec3 getMousePlaneIntersection(ComponentIndex camera, int x, int y);
 		void rotate(int relx, int rely, bool use_step);
 		float computeRotateAngle(int relx, int rely, bool use_step);
-		void renderTranslateGizmo(PipelineInstance& pipeline);
-		void renderRotateGizmo(PipelineInstance& pipeline);
-		void renderQuarterRing(PipelineInstance& pipeline, const Matrix& mtx, const Vec3& a, const Vec3& b, uint32 color);
+		void renderTranslateGizmo(Pipeline& pipeline);
+		void renderRotateGizmo(Pipeline& pipeline);
+		void renderQuarterRing(Pipeline& pipeline, const Matrix& mtx, const Vec3& a, const Vec3& b, uint32 color);
 
 	private:
 		WorldEditor& m_editor;

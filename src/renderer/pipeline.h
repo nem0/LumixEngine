@@ -9,70 +9,30 @@
 
 namespace Lumix
 {
-	
+
+
 class FrameBuffer;
-class JsonSerializer;
-class Material;
 struct Matrix;
 class Model;
 class Renderer;
 class RenderScene;
-class Texture;
 class TransientGeometry;
 
 
-namespace FS
-{
-
-class FileSystem;
-class IFile;
-
-}
-
-
-class LUMIX_RENDERER_API PipelineManager : public ResourceManagerBase
-{
-public:
-	PipelineManager(Renderer& renderer, IAllocator& allocator)
-		: ResourceManagerBase(allocator)
-		, m_renderer(renderer)
-		, m_allocator(allocator)
-	{}
-	~PipelineManager() {}
-	Renderer& getRenderer() { return m_renderer; }
-
-protected:
-	Resource* createResource(const Path& path) override;
-	void destroyResource(Resource& resource) override;
-
-private:
-	IAllocator& m_allocator;
-	Renderer& m_renderer;
-};
-
-
-class LUMIX_RENDERER_API Pipeline : public Resource
-{
-	public:
-		Pipeline(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
-		virtual ~Pipeline() {}
-};
-
-
-
-class LUMIX_RENDERER_API PipelineInstance
+class LUMIX_RENDERER_API Pipeline
 {
 	public:
 		typedef Delegate<void> CustomCommandHandler;
 
 	public:
-		virtual ~PipelineInstance() {}
+		virtual ~Pipeline() {}
 
+		virtual void load() = 0;
 		virtual void render() = 0;
 		virtual void setViewport(int x, int y, int width, int height) = 0;
 
-		static PipelineInstance* create(Pipeline& src, IAllocator& allocator);
-		static void destroy(PipelineInstance* pipeline);
+		static Pipeline* create(Renderer& renderer, const Path& path, IAllocator& allocator);
+		static void destroy(Pipeline* pipeline);
 
 		virtual FrameBuffer* getFramebuffer(const char* framebuffer_name) = 0;
 		virtual void setScene(RenderScene* scene) = 0;
@@ -100,5 +60,6 @@ class LUMIX_RENDERER_API PipelineInstance
 		virtual const char* getParameterName(int index) const = 0;
 		virtual void setParameter(int index, bool value) = 0;
 		virtual bool getParameter(int index) = 0;
+		virtual bool isReady() const = 0;
 };
 }
