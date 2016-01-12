@@ -541,9 +541,15 @@ int IntInterval::getRandom() const
 }
 
 
-void Interval::check()
+void Interval::checkZero()
 {
 	from = Math::maxValue(from, 0.0f);
+	to = Math::maxValue(from, to);
+}
+
+
+void Interval::check()
+{
 	to = Math::maxValue(from, to);
 }
 
