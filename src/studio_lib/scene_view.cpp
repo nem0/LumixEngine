@@ -81,8 +81,8 @@ bool SceneView::init(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
 	Lumix::Path path("pipelines/main.lua");
 	m_pipeline = Lumix::Pipeline::create(*renderer, path, engine.getAllocator());
 	m_pipeline->load();
-	m_pipeline->addCustomCommandHandler("render_gizmos")
-		.bind<SceneView, &SceneView::renderGizmos>(this);
+	m_pipeline->addCustomCommandHandler("renderGizmos")
+		.callback.bind<SceneView, &SceneView::renderGizmos>(this);
 
 	editor.universeCreated().bind<SceneView, &SceneView::onUniverseCreated>(this);
 	editor.universeDestroyed().bind<SceneView, &SceneView::onUniverseDestroyed>(this);

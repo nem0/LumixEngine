@@ -2,8 +2,6 @@
 
 #include "lumix.h"
 #include "core/delegate.h"
-#include "core/resource.h"
-#include "core/resource_manager_base.h"
 #include <bgfx/bgfx.h>
 
 
@@ -12,8 +10,10 @@ namespace Lumix
 
 
 class FrameBuffer;
+class IAllocator;
 struct Matrix;
 class Model;
+class Path;
 class Renderer;
 class RenderScene;
 class TransientGeometry;
@@ -22,7 +22,12 @@ class TransientGeometry;
 class LUMIX_RENDERER_API Pipeline
 {
 	public:
-		typedef Delegate<void> CustomCommandHandler;
+		struct CustomCommandHandler
+		{
+			Delegate<void> callback;
+			char name[30];
+			uint32 hash;
+		};
 
 	public:
 		virtual ~Pipeline() {}
@@ -36,7 +41,6 @@ class LUMIX_RENDERER_API Pipeline
 
 		virtual FrameBuffer* getFramebuffer(const char* framebuffer_name) = 0;
 		virtual void setScene(RenderScene* scene) = 0;
-		virtual RenderScene* getScene() = 0;
 		virtual int getWidth() = 0;
 		virtual int getHeight() = 0;
 		virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;
@@ -62,4 +66,6 @@ class LUMIX_RENDERER_API Pipeline
 		virtual bool getParameter(int index) = 0;
 		virtual bool isReady() const = 0;
 };
-}
+
+
+} // namespace Lumix
