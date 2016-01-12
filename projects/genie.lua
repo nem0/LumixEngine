@@ -180,6 +180,16 @@ project "animation"
 
 	defaultConfigurations()
 
+project "renderer_editor"
+	kind "SharedLib"
+
+	files { "../src/renderer_editor/**.h", "../src/renderer_editor/**.cpp" }
+	includedirs { "../src" }
+	includedirs { "../external/bgfx/include" }
+	links { "engine", "renderer", "studio_lib", "editor" }
+
+	defaultConfigurations()
+
 project "editor"
 	kind "SharedLib"
 

@@ -102,10 +102,10 @@ namespace PlatformInterface
 		const char* filter,
 		const char* default_extension);
 	bool getOpenDirectory(char* out, int max_size);
-	bool shellExecuteOpen(const char* path);
+	LUMIX_STUDIO_LIB_API bool shellExecuteOpen(const char* path);
 
-	bool deleteFile(const char* path);
-	bool moveFile(const char* from, const char* to);
+	LUMIX_STUDIO_LIB_API bool deleteFile(const char* path);
+	LUMIX_STUDIO_LIB_API bool moveFile(const char* from, const char* to);
 	bool fileExists(const char* path);
 	bool dirExists(const char* path);
 	Lumix::uint64 getLastModified(const char* file);

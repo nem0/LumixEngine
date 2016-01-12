@@ -254,7 +254,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 					auto* clip = audio_scene->getClipInfo(clip_id)->clip;
 					char path[Lumix::MAX_PATH_LENGTH];
 					Lumix::copyString(path, clip ? clip->getPath().c_str() : "");
-					int type = m_app.getAssetBrowser()->getTypeFromResourceManagerType(CLIP_HASH);
+					int type = m_app.getAssetBrowser()->getTypeIndexFromManagerType(CLIP_HASH);
 					if(m_app.getAssetBrowser()->resourceInput(
 						"Clip", "", path, Lumix::lengthOf(path), type))
 					{
