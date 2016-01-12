@@ -178,14 +178,7 @@ void AssetBrowser::onGUI()
 	auto getter = [](void* data, int idx, const char** out) -> bool
 	{
 		auto& browser = *static_cast<AssetBrowser*>(data);
-		if (idx == 0)
-		{
-			*out = "Universe";
-		}
-		else
-		{
-			*out = browser.m_plugins[idx - 1]->getName();
-		}
+		*out = idx == 0 ? "Universe" : browser.m_plugins[idx - 1]->getName();
 		return true;
 	};
 
@@ -244,7 +237,7 @@ void AssetBrowser::selectResource(const Lumix::Path& resource)
 }
 
 
-bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* buf, int max_size, int type)
+bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* buf, int max_size, Lumix::uint32 type)
 {
 	float item_w = ImGui::CalcItemWidth();
 	auto& style = ImGui::GetStyle();
