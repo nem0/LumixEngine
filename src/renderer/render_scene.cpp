@@ -1148,7 +1148,11 @@ public:
 	void setParticleEmitterLinearMovementX(ComponentIndex cmp, const Vec2& value) override
 	{
 		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
-		if(module) module->m_x = value;
+		if (module)
+		{
+			module->m_x = value;
+			module->m_x.check();
+		}
 	}
 
 
@@ -1162,7 +1166,11 @@ public:
 	void setParticleEmitterLinearMovementY(ComponentIndex cmp, const Vec2& value) override
 	{
 		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
-		if (module) module->m_y = value;
+		if (module)
+		{
+			module->m_y = value;
+			module->m_y.check();
+		}
 	}
 
 
@@ -1176,7 +1184,11 @@ public:
 	void setParticleEmitterLinearMovementZ(ComponentIndex cmp, const Vec2& value) override
 	{
 		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
-		if (module) module->m_z = value;
+		if (module)
+		{
+			module->m_z = value;
+			module->m_z.check();
+		}
 	}
 
 
@@ -1195,14 +1207,14 @@ public:
 	void setParticleEmitterInitialLife(ComponentIndex cmp, const Vec2& value) override
 	{
 		m_particle_emitters[cmp]->m_initial_life = value;
-		m_particle_emitters[cmp]->m_initial_life.check();
+		m_particle_emitters[cmp]->m_initial_life.checkZero();
 	}
 
 
 	void setParticleEmitterInitialSize(ComponentIndex cmp, const Vec2& value) override
 	{
 		m_particle_emitters[cmp]->m_initial_size = value;
-		m_particle_emitters[cmp]->m_initial_size.check();
+		m_particle_emitters[cmp]->m_initial_size.checkZero();
 	}
 
 
@@ -1217,7 +1229,7 @@ public:
 		m_particle_emitters[cmp]->m_spawn_period = value;
 		m_particle_emitters[cmp]->m_spawn_period.from =
 			Math::maxValue(0.01f, m_particle_emitters[cmp]->m_spawn_period.from);
-		m_particle_emitters[cmp]->m_spawn_period.check();
+		m_particle_emitters[cmp]->m_spawn_period.checkZero();
 	}
 
 

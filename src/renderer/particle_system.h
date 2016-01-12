@@ -39,8 +39,8 @@ struct Interval
 	Interval();
 	float getRandom() const;
 
-
 	void check();
+	void checkZero();
 
 	void operator=(const Vec2& value)
 	{
