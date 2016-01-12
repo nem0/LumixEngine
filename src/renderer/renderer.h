@@ -1,17 +1,12 @@
 #pragma once
 
 #include "lumix.h"
-#include "core/array.h"
 #include "iplugin.h"
-#include "renderer/ray_cast_model_hit.h"
-#include "renderer/render_scene.h"
 
 
 namespace bgfx
 {
 	struct VertexDecl;
-	struct TransientVertexBuffer;
-	struct TransientIndexBuffer;
 }
 
 
@@ -20,6 +15,9 @@ namespace Lumix
 
 
 class Engine;
+class LIFOAllocator;
+class MaterialManager;
+class Path;
 
 
 class LUMIX_RENDERER_API Renderer : public IPlugin 
@@ -41,6 +39,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual LIFOAllocator& getFrameAllocator() = 0;
 		virtual const bgfx::VertexDecl& getBasicVertexDecl() const = 0;
 		virtual const bgfx::VertexDecl& getBasic2DVertexDecl() const = 0;
+		virtual MaterialManager& getMaterialManager() = 0;
 
 		virtual Engine& getEngine() = 0;
 }; 

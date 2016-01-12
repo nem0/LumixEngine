@@ -17,7 +17,7 @@ class IArrayDescriptor;
 class IPlugin;
 class IPropertyDescriptor;
 class Path;
-class PipelineInstance;
+class Pipeline;
 class RayCastModelHit;
 class Universe;
 struct UniverseContext;
@@ -81,7 +81,7 @@ public:
 	virtual IScene* getScene(uint32 hash) = 0;
 	virtual IScene* getSceneByComponentType(uint32 hash) = 0;
 	virtual IAllocator& getAllocator() = 0;
-	virtual void renderIcons(PipelineInstance& pipeline) = 0;
+	virtual void renderIcons(Pipeline& pipeline) = 0;
 	virtual ComponentUID getEditCamera() = 0;
 	virtual class Gizmo& getGizmo() = 0;
 	virtual void setGizmoUseStep(bool use) = 0;

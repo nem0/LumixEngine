@@ -34,6 +34,7 @@
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/pipeline.h"
+#include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "renderer/transient_geometry.h"
@@ -264,7 +265,7 @@ public:
 	{
 		PROFILE_FUNCTION();
 
-		if (!m_gui_pipeline_source->isReady()) return;
+		if (!m_gui_pipeline->isReady()) return;
 
 		ImGuiIO& io = ImGui::GetIO();
 		io.DisplaySize = ImVec2((float)PlatformInterface::getWindowWidth(),
@@ -823,14 +824,10 @@ public:
 		Lumix::WorldEditor::destroy(m_editor, m_allocator);
 		m_sceneview.shutdown();
 		m_gameview.shutdown();
-		Lumix::PipelineInstance::destroy(m_gui_pipeline);
-		m_gui_pipeline_source->getResourceManager()
-			.get(Lumix::ResourceManager::PIPELINE)
-			->unload(*m_gui_pipeline_source);
+		Lumix::Pipeline::destroy(m_gui_pipeline);
 		Lumix::Engine::destroy(m_engine, m_allocator);
 		m_engine = nullptr;
 		m_gui_pipeline = nullptr;
-		m_gui_pipeline_source = nullptr;
 		m_editor = nullptr;
 		m_shader_editor = nullptr;
 
@@ -1339,13 +1336,11 @@ public:
 		m_editor->universeCreated().bind<StudioAppImpl, &StudioAppImpl::onUniverseCreated>(this);
 		m_editor->universeDestroyed().bind<StudioAppImpl, &StudioAppImpl::onUniverseDestroyed>(this);
 
-		auto* pipeline_manager =
-			m_engine->getResourceManager().get(Lumix::ResourceManager::PIPELINE);
-
-		m_gui_pipeline_source = static_cast<Lumix::Pipeline*>(
-			pipeline_manager->load(Lumix::Path("pipelines/imgui.lua")));
-		m_gui_pipeline =
-			Lumix::PipelineInstance::create(*m_gui_pipeline_source, m_engine->getAllocator());
+		auto& plugin_manager = m_editor->getEngine().getPluginManager();
+		auto* renderer = static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
+		Lumix::Path path("pipelines/imgui.lua");
+		m_gui_pipeline = Lumix::Pipeline::create(*renderer, path, m_engine->getAllocator());
+		m_gui_pipeline->load();
 
 		m_sceneview.init(*m_editor, m_actions);
 		m_gameview.init(*m_editor);
@@ -1353,8 +1348,6 @@ public:
 		int w = PlatformInterface::getWindowWidth();
 		int h = PlatformInterface::getWindowHeight();
 		m_gui_pipeline->setViewport(0, 0, w, h);
-		auto& plugin_manager = m_editor->getEngine().getPluginManager();
-		auto* renderer = static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
 		renderer->resize(w, h);
 		onUniverseCreated();
 		initIMGUI();
@@ -1518,8 +1511,7 @@ public:
 	SceneView m_sceneview;
 	GameView m_gameview;
 
-	Lumix::Pipeline* m_gui_pipeline_source;
-	Lumix::PipelineInstance* m_gui_pipeline;
+	Lumix::Pipeline* m_gui_pipeline;
 
 	float m_time_to_autosave;
 	Lumix::Array<Action*> m_actions;

@@ -132,7 +132,7 @@ float EditorIcon::hit(const Vec3& origin, const Vec3& dir) const
 }
 
 
-void EditorIcon::render(PipelineInstance& pipeline)
+void EditorIcon::render(Pipeline& pipeline)
 {
 	static const float MIN_SCALE_FACTOR = 10;
 	static const float MAX_SCALE_FACTOR = 60;

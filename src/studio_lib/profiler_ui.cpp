@@ -699,7 +699,6 @@ void ProfilerUIImpl::onGUIResources()
 		Lumix::ResourceManager::MATERIAL,
 		Lumix::ResourceManager::MODEL,
 		Lumix::ResourceManager::PHYSICS,
-		Lumix::ResourceManager::PIPELINE,
 		Lumix::ResourceManager::SHADER,
 		Lumix::ResourceManager::TEXTURE};
 	const char* manager_names[] = {
@@ -707,7 +706,6 @@ void ProfilerUIImpl::onGUIResources()
 		"Materials",
 		"Models",
 		"Physics",
-		"Pipelines",
 		"Shaders",
 		"Textures"
 	};

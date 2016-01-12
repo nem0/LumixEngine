@@ -4,18 +4,19 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "engine/engine.h"
+#include "engine/plugin_manager.h"
 #include "imgui/imgui.h"
 #include "platform_interface.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
+#include "renderer/renderer.h"
 #include "renderer/texture.h"
 
 
 GameView::GameView()
 	: m_is_opened(true)
 	, m_pipeline(nullptr)
-	, m_pipeline_source(nullptr)
 	, m_is_mouse_captured(false)
 	, m_editor(nullptr)
 	, m_is_mouse_hovering_window(false)
@@ -45,11 +46,10 @@ void GameView::init(Lumix::WorldEditor& editor)
 {
 	m_editor = &editor;
 	auto& engine = editor.getEngine();
-	auto* pipeline_manager = engine.getResourceManager().get(Lumix::ResourceManager::PIPELINE);
-	auto* resource = pipeline_manager->load(Lumix::Path("pipelines/game_view.lua"));
-
-	m_pipeline_source = static_cast<Lumix::Pipeline*>(resource);
-	m_pipeline = Lumix::PipelineInstance::create(*m_pipeline_source, engine.getAllocator());
+	auto* renderer = static_cast<Lumix::Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+	Lumix::Path path("pipelines/game_view.lua");
+	m_pipeline = Lumix::Pipeline::create(*renderer, path, engine.getAllocator());
+	m_pipeline->load();
 
 	editor.universeCreated().bind<GameView, &GameView::onUniverseCreated>(this);
 	editor.universeDestroyed().bind<GameView, &GameView::onUniverseDestroyed>(this);
@@ -59,12 +59,8 @@ void GameView::init(Lumix::WorldEditor& editor)
 
 void GameView::shutdown()
 {
-	Lumix::PipelineInstance::destroy(m_pipeline);
-	auto& rm = m_pipeline_source->getResourceManager();
-	rm.get(Lumix::ResourceManager::PIPELINE)->unload(*m_pipeline_source);
-
+	Lumix::Pipeline::destroy(m_pipeline);
 	m_pipeline = nullptr;
-	m_pipeline_source = nullptr;
 }
 
 
@@ -86,7 +82,7 @@ void GameView::captureMouse(bool capture)
 void GameView::onGui()
 {
 	PROFILE_FUNCTION();
-	if (!m_pipeline_source->isReady()) return;
+	if (!m_pipeline->isReady()) return;
 
 	auto& io = ImGui::GetIO();
 

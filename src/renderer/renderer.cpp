@@ -233,7 +233,6 @@ struct RendererImpl : public Renderer
 		, m_material_manager(*this, m_allocator)
 		, m_shader_manager(*this, m_allocator)
 		, m_shader_binary_manager(*this, m_allocator)
-		, m_pipeline_manager(*this, m_allocator)
 		, m_passes(m_allocator)
 		, m_shader_defines(m_allocator)
 		, m_bgfx_allocator(m_allocator)
@@ -257,7 +256,6 @@ struct RendererImpl : public Renderer
 		m_material_manager.create(ResourceManager::MATERIAL, manager);
 		m_shader_manager.create(ResourceManager::SHADER, manager);
 		m_shader_binary_manager.create(ResourceManager::SHADER_BINARY, manager);
-		m_pipeline_manager.create(ResourceManager::PIPELINE, manager);
 
 		m_current_pass_hash = crc32("MAIN");
 		m_view_counter = 0;
@@ -281,11 +279,16 @@ struct RendererImpl : public Renderer
 		m_material_manager.destroy();
 		m_shader_manager.destroy();
 		m_shader_binary_manager.destroy();
-		m_pipeline_manager.destroy();
 
 		bgfx::frame();
 		bgfx::frame();
 		bgfx::shutdown();
+	}
+
+
+	MaterialManager& getMaterialManager()
+	{
+		return m_material_manager;
 	}
 
 
@@ -416,7 +419,6 @@ struct RendererImpl : public Renderer
 	ShaderManager m_shader_manager;
 	ShaderBinaryManager m_shader_binary_manager;
 	ModelManager m_model_manager;
-	PipelineManager m_pipeline_manager;
 	uint32 m_current_pass_hash;
 	int m_view_counter;
 	BGFXAllocator m_bgfx_allocator;

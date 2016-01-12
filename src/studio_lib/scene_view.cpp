@@ -5,10 +5,12 @@
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "engine/plugin_manager.h"
 #include "imgui/imgui.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
+#include "renderer/renderer.h"
 #include "settings.h"
 
 
@@ -42,10 +44,8 @@ void SceneView::setScene(Lumix::RenderScene* scene)
 
 void SceneView::shutdown()
 {
-	Lumix::PipelineInstance::destroy(m_pipeline);
-	auto* pipeline_manager =
-		m_pipeline_source->getResourceManager().get(Lumix::ResourceManager::PIPELINE);
-	pipeline_manager->unload(*m_pipeline_source);
+	Lumix::Pipeline::destroy(m_pipeline);
+	m_pipeline = nullptr;
 }
 
 
@@ -76,11 +76,11 @@ bool SceneView::init(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
 	m_editor = &editor;
 	auto& engine = editor.getEngine();
 	auto& allocator = engine.getAllocator();
-	auto* pipeline_manager = engine.getResourceManager().get(Lumix::ResourceManager::PIPELINE);
+	auto* renderer = static_cast<Lumix::Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 
-	m_pipeline_source =
-		static_cast<Lumix::Pipeline*>(pipeline_manager->load(Lumix::Path("pipelines/main.lua")));
-	m_pipeline = Lumix::PipelineInstance::create(*m_pipeline_source, allocator);
+	Lumix::Path path("pipelines/main.lua");
+	m_pipeline = Lumix::Pipeline::create(*renderer, path, engine.getAllocator());
+	m_pipeline->load();
 	m_pipeline->addCustomCommandHandler("render_gizmos")
 		.bind<SceneView, &SceneView::renderGizmos>(this);
 

@@ -11,7 +11,7 @@ struct PlatformData;
 namespace Lumix
 {
 	class Pipeline;
-	class PipelineInstance;
+	class Pipeline;
 	class RenderScene;
 }
 
@@ -38,8 +38,7 @@ private:
 
 private:
 	bool m_is_mouse_captured;
-	Lumix::Pipeline* m_pipeline_source;
-	Lumix::PipelineInstance* m_pipeline;
+	Lumix::Pipeline* m_pipeline;
 	bgfx::TextureHandle m_texture_handle;
 	Lumix::WorldEditor* m_editor;
 	bool m_is_mouse_hovering_window;

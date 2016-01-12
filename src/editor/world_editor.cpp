@@ -2561,7 +2561,7 @@ public:
 	}
 
 
-	void renderIcons(PipelineInstance& pipeline) override
+	void renderIcons(Pipeline& pipeline) override
 	{
 		PROFILE_FUNCTION();
 		for (int i = 0, c = m_editor_icons.size(); i < c; ++i)

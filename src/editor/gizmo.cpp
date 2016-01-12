@@ -283,7 +283,7 @@ bool Gizmo::isHit()
 }
 
 
-void Gizmo::renderTranslateGizmo(PipelineInstance& pipeline)
+void Gizmo::renderTranslateGizmo(Pipeline& pipeline)
 {
 	if (!m_shader->isReady()) return;
 
@@ -363,7 +363,7 @@ void Gizmo::renderTranslateGizmo(PipelineInstance& pipeline)
 }
 
 
-void Gizmo::renderQuarterRing(PipelineInstance& pipeline, const Matrix& mtx, const Vec3& a, const Vec3& b, uint32 color)
+void Gizmo::renderQuarterRing(Pipeline& pipeline, const Matrix& mtx, const Vec3& a, const Vec3& b, uint32 color)
 {
 	Vertex vertices[1200];
 	uint16 indices[1200];
@@ -459,7 +459,7 @@ void Gizmo::renderQuarterRing(PipelineInstance& pipeline, const Matrix& mtx, con
 };
 
 
-void Gizmo::renderRotateGizmo(PipelineInstance& pipeline)
+void Gizmo::renderRotateGizmo(Pipeline& pipeline)
 {
 	if (!m_shader->isReady()) return;
 
@@ -510,7 +510,7 @@ void Gizmo::renderRotateGizmo(PipelineInstance& pipeline)
 }
 
 
-void Gizmo::render(PipelineInstance& pipeline)
+void Gizmo::render(Pipeline& pipeline)
 {
 	if (m_editor.getSelectedEntities().empty()) return;
 	if (m_mode == Mode::TRANSLATE)

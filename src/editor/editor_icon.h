@@ -11,7 +11,7 @@ namespace Lumix
 
 class Engine;
 class Model;
-class PipelineInstance;
+class Pipeline;
 class RenderScene;
 class WorldEditor;
 
@@ -33,7 +33,7 @@ class EditorIcon
 	public:
 		EditorIcon(WorldEditor& editor, RenderScene& scene, Entity entity);
 		~EditorIcon();
-		void render(PipelineInstance& pipeline);
+		void render(Pipeline& pipeline);
 		void show();
 		void hide();
 		float hit(const Vec3& origin, const Vec3& dir) const;
