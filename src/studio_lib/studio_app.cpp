@@ -1156,7 +1156,7 @@ public:
 				{
 					PROFILE_BLOCK("tick");
 					m_finished = !PlatformInterface::processSystemEvents();
-					update();
+					if (!m_finished) update();
 					frame_time = timer->tick();
 				}
 
