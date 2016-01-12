@@ -1,21 +1,15 @@
 #include "pipeline.h"
 
 #include "renderer/pipeline.h"
-#include "core/array.h"
-#include "core/associative_array.h"
 #include "core/crc32.h"
 #include "core/frustum.h"
 #include "core/fs/ifile.h"
 #include "core/fs/file_system.h"
-#include "core/json_serializer.h"
 #include "core/lifo_allocator.h"
 #include "core/log.h"
 #include "core/lua_wrapper.h"
 #include "core/profiler.h"
-#include "core/resource_manager.h"
-#include "core/resource_manager_base.h"
 #include "core/static_array.h"
-#include "core/string.h"
 #include "engine.h"
 #include "plugin_manager.h"
 #include "renderer/frame_buffer.h"
@@ -174,6 +168,7 @@ struct PipelineImpl : public Pipeline
 					lua_pop(L, 1);
 					auto* fb = LUMIX_NEW(m_allocator, FrameBuffer)(decl);
 					m_framebuffers.push(fb);
+					if (compareString(decl.m_name, "default") == 0) m_default_framebuffer = fb;
 				}
 				lua_pop(L, 1);
 			}
@@ -518,23 +513,23 @@ struct PipelineImpl : public Pipeline
 
 	void applyCamera(const char* slot)
 	{
-		ComponentIndex cmp = getScene()->getCameraInSlot(slot);
+		ComponentIndex cmp = m_scene->getCameraInSlot(slot);
 		if (cmp < 0) return;
 
-		getScene()->setCameraSize(cmp, m_width, m_height);
+		m_scene->setCameraSize(cmp, m_width, m_height);
 		m_applied_camera = cmp;
-		m_camera_frustum = getScene()->getCameraFrustum(cmp);
+		m_camera_frustum = m_scene->getCameraFrustum(cmp);
 
 		Matrix projection_matrix;
-		float fov = getScene()->getCameraFOV(cmp);
-		float near_plane = getScene()->getCameraNearPlane(cmp);
-		float far_plane = getScene()->getCameraFarPlane(cmp);
+		float fov = m_scene->getCameraFOV(cmp);
+		float near_plane = m_scene->getCameraNearPlane(cmp);
+		float far_plane = m_scene->getCameraFarPlane(cmp);
 		float ratio = float(m_width) / m_height;
 		projection_matrix.setPerspective(
 			Math::degreesToRadians(fov), ratio, near_plane, far_plane);
 
-		Universe& universe = getScene()->getUniverse();
-		Matrix mtx = universe.getMatrix(getScene()->getCameraEntity(cmp));
+		Universe& universe = m_scene->getUniverse();
+		Matrix mtx = universe.getMatrix(m_scene->getCameraEntity(cmp));
 		mtx.fastInverse();
 		bgfx::setViewTransform(m_view_idx, &mtx.m11, &projection_matrix.m11);
 
@@ -571,7 +566,11 @@ struct PipelineImpl : public Pipeline
 
 	CustomCommandHandler& addCustomCommandHandler(const char* name) override
 	{
-		return m_custom_commands_handlers[crc32(name)];
+		auto& handler = m_custom_commands_handlers.pushEmpty();
+		copyString(handler.name, name);
+		handler.hash = crc32(name);
+		exposeCustomCommandToLua(handler);
+		return handler;
 	}
 
 
@@ -627,9 +626,13 @@ struct PipelineImpl : public Pipeline
 	void executeCustomCommand(uint32 name)
 	{
 		CustomCommandHandler handler;
-		if (m_custom_commands_handlers.find(name, handler))
+		for(auto& handler : m_custom_commands_handlers)
 		{
-			handler.invoke();
+			if(handler.hash == name)
+			{
+				handler.callback.invoke();
+				break;
+			}
 		}
 		finishInstances();
 	}
@@ -1266,9 +1269,9 @@ struct PipelineImpl : public Pipeline
 		if (m_applied_camera >= 0)
 		{
 			Matrix projection_matrix;
-			float fov = getScene()->getCameraFOV(m_applied_camera);
-			float near_plane = getScene()->getCameraNearPlane(m_applied_camera);
-			float far_plane = getScene()->getCameraFarPlane(m_applied_camera);
+			float fov = m_scene->getCameraFOV(m_applied_camera);
+			float near_plane = m_scene->getCameraNearPlane(m_applied_camera);
+			float far_plane = m_scene->getCameraFarPlane(m_applied_camera);
 			float ratio = float(m_width) / m_height;
 			projection_matrix.setPerspective(
 				Math::degreesToRadians(fov), ratio, near_plane, far_plane);
@@ -1276,8 +1279,8 @@ struct PipelineImpl : public Pipeline
 
 			bgfx::setUniform(m_cam_inv_proj_uniform, &projection_matrix.m11);
 
-			Universe& universe = getScene()->getUniverse();
-			Matrix mtx = universe.getMatrix(getScene()->getCameraEntity(m_applied_camera));
+			Universe& universe = m_scene->getUniverse();
+			Matrix mtx = universe.getMatrix(m_scene->getCameraEntity(m_applied_camera));
 
 			bgfx::setUniform(m_cam_view_uniform, &mtx.m11);
 		}
@@ -1735,11 +1738,30 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	void exposeCustomCommandToLua(const CustomCommandHandler& handler)
+	{
+		if (!m_lua_state) return;
+
+		char tmp[1024];
+		copyString(tmp, "function ");
+		catString(tmp, handler.name);
+		catString(tmp, "(pipeline) executeCustomCommand(pipeline, \"");
+		catString(tmp, handler.name);
+		catString(tmp, "\") end");
+
+		bool errors = luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp), nullptr) != LUA_OK;
+		errors = errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
+
+		if (errors)
+		{
+			g_log_error.log("pipeline") << lua_tostring(m_lua_state, -1);
+			lua_pop(m_lua_state, 1);
+		}
+	}
+
+
 	bool isReady() const override { return m_is_ready; }
-
-
 	void setScene(RenderScene* scene) override { m_scene = scene; }
-	RenderScene* getScene() override { return m_scene; }
 	void setWireframe(bool wireframe) override { m_is_wireframe = wireframe; }
 
 
@@ -1802,7 +1824,7 @@ struct PipelineImpl : public Pipeline
 	int m_height;
 	bgfx::VertexBufferHandle m_particle_vertex_buffer;
 	bgfx::IndexBufferHandle m_particle_index_buffer;
-	AssociativeArray<uint32, CustomCommandHandler> m_custom_commands_handlers;
+	Array<CustomCommandHandler> m_custom_commands_handlers;
 	Array<RenderableMesh> m_tmp_meshes;
 	Array<const TerrainInfo*> m_tmp_terrains;
 	Array<GrassInfo> m_tmp_grasses;
@@ -1970,13 +1992,13 @@ void executeCustomCommand(PipelineImpl* pipeline, const char* command)
 
 bool hasScene(PipelineImpl* pipeline)
 {
-	return pipeline->getScene() != nullptr;
+	return pipeline->m_scene != nullptr;
 }
 
 
 bool cameraExists(PipelineImpl* pipeline, const char* slot_name)
 {
-	return pipeline->getScene()->getCameraInSlot(slot_name) != INVALID_ENTITY;
+	return pipeline->m_scene->getCameraInSlot(slot_name) != INVALID_ENTITY;
 }
 
 
@@ -2026,7 +2048,7 @@ int renderLocalLightsShadowmaps(lua_State* L)
 
 void renderShadowmap(PipelineImpl* pipeline, int64 layer_mask, const char* slot)
 {
-	pipeline->renderShadowmap(pipeline->getScene()->getCameraInSlot(slot), layer_mask);
+	pipeline->renderShadowmap(pipeline->m_scene->getCameraInSlot(slot), layer_mask);
 }
 
 
@@ -2118,6 +2140,11 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(renderParticles);
 
 	#undef REGISTER_FUNCTION
+	
+	for(auto& handler : m_custom_commands_handlers)
+	{
+		exposeCustomCommandToLua(handler);
+	}
 }
 
 
