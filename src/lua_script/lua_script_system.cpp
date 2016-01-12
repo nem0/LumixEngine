@@ -854,7 +854,6 @@ extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
 	auto* plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), PropertyGridPlugin);
 	app.getPropertyGrid()->addPlugin(*plugin);
 
-
 	auto* asset_browser_plugin =
 		LUMIX_NEW(app.getWorldEditor()->getAllocator(), AssetBrowserPlugin)(app);
 	app.getAssetBrowser()->addPlugin(*asset_browser_plugin);

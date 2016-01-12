@@ -167,7 +167,7 @@ public:
 				ImGui::Separator();
 				ImGui::Text("Open universe:");
 				ImGui::Indent();
-				auto& universes = m_asset_browser->getResources(AssetBrowser::UNIVERSE);
+				auto& universes = m_asset_browser->getResources(0);
 				for (auto& univ : universes)
 				{
 					if (ImGui::MenuItem(univ.c_str()))
@@ -506,7 +506,7 @@ public:
 				doMenuItem(getAction("newUniverse"), false, true);
 				if (ImGui::BeginMenu("Open"))
 				{
-					auto& universes = m_asset_browser->getResources(AssetBrowser::UNIVERSE);
+					auto& universes = m_asset_browser->getResources(0);
 					for (auto& univ : universes)
 					{
 						if (ImGui::MenuItem(univ.c_str()))
@@ -1029,6 +1029,10 @@ public:
 			auto* f = (void (*)(StudioApp&))Lumix::getLibrarySymbol(lib, "setStudioApp");
 			if (f) f(*this);
 		}
+		auto* lib = Lumix::loadLibrary("renderer_editor.dll");
+		TODO("todo");
+		auto* f = (void(*)(StudioApp&))Lumix::getLibrarySymbol(lib, "setStudioApp");
+		if (f) f(*this);
 	}
 
 
