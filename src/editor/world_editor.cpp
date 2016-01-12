@@ -3258,8 +3258,8 @@ public:
 		}
 		save(*file);
 		bool is_same = file->size() > 8 && result_file->size() > 8 &&
-					   *((const uint32*)result_file->getBuffer() + 1) ==
-						   *((const uint32*)file->getBuffer() + 1);
+					   *((const uint32*)result_file->getBuffer() + 3) ==
+						   *((const uint32*)file->getBuffer() + 3);
 		m_engine->getFileSystem().close(*result_file);
 		m_engine->getFileSystem().close(*file);
 

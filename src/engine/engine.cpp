@@ -459,6 +459,7 @@ static void showLogInVS(const char* system, const char* message)
 static FS::OsFile g_error_file;
 static bool g_is_error_file_opened = false;
 
+
 static void logErrorToFile(const char*, const char* message)
 {
 	if (!g_is_error_file_opened) return;
