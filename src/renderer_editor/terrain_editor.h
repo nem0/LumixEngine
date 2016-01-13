@@ -3,7 +3,7 @@
 
 #include "core/binary_array.h"
 #include "editor/world_editor.h"
-#include "utils.h"
+#include "studio_lib/utils.h"
 
 
 namespace Lumix
@@ -15,7 +15,7 @@ class Texture;
 }
 
 
-class LUMIX_STUDIO_LIB_API TerrainEditor : public Lumix::WorldEditor::Plugin
+class TerrainEditor : public Lumix::WorldEditor::Plugin
 {
 public:
 	enum Type

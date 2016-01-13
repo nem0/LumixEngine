@@ -96,7 +96,7 @@ namespace PlatformInterface
 	void setCursor(Cursor cursor);
 	void* getWindowHandle();
 	
-	bool getOpenFilename(char* out, int max_size, const char* filter);
+	LUMIX_STUDIO_LIB_API bool getOpenFilename(char* out, int max_size, const char* filter);
 	bool getSaveFilename(char* out,
 		int max_size,
 		const char* filter,
