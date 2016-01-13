@@ -23,7 +23,6 @@
 #include "editor/world_editor.h"
 #include "engine.h"
 #include "engine/plugin_manager.h"
-#include "game_view.h"
 #include "import_asset_dialog.h"
 #include "log_ui.h"
 #include "metadata.h"
@@ -38,18 +37,13 @@
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "renderer/transient_geometry.h"
-#include "scene_view.h"
+#include "renderer/shader.h"
 #include "settings.h"
-#include "shader_compiler.h"
-#include "shader_editor.h"
 #include "studio_app.h"
 #include "utils.h"
 
 #include <bgfx/bgfx.h>
 #include <lua.hpp>
-
-
-static void imGuiCallback(ImDrawData* draw_data);
 
 
 class StudioAppImpl* g_app;
@@ -62,8 +56,6 @@ public:
 		: m_is_entity_list_opened(true)
 		, m_finished(false)
 		, m_import_asset_dialog(nullptr)
-		, m_shader_compiler(nullptr)
-		, m_is_wireframe(false)
 		, m_is_entity_template_list_opened(false)
 		, m_selected_template_name(m_allocator)
 		, m_profiler_ui(nullptr)
@@ -71,9 +63,7 @@ public:
 		, m_property_grid(nullptr)
 		, m_actions(m_allocator)
 		, m_metadata(m_allocator)
-		, m_gui_pipeline(nullptr)
 		, m_is_welcome_screen_opened(true)
-		, m_shader_editor(nullptr)
 		, m_editor(nullptr)
 		, m_settings(m_allocator)
 		, m_plugins(m_allocator)
@@ -123,11 +113,9 @@ public:
 		if (m_time_to_autosave < 0) autosave();
 
 		m_editor->update();
-		m_sceneview.update();
 		m_engine->update(*m_editor->getUniverseContext());
 
 		m_asset_browser->update();
-		m_shader_compiler->update();
 		m_log_ui->update(time_delta);
 
 		m_gui_pipeline->render();
@@ -148,6 +136,12 @@ public:
 	PropertyGrid* getPropertyGrid() override
 	{
 		return m_property_grid;
+	}
+
+
+	LogUI* getLogUI() override
+	{
+		return m_log_ui;
 	}
 
 
@@ -309,9 +303,6 @@ public:
 			m_property_grid->onGUI();
 			showEntityList();
 			showEntityTemplateList();
-			m_sceneview.onGUI();
-			m_gameview.onGui();
-			m_shader_editor->onGUI();
 			for (auto* plugin : m_plugins)
 			{
 				plugin->onWindowGUI();
@@ -398,8 +389,18 @@ public:
 		m_time_to_autosave = float(m_settings.m_autosave_time);
 	}
 
-	void undo() { m_shader_editor->isFocused() ? m_shader_editor->undo() : m_editor->undo(); }
-	void redo() { m_shader_editor->isFocused() ? m_shader_editor->redo() :m_editor->redo(); }
+	bool hasPluginFocus()
+	{
+		for(auto* plugin : m_plugins)
+		{
+			if(plugin->hasFocus()) return true;
+		}
+		return false;
+	}
+
+
+	void undo() { if (!hasPluginFocus()) m_editor->undo(); }
+	void redo() { if (!hasPluginFocus()) m_editor->redo(); }
 	void copy() { m_editor->copyEntity(); }
 	void paste() { m_editor->pasteEntity(); }
 	void toggleOrbitCamera() { m_editor->setOrbitCamera(!m_editor->isOrbitCamera()); }
@@ -433,13 +434,6 @@ public:
 		{
 			gizmo.setMode(Lumix::Gizmo::Mode::TRANSLATE);
 		}
-	}
-
-	
-	void setWireframe()
-	{
-		m_is_wireframe = !m_is_wireframe;
-		m_sceneview.setWireframe(m_is_wireframe);
 	}
 
 
@@ -612,19 +606,16 @@ public:
 			if (ImGui::BeginMenu("View"))
 			{
 				doMenuItem(getAction("lookAtSelected"), false, is_any_entity_selected);
-				doMenuItem(getAction("setWireframe"), m_is_wireframe, true);
 				doMenuItem(getAction("toggleStats"), false, true);
 				if (ImGui::BeginMenu("Windows"))
 				{
 					ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
 					ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
 					ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
-					ImGui::MenuItem("Game view", nullptr, &m_gameview.m_is_opened);
 					ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
 					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
 					ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
 					ImGui::MenuItem("Settings", nullptr, &m_settings.m_is_opened);
-					ImGui::MenuItem("Shader editor", nullptr, &m_shader_editor->m_is_opened);
 					ImGui::Separator();
 					for (auto* plugin : m_plugins)
 					{
@@ -787,11 +778,9 @@ public:
 		m_settings.m_is_asset_browser_opened = m_asset_browser->m_is_opened;
 		m_settings.m_is_entity_list_opened = m_is_entity_list_opened;
 		m_settings.m_is_entity_template_list_opened = m_is_entity_template_list_opened;
-		m_settings.m_is_gameview_opened = m_gameview.m_is_opened;
 		m_settings.m_is_log_opened = m_log_ui->m_is_opened;
 		m_settings.m_is_profiler_opened = m_profiler_ui->m_is_opened;
 		m_settings.m_is_properties_opened = m_property_grid->m_is_opened;
-		m_settings.m_is_shader_editor_opened = m_shader_editor->m_is_opened;
 
 		m_settings.save(&m_actions[0], m_actions.size());
 
@@ -804,6 +793,11 @@ public:
 
 	void shutdown()
 	{
+		while(m_editor->getEngine().getFileSystem().hasWork())
+		{
+			m_editor->getEngine().getFileSystem().updateAsyncTransactions();
+		}
+
 		for (auto* plugin : m_plugins)
 		{
 			LUMIX_DELETE(m_editor->getAllocator(), plugin);
@@ -824,18 +818,13 @@ public:
 		LUMIX_DELETE(m_allocator, m_asset_browser);
 		LUMIX_DELETE(m_allocator, m_property_grid);
 		LUMIX_DELETE(m_allocator, m_import_asset_dialog);
-		LUMIX_DELETE(m_allocator, m_shader_compiler);
-		LUMIX_DELETE(m_allocator, m_shader_editor);
 		LUMIX_DELETE(m_allocator, m_log_ui);
 		Lumix::WorldEditor::destroy(m_editor, m_allocator);
-		m_sceneview.shutdown();
-		m_gameview.shutdown();
 		Lumix::Pipeline::destroy(m_gui_pipeline);
 		Lumix::Engine::destroy(m_engine, m_allocator);
 		m_engine = nullptr;
 		m_gui_pipeline = nullptr;
 		m_editor = nullptr;
-		m_shader_editor = nullptr;
 
 		PlatformInterface::shutdown();
 	}
@@ -880,22 +869,6 @@ public:
 		io.KeyMap[ImGuiKey_Y] = 'Y';
 		io.KeyMap[ImGuiKey_Z] = 'Z';
 
-		io.RenderDrawListsFn = ::imGuiCallback;
-
-		unsigned char* pixels;
-		int width, height;
-		io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-		auto* material_manager =
-			m_engine->getResourceManager().get(Lumix::ResourceManager::MATERIAL);
-		auto* resource = material_manager->load(Lumix::Path("models/imgui.mat"));
-		m_material = static_cast<Lumix::Material*>(resource);
-
-		Lumix::Texture* texture = LUMIX_NEW(m_allocator, Lumix::Texture)(
-			Lumix::Path("font"), m_engine->getResourceManager(), m_allocator);
-
-		texture->create(width, height, pixels);
-		m_material->setTexture(0, texture);
-
 		ImGui::GetStyle().WindowFillAlphaDefault = 1.0f;
 	}
 
@@ -922,11 +895,9 @@ public:
 		m_asset_browser->m_is_opened = m_settings.m_is_asset_browser_opened;
 		m_is_entity_list_opened = m_settings.m_is_entity_list_opened;
 		m_is_entity_template_list_opened = m_settings.m_is_entity_template_list_opened;
-		m_gameview.m_is_opened = m_settings.m_is_gameview_opened;
 		m_log_ui->m_is_opened = m_settings.m_is_log_opened;
 		m_profiler_ui->m_is_opened = m_settings.m_is_profiler_opened;
 		m_property_grid->m_is_opened = m_settings.m_is_properties_opened;
-		m_shader_editor->m_is_opened = m_settings.m_is_shader_editor_opened;
 
 		if (m_settings.m_is_maximized)
 		{
@@ -982,7 +953,6 @@ public:
 		addAction<&StudioAppImpl::snapDown>("Snap down", "snapDown");
 		addAction<&StudioAppImpl::lookAtSelected>("Look at selected", "lookAtSelected");
 
-		addAction<&StudioAppImpl::setWireframe>("Wireframe", "setWireframe");
 		addAction<&StudioAppImpl::toggleStats>("Stats", "toggleStats");
 	}
 
@@ -1039,6 +1009,8 @@ public:
 		TODO("todo");
 		auto* f = (void(*)(StudioApp&))Lumix::getLibrarySymbol(lib, "setStudioApp");
 		if (f) f(*this);
+
+		Lumix::Debug::StackTree::refreshModuleList();
 	}
 
 
@@ -1062,13 +1034,6 @@ public:
 	}
 
 
-	void LUA_compileShaders(bool wait)
-	{
-		m_shader_compiler->compileAll();
-		if (wait) m_shader_compiler->wait();
-	}
-
-
 	void LUA_logError(const char* message)
 	{
 		Lumix::g_log_error.log("editor") << message;
@@ -1084,6 +1049,20 @@ public:
 	bool LUA_runTest(const char* undo_stack_path, const char* result_universe_path)
 	{
 		return m_editor->runTest(Lumix::Path(undo_stack_path), Lumix::Path(result_universe_path));
+	}
+
+
+	void registerLuaFunction(const char* name, int (*function)(struct lua_State*)) override
+	{
+		lua_pushcfunction(m_lua_state, function);
+		lua_setglobal(m_lua_state, name);
+	}
+
+
+	void registerLuaGlobal(const char* name, void* data) override
+	{
+		lua_pushlightuserdata(m_lua_state, data);
+		lua_setglobal(m_lua_state, name);
 	}
 
 
@@ -1107,7 +1086,6 @@ public:
 				lua_setfield(m_lua_state, -2, name); \
 			} while(false) \
 
-		REGISTER_FUNCTION(LUA_compileShaders, "compileShaders");
 		REGISTER_FUNCTION(LUA_runTest, "runTest");
 		REGISTER_FUNCTION(LUA_logError, "logError");
 		REGISTER_FUNCTION(LUA_logInfo, "logInfo");
@@ -1219,10 +1197,6 @@ public:
 			input_system.injectMouseXMove(float(rel_x));
 			input_system.injectMouseYMove(float(rel_y));
 
-			if (m_app->m_gameview.isMouseCaptured()) return;
-
-			m_app->m_sceneview.onMouseMove(x, y, rel_x, rel_y);
-
 			ImGuiIO& io = ImGui::GetIO();
 			io.MousePos.x = (float)x;
 			io.MousePos.y = (float)y;
@@ -1241,28 +1215,13 @@ public:
 			{
 				case PlatformInterface::SystemEventHandler::MouseButton::LEFT:
 					m_app->m_editor->setAdditiveSelection(ImGui::GetIO().KeyCtrl);
-					if (!m_app->m_sceneview.onMouseDown(
-							m_mouse_x, m_mouse_y, Lumix::MouseButton::LEFT) &&
-						!m_app->m_gameview.isMouseCaptured())
-					{
-						ImGui::GetIO().MouseDown[0] = true;
-					}
+					ImGui::GetIO().MouseDown[0] = true;
 					break;
 				case PlatformInterface::SystemEventHandler::MouseButton::RIGHT:
-					if(!m_app->m_sceneview.onMouseDown(
-						m_mouse_x, m_mouse_y, Lumix::MouseButton::RIGHT) &&
-						!m_app->m_gameview.isMouseCaptured())
-					{
-						ImGui::GetIO().MouseDown[1] = true;
-					}
+					ImGui::GetIO().MouseDown[1] = true;
 					break;
 				case PlatformInterface::SystemEventHandler::MouseButton::MIDDLE:
-					if(!m_app->m_sceneview.onMouseDown(
-						m_mouse_x, m_mouse_y, Lumix::MouseButton::MIDDLE) &&
-						!m_app->m_gameview.isMouseCaptured())
-					{
-						ImGui::GetIO().MouseDown[2] = true;
-					}
+					ImGui::GetIO().MouseDown[2] = true;
 					break;
 			}
 		}
@@ -1273,15 +1232,12 @@ public:
 			switch (button)
 			{
 				case PlatformInterface::SystemEventHandler::MouseButton::LEFT:
-					m_app->m_sceneview.onMouseUp(Lumix::MouseButton::LEFT);
 					ImGui::GetIO().MouseDown[0] = false;
 					break;
 				case PlatformInterface::SystemEventHandler::MouseButton::RIGHT:
-					m_app->m_sceneview.onMouseUp(Lumix::MouseButton::RIGHT);
 					ImGui::GetIO().MouseDown[1] = false;
 					break;
 				case PlatformInterface::SystemEventHandler::MouseButton::MIDDLE:
-					m_app->m_sceneview.onMouseUp(Lumix::MouseButton::MIDDLE);
 					ImGui::GetIO().MouseDown[2] = false;
 					break;
 			}
@@ -1340,8 +1296,6 @@ public:
 		m_profiler_ui = ProfilerUI::create(*m_engine);
 		m_log_ui = LUMIX_NEW(m_allocator, LogUI)(m_editor->getAllocator());
 		m_import_asset_dialog = LUMIX_NEW(m_allocator, ImportAssetDialog)(*m_editor, m_metadata);
-		m_shader_compiler = LUMIX_NEW(m_allocator, ShaderCompiler)(*m_editor, *m_log_ui);
-		m_shader_editor = LUMIX_NEW(m_allocator, ShaderEditor)(m_editor->getAllocator());
 
 		m_editor->universeCreated().bind<StudioAppImpl, &StudioAppImpl::onUniverseCreated>(this);
 		m_editor->universeDestroyed().bind<StudioAppImpl, &StudioAppImpl::onUniverseDestroyed>(this);
@@ -1351,9 +1305,6 @@ public:
 		Lumix::Path path("pipelines/imgui.lua");
 		m_gui_pipeline = Lumix::Pipeline::create(*renderer, path, m_engine->getAllocator());
 		m_gui_pipeline->load();
-
-		m_sceneview.init(*m_editor, m_actions);
-		m_gameview.init(*m_editor);
 
 		int w = PlatformInterface::getWindowWidth();
 		int h = PlatformInterface::getWindowHeight();
@@ -1492,22 +1443,6 @@ public:
 	}
 
 
-	void imGuiCallback(ImDrawData* draw_data)
-	{
-		PROFILE_FUNCTION();
-		if (!m_material || !m_material->isReady()) return;
-		if (!m_material->getTexture(0)) return;
-
-		setGUIProjection();
-
-		for (int i = 0; i < draw_data->CmdListsCount; ++i)
-		{
-			ImDrawList* cmd_list = draw_data->CmdLists[i];
-			drawGUICmdList(cmd_list);
-		}
-	}
-
-
 	Lumix::WorldEditor* getWorldEditor() override
 	{
 		return m_editor;
@@ -1515,13 +1450,7 @@ public:
 
 
 	Lumix::DefaultAllocator m_allocator;
-	Lumix::Material* m_material;
 	Lumix::Engine* m_engine;
-
-	SceneView m_sceneview;
-	GameView m_gameview;
-
-	Lumix::Pipeline* m_gui_pipeline;
 
 	float m_time_to_autosave;
 	Lumix::Array<Action*> m_actions;
@@ -1532,11 +1461,9 @@ public:
 	LogUI* m_log_ui;
 	ProfilerUI* m_profiler_ui;
 	ImportAssetDialog* m_import_asset_dialog;
-	ShaderCompiler* m_shader_compiler;
 	Lumix::string m_selected_template_name;
 	Settings m_settings;
 	Metadata m_metadata;
-	ShaderEditor* m_shader_editor;
 	lua_State* m_lua_state;
 	char m_template_name[100];
 
@@ -1546,14 +1473,7 @@ public:
 	bool m_is_welcome_screen_opened;
 	bool m_is_entity_list_opened;
 	bool m_is_entity_template_list_opened;
-	bool m_is_wireframe;
 };
-
-
-static void imGuiCallback(ImDrawData* draw_data)
-{
-	g_app->imGuiCallback(draw_data);
-}
 
 
 static size_t alignMask(size_t _value, size_t _mask)

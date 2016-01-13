@@ -13,12 +13,12 @@
 #include "editor/world_editor.h"
 #include "engine.h"
 #include "engine/plugin_manager.h"
-#include "file_system_watcher.h"
-#include "log_ui.h"
-#include "platform_interface.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
-#include "utils.h"
+#include "studio_lib/file_system_watcher.h"
+#include "studio_lib/log_ui.h"
+#include "studio_lib/platform_interface.h"
+#include "studio_lib/utils.h"
 
 
 ShaderCompiler::ShaderCompiler(Lumix::WorldEditor& editor, LogUI& log_ui)
@@ -545,9 +545,13 @@ void ShaderCompiler::compile(const char* path)
 }
 
 
-void ShaderCompiler::compileAll()
+void ShaderCompiler::compileAll(bool wait)
 {
-	if (m_is_compiling) return;
+	if (m_is_compiling)
+	{
+		if(wait) this->wait();
+		return;
+	}
 
 	m_is_compiling = true;
 
@@ -557,7 +561,7 @@ void ShaderCompiler::compileAll()
 	auto& fs = m_editor.getEngine().getFileSystem();
 	while (PlatformInterface::getNextFile(iter, &info))
 	{
-		if (!Lumix::PathUtils::hasExtension(info.filename, "shd")) return;
+		if (!Lumix::PathUtils::hasExtension(info.filename, "shd")) continue;
 
 		const char* shd_path = StringBuilder<Lumix::MAX_PATH_LENGTH>("shaders/", info.filename);
 		auto* file =
@@ -586,4 +590,9 @@ void ShaderCompiler::compileAll()
 	}
 
 	PlatformInterface::destroyFileIterator(iter);
+
+	if(wait)
+	{
+		this->wait();
+	}
 }

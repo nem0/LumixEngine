@@ -23,13 +23,13 @@ class FileSystemWatcher;
 class LogUI;
 
 
-class LUMIX_STUDIO_LIB_API ShaderCompiler
+class ShaderCompiler
 {
 public:
 	ShaderCompiler(Lumix::WorldEditor& editor, LogUI& log_ui);
 	~ShaderCompiler();
 
-	void compileAll();
+	void compileAll(bool wait);
 	void update();
 	void wait();
 

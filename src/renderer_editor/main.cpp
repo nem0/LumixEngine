@@ -3,6 +3,7 @@
 #include "core/FS/file_system.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
+#include "core/lua_wrapper.h"
 #include "core/path_utils.h"
 #include "core/resource_manager.h"
 #include "editor/ieditor_command.h"
@@ -10,16 +11,24 @@
 #include "editor/property_descriptor.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "engine/plugin_manager.h"
+#include "game_view.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
+#include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
+#include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
+#include "renderer/transient_geometry.h"
 #include "studio_lib/asset_browser.h"
 #include "studio_lib/platform_interface.h"
 #include "studio_lib/property_grid.h"
 #include "studio_lib/studio_app.h"
 #include "studio_lib/utils.h"
+#include "scene_view.h"
+#include "shader_editor.h"
+#include "shader_compiler.h"
 #include "terrain_editor.h"
 #include <cfloat>
 
@@ -1114,31 +1123,238 @@ struct TerrainPlugin : public PropertyGrid::IPlugin
 };
 
 
-extern "C"
+struct SceneViewPlugin : public StudioApp::IPlugin
 {
-	LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
+	SceneViewPlugin(StudioApp& app)
 	{
-		auto& allocator = app.getWorldEditor()->getAllocator();
-		registerRendererProperties(*app.getWorldEditor());
-
-		auto* material_plugin =
-			LUMIX_NEW(app.getWorldEditor()->getAllocator(), MaterialPlugin)(app);
-		app.getAssetBrowser()->addPlugin(*material_plugin);
-		
-		auto* model_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ModelPlugin)(app);
-		app.getAssetBrowser()->addPlugin(*model_plugin);
-
-		auto* texture_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), TexturePlugin)(app);
-		app.getAssetBrowser()->addPlugin(*texture_plugin);
-		
-		auto* shader_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderPlugin)(app);
-		app.getAssetBrowser()->addPlugin(*shader_plugin);
-
-		auto* emitter_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), EmitterPlugin)(app);
-		app.getPropertyGrid()->addPlugin(*emitter_plugin);
-
-		auto* terrain_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), TerrainPlugin)(app);
-		app.getPropertyGrid()->addPlugin(*terrain_plugin);
-
+		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Scene View", "scene_view");
+		m_action->func.bind<SceneViewPlugin, &SceneViewPlugin::onAction>(this);
+		m_scene_view.init(*app.getWorldEditor(), app.getActions());
 	}
+
+
+	~SceneViewPlugin()
+	{
+		m_scene_view.shutdown();
+	}
+
+
+	void onAction() {}
+	void onWindowGUI() override { m_scene_view.onGUI(); }
+
+
+	SceneView m_scene_view;
+};
+
+
+struct GameViewPlugin : public StudioApp::IPlugin
+{
+	static GameViewPlugin* s_instance;
+
+
+	GameViewPlugin(StudioApp& app)
+	{
+		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Game View", "game_view");
+		m_action->func.bind<GameViewPlugin, &GameViewPlugin::onAction>(this);
+		m_game_view.m_is_opened = false;
+		m_game_view.init(*app.getWorldEditor());
+		s_instance = this;
+
+		unsigned char* pixels;
+		int width, height;
+		io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+		auto* material_manager =
+			m_engine->getResourceManager().get(Lumix::ResourceManager::MATERIAL);
+		auto* resource = material_manager->load(Lumix::Path("models/imgui.mat"));
+		m_material = static_cast<Lumix::Material*>(resource);
+
+		Lumix::Texture* texture = LUMIX_NEW(m_allocator, Lumix::Texture)(
+			Lumix::Path("font"), m_engine->getResourceManager(), m_allocator);
+
+		texture->create(width, height, pixels);
+		m_material->setTexture(0, texture);
+
+		ImGui::GetIO().RenderDrawListsFn = imGuiCallback;
+	}
+
+
+	void draw(ImDrawData* draw_data)
+	{
+		if(!m_material || !m_material->isReady()) return;
+		if(!m_material->getTexture(0)) return;
+
+		setGUIProjection();
+
+		for(int i = 0; i < draw_data->CmdListsCount; ++i)
+		{
+			ImDrawList* cmd_list = draw_data->CmdLists[i];
+			drawGUICmdList(cmd_list);
+		}
+	}
+
+
+	static void imGuiCallback(ImDrawData* draw_data)
+	{
+		s_instance->draw(draw_data);
+	}
+
+
+	void setGUIProjection()
+	{
+		float width = ImGui::GetIO().DisplaySize.x;
+		float height = ImGui::GetIO().DisplaySize.y;
+		Lumix::Matrix ortho;
+		ortho.setOrtho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
+		m_gui_pipeline->setViewProjection(ortho, (int)width, (int)height);
+	}
+
+
+	void drawGUICmdList(ImDrawList* cmd_list)
+	{
+		Lumix::Renderer* renderer =
+			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+
+		Lumix::TransientGeometry geom(&cmd_list->VtxBuffer[0],
+			cmd_list->VtxBuffer.size(),
+			renderer->getBasic2DVertexDecl(),
+			&cmd_list->IdxBuffer[0],
+			cmd_list->IdxBuffer.size());
+
+		if(geom.getNumVertices() < 0) return;
+
+		Lumix::uint32 elem_offset = 0;
+		const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
+		const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
+		for(const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
+		{
+			if(pcmd->UserCallback)
+			{
+				pcmd->UserCallback(cmd_list, pcmd);
+				elem_offset += pcmd->ElemCount;
+				continue;
+			}
+
+			if(0 == pcmd->ElemCount) continue;
+
+			m_gui_pipeline->setScissor(
+				Lumix::uint16(Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
+				Lumix::uint16(Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)),
+				Lumix::uint16(Lumix::Math::minValue(pcmd->ClipRect.z, 65535.0f) -
+				Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
+				Lumix::uint16(Lumix::Math::minValue(pcmd->ClipRect.w, 65535.0f) -
+				Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)));
+
+			auto material = m_material;
+			int pass_idx = m_gui_pipeline->getPassIdx();
+			const auto& texture_id = pcmd->TextureId
+				? *(bgfx::TextureHandle*)pcmd->TextureId
+				: material->getTexture(0)->getTextureHandle();
+			auto texture_uniform = material->getShader()->getTextureSlot(0).m_uniform_handle;
+			m_gui_pipeline->setTexture(0, texture_id, texture_uniform);
+			m_gui_pipeline->render(geom,
+				Lumix::Matrix::IDENTITY,
+				elem_offset,
+				pcmd->ElemCount,
+				material->getRenderStates(),
+				material->getShaderInstance().m_program_handles[pass_idx]);
+
+			elem_offset += pcmd->ElemCount;
+		}
+	}
+
+
+	~GameViewPlugin()
+	{
+		m_game_view.shutdown();
+	}
+
+
+	void onAction() { m_game_view.m_is_opened = !m_game_view.m_is_opened; }
+	void onWindowGUI() override { m_game_view.onGui(); }
+
+	Lumix::Engine* m_engine;
+	Lumix::Material* m_material;
+	Lumix::Pipeline* m_gui_pipeline;
+	GameView m_game_view;
+};
+
+
+GameViewPlugin* GameViewPlugin::s_instance = nullptr;
+
+
+struct ShaderEditorPlugin : public StudioApp::IPlugin
+{
+	ShaderEditorPlugin(StudioApp& app)
+		: m_shader_editor(app.getWorldEditor()->getAllocator())
+		, m_app(app)
+	{
+		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Shader Editor", "shader_editor");
+		m_action->func.bind<ShaderEditorPlugin, &ShaderEditorPlugin::onAction>(this);
+		m_shader_editor.m_is_opened = false;
+
+		m_compiler = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderCompiler)(
+			*app.getWorldEditor(), *app.getLogUI());
+		app.registerLuaGlobal("g_shader_compiler", m_compiler);
+		auto* f = &Lumix::LuaWrapper::wrapMethod < ShaderCompiler,
+			decltype(&ShaderCompiler::compileAll),
+			&ShaderCompiler::compileAll > ;
+		app.registerLuaFunction("compileShaders", f);
+	}
+
+
+	~ShaderEditorPlugin()
+	{
+		LUMIX_DELETE(m_app.getWorldEditor()->getAllocator(), m_compiler);
+	}
+
+
+	void onAction() { m_shader_editor.m_is_opened = !m_shader_editor.m_is_opened; }
+	void onWindowGUI() override { m_shader_editor.onGUI(); }
+	bool hasFocus() override { return m_shader_editor.isFocused(); }
+
+
+	StudioApp& m_app;
+	ShaderCompiler* m_compiler;
+	ShaderEditor m_shader_editor;
+};
+
+
+extern "C" {
+
+
+LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
+{
+	auto& allocator = app.getWorldEditor()->getAllocator();
+	registerRendererProperties(*app.getWorldEditor());
+
+	auto* material_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), MaterialPlugin)(app);
+	app.getAssetBrowser()->addPlugin(*material_plugin);
+
+	auto* model_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ModelPlugin)(app);
+	app.getAssetBrowser()->addPlugin(*model_plugin);
+
+	auto* texture_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), TexturePlugin)(app);
+	app.getAssetBrowser()->addPlugin(*texture_plugin);
+
+	auto* shader_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderPlugin)(app);
+	app.getAssetBrowser()->addPlugin(*shader_plugin);
+
+	auto* emitter_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), EmitterPlugin)(app);
+	app.getPropertyGrid()->addPlugin(*emitter_plugin);
+
+	auto* terrain_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), TerrainPlugin)(app);
+	app.getPropertyGrid()->addPlugin(*terrain_plugin);
+
+	auto* scene_view_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), SceneViewPlugin)(app);
+	app.addPlugin(*scene_view_plugin);
+
+	auto* game_view_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), GameViewPlugin)(app);
+	app.addPlugin(*game_view_plugin);
+
+	auto* shader_editor_plugin =
+		LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderEditorPlugin)(app);
+	app.addPlugin(*shader_editor_plugin);
+}
+
+
 }

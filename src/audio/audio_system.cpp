@@ -282,12 +282,6 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 	}
 
 
-	const char* getWindowName() override
-	{
-		return "Clip manager";
-	}
-
-
 	StudioApp& m_app;
 	char m_filter[256];
 	bool m_is_opened;

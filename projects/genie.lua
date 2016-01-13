@@ -188,6 +188,7 @@ project "renderer_editor"
 	includedirs { "../external/bgfx/include" }
 	links { "engine", "renderer", "studio_lib", "editor" }
 
+	useLua()
 	defaultConfigurations()
 
 project "editor"
