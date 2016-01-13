@@ -23,11 +23,11 @@
 #include "renderer/shader.h"
 #include "renderer/texture.h"
 #include "renderer/transient_geometry.h"
-#include "studio_lib/asset_browser.h"
-#include "studio_lib/platform_interface.h"
-#include "studio_lib/property_grid.h"
-#include "studio_lib/studio_app.h"
-#include "studio_lib/utils.h"
+#include "editor/asset_browser.h"
+#include "editor/platform_interface.h"
+#include "editor/property_grid.h"
+#include "editor/studio_app.h"
+#include "editor/utils.h"
 #include "scene_view.h"
 #include "shader_editor.h"
 #include "shader_compiler.h"
@@ -1193,7 +1193,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 			, m_models(editor.getAllocator())
 		{
 			m_model_index = -1;
-			auto& rm = editor.getEngine().getResourceManager();
+			auto& rm = m_editor.getEngine().getResourceManager();
 			Path shader_path("shaders/debugline.shd");
 			m_shader = static_cast<Shader*>(rm.get(ResourceManager::SHADER)->load(shader_path));
 
@@ -1205,6 +1205,9 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 
 		~RenderInterfaceImpl()
 		{
+			auto& rm = m_editor.getEngine().getResourceManager();
+			rm.get(ResourceManager::SHADER)->unload(*m_shader);
+
 			m_editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
 			m_editor.universeDestroyed().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
 		}
@@ -1276,7 +1279,6 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 
 	~SceneViewPlugin()
 	{
-		
 		m_scene_view.shutdown();
 	}
 

@@ -954,12 +954,6 @@ public:
 			auto* f = (void (*)(StudioApp&))Lumix::getLibrarySymbol(lib, "setStudioApp");
 			if (f) f(*this);
 		}
-		auto* lib = Lumix::loadLibrary("renderer_editor.dll");
-		TODO("todo");
-		auto* f = (void(*)(StudioApp&))Lumix::getLibrarySymbol(lib, "setStudioApp");
-		if (f) f(*this);
-
-		Lumix::Debug::StackTree::refreshModuleList();
 	}
 
 

@@ -1533,6 +1533,8 @@ public:
 		destroyUniverse();
 		EntityTemplateSystem::destroy(m_template_system);
 		PropertyRegister::shutdown();
+
+		LUMIX_DELETE(m_allocator, m_render_interface);
 	}
 
 

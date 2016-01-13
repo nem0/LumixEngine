@@ -19,11 +19,11 @@
 #include "iplugin.h"
 #include "lua_script/lua_script_manager.h"
 #include "plugin_manager.h"
-#include "studio_lib/asset_browser.h"
-#include "studio_lib/imgui/imgui.h"
-#include "studio_lib/property_grid.h"
-#include "studio_lib/studio_app.h"
-#include "studio_lib/utils.h"
+#include "editor/asset_browser.h"
+#include "editor/imgui/imgui.h"
+#include "editor/property_grid.h"
+#include "editor/studio_app.h"
+#include "editor/utils.h"
 #include "universe/universe.h"
 
 

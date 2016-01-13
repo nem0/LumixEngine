@@ -14,7 +14,7 @@ struct Action;
 struct lua_State;
 
 
-struct LUMIX_STUDIO_LIB_API Settings
+struct LUMIX_EDITOR_API Settings
 {
 	// gui - not saved
 	bool m_is_opened;

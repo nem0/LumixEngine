@@ -11,8 +11,8 @@
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
-#include "studio_lib/imgui/imgui.h"
-#include "studio_lib/settings.h"
+#include "editor/imgui/imgui.h"
+#include "editor/settings.h"
 
 
 static const char* WINDOW_NAME = "Scene View";

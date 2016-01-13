@@ -11,10 +11,10 @@
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "engine/plugin_manager.h"
-#include "studio_lib/asset_browser.h"
-#include "studio_lib/imgui/imgui.h"
-#include "studio_lib/studio_app.h"
-#include "studio_lib/utils.h"
+#include "editor/asset_browser.h"
+#include "editor/imgui/imgui.h"
+#include "editor/studio_app.h"
+#include "editor/utils.h"
 
 
 static const Lumix::uint32 CLIP_HASH = Lumix::crc32("CLIP");

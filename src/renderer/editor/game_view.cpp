@@ -10,8 +10,8 @@
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
-#include "studio_lib/imgui/imgui.h"
-#include "studio_lib/platform_interface.h"
+#include "editor/imgui/imgui.h"
+#include "editor/platform_interface.h"
 
 
 GameView::GameView()

@@ -11,7 +11,7 @@ class WorldEditor;
 }
 
 
-class LUMIX_STUDIO_LIB_API StudioApp
+class LUMIX_EDITOR_API StudioApp
 {
 public:
 	class IPlugin

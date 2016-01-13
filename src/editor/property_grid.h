@@ -19,7 +19,7 @@ struct Action;
 class AssetBrowser;
 
 
-class LUMIX_STUDIO_LIB_API PropertyGrid
+class LUMIX_EDITOR_API PropertyGrid
 {
 public:
 	struct IPlugin

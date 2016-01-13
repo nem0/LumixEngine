@@ -15,10 +15,10 @@
 #include "engine/plugin_manager.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
-#include "studio_lib/file_system_watcher.h"
-#include "studio_lib/log_ui.h"
-#include "studio_lib/platform_interface.h"
-#include "studio_lib/utils.h"
+#include "editor/file_system_watcher.h"
+#include "editor/log_ui.h"
+#include "editor/platform_interface.h"
+#include "editor/utils.h"
 
 
 ShaderCompiler::ShaderCompiler(Lumix::WorldEditor& editor, LogUI& log_ui)
