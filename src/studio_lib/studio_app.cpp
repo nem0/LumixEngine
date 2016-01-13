@@ -92,6 +92,12 @@ public:
 	}
 
 
+	Lumix::Array<Action*>& getActions() override
+	{
+		return m_actions;
+	}
+
+
 	int getExitCode() const override { return m_exit_code; }
 
 

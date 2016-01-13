@@ -17,7 +17,9 @@
 #include "renderer/texture.h"
 #include "studio_lib/asset_browser.h"
 #include "studio_lib/platform_interface.h"
+#include "studio_lib/property_grid.h"
 #include "studio_lib/studio_app.h"
+#include "studio_lib/terrain_editor.h"
 #include "studio_lib/utils.h"
 #include <cfloat>
 
@@ -726,7 +728,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 
 		bool execute() override
 		{
-			static const Lumix::uint32 RENDERABLE_HASH = crc32("renderable");
+			static const uint32 RENDERABLE_HASH = crc32("renderable");
 
 			Universe* universe = m_editor.getUniverse();
 			m_entity = universe->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
@@ -909,7 +911,7 @@ struct TexturePlugin : public AssetBrowser::IPlugin
 	{
 		if (type != TEXTURE_HASH) return false;
 
-		auto* texture = static_cast<Lumix::Texture*>(resource);
+		auto* texture = static_cast<Texture*>(resource);
 		if (texture->isFailure())
 		{
 			ImGui::Text("Texture failed to load");
@@ -972,11 +974,11 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 	bool onGUI(Resource* resource, uint32 type) override
 	{
 		if (type != SHADER_HASH) return false;
-		auto* shader = static_cast<Lumix::Shader*>(resource);
-		StringBuilder<Lumix::MAX_PATH_LENGTH> path(m_app.getWorldEditor()->getBasePath());
-		char basename[Lumix::MAX_PATH_LENGTH];
-		Lumix::PathUtils::getBasename(
-			basename, Lumix::lengthOf(basename), resource->getPath().c_str());
+		auto* shader = static_cast<Shader*>(resource);
+		StringBuilder<MAX_PATH_LENGTH> path(m_app.getWorldEditor()->getBasePath());
+		char basename[MAX_PATH_LENGTH];
+		PathUtils::getBasename(
+			basename, lengthOf(basename), resource->getPath().c_str());
 		path << "/shaders/" << basename;
 		if (ImGui::Button("Open vertex shader"))
 		{
@@ -1040,6 +1042,78 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 };
 
 
+static const uint32 PARTICLE_EMITTER_HASH = crc32("particle_emitter");
+
+
+struct EmitterPlugin : public PropertyGrid::IPlugin
+{
+	EmitterPlugin(StudioApp& app)
+		: m_app(app)
+	{
+		m_particle_emitter_updating = true;
+		m_particle_emitter_timescale = 1.0f;
+	}
+
+
+	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
+	{
+		if (cmp.type != PARTICLE_EMITTER_HASH) return;
+		
+		ImGui::Separator();
+		ImGui::Checkbox("Update", &m_particle_emitter_updating);
+		auto* scene = static_cast<Lumix::RenderScene*>(cmp.scene);
+		ImGui::SameLine();
+		if (ImGui::Button("Reset")) scene->resetParticleEmitter(cmp.index);
+
+		if (m_particle_emitter_updating)
+		{
+			ImGui::DragFloat("Timescale", &m_particle_emitter_timescale, 0.01f, 0.01f, 10000.0f);
+			float time_delta = m_app.getWorldEditor()->getEngine().getLastTimeDelta();
+			scene->updateEmitter(cmp.index, time_delta * m_particle_emitter_timescale);
+			scene->drawEmitterGizmo(cmp.index);
+		}
+	}
+
+
+	StudioApp& m_app;
+	float m_particle_emitter_timescale;
+	bool m_particle_emitter_updating;
+};
+
+
+static const uint32 TERRAIN_HASH = crc32("terrain");
+
+
+struct TerrainPlugin : public PropertyGrid::IPlugin
+{
+	TerrainPlugin(StudioApp& app)
+		: m_app(app)
+	{
+		auto& editor = *app.getWorldEditor();
+		m_terrain_editor = LUMIX_NEW(editor.getAllocator(), TerrainEditor)(editor, app.getActions());
+	}
+
+
+	~TerrainPlugin()
+	{
+		LUMIX_DELETE(m_app.getWorldEditor()->getAllocator(), m_terrain_editor);
+	}
+
+
+	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
+	{
+		if (cmp.type != TERRAIN_HASH) return;
+
+		m_terrain_editor->setComponent(cmp);
+		m_terrain_editor->onGUI();
+	}
+
+
+	StudioApp& m_app;
+	TerrainEditor* m_terrain_editor;
+};
+
+
 extern "C"
 {
 	LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
@@ -1059,5 +1133,12 @@ extern "C"
 		
 		auto* shader_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderPlugin)(app);
 		app.getAssetBrowser()->addPlugin(*shader_plugin);
+
+		auto* emitter_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), EmitterPlugin)(app);
+		app.getPropertyGrid()->addPlugin(*emitter_plugin);
+
+		auto* terrain_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), TerrainPlugin)(app);
+		app.getPropertyGrid()->addPlugin(*terrain_plugin);
+
 	}
 }

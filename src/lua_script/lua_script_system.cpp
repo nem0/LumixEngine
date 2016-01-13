@@ -716,7 +716,7 @@ namespace Lumix
 	{
 
 
-	struct PropertyGridPlugin : public PropertyGrid::Plugin
+	struct PropertyGridPlugin : public PropertyGrid::IPlugin
 	{
 		void onGUI(PropertyGrid& grid, Lumix::ComponentUID cmp) override
 		{
