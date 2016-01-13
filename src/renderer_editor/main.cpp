@@ -19,8 +19,8 @@
 #include "studio_lib/platform_interface.h"
 #include "studio_lib/property_grid.h"
 #include "studio_lib/studio_app.h"
-#include "studio_lib/terrain_editor.h"
 #include "studio_lib/utils.h"
+#include "terrain_editor.h"
 #include <cfloat>
 
 
