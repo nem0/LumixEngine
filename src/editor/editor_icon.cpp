@@ -5,10 +5,7 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "engine.h"
-#include "renderer/material.h"
-#include "renderer/model.h"
-#include "renderer/pipeline.h"
-#include "renderer/render_scene.h"
+#include "render_interface.h"
 #include "world_editor.h"
 #include <cmath>
 
@@ -17,40 +14,33 @@ namespace Lumix
 {
 
 
-static const char* ICON_NAMES[EditorIcon::COUNT] = {
-	"models/editor/phy_controller_icon.msh",
-	"models/editor/phy_box_icon.msh",
-	"models/editor/camera_icon.msh",
-	"models/editor/directional_light_icon.msh",
-	"models/editor/terrain_icon.msh",
-	"models/editor/icon.msh"};
-
-
-static Model* icon_models[EditorIcon::COUNT];
-
-
-bool EditorIcon::loadIcons(Engine& engine)
+static struct
 {
-	bool status = true;
-	for (int i = 0; i < sizeof(ICON_NAMES) / sizeof(ICON_NAMES[0]); ++i)
+	const char* name;
+	RenderInterface::ModelHandle model;
+} ICONS[EditorIcon::COUNT] = {
+	{ "models/editor/phy_controller_icon.msh", -1 },
+	{ "models/editor/phy_box_icon.msh", -1 },
+	{ "models/editor/camera_icon.msh", -1 },
+	{ "models/editor/directional_light_icon.msh", -1 },
+	{ "models/editor/terrain_icon.msh", -1 },
+	{ "models/editor/icon.msh", -1 } };
+
+
+void EditorIcon::loadIcons(WorldEditor& editor)
+{
+	for (int i = 0; i < lengthOf(ICONS); ++i)
 	{
-		icon_models[i] = static_cast<Model*>(engine.getResourceManager()
-												 .get(ResourceManager::MODEL)
-												 ->load(Path(ICON_NAMES[i])));
-		status = status && icon_models[i];
+		ICONS[i].model = editor.getRenderInterface()->loadModel(Path(ICONS[i].name));
 	}
-	return status;
 }
 
 
-void EditorIcon::unloadIcons()
+void EditorIcon::unloadIcons(WorldEditor& editor)
 {
-	for (int i = 0; i < lengthOf(icon_models); ++i)
+	for (int i = 0; i < lengthOf(ICONS); ++i)
 	{
-		icon_models[i]
-			->getResourceManager()
-			.get(ResourceManager::MODEL)
-			->unload(*icon_models[i]);
+		editor.getRenderInterface()->unloadModel(ICONS[i].model);
 	}
 }
 
@@ -91,16 +81,12 @@ EditorIcon::EditorIcon(WorldEditor& editor, RenderScene& scene, Entity entity)
 			break;
 		}
 	}
-	m_model = static_cast<Model*>(editor.getEngine()
-									  .getResourceManager()
-									  .get(ResourceManager::MODEL)
-									  ->load(Path(ICON_NAMES[m_type])));
+	m_model = ICONS[m_type].model;
 }
 
 
 EditorIcon::~EditorIcon()
 {
-	m_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_model);
 }
 
 
@@ -116,14 +102,13 @@ void EditorIcon::hide()
 }
 
 
-float EditorIcon::hit(const Vec3& origin, const Vec3& dir) const
+float EditorIcon::hit(WorldEditor& editor, const Vec3& origin, const Vec3& dir) const
 {
 	if (m_is_visible)
 	{
 		Matrix m = m_matrix;
 		m.multiply3x3(m_scale);
-		RayCastModelHit hit = m_model->castRay(origin, dir, m);
-		return hit.m_is_hit ? hit.m_t : -1;
+		return editor.getRenderInterface()->castRay(m_model, origin, dir, m);
 	}
 	else
 	{
@@ -132,18 +117,18 @@ float EditorIcon::hit(const Vec3& origin, const Vec3& dir) const
 }
 
 
-void EditorIcon::render(Pipeline& pipeline)
+void EditorIcon::render(WorldEditor& editor)
 {
 	static const float MIN_SCALE_FACTOR = 10;
 	static const float MAX_SCALE_FACTOR = 60;
 	if (m_is_visible)
 	{
-		ComponentIndex camera = m_scene->getCameraInSlot("editor");
+		ComponentIndex camera = editor.getEditCamera().index;
 		if (camera < 0) return;
-		const Universe& universe = m_scene->getUniverse();
-		Lumix::Matrix mtx = universe.getMatrix(m_scene->getCameraEntity(camera));
+		const Universe& universe = *editor.getUniverse();
+		Lumix::Matrix mtx = universe.getMatrix(editor.getEditCamera().entity);
 
-		float fov = m_scene->getCameraFOV(camera);
+		float fov = editor.getRenderInterface()->getCameraFOV(camera);
 		Vec3 position = universe.getPosition(m_entity);
 		float distance = (position - mtx.getTranslation()).length();
 
@@ -159,10 +144,7 @@ void EditorIcon::render(Pipeline& pipeline)
 		mtx = mtx * scale_mtx;
 		m_scale = scale;
 
-		if (m_model->isReady())
-		{
-			pipeline.renderModel(*m_model, mtx);
-		}
+		editor.getRenderInterface()->renderModel(m_model, mtx);
 	}
 }
 

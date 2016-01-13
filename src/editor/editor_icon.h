@@ -33,19 +33,19 @@ class EditorIcon
 	public:
 		EditorIcon(WorldEditor& editor, RenderScene& scene, Entity entity);
 		~EditorIcon();
-		void render(Pipeline& pipeline);
+		void render(WorldEditor& editor);
 		void show();
 		void hide();
-		float hit(const Vec3& origin, const Vec3& dir) const;
+		float hit(WorldEditor& editor, const Vec3& origin, const Vec3& dir) const;
 		Entity getEntity() const { return m_entity; }
 
-		static bool loadIcons(Engine& engine);
-		static void unloadIcons();
+		static void loadIcons(WorldEditor& editor);
+		static void unloadIcons(WorldEditor& editor);
 
 	private:
 		RenderScene* m_scene;
 		Entity m_entity;
-		Model* m_model;
+		int m_model;
 		Matrix m_matrix;
 		float m_scale;
 		bool m_is_visible;
