@@ -21,6 +21,7 @@ public:
 
 		virtual void onWindowGUI() = 0;
 		virtual bool hasFocus() { return false; }
+		virtual void update(float) {}
 
 		struct Action* m_action;
 	};

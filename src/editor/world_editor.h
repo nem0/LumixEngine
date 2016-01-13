@@ -33,8 +33,8 @@ struct MouseButton
 	enum Value
 	{
 		LEFT,
-		MIDDLE,
-		RIGHT
+		RIGHT,
+		MIDDLE
 	};
 };
 

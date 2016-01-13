@@ -99,8 +99,6 @@ public:
 			hInst,
 			0);
 
-		Lumix::Renderer::setInitData(hwnd);
-
 		m_hwnd = hwnd;
 		return hwnd;
 	}
