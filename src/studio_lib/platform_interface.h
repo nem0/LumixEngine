@@ -48,9 +48,9 @@ namespace PlatformInterface
 
 	struct FileIterator;
 
-	FileIterator* createFileIterator(const char* path, Lumix::IAllocator& allocator);
-	void destroyFileIterator(FileIterator* iterator);
-	bool getNextFile(FileIterator* iterator, FileInfo* info);
+	LUMIX_STUDIO_LIB_API FileIterator* createFileIterator(const char* path, Lumix::IAllocator& allocator);
+	LUMIX_STUDIO_LIB_API void destroyFileIterator(FileIterator* iterator);
+	LUMIX_STUDIO_LIB_API bool getNextFile(FileIterator* iterator, FileInfo* info);
 
 
 	struct SystemEventHandler
@@ -74,50 +74,50 @@ namespace PlatformInterface
 	};
 
 
-	bool isWindowActive();
-	bool processSystemEvents();
-	void clipCursor(float min_x, float min_y, float max_x, float max_y);
-	void showCursor(bool show);
-	void unclipCursor();
-	int getWindowX();
-	int getWindowY();
-	int getWindowWidth();
-	int getWindowHeight();
-	void createWindow(SystemEventHandler* handler);
-	void setSystemEventHandler(SystemEventHandler* handler);
-	void setWindowTitle(const char* title);
-	bool isMaximized();
-	void maximizeWindow();
-	void moveWindow(int x, int y, int w, int h);
-	void getCurrentDirectory(char* buffer, int buffer_size);
-	void shutdown();
-	bool isPressed(int key);
-	void getKeyName(int key, char* out, int max_size);
-	void setCursor(Cursor cursor);
-	void* getWindowHandle();
+	LUMIX_STUDIO_LIB_API bool isWindowActive();
+	LUMIX_STUDIO_LIB_API bool processSystemEvents();
+	LUMIX_STUDIO_LIB_API void clipCursor(float min_x, float min_y, float max_x, float max_y);
+	LUMIX_STUDIO_LIB_API void showCursor(bool show);
+	LUMIX_STUDIO_LIB_API void unclipCursor();
+	LUMIX_STUDIO_LIB_API int getWindowX();
+	LUMIX_STUDIO_LIB_API int getWindowY();
+	LUMIX_STUDIO_LIB_API int getWindowWidth();
+	LUMIX_STUDIO_LIB_API int getWindowHeight();
+	LUMIX_STUDIO_LIB_API void createWindow(SystemEventHandler* handler);
+	LUMIX_STUDIO_LIB_API void setSystemEventHandler(SystemEventHandler* handler);
+	LUMIX_STUDIO_LIB_API void setWindowTitle(const char* title);
+	LUMIX_STUDIO_LIB_API bool isMaximized();
+	LUMIX_STUDIO_LIB_API void maximizeWindow();
+	LUMIX_STUDIO_LIB_API void moveWindow(int x, int y, int w, int h);
+	LUMIX_STUDIO_LIB_API void getCurrentDirectory(char* buffer, int buffer_size);
+	LUMIX_STUDIO_LIB_API void shutdown();
+	LUMIX_STUDIO_LIB_API bool isPressed(int key);
+	LUMIX_STUDIO_LIB_API void getKeyName(int key, char* out, int max_size);
+	LUMIX_STUDIO_LIB_API void setCursor(Cursor cursor);
+	LUMIX_STUDIO_LIB_API void* getWindowHandle();
 	
 	LUMIX_STUDIO_LIB_API bool getOpenFilename(char* out, int max_size, const char* filter);
-	bool getSaveFilename(char* out,
+	LUMIX_STUDIO_LIB_API bool getSaveFilename(char* out,
 		int max_size,
 		const char* filter,
 		const char* default_extension);
-	bool getOpenDirectory(char* out, int max_size);
+	LUMIX_STUDIO_LIB_API bool getOpenDirectory(char* out, int max_size);
 	LUMIX_STUDIO_LIB_API bool shellExecuteOpen(const char* path);
 
 	LUMIX_STUDIO_LIB_API bool deleteFile(const char* path);
 	LUMIX_STUDIO_LIB_API bool moveFile(const char* from, const char* to);
-	bool fileExists(const char* path);
-	bool dirExists(const char* path);
-	Lumix::uint64 getLastModified(const char* file);
-	bool makePath(const char* path);
+	LUMIX_STUDIO_LIB_API bool fileExists(const char* path);
+	LUMIX_STUDIO_LIB_API bool dirExists(const char* path);
+	LUMIX_STUDIO_LIB_API Lumix::uint64 getLastModified(const char* file);
+	LUMIX_STUDIO_LIB_API bool makePath(const char* path);
 
 	struct Process;
 
-	Process* createProcess(const char* cmd, const char* args, Lumix::IAllocator& allocator);
-	void destroyProcess(Process& process);
-	bool isProcessFinished(Process& process);
-	int getProcessExitCode(Process& process);
-	int getProcessOutput(Process& process, char* buf, int buf_size);
+	LUMIX_STUDIO_LIB_API Process* createProcess(const char* cmd, const char* args, Lumix::IAllocator& allocator);
+	LUMIX_STUDIO_LIB_API void destroyProcess(Process& process);
+	LUMIX_STUDIO_LIB_API bool isProcessFinished(Process& process);
+	LUMIX_STUDIO_LIB_API int getProcessExitCode(Process& process);
+	LUMIX_STUDIO_LIB_API int getProcessOutput(Process& process, char* buf, int buf_size);
 
 
 } // namespace PlatformInterface

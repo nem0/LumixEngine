@@ -482,9 +482,6 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 	}
 
 
-	const char* getWindowName() override { return "Physics"; }
-
-
 	bool m_is_window_opened;
 	Lumix::WorldEditor& m_editor;
 };

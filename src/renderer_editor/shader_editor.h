@@ -3,7 +3,7 @@
 
 #include "core/array.h"
 #include "core/path.h"
-#include "imgui/imgui.h"
+#include "studio_lib/imgui/imgui.h"
 
 
 namespace Lumix

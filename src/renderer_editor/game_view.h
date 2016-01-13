@@ -16,7 +16,7 @@ namespace Lumix
 }
 
 
-class LUMIX_STUDIO_LIB_API GameView
+class GameView
 {
 public:
 	GameView();

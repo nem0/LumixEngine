@@ -6,12 +6,12 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
-#include "imgui/imgui.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
-#include "settings.h"
+#include "studio_lib/imgui/imgui.h"
+#include "studio_lib/settings.h"
 
 
 static const char* WINDOW_NAME = "Scene View";
@@ -44,6 +44,8 @@ void SceneView::setScene(Lumix::RenderScene* scene)
 
 void SceneView::shutdown()
 {
+	m_editor->universeCreated().unbind<SceneView, &SceneView::onUniverseCreated>(this);
+	m_editor->universeDestroyed().unbind<SceneView, &SceneView::onUniverseDestroyed>(this);
 	Lumix::Pipeline::destroy(m_pipeline);
 	m_pipeline = nullptr;
 }
@@ -146,45 +148,12 @@ void SceneView::renderGizmos()
 }
 
 
-void SceneView::onMouseUp(Lumix::MouseButton::Value button)
-{
-	auto pos = ImGui::GetIO().MousePos;
-	m_editor->onMouseUp(int(pos.x) - m_screen_x, int(pos.y) - m_screen_y, button);
-}
-
-
-bool SceneView::onMouseDown(int screen_x, int screen_y, Lumix::MouseButton::Value button)
-{
-	if (!m_is_mouse_hovering_window) return false;
-
-	bool is_inside = screen_x >= m_screen_x && screen_y >= m_screen_y &&
-					 screen_x <= m_screen_x + m_width && screen_y <= m_screen_y + m_height;
-
-	if (!is_inside) return false;
-
-	ImGui::ResetActiveID();
-	ImGui::SetWindowFocus(WINDOW_NAME);
-	m_editor->onMouseDown(screen_x - m_screen_x, screen_y - m_screen_y, button);
-
-	return true;
-}
-
-
-void SceneView::onMouseMove(int mouse_screen_x, int mouse_screen_y, int rel_x, int rel_y)
-{
-	m_editor->setGizmoUseStep(m_toggle_gizmo_step_action->isActive());
-	m_editor->onMouseMove(mouse_screen_x - m_screen_x, mouse_screen_y - m_screen_y, rel_x, rel_y);
-}
-
-
 void SceneView::onGUI()
 {
 	PROFILE_FUNCTION();
 	m_is_opened = false;
-	m_is_mouse_hovering_window = false;
 	if (ImGui::BeginDock(WINDOW_NAME))
 	{
-		m_is_mouse_hovering_window = ImGui::IsMouseHoveringWindow();
 		m_is_opened = true;
 		auto size = ImGui::GetContentRegionAvail();
 		size.y -= ImGui::GetTextLineHeightWithSpacing();
@@ -200,6 +169,31 @@ void SceneView::onGUI()
 			m_width = int(size.x);
 			m_height = int(size.y);
 			ImGui::Image(&m_texture_handle, size);
+			if (ImGui::IsItemHovered())
+			{
+				m_editor->setGizmoUseStep(m_toggle_gizmo_step_action->isActive());
+				auto rel_mp = ImGui::GetMousePos();
+				rel_mp.x -= m_screen_x;
+				rel_mp.y -= m_screen_y;
+				for (int i = 0; i < 3; ++i)
+				{
+					if (ImGui::IsMouseClicked(i))
+					{
+						m_editor->onMouseDown((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
+					}
+					if (ImGui::IsMouseReleased(i))
+					{
+						m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
+					}
+
+					auto delta = m_last_mouse_pos - Lumix::Vec2(rel_mp.x, rel_mp.y);
+					if(delta.x != 0 || delta.y != 0)
+					{
+						m_editor->onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)delta.x, (int)delta.y);
+						m_last_mouse_pos = {rel_mp.x, rel_mp.y};
+					}
+				}
+			}
 
 			m_pipeline->render();
 		}

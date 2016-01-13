@@ -6,7 +6,7 @@
 #include "core/string.h"
 
 
-class LogUI
+class LUMIX_STUDIO_LIB_API LogUI
 {
 	public:
 		LogUI(Lumix::IAllocator& allocator);

@@ -5,13 +5,13 @@
 #include "core/resource_manager.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
-#include "imgui/imgui.h"
-#include "platform_interface.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
+#include "studio_lib/imgui/imgui.h"
+#include "studio_lib/platform_interface.h"
 
 
 GameView::GameView()
@@ -59,6 +59,8 @@ void GameView::init(Lumix::WorldEditor& editor)
 
 void GameView::shutdown()
 {
+	m_editor->universeCreated().unbind<GameView, &GameView::onUniverseCreated>(this);
+	m_editor->universeDestroyed().unbind<GameView, &GameView::onUniverseDestroyed>(this);
 	Lumix::Pipeline::destroy(m_pipeline);
 	m_pipeline = nullptr;
 }
