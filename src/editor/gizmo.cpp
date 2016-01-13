@@ -7,12 +7,8 @@
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
 #include "engine.h"
-#include "renderer/model.h"
-#include "renderer/pipeline.h"
+#include "render_interface.h"
 #include "renderer/render_scene.h"
-#include "renderer/renderer.h"
-#include "renderer/shader.h"
-#include "renderer/transient_geometry.h"
 #include "universe/universe.h"
 #include <cfloat>
 #include <cmath>
@@ -29,19 +25,11 @@ static const uint32 Y_COLOR = 0xff63cf63;
 static const uint32 Z_COLOR = 0xffcf6363;
 static const uint32 SELECTED_COLOR = 0xff63cfcf;
 
-struct Vertex
-{
-	Vec3 position;
-	uint32 color;
-	float u, v;
-};
-
 
 Gizmo::Gizmo(WorldEditor& editor)
 	: m_editor(editor)
 {
 	m_is_autosnap_down = false;
-	m_shader = nullptr;
 	m_pivot = Pivot::OBJECT_PIVOT;
 	m_coord_system = CoordSystem::LOCAL;
 	m_is_transforming = false;
@@ -58,17 +46,12 @@ Gizmo::~Gizmo()
 
 void Gizmo::destroy()
 {
-	m_editor.getEngine().getResourceManager().get(ResourceManager::SHADER)->unload(*m_shader);
 }
 
 
 void Gizmo::create()
 {
 	m_scale = 1;
-	m_shader = static_cast<Shader*>(m_editor.getEngine()
-									  .getResourceManager()
-									  .get(ResourceManager::SHADER)
-									  ->load(Path("shaders/debugline.shd")));
 	m_scene = static_cast<RenderScene*>(m_editor.getScene(crc32("renderer")));
 }
 
@@ -90,24 +73,8 @@ void Gizmo::getEnityMatrix(Matrix& mtx, int selection_index)
 	else if (m_pivot == Pivot::CENTER)
 	{
 		mtx = m_universe->getPositionAndRotation(entity);
-		ComponentIndex cmp = m_scene->getRenderableComponent(entity);
-		if (cmp >= 0)
-		{
-			Model* model = m_scene->getRenderableModel(cmp);
-			if (model && model->isReady())
-			{
-				Vec3 center = (model->getAABB().getMin() + model->getAABB().getMax()) * 0.5f;
-				mtx.setTranslation(mtx.multiplyPosition(center));
-			}
-			else
-			{
-				mtx = m_universe->getPositionAndRotation(entity);
-			}
-		}
-		else
-		{
-			mtx = m_universe->getPositionAndRotation(entity);
-		}
+		Vec3 center = m_editor.getRenderInterface()->getModelCenter(entity);
+		mtx.setTranslation(mtx.multiplyPosition(center));
 	}
 	else
 	{
@@ -283,17 +250,15 @@ bool Gizmo::isHit()
 }
 
 
-void Gizmo::renderTranslateGizmo(Pipeline& pipeline)
+void Gizmo::renderTranslateGizmo()
 {
-	if (!m_shader->isReady()) return;
-
 	Matrix scale_mtx = Matrix::IDENTITY;
 	scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = m_scale;
 	Matrix gizmo_mtx;
 	getMatrix(gizmo_mtx);
 	Matrix mtx = gizmo_mtx * scale_mtx;
 
-	Vertex vertices[9];
+	RenderInterface::Vertex vertices[9];
 	uint16 indices[9];
 	vertices[0].position = Vec3(0, 0, 0);
 	vertices[0].color = m_transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR;
@@ -314,15 +279,8 @@ void Gizmo::renderTranslateGizmo(Pipeline& pipeline)
 	vertices[5].color = m_transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
 	indices[5] = 5;
 
-	auto& renderer = static_cast<Lumix::Renderer&>(m_scene->getPlugin());
-	Lumix::TransientGeometry geom(vertices, 6, renderer.getBasicVertexDecl(), indices, 6);
-	pipeline.render(geom,
-		mtx,
-		0,
-		6,
-		BGFX_STATE_PT_LINES | BGFX_STATE_DEPTH_TEST_LEQUAL,
-		m_shader->getInstance(0).m_program_handles[pipeline.getPassIdx()]);
-
+	m_editor.getRenderInterface()->render(mtx, indices, 6, vertices, 6, true);
+	
 	if (dotProduct(gizmo_mtx.getXVector(), m_camera_dir) < 0) mtx.setXVector(-mtx.getXVector());
 	if (dotProduct(gizmo_mtx.getYVector(), m_camera_dir) < 0) mtx.setYVector(-mtx.getYVector());
 	if (dotProduct(gizmo_mtx.getZVector(), m_camera_dir) < 0) mtx.setZVector(-mtx.getZVector());
@@ -357,15 +315,13 @@ void Gizmo::renderTranslateGizmo(Pipeline& pipeline)
 	vertices[8].color = m_transform_axis == Axis::XZ ? SELECTED_COLOR : Y_COLOR;
 	indices[8] = 8;
 
-	Lumix::TransientGeometry geom2(vertices, 9, renderer.getBasicVertexDecl(), indices, 9);
-	auto program_handle = m_shader->getInstance(0).m_program_handles[pipeline.getPassIdx()];
-	pipeline.render(geom2, mtx, 0, 9, BGFX_STATE_DEPTH_TEST_LEQUAL, program_handle);
+	m_editor.getRenderInterface()->render(mtx, indices, 9, vertices, 9, false);
 }
 
 
-void Gizmo::renderQuarterRing(Pipeline& pipeline, const Matrix& mtx, const Vec3& a, const Vec3& b, uint32 color)
+void Gizmo::renderQuarterRing(const Matrix& mtx, const Vec3& a, const Vec3& b, uint32 color)
 {
-	Vertex vertices[1200];
+	RenderInterface::Vertex vertices[1200];
 	uint16 indices[1200];
 	const float ANGLE_STEP = Math::degreesToRadians(1.0f / 100.0f * 360.0f);
 	Vec3 n = crossProduct(a, b) * 0.05f;
@@ -412,14 +368,7 @@ void Gizmo::renderQuarterRing(Pipeline& pipeline, const Matrix& mtx, const Vec3&
 		indices[offset] = offset;
 	}
 
-	auto& renderer = static_cast<Lumix::Renderer&>(m_scene->getPlugin());
-	Lumix::TransientGeometry ring_geom(vertices, offset, renderer.getBasicVertexDecl(), indices, offset);
-	pipeline.render(ring_geom,
-		mtx,
-		0,
-		offset,
-		BGFX_STATE_DEPTH_TEST_LEQUAL,
-		m_shader->getInstance(0).m_program_handles[pipeline.getPassIdx()]);
+	m_editor.getRenderInterface()->render(mtx, indices, offset, vertices, offset, false);
 
 	const int GRID_SIZE = 5;
 	offset = -1;
@@ -449,20 +398,12 @@ void Gizmo::renderQuarterRing(Pipeline& pipeline, const Matrix& mtx, const Vec3&
 		indices[offset] = offset;
 	}
 
-	Lumix::TransientGeometry plane_geom(vertices, offset, renderer.getBasicVertexDecl(), indices, offset);
-	pipeline.render(plane_geom,
-		mtx,
-		0,
-		offset,
-		BGFX_STATE_DEPTH_TEST_LEQUAL | BGFX_STATE_PT_LINES,
-		m_shader->getInstance(0).m_program_handles[pipeline.getPassIdx()]);
+	m_editor.getRenderInterface()->render(mtx, indices, offset, vertices, offset, true);
 };
 
 
-void Gizmo::renderRotateGizmo(Pipeline& pipeline)
+void Gizmo::renderRotateGizmo()
 {
-	if (!m_shader->isReady()) return;
-
 	Matrix scale_mtx = Matrix::IDENTITY;
 	scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = m_scale;
 	Matrix gizmo_mtx;
@@ -480,9 +421,9 @@ void Gizmo::renderRotateGizmo(Pipeline& pipeline)
 
 	if (!m_is_transforming)
 	{
-		renderQuarterRing(pipeline, mtx, right, up, m_transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR);
-		renderQuarterRing(pipeline, mtx, up, dir, m_transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR);
-		renderQuarterRing(pipeline, mtx, right, dir, m_transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR);
+		renderQuarterRing(mtx, right, up, m_transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR);
+		renderQuarterRing(mtx, up, dir, m_transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR);
+		renderQuarterRing(mtx, right, dir, m_transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR);
 	}
 	else
 	{
@@ -502,24 +443,24 @@ void Gizmo::renderRotateGizmo(Pipeline& pipeline)
 			axis2 = up;
 			break;
 		}
-		renderQuarterRing(pipeline, mtx, axis1, axis2, SELECTED_COLOR);
-		renderQuarterRing(pipeline, mtx, -axis1, axis2, SELECTED_COLOR);
-		renderQuarterRing(pipeline, mtx, -axis1, -axis2, SELECTED_COLOR);
-		renderQuarterRing(pipeline, mtx, axis1, -axis2, SELECTED_COLOR);
+		renderQuarterRing(mtx, axis1, axis2, SELECTED_COLOR);
+		renderQuarterRing(mtx, -axis1, axis2, SELECTED_COLOR);
+		renderQuarterRing(mtx, -axis1, -axis2, SELECTED_COLOR);
+		renderQuarterRing(mtx, axis1, -axis2, SELECTED_COLOR);
 	}
 }
 
 
-void Gizmo::render(Pipeline& pipeline)
+void Gizmo::render()
 {
 	if (m_editor.getSelectedEntities().empty()) return;
 	if (m_mode == Mode::TRANSLATE)
 	{
-		renderTranslateGizmo(pipeline);
+		renderTranslateGizmo();
 	}
 	else
 	{
-		renderRotateGizmo(pipeline);
+		renderRotateGizmo();
 	}
 }
 

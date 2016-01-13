@@ -197,7 +197,7 @@ project "editor"
 	files { "../src/editor/**.h", "../src/editor/**.cpp" }
 	includedirs { "../src", "../src/editor", "../external/bgfx/include" }
 	defines { "BUILDING_EDITOR" }
-	links { "renderer", "engine" }
+	links { "engine" }
 
 	useLua()
 	defaultConfigurations()

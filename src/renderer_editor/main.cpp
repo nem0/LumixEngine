@@ -14,6 +14,7 @@
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "game_view.h"
+#include "editor/render_interface.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
@@ -1126,16 +1127,156 @@ struct TerrainPlugin : public PropertyGrid::IPlugin
 
 struct SceneViewPlugin : public StudioApp::IPlugin
 {
-	SceneViewPlugin(StudioApp& app)
+	struct RenderInterfaceImpl : public RenderInterface
 	{
-		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Scene View", "scene_view");
+		ModelHandle loadModel(Lumix::Path& path) override
+		{
+			auto& rm = m_editor.getEngine().getResourceManager();
+			m_models.insert(m_model_index, static_cast<Model*>(rm.get(ResourceManager::MODEL)->load(path)));
+			++m_model_index;
+			return m_model_index - 1;
+		}
+
+
+		AABB getEntityAABB(Universe& universe, Entity entity) override
+		{
+			AABB aabb;
+			auto cmp = m_render_scene->getRenderableComponent(entity);
+			if (cmp != INVALID_COMPONENT)
+			{
+				Model* model = m_render_scene->getRenderableModel(cmp);
+				if (!model) return aabb;
+
+				aabb = model->getAABB();
+				aabb.transform(universe.getMatrix(entity));
+
+				return aabb;
+			}
+
+			Vec3 pos = universe.getPosition(entity);
+			aabb.set(pos, pos);
+
+			return aabb;
+		}
+
+
+		void unloadModel(ModelHandle handle) override
+		{
+			auto* model = m_models[handle];
+			model->getResourceManager().get(ResourceManager::MODEL)->unload(*model);
+			m_models.erase(handle);
+		}
+
+
+		float getCameraFOV(ComponentIndex cmp) override
+		{
+			return m_render_scene->getCameraFOV(cmp);
+		}
+
+
+		float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Matrix& mtx) override
+		{
+			RayCastModelHit hit = m_models[model]->castRay(origin, dir, mtx);
+			return hit.m_is_hit ? hit.m_t : -1;
+		}
+
+
+		void renderModel(ModelHandle model, const Matrix& mtx) override
+		{
+			if (m_pipeline.isReady()) m_pipeline.renderModel(*m_models[model], mtx);
+		}
+
+
+		RenderInterfaceImpl(Lumix::WorldEditor& editor, Lumix::Pipeline& pipeline)
+			: m_pipeline(pipeline)
+			, m_editor(editor)
+			, m_models(editor.getAllocator())
+		{
+			m_model_index = -1;
+			auto& rm = editor.getEngine().getResourceManager();
+			Path shader_path("shaders/debugline.shd");
+			m_shader = static_cast<Shader*>(rm.get(ResourceManager::SHADER)->load(shader_path));
+
+			editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
+			editor.universeDestroyed().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
+			onUniverseCreated();
+		}
+
+
+		~RenderInterfaceImpl()
+		{
+			m_editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
+			m_editor.universeDestroyed().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
+		}
+
+
+		void onUniverseCreated()
+		{
+			m_render_scene = static_cast<RenderScene*>(m_editor.getUniverseContext()->getScene(crc32("renderer")));
+		}
+
+
+		void onUniverseDestroyed()
+		{
+			m_render_scene = nullptr;
+		}
+
+
+		Vec3 getModelCenter(Entity entity) override
+		{
+			auto cmp = m_render_scene->getRenderableComponent(entity);
+			Model* model = m_render_scene->getRenderableModel(cmp);
+			if (!model) return Vec3(0, 0, 0);
+			return (model->getAABB().getMin() + model->getAABB().getMax()) * 0.5f;
+		}
+
+
+		void render(const Matrix& mtx,
+			uint16* indices,
+			int indices_count,
+			Vertex* vertices,
+			int vertices_count,
+			bool lines) override
+		{
+			auto& renderer = static_cast<Lumix::Renderer&>(m_render_scene->getPlugin());
+			Lumix::TransientGeometry geom(
+				vertices, vertices_count, renderer.getBasicVertexDecl(), indices, indices_count);
+			uint64 flags = BGFX_STATE_DEPTH_TEST_LEQUAL;
+			if (lines) flags |= BGFX_STATE_PT_LINES;
+			m_pipeline.render(geom,
+				mtx,
+				0,
+				indices_count,
+				flags,
+				m_shader->getInstance(0).m_program_handles[m_pipeline.getPassIdx()]);
+		}
+
+
+		Lumix::WorldEditor& m_editor;
+		Lumix::Shader* m_shader;
+		Lumix::RenderScene* m_render_scene;
+		Lumix::Pipeline& m_pipeline;
+		Lumix::PODHashMap<int, Model*> m_models;
+		int m_model_index;
+	};
+
+
+	SceneViewPlugin(StudioApp& app)
+		: m_app(app)
+	{
+		auto& editor = *app.getWorldEditor();
+		auto& allocator = editor.getAllocator();
+		m_action = LUMIX_NEW(allocator, Action)("Scene View", "scene_view");
 		m_action->func.bind<SceneViewPlugin, &SceneViewPlugin::onAction>(this);
-		m_scene_view.init(*app.getWorldEditor(), app.getActions());
+		m_scene_view.init(editor, app.getActions());
+		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getPipeline());
+		editor.setRenderInterface(m_render_interface);
 	}
 
 
 	~SceneViewPlugin()
 	{
+		
 		m_scene_view.shutdown();
 	}
 
@@ -1144,8 +1285,9 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 	void onAction() {}
 	void onWindowGUI() override { m_scene_view.onGUI(); }
 
-
+	StudioApp& m_app;
 	SceneView m_scene_view;
+	RenderInterfaceImpl* m_render_interface;
 };
 
 
@@ -1398,6 +1540,145 @@ struct ShaderEditorPlugin : public StudioApp::IPlugin
 };
 
 
+static const uint32 CAMERA_HASH = crc32("camera");
+static const uint32 POINT_LIGHT_HASH = crc32("point_light");
+static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
+static const uint32 RENDERABLE_HASH = crc32("renderable");
+
+
+struct WorldEditorPlugin : public WorldEditor::Plugin
+{
+	void showPointLightGizmo(ComponentUID light)
+	{
+		RenderScene* scene = static_cast<RenderScene*>(light.scene);
+		Universe& universe = scene->getUniverse();
+
+		float range = scene->getLightRange(light.index);
+
+		Vec3 pos = universe.getPosition(light.entity);
+		scene->addDebugSphere(pos, range, 0xff0000ff, 0);
+	}
+
+
+	static Vec3 minCoords(const Vec3& a, const Vec3& b)
+	{
+		return Vec3(Math::minValue(a.x, b.x),
+			Math::minValue(a.y, b.y),
+			Math::minValue(a.z, b.z));
+	}
+
+
+	static Vec3 maxCoords(const Vec3& a, const Vec3& b)
+	{
+		return Vec3(Math::maxValue(a.x, b.x),
+			Math::maxValue(a.y, b.y),
+			Math::maxValue(a.z, b.z));
+	}
+
+
+	void showRenderableGizmo(ComponentUID renderable)
+	{
+		RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
+		Universe& universe = scene->getUniverse();
+		Model* model = scene->getRenderableModel(renderable.index);
+		Vec3 points[8];
+		if (!model) return;
+
+		const AABB& aabb = model->getAABB();
+		points[0] = aabb.getMin();
+		points[7] = aabb.getMax();
+		points[1].set(points[0].x, points[0].y, points[7].z);
+		points[2].set(points[0].x, points[7].y, points[0].z);
+		points[3].set(points[0].x, points[7].y, points[7].z);
+		points[4].set(points[7].x, points[0].y, points[0].z);
+		points[5].set(points[7].x, points[0].y, points[7].z);
+		points[6].set(points[7].x, points[7].y, points[0].z);
+		Matrix mtx = universe.getMatrix(renderable.entity);
+
+		for (int j = 0; j < 8; ++j)
+		{
+			points[j] = mtx.multiplyPosition(points[j]);
+		}
+
+		Vec3 this_min = points[0];
+		Vec3 this_max = points[0];
+
+		for (int j = 0; j < 8; ++j)
+		{
+			this_min = minCoords(points[j], this_min);
+			this_max = maxCoords(points[j], this_max);
+		}
+
+		scene->addDebugCube(this_min, this_max, 0xffff0000, 0);
+	}
+
+
+	void showGlobalLightGizmo(ComponentUID light)
+	{
+		RenderScene* scene = static_cast<RenderScene*>(light.scene);
+		Universe& universe = scene->getUniverse();
+		Vec3 pos = universe.getPosition(light.entity);
+
+		Vec3 dir = universe.getRotation(light.entity) * Vec3(0, 0, 1);
+		Vec3 right = universe.getRotation(light.entity) * Vec3(1, 0, 0);
+		Vec3 up = universe.getRotation(light.entity) * Vec3(0, 1, 0);
+
+		scene->addDebugLine(pos, pos + dir, 0xff0000ff, 0);
+		scene->addDebugLine(pos + right, pos + dir + right, 0xff0000ff, 0);
+		scene->addDebugLine(pos - right, pos + dir - right, 0xff0000ff, 0);
+		scene->addDebugLine(pos + up, pos + dir + up, 0xff0000ff, 0);
+		scene->addDebugLine(pos - up, pos + dir - up, 0xff0000ff, 0);
+
+		scene->addDebugLine(pos + right + up, pos + dir + right + up, 0xff0000ff, 0);
+		scene->addDebugLine(pos + right - up, pos + dir + right - up, 0xff0000ff, 0);
+		scene->addDebugLine(pos - right - up, pos + dir - right - up, 0xff0000ff, 0);
+		scene->addDebugLine(pos - right + up, pos + dir - right + up, 0xff0000ff, 0);
+
+		scene->addDebugSphere(pos - dir, 0.1f, 0xff0000ff, 0);
+	}
+
+	bool showGizmo(ComponentUID cmp) override 
+	{
+		if (cmp.type == CAMERA_HASH)
+		{
+			RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
+			Universe& universe = scene->getUniverse();
+			Vec3 pos = universe.getPosition(cmp.entity);
+
+			float fov = scene->getCameraFOV(cmp.index);
+			float near_distance = scene->getCameraNearPlane(cmp.index);
+			float far_distance = scene->getCameraFarPlane(cmp.index);
+			Vec3 dir = universe.getRotation(cmp.entity) * Vec3(0, 0, -1);
+			Vec3 right = universe.getRotation(cmp.entity) * Vec3(1, 0, 0);
+			Vec3 up = universe.getRotation(cmp.entity) * Vec3(0, 1, 0);
+			float w = scene->getCameraWidth(cmp.index);
+			float h = scene->getCameraHeight(cmp.index);
+			float ratio = h < 1.0f ? 1 : w / h;
+
+			scene->addDebugFrustum(
+				pos, dir, up, fov, ratio, near_distance, far_distance, 0xffff0000, 0);
+			return true;
+		}
+		if (cmp.type == POINT_LIGHT_HASH)
+		{
+			showPointLightGizmo(cmp);
+			return true;
+		}
+		if (cmp.type == GLOBAL_LIGHT_HASH)
+		{
+			showGlobalLightGizmo(cmp);
+			return true;
+		}
+		if (cmp.type == RENDERABLE_HASH)
+		{
+			showRenderableGizmo(cmp);
+			return true;
+		}
+		return false;
+	}
+};
+
+
 extern "C" {
 
 
@@ -1433,6 +1714,9 @@ LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
 	auto* shader_editor_plugin =
 		LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderEditorPlugin)(app);
 	app.addPlugin(*shader_editor_plugin);
+
+	auto* world_editor_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), WorldEditorPlugin)();
+	app.getWorldEditor()->addPlugin(*world_editor_plugin);
 }
 
 

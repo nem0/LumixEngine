@@ -1,5 +1,6 @@
 #include "scene_view.h"
 #include "core/crc32.h"
+#include "core/path.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "editor/gizmo.h"
@@ -142,9 +143,9 @@ void SceneView::update()
 
 void SceneView::renderGizmos()
 {
-	m_editor->renderIcons(*m_pipeline);
+	m_editor->renderIcons();
 	m_editor->getGizmo().updateScale(m_editor->getEditCamera().index);
-	m_editor->getGizmo().render(*m_pipeline);
+	m_editor->getGizmo().render();
 }
 
 
