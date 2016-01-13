@@ -14,8 +14,8 @@
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
 #include "renderer/render_scene.h"
-#include "studio_lib/studio_app.h"
-#include "studio_lib/utils.h"
+#include "editor/studio_app.h"
+#include "editor/utils.h"
 #include "universe/universe.h"
 
 
@@ -480,9 +480,6 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 
 		ImGui::EndDock();
 	}
-
-
-	const char* getWindowName() override { return "Physics"; }
 
 
 	bool m_is_window_opened;

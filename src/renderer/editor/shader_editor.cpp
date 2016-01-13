@@ -6,8 +6,8 @@
 #include "core/math_utils.h"
 #include "core/path_utils.h"
 #include "core/string.h"
-#include "platform_interface.h"
-#include "utils.h"
+#include "editor/platform_interface.h"
+#include "editor/utils.h"
 #include <cstdio>
 
 

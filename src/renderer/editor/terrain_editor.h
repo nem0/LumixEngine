@@ -3,7 +3,7 @@
 
 #include "core/binary_array.h"
 #include "editor/world_editor.h"
-#include "utils.h"
+#include "editor/utils.h"
 
 
 namespace Lumix

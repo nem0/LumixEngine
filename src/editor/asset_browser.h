@@ -1,8 +1,9 @@
 #pragma once
+
+
 #include "core/array.h"
 #include "core/path.h"
 #include "core/mt/sync.h"
-#include <bgfx/bgfx.h>
 
 
 namespace Lumix
@@ -17,20 +18,9 @@ class FileSystemWatcher;
 class Metadata;
 
 
-class LUMIX_STUDIO_LIB_API AssetBrowser
+class LUMIX_EDITOR_API AssetBrowser
 {
 public:
-	enum Type
-	{
-		MATERIAL,
-		MODEL,
-		SHADER,
-		TEXTURE,
-		UNIVERSE,
-
-		Count
-	};
-
 	class IPlugin
 	{
 	public:
@@ -49,9 +39,9 @@ public:
 	void onGUI();
 	void update();
 	const Lumix::Array<Lumix::Path>& getResources(int type) const;
-	int getTypeFromResourceManagerType(Lumix::uint32 type) const;
+	int getTypeIndexFromManagerType(Lumix::uint32 type) const;
 	void selectResource(const Lumix::Path& resource);
-	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, int type);
+	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, Lumix::uint32 type);
 	void addPlugin(IPlugin& plugin);
 	void openInExternalEditor(Lumix::Resource* resource);
 
@@ -64,13 +54,9 @@ private:
 	void processDir(const char* path);
 	void addResource(const char* path, const char* filename);
 	void onGUIResource();
-	void onGUIMaterial();
-	void onGUIShader();
-	void onGUIModel();
-	void onGUITexture();
-	void saveMaterial(Lumix::Material* material);
 	void unloadResource();
 	void selectResource(Lumix::Resource* resource);
+	int getResourceTypeIndex(const char* ext);
 
 	Lumix::uint32 getResourceType(const char* path) const;
 
@@ -89,5 +75,4 @@ private:
 	Lumix::Path m_wanted_resource;
 	bool m_autoreload_changed_resource;
 	bool m_is_focus_requested;
-	bgfx::TextureHandle m_texture_handle;
 };
