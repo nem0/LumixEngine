@@ -186,7 +186,7 @@ void SceneView::onGUI()
 						m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
 					}
 
-					auto delta = m_last_mouse_pos - Lumix::Vec2(rel_mp.x, rel_mp.y);
+					auto delta = Lumix::Vec2(rel_mp.x, rel_mp.y) - m_last_mouse_pos;
 					if(delta.x != 0 || delta.y != 0)
 					{
 						m_editor->onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)delta.x, (int)delta.y);

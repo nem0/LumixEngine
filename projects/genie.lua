@@ -252,7 +252,7 @@ project "studio_lib"
 
 	files { "../src/studio_lib/**.h", "../src/studio_lib/**.inl", "../src/studio_lib/**.cpp" }
 	includedirs { "../src", "../src/studio_lib", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
-	links { "editor", "engine", "assimp", "crnlib", "winmm", "renderer" }
+	links { "editor", "engine", "assimp", "crnlib", "winmm" }
 	defines { "BUILDING_STUDIO_LIB" }
 
 	useLua()
@@ -292,7 +292,7 @@ project "studio"
 
 	files { "../src/studio/**.cpp" }
 	includedirs { "../src", "../src/studio_lib", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
-	links { "studio_lib", "animation", "editor", "engine", "renderer", "winmm" }
+	links { "studio_lib" }
 
 	useLua()
 	defaultConfigurations()

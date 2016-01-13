@@ -6,6 +6,7 @@
 #include "core/lua_wrapper.h"
 #include "core/path_utils.h"
 #include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "editor/ieditor_command.h"
 #include "editor/property_register.h"
 #include "editor/property_descriptor.h"
@@ -1139,6 +1140,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 	}
 
 
+	void update(float) override { m_scene_view.update(); }
 	void onAction() {}
 	void onWindowGUI() override { m_scene_view.onGUI(); }
 
@@ -1153,36 +1155,95 @@ struct GameViewPlugin : public StudioApp::IPlugin
 
 
 	GameViewPlugin(StudioApp& app)
+		: m_app(app)
 	{
-		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Game View", "game_view");
+		m_width = m_height = -1;
+		auto& editor = *app.getWorldEditor();
+		m_engine = &editor.getEngine();
+		m_action = LUMIX_NEW(editor.getAllocator(), Action)("Game View", "game_view");
 		m_action->func.bind<GameViewPlugin, &GameViewPlugin::onAction>(this);
 		m_game_view.m_is_opened = false;
-		m_game_view.init(*app.getWorldEditor());
+		m_game_view.init(editor);
+		
+		auto& plugin_manager = editor.getEngine().getPluginManager();
+		auto* renderer = static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
+		Lumix::Path path("pipelines/imgui.lua");
+		m_gui_pipeline = Lumix::Pipeline::create(*renderer, path, m_engine->getAllocator());
+		m_gui_pipeline->load();
+
+		int w = PlatformInterface::getWindowWidth();
+		int h = PlatformInterface::getWindowHeight();
+		m_gui_pipeline->setViewport(0, 0, w, h);
+		renderer->resize(w, h);
+		onUniverseCreated();
+
 		s_instance = this;
 
 		unsigned char* pixels;
 		int width, height;
-		io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 		auto* material_manager =
 			m_engine->getResourceManager().get(Lumix::ResourceManager::MATERIAL);
 		auto* resource = material_manager->load(Lumix::Path("models/imgui.mat"));
 		m_material = static_cast<Lumix::Material*>(resource);
 
-		Lumix::Texture* texture = LUMIX_NEW(m_allocator, Lumix::Texture)(
-			Lumix::Path("font"), m_engine->getResourceManager(), m_allocator);
+		Lumix::Texture* texture = LUMIX_NEW(editor.getAllocator(), Lumix::Texture)(
+			Lumix::Path("font"), m_engine->getResourceManager(), editor.getAllocator());
 
 		texture->create(width, height, pixels);
 		m_material->setTexture(0, texture);
 
 		ImGui::GetIO().RenderDrawListsFn = imGuiCallback;
+
+		editor.universeCreated().bind<GameViewPlugin, &GameViewPlugin::onUniverseCreated>(this);
+		editor.universeDestroyed().bind<GameViewPlugin, &GameViewPlugin::onUniverseDestroyed>(this);
+	}
+
+
+	~GameViewPlugin()
+	{
+		Lumix::Pipeline::destroy(m_gui_pipeline);
+		auto& editor = *m_app.getWorldEditor();
+		editor.universeCreated().unbind<GameViewPlugin, &GameViewPlugin::onUniverseCreated>(this);
+		editor.universeDestroyed().unbind<GameViewPlugin, &GameViewPlugin::onUniverseDestroyed>(this);
+		shutdownImGui();
+		m_game_view.shutdown();
+	}
+
+
+	void shutdownImGui()
+	{
+		ImGui::ShutdownDock();
+		ImGui::Shutdown();
+
+		Lumix::Texture* texture = m_material->getTexture(0);
+		m_material->setTexture(0, nullptr);
+		texture->destroy();
+		LUMIX_DELETE(m_app.getWorldEditor()->getAllocator(), texture);
+
+		m_material->getResourceManager().get(Lumix::ResourceManager::MATERIAL)->unload(*m_material);
 	}
 
 
 	void draw(ImDrawData* draw_data)
 	{
+		if (!m_gui_pipeline->isReady()) return;
 		if(!m_material || !m_material->isReady()) return;
 		if(!m_material->getTexture(0)) return;
 
+		int w = PlatformInterface::getWindowWidth();
+		int h = PlatformInterface::getWindowHeight();
+		if (w != m_width || h != m_height)
+		{
+			m_width = w;
+			m_height = h;
+			auto& plugin_manager = m_app.getWorldEditor()->getEngine().getPluginManager();
+			auto* renderer =
+				static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
+			if (renderer) renderer->resize(m_width, m_height);
+		}
+
+		m_gui_pipeline->render();
 		setGUIProjection();
 
 		for(int i = 0; i < draw_data->CmdListsCount; ++i)
@@ -1190,6 +1251,26 @@ struct GameViewPlugin : public StudioApp::IPlugin
 			ImDrawList* cmd_list = draw_data->CmdLists[i];
 			drawGUICmdList(cmd_list);
 		}
+
+		Lumix::Renderer* renderer =
+			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+
+		renderer->frame();
+	}
+
+
+	void onUniverseCreated()
+	{
+		auto* scene =
+			static_cast<Lumix::RenderScene*>(m_app.getWorldEditor()->getScene(Lumix::crc32("renderer")));
+
+		m_gui_pipeline->setScene(scene);
+	}
+
+
+	void onUniverseDestroyed()
+	{
+		m_gui_pipeline->setScene(nullptr);
 	}
 
 
@@ -1205,6 +1286,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		float height = ImGui::GetIO().DisplaySize.y;
 		Lumix::Matrix ortho;
 		ortho.setOrtho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
+		m_gui_pipeline->setViewport(0, 0, (int)width, (int)height);
 		m_gui_pipeline->setViewProjection(ortho, (int)width, (int)height);
 	}
 
@@ -1263,15 +1345,12 @@ struct GameViewPlugin : public StudioApp::IPlugin
 	}
 
 
-	~GameViewPlugin()
-	{
-		m_game_view.shutdown();
-	}
-
-
 	void onAction() { m_game_view.m_is_opened = !m_game_view.m_is_opened; }
 	void onWindowGUI() override { m_game_view.onGui(); }
 
+	int m_width;
+	int m_height;
+	StudioApp& m_app;
 	Lumix::Engine* m_engine;
 	Lumix::Material* m_material;
 	Lumix::Pipeline* m_gui_pipeline;

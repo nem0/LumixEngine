@@ -381,6 +381,12 @@ namespace PlatformInterface
 	}
 
 
+	void* getWindowHandle()
+	{
+		return g_platform_data.m_hwnd;
+	}
+
+
 	void createWindow(SystemEventHandler* handler)
 	{
 		g_platform_data.m_handler = handler;
@@ -411,7 +417,6 @@ namespace PlatformInterface
 		timeBeginPeriod(1);
 		trackMouse();
 
-		Lumix::Renderer::setInitData(g_platform_data.m_hwnd);
 		ImGui::GetIO().ImeWindowHandle = g_platform_data.m_hwnd;
 	}
 
@@ -442,13 +447,7 @@ namespace PlatformInterface
 		
 	}
 
-
-	void* getWindowHandle()
-	{
-		return g_platform_data.m_hwnd;
-	}
-
-
+	
 	struct Process
 	{
 		Process(Lumix::IAllocator& allocator)

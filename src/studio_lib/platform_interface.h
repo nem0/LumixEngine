@@ -84,6 +84,7 @@ namespace PlatformInterface
 	LUMIX_STUDIO_LIB_API int getWindowWidth();
 	LUMIX_STUDIO_LIB_API int getWindowHeight();
 	LUMIX_STUDIO_LIB_API void createWindow(SystemEventHandler* handler);
+	LUMIX_STUDIO_LIB_API void* getWindowHandle();
 	LUMIX_STUDIO_LIB_API void setSystemEventHandler(SystemEventHandler* handler);
 	LUMIX_STUDIO_LIB_API void setWindowTitle(const char* title);
 	LUMIX_STUDIO_LIB_API bool isMaximized();
@@ -94,7 +95,6 @@ namespace PlatformInterface
 	LUMIX_STUDIO_LIB_API bool isPressed(int key);
 	LUMIX_STUDIO_LIB_API void getKeyName(int key, char* out, int max_size);
 	LUMIX_STUDIO_LIB_API void setCursor(Cursor cursor);
-	LUMIX_STUDIO_LIB_API void* getWindowHandle();
 	
 	LUMIX_STUDIO_LIB_API bool getOpenFilename(char* out, int max_size, const char* filter);
 	LUMIX_STUDIO_LIB_API bool getSaveFilename(char* out,

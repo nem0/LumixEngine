@@ -30,20 +30,9 @@
 #include "platform_interface.h"
 #include "profiler_ui.h"
 #include "property_grid.h"
-#include "renderer/frame_buffer.h"
-#include "renderer/material.h"
-#include "renderer/pipeline.h"
-#include "renderer/render_scene.h"
-#include "renderer/renderer.h"
-#include "renderer/texture.h"
-#include "renderer/transient_geometry.h"
-#include "renderer/shader.h"
 #include "settings.h"
 #include "studio_app.h"
 #include "utils.h"
-
-#include <bgfx/bgfx.h>
-#include <lua.hpp>
 
 
 class StudioAppImpl* g_app;
@@ -115,15 +104,14 @@ public:
 		m_editor->update();
 		m_engine->update(*m_editor->getUniverseContext());
 
+		for (auto* plugin : m_plugins)
+		{
+			plugin->update(time_delta);
+		}
 		m_asset_browser->update();
 		m_log_ui->update(time_delta);
 
-		m_gui_pipeline->render();
 		onGUI();
-		Lumix::Renderer* renderer =
-			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
-
-		renderer->frame();
 	}
 
 
@@ -264,8 +252,6 @@ public:
 	void onGUI()
 	{
 		PROFILE_FUNCTION();
-
-		if (!m_gui_pipeline->isReady()) return;
 
 		ImGuiIO& io = ImGui::GetIO();
 		io.DisplaySize = ImVec2((float)PlatformInterface::getWindowWidth(),
@@ -415,7 +401,6 @@ public:
 	void toggleMeasure() { m_editor->toggleMeasure(); }
 	void snapDown() { m_editor->snapDown(); }
 	void lookAtSelected() { m_editor->lookAtSelected(); }
-	void toggleStats() { m_gui_pipeline->toggleStats(); }
 
 	void autosnapDown() 
 	{
@@ -606,7 +591,6 @@ public:
 			if (ImGui::BeginMenu("View"))
 			{
 				doMenuItem(getAction("lookAtSelected"), false, is_any_entity_selected);
-				doMenuItem(getAction("toggleStats"), false, true);
 				if (ImGui::BeginMenu("Windows"))
 				{
 					ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
@@ -793,7 +777,9 @@ public:
 
 	void shutdown()
 	{
-		while(m_editor->getEngine().getFileSystem().hasWork())
+		saveSettings();
+
+		while (m_editor->getEngine().getFileSystem().hasWork())
 		{
 			m_editor->getEngine().getFileSystem().updateAsyncTransactions();
 		}
@@ -804,15 +790,11 @@ public:
 		}
 		m_plugins.clear();
 
-		saveSettings();
-
 		for (auto* a : m_actions)
 		{
 			LUMIX_DELETE(m_editor->getAllocator(), a);
 		}
 		m_actions.clear();
-
-		shutdownImGui();
 
 		ProfilerUI::destroy(*m_profiler_ui);
 		LUMIX_DELETE(m_allocator, m_asset_browser);
@@ -820,27 +802,11 @@ public:
 		LUMIX_DELETE(m_allocator, m_import_asset_dialog);
 		LUMIX_DELETE(m_allocator, m_log_ui);
 		Lumix::WorldEditor::destroy(m_editor, m_allocator);
-		Lumix::Pipeline::destroy(m_gui_pipeline);
 		Lumix::Engine::destroy(m_engine, m_allocator);
 		m_engine = nullptr;
-		m_gui_pipeline = nullptr;
 		m_editor = nullptr;
 
 		PlatformInterface::shutdown();
-	}
-
-
-	void shutdownImGui()
-	{
-		ImGui::ShutdownDock();
-		ImGui::Shutdown();
-
-		Lumix::Texture* texture = m_material->getTexture(0);
-		m_material->setTexture(0, nullptr);
-		texture->destroy();
-		LUMIX_DELETE(m_allocator, texture);
-
-		m_material->getResourceManager().get(Lumix::ResourceManager::MATERIAL)->unload(*m_material);
 	}
 
 
@@ -870,21 +836,6 @@ public:
 		io.KeyMap[ImGuiKey_Z] = 'Z';
 
 		ImGui::GetStyle().WindowFillAlphaDefault = 1.0f;
-	}
-
-
-	void onUniverseCreated()
-	{
-		auto* scene =
-			static_cast<Lumix::RenderScene*>(m_editor->getScene(Lumix::crc32("renderer")));
-
-		m_gui_pipeline->setScene(scene);
-	}
-
-
-	void onUniverseDestroyed()
-	{
-		m_gui_pipeline->setScene(nullptr);
 	}
 
 
@@ -952,8 +903,6 @@ public:
 		addAction<&StudioAppImpl::autosnapDown>("Autosnap down", "autosnapDown");
 		addAction<&StudioAppImpl::snapDown>("Snap down", "snapDown");
 		addAction<&StudioAppImpl::lookAtSelected>("Look at selected", "lookAtSelected");
-
-		addAction<&StudioAppImpl::toggleStats>("Stats", "toggleStats");
 	}
 
 
@@ -1297,20 +1246,6 @@ public:
 		m_log_ui = LUMIX_NEW(m_allocator, LogUI)(m_editor->getAllocator());
 		m_import_asset_dialog = LUMIX_NEW(m_allocator, ImportAssetDialog)(*m_editor, m_metadata);
 
-		m_editor->universeCreated().bind<StudioAppImpl, &StudioAppImpl::onUniverseCreated>(this);
-		m_editor->universeDestroyed().bind<StudioAppImpl, &StudioAppImpl::onUniverseDestroyed>(this);
-
-		auto& plugin_manager = m_editor->getEngine().getPluginManager();
-		auto* renderer = static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
-		Lumix::Path path("pipelines/imgui.lua");
-		m_gui_pipeline = Lumix::Pipeline::create(*renderer, path, m_engine->getAllocator());
-		m_gui_pipeline->load();
-
-		int w = PlatformInterface::getWindowWidth();
-		int h = PlatformInterface::getWindowHeight();
-		m_gui_pipeline->setViewport(0, 0, w, h);
-		renderer->resize(w, h);
-		onUniverseCreated();
 		initIMGUI();
 
 		PlatformInterface::setSystemEventHandler(&m_handler);
@@ -1357,14 +1292,6 @@ public:
 		m_settings.m_window.w = width;
 		m_settings.m_window.h = height;
 		m_settings.m_is_maximized = PlatformInterface::isMaximized();
-
-		if (m_gui_pipeline) m_gui_pipeline->setViewport(0, 0, width, height);
-		if (!m_editor) return;
-
-		auto& plugin_manager = m_editor->getEngine().getPluginManager();
-		auto* renderer =
-			static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
-		if(renderer) renderer->resize(width, height);
 	}
 
 
@@ -1377,71 +1304,7 @@ public:
 		memset(io.KeysDown, 0, sizeof(io.KeysDown));
 		memset(io.MouseDown, 0, sizeof(io.MouseDown));
 	}
-
-
-	void setGUIProjection()
-	{
-		float width = ImGui::GetIO().DisplaySize.x;
-		float height = ImGui::GetIO().DisplaySize.y;
-		Lumix::Matrix ortho;
-		ortho.setOrtho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
-		m_gui_pipeline->setViewProjection(ortho, (int)width, (int)height);
-	}
-
-
-	void drawGUICmdList(ImDrawList* cmd_list)
-	{
-		Lumix::Renderer* renderer =
-			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
-
-		Lumix::TransientGeometry geom(&cmd_list->VtxBuffer[0],
-			cmd_list->VtxBuffer.size(),
-			renderer->getBasic2DVertexDecl(),
-			&cmd_list->IdxBuffer[0],
-			cmd_list->IdxBuffer.size());
-
-		if (geom.getNumVertices() < 0) return;
-
-		Lumix::uint32 elem_offset = 0;
-		const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
-		const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
-		for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
-		{
-			if (pcmd->UserCallback)
-			{
-				pcmd->UserCallback(cmd_list, pcmd);
-				elem_offset += pcmd->ElemCount;
-				continue;
-			}
-
-			if (0 == pcmd->ElemCount) continue;
-
-			m_gui_pipeline->setScissor(
-				Lumix::uint16(Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
-				Lumix::uint16(Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)),
-				Lumix::uint16(Lumix::Math::minValue(pcmd->ClipRect.z, 65535.0f) -
-				Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
-				Lumix::uint16(Lumix::Math::minValue(pcmd->ClipRect.w, 65535.0f) -
-				Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)));
-
-			auto material = m_material;
-			int pass_idx = m_gui_pipeline->getPassIdx();
-			const auto& texture_id = pcmd->TextureId
-				? *(bgfx::TextureHandle*)pcmd->TextureId
-				: material->getTexture(0)->getTextureHandle();
-			auto texture_uniform = material->getShader()->getTextureSlot(0).m_uniform_handle;
-			m_gui_pipeline->setTexture(0, texture_id, texture_uniform);
-			m_gui_pipeline->render(geom,
-				Lumix::Matrix::IDENTITY,
-				elem_offset,
-				pcmd->ElemCount,
-				material->getRenderStates(),
-				material->getShaderInstance().m_program_handles[pass_idx]);
-
-			elem_offset += pcmd->ElemCount;
-		}
-	}
-
+	
 
 	Lumix::WorldEditor* getWorldEditor() override
 	{
