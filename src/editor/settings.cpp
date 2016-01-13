@@ -86,10 +86,8 @@ Settings::Settings(Lumix::IAllocator& allocator)
 	m_is_maximized = true;
 	m_window.x = m_window.y = 0;
 	m_window.w = m_window.h = -1;
-	m_is_gameview_opened = false;
 	m_is_entity_list_opened = false;
 	m_is_entity_template_list_opened = false;
-	m_is_shader_editor_opened = false;
 	m_is_asset_browser_opened = false;
 	m_is_log_opened = false;
 	m_is_profiler_opened = false;
@@ -139,11 +137,9 @@ bool Settings::load(Action** actions, int actions_count)
 	m_is_asset_browser_opened = getBoolean(L, "asset_browser_opened", false);
 	m_is_entity_list_opened = getBoolean(L, "entity_list_opened", false);
 	m_is_entity_template_list_opened = getBoolean(L, "entity_template_list_opened", false);
-	m_is_gameview_opened = getBoolean(L, "gameview_opened", false);
 	m_is_log_opened = getBoolean(L, "log_opened", false);
 	m_is_profiler_opened = getBoolean(L, "profiler_opened", false);
 	m_is_properties_opened = getBoolean(L, "properties_opened", false);
-	m_is_shader_editor_opened = getBoolean(L, "shader_editor_opened", false);
 	m_is_crash_reporting_enabled = getBoolean(L, "error_reporting_enabled", true);
 	Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
 	m_autosave_time = getInteger(L, "autosave_time", 300);
@@ -237,11 +233,9 @@ bool Settings::save(Action** actions, int actions_count)
 	writeBool("asset_browser_opened", m_is_asset_browser_opened);
 	writeBool("entity_list_opened", m_is_entity_list_opened);
 	writeBool("entity_template_list_opened", m_is_entity_template_list_opened);
-	writeBool("gameview_opened", m_is_gameview_opened);
 	writeBool("log_opened", m_is_log_opened);
 	writeBool("profiler_opened", m_is_profiler_opened);
 	writeBool("properties_opened", m_is_properties_opened);
-	writeBool("shader_editor_opened", m_is_shader_editor_opened);
 	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
 	file << "autosave_time = " << m_autosave_time << "\n";
 

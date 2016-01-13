@@ -3,7 +3,7 @@
 #include "lumix.h"
 #include "core/array.h"
 #include "core/delegate_list.h"
-#include "core/quat.h"
+#include "core/vec.h"
 #include "universe/component.h"
 
 
@@ -18,7 +18,9 @@ class IPlugin;
 class IPropertyDescriptor;
 class Path;
 class Pipeline;
-class RayCastModelHit;
+class RenderInterface;
+struct Quat;
+struct RayCastModelHit;
 class Universe;
 struct UniverseContext;
 
@@ -33,8 +35,8 @@ struct MouseButton
 	enum Value
 	{
 		LEFT,
-		MIDDLE,
-		RIGHT
+		RIGHT,
+		MIDDLE
 	};
 };
 
@@ -50,7 +52,7 @@ public:
 		CONTROL = 2
 	};
 
-	class Plugin
+	class LUMIX_EDITOR_API Plugin
 	{
 	public:
 		virtual ~Plugin() {}
@@ -70,6 +72,8 @@ public:
 	static WorldEditor* create(const char* base_path, Engine& engine, IAllocator& allocator);
 	static void destroy(WorldEditor* editor, IAllocator& allocator);
 
+	virtual void setRenderInterface(RenderInterface* interface) = 0;
+	virtual RenderInterface* getRenderInterface() = 0;
 	virtual void update() = 0;
 	virtual void updateEngine() = 0;
 	virtual void executeCommand(IEditorCommand* command) = 0;
@@ -81,7 +85,7 @@ public:
 	virtual IScene* getScene(uint32 hash) = 0;
 	virtual IScene* getSceneByComponentType(uint32 hash) = 0;
 	virtual IAllocator& getAllocator() = 0;
-	virtual void renderIcons(Pipeline& pipeline) = 0;
+	virtual void renderIcons() = 0;
 	virtual ComponentUID getEditCamera() = 0;
 	virtual class Gizmo& getGizmo() = 0;
 	virtual void setGizmoUseStep(bool use) = 0;

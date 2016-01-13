@@ -9,10 +9,9 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "imgui/imgui.h"
-#include "renderer/render_scene.h"
-#include "terrain_editor.h"
 #include "utils.h"
 #include <cmath>
+#include <cstdlib>
 
 
 const char* PropertyGrid::getComponentTypeName(Lumix::ComponentUID cmp) const
@@ -39,7 +38,6 @@ PropertyGrid::PropertyGrid(Lumix::WorldEditor& editor,
 	m_particle_emitter_updating = true;
 	m_particle_emitter_timescale = 1.0f;
 	m_filter[0] = '\0';
-	m_terrain_editor = LUMIX_NEW(editor.getAllocator(), TerrainEditor)(editor, actions);
 }
 
 
@@ -49,7 +47,6 @@ PropertyGrid::~PropertyGrid()
 	{
 		LUMIX_DELETE(m_editor.getAllocator(), i);
 	}
-	LUMIX_DELETE(m_editor.getAllocator(), m_terrain_editor);
 }
 
 
@@ -168,12 +165,11 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		Lumix::copyString(buf, (const char*)stream.getData());
 		auto& resource_descriptor = dynamic_cast<Lumix::ResourcePropertyDescriptorBase&>(desc);
 		auto rm_type = resource_descriptor.getResourceType();
-		auto asset_type = m_asset_browser.getTypeFromResourceManagerType(rm_type);
 		if (m_asset_browser.resourceInput(desc.getName(),
 				StringBuilder<20>("", (Lumix::uint64)&desc),
 				buf,
 				sizeof(buf),
-				asset_type))
+				rm_type))
 		{
 			m_editor.setProperty(cmp.type, index, desc, buf, Lumix::stringLength(buf) + 1);
 		}
@@ -412,17 +408,6 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 		i->onGUI(*this, cmp);
 	}
 
-
-	if (cmp.type == Lumix::crc32("terrain"))
-	{
-		m_terrain_editor->setComponent(cmp);
-		m_terrain_editor->onGUI();
-	}
-
-	if (cmp.type == Lumix::crc32("particle_emitter"))
-	{
-		onParticleEmitterGUI(cmp);
-	}
 	ImGui::PopID();
 }
 
@@ -484,27 +469,6 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 		ImGui::EndPopup();
 	}
 	return false;
-}
-
-
-void PropertyGrid::onParticleEmitterGUI(Lumix::ComponentUID cmp)
-{
-	ImGui::Separator();
-	ImGui::Checkbox("Update", &m_particle_emitter_updating);
-	auto* scene = static_cast<Lumix::RenderScene*>(cmp.scene);
-	ImGui::SameLine();
-	if (ImGui::Button("Reset"))
-	{
-		scene->resetParticleEmitter(cmp.index);
-	}
-
-	if (m_particle_emitter_updating)
-	{
-		ImGui::DragFloat("Timescale", &m_particle_emitter_timescale, 0.01f, 0.01f, 10000.0f);
-		float time_delta = m_editor.getEngine().getLastTimeDelta();
-		scene->updateEmitter(cmp.index, time_delta * m_particle_emitter_timescale);
-		scene->drawEmitterGizmo(cmp.index);
-	}
 }
 
 

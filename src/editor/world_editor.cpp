@@ -16,6 +16,7 @@
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/matrix.h"
+#include "core/path.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -31,14 +32,12 @@
 #include "editor/iproperty_descriptor.h"
 #include "editor/property_register.h"
 #include "engine.h"
+#include "ieditor_command.h"
 #include "iplugin.h"
 #include "plugin_manager.h"
-#include "renderer/material.h"
-#include "renderer/model.h"
+#include "render_interface.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
-#include "renderer/texture.h"
-#include "ieditor_command.h"
 #include "universe/universe.h"
 
 
@@ -48,8 +47,6 @@ namespace Lumix
 
 static const uint32 RENDERABLE_HASH = crc32("renderable");
 static const uint32 CAMERA_HASH = crc32("camera");
-static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
-static const uint32 POINT_LIGHT_HASH = crc32("point_light");
 
 
 class SetEntityNameCommand : public IEditorCommand
@@ -1425,148 +1422,6 @@ public:
 	Engine& getEngine() override { return *m_engine; }
 
 
-	Vec3 minCoords(const Vec3& a, const Vec3& b)
-	{
-		return Vec3(Math::minValue(a.x, b.x),
-					Math::minValue(a.y, b.y),
-					Math::minValue(a.z, b.z));
-	}
-
-
-	Vec3 maxCoords(const Vec3& a, const Vec3& b)
-	{
-		return Vec3(Math::maxValue(a.x, b.x),
-					Math::maxValue(a.y, b.y),
-					Math::maxValue(a.z, b.z));
-	}
-
-
-	void showPointLightGizmo(ComponentUID light)
-	{
-		RenderScene* scene = static_cast<RenderScene*>(light.scene);
-		Universe& universe = scene->getUniverse();
-
-		float range = scene->getLightRange(light.index);
-
-		Vec3 pos = universe.getPosition(light.entity);
-		scene->addDebugSphere(pos, range, 0xff0000ff, 0);
-	}
-
-
-	void showRenderableGizmo(ComponentUID renderable)
-	{
-		RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
-		Universe& universe = scene->getUniverse();
-		Model* model = scene->getRenderableModel(renderable.index);
-		Vec3 points[8];
-		if (!model) return;
-
-		const AABB& aabb = model->getAABB();
-		points[0] = aabb.getMin();
-		points[7] = aabb.getMax();
-		points[1].set(points[0].x, points[0].y, points[7].z);
-		points[2].set(points[0].x, points[7].y, points[0].z);
-		points[3].set(points[0].x, points[7].y, points[7].z);
-		points[4].set(points[7].x, points[0].y, points[0].z);
-		points[5].set(points[7].x, points[0].y, points[7].z);
-		points[6].set(points[7].x, points[7].y, points[0].z);
-		Matrix mtx = universe.getMatrix(renderable.entity);
-
-		for (int j = 0; j < 8; ++j)
-		{
-			points[j] = mtx.multiplyPosition(points[j]);
-		}
-
-		Vec3 this_min = points[0];
-		Vec3 this_max = points[0];
-
-		for (int j = 0; j < 8; ++j)
-		{
-			this_min = minCoords(points[j], this_min);
-			this_max = maxCoords(points[j], this_max);
-		}
-
-		scene->addDebugCube(this_min, this_max, 0xffff0000, 0);
-	}
-
-
-	void showCameraGizmo(ComponentUID camera)
-	{
-		RenderScene* scene = static_cast<RenderScene*>(camera.scene);
-		Universe& universe = scene->getUniverse();
-		Vec3 pos = universe.getPosition(camera.entity);
-
-		float fov = scene->getCameraFOV(camera.index);
-		float near_distance = scene->getCameraNearPlane(camera.index);
-		float far_distance = scene->getCameraFarPlane(camera.index);
-		Vec3 dir = universe.getRotation(camera.entity) * Vec3(0, 0, -1);
-		Vec3 right = universe.getRotation(camera.entity) * Vec3(1, 0, 0);
-		Vec3 up = universe.getRotation(camera.entity) * Vec3(0, 1, 0);
-		float w = scene->getCameraWidth(camera.index);
-		float h = scene->getCameraHeight(camera.index);
-		float ratio = h < 1.0f ? 1 : w / h;
-
-		scene->addDebugFrustum(pos,
-							   dir,
-							   up,
-							   fov,
-							   ratio,
-							   near_distance,
-							   far_distance,
-							   0xffff0000,
-							   0);
-	}
-
-
-	void showGlobalLightGizmo(ComponentUID light)
-	{
-		RenderScene* scene = static_cast<RenderScene*>(light.scene);
-		Universe& universe = scene->getUniverse();
-		Vec3 pos = universe.getPosition(light.entity);
-
-		Vec3 dir = universe.getRotation(light.entity) * Vec3(0, 0, 1);
-		Vec3 right = universe.getRotation(light.entity) * Vec3(1, 0, 0);
-		Vec3 up = universe.getRotation(light.entity) * Vec3(0, 1, 0);
-
-		scene->addDebugLine(pos, pos + dir, 0xff0000ff, 0);
-		scene->addDebugLine(pos + right, pos + dir + right, 0xff0000ff, 0);
-		scene->addDebugLine(pos - right, pos + dir - right, 0xff0000ff, 0);
-		scene->addDebugLine(pos + up, pos + dir + up, 0xff0000ff, 0);
-		scene->addDebugLine(pos - up, pos + dir - up, 0xff0000ff, 0);
-
-		scene->addDebugLine(pos + right + up, pos + dir + right + up, 0xff0000ff, 0);
-		scene->addDebugLine(pos + right - up, pos + dir + right - up, 0xff0000ff, 0);
-		scene->addDebugLine(pos - right - up, pos + dir - right - up, 0xff0000ff, 0);
-		scene->addDebugLine(pos - right + up, pos + dir - right + up, 0xff0000ff, 0);
-
-		scene->addDebugSphere(pos - dir, 0.1f, 0xff0000ff, 0);
-	}
-
-
-	AABB getEntityAABB(Universe& universe, Entity entity)
-	{
-		AABB aabb;
-
-		ComponentUID cmp = getComponent(entity, RENDERABLE_HASH);
-		if (cmp.isValid())
-		{
-			RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-			Model* model = scene->getRenderableModel(cmp.index);
-			if (!model) return aabb;
-
-			aabb = model->getAABB();
-			aabb.transform(universe.getMatrix(entity));
-
-			return aabb;
-		}
-
-		Vec3 pos = universe.getPosition(entity);
-		aabb.set(pos, pos);
-
-		return aabb;
-	}
-
-
 	void showGizmos()
 	{
 		if (m_selected_entities.empty()) return;
@@ -1577,11 +1432,11 @@ public:
 
 		if (m_selected_entities.size() > 1)
 		{
-			AABB aabb = getEntityAABB(*universe, m_selected_entities[0]);
+			AABB aabb = m_render_interface->getEntityAABB(*universe, m_selected_entities[0]);
 			for (int i = 1; i < m_selected_entities.size(); ++i)
 			{
 				AABB entity_aabb =
-					getEntityAABB(*universe, m_selected_entities[i]);
+					m_render_interface->getEntityAABB(*universe, m_selected_entities[i]);
 				aabb.merge(entity_aabb);
 			}
 
@@ -1597,23 +1452,6 @@ public:
 			{
 				if (plugin->showGizmo(cmp))
 					break;
-			}
-
-			if (cmp.type == RENDERABLE_HASH)
-			{
-				showRenderableGizmo(cmp);
-			}
-			else if (cmp.type == CAMERA_HASH)
-			{
-				showCameraGizmo(cmp);
-			}
-			else if (cmp.type == GLOBAL_LIGHT_HASH)
-			{
-				showGlobalLightGizmo(cmp);
-			}
-			else if (cmp.type == POINT_LIGHT_HASH)
-			{
-				showPointLightGizmo(cmp);
 			}
 		}
 	}
@@ -1683,7 +1521,7 @@ public:
 		auto& library_loaded_callback = m_engine->getPluginManager().libraryLoaded();
 		library_loaded_callback.unbind<WorldEditorImpl, &WorldEditorImpl::onPluginLibraryLoaded>(this);
 
-		EditorIcon::unloadIcons();
+		EditorIcon::unloadIcons(*this);
 		removePlugin(*m_measure_tool);
 		LUMIX_DELETE(m_allocator, m_measure_tool);
 		for (auto* plugin : m_plugins)
@@ -1695,6 +1533,8 @@ public:
 		destroyUniverse();
 		EntityTemplateSystem::destroy(m_template_system);
 		PropertyRegister::shutdown();
+
+		LUMIX_DELETE(m_allocator, m_render_interface);
 	}
 
 
@@ -1704,7 +1544,7 @@ public:
 		hit.m_t = -1;
 		for (int i = 0, c = m_editor_icons.size(); i < c; ++i)
 		{
-			float t = m_editor_icons[i]->hit(origin, dir);
+			float t = m_editor_icons[i]->hit(*this, origin, dir);
 			if (t >= 0)
 			{
 				hit.m_icon = m_editor_icons[i];
@@ -1883,6 +1723,19 @@ public:
 
 		g_log_info.log("editor") << "Universe saved";
 		file.write(blob.getData(), blob.getSize());
+	}
+
+
+	void setRenderInterface(class RenderInterface* interface) override
+	{
+		m_render_interface = interface;
+		EditorIcon::loadIcons(*this);
+	}
+
+
+	RenderInterface* getRenderInterface() override
+	{
+		return m_render_interface;
 	}
 
 
@@ -2537,6 +2390,7 @@ public:
 		}
 	}
 
+
 	void resetAndLoad(FS::IFile& file)
 	{
 		destroyUniverse();
@@ -2561,12 +2415,12 @@ public:
 	}
 
 
-	void renderIcons(Pipeline& pipeline) override
+	void renderIcons() override
 	{
 		PROFILE_FUNCTION();
 		for (int i = 0, c = m_editor_icons.size(); i < c; ++i)
 		{
-			m_editor_icons[i]->render(pipeline);
+			m_editor_icons[i]->render(*this);
 		}
 	}
 
@@ -2645,8 +2499,6 @@ public:
 			&WorldEditorImpl::constructEditorCommand<DestroyComponentCommand>);
 		m_editor_command_creators.insert(
 			crc32("add_entity"), &WorldEditorImpl::constructEditorCommand<AddEntityCommand>);
-
-		EditorIcon::loadIcons(*m_engine);
 
 		plugin_manager.libraryLoaded().bind<WorldEditorImpl, &WorldEditorImpl::onPluginLibraryLoaded>(this);
 		const auto& libs = plugin_manager.getLibraries();
@@ -3345,6 +3197,7 @@ private:
 	bool m_is_loading;
 	UniverseContext* m_universe_context;
 	EntityGroups m_entity_groups;
+	RenderInterface* m_render_interface;
 };
 
 

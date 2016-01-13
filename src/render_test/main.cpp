@@ -99,8 +99,6 @@ public:
 			hInst,
 			0);
 
-		Lumix::Renderer::setInitData(hwnd);
-
 		m_hwnd = hwnd;
 		return hwnd;
 	}
@@ -130,6 +128,7 @@ public:
 			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 		m_pipeline = Lumix::Pipeline::create(
 			*renderer, Lumix::Path("pipelines/render_test.lua"), m_engine->getAllocator());
+		m_pipeline->load();
 
 		m_universe_context = &m_engine->createUniverse();
 		m_pipeline->setScene(

@@ -240,10 +240,11 @@ struct RendererImpl : public Renderer
 		, m_callback_stub(*this)
 	{
 		bgfx::PlatformData d;
-		if (s_platform_data)
+		void* platform_data = engine.getPlatformData().window_handle;
+		if (platform_data)
 		{
 			setMemory(&d, 0, sizeof(d));
-			d.nwh = s_platform_data;
+			d.nwh = platform_data;
 			bgfx::setPlatformData(d);
 		}
 		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub, &m_bgfx_allocator);
@@ -424,18 +425,7 @@ struct RendererImpl : public Renderer
 	BGFXAllocator m_bgfx_allocator;
 	bgfx::VertexDecl m_basic_vertex_decl;
 	bgfx::VertexDecl m_basic_2d_vertex_decl;
-
-	static void* s_platform_data;
 };
-
-
-void* RendererImpl::s_platform_data = nullptr;
-
-
-void Renderer::setInitData(void* data)
-{
-	RendererImpl::s_platform_data = data;
-}
 
 
 extern "C"

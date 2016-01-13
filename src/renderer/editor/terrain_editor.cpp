@@ -11,15 +11,16 @@
 #include "editor/iproperty_descriptor.h"
 #include "editor/property_register.h"
 #include "engine.h"
-#include "imgui/imgui.h"
-#include "platform_interface.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
-#include "stb/stb_image.h"
+#include "editor/imgui/imgui.h"
+#include "editor/platform_interface.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include "editor/stb/stb_image.h"
+#include "editor/utils.h"
 #include "universe/universe.h"
-#include "utils.h"
 #include <cmath>
 
 

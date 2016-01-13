@@ -4,7 +4,7 @@
 #include "core/path.h"
 
 
-class FileSystemWatcher
+class LUMIX_EDITOR_API FileSystemWatcher
 {
 	public:
 		virtual ~FileSystemWatcher() {}

@@ -26,7 +26,7 @@ namespace MT
 }
 
 
-class LUMIX_STUDIO_LIB_API ImportAssetDialog
+class LUMIX_EDITOR_API ImportAssetDialog
 {
 	friend struct ImportTask;
 	friend struct ConvertTask;
