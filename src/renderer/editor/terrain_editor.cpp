@@ -15,11 +15,11 @@
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
-#include "studio_lib/imgui/imgui.h"
-#include "studio_lib/platform_interface.h"
+#include "editor/imgui/imgui.h"
+#include "editor/platform_interface.h"
 #define STB_IMAGE_IMPLEMENTATION
-#include "studio_lib/stb/stb_image.h"
-#include "studio_lib/utils.h"
+#include "editor/stb/stb_image.h"
+#include "editor/utils.h"
 #include "universe/universe.h"
 #include <cmath>
 

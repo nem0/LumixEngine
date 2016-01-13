@@ -1,4 +1,4 @@
-#include "studio_lib/studio_app.h"
+#include "editor/studio_app.h"
 #include <Windows.h>
 
 

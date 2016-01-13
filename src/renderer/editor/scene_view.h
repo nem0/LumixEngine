@@ -2,7 +2,7 @@
 
 
 #include "editor/world_editor.h"
-#include "studio_lib/utils.h"
+#include "editor/utils.h"
 #include <bgfx/bgfx.h>
 
 

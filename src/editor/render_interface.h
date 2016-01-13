@@ -26,6 +26,8 @@ public:
 
 
 public:
+	virtual ~RenderInterface() {}
+
 	virtual AABB getEntityAABB(Universe& universe, Entity entity) = 0;
 	virtual float getCameraFOV(ComponentIndex cmp) = 0;
 	virtual float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Matrix& mtx) = 0;

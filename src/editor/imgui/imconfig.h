@@ -10,7 +10,7 @@
 #define IM_ASSERT(_EXPR)  do { if(!(_EXPR)) __debugbreak(); } while(false)
 
 //---- Define attributes of all API symbols declarations, e.g. for DLL under Windows.
-#ifdef BUILDING_STUDIO_LIB
+#ifdef BUILDING_EDITOR
 #define IMGUI_API __declspec( dllexport )
 #else
 #define IMGUI_API __declspec( dllimport )

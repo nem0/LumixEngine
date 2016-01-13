@@ -18,7 +18,7 @@ class FileSystemWatcher;
 class Metadata;
 
 
-class LUMIX_STUDIO_LIB_API AssetBrowser
+class LUMIX_EDITOR_API AssetBrowser
 {
 public:
 	class IPlugin
