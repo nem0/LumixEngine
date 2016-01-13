@@ -271,7 +271,7 @@ project "studio"
 	debugdir "../../LumixEngine_data"
 
 	files { "../src/studio/**.cpp" }
-	includedirs { "../src", "../src/studio_lib", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
+	includedirs { "../src", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
 	links { "editor" }
 
 	useLua()
