@@ -50,7 +50,7 @@ public:
 		CONTROL = 2
 	};
 
-	class Plugin
+	class LUMIX_EDITOR_API Plugin
 	{
 	public:
 		virtual ~Plugin() {}

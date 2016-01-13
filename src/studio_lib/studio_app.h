@@ -2,6 +2,7 @@
 
 
 #include "lumix.h"
+#include "core/array.h"
 
 
 namespace Lumix
@@ -35,6 +36,7 @@ public:
 	virtual void removePlugin(IPlugin& plugin) = 0;
 	virtual int getExitCode() const = 0;
 	virtual void runScript(const char* src, const char* script_name) = 0;
+	virtual Lumix::Array<Action*>& getActions() = 0;
 
 	virtual ~StudioApp() {}
 	virtual void run() = 0;

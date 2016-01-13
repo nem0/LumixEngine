@@ -22,7 +22,7 @@ class AssetBrowser;
 class LUMIX_STUDIO_LIB_API PropertyGrid
 {
 public:
-	struct Plugin
+	struct IPlugin
 	{
 		virtual void onGUI(PropertyGrid& grid, Lumix::ComponentUID cmp) = 0;
 	};
@@ -33,8 +33,8 @@ public:
 		Lumix::Array<Action*>& actions);
 	~PropertyGrid();
 
-	void addPlugin(Plugin& plugin) { m_plugins.push(&plugin); }
-	void removePlugin(Plugin& plugin) { m_plugins.eraseItem(&plugin); }
+	void addPlugin(IPlugin& plugin) { m_plugins.push(&plugin); }
+	void removePlugin(IPlugin& plugin) { m_plugins.eraseItem(&plugin); }
 	void onGUI();
 	bool entityInput(const char* label, const char* str_id, Lumix::Entity& entity) const;
 
@@ -42,7 +42,6 @@ public:
 	bool m_is_opened;
 
 private:
-	void onParticleEmitterGUI(Lumix::ComponentUID cmp);
 	void showProperty(Lumix::IPropertyDescriptor& desc, int index, Lumix::ComponentUID cmp);
 	void showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescriptor& desc);
 	void showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::ISampledFunctionDescriptor& desc);
@@ -54,8 +53,7 @@ private:
 private:
 	Lumix::WorldEditor& m_editor;
 	AssetBrowser& m_asset_browser;
-	Lumix::Array<Plugin*> m_plugins;
-	class TerrainEditor* m_terrain_editor;
+	Lumix::Array<IPlugin*> m_plugins;
 	char m_filter[128];
 
 	float m_particle_emitter_timescale;
