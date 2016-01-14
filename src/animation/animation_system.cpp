@@ -257,7 +257,7 @@ private:
 				break;
 			}
 		}
-		Animable& animable = src ? *src : m_animables.pushEmpty();
+		Animable& animable = src ? *src : m_animables.emplace();
 		animable.m_time = 0;
 		animable.m_is_free = false;
 		animable.m_renderable = INVALID_COMPONENT;

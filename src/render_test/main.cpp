@@ -196,7 +196,7 @@ public:
 		auto push_test = [&](const char* name) {
 			char basename[Lumix::MAX_PATH_LENGTH];
 			Lumix::PathUtils::getBasename(basename, Lumix::lengthOf(basename), name);
-			auto& test = m_tests.pushEmpty();
+			auto& test = m_tests.emplace();
 			Lumix::copyString(test.path, "render_tests/");
 			Lumix::catString(test.path, basename);
 			test.failed = false;

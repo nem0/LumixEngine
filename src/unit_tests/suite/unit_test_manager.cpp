@@ -83,7 +83,7 @@ namespace Lumix
 		public:
 			void registerFunction(const char* name, Manager::unitTestFunc func, const char* params)
 			{
-				UnitTestPair& pair = m_unit_tests.pushEmpty();
+				UnitTestPair& pair = m_unit_tests.emplace();
 				pair.name = name;
 				pair.parameters = params;
 				pair.func = func;
@@ -194,7 +194,7 @@ namespace Lumix
 
 			void handleFail(const char* msg, const char* file_name, uint32 line)
 			{	
-				FailInfo& fi = m_failed_tests.pushEmpty();
+				FailInfo& fi = m_failed_tests.emplace();
 				Lumix::copyString(fi.m_message, msg);
 				fi.m_file_name = file_name;
 				fi.m_line = line;

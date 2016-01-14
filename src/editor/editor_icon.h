@@ -2,7 +2,6 @@
 
 
 #include "core/matrix.h"
-#include "universe/universe.h"
 
 
 namespace Lumix
@@ -16,27 +15,23 @@ class RenderScene;
 class WorldEditor;
 
 
-class EditorIcon
+class EditorIcons
 {
 	public:
-		enum Type
+		struct Hit
 		{
-			PHYSICAL_CONTROLLER,
-			PHYSICAL_BOX,
-			CAMERA,
-			LIGHT,
-			TERRAIN,
-			ENTITY,
-			COUNT
+			Entity entity;
+			float t;
 		};
 
 	public:
-		EditorIcon(WorldEditor& editor, RenderScene& scene, Entity entity);
-		~EditorIcon();
-		void render(WorldEditor& editor);
-		void show();
-		void hide();
-		float hit(WorldEditor& editor, const Vec3& origin, const Vec3& dir) const;
+		static EditorIcons* create(WorldEditor& editor);
+		static void destroy(EditorIcons& icons);
+
+		virtual void clear() = 0;
+		virtual void render() = 0;
+		virtual Hit raycast(const Vec3& origin, const Vec3& dir) = 0;
+		/*float hit(WorldEditor& editor, const Vec3& origin, const Vec3& dir) const;
 		Entity getEntity() const { return m_entity; }
 
 		static void loadIcons(WorldEditor& editor);
@@ -49,7 +44,7 @@ class EditorIcon
 		Matrix m_matrix;
 		float m_scale;
 		bool m_is_visible;
-		Type m_type;
+		Type m_type;*/
 };
 
 

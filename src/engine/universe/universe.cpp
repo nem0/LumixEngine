@@ -162,7 +162,7 @@ void Universe::createEntity(Entity entity)
 	}
 	m_entity_map[entity] = m_transformations.size();
 
-	Transformation& trans = m_transformations.pushEmpty();
+	Transformation& trans = m_transformations.emplace();
 	trans.position.set(0, 0, 0);
 	trans.rotation.set(0, 0, 0, 1);
 	trans.scale = 1;
@@ -187,7 +187,7 @@ Entity Universe::createEntity(const Vec3& position, const Quat& rotation)
 		m_entity_map.push(m_transformations.size());
 	}
 
-	Transformation& trans = m_transformations.pushEmpty();
+	Transformation& trans = m_transformations.emplace();
 	trans.position = position;
 	trans.rotation = rotation;
 	trans.scale = 1;

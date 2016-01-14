@@ -636,7 +636,7 @@ public:
 		m_renderables.reserve(size);
 		for (int i = 0; i < size; ++i)
 		{
-			auto& r = m_renderables.pushEmpty();
+			auto& r = m_renderables.emplace();
 			serializer.read(r.entity);
 			ASSERT(r.entity == i || r.entity == INVALID_ENTITY);
 			r.model = nullptr;
@@ -1235,7 +1235,7 @@ public:
 
 	ComponentIndex createCamera(Entity entity)
 	{
-		Camera& camera = m_cameras.pushEmpty();
+		Camera& camera = m_cameras.emplace();
 		camera.m_is_free = false;
 		camera.m_is_active = false;
 		camera.m_entity = entity;
@@ -1854,7 +1854,7 @@ public:
 						LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
 						for (int j = lod.getFrom(), c = lod.getTo(); j <= c; ++j)
 						{
-							auto& info = subinfos.pushEmpty();
+							auto& info = subinfos.emplace();
 							info.renderable = raw_subresults[i];
 							info.mesh = &model->getMesh(j);
 						}
@@ -1986,7 +1986,7 @@ public:
 			{
 				for (int k = 0, kc = renderable.model->getMeshCount(); k < kc; ++k)
 				{
-					auto& info = infos.pushEmpty();
+					auto& info = infos.emplace();
 					info.mesh = &renderable.model->getMesh(k);
 					info.renderable = renderable_cmp;
 				}
@@ -2008,7 +2008,7 @@ public:
 			const Renderable& renderable = m_renderables[geoms[j]];
 			for (int k = 0, kc = renderable.model->getMeshCount(); k < kc; ++k)
 			{
-				auto& info = infos.pushEmpty();
+				auto& info = infos.emplace();
 				info.mesh = &renderable.model->getMesh(k);
 				info.renderable = geoms[j];
 			}
@@ -2472,7 +2472,7 @@ public:
 
 	void addDebugPoint(const Vec3& pos, uint32 color, float life) override
 	{
-		DebugPoint& point = m_debug_points.pushEmpty();
+		DebugPoint& point = m_debug_points.emplace();
 		point.m_pos = pos;
 		point.m_color = ARGBToABGR(color);
 		point.m_life = life;
@@ -2488,7 +2488,7 @@ public:
 
 	void addDebugLine(const Vec3& from, const Vec3& to, uint32 color, float life) override
 	{
-		DebugLine& line = m_debug_lines.pushEmpty();
+		DebugLine& line = m_debug_lines.emplace();
 		line.m_from = from;
 		line.m_to = to;
 		line.m_color = ARGBToABGR(color);
@@ -3083,7 +3083,7 @@ public:
 
 	ComponentIndex createGlobalLight(Entity entity)
 	{
-		GlobalLight& light = m_global_lights.pushEmpty();
+		GlobalLight& light = m_global_lights.emplace();
 		light.m_entity = entity;
 		light.m_color.set(1, 1, 1);
 		light.m_intensity = 0;
@@ -3108,7 +3108,7 @@ public:
 
 	ComponentIndex createPointLight(Entity entity)
 	{
-		PointLight& light = m_point_lights.pushEmpty();
+		PointLight& light = m_point_lights.emplace();
 		m_light_influenced_geometry.push(Array<int>(m_allocator));
 		light.m_entity = entity;
 		light.m_diffuse_color.set(1, 1, 1);

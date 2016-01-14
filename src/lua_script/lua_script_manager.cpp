@@ -84,7 +84,7 @@ void LuaScript::parseProperties()
 	{
 		const char* token = prop + PROPERTY_MARK_LENGTH + 1;
 
-		Property& property = m_properties.pushEmpty();
+		Property& property = m_properties.emplace();
 		token = getToken(token, property.name, sizeof(property.name));
 		char type[50];
 		token = getToken(token, type, sizeof(type));

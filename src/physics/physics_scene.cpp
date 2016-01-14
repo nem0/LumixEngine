@@ -566,7 +566,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		cDesc.behaviorCallback = nullptr;
 		Vec3 position = m_universe.getPosition(entity);
 		cDesc.position.set(position.x, position.y, position.z);
-		PhysicsSceneImpl::Controller& c = m_controllers.pushEmpty();
+		PhysicsSceneImpl::Controller& c = m_controllers.emplace();
 		c.m_controller = m_controller_manager->createController(cDesc);
 		c.m_entity = entity;
 		c.m_is_free = false;
@@ -1540,7 +1540,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.read(is_free);
 			Entity e(index);
 
-			Controller& c = m_controllers.pushEmpty();
+			Controller& c = m_controllers.emplace();
 			c.m_is_free = is_free;
 			c.m_frame_change.set(0, 0, 0);
 
@@ -1680,7 +1680,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void applyForceToActor(ComponentIndex cmp, const Vec3& force) override
 	{
-		auto& i = m_queued_forces.pushEmpty();
+		auto& i = m_queued_forces.emplace();
 		i.cmp = cmp;
 		i.force = force;
 	}

@@ -270,7 +270,7 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 	clearUniforms();
 	while (!serializer.isArrayEnd())
 	{
-		Uniform& uniform = m_uniforms.pushEmpty();
+		Uniform& uniform = m_uniforms.emplace();
 		serializer.nextArrayItem();
 		serializer.deserializeObjectBegin();
 		char label[256];
