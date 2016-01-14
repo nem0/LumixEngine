@@ -281,7 +281,7 @@ struct AudioSceneImpl : public AudioScene
 
 	ComponentIndex createEchoZone(Entity entity)
 	{
-		auto& zone = m_echo_zones.pushEmpty();
+		auto& zone = m_echo_zones.emplace();
 		zone.entity = entity;
 		zone.component = ++m_last_echo_zone_id;
 		zone.delay = 500.0f;
@@ -337,7 +337,7 @@ struct AudioSceneImpl : public AudioScene
 
 	ComponentIndex createAmbientSound(Entity entity)
 	{
-		auto& sound = m_ambient_sounds.pushEmpty();
+		auto& sound = m_ambient_sounds.emplace();
 		sound.component = ++m_last_ambient_sound_id;
 		sound.entity = entity;
 		sound.clip = nullptr;

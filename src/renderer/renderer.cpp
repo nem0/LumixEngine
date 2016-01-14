@@ -346,7 +346,7 @@ struct RendererImpl : public Renderer
 			}
 		}
 
-		auto& new_define = m_shader_defines.pushEmpty();
+		auto& new_define = m_shader_defines.emplace();
 		copyString(new_define, define);
 		return m_shader_defines.size() - 1;
 	}
@@ -362,7 +362,7 @@ struct RendererImpl : public Renderer
 			}
 		}
 
-		auto& new_pass = m_passes.pushEmpty();
+		auto& new_pass = m_passes.emplace();
 		copyString(new_pass, pass);
 		return m_passes.size() - 1;
 	}

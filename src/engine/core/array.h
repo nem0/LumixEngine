@@ -232,17 +232,6 @@ public:
 		m_size = 0;
 	}
 
-	T& pushEmpty()
-	{
-		if (m_size == m_capacity)
-		{
-			grow();
-		}
-		new (NewPlaceholder(), (char*)(m_data + m_size)) T();
-		++m_size;
-		return m_data[m_size - 1];
-	}
-
 	const T& back() const { return m_data[m_size - 1]; }
 
 

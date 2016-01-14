@@ -572,7 +572,7 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 		local_pos = local_pos / xz_scale;
 		local_pos.y = -1;
 
-		Item& item = m_items.pushEmpty();
+		Item& item = m_items.emplace();
 		item.m_local_pos = local_pos;
 		item.m_radius = radius;
 		item.m_amount = rel_amount;
@@ -615,7 +615,7 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 		serializer.deserializeArrayBegin("items");
 		while (!serializer.isArrayEnd())
 		{
-			Item& item = m_items.pushEmpty();
+			Item& item = m_items.emplace();
 			serializer.deserializeArrayItem(item.m_amount, 0);
 			serializer.deserializeArrayItem(item.m_local_pos.x, 0);
 			serializer.deserializeArrayItem(item.m_local_pos.z, 0);

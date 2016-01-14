@@ -566,7 +566,7 @@ struct PipelineImpl : public Pipeline
 
 	CustomCommandHandler& addCustomCommandHandler(const char* name) override
 	{
-		auto& handler = m_custom_commands_handlers.pushEmpty();
+		auto& handler = m_custom_commands_handlers.emplace();
 		copyString(handler.name, name);
 		handler.hash = crc32(name);
 		exposeCustomCommandToLua(handler);
@@ -685,7 +685,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::setViewTransform(
 			m_view_idx, &view_matrix.m11, &projection_matrix.m11);
 
-		PointLightShadowmap& s = m_point_light_shadowmaps.pushEmpty();
+		PointLightShadowmap& s = m_point_light_shadowmaps.emplace();
 		s.m_framebuffer = m_current_framebuffer;
 		s.m_light = light;
 		static const Matrix biasMatrix(
@@ -727,7 +727,7 @@ struct PipelineImpl : public Pipeline
 		};
 
 		PointLightShadowmap& shadowmap_info =
-			m_point_light_shadowmaps.pushEmpty();
+			m_point_light_shadowmaps.emplace();
 		shadowmap_info.m_framebuffer = fb;
 		shadowmap_info.m_light = light;
 

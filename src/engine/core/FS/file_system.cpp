@@ -212,7 +212,7 @@ public:
 
 		if (prev)
 		{
-			AsyncItem& item = m_pending.pushEmpty();
+			AsyncItem& item = m_pending.emplace();
 
 			item.m_file = prev;
 			item.m_cb = call_back;
@@ -274,7 +274,7 @@ public:
 
 	void closeAsync(IFile& file) override
 	{
-		AsyncItem& item = m_pending.pushEmpty();
+		AsyncItem& item = m_pending.emplace();
 
 		item.m_file = &file;
 		item.m_cb.bind<closeAsync>();

@@ -851,13 +851,6 @@ private:
 };
 
 
-struct EditorIconHit
-{
-	EditorIcon* m_icon;
-	float m_t;
-};
-
-
 struct WorldEditorImpl : public WorldEditor
 {
 private:
@@ -921,7 +914,7 @@ private:
 			serializer.deserializeArrayBegin("entities");
 			while (!serializer.isArrayEnd())
 			{
-				Entity& entity = m_entities.pushEmpty();
+				Entity& entity = m_entities.emplace();
 				serializer.deserializeArrayItem(entity, 0);
 			}
 			serializer.deserializeArrayEnd();
@@ -1521,7 +1514,7 @@ public:
 		auto& library_loaded_callback = m_engine->getPluginManager().libraryLoaded();
 		library_loaded_callback.unbind<WorldEditorImpl, &WorldEditorImpl::onPluginLibraryLoaded>(this);
 
-		EditorIcon::unloadIcons(*this);
+		EditorIcons::destroy(*m_editor_icons);
 		removePlugin(*m_measure_tool);
 		LUMIX_DELETE(m_allocator, m_measure_tool);
 		for (auto* plugin : m_plugins)
@@ -1538,24 +1531,6 @@ public:
 	}
 
 
-	EditorIconHit raycastEditorIcons(const Vec3& origin, const Vec3& dir)
-	{
-		EditorIconHit hit;
-		hit.m_t = -1;
-		for (int i = 0, c = m_editor_icons.size(); i < c; ++i)
-		{
-			float t = m_editor_icons[i]->hit(*this, origin, dir);
-			if (t >= 0)
-			{
-				hit.m_icon = m_editor_icons[i];
-				hit.m_t = t;
-				return hit;
-			}
-		}
-		return hit;
-	}
-
-
 	void onMouseDown(int x, int y, MouseButton::Value button) override
 	{
 		if (button == MouseButton::RIGHT)
@@ -1568,14 +1543,11 @@ public:
 			ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
 			if (camera_cmp.isValid())
 			{
-				RenderScene* scene =
-					static_cast<RenderScene*>(camera_cmp.scene);
-				scene->getRay(
-					camera_cmp.index, (float)x, (float)y, origin, dir);
-				RayCastModelHit hit =
-					scene->castRay(origin, dir, INVALID_COMPONENT);
+				RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
+				scene->getRay(camera_cmp.index, (float)x, (float)y, origin, dir);
+				RayCastModelHit hit = scene->castRay(origin, dir, INVALID_COMPONENT);
 				bool gizmo_hit = m_gizmo.isHit();
-				EditorIconHit icon_hit = raycastEditorIcons(origin, dir);
+				auto icon_hit = m_editor_icons->raycast(origin, dir);
 				if (gizmo_hit)
 				{
 					if (!m_selected_entities.empty())
@@ -1584,9 +1556,9 @@ public:
 						m_gizmo.startTransform(camera_cmp.index, x, y);
 					}
 				}
-				else if (icon_hit.m_t >= 0)
+				else if (icon_hit.entity != INVALID_ENTITY)
 				{
-					Entity e = icon_hit.m_icon->getEntity();
+					Entity e = icon_hit.entity;
 					if (m_is_additive_selection)
 					{
 						addEntitiesToSelection(&e, 1);
@@ -1729,7 +1701,7 @@ public:
 	void setRenderInterface(class RenderInterface* interface) override
 	{
 		m_render_interface = interface;
-		EditorIcon::loadIcons(*this);
+		m_editor_icons = EditorIcons::create(*this);
 	}
 
 
@@ -1857,18 +1829,6 @@ public:
 				  universe->getRotation(m_camera) * Vec3(0, 0, -2);
 		}
 		return pos;
-	}
-
-
-	void onEntityCreated(Entity entity)
-	{
-		if (m_camera >= 0)
-		{
-			EditorIcon* er = LUMIX_NEW(m_allocator, EditorIcon)(*this,
-				*static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene),
-				entity);
-			m_editor_icons.push(er);
-		}
 	}
 
 
@@ -2001,11 +1961,7 @@ public:
 		ASSERT(m_universe_context);
 		m_engine->stopGame(*m_universe_context);
 		selectEntities(nullptr, 0);
-		for (int i = 0; i < m_editor_icons.size(); ++i)
-		{
-			LUMIX_DELETE(m_allocator, m_editor_icons[i]);
-		}
-		m_editor_icons.clear();
+		m_editor_icons->clear();
 		m_is_game_mode = false;
 		m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
 		load(*m_game_mode_file);
@@ -2273,7 +2229,7 @@ public:
 		Header header;
 		header.version = -1;
 		int hashed_offset = sizeof(hash);
-		if(hash == 0xFFFFffff)
+		if (hash == 0xFFFFffff)
 		{
 			blob.rewind();
 			blob.read(header);
@@ -2297,7 +2253,7 @@ public:
 		if (m_engine->deserialize(*m_universe_context, blob))
 		{
 			m_template_system->deserialize(blob);
-			if(header.version > (int)SerializedVersion::ENTITY_GROUPS)
+			if (header.version > (int)SerializedVersion::ENTITY_GROUPS)
 			{
 				m_entity_groups.deserialize(blob);
 			}
@@ -2311,13 +2267,6 @@ public:
 
 			g_log_info.log("editor") << "Universe parsed in " << timer->getTimeSinceStart()
 									 << " seconds";
-
-			Universe* universe = getUniverse();
-			for (int i = 0; i < universe->getEntityCount(); ++i)
-			{
-				Entity e = universe->getEntityFromDenseIdx(i);
-				createEditorIcon(e);
-			}
 		}
 		else
 		{
@@ -2354,43 +2303,6 @@ public:
 	}
 
 
-	void createEditorIcon(Entity entity)
-	{
-		if (m_camera == entity)
-		{
-			return;
-		}
-
-		const WorldEditor::ComponentList& cmps = getComponents(entity);
-
-		bool found_renderable = false;
-		for (int i = 0; i < cmps.size(); ++i)
-		{
-			if (cmps[i].type == RENDERABLE_HASH)
-			{
-				found_renderable = true;
-				break;
-			}
-		}
-		for (int i = 0; i < m_editor_icons.size(); ++i)
-		{
-			if (m_editor_icons[i]->getEntity() == entity)
-			{
-				LUMIX_DELETE(m_allocator, m_editor_icons[i]);
-				m_editor_icons.eraseFast(i);
-				break;
-			}
-		}
-		if (!found_renderable)
-		{
-			EditorIcon* er = LUMIX_NEW(m_allocator, EditorIcon)(*this,
-				*static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene),
-				entity);
-			m_editor_icons.push(er);
-		}
-	}
-
-
 	void resetAndLoad(FS::IFile& file)
 	{
 		destroyUniverse();
@@ -2409,19 +2321,15 @@ public:
 	Gizmo& getGizmo() override { return m_gizmo; }
 
 
-	ComponentUID getEditCamera() override
+	void renderIcons() override
 	{
-		return getComponent(m_camera, CAMERA_HASH);
+		if(m_editor_icons) m_editor_icons->render();
 	}
 
 
-	void renderIcons() override
+	ComponentUID getEditCamera() override
 	{
-		PROFILE_FUNCTION();
-		for (int i = 0, c = m_editor_icons.size(); i < c; ++i)
-		{
-			m_editor_icons[i]->render(*this);
-		}
+		return getComponent(m_camera, CAMERA_HASH);
 	}
 
 
@@ -2437,7 +2345,7 @@ public:
 		, m_universe_loaded(m_allocator)
 		, m_property_set(m_allocator)
 		, m_selected_entities(m_allocator)
-		, m_editor_icons(m_allocator)
+		, m_editor_icons(nullptr)
 		, m_plugins(m_allocator)
 		, m_undo_stack(m_allocator)
 		, m_copy_buffer(m_allocator)
@@ -2710,47 +2618,17 @@ public:
 	void onComponentAdded(const ComponentUID& cmp)
 	{
 		getComponents(cmp.entity).push(cmp);
-		if (!m_is_loading)
-		{
-			createEditorIcon(cmp.entity);
-		}
 	}
-
 
 	void onComponentDestroyed(const ComponentUID& cmp)
 	{
 		getComponents(cmp.entity).eraseItemFast(cmp);
-		for (int i = 0; i < m_editor_icons.size(); ++i)
-		{
-			if (m_editor_icons[i]->getEntity() == cmp.entity)
-			{
-				LUMIX_DELETE(m_allocator, m_editor_icons[i]);
-				m_editor_icons.eraseFast(i);
-				break;
-			}
-		}
-		if (getUniverse()->hasEntity(cmp.entity) && !getComponents(cmp.entity).empty())
-		{
-			EditorIcon* er = LUMIX_NEW(m_allocator, EditorIcon)(*this,
-				*static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene),
-				cmp.entity);
-			m_editor_icons.push(er);
-		}
 	}
-
 
 	void onEntityDestroyed(Entity entity)
 	{
+		m_components.erase(entity);
 		m_selected_entities.eraseItemFast(entity);
-		for (int i = 0; i < m_editor_icons.size(); ++i)
-		{
-			if (m_editor_icons[i]->getEntity() == entity)
-			{
-				LUMIX_DELETE(m_allocator, m_editor_icons[i]);
-				m_editor_icons.eraseFast(i);
-				break;
-			}
-		}
 	}
 
 
@@ -2764,14 +2642,10 @@ public:
 		m_universe_destroyed.invoke();
 		m_gizmo.setUniverse(nullptr);
 		m_gizmo.destroy();
-		for (int i = 0; i < m_editor_icons.size(); ++i)
-		{
-			LUMIX_DELETE(m_allocator, m_editor_icons[i]);
-		}
+		m_editor_icons->clear();
 		m_components.clear();
 		selectEntities(nullptr, 0);
 		m_camera = INVALID_ENTITY;
-		m_editor_icons.clear();
 		m_engine->destroyUniverse(*m_universe_context);
 		m_universe_context = nullptr;
 	}
@@ -2858,15 +2732,11 @@ public:
 		m_gizmo.create();
 		m_gizmo.setUniverse(universe);
 
-		universe->entityCreated()
-			.bind<WorldEditorImpl, &WorldEditorImpl::onEntityCreated>(this);
-		universe->componentAdded()
-			.bind<WorldEditorImpl, &WorldEditorImpl::onComponentAdded>(this);
+		universe->componentAdded().bind<WorldEditorImpl, &WorldEditorImpl::onComponentAdded>(this);
 		universe->componentDestroyed()
-			.bind<WorldEditorImpl, &WorldEditorImpl::onComponentDestroyed>(
-				this);
-		universe->entityDestroyed()
-			.bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
+			.bind<WorldEditorImpl, &WorldEditorImpl::onComponentDestroyed>(this);
+		universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(
+			this);
 
 		m_selected_entities.clear();
 		m_universe_created.invoke();
@@ -3166,11 +3036,11 @@ private:
 	Gizmo m_gizmo;
 	Array<Entity> m_selected_entities;
 	MouseMode::Value m_mouse_mode;
+	EditorIcons* m_editor_icons;
 	float m_mouse_x;
 	float m_mouse_y;
 	bool m_gizmo_use_step;
-	Array<EditorIcon*> m_editor_icons;
-	AssociativeArray<int32, Array<ComponentUID>> m_components;
+	AssociativeArray<Entity, Array<ComponentUID>> m_components;
 	bool m_is_game_mode;
 	bool m_is_orbit;
 	bool m_is_additive_selection;

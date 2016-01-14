@@ -118,7 +118,7 @@ struct ProfilerUIImpl : public ProfilerUI
 	{
 		if (event.type == Lumix::FS::EventType::OPEN_BEGIN)
 		{
-			auto& file = m_opened_files.pushEmpty();
+			auto& file = m_opened_files.emplace();
 			file.start = m_timer->getTimeSinceStart();
 			file.last_read = file.start;
 			file.bytes = 0;

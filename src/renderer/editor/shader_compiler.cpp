@@ -368,7 +368,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			}
 			else
 			{
-				auto& p = m_processes.pushEmpty();
+				auto& p = m_processes.emplace();
 				p.process = process;
 				Lumix::copyString(p.path, out_path);
 			}

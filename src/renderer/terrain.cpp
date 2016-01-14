@@ -387,7 +387,7 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch,
 
 			if (density < 0.25f) continue;
 
-			Matrix& grass_mtx = patch.m_matrices.pushEmpty();
+			Matrix& grass_mtx = patch.m_matrices.emplace();
 			grass_mtx = Matrix::IDENTITY;
 			float x = quad_x + dx + step * Math::randFloat(-0.5f, 0.5f);
 			float z = quad_z + dz + step * Math::randFloat(-0.5f, 0.5f);
@@ -532,7 +532,7 @@ void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Com
 				const GrassPatch& patch = quad->m_patches[patch_idx];
 				if (!patch.m_matrices.empty())
 				{
-					GrassInfo& info = infos.pushEmpty();
+					GrassInfo& info = infos.emplace();
 					info.m_matrices = &patch.m_matrices[0];
 					info.m_matrix_count = patch.m_matrices.size();
 					info.m_model = patch.m_type->m_grass_model;
