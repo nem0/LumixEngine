@@ -396,7 +396,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderParticles(const ParticleEmitter& emitter)
+	void renderParticlesFromEmitter(const ParticleEmitter& emitter)
 	{
 		static const int PARTICLE_BATCH_SIZE = 256;
 
@@ -455,7 +455,7 @@ struct PipelineImpl : public Pipeline
 		{
 			if (!emitter) continue;
 
-			renderParticles(*emitter);
+			renderParticlesFromEmitter(*emitter);
 		}
 	}
 
@@ -587,7 +587,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void setCurrentFramebuffer(const char* framebuffer_name)
+	void setFramebuffer(const char* framebuffer_name)
 	{
 		if (compareString(framebuffer_name, "default") == 0)
 		{
@@ -623,12 +623,19 @@ struct PipelineImpl : public Pipeline
 	int getHeight() override { return m_height; }
 
 
-	void executeCustomCommand(uint32 name)
+	float getFPS()
 	{
+		return m_renderer.getEngine().getFPS();
+	}
+
+
+	void executeCustomCommand(const char* name)
+	{
+		uint32 name_hash = crc32(name);
 		CustomCommandHandler handler;
 		for(auto& handler : m_custom_commands_handlers)
 		{
-			if(handler.hash == name)
+			if(handler.hash == name_hash)
 			{
 				handler.callback.invoke();
 				break;
@@ -777,22 +784,19 @@ struct PipelineImpl : public Pipeline
 			0.5, 0.5, 0.5, 1.0);
 			shadowmap_info.m_matrices[i] = biasMatrix * (projection_matrix * view_matrix);
 
-			renderModels(light, frustum, layer_mask);
+			renderLitModels(light, frustum, layer_mask);
 		}
 	}
 
 
-	void renderModels(ComponentIndex light,
-					  const Frustum& frustum,
-					  int64 layer_mask)
+	void renderLitModels(ComponentIndex light, const Frustum& frustum, int64 layer_mask)
 	{
 		PROFILE_FUNCTION();
 
 		m_tmp_meshes.clear();
 		m_current_light = light;
 		m_is_current_light_global = false;
-		m_scene->getPointLightInfluencedGeometry(
-			light, frustum, m_tmp_meshes, layer_mask);
+		m_scene->getPointLightInfluencedGeometry(light, frustum, m_tmp_meshes, layer_mask);
 
 		renderMeshes(m_tmp_meshes);
 		m_current_light = -1;
@@ -853,8 +857,9 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderShadowmap(ComponentIndex camera, int64 layer_mask)
+	void renderShadowmap(int64 layer_mask, const char* slot)
 	{
+		auto camera = m_scene->getCameraInSlot(slot);
 		Universe& universe = m_scene->getUniverse();
 		ComponentIndex light_cmp = m_scene->getActiveGlobalLight();
 		if (light_cmp < 0 || camera < 0) return;
@@ -924,6 +929,13 @@ struct PipelineImpl : public Pipeline
 			renderAll(shadow_camera_frustum, layer_mask, false);
 		}
 		m_is_rendering_in_shadowmap = false;
+	}
+
+
+	void renderDebugShapes()
+	{
+		renderDebugLines();
+		renderDebugPoints();
 	}
 
 
@@ -1102,7 +1114,6 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void enableBlending(uint64 value) { m_render_state |= value; }
 	void disableBlending() { m_render_state &= ~BGFX_STATE_BLEND_MASK; }
 
 	void enableDepthWrite() { m_render_state |= BGFX_STATE_DEPTH_WRITE; }
@@ -1760,6 +1771,76 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	int loadMaterial(const char* path)
+	{
+		ResourceManagerBase& material_manager = m_renderer.getMaterialManager();
+		auto* material = static_cast<Material*>(material_manager.load(Lumix::Path(path)));
+
+		m_materials.push(material);
+		return m_materials.size() - 1;
+	}
+
+
+	int createUniform(const char* name)
+	{
+		bgfx::UniformHandle handle = bgfx::createUniform(name, bgfx::UniformType::Int1);
+		m_uniforms.push(handle);
+		return m_uniforms.size() - 1;
+	}
+
+
+	bool hasScene()
+	{
+		return m_scene != nullptr;
+	}
+
+
+	bool cameraExists(const char* slot_name)
+	{
+		return m_scene->getCameraInSlot(slot_name) != INVALID_ENTITY;
+	}
+
+
+	void enableBlending(const char* mode)
+	{
+		uint64 mode_value = 0;
+		if (compareString(mode, "alpha") == 0) mode_value = BGFX_STATE_BLEND_ALPHA;
+		else if (compareString(mode, "add") == 0) mode_value = BGFX_STATE_BLEND_ADD;
+		else if (compareString(mode, "multiply") == 0) mode_value = BGFX_STATE_BLEND_MULTIPLY;
+
+		m_render_state |= mode_value;
+	}
+
+
+	void clear(const char* buffers, int color)
+	{
+		uint16 flags = 0;
+		if (compareString(buffers, "all") == 0)
+		{
+			flags = BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH;
+		}
+		else if (compareString(buffers, "depth") == 0)
+		{
+			flags = BGFX_CLEAR_DEPTH;
+		}
+		bgfx::setViewClear(m_view_idx, flags, color, 1.0f, 0);
+		bgfx::touch(m_view_idx);
+	}
+
+
+	void renderModels(int64 layer_mask, bool is_point_light_render)
+	{
+		if (is_point_light_render)
+		{
+			renderPointLightInfluencedGeometry(m_camera_frustum, layer_mask);
+		}
+		else
+		{
+			renderAll(m_camera_frustum, layer_mask, true);
+		}
+	}
+
+
 	bool isReady() const override { return m_is_ready; }
 	void setScene(RenderScene* scene) override { m_scene = scene; }
 	void setWireframe(bool wireframe) override { m_is_wireframe = wireframe; }
@@ -1868,150 +1949,11 @@ void Pipeline::destroy(Pipeline* pipeline)
 
 namespace LuaAPI
 {
-
-
-void beginNewView(PipelineImpl* pipeline, const char* debug_name)
-{
-	pipeline->beginNewView(pipeline->m_current_framebuffer, debug_name);
-}
-
-
-void setPass(PipelineImpl* pipeline, const char* pass)
-{
-	pipeline->setPass(pass);
-}
-
-
-void setFramebuffer(PipelineImpl* pipeline, const char* framebuffer_name)
-{
-	pipeline->setCurrentFramebuffer(framebuffer_name);
-}
-
-
-void enableAlphaWrite(PipelineImpl* pipeline)
-{
-	pipeline->enableAlphaWrite();
-}
-
-
-void disableAlphaWrite(PipelineImpl* pipeline)
-{
-	pipeline->disableAlphaWrite();
-}
-
-
-void enableDepthWrite(PipelineImpl* pipeline)
-{
-	pipeline->enableDepthWrite();
-}
-
-
-void disableDepthWrite(PipelineImpl* pipeline)
-{
-	pipeline->disableDepthWrite();
-}
-
-
-void enableRGBWrite(PipelineImpl* pipeline)
-{
-	pipeline->enableRGBWrite();
-}
-
-
-void disableRGBWrite(PipelineImpl* pipeline)
-{
-	pipeline->disableRGBWrite();
-}
-
-
-void enableBlending(PipelineImpl* pipeline, const char* mode)
-{
-	uint64 mode_value = 0;
-	if (compareString(mode, "alpha") == 0) mode_value = BGFX_STATE_BLEND_ALPHA;
-	else if (compareString(mode, "add") == 0) mode_value = BGFX_STATE_BLEND_ADD;
-	else if (compareString(mode, "multiply") == 0) mode_value = BGFX_STATE_BLEND_MULTIPLY;
-
-	pipeline->enableBlending(mode_value);
-}
-
-
-void disableBlending(PipelineImpl* pipeline)
-{
-	pipeline->disableBlending();
-}
-
+	
 
 void logError(const char* message)
 {
-	g_log_error.log("rendere") << message;
-}
-
-
-void applyCamera(PipelineImpl* pipeline, const char* slot)
-{
-	pipeline->applyCamera(slot);
-}
-
-
-void clear(PipelineImpl* pipeline, const char* buffers, int color)
-{
-	uint16 flags = 0;
-	if (compareString(buffers, "all") == 0)
-	{
-		flags = BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH;
-	}
-	else if (compareString(buffers, "depth") == 0)
-	{
-		flags = BGFX_CLEAR_DEPTH;
-	}
-	bgfx::setViewClear(pipeline->m_view_idx, flags, color, 1.0f, 0);
-	bgfx::touch(pipeline->m_view_idx);
-}
-
-
-void renderModels(PipelineImpl* pipeline,
-				  int64 layer_mask,
-				  bool is_point_light_render)
-{
-	if (is_point_light_render)
-	{
-		pipeline->renderPointLightInfluencedGeometry(pipeline->m_camera_frustum, layer_mask);
-	}
-	else
-	{
-		pipeline->renderAll(pipeline->m_camera_frustum, layer_mask, true);
-	}
-}
-
-
-void executeCustomCommand(PipelineImpl* pipeline, const char* command)
-{
-	pipeline->executeCustomCommand(crc32(command));
-}
-
-
-bool hasScene(PipelineImpl* pipeline)
-{
-	return pipeline->m_scene != nullptr;
-}
-
-
-bool cameraExists(PipelineImpl* pipeline, const char* slot_name)
-{
-	return pipeline->m_scene->getCameraInSlot(slot_name) != INVALID_ENTITY;
-}
-
-
-float getFPS(PipelineImpl* pipeline)
-{
-	return pipeline->m_renderer.getEngine().getFPS();
-}
-
-
-void renderDebugShapes(PipelineImpl* pipeline)
-{
-	pipeline->renderDebugLines();
-	pipeline->renderDebugPoints();
+	g_log_error.log("renderer") << message;
 }
 
 
@@ -2046,56 +1988,6 @@ int renderLocalLightsShadowmaps(lua_State* L)
 }
 
 
-void renderShadowmap(PipelineImpl* pipeline, int64 layer_mask, const char* slot)
-{
-	pipeline->renderShadowmap(pipeline->m_scene->getCameraInSlot(slot), layer_mask);
-}
-
-
-int createUniform(PipelineImpl* pipeline, const char* name)
-{
-	bgfx::UniformHandle handle = bgfx::createUniform(name, bgfx::UniformType::Int1);
-	pipeline->m_uniforms.push(handle);
-	return pipeline->m_uniforms.size() - 1;
-}
-
-
-int loadMaterial(PipelineImpl* pipeline, const char* path)
-{
-	ResourceManagerBase& material_manager = pipeline->m_renderer.getMaterialManager();
-	auto* material = static_cast<Material*>(material_manager.load(Lumix::Path(path)));
-
-	pipeline->m_materials.push(material);
-	return pipeline->m_materials.size() - 1;
-}
-
-
-void renderParticles(PipelineImpl* pipeline)
-{
-	pipeline->renderParticles();
-}
-
-
-void bindFramebufferTexture(PipelineImpl* pipeline,
-	const char* framebuffer_name,
-	int renderbuffer_index,
-	int uniform_idx)
-{
-	pipeline->bindFramebufferTexture(framebuffer_name, renderbuffer_index, uniform_idx);
-}
-
-
-void drawQuad(PipelineImpl* pipeline,
-	float x,
-	float y,
-	float w,
-	float h,
-	int material_index)
-{
-	pipeline->drawQuad(x, y, w, h, material_index);
-}
-
-
 void print(int x, int y, const char* text)
 {
 	bgfx::dbgTextPrintf(x, y, 0x4f, text);
@@ -2108,14 +2000,17 @@ void print(int x, int y, const char* text)
 void PipelineImpl::registerCFunctions()
 {
 	#define REGISTER_FUNCTION(name) \
-		registerCFunction(#name, LuaWrapper::wrap<decltype(&LuaAPI::name), LuaAPI::name>)
+		do {\
+			auto f = &LuaWrapper::wrapMethod<PipelineImpl, decltype(&PipelineImpl::name), &PipelineImpl::name>; \
+			registerCFunction(#name, f); \
+		} while(false) \
 
 	REGISTER_FUNCTION(drawQuad);
-	REGISTER_FUNCTION(print);
-	REGISTER_FUNCTION(loadMaterial);
-	REGISTER_FUNCTION(createUniform);
-	REGISTER_FUNCTION(setFramebuffer);
-	REGISTER_FUNCTION(enableBlending);
+	REGISTER_FUNCTION(setPass);
+	REGISTER_FUNCTION(beginNewView);
+	REGISTER_FUNCTION(bindFramebufferTexture);
+	REGISTER_FUNCTION(applyCamera);
+	
 	REGISTER_FUNCTION(disableBlending);
 	REGISTER_FUNCTION(enableAlphaWrite);
 	REGISTER_FUNCTION(disableAlphaWrite);
@@ -2123,21 +2018,28 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(disableRGBWrite);
 	REGISTER_FUNCTION(enableDepthWrite);
 	REGISTER_FUNCTION(disableDepthWrite);
-	REGISTER_FUNCTION(setPass);
-	REGISTER_FUNCTION(beginNewView);
-	REGISTER_FUNCTION(applyCamera);
-	REGISTER_FUNCTION(logError);
+	REGISTER_FUNCTION(renderDebugShapes);
+	REGISTER_FUNCTION(setFramebuffer);
+	REGISTER_FUNCTION(renderParticles);
+	REGISTER_FUNCTION(loadMaterial);
+	REGISTER_FUNCTION(executeCustomCommand);
+	REGISTER_FUNCTION(getFPS);
+	REGISTER_FUNCTION(createUniform);
+	REGISTER_FUNCTION(hasScene);
+	REGISTER_FUNCTION(cameraExists);
+	REGISTER_FUNCTION(enableBlending);
 	REGISTER_FUNCTION(clear);
 	REGISTER_FUNCTION(renderModels);
 	REGISTER_FUNCTION(renderShadowmap);
+
+	#undef REGISTER_FUNCTION
+
+	#define REGISTER_FUNCTION(name) \
+		registerCFunction(#name, LuaWrapper::wrap<decltype(&LuaAPI::name), LuaAPI::name>)
+
+	REGISTER_FUNCTION(print);
+	REGISTER_FUNCTION(logError);
 	REGISTER_FUNCTION(renderLocalLightsShadowmaps);
-	REGISTER_FUNCTION(executeCustomCommand);
-	REGISTER_FUNCTION(renderDebugShapes);
-	REGISTER_FUNCTION(getFPS);
-	REGISTER_FUNCTION(cameraExists);
-	REGISTER_FUNCTION(hasScene);
-	REGISTER_FUNCTION(bindFramebufferTexture);
-	REGISTER_FUNCTION(renderParticles);
 
 	#undef REGISTER_FUNCTION
 	

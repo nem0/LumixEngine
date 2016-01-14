@@ -1408,7 +1408,7 @@ public:
 
 	Universe* getUniverse() override
 	{
-		return m_universe_context->m_universe;
+		return m_universe_context ? m_universe_context->m_universe : nullptr; 
 	}
 
 
@@ -1514,7 +1514,6 @@ public:
 		auto& library_loaded_callback = m_engine->getPluginManager().libraryLoaded();
 		library_loaded_callback.unbind<WorldEditorImpl, &WorldEditorImpl::onPluginLibraryLoaded>(this);
 
-		EditorIcons::destroy(*m_editor_icons);
 		removePlugin(*m_measure_tool);
 		LUMIX_DELETE(m_allocator, m_measure_tool);
 		for (auto* plugin : m_plugins)
@@ -1524,6 +1523,7 @@ public:
 		destroyUndoStack();
 
 		destroyUniverse();
+		EditorIcons::destroy(*m_editor_icons);
 		EntityTemplateSystem::destroy(m_template_system);
 		PropertyRegister::shutdown();
 

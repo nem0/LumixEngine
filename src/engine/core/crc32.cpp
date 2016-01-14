@@ -66,7 +66,7 @@ uint32 crc32(const void* data, int length)
 }
 
 
-uint32 crc32(const char str[])
+uint32 crc32(const char* str)
 {
 	const uint8* c = reinterpret_cast<const uint8*>(str);
 	uint32 crc = 0xffffFFFF;
@@ -79,7 +79,7 @@ uint32 crc32(const char str[])
 }
 
 
-uint32 continueCrc32(uint32 original_crc, const char str[])
+uint32 continueCrc32(uint32 original_crc, const char* str)
 {
 	const uint8* c = reinterpret_cast<const uint8*>(str);
 	uint32 crc = ~original_crc;

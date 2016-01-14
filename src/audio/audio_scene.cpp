@@ -20,43 +20,6 @@ namespace Lumix
 {
 
 
-namespace LuaAPI
-{
-
-
-static int playSound(IScene* scene, int entity, const char* clip_name, bool is_3d)
-{
-	auto* audio_scene = static_cast<AudioScene*>(scene);
-	auto* clip = audio_scene->getClipInfo(clip_name);
-	if (clip) return audio_scene->play(entity, clip, is_3d);
-
-	return -1;
-}
-
-
-static void setSoundVolume(IScene* scene, int sound_id, float volume)
-{
-	if (sound_id == AudioScene::INVALID_SOUND_HANDLE) return;
-	static_cast<AudioScene*>(scene)->setVolume(sound_id, volume);
-}
-
-
-static void setEcho(IScene* scene,
-	int sound_id,
-	float wet_dry_mix,
-	float feedback,
-	float left_delay,
-	float right_delay)
-{
-	if (sound_id == AudioScene::INVALID_SOUND_HANDLE) return;
-	static_cast<AudioScene*>(scene)->setEcho(
-		sound_id, wet_dry_mix, feedback, left_delay, right_delay);
-}
-
-
-} // namespace LuaAPI
-
-
 enum class AudioSceneVersion : int
 {
 	ECHO_ZONES,
@@ -134,6 +97,15 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
+	int playSound(int entity, const char* clip_name, bool is_3d)
+	{
+		auto* clip = getClipInfo(clip_name);
+		if (clip) return play(entity, clip, is_3d);
+
+		return -1;
+	}
+
+
 	void sendMessage(uint32 type, void*) override
 	{
 		static const uint32 register_hash = crc32("registerLuaAPI");
@@ -150,12 +122,18 @@ struct AudioSceneImpl : public AudioScene
 		if (!scene) return;
 
 		auto* script_scene = static_cast<LuaScriptScene*>(scene);
-		script_scene->registerFunction(
-			"Audio", "setEcho", LuaWrapper::wrap<decltype(&LuaAPI::setEcho), LuaAPI::setEcho>);
-		script_scene->registerFunction(
-			"Audio", "playSound", LuaWrapper::wrap<decltype(&LuaAPI::playSound), LuaAPI::playSound>);
-		script_scene->registerFunction(
-			"Audio", "setSoundVolume", LuaWrapper::wrap<decltype(&LuaAPI::setSoundVolume), LuaAPI::setSoundVolume>);
+		
+		#define REGISTER_FUNCTION(F) \
+			do { \
+			auto f = &LuaWrapper::wrapMethod<AudioSceneImpl, decltype(&AudioSceneImpl::F), &AudioSceneImpl::F>; \
+			script_scene->registerFunction("Audio", #F, f); \
+			} while(false) \
+
+		REGISTER_FUNCTION(setEcho);
+		REGISTER_FUNCTION(playSound);
+		REGISTER_FUNCTION(setVolume);
+
+		#undef REGISTER_FUNCTION
 	}
 
 
@@ -642,6 +620,7 @@ struct AudioSceneImpl : public AudioScene
 
 	void setVolume(SoundHandle sound_id, float volume) override
 	{
+		if (sound_id == AudioScene::INVALID_SOUND_HANDLE) return;
 		ASSERT(sound_id >= 0 && sound_id < lengthOf(m_playing_sounds));
 		m_device.setVolume(m_playing_sounds[sound_id].buffer_id, volume);
 	}

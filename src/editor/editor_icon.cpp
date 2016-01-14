@@ -52,6 +52,7 @@ struct EditorIconsImpl : public EditorIcons
 		}
 		editor.universeDestroyed().bind<EditorIconsImpl, &EditorIconsImpl::clear>(this);
 		editor.universeCreated().bind<EditorIconsImpl, &EditorIconsImpl::onUniverseCreated>(this);
+		if (m_editor.getUniverse()) onUniverseCreated();
 	}
 
 
@@ -113,6 +114,7 @@ struct EditorIconsImpl : public EditorIcons
 
 	void createIcon(Entity entity)
 	{
+		if (entity == 0) return;
 		if (m_editor.getEditCamera().entity == entity) return;
 
 		static const uint32 RENDERABLE_HASH = crc32("renderable");
