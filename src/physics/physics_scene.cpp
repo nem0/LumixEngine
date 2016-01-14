@@ -784,8 +784,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		REGISTER_FUNCTION(putToSleep);
 		REGISTER_FUNCTION(getActorSpeed);
 		REGISTER_FUNCTION(applyForceToActor);
-		//REGISTER_FUNCTION(moveController);
-		//REGISTER_FUNCTION(raycast);
+		REGISTER_FUNCTION(moveController);
+		REGISTER_FUNCTION(raycast);
 
 		#undef REGISTER_FUNCTION
 	}
