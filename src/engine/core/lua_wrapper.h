@@ -213,8 +213,8 @@ template <int N> struct FunctionCaller
 	{
 		typedef std::tuple_element<sizeof...(ArgsF)-N,
 								   std::tuple<ArgsF...>>::type T;
-		if (!checkParameterType<T>(L, sizeof...(ArgsF)-N + 1)) return R();
 		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		if (!checkParameterType<RealT>(L, sizeof...(ArgsF)-N + 1)) return R();
 		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 1);
 		return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
 	}
@@ -226,8 +226,8 @@ template <int N> struct FunctionCaller
 	{
 		typedef std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
-		if (!checkParameterType<T>(L, sizeof...(ArgsF)-N + 1)) return R();
 		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		if (!checkParameterType<RealT>(L, sizeof...(ArgsF)-N + 1)) return R();
 		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 1);
 		return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
 	}
@@ -239,8 +239,8 @@ template <int N> struct FunctionCaller
 	{
 		typedef std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
-		if (!checkParameterType<T>(L, sizeof...(ArgsF)-N + 2)) return R();
 		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		if (!checkParameterType<RealT>(L, sizeof...(ArgsF)-N + 2)) return R();
 
 		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 2);
 		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
@@ -253,8 +253,8 @@ template <int N> struct FunctionCaller
 	{
 		typedef std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
-		if (!checkParameterType<T>(L, sizeof...(ArgsF)-N + 2)) return R();
 		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		if (!checkParameterType<RealT>(L, sizeof...(ArgsF)-N + 2)) return R();
 		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 2);
 		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
 	}

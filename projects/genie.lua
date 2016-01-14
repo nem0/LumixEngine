@@ -19,6 +19,7 @@ newaction {
 		
 		installDllWithPdb "animation"
 		installDllWithPdb "audio"
+		installDllWithPdb "editor"
 		installDllWithPdb "engine"
 		installDllWithPdb "lua_script"
 		installDllWithPdb "physics"
