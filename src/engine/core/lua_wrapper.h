@@ -214,7 +214,8 @@ template <int N> struct FunctionCaller
 		typedef std::tuple_element<sizeof...(ArgsF)-N,
 								   std::tuple<ArgsF...>>::type T;
 		if (!checkParameterType<T>(L, sizeof...(ArgsF)-N + 1)) return R();
-		T a = toType<T>(L, sizeof...(ArgsF)-N + 1);
+		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 1);
 		return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
 	}
 
@@ -226,7 +227,8 @@ template <int N> struct FunctionCaller
 		typedef std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
 		if (!checkParameterType<T>(L, sizeof...(ArgsF)-N + 1)) return R();
-		T a = toType<T>(L, sizeof...(ArgsF)-N + 1);
+		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 1);
 		return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
 	}
 
@@ -238,7 +240,9 @@ template <int N> struct FunctionCaller
 		typedef std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
 		if (!checkParameterType<T>(L, sizeof...(ArgsF)-N + 2)) return R();
-		T a = toType<T>(L, sizeof...(ArgsF)-N + 2);
+		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+
+		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 2);
 		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
 	}
 
@@ -250,7 +254,8 @@ template <int N> struct FunctionCaller
 		typedef std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
 		if (!checkParameterType<T>(L, sizeof...(ArgsF)-N + 2)) return R();
-		T a = toType<T>(L, sizeof...(ArgsF)-N + 2);
+		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 2);
 		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
 	}
 };
@@ -332,6 +337,25 @@ int LUMIX_FORCE_INLINE callFunction(void (*f)(lua_State*, ArgsF...),
 template <typename T, T t> int wrap(lua_State* L)
 {
 	return callFunction(t, L);
+}
+
+
+template <typename C>
+int LUMIX_FORCE_INLINE callMethod(void(C::*f)(), lua_State* L)
+{
+	auto* inst = toType<C*>(L, 1);
+	(inst->*f)();
+	return 0;
+}
+
+
+template <typename C, typename R>
+int LUMIX_FORCE_INLINE callMethod(R(C::*f)(), lua_State* L)
+{
+	auto* inst = toType<C*>(L, 1);
+	R v = (inst->*f)();
+	pushLua(L, v);
+	return 1;
 }
 
 
