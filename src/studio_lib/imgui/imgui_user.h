@@ -44,11 +44,12 @@ IMGUI_API void NodeSlots(int count, bool input);
 
 struct CurveEditor
 {
-    bool valid;
-    ImVec2 beg_pos;
-    ImVec2 prev_point;
-    ImVec2 prev_tangent;
-    int point_idx;
+	bool valid;
+	ImVec2 beg_pos;
+	ImVec2 editor_size;
+	ImVec2 prev_point;
+	ImVec2 prev_tangent;
+	int point_idx;
 	int tangent_idx;
 	int point_count;
 };

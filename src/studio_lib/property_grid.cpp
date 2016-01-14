@@ -323,7 +323,6 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 		count += 3;
 		*(int*)blob.getData() = count;
 		f = (Lumix::Vec2*)((int*)blob.getData() + 1);
-		changed = true;
 
 		auto compare = [](const void* a, const void* b) -> int
 		{
@@ -333,6 +332,8 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 		};
 
 		qsort(f, count / 3, 3 * sizeof(f[0]), compare);
+
+		changed = true;
 	}
 
 	if (changed)
@@ -343,7 +344,7 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 			auto next_p = ((Lumix::Vec2*)f)[i + 2];
 			auto& tangent = ((Lumix::Vec2*)f)[i];
 			auto& tangent2 = ((Lumix::Vec2*)f)[i + 1];
-			float half = 0.5f * (next_p.x - prev_p.x);
+			float half = /*0.5f **/ (next_p.x - prev_p.x);
 			tangent = tangent.normalized() * half;
 			tangent2 = tangent2.normalized() * half;
 		}
