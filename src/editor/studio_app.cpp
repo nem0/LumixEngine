@@ -411,14 +411,7 @@ public:
 	void toggleGizmoMode() 
 	{
 		auto& gizmo = m_editor->getGizmo();
-		if (gizmo.getMode() == Lumix::Gizmo::Mode::TRANSLATE)
-		{
-			gizmo.setMode(Lumix::Gizmo::Mode::ROTATE);
-		}
-		else
-		{
-			gizmo.setMode(Lumix::Gizmo::Mode::TRANSLATE);
-		}
+		gizmo.toggleMode();
 	}
 
 

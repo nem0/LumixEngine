@@ -1485,13 +1485,19 @@ public:
 		PROFILE_FUNCTION();
 		updateGoTo();
 
+		if (!m_selected_entities.empty())
+		{
+			m_gizmo->add(m_selected_entities[0]);
+		}
+
 		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
 		if (camera_cmp.isValid())
 		{
 			Vec3 origin, cursor_dir;
 			RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
 			scene->getRay(camera_cmp.index, m_mouse_x, m_mouse_y, origin, cursor_dir);
-			m_gizmo.setCameraRay(origin, cursor_dir);
+			TODO("todo");
+			//m_gizmo.setCameraRay(origin, cursor_dir);
 		}
 
 		for (int i = 0; i < m_plugins.size(); ++i)
@@ -1499,6 +1505,7 @@ public:
 			m_plugins[i]->tick();
 		}
 		createEditorLines();
+		for (auto& i : m_is_mouse_click) i = false;
 	}
 
 
@@ -1511,6 +1518,7 @@ public:
 
 	~WorldEditorImpl()
 	{
+		Gizmo::destroy(*m_gizmo);
 		auto& library_loaded_callback = m_engine->getPluginManager().libraryLoaded();
 		library_loaded_callback.unbind<WorldEditorImpl, &WorldEditorImpl::onPluginLibraryLoaded>(this);
 
@@ -1531,8 +1539,22 @@ public:
 	}
 
 
+	bool isMouseClick(MouseButton::Value button) const override
+	{
+		return m_is_mouse_click[button];
+	}
+
+
+	bool isMouseDown(MouseButton::Value button) const override
+	{
+		return m_is_mouse_down[button];
+	}
+
+
 	void onMouseDown(int x, int y, MouseButton::Value button) override
 	{
+		m_is_mouse_click[button] = true;
+		m_is_mouse_down[button] = true;
 		if (button == MouseButton::RIGHT)
 		{
 			m_mouse_mode = MouseMode::NAVIGATE;
@@ -1546,17 +1568,10 @@ public:
 				RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
 				scene->getRay(camera_cmp.index, (float)x, (float)y, origin, dir);
 				RayCastModelHit hit = scene->castRay(origin, dir, INVALID_COMPONENT);
-				bool gizmo_hit = m_gizmo.isHit();
+				if (m_gizmo->isActive()) return;
+				
 				auto icon_hit = m_editor_icons->raycast(origin, dir);
-				if (gizmo_hit)
-				{
-					if (!m_selected_entities.empty())
-					{
-						m_mouse_mode = MouseMode::TRANSFORM;
-						m_gizmo.startTransform(camera_cmp.index, x, y);
-					}
-				}
-				else if (icon_hit.entity != INVALID_ENTITY)
+				if (icon_hit.entity != INVALID_ENTITY)
 				{
 					Entity e = icon_hit.entity;
 					if (m_is_additive_selection)
@@ -1629,7 +1644,8 @@ public:
 			case MouseMode::TRANSFORM:
 			{
 				int camera_cmp = getComponent(m_camera, CAMERA_HASH).index;
-				m_gizmo.transform(camera_cmp, x, y, relx, rely, m_gizmo_use_step);
+				TODO("todo");
+				//m_gizmo.transform(camera_cmp, x, y, relx, rely, m_gizmo_use_step);
 			}
 			break;
 		}
@@ -1645,7 +1661,7 @@ public:
 
 	void onMouseUp(int x, int y, MouseButton::Value button) override
 	{
-		m_gizmo.stopTransform();
+		m_is_mouse_down[button] = false;
 		if (m_mouse_handling_plugin)
 		{
 			m_mouse_handling_plugin->onMouseUp(x, y, button);
@@ -2318,7 +2334,7 @@ public:
 	}
 
 
-	Gizmo& getGizmo() override { return m_gizmo; }
+	Gizmo& getGizmo() override { return *m_gizmo; }
 
 
 	void renderIcons() override
@@ -2336,7 +2352,6 @@ public:
 	WorldEditorImpl(const char* base_path, Engine& engine, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_engine(nullptr)
-		, m_gizmo(*this)
 		, m_components(m_allocator)
 		, m_entity_name_set(m_allocator)
 		, m_entity_selected(m_allocator)
@@ -2359,6 +2374,8 @@ public:
 		, m_is_additive_selection(false)
 		, m_entity_groups(m_allocator)
 	{
+		for (auto& i : m_is_mouse_down) i = false;
+		for (auto& i : m_is_mouse_click) i = false;
 		PropertyRegister::init(m_allocator);
 		m_go_to_parameters.m_is_active = false;
 		m_undo_index = -1;
@@ -2415,6 +2432,8 @@ public:
 			auto* callback = static_cast<void (*)(WorldEditor&)>(getLibrarySymbol(lib, "setWorldEditor"));
 			if (callback) (*callback)(*this);
 		}
+
+		m_gizmo = Gizmo::create(*this);
 	}
 
 
@@ -2640,8 +2659,6 @@ public:
 		ASSERT(m_universe_context);
 		destroyUndoStack();
 		m_universe_destroyed.invoke();
-		m_gizmo.setUniverse(nullptr);
-		m_gizmo.destroy();
 		m_editor_icons->clear();
 		m_components.clear();
 		selectEntities(nullptr, 0);
@@ -2729,8 +2746,6 @@ public:
 		destroyUndoStack();
 		m_universe_context = &m_engine->createUniverse();
 		Universe* universe = m_universe_context->m_universe;
-		m_gizmo.create();
-		m_gizmo.setUniverse(universe);
 
 		universe->componentAdded().bind<WorldEditorImpl, &WorldEditorImpl::onComponentAdded>(this);
 		universe->componentDestroyed()
@@ -3033,7 +3048,7 @@ private:
 
 	Debug::Allocator m_allocator;
 	GoToParameters m_go_to_parameters;
-	Gizmo m_gizmo;
+	Gizmo* m_gizmo;
 	Array<Entity> m_selected_entities;
 	MouseMode::Value m_mouse_mode;
 	EditorIcons* m_editor_icons;
@@ -3053,6 +3068,8 @@ private:
 	DelegateList<void(ComponentUID, const IPropertyDescriptor&)> m_property_set;
 	DelegateList<void(const Array<Entity>&)> m_entity_selected;
 	DelegateList<void(Entity, const char*)> m_entity_name_set;
+	bool m_is_mouse_down[3];
+	bool m_is_mouse_click[3];
 
 	Path m_universe_path;
 	Path m_base_path;

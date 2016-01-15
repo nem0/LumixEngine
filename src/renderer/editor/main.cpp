@@ -1228,6 +1228,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		Vec3 getModelCenter(Entity entity) override
 		{
 			auto cmp = m_render_scene->getRenderableComponent(entity);
+			if (cmp == INVALID_COMPONENT) return Vec3(0, 0, 0);
 			Model* model = m_render_scene->getRenderableModel(cmp);
 			if (!model) return Vec3(0, 0, 0);
 			return (model->getAABB().getMin() + model->getAABB().getMax()) * 0.5f;

@@ -195,9 +195,10 @@ struct EditorIconsImpl : public EditorIcons
 			float distance = (position - camera_pos).length();
 
 			mtx.setTranslation(position);
-			mtx.multiply3x3(icon.scale > 0 ? icon.scale : 1);
+			Matrix tmp = mtx;
+			tmp.multiply3x3(icon.scale > 0 ? icon.scale : 1);
 
-			float t = m_editor.getRenderInterface()->castRay(m_models[(int)icon.type], origin, dir, mtx);
+			float t = m_editor.getRenderInterface()->castRay(m_models[(int)icon.type], origin, dir, tmp);
 			if(t >= 0 && (t < hit.t || hit.t < 0))
 			{
 				hit.t = t;
