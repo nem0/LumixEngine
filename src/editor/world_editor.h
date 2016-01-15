@@ -135,6 +135,8 @@ public:
 	virtual void removeArrayPropertyItem(const ComponentUID& cmp,
 		int index,
 		IArrayDescriptor& property) = 0;
+	virtual bool isMouseDown(MouseButton::Value button) const = 0;
+	virtual bool isMouseClick(MouseButton::Value button) const = 0;
 	virtual void onMouseDown(int x, int y, MouseButton::Value button) = 0;
 	virtual void onMouseMove(int x, int y, int relx, int rely) = 0;
 	virtual void onMouseUp(int x, int y, MouseButton::Value button) = 0;

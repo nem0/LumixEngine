@@ -1443,7 +1443,8 @@ public:
 	ComponentIndex getRenderableComponent(Entity entity) override
 	{
 		ComponentIndex cmp = (ComponentIndex)entity;
-		if(m_renderables[cmp].entity == INVALID_ENTITY) return INVALID_COMPONENT;
+		if (cmp >= m_renderables.size()) return INVALID_COMPONENT;
+		if (m_renderables[cmp].entity == INVALID_ENTITY) return INVALID_COMPONENT;
 		return cmp;
 	}
 

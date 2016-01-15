@@ -144,7 +144,6 @@ void SceneView::update()
 void SceneView::renderGizmos()
 {
 	m_editor->renderIcons();
-	m_editor->getGizmo().updateScale(m_editor->getEditCamera().index);
 	m_editor->getGizmo().render();
 }
 
