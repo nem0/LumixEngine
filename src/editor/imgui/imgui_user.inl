@@ -379,13 +379,6 @@ void BringToFront()
 }
 
 
-ImVec2 GetWindowSizeContents()
-{
-    ImGuiWindow* window = GetCurrentWindowRead();
-    return window->SizeContents;
-}
-
-
 static ImVec2 node_pos;
 static ImGuiID last_node_id;
 
