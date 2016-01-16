@@ -111,7 +111,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		}
 		if (ImGui::BeginPopupContextItem(StringBuilder<50>(desc_name, "pu")))
 		{
-			if (ColorPicker(StringBuilder<50>(desc_name, "cp"), &v.x))
+			if (ImGui::ColorPicker(&v.x, false))
 			{
 				m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
 			}

@@ -27,8 +27,7 @@ IMGUI_API bool ListBox(const char* label,
     void* data,
     int items_count,
     int height_in_items);
-
-IMGUI_API void ResetActiveID();
+IMGUI_API bool ColorPicker(float* col, bool alphabar);
 
 IMGUI_API ImVec2 GetWindowSizeContents();
 IMGUI_API void BringToFront();
