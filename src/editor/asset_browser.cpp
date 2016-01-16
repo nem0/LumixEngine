@@ -54,7 +54,8 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 
 	findResources();
 
-	m_watcher = FileSystemWatcher::create(editor.getBasePath(), editor.getAllocator());
+	const char* base_path = editor.getEngine().getPathManager().getBasePath();
+	m_watcher = FileSystemWatcher::create(base_path, editor.getAllocator());
 	m_watcher->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
 }
 
@@ -289,7 +290,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 
 void AssetBrowser::openInExternalEditor(Lumix::Resource* resource)
 {
-	StringBuilder<Lumix::MAX_PATH_LENGTH> path(m_editor.getBasePath());
+	StringBuilder<Lumix::MAX_PATH_LENGTH> path(m_editor.getEngine().getPathManager().getBasePath());
 	path << "/" << resource->getPath().c_str();
 	PlatformInterface::shellExecuteOpen(path);
 }

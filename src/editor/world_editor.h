@@ -25,11 +25,6 @@ class Universe;
 struct UniverseContext;
 
 
-namespace FS
-{
-class TCPFileServer;
-}
-
 struct MouseButton
 {
 	enum Value
@@ -39,6 +34,7 @@ struct MouseButton
 		MIDDLE
 	};
 };
+
 
 class LUMIX_EDITOR_API WorldEditor
 {
@@ -145,7 +141,6 @@ public:
 	virtual void lookAtSelected() = 0;
 	virtual bool isOrbitCamera() const = 0;
 	virtual void setOrbitCamera(bool enable) = 0;
-	virtual const char* getBasePath() = 0;
 	virtual const Array<Entity>& getSelectedEntities() const = 0;
 	virtual bool isEntitySelected(Entity entity) const = 0;
 

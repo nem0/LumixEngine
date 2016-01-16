@@ -327,6 +327,8 @@ void ShaderCompiler::compilePass(const char* shd_path,
 	int define_mask,
 	const Lumix::ShaderCombinations::Defines& all_defines)
 {
+	const char* base_path = m_editor.getEngine().getPathManager().getBasePath();
+
 	for (int mask = 0; mask < 1 << Lumix::lengthOf(all_defines); ++mask)
 	{
 		if ((mask & (~define_mask)) == 0)
@@ -337,7 +339,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			const char* source_path = StringBuilder<Lumix::MAX_PATH_LENGTH>(
 				"\"shaders/", basename, is_vertex_shader ? "_vs.sc\"" : "_fs.sc\"");
 			char out_path[Lumix::MAX_PATH_LENGTH];
-			Lumix::copyString(out_path, m_editor.getBasePath());
+			Lumix::copyString(out_path, base_path);
 			Lumix::catString(out_path, "/shaders/compiled/");
 			Lumix::catString(out_path, basename);
 			Lumix::catString(out_path, "_");
@@ -357,8 +359,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 				}
 			}
 
-			StringBuilder<Lumix::MAX_PATH_LENGTH> cmd(
-				m_editor.getBasePath(), "/shaders/shaderc.exe");
+			StringBuilder<Lumix::MAX_PATH_LENGTH> cmd(base_path, "/shaders/shaderc.exe");
 
 			PlatformInterface::deleteFile(out_path);
 			auto* process = PlatformInterface::createProcess(cmd, args, m_editor.getAllocator());
@@ -509,7 +510,8 @@ void ShaderCompiler::compileAllPasses(const char* path,
 
 void ShaderCompiler::compile(const char* path)
 {
-	StringBuilder<Lumix::MAX_PATH_LENGTH> compiled_dir(m_editor.getBasePath(), "/shaders/compiled");
+	StringBuilder<Lumix::MAX_PATH_LENGTH> compiled_dir(
+		m_editor.getEngine().getPathManager().getBasePath(), "/shaders/compiled");
 	if (!PlatformInterface::makePath(compiled_dir))
 	{
 		if (!PlatformInterface::dirExists(compiled_dir))

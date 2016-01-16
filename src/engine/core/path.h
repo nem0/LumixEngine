@@ -33,6 +33,8 @@ public:
 
 	void serialize(OutputBlob& serializer);
 	void deserialize(InputBlob& serializer);
+	void setBasePath(const char* path);
+	const char* getBasePath();
 
 	void clear();
 
@@ -48,6 +50,8 @@ private:
 	AssociativeArray<uint32, PathInternal*> m_paths;
 	MT::SpinMutex m_mutex;
 	PathInternal* m_empty_path;
+	char m_base_path[MAX_PATH_LENGTH];
+	int m_base_path_length;
 };
 
 

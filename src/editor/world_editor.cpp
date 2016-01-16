@@ -1368,9 +1368,6 @@ private:
 	};
 
 public:
-	const char* getBasePath() override { return m_base_path.c_str(); }
-
-
 	IAllocator& getAllocator() override { return m_allocator; }
 
 
@@ -1488,16 +1485,6 @@ public:
 		if (!m_selected_entities.empty())
 		{
 			m_gizmo->add(m_selected_entities[0]);
-		}
-
-		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
-		if (camera_cmp.isValid())
-		{
-			Vec3 origin, cursor_dir;
-			RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
-			scene->getRay(camera_cmp.index, m_mouse_x, m_mouse_y, origin, cursor_dir);
-			TODO("todo");
-			//m_gizmo.setCameraRay(origin, cursor_dir);
 		}
 
 		for (int i = 0; i < m_plugins.size(); ++i)
@@ -1641,12 +1628,6 @@ public:
 			}
 			break;
 			case MouseMode::NAVIGATE: rotateCamera(relx, rely); break;
-			case MouseMode::TRANSFORM:
-			{
-				int camera_cmp = getComponent(m_camera, CAMERA_HASH).index;
-				TODO("todo");
-				//m_gizmo.transform(camera_cmp, x, y, relx, rely, m_gizmo_use_step);
-			}
 			break;
 		}
 	}
@@ -2173,7 +2154,8 @@ public:
 
 	bool isRelativePath(const char* path) override
 	{
-		return compareStringN(m_base_path.c_str(), path, m_base_path.length()) == 0;
+		const char* base_path = m_engine->getPathManager().getBasePath();
+		return compareStringN(base_path, path, stringLength(base_path)) == 0;
 	}
 
 
@@ -2181,10 +2163,11 @@ public:
 	{
 		char tmp[MAX_PATH_LENGTH];
 		Lumix::PathUtils::normalize(source, tmp, sizeof(tmp));
-
-		if (compareStringN(m_base_path.c_str(), tmp, m_base_path.length()) == 0)
+		
+		if (isRelativePath(tmp))
 		{
-			const char* rel_path_start = tmp + m_base_path.length();
+			int base_path_length = stringLength(m_engine->getPathManager().getBasePath());
+			const char* rel_path_start = tmp + base_path_length;
 			if (rel_path_start[0] == '/')
 			{
 				++rel_path_start;
@@ -2384,7 +2367,7 @@ public:
 		m_measure_tool = LUMIX_NEW(m_allocator, MeasureTool)();
 		addPlugin(*m_measure_tool);
 
-		m_base_path = base_path;
+		engine.getPathManager().setBasePath(base_path);
 
 		m_engine = &engine;
 
@@ -3018,7 +3001,7 @@ private:
 			NONE,
 			SELECT,
 			NAVIGATE,
-			TRANSFORM,
+
 			CUSTOM
 		};
 	};
@@ -3072,7 +3055,6 @@ private:
 	bool m_is_mouse_click[3];
 
 	Path m_universe_path;
-	Path m_base_path;
 	Array<Plugin*> m_plugins;
 	MeasureTool* m_measure_tool;
 	Plugin* m_mouse_handling_plugin;
