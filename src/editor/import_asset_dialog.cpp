@@ -1,4 +1,5 @@
 #include "import_asset_dialog.h"
+#include "assimp/DefaultLogger.hpp"
 #include "assimp/postprocess.h"
 #include "assimp/ProgressHandler.hpp"
 #include "assimp/scene.h"
@@ -304,10 +305,30 @@ struct ImportTask : public Lumix::MT::Task
 		, m_dialog(dialog)
 	{
 		m_dialog.m_importer.SetProgressHandler(&m_progress_handler);
+		struct MyStream : public Assimp::LogStream
+		{
+			void write(const char* message) { Lumix::g_log_warning.log("import") << message; }
+		};
+		const unsigned int severity = Assimp::Logger::Err | Assimp::Logger::Warn;
+		Assimp::DefaultLogger::create(
+			ASSIMP_DEFAULT_LOG_NAME, Assimp::Logger::NORMAL, 0, nullptr);
+
+		Assimp::DefaultLogger::get()->attachStream(new MyStream(), severity);
 	}
 
 
 	~ImportTask() { m_dialog.m_importer.SetProgressHandler(nullptr); }
+
+
+	bool hasAnyMeshTangents()
+	{
+		auto* scene = m_dialog.m_importer.GetScene();
+		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		{
+			if (scene->mMeshes[i]->mTangents) return true;
+		}
+		return false;
+	}
 
 
 	int task() override
@@ -323,7 +344,7 @@ struct ImportTask : public Lumix::MT::Task
 		flags |= m_dialog.m_gen_smooth_normal ? aiProcess_GenSmoothNormals : aiProcess_GenNormals;
 		flags |= m_dialog.m_optimize_mesh_on_import ? aiProcess_OptimizeMeshes : 0;
 		const aiScene* scene = m_dialog.m_importer.ReadFile(m_dialog.m_source, flags);
-		if (!scene || !scene->mMeshes || !scene->mMeshes[0]->mTangents)
+		if (!scene || !scene->mMeshes || !hasAnyMeshTangents())
 		{
 			m_dialog.m_importer.FreeScene();
 			m_dialog.setMessage(m_dialog.m_importer.GetErrorString());
@@ -334,7 +355,7 @@ struct ImportTask : public Lumix::MT::Task
 			m_dialog.m_mesh_mask.resize(scene->mNumMeshes);
 			for (int i = 0; i < m_dialog.m_mesh_mask.size(); ++i)
 			{
-				m_dialog.m_mesh_mask[i] = true;
+				m_dialog.m_mesh_mask[i] = scene->mMeshes[i]->mTangents != nullptr;
 			}
 		}
 
@@ -1201,7 +1222,8 @@ struct ConvertTask : public Lumix::MT::Task
 			if (m_dialog.m_mesh_mask[i]) m_filtered_meshes.push(scene->mMeshes[i]);
 		}
 
-		static ConvertTask* that = this;
+		static ConvertTask* that = nullptr;
+		that = this;
 		auto cmpMeshes = [](const void* a, const void* b) -> int
 		{
 			auto a_mesh = static_cast<aiMesh* const*>(a);
@@ -1625,6 +1647,7 @@ void ImportAssetDialog::onGUI()
 				{
 					for (int i = 0; i < (int)scene->mNumMeshes; ++i)
 					{
+						if (!scene->mMeshes[i]->mTangents) continue;
 						const char* name = scene->mMeshes[i]->mName.C_Str();
 						bool b = m_mesh_mask[i];
 						ImGui::Checkbox(name[0] == '\0' ? StringBuilder<30>("N/A###na",
