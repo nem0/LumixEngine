@@ -108,6 +108,7 @@ public:
 	void init()
 	{
 		auto hwnd = createWindow();
+
 		Lumix::g_log_info.getCallback().bind<outputToVS>();
 		Lumix::g_log_warning.getCallback().bind<outputToVS>();
 		Lumix::g_log_error.getCallback().bind<outputToVS>();
@@ -119,6 +120,9 @@ public:
 		Lumix::enableCrashReporting(false);
 
 		m_engine = Lumix::Engine::create(NULL, m_allocator);
+		Lumix::Engine::PlatformData platform_data;
+		platform_data.window_handle = hwnd;
+		m_engine->setPlatformData(platform_data);
 
 		m_engine->getPluginManager().load("renderer.dll");
 		m_engine->getPluginManager().load("animation.dll");
