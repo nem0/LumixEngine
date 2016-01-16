@@ -1651,7 +1651,7 @@ void TerrainEditor::onGUI()
 		case COLOR:
 		{
 			m_type = TerrainEditor::COLOR;
-			ColorPicker("Color", &m_color.x);
+			ImGui::ColorPicker(&m_color.x, false);
 			break;
 		}
 		case LAYER:
