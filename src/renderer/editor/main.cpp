@@ -759,9 +759,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 			}
 			if (cmp >= 0)
 			{
-				char rel_path[MAX_PATH_LENGTH];
-				m_editor.getRelativePath(rel_path, MAX_PATH_LENGTH, m_mesh_path.c_str());
-				static_cast<RenderScene*>(scene)->setRenderablePath(cmp, Path(rel_path));
+				static_cast<RenderScene*>(scene)->setRenderablePath(cmp, m_mesh_path);
 			}
 			return true;
 		}
@@ -986,7 +984,7 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 	{
 		if (type != SHADER_HASH) return false;
 		auto* shader = static_cast<Shader*>(resource);
-		StringBuilder<MAX_PATH_LENGTH> path(m_app.getWorldEditor()->getBasePath());
+		StringBuilder<MAX_PATH_LENGTH> path(m_app.getWorldEditor()->getEngine().getPathManager().getBasePath());
 		char basename[MAX_PATH_LENGTH];
 		PathUtils::getBasename(
 			basename, lengthOf(basename), resource->getPath().c_str());

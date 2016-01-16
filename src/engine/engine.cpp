@@ -400,6 +400,7 @@ public:
 	}
 
 
+	PathManager& getPathManager() override{ return m_path_manager; }
 	float getLastTimeDelta() override { return m_last_time_delta; }
 
 private:

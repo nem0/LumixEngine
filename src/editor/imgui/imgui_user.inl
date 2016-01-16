@@ -351,12 +351,6 @@ bool ListBox(const char* label,
 }
 
 
-void ResetActiveID()
-{
-    SetActiveID(0);
-}
-
-
 void BringToFront()
 {
     ImGuiState& g = *GImGui;

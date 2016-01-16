@@ -81,6 +81,19 @@ struct GizmoImpl : public Gizmo
 		m_is_step = false;
 		m_relx_accum = m_rely_accum = 0;
 		m_is_dragging = false;
+		editor.universeDestroyed().bind<GizmoImpl, &GizmoImpl::onUniverseDestroyed>(this);
+	}
+
+
+	~GizmoImpl()
+	{
+		m_editor.universeDestroyed().unbind<GizmoImpl, &GizmoImpl::onUniverseDestroyed>(this);
+	}
+
+
+	void onUniverseDestroyed()
+	{
+		m_count = 0;
 	}
 
 
