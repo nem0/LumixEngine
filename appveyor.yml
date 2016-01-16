@@ -5,8 +5,6 @@ before_build:
   - cd projects
   - genie_vs13.bat
   - cd ..
-init:
-- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
 build:
   project: projects\tmp\LumixEngine.sln
   verbosity: minimal
