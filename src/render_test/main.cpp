@@ -4,6 +4,7 @@
 #include "core/crc32.h"
 #include "debug/debug.h"
 #include "core/log.h"
+#include "core/mt/thread.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -306,6 +307,7 @@ public:
 				if (!nextTest()) return;
 			}
 			m_engine->getFileSystem().updateAsyncTransactions();
+			Lumix::MT::sleep(100);
 			handleEvents();
 		}
 		int failed_count = getFailedCount();
