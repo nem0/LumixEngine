@@ -371,7 +371,7 @@ struct GizmoImpl : public Gizmo
 			float scale = getScale(camera_pos, fov, entity_pos, gizmo_mtx.getXVector().length());
 			scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
 
-			Vec3 camera_dir = entity_pos - camera_pos;
+			Vec3 camera_dir = camera_pos - entity_pos;
 			Matrix mtx = gizmo_mtx * scale_mtx;
 			Vec3 pos = mtx.getTranslation();
 
