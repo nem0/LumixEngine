@@ -239,6 +239,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		, m_queued_forces(m_allocator)
 		, m_layers_count(2)
 	{
+		setMemory(m_layers_names, 0, sizeof(m_layers_names));
 		for (int i = 0; i < lengthOf(m_layers_names); ++i)
 		{
 			copyString(m_layers_names[i], "Layer");
