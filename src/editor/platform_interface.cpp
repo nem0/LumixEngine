@@ -198,7 +198,14 @@ namespace PlatformInterface
 
 	void showCursor(bool show)
 	{
-		ShowCursor(show);
+		if (show)
+		{
+			while (ShowCursor(true) < 0);
+		}
+		else
+		{
+			while (ShowCursor(false) >= 0);
+		}
 	}
 
 
@@ -444,7 +451,6 @@ namespace PlatformInterface
 				SetCursor(LoadCursor(NULL, IDC_ARROW));
 				break;
 		}
-		
 	}
 
 	
