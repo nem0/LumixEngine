@@ -137,7 +137,7 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	void update(float time_delta) override
+	void update(float time_delta, bool paused) override
 	{
 		if (m_listener.entity != INVALID_ENTITY)
 		{

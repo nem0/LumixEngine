@@ -744,9 +744,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void update(float time_delta) override
+	void update(float time_delta, bool paused) override
 	{
-		if (!m_is_game_running) return;
+		if (!m_is_game_running || paused) return;
 		
 		applyQueuedForces();
 

@@ -182,11 +182,11 @@ public:
 	}
 
 
-	void update(float time_delta) override
+	void update(float time_delta, bool paused) override
 	{
 		PROFILE_FUNCTION();
-		if (m_animables.empty())
-			return;
+		if (m_animables.empty()) return;
+
 		for (int i = 0, c = m_animables.size(); i < c; ++i)
 		{
 			Animable& animable = m_animables[i];

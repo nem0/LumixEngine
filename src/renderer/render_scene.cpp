@@ -393,7 +393,7 @@ public:
 	}
 
 
-	void update(float dt) override
+	void update(float dt, bool paused) override
 	{
 		PROFILE_FUNCTION();
 		m_time += dt;
@@ -425,7 +425,7 @@ public:
 			}
 		}
 
-		if (m_is_game_running)
+		if (m_is_game_running && !paused)
 		{
 			for (auto* emitter : m_particle_emitters)
 			{

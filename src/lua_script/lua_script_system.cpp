@@ -571,9 +571,9 @@ namespace Lumix
 		IPlugin& getPlugin() const override { return m_system; }
 
 
-		void update(float time_delta) override
+		void update(float time_delta, bool paused) override
 		{
-			if (!m_global_state) { return; }
+			if (!m_global_state || paused) { return; }
 
 			for (auto* i : m_updates)
 			{
