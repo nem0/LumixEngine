@@ -17,6 +17,7 @@
 #include "editor/render_interface.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
+#include "renderer/particle_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
@@ -1079,7 +1080,7 @@ struct EmitterPlugin : public PropertyGrid::IPlugin
 			ImGui::DragFloat("Timescale", &m_particle_emitter_timescale, 0.01f, 0.01f, 10000.0f);
 			float time_delta = m_app.getWorldEditor()->getEngine().getLastTimeDelta();
 			scene->updateEmitter(cmp.index, time_delta * m_particle_emitter_timescale);
-			scene->drawEmitterGizmo(cmp.index);
+			scene->getParticleEmitter(cmp.index)->drawGizmo(*m_app.getWorldEditor(), *scene);
 		}
 	}
 

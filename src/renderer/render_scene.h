@@ -182,8 +182,8 @@ public:
 	virtual const char* getCameraSlot(ComponentIndex camera) = 0;
 	virtual void setCameraSize(ComponentIndex camera, int w, int h) = 0;
 
+	virtual class ParticleEmitter* getParticleEmitter(ComponentIndex cmp) = 0;
 	virtual void resetParticleEmitter(ComponentIndex cmp) = 0;
-	virtual void drawEmitterGizmo(ComponentIndex cmp) = 0;
 	virtual void updateEmitter(ComponentIndex cmp, float time_delta) = 0;
 	virtual const Array<class ParticleEmitter*>& getParticleEmitters() const = 0;
 	virtual const Vec2* getParticleEmitterAlpha(ComponentIndex cmp) = 0;
