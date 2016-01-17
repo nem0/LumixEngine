@@ -103,7 +103,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 			Vec3 extents = phy_scene->getHalfExtents(cmp.index);
 
 			Universe& universe = scene->getUniverse();
-			Matrix mtx = universe.getMatrix(cmp.entity);
+			Matrix mtx = universe.getPositionAndRotation(cmp.entity);
 
 			scene->addDebugCube(mtx.getTranslation(),
 				mtx.getXVector() * extents.x,
