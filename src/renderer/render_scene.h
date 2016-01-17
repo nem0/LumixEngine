@@ -111,7 +111,6 @@ public:
 		ComponentIndex camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 
 	virtual Frustum getCameraFrustum(ComponentIndex camera) const = 0;
-	virtual void update(float dt) = 0;
 	virtual float getTime() const = 0;
 	virtual Engine& getEngine() const = 0;
 	virtual IAllocator& getAllocator() = 0;

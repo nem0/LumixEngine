@@ -20,6 +20,8 @@ GameView::GameView()
 	, m_is_mouse_captured(false)
 	, m_editor(nullptr)
 	, m_is_mouse_hovering_window(false)
+	, m_time_multiplier(1.0f)
+	, m_paused(false)
 {
 }
 
@@ -103,6 +105,7 @@ void GameView::onGui()
 
 		auto content_min = ImGui::GetCursorScreenPos();
 		auto size = ImGui::GetContentRegionAvail();
+		size.y -= ImGui::GetTextLineHeightWithSpacing();
 		ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
 		if (size.x > 0 && size.y > 0)
 		{
@@ -113,6 +116,23 @@ void GameView::onGui()
 			auto* fb = m_pipeline->getFramebuffer("default");
 			m_texture_handle = fb->getRenderbufferHandle(0);
 			ImGui::Image(&m_texture_handle, size);
+			if (ImGui::Checkbox("Pause", &m_paused))
+			{
+				m_editor->getEngine().pause(m_paused);
+			}
+			if (m_paused)
+			{
+				ImGui::SameLine();
+				if (ImGui::Button("Next frame"))
+				{
+					m_editor->getEngine().nextFrame();
+				}
+			}
+			ImGui::SameLine();
+			if (ImGui::DragFloat("m_time_multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f))
+			{
+				m_editor->getEngine().setTimeMultiplier(m_time_multiplier);
+			}
 			m_pipeline->render();
 		}
 

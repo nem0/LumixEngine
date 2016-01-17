@@ -82,7 +82,7 @@ public:
 
 
 	IPlugin& getPlugin() const override { return m_system; }
-	void update(float time_delta) override {}
+	void update(float time_delta, bool paused) override {}
 	bool ownComponentType(uint32 type) const override { return HIERARCHY_HASH == type; }
 	Universe& getUniverse() override { return m_universe; }
 	IAllocator& getAllocator() { return m_allocator; }

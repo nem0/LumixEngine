@@ -77,6 +77,9 @@ public:
 		, m_component_types(m_allocator)
 		, m_last_time_delta(0)
 		, m_path_manager(m_allocator)
+		, m_time_multiplier(1.0f)
+		, m_paused(false)
+		, m_next_frame(false)
 	{
 		m_mtjd_manager = MTJD::Manager::create(m_allocator);
 		if (!fs)
@@ -225,6 +228,24 @@ public:
 	}
 
 
+	void pause(bool pause) override
+	{
+		m_paused = pause;
+	}
+
+
+	void nextFrame() override
+	{
+		m_next_frame = true;
+	}
+
+
+	void setTimeMultiplier(float multiplier) override
+	{
+		m_time_multiplier = multiplier;
+	}
+
+
 	void update(UniverseContext& context) override
 	{
 		PROFILE_FUNCTION();
@@ -235,18 +256,29 @@ public:
 			m_fps = m_fps_frame / m_fps_timer->tick();
 			m_fps_frame = 0;
 		}
-		dt = m_timer->tick();
+		dt = m_timer->tick() * m_time_multiplier;
+		if (m_next_frame)
+		{
+			m_paused = false;
+			dt = 1 / 30.0f;
+		}
 		m_last_time_delta = dt;
 		{
 			PROFILE_BLOCK("update scenes");
 			for (int i = 0; i < context.m_scenes.size(); ++i)
 			{
-				context.m_scenes[i]->update(dt);
+				context.m_scenes[i]->update(dt, m_paused);
 			}
 		}
-		m_plugin_manager->update(dt);
+		m_plugin_manager->update(dt, m_paused);
 		m_input_system->update(dt);
 		getFileSystem().updateAsyncTransactions();
+
+		if (m_next_frame)
+		{
+			m_paused = true;
+			m_next_frame = false;
+		}
 	}
 
 
@@ -436,9 +468,12 @@ private:
 	Timer* m_timer;
 	Timer* m_fps_timer;
 	int m_fps_frame;
+	float m_time_multiplier;
 	float m_fps;
 	float m_last_time_delta;
 	bool m_is_game_running;
+	bool m_paused;
+	bool m_next_frame;
 	PlatformData m_platform_data;
 	PathManager m_path_manager;
 

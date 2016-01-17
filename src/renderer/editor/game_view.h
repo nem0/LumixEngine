@@ -42,4 +42,6 @@ private:
 	bgfx::TextureHandle m_texture_handle;
 	Lumix::WorldEditor* m_editor;
 	bool m_is_mouse_hovering_window;
+	float m_time_multiplier;
+	bool m_paused;
 };
