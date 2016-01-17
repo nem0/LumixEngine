@@ -265,6 +265,7 @@ public:
 	{
 		if (type == RENDERABLE_HASH)
 		{
+			if (entity >= m_renderables.size()) return INVALID_COMPONENT;
 			return m_renderables[entity].entity != INVALID_ENTITY ? entity : INVALID_COMPONENT;
 		}
 		if (type == POINT_LIGHT_HASH)
