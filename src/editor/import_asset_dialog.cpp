@@ -416,7 +416,7 @@ struct ConvertTask : public Lumix::MT::Task
 					{
 						unsigned int index;
 						Lumix::fromCString(
-							texture_path.C_Str() + 1, texture_path.length - 1, &index);
+							texture_path.C_Str() + 1, (int)texture_path.length - 1, &index);
 						textures.push(index);
 					}
 				}
