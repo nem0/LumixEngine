@@ -531,7 +531,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		geom.halfExtents.y = 1;
 		geom.halfExtents.z = 1;
 		physx::PxTransform transform;
-		Matrix mtx = m_universe.getMatrix(entity);
+		Matrix mtx = m_universe.getPositionAndRotation(entity);
 		matrix2Transform(mtx, transform);
 		
 		physx::PxRigidStatic* physx_actor =
@@ -990,7 +990,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 
 			physx::PxTransform transform;
-			Matrix mtx = m_universe.getMatrix(terrain->m_entity);
+			Matrix mtx = m_universe.getPositionAndRotation(terrain->m_entity);
 			matrix2Transform(mtx, transform);
 
 			physx::PxRigidActor* actor;
@@ -1247,7 +1247,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 				physx::PxTransform transform;
 				matrix2Transform(
-					m_universe.getMatrix(m_actors[cmp]->getEntity()),
+					m_universe.getPositionAndRotation(m_actors[cmp]->getEntity()),
 					transform);
 
 				physx::PxRigidActor* actor;
@@ -1336,7 +1336,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				physx::PxBoxGeometry box_geom;
 				physx::PxTransform transform;
-				Matrix mtx = m_universe.getMatrix(m_actors[idx]->getEntity());
+				Matrix mtx = m_universe.getPositionAndRotation(m_actors[idx]->getEntity());
 				matrix2Transform(mtx, transform);
 				serializer.read(box_geom.halfExtents.x);
 				serializer.read(box_geom.halfExtents.y);
@@ -1745,7 +1745,7 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		setPhysxActor(nullptr);
 
 		physx::PxTransform transform;
-		Matrix mtx = m_scene.getUniverse().getMatrix(m_entity);
+		Matrix mtx = m_scene.getUniverse().getPositionAndRotation(m_entity);
 		matrix2Transform(mtx, transform);
 
 		physx::PxRigidActor* actor;
