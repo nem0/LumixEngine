@@ -396,12 +396,38 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	bool saveEmbeddedTextures(const aiScene* scene)
+	bool saveEmbeddedTextures(const aiScene* scene, unsigned int* materials, int materials_count)
 	{
 		bool success = true;
 		m_dialog.m_saved_embedded_textures.clear();
+
+		Lumix::Array<unsigned int> textures(m_dialog.m_editor.getAllocator());
+		for (int i = 0; i < materials_count; ++i)
+		{
+			auto* material = scene->mMaterials[materials[i]];
+			auto types = { aiTextureType_DIFFUSE, aiTextureType_NORMALS, aiTextureType_HEIGHT };
+			for (auto type : types)
+			{
+				for (unsigned int j = 0; j < material->GetTextureCount(type); ++j)
+				{
+					aiString texture_path;
+					material->GetTexture(type, j, &texture_path);
+					if (texture_path.C_Str()[0] == '*')
+					{
+						unsigned int index;
+						Lumix::fromCString(
+							texture_path.C_Str() + 1, texture_path.length - 1, &index);
+						textures.push(index);
+					}
+				}
+			}
+		}
+
 		for (unsigned int i = 0; i < scene->mNumTextures; ++i)
 		{
+			m_dialog.m_saved_embedded_textures.push(Lumix::string("", m_dialog.m_editor.getAllocator()));
+			if (textures.indexOf(i) == -1) continue;
+			
 			const aiTexture* texture = scene->mTextures[i];
 			if (texture->mHeight != 0)
 			{
@@ -415,8 +441,7 @@ struct ConvertTask : public Lumix::MT::Task
 				(stbi_uc*)texture->pcData, texture->mWidth, &width, &height, &comp, 4);
 			if (!data) continue;
 
-			m_dialog.m_saved_embedded_textures.push(
-				Lumix::string(texture_name, m_dialog.m_editor.getAllocator()));
+			m_dialog.m_saved_embedded_textures[i] = texture_name;
 			PathBuilder dest(m_dialog.m_texture_output_dir[0] ? m_dialog.m_texture_output_dir
 															  : m_dialog.m_output_dir);
 			dest << "/" << texture_name;
@@ -538,7 +563,14 @@ struct ConvertTask : public Lumix::MT::Task
 		m_dialog.setImportMessage("Importing materials...");
 		const aiScene* scene = m_dialog.m_importer.GetScene();
 
-		if (!saveEmbeddedTextures(scene))
+		Lumix::Array<unsigned int> materials(m_dialog.m_editor.getAllocator());
+		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		{
+			if (m_dialog.m_mesh_mask[i]) materials.push(scene->mMeshes[i]->mMaterialIndex);
+		}
+		materials.removeDuplicates();
+
+		if (!saveEmbeddedTextures(scene, &materials[0], materials.size()))
 		{
 			m_dialog.setMessage("Failed to import embedded texture");
 		}
@@ -549,7 +581,7 @@ struct ConvertTask : public Lumix::MT::Task
 		char source_mesh_dir[Lumix::MAX_PATH_LENGTH];
 		Lumix::PathUtils::getDir(source_mesh_dir, sizeof(source_mesh_dir), m_dialog.m_source);
 
-		for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
+		for (auto i : materials)
 		{
 			const aiMaterial* material = scene->mMaterials[i];
 			if (!saveMaterial(material, source_mesh_dir, &undefined_count))
@@ -1360,9 +1392,16 @@ bool ImportAssetDialog::checkTextures()
 	int undefined_count = 0;
 	char source_dir[Lumix::MAX_PATH_LENGTH];
 	Lumix::PathUtils::getDir(source_dir, sizeof(source_dir), m_source);
-	for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
+	Lumix::Array<unsigned int> materials(m_editor.getAllocator());
+	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 	{
-		const aiMaterial* material = scene->mMaterials[i];
+		if (m_mesh_mask[i]) materials.push(scene->mMeshes[i]->mMaterialIndex);
+	}
+	materials.removeDuplicates();
+
+	for (auto material_index : materials)
+	{
+		const aiMaterial* material = scene->mMaterials[material_index];
 
 		int types[] = {aiTextureType_DIFFUSE, aiTextureType_NORMALS, aiTextureType_HEIGHT};
 
@@ -1645,6 +1684,15 @@ void ImportAssetDialog::onGUI()
 						true,
 						true))
 				{
+					if (ImGui::Button("Select all"))
+					{
+						for (int i = 0; i < m_mesh_mask.size(); ++i) m_mesh_mask[i] = true;
+					}
+					ImGui::SameLine();
+					if (ImGui::Button("Deselect all"))
+					{
+						for (int i = 0; i < m_mesh_mask.size(); ++i) m_mesh_mask[i] = false;
+					}
 					for (int i = 0; i < (int)scene->mNumMeshes; ++i)
 					{
 						if (!scene->mMeshes[i]->mTangents) continue;
