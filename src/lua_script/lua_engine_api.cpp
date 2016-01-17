@@ -148,9 +148,15 @@ static void logInfo(const char* text)
 }
 
 
-static void setEntityPosition(Universe* univ, int entity_index, Vec3 pos)
+static Entity createEntity(Universe* univ)
 {
-	univ->setPosition(entity_index, pos);
+	return univ->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+}
+
+
+static void setEntityPosition(Universe* univ, Entity entity, Vec3 pos)
+{
+	univ->setPosition(entity, pos);
 }
 
 
@@ -233,6 +239,7 @@ void registerEngineLuaAPI(LuaScriptScene& scene, Engine& engine, lua_State* L)
 	REGISTER_FUNCTION(getEnvironment);
 	REGISTER_FUNCTION(getMaterialTexture);
 	REGISTER_FUNCTION(getTerrainMaterial);
+	REGISTER_FUNCTION(createEntity);
 	REGISTER_FUNCTION(setEntityPosition);
 	REGISTER_FUNCTION(setEntityRotation);
 	REGISTER_FUNCTION(setEntityLocalRotation);
