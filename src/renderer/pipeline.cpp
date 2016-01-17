@@ -436,15 +436,12 @@ struct PipelineImpl : public Pipeline
 			++instance;
 		}
 
-		if (emitter.m_life.size() % PARTICLE_BATCH_SIZE)
-		{
-			setMaterial(material);
-			bgfx::setInstanceDataBuffer(instance_buffer, emitter.m_life.size() % PARTICLE_BATCH_SIZE);
-			bgfx::setVertexBuffer(m_particle_vertex_buffer);
-			bgfx::setIndexBuffer(m_particle_index_buffer);
-			bgfx::setState(m_render_state | material->getRenderStates());
-			bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
-		}
+		setMaterial(material);
+		bgfx::setInstanceDataBuffer(instance_buffer, emitter.m_life.size() % PARTICLE_BATCH_SIZE);
+		bgfx::setVertexBuffer(m_particle_vertex_buffer);
+		bgfx::setIndexBuffer(m_particle_index_buffer);
+		bgfx::setState(m_render_state | material->getRenderStates());
+		bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
 
