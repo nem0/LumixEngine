@@ -237,10 +237,10 @@ public:
 		m_particle_emitters[cmp]->reset();
 	}
 
-
-	void drawEmitterGizmo(ComponentIndex cmp) override
+	
+	ParticleEmitter* getParticleEmitter(ComponentIndex cmp)
 	{
-		m_particle_emitters[cmp]->drawGizmo(*this);
+		return m_particle_emitters[cmp];
 	}
 
 

@@ -5,6 +5,8 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "editor/gizmo.h"
+#include "editor/world_editor.h"
 #include "renderer/material.h"
 #include "renderer/render_scene.h"
 #include "universe/universe.h"
@@ -98,11 +100,11 @@ void ParticleEmitter::ForceModule::update(float time_delta)
 const uint32 ParticleEmitter::ForceModule::s_type = Lumix::crc32("force");
 
 
-void ParticleEmitter::drawGizmo(RenderScene& scene)
+void ParticleEmitter::drawGizmo(WorldEditor& editor, RenderScene& scene)
 {
 	for (auto* module : m_modules)
 	{
-		module->drawGizmo(scene);
+		module->drawGizmo(editor, scene);
 	}
 }
 
@@ -115,6 +117,15 @@ ParticleEmitter::AttractorModule::AttractorModule(ParticleEmitter& emitter)
 	for(auto& e : m_entities)
 	{
 		e = INVALID_ENTITY;
+	}
+}
+
+
+void ParticleEmitter::AttractorModule::drawGizmo(WorldEditor& editor, RenderScene& scene)
+{
+	for (int i = 0; i < m_count; ++i)
+	{
+		if(m_entities[i] != INVALID_ENTITY) editor.getGizmo().add(m_entities[i]);
 	}
 }
 
@@ -182,11 +193,12 @@ ParticleEmitter::PlaneModule::PlaneModule(ParticleEmitter& emitter)
 }
 
 
-void ParticleEmitter::PlaneModule::drawGizmo(RenderScene& scene)
+void ParticleEmitter::PlaneModule::drawGizmo(WorldEditor& editor, RenderScene& scene)
 {
 	for (int i = 0; i < m_count; ++i)
 	{
 		Entity entity = m_entities[i];
+		if (m_entities[i] != INVALID_ENTITY) editor.getGizmo().add(entity);
 		if (entity == INVALID_ENTITY) continue;
 		if (!m_emitter.m_universe.hasEntity(entity)) continue;
 

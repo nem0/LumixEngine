@@ -555,36 +555,46 @@ struct GizmoImpl : public Gizmo
 		Array<Vec3> new_positions(m_editor.getAllocator());
 		Array<Quat> new_rotations(m_editor.getAllocator());
 		auto mtx = universe->getMatrix(m_entities[m_active]);
-		for (int i = 0, c = m_editor.getSelectedEntities().size(); i < c; ++i)
-		{
-			Vec3 pos = universe->getPosition(m_editor.getSelectedEntities()[i]);
-			Vec3 axis;
-			switch (m_transform_axis)
-			{
-				case Axis::X: axis = mtx.getXVector(); break;
-				case Axis::Y: axis = mtx.getYVector(); break;
-				case Axis::Z: axis = mtx.getZVector(); break;
-			}
-			float angle = computeRotateAngle((int)relx, (int)rely);
 
-			Quat old_rot = universe->getRotation(m_editor.getSelectedEntities()[i]);
+		Vec3 axis;
+		switch (m_transform_axis)
+		{
+			case Axis::X: axis = mtx.getXVector(); break;
+			case Axis::Y: axis = mtx.getYVector(); break;
+			case Axis::Z: axis = mtx.getZVector(); break;
+		}
+		float angle = computeRotateAngle((int)relx, (int)rely);
+
+		if (m_editor.getSelectedEntities()[0] == m_entities[m_active])
+		{
+			for (int i = 0, c = m_editor.getSelectedEntities().size(); i < c; ++i)
+			{
+				Vec3 pos = universe->getPosition(m_editor.getSelectedEntities()[i]);
+				Quat old_rot = universe->getRotation(m_editor.getSelectedEntities()[i]);
+				Quat new_rot = old_rot * Quat(axis, angle);
+				new_rot.normalize();
+				new_rotations.push(new_rot);
+				Vec3 pdif = mtx.getTranslation() - pos;
+				old_rot.conjugate();
+				pos = -pdif;
+				pos = new_rot * (old_rot * pos);
+				pos += mtx.getTranslation();
+
+				new_positions.push(pos);
+			}
+			m_editor.setEntitiesPositionsAndRotations(&m_editor.getSelectedEntities()[0],
+				&new_positions[0],
+				&new_rotations[0],
+				new_positions.size());
+		}
+		else
+		{
+			Quat old_rot = universe->getRotation(m_entities[m_active]);
 			Quat new_rot = old_rot * Quat(axis, angle);
 			new_rot.normalize();
 			new_rotations.push(new_rot);
-
-			Vec3 pdif = mtx.getTranslation() - pos;
-
-			old_rot.conjugate();
-			pos = -pdif;
-			pos = new_rot * (old_rot * pos);
-			pos += mtx.getTranslation();
-
-			new_positions.push(pos);
+			m_editor.setEntitiesRotations(&m_entities[m_active], &new_rotations[0], 1);
 		}
-		m_editor.setEntitiesPositionsAndRotations(&m_editor.getSelectedEntities()[0],
-			&new_positions[0],
-			&new_rotations[0],
-			new_positions.size());
 	}
 
 
@@ -599,16 +609,26 @@ struct GizmoImpl : public Gizmo
 			if (m_is_step) delta = delta.normalized() * float(getStep());
 
 			Array<Vec3> new_positions(m_editor.getAllocator());
-			for (int i = 0, ci = m_editor.getSelectedEntities().size(); i < ci; ++i)
+			if (m_entities[m_active] == m_editor.getSelectedEntities()[0])
 			{
-				Vec3 pos = m_editor.getUniverse()->getPosition(m_editor.getSelectedEntities()[i]);
+				for (int i = 0, ci = m_editor.getSelectedEntities().size(); i < ci; ++i)
+				{
+					Vec3 pos =
+						m_editor.getUniverse()->getPosition(m_editor.getSelectedEntities()[i]);
+					pos += delta;
+					new_positions.push(pos);
+				}
+				m_editor.setEntitiesPositions(
+					&m_editor.getSelectedEntities()[0], &new_positions[0], new_positions.size());
+				if (m_is_autosnap_down) m_editor.snapDown();
+			}
+			else
+			{
+				Vec3 pos = m_editor.getUniverse()->getPosition(m_entities[m_active]);
 				pos += delta;
 				new_positions.push(pos);
+				m_editor.setEntitiesPositions(&m_entities[m_active], &new_positions[0], 1);
 			}
-			m_editor.setEntitiesPositions(&m_editor.getSelectedEntities()[0],
-				&new_positions[0],
-				new_positions.size());
-			if (m_is_autosnap_down) m_editor.snapDown();
 
 			m_transform_point = intersection;
 		}
