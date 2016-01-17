@@ -99,6 +99,7 @@ void fillLabel(char* output, int max_size, const char* label, int count)
 
 void LogUI::showNotifications()
 {
+	m_are_notifications_hovered = false;
 	if (m_notifications.empty()) return;
 
 	ImGui::SetNextWindowPos(ImVec2(10, 30));
@@ -114,6 +115,11 @@ void LogUI::showNotifications()
 		ImGui::End();
 		return;
 	}
+
+	m_are_notifications_hovered = ImGui::IsWindowHovered();
+
+	if (ImGui::Button("Close")) m_notifications.clear();
+
 	if (m_move_notifications_to_front) ImGui::BringToFront();
 	m_move_notifications_to_front = false;
 	for (int i = 0; i < m_notifications.size(); ++i)
@@ -127,6 +133,8 @@ void LogUI::showNotifications()
 
 void LogUI::update(float time_delta)
 {
+	if (m_are_notifications_hovered) return;
+
 	for (int i = 0; i < m_notifications.size(); ++i)
 	{
 		m_notifications[i].time -= time_delta;
