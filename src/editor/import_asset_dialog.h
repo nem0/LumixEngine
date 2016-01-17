@@ -79,6 +79,7 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		bool m_is_importing_texture;
 		float m_raw_texture_scale;
 		float m_mesh_scale;
+		bool m_z_up;
 		Lumix::MT::Task* m_task;
 		Lumix::MT::SpinMutex m_mutex;
 		Metadata& m_metadata;

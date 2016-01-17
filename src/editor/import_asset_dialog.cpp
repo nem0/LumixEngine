@@ -800,6 +800,7 @@ struct ConvertTask : public Lumix::MT::Task
 		int skin_index = 0;
 		aiMatrix3x3 normal_matrix(scene->mRootNode->mTransformation);
 
+		bool z_up = m_dialog.m_z_up;
 		for (auto* mesh : m_filtered_meshes)
 		{
 			bool is_skinned = isSkinned(mesh);
@@ -816,7 +817,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 				auto v = scene->mRootNode->mTransformation * mesh->mVertices[j];
 
-				Lumix::Vec3 position(v.x, v.y, v.z);
+				Lumix::Vec3 position(v.x, z_up ? v.z : v.y, z_up ? -v.y : v.z);
 				position *= m_scale;
 				file.write((const char*)&position, sizeof(position));
 
@@ -832,12 +833,14 @@ struct ConvertTask : public Lumix::MT::Task
 				}
 
 				auto normal = normal_matrix * mesh->mNormals[j];
+				if (z_up) normal.Set(normal.x, normal.z, -normal.y);
 				Lumix::uint32 int_normal = packF4u(normal);
 				file.write((const char*)&int_normal, sizeof(int_normal));
 
 				if (mesh->mTangents)
 				{
 					auto tangent = mesh->mTangents[j];
+					if (z_up) tangent.Set(tangent.x, tangent.z, -tangent.y);
 					Lumix::uint32 int_tangent = packF4u(tangent);
 					file.write((const char*)&int_tangent, sizeof(int_tangent));
 				}
@@ -1337,6 +1340,7 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	, m_raw_texture_scale(1)
 	, m_mesh_scale(1)
 {
+	m_z_up = false;
 	m_is_opened = false;
 	m_message[0] = '\0';
 	m_import_message[0] = '\0';
@@ -1655,6 +1659,7 @@ void ImportAssetDialog::onGUI()
 			{
 				ImGui::SameLine();
 				ImGui::DragFloat("Scale", &m_mesh_scale, 0.01f, 0.001f, 0);
+				ImGui::Checkbox("Z up", &m_z_up);
 			}
 
 			if (scene->HasMaterials())
