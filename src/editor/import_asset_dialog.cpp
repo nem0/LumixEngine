@@ -309,7 +309,7 @@ struct ImportTask : public Lumix::MT::Task
 		{
 			void write(const char* message) { Lumix::g_log_warning.log("import") << message; }
 		};
-		const unsigned int severity = Assimp::Logger::Err | Assimp::Logger::Warn;
+		const unsigned int severity = Assimp::Logger::Err;
 		Assimp::DefaultLogger::create(
 			ASSIMP_DEFAULT_LOG_NAME, Assimp::Logger::NORMAL, 0, nullptr);
 
@@ -1650,9 +1650,9 @@ void ImportAssetDialog::onGUI()
 						if (!scene->mMeshes[i]->mTangents) continue;
 						const char* name = scene->mMeshes[i]->mName.C_Str();
 						bool b = m_mesh_mask[i];
-						ImGui::Checkbox(name[0] == '\0' ? StringBuilder<30>("N/A###na",
-															  (Lumix::uint64)&scene->mMeshes[i])
-														: name,
+						ImGui::Checkbox(StringBuilder<30>(name[0] == 0 ? "N/A" : name,
+											"###mesh",
+											(Lumix::uint64)&scene->mMeshes[i]),
 							&b);
 						m_mesh_mask[i] = b;
 					}
