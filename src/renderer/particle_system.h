@@ -94,7 +94,6 @@ public:
 	};
 
 
-
 	struct LUMIX_RENDERER_API LinearMovementModule : public ModuleBase
 	{
 		LinearMovementModule(ParticleEmitter& emitter);

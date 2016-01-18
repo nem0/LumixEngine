@@ -1538,6 +1538,54 @@ public:
 	}
 
 
+	void snapEntities(const RayCastModelHit& hit)
+	{
+		Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
+		Lumix::Array<Vec3> positions(m_allocator);
+		Lumix::Array<Quat> rotations(m_allocator);
+		if(m_gizmo->isTranslateMode())
+		{
+			for(auto e : m_selected_entities)
+			{
+				positions.push(hit_pos);
+				rotations.push(m_universe_context->m_universe->getRotation(e));
+			}
+		}
+		else
+		{
+			for(auto e : m_selected_entities)
+			{
+				auto pos = m_universe_context->m_universe->getPosition(e);
+				auto dir = hit_pos - pos;
+				dir.normalize();
+				Matrix mtx = Matrix::IDENTITY;
+				Vec3 y(0, 1, 0);
+				if(dotProduct(y, dir) > 0.99f)
+				{
+					y.set(1, 0, 0);
+				}
+				Vec3 x = crossProduct(y, dir);
+				x.normalize();
+				y = crossProduct(dir, x);
+				y.normalize();
+				mtx.setXVector(x);
+				mtx.setYVector(y);
+				mtx.setZVector(dir);
+
+				positions.push(pos);
+				mtx.getRotation(rotations.emplace());
+			}
+		}
+		MoveEntityCommand* cmd = LUMIX_NEW(m_allocator, MoveEntityCommand)(*this,
+			&m_selected_entities[0],
+			&positions[0],
+			&rotations[0],
+			positions.size(),
+			m_allocator);
+		executeCommand(cmd);
+	}
+
+
 	void onMouseDown(int x, int y, MouseButton::Value button) override
 	{
 		m_is_mouse_click[button] = true;
@@ -1556,7 +1604,13 @@ public:
 				scene->getRay(camera_cmp.index, (float)x, (float)y, origin, dir);
 				RayCastModelHit hit = scene->castRay(origin, dir, INVALID_COMPONENT);
 				if (m_gizmo->isActive()) return;
-				
+
+				if(m_is_snap_mode && !m_selected_entities.empty() && hit.m_is_hit)
+				{
+					snapEntities(hit);
+					return;
+				}
+
 				auto icon_hit = m_editor_icons->raycast(origin, dir);
 				if (icon_hit.entity != INVALID_ENTITY)
 				{
@@ -2364,6 +2418,7 @@ public:
 		m_undo_index = -1;
 		m_mouse_handling_plugin = nullptr;
 		m_is_game_mode = false;
+		m_is_snap_mode = false;
 		m_measure_tool = LUMIX_NEW(m_allocator, MeasureTool)();
 		addPlugin(*m_measure_tool);
 
@@ -2459,14 +2514,16 @@ public:
 	}
 
 
-	void setAdditiveSelection(bool additive) override
+	void setSnapMode(bool enable) override
 	{
-		m_is_additive_selection = additive;
+		m_is_snap_mode = enable;
 	}
 
 
-	void addArrayPropertyItem(const ComponentUID& cmp,
-									  IArrayDescriptor& property) override
+	void setAdditiveSelection(bool additive) override { m_is_additive_selection = additive; }
+
+
+	void addArrayPropertyItem(const ComponentUID& cmp, IArrayDescriptor& property) override
 	{
 		if (cmp.isValid())
 		{
@@ -2491,10 +2548,10 @@ public:
 
 
 	void setProperty(uint32 component,
-							 int index,
-							 IPropertyDescriptor& property,
-							 const void* data,
-							 int size) override
+		int index,
+		IPropertyDescriptor& property,
+		const void* data,
+		int size) override
 	{
 
 		ASSERT(m_selected_entities.size() == 1);
@@ -3042,6 +3099,7 @@ private:
 	bool m_is_game_mode;
 	bool m_is_orbit;
 	bool m_is_additive_selection;
+	bool m_is_snap_mode;
 	FS::IFile* m_game_mode_file;
 	Engine* m_engine;
 	Entity m_camera;
