@@ -569,6 +569,7 @@ public:
 
 			if (ImGui::BeginMenu("Tools"))
 			{
+				doMenuItem(getAction("lookAtSelected"), false, is_any_entity_selected);
 				doMenuItem(getAction("toggleGameMode"), m_editor->isGameMode(), true);
 				doMenuItem(getAction("toggleMeasure"), m_editor->isMeasureToolActive(), true);
 				doMenuItem(getAction("snapDown"), false, is_any_entity_selected);
@@ -583,25 +584,20 @@ public:
 
 			if (ImGui::BeginMenu("View"))
 			{
-				doMenuItem(getAction("lookAtSelected"), false, is_any_entity_selected);
-				if (ImGui::BeginMenu("Windows"))
+				ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
+				ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
+				ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
+				ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
+				ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
+				ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
+				ImGui::MenuItem("Settings", nullptr, &m_settings.m_is_opened);
+				ImGui::Separator();
+				for (auto* plugin : m_plugins)
 				{
-					ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
-					ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
-					ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
-					ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
-					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
-					ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
-					ImGui::MenuItem("Settings", nullptr, &m_settings.m_is_opened);
-					ImGui::Separator();
-					for (auto* plugin : m_plugins)
+					if (plugin->m_action)
 					{
-						if (plugin->m_action)
-						{
-							doMenuItem(*plugin->m_action, false, true);
-						}
+						doMenuItem(*plugin->m_action, false, true);
 					}
-					ImGui::EndMenu();
 				}
 				ImGui::EndMenu();
 			}

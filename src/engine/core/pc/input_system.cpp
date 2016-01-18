@@ -140,7 +140,6 @@ namespace Lumix
 				if (!m_xinput_connected[value.controller_id]) return 0;
 				switch (value.type)
 				{
-
 					case InputType::LTHUMB_X:
 						return deadZone(
 							m_xinput_states[value.controller_id].Gamepad.sThumbLX / 32767.0f,
