@@ -1151,6 +1151,7 @@ public:
 			{
 				case PlatformInterface::SystemEventHandler::MouseButton::LEFT:
 					m_app->m_editor->setAdditiveSelection(ImGui::GetIO().KeyCtrl);
+					m_app->m_editor->setSnapMode(ImGui::GetIO().KeyShift);
 					ImGui::GetIO().MouseDown[0] = true;
 					break;
 				case PlatformInterface::SystemEventHandler::MouseButton::RIGHT:

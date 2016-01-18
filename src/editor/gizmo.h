@@ -29,6 +29,7 @@ class LUMIX_EDITOR_API Gizmo
 		virtual void setStep(int step) = 0;
 		virtual bool isAutosnapDown() const = 0;
 		virtual void setAutosnapDown(bool snap) = 0;
+		virtual bool isTranslateMode() const = 0;
 };
 
 

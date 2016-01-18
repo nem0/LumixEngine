@@ -751,7 +751,7 @@ struct GizmoImpl : public Gizmo
 	void setStep(int step) override { m_steps[(int)m_mode] = step; }
 	bool isAutosnapDown() const override { return m_is_autosnap_down; }
 	void setAutosnapDown(bool snap) override { m_is_autosnap_down = snap; }
-
+	bool isTranslateMode() const override { return m_mode == Mode::TRANSLATE; }
 
 	Pivot m_pivot;
 	CoordSystem m_coord_system;
