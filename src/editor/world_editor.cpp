@@ -1556,7 +1556,7 @@ public:
 			for(auto e : m_selected_entities)
 			{
 				auto pos = m_universe_context->m_universe->getPosition(e);
-				auto dir = hit_pos - pos;
+				auto dir = pos - hit_pos;
 				dir.normalize();
 				Matrix mtx = Matrix::IDENTITY;
 				Vec3 y(0, 1, 0);
