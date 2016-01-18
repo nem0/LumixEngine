@@ -558,7 +558,7 @@ struct PipelineImpl : public Pipeline
 			}
 		}
 
-		beginNewView(m_current_framebuffer, name);
+		beginNewView(name);
 	}
 
 
@@ -643,16 +643,14 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void beginNewView(FrameBuffer* framebuffer, const char* debug_name)
+	void beginNewView(const char* debug_name)
 	{
 		m_renderer.viewCounterAdd();
 		m_view_idx = (uint8)m_renderer.getViewCounter();
 		m_view2pass_map[m_view_idx] = m_pass_idx;
-		m_current_framebuffer = framebuffer;
-		if (framebuffer)
+		if (m_current_framebuffer)
 		{
-			bgfx::setViewFrameBuffer(m_view_idx,
-									 m_current_framebuffer->getHandle());
+			bgfx::setViewFrameBuffer(m_view_idx, m_current_framebuffer->getHandle());
 		}
 		else
 		{
@@ -663,12 +661,9 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderSpotLightShadowmap(FrameBuffer* fb,
-								  ComponentIndex light,
-								  int64 layer_mask)
+	void renderSpotLightShadowmap(ComponentIndex light, int64 layer_mask)
 	{
-		ASSERT(fb);
-		beginNewView(fb, "point_light");
+		beginNewView("point_light");
 
 		Entity light_entity = m_scene->getPointLightEntity(light);
 		Matrix mtx = m_scene->getUniverse().getMatrix(light_entity);
@@ -704,15 +699,13 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderOmniLightShadowmap(FrameBuffer* fb,
-								  ComponentIndex light,
-								  int64 layer_mask)
+	void renderOmniLightShadowmap(ComponentIndex light, int64 layer_mask)
 	{
 		Entity light_entity = m_scene->getPointLightEntity(light);
 		Vec3 light_pos = m_scene->getUniverse().getPosition(light_entity);
 		float range = m_scene->getLightRange(light);
-		uint16 shadowmap_height = (uint16)fb->getHeight();
-		uint16 shadowmap_width = (uint16)fb->getWidth();
+		uint16 shadowmap_height = (uint16)m_current_framebuffer->getHeight();
+		uint16 shadowmap_width = (uint16)m_current_framebuffer->getWidth();
 
 		float viewports[] = {0, 0, 0.5, 0, 0, 0.5, 0.5, 0.5};
 
@@ -733,13 +726,12 @@ struct PipelineImpl : public Pipeline
 
 		PointLightShadowmap& shadowmap_info =
 			m_point_light_shadowmaps.emplace();
-		shadowmap_info.m_framebuffer = fb;
+		shadowmap_info.m_framebuffer = m_current_framebuffer;
 		shadowmap_info.m_light = light;
 
 		for (int i = 0; i < 4; ++i)
 		{
-			ASSERT(fb);
-			beginNewView(fb, "omnilight");
+			beginNewView("omnilight");
 
 			bgfx::setViewClear(m_view_idx, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
 			bgfx::touch(m_view_idx);
@@ -813,8 +805,7 @@ struct PipelineImpl : public Pipeline
 		Vec3 camera_pos = universe.getPosition(camera_entity);
 
 		ComponentIndex lights[16];
-		int light_count = m_scene->getClosestPointLights(
-			camera_pos, lights, lengthOf(lights));
+		int light_count = m_scene->getClosestPointLights(camera_pos, lights, lengthOf(lights));
 
 		int fb_index = 0;
 		for (int i = 0; i < light_count; ++i)
@@ -823,15 +814,19 @@ struct PipelineImpl : public Pipeline
 			if (fb_index == framebuffers_count) break;
 
 			float fov = m_scene->getLightFOV(lights[i]);
+			
+			m_current_framebuffer = fbs[i];
+			bgfx::setViewFrameBuffer(m_view_idx, m_current_framebuffer->getHandle());
+
 			if (fov < 180)
 			{
-				renderSpotLightShadowmap(fbs[fb_index], lights[i], layer_mask);
+				renderSpotLightShadowmap(lights[i], layer_mask);
 				++fb_index;
 				continue;
 			}
 			else
 			{
-				renderOmniLightShadowmap(fbs[fb_index], lights[i], layer_mask);
+				renderOmniLightShadowmap(lights[i], layer_mask);
 				++fb_index;
 				continue;
 			}
@@ -876,7 +871,7 @@ struct PipelineImpl : public Pipeline
 		m_is_rendering_in_shadowmap = true;
 		for (int split_index = 0; split_index < 4; ++split_index)
 		{
-			if (split_index > 0) beginNewView(m_current_framebuffer, "shadowmap");
+			if (split_index > 0) beginNewView("shadowmap");
 
 			bgfx::setViewClear(
 				m_view_idx, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
