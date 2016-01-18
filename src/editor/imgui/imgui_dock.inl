@@ -52,6 +52,7 @@ struct DockContext
             , active(true)
             , status(Status_Float)
             , label(nullptr)
+						, opened(false)
         {
             children[0] = children[1] = nullptr;
         }
@@ -63,20 +64,20 @@ struct DockContext
         }
 
 
-                ImVec2 getMinSize() const
-                {
-                        if(!children[0]) return ImVec2(16, 16 + GetTextLineHeightWithSpacing());
+        ImVec2 getMinSize() const
+        {
+            if(!children[0]) return ImVec2(16, 16 + GetTextLineHeightWithSpacing());
 
-                        ImVec2 s0 = children[0]->getMinSize();
-                        ImVec2 s1 = children[1]->getMinSize();
-                        return isHorizontal() ? ImVec2(s0.x + s1.x, ImMax(s0.y, s1.y))
-                                : ImVec2(ImMax(s0.x, s1.x), s0.y + s1.y);
-                }
+            ImVec2 s0 = children[0]->getMinSize();
+            ImVec2 s1 = children[1]->getMinSize();
+            return isHorizontal() ? ImVec2(s0.x + s1.x, ImMax(s0.y, s1.y))
+                : ImVec2(ImMax(s0.x, s1.x), s0.y + s1.y);
+        }
 
 
         bool isHorizontal() const
         {
-          return children[0]->pos.x < children[1]->pos.x;
+            return children[0]->pos.x < children[1]->pos.x;
         }
 
 
@@ -189,6 +190,8 @@ struct DockContext
         ImVec2	pos;
         ImVec2	size;
         Status_	status;
+				bool opened;
+				bool first;
     };
 
 
@@ -222,6 +225,8 @@ struct DockContext
         new_dock->status = Status_Float;
         new_dock->pos = ImVec2(0, 0);
         new_dock->size = GetIO().DisplaySize;
+				new_dock->opened = opened;
+				new_dock->first = true;
         return *new_dock;
     }
 
@@ -794,6 +799,8 @@ struct DockContext
         Dock& dock = getDock(label, !opened || *opened);
         m_end_action = EndAction_None;
 
+				if(dock.first && opened) *opened = dock.opened;
+				dock.first = false;
         if (opened && !*opened)
         {
             if (dock.status != Status_Float)
@@ -801,8 +808,10 @@ struct DockContext
                 doUndock(dock);
                 dock.status = Status_Float;
             }
+						dock.opened = false;
             return false;
         }
+				dock.opened = true;
 
         m_end_action = EndAction_Panel;
         beginPanel();
@@ -901,7 +910,8 @@ struct DockContext
             file << "size_x = " << (int)dock.size.x << ",\n";
             file << "size_y = " << (int)dock.size.y << ",\n";
             file << "status = " << (int)dock.status << ",\n";
-            file << "active = " << (int)dock.active << ",\n";
+						file << "active = " << (int)dock.active << ",\n";
+						file << "opened = " << (int)dock.opened << ",\n";
             file << "prev = " << (int)getDockIndex(dock.prev_tab) << ",\n";
             file << "next = " << (int)getDockIndex(dock.next_tab) << ",\n";
             file << "child0 = " << (int)getDockIndex(dock.children[0]) << ",\n";
@@ -974,11 +984,13 @@ struct DockContext
                         dock.size.y = (float)lua_tonumber(L, -1);
                     if (lua_getfield(L, -5, "active") == LUA_TNUMBER)
                         dock.active = lua_tointeger(L, -1) != 0;
-                    if (lua_getfield(L, -6, "status") == LUA_TNUMBER)
+                    if (lua_getfield(L, -6, "opened") == LUA_TNUMBER)
+                        dock.opened = lua_tointeger(L, -1) != 0;
+                    if (lua_getfield(L, -7, "status") == LUA_TNUMBER)
                     {
                         dock.status = (Status_)lua_tointeger(L, -1);
                     }
-                    lua_pop(L, 6);
+                    lua_pop(L, 7);
 
                     if (lua_getfield(L, -1, "prev") == LUA_TNUMBER)
                     {
