@@ -26,6 +26,7 @@ class IPropertyDescriptor;
 class IScene;
 class JsonSerializer;
 class OutputBlob;
+class PathManager;
 class PluginManager;
 class ResourceManager;
 class Universe;
@@ -81,6 +82,10 @@ public:
 	virtual bool deserialize(UniverseContext& ctx, InputBlob& serializer) = 0;
 	virtual float getFPS() const = 0;
 	virtual float getLastTimeDelta() = 0;
+	virtual void setTimeMultiplier(float multiplier) = 0;
+	virtual void pause(bool pause) = 0;
+	virtual void nextFrame() = 0;
+	virtual PathManager& getPathManager() = 0;
 
 protected:
 	Engine() {}

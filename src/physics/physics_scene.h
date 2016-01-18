@@ -33,9 +33,9 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 		static void destroy(PhysicsScene* scene);
 
 		virtual ~PhysicsScene() {}
-		virtual void update(float time_delta) = 0;
 		virtual void render(RenderScene& render_scene) = 0;
-		virtual bool raycast(const Vec3& origin,
+		virtual Entity raycast(const Vec3& origin, const Vec3& dir) = 0;
+		virtual bool raycastEx(const Vec3& origin,
 			const Vec3& dir,
 			float distance,
 			RaycastHit& result) = 0;

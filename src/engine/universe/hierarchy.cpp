@@ -82,7 +82,7 @@ public:
 
 
 	IPlugin& getPlugin() const override { return m_system; }
-	void update(float time_delta) override {}
+	void update(float time_delta, bool paused) override {}
 	bool ownComponentType(uint32 type) const override { return HIERARCHY_HASH == type; }
 	Universe& getUniverse() override { return m_universe; }
 	IAllocator& getAllocator() { return m_allocator; }
@@ -200,7 +200,7 @@ public:
 				m_children.insert(parent, LUMIX_NEW(m_allocator, Array<Child>)(m_allocator));
 				child_iter = m_children.find(parent);
 			}
-			Child& c = child_iter.value()->pushEmpty();
+			Child& c = child_iter.value()->emplace();
 			c.m_entity = child;
 			Matrix inv_parent_matrix = m_universe.getPositionAndRotation(parent);
 			inv_parent_matrix.inverse();

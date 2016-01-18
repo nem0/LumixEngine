@@ -193,7 +193,11 @@ struct RendererImpl : public Renderer
 			header.dataType = 2;
 
 			Lumix::FS::OsFile file;
-			file.open(filePath, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_renderer.m_allocator);
+			if(!file.open(filePath, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_renderer.m_allocator))
+			{
+				g_log_error.log("renderer") << "Failed to save screenshot to " << filePath;
+				return;
+			}
 			file.write(&header, sizeof(header));
 
 			file.write(data, size);
@@ -229,7 +233,6 @@ struct RendererImpl : public Renderer
 		, m_material_manager(*this, m_allocator)
 		, m_shader_manager(*this, m_allocator)
 		, m_shader_binary_manager(*this, m_allocator)
-		, m_pipeline_manager(*this, m_allocator)
 		, m_passes(m_allocator)
 		, m_shader_defines(m_allocator)
 		, m_bgfx_allocator(m_allocator)
@@ -237,10 +240,11 @@ struct RendererImpl : public Renderer
 		, m_callback_stub(*this)
 	{
 		bgfx::PlatformData d;
-		if (s_platform_data)
+		void* platform_data = engine.getPlatformData().window_handle;
+		if (platform_data)
 		{
 			setMemory(&d, 0, sizeof(d));
-			d.nwh = s_platform_data;
+			d.nwh = platform_data;
 			bgfx::setPlatformData(d);
 		}
 		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub, &m_bgfx_allocator);
@@ -253,7 +257,6 @@ struct RendererImpl : public Renderer
 		m_material_manager.create(ResourceManager::MATERIAL, manager);
 		m_shader_manager.create(ResourceManager::SHADER, manager);
 		m_shader_binary_manager.create(ResourceManager::SHADER_BINARY, manager);
-		m_pipeline_manager.create(ResourceManager::PIPELINE, manager);
 
 		m_current_pass_hash = crc32("MAIN");
 		m_view_counter = 0;
@@ -277,11 +280,16 @@ struct RendererImpl : public Renderer
 		m_material_manager.destroy();
 		m_shader_manager.destroy();
 		m_shader_binary_manager.destroy();
-		m_pipeline_manager.destroy();
 
 		bgfx::frame();
 		bgfx::frame();
 		bgfx::shutdown();
+	}
+
+
+	MaterialManager& getMaterialManager()
+	{
+		return m_material_manager;
 	}
 
 
@@ -338,7 +346,7 @@ struct RendererImpl : public Renderer
 			}
 		}
 
-		auto& new_define = m_shader_defines.pushEmpty();
+		auto& new_define = m_shader_defines.emplace();
 		copyString(new_define, define);
 		return m_shader_defines.size() - 1;
 	}
@@ -354,7 +362,7 @@ struct RendererImpl : public Renderer
 			}
 		}
 
-		auto& new_pass = m_passes.pushEmpty();
+		auto& new_pass = m_passes.emplace();
 		copyString(new_pass, pass);
 		return m_passes.size() - 1;
 	}
@@ -412,24 +420,12 @@ struct RendererImpl : public Renderer
 	ShaderManager m_shader_manager;
 	ShaderBinaryManager m_shader_binary_manager;
 	ModelManager m_model_manager;
-	PipelineManager m_pipeline_manager;
 	uint32 m_current_pass_hash;
 	int m_view_counter;
 	BGFXAllocator m_bgfx_allocator;
 	bgfx::VertexDecl m_basic_vertex_decl;
 	bgfx::VertexDecl m_basic_2d_vertex_decl;
-
-	static void* s_platform_data;
 };
-
-
-void* RendererImpl::s_platform_data = nullptr;
-
-
-void Renderer::setInitData(void* data)
-{
-	RendererImpl::s_platform_data = data;
-}
 
 
 extern "C"

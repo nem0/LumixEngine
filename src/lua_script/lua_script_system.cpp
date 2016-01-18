@@ -19,11 +19,11 @@
 #include "iplugin.h"
 #include "lua_script/lua_script_manager.h"
 #include "plugin_manager.h"
-#include "studio_lib/asset_browser.h"
-#include "studio_lib/imgui/imgui.h"
-#include "studio_lib/property_grid.h"
-#include "studio_lib/studio_app.h"
-#include "studio_lib/utils.h"
+#include "editor/asset_browser.h"
+#include "editor/imgui/imgui.h"
+#include "editor/property_grid.h"
+#include "editor/studio_app.h"
+#include "editor/utils.h"
 #include "universe/universe.h"
 
 
@@ -571,9 +571,9 @@ namespace Lumix
 		IPlugin& getPlugin() const override { return m_system; }
 
 
-		void update(float time_delta) override
+		void update(float time_delta, bool paused) override
 		{
-			if (!m_global_state) { return; }
+			if (!m_global_state || paused) { return; }
 
 			for (auto* i : m_updates)
 			{
@@ -716,7 +716,7 @@ namespace Lumix
 	{
 
 
-	struct PropertyGridPlugin : public PropertyGrid::Plugin
+	struct PropertyGridPlugin : public PropertyGrid::IPlugin
 	{
 		void onGUI(PropertyGrid& grid, Lumix::ComponentUID cmp) override
 		{
@@ -853,7 +853,6 @@ extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
 
 	auto* plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), PropertyGridPlugin);
 	app.getPropertyGrid()->addPlugin(*plugin);
-
 
 	auto* asset_browser_plugin =
 		LUMIX_NEW(app.getWorldEditor()->getAllocator(), AssetBrowserPlugin)(app);

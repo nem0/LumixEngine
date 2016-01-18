@@ -182,11 +182,11 @@ public:
 	}
 
 
-	void update(float time_delta) override
+	void update(float time_delta, bool paused) override
 	{
 		PROFILE_FUNCTION();
-		if (m_animables.empty())
-			return;
+		if (m_animables.empty()) return;
+
 		for (int i = 0, c = m_animables.size(); i < c; ++i)
 		{
 			Animable& animable = m_animables[i];
@@ -257,7 +257,7 @@ private:
 				break;
 			}
 		}
-		Animable& animable = src ? *src : m_animables.pushEmpty();
+		Animable& animable = src ? *src : m_animables.emplace();
 		animable.m_time = 0;
 		animable.m_is_free = false;
 		animable.m_renderable = INVALID_COMPONENT;

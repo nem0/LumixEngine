@@ -40,78 +40,6 @@ enum class PhysicsSceneVersion : int
 };
 
 
-namespace LuaAPI
-{
-
-
-static int raycast(lua_State* L)
-{
-	if (!LuaWrapper::checkParameterType<void*>(L, 1) ||
-		!LuaWrapper::checkParameterType<float>(L, 2) ||
-		!LuaWrapper::checkParameterType<float>(L, 3) ||
-		!LuaWrapper::checkParameterType<float>(L, 4) ||
-		!LuaWrapper::checkParameterType<float>(L, 5) ||
-		!LuaWrapper::checkParameterType<float>(L, 6) ||
-		!LuaWrapper::checkParameterType<float>(L, 7))
-	{
-		lua_pushnil(L);
-		return 1;
-	}
-
-	auto* scene = (PhysicsScene*)LuaWrapper::toType<void*>(L, 1);
-	Vec3 origin;
-	origin.x = LuaWrapper::toType<float>(L, 2);
-	origin.y = LuaWrapper::toType<float>(L, 3);
-	origin.z = LuaWrapper::toType<float>(L, 4);
-	Vec3 dir;
-	dir.x = LuaWrapper::toType<float>(L, 5);
-	dir.y = LuaWrapper::toType<float>(L, 6);
-	dir.z = LuaWrapper::toType<float>(L, 7);
-
-	RaycastHit hit;
-	scene->raycast(origin, dir, FLT_MAX, hit);
-
-	LuaWrapper::pushLua(L, hit.entity);
-	return 1;
-}
-
-
-static float getActorSpeed(IScene* scene, ComponentIndex component)
-{
-	return static_cast<PhysicsScene*>(scene)->getActorSpeed(component);
-}
-
-
-static void moveController(IScene* scene,
-	ComponentIndex component,
-	Vec3 dir,
-	float time_delta)
-{
-	static_cast<PhysicsScene*>(scene)->moveController(component, dir, time_delta);
-}
-
-
-static ComponentIndex getActorComponent(IScene* scene, Entity entity)
-{
-	return static_cast<PhysicsScene*>(scene)->getActorComponent(entity);
-}
-
-
-static void putToSleep(IScene* scene, Entity entity)
-{
-	static_cast<PhysicsScene*>(scene)->putToSleep(entity);
-}
-
-
-static void applyForceToActor(IScene* scene, int component, Vec3 force)
-{
-	static_cast<PhysicsScene*>(scene)->applyForceToActor(component, force);
-}
-
-
-} // namespace LuaAPI
-
-
 struct OutputStream : public physx::PxOutputStream
 {
 	OutputStream(IAllocator& allocator)
@@ -311,6 +239,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		, m_queued_forces(m_allocator)
 		, m_layers_count(2)
 	{
+		setMemory(m_layers_names, 0, sizeof(m_layers_names));
 		for (int i = 0; i < lengthOf(m_layers_names); ++i)
 		{
 			copyString(m_layers_names[i], "Layer");
@@ -566,7 +495,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		cDesc.behaviorCallback = nullptr;
 		Vec3 position = m_universe.getPosition(entity);
 		cDesc.position.set(position.x, position.y, position.z);
-		PhysicsSceneImpl::Controller& c = m_controllers.pushEmpty();
+		PhysicsSceneImpl::Controller& c = m_controllers.emplace();
 		c.m_controller = m_controller_manager->createController(cDesc);
 		c.m_entity = entity;
 		c.m_is_free = false;
@@ -602,7 +531,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		geom.halfExtents.y = 1;
 		geom.halfExtents.z = 1;
 		physx::PxTransform transform;
-		Matrix mtx = m_universe.getMatrix(entity);
+		Matrix mtx = m_universe.getPositionAndRotation(entity);
 		matrix2Transform(mtx, transform);
 		
 		physx::PxRigidStatic* physx_actor =
@@ -815,9 +744,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void update(float time_delta) override
+	void update(float time_delta, bool paused) override
 	{
-		if (!m_is_game_running) return;
+		if (!m_is_game_running || paused) return;
 		
 		applyQueuedForces();
 
@@ -846,18 +775,20 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
 
-#define REGISTER_FUNCTION(name)       \
-	m_script_scene->registerFunction( \
-		"Physics", #name, LuaWrapper::wrap<decltype(&LuaAPI::name), LuaAPI::name>)
+		#define REGISTER_FUNCTION(name) \
+			do {\
+				auto f = &LuaWrapper::wrapMethod<PhysicsSceneImpl, decltype(&PhysicsSceneImpl::name), &PhysicsSceneImpl::name>; \
+				m_script_scene->registerFunction("Physics", #name, f); \
+			} while(false) \
 
-		REGISTER_FUNCTION(moveController);
-		REGISTER_FUNCTION(applyForceToActor);
 		REGISTER_FUNCTION(getActorComponent);
 		REGISTER_FUNCTION(putToSleep);
 		REGISTER_FUNCTION(getActorSpeed);
-		m_script_scene->registerFunction("Physics", "raycast", LuaAPI::raycast);
+		REGISTER_FUNCTION(applyForceToActor);
+		REGISTER_FUNCTION(moveController);
+		REGISTER_FUNCTION(raycast);
 
-#undef REGISTER_FUNCTION
+		#undef REGISTER_FUNCTION
 	}
 
 
@@ -898,7 +829,15 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	bool raycast(const Vec3& origin,
+	Entity raycast(const Vec3& origin, const Vec3& dir) override
+	{
+		RaycastHit hit;
+		if (raycastEx(origin, dir, FLT_MAX, hit)) return hit.entity;
+		return INVALID_ENTITY;
+	}
+
+
+	bool raycastEx(const Vec3& origin,
 		const Vec3& dir,
 		float distance,
 		RaycastHit& result) override
@@ -1051,7 +990,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 
 			physx::PxTransform transform;
-			Matrix mtx = m_universe.getMatrix(terrain->m_entity);
+			Matrix mtx = m_universe.getPositionAndRotation(terrain->m_entity);
 			matrix2Transform(mtx, transform);
 
 			physx::PxRigidActor* actor;
@@ -1308,7 +1247,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 				physx::PxTransform transform;
 				matrix2Transform(
-					m_universe.getMatrix(m_actors[cmp]->getEntity()),
+					m_universe.getPositionAndRotation(m_actors[cmp]->getEntity()),
 					transform);
 
 				physx::PxRigidActor* actor;
@@ -1397,7 +1336,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				physx::PxBoxGeometry box_geom;
 				physx::PxTransform transform;
-				Matrix mtx = m_universe.getMatrix(m_actors[idx]->getEntity());
+				Matrix mtx = m_universe.getPositionAndRotation(m_actors[idx]->getEntity());
 				matrix2Transform(mtx, transform);
 				serializer.read(box_geom.halfExtents.x);
 				serializer.read(box_geom.halfExtents.y);
@@ -1540,7 +1479,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.read(is_free);
 			Entity e(index);
 
-			Controller& c = m_controllers.pushEmpty();
+			Controller& c = m_controllers.emplace();
 			c.m_is_free = is_free;
 			c.m_frame_change.set(0, 0, 0);
 
@@ -1680,7 +1619,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void applyForceToActor(ComponentIndex cmp, const Vec3& force) override
 	{
-		auto& i = m_queued_forces.pushEmpty();
+		auto& i = m_queued_forces.emplace();
 		i.cmp = cmp;
 		i.force = force;
 	}
@@ -1806,7 +1745,7 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		setPhysxActor(nullptr);
 
 		physx::PxTransform transform;
-		Matrix mtx = m_scene.getUniverse().getMatrix(m_entity);
+		Matrix mtx = m_scene.getUniverse().getPositionAndRotation(m_entity);
 		matrix2Transform(mtx, transform);
 
 		physx::PxRigidActor* actor;

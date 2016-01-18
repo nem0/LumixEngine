@@ -25,7 +25,6 @@
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/particle_system.h"
-#include "renderer/pipeline.h"
 #include "renderer/pose.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
@@ -238,10 +237,10 @@ public:
 		m_particle_emitters[cmp]->reset();
 	}
 
-
-	void drawEmitterGizmo(ComponentIndex cmp) override
+	
+	ParticleEmitter* getParticleEmitter(ComponentIndex cmp)
 	{
-		m_particle_emitters[cmp]->drawGizmo(*this);
+		return m_particle_emitters[cmp];
 	}
 
 
@@ -266,6 +265,7 @@ public:
 	{
 		if (type == RENDERABLE_HASH)
 		{
+			if (entity >= m_renderables.size()) return INVALID_COMPONENT;
 			return m_renderables[entity].entity != INVALID_ENTITY ? entity : INVALID_COMPONENT;
 		}
 		if (type == POINT_LIGHT_HASH)
@@ -393,7 +393,7 @@ public:
 	}
 
 
-	void update(float dt) override
+	void update(float dt, bool paused) override
 	{
 		PROFILE_FUNCTION();
 		m_time += dt;
@@ -425,7 +425,7 @@ public:
 			}
 		}
 
-		if (m_is_game_running)
+		if (m_is_game_running && !paused)
 		{
 			for (auto* emitter : m_particle_emitters)
 			{
@@ -637,7 +637,7 @@ public:
 		m_renderables.reserve(size);
 		for (int i = 0; i < size; ++i)
 		{
-			auto& r = m_renderables.pushEmpty();
+			auto& r = m_renderables.emplace();
 			serializer.read(r.entity);
 			ASSERT(r.entity == i || r.entity == INVALID_ENTITY);
 			r.model = nullptr;
@@ -1149,7 +1149,11 @@ public:
 	void setParticleEmitterLinearMovementX(ComponentIndex cmp, const Vec2& value) override
 	{
 		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
-		if(module) module->m_x = value;
+		if (module)
+		{
+			module->m_x = value;
+			module->m_x.check();
+		}
 	}
 
 
@@ -1163,7 +1167,11 @@ public:
 	void setParticleEmitterLinearMovementY(ComponentIndex cmp, const Vec2& value) override
 	{
 		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
-		if (module) module->m_y = value;
+		if (module)
+		{
+			module->m_y = value;
+			module->m_y.check();
+		}
 	}
 
 
@@ -1177,7 +1185,11 @@ public:
 	void setParticleEmitterLinearMovementZ(ComponentIndex cmp, const Vec2& value) override
 	{
 		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
-		if (module) module->m_z = value;
+		if (module)
+		{
+			module->m_z = value;
+			module->m_z.check();
+		}
 	}
 
 
@@ -1196,14 +1208,14 @@ public:
 	void setParticleEmitterInitialLife(ComponentIndex cmp, const Vec2& value) override
 	{
 		m_particle_emitters[cmp]->m_initial_life = value;
-		m_particle_emitters[cmp]->m_initial_life.check();
+		m_particle_emitters[cmp]->m_initial_life.checkZero();
 	}
 
 
 	void setParticleEmitterInitialSize(ComponentIndex cmp, const Vec2& value) override
 	{
 		m_particle_emitters[cmp]->m_initial_size = value;
-		m_particle_emitters[cmp]->m_initial_size.check();
+		m_particle_emitters[cmp]->m_initial_size.checkZero();
 	}
 
 
@@ -1218,13 +1230,13 @@ public:
 		m_particle_emitters[cmp]->m_spawn_period = value;
 		m_particle_emitters[cmp]->m_spawn_period.from =
 			Math::maxValue(0.01f, m_particle_emitters[cmp]->m_spawn_period.from);
-		m_particle_emitters[cmp]->m_spawn_period.check();
+		m_particle_emitters[cmp]->m_spawn_period.checkZero();
 	}
 
 
 	ComponentIndex createCamera(Entity entity)
 	{
-		Camera& camera = m_cameras.pushEmpty();
+		Camera& camera = m_cameras.emplace();
 		camera.m_is_free = false;
 		camera.m_is_active = false;
 		camera.m_entity = entity;
@@ -1432,7 +1444,8 @@ public:
 	ComponentIndex getRenderableComponent(Entity entity) override
 	{
 		ComponentIndex cmp = (ComponentIndex)entity;
-		if(m_renderables[cmp].entity == INVALID_ENTITY) return INVALID_COMPONENT;
+		if (cmp >= m_renderables.size()) return INVALID_COMPONENT;
+		if (m_renderables[cmp].entity == INVALID_ENTITY) return INVALID_COMPONENT;
 		return cmp;
 	}
 
@@ -1843,7 +1856,7 @@ public:
 						LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
 						for (int j = lod.getFrom(), c = lod.getTo(); j <= c; ++j)
 						{
-							auto& info = subinfos.pushEmpty();
+							auto& info = subinfos.emplace();
 							info.renderable = raw_subresults[i];
 							info.mesh = &model->getMesh(j);
 						}
@@ -1975,7 +1988,7 @@ public:
 			{
 				for (int k = 0, kc = renderable.model->getMeshCount(); k < kc; ++k)
 				{
-					auto& info = infos.pushEmpty();
+					auto& info = infos.emplace();
 					info.mesh = &renderable.model->getMesh(k);
 					info.renderable = renderable_cmp;
 				}
@@ -1997,7 +2010,7 @@ public:
 			const Renderable& renderable = m_renderables[geoms[j]];
 			for (int k = 0, kc = renderable.model->getMeshCount(); k < kc; ++k)
 			{
-				auto& info = infos.pushEmpty();
+				auto& info = infos.emplace();
 				info.mesh = &renderable.model->getMesh(k);
 				info.renderable = geoms[j];
 			}
@@ -2461,7 +2474,7 @@ public:
 
 	void addDebugPoint(const Vec3& pos, uint32 color, float life) override
 	{
-		DebugPoint& point = m_debug_points.pushEmpty();
+		DebugPoint& point = m_debug_points.emplace();
 		point.m_pos = pos;
 		point.m_color = ARGBToABGR(color);
 		point.m_life = life;
@@ -2477,7 +2490,7 @@ public:
 
 	void addDebugLine(const Vec3& from, const Vec3& to, uint32 color, float life) override
 	{
-		DebugLine& line = m_debug_lines.pushEmpty();
+		DebugLine& line = m_debug_lines.emplace();
 		line.m_from = from;
 		line.m_to = to;
 		line.m_color = ARGBToABGR(color);
@@ -3072,7 +3085,7 @@ public:
 
 	ComponentIndex createGlobalLight(Entity entity)
 	{
-		GlobalLight& light = m_global_lights.pushEmpty();
+		GlobalLight& light = m_global_lights.emplace();
 		light.m_entity = entity;
 		light.m_color.set(1, 1, 1);
 		light.m_intensity = 0;
@@ -3097,7 +3110,7 @@ public:
 
 	ComponentIndex createPointLight(Entity entity)
 	{
-		PointLight& light = m_point_lights.pushEmpty();
+		PointLight& light = m_point_lights.emplace();
 		m_light_influenced_geometry.push(Array<int>(m_allocator));
 		light.m_entity = entity;
 		light.m_diffuse_color.set(1, 1, 1);

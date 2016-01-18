@@ -21,6 +21,12 @@ test_script:
             $wc.UploadFile($url, (Resolve-Path .\tests.xml))
 
 - ps: >-
+    & "..\projects\tmp\bin\RelWithDebInfo\studio.exe" -run_script render_tests/main.lua | Write-Output
+
+- ps: >-
+    & "..\projects\tmp\bin\RelWithDebInfo\studio.exe" -run_script unit_tests/editor/main.lua | Write-Output
+
+- ps: >-
     & "..\projects\tmp\bin\RelWithDebInfo\render_test.exe" | Write-Output
 
 after_build:
@@ -31,7 +37,6 @@ after_build:
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\lua_script.dll
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\physics.dll
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\renderer.dll
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\studio_lib.dll
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\studio.exe
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\animation.pdb
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\audio.pdb
@@ -41,8 +46,7 @@ after_build:
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\physics.pdb
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\renderer.pdb
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\studio.pdb
- - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\bin\RelWithDebInfo\studio_lib.pdb
-
+ 
 artifacts:
 - path: tests.xml
   name: tests.xml

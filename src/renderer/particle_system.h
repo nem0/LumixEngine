@@ -18,6 +18,7 @@ class OutputBlob;
 class RenderScene;
 class ResourceManager;
 class Universe;
+class WorldEditor;
 
 
 struct IntInterval
@@ -39,8 +40,8 @@ struct Interval
 	Interval();
 	float getRandom() const;
 
-
 	void check();
+	void checkZero();
 
 	void operator=(const Vec2& value)
 	{
@@ -69,7 +70,7 @@ public:
 		virtual void serialize(OutputBlob& blob) = 0;
 		virtual void deserialize(InputBlob& blob, int version) = 0;
 		virtual uint32 getType() const = 0;
-		virtual void drawGizmo(RenderScene& scene) {}
+		virtual void drawGizmo(WorldEditor& editor, RenderScene& scene) {}
 
 		ParticleEmitter& m_emitter;
 	};
@@ -91,7 +92,6 @@ public:
 		float m_radius;
 		Shape m_shape;
 	};
-
 
 
 	struct LUMIX_RENDERER_API LinearMovementModule : public ModuleBase
@@ -116,7 +116,7 @@ public:
 		void deserialize(InputBlob& blob, int version) override;
 		void update(float time_delta) override;
 		uint32 getType() const override { return s_type; }
-		void drawGizmo(RenderScene& scene) override;
+		void drawGizmo(WorldEditor& editor, RenderScene& scene) override;
 
 		static const uint32 s_type;
 		Entity m_entities[8];
@@ -132,6 +132,7 @@ public:
 		void deserialize(InputBlob& blob, int version) override;
 		void update(float time_delta) override;
 		uint32 getType() const override { return s_type; }
+		void drawGizmo(WorldEditor& editor, RenderScene& scene) override;
 
 		static const uint32 s_type;
 		Entity m_entities[8];
@@ -202,7 +203,7 @@ public:
 	~ParticleEmitter();
 
 	void reset();
-	void drawGizmo(RenderScene& scene);
+	void drawGizmo(WorldEditor& editor, RenderScene& scene);
 	void serialize(OutputBlob& blob);
 	void deserialize(InputBlob& blob, ResourceManager& manager, bool has_version);
 	void update(float time_delta);

@@ -28,7 +28,6 @@ public:
 	static const uint32 MODEL = 0x06991edf; // MODEL
 	static const uint32 SHADER = 0x0f0b59ae; // SHADER
 	static const uint32 TEXTURE = 0xbd23f368; // TEXTURE
-	static const uint32 PIPELINE = 0xbbcf4595; // PIPELINE
 	static const uint32 ANIMATION = 0xc9909a33; // ANIMATION
 	static const uint32 PHYSICS = 0xE77419F9; // PHYSICS
 	static const uint32 FILE = 0xBA0ADBA4; // FILE

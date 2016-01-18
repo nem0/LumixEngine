@@ -14,8 +14,8 @@
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
 #include "renderer/render_scene.h"
-#include "studio_lib/studio_app.h"
-#include "studio_lib/utils.h"
+#include "editor/studio_app.h"
+#include "editor/utils.h"
 #include "universe/universe.h"
 
 
@@ -103,7 +103,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 			Vec3 extents = phy_scene->getHalfExtents(cmp.index);
 
 			Universe& universe = scene->getUniverse();
-			Matrix mtx = universe.getMatrix(cmp.entity);
+			Matrix mtx = universe.getPositionAndRotation(cmp.entity);
 
 			scene->addDebugCube(mtx.getTranslation(),
 				mtx.getXVector() * extents.x,
@@ -480,9 +480,6 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 
 		ImGui::EndDock();
 	}
-
-
-	const char* getWindowName() override { return "Physics"; }
 
 
 	bool m_is_window_opened;

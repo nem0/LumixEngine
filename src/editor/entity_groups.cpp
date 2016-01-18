@@ -13,7 +13,7 @@ EntityGroups::EntityGroups(IAllocator& allocator)
 	, m_universe(nullptr)
 {
 	m_groups.emplace(allocator);
-	auto& name = m_group_names.pushEmpty();
+	auto& name = m_group_names.emplace();
 	copyString(name.name, "default");
 }
 
@@ -64,7 +64,7 @@ void EntityGroups::createGroup(const char* name)
 	}
 
 	m_groups.emplace(m_allocator);
-	auto& group_name = m_group_names.pushEmpty();
+	auto& group_name = m_group_names.emplace();
 	copyString(group_name.name, name);
 }
 
@@ -81,7 +81,7 @@ void EntityGroups::setUniverse(Universe* universe)
 	m_group_names.clear();
 	m_groups.clear();
 	m_groups.emplace(m_allocator);
-	auto& name = m_group_names.pushEmpty();
+	auto& name = m_group_names.emplace();
 	copyString(name.name, "default");
 
 	if (m_universe)

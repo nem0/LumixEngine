@@ -21,6 +21,8 @@ namespace Lumix
 	{
 		g_path_manager = this;
 		m_empty_path = getPath(0, "");
+		m_base_path[0] = 0;
+		m_base_path_length = 0;
 	}
 
 
@@ -33,9 +35,20 @@ namespace Lumix
 	}
 
 
+	const char* PathManager::getBasePath() { return m_base_path; }
+
+
+	void PathManager::setBasePath(const char* path)
+	{
+		PathUtils::normalize(path, m_base_path, lengthOf(m_base_path));
+		m_base_path_length = stringLength(path);
+	}
+
+
 	void PathManager::serialize(OutputBlob& serializer)
 	{
 		MT::SpinLock lock(m_mutex);
+		clear();
 		serializer.write((int32)m_paths.size());
 		for (int i = 0; i < m_paths.size(); ++i)
 		{
@@ -158,8 +171,19 @@ namespace Lumix
 		size_t len = stringLength(path);
 		ASSERT(len < MAX_PATH_LENGTH);
 		PathUtils::normalize(path, tmp, (uint32)len + 1);
-		uint32 hash = crc32(tmp);
-		m_data = g_path_manager->getPath(hash, tmp);
+		const char* base_path = g_path_manager->m_base_path;
+		if (g_path_manager->m_base_path_length > 0 &&
+			compareStringN(base_path, tmp, g_path_manager->m_base_path_length) == 0)
+		{
+			const char* rel = tmp + g_path_manager->m_base_path_length + 1;
+			uint32 hash = crc32(rel);
+			m_data = g_path_manager->getPath(hash, rel);
+		}
+		else
+		{
+			uint32 hash = crc32(tmp);
+			m_data = g_path_manager->getPath(hash, tmp);
+		}
 	}
 
 
@@ -185,14 +209,24 @@ namespace Lumix
 
 	void Path::operator =(const char* rhs)
 	{
+		g_path_manager->decrementRefCount(m_data);
 		char tmp[MAX_PATH_LENGTH];
 		size_t len = stringLength(rhs);
 		ASSERT(len < MAX_PATH_LENGTH);
 		PathUtils::normalize(rhs, tmp, (uint32)len + 1);
-		uint32 hash = crc32(tmp);
-
-		g_path_manager->decrementRefCount(m_data);
-		m_data = g_path_manager->getPath(hash, tmp);
+		const char* base_path = g_path_manager->m_base_path;
+		if (g_path_manager->m_base_path_length > 0 &&
+			compareStringN(base_path, tmp, g_path_manager->m_base_path_length) == 0)
+		{
+			const char* rel = tmp + g_path_manager->m_base_path_length + 1;
+			uint32 hash = crc32(rel);
+			m_data = g_path_manager->getPath(hash, rel);
+		}
+		else
+		{
+			uint32 hash = crc32(tmp);
+			m_data = g_path_manager->getPath(hash, tmp);
+		}
 	}
 
 

@@ -15,8 +15,8 @@
 #include "core/input_system.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
-#include "core/lua_wrapper.h"
 #include "core/matrix.h"
+#include "core/path.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -32,16 +32,13 @@
 #include "editor/iproperty_descriptor.h"
 #include "editor/property_register.h"
 #include "engine.h"
+#include "ieditor_command.h"
 #include "iplugin.h"
 #include "plugin_manager.h"
-#include "renderer/material.h"
-#include "renderer/model.h"
+#include "render_interface.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
-#include "renderer/texture.h"
-#include "ieditor_command.h"
 #include "universe/universe.h"
-#include <lua.hpp>
 
 
 namespace Lumix
@@ -50,8 +47,6 @@ namespace Lumix
 
 static const uint32 RENDERABLE_HASH = crc32("renderable");
 static const uint32 CAMERA_HASH = crc32("camera");
-static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
-static const uint32 POINT_LIGHT_HASH = crc32("point_light");
 
 
 class SetEntityNameCommand : public IEditorCommand
@@ -856,13 +851,6 @@ private:
 };
 
 
-struct EditorIconHit
-{
-	EditorIcon* m_icon;
-	float m_t;
-};
-
-
 struct WorldEditorImpl : public WorldEditor
 {
 private:
@@ -926,7 +914,7 @@ private:
 			serializer.deserializeArrayBegin("entities");
 			while (!serializer.isArrayEnd())
 			{
-				Entity& entity = m_entities.pushEmpty();
+				Entity& entity = m_entities.emplace();
 				serializer.deserializeArrayItem(entity, 0);
 			}
 			serializer.deserializeArrayEnd();
@@ -1380,9 +1368,6 @@ private:
 	};
 
 public:
-	const char* getBasePath() override { return m_base_path.c_str(); }
-
-
 	IAllocator& getAllocator() override { return m_allocator; }
 
 
@@ -1420,153 +1405,11 @@ public:
 
 	Universe* getUniverse() override
 	{
-		return m_universe_context->m_universe;
+		return m_universe_context ? m_universe_context->m_universe : nullptr; 
 	}
 
 
 	Engine& getEngine() override { return *m_engine; }
-
-
-	Vec3 minCoords(const Vec3& a, const Vec3& b)
-	{
-		return Vec3(Math::minValue(a.x, b.x),
-					Math::minValue(a.y, b.y),
-					Math::minValue(a.z, b.z));
-	}
-
-
-	Vec3 maxCoords(const Vec3& a, const Vec3& b)
-	{
-		return Vec3(Math::maxValue(a.x, b.x),
-					Math::maxValue(a.y, b.y),
-					Math::maxValue(a.z, b.z));
-	}
-
-
-	void showPointLightGizmo(ComponentUID light)
-	{
-		RenderScene* scene = static_cast<RenderScene*>(light.scene);
-		Universe& universe = scene->getUniverse();
-
-		float range = scene->getLightRange(light.index);
-
-		Vec3 pos = universe.getPosition(light.entity);
-		scene->addDebugSphere(pos, range, 0xff0000ff, 0);
-	}
-
-
-	void showRenderableGizmo(ComponentUID renderable)
-	{
-		RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
-		Universe& universe = scene->getUniverse();
-		Model* model = scene->getRenderableModel(renderable.index);
-		Vec3 points[8];
-		if (!model) return;
-
-		const AABB& aabb = model->getAABB();
-		points[0] = aabb.getMin();
-		points[7] = aabb.getMax();
-		points[1].set(points[0].x, points[0].y, points[7].z);
-		points[2].set(points[0].x, points[7].y, points[0].z);
-		points[3].set(points[0].x, points[7].y, points[7].z);
-		points[4].set(points[7].x, points[0].y, points[0].z);
-		points[5].set(points[7].x, points[0].y, points[7].z);
-		points[6].set(points[7].x, points[7].y, points[0].z);
-		Matrix mtx = universe.getMatrix(renderable.entity);
-
-		for (int j = 0; j < 8; ++j)
-		{
-			points[j] = mtx.multiplyPosition(points[j]);
-		}
-
-		Vec3 this_min = points[0];
-		Vec3 this_max = points[0];
-
-		for (int j = 0; j < 8; ++j)
-		{
-			this_min = minCoords(points[j], this_min);
-			this_max = maxCoords(points[j], this_max);
-		}
-
-		scene->addDebugCube(this_min, this_max, 0xffff0000, 0);
-	}
-
-
-	void showCameraGizmo(ComponentUID camera)
-	{
-		RenderScene* scene = static_cast<RenderScene*>(camera.scene);
-		Universe& universe = scene->getUniverse();
-		Vec3 pos = universe.getPosition(camera.entity);
-
-		float fov = scene->getCameraFOV(camera.index);
-		float near_distance = scene->getCameraNearPlane(camera.index);
-		float far_distance = scene->getCameraFarPlane(camera.index);
-		Vec3 dir = universe.getRotation(camera.entity) * Vec3(0, 0, -1);
-		Vec3 right = universe.getRotation(camera.entity) * Vec3(1, 0, 0);
-		Vec3 up = universe.getRotation(camera.entity) * Vec3(0, 1, 0);
-		float w = scene->getCameraWidth(camera.index);
-		float h = scene->getCameraHeight(camera.index);
-		float ratio = h < 1.0f ? 1 : w / h;
-
-		scene->addDebugFrustum(pos,
-							   dir,
-							   up,
-							   fov,
-							   ratio,
-							   near_distance,
-							   far_distance,
-							   0xffff0000,
-							   0);
-	}
-
-
-	void showGlobalLightGizmo(ComponentUID light)
-	{
-		RenderScene* scene = static_cast<RenderScene*>(light.scene);
-		Universe& universe = scene->getUniverse();
-		Vec3 pos = universe.getPosition(light.entity);
-
-		Vec3 dir = universe.getRotation(light.entity) * Vec3(0, 0, 1);
-		Vec3 right = universe.getRotation(light.entity) * Vec3(1, 0, 0);
-		Vec3 up = universe.getRotation(light.entity) * Vec3(0, 1, 0);
-
-		scene->addDebugLine(pos, pos + dir, 0xff0000ff, 0);
-		scene->addDebugLine(pos + right, pos + dir + right, 0xff0000ff, 0);
-		scene->addDebugLine(pos - right, pos + dir - right, 0xff0000ff, 0);
-		scene->addDebugLine(pos + up, pos + dir + up, 0xff0000ff, 0);
-		scene->addDebugLine(pos - up, pos + dir - up, 0xff0000ff, 0);
-
-		scene->addDebugLine(pos + right + up, pos + dir + right + up, 0xff0000ff, 0);
-		scene->addDebugLine(pos + right - up, pos + dir + right - up, 0xff0000ff, 0);
-		scene->addDebugLine(pos - right - up, pos + dir - right - up, 0xff0000ff, 0);
-		scene->addDebugLine(pos - right + up, pos + dir - right + up, 0xff0000ff, 0);
-
-		scene->addDebugSphere(pos - dir, 0.1f, 0xff0000ff, 0);
-	}
-
-
-	AABB getEntityAABB(Universe& universe, Entity entity)
-	{
-		AABB aabb;
-
-		ComponentUID cmp = getComponent(entity, RENDERABLE_HASH);
-		if (cmp.isValid())
-		{
-			RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-			Model* model = scene->getRenderableModel(cmp.index);
-			if (!model) return aabb;
-
-			aabb = model->getAABB();
-			aabb.transform(universe.getMatrix(entity));
-
-			return aabb;
-		}
-
-		Vec3 pos = universe.getPosition(entity);
-		aabb.set(pos, pos);
-
-		return aabb;
-	}
 
 
 	void showGizmos()
@@ -1579,11 +1422,11 @@ public:
 
 		if (m_selected_entities.size() > 1)
 		{
-			AABB aabb = getEntityAABB(*universe, m_selected_entities[0]);
+			AABB aabb = m_render_interface->getEntityAABB(*universe, m_selected_entities[0]);
 			for (int i = 1; i < m_selected_entities.size(); ++i)
 			{
 				AABB entity_aabb =
-					getEntityAABB(*universe, m_selected_entities[i]);
+					m_render_interface->getEntityAABB(*universe, m_selected_entities[i]);
 				aabb.merge(entity_aabb);
 			}
 
@@ -1599,23 +1442,6 @@ public:
 			{
 				if (plugin->showGizmo(cmp))
 					break;
-			}
-
-			if (cmp.type == RENDERABLE_HASH)
-			{
-				showRenderableGizmo(cmp);
-			}
-			else if (cmp.type == CAMERA_HASH)
-			{
-				showCameraGizmo(cmp);
-			}
-			else if (cmp.type == GLOBAL_LIGHT_HASH)
-			{
-				showGlobalLightGizmo(cmp);
-			}
-			else if (cmp.type == POINT_LIGHT_HASH)
-			{
-				showPointLightGizmo(cmp);
 			}
 		}
 	}
@@ -1656,13 +1482,9 @@ public:
 		PROFILE_FUNCTION();
 		updateGoTo();
 
-		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
-		if (camera_cmp.isValid())
+		if (!m_selected_entities.empty())
 		{
-			Vec3 origin, cursor_dir;
-			RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
-			scene->getRay(camera_cmp.index, m_mouse_x, m_mouse_y, origin, cursor_dir);
-			m_gizmo.setCameraRay(origin, cursor_dir);
+			m_gizmo->add(m_selected_entities[0]);
 		}
 
 		for (int i = 0; i < m_plugins.size(); ++i)
@@ -1670,6 +1492,7 @@ public:
 			m_plugins[i]->tick();
 		}
 		createEditorLines();
+		for (auto& i : m_is_mouse_click) i = false;
 	}
 
 
@@ -1682,10 +1505,10 @@ public:
 
 	~WorldEditorImpl()
 	{
+		Gizmo::destroy(*m_gizmo);
 		auto& library_loaded_callback = m_engine->getPluginManager().libraryLoaded();
 		library_loaded_callback.unbind<WorldEditorImpl, &WorldEditorImpl::onPluginLibraryLoaded>(this);
 
-		EditorIcon::unloadIcons();
 		removePlugin(*m_measure_tool);
 		LUMIX_DELETE(m_allocator, m_measure_tool);
 		for (auto* plugin : m_plugins)
@@ -1695,33 +1518,78 @@ public:
 		destroyUndoStack();
 
 		destroyUniverse();
+		EditorIcons::destroy(*m_editor_icons);
 		EntityTemplateSystem::destroy(m_template_system);
 		PropertyRegister::shutdown();
 
-		lua_close(m_lua_state);
+		LUMIX_DELETE(m_allocator, m_render_interface);
 	}
 
 
-	EditorIconHit raycastEditorIcons(const Vec3& origin, const Vec3& dir)
+	bool isMouseClick(MouseButton::Value button) const override
 	{
-		EditorIconHit hit;
-		hit.m_t = -1;
-		for (int i = 0, c = m_editor_icons.size(); i < c; ++i)
+		return m_is_mouse_click[button];
+	}
+
+
+	bool isMouseDown(MouseButton::Value button) const override
+	{
+		return m_is_mouse_down[button];
+	}
+
+
+	void snapEntities(const RayCastModelHit& hit)
+	{
+		Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
+		Lumix::Array<Vec3> positions(m_allocator);
+		Lumix::Array<Quat> rotations(m_allocator);
+		if(m_gizmo->isTranslateMode())
 		{
-			float t = m_editor_icons[i]->hit(origin, dir);
-			if (t >= 0)
+			for(auto e : m_selected_entities)
 			{
-				hit.m_icon = m_editor_icons[i];
-				hit.m_t = t;
-				return hit;
+				positions.push(hit_pos);
+				rotations.push(m_universe_context->m_universe->getRotation(e));
 			}
 		}
-		return hit;
+		else
+		{
+			for(auto e : m_selected_entities)
+			{
+				auto pos = m_universe_context->m_universe->getPosition(e);
+				auto dir = pos - hit_pos;
+				dir.normalize();
+				Matrix mtx = Matrix::IDENTITY;
+				Vec3 y(0, 1, 0);
+				if(dotProduct(y, dir) > 0.99f)
+				{
+					y.set(1, 0, 0);
+				}
+				Vec3 x = crossProduct(y, dir);
+				x.normalize();
+				y = crossProduct(dir, x);
+				y.normalize();
+				mtx.setXVector(x);
+				mtx.setYVector(y);
+				mtx.setZVector(dir);
+
+				positions.push(pos);
+				mtx.getRotation(rotations.emplace());
+			}
+		}
+		MoveEntityCommand* cmd = LUMIX_NEW(m_allocator, MoveEntityCommand)(*this,
+			&m_selected_entities[0],
+			&positions[0],
+			&rotations[0],
+			positions.size(),
+			m_allocator);
+		executeCommand(cmd);
 	}
 
 
 	void onMouseDown(int x, int y, MouseButton::Value button) override
 	{
+		m_is_mouse_click[button] = true;
+		m_is_mouse_down[button] = true;
 		if (button == MouseButton::RIGHT)
 		{
 			m_mouse_mode = MouseMode::NAVIGATE;
@@ -1732,25 +1600,21 @@ public:
 			ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
 			if (camera_cmp.isValid())
 			{
-				RenderScene* scene =
-					static_cast<RenderScene*>(camera_cmp.scene);
-				scene->getRay(
-					camera_cmp.index, (float)x, (float)y, origin, dir);
-				RayCastModelHit hit =
-					scene->castRay(origin, dir, INVALID_COMPONENT);
-				bool gizmo_hit = m_gizmo.isHit();
-				EditorIconHit icon_hit = raycastEditorIcons(origin, dir);
-				if (gizmo_hit)
+				RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
+				scene->getRay(camera_cmp.index, (float)x, (float)y, origin, dir);
+				RayCastModelHit hit = scene->castRay(origin, dir, INVALID_COMPONENT);
+				if (m_gizmo->isActive()) return;
+
+				if(m_is_snap_mode && !m_selected_entities.empty() && hit.m_is_hit)
 				{
-					if (!m_selected_entities.empty())
-					{
-						m_mouse_mode = MouseMode::TRANSFORM;
-						m_gizmo.startTransform(camera_cmp.index, x, y);
-					}
+					snapEntities(hit);
+					return;
 				}
-				else if (icon_hit.m_t >= 0)
+
+				auto icon_hit = m_editor_icons->raycast(origin, dir);
+				if (icon_hit.entity != INVALID_ENTITY)
 				{
-					Entity e = icon_hit.m_icon->getEntity();
+					Entity e = icon_hit.entity;
 					if (m_is_additive_selection)
 					{
 						addEntitiesToSelection(&e, 1);
@@ -1818,11 +1682,6 @@ public:
 			}
 			break;
 			case MouseMode::NAVIGATE: rotateCamera(relx, rely); break;
-			case MouseMode::TRANSFORM:
-			{
-				int camera_cmp = getComponent(m_camera, CAMERA_HASH).index;
-				m_gizmo.transform(camera_cmp, x, y, relx, rely, m_gizmo_use_step);
-			}
 			break;
 		}
 	}
@@ -1837,7 +1696,7 @@ public:
 
 	void onMouseUp(int x, int y, MouseButton::Value button) override
 	{
-		m_gizmo.stopTransform();
+		m_is_mouse_down[button] = false;
 		if (m_mouse_handling_plugin)
 		{
 			m_mouse_handling_plugin->onMouseUp(x, y, button);
@@ -1887,6 +1746,19 @@ public:
 
 		g_log_info.log("editor") << "Universe saved";
 		file.write(blob.getData(), blob.getSize());
+	}
+
+
+	void setRenderInterface(class RenderInterface* interface) override
+	{
+		m_render_interface = interface;
+		m_editor_icons = EditorIcons::create(*this);
+	}
+
+
+	RenderInterface* getRenderInterface() override
+	{
+		return m_render_interface;
 	}
 
 
@@ -2008,18 +1880,6 @@ public:
 				  universe->getRotation(m_camera) * Vec3(0, 0, -2);
 		}
 		return pos;
-	}
-
-
-	void onEntityCreated(Entity entity)
-	{
-		if (m_camera >= 0)
-		{
-			EditorIcon* er = LUMIX_NEW(m_allocator, EditorIcon)(*this,
-				*static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene),
-				entity);
-			m_editor_icons.push(er);
-		}
 	}
 
 
@@ -2152,11 +2012,7 @@ public:
 		ASSERT(m_universe_context);
 		m_engine->stopGame(*m_universe_context);
 		selectEntities(nullptr, 0);
-		for (int i = 0; i < m_editor_icons.size(); ++i)
-		{
-			LUMIX_DELETE(m_allocator, m_editor_icons[i]);
-		}
-		m_editor_icons.clear();
+		m_editor_icons->clear();
 		m_is_game_mode = false;
 		m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
 		load(*m_game_mode_file);
@@ -2352,7 +2208,8 @@ public:
 
 	bool isRelativePath(const char* path) override
 	{
-		return compareStringN(m_base_path.c_str(), path, m_base_path.length()) == 0;
+		const char* base_path = m_engine->getPathManager().getBasePath();
+		return compareStringN(base_path, path, stringLength(base_path)) == 0;
 	}
 
 
@@ -2360,10 +2217,11 @@ public:
 	{
 		char tmp[MAX_PATH_LENGTH];
 		Lumix::PathUtils::normalize(source, tmp, sizeof(tmp));
-
-		if (compareStringN(m_base_path.c_str(), tmp, m_base_path.length()) == 0)
+		
+		if (isRelativePath(tmp))
 		{
-			const char* rel_path_start = tmp + m_base_path.length();
+			int base_path_length = stringLength(m_engine->getPathManager().getBasePath());
+			const char* rel_path_start = tmp + base_path_length;
 			if (rel_path_start[0] == '/')
 			{
 				++rel_path_start;
@@ -2424,7 +2282,7 @@ public:
 		Header header;
 		header.version = -1;
 		int hashed_offset = sizeof(hash);
-		if(hash == 0xFFFFffff)
+		if (hash == 0xFFFFffff)
 		{
 			blob.rewind();
 			blob.read(header);
@@ -2448,7 +2306,7 @@ public:
 		if (m_engine->deserialize(*m_universe_context, blob))
 		{
 			m_template_system->deserialize(blob);
-			if(header.version > (int)SerializedVersion::ENTITY_GROUPS)
+			if (header.version > (int)SerializedVersion::ENTITY_GROUPS)
 			{
 				m_entity_groups.deserialize(blob);
 			}
@@ -2462,13 +2320,6 @@ public:
 
 			g_log_info.log("editor") << "Universe parsed in " << timer->getTimeSinceStart()
 									 << " seconds";
-
-			Universe* universe = getUniverse();
-			for (int i = 0; i < universe->getEntityCount(); ++i)
-			{
-				Entity e = universe->getEntityFromDenseIdx(i);
-				createEditorIcon(e);
-			}
 		}
 		else
 		{
@@ -2505,42 +2356,6 @@ public:
 	}
 
 
-	void createEditorIcon(Entity entity)
-	{
-		if (m_camera == entity)
-		{
-			return;
-		}
-
-		const WorldEditor::ComponentList& cmps = getComponents(entity);
-
-		bool found_renderable = false;
-		for (int i = 0; i < cmps.size(); ++i)
-		{
-			if (cmps[i].type == RENDERABLE_HASH)
-			{
-				found_renderable = true;
-				break;
-			}
-		}
-		for (int i = 0; i < m_editor_icons.size(); ++i)
-		{
-			if (m_editor_icons[i]->getEntity() == entity)
-			{
-				LUMIX_DELETE(m_allocator, m_editor_icons[i]);
-				m_editor_icons.eraseFast(i);
-				break;
-			}
-		}
-		if (!found_renderable)
-		{
-			EditorIcon* er = LUMIX_NEW(m_allocator, EditorIcon)(*this,
-				*static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene),
-				entity);
-			m_editor_icons.push(er);
-		}
-	}
-
 	void resetAndLoad(FS::IFile& file)
 	{
 		destroyUniverse();
@@ -2556,7 +2371,13 @@ public:
 	}
 
 
-	Gizmo& getGizmo() override { return m_gizmo; }
+	Gizmo& getGizmo() override { return *m_gizmo; }
+
+
+	void renderIcons() override
+	{
+		if(m_editor_icons) m_editor_icons->render();
+	}
 
 
 	ComponentUID getEditCamera() override
@@ -2565,20 +2386,9 @@ public:
 	}
 
 
-	void renderIcons(PipelineInstance& pipeline) override
-	{
-		PROFILE_FUNCTION();
-		for (int i = 0, c = m_editor_icons.size(); i < c; ++i)
-		{
-			m_editor_icons[i]->render(pipeline);
-		}
-	}
-
-
 	WorldEditorImpl(const char* base_path, Engine& engine, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_engine(nullptr)
-		, m_gizmo(*this)
 		, m_components(m_allocator)
 		, m_entity_name_set(m_allocator)
 		, m_entity_selected(m_allocator)
@@ -2587,7 +2397,7 @@ public:
 		, m_universe_loaded(m_allocator)
 		, m_property_set(m_allocator)
 		, m_selected_entities(m_allocator)
-		, m_editor_icons(m_allocator)
+		, m_editor_icons(nullptr)
 		, m_plugins(m_allocator)
 		, m_undo_stack(m_allocator)
 		, m_copy_buffer(m_allocator)
@@ -2601,18 +2411,18 @@ public:
 		, m_is_additive_selection(false)
 		, m_entity_groups(m_allocator)
 	{
-		m_is_exit_requested = false;
-		createLua();
-
+		for (auto& i : m_is_mouse_down) i = false;
+		for (auto& i : m_is_mouse_click) i = false;
 		PropertyRegister::init(m_allocator);
 		m_go_to_parameters.m_is_active = false;
 		m_undo_index = -1;
 		m_mouse_handling_plugin = nullptr;
 		m_is_game_mode = false;
+		m_is_snap_mode = false;
 		m_measure_tool = LUMIX_NEW(m_allocator, MeasureTool)();
 		addPlugin(*m_measure_tool);
 
-		m_base_path = base_path;
+		engine.getPathManager().setBasePath(base_path);
 
 		m_engine = &engine;
 
@@ -2653,8 +2463,6 @@ public:
 		m_editor_command_creators.insert(
 			crc32("add_entity"), &WorldEditorImpl::constructEditorCommand<AddEntityCommand>);
 
-		EditorIcon::loadIcons(*m_engine);
-
 		plugin_manager.libraryLoaded().bind<WorldEditorImpl, &WorldEditorImpl::onPluginLibraryLoaded>(this);
 		const auto& libs = plugin_manager.getLibraries();
 		for (auto* lib : libs)
@@ -2662,6 +2470,8 @@ public:
 			auto* callback = static_cast<void (*)(WorldEditor&)>(getLibrarySymbol(lib, "setWorldEditor"));
 			if (callback) (*callback)(*this);
 		}
+
+		m_gizmo = Gizmo::create(*this);
 	}
 
 
@@ -2704,14 +2514,16 @@ public:
 	}
 
 
-	void setAdditiveSelection(bool additive) override
+	void setSnapMode(bool enable) override
 	{
-		m_is_additive_selection = additive;
+		m_is_snap_mode = enable;
 	}
 
 
-	void addArrayPropertyItem(const ComponentUID& cmp,
-									  IArrayDescriptor& property) override
+	void setAdditiveSelection(bool additive) override { m_is_additive_selection = additive; }
+
+
+	void addArrayPropertyItem(const ComponentUID& cmp, IArrayDescriptor& property) override
 	{
 		if (cmp.isValid())
 		{
@@ -2736,10 +2548,10 @@ public:
 
 
 	void setProperty(uint32 component,
-							 int index,
-							 IPropertyDescriptor& property,
-							 const void* data,
-							 int size) override
+		int index,
+		IPropertyDescriptor& property,
+		const void* data,
+		int size) override
 	{
 
 		ASSERT(m_selected_entities.size() == 1);
@@ -2865,47 +2677,17 @@ public:
 	void onComponentAdded(const ComponentUID& cmp)
 	{
 		getComponents(cmp.entity).push(cmp);
-		if (!m_is_loading)
-		{
-			createEditorIcon(cmp.entity);
-		}
 	}
-
 
 	void onComponentDestroyed(const ComponentUID& cmp)
 	{
 		getComponents(cmp.entity).eraseItemFast(cmp);
-		for (int i = 0; i < m_editor_icons.size(); ++i)
-		{
-			if (m_editor_icons[i]->getEntity() == cmp.entity)
-			{
-				LUMIX_DELETE(m_allocator, m_editor_icons[i]);
-				m_editor_icons.eraseFast(i);
-				break;
-			}
-		}
-		if (getUniverse()->hasEntity(cmp.entity) && !getComponents(cmp.entity).empty())
-		{
-			EditorIcon* er = LUMIX_NEW(m_allocator, EditorIcon)(*this,
-				*static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene),
-				cmp.entity);
-			m_editor_icons.push(er);
-		}
 	}
-
 
 	void onEntityDestroyed(Entity entity)
 	{
+		m_components.erase(entity);
 		m_selected_entities.eraseItemFast(entity);
-		for (int i = 0; i < m_editor_icons.size(); ++i)
-		{
-			if (m_editor_icons[i]->getEntity() == entity)
-			{
-				LUMIX_DELETE(m_allocator, m_editor_icons[i]);
-				m_editor_icons.eraseFast(i);
-				break;
-			}
-		}
 	}
 
 
@@ -2917,16 +2699,10 @@ public:
 		ASSERT(m_universe_context);
 		destroyUndoStack();
 		m_universe_destroyed.invoke();
-		m_gizmo.setUniverse(nullptr);
-		m_gizmo.destroy();
-		for (int i = 0; i < m_editor_icons.size(); ++i)
-		{
-			LUMIX_DELETE(m_allocator, m_editor_icons[i]);
-		}
+		m_editor_icons->clear();
 		m_components.clear();
 		selectEntities(nullptr, 0);
 		m_camera = INVALID_ENTITY;
-		m_editor_icons.clear();
 		m_engine->destroyUniverse(*m_universe_context);
 		m_universe_context = nullptr;
 	}
@@ -3010,18 +2786,12 @@ public:
 		destroyUndoStack();
 		m_universe_context = &m_engine->createUniverse();
 		Universe* universe = m_universe_context->m_universe;
-		m_gizmo.create();
-		m_gizmo.setUniverse(universe);
 
-		universe->entityCreated()
-			.bind<WorldEditorImpl, &WorldEditorImpl::onEntityCreated>(this);
-		universe->componentAdded()
-			.bind<WorldEditorImpl, &WorldEditorImpl::onComponentAdded>(this);
+		universe->componentAdded().bind<WorldEditorImpl, &WorldEditorImpl::onComponentAdded>(this);
 		universe->componentDestroyed()
-			.bind<WorldEditorImpl, &WorldEditorImpl::onComponentDestroyed>(
-				this);
-		universe->entityDestroyed()
-			.bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
+			.bind<WorldEditorImpl, &WorldEditorImpl::onComponentDestroyed>(this);
+		universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(
+			this);
 
 		m_selected_entities.clear();
 		m_universe_created.invoke();
@@ -3239,86 +3009,6 @@ public:
 	}
 
 
-	void createLua()
-	{
-		m_lua_state = luaL_newstate();
-		luaL_openlibs(m_lua_state);
-
-		lua_pushlightuserdata(m_lua_state, this);
-		lua_setglobal(m_lua_state, "g_editor");
-
-		lua_newtable(m_lua_state);
-		lua_pushvalue(m_lua_state, -1);
-		lua_setglobal(m_lua_state, "Editor");
-
-		#define REGISTER_FUNCTION(F, name) \
-			do { \
-				lua_pushvalue(m_lua_state, -1); \
-				auto* f = &LuaWrapper::wrap<decltype(&F), F>; \
-				lua_pushcfunction(m_lua_state, f); \
-				lua_setfield(m_lua_state, -2, name); \
-			} while(false) \
-
-		REGISTER_FUNCTION(LUA_runTest, "runTest");
-		REGISTER_FUNCTION(LUA_logError, "logError");
-		REGISTER_FUNCTION(LUA_logInfo, "logInfo");
-		REGISTER_FUNCTION(LUA_exit, "exit");
-
-		#undef REGISTER_FUNCTION
-
-		lua_pop(m_lua_state, 1);
-	}
-
-
-	bool isExitRequested() const override
-	{
-		return m_is_exit_requested;
-	}
-
-
-	int getExitCode() const override
-	{
-		return m_exit_code;
-	}
-
-
-	static void LUA_exit(WorldEditorImpl* editor, int exit_code)
-	{
-		editor->m_is_exit_requested = true;
-		editor->m_exit_code = exit_code;
-	}
-
-
-	static void LUA_logError(const char* message)
-	{
-		g_log_error.log("editor") << message;
-	}
-
-
-	static void LUA_logInfo(const char* message)
-	{
-		g_log_info.log("editor") << message;
-	}
-
-
-	static bool LUA_runTest(WorldEditor* editor, const char* undo_stack_path, const char* result_universe_path)
-	{
-		return editor->runTest(Path(undo_stack_path), Path(result_universe_path));
-	}
-
-
-	void runScript(const char* src, const char* script_name) override
-	{
-		bool errors = luaL_loadbuffer(m_lua_state, src, stringLength(src), script_name) != LUA_OK;
-		errors = errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
-		if (errors)
-		{
-			g_log_error.log("editor") << script_name << ": " << lua_tostring(m_lua_state, -1);
-			lua_pop(m_lua_state, 1);
-		}
-	}
-
-
 	bool runTest(const Path& undo_stack_path, const Path& result_universe_path) override
 	{
 		while (m_engine->getFileSystem().hasWork()) m_engine->getFileSystem().updateAsyncTransactions();
@@ -3345,8 +3035,8 @@ public:
 		}
 		save(*file);
 		bool is_same = file->size() > 8 && result_file->size() > 8 &&
-					   *((const uint32*)result_file->getBuffer() + 1) ==
-						   *((const uint32*)file->getBuffer() + 1);
+					   *((const uint32*)result_file->getBuffer() + 3) ==
+						   *((const uint32*)file->getBuffer() + 3);
 		m_engine->getFileSystem().close(*result_file);
 		m_engine->getFileSystem().close(*file);
 
@@ -3368,7 +3058,7 @@ private:
 			NONE,
 			SELECT,
 			NAVIGATE,
-			TRANSFORM,
+
 			CUSTOM
 		};
 	};
@@ -3398,17 +3088,18 @@ private:
 
 	Debug::Allocator m_allocator;
 	GoToParameters m_go_to_parameters;
-	Gizmo m_gizmo;
+	Gizmo* m_gizmo;
 	Array<Entity> m_selected_entities;
 	MouseMode::Value m_mouse_mode;
+	EditorIcons* m_editor_icons;
 	float m_mouse_x;
 	float m_mouse_y;
 	bool m_gizmo_use_step;
-	Array<EditorIcon*> m_editor_icons;
-	AssociativeArray<int32, Array<ComponentUID>> m_components;
+	AssociativeArray<Entity, Array<ComponentUID>> m_components;
 	bool m_is_game_mode;
 	bool m_is_orbit;
 	bool m_is_additive_selection;
+	bool m_is_snap_mode;
 	FS::IFile* m_game_mode_file;
 	Engine* m_engine;
 	Entity m_camera;
@@ -3418,9 +3109,10 @@ private:
 	DelegateList<void(ComponentUID, const IPropertyDescriptor&)> m_property_set;
 	DelegateList<void(const Array<Entity>&)> m_entity_selected;
 	DelegateList<void(Entity, const char*)> m_entity_name_set;
+	bool m_is_mouse_down[3];
+	bool m_is_mouse_click[3];
 
 	Path m_universe_path;
-	Path m_base_path;
 	Array<Plugin*> m_plugins;
 	MeasureTool* m_measure_tool;
 	Plugin* m_mouse_handling_plugin;
@@ -3432,9 +3124,7 @@ private:
 	bool m_is_loading;
 	UniverseContext* m_universe_context;
 	EntityGroups m_entity_groups;
-	lua_State* m_lua_state;
-	bool m_is_exit_requested;
-	int m_exit_code;
+	RenderInterface* m_render_interface;
 };
 
 
