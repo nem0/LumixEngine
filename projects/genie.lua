@@ -55,8 +55,14 @@ function defaultConfigurations()
 end
 
 function useLua()
+	defines { "LUA_BUILD_AS_DLL" }
+	includedirs { "../external/lua/include" }
+end
+
+function linkLua()
 	links {"lua"}
 	includedirs { "../external/lua/include" }
+	linkoptions {"/DEF:\"../../src/engine/engine.def\""}
 
 	configuration {"Debug", "x32" }
 		libdirs {"../external/lua/lib/" .. ide_dir .. "/win32/debug"}
@@ -73,7 +79,7 @@ function useLua()
 	configuration {"Release", "x64" }
 		libdirs {"../external/lua/lib/" .. ide_dir .. "/win64/release"}
 
-		configuration {"RelWithDebInfo", "x64" }
+	configuration {"RelWithDebInfo", "x64" }
 		libdirs {"../external/lua/lib/" .. ide_dir .. "/win64/release"}
 end
 
@@ -113,6 +119,7 @@ project "engine"
 	excludes { "../src/engine/**/osx/*"}
 
 	defines { "BUILDING_ENGINE" }
+	linkLua()
 
 	defaultConfigurations()
 
