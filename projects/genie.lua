@@ -1,5 +1,6 @@
-local BINARY_DIR = "tmp/bin/"
 local ide_dir = iif(_ACTION == nil, "vs2013", _ACTION)
+local LOCATION = "tmp/" .. ide_dir
+local BINARY_DIR = LOCATION .. "/bin/"
 
 newaction {
 	trigger = "install",
@@ -85,7 +86,7 @@ end
 
 function linkLua()
 	includedirs { "../external/lua/include" }
-	linkoptions {"/DEF:\"../../src/engine/engine.def\""}
+	linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
 
 	linkLib("lua")
 end
@@ -101,12 +102,12 @@ function copyDlls(src_dir, platform_bit, platform_dir, dest_dir)
 	end
 
 	postbuildcommands {
-		"xcopy /Y \"$(SolutionDir)../../external/assimp/dll/" .. ide_dir .. "/" .. platform_dir .. "/" .. src_dir .. "\\assimp.dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		"xcopy /Y \"$(SolutionDir)../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\nvToolsExt".. tostring(platform_bit) .. "_1.dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		"xcopy /Y \"$(SolutionDir)../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CommonCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		"xcopy /Y \"$(SolutionDir)../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CookingCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		"xcopy /Y \"$(SolutionDir)../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CharacterKinematicCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		"xcopy /Y \"$(SolutionDir)../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\""
+		"xcopy /Y \"$(SolutionDir)../../../external/assimp/dll/" .. ide_dir .. "/" .. platform_dir .. "/" .. src_dir .. "\\assimp.dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\nvToolsExt".. tostring(platform_bit) .. "_1.dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CommonCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CookingCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CharacterKinematicCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\""
 	}
 end
 
@@ -115,7 +116,7 @@ solution "LumixEngine"
 	platforms { "x32", "x64" }
 	flags { "FatalWarnings", "NoPCH" }
 	includedirs {"../src", "../src/engine"}
-	location "tmp"
+	location(LOCATION)
 	language "C++"
 	startproject "studio"
 
