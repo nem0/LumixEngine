@@ -54,33 +54,40 @@ function defaultConfigurations()
 		flags { "Symbols", "Optimize", "WinMain" }
 end
 
+function linkLib(lib)
+	links {lib}
+
+	configuration { "x64", "Debug" }
+		libdirs {"../external/" .. lib .. "/lib/win64_" .. ide_dir .. "/debug"}
+
+	configuration { "x64", "Release" }
+		libdirs {"../external/" .. lib .. "/lib/win64_" .. ide_dir .. "/release"}
+
+	configuration { "x64", "RelWithDebInfo" }
+		libdirs {"../external/" .. lib .. "/lib/win64_" .. ide_dir .. "/release"}
+
+	configuration { "x32", "Debug" }
+		libdirs {"../external/" .. lib .. "/lib/win32_" .. ide_dir .. "/debug"}
+
+	configuration { "x32", "Release" }
+		libdirs {"../external/" .. lib .. "/lib/win32_" .. ide_dir .. "/release"}
+
+	configuration { "x32", "RelWithDebInfo" }
+		libdirs {"../external/" .. lib .. "/lib/win32_" .. ide_dir .. "/release"}
+
+	configuration {}
+end
+
 function useLua()
 	defines { "LUA_BUILD_AS_DLL" }
 	includedirs { "../external/lua/include" }
 end
 
 function linkLua()
-	links {"lua"}
 	includedirs { "../external/lua/include" }
 	linkoptions {"/DEF:\"../../src/engine/engine.def\""}
 
-	configuration {"Debug", "x32" }
-		libdirs {"../external/lua/lib/" .. ide_dir .. "/win32/debug"}
-
-	configuration {"Release", "x32" }
-		libdirs {"../external/lua/lib/" .. ide_dir .. "/win32/release"}
-
-	configuration {"RelWithDebInfo", "x32" }
-		libdirs {"../external/lua/lib/" .. ide_dir .. "/win32/release"}
-
-	configuration {"Debug", "x64" }
-		libdirs {"../external/lua/lib/" .. ide_dir .. "/win64/debug"}
-
-	configuration {"Release", "x64" }
-		libdirs {"../external/lua/lib/" .. ide_dir .. "/win64/release"}
-
-	configuration {"RelWithDebInfo", "x64" }
-		libdirs {"../external/lua/lib/" .. ide_dir .. "/win64/release"}
+	linkLib("lua")
 end
 
 function copyDlls(src_dir, platform_bit, platform_dir, dest_dir)
@@ -160,22 +167,8 @@ project "renderer"
 	links { "engine", "psapi", "editor" }
 	useLua()
 
-	configuration { "x64" }
-		libdirs {"../external/bgfx/lib/" .. ide_dir .. "/win64"}
-
-	configuration { "x32" }
-		libdirs {"../external/bgfx/lib/" .. ide_dir .. "/win32"}
-
-	configuration "Debug"
-		links {"bgfxDebug"}
-
-	configuration "Release"
-		links {"bgfxRelease"}
-
-	configuration "RelWithDebInfo"
-		links {"bgfxRelease"}
-
-
+	linkLib("bgfx")
+	
 	defaultConfigurations()
 
 project "animation"
@@ -241,7 +234,7 @@ project "editor"
 	includedirs { "../src", "../src/editor", "../external/bgfx/include" }
 	defines { "BUILDING_EDITOR" }
 	links { "engine", "assimp", "crnlib", "winmm" }
-	includedirs { "../src", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
+	includedirs { "../src", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crnlib/include" }
 
 	useLua()
 	defaultConfigurations()
@@ -253,24 +246,20 @@ project "editor"
 	copyDlls("Release", 32, "win32", "RelWithDebInfo")
 	copyDlls("Release", 64, "win64", "RelWithDebInfo")
 
+	linkLib("crnlib")
+	
 	configuration { "Debug", "x64" }
 		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win64/debug"}
-		libdirs {"../external/crunch/lib/" .. ide_dir .. "/win64/debug"}
 	configuration { "Debug", "x32" }
 		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win32/debug"}
-		libdirs {"../external/crunch/lib/" .. ide_dir .. "/win32/debug"}
 	configuration { "Release", "x64" }
 		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win64/release"}
-		libdirs {"../external/crunch/lib/" .. ide_dir .. "/win64/release"}
 	configuration { "Release", "x32" }
 		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win32/release"}
-		libdirs {"../external/crunch/lib/" .. ide_dir .. "/win32/release"}
 	configuration { "RelWithDebInfo", "x64" }
 		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win64/release"}
-		libdirs {"../external/crunch/lib/" .. ide_dir .. "/win64/release"}
 	configuration { "RelWithDebInfo", "x32" }
 		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win32/release"}
-		libdirs {"../external/crunch/lib/" .. ide_dir .. "/win32/release"}
 
 
 project "studio"
@@ -279,7 +268,7 @@ project "studio"
 	debugdir "../../LumixEngine_data"
 
 	files { "../src/studio/**.cpp" }
-	includedirs { "../src", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crunch/include" }
+	includedirs { "../src" }
 	links { "editor" }
 
 	useLua()
