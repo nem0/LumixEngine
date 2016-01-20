@@ -552,7 +552,7 @@ public:
 		uint32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_descriptor = static_cast<const IArrayDescriptor*>(
-			&PropertyRegister::getDescriptor(m_component.type, property_name_hash));
+			PropertyRegister::getDescriptor(m_component.type, property_name_hash));
 	}
 
 
@@ -633,7 +633,7 @@ public:
 		uint32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_descriptor = static_cast<const IArrayDescriptor*>(
-			&PropertyRegister::getDescriptor(m_component.type, property_name_hash));
+			PropertyRegister::getDescriptor(m_component.type, property_name_hash));
 	}
 
 
@@ -754,7 +754,7 @@ public:
 		uint32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_property_descriptor =
-			&PropertyRegister::getDescriptor(m_component_type, property_name_hash);
+			PropertyRegister::getDescriptor(m_component_type, property_name_hash);
 	}
 
 

@@ -2813,6 +2813,7 @@ public:
 		{
 			r.pose = nullptr;
 		}
+		r.matrix = m_universe.getMatrix(r.entity);
 
 		for (int i = 0; i < m_point_lights.size(); ++i)
 		{
