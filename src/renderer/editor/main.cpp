@@ -7,12 +7,17 @@
 #include "core/path_utils.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "editor/asset_browser.h"
 #include "editor/ieditor_command.h"
-#include "editor/property_register.h"
-#include "editor/property_descriptor.h"
+#include "editor/platform_interface.h"
+#include "editor/property_grid.h"
+#include "editor/studio_app.h"
+#include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
+#include "engine/property_register.h"
+#include "engine/property_descriptor.h"
 #include "game_view.h"
 #include "editor/render_interface.h"
 #include "renderer/material.h"
@@ -24,16 +29,10 @@
 #include "renderer/shader.h"
 #include "renderer/texture.h"
 #include "renderer/transient_geometry.h"
-#include "editor/asset_browser.h"
-#include "editor/platform_interface.h"
-#include "editor/property_grid.h"
-#include "editor/studio_app.h"
-#include "editor/utils.h"
 #include "scene_view.h"
 #include "shader_editor.h"
 #include "shader_compiler.h"
 #include "terrain_editor.h"
-#include <cfloat>
 
 
 using namespace Lumix;
@@ -41,459 +40,6 @@ using namespace Lumix;
 
 static const uint32 TEXTURE_HASH = ResourceManager::TEXTURE;
 static const uint32 SHADER_HASH = ResourceManager::SHADER;
-
-
-template <class S> class EntityEnumPropertyDescriptor : public IEnumPropertyDescriptor
-{
-public:
-	typedef Entity(S::*Getter)(ComponentIndex);
-	typedef void (S::*Setter)(ComponentIndex, Entity);
-	typedef Entity(S::*ArrayGetter)(ComponentIndex, int);
-	typedef void (S::*ArraySetter)(ComponentIndex, int, Entity);
-
-public:
-	EntityEnumPropertyDescriptor(const char* name,
-		Getter _getter,
-		Setter _setter,
-		WorldEditor& editor,
-		IAllocator& allocator)
-		: IEnumPropertyDescriptor(allocator)
-		, m_editor(editor)
-	{
-		setName(name);
-		m_single.getter = _getter;
-		m_single.setter = _setter;
-		m_type = ENUM;
-	}
-
-
-	EntityEnumPropertyDescriptor(const char* name,
-		ArrayGetter _getter,
-		ArraySetter _setter,
-		WorldEditor& editor,
-		IAllocator& allocator)
-		: IEnumPropertyDescriptor(allocator)
-		, m_editor(editor)
-	{
-		setName(name);
-		m_array.getter = _getter;
-		m_array.setter = _setter;
-		m_type = ENUM;
-	}
-
-
-	void set(ComponentUID cmp, int index, InputBlob& stream) const override
-	{
-		int value;
-		stream.read(&value, sizeof(value));
-		auto entity = value < 0 ? INVALID_ENTITY : m_editor.getUniverse()->getEntityFromDenseIdx(value);
-		if (index == -1)
-		{
-			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.index, entity);
-		}
-		else
-		{
-			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.index, index, entity);
-		}
-	};
-
-
-	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
-	{
-		Entity value;
-		if (index == -1)
-		{
-			value = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.index);
-		}
-		else
-		{
-			value = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.index, index);
-		}
-		auto dense_idx = m_editor.getUniverse()->getDenseIdx(value);
-		int len = sizeof(dense_idx);
-		stream.write(&dense_idx, len);
-	};
-
-
-	int getEnumCount(IScene* scene) override { return scene->getUniverse().getEntityCount(); }
-
-
-	const char* getEnumItemName(IScene* scene, int index) override { return nullptr; }
-
-
-	void getEnumItemName(IScene* scene, int index, char* buf, int max_size) override
-	{
-		auto entity = scene->getUniverse().getEntityFromDenseIdx(index);
-		getEntityListDisplayName(m_editor, buf, max_size, entity);
-	}
-
-private:
-	union
-	{
-		struct
-		{
-			Getter getter;
-			Setter setter;
-		} m_single;
-		struct
-		{
-			ArrayGetter getter;
-			ArraySetter setter;
-		} m_array;
-	};
-	WorldEditor& m_editor;
-};
-
-
-void registerRendererProperties(WorldEditor& editor)
-{
-	IAllocator& allocator = editor.getAllocator();
-
-	PropertyRegister::registerComponentType("camera", "Camera");
-	PropertyRegister::registerComponentType("global_light", "Global light");
-	PropertyRegister::registerComponentType("renderable", "Mesh");
-	PropertyRegister::registerComponentType("particle_emitter", "Particle emitter");
-	PropertyRegister::registerComponentType("particle_emitter_spawn_shape", "Particle emitter - spawn shape");
-	PropertyRegister::registerComponentType("particle_emitter_fade", "Particle emitter - fade");
-	PropertyRegister::registerComponentType("particle_emitter_plane", "Particle emitter - plane");
-	PropertyRegister::registerComponentType("particle_emitter_force", "Particle emitter - force");
-	PropertyRegister::registerComponentType("particle_emitter_attractor", "Particle emitter - attractor");
-	PropertyRegister::registerComponentType(
-		"particle_emitter_linear_movement", "Particle emitter - linear movement");
-	PropertyRegister::registerComponentType(
-		"particle_emitter_random_rotation", "Particle emitter - random rotation");
-	PropertyRegister::registerComponentType("particle_emitter_size", "Particle emitter - size");
-	PropertyRegister::registerComponentType("point_light", "Point light");
-	PropertyRegister::registerComponentType("terrain", "Terrain");
-
-	PropertyRegister::registerComponentDependency("particle_emitter_fade", "particle_emitter");
-	PropertyRegister::registerComponentDependency("particle_emitter_force", "particle_emitter");
-	PropertyRegister::registerComponentDependency(
-		"particle_emitter_linear_movement", "particle_emitter");
-	PropertyRegister::registerComponentDependency(
-		"particle_emitter_random_rotation", "particle_emitter");
-
-	PropertyRegister::add("particle_emitter_spawn_shape",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Radius",
-		&RenderScene::getParticleEmitterShapeRadius,
-		&RenderScene::setParticleEmitterShapeRadius,
-		0.0f,
-		FLT_MAX,
-		0.01f,
-		allocator));
-
-	PropertyRegister::add("particle_emitter_plane",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Bounce",
-		&RenderScene::getParticleEmitterPlaneBounce,
-		&RenderScene::setParticleEmitterPlaneBounce,
-		0.0f,
-		1.0f,
-		0.01f,
-		allocator));
-	auto plane_module_planes = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Planes",
-		&RenderScene::getParticleEmitterPlaneCount,
-		&RenderScene::addParticleEmitterPlane,
-		&RenderScene::removeParticleEmitterPlane,
-		allocator);
-	plane_module_planes->addChild(
-		LUMIX_NEW(allocator, EntityEnumPropertyDescriptor<RenderScene>)("Entity",
-		&RenderScene::getParticleEmitterPlaneEntity,
-		&RenderScene::setParticleEmitterPlaneEntity,
-		editor,
-		allocator));
-	PropertyRegister::add("particle_emitter_plane", plane_module_planes);
-
-	PropertyRegister::add("particle_emitter_attractor",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Force",
-		&RenderScene::getParticleEmitterAttractorForce,
-		&RenderScene::setParticleEmitterAttractorForce,
-		-FLT_MAX,
-		FLT_MAX,
-		0.01f,
-		allocator));
-	auto attractor_module_planes = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Attractors",
-		&RenderScene::getParticleEmitterAttractorCount,
-		&RenderScene::addParticleEmitterAttractor,
-		&RenderScene::removeParticleEmitterAttractor,
-		allocator);
-	attractor_module_planes->addChild(
-		LUMIX_NEW(allocator, EntityEnumPropertyDescriptor<RenderScene>)("Entity",
-		&RenderScene::getParticleEmitterAttractorEntity,
-		&RenderScene::setParticleEmitterAttractorEntity,
-		editor,
-		allocator));
-	PropertyRegister::add("particle_emitter_attractor", attractor_module_planes);
-
-	PropertyRegister::add("particle_emitter_fade",
-		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Alpha",
-		&RenderScene::getParticleEmitterAlpha,
-		&RenderScene::setParticleEmitterAlpha,
-		&RenderScene::getParticleEmitterAlphaCount,
-		1,
-		1,
-		allocator));
-
-	PropertyRegister::add("particle_emitter_force",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, RenderScene>)("Acceleration",
-		&RenderScene::getParticleEmitterAcceleration,
-		&RenderScene::setParticleEmitterAcceleration,
-		allocator));
-
-	PropertyRegister::add("particle_emitter_size",
-		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Size",
-		&RenderScene::getParticleEmitterSize,
-		&RenderScene::setParticleEmitterSize,
-		&RenderScene::getParticleEmitterSizeCount,
-		1,
-		1,
-		allocator));
-
-	PropertyRegister::add("particle_emitter_linear_movement",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("x",
-		&RenderScene::getParticleEmitterLinearMovementX,
-		&RenderScene::setParticleEmitterLinearMovementX,
-		allocator));
-	PropertyRegister::add("particle_emitter_linear_movement",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("y",
-		&RenderScene::getParticleEmitterLinearMovementY,
-		&RenderScene::setParticleEmitterLinearMovementY,
-		allocator));
-	PropertyRegister::add("particle_emitter_linear_movement",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("z",
-		&RenderScene::getParticleEmitterLinearMovementZ,
-		&RenderScene::setParticleEmitterLinearMovementZ,
-		allocator));
-
-	PropertyRegister::add("particle_emitter",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("Life",
-		&RenderScene::getParticleEmitterInitialLife,
-		&RenderScene::setParticleEmitterInitialLife,
-		allocator));
-	PropertyRegister::add("particle_emitter",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("Initial size",
-		&RenderScene::getParticleEmitterInitialSize,
-		&RenderScene::setParticleEmitterInitialSize,
-		allocator));
-	PropertyRegister::add("particle_emitter",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("Spawn period",
-		&RenderScene::getParticleEmitterSpawnPeriod,
-		&RenderScene::setParticleEmitterSpawnPeriod,
-		allocator));
-	PropertyRegister::add("particle_emitter",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Int2, RenderScene>)("Spawn count",
-		&RenderScene::getParticleEmitterSpawnCount,
-		&RenderScene::setParticleEmitterSpawnCount,
-		allocator));
-	PropertyRegister::add("particle_emitter",
-		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",
-		&RenderScene::getParticleEmitterMaterialPath,
-		&RenderScene::setParticleEmitterMaterialPath,
-		"Material (*.mat)",
-		ResourceManager::MATERIAL,
-		allocator));
-
-	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, StringPropertyDescriptor<RenderScene>)("Slot",
-		&RenderScene::getCameraSlot,
-		&RenderScene::setCameraSlot,
-		allocator));
-	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("FOV",
-		&RenderScene::getCameraFOV,
-		&RenderScene::setCameraFOV,
-		1.0f,
-		179.0f,
-		1.0f,
-		allocator));
-	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Near",
-		&RenderScene::getCameraNearPlane,
-		&RenderScene::setCameraNearPlane,
-		0.0f,
-		FLT_MAX,
-		0.0f,
-		allocator));
-	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Far",
-		&RenderScene::getCameraFarPlane,
-		&RenderScene::setCameraFarPlane,
-		0.0f,
-		FLT_MAX,
-		0.0f,
-		allocator));
-
-	PropertyRegister::add("renderable",
-		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Source",
-		&RenderScene::getRenderablePath,
-		&RenderScene::setRenderablePath,
-		"Mesh (*.msh)",
-		ResourceManager::MODEL,
-		allocator));
-
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Ambient intensity",
-		&RenderScene::getLightAmbientIntensity,
-		&RenderScene::setLightAmbientIntensity,
-		0.0f,
-		1.0f,
-		0.05f,
-		allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec4, RenderScene>)("Shadow cascades",
-		&RenderScene::getShadowmapCascades,
-		&RenderScene::setShadowmapCascades,
-		allocator));
-
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Diffuse intensity",
-		&RenderScene::getGlobalLightIntensity,
-		&RenderScene::setGlobalLightIntensity,
-		0.0f,
-		1.0f,
-		0.05f,
-		allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Fog density",
-		&RenderScene::getFogDensity,
-		&RenderScene::setFogDensity,
-		0.0f,
-		1.0f,
-		0.01f,
-		allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Fog bottom",
-		&RenderScene::getFogBottom,
-		&RenderScene::setFogBottom,
-		-FLT_MAX,
-		FLT_MAX,
-		1.0f,
-		allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Fog height",
-		&RenderScene::getFogHeight,
-		&RenderScene::setFogHeight,
-		0.01f,
-		FLT_MAX,
-		1.0f,
-		allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Ambient color",
-		&RenderScene::getLightAmbientColor,
-		&RenderScene::setLightAmbientColor,
-		allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Diffuse color",
-		&RenderScene::getGlobalLightColor,
-		&RenderScene::setGlobalLightColor,
-		allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Fog color",
-		&RenderScene::getFogColor,
-		&RenderScene::setFogColor,
-		allocator));
-
-	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, BoolPropertyDescriptor<RenderScene>)("Cast shadows",
-		&RenderScene::getLightCastShadows,
-		&RenderScene::setLightCastShadows,
-		allocator));
-	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Diffuse intensity",
-		&RenderScene::getPointLightIntensity,
-		&RenderScene::setPointLightIntensity,
-		0.0f,
-		1.0f,
-		0.05f,
-		allocator));
-	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Diffuse color",
-		&RenderScene::getPointLightColor,
-		&RenderScene::setPointLightColor,
-		allocator));
-	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Specular color",
-		&RenderScene::getPointLightSpecularColor,
-		&RenderScene::setPointLightSpecularColor,
-		allocator));
-	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("FOV",
-		&RenderScene::getLightFOV,
-		&RenderScene::setLightFOV,
-		0.0f,
-		360.0f,
-		5.0f,
-		allocator));
-	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Attenuation",
-		&RenderScene::getLightAttenuation,
-		&RenderScene::setLightAttenuation,
-		0.0f,
-		1000.0f,
-		0.1f,
-		allocator));
-	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Range",
-		&RenderScene::getLightRange,
-		&RenderScene::setLightRange,
-		0.0f,
-		FLT_MAX,
-		1.0f,
-		allocator));
-	PropertyRegister::add("terrain",
-		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",
-		&RenderScene::getTerrainMaterialPath,
-		&RenderScene::setTerrainMaterialPath,
-		"Material (*.mat)",
-		ResourceManager::MATERIAL,
-		allocator));
-	PropertyRegister::add("terrain",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("XZ scale",
-		&RenderScene::getTerrainXZScale,
-		&RenderScene::setTerrainXZScale,
-		0.0f,
-		FLT_MAX,
-		0.0f,
-		allocator));
-	PropertyRegister::add("terrain",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Height scale",
-		&RenderScene::getTerrainYScale,
-		&RenderScene::setTerrainYScale,
-		0.0f,
-		FLT_MAX,
-		0.0f,
-		allocator));
-
-	PropertyRegister::add("terrain",
-		LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)("Grass distance",
-		&RenderScene::getGrassDistance,
-		&RenderScene::setGrassDistance,
-		allocator));
-
-	auto grass = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Grass",
-		&RenderScene::getGrassCount,
-		&RenderScene::addGrass,
-		&RenderScene::removeGrass,
-		allocator);
-	grass->addChild(LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Mesh",
-		&RenderScene::getGrassPath,
-		&RenderScene::setGrassPath,
-		"Mesh (*.msh)",
-		crc32("model"),
-		allocator));
-	auto ground = LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)("Ground",
-		&RenderScene::getGrassGround,
-		&RenderScene::setGrassGround,
-		allocator);
-	ground->setLimit(0, 4);
-	grass->addChild(ground);
-	grass->addChild(LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)("Density",
-		&RenderScene::getGrassDensity,
-		&RenderScene::setGrassDensity,
-		allocator));
-	PropertyRegister::add("terrain", grass);
-}
-
-
 static const uint32 MATERIAL_HASH = crc32("MATERIAL");
 
 
@@ -1639,6 +1185,7 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 		scene->addDebugSphere(pos - dir, 0.1f, 0xff0000ff, 0);
 	}
 
+
 	bool showGizmo(ComponentUID cmp) override 
 	{
 		if (cmp.type == CAMERA_HASH)
@@ -1687,37 +1234,36 @@ extern "C" {
 LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
 {
 	auto& allocator = app.getWorldEditor()->getAllocator();
-	registerRendererProperties(*app.getWorldEditor());
 
-	auto* material_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), MaterialPlugin)(app);
+	auto* material_plugin = LUMIX_NEW(allocator, MaterialPlugin)(app);
 	app.getAssetBrowser()->addPlugin(*material_plugin);
 
-	auto* model_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ModelPlugin)(app);
+	auto* model_plugin = LUMIX_NEW(allocator, ModelPlugin)(app);
 	app.getAssetBrowser()->addPlugin(*model_plugin);
 
-	auto* texture_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), TexturePlugin)(app);
+	auto* texture_plugin = LUMIX_NEW(allocator, TexturePlugin)(app);
 	app.getAssetBrowser()->addPlugin(*texture_plugin);
 
-	auto* shader_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderPlugin)(app);
+	auto* shader_plugin = LUMIX_NEW(allocator, ShaderPlugin)(app);
 	app.getAssetBrowser()->addPlugin(*shader_plugin);
 
-	auto* emitter_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), EmitterPlugin)(app);
+	auto* emitter_plugin = LUMIX_NEW(allocator, EmitterPlugin)(app);
 	app.getPropertyGrid()->addPlugin(*emitter_plugin);
 
-	auto* terrain_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), TerrainPlugin)(app);
+	auto* terrain_plugin = LUMIX_NEW(allocator, TerrainPlugin)(app);
 	app.getPropertyGrid()->addPlugin(*terrain_plugin);
 
-	auto* scene_view_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), SceneViewPlugin)(app);
+	auto* scene_view_plugin = LUMIX_NEW(allocator, SceneViewPlugin)(app);
 	app.addPlugin(*scene_view_plugin);
 
-	auto* game_view_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), GameViewPlugin)(app);
+	auto* game_view_plugin = LUMIX_NEW(allocator, GameViewPlugin)(app);
 	app.addPlugin(*game_view_plugin);
 
 	auto* shader_editor_plugin =
-		LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderEditorPlugin)(app);
+		LUMIX_NEW(allocator, ShaderEditorPlugin)(app);
 	app.addPlugin(*shader_editor_plugin);
 
-	auto* world_editor_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), WorldEditorPlugin)();
+	auto* world_editor_plugin = LUMIX_NEW(allocator, WorldEditorPlugin)();
 	app.getWorldEditor()->addPlugin(*world_editor_plugin);
 }
 

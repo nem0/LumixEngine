@@ -4,10 +4,11 @@
 #include "core/crc32.h"
 #include "core/math_utils.h"
 #include "core/vec.h"
-#include "editor/iproperty_descriptor.h"
-#include "editor/property_register.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "engine/iplugin.h"
+#include "engine/iproperty_descriptor.h"
+#include "engine/property_register.h"
 #include "imgui/imgui.h"
 #include "utils.h"
 #include <cmath>
@@ -192,12 +193,52 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	case Lumix::IPropertyDescriptor::SAMPLED_FUNCTION:
 		showSampledFunctionProperty(cmp, static_cast<Lumix::ISampledFunctionDescriptor&>(desc));
 		break;
+	case Lumix::IPropertyDescriptor::ENTITY:
+		showEntityProperty(cmp, index, static_cast<Lumix::IEnumPropertyDescriptor&>(desc));
+		break;
 	case Lumix::IPropertyDescriptor::ENUM:
 		showEnumProperty(cmp, index, static_cast<Lumix::IEnumPropertyDescriptor&>(desc));
 		break;
 	default:
 		ASSERT(false);
 		break;
+	}
+}
+
+
+void PropertyGrid::showEntityProperty(Lumix::ComponentUID cmp, int index, Lumix::IPropertyDescriptor& desc)
+{
+	Lumix::OutputBlob blob(m_editor.getAllocator());
+	desc.get(cmp, index, blob);
+	int value = *(int*)blob.getData();
+	auto& universe = cmp.scene->getUniverse();
+	int count = universe.getEntityCount();
+
+	struct Data
+	{
+		Lumix::IPropertyDescriptor* descriptor;
+		Lumix::IScene* scene;
+		Lumix::WorldEditor* editor;
+	};
+
+	auto getter = [](void* data, int index, const char** out) -> bool {
+		auto* combo_data = static_cast<Data*>(data);
+		static char buf[128];
+		Lumix::Entity entity = combo_data->scene->getUniverse().getEntityFromDenseIdx(index);
+		getEntityListDisplayName(*combo_data->editor, buf, Lumix::lengthOf(buf), entity);
+		*out = buf;
+
+		return true;
+	};
+
+	Data data;
+	data.scene = cmp.scene;
+	data.descriptor = &desc;
+	data.editor = &m_editor;
+
+	if(ImGui::Combo(desc.getName(), &value, getter, &data, count))
+	{
+		m_editor.setProperty(cmp.type, index, desc, &value, sizeof(value));
 	}
 }
 

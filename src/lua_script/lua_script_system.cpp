@@ -12,18 +12,18 @@
 #include "core/lua_wrapper.h"
 #include "core/resource_manager.h"
 #include "debug/debug.h"
-#include "editor/property_register.h"
-#include "editor/property_descriptor.h"
-#include "editor/world_editor.h"
-#include "engine.h"
-#include "iplugin.h"
-#include "lua_script/lua_script_manager.h"
-#include "plugin_manager.h"
 #include "editor/asset_browser.h"
 #include "editor/imgui/imgui.h"
 #include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
+#include "editor/world_editor.h"
+#include "engine.h"
+#include "engine/property_register.h"
+#include "engine/property_descriptor.h"
+#include "iplugin.h"
+#include "lua_script/lua_script_manager.h"
+#include "plugin_manager.h"
 #include "universe/universe.h"
 
 
@@ -668,6 +668,16 @@ namespace Lumix
 		, m_script_manager(m_allocator)
 	{
 		m_script_manager.create(crc32("lua_script"), engine.getResourceManager());
+
+		PropertyRegister::registerComponentType("lua_script", "Lua script");
+
+		PropertyRegister::add("lua_script",
+			LUMIX_NEW(engine.getAllocator(), ResourcePropertyDescriptor<LuaScriptScene>)("source",
+				&LuaScriptScene::getScriptPath,
+				&LuaScriptScene::setScriptPath,
+				"Lua (*.lua)",
+				crc32("lua_script"),
+				engine.getAllocator()));
 	}
 
 
@@ -841,16 +851,7 @@ namespace Lumix
 extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
 {
 	auto& allocator = app.getWorldEditor()->getAllocator();
-	PropertyRegister::registerComponentType("lua_script", "Lua script");
-
-	PropertyRegister::add("lua_script",
-		LUMIX_NEW(allocator, ResourcePropertyDescriptor<LuaScriptScene>)("source",
-		&LuaScriptScene::getScriptPath,
-		&LuaScriptScene::setScriptPath,
-		"Lua (*.lua)",
-		crc32("lua_script"),
-		allocator));
-
+	
 	auto* plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), PropertyGridPlugin);
 	app.getPropertyGrid()->addPlugin(*plugin);
 

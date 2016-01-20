@@ -1237,9 +1237,6 @@ public:
 
 		if (!m_metadata.load()) Lumix::g_log_info.log("studio") << "Could not load metadata";
 
-		void registerProperties(Lumix::WorldEditor&);
-		registerProperties(*m_editor);
-
 		setStudioApp();
 	}
 

@@ -15,6 +15,8 @@
 #include "core/mtjd/manager.h"
 #include "debug/debug.h"
 #include "engine/iplugin.h"
+#include "engine/property_descriptor.h"
+#include "engine/property_register.h"
 #include "plugin_manager.h"
 #include "universe/hierarchy.h"
 #include "universe/universe.h"
@@ -106,7 +108,19 @@ public:
 		m_timer = Timer::create(m_allocator);
 		m_fps_timer = Timer::create(m_allocator);
 		m_fps_frame = 0;
+		PropertyRegister::init(m_allocator);
 	}
+
+
+	void registerProperties()
+	{
+		PropertyRegister::registerComponentType("hierarchy", "Hierarchy");
+		PropertyRegister::add(
+			"hierarchy",
+			LUMIX_NEW(m_allocator, EntityPropertyDescriptor<Hierarchy>)(
+				"parent", &Hierarchy::getParent, &Hierarchy::setParent, m_allocator));
+	}
+
 
 	bool create()
 	{
@@ -115,15 +129,17 @@ public:
 		{
 			return false;
 		}
-		
+
 		HierarchyPlugin* hierarchy = LUMIX_NEW(m_allocator, HierarchyPlugin)(m_allocator);
 		m_plugin_manager->addPlugin(hierarchy);
-		
+
 		m_input_system = InputSystem::create(m_allocator);
 		if (!m_input_system)
 		{
 			return false;
 		}
+
+		registerProperties();
 
 		return true;
 	}
@@ -131,6 +147,7 @@ public:
 
 	~EngineImpl()
 	{
+		PropertyRegister::shutdown();
 		Timer::destroy(m_timer);
 		Timer::destroy(m_fps_timer);
 		PluginManager::destroy(m_plugin_manager);

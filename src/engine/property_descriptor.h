@@ -12,8 +12,8 @@ namespace Lumix
 {
 
 
-LUMIX_EDITOR_API int getIntPropertyMin();
-LUMIX_EDITOR_API int getIntPropertyMax();
+LUMIX_ENGINE_API int getIntPropertyMin();
+LUMIX_ENGINE_API int getIntPropertyMax();
 
 
 template <typename T> inline IPropertyDescriptor::Type toPropertyType();
@@ -603,6 +603,92 @@ private:
 	CountGetter m_count_getter;
 	float m_max_x;
 	float m_max_y;
+};
+
+
+
+template <class S> class EntityPropertyDescriptor : public IPropertyDescriptor
+{
+	public:
+	typedef Entity(S::*Getter)(ComponentIndex);
+	typedef void (S::*Setter)(ComponentIndex, Entity);
+	typedef Entity(S::*ArrayGetter)(ComponentIndex, int);
+	typedef void (S::*ArraySetter)(ComponentIndex, int, Entity);
+
+	public:
+	EntityPropertyDescriptor(const char* name,
+		Getter _getter,
+		Setter _setter,
+		IAllocator& allocator)
+		: IPropertyDescriptor(allocator)
+	{
+		setName(name);
+		m_single.getter = _getter;
+		m_single.setter = _setter;
+		m_type = ENTITY;
+	}
+
+
+	EntityPropertyDescriptor(const char* name,
+		ArrayGetter _getter,
+		ArraySetter _setter,
+		IAllocator& allocator)
+		: IPropertyDescriptor(allocator)
+	{
+		setName(name);
+		m_array.getter = _getter;
+		m_array.setter = _setter;
+		m_type = ENUM;
+	}
+
+
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		int value;
+		stream.read(&value, sizeof(value));
+		auto entity =
+			value < 0 ? INVALID_ENTITY : cmp.scene->getUniverse().getEntityFromDenseIdx(value);
+		if(index == -1)
+		{
+			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.index, entity);
+		}
+		else
+		{
+			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.index, index, entity);
+		}
+	};
+
+
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		Entity value;
+		if(index == -1)
+		{
+			value = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.index);
+		}
+		else
+		{
+			value = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.index, index);
+		}
+		auto dense_idx = cmp.scene->getUniverse().getDenseIdx(value);
+		int len = sizeof(dense_idx);
+		stream.write(&dense_idx, len);
+	};
+
+
+	private:
+	union {
+		struct
+		{
+			Getter getter;
+			Setter setter;
+		} m_single;
+		struct
+		{
+			ArrayGetter getter;
+			ArraySetter setter;
+		} m_array;
+	};
 };
 
 

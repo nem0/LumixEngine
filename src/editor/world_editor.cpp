@@ -29,9 +29,9 @@
 #include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
 #include "editor/measure_tool.h"
-#include "editor/iproperty_descriptor.h"
-#include "editor/property_register.h"
 #include "engine.h"
+#include "engine/iproperty_descriptor.h"
+#include "engine/property_register.h"
 #include "ieditor_command.h"
 #include "iplugin.h"
 #include "plugin_manager.h"
@@ -1519,7 +1519,6 @@ public:
 		destroyUniverse();
 		EditorIcons::destroy(*m_editor_icons);
 		EntityTemplateSystem::destroy(m_template_system);
-		PropertyRegister::shutdown();
 
 		LUMIX_DELETE(m_allocator, m_render_interface);
 	}
@@ -2412,7 +2411,6 @@ public:
 	{
 		for (auto& i : m_is_mouse_down) i = false;
 		for (auto& i : m_is_mouse_click) i = false;
-		PropertyRegister::init(m_allocator);
 		m_go_to_parameters.m_is_active = false;
 		m_undo_index = -1;
 		m_mouse_handling_plugin = nullptr;
