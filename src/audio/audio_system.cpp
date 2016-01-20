@@ -15,6 +15,7 @@
 #include "editor/imgui/imgui.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
+#include "renderer/render_scene.h"
 
 
 static const Lumix::uint32 CLIP_HASH = Lumix::crc32("CLIP");
@@ -288,16 +289,51 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 };
 
 
+struct EditorPlugin : public WorldEditor::Plugin
+{
+	EditorPlugin(WorldEditor& editor)
+		: m_editor(editor)
+	{
+	}
+
+	bool showGizmo(ComponentUID cmp) override
+	{
+		static const uint32 ECHO_ZONE_HASH = crc32("echo_zone");
+
+		if (cmp.type == ECHO_ZONE_HASH)
+		{
+			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
+			float radius = audio_scene->getEchoZoneRadius(cmp.index);
+			Universe& universe = audio_scene->getUniverse();
+			Vec3 pos = universe.getPosition(cmp.entity);
+
+			auto* scene = static_cast<RenderScene*>(m_editor.getScene(crc32("renderer")));
+			if (!scene) return true;
+			scene->addDebugSphere(pos, radius, 0xff0000ff, 0);
+			return true;
+		}
+
+		return false;
+	}
+
+	WorldEditor& m_editor;
+};
+
+
 extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
 {
-	auto& allocator = app.getWorldEditor()->getAllocator();
+	auto& editor = *app.getWorldEditor();
+	auto& allocator = editor.getAllocator();
 	registerProperties(allocator);
 
 	auto* asset_browser_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(app);
 	app.getAssetBrowser()->addPlugin(*asset_browser_plugin);
 
-	auto* app_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), StudioAppPlugin)(app);
+	auto* app_plugin = LUMIX_NEW(allocator, StudioAppPlugin)(app);
 	app.addPlugin(*app_plugin);
+
+	auto* plugin = LUMIX_NEW(allocator, EditorPlugin)(editor);
+	editor.addPlugin(*plugin);
 }
 
 

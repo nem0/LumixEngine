@@ -12,7 +12,6 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "lua_script/lua_script_system.h"
-#include "renderer/render_scene.h"
 #include "universe/universe.h"
 
 
@@ -704,42 +703,6 @@ AudioScene* AudioScene::createInstance(AudioSystem& system,
 void AudioScene::destroyInstance(AudioScene* scene)
 {
 	LUMIX_DELETE(static_cast<AudioSceneImpl*>(scene)->m_allocator, scene);
-}
-
-
-struct EditorPlugin : public WorldEditor::Plugin
-{
-	EditorPlugin(WorldEditor& editor)
-		: m_editor(editor)
-	{
-	}
-
-	bool showGizmo(ComponentUID cmp) override
-	{
-		if (cmp.type == ECHO_ZONE_HASH)
-		{
-			auto* audio_scene = static_cast<AudioSceneImpl*>(cmp.scene);
-			float radius = audio_scene->getEchoZoneRadius(cmp.index);
-			Universe& universe = audio_scene->getUniverse();
-			Vec3 pos = universe.getPosition(cmp.entity);
-
-			auto* scene = static_cast<RenderScene*>(m_editor.getScene(crc32("renderer")));
-			if (!scene) return true;
-			scene->addDebugSphere(pos, radius, 0xff0000ff, 0);
-			return true;
-		}
-		
-		return false;
-	}
-
-	WorldEditor& m_editor;
-};
-
-
-extern "C" LUMIX_AUDIO_API void setWorldEditor(Lumix::WorldEditor& editor)
-{
-	auto* plugin = LUMIX_NEW(editor.getAllocator(), EditorPlugin)(editor);
-	editor.addPlugin(*plugin);
 }
 
 
