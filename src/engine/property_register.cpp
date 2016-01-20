@@ -82,31 +82,30 @@ Array<IPropertyDescriptor*>& getDescriptors(uint32 type)
 }
 
 
-const IPropertyDescriptor& getDescriptor(uint32 type, uint32 name_hash)
+const IPropertyDescriptor* getDescriptor(uint32 type, uint32 name_hash)
 {
 	Array<IPropertyDescriptor*>& props = getDescriptors(type);
 	for (int i = 0; i < props.size(); ++i)
 	{
 		if (props[i]->getNameHash() == name_hash)
 		{
-			return *props[i];
+			return props[i];
 		}
 		auto& children = props[i]->getChildren();
 		for (int j = 0; j < children.size(); ++j)
 		{
 			if (children[j]->getNameHash() == name_hash)
 			{
-				return *children[j];
+				return children[j];
 			}
 
 		}
 	}
-	ASSERT(false);
-	return *props[0];
+	return nullptr;
 }
 
 
-const IPropertyDescriptor& getDescriptor(const char* component_type, const char* property_name)
+const IPropertyDescriptor* getDescriptor(const char* component_type, const char* property_name)
 {
 	return getDescriptor(crc32(component_type), crc32(property_name));
 }

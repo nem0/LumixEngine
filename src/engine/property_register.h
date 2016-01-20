@@ -19,8 +19,8 @@ namespace PropertyRegister
 LUMIX_ENGINE_API void init(IAllocator& allocator);
 LUMIX_ENGINE_API void shutdown();
 LUMIX_ENGINE_API void add(const char* component_type, IPropertyDescriptor* desc);
-LUMIX_ENGINE_API const IPropertyDescriptor& getDescriptor(uint32 type, uint32 name_hash);
-LUMIX_ENGINE_API const IPropertyDescriptor& getDescriptor(const char* component_type,
+LUMIX_ENGINE_API const IPropertyDescriptor* getDescriptor(uint32 type, uint32 name_hash);
+LUMIX_ENGINE_API const IPropertyDescriptor* getDescriptor(const char* component_type,
 	const char* property_name);
 LUMIX_ENGINE_API Array<IPropertyDescriptor*>& getDescriptors(uint32 type);
 

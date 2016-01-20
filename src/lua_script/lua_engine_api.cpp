@@ -2,7 +2,11 @@
 #include "core/input_system.h"
 #include "core/lua_wrapper.h"
 #include "engine.h"
+#include "core/blob.h"
+#include "engine/engine.h"
+#include "engine/iproperty_descriptor.h"
 #include "engine/plugin_manager.h"
+#include "engine/property_register.h"
 #include "iplugin.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/material.h"
@@ -41,6 +45,112 @@ static int getEnvironment(lua_State* L)
 	{
 		lua_rawgeti(L, LUA_REGISTRYINDEX, env);
 	}
+	return 1;
+}
+
+
+static void setProperty(const ComponentUID& cmp,
+	const IPropertyDescriptor& desc,
+	lua_State* L,
+	IAllocator& allocator)
+{
+	OutputBlob stream(allocator);
+	switch (desc.getType())
+	{
+		case IPropertyDescriptor::STRING:
+		case IPropertyDescriptor::FILE:
+		case IPropertyDescriptor::RESOURCE:
+			if (lua_isstring(L, -1))
+			{
+				const char* str = lua_tostring(L, -1);
+				stream.write(str, stringLength(str));
+			}
+			break;
+		case IPropertyDescriptor::DECIMAL:
+			if (lua_isnumber(L, -1))
+			{
+				float f = (float)lua_tonumber(L, -1);
+				stream.write(f);
+			}
+			break;
+		case IPropertyDescriptor::BOOL:
+			if (lua_isboolean(L, -1))
+			{
+				bool b = lua_toboolean(L, -1) != 0;
+				stream.write(b);
+			}
+			break;
+		default:
+			g_log_error.log("script") << "Property " << desc.getName() << " has unsupported type";
+			break;
+	}
+	InputBlob tmp(stream);
+	desc.set(cmp, -1, tmp);
+}
+
+
+static int createEntityEx(lua_State* L)
+{
+	if (!LuaWrapper::checkParameterType<void*>(L, 1) || !LuaWrapper::checkParameterType<void*>(L, 2))
+	{
+		return 0;
+	}
+	if (!lua_istable(L, 3))
+	{
+		luaL_error(L, "Expected table as parameter");
+		return 0;
+	}
+
+	auto* engine = LuaWrapper::toType<Engine*>(L, 1);
+	auto* ctx = LuaWrapper::toType<UniverseContext*>(L, 2);
+	Entity e = ctx->m_universe->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+
+	lua_pushvalue(L, 3);
+	lua_pushnil(L);
+	while (lua_next(L, -2) != 0)
+	{
+		const char* parameter_name = luaL_checkstring(L, -2);
+		if (compareString(parameter_name, "position") == 0)
+		{
+			auto pos = LuaWrapper::toType<Vec3>(L, -1);
+			ctx->m_universe->setPosition(e, pos);
+		}
+		else
+		{
+			uint32 cmp_hash = crc32(parameter_name);
+			for (int i = 0; i < ctx->m_scenes.size(); ++i)
+			{
+				ComponentUID cmp(
+					e, cmp_hash, ctx->m_scenes[i], ctx->m_scenes[i]->createComponent(cmp_hash, e));
+				if (cmp.isValid())
+				{
+					lua_pushvalue(L, -1);
+					lua_pushnil(L);
+					while (lua_next(L, -2) != 0)
+					{
+						const char* property_name = luaL_checkstring(L, -2);
+						auto* desc = PropertyRegister::getDescriptor(cmp_hash, crc32(property_name));
+						if (!desc)
+						{
+							g_log_error.log("script") << "Unknown property " << property_name;
+						}
+						else
+						{
+							setProperty(cmp, *desc, L, engine->getAllocator());
+						}
+
+						lua_pop(L, 1);
+					}
+					lua_pop(L, 1);
+					break;
+				}
+			}
+		}
+		lua_pop(L, 1);
+	}
+	lua_pop(L, 1);
+
+	LuaWrapper::pushLua(L, e);
 	return 1;
 }
 
@@ -250,6 +360,7 @@ void registerEngineLuaAPI(LuaScriptScene& scene, Engine& engine, lua_State* L)
 	REGISTER_FUNCTION(logInfo);
 	REGISTER_FUNCTION(addDebugCross);
 
+	scene.registerFunction("Engine", "createEntityEx", &LuaAPI::createEntityEx);
 	scene.registerFunction("Engine", "multVecQuat", &LuaAPI::multVecQuat);
 	scene.registerFunction("Engine", "getEntityPosition", &LuaAPI::getEntityPosition);
 	scene.registerFunction("Engine", "getEntityDirection", &LuaAPI::getEntityDirection);
