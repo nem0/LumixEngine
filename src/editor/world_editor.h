@@ -22,7 +22,6 @@ class RenderInterface;
 struct Quat;
 struct RayCastModelHit;
 class Universe;
-struct UniverseContext;
 
 
 struct MouseButton
@@ -75,7 +74,6 @@ public:
 	virtual void executeCommand(IEditorCommand* command) = 0;
 	virtual IEditorCommand* createEditorCommand(uint32 command_type) = 0;
 	virtual Engine& getEngine() = 0;
-	virtual UniverseContext* getUniverseContext() = 0;
 	virtual Universe* getUniverse() = 0;
 	virtual const Array<IScene*>& getScenes() const = 0;
 	virtual IScene* getScene(uint32 hash) = 0;

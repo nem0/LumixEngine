@@ -68,6 +68,10 @@ public:
 	void serialize(OutputBlob& serializer);
 	void deserialize(InputBlob& serializer);
 
+	IScene* getScene(uint32 hash) const;
+	Array<IScene*>& getScenes();
+	void addScene(IScene* scene);
+
 private:
 	struct Transformation
 	{
@@ -79,6 +83,7 @@ private:
 
 private:
 	IAllocator& m_allocator;
+	Array<IScene*> m_scenes;
 	Array<Transformation> m_transformations;
 	Array<int> m_entity_map;
 	AssociativeArray<uint32, uint32> m_name_to_id_map;

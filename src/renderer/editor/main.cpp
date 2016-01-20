@@ -760,7 +760,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 
 		void onUniverseCreated()
 		{
-			m_render_scene = static_cast<RenderScene*>(m_editor.getUniverseContext()->getScene(crc32("renderer")));
+			m_render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(crc32("renderer")));
 		}
 
 

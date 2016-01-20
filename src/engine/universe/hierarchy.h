@@ -26,7 +26,7 @@ namespace Lumix
 		void destroy() override {}
 		const char* getName() const override { return "hierarchy"; }
 
-		IScene* createScene(UniverseContext&) override;
+		IScene* createScene(Universe&) override;
 		void destroyScene(IScene*) override;
 	
 	private:

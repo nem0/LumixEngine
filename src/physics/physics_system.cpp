@@ -208,7 +208,7 @@ struct PhysicsSystemImpl : public PhysicsSystem
 	}
 
 	bool create() override;
-	IScene* createScene(UniverseContext& universe) override;
+	IScene* createScene(Universe& universe) override;
 	void destroyScene(IScene* scene) override;
 	void destroy() override;
 
@@ -295,7 +295,7 @@ struct CustomErrorCallback : public physx::PxErrorCallback
 	virtual void reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line);
 };
 
-IScene* PhysicsSystemImpl::createScene(UniverseContext& ctx)
+IScene* PhysicsSystemImpl::createScene(Universe& ctx)
 {
 	return PhysicsScene::create(*this, ctx, m_engine, m_allocator);
 }

@@ -11,7 +11,7 @@ namespace Lumix
 	class IPlugin;
 	class OutputBlob;
 	class Universe;
-	struct UniverseContext;
+	class Universe;
 
 
 	class LUMIX_ENGINE_API IScene
@@ -48,7 +48,7 @@ namespace Lumix
 			virtual const char* getName() const = 0;
 			virtual void sendMessage(const char*) {}
 
-			virtual IScene* createScene(UniverseContext&) { return nullptr; }
+			virtual IScene* createScene(Universe&) { return nullptr; }
 			virtual void destroyScene(IScene*) { ASSERT(false); }
 	};
 
