@@ -5,16 +5,16 @@
 #include "core/crc32.h"
 #include "core/path.h"
 #include "core/resource_manager.h"
-#include "editor/property_register.h"
-#include "editor/property_descriptor.h"
-#include "editor/world_editor.h"
-#include "engine/engine.h"
-#include "engine/iplugin.h"
-#include "engine/plugin_manager.h"
 #include "editor/asset_browser.h"
 #include "editor/imgui/imgui.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
+#include "editor/world_editor.h"
+#include "engine/engine.h"
+#include "engine/iplugin.h"
+#include "engine/plugin_manager.h"
+#include "engine/property_register.h"
+#include "engine/property_descriptor.h"
 #include "renderer/render_scene.h"
 
 
@@ -25,6 +25,45 @@ namespace Lumix
 {
 
 
+static void registerProperties(Lumix::IAllocator& allocator)
+{
+	PropertyRegister::registerComponentType("ambient_sound", "Ambient sound");
+	PropertyRegister::registerComponentType("audio_listener", "Audio listener");
+	PropertyRegister::registerComponentType("echo_zone", "Echo zone");
+
+	PropertyRegister::add("ambient_sound",
+		LUMIX_NEW(allocator, EnumPropertyDescriptor<AudioScene>)("Sound",
+			&AudioScene::getAmbientSoundClipIndex,
+			&AudioScene::setAmbientSoundClipIndex,
+			&AudioScene::getClipCount,
+			&AudioScene::getClipName,
+			allocator));
+
+	PropertyRegister::add("ambient_sound",
+		LUMIX_NEW(allocator, BoolPropertyDescriptor<AudioScene>)("3D",
+			&AudioScene::isAmbientSound3D,
+			&AudioScene::setAmbientSound3D,
+			allocator));
+
+	PropertyRegister::add("echo_zone",
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<AudioScene>)("Radius",
+			&AudioScene::getEchoZoneRadius,
+			&AudioScene::setEchoZoneRadius,
+			0.01f,
+			FLT_MAX,
+			0.1f,
+			allocator));
+	PropertyRegister::add("echo_zone",
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<AudioScene>)("Delay (ms)",
+			&AudioScene::getEchoZoneDelay,
+			&AudioScene::setEchoZoneDelay,
+			0.01f,
+			FLT_MAX,
+			100.0f,
+			allocator));
+}
+
+
 struct AudioSystemImpl : public AudioSystem
 {
 	AudioSystemImpl(Engine& engine)
@@ -32,6 +71,7 @@ struct AudioSystemImpl : public AudioSystem
 		, m_manager(engine.getAllocator())
 		, m_device(nullptr)
 	{
+		registerProperties(engine.getAllocator());
 	}
 
 
@@ -73,45 +113,6 @@ struct AudioSystemImpl : public AudioSystem
 	Engine& m_engine;
 	AudioDevice* m_device;
 };
-
-
-static void registerProperties(Lumix::IAllocator& allocator)
-{
-	PropertyRegister::registerComponentType("ambient_sound", "Ambient sound");
-	PropertyRegister::registerComponentType("audio_listener", "Audio listener");
-	PropertyRegister::registerComponentType("echo_zone", "Echo zone");
-
-	PropertyRegister::add("ambient_sound",
-		LUMIX_NEW(allocator, EnumPropertyDescriptor<AudioScene>)("Sound",
-		&AudioScene::getAmbientSoundClipIndex,
-		&AudioScene::setAmbientSoundClipIndex,
-		&AudioScene::getClipCount,
-		&AudioScene::getClipName,
-		allocator));
-
-	PropertyRegister::add("ambient_sound",
-		LUMIX_NEW(allocator, BoolPropertyDescriptor<AudioScene>)("3D",
-		&AudioScene::isAmbientSound3D,
-		&AudioScene::setAmbientSound3D,
-		allocator));
-
-	PropertyRegister::add("echo_zone",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<AudioScene>)("Radius",
-		&AudioScene::getEchoZoneRadius,
-		&AudioScene::setEchoZoneRadius,
-		0.01f,
-		FLT_MAX,
-		0.1f,
-		allocator));
-	PropertyRegister::add("echo_zone",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<AudioScene>)("Delay (ms)",
-		&AudioScene::getEchoZoneDelay,
-		&AudioScene::setEchoZoneDelay,
-		0.01f,
-		FLT_MAX,
-		100.0f,
-		allocator));
-}
 
 
 struct AssetBrowserPlugin : public AssetBrowser::IPlugin
@@ -324,7 +325,6 @@ extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
 {
 	auto& editor = *app.getWorldEditor();
 	auto& allocator = editor.getAllocator();
-	registerProperties(allocator);
 
 	auto* asset_browser_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(app);
 	app.getAssetBrowser()->addPlugin(*asset_browser_plugin);

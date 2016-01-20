@@ -1,7 +1,7 @@
 #include "property_register.h"
 #include "core/associative_array.h"
 #include "core/crc32.h"
-#include "editor/iproperty_descriptor.h"
+#include "engine/iproperty_descriptor.h"
 
 
 namespace Lumix

@@ -4,7 +4,6 @@
 #include <cstdint>
 
 
-
 namespace Lumix
 {
 
@@ -16,13 +15,13 @@ void IPropertyDescriptor::setName(const char* name)
 }
 
 
-LUMIX_EDITOR_API int getIntPropertyMin()
+LUMIX_ENGINE_API int getIntPropertyMin()
 {
 	return INT32_MIN;
 }
 
 
-LUMIX_EDITOR_API int getIntPropertyMax()
+LUMIX_ENGINE_API int getIntPropertyMax()
 {
 	return INT32_MAX;
 }

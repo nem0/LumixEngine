@@ -7,15 +7,15 @@
 #include "core/crc32.h"
 #include "core/log.h"
 #include "core/resource_manager.h"
-#include "editor/property_descriptor.h"
-#include "editor/property_register.h"
+#include "editor/studio_app.h"
+#include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine.h"
+#include "engine/property_descriptor.h"
+#include "engine/property_register.h"
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
 #include "renderer/render_scene.h"
-#include "editor/studio_app.h"
-#include "editor/utils.h"
 #include "universe/universe.h"
 
 
@@ -29,6 +29,172 @@ static const uint32 CONTROLLER_HASH = crc32("physical_controller");
 static const uint32 HEIGHTFIELD_HASH = crc32("physical_heightfield");
 
 
+class PhysicsLayerPropertyDescriptor : public IEnumPropertyDescriptor
+{
+public:
+	typedef int (PhysicsScene::*Getter)(ComponentIndex);
+	typedef void (PhysicsScene::*Setter)(ComponentIndex, int);
+	typedef int (PhysicsScene::*ArrayGetter)(ComponentIndex, int);
+	typedef void (PhysicsScene::*ArraySetter)(ComponentIndex, int, int);
+
+public:
+	PhysicsLayerPropertyDescriptor(const char* name,
+		Getter _getter,
+		Setter _setter,
+		IAllocator& allocator)
+		: IEnumPropertyDescriptor(allocator)
+	{
+		setName(name);
+		m_single.getter = _getter;
+		m_single.setter = _setter;
+		m_type = ENUM;
+	}
+
+
+	PhysicsLayerPropertyDescriptor(const char* name,
+		ArrayGetter _getter,
+		ArraySetter _setter,
+		IAllocator& allocator)
+		: IEnumPropertyDescriptor(allocator)
+	{
+		setName(name);
+		m_array.getter = _getter;
+		m_array.setter = _setter;
+		m_type = ENUM;
+	}
+
+
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		int value;
+		stream.read(&value, sizeof(value));
+		if (index == -1)
+		{
+			(static_cast<PhysicsScene*>(cmp.scene)->*m_single.setter)(cmp.index, value);
+		}
+		else
+		{
+			(static_cast<PhysicsScene*>(cmp.scene)->*m_array.setter)(cmp.index, index, value);
+		}
+	};
+
+
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		int value;
+		if (index == -1)
+		{
+			value = (static_cast<PhysicsScene*>(cmp.scene)->*m_single.getter)(cmp.index);
+		}
+		else
+		{
+			value = (static_cast<PhysicsScene*>(cmp.scene)->*m_array.getter)(cmp.index, index);
+		}
+		stream.write(&value, sizeof(value));
+	};
+
+
+	int getEnumCount(IScene* scene) override
+	{
+		return static_cast<PhysicsScene*>(scene)->getCollisionsLayersCount();
+	}
+
+
+	const char* getEnumItemName(IScene* scene, int index) override
+	{
+		auto* phy_scene = static_cast<PhysicsScene*>(scene);
+		return phy_scene->getCollisionLayerName(index);
+	}
+
+
+	void getEnumItemName(IScene* scene, int index, char* buf, int max_size) override {}
+
+private:
+	union
+	{
+		struct
+		{
+			Getter getter;
+			Setter setter;
+		} m_single;
+		struct
+		{
+			ArrayGetter getter;
+			ArraySetter setter;
+		} m_array;
+	};
+};
+
+
+static void registerProperties(Lumix::IAllocator& allocator)
+{
+	PropertyRegister::registerComponentType("box_rigid_actor", "Physics Box");
+	PropertyRegister::registerComponentType("physical_controller", "Physics Controller");
+	PropertyRegister::registerComponentType("mesh_rigid_actor", "Physics Mesh");
+	PropertyRegister::registerComponentType("physical_heightfield", "Physics Heightfield");
+
+	PropertyRegister::add("physical_controller",
+		LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
+			&PhysicsScene::getControllerLayer,
+			&PhysicsScene::setControllerLayer,
+			allocator));
+
+	PropertyRegister::add("box_rigid_actor",
+		LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)("Dynamic",
+			&PhysicsScene::isDynamic,
+			&PhysicsScene::setIsDynamic,
+			allocator));
+	PropertyRegister::add("box_rigid_actor",
+		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)("Size",
+			&PhysicsScene::getHalfExtents,
+			&PhysicsScene::setHalfExtents,
+			allocator));
+	PropertyRegister::add("box_rigid_actor",
+		LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
+			&PhysicsScene::getActorLayer,
+			&PhysicsScene::setActorLayer,
+			allocator));
+	PropertyRegister::add("mesh_rigid_actor",
+		LUMIX_NEW(allocator, FilePropertyDescriptor<PhysicsScene>)("Source",
+			&PhysicsScene::getShapeSource,
+			&PhysicsScene::setShapeSource,
+			"Physics (*.pda)",
+			allocator));
+	PropertyRegister::add("mesh_rigid_actor",
+		LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
+			&PhysicsScene::getActorLayer,
+			&PhysicsScene::setActorLayer,
+			allocator));
+	PropertyRegister::add("physical_heightfield",
+		LUMIX_NEW(allocator, ResourcePropertyDescriptor<PhysicsScene>)("Heightmap",
+			&PhysicsScene::getHeightmap,
+			&PhysicsScene::setHeightmap,
+			"Image (*.raw)",
+			ResourceManager::TEXTURE,
+			allocator));
+	PropertyRegister::add("physical_heightfield",
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("XZ scale",
+			&PhysicsScene::getHeightmapXZScale,
+			&PhysicsScene::setHeightmapXZScale,
+			0.0f,
+			FLT_MAX,
+			0.0f,
+			allocator));
+	PropertyRegister::add("physical_heightfield",
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Y scale",
+			&PhysicsScene::getHeightmapYScale,
+			&PhysicsScene::setHeightmapYScale,
+			0.0f,
+			FLT_MAX,
+			0.0f,
+			allocator));
+	PropertyRegister::add("physical_heightfield",
+		LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
+			&PhysicsScene::getHeightfieldLayer,
+			&PhysicsScene::setHeightfieldLayer,
+			allocator));
+}
+
 
 struct PhysicsSystemImpl : public PhysicsSystem
 {
@@ -37,6 +203,7 @@ struct PhysicsSystemImpl : public PhysicsSystem
 		, m_engine(engine)
 		, m_manager(*this, engine.getAllocator())
 	{
+		registerProperties(engine.getAllocator());
 		m_manager.create(ResourceManager::PHYSICS, engine.getResourceManager());
 	}
 
@@ -215,172 +382,6 @@ void CustomErrorCallback::reportError(physx::PxErrorCode::Enum,
 }
 
 
-class PhysicsLayerPropertyDescriptor : public IEnumPropertyDescriptor
-{
-	public:
-	typedef int (PhysicsScene::*Getter)(ComponentIndex);
-	typedef void (PhysicsScene::*Setter)(ComponentIndex, int);
-	typedef int (PhysicsScene::*ArrayGetter)(ComponentIndex, int);
-	typedef void (PhysicsScene::*ArraySetter)(ComponentIndex, int, int);
-
-	public:
-	PhysicsLayerPropertyDescriptor(const char* name,
-		Getter _getter,
-		Setter _setter,
-		IAllocator& allocator)
-		: IEnumPropertyDescriptor(allocator)
-	{
-		setName(name);
-		m_single.getter = _getter;
-		m_single.setter = _setter;
-		m_type = ENUM;
-	}
-
-
-	PhysicsLayerPropertyDescriptor(const char* name,
-		ArrayGetter _getter,
-		ArraySetter _setter,
-		IAllocator& allocator)
-		: IEnumPropertyDescriptor(allocator)
-	{
-		setName(name);
-		m_array.getter = _getter;
-		m_array.setter = _setter;
-		m_type = ENUM;
-	}
-
-
-	void set(ComponentUID cmp, int index, InputBlob& stream) const override
-	{
-		int value;
-		stream.read(&value, sizeof(value));
-		if(index == -1)
-		{
-			(static_cast<PhysicsScene*>(cmp.scene)->*m_single.setter)(cmp.index, value);
-		}
-		else
-		{
-			(static_cast<PhysicsScene*>(cmp.scene)->*m_array.setter)(cmp.index, index, value);
-		}
-	};
-
-
-	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
-	{
-		int value;
-		if(index == -1)
-		{
-			value = (static_cast<PhysicsScene*>(cmp.scene)->*m_single.getter)(cmp.index);
-		}
-		else
-		{
-			value = (static_cast<PhysicsScene*>(cmp.scene)->*m_array.getter)(cmp.index, index);
-		}
-		stream.write(&value, sizeof(value));
-	};
-
-
-	int getEnumCount(IScene* scene) override
-	{
-		return static_cast<PhysicsScene*>(scene)->getCollisionsLayersCount();
-	}
-
-
-	const char* getEnumItemName(IScene* scene, int index) override
-	{
-		auto* phy_scene = static_cast<PhysicsScene*>(scene);
-		return phy_scene->getCollisionLayerName(index);
-	}
-
-
-	void getEnumItemName(IScene* scene, int index, char* buf, int max_size) override {}
-
-	private:
-	union
-	{
-		struct
-		{
-			Getter getter;
-			Setter setter;
-		} m_single;
-		struct
-		{
-			ArrayGetter getter;
-			ArraySetter setter;
-		} m_array;
-	};
-};
-
-
-static void registerProperties(Lumix::IAllocator& allocator)
-{
-	PropertyRegister::registerComponentType("box_rigid_actor", "Physics Box");
-	PropertyRegister::registerComponentType("physical_controller", "Physics Controller");
-	PropertyRegister::registerComponentType("mesh_rigid_actor", "Physics Mesh");
-	PropertyRegister::registerComponentType("physical_heightfield", "Physics Heightfield");
-
-	PropertyRegister::add("physical_controller",
-		LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
-		&PhysicsScene::getControllerLayer,
-		&PhysicsScene::setControllerLayer,
-		allocator));
-
-	PropertyRegister::add("box_rigid_actor",
-		LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)("Dynamic",
-		&PhysicsScene::isDynamic,
-		&PhysicsScene::setIsDynamic,
-		allocator));
-	PropertyRegister::add("box_rigid_actor",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)("Size",
-		&PhysicsScene::getHalfExtents,
-		&PhysicsScene::setHalfExtents,
-		allocator));
-	PropertyRegister::add("box_rigid_actor",
-		LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
-		&PhysicsScene::getActorLayer,
-		&PhysicsScene::setActorLayer,
-		allocator));
-	PropertyRegister::add("mesh_rigid_actor",
-		LUMIX_NEW(allocator, FilePropertyDescriptor<PhysicsScene>)("Source",
-		&PhysicsScene::getShapeSource,
-		&PhysicsScene::setShapeSource,
-		"Physics (*.pda)",
-		allocator));
-	PropertyRegister::add("mesh_rigid_actor",
-		LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
-		&PhysicsScene::getActorLayer,
-		&PhysicsScene::setActorLayer,
-		allocator));
-	PropertyRegister::add("physical_heightfield",
-		LUMIX_NEW(allocator, ResourcePropertyDescriptor<PhysicsScene>)("Heightmap",
-		&PhysicsScene::getHeightmap,
-		&PhysicsScene::setHeightmap,
-		"Image (*.raw)",
-		ResourceManager::TEXTURE,
-		allocator));
-	PropertyRegister::add("physical_heightfield",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("XZ scale",
-		&PhysicsScene::getHeightmapXZScale,
-		&PhysicsScene::setHeightmapXZScale,
-		0.0f,
-		FLT_MAX,
-		0.0f,
-		allocator));
-	PropertyRegister::add("physical_heightfield",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Y scale",
-		&PhysicsScene::getHeightmapYScale,
-		&PhysicsScene::setHeightmapYScale,
-		0.0f,
-		FLT_MAX,
-		0.0f,
-		allocator));
-	PropertyRegister::add("physical_heightfield",
-		LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
-		&PhysicsScene::getHeightfieldLayer,
-		&PhysicsScene::setHeightfieldLayer,
-		allocator));
-}
-
 
 struct StudioAppPlugin : public StudioApp::IPlugin
 {
@@ -489,9 +490,6 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 
 extern "C" LUMIX_PHYSICS_API void setStudioApp(StudioApp& app)
 {
-	auto& allocator = app.getWorldEditor()->getAllocator();
-	registerProperties(allocator);
-
 	StudioAppPlugin* plugin =
 		LUMIX_NEW(app.getWorldEditor()->getAllocator(), StudioAppPlugin)(*app.getWorldEditor());
 	app.addPlugin(*plugin);

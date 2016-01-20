@@ -9,7 +9,7 @@ namespace Lumix
 {
 
 
-class LUMIX_EDITOR_API IPropertyDescriptor
+class LUMIX_ENGINE_API IPropertyDescriptor
 {
 public:
 	enum Type
@@ -27,7 +27,8 @@ public:
 		VEC2,
 		SAMPLED_FUNCTION,
 		ENUM,
-		INT2
+		INT2,
+		ENTITY
 	};
 
 public:
@@ -57,7 +58,7 @@ protected:
 };
 
 
-class LUMIX_EDITOR_API IDecimalPropertyDescriptor : public IPropertyDescriptor
+class LUMIX_ENGINE_API IDecimalPropertyDescriptor : public IPropertyDescriptor
 {
 public:
 	IDecimalPropertyDescriptor(IAllocator& allocator);
