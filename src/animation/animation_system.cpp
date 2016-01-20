@@ -43,16 +43,16 @@ private:
 public:
 	AnimationSceneImpl(IPlugin& anim_system,
 					   Engine& engine,
-					   UniverseContext& ctx,
+					   Universe& ctx,
 					   IAllocator& allocator)
-		: m_universe(*ctx.m_universe)
+		: m_universe(ctx)
 		, m_engine(engine)
 		, m_anim_system(anim_system)
 		, m_animables(allocator)
 	{
 		m_render_scene = nullptr;
 		uint32 hash = crc32("renderer");
-		for (auto* scene : ctx.m_scenes)
+		for (auto* scene : ctx.getScenes())
 		{
 			if (crc32(scene->getPlugin().getName()) == hash)
 			{
@@ -72,12 +72,14 @@ public:
 
 	~AnimationSceneImpl()
 	{
-		m_render_scene->renderableCreated()
-			.unbind<AnimationSceneImpl,
-					&AnimationSceneImpl::onRenderableCreated>(this);
-		m_render_scene->renderableDestroyed()
-			.unbind<AnimationSceneImpl,
-					&AnimationSceneImpl::onRenderableDestroyed>(this);
+		m_render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		if (m_render_scene)
+		{
+			m_render_scene->renderableCreated()
+				.unbind<AnimationSceneImpl, &AnimationSceneImpl::onRenderableCreated>(this);
+			m_render_scene->renderableDestroyed()
+				.unbind<AnimationSceneImpl, &AnimationSceneImpl::onRenderableDestroyed>(this);
+		}
 	}
 
 
@@ -299,7 +301,7 @@ public:
 	{
 	}
 
-	IScene* createScene(UniverseContext& ctx) override
+	IScene* createScene(Universe& ctx) override
 	{
 		return LUMIX_NEW(m_allocator, AnimationSceneImpl)(
 			*this, m_engine, ctx, m_allocator);

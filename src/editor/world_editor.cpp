@@ -1373,7 +1373,7 @@ public:
 
 	IScene* getSceneByComponentType(uint32 hash) override
 	{
-		for (auto* scene : m_universe_context->m_scenes)
+		for (auto* scene : m_universe->getScenes())
 		{
 			if (scene->ownComponentType(hash))
 			{
@@ -1386,7 +1386,7 @@ public:
 
 	IScene* getScene(uint32 hash) override
 	{
-		for (auto* scene : m_universe_context->m_scenes)
+		for (auto* scene : m_universe->getScenes())
 		{
 			if (crc32(scene->getPlugin().getName()) == hash)
 			{
@@ -1396,16 +1396,10 @@ public:
 		return nullptr;
 	}
 
-
-	UniverseContext* getUniverseContext() override
-	{
-		return m_universe_context;
-	}
-
-
+	
 	Universe* getUniverse() override
 	{
-		return m_universe_context ? m_universe_context->m_universe : nullptr; 
+		return m_universe; 
 	}
 
 
@@ -1453,7 +1447,7 @@ public:
 		showGizmos();
 
 		RenderScene* scene =
-			static_cast<RenderScene*>(m_universe_context->getScene(crc32("renderer")));
+			static_cast<RenderScene*>(m_universe->getScene(crc32("renderer")));
 		m_measure_tool->createEditorLines(*scene);
 	}
 
@@ -1498,8 +1492,8 @@ public:
 
 	void updateEngine() override
 	{
-		ASSERT(m_universe_context);
-		m_engine->update(*m_universe_context);
+		ASSERT(m_universe);
+		m_engine->update(*m_universe);
 	}
 
 
@@ -1546,14 +1540,14 @@ public:
 			for(auto e : m_selected_entities)
 			{
 				positions.push(hit_pos);
-				rotations.push(m_universe_context->m_universe->getRotation(e));
+				rotations.push(m_universe->getRotation(e));
 			}
 		}
 		else
 		{
 			for(auto e : m_selected_entities)
 			{
-				auto pos = m_universe_context->m_universe->getPosition(e);
+				auto pos = m_universe->getPosition(e);
 				auto dir = pos - hit_pos;
 				dir.normalize();
 				Matrix mtx = Matrix::IDENTITY;
@@ -1727,16 +1721,16 @@ public:
 
 	void save(FS::IFile& file)
 	{
-		ASSERT(m_universe_context);
+		ASSERT(m_universe);
 
 		OutputBlob blob(m_allocator);
-		blob.reserve(m_universe_context->m_universe->getEntityCount() * 100);
+		blob.reserve(m_universe->getEntityCount() * 100);
 
 		Header header = {0xffffFFFF, (int)SerializedVersion::LATEST, 0, 0};
 		blob.write(header);
 		int hashed_offset = sizeof(header);
 
-		header.engine_hash = m_engine->serialize(*m_universe_context, blob);
+		header.engine_hash = m_engine->serialize(*m_universe, blob);
 		m_template_system->serialize(blob);
 		m_entity_groups.serialize(blob);
 		header.hash = crc32((const uint8*)blob.getData() + hashed_offset, blob.getSize() - hashed_offset);
@@ -1989,7 +1983,7 @@ public:
 
 	void toggleGameMode() override
 	{
-		ASSERT(m_universe_context);
+		ASSERT(m_universe);
 		if (m_is_game_mode)
 		{
 			stopGameMode();
@@ -2000,15 +1994,15 @@ public:
 				m_engine->getFileSystem().getMemoryDevice(), Lumix::Path(""), FS::Mode::WRITE);
 			save(*m_game_mode_file);
 			m_is_game_mode = true;
-			m_engine->startGame(*m_universe_context);
+			m_engine->startGame(*m_universe);
 		}
 	}
 
 
 	void stopGameMode()
 	{
-		ASSERT(m_universe_context);
-		m_engine->stopGame(*m_universe_context);
+		ASSERT(m_universe);
+		m_engine->stopGame(*m_universe);
 		selectEntities(nullptr, 0);
 		m_editor_icons->clear();
 		m_is_game_mode = false;
@@ -2301,7 +2295,7 @@ public:
 			m_is_loading = false;
 			return;
 		}
-		if (m_engine->deserialize(*m_universe_context, blob))
+		if (m_engine->deserialize(*m_universe, blob))
 		{
 			m_template_system->deserialize(blob);
 			if (header.version > (int)SerializedVersion::ENTITY_GROUPS)
@@ -2403,7 +2397,7 @@ public:
 		, m_editor_command_creators(m_allocator)
 		, m_is_loading(false)
 		, m_universe_path("")
-		, m_universe_context(nullptr)
+		, m_universe(nullptr)
 		, m_is_orbit(false)
 		, m_gizmo_use_step(false)
 		, m_is_additive_selection(false)
@@ -2678,15 +2672,15 @@ public:
 		if (m_is_game_mode) stopGameMode();
 
 		m_entity_groups.setUniverse(nullptr);
-		ASSERT(m_universe_context);
+		ASSERT(m_universe);
 		destroyUndoStack();
 		m_universe_destroyed.invoke();
 		m_editor_icons->clear();
 		m_components.clear();
 		selectEntities(nullptr, 0);
 		m_camera = INVALID_ENTITY;
-		m_engine->destroyUniverse(*m_universe_context);
-		m_universe_context = nullptr;
+		m_engine->destroyUniverse(*m_universe);
+		m_universe = nullptr;
 	}
 
 
@@ -2763,11 +2757,11 @@ public:
 
 	void createUniverse(bool create_basic_entities)
 	{
-		ASSERT(!m_universe_context);
+		ASSERT(!m_universe);
 
 		destroyUndoStack();
-		m_universe_context = &m_engine->createUniverse();
-		Universe* universe = m_universe_context->m_universe;
+		m_universe = &m_engine->createUniverse();
+		Universe* universe = m_universe;
 
 		universe->componentAdded().bind<WorldEditorImpl, &WorldEditorImpl::onComponentAdded>(this);
 		universe->componentDestroyed()
@@ -2941,7 +2935,7 @@ public:
 	{
 		m_go_to_parameters.m_is_active = true;
 		m_go_to_parameters.m_t = 0;
-		auto* universe = m_universe_context->m_universe;
+		auto* universe = m_universe;
 		m_go_to_parameters.m_from = universe->getPosition(m_camera);
 		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
 		if (m_is_orbit && !m_selected_entities.empty())
@@ -2959,7 +2953,7 @@ public:
 	{
 		m_go_to_parameters.m_is_active = true;
 		m_go_to_parameters.m_t = 0;
-		auto* universe = m_universe_context->m_universe;
+		auto* universe = m_universe;
 		m_go_to_parameters.m_from = universe->getPosition(m_camera);
 		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
 		if (m_is_orbit && !m_selected_entities.empty())
@@ -2977,7 +2971,7 @@ public:
 	{
 		m_go_to_parameters.m_is_active = true;
 		m_go_to_parameters.m_t = 0;
-		auto* universe = m_universe_context->m_universe;
+		auto* universe = m_universe;
 		m_go_to_parameters.m_from = universe->getPosition(m_camera);
 		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
 		if (m_is_orbit && !m_selected_entities.empty())
@@ -3028,7 +3022,7 @@ public:
 
 	const Array<IScene*>& getScenes() const override
 	{
-		return m_universe_context->m_scenes;
+		return m_universe->getScenes();
 	}
 
 
@@ -3104,7 +3098,7 @@ private:
 	int m_undo_index;
 	OutputBlob m_copy_buffer;
 	bool m_is_loading;
-	UniverseContext* m_universe_context;
+	Universe* m_universe;
 	EntityGroups m_entity_groups;
 	RenderInterface* m_render_interface;
 };

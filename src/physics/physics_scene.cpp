@@ -226,14 +226,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	};
 
 
-	PhysicsSceneImpl(UniverseContext& context, IAllocator& allocator)
+	PhysicsSceneImpl(Universe& context, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_controllers(m_allocator)
 		, m_actors(m_allocator)
 		, m_terrains(m_allocator)
 		, m_dynamic_actors(m_allocator)
-		, m_universe(*context.m_universe)
-		, m_universe_context(context)
+		, m_universe(context)
 		, m_is_game_running(false)
 		, m_contact_callback(*this)
 		, m_queued_forces(m_allocator)
@@ -770,7 +769,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void registerLuaAPI()
 	{
-		auto* scene = m_universe_context.getScene(crc32("lua_script"));
+		auto* scene = m_universe.getScene(crc32("lua_script"));
 		if (!scene) return;
 
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
@@ -1667,7 +1666,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 	IAllocator& m_allocator;
 
 	Universe& m_universe;
-	UniverseContext& m_universe_context;
 	Engine* m_engine;
 	ContactCallback m_contact_callback;
 	physx::PxScene* m_scene;
@@ -1689,7 +1687,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 
 PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
-	UniverseContext& context,
+	Universe& context,
 	Engine& engine,
 	IAllocator& allocator)
 {

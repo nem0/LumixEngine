@@ -33,21 +33,6 @@ class Universe;
 class WorldEditor;
 
 
-struct LUMIX_ENGINE_API UniverseContext
-{
-	UniverseContext(IAllocator& allocator)
-		: m_scenes(allocator)
-	{
-	}
-
-	IScene* getScene(uint32 hash) const;
-
-	Universe* m_universe;
-	Array<IScene*> m_scenes;
-};
-
-
-
 class LUMIX_ENGINE_API Engine
 {
 public:
@@ -62,8 +47,8 @@ public:
 	static Engine* create(FS::FileSystem* fs, IAllocator& allocator);
 	static void destroy(Engine* engine, IAllocator& allocator);
 
-	virtual UniverseContext& createUniverse() = 0;
-	virtual void destroyUniverse(UniverseContext& context) = 0;
+	virtual Universe& createUniverse() = 0;
+	virtual void destroyUniverse(Universe& context) = 0;
 	virtual void setPlatformData(const PlatformData& data) = 0;
 	virtual const PlatformData& getPlatformData() = 0;
 
@@ -74,12 +59,12 @@ public:
 	virtual ResourceManager& getResourceManager() = 0;
 	virtual IAllocator& getAllocator() = 0;
 
-	virtual void startGame(UniverseContext& context) = 0;
-	virtual void stopGame(UniverseContext& context) = 0;
+	virtual void startGame(Universe& context) = 0;
+	virtual void stopGame(Universe& context) = 0;
 
-	virtual void update(UniverseContext& context) = 0;
-	virtual uint32 serialize(UniverseContext& ctx, OutputBlob& serializer) = 0;
-	virtual bool deserialize(UniverseContext& ctx, InputBlob& serializer) = 0;
+	virtual void update(Universe& context) = 0;
+	virtual uint32 serialize(Universe& ctx, OutputBlob& serializer) = 0;
+	virtual bool deserialize(Universe& ctx, InputBlob& serializer) = 0;
 	virtual float getFPS() const = 0;
 	virtual float getLastTimeDelta() = 0;
 	virtual void setTimeMultiplier(float multiplier) = 0;

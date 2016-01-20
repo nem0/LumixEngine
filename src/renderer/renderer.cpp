@@ -649,10 +649,9 @@ struct RendererImpl : public Renderer
 	}
 
 
-	IScene* createScene(UniverseContext& ctx) override
+	IScene* createScene(Universe& ctx) override
 	{
-		return RenderScene::createInstance(
-			*this, m_engine, *ctx.m_universe, true, m_allocator);
+		return RenderScene::createInstance(*this, m_engine, ctx, true, m_allocator);
 	}
 
 

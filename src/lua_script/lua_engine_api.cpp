@@ -102,8 +102,8 @@ static int createEntityEx(lua_State* L)
 	}
 
 	auto* engine = LuaWrapper::toType<Engine*>(L, 1);
-	auto* ctx = LuaWrapper::toType<UniverseContext*>(L, 2);
-	Entity e = ctx->m_universe->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+	auto* ctx = LuaWrapper::toType<Universe*>(L, 2);
+	Entity e = ctx->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
 
 	lua_pushvalue(L, 3);
 	lua_pushnil(L);
@@ -113,15 +113,14 @@ static int createEntityEx(lua_State* L)
 		if (compareString(parameter_name, "position") == 0)
 		{
 			auto pos = LuaWrapper::toType<Vec3>(L, -1);
-			ctx->m_universe->setPosition(e, pos);
+			ctx->setPosition(e, pos);
 		}
 		else
 		{
 			uint32 cmp_hash = crc32(parameter_name);
-			for (int i = 0; i < ctx->m_scenes.size(); ++i)
+			for (auto* scene : ctx->getScenes())
 			{
-				ComponentUID cmp(
-					e, cmp_hash, ctx->m_scenes[i], ctx->m_scenes[i]->createComponent(cmp_hash, e));
+				ComponentUID cmp(e, cmp_hash, scene, scene->createComponent(cmp_hash, e));
 				if (cmp.isValid())
 				{
 					lua_pushvalue(L, -1);
@@ -316,12 +315,9 @@ static void addInputAction(Engine* engine, uint32 action, int type, int key, int
 } // namespace LuaAPI
 
 
-void registerUniverse(UniverseContext* ctx, lua_State* L)
+void registerUniverse(Universe* ctx, lua_State* L)
 {
-	lua_pushlightuserdata(L, ctx);
-	lua_setglobal(L, "g_universe_context");
-
-	for (auto* scene : ctx->m_scenes)
+	for (auto* scene : ctx->getScenes())
 	{
 		const char* name = scene->getPlugin().getName();
 		char tmp[128];
@@ -332,7 +328,7 @@ void registerUniverse(UniverseContext* ctx, lua_State* L)
 		lua_setglobal(L, tmp);
 	}
 
-	lua_pushlightuserdata(L, ctx ? ctx->m_universe : nullptr);
+	lua_pushlightuserdata(L, ctx);
 	lua_setglobal(L, "g_universe");
 }
 

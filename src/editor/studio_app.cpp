@@ -102,7 +102,7 @@ public:
 		if (m_time_to_autosave < 0) autosave();
 
 		m_editor->update();
-		m_engine->update(*m_editor->getUniverseContext());
+		m_engine->update(*m_editor->getUniverse());
 
 		for (auto* plugin : m_plugins)
 		{

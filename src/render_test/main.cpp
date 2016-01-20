@@ -16,6 +16,7 @@
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
+#include "universe/universe.h"
 #include <Windows.h>
 #include <cstdio>
 
@@ -28,11 +29,11 @@ public:
 	{
 		m_current_test = -1;
 		m_is_test_universe_loaded = false;
-		m_universe_context = nullptr;
+		m_universe = nullptr;
 	}
 
 
-	~App() { ASSERT(!m_universe_context); }
+	~App() { ASSERT(!m_universe); }
 
 
 	void universeFileLoaded(Lumix::FS::IFile& file, bool success)
@@ -59,7 +60,7 @@ public:
 			Lumix::g_log_error.log("render_test") << "Universe corrupted";
 			return;
 		}
-		bool deserialize_succeeded = m_engine->deserialize(*m_universe_context, blob);
+		bool deserialize_succeeded = m_engine->deserialize(*m_universe, blob);
 		m_is_test_universe_loaded = true;
 		if (!deserialize_succeeded)
 		{
@@ -135,9 +136,8 @@ public:
 			*renderer, Lumix::Path("pipelines/render_test.lua"), m_engine->getAllocator());
 		m_pipeline->load();
 
-		m_universe_context = &m_engine->createUniverse();
-		m_pipeline->setScene(
-			(Lumix::RenderScene*)m_universe_context->getScene(Lumix::crc32("renderer")));
+		m_universe = &m_engine->createUniverse();
+		m_pipeline->setScene((Lumix::RenderScene*)m_universe->getScene(Lumix::crc32("renderer")));
 		m_pipeline->setViewport(0, 0, 600, 400);
 		renderer->resize(600, 400);
 
@@ -147,12 +147,12 @@ public:
 
 	void shutdown()
 	{
-		m_engine->destroyUniverse(*m_universe_context);
+		m_engine->destroyUniverse(*m_universe);
 		Lumix::Pipeline::destroy(m_pipeline);
 		Lumix::Engine::destroy(m_engine, m_allocator);
 		m_engine = nullptr;
 		m_pipeline = nullptr;
-		m_universe_context = nullptr;
+		m_universe = nullptr;
 	}
 
 
@@ -301,7 +301,7 @@ public:
 		m_finished = false;
 		while (!m_finished)
 		{
-			m_engine->update(*m_universe_context);
+			m_engine->update(*m_universe);
 			m_pipeline->setViewport(0, 0, 600, 400);
 			m_pipeline->render();
 			auto* renderer = m_engine->getPluginManager().getPlugin("renderer");
@@ -342,7 +342,7 @@ private:
 
 	Lumix::DefaultAllocator m_allocator;
 	Lumix::Engine* m_engine;
-	Lumix::UniverseContext* m_universe_context;
+	Lumix::Universe* m_universe;
 	Lumix::Pipeline* m_pipeline;
 	Lumix::Array<Test> m_tests;
 	int m_current_test;

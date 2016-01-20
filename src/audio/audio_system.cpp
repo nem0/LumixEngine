@@ -100,7 +100,7 @@ struct AudioSystemImpl : public AudioSystem
 	const char* getName() const override { return "audio"; }
 
 
-	IScene* createScene(UniverseContext& ctx)
+	IScene* createScene(Universe& ctx)
 	{
 		return AudioScene::createInstance(*this, ctx, m_engine.getAllocator());
 	}

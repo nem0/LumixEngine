@@ -35,7 +35,7 @@ namespace Lumix
 
 
 	void registerEngineLuaAPI(LuaScriptScene& scene, Engine& engine, lua_State* L);
-	void registerUniverse(UniverseContext*, lua_State* L);
+	void registerUniverse(Universe*, lua_State* L);
 
 
 
@@ -49,7 +49,7 @@ namespace Lumix
 		virtual ~LuaScriptSystem();
 
 		IAllocator& getAllocator();
-		IScene* createScene(UniverseContext& universe) override;
+		IScene* createScene(Universe& universe) override;
 		void destroyScene(IScene* scene) override;
 		bool create() override;
 		void destroy() override;
@@ -106,15 +106,15 @@ namespace Lumix
 
 
 	public:
-		LuaScriptSceneImpl(LuaScriptSystem& system, UniverseContext& ctx)
+		LuaScriptSceneImpl(LuaScriptSystem& system, Universe& ctx)
 			: m_system(system)
-			, m_universe_context(ctx)
+			, m_universe(ctx)
 			, m_scripts(system.getAllocator())
 			, m_global_state(nullptr)
 			, m_updates(system.getAllocator())
 			, m_entity_script_map(system.getAllocator())
 		{
-			auto* scene = m_universe_context.getScene(crc32("physics"));
+			auto* scene = m_universe.getScene(crc32("physics"));
 			m_first_free_script = -1;
 			m_function_call.is_in_progress = false;
 		}
@@ -209,15 +209,15 @@ namespace Lumix
 		}
 
 
-		Universe& getUniverse() override { return *m_universe_context.m_universe; }
+		Universe& getUniverse() override { return m_universe; }
 
 
 		void registerAPI(lua_State* L)
 		{
-			registerUniverse(&m_universe_context, L);
+			registerUniverse(&m_universe, L);
 			registerEngineLuaAPI(*this, m_system.m_engine, L);
 			uint32 register_msg = crc32("registerLuaAPI");
-			for (auto* i : m_universe_context.m_scenes)
+			for (auto* i : m_universe.getScenes())
 			{
 				i->sendMessage(register_msg, nullptr);
 			}
@@ -468,7 +468,7 @@ namespace Lumix
 				script.m_entity = entity;
 				script.m_script = nullptr;
 				script.m_state = nullptr;
-				m_universe_context.m_universe->addComponent(entity, type, this, cmp);
+				m_universe.addComponent(entity, type, this, cmp);
 				return m_scripts.size() - 1;
 			}
 			return INVALID_COMPONENT;
@@ -486,7 +486,7 @@ namespace Lumix
 
 				auto* script = m_scripts[component];
 				m_scripts[component] = nullptr;
-				m_universe_context.m_universe->destroyComponent(
+				m_universe.destroyComponent(
 					script->m_entity, type, this, component);
 				LUMIX_DELETE(m_system.getAllocator(), script);
 				if (m_first_free_script >= 0)
@@ -562,7 +562,7 @@ namespace Lumix
 					serializer.readString(tmp, sizeof(tmp));
 					prop.m_value = tmp;
 				}
-				m_universe_context.m_universe->addComponent(
+				m_universe.addComponent(
 					Entity(m_scripts[i]->m_entity), LUA_SCRIPT_HASH, this, i);
 			}
 		}
@@ -655,7 +655,7 @@ namespace Lumix
 		Array<ScriptComponent*> m_scripts;
 		PODHashMap<Entity, ScriptComponent*> m_entity_script_map;
 		lua_State* m_global_state;
-		UniverseContext& m_universe_context;
+		Universe& m_universe;
 		Array<ScriptComponent*> m_updates;
 		int m_first_free_script;
 		FunctionCall m_function_call;
@@ -693,7 +693,7 @@ namespace Lumix
 	}
 
 
-	IScene* LuaScriptSystem::createScene(UniverseContext& ctx)
+	IScene* LuaScriptSystem::createScene(Universe& ctx)
 	{
 		return LUMIX_NEW(m_allocator, LuaScriptSceneImpl)(*this, ctx);
 	}

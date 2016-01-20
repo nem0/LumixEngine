@@ -270,9 +270,9 @@ private:
 };
 
 
-IScene* HierarchyPlugin::createScene(UniverseContext& ctx)
+IScene* HierarchyPlugin::createScene(Universe& ctx)
 {
-	return Hierarchy::create(*this, *ctx.m_universe, m_allocator);
+	return Hierarchy::create(*this, ctx, m_allocator);
 }
 
 

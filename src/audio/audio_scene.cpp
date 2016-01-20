@@ -69,10 +69,9 @@ struct PlayingSound
 
 struct AudioSceneImpl : public AudioScene
 {
-	AudioSceneImpl(AudioSystem& system, UniverseContext& context, IAllocator& allocator)
+	AudioSceneImpl(AudioSystem& system, Universe& context, IAllocator& allocator)
 		: m_allocator(allocator)
-		, m_universe(*context.m_universe)
-		, m_universe_context(context)
+		, m_universe(context)
 		, m_clips(allocator)
 		, m_system(system)
 		, m_device(system.getDevice())
@@ -117,7 +116,7 @@ struct AudioSceneImpl : public AudioScene
 
 	void registerLuaAPI()
 	{
-		auto* scene = m_universe_context.getScene(crc32("lua_script"));
+		auto* scene = m_universe.getScene(crc32("lua_script"));
 		if (!scene) return;
 
 		auto* script_scene = static_cast<LuaScriptScene*>(scene);
@@ -646,7 +645,6 @@ struct AudioSceneImpl : public AudioScene
 	Listener m_listener;
 	IAllocator& m_allocator;
 	Universe& m_universe;
-	UniverseContext& m_universe_context;
 	Array<ClipInfo*> m_clips;
 	AudioSystem& m_system;
 	PlayingSound m_playing_sounds[AudioDevice::MAX_PLAYING_SOUNDS];
@@ -693,10 +691,10 @@ void AudioSceneImpl::destroyComponent(ComponentIndex component, uint32 type)
 
 
 AudioScene* AudioScene::createInstance(AudioSystem& system,
-	UniverseContext& universe_context,
+	Universe& universe,
 	IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, AudioSceneImpl)(system, universe_context, allocator);
+	return LUMIX_NEW(allocator, AudioSceneImpl)(system, universe, allocator);
 }
 
 
