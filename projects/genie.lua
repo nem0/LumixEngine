@@ -6,7 +6,7 @@ newaction {
 	trigger = "install",
 	description = "Install in ../../LumixEngine_data/bin",
 	execute = function()
-		local src_dir = path.join(BINARY_DIR, "RelWithDebInfo/")
+		local src_dir = "tmp/vs2013/bin/RelWithDebInfo/"
 		local dst_dir = "../../LumixEngine_data/bin/"
 		
 		function installDll(filename)
