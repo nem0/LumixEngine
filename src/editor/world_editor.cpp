@@ -1507,7 +1507,6 @@ public:
 	{
 		Gizmo::destroy(*m_gizmo);
 		auto& library_loaded_callback = m_engine->getPluginManager().libraryLoaded();
-		library_loaded_callback.unbind<WorldEditorImpl, &WorldEditorImpl::onPluginLibraryLoaded>(this);
 
 		removePlugin(*m_measure_tool);
 		LUMIX_DELETE(m_allocator, m_measure_tool);
@@ -2463,22 +2462,7 @@ public:
 		m_editor_command_creators.insert(
 			crc32("add_entity"), &WorldEditorImpl::constructEditorCommand<AddEntityCommand>);
 
-		plugin_manager.libraryLoaded().bind<WorldEditorImpl, &WorldEditorImpl::onPluginLibraryLoaded>(this);
-		const auto& libs = plugin_manager.getLibraries();
-		for (auto* lib : libs)
-		{
-			auto* callback = static_cast<void (*)(WorldEditor&)>(getLibrarySymbol(lib, "setWorldEditor"));
-			if (callback) (*callback)(*this);
-		}
-
 		m_gizmo = Gizmo::create(*this);
-	}
-
-
-	void onPluginLibraryLoaded(void* lib)
-	{
-		auto* callback = static_cast<void(*)(WorldEditor&)>(getLibrarySymbol(lib, "setWorldEditor"));
-		if (callback) (*callback)(*this);
 	}
 
 

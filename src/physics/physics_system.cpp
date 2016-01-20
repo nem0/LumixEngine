@@ -495,13 +495,10 @@ extern "C" LUMIX_PHYSICS_API void setStudioApp(StudioApp& app)
 	StudioAppPlugin* plugin =
 		LUMIX_NEW(app.getWorldEditor()->getAllocator(), StudioAppPlugin)(*app.getWorldEditor());
 	app.addPlugin(*plugin);
-}
 
-
-extern "C" LUMIX_PHYSICS_API void setWorldEditor(Lumix::WorldEditor& editor)
-{
-	auto* plugin = LUMIX_NEW(editor.getAllocator(), EditorPlugin)(editor);
-	editor.addPlugin(*plugin);
+	auto& editor = *app.getWorldEditor();
+	auto* editor_plugin = LUMIX_NEW(editor.getAllocator(), EditorPlugin)(editor);
+	editor.addPlugin(*editor_plugin);
 }
 
 
