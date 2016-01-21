@@ -1402,6 +1402,7 @@ Lumix::uint16 TerrainEditor::getHeight(const Lumix::Vec3& world_pos)
 
 bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int)
 {
+	if (!m_is_enabled) return false;
 	if (m_type == NOT_SET || !m_component.isValid()) return false;
 
 	detectModifiers();
@@ -1475,6 +1476,8 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 
 void TerrainEditor::onMouseMove(int x, int y, int, int)
 {
+	if (!m_is_enabled) return;
+
 	detectModifiers();
 
 	Lumix::ComponentUID camera_cmp = m_world_editor.getEditCamera();
