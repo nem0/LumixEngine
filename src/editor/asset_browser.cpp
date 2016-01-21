@@ -62,13 +62,14 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 
 AssetBrowser::~AssetBrowser()
 {
+	unloadResource();
+
 	for (auto* plugin : m_plugins)
 	{
 		LUMIX_DELETE(m_editor.getAllocator(), plugin);
 	}
 	m_plugins.clear();
 
-	unloadResource();
 	FileSystemWatcher::destroy(m_watcher);
 }
 
