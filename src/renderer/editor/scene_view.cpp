@@ -6,16 +6,14 @@
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "editor/imgui/imgui.h"
+#include "editor/platform_interface.h"
 #include "engine/plugin_manager.h"
+#include "editor/settings.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
-#include "editor/imgui/imgui.h"
-#include "editor/settings.h"
-
-
-static const char* WINDOW_NAME = "Scene View";
 
 
 SceneView::SceneView()
@@ -148,11 +146,19 @@ void SceneView::renderGizmos()
 }
 
 
+void SceneView::captureMouse(bool capture)
+{
+	m_is_mouse_captured = capture;
+	PlatformInterface::showCursor(!m_is_mouse_captured);
+	if(!m_is_mouse_captured) PlatformInterface::unclipCursor();
+}
+
+
 void SceneView::onGUI()
 {
 	PROFILE_FUNCTION();
 	m_is_opened = false;
-	if (ImGui::BeginDock(WINDOW_NAME))
+	if (ImGui::BeginDock("Scene View"))
 	{
 		m_is_opened = true;
 		auto size = ImGui::GetContentRegionAvail();
@@ -168,6 +174,8 @@ void SceneView::onGUI()
 			m_screen_y = int(cursor_pos.y);
 			m_width = int(size.x);
 			m_height = int(size.y);
+			auto content_min = ImGui::GetCursorScreenPos();
+			ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
 			ImGui::Image(&m_texture_handle, size);
 			if (ImGui::IsItemHovered())
 			{
@@ -179,10 +187,13 @@ void SceneView::onGUI()
 				{
 					if (ImGui::IsMouseClicked(i))
 					{
+						ImGui::ResetActiveID();
+						captureMouse(true);
 						m_editor->onMouseDown((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
 					}
 					if (ImGui::IsMouseReleased(i))
 					{
+						captureMouse(false);
 						m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
 					}
 
@@ -194,7 +205,11 @@ void SceneView::onGUI()
 					}
 				}
 			}
-
+			if(m_is_mouse_captured)
+			{
+				PlatformInterface::clipCursor(
+					content_min.x, content_min.y, content_max.x, content_max.y);
+			}
 			m_pipeline->render();
 		}
 
