@@ -155,14 +155,17 @@ struct PipelineImpl : public Pipeline
 					FrameBuffer::Declaration decl;
 					if (lua_getfield(L, -1, "name") == LUA_TSTRING)
 					{
-						copyString(decl.m_name,
-								   sizeof(decl.m_name),
-								   lua_tostring(L, -1));
+						copyString(decl.m_name, sizeof(decl.m_name), lua_tostring(L, -1));
 					}
 					lua_pop(L, 1);
 					if (lua_getfield(L, -1, "width") == LUA_TNUMBER)
 					{
 						decl.m_width = (int)lua_tointeger(L, -1);
+					}
+					lua_pop(L, 1);
+					if (lua_getfield(L, -1, "screen_size") == LUA_TBOOLEAN)
+					{
+						decl.m_screen_size = lua_toboolean(L, -1) != 0;
 					}
 					lua_pop(L, 1);
 					if (lua_getfield(L, -1, "height") == LUA_TNUMBER)
@@ -477,8 +480,11 @@ struct PipelineImpl : public Pipeline
 		Vec4 size;
 		size.x = (float)fb->getWidth();
 		size.y = (float)fb->getHeight();
-		bgfx::setUniform(m_texture_size_uniform, &size);
-		bgfx::setTexture(0, m_uniforms[uniform_idx], fb->getRenderbufferHandle(renderbuffer_idx));
+		if (m_bind_framebuffer_texture_idx == 0) bgfx::setUniform(m_texture_size_uniform, &size);
+		bgfx::setTexture(m_bind_framebuffer_texture_idx,
+			m_uniforms[uniform_idx],
+			fb->getRenderbufferHandle(renderbuffer_idx));
+		++m_bind_framebuffer_texture_idx;
 	}
 
 
@@ -653,6 +659,7 @@ struct PipelineImpl : public Pipeline
 
 	void beginNewView(const char* debug_name)
 	{
+		m_bind_framebuffer_texture_idx = 0;
 		m_renderer.viewCounterAdd();
 		m_view_idx = (uint8)m_renderer.getViewCounter();
 		m_view2pass_map[m_view_idx] = m_pass_idx;
@@ -1703,6 +1710,10 @@ struct PipelineImpl : public Pipeline
 		if (m_default_framebuffer)
 		{
 			m_default_framebuffer->resize(w, h);
+			for (auto& i : m_framebuffers)
+			{
+				if (i->hasScreenSize()) i->resize(w, h);
+			}
 		}
 		m_width = w;
 		m_height = h;
@@ -1937,6 +1948,7 @@ struct PipelineImpl : public Pipeline
 	bgfx::UniformHandle m_cam_view_uniform;
 	bgfx::UniformHandle m_cam_inv_proj_uniform;
 	bgfx::UniformHandle m_texture_size_uniform;
+	int m_bind_framebuffer_texture_idx;
 
 	Material* m_debug_line_material;
 	int m_has_shadowmap_define_idx;
