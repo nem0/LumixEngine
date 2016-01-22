@@ -1,5 +1,6 @@
 #include "scene_view.h"
 #include "core/crc32.h"
+#include "core/input_system.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -197,11 +198,11 @@ void SceneView::onGUI()
 						m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
 					}
 
-					auto delta = Lumix::Vec2(rel_mp.x, rel_mp.y) - m_last_mouse_pos;
+					auto& input = m_editor->getEngine().getInputSystem();
+					auto delta = Lumix::Vec2(input.getMouseXMove(), input.getMouseYMove());
 					if(delta.x != 0 || delta.y != 0)
 					{
 						m_editor->onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)delta.x, (int)delta.y);
-						m_last_mouse_pos = {rel_mp.x, rel_mp.y};
 					}
 				}
 			}
