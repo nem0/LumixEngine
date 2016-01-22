@@ -1835,11 +1835,6 @@ public:
 	void mergeTemporaryInfos(Array<RenderableMesh>& all_infos)
 	{
 		PROFILE_FUNCTION();
-		int count = 0;
-		for(auto& i : m_temporary_infos)
-		{
-			count += i.size();
-		}
 
 		for(auto& subinfos : m_temporary_infos)
 		{

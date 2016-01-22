@@ -961,7 +961,7 @@ struct DockContext
             {
                 if (lua_istable(L, -1))
                 {
-                    int idx;
+                    int idx = 0;
                     if (lua_getfield(L, -1, "index") == LUA_TNUMBER)
                         idx = (int)lua_tointeger(L, -1);
                     Dock& dock = *m_docks[idx];

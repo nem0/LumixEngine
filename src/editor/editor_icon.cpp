@@ -187,12 +187,10 @@ struct EditorIconsImpl : public EditorIcons
 		if(camera < 0) return hit;
 		Matrix mtx = universe.getMatrix(m_editor.getEditCamera().entity);
 		Vec3 camera_pos = mtx.getTranslation();
-		float fov = m_editor.getRenderInterface()->getCameraFOV(camera);
 
 		for(auto& icon : m_icons)
 		{
 			Vec3 position = universe.getPosition(icon.entity);
-			float distance = (position - camera_pos).length();
 
 			mtx.setTranslation(position);
 			Matrix tmp = mtx;
