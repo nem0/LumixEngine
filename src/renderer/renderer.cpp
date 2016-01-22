@@ -256,6 +256,19 @@ static void registerProperties(IAllocator& allocator)
 							  ResourceManager::MODEL,
 							  allocator));
 
+	auto renderable_material = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Materials",
+		&RenderScene::getRenderableMaterialsCount,
+		nullptr,
+		nullptr,
+		allocator);
+	renderable_material->addChild(LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",
+		&RenderScene::getRenderableMaterial,
+		&RenderScene::setRenderableMaterial,
+		"Material (*.mat)",
+		ResourceManager::MATERIAL,
+		allocator));
+	PropertyRegister::add("renderable", renderable_material);
+
 	PropertyRegister::add("global_light",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Ambient intensity",
 							  &RenderScene::getLightAmbientIntensity,
@@ -615,10 +628,13 @@ struct RendererImpl : public Renderer
 			.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
 			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
 			.end();
+
+		m_default_shader = static_cast<Shader*>(m_shader_manager.load(Path("shaders/default.shd")));
 	}
 
 	~RendererImpl()
 	{
+		m_shader_manager.unload(*m_default_shader);
 		m_texture_manager.destroy();
 		m_model_manager.destroy();
 		m_material_manager.destroy();
@@ -749,6 +765,12 @@ struct RendererImpl : public Renderer
 	}
 
 
+	Shader* getDefaultShader() override
+	{
+		return m_default_shader;
+	}
+
+
 	typedef char ShaderDefine[32];
 
 
@@ -765,6 +787,7 @@ struct RendererImpl : public Renderer
 	ModelManager m_model_manager;
 	uint32 m_current_pass_hash;
 	int m_view_counter;
+	Shader* m_default_shader;
 	BGFXAllocator m_bgfx_allocator;
 	bgfx::VertexDecl m_basic_vertex_decl;
 	bgfx::VertexDecl m_basic_2d_vertex_decl;

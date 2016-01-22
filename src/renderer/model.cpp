@@ -45,6 +45,20 @@ Mesh::Mesh(const bgfx::VertexDecl& def,
 }
 
 
+void Mesh::set(const bgfx::VertexDecl& def,
+	int attribute_array_offset,
+	int attribute_array_size,
+	int indices_offset,
+	int index_count)
+{
+	m_vertex_def = def;
+	m_attribute_array_offset = attribute_array_offset;
+	m_attribute_array_size = attribute_array_size;
+	m_indices_offset = indices_offset;
+	m_index_count = index_count;
+}
+
+
 Model::Model(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_bounding_radius()

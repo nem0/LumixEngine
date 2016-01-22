@@ -50,6 +50,8 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 	{
 		m_textures[i] = nullptr;
 	}
+
+	setShader(nullptr);
 }
 
 
@@ -397,7 +399,10 @@ void Material::setShader(Shader* shader)
 {
 	bool is_alpha = isAlphaCutout();
 	bool is_receiver = isShadowReceiver();
-	if (m_shader)
+	auto* manager = getResourceManager().get(ResourceManager::MATERIAL);
+	auto* mat_manager = static_cast<MaterialManager*>(manager);
+
+	if (m_shader && m_shader != mat_manager->getRenderer().getDefaultShader())
 	{
 		Shader* shader = m_shader;
 		m_shader = nullptr;
@@ -425,6 +430,11 @@ void Material::setShader(Shader* shader)
 			}
 			m_shader_instance = &m_shader->getInstance(m_shader_mask);
 		}
+	}
+	else
+	{
+		m_shader = mat_manager->getRenderer().getDefaultShader();
+		m_shader_instance = m_shader->getFirstInstance();
 	}
 }
 

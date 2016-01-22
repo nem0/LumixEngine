@@ -41,6 +41,11 @@ public:
 		 int index_count,
 		 const char* name,
 		 IAllocator& allocator);
+	void set(const bgfx::VertexDecl& def,
+		int attribute_array_offset,
+		int attribute_array_size,
+		int indices_offset,
+		int index_count);
 	Material* getMaterial() const { return m_material; }
 	void setMaterial(Material* material) { m_material = material; }
 	int getIndicesOffset() const { return m_indices_offset; }

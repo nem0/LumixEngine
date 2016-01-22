@@ -46,6 +46,12 @@ uint32 Shader::getDefineMask(int define_idx) const
 }
 
 
+ShaderInstance* Shader::getFirstInstance()
+{
+	return m_instances.empty() ? nullptr : m_instances[0];
+}
+
+
 ShaderInstance& Shader::getInstance(uint32 mask)
 {
 	for (int i = 0; i < m_instances.size(); ++i)
