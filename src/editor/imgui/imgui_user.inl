@@ -9,6 +9,12 @@ namespace ImGui
 {
 
 
+void ResetActiveID()
+{
+	SetActiveID(0);
+}
+
+
 int PlotHistogramEx(const char* label,
     float (*values_getter)(void* data, int idx),
     void* data,

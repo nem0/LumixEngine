@@ -9,6 +9,7 @@ struct lua_State;
 namespace ImGui
 {
 
+IMGUI_API void ResetActiveID();
 IMGUI_API int PlotHistogramEx(const char* label,
     float (*values_getter)(void* data, int idx),
     void* data,

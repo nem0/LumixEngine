@@ -32,8 +32,10 @@ class SceneView
 		void renderGizmos();
 		void onUniverseCreated();
 		void onUniverseDestroyed();
+		void captureMouse(bool capture);
 
 	private:
+		bool m_is_mouse_captured;
 		Action* m_toggle_gizmo_step_action;
 		bool m_is_mouse_hovering_window;
 		bool m_is_opened;
