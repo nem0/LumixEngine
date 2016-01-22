@@ -31,17 +31,16 @@ Mesh::Mesh(const bgfx::VertexDecl& def,
 		   int index_count,
 		   const char* name,
 		   IAllocator& allocator)
-	: m_name(allocator)
-	, m_vertex_def(def)
+	: name(allocator)
+	, vertex_def(def)
 {
-	m_material = mat;
-	m_attribute_array_offset = attribute_array_offset;
-	m_attribute_array_size = attribute_array_size;
-	m_indices_offset = indices_offset;
-	m_index_count = index_count;
-	m_name_hash = crc32(name);
-	m_name = name;
-	m_instance_idx = -1;
+	this->material = mat;
+	this->attribute_array_offset = attribute_array_offset;
+	this->attribute_array_size = attribute_array_size;
+	this->indices_offset = indices_offset;
+	this->indices_count = index_count;
+	this->name = name;
+	this->instance_idx = -1;
 }
 
 
@@ -51,11 +50,11 @@ void Mesh::set(const bgfx::VertexDecl& def,
 	int indices_offset,
 	int index_count)
 {
-	m_vertex_def = def;
-	m_attribute_array_offset = attribute_array_offset;
-	m_attribute_array_size = attribute_array_size;
-	m_indices_offset = indices_offset;
-	m_index_count = index_count;
+	this->vertex_def = def;
+	this->attribute_array_offset = attribute_array_offset;
+	this->attribute_array_size = attribute_array_size;
+	this->indices_offset = indices_offset;
+	this->indices_count = index_count;
 }
 
 
@@ -102,9 +101,9 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 	int vertex_offset = 0;
 	for (int mesh_index = 0; mesh_index < m_meshes.size(); ++mesh_index)
 	{
-		int indices_end = m_meshes[mesh_index].getIndicesOffset() +
-						  m_meshes[mesh_index].getIndexCount();
-		for (int i = m_meshes[mesh_index].getIndicesOffset(); i < indices_end;
+		int indices_end = m_meshes[mesh_index].indices_offset +
+						  m_meshes[mesh_index].indices_count;
+		for (int i = m_meshes[mesh_index].indices_offset; i < indices_end;
 			 i += 3)
 		{
 			Vec3 p0 = vertices[vertex_offset + indices[i]];
@@ -152,8 +151,8 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 				hit.m_mesh = &m_meshes[mesh_index];
 			}
 		}
-		vertex_offset += m_meshes[mesh_index].getAttributeArraySize() /
-						 m_meshes[mesh_index].getVertexDefinition().getStride();
+		vertex_offset += m_meshes[mesh_index].attribute_array_size /
+						 m_meshes[mesh_index].vertex_def.getStride();
 	}
 	hit.m_origin = origin;
 	hit.m_dir = dir;
@@ -300,13 +299,12 @@ void Model::computeRuntimeData(const uint8* vertices)
 
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
-		int mesh_vertex_count = m_meshes[i].getAttributeArraySize() /
-								m_meshes[i].getVertexDefinition().getStride();
-		int mesh_attributes_array_offset =
-			m_meshes[i].getAttributeArrayOffset();
-		int mesh_vertex_size = m_meshes[i].getVertexDefinition().getStride();
+		int mesh_vertex_count =
+			m_meshes[i].attribute_array_size / m_meshes[i].vertex_def.getStride();
+		int mesh_attributes_array_offset = m_meshes[i].attribute_array_offset;
+		int mesh_vertex_size = m_meshes[i].vertex_def.getStride();
 		int mesh_position_attribute_offset =
-			m_meshes[i].getVertexDefinition().getOffset(bgfx::Attrib::Position);
+			m_meshes[i].vertex_def.getOffset(bgfx::Attrib::Position);
 		for (int j = 0; j < mesh_vertex_count; ++j)
 		{
 			m_vertices[index] =
@@ -349,7 +347,7 @@ bool Model::parseGeometry(FS::IFile& file)
 	ASSERT(!bgfx::isValid(m_vertices_handle));
 	const bgfx::Memory* vertices_mem = bgfx::alloc(vertices_size);
 	file.read(vertices_mem->data, vertices_size);
-	m_vertices_handle = bgfx::createVertexBuffer(vertices_mem, m_meshes[0].getVertexDefinition());
+	m_vertices_handle = bgfx::createVertexBuffer(vertices_mem, m_meshes[0].vertex_def);
 	m_vertices_size = vertices_size;
 
 	ASSERT(!bgfx::isValid(m_indices_handle));
@@ -360,8 +358,7 @@ bool Model::parseGeometry(FS::IFile& file)
 	int vertex_count = 0;
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
-		vertex_count += m_meshes[i].getAttributeArraySize() /
-						m_meshes[i].getVertexDefinition().getStride();
+		vertex_count += m_meshes[i].attribute_array_size / m_meshes[i].vertex_def.getStride();
 	}
 	m_vertices.resize(vertex_count);
 
@@ -565,8 +562,8 @@ void Model::unload(void)
 	auto* material_manager = m_resource_manager.get(ResourceManager::MATERIAL);
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
-		removeDependency(*m_meshes[i].getMaterial());
-		material_manager->unload(*m_meshes[i].getMaterial());
+		removeDependency(*m_meshes[i].material);
+		material_manager->unload(*m_meshes[i].material);
 	}
 	m_meshes.clear();
 	m_bones.clear();

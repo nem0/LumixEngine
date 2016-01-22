@@ -487,24 +487,24 @@ struct PipelineImpl : public Pipeline
 
 		Mesh& mesh = *data.mesh;
 		const Model& model = *data.model;
-		Material* material = mesh.getMaterial();
-		const uint16 stride = mesh.getVertexDefinition().getStride();
+		Material* material = mesh.material;
+		const uint16 stride = mesh.vertex_def.getStride();
 
 		setMaterial(material);
 		bgfx::setVertexBuffer(model.getVerticesHandle(),
-							  mesh.getAttributeArrayOffset() / stride,
-							  mesh.getAttributeArraySize() / stride);
+							  mesh.attribute_array_offset / stride,
+							  mesh.attribute_array_size / stride);
 		bgfx::setIndexBuffer(model.getIndicesHandle(),
-							 mesh.getIndicesOffset(),
-							 mesh.getIndexCount());
+							 mesh.indices_offset,
+							 mesh.indices_count);
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(data.buffer, data.instance_count);
-		ShaderInstance& shader_instance = mesh.getMaterial()->getShaderInstance();
+		ShaderInstance& shader_instance = mesh.material->getShaderInstance();
 		bgfx::submit(m_view_idx, shader_instance.m_program_handles[m_pass_idx]);
 
 		data.buffer = nullptr;
 		data.instance_count = 0;
-		mesh.setInstanceIdx(-1);
+		mesh.instance_idx = -1;
 	}
 
 
@@ -1344,7 +1344,7 @@ struct PipelineImpl : public Pipeline
 		for (int i = 0; i < model.getMeshCount(); ++i)
 		{
 			auto& mesh = model.getMesh(i);
-			int instance_idx = mesh.getInstanceIdx();
+			int instance_idx = mesh.instance_idx;
 			if (instance_idx == -1)
 			{
 				instance_idx = m_instance_data_idx;
@@ -1353,7 +1353,7 @@ struct PipelineImpl : public Pipeline
 				{
 					finishInstances(instance_idx);
 				}
-				mesh.setInstanceIdx(instance_idx);
+				mesh.instance_idx = instance_idx;
 			}
 			InstanceData& data = m_instances_data[instance_idx];
 			if (!data.buffer)
@@ -1401,19 +1401,19 @@ struct PipelineImpl : public Pipeline
 	void renderSkinnedMesh(const Renderable& renderable, const RenderableMesh& info)
 	{
 		const Mesh& mesh = *info.mesh;
-		Material* material = mesh.getMaterial();
+		Material* material = mesh.material;
 
 		setPoseUniform(info);
 		setMaterial(material);
 		bgfx::setTransform(&renderable.matrix);
 		bgfx::setVertexBuffer(renderable.model->getVerticesHandle(),
-			mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(),
-			mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
+			mesh.attribute_array_offset / mesh.vertex_def.getStride(),
+			mesh.attribute_array_size / mesh.vertex_def.getStride());
 		bgfx::setIndexBuffer(
-			renderable.model->getIndicesHandle(), mesh.getIndicesOffset(), mesh.getIndexCount());
+			renderable.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::submit(m_view_idx,
-			mesh.getMaterial()->getShaderInstance().m_program_handles[m_pass_idx]);
+			mesh.material->getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
 
@@ -1446,7 +1446,7 @@ struct PipelineImpl : public Pipeline
 
 	void renderRigidMesh(const Renderable& renderable, const RenderableMesh& info)
 	{
-		int instance_idx = info.mesh->getInstanceIdx();
+		int instance_idx = info.mesh->instance_idx;
 		if (instance_idx == -1)
 		{
 			instance_idx = m_instance_data_idx;
@@ -1455,7 +1455,7 @@ struct PipelineImpl : public Pipeline
 			{
 				finishInstances(instance_idx);
 			}
-			info.mesh->setInstanceIdx(instance_idx);
+			info.mesh->instance_idx = instance_idx;
 		}
 		InstanceData& data = m_instances_data[instance_idx];
 		if (!data.buffer)
@@ -1598,11 +1598,11 @@ struct PipelineImpl : public Pipeline
 		}
 
 		bgfx::setVertexBuffer(info.m_terrain->getVerticesHandle());
-		int mesh_part_indices_count = mesh.getIndexCount() / 4;
+		int mesh_part_indices_count = mesh.indices_count / 4;
 		bgfx::setIndexBuffer(info.m_terrain->getIndicesHandle(),
 			info.m_index * mesh_part_indices_count,
 			mesh_part_indices_count);
-		bgfx::setState(m_render_state | mesh.getMaterial()->getRenderStates());
+		bgfx::setState(m_render_state | mesh.material->getRenderStates());
 		bgfx::setInstanceDataBuffer(instance_buffer, m_terrain_instances[index].m_count);
 		auto shader_instance = material->getShaderInstance().m_program_handles[m_pass_idx];
 		bgfx::submit(m_view_idx, shader_instance);
@@ -1617,14 +1617,14 @@ struct PipelineImpl : public Pipeline
 			bgfx::allocInstanceDataBuffer(grass.m_matrix_count, sizeof(Matrix));
 		copyMemory(idb->data, &grass.m_matrices[0], grass.m_matrix_count * sizeof(Matrix));
 		const Mesh& mesh = grass.m_model->getMesh(0);
-		Material* material = mesh.getMaterial();
+		Material* material = mesh.material;
 
 		setMaterial(material);
 		bgfx::setVertexBuffer(grass.m_model->getVerticesHandle(),
-			mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(),
-			mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
+			mesh.attribute_array_offset / mesh.vertex_def.getStride(),
+			mesh.attribute_array_size / mesh.vertex_def.getStride());
 		bgfx::setIndexBuffer(
-			grass.m_model->getIndicesHandle(), mesh.getIndicesOffset(), mesh.getIndexCount());
+			grass.m_model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(idb, grass.m_matrix_count);
 		bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);

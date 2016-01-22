@@ -146,7 +146,7 @@ struct TerrainQuad
 		if (squared_dist > r * r && m_lod > 1) return false;
 
 		Vec3 morph_const(r, getRadiusInner(m_size), 0);
-		Shader& shader = *terrain->getMesh()->getMaterial()->getShader();
+		Shader& shader = *terrain->getMesh()->material->getShader();
 		for (int i = 0; i < CHILD_COUNT; ++i)
 		{
 			if (!m_children[i] ||
@@ -557,7 +557,7 @@ void Terrain::setMaterial(Material* material)
 		m_heightmap = nullptr;
 		if (m_mesh && m_material)
 		{
-			m_mesh->setMaterial(m_material);
+			m_mesh->material = m_material;
 			m_material->onLoaded<Terrain, &Terrain::onMaterialLoaded>(this);
 		}
 	}
