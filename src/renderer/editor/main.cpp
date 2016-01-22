@@ -411,14 +411,14 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		for (int i = 0; i < model->getMeshCount(); ++i)
 		{
 			auto& mesh = model->getMesh(i);
-			if (ImGui::TreeNode(&mesh, mesh.getName()[0] != 0 ? mesh.getName() : "N/A"))
+			if (ImGui::TreeNode(&mesh, mesh.name.length() > 0 ? mesh.name.c_str() : "N/A"))
 			{
-				ImGui::LabelText("Triangle count", "%d", mesh.getTriangleCount());
-				ImGui::LabelText("Material", mesh.getMaterial()->getPath().c_str());
+				ImGui::LabelText("Triangle count", "%d", mesh.indices_count / 3);
+				ImGui::LabelText("Material", mesh.material->getPath().c_str());
 				ImGui::SameLine();
 				if (ImGui::Button("->"))
 				{
-					m_app.getAssetBrowser()->selectResource(mesh.getMaterial()->getPath());
+					m_app.getAssetBrowser()->selectResource(mesh.material->getPath());
 				}
 				ImGui::TreePop();
 			}

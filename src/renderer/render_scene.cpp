@@ -495,7 +495,7 @@ public:
 				{
 					for (int i = 0; i < r.mesh_count; ++i)
 					{
-						serializer.writeString(r.meshes[i].getMaterial()->getPath().c_str());
+						serializer.writeString(r.meshes[i].material->getPath().c_str());
 					}
 				}
 			}
@@ -2849,7 +2849,7 @@ public:
 		ASSERT(r.meshes != &r.model->getMesh(0));
 		for (int i = 0; i < r.mesh_count; ++i)
 		{
-			manager->unload(*r.meshes[i].getMaterial());
+			manager->unload(*r.meshes[i].material);
 			r.meshes[i].~Mesh();
 		}
 		m_allocator.deallocate(r.meshes);
@@ -2890,17 +2890,17 @@ public:
 				for (int i = 0; i < r.mesh_count; ++i)
 				{
 					auto& src = model->getMesh(i);
-					if (!r.meshes[i].getMaterial())
+					if (!r.meshes[i].material)
 					{
-						material_manager->load(*src.getMaterial());
-						r.meshes[i].setMaterial(src.getMaterial());
+						material_manager->load(*src.material);
+						r.meshes[i].material = src.material;
 					}
 					r.meshes[i].set(
-						src.getVertexDefinition(),
-						src.getAttributeArrayOffset(),
-						src.getAttributeArraySize(),
-						src.getIndicesOffset(),
-						src.getIndexCount()
+						src.vertex_def,
+						src.attribute_array_offset,
+						src.attribute_array_size,
+						src.indices_offset,
+						src.indices_count
 						);
 				}
 			}
@@ -2998,21 +2998,21 @@ public:
 			{
 				auto& src = r.model->getMesh(i);
 				
-				material_manager->load(*src.getMaterial());
-				new (NewPlaceholder(), r.meshes + i) Mesh(src.getVertexDefinition(),
-					src.getMaterial(),
-					src.getAttributeArrayOffset(),
-					src.getAttributeArraySize(),
-					src.getIndicesOffset(),
-					src.getIndexCount(),
+				material_manager->load(*src.material);
+				new (NewPlaceholder(), r.meshes + i) Mesh(src.vertex_def,
+					src.material,
+					src.attribute_array_offset,
+					src.attribute_array_size,
+					src.indices_offset,
+					src.indices_count,
 					"",
 					m_allocator);
 			}
 		}
 
-		if (r.meshes[index].getMaterial()) material_manager->unload(*r.meshes[index].getMaterial());
+		if (r.meshes[index].material) material_manager->unload(*r.meshes[index].material);
 		auto* new_material = static_cast<Material*>(material_manager->load(path));
-		r.meshes[index].setMaterial(new_material);
+		r.meshes[index].material = new_material;
 	}
 	
 	
@@ -3021,7 +3021,7 @@ public:
 		auto& r = m_renderables[cmp];
 		if (!r.meshes) return Path("");
 
-		return r.meshes[index].getMaterial()->getPath();
+		return r.meshes[index].material->getPath();
 	}
 
 

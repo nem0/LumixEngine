@@ -46,34 +46,15 @@ public:
 		int attribute_array_size,
 		int indices_offset,
 		int index_count);
-	Material* getMaterial() const { return m_material; }
-	void setMaterial(Material* material) { m_material = material; }
-	int getIndicesOffset() const { return m_indices_offset; }
-	int getIndexCount() const { return m_index_count; }
-	int getTriangleCount() const { return m_index_count / 3; }
-	int getAttributeArrayOffset() const { return m_attribute_array_offset; }
-	int getAttributeArraySize() const { return m_attribute_array_size; }
-	uint32 getNameHash() const { return m_name_hash; }
-	const char* getName() const { return m_name.c_str(); }
-	void setVertexDefinition(const bgfx::VertexDecl& def) { m_vertex_def = def; }
-	const bgfx::VertexDecl& getVertexDefinition() const { return m_vertex_def; }
-	int getInstanceIdx() const { return m_instance_idx; }
-	void setInstanceIdx(int value) { m_instance_idx = value; }
 
-private:
-	Mesh(const Mesh&);
-	void operator=(const Mesh&);
-
-private:
-	bgfx::VertexDecl m_vertex_def;
-	int32 m_instance_idx;
-	int32 m_attribute_array_offset;
-	int32 m_attribute_array_size;
-	int32 m_indices_offset;
-	int32 m_index_count;
-	uint32 m_name_hash;
-	Material* m_material;
-	string m_name;
+	bgfx::VertexDecl vertex_def;
+	int32 instance_idx;
+	int32 attribute_array_offset;
+	int32 attribute_array_size;
+	int32 indices_offset;
+	int32 indices_count;
+	Material* material;
+	string name;
 };
 
 
