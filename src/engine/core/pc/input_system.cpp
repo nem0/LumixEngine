@@ -57,6 +57,13 @@ namespace Lumix
 		}
 
 
+		void clear() override
+		{
+			m_mouse_rel_x = 0;
+			m_mouse_rel_y = 0;
+		}
+
+
 		void enable(bool enabled) override
 		{
 			m_is_enabled = enabled;
@@ -66,8 +73,6 @@ namespace Lumix
 		void update(float) override
 		{
 			PROFILE_FUNCTION();
-			m_mouse_rel_x = 0;
-			m_mouse_rel_y = 0;
 
 			if (m_xinput_get_state)
 			{
@@ -110,6 +115,18 @@ namespace Lumix
 		{
 			if (value < dead_zone && value > -dead_zone) return 0;
 			return value;
+		}
+
+
+		float getMouseXMove() const override
+		{
+			return m_mouse_rel_x;
+		}
+
+
+		float getMouseYMove() const override
+		{
+			return m_mouse_rel_y;
 		}
 
 

@@ -112,6 +112,8 @@ public:
 		m_log_ui->update(time_delta);
 
 		onGUI();
+
+		m_engine->getInputSystem().clear();
 	}
 
 

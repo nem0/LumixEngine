@@ -43,7 +43,6 @@ class SceneView
 		int m_screen_y;
 		int m_width;
 		int m_height;
-		Lumix::Vec2 m_last_mouse_pos;
 		float m_camera_speed;
 		Lumix::WorldEditor* m_editor;
 		Lumix::Pipeline* m_pipeline;
