@@ -2890,6 +2890,11 @@ public:
 				for (int i = 0; i < r.mesh_count; ++i)
 				{
 					auto& src = model->getMesh(i);
+					if (!r.meshes[i].getMaterial())
+					{
+						material_manager->load(*src.getMaterial());
+						r.meshes[i].setMaterial(src.getMaterial());
+					}
 					r.meshes[i].set(
 						src.getVertexDefinition(),
 						src.getAttributeArrayOffset(),
@@ -2967,7 +2972,25 @@ public:
 
 		auto& rm = r.model->getResourceManager();
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
-		if (r.meshes == &r.model->getMesh(0))
+		if (index >= r.mesh_count)
+		{
+			if (r.model->isReady()) freeMeshes(r, material_manager);
+			r.mesh_count = index + 1;
+			r.meshes = (Mesh*)m_allocator.allocate(r.mesh_count * sizeof(Mesh));
+			auto* material = static_cast<Material*>(material_manager->load(path));
+			for (int i = 0; i < r.mesh_count; ++i)
+			{
+				new (NewPlaceholder(), r.meshes + i) Mesh(m_renderer.getBasicVertexDecl(),
+					i == index ? material : nullptr,
+					0,
+					0,
+					0,
+					0,
+					"",
+					m_allocator);
+			}
+		}
+		else if (r.meshes == &r.model->getMesh(0))
 		{
 			r.mesh_count = r.model->getMeshCount();
 			r.meshes = (Mesh*)m_allocator.allocate(r.mesh_count * sizeof(Mesh));
@@ -2987,7 +3010,7 @@ public:
 			}
 		}
 
-		material_manager->unload(*r.meshes[index].getMaterial());
+		if (r.meshes[index].getMaterial()) material_manager->unload(*r.meshes[index].getMaterial());
 		auto* new_material = static_cast<Material*>(material_manager->load(path));
 		r.meshes[index].setMaterial(new_material);
 	}

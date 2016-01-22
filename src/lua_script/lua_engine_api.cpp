@@ -291,6 +291,20 @@ static void setEntityLocalRotation(IScene* hierarchy,
 }
 
 
+static ComponentIndex getRenderableComponent(IScene* scene, Entity entity)
+{
+	RenderScene* render_scene = (RenderScene*)scene;
+	return render_scene->getRenderableComponent(entity);
+}
+
+
+static void setRenderableMaterial(IScene* scene, int component, int mesh_idx, const char* path)
+{
+	RenderScene* render_scene = (RenderScene*)scene;
+	render_scene->setRenderableMaterial(component, mesh_idx, Path(path));
+}
+
+
 static void setRenderablePath(IScene* scene, int component, const char* path)
 {
 	RenderScene* render_scene = (RenderScene*)scene;
@@ -349,6 +363,8 @@ void registerEngineLuaAPI(LuaScriptScene& scene, Engine& engine, lua_State* L)
 	REGISTER_FUNCTION(setEntityPosition);
 	REGISTER_FUNCTION(setEntityRotation);
 	REGISTER_FUNCTION(setEntityLocalRotation);
+	REGISTER_FUNCTION(setRenderableMaterial);
+	REGISTER_FUNCTION(getRenderableComponent);
 	REGISTER_FUNCTION(setRenderablePath);
 	REGISTER_FUNCTION(getInputActionValue);
 	REGISTER_FUNCTION(addInputAction);
