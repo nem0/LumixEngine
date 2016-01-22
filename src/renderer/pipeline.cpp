@@ -47,6 +47,15 @@ struct InstanceData
 };
 
 
+struct DirectionalLightUniforms
+{
+	Vec4 diffuse_light_color;
+	Vec4 ambient_light_color;
+	Vec4 light_dir_fov;
+	Vec4 fog_color_density;
+	Vec4 fog_params;
+};
+
 
 struct PipelineImpl : public Pipeline
 {
@@ -1081,27 +1090,11 @@ struct PipelineImpl : public Pipeline
 	{
 		if (light_cmp < 0) return;
 
-		Universe& universe = m_scene->getUniverse();
-		Entity light_entity = m_scene->getGlobalLightEntity(light_cmp);
-		Vec3 light_dir = universe.getRotation(light_entity) * Vec3(0, 0, 1);
-		Vec3 diffuse_color = m_scene->getGlobalLightColor(light_cmp) *
-							 m_scene->getGlobalLightIntensity(light_cmp);
-		Vec3 ambient_color = m_scene->getLightAmbientColor(light_cmp) *
-							 m_scene->getLightAmbientIntensity(light_cmp);
-		Vec4 diffuse_light_color(diffuse_color, 1);
-		Vec3 fog_color = m_scene->getFogColor(light_cmp);
-		float fog_density = m_scene->getFogDensity(light_cmp);
-		Vec4 ambient_light_color(ambient_color, 1);
-		Vec4 light_dir_fov(light_dir, 0);
-		fog_density *= fog_density * fog_density;
-		Vec4 fog_color_density(fog_color, fog_density);
-		Vec4 fog_params(m_scene->getFogBottom(light_cmp), m_scene->getFogHeight(light_cmp), 0, 0);
-
-		bgfx::setUniform(m_light_color_uniform, &diffuse_light_color);
-		bgfx::setUniform(m_ambient_color_uniform, &ambient_light_color);
-		bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
-		bgfx::setUniform(m_fog_color_density_uniform, &fog_color_density);
-		bgfx::setUniform(m_fog_params_uniform, &fog_params);
+		bgfx::setUniform(m_light_color_uniform, &m_directional_light_uniforms.diffuse_light_color);
+		bgfx::setUniform(m_ambient_color_uniform, &m_directional_light_uniforms.ambient_light_color);
+		bgfx::setUniform(m_light_dir_fov_uniform, &m_directional_light_uniforms.light_dir_fov);
+		bgfx::setUniform(m_fog_color_density_uniform, &m_directional_light_uniforms.fog_color_density);
+		bgfx::setUniform(m_fog_params_uniform, &m_directional_light_uniforms.fog_params);
 		bgfx::setUniform(m_shadowmap_matrices_uniform, &m_shadow_viewprojection, 4);
 	}
 
@@ -1312,6 +1305,28 @@ struct PipelineImpl : public Pipeline
 
 		m_is_current_light_global = true;
 		m_current_light = m_scene->getActiveGlobalLight();
+
+		if (m_current_light != INVALID_COMPONENT)
+		{
+			Universe& universe = m_scene->getUniverse();
+			Entity light_entity = m_scene->getGlobalLightEntity(m_current_light);
+			Vec3 light_dir = universe.getRotation(light_entity) * Vec3(0, 0, 1);
+			Vec3 diffuse_color = m_scene->getGlobalLightColor(m_current_light) *
+				m_scene->getGlobalLightIntensity(m_current_light);
+			Vec3 ambient_color = m_scene->getLightAmbientColor(m_current_light) *
+				m_scene->getLightAmbientIntensity(m_current_light);
+			m_directional_light_uniforms.diffuse_light_color.set(diffuse_color, 1);
+			Vec3 fog_color = m_scene->getFogColor(m_current_light);
+			float fog_density = m_scene->getFogDensity(m_current_light);
+			m_directional_light_uniforms.ambient_light_color.set(ambient_color, 1);
+			m_directional_light_uniforms.light_dir_fov.set(light_dir, 0);
+			fog_density *= fog_density * fog_density;
+			m_directional_light_uniforms.fog_color_density.set(fog_color, fog_density);
+			m_directional_light_uniforms.fog_params.set(m_scene->getFogBottom(m_current_light),
+				m_scene->getFogHeight(m_current_light),
+				0,
+				0);
+		}
 
 		renderMeshes(m_tmp_meshes);
 		renderTerrains(m_tmp_terrains);
@@ -1901,6 +1916,7 @@ struct PipelineImpl : public Pipeline
 	Array<RenderableMesh> m_tmp_meshes;
 	Array<const TerrainInfo*> m_tmp_terrains;
 	Array<GrassInfo> m_tmp_grasses;
+	DirectionalLightUniforms m_directional_light_uniforms;
 
 	bgfx::UniformHandle m_specular_shininess_uniform;
 	bgfx::UniformHandle m_bone_matrices_uniform;
