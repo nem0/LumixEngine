@@ -384,7 +384,7 @@ void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescr
 	if (!ImGui::CollapsingHeader(desc_name, nullptr, true, true)) return;
 
 	int count = desc.getCount(cmp);
-	if (ImGui::Button("Add"))
+	if (desc.canAdd() && ImGui::Button("Add"))
 	{
 		m_editor.addArrayPropertyItem(cmp, desc);
 	}
@@ -394,10 +394,10 @@ void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescr
 	{
 		char tmp[10];
 		Lumix::toCString(i, tmp, sizeof(tmp));
-		if (ImGui::TreeNode(tmp))
+		ImGui::PushID(i);
+		if (!desc.canRemove() || ImGui::TreeNode(tmp))
 		{
-			ImGui::SameLine();
-			if (ImGui::Button("Remove"))
+			if (desc.canRemove() && ImGui::Button("Remove"))
 			{
 				m_editor.removeArrayPropertyItem(cmp, i, desc);
 				--i;
@@ -411,8 +411,9 @@ void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescr
 				auto* child = desc.getChildren()[j];
 				showProperty(*child, i, cmp);
 			}
-			ImGui::TreePop();
+			if (desc.canRemove()) ImGui::TreePop();
 		}
+		ImGui::PopID();
 	}
 }
 

@@ -46,6 +46,8 @@ struct Renderable
 	Matrix matrix;
 	Entity entity;
 	int64 layer_mask;
+	Mesh* meshes;
+	int8 mesh_count;
 };
 
 
@@ -235,6 +237,9 @@ public:
 	virtual Renderable* getRenderable(ComponentIndex cmp) = 0;
 	virtual Renderable* getRenderables() = 0;
 	virtual Path getRenderablePath(ComponentIndex cmp) = 0;
+	virtual void setRenderableMaterial(ComponentIndex cmp, int index, const Path& path) = 0;
+	virtual Path getRenderableMaterial(ComponentIndex cmp, int index) = 0;
+	virtual int getRenderableMaterialsCount(ComponentIndex cmp) = 0;
 	virtual void setRenderableLayer(ComponentIndex cmp,
 									const int32& layer) = 0;
 	virtual void setRenderablePath(ComponentIndex cmp, const Path& path) = 0;

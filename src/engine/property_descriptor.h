@@ -197,6 +197,19 @@ public:
 		(static_cast<S*>(cmp.scene)->*m_remover)(cmp.index, index);
 	}
 
+
+	bool canAdd() const override
+	{
+		return m_adder != nullptr;
+	}
+
+
+	bool canRemove() const override
+	{
+		return m_remover != nullptr;
+	}
+
+
 private:
 	IAllocator& m_allocator;
 	Counter m_counter;

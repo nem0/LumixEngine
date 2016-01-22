@@ -23,6 +23,7 @@
 
 #include "renderer/culling_system.h"
 #include "renderer/material.h"
+#include "renderer/material_manager.h"
 #include "renderer/model.h"
 #include "renderer/particle_system.h"
 #include "renderer/pose.h"
@@ -66,6 +67,7 @@ enum class RenderSceneVersion : int32
 	PARTICLE_EMITTERS_SPAWN_COUNT,
 	PARTICLES_FORCE_MODULE,
 	PARTICLES_SAVE_SIZE_ALPHA,
+	RENDERABLE_MATERIALS,
 
 	LATEST,
 	INVALID = -1,
@@ -200,6 +202,9 @@ public:
 
 	~RenderSceneImpl()
 	{
+		auto& rm = m_engine.getResourceManager();
+		auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
+
 		m_universe.entityTransformed()
 			.unbind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 
@@ -223,6 +228,10 @@ public:
 			if (i.entity != INVALID_ENTITY && i.model)
 			{
 				auto& manager = i.model->getResourceManager();
+				if (i.meshes && &i.model->getMesh(0) != i.meshes)
+				{
+					freeMeshes(i, material_manager);
+				}
 				manager.get(ResourceManager::MODEL)->unload(*i.model);
 				LUMIX_DELETE(m_allocator, i.pose);
 			}
@@ -473,14 +482,24 @@ public:
 	void serializeRenderables(OutputBlob& serializer)
 	{
 		serializer.write((int32)m_renderables.size());
-		for (int i = 0; i < m_renderables.size(); ++i)
+		for (auto& r : m_renderables)
 		{
-			serializer.write(m_renderables[i].entity);
-			if(m_renderables[i].entity != INVALID_ENTITY)
+			serializer.write(r.entity);
+			if(r.entity != INVALID_ENTITY)
 			{
-				serializer.write(m_renderables[i].layer_mask);
-				serializer.write(m_renderables[i].model ? m_renderables[i].model->getPath().getHash() : 0);
+				serializer.write(r.layer_mask);
+				serializer.write(r.model ? r.model->getPath().getHash() : 0);
+				bool has_changed_materials = r.model && r.meshes != &r.model->getMesh(0);
+				serializer.write(has_changed_materials ? r.mesh_count : 0);
+				if (has_changed_materials)
+				{
+					for (int i = 0; i < r.mesh_count; ++i)
+					{
+						serializer.writeString(r.meshes[i].getMaterial()->getPath().c_str());
+					}
+				}
 			}
+			
 		}
 	}
 
@@ -620,7 +639,7 @@ public:
 		}
 	}
 
-	void deserializeRenderables(InputBlob& serializer)
+	void deserializeRenderables(InputBlob& serializer, RenderSceneVersion version)
 	{
 		int32 size = 0;
 		serializer.read(size);
@@ -651,14 +670,38 @@ public:
 				uint32 path;
 				serializer.read(path);
 
-				if(r.entity != INVALID_ENTITY)
+				auto* model = static_cast<Model*>(m_engine.getResourceManager()
+														.get(ResourceManager::MODEL)
+														->load(Path(path)));
+				setModel(r.entity, model);
+
+				if (version > RenderSceneVersion::RENDERABLE_MATERIALS)
 				{
-					auto* model = static_cast<Model*>(m_engine.getResourceManager()
-														  .get(ResourceManager::MODEL)
-														  ->load(Path(path)));
-					setModel(r.entity, model);
-					m_universe.addComponent(r.entity, RENDERABLE_HASH, this, r.entity);
+					int material_count;
+					serializer.read(material_count);
+					if (material_count > 0)
+					{
+						r.meshes = (Mesh*)m_allocator.allocate(material_count * sizeof(Mesh));
+						r.mesh_count = material_count;
+						for (int j = 0; j < material_count; ++j)
+						{
+							char path[MAX_PATH_LENGTH];
+							serializer.readString(path, lengthOf(path));
+							Material* material = static_cast<Material*>(
+								m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path)));
+							new (NewPlaceholder(), r.meshes + j) Mesh(m_renderer.getBasicVertexDecl(),
+								material,
+								0,
+								0,
+								0,
+								0,
+								"",
+								m_allocator);
+						}
+					}
 				}
+
+				m_universe.addComponent(r.entity, RENDERABLE_HASH, this, r.entity);
 			}
 		}
 	}
@@ -769,7 +812,7 @@ public:
 	void deserialize(InputBlob& serializer, int version) override
 	{
 		deserializeCameras(serializer);
-		deserializeRenderables(serializer);
+		deserializeRenderables(serializer, (RenderSceneVersion)version);
 		deserializeLights(serializer, (RenderSceneVersion)version);
 		deserializeTerrains(serializer);
 		if (version >= 0) deserializeParticleEmitters(serializer, version);
@@ -1626,6 +1669,12 @@ public:
 	}
 
 
+	int getRenderableMaterialsCount(ComponentIndex cmp) override
+	{
+		return m_renderables[cmp].model ? m_renderables[cmp].mesh_count : 0;
+	}
+
+
 	void setRenderablePath(ComponentIndex cmp, const Path& path) override
 	{
 		Renderable& r = m_renderables[cmp];
@@ -1858,7 +1907,7 @@ public:
 						{
 							auto& info = subinfos.emplace();
 							info.renderable = raw_subresults[i];
-							info.mesh = &model->getMesh(j);
+							info.mesh = &renderable->meshes[j];
 						}
 					}
 				},
@@ -2795,8 +2844,24 @@ public:
 	}
 
 
+	void freeMeshes(Renderable& r, MaterialManager* manager)
+	{
+		ASSERT(r.meshes != &r.model->getMesh(0));
+		for (int i = 0; i < r.mesh_count; ++i)
+		{
+			manager->unload(*r.meshes[i].getMaterial());
+			r.meshes[i].~Mesh();
+		}
+		m_allocator.deallocate(r.meshes);
+		r.meshes = nullptr;
+	}
+
+
 	void modelLoaded(Model* model, ComponentIndex component)
 	{
+		auto& rm = m_engine.getResourceManager();
+		auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
+
 		auto& r = m_renderables[component];
 		float bounding_radius = r.model->getBoundingRadius();
 		float scale = m_universe.getScale(r.entity);
@@ -2814,6 +2879,32 @@ public:
 			r.pose = nullptr;
 		}
 		r.matrix = m_universe.getMatrix(r.entity);
+		if (r.meshes)
+		{
+			if (r.mesh_count != model->getMeshCount())
+			{
+				freeMeshes(r, material_manager);
+			}
+			else
+			{
+				for (int i = 0; i < r.mesh_count; ++i)
+				{
+					auto& src = model->getMesh(i);
+					r.meshes[i].set(
+						src.getVertexDefinition(),
+						src.getAttributeArrayOffset(),
+						src.getAttributeArraySize(),
+						src.getIndicesOffset(),
+						src.getIndexCount()
+						);
+				}
+			}
+		}
+		if(!r.meshes)
+		{
+			r.meshes = &r.model->getMesh(0);
+			r.mesh_count = r.model->getMeshCount();
+		}
 
 		for (int i = 0; i < m_point_lights.size(); ++i)
 		{
@@ -2869,6 +2960,48 @@ public:
 	}
 
 
+	void setRenderableMaterial(ComponentIndex cmp, int index, const Path& path) override
+	{
+		auto& r = m_renderables[cmp];
+		if (!r.model) return;
+
+		auto& rm = r.model->getResourceManager();
+		auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
+		if (r.meshes == &r.model->getMesh(0))
+		{
+			r.mesh_count = r.model->getMeshCount();
+			r.meshes = (Mesh*)m_allocator.allocate(r.mesh_count * sizeof(Mesh));
+			for (int i = 0; i < r.mesh_count; ++i)
+			{
+				auto& src = r.model->getMesh(i);
+				
+				material_manager->load(*src.getMaterial());
+				new (NewPlaceholder(), r.meshes + i) Mesh(src.getVertexDefinition(),
+					src.getMaterial(),
+					src.getAttributeArrayOffset(),
+					src.getAttributeArraySize(),
+					src.getIndicesOffset(),
+					src.getIndexCount(),
+					"",
+					m_allocator);
+			}
+		}
+
+		material_manager->unload(*r.meshes[index].getMaterial());
+		auto* new_material = static_cast<Material*>(material_manager->load(path));
+		r.meshes[index].setMaterial(new_material);
+	}
+	
+	
+	Path getRenderableMaterial(ComponentIndex cmp, int index) override
+	{
+		auto& r = m_renderables[cmp];
+		if (!r.meshes) return Path("");
+
+		return r.meshes[index].getMaterial()->getPath();
+	}
+
+
 	void setModel(ComponentIndex component, Model* model)
 	{
 		ASSERT(m_renderables[component].entity != INVALID_ENTITY);
@@ -2882,6 +3015,12 @@ public:
 		}
 		if (old_model)
 		{
+			auto& rm = old_model->getResourceManager();
+			auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
+			if (m_renderables[component].meshes != &old_model->getMesh(0))
+			{
+				freeMeshes(m_renderables[component], material_manager);
+			}
 			ModelLoadedCallback* callback = getModelLoadedCallback(old_model);
 			--callback->m_ref_count;
 			if (old_model->isReady())
@@ -2891,6 +3030,8 @@ public:
 			old_model->getResourceManager().get(ResourceManager::MODEL)->unload(*old_model);
 		}
 		m_renderables[component].model = model;
+		m_renderables[component].meshes = nullptr;
+		m_renderables[component].mesh_count = 0;
 		if (model)
 		{
 			ModelLoadedCallback* callback = getModelLoadedCallback(model);
@@ -3144,7 +3285,9 @@ public:
 		r.entity = entity;
 		r.model = nullptr;
 		r.layer_mask = 1;
+		r.meshes = nullptr;
 		r.pose = nullptr;
+		r.mesh_count = 0;
 		r.matrix = m_universe.getMatrix(entity);
 		m_universe.addComponent(entity, RENDERABLE_HASH, this, entity);
 		m_renderable_created.invoke(m_renderables.size() - 1);

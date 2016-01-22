@@ -127,6 +127,8 @@ public:
 	virtual void removeArrayItem(ComponentUID cmp, int index) const = 0;
 	virtual void addArrayItem(ComponentUID cmp, int index) const = 0;
 	virtual int getCount(ComponentUID cmp) const = 0;
+	virtual bool canAdd() const = 0;
+	virtual bool canRemove() const = 0;
 };
 
 

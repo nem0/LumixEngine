@@ -499,8 +499,7 @@ struct PipelineImpl : public Pipeline
 							 mesh.getIndexCount());
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(data.buffer, data.instance_count);
-		ShaderInstance& shader_instance =
-			mesh.getMaterial()->getShaderInstance();
+		ShaderInstance& shader_instance = mesh.getMaterial()->getShaderInstance();
 		bgfx::submit(m_view_idx, shader_instance.m_program_handles[m_pass_idx]);
 
 		data.buffer = nullptr;

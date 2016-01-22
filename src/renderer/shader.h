@@ -120,6 +120,7 @@ public:
 
 	uint32 getDefineMask(int define_idx) const;
 	ShaderInstance& getInstance(uint32 mask);
+	ShaderInstance* getFirstInstance();
 	const TextureSlot& getTextureSlot(int index) const
 	{
 		return m_texture_slots[index];
