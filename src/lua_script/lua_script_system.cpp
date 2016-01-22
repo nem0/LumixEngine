@@ -114,7 +114,6 @@ namespace Lumix
 			, m_updates(system.getAllocator())
 			, m_entity_script_map(system.getAllocator())
 		{
-			auto* scene = m_universe.getScene(crc32("physics"));
 			m_first_free_script = -1;
 			m_function_call.is_in_progress = false;
 		}
@@ -850,8 +849,6 @@ namespace Lumix
 
 extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
 {
-	auto& allocator = app.getWorldEditor()->getAllocator();
-	
 	auto* plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), PropertyGridPlugin);
 	app.getPropertyGrid()->addPlugin(*plugin);
 

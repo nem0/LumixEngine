@@ -1500,7 +1500,6 @@ public:
 	~WorldEditorImpl()
 	{
 		Gizmo::destroy(*m_gizmo);
-		auto& library_loaded_callback = m_engine->getPluginManager().libraryLoaded();
 
 		removePlugin(*m_measure_tool);
 		LUMIX_DELETE(m_allocator, m_measure_tool);
@@ -1674,7 +1673,6 @@ public:
 			}
 			break;
 			case MouseMode::NAVIGATE: rotateCamera(relx, rely); break;
-			break;
 		}
 	}
 

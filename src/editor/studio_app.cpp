@@ -656,7 +656,6 @@ public:
 		if (ImGui::BeginDock("Entity List", &m_is_entity_list_opened))
 		{
 			auto* universe = m_editor->getUniverse();
-			int scroll_to = -1;
 
 			auto& groups = m_editor->getEntityGroups();
 			static char group_name[20] = "";
