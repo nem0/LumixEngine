@@ -1071,6 +1071,12 @@ struct ShaderEditorPlugin : public StudioApp::IPlugin
 	}
 
 
+	void update(float) override
+	{
+		m_compiler->update();
+	}
+
+
 	~ShaderEditorPlugin()
 	{
 		LUMIX_DELETE(m_app.getWorldEditor()->getAllocator(), m_compiler);

@@ -67,10 +67,35 @@ Lumix::Renderer& ShaderCompiler::getRenderer()
 }
 
 
+static void getShaderPath(const char* shd_path, char* out, bool vertex)
+{
+	Lumix::PathUtils::FileInfo file_info(shd_path);
+	Lumix::copyString(out, Lumix::MAX_PATH_LENGTH, file_info.m_dir);
+	Lumix::catString(out, Lumix::MAX_PATH_LENGTH, file_info.m_basename);
+	Lumix::catString(out, Lumix::MAX_PATH_LENGTH, vertex ? "_vs.sc" : "_fs.sc");
+}
+
+
 bool ShaderCompiler::isChanged(const Lumix::ShaderCombinations& combinations,
 	const char* bin_base_path,
 	const char* shd_path) const
 {
+	char tmp[Lumix::MAX_PATH_LENGTH];
+	auto shd_last_modified = PlatformInterface::getLastModified(shd_path);
+	getShaderPath(shd_path, tmp, true);
+	if (!PlatformInterface::fileExists(tmp) ||
+		PlatformInterface::getLastModified(tmp) > shd_last_modified)
+	{
+		shd_last_modified = PlatformInterface::getLastModified(tmp);
+	}
+
+	getShaderPath(shd_path, tmp, false);
+	if (!PlatformInterface::fileExists(tmp) ||
+		PlatformInterface::getLastModified(tmp) > shd_last_modified)
+	{
+		shd_last_modified = PlatformInterface::getLastModified(tmp);
+	}
+
 	for (int i = 0; i < combinations.m_pass_count; ++i)
 	{
 		const char* pass_path =
@@ -82,8 +107,7 @@ bool ShaderCompiler::isChanged(const Lumix::ShaderCombinations& combinations,
 				const char* vs_bin_info =
 					StringBuilder<Lumix::MAX_PATH_LENGTH>(pass_path, j, "_vs.shb");
 				if (!PlatformInterface::fileExists(vs_bin_info) ||
-					PlatformInterface::getLastModified(vs_bin_info) <
-						PlatformInterface::getLastModified(shd_path))
+					PlatformInterface::getLastModified(vs_bin_info) < shd_last_modified)
 				{
 					return true;
 				}
@@ -93,8 +117,7 @@ bool ShaderCompiler::isChanged(const Lumix::ShaderCombinations& combinations,
 				const char* fs_bin_info =
 					StringBuilder<Lumix::MAX_PATH_LENGTH>(pass_path, j, "_fs.shb");
 				if (!PlatformInterface::fileExists(fs_bin_info) ||
-					PlatformInterface::getLastModified(fs_bin_info) <
-						PlatformInterface::getLastModified(shd_path))
+					PlatformInterface::getLastModified(fs_bin_info) < shd_last_modified)
 				{
 					return true;
 				}

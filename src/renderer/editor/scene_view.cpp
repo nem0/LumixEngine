@@ -164,11 +164,11 @@ void SceneView::onGUI()
 		m_is_opened = true;
 		auto size = ImGui::GetContentRegionAvail();
 		size.y -= ImGui::GetTextLineHeightWithSpacing();
-		if (size.x > 0 && size.y > 0)
+		auto* fb = m_pipeline->getFramebuffer("default");
+		if (size.x > 0 && size.y > 0 && fb)
 		{
 			auto pos = ImGui::GetWindowPos();
 			m_pipeline->setViewport(0, 0, int(size.x), int(size.y));
-			auto* fb = m_pipeline->getFramebuffer("default");
 			m_texture_handle = fb->getRenderbufferHandle(0);
 			auto cursor_pos = ImGui::GetCursorScreenPos();
 			m_screen_x = int(cursor_pos.x);
