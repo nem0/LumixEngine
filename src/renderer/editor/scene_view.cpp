@@ -19,7 +19,9 @@
 
 SceneView::SceneView()
 {
-	m_pipeline = nullptr;
+	m_current_pipeline = nullptr;
+	m_deferred_pipeline = nullptr;
+	m_forward_pipeline = nullptr;
 	m_editor = nullptr;
 	m_camera_speed = 0.1f;
 }
@@ -32,13 +34,15 @@ SceneView::~SceneView()
 
 void SceneView::setWireframe(bool wireframe)
 {
-	m_pipeline->setWireframe(wireframe);
+	m_forward_pipeline->setWireframe(wireframe);
+	m_deferred_pipeline->setWireframe(wireframe);
 }
 
 
 void SceneView::setScene(Lumix::RenderScene* scene)
 {
-	m_pipeline->setScene(scene);
+	m_deferred_pipeline->setScene(scene);
+	m_forward_pipeline->setScene(scene);
 }
 
 
@@ -46,30 +50,42 @@ void SceneView::shutdown()
 {
 	m_editor->universeCreated().unbind<SceneView, &SceneView::onUniverseCreated>(this);
 	m_editor->universeDestroyed().unbind<SceneView, &SceneView::onUniverseDestroyed>(this);
-	Lumix::Pipeline::destroy(m_pipeline);
-	m_pipeline = nullptr;
+	Lumix::Pipeline::destroy(m_forward_pipeline);
+	Lumix::Pipeline::destroy(m_deferred_pipeline);
+	m_current_pipeline = nullptr;
+	m_deferred_pipeline = nullptr;
+	m_forward_pipeline = nullptr;
 }
 
 
 void SceneView::onUniverseCreated()
 {
 	auto* scene = m_editor->getScene(Lumix::crc32("renderer"));
-	m_pipeline->setScene(static_cast<Lumix::RenderScene*>(scene));
+	m_forward_pipeline->setScene(static_cast<Lumix::RenderScene*>(scene));
+	m_deferred_pipeline->setScene(static_cast<Lumix::RenderScene*>(scene));
 	auto* settings = Settings::getInstance();
 	if (!settings) return;
 
-	int count = m_pipeline->getParameterCount();
+	int count = m_forward_pipeline->getParameterCount();
 	for (int i = 0; i < count; ++i)
 	{
-		bool b = settings->getValue(m_pipeline->getParameterName(i), m_pipeline->getParameter(i));
-		m_pipeline->setParameter(i, b);
+		bool b = settings->getValue(m_forward_pipeline->getParameterName(i), m_forward_pipeline->getParameter(i));
+		m_forward_pipeline->setParameter(i, b);
+	}
+	
+	count = m_deferred_pipeline->getParameterCount();
+	for (int i = 0; i < count; ++i)
+	{
+		bool b = settings->getValue(m_deferred_pipeline->getParameterName(i), m_deferred_pipeline->getParameter(i));
+		m_deferred_pipeline->setParameter(i, b);
 	}
 }
 
 
 void SceneView::onUniverseDestroyed()
 {
-	m_pipeline->setScene(nullptr);
+	m_forward_pipeline->setScene(nullptr);
+	m_deferred_pipeline->setScene(nullptr);
 }
 
 
@@ -81,10 +97,18 @@ bool SceneView::init(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
 	auto* renderer = static_cast<Lumix::Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 
 	Lumix::Path path("pipelines/main.lua");
-	m_pipeline = Lumix::Pipeline::create(*renderer, path, engine.getAllocator());
-	m_pipeline->load();
-	m_pipeline->addCustomCommandHandler("renderGizmos")
+	m_forward_pipeline = Lumix::Pipeline::create(*renderer, path, engine.getAllocator());
+	m_forward_pipeline->load();
+	m_forward_pipeline->addCustomCommandHandler("renderGizmos")
 		.callback.bind<SceneView, &SceneView::renderGizmos>(this);
+
+	path = "pipelines/deferred_main.lua";
+	m_deferred_pipeline = Lumix::Pipeline::create(*renderer, path, engine.getAllocator());
+	m_deferred_pipeline->load();
+	m_deferred_pipeline->addCustomCommandHandler("renderGizmos")
+		.callback.bind<SceneView, &SceneView::renderGizmos>(this);
+
+	m_current_pipeline = m_forward_pipeline;
 
 	editor.universeCreated().bind<SceneView, &SceneView::onUniverseCreated>(this);
 	editor.universeDestroyed().bind<SceneView, &SceneView::onUniverseDestroyed>(this);
@@ -103,6 +127,12 @@ bool SceneView::init(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
 void SceneView::update()
 {
 	PROFILE_FUNCTION();
+	if (m_is_pipeline_switch)
+	{
+		bool is_deferred = m_current_pipeline == m_deferred_pipeline;
+		m_current_pipeline = is_deferred ? m_forward_pipeline : m_deferred_pipeline;
+	}
+
 	if (ImGui::IsAnyItemActive()) return;
 	if (!m_is_opened) return;
 	if (ImGui::GetIO().KeyCtrl) return;
@@ -164,11 +194,11 @@ void SceneView::onGUI()
 		m_is_opened = true;
 		auto size = ImGui::GetContentRegionAvail();
 		size.y -= ImGui::GetTextLineHeightWithSpacing();
-		auto* fb = m_pipeline->getFramebuffer("default");
+		auto* fb = m_current_pipeline->getFramebuffer("default");
 		if (size.x > 0 && size.y > 0 && fb)
 		{
 			auto pos = ImGui::GetWindowPos();
-			m_pipeline->setViewport(0, 0, int(size.x), int(size.y));
+			m_current_pipeline->setViewport(0, 0, int(size.x), int(size.y));
 			m_texture_handle = fb->getRenderbufferHandle(0);
 			auto cursor_pos = ImGui::GetCursorScreenPos();
 			m_screen_x = int(cursor_pos.x);
@@ -211,7 +241,7 @@ void SceneView::onGUI()
 				PlatformInterface::clipCursor(
 					content_min.x, content_min.y, content_max.x, content_max.y);
 			}
-			m_pipeline->render();
+			m_current_pipeline->render();
 		}
 
 		ImGui::PushItemWidth(60);
@@ -230,7 +260,7 @@ void SceneView::onGUI()
 		}
 
 		ImGui::SameLine();
-		int count = m_pipeline->getParameterCount();
+		int count = m_current_pipeline->getParameterCount();
 		if (count)
 		{
 			if (ImGui::Button("Pipeline"))
@@ -243,21 +273,24 @@ void SceneView::onGUI()
 			{
 				for (int i = 0; i < count; ++i)
 				{
-					bool b = m_pipeline->getParameter(i);
-					if (ImGui::Checkbox(m_pipeline->getParameterName(i), &b))
+					bool b = m_current_pipeline->getParameter(i);
+					if (ImGui::Checkbox(m_current_pipeline->getParameterName(i), &b))
 					{
 						auto* settings = Settings::getInstance();
 						if (settings)
 						{
-							settings->setValue(m_pipeline->getParameterName(i), b);
+							settings->setValue(m_current_pipeline->getParameterName(i), b);
 						}
-						m_pipeline->setParameter(i, b);
+						m_current_pipeline->setParameter(i, b);
 					}
 				}
 
 				ImGui::EndPopup();
 			}
 		}
+
+		bool is_deferred = m_current_pipeline == m_deferred_pipeline;
+		m_is_pipeline_switch = ImGui::Checkbox("Deferred", &is_deferred);
 	}
 
 	ImGui::EndDock();

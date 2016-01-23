@@ -818,7 +818,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		m_action = LUMIX_NEW(allocator, Action)("Scene View", "scene_view");
 		m_action->func.bind<SceneViewPlugin, &SceneViewPlugin::onAction>(this);
 		m_scene_view.init(editor, app.getActions());
-		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getPipeline());
+		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getCurrentPipeline());
 		editor.setRenderInterface(m_render_interface);
 	}
 
@@ -829,7 +829,17 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 	}
 
 
-	void update(float) override { m_scene_view.update(); }
+	void update(float) override 
+	{ 
+		m_scene_view.update(); 
+		if (&m_render_interface->m_pipeline == m_scene_view.getCurrentPipeline()) return;
+
+		auto& editor = *m_app.getWorldEditor();
+		auto& allocator = editor.getAllocator();
+		LUMIX_DELETE(allocator, m_render_interface);
+		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getCurrentPipeline());
+		editor.setRenderInterface(m_render_interface);
+	}
 	void onAction() {}
 	void onWindowGUI() override { m_scene_view.onGUI(); }
 
