@@ -753,8 +753,8 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 			auto& rm = m_editor.getEngine().getResourceManager();
 			rm.get(ResourceManager::SHADER)->unload(*m_shader);
 
-			m_editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
-			m_editor.universeDestroyed().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
+			m_editor.universeCreated().unbind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
+			m_editor.universeDestroyed().unbind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
 		}
 
 
