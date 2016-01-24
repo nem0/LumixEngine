@@ -26,7 +26,7 @@ Features:
 * [Mindmap](https://raw.githubusercontent.com/nem0/LumixEngine/gh-pages/images/lumix_mindmap.png)
 * [Wiki](https://github.com/nem0/LumixEngine/wiki)
 
-Videos
+[Videos](https://www.youtube.com/channel/UCtjtIy0ldsq-9siM1Gm_rXg)
 
 * [Terrain](https://www.youtube.com/watch?v=DirHQUGFoOg)
 * [Terrain editor](https://www.youtube.com/watch?v=eyqk61Yw52E)
