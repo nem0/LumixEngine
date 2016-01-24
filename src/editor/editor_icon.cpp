@@ -45,11 +45,8 @@ struct EditorIconsImpl : public EditorIcons
 		: m_editor(editor)
 		, m_icons(editor.getAllocator())
 	{
+		m_render_interface = nullptr;
 		m_icons.reserve(200);
-		for(int i = 0; i < lengthOf(ICONS); ++i)
-		{
-			m_models[i] = editor.getRenderInterface()->loadModel(Path(ICONS[i]));
-		}
 		editor.universeDestroyed().bind<EditorIconsImpl, &EditorIconsImpl::clear>(this);
 		editor.universeCreated().bind<EditorIconsImpl, &EditorIconsImpl::onUniverseCreated>(this);
 		if (m_editor.getUniverse()) onUniverseCreated();
@@ -60,10 +57,7 @@ struct EditorIconsImpl : public EditorIcons
 	{
 		m_editor.universeDestroyed().unbind<EditorIconsImpl, &EditorIconsImpl::clear>(this);
 		m_editor.universeCreated().unbind<EditorIconsImpl, &EditorIconsImpl::onUniverseCreated>(this);
-		for(auto& model : m_models)
-		{
-			m_editor.getRenderInterface()->unloadModel(model);
-		}
+		setRenderInterface(nullptr);
 
 		if(m_editor.getUniverse())
 		{
@@ -208,6 +202,26 @@ struct EditorIconsImpl : public EditorIcons
 	}
 
 
+	void setRenderInterface(RenderInterface* render_interface) override
+	{
+		if (m_render_interface)
+		{
+			for (auto& model : m_models)
+			{
+				m_render_interface->unloadModel(model);
+			}
+		}
+		m_render_interface = render_interface;
+		if (m_render_interface)
+		{
+			for (int i = 0; i < lengthOf(ICONS); ++i)
+			{
+				m_models[i] = m_render_interface->loadModel(Path(ICONS[i]));
+			}
+		}
+	}
+
+
 	void render() override
 	{
 		static const float MIN_SCALE_FACTOR = 10;
@@ -249,6 +263,7 @@ struct EditorIconsImpl : public EditorIcons
 	Array<Icon> m_icons;
 	RenderInterface::ModelHandle m_models[(int)IconType::COUNT];
 	WorldEditor& m_editor;
+	RenderInterface* m_render_interface;
 };
 
 

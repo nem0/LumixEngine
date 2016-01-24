@@ -1742,8 +1742,7 @@ public:
 	void setRenderInterface(class RenderInterface* interface) override
 	{
 		m_render_interface = interface;
-		m_editor_icons = EditorIcons::create(*this);
-		TODO("icons are recreated when pipeline is changed");
+		m_editor_icons->setRenderInterface(m_render_interface);
 	}
 
 
@@ -2454,6 +2453,7 @@ public:
 			crc32("add_entity"), &WorldEditorImpl::constructEditorCommand<AddEntityCommand>);
 
 		m_gizmo = Gizmo::create(*this);
+		m_editor_icons = EditorIcons::create(*this);
 	}
 
 
