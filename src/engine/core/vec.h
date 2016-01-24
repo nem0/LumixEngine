@@ -210,6 +210,7 @@ struct LUMIX_ENGINE_API Vec4
 		x *= rhs;
 		y *= rhs;
 		z *= rhs;
+		w *= rhs;
 		this->x = x;
 		this->y = y;
 		this->z = z;

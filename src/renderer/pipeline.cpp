@@ -47,6 +47,13 @@ struct InstanceData
 };
 
 
+struct TextureBindData
+{
+	bgfx::TextureHandle texture;
+	bgfx::UniformHandle uniform;
+};
+
+
 struct DirectionalLightUniforms
 {
 	Vec4 diffuse_light_color;
@@ -69,6 +76,7 @@ struct PipelineImpl : public Pipeline
 		, m_tmp_terrains(allocator)
 		, m_tmp_grasses(allocator)
 		, m_tmp_meshes(allocator)
+		, m_tmp_local_lights(allocator)
 		, m_uniforms(allocator)
 		, m_renderer(renderer)
 		, m_default_framebuffer(nullptr)
@@ -79,6 +87,10 @@ struct PipelineImpl : public Pipeline
 		, m_is_rendering_in_shadowmap(false)
 		, m_is_ready(false)
 	{
+		m_deferred_point_light_vertex_decl.begin()
+			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
+			.end();
+
 		m_base_vertex_decl.begin()
 			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
 			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
@@ -92,7 +104,7 @@ struct PipelineImpl : public Pipeline
 		createUniforms();
 
 		m_debug_line_material = static_cast<Material*>(
-			renderer.getMaterialManager().load(Lumix::Path("models/editor/debug_line.mat")));
+			renderer.getMaterialManager().load(Lumix::Path("shaders/debug_line.mat")));
 
 		m_scene = nullptr;
 		m_width = m_height = -1;
@@ -324,6 +336,7 @@ struct PipelineImpl : public Pipeline
 	{
 		m_texture_size_uniform = bgfx::createUniform("u_textureSize", bgfx::UniformType::Vec4);
 		m_cam_view_uniform = bgfx::createUniform("u_camView", bgfx::UniformType::Mat4);
+		m_cam_inv_viewproj_uniform = bgfx::createUniform("u_camInvViewProj", bgfx::UniformType::Mat4);
 		m_cam_inv_proj_uniform = bgfx::createUniform("u_camInvProj", bgfx::UniformType::Mat4);
 		m_tex_shadowmap_uniform = bgfx::createUniform("u_texShadowmap", bgfx::UniformType::Int1);
 		m_attenuation_params_uniform =
@@ -370,6 +383,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::destroyUniform(m_shadowmap_matrices_uniform);
 		bgfx::destroyUniform(m_light_specular_uniform);
 		bgfx::destroyUniform(m_cam_inv_proj_uniform);
+		bgfx::destroyUniform(m_cam_inv_viewproj_uniform);
 		bgfx::destroyUniform(m_cam_view_uniform);
 		bgfx::destroyUniform(m_texture_size_uniform);
 	}
@@ -676,6 +690,116 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	void copyRenderbuffer(const char* src_fb_name, int src_rb_idx, const char* dest_fb_name, int dest_rb_idx)
+	{
+		auto* src_fb = getFramebuffer(src_fb_name);
+		auto* dest_fb = getFramebuffer(dest_fb_name);
+		if (!src_fb || !dest_fb) return;
+
+		auto src_rb = src_fb->getRenderbufferHandle(src_rb_idx);
+		auto dest_rb = dest_fb->getRenderbufferHandle(dest_rb_idx);
+
+		bgfx::blit(m_view_idx, dest_rb, 0, 0, src_rb);
+	}
+
+
+	void deferredLocalLightLoop(int material_index, TextureBindData* textures, int textures_count)
+	{
+		if (m_applied_camera == INVALID_COMPONENT) return;
+
+		Universe& universe = m_scene->getUniverse();
+		Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
+		Vec3 camera_pos = universe.getPosition(camera_entity);
+
+		float camera_fov = Math::degreesToRadians(m_scene->getCameraFOV(m_applied_camera));
+		float camera_ratio =
+			m_scene->getCameraWidth(m_applied_camera) / m_scene->getCameraHeight(m_applied_camera);
+		Frustum frustum;
+		Matrix camera_matrix = universe.getMatrix(camera_entity);
+		float near_plane = m_scene->getCameraNearPlane(m_applied_camera);
+		float far_plane = m_scene->getCameraFarPlane(m_applied_camera);
+		frustum.computePerspective(camera_matrix.getTranslation(),
+			camera_matrix.getZVector(),
+			camera_matrix.getYVector(),
+			camera_fov,
+			camera_ratio,
+			near_plane,
+			far_plane);
+
+		m_tmp_local_lights.clear();
+		m_scene->getPointLights(frustum, m_tmp_local_lights);
+		if (m_tmp_local_lights.empty()) return;
+
+		Matrix view_matrix = camera_matrix;
+		view_matrix.fastInverse();
+		Matrix projection_matrix;
+		projection_matrix.setPerspective(camera_fov, camera_ratio, near_plane, far_plane);
+
+		bgfx::setTransform(&Matrix::IDENTITY);
+		bgfx::setViewTransform(m_view_idx, &view_matrix.m11, &projection_matrix.m11);
+		Matrix view_proj = view_matrix * projection_matrix;
+		auto* material = m_materials[material_index];
+		if (!material->isReady()) return;;
+
+		for (auto light_cmp : m_tmp_local_lights)
+		{
+			bgfx::TransientVertexBuffer tvb;
+			bgfx::TransientIndexBuffer tib;
+			if (bgfx::allocTransientBuffers(&tvb, m_deferred_point_light_vertex_decl, 24, &tib, 36))
+			{
+				Vec3* vertices = (Vec3*)tvb.data;
+				uint16* indices = (uint16*)tib.data;
+
+				auto entity = m_scene->getPointLightEntity(light_cmp);
+				auto pos = universe.getPosition(entity);
+				float r = m_scene->getPointLightRange(light_cmp);
+				const Vec3 rel_pos[] = {
+					{ -r, -r, -r }, {  r, -r, -r }, {  r,  r, -r }, { -r,  r, -r },
+					{ -r, -r,  r }, {  r, -r,  r }, {  r,  r,  r }, { -r,  r,  r },
+					{  r, -r, -r }, {  r, -r,  r }, {  r,  r,  r }, {  r,  r, -r },
+					{ -r, -r, -r }, { -r, -r,  r }, { -r,  r,  r }, { -r,  r, -r },
+					{ -r,  r, -r }, {  r,  r, -r }, {  r,  r,  r }, { -r,  r,  r },
+					{ -r, -r, -r }, {  r, -r, -r }, {  r, -r,  r }, { -r, -r,  r }
+				};
+				for (int i = 0; i < lengthOf(rel_pos); ++i)
+				{
+					vertices[i] = pos + rel_pos[i];
+				}
+				int offset = vertices - (Vec3*)tvb.data;
+				vertices += lengthOf(rel_pos);
+
+				static const uint16 tmp_indices[] = {
+					0, 2, 1, 2, 0, 3,
+					4, 5, 6, 6, 7, 4,
+					8, 10, 9, 10, 8, 11,
+					12, 13, 14, 14, 15, 12,
+					16, 18, 17, 18, 16, 19,
+					20, 21, 22, 22, 23, 20
+				};
+				for (int i = 0; i < lengthOf(tmp_indices); ++i)
+				{
+					indices[i] = offset + tmp_indices[i];
+				}
+				indices += lengthOf(tmp_indices);
+				bgfx::setVertexBuffer(&tvb);
+				bgfx::setIndexBuffer(&tib);
+				bgfx::setState(m_render_state | material->getRenderStates());
+
+				for (int i = 0; i < textures_count; ++i)
+				{
+					bgfx::setTexture(m_bind_framebuffer_texture_idx + i,
+						textures[i].uniform,
+						textures[i].texture);
+				}
+
+				setPointLightUniforms(material, light_cmp);
+				bgfx::submit(
+					m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
+			}
+		}
+	}
+
+
 	void renderSpotLightShadowmap(ComponentIndex light, int64 layer_mask)
 	{
 		beginNewView("point_light");
@@ -964,11 +1088,11 @@ struct PipelineImpl : public Pipeline
 			for (int i = 0; i < points.size(); ++i)
 			{
 				const DebugPoint& point = points[i];
-				vertex[0].m_rgba = point.m_color;
-				vertex[0].m_x = point.m_pos.x;
-				vertex[0].m_y = point.m_pos.y;
-				vertex[0].m_z = point.m_pos.z;
-				vertex[0].m_u = vertex[0].m_v = 0;
+				vertex[0].rgba = point.m_color;
+				vertex[0].x = point.m_pos.x;
+				vertex[0].y = point.m_pos.y;
+				vertex[0].z = point.m_pos.z;
+				vertex[0].u = vertex[0].v = 0;
 
 				indices[0] = i;
 				++vertex;
@@ -1000,17 +1124,17 @@ struct PipelineImpl : public Pipeline
 			for (int i = 0; i < lines.size(); ++i)
 			{
 				const DebugLine& line = lines[i];
-				vertex[0].m_rgba = line.m_color;
-				vertex[0].m_x = line.m_from.x;
-				vertex[0].m_y = line.m_from.y;
-				vertex[0].m_z = line.m_from.z;
-				vertex[0].m_u = vertex[0].m_v = 0;
+				vertex[0].rgba = line.m_color;
+				vertex[0].x = line.m_from.x;
+				vertex[0].y = line.m_from.y;
+				vertex[0].z = line.m_from.z;
+				vertex[0].u = vertex[0].v = 0;
 
-				vertex[1].m_rgba = line.m_color;
-				vertex[1].m_x = line.m_to.x;
-				vertex[1].m_y = line.m_to.y;
-				vertex[1].m_z = line.m_to.z;
-				vertex[1].m_u = vertex[0].m_v = 0;
+				vertex[1].rgba = line.m_color;
+				vertex[1].x = line.m_to.x;
+				vertex[1].y = line.m_to.y;
+				vertex[1].z = line.m_to.z;
+				vertex[1].u = vertex[0].v = 0;
 
 				indices[0] = i * 2;
 				indices[1] = i * 2 + 1;
@@ -1194,47 +1318,47 @@ struct PipelineImpl : public Pipeline
 		float x2 = x + w;
 		float y2 = y + h;
 
-		vertex[0].m_x = x;
-		vertex[0].m_y = y;
-		vertex[0].m_z = 0;
-		vertex[0].m_rgba = 0xffffffff;
-		vertex[0].m_u = 0;
-		vertex[0].m_v = 0;
+		vertex[0].x = x;
+		vertex[0].y = y;
+		vertex[0].z = 0;
+		vertex[0].rgba = 0xffffffff;
+		vertex[0].u = 0;
+		vertex[0].v = 0;
 
-		vertex[1].m_x = x2;
-		vertex[1].m_y = y;
-		vertex[1].m_z = 0;
-		vertex[1].m_rgba = 0xffffffff;
-		vertex[1].m_u = 1;
-		vertex[1].m_v = 0;
+		vertex[1].x = x2;
+		vertex[1].y = y;
+		vertex[1].z = 0;
+		vertex[1].rgba = 0xffffffff;
+		vertex[1].u = 1;
+		vertex[1].v = 0;
 
-		vertex[2].m_x = x2;
-		vertex[2].m_y = y2;
-		vertex[2].m_z = 0;
-		vertex[2].m_rgba = 0xffffffff;
-		vertex[2].m_u = 1;
-		vertex[2].m_v = 1;
+		vertex[2].x = x2;
+		vertex[2].y = y2;
+		vertex[2].z = 0;
+		vertex[2].rgba = 0xffffffff;
+		vertex[2].u = 1;
+		vertex[2].v = 1;
 
-		vertex[3].m_x = x;
-		vertex[3].m_y = y;
-		vertex[3].m_z = 0;
-		vertex[3].m_rgba = 0xffffffff;
-		vertex[3].m_u = 0;
-		vertex[3].m_v = 0;
+		vertex[3].x = x;
+		vertex[3].y = y;
+		vertex[3].z = 0;
+		vertex[3].rgba = 0xffffffff;
+		vertex[3].u = 0;
+		vertex[3].v = 0;
 
-		vertex[4].m_x = x2;
-		vertex[4].m_y = y2;
-		vertex[4].m_z = 0;
-		vertex[4].m_rgba = 0xffffffff;
-		vertex[4].m_u = 1;
-		vertex[4].m_v = 1;
+		vertex[4].x = x2;
+		vertex[4].y = y2;
+		vertex[4].z = 0;
+		vertex[4].rgba = 0xffffffff;
+		vertex[4].u = 1;
+		vertex[4].v = 1;
 
-		vertex[5].m_x = x;
-		vertex[5].m_y = y2;
-		vertex[5].m_z = 0;
-		vertex[5].m_rgba = 0xffffffff;
-		vertex[5].m_u = 0;
-		vertex[5].m_v = 1;
+		vertex[5].x = x;
+		vertex[5].y = y2;
+		vertex[5].z = 0;
+		vertex[5].rgba = 0xffffffff;
+		vertex[5].u = 0;
+		vertex[5].v = 1;
 
 		for (int i = 0; i < material->getUniformCount(); ++i)
 		{
@@ -1272,20 +1396,29 @@ struct PipelineImpl : public Pipeline
 		if (m_applied_camera >= 0)
 		{
 			Matrix projection_matrix;
+			Universe& universe = m_scene->getUniverse();
 			float fov = m_scene->getCameraFOV(m_applied_camera);
 			float near_plane = m_scene->getCameraNearPlane(m_applied_camera);
 			float far_plane = m_scene->getCameraFarPlane(m_applied_camera);
 			float ratio = float(m_width) / m_height;
+			Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
+			Matrix camera_matrix = universe.getMatrix(camera_entity);
+			Matrix view_matrix = camera_matrix; 
+			view_matrix.fastInverse();
 			projection_matrix.setPerspective(
 				Math::degreesToRadians(fov), ratio, near_plane, far_plane);
-			projection_matrix.inverse();
+			Matrix inv_projection = projection_matrix;
+			inv_projection.inverse();
+			Matrix inv_view_proj = projection_matrix * view_matrix;
+			inv_view_proj.inverse();
 
-			bgfx::setUniform(m_cam_inv_proj_uniform, &projection_matrix.m11);
-
-			Universe& universe = m_scene->getUniverse();
-			Matrix mtx = universe.getMatrix(m_scene->getCameraEntity(m_applied_camera));
-
-			bgfx::setUniform(m_cam_view_uniform, &mtx.m11);
+			bgfx::setUniform(m_cam_inv_proj_uniform, &inv_projection.m11);
+			bgfx::setUniform(m_cam_inv_viewproj_uniform, &inv_view_proj.m11);
+			auto x = inv_view_proj * Vec4(0, 0, 0, 1);
+			x *= 1/x.w;
+			auto y = inv_view_proj * Vec4(1, 0, 0, 1);
+			y *= 1 / y.w;
+			bgfx::setUniform(m_cam_view_uniform, &camera_matrix.m11);
 		}
 
 		bgfx::setState(m_render_state | material->getRenderStates());
@@ -1710,10 +1843,10 @@ struct PipelineImpl : public Pipeline
 		if (m_default_framebuffer)
 		{
 			m_default_framebuffer->resize(w, h);
-			for (auto& i : m_framebuffers)
-			{
-				if (i->hasScreenSize()) i->resize(w, h);
-			}
+		}
+		for (auto& i : m_framebuffers)
+		{
+			if (i->hasScreenSize()) i->resize(w, h);
 		}
 		m_width = w;
 		m_height = h;
@@ -1863,7 +1996,7 @@ struct PipelineImpl : public Pipeline
 	void setScene(RenderScene* scene) override { m_scene = scene; }
 	void setWireframe(bool wireframe) override { m_is_wireframe = wireframe; }
 
-
+	
 	struct TerrainInstance
 	{
 		int m_count;
@@ -1881,13 +2014,14 @@ struct PipelineImpl : public Pipeline
 
 	struct BaseVertex
 	{
-		float m_x, m_y, m_z;
-		uint32 m_rgba;
-		float m_u;
-		float m_v;
+		float x, y, z;
+		uint32 rgba;
+		float u;
+		float v;
 	};
 
 
+	bgfx::VertexDecl m_deferred_point_light_vertex_decl;
 	bgfx::VertexDecl m_base_vertex_decl;
 	TerrainInstance m_terrain_instances[4];
 	uint32 m_debug_flags;
@@ -1927,6 +2061,7 @@ struct PipelineImpl : public Pipeline
 	Array<RenderableMesh> m_tmp_meshes;
 	Array<const TerrainInfo*> m_tmp_terrains;
 	Array<GrassInfo> m_tmp_grasses;
+	Array<ComponentIndex> m_tmp_local_lights;
 	DirectionalLightUniforms m_directional_light_uniforms;
 
 	bgfx::UniformHandle m_specular_shininess_uniform;
@@ -1947,6 +2082,7 @@ struct PipelineImpl : public Pipeline
 	bgfx::UniformHandle m_tex_shadowmap_uniform;
 	bgfx::UniformHandle m_cam_view_uniform;
 	bgfx::UniformHandle m_cam_inv_proj_uniform;
+	bgfx::UniformHandle m_cam_inv_viewproj_uniform;
 	bgfx::UniformHandle m_texture_size_uniform;
 	int m_bind_framebuffer_texture_idx;
 
@@ -1969,7 +2105,47 @@ void Pipeline::destroy(Pipeline* pipeline)
 
 namespace LuaAPI
 {
+
+
+int deferredLocalLightLoop(lua_State* L)
+{
+	if (!LuaWrapper::checkParameterType<PipelineImpl*>(L, 1) ||
+		!LuaWrapper::checkParameterType<int>(L, 2) || !lua_istable(L, 3))
+	{
+		auto x = lua_type(L, 3);
+		TODO("errors");
+		return 0;
+	}
+
+	auto* p = LuaWrapper::toType<PipelineImpl*>(L, 1);
+	int material_index = LuaWrapper::toType<int>(L, 2);
 	
+	TextureBindData textures[16];
+	int texture_count = 0;
+
+	lua_pushnil(L);
+	while (lua_next(L, -2))
+	{
+		if (lua_istable(L, -1))
+		{
+			lua_rawgeti(L, -1, 1);
+			const char* fb_name = lua_tostring(L, -1);
+			lua_rawgeti(L, -2, 2);
+			int rb_idx = (int)lua_tointeger(L, -1);
+			lua_rawgeti(L, -3, 3);
+			int uniform_idx = (int)lua_tointeger(L, -1);
+			textures[texture_count].uniform = p->m_uniforms[uniform_idx];
+			textures[texture_count].texture = p->getFramebuffer(fb_name)->getRenderbufferHandle(rb_idx);
+			++texture_count;
+			lua_pop(L, 3);
+		}
+		lua_pop(L, 1);
+	}
+
+	p->deferredLocalLightLoop(material_index, textures, texture_count);
+	return 0;
+}
+
 
 void logError(const char* message)
 {
@@ -2051,12 +2227,14 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(clear);
 	REGISTER_FUNCTION(renderModels);
 	REGISTER_FUNCTION(renderShadowmap);
+	REGISTER_FUNCTION(copyRenderbuffer);
 
 	#undef REGISTER_FUNCTION
 
 	#define REGISTER_FUNCTION(name) \
 		registerCFunction(#name, LuaWrapper::wrap<decltype(&LuaAPI::name), LuaAPI::name>)
 
+	REGISTER_FUNCTION(deferredLocalLightLoop);
 	REGISTER_FUNCTION(print);
 	REGISTER_FUNCTION(logError);
 	REGISTER_FUNCTION(renderLocalLightsShadowmaps);

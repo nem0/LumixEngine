@@ -884,7 +884,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 		auto* material_manager =
 			m_engine->getResourceManager().get(Lumix::ResourceManager::MATERIAL);
-		auto* resource = material_manager->load(Lumix::Path("models/imgui.mat"));
+		auto* resource = material_manager->load(Lumix::Path("shaders/imgui.mat"));
 		m_material = static_cast<Lumix::Material*>(resource);
 
 		Lumix::Texture* texture = LUMIX_NEW(editor.getAllocator(), Lumix::Texture)(

@@ -1743,6 +1743,7 @@ public:
 	{
 		m_render_interface = interface;
 		m_editor_icons = EditorIcons::create(*this);
+		TODO("icons are recreated when pipeline is changed");
 	}
 
 

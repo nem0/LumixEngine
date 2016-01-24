@@ -319,6 +319,7 @@ public:
 	virtual void setFogDensity(ComponentIndex cmp, float density) = 0;
 	virtual void setFogColor(ComponentIndex cmp, const Vec3& color) = 0;
 	virtual float getPointLightIntensity(ComponentIndex cmp) = 0;
+	virtual float getPointLightRange(ComponentIndex cmp) const = 0;
 	virtual Entity getPointLightEntity(ComponentIndex cmp) const = 0;
 	virtual Entity getGlobalLightEntity(ComponentIndex cmp) const = 0;
 	virtual float getGlobalLightIntensity(ComponentIndex cmp) = 0;
