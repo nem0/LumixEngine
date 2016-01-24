@@ -737,7 +737,6 @@ struct PipelineImpl : public Pipeline
 
 		bgfx::setTransform(&Matrix::IDENTITY);
 		bgfx::setViewTransform(m_view_idx, &view_matrix.m11, &projection_matrix.m11);
-		Matrix view_proj = view_matrix * projection_matrix;
 		auto* material = m_materials[material_index];
 		if (!material->isReady()) return;;
 
@@ -783,7 +782,15 @@ struct PipelineImpl : public Pipeline
 				indices += lengthOf(tmp_indices);
 				bgfx::setVertexBuffer(&tvb);
 				bgfx::setIndexBuffer(&tib);
-				bgfx::setState(m_render_state | material->getRenderStates());
+				if (frustum.intersectNearPlane(pos, r * Math::SQRT2))
+				{
+					bgfx::setState((m_render_state | material->getRenderStates()) &
+						~BGFX_STATE_CULL_MASK & ~BGFX_STATE_DEPTH_TEST_MASK | BGFX_STATE_CULL_CCW);
+				}
+				else
+				{
+					bgfx::setState(m_render_state | material->getRenderStates());
+				}
 
 				for (int i = 0; i < textures_count; ++i)
 				{
@@ -1165,7 +1172,7 @@ struct PipelineImpl : public Pipeline
 		Universe& universe = m_scene->getUniverse();
 		Entity light_entity = m_scene->getPointLightEntity(light_cmp);
 		Vec3 light_pos = universe.getPosition(light_entity);
-		Vec3 light_dir = universe.getRotation(light_entity) * Vec3(0, 0, 1);
+		Vec3 light_dir = universe.getRotation(light_entity) * Vec3(0, 0, -1);
 		float fov = Math::degreesToRadians(m_scene->getLightFOV(light_cmp));
 		Vec3 color = m_scene->getPointLightColor(light_cmp) *
 					 m_scene->getPointLightIntensity(light_cmp);
