@@ -836,6 +836,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 
 		auto& editor = *m_app.getWorldEditor();
 		auto& allocator = editor.getAllocator();
+		editor.setRenderInterface(nullptr);
 		LUMIX_DELETE(allocator, m_render_interface);
 		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getCurrentPipeline());
 		editor.setRenderInterface(m_render_interface);
