@@ -202,7 +202,7 @@ bool Settings::getValue(const char* name, bool default_value) const
 	{
 		v = lua_toboolean(m_state, -1) != 0;
 	}
-	lua_pop(m_state, 1);
+	lua_pop(m_state, 2);
 	return v;
 }
 
