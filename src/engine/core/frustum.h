@@ -28,6 +28,18 @@ public:
 		float far_distance);
 
 
+	bool intersectNearPlane(const Vec3& center, float radius) const
+	{
+		float x = center.x;
+		float y = center.y;
+		float z = center.z;
+		const Plane& plane = m_plane[(uint32)Sides::NEAR_PLANE];
+		float distance = x * plane.normal.x + y * plane.normal.y + z * plane.normal.z + plane.d;
+		distance = distance < 0 ? -distance : distance;
+		return distance < radius;
+	}
+
+
 	bool isSphereInside(const Vec3& center, float radius) const
 	{
 		float x = center.x;
