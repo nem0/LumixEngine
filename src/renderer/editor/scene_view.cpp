@@ -24,6 +24,7 @@ SceneView::SceneView()
 	m_forward_pipeline = nullptr;
 	m_editor = nullptr;
 	m_camera_speed = 0.1f;
+	m_is_pipeline_switch = false;
 }
 
 
