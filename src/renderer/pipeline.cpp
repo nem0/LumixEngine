@@ -765,7 +765,7 @@ struct PipelineImpl : public Pipeline
 				{
 					vertices[i] = pos + rel_pos[i];
 				}
-				int offset = vertices - (Vec3*)tvb.data;
+				int offset = int(vertices - (Vec3*)tvb.data);
 				vertices += lengthOf(rel_pos);
 
 				static const uint16 tmp_indices[] = {
