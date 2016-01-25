@@ -26,17 +26,10 @@ namespace LuaAPI
 
 static int getEnvironment(lua_State* L)
 {
-	if (!LuaWrapper::checkParameterType<void*>(L, 1) || !LuaWrapper::checkParameterType<int>(L, 2))
-	{
-		lua_pushnil(L);
-		return 1;
-	}
-
-	LuaScriptScene* scene = (LuaScriptScene*)lua_touserdata(L, 1);
-	Entity entity = (Entity)lua_tointeger(L, 2);
+	auto* scene = LuaWrapper::checkArg<LuaScriptScene*>(L, 1);
+	Entity entity = LuaWrapper::checkArg<Entity>(L, 2);
 
 	int env = scene->getEnvironment(entity);
-
 	if (env < 0)
 	{
 		lua_pushnil(L);
@@ -91,18 +84,10 @@ static void setProperty(const ComponentUID& cmp,
 
 static int createEntityEx(lua_State* L)
 {
-	if (!LuaWrapper::checkParameterType<void*>(L, 1) || !LuaWrapper::checkParameterType<void*>(L, 2))
-	{
-		return 0;
-	}
-	if (!lua_istable(L, 3))
-	{
-		luaL_error(L, "Expected table as parameter");
-		return 0;
-	}
+	auto* engine = LuaWrapper::checkArg<Engine*>(L, 1);
+	auto* ctx = LuaWrapper::checkArg<Universe*>(L, 2);
+	LuaWrapper::checkTableArg(L, 3);
 
-	auto* engine = LuaWrapper::toType<Engine*>(L, 1);
-	auto* ctx = LuaWrapper::toType<Universe*>(L, 2);
 	Entity e = ctx->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
 
 	lua_pushvalue(L, 3);
@@ -194,15 +179,9 @@ static int createComponent(IScene* scene, const char* type, int entity_idx)
 
 static int getEntityPosition(lua_State* L)
 {
-	if (!LuaWrapper::checkParameterType<void*>(L, 1) ||
-		!LuaWrapper::checkParameterType<Entity>(L, 2))
-	{
-		lua_pushnil(L);
-		return 1;
-	}
+	auto* universe = LuaWrapper::checkArg<Universe*>(L, 1);
+	Entity entity = LuaWrapper::checkArg<Entity>(L, 2);
 
-	auto* universe = LuaWrapper::toType<Universe*>(L, 1);
-	Entity entity = LuaWrapper::toType<Entity>(L, 2);
 	Vec3 pos = universe->getPosition(entity);
 	LuaWrapper::pushLua(L, pos);
 	return 1;
@@ -210,15 +189,9 @@ static int getEntityPosition(lua_State* L)
 
 static int getEntityDirection(lua_State* L)
 {
-	if (!LuaWrapper::checkParameterType<void*>(L, 1) ||
-		!LuaWrapper::checkParameterType<float>(L, 2))
-	{
-		lua_pushnil(L);
-		return 1;
-	}
+	auto* universe = LuaWrapper::checkArg<Universe*>(L, 1);
+	Entity entity = LuaWrapper::checkArg<Entity>(L, 2);
 
-	auto* universe = LuaWrapper::toType<Universe*>(L, 1);
-	Entity entity = LuaWrapper::toType<Entity>(L, 2);
 	Quat rot = universe->getRotation(entity);
 	LuaWrapper::pushLua(L, rot * Vec3(0, 0, 1));
 	return 1;
@@ -227,17 +200,11 @@ static int getEntityDirection(lua_State* L)
 
 static int multVecQuat(lua_State* L)
 {
-	if (!LuaWrapper::checkParameterType<Vec3>(L, 1) ||
-		!LuaWrapper::checkParameterType<Vec3>(L, 2) ||
-		!LuaWrapper::checkParameterType<float>(L, 3))
-	{
-		lua_pushnil(L);
-		return 1;
-	}
-	Vec3 v = LuaWrapper::toType<Vec3>(L, 1);
-	Vec3 axis = LuaWrapper::toType<Vec3>(L, 2);
-	Quat q(axis, (float)lua_tonumber(L, 7));
+	Vec3 v = LuaWrapper::checkArg<Vec3>(L, 1);
+	Vec3 axis = LuaWrapper::checkArg<Vec3>(L, 2);
+	float angle = LuaWrapper::checkArg<float>(L, 3);
 
+	Quat q(axis, angle);
 	Vec3 res = q * v;
 
 	LuaWrapper::pushLua(L, res);
