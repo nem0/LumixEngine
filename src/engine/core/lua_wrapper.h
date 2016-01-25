@@ -129,7 +129,7 @@ template <> inline void pushLua(lua_State* L, float value)
 inline void pushLua(lua_State* L, const Vec3& value)
 {
 	lua_createtable(L, 3, 0);
-	
+
 	lua_pushvalue(L, -1);
 	lua_pushnumber(L, value.x);
 	lua_rawseti(L, -2, 1);
@@ -177,31 +177,45 @@ inline const char* luaTypeToString(int type)
 }
 
 
+inline void argError(lua_State* L, int index, const char* expected_type)
+{
+	char buf[128];
+	copyString(buf, "expected ");
+	catString(buf, expected_type);
+	catString(buf, ", got ");
+	int type = lua_type(L, index);
+	catString(buf, LuaWrapper::luaTypeToString(type));
+	luaL_argerror(L, index, buf);
+}
+
+
+
 template <typename T>
-bool checkParameterType(lua_State* L, int index)
+void argError(lua_State* L, int index)
+{
+	argError(L, index, typeToString<T>());
+}
+
+
+template <typename T>
+T checkArg(lua_State* L, int index)
 {
 	if (!isType<T>(L, index))
 	{
-		int depth = 0;
-		lua_Debug entry;
-
-		int type = lua_type(L, index);
-		auto er = g_log_error.log("lua");
-		er << "Wrong argument " << index << " of type " << LuaWrapper::luaTypeToString(type)
-			<< " in:\n";
-		while (lua_getstack(L, depth, &entry))
-		{
-			int status = lua_getinfo(L, "Sln", &entry);
-			ASSERT(status);
-			er << entry.short_src << "(" << entry.currentline
-				<< "): " << (entry.name ? entry.name : "?") << "\n";
-			depth++;
-		}
-		er << typeToString<T>() << " expected\n";
-		return false;
+		argError<T>(L, index);
 	}
-	return true;
+	return toType<T>(L, index);
 }
+
+
+inline void checkTableArg(lua_State* L, int index)
+{
+	if(!lua_istable(L, index))
+	{
+		argError(L, index, "table");
+	}
+}
+
 
 
 template <int N> struct FunctionCaller
@@ -214,7 +228,7 @@ template <int N> struct FunctionCaller
 		typedef std::tuple_element<sizeof...(ArgsF)-N,
 								   std::tuple<ArgsF...>>::type T;
 		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
-		if (!checkParameterType<RealT>(L, sizeof...(ArgsF)-N + 1)) return R();
+		checkArg<RealT>(L, sizeof...(ArgsF)-N + 1);
 		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 1);
 		return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
 	}
@@ -227,7 +241,7 @@ template <int N> struct FunctionCaller
 		typedef std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
 		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
-		if (!checkParameterType<RealT>(L, sizeof...(ArgsF)-N + 1)) return R();
+		checkArg<RealT>(L, sizeof...(ArgsF)-N + 1);
 		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 1);
 		return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
 	}
@@ -240,7 +254,7 @@ template <int N> struct FunctionCaller
 		typedef std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
 		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
-		if (!checkParameterType<RealT>(L, sizeof...(ArgsF)-N + 2)) return R();
+		checkArg<RealT>(L, sizeof...(ArgsF)-N + 2);
 
 		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 2);
 		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
@@ -254,7 +268,7 @@ template <int N> struct FunctionCaller
 		typedef std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
 		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
-		if (!checkParameterType<RealT>(L, sizeof...(ArgsF)-N + 2)) return R();
+		checkArg<RealT>(L, sizeof...(ArgsF)-N + 2);
 		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 2);
 		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
 	}

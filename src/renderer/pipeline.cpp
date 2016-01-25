@@ -38,7 +38,7 @@ static const float SHADOW_CAM_FAR = 5000.0f;
 
 struct InstanceData
 {
-	static const int MAX_INSTANCE_COUNT = 64;
+	static const int MAX_INSTANCE_COUNT = 128;
 
 	const bgfx::InstanceDataBuffer* buffer;
 	int instance_count;
@@ -2116,17 +2116,10 @@ namespace LuaAPI
 
 int deferredLocalLightLoop(lua_State* L)
 {
-	if (!LuaWrapper::checkParameterType<PipelineImpl*>(L, 1) ||
-		!LuaWrapper::checkParameterType<int>(L, 2) || !lua_istable(L, 3))
-	{
-		auto x = lua_type(L, 3);
-		TODO("errors");
-		return 0;
-	}
+	auto* p = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
+	int material_index = LuaWrapper::checkArg<int>(L, 2);
+	LuaWrapper::checkTableArg(L, 3);
 
-	auto* p = LuaWrapper::toType<PipelineImpl*>(L, 1);
-	int material_index = LuaWrapper::toType<int>(L, 2);
-	
 	TextureBindData textures[16];
 	int texture_count = 0;
 
@@ -2162,15 +2155,11 @@ void logError(const char* message)
 
 int renderLocalLightsShadowmaps(lua_State* L)
 {
-	if (!LuaWrapper::isType<PipelineImpl*>(L, 1)
-		|| !LuaWrapper::isType<int>(L, 2)
-		|| !LuaWrapper::isType<const char*>(L, 4))
-	{
-		return 0;
-	}
+	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
+	int64 layer_mask = LuaWrapper::checkArg<int64>(L, 2);
+	const char* camera_slot = LuaWrapper::checkArg<const char*>(L, 4);
 
 	FrameBuffer* fbs[16];
-	auto* pipeline = (PipelineImpl*)lua_touserdata(L, 1);
 	int len = Math::minValue((int)lua_rawlen(L, 3), lengthOf(fbs));
 	for (int i = 0; i < len; ++i)
 	{
@@ -2183,8 +2172,7 @@ int renderLocalLightsShadowmaps(lua_State* L)
 	}
 
 	RenderScene* scene = pipeline->m_scene;
-	int64 layer_mask = (int64)lua_tonumber(L, 2);
-	ComponentIndex camera = scene->getCameraInSlot(lua_tostring(L, 4));
+	ComponentIndex camera = scene->getCameraInSlot(camera_slot);
 	pipeline->renderLocalLightShadowmaps(camera, fbs, len, layer_mask);
 
 	return 0;
