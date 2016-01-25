@@ -737,7 +737,7 @@ struct PipelineImpl : public Pipeline
 
 		bgfx::setViewTransform(m_view_idx, &view_matrix.m11, &projection_matrix.m11);
 		auto* material = m_materials[material_index];
-		if (!material->isReady()) return;;
+		if (!material->isReady()) return;
 
 		for (auto light_cmp : m_tmp_local_lights)
 		{
@@ -797,7 +797,6 @@ struct PipelineImpl : public Pipeline
 						textures[i].uniform,
 						textures[i].texture);
 				}
-
 				setPointLightUniforms(material, light_cmp);
 				bgfx::submit(
 					m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
@@ -1420,11 +1419,7 @@ struct PipelineImpl : public Pipeline
 
 			bgfx::setUniform(m_cam_inv_proj_uniform, &inv_projection.m11);
 			bgfx::setUniform(m_cam_inv_viewproj_uniform, &inv_view_proj.m11);
-			auto x = inv_view_proj * Vec4(0, 0, 0, 1);
-			x *= 1/x.w;
-			auto y = inv_view_proj * Vec4(1, 0, 0, 1);
-			y *= 1 / y.w;
-			bgfx::setUniform(m_cam_view_uniform, &camera_matrix.m11);
+			bgfx::setUniform(m_cam_view_uniform, &view_matrix.m11);
 		}
 
 		bgfx::setState(m_render_state | material->getRenderStates());
