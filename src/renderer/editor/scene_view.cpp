@@ -25,6 +25,7 @@ SceneView::SceneView()
 	m_editor = nullptr;
 	m_camera_speed = 0.1f;
 	m_is_pipeline_switch = false;
+	m_is_mouse_captured = false;
 }
 
 
@@ -180,6 +181,7 @@ void SceneView::renderGizmos()
 
 void SceneView::captureMouse(bool capture)
 {
+	if(m_is_mouse_captured == capture) return;
 	m_is_mouse_captured = capture;
 	PlatformInterface::showCursor(!m_is_mouse_captured);
 	if(!m_is_mouse_captured) PlatformInterface::unclipCursor();
