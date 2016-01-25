@@ -42,6 +42,7 @@ public:
 	void setComponent(Lumix::ComponentUID cmp) { m_component = cmp; }
 
 private:
+	void onUniverseDestroyed();
 	void detectModifiers();
 	void drawCursor(Lumix::RenderScene& scene,
 		const Lumix::ComponentUID& cmp,

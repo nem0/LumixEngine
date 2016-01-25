@@ -1114,6 +1114,7 @@ private:
 
 TerrainEditor::~TerrainEditor()
 {
+	m_world_editor.universeDestroyed().unbind<TerrainEditor, &TerrainEditor::onUniverseDestroyed>(this);
 	if (m_brush_texture)
 	{
 		m_brush_texture->destroy();
@@ -1121,6 +1122,13 @@ TerrainEditor::~TerrainEditor()
 	}
 
 	m_world_editor.removePlugin(*this);
+}
+
+
+void TerrainEditor::onUniverseDestroyed()
+{
+	m_component.scene = nullptr;
+	m_component.index = Lumix::INVALID_COMPONENT;
 }
 
 
@@ -1201,6 +1209,8 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	m_is_align_with_normal = false;
 	m_is_rotate_x = false;
 	m_is_rotate_z = false;
+
+	editor.universeDestroyed().bind<TerrainEditor, &TerrainEditor::onUniverseDestroyed>(this);
 }
 
 
