@@ -735,7 +735,6 @@ struct PipelineImpl : public Pipeline
 		Matrix projection_matrix;
 		projection_matrix.setPerspective(camera_fov, camera_ratio, near_plane, far_plane);
 
-		bgfx::setTransform(&Matrix::IDENTITY);
 		bgfx::setViewTransform(m_view_idx, &view_matrix.m11, &projection_matrix.m11);
 		auto* material = m_materials[material_index];
 		if (!material->isReady()) return;;

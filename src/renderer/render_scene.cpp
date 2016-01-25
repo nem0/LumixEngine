@@ -1519,6 +1519,11 @@ public:
 			Renderable& r = m_renderables[cmp];
 			r.matrix = m_universe.getMatrix(entity);
 			m_culling_system->updateBoundingPosition(m_universe.getPosition(entity), cmp);
+			if (r.model && r.model->isReady())
+			{
+				float radius = m_universe.getScale(entity) * r.model->getBoundingRadius();
+				m_culling_system->updateBoundingRadius(radius, cmp);
+			}
 
 			if(m_is_forward_rendered)
 			{
