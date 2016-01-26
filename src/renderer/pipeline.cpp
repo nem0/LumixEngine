@@ -1028,11 +1028,11 @@ struct PipelineImpl : public Pipeline
 		m_global_light_shadowmap = m_current_framebuffer;
 		float shadowmap_height = (float)m_current_framebuffer->getHeight();
 		float shadowmap_width = (float)m_current_framebuffer->getWidth();
-		float viewports[] = {0, 0, 0.5f, 0, 0, 0.5f, 0.5f, 0.5f};
+		float viewports[] = { 0, 0, 0.5f, 0, 0, 0.5f, 0.5f, 0.5f };
 		float camera_fov = Math::degreesToRadians(m_scene->getCameraFOV(m_applied_camera));
 		float camera_ratio = m_scene->getCameraWidth(m_applied_camera) / camera_height;
 		Vec4 cascades = m_scene->getShadowmapCascades(light_cmp);
-		float split_distances[] = {0.01f, cascades.x, cascades.y, cascades.z, cascades.w};
+		float split_distances[] = { 0.01f, cascades.x, cascades.y, cascades.z, cascades.w };
 		m_is_rendering_in_shadowmap = true;
 		for (int split_index = 0; split_index < 4; ++split_index)
 		{
@@ -1048,9 +1048,18 @@ struct PipelineImpl : public Pipeline
 				(uint16)(0.5f * shadowmap_width - 2),
 				(uint16)(0.5f * shadowmap_height - 2));
 
+			Frustum frustum;
 			Matrix camera_matrix = universe.getMatrix(m_scene->getCameraEntity(m_applied_camera));
+			frustum.computePerspective(camera_matrix.getTranslation(),
+				camera_matrix.getZVector(),
+				camera_matrix.getYVector(),
+				camera_fov,
+				camera_ratio,
+				split_distances[split_index],
+				split_distances[split_index + 1]);
+
 			Vec3 shadow_cam_pos = camera_matrix.getTranslation();
-			float bb_size = m_camera_frustum.getRadius();
+			float bb_size = frustum.getRadius();
 			shadow_cam_pos =
 				shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
 
