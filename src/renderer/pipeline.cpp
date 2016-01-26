@@ -179,6 +179,10 @@ struct PipelineImpl : public Pipeline
 					{
 						decl.m_screen_size = lua_toboolean(L, -1) != 0;
 					}
+					else
+					{
+						decl.m_screen_size = false;
+					}
 					lua_pop(L, 1);
 					if (lua_getfield(L, -1, "height") == LUA_TNUMBER)
 					{

@@ -31,6 +31,7 @@ class FrameBuffer
 		{
 			Declaration()
 				: m_renderbuffers_count(0)
+				, m_screen_size(false)
 			{ }
 
 			static const int MAX_RENDERBUFFERS = 16;
