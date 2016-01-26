@@ -73,6 +73,13 @@ static void setProperty(const ComponentUID& cmp,
 				stream.write(b);
 			}
 			break;
+		case IPropertyDescriptor::VEC3:
+		case IPropertyDescriptor::COLOR:
+			if (lua_istable(L, -1))
+			{
+				stream.write(LuaWrapper::toType<Vec3>(L, -1));
+			}
+			break;
 		default:
 			g_log_error.log("script") << "Property " << desc.getName() << " has unsupported type";
 			break;

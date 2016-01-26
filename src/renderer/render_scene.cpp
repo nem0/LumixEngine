@@ -2814,12 +2814,6 @@ public:
 	}
 
 
-	float getPointLightRange(ComponentIndex cmp) const override
-	{
-		return m_point_lights[getPointLightIndex(cmp)].m_range;
-	}
-
-
 	Entity getGlobalLightEntity(ComponentIndex cmp) const override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_entity;

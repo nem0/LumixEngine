@@ -736,6 +736,8 @@ struct PipelineImpl : public Pipeline
 	{
 		PROFILE_FUNCTION();
 		if (m_applied_camera == INVALID_COMPONENT) return;
+		auto* material = m_materials[material_index];
+		if(!material->isReady()) return;
 
 		Universe& universe = m_scene->getUniverse();
 		Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
@@ -764,53 +766,50 @@ struct PipelineImpl : public Pipeline
 		view_matrix.fastInverse();
 		Matrix projection_matrix;
 		projection_matrix.setPerspective(camera_fov, camera_ratio, near_plane, far_plane);
-
 		bgfx::setViewTransform(m_view_idx, &view_matrix.m11, &projection_matrix.m11);
-		auto* material = m_materials[material_index];
-		if (!material->isReady()) return;
 
+		PROFILE_INT("light count", m_tmp_local_lights.size());
+		struct Data
 		{
-			PROFILE_INT("light count", m_tmp_local_lights.size());
-			/*struct Data
-			{
-				Matrix mtx;
-				Vec4 a;
-				Vec4 b;
-				Vec4 b;
-				Vec4 b;
-			};
-			auto instance_buffer = bgfx::allocInstanceDataBuffer(m_tmp_local_lights.size(), sizeof(Data));*/
-			for(auto light_cmp : m_tmp_local_lights)
-			{
-				auto entity = m_scene->getPointLightEntity(light_cmp);
-				auto pos = universe.getPosition(entity);
-				float r = m_scene->getPointLightRange(light_cmp);
-				Matrix m = universe.getMatrix(entity);
-				m.multiply3x3(r);
-				bgfx::setVertexBuffer(m_cube_vb);
-				bgfx::setIndexBuffer(m_cube_ib);
-				bgfx::setTransform(&m);
-				if(frustum.intersectNearPlane(pos, r * Math::SQRT2))
-				{
-					bgfx::setState((m_render_state | material->getRenderStates()) &
-						~BGFX_STATE_CULL_MASK & ~BGFX_STATE_DEPTH_TEST_MASK | BGFX_STATE_CULL_CCW);
-				}
-				else
-				{
-					bgfx::setState(m_render_state | material->getRenderStates());
-				}
+			Matrix mtx;
+			Vec4 pos_radius;
+			Vec4 color_attenuation;
+			Vec4 dir_fov;
+			Vec4 specular;
+		};
+		const bgfx::InstanceDataBuffer* instance_buffer =
+			bgfx::allocInstanceDataBuffer(m_tmp_local_lights.size(), sizeof(Data));
+		Data* instance_data = (Data*)instance_buffer->data;
+		for(auto light_cmp : m_tmp_local_lights)
+		{
+			auto entity = m_scene->getPointLightEntity(light_cmp);
+			float range = m_scene->getLightRange(light_cmp);
+			Vec3 light_dir = universe.getRotation(entity) * Vec3(0, 0, -1);
+			float attenuation = m_scene->getLightAttenuation(light_cmp);
+			float fov = Math::degreesToRadians(m_scene->getLightFOV(light_cmp));
+			Vec3 color = m_scene->getPointLightColor(light_cmp) *
+				m_scene->getPointLightIntensity(light_cmp);
 
-				for(int i = 0; i < textures_count; ++i)
-				{
-					bgfx::setTexture(m_bind_framebuffer_texture_idx + i,
-						textures[i].uniform,
-						textures[i].texture);
-				}
-				setPointLightUniforms(material, light_cmp);
-				bgfx::submit(
-					m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
-			}
+			instance_data->mtx = universe.getPositionAndRotation(entity);
+			instance_data->mtx.multiply3x3(range);
+			instance_data->pos_radius.set(instance_data->mtx.getTranslation(), range);
+			instance_data->color_attenuation.set(color, attenuation);
+			instance_data->dir_fov.set(light_dir, fov);
+			instance_data->specular.set(m_scene->getPointLightSpecularColor(light_cmp), 1);
+			++instance_data;
 		}
+		bgfx::setInstanceDataBuffer(instance_buffer);
+		bgfx::setState(m_render_state | material->getRenderStates());
+		for(int i = 0; i < textures_count; ++i)
+		{
+			bgfx::setTexture(m_bind_framebuffer_texture_idx + i,
+				textures[i].uniform,
+				textures[i].texture);
+		}
+		bgfx::setVertexBuffer(m_cube_vb);
+		bgfx::setIndexBuffer(m_cube_ib);
+		bgfx::submit(
+			m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
 
@@ -825,7 +824,7 @@ struct PipelineImpl : public Pipeline
 		uint16 shadowmap_height = (uint16)m_current_framebuffer->getHeight();
 		uint16 shadowmap_width = (uint16)m_current_framebuffer->getWidth();
 		Vec3 pos = mtx.getTranslation();
-		
+
 		bgfx::setViewClear(m_view_idx, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
 		bgfx::touch(m_view_idx);
 		bgfx::setViewRect(m_view_idx, 0, 0, shadowmap_width, shadowmap_height);
@@ -902,7 +901,7 @@ struct PipelineImpl : public Pipeline
 
 			Matrix projection_matrix;
 			projection_matrix.setPerspective(fovx, aspect, 0.01f, range);
-			
+
 			Matrix view_matrix;
 			view_matrix.fromEuler(YPR[i][0], YPR[i][1], YPR[i][2]);
 			view_matrix.setTranslation(light_pos);
@@ -914,7 +913,7 @@ struct PipelineImpl : public Pipeline
 				aspect,
 				0.01f,
 				range);
-			
+
 			view_matrix.fastInverse();
 
 			bgfx::setViewTransform(
