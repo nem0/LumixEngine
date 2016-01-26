@@ -732,9 +732,9 @@ public:
 				serializer.read(light.m_fov);
 				serializer.read(light.m_specular_color);
 				serializer.read(light.m_cast_shadows);
-				m_point_lights_map.insert(light.m_uid, i);
 				light.m_range = 10;
 			}
+			m_point_lights_map.insert(light.m_uid, i);
 
 			m_universe.addComponent(light.m_entity, POINT_LIGHT_HASH, this, light.m_uid);
 		}
