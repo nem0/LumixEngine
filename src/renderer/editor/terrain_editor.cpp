@@ -1259,6 +1259,7 @@ void TerrainEditor::drawCursor(Lumix::RenderScene& scene,
 	const Lumix::ComponentUID& terrain,
 	const Lumix::Vec3& center)
 {
+	PROFILE_FUNCTION();
 	static const int SLICE_COUNT = 30;
 	if (m_type == TerrainEditor::FLAT_HEIGHT && ImGui::GetIO().KeyCtrl)
 	{
@@ -1289,37 +1290,12 @@ void TerrainEditor::drawCursor(Lumix::RenderScene& scene,
 		Lumix::Vec3 to = terrain_matrix.multiplyPosition(local_to);
 		scene.addDebugLine(from, to, 0xffff0000, 0);
 	}
-
-	float brush_size2 = brush_size * brush_size;
-	Lumix::Vec3 local_pos;
-	local_pos.x = Lumix::Math::floor(local_center.x - brush_size);
-	float to_x = Lumix::Math::floor(local_center.x + brush_size + 1);
-	float to_z = Lumix::Math::floor(local_center.z + brush_size + 1);
-	while (local_pos.x < to_x)
-	{
-		local_pos.z = Lumix::Math::floor(local_center.z - brush_size);
-		while (local_pos.z < to_z)
-		{
-			float dx = local_center.x - local_pos.x;
-			float dz = local_center.z - local_pos.z;
-			if (dx * dx + dz * dz < brush_size2)
-			{
-				local_pos.y = scene.getTerrainHeightAt(terrain.index, local_pos.x, local_pos.z);
-				local_pos.y += 0.05f;
-				Lumix::Vec3 world_pos = terrain_matrix.multiplyPosition(local_pos);
-				scene.addDebugPoint(world_pos, 0xffff0000, 0);
-			}
-			++local_pos.z;
-		}
-		++local_pos.x;
-	}
-
-	
 }
 
 
 void TerrainEditor::tick()
 {
+	PROFILE_FUNCTION();
 	if (!m_component.isValid()) return;
 	if (m_type == NOT_SET) return;
 	if (!m_is_enabled) return;

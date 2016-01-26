@@ -705,6 +705,7 @@ struct PipelineImpl : public Pipeline
 
 	void deferredLocalLightLoop(int material_index, TextureBindData* textures, int textures_count)
 	{
+		PROFILE_FUNCTION();
 		if (m_applied_camera == INVALID_COMPONENT) return;
 
 		Universe& universe = m_scene->getUniverse();
@@ -739,6 +740,7 @@ struct PipelineImpl : public Pipeline
 		auto* material = m_materials[material_index];
 		if (!material->isReady()) return;
 
+		PROFILE_INT("light count", m_tmp_local_lights.size());
 		for (auto light_cmp : m_tmp_local_lights)
 		{
 			bgfx::TransientVertexBuffer tvb;
