@@ -732,13 +732,12 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void finishDeferredPointLightInstances(int material_index,
+	void finishDeferredPointLightInstances(Material* material,
 		TextureBindData* textures,
 		int textures_count,
 		const bgfx::InstanceDataBuffer* instance_buffer,
 		bool is_intersecting)
 	{
-		auto* material = m_materials[material_index];
 		bgfx::setInstanceDataBuffer(instance_buffer);
 		if(is_intersecting)
 		{
@@ -767,7 +766,7 @@ struct PipelineImpl : public Pipeline
 		PROFILE_FUNCTION();
 		if (m_applied_camera == INVALID_COMPONENT) return;
 		auto* material = m_materials[material_index];
-		if(!material->isReady()) return;
+		if (!material->isReady()) return;
 
 		m_tmp_local_lights.clear();
 		m_scene->getPointLights(m_camera_frustum, m_tmp_local_lights);
@@ -814,7 +813,7 @@ struct PipelineImpl : public Pipeline
 
 			if(instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx]->data == 128)
 			{
-				finishDeferredPointLightInstances(material_index,
+				finishDeferredPointLightInstances(material,
 					textures,
 					textures_count,
 					instance_buffer[buffer_idx],
@@ -828,7 +827,7 @@ struct PipelineImpl : public Pipeline
 		{
 			if(instance_data[buffer_idx])
 			{
-				finishDeferredPointLightInstances(material_index,
+				finishDeferredPointLightInstances(material,
 					textures,
 					textures_count,
 					instance_buffer[buffer_idx],
@@ -855,12 +854,10 @@ struct PipelineImpl : public Pipeline
 		bgfx::setViewRect(m_view_idx, 0, 0, shadowmap_width, shadowmap_height);
 
 		Matrix projection_matrix;
-		projection_matrix.setPerspective(
-			Math::degreesToRadians(fov), 1, 0.01f, range);
+		projection_matrix.setPerspective(Math::degreesToRadians(fov), 1, 0.01f, range);
 		Matrix view_matrix;
-		view_matrix.lookAt(pos, pos + mtx.getZVector(), mtx.getYVector());
-		bgfx::setViewTransform(
-			m_view_idx, &view_matrix.m11, &projection_matrix.m11);
+		view_matrix.lookAt(pos, pos - mtx.getZVector(), mtx.getYVector());
+		bgfx::setViewTransform(m_view_idx, &view_matrix.m11, &projection_matrix.m11);
 
 		PointLightShadowmap& s = m_point_light_shadowmaps.emplace();
 		s.m_framebuffer = m_current_framebuffer;
@@ -901,8 +898,7 @@ struct PipelineImpl : public Pipeline
 			 Math::degreesToRadians(0.0f)},
 		};
 
-		PointLightShadowmap& shadowmap_info =
-			m_point_light_shadowmaps.emplace();
+		PointLightShadowmap& shadowmap_info = m_point_light_shadowmaps.emplace();
 		shadowmap_info.m_framebuffer = m_current_framebuffer;
 		shadowmap_info.m_light = light;
 
@@ -914,11 +910,8 @@ struct PipelineImpl : public Pipeline
 			bgfx::touch(m_view_idx);
 			uint16 view_x = uint16(shadowmap_width * viewports[i * 2]);
 			uint16 view_y = uint16(shadowmap_height * viewports[i * 2 + 1]);
-			bgfx::setViewRect(m_view_idx,
-							  view_x,
-							  view_y,
-							  shadowmap_width >> 1,
-							  shadowmap_height >> 1);
+			bgfx::setViewRect(
+				m_view_idx, view_x, view_y, shadowmap_width >> 1, shadowmap_height >> 1);
 
 			float fovx = Math::degreesToRadians(143.98570868f + 3.51f);
 			float fovy = Math::degreesToRadians(125.26438968f + 9.85f);
@@ -941,14 +934,10 @@ struct PipelineImpl : public Pipeline
 
 			view_matrix.fastInverse();
 
-			bgfx::setViewTransform(
-				m_view_idx, &view_matrix.m11, &projection_matrix.m11);
+			bgfx::setViewTransform(m_view_idx, &view_matrix.m11, &projection_matrix.m11);
 
 			static const Matrix biasMatrix(
-			0.5, 0.0, 0.0, 0.0,
-			0.0, -0.5, 0.0, 0.0,
-			0.0, 0.0, 0.5, 0.0,
-			0.5, 0.5, 0.5, 1.0);
+				0.5, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
 			shadowmap_info.m_matrices[i] = biasMatrix * (projection_matrix * view_matrix);
 
 			renderLitModels(light, frustum, layer_mask);
@@ -971,9 +960,9 @@ struct PipelineImpl : public Pipeline
 
 
 	void renderLocalLightShadowmaps(ComponentIndex camera,
-									FrameBuffer** fbs,
-									int framebuffers_count,
-									int64 layer_mask)
+		FrameBuffer** fbs,
+		int framebuffers_count,
+		int64 layer_mask)
 	{
 		if (camera < 0) return;
 
@@ -991,7 +980,7 @@ struct PipelineImpl : public Pipeline
 			if (fb_index == framebuffers_count) break;
 
 			float fov = m_scene->getLightFOV(lights[i]);
-			
+
 			m_current_framebuffer = fbs[i];
 			bgfx::setViewFrameBuffer(m_view_idx, m_current_framebuffer->getHandle());
 
@@ -1027,13 +1016,12 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderShadowmap(int64 layer_mask, const char* slot)
+	void renderShadowmap(int64 layer_mask)
 	{
-		auto camera = m_scene->getCameraInSlot(slot);
 		Universe& universe = m_scene->getUniverse();
 		ComponentIndex light_cmp = m_scene->getActiveGlobalLight();
-		if (light_cmp < 0 || camera < 0) return;
-		float camera_height = m_scene->getCameraHeight(camera);
+		if (light_cmp < 0 || m_applied_camera < 0) return;
+		float camera_height = m_scene->getCameraHeight(m_applied_camera);
 		if (!camera_height) return;
 
 		Matrix light_mtx = universe.getMatrix(m_scene->getGlobalLightEntity(light_cmp));
@@ -1041,8 +1029,8 @@ struct PipelineImpl : public Pipeline
 		float shadowmap_height = (float)m_current_framebuffer->getHeight();
 		float shadowmap_width = (float)m_current_framebuffer->getWidth();
 		float viewports[] = {0, 0, 0.5f, 0, 0, 0.5f, 0.5f, 0.5f};
-		float camera_fov = Math::degreesToRadians(m_scene->getCameraFOV(camera));
-		float camera_ratio = m_scene->getCameraWidth(camera) / camera_height;
+		float camera_fov = Math::degreesToRadians(m_scene->getCameraFOV(m_applied_camera));
+		float camera_ratio = m_scene->getCameraWidth(m_applied_camera) / camera_height;
 		Vec4 cascades = m_scene->getShadowmapCascades(light_cmp);
 		float split_distances[] = {0.01f, cascades.x, cascades.y, cascades.z, cascades.w};
 		m_is_rendering_in_shadowmap = true;
@@ -1060,18 +1048,9 @@ struct PipelineImpl : public Pipeline
 				(uint16)(0.5f * shadowmap_width - 2),
 				(uint16)(0.5f * shadowmap_height - 2));
 
-			Frustum frustum;
-			Matrix camera_matrix = universe.getMatrix(m_scene->getCameraEntity(camera));
-			frustum.computePerspective(camera_matrix.getTranslation(),
-				camera_matrix.getZVector(),
-				camera_matrix.getYVector(),
-				camera_fov,
-				camera_ratio,
-				split_distances[split_index],
-				split_distances[split_index + 1]);
-
+			Matrix camera_matrix = universe.getMatrix(m_scene->getCameraEntity(m_applied_camera));
 			Vec3 shadow_cam_pos = camera_matrix.getTranslation();
-			float bb_size = frustum.getRadius();
+			float bb_size = m_camera_frustum.getRadius();
 			shadow_cam_pos =
 				shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
 
@@ -1290,8 +1269,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderPointLightInfluencedGeometry(const Frustum& frustum,
-											int64 layer_mask)
+	void renderPointLightInfluencedGeometry(const Frustum& frustum, int64 layer_mask)
 	{
 		PROFILE_FUNCTION();
 
