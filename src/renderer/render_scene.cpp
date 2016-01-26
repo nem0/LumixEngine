@@ -190,6 +190,7 @@ public:
 		, m_is_grass_enabled(true)
 		, m_is_game_running(false)
 		, m_particle_emitters(m_allocator)
+		, m_point_lights_map(m_allocator)
 	{
 		m_universe.entityTransformed()
 			.bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
@@ -710,6 +711,7 @@ public:
 	{
 		int32 size = 0;
 		serializer.read(size);
+		m_point_lights_map.clear();
 		m_point_lights.resize(size);
 		m_light_influenced_geometry.clear();
 		for (int i = 0; i < size; ++i)
@@ -730,6 +732,7 @@ public:
 				serializer.read(light.m_fov);
 				serializer.read(light.m_specular_color);
 				serializer.read(light.m_cast_shadows);
+				m_point_lights_map.insert(light.m_uid, i);
 				light.m_range = 10;
 			}
 
@@ -866,6 +869,7 @@ public:
 		int index = getPointLightIndex(component);
 		Entity entity = m_point_lights[getPointLightIndex(component)].m_entity;
 		m_point_lights.eraseFast(index);
+		m_point_lights_map.erase(component);
 		m_light_influenced_geometry.eraseFast(index);
 		m_universe.destroyComponent(entity, POINT_LIGHT_HASH, this, component);
 	}
@@ -2616,14 +2620,7 @@ public:
 
 	int getPointLightIndex(ComponentIndex cmp) const
 	{
-		for (int i = 0; i < m_point_lights.size(); ++i)
-		{
-			if (m_point_lights[i].m_uid == cmp)
-			{
-				return i;
-			}
-		}
-		return -1;
+		return m_point_lights_map[cmp];
 	}
 
 
@@ -3294,6 +3291,7 @@ public:
 		light.m_cast_shadows = false;
 		light.m_attenuation_param = 2;
 		light.m_range = 10;
+		m_point_lights_map.insert(light.m_uid, m_point_lights.size() - 1);
 
 		m_universe.addComponent(entity, POINT_LIGHT_HASH, this, light.m_uid);
 
@@ -3360,6 +3358,7 @@ private:
 
 	int m_point_light_last_uid;
 	Array<PointLight> m_point_lights;
+	PODHashMap<ComponentIndex, int> m_point_lights_map;
 	Array<Array<ComponentIndex>> m_light_influenced_geometry;
 	int m_active_global_light_uid;
 	int m_global_light_last_uid;

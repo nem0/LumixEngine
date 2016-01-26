@@ -110,6 +110,7 @@ struct PipelineImpl : public Pipeline
 		m_width = m_height = -1;
 
 		createParticleBuffers();
+		createCubeBuffers();
 	}
 
 
@@ -421,6 +422,8 @@ struct PipelineImpl : public Pipeline
 		}
 		LUMIX_DELETE(m_allocator, m_default_framebuffer);
 
+		bgfx::destroyVertexBuffer(m_cube_vb);
+		bgfx::destroyIndexBuffer(m_cube_ib);
 		bgfx::destroyIndexBuffer(m_particle_index_buffer);
 		bgfx::destroyVertexBuffer(m_particle_vertex_buffer);
 	}
@@ -707,6 +710,31 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	void createCubeBuffers()
+	{
+		const Vec3 cube_vertices[] = {
+			{-1, -1, -1}, {1, -1, -1}, {1, 1, -1}, {-1, 1, -1},
+			{-1, -1, 1}, {1, -1, 1}, {1, 1, 1}, {-1, 1, 1},
+			{1, -1, -1}, {1, -1, 1}, {1, 1, 1}, {1, 1, -1},
+			{-1, -1, -1}, {-1, -1, 1}, {-1, 1, 1}, {-1, 1, -1},
+			{-1, 1, -1}, {1, 1, -1}, {1, 1, 1}, {-1, 1, 1},
+			{-1, -1, -1}, {1, -1, -1}, {1, -1, 1}, {-1, -1, 1}
+		};
+		static const uint16 cube_indices[] = {
+			0, 2, 1, 2, 0, 3,
+			4, 5, 6, 6, 7, 4,
+			8, 10, 9, 10, 8, 11,
+			12, 13, 14, 14, 15, 12,
+			16, 18, 17, 18, 16, 19,
+			20, 21, 22, 22, 23, 20
+		};
+		auto* vertices_mem = bgfx::copy(cube_vertices, sizeof(cube_vertices));
+		auto* indices_mem = bgfx::copy(cube_indices, sizeof(cube_indices));
+		m_cube_vb = bgfx::createVertexBuffer(vertices_mem, m_deferred_point_light_vertex_decl);
+		m_cube_ib = bgfx::createIndexBuffer(indices_mem);
+	}
+
+
 	void deferredLocalLightLoop(int material_index, TextureBindData* textures, int textures_count)
 	{
 		PROFILE_FUNCTION();
@@ -744,68 +772,46 @@ struct PipelineImpl : public Pipeline
 		auto* material = m_materials[material_index];
 		if (!material->isReady()) return;
 
-		PROFILE_INT("light count", m_tmp_local_lights.size());
-		for (auto light_cmp : m_tmp_local_lights)
 		{
-			bgfx::TransientVertexBuffer tvb;
-			bgfx::TransientIndexBuffer tib;
-			if (bgfx::allocTransientBuffers(&tvb, m_deferred_point_light_vertex_decl, 24, &tib, 36))
+			PROFILE_BLOCK("rendering");
+			PROFILE_INT("light count", m_tmp_local_lights.size());
+			for(auto light_cmp : m_tmp_local_lights)
 			{
-				Vec3* vertices = (Vec3*)tvb.data;
-				uint16* indices = (uint16*)tib.data;
+				bgfx::TransientVertexBuffer tvb;
+				bgfx::TransientIndexBuffer tib;
+				if(bgfx::allocTransientBuffers(&tvb, m_deferred_point_light_vertex_decl, 24, &tib, 36))
+				{
+					Vec3* vertices = (Vec3*)tvb.data;
+					uint16* indices = (uint16*)tib.data;
 
-				auto entity = m_scene->getPointLightEntity(light_cmp);
-				auto pos = universe.getPosition(entity);
-				float r = m_scene->getPointLightRange(light_cmp);
-				const Vec3 rel_pos[] = {
-					{ -r, -r, -r }, {  r, -r, -r }, {  r,  r, -r }, { -r,  r, -r },
-					{ -r, -r,  r }, {  r, -r,  r }, {  r,  r,  r }, { -r,  r,  r },
-					{  r, -r, -r }, {  r, -r,  r }, {  r,  r,  r }, {  r,  r, -r },
-					{ -r, -r, -r }, { -r, -r,  r }, { -r,  r,  r }, { -r,  r, -r },
-					{ -r,  r, -r }, {  r,  r, -r }, {  r,  r,  r }, { -r,  r,  r },
-					{ -r, -r, -r }, {  r, -r, -r }, {  r, -r,  r }, { -r, -r,  r }
-				};
-				for (int i = 0; i < lengthOf(rel_pos); ++i)
-				{
-					vertices[i] = pos + rel_pos[i];
-				}
-				int offset = int(vertices - (Vec3*)tvb.data);
-				vertices += lengthOf(rel_pos);
+					auto entity = m_scene->getPointLightEntity(light_cmp);
+					auto pos = universe.getPosition(entity);
+					float r = m_scene->getPointLightRange(light_cmp);
+					Matrix m = universe.getMatrix(entity);
+					m.multiply3x3(r);
+					bgfx::setVertexBuffer(m_cube_vb);
+					bgfx::setIndexBuffer(m_cube_ib);
+					bgfx::setTransform(&m);
+					if(frustum.intersectNearPlane(pos, r * Math::SQRT2))
+					{
+						bgfx::setState((m_render_state | material->getRenderStates()) &
+							~BGFX_STATE_CULL_MASK & ~BGFX_STATE_DEPTH_TEST_MASK | BGFX_STATE_CULL_CCW);
+					}
+					else
+					{
+						bgfx::setState(m_render_state | material->getRenderStates());
+					}
 
-				static const uint16 tmp_indices[] = {
-					0, 2, 1, 2, 0, 3,
-					4, 5, 6, 6, 7, 4,
-					8, 10, 9, 10, 8, 11,
-					12, 13, 14, 14, 15, 12,
-					16, 18, 17, 18, 16, 19,
-					20, 21, 22, 22, 23, 20
-				};
-				for (int i = 0; i < lengthOf(tmp_indices); ++i)
-				{
-					indices[i] = offset + tmp_indices[i];
+					for(int i = 0; i < textures_count; ++i)
+					{
+						bgfx::setTexture(m_bind_framebuffer_texture_idx + i,
+							textures[i].uniform,
+							textures[i].texture);
+					}
+					setPointLightUniforms(material, light_cmp);
+					bgfx::submit(
+						m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
 				}
-				indices += lengthOf(tmp_indices);
-				bgfx::setVertexBuffer(&tvb);
-				bgfx::setIndexBuffer(&tib);
-				if (frustum.intersectNearPlane(pos, r * Math::SQRT2))
-				{
-					bgfx::setState((m_render_state | material->getRenderStates()) &
-						~BGFX_STATE_CULL_MASK & ~BGFX_STATE_DEPTH_TEST_MASK | BGFX_STATE_CULL_CCW);
-				}
-				else
-				{
-					bgfx::setState(m_render_state | material->getRenderStates());
-				}
-
-				for (int i = 0; i < textures_count; ++i)
-				{
-					bgfx::setTexture(m_bind_framebuffer_texture_idx + i,
-						textures[i].uniform,
-						textures[i].texture);
-				}
-				setPointLightUniforms(material, light_cmp);
-				bgfx::submit(
-					m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
 			}
 		}
 	}
@@ -2051,6 +2057,8 @@ struct PipelineImpl : public Pipeline
 	int m_instance_data_idx;
 	ComponentIndex m_applied_camera;
 	ComponentIndex m_current_light;
+	bgfx::VertexBufferHandle m_cube_vb;
+	bgfx::IndexBufferHandle m_cube_ib;
 	bool m_is_current_light_global;
 	bool m_is_wireframe;
 	bool m_is_rendering_in_shadowmap;

@@ -334,11 +334,17 @@ namespace Lumix
 			return *this;
 		}
 
-		value_type& operator[](const key_type& key)
+		value_type& operator[](const key_type& key) const
 		{
-			node_type* n = _find(key);
-			ASSERT(&m_sentinel != n);
-			return n->m_value;
+			size_type pos = getPosition(key);
+			for(node_type* n = &m_table[pos]; nullptr != n && &m_sentinel != n->m_next; n = n->m_next)
+			{
+				if(n->m_key == key)
+					return n->m_value;
+			}
+
+			ASSERT(false);
+			return m_table[0].m_value;
 		}
 
 		// modifiers
