@@ -344,8 +344,6 @@ struct PipelineImpl : public Pipeline
 		m_cam_inv_viewproj_uniform = bgfx::createUniform("u_camInvViewProj", bgfx::UniformType::Mat4);
 		m_cam_inv_proj_uniform = bgfx::createUniform("u_camInvProj", bgfx::UniformType::Mat4);
 		m_tex_shadowmap_uniform = bgfx::createUniform("u_texShadowmap", bgfx::UniformType::Int1);
-		m_attenuation_params_uniform =
-			bgfx::createUniform("u_attenuationParams", bgfx::UniformType::Vec4);
 		m_terrain_scale_uniform = bgfx::createUniform("u_terrainScale", bgfx::UniformType::Vec4);
 		m_rel_camera_pos_uniform = bgfx::createUniform("u_relCamPos", bgfx::UniformType::Vec4);
 		m_terrain_params_uniform = bgfx::createUniform("u_terrainParams", bgfx::UniformType::Vec4);
@@ -354,7 +352,7 @@ struct PipelineImpl : public Pipeline
 			bgfx::createUniform("u_fogColorDensity", bgfx::UniformType::Vec4);
 		m_light_pos_radius_uniform =
 			bgfx::createUniform("u_lightPosRadius", bgfx::UniformType::Vec4);
-		m_light_color_uniform = bgfx::createUniform("u_lightRgbInnerR", bgfx::UniformType::Vec4);
+		m_light_color_attenuation_uniform = bgfx::createUniform("u_lightRgbAttenuation", bgfx::UniformType::Vec4);
 		m_light_dir_fov_uniform = bgfx::createUniform("u_lightDirFov", bgfx::UniformType::Vec4);
 		m_light_specular_uniform =
 			bgfx::createUniform("u_lightSpecular", bgfx::UniformType::Mat4, 64);
@@ -372,7 +370,6 @@ struct PipelineImpl : public Pipeline
 	void destroyUniforms()
 	{
 		bgfx::destroyUniform(m_tex_shadowmap_uniform);
-		bgfx::destroyUniform(m_attenuation_params_uniform);
 		bgfx::destroyUniform(m_terrain_matrix_uniform);
 		bgfx::destroyUniform(m_specular_shininess_uniform);
 		bgfx::destroyUniform(m_bone_matrices_uniform);
@@ -382,7 +379,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::destroyUniform(m_fog_params_uniform);
 		bgfx::destroyUniform(m_fog_color_density_uniform);
 		bgfx::destroyUniform(m_light_pos_radius_uniform);
-		bgfx::destroyUniform(m_light_color_uniform);
+		bgfx::destroyUniform(m_light_color_attenuation_uniform);
 		bgfx::destroyUniform(m_light_dir_fov_uniform);
 		bgfx::destroyUniform(m_ambient_color_uniform);
 		bgfx::destroyUniform(m_shadowmap_matrices_uniform);
@@ -773,45 +770,45 @@ struct PipelineImpl : public Pipeline
 		if (!material->isReady()) return;
 
 		{
-			PROFILE_BLOCK("rendering");
 			PROFILE_INT("light count", m_tmp_local_lights.size());
+			/*struct Data
+			{
+				Matrix mtx;
+				Vec4 a;
+				Vec4 b;
+				Vec4 b;
+				Vec4 b;
+			};
+			auto instance_buffer = bgfx::allocInstanceDataBuffer(m_tmp_local_lights.size(), sizeof(Data));*/
 			for(auto light_cmp : m_tmp_local_lights)
 			{
-				bgfx::TransientVertexBuffer tvb;
-				bgfx::TransientIndexBuffer tib;
-				if(bgfx::allocTransientBuffers(&tvb, m_deferred_point_light_vertex_decl, 24, &tib, 36))
+				auto entity = m_scene->getPointLightEntity(light_cmp);
+				auto pos = universe.getPosition(entity);
+				float r = m_scene->getPointLightRange(light_cmp);
+				Matrix m = universe.getMatrix(entity);
+				m.multiply3x3(r);
+				bgfx::setVertexBuffer(m_cube_vb);
+				bgfx::setIndexBuffer(m_cube_ib);
+				bgfx::setTransform(&m);
+				if(frustum.intersectNearPlane(pos, r * Math::SQRT2))
 				{
-					Vec3* vertices = (Vec3*)tvb.data;
-					uint16* indices = (uint16*)tib.data;
-
-					auto entity = m_scene->getPointLightEntity(light_cmp);
-					auto pos = universe.getPosition(entity);
-					float r = m_scene->getPointLightRange(light_cmp);
-					Matrix m = universe.getMatrix(entity);
-					m.multiply3x3(r);
-					bgfx::setVertexBuffer(m_cube_vb);
-					bgfx::setIndexBuffer(m_cube_ib);
-					bgfx::setTransform(&m);
-					if(frustum.intersectNearPlane(pos, r * Math::SQRT2))
-					{
-						bgfx::setState((m_render_state | material->getRenderStates()) &
-							~BGFX_STATE_CULL_MASK & ~BGFX_STATE_DEPTH_TEST_MASK | BGFX_STATE_CULL_CCW);
-					}
-					else
-					{
-						bgfx::setState(m_render_state | material->getRenderStates());
-					}
-
-					for(int i = 0; i < textures_count; ++i)
-					{
-						bgfx::setTexture(m_bind_framebuffer_texture_idx + i,
-							textures[i].uniform,
-							textures[i].texture);
-					}
-					setPointLightUniforms(material, light_cmp);
-					bgfx::submit(
-						m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
+					bgfx::setState((m_render_state | material->getRenderStates()) &
+						~BGFX_STATE_CULL_MASK & ~BGFX_STATE_DEPTH_TEST_MASK | BGFX_STATE_CULL_CCW);
 				}
+				else
+				{
+					bgfx::setState(m_render_state | material->getRenderStates());
+				}
+
+				for(int i = 0; i < textures_count; ++i)
+				{
+					bgfx::setTexture(m_bind_framebuffer_texture_idx + i,
+						textures[i].uniform,
+						textures[i].texture);
+				}
+				setPointLightUniforms(material, light_cmp);
+				bgfx::submit(
+					m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
 			}
 		}
 	}
@@ -1188,15 +1185,13 @@ struct PipelineImpl : public Pipeline
 					 m_scene->getPointLightIntensity(light_cmp);
 		float range = m_scene->getLightRange(light_cmp);
 		float attenuation = m_scene->getLightAttenuation(light_cmp);
-		Vec4 attenuation_params(range, attenuation, 0, 1);
 		Vec4 light_pos_radius(light_pos, range);
-		Vec4 light_color(color, 0);
+		Vec4 light_color_attenuation(color, attenuation);
 		Vec4 light_dir_fov(light_dir, fov);
 		Vec4 light_specular(m_scene->getPointLightSpecularColor(light_cmp), 1);
 
-		bgfx::setUniform(m_attenuation_params_uniform, &attenuation_params);
 		bgfx::setUniform(m_light_pos_radius_uniform, &light_pos_radius);
-		bgfx::setUniform(m_light_color_uniform, &light_color);
+		bgfx::setUniform(m_light_color_attenuation_uniform, &light_color_attenuation);
 		bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
 		bgfx::setUniform(m_light_specular_uniform, &light_specular);
 
@@ -1238,7 +1233,7 @@ struct PipelineImpl : public Pipeline
 	{
 		if (light_cmp < 0) return;
 
-		bgfx::setUniform(m_light_color_uniform, &m_directional_light_uniforms.diffuse_light_color);
+		bgfx::setUniform(m_light_color_attenuation_uniform, &m_directional_light_uniforms.diffuse_light_color);
 		bgfx::setUniform(m_ambient_color_uniform, &m_directional_light_uniforms.ambient_light_color);
 		bgfx::setUniform(m_light_dir_fov_uniform, &m_directional_light_uniforms.light_dir_fov);
 		bgfx::setUniform(m_fog_color_density_uniform, &m_directional_light_uniforms.fog_color_density);
@@ -2087,13 +2082,12 @@ struct PipelineImpl : public Pipeline
 	bgfx::UniformHandle m_fog_color_density_uniform;
 	bgfx::UniformHandle m_fog_params_uniform;
 	bgfx::UniformHandle m_light_pos_radius_uniform;
-	bgfx::UniformHandle m_light_color_uniform;
+	bgfx::UniformHandle m_light_color_attenuation_uniform;
 	bgfx::UniformHandle m_ambient_color_uniform;
 	bgfx::UniformHandle m_light_dir_fov_uniform;
 	bgfx::UniformHandle m_shadowmap_matrices_uniform;
 	bgfx::UniformHandle m_light_specular_uniform;
 	bgfx::UniformHandle m_terrain_matrix_uniform;
-	bgfx::UniformHandle m_attenuation_params_uniform;
 	bgfx::UniformHandle m_tex_shadowmap_uniform;
 	bgfx::UniformHandle m_cam_view_uniform;
 	bgfx::UniformHandle m_cam_inv_proj_uniform;
