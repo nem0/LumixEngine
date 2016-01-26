@@ -143,7 +143,7 @@ void EntityGroups::serialize(OutputBlob& blob)
 	for(auto& i : m_groups)
 	{
 		blob.write(i.size());
-		blob.write(&i[0], i.size() * sizeof(i[0]));
+		if(!i.empty()) blob.write(&i[0], i.size() * sizeof(i[0]));
 	}
 }
 
@@ -162,7 +162,7 @@ void EntityGroups::deserialize(InputBlob& blob)
 		auto& group = m_groups.emplace(m_allocator);
 		blob.read(group_size);
 		group.resize(group_size);
-		blob.read(&group[0], group_size * sizeof(group[0]));
+		if(group_size > 0) blob.read(&group[0], group_size * sizeof(group[0]));
 	}
 }
 
