@@ -732,74 +732,23 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void deferredLocalLightLoop(int material_index, TextureBindData* textures, int textures_count)
+	void finishDeferredPointLightInstances(int material_index,
+		TextureBindData* textures,
+		int textures_count,
+		const bgfx::InstanceDataBuffer* instance_buffer,
+		bool is_intersecting)
 	{
-		PROFILE_FUNCTION();
-		if (m_applied_camera == INVALID_COMPONENT) return;
 		auto* material = m_materials[material_index];
-		if(!material->isReady()) return;
-
-		Universe& universe = m_scene->getUniverse();
-		Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
-		Vec3 camera_pos = universe.getPosition(camera_entity);
-
-		float camera_fov = Math::degreesToRadians(m_scene->getCameraFOV(m_applied_camera));
-		float camera_ratio =
-			m_scene->getCameraWidth(m_applied_camera) / m_scene->getCameraHeight(m_applied_camera);
-		Frustum frustum;
-		Matrix camera_matrix = universe.getMatrix(camera_entity);
-		float near_plane = m_scene->getCameraNearPlane(m_applied_camera);
-		float far_plane = m_scene->getCameraFarPlane(m_applied_camera);
-		frustum.computePerspective(camera_matrix.getTranslation(),
-			camera_matrix.getZVector(),
-			camera_matrix.getYVector(),
-			camera_fov,
-			camera_ratio,
-			near_plane,
-			far_plane);
-
-		m_tmp_local_lights.clear();
-		m_scene->getPointLights(frustum, m_tmp_local_lights);
-		if (m_tmp_local_lights.empty()) return;
-
-		Matrix view_matrix = camera_matrix;
-		view_matrix.fastInverse();
-		Matrix projection_matrix;
-		projection_matrix.setPerspective(camera_fov, camera_ratio, near_plane, far_plane);
-		bgfx::setViewTransform(m_view_idx, &view_matrix.m11, &projection_matrix.m11);
-
-		PROFILE_INT("light count", m_tmp_local_lights.size());
-		struct Data
-		{
-			Matrix mtx;
-			Vec4 pos_radius;
-			Vec4 color_attenuation;
-			Vec4 dir_fov;
-			Vec4 specular;
-		};
-		const bgfx::InstanceDataBuffer* instance_buffer =
-			bgfx::allocInstanceDataBuffer(m_tmp_local_lights.size(), sizeof(Data));
-		Data* instance_data = (Data*)instance_buffer->data;
-		for(auto light_cmp : m_tmp_local_lights)
-		{
-			auto entity = m_scene->getPointLightEntity(light_cmp);
-			float range = m_scene->getLightRange(light_cmp);
-			Vec3 light_dir = universe.getRotation(entity) * Vec3(0, 0, -1);
-			float attenuation = m_scene->getLightAttenuation(light_cmp);
-			float fov = Math::degreesToRadians(m_scene->getLightFOV(light_cmp));
-			Vec3 color = m_scene->getPointLightColor(light_cmp) *
-				m_scene->getPointLightIntensity(light_cmp);
-
-			instance_data->mtx = universe.getPositionAndRotation(entity);
-			instance_data->mtx.multiply3x3(range);
-			instance_data->pos_radius.set(instance_data->mtx.getTranslation(), range);
-			instance_data->color_attenuation.set(color, attenuation);
-			instance_data->dir_fov.set(light_dir, fov);
-			instance_data->specular.set(m_scene->getPointLightSpecularColor(light_cmp), 1);
-			++instance_data;
-		}
 		bgfx::setInstanceDataBuffer(instance_buffer);
-		bgfx::setState(m_render_state | material->getRenderStates());
+		if(is_intersecting)
+		{
+			bgfx::setState((m_render_state | material->getRenderStates()) &
+				~BGFX_STATE_CULL_MASK & ~BGFX_STATE_DEPTH_TEST_MASK | BGFX_STATE_CULL_CCW);
+		}
+		else
+		{
+			bgfx::setState(m_render_state | material->getRenderStates());
+		}
 		for(int i = 0; i < textures_count; ++i)
 		{
 			bgfx::setTexture(m_bind_framebuffer_texture_idx + i,
@@ -810,6 +759,82 @@ struct PipelineImpl : public Pipeline
 		bgfx::setIndexBuffer(m_cube_ib);
 		bgfx::submit(
 			m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
+	}
+
+
+	void deferredLocalLightLoop(int material_index, TextureBindData* textures, int textures_count)
+	{
+		PROFILE_FUNCTION();
+		if (m_applied_camera == INVALID_COMPONENT) return;
+		auto* material = m_materials[material_index];
+		if(!material->isReady()) return;
+
+		m_tmp_local_lights.clear();
+		m_scene->getPointLights(m_camera_frustum, m_tmp_local_lights);
+		if (m_tmp_local_lights.empty()) return;
+
+		PROFILE_INT("light count", m_tmp_local_lights.size());
+		struct Data
+		{
+			Matrix mtx;
+			Vec4 pos_radius;
+			Vec4 color_attenuation;
+			Vec4 dir_fov;
+			Vec4 specular;
+		};
+		const bgfx::InstanceDataBuffer* instance_buffer[2] = {nullptr, nullptr};
+		Data* instance_data[2] = { nullptr, nullptr };
+		Universe& universe = m_scene->getUniverse();
+		for(auto light_cmp : m_tmp_local_lights)
+		{
+			auto entity = m_scene->getPointLightEntity(light_cmp);
+			float range = m_scene->getLightRange(light_cmp);
+			Vec3 light_dir = universe.getRotation(entity) * Vec3(0, 0, -1);
+			float attenuation = m_scene->getLightAttenuation(light_cmp);
+			float fov = Math::degreesToRadians(m_scene->getLightFOV(light_cmp));
+			Vec3 color = m_scene->getPointLightColor(light_cmp) *
+				m_scene->getPointLightIntensity(light_cmp);
+
+			Vec3 pos = universe.getPosition(entity);
+			int buffer_idx = m_camera_frustum.intersectNearPlane(pos, range * Math::SQRT2) ? 0 : 1;
+			if(!instance_buffer[buffer_idx])
+			{
+				instance_buffer[buffer_idx] = bgfx::allocInstanceDataBuffer(128, sizeof(Data));
+				instance_data[buffer_idx] = (Data*)instance_buffer[buffer_idx]->data;
+			}
+
+			auto* id = instance_data[buffer_idx];
+			id->mtx = universe.getPositionAndRotation(entity);
+			id->mtx.multiply3x3(range);
+			id->pos_radius.set(pos, range);
+			id->color_attenuation.set(color, attenuation);
+			id->dir_fov.set(light_dir, fov);
+			id->specular.set(m_scene->getPointLightSpecularColor(light_cmp), 1);
+			++instance_data[buffer_idx];
+
+			if(instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx]->data == 128)
+			{
+				finishDeferredPointLightInstances(material_index,
+					textures,
+					textures_count,
+					instance_buffer[buffer_idx],
+					buffer_idx == 0);
+				instance_buffer[buffer_idx] = nullptr;
+				instance_data[buffer_idx] = nullptr;
+			}
+		}
+
+		for(int buffer_idx = 0; buffer_idx < 2; ++buffer_idx)
+		{
+			if(instance_data[buffer_idx])
+			{
+				finishDeferredPointLightInstances(material_index,
+					textures,
+					textures_count,
+					instance_buffer[buffer_idx],
+					buffer_idx == 0);
+			}
+		}
 	}
 
 

@@ -3072,7 +3072,7 @@ public:
 	void detectLightInfluencedGeometry(int light_index)
 	{
 		if (!m_is_forward_rendered) return;
-		
+
 		Frustum frustum = getPointLightFrustum(light_index);
 		m_culling_system->cullToFrustum(frustum, 0xffffFFFF);
 		const CullingSystem::Results& results =
