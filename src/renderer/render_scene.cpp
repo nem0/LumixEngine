@@ -2568,6 +2568,7 @@ public:
 		const Vec3& dir,
 		ComponentIndex ignored_renderable) override
 	{
+		PROFILE_FUNCTION();
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
 		Universe& universe = getUniverse();
@@ -2975,6 +2976,7 @@ public:
 	{
 		auto& r = m_renderables[cmp];
 		if (!r.model) return;
+		if (path == r.meshes[index].material->getPath()) return;
 
 		auto& rm = r.model->getResourceManager();
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
