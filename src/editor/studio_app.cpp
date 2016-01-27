@@ -824,8 +824,6 @@ public:
 		io.KeyMap[ImGuiKey_X] = 'X';
 		io.KeyMap[ImGuiKey_Y] = 'Y';
 		io.KeyMap[ImGuiKey_Z] = 'Z';
-
-		ImGui::GetStyle().WindowFillAlphaDefault = 1.0f;
 	}
 
 

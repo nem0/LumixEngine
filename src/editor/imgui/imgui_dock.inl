@@ -1,4 +1,5 @@
 #include "imgui.h"
+#define IMGUI_DEFINE_PLACEMENT_NEW
 #include "imgui_internal.h"
 #include "core/fs/os_file.h"
 #include <lua.hpp>
@@ -216,7 +217,7 @@ struct DockContext
         }
 
         Dock* new_dock = (Dock*)MemAlloc(sizeof(Dock));
-        new (new_dock) Dock();
+		IM_PLACEMENT_NEW (new_dock) Dock();
         m_docks.push_back(new_dock);
         new_dock->label = ImStrdup(label);
         IM_ASSERT(new_dock->label);
@@ -314,7 +315,7 @@ struct DockContext
         ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
                                  ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
-                                 ImGuiWindowFlags_NoScrollWithMouse;
+                                 ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_ShowBorders;
         Dock* root = getRootDock();
         if (root)
         {
@@ -749,7 +750,7 @@ struct DockContext
         else
         {
             Dock* container = (Dock*)MemAlloc(sizeof(Dock));
-            new (container)Dock();
+            IM_PLACEMENT_NEW (container)Dock();
             m_docks.push_back(container);
             container->children[0] = &dest->getFirstTab();
             container->children[1] = &dock;
@@ -826,7 +827,7 @@ struct DockContext
             SetNextWindowPos(dock.pos);
             SetNextWindowSize(dock.size);
             bool ret = Begin(
-                label, opened, dock.size, -1.0f, ImGuiWindowFlags_NoCollapse | extra_flags);
+				label, opened, dock.size, -1.0f, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_ShowBorders | extra_flags);
             m_end_action = EndAction_End;
             dock.pos = GetWindowPos();
             dock.size = GetWindowSize();
@@ -861,7 +862,8 @@ struct DockContext
                                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
                                  ImGuiWindowFlags_NoSavedSettings | extra_flags;
         bool ret = BeginChild(label, size, true, flags);
-        ImDrawList* draw_list = GetWindowDrawList();
+		PopStyleColor();
+		ImDrawList* draw_list = GetWindowDrawList();
         return ret;
     }
 
@@ -874,9 +876,10 @@ struct DockContext
         }
         else if (m_end_action == EndAction_EndChild)
         {
+			PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
             EndChild();
-            PopStyleColor();
-        }
+			PopStyleColor();
+		}
         m_current = nullptr;
         if (m_end_action > EndAction_None) endPanel();
     }
@@ -947,7 +950,7 @@ struct DockContext
             while (lua_next(L, -2) != 0)
             {
                 Dock* new_dock = (Dock*)MemAlloc(sizeof(Dock));
-                m_docks.push_back(new (new_dock) Dock());
+				m_docks.push_back(IM_PLACEMENT_NEW(new_dock) Dock());
                 lua_pop(L, 1);
             }
         }
