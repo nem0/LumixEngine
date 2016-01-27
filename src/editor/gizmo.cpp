@@ -554,7 +554,7 @@ struct GizmoImpl : public Gizmo
 		Universe* universe = m_editor.getUniverse();
 		Array<Vec3> new_positions(m_editor.getAllocator());
 		Array<Quat> new_rotations(m_editor.getAllocator());
-		auto mtx = universe->getMatrix(m_entities[m_active]);
+		auto mtx = getMatrix(m_entities[m_active]);
 
 		Vec3 axis;
 		switch (m_transform_axis)
