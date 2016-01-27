@@ -7,6 +7,8 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "engine.h"
+#include "engine/property_descriptor.h"
+#include "engine/property_register.h"
 #include "renderer/render_scene.h"
 #include "universe/universe.h"
 
@@ -41,10 +43,7 @@ private:
 	};
 
 public:
-	AnimationSceneImpl(IPlugin& anim_system,
-					   Engine& engine,
-					   Universe& ctx,
-					   IAllocator& allocator)
+	AnimationSceneImpl(IPlugin& anim_system, Engine& engine, Universe& ctx, IAllocator& allocator)
 		: m_universe(ctx)
 		, m_engine(engine)
 		, m_anim_system(anim_system)
@@ -62,16 +61,20 @@ public:
 		}
 		ASSERT(m_render_scene);
 		m_render_scene->renderableCreated()
-			.bind<AnimationSceneImpl, &AnimationSceneImpl::onRenderableCreated>(
-				this);
+			.bind<AnimationSceneImpl, &AnimationSceneImpl::onRenderableCreated>(this);
 		m_render_scene->renderableDestroyed()
-			.bind<AnimationSceneImpl,
-				  &AnimationSceneImpl::onRenderableDestroyed>(this);
+			.bind<AnimationSceneImpl, &AnimationSceneImpl::onRenderableDestroyed>(this);
 	}
 
 
 	~AnimationSceneImpl()
 	{
+		for(auto& animable : m_animables)
+		{
+			if(animable.m_is_free) continue;
+			unloadAnimation(animable.m_animation);
+		}
+
 		m_render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (m_render_scene)
 		{
@@ -114,13 +117,23 @@ public:
 	}
 
 
-	virtual void destroyComponent(ComponentIndex component, uint32 type)
+	void unloadAnimation(Animation* animation)
+	{
+		if(!animation) return;
+
+		auto& rm = animation->getResourceManager();
+		auto* animation_manager = rm.get(ResourceManager::ANIMATION);
+		animation_manager->unload(*animation);
+	}
+
+
+	void destroyComponent(ComponentIndex component, uint32 type) override
 	{
 		if (type == ANIMABLE_HASH)
 		{
+			unloadAnimation(m_animables[component].m_animation);
 			m_animables[component].m_is_free = true;
-			m_universe.destroyComponent(
-				m_animables[component].m_entity, type, this, component);
+			m_universe.destroyComponent(m_animables[component].m_entity, type, this, component);
 		}
 	}
 
@@ -157,28 +170,23 @@ public:
 			serializer.read(m_animables[i].m_is_free);
 			char path[MAX_PATH_LENGTH];
 			serializer.readString(path, sizeof(path));
-			m_animables[i].m_animation = path[0] == '\0' ? nullptr : loadAnimation(path);
+			m_animables[i].m_animation = path[0] == '\0' ? nullptr : loadAnimation(Path(path));
 			m_universe.addComponent(m_animables[i].m_entity, ANIMABLE_HASH, this, i);
 		}
 	}
 
 
-	const char* getPreview(ComponentIndex cmp)
+	Path getAnimation(ComponentIndex cmp)
 	{
 		return m_animables[cmp].m_animation
-				   ? m_animables[cmp].m_animation->getPath().c_str()
-				   : "";
+				   ? m_animables[cmp].m_animation->getPath()
+				   : Path("");
 	}
 
 
-	void setPreview(ComponentIndex cmp, const char* path)
+	void setAnimation(ComponentIndex cmp, const Path& path)
 	{
-		playAnimation(cmp, path);
-	}
-
-
-	void playAnimation(ComponentIndex cmp, const char* path)
-	{
+		unloadAnimation(m_animables[cmp].m_animation);
 		m_animables[cmp].m_animation = loadAnimation(path);
 		m_animables[cmp].m_time = 0;
 	}
@@ -212,11 +220,10 @@ public:
 
 
 private:
-	Animation* loadAnimation(const char* path)
+	Animation* loadAnimation(const Path& path)
 	{
 		ResourceManager& rm = m_engine.getResourceManager();
-		return static_cast<Animation*>(
-			rm.get(ResourceManager::ANIMATION)->load(Path(path)));
+		return static_cast<Animation*>(rm.get(ResourceManager::ANIMATION)->load(path));
 	}
 
 
@@ -299,6 +306,14 @@ public:
 		, m_engine(engine)
 		, m_animation_manager(m_allocator)
 	{
+		PropertyRegister::registerComponentType("animable", "Animable");
+
+		PropertyRegister::add("animable", LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationSceneImpl>)("Animation",
+			&AnimationSceneImpl::getAnimation,
+			&AnimationSceneImpl::setAnimation,
+			"Animation (*.ani)",
+			ResourceManager::ANIMATION,
+			m_allocator));
 	}
 
 	IScene* createScene(Universe& ctx) override
