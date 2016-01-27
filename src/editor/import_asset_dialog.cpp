@@ -840,7 +840,8 @@ struct ConvertTask : public Lumix::MT::Task
 
 				if (mesh->mTangents)
 				{
-					auto tangent = mesh->mTangents[j];
+					auto tangent = normal_matrix * mesh->mTangents[j];
+					tangent.Normalize();
 					if (z_up) tangent.Set(tangent.x, tangent.z, -tangent.y);
 					Lumix::uint32 int_tangent = packF4u(tangent);
 					file.write((const char*)&int_tangent, sizeof(int_tangent));
