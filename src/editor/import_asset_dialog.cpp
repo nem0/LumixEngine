@@ -833,6 +833,7 @@ struct ConvertTask : public Lumix::MT::Task
 				}
 
 				auto normal = normal_matrix * mesh->mNormals[j];
+				normal.Normalize();
 				if (z_up) normal.Set(normal.x, normal.z, -normal.y);
 				Lumix::uint32 int_normal = packF4u(normal);
 				file.write((const char*)&int_normal, sizeof(int_normal));

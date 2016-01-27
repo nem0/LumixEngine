@@ -497,7 +497,7 @@ bool Model::parseMeshes(FS::IFile& file)
 			material_manager->unload(*material);
 			return false;
 		}
-		
+
 		char mesh_name[MAX_PATH_LENGTH];
 		mesh_name[str_size] = 0;
 		file.read(mesh_name, str_size);

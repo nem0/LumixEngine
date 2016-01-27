@@ -787,6 +787,8 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 			int vertices_count,
 			bool lines) override
 		{
+			if (!m_shader->isReady()) return;
+
 			auto& renderer = static_cast<Lumix::Renderer&>(m_render_scene->getPlugin());
 			Lumix::TransientGeometry geom(
 				vertices, vertices_count, renderer.getBasicVertexDecl(), indices, indices_count);
