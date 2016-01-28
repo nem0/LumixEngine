@@ -325,10 +325,16 @@ static void registerProperties(IAllocator& allocator)
 							  &RenderScene::getGlobalLightColor,
 							  &RenderScene::setGlobalLightColor,
 							  allocator));
-	PropertyRegister::add(
-		"global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)(
-			"Fog color", &RenderScene::getFogColor, &RenderScene::setFogColor, allocator));
+	PropertyRegister::add("global_light",
+		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Specular color",
+							  &RenderScene::getGlobalLightSpecular,
+							  &RenderScene::setGlobalLightSpecular,
+							  allocator));
+	PropertyRegister::add("global_light",
+		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Fog color",
+							  &RenderScene::getFogColor,
+							  &RenderScene::setFogColor,
+							  allocator));
 
 	PropertyRegister::add("point_light",
 		LUMIX_NEW(allocator, BoolPropertyDescriptor<RenderScene>)("Cast shadows",

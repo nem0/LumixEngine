@@ -312,6 +312,7 @@ public:
 										 float intensity) = 0;
 	virtual void setPointLightColor(ComponentIndex cmp, const Vec3& color) = 0;
 	virtual void setGlobalLightColor(ComponentIndex cmp, const Vec3& color) = 0;
+	virtual void setGlobalLightSpecular(ComponentIndex cmp, const Vec3& color) = 0;
 	virtual void setLightAmbientIntensity(ComponentIndex cmp,
 										  float intensity) = 0;
 	virtual void setLightAmbientColor(ComponentIndex cmp,
@@ -324,6 +325,7 @@ public:
 	virtual float getGlobalLightIntensity(ComponentIndex cmp) = 0;
 	virtual Vec3 getPointLightColor(ComponentIndex cmp) = 0;
 	virtual Vec3 getGlobalLightColor(ComponentIndex cmp) = 0;
+	virtual Vec3 getGlobalLightSpecular(ComponentIndex cmp) = 0;
 	virtual float getLightAmbientIntensity(ComponentIndex cmp) = 0;
 	virtual Vec3 getLightAmbientColor(ComponentIndex cmp) = 0;
 	virtual float getFogDensity(ComponentIndex cmp) = 0;
