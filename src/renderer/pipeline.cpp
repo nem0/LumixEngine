@@ -61,6 +61,7 @@ struct DirectionalLightUniforms
 	Vec4 light_dir_fov;
 	Vec4 fog_color_density;
 	Vec4 fog_params;
+	Vec4 specular;
 };
 
 
@@ -349,6 +350,7 @@ struct PipelineImpl : public Pipeline
 	{
 		m_texture_size_uniform = bgfx::createUniform("u_textureSize", bgfx::UniformType::Vec4);
 		m_cam_view_uniform = bgfx::createUniform("u_camView", bgfx::UniformType::Mat4);
+		m_inv_cam_view_uniform = bgfx::createUniform("u_invCamView", bgfx::UniformType::Mat4);
 		m_cam_inv_viewproj_uniform = bgfx::createUniform("u_camInvViewProj", bgfx::UniformType::Mat4);
 		m_cam_inv_proj_uniform = bgfx::createUniform("u_camInvProj", bgfx::UniformType::Mat4);
 		m_tex_shadowmap_uniform = bgfx::createUniform("u_texShadowmap", bgfx::UniformType::Int1);
@@ -395,6 +397,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::destroyUniform(m_cam_inv_proj_uniform);
 		bgfx::destroyUniform(m_cam_inv_viewproj_uniform);
 		bgfx::destroyUniform(m_cam_view_uniform);
+		bgfx::destroyUniform(m_inv_cam_view_uniform);
 		bgfx::destroyUniform(m_texture_size_uniform);
 	}
 
@@ -853,7 +856,7 @@ struct PipelineImpl : public Pipeline
 					textures,
 					textures_count,
 					instance_buffer[buffer_idx],
-					instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx]->data,
+					int(instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx]->data),
 					buffer_idx == 0);
 			}
 		}
@@ -1274,6 +1277,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::setUniform(m_fog_color_density_uniform, &m_directional_light_uniforms.fog_color_density);
 		bgfx::setUniform(m_fog_params_uniform, &m_directional_light_uniforms.fog_params);
 		bgfx::setUniform(m_shadowmap_matrices_uniform, &m_shadow_viewprojection, 4);
+		bgfx::setUniform(m_light_specular_uniform, &m_directional_light_uniforms.specular);
 	}
 
 
@@ -1439,6 +1443,15 @@ struct PipelineImpl : public Pipeline
 			}
 		}
 
+		if (m_is_current_light_global)
+		{
+			setDirectionalLightUniforms(m_current_light);
+		}
+		else
+		{
+			setPointLightUniforms(material, m_current_light);
+		}
+
 		if (m_applied_camera >= 0)
 		{
 			Matrix projection_matrix;
@@ -1461,6 +1474,7 @@ struct PipelineImpl : public Pipeline
 			bgfx::setUniform(m_cam_inv_proj_uniform, &inv_projection.m11);
 			bgfx::setUniform(m_cam_inv_viewproj_uniform, &inv_view_proj.m11);
 			bgfx::setUniform(m_cam_view_uniform, &view_matrix.m11);
+			bgfx::setUniform(m_inv_cam_view_uniform, &camera_matrix.m11);
 		}
 
 		bgfx::setState(m_render_state | material->getRenderStates());
@@ -1500,13 +1514,15 @@ struct PipelineImpl : public Pipeline
 				m_scene->getGlobalLightIntensity(m_current_light);
 			Vec3 ambient_color = m_scene->getLightAmbientColor(m_current_light) *
 				m_scene->getLightAmbientIntensity(m_current_light);
-			m_directional_light_uniforms.diffuse_light_color.set(diffuse_color, 1);
 			Vec3 fog_color = m_scene->getFogColor(m_current_light);
 			float fog_density = m_scene->getFogDensity(m_current_light);
+			Vec3 specular = m_scene->getGlobalLightSpecular(m_current_light);
+			m_directional_light_uniforms.diffuse_light_color.set(diffuse_color, 1);
 			m_directional_light_uniforms.ambient_light_color.set(ambient_color, 1);
 			m_directional_light_uniforms.light_dir_fov.set(light_dir, 0);
 			fog_density *= fog_density * fog_density;
 			m_directional_light_uniforms.fog_color_density.set(fog_color, fog_density);
+			m_directional_light_uniforms.specular.set(specular, 0);
 			m_directional_light_uniforms.fog_params.set(m_scene->getFogBottom(m_current_light),
 				m_scene->getFogHeight(m_current_light),
 				0,
@@ -2139,6 +2155,7 @@ struct PipelineImpl : public Pipeline
 	bgfx::UniformHandle m_terrain_matrix_uniform;
 	bgfx::UniformHandle m_tex_shadowmap_uniform;
 	bgfx::UniformHandle m_cam_view_uniform;
+	bgfx::UniformHandle m_inv_cam_view_uniform;
 	bgfx::UniformHandle m_cam_inv_proj_uniform;
 	bgfx::UniformHandle m_cam_inv_viewproj_uniform;
 	bgfx::UniformHandle m_texture_size_uniform;
