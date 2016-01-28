@@ -50,4 +50,5 @@ class SceneView
 		Lumix::Pipeline* m_deferred_pipeline;
 		Lumix::Pipeline* m_current_pipeline;
 		bgfx::TextureHandle m_texture_handle;
+		bool m_show_stats;
 };

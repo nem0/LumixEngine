@@ -2625,8 +2625,7 @@ public:
 	{
 		if (m_selected_entities.size() == 1)
 		{
-			ComponentUID cmp =
-				getComponent(m_selected_entities[0], RENDERABLE_HASH);
+			ComponentUID cmp = getComponent(m_selected_entities[0], RENDERABLE_HASH);
 			if (cmp.isValid())
 			{
 				Array<Entity> entities(m_allocator);
