@@ -346,7 +346,7 @@ static void registerProperties(IAllocator& allocator)
 							  &RenderScene::getPointLightIntensity,
 							  &RenderScene::setPointLightIntensity,
 							  0.0f,
-							  1.0f,
+							  999.0f,
 							  0.05f,
 							  allocator));
 	PropertyRegister::add("point_light",
