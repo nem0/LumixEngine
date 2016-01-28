@@ -816,7 +816,7 @@ struct PipelineImpl : public Pipeline
 				m_scene->getPointLightIntensity(light_cmp);
 
 			Vec3 pos = universe.getPosition(entity);
-			int buffer_idx = m_camera_frustum.intersectNearPlane(pos, range * Math::SQRT2) ? 0 : 1;
+			int buffer_idx = m_camera_frustum.intersectNearPlane(pos, range * Math::SQRT3) ? 0 : 1;
 			if(!instance_buffer[buffer_idx])
 			{
 				instance_buffer[buffer_idx] = bgfx::allocInstanceDataBuffer(128, sizeof(Data));
