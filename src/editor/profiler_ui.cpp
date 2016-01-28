@@ -585,8 +585,7 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 														 : block->m_frames[m_current_frame];
 						if (ImGui::Selectable(
 								StringBuilder<50>("") << frame << "###t" << (Lumix::int64)block,
-								m_current_block == block,
-								ImGuiSelectableFlags_SpanAllColumns))
+								m_current_block == block))
 						{
 							m_current_block = block;
 						}
