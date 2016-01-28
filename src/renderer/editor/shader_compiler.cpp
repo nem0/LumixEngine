@@ -490,6 +490,7 @@ void ShaderCompiler::update()
 
 				char buf[1024];
 				int read;
+				Lumix::g_log_error.log("shader compiler") << m_processes[i].path;
 				while ((read = PlatformInterface::getProcessOutput(
 							*m_processes[i].process, buf, sizeof(buf) - 1)) > 0)
 				{
