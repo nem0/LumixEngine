@@ -123,6 +123,10 @@ static bgfx::TextureFormat::Enum getFormat(const char* name)
 	{
 		return bgfx::TextureFormat::RGBA8;
 	}
+	else if (compareString(name, "rgba16f") == 0)
+	{
+		return bgfx::TextureFormat::RGBA16F;
+	}
 	else if (compareString(name, "r32f") == 0)
 	{
 		return bgfx::TextureFormat::R32F;
