@@ -22,6 +22,13 @@ class TransientGeometry;
 class LUMIX_RENDERER_API Pipeline
 {
 	public:
+		struct Stats
+		{
+			int m_draw_call_count;
+			int m_instance_count;
+			int m_triangle_count;
+		};
+
 		struct CustomCommandHandler
 		{
 			Delegate<void> callback;
@@ -65,6 +72,7 @@ class LUMIX_RENDERER_API Pipeline
 		virtual void setParameter(int index, bool value) = 0;
 		virtual bool getParameter(int index) = 0;
 		virtual bool isReady() const = 0;
+		virtual const Stats& getStats() = 0;
 };
 
 

@@ -368,7 +368,7 @@ public:
 
 	void destroy() override {}
 
-	BaseProxyAllocator m_allocator;
+	Lumix::IAllocator& m_allocator;
 	Engine& m_engine;
 	AnimationManager m_animation_manager;
 

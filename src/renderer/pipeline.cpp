@@ -111,6 +111,13 @@ struct PipelineImpl : public Pipeline
 
 		createParticleBuffers();
 		createCubeBuffers();
+		m_stats = {};
+	}
+
+
+	const Stats& getStats() override
+	{
+		return m_stats;
 	}
 
 
@@ -271,6 +278,7 @@ struct PipelineImpl : public Pipeline
 
 	lua_State* m_lua_state;
 	Array<string> m_parameters;
+	Stats m_stats;
 
 
 	int getParameterCount() const override
@@ -455,6 +463,9 @@ struct PipelineImpl : public Pipeline
 					bgfx::setVertexBuffer(m_particle_vertex_buffer);
 					bgfx::setIndexBuffer(m_particle_index_buffer);
 					bgfx::setState(m_render_state | material->getRenderStates());
+					++m_stats.m_draw_call_count;
+					m_stats.m_instance_count += PARTICLE_BATCH_SIZE;
+					m_stats.m_triangle_count += PARTICLE_BATCH_SIZE * 2;
 					bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
 				}
 
@@ -468,10 +479,14 @@ struct PipelineImpl : public Pipeline
 		}
 
 		setMaterial(material);
-		bgfx::setInstanceDataBuffer(instance_buffer, emitter.m_life.size() % PARTICLE_BATCH_SIZE);
+		int instance_count = emitter.m_life.size() % PARTICLE_BATCH_SIZE;
+		bgfx::setInstanceDataBuffer(instance_buffer, instance_count);
 		bgfx::setVertexBuffer(m_particle_vertex_buffer);
 		bgfx::setIndexBuffer(m_particle_index_buffer);
 		bgfx::setState(m_render_state | material->getRenderStates());
+		++m_stats.m_draw_call_count;
+		m_stats.m_instance_count += instance_count;
+		m_stats.m_triangle_count += instance_count * 2;
 		bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
@@ -533,6 +548,9 @@ struct PipelineImpl : public Pipeline
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(data.buffer, data.instance_count);
 		ShaderInstance& shader_instance = mesh.material->getShaderInstance();
+		++m_stats.m_draw_call_count;
+		m_stats.m_instance_count += data.instance_count;
+		m_stats.m_triangle_count += data.instance_count * mesh.indices_count / 3;
 		bgfx::submit(m_view_idx, shader_instance.m_program_handles[m_pass_idx]);
 
 		data.buffer = nullptr;
@@ -736,9 +754,10 @@ struct PipelineImpl : public Pipeline
 		TextureBindData* textures,
 		int textures_count,
 		const bgfx::InstanceDataBuffer* instance_buffer,
+		int instance_count,
 		bool is_intersecting)
 	{
-		bgfx::setInstanceDataBuffer(instance_buffer);
+		bgfx::setInstanceDataBuffer(instance_buffer, instance_count);
 		if(is_intersecting)
 		{
 			bgfx::setState((m_render_state | material->getRenderStates()) &
@@ -756,8 +775,10 @@ struct PipelineImpl : public Pipeline
 		}
 		bgfx::setVertexBuffer(m_cube_vb);
 		bgfx::setIndexBuffer(m_cube_ib);
-		bgfx::submit(
-			m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
+		++m_stats.m_draw_call_count;
+		m_stats.m_instance_count += instance_count;
+		m_stats.m_triangle_count +=	instance_count * 12;
+		bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
 
@@ -817,6 +838,7 @@ struct PipelineImpl : public Pipeline
 					textures,
 					textures_count,
 					instance_buffer[buffer_idx],
+					128,
 					buffer_idx == 0);
 				instance_buffer[buffer_idx] = nullptr;
 				instance_data[buffer_idx] = nullptr;
@@ -831,6 +853,7 @@ struct PipelineImpl : public Pipeline
 					textures,
 					textures_count,
 					instance_buffer[buffer_idx],
+					instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx]->data,
 					buffer_idx == 0);
 			}
 		}
@@ -1442,6 +1465,9 @@ struct PipelineImpl : public Pipeline
 
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::setVertexBuffer(&vb);
+		++m_stats.m_draw_call_count;
+		++m_stats.m_instance_count;
+		m_stats.m_triangle_count += 2;
 		bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
@@ -1586,8 +1612,10 @@ struct PipelineImpl : public Pipeline
 		bgfx::setIndexBuffer(
 			renderable.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
 		bgfx::setState(m_render_state | material->getRenderStates());
-		bgfx::submit(m_view_idx,
-			mesh.material->getShaderInstance().m_program_handles[m_pass_idx]);
+		++m_stats.m_draw_call_count;
+		++m_stats.m_instance_count;
+		m_stats.m_triangle_count += mesh.indices_count / 3;
+		bgfx::submit(m_view_idx, mesh.material->getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
 
@@ -1614,6 +1642,9 @@ struct PipelineImpl : public Pipeline
 		bgfx::setTransform(&mtx.m11);
 		bgfx::setVertexBuffer(&geom.getVertexBuffer());
 		bgfx::setIndexBuffer(&geom.getIndexBuffer(), first_index, num_indices);
+		++m_stats.m_draw_call_count;
+		++m_stats.m_instance_count;
+		m_stats.m_triangle_count += num_indices / 3;
 		bgfx::submit(m_view_idx, program_handle);
 	}
 
@@ -1779,6 +1810,9 @@ struct PipelineImpl : public Pipeline
 		bgfx::setState(m_render_state | mesh.material->getRenderStates());
 		bgfx::setInstanceDataBuffer(instance_buffer, m_terrain_instances[index].m_count);
 		auto shader_instance = material->getShaderInstance().m_program_handles[m_pass_idx];
+		++m_stats.m_draw_call_count;
+		m_stats.m_instance_count += m_terrain_instances[index].m_count;
+		m_stats.m_triangle_count += m_terrain_instances[index].m_count * mesh_part_indices_count;
 		bgfx::submit(m_view_idx, shader_instance);
 
 		m_terrain_instances[index].m_count = 0;
@@ -1801,6 +1835,9 @@ struct PipelineImpl : public Pipeline
 			grass.m_model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(idb, grass.m_matrix_count);
+		++m_stats.m_draw_call_count;
+		m_stats.m_instance_count += grass.m_matrix_count;
+		m_stats.m_triangle_count += grass.m_matrix_count * mesh.indices_count;
 		bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
@@ -1878,6 +1915,7 @@ struct PipelineImpl : public Pipeline
 
 		if (!isReady()) return;
 
+		m_stats = {};
 		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE |
 						 BGFX_STATE_MSAA;
 		m_applied_camera = INVALID_COMPONENT;

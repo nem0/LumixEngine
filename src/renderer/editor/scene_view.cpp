@@ -4,6 +4,7 @@
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
+#include "core/string.h"
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
@@ -26,6 +27,7 @@ SceneView::SceneView()
 	m_camera_speed = 0.1f;
 	m_is_pipeline_switch = false;
 	m_is_mouse_captured = false;
+	m_show_stats = false;
 }
 
 
@@ -192,6 +194,7 @@ void SceneView::onGUI()
 {
 	PROFILE_FUNCTION();
 	m_is_opened = false;
+	ImVec2 view_pos;
 	if (ImGui::BeginDock("Scene View"))
 	{
 		m_is_opened = true;
@@ -211,6 +214,7 @@ void SceneView::onGUI()
 			auto content_min = ImGui::GetCursorScreenPos();
 			ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
 			ImGui::Image(&m_texture_handle, size);
+			view_pos = content_min;
 			if (ImGui::IsItemHovered())
 			{
 				m_editor->setGizmoUseStep(m_toggle_gizmo_step_action->isActive());
@@ -262,15 +266,14 @@ void SceneView::onGUI()
 			m_editor->getGizmo().setStep(step);
 		}
 
-		ImGui::SameLine();
 		int count = m_current_pipeline->getParameterCount();
 		if (count)
 		{
+			ImGui::SameLine();
 			if (ImGui::Button("Pipeline"))
 			{
 				ImGui::OpenPopup("pipeline_parameters_popup");
 			}
-			ImGui::SameLine();
 
 			if (ImGui::BeginPopup("pipeline_parameters_popup"))
 			{
@@ -292,9 +295,38 @@ void SceneView::onGUI()
 			}
 		}
 
+		ImGui::SameLine();
+		ImGui::Checkbox("Stats", &m_show_stats);
+
 		bool is_deferred = m_current_pipeline == m_deferred_pipeline;
+		ImGui::SameLine();
 		m_is_pipeline_switch = ImGui::Checkbox("Deferred", &is_deferred);
 	}
 
 	ImGui::EndDock();
+
+	if(m_show_stats)
+	{
+		view_pos.x += ImGui::GetStyle().FramePadding.x;
+		view_pos.y += ImGui::GetStyle().FramePadding.y;
+		ImGui::SetNextWindowPos(view_pos);
+		auto col = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
+		col.w = 0.3f;
+		ImGui::PushStyleColor(ImGuiCol_WindowBg, col);
+		if (ImGui::Begin("###stats_overlay",
+				nullptr,
+				ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
+					ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+					ImGuiWindowFlags_ShowBorders))
+		{
+			const auto& stats = m_current_pipeline->getStats();
+			ImGui::LabelText("Draw calls", "%d", stats.m_draw_call_count);
+			ImGui::LabelText("Instances", "%d", stats.m_instance_count);
+			char buf[30];
+			Lumix::toCStringPretty(stats.m_triangle_count, buf, Lumix::lengthOf(buf));
+			ImGui::LabelText("Triangles", buf);
+		}
+		ImGui::End();
+		ImGui::PopStyleColor();
+	}
 }
