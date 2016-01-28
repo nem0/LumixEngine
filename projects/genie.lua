@@ -179,7 +179,7 @@ project "animation"
 	includedirs { "../src" }
 	includedirs { "../external/bgfx/include" }
 	defines { "BUILDING_ANIMATION" }
-	links { "engine", "renderer" }
+	links { "engine", "renderer", "editor" }
 
 	defaultConfigurations()
 

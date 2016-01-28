@@ -6,6 +6,10 @@
 #include "core/json_serializer.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
+#include "editor/asset_browser.h"
+#include "editor/imgui/imgui.h"
+#include "editor/studio_app.h"
+#include "editor/world_editor.h"
 #include "engine.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
@@ -49,6 +53,7 @@ public:
 		, m_anim_system(anim_system)
 		, m_animables(allocator)
 	{
+		m_is_game_running = false;
 		m_render_scene = nullptr;
 		uint32 hash = crc32("renderer");
 		for (auto* scene : ctx.getScenes())
@@ -84,6 +89,19 @@ public:
 				.unbind<AnimationSceneImpl, &AnimationSceneImpl::onRenderableDestroyed>(this);
 		}
 	}
+
+
+	void startGame() override 
+	{
+		m_is_game_running = true;
+	}
+
+
+	void stopGame() override
+	{
+		m_is_game_running = false;
+	}
+
 
 
 	Universe& getUniverse() override { return m_universe; }
@@ -196,6 +214,7 @@ public:
 	{
 		PROFILE_FUNCTION();
 		if (m_animables.empty()) return;
+		if (!m_is_game_running) return;
 
 		for (int i = 0, c = m_animables.size(); i < c; ++i)
 		{
@@ -203,9 +222,11 @@ public:
 			if (!animable.m_is_free && animable.m_animation &&
 				animable.m_animation->isReady())
 			{
+				auto* pose = m_render_scene->getPose(animable.m_renderable);
+				if (!pose) continue;
 				animable.m_animation->getPose(
 					animable.m_time,
-					*m_render_scene->getPose(animable.m_renderable),
+					*pose,
 					*m_render_scene->getRenderableModel(animable.m_renderable));
 				float t = animable.m_time + time_delta;
 				float l = animable.m_animation->getLength();
@@ -295,6 +316,7 @@ private:
 	Engine& m_engine;
 	Array<Animable> m_animables;
 	RenderScene* m_render_scene;
+	bool m_is_game_running;
 };
 
 
@@ -350,6 +372,66 @@ private:
 	void operator=(const AnimationSystemImpl&);
 	AnimationSystemImpl(const AnimationSystemImpl&);
 };
+
+
+extern "C" LUMIX_ANIMATION_API void setStudioApp(StudioApp& app)
+{
+	struct AssetBrowserPlugin : AssetBrowser::IPlugin
+	{
+
+		AssetBrowserPlugin(StudioApp& app)
+			: m_app(app)
+		{}
+	
+
+		bool onGUI(Lumix::Resource* resource, Lumix::uint32 type) override
+		{
+			if (type == ResourceManager::ANIMATION)
+			{
+				auto* animation = static_cast<Animation*>(resource);
+				ImGui::LabelText("FPS", "%d", animation->getFPS());
+				ImGui::LabelText("Length", "%.3fs", animation->getLength());
+				ImGui::LabelText("Frames", "%d", animation->getFrameCount());
+
+				return true;
+			}
+			return false;
+		}
+
+
+		void onResourceUnloaded(Resource* resource) override
+		{
+		}
+
+
+		const char* getName() const override
+		{
+			return "Animation";
+		}
+
+
+		bool hasResourceManager(uint32 type) const override
+		{
+			return type == ResourceManager::ANIMATION;
+		}
+
+
+		uint32 getResourceType(const char* ext) override
+		{
+			if (compareString(ext, "ani") == 0) return ResourceManager::ANIMATION;
+			return 0;
+		}
+
+
+		StudioApp& m_app;
+
+	};
+
+	auto& allocator = app.getWorldEditor()->getAllocator();
+	auto* plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(app);
+	app.getAssetBrowser()->addPlugin(*plugin);
+
+}
 
 
 extern "C" IPlugin* createPlugin(Engine& engine)
