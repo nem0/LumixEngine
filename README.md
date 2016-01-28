@@ -12,6 +12,7 @@
 3D Game Engine
 
 Features:
+  * MIT License
   * editor included
   * easy to use, fast and flexible 
   * open source
