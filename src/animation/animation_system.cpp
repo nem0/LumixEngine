@@ -8,6 +8,7 @@
 #include "core/resource_manager.h"
 #include "editor/asset_browser.h"
 #include "editor/imgui/imgui.h"
+#include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine.h"
@@ -34,9 +35,8 @@ class JsonSerializer;
 class Universe;
 
 
-class AnimationSceneImpl : public IScene
+struct AnimationSceneImpl : public IScene
 {
-private:
 	struct Animable
 	{
 		bool m_is_free;
@@ -46,7 +46,7 @@ private:
 		Entity m_entity;
 	};
 
-public:
+
 	AnimationSceneImpl(IPlugin& anim_system, Engine& engine, Universe& ctx, IAllocator& allocator)
 		: m_universe(ctx)
 		, m_engine(engine)
@@ -210,6 +210,29 @@ public:
 	}
 
 
+	void updateAnimable(ComponentIndex cmp, float time_delta)
+	{
+		Animable& animable = m_animables[cmp];
+		if(!animable.m_is_free && animable.m_animation &&
+			animable.m_animation->isReady())
+		{
+			auto* pose = m_render_scene->getPose(animable.m_renderable);
+			if(!pose) return;
+			animable.m_animation->getPose(
+				animable.m_time,
+				*pose,
+				*m_render_scene->getRenderableModel(animable.m_renderable));
+			float t = animable.m_time + time_delta;
+			float l = animable.m_animation->getLength();
+			while(t > l)
+			{
+				t -= l;
+			}
+			animable.m_time = t;
+		}
+	}
+
+
 	void update(float time_delta, bool paused) override
 	{
 		PROFILE_FUNCTION();
@@ -218,29 +241,11 @@ public:
 
 		for (int i = 0, c = m_animables.size(); i < c; ++i)
 		{
-			Animable& animable = m_animables[i];
-			if (!animable.m_is_free && animable.m_animation &&
-				animable.m_animation->isReady())
-			{
-				auto* pose = m_render_scene->getPose(animable.m_renderable);
-				if (!pose) continue;
-				animable.m_animation->getPose(
-					animable.m_time,
-					*pose,
-					*m_render_scene->getRenderableModel(animable.m_renderable));
-				float t = animable.m_time + time_delta;
-				float l = animable.m_animation->getLength();
-				while (t > l)
-				{
-					t -= l;
-				}
-				animable.m_time = t;
-			}
+			updateAnimable(i, time_delta);
 		}
 	}
 
 
-private:
 	Animation* loadAnimation(const Path& path)
 	{
 		ResourceManager& rm = m_engine.getResourceManager();
@@ -310,7 +315,6 @@ private:
 	IPlugin& getPlugin() const override { return m_anim_system; }
 
 
-private:
 	Universe& m_universe;
 	IPlugin& m_anim_system;
 	Engine& m_engine;
@@ -374,63 +378,108 @@ private:
 };
 
 
+struct AssetBrowserPlugin : AssetBrowser::IPlugin
+{
+
+	AssetBrowserPlugin(StudioApp& app)
+		: m_app(app)
+	{}
+
+
+	bool onGUI(Lumix::Resource* resource, Lumix::uint32 type) override
+	{
+		if(type == ResourceManager::ANIMATION)
+		{
+			auto* animation = static_cast<Animation*>(resource);
+			ImGui::LabelText("FPS", "%d", animation->getFPS());
+			ImGui::LabelText("Length", "%.3fs", animation->getLength());
+			ImGui::LabelText("Frames", "%d", animation->getFrameCount());
+
+			return true;
+		}
+		return false;
+	}
+
+
+	void onResourceUnloaded(Resource* resource) override
+	{
+	}
+
+
+	const char* getName() const override
+	{
+		return "Animation";
+	}
+
+
+	bool hasResourceManager(uint32 type) const override
+	{
+		return type == ResourceManager::ANIMATION;
+	}
+
+
+	uint32 getResourceType(const char* ext) override
+	{
+		if(compareString(ext, "ani") == 0) return ResourceManager::ANIMATION;
+		return 0;
+	}
+
+
+	StudioApp& m_app;
+
+};
+
+
+struct PropertyGridPlugin : PropertyGrid::IPlugin
+{
+	PropertyGridPlugin(StudioApp& app)
+		: m_app(app)
+	{
+		m_is_playing = false;
+		m_time_scale = 1;
+	}
+
+
+	void onGUI(PropertyGrid& grid, Lumix::ComponentUID cmp) override
+	{
+		if(cmp.type != ANIMABLE_HASH) return;
+
+		auto* scene = static_cast<AnimationSceneImpl*>(cmp.scene);
+		auto& animable = scene->m_animables[cmp.index];
+		if(!animable.m_animation) return;
+		if(!animable.m_animation->isReady()) return;
+
+		ImGui::Checkbox("Play", &m_is_playing);
+		if(ImGui::SliderFloat("Time", &animable.m_time, 0, animable.m_animation->getLength()))
+		{
+			scene->updateAnimable(cmp.index, 0);
+		}
+
+		if(m_is_playing)
+		{
+			ImGui::InputFloat("Time scale", &m_time_scale, 0.1f, 1.0f);
+			m_time_scale = Math::maxValue(0.0f, m_time_scale);
+			float time_delta = m_app.getWorldEditor()->getEngine().getLastTimeDelta();
+			scene->updateAnimable(cmp.index, time_delta * m_time_scale);
+		}
+
+	}
+
+
+	StudioApp& m_app;
+	bool m_is_playing;
+	float m_time_scale;
+};
+
+
 extern "C" LUMIX_ANIMATION_API void setStudioApp(StudioApp& app)
 {
-	struct AssetBrowserPlugin : AssetBrowser::IPlugin
-	{
-
-		AssetBrowserPlugin(StudioApp& app)
-			: m_app(app)
-		{}
-	
-
-		bool onGUI(Lumix::Resource* resource, Lumix::uint32 type) override
-		{
-			if (type == ResourceManager::ANIMATION)
-			{
-				auto* animation = static_cast<Animation*>(resource);
-				ImGui::LabelText("FPS", "%d", animation->getFPS());
-				ImGui::LabelText("Length", "%.3fs", animation->getLength());
-				ImGui::LabelText("Frames", "%d", animation->getFrameCount());
-
-				return true;
-			}
-			return false;
-		}
-
-
-		void onResourceUnloaded(Resource* resource) override
-		{
-		}
-
-
-		const char* getName() const override
-		{
-			return "Animation";
-		}
-
-
-		bool hasResourceManager(uint32 type) const override
-		{
-			return type == ResourceManager::ANIMATION;
-		}
-
-
-		uint32 getResourceType(const char* ext) override
-		{
-			if (compareString(ext, "ani") == 0) return ResourceManager::ANIMATION;
-			return 0;
-		}
-
-
-		StudioApp& m_app;
-
-	};
-
 	auto& allocator = app.getWorldEditor()->getAllocator();
-	auto* plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(app);
-	app.getAssetBrowser()->addPlugin(*plugin);
+	auto* ab_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(app);
+	app.getAssetBrowser()->addPlugin(*ab_plugin);
 
+	auto* pg_plugin = LUMIX_NEW(allocator, PropertyGridPlugin)(app);
+	app.getPropertyGrid()->addPlugin(*pg_plugin);
 }
 
 
