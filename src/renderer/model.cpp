@@ -67,10 +67,13 @@ Model::Model(const Path& path, ResourceManager& resource_manager, IAllocator& al
 	, m_bones(m_allocator)
 	, m_indices(m_allocator)
 	, m_vertices(m_allocator)
-	, m_lods(m_allocator)
 	, m_vertices_handle(BGFX_INVALID_HANDLE)
 	, m_indices_handle(BGFX_INVALID_HANDLE)
 {
+	m_lods[0] = { -1, -1, -1 };
+	m_lods[1] = { -1, -1, -1 };
+	m_lods[2] = { -1, -1, -1 };
+	m_lods[3] = { -1, -1, -1 };
 }
 
 
@@ -163,11 +166,11 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 LODMeshIndices Model::getLODMeshIndices(float squared_distance) const
 {
 	int i = 0;
-	while (squared_distance >= m_lods[i].m_distance)
+	while (squared_distance >= m_lods[i].distance)
 	{
 		++i;
 	}
-	return LODMeshIndices(m_lods[i].m_from_mesh, m_lods[i].m_to_mesh);
+	return{ m_lods[i].from_mesh, m_lods[i].to_mesh };
 }
 
 
@@ -275,10 +278,10 @@ void Model::create(const bgfx::VertexDecl& def,
 					 m_allocator);
 
 	Model::LOD lod;
-	lod.m_distance = FLT_MAX;
-	lod.m_from_mesh = 0;
-	lod.m_to_mesh = 0;
-	m_lods.push(lod);
+	lod.distance = FLT_MAX;
+	lod.from_mesh = 0;
+	lod.to_mesh = 0;
+	m_lods[0] = lod;
 
 	m_indices.resize(indices_size / sizeof(m_indices[0]));
 	copyMemory(&m_indices[0], indices_data, indices_size);
@@ -522,16 +525,15 @@ bool Model::parseLODs(FS::IFile& file)
 {
 	int32 lod_count;
 	file.read(&lod_count, sizeof(lod_count));
-	if (lod_count <= 0)
+	if (lod_count <= 0 || lod_count > lengthOf(m_lods))
 	{
 		return false;
 	}
-	m_lods.resize(lod_count);
 	for (int i = 0; i < lod_count; ++i)
 	{
-		file.read(&m_lods[i].m_to_mesh, sizeof(m_lods[i].m_to_mesh));
-		file.read(&m_lods[i].m_distance, sizeof(m_lods[i].m_distance));
-		m_lods[i].m_from_mesh = i > 0 ? m_lods[i - 1].m_to_mesh + 1 : 0;
+		file.read(&m_lods[i].to_mesh, sizeof(m_lods[i].to_mesh));
+		file.read(&m_lods[i].distance, sizeof(m_lods[i].distance));
+		m_lods[i].from_mesh = i > 0 ? m_lods[i - 1].to_mesh + 1 : 0;
 	}
 	return true;
 }
@@ -567,7 +569,6 @@ void Model::unload(void)
 	}
 	m_meshes.clear();
 	m_bones.clear();
-	m_lods.clear();
 
 	if(bgfx::isValid(m_vertices_handle)) bgfx::destroyVertexBuffer(m_vertices_handle);
 	if(bgfx::isValid(m_indices_handle)) bgfx::destroyIndexBuffer(m_indices_handle);

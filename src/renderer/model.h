@@ -58,21 +58,10 @@ public:
 };
 
 
-class LUMIX_RENDERER_API LODMeshIndices
+struct LODMeshIndices
 {
-public:
-	LODMeshIndices(int from, int to)
-		: m_from(from)
-		, m_to(to)
-	{
-	}
-
-	int getFrom() const { return m_from; }
-	int getTo() const { return m_to; }
-
-private:
-	int m_from;
-	int m_to;
+	int from;
+	int to;
 };
 
 
@@ -97,13 +86,12 @@ public:
 		LATEST // keep this last
 	};
 
-	class LOD
+	struct LOD
 	{
-	public:
-		int m_from_mesh;
-		int m_to_mesh;
+		int from_mesh;
+		int to_mesh;
 
-		float m_distance;
+		float distance;
 	};
 
 	struct Bone
@@ -148,10 +136,11 @@ public:
 	float getBoundingRadius() const { return m_bounding_radius; }
 	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
 	const AABB& getAABB() const { return m_aabb; }
-	Array<LOD>& getLODs() { return m_lods; }
+	LOD* getLODs() { return m_lods; }
 
 public:
 	static const uint32 FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
+	static const int MAX_LOD_COUNT = 4;
 
 private:
 	Model(const Model&);
@@ -178,7 +167,7 @@ private:
 	Array<Bone> m_bones;
 	Array<int32> m_indices;
 	Array<Vec3> m_vertices;
-	Array<LOD> m_lods;
+	LOD m_lods[MAX_LOD_COUNT];
 	float m_bounding_radius;
 	BoneMap m_bone_map;
 	AABB m_aabb;

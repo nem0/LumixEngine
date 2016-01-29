@@ -203,6 +203,21 @@ public:
 				}
 				ImGui::Separator();
 
+				ImGui::Text("Version 0.20. - News");
+				ImGui::BulletText("Deferred rendering");
+				ImGui::BulletText("HDR");
+				ImGui::BulletText("New editor skin");
+				ImGui::BulletText("Top, front, size view");
+				ImGui::BulletText("Editor does not depend on plugins");
+				ImGui::BulletText("Editor scripting");
+				ImGui::BulletText("Scale mesh on import, flip Y/Z axis");
+				ImGui::BulletText("Multiple gizmos when editing emitters");
+				ImGui::BulletText("Improved color picker");
+				ImGui::BulletText("Close notification button");
+				ImGui::BulletText("Entity look at");
+				ImGui::BulletText("Mesh and material decoupled");
+				ImGui::BulletText("Simple animable component");
+				ImGui::Separator();
 				ImGui::Text("Version 0.19. - News");
 				ImGui::BulletText("Editor UI - docking");
 				ImGui::BulletText("Physics - layers");
@@ -244,8 +259,6 @@ public:
 
 			}
 			ImGui::EndChild();
-
-			if (ImGui::Button("Close")) m_is_welcome_screen_opened = false;
 		}
 		ImGui::End();
 	}
