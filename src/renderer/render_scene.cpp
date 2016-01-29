@@ -1924,7 +1924,7 @@ public:
 								.squaredLength();
 
 						LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
-						for (int j = lod.getFrom(), c = lod.getTo(); j <= c; ++j)
+						for (int j = lod.from, c = lod.to; j <= c; ++j)
 						{
 							auto& info = subinfos.emplace();
 							info.renderable = raw_subresults[i];
