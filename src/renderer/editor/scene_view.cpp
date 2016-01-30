@@ -105,12 +105,16 @@ bool SceneView::init(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
 	m_forward_pipeline->load();
 	m_forward_pipeline->addCustomCommandHandler("renderGizmos")
 		.callback.bind<SceneView, &SceneView::renderGizmos>(this);
+	m_forward_pipeline->addCustomCommandHandler("renderIcons")
+		.callback.bind<SceneView, &SceneView::renderIcons>(this);
 
 	path = "pipelines/deferred_main.lua";
 	m_deferred_pipeline = Lumix::Pipeline::create(*renderer, path, engine.getAllocator());
 	m_deferred_pipeline->load();
 	m_deferred_pipeline->addCustomCommandHandler("renderGizmos")
 		.callback.bind<SceneView, &SceneView::renderGizmos>(this);
+	m_deferred_pipeline->addCustomCommandHandler("renderIcons")
+		.callback.bind<SceneView, &SceneView::renderIcons>(this);
 
 	m_current_pipeline = m_forward_pipeline;
 
@@ -174,9 +178,14 @@ void SceneView::update()
 }
 
 
-void SceneView::renderGizmos()
+void SceneView::renderIcons()
 {
 	m_editor->renderIcons();
+}
+
+
+void SceneView::renderGizmos()
+{
 	m_editor->getGizmo().render();
 }
 

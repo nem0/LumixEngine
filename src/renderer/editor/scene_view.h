@@ -30,6 +30,7 @@ class SceneView
 
 	private:
 		void renderGizmos();
+		void renderIcons();
 		void onUniverseCreated();
 		void onUniverseDestroyed();
 		void captureMouse(bool capture);
