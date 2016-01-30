@@ -815,8 +815,9 @@ struct PipelineImpl : public Pipeline
 			Vec3 light_dir = universe.getRotation(entity) * Vec3(0, 0, -1);
 			float attenuation = m_scene->getLightAttenuation(light_cmp);
 			float fov = Math::degreesToRadians(m_scene->getLightFOV(light_cmp));
-			Vec3 color = m_scene->getPointLightColor(light_cmp) *
-				m_scene->getPointLightIntensity(light_cmp);
+			float intensity = m_scene->getPointLightIntensity(light_cmp);
+			intensity *= intensity;
+			Vec3 color = m_scene->getPointLightColor(light_cmp) * intensity;
 
 			Vec3 pos = universe.getPosition(entity);
 			int buffer_idx = m_camera_frustum.intersectNearPlane(pos, range * Math::SQRT3) ? 0 : 1;
@@ -1219,8 +1220,9 @@ struct PipelineImpl : public Pipeline
 		Vec3 light_pos = universe.getPosition(light_entity);
 		Vec3 light_dir = universe.getRotation(light_entity) * Vec3(0, 0, -1);
 		float fov = Math::degreesToRadians(m_scene->getLightFOV(light_cmp));
-		Vec3 color = m_scene->getPointLightColor(light_cmp) *
-					 m_scene->getPointLightIntensity(light_cmp);
+		float intensity = m_scene->getPointLightIntensity(light_cmp);
+		intensity *= intensity;
+		Vec3 color = m_scene->getPointLightColor(light_cmp) * intensity;
 		float range = m_scene->getLightRange(light_cmp);
 		float attenuation = m_scene->getLightAttenuation(light_cmp);
 		Vec4 light_pos_radius(light_pos, range);
@@ -1529,13 +1531,13 @@ struct PipelineImpl : public Pipeline
 				0);
 		}
 
-		renderMeshes(m_tmp_meshes);
-		renderTerrains(m_tmp_terrains);
 		if (render_grass)
 		{
 			m_scene->getGrassInfos(frustum, m_tmp_grasses, layer_mask, m_applied_camera);
 			renderGrasses(m_tmp_grasses);
 		}
+		renderTerrains(m_tmp_terrains);
+		renderMeshes(m_tmp_meshes);
 
 		m_current_light = -1;
 	}
@@ -2013,6 +2015,15 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	int createVec4ArrayUniform(const char* name, int num)
+	{
+		bgfx::UniformHandle handle = bgfx::createUniform(name, bgfx::UniformType::Vec4, num);
+		m_uniforms.push(handle);
+		return m_uniforms.size() - 1;
+	}
+
+
+
 	bool hasScene()
 	{
 		return m_scene != nullptr;
@@ -2221,6 +2232,34 @@ void logError(const char* message)
 }
 
 
+int setUniform(lua_State* L)
+{
+	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
+	int uniform_idx = LuaWrapper::checkArg<int>(L, 2);
+	LuaWrapper::checkTableArg(L, 3);
+
+	Vec4 tmp[64];
+	int len = Math::minValue((int)lua_rawlen(L, 3), lengthOf(tmp));
+	for (int i = 0; i < len; ++i)
+	{
+		if (lua_rawgeti(L, 3, 1 + i) == LUA_TTABLE)
+		{
+			if (lua_rawgeti(L, -1, 1) == LUA_TNUMBER) tmp[i].x = (float)lua_tonumber(L, -1);
+			if (lua_rawgeti(L, -2, 2) == LUA_TNUMBER) tmp[i].y = (float)lua_tonumber(L, -1);
+			if (lua_rawgeti(L, -3, 3) == LUA_TNUMBER) tmp[i].z = (float)lua_tonumber(L, -1);
+			if (lua_rawgeti(L, -4, 4) == LUA_TNUMBER) tmp[i].w = (float)lua_tonumber(L, -1);
+			lua_pop(L, 4);
+		}
+		lua_pop(L, 1);
+	}
+
+	if (uniform_idx >= pipeline->m_uniforms.size()) luaL_argerror(L, 2, "unknown uniform");
+	
+	bgfx::setUniform(pipeline->m_uniforms[uniform_idx], tmp, len);
+	return 0;
+}
+
+
 int renderLocalLightsShadowmaps(lua_State* L)
 {
 	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
@@ -2284,6 +2323,7 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(executeCustomCommand);
 	REGISTER_FUNCTION(getFPS);
 	REGISTER_FUNCTION(createUniform);
+	REGISTER_FUNCTION(createVec4ArrayUniform);
 	REGISTER_FUNCTION(hasScene);
 	REGISTER_FUNCTION(cameraExists);
 	REGISTER_FUNCTION(enableBlending);
@@ -2301,6 +2341,7 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(print);
 	REGISTER_FUNCTION(logError);
 	REGISTER_FUNCTION(renderLocalLightsShadowmaps);
+	REGISTER_FUNCTION(setUniform);
 
 	#undef REGISTER_FUNCTION
 	
