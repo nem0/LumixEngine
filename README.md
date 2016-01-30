@@ -39,7 +39,7 @@ Features:
 * [New UI](https://youtu.be/otNtPetjFek)
 * [Gizmo, welcome screen](https://youtu.be/xKaZHPDWUkY)
 
-![Editor screenshot](https://cloud.githubusercontent.com/assets/153526/12075414/6ec25fc4-b180-11e5-891d-42f6faaf0573.png)
+![Editor screenshot](https://cloud.githubusercontent.com/assets/153526/12698548/983ae76a-c79f-11e5-8b10-284ae6fa0620.png)
 
 3rd party libraries
 
