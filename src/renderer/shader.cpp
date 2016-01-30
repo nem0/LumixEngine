@@ -261,6 +261,8 @@ void Shader::onBeforeReady()
 			auto fs_handle = binaries[i + 1]->getHandle();
 			auto program = bgfx::createProgram(vs_handle, fs_handle);
 			
+			ASSERT(bgfx::isValid(program));
+
 			int pass_idx = i / 2;
 			int global_idx = getRenderer().getPassIdx(m_combintions.m_passes[pass_idx]);
 
