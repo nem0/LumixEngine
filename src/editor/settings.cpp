@@ -1,3 +1,8 @@
+/*
+* Copyright 2011-2016 Branimir Karadzic. All rights reserved.
+* License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
+*/
+
 #include "settings.h"
 #include "core/fs/os_file.h"
 #include "core/log.h"
@@ -317,15 +322,17 @@ void Settings::onGUI(Action** actions, int actions_count)
 		ImGui::SameLine();
 		ImGui::Text("Settings are saved when the application closes");
 
-		ImGui::DragInt("Autosave time (seconds)", &m_autosave_time);
-		if (ImGui::Checkbox("Crash reporting", &m_is_crash_reporting_enabled))
+		if (ImGui::CollapsingHeader("General"))
 		{
-			Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
+			ImGui::DragInt("Autosave time (seconds)", &m_autosave_time);
+			if (ImGui::Checkbox("Crash reporting", &m_is_crash_reporting_enabled))
+			{
+				Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
+			}
 		}
 
 		if (ImGui::CollapsingHeader("Shortcuts")) showShortcutSettings(actions, actions_count);
-
-		ImGui::ShowStyleEditor();
+		if(ImGui::CollapsingHeader("Style")) ImGui::ShowStyleEditor();
 	}
 	ImGui::EndDock();
 }

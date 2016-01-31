@@ -247,7 +247,9 @@ project "editor"
 	copyDlls("Release", 32, "win32", "RelWithDebInfo")
 	copyDlls("Release", 64, "win64", "RelWithDebInfo")
 
-	linkLib("crnlib")
+	linkLib "crnlib"
+	linkLib "Scintilla"
+	defines {"SCI_NAMESPACE", "SCI_LEXER", "_CRT_SECURE_NO_WARNINGS"}
 	
 	configuration { "Debug", "x64" }
 		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win64/debug"}

@@ -790,11 +790,13 @@ namespace Lumix
 
 			auto* script = static_cast<Lumix::LuaScript*>(resource);
 
+			bool force_update = false;
 			if (m_text_buffer[0] == '\0')
 			{
+				force_update = true;
 				Lumix::copyString(m_text_buffer, script->getSourceCode());
 			}
-			ImGui::InputTextMultiline("Code", m_text_buffer, sizeof(m_text_buffer), ImVec2(0, 300));
+			ImGui::Scintilla("Code", m_text_buffer, sizeof(m_text_buffer), ImVec2(0, 300), force_update);
 			if (ImGui::Button("Save"))
 			{
 				auto& fs = m_app.getWorldEditor()->getEngine().getFileSystem();

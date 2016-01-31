@@ -2988,7 +2988,7 @@ public:
 	void setRenderableMaterial(ComponentIndex cmp, int index, const Path& path) override
 	{
 		auto& r = m_renderables[cmp];
-		if (!r.model) return;
+		if (!r.model || !r.model->isReady()) return;
 		if (path == r.meshes[index].material->getPath()) return;
 
 		auto& rm = r.model->getResourceManager();

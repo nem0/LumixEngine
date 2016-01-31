@@ -53,7 +53,7 @@ struct CurveEditor
 IMGUI_API CurveEditor BeginCurveEditor(const char* label);
 IMGUI_API bool CurvePoint(ImVec2* point, CurveEditor& editor);
 IMGUI_API void EndCurveEditor(const CurveEditor& editor);
-
+IMGUI_API void Scintilla(const char* name, char* buffer, int buffer_size, const ImVec2& _size, bool update);
 
 } // namespace ImGui
 

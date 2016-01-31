@@ -800,8 +800,8 @@ struct DockContext
         Dock& dock = getDock(label, !opened || *opened);
         m_end_action = EndAction_None;
 
-				if(dock.first && opened) *opened = dock.opened;
-				dock.first = false;
+		if(dock.first && opened) *opened = dock.opened;
+		dock.first = false;
         if (opened && !*opened)
         {
             if (dock.status != Status_Float)
@@ -809,10 +809,10 @@ struct DockContext
                 doUndock(dock);
                 dock.status = Status_Float;
             }
-						dock.opened = false;
+			dock.opened = false;
             return false;
         }
-				dock.opened = true;
+		dock.opened = true;
 
         m_end_action = EndAction_Panel;
         beginPanel();
