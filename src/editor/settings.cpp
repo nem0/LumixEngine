@@ -174,6 +174,7 @@ void Settings::setValue(const char* name, bool value)
 	lua_getglobal(m_state, "custom");
 	lua_pushboolean(m_state, value);
 	lua_setfield(m_state, -2, name);
+	lua_pop(m_state, 1);
 }
 
 
@@ -182,6 +183,7 @@ void Settings::setValue(const char* name, int value)
 	lua_getglobal(m_state, "custom");
 	lua_pushinteger(m_state, value);
 	lua_setfield(m_state, -2, name);
+	lua_pop(m_state, 1);
 }
 
 
