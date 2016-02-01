@@ -489,7 +489,7 @@ struct ConvertTask : public Lumix::MT::Task
 			material_file << (m_dialog.m_convert_to_dds ? "dds" : texture_info.m_extension);
 			if (is_srgb)
 			{
-				material_file << "\", \"is_srgb\" : true\n }\n";
+				material_file << "\", \"srgb\" : true\n }\n";
 			}
 			else
 			{
