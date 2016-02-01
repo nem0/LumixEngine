@@ -651,7 +651,7 @@ template <class S> class EntityPropertyDescriptor : public IPropertyDescriptor
 		setName(name);
 		m_array.getter = _getter;
 		m_array.setter = _setter;
-		m_type = ENUM;
+		m_type = ENTITY;
 	}
 
 
