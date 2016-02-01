@@ -567,6 +567,12 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 		{
 			serializer.deserialize(keep_data, false);
 		}
+		else if (compareString(label, "srgb") == 0)
+		{
+			bool is_srgb;
+			serializer.deserialize(is_srgb, false);
+			if(is_srgb) flags |= BGFX_TEXTURE_SRGB;
+		}
 		else
 		{
 			g_log_warning.log("Renderer") << "Unknown data \"" << label << "\" in material "
