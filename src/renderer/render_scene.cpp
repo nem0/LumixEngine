@@ -492,7 +492,7 @@ public:
 			{
 				serializer.write(r.layer_mask);
 				serializer.write(r.model ? r.model->getPath().getHash() : 0);
-				bool has_changed_materials = r.model && r.meshes != &r.model->getMesh(0);
+				bool has_changed_materials = r.model && r.model->isReady() && r.meshes != &r.model->getMesh(0);
 				serializer.write(has_changed_materials ? r.mesh_count : 0);
 				if (has_changed_materials)
 				{

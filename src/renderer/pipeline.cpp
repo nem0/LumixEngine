@@ -349,8 +349,10 @@ struct PipelineImpl : public Pipeline
 	void createUniforms()
 	{
 		m_texture_size_uniform = bgfx::createUniform("u_textureSize", bgfx::UniformType::Vec4);
+		m_cam_params = bgfx::createUniform("u_camParams", bgfx::UniformType::Vec4);
+		m_cam_proj_uniform = bgfx::createUniform("u_camProj", bgfx::UniformType::Mat4);
 		m_cam_view_uniform = bgfx::createUniform("u_camView", bgfx::UniformType::Mat4);
-		m_inv_cam_view_uniform = bgfx::createUniform("u_invCamView", bgfx::UniformType::Mat4);
+		m_cam_inv_view_uniform = bgfx::createUniform("u_camInView", bgfx::UniformType::Mat4);
 		m_cam_inv_viewproj_uniform = bgfx::createUniform("u_camInvViewProj", bgfx::UniformType::Mat4);
 		m_cam_inv_proj_uniform = bgfx::createUniform("u_camInvProj", bgfx::UniformType::Mat4);
 		m_tex_shadowmap_uniform = bgfx::createUniform("u_texShadowmap", bgfx::UniformType::Int1);
@@ -397,7 +399,9 @@ struct PipelineImpl : public Pipeline
 		bgfx::destroyUniform(m_cam_inv_proj_uniform);
 		bgfx::destroyUniform(m_cam_inv_viewproj_uniform);
 		bgfx::destroyUniform(m_cam_view_uniform);
-		bgfx::destroyUniform(m_inv_cam_view_uniform);
+		bgfx::destroyUniform(m_cam_proj_uniform);
+		bgfx::destroyUniform(m_cam_params);
+		bgfx::destroyUniform(m_cam_inv_view_uniform);
 		bgfx::destroyUniform(m_texture_size_uniform);
 	}
 
@@ -1476,7 +1480,9 @@ struct PipelineImpl : public Pipeline
 			bgfx::setUniform(m_cam_inv_proj_uniform, &inv_projection.m11);
 			bgfx::setUniform(m_cam_inv_viewproj_uniform, &inv_view_proj.m11);
 			bgfx::setUniform(m_cam_view_uniform, &view_matrix.m11);
-			bgfx::setUniform(m_inv_cam_view_uniform, &camera_matrix.m11);
+			bgfx::setUniform(m_cam_proj_uniform, &projection_matrix.m11);
+			bgfx::setUniform(m_cam_inv_view_uniform, &camera_matrix.m11);
+			bgfx::setUniform(m_cam_params, &Vec4(near_plane, far_plane, fov, ratio));
 		}
 
 		bgfx::setState(m_render_state | material->getRenderStates());
@@ -2166,7 +2172,9 @@ struct PipelineImpl : public Pipeline
 	bgfx::UniformHandle m_terrain_matrix_uniform;
 	bgfx::UniformHandle m_tex_shadowmap_uniform;
 	bgfx::UniformHandle m_cam_view_uniform;
-	bgfx::UniformHandle m_inv_cam_view_uniform;
+	bgfx::UniformHandle m_cam_proj_uniform;
+	bgfx::UniformHandle m_cam_params;
+	bgfx::UniformHandle m_cam_inv_view_uniform;
 	bgfx::UniformHandle m_cam_inv_proj_uniform;
 	bgfx::UniformHandle m_cam_inv_viewproj_uniform;
 	bgfx::UniformHandle m_texture_size_uniform;
