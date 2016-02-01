@@ -36,6 +36,17 @@ template <> inline Vec3 toType(lua_State* L, int index)
 	lua_pop(L, 1);
 	return v;
 }
+template <> inline Vec2 toType(lua_State* L, int index)
+{
+	Vec2 v;
+	lua_rawgeti(L, index, 1);
+	v.x = (float)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	lua_rawgeti(L, index, 2);
+	v.y = (float)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	return v;
+}
 template <> inline int64 toType(lua_State* L, int index)
 {
 	return (int64)lua_tointeger(L, index);

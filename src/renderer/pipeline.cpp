@@ -184,13 +184,19 @@ struct PipelineImpl : public Pipeline
 						decl.m_width = (int)lua_tointeger(L, -1);
 					}
 					lua_pop(L, 1);
+					if (lua_getfield(L, -1, "size_ratio") == LUA_TBOOLEAN)
+					{
+						decl.m_size_ratio = LuaWrapper::toType<Vec2>(L, -1);
+					}
+					lua_pop(L, 1);
 					if (lua_getfield(L, -1, "screen_size") == LUA_TBOOLEAN)
 					{
-						decl.m_screen_size = lua_toboolean(L, -1) != 0;
+						bool is_screen_size = lua_toboolean(L, -1) != 0;
+						decl.m_size_ratio = is_screen_size ? Vec2(1, 1) : Vec2(-1, -1);
 					}
 					else
 					{
-						decl.m_screen_size = false;
+						decl.m_size_ratio = Vec2(-1, -1);
 					}
 					lua_pop(L, 1);
 					if (lua_getfield(L, -1, "height") == LUA_TNUMBER)
@@ -1926,7 +1932,11 @@ struct PipelineImpl : public Pipeline
 		}
 		for (auto& i : m_framebuffers)
 		{
-			if (i->hasScreenSize()) i->resize(w, h);
+			auto size_ratio = i->getSizeRatio();
+			if (size_ratio.x > 0 || size_ratio.y > 0)
+			{
+				i->resize(int(w * size_ratio.x), int(h * size_ratio.y));
+			}
 		}
 		m_width = w;
 		m_height = h;
