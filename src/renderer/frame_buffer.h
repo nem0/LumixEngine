@@ -2,6 +2,7 @@
 
 
 #include "lumix.h"
+#include "core/vec.h"
 #include <bgfx/bgfx.h>
 
 
@@ -31,14 +32,14 @@ class FrameBuffer
 		{
 			Declaration()
 				: m_renderbuffers_count(0)
-				, m_screen_size(false)
+				, m_size_ratio(-1, -1)
 			{ }
 
 			static const int MAX_RENDERBUFFERS = 16;
 
 			int32 m_width;
 			int32 m_height;
-			bool m_screen_size;
+			Vec2 m_size_ratio;
 			RenderBuffer m_renderbuffers[MAX_RENDERBUFFERS];
 			int32 m_renderbuffers_count;
 			char m_name[64];
@@ -53,7 +54,7 @@ class FrameBuffer
 		int getWidth() const { return m_declaration.m_width; }
 		int getHeight() const { return m_declaration.m_height; }
 		void resize(int width, int height);
-		bool hasScreenSize() const { return m_declaration.m_screen_size; }
+		Vec2 getSizeRatio() const { return m_declaration.m_size_ratio; }
 		const char* getName() const { return m_declaration.m_name; }
 		bgfx::TextureHandle getRenderbufferHandle(int idx) const { return m_declaration.m_renderbuffers[idx].m_handle; }
 
