@@ -462,7 +462,8 @@ struct ConvertTask : public Lumix::MT::Task
 
 	bool saveTexture(const char* texture_path,
 		const char* source_mesh_dir,
-		Lumix::FS::IFile& material_file) const
+		Lumix::FS::IFile& material_file,
+		bool is_srgb) const
 	{
 		Lumix::string texture_source_path(texture_path, m_dialog.m_editor.getAllocator());
 		int mapping_index = m_dialog.m_path_mapping.find(texture_source_path);
@@ -486,7 +487,14 @@ struct ConvertTask : public Lumix::MT::Task
 			material_file << "\t, \"texture\" : {\n\t\t\"source\" : \"" << texture_info.m_basename
 						  << ".";
 			material_file << (m_dialog.m_convert_to_dds ? "dds" : texture_info.m_extension);
-			material_file << "\"\n }\n";
+			if (is_srgb)
+			{
+				material_file << "\", \"is_srgb\" : true\n }\n";
+			}
+			else
+			{
+				material_file << "\"\n }\n";
+			}
 		}
 		else
 		{
@@ -625,12 +633,14 @@ struct ConvertTask : public Lumix::MT::Task
 		{
 			aiString texture_path;
 			material->GetTexture(aiTextureType_DIFFUSE, 0, &texture_path);
-			saveTexture(texture_path.C_Str(), source_mesh_dir, *file);
+			saveTexture(texture_path.C_Str(), source_mesh_dir, *file, true);
 		}
 		else
 		{
-			saveTexture(
-				PathBuilder("undefined") << *undefined_count << ".dds", source_mesh_dir, *file);
+			saveTexture(PathBuilder("undefined") << *undefined_count << ".dds",
+				source_mesh_dir,
+				*file,
+				true);
 			++*undefined_count;
 		}
 
@@ -638,13 +648,13 @@ struct ConvertTask : public Lumix::MT::Task
 		{
 			aiString texture_path;
 			material->GetTexture(aiTextureType_NORMALS, 0, &texture_path);
-			saveTexture(texture_path.C_Str(), source_mesh_dir, *file);
+			saveTexture(texture_path.C_Str(), source_mesh_dir, *file, false);
 		}
 		else if (material->GetTextureCount(aiTextureType_HEIGHT) == 1)
 		{
 			aiString texture_path;
 			material->GetTexture(aiTextureType_HEIGHT, 0, &texture_path);
-			saveTexture(texture_path.C_Str(), source_mesh_dir, *file);
+			saveTexture(texture_path.C_Str(), source_mesh_dir, *file, false);
 		}
 		else if (material->GetTextureCount(aiTextureType_NORMALS) > 1)
 		{
