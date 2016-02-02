@@ -11,6 +11,7 @@ namespace Lumix
 
 	class InputBlob;
 	class OutputBlob;
+	struct Quat;
 	struct Vec3;
 	class WorldEditor;
 
@@ -27,8 +28,7 @@ namespace Lumix
 			virtual uint32 getTemplate(Entity entity) = 0;
 			virtual const Array<Entity>& getInstances(uint32 template_name_hash) = 0;
 			virtual Array<string>& getTemplateNames() = 0;
-			virtual Entity createInstance(const char* name, const Vec3& position) = 0;
-			virtual Entity createInstanceNoCommand(uint32 name_hash, const Vec3& position) = 0;
+			virtual Entity createInstance(const char* name, const Vec3& position, const Quat& rot) = 0;
 
 			virtual DelegateList<void()>& updated() = 0;
 	};

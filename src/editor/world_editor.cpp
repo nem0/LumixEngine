@@ -49,6 +49,36 @@ static const uint32 RENDERABLE_HASH = crc32("renderable");
 static const uint32 CAMERA_HASH = crc32("camera");
 
 
+class BeginGroupCommand : public IEditorCommand
+{
+	bool execute() override { ASSERT(false); return false; }
+	void undo() override { ASSERT(false); }
+	void serialize(JsonSerializer& serializer) override {}
+	void deserialize(JsonSerializer& serializer) override {}
+	bool merge(IEditorCommand& command) override { ASSERT(false); return false; }
+	uint32 getType() override
+	{
+		static const uint32 type = crc32("begin_group");
+		return type;
+	}
+};
+
+
+class EndGroupCommand : public IEditorCommand
+{
+	bool execute() override { ASSERT(false); return false; }
+	void undo() override { ASSERT(false); }
+	void serialize(JsonSerializer& serializer) override {}
+	void deserialize(JsonSerializer& serializer) override {}
+	bool merge(IEditorCommand& command) override { ASSERT(false); return false; }
+	uint32 getType() override
+	{
+		static const uint32 type = crc32("end_group");
+		return type;
+	}
+};
+
+
 class SetEntityNameCommand : public IEditorCommand
 {
 public:
@@ -1944,6 +1974,30 @@ public:
 	}
 
 
+	void beginCommandGroup() override
+	{
+		auto* cmd = LUMIX_NEW(m_allocator, BeginGroupCommand);
+		if(m_undo_index < m_undo_stack.size() - 1)
+		{
+			for(int i = m_undo_stack.size() - 1; i > m_undo_index; --i)
+			{
+				LUMIX_DELETE(m_allocator, m_undo_stack[i]);
+			}
+			m_undo_stack.resize(m_undo_index + 1);
+		}
+		m_undo_stack.push(cmd);
+		++m_undo_index;
+	}
+
+
+	void endCommandGroup() override
+	{
+		auto* cmd = LUMIX_NEW(m_allocator, EndGroupCommand);
+		m_undo_stack.push(cmd);
+		++m_undo_index;
+	}
+
+
 	void executeCommand(IEditorCommand* command) override
 	{
 		if (m_undo_index >= 0 && command->getType() == m_undo_stack[m_undo_index]->getType())
@@ -2797,7 +2851,22 @@ public:
 
 	void undo() override
 	{
-		if (m_undo_index < m_undo_stack.size() && m_undo_index >= 0)
+		static const uint32 end_group_hash = crc32("end_group");
+		static const uint32 begin_group_hash = crc32("begin_group");
+
+		if (m_undo_index >= m_undo_stack.size() || m_undo_index < 0) return;
+
+		if(m_undo_stack[m_undo_index]->getType() == end_group_hash)
+		{
+			--m_undo_index;
+			while(m_undo_stack[m_undo_index]->getType() != begin_group_hash)
+			{
+				m_undo_stack[m_undo_index]->undo();
+				--m_undo_index;
+			}
+			--m_undo_index;
+		}
+		else
 		{
 			m_undo_stack[m_undo_index]->undo();
 			--m_undo_index;
@@ -2807,9 +2876,23 @@ public:
 
 	void redo() override
 	{
-		if (m_undo_index + 1 < m_undo_stack.size())
+		static const uint32 end_group_hash = crc32("end_group");
+		static const uint32 begin_group_hash = crc32("begin_group");
+
+		if (m_undo_index + 1 >= m_undo_stack.size()) return;
+
+		++m_undo_index;
+		if(m_undo_stack[m_undo_index]->getType() == begin_group_hash)
 		{
 			++m_undo_index;
+			while(m_undo_stack[m_undo_index]->getType() != end_group_hash)
+			{
+				m_undo_stack[m_undo_index]->execute();
+				++m_undo_index;
+			}
+		}
+		else
+		{
 			m_undo_stack[m_undo_index]->execute();
 		}
 	}

@@ -345,7 +345,6 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		: m_app(app)
 	{
 		m_app.getWorldEditor()->registerEditorCommandCreator("insert_mesh", createInsertMeshCommand);
-
 	}
 
 

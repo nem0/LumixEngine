@@ -129,11 +129,12 @@ private:
 		CreateInstanceCommand(EntityTemplateSystemImpl& entity_system,
 			WorldEditor& editor,
 			const char* template_name,
-			const Vec3& position)
+			const Vec3& position,
+			const Quat& rot)
 			: m_entity_system(entity_system)
 			, m_template_name_hash(crc32(template_name))
 			, m_position(position)
-			, m_rotation(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2))
+			, m_rotation(rot)
 			, m_editor(editor)
 		{
 		}
@@ -326,28 +327,6 @@ public:
 	}
 
 
-	Entity createInstanceNoCommand(uint32 name_hash, const Vec3& position) override
-	{
-		int instance_index = m_instances.find(name_hash);
-		ASSERT(instance_index >= 0);
-		if (instance_index < 0) return INVALID_ENTITY;
-
-		Universe* universe = m_editor.getUniverse();
-		float random_angle = Math::randFloat(0, Math::PI * 2);
-		Lumix::Quat rotation(Lumix::Vec3(0, 1, 0), random_angle);
-		Entity entity = universe->createEntity(position, rotation);
-
-		m_instances.at(instance_index).push(entity);
-		Entity template_entity = m_instances.at(instance_index)[0];
-		const auto& template_cmps = m_editor.getComponents(template_entity);
-		for (const auto& cmp : template_cmps)
-		{
-			m_editor.cloneComponent(cmp, entity);
-		}
-		return entity;
-	}
-
-
 	void createTemplateFromEntity(const char* name, Entity entity) override
 	{
 		CreateTemplateCommand* command =
@@ -385,10 +364,10 @@ public:
 	}
 
 
-	Entity createInstance(const char* name, const Vec3& position) override
+	Entity createInstance(const char* name, const Vec3& position, const Quat& rotation) override
 	{
 		CreateInstanceCommand* command = LUMIX_NEW(m_editor.getAllocator(), CreateInstanceCommand)(
-			*this, m_editor, name, position);
+			*this, m_editor, name, position, rotation);
 		m_editor.executeCommand(command);
 		return command->getEntity();
 	}

@@ -33,320 +33,6 @@ static const char* TEX_COLOR_UNIFORM = "u_texColor";
 static const float MIN_BRUSH_SIZE = 0.5f;
 
 
-struct PaintEntitiesCommand : public Lumix::IEditorCommand
-{
-	PaintEntitiesCommand(Lumix::WorldEditor& editor)
-		: m_world_editor(editor)
-		, m_entities(editor.getAllocator())
-	{
-	}
-
-
-	PaintEntitiesCommand(Lumix::WorldEditor& editor,
-		Lumix::ComponentUID component,
-		Lumix::uint32 entity_template,
-		float brush_strength,
-		float brush_size,
-		bool align_with_normal,
-		bool rotate_x,
-		bool rotate_z,
-		const Lumix::RayCastModelHit& hit)
-		: m_world_editor(editor)
-		, m_component(component)
-		, m_brush_size(brush_size)
-		, m_brush_strength(brush_strength)
-		, m_entities(editor.getAllocator())
-		, m_align_with_normal(align_with_normal)
-		, m_rotate_x(rotate_x)
-		, m_rotate_z(rotate_z)
-	{
-		ASSERT(!m_align_with_normal || (!rotate_x && !rotate_z));
-
-		auto& template_system = m_world_editor.getEntityTemplateSystem();
-		auto& template_names = template_system.getTemplateNames();
-		m_template_name_hash = Lumix::crc32(template_names[entity_template].c_str());
-
-		m_center = hit.m_origin + hit.m_dir * hit.m_t;
-	}
-
-
-	virtual void undo()
-	{
-		for (auto entity : m_entities)
-		{
-			const auto& cmps = m_world_editor.getComponents(entity);
-			for (const auto& cmp : cmps)
-			{
-				cmp.scene->destroyComponent(cmp.index, cmp.type);
-			}
-			m_world_editor.getUniverse()->destroyEntity(entity);
-		}
-		m_entities.clear();
-	}
-
-
-	virtual void serialize(Lumix::JsonSerializer& serializer) 
-	{
-		serializer.serialize("brush_size", m_brush_size);
-		serializer.serialize("brush_strength", m_brush_strength);
-		serializer.serialize("center_x", m_center.x);
-		serializer.serialize("center_y", m_center.y);
-		serializer.serialize("center_z", m_center.z);
-		serializer.serialize("cmp_index", m_component.index);
-		serializer.serialize("entity", m_component.entity);
-		serializer.serialize("template", m_template_name_hash);
-		serializer.serialize("align_with_normal", m_align_with_normal);
-		serializer.serialize("rotate_x", m_rotate_x);
-		serializer.serialize("rotate_z", m_rotate_z);
-	}
-
-
-	virtual void deserialize(Lumix::JsonSerializer& serializer) 
-	{
-		serializer.deserialize("brush_size", m_brush_size, 0.0f);
-		serializer.deserialize("brush_strength", m_brush_strength, 0.0f);
-		serializer.deserialize("center_x", m_center.x, 0.0f);
-		serializer.deserialize("center_y", m_center.y, 0.0f);
-		serializer.deserialize("center_z", m_center.z, 0.0f);
-		serializer.deserialize("cmp_index", m_component.index, 0);
-		serializer.deserialize("entity", m_component.entity, 0);
-		serializer.deserialize("template", m_template_name_hash, 0);
-		serializer.deserialize("align_with_normal", m_align_with_normal, false);
-		serializer.deserialize("rotate_x", m_rotate_x, false);
-		serializer.deserialize("rotate_z", m_rotate_z, false);
-		m_component.type = TERRAIN_HASH;
-		m_component.scene = m_world_editor.getSceneByComponentType(TERRAIN_HASH);
-	}
-	
-
-	virtual Lumix::uint32 getType()
-	{
-		static const Lumix::uint32 type = Lumix::crc32("paint_entities_on_terrain");
-		return type;
-	}
-	
-
-	virtual bool merge(IEditorCommand& /*command*/) { return false; }
-
-
-	bool execute() override
-	{
-		PROFILE_FUNCTION();
-		m_entities.clear();
-		Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
-		Lumix::Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix(m_component.entity);
-		Lumix::Matrix inv_terrain_matrix = terrain_matrix;
-		inv_terrain_matrix.inverse();
-		auto& template_system = m_world_editor.getEntityTemplateSystem();
-
-		Lumix::Entity tpl = template_system.getInstances(m_template_name_hash)[0];
-		if (tpl < 0) return false;
-
-		Lumix::ComponentUID renderable = m_world_editor.getComponent(tpl, RENDERABLE_HASH);
-		if (!renderable.isValid()) return false;
-
-		Lumix::Frustum frustum;
-		frustum.computeOrtho(m_center,
-			Lumix::Vec3(0, 0, 1),
-			Lumix::Vec3(0, 1, 0),
-			2 * m_brush_size,
-			2 * m_brush_size,
-			-m_brush_size,
-			m_brush_size);
-
-		Lumix::Array<Lumix::RenderableMesh> meshes(m_world_editor.getAllocator());
-		meshes.clear();
-		scene->getRenderableInfos(frustum, meshes, ~0);
-
-		float w, h;
-		scene->getTerrainSize(m_component.index, &w, &h);
-		float scale = 1.0f - Lumix::Math::maxValue(0.01f, m_brush_strength);
-		Lumix::Model* model = scene->getRenderableModel(renderable.index);
-		for (int i = 0; i <= m_brush_size * m_brush_size / 1000.0f; ++i)
-		{
-			float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
-			float dist = Lumix::Math::randFloat(0, 1.0f) * m_brush_size;
-			Lumix::Vec3 pos(m_center.x + cos(angle) * dist, 0, m_center.z + sin(angle) * dist);
-			Lumix::Vec3 terrain_pos = inv_terrain_matrix.multiplyPosition(pos);
-			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= w &&
-				terrain_pos.z <= h)
-			{
-				pos.y = scene->getTerrainHeightAt(m_component.index, terrain_pos.x, terrain_pos.z);
-				pos.y += terrain_matrix.getTranslation().y;
-				if (!isOBBCollision(*scene, meshes, pos, model, scale))
-				{
-					auto entity = template_system.createInstanceNoCommand(m_template_name_hash, pos);
-					if (m_align_with_normal)
-					{
-						alignWithNormal(entity, pos);
-					}
-					else if (m_rotate_x || m_rotate_z)
-					{
-						rotateRandom(entity);
-					}
-					m_entities.push(entity);
-				}
-			}
-		}
-
-		return !m_entities.empty();
-	}
-
-
-	void rotateRandom(Lumix::Entity entity) const
-	{
-		Lumix::Matrix mtx = m_world_editor.getUniverse()->getMatrix(entity);
-		Lumix::Vec3 x = mtx.getXVector();
-		Lumix::Vec3 z = mtx.getZVector();
-		Lumix::Quat rot = m_world_editor.getUniverse()->getRotation(entity);
-
-		if (m_rotate_x)
-		{
-			float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
-			Lumix::Quat q(x, angle);
-			rot = rot * q;
-		}
-
-		if (m_rotate_z)
-		{
-			float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
-			Lumix::Quat q(z, angle);
-			rot = rot * q;
-		}
-
-		m_world_editor.getUniverse()->setRotation(entity, rot);
-	}
-
-
-	void alignWithNormal(Lumix::Entity entity, const Lumix::Vec3& pos) const
-	{
-		Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
-		Lumix::Vec3 normal = scene->getTerrainNormalAt(m_component.index, pos.x, pos.z);
-		Lumix::Matrix mtx = m_world_editor.getUniverse()->getMatrix(entity);
-		Lumix::Vec3 dir = Lumix::crossProduct(normal, mtx.getXVector()).normalized();
-		mtx.setXVector(Lumix::crossProduct(normal, dir));
-		mtx.setYVector(normal);
-		mtx.setXVector(dir);
-		m_world_editor.getUniverse()->setMatrix(entity, mtx);
-	}
-
-
-	static void getProjections(const Lumix::Vec3& axis,
-		const Lumix::Vec3 vertices[8],
-		float& min,
-		float& max)
-	{
-		min = max = Lumix::dotProduct(vertices[0], axis);
-		for (int i = 1; i < 8; ++i)
-		{
-			float dot = Lumix::dotProduct(vertices[i], axis);
-			min = Lumix::Math::minValue(dot, min);
-			max = Lumix::Math::maxValue(dot, max);
-		}
-	}
-
-
-	static bool overlaps(float min1, float max1, float min2, float max2)
-	{
-		return (min1 <= min2 && min2 <= max1) || (min2 <= min1 && min1 <= max2);
-	}
-
-
-	static bool testOBBCollision(const Lumix::Matrix& matrix_a,
-		const Lumix::Model* model_a,
-		const Lumix::Matrix& matrix_b,
-		const Lumix::Model* model_b,
-		float scale)
-	{
-		Lumix::Vec3 box_a_points[8];
-		Lumix::Vec3 box_b_points[8];
-
-		if (fabs(scale - 1.0) < 0.01f)
-		{
-			model_a->getAABB().getCorners(matrix_a, box_a_points);
-			model_b->getAABB().getCorners(matrix_b, box_b_points);
-		}
-		else
-		{
-			Lumix::Matrix scale_matrix_a = matrix_a;
-			scale_matrix_a.multiply3x3(scale);
-			Lumix::Matrix scale_matrix_b = matrix_b;
-			scale_matrix_b.multiply3x3(scale);
-			model_a->getAABB().getCorners(scale_matrix_a, box_a_points);
-			model_b->getAABB().getCorners(scale_matrix_b, box_b_points);
-		}
-
-		Lumix::Vec3 normals[] = {
-			matrix_a.getXVector(), matrix_a.getYVector(), matrix_a.getZVector() };
-		for (int i = 0; i < 3; i++)
-		{
-			float box_a_min, box_a_max, box_b_min, box_b_max;
-			getProjections(normals[i], box_a_points, box_a_min, box_a_max);
-			getProjections(normals[i], box_b_points, box_b_min, box_b_max);
-			if (!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
-			{
-				return false;
-			}
-		}
-
-		Lumix::Vec3 normals_b[] = {
-			matrix_b.getXVector(), matrix_b.getYVector(), matrix_b.getZVector() };
-		for (int i = 0; i < 3; i++)
-		{
-			float box_a_min, box_a_max, box_b_min, box_b_max;
-			getProjections(normals_b[i], box_a_points, box_a_min, box_a_max);
-			getProjections(normals_b[i], box_b_points, box_b_min, box_b_max);
-			if (!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
-			{
-				return false;
-			}
-		}
-
-		return true;
-	}
-
-
-	bool isOBBCollision(Lumix::RenderScene& scene,
-		const Lumix::Array<Lumix::RenderableMesh>& meshes,
-		const Lumix::Vec3& pos_a,
-		Lumix::Model* model,
-		float scale)
-	{
-		float radius_a_squared = model->getBoundingRadius();
-		radius_a_squared = radius_a_squared * radius_a_squared;
-		for (auto& mesh : meshes)
-		{
-			auto* renderable = scene.getRenderable(mesh.renderable);
-			Lumix::Vec3 pos_b = renderable->matrix.getTranslation();
-			float radius_b = renderable->model->getBoundingRadius();
-			float radius_squared = radius_a_squared + radius_b * radius_b;
-			if ((pos_a - pos_b).squaredLength() < radius_squared * scale * scale)
-			{
-				Lumix::Matrix matrix = Lumix::Matrix::IDENTITY;
-				matrix.setTranslation(pos_a);
-				if (testOBBCollision(matrix, model, renderable->matrix, renderable->model, scale))
-				{
-					return true;
-				}
-			}
-		}
-		return false;
-	}
-
-	Lumix::WorldEditor& m_world_editor;
-	Lumix::ComponentUID m_component;
-	Lumix::Array<Lumix::Entity> m_entities;
-	float m_brush_strength;
-	float m_brush_size;
-	Lumix::uint32 m_template_name_hash;
-	Lumix::Vec3 m_center;
-	bool m_align_with_normal;
-	bool m_rotate_x;
-	bool m_rotate_z;
-};
-
-
-
 struct RemoveEntitiesCommand : public Lumix::IEditorCommand
 {
 	RemoveEntitiesCommand(Lumix::WorldEditor& editor)
@@ -1132,12 +818,6 @@ void TerrainEditor::onUniverseDestroyed()
 }
 
 
-static Lumix::IEditorCommand* createPaintEntitiesCommand(Lumix::WorldEditor& editor)
-{
-	return LUMIX_NEW(editor.getAllocator(), PaintEntitiesCommand)(editor);
-}
-
-
 static Lumix::IEditorCommand* createRemoveEntitiesCommand(Lumix::WorldEditor& editor)
 {
 	return LUMIX_NEW(editor.getAllocator(), RemoveEntitiesCommand)(editor);
@@ -1161,7 +841,6 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	, m_flat_height(0)
 	, m_is_enabled(false)
 {
-	editor.registerEditorCommandCreator("paint_entities_on_terrain", createPaintEntitiesCommand);
 	editor.registerEditorCommandCreator("remove_entities_on_terrain", createRemoveEntitiesCommand);
 	editor.registerEditorCommandCreator("paint_terrain", createPaintTerrainCommand);
 
@@ -1440,23 +1119,201 @@ void TerrainEditor::removeEntities(const Lumix::RayCastModelHit& hit)
 	m_world_editor.executeCommand(command);
 }
 
+
+static bool overlaps(float min1, float max1, float min2, float max2)
+{
+	return (min1 <= min2 && min2 <= max1) || (min2 <= min1 && min1 <= max2);
+}
+
+
+static void getProjections(const Lumix::Vec3& axis,
+	const Lumix::Vec3 vertices[8],
+	float& min,
+	float& max)
+{
+	min = max = Lumix::dotProduct(vertices[0], axis);
+	for(int i = 1; i < 8; ++i)
+	{
+		float dot = Lumix::dotProduct(vertices[i], axis);
+		min = Lumix::Math::minValue(dot, min);
+		max = Lumix::Math::maxValue(dot, max);
+	}
+}
+
+
+static bool testOBBCollision(const Lumix::Matrix& matrix_a,
+	const Lumix::Model* model_a,
+	const Lumix::Matrix& matrix_b,
+	const Lumix::Model* model_b,
+	float scale)
+{
+	Lumix::Vec3 box_a_points[8];
+	Lumix::Vec3 box_b_points[8];
+
+	if(fabs(scale - 1.0) < 0.01f)
+	{
+		model_a->getAABB().getCorners(matrix_a, box_a_points);
+		model_b->getAABB().getCorners(matrix_b, box_b_points);
+	}
+	else
+	{
+		Lumix::Matrix scale_matrix_a = matrix_a;
+		scale_matrix_a.multiply3x3(scale);
+		Lumix::Matrix scale_matrix_b = matrix_b;
+		scale_matrix_b.multiply3x3(scale);
+		model_a->getAABB().getCorners(scale_matrix_a, box_a_points);
+		model_b->getAABB().getCorners(scale_matrix_b, box_b_points);
+	}
+
+	Lumix::Vec3 normals[] = {
+		matrix_a.getXVector(), matrix_a.getYVector(), matrix_a.getZVector()};
+	for(int i = 0; i < 3; i++)
+	{
+		float box_a_min, box_a_max, box_b_min, box_b_max;
+		getProjections(normals[i], box_a_points, box_a_min, box_a_max);
+		getProjections(normals[i], box_b_points, box_b_min, box_b_max);
+		if(!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
+		{
+			return false;
+		}
+	}
+
+	Lumix::Vec3 normals_b[] = {
+		matrix_b.getXVector(), matrix_b.getYVector(), matrix_b.getZVector()};
+	for(int i = 0; i < 3; i++)
+	{
+		float box_a_min, box_a_max, box_b_min, box_b_max;
+		getProjections(normals_b[i], box_a_points, box_a_min, box_a_max);
+		getProjections(normals_b[i], box_b_points, box_b_min, box_b_max);
+		if(!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+
+static bool isOBBCollision(Lumix::RenderScene& scene,
+	const Lumix::Array<Lumix::RenderableMesh>& meshes,
+	const Lumix::Vec3& pos_a,
+	Lumix::Model* model,
+	float scale)
+{
+	float radius_a_squared = model->getBoundingRadius();
+	radius_a_squared = radius_a_squared * radius_a_squared;
+	for(auto& mesh : meshes)
+	{
+		auto* renderable = scene.getRenderable(mesh.renderable);
+		Lumix::Vec3 pos_b = renderable->matrix.getTranslation();
+		float radius_b = renderable->model->getBoundingRadius();
+		float radius_squared = radius_a_squared + radius_b * radius_b;
+		if((pos_a - pos_b).squaredLength() < radius_squared * scale * scale)
+		{
+			Lumix::Matrix matrix = Lumix::Matrix::IDENTITY;
+			matrix.setTranslation(pos_a);
+			if(testOBBCollision(matrix, model, renderable->matrix, renderable->model, scale))
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+
 void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 {
+	PROFILE_FUNCTION();
 	if (m_selected_entity_template < 0) return;
-	int templates_count = m_world_editor.getEntityTemplateSystem().getTemplateNames().size();
+	auto& template_system = m_world_editor.getEntityTemplateSystem();
+	auto& template_names = template_system.getTemplateNames();
+	int templates_count = template_names.size();
 	if (m_selected_entity_template >= templates_count) return;
 
-	PaintEntitiesCommand* command =
-		LUMIX_NEW(m_world_editor.getAllocator(), PaintEntitiesCommand)(m_world_editor,
-			m_component,
-			m_selected_entity_template,
-			m_terrain_brush_strength,
-			m_terrain_brush_size,
-			m_is_align_with_normal,
-			m_is_rotate_x,
-			m_is_rotate_z,
-			hit);
-	m_world_editor.executeCommand(command);
+	m_world_editor.beginCommandGroup();
+	{
+		Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
+		Lumix::Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix(m_component.entity);
+		Lumix::Matrix inv_terrain_matrix = terrain_matrix;
+		inv_terrain_matrix.inverse();
+
+		auto hash = Lumix::crc32(template_names[m_selected_entity_template].c_str());
+		Lumix::Entity tpl = template_system.getInstances(hash)[0];
+		if(tpl < 0) return;
+
+		Lumix::ComponentUID renderable = m_world_editor.getComponent(tpl, RENDERABLE_HASH);
+		if(!renderable.isValid()) return;
+
+		Lumix::Frustum frustum;
+		auto center = hit.m_origin + hit.m_dir * hit.m_t;
+		frustum.computeOrtho(center,
+			Lumix::Vec3(0, 0, 1),
+			Lumix::Vec3(0, 1, 0),
+			2 * m_terrain_brush_size,
+			2 * m_terrain_brush_size,
+			-m_terrain_brush_size,
+			m_terrain_brush_size);
+
+		Lumix::Array<Lumix::RenderableMesh> meshes(m_world_editor.getAllocator());
+		meshes.clear();
+		scene->getRenderableInfos(frustum, meshes, ~0);
+
+		const auto* template_name = template_names[m_selected_entity_template].c_str();
+
+		float w, h;
+		scene->getTerrainSize(m_component.index, &w, &h);
+		float scale = 1.0f - Lumix::Math::maxValue(0.01f, m_terrain_brush_strength);
+		Lumix::Model* model = scene->getRenderableModel(renderable.index);
+		for(int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f; ++i)
+		{
+			float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
+			float dist = Lumix::Math::randFloat(0, 1.0f) * m_terrain_brush_size;
+			Lumix::Vec3 pos(center.x + cos(angle) * dist, 0, center.z + sin(angle) * dist);
+			Lumix::Vec3 terrain_pos = inv_terrain_matrix.multiplyPosition(pos);
+			if(terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= w &&
+				terrain_pos.z <= h)
+			{
+				pos.y = scene->getTerrainHeightAt(m_component.index, terrain_pos.x, terrain_pos.z);
+				pos.y += terrain_matrix.getTranslation().y;
+				if(!isOBBCollision(*scene, meshes, pos, model, scale))
+				{
+					Lumix::Quat rot(0, 0, 0, 1);
+					if(m_is_align_with_normal)
+					{
+						Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
+						Lumix::Vec3 normal = scene->getTerrainNormalAt(m_component.index, pos.x, pos.z);
+						Lumix::Vec3 dir = Lumix::crossProduct(normal, Lumix::Vec3(1, 0, 0)).normalized();
+						Lumix::Matrix mtx = Lumix::Matrix::IDENTITY;
+						mtx.setXVector(Lumix::crossProduct(normal, dir));
+						mtx.setYVector(normal);
+						mtx.setXVector(dir);
+						mtx.getRotation(rot);
+					}
+					else
+					{
+						if (m_is_rotate_x)
+						{
+							float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
+							Lumix::Quat q(Lumix::Vec3(1, 0, 0), angle);
+							rot = rot * q;
+						}
+
+						if (m_is_rotate_z)
+						{
+							float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
+							Lumix::Quat q(rot * Lumix::Vec3(0, 0, 1), angle);
+							rot = rot * q;
+						}
+					}
+
+					auto entity = template_system.createInstance(template_name, pos, rot);
+				}
+			}
+		}
+	}
+	m_world_editor.endCommandGroup();
 }
 
 

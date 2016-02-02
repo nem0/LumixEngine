@@ -13,6 +13,7 @@
 #include "core/mt/thread.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
+#include "core/quat.h"
 #include "core/resource_manager.h"
 #include "core/system.h"
 #include "core/timer.h"
@@ -573,7 +574,7 @@ public:
 				{
 					Lumix::Vec3 pos = m_editor->getCameraRaycastHit();
 					m_editor->getEntityTemplateSystem().createInstance(
-						m_selected_template_name.c_str(), pos);
+						m_selected_template_name.c_str(), pos, Lumix::Quat(0, 0, 0, 1));
 				}
 
 				doMenuItem(getAction("showEntities"), false, is_any_entity_selected);
