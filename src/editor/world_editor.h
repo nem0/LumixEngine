@@ -71,6 +71,8 @@ public:
 	virtual RenderInterface* getRenderInterface() = 0;
 	virtual void update() = 0;
 	virtual void updateEngine() = 0;
+	virtual void beginCommandGroup() = 0;
+	virtual void endCommandGroup() = 0;
 	virtual void executeCommand(IEditorCommand* command) = 0;
 	virtual IEditorCommand* createEditorCommand(uint32 command_type) = 0;
 	virtual Engine& getEngine() = 0;
