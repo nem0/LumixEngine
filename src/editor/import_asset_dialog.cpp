@@ -393,7 +393,7 @@ struct ConvertTask : public Lumix::MT::Task
 		, m_dialog(dialog)
 		, m_filtered_meshes(dialog.m_editor.getAllocator())
 		, m_scale(scale)
-		, m_bones(dialog.m_editor.getAllocator())
+		, m_nodes(dialog.m_editor.getAllocator())
 	{
 	}
 
@@ -566,11 +566,11 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	Lumix::Vec3 getPosition(const aiNodeAnim* channel, int frame_idx)
+	Lumix::Vec3 getPosition(const aiNodeAnim* channel, int frame_idx, uint32_t fps)
 	{
-		float frame = (float)frame_idx;
+		float time = frame_idx / (float)fps;
 		unsigned int i = 0;
-		while (frame > (float)channel->mPositionKeys[i].mTime && i < channel->mNumPositionKeys)
+		while (time > (float)channel->mPositionKeys[i].mTime && i < channel->mNumPositionKeys)
 		{
 			++i;
 		}
@@ -581,7 +581,7 @@ struct ConvertTask : public Lumix::MT::Task
 			return Lumix::Vec3(first.x, first.y, first.z);
 		}
 		auto second = channel->mPositionKeys[i + 1].mValue;
-		float t = float((frame - channel->mPositionKeys[i].mTime) /
+		float t = float((time - channel->mPositionKeys[i].mTime) /
 						(channel->mPositionKeys[i + 1].mTime - channel->mPositionKeys[i].mTime));
 		first *= 1 - t;
 		second *= t;
@@ -592,11 +592,11 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	Lumix::Quat getRotation(const aiNodeAnim* channel, int frame_idx)
+	Lumix::Quat getRotation(const aiNodeAnim* channel, int frame_idx, uint32_t fps)
 	{
-		float frame = (float)frame_idx;
+		float time = frame_idx / (float)fps;
 		unsigned int i = 0;
-		while (frame > (float)channel->mRotationKeys[i].mTime && i < channel->mNumRotationKeys)
+		while (time > (float)channel->mRotationKeys[i].mTime && i < channel->mNumRotationKeys)
 		{
 			++i;
 		}
@@ -608,7 +608,7 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 
 		auto second = channel->mRotationKeys[i + 1].mValue;
-		float t = float((frame - channel->mRotationKeys[i].mTime) /
+		float t = float((time - channel->mRotationKeys[i].mTime) /
 						(channel->mRotationKeys[i + 1].mTime - channel->mRotationKeys[i].mTime));
 		aiQuaternion out;
 		aiQuaternion::Interpolate(out, first, second, t);
@@ -640,6 +640,29 @@ struct ConvertTask : public Lumix::MT::Task
 		if (c >= 'a' && c <= 'z') return true;
 		if (c >= '0' && c <= '9') return true;
 		return false;
+	}
+
+
+	static float getLength(aiAnimation* animation)
+	{
+		float length = 0;
+		for (unsigned int i = 0; i < animation->mNumChannels; ++i)
+		{
+			auto* channel = animation->mChannels[i];
+			for (unsigned int j = 0; j < channel->mNumPositionKeys; ++j)
+			{
+				length = Lumix::Math::maxValue(length, (float)channel->mPositionKeys[j].mTime);
+			}
+			for (unsigned int j = 0; j < channel->mNumRotationKeys; ++j)
+			{
+				length = Lumix::Math::maxValue(length, (float)channel->mRotationKeys[j].mTime);
+			}
+			for (unsigned int j = 0; j < channel->mNumScalingKeys; ++j)
+			{
+				length = Lumix::Math::maxValue(length, (float)channel->mScalingKeys[j].mTime);
+			}
+		}
+		return length;
 	}
 
 
@@ -682,13 +705,16 @@ struct ConvertTask : public Lumix::MT::Task
 			}
 			
 			Lumix::Animation::Header header;
-			header.fps = Lumix::uint32(animation->mTicksPerSecond == 0 ? 25 : animation->mTicksPerSecond);
+			header.fps = Lumix::uint32(
+				animation->mTicksPerSecond == 0
+					? 25
+					: (animation->mTicksPerSecond == 1 ? 30 : animation->mTicksPerSecond));
 			header.magic = Lumix::Animation::HEADER_MAGIC;
 			header.version = 1;
 
 			file.write(&header, sizeof(header));
-			int frame_count = (int)animation->mDuration;
-			if (frame_count == 0) frame_count = animation->mChannels[0]->mNumPositionKeys;
+			float anim_length = getLength(animation);
+			int frame_count = int(anim_length * header.fps);
 			file.write(&frame_count, sizeof(frame_count));
 			int bone_count = (int)animation->mNumChannels;
 			file.write(&bone_count, sizeof(bone_count));
@@ -704,8 +730,8 @@ struct ConvertTask : public Lumix::MT::Task
 				const aiNodeAnim* channel = animation->mChannels[channel_idx];
 				for (int frame = 0; frame < frame_count; ++frame)
 				{
-					positions[frame * bone_count + channel_idx] = getPosition(channel, frame) * m_dialog.m_mesh_scale;
-					rotations[frame * bone_count + channel_idx] = getRotation(channel, frame);
+					positions[frame * bone_count + channel_idx] = getPosition(channel, frame, header.fps) * m_dialog.m_mesh_scale;
+					rotations[frame * bone_count + channel_idx] = getRotation(channel, frame, header.fps);
 				}
 			}
 
@@ -879,11 +905,18 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
+	int getNodeIndex(const aiBone* bone) const
+	{
+		for (int i = 0; i < m_nodes.size(); ++i)
+		{
+			if (bone->mName == m_nodes[i]->mName) return i;
+		}
+		return -1;
+	}
+
+
 	void fillSkinInfo(const aiScene* scene, Lumix::Array<SkinInfo>& infos, int vertices_count) const
 	{
-
-		Lumix::Array<int> node_names(m_dialog.m_editor.getAllocator());
-		getBoneNamesHashes(scene->mRootNode, node_names);
 		infos.resize(vertices_count);
 
 		int offset = 0;
@@ -892,7 +925,7 @@ struct ConvertTask : public Lumix::MT::Task
 			for (unsigned int j = 0; j < mesh->mNumBones; ++j)
 			{
 				const aiBone* bone = mesh->mBones[j];
-				int bone_index = node_names.indexOf(Lumix::crc32(bone->mName.C_Str()));
+				int bone_index = getNodeIndex(bone);
 				for (unsigned int k = 0; k < bone->mNumWeights; ++k)
 				{
 					auto& info = infos[offset + bone->mWeights[k].mVertexId];
@@ -936,6 +969,44 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
+	void flattenNodes(aiNode* node, Lumix::Array<aiNode*>& out)
+	{
+		if (!node) return;
+		if (out.indexOf(node) >= 0) return;
+
+		flattenNodes(node->mParent, out);
+		out.push(node);
+	}
+
+
+	void gatherNodes()
+	{
+		Lumix::Array<aiNode*> tmp(m_dialog.m_editor.getAllocator());
+		m_nodes.clear();
+		const aiScene* scene = m_dialog.m_importer.GetScene();
+		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		{
+			auto* mesh = scene->mMeshes[i];
+			for (unsigned int j = 0; j < mesh->mNumBones; ++j)
+			{
+				auto* node = getNode(mesh->mBones[j], scene->mRootNode);
+				while (node && node->mNumMeshes == 0)
+				{
+					if (tmp.indexOf(node) >= 0) break;
+					tmp.push(node);
+					node = node->mParent;
+				}
+				if (node && tmp.indexOf(node) < 0) tmp.push(node);
+			}
+		}
+
+		for (auto* node : tmp)
+		{
+			flattenNodes(node, m_nodes);
+		}
+	}
+
+
 	void writeGeometry(Lumix::FS::IFile& file) const
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
@@ -970,11 +1041,12 @@ struct ConvertTask : public Lumix::MT::Task
 		fillSkinInfo(scene, skin_infos, vertices_count);
 
 		int skin_index = 0;
-		aiMatrix3x3 normal_matrix(scene->mRootNode->mTransformation);
 
 		bool z_up = m_dialog.m_z_up;
 		for (auto* mesh : m_filtered_meshes)
 		{
+			auto mesh_matrix = getGlobalTransform(getNode(mesh, scene->mRootNode));
+			aiMatrix3x3 normal_matrix(mesh_matrix);
 			bool is_skinned = isSkinned(mesh);
 			for (unsigned int j = 0; j < mesh->mNumVertices; ++j)
 			{
@@ -987,7 +1059,7 @@ struct ConvertTask : public Lumix::MT::Task
 				}
 				++skin_index;
 
-				auto v = scene->mRootNode->mTransformation * mesh->mVertices[j];
+				auto v = mesh_matrix * mesh->mVertices[j];
 
 				Lumix::Vec3 position(v.x, z_up ? v.z : v.y, z_up ? -v.y : v.z);
 				position *= m_scale;
@@ -1100,7 +1172,6 @@ struct ConvertTask : public Lumix::MT::Task
 
 	void writeMeshes(Lumix::FS::IFile& file)
 	{
-		m_bones.clear();
 		const aiScene* scene = m_dialog.m_importer.GetScene();
 		Lumix::int32 mesh_count = 0;
 		for (int i = 0; i < m_dialog.m_mesh_mask.size(); ++i)
@@ -1113,11 +1184,6 @@ struct ConvertTask : public Lumix::MT::Task
 		Lumix::int32 indices_offset = 0;
 		for (auto* mesh : m_filtered_meshes)
 		{
-			for (unsigned int i = 0; i < mesh->mNumBones; ++i)
-			{
-				m_bones.push(mesh->mBones[i]);
-			}
-
 			int vertex_size = getVertexSize(mesh);
 			aiString material_name;
 			scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_NAME, material_name);
@@ -1172,59 +1238,6 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void writeNode(Lumix::FS::IFile& file,
-		const aiNode* node,
-		aiMatrix4x4 parent_transform,
-		const Lumix::Array<aiNode*>& filtered_nodes)
-	{
-		const aiScene* scene = m_dialog.m_importer.GetScene();
-		if (filtered_nodes.indexOf(node) < 0) return;
-
-		Lumix::int32 len = Lumix::stringLength(node->mName.C_Str());
-		file.write((const char*)&len, sizeof(len));
-		file.write(node->mName.C_Str(), node->mName.length);
-
-		if (node->mParent)
-		{
-			Lumix::int32 len = Lumix::stringLength(node->mParent->mName.C_Str());
-			file.write((const char*)&len, sizeof(len));
-			file.write(node->mParent->mName.C_Str(), node->mParent->mName.length);
-		}
-		else
-		{
-			Lumix::int32 len = 0;
-			file.write((const char*)&len, sizeof(len));
-		}
-
-		auto* bone = getBone(node);
-		if (bone)
-		{
-			auto* mesh_node = getNode(getMesh(bone), scene->mRootNode);
-			auto t = getGlobalTransform(mesh_node);
-			auto t2 = t * bone->mOffsetMatrix;
-			auto t3 = t.Inverse() * getGlobalTransform(getNode(bone, scene->mRootNode)) * bone->mOffsetMatrix;
-			auto t4 = t.Inverse() * bone->mOffsetMatrix;
-			auto t5 = getGlobalTransform(getNode(bone, scene->mRootNode)) * bone->mOffsetMatrix;
-			t = t;
-		}
-
-
-		aiQuaterniont<float> rot;
-		aiVector3t<float> pos;
-		(parent_transform * node->mTransformation).DecomposeNoScaling(rot, pos);
-		file.write((const char*)&pos, sizeof(pos));
-		file.write((const char*)&rot.x, sizeof(rot.x));
-		file.write((const char*)&rot.y, sizeof(rot.y));
-		file.write((const char*)&rot.z, sizeof(rot.z));
-		file.write((const char*)&rot.w, sizeof(rot.w));
-
-		for (unsigned int i = 0; i < node->mNumChildren; ++i)
-		{
-			writeNode(file, node->mChildren[i], parent_transform * node->mTransformation, filtered_nodes);
-		}
-	}
-
-
 	void writeLods(Lumix::FS::IFile& file) const
 	{
 		Lumix::int32 lods[] = {-1, -1, -1, -1, -1, -1, -1, -1};
@@ -1262,7 +1275,7 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	aiMatrix4x4 getGlobalTransform(aiNode* node)
+	aiMatrix4x4 getGlobalTransform(aiNode* node) const
 	{
 		aiMatrix4x4 mtx;
 		while (node)
@@ -1274,7 +1287,7 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	aiNode* getNode(aiMesh* mesh, aiNode* node)
+	aiNode* getNode(aiMesh* mesh, aiNode* node) const
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
 		for (unsigned int i = 0; i < node->mNumMeshes; ++i)
@@ -1293,7 +1306,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 
 
-	aiNode* getNode(aiBone* bone, aiNode* node)
+	aiNode* getNode(aiBone* bone, aiNode* node) const
 	{
 		if (bone->mName == node->mName) return node;
 
@@ -1339,33 +1352,41 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-
 	void writeSkeleton(Lumix::FS::IFile& file)
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
-		Lumix::Array<aiNode*> nodes(m_dialog.m_editor.getAllocator());
 
-		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
-		{
-			auto* mesh = scene->mMeshes[i];
-			for (unsigned int j = 0; j < mesh->mNumBones; ++j)
-			{
-				auto* node = getNode(mesh->mBones[j], scene->mRootNode);
-				while (node && node->mNumMeshes == 0)
-				{
-					if (nodes.indexOf(node) >= 0) break;
-					nodes.push(node);
-					node = node->mParent;
-				}
-				if (node && nodes.indexOf(node) < 0) nodes.push(node);
-			}
-		}
-
-		Lumix::int32 count = nodes.size();
+		Lumix::int32 count = m_nodes.size();
 		if (count == 1) count = 0;
 		file.write((const char*)&count, sizeof(count));
 
-		writeNode(file, scene->mRootNode, aiMatrix4x4(), nodes);
+		for (auto* bone : m_nodes)
+		{
+			Lumix::int32 len = Lumix::stringLength(bone->mName.C_Str());
+			file.write((const char*)&len, sizeof(len));
+			file.write(bone->mName.C_Str(), bone->mName.length);
+
+			if (bone->mParent)
+			{
+				Lumix::int32 len = Lumix::stringLength(bone->mParent->mName.C_Str());
+				file.write((const char*)&len, sizeof(len));
+				file.write(bone->mParent->mName.C_Str(), bone->mParent->mName.length);
+			}
+			else
+			{
+				Lumix::int32 len = 0;
+				file.write((const char*)&len, sizeof(len));
+			}
+
+			aiQuaterniont<float> rot;
+			aiVector3t<float> pos;
+			getGlobalTransform(bone).DecomposeNoScaling(rot, pos);
+			file.write((const char*)&pos, sizeof(pos));
+			file.write((const char*)&rot.x, sizeof(rot.x));
+			file.write((const char*)&rot.y, sizeof(rot.y));
+			file.write((const char*)&rot.z, sizeof(rot.z));
+			file.write((const char*)&rot.w, sizeof(rot.w));
+		}
 	}
 
 
@@ -1590,6 +1611,7 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 
 		filterMeshes();
+		gatherNodes();
 
 		writeModelHeader(*file);
 		writeMeshes(*file);
@@ -1601,9 +1623,9 @@ struct ConvertTask : public Lumix::MT::Task
 		return true;
 	}
 
-	Lumix::Array<aiBone*> m_bones;
 	Lumix::Array<aiMesh*> m_filtered_meshes;
 	ImportAssetDialog& m_dialog;
+	Lumix::Array<aiNode*> m_nodes;
 	float m_scale;
 
 }; // struct ConvertTask
