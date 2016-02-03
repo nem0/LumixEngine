@@ -179,14 +179,12 @@ void Model::getPose(Pose& pose)
 	ASSERT(pose.getCount() == getBoneCount());
 	Vec3* pos = pose.getPositions();
 	Quat* rot = pose.getRotations();
-	Matrix mtx;
 	for (int i = 0, c = getBoneCount(); i < c; ++i)
 	{
-		mtx = m_bones[i].inv_bind_matrix;
-		mtx.fastInverse();
-		mtx.getTranslation(pos[i]);
-		mtx.getRotation(rot[i]);
+		pos[i] = m_bones[i].position;
+		rot[i] = m_bones[i].rotation;
 	}
+	pose.setIsAbsolute();
 }
 
 

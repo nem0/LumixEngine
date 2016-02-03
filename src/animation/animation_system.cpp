@@ -219,13 +219,18 @@ struct AnimationSceneImpl : public IScene
 			animable.m_animation->isReady())
 		{
 			auto* pose = m_render_scene->getPose(animable.m_renderable);
+			auto* model = m_render_scene->getRenderableModel(animable.m_renderable);
+
 			if(!pose) return;
+			if (!model->isReady()) return;
+
+			model->getPose(*pose);
+			pose->computeRelative(*model);
 			animable.m_animation->getPose(
 				animable.m_time,
 				*pose,
-				*m_render_scene->getRenderableModel(animable.m_renderable));
+				*model);
 
-			auto* model = m_render_scene->getRenderableModel(animable.m_renderable);
 			for (int i = 0; i < pose->getCount(); ++i)
 			{
 				if (model->getBone(i).parent_idx >= 0)
