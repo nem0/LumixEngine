@@ -59,7 +59,10 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 		int off = frame * m_bone_count;
 		int off2 = off + m_bone_count;
 		float t = (time - frame / (float)m_fps) / (1.0f / m_fps);
-	
+		TODO("get rid of this");
+		bool is_relative[128] = {};
+		ASSERT(model.getBoneCount() < lengthOf(is_relative));
+
 		if(frame < m_frame_count - 1)
 		{
 			for(int i = 0; i < m_bone_count; ++i)
@@ -70,6 +73,7 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 					int model_bone_index = iter.value();
 					lerp(m_positions[off + i], m_positions[off2 + i], &pos[model_bone_index], t);
 					nlerp(m_rotations[off + i], m_rotations[off2 + i], &rot[model_bone_index], t);
+					is_relative[model_bone_index] = true;
 				}
 			}
 		}
@@ -83,11 +87,12 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 					int model_bone_index = iter.value();
 					pos[model_bone_index] = m_positions[off + i];
 					rot[model_bone_index] = m_rotations[off + i];
+					is_relative[model_bone_index] = true;
 				}
 			}
 		}
 		pose.setIsRelative();
-		pose.computeAbsolute(model);
+		pose.computeAbsolute(model, is_relative);
 	}
 }
 

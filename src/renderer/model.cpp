@@ -389,7 +389,7 @@ bool Model::parseBones(FS::IFile& file)
 		{
 			return false;
 		}
-		file.read(tmp, len + 1);
+		file.read(tmp, len);
 		tmp[len] = 0;
 		b.name = tmp;
 		m_bone_map.insert(crc32(b.name.c_str()), m_bones.size() - 1);

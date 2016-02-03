@@ -63,6 +63,25 @@ void Pose::resize(int count)
 }
 
 
+void Pose::computeAbsolute(Model& model, bool* is_relative)
+{
+	PROFILE_FUNCTION();
+	if (!m_is_absolute)
+	{
+		for (int i = model.getFirstNonrootBoneIndex(); i < m_count; ++i)
+		{
+			if (is_relative[i])
+			{
+				int parent = model.getBone(i).parent_idx;
+				m_positions[i] = m_rotations[parent] * m_positions[i] + m_positions[parent];
+				m_rotations[i] = m_rotations[i] * m_rotations[parent];
+			}
+		}
+		m_is_absolute = true;
+	}
+}
+
+
 void Pose::computeAbsolute(Model& model)
 {
 	PROFILE_FUNCTION();
