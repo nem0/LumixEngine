@@ -376,9 +376,17 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		ImGui::LabelText("Bone count", "%d", model->getBoneCount());
 		if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones"))
 		{
+			ImGui::Columns(3);
 			for (int i = 0; i < model->getBoneCount(); ++i)
 			{
 				ImGui::Text(model->getBone(i).name.c_str());
+				ImGui::NextColumn();
+				auto pos = model->getBone(i).position;
+				ImGui::Text("%f; %f; %f", pos.x, pos.y, pos.z);
+				ImGui::NextColumn();
+				auto rot = model->getBone(i).rotation;
+				ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
+				ImGui::NextColumn();
 			}
 		}
 

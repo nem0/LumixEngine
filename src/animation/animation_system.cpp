@@ -14,6 +14,8 @@
 #include "engine.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
+#include "renderer/model.h"
+#include "renderer/pose.h"
 #include "renderer/render_scene.h"
 #include "universe/universe.h"
 
@@ -222,6 +224,22 @@ struct AnimationSceneImpl : public IScene
 				animable.m_time,
 				*pose,
 				*m_render_scene->getRenderableModel(animable.m_renderable));
+
+			auto* model = m_render_scene->getRenderableModel(animable.m_renderable);
+			for (int i = 0; i < pose->getCount(); ++i)
+			{
+				if (model->getBone(i).parent_idx >= 0)
+				{
+					m_render_scene->addDebugLine(pose->getPositions()[i],
+						pose->getPositions()[model->getBone(i).parent_idx], 0xffffffff, 0);
+					m_render_scene->addDebugLine(model->getBone(i).position,
+						model->getBone(model->getBone(i).parent_idx).position, 0xfff00fff, 0);
+
+				}
+				
+
+			}
+			
 			float t = animable.m_time + time_delta;
 			float l = animable.m_animation->getLength();
 			while(t > l)

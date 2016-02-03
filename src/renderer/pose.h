@@ -27,6 +27,7 @@ class LUMIX_RENDERER_API Pose
 		Vec3* getPositions() const { return m_positions; }
 		Quat* getRotations() const { return m_rotations; }
 		void computeAbsolute(Model& model);
+		void computeAbsolute(Model& model, bool* is_relative);
 		void setIsRelative() { m_is_absolute = false; }
 		void blend(Pose& rhs, float weight);
 

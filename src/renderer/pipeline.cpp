@@ -1608,7 +1608,7 @@ struct PipelineImpl : public Pipeline
 
 	void setPoseUniform(const RenderableMesh& renderable_mesh) const
 	{
-		Matrix bone_mtx[64];
+		Matrix bone_mtx[128];
 		
 		Renderable* renderable = m_scene->getRenderable(renderable_mesh.renderable);
 		const Pose& pose = *renderable->pose;
