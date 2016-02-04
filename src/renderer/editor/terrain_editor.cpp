@@ -1289,7 +1289,7 @@ void TerrainEditor::onGUI()
 		if (ImGui::Button("Select mask"))
 		{
 			char filename[Lumix::MAX_PATH_LENGTH];
-			if (PlatformInterface::getOpenFilename(filename, Lumix::lengthOf(filename), "All\0*.*\0"))
+			if (PlatformInterface::getOpenFilename(filename, Lumix::lengthOf(filename), "All\0*.*\0", nullptr))
 			{
 				int image_width;
 				int image_height;

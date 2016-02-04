@@ -1775,7 +1775,7 @@ void ShaderEditor::loadNodeConnections(Lumix::InputBlob& blob, Node& node)
 void ShaderEditor::load()
 {
 	char path[Lumix::MAX_PATH_LENGTH];
-	if (!PlatformInterface::getOpenFilename(path, Lumix::lengthOf(path), "Shader edit data\0*.sed\0"))
+	if (!PlatformInterface::getOpenFilename(path, Lumix::lengthOf(path), "Shader edit data\0*.sed\0", nullptr))
 	{
 		return;
 	}

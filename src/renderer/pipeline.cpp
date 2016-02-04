@@ -1624,7 +1624,6 @@ struct PipelineImpl : public Pipeline
 			rots[bone_index].toMatrix(bone_mtx[bone_index]);
 			bone_mtx[bone_index].translate(poss[bone_index]);
 			bone_mtx[bone_index] = bone_mtx[bone_index] * bone.inv_bind_matrix;
-			//bone_mtx[bone_index].transpose();
 		}
 		bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.getCount());
 	}

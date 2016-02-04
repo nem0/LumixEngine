@@ -96,12 +96,12 @@ namespace PlatformInterface
 	LUMIX_EDITOR_API void getKeyName(int key, char* out, int max_size);
 	LUMIX_EDITOR_API void setCursor(Cursor cursor);
 	
-	LUMIX_EDITOR_API bool getOpenFilename(char* out, int max_size, const char* filter);
+	LUMIX_EDITOR_API bool getOpenFilename(char* out, int max_size, const char* filter, const char* starting_file);
 	LUMIX_EDITOR_API bool getSaveFilename(char* out,
 		int max_size,
 		const char* filter,
 		const char* default_extension);
-	LUMIX_EDITOR_API bool getOpenDirectory(char* out, int max_size);
+	LUMIX_EDITOR_API bool getOpenDirectory(char* out, int max_size, const char* starting_dir);
 	LUMIX_EDITOR_API bool shellExecuteOpen(const char* path);
 
 	LUMIX_EDITOR_API bool deleteFile(const char* path);
