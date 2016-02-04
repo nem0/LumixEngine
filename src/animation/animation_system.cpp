@@ -231,20 +231,6 @@ struct AnimationSceneImpl : public IScene
 				*pose,
 				*model);
 
-			for (int i = 0; i < pose->getCount(); ++i)
-			{
-				if (model->getBone(i).parent_idx >= 0)
-				{
-					m_render_scene->addDebugLine(pose->getPositions()[i],
-						pose->getPositions()[model->getBone(i).parent_idx], 0xffffffff, 0);
-					m_render_scene->addDebugLine(model->getBone(i).position,
-						model->getBone(model->getBone(i).parent_idx).position, 0xfff00fff, 0);
-
-				}
-				
-
-			}
-			
 			float t = animable.m_time + time_delta;
 			float l = animable.m_animation->getLength();
 			while(t > l)
