@@ -1,24 +1,25 @@
-#include "import_asset_dialog.h"
+#include "animation/animation.h"
 #include "assimp/DefaultLogger.hpp"
-#include "assimp/postprocess.h"
 #include "assimp/ProgressHandler.hpp"
+#include "assimp/postprocess.h"
 #include "assimp/scene.h"
-#include "core/crc32.h"
-#include "core/FS/ifile.h"
 #include "core/FS/file_system.h"
+#include "core/FS/ifile.h"
 #include "core/FS/os_file.h"
-#include "core/log.h"
 #include "core/MT/task.h"
+#include "core/crc32.h"
+#include "core/log.h"
 #include "core/path_utils.h"
 #include "core/system.h"
 #include "crnlib.h"
 #include "debug/floating_points.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "metadata.h"
 #include "imgui/imgui.h"
-#include "platform_interface.h"
+#include "import_asset_dialog.h"
+#include "metadata.h"
 #include "physics/physics_geometry_manager.h"
+#include "platform_interface.h"
 #include "renderer/model.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
@@ -310,8 +311,7 @@ struct ImportTask : public Lumix::MT::Task
 			void write(const char* message) { Lumix::g_log_warning.log("import") << message; }
 		};
 		const unsigned int severity = Assimp::Logger::Err;
-		Assimp::DefaultLogger::create(
-			ASSIMP_DEFAULT_LOG_NAME, Assimp::Logger::NORMAL, 0, nullptr);
+		Assimp::DefaultLogger::create(ASSIMP_DEFAULT_LOG_NAME, Assimp::Logger::NORMAL, 0, nullptr);
 
 		Assimp::DefaultLogger::get()->attachStream(new MyStream(), severity);
 	}
@@ -392,6 +392,7 @@ struct ConvertTask : public Lumix::MT::Task
 		, m_dialog(dialog)
 		, m_filtered_meshes(dialog.m_editor.getAllocator())
 		, m_scale(scale)
+		, m_nodes(dialog.m_editor.getAllocator())
 	{
 	}
 
@@ -405,7 +406,7 @@ struct ConvertTask : public Lumix::MT::Task
 		for (int i = 0; i < materials_count; ++i)
 		{
 			auto* material = scene->mMaterials[materials[i]];
-			auto types = { aiTextureType_DIFFUSE, aiTextureType_NORMALS, aiTextureType_HEIGHT };
+			auto types = {aiTextureType_DIFFUSE, aiTextureType_NORMALS, aiTextureType_HEIGHT};
 			for (auto type : types)
 			{
 				for (unsigned int j = 0; j < material->GetTextureCount(type); ++j)
@@ -425,9 +426,10 @@ struct ConvertTask : public Lumix::MT::Task
 
 		for (unsigned int i = 0; i < scene->mNumTextures; ++i)
 		{
-			m_dialog.m_saved_embedded_textures.push(Lumix::string("", m_dialog.m_editor.getAllocator()));
+			m_dialog.m_saved_embedded_textures.push(
+				Lumix::string("", m_dialog.m_editor.getAllocator()));
 			if (textures.indexOf(i) == -1) continue;
-			
+
 			const aiTexture* texture = scene->mTextures[i];
 			if (texture->mHeight != 0)
 			{
@@ -564,6 +566,180 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
+	Lumix::Vec3 getPosition(const aiNodeAnim* channel, int frame_idx, uint32_t fps)
+	{
+		float time = frame_idx / (float)fps;
+		unsigned int i = 0;
+		while (time > (float)channel->mPositionKeys[i].mTime && i < channel->mNumPositionKeys)
+		{
+			++i;
+		}
+		auto first = channel->mPositionKeys[i].mValue;
+
+		if (i + 1 == channel->mNumPositionKeys)
+		{
+			return Lumix::Vec3(first.x, first.y, first.z);
+		}
+		auto second = channel->mPositionKeys[i + 1].mValue;
+		float t = float((time - channel->mPositionKeys[i].mTime) /
+						(channel->mPositionKeys[i + 1].mTime - channel->mPositionKeys[i].mTime));
+		first *= 1 - t;
+		second *= t;
+
+		first += second;
+
+		return Lumix::Vec3(first.x, first.y, first.z);
+	}
+
+
+	Lumix::Quat getRotation(const aiNodeAnim* channel, int frame_idx, uint32_t fps)
+	{
+		float time = frame_idx / (float)fps;
+		unsigned int i = 0;
+		while (time > (float)channel->mRotationKeys[i].mTime && i < channel->mNumRotationKeys)
+		{
+			++i;
+		}
+		auto first = channel->mRotationKeys[i].mValue;
+
+		if (i + 1 == channel->mNumRotationKeys)
+		{
+			return Lumix::Quat(first.x, first.y, first.z, first.w);
+		}
+
+		auto second = channel->mRotationKeys[i + 1].mValue;
+		float t = float((time - channel->mRotationKeys[i].mTime) /
+						(channel->mRotationKeys[i + 1].mTime - channel->mRotationKeys[i].mTime));
+		aiQuaternion out;
+		aiQuaternion::Interpolate(out, first, second, t);
+
+		return Lumix::Quat(out.x, out.y, out.z, out.w);
+	}
+
+
+	bool isValidFilenameChar(char c)
+	{
+		if (c >= 'A' && c <= 'Z') return true;
+		if (c >= 'a' && c <= 'z') return true;
+		if (c >= '0' && c <= '9') return true;
+		return false;
+	}
+
+
+	static float getLength(aiAnimation* animation)
+	{
+		float length = 0;
+		for (unsigned int i = 0; i < animation->mNumChannels; ++i)
+		{
+			auto* channel = animation->mChannels[i];
+			for (unsigned int j = 0; j < channel->mNumPositionKeys; ++j)
+			{
+				length = Lumix::Math::maxValue(length, (float)channel->mPositionKeys[j].mTime);
+			}
+			for (unsigned int j = 0; j < channel->mNumRotationKeys; ++j)
+			{
+				length = Lumix::Math::maxValue(length, (float)channel->mRotationKeys[j].mTime);
+			}
+			for (unsigned int j = 0; j < channel->mNumScalingKeys; ++j)
+			{
+				length = Lumix::Math::maxValue(length, (float)channel->mScalingKeys[j].mTime);
+			}
+		}
+		return length;
+	}
+
+
+	bool saveLumixAnimations()
+	{
+		if (!m_dialog.m_import_animations) return true;
+
+		m_dialog.setImportMessage("Importing animations...");
+		const aiScene* scene = m_dialog.m_importer.GetScene();
+
+		bool failed = false;
+		for (unsigned int i = 0; i < scene->mNumAnimations; ++i)
+		{
+			auto* animation = scene->mAnimations[i];
+
+			Lumix::FS::OsFile file;
+			PathBuilder ani_path(m_dialog.m_output_dir);
+			if (animation->mName.length > 0)
+			{
+				char tmp[Lumix::MAX_PATH_LENGTH];
+				Lumix::copyString(tmp, animation->mName.C_Str());
+				char* c = tmp;
+				while (*c)
+				{
+					if (!isValidFilenameChar(*c)) *c = '_';
+					++c;
+				}
+				ani_path << "/" << tmp << ".ani";
+			}
+			else
+			{
+				ani_path << "/"
+						 << "anim" << i << ".ani";
+			}
+
+			if (!file.open(ani_path,
+					Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE,
+					m_dialog.m_editor.getAllocator()))
+			{
+				Lumix::g_log_error.log("import") << "Could not create file " << ani_path;
+				failed = true;
+				continue;
+			}
+
+			Lumix::Animation::Header header;
+			header.fps = Lumix::uint32(
+				animation->mTicksPerSecond == 0
+					? 25
+					: (animation->mTicksPerSecond == 1 ? 30 : animation->mTicksPerSecond));
+			header.magic = Lumix::Animation::HEADER_MAGIC;
+			header.version = 1;
+
+			file.write(&header, sizeof(header));
+			float anim_length = getLength(animation);
+			int frame_count = int(anim_length * header.fps);
+			file.write(&frame_count, sizeof(frame_count));
+			int bone_count = (int)animation->mNumChannels;
+			file.write(&bone_count, sizeof(bone_count));
+
+			Lumix::Array<Lumix::Vec3> positions(m_dialog.m_editor.getAllocator());
+			Lumix::Array<Lumix::Quat> rotations(m_dialog.m_editor.getAllocator());
+
+			positions.resize(bone_count * frame_count);
+			rotations.resize(bone_count * frame_count);
+
+			for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
+			{
+				const aiNodeAnim* channel = animation->mChannels[channel_idx];
+				for (int frame = 0; frame < frame_count; ++frame)
+				{
+					positions[frame * bone_count + channel_idx] =
+						getPosition(channel, frame, header.fps) * m_dialog.m_mesh_scale;
+					rotations[frame * bone_count + channel_idx] =
+						getRotation(channel, frame, header.fps);
+				}
+			}
+
+			file.write((const char*)&positions[0], sizeof(positions[0]) * positions.size());
+			file.write((const char*)&rotations[0], sizeof(rotations[0]) * rotations.size());
+			for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
+			{
+				const aiNodeAnim* channel = animation->mChannels[channel_idx];
+				uint32_t hash = Lumix::crc32(channel->mNodeName.C_Str());
+				file.write((const char*)&hash, sizeof(hash));
+			}
+
+
+			file.close();
+		}
+
+		return !failed;
+	}
+
+
 	bool saveLumixMaterials()
 	{
 		if (!m_dialog.m_import_materials) return true;
@@ -671,22 +847,11 @@ struct ConvertTask : public Lumix::MT::Task
 
 	int task() override
 	{
-		if (saveLumixPhysics() && saveLumixModel() && saveLumixMaterials())
+		if (saveLumixPhysics() && saveLumixModel() && saveLumixMaterials() && saveLumixAnimations())
 		{
 			m_dialog.setMessage("Success.");
 		}
 		return 0;
-	}
-
-
-	static int countNodes(const aiNode* node)
-	{
-		int count = 1;
-		for (unsigned int i = 0; i < node->mNumChildren; ++i)
-		{
-			count += countNodes(node->mChildren[i]);
-		}
-		return count;
 	}
 
 
@@ -707,21 +872,18 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	static void getBoneNamesHashes(const aiNode* node, Lumix::Array<int>& node_names)
+	int getNodeIndex(const aiBone* bone) const
 	{
-		node_names.push(Lumix::crc32(node->mName.C_Str()));
-		for (unsigned int i = 0; i < node->mNumChildren; ++i)
+		for (int i = 0; i < m_nodes.size(); ++i)
 		{
-			getBoneNamesHashes(node->mChildren[i], node_names);
+			if (bone->mName == m_nodes[i]->mName) return i;
 		}
+		return -1;
 	}
 
 
 	void fillSkinInfo(const aiScene* scene, Lumix::Array<SkinInfo>& infos, int vertices_count) const
 	{
-
-		Lumix::Array<int> node_names(m_dialog.m_editor.getAllocator());
-		getBoneNamesHashes(scene->mRootNode, node_names);
 		infos.resize(vertices_count);
 
 		int offset = 0;
@@ -730,7 +892,7 @@ struct ConvertTask : public Lumix::MT::Task
 			for (unsigned int j = 0; j < mesh->mNumBones; ++j)
 			{
 				const aiBone* bone = mesh->mBones[j];
-				int bone_index = node_names.indexOf(Lumix::crc32(bone->mName.C_Str()));
+				int bone_index = getNodeIndex(bone);
 				for (unsigned int k = 0; k < bone->mNumWeights; ++k)
 				{
 					auto& info = infos[offset + bone->mWeights[k].mVertexId];
@@ -749,8 +911,7 @@ struct ConvertTask : public Lumix::MT::Task
 		Lumix::uint8 _z,
 		Lumix::uint8 _w)
 	{
-		union
-		{
+		union {
 			Lumix::uint32 ui32;
 			Lumix::uint8 arr[4];
 		} un;
@@ -771,6 +932,43 @@ struct ConvertTask : public Lumix::MT::Task
 		const Lumix::uint8 zz = Lumix::uint8(vec.z * 127.0f + 128.0f);
 		const Lumix::uint8 ww = Lumix::uint8(0);
 		return packuint32(xx, yy, zz, ww);
+	}
+
+
+	void sortParentFirst(aiNode* node, Lumix::Array<aiNode*>& out)
+	{
+		if (!node) return;
+		if (out.indexOf(node) >= 0) return;
+
+		sortParentFirst(node->mParent, out);
+		out.push(node);
+	}
+
+
+	void gatherNodes()
+	{
+		Lumix::Array<aiNode*> tmp(m_dialog.m_editor.getAllocator());
+		m_nodes.clear();
+		const aiScene* scene = m_dialog.m_importer.GetScene();
+		for (auto* mesh : m_filtered_meshes)
+		{
+			for (unsigned int j = 0; j < mesh->mNumBones; ++j)
+			{
+				auto* node = getNode(mesh->mBones[j], scene->mRootNode);
+				while (node && node->mNumMeshes == 0)
+				{
+					if (tmp.indexOf(node) >= 0) break;
+					tmp.push(node);
+					node = node->mParent;
+				}
+				if (node && tmp.indexOf(node) < 0) tmp.push(node);
+			}
+		}
+
+		for (auto* node : tmp)
+		{
+			sortParentFirst(node, m_nodes);
+		}
 	}
 
 
@@ -808,11 +1006,12 @@ struct ConvertTask : public Lumix::MT::Task
 		fillSkinInfo(scene, skin_infos, vertices_count);
 
 		int skin_index = 0;
-		aiMatrix3x3 normal_matrix(scene->mRootNode->mTransformation);
 
 		bool z_up = m_dialog.m_z_up;
 		for (auto* mesh : m_filtered_meshes)
 		{
+			auto mesh_matrix = getGlobalTransform(getNode(mesh, scene->mRootNode));
+			aiMatrix3x3 normal_matrix(mesh_matrix);
 			bool is_skinned = isSkinned(mesh);
 			for (unsigned int j = 0; j < mesh->mNumVertices; ++j)
 			{
@@ -825,7 +1024,7 @@ struct ConvertTask : public Lumix::MT::Task
 				}
 				++skin_index;
 
-				auto v = scene->mRootNode->mTransformation * mesh->mVertices[j];
+				auto v = mesh_matrix * mesh->mVertices[j];
 
 				Lumix::Vec3 position(v.x, z_up ? v.z : v.y, z_up ? -v.y : v.z);
 				position *= m_scale;
@@ -936,7 +1135,7 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void writeMeshes(Lumix::FS::IFile& file) const
+	void writeMeshes(Lumix::FS::IFile& file)
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
 		Lumix::int32 mesh_count = 0;
@@ -1004,40 +1203,6 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	static void writeNode(Lumix::FS::IFile& file, const aiNode* node, aiMatrix4x4 parent_transform)
-	{
-		Lumix::int32 len = Lumix::stringLength(node->mName.C_Str());
-		file.write((const char*)&len, sizeof(len));
-		file.write(node->mName.C_Str(), node->mName.length + 1);
-
-		if (node->mParent)
-		{
-			Lumix::int32 len = Lumix::stringLength(node->mParent->mName.C_Str());
-			file.write((const char*)&len, sizeof(len));
-			file.write(node->mParent->mName.C_Str(), node->mParent->mName.length);
-		}
-		else
-		{
-			Lumix::int32 len = 0;
-			file.write((const char*)&len, sizeof(len));
-		}
-
-		aiQuaterniont<float> rot;
-		aiVector3t<float> pos;
-		(parent_transform * node->mTransformation).DecomposeNoScaling(rot, pos);
-		file.write((const char*)&pos, sizeof(pos));
-		file.write((const char*)&rot.x, sizeof(rot.x));
-		file.write((const char*)&rot.y, sizeof(rot.y));
-		file.write((const char*)&rot.z, sizeof(rot.z));
-		file.write((const char*)&rot.w, sizeof(rot.w));
-
-		for (unsigned int i = 0; i < node->mNumChildren; ++i)
-		{
-			writeNode(file, node->mChildren[i], parent_transform * node->mTransformation);
-		}
-	}
-
-
 	void writeLods(Lumix::FS::IFile& file) const
 	{
 		Lumix::int32 lods[] = {-1, -1, -1, -1, -1, -1, -1, -1};
@@ -1075,19 +1240,84 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void writeSkeleton(Lumix::FS::IFile& file) const
+	aiMatrix4x4 getGlobalTransform(aiNode* node) const
+	{
+		aiMatrix4x4 mtx;
+		while (node)
+		{
+			mtx = node->mTransformation * mtx;
+			node = node->mParent;
+		}
+		return mtx;
+	}
+
+
+	aiNode* getNode(aiMesh* mesh, aiNode* node) const
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
-		Lumix::int32 count = countNodes(scene->mRootNode);
-
-		if (count == 1)
+		for (unsigned int i = 0; i < node->mNumMeshes; ++i)
 		{
-			count = 0;
+			if (mesh == scene->mMeshes[node->mMeshes[i]]) return node;
 		}
-		file.write((const char*)&count, sizeof(count));
-		if (count > 0)
+
+		for (unsigned int i = 0; i < node->mNumChildren; ++i)
 		{
-			writeNode(file, scene->mRootNode, aiMatrix4x4());
+			auto* x = getNode(mesh, node->mChildren[i]);
+			if (x) return x;
+		}
+
+		return nullptr;
+	}
+
+
+	aiNode* getNode(aiBone* bone, aiNode* node) const
+	{
+		if (bone->mName == node->mName) return node;
+
+		for (unsigned int i = 0; i < node->mNumChildren; ++i)
+		{
+			auto* x = getNode(bone, node->mChildren[i]);
+			if (x) return x;
+		}
+
+		return nullptr;
+	}
+
+
+	void writeSkeleton(Lumix::FS::IFile& file)
+	{
+		const aiScene* scene = m_dialog.m_importer.GetScene();
+
+		Lumix::int32 count = m_nodes.size();
+		if (count == 1) count = 0;
+		file.write((const char*)&count, sizeof(count));
+
+		for (auto* bone : m_nodes)
+		{
+			Lumix::int32 len = Lumix::stringLength(bone->mName.C_Str());
+			file.write((const char*)&len, sizeof(len));
+			file.write(bone->mName.C_Str(), bone->mName.length);
+
+			if (bone->mParent)
+			{
+				Lumix::int32 len = Lumix::stringLength(bone->mParent->mName.C_Str());
+				file.write((const char*)&len, sizeof(len));
+				file.write(bone->mParent->mName.C_Str(), bone->mParent->mName.length);
+			}
+			else
+			{
+				Lumix::int32 len = 0;
+				file.write((const char*)&len, sizeof(len));
+			}
+
+			aiQuaterniont<float> rot;
+			aiVector3t<float> pos;
+			getGlobalTransform(bone).DecomposeNoScaling(rot, pos);
+			file.write((const char*)&pos, sizeof(pos));
+			file.write((const char*)&rot.x, sizeof(rot.x));
+			file.write((const char*)&rot.y, sizeof(rot.y));
+			file.write((const char*)&rot.z, sizeof(rot.z));
+			file.write((const char*)&rot.w, sizeof(rot.w));
 		}
 	}
 
@@ -1271,8 +1501,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 		static ConvertTask* that = nullptr;
 		that = this;
-		auto cmpMeshes = [](const void* a, const void* b) -> int
-		{
+		auto cmpMeshes = [](const void* a, const void* b) -> int {
 			auto a_mesh = static_cast<aiMesh* const*>(a);
 			auto b_mesh = static_cast<aiMesh* const*>(b);
 			return that->getMeshLOD(a_mesh) - that->getMeshLOD(b_mesh);
@@ -1313,6 +1542,7 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 
 		filterMeshes();
+		gatherNodes();
 
 		writeModelHeader(*file);
 		writeMeshes(*file);
@@ -1326,6 +1556,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 	Lumix::Array<aiMesh*> m_filtered_meshes;
 	ImportAssetDialog& m_dialog;
+	Lumix::Array<aiNode*> m_nodes;
 	float m_scale;
 
 }; // struct ConvertTask
@@ -1494,6 +1725,8 @@ void ImportAssetDialog::checkSource()
 		m_importer.FreeScene();
 		return;
 	}
+
+	m_import_animations = false;
 
 	ASSERT(!m_task);
 	setImportMessage("Importing...");

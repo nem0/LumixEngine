@@ -1608,7 +1608,7 @@ struct PipelineImpl : public Pipeline
 
 	void setPoseUniform(const RenderableMesh& renderable_mesh) const
 	{
-		Matrix bone_mtx[64];
+		Matrix bone_mtx[128];
 		
 		Renderable* renderable = m_scene->getRenderable(renderable_mesh.renderable);
 		const Pose& pose = *renderable->pose;
@@ -1620,9 +1620,11 @@ struct PipelineImpl : public Pipeline
 		for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count;
 			 ++bone_index)
 		{
+			auto& bone = model.getBone(bone_index);
 			rots[bone_index].toMatrix(bone_mtx[bone_index]);
 			bone_mtx[bone_index].translate(poss[bone_index]);
-			bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
+			bone_mtx[bone_index] = bone_mtx[bone_index] * bone.inv_bind_matrix;
+			//bone_mtx[bone_index].transpose();
 		}
 		bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.getCount());
 	}

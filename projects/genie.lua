@@ -25,13 +25,13 @@ newaction {
 		installDllWithPdb "lua_script"
 		installDllWithPdb "physics"
 		installDllWithPdb "renderer"
+		installDllWithPdb "assimp"
 		
 		installDll "PhysX3CommonCHECKED_x64"
 		installDll "PhysX3CookingCHECKED_x64"
 		installDll "PhysX3CharacterKinematicCHECKED_x64"
 		installDll "PhysX3CHECKED_x64"
 		installDll "nvToolsExt64_1"
-		installDll "assimp"
 
 		os.copyfile(path.join(src_dir, "studio.exe"), path.join(dst_dir, "studio.exe"))
 		os.copyfile(path.join(src_dir, "studio.pdb"), path.join(dst_dir, "studio.pdb"))
@@ -102,7 +102,7 @@ function copyDlls(src_dir, platform_bit, platform_dir, dest_dir)
 	end
 
 	postbuildcommands {
-		"xcopy /Y \"$(SolutionDir)../../../external/assimp/dll/" .. ide_dir .. "/" .. platform_dir .. "/" .. src_dir .. "\\assimp.dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../../external/assimp/dll/" .. platform_dir .. "_" .. ide_dir .. "/" .. src_dir .. "\\assimp.dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
 		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\nvToolsExt".. tostring(platform_bit) .. "_1.dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
 		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CommonCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
 		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CookingCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
@@ -248,20 +248,7 @@ project "editor"
 	copyDlls("Release", 64, "win64", "RelWithDebInfo")
 
 	linkLib("crnlib")
-	
-	configuration { "Debug", "x64" }
-		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win64/debug"}
-	configuration { "Debug", "x32" }
-		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win32/debug"}
-	configuration { "Release", "x64" }
-		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win64/release"}
-	configuration { "Release", "x32" }
-		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win32/release"}
-	configuration { "RelWithDebInfo", "x64" }
-		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win64/release"}
-	configuration { "RelWithDebInfo", "x32" }
-		libdirs {"../external/assimp/lib/" .. ide_dir .. "/win32/release"}
-
+	linkLib("assimp")
 
 project "studio"
 	kind "WindowedApp"
