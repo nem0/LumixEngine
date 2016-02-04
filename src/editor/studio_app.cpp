@@ -442,7 +442,7 @@ public:
 	void loadAndExecuteCommands()
 	{
 		char filename[Lumix::MAX_PATH_LENGTH];
-		if (PlatformInterface::getOpenFilename(filename, Lumix::lengthOf(filename), "JSON files\0*.json\0"))
+		if (PlatformInterface::getOpenFilename(filename, Lumix::lengthOf(filename), "JSON files\0*.json\0", nullptr))
 		{
 			m_editor->executeUndoStack(Lumix::Path(filename));
 		}

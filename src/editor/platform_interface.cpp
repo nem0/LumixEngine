@@ -578,33 +578,73 @@ namespace PlatformInterface
 	}
 
 
-	bool getOpenFilename(char* out, int max_size, const char* filter)
+	bool getOpenFilename(char* out, int max_size, const char* filter, const char* starting_file)
 	{
 		OPENFILENAME ofn;
 		ZeroMemory(&ofn, sizeof(ofn));
 		ofn.lStructSize = sizeof(ofn);
 		ofn.hwndOwner = NULL;
+		if (starting_file)
+		{
+			char* to = out;
+			for (const char* from = starting_file; *from; ++from, ++to)
+			{
+				if (to - out > max_size - 1) break;
+				*to = *to == '/' ? '\\' : *from;
+			}
+			*to = '\0';
+		}
+		else
+		{
+			out[0] = '\0';
+		}
 		ofn.lpstrFile = out;
-		ofn.lpstrFile[0] = '\0';
 		ofn.nMaxFile = max_size;
 		ofn.lpstrFilter = filter;
 		ofn.nFilterIndex = 1;
 		ofn.lpstrFileTitle = NULL;
 		ofn.nMaxFileTitle = 0;
-		ofn.lpstrInitialDir = NULL;
+		ofn.lpstrInitialDir = nullptr;
 		ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR | OFN_NONETWORKBUTTON;
 
-		return GetOpenFileName(&ofn) == TRUE;
+		auto x=  GetOpenFileName(&ofn);
+		auto err =GetLastError();
+		auto err2 =CommDlgExtendedError();
+		return x == TRUE;
 	}
 
 
-	bool getOpenDirectory(char* out, int max_size)
+	bool getOpenDirectory(char* out, int max_size, const char* starting_dir)
 	{
 		bool ret = false;
 		IFileDialog *pfd;
 		if (SUCCEEDED(CoCreateInstance(
 			CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd))))
 		{
+			if (starting_dir)
+			{
+				PIDLIST_ABSOLUTE pidl;
+				WCHAR wstarting_dir[MAX_PATH];
+				WCHAR* wc = wstarting_dir;
+				for (const char* c = starting_dir; *c && wc - wstarting_dir < MAX_PATH - 1; ++c, ++wc)
+				{
+					*wc = *c == '/' ? '\\' : *c;
+				}
+				*wc = 0;
+
+				HRESULT hresult = ::SHParseDisplayName(wstarting_dir, 0, &pidl, SFGAO_FOLDER, 0);
+				if (SUCCEEDED(hresult))
+				{
+					IShellItem *psi;
+					hresult = ::SHCreateShellItem(NULL, NULL, pidl, &psi);
+					if (SUCCEEDED(hresult))
+					{
+						pfd->SetFolder(psi);
+					}
+					ILFree(pidl);
+				}
+			}
+
 			DWORD dwOptions;
 			if (SUCCEEDED(pfd->GetOptions(&dwOptions)))
 			{

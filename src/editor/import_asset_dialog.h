@@ -61,6 +61,7 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		Lumix::BinaryArray m_mesh_mask;
 		char m_import_message[1024];
 		char m_message[1024];
+		char m_last_dir[Lumix::MAX_PATH_LENGTH];
 		char m_source[Lumix::MAX_PATH_LENGTH];
 		char m_output_dir[Lumix::MAX_PATH_LENGTH];
 		char m_texture_output_dir[Lumix::MAX_PATH_LENGTH];

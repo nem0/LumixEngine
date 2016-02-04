@@ -1591,6 +1591,7 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	m_source[0] = '\0';
 	m_output_dir[0] = '\0';
 	m_texture_output_dir[0] = '\0';
+	Lumix::copyString(m_last_dir, m_editor.getEngine().getPathManager().getBasePath());
 }
 
 
@@ -1621,7 +1622,7 @@ bool ImportAssetDialog::checkTexture(const char* source_dir,
 											  << path
 											  << " not found, please locate it");
 
-	if (!PlatformInterface::getOpenFilename(new_path, sizeof(new_path), "All\0*.*\0")) return false;
+	if (!PlatformInterface::getOpenFilename(new_path, sizeof(new_path), "All\0*.*\0", nullptr)) return false;
 
 	Lumix::string old_path_str(path, m_editor.getAllocator());
 	Lumix::string new_path_str(new_path, m_editor.getAllocator());
@@ -1862,8 +1863,14 @@ void ImportAssetDialog::onGUI()
 		ImGui::SameLine();
 		if (ImGui::Button("..."))
 		{
-			PlatformInterface::getOpenFilename(m_source, sizeof(m_source), "All\0*.*\0");
+			PlatformInterface::getOpenFilename(m_source, sizeof(m_source), "All\0*.*\0", m_source);
 			checkSource();
+		}
+
+		if (m_is_importing || m_is_converting)
+		{
+			ImGui::EndDock();
+			return;
 		}
 
 		if (isImage(m_source))
@@ -1885,7 +1892,8 @@ void ImportAssetDialog::onGUI()
 			ImGui::SameLine();
 			if (ImGui::Button("...###browseoutput"))
 			{
-				PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir));
+				auto* base_path = m_editor.getEngine().getPathManager().getBasePath();
+				PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir), base_path);
 			}
 
 			if (ImGui::Button("Import texture"))
@@ -1896,9 +1904,9 @@ void ImportAssetDialog::onGUI()
 			return;
 		}
 
-		if (m_importer.GetScene())
+		auto* scene = m_importer.GetScene();
+		if (scene)
 		{
-			auto* scene = m_importer.GetScene();
 			ImGui::Checkbox("Import model", &m_import_model);
 			if (m_import_model)
 			{
@@ -1961,7 +1969,10 @@ void ImportAssetDialog::onGUI()
 			ImGui::SameLine();
 			if (ImGui::Button("...###browseoutput"))
 			{
-				PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir));
+				if (PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir), m_last_dir))
+				{
+					Lumix::copyString(m_last_dir, m_output_dir);
+				}
 			}
 
 			ImGui::InputText(
@@ -1969,8 +1980,11 @@ void ImportAssetDialog::onGUI()
 			ImGui::SameLine();
 			if (ImGui::Button("...###browsetextureoutput"))
 			{
-				PlatformInterface::getOpenDirectory(
-					m_texture_output_dir, sizeof(m_texture_output_dir));
+				if (PlatformInterface::getOpenDirectory(
+						m_texture_output_dir, sizeof(m_texture_output_dir), m_last_dir))
+				{
+					Lumix::copyString(m_last_dir, m_output_dir);
+				}
 			}
 
 			if (m_output_dir[0] != '\0')

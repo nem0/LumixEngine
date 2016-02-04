@@ -1,4 +1,4 @@
-#LumixEngine
+#Lumix Engine
 =========
 
 <a href="https://scan.coverity.com/projects/5919">
