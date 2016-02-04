@@ -1,25 +1,25 @@
-#include "import_asset_dialog.h"
 #include "animation/animation.h"
 #include "assimp/DefaultLogger.hpp"
-#include "assimp/postprocess.h"
 #include "assimp/ProgressHandler.hpp"
+#include "assimp/postprocess.h"
 #include "assimp/scene.h"
-#include "core/crc32.h"
-#include "core/FS/ifile.h"
 #include "core/FS/file_system.h"
+#include "core/FS/ifile.h"
 #include "core/FS/os_file.h"
-#include "core/log.h"
 #include "core/MT/task.h"
+#include "core/crc32.h"
+#include "core/log.h"
 #include "core/path_utils.h"
 #include "core/system.h"
 #include "crnlib.h"
 #include "debug/floating_points.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "metadata.h"
 #include "imgui/imgui.h"
-#include "platform_interface.h"
+#include "import_asset_dialog.h"
+#include "metadata.h"
 #include "physics/physics_geometry_manager.h"
+#include "platform_interface.h"
 #include "renderer/model.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
@@ -311,8 +311,7 @@ struct ImportTask : public Lumix::MT::Task
 			void write(const char* message) { Lumix::g_log_warning.log("import") << message; }
 		};
 		const unsigned int severity = Assimp::Logger::Err;
-		Assimp::DefaultLogger::create(
-			ASSIMP_DEFAULT_LOG_NAME, Assimp::Logger::NORMAL, 0, nullptr);
+		Assimp::DefaultLogger::create(ASSIMP_DEFAULT_LOG_NAME, Assimp::Logger::NORMAL, 0, nullptr);
 
 		Assimp::DefaultLogger::get()->attachStream(new MyStream(), severity);
 	}
@@ -407,7 +406,7 @@ struct ConvertTask : public Lumix::MT::Task
 		for (int i = 0; i < materials_count; ++i)
 		{
 			auto* material = scene->mMaterials[materials[i]];
-			auto types = { aiTextureType_DIFFUSE, aiTextureType_NORMALS, aiTextureType_HEIGHT };
+			auto types = {aiTextureType_DIFFUSE, aiTextureType_NORMALS, aiTextureType_HEIGHT};
 			for (auto type : types)
 			{
 				for (unsigned int j = 0; j < material->GetTextureCount(type); ++j)
@@ -427,7 +426,8 @@ struct ConvertTask : public Lumix::MT::Task
 
 		for (unsigned int i = 0; i < scene->mNumTextures; ++i)
 		{
-			m_dialog.m_saved_embedded_textures.push(Lumix::string("", m_dialog.m_editor.getAllocator()));
+			m_dialog.m_saved_embedded_textures.push(
+				Lumix::string("", m_dialog.m_editor.getAllocator()));
 			if (textures.indexOf(i) == -1) continue;
 
 			const aiTexture* texture = scene->mTextures[i];
@@ -617,23 +617,6 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void getBoneNames(const aiNode* node, Lumix::Array<Lumix::string>& node_names)
-	{
-		node_names.emplace(node->mName.C_Str(), m_dialog.m_editor.getAllocator());
-		for (unsigned int i = 0; i < node->mNumChildren; ++i)
-		{
-			getBoneNames(node->mChildren[i], node_names);
-		}
-	}
-
-
-	void getBoneNames(const aiScene* scene, Lumix::Array<Lumix::string>& bone_names)
-	{
-		getBoneNames(scene->mRootNode, bone_names);
-		bone_names.removeDuplicates();
-	}
-
-
 	bool isValidFilenameChar(char c)
 	{
 		if (c >= 'A' && c <= 'Z') return true;
@@ -694,10 +677,13 @@ struct ConvertTask : public Lumix::MT::Task
 			}
 			else
 			{
-				ani_path << "/" << "anim" << i << ".ani";
+				ani_path << "/"
+						 << "anim" << i << ".ani";
 			}
 
-			if (!file.open(ani_path, Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE, m_dialog.m_editor.getAllocator()))
+			if (!file.open(ani_path,
+					Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE,
+					m_dialog.m_editor.getAllocator()))
 			{
 				Lumix::g_log_error.log("import") << "Could not create file " << ani_path;
 				failed = true;
@@ -730,8 +716,10 @@ struct ConvertTask : public Lumix::MT::Task
 				const aiNodeAnim* channel = animation->mChannels[channel_idx];
 				for (int frame = 0; frame < frame_count; ++frame)
 				{
-					positions[frame * bone_count + channel_idx] = getPosition(channel, frame, header.fps) * m_dialog.m_mesh_scale;
-					rotations[frame * bone_count + channel_idx] = getRotation(channel, frame, header.fps);
+					positions[frame * bone_count + channel_idx] =
+						getPosition(channel, frame, header.fps) * m_dialog.m_mesh_scale;
+					rotations[frame * bone_count + channel_idx] =
+						getRotation(channel, frame, header.fps);
 				}
 			}
 
@@ -867,17 +855,6 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	static int countNodes(const aiNode* node)
-	{
-		int count = 1;
-		for (unsigned int i = 0; i < node->mNumChildren; ++i)
-		{
-			count += countNodes(node->mChildren[i]);
-		}
-		return count;
-	}
-
-
 	static bool isSkinned(const aiMesh* mesh) { return mesh->mNumBones > 0; }
 
 
@@ -892,16 +869,6 @@ struct ConvertTask : public Lumix::MT::Task
 			}
 		}
 		return false;
-	}
-
-
-	static void getBoneNamesHashes(const aiNode* node, Lumix::Array<int>& node_names)
-	{
-		node_names.push(Lumix::crc32(node->mName.C_Str()));
-		for (unsigned int i = 0; i < node->mNumChildren; ++i)
-		{
-			getBoneNamesHashes(node->mChildren[i], node_names);
-		}
 	}
 
 
@@ -944,8 +911,7 @@ struct ConvertTask : public Lumix::MT::Task
 		Lumix::uint8 _z,
 		Lumix::uint8 _w)
 	{
-		union
-		{
+		union {
 			Lumix::uint32 ui32;
 			Lumix::uint8 arr[4];
 		} un;
@@ -1304,7 +1270,6 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-
 	aiNode* getNode(aiBone* bone, aiNode* node) const
 	{
 		if (bone->mName == node->mName) return node;
@@ -1315,38 +1280,6 @@ struct ConvertTask : public Lumix::MT::Task
 			if (x) return x;
 		}
 
-		return nullptr;
-	}
-
-
-	aiMesh* getMesh(const aiBone* bone)
-	{
-		const aiScene* scene = m_dialog.m_importer.GetScene();
-
-		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
-		{
-			auto* mesh = scene->mMeshes[i];
-			for (unsigned int j = 0; j < mesh->mNumBones; ++j)
-			{
-				if (mesh->mBones[j] == bone) return mesh;
-			}
-		}
-		return nullptr;
-	}
-
-
-	aiBone* getBone(const aiNode* node)
-	{
-		const aiScene* scene = m_dialog.m_importer.GetScene();
-		
-		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
-		{
-			auto* mesh = scene->mMeshes[i];
-			for (unsigned int j = 0; j < mesh->mNumBones; ++j)
-			{
-				if (mesh->mBones[j]->mName == node->mName) return mesh->mBones[j];
-			}
-		}
 		return nullptr;
 	}
 
@@ -1568,8 +1501,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 		static ConvertTask* that = nullptr;
 		that = this;
-		auto cmpMeshes = [](const void* a, const void* b) -> int
-		{
+		auto cmpMeshes = [](const void* a, const void* b) -> int {
 			auto a_mesh = static_cast<aiMesh* const*>(a);
 			auto b_mesh = static_cast<aiMesh* const*>(b);
 			return that->getMeshLOD(a_mesh) - that->getMeshLOD(b_mesh);
