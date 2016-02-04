@@ -1622,7 +1622,7 @@ bool ImportAssetDialog::checkTexture(const char* source_dir,
 											  << path
 											  << " not found, please locate it");
 
-	if (!PlatformInterface::getOpenFilename(new_path, sizeof(new_path), "All\0*.*\0", nullptr)) return false;
+	if (!PlatformInterface::getOpenFilename(new_path, sizeof(new_path), "All\0*.*\0", m_source)) return false;
 
 	Lumix::string old_path_str(path, m_editor.getAllocator());
 	Lumix::string new_path_str(new_path, m_editor.getAllocator());
