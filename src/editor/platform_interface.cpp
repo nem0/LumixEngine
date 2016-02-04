@@ -607,10 +607,7 @@ namespace PlatformInterface
 		ofn.lpstrInitialDir = nullptr;
 		ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR | OFN_NONETWORKBUTTON;
 
-		auto x=  GetOpenFileName(&ofn);
-		auto err =GetLastError();
-		auto err2 =CommDlgExtendedError();
-		return x == TRUE;
+		return GetOpenFileName(&ofn) == TRUE;
 	}
 
 
