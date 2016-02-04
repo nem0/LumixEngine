@@ -59,7 +59,7 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 		int off = frame * m_bone_count;
 		int off2 = off + m_bone_count;
 		float t = (time - frame / (float)m_fps) / (1.0f / m_fps);
-	
+
 		if(frame < m_frame_count - 1)
 		{
 			for(int i = 0; i < m_bone_count; ++i)
