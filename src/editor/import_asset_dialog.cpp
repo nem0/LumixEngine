@@ -429,7 +429,7 @@ struct ConvertTask : public Lumix::MT::Task
 		{
 			m_dialog.m_saved_embedded_textures.push(Lumix::string("", m_dialog.m_editor.getAllocator()));
 			if (textures.indexOf(i) == -1) continue;
-			
+
 			const aiTexture* texture = scene->mTextures[i];
 			if (texture->mHeight != 0)
 			{
@@ -703,7 +703,7 @@ struct ConvertTask : public Lumix::MT::Task
 				failed = true;
 				continue;
 			}
-			
+
 			Lumix::Animation::Header header;
 			header.fps = Lumix::uint32(
 				animation->mTicksPerSecond == 0
@@ -969,12 +969,12 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void flattenNodes(aiNode* node, Lumix::Array<aiNode*>& out)
+	void sortParentFirst(aiNode* node, Lumix::Array<aiNode*>& out)
 	{
 		if (!node) return;
 		if (out.indexOf(node) >= 0) return;
 
-		flattenNodes(node->mParent, out);
+		sortParentFirst(node->mParent, out);
 		out.push(node);
 	}
 
@@ -984,9 +984,8 @@ struct ConvertTask : public Lumix::MT::Task
 		Lumix::Array<aiNode*> tmp(m_dialog.m_editor.getAllocator());
 		m_nodes.clear();
 		const aiScene* scene = m_dialog.m_importer.GetScene();
-		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		for (auto* mesh : m_filtered_meshes)
 		{
-			auto* mesh = scene->mMeshes[i];
 			for (unsigned int j = 0; j < mesh->mNumBones; ++j)
 			{
 				auto* node = getNode(mesh->mBones[j], scene->mRootNode);
@@ -1002,7 +1001,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 		for (auto* node : tmp)
 		{
-			flattenNodes(node, m_nodes);
+			sortParentFirst(node, m_nodes);
 		}
 	}
 

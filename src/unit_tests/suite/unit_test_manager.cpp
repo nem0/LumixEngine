@@ -160,7 +160,6 @@ namespace Lumix
 
 			void dumpResults() const
 			{
-				
 				if (m_fails > 0)
 				{
 					g_log_info.log("unit") << "----------Fails----------";
