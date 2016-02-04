@@ -781,7 +781,7 @@ struct RendererImpl : public Renderer
 
 
 	Engine& m_engine;
-	Debug::Allocator m_allocator;
+	IAllocator& m_allocator;
 	Array<ShaderCombinations::Pass> m_passes;
 	Array<ShaderDefine> m_shader_defines;
 	CallbackStub m_callback_stub;

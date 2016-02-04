@@ -636,6 +636,8 @@ namespace Lumix
 					node_type* destr = n;
 					n = n->m_next;
 					destruct(destr);
+					if(destr < src || destr > &src[ids_count - 1])
+						m_allocator.deallocate(destr);
 				}
 			}
 		}
