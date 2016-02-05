@@ -20,7 +20,6 @@
 #include "universe/hierarchy.h"
 #include "universe/universe.h"
 
-#include <cstdio>
 
 namespace Lumix
 {
