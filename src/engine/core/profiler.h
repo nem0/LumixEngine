@@ -49,7 +49,7 @@ LUMIX_ENGINE_API DelegateList<void ()>& getFrameListeners();
 
 struct Scope
 {
-	Scope(const char* name) { beginBlock(name); }
+	explicit Scope(const char* name) { beginBlock(name); }
 	~Scope() { endBlock(); }
 };
 

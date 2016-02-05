@@ -235,7 +235,7 @@ static const char* getVertexInputBGFXName(VertexInput input)
 
 struct VertexOutputNode : public ShaderEditor::Node
 {
-	VertexOutputNode(ShaderEditor& editor)
+	explicit VertexOutputNode(ShaderEditor& editor)
 		: Node((int)NodeType::VERTEX_OUTPUT, editor)
 	{
 		m_inputs.push(nullptr);
@@ -291,7 +291,7 @@ struct VertexOutputNode : public ShaderEditor::Node
 
 struct VertexInputNode : public ShaderEditor::Node
 {
-	VertexInputNode(ShaderEditor& editor)
+	explicit VertexInputNode(ShaderEditor& editor)
 		: Node((int)NodeType::VERTEX_INPUT, editor)
 	{
 		m_outputs.push(nullptr);
@@ -435,7 +435,7 @@ static void removeConnection(ShaderEditor::Node* node, int pin_index, bool is_in
 
 struct ShaderEditor::ICommand
 {
-	ICommand(ShaderEditor& editor)
+	explicit ICommand(ShaderEditor& editor)
 		: m_editor(editor)
 	{
 	}
@@ -493,7 +493,7 @@ struct OperatorNode : public ShaderEditor::Node
 		DIVISION
 	};
 
-	OperatorNode(ShaderEditor& editor)
+	explicit OperatorNode(ShaderEditor& editor)
 		: Node((int)NodeType::OPERATOR, editor)
 	{
 		m_inputs.push(nullptr);
@@ -570,7 +570,7 @@ struct OperatorNode : public ShaderEditor::Node
 
 struct Vec4MergeNode : public ShaderEditor::Node
 {
-	Vec4MergeNode(ShaderEditor& editor)
+	explicit Vec4MergeNode(ShaderEditor& editor)
 		: Node((int)NodeType::VEC4_MERGE, editor)
 	{
 		m_inputs.push(nullptr);
@@ -647,7 +647,7 @@ struct Vec4MergeNode : public ShaderEditor::Node
 
 struct FunctionNode : public ShaderEditor::Node
 {
-	FunctionNode(ShaderEditor& editor)
+	explicit FunctionNode(ShaderEditor& editor)
 		: Node((int)NodeType::FUNCTION, editor)
 	{
 		m_inputs.push(nullptr);
@@ -667,7 +667,10 @@ struct FunctionNode : public ShaderEditor::Node
 
 	void generate(Lumix::OutputBlob& blob) override
 	{
-		m_inputs[0]->generate(blob);
+		if(m_inputs[0])
+		{
+			m_inputs[0]->generate(blob);
+		}
 
 		blob << "\t" << getValueTypeName(getOutputType(0)) << " v" << m_id << " = ";
 		blob << FUNCTIONS[m_function].bgfx_name << "(";
@@ -700,7 +703,7 @@ struct FunctionNode : public ShaderEditor::Node
 
 struct BinaryFunctionNode : public ShaderEditor::Node
 {
-	BinaryFunctionNode(ShaderEditor& editor)
+	explicit BinaryFunctionNode(ShaderEditor& editor)
 		: Node((int)NodeType::BINARY_FUNCTION, editor)
 	{
 		m_inputs.push(nullptr);
@@ -764,7 +767,7 @@ struct BinaryFunctionNode : public ShaderEditor::Node
 
 struct InstanceMatrixNode : public ShaderEditor::Node
 {
-	InstanceMatrixNode(ShaderEditor& editor)
+	explicit InstanceMatrixNode(ShaderEditor& editor)
 		: Node((int)NodeType::INSTANCE_MATRIX, editor)
 	{
 		m_outputs.push(nullptr);
@@ -798,7 +801,7 @@ struct InstanceMatrixNode : public ShaderEditor::Node
 
 struct FloatConstNode : public ShaderEditor::Node
 {
-	FloatConstNode(ShaderEditor& editor)
+	explicit FloatConstNode(ShaderEditor& editor)
 		: Node((int)NodeType::FLOAT_CONST, editor)
 	{
 		m_value = 0;
@@ -824,7 +827,7 @@ struct FloatConstNode : public ShaderEditor::Node
 
 struct ColorConstNode : public ShaderEditor::Node
 {
-	ColorConstNode(ShaderEditor& editor)
+	explicit ColorConstNode(ShaderEditor& editor)
 		: Node((int)NodeType::COLOR_CONST, editor)
 	{
 		m_color[0] = m_color[1] = m_color[2] = m_color[3] = 0;
@@ -849,7 +852,7 @@ struct ColorConstNode : public ShaderEditor::Node
 
 struct SampleNode : public ShaderEditor::Node
 {
-	SampleNode(ShaderEditor& editor)
+	explicit SampleNode(ShaderEditor& editor)
 		: Node((int)NodeType::SAMPLE, editor)
 	{
 		m_inputs.push(nullptr);
@@ -893,7 +896,7 @@ struct SampleNode : public ShaderEditor::Node
 
 struct FragmentInputNode : public ShaderEditor::Node
 {
-	FragmentInputNode(ShaderEditor& editor)
+	explicit FragmentInputNode(ShaderEditor& editor)
 		: Node((int)NodeType::FRAGMENT_INPUT, editor)
 	{
 		m_outputs.push(nullptr);
@@ -937,7 +940,7 @@ struct FragmentInputNode : public ShaderEditor::Node
 
 struct PositionOutputNode : public ShaderEditor::Node
 {
-	PositionOutputNode(ShaderEditor& editor)
+	explicit PositionOutputNode(ShaderEditor& editor)
 		: Node((int)NodeType::POSITION_OUTPUT, editor)
 	{
 		m_inputs.push(nullptr);
@@ -966,7 +969,7 @@ struct PositionOutputNode : public ShaderEditor::Node
 
 struct FragmentOutputNode : public ShaderEditor::Node
 {
-	FragmentOutputNode(ShaderEditor& editor)
+	explicit FragmentOutputNode(ShaderEditor& editor)
 		: Node((int)NodeType::FRAGMENT_OUTPUT, editor)
 	{
 		m_inputs.push(nullptr);
@@ -994,7 +997,7 @@ struct FragmentOutputNode : public ShaderEditor::Node
 
 struct MixNode : public ShaderEditor::Node
 {
-	MixNode(ShaderEditor& editor)
+	explicit MixNode(ShaderEditor& editor)
 		: Node((int)NodeType::MIX, editor)
 	{
 		m_inputs.push(nullptr);
@@ -1040,7 +1043,7 @@ struct MixNode : public ShaderEditor::Node
 
 struct PassNode : public ShaderEditor::Node
 {
-	PassNode(ShaderEditor& editor)
+	explicit PassNode(ShaderEditor& editor)
 		: Node((int)NodeType::PASS, editor)
 	{
 		m_outputs.push(nullptr);
@@ -1096,7 +1099,7 @@ struct PassNode : public ShaderEditor::Node
 
 struct BuiltinUniformNode : public ShaderEditor::Node
 {
-	BuiltinUniformNode(ShaderEditor& editor)
+	explicit BuiltinUniformNode(ShaderEditor& editor)
 		: Node((int)NodeType::BUILTIN_UNIFORM, editor)
 	{
 		m_outputs.push(nullptr);
@@ -1140,7 +1143,7 @@ struct BuiltinUniformNode : public ShaderEditor::Node
 
 struct UniformNode : public ShaderEditor::Node
 {
-	UniformNode(ShaderEditor& editor)
+	explicit UniformNode(ShaderEditor& editor)
 		: Node((int)NodeType::UNIFORM, editor)
 	{
 		m_outputs.push(nullptr);

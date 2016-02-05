@@ -15,7 +15,7 @@ namespace Lumix
 
 		struct TaskImpl
 		{
-			TaskImpl(IAllocator& allocator)
+			explicit TaskImpl(IAllocator& allocator)
 				: m_allocator(allocator)
 			{ }
 

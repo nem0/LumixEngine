@@ -37,7 +37,7 @@ private:
 class LUMIX_AUDIO_API ClipManager : public ResourceManagerBase
 {
 public:
-	ClipManager(IAllocator& allocator)
+	explicit ClipManager(IAllocator& allocator)
 		: ResourceManagerBase(allocator)
 		, m_allocator(allocator)
 	{

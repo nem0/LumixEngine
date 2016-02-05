@@ -366,10 +366,7 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 			tangent = tangent.normalized() * half;
 			tangent2 = tangent2.normalized() * half;
 		}
-	}
 
-	if (changed)
-	{
 		f[0].x = 0;
 		f[count - 1].x = desc.getMaxX();
 		m_editor.setProperty(cmp.type, -1, desc, blob.getData(), blob.getSize());

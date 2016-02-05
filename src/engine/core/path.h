@@ -28,7 +28,7 @@ class LUMIX_ENGINE_API PathManager
 	friend class Path;
 
 public:
-	PathManager(Lumix::IAllocator& allocator);
+	explicit PathManager(Lumix::IAllocator& allocator);
 	~PathManager();
 
 	void serialize(OutputBlob& serializer);

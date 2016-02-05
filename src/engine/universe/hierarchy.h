@@ -20,7 +20,7 @@ namespace Lumix
 	class HierarchyPlugin : public IPlugin
 	{
 	public:
-		HierarchyPlugin(IAllocator& allocator) : m_allocator(allocator) {}
+		explicit HierarchyPlugin(IAllocator& allocator) : m_allocator(allocator) {}
 
 		bool create() override { return true; }
 		void destroy() override {}

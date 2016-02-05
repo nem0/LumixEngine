@@ -57,7 +57,7 @@ struct TerrainQuad
 		CHILD_COUNT
 	};
 
-	TerrainQuad(IAllocator& allocator)
+	explicit TerrainQuad(IAllocator& allocator)
 		: m_allocator(allocator)
 	{
 		for (int i = 0; i < CHILD_COUNT; ++i)

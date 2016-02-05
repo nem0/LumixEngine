@@ -798,12 +798,12 @@ struct InitialVelocityModule : public ParticleEmitter::ModuleBase
 	Interval m_y;
 	Interval m_z;
 
-	InitialVelocityModule(ParticleEmitter& emitter)
+	explicit InitialVelocityModule(ParticleEmitter& emitter)
 		: ModuleBase(emitter)
 	{
 		m_z.from = -1;
 		m_z.to = 1;
-		m_x.from = m_x.to = m_x.to = m_y.from = m_y.to = 0;
+		m_x.from = m_x.to = m_y.from = m_y.to = 0;
 	}
 
 

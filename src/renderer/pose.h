@@ -18,7 +18,7 @@ struct Vec3;
 class LUMIX_RENDERER_API Pose
 {
 	public:
-		Pose(IAllocator& allocator);
+		explicit Pose(IAllocator& allocator);
 		~Pose();
 
 		void resize(int count);

@@ -53,7 +53,7 @@ private:
 class LuaScriptManager : public ResourceManagerBase
 {
 public:
-	LuaScriptManager(IAllocator& allocator);
+	explicit LuaScriptManager(IAllocator& allocator);
 	~LuaScriptManager();
 
 protected:

@@ -13,7 +13,7 @@ namespace Lumix
 
 	struct OutputStream : public physx::PxOutputStream
 	{
-		OutputStream(IAllocator& allocator)
+		explicit OutputStream(IAllocator& allocator)
 			: allocator(allocator)
 		{
 			data = (uint8*)allocator.allocate(sizeof(uint8) * 4096);

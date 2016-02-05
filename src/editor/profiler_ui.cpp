@@ -359,7 +359,7 @@ struct ProfilerUIImpl : public ProfilerUI
 
 	struct Block
 	{
-		Block(Lumix::IAllocator& allocator);
+		explicit Block(Lumix::IAllocator& allocator);
 		~Block() {}
 
 		const char* m_name;
@@ -375,7 +375,7 @@ struct ProfilerUIImpl : public ProfilerUI
 
 	struct AllocationStackNode
 	{
-		AllocationStackNode(Lumix::IAllocator& allocator)
+		explicit AllocationStackNode(Lumix::IAllocator& allocator)
 			: m_children(allocator)
 			, m_allocations(allocator)
 		{

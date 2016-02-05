@@ -43,7 +43,7 @@ struct FileSystemWatcherTask : public Lumix::MT::Task
 class FileSystemWatcherPC : public FileSystemWatcher
 {
 public:
-	FileSystemWatcherPC(Lumix::IAllocator& allocator)
+	explicit FileSystemWatcherPC(Lumix::IAllocator& allocator)
 		: m_allocator(allocator)
 	{
 		m_task = nullptr;

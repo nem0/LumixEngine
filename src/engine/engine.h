@@ -2,7 +2,6 @@
 
 
 #include "lumix.h"
-#include "core/array.h"
 
 
 namespace Lumix
@@ -20,6 +19,7 @@ class Manager;
 class InputBlob;
 class EditorServer;
 class Hierarchy;
+class IAllocator;
 class InputSystem;
 class IPlugin;
 class IPropertyDescriptor;

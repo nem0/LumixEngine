@@ -33,7 +33,7 @@ public:
 	static const uint32 FILE = 0xBA0ADBA4; // FILE
 	static const uint32 SHADER_BINARY = 0xDC8D194B; // SHADER_BINARY
 
-	ResourceManager(IAllocator& allocator);
+	explicit ResourceManager(IAllocator& allocator);
 	~ResourceManager();
 
 	void create(FS::FileSystem& fs);

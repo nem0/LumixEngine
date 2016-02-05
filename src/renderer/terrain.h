@@ -30,7 +30,7 @@ class Terrain
 		class GrassType
 		{
 			public:
-				GrassType(Terrain& terrain);
+				explicit GrassType(Terrain& terrain);
 				~GrassType();
 
 				void grassLoaded(Resource::State, Resource::State);
@@ -44,7 +44,7 @@ class Terrain
 		class GrassPatch
 		{
 			public:
-				GrassPatch(IAllocator& allocator)
+				explicit GrassPatch(IAllocator& allocator)
 					: m_matrices(allocator)
 				{ }
 
@@ -55,7 +55,7 @@ class Terrain
 		class GrassQuad
 		{
 			public:
-				GrassQuad(IAllocator& allocator)
+				explicit GrassQuad(IAllocator& allocator)
 					: m_patches(allocator)
 				{}
 

@@ -40,7 +40,7 @@ struct LUMIX_EDITOR_API Settings
 
 	int m_autosave_time;
 
-	Settings(Lumix::IAllocator& allocator);
+	explicit Settings(Lumix::IAllocator& allocator);
 	~Settings();
 
 	static Settings* getInstance();

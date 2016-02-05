@@ -1,11 +1,8 @@
 #include "hierarchy.h"
-#include "core/array.h"
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/hash_map.h"
 #include "core/json_serializer.h"
-#include "core/matrix.h"
-#include "core/pod_hash_map.h"
 #include "engine/engine.h"
 #include "universe.h"
 

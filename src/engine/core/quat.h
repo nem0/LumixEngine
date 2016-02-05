@@ -1,15 +1,14 @@
 #pragma once
 
 
-#include "core/vec.h"
 #include "lumix.h"
+#include "core/vec.h"
 
 
 namespace Lumix
 {
 
 
-struct Vec3;
 struct Matrix;
 
 

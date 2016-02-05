@@ -173,7 +173,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 
 struct ImportTextureTask : public Lumix::MT::Task
 {
-	ImportTextureTask(ImportAssetDialog& dialog)
+	explicit ImportTextureTask(ImportAssetDialog& dialog)
 		: Task(dialog.m_editor.getAllocator())
 		, m_dialog(dialog)
 	{
@@ -301,7 +301,7 @@ struct ImportTask : public Lumix::MT::Task
 		ImportTask* m_task;
 	};
 
-	ImportTask(ImportAssetDialog& dialog)
+	explicit ImportTask(ImportAssetDialog& dialog)
 		: Task(dialog.m_editor.getAllocator())
 		, m_dialog(dialog)
 	{
@@ -1286,8 +1286,6 @@ struct ConvertTask : public Lumix::MT::Task
 
 	void writeSkeleton(Lumix::FS::IFile& file)
 	{
-		const aiScene* scene = m_dialog.m_importer.GetScene();
-
 		Lumix::int32 count = m_nodes.size();
 		if (count == 1) count = 0;
 		file.write((const char*)&count, sizeof(count));

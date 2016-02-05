@@ -31,7 +31,7 @@ private:
 	class CreateTemplateCommand : public IEditorCommand
 	{
 	public:
-		CreateTemplateCommand(WorldEditor& editor)
+		explicit CreateTemplateCommand(WorldEditor& editor)
 			: m_entity_system(
 				  static_cast<EntityTemplateSystemImpl&>(editor.getEntityTemplateSystem()))
 			, m_editor(editor)
@@ -118,7 +118,7 @@ private:
 	class CreateInstanceCommand : public IEditorCommand
 	{
 	public:
-		CreateInstanceCommand(WorldEditor& editor)
+		explicit CreateInstanceCommand(WorldEditor& editor)
 			: m_entity_system(
 				  static_cast<EntityTemplateSystemImpl&>(editor.getEntityTemplateSystem()))
 			, m_editor(editor)
@@ -227,7 +227,7 @@ private:
 	};
 
 public:
-	EntityTemplateSystemImpl(WorldEditor& editor)
+	explicit EntityTemplateSystemImpl(WorldEditor& editor)
 		: m_editor(editor)
 		, m_universe(nullptr)
 		, m_instances(editor.getAllocator())

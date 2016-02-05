@@ -296,7 +296,7 @@ struct PipelineImpl : public Pipeline
 
 	const char* getParameterName(int index) const override
 	{
-		if (index >= m_parameters.size()) return false;
+		if (index >= m_parameters.size()) return nullptr;
 		return m_parameters[index].c_str();
 	}
 

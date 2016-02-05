@@ -58,7 +58,7 @@ template <int SIZE> bool catString(char(&destination)[SIZE], const char* source)
 template <class T> class base_string
 {
 public:
-	base_string(IAllocator& allocator)
+	explicit base_string(IAllocator& allocator)
 		: m_allocator(allocator)
 	{
 		m_cstr = nullptr;

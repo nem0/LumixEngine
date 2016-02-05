@@ -96,7 +96,7 @@ public:
 
 	struct Bone
 	{
-		Bone(IAllocator& allocator)
+		explicit Bone(IAllocator& allocator)
 			: name(allocator)
 			, parent(allocator)
 		{

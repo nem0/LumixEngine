@@ -13,9 +13,9 @@ namespace Lumix
 
 
 FrameBuffer::FrameBuffer(const Declaration& decl)
+	: m_declaration(decl)
 {
 	m_autodestroy_handle = true;
-	m_declaration = decl;
 	bgfx::TextureHandle texture_handles[16];
 
 	for (int i = 0; i < decl.m_renderbuffers_count; ++i)
