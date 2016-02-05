@@ -1715,6 +1715,8 @@ struct PipelineImpl : public Pipeline
 
 	void setMaterial(Material* material)
 	{
+		if (!material->isReady()) return;
+
 		if (m_is_current_light_global)
 		{
 			setDirectionalLightUniforms(m_current_light);

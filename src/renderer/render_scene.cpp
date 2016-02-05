@@ -152,7 +152,7 @@ private:
 			}
 			else if (old_state == Resource::State::READY && new_state == Resource::State::EMPTY)
 			{
-				m_scene.modeUnloaded(m_model);
+				m_scene.modelUnloaded(m_model);
 			}
 		}
 
@@ -233,7 +233,7 @@ public:
 				auto& manager = i.model->getResourceManager();
 				if (i.meshes && &i.model->getMesh(0) != i.meshes)
 				{
-					freeMeshes(i, material_manager);
+					freeCustomMeshes(i, material_manager);
 				}
 				manager.get(ResourceManager::MODEL)->unload(*i.model);
 				LUMIX_DELETE(m_allocator, i.pose);
@@ -664,6 +664,9 @@ public:
 			ASSERT(r.entity == i || r.entity == INVALID_ENTITY);
 			r.model = nullptr;
 			r.pose = nullptr;
+			r.custom_meshes = false;
+			r.meshes = nullptr;
+			r.mesh_count = 0;
 
 			if(r.entity != INVALID_ENTITY)
 			{
@@ -684,22 +687,14 @@ public:
 					serializer.read(material_count);
 					if (material_count > 0)
 					{
-						r.meshes = (Mesh*)m_allocator.allocate(material_count * sizeof(Mesh));
-						r.mesh_count = material_count;
+						allocateCustomMeshes(r, material_count);
 						for (int j = 0; j < material_count; ++j)
 						{
 							char path[MAX_PATH_LENGTH];
 							serializer.readString(path, lengthOf(path));
 							Material* material = static_cast<Material*>(
 								m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path)));
-							new (NewPlaceholder(), r.meshes + j) Mesh(m_renderer.getBasicVertexDecl(),
-								material,
-								0,
-								0,
-								0,
-								0,
-								"",
-								m_allocator);
+							r.meshes[j].material = material;
 						}
 					}
 				}
@@ -2860,13 +2855,20 @@ public:
 
 	void modelUnloaded(Model*, ComponentIndex component)
 	{
+		auto& r = m_renderables[component];
+		if (!r.custom_meshes)
+		{
+			r.meshes = nullptr;
+			r.mesh_count = 0;
+		}
+
 		m_culling_system->removeStatic(component);
 	}
 
 
-	void freeMeshes(Renderable& r, MaterialManager* manager)
+	void freeCustomMeshes(Renderable& r, MaterialManager* manager)
 	{
-		ASSERT(r.meshes != &r.model->getMesh(0));
+		if (!r.custom_meshes) return;
 		for (int i = 0; i < r.mesh_count; ++i)
 		{
 			manager->unload(*r.meshes[i].material);
@@ -2874,6 +2876,8 @@ public:
 		}
 		m_allocator.deallocate(r.meshes);
 		r.meshes = nullptr;
+		r.custom_meshes = false;
+		r.mesh_count = 0;
 	}
 
 
@@ -2899,33 +2903,28 @@ public:
 			r.pose = nullptr;
 		}
 		r.matrix = m_universe.getMatrix(r.entity);
+		ASSERT(!r.meshes || r.custom_meshes)
 		if (r.meshes)
 		{
-			if (r.mesh_count != model->getMeshCount())
+			allocateCustomMeshes(r, model->getMeshCount());
+			for (int i = 0; i < r.mesh_count; ++i)
 			{
-				freeMeshes(r, material_manager);
-			}
-			else
-			{
-				for (int i = 0; i < r.mesh_count; ++i)
+				auto& src = model->getMesh(i);
+				if (!r.meshes[i].material)
 				{
-					auto& src = model->getMesh(i);
-					if (!r.meshes[i].material)
-					{
-						material_manager->load(*src.material);
-						r.meshes[i].material = src.material;
-					}
-					r.meshes[i].set(
-						src.vertex_def,
-						src.attribute_array_offset,
-						src.attribute_array_size,
-						src.indices_offset,
-						src.indices_count
-						);
+					material_manager->load(*src.material);
+					r.meshes[i].material = src.material;
 				}
+				r.meshes[i].set(
+					src.vertex_def,
+					src.attribute_array_offset,
+					src.attribute_array_size,
+					src.indices_offset,
+					src.indices_count
+					);
 			}
 		}
-		if(!r.meshes)
+		else
 		{
 			r.meshes = &r.model->getMesh(0);
 			r.mesh_count = r.model->getMeshCount();
@@ -2945,8 +2944,10 @@ public:
 	}
 
 
-	void modeUnloaded(Model* model)
+	void modelUnloaded(Model* model)
 	{
+		auto& rm = model->getResourceManager();
+		auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
 		for (int i = 0, c = m_renderables.size(); i < c; ++i)
 		{
 			if (m_renderables[i].entity != INVALID_ENTITY && m_renderables[i].model == model)
@@ -2985,51 +2986,59 @@ public:
 	}
 
 
-	void setRenderableMaterial(ComponentIndex cmp, int index, const Path& path) override
+	void allocateCustomMeshes(Renderable& r, int count)
 	{
-		auto& r = m_renderables[cmp];
-		if (!r.model) return;
-		if (path == r.meshes[index].material->getPath()) return;
+		if (r.custom_meshes && r.mesh_count == count) return;
 
 		auto& rm = r.model->getResourceManager();
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
-		if (index >= r.mesh_count)
+
+		auto* new_meshes = (Mesh*)m_allocator.allocate(count * sizeof(Mesh));
+		if (r.meshes)
 		{
-			if (r.model->isReady()) freeMeshes(r, material_manager);
-			r.mesh_count = index + 1;
-			r.meshes = (Mesh*)m_allocator.allocate(r.mesh_count * sizeof(Mesh));
-			auto* material = static_cast<Material*>(material_manager->load(path));
 			for (int i = 0; i < r.mesh_count; ++i)
 			{
-				new (NewPlaceholder(), r.meshes + i) Mesh(m_renderer.getBasicVertexDecl(),
-					i == index ? material : nullptr,
-					0,
-					0,
-					0,
-					0,
-					"",
-					m_allocator);
+				new (NewPlaceholder(), new_meshes + i) Mesh(r.meshes[i]);
 			}
-		}
-		else if (r.meshes == &r.model->getMesh(0))
-		{
-			r.mesh_count = r.model->getMeshCount();
-			r.meshes = (Mesh*)m_allocator.allocate(r.mesh_count * sizeof(Mesh));
-			for (int i = 0; i < r.mesh_count; ++i)
+
+			if (r.custom_meshes)
 			{
-				auto& src = r.model->getMesh(i);
-				
-				material_manager->load(*src.material);
-				new (NewPlaceholder(), r.meshes + i) Mesh(src.vertex_def,
-					src.material,
-					src.attribute_array_offset,
-					src.attribute_array_size,
-					src.indices_offset,
-					src.indices_count,
-					"",
-					m_allocator);
+				for (int i = count; i < r.mesh_count; ++i)
+				{
+					material_manager->unload(*r.meshes[i].material);
+				}
+				m_allocator.deallocate(r.meshes);
+			}
+			else
+			{
+				for (int i = 0; i < r.mesh_count; ++i)
+				{
+					material_manager->load(*r.meshes[i].material);
+				}
 			}
 		}
+
+		for (int i = r.mesh_count; i < count; ++i)
+		{
+			new (NewPlaceholder(), new_meshes + i)
+				Mesh(m_renderer.getBasicVertexDecl(), nullptr, 0, 0, 0, 0, "", m_allocator);
+		}
+		r.meshes = new_meshes;
+		r.mesh_count = count;
+		r.custom_meshes = true;
+	}
+
+
+	void setRenderableMaterial(ComponentIndex cmp, int index, const Path& path) override
+	{
+		auto& r = m_renderables[cmp];
+		if (r.meshes && r.mesh_count > index && path == r.meshes[index].material->getPath()) return;
+
+		auto& rm = r.model->getResourceManager();
+		auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
+		
+		int new_count = Math::maxValue(int8(index + 1), r.mesh_count);
+		allocateCustomMeshes(r, new_count);
 
 		if (r.meshes[index].material) material_manager->unload(*r.meshes[index].material);
 		auto* new_material = static_cast<Material*>(material_manager->load(path));
@@ -3061,10 +3070,7 @@ public:
 		{
 			auto& rm = old_model->getResourceManager();
 			auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
-			if (m_renderables[component].meshes != &old_model->getMesh(0))
-			{
-				freeMeshes(m_renderables[component], material_manager);
-			}
+			freeCustomMeshes(m_renderables[component], material_manager);
 			ModelLoadedCallback* callback = getModelLoadedCallback(old_model);
 			--callback->m_ref_count;
 			if (old_model->isReady())
@@ -3333,6 +3339,7 @@ public:
 		r.layer_mask = 1;
 		r.meshes = nullptr;
 		r.pose = nullptr;
+		r.custom_meshes = false;
 		r.mesh_count = 0;
 		r.matrix = m_universe.getMatrix(entity);
 		m_universe.addComponent(entity, RENDERABLE_HASH, this, entity);

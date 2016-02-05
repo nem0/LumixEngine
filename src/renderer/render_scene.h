@@ -47,6 +47,7 @@ struct Renderable
 	Entity entity;
 	int64 layer_mask;
 	Mesh* meshes;
+	bool custom_meshes;
 	int8 mesh_count;
 };
 
