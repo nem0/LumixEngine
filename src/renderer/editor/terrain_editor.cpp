@@ -941,7 +941,8 @@ void TerrainEditor::removeEntities(const Lumix::RayCastModelHit& hit)
 
 	PROFILE_FUNCTION();
 
-	m_world_editor.beginCommandGroup();
+	static const Lumix::uint32 REMOVE_ENTITIES_HASH = Lumix::crc32("remove_entities");
+	m_world_editor.beginCommandGroup(REMOVE_ENTITIES_HASH);
 
 	Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
 	Lumix::Frustum frustum;
@@ -1079,7 +1080,8 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 	int templates_count = template_names.size();
 	if (m_selected_entity_template >= templates_count) return;
 
-	m_world_editor.beginCommandGroup();
+	static const Lumix::uint32 PAINT_ENTITIES_HASH = Lumix::crc32("paint_entities");
+	m_world_editor.beginCommandGroup(PAINT_ENTITIES_HASH);
 	{
 		Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
 		Lumix::Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix(m_component.entity);
