@@ -64,7 +64,7 @@ class BeginGroupCommand : public IEditorCommand
 };
 
 
-class EndGroupCommand : public IEditorCommand
+struct EndGroupCommand : public IEditorCommand
 {
 	bool execute() override { ASSERT(false); return false; }
 	void undo() override { ASSERT(false); }
@@ -76,6 +76,8 @@ class EndGroupCommand : public IEditorCommand
 		static const uint32 type = crc32("end_group");
 		return type;
 	}
+
+	uint32 group_type;
 };
 
 
@@ -1974,9 +1976,8 @@ public:
 	}
 
 
-	void beginCommandGroup() override
+	void beginCommandGroup(uint32 type) override
 	{
-		auto* cmd = LUMIX_NEW(m_allocator, BeginGroupCommand);
 		if(m_undo_index < m_undo_stack.size() - 1)
 		{
 			for(int i = m_undo_stack.size() - 1; i > m_undo_index; --i)
@@ -1985,6 +1986,24 @@ public:
 			}
 			m_undo_stack.resize(m_undo_index + 1);
 		}
+
+		if(m_undo_index >= 0)
+		{
+			static const uint32 end_group_hash = crc32("end_group");
+			if(m_undo_stack[m_undo_index]->getType() == end_group_hash)
+			{
+				if(static_cast<EndGroupCommand*>(m_undo_stack[m_undo_index])->group_type == type)
+				{
+					LUMIX_DELETE(m_allocator, m_undo_stack[m_undo_index]);
+					--m_undo_index;
+					m_undo_stack.pop();
+					return;
+				}
+			}
+		}
+
+		m_current_group_type = type;
+		auto* cmd = LUMIX_NEW(m_allocator, BeginGroupCommand);
 		m_undo_stack.push(cmd);
 		++m_undo_index;
 	}
@@ -1993,6 +2012,7 @@ public:
 	void endCommandGroup() override
 	{
 		auto* cmd = LUMIX_NEW(m_allocator, EndGroupCommand);
+		cmd->group_type = m_current_group_type;
 		m_undo_stack.push(cmd);
 		++m_undo_index;
 	}
@@ -3182,6 +3202,7 @@ private:
 	Universe* m_universe;
 	EntityGroups m_entity_groups;
 	RenderInterface* m_render_interface;
+	uint32 m_current_group_type;
 };
 
 
