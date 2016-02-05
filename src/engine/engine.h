@@ -17,20 +17,13 @@ class Manager;
 }
 
 class InputBlob;
-class EditorServer;
-class Hierarchy;
 class IAllocator;
 class InputSystem;
-class IPlugin;
-class IPropertyDescriptor;
-class IScene;
-class JsonSerializer;
 class OutputBlob;
 class PathManager;
 class PluginManager;
 class ResourceManager;
 class Universe;
-class WorldEditor;
 
 
 class LUMIX_ENGINE_API Engine
