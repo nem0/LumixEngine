@@ -200,6 +200,7 @@ bool Material::save(JsonSerializer& serializer)
 		serializer.beginObject("texture");
 		serializer.serialize("source", path);
 		if (atlas_size > 0) serializer.serialize("atlas_size", atlas_size);
+		if (flags & BGFX_TEXTURE_SRGB) serializer.serialize("srgb", true);
 		if (flags & BGFX_TEXTURE_U_CLAMP) serializer.serialize("u_clamp", true);
 		if (flags & BGFX_TEXTURE_V_CLAMP) serializer.serialize("v_clamp", true);
 		if (flags & BGFX_TEXTURE_W_CLAMP) serializer.serialize("w_clamp", true);
