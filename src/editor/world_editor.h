@@ -95,9 +95,9 @@ public:
 	virtual Path getUniversePath() const = 0;
 	virtual void showEntities() = 0;
 	virtual void hideEntities() = 0;
-	virtual void copyEntity() = 0;
-	virtual bool canPasteEntity() const = 0;
-	virtual void pasteEntity() = 0;
+	virtual void copyEntities() = 0;
+	virtual bool canPasteEntities() const = 0;
+	virtual void pasteEntities() = 0;
 	virtual ComponentUID getComponent(Entity entity, uint32 type) = 0;
 	virtual ComponentList& getComponents(Entity entity) = 0;
 	virtual void addComponent(uint32 type_crc) = 0;

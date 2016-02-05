@@ -403,8 +403,8 @@ public:
 
 	void undo() { if (!hasPluginFocus()) m_editor->undo(); }
 	void redo() { if (!hasPluginFocus()) m_editor->redo(); }
-	void copy() { m_editor->copyEntity(); }
-	void paste() { m_editor->pasteEntity(); }
+	void copy() { m_editor->copyEntities(); }
+	void paste() { m_editor->pasteEntities(); }
 	void toggleOrbitCamera() { m_editor->setOrbitCamera(!m_editor->isOrbitCamera()); }
 	void setTopView() { m_editor->setTopView(); }
 	void setFrontView() { m_editor->setFrontView(); }
@@ -525,7 +525,7 @@ public:
 				doMenuItem(getAction("redo"), false, m_editor->canRedo());
 				ImGui::Separator();
 				doMenuItem(getAction("copy"), false, is_any_entity_selected);
-				doMenuItem(getAction("paste"), false, m_editor->canPasteEntity());
+				doMenuItem(getAction("paste"), false, m_editor->canPasteEntities());
 				ImGui::Separator();
 				doMenuItem(getAction("orbitCamera"),
 					m_editor->isOrbitCamera(),

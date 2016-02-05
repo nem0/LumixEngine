@@ -168,14 +168,16 @@ public:
 	PasteEntityCommand(WorldEditor& editor)
 		: m_blob(editor.getAllocator())
 		, m_editor(editor)
+		, m_entities(editor.getAllocator())
 	{
 	}
+
 
 	PasteEntityCommand(WorldEditor& editor, OutputBlob& blob)
 		: m_blob(blob, editor.getAllocator())
 		, m_editor(editor)
 		, m_position(editor.getCameraRaycastHit())
-		, m_entity(INVALID_ENTITY)
+		, m_entities(editor.getAllocator())
 	{
 	}
 
@@ -188,7 +190,6 @@ public:
 		serializer.serialize("pos_x", m_position.x);
 		serializer.serialize("pos_y", m_position.y);
 		serializer.serialize("pos_z", m_position.z);
-		serializer.serialize("entity", m_entity);
 		serializer.serialize("size", m_blob.getSize());
 		serializer.beginArray("data");
 		for (int i = 0; i < m_blob.getSize(); ++i)
@@ -205,7 +206,6 @@ public:
 		serializer.deserialize("pos_x", m_position.x, 0);
 		serializer.deserialize("pos_y", m_position.y, 0);
 		serializer.deserialize("pos_z", m_position.z, 0);
-		serializer.deserialize("entity", m_entity, 0);
 		int size;
 		serializer.deserialize("size", size, 0);
 		serializer.deserializeArrayBegin("data");
@@ -222,14 +222,16 @@ public:
 
 	void undo() override
 	{
-		const WorldEditor::ComponentList& cmps =
-			m_editor.getComponents(m_entity);
-		for (int i = 0; i < cmps.size(); ++i)
+		for (auto entity : m_entities)
 		{
-			cmps[i].scene->destroyComponent(cmps[i].index, cmps[i].type);
+			const WorldEditor::ComponentList& cmps = m_editor.getComponents(entity);
+			for (int i = 0; i < cmps.size(); ++i)
+			{
+				cmps[i].scene->destroyComponent(cmps[i].index, cmps[i].type);
+			}
+			m_editor.getUniverse()->destroyEntity(entity);
 		}
-		m_editor.getUniverse()->destroyEntity(m_entity);
-		m_entity = INVALID_ENTITY;
+		m_entities.clear();
 	}
 
 
@@ -250,7 +252,7 @@ private:
 	OutputBlob m_blob;
 	WorldEditor& m_editor;
 	Vec3 m_position;
-	Entity m_entity;
+	Lumix::Array<Entity> m_entities;
 };
 
 
@@ -2120,12 +2122,17 @@ public:
 	}
 
 
-	void copyEntity() override
+	void copyEntities() override
 	{
-		if (!m_selected_entities.empty())
+		if (m_selected_entities.empty()) return;
+
+		m_copy_buffer.clear();
+		m_copy_buffer.write(m_selected_entities.size());
+		for (auto entity : m_selected_entities)
 		{
-			Entity entity = m_selected_entities[0];
-			m_copy_buffer.clear();
+			auto mtx = m_universe->getMatrix(entity);
+			m_copy_buffer.write(mtx);
+
 			const WorldEditor::ComponentList& cmps = getComponents(entity);
 			int32 count = cmps.size();
 			m_copy_buffer.write(count);
@@ -2145,13 +2152,13 @@ public:
 	}
 
 
-	bool canPasteEntity() const override
+	bool canPasteEntities() const override
 	{
 		return m_copy_buffer.getSize() > 0;
 	}
 
 
-	void pasteEntity() override
+	void pasteEntities() override
 	{
 		PasteEntityCommand* command =
 			LUMIX_NEW(m_allocator, PasteEntityCommand)(*this, m_copy_buffer);
@@ -3018,6 +3025,7 @@ public:
 					g_log_error.log("editor") << "Unknown command " << type << " in " << path;
 					destroyUndoStack();
 					m_undo_index = -1;
+					m_engine->getFileSystem().close(*file);
 					return false;
 				}
 				command->deserialize(serializer);
@@ -3222,22 +3230,47 @@ bool PasteEntityCommand::execute()
 {
 	InputBlob blob(m_blob.getData(), m_blob.getSize());
 	Universe* universe = m_editor.getUniverse();
-	Entity new_entity = universe->createEntity(m_position, Quat(0, 0, 0, 1));
-	int32 count;
-	blob.read(count);
-	for (int i = 0; i < count; ++i)
+	
+	int entity_count;
+	blob.read(entity_count);
+	m_entities.clear();
+	m_entities.reserve(entity_count);
+	Matrix base_matrix = Matrix::IDENTITY;
+	base_matrix.setTranslation(m_position);
+	for (int i = 0; i < entity_count; ++i)
 	{
-		uint32 type;
-		blob.read(type);
-		ComponentUID cmp =
-			static_cast<WorldEditorImpl&>(m_editor).createComponent(type, new_entity);
-		Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(type);
-		for (int j = 0; j < props.size(); ++j)
+		Matrix mtx;
+		blob.read(mtx);
+		if (i == 0) 
 		{
-			props[j]->set(cmp, -1, blob);
+			Matrix inv = mtx;
+			inv.inverse();
+			base_matrix.copy3x3(mtx);
+			base_matrix = base_matrix * inv;
+			mtx.setTranslation(m_position);
 		}
+		else
+		{
+			mtx = base_matrix * mtx;
+		}
+		Entity new_entity = universe->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+		universe->setMatrix(new_entity, mtx);
+		int32 count;
+		blob.read(count);
+		for (int i = 0; i < count; ++i)
+		{
+			uint32 type;
+			blob.read(type);
+			ComponentUID cmp =
+				static_cast<WorldEditorImpl&>(m_editor).createComponent(type, new_entity);
+			Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(type);
+			for (int j = 0; j < props.size(); ++j)
+			{
+				props[j]->set(cmp, -1, blob);
+			}
+		}
+		m_entities.push(new_entity);
 	}
-	m_entity = new_entity;
 	return true;
 }
 
