@@ -147,13 +147,19 @@ public:
 
 		int count;
 		stream.read(count);
-		while (getCount(cmp) < count)
+		if (m_adder)
 		{
-			addArrayItem(cmp, -1);
+			while (getCount(cmp) < count)
+			{
+				addArrayItem(cmp, -1);
+			}
 		}
-		while (getCount(cmp) > count)
+		if (m_remover)
 		{
-			removeArrayItem(cmp, getCount(cmp) - 1);
+			while (getCount(cmp) > count)
+			{
+				removeArrayItem(cmp, getCount(cmp) - 1);
+			}
 		}
 		for (int i = 0; i < count; ++i)
 		{
@@ -188,7 +194,7 @@ public:
 
 	void addArrayItem(ComponentUID cmp, int index) const override
 	{
-		(static_cast<S*>(cmp.scene)->*m_adder)(cmp.index, index);
+		if (m_adder) (static_cast<S*>(cmp.scene)->*m_adder)(cmp.index, index);
 	}
 
 
