@@ -1622,7 +1622,7 @@ bool ImportAssetDialog::checkTexture(const char* source_dir,
 
 	if (!PlatformInterface::getOpenFilename(new_path, sizeof(new_path), "All\0*.*\0", m_source)) return false;
 
-	Lumix::string old_path_str(path, m_editor.getAllocator());
+	Lumix::string old_path_str(texture_path, m_editor.getAllocator());
 	Lumix::string new_path_str(new_path, m_editor.getAllocator());
 	m_path_mapping.erase(old_path_str);
 	m_path_mapping.insert(old_path_str, new_path_str);
