@@ -6,8 +6,7 @@
 namespace Lumix
 {
 
-static const int BITS_IN_BYTE = 8;
-static const int BITMASK_7BIT = sizeof(int32) * BITS_IN_BYTE - 1;
+static const int BITMASK_7BIT = sizeof(int32) * 8 - 1;
 
 BinaryArray::StoreType BinaryArray::BINARY_MASK[32];
 BinaryArray::StoreType BinaryArray::INDEX_BIT[32];

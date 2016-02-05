@@ -10,7 +10,7 @@
 template <int size>
 struct StringBuilder
 {
-	StringBuilder(const char* str)
+	explicit StringBuilder(const char* str)
 	{
 		Lumix::copyString(data, size, str);
 	}

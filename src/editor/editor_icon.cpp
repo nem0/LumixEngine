@@ -41,7 +41,7 @@ const char* ICONS[(int)IconType::COUNT] =
 
 struct EditorIconsImpl : public EditorIcons
 {
-	EditorIconsImpl(WorldEditor& editor)
+	explicit EditorIconsImpl(WorldEditor& editor)
 		: m_editor(editor)
 		, m_icons(editor.getAllocator())
 	{

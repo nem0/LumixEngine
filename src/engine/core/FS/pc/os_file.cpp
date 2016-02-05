@@ -13,7 +13,7 @@ namespace FS
 {
 struct OsFileImpl
 {
-	OsFileImpl(IAllocator& allocator)
+	explicit OsFileImpl(IAllocator& allocator)
 		: m_allocator(allocator)
 	{
 	}

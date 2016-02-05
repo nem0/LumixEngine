@@ -94,7 +94,7 @@ private:
 class FileSystemImpl : public FileSystem
 {
 public:
-	FileSystemImpl(IAllocator& allocator)
+	explicit FileSystemImpl(IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_in_progress(m_allocator)
 		, m_pending(m_allocator)

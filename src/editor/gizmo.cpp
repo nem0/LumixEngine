@@ -66,7 +66,7 @@ struct GizmoImpl : public Gizmo
 	static const int MAX_GIZMOS = 16;
 
 
-	GizmoImpl(WorldEditor& editor)
+	explicit GizmoImpl(WorldEditor& editor)
 		: m_editor(editor)
 	{
 		m_mode = Mode::TRANSLATE;

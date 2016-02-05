@@ -155,7 +155,7 @@ namespace Lumix
 
 		struct TCPImpl
 		{
-			TCPImpl(IAllocator& allocator)
+			explicit TCPImpl(IAllocator& allocator)
 				: m_spin_mutex(false)
 				, m_allocator(allocator)
 				, m_connector(m_allocator)

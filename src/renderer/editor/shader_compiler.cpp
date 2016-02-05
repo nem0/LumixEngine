@@ -14,7 +14,6 @@
 #include "engine.h"
 #include "engine/plugin_manager.h"
 #include "renderer/renderer.h"
-#include "renderer/shader.h"
 #include "editor/file_system_watcher.h"
 #include "editor/log_ui.h"
 #include "editor/platform_interface.h"

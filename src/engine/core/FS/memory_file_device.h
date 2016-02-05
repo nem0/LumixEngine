@@ -14,7 +14,7 @@ namespace Lumix
 		class LUMIX_ENGINE_API MemoryFileDevice : public IFileDevice
 		{
 		public:
-			MemoryFileDevice(IAllocator& allocator) : m_allocator(allocator) {}
+			explicit MemoryFileDevice(IAllocator& allocator) : m_allocator(allocator) {}
 
 			void destroyFile(IFile* file) override;
 			IFile* createFile(IFile* child) override;

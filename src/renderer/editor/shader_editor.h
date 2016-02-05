@@ -70,7 +70,7 @@ public:
 	};
 
 public:
-	ShaderEditor(Lumix::IAllocator& allocator);
+	explicit ShaderEditor(Lumix::IAllocator& allocator);
 	~ShaderEditor();
 
 	void onGUI();

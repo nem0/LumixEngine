@@ -19,15 +19,13 @@ class InputBlob;
 class Event;
 struct Matrix;
 class OutputBlob;
-struct Quat;
 class Universe;
-struct Vec3;
 
 
 class LUMIX_ENGINE_API Universe
 {
 public:
-	Universe(IAllocator& allocator);
+	explicit Universe(IAllocator& allocator);
 	~Universe();
 
 	IAllocator& getAllocator() { return m_allocator; }

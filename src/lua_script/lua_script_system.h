@@ -21,7 +21,7 @@ class LuaScriptScene : public IScene
 public:
 	struct Property
 	{
-		Property(IAllocator& allocator)
+		explicit Property(IAllocator& allocator)
 			: m_value(allocator)
 		{
 		}

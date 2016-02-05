@@ -14,7 +14,7 @@ namespace Lumix
 class ErrorProxy
 {
 public:
-	ErrorProxy(JsonSerializer& serializer)
+	explicit ErrorProxy(JsonSerializer& serializer)
 		: m_log(g_log_error, "serializer", serializer.m_allocator)
 	{
 		serializer.m_is_error = true;
@@ -664,7 +664,10 @@ void JsonSerializer::deserializeToken()
 			ErrorProxy(*this).log() << "Unexpected end of file while looking for \".";
 			m_token_size = 0;
 		}
-		m_token_size = int(token_end - m_token);
+		else
+		{
+			m_token_size = int(token_end - m_token);
+		}
 	}
 	else if (isSingleCharToken(*m_token))
 	{

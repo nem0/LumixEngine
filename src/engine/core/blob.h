@@ -39,7 +39,7 @@ namespace Lumix
 	{
 		public:
 			InputBlob(const void* data, int size);
-			InputBlob(const OutputBlob& blob);
+			explicit InputBlob(const OutputBlob& blob);
 
 			bool read(void* data, int size);
 			bool readString(char* data, int max_size);

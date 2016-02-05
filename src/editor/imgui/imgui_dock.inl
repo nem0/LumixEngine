@@ -406,6 +406,8 @@ struct DockContext
             case Slot_Right:
                 return ImRect(ImVec2(parent_rect.Max.x - 30, center.y - 20),
                     ImVec2(parent_rect.Max.x - 10, center.y + 20));
+            default:
+                ASSERT(false);
         }
         IM_ASSERT(false);
         return ImRect();
@@ -428,7 +430,6 @@ struct DockContext
     bool dockSlots(Dock& dock, Dock* dest_dock, const ImRect& rect, bool on_border)
     {
         ImDrawList* canvas = GetWindowDrawList();
-        ImU32 text_color = GetColorU32(ImGuiCol_Text);
         ImU32 color = GetColorU32(ImGuiCol_Button);
         ImU32 color_hovered = GetColorU32(ImGuiCol_ButtonHovered);
         ImVec2 mouse_pos = GetIO().MousePos;
@@ -863,7 +864,6 @@ struct DockContext
                                  ImGuiWindowFlags_NoSavedSettings | extra_flags;
         bool ret = BeginChild(label, size, true, flags);
 		PopStyleColor();
-		ImDrawList* draw_list = GetWindowDrawList();
         return ret;
     }
 

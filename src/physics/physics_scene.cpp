@@ -42,7 +42,7 @@ enum class PhysicsSceneVersion : int
 
 struct OutputStream : public physx::PxOutputStream
 {
-	OutputStream(IAllocator& allocator)
+	explicit OutputStream(IAllocator& allocator)
 		: allocator(allocator)
 	{
 		data = (uint8*)allocator.allocate(sizeof(uint8) * 4096);
@@ -145,7 +145,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 {
 	struct ContactCallback : public physx::PxSimulationEventCallback
 	{
-		ContactCallback(PhysicsSceneImpl& scene)
+		explicit ContactCallback(PhysicsSceneImpl& scene)
 			: m_scene(scene)
 		{
 		}
@@ -193,7 +193,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	class RigidActor
 	{
 	public:
-		RigidActor(PhysicsSceneImpl& scene)
+		explicit RigidActor(PhysicsSceneImpl& scene)
 			: m_resource(nullptr)
 			, m_physx_actor(nullptr)
 			, m_scene(scene)

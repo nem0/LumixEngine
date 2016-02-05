@@ -26,7 +26,7 @@ class ShaderBinary;
 class ShaderInstance
 {
 public:
-	ShaderInstance(Shader& shader)
+	explicit ShaderInstance(Shader& shader)
 		: m_shader(shader)
 	{
 		for (int i = 0; i < lengthOf(m_program_handles); ++i)

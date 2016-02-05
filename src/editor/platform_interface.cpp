@@ -456,7 +456,7 @@ namespace PlatformInterface
 	
 	struct Process
 	{
-		Process(Lumix::IAllocator& allocator)
+		explicit Process(Lumix::IAllocator& allocator)
 			: allocator(allocator)
 		{
 		}

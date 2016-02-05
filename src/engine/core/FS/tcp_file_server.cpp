@@ -24,7 +24,7 @@ namespace FS
 class TCPFileServerTask : public MT::Task
 {
 public:
-	TCPFileServerTask(IAllocator& allocator)
+	explicit TCPFileServerTask(IAllocator& allocator)
 		: MT::Task(allocator)
 		, m_acceptor(allocator)
 	{
@@ -244,7 +244,7 @@ private:
 
 struct TCPFileServerImpl
 {
-	TCPFileServerImpl(IAllocator& allocator)
+	explicit TCPFileServerImpl(IAllocator& allocator)
 		: m_task(allocator)
 		, m_allocator(allocator)
 	{

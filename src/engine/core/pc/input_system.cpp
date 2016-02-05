@@ -18,7 +18,7 @@ namespace Lumix
 	{
 		typedef decltype(XInputGetState)* XInputGetState_fn_ptr;
 
-		InputSystemImpl(IAllocator& allocator)
+		explicit InputSystemImpl(IAllocator& allocator)
 			: m_actions(allocator)
 			, m_allocator(allocator)
 			, m_is_enabled(false)

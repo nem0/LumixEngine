@@ -54,7 +54,7 @@ public:
 	};
 
 public:
-	Allocator(IAllocator& source);
+	explicit Allocator(IAllocator& source);
 	virtual ~Allocator();
 
 	void* allocate(size_t size) override;

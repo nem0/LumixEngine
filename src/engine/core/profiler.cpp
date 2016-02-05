@@ -23,7 +23,7 @@ struct Block
 	};
 
 	
-	Block(IAllocator& allocator)
+	explicit Block(IAllocator& allocator)
 		: allocator(allocator)
 		, m_hits(allocator)
 		, m_type(BlockType::TIME)

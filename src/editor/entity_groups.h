@@ -17,7 +17,7 @@ class Universe;
 class LUMIX_EDITOR_API EntityGroups
 {
 public:
-	EntityGroups(IAllocator& allocator);
+	explicit EntityGroups(IAllocator& allocator);
 
 	void setGroup(Entity entity, int group);
 	const Entity* getGroupEntities(int idx) const;

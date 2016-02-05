@@ -61,7 +61,7 @@ class LUMIX_RENDERER_API ParticleEmitter
 public:
 	struct LUMIX_RENDERER_API ModuleBase
 	{
-		ModuleBase(ParticleEmitter& emitter);
+		explicit ModuleBase(ParticleEmitter& emitter);
 
 		virtual ~ModuleBase() {}
 		virtual void spawnParticle(int /*index*/) {}
@@ -78,7 +78,7 @@ public:
 
 	struct LUMIX_RENDERER_API SpawnShapeModule : public ModuleBase
 	{
-		SpawnShapeModule(ParticleEmitter& emitter);
+		explicit SpawnShapeModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob& blob) override;
 		void deserialize(InputBlob& blob, int version) override;
@@ -96,7 +96,7 @@ public:
 
 	struct LUMIX_RENDERER_API LinearMovementModule : public ModuleBase
 	{
-		LinearMovementModule(ParticleEmitter& emitter);
+		explicit LinearMovementModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob& blob) override;
 		void deserialize(InputBlob& blob, int version) override;
@@ -111,7 +111,7 @@ public:
 
 	struct LUMIX_RENDERER_API PlaneModule : public ModuleBase
 	{
-		PlaneModule(ParticleEmitter& emitter);
+		explicit PlaneModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
 		void deserialize(InputBlob& blob, int version) override;
 		void update(float time_delta) override;
@@ -127,7 +127,7 @@ public:
 
 	struct LUMIX_RENDERER_API AttractorModule : public ModuleBase
 	{
-		AttractorModule(ParticleEmitter& emitter);
+		explicit AttractorModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
 		void deserialize(InputBlob& blob, int version) override;
 		void update(float time_delta) override;
@@ -143,7 +143,7 @@ public:
 
 	struct LUMIX_RENDERER_API ForceModule : public ModuleBase
 	{
-		ForceModule(ParticleEmitter& emitter);
+		explicit ForceModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
 		void deserialize(InputBlob& blob, int version) override;
 		void update(float time_delta) override;
@@ -156,7 +156,7 @@ public:
 
 	struct LUMIX_RENDERER_API AlphaModule : public ModuleBase
 	{
-		AlphaModule(ParticleEmitter& emitter);
+		explicit AlphaModule(ParticleEmitter& emitter);
 		void update(float time_delta) override;
 		void serialize(OutputBlob&) override;
 		void deserialize(InputBlob&, int) override;
@@ -172,7 +172,7 @@ public:
 
 	struct LUMIX_RENDERER_API SizeModule : public ModuleBase
 	{
-		SizeModule(ParticleEmitter& emitter);
+		explicit SizeModule(ParticleEmitter& emitter);
 		void update(float time_delta) override;
 		void serialize(OutputBlob&) override;
 		void deserialize(InputBlob&, int) override;
@@ -188,7 +188,7 @@ public:
 
 	struct LUMIX_RENDERER_API RandomRotationModule : public ModuleBase
 	{
-		RandomRotationModule(ParticleEmitter& emitter);
+		explicit RandomRotationModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob&) override {}
 		void deserialize(InputBlob&, int) override {}
