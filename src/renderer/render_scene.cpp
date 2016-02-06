@@ -231,10 +231,7 @@ public:
 			if (i.entity != INVALID_ENTITY && i.model)
 			{
 				auto& manager = i.model->getResourceManager();
-				if (i.meshes && &i.model->getMesh(0) != i.meshes)
-				{
-					freeCustomMeshes(i, material_manager);
-				}
+				freeCustomMeshes(i, material_manager);
 				manager.get(ResourceManager::MODEL)->unload(*i.model);
 				LUMIX_DELETE(m_allocator, i.pose);
 			}
