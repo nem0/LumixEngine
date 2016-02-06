@@ -216,7 +216,7 @@ struct AnimationSceneImpl : public IScene
 	{
 		Animable& animable = m_animables[cmp];
 		if(!animable.m_is_free && animable.m_animation &&
-			animable.m_animation->isReady())
+			animable.m_animation->isReady() && animable.m_renderable != INVALID_COMPONENT)
 		{
 			auto* pose = m_render_scene->getPose(animable.m_renderable);
 			auto* model = m_render_scene->getRenderableModel(animable.m_renderable);

@@ -1358,6 +1358,7 @@ struct ConvertTask : public Lumix::MT::Task
 			{
 				getGlobalTransform(node).DecomposeNoScaling(rot, pos);
 			}
+			pos *= m_dialog.m_mesh_scale;
 			file.write((const char*)&pos, sizeof(pos));
 			file.write((const char*)&rot.x, sizeof(rot.x));
 			file.write((const char*)&rot.y, sizeof(rot.y));
