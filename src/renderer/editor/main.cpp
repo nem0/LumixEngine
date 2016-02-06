@@ -153,6 +153,11 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 
 			if (ImGui::BeginPopup(popup_name))
 			{
+				bool is_srgb = (texture->getFlags() & BGFX_TEXTURE_SRGB) != 0;
+				if (ImGui::Checkbox("SRGB", &is_srgb))
+				{
+					texture->setFlag(BGFX_TEXTURE_SRGB, is_srgb);
+				}
 				bool u_clamp = (texture->getFlags() & BGFX_TEXTURE_U_CLAMP) != 0;
 				if (ImGui::Checkbox("u clamp", &u_clamp))
 				{
