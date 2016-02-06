@@ -1284,23 +1284,57 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
+	aiBone* getBone(aiNode* node)
+	{
+		const aiScene* scene = m_dialog.m_importer.GetScene();
+		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		{
+			auto* mesh = scene->mMeshes[i];
+			for (unsigned int j = 0; j < mesh->mNumBones; ++j)
+			{
+				if (mesh->mBones[j]->mName == node->mName) return mesh->mBones[j];
+			}
+		}
+		return nullptr;
+	}
+
+
+	aiNode* getMeshNode(aiNode* node)
+	{
+		const aiScene* scene = m_dialog.m_importer.GetScene();
+		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		{
+			auto* mesh = scene->mMeshes[i];
+			for (unsigned int j = 0; j < mesh->mNumBones; ++j)
+			{
+				if (mesh->mBones[j]->mName == node->mName)
+				{
+					return getNode(mesh, scene->mRootNode);
+				}
+			}
+		}
+		return nullptr;
+	}
+
+
 	void writeSkeleton(Lumix::FS::IFile& file)
 	{
+		const aiScene* scene = m_dialog.m_importer.GetScene();
 		Lumix::int32 count = m_nodes.size();
 		if (count == 1) count = 0;
 		file.write((const char*)&count, sizeof(count));
 
-		for (auto* bone : m_nodes)
+		for (auto* node : m_nodes)
 		{
-			Lumix::int32 len = Lumix::stringLength(bone->mName.C_Str());
+			Lumix::int32 len = Lumix::stringLength(node->mName.C_Str());
 			file.write((const char*)&len, sizeof(len));
-			file.write(bone->mName.C_Str(), bone->mName.length);
+			file.write(node->mName.C_Str(), node->mName.length);
 
-			if (bone->mParent)
+			if (node->mParent)
 			{
-				Lumix::int32 len = Lumix::stringLength(bone->mParent->mName.C_Str());
+				Lumix::int32 len = Lumix::stringLength(node->mParent->mName.C_Str());
 				file.write((const char*)&len, sizeof(len));
-				file.write(bone->mParent->mName.C_Str(), bone->mParent->mName.length);
+				file.write(node->mParent->mName.C_Str(), node->mParent->mName.length);
 			}
 			else
 			{
@@ -1310,7 +1344,19 @@ struct ConvertTask : public Lumix::MT::Task
 
 			aiQuaterniont<float> rot;
 			aiVector3t<float> pos;
-			getGlobalTransform(bone).DecomposeNoScaling(rot, pos);
+			auto bone = getBone(node);
+			if (bone)
+			{
+				aiMatrix4x4 mtx;
+				mtx = bone->mOffsetMatrix;
+				mtx.Inverse();
+				mtx = getGlobalTransform(getMeshNode(node)) * mtx;
+				mtx.DecomposeNoScaling(rot, pos);
+			}
+			else
+			{
+				getGlobalTransform(node).DecomposeNoScaling(rot, pos);
+			}
 			file.write((const char*)&pos, sizeof(pos));
 			file.write((const char*)&rot.x, sizeof(rot.x));
 			file.write((const char*)&rot.y, sizeof(rot.y));
