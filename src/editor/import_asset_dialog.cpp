@@ -570,7 +570,7 @@ struct ConvertTask : public Lumix::MT::Task
 	{
 		float time = frame_idx / (float)fps;
 		unsigned int i = 0;
-		while (i + 1 < channel->mNumRotationKeys && time > (float)channel->mRotationKeys[i + 1].mTime)
+		while (i + 1 < channel->mNumPositionKeys && time > (float)channel->mPositionKeys[i + 1].mTime)
 		{
 			++i;
 		}
@@ -610,7 +610,6 @@ struct ConvertTask : public Lumix::MT::Task
 		auto second = channel->mRotationKeys[i + 1].mValue;
 		float t = float((time - channel->mRotationKeys[i].mTime) /
 						(channel->mRotationKeys[i + 1].mTime - channel->mRotationKeys[i].mTime));
-		ASSERT(t > -0.0001f && t < 1.0001f);
 		aiQuaternion out;
 		aiQuaternion::Interpolate(out, first, second, t);
 
