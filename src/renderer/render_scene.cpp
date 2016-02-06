@@ -150,7 +150,7 @@ private:
 			{
 				m_scene.modelLoaded(m_model);
 			}
-			else if (old_state == Resource::State::READY && new_state == Resource::State::EMPTY)
+			else if (old_state == Resource::State::READY && new_state != Resource::State::READY)
 			{
 				m_scene.modelUnloaded(m_model);
 			}
@@ -2855,11 +2855,11 @@ public:
 		auto& r = m_renderables[component];
 		if (!r.custom_meshes)
 		{
-			LUMIX_DELETE(m_allocator, r.pose);
-			r.pose = nullptr;
 			r.meshes = nullptr;
 			r.mesh_count = 0;
 		}
+		LUMIX_DELETE(m_allocator, r.pose);
+		r.pose = nullptr;
 
 		m_culling_system->removeStatic(component);
 	}
