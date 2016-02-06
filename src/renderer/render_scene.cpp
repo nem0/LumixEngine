@@ -2855,6 +2855,8 @@ public:
 		auto& r = m_renderables[component];
 		if (!r.custom_meshes)
 		{
+			LUMIX_DELETE(m_allocator, r.pose);
+			r.pose = nullptr;
 			r.meshes = nullptr;
 			r.mesh_count = 0;
 		}
@@ -2889,15 +2891,12 @@ public:
 		Sphere sphere(r.matrix.getTranslation(), bounding_radius * scale);
 		m_culling_system->addStatic(component, sphere);
 		m_culling_system->setLayerMask(component, r.layer_mask);
+		ASSERT(!r.pose);
 		if (model->getBoneCount() > 0)
 		{
 			r.pose = LUMIX_NEW(m_allocator, Pose)(m_allocator);
 			r.pose->resize(model->getBoneCount());
 			model->getPose(*r.pose);
-		}
-		else
-		{
-			r.pose = nullptr;
 		}
 		r.matrix = m_universe.getMatrix(r.entity);
 		ASSERT(!r.meshes || r.custom_meshes)
