@@ -935,9 +935,14 @@ struct ConvertTask : public Lumix::MT::Task
 			offset += mesh->mNumVertices;
 		}
 
+		int invalid_vertices = 0;
 		for (auto& info : infos)
 		{
 			float sum = info.weights[0] + info.weights[1] + info.weights[2] + info.weights[3];
+			if (sum < 0.001f)
+			{
+				++invalid_vertices;
+			}
 			if (sum < 0.999f)
 			{
 				for (int i = 0; i < 4; ++i)
@@ -945,6 +950,11 @@ struct ConvertTask : public Lumix::MT::Task
 					info.weights[i] /= sum;
 				}
 			}
+		}
+		if (invalid_vertices)
+		{
+			Lumix::g_log_error.log("import") << "Mesh contains " << invalid_vertices
+											 << " vertices not influenced by any bones.";
 		}
 	}
 
