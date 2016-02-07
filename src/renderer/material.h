@@ -118,7 +118,6 @@ private:
 	uint64 m_render_states;
 	Vec3 m_specular;
 	float m_shininess;
-	uint32 m_shader_mask;
 	uint32 m_define_mask;
 };
 

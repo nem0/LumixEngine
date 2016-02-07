@@ -40,7 +40,7 @@ public:
 
 	bgfx::ProgramHandle m_program_handles[16];
 	ShaderBinary* m_binaries[32];
-	uint32 m_combination;
+	uint32 m_define_mask;
 	Shader& m_shader;
 };
 
@@ -60,16 +60,16 @@ public:
 public:
 	typedef char Define[40];
 	typedef char Pass[20];
-	typedef int Defines[16];
+	typedef uint8 Defines[16];
 	typedef Pass Passes[16];
 
 	int m_pass_count;
 	int m_define_count;
-	int m_vs_combinations[16];
-	int m_fs_combinations[16];
+	int m_vs_local_mask[16];
+	int m_fs_local_mask[16];
 	Defines m_defines;
 	Passes m_passes;
-	int m_define_idx_map[32];
+	uint32 m_all_defines_mask;
 };
 
 
@@ -118,7 +118,7 @@ public:
 		   IAllocator& allocator);
 	~Shader();
 
-	uint32 getDefineMask(int define_idx) const;
+	bool hasDefine(uint8 define_idx) const;
 	ShaderInstance& getInstance(uint32 mask);
 	ShaderInstance* getFirstInstance();
 	const TextureSlot& getTextureSlot(int index) const
@@ -135,6 +135,7 @@ public:
 private:
 	void parseTextureSlots(lua_State* state);
 	bool generateInstances();
+	uint32 getDefineMaskFromDense(uint32 dense) const;
 
 	void onBeforeReady() override;
 	void unload(void) override;
