@@ -35,14 +35,9 @@ Shader::~Shader()
 }
 
 
-uint32 Shader::getDefineMask(int define_idx) const
+bool Shader::hasDefine(uint8 define_idx) const
 {
-	ASSERT(define_idx < lengthOf(m_combintions.m_define_idx_map));
-	if (m_combintions.m_define_idx_map[define_idx] >= 0)
-	{
-		return 1 << m_combintions.m_define_idx_map[define_idx];
-	}
-	return 0;
+	return (m_combintions.m_all_defines_mask & (1 << define_idx)) != 0;
 }
 
 
@@ -56,7 +51,7 @@ ShaderInstance& Shader::getInstance(uint32 mask)
 {
 	for (int i = 0; i < m_instances.size(); ++i)
 	{
-		if (m_instances[i]->m_combination == mask)
+		if (m_instances[i]->m_define_mask == mask)
 		{
 			return *m_instances[i];
 		}
@@ -70,10 +65,6 @@ ShaderInstance& Shader::getInstance(uint32 mask)
 ShaderCombinations::ShaderCombinations()
 {
 	setMemory(this, 0, sizeof(*this));
-	for (int i = 0; i < lengthOf(m_define_idx_map); ++i)
-	{
-		m_define_idx_map[i] = -1;
-	}
 }
 
 
@@ -152,6 +143,20 @@ Renderer& Shader::getRenderer()
 }
 
 
+uint32 Shader::getDefineMaskFromDense(uint32 dense) const
+{
+	uint32 mask = 0;
+	for (int i = 0; i < sizeof(dense) * 8; ++i)
+	{
+		if (dense & (1 << i))
+		{
+			mask |= 1 << m_combintions.m_defines[i];
+		}
+	}
+	return mask;
+}
+
+
 bool Shader::generateInstances()
 {
 	for (int i = 0; i < m_instances.size(); ++i)
@@ -160,18 +165,18 @@ bool Shader::generateInstances()
 	}
 	m_instances.clear();
 
-	int count = 1 << m_combintions.m_define_count;
+	uint32 count = 1 << m_combintions.m_define_count;
 
 	auto* binary_manager = m_resource_manager.get(ResourceManager::SHADER_BINARY);
 	char basename[MAX_PATH_LENGTH];
 	PathUtils::getBasename(basename, sizeof(basename), getPath().c_str());
 
-	for (int mask = 0; mask < count; ++mask)
+	for (uint32 mask = 0; mask < count; ++mask)
 	{
 		ShaderInstance* instance = LUMIX_NEW(m_allocator, ShaderInstance)(*this);
 		m_instances.push(instance);
 
-		instance->m_combination = mask;
+		instance->m_define_mask = getDefineMaskFromDense(mask);
 
 		for (int pass_idx = 0; pass_idx < m_combintions.m_pass_count; ++pass_idx)
 		{
@@ -182,7 +187,7 @@ bool Shader::generateInstances()
 			catString(path, "_");
 			catString(path, pass);
 			char mask_str[10];
-			int actual_mask = mask & m_combintions.m_vs_combinations[pass_idx];
+			int actual_mask = mask & m_combintions.m_vs_local_mask[pass_idx];
 			toCString(actual_mask, mask_str, sizeof(mask_str));
 			catString(path, mask_str);
 			catString(path, "_vs.shb");
@@ -196,7 +201,7 @@ bool Shader::generateInstances()
 			catString(path, basename);
 			catString(path, "_");
 			catString(path, pass);
-			actual_mask = mask & m_combintions.m_fs_combinations[pass_idx];
+			actual_mask = mask & m_combintions.m_fs_local_mask[pass_idx];
 			toCString(actual_mask, mask_str, sizeof(mask_str));
 			catString(path, mask_str);
 			catString(path, "_fs.shb");
@@ -215,8 +220,9 @@ void ShaderCombinations::parse(Renderer& renderer, lua_State* L)
 {
 	parsePasses(L);
 
-	parseCombinations(renderer, L, "fs_combinations", m_fs_combinations);
-	parseCombinations(renderer, L, "vs_combinations", m_vs_combinations);
+	m_all_defines_mask = 0;
+	parseCombinations(renderer, L, "fs_combinations", m_fs_local_mask);
+	parseCombinations(renderer, L, "vs_combinations", m_vs_local_mask);
 }
 
 
@@ -313,10 +319,8 @@ ShaderInstance::~ShaderInstance()
 }
 
 
-static int indexOf(Renderer& renderer, ShaderCombinations& combination, const char* define)
+static int indexOf(ShaderCombinations& combination, uint8 define_idx)
 {
-	int define_idx = renderer.getShaderDefineIdx(define);
-
 	for (int i = 0; i < combination.m_define_count; ++i)
 	{
 		if (combination.m_defines[i] == define_idx)
@@ -325,7 +329,6 @@ static int indexOf(Renderer& renderer, ShaderCombinations& combination, const ch
 		}
 	}
 
-	combination.m_define_idx_map[define_idx] = combination.m_define_count;
 	combination.m_defines[combination.m_define_count] = define_idx;
 	++combination.m_define_count;
 	return combination.m_define_count - 1;
@@ -350,7 +353,9 @@ void ShaderCombinations::parseCombinations(Renderer& renderer,
 					if (lua_rawgeti(L, -1, 1 + i) == LUA_TSTRING)
 					{
 						const char* tmp = lua_tostring(L, -1);
-						output[pass_idx] |= 1 << indexOf(renderer, *this, tmp);
+						int define_idx = renderer.getShaderDefineIdx(tmp);
+						m_all_defines_mask |= 1 << define_idx;
+						output[pass_idx] |= 1 << indexOf(*this, define_idx);
 					}
 					lua_pop(L, 1);
 				}

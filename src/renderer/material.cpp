@@ -33,7 +33,6 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 	, m_specular(1, 1, 1)
 	, m_shininess(4)
 	, m_shader_instance(nullptr)
-	, m_shader_mask(0)
 	, m_define_mask(0)
 {
 	auto* manager = resource_manager.get(ResourceManager::MATERIAL);
@@ -64,12 +63,13 @@ bool Material::isDefined(uint8 define_idx) const
 
 bool Material::hasDefine(uint8 define_idx) const
 {
-	return m_shader->getDefineMask(define_idx) != 0;
+	return m_shader->hasDefine(define_idx) != 0;
 }
 
 
 void Material::setDefine(uint8 define_idx, bool enabled)
 {
+	uint32 old_mask = m_define_mask;
 	if (enabled)
 	{
 		m_define_mask |= 1 << define_idx;
@@ -82,19 +82,9 @@ void Material::setDefine(uint8 define_idx, bool enabled)
 	if (!isReady()) return;
 	if (!m_shader) return;
 
-	uint32 old_mask = m_shader_mask;
-	if (enabled)
+	if (old_mask != m_define_mask)
 	{
-		m_shader_mask |= m_shader->getDefineMask(define_idx);
-	}
-	else
-	{
-		m_shader_mask &= ~m_shader->getDefineMask(define_idx);
-	}
-
-	if (old_mask != m_shader_mask)
-	{
-		m_shader_instance = &m_shader->getInstance(m_shader_mask);
+		m_shader_instance = &m_shader->getInstance(m_define_mask);
 	}
 }
 
@@ -326,16 +316,14 @@ void Material::setTexture(int i, Texture* texture)
 		int define_idx = m_shader->getTextureSlot(i).m_define_idx;
 		if (define_idx >= 0 && m_textures[i])
 		{
-			m_shader_mask |= m_shader->getDefineMask(define_idx);
 			m_define_mask |= 1 << define_idx;
 		}
 		else
 		{
-			m_shader_mask &= ~m_shader->getDefineMask(define_idx);
 			m_define_mask &= ~(1 << define_idx);
 		}
 
-		m_shader_instance = &m_shader->getInstance(m_shader_mask);
+		m_shader_instance = &m_shader->getInstance(m_define_mask);
 	}
 }
 
@@ -350,16 +338,7 @@ void Material::setShader(const Path& path)
 void Material::onBeforeReady()
 {
 	if (!m_shader) return;
-
-	m_shader_mask = 0;
-	for (int i = 0; i < sizeof(m_define_mask) * 8; ++i)
-	{
-		if ((m_define_mask & (1 << i)) != 0)
-		{
-			m_shader_mask |= m_shader->getDefineMask(i);
-		}
-	}
-	m_shader_instance = &m_shader->getInstance(m_shader_mask);
+	m_shader_instance = &m_shader->getInstance(m_define_mask);
 }
 
 
