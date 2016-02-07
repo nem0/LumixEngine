@@ -647,7 +647,6 @@ public:
 		{
 			if (m_renderables[i].entity != INVALID_ENTITY)
 			{
-				LUMIX_DELETE(m_allocator, m_renderables[i].pose);
 				setModel(i, nullptr);
 			}
 		}
@@ -854,6 +853,7 @@ public:
 		setModel(component, nullptr);
 		Entity entity = m_renderables[component].entity;
 		LUMIX_DELETE(m_allocator, m_renderables[component].pose);
+		m_renderables[component].pose = nullptr;
 		m_renderables[component].entity = INVALID_ENTITY;
 		m_universe.destroyComponent(entity, RENDERABLE_HASH, this, component);
 	}
@@ -3078,6 +3078,8 @@ public:
 		m_renderables[component].model = model;
 		m_renderables[component].meshes = nullptr;
 		m_renderables[component].mesh_count = 0;
+		LUMIX_DELETE(m_allocator, m_renderables[component].pose);
+		m_renderables[component].pose = nullptr;
 		if (model)
 		{
 			ModelLoadedCallback* callback = getModelLoadedCallback(model);
