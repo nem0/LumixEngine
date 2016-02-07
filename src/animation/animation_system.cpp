@@ -293,10 +293,12 @@ struct AnimationSceneImpl : public IScene
 	ComponentIndex createAnimable(Entity entity)
 	{
 		Animable* src = nullptr;
+		int cmp = m_animables.size();
 		for (int i = 0, c = m_animables.size(); i < c; ++i)
 		{
 			if (m_animables[i].m_is_free)
 			{
+				cmp = i;
 				src = &m_animables[i];
 				break;
 			}
@@ -308,16 +310,14 @@ struct AnimationSceneImpl : public IScene
 		animable.m_animation = nullptr;
 		animable.m_entity = entity;
 
-		ComponentIndex renderable =
-			m_render_scene->getRenderableComponent(entity);
+		ComponentIndex renderable = m_render_scene->getRenderableComponent(entity);
 		if (renderable >= 0)
 		{
 			animable.m_renderable = renderable;
 		}
 
-		m_universe.addComponent(
-			entity, ANIMABLE_HASH, this, m_animables.size() - 1);
-		return m_animables.size() - 1;
+		m_universe.addComponent(entity, ANIMABLE_HASH, this, cmp);
+		return cmp;
 	}
 
 
