@@ -6,6 +6,7 @@
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
 #include "core/FS/os_file.h"
+#include "core/math_utils.h"
 #include "core/MT/task.h"
 #include "core/crc32.h"
 #include "core/log.h"
@@ -337,10 +338,10 @@ struct ImportTask : public Lumix::MT::Task
 		Lumix::enableFloatingPointTraps(false);
 		m_dialog.m_importer.SetPropertyInteger(
 			AI_CONFIG_PP_RVC_FLAGS, aiComponent_LIGHTS | aiComponent_CAMERAS);
-		unsigned int flags = aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent |
-							 aiProcess_GenUVCoords | aiProcess_RemoveRedundantMaterials |
-							 aiProcess_Triangulate | aiProcess_LimitBoneWeights |
-							 aiProcess_OptimizeGraph | aiProcess_CalcTangentSpace;
+		unsigned int flags =
+			aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent | aiProcess_GenUVCoords |
+			aiProcess_RemoveRedundantMaterials | aiProcess_Triangulate | aiProcess_FindInvalidData |
+			aiProcess_OptimizeGraph | aiProcess_ValidateDataStructure | aiProcess_CalcTangentSpace;
 		flags |= m_dialog.m_gen_smooth_normal ? aiProcess_GenSmoothNormals : aiProcess_GenNormals;
 		flags |= m_dialog.m_optimize_mesh_on_import ? aiProcess_OptimizeMeshes : 0;
 		const aiScene* scene = m_dialog.m_importer.ReadFile(m_dialog.m_source, flags);
@@ -700,7 +701,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 			file.write(&header, sizeof(header));
 			float anim_length = getLength(animation);
-			int frame_count = int(anim_length * header.fps);
+			int frame_count = Lumix::Math::maxValue(int(anim_length * header.fps), 1);
 			file.write(&frame_count, sizeof(frame_count));
 			int bone_count = (int)animation->mNumChannels;
 			file.write(&bone_count, sizeof(bone_count));
@@ -714,10 +715,19 @@ struct ConvertTask : public Lumix::MT::Task
 			for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
 			{
 				const aiNodeAnim* channel = animation->mChannels[channel_idx];
+				auto global_transform =
+					getGlobalTransform(getNode(channel->mNodeName, scene->mRootNode)->mParent);
+				aiVector3t<float> scale;
+				aiVector3t<float> dummy_pos;
+				aiQuaterniont<float> dummy_rot;
+				global_transform.Decompose(scale, dummy_rot, dummy_pos);
 				for (int frame = 0; frame < frame_count; ++frame)
 				{
-					positions[frame * bone_count + channel_idx] =
-						getPosition(channel, frame, header.fps) * m_dialog.m_mesh_scale;
+					auto pos = getPosition(channel, frame, header.fps) * m_dialog.m_mesh_scale;
+					pos.x *= scale.x;
+					pos.y *= scale.y;
+					pos.z *= scale.z;
+					positions[frame * bone_count + channel_idx] = pos;
 					rotations[frame * bone_count + channel_idx] =
 						getRotation(channel, frame, header.fps);
 				}
@@ -882,6 +892,28 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
+	static void addBoneInfluence(SkinInfo& info, float weight, int bone_index)
+	{
+		if (info.index == 4)
+		{
+			int min = 0;
+			for (int i = 1; i < 4; ++i)
+			{
+				if (info.weights[min] > info.weights[i]) min = i;
+			}
+			float old_weight = info.weights[min];
+			info.weights[min] = weight;
+			info.bone_indices[min] = bone_index;
+		}
+		else
+		{
+			info.weights[info.index] = weight;
+			info.bone_indices[info.index] = bone_index;
+			++info.index;
+		}
+	}
+
+
 	void fillSkinInfo(const aiScene* scene, Lumix::Array<SkinInfo>& infos, int vertices_count) const
 	{
 		infos.resize(vertices_count);
@@ -893,15 +925,26 @@ struct ConvertTask : public Lumix::MT::Task
 			{
 				const aiBone* bone = mesh->mBones[j];
 				int bone_index = getNodeIndex(bone);
+				ASSERT(bone_index >= 0)
 				for (unsigned int k = 0; k < bone->mNumWeights; ++k)
 				{
 					auto& info = infos[offset + bone->mWeights[k].mVertexId];
-					info.weights[info.index] = bone->mWeights[k].mWeight;
-					info.bone_indices[info.index] = bone_index;
-					++info.index;
+					addBoneInfluence(info, bone->mWeights[k].mWeight, bone_index);
 				}
 			}
 			offset += mesh->mNumVertices;
+		}
+
+		for (auto& info : infos)
+		{
+			float sum = info.weights[0] + info.weights[1] + info.weights[2] + info.weights[3];
+			if (sum < 0.999f)
+			{
+				for (int i = 0; i < 4; ++i)
+				{
+					info.weights[i] /= sum;
+				}
+			}
 		}
 	}
 
@@ -954,7 +997,7 @@ struct ConvertTask : public Lumix::MT::Task
 		{
 			for (unsigned int j = 0; j < mesh->mNumBones; ++j)
 			{
-				auto* node = getNode(mesh->mBones[j], scene->mRootNode);
+				auto* node = getNode(mesh->mBones[j]->mName, scene->mRootNode);
 				while (node && node->mNumMeshes == 0)
 				{
 					if (tmp.indexOf(node) >= 0) break;
@@ -1011,7 +1054,6 @@ struct ConvertTask : public Lumix::MT::Task
 		for (auto* mesh : m_filtered_meshes)
 		{
 			auto mesh_matrix = getGlobalTransform(getNode(mesh, scene->mRootNode));
-			aiMatrix3x3 normal_matrix(mesh_matrix);
 			bool is_skinned = isSkinned(mesh);
 			for (unsigned int j = 0; j < mesh->mNumVertices; ++j)
 			{
@@ -1041,7 +1083,7 @@ struct ConvertTask : public Lumix::MT::Task
 					file.write(color, sizeof(color));
 				}
 
-				auto normal = normal_matrix * mesh->mNormals[j];
+				auto normal = mesh_matrix * mesh->mNormals[j];
 				normal.Normalize();
 				if (z_up) normal.Set(normal.x, normal.z, -normal.y);
 				Lumix::uint32 int_normal = packF4u(normal);
@@ -1049,7 +1091,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 				if (mesh->mTangents)
 				{
-					auto tangent = normal_matrix * mesh->mTangents[j];
+					auto tangent = mesh_matrix * mesh->mTangents[j];
 					tangent.Normalize();
 					if (z_up) tangent.Set(tangent.x, tangent.z, -tangent.y);
 					Lumix::uint32 int_tangent = packF4u(tangent);
@@ -1270,20 +1312,20 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	aiNode* getNode(aiBone* bone, aiNode* node) const
+	aiNode* getNode(const aiString& node_name, aiNode* node) const
 	{
-		if (bone->mName == node->mName) return node;
+		if (node->mName == node_name) return node;
 
 		for (unsigned int i = 0; i < node->mNumChildren; ++i)
 		{
-			auto* x = getNode(bone, node->mChildren[i]);
+			auto* x = getNode(node_name, node->mChildren[i]);
 			if (x) return x;
 		}
 
 		return nullptr;
 	}
 
-
+	
 	aiBone* getBone(aiNode* node)
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
@@ -1344,6 +1386,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 			aiQuaterniont<float> rot;
 			aiVector3t<float> pos;
+			aiVector3t<float> scale;
 			auto bone = getBone(node);
 			if (bone)
 			{
@@ -1351,11 +1394,11 @@ struct ConvertTask : public Lumix::MT::Task
 				mtx = bone->mOffsetMatrix;
 				mtx.Inverse();
 				mtx = getGlobalTransform(getMeshNode(node)) * mtx;
-				mtx.DecomposeNoScaling(rot, pos);
+				mtx.Decompose(scale, rot, pos);
 			}
 			else
 			{
-				getGlobalTransform(node).DecomposeNoScaling(rot, pos);
+				getGlobalTransform(node).Decompose(scale, rot, pos);
 			}
 			pos *= m_dialog.m_mesh_scale;
 			file.write((const char*)&pos, sizeof(pos));
