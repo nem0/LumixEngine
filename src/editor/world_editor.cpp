@@ -2345,12 +2345,20 @@ public:
 		ASSERT(file.getBuffer());
 		m_components.clear();
 		m_components.reserve(5000);
+		Header header;
+		if (file.size() < sizeof(header))
+		{
+			g_log_error.log("editor") << "Corrupted file.";
+			newUniverse();
+			m_is_loading = false;
+			return;
+		}
+
 		Timer* timer = Timer::create(m_allocator);
 		g_log_info.log("editor") << "Parsing universe...";
 		InputBlob blob(file.getBuffer(), (int)file.size());
 		uint32 hash = 0;
 		blob.read(hash);
-		Header header;
 		header.version = -1;
 		int hashed_offset = sizeof(hash);
 		if (hash == 0xFFFFffff)

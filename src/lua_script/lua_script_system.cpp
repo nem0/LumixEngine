@@ -75,7 +75,6 @@ namespace Lumix
 
 			LuaScript* m_script;
 			int m_entity;
-			ComponentIndex m_component;
 			lua_State* m_state;
 			int m_environment;
 			Array<Property> m_properties;
@@ -114,7 +113,6 @@ namespace Lumix
 			, m_updates(system.getAllocator())
 			, m_entity_script_map(system.getAllocator())
 		{
-			m_first_free_script = -1;
 			m_function_call.is_in_progress = false;
 		}
 
@@ -124,7 +122,7 @@ namespace Lumix
 			auto iter = m_entity_script_map.find(entity);
 			if (!iter.isValid()) return INVALID_COMPONENT;
 
-			return iter.value()->m_component;
+			return iter.value();
 		}
 
 
@@ -204,7 +202,6 @@ namespace Lumix
 			}
 			m_entity_script_map.clear();
 			m_scripts.clear();
-			m_first_free_script = -1;
 		}
 
 
@@ -228,7 +225,7 @@ namespace Lumix
 			auto iter = m_entity_script_map.find(entity);
 			if (iter == m_entity_script_map.end()) return -1;
 
-			return iter.value()->m_environment;
+			return m_scripts[iter.value()]->m_environment;
 		}
 
 
@@ -449,26 +446,27 @@ namespace Lumix
 			{
 				ScriptComponent& script =
 					*LUMIX_NEW(m_system.getAllocator(), ScriptComponent)(m_system.getAllocator());
-				m_entity_script_map.insert(entity, &script);
-				ComponentIndex cmp = -1;
-				if (m_first_free_script >= 0)
+				ComponentIndex cmp = INVALID_COMPONENT;
+				for (int i = 0; i < m_scripts.size(); ++i)
 				{
-					int next_free = *(int*)&m_scripts[m_first_free_script];
-					m_scripts[m_first_free_script] = &script;
-					cmp = m_first_free_script;
-					m_first_free_script = next_free;
+					if (m_scripts[i] == nullptr)
+					{
+						cmp = i;
+						m_scripts[i] = &script;
+						break;
+					}
 				}
-				else
+				if (cmp == INVALID_COMPONENT)
 				{
 					cmp = m_scripts.size();
-					script.m_component = cmp;
 					m_scripts.push(&script);
 				}
+				m_entity_script_map.insert(entity, cmp);
 				script.m_entity = entity;
 				script.m_script = nullptr;
 				script.m_state = nullptr;
 				m_universe.addComponent(entity, type, this, cmp);
-				return m_scripts.size() - 1;
+				return cmp;
 			}
 			return INVALID_COMPONENT;
 		}
@@ -480,24 +478,15 @@ namespace Lumix
 			{
 				m_updates.eraseItem(m_scripts[component]);
 				if (m_scripts[component]->m_script)
+				{
 					m_system.getScriptManager().unload(*m_scripts[component]->m_script);
+				}
 				m_entity_script_map.erase(m_scripts[component]->m_entity);
 
 				auto* script = m_scripts[component];
 				m_scripts[component] = nullptr;
-				m_universe.destroyComponent(
-					script->m_entity, type, this, component);
+				m_universe.destroyComponent(script->m_entity, type, this, component);
 				LUMIX_DELETE(m_system.getAllocator(), script);
-				if (m_first_free_script >= 0)
-				{
-					*(int*)&m_scripts[component] = m_first_free_script;
-					m_first_free_script = component;
-				}
-				else
-				{
-					m_first_free_script = component;
-					*(int*)&m_scripts[m_first_free_script] = -1;
-				}
 			}
 		}
 
@@ -539,10 +528,9 @@ namespace Lumix
 				}
 
 				ScriptComponent& script = *LUMIX_NEW(m_system.getAllocator(), ScriptComponent)(m_system.getAllocator());
-				script.m_component = m_scripts.size();
 				m_scripts.push(&script);
 				serializer.read(m_scripts[i]->m_entity);
-				m_entity_script_map.insert(m_scripts[i]->m_entity, &script);
+				m_entity_script_map.insert(m_scripts[i]->m_entity, i);
 				char tmp[MAX_PATH_LENGTH];
 				serializer.readString(tmp, MAX_PATH_LENGTH);
 				script.m_script = static_cast<LuaScript*>(
@@ -598,10 +586,8 @@ namespace Lumix
 		ComponentIndex getComponent(Entity entity, uint32 type) override
 		{
 			ASSERT(ownComponentType(type));
-			for (auto* i : m_scripts)
-			{
-				if (i && i->m_entity == entity) return i->m_component;
-			}
+			auto iter = m_entity_script_map.find(entity);
+			if (iter.isValid()) return iter.value();
 			return INVALID_COMPONENT;
 		}
 
@@ -652,11 +638,10 @@ namespace Lumix
 		LuaScriptSystem& m_system;
 
 		Array<ScriptComponent*> m_scripts;
-		PODHashMap<Entity, ScriptComponent*> m_entity_script_map;
+		PODHashMap<Entity, ComponentIndex> m_entity_script_map;
 		lua_State* m_global_state;
 		Universe& m_universe;
 		Array<ScriptComponent*> m_updates;
-		int m_first_free_script;
 		FunctionCall m_function_call;
 	};
 
