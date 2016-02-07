@@ -95,20 +95,18 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 		if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser()->openInExternalEditor(material);
 
 		bool b;
-		if (material->hasAlphaCutoutDefine())
+		auto* plugin = m_app.getWorldEditor()->getEngine().getPluginManager().getPlugin("renderer");
+		auto* renderer = static_cast<Renderer*>(plugin);
+
+		int alpha_cutout_define = renderer->getShaderDefineIdx("ALPHA_CUTOUT");
+		if (material->hasDefine(alpha_cutout_define))
 		{
-			b = material->isAlphaCutout();
-			if (ImGui::Checkbox("Is alpha cutout", &b)) material->enableAlphaCutout(b);
+			b = material->isDefined(alpha_cutout_define);
+			if (ImGui::Checkbox("Is alpha cutout", &b)) material->setDefine(alpha_cutout_define, b);
 		}
 
 		b = material->isBackfaceCulling();
 		if (ImGui::Checkbox("Is backface culling", &b)) material->enableBackfaceCulling(b);
-
-		if (material->hasShadowReceivingDefine())
-		{
-			b = material->isShadowReceiver();
-			if (ImGui::Checkbox("Is shadow receiver", &b)) material->enableShadowReceiving(b);
-		}
 
 		b = material->isZTest();
 		if (ImGui::Checkbox("Z test", &b)) material->enableZTest(b);

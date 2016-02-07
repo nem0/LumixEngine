@@ -67,12 +67,6 @@ public:
 	void enableZTest(bool enable) { setRenderState(enable, BGFX_STATE_DEPTH_TEST_LEQUAL, BGFX_STATE_DEPTH_TEST_MASK); }
 	bool isBackfaceCulling() const { return (m_render_states & BGFX_STATE_CULL_MASK) != 0; }
 	void enableBackfaceCulling(bool enable) { setRenderState(enable, BGFX_STATE_CULL_CW, BGFX_STATE_CULL_MASK); }
-	bool isAlphaCutout() const;
-	bool hasAlphaCutoutDefine() const;
-	void enableAlphaCutout(bool enable);
-	bool isShadowReceiver() const;
-	bool hasShadowReceivingDefine() const;
-	void enableShadowReceiving(bool enable);
 	float getShininess() const { return m_shininess; }
 	void setShininess(float value) { m_shininess = value; }
 	Vec3 getSpecular() const { return m_specular; }
@@ -95,8 +89,10 @@ public:
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }
 	ShaderInstance& getShaderInstance() { ASSERT(m_shader_instance); return *m_shader_instance; }
 	const ShaderInstance& getShaderInstance() const { ASSERT(m_shader_instance); return *m_shader_instance; }
-	void setUserDefine(int define_idx);
-	void unsetUserDefine(int define_idx);
+	
+	void setDefine(uint8 define_idx, bool enabled);
+	bool hasDefine(uint8 define_idx) const;
+	bool isDefined(uint8 define_idx) const;
 
 private:
 	void onBeforeReady() override;
@@ -106,6 +102,7 @@ private:
 	void clearUniforms();
 	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);
 	void deserializeUniforms(JsonSerializer& serializer);
+	void deserializeDefines(JsonSerializer& serializer);
 	void setRenderState(bool value, uint64 state, uint64 mask);
 
 private:
@@ -122,8 +119,7 @@ private:
 	Vec3 m_specular;
 	float m_shininess;
 	uint32 m_shader_mask;
-	static int s_alpha_cutout_define_idx;
-	static int s_shadow_receiver_define_idx;
+	uint32 m_define_mask;
 };
 
 } // ~namespace Lumix

@@ -701,12 +701,13 @@ struct RendererImpl : public Renderer
 	}
 
 
-	int getShaderDefineIdx(const char* define) override
+	uint8 getShaderDefineIdx(const char* define) override
 	{
 		for (int i = 0; i < m_shader_defines.size(); ++i)
 		{
 			if (compareString(m_shader_defines[i], define) == 0)
 			{
+				ASSERT(i < 256);
 				return i;
 			}
 		}
