@@ -21,8 +21,6 @@ namespace Lumix
 
 
 static const uint32 SHADOWMAP_HASH = crc32("shadowmap");
-int Material::s_alpha_cutout_define_idx = -1;
-int Material::s_shadow_receiver_define_idx = -1;
 
 
 Material::Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
@@ -36,16 +34,13 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 	, m_shininess(4)
 	, m_shader_instance(nullptr)
 	, m_shader_mask(0)
+	, m_define_mask(0)
 {
 	auto* manager = resource_manager.get(ResourceManager::MATERIAL);
 	auto* mat_manager = static_cast<MaterialManager*>(manager);
 
-	s_alpha_cutout_define_idx = mat_manager->getRenderer().getShaderDefineIdx("ALPHA_CUTOUT");
-	s_shadow_receiver_define_idx = mat_manager->getRenderer().getShaderDefineIdx("SHADOW_RECEIVER");
-
 	enableZTest(true);
 	enableBackfaceCulling(true);
-	enableShadowReceiving(true);
 	for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
 	{
 		m_textures[i] = nullptr;
@@ -61,101 +56,46 @@ Material::~Material()
 }
 
 
-void Material::setUserDefine(int define_idx)
+bool Material::isDefined(uint8 define_idx) const
 {
+	return (m_define_mask & (1 << define_idx)) != 0;
+}
+
+
+bool Material::hasDefine(uint8 define_idx) const
+{
+	return m_shader->getDefineMask(define_idx) != 0;
+}
+
+
+void Material::setDefine(uint8 define_idx, bool enabled)
+{
+	if (enabled)
+	{
+		m_define_mask |= 1 << define_idx;
+	}
+	else
+	{
+		m_define_mask &= ~(1 << define_idx);
+	}
+
 	if (!isReady()) return;
 	if (!m_shader) return;
 
 	uint32 old_mask = m_shader_mask;
-	m_shader_mask |= m_shader->getDefineMask(define_idx);
+	if (enabled)
+	{
+		m_shader_mask |= m_shader->getDefineMask(define_idx);
+	}
+	else
+	{
+		m_shader_mask &= ~m_shader->getDefineMask(define_idx);
+	}
 
 	if (old_mask != m_shader_mask)
 	{
 		m_shader_instance = &m_shader->getInstance(m_shader_mask);
 	}
-}
-
-
-void Material::unsetUserDefine(int define_idx)
-{
-	if (!isReady()) return;
-	if (!m_shader) return;
-
-	uint32 old_mask = m_shader_mask;
-	m_shader_mask &= ~m_shader->getDefineMask(define_idx);
-
-	if (old_mask != m_shader_mask)
-	{
-		m_shader_instance = &m_shader->getInstance(m_shader_mask);
-	}
-}
-
-
-bool Material::isAlphaCutout() const
-{
-	if (!isReady()) return false;
-	if (!m_shader)	return false;
-
-	return (m_shader_mask & m_shader->getDefineMask(s_alpha_cutout_define_idx)) != 0;
-}
-
-
-bool Material::hasAlphaCutoutDefine() const
-{
-	return m_shader->getDefineMask(s_alpha_cutout_define_idx) != 0;
-}
-
-
-void Material::enableAlphaCutout(bool enable)
-{
-	if (!isReady()) return;
-	if (!m_shader)	return;
-
-	uint32 mask = m_shader->getDefineMask(s_alpha_cutout_define_idx);
-	if (enable)
-	{
-		m_shader_mask |= mask;
-	}
-	else
-	{
-		m_shader_mask &= ~mask;
-	}
-
-	m_shader_instance = &m_shader->getInstance(m_shader_mask);
-}
-
-
-bool Material::isShadowReceiver() const
-{
-	if (!isReady()) return false;
-	if (!m_shader)	return false;
-
-	return (m_shader_mask & m_shader->getDefineMask(s_shadow_receiver_define_idx)) != 0;
-}
-
-
-bool Material::hasShadowReceivingDefine() const
-{
-	return m_shader->getDefineMask(s_shadow_receiver_define_idx) != 0;
-}
-
-
-void Material::enableShadowReceiving(bool enable)
-{
-	if (!isReady()) return;
-	if (!m_shader)	return;
-
-	uint32 mask = m_shader->getDefineMask(s_shadow_receiver_define_idx);
-	if (enable)
-	{
-		m_shader_mask |= mask;
-	}
-	else
-	{
-		m_shader_mask &= ~mask;
-	}
-
-	m_shader_instance = &m_shader->getInstance(m_shader_mask);
 }
 
 
@@ -179,6 +119,9 @@ void Material::unload(void)
 
 bool Material::save(JsonSerializer& serializer)
 {
+	auto* manager = getResourceManager().get(ResourceManager::MATERIAL);
+	auto& renderer = static_cast<MaterialManager*>(manager)->getRenderer();
+
 	serializer.beginObject();
 	serializer.serialize("shader", m_shader ? m_shader->getPath() : Path(""));
 	for (int i = 0; i < m_texture_count; ++i)
@@ -211,6 +154,14 @@ bool Material::save(JsonSerializer& serializer)
 		if (m_textures[i] && m_textures[i]->getData()) serializer.serialize("keep_data", true);
 		serializer.endObject();
 	}
+
+	serializer.beginArray("defines");
+	for (int i = 0; i < sizeof(m_define_mask) * 8; ++i)
+	{
+		if (m_define_mask & (1 << i)) serializer.serializeArrayItem(renderer.getShaderDefine(i));
+	}
+	serializer.endArray();
+
 	serializer.beginArray("uniforms");
 	for (int i = 0; i < m_uniforms.size(); ++i)
 	{
@@ -243,8 +194,6 @@ bool Material::save(JsonSerializer& serializer)
 	}
 	serializer.endArray();
 	serializer.serialize("backface_culling", isBackfaceCulling());
-	serializer.serialize("alpha_cutout", isAlphaCutout());
-	serializer.serialize("shadow_receiver", isShadowReceiver());
 	serializer.serialize("shininess", m_shininess);
 	serializer.beginArray("specular");
 	serializer.serializeArrayItem(m_specular.x);
@@ -264,6 +213,22 @@ void Material::clearUniforms()
 		bgfx::destroyUniform(uniform.m_handle);
 	}
 	m_uniforms.clear();
+}
+
+
+void Material::deserializeDefines(JsonSerializer& serializer)
+{
+	auto* manager = getResourceManager().get(ResourceManager::MATERIAL);
+	auto& renderer = static_cast<MaterialManager*>(manager)->getRenderer();
+	serializer.deserializeArrayBegin();
+	m_define_mask = 0;
+	while (!serializer.isArrayEnd())
+	{
+		char tmp[32];
+		serializer.deserializeArrayItem(tmp, lengthOf(tmp), "");
+		m_define_mask |= 1 << renderer.getShaderDefineIdx(tmp);
+	}
+	serializer.deserializeArrayEnd();
 }
 
 
@@ -362,10 +327,12 @@ void Material::setTexture(int i, Texture* texture)
 		if (define_idx >= 0 && m_textures[i])
 		{
 			m_shader_mask |= m_shader->getDefineMask(define_idx);
+			m_define_mask |= 1 << define_idx;
 		}
 		else
 		{
 			m_shader_mask &= ~m_shader->getDefineMask(define_idx);
+			m_define_mask &= ~(1 << define_idx);
 		}
 
 		m_shader_instance = &m_shader->getInstance(m_shader_mask);
@@ -384,12 +351,12 @@ void Material::onBeforeReady()
 {
 	if (!m_shader) return;
 
-	for (int i = 0; i < m_shader->getTextureSlotCount(); ++i)
+	m_shader_mask = 0;
+	for (int i = 0; i < sizeof(m_define_mask) * 8; ++i)
 	{
-		if (m_shader->getTextureSlot(i).m_define_idx >= 0 && m_textures[i])
+		if ((m_define_mask & (1 << i)) != 0)
 		{
-			m_shader_mask |= m_shader->getDefineMask(
-				m_shader->getTextureSlot(i).m_define_idx);
+			m_shader_mask |= m_shader->getDefineMask(i);
 		}
 	}
 	m_shader_instance = &m_shader->getInstance(m_shader_mask);
@@ -398,8 +365,6 @@ void Material::onBeforeReady()
 
 void Material::setShader(Shader* shader)
 {
-	bool is_alpha = isAlphaCutout();
-	bool is_receiver = isShadowReceiver();
 	auto* manager = getResourceManager().get(ResourceManager::MATERIAL);
 	auto* mat_manager = static_cast<MaterialManager*>(manager);
 
@@ -414,23 +379,7 @@ void Material::setShader(Shader* shader)
 	if (m_shader)
 	{
 		addDependency(*m_shader);
-
-		if (m_shader->isReady())
-		{
-			m_shader_mask = 0;
-			enableShadowReceiving(is_receiver);
-			enableAlphaCutout(is_alpha);
-
-			for (int i = 0; i < m_shader->getTextureSlotCount(); ++i)
-			{
-				if (m_shader->getTextureSlot(i).m_define_idx >= 0 && m_textures[i])
-				{
-					m_shader_mask |= m_shader->getDefineMask(
-						m_shader->getTextureSlot(i).m_define_idx);
-				}
-			}
-			m_shader_instance = &m_shader->getInstance(m_shader_mask);
-		}
+		if (m_shader->isReady()) onBeforeReady();
 	}
 	else
 	{
@@ -625,7 +574,11 @@ bool Material::load(FS::IFile& file)
 	while (!serializer.isObjectEnd())
 	{
 		serializer.deserializeLabel(label, 255);
-		if (compareString(label, "uniforms") == 0)
+		if (compareString(label, "defines") == 0)
+		{
+			deserializeDefines(serializer);
+		}
+		else if (compareString(label, "uniforms") == 0)
 		{
 			deserializeUniforms(serializer);
 		}
@@ -635,12 +588,6 @@ bool Material::load(FS::IFile& file)
 			{
 				return false;
 			}
-		}
-		else if (compareString(label, "alpha_cutout") == 0)
-		{
-			bool b;
-			serializer.deserialize(b, false);
-			enableAlphaCutout(b);
 		}
 		else if (compareString(label, "alpha_blending") == 0)
 		{
@@ -685,12 +632,6 @@ bool Material::load(FS::IFile& file)
 		else if (compareString(label, "shininess") == 0)
 		{
 			serializer.deserialize(m_shininess, 4.0f);
-		}
-		else if (compareString(label, "shadow_receiver") == 0)
-		{
-			bool b;
-			serializer.deserialize(b, true);
-			enableShadowReceiving(b);
 		}
 		else if (compareString(label, "shader") == 0)
 		{

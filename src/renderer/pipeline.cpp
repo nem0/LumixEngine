@@ -1251,7 +1251,7 @@ struct PipelineImpl : public Pipeline
 		}
 		else
 		{
-			material->unsetUserDefine(m_has_shadowmap_define_idx);
+			material->setDefine(m_has_shadowmap_define_idx, false);
 		}
 	}
 
@@ -1262,7 +1262,7 @@ struct PipelineImpl : public Pipeline
 		{
 			if (info.m_light == light)
 			{
-				material->setUserDefine(m_has_shadowmap_define_idx);
+				material->setDefine(m_has_shadowmap_define_idx, true);
 
 				bgfx::setUniform(m_shadowmap_matrices_uniform,
 					&info.m_matrices[0].m11,
@@ -1275,7 +1275,7 @@ struct PipelineImpl : public Pipeline
 				return;
 			}
 		}
-		material->unsetUserDefine(m_has_shadowmap_define_idx);
+		material->setDefine(m_has_shadowmap_define_idx, false);
 	}
 
 
