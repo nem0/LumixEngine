@@ -97,10 +97,13 @@ public:
 		auto iter = m_children.find(entity);
 		if (iter != m_children.end())
 		{
+			for (auto& x : *iter.value())
+			{
+				m_parents.erase(x.m_entity);
+			}
 			LUMIX_DELETE(m_allocator, iter.value());
 			m_children.erase(iter);
 		}
-		m_parents.erase(entity);
 	}
 
 
