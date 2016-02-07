@@ -400,6 +400,7 @@ void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescr
 				--i;
 				count = desc.getCount(cmp);
 				ImGui::TreePop();
+				ImGui::PopID();
 				continue;
 			}
 
