@@ -422,7 +422,7 @@ static void registerProperties(IAllocator& allocator)
 		&RenderScene::getGrassPath,
 		&RenderScene::setGrassPath,
 		"Mesh (*.msh)",
-		crc32("model"),
+		ResourceManager::MODEL,
 		allocator));
 	auto ground = LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)(
 		"Ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround, allocator);
