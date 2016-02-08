@@ -199,6 +199,17 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 			case Material::Uniform::FLOAT:
 				ImGui::DragFloat(uniform.m_name, &uniform.m_float);
 				break;
+			case Material::Uniform::VEC3:
+				ImGui::DragFloat3(uniform.m_name, uniform.m_vec3);
+				break;
+			case Material::Uniform::COLOR:
+				ImGui::ColorEdit3(uniform.m_name, uniform.m_vec3);
+				if (ImGui::BeginPopupContextItem(StringBuilder<50>(uniform.m_name, "pu")))
+				{
+					ImGui::ColorPicker(uniform.m_vec3, false);
+					ImGui::EndPopup();
+				}
+				break;
 			}
 		}
 		ImGui::Columns(1);

@@ -1255,6 +1255,12 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	void setActiveDirectionalLightUniforms()
+	{
+		setDirectionalLightUniforms(m_scene->getActiveGlobalLight());
+	}
+
+
 	void setPointLightShadowmapUniforms(Material* material, ComponentIndex light)
 	{
 		for (auto& info : m_point_light_shadowmaps)
@@ -1430,6 +1436,13 @@ struct PipelineImpl : public Pipeline
 				case Material::Uniform::FLOAT:
 				{
 					Vec4 v(uniform.m_float, 0, 0, 0);
+					bgfx::setUniform(uniform.m_handle, &v);
+				}
+				break;
+				case Material::Uniform::COLOR:
+				case Material::Uniform::VEC3:
+				{
+					Vec4 v(*(Vec3*)uniform.m_vec3, 0);
 					bgfx::setUniform(uniform.m_handle, &v);
 				}
 				break;
@@ -2351,6 +2364,7 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(renderModels);
 	REGISTER_FUNCTION(renderShadowmap);
 	REGISTER_FUNCTION(copyRenderbuffer);
+	REGISTER_FUNCTION(setActiveDirectionalLightUniforms);
 
 	#undef REGISTER_FUNCTION
 
