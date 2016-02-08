@@ -4,7 +4,6 @@
 #include "lumix.h"
 #include "core/matrix.h"
 #include "iplugin.h"
-#include "renderer/ray_cast_model_hit.h"
 
 
 namespace Lumix
@@ -19,6 +18,7 @@ class Mesh;
 class Model;
 class Path;
 class Pose;
+struct RayCastModelHit;
 class Renderer;
 class Shader;
 class Terrain;

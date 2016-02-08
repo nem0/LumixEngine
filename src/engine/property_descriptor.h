@@ -2,7 +2,6 @@
 
 #include "core/blob.h"
 #include "core/path.h"
-#include "core/stack_allocator.h"
 #include "core/string.h"
 #include "iproperty_descriptor.h"
 #include "universe\universe.h"

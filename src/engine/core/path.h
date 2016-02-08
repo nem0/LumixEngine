@@ -1,8 +1,6 @@
 #pragma once
 
 #include "core/associative_array.h"
-#include "core/base_proxy_allocator.h"
-#include "core/default_allocator.h"
 #include "core/mt/sync.h"
 
 
@@ -10,6 +8,7 @@ namespace Lumix
 {
 
 
+class IAllocator;
 class InputBlob;
 class OutputBlob;
 
