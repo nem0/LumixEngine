@@ -2,7 +2,14 @@
 
 #include "lumix.h"
 #include "core/delegate.h"
-#include <bgfx/bgfx.h>
+
+
+namespace bgfx
+{
+	struct TextureHandle;
+	struct UniformHandle;
+	struct ProgramHandle;
+}
 
 
 namespace Lumix

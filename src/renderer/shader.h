@@ -12,12 +12,9 @@ namespace Lumix
 
 namespace FS
 {
-class FileSystem;
 class IFile;
 }
 
-struct Matrix;
-struct Vec3;
 class Renderer;
 class Shader;
 class ShaderBinary;

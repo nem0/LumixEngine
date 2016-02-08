@@ -3,12 +3,9 @@
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/log.h"
-#include "core/matrix.h"
 #include "core/path_utils.h"
-#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
-#include "core/vec.h"
 #include "renderer/renderer.h"
 #include "renderer/shader_manager.h"
 #include <bgfx/bgfx.h>

@@ -1,12 +1,10 @@
 #pragma once
 
+
 #include "lumix.h"
-#include "core/array.h"
-#include "core/delegate_list.h"
 #include "core/matrix.h"
 #include "iplugin.h"
 #include "renderer/ray_cast_model_hit.h"
-#include "universe/component.h"
 
 
 namespace Lumix
@@ -14,6 +12,7 @@ namespace Lumix
 
 class Engine;
 class Frustum;
+class IAllocator;
 class LIFOAllocator;
 class Material;
 class Mesh;
@@ -23,8 +22,9 @@ class Pose;
 class Renderer;
 class Shader;
 class Terrain;
-class Timer;
 class Universe;
+template <typename T> class Array;
+template <typename T> class DelegateList;
 
 
 struct TerrainInfo

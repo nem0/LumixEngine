@@ -11,7 +11,6 @@
 #include "core/profiler.h"
 #include "core/static_array.h"
 #include "engine.h"
-#include "plugin_manager.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"

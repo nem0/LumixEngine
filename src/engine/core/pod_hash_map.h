@@ -103,7 +103,7 @@ namespace Lumix
 			typedef PODHashMap<key_type, value_type, hasher_type> hm_type;
 			typedef HashMapIterator<key_type, value_type, hasher_type> my_type;
 
-			friend class hm_type;
+			friend hm_type;
 
 			HashMapIterator()
 				: m_hash_map(nullptr)
@@ -196,7 +196,7 @@ namespace Lumix
 			typedef PODHashMap<key_type, value_type, hasher_type> hm_type;
 			typedef ConstHashMapIterator<key_type, value_type, hasher_type> my_type;
 
-			friend class hm_type;
+			friend hm_type;
 
 			ConstHashMapIterator()
 				: m_hash_map(nullptr)
