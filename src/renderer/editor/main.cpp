@@ -116,6 +116,11 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 		{
 			material->setSpecular(specular);
 		}
+		if (ImGui::BeginPopupContextItem("specular_pu"))
+		{
+			ImGui::ColorPicker(&specular.x, false);
+			ImGui::EndPopup();
+		}
 
 		float shininess = material->getShininess();
 		if (ImGui::DragFloat("Shininess", &shininess))
