@@ -160,6 +160,20 @@ bool Material::save(JsonSerializer& serializer)
 			case Uniform::FLOAT:
 				serializer.serialize("float_value", m_uniforms[i].m_float);
 				break;
+			case Uniform::COLOR:
+				serializer.beginArray("color");
+					serializer.serializeArrayItem(m_uniforms[i].m_vec3[0]);
+					serializer.serializeArrayItem(m_uniforms[i].m_vec3[1]);
+					serializer.serializeArrayItem(m_uniforms[i].m_vec3[2]);
+				serializer.endArray();
+				break;
+			case Uniform::VEC3:
+				serializer.beginArray("vec3");
+					serializer.serializeArrayItem(m_uniforms[i].m_vec3[0]);
+					serializer.serializeArrayItem(m_uniforms[i].m_vec3[1]);
+					serializer.serializeArrayItem(m_uniforms[i].m_vec3[2]);
+				serializer.endArray();
+				break;
 			case Uniform::TIME:
 				serializer.serialize("time", m_uniforms[i].m_float);
 				break;
@@ -266,6 +280,24 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 			{
 				uniform.m_type = Uniform::TIME;
 				serializer.deserialize(uniform.m_float, 0);
+			}
+			else if (compareString(label, "color") == 0)
+			{
+				uniform.m_type = Uniform::COLOR;
+				serializer.deserializeArrayBegin();
+					serializer.deserializeArrayItem(uniform.m_vec3[0], 0);
+					serializer.deserializeArrayItem(uniform.m_vec3[1], 0);
+					serializer.deserializeArrayItem(uniform.m_vec3[2], 0);
+				serializer.deserializeArrayEnd();
+			}
+			else if (compareString(label, "vec3") == 0)
+			{
+				uniform.m_type = Uniform::VEC3;
+				serializer.deserializeArrayBegin();
+					serializer.deserializeArrayItem(uniform.m_vec3[0], 0);
+					serializer.deserializeArrayItem(uniform.m_vec3[1], 0);
+					serializer.deserializeArrayItem(uniform.m_vec3[2], 0);
+				serializer.deserializeArrayEnd();
 			}
 			else
 			{

@@ -41,7 +41,9 @@ public:
 			INT,
 			FLOAT,
 			MATRIX,
-			TIME
+			TIME,
+			COLOR,
+			VEC3
 		};
 
 		static const int MAX_NAME_LENGTH = 32;
@@ -54,6 +56,7 @@ public:
 		{
 			int32 m_int;
 			float m_float;
+			float m_vec3[3];
 			float m_matrix[16];
 		};
 	};
