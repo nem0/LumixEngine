@@ -2,13 +2,14 @@
 
 
 #include "lumix.h"
-#include "core/array.h"
 
 
 namespace Lumix
 {
 
 
+template <typename T> class Array;
+class IAllocator;
 class IPropertyDescriptor;
 
 

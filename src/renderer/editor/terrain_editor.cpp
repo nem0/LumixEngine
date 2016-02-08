@@ -18,6 +18,7 @@
 #include "engine/property_register.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
+#include "renderer/ray_cast_model_hit.h"
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
 #include "universe/universe.h"

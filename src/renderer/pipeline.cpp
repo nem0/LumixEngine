@@ -17,6 +17,7 @@
 #include "renderer/model.h"
 #include "renderer/particle_system.h"
 #include "renderer/pose.h"
+#include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/terrain.h"

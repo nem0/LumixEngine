@@ -2,6 +2,8 @@
 
 
 #include "lumix.h"
+
+
 namespace bgfx
 {
 	struct VertexDecl;

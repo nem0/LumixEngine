@@ -3,10 +3,8 @@
 
 #include "core/array.h"
 #include "core/associative_array.h"
-#include "core/matrix.h"
 #include "core/resource.h"
 #include "core/vec.h"
-#include "renderer/render_scene.h"
 #include <bgfx/bgfx.h>
 
 
@@ -14,14 +12,22 @@ namespace Lumix
 {
 
 
+class Frustum;
+struct GrassInfo;
+class IAllocator;
 class LIFOAllocator;
 class Material;
+struct Matrix;
 class Mesh;
+class Model;
 class OutputBlob;
+struct RayCastModelHit;
 class Renderer;
 class RenderScene;
 struct TerrainQuad;
+struct TerrainInfo;
 class Texture;
+class Universe;
 
 
 class Terrain

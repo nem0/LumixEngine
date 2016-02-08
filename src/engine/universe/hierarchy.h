@@ -2,7 +2,6 @@
 
 
 #include "lumix.h"
-#include "core/array.h"
 #include "core/matrix.h"
 #include "core/pod_hash_map.h"
 #include "engine/iplugin.h"
@@ -15,6 +14,7 @@ namespace Lumix
 	class InputBlob;
 	class OutputBlob;
 	class Universe;
+	template <typename T> class Array;
 
 
 	class HierarchyPlugin : public IPlugin

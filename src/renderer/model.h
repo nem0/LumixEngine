@@ -9,7 +9,6 @@
 #include "core/string.h"
 #include "core/vec.h"
 #include "core/resource.h"
-#include "renderer/ray_cast_model_hit.h"
 #include <bgfx/bgfx.h>
 
 
@@ -21,6 +20,7 @@ class Material;
 class Model;
 class Pose;
 class ResourceManager;
+struct RayCastModelHit;
 
 
 namespace FS

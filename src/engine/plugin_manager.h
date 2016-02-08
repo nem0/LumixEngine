@@ -2,8 +2,6 @@
 
 
 #include "lumix.h"
-#include "core/array.h"
-#include "core/delegate_list.h"
 
 
 namespace Lumix
@@ -15,6 +13,9 @@ namespace Lumix
 	class JsonSerializer;
 	class OutputBlob;
 	class Universe;
+	template <typename T> class Array;
+	template <typename T> class DelegateList;
+
 
 	class LUMIX_ENGINE_API PluginManager
 	{

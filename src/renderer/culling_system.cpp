@@ -10,6 +10,8 @@
 #include "core/mtjd/manager.h"
 #include "core/mtjd/job.h"
 
+#include "core/sphere.h"
+
 namespace Lumix
 {
 typedef Array<int64> LayerMasks;
