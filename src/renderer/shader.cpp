@@ -342,7 +342,7 @@ void Shader::onBeforeReady()
 			auto vs_handle = binaries[i]->getHandle();
 			auto fs_handle = binaries[i + 1]->getHandle();
 			auto program = bgfx::createProgram(vs_handle, fs_handle);
-			
+
 			ASSERT(bgfx::isValid(program));
 
 			int pass_idx = i / 2;
@@ -356,6 +356,8 @@ void Shader::onBeforeReady()
 
 void Shader::unload(void)
 {
+	clearUniforms();
+
 	for (int i = 0; i < m_texture_slot_count; ++i)
 	{
 		if (bgfx::isValid(m_texture_slots[i].m_uniform_handle))

@@ -119,7 +119,10 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 		}
 		if (ImGui::BeginPopupContextItem("specular_pu"))
 		{
-			ImGui::ColorPicker(&specular.x, false);
+			if(ImGui::ColorPicker(&specular.x, false))
+			{
+				material->setSpecular(specular);
+			}
 			ImGui::EndPopup();
 		}
 
