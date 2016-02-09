@@ -1064,6 +1064,8 @@ struct ConvertTask : public Lumix::MT::Task
 		for (auto* mesh : m_filtered_meshes)
 		{
 			auto mesh_matrix = getGlobalTransform(getNode(mesh, scene->mRootNode));
+			auto normal_matrix = mesh_matrix;
+			normal_matrix.a4 = normal_matrix.b4 = normal_matrix.c4 = 0;
 			bool is_skinned = isSkinned(mesh);
 			for (unsigned int j = 0; j < mesh->mNumVertices; ++j)
 			{
@@ -1093,7 +1095,7 @@ struct ConvertTask : public Lumix::MT::Task
 					file.write(color, sizeof(color));
 				}
 
-				auto normal = mesh_matrix * mesh->mNormals[j];
+				auto normal = normal_matrix * mesh->mNormals[j];
 				normal.Normalize();
 				if (z_up) normal.Set(normal.x, normal.z, -normal.y);
 				Lumix::uint32 int_normal = packF4u(normal);
@@ -1101,7 +1103,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 				if (mesh->mTangents)
 				{
-					auto tangent = mesh_matrix * mesh->mTangents[j];
+					auto tangent = normal_matrix * mesh->mTangents[j];
 					tangent.Normalize();
 					if (z_up) tangent.Set(tangent.x, tangent.z, -tangent.y);
 					Lumix::uint32 int_tangent = packF4u(tangent);
