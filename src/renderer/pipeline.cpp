@@ -220,6 +220,13 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	void registerConst(const char* name, uint32 value)
+	{
+		lua_pushinteger(m_lua_state, value);
+		lua_setglobal(m_lua_state, name);
+	}
+
+
 	void registerCFunction(const char* name, lua_CFunction function)
 	{
 		lua_pushcfunction(m_lua_state, function);
@@ -475,6 +482,7 @@ struct PipelineImpl : public Pipeline
 					bgfx::setInstanceDataBuffer(instance_buffer, PARTICLE_BATCH_SIZE);
 					bgfx::setVertexBuffer(m_particle_vertex_buffer);
 					bgfx::setIndexBuffer(m_particle_index_buffer);
+					bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 					bgfx::setState(m_render_state | material->getRenderStates());
 					++m_stats.m_draw_call_count;
 					m_stats.m_instance_count += PARTICLE_BATCH_SIZE;
@@ -496,6 +504,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::setInstanceDataBuffer(instance_buffer, instance_count);
 		bgfx::setVertexBuffer(m_particle_vertex_buffer);
 		bgfx::setIndexBuffer(m_particle_index_buffer);
+		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(m_render_state | material->getRenderStates());
 		++m_stats.m_draw_call_count;
 		m_stats.m_instance_count += instance_count;
@@ -558,6 +567,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::setIndexBuffer(model.getIndicesHandle(),
 							 mesh.indices_offset,
 							 mesh.indices_count);
+		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(data.buffer, data.instance_count);
 		ShaderInstance& shader_instance = mesh.material->getShaderInstance();
@@ -771,7 +781,8 @@ struct PipelineImpl : public Pipeline
 		bool is_intersecting)
 	{
 		bgfx::setInstanceDataBuffer(instance_buffer, instance_count);
-		if(is_intersecting)
+		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE); 
+		if (is_intersecting)
 		{
 			bgfx::setState((m_render_state | material->getRenderStates()) &
 				~BGFX_STATE_CULL_MASK & ~BGFX_STATE_DEPTH_TEST_MASK | BGFX_STATE_CULL_CCW);
@@ -1164,6 +1175,7 @@ struct PipelineImpl : public Pipeline
 
 			bgfx::setVertexBuffer(&tvb);
 			bgfx::setIndexBuffer(&tib);
+			bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 			bgfx::setState(
 				m_render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_POINTS);
 			bgfx::submit(m_view_idx,
@@ -1207,6 +1219,7 @@ struct PipelineImpl : public Pipeline
 
 			bgfx::setVertexBuffer(&tvb);
 			bgfx::setIndexBuffer(&tib);
+			bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 			bgfx::setState(
 				m_render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_LINES);
 			bgfx::submit(m_view_idx,
@@ -1253,6 +1266,30 @@ struct PipelineImpl : public Pipeline
 		{
 			material->setDefine(m_has_shadowmap_define_idx, false);
 		}
+	}
+
+
+	void clearStencil()
+	{
+		m_stencil = BGFX_STENCIL_NONE;
+	}
+
+
+	void setStencilRef(uint32 ref)
+	{
+		m_stencil |= BGFX_STENCIL_FUNC_REF(ref);
+	}
+
+
+	void setStencilRMask(uint32 rmask)
+	{
+		m_stencil |= BGFX_STENCIL_FUNC_RMASK(rmask);
+	}
+
+
+	void setStencil(uint32 flags)
+	{
+		m_stencil |= flags;
 	}
 
 
@@ -1505,6 +1542,7 @@ struct PipelineImpl : public Pipeline
 			bgfx::setUniform(m_cam_params, &Vec4(near_plane, far_plane, fov, ratio));
 		}
 
+		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::setVertexBuffer(&vb);
 		++m_stats.m_draw_call_count;
@@ -1656,6 +1694,7 @@ struct PipelineImpl : public Pipeline
 			mesh.attribute_array_size / mesh.vertex_def.getStride());
 		bgfx::setIndexBuffer(
 			renderable.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
+		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(m_render_state | material->getRenderStates());
 		++m_stats.m_draw_call_count;
 		++m_stats.m_instance_count;
@@ -1683,6 +1722,7 @@ struct PipelineImpl : public Pipeline
 		uint64 render_states,
 		bgfx::ProgramHandle program_handle) override
 	{
+		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(m_render_state | render_states);
 		bgfx::setTransform(&mtx.m11);
 		bgfx::setVertexBuffer(&geom.getVertexBuffer());
@@ -1862,6 +1902,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::setIndexBuffer(info.m_terrain->getIndicesHandle(),
 			info.m_index * mesh_part_indices_count,
 			mesh_part_indices_count);
+		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(m_render_state | mesh.material->getRenderStates());
 		bgfx::setInstanceDataBuffer(instance_buffer, m_terrain_instances[index].m_count);
 		auto shader_instance = material->getShaderInstance().m_program_handles[m_pass_idx];
@@ -1888,6 +1929,7 @@ struct PipelineImpl : public Pipeline
 			mesh.attribute_array_size / mesh.vertex_def.getStride());
 		bgfx::setIndexBuffer(
 			grass.m_model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
+		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE); 
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(idb, grass.m_matrix_count);
 		++m_stats.m_draw_call_count;
@@ -1979,6 +2021,7 @@ struct PipelineImpl : public Pipeline
 						 BGFX_STATE_MSAA;
 		m_applied_camera = INVALID_COMPONENT;
 		m_global_light_shadowmap = nullptr;
+		m_stencil = BGFX_STENCIL_NONE;
 		m_render_state |= m_is_wireframe ? BGFX_STATE_PT_LINESTRIP : 0;
 		m_view_idx = m_renderer.getViewCounter();
 		m_pass_idx = -1;
@@ -2088,18 +2131,9 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void clear(const char* buffers, int color)
+	void clear(uint32 flags, uint32 color)
 	{
-		uint16 flags = 0;
-		if (compareString(buffers, "all") == 0)
-		{
-			flags = BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH;
-		}
-		else if (compareString(buffers, "depth") == 0)
-		{
-			flags = BGFX_CLEAR_DEPTH;
-		}
-		bgfx::setViewClear(m_view_idx, flags, color, 1.0f, 0);
+		bgfx::setViewClear(m_view_idx, (uint16)flags, color, 1.0f, 0);
 		bgfx::touch(m_view_idx);
 	}
 
@@ -2182,6 +2216,7 @@ struct PipelineImpl : public Pipeline
 	int m_view_y;
 	int m_width;
 	int m_height;
+	uint32 m_stencil;
 	bgfx::VertexBufferHandle m_particle_vertex_buffer;
 	bgfx::IndexBufferHandle m_particle_index_buffer;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
@@ -2375,6 +2410,10 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(renderShadowmap);
 	REGISTER_FUNCTION(copyRenderbuffer);
 	REGISTER_FUNCTION(setActiveDirectionalLightUniforms);
+	REGISTER_FUNCTION(setStencil);
+	REGISTER_FUNCTION(clearStencil);
+	REGISTER_FUNCTION(setStencilRMask);
+	REGISTER_FUNCTION(setStencilRef);
 
 	#undef REGISTER_FUNCTION
 
@@ -2388,7 +2427,61 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(setUniform);
 
 	#undef REGISTER_FUNCTION
-	
+
+	#define REGISTER_STENCIL_CONST(a) \
+		registerConst("STENCIL_" #a, BGFX_STENCIL_##a)
+
+	REGISTER_STENCIL_CONST(TEST_LESS);
+	REGISTER_STENCIL_CONST(TEST_LEQUAL);
+	REGISTER_STENCIL_CONST(TEST_EQUAL);
+	REGISTER_STENCIL_CONST(TEST_GEQUAL);
+	REGISTER_STENCIL_CONST(TEST_GREATER);
+	REGISTER_STENCIL_CONST(TEST_NOTEQUAL);
+	REGISTER_STENCIL_CONST(TEST_NEVER);
+	REGISTER_STENCIL_CONST(TEST_ALWAYS);
+	REGISTER_STENCIL_CONST(TEST_SHIFT);
+	REGISTER_STENCIL_CONST(TEST_MASK);
+
+	REGISTER_STENCIL_CONST(OP_FAIL_S_ZERO);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_KEEP);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_REPLACE);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_INCR);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_INCRSAT);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_DECR);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_DECRSAT);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_INVERT);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_SHIFT);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_MASK);
+
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_ZERO);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_KEEP);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_REPLACE);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_INCR);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_INCRSAT);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_DECR);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_DECRSAT);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_INVERT);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_SHIFT);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_MASK);
+
+	REGISTER_STENCIL_CONST(OP_PASS_Z_ZERO);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_KEEP);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_REPLACE);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_INCR);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_INCRSAT);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_DECR);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_DECRSAT);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_INVERT);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_SHIFT);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_MASK);
+
+	registerConst("CLEAR_DEPTH", BGFX_CLEAR_DEPTH);
+	registerConst("CLEAR_COLOR", BGFX_CLEAR_COLOR);
+	registerConst("CLEAR_STENCIL", BGFX_CLEAR_STENCIL);
+	registerConst("CLEAR_ALL", BGFX_CLEAR_STENCIL | BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR);
+
+	#undef REGISTER_STENCIL_CONST
+
 	for(auto& handler : m_custom_commands_handlers)
 	{
 		exposeCustomCommandToLua(handler);
