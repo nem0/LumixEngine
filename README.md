@@ -20,8 +20,7 @@
 * [Wiki](https://github.com/nem0/LumixEngine/wiki)
 * [Videos](https://www.youtube.com/channel/UCtjtIy0ldsq-9siM1Gm_rXg)
 
-![Editor screenshot](![studio](https://cloud.githubusercontent.com/assets/153526/12904252/3fcf130e-cece-11e5-878b-c9fe24c1b11a.png)
-)
+![Editor screenshot](https://cloud.githubusercontent.com/assets/153526/12904252/3fcf130e-cece-11e5-878b-c9fe24c1b11a.png)
 
 3rd party libraries
 
