@@ -31,33 +31,16 @@ public:
 		LEQUAL,
 		LESS
 	};
-	
+
 	struct Uniform
 	{
-		Uniform() {}
-
-		enum Type
-		{
-			INT,
-			FLOAT,
-			MATRIX,
-			TIME,
-			COLOR,
-			VEC3
-		};
-
-		static const int MAX_NAME_LENGTH = 32;
-		
-		char m_name[MAX_NAME_LENGTH + 1];
-		uint32 m_name_hash;
-		Type m_type;
-		bgfx::UniformHandle m_handle;
+		uint32 name_hash;
 		union
 		{
-			int32 m_int;
-			float m_float;
-			float m_vec3[3];
-			float m_matrix[16];
+			int32 int_value;
+			float float_value;
+			float vec3[3];
+			float matrix[16];
 		};
 	};
 
@@ -101,7 +84,6 @@ private:
 	void unload(void) override;
 	bool load(FS::IFile& file) override;
 
-	void clearUniforms();
 	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);
 	void deserializeUniforms(JsonSerializer& serializer);
 	void deserializeDefines(JsonSerializer& serializer);

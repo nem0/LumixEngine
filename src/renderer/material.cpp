@@ -89,7 +89,7 @@ void Material::setDefine(uint8 define_idx, bool enabled)
 
 void Material::unload(void)
 {
-	clearUniforms();
+	m_uniforms.clear();
 	setShader(nullptr);
 
 	ResourceManagerBase* texture_manager = m_resource_manager.get(ResourceManager::TEXTURE);
@@ -107,6 +107,9 @@ void Material::unload(void)
 
 bool Material::save(JsonSerializer& serializer)
 {
+	if(!isReady()) return false;
+	if(!m_shader) return false;
+
 	auto* manager = getResourceManager().get(ResourceManager::MATERIAL);
 	auto& renderer = static_cast<MaterialManager*>(manager)->getRenderer();
 
@@ -154,37 +157,39 @@ bool Material::save(JsonSerializer& serializer)
 	for (int i = 0; i < m_uniforms.size(); ++i)
 	{
 		serializer.beginObject();
-		serializer.serialize("name", m_uniforms[i].m_name);
-		switch (m_uniforms[i].m_type)
+		const auto& uniform = m_shader->getUniform(i);
+
+		serializer.serialize("name", uniform.name);
+		switch (uniform.type)
 		{
-			case Uniform::FLOAT:
-				serializer.serialize("float_value", m_uniforms[i].m_float);
+			case Shader::Uniform::FLOAT:
+				serializer.serialize("float_value", m_uniforms[i].float_value);
 				break;
-			case Uniform::COLOR:
+			case Shader::Uniform::COLOR:
 				serializer.beginArray("color");
-					serializer.serializeArrayItem(m_uniforms[i].m_vec3[0]);
-					serializer.serializeArrayItem(m_uniforms[i].m_vec3[1]);
-					serializer.serializeArrayItem(m_uniforms[i].m_vec3[2]);
+					serializer.serializeArrayItem(m_uniforms[i].vec3[0]);
+					serializer.serializeArrayItem(m_uniforms[i].vec3[1]);
+					serializer.serializeArrayItem(m_uniforms[i].vec3[2]);
 				serializer.endArray();
 				break;
-			case Uniform::VEC3:
+			case Shader::Uniform::VEC3:
 				serializer.beginArray("vec3");
-					serializer.serializeArrayItem(m_uniforms[i].m_vec3[0]);
-					serializer.serializeArrayItem(m_uniforms[i].m_vec3[1]);
-					serializer.serializeArrayItem(m_uniforms[i].m_vec3[2]);
+					serializer.serializeArrayItem(m_uniforms[i].vec3[0]);
+					serializer.serializeArrayItem(m_uniforms[i].vec3[1]);
+					serializer.serializeArrayItem(m_uniforms[i].vec3[2]);
 				serializer.endArray();
 				break;
-			case Uniform::TIME:
-				serializer.serialize("time", m_uniforms[i].m_float);
+			case Shader::Uniform::TIME:
+				serializer.serialize("time", 0);
 				break;
-			case Uniform::INT:
-				serializer.serialize("int_value", m_uniforms[i].m_int);
+			case Shader::Uniform::INT:
+				serializer.serialize("int_value", m_uniforms[i].int_value);
 				break;
-			case Uniform::MATRIX:
+			case Shader::Uniform::MATRIX4:
 				serializer.beginArray("matrix_value");
 				for (int j = 0; j < 16; ++j)
 				{
-					serializer.serializeArrayItem(m_uniforms[i].m_matrix[j]);
+					serializer.serializeArrayItem(m_uniforms[i].matrix[j]);
 				}
 				serializer.endArray();
 				break;
@@ -208,16 +213,6 @@ bool Material::save(JsonSerializer& serializer)
 }
 
 
-void Material::clearUniforms()
-{
-	for (auto& uniform : m_uniforms)
-	{
-		bgfx::destroyUniform(uniform.m_handle);
-	}
-	m_uniforms.clear();
-}
-
-
 void Material::deserializeDefines(JsonSerializer& serializer)
 {
 	auto* manager = getResourceManager().get(ResourceManager::MATERIAL);
@@ -237,7 +232,7 @@ void Material::deserializeDefines(JsonSerializer& serializer)
 void Material::deserializeUniforms(JsonSerializer& serializer)
 {
 	serializer.deserializeArrayBegin();
-	clearUniforms();
+	m_uniforms.clear();
 	while (!serializer.isArrayEnd())
 	{
 		Uniform& uniform = m_uniforms.emplace();
@@ -250,53 +245,45 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 			serializer.deserializeLabel(label, 255);
 			if (compareString(label, "name") == 0)
 			{
-				serializer.deserialize(uniform.m_name, Uniform::MAX_NAME_LENGTH, "");
-				uniform.m_name_hash = crc32(uniform.m_name);
+				char name[32];
+				serializer.deserialize(name, lengthOf(name), "");
+				uniform.name_hash = crc32(name);
 			}
 			else if (compareString(label, "int_value") == 0)
 			{
-				uniform_type = bgfx::UniformType::Int1;
-				uniform.m_type = Uniform::INT;
-				serializer.deserialize(uniform.m_int, 0);
+				serializer.deserialize(uniform.int_value, 0);
 			}
 			else if (compareString(label, "float_value") == 0)
 			{
-				uniform.m_type = Uniform::FLOAT;
-				serializer.deserialize(uniform.m_float, 0);
+				serializer.deserialize(uniform.float_value, 0);
 			}
 			else if (compareString(label, "matrix_value") == 0)
 			{
-				uniform_type = bgfx::UniformType::Mat4;
-				uniform.m_type = Uniform::MATRIX;
 				serializer.deserializeArrayBegin();
 				for (int i = 0; i < 16; ++i)
 				{
-					serializer.deserializeArrayItem(uniform.m_matrix[i], 0);
-					ASSERT(i == 15 || !serializer.isArrayEnd());
+					serializer.deserializeArrayItem(uniform.matrix[i], 0);
 				}
 				serializer.deserializeArrayEnd();
 			}
 			else if (compareString(label, "time") == 0)
 			{
-				uniform.m_type = Uniform::TIME;
-				serializer.deserialize(uniform.m_float, 0);
+				serializer.deserialize(uniform.float_value, 0);
 			}
 			else if (compareString(label, "color") == 0)
 			{
-				uniform.m_type = Uniform::COLOR;
 				serializer.deserializeArrayBegin();
-					serializer.deserializeArrayItem(uniform.m_vec3[0], 0);
-					serializer.deserializeArrayItem(uniform.m_vec3[1], 0);
-					serializer.deserializeArrayItem(uniform.m_vec3[2], 0);
+					serializer.deserializeArrayItem(uniform.vec3[0], 0);
+					serializer.deserializeArrayItem(uniform.vec3[1], 0);
+					serializer.deserializeArrayItem(uniform.vec3[2], 0);
 				serializer.deserializeArrayEnd();
 			}
 			else if (compareString(label, "vec3") == 0)
 			{
-				uniform.m_type = Uniform::VEC3;
 				serializer.deserializeArrayBegin();
-					serializer.deserializeArrayItem(uniform.m_vec3[0], 0);
-					serializer.deserializeArrayItem(uniform.m_vec3[1], 0);
-					serializer.deserializeArrayItem(uniform.m_vec3[2], 0);
+					serializer.deserializeArrayItem(uniform.vec3[0], 0);
+					serializer.deserializeArrayItem(uniform.vec3[1], 0);
+					serializer.deserializeArrayItem(uniform.vec3[2], 0);
 				serializer.deserializeArrayEnd();
 			}
 			else
@@ -304,8 +291,6 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 				g_log_warning.log("material") << "Unknown label \"" << label << "\"";
 			}
 		}
-		uniform.m_handle = bgfx::createUniform(uniform.m_name, uniform_type);
-
 		serializer.deserializeObjectEnd();
 	}
 	serializer.deserializeArrayEnd();
@@ -368,6 +353,34 @@ void Material::setShader(const Path& path)
 void Material::onBeforeReady()
 {
 	if (!m_shader) return;
+
+	for(int i = 0; i < m_shader->getUniformCount(); ++i)
+	{
+		auto& shader_uniform = m_shader->getUniform(i);
+		bool found = false;
+		for(int j = i; j < m_uniforms.size(); ++j)
+		{
+			if(m_uniforms[j].name_hash == shader_uniform.name_hash)
+			{
+				auto tmp = m_uniforms[i];
+				m_uniforms[i] = m_uniforms[j];
+				m_uniforms[j] = tmp;
+				found = true;
+				break;
+			}
+		}
+		if(found) continue;
+		if(i < m_uniforms.size())
+		{
+			m_uniforms.emplace(m_uniforms[i]);
+		}
+		else
+		{
+			m_uniforms.emplace();
+		}
+		m_uniforms[i].name_hash = shader_uniform.name_hash;
+	}
+
 	m_shader_instance = &m_shader->getInstance(m_define_mask);
 }
 
