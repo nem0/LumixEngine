@@ -673,10 +673,13 @@ public:
 				uint32 path;
 				serializer.read(path);
 
-				auto* model = static_cast<Model*>(m_engine.getResourceManager()
-														.get(ResourceManager::MODEL)
-														->load(Path(path)));
-				setModel(r.entity, model);
+				if (path != 0)
+				{
+					auto* model = static_cast<Model*>(m_engine.getResourceManager()
+														  .get(ResourceManager::MODEL)
+														  ->load(Path(path)));
+					setModel(r.entity, model);
+				}
 
 				if (version > RenderSceneVersion::RENDERABLE_MATERIALS)
 				{
