@@ -22,6 +22,7 @@ Shader::Shader(const Path& path, ResourceManager& resource_manager, IAllocator& 
 	, m_allocator(allocator)
 	, m_instances(m_allocator)
 	, m_texture_slot_count(0)
+	, m_uniforms(m_allocator)
 {
 }
 
@@ -84,6 +85,85 @@ void ShaderCombinations::parsePasses(lua_State* L)
 }
 
 
+void Shader::clearUniforms()
+{
+	for(auto& uniform : m_uniforms)
+	{
+		bgfx::destroyUniform(uniform.handle);
+	}
+	m_uniforms.clear();
+}
+
+
+void Shader::parseUniforms(lua_State* L)
+{
+	clearUniforms();
+	if(lua_getglobal(L, "uniforms") == LUA_TTABLE)
+	{
+		int len = (int)lua_rawlen(L, -1);
+		for(int i = 0; i < len; ++i)
+		{
+			auto& uniform = m_uniforms.emplace();
+			bgfx::UniformType::Enum bgfx_type;
+			if(lua_rawgeti(L, -1, 1 + i) == LUA_TTABLE)
+			{
+				if(lua_getfield(L, -1, "name") == LUA_TSTRING)
+				{
+					copyString(uniform.name, lua_tostring(L, -1));
+					uniform.name_hash = crc32(uniform.name);
+				}
+				lua_pop(L, 1);
+				if(lua_getfield(L, -1, "type") == LUA_TSTRING)
+				{
+					const char* type_str = lua_tostring(L, -1);
+					if(compareString(type_str, "float") == 0)
+					{
+						uniform.type = Shader::Uniform::FLOAT;
+						bgfx_type = bgfx::UniformType::Vec4;
+					}
+					else if(compareString(type_str, "int") == 0)
+					{
+						uniform.type = Shader::Uniform::INT;
+						bgfx_type = bgfx::UniformType::Int1;
+					}
+					else if(compareString(type_str, "color") == 0)
+					{
+						uniform.type = Shader::Uniform::COLOR;
+						bgfx_type = bgfx::UniformType::Vec4;
+					}
+					else if(compareString(type_str, "time") == 0)
+					{
+						uniform.type = Shader::Uniform::TIME;
+						bgfx_type = bgfx::UniformType::Vec4;
+					}
+					else if(compareString(type_str, "matrix4") == 0)
+					{
+						uniform.type = Shader::Uniform::MATRIX4;
+						bgfx_type = bgfx::UniformType::Mat4;
+					}
+					else if(compareString(type_str, "vec3") == 0)
+					{
+						uniform.type = Shader::Uniform::VEC3;
+						bgfx_type = bgfx::UniformType::Vec4;
+					}
+					else
+					{
+						g_log_error.log("shader") << "Unknown uniform type " << type_str << " in shader " << getPath().c_str();
+						uniform.type = Shader::Uniform::FLOAT;
+						bgfx_type = bgfx::UniformType::Vec4;
+					}
+				}
+				lua_pop(L, 1);
+
+				uniform.handle = bgfx::createUniform(uniform.name, bgfx_type);
+			}
+			lua_pop(L, 1);
+		}
+	}
+	lua_pop(L, 1);
+}
+
+
 void Shader::parseTextureSlots(lua_State* L)
 {
 	for (int i = 0; i < m_texture_slot_count; ++i)
@@ -99,9 +179,7 @@ void Shader::parseTextureSlots(lua_State* L)
 			{
 				if (lua_getfield(L, -1, "name") == LUA_TSTRING)
 				{
-					copyString(m_texture_slots[i].m_name,
-						sizeof(m_texture_slots[i].m_name),
-						lua_tostring(L, -1));
+					copyString(m_texture_slots[i].m_name, lua_tostring(L, -1));
 				}
 				lua_pop(L, 1);
 				if (lua_getfield(L, -1, "is_atlas") == LUA_TBOOLEAN)
@@ -238,6 +316,7 @@ bool Shader::load(FS::IFile& file)
 	}
 
 	parseTextureSlots(L);
+	parseUniforms(L);
 	m_combintions.parse(getRenderer(), L);
 	if (!generateInstances())
 	{

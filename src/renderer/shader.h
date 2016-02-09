@@ -90,9 +90,8 @@ class LUMIX_RENDERER_API Shader : public Resource
 	friend class ShaderInstance;
 
 public:
-	class TextureSlot
+	struct TextureSlot
 	{
-	public:
 		TextureSlot() { reset(); }
 
 		void reset() { m_name[0] = m_uniform[0] = '\0'; m_define_idx = -1; m_is_atlas = false; }
@@ -106,31 +105,49 @@ public:
 	};
 
 
+	struct Uniform
+	{
+		enum Type
+		{
+			INT,
+			FLOAT,
+			MATRIX4,
+			TIME,
+			COLOR,
+			VEC3
+		};
+
+		char name[32];
+		uint32 name_hash;
+		Type type;
+		bgfx::UniformHandle handle;
+	};
+
+
 public:
 	static const int MAX_TEXTURE_SLOT_COUNT = 16;
 
 public:
-	Shader(const Path& path,
-		   ResourceManager& resource_manager,
-		   IAllocator& allocator);
+	Shader(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	~Shader();
 
 	bool hasDefine(uint8 define_idx) const;
 	ShaderInstance& getInstance(uint32 mask);
 	ShaderInstance* getFirstInstance();
-	const TextureSlot& getTextureSlot(int index) const
-	{
-		return m_texture_slots[index];
-	}
+	const TextureSlot& getTextureSlot(int index) const { return m_texture_slots[index]; }
 	int getTextureSlotCount() const { return m_texture_slot_count; }
 	Renderer& getRenderer();
+	Uniform& getUniform(int index) { return m_uniforms[index]; }
+	int getUniformCount() const { return m_uniforms.size(); }
 
 	static bool getShaderCombinations(Renderer& renderer,
-									  const char* shader_content,
-									  ShaderCombinations* output);
+		const char* shader_content,
+		ShaderCombinations* output);
 
 private:
 	void parseTextureSlots(lua_State* state);
+	void parseUniforms(lua_State* state);
+	void clearUniforms();
 	bool generateInstances();
 	uint32 getDefineMaskFromDense(uint32 dense) const;
 
@@ -143,6 +160,7 @@ private:
 	TextureSlot m_texture_slots[MAX_TEXTURE_SLOT_COUNT];
 	int m_texture_slot_count;
 	Array<ShaderInstance*> m_instances;
+	Array<Uniform> m_uniforms;
 	ShaderCombinations m_combintions;
 };
 

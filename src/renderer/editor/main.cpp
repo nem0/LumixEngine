@@ -197,25 +197,32 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 
 		}
 
-		for (int i = 0; i < material->getUniformCount(); ++i)
+		auto* shader = material->getShader();
+		if(shader && material->isReady())
 		{
-			auto& uniform = material->getUniform(i);
-			switch (uniform.m_type)
+			for(int i = 0; i < shader->getUniformCount(); ++i)
 			{
-			case Material::Uniform::FLOAT:
-				ImGui::DragFloat(uniform.m_name, &uniform.m_float);
-				break;
-			case Material::Uniform::VEC3:
-				ImGui::DragFloat3(uniform.m_name, uniform.m_vec3);
-				break;
-			case Material::Uniform::COLOR:
-				ImGui::ColorEdit3(uniform.m_name, uniform.m_vec3);
-				if (ImGui::BeginPopupContextItem(StringBuilder<50>(uniform.m_name, "pu")))
+				auto& uniform = material->getUniform(i);
+				auto& shader_uniform = shader->getUniform(i);
+				switch(shader_uniform.type)
 				{
-					ImGui::ColorPicker(uniform.m_vec3, false);
-					ImGui::EndPopup();
+					case Shader::Uniform::FLOAT:
+						ImGui::DragFloat(shader_uniform.name, &uniform.float_value);
+						break;
+					case Shader::Uniform::VEC3:
+						ImGui::DragFloat3(shader_uniform.name, uniform.vec3);
+						break;
+					case Shader::Uniform::COLOR:
+						ImGui::ColorEdit3(shader_uniform.name, uniform.vec3);
+						if(ImGui::BeginPopupContextItem(StringBuilder<50>(shader_uniform.name, "pu")))
+						{
+							ImGui::ColorPicker(uniform.vec3, false);
+							ImGui::EndPopup();
+						}
+						break;
+					case Shader::Uniform::TIME: break;
+					default: ASSERT(false); break;
 				}
-				break;
 			}
 		}
 		ImGui::Columns(1);
@@ -577,7 +584,7 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 			PlatformInterface::shellExecuteOpen(path);
 		}
 
-		if (ImGui::CollapsingHeader("Texture slots", nullptr, true, true))
+		if (shader->getTextureSlotCount() > 0 && ImGui::CollapsingHeader("Texture slots", nullptr, true, true))
 		{
 			ImGui::Columns(2);
 			ImGui::Text("name");
@@ -594,6 +601,35 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 				ImGui::NextColumn();
 			}
 			ImGui::Columns(1);
+		}
+
+		if(shader->getUniformCount() > 0 && ImGui::CollapsingHeader("Uniforms", nullptr, true, true))
+		{
+			ImGui::Columns(2);
+			ImGui::Text("name");
+			ImGui::NextColumn();
+			ImGui::Text("type");
+			ImGui::NextColumn();
+			ImGui::Separator();
+			for(int i = 0; i < shader->getUniformCount(); ++i)
+			{
+				auto& uniform = shader->getUniform(i);
+				ImGui::Text(uniform.name);
+				ImGui::NextColumn();
+				switch(uniform.type)
+				{
+					case Shader::Uniform::COLOR: ImGui::Text("color"); break;
+					case Shader::Uniform::FLOAT: ImGui::Text("float"); break;
+					case Shader::Uniform::INT: ImGui::Text("int"); break;
+					case Shader::Uniform::MATRIX4: ImGui::Text("Matrix 4x4"); break;
+					case Shader::Uniform::TIME: ImGui::Text("time"); break;
+					case Shader::Uniform::VEC3: ImGui::Text("Vector3"); break;
+					default: ASSERT(false); break;
+				}
+				ImGui::NextColumn();
+			}
+			ImGui::Columns(1);
+
 		}
 		return true;
 	}
