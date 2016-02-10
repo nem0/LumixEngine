@@ -854,7 +854,9 @@ struct PipelineImpl : public Pipeline
 			id->pos_radius.set(pos, range);
 			id->color_attenuation.set(color, attenuation);
 			id->dir_fov.set(light_dir, fov);
-			id->specular.set(m_scene->getPointLightSpecularColor(light_cmp), 1);
+			float specular_intensity = m_scene->getPointLightSpecularIntensity(light_cmp);
+			id->specular.set(m_scene->getPointLightSpecularColor(light_cmp) 
+				* specular_intensity * specular_intensity, 1);
 			++instance_data[buffer_idx];
 
 			if(instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx]->data == 128)
@@ -1251,7 +1253,9 @@ struct PipelineImpl : public Pipeline
 		Vec4 light_pos_radius(light_pos, range);
 		Vec4 light_color_attenuation(color, attenuation);
 		Vec4 light_dir_fov(light_dir, fov);
-		Vec4 light_specular(m_scene->getPointLightSpecularColor(light_cmp), 1);
+		float specular_intensity = m_scene->getPointLightSpecularIntensity(light_cmp);
+		Vec4 light_specular(m_scene->getPointLightSpecularColor(light_cmp) * specular_intensity *
+								specular_intensity, 1);
 
 		bgfx::setUniform(m_light_pos_radius_uniform, &light_pos_radius);
 		bgfx::setUniform(m_light_color_attenuation_uniform, &light_color_attenuation);
@@ -1583,6 +1587,8 @@ struct PipelineImpl : public Pipeline
 			Vec3 fog_color = m_scene->getFogColor(m_current_light);
 			float fog_density = m_scene->getFogDensity(m_current_light);
 			Vec3 specular = m_scene->getGlobalLightSpecular(m_current_light);
+			float specular_intensity = m_scene->getGlobalLightSpecularIntensity(m_current_light);
+			specular *= specular_intensity * specular_intensity;
 			m_directional_light_uniforms.diffuse_light_color.set(diffuse_color, 1);
 			m_directional_light_uniforms.ambient_light_color.set(ambient_color, 1);
 			m_directional_light_uniforms.light_dir_fov.set(light_dir, 0);

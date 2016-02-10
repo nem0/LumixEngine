@@ -51,7 +51,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 	{
 	}
 
-		
+
 	void saveMaterial(Material* material)
 	{
 		FS::FileSystem& fs = m_app.getWorldEditor()->getEngine().getFileSystem();
