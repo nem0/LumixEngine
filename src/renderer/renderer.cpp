@@ -283,7 +283,7 @@ static void registerProperties(IAllocator& allocator)
 							  &RenderScene::getLightAmbientIntensity,
 							  &RenderScene::setLightAmbientIntensity,
 							  0.0f,
-							  1.0f,
+							  FLT_MAX,
 							  0.05f,
 							  allocator));
 	PropertyRegister::add("global_light",
@@ -291,7 +291,7 @@ static void registerProperties(IAllocator& allocator)
 							  &RenderScene::getGlobalLightIntensity,
 							  &RenderScene::setGlobalLightIntensity,
 							  0.0f,
-							  1.0f,
+							  FLT_MAX,
 							  0.05f,
 							  allocator));
 	PropertyRegister::add("global_light",
@@ -351,7 +351,7 @@ static void registerProperties(IAllocator& allocator)
 							  &RenderScene::getPointLightIntensity,
 							  &RenderScene::setPointLightIntensity,
 							  0.0f,
-							  999.0f,
+							  FLT_MAX,
 							  0.05f,
 							  allocator));
 	PropertyRegister::add("point_light",
@@ -359,7 +359,7 @@ static void registerProperties(IAllocator& allocator)
 							  &RenderScene::getPointLightSpecularIntensity,
 							  &RenderScene::setPointLightSpecularIntensity,
 							  0.0f,
-							  999.0f,
+							  FLT_MAX,
 							  0.05f,
 							  allocator));
 	PropertyRegister::add("point_light",
