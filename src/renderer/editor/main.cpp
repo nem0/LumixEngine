@@ -135,7 +135,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 		}
 
 		float shininess = material->getShininess();
-		if (ImGui::DragFloat("Shininess", &shininess))
+		if (ImGui::DragFloat("Shininess", &shininess, 0.1f, 0.0f, 64.0f))
 		{
 			material->setShininess(shininess);
 		}
