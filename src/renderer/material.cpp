@@ -19,6 +19,7 @@ namespace Lumix
 
 
 static const uint32 SHADOWMAP_HASH = crc32("shadowmap");
+static const float DEFAULT_ALPHA_REF_VALUE = 0.3f;
 
 
 Material::Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
@@ -38,6 +39,7 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 
 	enableZTest(true);
 	enableBackfaceCulling(true);
+	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
 	{
 		m_textures[i] = nullptr;
@@ -202,6 +204,7 @@ bool Material::save(JsonSerializer& serializer)
 	serializer.endArray();
 	serializer.serialize("backface_culling", isBackfaceCulling());
 	serializer.serialize("shininess", m_shininess);
+	serializer.serialize("alpha_ref", m_alpha_ref);
 	serializer.beginArray("specular");
 	serializer.serializeArrayItem(m_specular.x);
 	serializer.serializeArrayItem(m_specular.y);
@@ -581,11 +584,21 @@ void Material::setRenderState(bool value, uint64 state, uint64 mask)
 }
 
 
+void Material::setAlphaRef(float value)
+{
+	m_alpha_ref = value;
+	uint8 val = uint8(value * 255.0f);
+	m_render_states &= ~BGFX_STATE_ALPHA_REF_MASK;
+	m_render_states |= BGFX_STATE_ALPHA_REF(val);
+}
+
+
 bool Material::load(FS::IFile& file)
 {
 	PROFILE_FUNCTION();
 
 	m_render_states = BGFX_STATE_DEPTH_TEST_LEQUAL | BGFX_STATE_CULL_CW;
+	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	m_uniforms.clear();
 	JsonSerializer serializer(file, JsonSerializer::READ, getPath(), m_allocator);
 	serializer.deserializeObjectBegin();
@@ -610,6 +623,12 @@ bool Material::load(FS::IFile& file)
 			{
 				return false;
 			}
+		}
+		else if (compareString(label, "alpha_ref") == 0)
+		{
+			serializer.deserialize(m_alpha_ref, 0.3f);
+			uint8 val = uint8(m_alpha_ref * 255.0f);
+			m_render_states |= BGFX_STATE_ALPHA_REF(val);
 		}
 		else if (compareString(label, "alpha_blending") == 0)
 		{

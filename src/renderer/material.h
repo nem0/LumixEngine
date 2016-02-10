@@ -56,6 +56,8 @@ public:
 	void setShininess(float value) { m_shininess = value; }
 	Vec3 getSpecular() const { return m_specular; }
 	void setSpecular(const Vec3& specular) { m_specular = specular; }
+	float getAlphaRef() const { return m_alpha_ref; }
+	void setAlphaRef(float value);
 	uint64 getRenderStates() const { return m_render_states; }
 
 	void setShader(Shader* shader);
@@ -102,6 +104,7 @@ private:
 	uint64 m_render_states;
 	Vec3 m_specular;
 	float m_shininess;
+	float m_alpha_ref;
 	uint32 m_define_mask;
 };
 

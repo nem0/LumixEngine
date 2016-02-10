@@ -1817,7 +1817,7 @@ struct PipelineImpl : public Pipeline
 			}
 		}
 
-		for (int i = 0; i < material->getTextureCount(); ++i)
+		for (int i = 0; i < shader->getTextureSlotCount(); ++i)
 		{
 			Texture* texture = material->getTexture(i);
 			if (!texture) continue;
@@ -2023,7 +2023,7 @@ struct PipelineImpl : public Pipeline
 		if (!isReady()) return;
 
 		m_stats = {};
-		m_render_state = BGFX_STATE_DEFAULT;
+		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE | BGFX_STATE_MSAA;
 		m_applied_camera = INVALID_COMPONENT;
 		m_global_light_shadowmap = nullptr;
 		m_stencil = BGFX_STENCIL_NONE;
