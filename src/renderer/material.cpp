@@ -316,7 +316,7 @@ void Material::setTexturePath(int i, const Path& path)
 
 
 void Material::setTexture(int i, Texture* texture)
-{ 
+{
 	Texture* old_texture = i < m_texture_count ? m_textures[i] : nullptr;
 
 	if (texture) addDependency(*texture);
@@ -332,13 +332,16 @@ void Material::setTexture(int i, Texture* texture)
 	if (isReady() && m_shader)
 	{
 		int define_idx = m_shader->getTextureSlot(i).m_define_idx;
-		if (define_idx >= 0 && m_textures[i])
+		if(define_idx >= 0)
 		{
-			m_define_mask |= 1 << define_idx;
-		}
-		else
-		{
-			m_define_mask &= ~(1 << define_idx);
+			if(m_textures[i])
+			{
+				m_define_mask |= 1 << define_idx;
+			}
+			else
+			{
+				m_define_mask &= ~(1 << define_idx);
+			}
 		}
 
 		m_shader_instance = &m_shader->getInstance(m_define_mask);
@@ -382,6 +385,22 @@ void Material::onBeforeReady()
 			m_uniforms.emplace();
 		}
 		m_uniforms[i].name_hash = shader_uniform.name_hash;
+	}
+
+	for(int i = 0; i < m_shader->getTextureSlotCount(); ++i)
+	{
+		int define_idx = m_shader->getTextureSlot(i).m_define_idx;
+		if(define_idx >= 0)
+		{
+			if(m_textures[i])
+			{
+				m_define_mask |= 1 << define_idx;
+			}
+			else
+			{
+				m_define_mask &= ~(1 << define_idx);
+			}
+		}
 	}
 
 	m_shader_instance = &m_shader->getInstance(m_define_mask);
