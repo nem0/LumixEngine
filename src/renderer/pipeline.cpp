@@ -2023,8 +2023,7 @@ struct PipelineImpl : public Pipeline
 		if (!isReady()) return;
 
 		m_stats = {};
-		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE |
-						 BGFX_STATE_MSAA;
+		m_render_state = BGFX_STATE_DEFAULT;
 		m_applied_camera = INVALID_COMPONENT;
 		m_global_light_shadowmap = nullptr;
 		m_stencil = BGFX_STENCIL_NONE;
