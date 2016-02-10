@@ -365,7 +365,7 @@ struct PipelineImpl : public Pipeline
 		m_cam_params = bgfx::createUniform("u_camParams", bgfx::UniformType::Vec4);
 		m_cam_proj_uniform = bgfx::createUniform("u_camProj", bgfx::UniformType::Mat4);
 		m_cam_view_uniform = bgfx::createUniform("u_camView", bgfx::UniformType::Mat4);
-		m_cam_inv_view_uniform = bgfx::createUniform("u_camInView", bgfx::UniformType::Mat4);
+		m_cam_inv_view_uniform = bgfx::createUniform("u_camInvView", bgfx::UniformType::Mat4);
 		m_cam_inv_viewproj_uniform = bgfx::createUniform("u_camInvViewProj", bgfx::UniformType::Mat4);
 		m_cam_inv_proj_uniform = bgfx::createUniform("u_camInvProj", bgfx::UniformType::Mat4);
 		m_tex_shadowmap_uniform = bgfx::createUniform("u_texShadowmap", bgfx::UniformType::Int1);
@@ -1528,7 +1528,7 @@ struct PipelineImpl : public Pipeline
 			float far_plane = m_scene->getCameraFarPlane(m_applied_camera);
 			float ratio = float(m_width) / m_height;
 			Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
-			Matrix camera_matrix = universe.getMatrix(camera_entity);
+			Matrix camera_matrix = universe.getPositionAndRotation(camera_entity);
 			Matrix view_matrix = camera_matrix; 
 			view_matrix.fastInverse();
 			projection_matrix.setPerspective(
