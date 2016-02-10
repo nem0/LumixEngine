@@ -264,6 +264,21 @@ static void registerProperties(IAllocator& allocator)
 	PropertyRegister::add("renderable", renderable_material);
 
 	PropertyRegister::add("global_light",
+		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Ambient color",
+							  &RenderScene::getLightAmbientColor,
+							  &RenderScene::setLightAmbientColor,
+							  allocator));
+	PropertyRegister::add("global_light",
+		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Diffuse color",
+							  &RenderScene::getGlobalLightColor,
+							  &RenderScene::setGlobalLightColor,
+							  allocator));
+	PropertyRegister::add("global_light",
+		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Specular color",
+							  &RenderScene::getGlobalLightSpecular,
+							  &RenderScene::setGlobalLightSpecular,
+							  allocator));
+	PropertyRegister::add("global_light",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Ambient intensity",
 							  &RenderScene::getLightAmbientIntensity,
 							  &RenderScene::setLightAmbientIntensity,
@@ -272,18 +287,25 @@ static void registerProperties(IAllocator& allocator)
 							  0.05f,
 							  allocator));
 	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec4, RenderScene>)("Shadow cascades",
-							  &RenderScene::getShadowmapCascades,
-							  &RenderScene::setShadowmapCascades,
-							  allocator));
-
-	PropertyRegister::add("global_light",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Diffuse intensity",
 							  &RenderScene::getGlobalLightIntensity,
 							  &RenderScene::setGlobalLightIntensity,
 							  0.0f,
 							  1.0f,
 							  0.05f,
+							  allocator));
+	PropertyRegister::add("global_light",
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Specular intensity",
+							  &RenderScene::getGlobalLightSpecularIntensity,
+							  &RenderScene::setGlobalLightSpecularIntensity,
+							  0,
+							  FLT_MAX,
+							  0.01f,
+							  allocator));
+	PropertyRegister::add("global_light",
+		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec4, RenderScene>)("Shadow cascades",
+							  &RenderScene::getShadowmapCascades,
+							  &RenderScene::setShadowmapCascades,
 							  allocator));
 	PropertyRegister::add("global_light",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Fog density",
@@ -309,31 +331,20 @@ static void registerProperties(IAllocator& allocator)
 							  FLT_MAX,
 							  1.0f,
 							  allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Ambient color",
-							  &RenderScene::getLightAmbientColor,
-							  &RenderScene::setLightAmbientColor,
-							  allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Diffuse color",
-							  &RenderScene::getGlobalLightColor,
-							  &RenderScene::setGlobalLightColor,
-							  allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Specular color",
-							  &RenderScene::getGlobalLightSpecular,
-							  &RenderScene::setGlobalLightSpecular,
-							  allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Fog color",
-							  &RenderScene::getFogColor,
-							  &RenderScene::setFogColor,
-							  allocator));
+	PropertyRegister::add(
+		"global_light",
+		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)(
+			"Fog color", &RenderScene::getFogColor, &RenderScene::setFogColor, allocator));
 
 	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, BoolPropertyDescriptor<RenderScene>)("Cast shadows",
-							  &RenderScene::getLightCastShadows,
-							  &RenderScene::setLightCastShadows,
+		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Diffuse color",
+							  &RenderScene::getPointLightColor,
+							  &RenderScene::setPointLightColor,
+							  allocator));
+	PropertyRegister::add("point_light",
+		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Specular color",
+							  &RenderScene::getPointLightSpecularColor,
+							  &RenderScene::setPointLightSpecularColor,
 							  allocator));
 	PropertyRegister::add("point_light",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Diffuse intensity",
@@ -344,14 +355,12 @@ static void registerProperties(IAllocator& allocator)
 							  0.05f,
 							  allocator));
 	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Diffuse color",
-							  &RenderScene::getPointLightColor,
-							  &RenderScene::setPointLightColor,
-							  allocator));
-	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Specular color",
-							  &RenderScene::getPointLightSpecularColor,
-							  &RenderScene::setPointLightSpecularColor,
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Specular intensity",
+							  &RenderScene::getPointLightSpecularIntensity,
+							  &RenderScene::setPointLightSpecularIntensity,
+							  0.0f,
+							  999.0f,
+							  0.05f,
 							  allocator));
 	PropertyRegister::add("point_light",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("FOV",
@@ -376,6 +385,11 @@ static void registerProperties(IAllocator& allocator)
 							  0.0f,
 							  FLT_MAX,
 							  1.0f,
+							  allocator));
+	PropertyRegister::add("point_light",
+		LUMIX_NEW(allocator, BoolPropertyDescriptor<RenderScene>)("Cast shadows",
+							  &RenderScene::getLightCastShadows,
+							  &RenderScene::setLightCastShadows,
 							  allocator));
 	PropertyRegister::add("terrain",
 		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",

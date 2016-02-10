@@ -70,6 +70,7 @@ enum class RenderSceneVersion : int32
 	PARTICLES_SAVE_SIZE_ALPHA,
 	RENDERABLE_MATERIALS,
 	GLOBAL_LIGHT_SPECULAR,
+	SPECULAR_INTENSITY,
 
 	LATEST,
 	INVALID = -1,
@@ -80,7 +81,8 @@ struct PointLight
 {
 	Vec3 m_diffuse_color;
 	Vec3 m_specular_color;
-	float m_intensity;
+	float m_diffuse_intensity;
+	float m_specular_intensity;
 	Entity m_entity;
 	int m_uid;
 	float m_fov;
@@ -93,9 +95,10 @@ struct PointLight
 struct GlobalLight
 {
 	ComponentIndex m_uid;
-	Vec3 m_color;
+	Vec3 m_diffuse_color;
+	float m_specular_intensity;
 	Vec3 m_specular;
-	float m_intensity;
+	float m_diffuse_intensity;
 	Vec3 m_ambient_color;
 	float m_ambient_intensity;
 	Vec3 m_fog_color;
@@ -715,21 +718,24 @@ public:
 		{
 			m_light_influenced_geometry.push(Array<int>(m_allocator));
 			PointLight& light = m_point_lights[i];
-			if (version > RenderSceneVersion::WHOLE_LIGHTS)
+			if (version > RenderSceneVersion::SPECULAR_INTENSITY)
 			{
 				serializer.read(light);
 			}
 			else
 			{
-				serializer.read(light.m_uid);
 				serializer.read(light.m_diffuse_color);
-				serializer.read(light.m_intensity);
-				serializer.read(light.m_entity);
-				serializer.read(light.m_attenuation_param);
-				serializer.read(light.m_fov);
 				serializer.read(light.m_specular_color);
+				serializer.read(light.m_diffuse_intensity);
+				serializer.read(light.m_entity);
+				serializer.read(light.m_uid);
+				serializer.read(light.m_fov);
+				serializer.read(light.m_attenuation_param);
+				serializer.read(light.m_range);
 				serializer.read(light.m_cast_shadows);
-				light.m_range = 10;
+				uint8 padding;
+				for(int j = 0; j < 3; ++j) serializer.read(padding);
+				light.m_specular_intensity = 1;
 			}
 			m_point_lights_map.insert(light.m_uid, i);
 
@@ -743,29 +749,16 @@ public:
 		{
 			GlobalLight& light = m_global_lights[i];
 			light.m_specular.set(0, 0, 0);
-			if (version > RenderSceneVersion::GLOBAL_LIGHT_SPECULAR)
+			if (version > RenderSceneVersion::SPECULAR_INTENSITY)
 			{
 				serializer.read(light);
-			}
-			else if (version <= RenderSceneVersion::WHOLE_LIGHTS)
-			{
-				serializer.read(light.m_uid);
-				serializer.read(light.m_color);
-				serializer.read(light.m_intensity);
-				serializer.read(light.m_entity);
-				serializer.read(light.m_ambient_color);
-				serializer.read(light.m_ambient_intensity);
-				serializer.read(light.m_fog_color);
-				serializer.read(light.m_fog_density);
-				serializer.read(light.m_cascades);
-				serializer.read(light.m_fog_bottom);
-				serializer.read(light.m_fog_height);
 			}
 			else
 			{
 				serializer.read(light.m_uid);
-				serializer.read(light.m_color);
-				serializer.read(light.m_intensity);
+				serializer.read(light.m_diffuse_color);
+				serializer.read(light.m_specular);
+				serializer.read(light.m_diffuse_intensity);
 				serializer.read(light.m_ambient_color);
 				serializer.read(light.m_ambient_intensity);
 				serializer.read(light.m_fog_color);
@@ -774,6 +767,7 @@ public:
 				serializer.read(light.m_fog_height);
 				serializer.read(light.m_entity);
 				serializer.read(light.m_cascades);
+				light.m_specular_intensity = 1;
 			}
 			m_universe.addComponent(light.m_entity, GLOBAL_LIGHT_HASH, this, light.m_uid);
 		}
@@ -1113,7 +1107,7 @@ public:
 
 		auto* alpha_module = getEmitterModule<ParticleEmitter::AlphaModule>(cmp);
 		if (!alpha_module) return;
-		
+
 		alpha_module->m_values.resize(count);
 		for (int i = 0; i < count; ++i)
 		{
@@ -2733,12 +2727,12 @@ public:
 
 	void setPointLightIntensity(ComponentIndex cmp, float intensity) override
 	{
-		m_point_lights[getPointLightIndex(cmp)].m_intensity = intensity;
+		m_point_lights[getPointLightIndex(cmp)].m_diffuse_intensity = intensity;
 	}
 
 	void setGlobalLightIntensity(ComponentIndex cmp, float intensity) override
 	{
-		m_global_lights[getGlobalLightIndex(cmp)].m_intensity = intensity;
+		m_global_lights[getGlobalLightIndex(cmp)].m_diffuse_intensity = intensity;
 	}
 
 	void setPointLightColor(ComponentIndex cmp, const Vec3& color) override
@@ -2748,7 +2742,7 @@ public:
 
 	void setGlobalLightColor(ComponentIndex cmp, const Vec3& color) override
 	{
-		m_global_lights[getGlobalLightIndex(cmp)].m_color = color;
+		m_global_lights[getGlobalLightIndex(cmp)].m_diffuse_color = color;
 	}
 
 	void setGlobalLightSpecular(ComponentIndex cmp, const Vec3& color) override
@@ -2756,26 +2750,29 @@ public:
 		m_global_lights[getGlobalLightIndex(cmp)].m_specular = color;
 	}
 
-	void setLightAmbientIntensity(ComponentIndex cmp, float intensity) override
+	void setGlobalLightSpecularIntensity(ComponentIndex cmp, float intensity) override
 	{
-		m_global_lights[getGlobalLightIndex(cmp)].m_ambient_intensity =
-			intensity;
+		m_global_lights[getGlobalLightIndex(cmp)].m_specular_intensity = intensity;
 	}
 
-	void setLightAmbientColor(ComponentIndex cmp,
-									  const Vec3& color) override
+	void setLightAmbientIntensity(ComponentIndex cmp, float intensity) override
+	{
+		m_global_lights[getGlobalLightIndex(cmp)].m_ambient_intensity = intensity;
+	}
+
+	void setLightAmbientColor(ComponentIndex cmp, const Vec3& color) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_ambient_color = color;
 	}
 
 	float getPointLightIntensity(ComponentIndex cmp) override
 	{
-		return m_point_lights[getPointLightIndex(cmp)].m_intensity;
+		return m_point_lights[getPointLightIndex(cmp)].m_diffuse_intensity;
 	}
 
 	float getGlobalLightIntensity(ComponentIndex cmp) override
 	{
-		return m_global_lights[getGlobalLightIndex(cmp)].m_intensity;
+		return m_global_lights[getGlobalLightIndex(cmp)].m_diffuse_intensity;
 	}
 
 	Vec3 getPointLightColor(ComponentIndex cmp) override
@@ -2783,8 +2780,7 @@ public:
 		return m_point_lights[getPointLightIndex(cmp)].m_diffuse_color;
 	}
 
-	void setPointLightSpecularColor(ComponentIndex cmp,
-											const Vec3& color) override
+	void setPointLightSpecularColor(ComponentIndex cmp, const Vec3& color) override
 	{
 		m_point_lights[getPointLightIndex(cmp)].m_specular_color = color;
 	}
@@ -2794,14 +2790,29 @@ public:
 		return m_point_lights[getPointLightIndex(cmp)].m_specular_color;
 	}
 
+	void setPointLightSpecularIntensity(ComponentIndex cmp, float intensity) override
+	{
+		m_point_lights[getPointLightIndex(cmp)].m_specular_intensity = intensity;
+	}
+
+	float getPointLightSpecularIntensity(ComponentIndex cmp) override
+	{
+		return m_point_lights[getPointLightIndex(cmp)].m_specular_intensity;
+	}
+
 	Vec3 getGlobalLightColor(ComponentIndex cmp) override
 	{
-		return m_global_lights[getGlobalLightIndex(cmp)].m_color;
+		return m_global_lights[getGlobalLightIndex(cmp)].m_diffuse_color;
 	}
 
 	Vec3 getGlobalLightSpecular(ComponentIndex cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_specular;
+	}
+
+	float getGlobalLightSpecularIntensity(ComponentIndex cmp) override
+	{
+		return m_global_lights[getGlobalLightIndex(cmp)].m_specular_intensity;
 	}
 
 	float getLightAmbientIntensity(ComponentIndex cmp) override
@@ -2816,7 +2827,6 @@ public:
 
 	void setActiveGlobalLight(ComponentIndex cmp) override
 	{
-		ASSERT(cmp == GLOBAL_LIGHT_HASH);
 		m_active_global_light_uid = cmp;
 	}
 
@@ -2825,12 +2835,10 @@ public:
 		return m_active_global_light_uid;
 	};
 
-
 	Entity getPointLightEntity(ComponentIndex cmp) const override
 	{
 		return m_point_lights[getPointLightIndex(cmp)].m_entity;
 	}
-
 
 	Entity getGlobalLightEntity(ComponentIndex cmp) const override
 	{
@@ -3036,7 +3044,7 @@ public:
 
 		auto& rm = r.model->getResourceManager();
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
-		
+
 		int new_count = Math::maxValue(int8(index + 1), r.mesh_count);
 		allocateCustomMeshes(r, new_count);
 
@@ -3044,8 +3052,8 @@ public:
 		auto* new_material = static_cast<Material*>(material_manager->load(path));
 		r.meshes[index].material = new_material;
 	}
-	
-	
+
+
 	Path getRenderableMaterial(ComponentIndex cmp, int index) override
 	{
 		auto& r = m_renderables[cmp];
@@ -3281,8 +3289,8 @@ public:
 	{
 		GlobalLight& light = m_global_lights.emplace();
 		light.m_entity = entity;
-		light.m_color.set(1, 1, 1);
-		light.m_intensity = 0;
+		light.m_diffuse_color.set(1, 1, 1);
+		light.m_diffuse_intensity = 0;
 		light.m_ambient_color.set(1, 1, 1);
 		light.m_ambient_intensity = 1;
 		light.m_fog_color.set(1, 1, 1);
@@ -3292,6 +3300,7 @@ public:
 		light.m_fog_bottom = 0.0f;
 		light.m_fog_height = 10.0f;
 		light.m_specular.set(0, 0, 0);
+		light.m_specular_intensity = 1;
 
 		if (m_global_lights.size() == 1)
 		{
@@ -3309,10 +3318,11 @@ public:
 		m_light_influenced_geometry.push(Array<int>(m_allocator));
 		light.m_entity = entity;
 		light.m_diffuse_color.set(1, 1, 1);
-		light.m_intensity = 1;
+		light.m_diffuse_intensity = 1;
 		light.m_uid = ++m_point_light_last_uid;
 		light.m_fov = 999;
 		light.m_specular_color.set(1, 1, 1);
+		light.m_specular_intensity = 1;
 		light.m_cast_shadows = false;
 		light.m_attenuation_param = 2;
 		light.m_range = 10;

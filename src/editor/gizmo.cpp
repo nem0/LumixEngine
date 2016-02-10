@@ -683,7 +683,7 @@ struct GizmoImpl : public Gizmo
 				renderRotateGizmo(m_entities[i], camera_pos, fov);
 			}
 		}
-		
+
 		m_mouse_x = m_editor.getMouseX();
 		m_mouse_y = m_editor.getMouseY();
 		m_count = 0;
