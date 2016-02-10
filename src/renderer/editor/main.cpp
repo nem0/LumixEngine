@@ -104,6 +104,14 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 		{
 			b = material->isDefined(alpha_cutout_define);
 			if (ImGui::Checkbox("Is alpha cutout", &b)) material->setDefine(alpha_cutout_define, b);
+			if(b)
+			{
+				float tmp = material->getAlphaRef();
+				if(ImGui::DragFloat("Alpha reference value", &tmp, 0.01f, 0.0f, 1.0f))
+				{
+					material->setAlphaRef(tmp);
+				}
+			}
 		}
 
 		b = material->isBackfaceCulling();
