@@ -38,6 +38,42 @@ newaction {
 	end
 }
 
+newaction {
+	trigger = "install32",
+	description = "Install 32bit in ../../LumixEngine_data/bin32",
+	execute = function()
+		local src_dir = "tmp/vs2013/bin/RelWithDebInfo/"
+		local dst_dir = "../../LumixEngine_data/bin32/"
+		
+		function installDll(filename)
+			os.copyfile(path.join(src_dir, filename .. ".dll"), path.join(dst_dir, filename .. ".dll"))
+		end
+
+		function installDllWithPdb(filename)
+			installDll(filename)
+			os.copyfile(path.join(src_dir, filename .. ".pdb"), path.join(dst_dir, filename .. ".pdb"))
+		end
+		
+		installDllWithPdb "animation"
+		installDllWithPdb "audio"
+		installDllWithPdb "editor"
+		installDllWithPdb "engine"
+		installDllWithPdb "lua_script"
+		installDllWithPdb "physics"
+		installDllWithPdb "renderer"
+		installDllWithPdb "assimp"
+		
+		installDll "PhysX3CommonCHECKED_x86"
+		installDll "PhysX3CookingCHECKED_x86"
+		installDll "PhysX3CharacterKinematicCHECKED_x86"
+		installDll "PhysX3CHECKED_x86"
+		installDll "nvToolsExt32_1"
+
+		os.copyfile(path.join(src_dir, "studio.exe"), path.join(dst_dir, "studio.exe"))
+		os.copyfile(path.join(src_dir, "studio.pdb"), path.join(dst_dir, "studio.pdb"))
+	end
+}
+
 function defaultConfigurations()
 	configuration "Debug"
 		targetdir(BINARY_DIR .. "Debug")
