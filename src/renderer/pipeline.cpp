@@ -1193,39 +1193,45 @@ struct PipelineImpl : public Pipeline
 
 		bgfx::TransientVertexBuffer tvb;
 		bgfx::TransientIndexBuffer tib;
-		if (bgfx::allocTransientBuffers(
-				&tvb, m_base_vertex_decl, lines.size() * 2, &tib, lines.size() * 2))
+
+		static const int BATCH_SIZE = 1024 * 16;
+
+		for (int j = 0; j < lines.size(); j += BATCH_SIZE)
 		{
-			BaseVertex* vertex = (BaseVertex*)tvb.data;
-			uint16* indices = (uint16*)tib.data;
-			for (int i = 0; i < lines.size(); ++i)
+			int count = Math::minValue(BATCH_SIZE, lines.size() - j);
+			if (bgfx::allocTransientBuffers(&tvb, m_base_vertex_decl, count * 2, &tib, count * 2))
 			{
-				const DebugLine& line = lines[i];
-				vertex[0].rgba = line.m_color;
-				vertex[0].x = line.m_from.x;
-				vertex[0].y = line.m_from.y;
-				vertex[0].z = line.m_from.z;
-				vertex[0].u = vertex[0].v = 0;
+				BaseVertex* vertex = (BaseVertex*)tvb.data;
+				uint16* indices = (uint16*)tib.data;
+				for (int i = 0; i < count; ++i)
+				{
+					const DebugLine& line = lines[j + i];
+					vertex[0].rgba = line.m_color;
+					vertex[0].x = line.m_from.x;
+					vertex[0].y = line.m_from.y;
+					vertex[0].z = line.m_from.z;
+					vertex[0].u = vertex[0].v = 0;
 
-				vertex[1].rgba = line.m_color;
-				vertex[1].x = line.m_to.x;
-				vertex[1].y = line.m_to.y;
-				vertex[1].z = line.m_to.z;
-				vertex[1].u = vertex[0].v = 0;
+					vertex[1].rgba = line.m_color;
+					vertex[1].x = line.m_to.x;
+					vertex[1].y = line.m_to.y;
+					vertex[1].z = line.m_to.z;
+					vertex[1].u = vertex[0].v = 0;
 
-				indices[0] = i * 2;
-				indices[1] = i * 2 + 1;
-				vertex += 2;
-				indices += 2;
+					indices[0] = i * 2;
+					indices[1] = i * 2 + 1;
+					vertex += 2;
+					indices += 2;
+				}
+
+				bgfx::setVertexBuffer(&tvb);
+				bgfx::setIndexBuffer(&tib);
+				bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
+				bgfx::setState(m_render_state | m_debug_line_material->getRenderStates() |
+							   BGFX_STATE_PT_LINES);
+				bgfx::submit(m_view_idx,
+					m_debug_line_material->getShaderInstance().m_program_handles[m_pass_idx]);
 			}
-
-			bgfx::setVertexBuffer(&tvb);
-			bgfx::setIndexBuffer(&tib);
-			bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
-			bgfx::setState(
-				m_render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_LINES);
-			bgfx::submit(m_view_idx,
-				m_debug_line_material->getShaderInstance().m_program_handles[m_pass_idx]);
 		}
 	}
 
