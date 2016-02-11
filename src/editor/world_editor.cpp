@@ -1616,7 +1616,11 @@ public:
 	{
 		m_is_mouse_click[button] = true;
 		m_is_mouse_down[button] = true;
-		if (button == MouseButton::RIGHT)
+		if(button == MouseButton::MIDDLE)
+		{
+			m_mouse_mode = MouseMode::PAN;
+		}
+		else if (button == MouseButton::RIGHT)
 		{
 			m_mouse_mode = MouseMode::NAVIGATE;
 		}
@@ -1708,6 +1712,7 @@ public:
 			}
 			break;
 			case MouseMode::NAVIGATE: rotateCamera(relx, rely); break;
+			case MouseMode::PAN: panCamera(relx, rely); break;
 		}
 	}
 
@@ -2648,7 +2653,29 @@ public:
 
 	void setOrbitCamera(bool enable) override
 	{
+		m_orbit_delta = Vec2(0, 0);
 		m_is_orbit = enable;
+	}
+
+
+	void panCamera(int x, int y)
+	{
+		Universe* universe = getUniverse();
+		Vec3 pos = universe->getPosition(m_camera);
+		Quat rot = universe->getRotation(m_camera);
+
+		static const float MOUSE_MULTIPLIER = 1 / 200.0f;
+
+		if(m_is_orbit)
+		{
+			m_orbit_delta.x += x * MOUSE_MULTIPLIER;
+			m_orbit_delta.y += y * MOUSE_MULTIPLIER;
+		}
+
+		pos += rot * Vec3(1, 0, 0) * (float)x * MOUSE_MULTIPLIER;
+		pos += rot * Vec3(0, -1, 0) * (float)y * MOUSE_MULTIPLIER;
+
+		universe->setPosition(m_camera, pos);
 	}
 
 
@@ -2657,6 +2684,7 @@ public:
 		Universe* universe = getUniverse();
 		Vec3 pos = universe->getPosition(m_camera);
 		Quat rot = universe->getRotation(m_camera);
+		Quat old_rot = rot;
 
 		Quat yaw_rot(Vec3(0, 1, 0), -x / 200.0f);
 		rot = rot * yaw_rot;
@@ -2671,15 +2699,19 @@ public:
 		{
 			Vec3 dir = rot * Vec3(0, 0, 1);
 			Vec3 entity_pos = universe->getPosition(m_selected_entities[0]);
-			float dist = (entity_pos - pos).length();
+			Vec3 nondelta_pos = pos;
+
+			nondelta_pos -= old_rot * Vec3(0, -1, 0) * m_orbit_delta.y;
+			nondelta_pos -= old_rot * Vec3(1, 0, 0) * m_orbit_delta.x;
+
+			float dist = (entity_pos - nondelta_pos).length();
 			pos = entity_pos + dir * dist;
+			pos += rot * Vec3(1, 0, 0) * m_orbit_delta.x;
+			pos += rot * Vec3(0, -1, 0) * m_orbit_delta.y;
 		}
 
-		Matrix camera_mtx;
-		rot.toMatrix(camera_mtx);
-
-		camera_mtx.setTranslation(pos);
-		universe->setMatrix(m_camera, camera_mtx);
+		universe->setRotation(m_camera, rot);
+		universe->setPosition(m_camera, pos);
 	}
 
 
@@ -3152,6 +3184,7 @@ private:
 			NONE,
 			SELECT,
 			NAVIGATE,
+			PAN,
 
 			CUSTOM
 		};
@@ -3188,6 +3221,7 @@ private:
 	EditorIcons* m_editor_icons;
 	float m_mouse_x;
 	float m_mouse_y;
+	Vec2 m_orbit_delta;
 	bool m_gizmo_use_step;
 	AssociativeArray<Entity, Array<ComponentUID>> m_components;
 	bool m_is_game_mode;
