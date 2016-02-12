@@ -50,6 +50,7 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 	m_filter[0] = '\0';
 	m_current_type = 0;
 	m_is_opened = false;
+	m_activate = false;
 	m_resources.emplace(editor.getAllocator());
 
 	findResources();
@@ -163,9 +164,14 @@ void AssetBrowser::onGUI()
 
 	if (!ImGui::BeginDock("Asset Browser", &m_is_opened))
 	{
+		if (m_activate) ImGui::SetDockActive();
+		m_activate = false;
 		ImGui::EndDock();
 		return;
 	}
+
+	if (m_activate) ImGui::SetDockActive();
+	m_activate = false;
 
 	if (m_is_focus_requested)
 	{
@@ -229,6 +235,7 @@ void AssetBrowser::addPlugin(IPlugin& plugin)
 
 void AssetBrowser::selectResource(const Lumix::Path& resource)
 {
+	m_activate = true;
 	char ext[30];
 	Lumix::PathUtils::getExtension(ext, Lumix::lengthOf(ext), resource.c_str());
 	if (Lumix::compareString(ext, "unv") == 0) return;
