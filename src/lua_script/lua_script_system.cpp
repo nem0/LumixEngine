@@ -14,6 +14,7 @@
 #include "core/resource_manager.h"
 #include "debug/debug.h"
 #include "editor/asset_browser.h"
+#include "editor/ieditor_command.h"
 #include "editor/imgui/imgui.h"
 #include "editor/property_grid.h"
 #include "editor/studio_app.h"
@@ -81,6 +82,7 @@ namespace Lumix
 			int environment;
 			ComponentIndex cmp;
 		};
+
 
 		struct ScriptInstance
 		{
@@ -299,10 +301,10 @@ namespace Lumix
 		}
 
 
-		const char* getPropertyValue(Lumix::ComponentIndex cmp, int scr_index, int index) const override
+		const char* getPropertyValue(Lumix::ComponentIndex cmp, int scr_index, const char* name) const
 		{
 			auto& script = *m_scripts[cmp];
-			uint32 hash = crc32(getPropertyName(cmp, scr_index, index));
+			uint32 hash = crc32(name);
 
 			for (auto& value : script.m_scripts[scr_index].m_properties)
 			{
@@ -313,6 +315,12 @@ namespace Lumix
 			}
 
 			return "";
+		}
+
+
+		const char* getPropertyValue(Lumix::ComponentIndex cmp, int scr_index, int index) const override
+		{
+			return getPropertyValue(cmp, scr_index, getPropertyName(cmp, scr_index, index));
 		}
 
 
@@ -749,9 +757,16 @@ namespace Lumix
 		}
 
 
-		void addScript(ComponentIndex cmp)
+		void insertScript(ComponentIndex cmp, int idx)
+		{
+			m_scripts[cmp]->m_scripts.emplaceAt(idx, m_system.m_allocator);
+		}
+
+
+		int addScript(ComponentIndex cmp)
 		{
 			m_scripts[cmp]->m_scripts.emplace(m_system.m_allocator);
+			return m_scripts[cmp]->m_scripts.size() - 1;
 		}
 
 
@@ -762,6 +777,38 @@ namespace Lumix
 				m_system.getScriptManager().unload(*m_scripts[cmp]->m_scripts[scr_index].m_script);
 			}
 			m_scripts[cmp]->m_scripts.eraseFast(scr_index);
+		}
+
+
+		void serializeScript(ComponentIndex cmp, int scr_index, OutputBlob& blob)
+		{
+			auto& scr = m_scripts[cmp]->m_scripts[scr_index];
+			blob.writeString(scr.m_script ? scr.m_script->getPath().c_str() : "");
+			blob.write(scr.m_properties.size());
+			for (auto prop : scr.m_properties)
+			{
+				blob.write(prop.m_name_hash);
+				blob.writeString(prop.m_value.c_str());
+			}
+		}
+
+
+		void deserializeScript(ComponentIndex cmp, int scr_index, InputBlob& blob)
+		{
+			auto& scr = m_scripts[cmp]->m_scripts[scr_index];
+			int count;
+			char buf[256];
+			blob.readString(buf, lengthOf(buf));
+			scr.m_script = static_cast<LuaScript*>(m_system.getScriptManager().load(Lumix::Path(buf)));
+			blob.read(count);
+			scr.m_properties.clear();
+			for (int i = 0; i < count; ++i)
+			{
+				auto& prop = scr.m_properties.emplace(m_system.m_allocator);
+				blob.read(prop.m_name_hash);
+				blob.readString(buf, lengthOf(buf));
+				prop.m_value = buf;
+			}
 		}
 
 
@@ -835,6 +882,211 @@ namespace Lumix
 
 	struct PropertyGridPlugin : public PropertyGrid::IPlugin
 	{
+		struct AddScriptCommand : public IEditorCommand
+		{
+			bool execute() override
+			{
+				scr_index = scene->addScript(cmp);
+				return true;
+			}
+
+
+			void undo() override
+			{
+				scene->removeScript(cmp, scr_index);
+			}
+
+
+			void serialize(JsonSerializer& serializer) override
+			{
+				serializer.serialize("component", cmp);
+			}
+
+
+			void deserialize(JsonSerializer& serializer) override
+			{
+				serializer.deserialize("component", cmp, 0);
+			}
+
+
+			uint32 getType() override
+			{
+				static const uint32 hash = crc32("add_script");
+				return hash;
+			}
+
+
+			bool merge(IEditorCommand& command) override
+			{
+				return false;
+			}
+
+
+			LuaScriptSceneImpl* scene;
+			ComponentIndex cmp;
+			int scr_index;
+		};
+
+
+		struct RemoveScriptCommand : public IEditorCommand
+		{
+			RemoveScriptCommand(IAllocator& allocator)
+				: blob(allocator)
+			{
+			}
+
+
+			bool execute() override
+			{
+				scene->serializeScript(cmp, scr_index, blob);
+				scene->removeScript(cmp, scr_index);
+				return true;
+			}
+
+
+			void undo() override
+			{
+				scene->insertScript(cmp, scr_index);
+				scene->deserializeScript(cmp, scr_index, InputBlob(blob));
+			}
+
+
+			void serialize(JsonSerializer& serializer) override
+			{
+				serializer.serialize("component", cmp);
+				serializer.serialize("scr_index", scr_index);
+			}
+
+
+			void deserialize(JsonSerializer& serializer) override
+			{
+				serializer.deserialize("component", cmp, 0);
+				serializer.deserialize("scr_index", scr_index, 0);
+			}
+
+
+			uint32 getType() override
+			{
+				static const uint32 hash = crc32("remove_script");
+				return hash;
+			}
+
+
+			bool merge(IEditorCommand& command) override
+			{
+				return false;
+			}
+
+			OutputBlob blob;
+			LuaScriptSceneImpl* scene;
+			ComponentIndex cmp;
+			int scr_index;
+		};
+
+
+		struct SetPropertyCommand : public IEditorCommand
+		{
+			SetPropertyCommand(LuaScriptSceneImpl* scene,
+				ComponentIndex cmp,
+				int scr_index,
+				const char* property_name,
+				const char* val,
+				IAllocator& allocator)
+				: property_name(property_name, allocator)
+				, value(val, allocator)
+				, old_value(allocator)
+				, component(cmp)
+				, script_index(scr_index)
+			{
+				this->scene = scene;
+				if (property_name[0] == '-')
+				{
+					old_value = scene->getScriptPath(component, script_index).c_str();
+				}
+				else
+				{
+					old_value = scene->getPropertyValue(component, script_index, property_name);
+				}
+			}
+
+
+			bool execute() override
+			{
+				if (property_name.length() > 0 && property_name[0] == '-')
+				{
+					scene->setScriptPath(component, script_index, Path(value.c_str()));
+				}
+				else
+				{
+					scene->setPropertyValue(component, script_index, property_name.c_str(), value.c_str());
+				}
+				return true;
+			}
+
+
+			void undo() override
+			{
+				if (property_name.length() > 0 && property_name[0] == '-')
+				{
+					scene->setScriptPath(component, script_index, Path(old_value.c_str()));
+				}
+				else
+				{
+					scene->setPropertyValue(component, script_index, property_name.c_str(), old_value.c_str());
+				}
+			}
+
+
+			void serialize(JsonSerializer& serializer) override
+			{
+				serializer.serialize("component", component);
+				serializer.serialize("script_index", script_index);
+				serializer.serialize("property_name", property_name.c_str());
+				serializer.serialize("value", value.c_str());
+			}
+
+
+			void deserialize(JsonSerializer& serializer) override
+			{
+				serializer.deserialize("component", component, 0);
+				serializer.deserialize("script_index", script_index, 0);
+				char buf[256];
+				serializer.deserialize("property_name", buf, lengthOf(buf), "");
+				property_name = buf;
+				serializer.deserialize("value", buf, lengthOf(buf), "");
+				value = buf;
+			}
+			
+			
+			uint32 getType() override
+			{
+				static const uint32 hash = crc32("set_script_property");
+				return hash;
+			}
+
+
+			bool merge(IEditorCommand& command) override
+			{
+				auto& cmd = static_cast<SetPropertyCommand&>(command);
+				if (cmd.script_index == script_index && cmd.property_name == property_name)
+				{
+					cmd.value = value;
+					return true;
+				}
+				return false;
+			}
+
+
+			LuaScriptSceneImpl* scene;
+			string property_name;
+			string value;
+			string old_value;
+			ComponentIndex component;
+			int script_index;
+		};
+
+
+
 		PropertyGridPlugin(StudioApp& app)
 			: m_app(app)
 		{
@@ -845,11 +1097,16 @@ namespace Lumix
 		{
 			if (cmp.type != LUA_SCRIPT_HASH) return;
 
-			auto* scene = static_cast<Lumix::LuaScriptSceneImpl*>(cmp.scene);
+			auto* scene = static_cast<LuaScriptSceneImpl*>(cmp.scene);
+			auto& editor = *m_app.getWorldEditor();
+			auto& allocator = editor.getAllocator();
 
 			if (ImGui::Button("Add script"))
 			{
-				scene->addScript(cmp.index);
+				auto* cmd = LUMIX_NEW(allocator, AddScriptCommand);
+				cmd->scene = scene;
+				cmd->cmp = cmp.index;
+				editor.executeCommand(cmd);
 			}
 
 			for (int j = 0; j < scene->getScriptCount(cmp.index); ++j)
@@ -858,23 +1115,25 @@ namespace Lumix
 				copyString(buf, scene->getScriptPath(cmp.index, j).c_str());
 				char basename[50];
 				PathUtils::getBasename(basename, lengthOf(basename), buf);
-				if (basename[0] == 0)
-				{
-					toCString(j, basename, lengthOf(basename));
-				}
+				if (basename[0] == 0) toCString(j, basename, lengthOf(basename));
 
 				if (ImGui::CollapsingHeader(basename))
 				{
 					ImGui::PushID(j);
 					if (ImGui::Button("Remove script"))
 					{
-						scene->removeScript(cmp.index, j);
+						auto* cmd = LUMIX_NEW(allocator, RemoveScriptCommand)(allocator);
+						cmd->cmp = cmp.index;
+						cmd->scr_index = j;
+						cmd->scene = scene;
+						editor.executeCommand(cmd);
 						ImGui::PopID();
 						break;
 					}
 					if (m_app.getAssetBrowser()->resourceInput("Source", "src", buf, lengthOf(buf), LUA_SCRIPT_HASH))
 					{
-						scene->setScriptPath(cmp.index, j, Path(buf));
+						auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(scene, cmp.index, j, "-source", buf, allocator);
+						editor.executeCommand(cmd);
 					}
 					auto* script_res = scene->getScriptResource(cmp.index, j);
 					for (int i = 0; i < scene->getPropertyCount(cmp.index, j); ++i)
@@ -890,7 +1149,8 @@ namespace Lumix
 							if (ImGui::DragFloat(property_name, &f))
 							{
 								Lumix::toCString(f, buf, sizeof(buf), 5);
-								scene->setPropertyValue(cmp.index, j, property_name, buf);
+								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(scene, cmp.index, j, property_name, buf, allocator);
+								editor.executeCommand(cmd);
 							}
 						}
 						break;
@@ -902,14 +1162,16 @@ namespace Lumix
 								property_name, StringBuilder<50>(property_name, cmp.index), e))
 							{
 								Lumix::toCString(e, buf, sizeof(buf));
-								scene->setPropertyValue(cmp.index, j, property_name, buf);
+								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(scene, cmp.index, j, property_name, buf, allocator);
+								editor.executeCommand(cmd);
 							}
 						}
 						break;
 						case Lumix::LuaScript::Property::ANY:
 							if (ImGui::InputText(property_name, buf, sizeof(buf)))
 							{
-								scene->setPropertyValue(cmp.index, j, property_name, buf);
+								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(scene, cmp.index, j, property_name, buf, allocator);
+								editor.executeCommand(cmd);
 							}
 							break;
 						}

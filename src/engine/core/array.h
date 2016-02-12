@@ -224,6 +224,21 @@ public:
 		return m_data[m_size - 1];
 	}
 
+	template <typename... Params> T& emplaceAt(int idx, Params&&... params)
+	{
+		if (m_size == m_capacity)
+		{
+			grow();
+		}
+		for (int i = m_size - 2; i >= idx; --i)
+		{
+			copyMemory(&m_data[i + 1], &m_data[i], sizeof(m_data[i]));
+		}
+		new (NewPlaceholder(), (char*)(m_data + idx)) T(myforward<Params>(params)...);
+		++m_size;
+		return m_data[idx];
+	}
+
 	bool empty() const { return m_size == 0; }
 
 	void clear()
