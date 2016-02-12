@@ -230,7 +230,7 @@ public:
 		{
 			grow();
 		}
-		for (int i = m_size - 2; i >= idx; --i)
+		for (int i = m_size - 1; i >= idx; --i)
 		{
 			copyMemory(&m_data[i + 1], &m_data[i], sizeof(m_data[i]));
 		}

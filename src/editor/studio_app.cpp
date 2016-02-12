@@ -617,7 +617,9 @@ public:
 				}
 				ImGui::EndMenu();
 			}
-			StringBuilder<100> stats("");
+			StringBuilder<200> stats("");
+			if (m_log_ui->getUnreadErrorCount() == 1) stats << m_log_ui->getUnreadErrorCount() << " error | ";
+			else if (m_log_ui->getUnreadErrorCount() > 1) stats << m_log_ui->getUnreadErrorCount() << " errors | ";
 			if (m_engine->getFileSystem().hasWork()) stats << "Loading... | ";
 			stats << "FPS: ";
 			stats << m_engine->getFPS();
