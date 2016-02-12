@@ -7,6 +7,7 @@
 #include "core/string.h"
 #include "editor/gizmo.h"
 #include "editor/imgui/imgui.h"
+#include "editor/log_ui.h"
 #include "editor/platform_interface.h"
 #include "editor/settings.h"
 #include "engine/engine.h"
@@ -27,6 +28,7 @@ SceneView::SceneView()
 	m_is_pipeline_switch = false;
 	m_is_mouse_captured = false;
 	m_show_stats = false;
+	m_log_ui = nullptr;
 }
 
 
@@ -92,8 +94,9 @@ void SceneView::onUniverseDestroyed()
 }
 
 
-bool SceneView::init(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
+bool SceneView::init(LogUI& log_ui, Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
 {
+	m_log_ui = &log_ui;
 	m_editor = &editor;
 	auto& engine = editor.getEngine();
 	auto& allocator = engine.getAllocator();
@@ -203,7 +206,13 @@ void SceneView::onGUI()
 	PROFILE_FUNCTION();
 	m_is_opened = false;
 	ImVec2 view_pos;
-	if (ImGui::BeginDock("Scene View"))
+	const char* title = "Scene View###Scene View";
+	if (m_log_ui && m_log_ui->getUnreadErrorCount() > 0)
+	{
+		title = "Scene View | errors in log###Scene View";
+	}
+
+	if (ImGui::BeginDock(title))
 	{
 		m_is_opened = true;
 		auto size = ImGui::GetContentRegionAvail();

@@ -189,6 +189,8 @@ struct DockContext
 		Status_ status;
 		bool opened;
 		bool first;
+		int last_frame;
+		int invalid_frames;
 	};
 
 
@@ -222,6 +224,8 @@ struct DockContext
 		new_dock->size = GetIO().DisplaySize;
 		new_dock->opened = opened;
 		new_dock->first = true;
+		new_dock->last_frame = 0;
+		new_dock->invalid_frames = 0;
 		return *new_dock;
 	}
 
@@ -303,6 +307,28 @@ struct DockContext
 	}
 
 
+	void checkNonexistent()
+	{
+		int frame_limit = ImMax(0, ImGui::GetFrameCount() - 2);
+		for (Dock* dock : m_docks)
+		{
+			if (dock->isContainer()) continue;
+			if (dock->status == Status_Float) continue;
+			if (dock->last_frame < frame_limit)
+			{
+				++dock->invalid_frames;
+				if (dock->invalid_frames > 2)
+				{
+					doUndock(*dock);
+					dock->status = Status_Float;
+				}
+				return;
+			}
+			dock->invalid_frames = 0;
+		}
+	}
+
+
 	void beginPanel()
 	{
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
@@ -323,6 +349,8 @@ struct DockContext
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
 		Begin("###DockPanel", nullptr, flags);
 		splits();
+
+		checkNonexistent();
 	}
 
 
@@ -806,6 +834,13 @@ struct DockContext
 	bool begin(const char* label, bool* opened, ImGuiWindowFlags extra_flags)
 	{
 		Dock& dock = getDock(label, !opened || *opened);
+		dock.last_frame = ImGui::GetFrameCount();
+		if (strcmp(dock.label, label) != 0)
+		{
+			MemFree(dock.label);
+			dock.label = ImStrdup(label);
+		}
+
 		m_end_action = EndAction_None;
 
 		if (dock.first && opened) *opened = dock.opened;
@@ -855,6 +890,7 @@ struct DockContext
 		}
 
 		if (!dock.active && dock.status != Status_Dragged) return false;
+
 		m_end_action = EndAction_EndChild;
 
 		PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
@@ -975,6 +1011,8 @@ struct DockContext
 					if (lua_getfield(L, -1, "index") == LUA_TNUMBER)
 						idx = (int)lua_tointeger(L, -1);
 					Dock& dock = *m_docks[idx];
+					dock.last_frame = 0;
+					dock.invalid_frames = 0;
 					lua_pop(L, 1);
 
 					if (lua_getfield(L, -1, "label") == LUA_TSTRING)

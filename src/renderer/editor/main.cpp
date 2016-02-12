@@ -895,7 +895,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		auto& allocator = editor.getAllocator();
 		m_action = LUMIX_NEW(allocator, Action)("Scene View", "scene_view");
 		m_action->func.bind<SceneViewPlugin, &SceneViewPlugin::onAction>(this);
-		m_scene_view.init(editor, app.getActions());
+		m_scene_view.init(*app.getLogUI(), editor, app.getActions());
 		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getCurrentPipeline());
 		editor.setRenderInterface(m_render_interface);
 	}
