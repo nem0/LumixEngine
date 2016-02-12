@@ -176,6 +176,7 @@ namespace Lumix
 			m_function_call.cmp = cmp;
 			m_function_call.is_in_progress = true;
 			m_function_call.parameter_count = 0;
+			m_function_call.scr_index = scr_index;
 
 			return &m_function_call;
 		}
