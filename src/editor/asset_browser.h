@@ -75,4 +75,5 @@ private:
 	Lumix::Path m_wanted_resource;
 	bool m_autoreload_changed_resource;
 	bool m_is_focus_requested;
+	bool m_activate;
 };
