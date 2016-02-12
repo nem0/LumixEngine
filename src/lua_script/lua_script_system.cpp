@@ -548,12 +548,9 @@ namespace Lumix
 				serializer.write(m_scripts[i]->m_scripts.size());
 				for (auto& scr : m_scripts[i]->m_scripts)
 				{
-					serializer.writeString(
-						m_scripts[i]->m_scripts[i].m_script
-							? m_scripts[i]->m_scripts[i].m_script->getPath().c_str()
-							: "");
-					serializer.write(m_scripts[i]->m_scripts[i].m_properties.size());
-					for (Property& prop : m_scripts[i]->m_scripts[i].m_properties)
+					serializer.writeString(scr.m_script ? scr.m_script->getPath().c_str() : "");
+					serializer.write(scr.m_properties.size());
+					for (Property& prop : scr.m_properties)
 					{
 						serializer.write(prop.m_name_hash);
 						serializer.writeString(prop.m_value.c_str());
