@@ -120,16 +120,16 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 		b = material->isZTest();
 		if (ImGui::Checkbox("Z test", &b)) material->enableZTest(b);
 
-		Vec3 specular = material->getSpecular();
-		if (ImGui::ColorEdit3("Specular", &specular.x))
+		Vec3 color = material->getColor();
+		if (ImGui::ColorEdit3("Color", &color.x))
 		{
-			material->setSpecular(specular);
+			material->setColor(color);
 		}
-		if (ImGui::BeginPopupContextItem("specular_pu"))
+		if (ImGui::BeginPopupContextItem("color_pu"))
 		{
-			if(ImGui::ColorPicker(&specular.x, false))
+			if(ImGui::ColorPicker(&color.x, false))
 			{
-				material->setSpecular(specular);
+				material->setColor(color);
 			}
 			ImGui::EndPopup();
 		}
@@ -509,7 +509,7 @@ struct TexturePlugin : public AssetBrowser::IPlugin
 	{
 	}
 
-	
+
 	bool onGUI(Resource* resource, uint32 type) override
 	{
 		if (type != TEXTURE_HASH) return false;

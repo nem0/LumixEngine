@@ -54,8 +54,8 @@ public:
 	void enableBackfaceCulling(bool enable) { setRenderState(enable, BGFX_STATE_CULL_CW, BGFX_STATE_CULL_MASK); }
 	float getShininess() const { return m_shininess; }
 	void setShininess(float value) { m_shininess = value; }
-	Vec3 getSpecular() const { return m_specular; }
-	void setSpecular(const Vec3& specular) { m_specular = specular; }
+	Vec3 getColor() const { return m_color; }
+	void setColor(const Vec3& specular) { m_color = specular; }
 	float getAlphaRef() const { return m_alpha_ref; }
 	void setAlphaRef(float value);
 	uint64 getRenderStates() const { return m_render_states; }
@@ -76,7 +76,7 @@ public:
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }
 	ShaderInstance& getShaderInstance() { ASSERT(m_shader_instance); return *m_shader_instance; }
 	const ShaderInstance& getShaderInstance() const { ASSERT(m_shader_instance); return *m_shader_instance; }
-	
+
 	void setDefine(uint8 define_idx, bool enabled);
 	bool hasDefine(uint8 define_idx) const;
 	bool isDefined(uint8 define_idx) const;
@@ -102,7 +102,7 @@ private:
 	IAllocator& m_allocator;
 	bgfx::ProgramHandle m_program_id;
 	uint64 m_render_states;
-	Vec3 m_specular;
+	Vec3 m_color;
 	float m_shininess;
 	float m_alpha_ref;
 	uint32 m_define_mask;
