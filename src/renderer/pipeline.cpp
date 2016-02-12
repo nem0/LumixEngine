@@ -386,8 +386,8 @@ struct PipelineImpl : public Pipeline
 			bgfx::createUniform("u_shadowmapMatrices", bgfx::UniformType::Mat4, 4);
 		m_bone_matrices_uniform =
 			bgfx::createUniform("u_boneMatrices", bgfx::UniformType::Mat4, 64);
-		m_specular_shininess_uniform =
-			bgfx::createUniform("u_materialSpecularShininess", bgfx::UniformType::Vec4);
+		m_mat_color_shininess_uniform =
+			bgfx::createUniform("u_materialColorShininess", bgfx::UniformType::Vec4);
 		m_terrain_matrix_uniform = bgfx::createUniform("u_terrainMatrix", bgfx::UniformType::Mat4);
 	}
 
@@ -396,7 +396,7 @@ struct PipelineImpl : public Pipeline
 	{
 		bgfx::destroyUniform(m_tex_shadowmap_uniform);
 		bgfx::destroyUniform(m_terrain_matrix_uniform);
-		bgfx::destroyUniform(m_specular_shininess_uniform);
+		bgfx::destroyUniform(m_mat_color_shininess_uniform);
 		bgfx::destroyUniform(m_bone_matrices_uniform);
 		bgfx::destroyUniform(m_terrain_scale_uniform);
 		bgfx::destroyUniform(m_rel_camera_pos_uniform);
@@ -1832,8 +1832,8 @@ struct PipelineImpl : public Pipeline
 				i, shader->getTextureSlot(i).m_uniform_handle, texture->getTextureHandle());
 		}
 
-		Vec4 specular_shininess(material->getSpecular(), material->getShininess());
-		bgfx::setUniform(m_specular_shininess_uniform, &specular_shininess);
+		Vec4 color_shininess(material->getColor(), material->getShininess());
+		bgfx::setUniform(m_mat_color_shininess_uniform, &color_shininess);
 
 		if (m_is_current_light_global && !m_is_rendering_in_shadowmap && m_global_light_shadowmap)
 		{
@@ -2237,7 +2237,7 @@ struct PipelineImpl : public Pipeline
 	Array<ComponentIndex> m_tmp_local_lights;
 	DirectionalLightUniforms m_directional_light_uniforms;
 
-	bgfx::UniformHandle m_specular_shininess_uniform;
+	bgfx::UniformHandle m_mat_color_shininess_uniform;
 	bgfx::UniformHandle m_bone_matrices_uniform;
 	bgfx::UniformHandle m_terrain_scale_uniform;
 	bgfx::UniformHandle m_rel_camera_pos_uniform;

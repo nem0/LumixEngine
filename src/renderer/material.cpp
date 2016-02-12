@@ -29,7 +29,7 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 	, m_allocator(allocator)
 	, m_texture_count(0)
 	, m_render_states(0)
-	, m_specular(1, 1, 1)
+	, m_color(1, 1, 1)
 	, m_shininess(4)
 	, m_shader_instance(nullptr)
 	, m_define_mask(0)
@@ -205,10 +205,10 @@ bool Material::save(JsonSerializer& serializer)
 	serializer.serialize("backface_culling", isBackfaceCulling());
 	serializer.serialize("shininess", m_shininess);
 	serializer.serialize("alpha_ref", m_alpha_ref);
-	serializer.beginArray("specular");
-	serializer.serializeArrayItem(m_specular.x);
-	serializer.serializeArrayItem(m_specular.y);
-	serializer.serializeArrayItem(m_specular.z);
+	serializer.beginArray("color");
+		serializer.serializeArrayItem(m_color.x);
+		serializer.serializeArrayItem(m_color.y);
+		serializer.serializeArrayItem(m_color.z);
 	serializer.endArray();
 	serializer.serialize("z_test", isZTest());
 	serializer.endObject();
@@ -681,12 +681,12 @@ bool Material::load(FS::IFile& file)
 				}
 			}
 		}
-		else if (compareString(label, "specular") == 0)
+		else if (compareString(label, "color") == 0)
 		{
 			serializer.deserializeArrayBegin();
-			serializer.deserializeArrayItem(m_specular.x, 1.0f);
-			serializer.deserializeArrayItem(m_specular.y, 1.0f);
-			serializer.deserializeArrayItem(m_specular.z, 1.0f);
+			serializer.deserializeArrayItem(m_color.x, 1.0f);
+			serializer.deserializeArrayItem(m_color.y, 1.0f);
+			serializer.deserializeArrayItem(m_color.z, 1.0f);
 			serializer.deserializeArrayEnd();
 		}
 		else if (compareString(label, "shininess") == 0)
