@@ -275,14 +275,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 			auto cmp = m_script_scene->getComponent(e1);
 			if (cmp == INVALID_COMPONENT) return;
 
-			auto* call = m_script_scene->beginFunctionCall(cmp, "onContact");
-			if (!call) return;
+			for (int i = 0, c = m_script_scene->getScriptCount(cmp); i < c; ++i)
+			{
+				auto* call = m_script_scene->beginFunctionCall(cmp, i, "onContact");
+				if (!call) continue;
 
-			call->add(e2);
-			call->add(position.x);
-			call->add(position.y);
-			call->add(position.z);
-			m_script_scene->endFunctionCall(*call);
+				call->add(e2);
+				call->add(position.x);
+				call->add(position.y);
+				call->add(position.z);
+				m_script_scene->endFunctionCall(*call);
+			}
 		};
 
 		send(e1, e2, position);

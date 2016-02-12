@@ -41,20 +41,22 @@ public:
 	typedef int (*lua_CFunction) (lua_State *L);
 
 public:
-	virtual Path getScriptPath(ComponentIndex cmp) = 0;	
-	virtual void setScriptPath(ComponentIndex cmp, const Path& path) = 0;
-	virtual int getPropertyCount(ComponentIndex cmp) const = 0;
-	virtual const char* getPropertyName(ComponentIndex cmp, int index) const = 0;
-	virtual const char* getPropertyValue(ComponentIndex cmp, int index) const = 0;
-	virtual LuaScript* getScriptResource(ComponentIndex cmp) const = 0;
+	virtual Path getScriptPath(ComponentIndex cmp, int scr_index) = 0;	
+	virtual void setScriptPath(ComponentIndex cmp, int scr_index, const Path& path) = 0;
+	virtual int getPropertyCount(ComponentIndex cmp, int scr_index) const = 0;
+	virtual const char* getPropertyName(ComponentIndex cmp, int scr_index, int prop_index) const = 0;
+	virtual const char* getPropertyValue(ComponentIndex cmp, int scr_index, int prop_index) const = 0;
+	virtual LuaScript* getScriptResource(ComponentIndex cmp, int scr_index) const = 0;
 	virtual void registerFunction(const char* system, const char* name, lua_CFunction function) = 0;
 	virtual void setPropertyValue(ComponentIndex cmp,
+		int scr_index,
 		const char* name,
 		const char* value) = 0;
 	virtual ComponentIndex getComponent(Entity entity) = 0;
-	virtual int getEnvironment(Entity entity) = 0;
-	virtual IFunctionCall* beginFunctionCall(ComponentIndex cmp, const char* function) = 0;
+	virtual int getEnvironment(Entity entity, int scr_index) = 0;
+	virtual IFunctionCall* beginFunctionCall(ComponentIndex cmp, int scr_index, const char* function) = 0;
 	virtual void endFunctionCall(IFunctionCall& caller) = 0;
+	virtual int getScriptCount(ComponentIndex cmp) = 0;
 };
 
 
