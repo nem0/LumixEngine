@@ -6,6 +6,9 @@
 #include <bgfx/bgfx.h>
 
 
+class LogUI;
+
+
 namespace Lumix
 {
 	class Pipeline;
@@ -21,7 +24,7 @@ class SceneView
 		~SceneView();
 
 		void update();
-		bool init(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions);
+		bool init(LogUI& log_ui, Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions);
 		void setScene(Lumix::RenderScene* scene);
 		void shutdown();
 		void onGUI();
@@ -52,4 +55,5 @@ class SceneView
 		Lumix::Pipeline* m_current_pipeline;
 		bgfx::TextureHandle m_texture_handle;
 		bool m_show_stats;
+		LogUI* m_log_ui;
 };

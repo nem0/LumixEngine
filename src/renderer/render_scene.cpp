@@ -1607,9 +1607,16 @@ public:
 
 	void setTerrainMaterialPath(ComponentIndex cmp, const Path& path) override
 	{
-		Material* material = static_cast<Material*>(
-			m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path)));
-		m_terrains[cmp]->setMaterial(material);
+		if (path.isValid())
+		{
+			Material* material = static_cast<Material*>(
+				m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(path));
+			m_terrains[cmp]->setMaterial(material);
+		}
+		else
+		{
+			m_terrains[cmp]->setMaterial(nullptr);
+		}
 	}
 
 
@@ -1696,8 +1703,15 @@ public:
 		Renderable& r = m_renderables[cmp];
 
 		auto* manager = m_engine.getResourceManager().get(ResourceManager::MODEL);
-		Model* model = static_cast<Model*>(manager->load(path));
-		setModel(cmp, model);
+		if (path.isValid())
+		{
+			Model* model = static_cast<Model*>(manager->load(path));
+			setModel(cmp, model);
+		}
+		else
+		{
+			setModel(cmp, nullptr);
+		}
 		r.matrix = m_universe.getMatrix(r.entity);
 	}
 

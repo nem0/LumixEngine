@@ -618,14 +618,28 @@ public:
 				ImGui::EndMenu();
 			}
 			StringBuilder<200> stats("");
-			if (m_log_ui->getUnreadErrorCount() == 1) stats << m_log_ui->getUnreadErrorCount() << " error | ";
-			else if (m_log_ui->getUnreadErrorCount() > 1) stats << m_log_ui->getUnreadErrorCount() << " errors | ";
 			if (m_engine->getFileSystem().hasWork()) stats << "Loading... | ";
 			stats << "FPS: ";
 			stats << m_engine->getFPS();
 			auto stats_size = ImGui::CalcTextSize(stats);
 			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
 			ImGui::Text(stats);
+
+			if (m_log_ui->getUnreadErrorCount() == 1)
+			{
+				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
+				auto error_stats_size = ImGui::CalcTextSize("1 error | ");
+				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x - error_stats_size.x);
+				ImGui::TextColored(ImVec4(1, 0, 0, 1), "1 error | ");
+			}
+			else if (m_log_ui->getUnreadErrorCount() > 1)
+			{
+				StringBuilder<50> error_stats("", m_log_ui->getUnreadErrorCount(), " errors | ");
+				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
+				auto error_stats_size = ImGui::CalcTextSize(error_stats);
+				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x - error_stats_size.x);
+				ImGui::TextColored(ImVec4(1, 0, 0, 1), error_stats);
+			}
 
 			ImGui::EndMainMenuBar();
 		}

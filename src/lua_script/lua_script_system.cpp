@@ -748,7 +748,8 @@ namespace Lumix
 			}
 
 			m_scripts[cmp]->m_scripts[scr_index].m_script =
-				static_cast<LuaScript*>(m_system.getScriptManager().load(path));
+				path.isValid() ? static_cast<LuaScript*>(m_system.getScriptManager().load(path))
+							   : nullptr;
 		}
 
 

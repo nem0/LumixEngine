@@ -615,10 +615,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 			cb.unbind<Heightfield, &Heightfield::heightmapLoaded>(m_terrains[cmp]);
 		}
 		auto* texture_manager = resource_manager.get(ResourceManager::TEXTURE);
-		auto* new_hm = static_cast<Texture*>(texture_manager->load(str));
-		m_terrains[cmp]->m_heightmap = new_hm;
-		new_hm->onLoaded<Heightfield, &Heightfield::heightmapLoaded>(m_terrains[cmp]);
-		new_hm->addDataReference();
+		if (str.isValid())
+		{
+			auto* new_hm = static_cast<Texture*>(texture_manager->load(str));
+			m_terrains[cmp]->m_heightmap = new_hm;
+			new_hm->onLoaded<Heightfield, &Heightfield::heightmapLoaded>(m_terrains[cmp]);
+			new_hm->addDataReference();
+		}
+		else
+		{
+			m_terrains[cmp]->m_heightmap = nullptr;
+		}
 	}
 
 
