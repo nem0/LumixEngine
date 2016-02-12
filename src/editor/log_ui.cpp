@@ -148,6 +148,12 @@ void LogUI::update(float time_delta)
 }
 
 
+int LogUI::getUnreadErrorCount() const
+{
+	return m_new_message_count[Error];
+}
+
+
 void LogUI::onGUI()
 {
 	Lumix::MT::SpinLock lock(m_guard);

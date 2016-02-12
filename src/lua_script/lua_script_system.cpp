@@ -885,6 +885,15 @@ namespace Lumix
 	{
 		struct AddScriptCommand : public IEditorCommand
 		{
+			AddScriptCommand(){}
+			
+
+			AddScriptCommand(WorldEditor& editor)
+			{
+				scene = static_cast<LuaScriptSceneImpl*>(editor.getScene(crc32("lua_script")));
+			}
+
+
 			bool execute() override
 			{
 				scr_index = scene->addScript(cmp);
@@ -931,6 +940,13 @@ namespace Lumix
 
 		struct RemoveScriptCommand : public IEditorCommand
 		{
+			RemoveScriptCommand(WorldEditor& editor)
+				: blob(editor.getAllocator())
+			{
+				scene = static_cast<LuaScriptSceneImpl*>(editor.getScene(crc32("lua_script")));
+			}
+
+
 			RemoveScriptCommand(IAllocator& allocator)
 				: blob(allocator)
 			{
@@ -987,6 +1003,15 @@ namespace Lumix
 
 		struct SetPropertyCommand : public IEditorCommand
 		{
+			SetPropertyCommand(WorldEditor& editor)
+				: property_name(editor.getAllocator())
+				, value(editor.getAllocator())
+				, old_value(editor.getAllocator())
+			{
+				scene = static_cast<LuaScriptSceneImpl*>(editor.getScene(crc32("lua_script")));
+			}
+
+
 			SetPropertyCommand(LuaScriptSceneImpl* scene,
 				ComponentIndex cmp,
 				int scr_index,
@@ -1044,6 +1069,7 @@ namespace Lumix
 				serializer.serialize("script_index", script_index);
 				serializer.serialize("property_name", property_name.c_str());
 				serializer.serialize("value", value.c_str());
+				serializer.serialize("old_value", old_value.c_str());
 			}
 
 
@@ -1056,6 +1082,8 @@ namespace Lumix
 				property_name = buf;
 				serializer.deserialize("value", buf, lengthOf(buf), "");
 				value = buf;
+				serializer.deserialize("old_value", buf, lengthOf(buf), "");
+				old_value = buf;
 			}
 			
 			
@@ -1258,21 +1286,44 @@ namespace Lumix
 	} // anonoymous namespace
 
 
-extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
-{
-	auto* plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), PropertyGridPlugin)(app);
-	app.getPropertyGrid()->addPlugin(*plugin);
-
-	auto* asset_browser_plugin =
-		LUMIX_NEW(app.getWorldEditor()->getAllocator(), AssetBrowserPlugin)(app);
-	app.getAssetBrowser()->addPlugin(*asset_browser_plugin);
-}
+	IEditorCommand* createAddScriptCommand(WorldEditor& editor)
+	{
+		return LUMIX_NEW(editor.getAllocator(), PropertyGridPlugin::AddScriptCommand)(editor);
+	}
 
 
-extern "C" LUMIX_LIBRARY_EXPORT IPlugin* createPlugin(Engine& engine)
-{
-	return LUMIX_NEW(engine.getAllocator(), LuaScriptSystem)(engine);
-}
+	IEditorCommand* createSetPropertyCommand(WorldEditor& editor)
+	{
+		return LUMIX_NEW(editor.getAllocator(), PropertyGridPlugin::SetPropertyCommand)(editor);
+	}
+
+
+	IEditorCommand* createRemoveScriptCommand(WorldEditor& editor)
+	{
+		return LUMIX_NEW(editor.getAllocator(), PropertyGridPlugin::RemoveScriptCommand)(editor);
+	}
+
+
+
+	extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
+	{
+		auto& editor = *app.getWorldEditor();
+		editor.registerEditorCommandCreator("add_script", createAddScriptCommand);
+		editor.registerEditorCommandCreator("remove_script", createRemoveScriptCommand);
+		editor.registerEditorCommandCreator("set_script_property", createSetPropertyCommand);
+
+		auto* plugin = LUMIX_NEW(editor.getAllocator(), PropertyGridPlugin)(app);
+		app.getPropertyGrid()->addPlugin(*plugin);
+
+		auto* asset_browser_plugin = LUMIX_NEW(editor.getAllocator(), AssetBrowserPlugin)(app);
+		app.getAssetBrowser()->addPlugin(*asset_browser_plugin);
+	}
+
+
+	extern "C" LUMIX_LIBRARY_EXPORT IPlugin* createPlugin(Engine& engine)
+	{
+		return LUMIX_NEW(engine.getAllocator(), LuaScriptSystem)(engine);
+	}
 
 
 } // ~namespace Lumix
