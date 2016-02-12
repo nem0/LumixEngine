@@ -757,6 +757,10 @@ namespace Lumix
 
 		void removeScript(ComponentIndex cmp, int scr_index)
 		{
+			if (m_scripts[cmp]->m_scripts[scr_index].m_script)
+			{
+				m_system.getScriptManager().unload(*m_scripts[cmp]->m_scripts[scr_index].m_script);
+			}
 			m_scripts[cmp]->m_scripts.eraseFast(scr_index);
 		}
 
