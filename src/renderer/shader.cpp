@@ -55,7 +55,7 @@ ShaderInstance& Shader::getInstance(uint32 mask)
 		}
 	}
 
-	g_log_error.log("Shader") << "Unknown shader combination requested: " << mask;
+	g_log_error.log("Renderer") << "Unknown shader combination requested: " << mask;
 	return *m_instances[0];
 }
 
@@ -148,7 +148,7 @@ void Shader::parseUniforms(lua_State* L)
 					}
 					else
 					{
-						g_log_error.log("shader") << "Unknown uniform type " << type_str << " in shader " << getPath().c_str();
+						g_log_error.log("Renderer") << "Unknown uniform type " << type_str << " in shader " << getPath().c_str();
 						uniform.type = Shader::Uniform::FLOAT;
 						bgfx_type = bgfx::UniformType::Vec4;
 					}
@@ -310,7 +310,7 @@ bool Shader::load(FS::IFile& file)
 	errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
 	if (errors)
 	{
-		g_log_error.log("lua") << getPath().c_str() << ": " << lua_tostring(L, -1);
+		g_log_error.log("Renderer") << getPath().c_str() << ": " << lua_tostring(L, -1);
 		lua_pop(L, 1);
 		return false;
 	}
@@ -320,7 +320,7 @@ bool Shader::load(FS::IFile& file)
 	m_combintions.parse(getRenderer(), L);
 	if (!generateInstances())
 	{
-		g_log_error.log("renderer") << "Could not load instances of shader " << getPath().c_str();
+		g_log_error.log("Renderer") << "Could not load instances of shader " << getPath().c_str();
 		return false;
 	}
 
@@ -456,7 +456,7 @@ bool Shader::getShaderCombinations(Renderer& renderer,
 	errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
 	if (errors)
 	{
-		g_log_error.log("lua") << lua_tostring(L, -1);
+		g_log_error.log("Renderer") << lua_tostring(L, -1);
 		lua_pop(L, 1);
 		return false;
 	}

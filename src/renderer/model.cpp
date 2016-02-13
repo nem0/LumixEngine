@@ -423,7 +423,7 @@ bool Model::parseBones(FS::IFile& file)
 			b.parent_idx = getBoneIdx(b.parent.c_str());
 			if (b.parent_idx > i || b.parent_idx < 0)
 			{
-				g_log_error.log("renderer") << "Invalid skeleton in "
+				g_log_error.log("Renderer") << "Invalid skeleton in "
 											<< getPath().c_str();
 				return false;
 			}
@@ -554,7 +554,7 @@ bool Model::load(FS::IFile& file)
 		return true;
 	}
 
-	g_log_warning.log("renderer") << "Error loading model " << getPath().c_str();
+	g_log_warning.log("Renderer") << "Error loading model " << getPath().c_str();
 	return false;
 }
 

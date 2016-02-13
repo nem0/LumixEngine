@@ -313,7 +313,7 @@ class AssertNullAllocator : public physx::PxAllocatorCallback
 		void* allocate(size_t size, const char*, const char*, int) override
 		{
 			void* ret = _aligned_malloc(size, 16);
-			// g_log_info.log("PhysX") << "Allocated " << size << " bytes for " << typeName << "
+			// g_log_info.log("Physics") << "Allocated " << size << " bytes for " << typeName << "
 			// from " << filename << "(" << line << ")";
 			ASSERT(ret);
 			return ret;
@@ -378,7 +378,7 @@ void CustomErrorCallback::reportError(physx::PxErrorCode::Enum,
 	const char*,
 	int)
 {
-	g_log_error.log("PhysX") << message;
+	g_log_error.log("Physics") << message;
 }
 
 

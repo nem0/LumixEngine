@@ -740,7 +740,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			auto* actor = m_actors[i.cmp];
 			if (!actor->isDynamic())
 			{
-				g_log_warning.log("physics") << "Trying to apply force to static object";
+				g_log_warning.log("Physics") << "Trying to apply force to static object";
 				return;
 			}
 
@@ -1028,7 +1028,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 			else
 			{
-				g_log_error.log("PhysX")
+				g_log_error.log("Physics")
 					<< "Could not create PhysX heightfield "
 					<< terrain->m_heightmap->getPath();
 			}
@@ -1601,7 +1601,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto* actor = m_actors[cmp];
 		if (!actor->isDynamic())
 		{
-			g_log_warning.log("physics") << "Trying to get speed of static object";
+			g_log_warning.log("Physics") << "Trying to get speed of static object";
 			return 0;
 		}
 
@@ -1616,7 +1616,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto* actor = m_actors[cmp];
 		if (!actor->isDynamic())
 		{
-			g_log_warning.log("physics") << "Trying to put static object to sleep";
+			g_log_warning.log("Physics") << "Trying to put static object to sleep";
 			return;
 		}
 
@@ -1712,7 +1712,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
 		physx::PxDefaultCpuDispatcher* cpu_dispatcher = physx::PxDefaultCpuDispatcherCreate(1);
 		if (!cpu_dispatcher)
 		{
-			g_log_error.log("physics") << "PxDefaultCpuDispatcherCreate failed!";
+			g_log_error.log("Physics") << "PxDefaultCpuDispatcherCreate failed!";
 		}
 		sceneDesc.cpuDispatcher = cpu_dispatcher;
 	}
@@ -1779,7 +1779,7 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		}
 		else
 		{
-			g_log_error.log("PhysX") << "Could not create PhysX mesh "
+			g_log_error.log("Physics") << "Could not create PhysX mesh "
 									 << m_resource->getPath().c_str();
 		}
 	}

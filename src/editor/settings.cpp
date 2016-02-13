@@ -117,7 +117,7 @@ bool Settings::load(Action** actions, int actions_count)
 	errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
 	if (errors)
 	{
-		Lumix::g_log_error.log("lua") << SETTINGS_PATH << ": " << lua_tostring(L, -1);
+		Lumix::g_log_error.log("Editor") << SETTINGS_PATH << ": " << lua_tostring(L, -1);
 		lua_pop(L, 1);
 		return false;
 	}

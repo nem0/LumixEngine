@@ -82,7 +82,7 @@ static void setProperty(const ComponentUID& cmp,
 			}
 			break;
 		default:
-			g_log_error.log("script") << "Property " << desc.getName() << " has unsupported type";
+			g_log_error.log("Lua Script") << "Property " << desc.getName() << " has unsupported type";
 			break;
 	}
 	InputBlob tmp(stream);
@@ -124,7 +124,7 @@ static int createEntityEx(lua_State* L)
 						auto* desc = PropertyRegister::getDescriptor(cmp_hash, crc32(property_name));
 						if (!desc)
 						{
-							g_log_error.log("script") << "Unknown property " << property_name;
+							g_log_error.log("Lua Script") << "Unknown property " << property_name;
 						}
 						else
 						{
@@ -176,7 +176,7 @@ static int createComponent(IScene* scene, const char* type, int entity_idx)
 	uint32 hash = crc32(type);
 	if (scene->getComponent(e, hash) != INVALID_COMPONENT)
 	{
-		g_log_error.log("script") << "Component " << type << " already exists in entity "
+		g_log_error.log("Lua Script") << "Component " << type << " already exists in entity "
 								  << entity_idx;
 		return -1;
 	}
@@ -222,13 +222,13 @@ static int multVecQuat(lua_State* L)
 
 static void logError(const char* text)
 {
-	g_log_error.log("lua script") << text;
+	g_log_error.log("Lua Script") << text;
 }
 
 
 static void logInfo(const char* text)
 {
-	g_log_info.log("lua script") << text;
+	g_log_info.log("Lua Script") << text;
 }
 
 

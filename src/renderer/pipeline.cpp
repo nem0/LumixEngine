@@ -264,7 +264,7 @@ struct PipelineImpl : public Pipeline
 		errors = errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
 		if (errors)
 		{
-			g_log_error.log("lua") << m_path.c_str() << ": " << lua_tostring(m_lua_state, -1);
+			g_log_error.log("Renderer") << m_path.c_str() << ": " << lua_tostring(m_lua_state, -1);
 			lua_pop(m_lua_state, 1);
 			return;
 		}
@@ -279,7 +279,7 @@ struct PipelineImpl : public Pipeline
 			lua_pushlightuserdata(m_lua_state, this);
 			if (lua_pcall(m_lua_state, 1, 0, 0) != LUA_OK)
 			{
-				g_log_error.log("lua") << lua_tostring(m_lua_state, -1);
+				g_log_error.log("Renderer") << lua_tostring(m_lua_state, -1);
 				lua_pop(m_lua_state, 1);
 			}
 		}
@@ -515,6 +515,7 @@ struct PipelineImpl : public Pipeline
 
 	void renderParticles()
 	{
+		PROFILE_FUNCTION();
 		const auto& emitters = m_scene->getParticleEmitters();
 		for (const auto* emitter : emitters)
 		{
@@ -682,7 +683,7 @@ struct PipelineImpl : public Pipeline
 		}
 		else
 		{
-			g_log_warning.log("renderer") << "Framebuffer " << framebuffer_name
+			g_log_warning.log("Renderer") << "Framebuffer " << framebuffer_name
 										  << " not found";
 		}
 	}
@@ -2056,7 +2057,7 @@ struct PipelineImpl : public Pipeline
 			lua_pushlightuserdata(m_lua_state, this);
 			if (lua_pcall(m_lua_state, 1, 0, 0) != LUA_OK)
 			{
-				g_log_error.log("lua") << lua_tostring(m_lua_state, -1);
+				g_log_error.log("Renderer") << lua_tostring(m_lua_state, -1);
 				lua_pop(m_lua_state, 1);
 			}
 		}
@@ -2086,7 +2087,7 @@ struct PipelineImpl : public Pipeline
 
 		if (errors)
 		{
-			g_log_error.log("pipeline") << lua_tostring(m_lua_state, -1);
+			g_log_error.log("Renderer") << lua_tostring(m_lua_state, -1);
 			lua_pop(m_lua_state, 1);
 		}
 	}
@@ -2317,7 +2318,7 @@ int deferredLocalLightLoop(lua_State* L)
 
 void logError(const char* message)
 {
-	g_log_error.log("renderer") << message;
+	g_log_error.log("Renderer") << message;
 }
 
 

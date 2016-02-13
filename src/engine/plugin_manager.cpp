@@ -105,7 +105,7 @@ class PluginManagerImpl : public PluginManager
 
 		IPlugin* load(const char* path) override
 		{
-			g_log_info.log("plugins") << "loading plugin " << path;
+			g_log_info.log("Core") << "loading plugin " << path;
 			typedef IPlugin* (*PluginCreator)(Engine&);
 
 			auto* lib = loadLibrary(path);
@@ -117,7 +117,7 @@ class PluginManagerImpl : public PluginManager
 					IPlugin* plugin = creator(m_engine);
 					if (!plugin || !plugin->create())
 					{
-						g_log_error.log("plugins") << "createPlugin failed.";
+						g_log_error.log("Core") << "createPlugin failed.";
 						LUMIX_DELETE(m_engine.getAllocator(), plugin);
 						ASSERT(false);
 						return nullptr;
@@ -125,18 +125,18 @@ class PluginManagerImpl : public PluginManager
 					m_plugins.push(plugin);
 					m_libraries.push(lib);
 					m_library_loaded.invoke(lib);
-					g_log_info.log("plugins") << "Plugin loaded.";
+					g_log_info.log("Core") << "Plugin loaded.";
 					Lumix::Debug::StackTree::refreshModuleList();
 					return plugin;
 				}
 				else
 				{
-					g_log_error.log("plugins") << "No createPlugin function in plugin.";
+					g_log_error.log("Core") << "No createPlugin function in plugin.";
 				}
 			}
 			else
 			{
-				g_log_warning.log("plugins") << "Failed to load plugin.";
+				g_log_warning.log("Core") << "Failed to load plugin.";
 			}
 			unloadLibrary(lib);
 			return 0;

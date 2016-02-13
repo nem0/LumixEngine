@@ -1744,7 +1744,7 @@ public:
 
 	void saveUniverse(const Path& path, bool save_path) override
 	{
-		g_log_info.log("editor") << "saving universe " << path << "...";
+		g_log_info.log("Editor") << "saving universe " << path << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
 		char bkp_path[MAX_PATH_LENGTH];
 		copyString(bkp_path, path.c_str());
@@ -1835,7 +1835,7 @@ public:
 		{
 			if (m_camera == entities[i])
 			{
-				g_log_warning.log("editor") << "Can not destroy editor camera.";
+				g_log_warning.log("Editor") << "Can not destroy editor camera.";
 				return;
 			}
 		}
@@ -2216,7 +2216,7 @@ public:
 	{
 		if (component.entity == m_camera)
 		{
-			g_log_warning.log("editor")
+			g_log_warning.log("Editor")
 				<< "Can not destroy component from the editing camera";
 			return;
 		}
@@ -2261,7 +2261,7 @@ public:
 	void loadUniverse(const Path& path) override
 	{
 		m_universe_path = path;
-		g_log_info.log("editor") << "Loading universe " << path << "...";
+		g_log_info.log("Editor") << "Loading universe " << path << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
 		FS::ReadCallback file_read_cb;
 		file_read_cb.bind<WorldEditorImpl, &WorldEditorImpl::loadMap>(this);
@@ -2322,7 +2322,7 @@ public:
 		m_universe_path = "";
 		destroyUniverse();
 		createUniverse(true);
-		g_log_info.log("editor") << "Universe created.";
+		g_log_info.log("Editor") << "Universe created.";
 	}
 
 
@@ -2354,14 +2354,14 @@ public:
 		Header header;
 		if (file.size() < sizeof(header))
 		{
-			g_log_error.log("editor") << "Corrupted file.";
+			g_log_error.log("Editor") << "Corrupted file.";
 			newUniverse();
 			m_is_loading = false;
 			return;
 		}
 
 		Timer* timer = Timer::create(m_allocator);
-		g_log_info.log("editor") << "Parsing universe...";
+		g_log_info.log("Editor") << "Parsing universe...";
 		InputBlob blob(file.getBuffer(), (int)file.size());
 		uint32 hash = 0;
 		blob.read(hash);
@@ -2383,7 +2383,7 @@ public:
 			hash)
 		{
 			Timer::destroy(timer);
-			g_log_error.log("editor") << "Corrupted file.";
+			g_log_error.log("Editor") << "Corrupted file.";
 			newUniverse();
 			m_is_loading = false;
 			return;
@@ -2403,7 +2403,7 @@ public:
 
 			m_camera = render_scene->getCameraEntity(render_scene->getCameraInSlot("editor"));
 
-			g_log_info.log("editor") << "Universe parsed in " << timer->getTimeSinceStart()
+			g_log_info.log("Editor") << "Universe parsed in " << timer->getTimeSinceStart()
 									 << " seconds";
 		}
 		else
@@ -2517,7 +2517,7 @@ public:
 		{
 			if (!plugin_manager.load(plugin_name))
 			{
-				g_log_info.log("plugins") << plugin_name << " plugin has not been loaded";
+				g_log_info.log("Editor") << plugin_name << " plugin has not been loaded";
 			}
 		}
 
@@ -3020,7 +3020,7 @@ public:
 		}
 		else
 		{
-			g_log_error.log("editor") << "Could not save commands to " << path;
+			g_log_error.log("Editor") << "Could not save commands to " << path;
 		}
 	}
 
@@ -3063,7 +3063,7 @@ public:
 				IEditorCommand* command = createEditorCommand(type);
 				if (!command)
 				{
-					g_log_error.log("editor") << "Unknown command " << type << " in " << path;
+					g_log_error.log("Editor") << "Unknown command " << type << " in " << path;
 					destroyUndoStack();
 					m_undo_index = -1;
 					m_engine->getFileSystem().close(*file);

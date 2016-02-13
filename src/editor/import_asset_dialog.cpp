@@ -309,7 +309,7 @@ struct ImportTask : public Lumix::MT::Task
 		m_dialog.m_importer.SetProgressHandler(&m_progress_handler);
 		struct MyStream : public Assimp::LogStream
 		{
-			void write(const char* message) { Lumix::g_log_warning.log("import") << message; }
+			void write(const char* message) { Lumix::g_log_warning.log("Editor") << message; }
 		};
 		const unsigned int severity = Assimp::Logger::Err;
 		Assimp::DefaultLogger::create(ASSIMP_DEFAULT_LOG_NAME, Assimp::Logger::NORMAL, 0, nullptr);
@@ -349,7 +349,7 @@ struct ImportTask : public Lumix::MT::Task
 		{
 			m_dialog.m_importer.FreeScene();
 			m_dialog.setMessage(m_dialog.m_importer.GetErrorString());
-			Lumix::g_log_error.log("import") << m_dialog.m_importer.GetErrorString();
+			Lumix::g_log_error.log("Editor") << m_dialog.m_importer.GetErrorString();
 		}
 		else
 		{
@@ -686,7 +686,7 @@ struct ConvertTask : public Lumix::MT::Task
 					Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE,
 					m_dialog.m_editor.getAllocator()))
 			{
-				Lumix::g_log_error.log("import") << "Could not create file " << ani_path;
+				Lumix::g_log_error.log("Editor") << "Could not create file " << ani_path;
 				failed = true;
 				continue;
 			}
@@ -953,7 +953,7 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 		if (invalid_vertices)
 		{
-			Lumix::g_log_error.log("import") << "Mesh contains " << invalid_vertices
+			Lumix::g_log_error.log("Editor") << "Mesh contains " << invalid_vertices
 											 << " vertices not influenced by any bones.";
 		}
 	}
@@ -1448,7 +1448,7 @@ struct ConvertTask : public Lumix::MT::Task
 			Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
 		if (!file)
 		{
-			Lumix::g_log_error.log("import") << "Could not create file " << phy_path;
+			Lumix::g_log_error.log("Editor") << "Could not create file " << phy_path;
 			return false;
 		}
 

@@ -291,7 +291,7 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 			}
 			else
 			{
-				g_log_warning.log("material") << "Unknown label \"" << label << "\"";
+				g_log_warning.log("Renderer") << "Unknown label \"" << label << "\"";
 			}
 		}
 		serializer.deserializeObjectEnd();
@@ -712,7 +712,7 @@ bool Material::load(FS::IFile& file)
 		}
 		else
 		{
-			g_log_warning.log("renderer") << "Unknown parameter " << label << " in material "
+			g_log_warning.log("Renderer") << "Unknown parameter " << label << " in material "
 										  << getPath();
 		}
 	}
@@ -720,7 +720,7 @@ bool Material::load(FS::IFile& file)
 
 	if (!m_shader)
 	{
-		g_log_error.log("renderer") << "Material " << getPath() << " without a shader";
+		g_log_error.log("Renderer") << "Material " << getPath() << " without a shader";
 		return false;
 	}
 
