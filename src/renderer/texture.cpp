@@ -177,7 +177,7 @@ unsigned int Texture::compareTGA(IAllocator& allocator,
 		header1.dataType != header2.dataType ||
 		header1.imageDescriptor != header2.imageDescriptor)
 	{
-		g_log_error.log("renderer")
+		g_log_error.log("Renderer")
 			<< "Trying to compare textures with different formats";
 		return 0;
 	}
@@ -185,7 +185,7 @@ unsigned int Texture::compareTGA(IAllocator& allocator,
 	int color_mode = header1.bitsPerPixel / 8;
 	if (header1.dataType != 2)
 	{
-		g_log_error.log("renderer") << "Unsupported texture format";
+		g_log_error.log("Renderer") << "Unsupported texture format";
 		return 0;
 	}
 
@@ -226,7 +226,7 @@ bool Texture::saveTGA(IAllocator& allocator,
 {
 	if (bytes_per_pixel != 4)
 	{
-		g_log_error.log("renderer")
+		g_log_error.log("Renderer")
 			<< "Texture " << path.c_str()
 			<< " could not be saved, unsupported TGA format";
 		return false;
@@ -271,7 +271,7 @@ void Texture::saveTGA()
 {
 	if (m_data.empty())
 	{
-		g_log_error.log("renderer")
+		g_log_error.log("Renderer")
 			<< "Texture " << getPath().c_str()
 			<< " could not be saved, no data was loaded";
 		return;
@@ -309,7 +309,7 @@ void Texture::save()
 	}
 	else
 	{
-		g_log_error.log("renderer") << "Texture " << getPath().c_str()
+		g_log_error.log("Renderer") << "Texture " << getPath().c_str()
 									<< " can not be saved - unsupported format";
 	}
 }
@@ -402,13 +402,13 @@ bool Texture::loadTGA(FS::IFile& file)
 	int image_size = header.width * header.height * 4;
 	if (header.dataType != 2)
 	{
-		g_log_error.log("renderer") << "Unsupported texture format " << getPath().c_str();
+		g_log_error.log("Renderer") << "Unsupported texture format " << getPath().c_str();
 		return false;
 	}
 
 	if (color_mode < 3)
 	{
-		g_log_error.log("renderer") << "Unsupported color mode " << getPath().c_str();
+		g_log_error.log("Renderer") << "Unsupported color mode " << getPath().c_str();
 		return false;
 	}
 
@@ -522,7 +522,7 @@ bool Texture::load(FS::IFile& file)
 	}
 	if (!loaded)
 	{
-		g_log_warning.log("renderer") << "Error loading texture " << path;
+		g_log_warning.log("Renderer") << "Error loading texture " << path;
 		return false;
 	}
 

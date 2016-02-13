@@ -195,7 +195,7 @@ namespace Lumix
 
 			if (lua_pcall(script.m_state, m_function_call.parameter_count, 0, 0) != LUA_OK)
 			{
-				g_log_error.log("lua") << lua_tostring(script.m_state, -1);
+				g_log_error.log("Lua Script") << lua_tostring(script.m_state, -1);
 				lua_pop(script.m_state, 1);
 			}
 			lua_pop(script.m_state, 1);
@@ -289,7 +289,7 @@ namespace Lumix
 
 			if (errors)
 			{
-				g_log_error.log("lua") << script.m_script->getPath() << ": "
+				g_log_error.log("Lua Script") << script.m_script->getPath() << ": "
 					<< lua_tostring(state, -1);
 				lua_pop(state, 1);
 			}
@@ -403,7 +403,7 @@ namespace Lumix
 					if (!script.m_script->isReady())
 					{
 						script.m_state = nullptr;
-						g_log_error.log("lua script") << "Script " << script.m_script->getPath()
+						g_log_error.log("Lua Script") << "Script " << script.m_script->getPath()
 							<< " is not loaded";
 						continue;
 					}
@@ -446,7 +446,7 @@ namespace Lumix
 
 					if (errors)
 					{
-						g_log_error.log("lua") << script.m_script->getPath() << ": "
+						g_log_error.log("Lua Script") << script.m_script->getPath() << ": "
 							<< lua_tostring(script.m_state, -1);
 						lua_pop(script.m_state, 1);
 						continue;
@@ -458,7 +458,7 @@ namespace Lumix
 					errors = errors || lua_pcall(script.m_state, 0, LUA_MULTRET, 0) != LUA_OK;
 					if (errors)
 					{
-						g_log_error.log("lua") << script.m_script->getPath() << ": "
+						g_log_error.log("Lua Script") << script.m_script->getPath() << ": "
 							<< lua_tostring(script.m_state, -1);
 						lua_pop(script.m_state, 1);
 					}
@@ -693,7 +693,7 @@ namespace Lumix
 				lua_pushnumber(i.state, time_delta);
 				if (lua_pcall(i.state, 1, 0, 0) != LUA_OK)
 				{
-					g_log_error.log("lua") << lua_tostring(i.state, -1);
+					g_log_error.log("Lua Script") << lua_tostring(i.state, -1);
 					lua_pop(i.state, 1);
 				}
 				lua_pop(i.state, 1);
@@ -1244,7 +1244,7 @@ namespace Lumix
 
 				if (!file)
 				{
-					Lumix::g_log_warning.log("Asset browser") << "Could not save "
+					Lumix::g_log_warning.log("Lua Script") << "Could not save "
 															  << resource->getPath();
 					return true;
 				}

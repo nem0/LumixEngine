@@ -330,7 +330,7 @@ public:
 			serializer.read(version);
 			if (version > scene->getVersion())
 			{
-				g_log_error.log("engine") << "Plugin " << scene->getPlugin().getName() << " is too old";
+				g_log_error.log("Core") << "Plugin " << scene->getPlugin().getName() << " is too old";
 				return false;
 			}
 		}
@@ -348,7 +348,7 @@ public:
 			serializer.readString(tmp, sizeof(tmp));
 			if (!m_plugin_manager->getPlugin(tmp))
 			{
-				g_log_error.log("engine") << "Missing plugin " << tmp;
+				g_log_error.log("Core") << "Missing plugin " << tmp;
 				return false;
 			}
 		}
@@ -388,12 +388,12 @@ public:
 		serializer.read(header);
 		if (header.m_magic != SERIALIZED_ENGINE_MAGIC)
 		{
-			g_log_error.log("engine") << "Wrong or corrupted file";
+			g_log_error.log("Core") << "Wrong or corrupted file";
 			return false;
 		}
 		if (header.m_version > SerializedEngineVersion::LATEST)
 		{
-			g_log_error.log("engine") << "Unsupported version";
+			g_log_error.log("Core") << "Unsupported version";
 			return false;
 		}
 		if (!hasSerializedPlugins(serializer))
@@ -508,7 +508,7 @@ static void logErrorToFile(const char*, const char* message)
 
 Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 {
-	g_log_info.log("engine") << "Creating engine...";
+	g_log_info.log("Core") << "Creating engine...";
 	Profiler::setThreadName("Main");
 	installUnhandledExceptionHandler();
 
@@ -522,11 +522,11 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 	EngineImpl* engine = LUMIX_NEW(allocator, EngineImpl)(fs, allocator);
 	if (!engine->create())
 	{
-		g_log_error.log("engine") << "Failed to create engine.";
+		g_log_error.log("Core") << "Failed to create engine.";
 		LUMIX_DELETE(allocator, engine);
 		return nullptr;
 	}
-	g_log_info.log("engine") << "Engine created.";
+	g_log_info.log("Core") << "Engine created.";
 	return engine;
 }
 

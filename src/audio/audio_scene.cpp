@@ -211,7 +211,7 @@ struct AudioSceneImpl : public AudioScene
 	{
 		if (m_listener.entity != INVALID_ENTITY)
 		{
-			g_log_warning.log("audio") << "Listener already exists";
+			g_log_warning.log("Audio") << "Listener already exists";
 			return INVALID_COMPONENT;
 		}
 

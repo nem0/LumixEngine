@@ -69,7 +69,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 				*file, JsonSerializer::AccessMode::WRITE, material->getPath(), allocator);
 			if (!material->save(serializer))
 			{
-				g_log_error.log("Material manager") << "Error saving "
+				g_log_error.log("Editor") << "Error saving "
 					<< material->getPath().c_str();
 			}
 			fs.close(*file);
@@ -79,7 +79,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 		}
 		else
 		{
-			g_log_error.log("Material manager") << "Could not save file "
+			g_log_error.log("Editor") << "Could not save file "
 				<< material->getPath().c_str();
 		}
 	}

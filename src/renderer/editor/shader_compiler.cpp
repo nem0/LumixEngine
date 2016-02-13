@@ -145,7 +145,7 @@ void ShaderCompiler::makeUpToDate()
 
 		if (!file)
 		{
-			Lumix::g_log_error.log("shader compiler") << "Could not open " << info.filename;
+			Lumix::g_log_error.log("Editor") << "Could not open " << info.filename;
 			continue;
 		}
 
@@ -248,7 +248,7 @@ void ShaderCompiler::parseDependencies()
 			Lumix::FS::Mode::READ | Lumix::FS::Mode::OPEN);
 		if (!file)
 		{
-			Lumix::g_log_error.log("shader compiler") << "Could not open " << info.filename;
+			Lumix::g_log_error.log("Editor") << "Could not open " << info.filename;
 			continue;
 		}
 
@@ -387,7 +387,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			auto* process = PlatformInterface::createProcess(cmd, args, m_editor.getAllocator());
 			if (!process)
 			{
-				Lumix::g_log_error.log("shader compiler") << "Could not execute command: " << cmd;
+				Lumix::g_log_error.log("Editor") << "Could not execute command: " << cmd;
 			}
 			else
 			{
@@ -489,12 +489,12 @@ void ShaderCompiler::update()
 
 				char buf[1024];
 				int read;
-				Lumix::g_log_error.log("shader compiler") << m_processes[i].path;
+				Lumix::g_log_error.log("Editor") << m_processes[i].path;
 				while ((read = PlatformInterface::getProcessOutput(
 							*m_processes[i].process, buf, sizeof(buf) - 1)) > 0)
 				{
 					buf[read] = 0;
-					Lumix::g_log_error.log("shader compiler") << buf;
+					Lumix::g_log_error.log("Editor") << buf;
 				}
 			}
 
@@ -565,7 +565,7 @@ void ShaderCompiler::compile(const char* path)
 	}
 	else
 	{
-		Lumix::g_log_error.log("shader compiler") << "Could not open " << path;
+		Lumix::g_log_error.log("Editor") << "Could not open " << path;
 	}
 }
 
@@ -610,7 +610,7 @@ void ShaderCompiler::compileAll(bool wait)
 		}
 		else
 		{
-			Lumix::g_log_error.log("shader compiler") << "Could not open " << shd_path;
+			Lumix::g_log_error.log("Editor") << "Could not open " << shd_path;
 		}
 	}
 

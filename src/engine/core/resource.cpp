@@ -66,7 +66,7 @@ void Resource::fileLoaded(FS::IFile& file, bool success)
 
 	if (!success)
 	{
-		g_log_error.log("resource") << "Could not open " << getPath().c_str();
+		g_log_error.log("Core") << "Could not open " << getPath().c_str();
 		--m_empty_dep_count;
 		++m_failed_dep_count;
 		checkState();

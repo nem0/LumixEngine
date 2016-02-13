@@ -683,7 +683,7 @@ void ProfilerUIImpl::saveResourceList()
 	}
 	else
 	{
-		Lumix::g_log_error.log("profiler") << "Failed to save resource list to resources.csv";
+		Lumix::g_log_error.log("Editor") << "Failed to save resource list to resources.csv";
 	}
 }
 

@@ -694,11 +694,11 @@ public:
 			{
 				if(group_name[0] == 0)
 				{
-					Lumix::g_log_error.log("editor") << "Group name can not be empty";
+					Lumix::g_log_error.log("Editor") << "Group name can not be empty";
 				}
 				else if(groups.getGroup(group_name) != -1)
 				{
-					Lumix::g_log_error.log("editor") << "Group with name " << group_name << " already exists";
+					Lumix::g_log_error.log("Editor") << "Group with name " << group_name << " already exists";
 				}
 				else
 				{
@@ -790,7 +790,7 @@ public:
 
 		if (!m_metadata.save())
 		{
-			Lumix::g_log_warning.log("studio") << "Could not save metadata";
+			Lumix::g_log_warning.log("Editor") << "Could not save metadata";
 		}
 	}
 
@@ -941,7 +941,7 @@ public:
 			bool loaded = plugin_manager.load(tmp) != nullptr;
 			if (!loaded)
 			{
-				Lumix::g_log_error.log("init") << "Could not load plugin " << tmp
+				Lumix::g_log_error.log("Editor") << "Could not load plugin " << tmp
 											   << " requested by command line";
 			}
 		}
@@ -982,7 +982,7 @@ public:
 		errors = errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
 		if (errors)
 		{
-			Lumix::g_log_error.log("editor") << script_name << ": " << lua_tostring(m_lua_state, -1);
+			Lumix::g_log_error.log("Editor") << script_name << ": " << lua_tostring(m_lua_state, -1);
 			lua_pop(m_lua_state, 1);
 		}
 	}
@@ -997,13 +997,13 @@ public:
 
 	void LUA_logError(const char* message)
 	{
-		Lumix::g_log_error.log("editor") << message;
+		Lumix::g_log_error.log("Editor") << message;
 	}
 
 
 	void LUA_logInfo(const char* message)
 	{
-		Lumix::g_log_info.log("editor") << message;
+		Lumix::g_log_info.log("Editor") << message;
 	}
 
 
@@ -1083,7 +1083,7 @@ public:
 				}
 				else
 				{
-					Lumix::g_log_error.log("editor") << "Could not open " << tmp;
+					Lumix::g_log_error.log("Editor") << "Could not open " << tmp;
 				}
 				break;
 			}
@@ -1264,7 +1264,7 @@ public:
 		PlatformInterface::setSystemEventHandler(&m_handler);
 		loadSettings();
 
-		if (!m_metadata.load()) Lumix::g_log_info.log("studio") << "Could not load metadata";
+		if (!m_metadata.load()) Lumix::g_log_info.log("Editor") << "Could not load metadata";
 
 		setStudioApp();
 	}

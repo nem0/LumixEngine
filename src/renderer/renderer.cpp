@@ -505,7 +505,7 @@ struct RendererImpl : public Renderer
 
 		void fatal(bgfx::Fatal::Enum _code, const char* _str) override
 		{
-			Lumix::g_log_error.log("bgfx") << _str;
+			Lumix::g_log_error.log("Renderer") << _str;
 			if (bgfx::Fatal::DebugCheck == _code)
 			{
 				Lumix::Debug::debugBreak();
@@ -565,7 +565,7 @@ struct RendererImpl : public Renderer
 			Lumix::FS::OsFile file;
 			if(!file.open(filePath, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_renderer.m_allocator))
 			{
-				g_log_error.log("renderer") << "Failed to save screenshot to " << filePath;
+				g_log_error.log("Renderer") << "Failed to save screenshot to " << filePath;
 				return;
 			}
 			file.write(&header, sizeof(header));
