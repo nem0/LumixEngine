@@ -839,11 +839,7 @@ public:
 				if (influenced_geometry[j] == component)
 				{
 					influenced_geometry.erase(j);
-					--j;
-				}
-				else if (influenced_geometry[j] > component)
-				{
-					--influenced_geometry[j];
+					break;
 				}
 			}
 		}
