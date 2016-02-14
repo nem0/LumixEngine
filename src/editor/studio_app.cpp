@@ -102,6 +102,7 @@ public:
 		m_time_to_autosave -= time_delta;
 		if (m_time_to_autosave < 0) autosave();
 
+		m_editor->setMouseSensitivity(m_settings.m_mouse_sensitivity_x, m_settings.m_mouse_sensitivity_y);
 		m_editor->update();
 		m_engine->update(*m_editor->getUniverse());
 
@@ -785,6 +786,8 @@ public:
 		m_settings.m_is_log_opened = m_log_ui->m_is_opened;
 		m_settings.m_is_profiler_opened = m_profiler_ui->m_is_opened;
 		m_settings.m_is_properties_opened = m_property_grid->m_is_opened;
+		m_settings.m_mouse_sensitivity_x = m_editor->getMouseSensitivity().x;
+		m_settings.m_mouse_sensitivity_y = m_editor->getMouseSensitivity().y;
 
 		m_settings.save(&m_actions[0], m_actions.size());
 

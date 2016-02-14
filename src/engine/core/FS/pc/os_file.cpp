@@ -155,6 +155,16 @@ OsFile& OsFile::operator <<(uint64 value)
 }
 
 
+OsFile& OsFile::operator <<(float value)
+{
+	char buf[30];
+	toCString(value, buf, lengthOf(buf), 1);
+	write(buf, stringLength(buf));
+	return *this;
+}
+
+
+
 void OsFile::writeEOF()
 {
 	ASSERT(nullptr != m_impl);

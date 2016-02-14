@@ -2495,6 +2495,7 @@ public:
 		, m_gizmo_use_step(false)
 		, m_is_additive_selection(false)
 		, m_entity_groups(m_allocator)
+		, m_mouse_sensitivity(200, 200)
 	{
 		for (auto& i : m_is_mouse_down) i = false;
 		for (auto& i : m_is_mouse_click) i = false;
@@ -2679,6 +2680,19 @@ public:
 	}
 
 
+	Vec2 getMouseSensitivity() override
+	{
+		return m_mouse_sensitivity;
+	}
+
+
+	void setMouseSensitivity(float x, float y) override
+	{
+		m_mouse_sensitivity.x = x;
+		m_mouse_sensitivity.y = y;
+	}
+
+
 	void rotateCamera(int x, int y)
 	{
 		Universe* universe = getUniverse();
@@ -2686,12 +2700,12 @@ public:
 		Quat rot = universe->getRotation(m_camera);
 		Quat old_rot = rot;
 
-		Quat yaw_rot(Vec3(0, 1, 0), -x / 200.0f);
+		Quat yaw_rot(Vec3(0, 1, 0), -x / m_mouse_sensitivity.x);
 		rot = rot * yaw_rot;
 		rot.normalize();
 
 		Vec3 pitch_axis = rot * Vec3(1, 0, 0);
-		Quat pitch_rot(pitch_axis, -y / 200.0f);
+		Quat pitch_rot(pitch_axis, -y / m_mouse_sensitivity.y);
 		rot = rot * pitch_rot;
 		rot.normalize();
 
@@ -3222,6 +3236,7 @@ private:
 	float m_mouse_x;
 	float m_mouse_y;
 	Vec2 m_orbit_delta;
+	Vec2 m_mouse_sensitivity;
 	bool m_gizmo_use_step;
 	AssociativeArray<Entity, Array<ComponentUID>> m_components;
 	bool m_is_game_mode;
