@@ -348,6 +348,7 @@ void Material::setTexture(int i, Texture* texture)
 			}
 		}
 
+		createCommandBuffer();
 		m_shader_instance = &m_shader->getInstance(m_define_mask);
 	}
 }
@@ -396,10 +397,10 @@ void Material::createCommandBuffer()
 	}
 
 	Vec4 color_shininess(m_color, m_shininess);
-	TODO("todo");
-	static bgfx::UniformHandle mat_color_shininess_uniform =
-		bgfx::createUniform("u_materialColorShininess", bgfx::UniformType::Vec4);
-	generator.setUniform(mat_color_shininess_uniform, color_shininess);
+	auto* material_manager = getResourceManager().get(ResourceManager::MATERIAL);
+	auto& renderer = static_cast<MaterialManager*>(material_manager)->getRenderer();
+	auto& uniform = renderer.getMaterialColorShininessUniform();
+	generator.setUniform(uniform, color_shininess);
 
 	m_command_buffer = (uint8*)m_allocator.allocate(generator.getSize());
 	generator.getData(m_command_buffer);
