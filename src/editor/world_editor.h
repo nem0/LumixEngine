@@ -180,6 +180,8 @@ public:
 											  EditorCommandCreator) = 0;
 	virtual bool isGameMode() const = 0;
 	virtual class EntityGroups& getEntityGroups() = 0;
+	virtual void setMouseSensitivity(float x, float y) = 0;
+	virtual Vec2 getMouseSensitivity() = 0;
 
 protected:
 	virtual ~WorldEditor() {}

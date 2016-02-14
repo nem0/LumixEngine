@@ -53,6 +53,18 @@ static int getIntegerField(lua_State* L, const char* name, int default_value)
 }
 
 
+static float getFloat(lua_State* L, const char* name, float default_value)
+{
+	float value = default_value;
+	if (lua_getglobal(L, name) == LUA_TNUMBER)
+	{
+		value = (float)lua_tonumber(L, -1);
+	}
+	lua_pop(L, 1);
+	return value;
+}
+
+
 static bool getBoolean(lua_State* L, const char* name, bool default_value)
 {
 	bool value = default_value;
@@ -93,7 +105,7 @@ Settings::Settings(Lumix::IAllocator& allocator)
 	m_is_profiler_opened = false;
 	m_is_properties_opened = false;
 	m_is_crash_reporting_enabled = true;
-
+	m_mouse_sensitivity_x = m_mouse_sensitivity_y = 200.0f;
 	m_autosave_time = 300;
 
 	m_state = luaL_newstate();
@@ -143,6 +155,8 @@ bool Settings::load(Action** actions, int actions_count)
 	m_is_crash_reporting_enabled = getBoolean(L, "error_reporting_enabled", true);
 	Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
 	m_autosave_time = getInteger(L, "autosave_time", 300);
+	m_mouse_sensitivity_x = getFloat(L, "mouse_sensitivity_x", 200.0f);
+	m_mouse_sensitivity_y = getFloat(L, "mouse_sensitivity_y", 200.0f);
 
 	if (lua_getglobal(L, "actions") == LUA_TTABLE)
 	{
@@ -239,6 +253,8 @@ bool Settings::save(Action** actions, int actions_count)
 	writeBool("profiler_opened", m_is_profiler_opened);
 	writeBool("properties_opened", m_is_properties_opened);
 	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
+	file << "mouse_sensitivity_x = " << m_mouse_sensitivity_x << "\n";
+	file << "mouse_sensitivity_y = " << m_mouse_sensitivity_y << "\n";
 	file << "autosave_time = " << m_autosave_time << "\n";
 
 	file << "custom = {\n";
@@ -319,15 +335,18 @@ void Settings::onGUI(Action** actions, int actions_count)
 		ImGui::SameLine();
 		ImGui::Text("Settings are saved when the application closes");
 
-		ImGui::DragInt("Autosave time (seconds)", &m_autosave_time);
-		if (ImGui::Checkbox("Crash reporting", &m_is_crash_reporting_enabled))
+		if (ImGui::CollapsingHeader("General"))
 		{
-			Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
+			ImGui::DragInt("Autosave time (seconds)", &m_autosave_time);
+			if (ImGui::Checkbox("Crash reporting", &m_is_crash_reporting_enabled))
+			{
+				Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
+			}
+			ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity_x, 0.1f, 500.0f);
 		}
 
 		if (ImGui::CollapsingHeader("Shortcuts")) showShortcutSettings(actions, actions_count);
-
-		ImGui::ShowStyleEditor();
+		if (ImGui::CollapsingHeader("Style")) ImGui::ShowStyleEditor();
 	}
 	ImGui::EndDock();
 }

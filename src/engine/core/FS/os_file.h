@@ -32,6 +32,7 @@ namespace Lumix
 			OsFile& operator <<(int32 value);
 			OsFile& operator <<(uint32 value);
 			OsFile& operator <<(uint64 value);
+			OsFile& operator <<(float value);
 
 		private:
 			struct OsFileImpl* m_impl;
