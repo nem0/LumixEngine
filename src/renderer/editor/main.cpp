@@ -804,7 +804,9 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 
 		void renderModel(ModelHandle model, const Matrix& mtx) override
 		{
-			if (m_pipeline.isReady()) m_pipeline.renderModel(*m_models[model], mtx);
+			if (!m_pipeline.isReady() || !m_models[model]->isReady()) return;
+
+			m_pipeline.renderModel(*m_models[model], mtx);
 		}
 
 

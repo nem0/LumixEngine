@@ -24,6 +24,29 @@ class Path;
 class Renderer;
 class RenderScene;
 class TransientGeometry;
+struct Vec4;
+
+
+class CommandBufferGenerator
+{
+public:
+	CommandBufferGenerator();
+
+	void setTexture(uint8 stage,
+		const bgfx::UniformHandle& uniform,
+		const bgfx::TextureHandle& texture);
+	void setUniform(const bgfx::UniformHandle& uniform, const Vec4& value);
+	void setUniform(const bgfx::UniformHandle& uniform, const Matrix* values, int count);
+	void setTimeUniform(const bgfx::UniformHandle& uniform);
+	void setLocalShadowmap(const bgfx::TextureHandle& shadowmap);
+	void setGlobalShadowmap();
+	int getSize() const { return int(pointer - buffer + 1); }
+	void getData(uint8* data);
+
+private:
+	char buffer[1024];
+	char* pointer;
+};
 
 
 class LUMIX_RENDERER_API Pipeline

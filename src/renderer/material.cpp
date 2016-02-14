@@ -9,6 +9,7 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "renderer/material_manager.h"
+#include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
@@ -33,6 +34,7 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 	, m_shininess(4)
 	, m_shader_instance(nullptr)
 	, m_define_mask(0)
+	, m_command_buffer(nullptr)
 {
 	auto* manager = resource_manager.get(ResourceManager::MATERIAL);
 	auto* mat_manager = static_cast<MaterialManager*>(manager);
@@ -91,6 +93,8 @@ void Material::setDefine(uint8 define_idx, bool enabled)
 
 void Material::unload(void)
 {
+	m_allocator.deallocate(m_command_buffer);
+	m_command_buffer = nullptr;
 	m_uniforms.clear();
 	setShader(nullptr);
 
@@ -356,6 +360,52 @@ void Material::setShader(const Path& path)
 }
 
 
+void Material::createCommandBuffer()
+{
+	m_allocator.deallocate(m_command_buffer);
+	m_command_buffer = nullptr;
+	if (!m_shader) return;
+
+	CommandBufferGenerator generator;
+
+	for (int i = 0; i < m_shader->getUniformCount(); ++i)
+	{
+		const Material::Uniform& uniform = m_uniforms[i];
+		const Shader::Uniform& shader_uniform = m_shader->getUniform(i);
+
+		switch (shader_uniform.type)
+		{
+			case Shader::Uniform::FLOAT:
+				generator.setUniform(shader_uniform.handle, Vec4(uniform.float_value, 0, 0, 0));
+				break;
+			case Shader::Uniform::VEC3:
+			case Shader::Uniform::COLOR:
+				generator.setUniform(shader_uniform.handle, Vec4(*(Vec3*)uniform.vec3, 0));
+				break;
+			case Shader::Uniform::TIME: generator.setTimeUniform(shader_uniform.handle); break;
+			default: ASSERT(false); break;
+		}
+	}
+
+	for (int i = 0; i < m_shader->getTextureSlotCount(); ++i)
+	{
+		if (i >= m_texture_count || !m_textures[i]) continue;
+
+		generator.setTexture(
+			i, m_shader->getTextureSlot(i).m_uniform_handle, m_textures[i]->getTextureHandle());
+	}
+
+	Vec4 color_shininess(m_color, m_shininess);
+	TODO("todo");
+	static bgfx::UniformHandle mat_color_shininess_uniform =
+		bgfx::createUniform("u_materialColorShininess", bgfx::UniformType::Vec4);
+	generator.setUniform(mat_color_shininess_uniform, color_shininess);
+
+	m_command_buffer = (uint8*)m_allocator.allocate(generator.getSize());
+	generator.getData(m_command_buffer);
+}
+
+
 void Material::onBeforeReady()
 {
 	if (!m_shader) return;
@@ -403,6 +453,7 @@ void Material::onBeforeReady()
 		}
 	}
 
+	createCommandBuffer();
 	m_shader_instance = &m_shader->getInstance(m_define_mask);
 }
 
