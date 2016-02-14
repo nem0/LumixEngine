@@ -71,19 +71,19 @@ void LogUI::push(Type type, const char* message)
 
 void LogUI::onInfo(const char* system, const char* message)
 {
-	push(Lumix::compareString(system, "bgfx") == 0 ? BGFX : Info, message);
+	push(Info, message);
 }
 
 
 void LogUI::onWarning(const char* system, const char* message)
 {
-	push(Lumix::compareString(system, "bgfx") == 0 ? BGFX : Warning, message);
+	push(Warning, message);
 }
 
 
 void LogUI::onError(const char* system, const char* message)
 {
-	push(Lumix::compareString(system, "bgfx") == 0 ? BGFX : Error, message);
+	push(Error, message);
 }
 
 
@@ -161,7 +161,7 @@ void LogUI::onGUI()
 
 	if (ImGui::BeginDock("Log", &m_is_opened))
 	{
-		const char* labels[] = { "Info", "Warning", "Error", "BGFX" };
+		const char* labels[] = { "Info", "Warning", "Error" };
 		for (int i = 0; i < Lumix::lengthOf(labels); ++i)
 		{
 			char label[20];

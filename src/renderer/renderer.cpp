@@ -522,9 +522,6 @@ struct RendererImpl : public Renderer
 			const char* _format,
 			va_list _argList) override
 		{
-			char tmp[2048];
-			vsnprintf(tmp, sizeof(tmp), _format, _argList);
-			Lumix::g_log_info.log("bgfx") << _filePath << "(" << _line << ") " << tmp;
 		}
 
 

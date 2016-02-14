@@ -76,6 +76,7 @@ public:
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }
 	ShaderInstance& getShaderInstance() { ASSERT(m_shader_instance); return *m_shader_instance; }
 	const ShaderInstance& getShaderInstance() const { ASSERT(m_shader_instance); return *m_shader_instance; }
+	const uint8* getCommandBuffer() const { return m_command_buffer; }
 
 	void setDefine(uint8 define_idx, bool enabled);
 	bool hasDefine(uint8 define_idx) const;
@@ -86,6 +87,7 @@ private:
 	void unload(void) override;
 	bool load(FS::IFile& file) override;
 
+	void createCommandBuffer();
 	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);
 	void deserializeUniforms(JsonSerializer& serializer);
 	void deserializeDefines(JsonSerializer& serializer);
@@ -106,6 +108,7 @@ private:
 	float m_shininess;
 	float m_alpha_ref;
 	uint32 m_define_mask;
+	uint8* m_command_buffer;
 };
 
 } // ~namespace Lumix

@@ -27,7 +27,6 @@ class LUMIX_EDITOR_API LogUI
 			Info,
 			Warning,
 			Error,
-			BGFX,
 
 			Count
 		};
