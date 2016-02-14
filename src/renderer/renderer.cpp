@@ -628,6 +628,8 @@ struct RendererImpl : public Renderer
 
 		m_current_pass_hash = crc32("MAIN");
 		m_view_counter = 0;
+		m_mat_color_shininess_uniform =
+			bgfx::createUniform("u_materialColorShininess", bgfx::UniformType::Vec4);
 
 		m_basic_vertex_decl.begin()
 			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
@@ -652,6 +654,7 @@ struct RendererImpl : public Renderer
 		m_shader_manager.destroy();
 		m_shader_binary_manager.destroy();
 
+		bgfx::destroyUniform(m_mat_color_shininess_uniform);
 		bgfx::frame();
 		bgfx::frame();
 		bgfx::shutdown();
@@ -739,6 +742,12 @@ struct RendererImpl : public Renderer
 	}
 
 
+	const bgfx::UniformHandle& getMaterialColorShininessUniform() const override
+	{
+		return m_mat_color_shininess_uniform;
+	}
+
+
 	void makeScreenshot(const Path& filename) override
 	{
 		bgfx::saveScreenShot(filename.c_str());
@@ -803,6 +812,7 @@ struct RendererImpl : public Renderer
 	BGFXAllocator m_bgfx_allocator;
 	bgfx::VertexDecl m_basic_vertex_decl;
 	bgfx::VertexDecl m_basic_2d_vertex_decl;
+	bgfx::UniformHandle m_mat_color_shininess_uniform;
 };
 
 
@@ -821,7 +831,7 @@ extern "C"
 }
 
 
-} // ~namespace Lumix
+} // namespace Lumix
 
 
 

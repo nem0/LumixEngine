@@ -6,6 +6,7 @@
 
 namespace bgfx
 {
+	struct UniformHandle;
 	struct VertexDecl;
 }
 
@@ -27,6 +28,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		typedef void* TransientDataHandle;
 
 	public:
+		virtual ~Renderer() {}
 		virtual void frame() = 0;
 		virtual void resize(int width, int height) = 0;
 		virtual int getViewCounter() const = 0;
@@ -40,6 +42,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual const bgfx::VertexDecl& getBasic2DVertexDecl() const = 0;
 		virtual MaterialManager& getMaterialManager() = 0;
 		virtual Shader* getDefaultShader() = 0;
+		virtual const bgfx::UniformHandle& getMaterialColorShininessUniform() const = 0;
 
 		virtual Engine& getEngine() = 0;
 }; 
