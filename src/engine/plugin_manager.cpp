@@ -101,14 +101,16 @@ class PluginManagerImpl : public PluginManager
 		{
 			return m_library_loaded;
 		}
-
+		
 
 		IPlugin* load(const char* path) override
 		{
-			g_log_info.log("Core") << "loading plugin " << path;
+			char path_with_ext[MAX_PATH_LENGTH];
+			copyString(path_with_ext, path);
+			catString(path_with_ext, ".dll");
+			g_log_info.log("Core") << "loading plugin " << path_with_ext;
 			typedef IPlugin* (*PluginCreator)(Engine&);
-
-			auto* lib = loadLibrary(path);
+			auto* lib = loadLibrary(path_with_ext);
 			if (lib)
 			{
 				PluginCreator creator = (PluginCreator)getLibrarySymbol(lib, "createPlugin");
@@ -136,6 +138,13 @@ class PluginManagerImpl : public PluginManager
 			}
 			else
 			{
+				auto* plugin = StaticPluginRegister::create(path, m_engine);
+				if (plugin && plugin->create())
+				{
+					g_log_info.log("Core") << "Plugin loaded.";
+					m_plugins.push(plugin);
+					return plugin;
+				}
 				g_log_warning.log("Core") << "Failed to load plugin.";
 			}
 			unloadLibrary(lib);

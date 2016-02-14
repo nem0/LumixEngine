@@ -967,11 +967,19 @@ public:
 	void setStudioApp()
 	{
 		auto& plugin_manager = m_editor->getEngine().getPluginManager();
+		#ifdef STATIC_PLUGINS
+		for (auto* plugin : plugin_manager.getPlugins())
+		{
+			StudioApp::StaticPluginRegister::create(plugin->getName(), *this);
+		}
+		#else
 		for (auto* lib : plugin_manager.getLibraries())
 		{
-			auto* f = (void (*)(StudioApp&))Lumix::getLibrarySymbol(lib, "setStudioApp");
+			auto* f = (void(*)(StudioApp&))Lumix::getLibrarySymbol(lib, "setStudioApp");
 			if (f) f(*this);
 		}
+		#endif
+		
 	}
 
 
@@ -1376,4 +1384,31 @@ StudioApp* StudioApp::create()
 void StudioApp::destroy(StudioApp& app)
 {
 	app.~StudioApp();
+}
+
+
+static StudioApp::StaticPluginRegister* s_first_plugin = nullptr;
+
+
+StudioApp::StaticPluginRegister::StaticPluginRegister(const char* name, Creator creator)
+{
+	this->creator = creator;
+	this->name = name;
+	next = s_first_plugin;
+	s_first_plugin = this;
+}
+
+
+void StudioApp::StaticPluginRegister::create(const char* name, StudioApp& app)
+{
+	auto* i = s_first_plugin;
+	while (i)
+	{
+		if (Lumix::compareString(name, i->name) == 0)
+		{
+			i->creator(app);
+			return;
+		}
+		i = i->next;
+	}
 }

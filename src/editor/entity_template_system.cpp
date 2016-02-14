@@ -17,14 +17,6 @@ namespace Lumix
 {
 
 
-static const uint32 CAMERA_HASH = Lumix::crc32("camera");
-static const uint32 GLOBAL_LIGHT_HASH = Lumix::crc32("global_light");
-static const uint32 POINT_LIGHT_HASH = Lumix::crc32("point_light");
-static const uint32 SCRIPT_HASH = Lumix::crc32("script");
-static const uint32 ANIMABLE_HASH = Lumix::crc32("animable");
-static const uint32 TERRAIN_HASH = Lumix::crc32("terrain");
-
-
 class EntityTemplateSystemImpl : public EntityTemplateSystem
 {
 private:

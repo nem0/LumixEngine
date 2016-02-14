@@ -1305,8 +1305,7 @@ namespace Lumix
 	}
 
 
-
-	extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
+	LUMIX_STUDIO_ENTRY(lua_script)
 	{
 		auto& editor = *app.getWorldEditor();
 		editor.registerEditorCommandCreator("add_script", createAddScriptCommand);
@@ -1321,10 +1320,8 @@ namespace Lumix
 	}
 
 
-	extern "C" LUMIX_LIBRARY_EXPORT IPlugin* createPlugin(Engine& engine)
+	LUMIX_PLUGIN_ENTRY(lua_script)
 	{
 		return LUMIX_NEW(engine.getAllocator(), LuaScriptSystem)(engine);
 	}
-
-
-} // ~namespace Lumix
+}

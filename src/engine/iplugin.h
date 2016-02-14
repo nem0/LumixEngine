@@ -53,4 +53,30 @@ namespace Lumix
 	};
 
 
-};
+	struct LUMIX_ENGINE_API StaticPluginRegister
+	{
+		typedef IPlugin* (*Creator)(Engine& engine);
+		StaticPluginRegister(const char* name, Creator creator);
+		
+		static IPlugin* create(const char* name, Engine& engine);
+
+		StaticPluginRegister* next;
+		Creator creator;
+		const char* name;
+	};
+
+
+} // namespace Lumix
+
+
+#ifdef STATIC_PLUGINS
+	#define LUMIX_PLUGIN_ENTRY(plugin_name)                                           \
+		extern "C" Lumix::IPlugin* createPlugin_##plugin_name(Lumix::Engine& engine); \
+		extern "C" StaticPluginRegister s_##plugin_name##_plugin_register(            \
+			#plugin_name, createPlugin_##plugin_name);                                \
+		extern "C" Lumix::IPlugin* createPlugin_##plugin_name(Lumix::Engine& engine)
+#else
+	#define LUMIX_PLUGIN_ENTRY(plugin_name) \
+		extern "C" LUMIX_LIBRARY_EXPORT Lumix::IPlugin* createPlugin(Lumix::Engine& engine)
+#endif
+

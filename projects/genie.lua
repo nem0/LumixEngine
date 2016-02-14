@@ -2,6 +2,11 @@ local ide_dir = iif(_ACTION == nil, "vs2013", _ACTION)
 local LOCATION = "tmp/" .. ide_dir
 local BINARY_DIR = LOCATION .. "/bin/"
 
+newoption {
+	trigger = "static-plugins",
+	description = "Plugins are static libraries.",
+}
+
 newaction {
 	trigger = "install",
 	description = "Install in ../../LumixEngine_data/bin",
@@ -116,15 +121,12 @@ function linkLib(lib)
 end
 
 function useLua()
-	defines { "LUA_BUILD_AS_DLL" }
+	if _OPTIONS["static-plugins"] then
+		linkLib("lua")
+	else		
+		defines { "LUA_BUILD_AS_DLL" }
+	end
 	includedirs { "../external/lua/include" }
-end
-
-function linkLua()
-	includedirs { "../external/lua/include" }
-	linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
-
-	linkLib("lua")
 end
 
 function copyDlls(src_dir, platform_bit, platform_dir, dest_dir)
@@ -147,37 +149,15 @@ function copyDlls(src_dir, platform_bit, platform_dir, dest_dir)
 	}
 end
 
-solution "LumixEngine"
-	configurations { "Debug", "Release", "RelWithDebInfo" }
-	platforms { "x32", "x64" }
-	flags { "FatalWarnings", "NoPCH" }
-	includedirs {"../src", "../src/engine"}
-	location(LOCATION)
-	language "C++"
-	startproject "studio"
+function libType()
+	if _OPTIONS["static-plugins"] then
+		kind "StaticLib"
+	else
+		kind "SharedLib"
+	end
+end
 
-project "engine"
-	kind "SharedLib"
-
-	files { "../src/engine/**.h", "../src/engine/**.cpp", "genie.lua" }
-	excludes { "../src/engine/**/osx/*"}
-
-	defines { "BUILDING_ENGINE" }
-	linkLua()
-
-	defaultConfigurations()
-
-project "physics"
-	kind "SharedLib"
-
-	files { "../src/physics/**.h", "../src/physics/**.cpp" }
-	excludes { "../src/engine/**/osx/*"}
-	includedirs { "../external/physx/include/" .. ide_dir, "../external/bgfx/include" }
-	defines { "BUILDING_PHYSICS" }
-	links { "engine", "renderer", "editor" }
-
-	useLua()
-
+function linkPhysX()
 	configuration { "x64" }
 		libdirs {"../external/physx/lib/" .. ide_dir .. "/win64"}
 		links {"PhysX3CHECKED_x64", "PhysX3CommonCHECKED_x64", "PhysX3CharacterKinematicCHECKED_x64", "PhysX3CookingCHECKED_x64" }
@@ -191,12 +171,64 @@ project "physics"
 		links { "PhysX3ExtensionsCHECKED", "PhysXVisualDebuggerSDKCHECKED" }
 	configuration { "RelWithDebInfo" }
 		links { "PhysX3ExtensionsCHECKED", "PhysXVisualDebuggerSDKCHECKED" }
+		
+	configuration {}
+end
+
+function forceLink(name)
+	configuration { "x64" }
+		linkoptions {"/INCLUDE:" .. name}
+	configuration { "x32" }
+		linkoptions {"/INCLUDE:_" .. name}
+	configuration {}
+end
+
+solution "LumixEngine"
+	configurations { "Debug", "Release", "RelWithDebInfo" }
+	platforms { "x32", "x64" }
+	flags { "FatalWarnings", "NoPCH" }
+	includedirs {"../src", "../src/engine"}
+	location(LOCATION)
+	language "C++"
+	startproject "studio"
+	if _OPTIONS["static-plugins"] then
+		defines {"STATIC_PLUGINS"}
+	end
+	
+project "engine"
+	libType()
+
+	files { "../src/engine/**.h", "../src/engine/**.cpp", "genie.lua" }
+	excludes { "../src/engine/**/osx/*"}
+
+	defines { "BUILDING_ENGINE" }
+	includedirs { "../external/lua/include" }
+	if not _OPTIONS["static-plugins"] then
+		linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
+	end
+
+	linkLib("lua")
+
+	defaultConfigurations()
+
+project "physics"
+	libType()
+
+	files { "../src/physics/**.h", "../src/physics/**.cpp" }
+	excludes { "../src/engine/**/osx/*"}
+	includedirs { "../external/physx/include/" .. ide_dir, "../external/bgfx/include" }
+	defines { "BUILDING_PHYSICS" }
+	links { "engine", "renderer", "editor" }
+
+	useLua()
+
+	linkPhysX()
 
 	defaultConfigurations()
 
 
 project "renderer"
-	kind "SharedLib"
+	libType()
 
 	files { "../src/renderer/**.h", "../src/renderer/**.cpp" }
 	includedirs { "../src", "../external/bgfx/include" }
@@ -209,7 +241,7 @@ project "renderer"
 	defaultConfigurations()
 
 project "animation"
-	kind "SharedLib"
+	libType()
 
 	files { "../src/animation/**.h", "../src/animation/**.cpp" }
 	includedirs { "../src" }
@@ -220,7 +252,7 @@ project "animation"
 	defaultConfigurations()
 
 project "audio"
-	kind "SharedLib"
+	libType()
 
 	files { "../src/audio/**.h", "../src/audio/**.cpp", "../src/audio/**.c" }
 	includedirs { "../src", "../src/audio", "../external/bgfx/include" }
@@ -231,7 +263,7 @@ project "audio"
 	defaultConfigurations()
 
 project "lua_script"
-	kind "SharedLib"
+	libType()
 
 	files { "../src/lua_script/**.h", "../src/lua_script/**.cpp" }
 	includedirs { "../src", "../src/lua_script", "../external/lua/include", "../external/bgfx/include" }
@@ -247,6 +279,10 @@ project "unit_tests"
 	files { "../src/unit_tests/**.h", "../src/unit_tests/**.cpp" }
 	includedirs { "../src", "../src/unit_tests", "../external/bgfx/include" }
 	links { "engine", "animation", "renderer" }
+	if _OPTIONS["static-plugins"] then	
+		links { "engine", "winmm", "psapi" }
+		linkLib("bgfx")
+	end
 
 	useLua()
 	defaultConfigurations()
@@ -258,19 +294,42 @@ project "render_test"
 
 	files { "../src/render_test/**.h", "../src/render_test/**.cpp" }
 	includedirs { "../src", "../src/render_test", "../external/bgfx/include" }
+	if _OPTIONS["static-plugins"] then	
+		forceLink("s_animation_plugin_register")
+		forceLink("s_audio_plugin_register")
+		forceLink("s_lua_script_plugin_register")
+		forceLink("s_physics_plugin_register")
+		forceLink("s_renderer_plugin_register")
+
+		forceLink("setStudioApp_animation")
+		forceLink("setStudioApp_audio")
+		forceLink("setStudioApp_lua_script")
+		forceLink("setStudioApp_physics")
+		forceLink("setStudioApp_renderer")
+
+		links { "engine", "winmm", "audio", "animation", "renderer", "lua_script", "physics", "psapi", "dxguid" }
+		linkLib("crnlib")
+		linkLib("assimp")
+		linkLib("bgfx")
+		linkLib("lua")
+		linkPhysX()
+	end
 	links { "engine", "animation", "renderer" }
 
+	
 	useLua()
 	defaultConfigurations()
 
 
 project "editor"
-	kind "SharedLib"
+	libType()
 
 	files { "../src/editor/**.h", "../src/editor/**.cpp", "../src/editor/**.inl" }
 	includedirs { "../src", "../src/editor", "../external/bgfx/include" }
 	defines { "BUILDING_EDITOR" }
-	links { "engine", "assimp", "crnlib", "winmm" }
+	links { "engine", "winmm" }
+	linkLib("crnlib")
+	linkLib("assimp")
 	includedirs { "../src", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crnlib/include" }
 
 	useLua()
@@ -283,9 +342,6 @@ project "editor"
 	copyDlls("Release", 32, "win32", "RelWithDebInfo")
 	copyDlls("Release", 64, "win64", "RelWithDebInfo")
 
-	linkLib("crnlib")
-	linkLib("assimp")
-
 project "studio"
 	kind "WindowedApp"
 
@@ -293,6 +349,27 @@ project "studio"
 
 	files { "../src/studio/**.cpp" }
 	includedirs { "../src" }
+
+	if _OPTIONS["static-plugins"] then	
+		forceLink("s_animation_plugin_register")
+		forceLink("s_audio_plugin_register")
+		forceLink("s_lua_script_plugin_register")
+		forceLink("s_physics_plugin_register")
+		forceLink("s_renderer_plugin_register")
+
+		forceLink("setStudioApp_animation")
+		forceLink("setStudioApp_audio")
+		forceLink("setStudioApp_lua_script")
+		forceLink("setStudioApp_physics")
+		forceLink("setStudioApp_renderer")
+
+		links { "engine", "winmm", "audio", "animation", "renderer", "lua_script", "physics", "psapi", "dxguid" }
+		linkLib("crnlib")
+		linkLib("assimp")
+		linkLib("bgfx")
+		linkLib("lua")
+		linkPhysX()
+	end
 	links { "editor" }
 
 	useLua()

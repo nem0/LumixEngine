@@ -1326,7 +1326,7 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 extern "C" {
 
 
-LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
+LUMIX_STUDIO_ENTRY(renderer)
 {
 	auto& allocator = app.getWorldEditor()->getAllocator();
 
