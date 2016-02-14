@@ -34,7 +34,7 @@ struct LUMIX_ENGINE_API Quat
 	void toMatrix(Matrix& mtx) const;
 
 	inline Vec3 operator *(const Vec3& v) const;
-	inline Quat operator *(const Quat& q) const;
+	Quat operator *(const Quat& q) const;
 	Quat operator -() const;
 
 	float x, y, z, w;

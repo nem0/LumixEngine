@@ -125,11 +125,11 @@ public:
 		platform_data.window_handle = hwnd;
 		m_engine->setPlatformData(platform_data);
 
-		m_engine->getPluginManager().load("renderer.dll");
-		m_engine->getPluginManager().load("animation.dll");
-		m_engine->getPluginManager().load("audio.dll");
-		m_engine->getPluginManager().load("lua_script.dll");
-		m_engine->getPluginManager().load("physics.dll");
+		m_engine->getPluginManager().load("renderer");
+		m_engine->getPluginManager().load("animation");
+		m_engine->getPluginManager().load("audio");
+		m_engine->getPluginManager().load("lua_script");
+		m_engine->getPluginManager().load("physics");
 		Lumix::Renderer* renderer =
 			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 		m_pipeline = Lumix::Pipeline::create(

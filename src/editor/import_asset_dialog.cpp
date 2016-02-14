@@ -22,7 +22,9 @@
 #include "physics/physics_geometry_manager.h"
 #include "platform_interface.h"
 #include "renderer/model.h"
+#ifndef STATIC_PLUGINS
 #define STB_IMAGE_IMPLEMENTATION
+#endif
 #include "stb/stb_image.h"
 #include "utils.h"
 

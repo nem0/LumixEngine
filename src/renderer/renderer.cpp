@@ -811,7 +811,7 @@ struct RendererImpl : public Renderer
 
 extern "C"
 {
-	LUMIX_RENDERER_API IPlugin* createPlugin(Engine& engine)
+	LUMIX_PLUGIN_ENTRY(renderer)
 	{
 		RendererImpl* r = LUMIX_NEW(engine.getAllocator(), RendererImpl)(engine);
 		if (r->create())
