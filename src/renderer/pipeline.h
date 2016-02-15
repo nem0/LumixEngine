@@ -40,12 +40,13 @@ public:
 	void setTimeUniform(const bgfx::UniformHandle& uniform);
 	void setLocalShadowmap(const bgfx::TextureHandle& shadowmap);
 	void setGlobalShadowmap();
-	int getSize() const { return int(pointer - buffer + 1); }
+	int getSize() const { return int(pointer - buffer); }
 	void getData(uint8* data);
+	void clear();
+	void end();
 
-private:
-	char buffer[1024];
-	char* pointer;
+	uint8 buffer[1024];
+	uint8* pointer;
 };
 
 
