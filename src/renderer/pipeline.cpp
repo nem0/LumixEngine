@@ -1040,7 +1040,7 @@ struct PipelineImpl : public Pipeline
 		PointLightShadowmap& shadowmap_info = m_point_light_shadowmaps.emplace();
 		shadowmap_info.m_framebuffer = m_current_framebuffer;
 		shadowmap_info.m_light = light;
-		setPointLightUniforms(light);
+		//setPointLightUniforms(light);
 
 		for (int i = 0; i < 4; ++i)
 		{
@@ -1112,8 +1112,6 @@ struct PipelineImpl : public Pipeline
 			float fov = m_scene->getLightFOV(lights[i]);
 
 			m_current_framebuffer = fbs[i];
-			bgfx::setViewFrameBuffer(m_view_idx, m_current_framebuffer->getHandle());
-
 			if (fov < 180)
 			{
 				renderSpotLightShadowmap(lights[i], layer_mask);
@@ -1869,7 +1867,7 @@ struct PipelineImpl : public Pipeline
 					auto cmd = (SetLocalShadowmapCommand*)ip;
 					ip += sizeof(*cmd);
 					material->setDefine(m_has_shadowmap_define_idx, bgfx::isValid(cmd->texture));
-					bgfx::setTexture(material->getShader()->getTextureSlotCount(),
+					bgfx::setTexture(15 - m_global_textures_count,
 						m_tex_shadowmap_uniform,
 						cmd->texture);
 					break;
@@ -2433,8 +2431,7 @@ int setUniform(lua_State* L)
 int renderLocalLightsShadowmaps(lua_State* L)
 {
 	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
-	int64 layer_mask = LuaWrapper::checkArg<int64>(L, 2);
-	const char* camera_slot = LuaWrapper::checkArg<const char*>(L, 4);
+	const char* camera_slot = LuaWrapper::checkArg<const char*>(L, 2);
 
 	FrameBuffer* fbs[16];
 	int len = Math::minValue((int)lua_rawlen(L, 3), lengthOf(fbs));
@@ -2450,7 +2447,7 @@ int renderLocalLightsShadowmaps(lua_State* L)
 
 	RenderScene* scene = pipeline->m_scene;
 	ComponentIndex camera = scene->getCameraInSlot(camera_slot);
-	pipeline->renderLocalLightShadowmaps(camera, fbs, len, layer_mask);
+	pipeline->renderLocalLightShadowmaps(camera, fbs, len, 0xffffFFFF);
 
 	return 0;
 }
