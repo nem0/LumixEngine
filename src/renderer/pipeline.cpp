@@ -47,13 +47,6 @@ struct InstanceData
 };
 
 
-struct TextureBindData
-{
-	bgfx::TextureHandle texture;
-	bgfx::UniformHandle uniform;
-};
-
-
 enum class BufferCommands : uint8
 {
 	END,
@@ -148,6 +141,21 @@ void CommandBufferGenerator::setUniform(const bgfx::UniformHandle& uniform, cons
 }
 
 
+void CommandBufferGenerator::setUniform(const bgfx::UniformHandle& uniform, const Vec4* values, int count)
+{
+	SetUniformArrayCommand cmd;
+	cmd.uniform = uniform;
+	cmd.count = count;
+	cmd.size = uint16(count * sizeof(Vec4));
+	ASSERT(pointer + sizeof(cmd) - buffer <= sizeof(buffer));
+	copyMemory(pointer, &cmd, sizeof(cmd));
+	pointer += sizeof(cmd);
+	ASSERT(pointer + cmd.size - buffer <= sizeof(buffer));
+	copyMemory(pointer, values, cmd.size);
+	pointer += cmd.size;
+}
+
+
 void CommandBufferGenerator::setUniform(const bgfx::UniformHandle& uniform, const Matrix* values, int count)
 {
 	SetUniformArrayCommand cmd;
@@ -202,6 +210,12 @@ void CommandBufferGenerator::clear()
 {
 	buffer[0] = (uint8)BufferCommands::END;
 	pointer = buffer;
+}
+
+
+void CommandBufferGenerator::beginAppend()
+{
+	if (pointer != buffer) --pointer;
 }
 
 
@@ -618,11 +632,13 @@ struct PipelineImpl : public Pipeline
 		Vec4 size;
 		size.x = (float)fb->getWidth();
 		size.y = (float)fb->getHeight();
-		if (m_bind_framebuffer_texture_idx == 0) bgfx::setUniform(m_texture_size_uniform, &size);
-		bgfx::setTexture(m_bind_framebuffer_texture_idx,
+		m_global_command_buffer.beginAppend();
+		if (m_global_textures_count == 0) m_global_command_buffer.setUniform(m_texture_size_uniform, size);
+		m_global_command_buffer.setTexture(15 - m_global_textures_count,
 			m_uniforms[uniform_idx],
 			fb->getRenderbufferHandle(renderbuffer_idx));
-		++m_bind_framebuffer_texture_idx;
+		++m_global_textures_count;
+		m_global_command_buffer.end();
 	}
 
 
@@ -803,7 +819,6 @@ struct PipelineImpl : public Pipeline
 
 	void beginNewView(const char* debug_name)
 	{
-		m_bind_framebuffer_texture_idx = 0;
 		m_renderer.viewCounterAdd();
 		m_view_idx = (uint8)m_renderer.getViewCounter();
 		m_view2pass_map[m_view_idx] = m_pass_idx;
@@ -859,8 +874,6 @@ struct PipelineImpl : public Pipeline
 
 
 	void finishDeferredPointLightInstances(Material* material,
-		TextureBindData* textures,
-		int textures_count,
 		const bgfx::InstanceDataBuffer* instance_buffer,
 		int instance_count,
 		bool is_intersecting)
@@ -876,12 +889,7 @@ struct PipelineImpl : public Pipeline
 		{
 			bgfx::setState(m_render_state | material->getRenderStates());
 		}
-		for(int i = 0; i < textures_count; ++i)
-		{
-			bgfx::setTexture(m_bind_framebuffer_texture_idx + i,
-				textures[i].uniform,
-				textures[i].texture);
-		}
+		executeCommandBuffer(m_global_command_buffer.buffer, material);
 		bgfx::setVertexBuffer(m_cube_vb);
 		bgfx::setIndexBuffer(m_cube_ib);
 		++m_stats.m_draw_call_count;
@@ -891,7 +899,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void deferredLocalLightLoop(int material_index, TextureBindData* textures, int textures_count)
+	void deferredLocalLightLoop(int material_index)
 	{
 		PROFILE_FUNCTION();
 		if (m_applied_camera == INVALID_COMPONENT) return;
@@ -947,8 +955,6 @@ struct PipelineImpl : public Pipeline
 			if(instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx]->data == 128)
 			{
 				finishDeferredPointLightInstances(material,
-					textures,
-					textures_count,
 					instance_buffer[buffer_idx],
 					128,
 					buffer_idx == 0);
@@ -962,8 +968,6 @@ struct PipelineImpl : public Pipeline
 			if(instance_data[buffer_idx])
 			{
 				finishDeferredPointLightInstances(material,
-					textures,
-					textures_count,
 					instance_buffer[buffer_idx],
 					int(instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx]->data),
 					buffer_idx == 0);
@@ -1120,7 +1124,7 @@ struct PipelineImpl : public Pipeline
 			}
 			++fb_index;
 		}
-		m_global_command_buffer.clear();
+		clearGlobalCommandBuffer();
 	}
 
 
@@ -1140,8 +1144,9 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderShadowmap(int64 layer_mask)
+	void renderShadowmap()
 	{
+		int64 layer_mask = 0xffffFFFF;
 		Universe& universe = m_scene->getUniverse();
 		ComponentIndex light_cmp = m_scene->getActiveGlobalLight();
 		if (light_cmp < 0 || m_applied_camera < 0) return;
@@ -1337,7 +1342,7 @@ struct PipelineImpl : public Pipeline
 		Vec4 light_specular(m_scene->getPointLightSpecularColor(light_cmp) * specular_intensity *
 								specular_intensity, 1);
 
-		m_global_command_buffer.clear();
+		clearGlobalCommandBuffer();
 		m_global_command_buffer.setUniform(m_light_pos_radius_uniform, light_pos_radius);
 		m_global_command_buffer.setUniform(m_light_color_attenuation_uniform, light_color_attenuation);
 		m_global_command_buffer.setUniform(m_light_dir_fov_uniform, light_dir_fov);
@@ -1370,8 +1375,9 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void clearLightCommandBuffer()
+	void clearGlobalCommandBuffer()
 	{
+		m_global_textures_count = 0;
 		m_global_command_buffer.clear();
 	}
 
@@ -1418,7 +1424,7 @@ struct PipelineImpl : public Pipeline
 		float specular_intensity = m_scene->getGlobalLightSpecularIntensity(current_light);
 		specular *= specular_intensity * specular_intensity;
 
-		m_global_command_buffer.clear();
+		clearGlobalCommandBuffer();
 		m_global_command_buffer.setUniform(m_light_color_attenuation_uniform, Vec4(diffuse_color, 1));
 		m_global_command_buffer.setUniform(m_ambient_color_uniform, Vec4(ambient_color, 1));
 		m_global_command_buffer.setUniform(m_light_dir_fov_uniform, Vec4(light_dir, 0));
@@ -1490,7 +1496,7 @@ struct PipelineImpl : public Pipeline
 			renderTerrains(m_tmp_terrains);
 			renderGrasses(m_tmp_grasses);
 		}
-		m_global_command_buffer.clear();
+		clearGlobalCommandBuffer();
 	}
 
 
@@ -1633,7 +1639,7 @@ struct PipelineImpl : public Pipeline
 		}
 		renderTerrains(m_tmp_terrains);
 		renderMeshes(m_tmp_meshes);
-		m_global_command_buffer.clear();
+		clearGlobalCommandBuffer();
 	}
 
 
@@ -1853,7 +1859,7 @@ struct PipelineImpl : public Pipeline
 				{
 					ip += 1;
 					auto handle = m_global_light_shadowmap->getRenderbufferHandle(0);
-					bgfx::setTexture(material->getShader()->getTextureSlotCount(),
+					bgfx::setTexture(15 - m_global_textures_count,
 						m_tex_shadowmap_uniform,
 						handle);
 					break;
@@ -2077,7 +2083,7 @@ struct PipelineImpl : public Pipeline
 		m_view2pass_map.assign(0xFF);
 		m_instance_data_idx = 0;
 		m_point_light_shadowmaps.clear();
-		m_global_command_buffer.clear();
+		clearGlobalCommandBuffer();
 		for (int i = 0; i < lengthOf(m_terrain_instances); ++i)
 		{
 			m_terrain_instances[i].m_count = 0;
@@ -2319,7 +2325,7 @@ struct PipelineImpl : public Pipeline
 	bgfx::UniformHandle m_cam_inv_proj_uniform;
 	bgfx::UniformHandle m_cam_inv_viewproj_uniform;
 	bgfx::UniformHandle m_texture_size_uniform;
-	int m_bind_framebuffer_texture_idx;
+	int m_global_textures_count;
 
 	Material* m_debug_line_material;
 	int m_has_shadowmap_define_idx;
@@ -2340,39 +2346,6 @@ void Pipeline::destroy(Pipeline* pipeline)
 
 namespace LuaAPI
 {
-
-
-int deferredLocalLightLoop(lua_State* L)
-{
-	auto* p = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
-	int material_index = LuaWrapper::checkArg<int>(L, 2);
-	LuaWrapper::checkTableArg(L, 3);
-
-	TextureBindData textures[16];
-	int texture_count = 0;
-
-	lua_pushnil(L);
-	while (lua_next(L, -2))
-	{
-		if (lua_istable(L, -1))
-		{
-			lua_rawgeti(L, -1, 1);
-			const char* fb_name = lua_tostring(L, -1);
-			lua_rawgeti(L, -2, 2);
-			int rb_idx = (int)lua_tointeger(L, -1);
-			lua_rawgeti(L, -3, 3);
-			int uniform_idx = (int)lua_tointeger(L, -1);
-			textures[texture_count].uniform = p->m_uniforms[uniform_idx];
-			textures[texture_count].texture = p->getFramebuffer(fb_name)->getRenderbufferHandle(rb_idx);
-			++texture_count;
-			lua_pop(L, 3);
-		}
-		lua_pop(L, 1);
-	}
-
-	p->deferredLocalLightLoop(material_index, textures, texture_count);
-	return 0;
-}
 
 
 int addFramebuffer(lua_State* L)
@@ -2450,7 +2423,9 @@ int setUniform(lua_State* L)
 
 	if (uniform_idx >= pipeline->m_uniforms.size()) luaL_argerror(L, 2, "unknown uniform");
 	
-	bgfx::setUniform(pipeline->m_uniforms[uniform_idx], tmp, len);
+	pipeline->m_global_command_buffer.beginAppend();
+	pipeline->m_global_command_buffer.setUniform(pipeline->m_uniforms[uniform_idx], tmp, len);
+	pipeline->m_global_command_buffer.end();
 	return 0;
 }
 
@@ -2532,16 +2507,16 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(clearStencil);
 	REGISTER_FUNCTION(setStencilRMask);
 	REGISTER_FUNCTION(setStencilRef);
-	REGISTER_FUNCTION(clearLightCommandBuffer);
+	REGISTER_FUNCTION(clearGlobalCommandBuffer);
 	REGISTER_FUNCTION(addRenderParamFloat);
 	REGISTER_FUNCTION(getRenderParamFloat);
+	REGISTER_FUNCTION(deferredLocalLightLoop);
 
 	#undef REGISTER_FUNCTION
 
 	#define REGISTER_FUNCTION(name) \
 		registerCFunction(#name, LuaWrapper::wrap<decltype(&LuaAPI::name), LuaAPI::name>)
 
-	REGISTER_FUNCTION(deferredLocalLightLoop);
 	REGISTER_FUNCTION(print);
 	REGISTER_FUNCTION(logError);
 	REGISTER_FUNCTION(renderLocalLightsShadowmaps);

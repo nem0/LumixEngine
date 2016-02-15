@@ -36,6 +36,7 @@ public:
 		const bgfx::UniformHandle& uniform,
 		const bgfx::TextureHandle& texture);
 	void setUniform(const bgfx::UniformHandle& uniform, const Vec4& value);
+	void setUniform(const bgfx::UniformHandle& uniform, const Vec4* values, int count);
 	void setUniform(const bgfx::UniformHandle& uniform, const Matrix* values, int count);
 	void setTimeUniform(const bgfx::UniformHandle& uniform);
 	void setLocalShadowmap(const bgfx::TextureHandle& shadowmap);
@@ -43,6 +44,7 @@ public:
 	int getSize() const { return int(pointer - buffer); }
 	void getData(uint8* data);
 	void clear();
+	void beginAppend();
 	void end();
 
 	uint8 buffer[1024];
