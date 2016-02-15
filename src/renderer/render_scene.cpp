@@ -42,6 +42,7 @@ namespace Lumix
 
 
 static const uint32 RENDERABLE_HASH = crc32("renderable");
+static const uint32 RENDER_PARAMS_HASH = crc32("render_params");
 static const uint32 POINT_LIGHT_HASH = crc32("point_light");
 static const uint32 PARTICLE_EMITTER_HASH = crc32("particle_emitter");
 static const uint32 PARTICLE_EMITTER_FADE_HASH = crc32("particle_emitter_fade");
@@ -71,9 +72,24 @@ enum class RenderSceneVersion : int32
 	RENDERABLE_MATERIALS,
 	GLOBAL_LIGHT_SPECULAR,
 	SPECULAR_INTENSITY,
+	RENDER_PARAMS,
 
 	LATEST,
 	INVALID = -1,
+};
+
+
+struct RenderParamVec4
+{
+	char name[32];
+	Vec4 value;
+};
+
+
+struct RenderParamFloat
+{
+	char name[32];
+	float value;
 };
 
 
@@ -197,6 +213,8 @@ public:
 		, m_is_game_running(false)
 		, m_particle_emitters(m_allocator)
 		, m_point_lights_map(m_allocator)
+		, m_render_params_float(m_allocator)
+		, m_render_params_vec4(m_allocator)
 	{
 		m_universe.entityTransformed()
 			.bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
@@ -204,6 +222,7 @@ public:
 			CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
 		m_time = 0;
 		m_renderables.reserve(5000);
+		m_render_params_entity = INVALID_ENTITY;
 	}
 
 
@@ -242,6 +261,74 @@ public:
 		}
 
 		CullingSystem::destroy(*m_culling_system);
+	}
+
+
+	int getRenderParamFloatCount() const override
+	{
+		return m_render_params_float.size();
+	}
+
+
+	int getRenderParamVec4Count() const override
+	{
+		return m_render_params_vec4.size();
+	}
+
+
+	const char* getRenderParamFloatName(int index) const override
+	{
+		return m_render_params_float[index].name;
+	}
+
+
+	const char* getRenderParamVec4Name(int index) const override
+	{
+		return m_render_params_vec4[index].name;
+	}
+
+
+	int addRenderParamFloat(const char* name, float default_value) override
+	{
+		auto& p = m_render_params_float.emplace();
+		p.value = default_value;
+		copyString(p.name, name);
+		return m_render_params_float.size() - 1;
+	}
+
+
+	int addRenderParamVec4(const char* name, const Vec4& default_value) override
+	{
+		auto& p = m_render_params_vec4.emplace();
+		p.value = default_value;
+		copyString(p.name, name);
+		return m_render_params_vec4.size() - 1;
+	}
+
+
+	void setRenderParamFloat(int param_index, float value) override
+	{
+		m_render_params_float[param_index].value = value;
+	}
+
+
+	void setRenderParamVec4(int param_index, const Vec4& value) override
+	{
+		m_render_params_vec4[param_index].value = value;
+	}
+
+
+	float getRenderParamFloat(int param_index) override
+	{
+		if(param_index >= m_render_params_float.size()) return 0;
+		return m_render_params_float[param_index].value;
+	}
+
+
+	Vec4 getRenderParamVec4(int param_index) override
+	{
+		if(param_index >= m_render_params_vec4.size()) return Vec4(0, 0, 0, 0);
+		return m_render_params_vec4[param_index].value;
 	}
 
 
@@ -449,6 +536,23 @@ public:
 		}
 	}
 
+	void serializeRenderParams(OutputBlob& serializer)
+	{
+		serializer.write(m_render_params_entity);
+		serializer.write(m_render_params_float.size());
+		for(auto& p : m_render_params_float)
+		{
+			serializer.writeString(p.name);
+			serializer.write(p.value);
+		}
+		serializer.write(m_render_params_vec4.size());
+		for(auto& p : m_render_params_vec4)
+		{
+			serializer.writeString(p.name);
+			serializer.write(p.value);
+		}
+	}
+
 	void serializeCameras(OutputBlob& serializer)
 	{
 		serializer.write((int32)m_cameras.size());
@@ -617,8 +721,30 @@ public:
 		serializeLights(serializer);
 		serializeTerrains(serializer);
 		serializeParticleEmitters(serializer);
+		serializeRenderParams(serializer);
 	}
 
+	void deserializeRenderParams(InputBlob& serializer)
+	{
+		serializer.read(m_render_params_entity);
+		int count;
+		serializer.read(count);
+		m_render_params_float.resize(count);
+		for(int i = 0; i < count; ++i)
+		{
+			auto& p = m_render_params_float[i];
+			serializer.readString(p.name, lengthOf(p.name));
+			serializer.read(p.value);
+		}
+		serializer.read(count);
+		m_render_params_vec4.resize(count);
+		for(int i = 0; i < count; ++i)
+		{
+			auto& p = m_render_params_float[i];
+			serializer.readString(p.name, lengthOf(p.name));
+			serializer.read(p.value);
+		}
+	}
 
 	void deserializeCameras(InputBlob& serializer)
 	{
@@ -825,7 +951,16 @@ public:
 		deserializeLights(serializer, (RenderSceneVersion)version);
 		deserializeTerrains(serializer);
 		if (version >= 0) deserializeParticleEmitters(serializer, version);
+		if (version >= (int)RenderSceneVersion::RENDER_PARAMS) deserializeRenderParams(serializer);
 	}
+
+
+	void destroyRenderParams(ComponentIndex component)
+	{
+		auto entity = m_render_params_entity;
+		m_render_params_entity = INVALID_ENTITY;
+		m_universe.destroyComponent(entity, RENDER_PARAMS_HASH, this, component);
+ 	}
 
 
 	void destroyRenderable(ComponentIndex component)
@@ -3346,6 +3481,19 @@ public:
 	}
 
 
+	ComponentIndex createRenderParams(Entity entity)
+	{
+		if (m_render_params_entity != INVALID_ENTITY)
+		{
+			g_log_error.log("Render Scene") << "Render params already exist in entity " << m_render_params_entity;
+			return INVALID_COMPONENT;
+		}
+		m_render_params_entity = entity;
+		m_universe.addComponent(entity, RENDER_PARAMS_HASH, this, entity);
+		return 0;
+	}
+
+
 	ComponentIndex createRenderable(Entity entity)
 	{
 		while(entity >= m_renderables.size())
@@ -3404,6 +3552,9 @@ private:
 
 	int m_point_light_last_uid;
 	Array<PointLight> m_point_lights;
+	Array<RenderParamVec4> m_render_params_vec4;
+	Array<RenderParamFloat> m_render_params_float;
+	Entity m_render_params_entity;
 	PODHashMap<ComponentIndex, int> m_point_lights_map;
 	Array<Array<ComponentIndex>> m_light_influenced_geometry;
 	int m_active_global_light_uid;
@@ -3444,6 +3595,7 @@ static struct
 	{POINT_LIGHT_HASH, &RenderSceneImpl::createPointLight, &RenderSceneImpl::destroyPointLight},
 	{CAMERA_HASH, &RenderSceneImpl::createCamera, &RenderSceneImpl::destroyCamera},
 	{TERRAIN_HASH, &RenderSceneImpl::createTerrain, &RenderSceneImpl::destroyTerrain},
+	{RENDER_PARAMS_HASH, &RenderSceneImpl::createRenderParams, &RenderSceneImpl::destroyRenderParams},
 	{PARTICLE_EMITTER_HASH,
 		&RenderSceneImpl::createParticleEmitter,
 		&RenderSceneImpl::destroyParticleEmitter},

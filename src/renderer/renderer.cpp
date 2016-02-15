@@ -70,6 +70,7 @@ namespace Lumix
 
 static void registerProperties(IAllocator& allocator)
 {
+	PropertyRegister::registerComponentType("render_params", "Render params");
 	PropertyRegister::registerComponentType("camera", "Camera");
 	PropertyRegister::registerComponentType("global_light", "Global light");
 	PropertyRegister::registerComponentType("renderable", "Mesh");
