@@ -401,6 +401,7 @@ void Material::createCommandBuffer()
 	auto& renderer = static_cast<MaterialManager*>(material_manager)->getRenderer();
 	auto& uniform = renderer.getMaterialColorShininessUniform();
 	generator.setUniform(uniform, color_shininess);
+	generator.end();
 
 	m_command_buffer = (uint8*)m_allocator.allocate(generator.getSize());
 	generator.getData(m_command_buffer);

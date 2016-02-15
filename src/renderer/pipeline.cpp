@@ -194,9 +194,22 @@ void CommandBufferGenerator::setTimeUniform(const bgfx::UniformHandle& uniform)
 
 void CommandBufferGenerator::getData(uint8* data)
 {
+	copyMemory(data, buffer, pointer - buffer);
+}
+
+
+void CommandBufferGenerator::clear()
+{
+	buffer[0] = (uint8)BufferCommands::END;
+	pointer = buffer;
+}
+
+
+void CommandBufferGenerator::end()
+{
 	ASSERT(pointer + 1 - buffer <= sizeof(buffer));
 	*pointer = (uint8)BufferCommands::END;
-	copyMemory(data, buffer, pointer - buffer + 1);
+	++pointer;
 }
 
 
@@ -544,7 +557,7 @@ struct PipelineImpl : public Pipeline
 				if (instance_buffer)
 				{
 					executeCommandBuffer(material->getCommandBuffer(), material);
-					executeCommandBuffer(m_light_command_buffer, material);
+					executeCommandBuffer(m_global_command_buffer.buffer, material);
 
 					bgfx::setInstanceDataBuffer(instance_buffer, PARTICLE_BATCH_SIZE);
 					bgfx::setVertexBuffer(m_particle_vertex_buffer);
@@ -567,7 +580,7 @@ struct PipelineImpl : public Pipeline
 		}
 
 		executeCommandBuffer(material->getCommandBuffer(), material);
-		executeCommandBuffer(m_light_command_buffer, material);
+		executeCommandBuffer(m_global_command_buffer.buffer, material);
 
 		int instance_count = emitter.m_life.size() % PARTICLE_BATCH_SIZE;
 		bgfx::setInstanceDataBuffer(instance_buffer, instance_count);
@@ -631,7 +644,7 @@ struct PipelineImpl : public Pipeline
 		const uint16 stride = mesh.vertex_def.getStride();
 
 		executeCommandBuffer(material->getCommandBuffer(), material);
-		executeCommandBuffer(m_light_command_buffer, material);
+		executeCommandBuffer(m_global_command_buffer.buffer, material);
 
 		bgfx::setVertexBuffer(model.getVerticesHandle(),
 							  mesh.attribute_array_offset / stride,
@@ -1107,7 +1120,7 @@ struct PipelineImpl : public Pipeline
 			}
 			++fb_index;
 		}
-		m_light_command_buffer[0] = (uint8)BufferCommands::END;
+		m_global_command_buffer.clear();
 	}
 
 
@@ -1324,11 +1337,11 @@ struct PipelineImpl : public Pipeline
 		Vec4 light_specular(m_scene->getPointLightSpecularColor(light_cmp) * specular_intensity *
 								specular_intensity, 1);
 
-		CommandBufferGenerator generator;
-		generator.setUniform(m_light_pos_radius_uniform, light_pos_radius);
-		generator.setUniform(m_light_color_attenuation_uniform, light_color_attenuation);
-		generator.setUniform(m_light_dir_fov_uniform, light_dir_fov);
-		generator.setUniform(m_light_specular_uniform, light_specular);
+		m_global_command_buffer.clear();
+		m_global_command_buffer.setUniform(m_light_pos_radius_uniform, light_pos_radius);
+		m_global_command_buffer.setUniform(m_light_color_attenuation_uniform, light_color_attenuation);
+		m_global_command_buffer.setUniform(m_light_dir_fov_uniform, light_dir_fov);
+		m_global_command_buffer.setUniform(m_light_specular_uniform, light_specular);
 
 		FrameBuffer* shadowmap = nullptr;
 		if (m_scene->getLightCastShadows(light_cmp))
@@ -1338,7 +1351,7 @@ struct PipelineImpl : public Pipeline
 				if (info.m_light == light_cmp)
 				{
 					shadowmap = info.m_framebuffer;
-					generator.setUniform(m_shadowmap_matrices_uniform,
+					m_global_command_buffer.setUniform(m_shadowmap_matrices_uniform,
 						&info.m_matrices[0],
 						m_scene->getLightFOV(light_cmp) > 180 ? 4 : 1);
 					break;
@@ -1347,21 +1360,19 @@ struct PipelineImpl : public Pipeline
 		}
 		if (shadowmap)
 		{
-			generator.setLocalShadowmap(shadowmap->getRenderbufferHandle(0));
+			m_global_command_buffer.setLocalShadowmap(shadowmap->getRenderbufferHandle(0));
 		}
 		else
 		{
-			generator.setLocalShadowmap(BGFX_INVALID_HANDLE);
+			m_global_command_buffer.setLocalShadowmap(BGFX_INVALID_HANDLE);
 		}
-
-		ASSERT(generator.getSize() <= sizeof(m_light_command_buffer));
-		generator.getData(m_light_command_buffer);
+		m_global_command_buffer.end();
 	}
 
 
 	void clearLightCommandBuffer()
 	{
-		m_light_command_buffer[0] = (uint8)BufferCommands::END;
+		m_global_command_buffer.clear();
 	}
 
 
@@ -1407,26 +1418,25 @@ struct PipelineImpl : public Pipeline
 		float specular_intensity = m_scene->getGlobalLightSpecularIntensity(current_light);
 		specular *= specular_intensity * specular_intensity;
 
-		CommandBufferGenerator generator;
-		generator.setUniform(m_light_color_attenuation_uniform, Vec4(diffuse_color, 1));
-		generator.setUniform(m_ambient_color_uniform, Vec4(ambient_color, 1));
-		generator.setUniform(m_light_dir_fov_uniform, Vec4(light_dir, 0));
+		m_global_command_buffer.clear();
+		m_global_command_buffer.setUniform(m_light_color_attenuation_uniform, Vec4(diffuse_color, 1));
+		m_global_command_buffer.setUniform(m_ambient_color_uniform, Vec4(ambient_color, 1));
+		m_global_command_buffer.setUniform(m_light_dir_fov_uniform, Vec4(light_dir, 0));
 
 		fog_density *= fog_density * fog_density;
-		generator.setUniform(m_fog_color_density_uniform, Vec4(fog_color, fog_density));
-		generator.setUniform(m_light_specular_uniform, Vec4(specular, 0));
-		generator.setUniform(m_fog_params_uniform,
+		m_global_command_buffer.setUniform(m_fog_color_density_uniform, Vec4(fog_color, fog_density));
+		m_global_command_buffer.setUniform(m_light_specular_uniform, Vec4(specular, 0));
+		m_global_command_buffer.setUniform(m_fog_params_uniform,
 			Vec4(m_scene->getFogBottom(current_light),
 								 m_scene->getFogHeight(current_light),
 								 0,
 								 0));
 		if (m_global_light_shadowmap && !m_is_rendering_in_shadowmap)
 		{
-			generator.setUniform(m_shadowmap_matrices_uniform, m_shadow_viewprojection, 4);
-			generator.setGlobalShadowmap();
+			m_global_command_buffer.setUniform(m_shadowmap_matrices_uniform, m_shadow_viewprojection, 4);
+			m_global_command_buffer.setGlobalShadowmap();
 		}
-		ASSERT(generator.getSize() < sizeof(m_light_command_buffer));
-		generator.getData(m_light_command_buffer);
+		m_global_command_buffer.end();
 	}
 
 	void disableBlending() { m_render_state &= ~BGFX_STATE_BLEND_MASK; }
@@ -1480,7 +1490,7 @@ struct PipelineImpl : public Pipeline
 			renderTerrains(m_tmp_terrains);
 			renderGrasses(m_tmp_grasses);
 		}
-		m_light_command_buffer[0] = (uint8)BufferCommands::END;
+		m_global_command_buffer.clear();
 	}
 
 
@@ -1559,7 +1569,7 @@ struct PipelineImpl : public Pipeline
 		vertex[5].v = 1;
 
 		executeCommandBuffer(material->getCommandBuffer(), material);
-		executeCommandBuffer(m_light_command_buffer, material);
+		executeCommandBuffer(m_global_command_buffer.buffer, material);
 
 		if (m_applied_camera >= 0)
 		{
@@ -1623,8 +1633,7 @@ struct PipelineImpl : public Pipeline
 		}
 		renderTerrains(m_tmp_terrains);
 		renderMeshes(m_tmp_meshes);
-
-		m_light_command_buffer[0] = (uint8)BufferCommands::END;
+		m_global_command_buffer.clear();
 	}
 
 
@@ -1721,7 +1730,7 @@ struct PipelineImpl : public Pipeline
 
 		setPoseUniform(info);
 		executeCommandBuffer(material->getCommandBuffer(), material);
-		executeCommandBuffer(m_light_command_buffer, material);
+		executeCommandBuffer(m_global_command_buffer.buffer, material);
 
 		bgfx::setTransform(&renderable.matrix);
 		bgfx::setVertexBuffer(renderable.model->getVerticesHandle(),
@@ -1914,7 +1923,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::setUniform(m_terrain_matrix_uniform, &info.m_world_matrix.m11);
 
 		executeCommandBuffer(material->getCommandBuffer(), material);
-		executeCommandBuffer(m_light_command_buffer, material);
+		executeCommandBuffer(m_global_command_buffer.buffer, material);
 
 		struct TerrainInstanceData
 		{
@@ -1961,7 +1970,7 @@ struct PipelineImpl : public Pipeline
 		Material* material = mesh.material;
 
 		executeCommandBuffer(material->getCommandBuffer(), material);
-		executeCommandBuffer(m_light_command_buffer, material);
+		executeCommandBuffer(m_global_command_buffer.buffer, material);
 
 		bgfx::setVertexBuffer(grass.m_model->getVerticesHandle(),
 			mesh.attribute_array_offset / mesh.vertex_def.getStride(),
@@ -2068,7 +2077,7 @@ struct PipelineImpl : public Pipeline
 		m_view2pass_map.assign(0xFF);
 		m_instance_data_idx = 0;
 		m_point_light_shadowmaps.clear();
-		m_light_command_buffer[0] = (uint8)BufferCommands::END;
+		m_global_command_buffer.clear();
 		for (int i = 0; i < lengthOf(m_terrain_instances); ++i)
 		{
 			m_terrain_instances[i].m_count = 0;
@@ -2279,7 +2288,7 @@ struct PipelineImpl : public Pipeline
 	int m_width;
 	int m_height;
 	uint32 m_stencil;
-	uint8 m_light_command_buffer[1024];
+	CommandBufferGenerator m_global_command_buffer;
 	bgfx::VertexBufferHandle m_particle_vertex_buffer;
 	bgfx::IndexBufferHandle m_particle_index_buffer;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
