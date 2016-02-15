@@ -258,7 +258,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void parseRenderbuffers(lua_State* L, FrameBuffer::Declaration& decl)
+	static void parseRenderbuffers(lua_State* L, FrameBuffer::Declaration& decl)
 	{
 		decl.m_renderbuffers_count = 0;
 		int len = (int)lua_rawlen(L, -1);
@@ -286,69 +286,6 @@ struct PipelineImpl : public Pipeline
 			{
 				const char* parameter_name = luaL_checkstring(L, -2);
 				m_parameters.push(Lumix::string(parameter_name, m_allocator));
-				lua_pop(L, 1);
-			}
-		}
-		lua_pop(L, 1);
-	}
-
-
-	void parseFramebuffers(lua_State* L)
-	{
-		if (lua_getglobal(L, "framebuffers") == LUA_TTABLE)
-		{
-			for(int i = 0; i < m_framebuffers.size(); ++i)
-			{
-				LUMIX_DELETE(m_allocator, m_framebuffers[i]);
-			}
-			m_framebuffers.clear();
-
-			int len = (int)lua_rawlen(L, -1);
-			ASSERT(m_framebuffers.empty());
-			for (int i = 0; i < len; ++i)
-			{
-				if (lua_rawgeti(L, -1, 1 + i) == LUA_TTABLE)
-				{
-					FrameBuffer::Declaration decl;
-					if (lua_getfield(L, -1, "name") == LUA_TSTRING)
-					{
-						copyString(decl.m_name, sizeof(decl.m_name), lua_tostring(L, -1));
-					}
-					lua_pop(L, 1);
-					if (lua_getfield(L, -1, "width") == LUA_TNUMBER)
-					{
-						decl.m_width = (int)lua_tointeger(L, -1);
-					}
-					lua_pop(L, 1);
-					if (lua_getfield(L, -1, "size_ratio") == LUA_TBOOLEAN)
-					{
-						decl.m_size_ratio = LuaWrapper::toType<Vec2>(L, -1);
-					}
-					lua_pop(L, 1);
-					if (lua_getfield(L, -1, "screen_size") == LUA_TBOOLEAN)
-					{
-						bool is_screen_size = lua_toboolean(L, -1) != 0;
-						decl.m_size_ratio = is_screen_size ? Vec2(1, 1) : Vec2(-1, -1);
-					}
-					else
-					{
-						decl.m_size_ratio = Vec2(-1, -1);
-					}
-					lua_pop(L, 1);
-					if (lua_getfield(L, -1, "height") == LUA_TNUMBER)
-					{
-						decl.m_height = (int)lua_tointeger(L, -1);
-					}
-					lua_pop(L, 1);
-					if (lua_getfield(L, -1, "renderbuffers") == LUA_TTABLE)
-					{
-						parseRenderbuffers(L, decl);
-					}
-					lua_pop(L, 1);
-					auto* fb = LUMIX_NEW(m_allocator, FrameBuffer)(decl);
-					m_framebuffers.push(fb);
-					if (compareString(decl.m_name, "default") == 0) m_default_framebuffer = fb;
-				}
 				lua_pop(L, 1);
 			}
 		}
@@ -393,6 +330,11 @@ struct PipelineImpl : public Pipeline
 		}
 		m_lua_state = luaL_newstate();
 		luaL_openlibs(m_lua_state);
+		lua_pushstring(m_lua_state, m_renderer.getEngine().getPathManager().getBasePath());
+		lua_setglobal(m_lua_state, "LUA_PATH");
+		lua_pushlightuserdata(m_lua_state, this);
+		lua_setglobal(m_lua_state, "this");
+		registerCFunctions();
 		bool errors =
 			luaL_loadbuffer(
 				m_lua_state, (const char*)file.getBuffer(), file.size(), m_path.c_str()) !=
@@ -406,23 +348,10 @@ struct PipelineImpl : public Pipeline
 		}
 
 		parseParameters(m_lua_state);
-		parseFramebuffers(m_lua_state);
-		registerCFunctions();
 
 		m_width = m_height = -1;
-		if (lua_getglobal(m_lua_state, "init") == LUA_TFUNCTION)
-		{
-			lua_pushlightuserdata(m_lua_state, this);
-			if (lua_pcall(m_lua_state, 1, 0, 0) != LUA_OK)
-			{
-				g_log_error.log("Renderer") << lua_tostring(m_lua_state, -1);
-				lua_pop(m_lua_state, 1);
-			}
-		}
-		else
-		{
-			lua_pop(m_lua_state, 1);
-		}
+		if(m_scene) callInitScene();
+
 		m_is_ready = true;
 	}
 
@@ -1135,12 +1064,10 @@ struct PipelineImpl : public Pipeline
 			shadowmap_info.m_matrices[i] = biasMatrix * (projection_matrix * view_matrix);
 
 			m_tmp_meshes.clear();
-			m_current_light = light;
 			m_is_current_light_global = false;
 			m_scene->getPointLightInfluencedGeometry(light, frustum, m_tmp_meshes, layer_mask);
 
 			renderMeshes(m_tmp_meshes);
-			m_current_light = -1;
 		}
 	}
 
@@ -1173,15 +1100,12 @@ struct PipelineImpl : public Pipeline
 			if (fov < 180)
 			{
 				renderSpotLightShadowmap(lights[i], layer_mask);
-				++fb_index;
-				continue;
 			}
 			else
 			{
 				renderOmniLightShadowmap(lights[i], layer_mask);
-				++fb_index;
-				continue;
 			}
+			++fb_index;
 		}
 		m_light_command_buffer[0] = (uint8)BufferCommands::END;
 	}
@@ -1399,7 +1323,7 @@ struct PipelineImpl : public Pipeline
 		float specular_intensity = m_scene->getPointLightSpecularIntensity(light_cmp);
 		Vec4 light_specular(m_scene->getPointLightSpecularColor(light_cmp) * specular_intensity *
 								specular_intensity, 1);
-		
+
 		CommandBufferGenerator generator;
 		generator.setUniform(m_light_pos_radius_uniform, light_pos_radius);
 		generator.setUniform(m_light_color_attenuation_uniform, light_color_attenuation);
@@ -1465,22 +1389,22 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void setActiveDirectionalLightUniforms()
+	void setActiveGlobalLightUniforms()
 	{
-		m_current_light = m_scene->getActiveGlobalLight();
-		if (m_current_light == INVALID_COMPONENT) return;
+		auto current_light = m_scene->getActiveGlobalLight();
+		if (current_light == INVALID_COMPONENT) return;
 
 		Universe& universe = m_scene->getUniverse();
-		Entity light_entity = m_scene->getGlobalLightEntity(m_current_light);
+		Entity light_entity = m_scene->getGlobalLightEntity(current_light);
 		Vec3 light_dir = universe.getRotation(light_entity) * Vec3(0, 0, 1);
-		Vec3 diffuse_color = m_scene->getGlobalLightColor(m_current_light) *
-							 m_scene->getGlobalLightIntensity(m_current_light);
-		Vec3 ambient_color = m_scene->getLightAmbientColor(m_current_light) *
-							 m_scene->getLightAmbientIntensity(m_current_light);
-		Vec3 fog_color = m_scene->getFogColor(m_current_light);
-		float fog_density = m_scene->getFogDensity(m_current_light);
-		Vec3 specular = m_scene->getGlobalLightSpecular(m_current_light);
-		float specular_intensity = m_scene->getGlobalLightSpecularIntensity(m_current_light);
+		Vec3 diffuse_color = m_scene->getGlobalLightColor(current_light) *
+							 m_scene->getGlobalLightIntensity(current_light);
+		Vec3 ambient_color = m_scene->getLightAmbientColor(current_light) *
+							 m_scene->getLightAmbientIntensity(current_light);
+		Vec3 fog_color = m_scene->getFogColor(current_light);
+		float fog_density = m_scene->getFogDensity(current_light);
+		Vec3 specular = m_scene->getGlobalLightSpecular(current_light);
+		float specular_intensity = m_scene->getGlobalLightSpecularIntensity(current_light);
 		specular *= specular_intensity * specular_intensity;
 
 		CommandBufferGenerator generator;
@@ -1492,8 +1416,8 @@ struct PipelineImpl : public Pipeline
 		generator.setUniform(m_fog_color_density_uniform, Vec4(fog_color, fog_density));
 		generator.setUniform(m_light_specular_uniform, Vec4(specular, 0));
 		generator.setUniform(m_fog_params_uniform,
-			Vec4(m_scene->getFogBottom(m_current_light),
-								 m_scene->getFogHeight(m_current_light),
+			Vec4(m_scene->getFogBottom(current_light),
+								 m_scene->getFogHeight(current_light),
 								 0,
 								 0));
 		if (m_global_light_shadowmap && !m_is_rendering_in_shadowmap)
@@ -1504,7 +1428,6 @@ struct PipelineImpl : public Pipeline
 		ASSERT(generator.getSize() < sizeof(m_light_command_buffer));
 		generator.getData(m_light_command_buffer);
 	}
-
 
 	void disableBlending() { m_render_state &= ~BGFX_STATE_BLEND_MASK; }
 
@@ -1543,7 +1466,6 @@ struct PipelineImpl : public Pipeline
 			m_tmp_terrains.clear();
 
 			ComponentIndex light = lights[i];
-			m_current_light = light;
 			m_is_current_light_global = false;
 			setPointLightUniforms(light);
 			m_scene->getPointLightInfluencedGeometry(light, frustum, m_tmp_meshes, layer_mask);
@@ -1559,7 +1481,6 @@ struct PipelineImpl : public Pipeline
 			renderGrasses(m_tmp_grasses);
 		}
 		m_light_command_buffer[0] = (uint8)BufferCommands::END;
-		m_current_light = -1;
 	}
 
 
@@ -1694,8 +1615,6 @@ struct PipelineImpl : public Pipeline
 		m_scene->getTerrainInfos(m_tmp_terrains, layer_mask, camera_pos, frame_allocator);
 
 		m_is_current_light_global = true;
-		m_current_light = m_scene->getActiveGlobalLight();
-		setActiveDirectionalLightUniforms();
 
 		if (render_grass)
 		{
@@ -1706,7 +1625,6 @@ struct PipelineImpl : public Pipeline
 		renderMeshes(m_tmp_meshes);
 
 		m_light_command_buffer[0] = (uint8)BufferCommands::END;
-		m_current_light = -1;
 	}
 
 
@@ -1761,10 +1679,22 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	float getRenderParamFloat(int param_index)
+	{
+		return m_scene->getRenderParamFloat(param_index);
+	}
+
+
+	int addRenderParamFloat(const char* name, float default_value)
+	{
+		return m_scene->addRenderParamFloat(name, default_value);
+	}
+
+
 	void setPoseUniform(const RenderableMesh& renderable_mesh) const
 	{
 		Matrix bone_mtx[128];
-		
+
 		Renderable* renderable = m_scene->getRenderable(renderable_mesh.renderable);
 		const Pose& pose = *renderable->pose;
 		const Model& model = *renderable->model;
@@ -2124,6 +2054,7 @@ struct PipelineImpl : public Pipeline
 		PROFILE_FUNCTION();
 
 		if (!isReady()) return;
+		if (!m_scene) return;
 
 		m_stats = {};
 		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE | BGFX_STATE_MSAA;
@@ -2134,7 +2065,6 @@ struct PipelineImpl : public Pipeline
 		m_view_idx = m_renderer.getViewCounter();
 		m_pass_idx = -1;
 		m_current_framebuffer = m_default_framebuffer;
-		m_current_light = -1;
 		m_view2pass_map.assign(0xFF);
 		m_instance_data_idx = 0;
 		m_point_light_shadowmaps.clear();
@@ -2216,7 +2146,6 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-
 	bool hasScene()
 	{
 		return m_scene != nullptr;
@@ -2260,10 +2189,36 @@ struct PipelineImpl : public Pipeline
 
 
 	bool isReady() const override { return m_is_ready; }
-	void setScene(RenderScene* scene) override { m_scene = scene; }
+
+
+	void setScene(RenderScene* scene) override 
+	{
+		m_scene = scene;
+		if (m_lua_state && m_scene) callInitScene();
+	}
+
+
 	void setWireframe(bool wireframe) override { m_is_wireframe = wireframe; }
 
-	
+
+	void callInitScene()
+	{
+		if(lua_getglobal(m_lua_state, "initScene") == LUA_TFUNCTION)
+		{
+			lua_pushlightuserdata(m_lua_state, this);
+			if(lua_pcall(m_lua_state, 1, 0, 0) != LUA_OK)
+			{
+				g_log_error.log("lua") << lua_tostring(m_lua_state, -1);
+				lua_pop(m_lua_state, 1);
+			}
+		}
+		else
+		{
+			lua_pop(m_lua_state, 1);
+		}
+	}
+
+
 	struct TerrainInstance
 	{
 		int m_count;
@@ -2310,7 +2265,6 @@ struct PipelineImpl : public Pipeline
 	InstanceData m_instances_data[128];
 	int m_instance_data_idx;
 	ComponentIndex m_applied_camera;
-	ComponentIndex m_current_light;
 	bgfx::VertexBufferHandle m_cube_vb;
 	bgfx::IndexBufferHandle m_cube_ib;
 	bool m_is_current_light_global;
@@ -2408,6 +2362,52 @@ int deferredLocalLightLoop(lua_State* L)
 	}
 
 	p->deferredLocalLightLoop(material_index, textures, texture_count);
+	return 0;
+}
+
+
+int addFramebuffer(lua_State* L)
+{
+	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
+	const char* name = LuaWrapper::checkArg<const char*>(L, 2);
+	LuaWrapper::checkTableArg(L, 3);
+	FrameBuffer::Declaration decl;
+	copyString(decl.m_name, name);
+
+	if(lua_getfield(L, 3, "width") == LUA_TNUMBER)
+	{
+		decl.m_width = (int)lua_tointeger(L, -1);
+	}
+	lua_pop(L, 1);
+	if(lua_getfield(L, 3, "size_ratio") == LUA_TBOOLEAN)
+	{
+		decl.m_size_ratio = LuaWrapper::toType<Vec2>(L, -1);
+	}
+	lua_pop(L, 1);
+	if(lua_getfield(L, 3, "screen_size") == LUA_TBOOLEAN)
+	{
+		bool is_screen_size = lua_toboolean(L, -1) != 0;
+		decl.m_size_ratio = is_screen_size ? Vec2(1, 1) : Vec2(-1, -1);
+	}
+	else
+	{
+		decl.m_size_ratio = Vec2(-1, -1);
+	}
+	lua_pop(L, 1);
+	if(lua_getfield(L, 3, "height") == LUA_TNUMBER)
+	{
+		decl.m_height = (int)lua_tointeger(L, -1);
+	}
+	lua_pop(L, 1);
+	if(lua_getfield(L, 3, "renderbuffers") == LUA_TTABLE)
+	{
+		PipelineImpl::parseRenderbuffers(L, decl);
+	}
+	lua_pop(L, 1);
+	auto* fb = LUMIX_NEW(pipeline->m_allocator, FrameBuffer)(decl);
+	pipeline->m_framebuffers.push(fb);
+	if(compareString(decl.m_name, "default") == 0) pipeline->m_default_framebuffer = fb;
+
 	return 0;
 }
 
@@ -2518,12 +2518,14 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(renderModels);
 	REGISTER_FUNCTION(renderShadowmap);
 	REGISTER_FUNCTION(copyRenderbuffer);
-	REGISTER_FUNCTION(setActiveDirectionalLightUniforms);
+	REGISTER_FUNCTION(setActiveGlobalLightUniforms);
 	REGISTER_FUNCTION(setStencil);
 	REGISTER_FUNCTION(clearStencil);
 	REGISTER_FUNCTION(setStencilRMask);
 	REGISTER_FUNCTION(setStencilRef);
 	REGISTER_FUNCTION(clearLightCommandBuffer);
+	REGISTER_FUNCTION(addRenderParamFloat);
+	REGISTER_FUNCTION(getRenderParamFloat);
 
 	#undef REGISTER_FUNCTION
 
@@ -2535,6 +2537,7 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(logError);
 	REGISTER_FUNCTION(renderLocalLightsShadowmaps);
 	REGISTER_FUNCTION(setUniform);
+	REGISTER_FUNCTION(addFramebuffer);
 
 	#undef REGISTER_FUNCTION
 
