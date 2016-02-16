@@ -214,12 +214,6 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 			}
 		}
 
-		b = material->isBackfaceCulling();
-		if (ImGui::Checkbox("Is backface culling", &b)) material->enableBackfaceCulling(b);
-
-		b = material->isZTest();
-		if (ImGui::Checkbox("Z test", &b)) material->enableZTest(b);
-
 		Vec3 color = material->getColor();
 		if (ImGui::ColorEdit3("Color", &color.x))
 		{

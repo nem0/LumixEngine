@@ -40,8 +40,6 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 	auto* manager = resource_manager.get(ResourceManager::MATERIAL);
 	auto* mat_manager = static_cast<MaterialManager*>(manager);
 
-	enableZTest(true);
-	enableBackfaceCulling(true);
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
 	{
@@ -208,7 +206,6 @@ bool Material::save(JsonSerializer& serializer)
 		serializer.endObject();
 	}
 	serializer.endArray();
-	serializer.serialize("backface_culling", isBackfaceCulling());
 	serializer.serialize("shininess", m_shininess);
 	serializer.serialize("alpha_ref", m_alpha_ref);
 	serializer.beginArray("color");
@@ -216,7 +213,6 @@ bool Material::save(JsonSerializer& serializer)
 		serializer.serializeArrayItem(m_color.y);
 		serializer.serializeArrayItem(m_color.z);
 	serializer.endArray();
-	serializer.serialize("z_test", isZTest());
 	serializer.endObject();
 	return true;
 }
@@ -441,6 +437,8 @@ void Material::onBeforeReady()
 		m_uniforms[i].name_hash = shader_uniform.name_hash;
 	}
 
+	m_render_states |= m_shader->getRenderStates();
+
 	for(int i = 0; i < m_shader->getTextureSlotCount(); ++i)
 	{
 		int define_idx = m_shader->getTextureSlot(i).m_define_idx;
@@ -645,19 +643,6 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 }
 
 
-void Material::setRenderState(bool value, uint64 state, uint64 mask)
-{
-	if (value)
-	{
-		m_render_states |= state;
-	}
-	else
-	{
-		m_render_states &= ~mask;
-	}
-}
-
-
 void Material::setAlphaRef(float value)
 {
 	m_alpha_ref = value;
@@ -671,7 +656,7 @@ bool Material::load(FS::IFile& file)
 {
 	PROFILE_FUNCTION();
 
-	m_render_states = BGFX_STATE_DEPTH_TEST_LEQUAL | BGFX_STATE_CULL_CW;
+	m_render_states = 0;
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	m_uniforms.clear();
 	JsonSerializer serializer(file, JsonSerializer::READ, getPath(), m_allocator);
@@ -679,7 +664,6 @@ bool Material::load(FS::IFile& file)
 	char label[256];
 	char material_dir[MAX_PATH_LENGTH];
 	PathUtils::getDir(material_dir, MAX_PATH_LENGTH, getPath().c_str());
-	bool b_value;
 	while (!serializer.isObjectEnd())
 	{
 		serializer.deserializeLabel(label, 255);
@@ -758,16 +742,6 @@ bool Material::load(FS::IFile& file)
 			serializer.deserialize(path, Path(""));
 			auto* manager = m_resource_manager.get(ResourceManager::SHADER);
 			setShader(static_cast<Shader*>(manager->load(Path(path))));
-		}
-		else if (compareString(label, "z_test") == 0)
-		{
-			serializer.deserialize(b_value, true);
-			enableZTest(b_value);
-		}
-		else if (compareString(label, "backface_culling") == 0)
-		{
-			serializer.deserialize(b_value, true);
-			enableBackfaceCulling(b_value);
 		}
 		else
 		{
