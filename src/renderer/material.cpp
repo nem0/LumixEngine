@@ -35,7 +35,6 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 	, m_shader_instance(nullptr)
 	, m_define_mask(0)
 	, m_command_buffer(nullptr)
-	, m_layer_count(1)
 {
 	auto* manager = resource_manager.get(ResourceManager::MATERIAL);
 	auto* mat_manager = static_cast<MaterialManager*>(manager);
@@ -148,7 +147,6 @@ bool Material::save(JsonSerializer& serializer)
 		if (flags & BGFX_TEXTURE_MAG_POINT) serializer.serialize("mag_filter", "point");
 		if (flags & BGFX_TEXTURE_MAG_ANISOTROPIC) serializer.serialize("mag_filter", "anisotropic");
 		if (m_textures[i] && m_textures[i]->getData()) serializer.serialize("keep_data", true);
-		serializer.serialize("layer_count", m_layer_count);
 		serializer.endObject();
 	}
 
@@ -687,10 +685,6 @@ bool Material::load(FS::IFile& file)
 		else if(compareString(label, "alpha_ref") == 0)
 		{
 			serializer.deserialize(m_alpha_ref, 0.3f);
-		}
-		else if(compareString(label, "layer_count") == 0)
-		{
-			serializer.deserialize(m_layer_count, 1);
 		}
 		else if (compareString(label, "color") == 0)
 		{
