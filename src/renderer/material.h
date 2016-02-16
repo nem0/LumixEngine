@@ -48,10 +48,6 @@ public:
 	Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	~Material();
 
-	bool isZTest() const { return (m_render_states & BGFX_STATE_DEPTH_TEST_MASK) != 0; }
-	void enableZTest(bool enable) { setRenderState(enable, BGFX_STATE_DEPTH_TEST_LEQUAL, BGFX_STATE_DEPTH_TEST_MASK); }
-	bool isBackfaceCulling() const { return (m_render_states & BGFX_STATE_CULL_MASK) != 0; }
-	void enableBackfaceCulling(bool enable) { setRenderState(enable, BGFX_STATE_CULL_CW, BGFX_STATE_CULL_MASK); }
 	float getShininess() const { return m_shininess; }
 	void setShininess(float value) { m_shininess = value; }
 	Vec3 getColor() const { return m_color; }
@@ -77,8 +73,6 @@ public:
 	ShaderInstance& getShaderInstance() { ASSERT(m_shader_instance); return *m_shader_instance; }
 	const ShaderInstance& getShaderInstance() const { ASSERT(m_shader_instance); return *m_shader_instance; }
 	const uint8* getCommandBuffer() const { return m_command_buffer; }
-	int getLayerCount() const { return m_layer_count; }
-	void setLayerCount(int count) { m_layer_count = count; }
 
 	void setDefine(uint8 define_idx, bool enabled);
 	bool hasDefine(uint8 define_idx) const;
@@ -93,7 +87,6 @@ private:
 	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);
 	void deserializeUniforms(JsonSerializer& serializer);
 	void deserializeDefines(JsonSerializer& serializer);
-	void setRenderState(bool value, uint64 state, uint64 mask);
 
 private:
 	static const int MAX_TEXTURE_COUNT = 16;
@@ -111,7 +104,6 @@ private:
 	float m_alpha_ref;
 	uint32 m_define_mask;
 	uint8* m_command_buffer;
-	int m_layer_count;
 };
 
 } // ~namespace Lumix
