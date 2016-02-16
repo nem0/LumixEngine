@@ -2222,13 +2222,10 @@ public:
 	{
 		PROFILE_FUNCTION();
 
+		for(auto& i : m_temporary_infos) i.clear();
 		const CullingSystem::Results* results = cull(frustum);
 		if (!results) return m_temporary_infos;
 
-		for(auto& i : m_temporary_infos)
-		{
-			i.clear();
-		}
 		fillTemporaryInfos(*results, frustum);
 		return m_temporary_infos;
 	}
