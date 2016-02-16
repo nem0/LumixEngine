@@ -179,7 +179,6 @@ void CommandBufferGenerator::setGlobalShadowmap()
 }
 
 
-
 void CommandBufferGenerator::setLocalShadowmap(const bgfx::TextureHandle& shadowmap)
 {
 	SetLocalShadowmapCommand cmd;
@@ -1144,7 +1143,6 @@ struct PipelineImpl : public Pipeline
 
 	void renderShadowmap()
 	{
-		int64 layer_mask = 0xffffFFFF;
 		Universe& universe = m_scene->getUniverse();
 		ComponentIndex light_cmp = m_scene->getActiveGlobalLight();
 		if (light_cmp < 0 || m_applied_camera < 0) return;
@@ -1211,7 +1209,7 @@ struct PipelineImpl : public Pipeline
 				bb_size * 2,
 				SHADOW_CAM_NEAR,
 				SHADOW_CAM_FAR);
-			renderAll(shadow_camera_frustum, layer_mask, false);
+			renderAll(shadow_camera_frustum, false);
 		}
 		m_is_rendering_in_shadowmap = false;
 	}
@@ -1467,7 +1465,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderPointLightInfluencedGeometry(const Frustum& frustum, int64 layer_mask)
+	void renderPointLightInfluencedGeometry(const Frustum& frustum)
 	{
 		PROFILE_FUNCTION();
 
@@ -1482,14 +1480,13 @@ struct PipelineImpl : public Pipeline
 			ComponentIndex light = lights[i];
 			m_is_current_light_global = false;
 			setPointLightUniforms(light);
-			m_scene->getPointLightInfluencedGeometry(light, frustum, m_tmp_meshes, layer_mask);
+			m_scene->getPointLightInfluencedGeometry(light, frustum, m_tmp_meshes);
 
 			m_scene->getTerrainInfos(m_tmp_terrains,
-				layer_mask,
 				m_scene->getUniverse().getPosition(m_scene->getCameraEntity(m_applied_camera)),
 				m_renderer.getFrameAllocator());
 
-			m_scene->getGrassInfos(frustum, m_tmp_grasses, layer_mask, m_applied_camera);
+			m_scene->getGrassInfos(frustum, m_tmp_grasses, m_applied_camera);
 			renderMeshes(m_tmp_meshes);
 			renderTerrains(m_tmp_terrains);
 			renderGrasses(m_tmp_grasses);
@@ -1612,31 +1609,30 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderAll(const Frustum& frustum, int64 layer_mask, bool render_grass)
+	void renderAll(const Frustum& frustum, bool render_grass)
 	{
 		PROFILE_FUNCTION();
 
 		if (m_applied_camera < 0) return;
 
 		m_tmp_grasses.clear();
-		m_tmp_meshes.clear();
 		m_tmp_terrains.clear();
 
-		m_scene->getRenderableInfos(frustum, m_tmp_meshes, layer_mask);
+		auto& meshes = m_scene->getRenderableInfos(frustum);
 		Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
 		Vec3 camera_pos = m_scene->getUniverse().getPosition(camera_entity);
 		LIFOAllocator& frame_allocator = m_renderer.getFrameAllocator();
-		m_scene->getTerrainInfos(m_tmp_terrains, layer_mask, camera_pos, frame_allocator);
+		m_scene->getTerrainInfos(m_tmp_terrains, camera_pos, frame_allocator);
 
 		m_is_current_light_global = true;
 
 		if (render_grass)
 		{
-			m_scene->getGrassInfos(frustum, m_tmp_grasses, layer_mask, m_applied_camera);
+			m_scene->getGrassInfos(frustum, m_tmp_grasses, m_applied_camera);
 			renderGrasses(m_tmp_grasses);
 		}
 		renderTerrains(m_tmp_terrains);
-		renderMeshes(m_tmp_meshes);
+		renderMeshes(meshes);
 		clearGlobalCommandBuffer();
 	}
 
@@ -1981,7 +1977,7 @@ struct PipelineImpl : public Pipeline
 			mesh.attribute_array_size / mesh.vertex_def.getStride());
 		bgfx::setIndexBuffer(
 			grass.m_model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
-		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE); 
+		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(idb, grass.m_matrix_count);
 		++m_stats.m_draw_call_count;
@@ -2019,20 +2015,46 @@ struct PipelineImpl : public Pipeline
 	void renderMeshes(const Array<RenderableMesh>& meshes)
 	{
 		PROFILE_FUNCTION();
-		if (meshes.empty()) return;
+		if(meshes.empty()) return;
 
 		Renderable* renderables = m_scene->getRenderables();
 		PROFILE_INT("mesh count", meshes.size());
-		for (auto& mesh : meshes)
+		for(auto& mesh : meshes)
 		{
 			Renderable& renderable = renderables[mesh.renderable];
-			if (renderable.pose && renderable.pose->getCount() > 0)
+			if(renderable.pose && renderable.pose->getCount() > 0)
 			{
 				renderSkinnedMesh(renderable, mesh);
 			}
 			else
 			{
 				renderRigidMesh(renderable, mesh);
+			}
+		}
+		finishInstances();
+	}
+
+
+	void renderMeshes(const Array<Array<RenderableMesh>>& meshes)
+	{
+		PROFILE_FUNCTION();
+		if (meshes.empty()) return;
+
+		Renderable* renderables = m_scene->getRenderables();
+		PROFILE_INT("mesh count", meshes.size());
+		for (auto& submeshes : meshes)
+		{
+			for (auto& mesh : submeshes)
+			{
+				Renderable& renderable = renderables[mesh.renderable];
+				if (renderable.pose && renderable.pose->getCount() > 0)
+				{
+					renderSkinnedMesh(renderable, mesh);
+				}
+				else
+				{
+					renderRigidMesh(renderable, mesh);
+				}
 			}
 		}
 		finishInstances();
