@@ -23,6 +23,7 @@ Shader::Shader(const Path& path, ResourceManager& resource_manager, IAllocator& 
 	, m_instances(m_allocator)
 	, m_texture_slot_count(0)
 	, m_uniforms(m_allocator)
+	, m_render_states(0)
 {
 }
 
@@ -314,6 +315,47 @@ bool Shader::load(FS::IFile& file)
 		lua_pop(L, 1);
 		return false;
 	}
+
+	m_render_states = 0;
+	if (lua_getglobal(L, "backface_culling") == LUA_TBOOLEAN)
+	{
+		bool cull = lua_toboolean(L, -1) != 0;
+		if (cull) m_render_states |= BGFX_STATE_CULL_CW;
+	}
+	else
+	{
+		m_render_states |= BGFX_STATE_CULL_CW;
+	}
+	lua_pop(L, 1);
+	if (lua_getglobal(L, "depth_test") == LUA_TBOOLEAN)
+	{
+		bool test = lua_toboolean(L, -1) != 0;
+		if (test) m_render_states |= BGFX_STATE_DEPTH_TEST_LEQUAL;
+		else m_render_states &= ~BGFX_STATE_DEPTH_TEST_MASK;
+	}
+	else
+	{
+		m_render_states |= BGFX_STATE_DEPTH_TEST_LEQUAL;
+	}
+	lua_pop(L, 1);
+	
+	if (lua_getglobal(L, "alpha_blending") == LUA_TSTRING)
+	{
+		const char* tmp = lua_tostring(L, -1);
+		if (compareString(tmp, "add") == 0)
+		{
+			m_render_states |= BGFX_STATE_BLEND_ADD;
+		}
+		else if (compareString(tmp, "alpha") == 0)
+		{
+			m_render_states |= BGFX_STATE_BLEND_ALPHA;
+		}
+		else
+		{
+			g_log_error.log("Renderer") << "Unknown alpha blending value " << tmp << " in " << getPath().c_str();
+		}
+	}
+	lua_pop(L, 1);
 
 	parseTextureSlots(L);
 	parseUniforms(L);
