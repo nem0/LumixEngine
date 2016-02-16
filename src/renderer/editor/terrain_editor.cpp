@@ -1045,26 +1045,29 @@ static bool testOBBCollision(const Lumix::Matrix& matrix_a,
 
 
 static bool isOBBCollision(Lumix::RenderScene& scene,
-	const Lumix::Array<Lumix::RenderableMesh>& meshes,
+	const Lumix::Array<Lumix::Array<Lumix::RenderableMesh>>& meshes,
 	const Lumix::Vec3& pos_a,
 	Lumix::Model* model,
 	float scale)
 {
 	float radius_a_squared = model->getBoundingRadius();
 	radius_a_squared = radius_a_squared * radius_a_squared;
-	for(auto& mesh : meshes)
+	for(auto& submeshes : meshes)
 	{
-		auto* renderable = scene.getRenderable(mesh.renderable);
-		Lumix::Vec3 pos_b = renderable->matrix.getTranslation();
-		float radius_b = renderable->model->getBoundingRadius();
-		float radius_squared = radius_a_squared + radius_b * radius_b;
-		if((pos_a - pos_b).squaredLength() < radius_squared * scale * scale)
+		for(auto& mesh : submeshes)
 		{
-			Lumix::Matrix matrix = Lumix::Matrix::IDENTITY;
-			matrix.setTranslation(pos_a);
-			if(testOBBCollision(matrix, model, renderable->matrix, renderable->model, scale))
+			auto* renderable = scene.getRenderable(mesh.renderable);
+			Lumix::Vec3 pos_b = renderable->matrix.getTranslation();
+			float radius_b = renderable->model->getBoundingRadius();
+			float radius_squared = radius_a_squared + radius_b * radius_b;
+			if ((pos_a - pos_b).squaredLength() < radius_squared * scale * scale)
 			{
-				return true;
+				Lumix::Matrix matrix = Lumix::Matrix::IDENTITY;
+				matrix.setTranslation(pos_a);
+				if (testOBBCollision(matrix, model, renderable->matrix, renderable->model, scale))
+				{
+					return true;
+				}
 			}
 		}
 	}
@@ -1106,9 +1109,7 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 			-m_terrain_brush_size,
 			m_terrain_brush_size);
 
-		Lumix::Array<Lumix::RenderableMesh> meshes(m_world_editor.getAllocator());
-		meshes.clear();
-		scene->getRenderableInfos(frustum, meshes, ~0);
+		auto& meshes = scene->getRenderableInfos(frustum);
 
 		const auto* template_name = template_names[m_selected_entity_template].c_str();
 

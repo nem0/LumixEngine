@@ -1851,7 +1851,6 @@ public:
 
 
 	void getTerrainInfos(Array<const TerrainInfo*>& infos,
-								 int64 layer_mask,
 								 const Vec3& camera_pos,
 								 LIFOAllocator& frame_allocator) override
 	{
@@ -1859,7 +1858,7 @@ public:
 		infos.reserve(m_terrains.size());
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
-			if (m_terrains[i] && (m_terrains[i]->getLayerMask() & layer_mask) != 0)
+			if (m_terrains[i])
 			{
 				m_terrains[i]->getInfos(infos, camera_pos, frame_allocator);
 			}
@@ -1869,7 +1868,6 @@ public:
 
 	void getGrassInfos(const Frustum& frustum,
 							   Array<GrassInfo>& infos,
-							   int64 layer_mask,
 							   ComponentIndex camera) override
 	{
 		PROFILE_FUNCTION();
@@ -1878,7 +1876,7 @@ public:
 
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
-			if (m_terrains[i] && (m_terrains[i]->getLayerMask() & layer_mask) != 0)
+			if (m_terrains[i])
 			{
 				m_terrains[i]->getGrassInfos(frustum, infos, camera);
 			}
@@ -1992,23 +1990,7 @@ public:
 		return &m_culling_system->getResult();
 	}
 
-
-	void mergeTemporaryInfos(Array<RenderableMesh>& all_infos)
-	{
-		PROFILE_FUNCTION();
-
-		for(auto& subinfos : m_temporary_infos)
-		{
-			if (subinfos.empty()) continue;
-
-			int size = all_infos.size();
-			all_infos.resize(size + subinfos.size());
-			copyMemory(
-				&all_infos[0] + size, &subinfos[0], sizeof(subinfos[0]) * subinfos.size());
-		}
-	}
-
-
+	
 	void runJobs(Array<MTJD::Job*>& jobs, MTJD::Group& sync_point)
 	{
 		PROFILE_FUNCTION();
@@ -2242,17 +2224,19 @@ public:
 	}
 
 
-	void getRenderableInfos(const Frustum& frustum,
-									Array<RenderableMesh>& meshes,
-									int64 layer_mask) override
+	Array<Array<RenderableMesh>>& getRenderableInfos(const Frustum& frustum) override
 	{
 		PROFILE_FUNCTION();
 
-		const CullingSystem::Results* results = cull(frustum, layer_mask);
-		if (!results) return;
+		const CullingSystem::Results* results = cull(frustum);
+		if (!results) return m_temporary_infos;
 
+		for(auto& i : m_temporary_infos)
+		{
+			i.clear();
+		}
 		fillTemporaryInfos(*results, frustum);
-		mergeTemporaryInfos(meshes);
+		return m_temporary_infos;
 	}
 
 

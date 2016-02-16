@@ -255,9 +255,7 @@ public:
 	virtual void setRenderableLayer(ComponentIndex cmp,
 									const int32& layer) = 0;
 	virtual void setRenderablePath(ComponentIndex cmp, const Path& path) = 0;
-	virtual void getRenderableInfos(const Frustum& frustum,
-		Array<RenderableMesh>& meshes,
-		int64 layer_mask) = 0;
+	virtual Array<Array<RenderableMesh>>& getRenderableInfos(const Frustum& frustum) = 0;
 	virtual void getRenderableEntities(const Frustum& frustum,
 		Array<Entity>& entities,
 		int64 layer_mask) = 0;
@@ -268,11 +266,9 @@ public:
 
 	virtual void getGrassInfos(const Frustum& frustum,
 							   Array<GrassInfo>& infos,
-							   int64 layer_mask,
 							   ComponentIndex camera) = 0;
 	virtual void forceGrassUpdate(ComponentIndex cmp) = 0;
 	virtual void getTerrainInfos(Array<const TerrainInfo*>& infos,
-		int64 layer_mask,
 		const Vec3& camera_pos,
 		LIFOAllocator& allocator) = 0;
 	virtual float getTerrainHeightAt(ComponentIndex cmp, float x, float z) = 0;
