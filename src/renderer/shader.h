@@ -139,6 +139,7 @@ public:
 	Renderer& getRenderer();
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
 	int getUniformCount() const { return m_uniforms.size(); }
+	uint64 getRenderStates() const { return m_render_states; }
 
 	static bool getShaderCombinations(Renderer& renderer,
 		const char* shader_content,
@@ -162,6 +163,7 @@ private:
 	Array<ShaderInstance*> m_instances;
 	Array<Uniform> m_uniforms;
 	ShaderCombinations m_combintions;
+	uint64 m_render_states;
 };
 
 } // ~namespace Lumix

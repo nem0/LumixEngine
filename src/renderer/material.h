@@ -48,10 +48,6 @@ public:
 	Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	~Material();
 
-	bool isZTest() const { return (m_render_states & BGFX_STATE_DEPTH_TEST_MASK) != 0; }
-	void enableZTest(bool enable) { setRenderState(enable, BGFX_STATE_DEPTH_TEST_LEQUAL, BGFX_STATE_DEPTH_TEST_MASK); }
-	bool isBackfaceCulling() const { return (m_render_states & BGFX_STATE_CULL_MASK) != 0; }
-	void enableBackfaceCulling(bool enable) { setRenderState(enable, BGFX_STATE_CULL_CW, BGFX_STATE_CULL_MASK); }
 	float getShininess() const { return m_shininess; }
 	void setShininess(float value) { m_shininess = value; }
 	Vec3 getColor() const { return m_color; }
@@ -93,7 +89,6 @@ private:
 	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);
 	void deserializeUniforms(JsonSerializer& serializer);
 	void deserializeDefines(JsonSerializer& serializer);
-	void setRenderState(bool value, uint64 state, uint64 mask);
 
 private:
 	static const int MAX_TEXTURE_COUNT = 16;
