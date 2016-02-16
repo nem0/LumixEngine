@@ -256,9 +256,7 @@ public:
 									const int32& layer) = 0;
 	virtual void setRenderablePath(ComponentIndex cmp, const Path& path) = 0;
 	virtual Array<Array<RenderableMesh>>& getRenderableInfos(const Frustum& frustum) = 0;
-	virtual void getRenderableEntities(const Frustum& frustum,
-		Array<Entity>& entities,
-		int64 layer_mask) = 0;
+	virtual void getRenderableEntities(const Frustum& frustum, Array<Entity>& entities) = 0;
 	virtual Entity getRenderableEntity(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getFirstRenderable() = 0;
 	virtual ComponentIndex getNextRenderable(ComponentIndex cmp) = 0;
@@ -300,12 +298,10 @@ public:
 	virtual int getClosestPointLights(const Vec3& pos, ComponentIndex* lights, int max_lights) = 0;
 	virtual void getPointLights(const Frustum& frustum, Array<ComponentIndex>& lights) = 0;
 	virtual void getPointLightInfluencedGeometry(ComponentIndex light_cmp,
-		Array<RenderableMesh>& infos,
-		int64 layer_mask) = 0;
+		Array<RenderableMesh>& infos) = 0;
 	virtual void getPointLightInfluencedGeometry(ComponentIndex light_cmp,
 		const Frustum& frustum,
-		Array<RenderableMesh>& infos,
-		int64 layer_mask) = 0;
+		Array<RenderableMesh>& infos) = 0;
 	virtual void setLightCastShadows(ComponentIndex cmp, bool cast_shadows) = 0;
 	virtual bool getLightCastShadows(ComponentIndex cmp) = 0;
 	virtual float getLightAttenuation(ComponentIndex cmp) = 0;

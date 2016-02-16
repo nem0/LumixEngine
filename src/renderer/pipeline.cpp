@@ -975,7 +975,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderSpotLightShadowmap(ComponentIndex light, int64 layer_mask)
+	void renderSpotLightShadowmap(ComponentIndex light)
 	{
 		beginNewView("point_light");
 
@@ -1007,11 +1007,11 @@ struct PipelineImpl : public Pipeline
 			0.5,  0.5, 0.5, 1.0);
 		s.m_matrices[0] = biasMatrix * (projection_matrix * view_matrix);
 
-		renderPointLightInfluencedGeometry(light, layer_mask);
+		renderPointLightInfluencedGeometry(light);
 	}
 
 
-	void renderOmniLightShadowmap(ComponentIndex light, int64 layer_mask)
+	void renderOmniLightShadowmap(ComponentIndex light)
 	{
 		Entity light_entity = m_scene->getPointLightEntity(light);
 		Vec3 light_pos = m_scene->getUniverse().getPosition(light_entity);
@@ -1081,7 +1081,7 @@ struct PipelineImpl : public Pipeline
 
 			m_tmp_meshes.clear();
 			m_is_current_light_global = false;
-			m_scene->getPointLightInfluencedGeometry(light, frustum, m_tmp_meshes, layer_mask);
+			m_scene->getPointLightInfluencedGeometry(light, frustum, m_tmp_meshes);
 
 			renderMeshes(m_tmp_meshes);
 		}
@@ -1090,8 +1090,7 @@ struct PipelineImpl : public Pipeline
 
 	void renderLocalLightShadowmaps(ComponentIndex camera,
 		FrameBuffer** fbs,
-		int framebuffers_count,
-		int64 layer_mask)
+		int framebuffers_count)
 	{
 		if (camera < 0) return;
 
@@ -1113,11 +1112,11 @@ struct PipelineImpl : public Pipeline
 			m_current_framebuffer = fbs[i];
 			if (fov < 180)
 			{
-				renderSpotLightShadowmap(lights[i], layer_mask);
+				renderSpotLightShadowmap(lights[i]);
 			}
 			else
 			{
-				renderOmniLightShadowmap(lights[i], layer_mask);
+				renderOmniLightShadowmap(lights[i]);
 			}
 			++fb_index;
 		}
@@ -1453,13 +1452,13 @@ struct PipelineImpl : public Pipeline
 	void disableRGBWrite() { m_render_state &= ~BGFX_STATE_RGB_WRITE; }
 
 
-	void renderPointLightInfluencedGeometry(ComponentIndex light, int64 layer_mask)
+	void renderPointLightInfluencedGeometry(ComponentIndex light)
 	{
 		PROFILE_FUNCTION();
 
 		m_tmp_meshes.clear();
 
-		m_scene->getPointLightInfluencedGeometry(light, m_tmp_meshes, layer_mask);
+		m_scene->getPointLightInfluencedGeometry(light, m_tmp_meshes);
 
 		renderMeshes(m_tmp_meshes);
 	}
@@ -2213,13 +2212,13 @@ struct PipelineImpl : public Pipeline
 
 	void renderPointLightLitGeometry()
 	{
-		renderPointLightInfluencedGeometry(m_camera_frustum, 0xffffFFFF);
+		renderPointLightInfluencedGeometry(m_camera_frustum);
 	}
 
 
 	void renderModels()
 	{
-		renderAll(m_camera_frustum, 0xffffFFFF, true);
+		renderAll(m_camera_frustum, true);
 	}
 
 
@@ -2469,7 +2468,7 @@ int renderLocalLightsShadowmaps(lua_State* L)
 
 	RenderScene* scene = pipeline->m_scene;
 	ComponentIndex camera = scene->getCameraInSlot(camera_slot);
-	pipeline->renderLocalLightShadowmaps(camera, fbs, len, 0xffffFFFF);
+	pipeline->renderLocalLightShadowmaps(camera, fbs, len);
 
 	return 0;
 }

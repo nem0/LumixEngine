@@ -956,7 +956,7 @@ void TerrainEditor::removeEntities(const Lumix::RayCastModelHit& hit)
 		m_terrain_brush_size);
 
 	Lumix::Array<Lumix::Entity> entities(m_world_editor.getAllocator());
-	scene->getRenderableEntities(frustum, entities, ~0);
+	scene->getRenderableEntities(frustum, entities);
 	auto hash = Lumix::crc32(template_names[m_selected_entity_template].c_str());
 	for(Lumix::Entity entity : entities)
 	{
