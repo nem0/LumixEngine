@@ -2037,12 +2037,12 @@ struct PipelineImpl : public Pipeline
 	void renderMeshes(const Array<Array<RenderableMesh>>& meshes)
 	{
 		PROFILE_FUNCTION();
-		if (meshes.empty()) return;
-
-		Renderable* renderables = m_scene->getRenderables();
-		PROFILE_INT("mesh count", meshes.size());
+		int mesh_count = 0;
 		for (auto& submeshes : meshes)
 		{
+			if(submeshes.empty()) continue;
+			Renderable* renderables = m_scene->getRenderables();
+			mesh_count += submeshes.size();
 			for (auto& mesh : submeshes)
 			{
 				Renderable& renderable = renderables[mesh.renderable];
@@ -2057,6 +2057,7 @@ struct PipelineImpl : public Pipeline
 			}
 		}
 		finishInstances();
+		PROFILE_INT("mesh count", mesh_count);
 	}
 
 
