@@ -437,6 +437,8 @@ void Material::onBeforeReady()
 		m_uniforms[i].name_hash = shader_uniform.name_hash;
 	}
 
+	uint8 alpha_ref = uint8(m_alpha_ref * 255.0f);
+	m_render_states = BGFX_STATE_ALPHA_REF(alpha_ref);
 	m_render_states |= m_shader->getRenderStates();
 
 	for(int i = 0; i < m_shader->getTextureSlotCount(); ++i)
@@ -685,44 +687,10 @@ bool Material::load(FS::IFile& file)
 		else if(compareString(label, "alpha_ref") == 0)
 		{
 			serializer.deserialize(m_alpha_ref, 0.3f);
-			uint8 val = uint8(m_alpha_ref * 255.0f);
-			m_render_states |= BGFX_STATE_ALPHA_REF(val);
 		}
 		else if(compareString(label, "layer_count") == 0)
 		{
 			serializer.deserialize(m_layer_count, 1);
-		}
-		else if (compareString(label, "alpha_blending") == 0)
-		{
-			if (serializer.isNextBoolean())
-			{
-				bool is_alpha_blending;
-				serializer.deserialize(is_alpha_blending, false);
-				if (is_alpha_blending)
-				{
-					m_render_states |= BGFX_STATE_BLEND_ADD;
-				}
-				else
-				{
-					m_render_states &= ~BGFX_STATE_BLEND_MASK;
-				}
-			}
-			else
-			{
-				serializer.deserialize(label, 255, "alpha");
-				if (compareString(label, "alpha") == 0)
-				{
-					m_render_states |= BGFX_STATE_BLEND_ALPHA;
-				}
-				else if (compareString(label, "add") == 0)
-				{
-					m_render_states |= BGFX_STATE_BLEND_ADD;
-				}
-				else if (compareString(label, "disabled") == 0)
-				{
-					m_render_states &= ~BGFX_STATE_BLEND_MASK;
-				}
-			}
 		}
 		else if (compareString(label, "color") == 0)
 		{

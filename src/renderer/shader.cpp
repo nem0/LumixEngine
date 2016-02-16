@@ -338,6 +338,24 @@ bool Shader::load(FS::IFile& file)
 		m_render_states |= BGFX_STATE_DEPTH_TEST_LEQUAL;
 	}
 	lua_pop(L, 1);
+	
+	if (lua_getglobal(L, "alpha_blending") == LUA_TSTRING)
+	{
+		const char* tmp = lua_tostring(L, -1);
+		if (compareString(tmp, "add") == 0)
+		{
+			m_render_states |= BGFX_STATE_BLEND_ADD;
+		}
+		else if (compareString(tmp, "alpha") == 0)
+		{
+			m_render_states |= BGFX_STATE_BLEND_ALPHA;
+		}
+		else
+		{
+			g_log_error.log("Renderer") << "Unknown alpha blending value " << tmp << " in " << getPath().c_str();
+		}
+	}
+	lua_pop(L, 1);
 
 	parseTextureSlots(L);
 	parseUniforms(L);
