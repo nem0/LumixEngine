@@ -1788,17 +1788,15 @@ struct PipelineImpl : public Pipeline
 			{
 				finishInstances(instance_idx);
 			}
-			info.mesh->instance_idx = instance_idx;
-		}
-		InstanceData& data = m_instances_data[instance_idx];
-		if (!data.buffer)
-		{
+			InstanceData& data = m_instances_data[instance_idx];
 			data.buffer =
 				bgfx::allocInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
 			data.instance_count = 0;
 			data.mesh = info.mesh;
 			data.model = renderable.model;
+			info.mesh->instance_idx = instance_idx;
 		}
+		InstanceData& data = m_instances_data[instance_idx];
 		Matrix* mtcs = (Matrix*)data.buffer->data;
 		mtcs[data.instance_count] = renderable.matrix;
 		++data.instance_count;

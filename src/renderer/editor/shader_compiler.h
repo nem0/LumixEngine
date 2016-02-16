@@ -9,7 +9,7 @@
 
 namespace Lumix
 {
-class ShaderCombinations;
+struct ShaderCombinations;
 class WorldEditor;
 }
 
