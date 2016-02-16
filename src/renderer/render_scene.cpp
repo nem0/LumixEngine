@@ -1980,13 +1980,12 @@ public:
 	}
 
 
-	const CullingSystem::Results* cull(const Frustum& frustum,
-									   int64 layer_mask)
+	const CullingSystem::Results* cull(const Frustum& frustum)
 	{
 		PROFILE_FUNCTION();
 		if (m_renderables.empty()) return nullptr;
 
-		m_culling_system->cullToFrustumAsync(frustum, layer_mask);
+		m_culling_system->cullToFrustumAsync(frustum, ~0UL);
 		return &m_culling_system->getResult();
 	}
 
@@ -2159,8 +2158,7 @@ public:
 
 	void getPointLightInfluencedGeometry(ComponentIndex light_cmp,
 		const Frustum& frustum,
-		Array<RenderableMesh>& infos,
-		int64 layer_mask) override
+		Array<RenderableMesh>& infos) override
 	{
 		PROFILE_FUNCTION();
 
@@ -2169,9 +2167,8 @@ public:
 		{
 			ComponentIndex renderable_cmp = m_light_influenced_geometry[light_index][j];
 			Renderable& renderable = m_renderables[renderable_cmp];
-			bool is_layer = (layer_mask & m_culling_system->getLayerMask(renderable_cmp)) != 0;
 			const Sphere& sphere = m_culling_system->getSphere(renderable_cmp);
-			if (is_layer && frustum.isSphereInside(sphere.m_position, sphere.m_radius))
+			if (frustum.isSphereInside(sphere.m_position, sphere.m_radius))
 			{
 				for (int k = 0, kc = renderable.model->getMeshCount(); k < kc; ++k)
 				{
@@ -2185,8 +2182,7 @@ public:
 
 
 	void getPointLightInfluencedGeometry(ComponentIndex light_cmp,
-		Array<RenderableMesh>& infos,
-		int64) override
+		Array<RenderableMesh>& infos) override
 	{
 		PROFILE_FUNCTION();
 
@@ -2205,13 +2201,11 @@ public:
 	}
 
 
-	void getRenderableEntities(const Frustum& frustum,
-		Array<Entity>& entities,
-		int64 layer_mask) override
+	void getRenderableEntities(const Frustum& frustum, Array<Entity>& entities) override
 	{
 		PROFILE_FUNCTION();
 
-		const CullingSystem::Results* results = cull(frustum, layer_mask);
+		const CullingSystem::Results* results = cull(frustum);
 		if (!results) return;
 
 		for (auto& subresults : *results)
