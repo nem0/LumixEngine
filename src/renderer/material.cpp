@@ -437,7 +437,7 @@ void Material::onBeforeReady()
 
 	uint8 alpha_ref = uint8(m_alpha_ref * 255.0f);
 	m_render_states = BGFX_STATE_ALPHA_REF(alpha_ref);
-	m_render_states |= m_shader->getRenderStates();
+	m_render_states |= m_shader->m_render_states;
 
 	for(int i = 0; i < m_shader->getTextureSlotCount(); ++i)
 	{

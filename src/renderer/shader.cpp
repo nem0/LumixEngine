@@ -2,6 +2,7 @@
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
+#include "core/lua_wrapper.h"
 #include "core/log.h"
 #include "core/path_utils.h"
 #include "core/resource_manager.h"
@@ -64,151 +65,6 @@ ShaderInstance& Shader::getInstance(uint32 mask)
 ShaderCombinations::ShaderCombinations()
 {
 	setMemory(this, 0, sizeof(*this));
-}
-
-
-void ShaderCombinations::parsePasses(lua_State* L)
-{
-	if (lua_getglobal(L, "passes") == LUA_TTABLE)
-	{
-		int len = (int)lua_rawlen(L, -1);
-		for (int i = 0; i < len; ++i)
-		{
-			if (lua_rawgeti(L, -1, 1 + i) == LUA_TSTRING)
-			{
-				copyString(m_passes[i], sizeof(m_passes[i]), lua_tostring(L, -1));
-			}
-			lua_pop(L, 1);
-		}
-		m_pass_count = len;
-	}
-	lua_pop(L, 1);
-}
-
-
-void Shader::clearUniforms()
-{
-	for(auto& uniform : m_uniforms)
-	{
-		bgfx::destroyUniform(uniform.handle);
-	}
-	m_uniforms.clear();
-}
-
-
-void Shader::parseUniforms(lua_State* L)
-{
-	clearUniforms();
-	if(lua_getglobal(L, "uniforms") == LUA_TTABLE)
-	{
-		int len = (int)lua_rawlen(L, -1);
-		for(int i = 0; i < len; ++i)
-		{
-			auto& uniform = m_uniforms.emplace();
-			bgfx::UniformType::Enum bgfx_type;
-			if(lua_rawgeti(L, -1, 1 + i) == LUA_TTABLE)
-			{
-				if(lua_getfield(L, -1, "name") == LUA_TSTRING)
-				{
-					copyString(uniform.name, lua_tostring(L, -1));
-					uniform.name_hash = crc32(uniform.name);
-				}
-				lua_pop(L, 1);
-				if(lua_getfield(L, -1, "type") == LUA_TSTRING)
-				{
-					const char* type_str = lua_tostring(L, -1);
-					if(compareString(type_str, "float") == 0)
-					{
-						uniform.type = Shader::Uniform::FLOAT;
-						bgfx_type = bgfx::UniformType::Vec4;
-					}
-					else if(compareString(type_str, "int") == 0)
-					{
-						uniform.type = Shader::Uniform::INT;
-						bgfx_type = bgfx::UniformType::Int1;
-					}
-					else if(compareString(type_str, "color") == 0)
-					{
-						uniform.type = Shader::Uniform::COLOR;
-						bgfx_type = bgfx::UniformType::Vec4;
-					}
-					else if(compareString(type_str, "time") == 0)
-					{
-						uniform.type = Shader::Uniform::TIME;
-						bgfx_type = bgfx::UniformType::Vec4;
-					}
-					else if(compareString(type_str, "matrix4") == 0)
-					{
-						uniform.type = Shader::Uniform::MATRIX4;
-						bgfx_type = bgfx::UniformType::Mat4;
-					}
-					else if(compareString(type_str, "vec3") == 0)
-					{
-						uniform.type = Shader::Uniform::VEC3;
-						bgfx_type = bgfx::UniformType::Vec4;
-					}
-					else
-					{
-						g_log_error.log("Renderer") << "Unknown uniform type " << type_str << " in shader " << getPath().c_str();
-						uniform.type = Shader::Uniform::FLOAT;
-						bgfx_type = bgfx::UniformType::Vec4;
-					}
-				}
-				lua_pop(L, 1);
-
-				uniform.handle = bgfx::createUniform(uniform.name, bgfx_type);
-			}
-			lua_pop(L, 1);
-		}
-	}
-	lua_pop(L, 1);
-}
-
-
-void Shader::parseTextureSlots(lua_State* L)
-{
-	for (int i = 0; i < m_texture_slot_count; ++i)
-	{
-		m_texture_slots[i].reset();
-	}
-	if (lua_getglobal(L, "texture_slots") == LUA_TTABLE)
-	{
-		m_texture_slot_count = (int)lua_rawlen(L, -1);
-		for (int i = 0; i < m_texture_slot_count; ++i)
-		{
-			if (lua_rawgeti(L, -1, 1 + i) == LUA_TTABLE)
-			{
-				if (lua_getfield(L, -1, "name") == LUA_TSTRING)
-				{
-					copyString(m_texture_slots[i].m_name, lua_tostring(L, -1));
-				}
-				lua_pop(L, 1);
-				if (lua_getfield(L, -1, "is_atlas") == LUA_TBOOLEAN)
-				{
-					m_texture_slots[i].m_is_atlas = lua_toboolean(L, -1) != 0;
-				}
-				lua_pop(L, 1);
-				if (lua_getfield(L, -1, "uniform") == LUA_TSTRING)
-				{
-					copyString(m_texture_slots[i].m_uniform,
-						sizeof(m_texture_slots[i].m_uniform),
-						lua_tostring(L, -1));
-					m_texture_slots[i].m_uniform_handle =
-						bgfx::createUniform(m_texture_slots[i].m_uniform, bgfx::UniformType::Int1);
-					m_texture_slots[i].m_uniform_hash = crc32(m_texture_slots[i].m_uniform);
-				}
-				lua_pop(L, 1);
-				if (lua_getfield(L, -1, "define") == LUA_TSTRING)
-				{
-					m_texture_slots[i].m_define_idx =
-						getRenderer().getShaderDefineIdx(lua_tostring(L, -1));
-				}
-				lua_pop(L, 1);
-			}
-			lua_pop(L, 1);
-		}
-	}
-	lua_pop(L, 1);
 }
 
 
@@ -292,13 +148,264 @@ bool Shader::generateInstances()
 }
 
 
-void ShaderCombinations::parse(Renderer& renderer, lua_State* L)
+static void registerCFunction(lua_State* L, const char* name, lua_CFunction function)
 {
-	parsePasses(L);
+	lua_pushcfunction(L, function);
+	lua_setglobal(L, name);
+}
 
-	m_all_defines_mask = 0;
-	parseCombinations(renderer, L, "fs_combinations", m_fs_local_mask);
-	parseCombinations(renderer, L, "vs_combinations", m_vs_local_mask);
+
+static ShaderCombinations* getCombinations(lua_State* L)
+{
+	ShaderCombinations* ret = nullptr;
+	if (lua_getglobal(L, "this") == LUA_TLIGHTUSERDATA)
+	{
+		ret = LuaWrapper::toType<ShaderCombinations*>(L, -1);
+	}
+	lua_pop(L, 1);
+	return ret;
+}
+
+
+static Shader* getShader(lua_State* L)
+{
+	Shader* ret = nullptr;
+	if (lua_getglobal(L, "shader") == LUA_TLIGHTUSERDATA)
+	{
+		ret = LuaWrapper::toType<Shader*>(L, -1);
+	}
+	lua_pop(L, 1);
+	return ret;
+}
+
+
+static void texture_slot(lua_State* state, const char* name, const char* uniform)
+{
+	auto* shader = getShader(state);
+	if (!shader) return;
+	auto& slot = shader->m_texture_slots[shader->m_texture_slot_count];
+	copyString(slot.m_name, name);
+	slot.m_uniform_handle = bgfx::createUniform(uniform, bgfx::UniformType::Int1);
+	copyString(slot.m_uniform, uniform);
+	++shader->m_texture_slot_count;
+}
+
+
+static void atlas(lua_State* L)
+{
+	auto* shader = getShader(L);
+	if (!shader) return;
+	shader->m_texture_slots[shader->m_texture_slot_count - 1].m_is_atlas = true;
+}
+
+
+static void texture_define(lua_State* L, const char* define)
+{
+	auto* shader = getShader(L);
+	if (!shader) return;
+	Renderer* renderer = nullptr;
+	if (lua_getglobal(L, "renderer") == LUA_TLIGHTUSERDATA)
+	{
+		renderer = LuaWrapper::toType<Renderer*>(L, -1);
+	}
+	lua_pop(L, 1);
+	auto& slot = shader->m_texture_slots[shader->m_texture_slot_count - 1];
+	slot.m_define_idx = renderer->getShaderDefineIdx(lua_tostring(L, -1));
+}
+
+
+static void uniform(lua_State* L, const char* name, const char* type)
+{
+	auto* shader = getShader(L);
+	if (!shader) return;
+	auto& u = shader->m_uniforms.emplace();
+	copyString(u.name, name);
+	u.name_hash = crc32(name);
+	if (compareString(type, "float") == 0)
+	{
+		u.type = Shader::Uniform::FLOAT;
+		u.handle = bgfx::createUniform(name, bgfx::UniformType::Vec4);
+	}
+	else if (compareString(type, "color") == 0)
+	{
+		u.type = Shader::Uniform::COLOR;
+		u.handle = bgfx::createUniform(name, bgfx::UniformType::Vec4);
+	}
+	else if (compareString(type, "int") == 0)
+	{
+		u.type = Shader::Uniform::INT;
+		u.handle = bgfx::createUniform(name, bgfx::UniformType::Int1);
+	}
+	else if (compareString(type, "matrix4") == 0)
+	{
+		u.type = Shader::Uniform::MATRIX4;
+		u.handle = bgfx::createUniform(name, bgfx::UniformType::Mat4);
+	}
+	else if (compareString(type, "time") == 0)
+	{
+		u.type = Shader::Uniform::TIME;
+		u.handle = bgfx::createUniform(name, bgfx::UniformType::Vec4);
+	}
+	else if (compareString(type, "vec3") == 0)
+	{
+		u.type = Shader::Uniform::VEC3;
+		u.handle = bgfx::createUniform(name, bgfx::UniformType::Vec4);
+	}
+	else 
+	{
+		g_log_error.log("Renderer") << "Unknown uniform type " << type << " in " << shader->getPath().c_str();
+	}
+}
+
+
+static void pass(lua_State* state, const char* name)
+{
+	auto* cmb = getCombinations(state);
+	copyString(cmb->m_passes[cmb->m_pass_count], name);
+	cmb->m_vs_local_mask[cmb->m_pass_count] = 0;
+	cmb->m_fs_local_mask[cmb->m_pass_count] = 0;
+	++cmb->m_pass_count;
+}
+
+
+static int indexOf(ShaderCombinations& combination, uint8 define_idx)
+{
+	for (int i = 0; i < combination.m_define_count; ++i)
+	{
+		if (combination.m_defines[i] == define_idx)
+		{
+			return i;
+		}
+	}
+
+	combination.m_defines[combination.m_define_count] = define_idx;
+	++combination.m_define_count;
+	return combination.m_define_count - 1;
+}
+
+
+static void alpha_blending(lua_State* L, const char* mode)
+{
+	Shader* shader = getShader(L);
+	if (!shader) return;
+	if (compareString(mode, "add") == 0)
+	{
+		shader->m_render_states |= BGFX_STATE_BLEND_ADD;
+	}
+	else if (compareString(mode, "alpha") == 0)
+	{
+		shader->m_render_states |= BGFX_STATE_BLEND_ALPHA;
+	}
+	else
+	{
+		g_log_error.log("Renderer") << "Uknown blend mode " << mode << " in " << shader->getPath().c_str();
+	}
+}
+
+
+static void backface_culling(lua_State* L, bool enabled)
+{
+	Shader* shader = getShader(L);
+	if (!shader) return;
+	if (enabled)
+	{
+		shader->m_render_states |= BGFX_STATE_CULL_CW;
+	}
+	else
+	{
+		shader->m_render_states &= ~BGFX_STATE_CULL_MASK;
+	}
+}
+
+
+static void depth_test(lua_State* L, bool enabled)
+{
+	Shader* shader = nullptr;
+	if (lua_getglobal(L, "shader") == LUA_TLIGHTUSERDATA)
+	{
+		shader = LuaWrapper::toType<Shader*>(L, -1);
+	}
+	lua_pop(L, 1);
+	if (!shader) return;
+	if (enabled)
+	{
+		shader->m_render_states |= BGFX_STATE_DEPTH_TEST_LEQUAL;
+	}
+	else
+	{
+		shader->m_render_states &= ~BGFX_STATE_DEPTH_TEST_MASK;
+	}
+}
+
+
+static void fs(lua_State* L)
+{
+	auto* cmb = getCombinations(L);
+	Renderer* renderer = nullptr;
+	if (lua_getglobal(L, "renderer") == LUA_TLIGHTUSERDATA)
+	{
+		renderer = LuaWrapper::toType<Renderer*>(L, -1);
+	}
+	lua_pop(L, 1);
+
+	LuaWrapper::checkTableArg(L, 1);
+	int len = (int)lua_rawlen(L, 1);
+	for (int i = 0; i < len; ++i)
+	{
+		if (lua_rawgeti(L, 1, i + 1) == LUA_TSTRING)
+		{
+			const char* tmp = lua_tostring(L, -1);
+			int define_idx = renderer->getShaderDefineIdx(tmp);
+			cmb->m_all_defines_mask |= 1 << define_idx;
+			cmb->m_fs_local_mask[cmb->m_pass_count - 1] |= 1 << indexOf(*cmb, define_idx);
+		}
+	}
+}
+
+
+static void vs(lua_State* L)
+{
+	auto* cmb = getCombinations(L);
+	Renderer* renderer = nullptr;
+	if (lua_getglobal(L, "renderer") == LUA_TLIGHTUSERDATA)
+	{
+		renderer = LuaWrapper::toType<Renderer*>(L, -1);
+	}
+	lua_pop(L, 1);
+
+	LuaWrapper::checkTableArg(L, 1);
+	int len = (int)lua_rawlen(L, 1);
+	for (int i = 0; i < len; ++i)
+	{
+		if (lua_rawgeti(L, -1, i + 1) == LUA_TSTRING)
+		{
+			const char* tmp = lua_tostring(L, -1);
+			int define_idx = renderer->getShaderDefineIdx(tmp);
+			cmb->m_all_defines_mask |= 1 << define_idx;
+			cmb->m_vs_local_mask[cmb->m_pass_count - 1] |= 1 << indexOf(*cmb, define_idx);
+		}
+	}
+}
+
+
+static void registerFunctions(Shader* shader, ShaderCombinations* combinations, Renderer* renderer, lua_State* L)
+{
+	lua_pushlightuserdata(L, combinations);
+	lua_setglobal(L, "this");
+	lua_pushlightuserdata(L, renderer);
+	lua_setglobal(L, "renderer");
+	lua_pushlightuserdata(L, shader);
+	lua_setglobal(L, "shader");
+	registerCFunction(L, "pass", &LuaWrapper::wrap<decltype(&pass), pass>);
+	registerCFunction(L, "fs", &LuaWrapper::wrap<decltype(&fs), fs>);
+	registerCFunction(L, "vs", &LuaWrapper::wrap<decltype(&vs), vs>);
+	registerCFunction(L, "backface_culling", &LuaWrapper::wrap<decltype(&backface_culling), backface_culling>);
+	registerCFunction(L, "depth_test", &LuaWrapper::wrap<decltype(&depth_test), depth_test>);
+	registerCFunction(L, "alpha_blending", &LuaWrapper::wrap<decltype(&alpha_blending), alpha_blending>);
+	registerCFunction(L, "texture_slot", &LuaWrapper::wrap<decltype(&texture_slot), texture_slot>);
+	registerCFunction(L, "texture_define", &LuaWrapper::wrap<decltype(&texture_define), texture_define>);
+	registerCFunction(L, "atlas", &LuaWrapper::wrap<decltype(&atlas), atlas>);
+	registerCFunction(L, "uniform", &LuaWrapper::wrap<decltype(&uniform), uniform>);
 }
 
 
@@ -306,6 +413,8 @@ bool Shader::load(FS::IFile& file)
 {
 	lua_State* L = luaL_newstate();
 	luaL_openlibs(L);
+	registerFunctions(this, &m_combintions, &getRenderer(), L);
+	m_render_states = BGFX_STATE_CULL_CW | BGFX_STATE_DEPTH_TEST_LEQUAL;
 
 	bool errors = luaL_loadbuffer(L, (const char*)file.getBuffer(), file.size(), "") != LUA_OK;
 	errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
@@ -315,51 +424,7 @@ bool Shader::load(FS::IFile& file)
 		lua_pop(L, 1);
 		return false;
 	}
-
-	m_render_states = 0;
-	if (lua_getglobal(L, "backface_culling") == LUA_TBOOLEAN)
-	{
-		bool cull = lua_toboolean(L, -1) != 0;
-		if (cull) m_render_states |= BGFX_STATE_CULL_CW;
-	}
-	else
-	{
-		m_render_states |= BGFX_STATE_CULL_CW;
-	}
-	lua_pop(L, 1);
-	if (lua_getglobal(L, "depth_test") == LUA_TBOOLEAN)
-	{
-		bool test = lua_toboolean(L, -1) != 0;
-		if (test) m_render_states |= BGFX_STATE_DEPTH_TEST_LEQUAL;
-		else m_render_states &= ~BGFX_STATE_DEPTH_TEST_MASK;
-	}
-	else
-	{
-		m_render_states |= BGFX_STATE_DEPTH_TEST_LEQUAL;
-	}
-	lua_pop(L, 1);
 	
-	if (lua_getglobal(L, "alpha_blending") == LUA_TSTRING)
-	{
-		const char* tmp = lua_tostring(L, -1);
-		if (compareString(tmp, "add") == 0)
-		{
-			m_render_states |= BGFX_STATE_BLEND_ADD;
-		}
-		else if (compareString(tmp, "alpha") == 0)
-		{
-			m_render_states |= BGFX_STATE_BLEND_ALPHA;
-		}
-		else
-		{
-			g_log_error.log("Renderer") << "Unknown alpha blending value " << tmp << " in " << getPath().c_str();
-		}
-	}
-	lua_pop(L, 1);
-
-	parseTextureSlots(L);
-	parseUniforms(L);
-	m_combintions.parse(getRenderer(), L);
 	if (!generateInstances())
 	{
 		g_log_error.log("Renderer") << "Could not load instances of shader " << getPath().c_str();
@@ -398,7 +463,11 @@ void Shader::onBeforeReady()
 
 void Shader::unload(void)
 {
-	clearUniforms();
+	for (auto& uniform : m_uniforms)
+	{
+		bgfx::destroyUniform(uniform.handle);
+	}
+	m_uniforms.clear();
 
 	for (int i = 0; i < m_texture_slot_count; ++i)
 	{
@@ -439,60 +508,13 @@ ShaderInstance::~ShaderInstance()
 }
 
 
-static int indexOf(ShaderCombinations& combination, uint8 define_idx)
-{
-	for (int i = 0; i < combination.m_define_count; ++i)
-	{
-		if (combination.m_defines[i] == define_idx)
-		{
-			return i;
-		}
-	}
-
-	combination.m_defines[combination.m_define_count] = define_idx;
-	++combination.m_define_count;
-	return combination.m_define_count - 1;
-}
-
-
-void ShaderCombinations::parseCombinations(Renderer& renderer,
-	lua_State* L,
-	const char* name,
-	int* output)
-{
-	if (lua_getglobal(L, name) == LUA_TTABLE)
-	{
-		int len = (int)lua_rawlen(L, -1);
-		for (int pass_idx = 0; pass_idx < len; ++pass_idx)
-		{
-			if (lua_rawgeti(L, -1, 1 + pass_idx) == LUA_TTABLE)
-			{
-				int len = (int)lua_rawlen(L, -1);
-				for (int i = 0; i < len; ++i)
-				{
-					if (lua_rawgeti(L, -1, 1 + i) == LUA_TSTRING)
-					{
-						const char* tmp = lua_tostring(L, -1);
-						int define_idx = renderer.getShaderDefineIdx(tmp);
-						m_all_defines_mask |= 1 << define_idx;
-						output[pass_idx] |= 1 << indexOf(*this, define_idx);
-					}
-					lua_pop(L, 1);
-				}
-			}
-			lua_pop(L, 1);
-		}
-	}
-	lua_pop(L, 1);
-}
-
-
 bool Shader::getShaderCombinations(Renderer& renderer,
 	const char* shader_content,
 	ShaderCombinations* output)
 {
 	lua_State* L = luaL_newstate();
 	luaL_openlibs(L);
+	registerFunctions(nullptr, output, &renderer, L);
 
 	bool errors = luaL_loadbuffer(L, shader_content, stringLength(shader_content), "") != LUA_OK;
 	errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
@@ -500,11 +522,8 @@ bool Shader::getShaderCombinations(Renderer& renderer,
 	{
 		g_log_error.log("Renderer") << lua_tostring(L, -1);
 		lua_pop(L, 1);
+		lua_close(L);
 		return false;
-	}
-	else
-	{
-		output->parse(renderer, L);
 	}
 	lua_close(L);
 	return true;
