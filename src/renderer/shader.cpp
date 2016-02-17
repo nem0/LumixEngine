@@ -463,6 +463,8 @@ void Shader::onBeforeReady()
 
 void Shader::unload(void)
 {
+	m_combintions = {};
+
 	for (auto& uniform : m_uniforms)
 	{
 		bgfx::destroyUniform(uniform.handle);
@@ -479,9 +481,9 @@ void Shader::unload(void)
 	}
 	m_texture_slot_count = 0;
 
-	for (int i = 0; i < m_instances.size(); ++i)
+	for (auto i : m_instances)
 	{
-		LUMIX_DELETE(m_allocator, m_instances[i]);
+		LUMIX_DELETE(m_allocator, i);
 	}
 	m_instances.clear();
 }
