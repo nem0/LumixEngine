@@ -722,16 +722,6 @@ struct PipelineImpl : public Pipeline
 	void setPass(const char* name)
 	{
 		m_pass_idx = m_renderer.getPassIdx(name);
-		for (int i = 0; i < m_view2pass_map.size(); ++i)
-		{
-			if (m_view2pass_map[i] == m_pass_idx)
-			{
-				m_view_idx = (uint8)i;
-				return;
-			}
-		}
-
-		beginNewView(name);
 	}
 
 
@@ -816,11 +806,10 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void beginNewView(const char* debug_name)
+	void newView(const char* debug_name)
 	{
 		m_renderer.viewCounterAdd();
 		m_view_idx = (uint8)m_renderer.getViewCounter();
-		m_view2pass_map[m_view_idx] = m_pass_idx;
 		if (m_current_framebuffer)
 		{
 			bgfx::setViewFrameBuffer(m_view_idx, m_current_framebuffer->getHandle());
@@ -898,7 +887,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void deferredLocalLightLoop(int material_index)
+	void renderLightVolumes(int material_index)
 	{
 		PROFILE_FUNCTION();
 		if (m_applied_camera == INVALID_COMPONENT) return;
@@ -977,7 +966,7 @@ struct PipelineImpl : public Pipeline
 
 	void renderSpotLightShadowmap(ComponentIndex light)
 	{
-		beginNewView("point_light");
+		newView("point_light");
 
 		Entity light_entity = m_scene->getPointLightEntity(light);
 		Matrix mtx = m_scene->getUniverse().getMatrix(light_entity);
@@ -1043,7 +1032,7 @@ struct PipelineImpl : public Pipeline
 
 		for (int i = 0; i < 4; ++i)
 		{
-			beginNewView("omnilight");
+			newView("omnilight");
 
 			bgfx::setViewClear(m_view_idx, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
 			bgfx::touch(m_view_idx);
@@ -1140,7 +1129,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderShadowmap()
+	void renderShadowmap(int split_index)
 	{
 		Universe& universe = m_scene->getUniverse();
 		ComponentIndex light_cmp = m_scene->getActiveGlobalLight();
@@ -1158,58 +1147,53 @@ struct PipelineImpl : public Pipeline
 		Vec4 cascades = m_scene->getShadowmapCascades(light_cmp);
 		float split_distances[] = { 0.01f, cascades.x, cascades.y, cascades.z, cascades.w };
 		m_is_rendering_in_shadowmap = true;
-		for (int split_index = 0; split_index < 4; ++split_index)
-		{
-			if (split_index > 0) beginNewView("shadowmap");
+		bgfx::setViewClear(
+			m_view_idx, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
+		bgfx::touch(m_view_idx);
+		float* viewport = viewports + split_index * 2;
+		bgfx::setViewRect(m_view_idx,
+			(uint16)(1 + shadowmap_width * viewport[0]),
+			(uint16)(1 + shadowmap_height * viewport[1]),
+			(uint16)(0.5f * shadowmap_width - 2),
+			(uint16)(0.5f * shadowmap_height - 2));
 
-			bgfx::setViewClear(
-				m_view_idx, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
-			bgfx::touch(m_view_idx);
-			float* viewport = viewports + split_index * 2;
-			bgfx::setViewRect(m_view_idx,
-				(uint16)(1 + shadowmap_width * viewport[0]),
-				(uint16)(1 + shadowmap_height * viewport[1]),
-				(uint16)(0.5f * shadowmap_width - 2),
-				(uint16)(0.5f * shadowmap_height - 2));
+		Frustum frustum;
+		Matrix camera_matrix = universe.getMatrix(m_scene->getCameraEntity(m_applied_camera));
+		frustum.computePerspective(camera_matrix.getTranslation(),
+			camera_matrix.getZVector(),
+			camera_matrix.getYVector(),
+			camera_fov,
+			camera_ratio,
+			split_distances[split_index],
+			split_distances[split_index + 1]);
 
-			Frustum frustum;
-			Matrix camera_matrix = universe.getMatrix(m_scene->getCameraEntity(m_applied_camera));
-			frustum.computePerspective(camera_matrix.getTranslation(),
-				camera_matrix.getZVector(),
-				camera_matrix.getYVector(),
-				camera_fov,
-				camera_ratio,
-				split_distances[split_index],
-				split_distances[split_index + 1]);
+		Vec3 shadow_cam_pos = camera_matrix.getTranslation();
+		float bb_size = frustum.getRadius();
+		shadow_cam_pos =
+			shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
 
-			Vec3 shadow_cam_pos = camera_matrix.getTranslation();
-			float bb_size = frustum.getRadius();
-			shadow_cam_pos =
-				shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
+		Matrix projection_matrix;
+		projection_matrix.setOrtho(
+			bb_size, -bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
+		Vec3 light_forward = light_mtx.getZVector();
+		shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
+		Matrix view_matrix;
+		view_matrix.lookAt(
+			shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
+		bgfx::setViewTransform(m_view_idx, &view_matrix.m11, &projection_matrix.m11);
+		static const Matrix biasMatrix(
+			0.5, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
+		m_shadow_viewprojection[split_index] = biasMatrix * (projection_matrix * view_matrix);
 
-			Matrix projection_matrix;
-			projection_matrix.setOrtho(
-				bb_size, -bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
-			Vec3 light_forward = light_mtx.getZVector();
-			shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
-			Matrix view_matrix;
-			view_matrix.lookAt(
-				shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
-			bgfx::setViewTransform(m_view_idx, &view_matrix.m11, &projection_matrix.m11);
-			static const Matrix biasMatrix(
-				0.5, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
-			m_shadow_viewprojection[split_index] = biasMatrix * (projection_matrix * view_matrix);
-
-			Frustum shadow_camera_frustum;
-			shadow_camera_frustum.computeOrtho(shadow_cam_pos,
-				-light_forward,
-				light_mtx.getYVector(),
-				bb_size * 2,
-				bb_size * 2,
-				SHADOW_CAM_NEAR,
-				SHADOW_CAM_FAR);
-			renderAll(shadow_camera_frustum, false);
-		}
+		Frustum shadow_camera_frustum;
+		shadow_camera_frustum.computeOrtho(shadow_cam_pos,
+			-light_forward,
+			light_mtx.getYVector(),
+			bb_size * 2,
+			bb_size * 2,
+			SHADOW_CAM_NEAR,
+			SHADOW_CAM_FAR);
+		renderAll(shadow_camera_frustum, false);
 		m_is_rendering_in_shadowmap = false;
 	}
 
@@ -2098,7 +2082,6 @@ struct PipelineImpl : public Pipeline
 		m_view_idx = m_renderer.getViewCounter();
 		m_pass_idx = -1;
 		m_current_framebuffer = m_default_framebuffer;
-		m_view2pass_map.assign(0xFF);
 		m_instance_data_idx = 0;
 		m_point_light_shadowmaps.clear();
 		clearGlobalCommandBuffer();
@@ -2282,7 +2265,6 @@ struct PipelineImpl : public Pipeline
 	uint32 m_debug_flags;
 	uint8 m_view_idx;
 	int m_pass_idx;
-	StaticArray<uint8, 256> m_view2pass_map;
 	uint64 m_render_state;
 	IAllocator& m_allocator;
 	Lumix::Path m_path;
@@ -2492,7 +2474,7 @@ void PipelineImpl::registerCFunctions()
 
 	REGISTER_FUNCTION(drawQuad);
 	REGISTER_FUNCTION(setPass);
-	REGISTER_FUNCTION(beginNewView);
+	REGISTER_FUNCTION(newView);
 	REGISTER_FUNCTION(bindFramebufferTexture);
 	REGISTER_FUNCTION(applyCamera);
 	
@@ -2527,7 +2509,7 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(clearGlobalCommandBuffer);
 	REGISTER_FUNCTION(addRenderParamFloat);
 	REGISTER_FUNCTION(getRenderParamFloat);
-	REGISTER_FUNCTION(deferredLocalLightLoop);
+	REGISTER_FUNCTION(renderLightVolumes);
 
 	#undef REGISTER_FUNCTION
 
