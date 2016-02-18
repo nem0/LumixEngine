@@ -1763,12 +1763,6 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void setPoseUniform(const RenderableMesh& renderable_mesh) const
-	{
-		
-	}
-
-
 	void renderSkinnedMesh(const Renderable& renderable, const RenderableMesh& info)
 	{
 		const Mesh& mesh = *info.mesh;
