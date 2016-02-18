@@ -487,6 +487,7 @@ struct PipelineImpl : public Pipeline
 			bgfx::createUniform("u_shadowmapMatrices", bgfx::UniformType::Mat4, 4);
 		m_bone_matrices_uniform =
 			bgfx::createUniform("u_boneMatrices", bgfx::UniformType::Mat4, 64);
+		m_layer_uniform = bgfx::createUniform("u_layer", bgfx::UniformType::Vec4);
 		m_mat_color_shininess_uniform =
 			bgfx::createUniform("u_materialColorShininess", bgfx::UniformType::Vec4);
 		m_terrain_matrix_uniform = bgfx::createUniform("u_terrainMatrix", bgfx::UniformType::Mat4);
@@ -499,6 +500,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::destroyUniform(m_terrain_matrix_uniform);
 		bgfx::destroyUniform(m_mat_color_shininess_uniform);
 		bgfx::destroyUniform(m_bone_matrices_uniform);
+		bgfx::destroyUniform(m_layer_uniform);
 		bgfx::destroyUniform(m_terrain_scale_uniform);
 		bgfx::destroyUniform(m_rel_camera_pos_uniform);
 		bgfx::destroyUniform(m_terrain_params_uniform);
@@ -1763,24 +1765,7 @@ struct PipelineImpl : public Pipeline
 
 	void setPoseUniform(const RenderableMesh& renderable_mesh) const
 	{
-		Matrix bone_mtx[128];
-
-		Renderable* renderable = m_scene->getRenderable(renderable_mesh.renderable);
-		const Pose& pose = *renderable->pose;
-		const Model& model = *renderable->model;
-		Vec3* poss = pose.getPositions();
-		Quat* rots = pose.getRotations();
-
-		ASSERT(pose.getCount() <= lengthOf(bone_mtx));
-		for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count;
-			 ++bone_index)
-		{
-			auto& bone = model.getBone(bone_index);
-			rots[bone_index].toMatrix(bone_mtx[bone_index]);
-			bone_mtx[bone_index].translate(poss[bone_index]);
-			bone_mtx[bone_index] = bone_mtx[bone_index] * bone.inv_bind_matrix;
-		}
-		bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.getCount());
+		
 	}
 
 
@@ -1790,16 +1775,32 @@ struct PipelineImpl : public Pipeline
 		Material* material = mesh.material;
 		auto& shader_instance = mesh.material->getShaderInstance();
 
+		Matrix bone_mtx[128];
+
+		const Pose& pose = *renderable.pose;
+		const Model& model = *renderable.model;
+		Vec3* poss = pose.getPositions();
+		Quat* rots = pose.getRotations();
+
+		ASSERT(pose.getCount() <= lengthOf(bone_mtx));
+		for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count;
+		++bone_index)
+		{
+			auto& bone = model.getBone(bone_index);
+			rots[bone_index].toMatrix(bone_mtx[bone_index]);
+			bone_mtx[bone_index].translate(poss[bone_index]);
+			bone_mtx[bone_index] = bone_mtx[bone_index] * bone.inv_bind_matrix;
+		}
+
 		for (int i = 0; i < m_current_render_view_count; ++i)
 		{
 			auto& view = m_views[m_current_render_views[i]];
 			if (!bgfx::isValid(shader_instance.m_program_handles[view.pass_idx])) continue;
 
-			for (int j = 0; j < ((i > 0) ? 16 : 1); ++j)
+			for (int j = 0, c = material->getLayerCount(); j < c; ++j)
 			{
-				static bgfx::UniformHandle h = bgfx::createUniform("u_layer", bgfx::UniformType::Vec4);
-				bgfx::setUniform(h, &Vec4(j / 16.0f, 0, 0, 0));
-				setPoseUniform(info);
+				bgfx::setUniform(m_layer_uniform, &Vec4(j / (float)(c - 1), 0, 0, 0));
+				bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.getCount());
 				executeCommandBuffer(material->getCommandBuffer(), material);
 				executeCommandBuffer(view.command_buffer.buffer, material);
 
@@ -2395,6 +2396,7 @@ struct PipelineImpl : public Pipeline
 
 	bgfx::UniformHandle m_mat_color_shininess_uniform;
 	bgfx::UniformHandle m_bone_matrices_uniform;
+	bgfx::UniformHandle m_layer_uniform;
 	bgfx::UniformHandle m_terrain_scale_uniform;
 	bgfx::UniformHandle m_rel_camera_pos_uniform;
 	bgfx::UniformHandle m_terrain_params_uniform;

@@ -35,6 +35,7 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 	, m_shader_instance(nullptr)
 	, m_define_mask(0)
 	, m_command_buffer(nullptr)
+	, m_layer_count(1)
 {
 	auto* manager = resource_manager.get(ResourceManager::MATERIAL);
 	auto* mat_manager = static_cast<MaterialManager*>(manager);
