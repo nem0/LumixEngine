@@ -481,7 +481,7 @@ void Shader::unload(void)
 	}
 	m_texture_slot_count = 0;
 
-	for (auto i : m_instances)
+	for (auto* i : m_instances)
 	{
 		LUMIX_DELETE(m_allocator, i);
 	}
