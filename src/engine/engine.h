@@ -8,6 +8,7 @@ namespace Lumix
 {
 namespace FS
 {
+class DiskFileDevice;
 class FileSystem;
 }
 
@@ -37,7 +38,10 @@ public:
 public:
 	virtual ~Engine() {}
 
-	static Engine* create(FS::FileSystem* fs, IAllocator& allocator);
+	static Engine* create(const char* base_path0,
+		const char* base_path1,
+		FS::FileSystem* fs,
+		IAllocator& allocator);
 	static void destroy(Engine* engine, IAllocator& allocator);
 
 	virtual Universe& createUniverse() = 0;
@@ -46,6 +50,7 @@ public:
 	virtual const PlatformData& getPlatformData() = 0;
 
 	virtual FS::FileSystem& getFileSystem() = 0;
+	virtual FS::DiskFileDevice* getDiskFileDevice() = 0;
 	virtual InputSystem& getInputSystem() = 0;
 	virtual PluginManager& getPluginManager() = 0;
 	virtual MTJD::Manager& getMTJDManager() = 0;

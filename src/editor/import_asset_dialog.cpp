@@ -3,6 +3,7 @@
 #include "assimp/ProgressHandler.hpp"
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
+#include "core/FS/disk_file_device.h"
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
 #include "core/FS/os_file.h"
@@ -57,7 +58,30 @@ struct DDSConvertCallbackData
 };
 
 
-crn_bool ddsConvertCallback(crn_uint32 phase_index,
+static void getRelativePath(Lumix::WorldEditor& editor, char* relative_path, int max_length, const char* source)
+{
+	char tmp[Lumix::MAX_PATH_LENGTH];
+	Lumix::PathUtils::normalize(source, tmp, sizeof(tmp));
+
+	const char* base_path = editor.getEngine().getDiskFileDevice()->getBasePath(0);
+	if (Lumix::compareStringN(base_path, tmp, Lumix::stringLength(base_path)) == 0)
+	{
+		int base_path_length = Lumix::stringLength(base_path);
+		const char* rel_path_start = tmp + base_path_length;
+		if (rel_path_start[0] == '/')
+		{
+			++rel_path_start;
+		}
+		Lumix::copyString(relative_path, max_length, rel_path_start);
+	}
+	else
+	{
+		Lumix::copyString(relative_path, max_length, tmp);
+	}
+}
+
+
+static crn_bool ddsConvertCallback(crn_uint32 phase_index,
 	crn_uint32 total_phases,
 	crn_uint32 subphase_index,
 	crn_uint32 total_subphases,
@@ -505,8 +529,10 @@ struct ConvertTask : public Lumix::MT::Task
 		{
 			material_file << "\t, \"texture\" : {\n\t\t\"source\" : \"";
 			char from_root_path[Lumix::MAX_PATH_LENGTH];
-			m_dialog.m_editor.getRelativePath(
-				from_root_path, Lumix::lengthOf(from_root_path), m_dialog.m_texture_output_dir);
+			getRelativePath(m_dialog.m_editor,
+				from_root_path,
+				Lumix::lengthOf(from_root_path),
+				m_dialog.m_texture_output_dir);
 			material_file << "/" << from_root_path;
 			material_file << texture_info.m_basename << ".";
 			material_file << (m_dialog.m_convert_to_dds ? "dds" : texture_info.m_extension);
@@ -1693,7 +1719,7 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	m_source[0] = '\0';
 	m_output_dir[0] = '\0';
 	m_texture_output_dir[0] = '\0';
-	Lumix::copyString(m_last_dir, m_editor.getEngine().getPathManager().getBasePath());
+	Lumix::copyString(m_last_dir, m_editor.getEngine().getDiskFileDevice()->getBasePath(0));
 }
 
 
@@ -1896,7 +1922,7 @@ void ImportAssetDialog::importTexture()
 
 	char tmp[Lumix::MAX_PATH_LENGTH];
 	Lumix::PathUtils::normalize(dest_path, tmp, Lumix::lengthOf(tmp));
-	m_editor.getRelativePath(dest_path, Lumix::lengthOf(dest_path), tmp);
+	getRelativePath(m_editor, dest_path, Lumix::lengthOf(dest_path), tmp);
 	Lumix::uint32 hash = Lumix::crc32(dest_path);
 
 	m_metadata.setString(hash, Lumix::crc32("source"), m_source);
@@ -1915,7 +1941,8 @@ bool ImportAssetDialog::isTextureDirValid() const
 	Lumix::PathUtils::normalize(
 		m_texture_output_dir, normalized_path, Lumix::lengthOf(normalized_path));
 
-	return (m_editor.isRelativePath(normalized_path));
+	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath(0);
+	return Lumix::compareStringN(base_path, normalized_path, Lumix::stringLength(base_path)) == 0;
 }
 
 
@@ -1994,7 +2021,7 @@ void ImportAssetDialog::onGUI()
 			ImGui::SameLine();
 			if (ImGui::Button("...###browseoutput"))
 			{
-				auto* base_path = m_editor.getEngine().getPathManager().getBasePath();
+				auto* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath(0);
 				PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir), base_path);
 			}
 

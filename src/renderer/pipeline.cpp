@@ -3,6 +3,7 @@
 #include "renderer/pipeline.h"
 #include "core/crc32.h"
 #include "core/frustum.h"
+#include "core/fs/disk_file_device.h"
 #include "core/fs/ifile.h"
 #include "core/fs/file_system.h"
 #include "core/lifo_allocator.h"
@@ -366,7 +367,11 @@ struct PipelineImpl : public Pipeline
 		}
 		m_lua_state = luaL_newstate();
 		luaL_openlibs(m_lua_state);
-		lua_pushstring(m_lua_state, m_renderer.getEngine().getPathManager().getBasePath());
+		char paths[Lumix::MAX_PATH_LENGTH * 2 + 1];
+		copyString(paths, m_renderer.getEngine().getDiskFileDevice()->getBasePath(0));
+		catString(paths, "");
+		catString(paths, m_renderer.getEngine().getDiskFileDevice()->getBasePath(1));
+		lua_pushstring(m_lua_state, paths);
 		lua_setglobal(m_lua_state, "LUA_PATH");
 		lua_pushlightuserdata(m_lua_state, this);
 		lua_setglobal(m_lua_state, "this");

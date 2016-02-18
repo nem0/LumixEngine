@@ -5,6 +5,7 @@
 #include "core/fs/ifile_system_defines.h"
 #include "core/fs/os_file.h"
 #include "core/path.h"
+#include "core/string.h"
 
 
 namespace Lumix
@@ -23,7 +24,16 @@ namespace Lumix
 
 			bool open(const Path& path, Mode mode) override
 			{
-				return m_file.open(path.c_str(), mode, m_allocator);
+				char tmp[MAX_PATH_LENGTH];
+				copyString(tmp, m_device.getBasePath(0));
+				catString(tmp, path.c_str());
+				if (!m_file.open(tmp, mode, m_allocator))
+				{
+					copyString(tmp, m_device.getBasePath(1));
+					catString(tmp, path.c_str());
+					return m_file.open(tmp, mode, m_allocator);
+				}
+				return true;
 			}
 
 			void close() override
@@ -68,6 +78,16 @@ namespace Lumix
 			IAllocator& m_allocator;
 			OsFile m_file;
 		};
+
+
+		DiskFileDevice::DiskFileDevice(const char* base_path0, const char* base_path1, IAllocator& allocator)
+			: m_allocator(allocator)
+		{
+			copyString(m_base_paths[0], base_path0);
+			catString(m_base_paths[0], "/");
+			copyString(m_base_paths[1], base_path1);
+			catString(m_base_paths[1], "/");
+		}
 
 		void DiskFileDevice::destroyFile(IFile* file)
 		{

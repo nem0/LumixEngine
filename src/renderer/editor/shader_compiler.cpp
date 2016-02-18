@@ -1,4 +1,5 @@
 #include "shader_compiler.h"
+#include "core/FS/disk_file_device.h"
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
 #include "core/FS/os_file.h"
@@ -349,7 +350,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 	int define_mask,
 	const Lumix::ShaderCombinations::Defines& all_defines)
 {
-	const char* base_path = m_editor.getEngine().getPathManager().getBasePath();
+	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath(0);
 
 	for (int mask = 0; mask < 1 << Lumix::lengthOf(all_defines); ++mask)
 	{
@@ -534,7 +535,7 @@ void ShaderCompiler::compileAllPasses(const char* path,
 void ShaderCompiler::compile(const char* path)
 {
 	StringBuilder<Lumix::MAX_PATH_LENGTH> compiled_dir(
-		m_editor.getEngine().getPathManager().getBasePath(), "/shaders/compiled");
+		m_editor.getEngine().getDiskFileDevice()->getBasePath(0), "/shaders/compiled");
 	if (!PlatformInterface::makePath(compiled_dir))
 	{
 		if (!PlatformInterface::dirExists(compiled_dir))

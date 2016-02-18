@@ -2283,39 +2283,12 @@ public:
 	}
 
 
-	bool isRelativePath(const char* path) override
+	bool isRelativePath(const char* path)
 	{
-		const char* base_path = m_engine->getPathManager().getBasePath();
+		const char* base_path = m_engine->getDiskFileDevice()->getBasePath(0);
 		return compareStringN(base_path, path, stringLength(base_path)) == 0;
 	}
 
-
-	void getRelativePath(char* relative_path, int max_length, const char* source) override
-	{
-		char tmp[MAX_PATH_LENGTH];
-		Lumix::PathUtils::normalize(source, tmp, sizeof(tmp));
-		
-		if (isRelativePath(tmp))
-		{
-			int base_path_length = stringLength(m_engine->getPathManager().getBasePath());
-			const char* rel_path_start = tmp + base_path_length;
-			if (rel_path_start[0] == '/')
-			{
-				++rel_path_start;
-			}
-			copyString(relative_path, max_length, rel_path_start);
-		}
-		else
-		{
-			copyString(relative_path, max_length, tmp);
-		}
-	}
-
-
-	void getRelativePath(char* relative_path, int max_length, const Path& source) override
-	{
-		getRelativePath(relative_path, max_length, source.c_str());
-	}
 
 	void newUniverse() override
 	{
@@ -2506,8 +2479,6 @@ public:
 		m_is_snap_mode = false;
 		m_measure_tool = LUMIX_NEW(m_allocator, MeasureTool)();
 		addPlugin(*m_measure_tool);
-
-		engine.getPathManager().setBasePath(base_path);
 
 		m_engine = &engine;
 
