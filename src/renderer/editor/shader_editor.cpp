@@ -2108,7 +2108,7 @@ void ShaderEditor::newGraph()
 
 void ShaderEditor::generatePasses(Lumix::OutputBlob& blob)
 {
-	const char* passes[16];
+	const char* passes[32];
 	int pass = 0;
 
 	auto process = [&](Lumix::Array<Node*>& nodes){

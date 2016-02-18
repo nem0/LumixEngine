@@ -73,6 +73,8 @@ public:
 	ShaderInstance& getShaderInstance() { ASSERT(m_shader_instance); return *m_shader_instance; }
 	const ShaderInstance& getShaderInstance() const { ASSERT(m_shader_instance); return *m_shader_instance; }
 	const uint8* getCommandBuffer() const { return m_command_buffer; }
+	int getLayerCount() const { return m_layer_count; }
+	void setLayerCount(int count) { m_layer_count = count; }
 
 	void setDefine(uint8 define_idx, bool enabled);
 	bool hasDefine(uint8 define_idx) const;
@@ -104,6 +106,7 @@ private:
 	float m_alpha_ref;
 	uint32 m_define_mask;
 	uint8* m_command_buffer;
+	int m_layer_count;
 };
 
 } // ~namespace Lumix
