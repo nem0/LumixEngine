@@ -200,6 +200,13 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 		auto* renderer = static_cast<Renderer*>(plugin);
 
 		int alpha_cutout_define = renderer->getShaderDefineIdx("ALPHA_CUTOUT");
+		
+		int layer_count = material->getLayerCount();
+		if (ImGui::DragInt("Layers", &layer_count))
+		{
+			material->setLayerCount(layer_count);
+		}
+		
 		if (material->hasDefine(alpha_cutout_define))
 		{
 			b = material->isDefined(alpha_cutout_define);
