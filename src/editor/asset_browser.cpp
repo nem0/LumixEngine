@@ -65,6 +65,10 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 		m_watchers[1] = FileSystemWatcher::create(base_path, editor.getAllocator());
 		m_watchers[1]->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
 	}
+	else
+	{
+		m_watchers[1] = nullptr;
+	}
 }
 
 
@@ -441,5 +445,5 @@ void AssetBrowser::findResources()
 	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath(0);
 	processDir(base_path, Lumix::stringLength(base_path));
 	base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath(1);
-	processDir(base_path, Lumix::stringLength(base_path));
+	if (base_path[0] != 0) processDir(base_path, Lumix::stringLength(base_path));
 }
