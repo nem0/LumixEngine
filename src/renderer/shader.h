@@ -35,8 +35,8 @@ public:
 	}
 	~ShaderInstance();
 
-	bgfx::ProgramHandle m_program_handles[16];
-	ShaderBinary* m_binaries[32];
+	bgfx::ProgramHandle m_program_handles[32];
+	ShaderBinary* m_binaries[64];
 	uint32 m_define_mask;
 	Shader& m_shader;
 };
@@ -49,12 +49,12 @@ struct LUMIX_RENDERER_API ShaderCombinations
 	typedef char Define[40];
 	typedef char Pass[20];
 	typedef uint8 Defines[16];
-	typedef Pass Passes[16];
+	typedef Pass Passes[32];
 
 	int m_pass_count;
 	int m_define_count;
-	int m_vs_local_mask[16];
-	int m_fs_local_mask[16];
+	int m_vs_local_mask[32];
+	int m_fs_local_mask[32];
 	Defines m_defines;
 	Passes m_passes;
 	uint32 m_all_defines_mask;
