@@ -679,21 +679,20 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 	{
 		if (type != SHADER_HASH) return false;
 		auto* shader = static_cast<Shader*>(resource);
-		StringBuilder<MAX_PATH_LENGTH> path(m_app.getWorldEditor()->getEngine().getPathManager().getBasePath());
 		char basename[MAX_PATH_LENGTH];
 		PathUtils::getBasename(
 			basename, lengthOf(basename), resource->getPath().c_str());
-		path << "/shaders/" << basename;
+		StringBuilder<MAX_PATH_LENGTH> path("/shaders/", basename);
 		if (ImGui::Button("Open vertex shader"))
 		{
 			path << "_vs.sc";
-			PlatformInterface::shellExecuteOpen(path);
+			m_app.getAssetBrowser()->openInExternalEditor(path);
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Open fragment shader"))
 		{
 			path << "_fs.sc";
-			PlatformInterface::shellExecuteOpen(path);
+			m_app.getAssetBrowser()->openInExternalEditor(path);
 		}
 
 		if (shader->getTextureSlotCount() > 0 && ImGui::CollapsingHeader("Texture slots", nullptr, true, true))

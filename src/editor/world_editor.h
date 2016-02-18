@@ -155,13 +155,6 @@ public:
 	
 	virtual void addPlugin(Plugin& plugin) = 0;
 	virtual void removePlugin(Plugin& plugin) = 0;
-	virtual bool isRelativePath(const char* path) = 0;
-	virtual void getRelativePath(char* relative_path,
-								 int max_length,
-								 const char* source) = 0;
-	virtual void getRelativePath(char* relative_path,
-								 int max_length,
-								 const Path& source) = 0;
 	virtual EntityTemplateSystem& getEntityTemplateSystem() = 0;
 	virtual Vec3 getCameraRaycastHit() = 0;
 	virtual bool isMeasureToolActive() const = 0;

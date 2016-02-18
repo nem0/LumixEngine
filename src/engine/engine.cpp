@@ -55,7 +55,7 @@ public:
 class EngineImpl : public Engine
 {
 public:
-	EngineImpl(FS::FileSystem* fs, IAllocator& allocator)
+	EngineImpl(const char* base_path0, const char* base_path1, FS::FileSystem* fs, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_resource_manager(m_allocator)
 		, m_mtjd_manager(nullptr)
@@ -74,7 +74,7 @@ public:
 			m_file_system = FS::FileSystem::create(m_allocator);
 
 			m_mem_file_device = LUMIX_NEW(m_allocator, FS::MemoryFileDevice)(m_allocator);
-			m_disk_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)(m_allocator);
+			m_disk_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)(base_path0, base_path1, m_allocator);
 
 			m_file_system->mount(m_mem_file_device);
 			m_file_system->mount(m_disk_file_device);
@@ -206,7 +206,7 @@ public:
 
 
 	FS::FileSystem& getFileSystem() override { return *m_file_system; }
-
+	FS::DiskFileDevice* getDiskFileDevice() override { return m_disk_file_device; }
 
 	void startGame(Universe& context) override
 	{
@@ -506,7 +506,10 @@ static void logErrorToFile(const char*, const char* message)
 }
 
 
-Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
+Engine* Engine::create(const char* base_path0,
+	const char* base_path1,
+	FS::FileSystem* fs,
+	IAllocator& allocator)
 {
 	g_log_info.log("Core") << "Creating engine...";
 	Profiler::setThreadName("Main");
@@ -519,7 +522,7 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 	g_log_warning.getCallback().bind<showLogInVS>();
 	g_log_error.getCallback().bind<showLogInVS>();
 
-	EngineImpl* engine = LUMIX_NEW(allocator, EngineImpl)(fs, allocator);
+	EngineImpl* engine = LUMIX_NEW(allocator, EngineImpl)(base_path0, base_path1, fs, allocator);
 	if (!engine->create())
 	{
 		g_log_error.log("Core") << "Failed to create engine.";

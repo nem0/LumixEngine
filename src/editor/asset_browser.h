@@ -44,6 +44,7 @@ public:
 	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, Lumix::uint32 type);
 	void addPlugin(IPlugin& plugin);
 	void openInExternalEditor(Lumix::Resource* resource);
+	void openInExternalEditor(const char* path);
 
 public:
 	bool m_is_opened;
@@ -51,7 +52,7 @@ public:
 private:
 	void onFileChanged(const char* path);
 	void findResources();
-	void processDir(const char* path);
+	void processDir(const char* path, int base_length);
 	void addResource(const char* path, const char* filename);
 	void onGUIResource();
 	void unloadResource();
@@ -69,7 +70,7 @@ private:
 	Lumix::Array<Lumix::Array<Lumix::Path> > m_resources;
 	Lumix::Resource* m_selected_resource;
 	Lumix::WorldEditor& m_editor;
-	FileSystemWatcher* m_watcher;
+	FileSystemWatcher* m_watchers[2];
 	int m_current_type;
 	char m_filter[128];
 	Lumix::Path m_wanted_resource;

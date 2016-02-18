@@ -120,7 +120,7 @@ public:
 
 		Lumix::enableCrashReporting(false);
 
-		m_engine = Lumix::Engine::create(NULL, m_allocator);
+		m_engine = Lumix::Engine::create("", "", NULL, m_allocator);
 		Lumix::Engine::PlatformData platform_data;
 		platform_data.window_handle = hwnd;
 		m_engine->setPlatformData(platform_data);

@@ -951,6 +951,23 @@ public:
 	}
 
 
+	static void checkDataDirCommandLine(char* dir, int max_size)
+	{
+		char cmd_line[2048];
+		Lumix::getCommandLine(cmd_line, Lumix::lengthOf(cmd_line));
+
+		Lumix::CommandLineParser parser(cmd_line);
+		while (parser.next())
+		{
+			if (!parser.currentEquals("-data_dir")) continue;
+			if (!parser.next()) break;
+
+			parser.getCurrent(dir, max_size);
+			break;
+		}
+	}
+
+
 	void addPlugin(IPlugin& plugin) override
 	{
 		m_plugins.push(&plugin);
@@ -1252,12 +1269,15 @@ public:
 		m_handler.m_app = this;
 		PlatformInterface::createWindow(nullptr);
 
-		m_engine = Lumix::Engine::create(nullptr, m_allocator);
+		char current_dir[Lumix::MAX_PATH_LENGTH];
+		PlatformInterface::getCurrentDirectory(current_dir, Lumix::lengthOf(current_dir));
+
+		char base_path2[Lumix::MAX_PATH_LENGTH] = {};
+		checkDataDirCommandLine(base_path2, Lumix::lengthOf(base_path2));
+		m_engine = Lumix::Engine::create(current_dir, base_path2, nullptr, m_allocator);
 		Lumix::Engine::PlatformData platform_data;
 		platform_data.window_handle = PlatformInterface::getWindowHandle();
 		m_engine->setPlatformData(platform_data);
-		char current_dir[Lumix::MAX_PATH_LENGTH];
-		PlatformInterface::getCurrentDirectory(current_dir, Lumix::lengthOf(current_dir));
 		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine, m_allocator);
 		loadUserPlugins();
 
