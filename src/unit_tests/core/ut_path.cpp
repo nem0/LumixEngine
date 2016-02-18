@@ -4,8 +4,8 @@
 #include "core/crc32.h"
 #include "core/string.h"
 
-const char src_path[] = "d:\\Unit\\Test\\PATH_1231231.EXT";
-const char res_path[] = "d:/unit/test/path_1231231.ext";
+const char src_path[] = "Unit\\Test\\PATH_1231231.EXT";
+const char res_path[] = "unit/test/path_1231231.ext";
 
 void UT_path(const char* params)
 {
