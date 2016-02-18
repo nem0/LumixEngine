@@ -1793,7 +1793,7 @@ struct PipelineImpl : public Pipeline
 
 			for (int j = 0, c = material->getLayerCount(); j < c; ++j)
 			{
-				bgfx::setUniform(m_layer_uniform, &Vec4(j / (float)(c - 1), 0, 0, 0));
+				bgfx::setUniform(m_layer_uniform, &Vec4((j + 1) / (float)c, 0, 0, 0));
 				bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.getCount());
 				executeCommandBuffer(material->getCommandBuffer(), material);
 				executeCommandBuffer(view.command_buffer.buffer, material);
