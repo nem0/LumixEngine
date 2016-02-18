@@ -84,9 +84,9 @@ namespace Lumix
 			: m_allocator(allocator)
 		{
 			copyString(m_base_paths[0], base_path0);
-			catString(m_base_paths[0], "/");
+			if (m_base_paths[0][0] != '\0') catString(m_base_paths[0], "/");
 			copyString(m_base_paths[1], base_path1);
-			catString(m_base_paths[1], "/");
+			if (m_base_paths[1][0] != '\0') catString(m_base_paths[1], "/");
 		}
 
 		void DiskFileDevice::destroyFile(IFile* file)
