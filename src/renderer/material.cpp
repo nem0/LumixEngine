@@ -120,6 +120,7 @@ bool Material::save(JsonSerializer& serializer)
 
 	serializer.beginObject();
 	serializer.serialize("shader", m_shader ? m_shader->getPath() : Path(""));
+	if (m_layer_count != 1)serializer.serialize("layer_count", m_layer_count);
 	for (int i = 0; i < m_texture_count; ++i)
 	{
 		char path[MAX_PATH_LENGTH];
@@ -683,9 +684,13 @@ bool Material::load(FS::IFile& file)
 				return false;
 			}
 		}
-		else if(compareString(label, "alpha_ref") == 0)
+		else if (compareString(label, "alpha_ref") == 0)
 		{
 			serializer.deserialize(m_alpha_ref, 0.3f);
+		}
+		else if (compareString(label, "layer_count") == 0)
+		{
+			serializer.deserialize(m_layer_count, 1);
 		}
 		else if (compareString(label, "color") == 0)
 		{
