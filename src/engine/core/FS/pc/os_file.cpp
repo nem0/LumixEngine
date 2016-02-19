@@ -72,6 +72,12 @@ void OsFile::close()
 	}
 }
 
+bool OsFile::writeText(const char* text)
+{
+	int len = stringLength(text);
+	return write(text, len);
+}
+
 bool OsFile::write(const void* data, size_t size)
 {
 	ASSERT(nullptr != m_impl);

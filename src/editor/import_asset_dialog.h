@@ -36,7 +36,7 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		~ImportAssetDialog();
 		void setMessage(const char* message);
 		void setImportMessage(const char* message);
-
+		Lumix::WorldEditor& getEditor() { return m_editor; }
 		void onGUI();
 
 	public:

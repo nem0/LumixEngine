@@ -290,6 +290,15 @@ public:
 
 	int addRenderParamFloat(const char* name, float default_value) override
 	{
+		for (int i = 0; i < m_render_params_float.size(); ++i)
+		{
+			auto& param = m_render_params_float[i];
+			if (compareString(param.name, name) == 0)
+			{
+				return i;
+			}
+		}
+
 		auto& p = m_render_params_float.emplace();
 		p.value = default_value;
 		copyString(p.name, name);
@@ -299,6 +308,14 @@ public:
 
 	int addRenderParamVec4(const char* name, const Vec4& default_value) override
 	{
+		for (int i = 0; i < m_render_params_vec4.size(); ++i)
+		{
+			auto& param = m_render_params_vec4[i];
+			if (compareString(param.name, name) == 0)
+			{
+				return i;
+			}
+		}
 		auto& p = m_render_params_vec4.emplace();
 		p.value = default_value;
 		copyString(p.name, name);

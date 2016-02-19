@@ -20,6 +20,7 @@ namespace Lumix
 			void flush();
 
 			bool write(const void* data, size_t size);
+			bool writeText(const char* text);
 			bool read(void* data, size_t size);
 
 			size_t size();

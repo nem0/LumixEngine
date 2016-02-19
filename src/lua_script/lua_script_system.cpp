@@ -41,22 +41,18 @@ namespace Lumix
 	};
 
 
-	class LuaScriptSystemImpl;
-
-
 	void registerEngineLuaAPI(LuaScriptScene& scene, Engine& engine, lua_State* L);
 	void registerUniverse(Universe*, lua_State* L);
-
 
 
 	static const uint32 LUA_SCRIPT_HASH = crc32("lua_script");
 
 
-	class LuaScriptSystem : public IPlugin
+	class LuaScriptSystemImpl : public LuaScriptSystem
 	{
 	public:
-		LuaScriptSystem(Engine& engine);
-		virtual ~LuaScriptSystem();
+		LuaScriptSystemImpl(Engine& engine);
+		virtual ~LuaScriptSystemImpl();
 
 		IAllocator& getAllocator();
 		IScene* createScene(Universe& universe) override;
@@ -65,10 +61,12 @@ namespace Lumix
 		void destroy() override;
 		const char* getName() const override;
 		LuaScriptManager& getScriptManager() { return m_script_manager; }
+		void setMasterLuaState(lua_State* state) override { m_master_state = state; }
 
 		Engine& m_engine;
 		Debug::Allocator m_allocator;
 		LuaScriptManager m_script_manager;
+		lua_State* m_master_state;
 	};
 
 
@@ -137,7 +135,7 @@ namespace Lumix
 
 
 	public:
-		LuaScriptSceneImpl(LuaScriptSystem& system, Universe& ctx)
+		LuaScriptSceneImpl(LuaScriptSystemImpl& system, Universe& ctx)
 			: m_system(system)
 			, m_universe(ctx)
 			, m_scripts(system.getAllocator())
@@ -388,8 +386,15 @@ namespace Lumix
 
 		void startGame() override
 		{
-			m_global_state = lua_newstate(luaAllocator, &m_system.getAllocator());
-			luaL_openlibs(m_global_state);
+			if (m_system.m_master_state)
+			{
+				m_global_state = lua_newthread(m_system.m_master_state);
+			}
+			else
+			{
+				m_global_state = lua_newstate(luaAllocator, &m_system.getAllocator());
+				luaL_openlibs(m_global_state);
+			}
 			registerAPI(m_global_state);
 			for (int i = 0; i < m_scripts.size(); ++i)
 			{
@@ -486,11 +491,12 @@ namespace Lumix
 				if (!script) continue;
 				for (auto& i : script->m_scripts)
 				{
+					luaL_unref(i.m_state, LUA_REGISTRYINDEX, i.m_environment);
 					i.m_state = nullptr;
 				}
 			}
 
-			lua_close(m_global_state);
+			if(!m_system.m_master_state) lua_close(m_global_state);
 			m_global_state = nullptr;
 		}
 
@@ -815,7 +821,7 @@ namespace Lumix
 
 
 	private:
-		LuaScriptSystem& m_system;
+		LuaScriptSystemImpl& m_system;
 
 		Array<ScriptComponent*> m_scripts;
 		PODHashMap<Entity, ComponentIndex> m_entity_script_map;
@@ -826,10 +832,11 @@ namespace Lumix
 	};
 
 
-	LuaScriptSystem::LuaScriptSystem(Engine& engine)
+	LuaScriptSystemImpl::LuaScriptSystemImpl(Engine& engine)
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator())
 		, m_script_manager(m_allocator)
+		, m_master_state(nullptr)
 	{
 		m_script_manager.create(crc32("lua_script"), engine.getResourceManager());
 
@@ -837,42 +844,42 @@ namespace Lumix
 	}
 
 
-	LuaScriptSystem::~LuaScriptSystem()
+	LuaScriptSystemImpl::~LuaScriptSystemImpl()
 	{
 		m_script_manager.destroy();
 	}
 
 
-	IAllocator& LuaScriptSystem::getAllocator()
+	IAllocator& LuaScriptSystemImpl::getAllocator()
 	{
 		return m_allocator;
 	}
 
 
-	IScene* LuaScriptSystem::createScene(Universe& ctx)
+	IScene* LuaScriptSystemImpl::createScene(Universe& ctx)
 	{
 		return LUMIX_NEW(m_allocator, LuaScriptSceneImpl)(*this, ctx);
 	}
 
 
-	void LuaScriptSystem::destroyScene(IScene* scene)
+	void LuaScriptSystemImpl::destroyScene(IScene* scene)
 	{
 		LUMIX_DELETE(m_allocator, scene);
 	}
 
 
-	bool LuaScriptSystem::create()
+	bool LuaScriptSystemImpl::create()
 	{
 		return true;
 	}
 
 
-	void LuaScriptSystem::destroy()
+	void LuaScriptSystemImpl::destroy()
 	{
 	}
 
 
-	const char* LuaScriptSystem::getName() const
+	const char* LuaScriptSystemImpl::getName() const
 	{
 		return "lua_script";
 	}
@@ -880,6 +887,50 @@ namespace Lumix
 
 	namespace
 	{
+
+
+	int DragFloat(lua_State* L)
+	{
+		auto* name = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
+		float value = Lumix::LuaWrapper::checkArg<float>(L, 2);
+		bool changed = ImGui::DragFloat(name, &value);
+		lua_pushboolean(L, changed);
+		lua_pushnumber(L, value);
+		return 2;
+	}
+
+
+	int Button(lua_State* L)
+	{
+		auto* label = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
+		bool clicked = ImGui::Button(label);
+		lua_pushboolean(L, clicked);
+		return 1;
+	}
+
+
+	void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
+	{
+		lua_pushvalue(L, -1);
+		lua_pushcfunction(L, f);
+		lua_setfield(L, -2, name);
+	}
+
+
+	void registerImGuiLua(Lumix::WorldEditor& editor, lua_State* L)
+	{
+		lua_newtable(L);
+		lua_pushvalue(L, -1);
+		lua_setglobal(L, "ImGui");
+
+		registerCFunction(L, "DragFloat", &DragFloat);
+		registerCFunction(L, "Button", &Button);
+
+		lua_pop(L, 1);
+
+		auto* scr = static_cast<Lumix::LuaScriptSystem*>(editor.getEngine().getPluginManager().getPlugin("lua_script"));
+		scr->setMasterLuaState(L);
+	}
 
 
 	struct PropertyGridPlugin : public PropertyGrid::IPlugin
@@ -1120,6 +1171,7 @@ namespace Lumix
 		PropertyGridPlugin(StudioApp& app)
 			: m_app(app)
 		{
+			registerImGuiLua(*app.getWorldEditor(), app.getLuaState());
 		}
 
 
@@ -1206,9 +1258,14 @@ namespace Lumix
 							break;
 						}
 					}
+					if (auto* call = scene->beginFunctionCall(cmp.index, j, "onGUI"))
+					{
+						scene->endFunctionCall(*call);
+					}
 					ImGui::PopID();
 				}
 			}
+
 		}
 
 		StudioApp& m_app;
@@ -1322,6 +1379,6 @@ namespace Lumix
 
 	LUMIX_PLUGIN_ENTRY(lua_script)
 	{
-		return LUMIX_NEW(engine.getAllocator(), LuaScriptSystem)(engine);
+		return LUMIX_NEW(engine.getAllocator(), LuaScriptSystemImpl)(engine);
 	}
 }
