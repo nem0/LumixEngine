@@ -64,6 +64,7 @@ public:
 	virtual void registerLuaFunction(const char* name, int (*function)(struct lua_State*)) = 0;
 	virtual void registerLuaGlobal(const char* name, void* data) = 0;
 	virtual Lumix::Array<Action*>& getActions() = 0;
+	virtual lua_State* getLuaState() const = 0;
 
 	virtual ~StudioApp() {}
 	virtual void run() = 0;

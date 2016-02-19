@@ -78,6 +78,12 @@ public:
 	}
 
 
+	lua_State* getLuaState() const override
+	{
+		return m_lua_state;
+	}
+
+
 	int getExitCode() const override { return m_exit_code; }
 
 
