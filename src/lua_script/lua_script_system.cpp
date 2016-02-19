@@ -388,13 +388,13 @@ namespace Lumix
 		{
 			if (m_system.m_master_state)
 			{
-				m_global_state = lua_newthread(m_system.m_master_state); // TODO can not lua_close
+				m_global_state = lua_newthread(m_system.m_master_state);
 			}
 			else
 			{
 				m_global_state = lua_newstate(luaAllocator, &m_system.getAllocator());
+				luaL_openlibs(m_global_state);
 			}
-			luaL_openlibs(m_global_state);
 			registerAPI(m_global_state);
 			for (int i = 0; i < m_scripts.size(); ++i)
 			{
@@ -491,11 +491,12 @@ namespace Lumix
 				if (!script) continue;
 				for (auto& i : script->m_scripts)
 				{
+					luaL_unref(i.m_state, LUA_REGISTRYINDEX, i.m_environment);
 					i.m_state = nullptr;
 				}
 			}
 
-			lua_close(m_global_state);
+			if(!m_system.m_master_state) lua_close(m_global_state);
 			m_global_state = nullptr;
 		}
 
@@ -899,6 +900,15 @@ namespace Lumix
 	}
 
 
+	int Button(lua_State* L)
+	{
+		auto* label = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
+		bool clicked = ImGui::Button(label);
+		lua_pushboolean(L, clicked);
+		return 1;
+	}
+
+
 	void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 	{
 		lua_pushvalue(L, -1);
@@ -914,6 +924,7 @@ namespace Lumix
 		lua_setglobal(L, "ImGui");
 
 		registerCFunction(L, "DragFloat", &DragFloat);
+		registerCFunction(L, "Button", &Button);
 
 		lua_pop(L, 1);
 
