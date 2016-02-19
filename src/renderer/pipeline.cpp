@@ -889,6 +889,8 @@ struct PipelineImpl : public Pipeline
 		}
 		bgfx::setViewClear(m_bgfx_view, 0);
 		bgfx::setViewName(m_bgfx_view, debug_name);
+		m_stencil = BGFX_STENCIL_NONE;
+		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE | BGFX_STATE_MSAA;
 		return m_view_idx;
 	}
 

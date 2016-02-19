@@ -4,8 +4,6 @@
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
 #include "core/FS/disk_file_device.h"
-#include "core/FS/file_system.h"
-#include "core/FS/ifile.h"
 #include "core/FS/os_file.h"
 #include "core/math_utils.h"
 #include "core/MT/task.h"
@@ -113,10 +111,8 @@ static bool saveAsRaw(ImportAssetDialog& dialog,
 
 	dialog.setImportMessage(StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Saving ") << dest_path);
 
-	auto* file = fs.open(fs.getDiskDevice(),
-		Lumix::Path(dest_path),
-		Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE);
-	if (!file)
+	Lumix::FS::OsFile file;
+	if (!file.open(dest_path, Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE, dialog.getEditor().getAllocator()))
 	{
 		dialog.setMessage(
 			StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Could not save ") << dest_path);
@@ -134,8 +130,8 @@ static bool saveAsRaw(ImportAssetDialog& dialog,
 		}
 	}
 
-	file->write((const char*)&data[0], data.size() * sizeof(data[0]));
-	fs.close(*file);
+	file.write((const char*)&data[0], data.size() * sizeof(data[0]));
+	file.close();
 	return true;
 }
 
@@ -180,10 +176,8 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 		return false;
 	}
 
-	auto* file = fs.open(fs.getDiskDevice(),
-		Lumix::Path(dest_path),
-		Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE);
-	if (!file)
+	Lumix::FS::OsFile file;
+	if (!file.open(dest_path, Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE, dialog.getEditor().getAllocator()))
 	{
 		dialog.setMessage(
 			StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Could not save ") << dest_path);
@@ -191,8 +185,8 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 		return false;
 	}
 
-	file->write((const char*)data, size);
-	fs.close(*file);
+	file.write((const char*)data, size);
+	file.close();
 	crn_free_block(data);
 	return true;
 }
@@ -491,7 +485,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 	bool saveTexture(const char* texture_path,
 		const char* source_mesh_dir,
-		Lumix::FS::IFile& material_file,
+		Lumix::FS::OsFile& material_file,
 		bool is_srgb) const
 	{
 		Lumix::string texture_source_path(texture_path, m_dialog.m_editor.getAllocator());
@@ -828,11 +822,8 @@ struct ConvertTask : public Lumix::MT::Task
 
 		m_dialog.setImportMessage(
 			StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Converting ") << output_material_name);
-		auto& fs = m_dialog.m_editor.getEngine().getFileSystem();
-		auto* file = fs.open(fs.getDiskDevice(),
-			Lumix::Path(output_material_name),
-			Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
-		if (!file)
+		Lumix::FS::OsFile file;
+		if (!file.open(output_material_name, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_dialog.m_editor.getAllocator()))
 		{
 			m_dialog.setMessage(StringBuilder<20 + Lumix::MAX_PATH_LENGTH>(
 				"Could not create ", output_material_name));
@@ -840,20 +831,21 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 
 		const aiScene* scene = m_dialog.m_importer.GetScene();
-		*file << "{\n\t\"shader\" : \"shaders/"
-			  << (isSkinned(scene, material) ? "skinned" : "rigid") << ".shd\"\n";
+		file.writeText("{\n\t\"shader\" : \"shaders/");
+		file.writeText(isSkinned(scene, material) ? "skinned" : "rigid");
+		file.writeText(".shd\"\n");
 
 		if (material->GetTextureCount(aiTextureType_DIFFUSE) == 1)
 		{
 			aiString texture_path;
 			material->GetTexture(aiTextureType_DIFFUSE, 0, &texture_path);
-			saveTexture(texture_path.C_Str(), source_mesh_dir, *file, true);
+			saveTexture(texture_path.C_Str(), source_mesh_dir, file, true);
 		}
 		else
 		{
 			saveTexture(PathBuilder("undefined") << *undefined_count << ".dds",
 				source_mesh_dir,
-				*file,
+				file,
 				true);
 			++*undefined_count;
 		}
@@ -862,23 +854,23 @@ struct ConvertTask : public Lumix::MT::Task
 		{
 			aiString texture_path;
 			material->GetTexture(aiTextureType_NORMALS, 0, &texture_path);
-			saveTexture(texture_path.C_Str(), source_mesh_dir, *file, false);
+			saveTexture(texture_path.C_Str(), source_mesh_dir, file, false);
 		}
 		else if (material->GetTextureCount(aiTextureType_HEIGHT) == 1)
 		{
 			aiString texture_path;
 			material->GetTexture(aiTextureType_HEIGHT, 0, &texture_path);
-			saveTexture(texture_path.C_Str(), source_mesh_dir, *file, false);
+			saveTexture(texture_path.C_Str(), source_mesh_dir, file, false);
 		}
 		else if (material->GetTextureCount(aiTextureType_NORMALS) > 1)
 		{
 			m_dialog.setMessage(StringBuilder<Lumix::MAX_PATH_LENGTH + 20>(
 				"Too many normal maps in ", material_name.C_Str()));
-			fs.close(*file);
+			file.close();
 			return false;
 		}
-		file->write("}", 1);
-		fs.close(*file);
+		file.write("}", 1);
+		file.close();
 		return true;
 	}
 
@@ -945,12 +937,14 @@ struct ConvertTask : public Lumix::MT::Task
 	void fillSkinInfo(const aiScene* scene, Lumix::Array<SkinInfo>& infos, int vertices_count) const
 	{
 		infos.resize(vertices_count);
+		bool any_bones = false;
 
 		int offset = 0;
 		for (auto* mesh : m_filtered_meshes)
 		{
 			for (unsigned int j = 0; j < mesh->mNumBones; ++j)
 			{
+				any_bones = true;
 				const aiBone* bone = mesh->mBones[j];
 				int bone_index = getNodeIndex(bone);
 				ASSERT(bone_index >= 0)
@@ -962,6 +956,7 @@ struct ConvertTask : public Lumix::MT::Task
 			}
 			offset += mesh->mNumVertices;
 		}
+		if (!any_bones) return;
 
 		int invalid_vertices = 0;
 		for (auto& info : infos)
@@ -1053,7 +1048,7 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void writeGeometry(Lumix::FS::IFile& file) const
+	void writeGeometry(Lumix::FS::OsFile& file) const
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
 		Lumix::int32 indices_count = 0;
@@ -1217,7 +1212,7 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void writeMeshes(Lumix::FS::IFile& file)
+	void writeMeshes(Lumix::FS::OsFile& file)
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
 		Lumix::int32 mesh_count = 0;
@@ -1274,7 +1269,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 	static void writeAttribute(const char* attribute_name,
 		VertexAttributeDef attribute_type,
-		Lumix::FS::IFile& file)
+		Lumix::FS::OsFile& file)
 	{
 		Lumix::uint32 length = Lumix::stringLength(attribute_name);
 		file.write((const char*)&length, sizeof(length));
@@ -1285,7 +1280,7 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void writeLods(Lumix::FS::IFile& file) const
+	void writeLods(Lumix::FS::OsFile& file) const
 	{
 		Lumix::int32 lods[] = {-1, -1, -1, -1, -1, -1, -1, -1};
 		Lumix::int32 lod_count = -1;
@@ -1399,7 +1394,7 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void writeSkeleton(Lumix::FS::IFile& file)
+	void writeSkeleton(Lumix::FS::OsFile& file)
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
 		Lumix::int32 count = m_nodes.size();
@@ -1450,7 +1445,7 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void writePhysicsHeader(Lumix::FS::IFile& file) const
+	void writePhysicsHeader(Lumix::FS::OsFile& file) const
 	{
 		Lumix::PhysicsGeometry::Header header;
 		header.m_magic = Lumix::PhysicsGeometry::HEADER_MAGIC;
@@ -1471,36 +1466,34 @@ struct ConvertTask : public Lumix::MT::Task
 		auto& fs = m_dialog.m_editor.getEngine().getFileSystem();
 		PathBuilder phy_path(m_dialog.m_output_dir);
 		phy_path << "/" << filename;
-		Lumix::FS::IFile* file = fs.open(fs.getDiskDevice(),
-			Lumix::Path(phy_path),
-			Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
-		if (!file)
+		Lumix::FS::OsFile file;
+		if (!file.open(phy_path, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_dialog.m_editor.getAllocator()))
 		{
 			Lumix::g_log_error.log("Editor") << "Could not create file " << phy_path;
 			return false;
 		}
 
-		writePhysicsHeader(*file);
+		writePhysicsHeader(file);
 		Lumix::int32 count = 0;
 		for (auto* mesh : m_filtered_meshes)
 		{
 			count += (Lumix::int32)mesh->mNumVertices;
 		}
-		file->write((const char*)&count, sizeof(count));
+		file.write((const char*)&count, sizeof(count));
 		for (auto* mesh : m_filtered_meshes)
 		{
-			file->write(
+			file.write(
 				(const char*)mesh->mVertices, sizeof(mesh->mVertices[0]) * mesh->mNumVertices);
 		}
 
-		if (!m_dialog.m_make_convex) writePhysiscTriMesh(*file);
-		fs.close(*file);
+		if (!m_dialog.m_make_convex) writePhysiscTriMesh(file);
+		file.close();
 
 		return true;
 	}
 
 
-	void writePhysiscTriMesh(Lumix::FS::IFile& file)
+	void writePhysiscTriMesh(Lumix::FS::OsFile& file)
 	{
 		int count = 0;
 		for (auto* mesh : m_filtered_meshes)
@@ -1553,7 +1546,7 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	static void writeModelHeader(Lumix::FS::IFile& file)
+	static void writeModelHeader(Lumix::FS::OsFile& file)
 	{
 		Lumix::Model::FileHeader header;
 		header.m_magic = Lumix::Model::FILE_MAGIC;
@@ -1659,10 +1652,10 @@ struct ConvertTask : public Lumix::MT::Task
 		path << "/" << basename << ".msh";
 
 		auto& fs = m_dialog.m_editor.getEngine().getFileSystem();
-		Lumix::FS::IFile* file = fs.open(fs.getDiskDevice(),
-			Lumix::Path(path),
-			Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
-		if (!file)
+		Lumix::FS::OsFile file;
+		
+		if (!file.open(path,
+			Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_dialog.m_editor.getAllocator()))
 		{
 			m_dialog.setMessage(
 				StringBuilder<Lumix::MAX_PATH_LENGTH + 15>("Failed to open ", path));
@@ -1672,13 +1665,13 @@ struct ConvertTask : public Lumix::MT::Task
 		filterMeshes();
 		gatherNodes();
 
-		writeModelHeader(*file);
-		writeMeshes(*file);
-		writeGeometry(*file);
-		writeSkeleton(*file);
-		writeLods(*file);
+		writeModelHeader(file);
+		writeMeshes(file);
+		writeGeometry(file);
+		writeSkeleton(file);
+		writeLods(file);
 
-		fs.close(*file);
+		file.close();
 		return true;
 	}
 
