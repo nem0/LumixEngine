@@ -160,7 +160,7 @@ bool Material::save(JsonSerializer& serializer)
 	serializer.endArray();
 
 	serializer.beginArray("uniforms");
-	for (int i = 0; i < m_uniforms.size(); ++i)
+	for (int i = 0; i < m_shader->getUniformCount(); ++i)
 	{
 		serializer.beginObject();
 		const auto& uniform = m_shader->getUniform(i);
