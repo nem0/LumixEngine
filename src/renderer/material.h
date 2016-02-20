@@ -75,6 +75,7 @@ public:
 	const uint8* getCommandBuffer() const { return m_command_buffer; }
 	int getLayerCount() const { return m_layer_count; }
 	void setLayerCount(int count) { m_layer_count = count; }
+	void createCommandBuffer();
 
 	void setDefine(uint8 define_idx, bool enabled);
 	bool hasDefine(uint8 define_idx) const;
@@ -85,7 +86,6 @@ private:
 	void unload(void) override;
 	bool load(FS::IFile& file) override;
 
-	void createCommandBuffer();
 	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);
 	void deserializeUniforms(JsonSerializer& serializer);
 	void deserializeDefines(JsonSerializer& serializer);

@@ -319,16 +319,28 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 				switch(shader_uniform.type)
 				{
 					case Shader::Uniform::FLOAT:
-						ImGui::DragFloat(shader_uniform.name, &uniform.float_value);
+						if (ImGui::DragFloat(shader_uniform.name, &uniform.float_value))
+						{
+							material->createCommandBuffer();
+						}
 						break;
 					case Shader::Uniform::VEC3:
-						ImGui::DragFloat3(shader_uniform.name, uniform.vec3);
+						if(ImGui::DragFloat3(shader_uniform.name, uniform.vec3))
+						{
+							material->createCommandBuffer();
+						}
 						break;
 					case Shader::Uniform::COLOR:
-						ImGui::ColorEdit3(shader_uniform.name, uniform.vec3);
+						if(ImGui::ColorEdit3(shader_uniform.name, uniform.vec3))
+						{
+							material->createCommandBuffer();
+						}
 						if(ImGui::BeginPopupContextItem(StringBuilder<50>(shader_uniform.name, "pu")))
 						{
-							ImGui::ColorPicker(uniform.vec3, false);
+							if(ImGui::ColorPicker(uniform.vec3, false))
+							{
+								material->createCommandBuffer();
+							}
 							ImGui::EndPopup();
 						}
 						break;
