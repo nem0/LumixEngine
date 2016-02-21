@@ -45,6 +45,7 @@ public:
 	void addPlugin(IPlugin& plugin);
 	void openInExternalEditor(Lumix::Resource* resource);
 	void openInExternalEditor(const char* path);
+	void enableUpdate(bool enable) { m_is_update_enabled = enable; }
 
 public:
 	bool m_is_opened;
@@ -77,4 +78,5 @@ private:
 	bool m_autoreload_changed_resource;
 	bool m_is_focus_requested;
 	bool m_activate;
+	bool m_is_update_enabled;
 };

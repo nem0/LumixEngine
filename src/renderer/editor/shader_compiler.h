@@ -21,19 +21,21 @@ struct Process;
 
 class FileSystemWatcher;
 class LogUI;
+class StudioApp;
 
 
 class ShaderCompiler
 {
 public:
-	ShaderCompiler(Lumix::WorldEditor& editor, LogUI& log_ui);
+	ShaderCompiler(StudioApp& app, LogUI& log_ui);
 	~ShaderCompiler();
 
 	void compileAll(bool wait);
 	void update();
-	void wait();
+	bool isCompiling() const { return m_is_compiling; }
 
 private:
+	void wait();
 	void reloadShaders();
 	void onCompiled(int value);
 	void updateNotifications();
@@ -66,7 +68,7 @@ private:
 	};
 
 private:
-	bool m_is_compiling;
+	StudioApp& m_app;
 	Lumix::WorldEditor& m_editor;
 	FileSystemWatcher* m_watcher;
 	int m_notifications_id;
@@ -76,4 +78,5 @@ private:
 	Lumix::Array<Lumix::string> m_changed_files;
 	Lumix::MT::SpinMutex m_mutex;
 	LogUI& m_log_ui;
+	bool m_is_compiling;
 };

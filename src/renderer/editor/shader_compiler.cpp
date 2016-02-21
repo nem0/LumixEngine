@@ -15,19 +15,22 @@
 #include "engine.h"
 #include "engine/plugin_manager.h"
 #include "renderer/renderer.h"
+#include "editor/asset_browser.h"
 #include "editor/file_system_watcher.h"
 #include "editor/log_ui.h"
 #include "editor/platform_interface.h"
+#include "editor/studio_app.h"
 #include "editor/utils.h"
 
 
-ShaderCompiler::ShaderCompiler(Lumix::WorldEditor& editor, LogUI& log_ui)
-	: m_editor(editor)
+ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
+	: m_app(app)
+	, m_editor(*app.getWorldEditor())
 	, m_log_ui(log_ui)
-	, m_dependencies(editor.getAllocator())
-	, m_to_reload(editor.getAllocator())
-	, m_processes(editor.getAllocator())
-	, m_changed_files(editor.getAllocator())
+	, m_dependencies(m_editor.getAllocator())
+	, m_to_reload(m_editor.getAllocator())
+	, m_processes(m_editor.getAllocator())
+	, m_changed_files(m_editor.getAllocator())
 	, m_mutex(false)
 {
 	m_notifications_id = -1;
@@ -511,6 +514,7 @@ void ShaderCompiler::update()
 		}
 	}
 	m_is_compiling = !m_processes.empty();
+	m_app.getAssetBrowser()->enableUpdate(!m_is_compiling);
 
 	processChangedFiles();
 }
@@ -580,6 +584,7 @@ void ShaderCompiler::compileAll(bool wait)
 	}
 
 	m_is_compiling = true;
+	m_app.getAssetBrowser()->enableUpdate(!m_is_compiling);
 
 	PlatformInterface::FileInfo info;
 	auto* iter = PlatformInterface::createFileIterator("shaders", m_editor.getAllocator());
