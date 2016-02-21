@@ -295,13 +295,13 @@ struct DockContext
 			dock.children[0]->setPosSize(dock.children[0]->pos, new_size0);
 			dock.children[1]->setPosSize(new_pos1, new_size1);
 
-			if (IsItemHoveredRect() && IsMouseClicked(0))
+			if (IsItemHovered() && IsMouseClicked(0))
 			{
 				dock.status = Status_Dragged;
 			}
 
 			draw_list->AddRectFilled(
-				GetItemRectMin(), GetItemRectMax(), IsItemHoveredRect() ? color_hovered : color);
+				GetItemRectMin(), GetItemRectMax(), IsItemHovered() ? color_hovered : color);
 			PopID();
 		}
 	}
@@ -466,7 +466,7 @@ struct DockContext
 				return true;
 			}
 			ImRect docked_rect = getDockedRect(rect, (Slot_)i);
-			canvas->AddRectFilled(docked_rect.Min, docked_rect.Max, GetColorU32(ImGuiCol_TitleBg));
+			canvas->AddRectFilled(docked_rect.Min, docked_rect.Max, GetColorU32(ImGuiCol_Button));
 		}
 		return false;
 	}
