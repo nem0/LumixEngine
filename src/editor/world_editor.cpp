@@ -2066,7 +2066,7 @@ public:
 		ASSERT(m_universe);
 		if (m_is_game_mode)
 		{
-			stopGameMode();
+			stopGameMode(true);
 		}
 		else
 		{
@@ -2079,18 +2079,24 @@ public:
 	}
 
 
-	void stopGameMode()
+	void stopGameMode(bool reload)
 	{
 		ASSERT(m_universe);
 		m_engine->stopGame(*m_universe);
 		selectEntities(nullptr, 0);
 		m_editor_icons->clear();
 		m_is_game_mode = false;
-		m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
-		load(*m_game_mode_file);
+		if (reload)
+		{
+			m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
+			load(*m_game_mode_file);
+		}
 		m_engine->getFileSystem().close(*m_game_mode_file);
 		m_game_mode_file = nullptr;
-		m_universe_loaded.invoke();
+		if (reload)
+		{
+			m_universe_loaded.invoke();
+		}
 	}
 
 
@@ -2285,6 +2291,7 @@ public:
 
 	void loadUniverse(const Path& path) override
 	{
+		if (m_is_game_mode) stopGameMode(false);
 		m_universe_path = path;
 		g_log_info.log("Editor") << "Loading universe " << path << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
@@ -2800,7 +2807,7 @@ public:
 
 	void destroyUniverse()
 	{
-		if (m_is_game_mode) stopGameMode();
+		if (m_is_game_mode) stopGameMode(false);
 
 		m_entity_groups.setUniverse(nullptr);
 		ASSERT(m_universe);
