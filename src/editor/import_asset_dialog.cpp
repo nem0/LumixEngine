@@ -142,6 +142,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 	const Lumix::uint8* image_data,
 	int image_width,
 	int image_height,
+	bool alpha,
 	const char* dest_path)
 {
 	ASSERT(image_data);
@@ -157,7 +158,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 	comp_params.m_width = image_width;
 	comp_params.m_height = image_height;
 	comp_params.m_file_type = cCRNFileTypeDDS;
-	comp_params.m_format = cCRNFmtDXT3;
+	comp_params.m_format = alpha ? cCRNFmtDXT5 : cCRNFmtDXT1;
 	comp_params.m_quality_level = cCRNMinQualityLevel;
 	comp_params.m_dxt_quality = cCRNDXTQualitySuperFast;
 	comp_params.m_dxt_compressor_type = cCRNDXTCompressorRYG;
@@ -177,7 +178,9 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 	}
 
 	Lumix::FS::OsFile file;
-	if (!file.open(dest_path, Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE, dialog.getEditor().getAllocator()))
+	if (!file.open(dest_path,
+			Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE,
+			dialog.getEditor().getAllocator()))
 	{
 		dialog.setMessage(
 			StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Could not save ") << dest_path);
@@ -268,6 +271,7 @@ struct ImportTextureTask : public Lumix::MT::Task
 				data,
 				image_width,
 				image_height,
+				image_comp == 4,
 				dest_path);
 		}
 		else if (m_dialog.m_convert_to_raw)
@@ -474,6 +478,7 @@ struct ConvertTask : public Lumix::MT::Task
 				data,
 				width,
 				height,
+				comp == 4,
 				dest);
 			success = success && saved;
 
@@ -547,8 +552,8 @@ struct ConvertTask : public Lumix::MT::Task
 			PathBuilder dest(m_dialog.m_texture_output_dir[0] ? m_dialog.m_texture_output_dir
 															  : m_dialog.m_output_dir);
 			dest << "/" << texture_info.m_basename << ".dds";
-			int image_width, image_height, dummy;
-			auto data = stbi_load(source, &image_width, &image_height, &dummy, 4);
+			int image_width, image_height, image_comp;
+			auto data = stbi_load(source, &image_width, &image_height, &image_comp, 4);
 			if (!data)
 			{
 				StringBuilder<Lumix::MAX_PATH_LENGTH + 20> error_msg(
@@ -558,12 +563,13 @@ struct ConvertTask : public Lumix::MT::Task
 			}
 
 			if (!saveAsDDS(m_dialog,
-					m_dialog.m_editor.getEngine().getFileSystem(),
-					source,
-					data,
-					image_width,
-					image_height,
-					dest))
+				m_dialog.m_editor.getEngine().getFileSystem(),
+				source,
+				data,
+				image_width,
+				image_height,
+				image_comp == 4,
+				dest))
 			{
 				stbi_image_free(data);
 				m_dialog.setMessage(StringBuilder<Lumix::MAX_PATH_LENGTH * 2 + 20>(
