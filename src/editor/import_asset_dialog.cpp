@@ -248,8 +248,10 @@ struct ImportTextureTask : public Lumix::MT::Task
 
 		if (!data)
 		{
-			m_dialog.setMessage(
-				StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Could not load ") << m_dialog.m_source);
+			m_dialog.setMessage(StringBuilder<Lumix::MAX_PATH_LENGTH + 200>("Could not load ")
+								<< m_dialog.m_source
+								<< " : "
+								<< stbi_failure_reason());
 			return -1;
 		}
 
@@ -1007,7 +1009,7 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	static Lumix::uint32 packF4u(const aiVector3D& vec)
+	static Lumix::uint32 packF4u(const Lumix::Vec3& vec)
 	{
 		const Lumix::uint8 xx = Lumix::uint8(vec.x * 127.0f + 128.0f);
 		const Lumix::uint8 yy = Lumix::uint8(vec.y * 127.0f + 128.0f);
@@ -1054,6 +1056,19 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
+	Lumix::Vec3 fixOrientation(const aiVector3D& v) const
+	{
+		switch (m_dialog.m_orientation)
+		{
+			case ImportAssetDialog::Y_UP: return Lumix::Vec3(v.x, v.y, v.z);
+			case ImportAssetDialog::Z_UP: return Lumix::Vec3(v.x, v.z, -v.y);
+			case ImportAssetDialog::Z_MINUS_UP: return Lumix::Vec3(v.x, -v.z, v.y);
+		}
+		ASSERT(false);
+		return Lumix::Vec3(v.x, v.y, v.z);
+	}
+
+
 	void writeGeometry(Lumix::FS::OsFile& file) const
 	{
 		const aiScene* scene = m_dialog.m_importer.GetScene();
@@ -1089,7 +1104,6 @@ struct ConvertTask : public Lumix::MT::Task
 
 		int skin_index = 0;
 
-		bool z_up = m_dialog.m_z_up;
 		for (auto* mesh : m_filtered_meshes)
 		{
 			auto mesh_matrix = getGlobalTransform(getNode(mesh, scene->mRootNode));
@@ -1109,7 +1123,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 				auto v = mesh_matrix * mesh->mVertices[j];
 
-				Lumix::Vec3 position(v.x, z_up ? v.z : v.y, z_up ? -v.y : v.z);
+				Lumix::Vec3 position = fixOrientation(v);
 				position *= m_scale;
 				file.write((const char*)&position, sizeof(position));
 
@@ -1124,17 +1138,17 @@ struct ConvertTask : public Lumix::MT::Task
 					file.write(color, sizeof(color));
 				}
 
-				auto normal = normal_matrix * mesh->mNormals[j];
-				normal.Normalize();
-				if (z_up) normal.Set(normal.x, normal.z, -normal.y);
+				auto tmp_normal = normal_matrix * mesh->mNormals[j];
+				tmp_normal.Normalize();
+				Lumix::Vec3 normal = fixOrientation(tmp_normal);
 				Lumix::uint32 int_normal = packF4u(normal);
 				file.write((const char*)&int_normal, sizeof(int_normal));
 
 				if (mesh->mTangents)
 				{
-					auto tangent = normal_matrix * mesh->mTangents[j];
-					tangent.Normalize();
-					if (z_up) tangent.Set(tangent.x, tangent.z, -tangent.y);
+					auto tmp_tangent = normal_matrix * mesh->mTangents[j];
+					tmp_tangent.Normalize();
+					Lumix::Vec3 tangent = fixOrientation(tmp_tangent);
 					Lumix::uint32 int_tangent = packF4u(tangent);
 					file.write((const char*)&int_tangent, sizeof(int_tangent));
 				}
@@ -1710,7 +1724,7 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	, m_raw_texture_scale(1)
 	, m_mesh_scale(1)
 {
-	m_z_up = false;
+	m_orientation = Y_UP;
 	m_is_opened = false;
 	m_message[0] = '\0';
 	m_import_message[0] = '\0';
@@ -2038,9 +2052,10 @@ void ImportAssetDialog::onGUI()
 			ImGui::Checkbox("Import model", &m_import_model);
 			if (m_import_model)
 			{
-				ImGui::SameLine();
+				ImGui::Indent();
 				ImGui::DragFloat("Scale", &m_mesh_scale, 0.01f, 0.001f, 0);
-				ImGui::Checkbox("Z up", &m_z_up);
+				ImGui::Combo("Orientation", &(int&)m_orientation, "Y up\0Z up\0-Z up\0");
+				ImGui::Unindent();
 			}
 
 			if (scene->HasMaterials())

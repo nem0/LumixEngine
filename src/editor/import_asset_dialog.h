@@ -53,6 +53,14 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		bool isTextureDirValid() const;
 
 	private:
+		enum Orientation : int
+		{
+			Y_UP,
+			Z_UP,
+			Z_MINUS_UP
+		};
+
+	private:
 		Lumix::WorldEditor& m_editor;
 		Lumix::Array<Lumix::string> m_saved_textures;
 		Lumix::Array<Lumix::string> m_saved_embedded_textures;
@@ -80,7 +88,7 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		bool m_is_importing_texture;
 		float m_raw_texture_scale;
 		float m_mesh_scale;
-		bool m_z_up;
+		Orientation m_orientation;
 		Lumix::MT::Task* m_task;
 		Lumix::MT::SpinMutex m_mutex;
 		Metadata& m_metadata;
