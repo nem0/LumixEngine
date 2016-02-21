@@ -145,7 +145,7 @@ void EntityGroups::removeFromGroup(Entity entity)
 
 void EntityGroups::serialize(OutputBlob& blob)
 {
-	ASSERT(sizeof(m_group_infos[0]) == 20);
+	ASSERT(sizeof(m_group_infos[0].name) == 20);
 
 	blob.write(m_group_infos.size());
 	blob.write(&m_group_infos[0], m_group_infos.size() * sizeof(m_group_infos[0]));
