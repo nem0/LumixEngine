@@ -91,6 +91,7 @@ public:
 	{
 		m_time_to_autosave = float(m_settings.m_autosave_time);
 		if (!m_editor->getUniversePath().isValid()) return;
+		if (m_editor->isGameMode()) return;
 
 		char filename[Lumix::MAX_PATH_LENGTH];
 		Lumix::copyString(filename, m_editor->getUniversePath().c_str());
@@ -360,6 +361,12 @@ public:
 
 	void save()
 	{
+		if (m_editor->isGameMode())
+		{
+			Lumix::g_log_error.log("Editor") << "Could not save while the game is running";
+			return;
+		}
+
 		m_time_to_autosave = float(m_settings.m_autosave_time);
 		if (m_editor->getUniversePath().isValid())
 		{
@@ -381,6 +388,12 @@ public:
 
 	void saveAs()
 	{
+		if (m_editor->isGameMode())
+		{
+			Lumix::g_log_error.log("Editor") << "Could not save while the game is running";
+			return;
+		}
+
 		m_time_to_autosave = float(m_settings.m_autosave_time);
 		char filename[Lumix::MAX_PATH_LENGTH];
 		if (PlatformInterface::getSaveFilename(filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
@@ -519,8 +532,8 @@ public:
 					}
 					ImGui::EndMenu();
 				}
-				doMenuItem(getAction("save"), false, true);
-				doMenuItem(getAction("saveAs"), false, true);
+				doMenuItem(getAction("save"), false, !m_editor->isGameMode());
+				doMenuItem(getAction("saveAs"), false, !m_editor->isGameMode());
 				doMenuItem(getAction("exit"), false, true);
 
 				ImGui::EndMenu();
