@@ -2100,7 +2100,20 @@ public:
 	}
 
 
-	void showEntities() override
+	void showEntities(const Entity* entities, int count) override
+	{
+		for (int i = 0, c = count; i < c; ++i)
+		{
+			ComponentUID cmp = getComponent(entities[i], RENDERABLE_HASH);
+			if (cmp.isValid())
+			{
+				static_cast<RenderScene*>(cmp.scene)->showRenderable(cmp.index);
+			}
+		}
+	}
+
+
+	void showSelectedEntities() override
 	{
 		for (int i = 0, c = m_selected_entities.size(); i < c; ++i)
 		{
@@ -2114,12 +2127,24 @@ public:
 	}
 
 
-	void hideEntities() override
+	void hideEntities(const Entity* entities, int count) override
+	{
+		for (int i = 0, c = count; i < c; ++i)
+		{
+			ComponentUID cmp = getComponent(entities[i], RENDERABLE_HASH);
+			if (cmp.isValid())
+			{
+				static_cast<RenderScene*>(cmp.scene)->hideRenderable(cmp.index);
+			}
+		}
+	}
+
+
+	void hideSelectedEntities() override
 	{
 		for (int i = 0, c = m_selected_entities.size(); i < c; ++i)
 		{
-			ComponentUID cmp =
-				getComponent(m_selected_entities[i], RENDERABLE_HASH);
+			ComponentUID cmp = getComponent(m_selected_entities[i], RENDERABLE_HASH);
 			if (cmp.isValid())
 			{
 				static_cast<RenderScene*>(cmp.scene)->hideRenderable(cmp.index);
