@@ -8,23 +8,36 @@ namespace Lumix
 {
 EntityGroups::EntityGroups(IAllocator& allocator)
 	: m_groups(allocator)
-	, m_group_names(allocator)
+	, m_group_infos(allocator)
+	, m_entity_to_group_map(allocator)
 	, m_allocator(allocator)
 	, m_universe(nullptr)
 {
 	m_groups.emplace(allocator);
-	auto& name = m_group_names.emplace();
-	copyString(name.name, "default");
+	auto& info = m_group_infos.emplace();
+	copyString(info.name, "default");
 }
 
 
 int EntityGroups::getGroup(const char* name) const
 {
-	for(int i = 0, c = m_group_names.size(); i < c; ++i)
+	for (int i = 0, c = m_group_infos.size(); i < c; ++i)
 	{
-		if(compareString(m_group_names[i].name, name) == 0) return i;
+		if (compareString(m_group_infos[i].name, name) == 0) return i;
 	}
 	return -1;
+}
+
+
+void EntityGroups::freezeGroup(int idx, bool freeze)
+{
+	m_group_infos[idx].frozen = freeze;
+}
+
+
+bool EntityGroups::isGroupFrozen(int idx) const
+{
+	return m_group_infos[idx].frozen;
 }
 
 
@@ -38,6 +51,7 @@ void EntityGroups::allEntitiesToDefault()
 	{
 		Entity entity = m_universe->getEntityFromDenseIdx(i);
 		m_groups[0].push(entity);
+		m_entity_to_group_map[entity] = 0;
 	}
 }
 
@@ -51,21 +65,22 @@ void EntityGroups::deleteGroup(int idx)
 		m_groups[default_idx].push(e);
 	}
 	m_groups.eraseFast(idx);
-	m_group_names.eraseFast(idx);
+	m_group_infos.eraseFast(idx);
 }
 
 
 void EntityGroups::createGroup(const char* name)
 {
 	if (name[0] == 0) return;
-	for (auto& i : m_group_names)
+	for (auto& i : m_group_infos)
 	{
 		if (compareString(i.name, name) == 0) return;
 	}
 
 	m_groups.emplace(m_allocator);
-	auto& group_name = m_group_names.emplace();
-	copyString(group_name.name, name);
+	auto& group_info = m_group_infos.emplace();
+	copyString(group_info.name, name);
+	group_info.frozen = false;
 }
 
 
@@ -78,11 +93,11 @@ void EntityGroups::setUniverse(Universe* universe)
 	}
 
 	m_universe = universe;
-	m_group_names.clear();
+	m_group_infos.clear();
 	m_groups.clear();
 	m_groups.emplace(m_allocator);
-	auto& name = m_group_names.emplace();
-	copyString(name.name, "default");
+	auto& info = m_group_infos.emplace();
+	copyString(info.name, "default");
 
 	if (m_universe)
 	{
@@ -101,12 +116,15 @@ int EntityGroups::getGroupEntitiesCount(int idx) const
 void EntityGroups::onEntityCreated(Entity entity)
 {
 	m_groups[0].push(entity);
+	ASSERT(entity == m_entity_to_group_map.size());
+	m_entity_to_group_map.push(0);
 }
 
 
 void EntityGroups::onEntityDestroyed(Entity entity)
 {
 	removeFromGroup(entity);
+	m_entity_to_group_map[entity] = -1;
 }
 
 
@@ -114,31 +132,23 @@ void EntityGroups::setGroup(Entity entity, int group)
 {
 	removeFromGroup(entity);
 	m_groups[group].push(entity);
+	m_entity_to_group_map[entity] = group;
 }
 
 
 void EntityGroups::removeFromGroup(Entity entity)
 {
-	for (auto& g : m_groups)
-	{
-		for (int i = 0, c = g.size(); i < c; ++i)
-		{
-			if (g[i] == entity)
-			{
-				g.eraseFast(i);
-				return;
-			}
-		}
-	}
+	m_groups[m_entity_to_group_map[entity]].eraseItemFast(entity);
+	m_entity_to_group_map[entity] = -1;
 }
 
 
 void EntityGroups::serialize(OutputBlob& blob)
 {
-	ASSERT(sizeof(m_group_names[0]) == 20);
+	ASSERT(sizeof(m_group_infos[0]) == 20);
 
-	blob.write(m_group_names.size());
-	blob.write(&m_group_names[0], m_group_names.size() * sizeof(m_group_names[0]));
+	blob.write(m_group_infos.size());
+	blob.write(&m_group_infos[0], m_group_infos.size() * sizeof(m_group_infos[0]));
 
 	for(auto& i : m_groups)
 	{
@@ -152,17 +162,31 @@ void EntityGroups::deserialize(InputBlob& blob)
 {
 	int count;
 	blob.read(count);
-	m_group_names.resize(count);
-	blob.read(&m_group_names[0], count * sizeof(m_group_names[0]));
+	m_group_infos.resize(count);
+	for (int i = 0; i < count; ++i)
+	{
+		blob.read(m_group_infos[i].name, sizeof(m_group_infos[i].name));
+		m_group_infos[i].frozen = false;
+	}
 
 	m_groups.clear();
+	int entity_count = 0;
 	for(int i = 0; i < count; ++i)
 	{
 		int group_size;
 		auto& group = m_groups.emplace(m_allocator);
 		blob.read(group_size);
+		entity_count += group_size;
 		group.resize(group_size);
 		if(group_size > 0) blob.read(&group[0], group_size * sizeof(group[0]));
+	}
+	m_entity_to_group_map.resize(entity_count);
+	for (int i = 0; i < m_groups.size(); ++i)
+	{
+		for (auto e : m_groups[i])
+		{
+			m_entity_to_group_map[e] = i;
+		}
 	}
 }
 
@@ -181,12 +205,12 @@ int EntityGroups::getGroupCount() const
 
 const char* EntityGroups::getGroupName(int idx) const
 {
-	return m_group_names[idx].name;
+	return m_group_infos[idx].name;
 }
 
 
 void EntityGroups::setGroupName(int idx, const char* name)
 {
-	copyString(m_group_names[idx].name, name);
+	copyString(m_group_infos[idx].name, name);
 }
 } // namespace Lumix

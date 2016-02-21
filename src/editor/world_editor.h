@@ -108,7 +108,6 @@ public:
 	virtual bool canRemove(const ComponentUID& cmp) = 0;
 	virtual Entity addEntity() = 0;
 	virtual void destroyEntities(const Entity* entities, int count) = 0;
-	virtual void addEntityToSelection(Entity entity) = 0;
 	virtual void selectEntities(const Entity* entities, int count) = 0;
 	virtual void selectEntitiesWithSameMesh() = 0;
 	virtual Entity addEntityAt(int camera_x, int camera_y) = 0;

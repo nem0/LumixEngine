@@ -786,6 +786,15 @@ public:
 						m_editor->showEntities(groups.getGroupEntities(i), groups.getGroupEntitiesCount(i));
 					}
 
+					if (groups.isGroupFrozen(i) && ImGui::Button("Unfreeze"))
+					{
+						groups.freezeGroup(i, false);
+					}
+					else if (!groups.isGroupFrozen(i) && ImGui::Button("Freeze"))
+					{
+						groups.freezeGroup(i, true);
+					}
+
 					ImGui::TreePop();
 				}
 			}

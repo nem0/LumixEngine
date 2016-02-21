@@ -21,7 +21,7 @@ public:
 
 	void setGroup(Entity entity, int group);
 	const Entity* getGroupEntities(int idx) const;
-
+	int getEntityGroup(Entity entity) const { return m_entity_to_group_map[entity]; }
 	void createGroup(const char* name);
 	void deleteGroup(int idx);
 	int getGroup(const char* name) const;
@@ -29,6 +29,8 @@ public:
 	int getGroupEntitiesCount(int idx) const;
 	const char* getGroupName(int idx) const;
 	void setGroupName(int idx, const char* name);
+	void freezeGroup(int idx, bool freeze);
+	bool isGroupFrozen(int idx) const;
 
 	void setUniverse(Universe* universe);
 	void allEntitiesToDefault();
@@ -37,9 +39,10 @@ public:
 	void deserialize(InputBlob& blob);
 
 private:
-	struct GroupName
+	struct GroupInfo
 	{
 		char name[20];
+		bool frozen;
 	};
 
 private:
@@ -50,7 +53,8 @@ private:
 private:
 	IAllocator& m_allocator;
 	Array<Array<Entity> > m_groups;
-	Array<GroupName> m_group_names;
+	Array<GroupInfo> m_group_infos;
+	Array<int> m_entity_to_group_map;
 	Universe* m_universe;
 };
 

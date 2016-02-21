@@ -2729,16 +2729,13 @@ public:
 	{
 		for (int i = 0; i < count; ++i)
 		{
-			m_selected_entities.push(entities[i]);
+			int group = m_entity_groups.getEntityGroup(entities[i]);
+			if (!m_entity_groups.isGroupFrozen(group))
+			{
+				m_selected_entities.push(entities[i]);
+			}
 		}
 		m_entity_selected.invoke(m_selected_entities);
-	}
-
-
-	void addEntityToSelection(Entity entity) override
-	{
-		if (m_selected_entities.indexOf(entity) >= 0) return;
-		m_selected_entities.push(entity);
 	}
 
 
@@ -2747,7 +2744,11 @@ public:
 		m_selected_entities.clear();
 		for (int i = 0; i < count; ++i)
 		{
-			m_selected_entities.push(entities[i]);
+			int group = m_entity_groups.getEntityGroup(entities[i]);
+			if (!m_entity_groups.isGroupFrozen(group))
+			{
+				m_selected_entities.push(entities[i]);
+			}
 		}
 		m_entity_selected.invoke(m_selected_entities);
 	}
