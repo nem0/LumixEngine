@@ -419,8 +419,8 @@ public:
 	void togglePivotMode() { m_editor->getGizmo().togglePivot(); }
 	void toggleCoordSystem() { m_editor->getGizmo().toggleCoordSystem(); }
 	void createEntity() { m_editor->addEntity(); }
-	void showEntities() { m_editor->showEntities(); }
-	void hideEntities() { m_editor->hideEntities(); }
+	void showEntities() { m_editor->showSelectedEntities(); }
+	void hideEntities() { m_editor->hideSelectedEntities(); }
 	void toggleMeasure() { m_editor->toggleMeasure(); }
 	void snapDown() { m_editor->snapDown(); }
 	void lookAtSelected() { m_editor->lookAtSelected(); }
@@ -774,6 +774,16 @@ public:
 						{
 							groups.setGroup(e, i);
 						}
+					}
+
+					if (ImGui::Button("Hide all"))
+					{
+						m_editor->hideEntities(groups.getGroupEntities(i), groups.getGroupEntitiesCount(i));
+					}
+
+					if (ImGui::Button("Show all"))
+					{
+						m_editor->showEntities(groups.getGroupEntities(i), groups.getGroupEntitiesCount(i));
 					}
 
 					ImGui::TreePop();

@@ -93,8 +93,10 @@ public:
 	virtual void saveUniverse(const Path& path, bool save_path) = 0;
 	virtual void newUniverse() = 0;
 	virtual Path getUniversePath() const = 0;
-	virtual void showEntities() = 0;
-	virtual void hideEntities() = 0;
+	virtual void showEntities(const Entity* entities, int count) = 0;
+	virtual void showSelectedEntities() = 0;
+	virtual void hideEntities(const Entity* entities, int count) = 0;
+	virtual void hideSelectedEntities() = 0;
 	virtual void copyEntities() = 0;
 	virtual bool canPasteEntities() const = 0;
 	virtual void pasteEntities() = 0;
