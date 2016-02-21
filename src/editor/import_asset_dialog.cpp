@@ -49,13 +49,6 @@ enum class VertexAttributeDef : Lumix::uint32
 };
 
 
-struct DDSConvertCallbackData
-{
-	ImportAssetDialog* dialog;
-	const char* dest_path;
-};
-
-
 static void getRelativePath(Lumix::WorldEditor& editor, char* relative_path, int max_length, const char* source)
 {
 	char tmp[Lumix::MAX_PATH_LENGTH];
@@ -85,16 +78,14 @@ static crn_bool ddsConvertCallback(crn_uint32 phase_index,
 	crn_uint32 total_subphases,
 	void* pUser_data_ptr)
 {
-	DDSConvertCallbackData* data = (DDSConvertCallbackData*)pUser_data_ptr;
+	auto *data = (ImportAssetDialog::DDSConvertCallbackData*)pUser_data_ptr;
 
 	float fraction = phase_index / float(total_phases) +
 					 (subphase_index / float(total_subphases)) / total_phases;
 	data->dialog->setImportMessage(
-		StringBuilder<Lumix::MAX_PATH_LENGTH + 50>("Saving ") << data->dest_path << "\n"
-															  << int(fraction * 100)
-															  << "%%");
+		StringBuilder<Lumix::MAX_PATH_LENGTH + 50>("Saving ", data->dest_path), fraction);
 
-	return true;
+	return !data->cancel_requested;
 }
 
 
@@ -109,10 +100,12 @@ static bool saveAsRaw(ImportAssetDialog& dialog,
 {
 	ASSERT(image_data);
 
-	dialog.setImportMessage(StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Saving ") << dest_path);
+	dialog.setImportMessage(StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Saving ") << dest_path, -1);
 
 	Lumix::FS::OsFile file;
-	if (!file.open(dest_path, Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE, dialog.getEditor().getAllocator()))
+	if (!file.open(dest_path,
+			Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE,
+			dialog.getEditor().getAllocator()))
 	{
 		dialog.setMessage(
 			StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Could not save ") << dest_path);
@@ -147,11 +140,11 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 {
 	ASSERT(image_data);
 
-	dialog.setImportMessage(StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Saving ") << dest_path);
-
-	DDSConvertCallbackData callback_data;
-	callback_data.dialog = &dialog;
-	callback_data.dest_path = dest_path;
+	dialog.setImportMessage(StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Saving ") << dest_path, 0);
+	
+	dialog.getDDSConvertCallbackData().dialog = &dialog;
+	dialog.getDDSConvertCallbackData().dest_path = dest_path;
+	dialog.getDDSConvertCallbackData().cancel_requested = false;
 
 	crn_uint32 size;
 	crn_comp_params comp_params;
@@ -163,7 +156,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 	comp_params.m_dxt_quality = cCRNDXTQualitySuperFast;
 	comp_params.m_dxt_compressor_type = cCRNDXTCompressorRYG;
 	comp_params.m_pProgress_func = ddsConvertCallback;
-	comp_params.m_pProgress_func_data = &callback_data;
+	comp_params.m_pProgress_func_data = &dialog.getDDSConvertCallbackData();
 	comp_params.m_num_helper_threads = 3;
 	comp_params.m_pImages[0][0] = (Lumix::uint32*)image_data;
 	crn_mipmap_params mipmap_params;
@@ -240,7 +233,7 @@ struct ImportTextureTask : public Lumix::MT::Task
 
 	int task() override
 	{
-		m_dialog.setImportMessage("Importing texture...");
+		m_dialog.setImportMessage("Importing texture...", 0);
 		int image_width;
 		int image_height;
 		int image_comp;
@@ -265,7 +258,7 @@ struct ImportTextureTask : public Lumix::MT::Task
 
 		if (m_dialog.m_convert_to_dds)
 		{
-			m_dialog.setImportMessage("Converting to DDS...");
+			m_dialog.setImportMessage("Converting to DDS...", 0);
 
 			saveAsDDS(m_dialog,
 				m_dialog.m_editor.getEngine().getFileSystem(),
@@ -278,7 +271,7 @@ struct ImportTextureTask : public Lumix::MT::Task
 		}
 		else if (m_dialog.m_convert_to_raw)
 		{
-			m_dialog.setImportMessage("Converting to RAW...");
+			m_dialog.setImportMessage("Converting to RAW...", -1);
 
 			saveAsRaw(m_dialog,
 				m_dialog.m_editor.getEngine().getFileSystem(),
@@ -291,7 +284,7 @@ struct ImportTextureTask : public Lumix::MT::Task
 		}
 		else
 		{
-			m_dialog.setImportMessage("Copying...");
+			m_dialog.setImportMessage("Copying...", -1);
 
 			if (!Lumix::copyFile(m_dialog.m_source, dest_path))
 			{
@@ -319,13 +312,14 @@ struct ImportTask : public Lumix::MT::Task
 	{
 		bool Update(float percentage) override
 		{
-			m_task->m_dialog.setImportMessage(
-				StringBuilder<50>("Importing... ") << int(percentage * 100) << "%%");
+			task->m_dialog.setImportMessage(
+				StringBuilder<50>("Importing... "), percentage);
 
-			return true;
+			return !cancel_requested;
 		}
 
-		ImportTask* m_task;
+		ImportTask* task;
+		bool cancel_requested;
 	};
 
 	explicit ImportTask(ImportAssetDialog& dialog)
@@ -360,7 +354,8 @@ struct ImportTask : public Lumix::MT::Task
 
 	int task() override
 	{
-		m_progress_handler.m_task = this;
+		m_progress_handler.task = this;
+		m_progress_handler.cancel_requested = false;
 		Lumix::enableFloatingPointTraps(false);
 		m_dialog.m_importer.SetPropertyInteger(
 			AI_CONFIG_PP_RVC_FLAGS, aiComponent_LIGHTS | aiComponent_CAMERAS);
@@ -684,12 +679,13 @@ struct ConvertTask : public Lumix::MT::Task
 	{
 		if (!m_dialog.m_import_animations) return true;
 
-		m_dialog.setImportMessage("Importing animations...");
+		m_dialog.setImportMessage("Importing animations...", 0);
 		const aiScene* scene = m_dialog.m_importer.GetScene();
 
 		bool failed = false;
 		for (unsigned int i = 0; i < scene->mNumAnimations; ++i)
 		{
+			m_dialog.setImportMessage("Importing animations...", (float)i / scene->mNumAnimations);
 			auto* animation = scene->mAnimations[i];
 
 			Lumix::FS::OsFile file;
@@ -784,7 +780,7 @@ struct ConvertTask : public Lumix::MT::Task
 	{
 		if (!m_dialog.m_import_materials) return true;
 
-		m_dialog.setImportMessage("Importing materials...");
+		m_dialog.setImportMessage("Importing materials...", -1);
 		const aiScene* scene = m_dialog.m_importer.GetScene();
 
 		Lumix::Array<unsigned int> materials(m_dialog.m_editor.getAllocator());
@@ -829,7 +825,7 @@ struct ConvertTask : public Lumix::MT::Task
 		output_material_name << "/" << material_name.C_Str() << ".mat";
 
 		m_dialog.setImportMessage(
-			StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Converting ") << output_material_name);
+			StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Converting ") << output_material_name, -1);
 		Lumix::FS::OsFile file;
 		if (!file.open(output_material_name, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_dialog.m_editor.getAllocator()))
 		{
@@ -1479,7 +1475,7 @@ struct ConvertTask : public Lumix::MT::Task
 	{
 		if (!m_dialog.m_import_physics) return true;
 
-		m_dialog.setImportMessage("Importing physics...");
+		m_dialog.setImportMessage("Importing physics...", -1);
 		char filename[Lumix::MAX_PATH_LENGTH];
 		Lumix::PathUtils::getBasename(filename, sizeof(filename), m_dialog.m_source);
 		Lumix::catString(filename, ".phy");
@@ -1661,7 +1657,7 @@ struct ConvertTask : public Lumix::MT::Task
 		if (!m_dialog.m_import_model) return true;
 		if (!checkModel()) return false;
 
-		m_dialog.setImportMessage("Importing model...");
+		m_dialog.setImportMessage("Importing model...", -1);
 		PlatformInterface::makePath(m_dialog.m_output_dir);
 		if (m_dialog.m_texture_output_dir[0])
 			PlatformInterface::makePath(m_dialog.m_texture_output_dir);
@@ -1871,7 +1867,7 @@ void ImportAssetDialog::checkSource()
 	m_import_animations = false;
 
 	ASSERT(!m_task);
-	setImportMessage("Importing...");
+	setImportMessage("Importing...", -1);
 	m_is_importing = true;
 	m_task = LUMIX_NEW(m_editor.getAllocator(), ImportTask)(*this);
 	m_task->create("ImportAssetTask");
@@ -1886,10 +1882,11 @@ void ImportAssetDialog::setMessage(const char* message)
 }
 
 
-void ImportAssetDialog::setImportMessage(const char* message)
+void ImportAssetDialog::setImportMessage(const char* message, float progress_fraction)
 {
 	Lumix::MT::SpinLock lock(m_mutex);
 	Lumix::copyString(m_import_message, message);
+	m_progress_fraction = progress_fraction;
 }
 
 
@@ -1912,7 +1909,7 @@ void ImportAssetDialog::convert()
 	ASSERT(!m_task);
 	if (!checkTextures()) return;
 
-	setImportMessage("Converting...");
+	setImportMessage("Converting...", -1);
 	m_is_converting = true;
 	m_task = LUMIX_NEW(m_editor.getAllocator(), ConvertTask)(*this, m_mesh_scale);
 	m_task->create("ConvertAssetTask");
@@ -1923,7 +1920,7 @@ void ImportAssetDialog::convert()
 void ImportAssetDialog::importTexture()
 {
 	ASSERT(!m_task);
-	setImportMessage("Importing texture...");
+	setImportMessage("Importing texture...", 0);
 
 	char dest_path[Lumix::MAX_PATH_LENGTH];
 	ImportTextureTask::getDestinationPath(m_output_dir,
@@ -1978,6 +1975,18 @@ void ImportAssetDialog::onGUI()
 
 		if (m_is_converting || m_is_importing || m_is_importing_texture)
 		{
+			if (ImGui::Button("Cancel"))
+			{
+				if (m_is_importing_texture)
+				{
+					m_dds_convert_callback.cancel_requested = true;
+				}
+				else if (m_is_importing)
+				{
+					static_cast<ImportTask*>(m_task)->m_progress_handler.cancel_requested = true;
+				}
+			}
+
 			if (m_task && m_task->isFinished())
 			{
 				m_task->destroy();
@@ -1991,6 +2000,7 @@ void ImportAssetDialog::onGUI()
 			{
 				Lumix::MT::SpinLock lock(m_mutex);
 				ImGui::Text(m_import_message);
+				if (m_progress_fraction >= 0) ImGui::ProgressBar(m_progress_fraction);
 			}
 			ImGui::EndDock();
 			return;
