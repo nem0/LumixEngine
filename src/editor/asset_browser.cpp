@@ -48,6 +48,7 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 	, m_history(editor.getAllocator())
 	, m_plugins(editor.getAllocator())
 {
+	m_is_update_enabled = true;
 	m_filter[0] = '\0';
 	m_current_type = 0;
 	m_is_opened = false;
@@ -127,6 +128,7 @@ int AssetBrowser::getTypeIndexFromManagerType(Lumix::uint32 type) const
 void AssetBrowser::update()
 {
 	PROFILE_FUNCTION();
+	if (!m_is_update_enabled) return;
 	bool is_empty;
 	{
 		Lumix::MT::SpinLock lock(m_changed_files_mutex);

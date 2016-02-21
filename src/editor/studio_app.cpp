@@ -130,7 +130,7 @@ public:
 		return m_asset_browser;
 	}
 
-
+	
 	PropertyGrid* getPropertyGrid() override
 	{
 		return m_property_grid;

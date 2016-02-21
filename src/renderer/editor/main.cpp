@@ -1264,8 +1264,8 @@ struct ShaderEditorPlugin : public StudioApp::IPlugin
 		m_action->func.bind<ShaderEditorPlugin, &ShaderEditorPlugin::onAction>(this);
 		m_shader_editor.m_is_opened = false;
 
-		m_compiler = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderCompiler)(
-			*app.getWorldEditor(), *app.getLogUI());
+		m_compiler =
+			LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderCompiler)(app, *app.getLogUI());
 		app.registerLuaGlobal("g_shader_compiler", m_compiler);
 		auto* f = &Lumix::LuaWrapper::wrapMethod<ShaderCompiler,
 			decltype(&ShaderCompiler::compileAll),
