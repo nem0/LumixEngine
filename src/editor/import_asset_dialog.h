@@ -32,12 +32,28 @@ class LUMIX_EDITOR_API ImportAssetDialog
 	friend struct ConvertTask;
 	friend struct ImportTextureTask;
 	public:
+		enum Orientation : int
+		{
+			Y_UP,
+			Z_UP,
+			Z_MINUS_UP
+		};
+
+		struct DDSConvertCallbackData
+		{
+			ImportAssetDialog* dialog;
+			const char* dest_path;
+			bool cancel_requested;
+		};
+
+	public:
 		ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metadata);
 		~ImportAssetDialog();
 		void setMessage(const char* message);
-		void setImportMessage(const char* message);
+		void setImportMessage(const char* message, float progress_fraction);
 		Lumix::WorldEditor& getEditor() { return m_editor; }
 		void onGUI();
+		DDSConvertCallbackData& getDDSConvertCallbackData() { return m_dds_convert_callback; }
 
 	public:
 		bool m_is_opened;
@@ -53,14 +69,6 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		bool isTextureDirValid() const;
 
 	private:
-		enum Orientation : int
-		{
-			Y_UP,
-			Z_UP,
-			Z_MINUS_UP
-		};
-
-	private:
 		Lumix::WorldEditor& m_editor;
 		Lumix::Array<Lumix::string> m_saved_textures;
 		Lumix::Array<Lumix::string> m_saved_embedded_textures;
@@ -68,6 +76,7 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		Lumix::AssociativeArray<Lumix::string, Lumix::string> m_path_mapping;
 		Lumix::BinaryArray m_mesh_mask;
 		char m_import_message[1024];
+		float m_progress_fraction;
 		char m_message[1024];
 		char m_last_dir[Lumix::MAX_PATH_LENGTH];
 		char m_source[Lumix::MAX_PATH_LENGTH];
@@ -92,4 +101,5 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		Lumix::MT::Task* m_task;
 		Lumix::MT::SpinMutex m_mutex;
 		Metadata& m_metadata;
+		DDSConvertCallbackData m_dds_convert_callback;
 };
