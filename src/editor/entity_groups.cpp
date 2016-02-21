@@ -116,8 +116,8 @@ int EntityGroups::getGroupEntitiesCount(int idx) const
 void EntityGroups::onEntityCreated(Entity entity)
 {
 	m_groups[0].push(entity);
-	ASSERT(entity == m_entity_to_group_map.size());
-	m_entity_to_group_map.push(0);
+	if (entity >= m_entity_to_group_map.size()) m_entity_to_group_map.resize(entity + 1);
+	m_entity_to_group_map[entity] = 0;
 }
 
 
@@ -185,6 +185,7 @@ void EntityGroups::deserialize(InputBlob& blob)
 	{
 		for (auto e : m_groups[i])
 		{
+			if (e >= m_entity_to_group_map.size()) m_entity_to_group_map.resize(e + 1);
 			m_entity_to_group_map[e] = i;
 		}
 	}
