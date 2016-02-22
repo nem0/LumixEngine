@@ -1012,12 +1012,23 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		m_scene_view.init(*app.getLogUI(), editor, app.getActions());
 		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getCurrentPipeline());
 		editor.setRenderInterface(m_render_interface);
+		m_app.getAssetBrowser()->resourceChanged().bind<SceneViewPlugin, &SceneViewPlugin::onResourceChanged>(this);
 	}
 
 
 	~SceneViewPlugin()
 	{
+		m_app.getAssetBrowser()->resourceChanged().unbind<SceneViewPlugin, &SceneViewPlugin::onResourceChanged>(this);
 		m_scene_view.shutdown();
+	}
+
+
+	void onResourceChanged(const Path& path, const char* ext)
+	{
+		if (m_scene_view.getCurrentPipeline()->getPath() == path)
+		{
+			m_scene_view.getCurrentPipeline()->load();
+		}
 	}
 
 

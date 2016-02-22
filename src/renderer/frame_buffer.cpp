@@ -31,6 +31,7 @@ FrameBuffer::FrameBuffer(const Declaration& decl)
 
 	m_window_handle = nullptr;
 	m_handle = bgfx::createFrameBuffer((uint8_t)decl.m_renderbuffers_count, texture_handles);
+	ASSERT(bgfx::isValid(m_handle));
 }
 
 
@@ -43,6 +44,7 @@ FrameBuffer::FrameBuffer(const char* name, int width, int height, void* window_h
 	m_declaration.m_renderbuffers_count = 0;
 	m_window_handle = window_handle;
 	m_handle = bgfx::createFrameBuffer(window_handle, (uint16_t)width, (uint16_t)height);
+	ASSERT(bgfx::isValid(m_handle));
 }
 
 

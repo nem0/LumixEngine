@@ -106,6 +106,7 @@ class LUMIX_RENDERER_API Pipeline
 		virtual bool getParameter(int index) = 0;
 		virtual bool isReady() const = 0;
 		virtual const Stats& getStats() = 0;
+		virtual Path& getPath() = 0;
 };
 
 

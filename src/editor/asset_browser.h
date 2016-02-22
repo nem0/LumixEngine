@@ -2,6 +2,7 @@
 
 
 #include "core/array.h"
+#include "core/delegate_list.h"
 #include "core/path.h"
 #include "core/mt/sync.h"
 
@@ -33,6 +34,8 @@ public:
 		virtual bool hasResourceManager(Lumix::uint32 type) const = 0;
 	};
 
+	typedef Lumix::DelegateList<void(const Lumix::Path&, const char*)> OnResourceChanged;
+
 public:
 	AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata);
 	~AssetBrowser();
@@ -46,6 +49,7 @@ public:
 	void openInExternalEditor(Lumix::Resource* resource);
 	void openInExternalEditor(const char* path);
 	void enableUpdate(bool enable) { m_is_update_enabled = enable; }
+	OnResourceChanged& resourceChanged() { return m_on_resource_changed; }
 
 public:
 	bool m_is_opened;
@@ -65,6 +69,7 @@ private:
 private:
 	Metadata& m_metadata;
 	Lumix::Array<Lumix::Path> m_changed_files;
+	OnResourceChanged m_on_resource_changed;
 	Lumix::Array<Lumix::Path> m_history;
 	Lumix::Array<IPlugin*> m_plugins;
 	Lumix::MT::SpinMutex m_changed_files_mutex;
