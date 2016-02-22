@@ -47,6 +47,7 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 	, m_changed_files_mutex(false)
 	, m_history(editor.getAllocator())
 	, m_plugins(editor.getAllocator())
+	, m_on_resource_changed(editor.getAllocator())
 {
 	m_is_update_enabled = true;
 	m_filter[0] = '\0';
@@ -145,6 +146,10 @@ void AssetBrowser::update()
 			m_changed_files.pop();
 			is_empty = m_changed_files.empty();
 		}
+
+		char ext[10];
+		Lumix::PathUtils::getExtension(ext, Lumix::lengthOf(ext), path.c_str());
+		m_on_resource_changed.invoke(path, ext);
 
 		Lumix::uint32 resource_type = getResourceType(path.c_str());
 		if (resource_type == 0) continue;

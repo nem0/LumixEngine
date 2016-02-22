@@ -347,6 +347,12 @@ struct PipelineImpl : public Pipeline
 	void registerCFunctions();
 
 
+	Path& getPath() override
+	{
+		return m_path;
+	}
+
+
 	void load() override
 	{
 		auto& fs = m_renderer.getEngine().getFileSystem();
@@ -356,15 +362,45 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void onFileLoaded(FS::IFile& file, bool success)
+	void cleanup()
 	{
-		if(!success) return;
-
 		if (m_lua_state)
 		{
 			lua_close(m_lua_state);
 			m_lua_state = nullptr;
 		}
+
+		ResourceManagerBase& material_manager = m_renderer.getMaterialManager();
+		for (auto* material : m_materials)
+		{
+			material_manager.unload(*material);
+		}
+		m_materials.clear();
+
+		for (int i = 0; i < m_uniforms.size(); ++i)
+		{
+			bgfx::destroyUniform(m_uniforms[i]);
+		}
+		m_uniforms.clear();
+
+		for (int i = 0; i < m_framebuffers.size(); ++i)
+		{
+			LUMIX_DELETE(m_allocator, m_framebuffers[i]);
+			if (m_framebuffers[i] == m_default_framebuffer) m_default_framebuffer = nullptr;
+		}
+		LUMIX_DELETE(m_allocator, m_default_framebuffer);
+		m_framebuffers.clear();
+		bgfx::frame();
+		bgfx::frame();
+	}
+
+
+	void onFileLoaded(FS::IFile& file, bool success)
+	{
+		if(!success) return;
+
+		cleanup();
+
 		m_lua_state = luaL_newstate();
 		luaL_openlibs(m_lua_state);
 		char paths[Lumix::MAX_PATH_LENGTH * 2 + 1];
