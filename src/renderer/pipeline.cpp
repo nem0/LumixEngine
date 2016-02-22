@@ -2454,7 +2454,8 @@ int addFramebuffer(lua_State* L)
 		decl.m_width = (int)lua_tointeger(L, -1);
 	}
 	lua_pop(L, 1);
-	if(lua_getfield(L, 3, "size_ratio") == LUA_TBOOLEAN)
+	decl.m_size_ratio = Vec2(-1, -1);
+	if(lua_getfield(L, 3, "size_ratio") == LUA_TTABLE)
 	{
 		decl.m_size_ratio = LuaWrapper::toType<Vec2>(L, -1);
 	}
@@ -2463,10 +2464,6 @@ int addFramebuffer(lua_State* L)
 	{
 		bool is_screen_size = lua_toboolean(L, -1) != 0;
 		decl.m_size_ratio = is_screen_size ? Vec2(1, 1) : Vec2(-1, -1);
-	}
-	else
-	{
-		decl.m_size_ratio = Vec2(-1, -1);
 	}
 	lua_pop(L, 1);
 	if(lua_getfield(L, 3, "height") == LUA_TNUMBER)
