@@ -4,6 +4,9 @@
 #include "core/delegate.h"
 
 
+struct lua_State;
+
+
 namespace bgfx
 {
 	struct TextureHandle;
@@ -70,6 +73,8 @@ class LUMIX_RENDERER_API Pipeline
 		};
 
 	public:
+		static void registerLuaAPI(lua_State* state);
+
 		virtual ~Pipeline() {}
 
 		virtual void load() = 0;

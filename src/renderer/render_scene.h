@@ -96,22 +96,19 @@ class LUMIX_RENDERER_API RenderScene : public IScene
 {
 public:
 	static RenderScene* createInstance(Renderer& renderer,
-									   Engine& engine,
-									   Universe& universe,
-									   bool is_forward_rendered,
-									   IAllocator& allocator);
+		Engine& engine,
+		Universe& universe,
+		bool is_forward_rendered,
+		IAllocator& allocator);
 	static void destroyInstance(RenderScene* scene);
 
-	virtual RayCastModelHit castRay(const Vec3& origin,
-									const Vec3& dir,
-									ComponentIndex ignore) = 0;
+	virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, ComponentIndex ignore) = 0;
 
 	virtual RayCastModelHit castRayTerrain(ComponentIndex terrain,
-										   const Vec3& origin,
-										   const Vec3& dir) = 0;
+		const Vec3& origin,
+		const Vec3& dir) = 0;
 
-	virtual void getRay(
-		ComponentIndex camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
+	virtual void getRay(ComponentIndex camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 
 	virtual Frustum getCameraFrustum(ComponentIndex camera) const = 0;
 	virtual float getTime() const = 0;
@@ -122,8 +119,7 @@ public:
 	virtual ComponentIndex getActiveGlobalLight() = 0;
 	virtual void setActiveGlobalLight(ComponentIndex cmp) = 0;
 	virtual Vec4 getShadowmapCascades(ComponentIndex cmp) = 0;
-	virtual void setShadowmapCascades(ComponentIndex cmp,
-									  const Vec4& value) = 0;
+	virtual void setShadowmapCascades(ComponentIndex cmp, const Vec4& value) = 0;
 
 
 	virtual void addDebugPoint(const Vec3& pos, uint32 color, float life) = 0;
@@ -237,7 +233,9 @@ public:
 	virtual void addParticleEmitterAttractor(ComponentIndex cmp, int index) = 0;
 	virtual void removeParticleEmitterAttractor(ComponentIndex cmp, int index) = 0;
 	virtual Entity getParticleEmitterAttractorEntity(ComponentIndex cmp, int index) = 0;
-	virtual void setParticleEmitterAttractorEntity(ComponentIndex cmp, int index, Entity entity) = 0;
+	virtual void setParticleEmitterAttractorEntity(ComponentIndex cmp,
+		int index,
+		Entity entity) = 0;
 	virtual float getParticleEmitterAttractorForce(ComponentIndex cmp) = 0;
 	virtual void setParticleEmitterAttractorForce(ComponentIndex cmp, float value) = 0;
 
@@ -252,8 +250,7 @@ public:
 	virtual void setRenderableMaterial(ComponentIndex cmp, int index, const Path& path) = 0;
 	virtual Path getRenderableMaterial(ComponentIndex cmp, int index) = 0;
 	virtual int getRenderableMaterialsCount(ComponentIndex cmp) = 0;
-	virtual void setRenderableLayer(ComponentIndex cmp,
-									const int32& layer) = 0;
+	virtual void setRenderableLayer(ComponentIndex cmp, const int32& layer) = 0;
 	virtual void setRenderablePath(ComponentIndex cmp, const Path& path) = 0;
 	virtual Array<Array<RenderableMesh>>& getRenderableInfos(const Frustum& frustum) = 0;
 	virtual void getRenderableEntities(const Frustum& frustum, Array<Entity>& entities) = 0;
@@ -263,8 +260,8 @@ public:
 	virtual Model* getRenderableModel(ComponentIndex cmp) = 0;
 
 	virtual void getGrassInfos(const Frustum& frustum,
-							   Array<GrassInfo>& infos,
-							   ComponentIndex camera) = 0;
+		Array<GrassInfo>& infos,
+		ComponentIndex camera) = 0;
 	virtual void forceGrassUpdate(ComponentIndex cmp) = 0;
 	virtual void getTerrainInfos(Array<const TerrainInfo*>& infos,
 		const Vec3& camera_pos,
