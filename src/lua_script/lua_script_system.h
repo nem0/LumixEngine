@@ -42,6 +42,7 @@ public:
 	public:
 		virtual void add(int parameter) = 0;
 		virtual void add(float parameter) = 0;
+		virtual void add(void* parameter) = 0;
 	};
 
 
@@ -54,7 +55,6 @@ public:
 	virtual const char* getPropertyName(ComponentIndex cmp, int scr_index, int prop_index) const = 0;
 	virtual const char* getPropertyValue(ComponentIndex cmp, int scr_index, int prop_index) const = 0;
 	virtual LuaScript* getScriptResource(ComponentIndex cmp, int scr_index) const = 0;
-	virtual void registerFunction(const char* system, const char* name, lua_CFunction function) = 0;
 	virtual void setPropertyValue(ComponentIndex cmp,
 		int scr_index,
 		const char* name,
@@ -64,6 +64,7 @@ public:
 	virtual IFunctionCall* beginFunctionCall(ComponentIndex cmp, int scr_index, const char* function) = 0;
 	virtual void endFunctionCall(IFunctionCall& caller) = 0;
 	virtual int getScriptCount(ComponentIndex cmp) = 0;
+	virtual lua_State* getGlobalState() = 0;
 };
 
 

@@ -12,6 +12,7 @@
 #include "core/profiler.h"
 #include "core/static_array.h"
 #include "engine.h"
+#include "lua_script/lua_script_system.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
@@ -330,23 +331,6 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void registerConst(const char* name, uint32 value)
-	{
-		lua_pushinteger(m_lua_state, value);
-		lua_setglobal(m_lua_state, name);
-	}
-
-
-	void registerCFunction(const char* name, lua_CFunction function)
-	{
-		lua_pushcfunction(m_lua_state, function);
-		lua_setglobal(m_lua_state, name);
-	}
-
-
-	void registerCFunctions();
-
-
 	Path& getPath() override
 	{
 		return m_path;
@@ -411,7 +395,12 @@ struct PipelineImpl : public Pipeline
 		lua_setglobal(m_lua_state, "LUA_PATH");
 		lua_pushlightuserdata(m_lua_state, this);
 		lua_setglobal(m_lua_state, "this");
-		registerCFunctions();
+		Pipeline::registerLuaAPI(m_lua_state);
+		for (auto& handler : m_custom_commands_handlers)
+		{
+			exposeCustomCommandToLua(handler);
+		}
+
 		bool errors =
 			luaL_loadbuffer(
 				m_lua_state, (const char*)file.getBuffer(), file.size(), m_path.c_str()) !=
@@ -992,6 +981,26 @@ struct PipelineImpl : public Pipeline
 		m_stats.m_instance_count += instance_count;
 		m_stats.m_triangle_count +=	instance_count * 12;
 		bgfx::submit(m_bgfx_view, material->getShaderInstance().m_program_handles[m_pass_idx]);
+	}
+
+
+	void postprocessCallback()
+	{
+		auto scr_scene = static_cast<LuaScriptScene*>(m_scene->getUniverse().getScene(crc32("lua_script")));
+		if (!scr_scene) return;
+		if (m_applied_camera == INVALID_COMPONENT) return;
+		Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
+		ComponentIndex scr_cmp = scr_scene->getComponent(camera_entity);
+		if (scr_cmp == INVALID_COMPONENT) return;
+
+		for (int i = 0, c = scr_scene->getScriptCount(scr_cmp); i < c; ++i)
+		{
+			if (auto* call = scr_scene->beginFunctionCall(scr_cmp, i, "postprocess"))
+			{
+				call->add(this);
+				scr_scene->endFunctionCall(*call);
+			}
+		}
 	}
 
 
@@ -2614,8 +2623,20 @@ void print(int x, int y, const char* text)
 } // namespace LuaAPI
 
 
-void PipelineImpl::registerCFunctions()
+void Pipeline::registerLuaAPI(lua_State* L)
 {
+	auto registerCFunction = [L](const char* name, lua_CFunction function)
+	{
+		lua_pushcfunction(L, function);
+		lua_setglobal(L, name);
+	};
+
+	auto registerConst = [L](const char* name, uint32 value)
+	{
+		lua_pushinteger(L, value);
+		lua_setglobal(L, name);
+	};
+
 	#define REGISTER_FUNCTION(name) \
 		do {\
 			auto f = &LuaWrapper::wrapMethod<PipelineImpl, decltype(&PipelineImpl::name), &PipelineImpl::name>; \
@@ -2657,6 +2678,7 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(addRenderParamFloat);
 	REGISTER_FUNCTION(getRenderParamFloat);
 	REGISTER_FUNCTION(renderLightVolumes);
+	REGISTER_FUNCTION(postprocessCallback);
 
 	#undef REGISTER_FUNCTION
 
@@ -2725,11 +2747,6 @@ void PipelineImpl::registerCFunctions()
 	registerConst("CLEAR_ALL", BGFX_CLEAR_STENCIL | BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR);
 
 	#undef REGISTER_STENCIL_CONST
-
-	for(auto& handler : m_custom_commands_handlers)
-	{
-		exposeCustomCommandToLua(handler);
-	}
 }
 
 

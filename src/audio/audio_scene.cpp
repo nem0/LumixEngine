@@ -120,11 +120,20 @@ struct AudioSceneImpl : public AudioScene
 		if (!scene) return;
 
 		auto* script_scene = static_cast<LuaScriptScene*>(scene);
-		
+		lua_State* L = script_scene->getGlobalState();
+
 		#define REGISTER_FUNCTION(F) \
 			do { \
 			auto f = &LuaWrapper::wrapMethod<AudioSceneImpl, decltype(&AudioSceneImpl::F), &AudioSceneImpl::F>; \
-			script_scene->registerFunction("Audio", #F, f); \
+			if (lua_getglobal(L, "Audio") == LUA_TNIL) \
+			{ \
+				lua_pop(L, 1); \
+				lua_newtable(L); \
+				lua_setglobal(L, "Audio"); \
+				lua_getglobal(L, "Audio"); \
+			} \
+			lua_pushcfunction(L, f); \
+			lua_setfield(L, -2, #F); \
 			} while(false) \
 
 		REGISTER_FUNCTION(setEcho);

@@ -21,11 +21,14 @@
 
 #include "engine.h"
 
+#include "lua_script/lua_script_system.h"
+
 #include "renderer/culling_system.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
 #include "renderer/model.h"
 #include "renderer/particle_system.h"
+#include "renderer/pipeline.h"
 #include "renderer/pose.h"
 #include "renderer/ray_cast_model_hit.h"
 #include "renderer/renderer.h"
@@ -1868,8 +1871,8 @@ public:
 
 
 	void getTerrainInfos(Array<const TerrainInfo*>& infos,
-								 const Vec3& camera_pos,
-								 LIFOAllocator& frame_allocator) override
+		const Vec3& camera_pos,
+		LIFOAllocator& frame_allocator) override
 	{
 		PROFILE_FUNCTION();
 		infos.reserve(m_terrains.size());
@@ -1884,8 +1887,8 @@ public:
 
 
 	void getGrassInfos(const Frustum& frustum,
-							   Array<GrassInfo>& infos,
-							   ComponentIndex camera) override
+		Array<GrassInfo>& infos,
+		ComponentIndex camera) override
 	{
 		PROFILE_FUNCTION();
 
@@ -1897,6 +1900,27 @@ public:
 			{
 				m_terrains[i]->getGrassInfos(frustum, infos, camera);
 			}
+		}
+	}
+
+
+	void registerLuaAPI()
+	{
+		auto* scene = m_universe.getScene(crc32("lua_script"));
+		if (!scene) return;
+
+		auto* script_scene = static_cast<LuaScriptScene*>(scene);
+
+		Pipeline::registerLuaAPI(script_scene->getGlobalState());
+	}
+
+
+	void sendMessage(uint32 type, void*) override
+	{
+		static const uint32 register_hash = crc32("registerLuaAPI");
+		if (type == register_hash)
+		{
+			registerLuaAPI();
 		}
 	}
 
