@@ -4,6 +4,9 @@
 #include "lumix.h"
 
 
+struct lua_State;
+
+
 namespace Lumix
 {
 namespace FS
@@ -69,6 +72,7 @@ public:
 	virtual void pause(bool pause) = 0;
 	virtual void nextFrame() = 0;
 	virtual PathManager& getPathManager() = 0;
+	virtual lua_State* getState() = 0;
 
 protected:
 	Engine() {}

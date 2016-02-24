@@ -171,6 +171,34 @@ template <> inline void pushLua(lua_State* L, void* value)
 }
 
 
+inline void createSystemVariable(lua_State* L, const char* system, const char* var_name, void* value)
+{
+	if (lua_getglobal(L, system) == LUA_TNIL)
+	{
+		lua_pop(L, 1);
+		lua_newtable(L);
+		lua_setglobal(L, system);
+		lua_getglobal(L, system);
+	}
+	lua_pushlightuserdata(L, value);
+	lua_setfield(L, -2, var_name);
+}
+
+
+inline void createSystemFunction(lua_State* L, const char* system, const char* var_name, lua_CFunction fn)
+{
+	if (lua_getglobal(L, system) == LUA_TNIL)
+	{
+		lua_pop(L, 1);
+		lua_newtable(L);
+		lua_setglobal(L, system);
+		lua_getglobal(L, system);
+	}
+	lua_pushcfunction(L, fn);
+	lua_setfield(L, -2, var_name);
+}
+
+
 inline const char* luaTypeToString(int type)
 {
 	switch (type)

@@ -317,7 +317,7 @@ struct PipelineImpl : public Pipeline
 	void parseParameters(lua_State* L)
 	{
 		m_parameters.clear();
-		if (lua_getglobal(L, "parameters") == LUA_TTABLE)
+		if (lua_getglobal(L, "pipeline_parameters") == LUA_TTABLE)
 		{
 			lua_pushnil(L);
 			while (lua_next(L, -2) != 0)
@@ -350,7 +350,7 @@ struct PipelineImpl : public Pipeline
 	{
 		if (m_lua_state)
 		{
-			lua_close(m_lua_state);
+			luaL_unref(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 			m_lua_state = nullptr;
 		}
 
@@ -385,16 +385,26 @@ struct PipelineImpl : public Pipeline
 
 		cleanup();
 
-		m_lua_state = luaL_newstate();
-		luaL_openlibs(m_lua_state);
+		m_lua_state = lua_newthread(m_renderer.getEngine().getState());
+		lua_newtable(m_lua_state);
+		lua_pushvalue(m_lua_state, -1);
+		m_lua_env = luaL_ref(m_lua_state, LUA_REGISTRYINDEX);
+		lua_pushvalue(m_lua_state, -1);
+		lua_setmetatable(m_lua_state, -2);
+		lua_pushglobaltable(m_lua_state);
+		lua_setfield(m_lua_state, -2, "__index");
+
 		char paths[Lumix::MAX_PATH_LENGTH * 2 + 1];
 		copyString(paths, m_renderer.getEngine().getDiskFileDevice()->getBasePath(0));
 		catString(paths, "");
 		catString(paths, m_renderer.getEngine().getDiskFileDevice()->getBasePath(1));
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		lua_pushstring(m_lua_state, paths);
-		lua_setglobal(m_lua_state, "LUA_PATH");
+		lua_setfield(m_lua_state, -2, "LUA_PATH");
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		lua_pushlightuserdata(m_lua_state, this);
-		lua_setglobal(m_lua_state, "this");
+		lua_setfield(m_lua_state, -2, "this");
+
 		Pipeline::registerLuaAPI(m_lua_state);
 		for (auto& handler : m_custom_commands_handlers)
 		{
@@ -405,7 +415,16 @@ struct PipelineImpl : public Pipeline
 			luaL_loadbuffer(
 				m_lua_state, (const char*)file.getBuffer(), file.size(), m_path.c_str()) !=
 			LUA_OK;
-		errors = errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
+		if (errors)
+		{
+			g_log_error.log("Renderer") << m_path.c_str() << ": " << lua_tostring(m_lua_state, -1);
+			lua_pop(m_lua_state, 1);
+			return;
+		}
+
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		lua_setupvalue(m_lua_state, -2, 1);
+		errors = lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
 		if (errors)
 		{
 			g_log_error.log("Renderer") << m_path.c_str() << ": " << lua_tostring(m_lua_state, -1);
@@ -422,6 +441,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 	lua_State* m_lua_state;
+	int m_lua_env;
 	Array<string> m_parameters;
 	Stats m_stats;
 
@@ -446,7 +466,7 @@ struct PipelineImpl : public Pipeline
 
 		bool ret = false;
 		lua_State* L = m_lua_state;
-		if (lua_getglobal(L, "parameters") == LUA_TTABLE)
+		if (lua_getglobal(L, "pipeline_parameters") == LUA_TTABLE)
 		{
 			lua_getfield(L, -1, m_parameters[index].c_str());
 			ret = lua_toboolean(L, -1) != 0;
@@ -463,7 +483,7 @@ struct PipelineImpl : public Pipeline
 		if (index >= m_parameters.size()) return;
 		
 		lua_State* L = m_lua_state;
-		if (lua_getglobal(L, "parameters") == LUA_TTABLE)
+		if (lua_getglobal(L, "pipeline_parameters") == LUA_TTABLE)
 		{
 			lua_pushboolean(L, value);
 			lua_setfield(L, -2, m_parameters[index].c_str());
@@ -556,7 +576,7 @@ struct PipelineImpl : public Pipeline
 	{
 		if(m_lua_state)
 		{
-			lua_close(m_lua_state);
+			luaL_unref(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		}
 
 		ResourceManagerBase& material_manager = m_renderer.getMaterialManager();
@@ -2234,7 +2254,8 @@ struct PipelineImpl : public Pipeline
 			m_instances_data[i].instance_count = 0;
 		}
 
-		if (lua_getglobal(m_lua_state, "render") == LUA_TFUNCTION)
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		if (lua_getfield(m_lua_state, -1, "render") == LUA_TFUNCTION)
 		{
 			lua_pushlightuserdata(m_lua_state, this);
 			if (lua_pcall(m_lua_state, 1, 0, 0) != LUA_OK)
@@ -2353,7 +2374,8 @@ struct PipelineImpl : public Pipeline
 
 	void callInitScene()
 	{
-		if(lua_getglobal(m_lua_state, "initScene") == LUA_TFUNCTION)
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		if(lua_getfield(m_lua_state, -1, "initScene") == LUA_TFUNCTION)
 		{
 			lua_pushlightuserdata(m_lua_state, this);
 			if(lua_pcall(m_lua_state, 1, 0, 0) != LUA_OK)
