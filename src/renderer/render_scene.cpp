@@ -1923,11 +1923,9 @@ public:
 		REGISTER_FUNCTION(setFogBottom);
 		REGISTER_FUNCTION(setFogHeight);
 		REGISTER_FUNCTION(setFogColor);
-		REGISTER_FUNCTION(setFogColor);
 		REGISTER_FUNCTION(getFogDensity);
 		REGISTER_FUNCTION(getFogBottom);
 		REGISTER_FUNCTION(getFogHeight);
-		REGISTER_FUNCTION(getFogColor);
 		REGISTER_FUNCTION(getFogColor);
 
 		#undef REGISTER_FUNCTION
