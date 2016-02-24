@@ -16,13 +16,6 @@ namespace Lumix
 class LuaScript;
 
 
-class LuaScriptSystem : public IPlugin
-{
-public:
-	virtual void setMasterLuaState(lua_State* state) = 0;
-};
-
-
 class LuaScriptScene : public IScene
 {
 public:

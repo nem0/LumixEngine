@@ -78,12 +78,6 @@ public:
 	}
 
 
-	lua_State* getLuaState() const override
-	{
-		return m_lua_state;
-	}
-
-
 	int getExitCode() const override { return m_exit_code; }
 
 
@@ -1043,13 +1037,14 @@ public:
 
 	void runScript(const char* src, const char* script_name) override
 	{
+		lua_State* L = m_engine->getState();
 		bool errors =
-			luaL_loadbuffer(m_lua_state, src, Lumix::stringLength(src), script_name) != LUA_OK;
-		errors = errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
+			luaL_loadbuffer(L, src, Lumix::stringLength(src), script_name) != LUA_OK;
+		errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
 		if (errors)
 		{
-			Lumix::g_log_error.log("Editor") << script_name << ": " << lua_tostring(m_lua_state, -1);
-			lua_pop(m_lua_state, 1);
+			Lumix::g_log_error.log("Editor") << script_name << ": " << lua_tostring(L, -1);
+			lua_pop(L, 1);
 		}
 	}
 
@@ -1077,40 +1072,18 @@ public:
 	{
 		return m_editor->runTest(Lumix::Path(undo_stack_path), Lumix::Path(result_universe_path));
 	}
-
-
-	void registerLuaFunction(const char* name, int (*function)(struct lua_State*)) override
-	{
-		lua_pushcfunction(m_lua_state, function);
-		lua_setglobal(m_lua_state, name);
-	}
-
-
-	void registerLuaGlobal(const char* name, void* data) override
-	{
-		lua_pushlightuserdata(m_lua_state, data);
-		lua_setglobal(m_lua_state, name);
-	}
-
+	
 
 	void createLua()
 	{
-		m_lua_state = luaL_newstate();
-		luaL_openlibs(m_lua_state);
+		lua_State* L = m_engine->getState();
 
-		lua_pushlightuserdata(m_lua_state, this);
-		lua_setglobal(m_lua_state, "g_editor");
-
-		lua_newtable(m_lua_state);
-		lua_pushvalue(m_lua_state, -1);
-		lua_setglobal(m_lua_state, "Editor");
+		Lumix::LuaWrapper::createSystemVariable(L, "Editor", "editor", this);
 
 		#define REGISTER_FUNCTION(F, name) \
 			do { \
-				lua_pushvalue(m_lua_state, -1); \
 				auto* f = &Lumix::LuaWrapper::wrapMethod<StudioAppImpl, decltype(&StudioAppImpl::F), &StudioAppImpl::F>; \
-				lua_pushcfunction(m_lua_state, f); \
-				lua_setfield(m_lua_state, -2, name); \
+				Lumix::LuaWrapper::createSystemFunction(L, "Editor", name, f); \
 			} while(false) \
 
 		REGISTER_FUNCTION(LUA_runTest, "runTest");
@@ -1119,8 +1092,6 @@ public:
 		REGISTER_FUNCTION(LUA_exit, "exit");
 
 		#undef REGISTER_FUNCTION
-
-		lua_pop(m_lua_state, 1);
 	}
 
 
@@ -1302,7 +1273,6 @@ public:
 
 	void init()
 	{
-		createLua();
 		checkWorkingDirector();
 		m_handler.m_app = this;
 		PlatformInterface::createWindow(nullptr);
@@ -1313,6 +1283,7 @@ public:
 		char base_path2[Lumix::MAX_PATH_LENGTH] = {};
 		checkDataDirCommandLine(base_path2, Lumix::lengthOf(base_path2));
 		m_engine = Lumix::Engine::create(current_dir, base_path2, nullptr, m_allocator);
+		createLua();
 		Lumix::Engine::PlatformData platform_data;
 		platform_data.window_handle = PlatformInterface::getWindowHandle();
 		m_engine->setPlatformData(platform_data);
@@ -1406,7 +1377,6 @@ public:
 	Lumix::string m_selected_template_name;
 	Settings m_settings;
 	Metadata m_metadata;
-	lua_State* m_lua_state;
 	char m_template_name[100];
 
 	bool m_finished;

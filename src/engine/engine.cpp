@@ -19,6 +19,7 @@
 #include "plugin_manager.h"
 #include "universe/hierarchy.h"
 #include "universe/universe.h"
+#include <lua.hpp>
 
 
 namespace Lumix
@@ -68,6 +69,9 @@ public:
 		, m_paused(false)
 		, m_next_frame(false)
 	{
+		m_state = lua_newstate(luaAllocator, &m_allocator);
+		luaL_openlibs(m_state);
+
 		m_mtjd_manager = MTJD::Manager::create(m_allocator);
 		if (!fs)
 		{
@@ -94,6 +98,23 @@ public:
 		m_fps_timer = Timer::create(m_allocator);
 		m_fps_frame = 0;
 		PropertyRegister::init(m_allocator);
+	}
+
+
+	static void* luaAllocator(void* ud, void* ptr, size_t osize, size_t nsize)
+	{
+		auto& allocator = *static_cast<IAllocator*>(ud);
+		if (nsize == 0)
+		{
+			allocator.deallocate(ptr);
+			return nullptr;
+		}
+		if (nsize > 0 && ptr == nullptr) return allocator.allocate(nsize);
+
+		void* new_mem = allocator.allocate(nsize);
+		copyMemory(new_mem, ptr, Math::minValue(osize, nsize));
+		allocator.deallocate(ptr);
+		return new_mem;
 	}
 
 
@@ -146,6 +167,7 @@ public:
 
 		m_resource_manager.destroy();
 		MTJD::Manager::destroy(*m_mtjd_manager);
+		lua_close(m_state);
 	}
 
 
@@ -434,6 +456,7 @@ public:
 	}
 
 
+	lua_State* getState() override { return m_state; }
 	PathManager& getPathManager() override{ return m_path_manager; }
 	float getLastTimeDelta() override { return m_last_time_delta; }
 
@@ -478,6 +501,7 @@ private:
 	bool m_next_frame;
 	PlatformData m_platform_data;
 	PathManager m_path_manager;
+	lua_State* m_state;
 
 private:
 	void operator=(const EngineImpl&);

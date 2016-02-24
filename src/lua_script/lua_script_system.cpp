@@ -48,7 +48,7 @@ namespace Lumix
 	static const uint32 LUA_SCRIPT_HASH = crc32("lua_script");
 
 
-	class LuaScriptSystemImpl : public LuaScriptSystem
+	class LuaScriptSystemImpl : public IPlugin
 	{
 	public:
 		LuaScriptSystemImpl(Engine& engine);
@@ -61,12 +61,10 @@ namespace Lumix
 		void destroy() override;
 		const char* getName() const override;
 		LuaScriptManager& getScriptManager() { return m_script_manager; }
-		void setMasterLuaState(lua_State* state) override { m_master_state = state; }
 
 		Engine& m_engine;
 		Debug::Allocator m_allocator;
 		LuaScriptManager m_script_manager;
-		lua_State* m_master_state;
 	};
 
 
@@ -129,7 +127,7 @@ namespace Lumix
 					// reference environment
 					lua_pushvalue(script.m_state, -1);
 					script.m_environment = luaL_ref(script.m_state, LUA_REGISTRYINDEX);
-
+					
 					// environment's metatable & __index
 					lua_pushvalue(script.m_state, -1);
 					lua_setmetatable(script.m_state, -2);
@@ -279,7 +277,6 @@ namespace Lumix
 		~LuaScriptSceneImpl()
 		{
 			unloadAllScripts();
-			if (!m_system.m_master_state) lua_close(m_global_state);
 		}
 
 		
@@ -313,15 +310,7 @@ namespace Lumix
 
 			m_is_api_registered = true;
 
-			if (m_system.m_master_state)
-			{
-				m_global_state = lua_newthread(m_system.m_master_state);
-			}
-			else
-			{
-				m_global_state = lua_newstate(luaAllocator, &m_system.getAllocator());
-				luaL_openlibs(m_global_state);
-			}
+			m_global_state = lua_newthread(m_system.m_engine.getState());
 			registerUniverse(&m_universe, m_global_state);
 			registerEngineLuaAPI(*this, m_system.m_engine, m_global_state);
 			uint32 register_msg = crc32("registerLuaAPI");
@@ -857,7 +846,6 @@ namespace Lumix
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator())
 		, m_script_manager(m_allocator)
-		, m_master_state(nullptr)
 	{
 		m_script_manager.create(crc32("lua_script"), engine.getResourceManager());
 
@@ -935,22 +923,6 @@ namespace Lumix
 		lua_pushvalue(L, -1);
 		lua_pushcfunction(L, f);
 		lua_setfield(L, -2, name);
-	}
-
-
-	void registerImGuiLua(Lumix::WorldEditor& editor, lua_State* L)
-	{
-		lua_newtable(L);
-		lua_pushvalue(L, -1);
-		lua_setglobal(L, "ImGui");
-
-		registerCFunction(L, "DragFloat", &DragFloat);
-		registerCFunction(L, "Button", &Button);
-
-		lua_pop(L, 1);
-
-		auto* scr = static_cast<Lumix::LuaScriptSystem*>(editor.getEngine().getPluginManager().getPlugin("lua_script"));
-		scr->setMasterLuaState(L);
 	}
 
 
@@ -1192,7 +1164,16 @@ namespace Lumix
 		PropertyGridPlugin(StudioApp& app)
 			: m_app(app)
 		{
-			registerImGuiLua(*app.getWorldEditor(), app.getLuaState());
+			lua_State* L = app.getWorldEditor()->getEngine().getState();
+			lua_newtable(L);
+			lua_pushvalue(L, -1);
+			lua_setglobal(L, "ImGui");
+
+			registerCFunction(L, "DragFloat", &DragFloat);
+			registerCFunction(L, "Button", &Button);
+
+			lua_pop(L, 1);
+
 		}
 
 
