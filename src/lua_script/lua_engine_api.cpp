@@ -327,21 +327,8 @@ void registerEngineLuaAPI(LuaScriptScene& scene, Engine& engine, lua_State* L)
 	lua_pushlightuserdata(L, &engine);
 	lua_setglobal(L, "g_engine");
 
-	auto registerFunction = [L](const char* system, const char* fn_name, lua_CFunction f)
-	{
-			if (lua_getglobal(L, system) == LUA_TNIL)
-			{
-				lua_pop(L, 1);
-				lua_newtable(L);
-				lua_setglobal(L, system);
-				lua_getglobal(L, system);
-			}
-			lua_pushcfunction(L, f);
-			lua_setfield(L, -2, fn_name);
-	};
-
 	#define REGISTER_FUNCTION(name) \
-		registerFunction("Engine", #name, LuaWrapper::wrap<decltype(&LuaAPI::name), LuaAPI::name>)
+		LuaWrapper::createSystemFunction(L, "Engine", #name, &LuaWrapper::wrap<decltype(&LuaAPI::name), LuaAPI::name>); \
 
 	REGISTER_FUNCTION(createComponent);
 	REGISTER_FUNCTION(getEnvironment);
@@ -360,10 +347,10 @@ void registerEngineLuaAPI(LuaScriptScene& scene, Engine& engine, lua_State* L)
 	REGISTER_FUNCTION(logInfo);
 	REGISTER_FUNCTION(addDebugCross);
 
-	registerFunction("Engine", "createEntityEx", &LuaAPI::createEntityEx);
-	registerFunction("Engine", "multVecQuat", &LuaAPI::multVecQuat);
-	registerFunction("Engine", "getEntityPosition", &LuaAPI::getEntityPosition);
-	registerFunction("Engine", "getEntityDirection", &LuaAPI::getEntityDirection);
+	LuaWrapper::createSystemFunction(L, "Engine", "createEntityEx", &LuaAPI::createEntityEx);
+	LuaWrapper::createSystemFunction(L, "Engine", "multVecQuat", &LuaAPI::multVecQuat);
+	LuaWrapper::createSystemFunction(L, "Engine", "getEntityPosition", &LuaAPI::getEntityPosition);
+	LuaWrapper::createSystemFunction(L, "Engine", "getEntityDirection", &LuaAPI::getEntityDirection);
 
 	#undef REGISTER_FUNCTION
 }

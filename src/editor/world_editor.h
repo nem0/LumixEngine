@@ -151,9 +151,8 @@ public:
 	virtual DelegateList<void()>& universeDestroyed() = 0;
 	virtual DelegateList<void()>& universeLoaded() = 0;
 	virtual DelegateList<void(Entity, const char*)>& entityNameSet() = 0;
-	virtual DelegateList<void(ComponentUID, const IPropertyDescriptor&)>&
-	propertySet() = 0;
-	
+	virtual DelegateList<void(ComponentUID, const IPropertyDescriptor&)>& propertySet() = 0;
+
 	virtual void addPlugin(Plugin& plugin) = 0;
 	virtual void removePlugin(Plugin& plugin) = 0;
 	virtual EntityTemplateSystem& getEntityTemplateSystem() = 0;

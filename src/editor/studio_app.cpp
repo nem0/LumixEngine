@@ -1072,7 +1072,7 @@ public:
 	{
 		return m_editor->runTest(Lumix::Path(undo_stack_path), Lumix::Path(result_universe_path));
 	}
-	
+
 
 	void createLua()
 	{

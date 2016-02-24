@@ -125,15 +125,7 @@ struct AudioSceneImpl : public AudioScene
 		#define REGISTER_FUNCTION(F) \
 			do { \
 			auto f = &LuaWrapper::wrapMethod<AudioSceneImpl, decltype(&AudioSceneImpl::F), &AudioSceneImpl::F>; \
-			if (lua_getglobal(L, "Audio") == LUA_TNIL) \
-			{ \
-				lua_pop(L, 1); \
-				lua_newtable(L); \
-				lua_setglobal(L, "Audio"); \
-				lua_getglobal(L, "Audio"); \
-			} \
-			lua_pushcfunction(L, f); \
-			lua_setfield(L, -2, #F); \
+			LuaWrapper::createSystemFunction(L, "Audio", #F, f); \
 			} while(false) \
 
 		REGISTER_FUNCTION(setEcho);
