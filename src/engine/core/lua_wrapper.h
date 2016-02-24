@@ -182,6 +182,7 @@ inline void createSystemVariable(lua_State* L, const char* system, const char* v
 	}
 	lua_pushlightuserdata(L, value);
 	lua_setfield(L, -2, var_name);
+	lua_pop(L, 1);
 }
 
 
@@ -196,6 +197,7 @@ inline void createSystemFunction(lua_State* L, const char* system, const char* v
 	}
 	lua_pushcfunction(L, fn);
 	lua_setfield(L, -2, var_name);
+	lua_pop(L, 1);
 }
 
 
