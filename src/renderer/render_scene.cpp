@@ -8,6 +8,7 @@
 #include "core/json_serializer.h"
 #include "core/lifo_allocator.h"
 #include "core/log.h"
+#include "core/lua_wrapper.h"
 #include "core/math_utils.h"
 #include "core/mtjd/generic_job.h"
 #include "core/mtjd/job.h"
@@ -53,10 +54,8 @@ static const uint32 PARTICLE_EMITTER_FORCE_HASH = crc32("particle_emitter_force"
 static const uint32 PARTICLE_EMITTER_ATTRACTOR_HASH = crc32("particle_emitter_attractor");
 static const uint32 PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH =
 	crc32("particle_emitter_linear_movement");
-static const uint32 PARTICLE_EMITTER_SPAWN_SHAPE_HASH =
-	crc32("particle_emitter_spawn_shape");
-static const uint32 PARTICLE_EMITTER_PLANE_HASH =
-	crc32("particle_emitter_plane");
+static const uint32 PARTICLE_EMITTER_SPAWN_SHAPE_HASH = crc32("particle_emitter_spawn_shape");
+static const uint32 PARTICLE_EMITTER_PLANE_HASH = crc32("particle_emitter_plane");
 static const uint32 PARTICLE_EMITTER_RANDOM_ROTATION_HASH =
 	crc32("particle_emitter_random_rotation");
 static const uint32 PARTICLE_EMITTER_SIZE_HASH = crc32("particle_emitter_size");
@@ -1911,7 +1910,27 @@ public:
 
 		auto* script_scene = static_cast<LuaScriptScene*>(scene);
 
-		Pipeline::registerLuaAPI(script_scene->getGlobalState());
+		lua_State* L = script_scene->getGlobalState();
+		Pipeline::registerLuaAPI(L);
+
+		#define REGISTER_FUNCTION(F)\
+			do { \
+			auto f = &LuaWrapper::wrapMethod<RenderSceneImpl, decltype(&RenderSceneImpl::F), &RenderSceneImpl::F>; \
+			LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
+			} while(false) \
+
+		REGISTER_FUNCTION(setFogDensity);
+		REGISTER_FUNCTION(setFogBottom);
+		REGISTER_FUNCTION(setFogHeight);
+		REGISTER_FUNCTION(setFogColor);
+		REGISTER_FUNCTION(setFogColor);
+		REGISTER_FUNCTION(getFogDensity);
+		REGISTER_FUNCTION(getFogBottom);
+		REGISTER_FUNCTION(getFogHeight);
+		REGISTER_FUNCTION(getFogColor);
+		REGISTER_FUNCTION(getFogColor);
+
+		#undef REGISTER_FUNCTION
 	}
 
 
@@ -1929,7 +1948,7 @@ public:
 	{
 		return m_is_grass_enabled;
 	}
-	
+
 
 	int getGrassDistance(ComponentIndex cmp) override
 	{
@@ -1942,7 +1961,7 @@ public:
 		m_terrains[cmp]->setGrassDistance(value);
 	}
 
-	
+
 	void enableGrass(bool enabled) override
 	{
 		m_is_grass_enabled = enabled;

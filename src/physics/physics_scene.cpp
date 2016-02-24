@@ -785,23 +785,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
 		auto* L = m_script_scene->getGlobalState();
 
-		auto registerFunction = [L](const char* system, const char* fn_name, lua_CFunction f)
-		{
-			if (lua_getglobal(L, system) == LUA_TNIL)
-			{
-				lua_pop(L, 1);
-				lua_newtable(L);
-				lua_setglobal(L, system);
-				lua_getglobal(L, system);
-			}
-			lua_pushcfunction(L, f);
-			lua_setfield(L, -2, fn_name);
-		};
-
 		#define REGISTER_FUNCTION(name) \
 			do {\
 				auto f = &LuaWrapper::wrapMethod<PhysicsSceneImpl, decltype(&PhysicsSceneImpl::name), &PhysicsSceneImpl::name>; \
-				registerFunction("Physics", #name, f); \
+				LuaWrapper::createSystemFunction(L, "Physics", #name, f); \
 			} while(false) \
 
 		REGISTER_FUNCTION(getActorComponent);

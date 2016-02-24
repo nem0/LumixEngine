@@ -2670,7 +2670,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(newView);
 	REGISTER_FUNCTION(bindFramebufferTexture);
 	REGISTER_FUNCTION(applyCamera);
-	
+
 	REGISTER_FUNCTION(disableBlending);
 	REGISTER_FUNCTION(enableAlphaWrite);
 	REGISTER_FUNCTION(disableAlphaWrite);
