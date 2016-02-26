@@ -1802,18 +1802,6 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	float getRenderParamFloat(int param_index)
-	{
-		return m_scene->getRenderParamFloat(param_index);
-	}
-
-
-	int addRenderParamFloat(const char* name, float default_value)
-	{
-		return m_scene->addRenderParamFloat(name, default_value);
-	}
-
-
 	void renderSkinnedMesh(const Renderable& renderable, const RenderableMesh& info)
 	{
 		const Mesh& mesh = *info.mesh;
@@ -2688,8 +2676,6 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(setStencil);
 	REGISTER_FUNCTION(setStencilRMask);
 	REGISTER_FUNCTION(setStencilRef);
-	REGISTER_FUNCTION(addRenderParamFloat);
-	REGISTER_FUNCTION(getRenderParamFloat);
 	REGISTER_FUNCTION(renderLightVolumes);
 	REGISTER_FUNCTION(postprocessCallback);
 	REGISTER_FUNCTION(removeFramebuffer);

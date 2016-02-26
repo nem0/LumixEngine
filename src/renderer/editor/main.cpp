@@ -45,105 +45,6 @@ static const uint32 MATERIAL_HASH = crc32("MATERIAL");
 static const uint32 RENDER_PARAMS_HASH = crc32("render_params");
 
 
-struct RenderParamsPlugin : public PropertyGrid::IPlugin
-{
-	struct SetRenderParamCommand : public IEditorCommand
-	{
-		SetRenderParamCommand(RenderScene* scene, int idx, float value)
-		{
-			this->param_idx = idx;
-			this->value = value;
-			this->scene = scene;
-			old_value = scene->getRenderParamFloat(param_idx);
-		}
-
-
-		bool execute() override
-		{
-			scene->setRenderParamFloat(param_idx, value);
-			return true;
-		}
-
-
-		void undo() override
-		{
-			scene->setRenderParamFloat(param_idx, old_value);
-		}
-
-
-		void serialize(JsonSerializer& serializer) override
-		{
-			serializer.serialize("param_idx", param_idx);
-			serializer.serialize("value", value);
-		}
-
-
-		void deserialize(JsonSerializer& serializer) override
-		{
-			serializer.deserialize("param_idx", param_idx, 0);
-			serializer.deserialize("value", value, 0);
-		}
-
-
-		uint32 getType() override
-		{
-			static const uint32 hash = crc32("set_render_param");
-			return hash;
-		}
-
-
-		bool merge(IEditorCommand& command) override
-		{
-			auto& cmd = static_cast<SetRenderParamCommand&>(command);
-			if(param_idx == cmd.param_idx)
-			{
-				cmd.value = value;
-			}
-			return false;
-		}
-
-		RenderScene* scene;
-		int param_idx;
-		float value;
-		float old_value;
-	};
-
-
-	RenderParamsPlugin(StudioApp& app)
-		: m_app(app)
-	{
-	}
-
-
-	~RenderParamsPlugin()
-	{
-	}
-
-
-	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
-	{
-		if(cmp.type != RENDER_PARAMS_HASH) return;
-
-		auto* scene = static_cast<RenderScene*>(cmp.scene);
-		for(int i = 0; i < scene->getRenderParamFloatCount(); ++i)
-		{
-			float val = scene->getRenderParamFloat(i);
-			if (ImGui::DragFloat(scene->getRenderParamFloatName(i), &val))
-			{
-				auto* cmd = LUMIX_NEW(m_app.getWorldEditor()->getAllocator(), SetRenderParamCommand)(scene, i, val);
-				m_app.getWorldEditor()->executeCommand(cmd);
-			}
-		}
-
-		ASSERT(scene->getRenderParamVec4Count() == 0);
-	}
-
-
-	StudioApp& m_app;
-};
-
-
-
 struct MaterialPlugin : public AssetBrowser::IPlugin
 {
 	MaterialPlugin(StudioApp& app)
@@ -1474,9 +1375,6 @@ LUMIX_STUDIO_ENTRY(renderer)
 
 	auto* terrain_plugin = LUMIX_NEW(allocator, TerrainPlugin)(app);
 	app.getPropertyGrid()->addPlugin(*terrain_plugin);
-
-	auto* render_params_plugin = LUMIX_NEW(allocator, RenderParamsPlugin)(app);
-	app.getPropertyGrid()->addPlugin(*render_params_plugin);
 
 	auto* scene_view_plugin = LUMIX_NEW(allocator, SceneViewPlugin)(app);
 	app.addPlugin(*scene_view_plugin);
