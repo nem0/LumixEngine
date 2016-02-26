@@ -148,7 +148,10 @@ void EntityGroups::serialize(OutputBlob& blob)
 	ASSERT(sizeof(m_group_infos[0].name) == 20);
 
 	blob.write(m_group_infos.size());
-	blob.write(&m_group_infos[0], m_group_infos.size() * sizeof(m_group_infos[0]));
+	for(auto& group : m_group_infos)
+	{
+		blob.write(&group.name, sizeof(group.name));
+	}
 
 	for(auto& i : m_groups)
 	{

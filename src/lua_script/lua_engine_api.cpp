@@ -30,7 +30,8 @@ static int getEnvironment(lua_State* L)
 	Entity entity = LuaWrapper::checkArg<Entity>(L, 2);
 	int scr_index = LuaWrapper::checkArg<int>(L, 3);
 
-	int env = scene->getEnvironment(entity, scr_index);
+	ComponentIndex cmp = scene->getComponent(entity);
+	int env = scene->getEnvironment(cmp, scr_index);
 	if (env < 0)
 	{
 		lua_pushnil(L);

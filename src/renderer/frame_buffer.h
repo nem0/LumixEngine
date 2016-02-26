@@ -15,7 +15,7 @@ namespace Lumix
 
 class JsonSerializer;
 
-/**/
+
 class FrameBuffer
 {
 	public:
@@ -56,7 +56,11 @@ class FrameBuffer
 		void resize(int width, int height);
 		Vec2 getSizeRatio() const { return m_declaration.m_size_ratio; }
 		const char* getName() const { return m_declaration.m_name; }
-		bgfx::TextureHandle getRenderbufferHandle(int idx) const { return m_declaration.m_renderbuffers[idx].m_handle; }
+		bgfx::TextureHandle getRenderbufferHandle(int idx) const 
+		{
+			if (idx >= m_declaration.m_renderbuffers_count ) return BGFX_INVALID_HANDLE;
+			return m_declaration.m_renderbuffers[idx].m_handle;
+		}
 
 	private:
 		void destroyRenderbuffers();
@@ -69,5 +73,5 @@ class FrameBuffer
 };
 
 
-} // ~namespace
+} // namespace Lumix
 

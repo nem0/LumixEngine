@@ -79,7 +79,7 @@ template <typename T> inline const char* typeToString()
 }
 template <> inline const char* typeToString<int>()
 {
-	return "number";
+	return "number|integer";
 }
 template <> inline const char* typeToString<const char*>()
 {
@@ -181,6 +181,21 @@ inline void createSystemVariable(lua_State* L, const char* system, const char* v
 		lua_getglobal(L, system);
 	}
 	lua_pushlightuserdata(L, value);
+	lua_setfield(L, -2, var_name);
+	lua_pop(L, 1);
+}
+
+
+inline void createSystemVariable(lua_State* L, const char* system, const char* var_name, int value)
+{
+	if (lua_getglobal(L, system) == LUA_TNIL)
+	{
+		lua_pop(L, 1);
+		lua_newtable(L);
+		lua_setglobal(L, system);
+		lua_getglobal(L, system);
+	}
+	lua_pushinteger(L, value);
 	lua_setfield(L, -2, var_name);
 	lua_pop(L, 1);
 }

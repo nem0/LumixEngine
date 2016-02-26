@@ -68,22 +68,6 @@ void SceneView::onUniverseCreated()
 	auto* scene = m_editor->getScene(Lumix::crc32("renderer"));
 	m_forward_pipeline->setScene(static_cast<Lumix::RenderScene*>(scene));
 	m_deferred_pipeline->setScene(static_cast<Lumix::RenderScene*>(scene));
-	auto* settings = Settings::getInstance();
-	if (!settings) return;
-
-	int count = m_forward_pipeline->getParameterCount();
-	for (int i = 0; i < count; ++i)
-	{
-		bool b = settings->getValue(m_forward_pipeline->getParameterName(i), m_forward_pipeline->getParameter(i));
-		m_forward_pipeline->setParameter(i, b);
-	}
-	
-	count = m_deferred_pipeline->getParameterCount();
-	for (int i = 0; i < count; ++i)
-	{
-		bool b = settings->getValue(m_deferred_pipeline->getParameterName(i), m_deferred_pipeline->getParameter(i));
-		m_deferred_pipeline->setParameter(i, b);
-	}
 }
 
 
@@ -283,41 +267,13 @@ void SceneView::onGUI()
 			m_editor->getGizmo().setStep(step);
 		}
 
-		int count = m_current_pipeline->getParameterCount();
-		if (count)
-		{
-			ImGui::SameLine();
-			if (ImGui::Button("Pipeline"))
-			{
-				ImGui::OpenPopup("pipeline_parameters_popup");
-			}
-
-			if (ImGui::BeginPopup("pipeline_parameters_popup"))
-			{
-				for (int i = 0; i < count; ++i)
-				{
-					bool b = m_current_pipeline->getParameter(i);
-					if (ImGui::Checkbox(m_current_pipeline->getParameterName(i), &b))
-					{
-						auto* settings = Settings::getInstance();
-						if (settings)
-						{
-							settings->setValue(m_current_pipeline->getParameterName(i), b);
-						}
-						m_current_pipeline->setParameter(i, b);
-					}
-				}
-
-				ImGui::EndPopup();
-			}
-		}
-
 		ImGui::SameLine();
 		ImGui::Checkbox("Stats", &m_show_stats);
 
 		bool is_deferred = m_current_pipeline == m_deferred_pipeline;
 		ImGui::SameLine();
-		m_is_pipeline_switch = ImGui::Checkbox("Deferred", &is_deferred);
+		//m_is_pipeline_switch = ImGui::Checkbox("Deferred", &is_deferred);
+		// TODO
 	}
 
 	ImGui::EndDock();

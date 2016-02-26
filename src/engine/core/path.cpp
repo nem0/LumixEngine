@@ -151,7 +151,7 @@ namespace Lumix
 	{
 		g_path_manager->incrementRefCount(m_data);
 	}
-	
+
 
 	Path::Path(const char* path)
 	{

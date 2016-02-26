@@ -437,6 +437,8 @@ namespace Lumix
 
 		iterator find(const key_type& key) { return iterator(_find(key), this); }
 
+		const_iterator find(const key_type& key) const { return const_iterator(_find(key), this); }
+
 		value_type& at(const key_type& key)
 		{
 			node_type* n = _find(key);
