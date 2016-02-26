@@ -192,7 +192,7 @@ void SceneView::onGUI()
 			view_pos = content_min;
 			if (ImGui::IsItemHovered())
 			{
-				m_editor->setGizmoUseStep(m_toggle_gizmo_step_action->isActive());
+				m_editor->getGizmo().enableStep(m_toggle_gizmo_step_action->isActive());
 				auto rel_mp = ImGui::GetMousePos();
 				rel_mp.x -= m_screen_x;
 				rel_mp.y -= m_screen_y;

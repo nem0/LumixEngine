@@ -1717,13 +1717,6 @@ public:
 	}
 
 
-	void setGizmoUseStep(bool use) override
-	{
-		m_gizmo_use_step = use;
-	}
-
-
-
 	void onMouseUp(int x, int y, MouseButton::Value button) override
 	{
 		m_is_mouse_down[button] = false;
