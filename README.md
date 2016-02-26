@@ -13,11 +13,7 @@
 * [License](https://github.com/nem0/LumixEngine/blob/master/LICENSE)
 * [Getting started](https://github.com/nem0/LumixEngine/wiki/Getting-started)
 * [News on twitter](https://twitter.com/mikulasflorek)
-* [Download latest executables](https://ci.appveyor.com/project/nem0/lumixengine/build/artifacts)
-* [Code rules](https://github.com/nem0/LumixEngine/wiki/Code-rules)
 * [Data repository](https://github.com/nem0/lumixengine_data)
-* [Mindmap](https://raw.githubusercontent.com/nem0/LumixEngine/gh-pages/images/lumix_mindmap.png)
-* [Wiki](https://github.com/nem0/LumixEngine/wiki)
 * [Videos](https://www.youtube.com/channel/UCtjtIy0ldsq-9siM1Gm_rXg)
 
 ![Editor screenshot](https://cloud.githubusercontent.com/assets/153526/12904252/3fcf130e-cece-11e5-878b-c9fe24c1b11a.png)
