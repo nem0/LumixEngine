@@ -105,10 +105,6 @@ class LUMIX_RENDERER_API Pipeline
 		virtual void toggleStats() = 0;
 		virtual void setWindowHandle(void* data) = 0;
 		virtual int getPassIdx() const = 0;
-		virtual int getParameterCount() const = 0;
-		virtual const char* getParameterName(int index) const = 0;
-		virtual void setParameter(int index, bool value) = 0;
-		virtual bool getParameter(int index) = 0;
 		virtual bool isReady() const = 0;
 		virtual const Stats& getStats() = 0;
 		virtual Path& getPath() = 0;

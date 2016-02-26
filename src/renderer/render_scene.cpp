@@ -1927,6 +1927,8 @@ public:
 		REGISTER_FUNCTION(getFogBottom);
 		REGISTER_FUNCTION(getFogHeight);
 		REGISTER_FUNCTION(getFogColor);
+		REGISTER_FUNCTION(getCameraSlot);
+		REGISTER_FUNCTION(getCameraComponent);
 
 		#undef REGISTER_FUNCTION
 	}
@@ -2292,6 +2294,16 @@ public:
 	void setCameraSlot(ComponentIndex camera, const char* slot) override
 	{
 		copyString(m_cameras[camera].m_slot, Camera::MAX_SLOT_LENGTH, slot);
+	}
+
+
+	ComponentIndex getCameraComponent(Entity entity)
+	{
+		for (int i = 0; i < m_cameras.size(); ++i)
+		{
+			if (m_cameras[i].m_entity == entity) return i;
+		}
+		return INVALID_COMPONENT;
 	}
 
 	const char* getCameraSlot(ComponentIndex camera) override

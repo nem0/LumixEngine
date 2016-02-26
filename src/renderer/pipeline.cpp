@@ -246,7 +246,6 @@ struct PipelineImpl : public Pipeline
 		, m_path(path)
 		, m_framebuffers(allocator)
 		, m_lua_state(nullptr)
-		, m_parameters(allocator)
 		, m_custom_commands_handlers(allocator)
 		, m_tmp_terrains(allocator)
 		, m_tmp_grasses(allocator)
@@ -262,6 +261,7 @@ struct PipelineImpl : public Pipeline
 		, m_is_rendering_in_shadowmap(false)
 		, m_is_ready(false)
 	{
+		m_first_postprocess_framebuffer = 0;
 		m_deferred_point_light_vertex_decl.begin()
 			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
 			.end();
@@ -311,23 +311,6 @@ struct PipelineImpl : public Pipeline
 			}
 			lua_pop(L, 1);
 		}
-	}
-
-
-	void parseParameters(lua_State* L)
-	{
-		m_parameters.clear();
-		if (lua_getglobal(L, "pipeline_parameters") == LUA_TTABLE)
-		{
-			lua_pushnil(L);
-			while (lua_next(L, -2) != 0)
-			{
-				const char* parameter_name = luaL_checkstring(L, -2);
-				m_parameters.push(Lumix::string(parameter_name, m_allocator));
-				lua_pop(L, 1);
-			}
-		}
-		lua_pop(L, 1);
 	}
 
 
@@ -431,8 +414,7 @@ struct PipelineImpl : public Pipeline
 			lua_pop(m_lua_state, 1);
 			return;
 		}
-
-		parseParameters(m_lua_state);
+		m_first_postprocess_framebuffer = m_framebuffers.size();;
 
 		m_width = m_height = -1;
 		if(m_scene) callInitScene();
@@ -442,54 +424,7 @@ struct PipelineImpl : public Pipeline
 
 	lua_State* m_lua_state;
 	int m_lua_env;
-	Array<string> m_parameters;
 	Stats m_stats;
-
-
-	int getParameterCount() const override
-	{
-		return m_parameters.size();
-	}
-
-
-	const char* getParameterName(int index) const override
-	{
-		if (index >= m_parameters.size()) return nullptr;
-		return m_parameters[index].c_str();
-	}
-
-
-	bool getParameter(int index) override
-	{
-		if (!m_lua_state) return false;
-		if (index >= m_parameters.size()) return false;
-
-		bool ret = false;
-		lua_State* L = m_lua_state;
-		if (lua_getglobal(L, "pipeline_parameters") == LUA_TTABLE)
-		{
-			lua_getfield(L, -1, m_parameters[index].c_str());
-			ret = lua_toboolean(L, -1) != 0;
-			lua_pop(L, -1);
-		}
-		lua_pop(L, -1);
-		return ret;
-	}
-
-
-	void setParameter(int index, bool value) override
-	{
-		if (!m_lua_state) return;
-		if (index >= m_parameters.size()) return;
-		
-		lua_State* L = m_lua_state;
-		if (lua_getglobal(L, "pipeline_parameters") == LUA_TTABLE)
-		{
-			lua_pushboolean(L, value);
-			lua_setfield(L, -2, m_parameters[index].c_str());
-		}
-		lua_pop(L, -1);
-	}
 
 
 	void createParticleBuffers()
@@ -1004,23 +939,67 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void postprocessCallback()
+	void removeFramebuffer(const char* framebuffer_name)
+	{
+		for (int i = 0; i < m_framebuffers.size(); ++i)
+		{
+			auto* f = m_framebuffers[i];
+			if (compareString(f->getName(), framebuffer_name) == 0)
+			{
+				LUMIX_DELETE(m_allocator, m_framebuffers[i]);
+				if (m_first_postprocess_framebuffer > i)
+				{
+					--m_first_postprocess_framebuffer;
+				}
+				m_framebuffers.eraseFast(i);
+				break;
+			}
+		}
+	}
+
+
+	bool postprocessCallback(const char* camera_slot)
 	{
 		auto scr_scene = static_cast<LuaScriptScene*>(m_scene->getUniverse().getScene(crc32("lua_script")));
-		if (!scr_scene) return;
-		if (m_applied_camera == INVALID_COMPONENT) return;
-		Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
-		ComponentIndex scr_cmp = scr_scene->getComponent(camera_entity);
-		if (scr_cmp == INVALID_COMPONENT) return;
+		if (!scr_scene) return false;
+		ComponentIndex camera = m_scene->getCameraInSlot(camera_slot);
+		if (camera == INVALID_COMPONENT) return false;
 
+		Entity camera_entity = m_scene->getCameraEntity(camera);
+		ComponentIndex scr_cmp = scr_scene->getComponent(camera_entity);
+		if (scr_cmp == INVALID_COMPONENT) return false;
+
+		bool ret = false;
 		for (int i = 0, c = scr_scene->getScriptCount(scr_cmp); i < c; ++i)
 		{
+			lua_State* L = scr_scene->getState(scr_cmp, i);
+			if(!L) continue;
+
+			int env = scr_scene->getEnvironment(scr_cmp, i);
+			lua_rawgeti(L, LUA_REGISTRYINDEX, env);
+			if(lua_getfield(L, -1, "_IS_POSTPROCESS_INITIALIZED") == LUA_TNIL)
+			{
+				if(auto* call = scr_scene->beginFunctionCall(scr_cmp, i, "initPostprocess"))
+				{
+					call->add(this);
+					call->addEnvironment(m_lua_env);
+					scr_scene->endFunctionCall(*call);
+					lua_rawgeti(L, LUA_REGISTRYINDEX, env);
+					lua_pushboolean(L, 1);
+					lua_setfield(L, -2, "_IS_POSTPROCESS_INITIALIZED");
+				}
+			}
+			lua_pop(L, 2);
+
 			if (auto* call = scr_scene->beginFunctionCall(scr_cmp, i, "postprocess"))
 			{
+				ret = true;
 				call->add(this);
+				call->addEnvironment(m_lua_env);
 				scr_scene->endFunctionCall(*call);
 			}
 		}
+		return ret;
 	}
 
 
@@ -2260,7 +2239,7 @@ struct PipelineImpl : public Pipeline
 			lua_pushlightuserdata(m_lua_state, this);
 			if (lua_pcall(m_lua_state, 1, 0, 0) != LUA_OK)
 			{
-				g_log_error.log("Renderer") << lua_tostring(m_lua_state, -1);
+				g_log_warning.log("Renderer") << lua_tostring(m_lua_state, -1);
 				lua_pop(m_lua_state, 1);
 			}
 		}
@@ -2364,6 +2343,12 @@ struct PipelineImpl : public Pipeline
 
 	void setScene(RenderScene* scene) override 
 	{
+		for (int i = m_first_postprocess_framebuffer; i < m_framebuffers.size(); ++i)
+		{
+			LUMIX_DELETE(m_allocator, m_framebuffers[i]);
+		}
+		m_framebuffers.resize(m_first_postprocess_framebuffer);
+
 		m_scene = scene;
 		if (m_lua_state && m_scene) callInitScene();
 	}
@@ -2489,6 +2474,7 @@ struct PipelineImpl : public Pipeline
 
 	Material* m_debug_line_material;
 	int m_has_shadowmap_define_idx;
+	int m_first_postprocess_framebuffer;
 };
 
 
@@ -2543,6 +2529,11 @@ int addFramebuffer(lua_State* L)
 		PipelineImpl::parseRenderbuffers(L, decl);
 	}
 	lua_pop(L, 1);
+	if ((decl.m_size_ratio.x > 0 || decl.m_size_ratio.y > 0) && pipeline->m_height > 0)
+	{
+		decl.m_width = int(pipeline->m_width * decl.m_size_ratio.x);
+		decl.m_height = int(pipeline->m_height * decl.m_size_ratio.y);
+	}
 	auto* fb = LUMIX_NEW(pipeline->m_allocator, FrameBuffer)(decl);
 	pipeline->m_framebuffers.push(fb);
 	if(compareString(decl.m_name, "default") == 0) pipeline->m_default_framebuffer = fb;
@@ -2701,6 +2692,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getRenderParamFloat);
 	REGISTER_FUNCTION(renderLightVolumes);
 	REGISTER_FUNCTION(postprocessCallback);
+	REGISTER_FUNCTION(removeFramebuffer);
 
 	#undef REGISTER_FUNCTION
 

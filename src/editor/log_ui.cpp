@@ -62,7 +62,7 @@ void LogUI::push(Type type, const char* message)
 	++m_new_message_count[type];
 	m_messages[type].push(Lumix::string(message, m_allocator));
 
-	if (type == Error || type == Warning)
+	if (type == Error)
 	{
 		addNotification(message);
 	}
