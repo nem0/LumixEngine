@@ -987,6 +987,7 @@ namespace Lumix
 			for (int i = 0; i < count; ++i)
 			{
 				auto& prop = scr.m_properties.emplace(m_system.m_allocator);
+				prop.type = Property::ANY;
 				blob.read(prop.name_hash);
 				blob.readString(buf, lengthOf(buf));
 				prop.stored_value = buf;
