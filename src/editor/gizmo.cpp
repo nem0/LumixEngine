@@ -751,6 +751,7 @@ struct GizmoImpl : public Gizmo
 
 
 	int getStep() const override { return m_steps[(int)m_mode]; }
+	void enableStep(bool enable) override { m_is_step = enable; }
 	void setStep(int step) override { m_steps[(int)m_mode] = step; }
 	bool isAutosnapDown() const override { return m_is_autosnap_down; }
 	void setAutosnapDown(bool snap) override { m_is_autosnap_down = snap; }
