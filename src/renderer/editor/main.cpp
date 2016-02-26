@@ -911,7 +911,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		m_action = LUMIX_NEW(allocator, Action)("Scene View", "scene_view");
 		m_action->func.bind<SceneViewPlugin, &SceneViewPlugin::onAction>(this);
 		m_scene_view.init(*app.getLogUI(), editor, app.getActions());
-		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getCurrentPipeline());
+		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getPipeline());
 		editor.setRenderInterface(m_render_interface);
 		m_app.getAssetBrowser()->resourceChanged().bind<SceneViewPlugin, &SceneViewPlugin::onResourceChanged>(this);
 	}
@@ -926,23 +926,23 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 
 	void onResourceChanged(const Path& path, const char* ext)
 	{
-		if (m_scene_view.getCurrentPipeline()->getPath() == path)
+		if (m_scene_view.getPipeline()->getPath() == path)
 		{
-			m_scene_view.getCurrentPipeline()->load();
+			m_scene_view.getPipeline()->load();
 		}
 	}
 
 
-	void update(float) override 
-	{ 
-		m_scene_view.update(); 
-		if (&m_render_interface->m_pipeline == m_scene_view.getCurrentPipeline()) return;
+	void update(float) override
+	{
+		m_scene_view.update();
+		if(&m_render_interface->m_pipeline == m_scene_view.getPipeline()) return;
 
 		auto& editor = *m_app.getWorldEditor();
 		auto& allocator = editor.getAllocator();
 		editor.setRenderInterface(nullptr);
 		LUMIX_DELETE(allocator, m_render_interface);
-		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getCurrentPipeline());
+		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getPipeline());
 		editor.setRenderInterface(m_render_interface);
 	}
 	void onAction() {}
