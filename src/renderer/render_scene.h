@@ -166,17 +166,6 @@ public:
 	virtual const Array<DebugLine>& getDebugLines() const = 0;
 	virtual const Array<DebugPoint>& getDebugPoints() const = 0;
 
-	virtual void setRenderParamFloat(int param_index, float value) = 0;
-	virtual void setRenderParamVec4(int param_index, const Vec4& value) = 0;
-	virtual int getRenderParamFloatCount() const = 0;
-	virtual const char* getRenderParamFloatName(int index) const = 0;
-	virtual int getRenderParamVec4Count() const = 0;
-	virtual const char* getRenderParamVec4Name(int index) const = 0;
-	virtual int addRenderParamFloat(const char* name, float default_value) = 0;
-	virtual int addRenderParamVec4(const char* name, const Vec4& default_value) = 0;
-	virtual float getRenderParamFloat(int param_index) = 0;
-	virtual Vec4 getRenderParamVec4(int param_index) = 0;
-
 	virtual Entity getCameraEntity(ComponentIndex camera) const = 0;
 	virtual ComponentIndex getCameraInSlot(const char* slot) = 0;
 	virtual float getCameraFOV(ComponentIndex camera) = 0;
