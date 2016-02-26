@@ -2245,9 +2245,9 @@ public:
 
 	void destroyComponent(const ComponentUID& component) override
 	{
-		if (component.entity == m_camera)
+		if (component.entity == m_camera && component.type == CAMERA_HASH)
 		{
-			g_log_warning.log("Editor")
+			g_log_error.log("Editor")
 				<< "Can not destroy component from the editing camera";
 			return;
 		}

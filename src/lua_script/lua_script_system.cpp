@@ -952,10 +952,7 @@ namespace Lumix
 
 		void removeScript(ComponentIndex cmp, int scr_index)
 		{
-			if (m_scripts[cmp]->m_scripts[scr_index].m_script)
-			{
-				m_system.getScriptManager().unload(*m_scripts[cmp]->m_scripts[scr_index].m_script);
-			}
+			setScriptPath(cmp, scr_index, Path());
 			m_scripts[cmp]->m_scripts.eraseFast(scr_index);
 		}
 
@@ -979,11 +976,12 @@ namespace Lumix
 		{
 			auto& scr = m_scripts[cmp]->m_scripts[scr_index];
 			int count;
-			char buf[256];
-			blob.readString(buf, lengthOf(buf));
-			scr.m_script = static_cast<LuaScript*>(m_system.getScriptManager().load(Lumix::Path(buf)));
+			char path[MAX_PATH_LENGTH];
+			blob.readString(path, lengthOf(path));
 			blob.read(count);
+			scr.m_environment = -1;
 			scr.m_properties.clear();
+			char buf[256];
 			for (int i = 0; i < count; ++i)
 			{
 				auto& prop = scr.m_properties.emplace(m_system.m_allocator);
@@ -992,6 +990,7 @@ namespace Lumix
 				blob.readString(buf, lengthOf(buf));
 				prop.stored_value = buf;
 			}
+			setScriptPath(cmp, scr_index, Path(path));
 		}
 
 
