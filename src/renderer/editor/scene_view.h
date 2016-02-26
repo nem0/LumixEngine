@@ -29,7 +29,7 @@ class SceneView
 		void shutdown();
 		void onGUI();
 		void setWireframe(bool wireframe);
-		Lumix::Pipeline* getCurrentPipeline() { return m_current_pipeline; }
+		Lumix::Pipeline* getPipeline() { return m_pipeline; }
 
 	private:
 		void renderGizmos();
@@ -43,16 +43,13 @@ class SceneView
 		Action* m_toggle_gizmo_step_action;
 		bool m_is_mouse_hovering_window;
 		bool m_is_opened;
-		bool m_is_pipeline_switch;
 		int m_screen_x;
 		int m_screen_y;
 		int m_width;
 		int m_height;
 		float m_camera_speed;
 		Lumix::WorldEditor* m_editor;
-		Lumix::Pipeline* m_forward_pipeline;
-		Lumix::Pipeline* m_deferred_pipeline;
-		Lumix::Pipeline* m_current_pipeline;
+		Lumix::Pipeline* m_pipeline;
 		bgfx::TextureHandle m_texture_handle;
 		bool m_show_stats;
 		LogUI* m_log_ui;
