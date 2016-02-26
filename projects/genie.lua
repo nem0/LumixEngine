@@ -94,6 +94,10 @@ function defaultConfigurations()
 		targetdir(BINARY_DIR .. "RelWithDebInfo")
 		defines { "NDEBUG" }
 		flags { "Symbols", "Optimize", "WinMain" }
+		
+	configuration {}
+		files { "lumix.natvis" }
+	
 end
 
 function linkLib(lib)
