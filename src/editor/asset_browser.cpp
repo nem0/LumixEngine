@@ -156,11 +156,23 @@ void AssetBrowser::update()
 
 		if (m_autoreload_changed_resource) m_editor.getEngine().getResourceManager().reload(path);
 
-		if (!PlatformInterface::fileExists(path.c_str()))
+		char tmp_path[Lumix::MAX_PATH_LENGTH];
+		const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath(0);
+		Lumix::copyString(tmp_path, base_path);
+		Lumix::catString(tmp_path, path.c_str());
+
+		if (!PlatformInterface::fileExists(tmp_path))
 		{
-			int index = getTypeIndexFromManagerType(resource_type);
-			m_resources[index].eraseItemFast(path);
-			continue;
+			base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath(1);
+			Lumix::copyString(tmp_path, base_path);
+			Lumix::catString(tmp_path, path.c_str());
+
+			if (!PlatformInterface::fileExists(tmp_path))
+			{
+				int index = getTypeIndexFromManagerType(resource_type);
+				m_resources[index].eraseItemFast(path);
+				continue;
+			}
 		}
 
 		char dir[Lumix::MAX_PATH_LENGTH];
