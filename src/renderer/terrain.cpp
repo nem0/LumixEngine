@@ -517,7 +517,7 @@ void Terrain::GrassType::grassLoaded(Resource::State, Resource::State)
 
 void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentIndex camera)
 {
-	if (!m_material->isReady()) return;
+	if (!m_material || !m_material->isReady()) return;
 
 	updateGrass(camera);
 	Array<GrassQuad*>& quads = getQuads(camera);
