@@ -87,6 +87,7 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		bool m_gen_smooth_normal;
 		bool m_import_materials;
 		bool m_convert_to_dds;
+		bool m_import_textures;
 		bool m_convert_to_raw;
 		bool m_import_animations;
 		bool m_import_physics;
