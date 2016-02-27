@@ -2093,40 +2093,37 @@ void ImportAssetDialog::onGUI()
 				ImGui::Checkbox("Make convex", &m_make_convex);
 			}
 
-			if (scene->mNumMeshes > 1)
+			if (ImGui::CollapsingHeader(
+					StringBuilder<30>("Meshes (") << scene->mNumMeshes << ")###Meshes",
+					nullptr,
+					true,
+					true))
 			{
-				if (ImGui::CollapsingHeader(
-						StringBuilder<30>("Meshes (") << scene->mNumMeshes << ")###Meshes",
-						nullptr,
-						true,
-						true))
+				if (ImGui::Button("Select all"))
 				{
-					if (ImGui::Button("Select all"))
-					{
-						for (int i = 0; i < m_mesh_mask.size(); ++i) m_mesh_mask[i] = true;
-					}
+					for (int i = 0; i < m_mesh_mask.size(); ++i) m_mesh_mask[i] = true;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Deselect all"))
+				{
+					for (int i = 0; i < m_mesh_mask.size(); ++i) m_mesh_mask[i] = false;
+				}
+				for (int i = 0; i < (int)scene->mNumMeshes; ++i)
+				{
+					if (!scene->mMeshes[i]->mTangents) continue;
+					const char* name = scene->mMeshes[i]->mName.C_Str();
+					if (name[0] == 0) name = ConvertTask::getMeshName(scene, scene->mMeshes[i]).C_Str();
+					bool b = m_mesh_mask[i];
+					auto* material = scene->mMaterials[scene->mMeshes[i]->mMaterialIndex];
+					aiString material_name;
+					material->Get(AI_MATKEY_NAME, material_name);
+					ImGui::Checkbox(StringBuilder<30>(name[0] == 0 ? material_name.C_Str() : name,
+										"###mesh",
+										(Lumix::uint64)&scene->mMeshes[i]),
+						&b);
 					ImGui::SameLine();
-					if (ImGui::Button("Deselect all"))
-					{
-						for (int i = 0; i < m_mesh_mask.size(); ++i) m_mesh_mask[i] = false;
-					}
-					for (int i = 0; i < (int)scene->mNumMeshes; ++i)
-					{
-						if (!scene->mMeshes[i]->mTangents) continue;
-						const char* name = scene->mMeshes[i]->mName.C_Str();
-						if (name[0] == 0) name = ConvertTask::getMeshName(scene, scene->mMeshes[i]).C_Str();
-						bool b = m_mesh_mask[i];
-						auto* material = scene->mMaterials[scene->mMeshes[i]->mMaterialIndex];
-						aiString material_name;
-						material->Get(AI_MATKEY_NAME, material_name);
-						ImGui::Checkbox(StringBuilder<30>(name[0] == 0 ? material_name.C_Str() : name,
-											"###mesh",
-											(Lumix::uint64)&scene->mMeshes[i]),
-							&b);
-						ImGui::SameLine();
-						ImGui::Text(" - material: %s", material_name.C_Str());
-						m_mesh_mask[i] = b;
-					}
+					ImGui::Text(" - material: %s", material_name.C_Str());
+					m_mesh_mask[i] = b;
 				}
 			}
 

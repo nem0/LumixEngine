@@ -1,5 +1,6 @@
 #include "lumix.h"
 #include "core/crc32.h"
+#include "core/FS/disk_file_device.h"
 #include "core/FS/file_system.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
@@ -70,13 +71,33 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 				*file, JsonSerializer::AccessMode::WRITE, material->getPath(), allocator);
 			if (!material->save(serializer))
 			{
-				g_log_error.log("Editor") << "Error saving "
-					<< material->getPath().c_str();
+				g_log_error.log("Editor") << "Error saving " << material->getPath().c_str();
 			}
 			fs.close(*file);
 
-			PlatformInterface::deleteFile(material->getPath().c_str());
-			PlatformInterface::moveFile(tmp_path, material->getPath().c_str());
+			StringBuilder<Lumix::MAX_PATH_LENGTH> src_full_path(
+				m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(0));
+			StringBuilder<Lumix::MAX_PATH_LENGTH> dest_full_path(
+				m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(0));
+			src_full_path << tmp_path;
+			dest_full_path << material->getPath().c_str();
+			if (!PlatformInterface::fileExists(src_full_path))
+			{
+				src_full_path.data[0] = 0;
+				dest_full_path.data[0] = 0;
+				src_full_path << m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(1);
+				src_full_path << tmp_path;
+				dest_full_path << m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(1);
+				dest_full_path << material->getPath().c_str();
+			}
+
+			PlatformInterface::deleteFile(dest_full_path);
+
+			if (!PlatformInterface::moveFile(src_full_path, dest_full_path))
+			{
+				g_log_error.log("Editor") << "Could not save file "
+											<< material->getPath().c_str();
+			}
 		}
 		else
 		{
