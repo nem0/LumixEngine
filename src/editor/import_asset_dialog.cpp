@@ -1202,9 +1202,8 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	const aiNode* getOwner(const aiMesh* mesh) const
+	static const aiNode* getOwner(const aiScene* scene, const aiMesh* mesh)
 	{
-		const aiScene* scene = m_dialog.m_importer.GetScene();
 		for (int i = 0; i < int(scene->mNumMeshes); ++i)
 		{
 			if (scene->mMeshes[i] == mesh) return getOwner(scene->mRootNode, i);
@@ -1213,13 +1212,13 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	aiString getMeshName(const aiMesh* mesh) const
+	static aiString getMeshName(const aiScene* scene, const aiMesh* mesh)
 	{
 		aiString mesh_name = mesh->mName;
 		int length = Lumix::stringLength(mesh_name.C_Str());
 		if (length == 0)
 		{
-			const auto* node = getOwner(mesh);
+			const auto* node = getOwner(scene, mesh);
 			if (node)
 			{
 				mesh_name = node->mName;
@@ -1260,7 +1259,7 @@ struct ConvertTask : public Lumix::MT::Task
 			indices_offset += mesh->mNumFaces * 3;
 			file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
-			aiString mesh_name = getMeshName(mesh);
+			aiString mesh_name = getMeshName(scene, mesh);
 			length = Lumix::stringLength(mesh_name.C_Str());
 
 			file.write((const char*)&length, sizeof(length));
@@ -1538,24 +1537,25 @@ struct ConvertTask : public Lumix::MT::Task
 
 	bool checkModel() const
 	{
+		auto* scene = m_dialog.m_importer.GetScene();
 		for (auto* mesh : m_filtered_meshes)
 		{
 			if (!mesh->HasNormals())
 			{
-				m_dialog.setMessage(
-					StringBuilder<256>("Mesh ", getMeshName(mesh).C_Str(), " has no normals."));
+				m_dialog.setMessage(StringBuilder<256>(
+					"Mesh ", getMeshName(scene, mesh).C_Str(), " has no normals."));
 				return false;
 			}
 			if (!mesh->HasPositions())
 			{
-				m_dialog.setMessage(
-					StringBuilder<256>("Mesh ", getMeshName(mesh).C_Str(), " has no positions."));
+				m_dialog.setMessage(StringBuilder<256>(
+					"Mesh ", getMeshName(scene, mesh).C_Str(), " has no positions."));
 				return false;
 			}
 			if (!mesh->HasTextureCoords(0))
 			{
 				m_dialog.setMessage(StringBuilder<256>(
-					"Mesh ", getMeshName(mesh).C_Str(), " has no texture coords."));
+					"Mesh ", getMeshName(scene, mesh).C_Str(), " has no texture coords."));
 				return false;
 			}
 		}
@@ -1574,7 +1574,8 @@ struct ConvertTask : public Lumix::MT::Task
 
 	float getMeshLODFactor(const aiMesh* mesh) const
 	{
-		const char* mesh_name = getMeshName(mesh).C_Str();
+		auto* scene = m_dialog.m_importer.GetScene();
+		const char* mesh_name = getMeshName(scene, mesh).C_Str();
 		int len = Lumix::stringLength(mesh_name);
 		if (len < 5) return FLT_MAX;
 
@@ -1606,9 +1607,10 @@ struct ConvertTask : public Lumix::MT::Task
 
 	int getMeshLOD(const aiMesh* const* mesh_ptr) const
 	{
+		auto* scene = m_dialog.m_importer.GetScene();
 		const aiMesh* const mesh = *mesh_ptr;
 
-		const char* mesh_name = getMeshName(mesh).C_Str();
+		const char* mesh_name = getMeshName(scene, mesh).C_Str();
 		int len = Lumix::stringLength(mesh_name);
 		if (len < 5) return -1;
 
@@ -2112,11 +2114,17 @@ void ImportAssetDialog::onGUI()
 					{
 						if (!scene->mMeshes[i]->mTangents) continue;
 						const char* name = scene->mMeshes[i]->mName.C_Str();
+						if (name[0] == 0) name = ConvertTask::getMeshName(scene, scene->mMeshes[i]).C_Str();
 						bool b = m_mesh_mask[i];
-						ImGui::Checkbox(StringBuilder<30>(name[0] == 0 ? "N/A" : name,
+						auto* material = scene->mMaterials[scene->mMeshes[i]->mMaterialIndex];
+						aiString material_name;
+						material->Get(AI_MATKEY_NAME, material_name);
+						ImGui::Checkbox(StringBuilder<30>(name[0] == 0 ? material_name.C_Str() : name,
 											"###mesh",
 											(Lumix::uint64)&scene->mMeshes[i]),
 							&b);
+						ImGui::SameLine();
+						ImGui::Text(" - material: %s", material_name.C_Str());
 						m_mesh_mask[i] = b;
 					}
 				}
