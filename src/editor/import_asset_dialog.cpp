@@ -535,6 +535,7 @@ struct ConvertTask : public Lumix::MT::Task
 			material_file << "\"\n }\n";
 		}
 
+		if (!m_dialog.m_import_textures) return true;
 		bool is_already_saved = m_dialog.m_saved_textures.indexOf(texture_source_path) >= 0;
 		if (is_embedded || is_already_saved) return true;
 
@@ -1717,6 +1718,7 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	, m_mesh_mask(editor.getAllocator())
 	, m_convert_to_dds(false)
 	, m_convert_to_raw(false)
+	, m_import_textures(true)
 	, m_raw_texture_scale(1)
 	, m_mesh_scale(1)
 {
@@ -1772,6 +1774,7 @@ bool ImportAssetDialog::checkTexture(const char* source_dir,
 bool ImportAssetDialog::checkTextures()
 {
 	if (!m_import_materials) return true;
+	if (!m_import_textures) return true;
 
 	auto scene = m_importer.GetScene();
 	int undefined_count = 0;
@@ -2072,7 +2075,8 @@ void ImportAssetDialog::onGUI()
 			{
 				ImGui::Checkbox(StringBuilder<50>("Import materials (", scene->mNumMaterials, ")"),
 					&m_import_materials);
-				ImGui::Checkbox("Convert to DDS", &m_convert_to_dds);
+				ImGui::Checkbox("Import textures", &m_import_textures);
+				if(m_import_textures) ImGui::Checkbox("Convert to DDS", &m_convert_to_dds);
 			}
 			if (scene->HasAnimations())
 			{
