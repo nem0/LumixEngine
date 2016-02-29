@@ -206,6 +206,24 @@ public:
 				}
 				ImGui::Separator();
 
+				ImGui::Text("Version 0.21. - News");
+				ImGui::BulletText("copy / paste multiple entities at once");
+				ImGui::BulletText("stencil support");
+				ImGui::BulletText("unlimited light intensity");
+				ImGui::BulletText("alpha test reference value editable");
+				ImGui::BulletText("panning");
+				ImGui::BulletText("multiple script components in one entity");
+				ImGui::BulletText("errors messages are more visible");
+				ImGui::BulletText("plugins can be static libraries");
+				ImGui::BulletText("multipass materials");
+				ImGui::BulletText("several data sources");
+				ImGui::BulletText("editor GUI can be created from lua script");
+				ImGui::BulletText("DXT1 for images without alpha");
+				ImGui::BulletText("import dialog - several new features, improved UX");
+				ImGui::BulletText("show / hide, freeze / unfreeze group");
+				ImGui::BulletText("pipeline can be reloaded in runtime");
+				ImGui::BulletText("postprocess effect framework");
+				ImGui::Separator();
 				ImGui::Text("Version 0.20. - News");
 				ImGui::BulletText("Deferred rendering");
 				ImGui::BulletText("HDR");
@@ -238,28 +256,6 @@ public:
 				ImGui::BulletText("Shader editor");
 				ImGui::BulletText("Audio system");
 				ImGui::BulletText("Basic particle system");
-				ImGui::Separator();
-				ImGui::Text("Version 0.17. - News");
-				ImGui::BulletText("Back button in the asset browser");
-				ImGui::BulletText("Grass culling");
-				ImGui::BulletText("Importing compressed embedded textures");
-				ImGui::BulletText("Euler angles");
-				ImGui::BulletText("Textures relative to root");
-				ImGui::BulletText("Painting entities - align with normal");
-				ImGui::BulletText("Painting entities - random x and z rotation");
-				ImGui::BulletText("Lua properties with types");
-				ImGui::BulletText("Moving the Light Texel-Sized Increments");
-				ImGui::BulletText("Terrain brush for removing entities");
-				ImGui::BulletText("Improved shadows on terrain");
-				ImGui::BulletText("Fog height");
-				ImGui::BulletText("Bitmap to heightmap convertor");
-				ImGui::BulletText("LOD preview");
-				ImGui::BulletText("New gizmo");
-				ImGui::BulletText("Orbit camera");
-				ImGui::BulletText("Welcome screen");
-				ImGui::BulletText("Visualization of physical contorller");
-				ImGui::BulletText("Game view fixed");
-
 			}
 			ImGui::EndChild();
 		}
