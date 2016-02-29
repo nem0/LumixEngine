@@ -839,6 +839,8 @@ public:
 			m_editor->getEngine().getFileSystem().updateAsyncTransactions();
 		}
 
+		m_editor->newUniverse();
+
 		for (auto* plugin : m_plugins)
 		{
 			LUMIX_DELETE(m_editor->getAllocator(), plugin);
