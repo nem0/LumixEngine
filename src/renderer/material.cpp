@@ -37,9 +37,6 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 	, m_command_buffer(nullptr)
 	, m_layer_count(1)
 {
-	auto* manager = resource_manager.get(ResourceManager::MATERIAL);
-	auto* mat_manager = static_cast<MaterialManager*>(manager);
-
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
 	{

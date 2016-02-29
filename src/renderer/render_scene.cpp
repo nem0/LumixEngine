@@ -3034,8 +3034,6 @@ public:
 
 	void modelUnloaded(Model* model)
 	{
-		auto& rm = model->getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
 		for (int i = 0, c = m_renderables.size(); i < c; ++i)
 		{
 			if (m_renderables[i].entity != INVALID_ENTITY && m_renderables[i].model == model)
