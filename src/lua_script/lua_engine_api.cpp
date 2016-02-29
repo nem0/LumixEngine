@@ -49,7 +49,6 @@ static void setProperty(const ComponentUID& cmp,
 	lua_State* L,
 	IAllocator& allocator)
 {
-	OutputBlob stream(allocator);
 	switch (desc.getType())
 	{
 		case IPropertyDescriptor::STRING:
@@ -58,36 +57,36 @@ static void setProperty(const ComponentUID& cmp,
 			if (lua_isstring(L, -1))
 			{
 				const char* str = lua_tostring(L, -1);
-				stream.write(str, stringLength(str));
+				desc.set(cmp, -1, InputBlob(str, stringLength(str)));
 			}
 			break;
 		case IPropertyDescriptor::DECIMAL:
 			if (lua_isnumber(L, -1))
 			{
 				float f = (float)lua_tonumber(L, -1);
-				stream.write(f);
+				desc.set(cmp, -1, InputBlob(&f, sizeof(f)));
 			}
 			break;
 		case IPropertyDescriptor::BOOL:
 			if (lua_isboolean(L, -1))
 			{
 				bool b = lua_toboolean(L, -1) != 0;
-				stream.write(b);
+				desc.set(cmp, -1, InputBlob(&b, sizeof(b)));
 			}
 			break;
 		case IPropertyDescriptor::VEC3:
 		case IPropertyDescriptor::COLOR:
 			if (lua_istable(L, -1))
 			{
-				stream.write(LuaWrapper::toType<Vec3>(L, -1));
+				auto v = LuaWrapper::toType<Vec3>(L, -1);
+				desc.set(cmp, -1, InputBlob(&v, sizeof(v)));
 			}
 			break;
 		default:
 			g_log_error.log("Lua Script") << "Property " << desc.getName() << " has unsupported type";
 			break;
 	}
-	InputBlob tmp(stream);
-	desc.set(cmp, -1, tmp);
+	;
 }
 
 
