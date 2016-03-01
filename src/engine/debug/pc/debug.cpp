@@ -2,8 +2,7 @@
 #include "core/mt/atomic.h"
 #include "core/string.h"
 #include "core/system.h"
-#include "core/pc/simple_win.h"
-#include <Windows.h>
+#include <windows.h>
 #include <DbgHelp.h>
 #include <mapi.h>
 #include <cstdlib>

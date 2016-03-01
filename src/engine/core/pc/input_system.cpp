@@ -3,10 +3,7 @@
 #include "core/profiler.h"
 #include "core/string.h"
 
-#include "core/pc/simple_win.h"
-#undef NOKEYSTATES
-#undef NOUSER
-#include <Windows.h>
+#include <windows.h>
 #include <Xinput.h>
 
 

@@ -4,7 +4,7 @@
 #include "core/mt/thread.h"
 #include "core/pc/simple_win.h"
 #include "core/profiler.h"
-#include <Windows.h>
+
 
 
 namespace Lumix

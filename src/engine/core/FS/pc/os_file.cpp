@@ -1,10 +1,8 @@
 #include "core/fs/os_file.h"
 #include "core/iallocator.h"
+#include "core/pc/simple_win.h"
 #include "core/string.h"
 #include "lumix.h"
-
-#include "core/pc/simple_win.h"
-#include <windows.h>
 
 
 namespace Lumix

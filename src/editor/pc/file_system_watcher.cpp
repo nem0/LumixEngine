@@ -4,7 +4,6 @@
 #include "core/string.h"
 
 #include "core/pc/simple_win.h"
-#include <windows.h>
 
 
 class FileSystemWatcherPC;
