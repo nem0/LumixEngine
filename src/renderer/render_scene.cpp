@@ -2950,7 +2950,6 @@ public:
 
 		for (int i = 0; i < m_point_lights.size(); ++i)
 		{
-			PointLight& light = m_point_lights[i];
 			m_light_influenced_geometry[i].eraseItemFast(component);
 		}
 		m_culling_system->removeStatic(component);

@@ -195,6 +195,7 @@ static int getEntityPosition(lua_State* L)
 	return 1;
 }
 
+
 static int getEntityDirection(lua_State* L)
 {
 	auto* universe = LuaWrapper::checkArg<Universe*>(L, 1);

@@ -452,7 +452,7 @@ static const uint32 CAMERA_HASH = crc32("camera");
 struct BGFXAllocator : public bx::AllocatorI
 {
 
-	BGFXAllocator(Lumix::IAllocator& source)
+	explicit BGFXAllocator(Lumix::IAllocator& source)
 		: m_source(source)
 	{
 	}
@@ -499,7 +499,7 @@ struct RendererImpl : public Renderer
 {
 	struct CallbackStub : public bgfx::CallbackI
 	{
-		CallbackStub(RendererImpl& renderer)
+		explicit CallbackStub(RendererImpl& renderer)
 			: m_renderer(renderer)
 		{}
 
@@ -593,7 +593,7 @@ struct RendererImpl : public Renderer
 	};
 
 
-	RendererImpl(Engine& engine)
+	explicit RendererImpl(Engine& engine)
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator())
 		, m_texture_manager(m_allocator)

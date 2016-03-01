@@ -926,7 +926,6 @@ struct ConvertTask : public Lumix::MT::Task
 			{
 				if (info.weights[min] > info.weights[i]) min = i;
 			}
-			float old_weight = info.weights[min];
 			info.weights[min] = weight;
 			info.bone_indices[min] = bone_index;
 		}
@@ -1412,7 +1411,6 @@ struct ConvertTask : public Lumix::MT::Task
 
 	void writeSkeleton(Lumix::FS::OsFile& file)
 	{
-		const aiScene* scene = m_dialog.m_importer.GetScene();
 		Lumix::int32 count = m_nodes.size();
 		if (count == 1) count = 0;
 		file.write((const char*)&count, sizeof(count));
@@ -1479,7 +1477,6 @@ struct ConvertTask : public Lumix::MT::Task
 		char filename[Lumix::MAX_PATH_LENGTH];
 		Lumix::PathUtils::getBasename(filename, sizeof(filename), m_dialog.m_source);
 		Lumix::catString(filename, ".phy");
-		auto& fs = m_dialog.m_editor.getEngine().getFileSystem();
 		PathBuilder phy_path(m_dialog.m_output_dir);
 		phy_path << "/" << filename;
 		Lumix::FS::OsFile file;
@@ -1670,7 +1667,6 @@ struct ConvertTask : public Lumix::MT::Task
 		PathBuilder path(m_dialog.m_output_dir);
 		path << "/" << basename << ".msh";
 
-		auto& fs = m_dialog.m_editor.getEngine().getFileSystem();
 		Lumix::FS::OsFile file;
 		
 		if (!file.open(path,

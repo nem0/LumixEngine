@@ -45,7 +45,7 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 	};
 
 
-	PaintTerrainCommand(Lumix::WorldEditor& editor)
+	explicit PaintTerrainCommand(Lumix::WorldEditor& editor)
 		: m_world_editor(editor)
 		, m_new_data(editor.getAllocator())
 		, m_old_data(editor.getAllocator())
@@ -937,7 +937,6 @@ void TerrainEditor::removeEntities(const Lumix::RayCastModelHit& hit)
 	if (m_selected_entity_templates.empty()) return;
 	auto& template_system = m_world_editor.getEntityTemplateSystem();
 	auto& template_names = template_system.getTemplateNames();
-	int templates_count = template_names.size();
 
 	PROFILE_FUNCTION();
 
@@ -1090,7 +1089,6 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 	if (m_selected_entity_templates.empty()) return;
 	auto& template_system = m_world_editor.getEntityTemplateSystem();
 	auto& template_names = template_system.getTemplateNames();
-	int templates_count = template_names.size();
 
 	static const Lumix::uint32 PAINT_ENTITIES_HASH = Lumix::crc32("paint_entities");
 	m_world_editor.beginCommandGroup(PAINT_ENTITIES_HASH);

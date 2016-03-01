@@ -198,7 +198,7 @@ namespace Lumix
 
 	struct PhysicsSystemImpl : public PhysicsSystem
 	{
-		PhysicsSystemImpl(Engine& engine)
+		explicit PhysicsSystemImpl(Engine& engine)
 			: m_allocator(engine.getAllocator())
 			, m_engine(engine)
 			, m_manager(*this, engine.getAllocator())
@@ -244,7 +244,7 @@ namespace Lumix
 
 	struct EditorPlugin : public WorldEditor::Plugin
 	{
-		EditorPlugin(WorldEditor& editor)
+		explicit EditorPlugin(WorldEditor& editor)
 			: m_editor(editor)
 		{
 		}
@@ -386,7 +386,7 @@ namespace {
 
 	struct StudioAppPlugin : public StudioApp::IPlugin
 	{
-		StudioAppPlugin(Lumix::WorldEditor& editor)
+		explicit StudioAppPlugin(Lumix::WorldEditor& editor)
 			: m_editor(editor)
 		{
 			m_action = LUMIX_NEW(m_editor.getAllocator(), Action)("Physics", "physics");

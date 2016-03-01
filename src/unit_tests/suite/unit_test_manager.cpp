@@ -213,7 +213,7 @@ namespace Lumix
 				m_task.run();
 			}
 
-			ManagerImpl(IAllocator& allocator)
+			explicit ManagerImpl(IAllocator& allocator)
 				: m_fails(0)
 				, m_task(&m_trans_queue, allocator)
 				, m_in_progress(allocator)

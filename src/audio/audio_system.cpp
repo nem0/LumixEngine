@@ -66,7 +66,7 @@ static void registerProperties(Lumix::IAllocator& allocator)
 
 struct AudioSystemImpl : public AudioSystem
 {
-	AudioSystemImpl(Engine& engine)
+	explicit AudioSystemImpl(Engine& engine)
 		: m_engine(engine)
 		, m_manager(engine.getAllocator())
 		, m_device(nullptr)
@@ -120,7 +120,7 @@ namespace {
 
 	struct AssetBrowserPlugin : public AssetBrowser::IPlugin
 	{
-		AssetBrowserPlugin(StudioApp& app)
+		explicit AssetBrowserPlugin(StudioApp& app)
 			: m_app(app)
 			, m_browser(*app.getAssetBrowser())
 			, m_playing_clip(-1)
@@ -213,7 +213,7 @@ namespace {
 
 	struct StudioAppPlugin : public StudioApp::IPlugin
 	{
-		StudioAppPlugin(StudioApp& app)
+		explicit StudioAppPlugin(StudioApp& app)
 			: m_app(app)
 		{
 			m_filter[0] = 0;
@@ -295,7 +295,7 @@ namespace {
 
 	struct EditorPlugin : public WorldEditor::Plugin
 	{
-		EditorPlugin(WorldEditor& editor)
+		explicit EditorPlugin(WorldEditor& editor)
 			: m_editor(editor)
 		{
 		}
