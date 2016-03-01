@@ -336,7 +336,7 @@ namespace Lumix
 	struct AnimationSystemImpl : public IPlugin
 	{
 	public:
-		AnimationSystemImpl(Engine& engine)
+		explicit AnimationSystemImpl(Engine& engine)
 			: m_allocator(engine.getAllocator())
 			, m_engine(engine)
 			, m_animation_manager(m_allocator)
@@ -394,7 +394,7 @@ namespace Lumix
 	struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	{
 
-		AssetBrowserPlugin(StudioApp& app)
+		explicit AssetBrowserPlugin(StudioApp& app)
 			: m_app(app)
 		{
 		}
@@ -440,7 +440,7 @@ namespace Lumix
 
 	struct PropertyGridPlugin : PropertyGrid::IPlugin
 	{
-		PropertyGridPlugin(StudioApp& app)
+		explicit PropertyGridPlugin(StudioApp& app)
 			: m_app(app)
 		{
 			m_is_playing = false;

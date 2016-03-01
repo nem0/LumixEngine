@@ -51,7 +51,7 @@ namespace Lumix
 	class LuaScriptSystemImpl : public IPlugin
 	{
 	public:
-		LuaScriptSystemImpl(Engine& engine);
+		explicit LuaScriptSystemImpl(Engine& engine);
 		virtual ~LuaScriptSystemImpl();
 
 		IAllocator& getAllocator();
@@ -102,7 +102,7 @@ namespace Lumix
 
 		struct ScriptInstance
 		{
-			ScriptInstance(IAllocator& allocator)
+			explicit ScriptInstance(IAllocator& allocator)
 				: m_properties(allocator)
 			{
 				m_script = nullptr;
@@ -1098,7 +1098,7 @@ namespace Lumix
 			AddScriptCommand(){}
 			
 
-			AddScriptCommand(WorldEditor& editor)
+			explicit AddScriptCommand(WorldEditor& editor)
 			{
 				scene = static_cast<LuaScriptSceneImpl*>(editor.getScene(crc32("lua_script")));
 			}
@@ -1150,14 +1150,14 @@ namespace Lumix
 
 		struct RemoveScriptCommand : public IEditorCommand
 		{
-			RemoveScriptCommand(WorldEditor& editor)
+			explicit RemoveScriptCommand(WorldEditor& editor)
 				: blob(editor.getAllocator())
 			{
 				scene = static_cast<LuaScriptSceneImpl*>(editor.getScene(crc32("lua_script")));
 			}
 
 
-			RemoveScriptCommand(IAllocator& allocator)
+			explicit RemoveScriptCommand(IAllocator& allocator)
 				: blob(allocator)
 			{
 			}
@@ -1213,7 +1213,7 @@ namespace Lumix
 
 		struct SetPropertyCommand : public IEditorCommand
 		{
-			SetPropertyCommand(WorldEditor& editor)
+			explicit SetPropertyCommand(WorldEditor& editor)
 				: property_name(editor.getAllocator())
 				, value(editor.getAllocator())
 				, old_value(editor.getAllocator())
@@ -1339,7 +1339,7 @@ namespace Lumix
 
 
 
-		PropertyGridPlugin(StudioApp& app)
+		explicit PropertyGridPlugin(StudioApp& app)
 			: m_app(app)
 		{
 			lua_State* L = app.getWorldEditor()->getEngine().getState();
@@ -1473,7 +1473,7 @@ namespace Lumix
 
 	struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	{
-		AssetBrowserPlugin(StudioApp& app)
+		explicit AssetBrowserPlugin(StudioApp& app)
 			: m_app(app)
 		{
 			m_text_buffer[0] = 0;

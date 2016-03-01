@@ -85,7 +85,7 @@ struct EndGroupCommand : public IEditorCommand
 class SetEntityNameCommand : public IEditorCommand
 {
 public:
-	SetEntityNameCommand(WorldEditor& editor)
+	explicit SetEntityNameCommand(WorldEditor& editor)
 		: m_new_name(m_editor.getAllocator())
 		, m_old_name(m_editor.getAllocator())
 		, m_editor(editor)
@@ -166,7 +166,7 @@ private:
 class PasteEntityCommand : public IEditorCommand
 {
 public:
-	PasteEntityCommand(WorldEditor& editor)
+	explicit PasteEntityCommand(WorldEditor& editor)
 		: m_blob(editor.getAllocator())
 		, m_editor(editor)
 		, m_entities(editor.getAllocator())
@@ -260,7 +260,7 @@ private:
 class MoveEntityCommand : public IEditorCommand
 {
 public:
-	MoveEntityCommand(WorldEditor& editor)
+	explicit MoveEntityCommand(WorldEditor& editor)
 		: m_new_positions(editor.getAllocator())
 		, m_new_rotations(editor.getAllocator())
 		, m_old_positions(editor.getAllocator())
@@ -416,7 +416,7 @@ private:
 class ScaleEntityCommand : public IEditorCommand
 {
 public:
-	ScaleEntityCommand(WorldEditor& editor)
+	explicit ScaleEntityCommand(WorldEditor& editor)
 		: m_new_scales(editor.getAllocator())
 		, m_old_scales(editor.getAllocator())
 		, m_entities(editor.getAllocator())
@@ -544,7 +544,7 @@ class RemoveArrayPropertyItemCommand : public IEditorCommand
 {
 
 public:
-	RemoveArrayPropertyItemCommand(WorldEditor& editor)
+	explicit RemoveArrayPropertyItemCommand(WorldEditor& editor)
 		: m_old_values(editor.getAllocator())
 		, m_editor(editor)
 	{
@@ -632,7 +632,7 @@ class AddArrayPropertyItemCommand : public IEditorCommand
 {
 
 public:
-	AddArrayPropertyItemCommand(WorldEditor& editor)
+	explicit AddArrayPropertyItemCommand(WorldEditor& editor)
 		: m_editor(editor)
 	{
 	}
@@ -706,7 +706,7 @@ private:
 class SetPropertyCommand : public IEditorCommand
 {
 public:
-	SetPropertyCommand(WorldEditor& editor)
+	explicit SetPropertyCommand(WorldEditor& editor)
 		: m_editor(editor)
 		, m_new_value(editor.getAllocator())
 		, m_old_value(editor.getAllocator())
@@ -892,7 +892,7 @@ private:
 	class AddComponentCommand : public IEditorCommand
 	{
 	public:
-		AddComponentCommand(WorldEditor& editor)
+		explicit AddComponentCommand(WorldEditor& editor)
 			: m_editor(static_cast<WorldEditorImpl&>(editor))
 			, m_entities(editor.getAllocator())
 		{
@@ -1010,7 +1010,7 @@ private:
 	class DestroyEntitiesCommand : public IEditorCommand
 	{
 	public:
-		DestroyEntitiesCommand(WorldEditor& editor)
+		explicit DestroyEntitiesCommand(WorldEditor& editor)
 			: m_editor(static_cast<WorldEditorImpl&>(editor))
 			, m_entities(editor.getAllocator())
 			, m_positons_rotations(editor.getAllocator())
@@ -1192,7 +1192,7 @@ private:
 	class DestroyComponentCommand : public IEditorCommand
 	{
 	public:
-		DestroyComponentCommand(WorldEditor& editor)
+		explicit DestroyComponentCommand(WorldEditor& editor)
 			: m_editor(static_cast<WorldEditorImpl&>(editor))
 			, m_old_values(editor.getAllocator())
 		{
@@ -1330,7 +1330,7 @@ private:
 	class AddEntityCommand : public IEditorCommand
 	{
 	public:
-		AddEntityCommand(WorldEditor& editor)
+		explicit AddEntityCommand(WorldEditor& editor)
 			: m_editor(static_cast<WorldEditorImpl&>(editor))
 		{
 			m_entity = INVALID_ENTITY;
@@ -3214,7 +3214,7 @@ private:
 
 	struct ComponentType
 	{
-		ComponentType(IAllocator& allocator)
+		explicit ComponentType(IAllocator& allocator)
 			: m_name(allocator)
 			, m_id(allocator)
 		{

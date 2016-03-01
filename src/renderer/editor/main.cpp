@@ -48,7 +48,7 @@ static const uint32 RENDER_PARAMS_HASH = crc32("render_params");
 
 struct MaterialPlugin : public AssetBrowser::IPlugin
 {
-	MaterialPlugin(StudioApp& app)
+	explicit MaterialPlugin(StudioApp& app)
 		: m_app(app)
 	{
 	}
@@ -317,7 +317,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		WorldEditor& m_editor;
 
 		Entity getEntity() const { return m_entity; }
-		InsertMeshCommand(WorldEditor& editor)
+		explicit InsertMeshCommand(WorldEditor& editor)
 			: m_editor(editor)
 		{
 		}
@@ -414,7 +414,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 	};
 
 
-	ModelPlugin(StudioApp& app)
+	explicit ModelPlugin(StudioApp& app)
 		: m_app(app)
 	{
 		m_app.getWorldEditor()->registerEditorCommandCreator("insert_mesh", createInsertMeshCommand);
@@ -539,7 +539,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 
 struct TexturePlugin : public AssetBrowser::IPlugin
 {
-	TexturePlugin(StudioApp& app)
+	explicit TexturePlugin(StudioApp& app)
 		: m_app(app)
 	{
 	}
@@ -603,7 +603,7 @@ struct TexturePlugin : public AssetBrowser::IPlugin
 
 struct ShaderPlugin : public AssetBrowser::IPlugin
 {
-	ShaderPlugin(StudioApp& app)
+	explicit ShaderPlugin(StudioApp& app)
 		: m_app(app)
 	{
 	}
@@ -713,7 +713,7 @@ static const uint32 PARTICLE_EMITTER_HASH = crc32("particle_emitter");
 
 struct EmitterPlugin : public PropertyGrid::IPlugin
 {
-	EmitterPlugin(StudioApp& app)
+	explicit EmitterPlugin(StudioApp& app)
 		: m_app(app)
 	{
 		m_particle_emitter_updating = true;
@@ -752,7 +752,7 @@ static const uint32 TERRAIN_HASH = crc32("terrain");
 
 struct TerrainPlugin : public PropertyGrid::IPlugin
 {
-	TerrainPlugin(StudioApp& app)
+	explicit TerrainPlugin(StudioApp& app)
 		: m_app(app)
 	{
 		auto& editor = *app.getWorldEditor();
@@ -924,7 +924,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 	};
 
 
-	SceneViewPlugin(StudioApp& app)
+	explicit SceneViewPlugin(StudioApp& app)
 		: m_app(app)
 	{
 		auto& editor = *app.getWorldEditor();
@@ -980,7 +980,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 	static GameViewPlugin* s_instance;
 
 
-	GameViewPlugin(StudioApp& app)
+	explicit GameViewPlugin(StudioApp& app)
 		: m_app(app)
 	{
 		m_width = m_height = -1;
@@ -1189,7 +1189,7 @@ GameViewPlugin* GameViewPlugin::s_instance = nullptr;
 
 struct ShaderEditorPlugin : public StudioApp::IPlugin
 {
-	ShaderEditorPlugin(StudioApp& app)
+	explicit ShaderEditorPlugin(StudioApp& app)
 		: m_shader_editor(app.getWorldEditor()->getAllocator())
 		, m_app(app)
 	{

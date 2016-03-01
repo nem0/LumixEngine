@@ -14,7 +14,7 @@ namespace PropertyRegister
 
 struct ComponentType
 {
-	ComponentType(IAllocator& allocator)
+	explicit ComponentType(IAllocator& allocator)
 		: m_name(allocator)
 		, m_id(allocator)
 	{
