@@ -663,7 +663,7 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	: m_world_editor(editor)
 	, m_color(1, 1, 1)
 	, m_current_brush(0)
-	, m_selected_entity_template(0)
+	, m_selected_entity_templates(editor.getAllocator())
 	, m_brush_mask(editor.getAllocator())
 	, m_brush_texture(nullptr)
 	, m_flat_height(0)
@@ -934,11 +934,10 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, in
 
 void TerrainEditor::removeEntities(const Lumix::RayCastModelHit& hit)
 {
-	if (m_selected_entity_template < 0) return;
+	if (m_selected_entity_templates.empty()) return;
 	auto& template_system = m_world_editor.getEntityTemplateSystem();
 	auto& template_names = template_system.getTemplateNames();
 	int templates_count = template_names.size();
-	if (m_selected_entity_template >= templates_count) return;
 
 	PROFILE_FUNCTION();
 
@@ -947,6 +946,12 @@ void TerrainEditor::removeEntities(const Lumix::RayCastModelHit& hit)
 
 	Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
 	Lumix::Frustum frustum;
+	Lumix::Array<Lumix::uint32> hashes(m_world_editor.getAllocator());
+	hashes.reserve(m_selected_entity_templates.size());
+	for(int template_idx : m_selected_entity_templates)
+	{
+		hashes.push(Lumix::crc32(template_names[template_idx].c_str()));
+	}
 	frustum.computeOrtho(hit.m_origin + hit.m_dir * hit.m_t,
 		Lumix::Vec3(0, 0, 1),
 		Lumix::Vec3(0, 1, 0),
@@ -957,12 +962,16 @@ void TerrainEditor::removeEntities(const Lumix::RayCastModelHit& hit)
 
 	Lumix::Array<Lumix::Entity> entities(m_world_editor.getAllocator());
 	scene->getRenderableEntities(frustum, entities);
-	auto hash = Lumix::crc32(template_names[m_selected_entity_template].c_str());
 	for(Lumix::Entity entity : entities)
 	{
-		if(template_system.getTemplate(entity) != hash) continue;
-
-		m_world_editor.destroyEntities(&entity, 1);
+		for(auto hash : hashes)
+		{
+			if(template_system.getTemplate(entity) == hash && template_system.getInstances(hash).size() > 1)
+			{
+				m_world_editor.destroyEntities(&entity, 1);
+				break;
+			}
+		}
 	}
 
 	m_world_editor.endCommandGroup();
@@ -1078,11 +1087,10 @@ static bool isOBBCollision(Lumix::RenderScene& scene,
 void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 {
 	PROFILE_FUNCTION();
-	if (m_selected_entity_template < 0) return;
+	if (m_selected_entity_templates.empty()) return;
 	auto& template_system = m_world_editor.getEntityTemplateSystem();
 	auto& template_names = template_system.getTemplateNames();
 	int templates_count = template_names.size();
-	if (m_selected_entity_template >= templates_count) return;
 
 	static const Lumix::uint32 PAINT_ENTITIES_HASH = Lumix::crc32("paint_entities");
 	m_world_editor.beginCommandGroup(PAINT_ENTITIES_HASH);
@@ -1092,12 +1100,23 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 		Lumix::Matrix inv_terrain_matrix = terrain_matrix;
 		inv_terrain_matrix.inverse();
 
-		auto hash = Lumix::crc32(template_names[m_selected_entity_template].c_str());
-		Lumix::Entity tpl = template_system.getInstances(hash)[0];
-		if(tpl < 0) return;
+		struct Tpl
+		{
+			Lumix::ComponentIndex cmp;
+			int template_idx;
+		};
 
-		Lumix::ComponentUID renderable = m_world_editor.getComponent(tpl, RENDERABLE_HASH);
-		if(!renderable.isValid()) return;
+		Lumix::Array<Tpl> tpls(m_world_editor.getAllocator());
+		tpls.reserve(m_selected_entity_templates.size());
+		for(int idx : m_selected_entity_templates)
+		{
+			Lumix::uint32 hash = Lumix::crc32(template_names[idx].c_str());
+			Lumix::Entity tpl = template_system.getInstances(hash)[0];
+			if(tpl < 0) continue;
+			Lumix::ComponentUID renderable = m_world_editor.getComponent(tpl, RENDERABLE_HASH);
+			if(!renderable.isValid()) continue;
+			tpls.push({renderable.index, idx});
+		}
 
 		Lumix::Frustum frustum;
 		auto center = hit.m_origin + hit.m_dir * hit.m_t;
@@ -1108,17 +1127,18 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 			2 * m_terrain_brush_size,
 			-m_terrain_brush_size,
 			m_terrain_brush_size);
-
 		auto& meshes = scene->getRenderableInfos(frustum);
 
-		const auto* template_name = template_names[m_selected_entity_template].c_str();
 
 		float w, h;
 		scene->getTerrainSize(m_component.index, &w, &h);
 		float scale = 1.0f - Lumix::Math::maxValue(0.01f, m_terrain_brush_strength);
-		Lumix::Model* model = scene->getRenderableModel(renderable.index);
 		for(int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f; ++i)
 		{
+			int renderable_idx = Lumix::Math::rand() % tpls.size();
+			Lumix::Model* model = scene->getRenderableModel(tpls[renderable_idx].cmp);
+			const auto* template_name = template_names[tpls[renderable_idx].template_idx].c_str();
+
 			float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
 			float dist = Lumix::Math::randFloat(0, 1.0f) * m_terrain_brush_size;
 			Lumix::Vec3 pos(center.x + cos(angle) * dist, 0, center.z + sin(angle) * dist);
@@ -1379,35 +1399,42 @@ void TerrainEditor::onGUI()
 			}
 			else
 			{
-				ImGui::Combo("Entity",
-					&m_selected_entity_template,
-					[](void* data, int idx, const char** out_text) -> bool
+				ImGui::BeginChild("entities", ImVec2(0, 150));
+				for(int i = 0; i < template_names.size(); ++i)
 				{
-					auto& template_names = *static_cast<Lumix::Array<Lumix::string>*>(data);
-					if (idx >= template_names.size()) return false;
-					*out_text = template_names[idx].c_str();
-					return true;
-				},
-					&template_names,
-					template_names.size());
-			}
-			if (ImGui::Checkbox("Align with normal", &m_is_align_with_normal))
-			{
-				if (m_is_align_with_normal) m_is_rotate_x = m_is_rotate_z = false;
-			}
-			if (ImGui::Checkbox("Rotate around X", &m_is_rotate_x))
-			{
-				if (m_is_rotate_x) m_is_align_with_normal = false;
-			}
-			ImGui::SameLine();
-			if (ImGui::Checkbox("Rotate around Z", &m_is_rotate_z))
-			{
-				if (m_is_rotate_z) m_is_align_with_normal = false;
+					int index_of = m_selected_entity_templates.indexOf(i);
+					bool b = index_of >= 0;
+					if(ImGui::Checkbox(template_names[i].c_str(), &b))
+					{
+						if(b)
+						{
+							m_selected_entity_templates.push(i);
+						}
+						else
+						{
+							m_selected_entity_templates.eraseFast(index_of);
+						}
+					}
+				}
+				ImGui::EndChild();
+				if(ImGui::Checkbox("Align with normal", &m_is_align_with_normal))
+				{
+					if(m_is_align_with_normal) m_is_rotate_x = m_is_rotate_z = false;
+				}
+				if(ImGui::Checkbox("Rotate around X", &m_is_rotate_x))
+				{
+					if(m_is_rotate_x) m_is_align_with_normal = false;
+				}
+				ImGui::SameLine();
+				if(ImGui::Checkbox("Rotate around Z", &m_is_rotate_z))
+				{
+					if(m_is_rotate_z) m_is_align_with_normal = false;
+				}
 			}
 		}
 		break;
 		default: ASSERT(false); break;
-	}	
+	}
 }
 
 

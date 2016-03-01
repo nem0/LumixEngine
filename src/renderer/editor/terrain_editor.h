@@ -74,7 +74,7 @@ private:
 	Lumix::uint16 m_flat_height;
 	Lumix::Vec3 m_color;
 	int m_current_brush;
-	int m_selected_entity_template;
+	Lumix::Array<int> m_selected_entity_templates;
 	Action* m_increase_brush_size;
 	Action* m_decrease_brush_size;
 	Action* m_increase_texture_idx;
