@@ -3,7 +3,6 @@
 #include "core/timer.h"
 
 #include "core/pc/simple_win.h"
-#include <Windows.h>
 
 namespace Lumix
 {

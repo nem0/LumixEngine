@@ -1,10 +1,9 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
 #include "core/log.h"
+#include "core/pc/simple_win.h"
 #include "core/stack_allocator.h"
 #include <cstdio>
-#include "core/pc/simple_win.h"
-#include <Windows.h>
 
 
 namespace Lumix

@@ -8,7 +8,6 @@
 #include "core/queue.h"
 #include "core/array.h"
 
-#include "core/pc/simple_win.h"
 #include <Windows.h>
 #include <cstdio>
 

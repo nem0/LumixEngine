@@ -6,7 +6,6 @@
 
 
 #include <ShlObj.h>
-#include <Windows.h>
 #include <mmsystem.h>
 
 

@@ -17,7 +17,7 @@
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "universe/universe.h"
-#include <Windows.h>
+#include <windows.h>
 #include <cstdio>
 
 
@@ -79,7 +79,7 @@ public:
 	{
 		HINSTANCE hInst = GetModuleHandle(NULL);
 		WNDCLASSEX wnd;
-		memset(&wnd, 0, sizeof(wnd));
+		wnd = {};
 		wnd.cbSize = sizeof(wnd);
 		wnd.style = CS_HREDRAW | CS_VREDRAW;
 		wnd.lpfnWndProc = msgProc;

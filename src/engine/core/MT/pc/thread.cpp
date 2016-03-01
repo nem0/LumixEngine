@@ -1,7 +1,7 @@
 #include "lumix.h"
 #include "core/mt/thread.h"
 #include "core/pc/simple_win.h"
-#include <Windows.h>
+
 
 namespace Lumix
 {
