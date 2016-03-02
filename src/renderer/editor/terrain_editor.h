@@ -87,6 +87,10 @@ private:
 	Lumix::Vec2 m_size_spread;
 	bool m_is_align_with_normal;
 	bool m_is_rotate_x;
+	bool m_is_rotate_y;
 	bool m_is_rotate_z;
 	bool m_is_enabled;
+	Lumix::Vec2 m_rotate_x_spread;
+	Lumix::Vec2 m_rotate_y_spread;
+	Lumix::Vec2 m_rotate_z_spread;
 };
