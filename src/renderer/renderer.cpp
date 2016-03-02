@@ -662,7 +662,13 @@ struct RendererImpl : public Renderer
 	}
 
 
-	MaterialManager& getMaterialManager()
+	ModelManager& getModelManager() override
+	{
+		return m_model_manager;
+	}
+
+
+	MaterialManager& getMaterialManager() override
 	{
 		return m_material_manager;
 	}
