@@ -159,7 +159,6 @@ namespace Lumix
 		size_t len = stringLength(path);
 		ASSERT(len < MAX_PATH_LENGTH);
 		PathUtils::normalize(path, tmp, (uint32)len + 1);
-		ASSERT(tmp[0] == 0 || tmp[1] != ':');
 		uint32 hash = crc32(tmp);
 		m_data = g_path_manager->getPath(hash, tmp);
 	}
@@ -192,7 +191,6 @@ namespace Lumix
 		size_t len = stringLength(rhs);
 		ASSERT(len < MAX_PATH_LENGTH);
 		PathUtils::normalize(rhs, tmp, (uint32)len + 1);
-		ASSERT(tmp[0] == 0 || tmp[1] != ':');
 		uint32 hash = crc32(tmp);
 		m_data = g_path_manager->getPath(hash, tmp);
 	}

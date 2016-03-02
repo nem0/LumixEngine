@@ -18,6 +18,7 @@ namespace Lumix
 class Engine;
 class LIFOAllocator;
 class MaterialManager;
+class ModelManager;
 class Path;
 class Shader;
 
@@ -41,6 +42,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual const bgfx::VertexDecl& getBasicVertexDecl() const = 0;
 		virtual const bgfx::VertexDecl& getBasic2DVertexDecl() const = 0;
 		virtual MaterialManager& getMaterialManager() = 0;
+		virtual ModelManager& getModelManager() = 0;
 		virtual Shader* getDefaultShader() = 0;
 		virtual const bgfx::UniformHandle& getMaterialColorShininessUniform() const = 0;
 

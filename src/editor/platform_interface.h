@@ -106,6 +106,7 @@ namespace PlatformInterface
 
 	LUMIX_EDITOR_API bool deleteFile(const char* path);
 	LUMIX_EDITOR_API bool moveFile(const char* from, const char* to);
+	LUMIX_EDITOR_API bool copyFile(const char* from, const char* to);
 	LUMIX_EDITOR_API bool fileExists(const char* path);
 	LUMIX_EDITOR_API bool dirExists(const char* path);
 	LUMIX_EDITOR_API Lumix::uint64 getLastModified(const char* file);

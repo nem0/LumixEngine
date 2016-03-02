@@ -691,6 +691,12 @@ namespace PlatformInterface
 	}
 
 
+	bool copyFile(const char* from, const char* to)
+	{
+		return CopyFile(from, to, FALSE) == TRUE;
+	}
+
+
 	bool fileExists(const char* path)
 	{
 		DWORD dwAttrib = GetFileAttributes(path);
