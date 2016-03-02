@@ -715,7 +715,9 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	m_texture_idx = 0;
 	m_is_align_with_normal = false;
 	m_is_rotate_x = false;
+	m_is_rotate_y = false;
 	m_is_rotate_z = false;
+	m_rotate_x_spread = m_rotate_y_spread = m_rotate_z_spread = Lumix::Vec2(0, Lumix::Math::PI * 2);
 
 	editor.universeDestroyed().bind<TerrainEditor, &TerrainEditor::onUniverseDestroyed>(this);
 }
@@ -1164,14 +1166,21 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 					{
 						if (m_is_rotate_x)
 						{
-							float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
+							float angle = Lumix::Math::randFloat(m_rotate_x_spread.x, m_rotate_x_spread.y);
 							Lumix::Quat q(Lumix::Vec3(1, 0, 0), angle);
+							rot = rot * q;
+						}
+
+						if (m_is_rotate_y)
+						{
+							float angle = Lumix::Math::randFloat(m_rotate_y_spread.x, m_rotate_y_spread.y);
+							Lumix::Quat q(Lumix::Vec3(0, 1, 0), angle);
 							rot = rot * q;
 						}
 
 						if (m_is_rotate_z)
 						{
-							float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
+							float angle = Lumix::Math::randFloat(m_rotate_z_spread.x, m_rotate_z_spread.y);
 							Lumix::Quat q(rot * Lumix::Vec3(0, 0, 1), angle);
 							rot = rot * q;
 						}
@@ -1418,16 +1427,52 @@ void TerrainEditor::onGUI()
 				ImGui::EndChild();
 				if(ImGui::Checkbox("Align with normal", &m_is_align_with_normal))
 				{
-					if(m_is_align_with_normal) m_is_rotate_x = m_is_rotate_z = false;
+					if(m_is_align_with_normal) m_is_rotate_x = m_is_rotate_y = m_is_rotate_z = false;
 				}
-				if(ImGui::Checkbox("Rotate around X", &m_is_rotate_x))
+				if (ImGui::Checkbox("Rotate around X", &m_is_rotate_x))
 				{
-					if(m_is_rotate_x) m_is_align_with_normal = false;
+					if (m_is_rotate_x) m_is_align_with_normal = false;
 				}
-				ImGui::SameLine();
+				if (m_is_rotate_x)
+				{
+					Lumix::Vec2 tmp = m_rotate_x_spread;
+					tmp.x = Lumix::Math::radiansToDegrees(tmp.x);
+					tmp.y = Lumix::Math::radiansToDegrees(tmp.y);
+					if (ImGui::DragFloat2("Rotate X spread", &tmp.x))
+					{
+						m_rotate_x_spread.x = Lumix::Math::degreesToRadians(tmp.x);
+						m_rotate_x_spread.y = Lumix::Math::degreesToRadians(tmp.y);
+					}
+				}
+				if (ImGui::Checkbox("Rotate around Y", &m_is_rotate_y))
+				{
+					if (m_is_rotate_y) m_is_align_with_normal = false;
+				}
+				if (m_is_rotate_y)
+				{
+					Lumix::Vec2 tmp = m_rotate_y_spread;
+					tmp.x = Lumix::Math::radiansToDegrees(tmp.x);
+					tmp.y = Lumix::Math::radiansToDegrees(tmp.y);
+					if (ImGui::DragFloat2("Rotate Y spread", &tmp.x))
+					{
+						m_rotate_y_spread.x = Lumix::Math::degreesToRadians(tmp.x);
+						m_rotate_y_spread.y = Lumix::Math::degreesToRadians(tmp.y);
+					}
+				}
 				if(ImGui::Checkbox("Rotate around Z", &m_is_rotate_z))
 				{
 					if(m_is_rotate_z) m_is_align_with_normal = false;
+				}
+				if (m_is_rotate_z)
+				{
+					Lumix::Vec2 tmp = m_rotate_z_spread;
+					tmp.x = Lumix::Math::radiansToDegrees(tmp.x);
+					tmp.y = Lumix::Math::radiansToDegrees(tmp.y);
+					if (ImGui::DragFloat2("Rotate Z spread", &tmp.x))
+					{
+						m_rotate_z_spread.x = Lumix::Math::degreesToRadians(tmp.x);
+						m_rotate_z_spread.y = Lumix::Math::degreesToRadians(tmp.y);
+					}
 				}
 				ImGui::DragFloat2("Size spread", &m_size_spread.x, 0.01f);
 				m_size_spread.x = Lumix::Math::minValue(m_size_spread.x, m_size_spread.y);
