@@ -122,11 +122,13 @@ private:
 			WorldEditor& editor,
 			const char* template_name,
 			const Vec3& position,
-			const Quat& rot)
+			const Quat& rot,
+			float size)
 			: m_entity_system(entity_system)
 			, m_template_name_hash(crc32(template_name))
 			, m_position(position)
 			, m_rotation(rot)
+			, m_size(size)
 			, m_editor(editor)
 		{
 		}
@@ -143,6 +145,7 @@ private:
 			serializer.serialize("rotation_y", m_rotation.y);
 			serializer.serialize("rotation_z", m_rotation.z);
 			serializer.serialize("rotation_w", m_rotation.w);
+			serializer.serialize("size", m_size);
 		}
 
 
@@ -157,6 +160,7 @@ private:
 			serializer.deserialize("rotation_y", m_rotation.y, 0);
 			serializer.deserialize("rotation_z", m_rotation.z, 0);
 			serializer.deserialize("rotation_w", m_rotation.w, 0);
+			serializer.deserialize("size", m_size, 1);
 		}
 
 
@@ -167,6 +171,7 @@ private:
 			{
 				Universe* universe = m_entity_system.m_editor.getUniverse();
 				m_entity = universe->createEntity(m_position, m_rotation);
+				universe->setScale(m_entity, m_size);
 
 				m_entity_system.m_instances.at(instance_index).push(m_entity);
 				Entity template_entity = m_entity_system.m_instances.at(instance_index)[0];
@@ -216,6 +221,7 @@ private:
 		Entity m_entity;
 		Vec3 m_position;
 		Quat m_rotation;
+		float m_size;
 	};
 
 public:
@@ -356,10 +362,10 @@ public:
 	}
 
 
-	Entity createInstance(const char* name, const Vec3& position, const Quat& rotation) override
+	Entity createInstance(const char* name, const Vec3& position, const Quat& rotation, float size) override
 	{
 		CreateInstanceCommand* command = LUMIX_NEW(m_editor.getAllocator(), CreateInstanceCommand)(
-			*this, m_editor, name, position, rotation);
+			*this, m_editor, name, position, rotation, size);
 		m_editor.executeCommand(command);
 		return command->getEntity();
 	}

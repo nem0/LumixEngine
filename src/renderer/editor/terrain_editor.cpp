@@ -668,6 +668,7 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	, m_brush_texture(nullptr)
 	, m_flat_height(0)
 	, m_is_enabled(false)
+	, m_size_spread(1, 1)
 {
 	editor.registerEditorCommandCreator("paint_terrain", createPaintTerrainCommand);
 
@@ -1127,7 +1128,6 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 			m_terrain_brush_size);
 		auto& meshes = scene->getRenderableInfos(frustum);
 
-
 		float w, h;
 		scene->getTerrainSize(m_component.index, &w, &h);
 		float scale = 1.0f - Lumix::Math::maxValue(0.01f, m_terrain_brush_strength);
@@ -1177,7 +1177,8 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 						}
 					}
 
-					auto entity = template_system.createInstance(template_name, pos, rot);
+					float size = Lumix::Math::randFloat(m_size_spread.x, m_size_spread.y);
+					auto entity = template_system.createInstance(template_name, pos, rot, size);
 				}
 			}
 		}
@@ -1428,6 +1429,8 @@ void TerrainEditor::onGUI()
 				{
 					if(m_is_rotate_z) m_is_align_with_normal = false;
 				}
+				ImGui::DragFloat2("Size spread", &m_size_spread.x, 0.01f);
+				m_size_spread.x = Lumix::Math::minValue(m_size_spread.x, m_size_spread.y);
 			}
 		}
 		break;

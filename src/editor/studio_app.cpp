@@ -584,7 +584,7 @@ public:
 				{
 					Lumix::Vec3 pos = m_editor->getCameraRaycastHit();
 					m_editor->getEntityTemplateSystem().createInstance(
-						m_selected_template_name.c_str(), pos, Lumix::Quat(0, 0, 0, 1));
+						m_selected_template_name.c_str(), pos, Lumix::Quat(0, 0, 0, 1), 1);
 				}
 
 				doMenuItem(getAction("showEntities"), false, is_any_entity_selected);
