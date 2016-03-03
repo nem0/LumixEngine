@@ -105,7 +105,7 @@ Settings::Settings(Lumix::IAllocator& allocator)
 	m_is_profiler_opened = false;
 	m_is_properties_opened = false;
 	m_is_crash_reporting_enabled = true;
-	m_mouse_sensitivity_x = m_mouse_sensitivity_y = 200.0f;
+	m_mouse_sensitivity_x = m_mouse_sensitivity_y = 1000.0f;
 	m_autosave_time = 300;
 
 	m_state = luaL_newstate();
