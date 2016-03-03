@@ -96,7 +96,7 @@ float getLineSegmentDistance(const Vec3& origin, const Vec3& dir, const Vec3& a,
 	float dot5 = dotProduct(dir, dir);
 
 	float denom = dot4 * dot5 - dot2 * dot2;
-	if (fabsf(denom) < 1e-5f)
+	if (abs(denom) < 1e-5f)
 	{
 		Vec3 X = origin + dir * dotProduct(b - origin, dir);
 		return (b - X).length();
@@ -168,6 +168,12 @@ static std::mt19937& getRandomGenerator()
 	static std::mt19937 gen(seed());
 
 	return gen;
+}
+
+
+float pow(float base, float exponent)
+{
+	return ::pow(base, exponent);
 }
 
 
