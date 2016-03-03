@@ -241,7 +241,8 @@ public:
 	virtual int getRenderableMaterialsCount(ComponentIndex cmp) = 0;
 	virtual void setRenderableLayer(ComponentIndex cmp, const int32& layer) = 0;
 	virtual void setRenderablePath(ComponentIndex cmp, const Path& path) = 0;
-	virtual Array<Array<RenderableMesh>>& getRenderableInfos(const Frustum& frustum) = 0;
+	virtual Array<Array<RenderableMesh>>& getRenderableInfos(const Frustum& frustum,
+		const Vec3& lod_ref_point) = 0;
 	virtual void getRenderableEntities(const Frustum& frustum, Array<Entity>& entities) = 0;
 	virtual Entity getRenderableEntity(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getFirstRenderable() = 0;

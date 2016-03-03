@@ -1129,7 +1129,7 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 			2 * m_terrain_brush_size,
 			-m_terrain_brush_size,
 			m_terrain_brush_size);
-		auto& meshes = scene->getRenderableInfos(frustum);
+		auto& meshes = scene->getRenderableInfos(frustum, frustum.getPosition());
 
 		float w, h;
 		scene->getTerrainSize(m_component.index, &w, &h);

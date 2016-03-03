@@ -1310,7 +1310,7 @@ struct PipelineImpl : public Pipeline
 			SHADOW_CAM_FAR);
 		m_current_render_views = &m_view_idx;
 		m_current_render_view_count = 1;
-		renderAll(shadow_camera_frustum, false);
+		renderAll(shadow_camera_frustum, false, camera_matrix.getTranslation());
 		m_is_rendering_in_shadowmap = false;
 	}
 
@@ -1724,7 +1724,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderAll(const Frustum& frustum, bool render_grass)
+	void renderAll(const Frustum& frustum, bool render_grass, const Vec3& lod_ref_point)
 	{
 		PROFILE_FUNCTION();
 
@@ -1733,7 +1733,7 @@ struct PipelineImpl : public Pipeline
 		m_tmp_grasses.clear();
 		m_tmp_terrains.clear();
 
-		auto& meshes = m_scene->getRenderableInfos(frustum);
+		auto& meshes = m_scene->getRenderableInfos(frustum, lod_ref_point);
 		Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
 		Vec3 camera_pos = m_scene->getUniverse().getPosition(camera_entity);
 		LIFOAllocator& frame_allocator = m_renderer.getFrameAllocator();
@@ -2547,7 +2547,7 @@ int renderModels(lua_State* L)
 
 	pipeline->m_current_render_views = views;
 	pipeline->m_current_render_view_count = len;
-	pipeline->renderAll(pipeline->m_camera_frustum, true);
+	pipeline->renderAll(pipeline->m_camera_frustum, true, pipeline->m_camera_frustum.getPosition());
 	pipeline->m_current_render_views = &pipeline->m_view_idx;
 	pipeline->m_current_render_view_count = 1;
 	return 0;
