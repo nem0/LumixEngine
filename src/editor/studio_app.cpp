@@ -1047,6 +1047,12 @@ public:
 	}
 
 
+	void LUA_createEntityTemplate(Lumix::Entity entity, const char* name)
+	{
+		m_editor->getEntityTemplateSystem().createTemplateFromEntity(name, entity);
+	}
+
+
 	void LUA_exit(int exit_code)
 	{
 		m_finished = true;
@@ -1088,6 +1094,7 @@ public:
 		REGISTER_FUNCTION(LUA_logError, "logError");
 		REGISTER_FUNCTION(LUA_logInfo, "logInfo");
 		REGISTER_FUNCTION(LUA_exit, "exit");
+		REGISTER_FUNCTION(LUA_createEntityTemplate, "createEntityTemplate");
 
 		#undef REGISTER_FUNCTION
 	}
