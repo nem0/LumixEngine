@@ -1949,7 +1949,9 @@ public:
 	}
 
 
-	void fillTemporaryInfos(const CullingSystem::Results& results, const Frustum& frustum)
+	void fillTemporaryInfos(const CullingSystem::Results& results,
+		const Frustum& frustum,
+		const Vec3& lod_ref_point)
 	{
 		PROFILE_FUNCTION();
 		m_jobs.clear();
@@ -1969,11 +1971,11 @@ public:
 			if (results[subresult_index].empty()) continue;
 
 			MTJD::Job* job = MTJD::makeJob(m_engine.getMTJDManager(),
-				[&subinfos, this, &results, subresult_index, &frustum]()
+				[&subinfos, this, &results, subresult_index, &frustum, lod_ref_point]()
 				{
 					PROFILE_BLOCK("Temporary Info Job");
 					PROFILE_INT("Renderable count", results[subresult_index].size());
-					Vec3 frustum_position = frustum.getPosition();
+					Vec3 ref_point = lod_ref_point;
 					const int* LUMIX_RESTRICT raw_subresults = &results[subresult_index][0];
 					Renderable* LUMIX_RESTRICT renderables = &m_renderables[0];
 					for (int i = 0, c = results[subresult_index].size(); i < c; ++i)
@@ -1981,8 +1983,7 @@ public:
 						Renderable* LUMIX_RESTRICT renderable = &renderables[raw_subresults[i]];
 						Model* LUMIX_RESTRICT model = renderable->model;
 						float squared_distance =
-							(renderable->matrix.getTranslation() - frustum_position)
-								.squaredLength();
+							(renderable->matrix.getTranslation() - ref_point).squaredLength();
 
 						LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
 						for (int j = lod.from, c = lod.to; j <= c; ++j)
@@ -2163,7 +2164,8 @@ public:
 	}
 
 
-	Array<Array<RenderableMesh>>& getRenderableInfos(const Frustum& frustum) override
+	Array<Array<RenderableMesh>>& getRenderableInfos(const Frustum& frustum,
+		const Vec3& lod_ref_point) override
 	{
 		PROFILE_FUNCTION();
 
@@ -2171,7 +2173,7 @@ public:
 		const CullingSystem::Results* results = cull(frustum);
 		if (!results) return m_temporary_infos;
 
-		fillTemporaryInfos(*results, frustum);
+		fillTemporaryInfos(*results, frustum, lod_ref_point);
 		return m_temporary_infos;
 	}
 
