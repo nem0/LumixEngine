@@ -37,15 +37,30 @@ namespace Lumix
 	class Universe;
 
 
+	enum class AnimationSceneVersion : int
+	{
+		FIRST,
+
+		LATEST
+	};
+
+
 	struct AnimationSceneImpl : public IScene
 	{
 		struct Animable
 		{
-			bool m_is_free;
-			ComponentIndex m_renderable;
-			float m_time;
-			class Animation* m_animation;
-			Entity m_entity;
+			enum Flags : int
+			{
+				FREE = 1
+			};
+
+			uint32 flags;
+			ComponentIndex renderable;
+			float time;
+			float time_scale;
+			float start_time;
+			class Animation* animation;
+			Entity entity;
 		};
 
 
@@ -78,8 +93,8 @@ namespace Lumix
 		{
 			for (auto& animable : m_animables)
 			{
-				if (animable.m_is_free) continue;
-				unloadAnimation(animable.m_animation);
+				if (animable.flags & Animable::FREE) continue;
+				unloadAnimation(animable.animation);
 			}
 
 			m_render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
@@ -114,7 +129,7 @@ namespace Lumix
 			ASSERT(ownComponentType(type));
 			for (int i = 0; i < m_animables.size(); ++i)
 			{
-				if (!m_animables[i].m_is_free && m_animables[i].m_entity == entity) return i;
+				if ((m_animables[i].flags & Animable::FREE) == 0 && m_animables[i].entity == entity) return i;
 			}
 			return INVALID_COMPONENT;
 		}
@@ -151,9 +166,9 @@ namespace Lumix
 		{
 			if (type == ANIMABLE_HASH)
 			{
-				unloadAnimation(m_animables[component].m_animation);
-				m_animables[component].m_is_free = true;
-				m_universe.destroyComponent(m_animables[component].m_entity, type, this, component);
+				unloadAnimation(m_animables[component].animation);
+				m_animables[component].flags |= Animable::FREE;
+				m_universe.destroyComponent(m_animables[component].entity, type, this, component);
 			}
 		}
 
@@ -163,81 +178,122 @@ namespace Lumix
 			serializer.write((int32)m_animables.size());
 			for (int i = 0; i < m_animables.size(); ++i)
 			{
-				serializer.write(m_animables[i].m_entity);
-				serializer.write(m_animables[i].m_time);
-				serializer.write(m_animables[i].m_is_free);
+				serializer.write(m_animables[i].entity);
+				serializer.write(m_animables[i].flags);
+				serializer.write(m_animables[i].time_scale);
+				serializer.write(m_animables[i].start_time);
 				serializer.writeString(
-					m_animables[i].m_animation ? m_animables[i].m_animation->getPath().c_str() : "");
+					m_animables[i].animation ? m_animables[i].animation->getPath().c_str() : "");
 			}
 		}
 
 
-		void deserialize(InputBlob& serializer, int) override
+		int getVersion() const override { return (int)AnimationSceneVersion::LATEST; }
+
+
+		void deserialize(InputBlob& serializer, int version) override
 		{
 			int32 count;
 			serializer.read(count);
 			m_animables.resize(count);
 			for (int i = 0; i < count; ++i)
 			{
-				serializer.read(m_animables[i].m_entity);
+				serializer.read(m_animables[i].entity);
 				ComponentIndex renderable =
-					m_render_scene->getRenderableComponent(m_animables[i].m_entity);
-				if (renderable >= 0)
+					m_render_scene->getRenderableComponent(m_animables[i].entity);
+				if (renderable >= 0) m_animables[i].renderable = renderable;
+				if(version <= (int)AnimationSceneVersion::FIRST)
 				{
-					m_animables[i].m_renderable = renderable;
+					serializer.read(m_animables[i].time);
+					bool free;
+					serializer.read(free);
+					if(free) m_animables[i].flags |= Animable::FREE;
+					else m_animables[i].flags &= ~Animable::FREE;
+					m_animables[i].time_scale = 1;
+					m_animables[i].start_time = 0;
 				}
-				serializer.read(m_animables[i].m_time);
-				serializer.read(m_animables[i].m_is_free);
+				else
+				{
+					serializer.read(m_animables[i].flags);
+					serializer.read(m_animables[i].time_scale);
+					serializer.read(m_animables[i].start_time);
+					m_animables[i].time = m_animables[i].start_time;
+				}
+
 				char path[MAX_PATH_LENGTH];
 				serializer.readString(path, sizeof(path));
-				m_animables[i].m_animation = path[0] == '\0' ? nullptr : loadAnimation(Path(path));
-				m_universe.addComponent(m_animables[i].m_entity, ANIMABLE_HASH, this, i);
+				m_animables[i].animation = path[0] == '\0' ? nullptr : loadAnimation(Path(path));
+				m_universe.addComponent(m_animables[i].entity, ANIMABLE_HASH, this, i);
 			}
+		}
+
+
+		float getTimeScale(ComponentIndex cmp)
+		{
+			return m_animables[cmp].time_scale;
+		}
+
+
+		void setTimeScale(ComponentIndex cmp, float time_scale)
+		{
+			m_animables[cmp].time_scale = time_scale;
+		}
+
+
+		float getStartTime(ComponentIndex cmp)
+		{
+			return m_animables[cmp].start_time;
+		}
+
+
+		void setStartTime(ComponentIndex cmp, float time)
+		{
+			m_animables[cmp].start_time = time;
 		}
 
 
 		Path getAnimation(ComponentIndex cmp)
 		{
-			return m_animables[cmp].m_animation
-				? m_animables[cmp].m_animation->getPath()
+			return m_animables[cmp].animation
+				? m_animables[cmp].animation->getPath()
 				: Path("");
 		}
 
 
 		void setAnimation(ComponentIndex cmp, const Path& path)
 		{
-			unloadAnimation(m_animables[cmp].m_animation);
-			m_animables[cmp].m_animation = loadAnimation(path);
-			m_animables[cmp].m_time = 0;
+			unloadAnimation(m_animables[cmp].animation);
+			m_animables[cmp].animation = loadAnimation(path);
+			m_animables[cmp].time = 0;
 		}
 
 
 		void updateAnimable(ComponentIndex cmp, float time_delta)
 		{
 			Animable& animable = m_animables[cmp];
-			if (!animable.m_is_free && animable.m_animation &&
-				animable.m_animation->isReady() && animable.m_renderable != INVALID_COMPONENT)
+			if ((animable.flags & Animable::FREE) == 0 && animable.animation &&
+				animable.animation->isReady() && animable.renderable != INVALID_COMPONENT)
 			{
-				auto* pose = m_render_scene->getPose(animable.m_renderable);
-				auto* model = m_render_scene->getRenderableModel(animable.m_renderable);
+				auto* pose = m_render_scene->getPose(animable.renderable);
+				auto* model = m_render_scene->getRenderableModel(animable.renderable);
 
 				if (!pose) return;
 				if (!model->isReady()) return;
 
 				model->getPose(*pose);
 				pose->computeRelative(*model);
-				animable.m_animation->getPose(
-					animable.m_time,
+				animable.animation->getPose(
+					animable.time,
 					*pose,
 					*model);
 
-				float t = animable.m_time + time_delta;
-				float l = animable.m_animation->getLength();
+				float t = animable.time + time_delta * animable.time_scale;
+				float l = animable.animation->getLength();
 				while (t > l)
 				{
 					t -= l;
 				}
-				animable.m_time = t;
+				animable.time = t;
 			}
 		}
 
@@ -267,9 +323,9 @@ namespace Lumix
 			Entity entity = m_render_scene->getRenderableEntity(cmp);
 			for (int i = 0; i < m_animables.size(); ++i)
 			{
-				if (m_animables[i].m_entity == entity)
+				if (m_animables[i].entity == entity)
 				{
-					m_animables[i].m_renderable = cmp;
+					m_animables[i].renderable = cmp;
 					break;
 				}
 			}
@@ -281,9 +337,9 @@ namespace Lumix
 			Entity entity = m_render_scene->getRenderableEntity(cmp);
 			for (int i = 0; i < m_animables.size(); ++i)
 			{
-				if (m_animables[i].m_entity == entity)
+				if (m_animables[i].entity == entity)
 				{
-					m_animables[i].m_renderable = INVALID_COMPONENT;
+					m_animables[i].renderable = INVALID_COMPONENT;
 					break;
 				}
 			}
@@ -296,7 +352,7 @@ namespace Lumix
 			int cmp = m_animables.size();
 			for (int i = 0, c = m_animables.size(); i < c; ++i)
 			{
-				if (m_animables[i].m_is_free)
+				if (m_animables[i].flags & Animable::FREE)
 				{
 					cmp = i;
 					src = &m_animables[i];
@@ -304,16 +360,18 @@ namespace Lumix
 				}
 			}
 			Animable& animable = src ? *src : m_animables.emplace();
-			animable.m_time = 0;
-			animable.m_is_free = false;
-			animable.m_renderable = INVALID_COMPONENT;
-			animable.m_animation = nullptr;
-			animable.m_entity = entity;
+			animable.time = 0;
+			animable.flags &= ~Animable::FREE;
+			animable.renderable = INVALID_COMPONENT;
+			animable.animation = nullptr;
+			animable.entity = entity;
+			animable.time_scale = 1;
+			animable.start_time = 0;
 
 			ComponentIndex renderable = m_render_scene->getRenderableComponent(entity);
 			if (renderable >= 0)
 			{
-				animable.m_renderable = renderable;
+				animable.renderable = renderable;
 			}
 
 			m_universe.addComponent(entity, ANIMABLE_HASH, this, cmp);
@@ -339,7 +397,7 @@ namespace Lumix
 		explicit AnimationSystemImpl(Engine& engine)
 			: m_allocator(engine.getAllocator())
 			, m_engine(engine)
-			, m_animation_manager(m_allocator)
+			, animation_manager(m_allocator)
 		{
 			PropertyRegister::registerComponentType("animable", "Animable");
 
@@ -348,6 +406,20 @@ namespace Lumix
 				&AnimationSceneImpl::setAnimation,
 				"Animation (*.ani)",
 				ResourceManager::ANIMATION,
+				m_allocator));
+			PropertyRegister::add("animable", LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationSceneImpl>)("Start time",
+				&AnimationSceneImpl::getStartTime,
+				&AnimationSceneImpl::setStartTime,
+				0,
+				FLT_MAX,
+				0.1f,
+				m_allocator));
+			PropertyRegister::add("animable", LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationSceneImpl>)("Time scale",
+				&AnimationSceneImpl::getTimeScale,
+				&AnimationSceneImpl::setTimeScale,
+				0,
+				FLT_MAX,
+				0.1f,
 				m_allocator));
 		}
 
@@ -369,7 +441,7 @@ namespace Lumix
 
 		bool create() override
 		{
-			m_animation_manager.create(ResourceManager::ANIMATION,
+			animation_manager.create(ResourceManager::ANIMATION,
 				m_engine.getResourceManager());
 			return true;
 		}
@@ -379,7 +451,7 @@ namespace Lumix
 
 		Lumix::IAllocator& m_allocator;
 		Engine& m_engine;
-		AnimationManager m_animation_manager;
+		AnimationManager animation_manager;
 
 	private:
 		void operator=(const AnimationSystemImpl&);
@@ -444,7 +516,6 @@ namespace Lumix
 			: m_app(app)
 		{
 			m_is_playing = false;
-			m_time_scale = 1;
 		}
 
 
@@ -454,28 +525,25 @@ namespace Lumix
 
 			auto* scene = static_cast<AnimationSceneImpl*>(cmp.scene);
 			auto& animable = scene->m_animables[cmp.index];
-			if (!animable.m_animation) return;
-			if (!animable.m_animation->isReady()) return;
+			if (!animable.animation) return;
+			if (!animable.animation->isReady()) return;
 
-			ImGui::Checkbox("Play", &m_is_playing);
-			if (ImGui::SliderFloat("Time", &animable.m_time, 0, animable.m_animation->getLength()))
+			ImGui::Checkbox("Preview", &m_is_playing);
+			if (ImGui::SliderFloat("Time", &animable.time, 0, animable.animation->getLength()))
 			{
 				scene->updateAnimable(cmp.index, 0);
 			}
 
 			if (m_is_playing)
 			{
-				ImGui::InputFloat("Time scale", &m_time_scale, 0.1f, 1.0f);
-				m_time_scale = Math::maxValue(0.0f, m_time_scale);
 				float time_delta = m_app.getWorldEditor()->getEngine().getLastTimeDelta();
-				scene->updateAnimable(cmp.index, time_delta * m_time_scale);
+				scene->updateAnimable(cmp.index, time_delta);
 			}
 		}
 
 
 		StudioApp& m_app;
 		bool m_is_playing;
-		float m_time_scale;
 	};
 
 
