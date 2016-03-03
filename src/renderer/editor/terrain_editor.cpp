@@ -21,6 +21,7 @@
 #include "renderer/ray_cast_model_hit.h"
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
+#include "renderer/terrain.h"
 #include "universe/universe.h"
 #include <cmath>
 
@@ -821,8 +822,8 @@ void TerrainEditor::tick()
 		Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.scene);
 		Lumix::Vec3 origin, dir;
 		scene->getRay(camera_cmp.index, (float)mouse_x, (float)mouse_y, origin, dir);
-		Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::INVALID_COMPONENT);
-		
+		Lumix::RayCastModelHit hit = scene->castRayTerrain(terrain.index, origin, dir);
+
 		if (hit.m_is_hit)
 		{
 			Lumix::Vec3 center = hit.m_origin + hit.m_dir * hit.m_t;
