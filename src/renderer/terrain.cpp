@@ -771,14 +771,14 @@ RayCastModelHit Terrain::castRay(const Vec3& origin, const Vec3& dir)
 			int hz = (int)(start.z / m_scale.x);
 
 			float next_x = fabs(rel_dir.x) < 0.01f ? hx : ((hx + (rel_dir.x < 0 ? 0 : 1)) * m_scale.x - rel_origin.x) / rel_dir.x;
-			float next_z = fabs(rel_dir.z) < 0.01f ? hx : ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_scale.x - rel_origin.z) / rel_dir.z;
+			float next_z = fabs(rel_dir.z) < 0.01f ? hz : ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_scale.x - rel_origin.z) / rel_dir.z;
 
 			float delta_x = fabs(rel_dir.x) < 0.01f ? 0 : m_scale.x / Math::abs(rel_dir.x);
 			float delta_z = fabs(rel_dir.z) < 0.01f ? 0 : m_scale.x / Math::abs(rel_dir.z);
 			int step_x = (int)Math::signum(rel_dir.x);
 			int step_z = (int)Math::signum(rel_dir.z);
 
-			while (hx >= 0 && hz >= 0 && hx + 1 < m_width && hz + 1 < m_height)
+			while (hx >= 0 && hz >= 0 && hx + step_x < m_width && hz + step_z < m_height)
 			{
 				float t;
 				float x = hx * m_scale.x;
