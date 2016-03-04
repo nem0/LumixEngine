@@ -4,6 +4,7 @@
 #include "core/fs/os_file.h"
 #include "core/input_system.h"
 #include "core/log.h"
+#include "core/lua_wrapper.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -71,6 +72,7 @@ public:
 	{
 		m_state = lua_newstate(luaAllocator, &m_allocator);
 		luaL_openlibs(m_state);
+		registerLuaAPI();
 
 		m_mtjd_manager = MTJD::Manager::create(m_allocator);
 		if (!fs)
@@ -98,6 +100,240 @@ public:
 		m_fps_timer = Timer::create(m_allocator);
 		m_fps_frame = 0;
 		PropertyRegister::init(m_allocator);
+	}
+
+
+	static ComponentIndex LUA_createComponent(IScene* scene, const char* type, int entity_idx)
+	{
+		if (!scene) return -1;
+		Entity e(entity_idx);
+		uint32 hash = crc32(type);
+		if (scene->getComponent(e, hash) != INVALID_COMPONENT)
+		{
+			g_log_error.log("Lua Script") << "Component " << type << " already exists in entity "
+				<< entity_idx;
+			return -1;
+		}
+
+		return scene->createComponent(hash, e);
+	}
+
+
+	static Entity LUA_createEntity(Universe* univ)
+	{
+		return univ->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+	}
+
+
+	static void setProperty(const ComponentUID& cmp,
+		const IPropertyDescriptor& desc,
+		lua_State* L,
+		IAllocator& allocator)
+	{
+		switch (desc.getType())
+		{
+		case IPropertyDescriptor::STRING:
+		case IPropertyDescriptor::FILE:
+		case IPropertyDescriptor::RESOURCE:
+			if (lua_isstring(L, -1))
+			{
+				const char* str = lua_tostring(L, -1);
+				desc.set(cmp, -1, InputBlob(str, stringLength(str)));
+			}
+			break;
+		case IPropertyDescriptor::DECIMAL:
+			if (lua_isnumber(L, -1))
+			{
+				float f = (float)lua_tonumber(L, -1);
+				desc.set(cmp, -1, InputBlob(&f, sizeof(f)));
+			}
+			break;
+		case IPropertyDescriptor::BOOL:
+			if (lua_isboolean(L, -1))
+			{
+				bool b = lua_toboolean(L, -1) != 0;
+				desc.set(cmp, -1, InputBlob(&b, sizeof(b)));
+			}
+			break;
+		case IPropertyDescriptor::VEC3:
+		case IPropertyDescriptor::COLOR:
+			if (lua_istable(L, -1))
+			{
+				auto v = LuaWrapper::toType<Vec3>(L, -1);
+				desc.set(cmp, -1, InputBlob(&v, sizeof(v)));
+			}
+			break;
+		default:
+			g_log_error.log("Lua Script") << "Property " << desc.getName() << " has unsupported type";
+			break;
+		}
+	}
+
+
+	static int LUA_createEntityEx(lua_State* L)
+	{
+		auto* engine = LuaWrapper::checkArg<Engine*>(L, 1);
+		auto* ctx = LuaWrapper::checkArg<Universe*>(L, 2);
+		LuaWrapper::checkTableArg(L, 3);
+
+		Entity e = ctx->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+
+		lua_pushvalue(L, 3);
+		lua_pushnil(L);
+		while (lua_next(L, -2) != 0)
+		{
+			const char* parameter_name = luaL_checkstring(L, -2);
+			if (compareString(parameter_name, "position") == 0)
+			{
+				auto pos = LuaWrapper::toType<Vec3>(L, -1);
+				ctx->setPosition(e, pos);
+			}
+			else
+			{
+				uint32 cmp_hash = crc32(parameter_name);
+				for (auto* scene : ctx->getScenes())
+				{
+					ComponentUID cmp(e, cmp_hash, scene, scene->createComponent(cmp_hash, e));
+					if (cmp.isValid())
+					{
+						lua_pushvalue(L, -1);
+						lua_pushnil(L);
+						while (lua_next(L, -2) != 0)
+						{
+							const char* property_name = luaL_checkstring(L, -2);
+							auto* desc = PropertyRegister::getDescriptor(cmp_hash, crc32(property_name));
+							if (!desc)
+							{
+								g_log_error.log("Lua Script") << "Unknown property " << property_name;
+							}
+							else
+							{
+								setProperty(cmp, *desc, L, engine->getAllocator());
+							}
+
+							lua_pop(L, 1);
+						}
+						lua_pop(L, 1);
+						break;
+					}
+				}
+			}
+			lua_pop(L, 1);
+		}
+		lua_pop(L, 1);
+
+		LuaWrapper::pushLua(L, e);
+		return 1;
+	}
+
+
+	static void LUA_setEntityPosition(Universe* univ, Entity entity, Vec3 pos)
+	{
+		univ->setPosition(entity, pos);
+	}
+
+
+	static void LUA_setEntityRotation(Universe* univ,
+		int entity_index,
+		Vec3 axis,
+		float angle)
+	{
+		if (entity_index < 0 || entity_index > univ->getEntityCount()) return;
+
+		univ->setRotation(entity_index, Quat(axis, angle));
+	}
+
+
+	static void LUA_setEntityLocalRotation(IScene* hierarchy,
+		Entity entity,
+		Vec3 axis,
+		float angle)
+	{
+		if (entity == INVALID_ENTITY) return;
+
+		static_cast<Hierarchy*>(hierarchy)->setLocalRotation(entity, Quat(axis, angle));
+	}
+
+
+	static void LUA_logError(const char* text)
+	{
+		g_log_error.log("Lua Script") << text;
+	}
+
+
+	static void LUA_logInfo(const char* text)
+	{
+		g_log_info.log("Lua Script") << text;
+	}
+
+
+	static float LUA_getInputActionValue(Engine* engine, uint32 action)
+	{
+		auto v = engine->getInputSystem().getActionValue(action);
+		return v;
+	}
+
+
+	static void LUA_addInputAction(Engine* engine, uint32 action, int type, int key, int controller_id)
+	{
+		engine->getInputSystem().addAction(
+			action, Lumix::InputSystem::InputType(type), key, controller_id);
+	}
+
+
+	static int LUA_multVecQuat(lua_State* L)
+	{
+		Vec3 v = LuaWrapper::checkArg<Vec3>(L, 1);
+		Vec3 axis = LuaWrapper::checkArg<Vec3>(L, 2);
+		float angle = LuaWrapper::checkArg<float>(L, 3);
+
+		Quat q(axis, angle);
+		Vec3 res = q * v;
+
+		LuaWrapper::pushLua(L, res);
+		return 1;
+	}
+
+
+	static Vec3 LUA_getEntityPosition(Universe* universe, Entity entity)
+	{
+		return universe->getPosition(entity);
+	}
+
+
+	static Vec3 LUA_getEntityDirection(Universe* universe, Entity entity)
+	{
+		Quat rot = universe->getRotation(entity);
+		return rot * Vec3(0, 0, 1);
+	}
+
+
+	void registerLuaAPI()
+	{
+		lua_pushlightuserdata(m_state, this);
+		lua_setglobal(m_state, "g_engine");
+
+		#define REGISTER_FUNCTION(name) \
+			LuaWrapper::createSystemFunction(m_state, "Engine", #name, \
+				&LuaWrapper::wrap<decltype(&LUA_##name), LUA_##name>); \
+
+		REGISTER_FUNCTION(createComponent);
+		REGISTER_FUNCTION(createEntity);
+		REGISTER_FUNCTION(setEntityPosition);
+		REGISTER_FUNCTION(getEntityPosition);
+		REGISTER_FUNCTION(getEntityDirection);
+		REGISTER_FUNCTION(setEntityRotation);
+		REGISTER_FUNCTION(setEntityLocalRotation);
+		REGISTER_FUNCTION(getInputActionValue);
+		REGISTER_FUNCTION(addInputAction);
+		REGISTER_FUNCTION(logError);
+		REGISTER_FUNCTION(logInfo);
+
+
+		#undef REGISTER_FUNCTION
+
+		LuaWrapper::createSystemFunction(m_state, "Engine", "createEntityEx", &LUA_createEntityEx);
+		LuaWrapper::createSystemFunction(m_state, "Engine", "multVecQuat", &LUA_multVecQuat);
 	}
 
 

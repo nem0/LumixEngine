@@ -1788,6 +1788,29 @@ public:
 	}
 
 
+	static Texture* LUA_getMaterialTexture(Material* material, int texture_index)
+	{
+		if (!material) return nullptr;
+		return material->getTexture(texture_index);
+	}
+
+
+	static void LUA_setRenderablePath(IScene* scene, int component, const char* path)
+	{
+		RenderScene* render_scene = (RenderScene*)scene;
+		render_scene->setRenderablePath(component, Path(path));
+	}
+
+
+	static void LUA_setRenderableMaterial(RenderScene* scene,
+		ComponentIndex cmp,
+		int index,
+		const char* path)
+	{
+		scene->setRenderableMaterial(cmp, index, Path(path));
+	}
+
+
 	void registerLuaAPI()
 	{
 		auto* scene = m_universe.getScene(crc32("lua_script"));
@@ -1814,6 +1837,21 @@ public:
 		REGISTER_FUNCTION(getFogColor);
 		REGISTER_FUNCTION(getCameraSlot);
 		REGISTER_FUNCTION(getCameraComponent);
+		REGISTER_FUNCTION(getRenderableComponent);
+		REGISTER_FUNCTION(addDebugCross);
+		REGISTER_FUNCTION(getTerrainMaterial);
+
+		#undef REGISTER_FUNCTION
+
+		#define REGISTER_FUNCTION(F)\
+			do { \
+			auto f = &LuaWrapper::wrap<decltype(&RenderSceneImpl::LUA_##F), &RenderSceneImpl::LUA_##F>; \
+			LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
+			} while(false) \
+
+		REGISTER_FUNCTION(getMaterialTexture);
+		REGISTER_FUNCTION(setRenderableMaterial);
+		REGISTER_FUNCTION(setRenderablePath);
 
 		#undef REGISTER_FUNCTION
 	}

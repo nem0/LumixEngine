@@ -1060,18 +1060,6 @@ public:
 	}
 
 
-	void LUA_logError(const char* message)
-	{
-		Lumix::g_log_error.log("Editor") << message;
-	}
-
-
-	void LUA_logInfo(const char* message)
-	{
-		Lumix::g_log_info.log("Editor") << message;
-	}
-
-
 	bool LUA_runTest(const char* undo_stack_path, const char* result_universe_path)
 	{
 		return m_editor->runTest(Lumix::Path(undo_stack_path), Lumix::Path(result_universe_path));
@@ -1091,8 +1079,6 @@ public:
 			} while(false) \
 
 		REGISTER_FUNCTION(LUA_runTest, "runTest");
-		REGISTER_FUNCTION(LUA_logError, "logError");
-		REGISTER_FUNCTION(LUA_logInfo, "logInfo");
 		REGISTER_FUNCTION(LUA_exit, "exit");
 		REGISTER_FUNCTION(LUA_createEntityTemplate, "createEntityTemplate");
 
