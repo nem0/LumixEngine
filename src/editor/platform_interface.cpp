@@ -675,7 +675,7 @@ namespace PlatformInterface
 
 	bool shellExecuteOpen(const char* path)
 	{
-		return (int)ShellExecute(NULL, NULL, path, NULL, NULL, SW_SHOW) > 32;
+		return (uintptr_t)ShellExecute(NULL, NULL, path, NULL, NULL, SW_SHOW) > 32;
 	}
 
 

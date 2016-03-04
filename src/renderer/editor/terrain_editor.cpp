@@ -11,6 +11,9 @@
 #include "editor/imgui/imgui.h"
 #include "editor/platform_interface.h"
 #define STB_IMAGE_IMPLEMENTATION
+#if defined _MSC_VER && _MSC_VER == 1900 
+#pragma warning(disable : 4312)
+#endif
 #include "editor/stb/stb_image.h"
 #include "editor/utils.h"
 #include "engine.h"

@@ -1,7 +1,13 @@
 #pragma once
 
 
-#ifndef _WIN32
+#ifdef _WIN32
+	#ifdef _WIN64
+		#define PLATFORM64
+	#else
+		#define PLATFORM32
+	#endif
+#else 
 #error Platform not supported
 #endif
 
