@@ -39,12 +39,8 @@ namespace Lumix
 
 		LATEST
 	};
-
-
-	void registerEngineLuaAPI(LuaScriptScene& scene, Engine& engine, lua_State* L);
-	void registerUniverse(Universe*, lua_State* L);
-
-
+	
+	
 	static const uint32 LUA_SCRIPT_HASH = crc32("lua_script");
 
 
@@ -430,6 +426,26 @@ namespace Lumix
 		}
 
 
+		static int getEnvironment(lua_State* L)
+		{
+			auto* scene = LuaWrapper::checkArg<LuaScriptScene*>(L, 1);
+			Entity entity = LuaWrapper::checkArg<Entity>(L, 2);
+			int scr_index = LuaWrapper::checkArg<int>(L, 3);
+
+			ComponentIndex cmp = scene->getComponent(entity);
+			int env = scene->getEnvironment(cmp, scr_index);
+			if (env < 0)
+			{
+				lua_pushnil(L);
+			}
+			else
+			{
+				lua_rawgeti(L, LUA_REGISTRYINDEX, env);
+			}
+			return 1;
+		}
+
+
 		void registerAPI()
 		{
 			if (m_is_api_registered) return;
@@ -437,8 +453,21 @@ namespace Lumix
 			m_is_api_registered = true;
 
 			m_global_state = lua_newthread(m_system.m_engine.getState());
-			registerUniverse(&m_universe, m_global_state);
-			registerEngineLuaAPI(*this, m_system.m_engine, m_global_state);
+			for (auto* scene : m_universe.getScenes())
+			{
+				const char* name = scene->getPlugin().getName();
+				char tmp[128];
+
+				copyString(tmp, "g_scene_");
+				catString(tmp, name);
+				lua_pushlightuserdata(m_global_state, scene);
+				lua_setglobal(m_global_state, tmp);
+			}
+
+			lua_pushlightuserdata(m_global_state, &m_universe);
+			lua_setglobal(m_global_state, "g_universe");
+			LuaWrapper::createSystemFunction(
+				m_global_state, "LuaScript", "getEnvironment", &LuaScriptSceneImpl::getEnvironment);
 			registerPropertyAPI();
 			uint32 register_msg = crc32("registerLuaAPI");
 			for (auto* i : m_universe.getScenes())
