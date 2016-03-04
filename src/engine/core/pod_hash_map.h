@@ -24,6 +24,22 @@ namespace Lumix
 		static uint32 get(const Key& key);
 	};
 
+	// https://gist.github.com/badboy/6267743
+	template<>
+	struct PODHashFunc<uint64>
+	{
+		static uint32 get(const uint64& key)
+		{
+			uint64 tmp = (~key) + (key << 18);
+			tmp = tmp ^ (tmp >> 31);
+			tmp = tmp * 21;
+			tmp = tmp ^ (tmp >> 11);
+			tmp = tmp + (tmp << 6);
+			tmp = tmp ^ (tmp >> 22);
+			return (uint32)tmp;
+		}
+	};
+
 	template<>
 	struct PODHashFunc<int32>
 	{
@@ -51,12 +67,23 @@ namespace Lumix
 	template<>
 	struct PODHashFunc<void*>
 	{
-		static size_t get(const void* key)
+		static uint32 get(const void* key)
 		{
-			size_t x = ((int32(key) >> 16) ^ int32(key)) * 0x45d9f3b;
-			x = ((x >> 16) ^ x) * 0x45d9f3b;
-			x = ((x >> 16) ^ x);
-			return x;
+			#ifdef PLATFORM64
+				uint64 tmp = (uint64)key;
+				tmp = (~tmp) + (tmp << 18);
+				tmp = tmp ^ (tmp >> 31);
+				tmp = tmp * 21;
+				tmp = tmp ^ (tmp >> 11);
+				tmp = tmp + (tmp << 6);
+				tmp = tmp ^ (tmp >> 22);
+				return (uint32)tmp;
+			#else
+				uint32 x = ((uint32(key) >> 16) ^ uint32(key)) * 0x45d9f3b;
+				x = ((x >> 16) ^ x) * 0x45d9f3b;
+				x = ((x >> 16) ^ x);
+				return x;
+			#endif
 		}
 	};
 
