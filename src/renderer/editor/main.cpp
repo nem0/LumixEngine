@@ -480,10 +480,12 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 			int lod_count = 1;
 			for (int i = 0; i < Model::MAX_LOD_COUNT - 1 && lods[i + 1].to_mesh >= 0; ++i)
 			{
+				ImGui::PushID(i);
 				ImGui::Text("%d", i); ImGui::NextColumn();
 				ImGui::DragFloat("", &lods[i].distance); ImGui::NextColumn();
 				ImGui::Text("%d", lods[i].to_mesh - lods[i].from_mesh + 1); ImGui::NextColumn();
 				++lod_count;
+				ImGui::PopID();
 			}
 
 			ImGui::Text("%d", lod_count - 1); ImGui::NextColumn();
