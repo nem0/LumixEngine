@@ -33,7 +33,6 @@
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
-#include "renderer/transient_geometry.h"
 #include "scene_view.h"
 #include "shader_editor.h"
 #include "shader_compiler.h"
@@ -907,11 +906,26 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 			if (!m_shader->isReady()) return;
 
 			auto& renderer = static_cast<Renderer&>(m_render_scene->getPlugin());
-			TransientGeometry geom(
-				vertices, vertices_count, renderer.getBasicVertexDecl(), indices, indices_count);
+			if (!bgfx::checkAvailTransientBuffers(
+					vertices_count, renderer.getBasicVertexDecl(), indices_count))
+			{
+				return;
+			}
+			bgfx::TransientVertexBuffer vertex_buffer;
+			bgfx::TransientIndexBuffer index_buffer;
+			bgfx::allocTransientVertexBuffer(
+				&vertex_buffer, vertices_count, renderer.getBasicVertexDecl());
+			bgfx::allocTransientIndexBuffer(&index_buffer, indices_count);
+
+			copyMemory(vertex_buffer.data,
+				vertices,
+				vertices_count * renderer.getBasicVertexDecl().getStride());
+			copyMemory(index_buffer.data, indices, indices_count * sizeof(uint16));
+			
 			uint64 flags = BGFX_STATE_DEPTH_TEST_LEQUAL;
 			if (lines) flags |= BGFX_STATE_PT_LINES;
-			m_pipeline.render(geom,
+			m_pipeline.render(vertex_buffer,
+				index_buffer,
 				mtx,
 				0,
 				indices_count,
@@ -1572,13 +1586,17 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		Renderer* renderer =
 			static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 
-		TransientGeometry geom(&cmd_list->VtxBuffer[0],
-			cmd_list->VtxBuffer.size(),
-			renderer->getBasic2DVertexDecl(),
-			&cmd_list->IdxBuffer[0],
-			cmd_list->IdxBuffer.size());
+		int num_indices = cmd_list->IdxBuffer.size();
+		int num_vertices = cmd_list->VtxBuffer.size();
+		auto& decl = renderer->getBasic2DVertexDecl();
+		bgfx::TransientVertexBuffer vertex_buffer;
+		bgfx::TransientIndexBuffer index_buffer;
+		if (!bgfx::checkAvailTransientBuffers(num_vertices, decl, num_indices)) return;
+		bgfx::allocTransientVertexBuffer(&vertex_buffer, num_vertices, decl);
+		bgfx::allocTransientIndexBuffer(&index_buffer, num_indices);
 
-		if(geom.getNumVertices() < 0) return;
+		copyMemory(vertex_buffer.data, &cmd_list->VtxBuffer[0], num_vertices * decl.getStride());
+		copyMemory(index_buffer.data, &cmd_list->IdxBuffer[0], num_indices * sizeof(uint16));
 
 		uint32 elem_offset = 0;
 		const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
@@ -1609,7 +1627,8 @@ struct GameViewPlugin : public StudioApp::IPlugin
 				: material->getTexture(0)->getTextureHandle();
 			auto texture_uniform = material->getShader()->getTextureSlot(0).m_uniform_handle;
 			m_gui_pipeline->setTexture(0, texture_id, texture_uniform);
-			m_gui_pipeline->render(geom,
+			m_gui_pipeline->render(vertex_buffer,
+				index_buffer,
 				Matrix::IDENTITY,
 				elem_offset,
 				pcmd->ElemCount,

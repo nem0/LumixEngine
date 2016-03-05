@@ -56,7 +56,6 @@ uint8* ShaderManager::getBuffer(int32 size)
 ShaderBinaryManager::ShaderBinaryManager(Renderer& renderer, IAllocator& allocator)
 	: ResourceManagerBase(allocator)
 	, m_allocator(allocator)
-	, m_renderer(renderer)
 {
 }
 
