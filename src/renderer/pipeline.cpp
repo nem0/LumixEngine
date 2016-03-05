@@ -24,7 +24,6 @@
 #include "renderer/shader.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
-#include "renderer/transient_geometry.h"
 #include "universe/universe.h"
 #include <bgfx/bgfx.h>
 #include <cmath>
@@ -1866,7 +1865,8 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void render(TransientGeometry& geom,
+	void render(const bgfx::TransientVertexBuffer& vertex_buffer,
+		const bgfx::TransientIndexBuffer& index_buffer,
 		const Matrix& mtx,
 		int first_index,
 		int num_indices,
@@ -1876,8 +1876,8 @@ struct PipelineImpl : public Pipeline
 		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(m_render_state | render_states);
 		bgfx::setTransform(&mtx.m11);
-		bgfx::setVertexBuffer(&geom.getVertexBuffer());
-		bgfx::setIndexBuffer(&geom.getIndexBuffer(), first_index, num_indices);
+		bgfx::setVertexBuffer(&vertex_buffer);
+		bgfx::setIndexBuffer(&index_buffer, first_index, num_indices);
 		++m_stats.m_draw_call_count;
 		++m_stats.m_instance_count;
 		m_stats.m_triangle_count += num_indices / 3;

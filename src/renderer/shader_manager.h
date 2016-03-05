@@ -13,15 +13,12 @@ namespace Lumix
 		ShaderBinaryManager(Renderer& renderer, IAllocator& allocator);
 		~ShaderBinaryManager();
 
-		Renderer& getRenderer() { return m_renderer; }
-
 	protected:
 		Resource* createResource(const Path& path) override;
 		void destroyResource(Resource& resource) override;
 
 	private:
 		IAllocator& m_allocator;
-		Renderer& m_renderer;
 	};
 
 	class LUMIX_RENDERER_API ShaderManager : public ResourceManagerBase

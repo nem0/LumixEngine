@@ -12,6 +12,8 @@ namespace bgfx
 	struct TextureHandle;
 	struct UniformHandle;
 	struct ProgramHandle;
+	struct TransientVertexBuffer;
+	struct TransientIndexBuffer;
 }
 
 
@@ -26,7 +28,6 @@ class Model;
 class Path;
 class Renderer;
 class RenderScene;
-class TransientGeometry;
 struct Vec4;
 
 
@@ -94,7 +95,8 @@ class LUMIX_RENDERER_API Pipeline
 		virtual void setTexture(int slot,
 			bgfx::TextureHandle texture,
 			bgfx::UniformHandle uniform) = 0;
-		virtual void render(TransientGeometry& geom,
+		virtual void render(const bgfx::TransientVertexBuffer& vertex_buffer,
+			const bgfx::TransientIndexBuffer& index_buffer,
 			const Matrix& mtx,
 			int first_index,
 			int num_indices,

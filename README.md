@@ -26,6 +26,7 @@
 * [assimp](https://github.com/assimp/assimp)
 * [PhysX](https://developer.nvidia.com/physx-sdk)
 * [ImGui](https://github.com/ocornut/imgui)
+* [stb](https://github.com/nothings/stb)
 
 Project generator
 * [Genie](https://github.com/bkaradzic/genie)
