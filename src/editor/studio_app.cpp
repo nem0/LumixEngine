@@ -602,8 +602,6 @@ public:
 				doMenuItem(getAction("autosnapDown"), m_editor->getGizmo().isAutosnapDown(), true);
 				if (ImGui::MenuItem("Save commands")) saveUndoStack();
 				if (ImGui::MenuItem("Load commands")) loadAndExecuteCommands();
-
-				ImGui::MenuItem("Import asset", nullptr, &m_import_asset_dialog->m_is_opened);
 				ImGui::EndMenu();
 			}
 
@@ -613,6 +611,7 @@ public:
 				ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
 				ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
 				ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
+				ImGui::MenuItem("Import asset", nullptr, &m_import_asset_dialog->m_is_opened);
 				ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
 				ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
 				ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);

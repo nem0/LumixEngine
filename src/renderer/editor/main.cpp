@@ -986,7 +986,7 @@ struct MeshMergerPlugin : public StudioApp::IPlugin
 		: app(_app)
 		, models(_app.getWorldEditor()->getAllocator())
 	{
-		m_is_visible = true;
+		m_is_window_opened = false;
 		m_action =
 			LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Mesh Merger", "mesh_merger");
 		m_action->func.bind<MeshMergerPlugin, &MeshMergerPlugin::onAction>(this);
@@ -1007,7 +1007,7 @@ struct MeshMergerPlugin : public StudioApp::IPlugin
 	}
 
 
-	void onAction() { m_is_visible = !m_is_visible; }
+	void onAction() { m_is_window_opened = !m_is_window_opened; }
 
 
 	enum class VertexAttributeDef : uint32
@@ -1329,7 +1329,7 @@ struct MeshMergerPlugin : public StudioApp::IPlugin
 
 	void onWindowGUI() override
 	{
-		if (ImGui::BeginDock("Mesh Merger", &m_is_visible))
+		if (ImGui::BeginDock("Mesh Merger", &m_is_window_opened))
 		{
 			ImGui::InputText("Output", output, sizeof(output));
 			ImGui::SameLine();
@@ -1417,7 +1417,7 @@ struct MeshMergerPlugin : public StudioApp::IPlugin
 
 
 	StudioApp& app;
-	bool m_is_visible;
+	bool m_is_window_opened;
 	Array<Model*> models;
 	float lods[16];
 	char output[MAX_PATH_LENGTH];
