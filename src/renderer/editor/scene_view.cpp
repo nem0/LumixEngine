@@ -204,11 +204,6 @@ void SceneView::onGUI()
 						captureMouse(true);
 						m_editor->onMouseDown((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
 					}
-					if (ImGui::IsMouseReleased(i))
-					{
-						captureMouse(false);
-						m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
-					}
 
 					auto& input = m_editor->getEngine().getInputSystem();
 					auto delta = Lumix::Vec2(input.getMouseXMove(), input.getMouseYMove());
@@ -216,6 +211,17 @@ void SceneView::onGUI()
 					{
 						m_editor->onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)delta.x, (int)delta.y);
 					}
+				}
+			}
+			for (int i = 0; i < 3; ++i)
+			{
+				auto rel_mp = ImGui::GetMousePos();
+				rel_mp.x -= m_screen_x;
+				rel_mp.y -= m_screen_y;
+				if (ImGui::IsMouseReleased(i))
+				{
+					captureMouse(false);
+					m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
 				}
 			}
 			if(m_is_mouse_captured)

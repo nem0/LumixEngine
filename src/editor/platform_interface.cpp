@@ -322,6 +322,12 @@ namespace PlatformInterface
 				g_platform_data.m_handler->onMouseLeftWindow();
 			}
 			break;
+			case WM_SYSCOMMAND:
+			{
+				bool is_alt_key_menu = wParam == SC_KEYMENU && (lParam >> 16) <= 0;
+				if (is_alt_key_menu) return 0;
+				break;
+			}
 			case WM_KEYUP:
 			case WM_SYSKEYUP: g_platform_data.m_handler->onKeyUp(getKeyFromSystem((int)wParam)); break;
 			case WM_KEYDOWN:

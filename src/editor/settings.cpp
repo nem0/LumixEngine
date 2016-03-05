@@ -9,6 +9,7 @@
 #include <lua.hpp>
 
 
+static const char DEFAULT_SETTINGS_PATH[] = "studio_default.ini";
 static const char SETTINGS_PATH[] = "studio.ini";
 static Settings* g_instance = nullptr;
 
@@ -125,7 +126,8 @@ Settings::~Settings()
 bool Settings::load(Action** actions, int actions_count)
 {
 	auto L = m_state;
-	bool errors = luaL_loadfile(L, SETTINGS_PATH) != LUA_OK;
+	bool has_settings = PlatformInterface::fileExists(SETTINGS_PATH);
+	bool errors = luaL_loadfile(L, has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH) != LUA_OK;
 	errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
 	if (errors)
 	{
