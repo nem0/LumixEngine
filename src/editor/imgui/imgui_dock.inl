@@ -55,6 +55,7 @@ struct DockContext
 			, label(nullptr)
 			, opened(false)
 		{
+			location[0] = 0;
 			children[0] = children[1] = nullptr;
 		}
 
@@ -187,10 +188,11 @@ struct DockContext
 		ImVec2 pos;
 		ImVec2 size;
 		Status_ status;
-		bool opened;
-		bool first;
 		int last_frame;
 		int invalid_frames;
+		char location[16];
+		bool opened;
+		bool first;
 	};
 
 
@@ -226,6 +228,7 @@ struct DockContext
 		new_dock->first = true;
 		new_dock->last_frame = 0;
 		new_dock->invalid_frames = 0;
+		new_dock->location[0] = 0;
 		return *new_dock;
 	}
 
@@ -334,7 +337,8 @@ struct DockContext
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
 								 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
 								 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
-								 ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_ShowBorders;
+								 ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_ShowBorders | 
+								 ImGuiWindowFlags_NoBringToFrontOnFocus;
 		Dock* root = getRootDock();
 		if (root)
 		{
@@ -488,6 +492,7 @@ struct DockContext
 		canvas->PushClipRectFullScreen();
 
 		ImU32 docked_color = GetColorU32(ImGuiCol_FrameBg);
+		docked_color = docked_color & 0x00ffFFFF | 0x80000000;
 		dock.pos = GetIO().MousePos - m_drag_offset;
 		if (dest_dock)
 		{
@@ -513,10 +518,26 @@ struct DockContext
 		if (!IsMouseDown(0))
 		{
 			dock.status = Status_Float;
+			dock.location[0] = 0;
 			dock.setActive();
 		}
 
 		End();
+	}
+
+
+	void fillLocation(Dock& dock)
+	{
+		if (dock.status == Status_Float) return;
+		char* c = dock.location;
+		Dock* tmp = &dock;
+		while (tmp->parent)
+		{
+			*c = getLocationCode(tmp);
+			tmp = tmp->parent;
+			++c;
+		}
+		*c = 0;
 	}
 
 
@@ -831,9 +852,61 @@ struct DockContext
 	}
 
 
+	static Slot_ getSlotFromLocationCode(char code)
+	{
+		switch (code)
+		{
+			case '1': return Slot_Left;
+			case '2': return Slot_Top;
+			case '3': return Slot_Bottom;
+			default: return Slot_Right;
+		}
+	}
+
+
+	static char getLocationCode(Dock* dock)
+	{
+		if (!dock) return '0';
+
+		if (dock->parent->isHorizontal())
+		{
+			if (dock->pos.x < dock->parent->children[0]->pos.x) return '1';
+			if (dock->pos.x < dock->parent->children[1]->pos.x) return '1';
+			return '0';
+		}
+		else
+		{
+			if (dock->pos.y < dock->parent->children[0]->pos.y) return '2';
+			if (dock->pos.y < dock->parent->children[1]->pos.y) return '2';
+			return '3';
+		}
+	}
+
+
+	void tryDockToStoredLocation(Dock& dock)
+	{
+		if (dock.status == Status_Docked) return;
+		if (dock.location[0] == 0) return;
+		
+		Dock* tmp = getRootDock();
+		if (!tmp) return;
+
+		Dock* prev = nullptr;
+		char* c = dock.location + strlen(dock.location) - 1;
+		while (c >= dock.location && tmp)
+		{
+			prev = tmp;
+			tmp = *c == getLocationCode(tmp->children[0]) ? tmp->children[0] : tmp->children[1];
+			if(tmp) --c;
+		}
+		doDock(dock, tmp ? tmp : prev, tmp ? Slot_Tab : getSlotFromLocationCode(*c));
+	}
+
+
 	bool begin(const char* label, bool* opened, ImGuiWindowFlags extra_flags)
 	{
 		Dock& dock = getDock(label, !opened || *opened);
+		if (!dock.opened && (!opened || *opened)) tryDockToStoredLocation(dock);
 		dock.last_frame = ImGui::GetFrameCount();
 		if (strcmp(dock.label, label) != 0)
 		{
@@ -849,6 +922,7 @@ struct DockContext
 		{
 			if (dock.status != Status_Float)
 			{
+				fillLocation(dock);
 				doUndock(dock);
 				dock.status = Status_Float;
 			}
@@ -897,6 +971,7 @@ struct DockContext
 		float tabbar_height = GetTextLineHeightWithSpacing();
 		if (tabbar(dock.getFirstTab(), opened != nullptr))
 		{
+			fillLocation(dock);
 			*opened = false;
 		}
 		ImVec2 pos = dock.pos;
@@ -907,7 +982,8 @@ struct DockContext
 		SetCursorScreenPos(pos);
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
 								 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
-								 ImGuiWindowFlags_NoSavedSettings | extra_flags;
+								 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus |
+								 extra_flags;
 		bool ret = BeginChild(label, size, true, flags);
 		PopStyleColor();
 		return ret;
@@ -956,6 +1032,7 @@ struct DockContext
 			file << "label = \"" << dock.label << "\",\n";
 			file << "x = " << (int)dock.pos.x << ",\n";
 			file << "y = " << (int)dock.pos.y << ",\n";
+			file << "location = \"" << dock.location << "\",\n";
 			file << "size_x = " << (int)dock.size.x << ",\n";
 			file << "size_y = " << (int)dock.size.y << ",\n";
 			file << "status = " << (int)dock.status << ",\n";
@@ -1034,11 +1111,13 @@ struct DockContext
 						dock.active = lua_tointeger(L, -1) != 0;
 					if (lua_getfield(L, -6, "opened") == LUA_TNUMBER)
 						dock.opened = lua_tointeger(L, -1) != 0;
-					if (lua_getfield(L, -7, "status") == LUA_TNUMBER)
+					if (lua_getfield(L, -7, "location") == LUA_TSTRING)
+						strcpy(dock.location, lua_tostring(L, -1));
+					if (lua_getfield(L, -8, "status") == LUA_TNUMBER)
 					{
 						dock.status = (Status_)lua_tointeger(L, -1);
 					}
-					lua_pop(L, 7);
+					lua_pop(L, 8);
 
 					if (lua_getfield(L, -1, "prev") == LUA_TNUMBER)
 					{
