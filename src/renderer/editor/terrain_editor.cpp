@@ -935,7 +935,7 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, in
 			return true;
 		}
 	}
-	return false;
+	return true;
 }
 
 
