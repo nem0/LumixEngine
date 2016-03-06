@@ -349,7 +349,20 @@ namespace Lumix
 
 		~HashMap()
 		{
-			clear();
+			for (node_type* n = first(); m_sentinel != n;)
+			{
+				node_type* dest = n;
+				n = next(n);
+				destruct(dest);
+				if (dest < m_table || dest > &m_table[m_max_id - 1])
+					m_allocator.deallocate(dest);
+			}
+
+			m_allocator.deallocate(m_table);
+			m_table = nullptr;
+			m_size = 0;
+			m_max_id = 0;
+			m_mask = 0;
 		}
 
 		size_type size() const { return m_size; }
@@ -706,4 +719,4 @@ namespace Lumix
 		size_type m_max_id;
 		IAllocator& m_allocator;
 	};
-} // ~namespace Lumix
+} // namespace Lumix
