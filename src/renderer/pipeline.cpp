@@ -956,6 +956,13 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	void setMaterialDefine(int material_idx, const char* define, bool enabled)
+	{
+		auto define_idx = m_renderer.getShaderDefineIdx(define);
+		m_materials[material_idx]->setDefine(define_idx, enabled);
+	}
+
+
 	bool postprocessCallback(const char* camera_slot)
 	{
 		auto scr_scene = static_cast<LuaScriptScene*>(m_scene->getUniverse().getScene(crc32("lua_script")));
@@ -2678,6 +2685,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(renderLightVolumes);
 	REGISTER_FUNCTION(postprocessCallback);
 	REGISTER_FUNCTION(removeFramebuffer);
+	REGISTER_FUNCTION(setMaterialDefine);
 
 	#undef REGISTER_FUNCTION
 
