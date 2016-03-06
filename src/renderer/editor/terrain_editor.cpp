@@ -213,10 +213,10 @@ private:
 		Rectangle getBoundingRectangle(int max_x, int max_z) const 
 		{
 			Rectangle r;
-			r.m_from_x = Lumix::Math::maxValue(0, int(m_local_pos.x - m_radius - 0.5f));
-			r.m_from_y = Lumix::Math::maxValue(0, int(m_local_pos.z - m_radius - 0.5f));
-			r.m_to_x = Lumix::Math::minValue(max_x, int(m_local_pos.x + m_radius + 0.5f));
-			r.m_to_y = Lumix::Math::minValue(max_z, int(m_local_pos.z + m_radius + 0.5f));
+			r.m_from_x = Lumix::Math::maximum(0, int(m_local_pos.x - m_radius - 0.5f));
+			r.m_from_y = Lumix::Math::maximum(0, int(m_local_pos.z - m_radius - 0.5f));
+			r.m_to_x = Lumix::Math::minimum(max_x, int(m_local_pos.x + m_radius + 0.5f));
+			r.m_to_y = Lumix::Math::minimum(max_z, int(m_local_pos.z + m_radius + 0.5f));
 			return r;
 		}
 
@@ -284,7 +284,7 @@ private:
 		float dist = sqrt(
 			(item.m_local_pos.x - 0.5f - i) * (item.m_local_pos.x - 0.5f - i) +
 			(item.m_local_pos.z - 0.5f - j) * (item.m_local_pos.z - 0.5f - j));
-		return 1.0f - Lumix::Math::minValue(dist / item.m_radius, 1.0f);
+		return 1.0f - Lumix::Math::minimum(dist / item.m_radius, 1.0f);
 	}
 
 
@@ -367,7 +367,7 @@ private:
 					{
 						if (data[offset] == m_texture_idx)
 						{
-							data[offset + 1] += Lumix::Math::minValue(255 - data[offset + 1], add);
+							data[offset + 1] += Lumix::Math::minimum(255 - data[offset + 1], add);
 						}
 						else
 						{
@@ -456,7 +456,7 @@ private:
 
 		const float STRENGTH_MULTIPLICATOR = 256.0f;
 		float amount =
-			Lumix::Math::maxValue(item.m_amount * item.m_amount * STRENGTH_MULTIPLICATOR, 1.0f);
+			Lumix::Math::maximum(item.m_amount * item.m_amount * STRENGTH_MULTIPLICATOR, 1.0f);
 
 		for (int i = rect.m_from_x, end = rect.m_to_x; i < end; ++i)
 		{
@@ -467,8 +467,8 @@ private:
 
 				int add = int(attenuation * amount);
 				Lumix::uint16 x = ((Lumix::uint16*)texture->getData())[(i + j * texture_width)];
-				x += m_type == TerrainEditor::RAISE_HEIGHT ? Lumix::Math::minValue(add, 0xFFFF - x)
-														   : Lumix::Math::maxValue(-add, -x);
+				x += m_type == TerrainEditor::RAISE_HEIGHT ? Lumix::Math::minimum(add, 0xFFFF - x)
+														   : Lumix::Math::maximum(-add, -x);
 				((Lumix::uint16*)&data[0])[offset] = x;
 			}
 		}
@@ -481,7 +481,7 @@ private:
 		int bpp = texture->getBytesPerPixel();
 		Rectangle rect;
 		getBoundingRectangle(texture, rect);
-		m_new_data.resize(bpp * Lumix::Math::maxValue(1,
+		m_new_data.resize(bpp * Lumix::Math::maximum(1,
 									 (rect.m_to_x - rect.m_from_x) *
 										 (rect.m_to_y - rect.m_from_y)));
 		Lumix::copyMemory(&m_new_data[0], &m_old_data[0], m_new_data.size());
@@ -594,28 +594,28 @@ private:
 	void getBoundingRectangle(Lumix::Texture* texture, Rectangle& rect)
 	{
 		Item& item = m_items[0];
-		rect.m_from_x = Lumix::Math::maxValue(int(item.m_local_pos.x - item.m_radius - 0.5f), 0);
-		rect.m_from_y = Lumix::Math::maxValue(int(item.m_local_pos.z - item.m_radius - 0.5f), 0);
-		rect.m_to_x = Lumix::Math::minValue(int(item.m_local_pos.x + item.m_radius + 0.5f),
+		rect.m_from_x = Lumix::Math::maximum(int(item.m_local_pos.x - item.m_radius - 0.5f), 0);
+		rect.m_from_y = Lumix::Math::maximum(int(item.m_local_pos.z - item.m_radius - 0.5f), 0);
+		rect.m_to_x = Lumix::Math::minimum(int(item.m_local_pos.x + item.m_radius + 0.5f),
 						   texture->getWidth());
-		rect.m_to_y = Lumix::Math::minValue(int(item.m_local_pos.z + item.m_radius + 0.5f),
+		rect.m_to_y = Lumix::Math::minimum(int(item.m_local_pos.z + item.m_radius + 0.5f),
 						   texture->getHeight());
 		for (int i = 1; i < m_items.size(); ++i)
 		{
 			Item& item = m_items[i];
-			rect.m_from_x = Lumix::Math::minValue(int(item.m_local_pos.x - item.m_radius - 0.5f),
+			rect.m_from_x = Lumix::Math::minimum(int(item.m_local_pos.x - item.m_radius - 0.5f),
 								 rect.m_from_x);
-			rect.m_to_x = Lumix::Math::maxValue(int(item.m_local_pos.x + item.m_radius + 0.5f),
+			rect.m_to_x = Lumix::Math::maximum(int(item.m_local_pos.x + item.m_radius + 0.5f),
 							   rect.m_to_x);
-			rect.m_from_y = Lumix::Math::minValue(int(item.m_local_pos.z - item.m_radius - 0.5f),
+			rect.m_from_y = Lumix::Math::minimum(int(item.m_local_pos.z - item.m_radius - 0.5f),
 								 rect.m_from_y);
-			rect.m_to_y = Lumix::Math::maxValue(int(item.m_local_pos.z + item.m_radius + 0.5f),
+			rect.m_to_y = Lumix::Math::maximum(int(item.m_local_pos.z + item.m_radius + 0.5f),
 							   rect.m_to_y);
 		}
-		rect.m_from_x = Lumix::Math::maxValue(rect.m_from_x, 0);
-		rect.m_to_x = Lumix::Math::minValue(rect.m_to_x, texture->getWidth());
-		rect.m_from_y = Lumix::Math::maxValue(rect.m_from_y, 0);
-		rect.m_to_y = Lumix::Math::minValue(rect.m_to_y, texture->getHeight());
+		rect.m_from_x = Lumix::Math::maximum(rect.m_from_x, 0);
+		rect.m_to_x = Lumix::Math::minimum(rect.m_to_x, texture->getWidth());
+		rect.m_from_y = Lumix::Math::maximum(rect.m_from_y, 0);
+		rect.m_to_y = Lumix::Math::minimum(rect.m_to_y, texture->getHeight());
 	}
 
 
@@ -735,14 +735,14 @@ void TerrainEditor::nextTerrainTexture()
 	if (tex)
 	{
 		m_texture_idx =
-			Lumix::Math::minValue(tex->getAtlasSize() * tex->getAtlasSize() - 1, m_texture_idx + 1);
+			Lumix::Math::minimum(tex->getAtlasSize() * tex->getAtlasSize() - 1, m_texture_idx + 1);
 	}
 }
 
 
 void TerrainEditor::prevTerrainTexture()
 {
-	m_texture_idx = Lumix::Math::maxValue(0, m_texture_idx - 1);
+	m_texture_idx = Lumix::Math::maximum(0, m_texture_idx - 1);
 }
 
 
@@ -753,7 +753,7 @@ void TerrainEditor::increaseBrushSize()
 		++m_terrain_brush_size;
 		return;
 	}
-	m_terrain_brush_size = Lumix::Math::minValue(100.0f, m_terrain_brush_size + 10);
+	m_terrain_brush_size = Lumix::Math::minimum(100.0f, m_terrain_brush_size + 10);
 }
 
 
@@ -761,10 +761,10 @@ void TerrainEditor::decreaseBrushSize()
 {
 	if (m_terrain_brush_size < 10)
 	{
-		m_terrain_brush_size = Lumix::Math::maxValue(MIN_BRUSH_SIZE, m_terrain_brush_size - 1.0f);
+		m_terrain_brush_size = Lumix::Math::maximum(MIN_BRUSH_SIZE, m_terrain_brush_size - 1.0f);
 		return;
 	}
-	m_terrain_brush_size = Lumix::Math::maxValue(MIN_BRUSH_SIZE, m_terrain_brush_size - 10.0f);
+	m_terrain_brush_size = Lumix::Math::maximum(MIN_BRUSH_SIZE, m_terrain_brush_size - 10.0f);
 }
 
 
@@ -999,8 +999,8 @@ static void getProjections(const Lumix::Vec3& axis,
 	for(int i = 1; i < 8; ++i)
 	{
 		float dot = Lumix::dotProduct(vertices[i], axis);
-		min = Lumix::Math::minValue(dot, min);
-		max = Lumix::Math::maxValue(dot, max);
+		min = Lumix::Math::minimum(dot, min);
+		max = Lumix::Math::maximum(dot, max);
 	}
 }
 
@@ -1136,7 +1136,7 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 
 		float w, h;
 		scene->getTerrainSize(m_component.index, &w, &h);
-		float scale = 1.0f - Lumix::Math::maxValue(0.01f, m_terrain_brush_strength);
+		float scale = 1.0f - Lumix::Math::maximum(0.01f, m_terrain_brush_strength);
 		for(int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f; ++i)
 		{
 			int renderable_idx = Lumix::Math::rand() % tpls.size();
@@ -1479,7 +1479,7 @@ void TerrainEditor::onGUI()
 					}
 				}
 				ImGui::DragFloat2("Size spread", &m_size_spread.x, 0.01f);
-				m_size_spread.x = Lumix::Math::minValue(m_size_spread.x, m_size_spread.y);
+				m_size_spread.x = Lumix::Math::minimum(m_size_spread.x, m_size_spread.y);
 			}
 		}
 		break;

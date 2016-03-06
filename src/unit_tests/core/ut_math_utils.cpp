@@ -123,30 +123,30 @@ void UT_math_utils_is_pow_of_two(const char* params)
 
 void UT_math_utils_min_max(const char* params)
 {
-	LUMIX_EXPECT(Lumix::Math::minValue(0, 1) == 0);
-	LUMIX_EXPECT(Lumix::Math::minValue(-1, 1) == -1);
-	LUMIX_EXPECT(Lumix::Math::minValue(-1, 0) == -1);
-	LUMIX_EXPECT(Lumix::Math::minValue(-1, -2) == -2);
-	LUMIX_EXPECT(Lumix::Math::minValue(0, -2) == -2);
-	LUMIX_EXPECT(Lumix::Math::minValue(3, -2) == -2);
-	LUMIX_EXPECT(Lumix::Math::minValue(0xffffFFFE, 0xffffFFFF) == 0xFFFFfffe);
+	LUMIX_EXPECT(Lumix::Math::minimum(0, 1) == 0);
+	LUMIX_EXPECT(Lumix::Math::minimum(-1, 1) == -1);
+	LUMIX_EXPECT(Lumix::Math::minimum(-1, 0) == -1);
+	LUMIX_EXPECT(Lumix::Math::minimum(-1, -2) == -2);
+	LUMIX_EXPECT(Lumix::Math::minimum(0, -2) == -2);
+	LUMIX_EXPECT(Lumix::Math::minimum(3, -2) == -2);
+	LUMIX_EXPECT(Lumix::Math::minimum(0xffffFFFE, 0xffffFFFF) == 0xFFFFfffe);
 
-	LUMIX_EXPECT(Lumix::Math::maxValue(0, 1) == 1);
-	LUMIX_EXPECT(Lumix::Math::maxValue(-1, 1) == 1);
-	LUMIX_EXPECT(Lumix::Math::maxValue(-1, 0) == 0);
-	LUMIX_EXPECT(Lumix::Math::maxValue(-1, -2) == -1);
-	LUMIX_EXPECT(Lumix::Math::maxValue(0, -2) == 0);
-	LUMIX_EXPECT(Lumix::Math::maxValue(3, -2) == 3);
-	LUMIX_EXPECT(Lumix::Math::maxValue(0xffffFFFE, 0xffffFFFF) == 0xFFFFffff);
+	LUMIX_EXPECT(Lumix::Math::maximum(0, 1) == 1);
+	LUMIX_EXPECT(Lumix::Math::maximum(-1, 1) == 1);
+	LUMIX_EXPECT(Lumix::Math::maximum(-1, 0) == 0);
+	LUMIX_EXPECT(Lumix::Math::maximum(-1, -2) == -1);
+	LUMIX_EXPECT(Lumix::Math::maximum(0, -2) == 0);
+	LUMIX_EXPECT(Lumix::Math::maximum(3, -2) == 3);
+	LUMIX_EXPECT(Lumix::Math::maximum(0xffffFFFE, 0xffffFFFF) == 0xFFFFffff);
 
 	for(int i = -100; i < 100; ++i)
 	{
-		LUMIX_EXPECT(Lumix::Math::minValue(i, i + 1) == i);
+		LUMIX_EXPECT(Lumix::Math::minimum(i, i + 1) == i);
 	}
 	for(float f = -100; f < 100; f += 0.3f)
 	{
-		LUMIX_EXPECT(Lumix::Math::minValue(f, f + 0.2f) == f);
-		LUMIX_EXPECT(Lumix::Math::minValue(f, f + 0.3f) == f);
+		LUMIX_EXPECT(Lumix::Math::minimum(f, f + 0.2f) == f);
+		LUMIX_EXPECT(Lumix::Math::minimum(f, f + 0.3f) == f);
 	}
 }
 

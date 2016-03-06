@@ -2,6 +2,7 @@
 
 
 #include "core/binary_array.h"
+#include "core/vec.h"
 #include "editor/world_editor.h"
 #include "editor/utils.h"
 

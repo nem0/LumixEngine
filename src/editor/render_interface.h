@@ -2,7 +2,7 @@
 
 
 #include "lumix.h"
-#include "core/aabb.h"
+#include "core/geometry.h"
 #include "core/matrix.h"
 #include "core/path.h"
 #include "core/vec.h"

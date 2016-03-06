@@ -1,7 +1,6 @@
 #pragma once
 
 
-#include "core/vec.h"
 #include "engine/iplugin.h"
 
 

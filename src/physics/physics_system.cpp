@@ -442,7 +442,7 @@ namespace {
 					for (int i = 0, c = scene->getCollisionsLayersCount(); i < c; ++i)
 					{
 						auto* layer_name = scene->getCollisionLayerName(i);
-						basic_offset = Math::maxValue(basic_offset, ImGui::CalcTextSize(layer_name).x);
+						basic_offset = Math::maximum(basic_offset, ImGui::CalcTextSize(layer_name).x);
 					}
 					basic_offset += ImGui::GetStyle().FramePadding.x * 2 + ImGui::GetStyle().WindowPadding.x;
 

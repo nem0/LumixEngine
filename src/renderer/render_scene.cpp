@@ -336,7 +336,7 @@ public:
 	void setParticleEmitterSpawnCount(ComponentIndex cmp, const Int2& value) override
 	{
 		m_particle_emitters[cmp]->m_spawn_count.from = value.x;
-		m_particle_emitters[cmp]->m_spawn_count.to = Math::maxValue(value.x, value.y);
+		m_particle_emitters[cmp]->m_spawn_count.to = Math::maximum(value.x, value.y);
 	}
 
 
@@ -1317,7 +1317,7 @@ public:
 	{
 		m_particle_emitters[cmp]->m_spawn_period = value;
 		m_particle_emitters[cmp]->m_spawn_period.from =
-			Math::maxValue(0.01f, m_particle_emitters[cmp]->m_spawn_period.from);
+			Math::maximum(0.01f, m_particle_emitters[cmp]->m_spawn_period.from);
 		m_particle_emitters[cmp]->m_spawn_period.checkZero();
 	}
 
@@ -2755,10 +2755,10 @@ public:
 									  const Vec4& value) override
 	{
 		Vec4 valid_value = value;
-		valid_value.x = Math::maxValue(valid_value.x, 0.02f);
-		valid_value.y = Math::maxValue(valid_value.x + 0.01f, valid_value.y);
-		valid_value.z = Math::maxValue(valid_value.y + 0.01f, valid_value.z);
-		valid_value.w = Math::maxValue(valid_value.z + 0.01f, valid_value.w);
+		valid_value.x = Math::maximum(valid_value.x, 0.02f);
+		valid_value.y = Math::maximum(valid_value.x + 0.01f, valid_value.y);
+		valid_value.z = Math::maximum(valid_value.y + 0.01f, valid_value.z);
+		valid_value.w = Math::maximum(valid_value.z + 0.01f, valid_value.w);
 
 		m_global_lights[getGlobalLightIndex(cmp)].m_cascades = valid_value;
 	}
@@ -3161,7 +3161,7 @@ public:
 		auto& rm = r.model->getResourceManager();
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
 
-		int new_count = Math::maxValue(int8(index + 1), r.mesh_count);
+		int new_count = Math::maximum(int8(index + 1), r.mesh_count);
 		allocateCustomMeshes(r, new_count);
 
 		if (r.meshes[index].material) material_manager->unload(*r.meshes[index].material);
@@ -3510,7 +3510,7 @@ private:
 
 	int m_point_light_last_uid;
 	Array<PointLight> m_point_lights;
-	PODHashMap<ComponentIndex, int> m_point_lights_map;
+	HashMap<ComponentIndex, int> m_point_lights_map;
 	Array<Array<ComponentIndex>> m_light_influenced_geometry;
 	int m_active_global_light_uid;
 	int m_global_light_last_uid;

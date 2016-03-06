@@ -20,4 +20,4 @@ namespace Lumix
 		uint32 m_component_type;
 	};
 
-} // ~ namespace Lumix
+} // namespace Lumix

@@ -3,7 +3,7 @@
 
 #include "lumix.h"
 #include "core/matrix.h"
-#include "core/pod_hash_map.h"
+#include "core/hash_map.h"
 #include "engine/iplugin.h"
 
 
@@ -44,7 +44,7 @@ namespace Lumix
 					Matrix m_local_matrix;
 			};
 
-			typedef PODHashMap<int32, Array<Child>*> Children;
+			typedef HashMap<int32, Array<Child>*> Children;
 
 		public:
 			static Hierarchy* create(IPlugin& system, Universe& universe, IAllocator& allocator);

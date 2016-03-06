@@ -3,7 +3,6 @@
 #include "lumix.h"
 #include "core/array.h"
 #include "core/delegate_list.h"
-#include "core/vec.h"
 #include "universe/component.h"
 
 
@@ -22,7 +21,8 @@ class RenderInterface;
 struct Quat;
 struct RayCastModelHit;
 class Universe;
-
+struct Vec2;
+struct Vec3;
 
 struct MouseButton
 {

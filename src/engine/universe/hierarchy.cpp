@@ -17,7 +17,7 @@ static const Lumix::uint32 HIERARCHY_HASH = Lumix::crc32("hierarchy");
 class HierarchyImpl : public Hierarchy
 {
 private:
-	typedef PODHashMap<Entity, Entity> Parents;
+	typedef HashMap<Entity, Entity> Parents;
 
 public:
 	HierarchyImpl(IPlugin& system, Universe& universe, IAllocator& allocator)
@@ -35,8 +35,7 @@ public:
 
 	~HierarchyImpl()
 	{
-		PODHashMap<int32, Array<Child> *>::iterator iter = m_children.begin(),
-													end = m_children.end();
+		auto iter = m_children.begin(), end = m_children.end();
 		while (iter != end)
 		{
 			LUMIX_DELETE(m_allocator, iter.value());
