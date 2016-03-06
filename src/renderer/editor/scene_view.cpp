@@ -252,8 +252,6 @@ void SceneView::onGUI()
 
 		ImGui::SameLine();
 		ImGui::Checkbox("Stats", &m_show_stats);
-
-		ImGui::SameLine();
 	}
 
 	ImGui::EndDock();
@@ -278,6 +276,8 @@ void SceneView::onGUI()
 			char buf[30];
 			Lumix::toCStringPretty(stats.m_triangle_count, buf, Lumix::lengthOf(buf));
 			ImGui::LabelText("Triangles", buf);
+			ImGui::LabelText("Resolution", "%dx%d", m_pipeline->getWidth(), m_pipeline->getHeight());
+			ImGui::LabelText("FPS", "%.2f", m_editor->getEngine().getFPS());
 		}
 		ImGui::End();
 		ImGui::PopStyleColor();
