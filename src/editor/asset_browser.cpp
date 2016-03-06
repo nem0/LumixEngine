@@ -303,11 +303,12 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	ImGui::Text(label);
 	ImGui::PopItemWidth();
 
-	if (ImGui::BeginPopup(popup_name))
+	if (ImGui::BeginResizablePopup(popup_name, ImVec2(300, 300)))
 	{
 		static char filter[128] = "";
 		ImGui::InputText("Filter", filter, sizeof(filter));
 
+		ImGui::BeginChild("Resources", ImVec2(0, 0));
 		for (auto unv : getResources(getTypeIndexFromManagerType(type)))
 		{
 			if (filter[0] != '\0' && strstr(unv.c_str(), filter) == nullptr) continue;
@@ -315,11 +316,13 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 			if (ImGui::Selectable(unv.c_str(), false))
 			{
 				Lumix::copyString(buf, max_size, unv.c_str());
+				ImGui::EndChild();
 				ImGui::EndPopup();
 				return true;
 			}
 		}
 
+		ImGui::EndChild();
 		ImGui::EndPopup();
 	}
 

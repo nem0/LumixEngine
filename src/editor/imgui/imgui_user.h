@@ -53,6 +53,7 @@ struct CurveEditor
 IMGUI_API CurveEditor BeginCurveEditor(const char* label);
 IMGUI_API bool CurvePoint(ImVec2* point, CurveEditor& editor);
 IMGUI_API void EndCurveEditor(const CurveEditor& editor);
+IMGUI_API bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use);
 
 
 } // namespace ImGui
