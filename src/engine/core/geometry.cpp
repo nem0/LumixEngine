@@ -98,7 +98,7 @@ void Frustum::computePerspective(const Vec3& position,
 	Vec3 corner2 = far_center + x * far_width + y * far_height;
 
 	float size = (corner1 - corner2).length();
-	size = Math::maxValue(sqrt(far_width * far_width * 4 + far_height * far_height * 4), size);
+	size = Math::maximum(sqrt(far_width * far_width * 4 + far_height * far_height * 4), size);
 	m_radius = size * 0.5f;
 	m_position = position;
 	m_direction = direction;

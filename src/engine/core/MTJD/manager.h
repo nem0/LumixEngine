@@ -23,7 +23,6 @@ class WorkerTask;
 class LUMIX_ENGINE_API Manager
 {
 	friend class Scheduler;
-	friend class SpuHelperTask;
 	friend class WorkerTask;
 
 public:

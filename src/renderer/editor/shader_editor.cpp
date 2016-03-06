@@ -1816,7 +1816,7 @@ void ShaderEditor::load()
 	for(auto* node : m_vertex_nodes)
 	{
 		loadNodeConnections(blob, *node);
-		m_last_node_id = Lumix::Math::maxValue(int(node->m_id + 1), int(m_last_node_id));
+		m_last_node_id = Lumix::Math::maximum(int(node->m_id + 1), int(m_last_node_id));
 	}
 
 	blob.read(size);
@@ -1828,7 +1828,7 @@ void ShaderEditor::load()
 	for (auto* node : m_fragment_nodes)
 	{
 		loadNodeConnections(blob, *node);
-		m_last_node_id = Lumix::Math::maxValue(int(node->m_id + 1), int(m_last_node_id));
+		m_last_node_id = Lumix::Math::maximum(int(node->m_id + 1), int(m_last_node_id));
 	}
 
 	fclose(fp);

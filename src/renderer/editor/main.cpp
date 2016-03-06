@@ -938,7 +938,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		Shader* m_shader;
 		RenderScene* m_render_scene;
 		Pipeline& m_pipeline;
-		PODHashMap<int, Model*> m_models;
+		HashMap<int, Model*> m_models;
 		int m_model_index;
 	};
 
@@ -1232,7 +1232,7 @@ struct MeshMergerPlugin : public StudioApp::IPlugin
 			char buf[4096];
 			while (in_vertices_size)
 			{
-				int size = Math::minValue(in_vertices_size, lengthOf(buf));
+				int size = Math::minimum(in_vertices_size, lengthOf(buf));
 				in_file->read(buf, size);
 				file.write(buf, size);
 				in_vertices_size -= size;
@@ -1613,12 +1613,12 @@ struct GameViewPlugin : public StudioApp::IPlugin
 			if(0 == pcmd->ElemCount) continue;
 
 			m_gui_pipeline->setScissor(
-				uint16(Math::maxValue(pcmd->ClipRect.x, 0.0f)),
-				uint16(Math::maxValue(pcmd->ClipRect.y, 0.0f)),
-				uint16(Math::minValue(pcmd->ClipRect.z, 65535.0f) -
-				Math::maxValue(pcmd->ClipRect.x, 0.0f)),
-				uint16(Math::minValue(pcmd->ClipRect.w, 65535.0f) -
-				Math::maxValue(pcmd->ClipRect.y, 0.0f)));
+				uint16(Math::maximum(pcmd->ClipRect.x, 0.0f)),
+				uint16(Math::maximum(pcmd->ClipRect.y, 0.0f)),
+				uint16(Math::minimum(pcmd->ClipRect.z, 65535.0f) -
+				Math::maximum(pcmd->ClipRect.x, 0.0f)),
+				uint16(Math::minimum(pcmd->ClipRect.w, 65535.0f) -
+				Math::maximum(pcmd->ClipRect.y, 0.0f)));
 
 			auto material = m_material;
 			int pass_idx = m_gui_pipeline->getPassIdx();
@@ -1723,17 +1723,17 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 
 	static Vec3 minCoords(const Vec3& a, const Vec3& b)
 	{
-		return Vec3(Math::minValue(a.x, b.x),
-			Math::minValue(a.y, b.y),
-			Math::minValue(a.z, b.z));
+		return Vec3(Math::minimum(a.x, b.x),
+			Math::minimum(a.y, b.y),
+			Math::minimum(a.z, b.z));
 	}
 
 
 	static Vec3 maxCoords(const Vec3& a, const Vec3& b)
 	{
-		return Vec3(Math::maxValue(a.x, b.x),
-			Math::maxValue(a.y, b.y),
-			Math::maxValue(a.z, b.z));
+		return Vec3(Math::maximum(a.x, b.x),
+			Math::maximum(a.y, b.y),
+			Math::maximum(a.z, b.z));
 	}
 
 

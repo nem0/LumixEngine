@@ -1,5 +1,4 @@
 #include "terrain.h"
-#include "core/aabb.h"
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/geometry.h"
@@ -444,10 +443,10 @@ void Terrain::updateGrass(ComponentIndex camera)
 	for (int i = quads.size() - 1; i >= 0; --i)
 	{
 		GrassQuad* quad = quads[i];
-		old_bounds[0] = Math::minValue(old_bounds[0], quad->pos.x);
-		old_bounds[1] = Math::maxValue(old_bounds[1], quad->pos.x);
-		old_bounds[2] = Math::minValue(old_bounds[2], quad->pos.z);
-		old_bounds[3] = Math::maxValue(old_bounds[3], quad->pos.z);
+		old_bounds[0] = Math::minimum(old_bounds[0], quad->pos.x);
+		old_bounds[1] = Math::maximum(old_bounds[1], quad->pos.x);
+		old_bounds[2] = Math::minimum(old_bounds[2], quad->pos.z);
+		old_bounds[3] = Math::maximum(old_bounds[3], quad->pos.z);
 		if (quad->pos.x < from_quad_x || quad->pos.x > to_quad_x || quad->pos.z < from_quad_z ||
 			quad->pos.z > to_quad_z)
 		{
@@ -456,8 +455,8 @@ void Terrain::updateGrass(ComponentIndex camera)
 		}
 	}
 
-	from_quad_x = Math::maxValue(0.0f, from_quad_x);
-	from_quad_z = Math::maxValue(0.0f, from_quad_z);
+	from_quad_x = Math::maximum(0.0f, from_quad_x);
+	from_quad_z = Math::maximum(0.0f, from_quad_z);
 
 	for (float quad_z = from_quad_z; quad_z <= to_quad_z; quad_z += GRASS_QUAD_SIZE)
 	{
@@ -496,13 +495,13 @@ void Terrain::updateGrass(ComponentIndex camera)
 				generateGrassTypeQuad(patch, mtx, quad_x, quad_z);
 				for (auto mtx : patch.m_matrices)
 				{
-					min_y = Math::minValue(mtx.getTranslation().y, min_y);
-					max_y = Math::maxValue(mtx.getTranslation().y, max_y);
+					min_y = Math::minimum(mtx.getTranslation().y, min_y);
+					max_y = Math::maximum(mtx.getTranslation().y, max_y);
 				}
 			}
 
 			quad->pos.y = (max_y + min_y) * 0.5f;
-			quad->radius = Math::maxValue((max_y - min_y) * 0.5f, (float)GRASS_QUAD_SIZE) * 1.42f;
+			quad->radius = Math::maximum((max_y - min_y) * 0.5f, (float)GRASS_QUAD_SIZE) * 1.42f;
 
 		}
 	}

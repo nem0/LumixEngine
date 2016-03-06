@@ -106,7 +106,7 @@ void SceneView::update()
 	if (ImGui::GetIO().KeyCtrl) return;
 
 	m_camera_speed =
-		Lumix::Math::maxValue(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
+		Lumix::Math::maximum(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
 
 	int screen_x = int(ImGui::GetIO().MousePos.x);
 	int screen_y = int(ImGui::GetIO().MousePos.y);

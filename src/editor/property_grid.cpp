@@ -305,11 +305,11 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 				changed = true;
 				if (i > 1)
 				{
-					f[i].x = Lumix::Math::maxValue(f[i - 3].x + 0.001f, f[i].x);
+					f[i].x = Lumix::Math::maximum(f[i - 3].x + 0.001f, f[i].x);
 				}
 				if (i + 3 < count)
 				{
-					f[i].x = Lumix::Math::minValue(f[i + 3].x - 0.001f, f[i].x);
+					f[i].x = Lumix::Math::minimum(f[i + 3].x - 0.001f, f[i].x);
 				}
 			}
 			if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))

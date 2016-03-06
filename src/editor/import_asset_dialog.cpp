@@ -661,15 +661,15 @@ struct ConvertTask : public Lumix::MT::Task
 			auto* channel = animation->mChannels[i];
 			for (unsigned int j = 0; j < channel->mNumPositionKeys; ++j)
 			{
-				length = Lumix::Math::maxValue(length, (float)channel->mPositionKeys[j].mTime);
+				length = Lumix::Math::maximum(length, (float)channel->mPositionKeys[j].mTime);
 			}
 			for (unsigned int j = 0; j < channel->mNumRotationKeys; ++j)
 			{
-				length = Lumix::Math::maxValue(length, (float)channel->mRotationKeys[j].mTime);
+				length = Lumix::Math::maximum(length, (float)channel->mRotationKeys[j].mTime);
 			}
 			for (unsigned int j = 0; j < channel->mNumScalingKeys; ++j)
 			{
-				length = Lumix::Math::maxValue(length, (float)channel->mScalingKeys[j].mTime);
+				length = Lumix::Math::maximum(length, (float)channel->mScalingKeys[j].mTime);
 			}
 		}
 		return length;
@@ -728,7 +728,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 			file.write(&header, sizeof(header));
 			float anim_length = getLength(animation);
-			int frame_count = Lumix::Math::maxValue(int(anim_length * header.fps), 1);
+			int frame_count = Lumix::Math::maximum(int(anim_length * header.fps), 1);
 			file.write(&frame_count, sizeof(frame_count));
 			int bone_count = (int)animation->mNumChannels;
 			file.write(&bone_count, sizeof(bone_count));
@@ -1306,7 +1306,7 @@ struct ConvertTask : public Lumix::MT::Task
 			if (lod < 0 || lod >= Lumix::lengthOf(lods)) break;
 			lods[lod] = i;
 			factors[lod] = getMeshLODFactor(m_filtered_meshes[i]);
-			lod_count = Lumix::Math::maxValue(lod_count, lod + 1);
+			lod_count = Lumix::Math::maximum(lod_count, lod + 1);
 		}
 
 		if (lods[0] < 0)

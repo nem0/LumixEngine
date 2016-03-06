@@ -567,7 +567,7 @@ namespace Lumix
 			if (nsize > 0 && ptr == nullptr) return allocator.allocate(nsize);
 
 			void* new_mem = allocator.allocate(nsize);
-			copyMemory(new_mem, ptr, Math::minValue(osize, nsize));
+			copyMemory(new_mem, ptr, Math::minimum(osize, nsize));
 			allocator.deallocate(ptr);
 			return new_mem;
 		}
@@ -1025,7 +1025,7 @@ namespace Lumix
 
 		LuaScriptSystemImpl& m_system;
 		Array<ScriptComponent*> m_scripts;
-		PODHashMap<Entity, ComponentIndex> m_entity_script_map;
+		HashMap<Entity, ComponentIndex> m_entity_script_map;
 		AssociativeArray<uint32, string> m_property_names;
 		lua_State* m_global_state;
 		Universe& m_universe;

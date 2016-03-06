@@ -440,7 +440,7 @@ void ParticleEmitter::AlphaModule::update(float)
 	{
 		float float_idx = float_size * rel_life[i];
 		int idx = (int)float_idx;
-		int next_idx = Math::minValue(idx + 1, size);
+		int next_idx = Math::minimum(idx + 1, size);
 		float w = float_idx - idx;
 		particle_alpha[i] = m_sampled[idx] * (1 - w) + m_sampled[next_idx] * w;
 	}
@@ -506,7 +506,7 @@ void ParticleEmitter::SizeModule::update(float)
 	{
 		float float_idx = float_size * rel_life[i];
 		int idx = (int)float_idx;
-		int next_idx = Math::minValue(idx + 1, size);
+		int next_idx = Math::minimum(idx + 1, size);
 		float w = float_idx - idx;
 		particle_size[i] = m_sampled[idx] * (1 - w) + m_sampled[next_idx] * w;
 		PROFILE_INT("Test", int(particle_size[i] * 1000));
@@ -555,14 +555,14 @@ int IntInterval::getRandom() const
 
 void Interval::checkZero()
 {
-	from = Math::maxValue(from, 0.0f);
-	to = Math::maxValue(from, to);
+	from = Math::maximum(from, 0.0f);
+	to = Math::maximum(from, to);
 }
 
 
 void Interval::check()
 {
-	to = Math::maxValue(from, to);
+	to = Math::maximum(from, to);
 }
 
 

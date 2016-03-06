@@ -10,7 +10,6 @@
 #include "core/log.h"
 #include "core/lua_wrapper.h"
 #include "core/profiler.h"
-#include "core/static_array.h"
 #include "engine.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/frame_buffer.h"
@@ -1372,7 +1371,7 @@ struct PipelineImpl : public Pipeline
 
 		for (int j = 0; j < lines.size(); j += BATCH_SIZE)
 		{
-			int count = Math::minValue(BATCH_SIZE, lines.size() - j);
+			int count = Math::minimum(BATCH_SIZE, lines.size() - j);
 			if (bgfx::allocTransientBuffers(&tvb, m_base_vertex_decl, count * 2, &tib, count * 2))
 			{
 				BaseVertex* vertex = (BaseVertex*)tvb.data;
@@ -2567,7 +2566,7 @@ int setUniform(lua_State* L)
 	LuaWrapper::checkTableArg(L, 3);
 
 	Vec4 tmp[64];
-	int len = Math::minValue((int)lua_rawlen(L, 3), lengthOf(tmp));
+	int len = Math::minimum((int)lua_rawlen(L, 3), lengthOf(tmp));
 	for (int i = 0; i < len; ++i)
 	{
 		if (lua_rawgeti(L, 3, 1 + i) == LUA_TTABLE)
@@ -2596,7 +2595,7 @@ int renderLocalLightsShadowmaps(lua_State* L)
 	const char* camera_slot = LuaWrapper::checkArg<const char*>(L, 2);
 
 	FrameBuffer* fbs[16];
-	int len = Math::minValue((int)lua_rawlen(L, 3), lengthOf(fbs));
+	int len = Math::minimum((int)lua_rawlen(L, 3), lengthOf(fbs));
 	for (int i = 0; i < len; ++i)
 	{
 		if (lua_rawgeti(L, 3, 1 + i) == LUA_TSTRING)

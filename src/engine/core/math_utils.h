@@ -40,12 +40,12 @@ LUMIX_ENGINE_API bool getRayTriangleIntersection(const Vec3& origin,
 	const Vec3& c,
 	float* out_t);
 
-template <typename T> LUMIX_FORCE_INLINE T minValue(T a, T b)
+template <typename T> LUMIX_FORCE_INLINE T minimum(T a, T b)
 {
 	return a < b ? a : b;
 }
 
-template <typename T> LUMIX_FORCE_INLINE T maxValue(T a, T b)
+template <typename T> LUMIX_FORCE_INLINE T maximum(T a, T b)
 {
 	return a < b ? b : a;
 }
@@ -68,7 +68,7 @@ template <typename T> LUMIX_FORCE_INLINE T signum(T a)
 template <typename T>
 LUMIX_FORCE_INLINE T clamp(T value, T min_value, T max_value)
 {
-	return minValue(maxValue(value, min_value), max_value);
+	return minimum(maximum(value, min_value), max_value);
 }
 
 template <typename T> bool isPowOfTwo(T n)

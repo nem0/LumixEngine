@@ -1,5 +1,5 @@
 #include "profiler.h"
-#include "core/pod_hash_map.h"
+#include "core/hash_map.h"
 #include "core/log.h"
 #include "core/timer.h"
 #include "core/mt/sync.h"
@@ -157,7 +157,7 @@ struct Instance
 
 	DefaultAllocator allocator;
 	DelegateList<void()> frame_listeners;
-	PODHashMap<uint32, ThreadData*> threads;
+	HashMap<uint32, ThreadData*> threads;
 	ThreadData main_thread;
 	Timer* timer;
 	MT::SpinMutex m_mutex;

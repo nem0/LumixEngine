@@ -64,10 +64,10 @@ bool getRayAABBIntersection(const Vec3& origin,
 	float t5 = (min.z - origin.z) * dirfrac.z;
 	float t6 = (max.z - origin.z) * dirfrac.z;
 
-	float tmin = Math::maxValue(
-		Math::maxValue(Math::minValue(t1, t2), Math::minValue(t3, t4)), Math::minValue(t5, t6));
-	float tmax = Math::minValue(
-		Math::minValue(Math::maxValue(t1, t2), Math::maxValue(t3, t4)), Math::maxValue(t5, t6));
+	float tmin = Math::maximum(
+		Math::maximum(Math::minimum(t1, t2), Math::minimum(t3, t4)), Math::minimum(t5, t6));
+	float tmax = Math::minimum(
+		Math::minimum(Math::maximum(t1, t2), Math::maximum(t3, t4)), Math::maximum(t5, t6));
 
 	if (tmax < 0)
 	{

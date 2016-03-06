@@ -5,6 +5,7 @@
 #include "core/input_system.h"
 #include "core/log.h"
 #include "core/lua_wrapper.h"
+#include "core/math_utils.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -348,7 +349,7 @@ public:
 		if (nsize > 0 && ptr == nullptr) return allocator.allocate(nsize);
 
 		void* new_mem = allocator.allocate(nsize);
-		copyMemory(new_mem, ptr, Math::minValue(osize, nsize));
+		copyMemory(new_mem, ptr, Math::minimum(osize, nsize));
 		allocator.deallocate(ptr);
 		return new_mem;
 	}

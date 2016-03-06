@@ -58,7 +58,7 @@ struct OutputStream : public physx::PxOutputStream
 		if (size + (int)count > capacity)
 		{
 			int new_capacity =
-				Math::maxValue(size + (int)count, capacity + 4096);
+				Math::maximum(size + (int)count, capacity + 4096);
 			uint8* new_data =
 				(uint8*)allocator.allocate(sizeof(uint8) * new_capacity);
 			copyMemory(new_data, data, size);
@@ -759,7 +759,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		
 		applyQueuedForces();
 
-		time_delta = Math::minValue(1 / 20.0f, time_delta);
+		time_delta = Math::minimum(1 / 20.0f, time_delta);
 		simulateScene(time_delta);
 		fetchResults();
 		updateDynamicActors();
@@ -1039,29 +1039,29 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void addCollisionLayer() override 
 	{
-		m_layers_count = Math::minValue(lengthOf(m_layers_names), m_layers_count + 1);
+		m_layers_count = Math::minimum(lengthOf(m_layers_names), m_layers_count + 1);
 	}
 
 
 	void removeCollisionLayer() override
 	{
-		m_layers_count = Math::maxValue(0, m_layers_count - 1);
+		m_layers_count = Math::maximum(0, m_layers_count - 1);
 		for (auto* actor : m_actors)
 		{
 			if (!actor->getPhysxActor()) continue;
 			if (actor->getEntity() == INVALID_ENTITY) continue;
-			actor->setLayer(Math::minValue(m_layers_count - 1, actor->getLayer()));
+			actor->setLayer(Math::minimum(m_layers_count - 1, actor->getLayer()));
 		}
 		for (auto& controller : m_controllers)
 		{
 			if (controller.m_is_free) continue;
-			controller.m_layer = Math::minValue(m_layers_count - 1, controller.m_layer);
+			controller.m_layer = Math::minimum(m_layers_count - 1, controller.m_layer);
 		}
 		for (auto* terrain : m_terrains)
 		{
 			if (!terrain) continue;
 			if (!terrain->m_actor) continue;
-			terrain->m_layer = Math::minValue(m_layers_count - 1, terrain->m_layer);
+			terrain->m_layer = Math::minimum(m_layers_count - 1, terrain->m_layer);
 		}
 
 		updateFilterData();
@@ -1225,9 +1225,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 			bool is_box = shapes->getBoxGeometry(box);
 			ASSERT(is_box);
 			physx::PxVec3& half = box.halfExtents;
-			half.x = Math::maxValue(0.01f, size.x);
-			half.y = Math::maxValue(0.01f, size.y);
-			half.z = Math::maxValue(0.01f, size.z);
+			half.x = Math::maximum(0.01f, size.x);
+			half.y = Math::maximum(0.01f, size.y);
+			half.z = Math::maximum(0.01f, size.z);
 			shapes->setGeometry(box);
 		}
 	}

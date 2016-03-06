@@ -102,7 +102,7 @@ namespace Lumix
 				size_t sz = m_size;
 				if(pos + size > cap)
 				{
-					size_t new_cap = Math::maxValue(cap * 2, pos + size);
+					size_t new_cap = Math::maximum(cap * 2, pos + size);
 					uint8* new_data = (uint8*)m_allocator.allocate(sizeof(uint8) * new_cap);
 					copyMemory(new_data, m_buffer, (int)sz);
 					m_allocator.deallocate(m_buffer);
@@ -148,7 +148,7 @@ namespace Lumix
 					break;
 				}
 
-				m_pos = Math::minValue(m_pos, m_size);
+				m_pos = Math::minimum(m_pos, m_size);
 				return m_pos;
 			}
 

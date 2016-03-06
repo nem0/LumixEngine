@@ -2,6 +2,7 @@
 #include "core/iallocator.h"
 #include "core/fs/ifile.h"
 #include "core/resource.h"
+#include "core/string.h"
 #include "lumix.h"
 #define STB_VORBIS_HEADER_ONLY
 #include "stb_vorbis.c"

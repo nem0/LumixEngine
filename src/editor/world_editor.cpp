@@ -1,6 +1,5 @@
 #include "world_editor.h"
 
-#include "core/aabb.h"
 #include "core/array.h"
 #include "core/associative_array.h"
 #include "core/blob.h"
@@ -12,6 +11,7 @@
 #include "core/fs/tcp_file_device.h"
 #include "core/fs/tcp_file_server.h"
 #include "core/fs/ifile.h"
+#include "core/geometry.h"
 #include "core/input_system.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
@@ -2277,7 +2277,7 @@ public:
 		Vec3 dir = camera_rot * Vec3(0, 0, 1);
 		m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + dir * 10;
 		float len = (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
-		m_go_to_parameters.m_speed = Math::maxValue(100.0f / (len > 0 ? len : 1), 2.0f);
+		m_go_to_parameters.m_speed = Math::maximum(100.0f / (len > 0 ? len : 1), 2.0f);
 		m_go_to_parameters.m_from_rot = m_go_to_parameters.m_to_rot = camera_rot;
 	}
 
