@@ -647,6 +647,42 @@ bool CurvePoint(ImVec2* points, CurveEditor& editor)
 }
 
 
+bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use)
+{
+	if (GImGui->OpenedPopupStack.Size <= GImGui->CurrentPopupStack.Size)
+	{
+		ClearSetNextWindowData();
+		return false;
+	}
+	ImGuiState& g = *GImGui;
+	ImGuiWindow* window = g.CurrentWindow;
+	const ImGuiID id = window->GetID(str_id);
+	if (!IsPopupOpen(id))
+	{
+		ClearSetNextWindowData();
+		return false;
+	}
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+	ImGuiWindowFlags flags = ImGuiWindowFlags_ShowBorders | ImGuiWindowFlags_Popup | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
+
+	char name[32];
+	if (flags & ImGuiWindowFlags_ChildMenu)
+		ImFormatString(name, 20, "##menu_%d", g.CurrentPopupStack.Size);
+	else
+		ImFormatString(name, 20, "##popup_%08x", id);
+	float alpha = 1.0f;
+
+	bool opened = ImGui::Begin(name, NULL, size_on_first_use, alpha, flags);
+	if (!(window->Flags & ImGuiWindowFlags_ShowBorders))
+		g.CurrentWindow->Flags &= ~ImGuiWindowFlags_ShowBorders;
+	if (!opened)
+		ImGui::EndPopup();
+
+	return opened;
+}
+
+
 } // namespace ImGui
 
 
