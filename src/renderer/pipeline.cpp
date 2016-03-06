@@ -2,10 +2,10 @@
 
 #include "renderer/pipeline.h"
 #include "core/crc32.h"
-#include "core/frustum.h"
 #include "core/fs/disk_file_device.h"
 #include "core/fs/ifile.h"
 #include "core/fs/file_system.h"
+#include "core/geometry.h"
 #include "core/lifo_allocator.h"
 #include "core/log.h"
 #include "core/lua_wrapper.h"

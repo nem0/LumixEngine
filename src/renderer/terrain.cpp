@@ -2,7 +2,7 @@
 #include "core/aabb.h"
 #include "core/blob.h"
 #include "core/crc32.h"
-#include "core/frustum.h"
+#include "core/geometry.h"
 #include "core/json_serializer.h"
 #include "core/lifo_allocator.h"
 #include "core/log.h"

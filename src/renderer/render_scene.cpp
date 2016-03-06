@@ -5,6 +5,7 @@
 #include "core/crc32.h"
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
+#include "core/geometry.h"
 #include "core/json_serializer.h"
 #include "core/lifo_allocator.h"
 #include "core/log.h"
@@ -17,8 +18,6 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/timer.h"
-#include "core/sphere.h"
-#include "core/frustum.h"
 
 #include "engine.h"
 

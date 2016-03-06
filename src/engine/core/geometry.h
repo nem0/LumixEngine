@@ -1,12 +1,102 @@
 #pragma once
 
 #include "lumix.h"
-#include "core/plane.h"
+#include "core/vec.h"
 #include "core/math_utils.h"
 
 
 namespace Lumix
 {
+
+
+struct Plane
+{
+	Plane() {}
+
+	Plane(const Vec3& normal, float d)
+		: normal(normal.x, normal.y, normal.z)
+		, d(d)
+	{
+	}
+
+	explicit Plane(const Vec4& rhs)
+		: normal(rhs.x, rhs.y, rhs.z)
+		, d(rhs.w)
+	{
+	}
+
+	Plane(const Vec3& point, const Vec3& normal)
+		: normal(normal.x, normal.y, normal.z)
+		, d(-dotProduct(point, normal))
+	{
+	}
+
+	void set(const Vec3& normal, float d)
+	{
+		this->normal = normal;
+		this->d = d;
+	}
+
+	void set(const Vec3& normal, const Vec3& point)
+	{
+		this->normal = normal;
+		d = -dotProduct(point, normal);
+	}
+
+	void set(const Vec4& rhs)
+	{
+		normal.x = rhs.x;
+		normal.y = rhs.y;
+		normal.z = rhs.z;
+		d = rhs.w;
+	}
+
+	Vec3 getNormal() const { return normal; }
+
+	float getD() const { return d; }
+
+	float distance(const Vec3& point) const { return dotProduct(point, normal) + d; }
+
+	bool getIntersectionWithLine(const Vec3& line_point,
+		const Vec3& line_vect,
+		Vec3& out_intersection) const
+	{
+		float t2 = dotProduct(normal, line_vect);
+
+		if (t2 == 0.f) return false;
+
+		float t = -(dotProduct(normal, line_point) + d) / t2;
+		out_intersection = line_point + (line_vect * t);
+		return true;
+	}
+
+	Vec3 normal;
+	float d;
+};
+
+
+struct Sphere
+{
+	Sphere(float x, float y, float z, float radius)
+		: m_position(x, y, z)
+		, m_radius(radius)
+	{}
+
+	Sphere(const Vec3& point, float radius)
+		: m_position(point)
+		, m_radius(radius)
+	{}
+
+	explicit Sphere(const Vec4& sphere)
+		: m_position(sphere.x, sphere.y, sphere.z)
+		, m_radius(sphere.w)
+	{}
+
+	Vec3 m_position;
+	float m_radius;
+};
+
+
 class LUMIX_ENGINE_API Frustum
 {
 public:
@@ -107,4 +197,6 @@ private:
 	float m_far_distance;
 	float m_radius;
 };
-}
+
+
+} // namespace Lumix

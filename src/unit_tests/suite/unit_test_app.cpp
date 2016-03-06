@@ -2,7 +2,6 @@
 
 #include "core/log.h"
 #include "core/pc/simple_win.h"
-#include "core/stack_allocator.h"
 #include <cstdio>
 
 
@@ -12,14 +11,13 @@ namespace Lumix
 	{
 		void outputToVS(const char* system, const char* message)
 		{
-			StackAllocator<2048> allocator;
-			string tmp(allocator);
-			tmp = system;
-			tmp += ": ";
-			tmp += message;
-			tmp += "\r";
+			char tmp[2048];
+			copyString(tmp, system);
+			catString(tmp, ": ");
+			catString(tmp, message);
+			catString(tmp, "\r");
 
-			OutputDebugString(tmp.c_str());
+			OutputDebugString(tmp);
 		}
 
 		void outputToConsole(const char* system, const char* message)
