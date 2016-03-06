@@ -190,12 +190,12 @@ void SceneView::onGUI()
 			ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
 			ImGui::Image(&m_texture_handle, size);
 			view_pos = content_min;
+			auto rel_mp = ImGui::GetMousePos();
+			rel_mp.x -= m_screen_x;
+			rel_mp.y -= m_screen_y;
 			if (ImGui::IsItemHovered())
 			{
 				m_editor->getGizmo().enableStep(m_toggle_gizmo_step_action->isActive());
-				auto rel_mp = ImGui::GetMousePos();
-				rel_mp.x -= m_screen_x;
-				rel_mp.y -= m_screen_y;
 				for (int i = 0; i < 3; ++i)
 				{
 					if (ImGui::IsMouseClicked(i))
@@ -203,31 +203,34 @@ void SceneView::onGUI()
 						ImGui::ResetActiveID();
 						captureMouse(true);
 						m_editor->onMouseDown((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
-					}
-
-					auto& input = m_editor->getEngine().getInputSystem();
-					auto delta = Lumix::Vec2(input.getMouseXMove(), input.getMouseYMove());
-					if(delta.x != 0 || delta.y != 0)
-					{
-						m_editor->onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)delta.x, (int)delta.y);
+						break;
 					}
 				}
 			}
-			for (int i = 0; i < 3; ++i)
+			if (m_is_mouse_captured || ImGui::IsItemHovered())
 			{
-				auto rel_mp = ImGui::GetMousePos();
-				rel_mp.x -= m_screen_x;
-				rel_mp.y -= m_screen_y;
-				if (ImGui::IsMouseReleased(i))
+				auto& input = m_editor->getEngine().getInputSystem();
+				auto delta = Lumix::Vec2(input.getMouseXMove(), input.getMouseYMove());
+				if (delta.x != 0 || delta.y != 0)
 				{
-					captureMouse(false);
-					m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
+					m_editor->onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)delta.x, (int)delta.y);
 				}
 			}
 			if(m_is_mouse_captured)
 			{
 				PlatformInterface::clipCursor(
 					content_min.x, content_min.y, content_max.x, content_max.y);
+				for (int i = 0; i < 3; ++i)
+				{
+					auto rel_mp = ImGui::GetMousePos();
+					rel_mp.x -= m_screen_x;
+					rel_mp.y -= m_screen_y;
+					if (ImGui::IsMouseReleased(i))
+					{
+						captureMouse(false);
+						m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
+					}
+				}
 			}
 			m_pipeline->render();
 		}
