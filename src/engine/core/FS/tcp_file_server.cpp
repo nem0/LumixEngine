@@ -7,7 +7,6 @@
 #include "core/mt/task.h"
 #include "core/path.h"
 #include "core/profiler.h"
-#include "core/stack_allocator.h"
 #include "core/static_array.h"
 #include "core/string.h"
 #include "core/network.h"
@@ -221,13 +220,20 @@ public:
 
 	void setBasePath(const char* base_path)
 	{
-		StackAllocator<MAX_PATH_LENGTH> allocator;
-		string base_path_str(base_path, allocator);
-		if (base_path_str[base_path_str.length() - 1] != '/')
+		int len = stringLength(base_path);
+		if (len <= 0) return;
+
+		if (base_path[len - 1] == '/')
 		{
-			base_path_str += "/";
+			m_base_path = base_path;
 		}
-		m_base_path = base_path_str.c_str();
+		else
+		{
+			char tmp[MAX_PATH_LENGTH];
+			copyString(tmp, base_path);
+			catString(tmp, "/");
+			m_base_path = tmp;
+		}
 	}
 
 

@@ -10,7 +10,6 @@
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/queue.h"
-#include "core/stack_allocator.h"
 #include "core/string.h"
 
 

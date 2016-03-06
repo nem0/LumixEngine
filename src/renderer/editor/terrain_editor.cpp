@@ -1,7 +1,7 @@
 #include "terrain_editor.h"
 #include "core/blob.h"
 #include "core/crc32.h"
-#include "core/frustum.h"
+#include "core/geometry.h"
 #include "core/json_serializer.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"

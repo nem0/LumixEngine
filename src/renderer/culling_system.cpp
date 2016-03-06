@@ -3,14 +3,12 @@
 
 #include "core/binary_array.h"
 #include "core/free_list.h"
-#include "core/frustum.h"
+#include "core/geometry.h"
 #include "core/profiler.h"
 
 #include "core/mtjd/group.h"
 #include "core/mtjd/manager.h"
 #include "core/mtjd/job.h"
-
-#include "core/sphere.h"
 
 namespace Lumix
 {
