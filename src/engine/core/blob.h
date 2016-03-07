@@ -12,18 +12,19 @@ namespace Lumix
 	{
 		public:
 			explicit OutputBlob(IAllocator& allocator);
+			OutputBlob(void* data, int size);
 			OutputBlob(const OutputBlob& blob, IAllocator& allocator);
 			void operator =(const OutputBlob& rhs);
-			OutputBlob(const OutputBlob& rhs);
+			~OutputBlob();
 
-			void reserve(int size) { m_data.reserve(size); }
-			const void* getData() const { return m_data.empty() ? nullptr : &m_data[0]; }
-			int getSize() const { return m_data.size(); }
+			void reserve(int size);
+			const void* getData() const { return m_data; }
+			int getSize() const { return m_size; }
 			void write(const void* data, int size);
 			void writeString(const char* string);
 			template <class T> void write(const T& value) { write(&value, sizeof(T)); }
 			template <> void write<bool>(const bool& value) { uint8 v = value; write(&v, sizeof(v)); }
-			void clear() { m_data.clear(); }
+			void clear();
 
 			OutputBlob& operator << (const char* str);
 			OutputBlob& operator << (int value);
@@ -31,7 +32,10 @@ namespace Lumix
 			OutputBlob& operator << (float value);
 
 		private:
-			Array<uint8> m_data;
+			void* m_data;
+			int m_size;
+			int m_pos;
+			IAllocator* m_allocator;
 	};
 
 

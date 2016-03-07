@@ -6,14 +6,43 @@ namespace Lumix
 {
 
 	OutputBlob::OutputBlob(IAllocator& allocator)
-		: m_data(allocator)
+		: m_allocator(&allocator)
+		, m_data(nullptr)
+		, m_size(0)
+		, m_pos(0)
 	{}
 
 
-	OutputBlob::OutputBlob(const OutputBlob& blob, IAllocator& allocator)
-		: m_data(allocator)
+	OutputBlob::OutputBlob(void* data, int size)
+		: m_data(data)
+		, m_size(size)
+		, m_allocator(nullptr)
+		, m_pos(0)
 	{
-		m_data = blob.m_data;
+	}
+
+
+	OutputBlob::OutputBlob(const OutputBlob& blob, IAllocator& allocator)
+		: m_allocator(&allocator)
+		, m_pos(blob.m_pos)
+	{
+		if (blob.m_size > 0)
+		{
+			m_data = allocator.allocate(blob.m_size);
+			copyMemory(m_data, blob.m_data, blob.m_size);
+			m_size = blob.m_size;
+		}
+		else
+		{
+			m_data = nullptr;
+			m_size = 0;
+		}
+	}
+
+
+	OutputBlob::~OutputBlob()
+	{
+		if (m_allocator) m_allocator->deallocate(m_data);
 	}
 
 
@@ -53,23 +82,32 @@ namespace Lumix
 
 	void OutputBlob::operator =(const OutputBlob& rhs)
 	{
-		m_data = rhs.m_data;
+		ASSERT(rhs.m_allocator);
+		if (m_allocator) m_allocator->deallocate(m_data);
+		
+		m_allocator = rhs.m_allocator;
+		m_pos = rhs.m_pos;
+		if (rhs.m_size > 0)
+		{
+			m_data = m_allocator->allocate(rhs.m_size);
+			copyMemory(m_data, rhs.m_data, rhs.m_size);
+			m_size = rhs.m_size;
+		}
+		else
+		{
+			m_data = nullptr;
+			m_size = 0;
+		}
 	}
-
-
-	OutputBlob::OutputBlob(const OutputBlob& rhs)
-		: m_data(rhs.m_data)
-	{}
-
+	
 
 	void OutputBlob::write(const void* data, int size)
 	{
-		if (size)
-		{
-			int pos = m_data.size();
-			m_data.resize(m_data.size() + size);
-			copyMemory(&m_data[0] + pos, data, size);
-		}
+		if (!size) return;
+
+		reserve(m_pos + size);
+		copyMemory((uint8*)m_data + m_pos, data, size);
+		m_pos += size;
 	}
 
 
@@ -85,6 +123,25 @@ namespace Lumix
 		{
 			write((int32)0);
 		}
+	}
+
+
+	void OutputBlob::clear()
+	{
+		m_pos = 0;
+	}
+
+
+	void OutputBlob::reserve(int size)
+	{
+		if (size <= m_size) return;
+
+		ASSERT(m_allocator);
+		uint8* tmp = (uint8*)m_allocator->allocate(m_pos + size);
+		copyMemory(tmp, m_data, m_size);
+		m_allocator->deallocate(m_data);
+		m_data = tmp;
+		m_size = m_pos + size;
 	}
 
 
