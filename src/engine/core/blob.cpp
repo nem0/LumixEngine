@@ -105,7 +105,10 @@ namespace Lumix
 	{
 		if (!size) return;
 
-		reserve(m_pos + size);
+		if (m_pos + size > m_size)
+		{
+			reserve((m_pos + size) << 1);
+		}
 		copyMemory((uint8*)m_data + m_pos, data, size);
 		m_pos += size;
 	}
@@ -137,11 +140,11 @@ namespace Lumix
 		if (size <= m_size) return;
 
 		ASSERT(m_allocator);
-		uint8* tmp = (uint8*)m_allocator->allocate(m_pos + size);
+		uint8* tmp = (uint8*)m_allocator->allocate(size);
 		copyMemory(tmp, m_data, m_size);
 		m_allocator->deallocate(m_data);
 		m_data = tmp;
-		m_size = m_pos + size;
+		m_size = size;
 	}
 
 
@@ -154,7 +157,7 @@ namespace Lumix
 
 	InputBlob::InputBlob(const OutputBlob& blob)
 		: m_data((const uint8*)blob.getData())
-		, m_size(blob.getSize())
+		, m_size(blob.getPos())
 		, m_pos(0)
 	{}
 

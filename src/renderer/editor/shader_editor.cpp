@@ -1546,7 +1546,7 @@ void ShaderEditor::generate(const char* path, ShaderType shader_type)
 	}
 	blob << "}\n";
 
-	file.write(blob.getData(), blob.getSize());
+	file.write(blob.getData(), blob.getPos());
 	file.close();
 }
 
@@ -1669,7 +1669,7 @@ void ShaderEditor::save(const char* path)
 		saveNodeConnections(blob, *node);
 	}
 
-	fwrite(blob.getData(), blob.getSize(), 1, fp);
+	fwrite(blob.getData(), blob.getPos(), 1, fp);
 	fclose(fp);
 }
 
@@ -2158,7 +2158,7 @@ void ShaderEditor::generateMain(const char* path)
 
 	Lumix::OutputBlob blob(m_allocator);
 	generatePasses(blob);
-	fwrite(blob.getData(), 1, blob.getSize(), fp);
+	fwrite(blob.getData(), 1, blob.getPos(), fp);
 	fputs("}\n"
 		  "vs_combinations = {\"\"}\n"
 		  "fs_combinations = {\"\"}\n"

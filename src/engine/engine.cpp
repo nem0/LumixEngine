@@ -625,7 +625,7 @@ public:
 		serializePluginList(serializer);
 		serializerSceneVersions(serializer, ctx);
 		m_path_manager.serialize(serializer);
-		int pos = serializer.getSize();
+		int pos = serializer.getPos();
 		ctx.serialize(serializer);
 		m_plugin_manager->serialize(serializer);
 		serializer.write((int32)ctx.getScenes().size());
@@ -635,8 +635,7 @@ public:
 			serializer.write(scene->getVersion());
 			scene->serialize(serializer);
 		}
-		uint32 crc = crc32((const uint8*)serializer.getData() + pos,
-							 serializer.getSize() - pos);
+		uint32 crc = crc32((const uint8*)serializer.getData() + pos, serializer.getPos() - pos);
 		return crc;
 	}
 

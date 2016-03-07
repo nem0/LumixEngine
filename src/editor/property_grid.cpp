@@ -369,7 +369,7 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 
 		f[0].x = 0;
 		f[count - 1].x = desc.getMaxX();
-		m_editor.setProperty(cmp.type, -1, desc, blob.getData(), blob.getSize());
+		m_editor.setProperty(cmp.type, -1, desc, blob.getData(), blob.getPos());
 	}
 }
 

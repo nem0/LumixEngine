@@ -19,7 +19,8 @@ namespace Lumix
 
 			void reserve(int size);
 			const void* getData() const { return m_data; }
-			int getSize() const { return m_size; }
+			//int getSize() const { return m_size; }
+			int getPos() const { return m_pos; }
 			void write(const void* data, int size);
 			void writeString(const char* string);
 			template <class T> void write(const T& value) { write(&value, sizeof(T)); }
