@@ -457,6 +457,27 @@ namespace Lumix
 			cmp.entity = INVALID_ENTITY;
 			switch (desc->getType())
 			{
+				case IPropertyDescriptor::DECIMAL:
+				{
+					float v;
+					desc->get(cmp, -1, OutputBlob(&v, sizeof(v)));
+					LuaWrapper::pushLua(L, v);
+				}
+				break;
+				case IPropertyDescriptor::BOOL:
+				{
+					bool v;
+					desc->get(cmp, -1, OutputBlob(&v, sizeof(v)));
+					LuaWrapper::pushLua(L, v);
+				}
+				break;
+				case IPropertyDescriptor::INTEGER:
+				{
+					int v;
+					desc->get(cmp, -1, OutputBlob(&v, sizeof(v)));
+					LuaWrapper::pushLua(L, v);
+				}
+				break;
 				case IPropertyDescriptor::COLOR:
 				case IPropertyDescriptor::VEC3:
 				{
@@ -481,6 +502,24 @@ namespace Lumix
 			cmp.entity = INVALID_ENTITY;
 			switch(desc->getType())
 			{
+				case IPropertyDescriptor::DECIMAL:
+				{
+					auto v = LuaWrapper::checkArg<float>(L, 3);
+					desc->set(cmp, -1, InputBlob(&v, sizeof(v)));
+				}
+				break;
+				case IPropertyDescriptor::INTEGER:
+				{
+					auto v = LuaWrapper::checkArg<int>(L, 3);
+					desc->set(cmp, -1, InputBlob(&v, sizeof(v)));
+				}
+				break;
+				case IPropertyDescriptor::BOOL:
+				{
+					auto v = LuaWrapper::checkArg<bool>(L, 3);
+					desc->set(cmp, -1, InputBlob(&v, sizeof(v)));
+				}
+				break;
 				case IPropertyDescriptor::COLOR:
 				case IPropertyDescriptor::VEC3:
 				{
