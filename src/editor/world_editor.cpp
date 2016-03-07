@@ -191,9 +191,9 @@ public:
 		serializer.serialize("pos_x", m_position.x);
 		serializer.serialize("pos_y", m_position.y);
 		serializer.serialize("pos_z", m_position.z);
-		serializer.serialize("size", m_blob.getSize());
+		serializer.serialize("size", m_blob.getPos());
 		serializer.beginArray("data");
-		for (int i = 0; i < m_blob.getSize(); ++i)
+		for (int i = 0; i < m_blob.getPos(); ++i)
 		{
 			serializer.serializeArrayItem(
 				(int32)((const uint8*)m_blob.getData())[i]);
@@ -211,7 +211,8 @@ public:
 		serializer.deserialize("size", size, 0);
 		serializer.deserializeArrayBegin("data");
 		m_blob.clear();
-		for (int i = 0; i < m_blob.getSize(); ++i)
+		m_blob.reserve(size);
+		for (int i = 0; i < size; ++i)
 		{
 			int32 data;
 			serializer.deserializeArrayItem(data, 0);
@@ -601,7 +602,7 @@ public:
 	void undo() override
 	{
 		m_descriptor->addArrayItem(m_component, m_index);
-		InputBlob old_values(m_old_values.getData(), m_old_values.getSize());
+		InputBlob old_values(m_old_values.getData(), m_old_values.getPos());
 		for (int i = 0, c = m_descriptor->getChildren().size(); i < c; ++i)
 		{
 			m_descriptor->getChildren()[i]->set(
@@ -761,7 +762,7 @@ public:
 		serializer.serialize("entity_index", m_entity);
 		serializer.serialize("component_type", m_component_type);
 		serializer.beginArray("data");
-		for (int i = 0; i < m_new_value.getSize(); ++i)
+		for (int i = 0; i < m_new_value.getPos(); ++i)
 		{
 			serializer.serializeArrayItem(
 				(int)((const uint8*)m_new_value.getData())[i]);
@@ -1764,11 +1765,11 @@ public:
 		header.engine_hash = m_engine->serialize(*m_universe, blob);
 		m_template_system->serialize(blob);
 		m_entity_groups.serialize(blob);
-		header.hash = crc32((const uint8*)blob.getData() + hashed_offset, blob.getSize() - hashed_offset);
+		header.hash = crc32((const uint8*)blob.getData() + hashed_offset, blob.getPos() - hashed_offset);
 		*(Header*)blob.getData() = header;
 
 		g_log_info.log("editor") << "Universe saved";
-		file.write(blob.getData(), blob.getSize());
+		file.write(blob.getData(), blob.getPos());
 	}
 
 
@@ -2184,7 +2185,7 @@ public:
 
 	bool canPasteEntities() const override
 	{
-		return m_copy_buffer.getSize() > 0;
+		return m_copy_buffer.getPos() > 0;
 	}
 
 
@@ -2219,7 +2220,7 @@ public:
 		{
 			stream.clear();
 			properties[i]->get(src, -1, stream);
-			InputBlob blob(stream.getData(), stream.getSize());
+			InputBlob blob(stream.getData(), stream.getPos());
 			properties[i]->set(clone, -1, blob);
 		}
 	}
@@ -3287,7 +3288,7 @@ void WorldEditor::destroy(WorldEditor* editor, IAllocator& allocator)
 
 bool PasteEntityCommand::execute()
 {
-	InputBlob blob(m_blob.getData(), m_blob.getSize());
+	InputBlob blob(m_blob.getData(), m_blob.getPos());
 	Universe* universe = m_editor.getUniverse();
 	
 	int entity_count;
