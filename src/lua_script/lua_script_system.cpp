@@ -446,6 +446,120 @@ namespace Lumix
 		}
 
 
+		static int LUA_getProperty(lua_State* L)
+		{
+			auto* desc = LuaWrapper::toType<IPropertyDescriptor*>(L, lua_upvalueindex(1));
+			auto type = LuaWrapper::toType<uint32>(L, lua_upvalueindex(2));
+			ComponentUID cmp;
+			cmp.scene = LuaWrapper::checkArg<IScene*>(L, 1);
+			cmp.index = LuaWrapper::checkArg<ComponentIndex>(L, 2);
+			cmp.type = type;
+			cmp.entity = INVALID_ENTITY;
+			switch (desc->getType())
+			{
+				case IPropertyDescriptor::COLOR:
+				case IPropertyDescriptor::VEC3:
+				{
+					Vec3 v;
+					desc->get(cmp, -1, OutputBlob(&v, sizeof(v)));
+					LuaWrapper::pushLua(L, v);
+				}
+				break;
+			}
+			return 1;
+		}
+
+
+		static int LUA_setProperty(lua_State* L)
+		{
+			auto* desc = LuaWrapper::toType<IPropertyDescriptor*>(L, lua_upvalueindex(1));
+			auto type = LuaWrapper::toType<uint32>(L, lua_upvalueindex(2));
+			ComponentUID cmp;
+			cmp.scene = LuaWrapper::checkArg<IScene*>(L, 1);
+			cmp.index = LuaWrapper::checkArg<ComponentIndex>(L, 2);
+			cmp.type = type;
+			cmp.entity = INVALID_ENTITY;
+			switch(desc->getType())
+			{
+				case IPropertyDescriptor::COLOR:
+				case IPropertyDescriptor::VEC3:
+				{
+					auto v = LuaWrapper::checkArg<Vec3>(L, 3);
+					desc->set(cmp, -1, InputBlob(&v, sizeof(v)));
+				}
+				break;
+			}
+			return 0;
+		}
+
+		
+		static void convertPropertyToLuaName(const char* src, char* out, int max_size)
+		{
+			ASSERT(max_size > 0);
+			bool to_upper = true;
+			char* dest = out;
+			while (*src && dest - out < max_size - 1)
+			{
+				if (isLetter(*src))
+				{
+					*dest = to_upper && !isUpperCase(*src) ? *src - 'a' + 'A' : *src;
+					to_upper = false;
+					++dest;
+				}
+				else
+				{
+					to_upper = true;
+				}
+				++src;
+			}
+			*dest = 0;
+		}
+
+
+		void registerProperties()
+		{
+			int cmps_count = PropertyRegister::getComponentTypesCount();
+			for (int i = 0; i < cmps_count; ++i)
+			{
+				const char* cmp_name = PropertyRegister::getComponentTypeID(i);
+				lua_newtable(m_global_state);
+				lua_pushvalue(m_global_state, -1);
+				char tmp[50];
+				convertPropertyToLuaName(cmp_name, tmp, lengthOf(tmp));
+				lua_setglobal(m_global_state, tmp);
+
+				uint32 cmp_name_hash = crc32(cmp_name);
+				auto& descs = PropertyRegister::getDescriptors(cmp_name_hash);
+				char setter[50];
+				char getter[50];
+				for (auto* desc : descs)
+				{
+					convertPropertyToLuaName(desc->getName(), tmp, lengthOf(tmp));
+					copyString(setter, "set");
+					copyString(getter, "get");
+					catString(setter, tmp);
+					catString(getter, tmp);
+					switch (desc->getType())
+					{
+						case IPropertyDescriptor::VEC3:
+						case IPropertyDescriptor::COLOR:
+							lua_pushlightuserdata(m_global_state, desc);
+							lua_pushinteger(m_global_state, cmp_name_hash);
+							lua_pushcclosure(m_global_state, &LUA_setProperty, 2);
+							lua_setfield(m_global_state, -2, setter);
+
+							lua_pushlightuserdata(m_global_state, desc);
+							lua_pushinteger(m_global_state, cmp_name_hash);
+							lua_pushcclosure(m_global_state, &LUA_getProperty, 2);
+							lua_setfield(m_global_state, -2, getter);
+							break;
+					}
+				}
+				lua_pop(m_global_state, 1);
+			}
+		}
+
+
 		void registerAPI()
 		{
 			if (m_is_api_registered) return;
@@ -468,6 +582,7 @@ namespace Lumix
 			lua_setglobal(m_global_state, "g_universe");
 			LuaWrapper::createSystemFunction(
 				m_global_state, "LuaScript", "getEnvironment", &LuaScriptSceneImpl::getEnvironment);
+			registerProperties();
 			registerPropertyAPI();
 			uint32 register_msg = crc32("registerLuaAPI");
 			for (auto* i : m_universe.getScenes())
