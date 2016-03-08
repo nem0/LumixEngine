@@ -3,6 +3,8 @@
 
 #include "lumix.h"
 #include "core/iallocator.h"
+#include "core/math_utils.h"
+#include "core/string.h"
 
 
 namespace Lumix
@@ -35,6 +37,22 @@ namespace Lumix
 		static uint32 get(const Key& key);
 	};
 
+	// https://gist.github.com/badboy/6267743
+	template<>
+	struct HashFunc<uint64>
+	{
+		static uint32 get(const uint64& key)
+		{
+			uint64 tmp = (~key) + (key << 18);
+			tmp = tmp ^ (tmp >> 31);
+			tmp = tmp * 21;
+			tmp = tmp ^ (tmp >> 11);
+			tmp = tmp + (tmp << 6);
+			tmp = tmp ^ (tmp >> 22);
+			return (uint32)tmp;
+		}
+	};
+
 	template<>
 	struct HashFunc<int32>
 	{
@@ -62,12 +80,23 @@ namespace Lumix
 	template<>
 	struct HashFunc<void*>
 	{
-		static size_t get(const void* key)
+		static uint32 get(const void* key)
 		{
-			size_t x = ((int32(key) >> 16) ^ int32(key)) * 0x45d9f3b;
-			x = ((x >> 16) ^ x) * 0x45d9f3b;
-			x = ((x >> 16) ^ x);
-			return x;
+			#ifdef PLATFORM64
+				uint64 tmp = (uint64)key;
+				tmp = (~tmp) + (tmp << 18);
+				tmp = tmp ^ (tmp >> 31);
+				tmp = tmp * 21;
+				tmp = tmp ^ (tmp >> 11);
+				tmp = tmp + (tmp << 6);
+				tmp = tmp ^ (tmp >> 22);
+				return (uint32)tmp;
+			#else
+				size_t x = ((int32(key) >> 16) ^ int32(key)) * 0x45d9f3b;
+				x = ((x >> 16) ^ x) * 0x45d9f3b;
+				x = ((x >> 16) ^ x);
+				return x;
+			#endif
 		}
 	};
 
@@ -115,7 +144,7 @@ namespace Lumix
 			typedef HashMap<key_type, value_type, hasher_type> hm_type;
 			typedef HashMapIterator<key_type, value_type, hasher_type> my_type;
 
-			friend class hm_type;
+			friend hm_type;
 
 			HashMapIterator()
 				: m_hash_map(nullptr)
@@ -208,7 +237,7 @@ namespace Lumix
 			typedef HashMap<key_type, value_type, hasher_type> hm_type;
 			typedef ConstHashMapIterator<key_type, value_type, hasher_type> my_type;
 
-			friend class hm_type;
+			friend hm_type;
 
 			ConstHashMapIterator()
 				: m_hash_map(nullptr)
@@ -293,7 +322,7 @@ namespace Lumix
 		typedef HashMapIterator<key_type, value_type, hasher_type> iterator;
 		typedef ConstHashMapIterator<key_type, value_type, hasher_type> constIterator;
 
-		HashMap(IAllocator& allocator)
+		explicit HashMap(IAllocator& allocator)
 			: m_allocator(allocator)
 		{
 			initSentinel();
@@ -307,7 +336,7 @@ namespace Lumix
 			init(buckets);
 		}
 
-		HashMap(const my_type& src)
+		explicit HashMap(const my_type& src)
 			: m_allocator(src.m_allocator)
 		{
 			initSentinel();
@@ -320,8 +349,20 @@ namespace Lumix
 
 		~HashMap()
 		{
-			clear();
-			m_allocator.deallocate(m_sentinel);
+			for (node_type* n = first(); m_sentinel != n;)
+			{
+				node_type* dest = n;
+				n = next(n);
+				destruct(dest);
+				if (dest < m_table || dest > &m_table[m_max_id - 1])
+					m_allocator.deallocate(dest);
+			}
+
+			m_allocator.deallocate(m_table);
+			m_table = nullptr;
+			m_size = 0;
+			m_max_id = 0;
+			m_mask = 0;
 		}
 
 		size_type size() const { return m_size; }
@@ -345,14 +386,13 @@ namespace Lumix
 			return *this;
 		}
 
-		value_type& operator[](const key_type& key)
+		value_type& operator[](const key_type& key) const
 		{
 			node_type* n = _find(key);
 			ASSERT(m_sentinel != n);
 			return n->m_value;
 		}
 
-		// modifiers
 		void insert(const key_type& key, const value_type& val)
 		{
 			size_type pos = getPosition(key);
@@ -430,6 +470,7 @@ namespace Lumix
 			m_size = 0;
 			m_max_id = 0;
 			m_mask = 0;
+			init();
 		}
 
 		void rehash(size_type ids_count)
@@ -483,18 +524,46 @@ namespace Lumix
 			m_size = 0;
 		}
 
+		void copyTable(node_type* src, const node_type* src_sentinel, size_type ids_count)
+		{
+			for (size_type i = 0; i < ids_count; i++)
+			{
+				node_type* n = &src[i];
+				while (nullptr != n && src_sentinel != n->m_next)
+				{
+					int32 pos = getPosition(n->m_key);
+					node_type* new_node = getEmptyNode(pos);
+					copyMemory(new_node, n, sizeof(node_type));
+					new_node->m_next = nullptr;
+					n = n->m_next;
+				}
+			}
+		}
+
 		void grow(size_type ids_count)
 		{
-			size_type old_ids_count = m_max_id;
 			size_type old_size = m_size;
 			size_type new_ids_count = ids_count < 512 ? ids_count * 4 : ids_count * 2;
 			node_type* old = m_table;
 
 			init(new_ids_count);
-			copyTableUninitialized(old, m_sentinel, old_ids_count);
-			destructTable(old, m_sentinel, old_ids_count);
+			copyTable(old, m_sentinel, ids_count);
 
 			m_size = old_size;
+			for (size_type i = 0; i < old_size; ++i)
+			{
+				node_type* n = &old[i];
+				if (n->m_next && n->m_next != m_sentinel)
+				{
+					n = n->m_next;
+					while (n && n->m_next != m_sentinel)
+					{
+						node_type* old_n = n;
+						n = n->m_next;
+						m_allocator.deallocate(old_n);
+					}
+				}
+			}
 			m_allocator.deallocate(old);
 		}
 
@@ -522,7 +591,7 @@ namespace Lumix
 
 		void initSentinel()
 		{
-			m_sentinel = reinterpret_cast<node_type*>(m_allocator.allocate(sizeof(node_type)));
+			m_sentinel = reinterpret_cast<node_type*>(m_sentinel_mem);
 			m_sentinel->m_next = m_sentinel;
 		}
 
@@ -576,7 +645,7 @@ namespace Lumix
 			}
 		}
 
-		node_type* _find(const key_type& key)
+		node_type* _find(const key_type& key) const
 		{
 			size_type pos = getPosition(key);
 			for(node_type* n = &m_table[pos]; nullptr != n && m_sentinel != n->m_next; n = n->m_next)
@@ -636,15 +705,18 @@ namespace Lumix
 					node_type* destr = n;
 					n = n->m_next;
 					destruct(destr);
+					if(destr < src || destr > &src[ids_count - 1])
+						m_allocator.deallocate(destr);
 				}
 			}
 		}
 
 		node_type* m_table;
+		char m_sentinel_mem[sizeof(node_type)];
 		node_type* m_sentinel;
 		size_type m_size;
 		size_type m_mask;
 		size_type m_max_id;
 		IAllocator& m_allocator;
 	};
-} // ~namespace Lumix
+} // namespace Lumix

@@ -5,6 +5,8 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "editor/gizmo.h"
+#include "editor/world_editor.h"
 #include "renderer/material.h"
 #include "renderer/render_scene.h"
 #include "universe/universe.h"
@@ -98,11 +100,11 @@ void ParticleEmitter::ForceModule::update(float time_delta)
 const uint32 ParticleEmitter::ForceModule::s_type = Lumix::crc32("force");
 
 
-void ParticleEmitter::drawGizmo(RenderScene& scene)
+void ParticleEmitter::drawGizmo(WorldEditor& editor, RenderScene& scene)
 {
 	for (auto* module : m_modules)
 	{
-		module->drawGizmo(scene);
+		module->drawGizmo(editor, scene);
 	}
 }
 
@@ -115,6 +117,15 @@ ParticleEmitter::AttractorModule::AttractorModule(ParticleEmitter& emitter)
 	for(auto& e : m_entities)
 	{
 		e = INVALID_ENTITY;
+	}
+}
+
+
+void ParticleEmitter::AttractorModule::drawGizmo(WorldEditor& editor, RenderScene& scene)
+{
+	for (int i = 0; i < m_count; ++i)
+	{
+		if(m_entities[i] != INVALID_ENTITY) editor.getGizmo().add(m_entities[i]);
 	}
 }
 
@@ -182,11 +193,12 @@ ParticleEmitter::PlaneModule::PlaneModule(ParticleEmitter& emitter)
 }
 
 
-void ParticleEmitter::PlaneModule::drawGizmo(RenderScene& scene)
+void ParticleEmitter::PlaneModule::drawGizmo(WorldEditor& editor, RenderScene& scene)
 {
 	for (int i = 0; i < m_count; ++i)
 	{
 		Entity entity = m_entities[i];
+		if (m_entities[i] != INVALID_ENTITY) editor.getGizmo().add(entity);
 		if (entity == INVALID_ENTITY) continue;
 		if (!m_emitter.m_universe.hasEntity(entity)) continue;
 
@@ -428,7 +440,7 @@ void ParticleEmitter::AlphaModule::update(float)
 	{
 		float float_idx = float_size * rel_life[i];
 		int idx = (int)float_idx;
-		int next_idx = Math::minValue(idx + 1, size);
+		int next_idx = Math::minimum(idx + 1, size);
 		float w = float_idx - idx;
 		particle_alpha[i] = m_sampled[idx] * (1 - w) + m_sampled[next_idx] * w;
 	}
@@ -494,7 +506,7 @@ void ParticleEmitter::SizeModule::update(float)
 	{
 		float float_idx = float_size * rel_life[i];
 		int idx = (int)float_idx;
-		int next_idx = Math::minValue(idx + 1, size);
+		int next_idx = Math::minimum(idx + 1, size);
 		float w = float_idx - idx;
 		particle_size[i] = m_sampled[idx] * (1 - w) + m_sampled[next_idx] * w;
 		PROFILE_INT("Test", int(particle_size[i] * 1000));
@@ -541,10 +553,16 @@ int IntInterval::getRandom() const
 }
 
 
+void Interval::checkZero()
+{
+	from = Math::maximum(from, 0.0f);
+	to = Math::maximum(from, to);
+}
+
+
 void Interval::check()
 {
-	from = Math::maxValue(from, 0.0f);
-	to = Math::maxValue(from, to);
+	to = Math::maximum(from, to);
 }
 
 
@@ -780,12 +798,12 @@ struct InitialVelocityModule : public ParticleEmitter::ModuleBase
 	Interval m_y;
 	Interval m_z;
 
-	InitialVelocityModule(ParticleEmitter& emitter)
+	explicit InitialVelocityModule(ParticleEmitter& emitter)
 		: ModuleBase(emitter)
 	{
 		m_z.from = -1;
 		m_z.to = 1;
-		m_x.from = m_x.to = m_x.to = m_y.from = m_y.to = 0;
+		m_x.from = m_x.to = m_y.from = m_y.to = 0;
 	}
 
 

@@ -2,6 +2,7 @@
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/resource_manager.h"
+#include "core/string.h"
 #include "core/vec.h"
 #include "physics/physics_system.h"
 #include <PxPhysicsAPI.h>
@@ -13,7 +14,7 @@ namespace Lumix
 
 	struct OutputStream : public physx::PxOutputStream
 	{
-		OutputStream(IAllocator& allocator)
+		explicit OutputStream(IAllocator& allocator)
 			: allocator(allocator)
 		{
 			data = (uint8*)allocator.allocate(sizeof(uint8) * 4096);
@@ -31,7 +32,7 @@ namespace Lumix
 		{
 			if (size + (int)count > capacity)
 			{
-				int new_capacity = Math::maxValue(size + (int)count, capacity + 4096);
+				int new_capacity = Math::maximum(size + (int)count, capacity + 4096);
 				uint8* new_data = (uint8*)allocator.allocate(sizeof(uint8) * new_capacity);
 				copyMemory(new_data, data, size);
 				allocator.deallocate(data);

@@ -36,6 +36,17 @@ template <> inline Vec3 toType(lua_State* L, int index)
 	lua_pop(L, 1);
 	return v;
 }
+template <> inline Vec2 toType(lua_State* L, int index)
+{
+	Vec2 v;
+	lua_rawgeti(L, index, 1);
+	v.x = (float)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	lua_rawgeti(L, index, 2);
+	v.y = (float)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	return v;
+}
 template <> inline int64 toType(lua_State* L, int index)
 {
 	return (int64)lua_tointeger(L, index);
@@ -68,7 +79,7 @@ template <typename T> inline const char* typeToString()
 }
 template <> inline const char* typeToString<int>()
 {
-	return "number";
+	return "number|integer";
 }
 template <> inline const char* typeToString<const char*>()
 {
@@ -129,7 +140,7 @@ template <> inline void pushLua(lua_State* L, float value)
 inline void pushLua(lua_State* L, const Vec3& value)
 {
 	lua_createtable(L, 3, 0);
-	
+
 	lua_pushvalue(L, -1);
 	lua_pushnumber(L, value.x);
 	lua_rawseti(L, -2, 1);
@@ -160,6 +171,51 @@ template <> inline void pushLua(lua_State* L, void* value)
 }
 
 
+inline void createSystemVariable(lua_State* L, const char* system, const char* var_name, void* value)
+{
+	if (lua_getglobal(L, system) == LUA_TNIL)
+	{
+		lua_pop(L, 1);
+		lua_newtable(L);
+		lua_setglobal(L, system);
+		lua_getglobal(L, system);
+	}
+	lua_pushlightuserdata(L, value);
+	lua_setfield(L, -2, var_name);
+	lua_pop(L, 1);
+}
+
+
+inline void createSystemVariable(lua_State* L, const char* system, const char* var_name, int value)
+{
+	if (lua_getglobal(L, system) == LUA_TNIL)
+	{
+		lua_pop(L, 1);
+		lua_newtable(L);
+		lua_setglobal(L, system);
+		lua_getglobal(L, system);
+	}
+	lua_pushinteger(L, value);
+	lua_setfield(L, -2, var_name);
+	lua_pop(L, 1);
+}
+
+
+inline void createSystemFunction(lua_State* L, const char* system, const char* var_name, lua_CFunction fn)
+{
+	if (lua_getglobal(L, system) == LUA_TNIL)
+	{
+		lua_pop(L, 1);
+		lua_newtable(L);
+		lua_setglobal(L, system);
+		lua_getglobal(L, system);
+	}
+	lua_pushcfunction(L, fn);
+	lua_setfield(L, -2, var_name);
+	lua_pop(L, 1);
+}
+
+
 inline const char* luaTypeToString(int type)
 {
 	switch (type)
@@ -177,31 +233,45 @@ inline const char* luaTypeToString(int type)
 }
 
 
+inline void argError(lua_State* L, int index, const char* expected_type)
+{
+	char buf[128];
+	copyString(buf, "expected ");
+	catString(buf, expected_type);
+	catString(buf, ", got ");
+	int type = lua_type(L, index);
+	catString(buf, LuaWrapper::luaTypeToString(type));
+	luaL_argerror(L, index, buf);
+}
+
+
+
 template <typename T>
-bool checkParameterType(lua_State* L, int index)
+void argError(lua_State* L, int index)
+{
+	argError(L, index, typeToString<T>());
+}
+
+
+template <typename T>
+T checkArg(lua_State* L, int index)
 {
 	if (!isType<T>(L, index))
 	{
-		int depth = 0;
-		lua_Debug entry;
-
-		int type = lua_type(L, index);
-		auto er = g_log_error.log("lua");
-		er << "Wrong argument " << index << " of type " << LuaWrapper::luaTypeToString(type)
-			<< " in:\n";
-		while (lua_getstack(L, depth, &entry))
-		{
-			int status = lua_getinfo(L, "Sln", &entry);
-			ASSERT(status);
-			er << entry.short_src << "(" << entry.currentline
-				<< "): " << (entry.name ? entry.name : "?") << "\n";
-			depth++;
-		}
-		er << typeToString<T>() << " expected\n";
-		return false;
+		argError<T>(L, index);
 	}
-	return true;
+	return toType<T>(L, index);
 }
+
+
+inline void checkTableArg(lua_State* L, int index)
+{
+	if(!lua_istable(L, index))
+	{
+		argError(L, index, "table");
+	}
+}
+
 
 
 template <int N> struct FunctionCaller
@@ -213,8 +283,9 @@ template <int N> struct FunctionCaller
 	{
 		typedef std::tuple_element<sizeof...(ArgsF)-N,
 								   std::tuple<ArgsF...>>::type T;
-		if (!checkParameterType<T>(L, sizeof...(ArgsF)-N + 1)) return R();
-		T a = toType<T>(L, sizeof...(ArgsF)-N + 1);
+		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		checkArg<RealT>(L, sizeof...(ArgsF)-N + 1);
+		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 1);
 		return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
 	}
 
@@ -225,9 +296,37 @@ template <int N> struct FunctionCaller
 	{
 		typedef std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
-		if (!checkParameterType<T>(L, sizeof...(ArgsF)-N + 1)) return R();
-		T a = toType<T>(L, sizeof...(ArgsF)-N + 1);
+		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		checkArg<RealT>(L, sizeof...(ArgsF)-N + 1);
+		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 1);
 		return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
+	}
+
+	template <typename R, typename C, typename... ArgsF, typename... Args>
+	static LUMIX_FORCE_INLINE R callMethod(C* inst, R(C::*f)(ArgsF...),
+		lua_State* L,
+		Args... args)
+	{
+		typedef std::tuple_element<sizeof...(ArgsF)-N,
+			std::tuple<ArgsF... >> ::type T;
+		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		checkArg<RealT>(L, sizeof...(ArgsF)-N + 2);
+
+		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 2);
+		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
+	}
+
+	template <typename R, typename C, typename... ArgsF, typename... Args>
+	static LUMIX_FORCE_INLINE R callMethod(C* inst, R(C::*f)(lua_State*, ArgsF...),
+		lua_State* L,
+		Args... args)
+	{
+		typedef std::tuple_element<sizeof...(ArgsF)-N,
+			std::tuple<ArgsF... >> ::type T;
+		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		checkArg<RealT>(L, sizeof...(ArgsF)-N + 2);
+		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 2);
+		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
 	}
 };
 
@@ -249,6 +348,23 @@ template <> struct FunctionCaller<0>
 											 Args... args)
 	{
 		return f(L, args...);
+	}
+
+	template <typename R, typename C, typename... ArgsF, typename... Args>
+	static LUMIX_FORCE_INLINE R callMethod(C* inst, R(C::*f)(ArgsF...),
+		lua_State*,
+		Args... args)
+	{
+		return (inst->*f)(args...);
+	}
+
+
+	template <typename R, typename C, typename... ArgsF, typename... Args>
+	static LUMIX_FORCE_INLINE R callMethod(C* inst, R(C::*f)(lua_State*, ArgsF...),
+		lua_State* L,
+		Args... args)
+	{
+		return (inst->*f)(L, args...);
 	}
 };
 
@@ -291,6 +407,52 @@ int LUMIX_FORCE_INLINE callFunction(void (*f)(lua_State*, ArgsF...),
 template <typename T, T t> int wrap(lua_State* L)
 {
 	return callFunction(t, L);
+}
+
+
+template <typename C>
+int LUMIX_FORCE_INLINE callMethod(void(C::*f)(), lua_State* L)
+{
+	auto* inst = toType<C*>(L, 1);
+	(inst->*f)();
+	return 0;
+}
+
+
+template <typename C, typename R>
+int LUMIX_FORCE_INLINE callMethod(R(C::*f)(), lua_State* L)
+{
+	auto* inst = toType<C*>(L, 1);
+	R v = (inst->*f)();
+	pushLua(L, v);
+	return 1;
+}
+
+
+template <typename C, typename... ArgsF>
+int LUMIX_FORCE_INLINE callMethod(void(C::*f)(ArgsF...), lua_State* L)
+{
+	auto* inst = toType<C*>(L, 1);
+
+	FunctionCaller<sizeof...(ArgsF)>::callMethod(inst, f, L);
+	return 0;
+}
+
+
+template <typename C, typename R, typename... ArgsF>
+int LUMIX_FORCE_INLINE callMethod(R (C::*f)(ArgsF...), lua_State* L)
+{
+	auto* inst = toType<C*>(L, 1);
+
+	R v = FunctionCaller<sizeof...(ArgsF)>::callMethod(inst, f, L);
+	pushLua(L, v);
+	return 1;
+}
+
+
+template <typename C, typename T, T t> int wrapMethod(lua_State* L)
+{
+	return callMethod<C>(t, L);
 }
 
 

@@ -3,10 +3,8 @@
 
 #include "core/array.h"
 #include "core/associative_array.h"
-#include "core/matrix.h"
 #include "core/resource.h"
 #include "core/vec.h"
-#include "renderer/render_scene.h"
 #include <bgfx/bgfx.h>
 
 
@@ -14,15 +12,22 @@ namespace Lumix
 {
 
 
+class Frustum;
+struct GrassInfo;
+class IAllocator;
 class LIFOAllocator;
 class Material;
+struct Matrix;
 class Mesh;
+class Model;
 class OutputBlob;
-class PipelineInstance;
+struct RayCastModelHit;
 class Renderer;
 class RenderScene;
 struct TerrainQuad;
+struct TerrainInfo;
 class Texture;
+class Universe;
 
 
 class Terrain
@@ -31,7 +36,7 @@ class Terrain
 		class GrassType
 		{
 			public:
-				GrassType(Terrain& terrain);
+				explicit GrassType(Terrain& terrain);
 				~GrassType();
 
 				void grassLoaded(Resource::State, Resource::State);
@@ -45,7 +50,7 @@ class Terrain
 		class GrassPatch
 		{
 			public:
-				GrassPatch(IAllocator& allocator)
+				explicit GrassPatch(IAllocator& allocator)
 					: m_matrices(allocator)
 				{ }
 
@@ -56,7 +61,7 @@ class Terrain
 		class GrassQuad
 		{
 			public:
-				GrassQuad(IAllocator& allocator)
+				explicit GrassQuad(IAllocator& allocator)
 					: m_patches(allocator)
 				{}
 

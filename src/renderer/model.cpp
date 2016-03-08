@@ -14,6 +14,7 @@
 #include "renderer/material.h"
 #include "renderer/model_manager.h"
 #include "renderer/pose.h"
+#include "renderer/ray_cast_model_hit.h"
 
 #include <cfloat>
 #include <cmath>
@@ -31,17 +32,30 @@ Mesh::Mesh(const bgfx::VertexDecl& def,
 		   int index_count,
 		   const char* name,
 		   IAllocator& allocator)
-	: m_name(allocator)
-	, m_vertex_def(def)
+	: name(allocator)
+	, vertex_def(def)
 {
-	m_material = mat;
-	m_attribute_array_offset = attribute_array_offset;
-	m_attribute_array_size = attribute_array_size;
-	m_indices_offset = indices_offset;
-	m_index_count = index_count;
-	m_name_hash = crc32(name);
-	m_name = name;
-	m_instance_idx = -1;
+	this->material = mat;
+	this->attribute_array_offset = attribute_array_offset;
+	this->attribute_array_size = attribute_array_size;
+	this->indices_offset = indices_offset;
+	this->indices_count = index_count;
+	this->name = name;
+	this->instance_idx = -1;
+}
+
+
+void Mesh::set(const bgfx::VertexDecl& def,
+	int attribute_array_offset,
+	int attribute_array_size,
+	int indices_offset,
+	int index_count)
+{
+	this->vertex_def = def;
+	this->attribute_array_offset = attribute_array_offset;
+	this->attribute_array_size = attribute_array_size;
+	this->indices_offset = indices_offset;
+	this->indices_count = index_count;
 }
 
 
@@ -54,10 +68,13 @@ Model::Model(const Path& path, ResourceManager& resource_manager, IAllocator& al
 	, m_bones(m_allocator)
 	, m_indices(m_allocator)
 	, m_vertices(m_allocator)
-	, m_lods(m_allocator)
 	, m_vertices_handle(BGFX_INVALID_HANDLE)
 	, m_indices_handle(BGFX_INVALID_HANDLE)
 {
+	m_lods[0] = { -1, -1, -1 };
+	m_lods[1] = { -1, -1, -1 };
+	m_lods[2] = { -1, -1, -1 };
+	m_lods[3] = { -1, -1, -1 };
 }
 
 
@@ -88,9 +105,9 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 	int vertex_offset = 0;
 	for (int mesh_index = 0; mesh_index < m_meshes.size(); ++mesh_index)
 	{
-		int indices_end = m_meshes[mesh_index].getIndicesOffset() +
-						  m_meshes[mesh_index].getIndexCount();
-		for (int i = m_meshes[mesh_index].getIndicesOffset(); i < indices_end;
+		int indices_end = m_meshes[mesh_index].indices_offset +
+						  m_meshes[mesh_index].indices_count;
+		for (int i = m_meshes[mesh_index].indices_offset; i < indices_end;
 			 i += 3)
 		{
 			Vec3 p0 = vertices[vertex_offset + indices[i]];
@@ -138,8 +155,8 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 				hit.m_mesh = &m_meshes[mesh_index];
 			}
 		}
-		vertex_offset += m_meshes[mesh_index].getAttributeArraySize() /
-						 m_meshes[mesh_index].getVertexDefinition().getStride();
+		vertex_offset += m_meshes[mesh_index].attribute_array_size /
+						 m_meshes[mesh_index].vertex_def.getStride();
 	}
 	hit.m_origin = origin;
 	hit.m_dir = dir;
@@ -150,11 +167,11 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 LODMeshIndices Model::getLODMeshIndices(float squared_distance) const
 {
 	int i = 0;
-	while (squared_distance >= m_lods[i].m_distance)
+	while (squared_distance >= m_lods[i].distance)
 	{
 		++i;
 	}
-	return LODMeshIndices(m_lods[i].m_from_mesh, m_lods[i].m_to_mesh);
+	return{ m_lods[i].from_mesh, m_lods[i].to_mesh };
 }
 
 
@@ -163,14 +180,12 @@ void Model::getPose(Pose& pose)
 	ASSERT(pose.getCount() == getBoneCount());
 	Vec3* pos = pose.getPositions();
 	Quat* rot = pose.getRotations();
-	Matrix mtx;
 	for (int i = 0, c = getBoneCount(); i < c; ++i)
 	{
-		mtx = m_bones[i].inv_bind_matrix;
-		mtx.fastInverse();
-		mtx.getTranslation(pos[i]);
-		mtx.getRotation(rot[i]);
+		pos[i] = m_bones[i].position;
+		rot[i] = m_bones[i].rotation;
 	}
+	pose.setIsAbsolute();
 }
 
 
@@ -262,10 +277,10 @@ void Model::create(const bgfx::VertexDecl& def,
 					 m_allocator);
 
 	Model::LOD lod;
-	lod.m_distance = FLT_MAX;
-	lod.m_from_mesh = 0;
-	lod.m_to_mesh = 0;
-	m_lods.push(lod);
+	lod.distance = FLT_MAX;
+	lod.from_mesh = 0;
+	lod.to_mesh = 0;
+	m_lods[0] = lod;
 
 	m_indices.resize(indices_size / sizeof(m_indices[0]));
 	copyMemory(&m_indices[0], indices_data, indices_size);
@@ -286,30 +301,29 @@ void Model::computeRuntimeData(const uint8* vertices)
 
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
-		int mesh_vertex_count = m_meshes[i].getAttributeArraySize() /
-								m_meshes[i].getVertexDefinition().getStride();
-		int mesh_attributes_array_offset =
-			m_meshes[i].getAttributeArrayOffset();
-		int mesh_vertex_size = m_meshes[i].getVertexDefinition().getStride();
+		int mesh_vertex_count =
+			m_meshes[i].attribute_array_size / m_meshes[i].vertex_def.getStride();
+		int mesh_attributes_array_offset = m_meshes[i].attribute_array_offset;
+		int mesh_vertex_size = m_meshes[i].vertex_def.getStride();
 		int mesh_position_attribute_offset =
-			m_meshes[i].getVertexDefinition().getOffset(bgfx::Attrib::Position);
+			m_meshes[i].vertex_def.getOffset(bgfx::Attrib::Position);
 		for (int j = 0; j < mesh_vertex_count; ++j)
 		{
 			m_vertices[index] =
 				*(const Vec3*)&vertices[mesh_attributes_array_offset +
 										j * mesh_vertex_size +
 										mesh_position_attribute_offset];
-			bounding_radius_squared = Math::maxValue(
+			bounding_radius_squared = Math::maximum(
 				bounding_radius_squared,
 				dotProduct(m_vertices[index], m_vertices[index]) > 0
 					? m_vertices[index].squaredLength()
 					: 0);
-			min_vertex.x = Math::minValue(min_vertex.x, m_vertices[index].x);
-			min_vertex.y = Math::minValue(min_vertex.y, m_vertices[index].y);
-			min_vertex.z = Math::minValue(min_vertex.z, m_vertices[index].z);
-			max_vertex.x = Math::maxValue(max_vertex.x, m_vertices[index].x);
-			max_vertex.y = Math::maxValue(max_vertex.y, m_vertices[index].y);
-			max_vertex.z = Math::maxValue(max_vertex.z, m_vertices[index].z);
+			min_vertex.x = Math::minimum(min_vertex.x, m_vertices[index].x);
+			min_vertex.y = Math::minimum(min_vertex.y, m_vertices[index].y);
+			min_vertex.z = Math::minimum(min_vertex.z, m_vertices[index].z);
+			max_vertex.x = Math::maximum(max_vertex.x, m_vertices[index].x);
+			max_vertex.y = Math::maximum(max_vertex.y, m_vertices[index].y);
+			max_vertex.z = Math::maximum(max_vertex.z, m_vertices[index].z);
 			++index;
 		}
 	}
@@ -335,7 +349,7 @@ bool Model::parseGeometry(FS::IFile& file)
 	ASSERT(!bgfx::isValid(m_vertices_handle));
 	const bgfx::Memory* vertices_mem = bgfx::alloc(vertices_size);
 	file.read(vertices_mem->data, vertices_size);
-	m_vertices_handle = bgfx::createVertexBuffer(vertices_mem, m_meshes[0].getVertexDefinition());
+	m_vertices_handle = bgfx::createVertexBuffer(vertices_mem, m_meshes[0].vertex_def);
 	m_vertices_size = vertices_size;
 
 	ASSERT(!bgfx::isValid(m_indices_handle));
@@ -346,8 +360,7 @@ bool Model::parseGeometry(FS::IFile& file)
 	int vertex_count = 0;
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
-		vertex_count += m_meshes[i].getAttributeArraySize() /
-						m_meshes[i].getVertexDefinition().getStride();
+		vertex_count += m_meshes[i].attribute_array_size / m_meshes[i].vertex_def.getStride();
 	}
 	m_vertices.resize(vertex_count);
 
@@ -375,7 +388,7 @@ bool Model::parseBones(FS::IFile& file)
 		{
 			return false;
 		}
-		file.read(tmp, len + 1);
+		file.read(tmp, len);
 		tmp[len] = 0;
 		b.name = tmp;
 		m_bone_map.insert(crc32(b.name.c_str()), m_bones.size() - 1);
@@ -410,7 +423,7 @@ bool Model::parseBones(FS::IFile& file)
 			b.parent_idx = getBoneIdx(b.parent.c_str());
 			if (b.parent_idx > i || b.parent_idx < 0)
 			{
-				g_log_error.log("renderer") << "Invalid skeleton in "
+				g_log_error.log("Renderer") << "Invalid skeleton in "
 											<< getPath().c_str();
 				return false;
 			}
@@ -486,7 +499,7 @@ bool Model::parseMeshes(FS::IFile& file)
 			material_manager->unload(*material);
 			return false;
 		}
-		
+
 		char mesh_name[MAX_PATH_LENGTH];
 		mesh_name[str_size] = 0;
 		file.read(mesh_name, str_size);
@@ -511,16 +524,15 @@ bool Model::parseLODs(FS::IFile& file)
 {
 	int32 lod_count;
 	file.read(&lod_count, sizeof(lod_count));
-	if (lod_count <= 0)
+	if (lod_count <= 0 || lod_count > lengthOf(m_lods))
 	{
 		return false;
 	}
-	m_lods.resize(lod_count);
 	for (int i = 0; i < lod_count; ++i)
 	{
-		file.read(&m_lods[i].m_to_mesh, sizeof(m_lods[i].m_to_mesh));
-		file.read(&m_lods[i].m_distance, sizeof(m_lods[i].m_distance));
-		m_lods[i].m_from_mesh = i > 0 ? m_lods[i - 1].m_to_mesh + 1 : 0;
+		file.read(&m_lods[i].to_mesh, sizeof(m_lods[i].to_mesh));
+		file.read(&m_lods[i].distance, sizeof(m_lods[i].distance));
+		m_lods[i].from_mesh = i > 0 ? m_lods[i - 1].to_mesh + 1 : 0;
 	}
 	return true;
 }
@@ -542,7 +554,7 @@ bool Model::load(FS::IFile& file)
 		return true;
 	}
 
-	g_log_warning.log("renderer") << "Error loading model " << getPath().c_str();
+	g_log_warning.log("Renderer") << "Error loading model " << getPath().c_str();
 	return false;
 }
 
@@ -551,12 +563,11 @@ void Model::unload(void)
 	auto* material_manager = m_resource_manager.get(ResourceManager::MATERIAL);
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
-		removeDependency(*m_meshes[i].getMaterial());
-		material_manager->unload(*m_meshes[i].getMaterial());
+		removeDependency(*m_meshes[i].material);
+		material_manager->unload(*m_meshes[i].material);
 	}
 	m_meshes.clear();
 	m_bones.clear();
-	m_lods.clear();
 
 	if(bgfx::isValid(m_vertices_handle)) bgfx::destroyVertexBuffer(m_vertices_handle);
 	if(bgfx::isValid(m_indices_handle)) bgfx::destroyIndexBuffer(m_indices_handle);

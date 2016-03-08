@@ -3,7 +3,6 @@
 #include "core/timer.h"
 
 #include "core/pc/simple_win.h"
-#include <Windows.h>
 
 namespace Lumix
 {
@@ -12,7 +11,7 @@ namespace Lumix
 class TimerImpl : public Timer
 {
 	public:
-		TimerImpl(IAllocator& allocator)
+		explicit TimerImpl(IAllocator& allocator)
 			: m_allocator(allocator)
 		{
 			QueryPerformanceFrequency(&m_frequency);

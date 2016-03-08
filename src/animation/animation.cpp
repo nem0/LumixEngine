@@ -59,7 +59,7 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 		int off = frame * m_bone_count;
 		int off2 = off + m_bone_count;
 		float t = (time - frame / (float)m_fps) / (1.0f / m_fps);
-	
+
 		if(frame < m_frame_count - 1)
 		{
 			for(int i = 0; i < m_bone_count; ++i)
@@ -106,12 +106,12 @@ bool Animation::load(FS::IFile& file)
 	file.read(&header, sizeof(header));
 	if (header.magic != HEADER_MAGIC)
 	{
-		g_log_error.log("animation") << getPath() << " is not an animation file";
+		g_log_error.log("Animation") << getPath() << " is not an animation file";
 		return false;
 	}
 	if (header.version > 1)
 	{
-		g_log_error.log("animation") << "Unsupported animation version " << header.version << " ("
+		g_log_error.log("Animation") << "Unsupported animation version " << header.version << " ("
 									 << getPath() << ")";
 		return false;
 	}

@@ -1,8 +1,6 @@
 #pragma once
 
 #include "core/associative_array.h"
-#include "core/base_proxy_allocator.h"
-#include "core/default_allocator.h"
 #include "core/mt/sync.h"
 
 
@@ -10,6 +8,7 @@ namespace Lumix
 {
 
 
+class IAllocator;
 class InputBlob;
 class OutputBlob;
 
@@ -28,7 +27,7 @@ class LUMIX_ENGINE_API PathManager
 	friend class Path;
 
 public:
-	PathManager(Lumix::IAllocator& allocator);
+	explicit PathManager(Lumix::IAllocator& allocator);
 	~PathManager();
 
 	void serialize(OutputBlob& serializer);

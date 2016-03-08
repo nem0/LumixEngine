@@ -4,6 +4,7 @@
 #include "core/crc32.h"
 #include "debug/debug.h"
 #include "core/log.h"
+#include "core/mt/thread.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -15,7 +16,8 @@
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
-#include <Windows.h>
+#include "universe/universe.h"
+#include <windows.h>
 #include <cstdio>
 
 
@@ -27,11 +29,11 @@ public:
 	{
 		m_current_test = -1;
 		m_is_test_universe_loaded = false;
-		m_universe_context = nullptr;
+		m_universe = nullptr;
 	}
 
 
-	~App() { ASSERT(!m_universe_context); }
+	~App() { ASSERT(!m_universe); }
 
 
 	void universeFileLoaded(Lumix::FS::IFile& file, bool success)
@@ -58,7 +60,7 @@ public:
 			Lumix::g_log_error.log("render_test") << "Universe corrupted";
 			return;
 		}
-		bool deserialize_succeeded = m_engine->deserialize(*m_universe_context, blob);
+		bool deserialize_succeeded = m_engine->deserialize(*m_universe, blob);
 		m_is_test_universe_loaded = true;
 		if (!deserialize_succeeded)
 		{
@@ -77,7 +79,7 @@ public:
 	{
 		HINSTANCE hInst = GetModuleHandle(NULL);
 		WNDCLASSEX wnd;
-		memset(&wnd, 0, sizeof(wnd));
+		wnd = {};
 		wnd.cbSize = sizeof(wnd);
 		wnd.style = CS_HREDRAW | CS_VREDRAW;
 		wnd.lpfnWndProc = msgProc;
@@ -99,8 +101,6 @@ public:
 			hInst,
 			0);
 
-		Lumix::Renderer::setInitData(hwnd);
-
 		m_hwnd = hwnd;
 		return hwnd;
 	}
@@ -109,6 +109,7 @@ public:
 	void init()
 	{
 		auto hwnd = createWindow();
+
 		Lumix::g_log_info.getCallback().bind<outputToVS>();
 		Lumix::g_log_warning.getCallback().bind<outputToVS>();
 		Lumix::g_log_error.getCallback().bind<outputToVS>();
@@ -119,30 +120,25 @@ public:
 
 		Lumix::enableCrashReporting(false);
 
-		m_engine = Lumix::Engine::create(NULL, m_allocator);
+		m_engine = Lumix::Engine::create("", "", NULL, m_allocator);
+		Lumix::Engine::PlatformData platform_data;
+		platform_data.window_handle = hwnd;
+		m_engine->setPlatformData(platform_data);
 
-		m_engine->getPluginManager().load("renderer.dll");
-		m_engine->getPluginManager().load("animation.dll");
-		m_engine->getPluginManager().load("audio.dll");
-		m_engine->getPluginManager().load("lua_script.dll");
-		m_engine->getPluginManager().load("physics.dll");
-		Lumix::Pipeline* pipeline_object =
-			static_cast<Lumix::Pipeline*>(m_engine->getResourceManager()
-											  .get(Lumix::ResourceManager::PIPELINE)
-											  ->load(Lumix::Path("pipelines/render_test.lua")));
-		ASSERT(pipeline_object);
-		if (pipeline_object)
-		{
-			m_pipeline =
-				Lumix::PipelineInstance::create(*pipeline_object, m_engine->getAllocator());
-		}
-
-		m_universe_context = &m_engine->createUniverse();
-		m_pipeline->setScene(
-			(Lumix::RenderScene*)m_universe_context->getScene(Lumix::crc32("renderer")));
-		m_pipeline->setViewport(0, 0, 600, 400);
+		m_engine->getPluginManager().load("renderer");
+		m_engine->getPluginManager().load("animation");
+		m_engine->getPluginManager().load("audio");
+		m_engine->getPluginManager().load("lua_script");
+		m_engine->getPluginManager().load("physics");
 		Lumix::Renderer* renderer =
 			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+		m_pipeline = Lumix::Pipeline::create(
+			*renderer, Lumix::Path("pipelines/render_test.lua"), m_engine->getAllocator());
+		m_pipeline->load();
+
+		m_universe = &m_engine->createUniverse();
+		m_pipeline->setScene((Lumix::RenderScene*)m_universe->getScene(Lumix::crc32("renderer")));
+		m_pipeline->setViewport(0, 0, 600, 400);
 		renderer->resize(600, 400);
 
 		enumerateTests();
@@ -151,12 +147,12 @@ public:
 
 	void shutdown()
 	{
-		m_engine->destroyUniverse(*m_universe_context);
-		Lumix::PipelineInstance::destroy(m_pipeline);
+		m_engine->destroyUniverse(*m_universe);
+		Lumix::Pipeline::destroy(m_pipeline);
 		Lumix::Engine::destroy(m_engine, m_allocator);
 		m_engine = nullptr;
 		m_pipeline = nullptr;
-		m_universe_context = nullptr;
+		m_universe = nullptr;
 	}
 
 
@@ -205,7 +201,7 @@ public:
 		auto push_test = [&](const char* name) {
 			char basename[Lumix::MAX_PATH_LENGTH];
 			Lumix::PathUtils::getBasename(basename, Lumix::lengthOf(basename), name);
-			auto& test = m_tests.pushEmpty();
+			auto& test = m_tests.emplace();
 			Lumix::copyString(test.path, "render_tests/");
 			Lumix::catString(test.path, basename);
 			test.failed = false;
@@ -305,7 +301,7 @@ public:
 		m_finished = false;
 		while (!m_finished)
 		{
-			m_engine->update(*m_universe_context);
+			m_engine->update(*m_universe);
 			m_pipeline->setViewport(0, 0, 600, 400);
 			m_pipeline->render();
 			auto* renderer = m_engine->getPluginManager().getPlugin("renderer");
@@ -315,6 +311,7 @@ public:
 				if (!nextTest()) return;
 			}
 			m_engine->getFileSystem().updateAsyncTransactions();
+			Lumix::MT::sleep(100);
 			handleEvents();
 		}
 		int failed_count = getFailedCount();
@@ -345,8 +342,8 @@ private:
 
 	Lumix::DefaultAllocator m_allocator;
 	Lumix::Engine* m_engine;
-	Lumix::UniverseContext* m_universe_context;
-	Lumix::PipelineInstance* m_pipeline;
+	Lumix::Universe* m_universe;
+	Lumix::Pipeline* m_pipeline;
 	Lumix::Array<Test> m_tests;
 	int m_current_test;
 	bool m_is_test_universe_loaded;

@@ -3,6 +3,7 @@
 #include "core/crc32.h"
 #include "core/matrix.h"
 #include "core/json_serializer.h"
+#include "engine/iplugin.h"
 #include <cstdint>
 
 
@@ -30,9 +31,35 @@ Universe::Universe(IAllocator& allocator)
 	, m_entity_moved(m_allocator)
 	, m_entity_map(m_allocator)
 	, m_first_free_slot(-1)
+	, m_scenes(m_allocator)
 {
 	m_transformations.reserve(RESERVED_ENTITIES_COUNT);
 	m_entity_map.reserve(RESERVED_ENTITIES_COUNT);
+}
+
+
+IScene* Universe::getScene(uint32 hash) const
+{
+	for (auto* scene : m_scenes)
+	{
+		if (crc32(scene->getPlugin().getName()) == hash)
+		{
+			return scene;
+		}
+	}
+	return nullptr;
+}
+
+
+Array<IScene*>& Universe::getScenes()
+{
+	return m_scenes;
+}
+
+
+void Universe::addScene(IScene* scene)
+{
+	m_scenes.push(scene);
 }
 
 
@@ -162,7 +189,7 @@ void Universe::createEntity(Entity entity)
 	}
 	m_entity_map[entity] = m_transformations.size();
 
-	Transformation& trans = m_transformations.pushEmpty();
+	Transformation& trans = m_transformations.emplace();
 	trans.position.set(0, 0, 0);
 	trans.rotation.set(0, 0, 0, 1);
 	trans.scale = 1;
@@ -187,7 +214,7 @@ Entity Universe::createEntity(const Vec3& position, const Quat& rotation)
 		m_entity_map.push(m_transformations.size());
 	}
 
-	Transformation& trans = m_transformations.pushEmpty();
+	Transformation& trans = m_transformations.emplace();
 	trans.position = position;
 	trans.rotation = rotation;
 	trans.scale = 1;

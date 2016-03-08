@@ -238,7 +238,7 @@ namespace Lumix
 
 		private:
 			Stub m_stub;
-	}; 
+	};
 
 	template <typename R, typename A0, typename A1, typename A2, typename A3>
 	class Delegate<R (A0, A1, A2, A3)> 

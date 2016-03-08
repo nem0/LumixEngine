@@ -1,10 +1,11 @@
-#include "lumix.h"
 #include "engine.h"
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/fs/os_file.h"
 #include "core/input_system.h"
 #include "core/log.h"
+#include "core/lua_wrapper.h"
+#include "core/math_utils.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -15,11 +16,13 @@
 #include "core/mtjd/manager.h"
 #include "debug/debug.h"
 #include "engine/iplugin.h"
+#include "engine/property_descriptor.h"
+#include "engine/property_register.h"
 #include "plugin_manager.h"
 #include "universe/hierarchy.h"
 #include "universe/universe.h"
+#include <lua.hpp>
 
-#include <cstdio>
 
 namespace Lumix
 {
@@ -52,23 +55,10 @@ public:
 #pragma pack()
 
 
-IScene* UniverseContext::getScene(uint32 hash) const
-{
-	for (auto* scene : m_scenes)
-	{
-		if (crc32(scene->getPlugin().getName()) == hash)
-		{
-			return scene;
-		}
-	}
-	return nullptr;
-}
-
-
 class EngineImpl : public Engine
 {
 public:
-	EngineImpl(FS::FileSystem* fs, IAllocator& allocator)
+	EngineImpl(const char* base_path0, const char* base_path1, FS::FileSystem* fs, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_resource_manager(m_allocator)
 		, m_mtjd_manager(nullptr)
@@ -77,14 +67,21 @@ public:
 		, m_component_types(m_allocator)
 		, m_last_time_delta(0)
 		, m_path_manager(m_allocator)
+		, m_time_multiplier(1.0f)
+		, m_paused(false)
+		, m_next_frame(false)
 	{
+		m_state = lua_newstate(luaAllocator, &m_allocator);
+		luaL_openlibs(m_state);
+		registerLuaAPI();
+
 		m_mtjd_manager = MTJD::Manager::create(m_allocator);
 		if (!fs)
 		{
 			m_file_system = FS::FileSystem::create(m_allocator);
 
 			m_mem_file_device = LUMIX_NEW(m_allocator, FS::MemoryFileDevice)(m_allocator);
-			m_disk_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)(m_allocator);
+			m_disk_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)(base_path0, base_path1, m_allocator);
 
 			m_file_system->mount(m_mem_file_device);
 			m_file_system->mount(m_disk_file_device);
@@ -103,7 +100,270 @@ public:
 		m_timer = Timer::create(m_allocator);
 		m_fps_timer = Timer::create(m_allocator);
 		m_fps_frame = 0;
+		PropertyRegister::init(m_allocator);
 	}
+
+
+	static ComponentIndex LUA_createComponent(IScene* scene, const char* type, int entity_idx)
+	{
+		if (!scene) return -1;
+		Entity e(entity_idx);
+		uint32 hash = crc32(type);
+		if (scene->getComponent(e, hash) != INVALID_COMPONENT)
+		{
+			g_log_error.log("Lua Script") << "Component " << type << " already exists in entity "
+				<< entity_idx;
+			return -1;
+		}
+
+		return scene->createComponent(hash, e);
+	}
+
+
+	static Entity LUA_createEntity(Universe* univ)
+	{
+		return univ->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+	}
+
+
+	static void setProperty(const ComponentUID& cmp,
+		const IPropertyDescriptor& desc,
+		lua_State* L,
+		IAllocator& allocator)
+	{
+		switch (desc.getType())
+		{
+		case IPropertyDescriptor::STRING:
+		case IPropertyDescriptor::FILE:
+		case IPropertyDescriptor::RESOURCE:
+			if (lua_isstring(L, -1))
+			{
+				const char* str = lua_tostring(L, -1);
+				desc.set(cmp, -1, InputBlob(str, stringLength(str)));
+			}
+			break;
+		case IPropertyDescriptor::DECIMAL:
+			if (lua_isnumber(L, -1))
+			{
+				float f = (float)lua_tonumber(L, -1);
+				desc.set(cmp, -1, InputBlob(&f, sizeof(f)));
+			}
+			break;
+		case IPropertyDescriptor::BOOL:
+			if (lua_isboolean(L, -1))
+			{
+				bool b = lua_toboolean(L, -1) != 0;
+				desc.set(cmp, -1, InputBlob(&b, sizeof(b)));
+			}
+			break;
+		case IPropertyDescriptor::VEC3:
+		case IPropertyDescriptor::COLOR:
+			if (lua_istable(L, -1))
+			{
+				auto v = LuaWrapper::toType<Vec3>(L, -1);
+				desc.set(cmp, -1, InputBlob(&v, sizeof(v)));
+			}
+			break;
+		default:
+			g_log_error.log("Lua Script") << "Property " << desc.getName() << " has unsupported type";
+			break;
+		}
+	}
+
+
+	static int LUA_createEntityEx(lua_State* L)
+	{
+		auto* engine = LuaWrapper::checkArg<Engine*>(L, 1);
+		auto* ctx = LuaWrapper::checkArg<Universe*>(L, 2);
+		LuaWrapper::checkTableArg(L, 3);
+
+		Entity e = ctx->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+
+		lua_pushvalue(L, 3);
+		lua_pushnil(L);
+		while (lua_next(L, -2) != 0)
+		{
+			const char* parameter_name = luaL_checkstring(L, -2);
+			if (compareString(parameter_name, "position") == 0)
+			{
+				auto pos = LuaWrapper::toType<Vec3>(L, -1);
+				ctx->setPosition(e, pos);
+			}
+			else
+			{
+				uint32 cmp_hash = crc32(parameter_name);
+				for (auto* scene : ctx->getScenes())
+				{
+					ComponentUID cmp(e, cmp_hash, scene, scene->createComponent(cmp_hash, e));
+					if (cmp.isValid())
+					{
+						lua_pushvalue(L, -1);
+						lua_pushnil(L);
+						while (lua_next(L, -2) != 0)
+						{
+							const char* property_name = luaL_checkstring(L, -2);
+							auto* desc = PropertyRegister::getDescriptor(cmp_hash, crc32(property_name));
+							if (!desc)
+							{
+								g_log_error.log("Lua Script") << "Unknown property " << property_name;
+							}
+							else
+							{
+								setProperty(cmp, *desc, L, engine->getAllocator());
+							}
+
+							lua_pop(L, 1);
+						}
+						lua_pop(L, 1);
+						break;
+					}
+				}
+			}
+			lua_pop(L, 1);
+		}
+		lua_pop(L, 1);
+
+		LuaWrapper::pushLua(L, e);
+		return 1;
+	}
+
+
+	static void LUA_setEntityPosition(Universe* univ, Entity entity, Vec3 pos)
+	{
+		univ->setPosition(entity, pos);
+	}
+
+
+	static void LUA_setEntityRotation(Universe* univ,
+		int entity_index,
+		Vec3 axis,
+		float angle)
+	{
+		if (entity_index < 0 || entity_index > univ->getEntityCount()) return;
+
+		univ->setRotation(entity_index, Quat(axis, angle));
+	}
+
+
+	static void LUA_setEntityLocalRotation(IScene* hierarchy,
+		Entity entity,
+		Vec3 axis,
+		float angle)
+	{
+		if (entity == INVALID_ENTITY) return;
+
+		static_cast<Hierarchy*>(hierarchy)->setLocalRotation(entity, Quat(axis, angle));
+	}
+
+
+	static void LUA_logError(const char* text)
+	{
+		g_log_error.log("Lua Script") << text;
+	}
+
+
+	static void LUA_logInfo(const char* text)
+	{
+		g_log_info.log("Lua Script") << text;
+	}
+
+
+	static float LUA_getInputActionValue(Engine* engine, uint32 action)
+	{
+		auto v = engine->getInputSystem().getActionValue(action);
+		return v;
+	}
+
+
+	static void LUA_addInputAction(Engine* engine, uint32 action, int type, int key, int controller_id)
+	{
+		engine->getInputSystem().addAction(
+			action, Lumix::InputSystem::InputType(type), key, controller_id);
+	}
+
+
+	static int LUA_multVecQuat(lua_State* L)
+	{
+		Vec3 v = LuaWrapper::checkArg<Vec3>(L, 1);
+		Vec3 axis = LuaWrapper::checkArg<Vec3>(L, 2);
+		float angle = LuaWrapper::checkArg<float>(L, 3);
+
+		Quat q(axis, angle);
+		Vec3 res = q * v;
+
+		LuaWrapper::pushLua(L, res);
+		return 1;
+	}
+
+
+	static Vec3 LUA_getEntityPosition(Universe* universe, Entity entity)
+	{
+		return universe->getPosition(entity);
+	}
+
+
+	static Vec3 LUA_getEntityDirection(Universe* universe, Entity entity)
+	{
+		Quat rot = universe->getRotation(entity);
+		return rot * Vec3(0, 0, 1);
+	}
+
+
+	void registerLuaAPI()
+	{
+		lua_pushlightuserdata(m_state, this);
+		lua_setglobal(m_state, "g_engine");
+
+		#define REGISTER_FUNCTION(name) \
+			LuaWrapper::createSystemFunction(m_state, "Engine", #name, \
+				&LuaWrapper::wrap<decltype(&LUA_##name), LUA_##name>); \
+
+		REGISTER_FUNCTION(createComponent);
+		REGISTER_FUNCTION(createEntity);
+		REGISTER_FUNCTION(setEntityPosition);
+		REGISTER_FUNCTION(getEntityPosition);
+		REGISTER_FUNCTION(getEntityDirection);
+		REGISTER_FUNCTION(setEntityRotation);
+		REGISTER_FUNCTION(setEntityLocalRotation);
+		REGISTER_FUNCTION(getInputActionValue);
+		REGISTER_FUNCTION(addInputAction);
+		REGISTER_FUNCTION(logError);
+		REGISTER_FUNCTION(logInfo);
+
+
+		#undef REGISTER_FUNCTION
+
+		LuaWrapper::createSystemFunction(m_state, "Engine", "createEntityEx", &LUA_createEntityEx);
+		LuaWrapper::createSystemFunction(m_state, "Engine", "multVecQuat", &LUA_multVecQuat);
+	}
+
+
+	static void* luaAllocator(void* ud, void* ptr, size_t osize, size_t nsize)
+	{
+		auto& allocator = *static_cast<IAllocator*>(ud);
+		if (nsize == 0)
+		{
+			allocator.deallocate(ptr);
+			return nullptr;
+		}
+		if (nsize > 0 && ptr == nullptr) return allocator.allocate(nsize);
+
+		void* new_mem = allocator.allocate(nsize);
+		copyMemory(new_mem, ptr, Math::minimum(osize, nsize));
+		allocator.deallocate(ptr);
+		return new_mem;
+	}
+
+
+	void registerProperties()
+	{
+		PropertyRegister::registerComponentType("hierarchy", "Hierarchy");
+		PropertyRegister::add(
+			"hierarchy",
+			LUMIX_NEW(m_allocator, EntityPropertyDescriptor<Hierarchy>)(
+				"parent", &Hierarchy::getParent, &Hierarchy::setParent, m_allocator));
+	}
+
 
 	bool create()
 	{
@@ -112,15 +372,17 @@ public:
 		{
 			return false;
 		}
-		
+
 		HierarchyPlugin* hierarchy = LUMIX_NEW(m_allocator, HierarchyPlugin)(m_allocator);
 		m_plugin_manager->addPlugin(hierarchy);
-		
+
 		m_input_system = InputSystem::create(m_allocator);
 		if (!m_input_system)
 		{
 			return false;
 		}
+
+		registerProperties();
 
 		return true;
 	}
@@ -128,6 +390,7 @@ public:
 
 	~EngineImpl()
 	{
+		PropertyRegister::shutdown();
 		Timer::destroy(m_timer);
 		Timer::destroy(m_fps_timer);
 		PluginManager::destroy(m_plugin_manager);
@@ -141,6 +404,7 @@ public:
 
 		m_resource_manager.destroy();
 		MTJD::Manager::destroy(*m_mtjd_manager);
+		lua_close(m_state);
 	}
 
 
@@ -160,36 +424,36 @@ public:
 	IAllocator& getAllocator() override { return m_allocator; }
 
 
-	UniverseContext& createUniverse() override
+	Universe& createUniverse() override
 	{
-		UniverseContext* context = LUMIX_NEW(m_allocator, UniverseContext)(m_allocator);
-		context->m_universe = LUMIX_NEW(m_allocator, Universe)(m_allocator);
+		Universe* universe = LUMIX_NEW(m_allocator, Universe)(m_allocator);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 		for (auto* plugin : plugins)
 		{
-			IScene* scene = plugin->createScene(*context);
+			IScene* scene = plugin->createScene(*universe);
 			if (scene)
 			{
-				context->m_scenes.push(scene);
+				universe->addScene(scene);
 			}
 		}
 
-		return *context;
+		return *universe;
 	}
 
 
 	MTJD::Manager& getMTJDManager() override { return *m_mtjd_manager; }
 
 
-	void destroyUniverse(UniverseContext& context) override
+	void destroyUniverse(Universe& universe) override
 	{
-		for (int i = context.m_scenes.size() - 1; i >= 0; --i)
+		auto& scenes = universe.getScenes();
+		for (int i = scenes.size() - 1; i >= 0; --i)
 		{
-			context.m_scenes[i]->getPlugin().destroyScene(context.m_scenes[i]);
+			auto* scene = scenes[i];
+			scenes.pop();
+			scene->getPlugin().destroyScene(scene);
 		}
-		LUMIX_DELETE(m_allocator, context.m_universe);
-
-		LUMIX_DELETE(m_allocator, &context);
+		LUMIX_DELETE(m_allocator, &universe);
 		m_resource_manager.removeUnreferenced();
 	}
 
@@ -201,31 +465,49 @@ public:
 
 
 	FS::FileSystem& getFileSystem() override { return *m_file_system; }
+	FS::DiskFileDevice* getDiskFileDevice() override { return m_disk_file_device; }
 
-
-	void startGame(UniverseContext& context) override
+	void startGame(Universe& context) override
 	{
 		ASSERT(!m_is_game_running);
 		m_is_game_running = true;
-		for (auto* scene : context.m_scenes)
+		for (auto* scene : context.getScenes())
 		{
 			scene->startGame();
 		}
 	}
 
 
-	void stopGame(UniverseContext& context) override
+	void stopGame(Universe& context) override
 	{
 		ASSERT(m_is_game_running);
 		m_is_game_running = false;
-		for (auto* scene : context.m_scenes)
+		for (auto* scene : context.getScenes())
 		{
 			scene->stopGame();
 		}
 	}
 
 
-	void update(UniverseContext& context) override
+	void pause(bool pause) override
+	{
+		m_paused = pause;
+	}
+
+
+	void nextFrame() override
+	{
+		m_next_frame = true;
+	}
+
+
+	void setTimeMultiplier(float multiplier) override
+	{
+		m_time_multiplier = multiplier;
+	}
+
+
+	void update(Universe& context) override
 	{
 		PROFILE_FUNCTION();
 		float dt;
@@ -235,18 +517,29 @@ public:
 			m_fps = m_fps_frame / m_fps_timer->tick();
 			m_fps_frame = 0;
 		}
-		dt = m_timer->tick();
+		dt = m_timer->tick() * m_time_multiplier;
+		if (m_next_frame)
+		{
+			m_paused = false;
+			dt = 1 / 30.0f;
+		}
 		m_last_time_delta = dt;
 		{
 			PROFILE_BLOCK("update scenes");
-			for (int i = 0; i < context.m_scenes.size(); ++i)
+			for (auto* scene : context.getScenes())
 			{
-				context.m_scenes[i]->update(dt);
+				scene->update(dt, m_paused);
 			}
 		}
-		m_plugin_manager->update(dt);
+		m_plugin_manager->update(dt, m_paused);
 		m_input_system->update(dt);
 		getFileSystem().updateAsyncTransactions();
+
+		if (m_next_frame)
+		{
+			m_paused = true;
+			m_next_frame = false;
+		}
 	}
 
 
@@ -262,10 +555,10 @@ public:
 	float getFPS() const override { return m_fps; }
 
 
-	void serializerSceneVersions(OutputBlob& serializer, UniverseContext& ctx)
+	void serializerSceneVersions(OutputBlob& serializer, Universe& ctx)
 	{
-		serializer.write(ctx.m_scenes.size());
-		for (auto* scene : ctx.m_scenes)
+		serializer.write(ctx.getScenes().size());
+		for (auto* scene : ctx.getScenes())
 		{
 			serializer.write(crc32(scene->getPlugin().getName()));
 			serializer.write(scene->getVersion());
@@ -283,7 +576,7 @@ public:
 	}
 
 
-	bool hasSupportedSceneVersions(InputBlob& serializer, UniverseContext& ctx)
+	bool hasSupportedSceneVersions(InputBlob& serializer, Universe& ctx)
 	{
 		int32 count;
 		serializer.read(count);
@@ -296,7 +589,7 @@ public:
 			serializer.read(version);
 			if (version > scene->getVersion())
 			{
-				g_log_error.log("engine") << "Plugin " << scene->getPlugin().getName() << " is too old";
+				g_log_error.log("Core") << "Plugin " << scene->getPlugin().getName() << " is too old";
 				return false;
 			}
 		}
@@ -314,7 +607,7 @@ public:
 			serializer.readString(tmp, sizeof(tmp));
 			if (!m_plugin_manager->getPlugin(tmp))
 			{
-				g_log_error.log("engine") << "Missing plugin " << tmp;
+				g_log_error.log("Core") << "Missing plugin " << tmp;
 				return false;
 			}
 		}
@@ -322,7 +615,7 @@ public:
 	}
 
 
-	uint32 serialize(UniverseContext& ctx, OutputBlob& serializer) override
+	uint32 serialize(Universe& ctx, OutputBlob& serializer) override
 	{
 		SerializedEngineHeader header;
 		header.m_magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
@@ -332,34 +625,33 @@ public:
 		serializePluginList(serializer);
 		serializerSceneVersions(serializer, ctx);
 		m_path_manager.serialize(serializer);
-		int pos = serializer.getSize();
-		ctx.m_universe->serialize(serializer);
+		int pos = serializer.getPos();
+		ctx.serialize(serializer);
 		m_plugin_manager->serialize(serializer);
-		serializer.write((int32)ctx.m_scenes.size());
-		for (int i = 0; i < ctx.m_scenes.size(); ++i)
+		serializer.write((int32)ctx.getScenes().size());
+		for (auto* scene : ctx.getScenes())
 		{
-			serializer.writeString(ctx.m_scenes[i]->getPlugin().getName());
-			serializer.write(ctx.m_scenes[i]->getVersion());
-			ctx.m_scenes[i]->serialize(serializer);
+			serializer.writeString(scene->getPlugin().getName());
+			serializer.write(scene->getVersion());
+			scene->serialize(serializer);
 		}
-		uint32 crc = crc32((const uint8*)serializer.getData() + pos,
-							 serializer.getSize() - pos);
+		uint32 crc = crc32((const uint8*)serializer.getData() + pos, serializer.getPos() - pos);
 		return crc;
 	}
 
 
-	bool deserialize(UniverseContext& ctx, InputBlob& serializer) override
+	bool deserialize(Universe& ctx, InputBlob& serializer) override
 	{
 		SerializedEngineHeader header;
 		serializer.read(header);
 		if (header.m_magic != SERIALIZED_ENGINE_MAGIC)
 		{
-			g_log_error.log("engine") << "Wrong or corrupted file";
+			g_log_error.log("Core") << "Wrong or corrupted file";
 			return false;
 		}
 		if (header.m_version > SerializedEngineVersion::LATEST)
 		{
-			g_log_error.log("engine") << "Unsupported version";
+			g_log_error.log("Core") << "Unsupported version";
 			return false;
 		}
 		if (!hasSerializedPlugins(serializer))
@@ -373,7 +665,7 @@ public:
 		}
 
 		m_path_manager.deserialize(serializer);
-		ctx.m_universe->deserialize(serializer);
+		ctx.deserialize(serializer);
 
 		if (header.m_version <= SerializedEngineVersion::HIERARCHY_COMPONENT)
 		{
@@ -400,12 +692,14 @@ public:
 	}
 
 
+	lua_State* getState() override { return m_state; }
+	PathManager& getPathManager() override{ return m_path_manager; }
 	float getLastTimeDelta() override { return m_last_time_delta; }
 
 private:
 	struct ComponentType
 	{
-		ComponentType(IAllocator& allocator)
+		explicit ComponentType(IAllocator& allocator)
 			: m_name(allocator)
 			, m_id(allocator)
 		{
@@ -435,11 +729,15 @@ private:
 	Timer* m_timer;
 	Timer* m_fps_timer;
 	int m_fps_frame;
+	float m_time_multiplier;
 	float m_fps;
 	float m_last_time_delta;
 	bool m_is_game_running;
+	bool m_paused;
+	bool m_next_frame;
 	PlatformData m_platform_data;
 	PathManager m_path_manager;
+	lua_State* m_state;
 
 private:
 	void operator=(const EngineImpl&);
@@ -459,6 +757,7 @@ static void showLogInVS(const char* system, const char* message)
 static FS::OsFile g_error_file;
 static bool g_is_error_file_opened = false;
 
+
 static void logErrorToFile(const char*, const char* message)
 {
 	if (!g_is_error_file_opened) return;
@@ -467,9 +766,12 @@ static void logErrorToFile(const char*, const char* message)
 }
 
 
-Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
+Engine* Engine::create(const char* base_path0,
+	const char* base_path1,
+	FS::FileSystem* fs,
+	IAllocator& allocator)
 {
-	g_log_info.log("engine") << "Creating engine...";
+	g_log_info.log("Core") << "Creating engine...";
 	Profiler::setThreadName("Main");
 	installUnhandledExceptionHandler();
 
@@ -480,14 +782,14 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 	g_log_warning.getCallback().bind<showLogInVS>();
 	g_log_error.getCallback().bind<showLogInVS>();
 
-	EngineImpl* engine = LUMIX_NEW(allocator, EngineImpl)(fs, allocator);
+	EngineImpl* engine = LUMIX_NEW(allocator, EngineImpl)(base_path0, base_path1, fs, allocator);
 	if (!engine->create())
 	{
-		g_log_error.log("engine") << "Failed to create engine.";
+		g_log_error.log("Core") << "Failed to create engine.";
 		LUMIX_DELETE(allocator, engine);
 		return nullptr;
 	}
-	g_log_info.log("engine") << "Engine created.";
+	g_log_info.log("Core") << "Engine created.";
 	return engine;
 }
 

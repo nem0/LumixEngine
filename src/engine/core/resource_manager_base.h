@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/pod_hash_map.h"
+#include "core/hash_map.h"
 
 
 namespace Lumix
@@ -23,7 +23,7 @@ class LUMIX_ENGINE_API ResourceManagerBase
 {
 	friend class Resource;
 public:
-	typedef PODHashMap<uint32, Resource*> ResourceTable;
+	typedef HashMap<uint32, Resource*> ResourceTable;
 
 public:
 	void create(uint32 id, ResourceManager& owner);

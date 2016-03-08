@@ -1,12 +1,9 @@
 #pragma once
 
+
 #include "lumix.h"
-#include "core/array.h"
-#include "core/delegate_list.h"
 #include "core/matrix.h"
 #include "iplugin.h"
-#include "renderer/ray_cast_model_hit.h"
-#include "universe/component.h"
 
 
 namespace Lumix
@@ -14,18 +11,20 @@ namespace Lumix
 
 class Engine;
 class Frustum;
+class IAllocator;
 class LIFOAllocator;
 class Material;
 class Mesh;
 class Model;
 class Path;
-class PipelineInstance;
 class Pose;
+struct RayCastModelHit;
 class Renderer;
 class Shader;
 class Terrain;
-class Timer;
 class Universe;
+template <typename T> class Array;
+template <typename T> class DelegateList;
 
 
 struct TerrainInfo
@@ -47,6 +46,9 @@ struct Renderable
 	Matrix matrix;
 	Entity entity;
 	int64 layer_mask;
+	Mesh* meshes;
+	bool custom_meshes;
+	int8 mesh_count;
 };
 
 
@@ -94,25 +96,21 @@ class LUMIX_RENDERER_API RenderScene : public IScene
 {
 public:
 	static RenderScene* createInstance(Renderer& renderer,
-									   Engine& engine,
-									   Universe& universe,
-									   bool is_forward_rendered,
-									   IAllocator& allocator);
+		Engine& engine,
+		Universe& universe,
+		bool is_forward_rendered,
+		IAllocator& allocator);
 	static void destroyInstance(RenderScene* scene);
 
-	virtual RayCastModelHit castRay(const Vec3& origin,
-									const Vec3& dir,
-									ComponentIndex ignore) = 0;
+	virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, ComponentIndex ignore) = 0;
 
 	virtual RayCastModelHit castRayTerrain(ComponentIndex terrain,
-										   const Vec3& origin,
-										   const Vec3& dir) = 0;
+		const Vec3& origin,
+		const Vec3& dir) = 0;
 
-	virtual void getRay(
-		ComponentIndex camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
+	virtual void getRay(ComponentIndex camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 
 	virtual Frustum getCameraFrustum(ComponentIndex camera) const = 0;
-	virtual void update(float dt) = 0;
 	virtual float getTime() const = 0;
 	virtual Engine& getEngine() const = 0;
 	virtual IAllocator& getAllocator() = 0;
@@ -121,8 +119,7 @@ public:
 	virtual ComponentIndex getActiveGlobalLight() = 0;
 	virtual void setActiveGlobalLight(ComponentIndex cmp) = 0;
 	virtual Vec4 getShadowmapCascades(ComponentIndex cmp) = 0;
-	virtual void setShadowmapCascades(ComponentIndex cmp,
-									  const Vec4& value) = 0;
+	virtual void setShadowmapCascades(ComponentIndex cmp, const Vec4& value) = 0;
 
 
 	virtual void addDebugPoint(const Vec3& pos, uint32 color, float life) = 0;
@@ -183,8 +180,8 @@ public:
 	virtual const char* getCameraSlot(ComponentIndex camera) = 0;
 	virtual void setCameraSize(ComponentIndex camera, int w, int h) = 0;
 
+	virtual class ParticleEmitter* getParticleEmitter(ComponentIndex cmp) = 0;
 	virtual void resetParticleEmitter(ComponentIndex cmp) = 0;
-	virtual void drawEmitterGizmo(ComponentIndex cmp) = 0;
 	virtual void updateEmitter(ComponentIndex cmp, float time_delta) = 0;
 	virtual const Array<class ParticleEmitter*>& getParticleEmitters() const = 0;
 	virtual const Vec2* getParticleEmitterAlpha(ComponentIndex cmp) = 0;
@@ -225,7 +222,9 @@ public:
 	virtual void addParticleEmitterAttractor(ComponentIndex cmp, int index) = 0;
 	virtual void removeParticleEmitterAttractor(ComponentIndex cmp, int index) = 0;
 	virtual Entity getParticleEmitterAttractorEntity(ComponentIndex cmp, int index) = 0;
-	virtual void setParticleEmitterAttractorEntity(ComponentIndex cmp, int index, Entity entity) = 0;
+	virtual void setParticleEmitterAttractorEntity(ComponentIndex cmp,
+		int index,
+		Entity entity) = 0;
 	virtual float getParticleEmitterAttractorForce(ComponentIndex cmp) = 0;
 	virtual void setParticleEmitterAttractorForce(ComponentIndex cmp, float value) = 0;
 
@@ -237,27 +236,24 @@ public:
 	virtual Renderable* getRenderable(ComponentIndex cmp) = 0;
 	virtual Renderable* getRenderables() = 0;
 	virtual Path getRenderablePath(ComponentIndex cmp) = 0;
-	virtual void setRenderableLayer(ComponentIndex cmp,
-									const int32& layer) = 0;
+	virtual void setRenderableMaterial(ComponentIndex cmp, int index, const Path& path) = 0;
+	virtual Path getRenderableMaterial(ComponentIndex cmp, int index) = 0;
+	virtual int getRenderableMaterialsCount(ComponentIndex cmp) = 0;
+	virtual void setRenderableLayer(ComponentIndex cmp, const int32& layer) = 0;
 	virtual void setRenderablePath(ComponentIndex cmp, const Path& path) = 0;
-	virtual void getRenderableInfos(const Frustum& frustum,
-		Array<RenderableMesh>& meshes,
-		int64 layer_mask) = 0;
-	virtual void getRenderableEntities(const Frustum& frustum,
-		Array<Entity>& entities,
-		int64 layer_mask) = 0;
+	virtual Array<Array<RenderableMesh>>& getRenderableInfos(const Frustum& frustum,
+		const Vec3& lod_ref_point) = 0;
+	virtual void getRenderableEntities(const Frustum& frustum, Array<Entity>& entities) = 0;
 	virtual Entity getRenderableEntity(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getFirstRenderable() = 0;
 	virtual ComponentIndex getNextRenderable(ComponentIndex cmp) = 0;
 	virtual Model* getRenderableModel(ComponentIndex cmp) = 0;
 
 	virtual void getGrassInfos(const Frustum& frustum,
-							   Array<GrassInfo>& infos,
-							   int64 layer_mask,
-							   ComponentIndex camera) = 0;
+		Array<GrassInfo>& infos,
+		ComponentIndex camera) = 0;
 	virtual void forceGrassUpdate(ComponentIndex cmp) = 0;
 	virtual void getTerrainInfos(Array<const TerrainInfo*>& infos,
-		int64 layer_mask,
 		const Vec3& camera_pos,
 		LIFOAllocator& allocator) = 0;
 	virtual float getTerrainHeightAt(ComponentIndex cmp, float x, float z) = 0;
@@ -289,12 +285,10 @@ public:
 	virtual int getClosestPointLights(const Vec3& pos, ComponentIndex* lights, int max_lights) = 0;
 	virtual void getPointLights(const Frustum& frustum, Array<ComponentIndex>& lights) = 0;
 	virtual void getPointLightInfluencedGeometry(ComponentIndex light_cmp,
-		Array<RenderableMesh>& infos,
-		int64 layer_mask) = 0;
+		Array<RenderableMesh>& infos) = 0;
 	virtual void getPointLightInfluencedGeometry(ComponentIndex light_cmp,
 		const Frustum& frustum,
-		Array<RenderableMesh>& infos,
-		int64 layer_mask) = 0;
+		Array<RenderableMesh>& infos) = 0;
 	virtual void setLightCastShadows(ComponentIndex cmp, bool cast_shadows) = 0;
 	virtual bool getLightCastShadows(ComponentIndex cmp) = 0;
 	virtual float getLightAttenuation(ComponentIndex cmp) = 0;
@@ -303,16 +297,14 @@ public:
 	virtual void setLightFOV(ComponentIndex cmp, float fov) = 0;
 	virtual float getLightRange(ComponentIndex cmp) = 0;
 	virtual void setLightRange(ComponentIndex cmp, float value) = 0;
-	virtual void setPointLightIntensity(ComponentIndex cmp,
-										float intensity) = 0;
-	virtual void setGlobalLightIntensity(ComponentIndex cmp,
-										 float intensity) = 0;
+	virtual void setPointLightIntensity(ComponentIndex cmp, float intensity) = 0;
+	virtual void setGlobalLightIntensity(ComponentIndex cmp, float intensity) = 0;
 	virtual void setPointLightColor(ComponentIndex cmp, const Vec3& color) = 0;
 	virtual void setGlobalLightColor(ComponentIndex cmp, const Vec3& color) = 0;
-	virtual void setLightAmbientIntensity(ComponentIndex cmp,
-										  float intensity) = 0;
-	virtual void setLightAmbientColor(ComponentIndex cmp,
-									  const Vec3& color) = 0;
+	virtual void setGlobalLightSpecular(ComponentIndex cmp, const Vec3& color) = 0;
+	virtual void setGlobalLightSpecularIntensity(ComponentIndex cmp, float intensity) = 0;
+	virtual void setLightAmbientIntensity(ComponentIndex cmp, float intensity) = 0;
+	virtual void setLightAmbientColor(ComponentIndex cmp, const Vec3& color) = 0;
 	virtual void setFogDensity(ComponentIndex cmp, float density) = 0;
 	virtual void setFogColor(ComponentIndex cmp, const Vec3& color) = 0;
 	virtual float getPointLightIntensity(ComponentIndex cmp) = 0;
@@ -321,6 +313,8 @@ public:
 	virtual float getGlobalLightIntensity(ComponentIndex cmp) = 0;
 	virtual Vec3 getPointLightColor(ComponentIndex cmp) = 0;
 	virtual Vec3 getGlobalLightColor(ComponentIndex cmp) = 0;
+	virtual Vec3 getGlobalLightSpecular(ComponentIndex cmp) = 0;
+	virtual float getGlobalLightSpecularIntensity(ComponentIndex cmp) = 0;
 	virtual float getLightAmbientIntensity(ComponentIndex cmp) = 0;
 	virtual Vec3 getLightAmbientColor(ComponentIndex cmp) = 0;
 	virtual float getFogDensity(ComponentIndex cmp) = 0;
@@ -330,8 +324,9 @@ public:
 	virtual void setFogHeight(ComponentIndex cmp, float value) = 0;
 	virtual Vec3 getFogColor(ComponentIndex cmp) = 0;
 	virtual Vec3 getPointLightSpecularColor(ComponentIndex cmp) = 0;
-	virtual void setPointLightSpecularColor(ComponentIndex cmp,
-											const Vec3& color) = 0;
+	virtual void setPointLightSpecularColor(ComponentIndex cmp, const Vec3& color) = 0;
+	virtual float getPointLightSpecularIntensity(ComponentIndex cmp) = 0;
+	virtual void setPointLightSpecularIntensity(ComponentIndex cmp, float color) = 0;
 
 protected:
 	virtual ~RenderScene() {}

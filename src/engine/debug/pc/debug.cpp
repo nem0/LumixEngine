@@ -2,9 +2,7 @@
 #include "core/mt/atomic.h"
 #include "core/string.h"
 #include "core/system.h"
-#include "debug/debug.h"
-#include "core/pc/simple_win.h"
-#include <Windows.h>
+#include <windows.h>
 #include <DbgHelp.h>
 #include <mapi.h>
 #include <cstdlib>
@@ -79,6 +77,13 @@ StackTree::~StackTree()
 }
 
 
+void StackTree::refreshModuleList()
+{
+	ASSERT(s_instances > 0);
+	SymRefreshModuleList(GetCurrentProcess());
+}
+
+
 int StackTree::getPath(StackNode* node, StackNode** output, int max_size)
 {
 	int i = 0;
@@ -101,9 +106,8 @@ StackNode* StackTree::getParent(StackNode* node)
 bool StackTree::getFunction(StackNode* node, char* out, int max_size, int* line)
 {
 	HANDLE process = GetCurrentProcess();
-	uint8 symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)];
+	uint8 symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)] = {};
 	SYMBOL_INFO* symbol = reinterpret_cast<SYMBOL_INFO*>(symbol_mem);
-	memset(symbol_mem, 0, sizeof(symbol_mem));
 	symbol->MaxNameLen = 255;
 	symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
 	BOOL success = SymFromAddr(process, (DWORD64)(node->m_instruction), 0, symbol);
@@ -614,11 +618,17 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 	};
 
 	auto dumper = [](void* data) -> DWORD {
-
 		auto info = ((CrashInfo*)data)->info;
 		char message[4096];
-		getStack(*info->ContextRecord, message, sizeof(message));
-		messageBox(message);
+		if(info)
+		{
+			getStack(*info->ContextRecord, message, sizeof(message));
+			messageBox(message);
+		}
+		else
+		{
+			message[0] = '\0';
+		}
 
 		char minidump_path[Lumix::MAX_PATH_LENGTH];
 		GetCurrentDirectory(sizeof(minidump_path), minidump_path);

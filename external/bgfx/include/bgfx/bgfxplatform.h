@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2015 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2016 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -11,6 +11,7 @@
 // necessary to use this header in conjunction with creating windows.
 
 #include <bx/platform.h>
+#include <bgfx/bgfx.h>
 
 namespace bgfx
 {
@@ -45,10 +46,10 @@ namespace bgfx
 	///
 	struct PlatformData
 	{
-		void* ndt;          //!< Native display type
-		void* nwh;          //!< Native window handle
-		void* context;      //!< GL context, or D3D device
-		void* backBuffer;   //!< GL backbuffer, or D3D render target view
+		void* ndt;          //!< Native display type.
+		void* nwh;          //!< Native window handle.
+		void* context;      //!< GL context, or D3D device.
+		void* backBuffer;   //!< GL backbuffer, or D3D render target view.
 		void* backBufferDS; //!< Backbuffer depth/stencil.
 	};
 
@@ -58,7 +59,36 @@ namespace bgfx
 	///
 	/// @attention C99 equivalent is `bgfx_set_platform_data`.
 	///
-	void setPlatformData(const PlatformData& _hooks);
+	void setPlatformData(const PlatformData& _data);
+
+	/// Internal data.
+	///
+	/// @attention C99 equivalent is `bgfx_internal_data_t`.
+	///
+	struct InternalData
+	{
+		const struct Caps* caps; //!< Renderer capabilities.
+		void* context;           //!< GL context, or D3D device.
+	};
+
+	/// Get internal data for interop.
+	///
+	/// @warning Must be called only on render thread.
+	///
+	/// @attention C99 equivalent is `bgfx_get_internal_data`.
+	///
+	const InternalData* getInternalData();
+
+	/// Set externally created texture.
+	///
+	/// @warning Must be called only on render thread.
+	///
+	/// @attention C99 equivalent is `bgfx_set_internal_texture`.
+	///
+	void setInternal(TextureHandle _handle, uintptr_t _ptr);
+
+	///
+	uintptr_t setInternal(TextureHandle _handle, uint16_t _width, uint16_t _height, uint8_t _numMips, TextureFormat::Enum _format, uint32_t _flags = BGFX_TEXTURE_NONE);
 
 } // namespace bgfx
 
@@ -98,7 +128,7 @@ namespace bgfx
 
 } // namespace bgfx
 
-#elif BX_PLATFORM_FREEBSD || BX_PLATFORM_LINUX || BX_PLATFORM_RPI
+#elif BX_PLATFORM_BSD || BX_PLATFORM_LINUX || BX_PLATFORM_RPI
 
 namespace bgfx
 {
@@ -203,7 +233,7 @@ namespace bgfx
 		}
 
 		PlatformData pd;
-#	if BX_PLATFORM_LINUX || BX_PLATFORM_FREEBSD
+#	if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 		pd.ndt          = wmi.info.x11.display;
 		pd.nwh          = (void*)(uintptr_t)wmi.info.x11.window;
 #	elif BX_PLATFORM_OSX
@@ -227,7 +257,7 @@ namespace bgfx
 // If GLFW/glfw3.h is included before bgfxplatform.h we can enable GLFW3
 // window interop convenience code.
 
-#	if BX_PLATFORM_LINUX || BX_PLATFORM_FREEBSD
+#	if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 #		define GLFW_EXPOSE_NATIVE_X11
 #		define GLFW_EXPOSE_NATIVE_GLX
 #	elif BX_PLATFORM_OSX
@@ -244,7 +274,7 @@ namespace bgfx
 	inline void glfwSetWindow(GLFWwindow* _window)
 	{
 		PlatformData pd;
-#	if BX_PLATFORM_LINUX || BX_PLATFORM_FREEBSD
+#	if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 		pd.ndt          = glfwGetX11Display();
 		pd.nwh          = (void*)(uintptr_t)glfwGetX11Window(_window);
 		pd.context      = glfwGetGLXContext(_window);

@@ -1,5 +1,5 @@
 #include "profiler.h"
-#include "core/pod_hash_map.h"
+#include "core/hash_map.h"
 #include "core/log.h"
 #include "core/timer.h"
 #include "core/mt/sync.h"
@@ -23,7 +23,7 @@ struct Block
 	};
 
 	
-	Block::Block(IAllocator& allocator)
+	explicit Block(IAllocator& allocator)
 		: allocator(allocator)
 		, m_hits(allocator)
 		, m_type(BlockType::TIME)
@@ -157,7 +157,7 @@ struct Instance
 
 	DefaultAllocator allocator;
 	DelegateList<void()> frame_listeners;
-	PODHashMap<uint32, ThreadData*> threads;
+	HashMap<uint32, ThreadData*> threads;
 	ThreadData main_thread;
 	Timer* timer;
 	MT::SpinMutex m_mutex;
@@ -260,7 +260,7 @@ void beginBlock(const char* name)
 {
 	auto data = getBlock(name);
 
-	auto& hit = data.block->m_hits.pushEmpty();
+	auto& hit = data.block->m_hits.emplace();
 	hit.m_start = g_instance.timer->getTimeSinceStart();
 	hit.m_length = 0;
 }
@@ -366,7 +366,7 @@ void frame()
 		auto* block = i->current_block;
 		while (block)
 		{
-			auto& hit = block->m_hits.pushEmpty();
+			auto& hit = block->m_hits.emplace();
 			hit.m_start = now;
 			hit.m_length = 0;
 			block = block->m_parent;

@@ -1,13 +1,11 @@
 #include "core/network.h"
 #include "core/iallocator.h"
 #include "core/string.h"
-#include "core/pc/simple_win.h"
-#undef WIN32_LEAN_AND_MEAN
-#include <Windows.h>
 
+#include "core/pc/simple_win.h"
 
 #pragma comment(lib, "Ws2_32.lib")
-
+#pragma comment(lib, "wininet.lib")
 
 namespace Lumix
 {
@@ -31,14 +29,14 @@ bool TCPAcceptor::start(const char* ip, uint16 port)
 {
 	WORD sockVer;
 	WSADATA wsaData;
-	sockVer = MAKEWORD(2, 2);
+	sockVer = 2 | (2 << 8);
 	if (WSAStartup(sockVer, &wsaData) != 0) return false;
 
 	SOCKET socket = ::socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (socket == INVALID_SOCKET) return false;
 
 	SOCKADDR_IN sin;
-	memset(&sin, 0, sizeof(sin));
+	setMemory(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(port);
 	sin.sin_addr.s_addr = ip ? ::inet_addr(ip) : INADDR_ANY;
@@ -77,11 +75,12 @@ TCPConnector::~TCPConnector()
 	::closesocket(m_socket);
 }
 
+
 TCPStream* TCPConnector::connect(const char* ip, uint16 port)
 {
 	WORD sockVer;
 	WSADATA wsaData;
-	sockVer = MAKEWORD(2, 2);
+	sockVer = 2 | (2 << 8);
 	if (WSAStartup(sockVer, &wsaData) != 0) return nullptr;
 
 	SOCKET socket = ::socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -89,7 +88,7 @@ TCPStream* TCPConnector::connect(const char* ip, uint16 port)
 
 	SOCKADDR_IN sin;
 
-	memset(&sin, 0, sizeof(sin));
+	setMemory(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(port);
 	sin.sin_addr.s_addr = ip ? ::inet_addr(ip) : INADDR_ANY;

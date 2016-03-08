@@ -5,10 +5,8 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "engine.h"
-#include "renderer/material.h"
-#include "renderer/model.h"
-#include "renderer/pipeline.h"
-#include "renderer/render_scene.h"
+#include "render_interface.h"
+#include "universe/universe.h"
 #include "world_editor.h"
 #include <cmath>
 
@@ -17,153 +15,268 @@ namespace Lumix
 {
 
 
-static const char* ICON_NAMES[EditorIcon::COUNT] = {
+enum class IconType
+{
+	PHYSICAL_CONTROLLER,
+	PHYSICAL_BOX,
+	CAMERA,
+	LIGHT,
+	TERRAIN,
+	ENTITY,
+
+	COUNT
+};
+
+
+const char* ICONS[(int)IconType::COUNT] =
+{
 	"models/editor/phy_controller_icon.msh",
 	"models/editor/phy_box_icon.msh",
 	"models/editor/camera_icon.msh",
 	"models/editor/directional_light_icon.msh",
 	"models/editor/terrain_icon.msh",
-	"models/editor/icon.msh"};
+	"models/editor/icon.msh"
+};
 
 
-static Model* icon_models[EditorIcon::COUNT];
-
-
-bool EditorIcon::loadIcons(Engine& engine)
+struct EditorIconsImpl : public EditorIcons
 {
-	bool status = true;
-	for (int i = 0; i < sizeof(ICON_NAMES) / sizeof(ICON_NAMES[0]); ++i)
+	explicit EditorIconsImpl(WorldEditor& editor)
+		: m_editor(editor)
+		, m_icons(editor.getAllocator())
 	{
-		icon_models[i] = static_cast<Model*>(engine.getResourceManager()
-												 .get(ResourceManager::MODEL)
-												 ->load(Path(ICON_NAMES[i])));
-		status = status && icon_models[i];
+		m_render_interface = nullptr;
+		m_icons.reserve(200);
+		editor.universeDestroyed().bind<EditorIconsImpl, &EditorIconsImpl::clear>(this);
+		editor.universeCreated().bind<EditorIconsImpl, &EditorIconsImpl::onUniverseCreated>(this);
+		if (m_editor.getUniverse()) onUniverseCreated();
 	}
-	return status;
-}
 
 
-void EditorIcon::unloadIcons()
-{
-	for (int i = 0; i < lengthOf(icon_models); ++i)
+	~EditorIconsImpl()
 	{
-		icon_models[i]
-			->getResourceManager()
-			.get(ResourceManager::MODEL)
-			->unload(*icon_models[i]);
-	}
-}
+		m_editor.universeDestroyed().unbind<EditorIconsImpl, &EditorIconsImpl::clear>(this);
+		m_editor.universeCreated().unbind<EditorIconsImpl, &EditorIconsImpl::onUniverseCreated>(this);
+		setRenderInterface(nullptr);
 
-
-EditorIcon::EditorIcon(WorldEditor& editor, RenderScene& scene, Entity entity)
-{
-	m_scale = 1;
-	m_scene = &scene;
-	m_entity = entity;
-	m_is_visible = true;
-	const WorldEditor::ComponentList& cmps = editor.getComponents(entity);
-	m_type = ENTITY;
-	for (int i = 0; i < cmps.size(); ++i)
-	{
-		if (cmps[i].type == crc32("physical_controller"))
+		if(m_editor.getUniverse())
 		{
-			m_type = PHYSICAL_CONTROLLER;
-			break;
-		}
-		else if (cmps[i].type == crc32("box_rigid_actor"))
-		{
-			m_type = PHYSICAL_BOX;
-			break;
-		}
-		else if (cmps[i].type == crc32("camera"))
-		{
-			m_type = CAMERA;
-			break;
-		}
-		else if (cmps[i].type == crc32("global_light") || cmps[i].type == crc32("point_light"))
-		{
-			m_type = LIGHT;
-			break;
-		}
-		else if (cmps[i].type == crc32("terrain"))
-		{
-			m_type = TERRAIN;
-			break;
+			auto& universe = *m_editor.getUniverse();
+			universe.entityCreated().unbind<EditorIconsImpl, &EditorIconsImpl::onEntityCreated>(this);
+			universe.entityDestroyed().unbind<EditorIconsImpl, &EditorIconsImpl::destroyIcon>(this);
+			universe.componentAdded().unbind<EditorIconsImpl, &EditorIconsImpl::refreshIcon>(this);
+			universe.componentDestroyed().unbind<EditorIconsImpl, &EditorIconsImpl::refreshIcon>(this);
 		}
 	}
-	m_model = static_cast<Model*>(editor.getEngine()
-									  .getResourceManager()
-									  .get(ResourceManager::MODEL)
-									  ->load(Path(ICON_NAMES[m_type])));
-}
 
 
-EditorIcon::~EditorIcon()
-{
-	m_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_model);
-}
-
-
-void EditorIcon::show()
-{
-	m_is_visible = true;
-}
-
-
-void EditorIcon::hide()
-{
-	m_is_visible = false;
-}
-
-
-float EditorIcon::hit(const Vec3& origin, const Vec3& dir) const
-{
-	if (m_is_visible)
+	void onUniverseCreated()
 	{
-		Matrix m = m_matrix;
-		m.multiply3x3(m_scale);
-		RayCastModelHit hit = m_model->castRay(origin, dir, m);
-		return hit.m_is_hit ? hit.m_t : -1;
+		auto& universe = *m_editor.getUniverse();
+		universe.entityCreated().bind<EditorIconsImpl, &EditorIconsImpl::onEntityCreated>(this);
+		universe.entityDestroyed().bind<EditorIconsImpl, &EditorIconsImpl::destroyIcon>(this);
+		universe.componentAdded().bind<EditorIconsImpl, &EditorIconsImpl::refreshIcon>(this);
+		universe.componentDestroyed().bind<EditorIconsImpl, &EditorIconsImpl::refreshIcon>(this);
 	}
-	else
+
+
+	void onEntityCreated(Entity entity)
 	{
-		return -1;
+		createIcon(entity);
 	}
-}
 
 
-void EditorIcon::render(PipelineInstance& pipeline)
-{
-	static const float MIN_SCALE_FACTOR = 10;
-	static const float MAX_SCALE_FACTOR = 60;
-	if (m_is_visible)
+	void destroyIcon(Entity entity)
 	{
-		ComponentIndex camera = m_scene->getCameraInSlot("editor");
-		if (camera < 0) return;
-		const Universe& universe = m_scene->getUniverse();
-		Lumix::Matrix mtx = universe.getMatrix(m_scene->getCameraEntity(camera));
-
-		float fov = m_scene->getCameraFOV(camera);
-		Vec3 position = universe.getPosition(m_entity);
-		float distance = (position - mtx.getTranslation()).length();
-
-		float scaleFactor = MIN_SCALE_FACTOR + distance;
-		scaleFactor = Math::clamp(scaleFactor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
-
-		float scale = tan(Math::degreesToRadians(fov) * 0.5f) * distance / scaleFactor;
-
-		mtx.setTranslation(position);
-		Matrix scale_mtx = Matrix::IDENTITY;
-		m_matrix = mtx;
-		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale > 0 ? scale : 1;
-		mtx = mtx * scale_mtx;
-		m_scale = scale;
-
-		if (m_model->isReady())
+		for(int i = 0, c = m_icons.size(); i < c; ++i)
 		{
-			pipeline.renderModel(*m_model, mtx);
+			if(m_icons[i].entity == entity)
+			{
+				m_icons.eraseFast(i);
+				return;
+			}
 		}
 	}
+
+
+	void refreshIcon(const ComponentUID& cmp)
+	{
+		destroyIcon(cmp.entity);
+		createIcon(cmp.entity);
+	}
+
+
+	void createIcon(Entity entity)
+	{
+		if (entity == 0) return;
+		if (m_editor.getEditCamera().entity == entity) return;
+
+		static const uint32 RENDERABLE_HASH = crc32("renderable");
+		static const uint32 RENDERER_HASH = crc32("renderer");
+		static const uint32 PHYSICAL_CONTROLLER_HASH = crc32("physical_controller");
+		static const uint32 BOX_RIGID_ACTOR_HASH = crc32("box_rigid_actor");
+		static const uint32 CAMERA_HASH = crc32("camera");
+		static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
+		static const uint32 POINT_LIGHT_HASH = crc32("point_light");
+		static const uint32 TERRAIN_HASH = crc32("terrain");
+
+		const WorldEditor::ComponentList& cmps = m_editor.getComponents(entity);
+
+		for(auto& cmp : cmps)
+		{
+			if (cmp.type == RENDERABLE_HASH) return;
+		}
+
+		auto& icon = m_icons.emplace();
+		icon.entity = entity;
+		icon.type = IconType::ENTITY;
+		for(auto& cmp : cmps)
+		{
+			if(cmp.type == PHYSICAL_CONTROLLER_HASH)
+			{
+				icon.type = IconType::PHYSICAL_CONTROLLER;
+				break;
+			}
+			if(cmp.type == BOX_RIGID_ACTOR_HASH)
+			{
+				icon.type = IconType::PHYSICAL_BOX;
+				break;
+			}
+			if(cmp.type == CAMERA_HASH)
+			{
+				icon.type = IconType::CAMERA;
+				break;
+			}
+			if(cmp.type == GLOBAL_LIGHT_HASH || cmp.type == POINT_LIGHT_HASH)
+			{
+				icon.type = IconType::LIGHT;
+				break;
+			}
+			if(cmp.type == TERRAIN_HASH)
+			{
+				icon.type = IconType::TERRAIN;
+				break;
+			}
+		}
+	}
+
+
+	void clear() override
+	{
+		m_icons.clear();
+	}
+
+
+	Hit raycast(const Vec3& origin, const Vec3& dir) override
+	{
+		Hit hit;
+		hit.t = -1;
+		hit.entity = INVALID_ENTITY;
+
+		auto* render_interface = m_editor.getRenderInterface();
+		if(!render_interface) return hit;
+
+		const auto& universe = *m_editor.getUniverse();
+		ComponentIndex camera = m_editor.getEditCamera().index;
+		if(camera < 0) return hit;
+		Matrix mtx = universe.getMatrix(m_editor.getEditCamera().entity);
+		Vec3 camera_pos = mtx.getTranslation();
+
+		for(auto& icon : m_icons)
+		{
+			Vec3 position = universe.getPosition(icon.entity);
+
+			mtx.setTranslation(position);
+			Matrix tmp = mtx;
+			tmp.multiply3x3(icon.scale > 0 ? icon.scale : 1);
+
+			float t = m_editor.getRenderInterface()->castRay(m_models[(int)icon.type], origin, dir, tmp);
+			if(t >= 0 && (t < hit.t || hit.t < 0))
+			{
+				hit.t = t;
+				hit.entity = icon.entity;
+			}
+		}
+
+		return hit;
+	}
+
+
+	void setRenderInterface(RenderInterface* render_interface) override
+	{
+		if (m_render_interface)
+		{
+			for (auto& model : m_models)
+			{
+				m_render_interface->unloadModel(model);
+			}
+		}
+		m_render_interface = render_interface;
+		if (m_render_interface)
+		{
+			for (int i = 0; i < lengthOf(ICONS); ++i)
+			{
+				m_models[i] = m_render_interface->loadModel(Path(ICONS[i]));
+			}
+		}
+	}
+
+
+	void render() override
+	{
+		static const float MIN_SCALE_FACTOR = 10;
+		static const float MAX_SCALE_FACTOR = 60;
+
+		auto* render_interface = m_editor.getRenderInterface();
+		if(!render_interface) return;
+
+		const auto& universe = *m_editor.getUniverse();
+		ComponentIndex camera = m_editor.getEditCamera().index;
+		if(camera < 0) return;
+		Matrix mtx = universe.getMatrix(m_editor.getEditCamera().entity);
+		Vec3 camera_pos = mtx.getTranslation();
+		float fov = m_editor.getRenderInterface()->getCameraFOV(camera);
+
+		for(auto& icon : m_icons)
+		{
+			Vec3 position = universe.getPosition(icon.entity);
+			float distance = (position - camera_pos).length();
+			float scaleFactor = MIN_SCALE_FACTOR + distance;
+			scaleFactor = Math::clamp(scaleFactor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
+
+			icon.scale = tan(Math::degreesToRadians(fov) * 0.5f) * distance / scaleFactor;
+			mtx.setTranslation(position);
+			Matrix scaled_mtx = mtx;
+			scaled_mtx.multiply3x3(icon.scale > 0 ? icon.scale : 1);
+
+			render_interface->renderModel(m_models[(int)icon.type], scaled_mtx);
+		}
+	}
+
+	struct Icon
+	{
+		Entity entity;
+		IconType type;
+		float scale;
+	};
+
+	Array<Icon> m_icons;
+	RenderInterface::ModelHandle m_models[(int)IconType::COUNT];
+	WorldEditor& m_editor;
+	RenderInterface* m_render_interface;
+};
+
+
+EditorIcons* EditorIcons::create(WorldEditor& editor)
+{
+	return LUMIX_NEW(editor.getAllocator(), EditorIconsImpl)(editor);
+}
+
+
+void EditorIcons::destroy(EditorIcons& icons)
+{
+	auto& i = static_cast<EditorIconsImpl&>(icons);
+	LUMIX_DELETE(i.m_editor.getAllocator(), &icons);
 }
 
 

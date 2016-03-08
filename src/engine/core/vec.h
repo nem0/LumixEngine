@@ -33,6 +33,7 @@ struct LUMIX_ENGINE_API Vec2
 
 	Vec2 operator *(float f) const { return Vec2(x * f, y * f); }
 	Vec2 operator +(const Vec2& v) const { return Vec2(x + v.x, y + v.y); }
+	Vec2 operator -(const Vec2& v) const { return Vec2(x - v.x, y - v.y); }
 	Vec2 normalized() const { return *this * (1 / length()); }
 	float length() const;
 
@@ -209,6 +210,7 @@ struct LUMIX_ENGINE_API Vec4
 		x *= rhs;
 		y *= rhs;
 		z *= rhs;
+		w *= rhs;
 		this->x = x;
 		this->y = y;
 		this->z = z;
@@ -216,6 +218,14 @@ struct LUMIX_ENGINE_API Vec4
 	}
 
 	void normalize();
+
+	void set(const Vec3& v, float w)
+	{
+		this->x = v.x;
+		this->y = v.y;
+		this->z = v.z;
+		this->w = w;
+	}
 
 	void set(float x, float y, float z, float w)
 	{

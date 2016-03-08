@@ -1,11 +1,8 @@
 #include "hierarchy.h"
-#include "core/array.h"
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/hash_map.h"
 #include "core/json_serializer.h"
-#include "core/matrix.h"
-#include "core/pod_hash_map.h"
 #include "engine/engine.h"
 #include "universe.h"
 
@@ -20,7 +17,7 @@ static const Lumix::uint32 HIERARCHY_HASH = Lumix::crc32("hierarchy");
 class HierarchyImpl : public Hierarchy
 {
 private:
-	typedef PODHashMap<Entity, Entity> Parents;
+	typedef HashMap<Entity, Entity> Parents;
 
 public:
 	HierarchyImpl(IPlugin& system, Universe& universe, IAllocator& allocator)
@@ -38,8 +35,7 @@ public:
 
 	~HierarchyImpl()
 	{
-		PODHashMap<int32, Array<Child> *>::iterator iter = m_children.begin(),
-													end = m_children.end();
+		auto iter = m_children.begin(), end = m_children.end();
 		while (iter != end)
 		{
 			LUMIX_DELETE(m_allocator, iter.value());
@@ -82,7 +78,7 @@ public:
 
 
 	IPlugin& getPlugin() const override { return m_system; }
-	void update(float time_delta) override {}
+	void update(float time_delta, bool paused) override {}
 	bool ownComponentType(uint32 type) const override { return HIERARCHY_HASH == type; }
 	Universe& getUniverse() override { return m_universe; }
 	IAllocator& getAllocator() { return m_allocator; }
@@ -100,10 +96,13 @@ public:
 		auto iter = m_children.find(entity);
 		if (iter != m_children.end())
 		{
+			for (auto& x : *iter.value())
+			{
+				m_parents.erase(x.m_entity);
+			}
 			LUMIX_DELETE(m_allocator, iter.value());
 			m_children.erase(iter);
 		}
-		m_parents.erase(entity);
 	}
 
 
@@ -200,7 +199,7 @@ public:
 				m_children.insert(parent, LUMIX_NEW(m_allocator, Array<Child>)(m_allocator));
 				child_iter = m_children.find(parent);
 			}
-			Child& c = child_iter.value()->pushEmpty();
+			Child& c = child_iter.value()->emplace();
 			c.m_entity = child;
 			Matrix inv_parent_matrix = m_universe.getPositionAndRotation(parent);
 			inv_parent_matrix.inverse();
@@ -270,9 +269,9 @@ private:
 };
 
 
-IScene* HierarchyPlugin::createScene(UniverseContext& ctx)
+IScene* HierarchyPlugin::createScene(Universe& ctx)
 {
-	return Hierarchy::create(*this, *ctx.m_universe, m_allocator);
+	return Hierarchy::create(*this, ctx, m_allocator);
 }
 
 

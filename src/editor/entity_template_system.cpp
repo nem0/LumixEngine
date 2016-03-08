@@ -17,21 +17,13 @@ namespace Lumix
 {
 
 
-static const uint32 CAMERA_HASH = Lumix::crc32("camera");
-static const uint32 GLOBAL_LIGHT_HASH = Lumix::crc32("global_light");
-static const uint32 POINT_LIGHT_HASH = Lumix::crc32("point_light");
-static const uint32 SCRIPT_HASH = Lumix::crc32("script");
-static const uint32 ANIMABLE_HASH = Lumix::crc32("animable");
-static const uint32 TERRAIN_HASH = Lumix::crc32("terrain");
-
-
 class EntityTemplateSystemImpl : public EntityTemplateSystem
 {
 private:
 	class CreateTemplateCommand : public IEditorCommand
 	{
 	public:
-		CreateTemplateCommand(WorldEditor& editor)
+		explicit CreateTemplateCommand(WorldEditor& editor)
 			: m_entity_system(
 				  static_cast<EntityTemplateSystemImpl&>(editor.getEntityTemplateSystem()))
 			, m_editor(editor)
@@ -118,7 +110,7 @@ private:
 	class CreateInstanceCommand : public IEditorCommand
 	{
 	public:
-		CreateInstanceCommand(WorldEditor& editor)
+		explicit CreateInstanceCommand(WorldEditor& editor)
 			: m_entity_system(
 				  static_cast<EntityTemplateSystemImpl&>(editor.getEntityTemplateSystem()))
 			, m_editor(editor)
@@ -129,11 +121,14 @@ private:
 		CreateInstanceCommand(EntityTemplateSystemImpl& entity_system,
 			WorldEditor& editor,
 			const char* template_name,
-			const Vec3& position)
+			const Vec3& position,
+			const Quat& rot,
+			float size)
 			: m_entity_system(entity_system)
 			, m_template_name_hash(crc32(template_name))
 			, m_position(position)
-			, m_rotation(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2))
+			, m_rotation(rot)
+			, m_size(size)
 			, m_editor(editor)
 		{
 		}
@@ -150,6 +145,7 @@ private:
 			serializer.serialize("rotation_y", m_rotation.y);
 			serializer.serialize("rotation_z", m_rotation.z);
 			serializer.serialize("rotation_w", m_rotation.w);
+			serializer.serialize("size", m_size);
 		}
 
 
@@ -164,6 +160,7 @@ private:
 			serializer.deserialize("rotation_y", m_rotation.y, 0);
 			serializer.deserialize("rotation_z", m_rotation.z, 0);
 			serializer.deserialize("rotation_w", m_rotation.w, 0);
+			serializer.deserialize("size", m_size, 1);
 		}
 
 
@@ -174,6 +171,7 @@ private:
 			{
 				Universe* universe = m_entity_system.m_editor.getUniverse();
 				m_entity = universe->createEntity(m_position, m_rotation);
+				universe->setScale(m_entity, m_size);
 
 				m_entity_system.m_instances.at(instance_index).push(m_entity);
 				Entity template_entity = m_entity_system.m_instances.at(instance_index)[0];
@@ -223,10 +221,11 @@ private:
 		Entity m_entity;
 		Vec3 m_position;
 		Quat m_rotation;
+		float m_size;
 	};
 
 public:
-	EntityTemplateSystemImpl(WorldEditor& editor)
+	explicit EntityTemplateSystemImpl(WorldEditor& editor)
 		: m_editor(editor)
 		, m_universe(nullptr)
 		, m_instances(editor.getAllocator())
@@ -326,28 +325,6 @@ public:
 	}
 
 
-	Entity createInstanceNoCommand(uint32 name_hash, const Vec3& position) override
-	{
-		int instance_index = m_instances.find(name_hash);
-		ASSERT(instance_index >= 0);
-		if (instance_index < 0) return INVALID_ENTITY;
-
-		Universe* universe = m_editor.getUniverse();
-		float random_angle = Math::randFloat(0, Math::PI * 2);
-		Lumix::Quat rotation(Lumix::Vec3(0, 1, 0), random_angle);
-		Entity entity = universe->createEntity(position, rotation);
-
-		m_instances.at(instance_index).push(entity);
-		Entity template_entity = m_instances.at(instance_index)[0];
-		const auto& template_cmps = m_editor.getComponents(template_entity);
-		for (const auto& cmp : template_cmps)
-		{
-			m_editor.cloneComponent(cmp, entity);
-		}
-		return entity;
-	}
-
-
 	void createTemplateFromEntity(const char* name, Entity entity) override
 	{
 		CreateTemplateCommand* command =
@@ -385,10 +362,10 @@ public:
 	}
 
 
-	Entity createInstance(const char* name, const Vec3& position) override
+	Entity createInstance(const char* name, const Vec3& position, const Quat& rotation, float size) override
 	{
 		CreateInstanceCommand* command = LUMIX_NEW(m_editor.getAllocator(), CreateInstanceCommand)(
-			*this, m_editor, name, position);
+			*this, m_editor, name, position, rotation, size);
 		m_editor.executeCommand(command);
 		return command->getEntity();
 	}

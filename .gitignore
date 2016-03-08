@@ -6,13 +6,4 @@ obj/
 *.opensdf
 *.user
 *.nvuser
-evona_test/
 *.orig
-/debug/
-/release/
-/projects/vs2013/Debug
-/projects/vs2013/Release
-studio/projects/vs2013/ui_*.h
-studio/projects/vs2013/debug
-studio/projects/vs2013/release
-/projects/vs2013/render_test/GeneratedFiles/*

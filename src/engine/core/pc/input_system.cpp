@@ -3,10 +3,7 @@
 #include "core/profiler.h"
 #include "core/string.h"
 
-#include "core/pc/simple_win.h"
-#undef NOKEYSTATES
-#undef NOUSER
-#include <Windows.h>
+#include <windows.h>
 #include <Xinput.h>
 
 
@@ -18,7 +15,7 @@ namespace Lumix
 	{
 		typedef decltype(XInputGetState)* XInputGetState_fn_ptr;
 
-		InputSystemImpl(IAllocator& allocator)
+		explicit InputSystemImpl(IAllocator& allocator)
 			: m_actions(allocator)
 			, m_allocator(allocator)
 			, m_is_enabled(false)
@@ -57,6 +54,13 @@ namespace Lumix
 		}
 
 
+		void clear() override
+		{
+			m_mouse_rel_x = 0;
+			m_mouse_rel_y = 0;
+		}
+
+
 		void enable(bool enabled) override
 		{
 			m_is_enabled = enabled;
@@ -66,8 +70,6 @@ namespace Lumix
 		void update(float) override
 		{
 			PROFILE_FUNCTION();
-			m_mouse_rel_x = 0;
-			m_mouse_rel_y = 0;
 
 			if (m_xinput_get_state)
 			{
@@ -113,6 +115,18 @@ namespace Lumix
 		}
 
 
+		float getMouseXMove() const override
+		{
+			return m_mouse_rel_x;
+		}
+
+
+		float getMouseYMove() const override
+		{
+			return m_mouse_rel_y;
+		}
+
+
 		float getActionValue(uint32 action) override
 		{
 			if (!m_is_enabled) return 0;
@@ -140,7 +154,6 @@ namespace Lumix
 				if (!m_xinput_connected[value.controller_id]) return 0;
 				switch (value.type)
 				{
-
 					case InputType::LTHUMB_X:
 						return deadZone(
 							m_xinput_states[value.controller_id].Gamepad.sThumbLX / 32767.0f,

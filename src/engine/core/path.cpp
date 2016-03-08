@@ -36,6 +36,7 @@ namespace Lumix
 	void PathManager::serialize(OutputBlob& serializer)
 	{
 		MT::SpinLock lock(m_mutex);
+		clear();
 		serializer.write((int32)m_paths.size());
 		for (int i = 0; i < m_paths.size(); ++i)
 		{
@@ -150,7 +151,7 @@ namespace Lumix
 	{
 		g_path_manager->incrementRefCount(m_data);
 	}
-	
+
 
 	Path::Path(const char* path)
 	{
@@ -185,13 +186,12 @@ namespace Lumix
 
 	void Path::operator =(const char* rhs)
 	{
+		g_path_manager->decrementRefCount(m_data);
 		char tmp[MAX_PATH_LENGTH];
 		size_t len = stringLength(rhs);
 		ASSERT(len < MAX_PATH_LENGTH);
 		PathUtils::normalize(rhs, tmp, (uint32)len + 1);
 		uint32 hash = crc32(tmp);
-
-		g_path_manager->decrementRefCount(m_data);
 		m_data = g_path_manager->getPath(hash, tmp);
 	}
 

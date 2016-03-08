@@ -10,7 +10,6 @@
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/queue.h"
-#include "core/stack_allocator.h"
 #include "core/string.h"
 
 
@@ -94,7 +93,7 @@ private:
 class FileSystemImpl : public FileSystem
 {
 public:
-	FileSystemImpl(IAllocator& allocator)
+	explicit FileSystemImpl(IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_in_progress(m_allocator)
 		, m_pending(m_allocator)
@@ -212,7 +211,7 @@ public:
 
 		if (prev)
 		{
-			AsyncItem& item = m_pending.pushEmpty();
+			AsyncItem& item = m_pending.emplace();
 
 			item.m_file = prev;
 			item.m_cb = call_back;
@@ -274,7 +273,7 @@ public:
 
 	void closeAsync(IFile& file) override
 	{
-		AsyncItem& item = m_pending.pushEmpty();
+		AsyncItem& item = m_pending.emplace();
 
 		item.m_file = &file;
 		item.m_cb.bind<closeAsync>();

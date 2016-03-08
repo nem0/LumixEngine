@@ -29,13 +29,13 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 {
 	friend class PhysicsSystem;
 	public:
-		static PhysicsScene* create(PhysicsSystem& system, UniverseContext& context, Engine& engine, IAllocator& allocator);
+		static PhysicsScene* create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator);
 		static void destroy(PhysicsScene* scene);
 
 		virtual ~PhysicsScene() {}
-		virtual void update(float time_delta) = 0;
 		virtual void render(RenderScene& render_scene) = 0;
-		virtual bool raycast(const Vec3& origin,
+		virtual Entity raycast(const Vec3& origin, const Vec3& dir) = 0;
+		virtual bool raycastEx(const Vec3& origin,
 			const Vec3& dir,
 			float distance,
 			RaycastHit& result) = 0;

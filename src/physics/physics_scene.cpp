@@ -40,81 +40,9 @@ enum class PhysicsSceneVersion : int
 };
 
 
-namespace LuaAPI
-{
-
-
-static int raycast(lua_State* L)
-{
-	if (!LuaWrapper::checkParameterType<void*>(L, 1) ||
-		!LuaWrapper::checkParameterType<float>(L, 2) ||
-		!LuaWrapper::checkParameterType<float>(L, 3) ||
-		!LuaWrapper::checkParameterType<float>(L, 4) ||
-		!LuaWrapper::checkParameterType<float>(L, 5) ||
-		!LuaWrapper::checkParameterType<float>(L, 6) ||
-		!LuaWrapper::checkParameterType<float>(L, 7))
-	{
-		lua_pushnil(L);
-		return 1;
-	}
-
-	auto* scene = (PhysicsScene*)LuaWrapper::toType<void*>(L, 1);
-	Vec3 origin;
-	origin.x = LuaWrapper::toType<float>(L, 2);
-	origin.y = LuaWrapper::toType<float>(L, 3);
-	origin.z = LuaWrapper::toType<float>(L, 4);
-	Vec3 dir;
-	dir.x = LuaWrapper::toType<float>(L, 5);
-	dir.y = LuaWrapper::toType<float>(L, 6);
-	dir.z = LuaWrapper::toType<float>(L, 7);
-
-	RaycastHit hit;
-	scene->raycast(origin, dir, FLT_MAX, hit);
-
-	LuaWrapper::pushLua(L, hit.entity);
-	return 1;
-}
-
-
-static float getActorSpeed(IScene* scene, ComponentIndex component)
-{
-	return static_cast<PhysicsScene*>(scene)->getActorSpeed(component);
-}
-
-
-static void moveController(IScene* scene,
-	ComponentIndex component,
-	Vec3 dir,
-	float time_delta)
-{
-	static_cast<PhysicsScene*>(scene)->moveController(component, dir, time_delta);
-}
-
-
-static ComponentIndex getActorComponent(IScene* scene, Entity entity)
-{
-	return static_cast<PhysicsScene*>(scene)->getActorComponent(entity);
-}
-
-
-static void putToSleep(IScene* scene, Entity entity)
-{
-	static_cast<PhysicsScene*>(scene)->putToSleep(entity);
-}
-
-
-static void applyForceToActor(IScene* scene, int component, Vec3 force)
-{
-	static_cast<PhysicsScene*>(scene)->applyForceToActor(component, force);
-}
-
-
-} // namespace LuaAPI
-
-
 struct OutputStream : public physx::PxOutputStream
 {
-	OutputStream(IAllocator& allocator)
+	explicit OutputStream(IAllocator& allocator)
 		: allocator(allocator)
 	{
 		data = (uint8*)allocator.allocate(sizeof(uint8) * 4096);
@@ -130,7 +58,7 @@ struct OutputStream : public physx::PxOutputStream
 		if (size + (int)count > capacity)
 		{
 			int new_capacity =
-				Math::maxValue(size + (int)count, capacity + 4096);
+				Math::maximum(size + (int)count, capacity + 4096);
 			uint8* new_data =
 				(uint8*)allocator.allocate(sizeof(uint8) * new_capacity);
 			copyMemory(new_data, data, size);
@@ -217,7 +145,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 {
 	struct ContactCallback : public physx::PxSimulationEventCallback
 	{
-		ContactCallback(PhysicsSceneImpl& scene)
+		explicit ContactCallback(PhysicsSceneImpl& scene)
 			: m_scene(scene)
 		{
 		}
@@ -237,8 +165,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 				auto contact_count = cp.extractContacts(&contact, 1);
 
 				auto pos = toVec3(contact.position);
-				auto e1 = (Entity)pairHeader.actors[0]->userData;
-				auto e2 = (Entity)pairHeader.actors[1]->userData;
+				auto e1 = (Entity)(intptr_t)(pairHeader.actors[0]->userData);
+				auto e2 = (Entity)(intptr_t)(pairHeader.actors[1]->userData);
 				m_scene.onContact(e1, e2, pos);
 			}
 		}
@@ -265,7 +193,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	class RigidActor
 	{
 	public:
-		RigidActor(PhysicsSceneImpl& scene)
+		explicit RigidActor(PhysicsSceneImpl& scene)
 			: m_resource(nullptr)
 			, m_physx_actor(nullptr)
 			, m_scene(scene)
@@ -298,19 +226,19 @@ struct PhysicsSceneImpl : public PhysicsScene
 	};
 
 
-	PhysicsSceneImpl(UniverseContext& context, IAllocator& allocator)
+	PhysicsSceneImpl(Universe& context, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_controllers(m_allocator)
 		, m_actors(m_allocator)
 		, m_terrains(m_allocator)
 		, m_dynamic_actors(m_allocator)
-		, m_universe(*context.m_universe)
-		, m_universe_context(context)
+		, m_universe(context)
 		, m_is_game_running(false)
 		, m_contact_callback(*this)
 		, m_queued_forces(m_allocator)
 		, m_layers_count(2)
 	{
+		setMemory(m_layers_names, 0, sizeof(m_layers_names));
 		for (int i = 0; i < lengthOf(m_layers_names); ++i)
 		{
 			copyString(m_layers_names[i], "Layer");
@@ -347,14 +275,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 			auto cmp = m_script_scene->getComponent(e1);
 			if (cmp == INVALID_COMPONENT) return;
 
-			auto* call = m_script_scene->beginFunctionCall(cmp, "onContact");
-			if (!call) return;
+			for (int i = 0, c = m_script_scene->getScriptCount(cmp); i < c; ++i)
+			{
+				auto* call = m_script_scene->beginFunctionCall(cmp, i, "onContact");
+				if (!call) continue;
 
-			call->add(e2);
-			call->add(position.x);
-			call->add(position.y);
-			call->add(position.z);
-			m_script_scene->endFunctionCall(*call);
+				call->add(e2);
+				call->add(position.x);
+				call->add(position.y);
+				call->add(position.z);
+				m_script_scene->endFunctionCall(*call);
+			}
 		};
 
 		send(e1, e2, position);
@@ -566,7 +497,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		cDesc.behaviorCallback = nullptr;
 		Vec3 position = m_universe.getPosition(entity);
 		cDesc.position.set(position.x, position.y, position.z);
-		PhysicsSceneImpl::Controller& c = m_controllers.pushEmpty();
+		PhysicsSceneImpl::Controller& c = m_controllers.emplace();
 		c.m_controller = m_controller_manager->createController(cDesc);
 		c.m_entity = entity;
 		c.m_is_free = false;
@@ -602,7 +533,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		geom.halfExtents.y = 1;
 		geom.halfExtents.z = 1;
 		physx::PxTransform transform;
-		Matrix mtx = m_universe.getMatrix(entity);
+		Matrix mtx = m_universe.getPositionAndRotation(entity);
 		matrix2Transform(mtx, transform);
 		
 		physx::PxRigidStatic* physx_actor =
@@ -684,10 +615,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 			cb.unbind<Heightfield, &Heightfield::heightmapLoaded>(m_terrains[cmp]);
 		}
 		auto* texture_manager = resource_manager.get(ResourceManager::TEXTURE);
-		auto* new_hm = static_cast<Texture*>(texture_manager->load(str));
-		m_terrains[cmp]->m_heightmap = new_hm;
-		new_hm->onLoaded<Heightfield, &Heightfield::heightmapLoaded>(m_terrains[cmp]);
-		new_hm->addDataReference();
+		if (str.isValid())
+		{
+			auto* new_hm = static_cast<Texture*>(texture_manager->load(str));
+			m_terrains[cmp]->m_heightmap = new_hm;
+			new_hm->onLoaded<Heightfield, &Heightfield::heightmapLoaded>(m_terrains[cmp]);
+			new_hm->addDataReference();
+		}
+		else
+		{
+			m_terrains[cmp]->m_heightmap = nullptr;
+		}
 	}
 
 
@@ -802,7 +740,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			auto* actor = m_actors[i.cmp];
 			if (!actor->isDynamic())
 			{
-				g_log_warning.log("physics") << "Trying to apply force to static object";
+				g_log_warning.log("Physics") << "Trying to apply force to static object";
 				return;
 			}
 
@@ -815,13 +753,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void update(float time_delta) override
+	void update(float time_delta, bool paused) override
 	{
-		if (!m_is_game_running) return;
+		if (!m_is_game_running || paused) return;
 		
 		applyQueuedForces();
 
-		time_delta = Math::minValue(1 / 20.0f, time_delta);
+		time_delta = Math::minimum(1 / 20.0f, time_delta);
 		simulateScene(time_delta);
 		fetchResults();
 		updateDynamicActors();
@@ -841,23 +779,26 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void registerLuaAPI()
 	{
-		auto* scene = m_universe_context.getScene(crc32("lua_script"));
+		auto* scene = m_universe.getScene(crc32("lua_script"));
 		if (!scene) return;
 
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
+		auto* L = m_script_scene->getGlobalState();
 
-#define REGISTER_FUNCTION(name)       \
-	m_script_scene->registerFunction( \
-		"Physics", #name, LuaWrapper::wrap<decltype(&LuaAPI::name), LuaAPI::name>)
+		#define REGISTER_FUNCTION(name) \
+			do {\
+				auto f = &LuaWrapper::wrapMethod<PhysicsSceneImpl, decltype(&PhysicsSceneImpl::name), &PhysicsSceneImpl::name>; \
+				LuaWrapper::createSystemFunction(L, "Physics", #name, f); \
+			} while(false) \
 
-		REGISTER_FUNCTION(moveController);
-		REGISTER_FUNCTION(applyForceToActor);
 		REGISTER_FUNCTION(getActorComponent);
 		REGISTER_FUNCTION(putToSleep);
 		REGISTER_FUNCTION(getActorSpeed);
-		m_script_scene->registerFunction("Physics", "raycast", LuaAPI::raycast);
+		REGISTER_FUNCTION(applyForceToActor);
+		REGISTER_FUNCTION(moveController);
+		REGISTER_FUNCTION(raycast);
 
-#undef REGISTER_FUNCTION
+		#undef REGISTER_FUNCTION
 	}
 
 
@@ -898,7 +839,15 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	bool raycast(const Vec3& origin,
+	Entity raycast(const Vec3& origin, const Vec3& dir) override
+	{
+		RaycastHit hit;
+		if (raycastEx(origin, dir, FLT_MAX, hit)) return hit.entity;
+		return INVALID_ENTITY;
+	}
+
+
+	bool raycastEx(const Vec3& origin,
 		const Vec3& dir,
 		float distance,
 		RaycastHit& result) override
@@ -924,7 +873,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		if (hit.shape)
 		{
 			physx::PxRigidActor* actor = hit.shape->getActor();
-			if (actor && actor->userData) result.entity = (int)actor->userData;
+			if (actor && actor->userData) result.entity = (Entity)(intptr_t)actor->userData;
 		}
 		return status;
 	}
@@ -1051,7 +1000,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 
 			physx::PxTransform transform;
-			Matrix mtx = m_universe.getMatrix(terrain->m_entity);
+			Matrix mtx = m_universe.getPositionAndRotation(terrain->m_entity);
 			matrix2Transform(mtx, transform);
 
 			physx::PxRigidActor* actor;
@@ -1063,7 +1012,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION,
 									width <= 1024);
-				actor->userData = (void*)terrain->m_entity;
+				actor->userData = (void*)(intptr_t)terrain->m_entity;
 				m_scene->addActor(*actor);
 				terrain->m_actor = actor;
 
@@ -1080,7 +1029,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 			else
 			{
-				g_log_error.log("PhysX")
+				g_log_error.log("Physics")
 					<< "Could not create PhysX heightfield "
 					<< terrain->m_heightmap->getPath();
 			}
@@ -1090,29 +1039,29 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void addCollisionLayer() override 
 	{
-		m_layers_count = Math::minValue(lengthOf(m_layers_names), m_layers_count + 1);
+		m_layers_count = Math::minimum(lengthOf(m_layers_names), m_layers_count + 1);
 	}
 
 
 	void removeCollisionLayer() override
 	{
-		m_layers_count = Math::maxValue(0, m_layers_count - 1);
+		m_layers_count = Math::maximum(0, m_layers_count - 1);
 		for (auto* actor : m_actors)
 		{
 			if (!actor->getPhysxActor()) continue;
 			if (actor->getEntity() == INVALID_ENTITY) continue;
-			actor->setLayer(Math::minValue(m_layers_count - 1, actor->getLayer()));
+			actor->setLayer(Math::minimum(m_layers_count - 1, actor->getLayer()));
 		}
 		for (auto& controller : m_controllers)
 		{
 			if (controller.m_is_free) continue;
-			controller.m_layer = Math::minValue(m_layers_count - 1, controller.m_layer);
+			controller.m_layer = Math::minimum(m_layers_count - 1, controller.m_layer);
 		}
 		for (auto* terrain : m_terrains)
 		{
 			if (!terrain) continue;
 			if (!terrain->m_actor) continue;
-			terrain->m_layer = Math::minValue(m_layers_count - 1, terrain->m_layer);
+			terrain->m_layer = Math::minimum(m_layers_count - 1, terrain->m_layer);
 		}
 
 		updateFilterData();
@@ -1276,9 +1225,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 			bool is_box = shapes->getBoxGeometry(box);
 			ASSERT(is_box);
 			physx::PxVec3& half = box.halfExtents;
-			half.x = Math::maxValue(0.01f, size.x);
-			half.y = Math::maxValue(0.01f, size.y);
-			half.z = Math::maxValue(0.01f, size.z);
+			half.x = Math::maximum(0.01f, size.x);
+			half.y = Math::maximum(0.01f, size.y);
+			half.z = Math::maximum(0.01f, size.z);
 			shapes->setGeometry(box);
 		}
 	}
@@ -1308,7 +1257,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 				physx::PxTransform transform;
 				matrix2Transform(
-					m_universe.getMatrix(m_actors[cmp]->getEntity()),
+					m_universe.getPositionAndRotation(m_actors[cmp]->getEntity()),
 					transform);
 
 				physx::PxRigidActor* actor;
@@ -1328,7 +1277,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 										   *m_default_material);
 				}
 				ASSERT(actor);
-				actor->userData = (void*)m_actors[cmp]->getEntity();
+				actor->userData = (void*)(intptr_t)m_actors[cmp]->getEntity();
 				actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 				m_actors[cmp]->setPhysxActor(actor);
 			}
@@ -1397,7 +1346,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				physx::PxBoxGeometry box_geom;
 				physx::PxTransform transform;
-				Matrix mtx = m_universe.getMatrix(m_actors[idx]->getEntity());
+				Matrix mtx = m_universe.getPositionAndRotation(m_actors[idx]->getEntity());
 				matrix2Transform(mtx, transform);
 				serializer.read(box_geom.halfExtents.x);
 				serializer.read(box_geom.halfExtents.y);
@@ -1540,7 +1489,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.read(is_free);
 			Entity e(index);
 
-			Controller& c = m_controllers.pushEmpty();
+			Controller& c = m_controllers.emplace();
 			c.m_is_free = is_free;
 			c.m_frame_change.set(0, 0, 0);
 
@@ -1653,7 +1602,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto* actor = m_actors[cmp];
 		if (!actor->isDynamic())
 		{
-			g_log_warning.log("physics") << "Trying to get speed of static object";
+			g_log_warning.log("Physics") << "Trying to get speed of static object";
 			return 0;
 		}
 
@@ -1668,7 +1617,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto* actor = m_actors[cmp];
 		if (!actor->isDynamic())
 		{
-			g_log_warning.log("physics") << "Trying to put static object to sleep";
+			g_log_warning.log("Physics") << "Trying to put static object to sleep";
 			return;
 		}
 
@@ -1680,7 +1629,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void applyForceToActor(ComponentIndex cmp, const Vec3& force) override
 	{
-		auto& i = m_queued_forces.pushEmpty();
+		auto& i = m_queued_forces.emplace();
 		i.cmp = cmp;
 		i.force = force;
 	}
@@ -1728,7 +1677,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 	IAllocator& m_allocator;
 
 	Universe& m_universe;
-	UniverseContext& m_universe_context;
 	Engine* m_engine;
 	ContactCallback m_contact_callback;
 	physx::PxScene* m_scene;
@@ -1750,7 +1698,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 
 PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
-	UniverseContext& context,
+	Universe& context,
 	Engine& engine,
 	IAllocator& allocator)
 {
@@ -1765,7 +1713,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
 		physx::PxDefaultCpuDispatcher* cpu_dispatcher = physx::PxDefaultCpuDispatcherCreate(1);
 		if (!cpu_dispatcher)
 		{
-			g_log_error.log("physics") << "PxDefaultCpuDispatcherCreate failed!";
+			g_log_error.log("Physics") << "PxDefaultCpuDispatcherCreate failed!";
 		}
 		sceneDesc.cpuDispatcher = cpu_dispatcher;
 	}
@@ -1806,7 +1754,7 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		setPhysxActor(nullptr);
 
 		physx::PxTransform transform;
-		Matrix mtx = m_scene.getUniverse().getMatrix(m_entity);
+		Matrix mtx = m_scene.getUniverse().getPositionAndRotation(m_entity);
 		matrix2Transform(mtx, transform);
 
 		physx::PxRigidActor* actor;
@@ -1832,7 +1780,7 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		}
 		else
 		{
-			g_log_error.log("PhysX") << "Could not create PhysX mesh "
+			g_log_error.log("Physics") << "Could not create PhysX mesh "
 									 << m_resource->getPath().c_str();
 		}
 	}
@@ -1851,7 +1799,7 @@ void PhysicsSceneImpl::RigidActor::setPhysxActor(physx::PxRigidActor* actor)
 	{
 		m_scene.m_scene->addActor(*actor);
 		actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
-		actor->userData = (void*)m_entity;
+		actor->userData = (void*)(intptr_t)m_entity;
 		m_scene.updateFilterData(actor, m_layer);
 	}
 }

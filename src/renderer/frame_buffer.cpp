@@ -13,9 +13,9 @@ namespace Lumix
 
 
 FrameBuffer::FrameBuffer(const Declaration& decl)
+	: m_declaration(decl)
 {
 	m_autodestroy_handle = true;
-	m_declaration = decl;
 	bgfx::TextureHandle texture_handles[16];
 
 	for (int i = 0; i < decl.m_renderbuffers_count; ++i)
@@ -31,6 +31,7 @@ FrameBuffer::FrameBuffer(const Declaration& decl)
 
 	m_window_handle = nullptr;
 	m_handle = bgfx::createFrameBuffer((uint8_t)decl.m_renderbuffers_count, texture_handles);
+	ASSERT(bgfx::isValid(m_handle));
 }
 
 
@@ -43,6 +44,7 @@ FrameBuffer::FrameBuffer(const char* name, int width, int height, void* window_h
 	m_declaration.m_renderbuffers_count = 0;
 	m_window_handle = window_handle;
 	m_handle = bgfx::createFrameBuffer(window_handle, (uint16_t)width, (uint16_t)height);
+	ASSERT(bgfx::isValid(m_handle));
 }
 
 
@@ -122,6 +124,10 @@ static bgfx::TextureFormat::Enum getFormat(const char* name)
 	else if (compareString(name, "rgba8") == 0)
 	{
 		return bgfx::TextureFormat::RGBA8;
+	}
+	else if (compareString(name, "rgba16f") == 0)
+	{
+		return bgfx::TextureFormat::RGBA16F;
 	}
 	else if (compareString(name, "r32f") == 0)
 	{

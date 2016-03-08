@@ -18,6 +18,7 @@ class OutputBlob;
 class RenderScene;
 class ResourceManager;
 class Universe;
+class WorldEditor;
 
 
 struct IntInterval
@@ -39,8 +40,8 @@ struct Interval
 	Interval();
 	float getRandom() const;
 
-
 	void check();
+	void checkZero();
 
 	void operator=(const Vec2& value)
 	{
@@ -60,7 +61,7 @@ class LUMIX_RENDERER_API ParticleEmitter
 public:
 	struct LUMIX_RENDERER_API ModuleBase
 	{
-		ModuleBase(ParticleEmitter& emitter);
+		explicit ModuleBase(ParticleEmitter& emitter);
 
 		virtual ~ModuleBase() {}
 		virtual void spawnParticle(int /*index*/) {}
@@ -69,7 +70,7 @@ public:
 		virtual void serialize(OutputBlob& blob) = 0;
 		virtual void deserialize(InputBlob& blob, int version) = 0;
 		virtual uint32 getType() const = 0;
-		virtual void drawGizmo(RenderScene& scene) {}
+		virtual void drawGizmo(WorldEditor& editor, RenderScene& scene) {}
 
 		ParticleEmitter& m_emitter;
 	};
@@ -77,7 +78,7 @@ public:
 
 	struct LUMIX_RENDERER_API SpawnShapeModule : public ModuleBase
 	{
-		SpawnShapeModule(ParticleEmitter& emitter);
+		explicit SpawnShapeModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob& blob) override;
 		void deserialize(InputBlob& blob, int version) override;
@@ -93,10 +94,9 @@ public:
 	};
 
 
-
 	struct LUMIX_RENDERER_API LinearMovementModule : public ModuleBase
 	{
-		LinearMovementModule(ParticleEmitter& emitter);
+		explicit LinearMovementModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob& blob) override;
 		void deserialize(InputBlob& blob, int version) override;
@@ -111,12 +111,12 @@ public:
 
 	struct LUMIX_RENDERER_API PlaneModule : public ModuleBase
 	{
-		PlaneModule(ParticleEmitter& emitter);
+		explicit PlaneModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
 		void deserialize(InputBlob& blob, int version) override;
 		void update(float time_delta) override;
 		uint32 getType() const override { return s_type; }
-		void drawGizmo(RenderScene& scene) override;
+		void drawGizmo(WorldEditor& editor, RenderScene& scene) override;
 
 		static const uint32 s_type;
 		Entity m_entities[8];
@@ -127,11 +127,12 @@ public:
 
 	struct LUMIX_RENDERER_API AttractorModule : public ModuleBase
 	{
-		AttractorModule(ParticleEmitter& emitter);
+		explicit AttractorModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
 		void deserialize(InputBlob& blob, int version) override;
 		void update(float time_delta) override;
 		uint32 getType() const override { return s_type; }
+		void drawGizmo(WorldEditor& editor, RenderScene& scene) override;
 
 		static const uint32 s_type;
 		Entity m_entities[8];
@@ -142,7 +143,7 @@ public:
 
 	struct LUMIX_RENDERER_API ForceModule : public ModuleBase
 	{
-		ForceModule(ParticleEmitter& emitter);
+		explicit ForceModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
 		void deserialize(InputBlob& blob, int version) override;
 		void update(float time_delta) override;
@@ -155,7 +156,7 @@ public:
 
 	struct LUMIX_RENDERER_API AlphaModule : public ModuleBase
 	{
-		AlphaModule(ParticleEmitter& emitter);
+		explicit AlphaModule(ParticleEmitter& emitter);
 		void update(float time_delta) override;
 		void serialize(OutputBlob&) override;
 		void deserialize(InputBlob&, int) override;
@@ -171,7 +172,7 @@ public:
 
 	struct LUMIX_RENDERER_API SizeModule : public ModuleBase
 	{
-		SizeModule(ParticleEmitter& emitter);
+		explicit SizeModule(ParticleEmitter& emitter);
 		void update(float time_delta) override;
 		void serialize(OutputBlob&) override;
 		void deserialize(InputBlob&, int) override;
@@ -187,7 +188,7 @@ public:
 
 	struct LUMIX_RENDERER_API RandomRotationModule : public ModuleBase
 	{
-		RandomRotationModule(ParticleEmitter& emitter);
+		explicit RandomRotationModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob&) override {}
 		void deserialize(InputBlob&, int) override {}
@@ -202,7 +203,7 @@ public:
 	~ParticleEmitter();
 
 	void reset();
-	void drawGizmo(RenderScene& scene);
+	void drawGizmo(WorldEditor& editor, RenderScene& scene);
 	void serialize(OutputBlob& blob);
 	void deserialize(InputBlob& blob, ResourceManager& manager, bool has_version);
 	void update(float time_delta);

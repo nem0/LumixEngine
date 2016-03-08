@@ -1,15 +1,14 @@
 #pragma once
 
 
-#include "core/aabb.h"
 #include "core/array.h"
+#include "core/geometry.h"
 #include "core/hash_map.h"
 #include "core/matrix.h"
 #include "core/quat.h"
 #include "core/string.h"
 #include "core/vec.h"
 #include "core/resource.h"
-#include "renderer/ray_cast_model_hit.h"
 #include <bgfx/bgfx.h>
 
 
@@ -21,6 +20,7 @@ class Material;
 class Model;
 class Pose;
 class ResourceManager;
+struct RayCastModelHit;
 
 
 namespace FS
@@ -41,52 +41,27 @@ public:
 		 int index_count,
 		 const char* name,
 		 IAllocator& allocator);
-	Material* getMaterial() const { return m_material; }
-	void setMaterial(Material* material) { m_material = material; }
-	int getIndicesOffset() const { return m_indices_offset; }
-	int getIndexCount() const { return m_index_count; }
-	int getTriangleCount() const { return m_index_count / 3; }
-	int getAttributeArrayOffset() const { return m_attribute_array_offset; }
-	int getAttributeArraySize() const { return m_attribute_array_size; }
-	uint32 getNameHash() const { return m_name_hash; }
-	const char* getName() const { return m_name.c_str(); }
-	void setVertexDefinition(const bgfx::VertexDecl& def) { m_vertex_def = def; }
-	const bgfx::VertexDecl& getVertexDefinition() const { return m_vertex_def; }
-	int getInstanceIdx() const { return m_instance_idx; }
-	void setInstanceIdx(int value) { m_instance_idx = value; }
+	void set(const bgfx::VertexDecl& def,
+		int attribute_array_offset,
+		int attribute_array_size,
+		int indices_offset,
+		int index_count);
 
-private:
-	Mesh(const Mesh&);
-	void operator=(const Mesh&);
-
-private:
-	bgfx::VertexDecl m_vertex_def;
-	int32 m_instance_idx;
-	int32 m_attribute_array_offset;
-	int32 m_attribute_array_size;
-	int32 m_indices_offset;
-	int32 m_index_count;
-	uint32 m_name_hash;
-	Material* m_material;
-	string m_name;
+	bgfx::VertexDecl vertex_def;
+	int32 instance_idx;
+	int32 attribute_array_offset;
+	int32 attribute_array_size;
+	int32 indices_offset;
+	int32 indices_count;
+	Material* material;
+	string name;
 };
 
 
-class LUMIX_RENDERER_API LODMeshIndices
+struct LODMeshIndices
 {
-public:
-	LODMeshIndices(int from, int to)
-		: m_from(from)
-		, m_to(to)
-	{
-	}
-
-	int getFrom() const { return m_from; }
-	int getTo() const { return m_to; }
-
-private:
-	int m_from;
-	int m_to;
+	int from;
+	int to;
 };
 
 
@@ -111,18 +86,17 @@ public:
 		LATEST // keep this last
 	};
 
-	class LOD
+	struct LOD
 	{
-	public:
-		int m_from_mesh;
-		int m_to_mesh;
+		int from_mesh;
+		int to_mesh;
 
-		float m_distance;
+		float distance;
 	};
 
 	struct Bone
 	{
-		Bone(IAllocator& allocator)
+		explicit Bone(IAllocator& allocator)
 			: name(allocator)
 			, parent(allocator)
 		{
@@ -162,10 +136,12 @@ public:
 	float getBoundingRadius() const { return m_bounding_radius; }
 	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
 	const AABB& getAABB() const { return m_aabb; }
-	Array<LOD>& getLODs() { return m_lods; }
+	LOD* getLODs() { return m_lods; }
+	Array<int>& getIndices() { return m_indices; }
 
 public:
 	static const uint32 FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
+	static const int MAX_LOD_COUNT = 4;
 
 private:
 	Model(const Model&);
@@ -192,7 +168,7 @@ private:
 	Array<Bone> m_bones;
 	Array<int32> m_indices;
 	Array<Vec3> m_vertices;
-	Array<LOD> m_lods;
+	LOD m_lods[MAX_LOD_COUNT];
 	float m_bounding_radius;
 	BoneMap m_bone_map;
 	AABB m_aabb;

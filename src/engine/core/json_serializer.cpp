@@ -14,7 +14,7 @@ namespace Lumix
 class ErrorProxy
 {
 public:
-	ErrorProxy(JsonSerializer& serializer)
+	explicit ErrorProxy(JsonSerializer& serializer)
 		: m_log(g_log_error, "serializer", serializer.m_allocator)
 	{
 		serializer.m_is_error = true;
@@ -321,7 +321,7 @@ void JsonSerializer::deserialize(const char* label, Path& value, const Path& def
 	else
 	{
 		char tmp[MAX_PATH_LENGTH];
-		int size = Math::minValue(lengthOf(tmp) - 1, m_token_size);
+		int size = Math::minimum(lengthOf(tmp) - 1, m_token_size);
 		copyMemory(tmp, m_token, size);
 		tmp[size] = '\0';
 		value = tmp;
@@ -339,7 +339,7 @@ void JsonSerializer::deserialize(Path& value, const Path& default_value)
 	else
 	{
 		char tmp[MAX_PATH_LENGTH];
-		int size = Math::minValue(lengthOf(tmp) - 1, m_token_size);
+		int size = Math::minimum(lengthOf(tmp) - 1, m_token_size);
 		copyMemory(tmp, m_token, size);
 		tmp[size] = '\0';
 		value = tmp;
@@ -356,7 +356,7 @@ void JsonSerializer::deserialize(char* value, int max_length, const char* defaul
 	}
 	else
 	{
-		int size = Math::minValue(max_length - 1, m_token_size);
+		int size = Math::minimum(max_length - 1, m_token_size);
 		copyMemory(value, m_token, size);
 		value[size] = '\0';
 		deserializeToken();
@@ -428,7 +428,7 @@ void JsonSerializer::deserialize(const char* label,
 	}
 	else
 	{
-		int size = Math::minValue(max_length - 1, m_token_size);
+		int size = Math::minimum(max_length - 1, m_token_size);
 		copyMemory(value, m_token, size);
 		value[size] = '\0';
 		deserializeToken();
@@ -470,7 +470,7 @@ void JsonSerializer::deserializeArrayBegin()
 
 void JsonSerializer::deserializeRawString(char* buffer, int max_length)
 {
-	int size = Math::minValue(max_length - 1, m_token_size);
+	int size = Math::minimum(max_length - 1, m_token_size);
 	copyMemory(buffer, m_token, size);
 	buffer[size] = '\0';
 	deserializeToken();
@@ -512,7 +512,7 @@ void JsonSerializer::deserializeArrayItem(char* value, int max_length, const cha
 	deserializeArrayComma();
 	if (m_is_string_token)
 	{
-		int size = Math::minValue(max_length - 1, m_token_size);
+		int size = Math::minimum(max_length - 1, m_token_size);
 		copyMemory(value, m_token, size);
 		value[size] = '\0';
 		deserializeToken();
@@ -664,7 +664,10 @@ void JsonSerializer::deserializeToken()
 			ErrorProxy(*this).log() << "Unexpected end of file while looking for \".";
 			m_token_size = 0;
 		}
-		m_token_size = int(token_end - m_token);
+		else
+		{
+			m_token_size = int(token_end - m_token);
+		}
 	}
 	else if (isSingleCharToken(*m_token))
 	{
@@ -788,7 +791,7 @@ void JsonSerializer::deserializeLabel(const char* label)
 float JsonSerializer::tokenToFloat()
 {
 	char tmp[64];
-	int size = Math::minValue((int)sizeof(tmp) - 1, m_token_size);
+	int size = Math::minimum((int)sizeof(tmp) - 1, m_token_size);
 	copyMemory(tmp, m_token, size);
 	tmp[size] = '\0';
 	return (float)atof(tmp);

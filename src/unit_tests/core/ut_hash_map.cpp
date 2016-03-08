@@ -2,12 +2,14 @@
 
 #include "core/array.h"
 #include "core/hash_map.h"
+#include "debug/debug.h"
 
 namespace
 {
 	void UT_insert(const char* params)
 	{
-		Lumix::DefaultAllocator allocator;
+		Lumix::DefaultAllocator main_allocator;
+		Lumix::Debug::Allocator allocator(main_allocator);
 		Lumix::HashMap<int32, int32> hash_table(allocator);
 
 		LUMIX_EXPECT(hash_table.empty());
@@ -29,7 +31,8 @@ namespace
 
 	void UT_array(const char* params)
 	{
-		Lumix::DefaultAllocator allocator;
+		Lumix::DefaultAllocator main_allocator;
+		Lumix::Debug::Allocator allocator(main_allocator);
 		Lumix::HashMap<int32, Lumix::Array<int> > hash_table(allocator);
 
 		LUMIX_EXPECT(hash_table.empty());
@@ -37,7 +40,8 @@ namespace
 
 	void UT_clear(const char* params)
 	{
-		Lumix::DefaultAllocator allocator;
+		Lumix::DefaultAllocator main_allocator;
+		Lumix::Debug::Allocator allocator(main_allocator);
 		Lumix::HashMap<int32, int32> hash_table(allocator);
 
 		LUMIX_EXPECT(hash_table.empty());
@@ -72,7 +76,8 @@ namespace
 	{
 		typedef Lumix::HashMap<int32, int32> HashTableType;
 
-		Lumix::DefaultAllocator allocator;
+		Lumix::DefaultAllocator main_allocator;
+		Lumix::Debug::Allocator allocator(main_allocator);
 		HashTableType hash_table(allocator);
 
 		LUMIX_EXPECT(hash_table.empty());

@@ -3,6 +3,7 @@
 #include "core/log.h"
 #include "core/profiler.h"
 #include "core/system.h"
+#include "debug/debug.h"
 #include "engine.h"
 #include "iplugin.h"
 
@@ -43,7 +44,7 @@ class PluginManagerImpl : public PluginManager
 		}
 
 
-		void update(float dt) override
+		void update(float dt, bool paused) override
 		{
 			PROFILE_FUNCTION();
 			for (int i = 0, c = m_plugins.size(); i < c; ++i)
@@ -100,14 +101,16 @@ class PluginManagerImpl : public PluginManager
 		{
 			return m_library_loaded;
 		}
-
+		
 
 		IPlugin* load(const char* path) override
 		{
-			g_log_info.log("plugins") << "loading plugin " << path;
+			char path_with_ext[MAX_PATH_LENGTH];
+			copyString(path_with_ext, path);
+			catString(path_with_ext, ".dll");
+			g_log_info.log("Core") << "loading plugin " << path_with_ext;
 			typedef IPlugin* (*PluginCreator)(Engine&);
-
-			auto* lib = loadLibrary(path);
+			auto* lib = loadLibrary(path_with_ext);
 			if (lib)
 			{
 				PluginCreator creator = (PluginCreator)getLibrarySymbol(lib, "createPlugin");
@@ -116,7 +119,7 @@ class PluginManagerImpl : public PluginManager
 					IPlugin* plugin = creator(m_engine);
 					if (!plugin || !plugin->create())
 					{
-						g_log_error.log("plugins") << "createPlugin failed.";
+						g_log_error.log("Core") << "createPlugin failed.";
 						LUMIX_DELETE(m_engine.getAllocator(), plugin);
 						ASSERT(false);
 						return nullptr;
@@ -124,17 +127,25 @@ class PluginManagerImpl : public PluginManager
 					m_plugins.push(plugin);
 					m_libraries.push(lib);
 					m_library_loaded.invoke(lib);
-					g_log_info.log("plugins") << "Plugin loaded.";
+					g_log_info.log("Core") << "Plugin loaded.";
+					Lumix::Debug::StackTree::refreshModuleList();
 					return plugin;
 				}
 				else
 				{
-					g_log_error.log("plugins") << "No createPlugin function in plugin.";
+					g_log_error.log("Core") << "No createPlugin function in plugin.";
 				}
 			}
 			else
 			{
-				g_log_warning.log("plugins") << "Failed to load plugin.";
+				auto* plugin = StaticPluginRegister::create(path, m_engine);
+				if (plugin && plugin->create())
+				{
+					g_log_info.log("Core") << "Plugin loaded.";
+					m_plugins.push(plugin);
+					return plugin;
+				}
+				g_log_warning.log("Core") << "Failed to load plugin.";
 			}
 			unloadLibrary(lib);
 			return 0;

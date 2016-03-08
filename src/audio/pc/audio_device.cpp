@@ -92,7 +92,7 @@ struct AudioDeviceImpl : public AudioDevice
 		auto coinitialize_result = CoInitialize(nullptr);
 		if (!SUCCEEDED(coinitialize_result))
 		{
-			g_log_error.log("audio") << "CoInitialize failed. Error code: " << coinitialize_result;
+			g_log_error.log("Audio") << "CoInitialize failed. Error code: " << coinitialize_result;
 			ASSERT(false);
 			return false;
 		}
@@ -100,14 +100,14 @@ struct AudioDeviceImpl : public AudioDevice
 		m_library = LoadLibrary("dsound.dll");
 		if (!m_library)
 		{
-			g_log_error.log("audio") << "Failed to load dsound.dll.";
+			g_log_error.log("Audio") << "Failed to load dsound.dll.";
 			return false;
 		}
 		auto* dsoundCreate =
 			(decltype(DirectSoundCreate8)*)GetProcAddress(m_library, "DirectSoundCreate8");
 		if (!dsoundCreate)
 		{
-			g_log_error.log("audio") << "Failed to get DirectSoundCreate8 from dsound.dll.";
+			g_log_error.log("Audio") << "Failed to get DirectSoundCreate8 from dsound.dll.";
 			ASSERT(false);
 			FreeLibrary(m_library);
 			return false;
@@ -116,7 +116,7 @@ struct AudioDeviceImpl : public AudioDevice
 		auto create_result = dsoundCreate(0, &m_direct_sound, nullptr);
 		if (!SUCCEEDED(create_result))
 		{
-			g_log_error.log("audio") << "Failed to create DirectSound. Error code: " << create_result;
+			g_log_error.log("Audio") << "Failed to create DirectSound. Error code: " << create_result;
 			ASSERT(false);
 			FreeLibrary(m_library);
 			return false;
@@ -126,7 +126,7 @@ struct AudioDeviceImpl : public AudioDevice
 		auto result = SUCCEEDED(m_direct_sound->SetCooperativeLevel(hwnd, DSSCL_PRIORITY));
 		if (!result || !initPrimaryBuffer())
 		{
-			g_log_error.log("audio") << "Failed to initialize the primary buffer.";
+			g_log_error.log("Audio") << "Failed to initialize the primary buffer.";
 			ASSERT(false);
 			m_direct_sound->Release();
 			FreeLibrary(m_library);
@@ -538,7 +538,7 @@ AudioDevice* AudioDevice::create(Engine& engine)
 	if (!device->init(engine))
 	{
 		LUMIX_DELETE(engine.getAllocator(), device);
-		g_log_warning.log("audio") << "Using null device";
+		g_log_warning.log("Audio") << "Using null device";
 		return &g_null_device;
 	}
 	return device;

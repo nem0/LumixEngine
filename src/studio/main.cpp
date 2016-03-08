@@ -1,5 +1,5 @@
-#include "studio_lib/studio_app.h"
-#include <Windows.h>
+#include "editor/studio_app.h"
+#include "core/pc/simple_win.h"
 
 
 INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
