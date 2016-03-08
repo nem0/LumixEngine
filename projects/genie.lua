@@ -265,7 +265,18 @@ project "audio"
 
 	useLua()
 	defaultConfigurations()
+	
+project "navigation"
+	libType()
 
+	files { "../src/navigation/**.h", "../src/navigation/**.cpp" }
+	includedirs { "../src", "../src/navigation", "../external/recast/include" }
+	links { "engine", "editor" }
+	linkLib "recast"
+	
+	useLua()
+	defaultConfigurations()
+	
 project "lua_script"
 	libType()
 
