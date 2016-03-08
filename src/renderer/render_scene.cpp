@@ -45,7 +45,6 @@ namespace Lumix
 
 
 static const uint32 RENDERABLE_HASH = crc32("renderable");
-static const uint32 RENDER_PARAMS_HASH = crc32("render_params");
 static const uint32 POINT_LIGHT_HASH = crc32("point_light");
 static const uint32 PARTICLE_EMITTER_HASH = crc32("particle_emitter");
 static const uint32 PARTICLE_EMITTER_FADE_HASH = crc32("particle_emitter_fade");
