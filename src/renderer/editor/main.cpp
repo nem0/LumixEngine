@@ -45,7 +45,6 @@ using namespace Lumix;
 static const uint32 TEXTURE_HASH = ResourceManager::TEXTURE;
 static const uint32 SHADER_HASH = ResourceManager::SHADER;
 static const uint32 MATERIAL_HASH = crc32("MATERIAL");
-static const uint32 RENDER_PARAMS_HASH = crc32("render_params");
 
 
 struct MaterialPlugin : public AssetBrowser::IPlugin
