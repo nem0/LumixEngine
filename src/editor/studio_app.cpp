@@ -630,6 +630,7 @@ public:
 			if (m_engine->getFileSystem().hasWork()) stats << "Loading... | ";
 			stats << "FPS: ";
 			stats << m_engine->getFPS();
+			if (!PlatformInterface::isWindowActive()) stats << " - inactive window";
 			auto stats_size = ImGui::CalcTextSize(stats);
 			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
 			ImGui::Text(stats);
