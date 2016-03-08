@@ -313,6 +313,7 @@ project "render_test"
 		forceLink("s_animation_plugin_register")
 		forceLink("s_audio_plugin_register")
 		forceLink("s_lua_script_plugin_register")
+		forceLink("s_navigation_plugin_register")
 		forceLink("s_physics_plugin_register")
 		forceLink("s_renderer_plugin_register")
 
@@ -322,11 +323,12 @@ project "render_test"
 		forceLink("setStudioApp_physics")
 		forceLink("setStudioApp_renderer")
 
-		links { "engine", "winmm", "audio", "animation", "renderer", "lua_script", "physics", "psapi", "dxguid" }
+		links { "engine", "winmm", "audio", "animation", "renderer", "lua_script", "navigation", "physics", "psapi", "dxguid" }
 		linkLib("crnlib")
 		linkLib("assimp")
 		linkLib("bgfx")
 		linkLib("lua")
+		linkLib("recast")
 		linkPhysX()
 	end
 	links { "engine", "animation", "renderer" }
@@ -369,6 +371,7 @@ project "studio"
 		forceLink("s_animation_plugin_register")
 		forceLink("s_audio_plugin_register")
 		forceLink("s_lua_script_plugin_register")
+		forceLink("s_navigation_plugin_register")
 		forceLink("s_physics_plugin_register")
 		forceLink("s_renderer_plugin_register")
 
@@ -378,11 +381,12 @@ project "studio"
 		forceLink("setStudioApp_physics")
 		forceLink("setStudioApp_renderer")
 
-		links { "engine", "winmm", "audio", "animation", "renderer", "lua_script", "physics", "psapi", "dxguid" }
+		links { "engine", "winmm", "audio", "animation", "renderer", "lua_script", "navigation", "physics", "psapi", "dxguid" }
 		linkLib("crnlib")
 		linkLib("assimp")
 		linkLib("bgfx")
 		linkLib("lua")
+		linkLib("recast")
 		linkPhysX()
 	end
 	links { "editor" }
