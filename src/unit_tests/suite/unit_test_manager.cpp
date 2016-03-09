@@ -8,7 +8,6 @@
 #include "core/queue.h"
 #include "core/array.h"
 
-#include "core/pc/simple_win.h"
 #include <Windows.h>
 #include <cstdio>
 
@@ -160,7 +159,6 @@ namespace Lumix
 
 			void dumpResults() const
 			{
-				
 				if (m_fails > 0)
 				{
 					g_log_info.log("unit") << "----------Fails----------";
@@ -214,7 +212,7 @@ namespace Lumix
 				m_task.run();
 			}
 
-			ManagerImpl(IAllocator& allocator)
+			explicit ManagerImpl(IAllocator& allocator)
 				: m_fails(0)
 				, m_task(&m_trans_queue, allocator)
 				, m_in_progress(allocator)

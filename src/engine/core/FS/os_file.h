@@ -20,6 +20,7 @@ namespace Lumix
 			void flush();
 
 			bool write(const void* data, size_t size);
+			bool writeText(const char* text);
 			bool read(void* data, size_t size);
 
 			size_t size();
@@ -32,6 +33,7 @@ namespace Lumix
 			OsFile& operator <<(int32 value);
 			OsFile& operator <<(uint32 value);
 			OsFile& operator <<(uint64 value);
+			OsFile& operator <<(float value);
 
 		private:
 			struct OsFileImpl* m_impl;

@@ -53,7 +53,7 @@ namespace Lumix
 			};
 
 		public:
-			BinaryArray(IAllocator& allocator);
+			explicit BinaryArray(IAllocator& allocator);
 			~BinaryArray();
 
 			Accessor operator[](int index);

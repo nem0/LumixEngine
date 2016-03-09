@@ -21,8 +21,6 @@ namespace Lumix
 	{
 		g_path_manager = this;
 		m_empty_path = getPath(0, "");
-		m_base_path[0] = 0;
-		m_base_path_length = 0;
 	}
 
 
@@ -32,16 +30,6 @@ namespace Lumix
 		m_empty_path = nullptr;
 		ASSERT(m_paths.size() == 0);
 		g_path_manager = nullptr;
-	}
-
-
-	const char* PathManager::getBasePath() { return m_base_path; }
-
-
-	void PathManager::setBasePath(const char* path)
-	{
-		PathUtils::normalize(path, m_base_path, lengthOf(m_base_path));
-		m_base_path_length = stringLength(path);
 	}
 
 
@@ -163,7 +151,7 @@ namespace Lumix
 	{
 		g_path_manager->incrementRefCount(m_data);
 	}
-	
+
 
 	Path::Path(const char* path)
 	{
@@ -171,19 +159,8 @@ namespace Lumix
 		size_t len = stringLength(path);
 		ASSERT(len < MAX_PATH_LENGTH);
 		PathUtils::normalize(path, tmp, (uint32)len + 1);
-		const char* base_path = g_path_manager->m_base_path;
-		if (g_path_manager->m_base_path_length > 0 &&
-			compareStringN(base_path, tmp, g_path_manager->m_base_path_length) == 0)
-		{
-			const char* rel = tmp + g_path_manager->m_base_path_length + 1;
-			uint32 hash = crc32(rel);
-			m_data = g_path_manager->getPath(hash, rel);
-		}
-		else
-		{
-			uint32 hash = crc32(tmp);
-			m_data = g_path_manager->getPath(hash, tmp);
-		}
+		uint32 hash = crc32(tmp);
+		m_data = g_path_manager->getPath(hash, tmp);
 	}
 
 
@@ -214,19 +191,8 @@ namespace Lumix
 		size_t len = stringLength(rhs);
 		ASSERT(len < MAX_PATH_LENGTH);
 		PathUtils::normalize(rhs, tmp, (uint32)len + 1);
-		const char* base_path = g_path_manager->m_base_path;
-		if (g_path_manager->m_base_path_length > 0 &&
-			compareStringN(base_path, tmp, g_path_manager->m_base_path_length) == 0)
-		{
-			const char* rel = tmp + g_path_manager->m_base_path_length + 1;
-			uint32 hash = crc32(rel);
-			m_data = g_path_manager->getPath(hash, rel);
-		}
-		else
-		{
-			uint32 hash = crc32(tmp);
-			m_data = g_path_manager->getPath(hash, tmp);
-		}
+		uint32 hash = crc32(tmp);
+		m_data = g_path_manager->getPath(hash, tmp);
 	}
 
 

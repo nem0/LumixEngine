@@ -12,7 +12,7 @@ namespace
 		Lumix::DefaultAllocator allocator;
 		Lumix::PathManager path_manager(allocator);
 
-		Lumix::FS::DiskFileDevice disk_file_device(allocator);
+		Lumix::FS::DiskFileDevice disk_file_device("", "", allocator);
 		Lumix::FS::IFile* file1 = disk_file_device.createFile(NULL);
 		Lumix::FS::IFile* file2 = disk_file_device.createFile(NULL);
 

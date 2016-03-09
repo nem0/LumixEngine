@@ -1,15 +1,14 @@
 #pragma once
 
 
-#include "core/vec.h"
 #include "lumix.h"
+#include "core/vec.h"
 
 
 namespace Lumix
 {
 
 
-struct Vec3;
 struct Matrix;
 
 
@@ -35,7 +34,7 @@ struct LUMIX_ENGINE_API Quat
 	void toMatrix(Matrix& mtx) const;
 
 	inline Vec3 operator *(const Vec3& v) const;
-	inline Quat operator *(const Quat& q) const;
+	Quat operator *(const Quat& q) const;
 	Quat operator -() const;
 
 	float x, y, z, w;

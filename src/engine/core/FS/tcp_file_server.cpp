@@ -7,8 +7,6 @@
 #include "core/mt/task.h"
 #include "core/path.h"
 #include "core/profiler.h"
-#include "core/stack_allocator.h"
-#include "core/static_array.h"
 #include "core/string.h"
 #include "core/network.h"
 
@@ -24,10 +22,12 @@ namespace FS
 class TCPFileServerTask : public MT::Task
 {
 public:
-	TCPFileServerTask(IAllocator& allocator)
+	explicit TCPFileServerTask(IAllocator& allocator)
 		: MT::Task(allocator)
 		, m_acceptor(allocator)
 	{
+		setMemory(m_buffer, 0, sizeof(m_buffer));
+		setMemory(m_files, 0, sizeof(m_files));
 	}
 
 
@@ -40,7 +40,7 @@ public:
 	{
 		int32 mode = 0;
 		stream->read(mode);
-		stream->readString(m_buffer.data(), m_buffer.size());
+		stream->readString(m_buffer, lengthOf(m_buffer));
 
 		int32 ret = -2;
 		int32 id = m_ids.alloc();
@@ -50,14 +50,14 @@ public:
 			m_files[id] = file;
 
 			char path[MAX_PATH_LENGTH];
-			if (compareStringN(m_buffer.data(), m_base_path.c_str(), m_base_path.length()) != 0)
+			if (compareStringN(m_buffer, m_base_path.c_str(), m_base_path.length()) != 0)
 			{
 				copyString(path, m_base_path.c_str());
-				catString(path, m_buffer.data());
+				catString(path, m_buffer);
 			}
 			else
 			{
-				copyString(path, m_buffer.data());
+				copyString(path, m_buffer);
 			}
 			ret = file->open(path, mode, getAllocator()) ? id : -1;
 			if (ret == -1)
@@ -83,10 +83,10 @@ public:
 
 		while (size > 0)
 		{
-			int32 read = (int32)size > m_buffer.size() ? m_buffer.size()
+			int32 read = (int32)size > lengthOf(m_buffer) ? lengthOf(m_buffer)
 														   : (int32)size;
-			read_successful &= file->read((void*)m_buffer.data(), read);
-			stream->write((const void*)m_buffer.data(), read);
+			read_successful &= file->read((void*)m_buffer, read);
+			stream->write((const void*)m_buffer, read);
 			size -= read;
 		}
 
@@ -118,10 +118,10 @@ public:
 
 		while (size > 0)
 		{
-			int32 read = (int32)size > m_buffer.size() ? m_buffer.size()
+			int32 read = (int32)size > lengthOf(m_buffer) ? lengthOf(m_buffer)
 														   : (int32)size;
-			write_successful &= stream->read((void*)m_buffer.data(), read);
-			file->write(m_buffer.data(), read);
+			write_successful &= stream->read((void*)m_buffer, read);
+			file->write(m_buffer, read);
 			size -= read;
 		}
 
@@ -221,13 +221,20 @@ public:
 
 	void setBasePath(const char* base_path)
 	{
-		StackAllocator<MAX_PATH_LENGTH> allocator;
-		string base_path_str(base_path, allocator);
-		if (base_path_str[base_path_str.length() - 1] != '/')
+		int len = stringLength(base_path);
+		if (len <= 0) return;
+
+		if (base_path[len - 1] == '/')
 		{
-			base_path_str += "/";
+			m_base_path = base_path;
 		}
-		m_base_path = base_path_str.c_str();
+		else
+		{
+			char tmp[MAX_PATH_LENGTH];
+			copyString(tmp, base_path);
+			catString(tmp, "/");
+			m_base_path = tmp;
+		}
 	}
 
 
@@ -235,8 +242,8 @@ public:
 
 private:
 	Net::TCPAcceptor m_acceptor;
-	StaticArray<char, 0x50000> m_buffer;
-	StaticArray<OsFile*, 0x50000> m_files;
+	char m_buffer[0x50000];
+	OsFile* m_files[0x50000];
 	FreeList<int32, 0x50000> m_ids;
 	Path m_base_path;
 };
@@ -244,7 +251,7 @@ private:
 
 struct TCPFileServerImpl
 {
-	TCPFileServerImpl(IAllocator& allocator)
+	explicit TCPFileServerImpl(IAllocator& allocator)
 		: m_task(allocator)
 		, m_allocator(allocator)
 	{

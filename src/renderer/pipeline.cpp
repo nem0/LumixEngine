@@ -2,27 +2,27 @@
 
 #include "renderer/pipeline.h"
 #include "core/crc32.h"
-#include "core/frustum.h"
+#include "core/fs/disk_file_device.h"
 #include "core/fs/ifile.h"
 #include "core/fs/file_system.h"
+#include "core/geometry.h"
 #include "core/lifo_allocator.h"
 #include "core/log.h"
 #include "core/lua_wrapper.h"
 #include "core/profiler.h"
-#include "core/static_array.h"
 #include "engine.h"
-#include "plugin_manager.h"
+#include "lua_script/lua_script_system.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
 #include "renderer/model.h"
 #include "renderer/particle_system.h"
 #include "renderer/pose.h"
+#include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
-#include "renderer/transient_geometry.h"
 #include "universe/universe.h"
 #include <bgfx/bgfx.h>
 #include <cmath>
@@ -38,13 +38,202 @@ static const float SHADOW_CAM_FAR = 5000.0f;
 
 struct InstanceData
 {
-	static const int MAX_INSTANCE_COUNT = 64;
+	static const int MAX_INSTANCE_COUNT = 128;
 
 	const bgfx::InstanceDataBuffer* buffer;
 	int instance_count;
 	Mesh* mesh;
 	Model* model;
 };
+
+
+struct View
+{
+	uint8 bgfx_id;
+	uint64 render_state;
+	uint32 stencil;
+	int pass_idx;
+	CommandBufferGenerator command_buffer;
+};
+
+
+enum class BufferCommands : uint8
+{
+	END,
+	SET_TEXTURE,
+	SET_UNIFORM_VEC4,
+	SET_UNIFORM_TIME,
+	SET_UNIFORM_ARRAY,
+	SET_GLOBAL_SHADOWMAP,
+	SET_LOCAL_SHADOWMAP,
+
+	COUNT
+};
+
+
+#pragma pack(1)
+struct SetTextureCommand
+{
+	SetTextureCommand() : type(BufferCommands::SET_TEXTURE) {}
+	BufferCommands type;
+	uint8 stage;
+	bgfx::UniformHandle uniform;
+	bgfx::TextureHandle texture;
+};
+
+
+struct SetUniformVec4Command
+{
+	SetUniformVec4Command() : type(BufferCommands::SET_UNIFORM_VEC4) {}
+	BufferCommands type;
+	bgfx::UniformHandle uniform;
+	Vec4 value;
+};
+
+
+struct SetUniformTimeCommand
+{
+	SetUniformTimeCommand() : type(BufferCommands::SET_UNIFORM_TIME) {}
+	BufferCommands type;
+	bgfx::UniformHandle uniform;
+};
+
+
+struct SetLocalShadowmapCommand
+{
+	SetLocalShadowmapCommand() : type(BufferCommands::SET_LOCAL_SHADOWMAP) {}
+	BufferCommands type;
+	bgfx::TextureHandle texture;
+};
+
+
+struct SetUniformArrayCommand
+{
+	SetUniformArrayCommand() : type(BufferCommands::SET_UNIFORM_ARRAY) {}
+	BufferCommands type;
+	bgfx::UniformHandle uniform;
+	uint16 size;
+	uint16 count;
+};
+
+
+#pragma pack()
+
+
+CommandBufferGenerator::CommandBufferGenerator()
+{
+	pointer = buffer;
+}
+
+
+void CommandBufferGenerator::setTexture(uint8 stage,
+	const bgfx::UniformHandle& uniform,
+	const bgfx::TextureHandle& texture)
+{
+	SetTextureCommand cmd;
+	cmd.stage = stage;
+	cmd.uniform = uniform;
+	cmd.texture = texture;
+	ASSERT(pointer + sizeof(cmd) - buffer <= sizeof(buffer));
+	copyMemory(pointer, &cmd, sizeof(cmd));
+	pointer += sizeof(cmd);
+}
+
+
+void CommandBufferGenerator::setUniform(const bgfx::UniformHandle& uniform, const Vec4& value)
+{
+	SetUniformVec4Command cmd;
+	cmd.uniform = uniform;
+	cmd.value = value;
+	ASSERT(pointer + sizeof(cmd) - buffer <= sizeof(buffer));
+	copyMemory(pointer, &cmd, sizeof(cmd));
+	pointer += sizeof(cmd);
+}
+
+
+void CommandBufferGenerator::setUniform(const bgfx::UniformHandle& uniform, const Vec4* values, int count)
+{
+	SetUniformArrayCommand cmd;
+	cmd.uniform = uniform;
+	cmd.count = count;
+	cmd.size = uint16(count * sizeof(Vec4));
+	ASSERT(pointer + sizeof(cmd) - buffer <= sizeof(buffer));
+	copyMemory(pointer, &cmd, sizeof(cmd));
+	pointer += sizeof(cmd);
+	ASSERT(pointer + cmd.size - buffer <= sizeof(buffer));
+	copyMemory(pointer, values, cmd.size);
+	pointer += cmd.size;
+}
+
+
+void CommandBufferGenerator::setUniform(const bgfx::UniformHandle& uniform, const Matrix* values, int count)
+{
+	SetUniformArrayCommand cmd;
+	cmd.uniform = uniform;
+	cmd.count = count;
+	cmd.size = uint16(count * sizeof(Matrix));
+	ASSERT(pointer + sizeof(cmd) - buffer <= sizeof(buffer));
+	copyMemory(pointer, &cmd, sizeof(cmd));
+	pointer += sizeof(cmd);
+	ASSERT(pointer + cmd.size - buffer <= sizeof(buffer));
+	copyMemory(pointer, values, cmd.size);
+	pointer += cmd.size;
+}
+
+
+void CommandBufferGenerator::setGlobalShadowmap()
+{
+	ASSERT(pointer + 1 - buffer <= sizeof(buffer));
+	*pointer = (uint8)BufferCommands::SET_GLOBAL_SHADOWMAP;
+	pointer += 1;
+}
+
+
+void CommandBufferGenerator::setLocalShadowmap(const bgfx::TextureHandle& shadowmap)
+{
+	SetLocalShadowmapCommand cmd;
+	cmd.texture = shadowmap;
+	ASSERT(pointer + sizeof(cmd) - buffer <= sizeof(buffer));
+	copyMemory(pointer, &cmd, sizeof(cmd));
+	pointer += sizeof(cmd);
+}
+
+
+void CommandBufferGenerator::setTimeUniform(const bgfx::UniformHandle& uniform)
+{
+	SetUniformTimeCommand cmd;
+	cmd.uniform = uniform;
+	ASSERT(pointer + sizeof(cmd) - buffer <= sizeof(buffer));
+	copyMemory(pointer, &cmd, sizeof(cmd));
+	pointer += sizeof(cmd);
+}
+
+
+void CommandBufferGenerator::getData(uint8* data)
+{
+	copyMemory(data, buffer, pointer - buffer);
+}
+
+
+void CommandBufferGenerator::clear()
+{
+	buffer[0] = (uint8)BufferCommands::END;
+	pointer = buffer;
+}
+
+
+void CommandBufferGenerator::beginAppend()
+{
+	if (pointer != buffer) --pointer;
+}
+
+
+void CommandBufferGenerator::end()
+{
+	ASSERT(pointer + 1 - buffer <= sizeof(buffer));
+	*pointer = (uint8)BufferCommands::END;
+	++pointer;
+}
 
 
 
@@ -55,11 +244,11 @@ struct PipelineImpl : public Pipeline
 		, m_path(path)
 		, m_framebuffers(allocator)
 		, m_lua_state(nullptr)
-		, m_parameters(allocator)
 		, m_custom_commands_handlers(allocator)
 		, m_tmp_terrains(allocator)
 		, m_tmp_grasses(allocator)
 		, m_tmp_meshes(allocator)
+		, m_tmp_local_lights(allocator)
 		, m_uniforms(allocator)
 		, m_renderer(renderer)
 		, m_default_framebuffer(nullptr)
@@ -70,6 +259,11 @@ struct PipelineImpl : public Pipeline
 		, m_is_rendering_in_shadowmap(false)
 		, m_is_ready(false)
 	{
+		m_first_postprocess_framebuffer = 0;
+		m_deferred_point_light_vertex_decl.begin()
+			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
+			.end();
+
 		m_base_vertex_decl.begin()
 			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
 			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
@@ -83,16 +277,24 @@ struct PipelineImpl : public Pipeline
 		createUniforms();
 
 		m_debug_line_material = static_cast<Material*>(
-			renderer.getMaterialManager().load(Lumix::Path("models/editor/debug_line.mat")));
+			renderer.getMaterialManager().load(Lumix::Path("shaders/debug_line.mat")));
 
 		m_scene = nullptr;
 		m_width = m_height = -1;
 
 		createParticleBuffers();
+		createCubeBuffers();
+		m_stats = {};
 	}
 
 
-	void parseRenderbuffers(lua_State* L, FrameBuffer::Declaration& decl)
+	const Stats& getStats() override
+	{
+		return m_stats;
+	}
+
+
+	static void parseRenderbuffers(lua_State* L, FrameBuffer::Declaration& decl)
 	{
 		decl.m_renderbuffers_count = 0;
 		int len = (int)lua_rawlen(L, -1);
@@ -110,81 +312,10 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void parseParameters(lua_State* L)
+	Path& getPath() override
 	{
-		m_parameters.clear();
-		if (lua_getglobal(L, "parameters") == LUA_TTABLE)
-		{
-			lua_pushnil(L);
-			while (lua_next(L, -2) != 0)
-			{
-				const char* parameter_name = luaL_checkstring(L, -2);
-				m_parameters.push(Lumix::string(parameter_name, m_allocator));
-				lua_pop(L, 1);
-			}
-		}
-		lua_pop(L, 1);
+		return m_path;
 	}
-
-
-	void parseFramebuffers(lua_State* L)
-	{
-		if (lua_getglobal(L, "framebuffers") == LUA_TTABLE)
-		{
-			for(int i = 0; i < m_framebuffers.size(); ++i)
-			{
-				LUMIX_DELETE(m_allocator, m_framebuffers[i]);
-			}
-			m_framebuffers.clear();
-
-			int len = (int)lua_rawlen(L, -1);
-			ASSERT(m_framebuffers.empty());
-			for (int i = 0; i < len; ++i)
-			{
-				if (lua_rawgeti(L, -1, 1 + i) == LUA_TTABLE)
-				{
-					FrameBuffer::Declaration decl;
-					if (lua_getfield(L, -1, "name") == LUA_TSTRING)
-					{
-						copyString(decl.m_name,
-								   sizeof(decl.m_name),
-								   lua_tostring(L, -1));
-					}
-					lua_pop(L, 1);
-					if (lua_getfield(L, -1, "width") == LUA_TNUMBER)
-					{
-						decl.m_width = (int)lua_tointeger(L, -1);
-					}
-					lua_pop(L, 1);
-					if (lua_getfield(L, -1, "height") == LUA_TNUMBER)
-					{
-						decl.m_height = (int)lua_tointeger(L, -1);
-					}
-					lua_pop(L, 1);
-					if (lua_getfield(L, -1, "renderbuffers") == LUA_TTABLE)
-					{
-						parseRenderbuffers(L, decl);
-					}
-					lua_pop(L, 1);
-					auto* fb = LUMIX_NEW(m_allocator, FrameBuffer)(decl);
-					m_framebuffers.push(fb);
-					if (compareString(decl.m_name, "default") == 0) m_default_framebuffer = fb;
-				}
-				lua_pop(L, 1);
-			}
-		}
-		lua_pop(L, 1);
-	}
-
-
-	void registerCFunction(const char* name, lua_CFunction function)
-	{
-		lua_pushcfunction(m_lua_state, function);
-		lua_setglobal(m_lua_state, name);
-	}
-
-
-	void registerCFunctions();
 
 
 	void load() override
@@ -196,98 +327,102 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	void cleanup()
+	{
+		if (m_lua_state)
+		{
+			luaL_unref(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+			m_lua_state = nullptr;
+		}
+
+		ResourceManagerBase& material_manager = m_renderer.getMaterialManager();
+		for (auto* material : m_materials)
+		{
+			material_manager.unload(*material);
+		}
+		m_materials.clear();
+
+		for (int i = 0; i < m_uniforms.size(); ++i)
+		{
+			bgfx::destroyUniform(m_uniforms[i]);
+		}
+		m_uniforms.clear();
+
+		for (int i = 0; i < m_framebuffers.size(); ++i)
+		{
+			LUMIX_DELETE(m_allocator, m_framebuffers[i]);
+			if (m_framebuffers[i] == m_default_framebuffer) m_default_framebuffer = nullptr;
+		}
+		LUMIX_DELETE(m_allocator, m_default_framebuffer);
+		m_framebuffers.clear();
+		bgfx::frame();
+		bgfx::frame();
+	}
+
+
 	void onFileLoaded(FS::IFile& file, bool success)
 	{
 		if(!success) return;
 
-		if (m_lua_state)
+		cleanup();
+
+		m_lua_state = lua_newthread(m_renderer.getEngine().getState());
+		lua_newtable(m_lua_state);
+		lua_pushvalue(m_lua_state, -1);
+		m_lua_env = luaL_ref(m_lua_state, LUA_REGISTRYINDEX);
+		lua_pushvalue(m_lua_state, -1);
+		lua_setmetatable(m_lua_state, -2);
+		lua_pushglobaltable(m_lua_state);
+		lua_setfield(m_lua_state, -2, "__index");
+
+		char paths[Lumix::MAX_PATH_LENGTH * 2 + 1];
+		copyString(paths, m_renderer.getEngine().getDiskFileDevice()->getBasePath(0));
+		catString(paths, "");
+		catString(paths, m_renderer.getEngine().getDiskFileDevice()->getBasePath(1));
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		lua_pushstring(m_lua_state, paths);
+		lua_setfield(m_lua_state, -2, "LUA_PATH");
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		lua_pushlightuserdata(m_lua_state, this);
+		lua_setfield(m_lua_state, -2, "this");
+
+		Pipeline::registerLuaAPI(m_lua_state);
+		for (auto& handler : m_custom_commands_handlers)
 		{
-			lua_close(m_lua_state);
-			m_lua_state = nullptr;
+			exposeCustomCommandToLua(handler);
 		}
-		m_lua_state = luaL_newstate();
-		luaL_openlibs(m_lua_state);
+
 		bool errors =
 			luaL_loadbuffer(
 				m_lua_state, (const char*)file.getBuffer(), file.size(), m_path.c_str()) !=
 			LUA_OK;
-		errors = errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
 		if (errors)
 		{
-			g_log_error.log("lua") << m_path.c_str() << ": " << lua_tostring(m_lua_state, -1);
+			g_log_error.log("Renderer") << m_path.c_str() << ": " << lua_tostring(m_lua_state, -1);
 			lua_pop(m_lua_state, 1);
 			return;
 		}
 
-		parseParameters(m_lua_state);
-		parseFramebuffers(m_lua_state);
-		registerCFunctions();
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		lua_setupvalue(m_lua_state, -2, 1);
+		errors = lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
+		if (errors)
+		{
+			g_log_error.log("Renderer") << m_path.c_str() << ": " << lua_tostring(m_lua_state, -1);
+			lua_pop(m_lua_state, 1);
+			return;
+		}
+		m_first_postprocess_framebuffer = m_framebuffers.size();;
 
 		m_width = m_height = -1;
-		if (lua_getglobal(m_lua_state, "init") == LUA_TFUNCTION)
-		{
-			lua_pushlightuserdata(m_lua_state, this);
-			if (lua_pcall(m_lua_state, 1, 0, 0) != LUA_OK)
-			{
-				g_log_error.log("lua") << lua_tostring(m_lua_state, -1);
-				lua_pop(m_lua_state, 1);
-			}
-		}
-		else
-		{
-			lua_pop(m_lua_state, 1);
-		}
+		if(m_scene) callInitScene();
+
 		m_is_ready = true;
 	}
 
 	lua_State* m_lua_state;
-	Array<string> m_parameters;
-
-
-	int getParameterCount() const override
-	{
-		return m_parameters.size();
-	}
-
-
-	const char* getParameterName(int index) const override
-	{
-		if (index >= m_parameters.size()) return false;
-		return m_parameters[index].c_str();
-	}
-
-
-	bool getParameter(int index) override
-	{
-		if (!m_lua_state) return false;
-		if (index >= m_parameters.size()) return false;
-
-		bool ret = false;
-		lua_State* L = m_lua_state;
-		if (lua_getglobal(L, "parameters") == LUA_TTABLE)
-		{
-			lua_getfield(L, -1, m_parameters[index].c_str());
-			ret = lua_toboolean(L, -1) != 0;
-			lua_pop(L, -1);
-		}
-		lua_pop(L, -1);
-		return ret;
-	}
-
-
-	void setParameter(int index, bool value) override
-	{
-		if (!m_lua_state) return;
-		if (index >= m_parameters.size()) return;
-		
-		lua_State* L = m_lua_state;
-		if (lua_getglobal(L, "parameters") == LUA_TTABLE)
-		{
-			lua_pushboolean(L, value);
-			lua_setfield(L, -2, m_parameters[index].c_str());
-		}
-		lua_pop(L, -1);
-	}
+	int m_lua_env;
+	Stats m_stats;
 
 
 	void createParticleBuffers()
@@ -311,11 +446,13 @@ struct PipelineImpl : public Pipeline
 	void createUniforms()
 	{
 		m_texture_size_uniform = bgfx::createUniform("u_textureSize", bgfx::UniformType::Vec4);
+		m_cam_params = bgfx::createUniform("u_camParams", bgfx::UniformType::Vec4);
+		m_cam_proj_uniform = bgfx::createUniform("u_camProj", bgfx::UniformType::Mat4);
 		m_cam_view_uniform = bgfx::createUniform("u_camView", bgfx::UniformType::Mat4);
+		m_cam_inv_view_uniform = bgfx::createUniform("u_camInvView", bgfx::UniformType::Mat4);
+		m_cam_inv_viewproj_uniform = bgfx::createUniform("u_camInvViewProj", bgfx::UniformType::Mat4);
 		m_cam_inv_proj_uniform = bgfx::createUniform("u_camInvProj", bgfx::UniformType::Mat4);
 		m_tex_shadowmap_uniform = bgfx::createUniform("u_texShadowmap", bgfx::UniformType::Int1);
-		m_attenuation_params_uniform =
-			bgfx::createUniform("u_attenuationParams", bgfx::UniformType::Vec4);
 		m_terrain_scale_uniform = bgfx::createUniform("u_terrainScale", bgfx::UniformType::Vec4);
 		m_rel_camera_pos_uniform = bgfx::createUniform("u_relCamPos", bgfx::UniformType::Vec4);
 		m_terrain_params_uniform = bgfx::createUniform("u_terrainParams", bgfx::UniformType::Vec4);
@@ -324,7 +461,7 @@ struct PipelineImpl : public Pipeline
 			bgfx::createUniform("u_fogColorDensity", bgfx::UniformType::Vec4);
 		m_light_pos_radius_uniform =
 			bgfx::createUniform("u_lightPosRadius", bgfx::UniformType::Vec4);
-		m_light_color_uniform = bgfx::createUniform("u_lightRgbInnerR", bgfx::UniformType::Vec4);
+		m_light_color_attenuation_uniform = bgfx::createUniform("u_lightRgbAttenuation", bgfx::UniformType::Vec4);
 		m_light_dir_fov_uniform = bgfx::createUniform("u_lightDirFov", bgfx::UniformType::Vec4);
 		m_light_specular_uniform =
 			bgfx::createUniform("u_lightSpecular", bgfx::UniformType::Mat4, 64);
@@ -333,8 +470,9 @@ struct PipelineImpl : public Pipeline
 			bgfx::createUniform("u_shadowmapMatrices", bgfx::UniformType::Mat4, 4);
 		m_bone_matrices_uniform =
 			bgfx::createUniform("u_boneMatrices", bgfx::UniformType::Mat4, 64);
-		m_specular_shininess_uniform =
-			bgfx::createUniform("u_materialSpecularShininess", bgfx::UniformType::Vec4);
+		m_layer_uniform = bgfx::createUniform("u_layer", bgfx::UniformType::Vec4);
+		m_mat_color_shininess_uniform =
+			bgfx::createUniform("u_materialColorShininess", bgfx::UniformType::Vec4);
 		m_terrain_matrix_uniform = bgfx::createUniform("u_terrainMatrix", bgfx::UniformType::Mat4);
 	}
 
@@ -342,23 +480,27 @@ struct PipelineImpl : public Pipeline
 	void destroyUniforms()
 	{
 		bgfx::destroyUniform(m_tex_shadowmap_uniform);
-		bgfx::destroyUniform(m_attenuation_params_uniform);
 		bgfx::destroyUniform(m_terrain_matrix_uniform);
-		bgfx::destroyUniform(m_specular_shininess_uniform);
+		bgfx::destroyUniform(m_mat_color_shininess_uniform);
 		bgfx::destroyUniform(m_bone_matrices_uniform);
+		bgfx::destroyUniform(m_layer_uniform);
 		bgfx::destroyUniform(m_terrain_scale_uniform);
 		bgfx::destroyUniform(m_rel_camera_pos_uniform);
 		bgfx::destroyUniform(m_terrain_params_uniform);
 		bgfx::destroyUniform(m_fog_params_uniform);
 		bgfx::destroyUniform(m_fog_color_density_uniform);
 		bgfx::destroyUniform(m_light_pos_radius_uniform);
-		bgfx::destroyUniform(m_light_color_uniform);
+		bgfx::destroyUniform(m_light_color_attenuation_uniform);
 		bgfx::destroyUniform(m_light_dir_fov_uniform);
 		bgfx::destroyUniform(m_ambient_color_uniform);
 		bgfx::destroyUniform(m_shadowmap_matrices_uniform);
 		bgfx::destroyUniform(m_light_specular_uniform);
 		bgfx::destroyUniform(m_cam_inv_proj_uniform);
+		bgfx::destroyUniform(m_cam_inv_viewproj_uniform);
 		bgfx::destroyUniform(m_cam_view_uniform);
+		bgfx::destroyUniform(m_cam_proj_uniform);
+		bgfx::destroyUniform(m_cam_params);
+		bgfx::destroyUniform(m_cam_inv_view_uniform);
 		bgfx::destroyUniform(m_texture_size_uniform);
 	}
 
@@ -367,7 +509,7 @@ struct PipelineImpl : public Pipeline
 	{
 		if(m_lua_state)
 		{
-			lua_close(m_lua_state);
+			luaL_unref(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		}
 
 		ResourceManagerBase& material_manager = m_renderer.getMaterialManager();
@@ -391,6 +533,8 @@ struct PipelineImpl : public Pipeline
 		}
 		LUMIX_DELETE(m_allocator, m_default_framebuffer);
 
+		bgfx::destroyVertexBuffer(m_cube_vb);
+		bgfx::destroyIndexBuffer(m_cube_ib);
 		bgfx::destroyIndexBuffer(m_particle_index_buffer);
 		bgfx::destroyVertexBuffer(m_particle_vertex_buffer);
 	}
@@ -414,18 +558,25 @@ struct PipelineImpl : public Pipeline
 		};
 		Instance* instance = nullptr;
 
+		auto& view = m_views[m_current_render_views[0]];
 		for (int i = 0, c = emitter.m_life.size(); i < c; ++i)
 		{
 			if (i % PARTICLE_BATCH_SIZE == 0)
 			{
 				if (instance_buffer)
 				{
-					setMaterial(material);
+					executeCommandBuffer(material->getCommandBuffer(), material);
+					executeCommandBuffer(view.command_buffer.buffer, material);
+
 					bgfx::setInstanceDataBuffer(instance_buffer, PARTICLE_BATCH_SIZE);
 					bgfx::setVertexBuffer(m_particle_vertex_buffer);
 					bgfx::setIndexBuffer(m_particle_index_buffer);
-					bgfx::setState(m_render_state | material->getRenderStates());
-					bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
+					bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+					bgfx::setState(view.render_state | material->getRenderStates());
+					++m_stats.m_draw_call_count;
+					m_stats.m_instance_count += PARTICLE_BATCH_SIZE;
+					m_stats.m_triangle_count += PARTICLE_BATCH_SIZE * 2;
+					bgfx::submit(view.bgfx_id, material->getShaderInstance().m_program_handles[view.pass_idx]);
 				}
 
 				instance_buffer = bgfx::allocInstanceDataBuffer(PARTICLE_BATCH_SIZE, sizeof(Instance));
@@ -437,17 +588,25 @@ struct PipelineImpl : public Pipeline
 			++instance;
 		}
 
-		setMaterial(material);
-		bgfx::setInstanceDataBuffer(instance_buffer, emitter.m_life.size() % PARTICLE_BATCH_SIZE);
+		executeCommandBuffer(material->getCommandBuffer(), material);
+		executeCommandBuffer(view.command_buffer.buffer, material);
+
+		int instance_count = emitter.m_life.size() % PARTICLE_BATCH_SIZE;
+		bgfx::setInstanceDataBuffer(instance_buffer, instance_count);
 		bgfx::setVertexBuffer(m_particle_vertex_buffer);
 		bgfx::setIndexBuffer(m_particle_index_buffer);
-		bgfx::setState(m_render_state | material->getRenderStates());
-		bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
+		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+		bgfx::setState(view.render_state | material->getRenderStates());
+		++m_stats.m_draw_call_count;
+		m_stats.m_instance_count += instance_count;
+		m_stats.m_triangle_count += instance_count * 2;
+		bgfx::submit(view.bgfx_id, material->getShaderInstance().m_program_handles[view.pass_idx]);
 	}
 
 
 	void renderParticles()
 	{
+		PROFILE_FUNCTION();
 		const auto& emitters = m_scene->getParticleEmitters();
 		for (const auto* emitter : emitters)
 		{
@@ -468,15 +627,59 @@ struct PipelineImpl : public Pipeline
 		Vec4 size;
 		size.x = (float)fb->getWidth();
 		size.y = (float)fb->getHeight();
-		bgfx::setUniform(m_texture_size_uniform, &size);
-		bgfx::setTexture(0, m_uniforms[uniform_idx], fb->getRenderbufferHandle(renderbuffer_idx));
+		m_views[m_view_idx].command_buffer.beginAppend();
+		if (m_global_textures_count == 0) m_views[m_view_idx].command_buffer.setUniform(m_texture_size_uniform, size);
+		m_views[m_view_idx].command_buffer.setTexture(15 - m_global_textures_count,
+			m_uniforms[uniform_idx],
+			fb->getRenderbufferHandle(renderbuffer_idx));
+		++m_global_textures_count;
+		m_views[m_view_idx].command_buffer.end();
 	}
 
 
 	void setViewProjection(const Matrix& mtx, int width, int height) override
 	{
-		bgfx::setViewRect(m_view_idx, 0, 0, (uint16_t)width, (uint16_t)height);
-		bgfx::setViewTransform(m_view_idx, nullptr, &mtx.m11);
+		bgfx::setViewRect(m_bgfx_view, 0, 0, (uint16_t)width, (uint16_t)height);
+		bgfx::setViewTransform(m_bgfx_view, nullptr, &mtx.m11);
+	}
+
+
+	void finishInstances(int idx, int* views, int view_count)
+	{
+		InstanceData& data = m_instances_data[idx];
+		if (!data.buffer) return;
+
+		Mesh& mesh = *data.mesh;
+		const Model& model = *data.model;
+		Material* material = mesh.material;
+		const uint16 stride = mesh.vertex_def.getStride();
+
+		for (int i = 0; i <	view_count; ++i)
+		{
+			auto& view = m_views[views[i]];
+			ShaderInstance& shader_instance = mesh.material->getShaderInstance();
+			if (!bgfx::isValid(shader_instance.m_program_handles[view.pass_idx])) continue;
+			
+			executeCommandBuffer(material->getCommandBuffer(), material);
+			executeCommandBuffer(view.command_buffer.buffer, material);
+
+			bgfx::setVertexBuffer(model.getVerticesHandle(),
+				mesh.attribute_array_offset / stride,
+				mesh.attribute_array_size / stride);
+			bgfx::setIndexBuffer(model.getIndicesHandle(),
+				mesh.indices_offset,
+				mesh.indices_count);
+			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+			bgfx::setState(view.render_state | material->getRenderStates());
+			bgfx::setInstanceDataBuffer(data.buffer, data.instance_count);
+			++m_stats.m_draw_call_count;
+			m_stats.m_instance_count += data.instance_count;
+			m_stats.m_triangle_count += data.instance_count * mesh.indices_count / 3;
+			bgfx::submit(view.bgfx_id, shader_instance.m_program_handles[view.pass_idx]);
+		}
+		data.buffer = nullptr;
+		data.instance_count = 0;
+		mesh.instance_idx = -1;
 	}
 
 
@@ -487,25 +690,32 @@ struct PipelineImpl : public Pipeline
 
 		Mesh& mesh = *data.mesh;
 		const Model& model = *data.model;
-		Material* material = mesh.getMaterial();
-		const uint16 stride = mesh.getVertexDefinition().getStride();
+		Material* material = mesh.material;
+		const uint16 stride = mesh.vertex_def.getStride();
 
-		setMaterial(material);
+		auto& view = m_views[m_current_render_views[0]];
+
+		executeCommandBuffer(material->getCommandBuffer(), material);
+		executeCommandBuffer(view.command_buffer.buffer, material);
+
 		bgfx::setVertexBuffer(model.getVerticesHandle(),
-							  mesh.getAttributeArrayOffset() / stride,
-							  mesh.getAttributeArraySize() / stride);
+							  mesh.attribute_array_offset / stride,
+							  mesh.attribute_array_size / stride);
 		bgfx::setIndexBuffer(model.getIndicesHandle(),
-							 mesh.getIndicesOffset(),
-							 mesh.getIndexCount());
-		bgfx::setState(m_render_state | material->getRenderStates());
+							 mesh.indices_offset,
+							 mesh.indices_count);
+		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+		bgfx::setState(view.render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(data.buffer, data.instance_count);
-		ShaderInstance& shader_instance =
-			mesh.getMaterial()->getShaderInstance();
-		bgfx::submit(m_view_idx, shader_instance.m_program_handles[m_pass_idx]);
+		ShaderInstance& shader_instance = mesh.material->getShaderInstance();
+		++m_stats.m_draw_call_count;
+		m_stats.m_instance_count += data.instance_count;
+		m_stats.m_triangle_count += data.instance_count * mesh.indices_count / 3;
+		bgfx::submit(view.bgfx_id, shader_instance.m_program_handles[view.pass_idx]);
 
 		data.buffer = nullptr;
 		data.instance_count = 0;
-		mesh.setInstanceIdx(-1);
+		mesh.instance_idx = -1;
 	}
 
 
@@ -529,13 +739,13 @@ struct PipelineImpl : public Pipeline
 		Universe& universe = m_scene->getUniverse();
 		Matrix mtx = universe.getMatrix(m_scene->getCameraEntity(cmp));
 		mtx.fastInverse();
-		bgfx::setViewTransform(m_view_idx, &mtx.m11, &projection_matrix.m11);
+		bgfx::setViewTransform(m_bgfx_view, &mtx.m11, &projection_matrix.m11);
 
 		bgfx::setViewRect(
-			m_view_idx, (uint16_t)m_view_x, (uint16_t)m_view_y, (uint16)m_width, (uint16)m_height);
+			m_bgfx_view, (uint16_t)m_view_x, (uint16_t)m_view_y, (uint16)m_width, (uint16)m_height);
 	}
 
-
+	
 	void finishInstances()
 	{
 		for (int i = 0; i < lengthOf(m_instances_data); ++i)
@@ -549,16 +759,7 @@ struct PipelineImpl : public Pipeline
 	void setPass(const char* name)
 	{
 		m_pass_idx = m_renderer.getPassIdx(name);
-		for (int i = 0; i < m_view2pass_map.size(); ++i)
-		{
-			if (m_view2pass_map[i] == m_pass_idx)
-			{
-				m_view_idx = (uint8)i;
-				return;
-			}
-		}
-
-		beginNewView(name);
+		m_views[m_view_idx].pass_idx = m_pass_idx;
 	}
 
 
@@ -592,24 +793,24 @@ struct PipelineImpl : public Pipeline
 			m_current_framebuffer = m_default_framebuffer;
 			if (m_current_framebuffer)
 			{
-				bgfx::setViewFrameBuffer(m_view_idx,
+				bgfx::setViewFrameBuffer(m_bgfx_view,
 										 m_current_framebuffer->getHandle());
 			}
 			else
 			{
-				bgfx::setViewFrameBuffer(m_view_idx, BGFX_INVALID_HANDLE);
+				bgfx::setViewFrameBuffer(m_bgfx_view, BGFX_INVALID_HANDLE);
 			}
 			return;
 		}
 		m_current_framebuffer = getFramebuffer(framebuffer_name);
 		if (m_current_framebuffer)
 		{
-			bgfx::setViewFrameBuffer(m_view_idx,
+			bgfx::setViewFrameBuffer(m_bgfx_view,
 									 m_current_framebuffer->getHandle());
 		}
 		else
 		{
-			g_log_warning.log("renderer") << "Framebuffer " << framebuffer_name
+			g_log_warning.log("Renderer") << "Framebuffer " << framebuffer_name
 										  << " not found";
 		}
 	}
@@ -643,27 +844,250 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void beginNewView(const char* debug_name)
+	int newView(const char* debug_name)
 	{
+		++m_view_idx;
+		ASSERT(m_view_idx < lengthOf(m_views));
 		m_renderer.viewCounterAdd();
-		m_view_idx = (uint8)m_renderer.getViewCounter();
-		m_view2pass_map[m_view_idx] = m_pass_idx;
+		m_bgfx_view = (uint8)m_renderer.getViewCounter();
+		auto& view = m_views[m_view_idx];
+		view.bgfx_id = m_bgfx_view;
+		view.render_state = m_render_state;
+		view.stencil = m_stencil;
+		view.pass_idx = m_pass_idx;
+		view.command_buffer.clear();
+		m_global_textures_count = 0;
 		if (m_current_framebuffer)
 		{
-			bgfx::setViewFrameBuffer(m_view_idx, m_current_framebuffer->getHandle());
+			bgfx::setViewFrameBuffer(m_bgfx_view, m_current_framebuffer->getHandle());
 		}
 		else
 		{
-			bgfx::setViewFrameBuffer(m_view_idx, BGFX_INVALID_HANDLE);
+			bgfx::setViewFrameBuffer(m_bgfx_view, BGFX_INVALID_HANDLE);
 		}
-		bgfx::setViewClear(m_view_idx, 0);
-		bgfx::setViewName(m_view_idx, debug_name);
+		bgfx::setViewClear(m_bgfx_view, 0);
+		bgfx::setViewName(m_bgfx_view, debug_name);
+		m_stencil = BGFX_STENCIL_NONE;
+		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE | BGFX_STATE_MSAA;
+		return m_view_idx;
 	}
 
 
-	void renderSpotLightShadowmap(ComponentIndex light, int64 layer_mask)
+	void copyRenderbuffer(const char* src_fb_name, int src_rb_idx, const char* dest_fb_name, int dest_rb_idx)
 	{
-		beginNewView("point_light");
+		auto* src_fb = getFramebuffer(src_fb_name);
+		auto* dest_fb = getFramebuffer(dest_fb_name);
+		if (!src_fb || !dest_fb) return;
+
+		auto src_rb = src_fb->getRenderbufferHandle(src_rb_idx);
+		auto dest_rb = dest_fb->getRenderbufferHandle(dest_rb_idx);
+
+		bgfx::blit(m_bgfx_view, dest_rb, 0, 0, src_rb);
+	}
+
+
+	void createCubeBuffers()
+	{
+		const Vec3 cube_vertices[] = {
+			{-1, -1, -1}, {1, -1, -1}, {1, 1, -1}, {-1, 1, -1},
+			{-1, -1, 1}, {1, -1, 1}, {1, 1, 1}, {-1, 1, 1},
+			{1, -1, -1}, {1, -1, 1}, {1, 1, 1}, {1, 1, -1},
+			{-1, -1, -1}, {-1, -1, 1}, {-1, 1, 1}, {-1, 1, -1},
+			{-1, 1, -1}, {1, 1, -1}, {1, 1, 1}, {-1, 1, 1},
+			{-1, -1, -1}, {1, -1, -1}, {1, -1, 1}, {-1, -1, 1}
+		};
+		static const uint16 cube_indices[] = {
+			0, 2, 1, 2, 0, 3,
+			4, 5, 6, 6, 7, 4,
+			8, 10, 9, 10, 8, 11,
+			12, 13, 14, 14, 15, 12,
+			16, 18, 17, 18, 16, 19,
+			20, 21, 22, 22, 23, 20
+		};
+		auto* vertices_mem = bgfx::copy(cube_vertices, sizeof(cube_vertices));
+		auto* indices_mem = bgfx::copy(cube_indices, sizeof(cube_indices));
+		m_cube_vb = bgfx::createVertexBuffer(vertices_mem, m_deferred_point_light_vertex_decl);
+		m_cube_ib = bgfx::createIndexBuffer(indices_mem);
+	}
+
+
+	void finishDeferredPointLightInstances(Material* material,
+		const bgfx::InstanceDataBuffer* instance_buffer,
+		int instance_count,
+		bool is_intersecting)
+	{
+		bgfx::setInstanceDataBuffer(instance_buffer, instance_count);
+		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE); 
+		if (is_intersecting)
+		{
+			bgfx::setState((m_render_state | material->getRenderStates()) &
+				~BGFX_STATE_CULL_MASK & ~BGFX_STATE_DEPTH_TEST_MASK | BGFX_STATE_CULL_CCW);
+		}
+		else
+		{
+			bgfx::setState(m_render_state | material->getRenderStates());
+		}
+		executeCommandBuffer(m_views[m_view_idx].command_buffer.buffer, material);
+		bgfx::setVertexBuffer(m_cube_vb);
+		bgfx::setIndexBuffer(m_cube_ib);
+		++m_stats.m_draw_call_count;
+		m_stats.m_instance_count += instance_count;
+		m_stats.m_triangle_count +=	instance_count * 12;
+		bgfx::submit(m_bgfx_view, material->getShaderInstance().m_program_handles[m_pass_idx]);
+	}
+
+
+	void removeFramebuffer(const char* framebuffer_name)
+	{
+		for (int i = 0; i < m_framebuffers.size(); ++i)
+		{
+			auto* f = m_framebuffers[i];
+			if (compareString(f->getName(), framebuffer_name) == 0)
+			{
+				LUMIX_DELETE(m_allocator, m_framebuffers[i]);
+				if (m_first_postprocess_framebuffer > i)
+				{
+					--m_first_postprocess_framebuffer;
+				}
+				m_framebuffers.eraseFast(i);
+				break;
+			}
+		}
+	}
+
+
+	void setMaterialDefine(int material_idx, const char* define, bool enabled)
+	{
+		auto define_idx = m_renderer.getShaderDefineIdx(define);
+		m_materials[material_idx]->setDefine(define_idx, enabled);
+	}
+
+
+	bool postprocessCallback(const char* camera_slot)
+	{
+		auto scr_scene = static_cast<LuaScriptScene*>(m_scene->getUniverse().getScene(crc32("lua_script")));
+		if (!scr_scene) return false;
+		ComponentIndex camera = m_scene->getCameraInSlot(camera_slot);
+		if (camera == INVALID_COMPONENT) return false;
+
+		Entity camera_entity = m_scene->getCameraEntity(camera);
+		ComponentIndex scr_cmp = scr_scene->getComponent(camera_entity);
+		if (scr_cmp == INVALID_COMPONENT) return false;
+
+		bool ret = false;
+		for (int i = 0, c = scr_scene->getScriptCount(scr_cmp); i < c; ++i)
+		{
+			lua_State* L = scr_scene->getState(scr_cmp, i);
+			if(!L) continue;
+
+			int env = scr_scene->getEnvironment(scr_cmp, i);
+			lua_rawgeti(L, LUA_REGISTRYINDEX, env);
+			if(lua_getfield(L, -1, "_IS_POSTPROCESS_INITIALIZED") == LUA_TNIL)
+			{
+				if(auto* call = scr_scene->beginFunctionCall(scr_cmp, i, "initPostprocess"))
+				{
+					call->add(this);
+					call->addEnvironment(m_lua_env);
+					scr_scene->endFunctionCall(*call);
+					lua_rawgeti(L, LUA_REGISTRYINDEX, env);
+					lua_pushboolean(L, 1);
+					lua_setfield(L, -2, "_IS_POSTPROCESS_INITIALIZED");
+				}
+			}
+			lua_pop(L, 2);
+
+			if (auto* call = scr_scene->beginFunctionCall(scr_cmp, i, "postprocess"))
+			{
+				ret = true;
+				call->add(this);
+				call->addEnvironment(m_lua_env);
+				scr_scene->endFunctionCall(*call);
+			}
+		}
+		return ret;
+	}
+
+
+	void renderLightVolumes(int material_index)
+	{
+		PROFILE_FUNCTION();
+		if (m_applied_camera == INVALID_COMPONENT) return;
+		auto* material = m_materials[material_index];
+		if (!material->isReady()) return;
+
+		m_tmp_local_lights.clear();
+		m_scene->getPointLights(m_camera_frustum, m_tmp_local_lights);
+		if (m_tmp_local_lights.empty()) return;
+
+		PROFILE_INT("light count", m_tmp_local_lights.size());
+		struct Data
+		{
+			Matrix mtx;
+			Vec4 pos_radius;
+			Vec4 color_attenuation;
+			Vec4 dir_fov;
+			Vec4 specular;
+		};
+		const bgfx::InstanceDataBuffer* instance_buffer[2] = {nullptr, nullptr};
+		Data* instance_data[2] = { nullptr, nullptr };
+		Universe& universe = m_scene->getUniverse();
+		for(auto light_cmp : m_tmp_local_lights)
+		{
+			auto entity = m_scene->getPointLightEntity(light_cmp);
+			float range = m_scene->getLightRange(light_cmp);
+			Vec3 light_dir = universe.getRotation(entity) * Vec3(0, 0, -1);
+			float attenuation = m_scene->getLightAttenuation(light_cmp);
+			float fov = Math::degreesToRadians(m_scene->getLightFOV(light_cmp));
+			float intensity = m_scene->getPointLightIntensity(light_cmp);
+			intensity *= intensity;
+			Vec3 color = m_scene->getPointLightColor(light_cmp) * intensity;
+
+			Vec3 pos = universe.getPosition(entity);
+			int buffer_idx = m_camera_frustum.intersectNearPlane(pos, range * Math::SQRT3) ? 0 : 1;
+			if(!instance_buffer[buffer_idx])
+			{
+				instance_buffer[buffer_idx] = bgfx::allocInstanceDataBuffer(128, sizeof(Data));
+				instance_data[buffer_idx] = (Data*)instance_buffer[buffer_idx]->data;
+			}
+
+			auto* id = instance_data[buffer_idx];
+			id->mtx = universe.getPositionAndRotation(entity);
+			id->mtx.multiply3x3(range);
+			id->pos_radius.set(pos, range);
+			id->color_attenuation.set(color, attenuation);
+			id->dir_fov.set(light_dir, fov);
+			float specular_intensity = m_scene->getPointLightSpecularIntensity(light_cmp);
+			id->specular.set(m_scene->getPointLightSpecularColor(light_cmp) 
+				* specular_intensity * specular_intensity, 1);
+			++instance_data[buffer_idx];
+
+			if(instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx]->data == 128)
+			{
+				finishDeferredPointLightInstances(material,
+					instance_buffer[buffer_idx],
+					128,
+					buffer_idx == 0);
+				instance_buffer[buffer_idx] = nullptr;
+				instance_data[buffer_idx] = nullptr;
+			}
+		}
+
+		for(int buffer_idx = 0; buffer_idx < 2; ++buffer_idx)
+		{
+			if(instance_data[buffer_idx])
+			{
+				finishDeferredPointLightInstances(material,
+					instance_buffer[buffer_idx],
+					int(instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx]->data),
+					buffer_idx == 0);
+			}
+		}
+	}
+
+
+	void renderSpotLightShadowmap(ComponentIndex light)
+	{
+		newView("point_light");
 
 		Entity light_entity = m_scene->getPointLightEntity(light);
 		Matrix mtx = m_scene->getUniverse().getMatrix(light_entity);
@@ -672,18 +1096,16 @@ struct PipelineImpl : public Pipeline
 		uint16 shadowmap_height = (uint16)m_current_framebuffer->getHeight();
 		uint16 shadowmap_width = (uint16)m_current_framebuffer->getWidth();
 		Vec3 pos = mtx.getTranslation();
-		
-		bgfx::setViewClear(m_view_idx, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
-		bgfx::touch(m_view_idx);
-		bgfx::setViewRect(m_view_idx, 0, 0, shadowmap_width, shadowmap_height);
+
+		bgfx::setViewClear(m_bgfx_view, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
+		bgfx::touch(m_bgfx_view);
+		bgfx::setViewRect(m_bgfx_view, 0, 0, shadowmap_width, shadowmap_height);
 
 		Matrix projection_matrix;
-		projection_matrix.setPerspective(
-			Math::degreesToRadians(fov), 1, 0.01f, range);
+		projection_matrix.setPerspective(Math::degreesToRadians(fov), 1, 0.01f, range);
 		Matrix view_matrix;
-		view_matrix.lookAt(pos, pos + mtx.getZVector(), mtx.getYVector());
-		bgfx::setViewTransform(
-			m_view_idx, &view_matrix.m11, &projection_matrix.m11);
+		view_matrix.lookAt(pos, pos - mtx.getZVector(), mtx.getYVector());
+		bgfx::setViewTransform(m_bgfx_view, &view_matrix.m11, &projection_matrix.m11);
 
 		PointLightShadowmap& s = m_point_light_shadowmaps.emplace();
 		s.m_framebuffer = m_current_framebuffer;
@@ -695,11 +1117,11 @@ struct PipelineImpl : public Pipeline
 			0.5,  0.5, 0.5, 1.0);
 		s.m_matrices[0] = biasMatrix * (projection_matrix * view_matrix);
 
-		renderPointLightInfluencedGeometry(light, layer_mask);
+		renderPointLightInfluencedGeometry(light);
 	}
 
 
-	void renderOmniLightShadowmap(ComponentIndex light, int64 layer_mask)
+	void renderOmniLightShadowmap(ComponentIndex light)
 	{
 		Entity light_entity = m_scene->getPointLightEntity(light);
 		Vec3 light_pos = m_scene->getUniverse().getPosition(light_entity);
@@ -724,24 +1146,21 @@ struct PipelineImpl : public Pipeline
 			 Math::degreesToRadians(0.0f)},
 		};
 
-		PointLightShadowmap& shadowmap_info =
-			m_point_light_shadowmaps.emplace();
+		PointLightShadowmap& shadowmap_info = m_point_light_shadowmaps.emplace();
 		shadowmap_info.m_framebuffer = m_current_framebuffer;
 		shadowmap_info.m_light = light;
+		//setPointLightUniforms(light);
 
 		for (int i = 0; i < 4; ++i)
 		{
-			beginNewView("omnilight");
+			newView("omnilight");
 
-			bgfx::setViewClear(m_view_idx, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
-			bgfx::touch(m_view_idx);
+			bgfx::setViewClear(m_bgfx_view, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
+			bgfx::touch(m_bgfx_view);
 			uint16 view_x = uint16(shadowmap_width * viewports[i * 2]);
 			uint16 view_y = uint16(shadowmap_height * viewports[i * 2 + 1]);
-			bgfx::setViewRect(m_view_idx,
-							  view_x,
-							  view_y,
-							  shadowmap_width >> 1,
-							  shadowmap_height >> 1);
+			bgfx::setViewRect(
+				m_bgfx_view, view_x, view_y, shadowmap_width >> 1, shadowmap_height >> 1);
 
 			float fovx = Math::degreesToRadians(143.98570868f + 3.51f);
 			float fovy = Math::degreesToRadians(125.26438968f + 9.85f);
@@ -749,7 +1168,7 @@ struct PipelineImpl : public Pipeline
 
 			Matrix projection_matrix;
 			projection_matrix.setPerspective(fovx, aspect, 0.01f, range);
-			
+
 			Matrix view_matrix;
 			view_matrix.fromEuler(YPR[i][0], YPR[i][1], YPR[i][2]);
 			view_matrix.setTranslation(light_pos);
@@ -761,42 +1180,27 @@ struct PipelineImpl : public Pipeline
 				aspect,
 				0.01f,
 				range);
-			
+
 			view_matrix.fastInverse();
 
-			bgfx::setViewTransform(
-				m_view_idx, &view_matrix.m11, &projection_matrix.m11);
+			bgfx::setViewTransform(m_bgfx_view, &view_matrix.m11, &projection_matrix.m11);
 
 			static const Matrix biasMatrix(
-			0.5, 0.0, 0.0, 0.0,
-			0.0, -0.5, 0.0, 0.0,
-			0.0, 0.0, 0.5, 0.0,
-			0.5, 0.5, 0.5, 1.0);
+				0.5, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
 			shadowmap_info.m_matrices[i] = biasMatrix * (projection_matrix * view_matrix);
 
-			renderLitModels(light, frustum, layer_mask);
+			m_tmp_meshes.clear();
+			m_is_current_light_global = false;
+			m_scene->getPointLightInfluencedGeometry(light, frustum, m_tmp_meshes);
+
+			renderMeshes(m_tmp_meshes);
 		}
 	}
 
 
-	void renderLitModels(ComponentIndex light, const Frustum& frustum, int64 layer_mask)
-	{
-		PROFILE_FUNCTION();
-
-		m_tmp_meshes.clear();
-		m_current_light = light;
-		m_is_current_light_global = false;
-		m_scene->getPointLightInfluencedGeometry(light, frustum, m_tmp_meshes, layer_mask);
-
-		renderMeshes(m_tmp_meshes);
-		m_current_light = -1;
-	}
-
-
 	void renderLocalLightShadowmaps(ComponentIndex camera,
-									FrameBuffer** fbs,
-									int framebuffers_count,
-									int64 layer_mask)
+		FrameBuffer** fbs,
+		int framebuffers_count)
 	{
 		if (camera < 0) return;
 
@@ -814,22 +1218,17 @@ struct PipelineImpl : public Pipeline
 			if (fb_index == framebuffers_count) break;
 
 			float fov = m_scene->getLightFOV(lights[i]);
-			
-			m_current_framebuffer = fbs[i];
-			bgfx::setViewFrameBuffer(m_view_idx, m_current_framebuffer->getHandle());
 
+			m_current_framebuffer = fbs[i];
 			if (fov < 180)
 			{
-				renderSpotLightShadowmap(lights[i], layer_mask);
-				++fb_index;
-				continue;
+				renderSpotLightShadowmap(lights[i]);
 			}
 			else
 			{
-				renderOmniLightShadowmap(lights[i], layer_mask);
-				++fb_index;
-				continue;
+				renderOmniLightShadowmap(lights[i]);
 			}
+			++fb_index;
 		}
 	}
 
@@ -850,77 +1249,73 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderShadowmap(int64 layer_mask, const char* slot)
+	void renderShadowmap(int split_index)
 	{
-		auto camera = m_scene->getCameraInSlot(slot);
 		Universe& universe = m_scene->getUniverse();
 		ComponentIndex light_cmp = m_scene->getActiveGlobalLight();
-		if (light_cmp < 0 || camera < 0) return;
-		float camera_height = m_scene->getCameraHeight(camera);
+		if (light_cmp < 0 || m_applied_camera < 0) return;
+		float camera_height = m_scene->getCameraHeight(m_applied_camera);
 		if (!camera_height) return;
 
 		Matrix light_mtx = universe.getMatrix(m_scene->getGlobalLightEntity(light_cmp));
 		m_global_light_shadowmap = m_current_framebuffer;
 		float shadowmap_height = (float)m_current_framebuffer->getHeight();
 		float shadowmap_width = (float)m_current_framebuffer->getWidth();
-		float viewports[] = {0, 0, 0.5f, 0, 0, 0.5f, 0.5f, 0.5f};
-		float camera_fov = Math::degreesToRadians(m_scene->getCameraFOV(camera));
-		float camera_ratio = m_scene->getCameraWidth(camera) / camera_height;
+		float viewports[] = { 0, 0, 0.5f, 0, 0, 0.5f, 0.5f, 0.5f };
+		float camera_fov = Math::degreesToRadians(m_scene->getCameraFOV(m_applied_camera));
+		float camera_ratio = m_scene->getCameraWidth(m_applied_camera) / camera_height;
 		Vec4 cascades = m_scene->getShadowmapCascades(light_cmp);
-		float split_distances[] = {0.01f, cascades.x, cascades.y, cascades.z, cascades.w};
+		float split_distances[] = { 0.01f, cascades.x, cascades.y, cascades.z, cascades.w };
 		m_is_rendering_in_shadowmap = true;
-		for (int split_index = 0; split_index < 4; ++split_index)
-		{
-			if (split_index > 0) beginNewView("shadowmap");
+		bgfx::setViewClear(
+			m_bgfx_view, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
+		bgfx::touch(m_bgfx_view);
+		float* viewport = viewports + split_index * 2;
+		bgfx::setViewRect(m_bgfx_view,
+			(uint16)(1 + shadowmap_width * viewport[0]),
+			(uint16)(1 + shadowmap_height * viewport[1]),
+			(uint16)(0.5f * shadowmap_width - 2),
+			(uint16)(0.5f * shadowmap_height - 2));
 
-			bgfx::setViewClear(
-				m_view_idx, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
-			bgfx::touch(m_view_idx);
-			float* viewport = viewports + split_index * 2;
-			bgfx::setViewRect(m_view_idx,
-				(uint16)(1 + shadowmap_width * viewport[0]),
-				(uint16)(1 + shadowmap_height * viewport[1]),
-				(uint16)(0.5f * shadowmap_width - 2),
-				(uint16)(0.5f * shadowmap_height - 2));
+		Frustum frustum;
+		Matrix camera_matrix = universe.getMatrix(m_scene->getCameraEntity(m_applied_camera));
+		frustum.computePerspective(camera_matrix.getTranslation(),
+			camera_matrix.getZVector(),
+			camera_matrix.getYVector(),
+			camera_fov,
+			camera_ratio,
+			split_distances[split_index],
+			split_distances[split_index + 1]);
 
-			Frustum frustum;
-			Matrix camera_matrix = universe.getMatrix(m_scene->getCameraEntity(camera));
-			frustum.computePerspective(camera_matrix.getTranslation(),
-				camera_matrix.getZVector(),
-				camera_matrix.getYVector(),
-				camera_fov,
-				camera_ratio,
-				split_distances[split_index],
-				split_distances[split_index + 1]);
+		Vec3 shadow_cam_pos = camera_matrix.getTranslation();
+		float bb_size = frustum.getRadius();
+		shadow_cam_pos =
+			shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
 
-			Vec3 shadow_cam_pos = camera_matrix.getTranslation();
-			float bb_size = frustum.getRadius();
-			shadow_cam_pos =
-				shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
+		Matrix projection_matrix;
+		projection_matrix.setOrtho(
+			bb_size, -bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
+		Vec3 light_forward = light_mtx.getZVector();
+		shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
+		Matrix view_matrix;
+		view_matrix.lookAt(
+			shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
+		bgfx::setViewTransform(m_bgfx_view, &view_matrix.m11, &projection_matrix.m11);
+		static const Matrix biasMatrix(
+			0.5, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
+		m_shadow_viewprojection[split_index] = biasMatrix * (projection_matrix * view_matrix);
 
-			Matrix projection_matrix;
-			projection_matrix.setOrtho(
-				bb_size, -bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
-			Vec3 light_forward = light_mtx.getZVector();
-			shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
-			Matrix view_matrix;
-			view_matrix.lookAt(
-				shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
-			bgfx::setViewTransform(m_view_idx, &view_matrix.m11, &projection_matrix.m11);
-			static const Matrix biasMatrix(
-				0.5, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
-			m_shadow_viewprojection[split_index] = biasMatrix * (projection_matrix * view_matrix);
-
-			Frustum shadow_camera_frustum;
-			shadow_camera_frustum.computeOrtho(shadow_cam_pos,
-				-light_forward,
-				light_mtx.getYVector(),
-				bb_size * 2,
-				bb_size * 2,
-				SHADOW_CAM_NEAR,
-				SHADOW_CAM_FAR);
-			renderAll(shadow_camera_frustum, layer_mask, false);
-		}
+		Frustum shadow_camera_frustum;
+		shadow_camera_frustum.computeOrtho(shadow_cam_pos,
+			-light_forward,
+			light_mtx.getYVector(),
+			bb_size * 2,
+			bb_size * 2,
+			SHADOW_CAM_NEAR,
+			SHADOW_CAM_FAR);
+		m_current_render_views = &m_view_idx;
+		m_current_render_view_count = 1;
+		renderAll(shadow_camera_frustum, false, camera_matrix.getTranslation());
 		m_is_rendering_in_shadowmap = false;
 	}
 
@@ -949,11 +1344,11 @@ struct PipelineImpl : public Pipeline
 			for (int i = 0; i < points.size(); ++i)
 			{
 				const DebugPoint& point = points[i];
-				vertex[0].m_rgba = point.m_color;
-				vertex[0].m_x = point.m_pos.x;
-				vertex[0].m_y = point.m_pos.y;
-				vertex[0].m_z = point.m_pos.z;
-				vertex[0].m_u = vertex[0].m_v = 0;
+				vertex[0].rgba = point.m_color;
+				vertex[0].x = point.m_pos.x;
+				vertex[0].y = point.m_pos.y;
+				vertex[0].z = point.m_pos.z;
+				vertex[0].u = vertex[0].v = 0;
 
 				indices[0] = i;
 				++vertex;
@@ -962,9 +1357,10 @@ struct PipelineImpl : public Pipeline
 
 			bgfx::setVertexBuffer(&tvb);
 			bgfx::setIndexBuffer(&tib);
+			bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 			bgfx::setState(
 				m_render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_POINTS);
-			bgfx::submit(m_view_idx,
+			bgfx::submit(m_bgfx_view,
 				m_debug_line_material->getShaderInstance().m_program_handles[m_pass_idx]);
 		}
 	}
@@ -977,38 +1373,45 @@ struct PipelineImpl : public Pipeline
 
 		bgfx::TransientVertexBuffer tvb;
 		bgfx::TransientIndexBuffer tib;
-		if (bgfx::allocTransientBuffers(
-				&tvb, m_base_vertex_decl, lines.size() * 2, &tib, lines.size() * 2))
+
+		static const int BATCH_SIZE = 1024 * 16;
+
+		for (int j = 0; j < lines.size(); j += BATCH_SIZE)
 		{
-			BaseVertex* vertex = (BaseVertex*)tvb.data;
-			uint16* indices = (uint16*)tib.data;
-			for (int i = 0; i < lines.size(); ++i)
+			int count = Math::minimum(BATCH_SIZE, lines.size() - j);
+			if (bgfx::allocTransientBuffers(&tvb, m_base_vertex_decl, count * 2, &tib, count * 2))
 			{
-				const DebugLine& line = lines[i];
-				vertex[0].m_rgba = line.m_color;
-				vertex[0].m_x = line.m_from.x;
-				vertex[0].m_y = line.m_from.y;
-				vertex[0].m_z = line.m_from.z;
-				vertex[0].m_u = vertex[0].m_v = 0;
+				BaseVertex* vertex = (BaseVertex*)tvb.data;
+				uint16* indices = (uint16*)tib.data;
+				for (int i = 0; i < count; ++i)
+				{
+					const DebugLine& line = lines[j + i];
+					vertex[0].rgba = line.m_color;
+					vertex[0].x = line.m_from.x;
+					vertex[0].y = line.m_from.y;
+					vertex[0].z = line.m_from.z;
+					vertex[0].u = vertex[0].v = 0;
 
-				vertex[1].m_rgba = line.m_color;
-				vertex[1].m_x = line.m_to.x;
-				vertex[1].m_y = line.m_to.y;
-				vertex[1].m_z = line.m_to.z;
-				vertex[1].m_u = vertex[0].m_v = 0;
+					vertex[1].rgba = line.m_color;
+					vertex[1].x = line.m_to.x;
+					vertex[1].y = line.m_to.y;
+					vertex[1].z = line.m_to.z;
+					vertex[1].u = vertex[0].v = 0;
 
-				indices[0] = i * 2;
-				indices[1] = i * 2 + 1;
-				vertex += 2;
-				indices += 2;
+					indices[0] = i * 2;
+					indices[1] = i * 2 + 1;
+					vertex += 2;
+					indices += 2;
+				}
+
+				bgfx::setVertexBuffer(&tvb);
+				bgfx::setIndexBuffer(&tib);
+				bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
+				bgfx::setState(m_render_state | m_debug_line_material->getRenderStates() |
+							   BGFX_STATE_PT_LINES);
+				bgfx::submit(m_bgfx_view,
+					m_debug_line_material->getShaderInstance().m_program_handles[m_pass_idx]);
 			}
-
-			bgfx::setVertexBuffer(&tvb);
-			bgfx::setIndexBuffer(&tib);
-			bgfx::setState(
-				m_render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_LINES);
-			bgfx::submit(m_view_idx,
-				m_debug_line_material->getShaderInstance().m_program_handles[m_pass_idx]);
 		}
 	}
 
@@ -1019,120 +1422,171 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void setPointLightUniforms(Material* material, ComponentIndex light_cmp)
+	void setPointLightUniforms(ComponentIndex light_cmp)
 	{
 		if (light_cmp < 0) return;
 
 		Universe& universe = m_scene->getUniverse();
 		Entity light_entity = m_scene->getPointLightEntity(light_cmp);
 		Vec3 light_pos = universe.getPosition(light_entity);
-		Vec3 light_dir = universe.getRotation(light_entity) * Vec3(0, 0, 1);
+		Vec3 light_dir = universe.getRotation(light_entity) * Vec3(0, 0, -1);
 		float fov = Math::degreesToRadians(m_scene->getLightFOV(light_cmp));
-		Vec3 color = m_scene->getPointLightColor(light_cmp) *
-					 m_scene->getPointLightIntensity(light_cmp);
+		float intensity = m_scene->getPointLightIntensity(light_cmp);
+		intensity *= intensity;
+		Vec3 color = m_scene->getPointLightColor(light_cmp) * intensity;
 		float range = m_scene->getLightRange(light_cmp);
 		float attenuation = m_scene->getLightAttenuation(light_cmp);
-		Vec4 attenuation_params(range, attenuation, 0, 1);
 		Vec4 light_pos_radius(light_pos, range);
-		Vec4 light_color(color, 0);
+		Vec4 light_color_attenuation(color, attenuation);
 		Vec4 light_dir_fov(light_dir, fov);
-		Vec4 light_specular(m_scene->getPointLightSpecularColor(light_cmp), 1);
+		float specular_intensity = m_scene->getPointLightSpecularIntensity(light_cmp);
+		Vec4 light_specular(m_scene->getPointLightSpecularColor(light_cmp) * specular_intensity *
+								specular_intensity, 1);
 
-		bgfx::setUniform(m_attenuation_params_uniform, &attenuation_params);
-		bgfx::setUniform(m_light_pos_radius_uniform, &light_pos_radius);
-		bgfx::setUniform(m_light_color_uniform, &light_color);
-		bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
-		bgfx::setUniform(m_light_specular_uniform, &light_specular);
+		m_views[m_view_idx].command_buffer.setUniform(m_light_pos_radius_uniform, light_pos_radius);
+		m_views[m_view_idx].command_buffer.setUniform(m_light_color_attenuation_uniform, light_color_attenuation);
+		m_views[m_view_idx].command_buffer.setUniform(m_light_dir_fov_uniform, light_dir_fov);
+		m_views[m_view_idx].command_buffer.setUniform(m_light_specular_uniform, light_specular);
 
+		FrameBuffer* shadowmap = nullptr;
 		if (m_scene->getLightCastShadows(light_cmp))
 		{
-			setPointLightShadowmapUniforms(material, light_cmp);
+			for (auto& info : m_point_light_shadowmaps)
+			{
+				if (info.m_light == light_cmp)
+				{
+					shadowmap = info.m_framebuffer;
+					m_views[m_view_idx].command_buffer.setUniform(m_shadowmap_matrices_uniform,
+						&info.m_matrices[0],
+						m_scene->getLightFOV(light_cmp) > 180 ? 4 : 1);
+					break;
+				}
+			}
+		}
+		if (shadowmap)
+		{
+			m_views[m_view_idx].command_buffer.setLocalShadowmap(shadowmap->getRenderbufferHandle(0));
 		}
 		else
 		{
-			material->unsetUserDefine(m_has_shadowmap_define_idx);
+			m_views[m_view_idx].command_buffer.setLocalShadowmap(BGFX_INVALID_HANDLE);
 		}
+		m_views[m_view_idx].command_buffer.end();
 	}
 
 
-	void setPointLightShadowmapUniforms(Material* material, ComponentIndex light)
+	void setStencilRef(uint32 ref)
 	{
-		for (auto& info : m_point_light_shadowmaps)
-		{
-			if (info.m_light == light)
-			{
-				material->setUserDefine(m_has_shadowmap_define_idx);
-
-				bgfx::setUniform(m_shadowmap_matrices_uniform,
-					&info.m_matrices[0].m11,
-					m_scene->getLightFOV(light) > 180 ? 4 : 1);
-
-				int texture_offset = material->getShader()->getTextureSlotCount();
-				bgfx::setTexture(texture_offset,
-					m_tex_shadowmap_uniform,
-					info.m_framebuffer->getRenderbufferHandle(0));
-				return;
-			}
-		}
-		material->unsetUserDefine(m_has_shadowmap_define_idx);
+		m_stencil |= BGFX_STENCIL_FUNC_REF(ref);
+		m_views[m_view_idx].stencil = m_stencil;
 	}
 
 
-	void setDirectionalLightUniforms(ComponentIndex light_cmp) const
+	void setStencilRMask(uint32 rmask)
 	{
-		if (light_cmp < 0) return;
+		m_stencil |= BGFX_STENCIL_FUNC_RMASK(rmask);
+		m_views[m_view_idx].stencil = m_stencil;
+	}
+
+
+	void setStencil(uint32 flags)
+	{
+		m_stencil |= flags;
+		m_views[m_view_idx].stencil = m_stencil;
+	}
+
+
+	void setActiveGlobalLightUniforms()
+	{
+		auto current_light = m_scene->getActiveGlobalLight();
+		if (current_light == INVALID_COMPONENT) return;
 
 		Universe& universe = m_scene->getUniverse();
-		Entity light_entity = m_scene->getGlobalLightEntity(light_cmp);
+		Entity light_entity = m_scene->getGlobalLightEntity(current_light);
 		Vec3 light_dir = universe.getRotation(light_entity) * Vec3(0, 0, 1);
-		Vec3 diffuse_color = m_scene->getGlobalLightColor(light_cmp) *
-							 m_scene->getGlobalLightIntensity(light_cmp);
-		Vec3 ambient_color = m_scene->getLightAmbientColor(light_cmp) *
-							 m_scene->getLightAmbientIntensity(light_cmp);
-		Vec4 diffuse_light_color(diffuse_color, 1);
-		Vec3 fog_color = m_scene->getFogColor(light_cmp);
-		float fog_density = m_scene->getFogDensity(light_cmp);
-		Vec4 ambient_light_color(ambient_color, 1);
-		Vec4 light_dir_fov(light_dir, 0);
-		fog_density *= fog_density * fog_density;
-		Vec4 fog_color_density(fog_color, fog_density);
-		Vec4 fog_params(m_scene->getFogBottom(light_cmp), m_scene->getFogHeight(light_cmp), 0, 0);
+		Vec3 diffuse_color = m_scene->getGlobalLightColor(current_light) *
+							 m_scene->getGlobalLightIntensity(current_light);
+		Vec3 ambient_color = m_scene->getLightAmbientColor(current_light) *
+							 m_scene->getLightAmbientIntensity(current_light);
+		Vec3 fog_color = m_scene->getFogColor(current_light);
+		float fog_density = m_scene->getFogDensity(current_light);
+		Vec3 specular = m_scene->getGlobalLightSpecular(current_light);
+		float specular_intensity = m_scene->getGlobalLightSpecularIntensity(current_light);
+		specular *= specular_intensity * specular_intensity;
 
-		bgfx::setUniform(m_light_color_uniform, &diffuse_light_color);
-		bgfx::setUniform(m_ambient_color_uniform, &ambient_light_color);
-		bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
-		bgfx::setUniform(m_fog_color_density_uniform, &fog_color_density);
-		bgfx::setUniform(m_fog_params_uniform, &fog_params);
-		bgfx::setUniform(m_shadowmap_matrices_uniform, &m_shadow_viewprojection, 4);
+		m_views[m_view_idx].command_buffer.setUniform(m_light_color_attenuation_uniform, Vec4(diffuse_color, 1));
+		m_views[m_view_idx].command_buffer.setUniform(m_ambient_color_uniform, Vec4(ambient_color, 1));
+		m_views[m_view_idx].command_buffer.setUniform(m_light_dir_fov_uniform, Vec4(light_dir, 0));
+
+		fog_density *= fog_density * fog_density;
+		m_views[m_view_idx].command_buffer.setUniform(m_fog_color_density_uniform, Vec4(fog_color, fog_density));
+		m_views[m_view_idx].command_buffer.setUniform(m_light_specular_uniform, Vec4(specular, 0));
+		m_views[m_view_idx].command_buffer.setUniform(m_fog_params_uniform,
+			Vec4(m_scene->getFogBottom(current_light),
+								 m_scene->getFogHeight(current_light),
+								 0,
+								 0));
+		if (m_global_light_shadowmap && !m_is_rendering_in_shadowmap)
+		{
+			m_views[m_view_idx].command_buffer.setUniform(m_shadowmap_matrices_uniform, m_shadow_viewprojection, 4);
+			m_views[m_view_idx].command_buffer.setGlobalShadowmap();
+		}
+		m_views[m_view_idx].command_buffer.end();
+	}
+
+	void disableBlending()
+	{
+		m_render_state &= ~BGFX_STATE_BLEND_MASK;
+		m_views[m_view_idx].render_state = m_render_state;
+	}
+
+	void enableDepthWrite()
+	{
+		m_render_state |= BGFX_STATE_DEPTH_WRITE;
+		m_views[m_view_idx].render_state = m_render_state;
+	}
+	void disableDepthWrite()
+	{
+		m_render_state &= ~BGFX_STATE_DEPTH_WRITE;
+		m_views[m_view_idx].render_state = m_render_state;
+	}
+
+	void enableAlphaWrite()
+	{
+		m_render_state |= BGFX_STATE_ALPHA_WRITE;
+		m_views[m_view_idx].render_state = m_render_state;
+	}
+	void disableAlphaWrite()
+	{
+		m_render_state &= ~BGFX_STATE_ALPHA_WRITE;
+		m_views[m_view_idx].render_state = m_render_state;
+	}
+
+	void enableRGBWrite()
+	{
+		m_render_state |= BGFX_STATE_RGB_WRITE;
+		m_views[m_view_idx].render_state = m_render_state;
+	}
+	void disableRGBWrite()
+	{
+		m_render_state &= ~BGFX_STATE_RGB_WRITE;
+		m_views[m_view_idx].render_state = m_render_state;
 	}
 
 
-	void disableBlending() { m_render_state &= ~BGFX_STATE_BLEND_MASK; }
-
-	void enableDepthWrite() { m_render_state |= BGFX_STATE_DEPTH_WRITE; }
-	void disableDepthWrite() { m_render_state &= ~BGFX_STATE_DEPTH_WRITE; }
-
-	void enableAlphaWrite() { m_render_state |= BGFX_STATE_ALPHA_WRITE; }
-	void disableAlphaWrite() { m_render_state &= ~BGFX_STATE_ALPHA_WRITE; }
-
-	void enableRGBWrite() { m_render_state |= BGFX_STATE_RGB_WRITE; }
-	void disableRGBWrite() { m_render_state &= ~BGFX_STATE_RGB_WRITE; }
-
-
-	void renderPointLightInfluencedGeometry(ComponentIndex light, int64 layer_mask)
+	void renderPointLightInfluencedGeometry(ComponentIndex light)
 	{
 		PROFILE_FUNCTION();
 
 		m_tmp_meshes.clear();
 
-		m_scene->getPointLightInfluencedGeometry(light, m_tmp_meshes, layer_mask);
+		m_scene->getPointLightInfluencedGeometry(light, m_tmp_meshes);
 
 		renderMeshes(m_tmp_meshes);
 	}
 
 
-	void renderPointLightInfluencedGeometry(const Frustum& frustum,
-											int64 layer_mask)
+	void renderPointLightInfluencedGeometry(const Frustum& frustum)
 	{
 		PROFILE_FUNCTION();
 
@@ -1145,21 +1599,19 @@ struct PipelineImpl : public Pipeline
 			m_tmp_terrains.clear();
 
 			ComponentIndex light = lights[i];
-			m_current_light = light;
 			m_is_current_light_global = false;
-			m_scene->getPointLightInfluencedGeometry(light, frustum, m_tmp_meshes, layer_mask);
+			setPointLightUniforms(light);
+			m_scene->getPointLightInfluencedGeometry(light, frustum, m_tmp_meshes);
 
 			m_scene->getTerrainInfos(m_tmp_terrains,
-				layer_mask,
 				m_scene->getUniverse().getPosition(m_scene->getCameraEntity(m_applied_camera)),
 				m_renderer.getFrameAllocator());
 
-			m_scene->getGrassInfos(frustum, m_tmp_grasses, layer_mask, m_applied_camera);
+			m_scene->getGrassInfos(frustum, m_tmp_grasses, m_applied_camera);
 			renderMeshes(m_tmp_meshes);
 			renderTerrains(m_tmp_terrains);
 			renderGrasses(m_tmp_grasses);
 		}
-		m_current_light = -1;
 	}
 
 
@@ -1168,17 +1620,17 @@ struct PipelineImpl : public Pipeline
 		Material* material = m_materials[material_index];
 		if (!material->isReady() || !bgfx::checkAvailTransientVertexBuffer(3, m_base_vertex_decl))
 		{
-			bgfx::touch(m_view_idx);
+			bgfx::touch(m_bgfx_view);
 			return;
 		}
 
 		Matrix projection_mtx;
 		projection_mtx.setOrtho(-1, 1, 1, -1, 0, 30);
 
-		bgfx::setViewTransform(m_view_idx, &Matrix::IDENTITY.m11, &projection_mtx.m11);
+		bgfx::setViewTransform(m_bgfx_view, &Matrix::IDENTITY.m11, &projection_mtx.m11);
 		if (m_current_framebuffer)
 		{
-			bgfx::setViewRect(m_view_idx,
+			bgfx::setViewRect(m_bgfx_view,
 				m_view_x,
 				m_view_y,
 				(uint16)m_current_framebuffer->getWidth(),
@@ -1186,7 +1638,7 @@ struct PipelineImpl : public Pipeline
 		}
 		else
 		{
-			bgfx::setViewRect(m_view_idx, m_view_x, m_view_y, (uint16)m_width, (uint16)m_height);
+			bgfx::setViewRect(m_bgfx_view, m_view_x, m_view_y, (uint16)m_width, (uint16)m_height);
 		}
 
 		bgfx::TransientVertexBuffer vb;
@@ -1195,134 +1647,112 @@ struct PipelineImpl : public Pipeline
 		float x2 = x + w;
 		float y2 = y + h;
 
-		vertex[0].m_x = x;
-		vertex[0].m_y = y;
-		vertex[0].m_z = 0;
-		vertex[0].m_rgba = 0xffffffff;
-		vertex[0].m_u = 0;
-		vertex[0].m_v = 0;
+		vertex[0].x = x;
+		vertex[0].y = y;
+		vertex[0].z = 0;
+		vertex[0].rgba = 0xffffffff;
+		vertex[0].u = 0;
+		vertex[0].v = 0;
 
-		vertex[1].m_x = x2;
-		vertex[1].m_y = y;
-		vertex[1].m_z = 0;
-		vertex[1].m_rgba = 0xffffffff;
-		vertex[1].m_u = 1;
-		vertex[1].m_v = 0;
+		vertex[1].x = x2;
+		vertex[1].y = y;
+		vertex[1].z = 0;
+		vertex[1].rgba = 0xffffffff;
+		vertex[1].u = 1;
+		vertex[1].v = 0;
 
-		vertex[2].m_x = x2;
-		vertex[2].m_y = y2;
-		vertex[2].m_z = 0;
-		vertex[2].m_rgba = 0xffffffff;
-		vertex[2].m_u = 1;
-		vertex[2].m_v = 1;
+		vertex[2].x = x2;
+		vertex[2].y = y2;
+		vertex[2].z = 0;
+		vertex[2].rgba = 0xffffffff;
+		vertex[2].u = 1;
+		vertex[2].v = 1;
 
-		vertex[3].m_x = x;
-		vertex[3].m_y = y;
-		vertex[3].m_z = 0;
-		vertex[3].m_rgba = 0xffffffff;
-		vertex[3].m_u = 0;
-		vertex[3].m_v = 0;
+		vertex[3].x = x;
+		vertex[3].y = y;
+		vertex[3].z = 0;
+		vertex[3].rgba = 0xffffffff;
+		vertex[3].u = 0;
+		vertex[3].v = 0;
 
-		vertex[4].m_x = x2;
-		vertex[4].m_y = y2;
-		vertex[4].m_z = 0;
-		vertex[4].m_rgba = 0xffffffff;
-		vertex[4].m_u = 1;
-		vertex[4].m_v = 1;
+		vertex[4].x = x2;
+		vertex[4].y = y2;
+		vertex[4].z = 0;
+		vertex[4].rgba = 0xffffffff;
+		vertex[4].u = 1;
+		vertex[4].v = 1;
 
-		vertex[5].m_x = x;
-		vertex[5].m_y = y2;
-		vertex[5].m_z = 0;
-		vertex[5].m_rgba = 0xffffffff;
-		vertex[5].m_u = 0;
-		vertex[5].m_v = 1;
+		vertex[5].x = x;
+		vertex[5].y = y2;
+		vertex[5].z = 0;
+		vertex[5].rgba = 0xffffffff;
+		vertex[5].u = 0;
+		vertex[5].v = 1;
 
-		for (int i = 0; i < material->getUniformCount(); ++i)
-		{
-			const Material::Uniform& uniform = material->getUniform(i);
-
-			switch (uniform.m_type)
-			{
-				case Material::Uniform::FLOAT:
-				{
-					Vec4 v(uniform.m_float, 0, 0, 0);
-					bgfx::setUniform(uniform.m_handle, &v);
-				}
-				break;
-				case Material::Uniform::TIME:
-				{
-					Vec4 v(m_scene->getTime(), 0, 0, 0);
-					bgfx::setUniform(uniform.m_handle, &v);
-				}
-				break;
-				default: ASSERT(false); break;
-			}
-		}
-
-		Shader* shader = material->getShader();
-		for (int i = 0; i < material->getTextureCount(); ++i)
-		{
-			Texture* texture = material->getTexture(i);
-			if (texture)
-			{
-				bgfx::setTexture(
-					i, shader->getTextureSlot(i).m_uniform_handle, texture->getTextureHandle());
-			}
-		}
+		executeCommandBuffer(material->getCommandBuffer(), material);
+		executeCommandBuffer(m_views[m_view_idx].command_buffer.buffer, material);
 
 		if (m_applied_camera >= 0)
 		{
 			Matrix projection_matrix;
+			Universe& universe = m_scene->getUniverse();
 			float fov = m_scene->getCameraFOV(m_applied_camera);
 			float near_plane = m_scene->getCameraNearPlane(m_applied_camera);
 			float far_plane = m_scene->getCameraFarPlane(m_applied_camera);
 			float ratio = float(m_width) / m_height;
+			Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
+			Matrix camera_matrix = universe.getPositionAndRotation(camera_entity);
+			Matrix view_matrix = camera_matrix; 
+			view_matrix.fastInverse();
 			projection_matrix.setPerspective(
 				Math::degreesToRadians(fov), ratio, near_plane, far_plane);
-			projection_matrix.inverse();
+			Matrix inv_projection = projection_matrix;
+			inv_projection.inverse();
+			Matrix inv_view_proj = projection_matrix * view_matrix;
+			inv_view_proj.inverse();
 
-			bgfx::setUniform(m_cam_inv_proj_uniform, &projection_matrix.m11);
-
-			Universe& universe = m_scene->getUniverse();
-			Matrix mtx = universe.getMatrix(m_scene->getCameraEntity(m_applied_camera));
-
-			bgfx::setUniform(m_cam_view_uniform, &mtx.m11);
+			bgfx::setUniform(m_cam_inv_proj_uniform, &inv_projection.m11);
+			bgfx::setUniform(m_cam_inv_viewproj_uniform, &inv_view_proj.m11);
+			bgfx::setUniform(m_cam_view_uniform, &view_matrix.m11);
+			bgfx::setUniform(m_cam_proj_uniform, &projection_matrix.m11);
+			bgfx::setUniform(m_cam_inv_view_uniform, &camera_matrix.m11);
+			bgfx::setUniform(m_cam_params, &Vec4(near_plane, far_plane, fov, ratio));
 		}
 
+		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::setVertexBuffer(&vb);
-		bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
+		++m_stats.m_draw_call_count;
+		++m_stats.m_instance_count;
+		m_stats.m_triangle_count += 2;
+		bgfx::submit(m_bgfx_view, material->getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
 
-	void renderAll(const Frustum& frustum, int64 layer_mask, bool render_grass)
+	void renderAll(const Frustum& frustum, bool render_grass, const Vec3& lod_ref_point)
 	{
 		PROFILE_FUNCTION();
 
 		if (m_applied_camera < 0) return;
 
 		m_tmp_grasses.clear();
-		m_tmp_meshes.clear();
 		m_tmp_terrains.clear();
 
-		m_scene->getRenderableInfos(frustum, m_tmp_meshes, layer_mask);
+		auto& meshes = m_scene->getRenderableInfos(frustum, lod_ref_point);
 		Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
 		Vec3 camera_pos = m_scene->getUniverse().getPosition(camera_entity);
 		LIFOAllocator& frame_allocator = m_renderer.getFrameAllocator();
-		m_scene->getTerrainInfos(m_tmp_terrains, layer_mask, camera_pos, frame_allocator);
+		m_scene->getTerrainInfos(m_tmp_terrains, camera_pos, frame_allocator);
 
 		m_is_current_light_global = true;
-		m_current_light = m_scene->getActiveGlobalLight();
 
-		renderMeshes(m_tmp_meshes);
-		renderTerrains(m_tmp_terrains);
 		if (render_grass)
 		{
-			m_scene->getGrassInfos(frustum, m_tmp_grasses, layer_mask, m_applied_camera);
+			m_scene->getGrassInfos(frustum, m_tmp_grasses, m_applied_camera);
 			renderGrasses(m_tmp_grasses);
 		}
-
-		m_current_light = -1;
+		renderTerrains(m_tmp_terrains);
+		renderMeshes(meshes);
 	}
 
 
@@ -1345,7 +1775,7 @@ struct PipelineImpl : public Pipeline
 		for (int i = 0; i < model.getMeshCount(); ++i)
 		{
 			auto& mesh = model.getMesh(i);
-			int instance_idx = mesh.getInstanceIdx();
+			int instance_idx = mesh.instance_idx;
 			if (instance_idx == -1)
 			{
 				instance_idx = m_instance_data_idx;
@@ -1354,7 +1784,7 @@ struct PipelineImpl : public Pipeline
 				{
 					finishInstances(instance_idx);
 				}
-				mesh.setInstanceIdx(instance_idx);
+				mesh.instance_idx = instance_idx;
 			}
 			InstanceData& data = m_instances_data[instance_idx];
 			if (!data.buffer)
@@ -1377,44 +1807,55 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void setPoseUniform(const RenderableMesh& renderable_mesh) const
+	void renderSkinnedMesh(const Renderable& renderable, const RenderableMesh& info)
 	{
-		Matrix bone_mtx[64];
-		
-		Renderable* renderable = m_scene->getRenderable(renderable_mesh.renderable);
-		const Pose& pose = *renderable->pose;
-		const Model& model = *renderable->model;
+		const Mesh& mesh = *info.mesh;
+		Material* material = mesh.material;
+		auto& shader_instance = mesh.material->getShaderInstance();
+
+		Matrix bone_mtx[128];
+
+		const Pose& pose = *renderable.pose;
+		const Model& model = *renderable.model;
 		Vec3* poss = pose.getPositions();
 		Quat* rots = pose.getRotations();
 
 		ASSERT(pose.getCount() <= lengthOf(bone_mtx));
 		for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count;
-			 ++bone_index)
+		++bone_index)
 		{
+			auto& bone = model.getBone(bone_index);
 			rots[bone_index].toMatrix(bone_mtx[bone_index]);
 			bone_mtx[bone_index].translate(poss[bone_index]);
-			bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
+			bone_mtx[bone_index] = bone_mtx[bone_index] * bone.inv_bind_matrix;
 		}
-		bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.getCount());
-	}
 
+		for (int i = 0; i < m_current_render_view_count; ++i)
+		{
+			auto& view = m_views[m_current_render_views[i]];
+			if (!bgfx::isValid(shader_instance.m_program_handles[view.pass_idx])) continue;
 
-	void renderSkinnedMesh(const Renderable& renderable, const RenderableMesh& info)
-	{
-		const Mesh& mesh = *info.mesh;
-		Material* material = mesh.getMaterial();
+			for (int j = 0, c = material->getLayerCount(); j < c; ++j)
+			{
+				bgfx::setUniform(m_layer_uniform, &Vec4((j + 1) / (float)c, 0, 0, 0));
+				bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.getCount());
+				executeCommandBuffer(material->getCommandBuffer(), material);
+				executeCommandBuffer(view.command_buffer.buffer, material);
 
-		setPoseUniform(info);
-		setMaterial(material);
-		bgfx::setTransform(&renderable.matrix);
-		bgfx::setVertexBuffer(renderable.model->getVerticesHandle(),
-			mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(),
-			mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
-		bgfx::setIndexBuffer(
-			renderable.model->getIndicesHandle(), mesh.getIndicesOffset(), mesh.getIndexCount());
-		bgfx::setState(m_render_state | material->getRenderStates());
-		bgfx::submit(m_view_idx,
-			mesh.getMaterial()->getShaderInstance().m_program_handles[m_pass_idx]);
+				bgfx::setTransform(&renderable.matrix);
+				bgfx::setVertexBuffer(renderable.model->getVerticesHandle(),
+					mesh.attribute_array_offset / mesh.vertex_def.getStride(),
+					mesh.attribute_array_size / mesh.vertex_def.getStride());
+				bgfx::setIndexBuffer(
+					renderable.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
+				bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+				bgfx::setState(view.render_state | material->getRenderStates());
+				++m_stats.m_draw_call_count;
+				++m_stats.m_instance_count;
+				m_stats.m_triangle_count += mesh.indices_count / 3;
+				bgfx::submit(view.bgfx_id, shader_instance.m_program_handles[view.pass_idx]);
+			}
+		}
 	}
 
 
@@ -1430,24 +1871,29 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void render(TransientGeometry& geom,
+	void render(const bgfx::TransientVertexBuffer& vertex_buffer,
+		const bgfx::TransientIndexBuffer& index_buffer,
 		const Matrix& mtx,
 		int first_index,
 		int num_indices,
 		uint64 render_states,
 		bgfx::ProgramHandle program_handle) override
 	{
+		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(m_render_state | render_states);
 		bgfx::setTransform(&mtx.m11);
-		bgfx::setVertexBuffer(&geom.getVertexBuffer());
-		bgfx::setIndexBuffer(&geom.getIndexBuffer(), first_index, num_indices);
-		bgfx::submit(m_view_idx, program_handle);
+		bgfx::setVertexBuffer(&vertex_buffer);
+		bgfx::setIndexBuffer(&index_buffer, first_index, num_indices);
+		++m_stats.m_draw_call_count;
+		++m_stats.m_instance_count;
+		m_stats.m_triangle_count += num_indices / 3;
+		bgfx::submit(m_bgfx_view, program_handle);
 	}
 
 
 	void renderRigidMesh(const Renderable& renderable, const RenderableMesh& info)
 	{
-		int instance_idx = info.mesh->getInstanceIdx();
+		int instance_idx = info.mesh->instance_idx;
 		if (instance_idx == -1)
 		{
 			instance_idx = m_instance_data_idx;
@@ -1456,17 +1902,15 @@ struct PipelineImpl : public Pipeline
 			{
 				finishInstances(instance_idx);
 			}
-			info.mesh->setInstanceIdx(instance_idx);
-		}
-		InstanceData& data = m_instances_data[instance_idx];
-		if (!data.buffer)
-		{
+			InstanceData& data = m_instances_data[instance_idx];
 			data.buffer =
 				bgfx::allocInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
 			data.instance_count = 0;
 			data.mesh = info.mesh;
 			data.model = renderable.model;
+			info.mesh->instance_idx = instance_idx;
 		}
+		InstanceData& data = m_instances_data[instance_idx];
 		Matrix* mtcs = (Matrix*)data.buffer->data;
 		mtcs[data.instance_count] = renderable.matrix;
 		++data.instance_count;
@@ -1478,56 +1922,67 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void setMaterial(Material* material)
+	void executeCommandBuffer(const uint8* data, Material* material) const
 	{
-		if (m_is_current_light_global)
+		const uint8* ip = data;
+		for (;;)
 		{
-			setDirectionalLightUniforms(m_current_light);
-		}
-		else
-		{
-			setPointLightUniforms(material, m_current_light);
-		}
-
-		for (int i = 0; i < material->getUniformCount(); ++i)
-		{
-			const Material::Uniform& uniform = material->getUniform(i);
-
-			switch (uniform.m_type)
+			switch ((BufferCommands)*ip)
 			{
-				case Material::Uniform::FLOAT:
+				case BufferCommands::END:
+					return;
+				case BufferCommands::SET_TEXTURE:
 				{
-					Vec4 v(uniform.m_float, 0, 0, 0);
-					bgfx::setUniform(uniform.m_handle, &v);
+					auto cmd = (SetTextureCommand*)ip;
+					ip += sizeof(*cmd);
+					bgfx::setTexture(cmd->stage, cmd->uniform, cmd->texture);
+					break;
 				}
-				break;
-				case Material::Uniform::TIME:
+				case BufferCommands::SET_UNIFORM_TIME:
 				{
-					Vec4 v(m_scene->getTime(), 0, 0, 0);
-					bgfx::setUniform(uniform.m_handle, &v);
+					auto cmd = (SetUniformTimeCommand*)ip;
+					ip += sizeof(*cmd);
+					bgfx::setUniform(cmd->uniform, &Vec4(m_scene->getTime(), 0, 0, 0));
+					break;
 				}
-				break;
-				default: ASSERT(false); break;
+				case BufferCommands::SET_UNIFORM_VEC4:
+				{
+					auto cmd = (SetUniformVec4Command*)ip;
+					ip += sizeof(*cmd);
+					bgfx::setUniform(cmd->uniform, &cmd->value);
+					break;
+				}
+				case BufferCommands::SET_UNIFORM_ARRAY:
+				{
+					auto cmd = (SetUniformArrayCommand*)ip;
+					ip += sizeof(*cmd);
+					bgfx::setUniform(cmd->uniform, ip, cmd->count);
+					ip += cmd->size;
+					break;
+				}
+				case BufferCommands::SET_GLOBAL_SHADOWMAP:
+				{
+					ip += 1;
+					auto handle = m_global_light_shadowmap->getRenderbufferHandle(0);
+					bgfx::setTexture(15 - m_global_textures_count,
+						m_tex_shadowmap_uniform,
+						handle);
+					break;
+				}
+				case BufferCommands::SET_LOCAL_SHADOWMAP:
+				{
+					auto cmd = (SetLocalShadowmapCommand*)ip;
+					ip += sizeof(*cmd);
+					material->setDefine(m_has_shadowmap_define_idx, bgfx::isValid(cmd->texture));
+					bgfx::setTexture(15 - m_global_textures_count,
+						m_tex_shadowmap_uniform,
+						cmd->texture);
+					break;
+				}
+				default:
+					ASSERT(false);
+					break;
 			}
-		}
-
-		Shader* shader = material->getShader();
-		for (int i = 0; i < material->getTextureCount(); ++i)
-		{
-			Texture* texture = material->getTexture(i);
-			if (!texture) continue;
-
-			bgfx::setTexture(
-				i, shader->getTextureSlot(i).m_uniform_handle, texture->getTextureHandle());
-		}
-
-		Vec4 specular_shininess(material->getSpecular(), material->getShininess());
-		bgfx::setUniform(m_specular_shininess_uniform, &specular_shininess);
-
-		if (m_is_current_light_global && !m_is_rendering_in_shadowmap && m_global_light_shadowmap)
-		{
-			auto handle = m_global_light_shadowmap->getRenderbufferHandle(0);
-			bgfx::setTexture(shader->getTextureSlotCount(), m_tex_shadowmap_uniform, handle);
 		}
 	}
 
@@ -1578,7 +2033,9 @@ struct PipelineImpl : public Pipeline
 		bgfx::setUniform(m_terrain_scale_uniform, &terrain_scale);
 		bgfx::setUniform(m_terrain_matrix_uniform, &info.m_world_matrix.m11);
 
-		setMaterial(material);
+		auto& view = m_views[m_current_render_views[0]];
+		executeCommandBuffer(material->getCommandBuffer(), material);
+		executeCommandBuffer(view.command_buffer.buffer, material);
 
 		struct TerrainInstanceData
 		{
@@ -1599,14 +2056,18 @@ struct PipelineImpl : public Pipeline
 		}
 
 		bgfx::setVertexBuffer(info.m_terrain->getVerticesHandle());
-		int mesh_part_indices_count = mesh.getIndexCount() / 4;
+		int mesh_part_indices_count = mesh.indices_count / 4;
 		bgfx::setIndexBuffer(info.m_terrain->getIndicesHandle(),
 			info.m_index * mesh_part_indices_count,
 			mesh_part_indices_count);
-		bgfx::setState(m_render_state | mesh.getMaterial()->getRenderStates());
+		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+		bgfx::setState(view.render_state | mesh.material->getRenderStates());
 		bgfx::setInstanceDataBuffer(instance_buffer, m_terrain_instances[index].m_count);
-		auto shader_instance = material->getShaderInstance().m_program_handles[m_pass_idx];
-		bgfx::submit(m_view_idx, shader_instance);
+		auto shader_instance = material->getShaderInstance().m_program_handles[view.pass_idx];
+		++m_stats.m_draw_call_count;
+		m_stats.m_instance_count += m_terrain_instances[index].m_count;
+		m_stats.m_triangle_count += m_terrain_instances[index].m_count * mesh_part_indices_count;
+		bgfx::submit(view.bgfx_id, shader_instance);
 
 		m_terrain_instances[index].m_count = 0;
 	}
@@ -1618,17 +2079,24 @@ struct PipelineImpl : public Pipeline
 			bgfx::allocInstanceDataBuffer(grass.m_matrix_count, sizeof(Matrix));
 		copyMemory(idb->data, &grass.m_matrices[0], grass.m_matrix_count * sizeof(Matrix));
 		const Mesh& mesh = grass.m_model->getMesh(0);
-		Material* material = mesh.getMaterial();
+		Material* material = mesh.material;
 
-		setMaterial(material);
+		auto& view = m_views[m_current_render_views[0]];
+		executeCommandBuffer(material->getCommandBuffer(), material);
+		executeCommandBuffer(view.command_buffer.buffer, material);
+
 		bgfx::setVertexBuffer(grass.m_model->getVerticesHandle(),
-			mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(),
-			mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
+			mesh.attribute_array_offset / mesh.vertex_def.getStride(),
+			mesh.attribute_array_size / mesh.vertex_def.getStride());
 		bgfx::setIndexBuffer(
-			grass.m_model->getIndicesHandle(), mesh.getIndicesOffset(), mesh.getIndexCount());
-		bgfx::setState(m_render_state | material->getRenderStates());
+			grass.m_model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
+		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+		bgfx::setState(view.render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(idb, grass.m_matrix_count);
-		bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
+		++m_stats.m_draw_call_count;
+		m_stats.m_instance_count += grass.m_matrix_count;
+		m_stats.m_triangle_count += grass.m_matrix_count * mesh.indices_count;
+		bgfx::submit(view.bgfx_id, material->getShaderInstance().m_program_handles[view.pass_idx]);
 	}
 
 
@@ -1660,14 +2128,14 @@ struct PipelineImpl : public Pipeline
 	void renderMeshes(const Array<RenderableMesh>& meshes)
 	{
 		PROFILE_FUNCTION();
-		if (meshes.empty()) return;
+		if(meshes.empty()) return;
 
 		Renderable* renderables = m_scene->getRenderables();
 		PROFILE_INT("mesh count", meshes.size());
-		for (auto& mesh : meshes)
+		for(auto& mesh : meshes)
 		{
 			Renderable& renderable = renderables[mesh.renderable];
-			if (renderable.pose && renderable.pose->getCount() > 0)
+			if(renderable.pose && renderable.pose->getCount() > 0)
 			{
 				renderSkinnedMesh(renderable, mesh);
 			}
@@ -1677,6 +2145,33 @@ struct PipelineImpl : public Pipeline
 			}
 		}
 		finishInstances();
+	}
+
+	
+	void renderMeshes(const Array<Array<RenderableMesh>>& meshes)
+	{
+		PROFILE_FUNCTION();
+		int mesh_count = 0;
+		for (auto& submeshes : meshes)
+		{
+			if(submeshes.empty()) continue;
+			Renderable* renderables = m_scene->getRenderables();
+			mesh_count += submeshes.size();
+			for (auto& mesh : submeshes)
+			{
+				Renderable& renderable = renderables[mesh.renderable];
+				if (renderable.pose && renderable.pose->getCount() > 0)
+				{
+					renderSkinnedMesh(renderable, mesh);
+				}
+				else
+				{
+					renderRigidMesh(renderable, mesh);
+				}
+			}
+		}
+		finishInstances();
+		PROFILE_INT("mesh count", mesh_count);
 	}
 
 
@@ -1690,6 +2185,14 @@ struct PipelineImpl : public Pipeline
 		{
 			m_default_framebuffer->resize(w, h);
 		}
+		for (auto& i : m_framebuffers)
+		{
+			auto size_ratio = i->getSizeRatio();
+			if (size_ratio.x > 0 || size_ratio.y > 0)
+			{
+				i->resize(int(w * size_ratio.x), int(h * size_ratio.y));
+			}
+		}
 		m_width = w;
 		m_height = h;
 	}
@@ -1700,17 +2203,18 @@ struct PipelineImpl : public Pipeline
 		PROFILE_FUNCTION();
 
 		if (!isReady()) return;
+		if (!m_scene) return;
 
-		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE |
-						 BGFX_STATE_MSAA;
+		m_stats = {};
+		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE | BGFX_STATE_MSAA;
 		m_applied_camera = INVALID_COMPONENT;
 		m_global_light_shadowmap = nullptr;
+		m_stencil = BGFX_STENCIL_NONE;
 		m_render_state |= m_is_wireframe ? BGFX_STATE_PT_LINESTRIP : 0;
-		m_view_idx = m_renderer.getViewCounter();
+		m_view_idx = -1;
+		m_bgfx_view = m_renderer.getViewCounter();
 		m_pass_idx = -1;
 		m_current_framebuffer = m_default_framebuffer;
-		m_current_light = -1;
-		m_view2pass_map.assign(0xFF);
 		m_instance_data_idx = 0;
 		m_point_light_shadowmaps.clear();
 		for (int i = 0; i < lengthOf(m_terrain_instances); ++i)
@@ -1723,12 +2227,13 @@ struct PipelineImpl : public Pipeline
 			m_instances_data[i].instance_count = 0;
 		}
 
-		if (lua_getglobal(m_lua_state, "render") == LUA_TFUNCTION)
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		if (lua_getfield(m_lua_state, -1, "render") == LUA_TFUNCTION)
 		{
 			lua_pushlightuserdata(m_lua_state, this);
 			if (lua_pcall(m_lua_state, 1, 0, 0) != LUA_OK)
 			{
-				g_log_error.log("lua") << lua_tostring(m_lua_state, -1);
+				g_log_warning.log("Renderer") << lua_tostring(m_lua_state, -1);
 				lua_pop(m_lua_state, 1);
 			}
 		}
@@ -1758,7 +2263,7 @@ struct PipelineImpl : public Pipeline
 
 		if (errors)
 		{
-			g_log_error.log("pipeline") << lua_tostring(m_lua_state, -1);
+			g_log_error.log("Renderer") << lua_tostring(m_lua_state, -1);
 			lua_pop(m_lua_state, 1);
 		}
 	}
@@ -1777,6 +2282,14 @@ struct PipelineImpl : public Pipeline
 	int createUniform(const char* name)
 	{
 		bgfx::UniformHandle handle = bgfx::createUniform(name, bgfx::UniformType::Int1);
+		m_uniforms.push(handle);
+		return m_uniforms.size() - 1;
+	}
+
+
+	int createVec4ArrayUniform(const char* name, int num)
+	{
+		bgfx::UniformHandle handle = bgfx::createUniform(name, bgfx::UniformType::Vec4, num);
 		m_uniforms.push(handle);
 		return m_uniforms.size() - 1;
 	}
@@ -1802,41 +2315,59 @@ struct PipelineImpl : public Pipeline
 		else if (compareString(mode, "multiply") == 0) mode_value = BGFX_STATE_BLEND_MULTIPLY;
 
 		m_render_state |= mode_value;
+		m_views[m_view_idx].render_state = m_render_state;
 	}
 
 
-	void clear(const char* buffers, int color)
+	void clear(uint32 flags, uint32 color)
 	{
-		uint16 flags = 0;
-		if (compareString(buffers, "all") == 0)
-		{
-			flags = BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH;
-		}
-		else if (compareString(buffers, "depth") == 0)
-		{
-			flags = BGFX_CLEAR_DEPTH;
-		}
-		bgfx::setViewClear(m_view_idx, flags, color, 1.0f, 0);
-		bgfx::touch(m_view_idx);
+		bgfx::setViewClear(m_bgfx_view, (uint16)flags, color, 1.0f, 0);
+		bgfx::touch(m_bgfx_view);
 	}
 
 
-	void renderModels(int64 layer_mask, bool is_point_light_render)
+	void renderPointLightLitGeometry()
 	{
-		if (is_point_light_render)
-		{
-			renderPointLightInfluencedGeometry(m_camera_frustum, layer_mask);
-		}
-		else
-		{
-			renderAll(m_camera_frustum, layer_mask, true);
-		}
+		renderPointLightInfluencedGeometry(m_camera_frustum);
 	}
 
 
 	bool isReady() const override { return m_is_ready; }
-	void setScene(RenderScene* scene) override { m_scene = scene; }
+
+
+	void setScene(RenderScene* scene) override 
+	{
+		for (int i = m_first_postprocess_framebuffer; i < m_framebuffers.size(); ++i)
+		{
+			LUMIX_DELETE(m_allocator, m_framebuffers[i]);
+		}
+		m_framebuffers.resize(m_first_postprocess_framebuffer);
+
+		m_scene = scene;
+		if (m_lua_state && m_scene) callInitScene();
+	}
+
+
 	void setWireframe(bool wireframe) override { m_is_wireframe = wireframe; }
+
+
+	void callInitScene()
+	{
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		if(lua_getfield(m_lua_state, -1, "initScene") == LUA_TFUNCTION)
+		{
+			lua_pushlightuserdata(m_lua_state, this);
+			if(lua_pcall(m_lua_state, 1, 0, 0) != LUA_OK)
+			{
+				g_log_error.log("lua") << lua_tostring(m_lua_state, -1);
+				lua_pop(m_lua_state, 1);
+			}
+		}
+		else
+		{
+			lua_pop(m_lua_state, 1);
+		}
+	}
 
 
 	struct TerrainInstance
@@ -1856,19 +2387,21 @@ struct PipelineImpl : public Pipeline
 
 	struct BaseVertex
 	{
-		float m_x, m_y, m_z;
-		uint32 m_rgba;
-		float m_u;
-		float m_v;
+		float x, y, z;
+		uint32 rgba;
+		float u;
+		float v;
 	};
 
 
+	bgfx::VertexDecl m_deferred_point_light_vertex_decl;
 	bgfx::VertexDecl m_base_vertex_decl;
 	TerrainInstance m_terrain_instances[4];
 	uint32 m_debug_flags;
-	uint8 m_view_idx;
+	uint8 m_bgfx_view;
+	int m_view_idx;
+	View m_views[32];
 	int m_pass_idx;
-	StaticArray<uint8, 256> m_view2pass_map;
 	uint64 m_render_state;
 	IAllocator& m_allocator;
 	Lumix::Path m_path;
@@ -1884,47 +2417,58 @@ struct PipelineImpl : public Pipeline
 	InstanceData m_instances_data[128];
 	int m_instance_data_idx;
 	ComponentIndex m_applied_camera;
-	ComponentIndex m_current_light;
+	bgfx::VertexBufferHandle m_cube_vb;
+	bgfx::IndexBufferHandle m_cube_ib;
 	bool m_is_current_light_global;
 	bool m_is_wireframe;
 	bool m_is_rendering_in_shadowmap;
 	bool m_is_ready;
 	Frustum m_camera_frustum;
 
+	int* m_current_render_views;
+	int m_current_render_view_count;
 	Matrix m_shadow_viewprojection[4];
 	int m_view_x;
 	int m_view_y;
 	int m_width;
 	int m_height;
+	uint32 m_stencil;
 	bgfx::VertexBufferHandle m_particle_vertex_buffer;
 	bgfx::IndexBufferHandle m_particle_index_buffer;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
 	Array<RenderableMesh> m_tmp_meshes;
 	Array<const TerrainInfo*> m_tmp_terrains;
 	Array<GrassInfo> m_tmp_grasses;
+	Array<ComponentIndex> m_tmp_local_lights;
 
-	bgfx::UniformHandle m_specular_shininess_uniform;
+	bgfx::UniformHandle m_mat_color_shininess_uniform;
 	bgfx::UniformHandle m_bone_matrices_uniform;
+	bgfx::UniformHandle m_layer_uniform;
 	bgfx::UniformHandle m_terrain_scale_uniform;
 	bgfx::UniformHandle m_rel_camera_pos_uniform;
 	bgfx::UniformHandle m_terrain_params_uniform;
 	bgfx::UniformHandle m_fog_color_density_uniform;
 	bgfx::UniformHandle m_fog_params_uniform;
 	bgfx::UniformHandle m_light_pos_radius_uniform;
-	bgfx::UniformHandle m_light_color_uniform;
+	bgfx::UniformHandle m_light_color_attenuation_uniform;
 	bgfx::UniformHandle m_ambient_color_uniform;
 	bgfx::UniformHandle m_light_dir_fov_uniform;
 	bgfx::UniformHandle m_shadowmap_matrices_uniform;
 	bgfx::UniformHandle m_light_specular_uniform;
 	bgfx::UniformHandle m_terrain_matrix_uniform;
-	bgfx::UniformHandle m_attenuation_params_uniform;
 	bgfx::UniformHandle m_tex_shadowmap_uniform;
 	bgfx::UniformHandle m_cam_view_uniform;
+	bgfx::UniformHandle m_cam_proj_uniform;
+	bgfx::UniformHandle m_cam_params;
+	bgfx::UniformHandle m_cam_inv_view_uniform;
 	bgfx::UniformHandle m_cam_inv_proj_uniform;
+	bgfx::UniformHandle m_cam_inv_viewproj_uniform;
 	bgfx::UniformHandle m_texture_size_uniform;
+	int m_global_textures_count;
 
 	Material* m_debug_line_material;
 	int m_has_shadowmap_define_idx;
+	int m_first_postprocess_framebuffer;
 };
 
 
@@ -1942,26 +2486,123 @@ void Pipeline::destroy(Pipeline* pipeline)
 
 namespace LuaAPI
 {
-	
+
+
+int addFramebuffer(lua_State* L)
+{
+	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
+	const char* name = LuaWrapper::checkArg<const char*>(L, 2);
+	LuaWrapper::checkTableArg(L, 3);
+	FrameBuffer::Declaration decl;
+	copyString(decl.m_name, name);
+
+	if(lua_getfield(L, 3, "width") == LUA_TNUMBER)
+	{
+		decl.m_width = (int)lua_tointeger(L, -1);
+	}
+	lua_pop(L, 1);
+	decl.m_size_ratio = Vec2(-1, -1);
+	if(lua_getfield(L, 3, "size_ratio") == LUA_TTABLE)
+	{
+		decl.m_size_ratio = LuaWrapper::toType<Vec2>(L, -1);
+	}
+	lua_pop(L, 1);
+	if(lua_getfield(L, 3, "screen_size") == LUA_TBOOLEAN)
+	{
+		bool is_screen_size = lua_toboolean(L, -1) != 0;
+		decl.m_size_ratio = is_screen_size ? Vec2(1, 1) : Vec2(-1, -1);
+	}
+	lua_pop(L, 1);
+	if(lua_getfield(L, 3, "height") == LUA_TNUMBER)
+	{
+		decl.m_height = (int)lua_tointeger(L, -1);
+	}
+	lua_pop(L, 1);
+	if(lua_getfield(L, 3, "renderbuffers") == LUA_TTABLE)
+	{
+		PipelineImpl::parseRenderbuffers(L, decl);
+	}
+	lua_pop(L, 1);
+	if ((decl.m_size_ratio.x > 0 || decl.m_size_ratio.y > 0) && pipeline->m_height > 0)
+	{
+		decl.m_width = int(pipeline->m_width * decl.m_size_ratio.x);
+		decl.m_height = int(pipeline->m_height * decl.m_size_ratio.y);
+	}
+	auto* fb = LUMIX_NEW(pipeline->m_allocator, FrameBuffer)(decl);
+	pipeline->m_framebuffers.push(fb);
+	if(compareString(decl.m_name, "default") == 0) pipeline->m_default_framebuffer = fb;
+
+	return 0;
+}
+
+
+int renderModels(lua_State* L)
+{
+	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
+	LuaWrapper::checkTableArg(L, 2);
+	int len = (int)lua_rawlen(L, 2);
+	int views[16] = {};
+	for (int i = 0; i < len; ++i)
+	{
+		if (lua_rawgeti(L, 2, 1 + i))
+		{
+			views[i] = (int)lua_tointeger(L, -1);
+		}
+		lua_pop(L, 1);
+	}
+
+	pipeline->m_current_render_views = views;
+	pipeline->m_current_render_view_count = len;
+	pipeline->renderAll(pipeline->m_camera_frustum, true, pipeline->m_camera_frustum.getPosition());
+	pipeline->m_current_render_views = &pipeline->m_view_idx;
+	pipeline->m_current_render_view_count = 1;
+	return 0;
+}
+
 
 void logError(const char* message)
 {
-	g_log_error.log("renderer") << message;
+	g_log_error.log("Renderer") << message;
+}
+
+
+int setUniform(lua_State* L)
+{
+	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
+	int uniform_idx = LuaWrapper::checkArg<int>(L, 2);
+	LuaWrapper::checkTableArg(L, 3);
+
+	Vec4 tmp[64];
+	int len = Math::minimum((int)lua_rawlen(L, 3), lengthOf(tmp));
+	for (int i = 0; i < len; ++i)
+	{
+		if (lua_rawgeti(L, 3, 1 + i) == LUA_TTABLE)
+		{
+			if (lua_rawgeti(L, -1, 1) == LUA_TNUMBER) tmp[i].x = (float)lua_tonumber(L, -1);
+			if (lua_rawgeti(L, -2, 2) == LUA_TNUMBER) tmp[i].y = (float)lua_tonumber(L, -1);
+			if (lua_rawgeti(L, -3, 3) == LUA_TNUMBER) tmp[i].z = (float)lua_tonumber(L, -1);
+			if (lua_rawgeti(L, -4, 4) == LUA_TNUMBER) tmp[i].w = (float)lua_tonumber(L, -1);
+			lua_pop(L, 4);
+		}
+		lua_pop(L, 1);
+	}
+
+	if (uniform_idx >= pipeline->m_uniforms.size()) luaL_argerror(L, 2, "unknown uniform");
+	
+	pipeline->m_views[pipeline->m_view_idx].command_buffer.beginAppend();
+	pipeline->m_views[pipeline->m_view_idx].command_buffer.setUniform(pipeline->m_uniforms[uniform_idx], tmp, len);
+	pipeline->m_views[pipeline->m_view_idx].command_buffer.end();
+	return 0;
 }
 
 
 int renderLocalLightsShadowmaps(lua_State* L)
 {
-	if (!LuaWrapper::isType<PipelineImpl*>(L, 1)
-		|| !LuaWrapper::isType<int>(L, 2)
-		|| !LuaWrapper::isType<const char*>(L, 4))
-	{
-		return 0;
-	}
+	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
+	const char* camera_slot = LuaWrapper::checkArg<const char*>(L, 2);
 
 	FrameBuffer* fbs[16];
-	auto* pipeline = (PipelineImpl*)lua_touserdata(L, 1);
-	int len = Math::minValue((int)lua_rawlen(L, 3), lengthOf(fbs));
+	int len = Math::minimum((int)lua_rawlen(L, 3), lengthOf(fbs));
 	for (int i = 0; i < len; ++i)
 	{
 		if (lua_rawgeti(L, 3, 1 + i) == LUA_TSTRING)
@@ -1973,9 +2614,8 @@ int renderLocalLightsShadowmaps(lua_State* L)
 	}
 
 	RenderScene* scene = pipeline->m_scene;
-	int64 layer_mask = (int64)lua_tonumber(L, 2);
-	ComponentIndex camera = scene->getCameraInSlot(lua_tostring(L, 4));
-	pipeline->renderLocalLightShadowmaps(camera, fbs, len, layer_mask);
+	ComponentIndex camera = scene->getCameraInSlot(camera_slot);
+	pipeline->renderLocalLightShadowmaps(camera, fbs, len);
 
 	return 0;
 }
@@ -1990,8 +2630,20 @@ void print(int x, int y, const char* text)
 } // namespace LuaAPI
 
 
-void PipelineImpl::registerCFunctions()
+void Pipeline::registerLuaAPI(lua_State* L)
 {
+	auto registerCFunction = [L](const char* name, lua_CFunction function)
+	{
+		lua_pushcfunction(L, function);
+		lua_setglobal(L, name);
+	};
+
+	auto registerConst = [L](const char* name, uint32 value)
+	{
+		lua_pushinteger(L, value);
+		lua_setglobal(L, name);
+	};
+
 	#define REGISTER_FUNCTION(name) \
 		do {\
 			auto f = &LuaWrapper::wrapMethod<PipelineImpl, decltype(&PipelineImpl::name), &PipelineImpl::name>; \
@@ -2000,10 +2652,10 @@ void PipelineImpl::registerCFunctions()
 
 	REGISTER_FUNCTION(drawQuad);
 	REGISTER_FUNCTION(setPass);
-	REGISTER_FUNCTION(beginNewView);
+	REGISTER_FUNCTION(newView);
 	REGISTER_FUNCTION(bindFramebufferTexture);
 	REGISTER_FUNCTION(applyCamera);
-	
+
 	REGISTER_FUNCTION(disableBlending);
 	REGISTER_FUNCTION(enableAlphaWrite);
 	REGISTER_FUNCTION(disableAlphaWrite);
@@ -2018,12 +2670,22 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(executeCustomCommand);
 	REGISTER_FUNCTION(getFPS);
 	REGISTER_FUNCTION(createUniform);
+	REGISTER_FUNCTION(createVec4ArrayUniform);
 	REGISTER_FUNCTION(hasScene);
 	REGISTER_FUNCTION(cameraExists);
 	REGISTER_FUNCTION(enableBlending);
 	REGISTER_FUNCTION(clear);
-	REGISTER_FUNCTION(renderModels);
+	REGISTER_FUNCTION(renderPointLightLitGeometry);
 	REGISTER_FUNCTION(renderShadowmap);
+	REGISTER_FUNCTION(copyRenderbuffer);
+	REGISTER_FUNCTION(setActiveGlobalLightUniforms);
+	REGISTER_FUNCTION(setStencil);
+	REGISTER_FUNCTION(setStencilRMask);
+	REGISTER_FUNCTION(setStencilRef);
+	REGISTER_FUNCTION(renderLightVolumes);
+	REGISTER_FUNCTION(postprocessCallback);
+	REGISTER_FUNCTION(removeFramebuffer);
+	REGISTER_FUNCTION(setMaterialDefine);
 
 	#undef REGISTER_FUNCTION
 
@@ -2033,13 +2695,65 @@ void PipelineImpl::registerCFunctions()
 	REGISTER_FUNCTION(print);
 	REGISTER_FUNCTION(logError);
 	REGISTER_FUNCTION(renderLocalLightsShadowmaps);
+	REGISTER_FUNCTION(setUniform);
+	REGISTER_FUNCTION(addFramebuffer);
+	REGISTER_FUNCTION(renderModels);
 
 	#undef REGISTER_FUNCTION
-	
-	for(auto& handler : m_custom_commands_handlers)
-	{
-		exposeCustomCommandToLua(handler);
-	}
+
+	#define REGISTER_STENCIL_CONST(a) \
+		registerConst("STENCIL_" #a, BGFX_STENCIL_##a)
+
+	REGISTER_STENCIL_CONST(TEST_LESS);
+	REGISTER_STENCIL_CONST(TEST_LEQUAL);
+	REGISTER_STENCIL_CONST(TEST_EQUAL);
+	REGISTER_STENCIL_CONST(TEST_GEQUAL);
+	REGISTER_STENCIL_CONST(TEST_GREATER);
+	REGISTER_STENCIL_CONST(TEST_NOTEQUAL);
+	REGISTER_STENCIL_CONST(TEST_NEVER);
+	REGISTER_STENCIL_CONST(TEST_ALWAYS);
+	REGISTER_STENCIL_CONST(TEST_SHIFT);
+	REGISTER_STENCIL_CONST(TEST_MASK);
+
+	REGISTER_STENCIL_CONST(OP_FAIL_S_ZERO);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_KEEP);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_REPLACE);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_INCR);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_INCRSAT);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_DECR);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_DECRSAT);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_INVERT);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_SHIFT);
+	REGISTER_STENCIL_CONST(OP_FAIL_S_MASK);
+
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_ZERO);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_KEEP);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_REPLACE);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_INCR);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_INCRSAT);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_DECR);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_DECRSAT);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_INVERT);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_SHIFT);
+	REGISTER_STENCIL_CONST(OP_FAIL_Z_MASK);
+
+	REGISTER_STENCIL_CONST(OP_PASS_Z_ZERO);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_KEEP);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_REPLACE);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_INCR);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_INCRSAT);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_DECR);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_DECRSAT);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_INVERT);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_SHIFT);
+	REGISTER_STENCIL_CONST(OP_PASS_Z_MASK);
+
+	registerConst("CLEAR_DEPTH", BGFX_CLEAR_DEPTH);
+	registerConst("CLEAR_COLOR", BGFX_CLEAR_COLOR);
+	registerConst("CLEAR_STENCIL", BGFX_CLEAR_STENCIL);
+	registerConst("CLEAR_ALL", BGFX_CLEAR_STENCIL | BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR);
+
+	#undef REGISTER_STENCIL_CONST
 }
 
 

@@ -9,13 +9,14 @@
 class LUMIX_EDITOR_API LogUI
 {
 	public:
-		LogUI(Lumix::IAllocator& allocator);
+		explicit LogUI(Lumix::IAllocator& allocator);
 		~LogUI();
 
 		void onGUI();
 		void update(float time_delta);
 		int addNotification(const char* text);
 		void setNotificationTime(int uid, float time);
+		int getUnreadErrorCount() const;
 
 	public:
 		bool m_is_opened;
@@ -26,14 +27,13 @@ class LUMIX_EDITOR_API LogUI
 			Info,
 			Warning,
 			Error,
-			BGFX,
 
 			Count
 		};
 
 		struct Notification
 		{
-			Notification(Lumix::IAllocator& alloc)
+			explicit Notification(Lumix::IAllocator& alloc)
 				: message(alloc)
 			{
 			}

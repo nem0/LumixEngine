@@ -1,12 +1,10 @@
 #include "culling_system.h"
 #include "lumix.h"
 
-#include "core/array.h"
 #include "core/binary_array.h"
 #include "core/free_list.h"
-#include "core/frustum.h"
+#include "core/geometry.h"
 #include "core/profiler.h"
-#include "core/sphere.h"
 
 #include "core/mtjd/group.h"
 #include "core/mtjd/manager.h"

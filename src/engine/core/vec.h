@@ -210,6 +210,7 @@ struct LUMIX_ENGINE_API Vec4
 		x *= rhs;
 		y *= rhs;
 		z *= rhs;
+		w *= rhs;
 		this->x = x;
 		this->y = y;
 		this->z = z;
@@ -217,6 +218,14 @@ struct LUMIX_ENGINE_API Vec4
 	}
 
 	void normalize();
+
+	void set(const Vec3& v, float w)
+	{
+		this->x = v.x;
+		this->y = v.y;
+		this->z = v.z;
+		this->w = w;
+	}
 
 	void set(float x, float y, float z, float w)
 	{

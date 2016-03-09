@@ -9,6 +9,7 @@
 #include <lua.hpp>
 
 
+static const char DEFAULT_SETTINGS_PATH[] = "studio_default.ini";
 static const char SETTINGS_PATH[] = "studio.ini";
 static Settings* g_instance = nullptr;
 
@@ -47,6 +48,18 @@ static int getIntegerField(lua_State* L, const char* name, int default_value)
 	if (lua_getfield(L, -1, name) == LUA_TNUMBER)
 	{
 		value = (int)lua_tointeger(L, -1);
+	}
+	lua_pop(L, 1);
+	return value;
+}
+
+
+static float getFloat(lua_State* L, const char* name, float default_value)
+{
+	float value = default_value;
+	if (lua_getglobal(L, name) == LUA_TNUMBER)
+	{
+		value = (float)lua_tonumber(L, -1);
 	}
 	lua_pop(L, 1);
 	return value;
@@ -93,7 +106,7 @@ Settings::Settings(Lumix::IAllocator& allocator)
 	m_is_profiler_opened = false;
 	m_is_properties_opened = false;
 	m_is_crash_reporting_enabled = true;
-
+	m_mouse_sensitivity_x = m_mouse_sensitivity_y = 1000.0f;
 	m_autosave_time = 300;
 
 	m_state = luaL_newstate();
@@ -113,11 +126,12 @@ Settings::~Settings()
 bool Settings::load(Action** actions, int actions_count)
 {
 	auto L = m_state;
-	bool errors = luaL_loadfile(L, SETTINGS_PATH) != LUA_OK;
+	bool has_settings = PlatformInterface::fileExists(SETTINGS_PATH);
+	bool errors = luaL_loadfile(L, has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH) != LUA_OK;
 	errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
 	if (errors)
 	{
-		Lumix::g_log_error.log("lua") << SETTINGS_PATH << ": " << lua_tostring(L, -1);
+		Lumix::g_log_error.log("Editor") << SETTINGS_PATH << ": " << lua_tostring(L, -1);
 		lua_pop(L, 1);
 		return false;
 	}
@@ -143,6 +157,8 @@ bool Settings::load(Action** actions, int actions_count)
 	m_is_crash_reporting_enabled = getBoolean(L, "error_reporting_enabled", true);
 	Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
 	m_autosave_time = getInteger(L, "autosave_time", 300);
+	m_mouse_sensitivity_x = getFloat(L, "mouse_sensitivity_x", 200.0f);
+	m_mouse_sensitivity_y = getFloat(L, "mouse_sensitivity_y", 200.0f);
 
 	if (lua_getglobal(L, "actions") == LUA_TTABLE)
 	{
@@ -174,6 +190,7 @@ void Settings::setValue(const char* name, bool value)
 	lua_getglobal(m_state, "custom");
 	lua_pushboolean(m_state, value);
 	lua_setfield(m_state, -2, name);
+	lua_pop(m_state, 1);
 }
 
 
@@ -182,6 +199,7 @@ void Settings::setValue(const char* name, int value)
 	lua_getglobal(m_state, "custom");
 	lua_pushinteger(m_state, value);
 	lua_setfield(m_state, -2, name);
+	lua_pop(m_state, 1);
 }
 
 
@@ -202,7 +220,7 @@ bool Settings::getValue(const char* name, bool default_value) const
 	{
 		v = lua_toboolean(m_state, -1) != 0;
 	}
-	lua_pop(m_state, 1);
+	lua_pop(m_state, 2);
 	return v;
 }
 
@@ -237,6 +255,8 @@ bool Settings::save(Action** actions, int actions_count)
 	writeBool("profiler_opened", m_is_profiler_opened);
 	writeBool("properties_opened", m_is_properties_opened);
 	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
+	file << "mouse_sensitivity_x = " << m_mouse_sensitivity_x << "\n";
+	file << "mouse_sensitivity_y = " << m_mouse_sensitivity_y << "\n";
 	file << "autosave_time = " << m_autosave_time << "\n";
 
 	file << "custom = {\n";
@@ -317,15 +337,18 @@ void Settings::onGUI(Action** actions, int actions_count)
 		ImGui::SameLine();
 		ImGui::Text("Settings are saved when the application closes");
 
-		ImGui::DragInt("Autosave time (seconds)", &m_autosave_time);
-		if (ImGui::Checkbox("Crash reporting", &m_is_crash_reporting_enabled))
+		if (ImGui::CollapsingHeader("General"))
 		{
-			Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
+			ImGui::DragInt("Autosave time (seconds)", &m_autosave_time);
+			if (ImGui::Checkbox("Crash reporting", &m_is_crash_reporting_enabled))
+			{
+				Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
+			}
+			ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity_x, 0.1f, 500.0f);
 		}
 
 		if (ImGui::CollapsingHeader("Shortcuts")) showShortcutSettings(actions, actions_count);
-
-		ImGui::ShowStyleEditor();
+		if (ImGui::CollapsingHeader("Style")) ImGui::ShowStyleEditor();
 	}
 	ImGui::EndDock();
 }

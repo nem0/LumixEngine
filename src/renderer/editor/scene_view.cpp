@@ -1,21 +1,21 @@
 #include "scene_view.h"
 #include "core/crc32.h"
+#include "core/input_system.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
+#include "core/string.h"
 #include "editor/gizmo.h"
-#include "editor/world_editor.h"
+#include "editor/imgui/imgui.h"
+#include "editor/log_ui.h"
+#include "editor/platform_interface.h"
+#include "editor/settings.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
-#include "editor/imgui/imgui.h"
-#include "editor/settings.h"
-
-
-static const char* WINDOW_NAME = "Scene View";
 
 
 SceneView::SceneView()
@@ -23,6 +23,9 @@ SceneView::SceneView()
 	m_pipeline = nullptr;
 	m_editor = nullptr;
 	m_camera_speed = 0.1f;
+	m_is_mouse_captured = false;
+	m_show_stats = false;
+	m_log_ui = nullptr;
 }
 
 
@@ -56,15 +59,6 @@ void SceneView::onUniverseCreated()
 {
 	auto* scene = m_editor->getScene(Lumix::crc32("renderer"));
 	m_pipeline->setScene(static_cast<Lumix::RenderScene*>(scene));
-	auto* settings = Settings::getInstance();
-	if (!settings) return;
-
-	int count = m_pipeline->getParameterCount();
-	for (int i = 0; i < count; ++i)
-	{
-		bool b = settings->getValue(m_pipeline->getParameterName(i), m_pipeline->getParameter(i));
-		m_pipeline->setParameter(i, b);
-	}
 }
 
 
@@ -74,8 +68,9 @@ void SceneView::onUniverseDestroyed()
 }
 
 
-bool SceneView::init(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
+bool SceneView::init(LogUI& log_ui, Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
 {
+	m_log_ui = &log_ui;
 	m_editor = &editor;
 	auto& engine = editor.getEngine();
 	auto& allocator = engine.getAllocator();
@@ -86,6 +81,8 @@ bool SceneView::init(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
 	m_pipeline->load();
 	m_pipeline->addCustomCommandHandler("renderGizmos")
 		.callback.bind<SceneView, &SceneView::renderGizmos>(this);
+	m_pipeline->addCustomCommandHandler("renderIcons")
+		.callback.bind<SceneView, &SceneView::renderIcons>(this);
 
 	editor.universeCreated().bind<SceneView, &SceneView::onUniverseCreated>(this);
 	editor.universeDestroyed().bind<SceneView, &SceneView::onUniverseDestroyed>(this);
@@ -109,7 +106,7 @@ void SceneView::update()
 	if (ImGui::GetIO().KeyCtrl) return;
 
 	m_camera_speed =
-		Lumix::Math::maxValue(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
+		Lumix::Math::maximum(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
 
 	int screen_x = int(ImGui::GetIO().MousePos.x);
 	int screen_y = int(ImGui::GetIO().MousePos.y);
@@ -141,10 +138,24 @@ void SceneView::update()
 }
 
 
-void SceneView::renderGizmos()
+void SceneView::renderIcons()
 {
 	m_editor->renderIcons();
+}
+
+
+void SceneView::renderGizmos()
+{
 	m_editor->getGizmo().render();
+}
+
+
+void SceneView::captureMouse(bool capture)
+{
+	if(m_is_mouse_captured == capture) return;
+	m_is_mouse_captured = capture;
+	PlatformInterface::showCursor(!m_is_mouse_captured);
+	if(!m_is_mouse_captured) PlatformInterface::unclipCursor();
 }
 
 
@@ -152,49 +163,75 @@ void SceneView::onGUI()
 {
 	PROFILE_FUNCTION();
 	m_is_opened = false;
-	if (ImGui::BeginDock(WINDOW_NAME))
+	ImVec2 view_pos;
+	const char* title = "Scene View###Scene View";
+	if (m_log_ui && m_log_ui->getUnreadErrorCount() > 0)
+	{
+		title = "Scene View | errors in log###Scene View";
+	}
+
+	if (ImGui::BeginDock(title))
 	{
 		m_is_opened = true;
 		auto size = ImGui::GetContentRegionAvail();
 		size.y -= ImGui::GetTextLineHeightWithSpacing();
-		if (size.x > 0 && size.y > 0)
+		auto* fb = m_pipeline->getFramebuffer("default");
+		if (size.x > 0 && size.y > 0 && fb)
 		{
 			auto pos = ImGui::GetWindowPos();
 			m_pipeline->setViewport(0, 0, int(size.x), int(size.y));
-			auto* fb = m_pipeline->getFramebuffer("default");
 			m_texture_handle = fb->getRenderbufferHandle(0);
 			auto cursor_pos = ImGui::GetCursorScreenPos();
 			m_screen_x = int(cursor_pos.x);
 			m_screen_y = int(cursor_pos.y);
 			m_width = int(size.x);
 			m_height = int(size.y);
+			auto content_min = ImGui::GetCursorScreenPos();
+			ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
 			ImGui::Image(&m_texture_handle, size);
+			view_pos = content_min;
+			auto rel_mp = ImGui::GetMousePos();
+			rel_mp.x -= m_screen_x;
+			rel_mp.y -= m_screen_y;
 			if (ImGui::IsItemHovered())
 			{
-				m_editor->setGizmoUseStep(m_toggle_gizmo_step_action->isActive());
-				auto rel_mp = ImGui::GetMousePos();
-				rel_mp.x -= m_screen_x;
-				rel_mp.y -= m_screen_y;
+				m_editor->getGizmo().enableStep(m_toggle_gizmo_step_action->isActive());
 				for (int i = 0; i < 3; ++i)
 				{
 					if (ImGui::IsMouseClicked(i))
 					{
+						ImGui::ResetActiveID();
+						captureMouse(true);
 						m_editor->onMouseDown((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
-					}
-					if (ImGui::IsMouseReleased(i))
-					{
-						m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
-					}
-
-					auto delta = Lumix::Vec2(rel_mp.x, rel_mp.y) - m_last_mouse_pos;
-					if(delta.x != 0 || delta.y != 0)
-					{
-						m_editor->onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)delta.x, (int)delta.y);
-						m_last_mouse_pos = {rel_mp.x, rel_mp.y};
+						break;
 					}
 				}
 			}
-
+			if (m_is_mouse_captured || ImGui::IsItemHovered())
+			{
+				auto& input = m_editor->getEngine().getInputSystem();
+				auto delta = Lumix::Vec2(input.getMouseXMove(), input.getMouseYMove());
+				if (delta.x != 0 || delta.y != 0)
+				{
+					m_editor->onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)delta.x, (int)delta.y);
+				}
+			}
+			if(m_is_mouse_captured)
+			{
+				PlatformInterface::clipCursor(
+					content_min.x, content_min.y, content_max.x, content_max.y);
+				for (int i = 0; i < 3; ++i)
+				{
+					auto rel_mp = ImGui::GetMousePos();
+					rel_mp.x -= m_screen_x;
+					rel_mp.y -= m_screen_y;
+					if (ImGui::IsMouseReleased(i))
+					{
+						captureMouse(false);
+						m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
+					}
+				}
+			}
 			m_pipeline->render();
 		}
 
@@ -214,35 +251,35 @@ void SceneView::onGUI()
 		}
 
 		ImGui::SameLine();
-		int count = m_pipeline->getParameterCount();
-		if (count)
-		{
-			if (ImGui::Button("Pipeline"))
-			{
-				ImGui::OpenPopup("pipeline_parameters_popup");
-			}
-			ImGui::SameLine();
-
-			if (ImGui::BeginPopup("pipeline_parameters_popup"))
-			{
-				for (int i = 0; i < count; ++i)
-				{
-					bool b = m_pipeline->getParameter(i);
-					if (ImGui::Checkbox(m_pipeline->getParameterName(i), &b))
-					{
-						auto* settings = Settings::getInstance();
-						if (settings)
-						{
-							settings->setValue(m_pipeline->getParameterName(i), b);
-						}
-						m_pipeline->setParameter(i, b);
-					}
-				}
-
-				ImGui::EndPopup();
-			}
-		}
+		ImGui::Checkbox("Stats", &m_show_stats);
 	}
 
 	ImGui::EndDock();
+
+	if(m_show_stats)
+	{
+		view_pos.x += ImGui::GetStyle().FramePadding.x;
+		view_pos.y += ImGui::GetStyle().FramePadding.y;
+		ImGui::SetNextWindowPos(view_pos);
+		auto col = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
+		col.w = 0.3f;
+		ImGui::PushStyleColor(ImGuiCol_WindowBg, col);
+		if (ImGui::Begin("###stats_overlay",
+				nullptr,
+				ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
+					ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+					ImGuiWindowFlags_ShowBorders))
+		{
+			const auto& stats = m_pipeline->getStats();
+			ImGui::LabelText("Draw calls", "%d", stats.m_draw_call_count);
+			ImGui::LabelText("Instances", "%d", stats.m_instance_count);
+			char buf[30];
+			Lumix::toCStringPretty(stats.m_triangle_count, buf, Lumix::lengthOf(buf));
+			ImGui::LabelText("Triangles", buf);
+			ImGui::LabelText("Resolution", "%dx%d", m_pipeline->getWidth(), m_pipeline->getHeight());
+			ImGui::LabelText("FPS", "%.2f", m_editor->getEngine().getFPS());
+		}
+		ImGui::End();
+		ImGui::PopStyleColor();
+	}
 }

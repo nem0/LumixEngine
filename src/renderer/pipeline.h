@@ -2,7 +2,19 @@
 
 #include "lumix.h"
 #include "core/delegate.h"
-#include <bgfx/bgfx.h>
+
+
+struct lua_State;
+
+
+namespace bgfx
+{
+	struct TextureHandle;
+	struct UniformHandle;
+	struct ProgramHandle;
+	struct TransientVertexBuffer;
+	struct TransientIndexBuffer;
+}
 
 
 namespace Lumix
@@ -16,12 +28,44 @@ class Model;
 class Path;
 class Renderer;
 class RenderScene;
-class TransientGeometry;
+struct Vec4;
+
+
+class CommandBufferGenerator
+{
+public:
+	CommandBufferGenerator();
+
+	void setTexture(uint8 stage,
+		const bgfx::UniformHandle& uniform,
+		const bgfx::TextureHandle& texture);
+	void setUniform(const bgfx::UniformHandle& uniform, const Vec4& value);
+	void setUniform(const bgfx::UniformHandle& uniform, const Vec4* values, int count);
+	void setUniform(const bgfx::UniformHandle& uniform, const Matrix* values, int count);
+	void setTimeUniform(const bgfx::UniformHandle& uniform);
+	void setLocalShadowmap(const bgfx::TextureHandle& shadowmap);
+	void setGlobalShadowmap();
+	int getSize() const { return int(pointer - buffer); }
+	void getData(uint8* data);
+	void clear();
+	void beginAppend();
+	void end();
+
+	uint8 buffer[1024];
+	uint8* pointer;
+};
 
 
 class LUMIX_RENDERER_API Pipeline
 {
 	public:
+		struct Stats
+		{
+			int m_draw_call_count;
+			int m_instance_count;
+			int m_triangle_count;
+		};
+
 		struct CustomCommandHandler
 		{
 			Delegate<void> callback;
@@ -30,6 +74,8 @@ class LUMIX_RENDERER_API Pipeline
 		};
 
 	public:
+		static void registerLuaAPI(lua_State* state);
+
 		virtual ~Pipeline() {}
 
 		virtual void load() = 0;
@@ -49,7 +95,8 @@ class LUMIX_RENDERER_API Pipeline
 		virtual void setTexture(int slot,
 			bgfx::TextureHandle texture,
 			bgfx::UniformHandle uniform) = 0;
-		virtual void render(TransientGeometry& geom,
+		virtual void render(const bgfx::TransientVertexBuffer& vertex_buffer,
+			const bgfx::TransientIndexBuffer& index_buffer,
 			const Matrix& mtx,
 			int first_index,
 			int num_indices,
@@ -60,11 +107,9 @@ class LUMIX_RENDERER_API Pipeline
 		virtual void toggleStats() = 0;
 		virtual void setWindowHandle(void* data) = 0;
 		virtual int getPassIdx() const = 0;
-		virtual int getParameterCount() const = 0;
-		virtual const char* getParameterName(int index) const = 0;
-		virtual void setParameter(int index, bool value) = 0;
-		virtual bool getParameter(int index) = 0;
 		virtual bool isReady() const = 0;
+		virtual const Stats& getStats() = 0;
+		virtual Path& getPath() = 0;
 };
 
 

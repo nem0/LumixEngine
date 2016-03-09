@@ -43,6 +43,16 @@ LUMIX_ENGINE_API void setMemory(void* ptr, uint8 value, size_t num);
 LUMIX_ENGINE_API const char* findSubstring(const char* str, const char* substr);
 
 
+inline bool isLetter(char c)
+{
+	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+}
+
+
+inline bool isUpperCase(char c)
+{
+	return c >= 'A' && c <= 'Z';
+}
 
 
 template <int SIZE> bool copyString(char(&destination)[SIZE], const char* source)
@@ -58,7 +68,7 @@ template <int SIZE> bool catString(char(&destination)[SIZE], const char* source)
 template <class T> class base_string
 {
 public:
-	base_string(IAllocator& allocator)
+	explicit base_string(IAllocator& allocator)
 		: m_allocator(allocator)
 	{
 		m_cstr = nullptr;

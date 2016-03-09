@@ -6,7 +6,6 @@
 
 
 #include <ShlObj.h>
-#include <Windows.h>
 #include <mmsystem.h>
 
 
@@ -323,6 +322,12 @@ namespace PlatformInterface
 				g_platform_data.m_handler->onMouseLeftWindow();
 			}
 			break;
+			case WM_SYSCOMMAND:
+			{
+				bool is_alt_key_menu = wParam == SC_KEYMENU && (lParam >> 16) <= 0;
+				if (is_alt_key_menu) return 0;
+				break;
+			}
 			case WM_KEYUP:
 			case WM_SYSKEYUP: g_platform_data.m_handler->onKeyUp(getKeyFromSystem((int)wParam)); break;
 			case WM_KEYDOWN:
@@ -456,7 +461,7 @@ namespace PlatformInterface
 	
 	struct Process
 	{
-		Process(Lumix::IAllocator& allocator)
+		explicit Process(Lumix::IAllocator& allocator)
 			: allocator(allocator)
 		{
 		}
@@ -578,33 +583,70 @@ namespace PlatformInterface
 	}
 
 
-	bool getOpenFilename(char* out, int max_size, const char* filter)
+	bool getOpenFilename(char* out, int max_size, const char* filter, const char* starting_file)
 	{
 		OPENFILENAME ofn;
 		ZeroMemory(&ofn, sizeof(ofn));
 		ofn.lStructSize = sizeof(ofn);
 		ofn.hwndOwner = NULL;
+		if (starting_file)
+		{
+			char* to = out;
+			for (const char* from = starting_file; *from; ++from, ++to)
+			{
+				if (to - out > max_size - 1) break;
+				*to = *to == '/' ? '\\' : *from;
+			}
+			*to = '\0';
+		}
+		else
+		{
+			out[0] = '\0';
+		}
 		ofn.lpstrFile = out;
-		ofn.lpstrFile[0] = '\0';
 		ofn.nMaxFile = max_size;
 		ofn.lpstrFilter = filter;
 		ofn.nFilterIndex = 1;
 		ofn.lpstrFileTitle = NULL;
 		ofn.nMaxFileTitle = 0;
-		ofn.lpstrInitialDir = NULL;
+		ofn.lpstrInitialDir = nullptr;
 		ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR | OFN_NONETWORKBUTTON;
 
 		return GetOpenFileName(&ofn) == TRUE;
 	}
 
 
-	bool getOpenDirectory(char* out, int max_size)
+	bool getOpenDirectory(char* out, int max_size, const char* starting_dir)
 	{
 		bool ret = false;
 		IFileDialog *pfd;
 		if (SUCCEEDED(CoCreateInstance(
 			CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd))))
 		{
+			if (starting_dir)
+			{
+				PIDLIST_ABSOLUTE pidl;
+				WCHAR wstarting_dir[MAX_PATH];
+				WCHAR* wc = wstarting_dir;
+				for (const char* c = starting_dir; *c && wc - wstarting_dir < MAX_PATH - 1; ++c, ++wc)
+				{
+					*wc = *c == '/' ? '\\' : *c;
+				}
+				*wc = 0;
+
+				HRESULT hresult = ::SHParseDisplayName(wstarting_dir, 0, &pidl, SFGAO_FOLDER, 0);
+				if (SUCCEEDED(hresult))
+				{
+					IShellItem *psi;
+					hresult = ::SHCreateShellItem(NULL, NULL, pidl, &psi);
+					if (SUCCEEDED(hresult))
+					{
+						pfd->SetFolder(psi);
+					}
+					ILFree(pidl);
+				}
+			}
+
 			DWORD dwOptions;
 			if (SUCCEEDED(pfd->GetOptions(&dwOptions)))
 			{
@@ -639,7 +681,7 @@ namespace PlatformInterface
 
 	bool shellExecuteOpen(const char* path)
 	{
-		return (int)ShellExecute(NULL, NULL, path, NULL, NULL, SW_SHOW) > 32;
+		return (uintptr_t)ShellExecute(NULL, NULL, path, NULL, NULL, SW_SHOW) > 32;
 	}
 
 
@@ -652,6 +694,12 @@ namespace PlatformInterface
 	bool moveFile(const char* from, const char* to)
 	{
 		return MoveFile(from, to) == TRUE;
+	}
+
+
+	bool copyFile(const char* from, const char* to)
+	{
+		return CopyFile(from, to, FALSE) == TRUE;
 	}
 
 

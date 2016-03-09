@@ -1,7 +1,13 @@
 #pragma once
 
 
-#ifndef _WIN32
+#ifdef _WIN32
+	#ifdef _WIN64
+		#define PLATFORM64
+	#else
+		#define PLATFORM32
+	#endif
+#else 
 #error Platform not supported
 #endif
 
@@ -14,14 +20,14 @@
 
 namespace Lumix
 {
-	typedef char					int8;
-	typedef unsigned char			uint8;
-	typedef short					int16;
-	typedef unsigned short			uint16;
-	typedef int						int32;
-	typedef unsigned int			uint32;
-	typedef long long				int64;
-	typedef unsigned long long		uint64;
+typedef char int8;
+typedef unsigned char uint8;
+typedef short int16;
+typedef unsigned short uint16;
+typedef int int32;
+typedef unsigned int uint32;
+typedef long long int64;
+typedef unsigned long long uint64;
 
 #ifdef _WIN64
 	typedef uint64 uintptr;
@@ -68,48 +74,62 @@ namespace Lumix
 #define LUMIX_FORCE_INLINE __forceinline
 #define LUMIX_RESTRICT __restrict
 
-
-#ifdef BUILDING_AUDIO
+#ifdef STATIC_PLUGINS
+	#define LUMIX_AUDIO_API
+#elif defined BUILDING_AUDIO
 	#define LUMIX_AUDIO_API LUMIX_LIBRARY_EXPORT
 #else
 	#define LUMIX_AUDIO_API LUMIX_LIBRARY_IMPORT
 #endif
 
-#ifdef BUILDING_PHYSICS
+#ifdef STATIC_PLUGINS
+	#define LUMIX_PHYSICS_API
+#elif defined BUILDING_PHYSICS
 	#define LUMIX_PHYSICS_API LUMIX_LIBRARY_EXPORT
 #else
 	#define LUMIX_PHYSICS_API LUMIX_LIBRARY_IMPORT
 #endif
 
-#ifdef BUILDING_ENGINE
+#ifdef STATIC_PLUGINS
+	#define LUMIX_ENGINE_API
+#elif defined BUILDING_ENGINE
 	#define LUMIX_ENGINE_API LUMIX_LIBRARY_EXPORT
 #else
 	#define LUMIX_ENGINE_API LUMIX_LIBRARY_IMPORT
 #endif
 
-#ifdef BUILDING_EDITOR
+#ifdef STATIC_PLUGINS
+	#define LUMIX_EDITOR_API
+#elif defined BUILDING_EDITOR
 	#define LUMIX_EDITOR_API LUMIX_LIBRARY_EXPORT
 #else
 	#define LUMIX_EDITOR_API LUMIX_LIBRARY_IMPORT
 #endif
 
-#ifdef BUILDING_RENDERER
+#ifdef STATIC_PLUGINS
+	#define LUMIX_RENDERER_API
+#elif defined BUILDING_RENDERER
 	#define LUMIX_RENDERER_API LUMIX_LIBRARY_EXPORT
 #else
 	#define LUMIX_RENDERER_API LUMIX_LIBRARY_IMPORT
 #endif
 
-#ifdef BUILDING_SCRIPT
+#ifdef STATIC_PLUGINS
+	#define LUMIX_SCRIPT_API
+#elif defined BUILDING_SCRIPT
 	#define LUMIX_SCRIPT_API LUMIX_LIBRARY_EXPORT
 #else
 	#define LUMIX_SCRIPT_API LUMIX_LIBRARY_IMPORT
 #endif
 
-#ifdef BUILDING_ANIMATION
+#ifdef STATIC_PLUGINS
+	#define LUMIX_ANIMATION_API
+#elif defined BUILDING_ANIMATION
 	#define LUMIX_ANIMATION_API LUMIX_LIBRARY_EXPORT
 #else
 	#define LUMIX_ANIMATION_API LUMIX_LIBRARY_IMPORT
 #endif
+
 
 #pragma warning(disable : 4251)
 #pragma warning(disable : 4365)

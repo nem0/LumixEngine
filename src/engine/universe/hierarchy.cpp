@@ -1,11 +1,8 @@
 #include "hierarchy.h"
-#include "core/array.h"
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/hash_map.h"
 #include "core/json_serializer.h"
-#include "core/matrix.h"
-#include "core/pod_hash_map.h"
 #include "engine/engine.h"
 #include "universe.h"
 
@@ -20,7 +17,7 @@ static const Lumix::uint32 HIERARCHY_HASH = Lumix::crc32("hierarchy");
 class HierarchyImpl : public Hierarchy
 {
 private:
-	typedef PODHashMap<Entity, Entity> Parents;
+	typedef HashMap<Entity, Entity> Parents;
 
 public:
 	HierarchyImpl(IPlugin& system, Universe& universe, IAllocator& allocator)
@@ -38,8 +35,7 @@ public:
 
 	~HierarchyImpl()
 	{
-		PODHashMap<int32, Array<Child> *>::iterator iter = m_children.begin(),
-													end = m_children.end();
+		auto iter = m_children.begin(), end = m_children.end();
 		while (iter != end)
 		{
 			LUMIX_DELETE(m_allocator, iter.value());
@@ -100,10 +96,13 @@ public:
 		auto iter = m_children.find(entity);
 		if (iter != m_children.end())
 		{
+			for (auto& x : *iter.value())
+			{
+				m_parents.erase(x.m_entity);
+			}
 			LUMIX_DELETE(m_allocator, iter.value());
 			m_children.erase(iter);
 		}
-		m_parents.erase(entity);
 	}
 
 
@@ -270,9 +269,9 @@ private:
 };
 
 
-IScene* HierarchyPlugin::createScene(UniverseContext& ctx)
+IScene* HierarchyPlugin::createScene(Universe& ctx)
 {
-	return Hierarchy::create(*this, *ctx.m_universe, m_allocator);
+	return Hierarchy::create(*this, ctx, m_allocator);
 }
 
 

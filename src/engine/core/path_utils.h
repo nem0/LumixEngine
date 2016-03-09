@@ -19,7 +19,7 @@ namespace PathUtils
 
 	struct LUMIX_ENGINE_API PathDirectory
 	{
-		PathDirectory(const char* path)
+		explicit PathDirectory(const char* path)
 		{
 			getDir(m_dir, sizeof(m_dir), path);
 		}
@@ -35,7 +35,7 @@ namespace PathUtils
 
 	struct LUMIX_ENGINE_API FileInfo
 	{
-		FileInfo(const char* path)
+		explicit FileInfo(const char* path)
 		{
 			getExtension(m_extension, sizeof(m_extension), path);
 			getBasename(m_basename, sizeof(m_basename), path);

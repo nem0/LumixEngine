@@ -1,4 +1,5 @@
 #include "shader_compiler.h"
+#include "core/FS/disk_file_device.h"
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
 #include "core/FS/os_file.h"
@@ -14,20 +15,22 @@
 #include "engine.h"
 #include "engine/plugin_manager.h"
 #include "renderer/renderer.h"
-#include "renderer/shader.h"
+#include "editor/asset_browser.h"
 #include "editor/file_system_watcher.h"
 #include "editor/log_ui.h"
 #include "editor/platform_interface.h"
+#include "editor/studio_app.h"
 #include "editor/utils.h"
 
 
-ShaderCompiler::ShaderCompiler(Lumix::WorldEditor& editor, LogUI& log_ui)
-	: m_editor(editor)
+ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
+	: m_app(app)
+	, m_editor(*app.getWorldEditor())
 	, m_log_ui(log_ui)
-	, m_dependencies(editor.getAllocator())
-	, m_to_reload(editor.getAllocator())
-	, m_processes(editor.getAllocator())
-	, m_changed_files(editor.getAllocator())
+	, m_dependencies(m_editor.getAllocator())
+	, m_to_reload(m_editor.getAllocator())
+	, m_processes(m_editor.getAllocator())
+	, m_changed_files(m_editor.getAllocator())
 	, m_mutex(false)
 {
 	m_notifications_id = -1;
@@ -67,34 +70,57 @@ Lumix::Renderer& ShaderCompiler::getRenderer()
 }
 
 
+static void getShaderPath(const char* shd_path, char* out, bool vertex)
+{
+	Lumix::PathUtils::FileInfo file_info(shd_path);
+	Lumix::copyString(out, Lumix::MAX_PATH_LENGTH, file_info.m_dir);
+	Lumix::catString(out, Lumix::MAX_PATH_LENGTH, file_info.m_basename);
+	Lumix::catString(out, Lumix::MAX_PATH_LENGTH, vertex ? "_vs.sc" : "_fs.sc");
+}
+
+
 bool ShaderCompiler::isChanged(const Lumix::ShaderCombinations& combinations,
 	const char* bin_base_path,
 	const char* shd_path) const
 {
+	char tmp[Lumix::MAX_PATH_LENGTH];
+	auto shd_last_modified = PlatformInterface::getLastModified(shd_path);
+	getShaderPath(shd_path, tmp, true);
+	if (!PlatformInterface::fileExists(tmp) ||
+		PlatformInterface::getLastModified(tmp) > shd_last_modified)
+	{
+		shd_last_modified = PlatformInterface::getLastModified(tmp);
+	}
+
+	getShaderPath(shd_path, tmp, false);
+	if (!PlatformInterface::fileExists(tmp) ||
+		PlatformInterface::getLastModified(tmp) > shd_last_modified)
+	{
+		shd_last_modified = PlatformInterface::getLastModified(tmp);
+	}
+
 	for (int i = 0; i < combinations.m_pass_count; ++i)
 	{
 		const char* pass_path =
 			StringBuilder<Lumix::MAX_PATH_LENGTH>(bin_base_path, combinations.m_passes[i]);
 		for (int j = 0; j < 1 << Lumix::lengthOf(combinations.m_defines); ++j)
 		{
-			if ((j & (~combinations.m_vs_combinations[i])) == 0)
+			if ((j & (~combinations.m_vs_local_mask[i])) == 0)
 			{
 				const char* vs_bin_info =
 					StringBuilder<Lumix::MAX_PATH_LENGTH>(pass_path, j, "_vs.shb");
 				if (!PlatformInterface::fileExists(vs_bin_info) ||
-					PlatformInterface::getLastModified(vs_bin_info) <
-						PlatformInterface::getLastModified(shd_path))
+					PlatformInterface::getLastModified(vs_bin_info) < shd_last_modified)
 				{
 					return true;
 				}
 			}
-			if ((j & (~combinations.m_fs_combinations[i])) == 0)
+			if ((j & (~combinations.m_fs_local_mask[i])) == 0)
 			{
 				const char* fs_bin_info =
 					StringBuilder<Lumix::MAX_PATH_LENGTH>(pass_path, j, "_fs.shb");
 				if (!PlatformInterface::fileExists(fs_bin_info) ||
-					PlatformInterface::getLastModified(fs_bin_info) <
-						PlatformInterface::getLastModified(shd_path))
+					PlatformInterface::getLastModified(fs_bin_info) < shd_last_modified)
 				{
 					return true;
 				}
@@ -123,7 +149,7 @@ void ShaderCompiler::makeUpToDate()
 
 		if (!file)
 		{
-			Lumix::g_log_error.log("shader compiler") << "Could not open " << info.filename;
+			Lumix::g_log_error.log("Editor") << "Could not open " << info.filename;
 			continue;
 		}
 
@@ -226,7 +252,7 @@ void ShaderCompiler::parseDependencies()
 			Lumix::FS::Mode::READ | Lumix::FS::Mode::OPEN);
 		if (!file)
 		{
-			Lumix::g_log_error.log("shader compiler") << "Could not open " << info.filename;
+			Lumix::g_log_error.log("Editor") << "Could not open " << info.filename;
 			continue;
 		}
 
@@ -327,7 +353,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 	int define_mask,
 	const Lumix::ShaderCombinations::Defines& all_defines)
 {
-	const char* base_path = m_editor.getEngine().getPathManager().getBasePath();
+	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath(0);
 
 	for (int mask = 0; mask < 1 << Lumix::lengthOf(all_defines); ++mask)
 	{
@@ -365,7 +391,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			auto* process = PlatformInterface::createProcess(cmd, args, m_editor.getAllocator());
 			if (!process)
 			{
-				Lumix::g_log_error.log("shader compiler") << "Could not execute command: " << cmd;
+				Lumix::g_log_error.log("Editor") << "Could not execute command: " << cmd;
 			}
 			else
 			{
@@ -467,11 +493,12 @@ void ShaderCompiler::update()
 
 				char buf[1024];
 				int read;
+				Lumix::g_log_error.log("Editor") << m_processes[i].path;
 				while ((read = PlatformInterface::getProcessOutput(
 							*m_processes[i].process, buf, sizeof(buf) - 1)) > 0)
 				{
 					buf[read] = 0;
-					Lumix::g_log_error.log("shader compiler") << buf;
+					Lumix::g_log_error.log("Editor") << buf;
 				}
 			}
 
@@ -487,6 +514,7 @@ void ShaderCompiler::update()
 		}
 	}
 	m_is_compiling = !m_processes.empty();
+	m_app.getAssetBrowser()->enableUpdate(!m_is_compiling);
 
 	processChangedFiles();
 }
@@ -511,7 +539,7 @@ void ShaderCompiler::compileAllPasses(const char* path,
 void ShaderCompiler::compile(const char* path)
 {
 	StringBuilder<Lumix::MAX_PATH_LENGTH> compiled_dir(
-		m_editor.getEngine().getPathManager().getBasePath(), "/shaders/compiled");
+		m_editor.getEngine().getDiskFileDevice()->getBasePath(0), "/shaders/compiled");
 	if (!PlatformInterface::makePath(compiled_dir))
 	{
 		if (!PlatformInterface::dirExists(compiled_dir))
@@ -537,12 +565,12 @@ void ShaderCompiler::compile(const char* path)
 		Lumix::ShaderCombinations combinations;
 		Lumix::Shader::getShaderCombinations(getRenderer(), &data[0], &combinations);
 
-		compileAllPasses(path, false, combinations.m_fs_combinations, combinations);
-		compileAllPasses(path, true, combinations.m_vs_combinations, combinations);
+		compileAllPasses(path, false, combinations.m_fs_local_mask, combinations);
+		compileAllPasses(path, true, combinations.m_vs_local_mask, combinations);
 	}
 	else
 	{
-		Lumix::g_log_error.log("shader compiler") << "Could not open " << path;
+		Lumix::g_log_error.log("Editor") << "Could not open " << path;
 	}
 }
 
@@ -556,6 +584,7 @@ void ShaderCompiler::compileAll(bool wait)
 	}
 
 	m_is_compiling = true;
+	m_app.getAssetBrowser()->enableUpdate(!m_is_compiling);
 
 	PlatformInterface::FileInfo info;
 	auto* iter = PlatformInterface::createFileIterator("shaders", m_editor.getAllocator());
@@ -580,14 +609,14 @@ void ShaderCompiler::compileAll(bool wait)
 			Lumix::ShaderCombinations combinations;
 			Lumix::Shader::getShaderCombinations(getRenderer(), &data[0], &combinations);
 
-			compileAllPasses(shd_path, false, combinations.m_fs_combinations, combinations);
-			compileAllPasses(shd_path, true, combinations.m_vs_combinations, combinations);
+			compileAllPasses(shd_path, false, combinations.m_fs_local_mask, combinations);
+			compileAllPasses(shd_path, true, combinations.m_vs_local_mask, combinations);
 
 			fs.close(*file);
 		}
 		else
 		{
-			Lumix::g_log_error.log("shader compiler") << "Could not open " << shd_path;
+			Lumix::g_log_error.log("Editor") << "Could not open " << shd_path;
 		}
 	}
 

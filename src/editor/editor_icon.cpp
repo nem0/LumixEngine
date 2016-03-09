@@ -41,15 +41,12 @@ const char* ICONS[(int)IconType::COUNT] =
 
 struct EditorIconsImpl : public EditorIcons
 {
-	EditorIconsImpl(WorldEditor& editor)
+	explicit EditorIconsImpl(WorldEditor& editor)
 		: m_editor(editor)
 		, m_icons(editor.getAllocator())
 	{
+		m_render_interface = nullptr;
 		m_icons.reserve(200);
-		for(int i = 0; i < lengthOf(ICONS); ++i)
-		{
-			m_models[i] = editor.getRenderInterface()->loadModel(Path(ICONS[i]));
-		}
 		editor.universeDestroyed().bind<EditorIconsImpl, &EditorIconsImpl::clear>(this);
 		editor.universeCreated().bind<EditorIconsImpl, &EditorIconsImpl::onUniverseCreated>(this);
 		if (m_editor.getUniverse()) onUniverseCreated();
@@ -60,10 +57,7 @@ struct EditorIconsImpl : public EditorIcons
 	{
 		m_editor.universeDestroyed().unbind<EditorIconsImpl, &EditorIconsImpl::clear>(this);
 		m_editor.universeCreated().unbind<EditorIconsImpl, &EditorIconsImpl::onUniverseCreated>(this);
-		for(auto& model : m_models)
-		{
-			m_editor.getRenderInterface()->unloadModel(model);
-		}
+		setRenderInterface(nullptr);
 
 		if(m_editor.getUniverse())
 		{
@@ -187,12 +181,10 @@ struct EditorIconsImpl : public EditorIcons
 		if(camera < 0) return hit;
 		Matrix mtx = universe.getMatrix(m_editor.getEditCamera().entity);
 		Vec3 camera_pos = mtx.getTranslation();
-		float fov = m_editor.getRenderInterface()->getCameraFOV(camera);
 
 		for(auto& icon : m_icons)
 		{
 			Vec3 position = universe.getPosition(icon.entity);
-			float distance = (position - camera_pos).length();
 
 			mtx.setTranslation(position);
 			Matrix tmp = mtx;
@@ -207,6 +199,26 @@ struct EditorIconsImpl : public EditorIcons
 		}
 
 		return hit;
+	}
+
+
+	void setRenderInterface(RenderInterface* render_interface) override
+	{
+		if (m_render_interface)
+		{
+			for (auto& model : m_models)
+			{
+				m_render_interface->unloadModel(model);
+			}
+		}
+		m_render_interface = render_interface;
+		if (m_render_interface)
+		{
+			for (int i = 0; i < lengthOf(ICONS); ++i)
+			{
+				m_models[i] = m_render_interface->loadModel(Path(ICONS[i]));
+			}
+		}
 	}
 
 
@@ -251,6 +263,7 @@ struct EditorIconsImpl : public EditorIcons
 	Array<Icon> m_icons;
 	RenderInterface::ModelHandle m_models[(int)IconType::COUNT];
 	WorldEditor& m_editor;
+	RenderInterface* m_render_interface;
 };
 
 

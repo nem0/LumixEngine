@@ -1,39 +1,42 @@
 #include "lumix.h"
 #include "core/crc32.h"
+#include "core/FS/disk_file_device.h"
 #include "core/FS/file_system.h"
+#include "core/FS/ifile.h"
+#include "core/FS/os_file.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/lua_wrapper.h"
 #include "core/path_utils.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
-#include "editor/ieditor_command.h"
-#include "editor/property_register.h"
-#include "editor/property_descriptor.h"
-#include "editor/world_editor.h"
-#include "engine/engine.h"
-#include "engine/plugin_manager.h"
-#include "game_view.h"
-#include "editor/render_interface.h"
-#include "renderer/material.h"
-#include "renderer/model.h"
-#include "renderer/particle_system.h"
-#include "renderer/pipeline.h"
-#include "renderer/render_scene.h"
-#include "renderer/renderer.h"
-#include "renderer/shader.h"
-#include "renderer/texture.h"
-#include "renderer/transient_geometry.h"
 #include "editor/asset_browser.h"
+#include "editor/ieditor_command.h"
 #include "editor/platform_interface.h"
 #include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
+#include "editor/world_editor.h"
+#include "engine/engine.h"
+#include "engine/plugin_manager.h"
+#include "engine/property_register.h"
+#include "engine/property_descriptor.h"
+#include "game_view.h"
+#include "editor/render_interface.h"
+#include "renderer/material.h"
+#include "renderer/model.h"
+#include "renderer/model_manager.h"
+#include "renderer/particle_system.h"
+#include "renderer/pipeline.h"
+#include "renderer/ray_cast_model_hit.h"
+#include "renderer/render_scene.h"
+#include "renderer/renderer.h"
+#include "renderer/shader.h"
+#include "renderer/texture.h"
 #include "scene_view.h"
 #include "shader_editor.h"
 #include "shader_compiler.h"
 #include "terrain_editor.h"
-#include <cfloat>
 
 
 using namespace Lumix;
@@ -41,470 +44,18 @@ using namespace Lumix;
 
 static const uint32 TEXTURE_HASH = ResourceManager::TEXTURE;
 static const uint32 SHADER_HASH = ResourceManager::SHADER;
-
-
-template <class S> class EntityEnumPropertyDescriptor : public IEnumPropertyDescriptor
-{
-public:
-	typedef Entity(S::*Getter)(ComponentIndex);
-	typedef void (S::*Setter)(ComponentIndex, Entity);
-	typedef Entity(S::*ArrayGetter)(ComponentIndex, int);
-	typedef void (S::*ArraySetter)(ComponentIndex, int, Entity);
-
-public:
-	EntityEnumPropertyDescriptor(const char* name,
-		Getter _getter,
-		Setter _setter,
-		WorldEditor& editor,
-		IAllocator& allocator)
-		: IEnumPropertyDescriptor(allocator)
-		, m_editor(editor)
-	{
-		setName(name);
-		m_single.getter = _getter;
-		m_single.setter = _setter;
-		m_type = ENUM;
-	}
-
-
-	EntityEnumPropertyDescriptor(const char* name,
-		ArrayGetter _getter,
-		ArraySetter _setter,
-		WorldEditor& editor,
-		IAllocator& allocator)
-		: IEnumPropertyDescriptor(allocator)
-		, m_editor(editor)
-	{
-		setName(name);
-		m_array.getter = _getter;
-		m_array.setter = _setter;
-		m_type = ENUM;
-	}
-
-
-	void set(ComponentUID cmp, int index, InputBlob& stream) const override
-	{
-		int value;
-		stream.read(&value, sizeof(value));
-		auto entity = value < 0 ? INVALID_ENTITY : m_editor.getUniverse()->getEntityFromDenseIdx(value);
-		if (index == -1)
-		{
-			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.index, entity);
-		}
-		else
-		{
-			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.index, index, entity);
-		}
-	};
-
-
-	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
-	{
-		Entity value;
-		if (index == -1)
-		{
-			value = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.index);
-		}
-		else
-		{
-			value = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.index, index);
-		}
-		auto dense_idx = m_editor.getUniverse()->getDenseIdx(value);
-		int len = sizeof(dense_idx);
-		stream.write(&dense_idx, len);
-	};
-
-
-	int getEnumCount(IScene* scene) override { return scene->getUniverse().getEntityCount(); }
-
-
-	const char* getEnumItemName(IScene* scene, int index) override { return nullptr; }
-
-
-	void getEnumItemName(IScene* scene, int index, char* buf, int max_size) override
-	{
-		auto entity = scene->getUniverse().getEntityFromDenseIdx(index);
-		getEntityListDisplayName(m_editor, buf, max_size, entity);
-	}
-
-private:
-	union
-	{
-		struct
-		{
-			Getter getter;
-			Setter setter;
-		} m_single;
-		struct
-		{
-			ArrayGetter getter;
-			ArraySetter setter;
-		} m_array;
-	};
-	WorldEditor& m_editor;
-};
-
-
-void registerRendererProperties(WorldEditor& editor)
-{
-	IAllocator& allocator = editor.getAllocator();
-
-	PropertyRegister::registerComponentType("camera", "Camera");
-	PropertyRegister::registerComponentType("global_light", "Global light");
-	PropertyRegister::registerComponentType("renderable", "Mesh");
-	PropertyRegister::registerComponentType("particle_emitter", "Particle emitter");
-	PropertyRegister::registerComponentType("particle_emitter_spawn_shape", "Particle emitter - spawn shape");
-	PropertyRegister::registerComponentType("particle_emitter_fade", "Particle emitter - fade");
-	PropertyRegister::registerComponentType("particle_emitter_plane", "Particle emitter - plane");
-	PropertyRegister::registerComponentType("particle_emitter_force", "Particle emitter - force");
-	PropertyRegister::registerComponentType("particle_emitter_attractor", "Particle emitter - attractor");
-	PropertyRegister::registerComponentType(
-		"particle_emitter_linear_movement", "Particle emitter - linear movement");
-	PropertyRegister::registerComponentType(
-		"particle_emitter_random_rotation", "Particle emitter - random rotation");
-	PropertyRegister::registerComponentType("particle_emitter_size", "Particle emitter - size");
-	PropertyRegister::registerComponentType("point_light", "Point light");
-	PropertyRegister::registerComponentType("terrain", "Terrain");
-
-	PropertyRegister::registerComponentDependency("particle_emitter_fade", "particle_emitter");
-	PropertyRegister::registerComponentDependency("particle_emitter_force", "particle_emitter");
-	PropertyRegister::registerComponentDependency(
-		"particle_emitter_linear_movement", "particle_emitter");
-	PropertyRegister::registerComponentDependency(
-		"particle_emitter_random_rotation", "particle_emitter");
-
-	PropertyRegister::add("particle_emitter_spawn_shape",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Radius",
-		&RenderScene::getParticleEmitterShapeRadius,
-		&RenderScene::setParticleEmitterShapeRadius,
-		0.0f,
-		FLT_MAX,
-		0.01f,
-		allocator));
-
-	PropertyRegister::add("particle_emitter_plane",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Bounce",
-		&RenderScene::getParticleEmitterPlaneBounce,
-		&RenderScene::setParticleEmitterPlaneBounce,
-		0.0f,
-		1.0f,
-		0.01f,
-		allocator));
-	auto plane_module_planes = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Planes",
-		&RenderScene::getParticleEmitterPlaneCount,
-		&RenderScene::addParticleEmitterPlane,
-		&RenderScene::removeParticleEmitterPlane,
-		allocator);
-	plane_module_planes->addChild(
-		LUMIX_NEW(allocator, EntityEnumPropertyDescriptor<RenderScene>)("Entity",
-		&RenderScene::getParticleEmitterPlaneEntity,
-		&RenderScene::setParticleEmitterPlaneEntity,
-		editor,
-		allocator));
-	PropertyRegister::add("particle_emitter_plane", plane_module_planes);
-
-	PropertyRegister::add("particle_emitter_attractor",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Force",
-		&RenderScene::getParticleEmitterAttractorForce,
-		&RenderScene::setParticleEmitterAttractorForce,
-		-FLT_MAX,
-		FLT_MAX,
-		0.01f,
-		allocator));
-	auto attractor_module_planes = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Attractors",
-		&RenderScene::getParticleEmitterAttractorCount,
-		&RenderScene::addParticleEmitterAttractor,
-		&RenderScene::removeParticleEmitterAttractor,
-		allocator);
-	attractor_module_planes->addChild(
-		LUMIX_NEW(allocator, EntityEnumPropertyDescriptor<RenderScene>)("Entity",
-		&RenderScene::getParticleEmitterAttractorEntity,
-		&RenderScene::setParticleEmitterAttractorEntity,
-		editor,
-		allocator));
-	PropertyRegister::add("particle_emitter_attractor", attractor_module_planes);
-
-	PropertyRegister::add("particle_emitter_fade",
-		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Alpha",
-		&RenderScene::getParticleEmitterAlpha,
-		&RenderScene::setParticleEmitterAlpha,
-		&RenderScene::getParticleEmitterAlphaCount,
-		1,
-		1,
-		allocator));
-
-	PropertyRegister::add("particle_emitter_force",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, RenderScene>)("Acceleration",
-		&RenderScene::getParticleEmitterAcceleration,
-		&RenderScene::setParticleEmitterAcceleration,
-		allocator));
-
-	PropertyRegister::add("particle_emitter_size",
-		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Size",
-		&RenderScene::getParticleEmitterSize,
-		&RenderScene::setParticleEmitterSize,
-		&RenderScene::getParticleEmitterSizeCount,
-		1,
-		1,
-		allocator));
-
-	PropertyRegister::add("particle_emitter_linear_movement",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("x",
-		&RenderScene::getParticleEmitterLinearMovementX,
-		&RenderScene::setParticleEmitterLinearMovementX,
-		allocator));
-	PropertyRegister::add("particle_emitter_linear_movement",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("y",
-		&RenderScene::getParticleEmitterLinearMovementY,
-		&RenderScene::setParticleEmitterLinearMovementY,
-		allocator));
-	PropertyRegister::add("particle_emitter_linear_movement",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("z",
-		&RenderScene::getParticleEmitterLinearMovementZ,
-		&RenderScene::setParticleEmitterLinearMovementZ,
-		allocator));
-
-	PropertyRegister::add("particle_emitter",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("Life",
-		&RenderScene::getParticleEmitterInitialLife,
-		&RenderScene::setParticleEmitterInitialLife,
-		allocator));
-	PropertyRegister::add("particle_emitter",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("Initial size",
-		&RenderScene::getParticleEmitterInitialSize,
-		&RenderScene::setParticleEmitterInitialSize,
-		allocator));
-	PropertyRegister::add("particle_emitter",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("Spawn period",
-		&RenderScene::getParticleEmitterSpawnPeriod,
-		&RenderScene::setParticleEmitterSpawnPeriod,
-		allocator));
-	PropertyRegister::add("particle_emitter",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Int2, RenderScene>)("Spawn count",
-		&RenderScene::getParticleEmitterSpawnCount,
-		&RenderScene::setParticleEmitterSpawnCount,
-		allocator));
-	PropertyRegister::add("particle_emitter",
-		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",
-		&RenderScene::getParticleEmitterMaterialPath,
-		&RenderScene::setParticleEmitterMaterialPath,
-		"Material (*.mat)",
-		ResourceManager::MATERIAL,
-		allocator));
-
-	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, StringPropertyDescriptor<RenderScene>)("Slot",
-		&RenderScene::getCameraSlot,
-		&RenderScene::setCameraSlot,
-		allocator));
-	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("FOV",
-		&RenderScene::getCameraFOV,
-		&RenderScene::setCameraFOV,
-		1.0f,
-		179.0f,
-		1.0f,
-		allocator));
-	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Near",
-		&RenderScene::getCameraNearPlane,
-		&RenderScene::setCameraNearPlane,
-		0.0f,
-		FLT_MAX,
-		0.0f,
-		allocator));
-	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Far",
-		&RenderScene::getCameraFarPlane,
-		&RenderScene::setCameraFarPlane,
-		0.0f,
-		FLT_MAX,
-		0.0f,
-		allocator));
-
-	PropertyRegister::add("renderable",
-		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Source",
-		&RenderScene::getRenderablePath,
-		&RenderScene::setRenderablePath,
-		"Mesh (*.msh)",
-		ResourceManager::MODEL,
-		allocator));
-
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Ambient intensity",
-		&RenderScene::getLightAmbientIntensity,
-		&RenderScene::setLightAmbientIntensity,
-		0.0f,
-		1.0f,
-		0.05f,
-		allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec4, RenderScene>)("Shadow cascades",
-		&RenderScene::getShadowmapCascades,
-		&RenderScene::setShadowmapCascades,
-		allocator));
-
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Diffuse intensity",
-		&RenderScene::getGlobalLightIntensity,
-		&RenderScene::setGlobalLightIntensity,
-		0.0f,
-		1.0f,
-		0.05f,
-		allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Fog density",
-		&RenderScene::getFogDensity,
-		&RenderScene::setFogDensity,
-		0.0f,
-		1.0f,
-		0.01f,
-		allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Fog bottom",
-		&RenderScene::getFogBottom,
-		&RenderScene::setFogBottom,
-		-FLT_MAX,
-		FLT_MAX,
-		1.0f,
-		allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Fog height",
-		&RenderScene::getFogHeight,
-		&RenderScene::setFogHeight,
-		0.01f,
-		FLT_MAX,
-		1.0f,
-		allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Ambient color",
-		&RenderScene::getLightAmbientColor,
-		&RenderScene::setLightAmbientColor,
-		allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Diffuse color",
-		&RenderScene::getGlobalLightColor,
-		&RenderScene::setGlobalLightColor,
-		allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Fog color",
-		&RenderScene::getFogColor,
-		&RenderScene::setFogColor,
-		allocator));
-
-	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, BoolPropertyDescriptor<RenderScene>)("Cast shadows",
-		&RenderScene::getLightCastShadows,
-		&RenderScene::setLightCastShadows,
-		allocator));
-	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Diffuse intensity",
-		&RenderScene::getPointLightIntensity,
-		&RenderScene::setPointLightIntensity,
-		0.0f,
-		1.0f,
-		0.05f,
-		allocator));
-	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Diffuse color",
-		&RenderScene::getPointLightColor,
-		&RenderScene::setPointLightColor,
-		allocator));
-	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Specular color",
-		&RenderScene::getPointLightSpecularColor,
-		&RenderScene::setPointLightSpecularColor,
-		allocator));
-	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("FOV",
-		&RenderScene::getLightFOV,
-		&RenderScene::setLightFOV,
-		0.0f,
-		360.0f,
-		5.0f,
-		allocator));
-	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Attenuation",
-		&RenderScene::getLightAttenuation,
-		&RenderScene::setLightAttenuation,
-		0.0f,
-		1000.0f,
-		0.1f,
-		allocator));
-	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Range",
-		&RenderScene::getLightRange,
-		&RenderScene::setLightRange,
-		0.0f,
-		FLT_MAX,
-		1.0f,
-		allocator));
-	PropertyRegister::add("terrain",
-		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",
-		&RenderScene::getTerrainMaterialPath,
-		&RenderScene::setTerrainMaterialPath,
-		"Material (*.mat)",
-		ResourceManager::MATERIAL,
-		allocator));
-	PropertyRegister::add("terrain",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("XZ scale",
-		&RenderScene::getTerrainXZScale,
-		&RenderScene::setTerrainXZScale,
-		0.0f,
-		FLT_MAX,
-		0.0f,
-		allocator));
-	PropertyRegister::add("terrain",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Height scale",
-		&RenderScene::getTerrainYScale,
-		&RenderScene::setTerrainYScale,
-		0.0f,
-		FLT_MAX,
-		0.0f,
-		allocator));
-
-	PropertyRegister::add("terrain",
-		LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)("Grass distance",
-		&RenderScene::getGrassDistance,
-		&RenderScene::setGrassDistance,
-		allocator));
-
-	auto grass = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Grass",
-		&RenderScene::getGrassCount,
-		&RenderScene::addGrass,
-		&RenderScene::removeGrass,
-		allocator);
-	grass->addChild(LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Mesh",
-		&RenderScene::getGrassPath,
-		&RenderScene::setGrassPath,
-		"Mesh (*.msh)",
-		crc32("model"),
-		allocator));
-	auto ground = LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)("Ground",
-		&RenderScene::getGrassGround,
-		&RenderScene::setGrassGround,
-		allocator);
-	ground->setLimit(0, 4);
-	grass->addChild(ground);
-	grass->addChild(LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)("Density",
-		&RenderScene::getGrassDensity,
-		&RenderScene::setGrassDensity,
-		allocator));
-	PropertyRegister::add("terrain", grass);
-}
-
-
 static const uint32 MATERIAL_HASH = crc32("MATERIAL");
+static const uint32 RENDER_PARAMS_HASH = crc32("render_params");
 
 
 struct MaterialPlugin : public AssetBrowser::IPlugin
 {
-	MaterialPlugin(StudioApp& app)
+	explicit MaterialPlugin(StudioApp& app)
 		: m_app(app)
 	{
 	}
 
-		
+
 	void saveMaterial(Material* material)
 	{
 		FS::FileSystem& fs = m_app.getWorldEditor()->getEngine().getFileSystem();
@@ -522,17 +73,37 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 				*file, JsonSerializer::AccessMode::WRITE, material->getPath(), allocator);
 			if (!material->save(serializer))
 			{
-				g_log_error.log("Material manager") << "Error saving "
-					<< material->getPath().c_str();
+				g_log_error.log("Editor") << "Error saving " << material->getPath().c_str();
 			}
 			fs.close(*file);
 
-			PlatformInterface::deleteFile(material->getPath().c_str());
-			PlatformInterface::moveFile(tmp_path, material->getPath().c_str());
+			StringBuilder<MAX_PATH_LENGTH> src_full_path(
+				m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(0));
+			StringBuilder<MAX_PATH_LENGTH> dest_full_path(
+				m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(0));
+			src_full_path << tmp_path;
+			dest_full_path << material->getPath().c_str();
+			if (!PlatformInterface::fileExists(src_full_path))
+			{
+				src_full_path.data[0] = 0;
+				dest_full_path.data[0] = 0;
+				src_full_path << m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(1);
+				src_full_path << tmp_path;
+				dest_full_path << m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(1);
+				dest_full_path << material->getPath().c_str();
+			}
+
+			PlatformInterface::deleteFile(dest_full_path);
+
+			if (!PlatformInterface::moveFile(src_full_path, dest_full_path))
+			{
+				g_log_error.log("Editor") << "Could not save file "
+											<< material->getPath().c_str();
+			}
 		}
 		else
 		{
-			g_log_error.log("Material manager") << "Could not save file "
+			g_log_error.log("Editor") << "Could not save file "
 				<< material->getPath().c_str();
 		}
 	}
@@ -549,32 +120,47 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 		if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser()->openInExternalEditor(material);
 
 		bool b;
-		if (material->hasAlphaCutoutDefine())
+		auto* plugin = m_app.getWorldEditor()->getEngine().getPluginManager().getPlugin("renderer");
+		auto* renderer = static_cast<Renderer*>(plugin);
+
+		int alpha_cutout_define = renderer->getShaderDefineIdx("ALPHA_CUTOUT");
+		
+		int layer_count = material->getLayerCount();
+		if (ImGui::DragInt("Layers", &layer_count))
 		{
-			b = material->isAlphaCutout();
-			if (ImGui::Checkbox("Is alpha cutout", &b)) material->enableAlphaCutout(b);
+			material->setLayerCount(layer_count);
+		}
+		
+		if (material->hasDefine(alpha_cutout_define))
+		{
+			b = material->isDefined(alpha_cutout_define);
+			if (ImGui::Checkbox("Is alpha cutout", &b)) material->setDefine(alpha_cutout_define, b);
+			if(b)
+			{
+				float tmp = material->getAlphaRef();
+				if(ImGui::DragFloat("Alpha reference value", &tmp, 0.01f, 0.0f, 1.0f))
+				{
+					material->setAlphaRef(tmp);
+				}
+			}
 		}
 
-		b = material->isBackfaceCulling();
-		if (ImGui::Checkbox("Is backface culling", &b)) material->enableBackfaceCulling(b);
-
-		if (material->hasShadowReceivingDefine())
+		Vec3 color = material->getColor();
+		if (ImGui::ColorEdit3("Color", &color.x))
 		{
-			b = material->isShadowReceiver();
-			if (ImGui::Checkbox("Is shadow receiver", &b)) material->enableShadowReceiving(b);
+			material->setColor(color);
 		}
-
-		b = material->isZTest();
-		if (ImGui::Checkbox("Z test", &b)) material->enableZTest(b);
-
-		Vec3 specular = material->getSpecular();
-		if (ImGui::ColorEdit3("Specular", &specular.x))
+		if (ImGui::BeginPopupContextItem("color_pu"))
 		{
-			material->setSpecular(specular);
+			if(ImGui::ColorPicker(&color.x, false))
+			{
+				material->setColor(color);
+			}
+			ImGui::EndPopup();
 		}
 
 		float shininess = material->getShininess();
-		if (ImGui::DragFloat("Shininess", &shininess))
+		if (ImGui::DragFloat("Shininess", &shininess, 0.1f, 0.0f, 64.0f))
 		{
 			material->setShininess(shininess);
 		}
@@ -607,6 +193,11 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 
 			if (ImGui::BeginPopup(popup_name))
 			{
+				bool is_srgb = (texture->getFlags() & BGFX_TEXTURE_SRGB) != 0;
+				if (ImGui::Checkbox("SRGB", &is_srgb))
+				{
+					texture->setFlag(BGFX_TEXTURE_SRGB, is_srgb);
+				}
 				bool u_clamp = (texture->getFlags() & BGFX_TEXTURE_U_CLAMP) != 0;
 				if (ImGui::Checkbox("u clamp", &u_clamp))
 				{
@@ -642,14 +233,44 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 
 		}
 
-		for (int i = 0; i < material->getUniformCount(); ++i)
+		auto* shader = material->getShader();
+		if(shader && material->isReady())
 		{
-			auto& uniform = material->getUniform(i);
-			switch (uniform.m_type)
+			for(int i = 0; i < shader->getUniformCount(); ++i)
 			{
-			case Material::Uniform::FLOAT:
-				ImGui::DragFloat(uniform.m_name, &uniform.m_float);
-				break;
+				auto& uniform = material->getUniform(i);
+				auto& shader_uniform = shader->getUniform(i);
+				switch(shader_uniform.type)
+				{
+					case Shader::Uniform::FLOAT:
+						if (ImGui::DragFloat(shader_uniform.name, &uniform.float_value))
+						{
+							material->createCommandBuffer();
+						}
+						break;
+					case Shader::Uniform::VEC3:
+						if(ImGui::DragFloat3(shader_uniform.name, uniform.vec3))
+						{
+							material->createCommandBuffer();
+						}
+						break;
+					case Shader::Uniform::COLOR:
+						if(ImGui::ColorEdit3(shader_uniform.name, uniform.vec3))
+						{
+							material->createCommandBuffer();
+						}
+						if(ImGui::BeginPopupContextItem(StringBuilder<50>(shader_uniform.name, "pu")))
+						{
+							if(ImGui::ColorPicker(uniform.vec3, false))
+							{
+								material->createCommandBuffer();
+							}
+							ImGui::EndPopup();
+						}
+						break;
+					case Shader::Uniform::TIME: break;
+					default: ASSERT(false); break;
+				}
 			}
 		}
 		ImGui::Columns(1);
@@ -698,7 +319,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		WorldEditor& m_editor;
 
 		Entity getEntity() const { return m_entity; }
-		InsertMeshCommand(WorldEditor& editor)
+		explicit InsertMeshCommand(WorldEditor& editor)
 			: m_editor(editor)
 		{
 		}
@@ -795,11 +416,10 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 	};
 
 
-	ModelPlugin(StudioApp& app)
+	explicit ModelPlugin(StudioApp& app)
 		: m_app(app)
 	{
 		m_app.getWorldEditor()->registerEditorCommandCreator("insert_mesh", createInsertMeshCommand);
-
 	}
 
 
@@ -831,16 +451,24 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		ImGui::LabelText("Bone count", "%d", model->getBoneCount());
 		if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones"))
 		{
+			ImGui::Columns(3);
 			for (int i = 0; i < model->getBoneCount(); ++i)
 			{
 				ImGui::Text(model->getBone(i).name.c_str());
+				ImGui::NextColumn();
+				auto pos = model->getBone(i).position;
+				ImGui::Text("%f; %f; %f", pos.x, pos.y, pos.z);
+				ImGui::NextColumn();
+				auto rot = model->getBone(i).rotation;
+				ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
+				ImGui::NextColumn();
 			}
 		}
 
 		ImGui::LabelText("Bounding radius", "%f", model->getBoundingRadius());
 
-		auto& lods = model->getLODs();
-		if (!lods.empty())
+		auto* lods = model->getLODs();
+		if (lods[0].to_mesh >= 0)
 		{
 			ImGui::Separator();
 			ImGui::Columns(3);
@@ -848,16 +476,20 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 			ImGui::Text("Distance"); ImGui::NextColumn();
 			ImGui::Text("# of meshes"); ImGui::NextColumn();
 			ImGui::Separator();
-			for (int i = 0; i < lods.size() - 1; ++i)
+			int lod_count = 1;
+			for (int i = 0; i < Model::MAX_LOD_COUNT - 1 && lods[i + 1].to_mesh >= 0; ++i)
 			{
+				ImGui::PushID(i);
 				ImGui::Text("%d", i); ImGui::NextColumn();
-				ImGui::DragFloat("", &lods[i].m_distance); ImGui::NextColumn();
-				ImGui::Text("%d", lods[i].m_to_mesh - lods[i].m_from_mesh + 1); ImGui::NextColumn();
+				ImGui::DragFloat("", &lods[i].distance); ImGui::NextColumn();
+				ImGui::Text("%d", lods[i].to_mesh - lods[i].from_mesh + 1); ImGui::NextColumn();
+				++lod_count;
+				ImGui::PopID();
 			}
 
-			ImGui::Text("%d", lods.size() - 1); ImGui::NextColumn();
+			ImGui::Text("%d", lod_count - 1); ImGui::NextColumn();
 			ImGui::Text("INFINITE"); ImGui::NextColumn();
-			ImGui::Text("%d", lods.back().m_to_mesh - lods.back().m_from_mesh + 1);
+			ImGui::Text("%d", lods[lod_count - 1].to_mesh - lods[lod_count - 1].from_mesh + 1);
 			ImGui::Columns(1);
 		}
 
@@ -865,14 +497,14 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		for (int i = 0; i < model->getMeshCount(); ++i)
 		{
 			auto& mesh = model->getMesh(i);
-			if (ImGui::TreeNode(&mesh, mesh.getName()[0] != 0 ? mesh.getName() : "N/A"))
+			if (ImGui::TreeNode(&mesh, mesh.name.length() > 0 ? mesh.name.c_str() : "N/A"))
 			{
-				ImGui::LabelText("Triangle count", "%d", mesh.getTriangleCount());
-				ImGui::LabelText("Material", mesh.getMaterial()->getPath().c_str());
+				ImGui::LabelText("Triangle count", "%d", mesh.indices_count / 3);
+				ImGui::LabelText("Material", mesh.material->getPath().c_str());
 				ImGui::SameLine();
 				if (ImGui::Button("->"))
 				{
-					m_app.getAssetBrowser()->selectResource(mesh.getMaterial()->getPath());
+					m_app.getAssetBrowser()->selectResource(mesh.material->getPath());
 				}
 				ImGui::TreePop();
 			}
@@ -911,12 +543,12 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 
 struct TexturePlugin : public AssetBrowser::IPlugin
 {
-	TexturePlugin(StudioApp& app)
+	explicit TexturePlugin(StudioApp& app)
 		: m_app(app)
 	{
 	}
 
-	
+
 	bool onGUI(Resource* resource, uint32 type) override
 	{
 		if (type != TEXTURE_HASH) return false;
@@ -975,7 +607,7 @@ struct TexturePlugin : public AssetBrowser::IPlugin
 
 struct ShaderPlugin : public AssetBrowser::IPlugin
 {
-	ShaderPlugin(StudioApp& app)
+	explicit ShaderPlugin(StudioApp& app)
 		: m_app(app)
 	{
 	}
@@ -985,24 +617,23 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 	{
 		if (type != SHADER_HASH) return false;
 		auto* shader = static_cast<Shader*>(resource);
-		StringBuilder<MAX_PATH_LENGTH> path(m_app.getWorldEditor()->getEngine().getPathManager().getBasePath());
 		char basename[MAX_PATH_LENGTH];
 		PathUtils::getBasename(
 			basename, lengthOf(basename), resource->getPath().c_str());
-		path << "/shaders/" << basename;
+		StringBuilder<MAX_PATH_LENGTH> path("/shaders/", basename);
 		if (ImGui::Button("Open vertex shader"))
 		{
 			path << "_vs.sc";
-			PlatformInterface::shellExecuteOpen(path);
+			m_app.getAssetBrowser()->openInExternalEditor(path);
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Open fragment shader"))
 		{
 			path << "_fs.sc";
-			PlatformInterface::shellExecuteOpen(path);
+			m_app.getAssetBrowser()->openInExternalEditor(path);
 		}
 
-		if (ImGui::CollapsingHeader("Texture slots", nullptr, true, true))
+		if (shader->getTextureSlotCount() > 0 && ImGui::CollapsingHeader("Texture slots", nullptr, true, true))
 		{
 			ImGui::Columns(2);
 			ImGui::Text("name");
@@ -1019,6 +650,35 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 				ImGui::NextColumn();
 			}
 			ImGui::Columns(1);
+		}
+
+		if(shader->getUniformCount() > 0 && ImGui::CollapsingHeader("Uniforms", nullptr, true, true))
+		{
+			ImGui::Columns(2);
+			ImGui::Text("name");
+			ImGui::NextColumn();
+			ImGui::Text("type");
+			ImGui::NextColumn();
+			ImGui::Separator();
+			for(int i = 0; i < shader->getUniformCount(); ++i)
+			{
+				auto& uniform = shader->getUniform(i);
+				ImGui::Text(uniform.name);
+				ImGui::NextColumn();
+				switch(uniform.type)
+				{
+					case Shader::Uniform::COLOR: ImGui::Text("color"); break;
+					case Shader::Uniform::FLOAT: ImGui::Text("float"); break;
+					case Shader::Uniform::INT: ImGui::Text("int"); break;
+					case Shader::Uniform::MATRIX4: ImGui::Text("Matrix 4x4"); break;
+					case Shader::Uniform::TIME: ImGui::Text("time"); break;
+					case Shader::Uniform::VEC3: ImGui::Text("Vector3"); break;
+					default: ASSERT(false); break;
+				}
+				ImGui::NextColumn();
+			}
+			ImGui::Columns(1);
+
 		}
 		return true;
 	}
@@ -1057,7 +717,7 @@ static const uint32 PARTICLE_EMITTER_HASH = crc32("particle_emitter");
 
 struct EmitterPlugin : public PropertyGrid::IPlugin
 {
-	EmitterPlugin(StudioApp& app)
+	explicit EmitterPlugin(StudioApp& app)
 		: m_app(app)
 	{
 		m_particle_emitter_updating = true;
@@ -1071,7 +731,7 @@ struct EmitterPlugin : public PropertyGrid::IPlugin
 		
 		ImGui::Separator();
 		ImGui::Checkbox("Update", &m_particle_emitter_updating);
-		auto* scene = static_cast<Lumix::RenderScene*>(cmp.scene);
+		auto* scene = static_cast<RenderScene*>(cmp.scene);
 		ImGui::SameLine();
 		if (ImGui::Button("Reset")) scene->resetParticleEmitter(cmp.index);
 
@@ -1096,7 +756,7 @@ static const uint32 TERRAIN_HASH = crc32("terrain");
 
 struct TerrainPlugin : public PropertyGrid::IPlugin
 {
-	TerrainPlugin(StudioApp& app)
+	explicit TerrainPlugin(StudioApp& app)
 		: m_app(app)
 	{
 		auto& editor = *app.getWorldEditor();
@@ -1128,7 +788,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 {
 	struct RenderInterfaceImpl : public RenderInterface
 	{
-		ModelHandle loadModel(Lumix::Path& path) override
+		ModelHandle loadModel(Path& path) override
 		{
 			auto& rm = m_editor.getEngine().getResourceManager();
 			m_models.insert(m_model_index, static_cast<Model*>(rm.get(ResourceManager::MODEL)->load(path)));
@@ -1182,11 +842,13 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 
 		void renderModel(ModelHandle model, const Matrix& mtx) override
 		{
-			if (m_pipeline.isReady()) m_pipeline.renderModel(*m_models[model], mtx);
+			if (!m_pipeline.isReady() || !m_models[model]->isReady()) return;
+
+			m_pipeline.renderModel(*m_models[model], mtx);
 		}
 
 
-		RenderInterfaceImpl(Lumix::WorldEditor& editor, Lumix::Pipeline& pipeline)
+		RenderInterfaceImpl(WorldEditor& editor, Pipeline& pipeline)
 			: m_pipeline(pipeline)
 			, m_editor(editor)
 			, m_models(editor.getAllocator())
@@ -1207,14 +869,14 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 			auto& rm = m_editor.getEngine().getResourceManager();
 			rm.get(ResourceManager::SHADER)->unload(*m_shader);
 
-			m_editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
-			m_editor.universeDestroyed().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
+			m_editor.universeCreated().unbind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
+			m_editor.universeDestroyed().unbind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
 		}
 
 
 		void onUniverseCreated()
 		{
-			m_render_scene = static_cast<RenderScene*>(m_editor.getUniverseContext()->getScene(crc32("renderer")));
+			m_render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(crc32("renderer")));
 		}
 
 
@@ -1241,12 +903,29 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 			int vertices_count,
 			bool lines) override
 		{
-			auto& renderer = static_cast<Lumix::Renderer&>(m_render_scene->getPlugin());
-			Lumix::TransientGeometry geom(
-				vertices, vertices_count, renderer.getBasicVertexDecl(), indices, indices_count);
+			if (!m_shader->isReady()) return;
+
+			auto& renderer = static_cast<Renderer&>(m_render_scene->getPlugin());
+			if (!bgfx::checkAvailTransientBuffers(
+					vertices_count, renderer.getBasicVertexDecl(), indices_count))
+			{
+				return;
+			}
+			bgfx::TransientVertexBuffer vertex_buffer;
+			bgfx::TransientIndexBuffer index_buffer;
+			bgfx::allocTransientVertexBuffer(
+				&vertex_buffer, vertices_count, renderer.getBasicVertexDecl());
+			bgfx::allocTransientIndexBuffer(&index_buffer, indices_count);
+
+			copyMemory(vertex_buffer.data,
+				vertices,
+				vertices_count * renderer.getBasicVertexDecl().getStride());
+			copyMemory(index_buffer.data, indices, indices_count * sizeof(uint16));
+			
 			uint64 flags = BGFX_STATE_DEPTH_TEST_LEQUAL;
 			if (lines) flags |= BGFX_STATE_PT_LINES;
-			m_pipeline.render(geom,
+			m_pipeline.render(vertex_buffer,
+				index_buffer,
 				mtx,
 				0,
 				indices_count,
@@ -1255,35 +934,57 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		}
 
 
-		Lumix::WorldEditor& m_editor;
-		Lumix::Shader* m_shader;
-		Lumix::RenderScene* m_render_scene;
-		Lumix::Pipeline& m_pipeline;
-		Lumix::PODHashMap<int, Model*> m_models;
+		WorldEditor& m_editor;
+		Shader* m_shader;
+		RenderScene* m_render_scene;
+		Pipeline& m_pipeline;
+		HashMap<int, Model*> m_models;
 		int m_model_index;
 	};
 
 
-	SceneViewPlugin(StudioApp& app)
+	explicit SceneViewPlugin(StudioApp& app)
 		: m_app(app)
 	{
 		auto& editor = *app.getWorldEditor();
 		auto& allocator = editor.getAllocator();
 		m_action = LUMIX_NEW(allocator, Action)("Scene View", "scene_view");
 		m_action->func.bind<SceneViewPlugin, &SceneViewPlugin::onAction>(this);
-		m_scene_view.init(editor, app.getActions());
+		m_scene_view.init(*app.getLogUI(), editor, app.getActions());
 		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getPipeline());
 		editor.setRenderInterface(m_render_interface);
+		m_app.getAssetBrowser()->resourceChanged().bind<SceneViewPlugin, &SceneViewPlugin::onResourceChanged>(this);
 	}
 
 
 	~SceneViewPlugin()
 	{
+		m_app.getAssetBrowser()->resourceChanged().unbind<SceneViewPlugin, &SceneViewPlugin::onResourceChanged>(this);
 		m_scene_view.shutdown();
 	}
 
 
-	void update(float) override { m_scene_view.update(); }
+	void onResourceChanged(const Path& path, const char* ext)
+	{
+		if (m_scene_view.getPipeline()->getPath() == path)
+		{
+			m_scene_view.getPipeline()->load();
+		}
+	}
+
+
+	void update(float) override
+	{
+		m_scene_view.update();
+		if(&m_render_interface->m_pipeline == m_scene_view.getPipeline()) return;
+
+		auto& editor = *m_app.getWorldEditor();
+		auto& allocator = editor.getAllocator();
+		editor.setRenderInterface(nullptr);
+		LUMIX_DELETE(allocator, m_render_interface);
+		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getPipeline());
+		editor.setRenderInterface(m_render_interface);
+	}
 	void onAction() {}
 	void onWindowGUI() override { m_scene_view.onGUI(); }
 
@@ -1293,12 +994,457 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 };
 
 
+struct MeshMergerPlugin : public StudioApp::IPlugin
+{
+	explicit MeshMergerPlugin(StudioApp& _app)
+		: app(_app)
+		, models(_app.getWorldEditor()->getAllocator())
+	{
+		m_is_window_opened = false;
+		m_action =
+			LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Mesh Merger", "mesh_merger");
+		m_action->func.bind<MeshMergerPlugin, &MeshMergerPlugin::onAction>(this);
+		auto& engine = app.getWorldEditor()->getEngine();
+		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+		model_manager = &renderer->getModelManager();
+		output[0] = 0;
+		for (int i = 0; i < lengthOf(lods); ++i) lods[i] = (float)i;
+	}
+
+
+	~MeshMergerPlugin()
+	{
+		for (auto* model : models)
+		{
+			model_manager->unload(*model);
+		}
+	}
+
+
+	void onAction() { m_is_window_opened = !m_is_window_opened; }
+
+
+	enum class VertexAttributeDef : uint32
+	{
+		POSITION,
+		FLOAT1,
+		FLOAT2,
+		FLOAT3,
+		FLOAT4,
+		INT1,
+		INT2,
+		INT3,
+		INT4,
+		SHORT2,
+		SHORT4,
+		BYTE4,
+		NONE
+	};
+
+
+	static void writeAttribute(const char* attribute_name,
+		VertexAttributeDef attribute_type,
+		FS::OsFile& file)
+	{
+		uint32 length = stringLength(attribute_name);
+		file.write((const char*)&length, sizeof(length));
+		file.write(attribute_name, length);
+
+		uint32 type = (uint32)attribute_type;
+		file.write((const char*)&type, sizeof(type));
+	}
+
+
+	int getAttributeArrayOffset(Mesh& mesh)
+	{
+		int offset = 0;
+		for (auto& model : models)
+		{
+			for (int i = 0; i < model->getMeshCount(); ++i)
+			{
+				auto& tmp = model->getMesh(i);
+				if (&tmp == &mesh) return offset;
+				offset += tmp.attribute_array_size;
+			}
+		}
+		return offset;
+	}
+
+
+	int getIndicesOffset(Mesh& mesh)
+	{
+		int offset = 0;
+		for (auto& model : models)
+		{
+			for (int i = 0; i < model->getMeshCount(); ++i)
+			{
+				auto& tmp = model->getMesh(i);
+				if (&tmp == &mesh) return offset + tmp.indices_offset;
+			}
+			offset += model->getIndices().size();
+		}
+		return offset;
+	}
+
+
+	void writeMeshes(FS::OsFile& file)
+	{
+		Array<Mesh*> meshes(app.getWorldEditor()->getAllocator());
+		int mesh_count = 0;
+		for (auto* model : models)
+		{
+			mesh_count += model->getMeshCount();
+		}
+		file.write((const char*)&mesh_count, sizeof(mesh_count));
+		for (auto* model : models)
+		{
+			for (int i = 0; i < model->getMeshCount(); ++i)
+			{
+				auto& engine_mesh = model->getMesh(i);
+				int vertex_size = engine_mesh.vertex_def.getStride();
+				char material_name[MAX_PATH_LENGTH];
+				PathUtils::getBasename(material_name,
+					lengthOf(material_name),
+					engine_mesh.material->getPath().c_str());
+				int32 length = stringLength(material_name);
+				file.write((const char*)&length, sizeof(length));
+				file.write(material_name, length);
+
+				int32 attribute_array_offset = getAttributeArrayOffset(engine_mesh);
+				file.write((const char*)&attribute_array_offset, sizeof(attribute_array_offset));
+				int32 attribute_array_size = engine_mesh.attribute_array_size;
+				attribute_array_offset += attribute_array_size;
+				file.write((const char*)&attribute_array_size, sizeof(attribute_array_size));
+
+				int32 indices_offset = getIndicesOffset(engine_mesh);
+				file.write((const char*)&indices_offset, sizeof(indices_offset));
+				indices_offset += engine_mesh.indices_count;
+				int mesh_tri_count = engine_mesh.indices_count / 3;
+				file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
+
+				length = engine_mesh.name.length();
+
+				file.write((const char*)&length, sizeof(length));
+				file.write((const char*)engine_mesh.name.c_str(), length);
+
+				int32 attribute_count = 3;
+				if (engine_mesh.vertex_def.has(bgfx::Attrib::Color0)) ++attribute_count;
+				if (engine_mesh.vertex_def.has(bgfx::Attrib::Tangent)) ++attribute_count;
+
+				file.write((const char*)&attribute_count, sizeof(attribute_count));
+
+				writeAttribute("in_position", VertexAttributeDef::POSITION, file);
+				if (engine_mesh.vertex_def.has(bgfx::Attrib::Color0))
+				{
+					writeAttribute("in_colors", VertexAttributeDef::BYTE4, file);
+				}
+				writeAttribute("in_normal", VertexAttributeDef::BYTE4, file);
+				if (engine_mesh.vertex_def.has(bgfx::Attrib::Tangent))
+				{
+					writeAttribute("in_tangents", VertexAttributeDef::BYTE4, file);
+				}
+				writeAttribute("in_tex_coords", VertexAttributeDef::FLOAT2, file);
+			}
+		}
+	}
+
+
+	bool writeGeometry(FS::OsFile& file)
+	{
+		int32 indices_count = 0;
+		int32 vertices_size = 0;
+		for (auto& model : models)
+		{
+			indices_count += model->getIndices().size();
+			for (int i = 0; i < model->getMeshCount(); ++i)
+			{
+				auto& engine_mesh = model->getMesh(i);
+				vertices_size += engine_mesh.attribute_array_size;
+			}
+		}
+		file.write((const char*)&indices_count, sizeof(indices_count));
+
+		int32 polygon_idx = 0;
+		int indices_offset = 0;
+		for (auto& model : models)
+		{
+			const int* indices = &model->getIndices()[0];
+			for (int j = 0; j < model->getIndices().size(); ++j)
+			{
+				int tmp = indices_offset + indices[j];
+				file.write(&tmp, sizeof(tmp));
+			}
+		}
+
+		file.write((const char*)&vertices_size, sizeof(vertices_size));
+		for (auto& model : models)
+		{
+			auto& allocator = app.getWorldEditor()->getAllocator();
+			auto& fs = app.getWorldEditor()->getEngine().getFileSystem();
+			auto in_file = fs.open(fs.getDiskDevice(), model->getPath(), FS::Mode::OPEN_AND_READ);
+			if (!in_file)
+			{
+				g_log_error.log("Renderer") << "Failed to open \"" << model->getPath() << "\"";
+				return false;
+			}
+
+			Model::FileHeader header;
+			in_file->read(&header, sizeof(Model::FileHeader));
+			if (header.m_version != (uint32)Model::FileVersion::FIRST + 1)
+			{
+				g_log_error.log("Renderer") << model->getPath().c_str()
+											<< " has unsupported version";
+				return false;
+			}
+
+			int object_count = 0;
+			in_file->read(&object_count, sizeof(object_count));
+			for (int i = 0; i < object_count; ++i)
+			{
+				int32 str_size;
+				in_file->read(&str_size, sizeof(str_size));
+				char dummy[MAX_PATH_LENGTH];
+				in_file->read(dummy, str_size);
+
+				int32 idummy[4];
+				in_file->read(idummy, sizeof(idummy));
+
+				in_file->read(&str_size, sizeof(str_size));
+				in_file->read(dummy, str_size);
+
+				uint32 attribute_count;
+				in_file->read(&attribute_count, sizeof(attribute_count));
+				for (uint32 i = 0; i < attribute_count; ++i)
+				{
+					char tmp[50];
+					uint32 len;
+					in_file->read(&len, sizeof(len));
+					in_file->read(tmp, len);
+					uint32 type;
+					in_file->read(&type, sizeof(type));
+				}
+			}
+			int32 indices_count;
+			in_file->read(&indices_count, sizeof(indices_count));
+			in_file->seek(FS::SeekMode::CURRENT, indices_count * sizeof(int32));
+			int32 in_vertices_size;
+			in_file->read(&in_vertices_size, sizeof(in_vertices_size));
+			char buf[4096];
+			while (in_vertices_size)
+			{
+				int size = Math::minimum(in_vertices_size, lengthOf(buf));
+				in_file->read(buf, size);
+				file.write(buf, size);
+				in_vertices_size -= size;
+			}
+
+			fs.close(*in_file);
+		}
+		return true;
+	}
+
+
+	void writeLODs(FS::OsFile& file)
+	{
+		int lod_count = models.size();
+		if (lods[lod_count - 1] < 10e9)
+		{
+			lods[lod_count] = FLT_MAX;
+			++lod_count;
+		}
+		file.write((const char*)&lod_count, sizeof(lod_count));
+		int32 to_mesh = -1;
+		for (int i = 0; i < lod_count; ++i)
+		{
+			to_mesh += i < models.size() ? models[i]->getMeshCount() : 0;
+			file.write((const char*)&to_mesh, sizeof(to_mesh));
+			float squared_dist = lods[i] * lods[i];
+			file.write((const char*)&squared_dist, sizeof(squared_dist));
+		}
+	}
+
+
+	bool check()
+	{
+		for (auto* model : models)
+		{
+			if (model->getBoneCount() > 0)
+			{
+				g_log_error.log("Renderer") << "Skinned meshes are not supported";
+				return false;
+			}
+		}
+		return true;
+	}
+
+
+	void merge()
+	{
+		if (output[0] == 0) return;
+		if (!check()) return;
+
+		FS::OsFile file;
+		if (!file.open(
+				output, FS::Mode::WRITE | FS::Mode::CREATE, app.getWorldEditor()->getAllocator()))
+		{
+			g_log_error.log("Renderer") << "Failed to save \"" << output << "\"";
+			return;
+		}
+
+		Model::FileHeader header;
+		header.m_magic = Model::FILE_MAGIC;
+		header.m_version = (uint32)Model::FileVersion::FIRST;
+
+		file.write(&header, sizeof(header));
+		writeMeshes(file);
+		if (!writeGeometry(file))
+		{
+			file.close();
+			return;
+		}
+		int32 bone_count = 0;
+		file.write((const char*)&bone_count, sizeof(bone_count));
+		writeLODs(file);
+
+		auto* disk_device = app.getWorldEditor()->getEngine().getDiskFileDevice();
+		char dir[MAX_PATH_LENGTH];
+		PathUtils::getDir(dir, lengthOf(dir), output);
+		for (auto& model : models)
+		{
+			for (int i = 0; i < model->getMeshCount(); ++i)
+			{
+				auto& engine_mesh = model->getMesh(i);
+				char src[MAX_PATH_LENGTH];
+				copyString(src, disk_device->getBasePath(0));
+				catString(src, engine_mesh.material->getPath().c_str());
+				char dest[MAX_PATH_LENGTH];
+				copyString(dest, dir);
+				char mat_basename[MAX_PATH_LENGTH];
+				PathUtils::getBasename(
+					mat_basename, lengthOf(mat_basename), engine_mesh.material->getPath().c_str());
+				catString(dest, mat_basename);
+				catString(dest, ".mat");
+				if (!PlatformInterface::copyFile(src, dest))
+				{
+					copyString(src, disk_device->getBasePath(1));
+					catString(src, engine_mesh.material->getPath().c_str());
+					if (!PlatformInterface::copyFile(src, dest))
+					{
+						g_log_error.log("Renderer") << "Failed to copy "
+													<< engine_mesh.material->getPath();
+					}
+				}
+			}
+		}
+
+		file.close();
+	}
+
+
+	void onWindowGUI() override
+	{
+		if (ImGui::BeginDock("Mesh Merger", &m_is_window_opened))
+		{
+			ImGui::InputText("Output", output, sizeof(output));
+			ImGui::SameLine();
+			if (ImGui::Button("...###browseoutput"))
+			{
+				auto* base_path =
+					app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(0);
+				PlatformInterface::getSaveFilename(output, sizeof(output), base_path, "msh");
+			}
+			if (ImGui::Button("Merge")) merge();
+
+			if (ImGui::CollapsingHeader("Sources", nullptr, true, true))
+			{
+				char buf[MAX_PATH_LENGTH];
+				ImGui::Columns(2);
+				if (!models.empty())
+				{
+					ImGui::Text("Model");
+					ImGui::NextColumn();
+					ImGui::Text("Distance");
+					ImGui::NextColumn();
+				}
+				for (int i = 0; i < models.size(); ++i)
+				{
+					auto& model = models[i];
+					ImGui::PushID(model);
+					buf[0] = 0;
+					copyString(buf, model->getPath().c_str());
+					if (app.getAssetBrowser()->resourceInput(
+							"Model", "model", buf, lengthOf(buf), ResourceManager::MODEL))
+					{
+						if (model) model_manager->unload(*model);
+						if (buf[0] != 0)
+						{
+							model = static_cast<Model*>(model_manager->load(Path(buf)));
+						}
+						else
+						{
+							models.erase(i);
+							ImGui::PopID();
+							break;
+						}
+					}
+					ImGui::NextColumn();
+					if (lods[i] < 10e9)
+					{
+						ImGui::DragFloat("",
+							&lods[i],
+							1,
+							i > 0 ? lods[i - 1] : 0,
+							i < models.size() - 1 ? lods[i + 1] : 10e8f);
+						ImGui::SameLine();
+					}
+					if (i == models.size() - 1)
+					{
+						bool b = lods[i] > 10e9;
+						if (ImGui::Checkbox("Infinite", &b))
+						{
+							lods[i] = b ? FLT_MAX : 0;
+						}
+					}
+					ImGui::NextColumn();
+					ImGui::PopID();
+				}
+				ImGui::Columns();
+				buf[0] = 0;
+				ImGui::PushID(models.size());
+				if (app.getAssetBrowser()->resourceInput(
+						"Model", "model", buf, lengthOf(buf), ResourceManager::MODEL))
+				{
+					auto& model = models.emplace();
+					model = static_cast<Model*>(model_manager->load(Path(buf)));
+				}
+				ImGui::PopID();
+			}
+		}
+		ImGui::EndDock();
+	}
+
+
+	bool hasFocus() override { return false; }
+
+
+	void update(float) override {}
+
+
+	StudioApp& app;
+	bool m_is_window_opened;
+	Array<Model*> models;
+	float lods[16];
+	char output[MAX_PATH_LENGTH];
+	ModelManager* model_manager;
+};
+
+
 struct GameViewPlugin : public StudioApp::IPlugin
 {
 	static GameViewPlugin* s_instance;
 
 
-	GameViewPlugin(StudioApp& app)
+	explicit GameViewPlugin(StudioApp& app)
 		: m_app(app)
 	{
 		m_width = m_height = -1;
@@ -1310,9 +1456,9 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		m_game_view.init(editor);
 		
 		auto& plugin_manager = editor.getEngine().getPluginManager();
-		auto* renderer = static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
-		Lumix::Path path("pipelines/imgui.lua");
-		m_gui_pipeline = Lumix::Pipeline::create(*renderer, path, m_engine->getAllocator());
+		auto* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
+		Path path("pipelines/imgui.lua");
+		m_gui_pipeline = Pipeline::create(*renderer, path, m_engine->getAllocator());
 		m_gui_pipeline->load();
 
 		int w = PlatformInterface::getWindowWidth();
@@ -1327,12 +1473,12 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		int width, height;
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 		auto* material_manager =
-			m_engine->getResourceManager().get(Lumix::ResourceManager::MATERIAL);
-		auto* resource = material_manager->load(Lumix::Path("models/imgui.mat"));
-		m_material = static_cast<Lumix::Material*>(resource);
+			m_engine->getResourceManager().get(ResourceManager::MATERIAL);
+		auto* resource = material_manager->load(Path("shaders/imgui.mat"));
+		m_material = static_cast<Material*>(resource);
 
-		Lumix::Texture* texture = LUMIX_NEW(editor.getAllocator(), Lumix::Texture)(
-			Lumix::Path("font"), m_engine->getResourceManager(), editor.getAllocator());
+		Texture* texture = LUMIX_NEW(editor.getAllocator(), Texture)(
+			Path("font"), m_engine->getResourceManager(), editor.getAllocator());
 
 		texture->create(width, height, pixels);
 		m_material->setTexture(0, texture);
@@ -1346,7 +1492,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 
 	~GameViewPlugin()
 	{
-		Lumix::Pipeline::destroy(m_gui_pipeline);
+		Pipeline::destroy(m_gui_pipeline);
 		auto& editor = *m_app.getWorldEditor();
 		editor.universeCreated().unbind<GameViewPlugin, &GameViewPlugin::onUniverseCreated>(this);
 		editor.universeDestroyed().unbind<GameViewPlugin, &GameViewPlugin::onUniverseDestroyed>(this);
@@ -1360,12 +1506,12 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		ImGui::ShutdownDock();
 		ImGui::Shutdown();
 
-		Lumix::Texture* texture = m_material->getTexture(0);
+		Texture* texture = m_material->getTexture(0);
 		m_material->setTexture(0, nullptr);
 		texture->destroy();
 		LUMIX_DELETE(m_app.getWorldEditor()->getAllocator(), texture);
 
-		m_material->getResourceManager().get(Lumix::ResourceManager::MATERIAL)->unload(*m_material);
+		m_material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*m_material);
 	}
 
 
@@ -1383,7 +1529,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 			m_height = h;
 			auto& plugin_manager = m_app.getWorldEditor()->getEngine().getPluginManager();
 			auto* renderer =
-				static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
+				static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 			if (renderer) renderer->resize(m_width, m_height);
 		}
 
@@ -1396,8 +1542,8 @@ struct GameViewPlugin : public StudioApp::IPlugin
 			drawGUICmdList(cmd_list);
 		}
 
-		Lumix::Renderer* renderer =
-			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+		Renderer* renderer =
+			static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 
 		renderer->frame();
 	}
@@ -1406,7 +1552,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 	void onUniverseCreated()
 	{
 		auto* scene =
-			static_cast<Lumix::RenderScene*>(m_app.getWorldEditor()->getScene(Lumix::crc32("renderer")));
+			static_cast<RenderScene*>(m_app.getWorldEditor()->getScene(crc32("renderer")));
 
 		m_gui_pipeline->setScene(scene);
 	}
@@ -1428,7 +1574,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 	{
 		float width = ImGui::GetIO().DisplaySize.x;
 		float height = ImGui::GetIO().DisplaySize.y;
-		Lumix::Matrix ortho;
+		Matrix ortho;
 		ortho.setOrtho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
 		m_gui_pipeline->setViewport(0, 0, (int)width, (int)height);
 		m_gui_pipeline->setViewProjection(ortho, (int)width, (int)height);
@@ -1437,18 +1583,22 @@ struct GameViewPlugin : public StudioApp::IPlugin
 
 	void drawGUICmdList(ImDrawList* cmd_list)
 	{
-		Lumix::Renderer* renderer =
-			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+		Renderer* renderer =
+			static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 
-		Lumix::TransientGeometry geom(&cmd_list->VtxBuffer[0],
-			cmd_list->VtxBuffer.size(),
-			renderer->getBasic2DVertexDecl(),
-			&cmd_list->IdxBuffer[0],
-			cmd_list->IdxBuffer.size());
+		int num_indices = cmd_list->IdxBuffer.size();
+		int num_vertices = cmd_list->VtxBuffer.size();
+		auto& decl = renderer->getBasic2DVertexDecl();
+		bgfx::TransientVertexBuffer vertex_buffer;
+		bgfx::TransientIndexBuffer index_buffer;
+		if (!bgfx::checkAvailTransientBuffers(num_vertices, decl, num_indices)) return;
+		bgfx::allocTransientVertexBuffer(&vertex_buffer, num_vertices, decl);
+		bgfx::allocTransientIndexBuffer(&index_buffer, num_indices);
 
-		if(geom.getNumVertices() < 0) return;
+		copyMemory(vertex_buffer.data, &cmd_list->VtxBuffer[0], num_vertices * decl.getStride());
+		copyMemory(index_buffer.data, &cmd_list->IdxBuffer[0], num_indices * sizeof(uint16));
 
-		Lumix::uint32 elem_offset = 0;
+		uint32 elem_offset = 0;
 		const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
 		const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
 		for(const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
@@ -1463,12 +1613,12 @@ struct GameViewPlugin : public StudioApp::IPlugin
 			if(0 == pcmd->ElemCount) continue;
 
 			m_gui_pipeline->setScissor(
-				Lumix::uint16(Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
-				Lumix::uint16(Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)),
-				Lumix::uint16(Lumix::Math::minValue(pcmd->ClipRect.z, 65535.0f) -
-				Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
-				Lumix::uint16(Lumix::Math::minValue(pcmd->ClipRect.w, 65535.0f) -
-				Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)));
+				uint16(Math::maximum(pcmd->ClipRect.x, 0.0f)),
+				uint16(Math::maximum(pcmd->ClipRect.y, 0.0f)),
+				uint16(Math::minimum(pcmd->ClipRect.z, 65535.0f) -
+				Math::maximum(pcmd->ClipRect.x, 0.0f)),
+				uint16(Math::minimum(pcmd->ClipRect.w, 65535.0f) -
+				Math::maximum(pcmd->ClipRect.y, 0.0f)));
 
 			auto material = m_material;
 			int pass_idx = m_gui_pipeline->getPassIdx();
@@ -1477,8 +1627,9 @@ struct GameViewPlugin : public StudioApp::IPlugin
 				: material->getTexture(0)->getTextureHandle();
 			auto texture_uniform = material->getShader()->getTextureSlot(0).m_uniform_handle;
 			m_gui_pipeline->setTexture(0, texture_id, texture_uniform);
-			m_gui_pipeline->render(geom,
-				Lumix::Matrix::IDENTITY,
+			m_gui_pipeline->render(vertex_buffer,
+				index_buffer,
+				Matrix::IDENTITY,
 				elem_offset,
 				pcmd->ElemCount,
 				material->getRenderStates(),
@@ -1495,9 +1646,9 @@ struct GameViewPlugin : public StudioApp::IPlugin
 	int m_width;
 	int m_height;
 	StudioApp& m_app;
-	Lumix::Engine* m_engine;
-	Lumix::Material* m_material;
-	Lumix::Pipeline* m_gui_pipeline;
+	Engine* m_engine;
+	Material* m_material;
+	Pipeline* m_gui_pipeline;
 	GameView m_game_view;
 };
 
@@ -1507,7 +1658,7 @@ GameViewPlugin* GameViewPlugin::s_instance = nullptr;
 
 struct ShaderEditorPlugin : public StudioApp::IPlugin
 {
-	ShaderEditorPlugin(StudioApp& app)
+	explicit ShaderEditorPlugin(StudioApp& app)
 		: m_shader_editor(app.getWorldEditor()->getAllocator())
 		, m_app(app)
 	{
@@ -1515,13 +1666,21 @@ struct ShaderEditorPlugin : public StudioApp::IPlugin
 		m_action->func.bind<ShaderEditorPlugin, &ShaderEditorPlugin::onAction>(this);
 		m_shader_editor.m_is_opened = false;
 
-		m_compiler = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderCompiler)(
-			*app.getWorldEditor(), *app.getLogUI());
-		app.registerLuaGlobal("g_shader_compiler", m_compiler);
-		auto* f = &Lumix::LuaWrapper::wrapMethod < ShaderCompiler,
+		m_compiler =
+			LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderCompiler)(app, *app.getLogUI());
+		
+		lua_State* L = app.getWorldEditor()->getEngine().getState();
+		LuaWrapper::createSystemVariable(L, "Editor", "shader_compiler", m_compiler);
+		auto* f = &LuaWrapper::wrapMethod<ShaderCompiler,
 			decltype(&ShaderCompiler::compileAll),
-			&ShaderCompiler::compileAll > ;
-		app.registerLuaFunction("compileShaders", f);
+			&ShaderCompiler::compileAll>;
+		LuaWrapper::createSystemFunction(L, "Editor", "compileShaders", f);
+	}
+
+
+	void update(float) override
+	{
+		m_compiler->update();
 	}
 
 
@@ -1564,17 +1723,17 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 
 	static Vec3 minCoords(const Vec3& a, const Vec3& b)
 	{
-		return Vec3(Math::minValue(a.x, b.x),
-			Math::minValue(a.y, b.y),
-			Math::minValue(a.z, b.z));
+		return Vec3(Math::minimum(a.x, b.x),
+			Math::minimum(a.y, b.y),
+			Math::minimum(a.z, b.z));
 	}
 
 
 	static Vec3 maxCoords(const Vec3& a, const Vec3& b)
 	{
-		return Vec3(Math::maxValue(a.x, b.x),
-			Math::maxValue(a.y, b.y),
-			Math::maxValue(a.z, b.z));
+		return Vec3(Math::maximum(a.x, b.x),
+			Math::maximum(a.y, b.y),
+			Math::maximum(a.z, b.z));
 	}
 
 
@@ -1639,6 +1798,7 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 		scene->addDebugSphere(pos - dir, 0.1f, 0xff0000ff, 0);
 	}
 
+
 	bool showGizmo(ComponentUID cmp) override 
 	{
 		if (cmp.type == CAMERA_HASH)
@@ -1684,40 +1844,42 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 extern "C" {
 
 
-LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
+LUMIX_STUDIO_ENTRY(renderer)
 {
 	auto& allocator = app.getWorldEditor()->getAllocator();
-	registerRendererProperties(*app.getWorldEditor());
 
-	auto* material_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), MaterialPlugin)(app);
+	auto* material_plugin = LUMIX_NEW(allocator, MaterialPlugin)(app);
 	app.getAssetBrowser()->addPlugin(*material_plugin);
 
-	auto* model_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ModelPlugin)(app);
+	auto* model_plugin = LUMIX_NEW(allocator, ModelPlugin)(app);
 	app.getAssetBrowser()->addPlugin(*model_plugin);
 
-	auto* texture_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), TexturePlugin)(app);
+	auto* texture_plugin = LUMIX_NEW(allocator, TexturePlugin)(app);
 	app.getAssetBrowser()->addPlugin(*texture_plugin);
 
-	auto* shader_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderPlugin)(app);
+	auto* shader_plugin = LUMIX_NEW(allocator, ShaderPlugin)(app);
 	app.getAssetBrowser()->addPlugin(*shader_plugin);
 
-	auto* emitter_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), EmitterPlugin)(app);
+	auto* emitter_plugin = LUMIX_NEW(allocator, EmitterPlugin)(app);
 	app.getPropertyGrid()->addPlugin(*emitter_plugin);
 
-	auto* terrain_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), TerrainPlugin)(app);
+	auto* terrain_plugin = LUMIX_NEW(allocator, TerrainPlugin)(app);
 	app.getPropertyGrid()->addPlugin(*terrain_plugin);
 
-	auto* scene_view_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), SceneViewPlugin)(app);
+	auto* mesh_merger_plugin = LUMIX_NEW(allocator, MeshMergerPlugin)(app);
+	app.addPlugin(*mesh_merger_plugin);
+
+	auto* scene_view_plugin = LUMIX_NEW(allocator, SceneViewPlugin)(app);
 	app.addPlugin(*scene_view_plugin);
 
-	auto* game_view_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), GameViewPlugin)(app);
+	auto* game_view_plugin = LUMIX_NEW(allocator, GameViewPlugin)(app);
 	app.addPlugin(*game_view_plugin);
 
 	auto* shader_editor_plugin =
-		LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderEditorPlugin)(app);
+		LUMIX_NEW(allocator, ShaderEditorPlugin)(app);
 	app.addPlugin(*shader_editor_plugin);
 
-	auto* world_editor_plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), WorldEditorPlugin)();
+	auto* world_editor_plugin = LUMIX_NEW(allocator, WorldEditorPlugin)();
 	app.getWorldEditor()->addPlugin(*world_editor_plugin);
 }
 

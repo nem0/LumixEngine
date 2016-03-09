@@ -1,8 +1,7 @@
 #include "terrain.h"
-#include "core/aabb.h"
 #include "core/blob.h"
 #include "core/crc32.h"
-#include "core/frustum.h"
+#include "core/geometry.h"
 #include "core/json_serializer.h"
 #include "core/lifo_allocator.h"
 #include "core/log.h"
@@ -13,6 +12,7 @@
 #include "engine.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
+#include "renderer/ray_cast_model_hit.h"
 #include "renderer/render_scene.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
@@ -57,7 +57,7 @@ struct TerrainQuad
 		CHILD_COUNT
 	};
 
-	TerrainQuad(IAllocator& allocator)
+	explicit TerrainQuad(IAllocator& allocator)
 		: m_allocator(allocator)
 	{
 		for (int i = 0; i < CHILD_COUNT; ++i)
@@ -146,7 +146,7 @@ struct TerrainQuad
 		if (squared_dist > r * r && m_lod > 1) return false;
 
 		Vec3 morph_const(r, getRadiusInner(m_size), 0);
-		Shader& shader = *terrain->getMesh()->getMaterial()->getShader();
+		Shader& shader = *terrain->getMesh()->material->getShader();
 		for (int i = 0; i < CHILD_COUNT; ++i)
 		{
 			if (!m_children[i] ||
@@ -443,10 +443,10 @@ void Terrain::updateGrass(ComponentIndex camera)
 	for (int i = quads.size() - 1; i >= 0; --i)
 	{
 		GrassQuad* quad = quads[i];
-		old_bounds[0] = Math::minValue(old_bounds[0], quad->pos.x);
-		old_bounds[1] = Math::maxValue(old_bounds[1], quad->pos.x);
-		old_bounds[2] = Math::minValue(old_bounds[2], quad->pos.z);
-		old_bounds[3] = Math::maxValue(old_bounds[3], quad->pos.z);
+		old_bounds[0] = Math::minimum(old_bounds[0], quad->pos.x);
+		old_bounds[1] = Math::maximum(old_bounds[1], quad->pos.x);
+		old_bounds[2] = Math::minimum(old_bounds[2], quad->pos.z);
+		old_bounds[3] = Math::maximum(old_bounds[3], quad->pos.z);
 		if (quad->pos.x < from_quad_x || quad->pos.x > to_quad_x || quad->pos.z < from_quad_z ||
 			quad->pos.z > to_quad_z)
 		{
@@ -455,8 +455,8 @@ void Terrain::updateGrass(ComponentIndex camera)
 		}
 	}
 
-	from_quad_x = Math::maxValue(0.0f, from_quad_x);
-	from_quad_z = Math::maxValue(0.0f, from_quad_z);
+	from_quad_x = Math::maximum(0.0f, from_quad_x);
+	from_quad_z = Math::maximum(0.0f, from_quad_z);
 
 	for (float quad_z = from_quad_z; quad_z <= to_quad_z; quad_z += GRASS_QUAD_SIZE)
 	{
@@ -495,13 +495,13 @@ void Terrain::updateGrass(ComponentIndex camera)
 				generateGrassTypeQuad(patch, mtx, quad_x, quad_z);
 				for (auto mtx : patch.m_matrices)
 				{
-					min_y = Math::minValue(mtx.getTranslation().y, min_y);
-					max_y = Math::maxValue(mtx.getTranslation().y, max_y);
+					min_y = Math::minimum(mtx.getTranslation().y, min_y);
+					max_y = Math::maximum(mtx.getTranslation().y, max_y);
 				}
 			}
 
 			quad->pos.y = (max_y + min_y) * 0.5f;
-			quad->radius = Math::maxValue((max_y - min_y) * 0.5f, (float)GRASS_QUAD_SIZE) * 1.42f;
+			quad->radius = Math::maximum((max_y - min_y) * 0.5f, (float)GRASS_QUAD_SIZE) * 1.42f;
 
 		}
 	}
@@ -516,6 +516,8 @@ void Terrain::GrassType::grassLoaded(Resource::State, Resource::State)
 
 void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentIndex camera)
 {
+	if (!m_material || !m_material->isReady()) return;
+
 	updateGrass(camera);
 	Array<GrassQuad*>& quads = getQuads(camera);
 	
@@ -557,7 +559,7 @@ void Terrain::setMaterial(Material* material)
 		m_heightmap = nullptr;
 		if (m_mesh && m_material)
 		{
-			m_mesh->setMaterial(m_material);
+			m_mesh->material = m_material;
 			m_material->onLoaded<Terrain, &Terrain::onMaterialLoaded>(this);
 		}
 	}
@@ -768,14 +770,14 @@ RayCastModelHit Terrain::castRay(const Vec3& origin, const Vec3& dir)
 			int hz = (int)(start.z / m_scale.x);
 
 			float next_x = fabs(rel_dir.x) < 0.01f ? hx : ((hx + (rel_dir.x < 0 ? 0 : 1)) * m_scale.x - rel_origin.x) / rel_dir.x;
-			float next_z = fabs(rel_dir.z) < 0.01f ? hx : ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_scale.x - rel_origin.z) / rel_dir.z;
+			float next_z = fabs(rel_dir.z) < 0.01f ? hz : ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_scale.x - rel_origin.z) / rel_dir.z;
 
 			float delta_x = fabs(rel_dir.x) < 0.01f ? 0 : m_scale.x / Math::abs(rel_dir.x);
 			float delta_z = fabs(rel_dir.z) < 0.01f ? 0 : m_scale.x / Math::abs(rel_dir.z);
 			int step_x = (int)Math::signum(rel_dir.x);
 			int step_z = (int)Math::signum(rel_dir.z);
 
-			while (hx >= 0 && hz >= 0 && hx + 1 < m_width && hz + 1 < m_height)
+			while (hx >= 0 && hz >= 0 && hx + step_x < m_width && hz + step_z < m_height)
 			{
 				float t;
 				float x = hx * m_scale.x;

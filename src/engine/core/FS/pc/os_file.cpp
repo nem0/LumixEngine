@@ -1,10 +1,8 @@
 #include "core/fs/os_file.h"
 #include "core/iallocator.h"
+#include "core/pc/simple_win.h"
 #include "core/string.h"
 #include "lumix.h"
-
-#include "core/pc/simple_win.h"
-#include <windows.h>
 
 
 namespace Lumix
@@ -13,7 +11,7 @@ namespace FS
 {
 struct OsFileImpl
 {
-	OsFileImpl(IAllocator& allocator)
+	explicit OsFileImpl(IAllocator& allocator)
 		: m_allocator(allocator)
 	{
 	}
@@ -70,6 +68,12 @@ void OsFile::close()
 		LUMIX_DELETE(m_impl->m_allocator, m_impl);
 		m_impl = nullptr;
 	}
+}
+
+bool OsFile::writeText(const char* text)
+{
+	int len = stringLength(text);
+	return write(text, len);
 }
 
 bool OsFile::write(const void* data, size_t size)
@@ -153,6 +157,16 @@ OsFile& OsFile::operator <<(uint64 value)
 	write(buf, stringLength(buf));
 	return *this;
 }
+
+
+OsFile& OsFile::operator <<(float value)
+{
+	char buf[30];
+	toCString(value, buf, lengthOf(buf), 1);
+	write(buf, stringLength(buf));
+	return *this;
+}
+
 
 
 void OsFile::writeEOF()

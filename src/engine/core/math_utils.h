@@ -12,6 +12,7 @@ namespace Math
 {
 const float PI = 3.14159265f;
 const float SQRT2 = 1.41421356237f;
+const float SQRT3 = 1.73205080757f;
 
 LUMIX_ENGINE_API bool getRayPlaneIntersecion(const Vec3& origin,
 	const Vec3& dir,
@@ -39,12 +40,12 @@ LUMIX_ENGINE_API bool getRayTriangleIntersection(const Vec3& origin,
 	const Vec3& c,
 	float* out_t);
 
-template <typename T> LUMIX_FORCE_INLINE T minValue(T a, T b)
+template <typename T> LUMIX_FORCE_INLINE T minimum(T a, T b)
 {
 	return a < b ? a : b;
 }
 
-template <typename T> LUMIX_FORCE_INLINE T maxValue(T a, T b)
+template <typename T> LUMIX_FORCE_INLINE T maximum(T a, T b)
 {
 	return a < b ? b : a;
 }
@@ -67,7 +68,7 @@ template <typename T> LUMIX_FORCE_INLINE T signum(T a)
 template <typename T>
 LUMIX_FORCE_INLINE T clamp(T value, T min_value, T max_value)
 {
-	return minValue(maxValue(value, min_value), max_value);
+	return minimum(maximum(value, min_value), max_value);
 }
 
 template <typename T> bool isPowOfTwo(T n)
@@ -97,6 +98,7 @@ inline float easeInOut(float t)
 }
 
 
+LUMIX_ENGINE_API float pow(float base, float exponent);
 LUMIX_ENGINE_API uint32 rand();
 LUMIX_ENGINE_API uint32 rand(uint32 from, uint32 to);
 LUMIX_ENGINE_API float randFloat();

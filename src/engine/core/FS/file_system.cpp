@@ -10,7 +10,6 @@
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/queue.h"
-#include "core/stack_allocator.h"
 #include "core/string.h"
 
 
@@ -94,7 +93,7 @@ private:
 class FileSystemImpl : public FileSystem
 {
 public:
-	FileSystemImpl(IAllocator& allocator)
+	explicit FileSystemImpl(IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_in_progress(m_allocator)
 		, m_pending(m_allocator)

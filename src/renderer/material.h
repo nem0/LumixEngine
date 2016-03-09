@@ -12,7 +12,6 @@ namespace Lumix
 
 namespace FS
 {
-	class FileSystem;
 	class IFile;
 }
 
@@ -32,30 +31,16 @@ public:
 		LEQUAL,
 		LESS
 	};
-	
+
 	struct Uniform
 	{
-		Uniform() {}
-
-		enum Type
-		{
-			INT,
-			FLOAT,
-			MATRIX,
-			TIME
-		};
-
-		static const int MAX_NAME_LENGTH = 32;
-		
-		char m_name[MAX_NAME_LENGTH + 1];
-		uint32 m_name_hash;
-		Type m_type;
-		bgfx::UniformHandle m_handle;
+		uint32 name_hash;
 		union
 		{
-			int32 m_int;
-			float m_float;
-			float m_matrix[16];
+			int32 int_value;
+			float float_value;
+			float vec3[3];
+			float matrix[16];
 		};
 	};
 
@@ -63,20 +48,12 @@ public:
 	Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	~Material();
 
-	bool isZTest() const { return (m_render_states & BGFX_STATE_DEPTH_TEST_MASK) != 0; }
-	void enableZTest(bool enable) { setRenderState(enable, BGFX_STATE_DEPTH_TEST_LEQUAL, BGFX_STATE_DEPTH_TEST_MASK); }
-	bool isBackfaceCulling() const { return (m_render_states & BGFX_STATE_CULL_MASK) != 0; }
-	void enableBackfaceCulling(bool enable) { setRenderState(enable, BGFX_STATE_CULL_CW, BGFX_STATE_CULL_MASK); }
-	bool isAlphaCutout() const;
-	bool hasAlphaCutoutDefine() const;
-	void enableAlphaCutout(bool enable);
-	bool isShadowReceiver() const;
-	bool hasShadowReceivingDefine() const;
-	void enableShadowReceiving(bool enable);
 	float getShininess() const { return m_shininess; }
 	void setShininess(float value) { m_shininess = value; }
-	Vec3 getSpecular() const { return m_specular; }
-	void setSpecular(const Vec3& specular) { m_specular = specular; }
+	Vec3 getColor() const { return m_color; }
+	void setColor(const Vec3& specular) { m_color = specular; }
+	float getAlphaRef() const { return m_alpha_ref; }
+	void setAlphaRef(float value);
 	uint64 getRenderStates() const { return m_render_states; }
 
 	void setShader(Shader* shader);
@@ -95,23 +72,28 @@ public:
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }
 	ShaderInstance& getShaderInstance() { ASSERT(m_shader_instance); return *m_shader_instance; }
 	const ShaderInstance& getShaderInstance() const { ASSERT(m_shader_instance); return *m_shader_instance; }
-	void setUserDefine(int define_idx);
-	void unsetUserDefine(int define_idx);
+	const uint8* getCommandBuffer() const { return m_command_buffer; }
+	int getLayerCount() const { return m_layer_count; }
+	void setLayerCount(int count) { m_layer_count = count; }
+	void createCommandBuffer();
+
+	void setDefine(uint8 define_idx, bool enabled);
+	bool hasDefine(uint8 define_idx) const;
+	bool isDefined(uint8 define_idx) const;
 
 private:
 	void onBeforeReady() override;
 	void unload(void) override;
 	bool load(FS::IFile& file) override;
 
-	void clearUniforms();
 	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);
 	void deserializeUniforms(JsonSerializer& serializer);
-	void setRenderState(bool value, uint64 state, uint64 mask);
+	void deserializeDefines(JsonSerializer& serializer);
 
 private:
 	static const int MAX_TEXTURE_COUNT = 16;
 
-	Shader*	m_shader;
+	Shader* m_shader;
 	ShaderInstance* m_shader_instance;
 	Texture* m_textures[MAX_TEXTURE_COUNT];
 	int m_texture_count;
@@ -119,11 +101,12 @@ private:
 	IAllocator& m_allocator;
 	bgfx::ProgramHandle m_program_id;
 	uint64 m_render_states;
-	Vec3 m_specular;
+	Vec3 m_color;
 	float m_shininess;
-	uint32 m_shader_mask;
-	static int s_alpha_cutout_define_idx;
-	static int s_shadow_receiver_define_idx;
+	float m_alpha_ref;
+	uint32 m_define_mask;
+	uint8* m_command_buffer;
+	int m_layer_count;
 };
 
 } // ~namespace Lumix

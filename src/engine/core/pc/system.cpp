@@ -2,7 +2,6 @@
 #include "core/iallocator.h"
 #include "core/string.h"
 #include <ShlObj.h>
-#include <Windows.h>
 
 
 namespace Lumix

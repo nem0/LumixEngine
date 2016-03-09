@@ -62,7 +62,7 @@ void LogUI::push(Type type, const char* message)
 	++m_new_message_count[type];
 	m_messages[type].push(Lumix::string(message, m_allocator));
 
-	if (type == Error || type == Warning)
+	if (type == Error)
 	{
 		addNotification(message);
 	}
@@ -71,19 +71,19 @@ void LogUI::push(Type type, const char* message)
 
 void LogUI::onInfo(const char* system, const char* message)
 {
-	push(Lumix::compareString(system, "bgfx") == 0 ? BGFX : Info, message);
+	push(Info, message);
 }
 
 
 void LogUI::onWarning(const char* system, const char* message)
 {
-	push(Lumix::compareString(system, "bgfx") == 0 ? BGFX : Warning, message);
+	push(Warning, message);
 }
 
 
 void LogUI::onError(const char* system, const char* message)
 {
-	push(Lumix::compareString(system, "bgfx") == 0 ? BGFX : Error, message);
+	push(Error, message);
 }
 
 
@@ -105,12 +105,12 @@ void LogUI::showNotifications()
 	ImGui::SetNextWindowPos(ImVec2(10, 30));
 	bool opened;
 	if (!ImGui::Begin("Notifications",
-					  &opened,
-					  ImVec2(200, 0),
-					  1.0f,
-					  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
-						  ImGuiWindowFlags_NoMove |
-						  ImGuiWindowFlags_NoSavedSettings))
+			&opened,
+			ImVec2(200, 0),
+			1.0f,
+			ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
+				ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+				ImGuiWindowFlags_ShowBorders))
 	{
 		ImGui::End();
 		return;
@@ -148,6 +148,12 @@ void LogUI::update(float time_delta)
 }
 
 
+int LogUI::getUnreadErrorCount() const
+{
+	return m_new_message_count[Error];
+}
+
+
 void LogUI::onGUI()
 {
 	Lumix::MT::SpinLock lock(m_guard);
@@ -155,7 +161,7 @@ void LogUI::onGUI()
 
 	if (ImGui::BeginDock("Log", &m_is_opened))
 	{
-		const char* labels[] = { "Info", "Warning", "Error", "BGFX" };
+		const char* labels[] = { "Info", "Warning", "Error" };
 		for (int i = 0; i < Lumix::lengthOf(labels); ++i)
 		{
 			char label[20];

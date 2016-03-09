@@ -150,7 +150,7 @@ namespace Lumix
 	{ }
 
 	ResourceManagerBase::~ResourceManagerBase()
-	{ 
+	{
 		ASSERT(m_resources.empty());
 	}
 }

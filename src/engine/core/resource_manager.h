@@ -1,6 +1,8 @@
 #pragma once
 
-#include "core/pod_hash_map.h"
+
+#include "core/hash_map.h"
+
 
 namespace Lumix
 {
@@ -21,7 +23,7 @@ class ResourceManagerBase;
 
 class LUMIX_ENGINE_API ResourceManager final
 {
-	typedef PODHashMap<uint32, ResourceManagerBase*> ResourceManagerTable;
+	typedef HashMap<uint32, ResourceManagerBase*> ResourceManagerTable;
 
 public:
 	static const uint32 MATERIAL = 0xba8de9d9; // MATERIAL
@@ -33,7 +35,7 @@ public:
 	static const uint32 FILE = 0xBA0ADBA4; // FILE
 	static const uint32 SHADER_BINARY = 0xDC8D194B; // SHADER_BINARY
 
-	ResourceManager(IAllocator& allocator);
+	explicit ResourceManager(IAllocator& allocator);
 	~ResourceManager();
 
 	void create(FS::FileSystem& fs);

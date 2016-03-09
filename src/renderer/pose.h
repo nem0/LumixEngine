@@ -18,7 +18,7 @@ struct Vec3;
 class LUMIX_RENDERER_API Pose
 {
 	public:
-		Pose(IAllocator& allocator);
+		explicit Pose(IAllocator& allocator);
 		~Pose();
 
 		void resize(int count);
@@ -27,7 +27,9 @@ class LUMIX_RENDERER_API Pose
 		Vec3* getPositions() const { return m_positions; }
 		Quat* getRotations() const { return m_rotations; }
 		void computeAbsolute(Model& model);
+		void computeRelative(Model& model);
 		void setIsRelative() { m_is_absolute = false; }
+		void setIsAbsolute() { m_is_absolute = true; }
 		void blend(Pose& rhs, float weight);
 
 	private:

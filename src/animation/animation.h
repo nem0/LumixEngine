@@ -21,7 +21,7 @@ struct Vec3;
 class LUMIX_ANIMATION_API AnimationManager : public ResourceManagerBase
 {
 public:
-	AnimationManager(IAllocator& allocator) 
+	explicit AnimationManager(IAllocator& allocator) 
 		: ResourceManagerBase(allocator)
 		, m_allocator(allocator)
 	{}

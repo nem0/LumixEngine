@@ -13,6 +13,7 @@
 #include "core/mt/thread.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
+#include "core/quat.h"
 #include "core/resource_manager.h"
 #include "core/system.h"
 #include "core/timer.h"
@@ -84,6 +85,7 @@ public:
 	{
 		m_time_to_autosave = float(m_settings.m_autosave_time);
 		if (!m_editor->getUniversePath().isValid()) return;
+		if (m_editor->isGameMode()) return;
 
 		char filename[Lumix::MAX_PATH_LENGTH];
 		Lumix::copyString(filename, m_editor->getUniversePath().c_str());
@@ -101,8 +103,9 @@ public:
 		m_time_to_autosave -= time_delta;
 		if (m_time_to_autosave < 0) autosave();
 
+		m_editor->setMouseSensitivity(m_settings.m_mouse_sensitivity_x, m_settings.m_mouse_sensitivity_y);
 		m_editor->update();
-		m_engine->update(*m_editor->getUniverseContext());
+		m_engine->update(*m_editor->getUniverse());
 
 		for (auto* plugin : m_plugins)
 		{
@@ -112,6 +115,8 @@ public:
 		m_log_ui->update(time_delta);
 
 		onGUI();
+
+		m_engine->getInputSystem().clear();
 	}
 
 
@@ -120,7 +125,7 @@ public:
 		return m_asset_browser;
 	}
 
-
+	
 	PropertyGrid* getPropertyGrid() override
 	{
 		return m_property_grid;
@@ -201,6 +206,39 @@ public:
 				}
 				ImGui::Separator();
 
+				ImGui::Text("Version 0.21. - News");
+				ImGui::BulletText("copy / paste multiple entities at once");
+				ImGui::BulletText("stencil support");
+				ImGui::BulletText("unlimited light intensity");
+				ImGui::BulletText("alpha test reference value editable");
+				ImGui::BulletText("panning");
+				ImGui::BulletText("multiple script components in one entity");
+				ImGui::BulletText("errors messages are more visible");
+				ImGui::BulletText("plugins can be static libraries");
+				ImGui::BulletText("multipass materials");
+				ImGui::BulletText("several data sources");
+				ImGui::BulletText("editor GUI can be created from lua script");
+				ImGui::BulletText("DXT1 for images without alpha");
+				ImGui::BulletText("import dialog - several new features, improved UX");
+				ImGui::BulletText("show / hide, freeze / unfreeze group");
+				ImGui::BulletText("pipeline can be reloaded in runtime");
+				ImGui::BulletText("postprocess effect framework");
+				ImGui::Separator();
+				ImGui::Text("Version 0.20. - News");
+				ImGui::BulletText("Deferred rendering");
+				ImGui::BulletText("HDR");
+				ImGui::BulletText("New editor skin");
+				ImGui::BulletText("Top, front, size view");
+				ImGui::BulletText("Editor does not depend on plugins");
+				ImGui::BulletText("Editor scripting");
+				ImGui::BulletText("Scale mesh on import, flip Y/Z axis");
+				ImGui::BulletText("Multiple gizmos when editing emitters");
+				ImGui::BulletText("Improved color picker");
+				ImGui::BulletText("Close notification button");
+				ImGui::BulletText("Entity look at");
+				ImGui::BulletText("Mesh and material decoupled");
+				ImGui::BulletText("Simple animable component");
+				ImGui::Separator();
 				ImGui::Text("Version 0.19. - News");
 				ImGui::BulletText("Editor UI - docking");
 				ImGui::BulletText("Physics - layers");
@@ -218,32 +256,8 @@ public:
 				ImGui::BulletText("Shader editor");
 				ImGui::BulletText("Audio system");
 				ImGui::BulletText("Basic particle system");
-				ImGui::Separator();
-				ImGui::Text("Version 0.17. - News");
-				ImGui::BulletText("Back button in the asset browser");
-				ImGui::BulletText("Grass culling");
-				ImGui::BulletText("Importing compressed embedded textures");
-				ImGui::BulletText("Euler angles");
-				ImGui::BulletText("Textures relative to root");
-				ImGui::BulletText("Painting entities - align with normal");
-				ImGui::BulletText("Painting entities - random x and z rotation");
-				ImGui::BulletText("Lua properties with types");
-				ImGui::BulletText("Moving the Light Texel-Sized Increments");
-				ImGui::BulletText("Terrain brush for removing entities");
-				ImGui::BulletText("Improved shadows on terrain");
-				ImGui::BulletText("Fog height");
-				ImGui::BulletText("Bitmap to heightmap convertor");
-				ImGui::BulletText("LOD preview");
-				ImGui::BulletText("New gizmo");
-				ImGui::BulletText("Orbit camera");
-				ImGui::BulletText("Welcome screen");
-				ImGui::BulletText("Visualization of physical contorller");
-				ImGui::BulletText("Game view fixed");
-
 			}
 			ImGui::EndChild();
-
-			if (ImGui::Button("Close")) m_is_welcome_screen_opened = false;
 		}
 		ImGui::End();
 	}
@@ -337,6 +351,12 @@ public:
 
 	void save()
 	{
+		if (m_editor->isGameMode())
+		{
+			Lumix::g_log_error.log("Editor") << "Could not save while the game is running";
+			return;
+		}
+
 		m_time_to_autosave = float(m_settings.m_autosave_time);
 		if (m_editor->getUniversePath().isValid())
 		{
@@ -358,6 +378,12 @@ public:
 
 	void saveAs()
 	{
+		if (m_editor->isGameMode())
+		{
+			Lumix::g_log_error.log("Editor") << "Could not save while the game is running";
+			return;
+		}
+
 		m_time_to_autosave = float(m_settings.m_autosave_time);
 		char filename[Lumix::MAX_PATH_LENGTH];
 		if (PlatformInterface::getSaveFilename(filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
@@ -387,8 +413,8 @@ public:
 
 	void undo() { if (!hasPluginFocus()) m_editor->undo(); }
 	void redo() { if (!hasPluginFocus()) m_editor->redo(); }
-	void copy() { m_editor->copyEntity(); }
-	void paste() { m_editor->pasteEntity(); }
+	void copy() { m_editor->copyEntities(); }
+	void paste() { m_editor->pasteEntities(); }
 	void toggleOrbitCamera() { m_editor->setOrbitCamera(!m_editor->isOrbitCamera()); }
 	void setTopView() { m_editor->setTopView(); }
 	void setFrontView() { m_editor->setFrontView(); }
@@ -396,8 +422,8 @@ public:
 	void togglePivotMode() { m_editor->getGizmo().togglePivot(); }
 	void toggleCoordSystem() { m_editor->getGizmo().toggleCoordSystem(); }
 	void createEntity() { m_editor->addEntity(); }
-	void showEntities() { m_editor->showEntities(); }
-	void hideEntities() { m_editor->hideEntities(); }
+	void showEntities() { m_editor->showSelectedEntities(); }
+	void hideEntities() { m_editor->hideSelectedEntities(); }
 	void toggleMeasure() { m_editor->toggleMeasure(); }
 	void snapDown() { m_editor->snapDown(); }
 	void lookAtSelected() { m_editor->lookAtSelected(); }
@@ -426,7 +452,7 @@ public:
 	void loadAndExecuteCommands()
 	{
 		char filename[Lumix::MAX_PATH_LENGTH];
-		if (PlatformInterface::getOpenFilename(filename, Lumix::lengthOf(filename), "JSON files\0*.json\0"))
+		if (PlatformInterface::getOpenFilename(filename, Lumix::lengthOf(filename), "JSON files\0*.json\0", nullptr))
 		{
 			m_editor->executeUndoStack(Lumix::Path(filename));
 		}
@@ -496,8 +522,8 @@ public:
 					}
 					ImGui::EndMenu();
 				}
-				doMenuItem(getAction("save"), false, true);
-				doMenuItem(getAction("saveAs"), false, true);
+				doMenuItem(getAction("save"), false, !m_editor->isGameMode());
+				doMenuItem(getAction("saveAs"), false, !m_editor->isGameMode());
 				doMenuItem(getAction("exit"), false, true);
 
 				ImGui::EndMenu();
@@ -509,7 +535,7 @@ public:
 				doMenuItem(getAction("redo"), false, m_editor->canRedo());
 				ImGui::Separator();
 				doMenuItem(getAction("copy"), false, is_any_entity_selected);
-				doMenuItem(getAction("paste"), false, m_editor->canPasteEntity());
+				doMenuItem(getAction("paste"), false, m_editor->canPasteEntities());
 				ImGui::Separator();
 				doMenuItem(getAction("orbitCamera"),
 					m_editor->isOrbitCamera(),
@@ -558,7 +584,7 @@ public:
 				{
 					Lumix::Vec3 pos = m_editor->getCameraRaycastHit();
 					m_editor->getEntityTemplateSystem().createInstance(
-						m_selected_template_name.c_str(), pos);
+						m_selected_template_name.c_str(), pos, Lumix::Quat(0, 0, 0, 1), 1);
 				}
 
 				doMenuItem(getAction("showEntities"), false, is_any_entity_selected);
@@ -569,49 +595,60 @@ public:
 
 			if (ImGui::BeginMenu("Tools"))
 			{
+				doMenuItem(getAction("lookAtSelected"), false, is_any_entity_selected);
 				doMenuItem(getAction("toggleGameMode"), m_editor->isGameMode(), true);
 				doMenuItem(getAction("toggleMeasure"), m_editor->isMeasureToolActive(), true);
 				doMenuItem(getAction("snapDown"), false, is_any_entity_selected);
 				doMenuItem(getAction("autosnapDown"), m_editor->getGizmo().isAutosnapDown(), true);
 				if (ImGui::MenuItem("Save commands")) saveUndoStack();
 				if (ImGui::MenuItem("Load commands")) loadAndExecuteCommands();
-
-				ImGui::MenuItem("Import asset", nullptr, &m_import_asset_dialog->m_is_opened);
 				ImGui::EndMenu();
 			}
 
 
 			if (ImGui::BeginMenu("View"))
 			{
-				doMenuItem(getAction("lookAtSelected"), false, is_any_entity_selected);
-				if (ImGui::BeginMenu("Windows"))
+				ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
+				ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
+				ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
+				ImGui::MenuItem("Import asset", nullptr, &m_import_asset_dialog->m_is_opened);
+				ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
+				ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
+				ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
+				ImGui::MenuItem("Settings", nullptr, &m_settings.m_is_opened);
+				ImGui::Separator();
+				for (auto* plugin : m_plugins)
 				{
-					ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
-					ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
-					ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
-					ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
-					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
-					ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
-					ImGui::MenuItem("Settings", nullptr, &m_settings.m_is_opened);
-					ImGui::Separator();
-					for (auto* plugin : m_plugins)
+					if (plugin->m_action)
 					{
-						if (plugin->m_action)
-						{
-							doMenuItem(*plugin->m_action, false, true);
-						}
+						doMenuItem(*plugin->m_action, false, true);
 					}
-					ImGui::EndMenu();
 				}
 				ImGui::EndMenu();
 			}
-			StringBuilder<100> stats("");
+			StringBuilder<200> stats("");
 			if (m_engine->getFileSystem().hasWork()) stats << "Loading... | ";
 			stats << "FPS: ";
 			stats << m_engine->getFPS();
 			auto stats_size = ImGui::CalcTextSize(stats);
 			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
 			ImGui::Text(stats);
+
+			if (m_log_ui->getUnreadErrorCount() == 1)
+			{
+				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
+				auto error_stats_size = ImGui::CalcTextSize("1 error | ");
+				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x - error_stats_size.x);
+				ImGui::TextColored(ImVec4(1, 0, 0, 1), "1 error | ");
+			}
+			else if (m_log_ui->getUnreadErrorCount() > 1)
+			{
+				StringBuilder<50> error_stats("", m_log_ui->getUnreadErrorCount(), " errors | ");
+				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
+				auto error_stats_size = ImGui::CalcTextSize(error_stats);
+				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x - error_stats_size.x);
+				ImGui::TextColored(ImVec4(1, 0, 0, 1), error_stats);
+			}
 
 			ImGui::EndMainMenuBar();
 		}
@@ -658,7 +695,6 @@ public:
 		if (ImGui::BeginDock("Entity List", &m_is_entity_list_opened))
 		{
 			auto* universe = m_editor->getUniverse();
-			int scroll_to = -1;
 
 			auto& groups = m_editor->getEntityGroups();
 			static char group_name[20] = "";
@@ -667,11 +703,11 @@ public:
 			{
 				if(group_name[0] == 0)
 				{
-					Lumix::g_log_error.log("editor") << "Group name can not be empty";
+					Lumix::g_log_error.log("Editor") << "Group name can not be empty";
 				}
 				else if(groups.getGroup(group_name) != -1)
 				{
-					Lumix::g_log_error.log("editor") << "Group with name " << group_name << " already exists";
+					Lumix::g_log_error.log("Editor") << "Group with name " << group_name << " already exists";
 				}
 				else
 				{
@@ -742,6 +778,25 @@ public:
 						}
 					}
 
+					if (ImGui::Button("Hide all"))
+					{
+						m_editor->hideEntities(groups.getGroupEntities(i), groups.getGroupEntitiesCount(i));
+					}
+
+					if (ImGui::Button("Show all"))
+					{
+						m_editor->showEntities(groups.getGroupEntities(i), groups.getGroupEntitiesCount(i));
+					}
+
+					if (groups.isGroupFrozen(i) && ImGui::Button("Unfreeze"))
+					{
+						groups.freezeGroup(i, false);
+					}
+					else if (!groups.isGroupFrozen(i) && ImGui::Button("Freeze"))
+					{
+						groups.freezeGroup(i, true);
+					}
+
 					ImGui::TreePop();
 				}
 			}
@@ -758,12 +813,14 @@ public:
 		m_settings.m_is_log_opened = m_log_ui->m_is_opened;
 		m_settings.m_is_profiler_opened = m_profiler_ui->m_is_opened;
 		m_settings.m_is_properties_opened = m_property_grid->m_is_opened;
+		m_settings.m_mouse_sensitivity_x = m_editor->getMouseSensitivity().x;
+		m_settings.m_mouse_sensitivity_y = m_editor->getMouseSensitivity().y;
 
 		m_settings.save(&m_actions[0], m_actions.size());
 
 		if (!m_metadata.save())
 		{
-			Lumix::g_log_warning.log("studio") << "Could not save metadata";
+			Lumix::g_log_warning.log("Editor") << "Could not save metadata";
 		}
 	}
 
@@ -776,6 +833,8 @@ public:
 		{
 			m_editor->getEngine().getFileSystem().updateAsyncTransactions();
 		}
+
+		m_editor->newUniverse();
 
 		for (auto* plugin : m_plugins)
 		{
@@ -827,8 +886,6 @@ public:
 		io.KeyMap[ImGuiKey_X] = 'X';
 		io.KeyMap[ImGuiKey_Y] = 'Y';
 		io.KeyMap[ImGuiKey_Z] = 'Z';
-
-		ImGui::GetStyle().WindowFillAlphaDefault = 1.0f;
 	}
 
 
@@ -916,9 +973,26 @@ public:
 			bool loaded = plugin_manager.load(tmp) != nullptr;
 			if (!loaded)
 			{
-				Lumix::g_log_error.log("init") << "Could not load plugin " << tmp
+				Lumix::g_log_error.log("Editor") << "Could not load plugin " << tmp
 											   << " requested by command line";
 			}
+		}
+	}
+
+
+	static void checkDataDirCommandLine(char* dir, int max_size)
+	{
+		char cmd_line[2048];
+		Lumix::getCommandLine(cmd_line, Lumix::lengthOf(cmd_line));
+
+		Lumix::CommandLineParser parser(cmd_line);
+		while (parser.next())
+		{
+			if (!parser.currentEquals("-data_dir")) continue;
+			if (!parser.next()) break;
+
+			parser.getCurrent(dir, max_size);
+			break;
 		}
 	}
 
@@ -942,24 +1016,39 @@ public:
 	void setStudioApp()
 	{
 		auto& plugin_manager = m_editor->getEngine().getPluginManager();
+		#ifdef STATIC_PLUGINS
+		for (auto* plugin : plugin_manager.getPlugins())
+		{
+			StudioApp::StaticPluginRegister::create(plugin->getName(), *this);
+		}
+		#else
 		for (auto* lib : plugin_manager.getLibraries())
 		{
-			auto* f = (void (*)(StudioApp&))Lumix::getLibrarySymbol(lib, "setStudioApp");
+			auto* f = (void(*)(StudioApp&))Lumix::getLibrarySymbol(lib, "setStudioApp");
 			if (f) f(*this);
 		}
+		#endif
+		
 	}
 
 
 	void runScript(const char* src, const char* script_name) override
 	{
+		lua_State* L = m_engine->getState();
 		bool errors =
-			luaL_loadbuffer(m_lua_state, src, Lumix::stringLength(src), script_name) != LUA_OK;
-		errors = errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
+			luaL_loadbuffer(L, src, Lumix::stringLength(src), script_name) != LUA_OK;
+		errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
 		if (errors)
 		{
-			Lumix::g_log_error.log("editor") << script_name << ": " << lua_tostring(m_lua_state, -1);
-			lua_pop(m_lua_state, 1);
+			Lumix::g_log_error.log("Editor") << script_name << ": " << lua_tostring(L, -1);
+			lua_pop(L, 1);
 		}
+	}
+
+
+	void LUA_createEntityTemplate(Lumix::Entity entity, const char* name)
+	{
+		m_editor->getEntityTemplateSystem().createTemplateFromEntity(name, entity);
 	}
 
 
@@ -970,66 +1059,29 @@ public:
 	}
 
 
-	void LUA_logError(const char* message)
-	{
-		Lumix::g_log_error.log("editor") << message;
-	}
-
-
-	void LUA_logInfo(const char* message)
-	{
-		Lumix::g_log_info.log("editor") << message;
-	}
-
-
 	bool LUA_runTest(const char* undo_stack_path, const char* result_universe_path)
 	{
 		return m_editor->runTest(Lumix::Path(undo_stack_path), Lumix::Path(result_universe_path));
 	}
 
 
-	void registerLuaFunction(const char* name, int (*function)(struct lua_State*)) override
-	{
-		lua_pushcfunction(m_lua_state, function);
-		lua_setglobal(m_lua_state, name);
-	}
-
-
-	void registerLuaGlobal(const char* name, void* data) override
-	{
-		lua_pushlightuserdata(m_lua_state, data);
-		lua_setglobal(m_lua_state, name);
-	}
-
-
 	void createLua()
 	{
-		m_lua_state = luaL_newstate();
-		luaL_openlibs(m_lua_state);
+		lua_State* L = m_engine->getState();
 
-		lua_pushlightuserdata(m_lua_state, this);
-		lua_setglobal(m_lua_state, "g_editor");
-
-		lua_newtable(m_lua_state);
-		lua_pushvalue(m_lua_state, -1);
-		lua_setglobal(m_lua_state, "Editor");
+		Lumix::LuaWrapper::createSystemVariable(L, "Editor", "editor", this);
 
 		#define REGISTER_FUNCTION(F, name) \
 			do { \
-				lua_pushvalue(m_lua_state, -1); \
 				auto* f = &Lumix::LuaWrapper::wrapMethod<StudioAppImpl, decltype(&StudioAppImpl::F), &StudioAppImpl::F>; \
-				lua_pushcfunction(m_lua_state, f); \
-				lua_setfield(m_lua_state, -2, name); \
+				Lumix::LuaWrapper::createSystemFunction(L, "Editor", name, f); \
 			} while(false) \
 
 		REGISTER_FUNCTION(LUA_runTest, "runTest");
-		REGISTER_FUNCTION(LUA_logError, "logError");
-		REGISTER_FUNCTION(LUA_logInfo, "logInfo");
 		REGISTER_FUNCTION(LUA_exit, "exit");
+		REGISTER_FUNCTION(LUA_createEntityTemplate, "createEntityTemplate");
 
 		#undef REGISTER_FUNCTION
-
-		lua_pop(m_lua_state, 1);
 	}
 
 
@@ -1058,7 +1110,7 @@ public:
 				}
 				else
 				{
-					Lumix::g_log_error.log("editor") << "Could not open " << tmp;
+					Lumix::g_log_error.log("Editor") << "Could not open " << tmp;
 				}
 				break;
 			}
@@ -1211,17 +1263,20 @@ public:
 
 	void init()
 	{
-		createLua();
 		checkWorkingDirector();
 		m_handler.m_app = this;
 		PlatformInterface::createWindow(nullptr);
 
-		m_engine = Lumix::Engine::create(nullptr, m_allocator);
+		char current_dir[Lumix::MAX_PATH_LENGTH];
+		PlatformInterface::getCurrentDirectory(current_dir, Lumix::lengthOf(current_dir));
+
+		char base_path2[Lumix::MAX_PATH_LENGTH] = {};
+		checkDataDirCommandLine(base_path2, Lumix::lengthOf(base_path2));
+		m_engine = Lumix::Engine::create(current_dir, base_path2, nullptr, m_allocator);
+		createLua();
 		Lumix::Engine::PlatformData platform_data;
 		platform_data.window_handle = PlatformInterface::getWindowHandle();
 		m_engine->setPlatformData(platform_data);
-		char current_dir[Lumix::MAX_PATH_LENGTH];
-		PlatformInterface::getCurrentDirectory(current_dir, Lumix::lengthOf(current_dir));
 		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine, m_allocator);
 		loadUserPlugins();
 
@@ -1239,10 +1294,7 @@ public:
 		PlatformInterface::setSystemEventHandler(&m_handler);
 		loadSettings();
 
-		if (!m_metadata.load()) Lumix::g_log_info.log("studio") << "Could not load metadata";
-
-		void registerProperties(Lumix::WorldEditor&);
-		registerProperties(*m_editor);
+		if (!m_metadata.load()) Lumix::g_log_info.log("Editor") << "Could not load metadata";
 
 		setStudioApp();
 	}
@@ -1315,7 +1367,6 @@ public:
 	Lumix::string m_selected_template_name;
 	Settings m_settings;
 	Metadata m_metadata;
-	lua_State* m_lua_state;
 	char m_template_name[100];
 
 	bool m_finished;
@@ -1354,4 +1405,31 @@ StudioApp* StudioApp::create()
 void StudioApp::destroy(StudioApp& app)
 {
 	app.~StudioApp();
+}
+
+
+static StudioApp::StaticPluginRegister* s_first_plugin = nullptr;
+
+
+StudioApp::StaticPluginRegister::StaticPluginRegister(const char* name, Creator creator)
+{
+	this->creator = creator;
+	this->name = name;
+	next = s_first_plugin;
+	s_first_plugin = this;
+}
+
+
+void StudioApp::StaticPluginRegister::create(const char* name, StudioApp& app)
+{
+	auto* i = s_first_plugin;
+	while (i)
+	{
+		if (Lumix::compareString(name, i->name) == 0)
+		{
+			i->creator(app);
+			return;
+		}
+		i = i->next;
+	}
 }

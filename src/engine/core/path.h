@@ -1,8 +1,6 @@
 #pragma once
 
 #include "core/associative_array.h"
-#include "core/base_proxy_allocator.h"
-#include "core/default_allocator.h"
 #include "core/mt/sync.h"
 
 
@@ -10,6 +8,7 @@ namespace Lumix
 {
 
 
+class IAllocator;
 class InputBlob;
 class OutputBlob;
 
@@ -28,13 +27,11 @@ class LUMIX_ENGINE_API PathManager
 	friend class Path;
 
 public:
-	PathManager(Lumix::IAllocator& allocator);
+	explicit PathManager(Lumix::IAllocator& allocator);
 	~PathManager();
 
 	void serialize(OutputBlob& serializer);
 	void deserialize(InputBlob& serializer);
-	void setBasePath(const char* path);
-	const char* getBasePath();
 
 	void clear();
 
@@ -50,8 +47,6 @@ private:
 	AssociativeArray<uint32, PathInternal*> m_paths;
 	MT::SpinMutex m_mutex;
 	PathInternal* m_empty_path;
-	char m_base_path[MAX_PATH_LENGTH];
-	int m_base_path_length;
 };
 
 

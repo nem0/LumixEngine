@@ -12,7 +12,6 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "lua_script/lua_script_system.h"
-#include "renderer/render_scene.h"
 #include "universe/universe.h"
 
 
@@ -70,10 +69,9 @@ struct PlayingSound
 
 struct AudioSceneImpl : public AudioScene
 {
-	AudioSceneImpl(AudioSystem& system, UniverseContext& context, IAllocator& allocator)
+	AudioSceneImpl(AudioSystem& system, Universe& context, IAllocator& allocator)
 		: m_allocator(allocator)
-		, m_universe(*context.m_universe)
-		, m_universe_context(context)
+		, m_universe(context)
 		, m_clips(allocator)
 		, m_system(system)
 		, m_device(system.getDevice())
@@ -118,15 +116,16 @@ struct AudioSceneImpl : public AudioScene
 
 	void registerLuaAPI()
 	{
-		auto* scene = m_universe_context.getScene(crc32("lua_script"));
+		auto* scene = m_universe.getScene(crc32("lua_script"));
 		if (!scene) return;
 
 		auto* script_scene = static_cast<LuaScriptScene*>(scene);
-		
+		lua_State* L = script_scene->getGlobalState();
+
 		#define REGISTER_FUNCTION(F) \
 			do { \
 			auto f = &LuaWrapper::wrapMethod<AudioSceneImpl, decltype(&AudioSceneImpl::F), &AudioSceneImpl::F>; \
-			script_scene->registerFunction("Audio", #F, f); \
+			LuaWrapper::createSystemFunction(L, "Audio", #F, f); \
 			} while(false) \
 
 		REGISTER_FUNCTION(setEcho);
@@ -213,7 +212,7 @@ struct AudioSceneImpl : public AudioScene
 	{
 		if (m_listener.entity != INVALID_ENTITY)
 		{
-			g_log_warning.log("audio") << "Listener already exists";
+			g_log_warning.log("Audio") << "Listener already exists";
 			return INVALID_COMPONENT;
 		}
 
@@ -647,7 +646,6 @@ struct AudioSceneImpl : public AudioScene
 	Listener m_listener;
 	IAllocator& m_allocator;
 	Universe& m_universe;
-	UniverseContext& m_universe_context;
 	Array<ClipInfo*> m_clips;
 	AudioSystem& m_system;
 	PlayingSound m_playing_sounds[AudioDevice::MAX_PLAYING_SOUNDS];
@@ -694,52 +692,16 @@ void AudioSceneImpl::destroyComponent(ComponentIndex component, uint32 type)
 
 
 AudioScene* AudioScene::createInstance(AudioSystem& system,
-	UniverseContext& universe_context,
+	Universe& universe,
 	IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, AudioSceneImpl)(system, universe_context, allocator);
+	return LUMIX_NEW(allocator, AudioSceneImpl)(system, universe, allocator);
 }
 
 
 void AudioScene::destroyInstance(AudioScene* scene)
 {
 	LUMIX_DELETE(static_cast<AudioSceneImpl*>(scene)->m_allocator, scene);
-}
-
-
-struct EditorPlugin : public WorldEditor::Plugin
-{
-	EditorPlugin(WorldEditor& editor)
-		: m_editor(editor)
-	{
-	}
-
-	bool showGizmo(ComponentUID cmp) override
-	{
-		if (cmp.type == ECHO_ZONE_HASH)
-		{
-			auto* audio_scene = static_cast<AudioSceneImpl*>(cmp.scene);
-			float radius = audio_scene->getEchoZoneRadius(cmp.index);
-			Universe& universe = audio_scene->getUniverse();
-			Vec3 pos = universe.getPosition(cmp.entity);
-
-			auto* scene = static_cast<RenderScene*>(m_editor.getScene(crc32("renderer")));
-			if (!scene) return true;
-			scene->addDebugSphere(pos, radius, 0xff0000ff, 0);
-			return true;
-		}
-		
-		return false;
-	}
-
-	WorldEditor& m_editor;
-};
-
-
-extern "C" LUMIX_AUDIO_API void setWorldEditor(Lumix::WorldEditor& editor)
-{
-	auto* plugin = LUMIX_NEW(editor.getAllocator(), EditorPlugin)(editor);
-	editor.addPlugin(*plugin);
 }
 
 

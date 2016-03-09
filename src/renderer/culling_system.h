@@ -1,10 +1,17 @@
 #pragma once
 
-#include "core/array.h"
-#include "core/sphere.h"
+
+#include "lumix.h"
+
 
 namespace Lumix
 {
+	template <typename T> class Array;
+	class IAllocator;
+	struct Sphere;
+	struct Vec3;
+
+
 	namespace MTJD
 	{
 		class Manager;

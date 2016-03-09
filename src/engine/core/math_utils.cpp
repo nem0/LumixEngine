@@ -64,10 +64,10 @@ bool getRayAABBIntersection(const Vec3& origin,
 	float t5 = (min.z - origin.z) * dirfrac.z;
 	float t6 = (max.z - origin.z) * dirfrac.z;
 
-	float tmin = Math::maxValue(
-		Math::maxValue(Math::minValue(t1, t2), Math::minValue(t3, t4)), Math::minValue(t5, t6));
-	float tmax = Math::minValue(
-		Math::minValue(Math::maxValue(t1, t2), Math::maxValue(t3, t4)), Math::maxValue(t5, t6));
+	float tmin = Math::maximum(
+		Math::maximum(Math::minimum(t1, t2), Math::minimum(t3, t4)), Math::minimum(t5, t6));
+	float tmax = Math::minimum(
+		Math::minimum(Math::maximum(t1, t2), Math::maximum(t3, t4)), Math::maximum(t5, t6));
 
 	if (tmax < 0)
 	{
@@ -96,7 +96,7 @@ float getLineSegmentDistance(const Vec3& origin, const Vec3& dir, const Vec3& a,
 	float dot5 = dotProduct(dir, dir);
 
 	float denom = dot4 * dot5 - dot2 * dot2;
-	if (fabsf(denom) < 1e-5f)
+	if (abs(denom) < 1e-5f)
 	{
 		Vec3 X = origin + dir * dotProduct(b - origin, dir);
 		return (b - X).length();
@@ -168,6 +168,12 @@ static std::mt19937& getRandomGenerator()
 	static std::mt19937 gen(seed());
 
 	return gen;
+}
+
+
+float pow(float base, float exponent)
+{
+	return ::pow(base, exponent);
 }
 
 

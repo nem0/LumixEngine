@@ -9,7 +9,7 @@
 class Metadata
 {
 public:
-	Metadata(Lumix::IAllocator& allocator);
+	explicit Metadata(Lumix::IAllocator& allocator);
 
 	bool load();
 	bool save();

@@ -1,5 +1,6 @@
 #include "asset_browser.h"
 #include "core/crc32.h"
+#include "core/fs/disk_file_device.h"
 #include "core/log.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
@@ -46,30 +47,45 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 	, m_changed_files_mutex(false)
 	, m_history(editor.getAllocator())
 	, m_plugins(editor.getAllocator())
+	, m_on_resource_changed(editor.getAllocator())
 {
+	m_is_update_enabled = true;
 	m_filter[0] = '\0';
 	m_current_type = 0;
 	m_is_opened = false;
+	m_activate = false;
 	m_resources.emplace(editor.getAllocator());
 
 	findResources();
 
-	const char* base_path = editor.getEngine().getPathManager().getBasePath();
-	m_watcher = FileSystemWatcher::create(base_path, editor.getAllocator());
-	m_watcher->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
+	const char* base_path = editor.getEngine().getDiskFileDevice()->getBasePath(0);
+	m_watchers[0] = FileSystemWatcher::create(base_path, editor.getAllocator());
+	m_watchers[0]->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
+	base_path = editor.getEngine().getDiskFileDevice()->getBasePath(1);
+	if (Lumix::stringLength(base_path) > 1)
+	{
+		m_watchers[1] = FileSystemWatcher::create(base_path, editor.getAllocator());
+		m_watchers[1]->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
+	}
+	else
+	{
+		m_watchers[1] = nullptr;
+	}
 }
 
 
 AssetBrowser::~AssetBrowser()
 {
+	unloadResource();
+
 	for (auto* plugin : m_plugins)
 	{
 		LUMIX_DELETE(m_editor.getAllocator(), plugin);
 	}
 	m_plugins.clear();
 
-	unloadResource();
-	FileSystemWatcher::destroy(m_watcher);
+	FileSystemWatcher::destroy(m_watchers[0]);
+	FileSystemWatcher::destroy(m_watchers[1]);
 }
 
 
@@ -113,6 +129,7 @@ int AssetBrowser::getTypeIndexFromManagerType(Lumix::uint32 type) const
 void AssetBrowser::update()
 {
 	PROFILE_FUNCTION();
+	if (!m_is_update_enabled) return;
 	bool is_empty;
 	{
 		Lumix::MT::SpinLock lock(m_changed_files_mutex);
@@ -130,16 +147,32 @@ void AssetBrowser::update()
 			is_empty = m_changed_files.empty();
 		}
 
+		char ext[10];
+		Lumix::PathUtils::getExtension(ext, Lumix::lengthOf(ext), path.c_str());
+		m_on_resource_changed.invoke(path, ext);
+
 		Lumix::uint32 resource_type = getResourceType(path.c_str());
 		if (resource_type == 0) continue;
 
 		if (m_autoreload_changed_resource) m_editor.getEngine().getResourceManager().reload(path);
 
-		if (!PlatformInterface::fileExists(path.c_str()))
+		char tmp_path[Lumix::MAX_PATH_LENGTH];
+		const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath(0);
+		Lumix::copyString(tmp_path, base_path);
+		Lumix::catString(tmp_path, path.c_str());
+
+		if (!PlatformInterface::fileExists(tmp_path))
 		{
-			int index = getTypeIndexFromManagerType(resource_type);
-			m_resources[index].eraseItemFast(path);
-			continue;
+			base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath(1);
+			Lumix::copyString(tmp_path, base_path);
+			Lumix::catString(tmp_path, path.c_str());
+
+			if (!PlatformInterface::fileExists(tmp_path))
+			{
+				int index = getTypeIndexFromManagerType(resource_type);
+				m_resources[index].eraseItemFast(path);
+				continue;
+			}
 		}
 
 		char dir[Lumix::MAX_PATH_LENGTH];
@@ -162,9 +195,14 @@ void AssetBrowser::onGUI()
 
 	if (!ImGui::BeginDock("Asset Browser", &m_is_opened))
 	{
+		if (m_activate) ImGui::SetDockActive();
+		m_activate = false;
 		ImGui::EndDock();
 		return;
 	}
+
+	if (m_activate) ImGui::SetDockActive();
+	m_activate = false;
 
 	if (m_is_focus_requested)
 	{
@@ -228,6 +266,7 @@ void AssetBrowser::addPlugin(IPlugin& plugin)
 
 void AssetBrowser::selectResource(const Lumix::Path& resource)
 {
+	m_activate = true;
 	char ext[30];
 	Lumix::PathUtils::getExtension(ext, Lumix::lengthOf(ext), resource.c_str());
 	if (Lumix::compareString(ext, "unv") == 0) return;
@@ -264,11 +303,12 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	ImGui::Text(label);
 	ImGui::PopItemWidth();
 
-	if (ImGui::BeginPopup(popup_name))
+	if (ImGui::BeginResizablePopup(popup_name, ImVec2(300, 300)))
 	{
 		static char filter[128] = "";
 		ImGui::InputText("Filter", filter, sizeof(filter));
 
+		ImGui::BeginChild("Resources", ImVec2(0, 0));
 		for (auto unv : getResources(getTypeIndexFromManagerType(type)))
 		{
 			if (filter[0] != '\0' && strstr(unv.c_str(), filter) == nullptr) continue;
@@ -276,11 +316,13 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 			if (ImGui::Selectable(unv.c_str(), false))
 			{
 				Lumix::copyString(buf, max_size, unv.c_str());
+				ImGui::EndChild();
 				ImGui::EndPopup();
 				return true;
 			}
 		}
 
+		ImGui::EndChild();
 		ImGui::EndPopup();
 	}
 
@@ -290,9 +332,21 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 
 void AssetBrowser::openInExternalEditor(Lumix::Resource* resource)
 {
-	StringBuilder<Lumix::MAX_PATH_LENGTH> path(m_editor.getEngine().getPathManager().getBasePath());
-	path << "/" << resource->getPath().c_str();
-	PlatformInterface::shellExecuteOpen(path);
+	openInExternalEditor(resource->getPath().c_str());
+}
+
+
+void AssetBrowser::openInExternalEditor(const char* path)
+{
+	StringBuilder<Lumix::MAX_PATH_LENGTH> full_path(m_editor.getEngine().getDiskFileDevice()->getBasePath(0));
+	full_path << path;
+	if (!PlatformInterface::fileExists(path))
+	{
+		full_path.data[0] = 0;
+		full_path << m_editor.getEngine().getDiskFileDevice()->getBasePath(0);
+		full_path << path;
+	}
+	PlatformInterface::shellExecuteOpen(full_path);
 }
 
 
@@ -365,8 +419,8 @@ void AssetBrowser::addResource(const char* path, const char* filename)
 	
 	int index = getResourceTypeIndex(ext);
 
-	if (Lumix::startsWith(path, "./render_tests") != 0) return;
-	if (Lumix::startsWith(path, "./unit_tests") != 0) return;
+	if (Lumix::startsWith(path, "/render_tests") != 0) return;
+	if (Lumix::startsWith(path, "/unit_tests") != 0) return;
 	if (index < 0) return;
 
 	Lumix::Path path_obj(fullpath);
@@ -377,7 +431,7 @@ void AssetBrowser::addResource(const char* path, const char* filename)
 }
 
 
-void AssetBrowser::processDir(const char* dir)
+void AssetBrowser::processDir(const char* dir, int base_length)
 {
 	auto* iter = PlatformInterface::createFileIterator(dir, m_editor.getAllocator());
 	PlatformInterface::FileInfo info;
@@ -391,11 +445,11 @@ void AssetBrowser::processDir(const char* dir)
 			Lumix::copyString(child_path, dir);
 			Lumix::catString(child_path, "/");
 			Lumix::catString(child_path, info.filename);
-			processDir(child_path);
+			processDir(child_path, base_length);
 		}
 		else
 		{
-			addResource(dir, info.filename);
+			addResource(dir + base_length, info.filename);
 		}
 	}
 
@@ -410,5 +464,8 @@ void AssetBrowser::findResources()
 		resources.clear();
 	}
 
-	processDir(".");
+	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath(0);
+	processDir(base_path, Lumix::stringLength(base_path));
+	base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath(1);
+	if (base_path[0] != 0) processDir(base_path, Lumix::stringLength(base_path));
 }

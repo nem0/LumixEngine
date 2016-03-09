@@ -359,7 +359,7 @@ struct ProfilerUIImpl : public ProfilerUI
 
 	struct Block
 	{
-		Block(Lumix::IAllocator& allocator);
+		explicit Block(Lumix::IAllocator& allocator);
 		~Block() {}
 
 		const char* m_name;
@@ -375,7 +375,7 @@ struct ProfilerUIImpl : public ProfilerUI
 
 	struct AllocationStackNode
 	{
-		AllocationStackNode(Lumix::IAllocator& allocator)
+		explicit AllocationStackNode(Lumix::IAllocator& allocator)
 			: m_children(allocator)
 			, m_allocations(allocator)
 		{
@@ -585,8 +585,7 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 														 : block->m_frames[m_current_frame];
 						if (ImGui::Selectable(
 								StringBuilder<50>("") << frame << "###t" << (Lumix::int64)block,
-								m_current_block == block,
-								ImGuiSelectableFlags_SpanAllColumns))
+								m_current_block == block))
 						{
 							m_current_block = block;
 						}
@@ -684,7 +683,7 @@ void ProfilerUIImpl::saveResourceList()
 	}
 	else
 	{
-		Lumix::g_log_error.log("profiler") << "Failed to save resource list to resources.csv";
+		Lumix::g_log_error.log("Editor") << "Failed to save resource list to resources.csv";
 	}
 }
 
@@ -955,7 +954,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 	auto* block = m_current_block ? m_current_block : m_root;
 	float width = ImGui::GetWindowContentRegionWidth();
-	int count = Lumix::Math::minValue(int(width / 5), block->m_int_values.size());
+	int count = Lumix::Math::minimum(int(width / 5), block->m_int_values.size());
 	int offset = block->m_int_values.size() - count;
 	struct PlotData
 	{

@@ -3,7 +3,6 @@
 #include "lumix.h"
 #include "core/array.h"
 #include "core/delegate_list.h"
-#include "core/vec.h"
 #include "universe/component.h"
 
 
@@ -22,8 +21,8 @@ class RenderInterface;
 struct Quat;
 struct RayCastModelHit;
 class Universe;
-struct UniverseContext;
-
+struct Vec2;
+struct Vec3;
 
 struct MouseButton
 {
@@ -72,10 +71,11 @@ public:
 	virtual RenderInterface* getRenderInterface() = 0;
 	virtual void update() = 0;
 	virtual void updateEngine() = 0;
+	virtual void beginCommandGroup(uint32 type) = 0;
+	virtual void endCommandGroup() = 0;
 	virtual void executeCommand(IEditorCommand* command) = 0;
 	virtual IEditorCommand* createEditorCommand(uint32 command_type) = 0;
 	virtual Engine& getEngine() = 0;
-	virtual UniverseContext* getUniverseContext() = 0;
 	virtual Universe* getUniverse() = 0;
 	virtual const Array<IScene*>& getScenes() const = 0;
 	virtual IScene* getScene(uint32 hash) = 0;
@@ -84,7 +84,6 @@ public:
 	virtual void renderIcons() = 0;
 	virtual ComponentUID getEditCamera() = 0;
 	virtual class Gizmo& getGizmo() = 0;
-	virtual void setGizmoUseStep(bool use) = 0;
 	virtual bool canUndo() const = 0;
 	virtual bool canRedo() const = 0;
 	virtual void undo() = 0;
@@ -93,11 +92,13 @@ public:
 	virtual void saveUniverse(const Path& path, bool save_path) = 0;
 	virtual void newUniverse() = 0;
 	virtual Path getUniversePath() const = 0;
-	virtual void showEntities() = 0;
-	virtual void hideEntities() = 0;
-	virtual void copyEntity() = 0;
-	virtual bool canPasteEntity() const = 0;
-	virtual void pasteEntity() = 0;
+	virtual void showEntities(const Entity* entities, int count) = 0;
+	virtual void showSelectedEntities() = 0;
+	virtual void hideEntities(const Entity* entities, int count) = 0;
+	virtual void hideSelectedEntities() = 0;
+	virtual void copyEntities() = 0;
+	virtual bool canPasteEntities() const = 0;
+	virtual void pasteEntities() = 0;
 	virtual ComponentUID getComponent(Entity entity, uint32 type) = 0;
 	virtual ComponentList& getComponents(Entity entity) = 0;
 	virtual void addComponent(uint32 type_crc) = 0;
@@ -106,7 +107,6 @@ public:
 	virtual bool canRemove(const ComponentUID& cmp) = 0;
 	virtual Entity addEntity() = 0;
 	virtual void destroyEntities(const Entity* entities, int count) = 0;
-	virtual void addEntityToSelection(Entity entity) = 0;
 	virtual void selectEntities(const Entity* entities, int count) = 0;
 	virtual void selectEntitiesWithSameMesh() = 0;
 	virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
@@ -150,18 +150,10 @@ public:
 	virtual DelegateList<void()>& universeDestroyed() = 0;
 	virtual DelegateList<void()>& universeLoaded() = 0;
 	virtual DelegateList<void(Entity, const char*)>& entityNameSet() = 0;
-	virtual DelegateList<void(ComponentUID, const IPropertyDescriptor&)>&
-	propertySet() = 0;
-	
+	virtual DelegateList<void(ComponentUID, const IPropertyDescriptor&)>& propertySet() = 0;
+
 	virtual void addPlugin(Plugin& plugin) = 0;
 	virtual void removePlugin(Plugin& plugin) = 0;
-	virtual bool isRelativePath(const char* path) = 0;
-	virtual void getRelativePath(char* relative_path,
-								 int max_length,
-								 const char* source) = 0;
-	virtual void getRelativePath(char* relative_path,
-								 int max_length,
-								 const Path& source) = 0;
 	virtual EntityTemplateSystem& getEntityTemplateSystem() = 0;
 	virtual Vec3 getCameraRaycastHit() = 0;
 	virtual bool isMeasureToolActive() const = 0;
@@ -180,6 +172,8 @@ public:
 											  EditorCommandCreator) = 0;
 	virtual bool isGameMode() const = 0;
 	virtual class EntityGroups& getEntityGroups() = 0;
+	virtual void setMouseSensitivity(float x, float y) = 0;
+	virtual Vec2 getMouseSensitivity() = 0;
 
 protected:
 	virtual ~WorldEditor() {}

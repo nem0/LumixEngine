@@ -9,22 +9,22 @@ void UT_blob(const char* params)
 	
 	Lumix::OutputBlob blob(allocator);
 	
-	LUMIX_EXPECT(blob.getSize() == 0);
+	LUMIX_EXPECT(blob.getPos() == 0);
 	bool b = false;
 	blob.reserve(sizeof(b));
-	LUMIX_EXPECT(blob.getSize() == 0);
+	LUMIX_EXPECT(blob.getPos() == 0);
 	blob.write(b);
-	LUMIX_EXPECT(blob.getSize() == sizeof(b));
+	LUMIX_EXPECT(blob.getPos() == sizeof(b));
 	blob.reserve(sizeof(b));
-	LUMIX_EXPECT(blob.getSize() == sizeof(b));
+	LUMIX_EXPECT(blob.getPos() == sizeof(b));
 
 	char c = 'A';
 	blob.reserve(sizeof(b) + sizeof(c));
-	LUMIX_EXPECT(blob.getSize() == sizeof(b));
+	LUMIX_EXPECT(blob.getPos() == sizeof(b));
 	blob.reserve(0);
-	LUMIX_EXPECT(blob.getSize() == sizeof(b));
+	LUMIX_EXPECT(blob.getPos() == sizeof(b));
 	blob.write(c);
-	LUMIX_EXPECT(blob.getSize() == sizeof(b) + sizeof(c));
+	LUMIX_EXPECT(blob.getPos() == sizeof(b) + sizeof(c));
 
 	int32 i = 123456;
 	blob.write(i);
@@ -95,15 +95,15 @@ void UT_blob(const char* params)
 	LUMIX_EXPECT(Lumix::compareString(tmp, "test string") == 0);
 	LUMIX_EXPECT(Lumix::compareMemory(&s, &s2, sizeof(s)) == 0);
 
-	LUMIX_EXPECT(input.getSize() == blob.getSize());
+	LUMIX_EXPECT(input.getSize() == blob.getPos());
 	input.setPosition(sizeof(b2) + sizeof(c2) + sizeof(i2));
 	input.read(ui2);
 	LUMIX_EXPECT(ui == ui2);
 
 	blob.clear();
-	LUMIX_EXPECT(blob.getSize() == 0);
+	LUMIX_EXPECT(blob.getPos() == 0);
 	blob.write(b);
-	LUMIX_EXPECT(blob.getSize() == sizeof(b));
+	LUMIX_EXPECT(blob.getPos() == sizeof(b));
 }
 
 REGISTER_TEST("unit_tests/core/blob", UT_blob, "")

@@ -37,10 +37,12 @@ struct LUMIX_EDITOR_API Settings
 	bool m_is_profiler_opened;
 	bool m_is_properties_opened;
 	bool m_is_crash_reporting_enabled;
+	float m_mouse_sensitivity_x;
+	float m_mouse_sensitivity_y;
 
 	int m_autosave_time;
 
-	Settings(Lumix::IAllocator& allocator);
+	explicit Settings(Lumix::IAllocator& allocator);
 	~Settings();
 
 	static Settings* getInstance();
