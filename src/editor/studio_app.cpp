@@ -1301,24 +1301,34 @@ public:
 	}
 
 
+
 	void checkShortcuts()
 	{
 		if (ImGui::IsAnyItemActive()) return;
 
-		bool* keysDown = ImGui::GetIO().KeysDown;
+		auto& io = ImGui::GetIO();
+		bool* keysDown = io.KeysDown;
+		Lumix::uint8 pressed_modifiers = io.KeyCtrl ? 1 : 0;
+		pressed_modifiers |= io.KeyAlt ? 2 : 0;
+		pressed_modifiers |= io.KeyShift ? 4 : 0;
 		for (auto* a : m_actions)
 		{
 			if (!a->is_global || a->shortcut[0] == -1) continue;
 
+			Lumix::uint8 action_modifiers = 0;
 			for (int i = 0; i < Lumix::lengthOf(a->shortcut) + 1; ++i)
 			{
-				if (a->shortcut[i] == -1 || i == Lumix::lengthOf(a->shortcut))
+				if ((a->shortcut[i] == -1 || i == Lumix::lengthOf(a->shortcut)) &&
+					action_modifiers == pressed_modifiers)
 				{
 					a->func.invoke();
 					return;
 				}
 
 				if (!keysDown[a->shortcut[i]]) break;
+				if (a->shortcut[i] == (int)PlatformInterface::Keys::CONTROL) action_modifiers |= 1;
+				else if (a->shortcut[i] == (int)PlatformInterface::Keys::ALT) action_modifiers |= 2;
+				else if (a->shortcut[i] == (int)PlatformInterface::Keys::SHIFT) action_modifiers |= 4;
 			}
 		}
 	}
