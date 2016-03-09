@@ -7,11 +7,11 @@
 
 namespace Lumix
 {
-	class IArrayDescriptor;
-	class IEnumPropertyDescriptor;
-	class IPropertyDescriptor;
-	class ISampledFunctionDescriptor;
-	class WorldEditor;
+class IArrayDescriptor;
+class IEnumPropertyDescriptor;
+class IPropertyDescriptor;
+class ISampledFunctionDescriptor;
+class WorldEditor;
 }
 
 
