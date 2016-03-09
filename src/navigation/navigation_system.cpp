@@ -29,11 +29,8 @@ struct NavigationSystem : public IPlugin
 	bool create() override { return true; }
 	void destroy() override {}
 	const char* getName() const override { return "navigation"; }
-
-
 	IScene* createScene(Universe& universe) override;
 	void destroyScene(IScene* scene) override;
-
 
 	BaseProxyAllocator m_allocator;
 	Engine& m_engine;
