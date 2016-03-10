@@ -185,6 +185,7 @@ public:
 		, m_point_lights(m_allocator)
 		, m_light_influenced_geometry(m_allocator)
 		, m_global_lights(m_allocator)
+		, m_debug_triangles(m_allocator)
 		, m_debug_lines(m_allocator)
 		, m_debug_points(m_allocator)
 		, m_temporary_infos(m_allocator)
@@ -413,31 +414,46 @@ public:
 	{
 		PROFILE_FUNCTION();
 		m_time += dt;
-		for (int i = m_debug_lines.size() - 1; i >= 0; --i)
+		for (int i = m_debug_triangles.size() - 1; i >= 0; --i)
 		{
-			float life = m_debug_lines[i].m_life;
+			float life = m_debug_triangles[i].life;
 			if (life < 0)
+			{
+				m_debug_triangles.eraseFast(i);
+			}
+			else
+			{
+				life -= dt;
+				m_debug_triangles[i].life = life;
+			}
+		}
+
+		for(int i = m_debug_lines.size() - 1; i >= 0; --i)
+		{
+			float life = m_debug_lines[i].life;
+			if(life < 0)
 			{
 				m_debug_lines.eraseFast(i);
 			}
 			else
 			{
 				life -= dt;
-				m_debug_lines[i].m_life = life;
+				m_debug_lines[i].life = life;
 			}
 		}
 
+
 		for (int i = m_debug_points.size() - 1; i >= 0; --i)
 		{
-			float life = m_debug_points[i].m_life;
+			float life = m_debug_points[i].life;
 			if (life < 0)
 			{
-				m_debug_points.eraseFast(i);	
+				m_debug_points.eraseFast(i);
 			}
 			else
 			{
 				life -= dt;
-				m_debug_points[i].m_life = life;
+				m_debug_points[i].life = life;
 			}
 		}
 
@@ -2286,6 +2302,12 @@ public:
 	}
 
 
+	const Array<DebugTriangle>& getDebugTriangles() const override
+	{
+		return m_debug_triangles;
+	}
+
+
 	const Array<DebugLine>& getDebugLines() const override
 	{
 		return m_debug_lines;
@@ -2403,6 +2425,20 @@ public:
 		}
 	}
 
+
+	void addDebugTriangle(const Vec3& p0,
+		const Vec3& p1,
+		const Vec3& p2,
+		uint32 color,
+		float life) override
+	{
+		DebugTriangle& tri = m_debug_triangles.emplace();
+		tri.p0 = p0;
+		tri.p1 = p1;
+		tri.p2 = p2;
+		tri.color = ARGBToABGR(color);
+		tri.life = life;
+	}
 
 
 	void addDebugCapsule(const Vec3& position,
@@ -2648,9 +2684,9 @@ public:
 	void addDebugPoint(const Vec3& pos, uint32 color, float life) override
 	{
 		DebugPoint& point = m_debug_points.emplace();
-		point.m_pos = pos;
-		point.m_color = ARGBToABGR(color);
-		point.m_life = life;
+		point.pos = pos;
+		point.color = ARGBToABGR(color);
+		point.life = life;
 	}
 
 
@@ -2664,10 +2700,10 @@ public:
 	void addDebugLine(const Vec3& from, const Vec3& to, uint32 color, float life) override
 	{
 		DebugLine& line = m_debug_lines.emplace();
-		line.m_from = from;
-		line.m_to = to;
-		line.m_color = ARGBToABGR(color);
-		line.m_life = life;
+		line.from = from;
+		line.to = to;
+		line.color = ARGBToABGR(color);
+		line.life = life;
 	}
 
 
@@ -3521,6 +3557,7 @@ private:
 	Universe& m_universe;
 	Renderer& m_renderer;
 	Engine& m_engine;
+	Array<DebugTriangle> m_debug_triangles;
 	Array<DebugLine> m_debug_lines;
 	Array<DebugPoint> m_debug_points;
 	CullingSystem* m_culling_system;

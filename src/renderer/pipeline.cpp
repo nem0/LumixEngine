@@ -1322,6 +1322,7 @@ struct PipelineImpl : public Pipeline
 
 	void renderDebugShapes()
 	{
+		renderDebugTriangles();
 		renderDebugLines();
 		renderDebugPoints();
 	}
@@ -1344,10 +1345,10 @@ struct PipelineImpl : public Pipeline
 			for (int i = 0; i < points.size(); ++i)
 			{
 				const DebugPoint& point = points[i];
-				vertex[0].rgba = point.m_color;
-				vertex[0].x = point.m_pos.x;
-				vertex[0].y = point.m_pos.y;
-				vertex[0].z = point.m_pos.z;
+				vertex[0].rgba = point.color;
+				vertex[0].x = point.pos.x;
+				vertex[0].y = point.pos.y;
+				vertex[0].z = point.pos.z;
 				vertex[0].u = vertex[0].v = 0;
 
 				indices[0] = i;
@@ -1386,16 +1387,16 @@ struct PipelineImpl : public Pipeline
 				for (int i = 0; i < count; ++i)
 				{
 					const DebugLine& line = lines[j + i];
-					vertex[0].rgba = line.m_color;
-					vertex[0].x = line.m_from.x;
-					vertex[0].y = line.m_from.y;
-					vertex[0].z = line.m_from.z;
+					vertex[0].rgba = line.color;
+					vertex[0].x = line.from.x;
+					vertex[0].y = line.from.y;
+					vertex[0].z = line.from.z;
 					vertex[0].u = vertex[0].v = 0;
 
-					vertex[1].rgba = line.m_color;
-					vertex[1].x = line.m_to.x;
-					vertex[1].y = line.m_to.y;
-					vertex[1].z = line.m_to.z;
+					vertex[1].rgba = line.color;
+					vertex[1].x = line.to.x;
+					vertex[1].y = line.to.y;
+					vertex[1].z = line.to.z;
 					vertex[1].u = vertex[0].v = 0;
 
 					indices[0] = i * 2;
@@ -1415,6 +1416,61 @@ struct PipelineImpl : public Pipeline
 		}
 	}
 
+
+	void renderDebugTriangles()
+	{
+		const auto& tris = m_scene->getDebugTriangles();
+		if(tris.empty() || !m_debug_line_material->isReady()) return;
+
+		bgfx::TransientVertexBuffer tvb;
+		bgfx::TransientIndexBuffer tib;
+
+		static const int BATCH_SIZE = 1024 * 16;
+
+		for(int j = 0; j < tris.size(); j += BATCH_SIZE)
+		{
+			int count = Math::minimum(BATCH_SIZE, tris.size() - j);
+			if(bgfx::allocTransientBuffers(&tvb, m_base_vertex_decl, count * 3, &tib, count * 3))
+			{
+				BaseVertex* vertex = (BaseVertex*)tvb.data;
+				uint16* indices = (uint16*)tib.data;
+				for(int i = 0; i < count; ++i)
+				{
+					const DebugTriangle& tri = tris[j + i];
+					vertex[0].rgba = tri.color;
+					vertex[0].x = tri.p0.x;
+					vertex[0].y = tri.p0.y;
+					vertex[0].z = tri.p0.z;
+					vertex[0].u = vertex[0].v = 0;
+
+					vertex[1].rgba = tri.color;
+					vertex[1].x = tri.p1.x;
+					vertex[1].y = tri.p1.y;
+					vertex[1].z = tri.p1.z;
+					vertex[1].u = vertex[0].v = 0;
+
+					vertex[2].rgba = tri.color;
+					vertex[2].x = tri.p2.x;
+					vertex[2].y = tri.p2.y;
+					vertex[2].z = tri.p2.z;
+					vertex[2].u = vertex[0].v = 0;
+
+					indices[0] = i * 3;
+					indices[1] = i * 3 + 1;
+					indices[2] = i * 3 + 2;
+					vertex += 3;
+					indices += 3;
+				}
+
+				bgfx::setVertexBuffer(&tvb);
+				bgfx::setIndexBuffer(&tib);
+				bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
+				bgfx::setState(m_render_state | m_debug_line_material->getRenderStates());
+				bgfx::submit(m_bgfx_view,
+					m_debug_line_material->getShaderInstance().m_program_handles[m_pass_idx]);
+			}
+		}
+	}
 
 	int getPassIdx() const override
 	{
