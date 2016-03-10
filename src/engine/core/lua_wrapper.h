@@ -413,7 +413,7 @@ template <typename T, T t> int wrap(lua_State* L)
 template <typename C>
 int LUMIX_FORCE_INLINE callMethod(void(C::*f)(), lua_State* L)
 {
-	auto* inst = toType<C*>(L, 1);
+	auto* inst = checkArg<C*>(L, 1);
 	(inst->*f)();
 	return 0;
 }
@@ -422,7 +422,7 @@ int LUMIX_FORCE_INLINE callMethod(void(C::*f)(), lua_State* L)
 template <typename C, typename R>
 int LUMIX_FORCE_INLINE callMethod(R(C::*f)(), lua_State* L)
 {
-	auto* inst = toType<C*>(L, 1);
+	auto* inst = checkArg<C*>(L, 1);
 	R v = (inst->*f)();
 	pushLua(L, v);
 	return 1;
@@ -432,7 +432,7 @@ int LUMIX_FORCE_INLINE callMethod(R(C::*f)(), lua_State* L)
 template <typename C, typename... ArgsF>
 int LUMIX_FORCE_INLINE callMethod(void(C::*f)(ArgsF...), lua_State* L)
 {
-	auto* inst = toType<C*>(L, 1);
+	auto* inst = checkArg<C*>(L, 1);
 
 	FunctionCaller<sizeof...(ArgsF)>::callMethod(inst, f, L);
 	return 0;
@@ -442,7 +442,7 @@ int LUMIX_FORCE_INLINE callMethod(void(C::*f)(ArgsF...), lua_State* L)
 template <typename C, typename R, typename... ArgsF>
 int LUMIX_FORCE_INLINE callMethod(R (C::*f)(ArgsF...), lua_State* L)
 {
-	auto* inst = toType<C*>(L, 1);
+	auto* inst = checkArg<C*>(L, 1);
 
 	R v = FunctionCaller<sizeof...(ArgsF)>::callMethod(inst, f, L);
 	pushLua(L, v);
