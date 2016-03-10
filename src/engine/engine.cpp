@@ -298,6 +298,11 @@ public:
 
 	static Vec3 LUA_getEntityPosition(Universe* universe, Entity entity)
 	{
+		if (entity == INVALID_ENTITY)
+		{
+			g_log_warning.log("Engine") << "Requesting position on invalid entity";
+			return Vec3(0, 0, 0);
+		}
 		return universe->getPosition(entity);
 	}
 
