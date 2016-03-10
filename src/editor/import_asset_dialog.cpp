@@ -341,17 +341,6 @@ struct ImportTask : public Lumix::MT::Task
 	~ImportTask() { m_dialog.m_importer.SetProgressHandler(nullptr); }
 
 
-	bool hasAnyMeshTangents()
-	{
-		auto* scene = m_dialog.m_importer.GetScene();
-		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
-		{
-			if (scene->mMeshes[i]->mTangents) return true;
-		}
-		return false;
-	}
-
-
 	int task() override
 	{
 		m_progress_handler.task = this;
@@ -366,10 +355,11 @@ struct ImportTask : public Lumix::MT::Task
 		flags |= m_dialog.m_gen_smooth_normal ? aiProcess_GenSmoothNormals : aiProcess_GenNormals;
 		flags |= m_dialog.m_optimize_mesh_on_import ? aiProcess_OptimizeMeshes : 0;
 		const aiScene* scene = m_dialog.m_importer.ReadFile(m_dialog.m_source, flags);
-		if (!scene || !scene->mMeshes || !hasAnyMeshTangents())
+		if (!scene || !scene->mMeshes)
 		{
 			m_dialog.m_importer.FreeScene();
-			m_dialog.setMessage(m_dialog.m_importer.GetErrorString());
+			const char* msg = m_dialog.m_importer.GetErrorString();
+			m_dialog.setMessage(msg);
 			Lumix::g_log_error.log("Editor") << m_dialog.m_importer.GetErrorString();
 		}
 		else
@@ -377,7 +367,7 @@ struct ImportTask : public Lumix::MT::Task
 			m_dialog.m_mesh_mask.resize(scene->mNumMeshes);
 			for (int i = 0; i < m_dialog.m_mesh_mask.size(); ++i)
 			{
-				m_dialog.m_mesh_mask[i] = scene->mMeshes[i]->mTangents != nullptr;
+				m_dialog.m_mesh_mask[i] = true;
 			}
 		}
 
@@ -1059,6 +1049,7 @@ struct ConvertTask : public Lumix::MT::Task
 			case ImportAssetDialog::Y_UP: return Lumix::Vec3(v.x, v.y, v.z);
 			case ImportAssetDialog::Z_UP: return Lumix::Vec3(v.x, v.z, -v.y);
 			case ImportAssetDialog::Z_MINUS_UP: return Lumix::Vec3(v.x, -v.z, v.y);
+			case ImportAssetDialog::X_MINUS_UP: return Lumix::Vec3(v.y, -v.x, v.z);
 		}
 		ASSERT(false);
 		return Lumix::Vec3(v.x, v.y, v.z);
@@ -1149,9 +1140,12 @@ struct ConvertTask : public Lumix::MT::Task
 					file.write((const char*)&int_tangent, sizeof(int_tangent));
 				}
 
-				auto uv = mesh->mTextureCoords[0][j];
-				uv.y = -uv.y;
-				file.write((const char*)&uv, sizeof(uv.x) + sizeof(uv.y));
+				if (mesh->mTextureCoords[0])
+				{
+					auto uv = mesh->mTextureCoords[0][j];
+					uv.y = -uv.y;
+					file.write((const char*)&uv, sizeof(uv.x) + sizeof(uv.y));
+				}
 			}
 		}
 	}
@@ -1159,7 +1153,8 @@ struct ConvertTask : public Lumix::MT::Task
 
 	static int getAttributeCount(const aiMesh* mesh)
 	{
-		int count = 3; // position, normal, uv
+		int count = 2; // position, normal
+		if (mesh->mTextureCoords[0]) ++count;
 		if (isSkinned(mesh)) count += 2;
 		if (mesh->mColors[0]) ++count;
 		if (mesh->mTangents) ++count;
@@ -1175,7 +1170,8 @@ struct ConvertTask : public Lumix::MT::Task
 		static const int UV_SIZE = sizeof(float) * 2;
 		static const int COLOR_SIZE = sizeof(Lumix::uint8) * 4;
 		static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(Lumix::uint16) * 4;
-		int size = POSITION_SIZE + NORMAL_SIZE + UV_SIZE;
+		int size = POSITION_SIZE + NORMAL_SIZE;
+		if (mesh->mTextureCoords[0]) size += UV_SIZE;
 		if (mesh->mTangents) size += TANGENT_SIZE;
 		if (mesh->mColors[0]) size += COLOR_SIZE;
 		if (isSkinned(mesh)) size += BONE_INDICES_WEIGHTS_SIZE;
@@ -1277,7 +1273,7 @@ struct ConvertTask : public Lumix::MT::Task
 			if (mesh->mColors[0]) writeAttribute("in_colors", VertexAttributeDef::BYTE4, file);
 			writeAttribute("in_normal", VertexAttributeDef::BYTE4, file);
 			if (mesh->mTangents) writeAttribute("in_tangents", VertexAttributeDef::BYTE4, file);
-			writeAttribute("in_tex_coords", VertexAttributeDef::FLOAT2, file);
+			if (mesh->mTextureCoords[0]) writeAttribute("in_tex_coords", VertexAttributeDef::FLOAT2, file);
 		}
 	}
 
@@ -2065,7 +2061,7 @@ void ImportAssetDialog::onGUI()
 			{
 				ImGui::Indent();
 				ImGui::DragFloat("Scale", &m_mesh_scale, 0.01f, 0.001f, 0);
-				ImGui::Combo("Orientation", &(int&)m_orientation, "Y up\0Z up\0-Z up\0");
+				ImGui::Combo("Orientation", &(int&)m_orientation, "Y up\0Z up\0-Z up\0-X up\0");
 				ImGui::Unindent();
 			}
 
@@ -2106,7 +2102,6 @@ void ImportAssetDialog::onGUI()
 				}
 				for (int i = 0; i < (int)scene->mNumMeshes; ++i)
 				{
-					if (!scene->mMeshes[i]->mTangents) continue;
 					const char* name = scene->mMeshes[i]->mName.C_Str();
 					if (name[0] == 0) name = ConvertTask::getMeshName(scene, scene->mMeshes[i]).C_Str();
 					bool b = m_mesh_mask[i];
