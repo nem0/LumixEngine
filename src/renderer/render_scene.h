@@ -67,20 +67,30 @@ struct GrassInfo
 };
 
 
+struct DebugTriangle
+{
+	Vec3 p0;
+	Vec3 p1;
+	Vec3 p2;
+	uint32 color;
+	float life;
+};
+
+
 struct DebugLine
 {
-	Vec3 m_from;
-	Vec3 m_to;
-	uint32 m_color;
-	float m_life;
+	Vec3 from;
+	Vec3 to;
+	uint32 color;
+	float life;
 };
 
 
 struct DebugPoint
 {
-	Vec3 m_pos;
-	uint32 m_color;
-	float m_life;
+	Vec3 pos;
+	uint32 color;
+	float life;
 };
 
 
@@ -121,7 +131,11 @@ public:
 	virtual Vec4 getShadowmapCascades(ComponentIndex cmp) = 0;
 	virtual void setShadowmapCascades(ComponentIndex cmp, const Vec4& value) = 0;
 
-
+	virtual void addDebugTriangle(const Vec3& p0,
+		const Vec3& p1,
+		const Vec3& p2,
+		uint32 color,
+		float life) = 0;
 	virtual void addDebugPoint(const Vec3& pos, uint32 color, float life) = 0;
 
 	virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32 color, float life) = 0;
@@ -163,6 +177,7 @@ public:
 		uint32 color,
 		float life) = 0;
 
+	virtual const Array<DebugTriangle>& getDebugTriangles() const = 0;
 	virtual const Array<DebugLine>& getDebugLines() const = 0;
 	virtual const Array<DebugPoint>& getDebugPoints() const = 0;
 

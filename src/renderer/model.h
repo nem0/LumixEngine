@@ -138,6 +138,7 @@ public:
 	const AABB& getAABB() const { return m_aabb; }
 	LOD* getLODs() { return m_lods; }
 	Array<int>& getIndices() { return m_indices; }
+	const Array<Vec3>& getVertices() const { return m_vertices; }
 
 public:
 	static const uint32 FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
