@@ -139,7 +139,8 @@ struct NavigationScene : public IScene
 
 		REGISTER_FUNCTION(generateNavmesh);
 		REGISTER_FUNCTION(navigate);
-		REGISTER_FUNCTION(debugDraw);
+		REGISTER_FUNCTION(debugDrawNavmesh);
+		REGISTER_FUNCTION(debugDrawPaths);
 		REGISTER_FUNCTION(getPolygonCount);
 
 		#undef REGISTER_FUNCTION
@@ -203,6 +204,11 @@ struct NavigationScene : public IScene
 			{
 				v *= speed * time_delta / len;
 				m_universe.setPosition(path.entity, pos + v);
+				v.y = 0;
+				v.normalize();
+				float wanted_yaw = atan2(v.x, v.z);
+				Quat wanted_rot(Vec3(0, 1, 0), wanted_yaw);
+				m_universe.setRotation(path.entity, wanted_rot);
 			}
 		}
 		for(int i = m_paths.size() - 1; i >= 0; --i)
@@ -215,7 +221,23 @@ struct NavigationScene : public IScene
 	}
 
 
-	void debugDraw()
+	void debugDrawPaths()
+	{
+		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		if (!render_scene) return;
+
+		const Vec3 OFFSET(0, 0.1f, 0);
+		for (auto& path : m_paths)
+		{
+			for (int i = 1; i < path.vertex_count; ++i)
+			{
+				render_scene->addDebugLine(path.vertices[i - 1] + OFFSET, path.vertices[i] + OFFSET, 0xffff0000, 0);
+			}
+		}
+	}
+
+
+	void debugDrawNavmesh()
 	{
 		if (!m_polymesh) return;
 		auto& mesh = *m_polymesh;
@@ -350,9 +372,9 @@ struct NavigationScene : public IScene
 		}
 		rasterizeGeometry(ctx, cfg, *solid);
 
-		/*rcFilterLowHangingWalkableObstacles(&ctx, cfg.walkableClimb, *solid);
+		rcFilterLowHangingWalkableObstacles(&ctx, cfg.walkableClimb, *solid);
 		rcFilterLedgeSpans(&ctx, cfg.walkableHeight, cfg.walkableClimb, *solid);
-		rcFilterWalkableLowHeightSpans(&ctx, cfg.walkableHeight, *solid);*/
+		rcFilterWalkableLowHeightSpans(&ctx, cfg.walkableHeight, *solid);
 
 		rcCompactHeightfield* chf = rcAllocCompactHeightfield();
 		if (!chf)
