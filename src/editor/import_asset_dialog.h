@@ -36,7 +36,8 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		{
 			Y_UP,
 			Z_UP,
-			Z_MINUS_UP
+			Z_MINUS_UP,
+			X_MINUS_UP
 		};
 
 		struct DDSConvertCallbackData
