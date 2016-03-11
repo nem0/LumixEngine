@@ -644,45 +644,6 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void finishInstances(int idx, int* views, int view_count)
-	{
-		InstanceData& data = m_instances_data[idx];
-		if (!data.buffer) return;
-
-		Mesh& mesh = *data.mesh;
-		const Model& model = *data.model;
-		Material* material = mesh.material;
-		const uint16 stride = mesh.vertex_def.getStride();
-
-		for (int i = 0; i <	view_count; ++i)
-		{
-			auto& view = m_views[views[i]];
-			ShaderInstance& shader_instance = mesh.material->getShaderInstance();
-			if (!bgfx::isValid(shader_instance.m_program_handles[view.pass_idx])) continue;
-			
-			executeCommandBuffer(material->getCommandBuffer(), material);
-			executeCommandBuffer(view.command_buffer.buffer, material);
-
-			bgfx::setVertexBuffer(model.getVerticesHandle(),
-				mesh.attribute_array_offset / stride,
-				mesh.attribute_array_size / stride);
-			bgfx::setIndexBuffer(model.getIndicesHandle(),
-				mesh.indices_offset,
-				mesh.indices_count);
-			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
-			bgfx::setState(view.render_state | material->getRenderStates());
-			bgfx::setInstanceDataBuffer(data.buffer, data.instance_count);
-			++m_stats.m_draw_call_count;
-			m_stats.m_instance_count += data.instance_count;
-			m_stats.m_triangle_count += data.instance_count * mesh.indices_count / 3;
-			bgfx::submit(view.bgfx_id, shader_instance.m_program_handles[view.pass_idx]);
-		}
-		data.buffer = nullptr;
-		data.instance_count = 0;
-		mesh.instance_idx = -1;
-	}
-
-
 	void finishInstances(int idx)
 	{
 		InstanceData& data = m_instances_data[idx];
@@ -1288,7 +1249,7 @@ struct PipelineImpl : public Pipeline
 			split_distances[split_index + 1]);
 
 		Vec3 shadow_cam_pos = camera_matrix.getTranslation();
-		float bb_size = frustum.getRadius();
+		float bb_size = frustum.radius;
 		shadow_cam_pos =
 			shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
 
@@ -2609,7 +2570,7 @@ int renderModels(lua_State* L)
 
 	pipeline->m_current_render_views = views;
 	pipeline->m_current_render_view_count = len;
-	pipeline->renderAll(pipeline->m_camera_frustum, true, pipeline->m_camera_frustum.getPosition());
+	pipeline->renderAll(pipeline->m_camera_frustum, true, pipeline->m_camera_frustum.position);
 	pipeline->m_current_render_views = &pipeline->m_view_idx;
 	pipeline->m_current_render_view_count = 1;
 	return 0;

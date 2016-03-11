@@ -2530,6 +2530,74 @@ public:
 	}
 
 
+	void addDebugCubeSolid(const Vec3& min,
+		const Vec3& max,
+		uint32 color,
+		float life) override
+	{
+		Vec3 a = min;
+		Vec3 b = min;
+		Vec3 c = max;
+
+		b.x = max.x;
+		c.z = min.z;
+		addDebugTriangle(a, c, b, color, life);
+		b.x = min.x;
+		b.y = max.y;
+		addDebugTriangle(a, b, c, color, life);
+
+		b = max;
+		c = max;
+		a.z = max.z;
+		b.y = min.y;
+		addDebugTriangle(a, b, c, color, life);
+		b.x = min.x;
+		b.y = max.y;
+		addDebugTriangle(a, c, b, color, life);
+
+		a = min;
+		b = min;
+		c = max;
+
+		b.x = max.x;
+		c.y = min.y;
+		addDebugTriangle(a, c, b, color, life);
+		b.x = min.x;
+		b.z = max.z;
+		addDebugTriangle(a, b, c, color, life);
+
+		b = max;
+		c = max;
+		a.y = max.y;
+		b.z = min.z;
+		addDebugTriangle(a, c, b, color, life);
+		b.x = min.x;
+		b.z = max.z;
+		addDebugTriangle(a, b, c, color, life);
+
+		a = min;
+		b = min;
+		c = max;
+
+		b.y = max.y;
+		c.x = min.x;
+		addDebugTriangle(a, c, b, color, life);
+		b.y = min.y;
+		b.z = max.z;
+		addDebugTriangle(a, b, c, color, life);
+
+		b = max;
+		c = max;
+		a.x = max.x;
+		b.z = min.z;
+		addDebugTriangle(a, b, c, color, life);
+		b.y = min.y;
+		b.z = max.z;
+		addDebugTriangle(a, c, b, color, life);
+	}
+
+
+
 	void addDebugCube(const Vec3& min,
 							  const Vec3& max,
 							  uint32 color,
@@ -2576,13 +2644,13 @@ public:
 
 	void addDebugFrustum(const Frustum& frustum, uint32 color, float life) override
 	{
-		addDebugFrustum(frustum.getPosition(),
-						frustum.getDirection(),
-						frustum.getUp(),
-						frustum.getFOV(),
-						frustum.getRatio(),
-						frustum.getNearDistance(),
-						frustum.getFarDistance(),
+		addDebugFrustum(frustum.position,
+						frustum.direction,
+						frustum.up,
+						frustum.fov,
+						frustum.ratio,
+						frustum.near_distance,
+						frustum.far_distance,
 						color,
 						life);
 	}

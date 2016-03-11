@@ -106,6 +106,9 @@ struct NavigationScene : public IScene
 		m_polymesh = nullptr;
 		m_navquery = nullptr;
 		m_navmesh = nullptr;
+		m_debug_compact_heightfield = nullptr;
+		m_debug_heightfield = nullptr;
+		m_debug_contours = nullptr;
 	}
 
 
@@ -121,10 +124,16 @@ struct NavigationScene : public IScene
 		rcFreePolyMesh(m_polymesh);
 		dtFreeNavMeshQuery(m_navquery);
 		dtFreeNavMesh(m_navmesh);
+		rcFreeCompactHeightfield(m_debug_compact_heightfield);
+		rcFreeHeightField(m_debug_heightfield);
+		rcFreeContourSet(m_debug_contours);
 		m_detail_mesh = nullptr;
 		m_polymesh = nullptr;
 		m_navquery = nullptr;
 		m_navmesh = nullptr;
+		m_debug_compact_heightfield = nullptr;
+		m_debug_heightfield = nullptr;
+		m_debug_contours = nullptr;
 	}
 
 
@@ -140,8 +149,11 @@ struct NavigationScene : public IScene
 		REGISTER_FUNCTION(generateNavmesh);
 		REGISTER_FUNCTION(navigate);
 		REGISTER_FUNCTION(debugDrawNavmesh);
+		REGISTER_FUNCTION(debugDrawCompactHeightfield);
+		REGISTER_FUNCTION(debugDrawHeightfield);
 		REGISTER_FUNCTION(debugDrawPaths);
 		REGISTER_FUNCTION(getPolygonCount);
+		REGISTER_FUNCTION(debugDrawContours);
 
 		#undef REGISTER_FUNCTION
 	}
@@ -232,6 +244,102 @@ struct NavigationScene : public IScene
 			for (int i = 1; i < path.vertex_count; ++i)
 			{
 				render_scene->addDebugLine(path.vertices[i - 1] + OFFSET, path.vertices[i] + OFFSET, 0xffff0000, 0);
+			}
+		}
+	}
+
+
+	void debugDrawContours()
+	{
+		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		if (!render_scene) return;
+		if (!m_debug_contours) return;
+
+		Vec3 orig(-256, -256, -256);
+		float cs = m_debug_contours->cs;
+		float ch = m_debug_contours->ch;
+		for (int i = 0; i < m_debug_contours->nconts; ++i)
+		{
+			const rcContour& c = m_debug_contours->conts[i];
+
+			if (c.nverts < 2) continue;
+
+			Vec3 first =
+				orig + Vec3((float)c.verts[0] * cs, (float)c.verts[1] * ch, (float)c.verts[2] * cs);
+			Vec3 prev = first;
+			for (int j = 1; j < c.nverts; ++j)
+			{
+				const int* v = &c.verts[j * 4];
+				Vec3 cur = orig + Vec3((float)v[0] * cs, (float)v[1] * ch, (float)v[2] * cs);
+				render_scene->addDebugLine(prev, cur, i & 1 ? 0xffff00ff : 0xffff0000, 0);
+				prev = cur;
+			}
+
+			render_scene->addDebugLine(prev, first, i & 1 ? 0xffff00ff : 0xffff0000, 0);
+		}
+	}
+
+
+	void debugDrawHeightfield()
+	{
+		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		if (!render_scene) return;
+		if (!m_debug_heightfield) return;
+
+		Vec3 orig(-256, -256, -256);
+		int width = m_debug_heightfield->width;
+		float cell_size = 0.3f;
+		float cell_height = 0.1f;
+		for(int z = 0; z < m_debug_heightfield->height; ++z)
+		{
+			for(int x = 0; x < width; ++x)
+			{
+				float fx = orig.x + x * cell_size;
+				float fz = orig.z + z * cell_size;
+				const rcSpan* span = m_debug_heightfield->spans[x + z * width];
+				while(span)
+				{
+					char atype = span->area;
+					Vec3 mins(fx, orig.y + span->smin * cell_height, fz);
+					Vec3 maxs(fx + cell_size, orig.y + span->smax * cell_height, fz + cell_size);
+					render_scene->addDebugCubeSolid(mins, maxs, 0xffff00ff, 0);
+					render_scene->addDebugCube(mins, maxs, 0xff00aaff, 0);
+					span = span->next;
+				}
+			}
+		}
+	}
+
+
+	void debugDrawCompactHeightfield()
+	{
+		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		if (!render_scene) return;
+		if (!m_debug_compact_heightfield) return;
+
+		auto& chf = *m_debug_compact_heightfield;
+		const float cs = chf.cs;
+		const float ch = chf.ch;
+
+		Vec3 orig(-256, -256, -256);
+
+		for (int y = 0; y < chf.height; ++y)
+		{
+			for (int x = 0; x < chf.width; ++x)
+			{
+				float vx = orig.x + (float)x * cs;
+				float vz = orig.z + (float)y * cs;
+
+				const rcCompactCell& c = chf.cells[x + y * chf.width];
+
+				for (uint32 i = c.index, ni = c.index + c.count; i < ni; ++i)
+				{
+					float vy = orig.y + float(chf.spans[i].y) * ch;
+					render_scene->addDebugTriangle(
+						Vec3(vx, vy, vz), Vec3(vx + cs, vy, vz + cs), Vec3(vx + cs, vy, vz), 0xffff00FF, 0);
+					render_scene->addDebugTriangle(
+						Vec3(vx, vy, vz), Vec3(vx, vy, vz + cs), Vec3(vx + cs, vy, vz + cs), 0xffff00FF, 0);
+				}
 			}
 		}
 	}
@@ -360,6 +468,7 @@ struct NavigationScene : public IScene
 		rcVcopy(cfg.bmax, &bmax.x);
 		rcCalcGridSize(cfg.bmin, cfg.bmax, cfg.cs, &cfg.width, &cfg.height);
 		rcHeightfield* solid = rcAllocHeightfield();
+		m_debug_heightfield = solid;
 		if (!solid)
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Out of memory 'solid'.";
@@ -377,6 +486,7 @@ struct NavigationScene : public IScene
 		rcFilterWalkableLowHeightSpans(&ctx, cfg.walkableHeight, *solid);
 
 		rcCompactHeightfield* chf = rcAllocCompactHeightfield();
+		m_debug_compact_heightfield = chf;
 		if (!chf)
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Out of memory 'chf'.";
@@ -389,7 +499,7 @@ struct NavigationScene : public IScene
 			return false;
 		}
 
-		rcFreeHeightField(solid);
+		if(!m_debug_heightfield) rcFreeHeightField(solid);
 
 		if (!rcErodeWalkableArea(&ctx, cfg.walkableRadius, *chf))
 		{
@@ -410,6 +520,7 @@ struct NavigationScene : public IScene
 		}
 
 		rcContourSet* cset = rcAllocContourSet();
+		m_debug_contours = cset;
 		if (!cset)
 		{
 			ctx.log(RC_LOG_ERROR, "Could not generate navmesh: Out of memory 'cset'.");
@@ -446,11 +557,11 @@ struct NavigationScene : public IScene
 			return false;
 		}
 
-		rcFreeCompactHeightfield(chf);
-		rcFreeContourSet(cset);
+		if(!m_debug_compact_heightfield) rcFreeCompactHeightfield(chf);
+		if(!m_debug_contours) rcFreeContourSet(cset);
 
-		unsigned char* navData = 0;
-		int navDataSize = 0;
+		unsigned char* nav_data = 0;
+		int nav_data_size = 0;
 
 		for (int i = 0; i < m_polymesh->npolys; ++i)
 		{
@@ -479,7 +590,7 @@ struct NavigationScene : public IScene
 		params.ch = cfg.ch;
 		params.buildBvTree = true;
 
-		if (!dtCreateNavMeshData(&params, &navData, &navDataSize))
+		if (!dtCreateNavMeshData(&params, &nav_data, &nav_data_size))
 		{
 			g_log_error.log("Navigation") << "Could not build Detour navmesh.";
 			return false;
@@ -488,17 +599,17 @@ struct NavigationScene : public IScene
 		m_navmesh = dtAllocNavMesh();
 		if (!m_navmesh)
 		{
-			dtFree(navData);
+			dtFree(nav_data);
 			g_log_error.log("Navigation") << "Could not create Detour navmesh";
 			return false;
 		}
 
 		dtStatus status;
 
-		status = m_navmesh->init(navData, navDataSize, DT_TILE_FREE_DATA);
+		status = m_navmesh->init(nav_data, nav_data_size, DT_TILE_FREE_DATA);
 		if (dtStatusFailed(status))
 		{
-			dtFree(navData);
+			dtFree(nav_data);
 			g_log_error.log("Navigation") << "Could not init Detour navmesh";
 			return false;
 		}
@@ -533,6 +644,9 @@ struct NavigationScene : public IScene
 	dtNavMeshQuery* m_navquery;
 	rcPolyMeshDetail* m_detail_mesh;
 	Array<Path> m_paths;
+	rcCompactHeightfield* m_debug_compact_heightfield;
+	rcHeightfield* m_debug_heightfield;
+	rcContourSet* m_debug_contours;
 };
 
 

@@ -147,6 +147,7 @@ public:
 		uint32 color,
 		float life) = 0;
 	virtual void addDebugCube(const Vec3& from, const Vec3& max, uint32 color, float life) = 0;
+	virtual void addDebugCubeSolid(const Vec3& from, const Vec3& max, uint32 color, float life) = 0;
 	virtual void addDebugCircle(const Vec3& center,
 		const Vec3& up,
 		float radius,
