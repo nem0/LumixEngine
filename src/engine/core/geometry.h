@@ -127,7 +127,7 @@ public:
 		float x = center.x;
 		float y = center.y;
 		float z = center.z;
-		const Plane& plane = m_plane[(uint32)Sides::NEAR_PLANE];
+		const Plane& plane = planes[(uint32)Sides::NEAR_PLANE];
 		float distance = x * plane.normal.x + y * plane.normal.y + z * plane.normal.z + plane.d;
 		distance = distance < 0 ? -distance : distance;
 		return distance < radius;
@@ -139,7 +139,7 @@ public:
 		float x = center.x;
 		float y = center.y;
 		float z = center.z;
-		const Plane* plane = &m_plane[0];
+		const Plane* plane = &planes[0];
 		float distance =
 			x * plane[0].normal.x + y * plane[0].normal.y + z * plane[0].normal.z + plane[0].d;
 		if (distance < -radius) return false;
@@ -167,17 +167,6 @@ public:
 		return true;
 	}
 
-	const Vec3& getCenter() const { return m_center; }
-	const Vec3& getPosition() const { return m_position; }
-	const Vec3& getDirection() const { return m_direction; }
-	const Vec3& getUp() const { return m_up; }
-	float getFOV() const { return m_fov; }
-	float getRatio() const { return m_ratio; }
-	float getNearDistance() const { return m_near_distance; }
-	float getFarDistance() const { return m_far_distance; }
-	float getRadius() const { return m_radius; }
-
-private:
 	enum class Sides : uint32
 	{
 		NEAR_PLANE,
@@ -189,17 +178,16 @@ private:
 		COUNT
 	};
 
-private:
-	Plane m_plane[(uint32)Sides::COUNT];
-	Vec3 m_center;
-	Vec3 m_position;
-	Vec3 m_direction;
-	Vec3 m_up;
-	float m_fov;
-	float m_ratio;
-	float m_near_distance;
-	float m_far_distance;
-	float m_radius;
+	Plane planes[(uint32)Sides::COUNT];
+	Vec3 center;
+	Vec3 position;
+	Vec3 direction;
+	Vec3 up;
+	float fov;
+	float ratio;
+	float near_distance;
+	float far_distance;
+	float radius;
 };
 
 

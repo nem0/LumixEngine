@@ -273,7 +273,6 @@ inline void checkTableArg(lua_State* L, int index)
 }
 
 
-
 template <int N> struct FunctionCaller
 {
 	template <typename R, typename... ArgsF, typename... Args>
