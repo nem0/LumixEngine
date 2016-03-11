@@ -1622,6 +1622,39 @@ public:
 	Engine& getEngine() const override { return m_engine; }
 
 
+	Entity getTerrainEntity(ComponentIndex cmp) override
+	{
+		return m_terrains[cmp]->getEntity();
+	}
+
+
+	Vec2 getTerrainResolution(ComponentIndex cmp) override
+	{
+		return Vec2((float)m_terrains[cmp]->getWidth(), (float)m_terrains[cmp]->getHeight());
+	}
+
+
+	ComponentIndex getFirstTerrain() override
+	{
+		if (m_terrains.empty()) return INVALID_COMPONENT;
+		for (int i = 0; i < m_terrains.size(); ++i)
+		{
+			if (m_terrains[i]) return i;
+		}
+		return INVALID_COMPONENT;
+	}
+
+
+	ComponentIndex getNextTerrain(ComponentIndex cmp) override
+	{
+		for (int i = cmp + 1; i < m_terrains.size(); ++i)
+		{
+			if (m_terrains[i]) return i;
+		}
+		return INVALID_COMPONENT;
+	}
+
+
 	ComponentIndex getTerrainComponent(Entity entity) override
 	{
 		for (int i = 0; i < m_terrains.size(); ++i)
