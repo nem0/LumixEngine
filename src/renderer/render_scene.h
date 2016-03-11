@@ -283,6 +283,10 @@ public:
 	virtual float getTerrainYScale(ComponentIndex cmp) = 0;
 	virtual void getTerrainSize(ComponentIndex cmp, float* width, float* height) = 0;
 	virtual ComponentIndex getTerrainComponent(Entity entity) = 0;
+	virtual Entity getTerrainEntity(ComponentIndex cmp) = 0;
+	virtual Vec2 getTerrainResolution(ComponentIndex cmp) = 0;
+	virtual ComponentIndex getFirstTerrain() = 0;
+	virtual ComponentIndex getNextTerrain(ComponentIndex cmp) = 0;
 
 	virtual bool isGrassEnabled() const = 0;
 	virtual int getGrassDistance(ComponentIndex cmp) = 0;

@@ -9,7 +9,9 @@
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "renderer/model.h"
+#include "renderer/material.h"
 #include "renderer/render_scene.h"
+#include "renderer/texture.h"
 #include "universe/universe.h"
 #include <cmath>
 #include <DetourAlloc.h>
@@ -22,6 +24,9 @@
 
 namespace Lumix
 {
+
+
+static const float SIZE = 64;
 
 
 struct NavigationSystem : public IPlugin
@@ -168,7 +173,68 @@ struct NavigationScene : public IScene
 
 	void rasterizeGeometry(rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
 	{
-		const float walkable_threshold = cosf(Math::degreesToRadians(30));
+		rasterizeMeshes(ctx, cfg, solid);
+		rasterizeTerrains(ctx, cfg, solid);
+	}
+
+
+	void rasterizeTerrains(rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
+	{
+		const float walkable_threshold = cosf(Math::degreesToRadians(60));
+
+		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		if (!render_scene) return;
+
+		ComponentIndex cmp = render_scene->getFirstTerrain();
+		while (cmp != INVALID_COMPONENT)
+		{
+			Entity entity = render_scene->getTerrainEntity(cmp);
+			Vec3 pos = m_universe.getPosition(entity);
+			Quat rot = m_universe.getRotation(entity);
+			Vec2 res = render_scene->getTerrainResolution(cmp);
+			float scaleXZ = render_scene->getTerrainXZScale(cmp);
+			for (int j = 0; j < (int)res.y - 1; ++j)
+			{
+				for (int i = 0; i < (int)res.x - 1; ++i)
+				{
+					float x = i * scaleXZ;
+					float z = j * scaleXZ;
+					float h0 = render_scene->getTerrainHeightAt(cmp, x, z);
+					Vec3 p0 = pos + rot * Vec3(x, h0, z);
+
+					x = (i + 1) * scaleXZ;
+					z = j * scaleXZ;
+					float h1 = render_scene->getTerrainHeightAt(cmp, x, z);
+					Vec3 p1 = pos + rot * Vec3(x, h1, z);
+
+					x = (i + 1) * scaleXZ;
+					z = (j + 1) * scaleXZ;
+					float h2 = render_scene->getTerrainHeightAt(cmp, x, z);
+					Vec3 p2 = pos + rot * Vec3(x, h2, z);
+
+					x = i * scaleXZ;
+					z = (j + 1) * scaleXZ;
+					float h3 = render_scene->getTerrainHeightAt(cmp, x, z);
+					Vec3 p3 = pos + rot * Vec3(x, h3, z);
+
+					Vec3 n = crossProduct(p1 - p0, p0 - p2).normalized();
+					uint8 area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
+					rcRasterizeTriangle(&ctx, &p0.x, &p1.x, &p2.x, area, solid);
+
+					n = crossProduct(p2 - p0, p0 - p3).normalized();
+					area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
+					rcRasterizeTriangle(&ctx, &p0.x, &p2.x, &p3.x, area, solid);
+				}
+			}
+			
+			cmp = render_scene->getNextTerrain(cmp);
+		}
+	}
+
+
+	void rasterizeMeshes(rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
+	{
+		const float walkable_threshold = cosf(Math::degreesToRadians(45));
 
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
@@ -180,19 +246,23 @@ struct NavigationScene : public IScene
 			ASSERT(model->isReady());
 
 			auto& indices = model->getIndices();
-			auto& vertices = model->getVertices();
 			Entity entity = render_scene->getRenderableEntity(renderable);
 			Matrix mtx = m_universe.getMatrix(entity);
 
-			for (int i = 0; i < indices.size(); i += 3)
+			for (int mesh_idx = 0; mesh_idx < model->getMeshCount(); ++mesh_idx)
 			{
-				Vec3 a = mtx.multiplyPosition(vertices[indices[i]]);
-				Vec3 b = mtx.multiplyPosition(vertices[indices[i + 1]]);
-				Vec3 c = mtx.multiplyPosition(vertices[indices[i + 2]]);
+				auto& mesh = model->getMesh(mesh_idx);
+				auto* vertices = &model->getVertices()[mesh.attribute_array_offset / mesh.vertex_def.getStride()];
+				for (int i = 0; i < mesh.indices_count; i += 3)
+				{
+					Vec3 a = mtx.multiplyPosition(vertices[indices[mesh.indices_offset + i]]);
+					Vec3 b = mtx.multiplyPosition(vertices[indices[mesh.indices_offset + i + 1]]);
+					Vec3 c = mtx.multiplyPosition(vertices[indices[mesh.indices_offset + i + 2]]);
 
-				Vec3 n = crossProduct(a - b, a - c).normalized();
-				uint8 area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
-				rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
+					Vec3 n = crossProduct(a - b, a - c).normalized();
+					uint8 area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
+					rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
+				}
 			}
 		}
 	}
@@ -255,7 +325,7 @@ struct NavigationScene : public IScene
 		if (!render_scene) return;
 		if (!m_debug_contours) return;
 
-		Vec3 orig(-256, -256, -256);
+		Vec3 orig(-SIZE, -SIZE, -SIZE);
 		float cs = m_debug_contours->cs;
 		float ch = m_debug_contours->ch;
 		for (int i = 0; i < m_debug_contours->nconts; ++i)
@@ -282,14 +352,17 @@ struct NavigationScene : public IScene
 
 	void debugDrawHeightfield()
 	{
+		static const int MAX_CUBES = 2 << 10;
+
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 		if (!m_debug_heightfield) return;
 
-		Vec3 orig(-256, -256, -256);
+		Vec3 orig(-SIZE, -SIZE, -SIZE);
 		int width = m_debug_heightfield->width;
 		float cell_size = 0.3f;
 		float cell_height = 0.1f;
+		int rendered_cubes = 0;
 		for(int z = 0; z < m_debug_heightfield->height; ++z)
 		{
 			for(int x = 0; x < width; ++x)
@@ -305,6 +378,8 @@ struct NavigationScene : public IScene
 					render_scene->addDebugCubeSolid(mins, maxs, 0xffff00ff, 0);
 					render_scene->addDebugCube(mins, maxs, 0xff00aaff, 0);
 					span = span->next;
+					++rendered_cubes;
+					if (rendered_cubes > MAX_CUBES) return;
 				}
 			}
 		}
@@ -313,6 +388,8 @@ struct NavigationScene : public IScene
 
 	void debugDrawCompactHeightfield()
 	{
+		static const int MAX_CUBES = 2 << 10;
+
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 		if (!m_debug_compact_heightfield) return;
@@ -321,8 +398,9 @@ struct NavigationScene : public IScene
 		const float cs = chf.cs;
 		const float ch = chf.ch;
 
-		Vec3 orig(-256, -256, -256);
+		Vec3 orig(-SIZE, -SIZE, -SIZE);
 
+		int rendered_cubes = 0;
 		for (int y = 0; y < chf.height; ++y)
 		{
 			for (int x = 0; x < chf.width; ++x)
@@ -339,6 +417,8 @@ struct NavigationScene : public IScene
 						Vec3(vx, vy, vz), Vec3(vx + cs, vy, vz + cs), Vec3(vx + cs, vy, vz), 0xffff00FF, 0);
 					render_scene->addDebugTriangle(
 						Vec3(vx, vy, vz), Vec3(vx, vy, vz + cs), Vec3(vx + cs, vy, vz + cs), 0xffff00FF, 0);
+					++rendered_cubes;
+					if (rendered_cubes > MAX_CUBES) return;
 				}
 			}
 		}
@@ -437,8 +517,8 @@ struct NavigationScene : public IScene
 		const float voxel_size = 0.3f;
 		const float agent_height = 2.0f;
 		const float agent_radius = 0.6f;
-		const float agent_max_step = 0.1f;
-		const float agent_max_climb = 0.3f;
+		const float agent_max_step = 0.9f;
+		const float agent_max_climb = 1.5f;
 		const float detail_sample_dist = 6;
 		const float max_edge_length = 12;
 		const int min_region_area = 64;
@@ -449,7 +529,7 @@ struct NavigationScene : public IScene
 		rcConfig cfg = {};
 		cfg.cs = voxel_size;
 		cfg.ch = voxel_height;
-		cfg.walkableSlopeAngle = 45.0f;
+		cfg.walkableSlopeAngle = 60.0f;
 		cfg.walkableHeight = (int)(agent_max_step / cfg.ch + 0.99f);
 		cfg.walkableClimb = (int)(agent_max_climb / cfg.ch);
 		cfg.walkableRadius = (int)(agent_radius / cfg.cs + 0.99f);
@@ -462,8 +542,8 @@ struct NavigationScene : public IScene
 		cfg.detailSampleMaxError = voxel_height * detail_sample_max_error;
 
 		rcContext ctx;
-		Vec3 bmin(-256, -256, -256);
-		Vec3 bmax(256, 256, 256);
+		Vec3 bmin(-SIZE, -SIZE, -SIZE);
+		Vec3 bmax(SIZE, SIZE, SIZE);
 		rcVcopy(cfg.bmin, &bmin.x);
 		rcVcopy(cfg.bmax, &bmax.x);
 		rcCalcGridSize(cfg.bmin, cfg.bmax, cfg.cs, &cfg.width, &cfg.height);

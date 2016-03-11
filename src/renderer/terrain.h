@@ -90,6 +90,8 @@ class Terrain
 		Path getGrassTypePath(int index);
 		Vec3 getScale() const { return m_scale; }
 		void getSize(float* width, float* height) const { ASSERT(width); ASSERT(height); *width = m_width * m_scale.x; *height = m_height * m_scale.z; }
+		int getWidth() const { return m_width; }
+		int getHeight() const { return m_height; }
 		int getGrassTypeGround(int index);
 		int getGrassTypeDensity(int index);
 		int getGrassTypeCount() const { return m_grass_types.size(); }
