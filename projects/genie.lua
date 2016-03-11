@@ -272,7 +272,7 @@ project "navigation"
 	files { "../src/navigation/**.h", "../src/navigation/**.cpp" }
 	includedirs { "../src", "../src/navigation", "../external/recast/include" }
 	includedirs { "../external/bgfx/include" }
-	links { "engine", "editor" }
+	links { "engine", "editor", "renderer" }
 	linkLib "recast"
 	
 	useLua()
