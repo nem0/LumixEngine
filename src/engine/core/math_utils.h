@@ -71,6 +71,30 @@ LUMIX_FORCE_INLINE T clamp(T value, T min_value, T max_value)
 	return minimum(maximum(value, min_value), max_value);
 }
 
+inline uint32 nextPow2(uint32 v)
+{
+	v--;
+	v |= v >> 1;
+	v |= v >> 2;
+	v |= v >> 4;
+	v |= v >> 8;
+	v |= v >> 16;
+	v++;
+	return v;
+}
+
+inline uint32 log2(uint32 v)
+{
+	uint32 r;
+	uint32 shift;
+	r = (v > 0xffff) << 4; v >>= r;
+	shift = (v > 0xff) << 3; v >>= shift; r |= shift;
+	shift = (v > 0xf) << 2; v >>= shift; r |= shift;
+	shift = (v > 0x3) << 1; v >>= shift; r |= shift;
+	r |= (v >> 1);
+	return r;
+}
+
 template <typename T> bool isPowOfTwo(T n)
 {
 	return (n) && !(n & (n - 1));
