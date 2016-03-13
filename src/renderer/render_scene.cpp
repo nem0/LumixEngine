@@ -1681,9 +1681,15 @@ public:
 	}
 
 
-	void getTerrainSize(ComponentIndex cmp, float* width, float* height) override
+	AABB getTerrainAABB(ComponentIndex cmp) override
 	{
-		m_terrains[cmp]->getSize(width, height);
+		return m_terrains[cmp]->getAABB();
+	}
+
+
+	Vec2 getTerrainSize(ComponentIndex cmp) override
+	{
+		return m_terrains[cmp]->getSize();
 	}
 
 
@@ -1835,6 +1841,23 @@ public:
 	}
 
 
+	static int LUA_castCameraRay(lua_State* L)
+	{
+		auto* scene = LuaWrapper::checkArg<RenderSceneImpl*>(L, 1);
+		const char* slot = LuaWrapper::checkArg<const char*>(L, 2);
+
+		ComponentIndex camera_cmp = scene->getCameraInSlot(slot);
+		Vec3 origin = scene->m_universe.getPosition(scene->m_cameras[camera_cmp].m_entity);
+		Quat rot = scene->m_universe.getRotation(scene->m_cameras[camera_cmp].m_entity);
+
+		RayCastModelHit hit = scene->castRay(origin, rot * Vec3(0, 0, -1), INVALID_COMPONENT);
+		LuaWrapper::pushLua(L, hit.m_is_hit);
+		LuaWrapper::pushLua(L, hit.m_is_hit ? hit.m_origin + hit.m_dir * hit.m_t : Vec3(0, 0, 0));
+
+		return 2;
+	}
+
+
 	static Texture* LUA_getMaterialTexture(Material* material, int texture_index)
 	{
 		if (!material) return nullptr;
@@ -1899,6 +1922,8 @@ public:
 		REGISTER_FUNCTION(getMaterialTexture);
 		REGISTER_FUNCTION(setRenderableMaterial);
 		REGISTER_FUNCTION(setRenderablePath);
+		
+		LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", LUA_castCameraRay);
 
 		#undef REGISTER_FUNCTION
 	}

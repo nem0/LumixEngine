@@ -12,6 +12,7 @@ namespace Lumix
 {
 
 
+struct AABB;
 class Frustum;
 struct GrassInfo;
 class IAllocator;
@@ -83,13 +84,14 @@ class Terrain
 		Entity getEntity() const { return m_entity; }
 		float getRootSize() const;
 		Vec3 getNormal(float x, float z);
-		float getHeight(float x, float z);
+		float getHeight(float x, float z) const;
 		float getXZScale() const { return m_scale.x; }
 		float getYScale() const { return m_scale.y; }
 		Mesh* getMesh() { return m_mesh; }
 		Path getGrassTypePath(int index);
 		Vec3 getScale() const { return m_scale; }
-		void getSize(float* width, float* height) const { ASSERT(width); ASSERT(height); *width = m_width * m_scale.x; *height = m_height * m_scale.z; }
+		Vec2 getSize() const { return Vec2(m_width * m_scale.x, m_height * m_scale.z); }
+		AABB getAABB() const;
 		int getWidth() const { return m_width; }
 		int getHeight() const { return m_height; }
 		int getGrassTypeGround(int index);
@@ -119,7 +121,7 @@ class Terrain
 	private: 
 		Array<Terrain::GrassQuad*>& getQuads(ComponentIndex camera);
 		TerrainQuad* generateQuadTree(float size);
-		float getHeight(int x, int z);
+		float getHeight(int x, int z) const;
 		void updateGrass(ComponentIndex camera);
 		void generateGrassTypeQuad(GrassPatch& patch,
 								   const Matrix& terrain_matrix,

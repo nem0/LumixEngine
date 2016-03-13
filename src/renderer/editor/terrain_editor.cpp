@@ -780,8 +780,6 @@ void TerrainEditor::drawCursor(Lumix::RenderScene& scene,
 		return;
 	}
 
-	float w, h;
-	scene.getTerrainSize(terrain.index, &w, &h);
 	float brush_size = m_terrain_brush_size;
 	Lumix::Vec3 local_center = getRelativePosition(center);
 	Lumix::Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix(m_component.entity);
@@ -1134,10 +1132,9 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 			m_terrain_brush_size);
 		auto& meshes = scene->getRenderableInfos(frustum, frustum.position);
 
-		float w, h;
-		scene->getTerrainSize(m_component.index, &w, &h);
+		Lumix::Vec2 size = scene->getTerrainSize(m_component.index);
 		float scale = 1.0f - Lumix::Math::maximum(0.01f, m_terrain_brush_strength);
-		for(int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f; ++i)
+		for (int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f; ++i)
 		{
 			int renderable_idx = Lumix::Math::rand() % tpls.size();
 			Lumix::Model* model = scene->getRenderableModel(tpls[renderable_idx].cmp);
@@ -1147,8 +1144,7 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 			float dist = Lumix::Math::randFloat(0, 1.0f) * m_terrain_brush_size;
 			Lumix::Vec3 pos(center.x + cos(angle) * dist, 0, center.z + sin(angle) * dist);
 			Lumix::Vec3 terrain_pos = inv_terrain_matrix.multiplyPosition(pos);
-			if(terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= w &&
-				terrain_pos.z <= h)
+			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= size.x && terrain_pos.z <= size.y)
 			{
 				pos.y = scene->getTerrainHeightAt(m_component.index, terrain_pos.x, terrain_pos.z);
 				pos.y += terrain_matrix.getTranslation().y;

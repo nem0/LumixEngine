@@ -2,9 +2,11 @@
 #include "core/array.h"
 #include "core/base_proxy_allocator.h"
 #include "core/crc32.h"
+#include "core/fs/os_file.h"
 #include "core/iallocator.h"
 #include "core/log.h"
 #include "core/lua_wrapper.h"
+#include "core/profiler.h"
 #include "core/vec.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
@@ -25,8 +27,8 @@
 namespace Lumix
 {
 
-
-static const float SIZE = 64;
+static const int CELLS_PER_TILE_SIDE = 256;
+static const float CELL_SIZE = 0.3f;
 
 
 struct NavigationSystem : public IPlugin
@@ -159,6 +161,9 @@ struct NavigationScene : public IScene
 		REGISTER_FUNCTION(debugDrawPaths);
 		REGISTER_FUNCTION(getPolygonCount);
 		REGISTER_FUNCTION(debugDrawContours);
+		REGISTER_FUNCTION(generateTile);
+		REGISTER_FUNCTION(save);
+		REGISTER_FUNCTION(load);
 
 		#undef REGISTER_FUNCTION
 	}
@@ -171,15 +176,16 @@ struct NavigationScene : public IScene
 	}
 
 
-	void rasterizeGeometry(rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
+	void rasterizeGeometry(const AABB& aabb, rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
 	{
-		rasterizeMeshes(ctx, cfg, solid);
-		rasterizeTerrains(ctx, cfg, solid);
+		rasterizeMeshes(aabb, ctx, cfg, solid);
+		rasterizeTerrains(aabb, ctx, cfg, solid);
 	}
 
 
-	void rasterizeTerrains(rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
+	void rasterizeTerrains(const AABB& aabb, rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
 	{
+		PROFILE_FUNCTION();
 		const float walkable_threshold = cosf(Math::degreesToRadians(60));
 
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
@@ -201,6 +207,10 @@ struct NavigationScene : public IScene
 					float z = j * scaleXZ;
 					float h0 = render_scene->getTerrainHeightAt(cmp, x, z);
 					Vec3 p0 = pos + rot * Vec3(x, h0, z);
+					if (p0.x < aabb.min.x - scaleXZ * 2) continue;
+					if (p0.x > aabb.max.x + scaleXZ * 2) continue;
+					if (p0.z < aabb.min.z - scaleXZ * 2) continue;
+					if (p0.z > aabb.max.z + scaleXZ * 2) continue;
 
 					x = (i + 1) * scaleXZ;
 					z = j * scaleXZ;
@@ -232,12 +242,14 @@ struct NavigationScene : public IScene
 	}
 
 
-	void rasterizeMeshes(rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
+	void rasterizeMeshes(const AABB& aabb, rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
 	{
+		PROFILE_FUNCTION();
 		const float walkable_threshold = cosf(Math::degreesToRadians(45));
 
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
+
 		for (auto renderable = render_scene->getFirstRenderable(); renderable != INVALID_COMPONENT;
 			 renderable = render_scene->getNextRenderable(renderable))
 		{
@@ -248,6 +260,9 @@ struct NavigationScene : public IScene
 			auto& indices = model->getIndices();
 			Entity entity = render_scene->getRenderableEntity(renderable);
 			Matrix mtx = m_universe.getMatrix(entity);
+			AABB model_aabb = model->getAABB();
+			model_aabb.transform(mtx);
+			if (!model_aabb.overlaps(aabb)) continue;
 
 			for (int mesh_idx = 0; mesh_idx < model->getMeshCount(); ++mesh_idx)
 			{
@@ -325,7 +340,7 @@ struct NavigationScene : public IScene
 		if (!render_scene) return;
 		if (!m_debug_contours) return;
 
-		Vec3 orig(-SIZE, -SIZE, -SIZE);
+		Vec3 orig = m_debug_tile_origin;
 		float cs = m_debug_contours->cs;
 		float ch = m_debug_contours->ch;
 		for (int i = 0; i < m_debug_contours->nconts; ++i)
@@ -350,6 +365,73 @@ struct NavigationScene : public IScene
 	}
 
 
+	bool load(const char* path)
+	{
+		clear();
+
+		FS::OsFile file;
+		if (!file.open(path, FS::Mode::OPEN_AND_READ, m_allocator)) return false;
+
+		if (!initNavmesh()) return false;
+
+		file.read(&m_aabb, sizeof(m_aabb));
+		file.read(&m_num_tiles_x, sizeof(m_num_tiles_x));
+		file.read(&m_num_tiles_z, sizeof(m_num_tiles_z));
+		dtNavMeshParams params;
+		file.read(&params, sizeof(params));
+		if (dtStatusFailed(m_navmesh->init(&params)))
+		{
+			g_log_error.log("Navigation") << "Could not init Detour navmesh";
+			return false;
+		}
+		for (int j = 0; j < m_num_tiles_z; ++j)
+		{
+			for (int i = 0; i < m_num_tiles_x; ++i)
+			{
+				int data_size;
+				file.read(&data_size, sizeof(data_size));
+				uint8* data = (uint8*)dtAlloc(data_size, DT_ALLOC_PERM);
+				file.read(data, data_size);
+				if (dtStatusFailed(m_navmesh->addTile(data, data_size, DT_TILE_FREE_DATA, 0, 0)))
+				{
+					dtFree(data);
+					return false;
+				}
+			}
+		}
+
+		file.close();
+		return true;
+	}
+
+	
+	bool save(const char* path)
+	{
+		if (!m_navmesh) return false;
+
+		FS::OsFile file;
+		if (!file.open(path, FS::Mode::CREATE | FS::Mode::WRITE, m_allocator)) return false;
+
+		file.write(&m_aabb, sizeof(m_aabb));
+		file.write(&m_num_tiles_x, sizeof(m_num_tiles_x));
+		file.write(&m_num_tiles_z, sizeof(m_num_tiles_z));
+		auto params = m_navmesh->getParams();
+		file.write(params, sizeof(*params));
+		for (int j = 0; j < m_num_tiles_z; ++j)
+		{
+			for (int i = 0; i < m_num_tiles_x; ++i)
+			{
+				const auto* tile = m_navmesh->getTileAt(i, j, 0);
+				file.write(&tile->dataSize, sizeof(tile->dataSize));
+				file.write(tile->data, tile->dataSize);
+			}
+		}
+
+		file.close();
+		return true;
+	}
+
+
 	void debugDrawHeightfield()
 	{
 		static const int MAX_CUBES = 2 << 10;
@@ -358,7 +440,7 @@ struct NavigationScene : public IScene
 		if (!render_scene) return;
 		if (!m_debug_heightfield) return;
 
-		Vec3 orig(-SIZE, -SIZE, -SIZE);
+		Vec3 orig = m_debug_tile_origin;
 		int width = m_debug_heightfield->width;
 		float cell_size = 0.3f;
 		float cell_height = 0.1f;
@@ -389,7 +471,7 @@ struct NavigationScene : public IScene
 	void debugDrawCompactHeightfield()
 	{
 		static const int MAX_CUBES = 2 << 10;
-
+		
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 		if (!m_debug_compact_heightfield) return;
@@ -398,7 +480,7 @@ struct NavigationScene : public IScene
 		const float cs = chf.cs;
 		const float ch = chf.ch;
 
-		Vec3 orig(-SIZE, -SIZE, -SIZE);
+		Vec3 orig = m_debug_tile_origin;
 
 		int rendered_cubes = 0;
 		for (int y = 0; y < chf.height; ++y)
@@ -469,6 +551,7 @@ struct NavigationScene : public IScene
 
 	void navigate(Entity entity, const Vec3& dest, float speed)
 	{
+		if (!m_navquery) return;
 		if (entity == INVALID_ENTITY) return;
 
 		auto& path = m_paths.emplace();
@@ -488,10 +571,16 @@ struct NavigationScene : public IScene
 		m_navquery->findNearestPoly(&dest.x, ext, &filter, &end_poly_ref, 0);
 		m_navquery->findPath(
 			start_poly_ref, end_poly_ref, &start_pos.x, &dest.x, &filter, path_poly_ref, &path_count, 256);
+		if (!path_count) return;
+		Vec3 final_dest = dest;
+		if (path_poly_ref[path_count - 1] != end_poly_ref)
+		{
+			m_navquery->closestPointOnPoly(path_poly_ref[path_count - 1], &dest.x, &final_dest.x, 0);
+		}
 		dtPolyRef frefs[256];
 		unsigned char fflags[256];
 		m_navquery->findStraightPath(&start_pos.x,
-			&dest.x,
+			&final_dest.x,
 			path_poly_ref,
 			path_count,
 			&path.vertices[0].x,
@@ -509,9 +598,11 @@ struct NavigationScene : public IScene
 	}
 
 
-	bool generateNavmesh()
+	bool generateTile(int x, int z, bool keep_data)
 	{
-		clear();
+		PROFILE_FUNCTION();
+		if (!m_navmesh) return false;
+		m_navmesh->removeTile(m_navmesh->getTileRefAt(x, z, 0), 0, 0);
 
 		const float voxel_height = 0.1f;
 		const float voxel_size = 0.3f;
@@ -540,15 +631,24 @@ struct NavigationScene : public IScene
 		cfg.maxVertsPerPoly = max_verts_per_poly;
 		cfg.detailSampleDist = detail_sample_dist < 0.9f ? 0 : voxel_size * detail_sample_dist;
 		cfg.detailSampleMaxError = voxel_height * detail_sample_max_error;
+		cfg.borderSize = int(1.5f + agent_radius / voxel_size);
+		cfg.tileSize = CELLS_PER_TILE_SIDE;
+		cfg.width = cfg.tileSize + cfg.borderSize * 2;
+		cfg.height = cfg.tileSize + cfg.borderSize * 2;
 
 		rcContext ctx;
-		Vec3 bmin(-SIZE, -SIZE, -SIZE);
-		Vec3 bmax(SIZE, SIZE, SIZE);
+		
+		Vec3 bmin = m_aabb.min;
+		bmin.x += x * CELLS_PER_TILE_SIDE * CELL_SIZE - cfg.borderSize * cfg.cs;
+		bmin.z += z * CELLS_PER_TILE_SIDE * CELL_SIZE - cfg.borderSize * cfg.cs;
+		if (keep_data) m_debug_tile_origin = bmin;
+		Vec3 bmax(bmin.x + CELLS_PER_TILE_SIDE * CELL_SIZE + cfg.borderSize * cfg.cs
+			, m_aabb.max.y
+			, bmin.z + CELLS_PER_TILE_SIDE * CELL_SIZE + cfg.borderSize * cfg.cs);
 		rcVcopy(cfg.bmin, &bmin.x);
 		rcVcopy(cfg.bmax, &bmax.x);
-		rcCalcGridSize(cfg.bmin, cfg.bmax, cfg.cs, &cfg.width, &cfg.height);
 		rcHeightfield* solid = rcAllocHeightfield();
-		m_debug_heightfield = solid;
+		m_debug_heightfield = keep_data ? solid : nullptr;
 		if (!solid)
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Out of memory 'solid'.";
@@ -559,14 +659,14 @@ struct NavigationScene : public IScene
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not create solid heightfield.";
 			return false;
 		}
-		rasterizeGeometry(ctx, cfg, *solid);
+		rasterizeGeometry(AABB(bmin, bmax), ctx, cfg, *solid);
 
 		rcFilterLowHangingWalkableObstacles(&ctx, cfg.walkableClimb, *solid);
 		rcFilterLedgeSpans(&ctx, cfg.walkableHeight, cfg.walkableClimb, *solid);
 		rcFilterWalkableLowHeightSpans(&ctx, cfg.walkableHeight, *solid);
 
 		rcCompactHeightfield* chf = rcAllocCompactHeightfield();
-		m_debug_compact_heightfield = chf;
+		m_debug_compact_heightfield = keep_data ? chf : nullptr;
 		if (!chf)
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Out of memory 'chf'.";
@@ -593,14 +693,14 @@ struct NavigationScene : public IScene
 			return false;
 		}
 
-		if (!rcBuildRegions(&ctx, *chf, 0, cfg.minRegionArea, cfg.mergeRegionArea))
+		if (!rcBuildRegions(&ctx, *chf, cfg.borderSize, cfg.minRegionArea, cfg.mergeRegionArea))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not build regions.";
 			return false;
 		}
 
 		rcContourSet* cset = rcAllocContourSet();
-		m_debug_contours = cset;
+		m_debug_contours = keep_data ? cset : nullptr;
 		if (!cset)
 		{
 			ctx.log(RC_LOG_ERROR, "Could not generate navmesh: Out of memory 'cset'.");
@@ -664,44 +764,122 @@ struct NavigationScene : public IScene
 		params.walkableHeight = (float)cfg.walkableHeight;
 		params.walkableRadius = (float)cfg.walkableRadius;
 		params.walkableClimb = (float)cfg.walkableClimb;
+		params.tileX = x;
+		params.tileY = z;
 		rcVcopy(params.bmin, m_polymesh->bmin);
 		rcVcopy(params.bmax, m_polymesh->bmax);
 		params.cs = cfg.cs;
 		params.ch = cfg.ch;
-		params.buildBvTree = true;
+		params.buildBvTree = false;
 
 		if (!dtCreateNavMeshData(&params, &nav_data, &nav_data_size))
 		{
 			g_log_error.log("Navigation") << "Could not build Detour navmesh.";
 			return false;
 		}
+		if (dtStatusFailed(m_navmesh->addTile(nav_data, nav_data_size, DT_TILE_FREE_DATA, 0, nullptr)))
+		{
+			g_log_error.log("Navigation") << "Could not add Detour tile.";
+			return false;
+		}
+		return true;
+	}
 
+
+	void computeAABB()
+	{
+		m_aabb.set(Vec3(0, 0, 0), Vec3(0, 0, 0));
+		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		if (!render_scene) return;
+
+		for (auto renderable = render_scene->getFirstRenderable(); renderable != INVALID_COMPONENT;
+			renderable = render_scene->getNextRenderable(renderable))
+		{
+			auto* model = render_scene->getRenderableModel(renderable);
+			if (!model) continue;
+			ASSERT(model->isReady());
+
+			AABB model_bb = model->getAABB();
+			Matrix mtx = m_universe.getMatrix(render_scene->getRenderableEntity(renderable));
+			model_bb.transform(mtx);
+			m_aabb.merge(model_bb);
+		}
+
+		ComponentIndex cmp = render_scene->getFirstTerrain();
+		while (cmp != INVALID_COMPONENT)
+		{
+			AABB terrain_aabb = render_scene->getTerrainAABB(cmp);
+			Matrix mtx = m_universe.getMatrix(render_scene->getTerrainEntity(cmp));
+			terrain_aabb.transform(mtx);
+			m_aabb.merge(terrain_aabb);
+
+			cmp = render_scene->getNextTerrain(cmp);
+		}
+	}
+
+
+	bool initNavmesh()
+	{
 		m_navmesh = dtAllocNavMesh();
 		if (!m_navmesh)
 		{
-			dtFree(nav_data);
 			g_log_error.log("Navigation") << "Could not create Detour navmesh";
 			return false;
 		}
 
-		dtStatus status;
-
-		status = m_navmesh->init(nav_data, nav_data_size, DT_TILE_FREE_DATA);
-		if (dtStatusFailed(status))
+		m_navquery = dtAllocNavMeshQuery();
+		if (!m_navquery)
 		{
-			dtFree(nav_data);
-			g_log_error.log("Navigation") << "Could not init Detour navmesh";
+			g_log_error.log("Navigation") << "Could not create Detour navmesh query";
 			return false;
 		}
-
-		m_navquery = dtAllocNavMeshQuery();
-		status = m_navquery->init(m_navmesh, 2048);
-		if (dtStatusFailed(status))
+		if (dtStatusFailed(m_navquery->init(m_navmesh, 2048)))
 		{
 			g_log_error.log("Navigation") << "Could not init Detour navmesh query";
 			return false;
 		}
+		return true;
+	}
 
+
+	bool generateNavmesh()
+	{
+		PROFILE_FUNCTION();
+		int cells_per_tile_side = 256;
+		float cell_size = 0.3f;
+
+		clear();
+
+		if (!initNavmesh()) return false;
+
+		computeAABB();
+		dtNavMeshParams params;
+		rcVcopy(params.orig, &m_aabb.min.x);
+		params.tileWidth = float(cells_per_tile_side * cell_size);
+		params.tileHeight = float(cells_per_tile_side * cell_size);
+		int grid_width, grid_height;
+		rcCalcGridSize(&m_aabb.min.x, &m_aabb.max.x, cell_size, &grid_width, &grid_height);
+		m_num_tiles_x = (grid_width + cells_per_tile_side - 1) / cells_per_tile_side;
+		m_num_tiles_z = (grid_height + cells_per_tile_side - 1) / cells_per_tile_side;
+		params.maxTiles = m_num_tiles_x * m_num_tiles_z;
+		params.maxPolys = 1 << 12;
+
+		if (dtStatusFailed(m_navmesh->init(&params)))
+		{
+			g_log_error.log("Navigation") << "Could not init Detour navmesh";
+			return false;
+		}
+
+		for (int j = 0; j < m_num_tiles_z; ++j)
+		{
+			for (int i = 0; i < m_num_tiles_x; ++i)
+			{
+				if (!generateTile(i, j, false))
+				{
+					return false;
+				}
+			}
+		}
 		return true;
 	}
 
@@ -727,6 +905,10 @@ struct NavigationScene : public IScene
 	rcCompactHeightfield* m_debug_compact_heightfield;
 	rcHeightfield* m_debug_heightfield;
 	rcContourSet* m_debug_contours;
+	Vec3 m_debug_tile_origin;
+	AABB m_aabb;
+	int m_num_tiles_x;
+	int m_num_tiles_z;
 };
 
 

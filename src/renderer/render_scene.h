@@ -9,6 +9,7 @@
 namespace Lumix
 {
 
+struct AABB;
 class Engine;
 class Frustum;
 class IAllocator;
@@ -281,7 +282,8 @@ public:
 	virtual float getTerrainXZScale(ComponentIndex cmp) = 0;
 	virtual void setTerrainYScale(ComponentIndex cmp, float scale) = 0;
 	virtual float getTerrainYScale(ComponentIndex cmp) = 0;
-	virtual void getTerrainSize(ComponentIndex cmp, float* width, float* height) = 0;
+	virtual Vec2 getTerrainSize(ComponentIndex cmp) = 0;
+	virtual AABB getTerrainAABB(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getTerrainComponent(Entity entity) = 0;
 	virtual Entity getTerrainEntity(ComponentIndex cmp) = 0;
 	virtual Vec2 getTerrainResolution(ComponentIndex cmp) = 0;

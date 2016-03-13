@@ -1460,7 +1460,7 @@ public:
 				aabb.merge(entity_aabb);
 			}
 
-			scene->addDebugCube(aabb.getMin(), aabb.getMax(), 0xffffff00, 0);
+			scene->addDebugCube(aabb.min, aabb.max, 0xffffff00, 0);
 			return;
 		}
 
