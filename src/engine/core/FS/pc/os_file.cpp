@@ -98,6 +98,13 @@ size_t OsFile::size()
 	return ::GetFileSize(m_impl->m_file, 0);
 }
 
+bool OsFile::fileExists(const char* path)
+{
+	DWORD dwAttrib = GetFileAttributes(path);
+	return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
+		!(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
+
 size_t OsFile::pos()
 {
 	ASSERT(nullptr != m_impl);
