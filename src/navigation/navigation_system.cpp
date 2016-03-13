@@ -442,21 +442,20 @@ struct NavigationScene : public IScene
 
 		Vec3 orig = m_debug_tile_origin;
 		int width = m_debug_heightfield->width;
-		float cell_size = 0.3f;
 		float cell_height = 0.1f;
 		int rendered_cubes = 0;
 		for(int z = 0; z < m_debug_heightfield->height; ++z)
 		{
 			for(int x = 0; x < width; ++x)
 			{
-				float fx = orig.x + x * cell_size;
-				float fz = orig.z + z * cell_size;
+				float fx = orig.x + x * CELL_SIZE;
+				float fz = orig.z + z * CELL_SIZE;
 				const rcSpan* span = m_debug_heightfield->spans[x + z * width];
 				while(span)
 				{
 					char atype = span->area;
 					Vec3 mins(fx, orig.y + span->smin * cell_height, fz);
-					Vec3 maxs(fx + cell_size, orig.y + span->smax * cell_height, fz + cell_size);
+					Vec3 maxs(fx + CELL_SIZE, orig.y + span->smax * cell_height, fz + CELL_SIZE);
 					render_scene->addDebugCubeSolid(mins, maxs, 0xffff00ff, 0);
 					render_scene->addDebugCube(mins, maxs, 0xff00aaff, 0);
 					span = span->next;
@@ -605,7 +604,6 @@ struct NavigationScene : public IScene
 		m_navmesh->removeTile(m_navmesh->getTileRefAt(x, z, 0), 0, 0);
 
 		const float voxel_height = 0.1f;
-		const float voxel_size = 0.3f;
 		const float agent_height = 2.0f;
 		const float agent_radius = 0.6f;
 		const float agent_max_step = 0.9f;
@@ -618,33 +616,33 @@ struct NavigationScene : public IScene
 		const float detail_sample_max_error = 1;
 
 		rcConfig cfg = {};
-		cfg.cs = voxel_size;
+		cfg.cs = CELL_SIZE;
 		cfg.ch = voxel_height;
 		cfg.walkableSlopeAngle = 60.0f;
 		cfg.walkableHeight = (int)(agent_max_step / cfg.ch + 0.99f);
 		cfg.walkableClimb = (int)(agent_max_climb / cfg.ch);
 		cfg.walkableRadius = (int)(agent_radius / cfg.cs + 0.99f);
-		cfg.maxEdgeLen = (int)(max_edge_length / voxel_size);
+		cfg.maxEdgeLen = (int)(max_edge_length / cfg.cs);
 		cfg.maxSimplificationError = 1.3f;
 		cfg.minRegionArea = min_region_area;
 		cfg.mergeRegionArea = merge_region_area;
 		cfg.maxVertsPerPoly = max_verts_per_poly;
-		cfg.detailSampleDist = detail_sample_dist < 0.9f ? 0 : voxel_size * detail_sample_dist;
+		cfg.detailSampleDist = detail_sample_dist < 0.9f ? 0 : CELL_SIZE * detail_sample_dist;
 		cfg.detailSampleMaxError = voxel_height * detail_sample_max_error;
-		cfg.borderSize = int(1.5f + agent_radius / voxel_size);
+		cfg.borderSize = cfg.walkableRadius + 3;
 		cfg.tileSize = CELLS_PER_TILE_SIDE;
 		cfg.width = cfg.tileSize + cfg.borderSize * 2;
 		cfg.height = cfg.tileSize + cfg.borderSize * 2;
 
 		rcContext ctx;
-		
-		Vec3 bmin = m_aabb.min;
-		bmin.x += x * CELLS_PER_TILE_SIDE * CELL_SIZE - cfg.borderSize * cfg.cs;
-		bmin.z += z * CELLS_PER_TILE_SIDE * CELL_SIZE - cfg.borderSize * cfg.cs;
+
+		Vec3 bmin(m_aabb.min.x + x * CELLS_PER_TILE_SIDE * CELL_SIZE - (1 + cfg.borderSize) * cfg.cs,
+			m_aabb.min.y,
+			m_aabb.min.z + z * CELLS_PER_TILE_SIDE * CELL_SIZE - (1 + cfg.borderSize) * cfg.cs);
+		Vec3 bmax(bmin.x + CELLS_PER_TILE_SIDE * CELL_SIZE + (1 + cfg.borderSize) * cfg.cs,
+			m_aabb.max.y,
+			bmin.z + CELLS_PER_TILE_SIDE * CELL_SIZE + (1 + cfg.borderSize) * cfg.cs);
 		if (keep_data) m_debug_tile_origin = bmin;
-		Vec3 bmax(bmin.x + CELLS_PER_TILE_SIDE * CELL_SIZE + cfg.borderSize * cfg.cs
-			, m_aabb.max.y
-			, bmin.z + CELLS_PER_TILE_SIDE * CELL_SIZE + cfg.borderSize * cfg.cs);
 		rcVcopy(cfg.bmin, &bmin.x);
 		rcVcopy(cfg.bmax, &bmax.x);
 		rcHeightfield* solid = rcAllocHeightfield();
@@ -845,9 +843,6 @@ struct NavigationScene : public IScene
 	bool generateNavmesh()
 	{
 		PROFILE_FUNCTION();
-		int cells_per_tile_side = 256;
-		float cell_size = 0.3f;
-
 		clear();
 
 		if (!initNavmesh()) return false;
@@ -855,14 +850,15 @@ struct NavigationScene : public IScene
 		computeAABB();
 		dtNavMeshParams params;
 		rcVcopy(params.orig, &m_aabb.min.x);
-		params.tileWidth = float(cells_per_tile_side * cell_size);
-		params.tileHeight = float(cells_per_tile_side * cell_size);
+		params.tileWidth = float(CELLS_PER_TILE_SIDE * CELL_SIZE);
+		params.tileHeight = float(CELLS_PER_TILE_SIDE * CELL_SIZE);
 		int grid_width, grid_height;
-		rcCalcGridSize(&m_aabb.min.x, &m_aabb.max.x, cell_size, &grid_width, &grid_height);
-		m_num_tiles_x = (grid_width + cells_per_tile_side - 1) / cells_per_tile_side;
-		m_num_tiles_z = (grid_height + cells_per_tile_side - 1) / cells_per_tile_side;
+		rcCalcGridSize(&m_aabb.min.x, &m_aabb.max.x, CELL_SIZE, &grid_width, &grid_height);
+		m_num_tiles_x = (grid_width + CELLS_PER_TILE_SIDE - 1) / CELLS_PER_TILE_SIDE;
+		m_num_tiles_z = (grid_height + CELLS_PER_TILE_SIDE - 1) / CELLS_PER_TILE_SIDE;
 		params.maxTiles = m_num_tiles_x * m_num_tiles_z;
-		params.maxPolys = 1 << 12;
+		int tiles_bits = Math::log2(Math::nextPow2(params.maxTiles));
+		params.maxPolys = 1 << (22 - tiles_bits); // keep 10 bits for salt
 
 		if (dtStatusFailed(m_navmesh->init(&params)))
 		{
