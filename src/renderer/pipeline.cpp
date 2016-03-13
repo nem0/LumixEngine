@@ -1806,6 +1806,10 @@ struct PipelineImpl : public Pipeline
 			InstanceData& data = m_instances_data[instance_idx];
 			if (!data.buffer)
 			{
+				if (!bgfx::checkAvailInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix)))
+				{
+					return;
+				}
 				data.buffer =
 					bgfx::allocInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
 				data.instance_count = 0;
@@ -1920,6 +1924,10 @@ struct PipelineImpl : public Pipeline
 				finishInstances(instance_idx);
 			}
 			InstanceData& data = m_instances_data[instance_idx];
+			if (!bgfx::checkAvailInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix)))
+			{
+				return;
+			}
 			data.buffer =
 				bgfx::allocInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
 			data.instance_count = 0;
