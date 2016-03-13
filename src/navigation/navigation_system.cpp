@@ -250,6 +250,7 @@ struct NavigationScene : public IScene
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 
+		uint32 no_navigation_flag = Material::getCustomFlag("no_navigation");
 		for (auto renderable = render_scene->getFirstRenderable(); renderable != INVALID_COMPONENT;
 			 renderable = render_scene->getNextRenderable(renderable))
 		{
@@ -264,9 +265,11 @@ struct NavigationScene : public IScene
 			model_aabb.transform(mtx);
 			if (!model_aabb.overlaps(aabb)) continue;
 
-			for (int mesh_idx = 0; mesh_idx < model->getMeshCount(); ++mesh_idx)
+			auto lod = model->getLODMeshIndices(0);
+			for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx)
 			{
 				auto& mesh = model->getMesh(mesh_idx);
+				if (mesh.material->isCustomFlag(no_navigation_flag)) continue;
 				auto* vertices = &model->getVertices()[mesh.attribute_array_offset / mesh.vertex_def.getStride()];
 				for (int i = 0; i < mesh.indices_count; i += 3)
 				{

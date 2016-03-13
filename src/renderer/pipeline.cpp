@@ -2100,6 +2100,8 @@ struct PipelineImpl : public Pipeline
 
 	void renderGrass(const GrassInfo& grass)
 	{
+		if (!bgfx::checkAvailInstanceDataBuffer(grass.m_matrix_count, sizeof(Matrix))) return;
+
 		const bgfx::InstanceDataBuffer* idb =
 			bgfx::allocInstanceDataBuffer(grass.m_matrix_count, sizeof(Matrix));
 		copyMemory(idb->data, &grass.m_matrices[0], grass.m_matrix_count * sizeof(Matrix));
