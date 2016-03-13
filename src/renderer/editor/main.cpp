@@ -37,6 +37,7 @@
 #include "shader_editor.h"
 #include "shader_compiler.h"
 #include "terrain_editor.h"
+#include <cmath>
 
 
 using namespace Lumix;
@@ -480,7 +481,12 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 			{
 				ImGui::PushID(i);
 				ImGui::Text("%d", i); ImGui::NextColumn();
-				ImGui::DragFloat("", &lods[i].distance); ImGui::NextColumn();
+				float dist = sqrt(lods[i].distance);
+				if (ImGui::DragFloat("", &dist))
+				{
+					lods[i].distance = dist * dist;
+				}
+				ImGui::NextColumn();
 				ImGui::Text("%d", lods[i].to_mesh - lods[i].from_mesh + 1); ImGui::NextColumn();
 				++lod_count;
 				ImGui::PopID();

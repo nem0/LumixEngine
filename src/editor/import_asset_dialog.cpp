@@ -1302,6 +1302,7 @@ struct ConvertTask : public Lumix::MT::Task
 			if (lod < 0 || lod >= Lumix::lengthOf(lods)) break;
 			lods[lod] = i;
 			factors[lod] = getMeshLODFactor(m_filtered_meshes[i]);
+			factors[lod] *= factors[lod];
 			lod_count = Lumix::Math::maximum(lod_count, lod + 1);
 		}
 
@@ -1579,7 +1580,7 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 		++last;
 		if (last < mesh_name + 4) FLT_MAX;
-		if (Lumix::compareStringN(last - 4, "_LOD", 4) != 0) return FLT_MAX;
+		if (Lumix::compareIStringN(last - 4, "_LOD", 4) != 0) return FLT_MAX;
 		const char* end_of_factor = last - 4;
 		const char* begin_factor = end_of_factor - 1;
 		if (begin_factor <= mesh_name) return FLT_MAX;
@@ -1614,7 +1615,7 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 		++last;
 		if (last < mesh_name + 4) return -1;
-		if (Lumix::compareStringN(last - 4, "_LOD", 4) != 0) return -1;
+		if (Lumix::compareIStringN(last - 4, "_LOD", 4) != 0) return -1;
 
 		int lod;
 		Lumix::fromCString(last, len - int(last - mesh_name), &lod);
