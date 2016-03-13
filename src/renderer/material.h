@@ -81,6 +81,13 @@ public:
 	bool hasDefine(uint8 define_idx) const;
 	bool isDefined(uint8 define_idx) const;
 
+	void setCustomFlag(uint32 flag) { m_custom_flags |= flag; }
+	void unsetCustomFlag(uint32 flag) { m_custom_flags &= ~flag; }
+	bool isCustomFlag(uint32 flag) const { return (m_custom_flags & flag) == flag; }
+
+	static uint32 getCustomFlag(const char* flag_name);
+	static const char* getCustomFlagName(int index);
+
 private:
 	void onBeforeReady() override;
 	void unload(void) override;
@@ -89,6 +96,7 @@ private:
 	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);
 	void deserializeUniforms(JsonSerializer& serializer);
 	void deserializeDefines(JsonSerializer& serializer);
+	void deserializeCustomFlags(JsonSerializer& serializer);
 
 private:
 	static const int MAX_TEXTURE_COUNT = 16;
@@ -107,6 +115,7 @@ private:
 	uint32 m_define_mask;
 	uint8* m_command_buffer;
 	int m_layer_count;
+	uint32 m_custom_flags;
 };
 
 } // ~namespace Lumix

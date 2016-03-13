@@ -273,7 +273,14 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 				}
 			}
 		}
-		ImGui::Columns(1);
+		for (int i = 0; i < 32; ++i)
+		{
+			if (material->isCustomFlag(1 << i))
+			{
+				ImGui::LabelText("Custom flag", Material::getCustomFlagName(i));
+			}
+		}
+
 		return true;
 	}
 
