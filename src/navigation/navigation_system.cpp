@@ -116,6 +116,7 @@ struct NavigationScene : public IScene
 		m_debug_compact_heightfield = nullptr;
 		m_debug_heightfield = nullptr;
 		m_debug_contours = nullptr;
+		setGeneratorParams(0.3f, 0.1f, 0.3f, 2.0f, 60.0f, 1.5f);
 	}
 
 
@@ -164,6 +165,7 @@ struct NavigationScene : public IScene
 		REGISTER_FUNCTION(generateTile);
 		REGISTER_FUNCTION(save);
 		REGISTER_FUNCTION(load);
+		REGISTER_FUNCTION(setGeneratorParams);
 
 		#undef REGISTER_FUNCTION
 	}
@@ -600,54 +602,53 @@ struct NavigationScene : public IScene
 	}
 
 
+	void setGeneratorParams(float cell_size,
+		float cell_height,
+		float agent_radius,
+		float agent_height,
+		float walkable_angle,
+		float max_climb)
+	{
+		static const float DETAIL_SAMPLE_DIST = 6;
+		static const float DETAIL_SAMPLE_MAX_ERROR = 1;
+
+		m_config.cs = cell_size;
+		m_config.ch = cell_height;
+		m_config.walkableSlopeAngle = walkable_angle;
+		m_config.walkableHeight = (int)(agent_height / m_config.ch + 0.99f);
+		m_config.walkableClimb = (int)(max_climb / m_config.ch);
+		m_config.walkableRadius = (int)(agent_radius / m_config.cs + 0.99f);
+		m_config.maxEdgeLen = (int)(12 / m_config.cs);
+		m_config.maxSimplificationError = 1.3f;
+		m_config.minRegionArea = 8 * 8;
+		m_config.mergeRegionArea = 20 * 20;
+		m_config.maxVertsPerPoly = 6;
+		m_config.detailSampleDist = DETAIL_SAMPLE_DIST < 0.9f ? 0 : CELL_SIZE * DETAIL_SAMPLE_DIST;
+		m_config.detailSampleMaxError = m_config.ch * DETAIL_SAMPLE_MAX_ERROR;
+		m_config.borderSize = m_config.walkableRadius + 3;
+		m_config.tileSize = CELLS_PER_TILE_SIDE;
+		m_config.width = m_config.tileSize + m_config.borderSize * 2;
+		m_config.height = m_config.tileSize + m_config.borderSize * 2;
+	}
+
+
 	bool generateTile(int x, int z, bool keep_data)
 	{
 		PROFILE_FUNCTION();
 		if (!m_navmesh) return false;
 		m_navmesh->removeTile(m_navmesh->getTileRefAt(x, z, 0), 0, 0);
 
-		const float voxel_height = 0.1f;
-		const float agent_height = 2.0f;
-		const float agent_radius = 0.6f;
-		const float agent_max_step = 0.9f;
-		const float agent_max_climb = 1.5f;
-		const float detail_sample_dist = 6;
-		const float max_edge_length = 12;
-		const int min_region_area = 64;
-		const int merge_region_area = 400;
-		const int max_verts_per_poly = 6;
-		const float detail_sample_max_error = 1;
-
-		rcConfig cfg = {};
-		cfg.cs = CELL_SIZE;
-		cfg.ch = voxel_height;
-		cfg.walkableSlopeAngle = 60.0f;
-		cfg.walkableHeight = (int)(agent_max_step / cfg.ch + 0.99f);
-		cfg.walkableClimb = (int)(agent_max_climb / cfg.ch);
-		cfg.walkableRadius = (int)(agent_radius / cfg.cs + 0.99f);
-		cfg.maxEdgeLen = (int)(max_edge_length / cfg.cs);
-		cfg.maxSimplificationError = 1.3f;
-		cfg.minRegionArea = min_region_area;
-		cfg.mergeRegionArea = merge_region_area;
-		cfg.maxVertsPerPoly = max_verts_per_poly;
-		cfg.detailSampleDist = detail_sample_dist < 0.9f ? 0 : CELL_SIZE * detail_sample_dist;
-		cfg.detailSampleMaxError = voxel_height * detail_sample_max_error;
-		cfg.borderSize = cfg.walkableRadius + 3;
-		cfg.tileSize = CELLS_PER_TILE_SIDE;
-		cfg.width = cfg.tileSize + cfg.borderSize * 2;
-		cfg.height = cfg.tileSize + cfg.borderSize * 2;
-
 		rcContext ctx;
 
-		Vec3 bmin(m_aabb.min.x + x * CELLS_PER_TILE_SIDE * CELL_SIZE - (1 + cfg.borderSize) * cfg.cs,
+		Vec3 bmin(m_aabb.min.x + x * CELLS_PER_TILE_SIDE * CELL_SIZE - (1 + m_config.borderSize) * m_config.cs,
 			m_aabb.min.y,
-			m_aabb.min.z + z * CELLS_PER_TILE_SIDE * CELL_SIZE - (1 + cfg.borderSize) * cfg.cs);
-		Vec3 bmax(bmin.x + CELLS_PER_TILE_SIDE * CELL_SIZE + (1 + cfg.borderSize) * cfg.cs,
+			m_aabb.min.z + z * CELLS_PER_TILE_SIDE * CELL_SIZE - (1 + m_config.borderSize) * m_config.cs);
+		Vec3 bmax(bmin.x + CELLS_PER_TILE_SIDE * CELL_SIZE + (1 + m_config.borderSize) * m_config.cs,
 			m_aabb.max.y,
-			bmin.z + CELLS_PER_TILE_SIDE * CELL_SIZE + (1 + cfg.borderSize) * cfg.cs);
+			bmin.z + CELLS_PER_TILE_SIDE * CELL_SIZE + (1 + m_config.borderSize) * m_config.cs);
 		if (keep_data) m_debug_tile_origin = bmin;
-		rcVcopy(cfg.bmin, &bmin.x);
-		rcVcopy(cfg.bmax, &bmax.x);
+		rcVcopy(m_config.bmin, &bmin.x);
+		rcVcopy(m_config.bmax, &bmax.x);
 		rcHeightfield* solid = rcAllocHeightfield();
 		m_debug_heightfield = keep_data ? solid : nullptr;
 		if (!solid)
@@ -655,26 +656,26 @@ struct NavigationScene : public IScene
 			g_log_error.log("Navigation") << "Could not generate navmesh: Out of memory 'solid'.";
 			return false;
 		}
-		if (!rcCreateHeightfield(&ctx, *solid, cfg.width, cfg.height, cfg.bmin, cfg.bmax, cfg.cs, cfg.ch))
+		if(!rcCreateHeightfield(&ctx, *solid, m_config.width, m_config.height, m_config.bmin, m_config.bmax, m_config.cs, m_config.ch))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not create solid heightfield.";
 			return false;
 		}
-		rasterizeGeometry(AABB(bmin, bmax), ctx, cfg, *solid);
+		rasterizeGeometry(AABB(bmin, bmax), ctx, m_config, *solid);
 
-		rcFilterLowHangingWalkableObstacles(&ctx, cfg.walkableClimb, *solid);
-		rcFilterLedgeSpans(&ctx, cfg.walkableHeight, cfg.walkableClimb, *solid);
-		rcFilterWalkableLowHeightSpans(&ctx, cfg.walkableHeight, *solid);
+		rcFilterLowHangingWalkableObstacles(&ctx, m_config.walkableClimb, *solid);
+		rcFilterLedgeSpans(&ctx, m_config.walkableHeight, m_config.walkableClimb, *solid);
+		rcFilterWalkableLowHeightSpans(&ctx, m_config.walkableHeight, *solid);
 
 		rcCompactHeightfield* chf = rcAllocCompactHeightfield();
 		m_debug_compact_heightfield = keep_data ? chf : nullptr;
-		if (!chf)
+		if(!chf)
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Out of memory 'chf'.";
 			return false;
 		}
 
-		if (!rcBuildCompactHeightfield(&ctx, cfg.walkableHeight, cfg.walkableClimb, *solid, *chf))
+		if(!rcBuildCompactHeightfield(&ctx, m_config.walkableHeight, m_config.walkableClimb, *solid, *chf))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not build compact data.";
 			return false;
@@ -682,19 +683,19 @@ struct NavigationScene : public IScene
 
 		if(!m_debug_heightfield) rcFreeHeightField(solid);
 
-		if (!rcErodeWalkableArea(&ctx, cfg.walkableRadius, *chf))
+		if(!rcErodeWalkableArea(&ctx, m_config.walkableRadius, *chf))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not erode.";
 			return false;
 		}
 
-		if (!rcBuildDistanceField(&ctx, *chf))
+		if(!rcBuildDistanceField(&ctx, *chf))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not build distance field.";
 			return false;
 		}
 
-		if (!rcBuildRegions(&ctx, *chf, cfg.borderSize, cfg.minRegionArea, cfg.mergeRegionArea))
+		if(!rcBuildRegions(&ctx, *chf, m_config.borderSize, m_config.minRegionArea, m_config.mergeRegionArea))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not build regions.";
 			return false;
@@ -702,37 +703,37 @@ struct NavigationScene : public IScene
 
 		rcContourSet* cset = rcAllocContourSet();
 		m_debug_contours = keep_data ? cset : nullptr;
-		if (!cset)
+		if(!cset)
 		{
 			ctx.log(RC_LOG_ERROR, "Could not generate navmesh: Out of memory 'cset'.");
 			return false;
 		}
-		if (!rcBuildContours(&ctx, *chf, cfg.maxSimplificationError, cfg.maxEdgeLen, *cset))
+		if(!rcBuildContours(&ctx, *chf, m_config.maxSimplificationError, m_config.maxEdgeLen, *cset))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not create contours.";
 			return false;
 		}
 
 		m_polymesh = rcAllocPolyMesh();
-		if (!m_polymesh)
+		if(!m_polymesh)
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Out of memory 'm_polymesh'.";
 			return false;
 		}
-		if (!rcBuildPolyMesh(&ctx, *cset, cfg.maxVertsPerPoly, *m_polymesh))
+		if(!rcBuildPolyMesh(&ctx, *cset, m_config.maxVertsPerPoly, *m_polymesh))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not triangulate contours.";
 			return false;
 		}
 
 		m_detail_mesh = rcAllocPolyMeshDetail();
-		if (!m_detail_mesh)
+		if(!m_detail_mesh)
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Out of memory 'pmdtl'.";
 			return false;
 		}
 
-		if (!rcBuildPolyMeshDetail(&ctx, *m_polymesh, *chf, cfg.detailSampleDist, cfg.detailSampleMaxError, *m_detail_mesh))
+		if(!rcBuildPolyMeshDetail(&ctx, *m_polymesh, *chf, m_config.detailSampleDist, m_config.detailSampleMaxError, *m_detail_mesh))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not build detail mesh.";
 			return false;
@@ -744,7 +745,7 @@ struct NavigationScene : public IScene
 		unsigned char* nav_data = 0;
 		int nav_data_size = 0;
 
-		for (int i = 0; i < m_polymesh->npolys; ++i)
+		for(int i = 0; i < m_polymesh->npolys; ++i)
 		{
 			m_polymesh->flags[i] = m_polymesh->areas[i] == RC_WALKABLE_AREA ? 1 : 0;
 		}
@@ -762,23 +763,23 @@ struct NavigationScene : public IScene
 		params.detailVertsCount = m_detail_mesh->nverts;
 		params.detailTris = m_detail_mesh->tris;
 		params.detailTriCount = m_detail_mesh->ntris;
-		params.walkableHeight = (float)cfg.walkableHeight;
-		params.walkableRadius = (float)cfg.walkableRadius;
-		params.walkableClimb = (float)cfg.walkableClimb;
+		params.walkableHeight = (float)m_config.walkableHeight;
+		params.walkableRadius = (float)m_config.walkableRadius;
+		params.walkableClimb = (float)m_config.walkableClimb;
 		params.tileX = x;
 		params.tileY = z;
 		rcVcopy(params.bmin, m_polymesh->bmin);
 		rcVcopy(params.bmax, m_polymesh->bmax);
-		params.cs = cfg.cs;
-		params.ch = cfg.ch;
+		params.cs = m_config.cs;
+		params.ch = m_config.ch;
 		params.buildBvTree = false;
 
-		if (!dtCreateNavMeshData(&params, &nav_data, &nav_data_size))
+		if(!dtCreateNavMeshData(&params, &nav_data, &nav_data_size))
 		{
 			g_log_error.log("Navigation") << "Could not build Detour navmesh.";
 			return false;
 		}
-		if (dtStatusFailed(m_navmesh->addTile(nav_data, nav_data_size, DT_TILE_FREE_DATA, 0, nullptr)))
+		if(dtStatusFailed(m_navmesh->addTile(nav_data, nav_data_size, DT_TILE_FREE_DATA, 0, nullptr)))
 		{
 			g_log_error.log("Navigation") << "Could not add Detour tile.";
 			return false;
@@ -906,6 +907,7 @@ struct NavigationScene : public IScene
 	rcContourSet* m_debug_contours;
 	Vec3 m_debug_tile_origin;
 	AABB m_aabb;
+	rcConfig m_config;
 	int m_num_tiles_x;
 	int m_num_tiles_z;
 };
