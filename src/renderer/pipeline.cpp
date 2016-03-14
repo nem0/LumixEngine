@@ -1632,6 +1632,20 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	float getCPUTime() const override
+	{
+		auto* stats = bgfx::getStats();
+		return float(double(stats->cpuTimeEnd - stats->cpuTimeBegin) / (double)stats->cpuTimerFreq);
+	}
+
+
+	float getGPUTime() const override
+	{
+		auto* stats = bgfx::getStats();
+		return float(double(stats->gpuTimeEnd - stats->gpuTimeBegin) / (double)stats->gpuTimerFreq);
+	}
+
+
 	void drawQuad(float x, float y, float w, float h, int material_index)
 	{
 		Material* material = m_materials[material_index];
