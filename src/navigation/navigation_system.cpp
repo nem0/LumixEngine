@@ -185,6 +185,18 @@ struct NavigationScene : public IScene
 	}
 
 
+	AABB getTerrainSpaceAABB(const Vec3& terrain_pos, const Quat& terrain_rot, const AABB& aabb_world_space)
+	{
+		Matrix mtx;
+		terrain_rot.toMatrix(mtx);
+		mtx.setTranslation(terrain_pos);
+		mtx.fastInverse();
+		AABB ret = aabb_world_space;
+		ret.transform(mtx);
+		return ret;
+	}
+
+
 	void rasterizeTerrains(const AABB& aabb, rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
 	{
 		PROFILE_FUNCTION();
@@ -201,18 +213,19 @@ struct NavigationScene : public IScene
 			Quat rot = m_universe.getRotation(entity);
 			Vec2 res = render_scene->getTerrainResolution(cmp);
 			float scaleXZ = render_scene->getTerrainXZScale(cmp);
-			for (int j = 0; j < (int)res.y - 1; ++j)
+			AABB terrain_space_aabb = getTerrainSpaceAABB(pos, rot, aabb);
+			int from_z = (int)Math::clamp(terrain_space_aabb.min.z / scaleXZ - 1, 0.0f, res.y - 1);
+			int to_z = (int)Math::clamp(terrain_space_aabb.max.z / scaleXZ + 1, 0.0f, res.y - 1);
+			int from_x = (int)Math::clamp(terrain_space_aabb.min.x / scaleXZ - 1, 0.0f, res.x - 1);
+			int to_x = (int)Math::clamp(terrain_space_aabb.max.x / scaleXZ + 1, 0.0f, res.x - 1);
+			for (int j = from_z; j < to_z; ++j)
 			{
-				for (int i = 0; i < (int)res.x - 1; ++i)
+				for (int i = from_x; i < to_x; ++i)
 				{
 					float x = i * scaleXZ;
 					float z = j * scaleXZ;
 					float h0 = render_scene->getTerrainHeightAt(cmp, x, z);
 					Vec3 p0 = pos + rot * Vec3(x, h0, z);
-					if (p0.x < aabb.min.x - scaleXZ * 2) continue;
-					if (p0.x > aabb.max.x + scaleXZ * 2) continue;
-					if (p0.z < aabb.min.z - scaleXZ * 2) continue;
-					if (p0.z > aabb.max.z + scaleXZ * 2) continue;
 
 					x = (i + 1) * scaleXZ;
 					z = j * scaleXZ;
@@ -238,7 +251,7 @@ struct NavigationScene : public IScene
 					rcRasterizeTriangle(&ctx, &p0.x, &p2.x, &p3.x, area, solid);
 				}
 			}
-			
+
 			cmp = render_scene->getNextTerrain(cmp);
 		}
 	}
