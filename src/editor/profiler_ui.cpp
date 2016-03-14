@@ -45,12 +45,11 @@ struct ProfilerUIImpl : public ProfilerUI
 		, m_opened_files(allocator)
 		, m_device(allocator)
 		, m_engine(engine)
+		, m_threads(allocator)
 	{
-		m_viewed_thread_id = 0;
 		m_allocation_size_from = 0;
 		m_allocation_size_to = 1024 * 1024;
 		m_current_frame = -1;
-		m_root = nullptr;
 		m_is_opened = false;
 		m_is_paused = true;
 		m_current_block = nullptr;
@@ -420,8 +419,14 @@ struct ProfilerUIImpl : public ProfilerUI
 		Lumix::Debug::StackNode* external_node, size_t size);
 	void saveResourceList();
 
+	struct Thread
+	{
+		Block* root;
+		bool opened;
+	};
+
 	Lumix::DefaultAllocator m_allocator;
-	Block* m_root;
+	Lumix::Array<Thread> m_threads;
 	Block* m_current_block;
 	Lumix::Debug::Allocator& m_main_allocator;
 	Lumix::ResourceManager& m_resource_manager;
@@ -429,7 +434,6 @@ struct ProfilerUIImpl : public ProfilerUI
 	int m_allocation_size_from;
 	int m_allocation_size_to;
 	int m_current_frame;
-	int m_viewed_thread_id;
 	bool m_is_paused;
 	char m_filter[100];
 	char m_resource_filter[100];
@@ -533,21 +537,44 @@ void ProfilerUIImpl::onFrame()
 	if (!m_is_opened) return;
 	if (m_is_paused) return;
 
-	auto* root = Lumix::Profiler::getRootBlock(m_viewed_thread_id);
-	if (!m_root && root)
+	int thread_count = Lumix::Profiler::getThreadCount();
+	for (int i = 0; i < thread_count; ++i)
 	{
-		m_root = new Block(m_allocator);
-		m_root->m_name = Lumix::Profiler::getBlockName(root);
-		m_root->m_parent = nullptr;
-		m_root->m_next = nullptr;
-		m_root->m_first_child = nullptr;
+		Lumix::uint32 thread_id = Lumix::Profiler::getThreadID(i);
+		auto* root = Lumix::Profiler::getRootBlock(thread_id);
+		if (m_threads.size() <= i)
+		{
+			if (!root)
+			{
+				auto& thread = m_threads.emplace();
+				thread.root = nullptr;
+				thread.opened = false;
+			}
+			else
+			{
+				auto* my_root = new Block(m_allocator);
+				my_root->m_name = Lumix::Profiler::getBlockName(root);
+				my_root->m_parent = nullptr;
+				my_root->m_next = nullptr;
+				my_root->m_first_child = nullptr;
+				auto& thread = m_threads.emplace();
+				thread.root = my_root;
+				thread.opened = false;
+			}
+		}
+		if (!m_threads[i].root && root)
+		{
+			auto* my_root = new Block(m_allocator);
+			my_root->m_name = Lumix::Profiler::getBlockName(root);
+			my_root->m_parent = nullptr;
+			my_root->m_next = nullptr;
+			my_root->m_first_child = nullptr;
+			m_threads[i].root = my_root;
+		}
+		ASSERT(!root || m_threads[i].root->m_name == Lumix::Profiler::getBlockName(root));
+
+		if (m_threads[i].root) cloneBlock(m_threads[i].root, root);
 	}
-	else
-	{
-		ASSERT(!root || m_root->m_name == Lumix::Profiler::getBlockName(root));
-	}
-	
-	if (m_root) cloneBlock(m_root, root);
 }
 
 
@@ -914,45 +941,60 @@ void ProfilerUIImpl::onGUIMemoryProfiler()
 }
 
 
+static void showThreadColumn(ProfilerUIImpl& profiler, Column column)
+{
+	for (int i = 0; i < profiler.m_threads.size(); ++i)
+	{
+		auto* root = profiler.m_threads[i].root;
+		Lumix::uint32 thread_id = Lumix::Profiler::getThreadID(i);
+		const char* thread_name = Lumix::Profiler::getThreadName(thread_id);
+		if (column != NAME)
+		{
+			ImGui::Dummy(ImVec2(10, ImGui::GetTextLineHeight()));
+			if (profiler.m_threads[i].opened)
+			{
+				profiler.showProfileBlock(root, column);
+			}
+		}
+		else
+		{
+			if (ImGui::TreeNode(root, thread_name))
+			{
+				profiler.m_threads[i].opened = true;
+				profiler.showProfileBlock(root, column);
+				ImGui::TreePop();
+			}
+			else
+			{
+				profiler.m_threads[i].opened = false;
+			}
+		}
+	}
+	ImGui::NextColumn();
+}
+
+
 void ProfilerUIImpl::onGUICPUProfiler()
 {
 	if (!ImGui::CollapsingHeader("CPU")) return;
 
-	if (ImGui::Checkbox("Pause", &m_is_paused))
-	{
-		if (m_viewed_thread_id == 0 && !m_root)
-		{
-			m_viewed_thread_id = Lumix::Profiler::getThreadID(0);
-		}
-	}
+	ImGui::Checkbox("Pause", &m_is_paused);
 	
 	auto thread_getter = [](void* data, int index, const char** out) -> bool {
 		auto id = Lumix::Profiler::getThreadID(index);
 		*out = Lumix::Profiler::getThreadName(id); 
 		return true;
 	};
-	int thread_idx = Lumix::Profiler::getThreadIndex(m_viewed_thread_id);
-	ImGui::SameLine();
-	if (ImGui::Combo("Thread", &thread_idx, thread_getter, nullptr, Lumix::Profiler::getThreadCount()))
-	{
-		m_viewed_thread_id = Lumix::Profiler::getThreadID(thread_idx);
-		LUMIX_DELETE(m_allocator, m_root);
-		m_root = nullptr;
-		m_current_frame = -1;
-	}
 
-	if (!m_root) return;
+	if (m_threads.empty()) return;
 
 	ImGui::Columns(3, "cpuc");
-	showProfileBlock(m_root, NAME);
-	ImGui::NextColumn();
-	showProfileBlock(m_root, TIME);
-	ImGui::NextColumn();
-	showProfileBlock(m_root, HIT_COUNT);
-	ImGui::NextColumn();
+	showThreadColumn(*this, NAME);
+	showThreadColumn(*this, TIME);
+	showThreadColumn(*this, HIT_COUNT);
 	ImGui::Columns(1);
 
-	auto* block = m_current_block ? m_current_block : m_root;
+	auto* block = m_current_block ? m_current_block : m_threads[0].root;
 	float width = ImGui::GetWindowContentRegionWidth();
 	int count = Lumix::Math::minimum(int(width / 5), block->m_int_values.size());
 	int offset = block->m_int_values.size() - count;
