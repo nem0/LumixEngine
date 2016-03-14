@@ -278,6 +278,8 @@ void SceneView::onGUI()
 			ImGui::LabelText("Triangles", buf);
 			ImGui::LabelText("Resolution", "%dx%d", m_pipeline->getWidth(), m_pipeline->getHeight());
 			ImGui::LabelText("FPS", "%.2f", m_editor->getEngine().getFPS());
+			ImGui::LabelText("CPU time", "%.2f", m_pipeline->getCPUTime() * 1000.0f);
+			ImGui::LabelText("GPU time", "%.2f", m_pipeline->getGPUTime() * 1000.0f);
 		}
 		ImGui::End();
 		ImGui::PopStyleColor();
