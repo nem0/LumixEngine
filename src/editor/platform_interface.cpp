@@ -310,9 +310,11 @@ namespace PlatformInterface
 			case WM_SIZE:
 			{
 				RECT rect;
+				RECT screen_rect;
+				GetWindowRect(g_platform_data.m_hwnd, &screen_rect);
 				GetClientRect(g_platform_data.m_hwnd, &rect);
 				g_platform_data.m_handler->onWindowTransformed(
-					rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
+					screen_rect.left, screen_rect.top, rect.right - rect.left, rect.bottom - rect.top);
 			}
 			break;
 			case WM_CLOSE: PostQuitMessage(0); break;
