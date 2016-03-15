@@ -22,7 +22,7 @@ struct Block
 		float m_start;
 	};
 
-	
+
 	explicit Block(IAllocator& allocator)
 		: allocator(allocator)
 		, m_hits(allocator)
@@ -99,6 +99,18 @@ Block* getBlockFirstChild(Block* block)
 Block* getBlockNext(Block* block)
 {
 	return block->m_next;
+}
+
+
+float getBlockHitStart(Block* block, int hit_index)
+{
+		return block->m_hits[hit_index].m_start;
+}
+
+
+float getBlockHitLength(Block* block, int hit_index)
+{
+	return block->m_hits[hit_index].m_length;
 }
 
 
@@ -322,6 +334,12 @@ int getThreadCount()
 }
 
 
+float now()
+{
+	return g_instance.timer->getTimeSinceStart();
+}
+
+
 Block* getRootBlock(uint32 thread_id)
 {
 	auto iter = g_instance.threads.find(thread_id);
@@ -345,8 +363,7 @@ void endBlock()
 
 	ASSERT(thread_data->current_block);
 	float now = g_instance.timer->getTimeSinceStart();
-	thread_data->current_block->m_hits.back().m_length =
-		1000.0f * (now - thread_data->current_block->m_hits.back().m_start);
+	thread_data->current_block->m_hits.back().m_length = now - thread_data->current_block->m_hits.back().m_start;
 	thread_data->current_block = thread_data->current_block->m_parent;
 }
 

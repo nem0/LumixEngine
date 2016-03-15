@@ -17,4 +17,6 @@ public:
 	static void destroy(ProfilerUI& ui);
 
 	bool m_is_opened;
+	float m_frame_start;
+	float m_frame_end;
 };
