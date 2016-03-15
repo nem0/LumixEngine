@@ -701,9 +701,6 @@ void IntervalGraph(const float* value_pairs, int value_pairs_count, float scale_
 
 
 	float graph_length = scele_max - scale_min;
-
-	RenderFrame(frame_bb.Min, frame_bb.Max, GetColorU32(ImGuiCol_FrameBg), true, style.FrameRounding);
-
 	const ImU32 col_base = GetColorU32(ImGuiCol_PlotHistogram);
 
 	for (int i = 0; i < value_pairs_count; ++i)
