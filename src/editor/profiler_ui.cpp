@@ -25,7 +25,8 @@ enum Column
 {
 	NAME,
 	TIME,
-	HIT_COUNT
+	HIT_COUNT,
+	HITS
 };
 
 
@@ -53,6 +54,7 @@ struct ProfilerUIImpl : public ProfilerUI
 		m_is_opened = false;
 		m_is_paused = true;
 		m_current_block = nullptr;
+		m_frame_start = m_frame_end = 0;
 		Lumix::Profiler::getFrameListeners().bind<ProfilerUIImpl, &ProfilerUIImpl::onFrame>(this);
 		m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(m_allocator);
 		m_allocation_root->m_stack_node = nullptr;
@@ -242,27 +244,33 @@ struct ProfilerUIImpl : public ProfilerUI
 
 		ImGui::InputText("filter###fs_filter", m_filter, Lumix::lengthOf(m_filter));
 
-		if (ImGui::Button("Clear")) m_logs.clear();
+		if(ImGui::Button("Clear")) m_logs.clear();
 
-		if (ImGui::BeginChild("list"))
+		if(ImGui::BeginChild("list"))
 		{
 			ImGui::Columns(3);
 			ImGui::Text("File");
 			ImGui::NextColumn();
-			
+
 			const char* duration_label = "Duration (ms)";
-			if (m_sort_order == TIME_ASC) duration_label = "Duration (ms) < ";
-			else if (m_sort_order == TIME_DESC) duration_label = "Duration (ms) >";
+			if (m_sort_order == TIME_ASC)
+			{
+				duration_label = "Duration (ms) < ";
+			}
+			else if (m_sort_order == TIME_DESC)
+			{
+				duration_label = "Duration (ms) >";
+			}
 			if (ImGui::Selectable(duration_label))
 			{
 				sortByDuration();
 			}
 			ImGui::NextColumn();
-			
+
 			const char* bytes_read_label = "Bytes read (kB)";
-			if (m_sort_order == BYTES_READ_ASC) bytes_read_label = "Bytes read (kB) <";
-			else if (m_sort_order == BYTES_READ_DESC) bytes_read_label = "Bytes read (kB) >";
-			if (ImGui::Selectable(bytes_read_label))
+			if(m_sort_order == BYTES_READ_ASC) bytes_read_label = "Bytes read (kB) <";
+			else if(m_sort_order == BYTES_READ_DESC) bytes_read_label = "Bytes read (kB) >";
+			if(ImGui::Selectable(bytes_read_label))
 			{
 				sortByBytesRead();
 			}
@@ -368,6 +376,12 @@ struct ProfilerUIImpl : public ProfilerUI
 		bool m_is_opened;
 		Lumix::Profiler::BlockType m_type;
 		Lumix::Array<float> m_frames;
+		struct Hit
+		{
+			float start;
+			float length;
+		};
+		Lumix::Array<Hit> m_hits;
 		Lumix::Array<int> m_int_values; // hit count in case of m_type == TIME
 	};
 
@@ -454,7 +468,7 @@ struct ProfilerUIImpl : public ProfilerUI
 void ProfilerUIImpl::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_block)
 {
 	ASSERT(my_block->m_name == Lumix::Profiler::getBlockName(remote_block));
-
+	my_block->m_hits.clear();
 	my_block->m_type = Lumix::Profiler::getBlockType(remote_block);
 	switch (my_block->m_type)
 	{
@@ -469,6 +483,14 @@ void ProfilerUIImpl::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_
 			ASSERT(false);
 			break;
 	}
+	my_block->m_hits.resize(Lumix::Profiler::getBlockHitCount(remote_block));
+	for(int i = 0, c = my_block->m_hits.size(); i < c; ++i)
+	{
+		auto& hit = my_block->m_hits[i];
+		hit.start = Lumix::Profiler::getBlockHitStart(remote_block, i);
+		hit.length = Lumix::Profiler::getBlockHitLength(remote_block, i);
+	}
+
 	if (my_block->m_frames.size() > MAX_FRAMES)
 	{
 		my_block->m_frames.erase(0);
@@ -537,6 +559,8 @@ void ProfilerUIImpl::onFrame()
 	if (!m_is_opened) return;
 	if (m_is_paused) return;
 
+	m_frame_start = m_frame_end;
+	m_frame_end = Lumix::Profiler::now();
 	int thread_count = Lumix::Profiler::getThreadCount();
 	for (int i = 0; i < thread_count; ++i)
 	{
@@ -611,7 +635,7 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 						auto frame = m_current_frame < 0 ? block->m_frames.back()
 														 : block->m_frames[m_current_frame];
 						if (ImGui::Selectable(
-								StringBuilder<50>("") << frame << "###t" << (Lumix::int64)block,
+								StringBuilder<50>("") << frame * 1000.0f << "###t" << (Lumix::int64)block,
 								m_current_block == block))
 						{
 							m_current_block = block;
@@ -640,7 +664,6 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 						break;
 				}
 
-
 				block = block->m_next;
 			}
 			return;
@@ -649,8 +672,8 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 			{
 				while (block)
 				{
-					int hit_count = m_current_frame < 0 ? block->m_int_values.back()
-						: block->m_int_values[m_current_frame];
+					int hit_count =
+						m_current_frame < 0 ? block->m_int_values.back() : block->m_int_values[m_current_frame];
 
 					ImGui::Text("%d", hit_count);
 					if (block->m_is_opened)
@@ -662,6 +685,26 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 				}
 			}
 			return;
+		case HITS:
+			while(block)
+			{
+				if (block->m_hits.empty())
+				{
+					ImGui::Dummy(ImVec2(10, ImGui::GetTextLineHeight()));
+				}
+				else
+				{
+					ImGui::IntervalGraph(&block->m_hits[0].start, block->m_hits.size(), m_frame_start, m_frame_end);
+				}
+				if(block->m_is_opened)
+				{
+					showProfileBlock(block->m_first_child, column);
+				}
+
+				block = block->m_next;
+			}
+			return;
+		default: ASSERT(false); return;
 	}
 }
 
@@ -696,10 +739,10 @@ void ProfilerUIImpl::saveResourceList()
 				Lumix::toCString(res->size() / 1024.0f, tmp, Lumix::lengthOf(tmp), 3);
 				file.write(tmp, Lumix::stringLength(tmp));
 				file.write("KB, ", 4);
-				
+
 				const char* state = getResourceStateString(res->getState());
 				file.write(state, Lumix::stringLength(state));
-				
+
 				file.write(", ", 4);
 				Lumix::toCString(res->getRefCount(), tmp, Lumix::lengthOf(tmp));
 				file.write(tmp, Lumix::stringLength(tmp));
@@ -781,7 +824,6 @@ void ProfilerUIImpl::onGUIResources()
 		ImGui::NextColumn();
 
 		ImGui::Columns(1);
-		
 	}
 
 	static int saved_displayed = 0;
@@ -979,19 +1021,20 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	if (!ImGui::CollapsingHeader("CPU")) return;
 
 	ImGui::Checkbox("Pause", &m_is_paused);
-	
+
 	auto thread_getter = [](void* data, int index, const char** out) -> bool {
 		auto id = Lumix::Profiler::getThreadID(index);
-		*out = Lumix::Profiler::getThreadName(id); 
+		*out = Lumix::Profiler::getThreadName(id);
 		return true;
 	};
 
 	if (m_threads.empty()) return;
 
-	ImGui::Columns(3, "cpuc");
+	ImGui::Columns(4, "cpuc");
 	showThreadColumn(*this, NAME);
 	showThreadColumn(*this, TIME);
 	showThreadColumn(*this, HIT_COUNT);
+	showThreadColumn(*this, HITS);
 	ImGui::Columns(1);
 
 	auto* block = m_current_block ? m_current_block : m_threads[0].root;
@@ -1036,6 +1079,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 ProfilerUIImpl::Block::Block(Lumix::IAllocator& allocator)
 	: m_frames(allocator)
+	, m_hits(allocator)
 	, m_int_values(allocator)
 	, m_is_opened(false)
 {
