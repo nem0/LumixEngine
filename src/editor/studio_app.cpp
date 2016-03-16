@@ -510,12 +510,6 @@ public:
 				doMenuItem(getAction("save"), false, !m_editor->isGameMode());
 				doMenuItem(getAction("saveAs"), false, !m_editor->isGameMode());
 				doMenuItem(getAction("exit"), false, true);
-				ImGui::Separator();
-				if(ImGui::MenuItem("Pack data"))
-				{
-					packData();
-				}
-
 				ImGui::EndMenu();
 			}
 
@@ -592,6 +586,7 @@ public:
 				doMenuItem(getAction("autosnapDown"), m_editor->getGizmo().isAutosnapDown(), true);
 				if (ImGui::MenuItem("Save commands")) saveUndoStack();
 				if (ImGui::MenuItem("Load commands")) loadAndExecuteCommands();
+				if (ImGui::MenuItem("Pack data")) packData();
 				ImGui::EndMenu();
 			}
 
@@ -1107,18 +1102,19 @@ public:
 
 	static bool includeFileInPack(const char* filename)
 	{
-		if(filename[0] == '.') return false;
-		if(Lumix::compareStringN("bin/", filename, 4) == 0) return false;
-		if(Lumix::compareStringN("bin32/", filename, 4) == 0) return false;
+		if (filename[0] == '.') return false;
+		if (Lumix::compareStringN("bin/", filename, 4) == 0) return false;
+		if (Lumix::compareStringN("bin32/", filename, 4) == 0) return false;
+		if (Lumix::compareString("data.pak", filename) == 0) return false;
 		return true;
 	}
 
 
 	static bool includeDirInPack(const char* filename)
 	{
-		if(filename[0] == '.') return false;
-		if(Lumix::compareStringN("bin", filename, 4) == 0) return false;
-		if(Lumix::compareStringN("bin32", filename, 4) == 0) return false;
+		if (filename[0] == '.') return false;
+		if (Lumix::compareStringN("bin", filename, 4) == 0) return false;
+		if (Lumix::compareStringN("bin32", filename, 4) == 0) return false;
 		return true;
 	}
 
