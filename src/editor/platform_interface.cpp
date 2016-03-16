@@ -705,6 +705,17 @@ namespace PlatformInterface
 	}
 
 
+	size_t getFileSize(const char* path)
+	{
+		WIN32_FILE_ATTRIBUTE_DATA fad;
+		if(!GetFileAttributesEx(path, GetFileExInfoStandard, &fad))	return -1; 
+		LARGE_INTEGER size;
+		size.HighPart = fad.nFileSizeHigh;
+		size.LowPart = fad.nFileSizeLow;
+		return (size_t)size.QuadPart;
+	}
+
+
 	bool fileExists(const char* path)
 	{
 		DWORD dwAttrib = GetFileAttributes(path);

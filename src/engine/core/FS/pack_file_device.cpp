@@ -26,7 +26,7 @@ public:
 	bool open(const Path& path, Mode mode) override
 	{
 		m_file = m_device.m_files[path.getHash()];
-		return m_device.m_file.seek(SeekMode::BEGIN, m_file.offset) == m_file.offset;
+		return m_device.m_file.seek(SeekMode::BEGIN, (size_t)m_file.offset) == (size_t)m_file.offset;
 	}
 
 
@@ -34,7 +34,8 @@ public:
 	{
 		if (m_device.m_offset != m_file.offset + m_local_offset)
 		{
-			if(m_device.m_file.seek(FS::SeekMode::BEGIN, m_file.offset + m_local_offset) != m_file.offset + m_local_offset)
+			if (m_device.m_file.seek(FS::SeekMode::BEGIN, size_t(m_file.offset + m_local_offset)) !=
+				size_t(m_file.offset + m_local_offset))
 			{
 				return false;
 			}
@@ -47,7 +48,7 @@ public:
 	size_t seek(SeekMode base, size_t pos) override
 	{
 		m_local_offset = pos;
-		return m_device.m_file.seek(SeekMode::BEGIN, m_file.offset + pos);
+		return m_device.m_file.seek(SeekMode::BEGIN, size_t(m_file.offset + pos));
 	}
 
 
@@ -55,7 +56,7 @@ public:
 	void close() override { m_local_offset = 0; }
 	bool write(const void* buffer, size_t size) override { ASSERT(false); return false; }
 	const void* getBuffer() const override { return nullptr; }
-	size_t size() override { return m_file.size; }
+	size_t size() override { return (size_t)m_file.size; }
 	size_t pos() override { return m_local_offset; }
 
 private:

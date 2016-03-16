@@ -78,9 +78,6 @@ public:
 	}
 
 
-	int getExitCode() const override { return m_exit_code; }
-
-
 	void autosave()
 	{
 		m_time_to_autosave = float(m_settings.m_autosave_time);
@@ -117,24 +114,6 @@ public:
 		onGUI();
 
 		m_engine->getInputSystem().clear();
-	}
-
-
-	AssetBrowser* getAssetBrowser() override
-	{
-		return m_asset_browser;
-	}
-
-	
-	PropertyGrid* getPropertyGrid() override
-	{
-		return m_property_grid;
-	}
-
-
-	LogUI* getLogUI() override
-	{
-		return m_log_ui;
 	}
 
 
@@ -427,6 +406,12 @@ public:
 	void toggleMeasure() { m_editor->toggleMeasure(); }
 	void snapDown() { m_editor->snapDown(); }
 	void lookAtSelected() { m_editor->lookAtSelected(); }
+	int getExitCode() const override { return m_exit_code; }
+	AssetBrowser* getAssetBrowser() override { return m_asset_browser; }
+	PropertyGrid* getPropertyGrid() override { return m_property_grid; }
+	LogUI* getLogUI() override { return m_log_ui; }
+	void toggleGameMode() { m_editor->toggleGameMode(); }
+
 
 	void autosnapDown() 
 	{
@@ -525,6 +510,11 @@ public:
 				doMenuItem(getAction("save"), false, !m_editor->isGameMode());
 				doMenuItem(getAction("saveAs"), false, !m_editor->isGameMode());
 				doMenuItem(getAction("exit"), false, true);
+				ImGui::Separator();
+				if(ImGui::MenuItem("Pack data"))
+				{
+					packData();
+				}
 
 				ImGui::EndMenu();
 			}
@@ -654,9 +644,6 @@ public:
 			ImGui::EndMainMenuBar();
 		}
 	}
-
-
-	void toggleGameMode() { m_editor->toggleGameMode(); }
 
 
 	void showEntityTemplateList()
@@ -1018,18 +1005,17 @@ public:
 	{
 		auto& plugin_manager = m_editor->getEngine().getPluginManager();
 		#ifdef STATIC_PLUGINS
-		for (auto* plugin : plugin_manager.getPlugins())
-		{
-			StudioApp::StaticPluginRegister::create(plugin->getName(), *this);
-		}
+			for (auto* plugin : plugin_manager.getPlugins())
+			{
+				StudioApp::StaticPluginRegister::create(plugin->getName(), *this);
+			}
 		#else
-		for (auto* lib : plugin_manager.getLibraries())
-		{
-			auto* f = (void(*)(StudioApp&))Lumix::getLibrarySymbol(lib, "setStudioApp");
-			if (f) f(*this);
-		}
+			for (auto* lib : plugin_manager.getLibraries())
+			{
+				auto* f = (void (*)(StudioApp&))Lumix::getLibrarySymbol(lib, "setStudioApp");
+				if (f) f(*this);
+			}
 		#endif
-		
 	}
 
 
@@ -1116,6 +1102,129 @@ public:
 				break;
 			}
 		}
+	}
+
+
+	static bool includeFileInPack(const char* filename)
+	{
+		if(filename[0] == '.') return false;
+		if(Lumix::compareStringN("bin/", filename, 4) == 0) return false;
+		if(Lumix::compareStringN("bin32/", filename, 4) == 0) return false;
+		return true;
+	}
+
+
+	static bool includeDirInPack(const char* filename)
+	{
+		if(filename[0] == '.') return false;
+		if(Lumix::compareStringN("bin", filename, 4) == 0) return false;
+		if(Lumix::compareStringN("bin32", filename, 4) == 0) return false;
+		return true;
+	}
+
+
+	#pragma pack(1)
+	struct PackFileInfo
+	{
+		Lumix::uint32 hash;
+		Lumix::uint64 offset;
+		Lumix::uint64 size;
+
+		typedef char Path[Lumix::MAX_PATH_LENGTH];
+	};
+	#pragma pack()
+
+
+
+	void packDataScan(const char* dir_path, Lumix::Array<PackFileInfo>& infos, Lumix::Array<PackFileInfo::Path>& paths)
+	{
+		auto* iter = PlatformInterface::createFileIterator(dir_path, m_allocator);
+		PlatformInterface::FileInfo info;
+		while(PlatformInterface::getNextFile(iter, &info))
+		{
+			char normalized_path[Lumix::MAX_PATH_LENGTH];
+			Lumix::PathUtils::normalize(info.filename, normalized_path, Lumix::lengthOf(normalized_path));
+			if(info.is_directory)
+			{
+				if(!includeDirInPack(normalized_path)) continue;
+
+				char dir[Lumix::MAX_PATH_LENGTH] = { 0 };
+				if(dir_path[0] != '.') Lumix::copyString(dir, dir_path);
+				Lumix::catString(dir, info.filename);
+				Lumix::catString(dir, "/");
+				packDataScan(dir, infos, paths);
+				continue;
+			}
+
+			if(!includeFileInPack(normalized_path)) continue;
+
+			auto& out_path = paths.emplace();
+			Lumix::copyString(out_path, Lumix::lengthOf(out_path), normalized_path);
+			auto& out_info = infos.emplace();
+			out_info.hash = Lumix::crc32(out_path);
+			out_info.size = PlatformInterface::getFileSize(normalized_path);
+			out_info.offset = ~0UL;
+		}
+	}
+
+
+	void packData()
+	{
+		static const char* OUT_FILENAME = "data.pak";
+		Lumix::Array<PackFileInfo> infos(m_allocator);
+		Lumix::Array<PackFileInfo::Path> paths(m_allocator);
+		infos.reserve(10000);
+		paths.reserve(10000);
+		packDataScan("./", infos, paths);
+		if(infos.empty())
+		{
+			Lumix::g_log_error.log("Editor") << "No files found while trying to create " << OUT_FILENAME;
+			return;
+		}
+
+		Lumix::FS::OsFile file;
+		if(!file.open("data.pak", Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_allocator))
+		{
+			Lumix::g_log_error.log("Editor") << "Could not create " << OUT_FILENAME;
+			return;
+		}
+
+		int count = infos.size();
+		file.write(&count, sizeof(count));
+		Lumix::uint64 offset = sizeof(count) + sizeof(infos[0]) * count;
+		for(auto& info : infos)
+		{
+			info.offset = offset;
+			offset += info.size;
+		}
+		file.write(&infos[0], sizeof(infos[0]) * count);
+
+		for(auto& path : paths)
+		{
+			Lumix::FS::OsFile src;
+			size_t src_size = PlatformInterface::getFileSize(path);
+			if(!src.open(path, Lumix::FS::Mode::OPEN_AND_READ, m_allocator))
+			{
+				file.close();
+				Lumix::g_log_error.log("Editor") << "Could not open " << path;
+				return;
+			}
+			Lumix::uint8 buf[4096];
+			for(; src_size > 0; src_size -= sizeof(buf))
+			{
+				size_t batch_size = Lumix::Math::minimum(sizeof(buf), src_size);
+				if(!src.read(buf, batch_size))
+				{
+					file.close();
+					Lumix::g_log_error.log("Editor") << "Could not read " << path;
+					return;
+				}
+				file.write(buf, batch_size);
+			}
+			src.close();
+		}
+
+		file.close();
 	}
 
 
