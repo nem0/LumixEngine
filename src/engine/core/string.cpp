@@ -25,6 +25,12 @@ int compareStringN(const char* lhs, const char* rhs, int length)
 }
 
 
+int compareIStringN(const char* lhs, const char* rhs, int length)
+{
+	return strnicmp(lhs, rhs, length);
+}
+
+
 int compareString(const char* lhs, const char* rhs)
 {
 	return strcmp(lhs, rhs);

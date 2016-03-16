@@ -23,19 +23,19 @@ void Frustum::computeOrtho(const Vec3& position,
 	x.normalize();
 	Vec3 y = crossProduct(z, x);
 
-	m_plane[(uint32)Sides::NEAR_PLANE].set(-z, near_center);
-	m_plane[(uint32)Sides::FAR_PLANE].set(z, far_center);
+	planes[(uint32)Sides::NEAR_PLANE].set(-z, near_center);
+	planes[(uint32)Sides::FAR_PLANE].set(z, far_center);
 
-	m_plane[(uint32)Sides::TOP_PLANE].set(-y, near_center + y * (height * 0.5f));
-	m_plane[(uint32)Sides::BOTTOM_PLANE].set(y, near_center - y * (height * 0.5f));
+	planes[(uint32)Sides::TOP_PLANE].set(-y, near_center + y * (height * 0.5f));
+	planes[(uint32)Sides::BOTTOM_PLANE].set(y, near_center - y * (height * 0.5f));
 
-	m_plane[(uint32)Sides::LEFT_PLANE].set(x, near_center - x * (width * 0.5f));
-	m_plane[(uint32)Sides::RIGHT_PLANE].set(-x, near_center + x * (width * 0.5f));
+	planes[(uint32)Sides::LEFT_PLANE].set(x, near_center - x * (width * 0.5f));
+	planes[(uint32)Sides::RIGHT_PLANE].set(-x, near_center + x * (width * 0.5f));
 
-	m_center = (near_center + far_center) * 0.5f;
+	center = (near_center + far_center) * 0.5f;
 	float z_diff = far_distance - near_distance;
-	m_radius = sqrt(width * width + height * height + z_diff * z_diff) * 0.5f;
-	m_position = position;
+	radius = sqrt(width * width + height * height + z_diff * z_diff) * 0.5f;
+	this->position = position;
 }
 
 
@@ -66,30 +66,30 @@ void Frustum::computePerspective(const Vec3& position,
 
 	Vec3 near_center = position - z * near_distance;
 	Vec3 far_center = position - z * far_distance;
-	m_center = position - z * ((near_distance + far_distance)* 0.5f);
+	center = position - z * ((near_distance + far_distance)* 0.5f);
 
-	m_plane[(uint32)Sides::NEAR_PLANE].set(-z, near_center);
-	m_plane[(uint32)Sides::FAR_PLANE].set(z, far_center);
+	planes[(uint32)Sides::NEAR_PLANE].set(-z, near_center);
+	planes[(uint32)Sides::FAR_PLANE].set(z, far_center);
 
 	Vec3 aux = (near_center + y * near_height) - position;
 	aux.normalize();
 	Vec3 normal = crossProduct(aux, x);
-	m_plane[(uint32)Sides::TOP_PLANE].set(normal, near_center + y * near_height);
+	planes[(uint32)Sides::TOP_PLANE].set(normal, near_center + y * near_height);
 
 	aux = (near_center - y * near_height) - position;
 	aux.normalize();
 	normal = crossProduct(x, aux);
-	m_plane[(uint32)Sides::BOTTOM_PLANE].set(normal, near_center - y * near_height);
+	planes[(uint32)Sides::BOTTOM_PLANE].set(normal, near_center - y * near_height);
 
 	aux = (near_center - x * near_width) - position;
 	aux.normalize();
 	normal = crossProduct(aux, y);
-	m_plane[(uint32)Sides::LEFT_PLANE].set(normal, near_center - x * near_width);
+	planes[(uint32)Sides::LEFT_PLANE].set(normal, near_center - x * near_width);
 
 	aux = (near_center + x * near_width) - position;
 	aux.normalize();
 	normal = crossProduct(y, aux);
-	m_plane[(uint32)Sides::RIGHT_PLANE].set(normal, near_center + x * near_width);
+	planes[(uint32)Sides::RIGHT_PLANE].set(normal, near_center + x * near_width);
 
 	float far_height = far_distance * tang;
 	float far_width = far_height * ratio;
@@ -99,14 +99,14 @@ void Frustum::computePerspective(const Vec3& position,
 
 	float size = (corner1 - corner2).length();
 	size = Math::maximum(sqrt(far_width * far_width * 4 + far_height * far_height * 4), size);
-	m_radius = size * 0.5f;
-	m_position = position;
-	m_direction = direction;
-	m_up = up;
-	m_fov = fov;
-	m_ratio = ratio;
-	m_near_distance = near_distance;
-	m_far_distance = far_distance;
+	this->radius = size * 0.5f;
+	this->position = position;
+	this->direction = direction;
+	this->up = up;
+	this->fov = fov;
+	this->ratio = ratio;
+	this->near_distance = near_distance;
+	this->far_distance = far_distance;
 }
 
 

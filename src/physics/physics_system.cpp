@@ -224,15 +224,15 @@ namespace Lumix
 
 		bool connect2VisualDebugger();
 
-		physx::PxPhysics*			m_physics;
-		physx::PxFoundation*		m_foundation;
-		physx::PxControllerManager*	m_controller_manager;
-		physx::PxAllocatorCallback*	m_physx_allocator;
-		physx::PxErrorCallback*		m_error_callback;
-		physx::PxCooking*			m_cooking;
-		PhysicsGeometryManager		m_manager;
-		class Engine&				m_engine;
-		class BaseProxyAllocator	m_allocator;
+		physx::PxPhysics* m_physics;
+		physx::PxFoundation* m_foundation;
+		physx::PxControllerManager* m_controller_manager;
+		physx::PxAllocatorCallback* m_physx_allocator;
+		physx::PxErrorCallback* m_error_callback;
+		physx::PxCooking* m_cooking;
+		PhysicsGeometryManager m_manager;
+		Engine& m_engine;
+		BaseProxyAllocator m_allocator;
 	};
 
 

@@ -35,6 +35,8 @@ namespace Lumix
 			OsFile& operator <<(uint64 value);
 			OsFile& operator <<(float value);
 
+			static bool fileExists(const char* path);
+
 		private:
 			struct OsFileImpl* m_impl;
 		};

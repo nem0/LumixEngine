@@ -54,6 +54,7 @@ IMGUI_API CurveEditor BeginCurveEditor(const char* label);
 IMGUI_API bool CurvePoint(ImVec2* point, CurveEditor& editor);
 IMGUI_API void EndCurveEditor(const CurveEditor& editor);
 IMGUI_API bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use);
+IMGUI_API void IntervalGraph(const float* value_pairs, int value_pairs_count, float scale_min, float scele_max);
 
 
 } // namespace ImGui

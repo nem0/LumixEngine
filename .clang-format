@@ -14,7 +14,7 @@ BinPackArguments : false
 BinPackParameters : false
 BreakBeforeBraces : Allman
 BreakConstructorInitializersBeforeComma  : true
-ColumnLimit  : 100
+ColumnLimit  : 120
 ConstructorInitializerIndentWidth : 4
 ConstructorInitializerAllOnOneLineOrOnePerLine : false
 ContinuationIndentWidth : 4

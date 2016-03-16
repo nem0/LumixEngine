@@ -9,6 +9,7 @@
 namespace Lumix
 {
 
+struct AABB;
 class Engine;
 class Frustum;
 class IAllocator;
@@ -67,20 +68,30 @@ struct GrassInfo
 };
 
 
+struct DebugTriangle
+{
+	Vec3 p0;
+	Vec3 p1;
+	Vec3 p2;
+	uint32 color;
+	float life;
+};
+
+
 struct DebugLine
 {
-	Vec3 m_from;
-	Vec3 m_to;
-	uint32 m_color;
-	float m_life;
+	Vec3 from;
+	Vec3 to;
+	uint32 color;
+	float life;
 };
 
 
 struct DebugPoint
 {
-	Vec3 m_pos;
-	uint32 m_color;
-	float m_life;
+	Vec3 pos;
+	uint32 color;
+	float life;
 };
 
 
@@ -121,7 +132,11 @@ public:
 	virtual Vec4 getShadowmapCascades(ComponentIndex cmp) = 0;
 	virtual void setShadowmapCascades(ComponentIndex cmp, const Vec4& value) = 0;
 
-
+	virtual void addDebugTriangle(const Vec3& p0,
+		const Vec3& p1,
+		const Vec3& p2,
+		uint32 color,
+		float life) = 0;
 	virtual void addDebugPoint(const Vec3& pos, uint32 color, float life) = 0;
 
 	virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32 color, float life) = 0;
@@ -133,6 +148,7 @@ public:
 		uint32 color,
 		float life) = 0;
 	virtual void addDebugCube(const Vec3& from, const Vec3& max, uint32 color, float life) = 0;
+	virtual void addDebugCubeSolid(const Vec3& from, const Vec3& max, uint32 color, float life) = 0;
 	virtual void addDebugCircle(const Vec3& center,
 		const Vec3& up,
 		float radius,
@@ -163,6 +179,7 @@ public:
 		uint32 color,
 		float life) = 0;
 
+	virtual const Array<DebugTriangle>& getDebugTriangles() const = 0;
 	virtual const Array<DebugLine>& getDebugLines() const = 0;
 	virtual const Array<DebugPoint>& getDebugPoints() const = 0;
 
@@ -265,8 +282,13 @@ public:
 	virtual float getTerrainXZScale(ComponentIndex cmp) = 0;
 	virtual void setTerrainYScale(ComponentIndex cmp, float scale) = 0;
 	virtual float getTerrainYScale(ComponentIndex cmp) = 0;
-	virtual void getTerrainSize(ComponentIndex cmp, float* width, float* height) = 0;
+	virtual Vec2 getTerrainSize(ComponentIndex cmp) = 0;
+	virtual AABB getTerrainAABB(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getTerrainComponent(Entity entity) = 0;
+	virtual Entity getTerrainEntity(ComponentIndex cmp) = 0;
+	virtual Vec2 getTerrainResolution(ComponentIndex cmp) = 0;
+	virtual ComponentIndex getFirstTerrain() = 0;
+	virtual ComponentIndex getNextTerrain(ComponentIndex cmp) = 0;
 
 	virtual bool isGrassEnabled() const = 0;
 	virtual int getGrassDistance(ComponentIndex cmp) = 0;

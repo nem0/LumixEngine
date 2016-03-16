@@ -93,7 +93,8 @@ void fillLabel(char* output, int max_size, const char* label, int count)
 	Lumix::catString(output, max_size, "(");
 	int len = Lumix::stringLength(output);
 	Lumix::toCString(count, output + len, max_size - len);
-	Lumix::catString(output, max_size, ")");
+	Lumix::catString(output, max_size, ")###");
+	Lumix::catString(output, max_size, label);
 }
 
 
@@ -164,7 +165,7 @@ void LogUI::onGUI()
 		const char* labels[] = { "Info", "Warning", "Error" };
 		for (int i = 0; i < Lumix::lengthOf(labels); ++i)
 		{
-			char label[20];
+			char label[40];
 			fillLabel(label, sizeof(label), labels[i], m_new_message_count[i]);
 			if(i > 0) ImGui::SameLine();
 			if (ImGui::Button(label))

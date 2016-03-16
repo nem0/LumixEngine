@@ -1266,6 +1266,17 @@ namespace Lumix
 	}
 
 
+	int Checkbox(lua_State* L)
+	{
+		auto* label = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
+		bool b = Lumix::LuaWrapper::checkArg<bool>(L, 2);
+		bool clicked = ImGui::Checkbox(label, &b);
+		lua_pushboolean(L, clicked);
+		lua_pushboolean(L, b);
+		return 2;
+	}
+
+
 	void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 	{
 		lua_pushvalue(L, -1);
@@ -1532,6 +1543,7 @@ namespace Lumix
 
 			registerCFunction(L, "DragFloat", &DragFloat);
 			registerCFunction(L, "Button", &Button);
+			registerCFunction(L, "Checkbox", &Checkbox);
 
 			lua_pop(L, 1);
 

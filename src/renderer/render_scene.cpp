@@ -45,7 +45,6 @@ namespace Lumix
 
 
 static const uint32 RENDERABLE_HASH = crc32("renderable");
-static const uint32 RENDER_PARAMS_HASH = crc32("render_params");
 static const uint32 POINT_LIGHT_HASH = crc32("point_light");
 static const uint32 PARTICLE_EMITTER_HASH = crc32("particle_emitter");
 static const uint32 PARTICLE_EMITTER_FADE_HASH = crc32("particle_emitter_fade");
@@ -186,6 +185,7 @@ public:
 		, m_point_lights(m_allocator)
 		, m_light_influenced_geometry(m_allocator)
 		, m_global_lights(m_allocator)
+		, m_debug_triangles(m_allocator)
 		, m_debug_lines(m_allocator)
 		, m_debug_points(m_allocator)
 		, m_temporary_infos(m_allocator)
@@ -414,31 +414,46 @@ public:
 	{
 		PROFILE_FUNCTION();
 		m_time += dt;
-		for (int i = m_debug_lines.size() - 1; i >= 0; --i)
+		for (int i = m_debug_triangles.size() - 1; i >= 0; --i)
 		{
-			float life = m_debug_lines[i].m_life;
+			float life = m_debug_triangles[i].life;
 			if (life < 0)
+			{
+				m_debug_triangles.eraseFast(i);
+			}
+			else
+			{
+				life -= dt;
+				m_debug_triangles[i].life = life;
+			}
+		}
+
+		for(int i = m_debug_lines.size() - 1; i >= 0; --i)
+		{
+			float life = m_debug_lines[i].life;
+			if(life < 0)
 			{
 				m_debug_lines.eraseFast(i);
 			}
 			else
 			{
 				life -= dt;
-				m_debug_lines[i].m_life = life;
+				m_debug_lines[i].life = life;
 			}
 		}
 
+
 		for (int i = m_debug_points.size() - 1; i >= 0; --i)
 		{
-			float life = m_debug_points[i].m_life;
+			float life = m_debug_points[i].life;
 			if (life < 0)
 			{
-				m_debug_points.eraseFast(i);	
+				m_debug_points.eraseFast(i);
 			}
 			else
 			{
 				life -= dt;
-				m_debug_points[i].m_life = life;
+				m_debug_points[i].life = life;
 			}
 		}
 
@@ -1607,6 +1622,39 @@ public:
 	Engine& getEngine() const override { return m_engine; }
 
 
+	Entity getTerrainEntity(ComponentIndex cmp) override
+	{
+		return m_terrains[cmp]->getEntity();
+	}
+
+
+	Vec2 getTerrainResolution(ComponentIndex cmp) override
+	{
+		return Vec2((float)m_terrains[cmp]->getWidth(), (float)m_terrains[cmp]->getHeight());
+	}
+
+
+	ComponentIndex getFirstTerrain() override
+	{
+		if (m_terrains.empty()) return INVALID_COMPONENT;
+		for (int i = 0; i < m_terrains.size(); ++i)
+		{
+			if (m_terrains[i]) return i;
+		}
+		return INVALID_COMPONENT;
+	}
+
+
+	ComponentIndex getNextTerrain(ComponentIndex cmp) override
+	{
+		for (int i = cmp + 1; i < m_terrains.size(); ++i)
+		{
+			if (m_terrains[i]) return i;
+		}
+		return INVALID_COMPONENT;
+	}
+
+
 	ComponentIndex getTerrainComponent(Entity entity) override
 	{
 		for (int i = 0; i < m_terrains.size(); ++i)
@@ -1633,9 +1681,15 @@ public:
 	}
 
 
-	void getTerrainSize(ComponentIndex cmp, float* width, float* height) override
+	AABB getTerrainAABB(ComponentIndex cmp) override
 	{
-		m_terrains[cmp]->getSize(width, height);
+		return m_terrains[cmp]->getAABB();
+	}
+
+
+	Vec2 getTerrainSize(ComponentIndex cmp) override
+	{
+		return m_terrains[cmp]->getSize();
 	}
 
 
@@ -1787,6 +1841,23 @@ public:
 	}
 
 
+	static int LUA_castCameraRay(lua_State* L)
+	{
+		auto* scene = LuaWrapper::checkArg<RenderSceneImpl*>(L, 1);
+		const char* slot = LuaWrapper::checkArg<const char*>(L, 2);
+
+		ComponentIndex camera_cmp = scene->getCameraInSlot(slot);
+		Vec3 origin = scene->m_universe.getPosition(scene->m_cameras[camera_cmp].m_entity);
+		Quat rot = scene->m_universe.getRotation(scene->m_cameras[camera_cmp].m_entity);
+
+		RayCastModelHit hit = scene->castRay(origin, rot * Vec3(0, 0, -1), INVALID_COMPONENT);
+		LuaWrapper::pushLua(L, hit.m_is_hit);
+		LuaWrapper::pushLua(L, hit.m_is_hit ? hit.m_origin + hit.m_dir * hit.m_t : Vec3(0, 0, 0));
+
+		return 2;
+	}
+
+
 	static Texture* LUA_getMaterialTexture(Material* material, int texture_index)
 	{
 		if (!material) return nullptr;
@@ -1851,6 +1922,8 @@ public:
 		REGISTER_FUNCTION(getMaterialTexture);
 		REGISTER_FUNCTION(setRenderableMaterial);
 		REGISTER_FUNCTION(setRenderablePath);
+		
+		LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", LUA_castCameraRay);
 
 		#undef REGISTER_FUNCTION
 	}
@@ -2287,6 +2360,12 @@ public:
 	}
 
 
+	const Array<DebugTriangle>& getDebugTriangles() const override
+	{
+		return m_debug_triangles;
+	}
+
+
 	const Array<DebugLine>& getDebugLines() const override
 	{
 		return m_debug_lines;
@@ -2405,6 +2484,20 @@ public:
 	}
 
 
+	void addDebugTriangle(const Vec3& p0,
+		const Vec3& p1,
+		const Vec3& p2,
+		uint32 color,
+		float life) override
+	{
+		DebugTriangle& tri = m_debug_triangles.emplace();
+		tri.p0 = p0;
+		tri.p1 = p1;
+		tri.p2 = p2;
+		tri.color = ARGBToABGR(color);
+		tri.life = life;
+	}
+
 
 	void addDebugCapsule(const Vec3& position,
 		float height,
@@ -2495,6 +2588,74 @@ public:
 	}
 
 
+	void addDebugCubeSolid(const Vec3& min,
+		const Vec3& max,
+		uint32 color,
+		float life) override
+	{
+		Vec3 a = min;
+		Vec3 b = min;
+		Vec3 c = max;
+
+		b.x = max.x;
+		c.z = min.z;
+		addDebugTriangle(a, c, b, color, life);
+		b.x = min.x;
+		b.y = max.y;
+		addDebugTriangle(a, b, c, color, life);
+
+		b = max;
+		c = max;
+		a.z = max.z;
+		b.y = min.y;
+		addDebugTriangle(a, b, c, color, life);
+		b.x = min.x;
+		b.y = max.y;
+		addDebugTriangle(a, c, b, color, life);
+
+		a = min;
+		b = min;
+		c = max;
+
+		b.x = max.x;
+		c.y = min.y;
+		addDebugTriangle(a, c, b, color, life);
+		b.x = min.x;
+		b.z = max.z;
+		addDebugTriangle(a, b, c, color, life);
+
+		b = max;
+		c = max;
+		a.y = max.y;
+		b.z = min.z;
+		addDebugTriangle(a, c, b, color, life);
+		b.x = min.x;
+		b.z = max.z;
+		addDebugTriangle(a, b, c, color, life);
+
+		a = min;
+		b = min;
+		c = max;
+
+		b.y = max.y;
+		c.x = min.x;
+		addDebugTriangle(a, c, b, color, life);
+		b.y = min.y;
+		b.z = max.z;
+		addDebugTriangle(a, b, c, color, life);
+
+		b = max;
+		c = max;
+		a.x = max.x;
+		b.z = min.z;
+		addDebugTriangle(a, b, c, color, life);
+		b.y = min.y;
+		b.z = max.z;
+		addDebugTriangle(a, c, b, color, life);
+	}
+
+
+
 	void addDebugCube(const Vec3& min,
 							  const Vec3& max,
 							  uint32 color,
@@ -2541,13 +2702,13 @@ public:
 
 	void addDebugFrustum(const Frustum& frustum, uint32 color, float life) override
 	{
-		addDebugFrustum(frustum.getPosition(),
-						frustum.getDirection(),
-						frustum.getUp(),
-						frustum.getFOV(),
-						frustum.getRatio(),
-						frustum.getNearDistance(),
-						frustum.getFarDistance(),
+		addDebugFrustum(frustum.position,
+						frustum.direction,
+						frustum.up,
+						frustum.fov,
+						frustum.ratio,
+						frustum.near_distance,
+						frustum.far_distance,
 						color,
 						life);
 	}
@@ -2649,9 +2810,9 @@ public:
 	void addDebugPoint(const Vec3& pos, uint32 color, float life) override
 	{
 		DebugPoint& point = m_debug_points.emplace();
-		point.m_pos = pos;
-		point.m_color = ARGBToABGR(color);
-		point.m_life = life;
+		point.pos = pos;
+		point.color = ARGBToABGR(color);
+		point.life = life;
 	}
 
 
@@ -2665,10 +2826,10 @@ public:
 	void addDebugLine(const Vec3& from, const Vec3& to, uint32 color, float life) override
 	{
 		DebugLine& line = m_debug_lines.emplace();
-		line.m_from = from;
-		line.m_to = to;
-		line.m_color = ARGBToABGR(color);
-		line.m_life = life;
+		line.from = from;
+		line.to = to;
+		line.color = ARGBToABGR(color);
+		line.life = life;
 	}
 
 
@@ -3522,6 +3683,7 @@ private:
 	Universe& m_universe;
 	Renderer& m_renderer;
 	Engine& m_engine;
+	Array<DebugTriangle> m_debug_triangles;
 	Array<DebugLine> m_debug_lines;
 	Array<DebugPoint> m_debug_points;
 	CullingSystem* m_culling_system;

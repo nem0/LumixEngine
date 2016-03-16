@@ -21,6 +21,11 @@ namespace Lumix
 
 static const uint32 SHADOWMAP_HASH = crc32("shadowmap");
 static const float DEFAULT_ALPHA_REF_VALUE = 0.3f;
+static struct CustomFlags
+{
+	char flags[32][32];
+	int count;
+} s_custom_flags = {};
 
 
 Material::Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
@@ -36,6 +41,7 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 	, m_define_mask(0)
 	, m_command_buffer(nullptr)
 	, m_layer_count(1)
+	, m_custom_flags(0)
 {
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
@@ -50,6 +56,29 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 Material::~Material()
 {
 	ASSERT(isEmpty());
+}
+
+
+const char* Material::getCustomFlagName(int index)
+{
+	return s_custom_flags.flags[index];
+}
+
+
+uint32 Material::getCustomFlag(const char* flag_name)
+{
+	for (int i = 0; i < s_custom_flags.count; ++i)
+	{
+		if (compareString(s_custom_flags.flags[i], flag_name) == 0) return 1 << i;
+	}
+	if (s_custom_flags.count >= lengthOf(s_custom_flags.flags))
+	{
+		ASSERT(false);
+		return 0;
+	}
+	copyString(s_custom_flags.flags[s_custom_flags.count], flag_name);
+	++s_custom_flags.count;
+	return 1 << (s_custom_flags.count - 1);
 }
 
 
@@ -149,6 +178,16 @@ bool Material::save(JsonSerializer& serializer)
 		serializer.endObject();
 	}
 
+	if (m_custom_flags != 0)
+	{
+		serializer.beginArray("custom_flags");
+		for (int i = 0; i < 32; ++i)
+		{
+			if (m_custom_flags & (1 << i)) serializer.serializeArrayItem(s_custom_flags.flags[i]);
+		}
+		serializer.endArray();
+	}
+
 	serializer.beginArray("defines");
 	for (int i = 0; i < sizeof(m_define_mask) * 8; ++i)
 	{
@@ -212,6 +251,20 @@ bool Material::save(JsonSerializer& serializer)
 	serializer.endArray();
 	serializer.endObject();
 	return true;
+}
+
+
+void Material::deserializeCustomFlags(JsonSerializer& serializer)
+{
+	m_custom_flags = 0;
+	serializer.deserializeArrayBegin();
+	while (!serializer.isArrayEnd())
+	{
+		char tmp[32];
+		serializer.deserializeArrayItem(tmp, lengthOf(tmp), "");
+		setCustomFlag(getCustomFlag(tmp));
+	}
+	serializer.deserializeArrayEnd();
 }
 
 
@@ -669,6 +722,10 @@ bool Material::load(FS::IFile& file)
 		if (compareString(label, "defines") == 0)
 		{
 			deserializeDefines(serializer);
+		}
+		else if (compareString(label, "custom_flags") == 0)
+		{
+			deserializeCustomFlags(serializer);
 		}
 		else if (compareString(label, "uniforms") == 0)
 		{

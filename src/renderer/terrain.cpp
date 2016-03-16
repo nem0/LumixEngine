@@ -304,6 +304,23 @@ int Terrain::getGrassTypeGround(int index)
 }
 
 
+AABB Terrain::getAABB() const
+{
+	Vec3 min(0, 0, 0);
+	Vec3 max(m_width * m_scale.x, 0, m_height * m_scale.z);
+	for (int j = 0; j < m_height; ++j)
+	{
+		for (int i = 0; i < m_width; ++i)
+		{
+			float height = getHeight(i, j);
+			if (height > max.y) max.y = height;
+		}
+	}
+			
+	return AABB(min, max);
+}
+
+
 Path Terrain::getGrassTypePath(int index)
 {
 	GrassType& type = *m_grass_types[index];
@@ -659,7 +676,7 @@ Vec3 Terrain::getNormal(float x, float z)
 }
 
 	
-float Terrain::getHeight(float x, float z)
+float Terrain::getHeight(float x, float z) const
 {
 	int int_x = (int)(x / m_scale.x);
 	int int_z = (int)(z / m_scale.x);
@@ -686,7 +703,7 @@ float Terrain::getHeight(float x, float z)
 }
 	
 
-float Terrain::getHeight(int x, int z)
+float Terrain::getHeight(int x, int z) const
 {
 	if (!m_heightmap) return 0;
 

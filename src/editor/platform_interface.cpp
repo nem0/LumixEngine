@@ -310,9 +310,11 @@ namespace PlatformInterface
 			case WM_SIZE:
 			{
 				RECT rect;
+				RECT screen_rect;
+				GetWindowRect(g_platform_data.m_hwnd, &screen_rect);
 				GetClientRect(g_platform_data.m_hwnd, &rect);
 				g_platform_data.m_handler->onWindowTransformed(
-					rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
+					screen_rect.left, screen_rect.top, rect.right - rect.left, rect.bottom - rect.top);
 			}
 			break;
 			case WM_CLOSE: PostQuitMessage(0); break;
@@ -700,6 +702,17 @@ namespace PlatformInterface
 	bool copyFile(const char* from, const char* to)
 	{
 		return CopyFile(from, to, FALSE) == TRUE;
+	}
+
+
+	size_t getFileSize(const char* path)
+	{
+		WIN32_FILE_ATTRIBUTE_DATA fad;
+		if(!GetFileAttributesEx(path, GetFileExInfoStandard, &fad))	return -1; 
+		LARGE_INTEGER size;
+		size.HighPart = fad.nFileSizeHigh;
+		size.LowPart = fad.nFileSizeLow;
+		return (size_t)size.QuadPart;
 	}
 
 

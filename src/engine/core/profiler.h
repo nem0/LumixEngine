@@ -30,6 +30,7 @@ LUMIX_ENGINE_API const char* getThreadName(uint32 thread_id);
 LUMIX_ENGINE_API int getThreadIndex(uint32 id);
 LUMIX_ENGINE_API int getThreadCount();
 
+LUMIX_ENGINE_API float now();
 LUMIX_ENGINE_API Block* getRootBlock(uint32 thread_id);
 LUMIX_ENGINE_API int getBlockInt(Block* block);
 LUMIX_ENGINE_API BlockType getBlockType(Block* block);
@@ -37,6 +38,8 @@ LUMIX_ENGINE_API Block* getBlockFirstChild(Block* block);
 LUMIX_ENGINE_API Block* getBlockNext(Block* block);
 LUMIX_ENGINE_API float getBlockLength(Block* block);
 LUMIX_ENGINE_API int getBlockHitCount(Block* block);
+LUMIX_ENGINE_API float getBlockHitStart(Block* block, int hit_index);
+LUMIX_ENGINE_API float getBlockHitLength(Block* block, int hit_index);
 LUMIX_ENGINE_API const char* getBlockName(Block* block);
 
 LUMIX_ENGINE_API void record(const char* name, float value);

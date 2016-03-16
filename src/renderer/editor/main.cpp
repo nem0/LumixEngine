@@ -37,6 +37,7 @@
 #include "shader_editor.h"
 #include "shader_compiler.h"
 #include "terrain_editor.h"
+#include <cmath>
 
 
 using namespace Lumix;
@@ -45,7 +46,6 @@ using namespace Lumix;
 static const uint32 TEXTURE_HASH = ResourceManager::TEXTURE;
 static const uint32 SHADER_HASH = ResourceManager::SHADER;
 static const uint32 MATERIAL_HASH = crc32("MATERIAL");
-static const uint32 RENDER_PARAMS_HASH = crc32("render_params");
 
 
 struct MaterialPlugin : public AssetBrowser::IPlugin
@@ -273,7 +273,14 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 				}
 			}
 		}
-		ImGui::Columns(1);
+		for (int i = 0; i < 32; ++i)
+		{
+			if (material->isCustomFlag(1 << i))
+			{
+				ImGui::LabelText("Custom flag", Material::getCustomFlagName(i));
+			}
+		}
+
 		return true;
 	}
 
@@ -481,7 +488,12 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 			{
 				ImGui::PushID(i);
 				ImGui::Text("%d", i); ImGui::NextColumn();
-				ImGui::DragFloat("", &lods[i].distance); ImGui::NextColumn();
+				float dist = sqrt(lods[i].distance);
+				if (ImGui::DragFloat("", &dist))
+				{
+					lods[i].distance = dist * dist;
+				}
+				ImGui::NextColumn();
 				ImGui::Text("%d", lods[i].to_mesh - lods[i].from_mesh + 1); ImGui::NextColumn();
 				++lod_count;
 				ImGui::PopID();
@@ -892,7 +904,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 			if (cmp == INVALID_COMPONENT) return Vec3(0, 0, 0);
 			Model* model = m_render_scene->getRenderableModel(cmp);
 			if (!model) return Vec3(0, 0, 0);
-			return (model->getAABB().getMin() + model->getAABB().getMax()) * 0.5f;
+			return (model->getAABB().min + model->getAABB().max) * 0.5f;
 		}
 
 
@@ -1746,8 +1758,8 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 		if (!model) return;
 
 		const AABB& aabb = model->getAABB();
-		points[0] = aabb.getMin();
-		points[7] = aabb.getMax();
+		points[0] = aabb.min;
+		points[7] = aabb.max;
 		points[1].set(points[0].x, points[0].y, points[7].z);
 		points[2].set(points[0].x, points[7].y, points[0].z);
 		points[3].set(points[0].x, points[7].y, points[7].z);
