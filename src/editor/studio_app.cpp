@@ -1106,6 +1106,7 @@ public:
 		if (Lumix::compareStringN("bin/", filename, 4) == 0) return false;
 		if (Lumix::compareStringN("bin32/", filename, 4) == 0) return false;
 		if (Lumix::compareString("data.pak", filename) == 0) return false;
+		if (Lumix::compareString("error.log", filename) == 0) return false;
 		return true;
 	}
 
@@ -1155,7 +1156,8 @@ public:
 			if(!includeFileInPack(normalized_path)) continue;
 
 			auto& out_path = paths.emplace();
-			Lumix::copyString(out_path, Lumix::lengthOf(out_path), normalized_path);
+			Lumix::copyString(out_path, Lumix::lengthOf(out_path), dir_path);
+			Lumix::catString(out_path, Lumix::lengthOf(out_path), normalized_path);
 			auto& out_info = infos.emplace();
 			out_info.hash = Lumix::crc32(out_path);
 			out_info.size = PlatformInterface::getFileSize(normalized_path);
@@ -1206,7 +1208,7 @@ public:
 				return;
 			}
 			Lumix::uint8 buf[4096];
-			for(; src_size > 0; src_size -= sizeof(buf))
+			for (; src_size > 0; src_size -= Lumix::Math::minimum(sizeof(buf), src_size))
 			{
 				size_t batch_size = Lumix::Math::minimum(sizeof(buf), src_size);
 				if(!src.read(buf, batch_size))

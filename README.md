@@ -16,7 +16,7 @@
 * [Data repository](https://github.com/nem0/lumixengine_data)
 * [Videos](https://www.youtube.com/channel/UCtjtIy0ldsq-9siM1Gm_rXg)
 
-![Editor screenshot](https://cloud.githubusercontent.com/assets/153526/12904252/3fcf130e-cece-11e5-878b-c9fe24c1b11a.png)
+![Editor screenshot](https://cloud.githubusercontent.com/assets/153526/13830772/2b2b17a4-ebcf-11e5-8bdd-dec086cebd60.png)
 
 3rd party libraries
 
