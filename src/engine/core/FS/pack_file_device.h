@@ -29,8 +29,8 @@ public:
 private:
 	struct PackFileInfo
 	{
-		size_t offset;
-		size_t size;
+		uint64 offset;
+		uint64 size;
 	};
 
 	HashMap<uint32, PackFileInfo> m_files;
