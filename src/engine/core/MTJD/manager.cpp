@@ -71,7 +71,7 @@ struct ManagerImpl : public Manager
 	{
 #if TYPE == MULTI_THREAD
 
-		return MT::getCPUsCount() - 1; // -1 for bgfx thread
+		return MT::getCPUsCount() <= 1 ? 1 : MT::getCPUsCount() - 1; // -1 for bgfx thread
 
 #else // TYPE == MULTI_THREAD
 
