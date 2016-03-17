@@ -19,13 +19,17 @@ public:
 	PackFile(PackFileDevice& device, IAllocator& allocator)
 		: m_device(device)
 		, m_allocator(allocator)
+		, m_local_offset(0)
 	{
 	}
 
 
 	bool open(const Path& path, Mode mode) override
 	{
-		m_file = m_device.m_files[path.getHash()];
+		auto iter = m_device.m_files.find(path.getHash());
+		if (iter == m_device.m_files.end()) return false;
+		m_file = iter.value();
+		m_local_offset = 0;
 		return m_device.m_file.seek(SeekMode::BEGIN, (size_t)m_file.offset) == (size_t)m_file.offset;
 	}
 

@@ -1160,7 +1160,7 @@ public:
 			Lumix::catString(out_path, Lumix::lengthOf(out_path), normalized_path);
 			auto& out_info = infos.emplace();
 			out_info.hash = Lumix::crc32(out_path);
-			out_info.size = PlatformInterface::getFileSize(normalized_path);
+			out_info.size = PlatformInterface::getFileSize(out_path);
 			out_info.offset = ~0UL;
 		}
 	}
