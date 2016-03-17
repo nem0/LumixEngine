@@ -1,5 +1,5 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "core/fs/ifile.h"
+#include "core/fs/file_system.h"
 #include "core/FS/memory_file_device.h"
 #include "core/json_serializer.h"
 #include "core/path.h"

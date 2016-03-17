@@ -1,7 +1,7 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
 #include "core/FS/disk_file_device.h"
-#include "core/FS/ifile.h"
+#include "core/FS/file_system.h"
 #include "renderer/texture.h"
 
 namespace
@@ -12,7 +12,7 @@ namespace
 		Lumix::DefaultAllocator allocator;
 		Lumix::PathManager path_manager(allocator);
 
-		Lumix::FS::DiskFileDevice disk_file_device("", "", allocator);
+		Lumix::FS::DiskFileDevice disk_file_device("disk", "", allocator);
 		Lumix::FS::IFile* file1 = disk_file_device.createFile(NULL);
 		Lumix::FS::IFile* file2 = disk_file_device.createFile(NULL);
 

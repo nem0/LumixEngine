@@ -14,11 +14,9 @@ namespace FS
 {
 
 
-class IFile;
 class IFileDevice;
 
 
-typedef Delegate<void(IFile&, bool)> ReadCallback;
 struct Mode
 {
 	enum Value
@@ -29,7 +27,7 @@ struct Mode
 		OPEN = WRITE << 1,
 		CREATE = OPEN << 1,
 
-		CREATE_AND_WRITE = CREATE | WRITE, 
+		CREATE_AND_WRITE = CREATE | WRITE,
 		OPEN_AND_READ = OPEN | READ
 	};
 
@@ -54,6 +52,37 @@ struct SeekMode
 	operator Value() { return (Value)value; }
 	uint32 value;
 };
+
+
+class LUMIX_ENGINE_API IFile
+{
+public:
+	IFile() {}
+	virtual ~IFile() {}
+
+	virtual bool open(const Path& path, Mode mode) = 0;
+	virtual void close() = 0;
+
+	virtual bool read(void* buffer, size_t size) = 0;
+	virtual bool write(const void* buffer, size_t size) = 0;
+
+	virtual const void* getBuffer() const = 0;
+	virtual size_t size() = 0;
+
+	virtual size_t seek(SeekMode base, size_t pos) = 0;
+	virtual size_t pos() = 0;
+
+	IFile& operator << (const char* text);
+
+	void release();
+
+protected:
+	virtual IFileDevice& getDevice() = 0;
+
+};
+
+
+typedef Delegate<void(IFile&, bool)> ReadCallback;
 
 
 struct LUMIX_ENGINE_API DeviceList

@@ -3,7 +3,6 @@
 #include "core/crc32.h"
 #include "core/log.h"
 #include "core/FS/file_system.h"
-#include "core/FS/ifile.h"
 
 
 namespace Lumix

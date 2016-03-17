@@ -81,18 +81,31 @@ public:
 			m_file_system = FS::FileSystem::create(m_allocator);
 
 			m_mem_file_device = LUMIX_NEW(m_allocator, FS::MemoryFileDevice)(m_allocator);
-			m_disk_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)(base_path0, base_path1, m_allocator);
+			m_disk_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)("disk", base_path0, m_allocator);
 
 			m_file_system->mount(m_mem_file_device);
 			m_file_system->mount(m_disk_file_device);
-			m_file_system->setDefaultDevice("memory:disk");
-			m_file_system->setSaveGameDevice("memory:disk");
+			bool is_patching = base_path1[0] != 0 && compareString(base_path0, base_path1) != 0;
+			if (is_patching)
+			{
+				m_patch_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)("patch", base_path1, m_allocator);
+				m_file_system->mount(m_patch_file_device);
+				m_file_system->setDefaultDevice("memory:patch:disk");
+				m_file_system->setSaveGameDevice("memory:disk");
+			}
+			else
+			{
+				m_patch_file_device = nullptr;
+				m_file_system->setDefaultDevice("memory:disk");
+				m_file_system->setSaveGameDevice("memory:disk");
+			}
 		}
 		else
 		{
 			m_file_system = fs;
 			m_mem_file_device = nullptr;
 			m_disk_file_device = nullptr;
+			m_patch_file_device = nullptr;
 		}
 
 		m_resource_manager.create(*m_file_system);
@@ -405,6 +418,7 @@ public:
 			FS::FileSystem::destroy(m_file_system);
 			LUMIX_DELETE(m_allocator, m_mem_file_device);
 			LUMIX_DELETE(m_allocator, m_disk_file_device);
+			LUMIX_DELETE(m_allocator, m_patch_file_device);
 		}
 
 		m_resource_manager.destroy();
@@ -471,6 +485,7 @@ public:
 
 	FS::FileSystem& getFileSystem() override { return *m_file_system; }
 	FS::DiskFileDevice* getDiskFileDevice() override { return m_disk_file_device; }
+	FS::DiskFileDevice* getPatchFileDevice() override { return m_patch_file_device; }
 
 	void startGame(Universe& context) override
 	{
@@ -723,6 +738,7 @@ private:
 	FS::FileSystem* m_file_system;
 	FS::MemoryFileDevice* m_mem_file_device;
 	FS::DiskFileDevice* m_disk_file_device;
+	FS::DiskFileDevice* m_patch_file_device;
 
 	ResourceManager m_resource_manager;
 	

@@ -4,7 +4,6 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/FS/file_system.h"
-#include "core/FS/ifile.h"
 #include "core/geometry.h"
 #include "core/json_serializer.h"
 #include "core/lifo_allocator.h"

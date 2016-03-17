@@ -1,5 +1,4 @@
 #include "core/fs/file_system.h"
-#include "core/fs/ifile.h"
 #include "core/log.h"
 #include "core/math_utils.h"
 #include "core/path_utils.h"
@@ -278,7 +277,7 @@ void Texture::saveTGA()
 	}
 
 	FS::FileSystem& fs = m_resource_manager.getFileSystem();
-	FS::IFile* file = fs.open(fs.getDiskDevice(),
+	FS::IFile* file = fs.open(fs.getDefaultDevice(),
 							  getPath(),
 							  FS::Mode::CREATE_AND_WRITE);
 

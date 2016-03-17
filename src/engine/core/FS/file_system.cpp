@@ -3,7 +3,7 @@
 #include "core/array.h"
 #include "core/base_proxy_allocator.h"
 #include "core/fs/disk_file_device.h"
-#include "core/fs/ifile.h"
+#include "core/fs/file_system.h"
 #include "core/mt/lock_free_fixed_queue.h"
 #include "core/mt/task.h"
 #include "core/mt/transaction.h"
@@ -45,6 +45,19 @@ typedef MT::LockFreeFixedQueue<AsynTrans, C_MAX_TRANS> TransQueue;
 typedef Queue<AsynTrans*, C_MAX_TRANS> InProgressQueue;
 typedef Array<AsyncItem> ItemsTable;
 typedef Array<IFileDevice*> DevicesTable;
+
+
+void IFile::release()
+{
+	getDevice().destroyFile(this);
+}
+
+
+IFile& IFile::operator<<(const char* text)
+{
+	write(text, stringLength(text));
+	return *this;
+}
 
 
 class FSTask : public MT::Task

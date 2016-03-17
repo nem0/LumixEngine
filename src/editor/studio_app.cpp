@@ -1383,9 +1383,9 @@ public:
 		char current_dir[Lumix::MAX_PATH_LENGTH];
 		PlatformInterface::getCurrentDirectory(current_dir, Lumix::lengthOf(current_dir));
 
-		char base_path2[Lumix::MAX_PATH_LENGTH] = {};
-		checkDataDirCommandLine(base_path2, Lumix::lengthOf(base_path2));
-		m_engine = Lumix::Engine::create(current_dir, base_path2, nullptr, m_allocator);
+		char data_dir_path[Lumix::MAX_PATH_LENGTH] = {};
+		checkDataDirCommandLine(data_dir_path, Lumix::lengthOf(data_dir_path));
+		m_engine = Lumix::Engine::create(current_dir, data_dir_path, nullptr, m_allocator);
 		createLua();
 		Lumix::Engine::PlatformData platform_data;
 		platform_data.window_handle = PlatformInterface::getWindowHandle();

@@ -2,7 +2,6 @@
 #include "core/crc32.h"
 #include "core/FS/disk_file_device.h"
 #include "core/FS/file_system.h"
-#include "core/FS/ifile.h"
 #include "core/FS/os_file.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
@@ -77,34 +76,32 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 			}
 			fs.close(*file);
 
-			StringBuilder<MAX_PATH_LENGTH> src_full_path(
-				m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(0));
-			StringBuilder<MAX_PATH_LENGTH> dest_full_path(
-				m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(0));
-			src_full_path << tmp_path;
-			dest_full_path << material->getPath().c_str();
-			if (!PlatformInterface::fileExists(src_full_path))
+			auto& engine = m_app.getWorldEditor()->getEngine();
+			StringBuilder<MAX_PATH_LENGTH> src_full_path("");
+			StringBuilder<MAX_PATH_LENGTH> dest_full_path("");
+			if (engine.getPatchFileDevice())
+			{
+				src_full_path << engine.getPatchFileDevice()->getBasePath(0) << tmp_path;
+				dest_full_path << engine.getPatchFileDevice()->getBasePath(0) << material->getPath().c_str();
+			}
+			if (!engine.getPatchFileDevice() || !PlatformInterface::fileExists(src_full_path))
 			{
 				src_full_path.data[0] = 0;
 				dest_full_path.data[0] = 0;
-				src_full_path << m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(1);
-				src_full_path << tmp_path;
-				dest_full_path << m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(1);
-				dest_full_path << material->getPath().c_str();
+				src_full_path << engine.getDiskFileDevice()->getBasePath(0) << tmp_path;
+				dest_full_path << engine.getDiskFileDevice()->getBasePath(0) << material->getPath().c_str();
 			}
 
 			PlatformInterface::deleteFile(dest_full_path);
 
 			if (!PlatformInterface::moveFile(src_full_path, dest_full_path))
 			{
-				g_log_error.log("Editor") << "Could not save file "
-											<< material->getPath().c_str();
+				g_log_error.log("Editor") << "Could not save file " << material->getPath().c_str();
 			}
 		}
 		else
 		{
-			g_log_error.log("Editor") << "Could not save file "
-				<< material->getPath().c_str();
+			g_log_error.log("Editor") << "Could not save file " << material->getPath().c_str();
 		}
 	}
 
@@ -1319,6 +1316,7 @@ struct MeshMergerPlugin : public StudioApp::IPlugin
 		writeLODs(file);
 
 		auto* disk_device = app.getWorldEditor()->getEngine().getDiskFileDevice();
+		auto* patch_device = app.getWorldEditor()->getEngine().getPatchFileDevice();
 		char dir[MAX_PATH_LENGTH];
 		PathUtils::getDir(dir, lengthOf(dir), output);
 		for (auto& model : models)
@@ -1327,23 +1325,24 @@ struct MeshMergerPlugin : public StudioApp::IPlugin
 			{
 				auto& engine_mesh = model->getMesh(i);
 				char src[MAX_PATH_LENGTH];
-				copyString(src, disk_device->getBasePath(0));
-				catString(src, engine_mesh.material->getPath().c_str());
 				char dest[MAX_PATH_LENGTH];
-				copyString(dest, dir);
-				char mat_basename[MAX_PATH_LENGTH];
-				PathUtils::getBasename(
-					mat_basename, lengthOf(mat_basename), engine_mesh.material->getPath().c_str());
-				catString(dest, mat_basename);
-				catString(dest, ".mat");
-				if (!PlatformInterface::copyFile(src, dest))
+				if (patch_device)
+				{
+					copyString(src, patch_device->getBasePath(0));
+					catString(src, engine_mesh.material->getPath().c_str());
+					copyString(dest, dir);
+					char mat_basename[MAX_PATH_LENGTH];
+					PathUtils::getBasename(mat_basename, lengthOf(mat_basename), engine_mesh.material->getPath().c_str());
+					catString(dest, mat_basename);
+					catString(dest, ".mat");
+				}
+				if (!patch_device || !PlatformInterface::copyFile(src, dest))
 				{
 					copyString(src, disk_device->getBasePath(1));
 					catString(src, engine_mesh.material->getPath().c_str());
 					if (!PlatformInterface::copyFile(src, dest))
 					{
-						g_log_error.log("Renderer") << "Failed to copy "
-													<< engine_mesh.material->getPath();
+						g_log_error.log("Renderer") << "Failed to copy " << engine_mesh.material->getPath();
 					}
 				}
 			}

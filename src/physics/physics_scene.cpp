@@ -3,7 +3,6 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
-#include "core/fs/ifile.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/lua_wrapper.h"
