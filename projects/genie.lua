@@ -23,13 +23,13 @@ newaction {
 			os.copyfile(path.join(src_dir, filename .. ".pdb"), path.join(dst_dir, filename .. ".pdb"))
 		end
 		
-		installDllWithPdb "animation"
-		installDllWithPdb "audio"
-		installDllWithPdb "editor"
-		installDllWithPdb "engine"
-		installDllWithPdb "lua_script"
-		installDllWithPdb "physics"
-		installDllWithPdb "renderer"
+		--installDllWithPdb "animation"
+		--installDllWithPdb "audio"
+		--installDllWithPdb "editor"
+		--installDllWithPdb "engine"
+		--installDllWithPdb "lua_script"
+		--installDllWithPdb "physics"
+		--installDllWithPdb "renderer"
 		installDllWithPdb "assimp"
 		
 		installDll "PhysX3CommonCHECKED_x64"
@@ -59,13 +59,13 @@ newaction {
 			os.copyfile(path.join(src_dir, filename .. ".pdb"), path.join(dst_dir, filename .. ".pdb"))
 		end
 		
-		installDllWithPdb "animation"
-		installDllWithPdb "audio"
-		installDllWithPdb "editor"
-		installDllWithPdb "engine"
-		installDllWithPdb "lua_script"
-		installDllWithPdb "physics"
-		installDllWithPdb "renderer"
+		--installDllWithPdb "animation"
+		--installDllWithPdb "audio"
+		--installDllWithPdb "editor"
+		--installDllWithPdb "engine"
+		--installDllWithPdb "lua_script"
+		--installDllWithPdb "physics"
+		--installDllWithPdb "renderer"
 		installDllWithPdb "assimp"
 		
 		installDll "PhysX3CommonCHECKED_x86"
