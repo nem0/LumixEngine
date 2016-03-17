@@ -725,7 +725,7 @@ static const char* getResourceStateString(Lumix::Resource::State state)
 void ProfilerUIImpl::saveResourceList()
 {
 	Lumix::FS::OsFile file;
-	if (file.open("resources.csv", Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_allocator))
+	if (file.open("resources.csv", Lumix::FS::Mode::CREATE_AND_WRITE, m_allocator))
 	{
 		auto& managers = m_resource_manager.getAll();
 		for (auto* i : managers)

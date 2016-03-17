@@ -2,13 +2,17 @@
 #include "core/FS/ifile.h"
 #include "core/blob.h"
 #include "core/crc32.h"
-#include "debug/debug.h"
+#include "core/fs/disk_file_device.h"
+#include "core/fs/file_system.h"
+#include "core/fs/memory_file_device.h"
+#include "core/fs/pack_file_device.h"
 #include "core/log.h"
 #include "core/mt/thread.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "debug/debug.h"
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
@@ -120,7 +124,19 @@ public:
 
 		Lumix::enableCrashReporting(false);
 
-		m_engine = Lumix::Engine::create("", "", NULL, m_allocator);
+		m_file_system = Lumix::FS::FileSystem::create(m_allocator);
+
+		m_mem_file_device = LUMIX_NEW(m_allocator, Lumix::FS::MemoryFileDevice)(m_allocator);
+		m_disk_file_device = LUMIX_NEW(m_allocator, Lumix::FS::DiskFileDevice)("", "", m_allocator);
+		m_pack_file_device = LUMIX_NEW(m_allocator, Lumix::FS::PackFileDevice)(m_allocator);
+
+		m_file_system->mount(m_mem_file_device);
+		m_file_system->mount(m_disk_file_device);
+		m_file_system->mount(m_pack_file_device);
+		m_file_system->setDefaultDevice("memory:disk");
+		m_file_system->setSaveGameDevice("memory:disk");
+
+		m_engine = Lumix::Engine::create("", "", nullptr, m_allocator);
 		Lumix::Engine::PlatformData platform_data;
 		platform_data.window_handle = hwnd;
 		m_engine->setPlatformData(platform_data);
@@ -148,6 +164,10 @@ public:
 	void shutdown()
 	{
 		m_engine->destroyUniverse(*m_universe);
+		Lumix::FS::FileSystem::destroy(m_file_system);
+		LUMIX_DELETE(m_allocator, m_disk_file_device);
+		LUMIX_DELETE(m_allocator, m_mem_file_device);
+		LUMIX_DELETE(m_allocator, m_pack_file_device);
 		Lumix::Pipeline::destroy(m_pipeline);
 		Lumix::Engine::destroy(m_engine, m_allocator);
 		m_engine = nullptr;
@@ -345,6 +365,10 @@ private:
 	Lumix::Universe* m_universe;
 	Lumix::Pipeline* m_pipeline;
 	Lumix::Array<Test> m_tests;
+	Lumix::FS::FileSystem* m_file_system;
+	Lumix::FS::MemoryFileDevice* m_mem_file_device;
+	Lumix::FS::DiskFileDevice* m_disk_file_device;
+	Lumix::FS::PackFileDevice* m_pack_file_device;
 	int m_current_test;
 	bool m_is_test_universe_loaded;
 	bool m_finished;

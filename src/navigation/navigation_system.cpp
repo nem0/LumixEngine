@@ -428,7 +428,7 @@ struct NavigationScene : public IScene
 		if (!m_navmesh) return false;
 
 		FS::OsFile file;
-		if (!file.open(path, FS::Mode::CREATE | FS::Mode::WRITE, m_allocator)) return false;
+		if (!file.open(path, FS::Mode::CREATE_AND_WRITE, m_allocator)) return false;
 
 		file.write(&m_aabb, sizeof(m_aabb));
 		file.write(&m_num_tiles_x, sizeof(m_num_tiles_x));

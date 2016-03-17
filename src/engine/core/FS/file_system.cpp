@@ -256,11 +256,7 @@ public:
 
 
 	const DeviceList& getMemoryDevice() const override { return m_memory_device; }
-
-
 	const DeviceList& getDiskDevice() const override { return m_disk_device; }
-
-
 	void setSaveGameDevice(const char* dev) override { fillDeviceList(dev, m_save_game_device); }
 
 

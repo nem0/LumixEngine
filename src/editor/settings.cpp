@@ -234,7 +234,7 @@ Settings* Settings::getInstance()
 bool Settings::save(Action** actions, int actions_count)
 {
 	Lumix::FS::OsFile file;
-	if (!file.open(SETTINGS_PATH, Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE, m_allocator)) return false;
+	if (!file.open(SETTINGS_PATH, Lumix::FS::Mode::CREATE_AND_WRITE, m_allocator)) return false;
 
 	file << "window = { x = " << m_window.x 
 		<< ", y = " << m_window.y 

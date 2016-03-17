@@ -1481,7 +1481,7 @@ void ShaderEditor::generate(const char* path, ShaderType shader_type)
 	}
 
 	Lumix::FS::OsFile file;
-	if(!file.open(sc_path, Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE, m_allocator))
+	if(!file.open(sc_path, Lumix::FS::Mode::CREATE_AND_WRITE, m_allocator))
 	{
 		Lumix::g_log_error.log("Editor") << "Could not create file " << sc_path;
 		return;

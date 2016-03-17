@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/fs/ifile_system_defines.h"
+#include "core/fs/file_system.h"
 #include "lumix.h"
 
 namespace Lumix

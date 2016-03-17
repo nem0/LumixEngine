@@ -18,6 +18,44 @@ class IFile;
 class IFileDevice;
 
 
+typedef Delegate<void(IFile&, bool)> ReadCallback;
+struct Mode
+{
+	enum Value
+	{
+		NONE = 0,
+		READ = 0x1,
+		WRITE = READ << 1,
+		OPEN = WRITE << 1,
+		CREATE = OPEN << 1,
+
+		CREATE_AND_WRITE = CREATE | WRITE, 
+		OPEN_AND_READ = OPEN | READ
+	};
+
+	Mode() : value(0) {}
+	Mode(Value _value) : value(_value) { }
+	Mode(int32 _value) : value(_value) { }
+	operator Value() const { return (Value)value; }
+	int32 value;
+};
+
+
+struct SeekMode
+{
+	enum Value
+	{
+		BEGIN = 0,
+		END,
+		CURRENT,
+	};
+	SeekMode(Value _value) : value(_value) {}
+	SeekMode(uint32 _value) : value(_value) {}
+	operator Value() { return (Value)value; }
+	uint32 value;
+};
+
+
 struct LUMIX_ENGINE_API DeviceList
 {
 	IFileDevice* m_devices[8];
