@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/fs/ifile_system_defines.h"
+#include "core/fs/file_system.h"
 #include "core/delegate_list.h"
 #include "core/path.h"
 

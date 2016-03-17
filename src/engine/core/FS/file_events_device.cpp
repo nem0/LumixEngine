@@ -2,7 +2,6 @@
 #include "core/iallocator.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
-#include "core/fs/ifile_system_defines.h"
 #include "core/path.h"
 
 #ifdef FILE_EVENT_DEVICE

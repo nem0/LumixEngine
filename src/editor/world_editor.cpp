@@ -1744,7 +1744,7 @@ public:
 		copyString(bkp_path, path.c_str());
 		catString(bkp_path, ".bkp");
 		copyFile(path.c_str(), bkp_path);
-		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::CREATE | FS::Mode::WRITE);
+		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::CREATE_AND_WRITE);
 		save(*file);
 		fs.close(*file);
 		if (save_path) m_universe_path = path;
@@ -2064,8 +2064,8 @@ public:
 		}
 		else
 		{
-			m_game_mode_file = m_engine->getFileSystem().open(
-				m_engine->getFileSystem().getMemoryDevice(), Lumix::Path(""), FS::Mode::WRITE);
+			auto& fs = m_engine->getFileSystem();
+			m_game_mode_file = fs.open(fs.getMemoryDevice(), Lumix::Path(""), FS::Mode::WRITE);
 			save(*m_game_mode_file);
 			m_is_game_mode = true;
 			m_engine->startGame(*m_universe);
@@ -2294,6 +2294,7 @@ public:
 		fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN_AND_READ, file_read_cb);
 	}
 
+
 	void loadMap(FS::IFile& file, bool success)
 	{
 		ASSERT(success);
@@ -2306,13 +2307,6 @@ public:
 		copyFile(m_universe_path.c_str(), path);
 		}
 		m_universe_loaded.invoke();
-	}
-
-
-	bool isRelativePath(const char* path)
-	{
-		const char* base_path = m_engine->getDiskFileDevice()->getBasePath(0);
-		return compareStringN(base_path, path, stringLength(base_path)) == 0;
 	}
 
 
@@ -3015,7 +3009,7 @@ public:
 		FS::IFile* file = m_engine->getFileSystem().open(
 			m_engine->getFileSystem().getDiskDevice(),
 			path,
-			FS::Mode::CREATE | FS::Mode::WRITE);
+			FS::Mode::CREATE_AND_WRITE);
 		if (file)
 		{
 			JsonSerializer serializer(
@@ -3161,7 +3155,7 @@ public:
 		FS::IFile* file =
 			m_engine->getFileSystem().open(m_engine->getFileSystem().getMemoryDevice(),
 				Lumix::Path(""),
-				FS::Mode::CREATE | FS::Mode::WRITE);
+				FS::Mode::CREATE_AND_WRITE);
 		if (!file)
 		{
 			return false;

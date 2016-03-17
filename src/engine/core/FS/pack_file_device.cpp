@@ -1,6 +1,5 @@
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
-#include "core/fs/ifile_system_defines.h"
 #include "core/iallocator.h"
 #include "core/path.h"
 #include "core/string.h"
