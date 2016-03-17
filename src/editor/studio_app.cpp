@@ -1168,40 +1168,45 @@ public:
 
 	void packData()
 	{
+		char dest[Lumix::MAX_PATH_LENGTH];
+		if (!PlatformInterface::getOpenDirectory(dest, Lumix::lengthOf(dest), ".")) return;
+
 		static const char* OUT_FILENAME = "data.pak";
+		Lumix::catString(dest, "/");
+		Lumix::catString(dest, OUT_FILENAME);
 		Lumix::Array<PackFileInfo> infos(m_allocator);
 		Lumix::Array<PackFileInfo::Path> paths(m_allocator);
 		infos.reserve(10000);
 		paths.reserve(10000);
 		packDataScan("./", infos, paths);
-		if(infos.empty())
+		if (infos.empty())
 		{
-			Lumix::g_log_error.log("Editor") << "No files found while trying to create " << OUT_FILENAME;
+			Lumix::g_log_error.log("Editor") << "No files found while trying to create " << dest;
 			return;
 		}
 
 		Lumix::FS::OsFile file;
-		if(!file.open("data.pak", Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_allocator))
+		if (!file.open(dest, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_allocator))
 		{
-			Lumix::g_log_error.log("Editor") << "Could not create " << OUT_FILENAME;
+			Lumix::g_log_error.log("Editor") << "Could not create " << dest;
 			return;
 		}
 
 		int count = infos.size();
 		file.write(&count, sizeof(count));
 		Lumix::uint64 offset = sizeof(count) + sizeof(infos[0]) * count;
-		for(auto& info : infos)
+		for (auto& info : infos)
 		{
 			info.offset = offset;
 			offset += info.size;
 		}
 		file.write(&infos[0], sizeof(infos[0]) * count);
 
-		for(auto& path : paths)
+		for (auto& path : paths)
 		{
 			Lumix::FS::OsFile src;
 			size_t src_size = PlatformInterface::getFileSize(path);
-			if(!src.open(path, Lumix::FS::Mode::OPEN_AND_READ, m_allocator))
+			if (!src.open(path, Lumix::FS::Mode::OPEN_AND_READ, m_allocator))
 			{
 				file.close();
 				Lumix::g_log_error.log("Editor") << "Could not open " << path;
@@ -1211,7 +1216,7 @@ public:
 			for (; src_size > 0; src_size -= Lumix::Math::minimum(sizeof(buf), src_size))
 			{
 				size_t batch_size = Lumix::Math::minimum(sizeof(buf), src_size);
-				if(!src.read(buf, batch_size))
+				if (!src.read(buf, batch_size))
 				{
 					file.close();
 					Lumix::g_log_error.log("Editor") << "Could not read " << path;

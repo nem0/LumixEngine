@@ -2300,11 +2300,11 @@ public:
 		if (success)
 		{
 			resetAndLoad(file);
-		}
 		char path[MAX_PATH_LENGTH];
 		copyString(path, sizeof(path), m_universe_path.c_str());
 		catString(path, sizeof(path), ".lst");
 		copyFile(m_universe_path.c_str(), path);
+		}
 		m_universe_loaded.invoke();
 	}
 
