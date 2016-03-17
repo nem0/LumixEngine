@@ -29,7 +29,7 @@ namespace Lumix
 			bool open(const Path& path, Mode mode) override
 			{
 				char tmp[MAX_PATH_LENGTH];
-				copyString(tmp, m_device.getBasePath(0));
+				copyString(tmp, m_device.getBasePath());
 				catString(tmp, path.c_str());
 				if (!OsFile::fileExists(tmp) && m_fallthrough)
 				{
