@@ -59,7 +59,7 @@ bool Metadata::load()
 bool Metadata::save()
 {
 	Lumix::FS::OsFile file;
-	if (!file.open(METADATA_FILENAME, Lumix::FS::Mode::OPEN | Lumix::FS::Mode::WRITE, m_allocator)) return false;
+	if (!file.open(METADATA_FILENAME, Lumix::FS::Mode::CREATE_AND_WRITE, m_allocator)) return false;
 
 	int count = m_data.size();
 	file.write(&count, sizeof(count));

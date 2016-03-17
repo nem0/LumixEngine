@@ -99,7 +99,7 @@ void UT_file_events_device(const char* params)
 
 	file = file_system->open(device_list,
 		Lumix::Path("unit_tests/file_system/selenitic2.xml"),
-		Lumix::FS::Mode::OPEN_OR_CREATE | Lumix::FS::Mode::WRITE);
+		Lumix::FS::Mode::CREATE_AND_WRITE);
 
 	LUMIX_EXPECT(file != nullptr);
 

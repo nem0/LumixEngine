@@ -560,7 +560,7 @@ struct RendererImpl : public Renderer
 			header.dataType = 2;
 
 			Lumix::FS::OsFile file;
-			if(!file.open(filePath, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_renderer.m_allocator))
+			if(!file.open(filePath, Lumix::FS::Mode::CREATE_AND_WRITE, m_renderer.m_allocator))
 			{
 				g_log_error.log("Renderer") << "Failed to save screenshot to " << filePath;
 				return;

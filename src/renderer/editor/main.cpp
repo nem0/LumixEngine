@@ -65,7 +65,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 		strcat(tmp_path, ".tmp");
 		FS::IFile* file = fs.open(fs.getDefaultDevice(),
 			Path(tmp_path),
-			FS::Mode::CREATE | FS::Mode::WRITE);
+			FS::Mode::CREATE_AND_WRITE);
 		if (file)
 		{
 			DefaultAllocator allocator;
@@ -1297,7 +1297,7 @@ struct MeshMergerPlugin : public StudioApp::IPlugin
 
 		FS::OsFile file;
 		if (!file.open(
-				output, FS::Mode::WRITE | FS::Mode::CREATE, app.getWorldEditor()->getAllocator()))
+				output, FS::Mode::CREATE_AND_WRITE, app.getWorldEditor()->getAllocator()))
 		{
 			g_log_error.log("Renderer") << "Failed to save \"" << output << "\"";
 			return;

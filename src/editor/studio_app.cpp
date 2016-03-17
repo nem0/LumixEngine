@@ -1186,7 +1186,7 @@ public:
 		}
 
 		Lumix::FS::OsFile file;
-		if (!file.open(dest, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_allocator))
+		if (!file.open(dest, Lumix::FS::Mode::CREATE_AND_WRITE, m_allocator))
 		{
 			Lumix::g_log_error.log("Editor") << "Could not create " << dest;
 			return;

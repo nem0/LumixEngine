@@ -104,7 +104,7 @@ static bool saveAsRaw(ImportAssetDialog& dialog,
 
 	Lumix::FS::OsFile file;
 	if (!file.open(dest_path,
-			Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE,
+			Lumix::FS::Mode::CREATE_AND_WRITE,
 			dialog.getEditor().getAllocator()))
 	{
 		dialog.setMessage(
@@ -172,7 +172,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 
 	Lumix::FS::OsFile file;
 	if (!file.open(dest_path,
-			Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE,
+			Lumix::FS::Mode::CREATE_AND_WRITE,
 			dialog.getEditor().getAllocator()))
 	{
 		dialog.setMessage(
@@ -700,7 +700,7 @@ struct ConvertTask : public Lumix::MT::Task
 			}
 
 			if (!file.open(ani_path,
-					Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE,
+					Lumix::FS::Mode::CREATE_AND_WRITE,
 					m_dialog.m_editor.getAllocator()))
 			{
 				Lumix::g_log_error.log("Editor") << "Could not create file " << ani_path;
@@ -818,7 +818,7 @@ struct ConvertTask : public Lumix::MT::Task
 		m_dialog.setImportMessage(
 			StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Converting ") << output_material_name, -1);
 		Lumix::FS::OsFile file;
-		if (!file.open(output_material_name, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_dialog.m_editor.getAllocator()))
+		if (!file.open(output_material_name, Lumix::FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
 		{
 			m_dialog.setMessage(StringBuilder<20 + Lumix::MAX_PATH_LENGTH>(
 				"Could not create ", output_material_name));
@@ -1477,7 +1477,7 @@ struct ConvertTask : public Lumix::MT::Task
 		PathBuilder phy_path(m_dialog.m_output_dir);
 		phy_path << "/" << filename;
 		Lumix::FS::OsFile file;
-		if (!file.open(phy_path, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_dialog.m_editor.getAllocator()))
+		if (!file.open(phy_path, Lumix::FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
 		{
 			Lumix::g_log_error.log("Editor") << "Could not create file " << phy_path;
 			return false;
@@ -1667,7 +1667,7 @@ struct ConvertTask : public Lumix::MT::Task
 		Lumix::FS::OsFile file;
 		
 		if (!file.open(path,
-			Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_dialog.m_editor.getAllocator()))
+			Lumix::FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
 		{
 			m_dialog.setMessage(
 				StringBuilder<Lumix::MAX_PATH_LENGTH + 15>("Failed to open ", path));
