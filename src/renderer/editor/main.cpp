@@ -81,15 +81,15 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 			StringBuilder<MAX_PATH_LENGTH> dest_full_path("");
 			if (engine.getPatchFileDevice())
 			{
-				src_full_path << engine.getPatchFileDevice()->getBasePath(0) << tmp_path;
-				dest_full_path << engine.getPatchFileDevice()->getBasePath(0) << material->getPath().c_str();
+				src_full_path << engine.getPatchFileDevice()->getBasePath() << tmp_path;
+				dest_full_path << engine.getPatchFileDevice()->getBasePath() << material->getPath().c_str();
 			}
 			if (!engine.getPatchFileDevice() || !PlatformInterface::fileExists(src_full_path))
 			{
 				src_full_path.data[0] = 0;
 				dest_full_path.data[0] = 0;
-				src_full_path << engine.getDiskFileDevice()->getBasePath(0) << tmp_path;
-				dest_full_path << engine.getDiskFileDevice()->getBasePath(0) << material->getPath().c_str();
+				src_full_path << engine.getDiskFileDevice()->getBasePath() << tmp_path;
+				dest_full_path << engine.getDiskFileDevice()->getBasePath() << material->getPath().c_str();
 			}
 
 			PlatformInterface::deleteFile(dest_full_path);
@@ -1328,7 +1328,7 @@ struct MeshMergerPlugin : public StudioApp::IPlugin
 				char dest[MAX_PATH_LENGTH];
 				if (patch_device)
 				{
-					copyString(src, patch_device->getBasePath(0));
+					copyString(src, patch_device->getBasePath());
 					catString(src, engine_mesh.material->getPath().c_str());
 					copyString(dest, dir);
 					char mat_basename[MAX_PATH_LENGTH];
@@ -1338,7 +1338,7 @@ struct MeshMergerPlugin : public StudioApp::IPlugin
 				}
 				if (!patch_device || !PlatformInterface::copyFile(src, dest))
 				{
-					copyString(src, disk_device->getBasePath(1));
+					copyString(src, disk_device->getBasePath());
 					catString(src, engine_mesh.material->getPath().c_str());
 					if (!PlatformInterface::copyFile(src, dest))
 					{
@@ -1361,7 +1361,7 @@ struct MeshMergerPlugin : public StudioApp::IPlugin
 			if (ImGui::Button("...###browseoutput"))
 			{
 				auto* base_path =
-					app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(0);
+					app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath();
 				PlatformInterface::getSaveFilename(output, sizeof(output), base_path, "msh");
 			}
 			if (ImGui::Button("Merge")) merge();

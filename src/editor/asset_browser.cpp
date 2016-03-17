@@ -58,12 +58,12 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 
 	findResources();
 
-	const char* base_path = editor.getEngine().getDiskFileDevice()->getBasePath(0);
+	const char* base_path = editor.getEngine().getDiskFileDevice()->getBasePath();
 	m_watchers[0] = FileSystemWatcher::create(base_path, editor.getAllocator());
 	m_watchers[0]->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
 	if (editor.getEngine().getPatchFileDevice())
 	{
-		base_path = editor.getEngine().getPatchFileDevice()->getBasePath(1);
+		base_path = editor.getEngine().getPatchFileDevice()->getBasePath();
 		m_watchers[1] = FileSystemWatcher::create(base_path, editor.getAllocator());
 		m_watchers[1]->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
 	}
@@ -159,13 +159,13 @@ void AssetBrowser::update()
 		char tmp_path[Lumix::MAX_PATH_LENGTH];
 		if (m_editor.getEngine().getPatchFileDevice())
 		{
-			Lumix::copyString(tmp_path, m_editor.getEngine().getPatchFileDevice()->getBasePath(0));
+			Lumix::copyString(tmp_path, m_editor.getEngine().getPatchFileDevice()->getBasePath());
 			Lumix::catString(tmp_path, path.c_str());
 		}
 
 		if (!m_editor.getEngine().getPatchFileDevice() || !PlatformInterface::fileExists(tmp_path))
 		{
-			Lumix::copyString(tmp_path, m_editor.getEngine().getDiskFileDevice()->getBasePath(1));
+			Lumix::copyString(tmp_path, m_editor.getEngine().getDiskFileDevice()->getBasePath());
 			Lumix::catString(tmp_path, path.c_str());
 
 			if (!PlatformInterface::fileExists(tmp_path))
@@ -341,7 +341,7 @@ void AssetBrowser::openInExternalEditor(const char* path)
 {
 	if (m_editor.getEngine().getPatchFileDevice())
 	{
-		StringBuilder<Lumix::MAX_PATH_LENGTH> full_path(m_editor.getEngine().getPatchFileDevice()->getBasePath(0));
+		StringBuilder<Lumix::MAX_PATH_LENGTH> full_path(m_editor.getEngine().getPatchFileDevice()->getBasePath());
 		full_path << path;
 		if (PlatformInterface::fileExists(full_path))
 		{
@@ -350,7 +350,7 @@ void AssetBrowser::openInExternalEditor(const char* path)
 		}
 	}
 
-	StringBuilder<Lumix::MAX_PATH_LENGTH> full_path(m_editor.getEngine().getDiskFileDevice()->getBasePath(0));
+	StringBuilder<Lumix::MAX_PATH_LENGTH> full_path(m_editor.getEngine().getDiskFileDevice()->getBasePath());
 	full_path << path;
 	PlatformInterface::shellExecuteOpen(full_path);
 }
@@ -470,8 +470,8 @@ void AssetBrowser::findResources()
 		resources.clear();
 	}
 
-	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath(0);
+	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
 	processDir(base_path, Lumix::stringLength(base_path));
 	auto* patch_device = m_editor.getEngine().getPatchFileDevice();
-	if (patch_device) processDir(patch_device->getBasePath(1), Lumix::stringLength(patch_device->getBasePath(1)));
+	if (patch_device) processDir(patch_device->getBasePath(), Lumix::stringLength(patch_device->getBasePath()));
 }

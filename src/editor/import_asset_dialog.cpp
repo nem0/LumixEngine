@@ -54,7 +54,7 @@ static void getRelativePath(Lumix::WorldEditor& editor, char* relative_path, int
 	char tmp[Lumix::MAX_PATH_LENGTH];
 	Lumix::PathUtils::normalize(source, tmp, sizeof(tmp));
 
-	const char* base_path = editor.getEngine().getDiskFileDevice()->getBasePath(0);
+	const char* base_path = editor.getEngine().getDiskFileDevice()->getBasePath();
 	if (Lumix::compareStringN(base_path, tmp, Lumix::stringLength(base_path)) == 0)
 	{
 		int base_path_length = Lumix::stringLength(base_path);
@@ -1725,7 +1725,7 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	m_source[0] = '\0';
 	m_output_dir[0] = '\0';
 	m_texture_output_dir[0] = '\0';
-	Lumix::copyString(m_last_dir, m_editor.getEngine().getDiskFileDevice()->getBasePath(0));
+	Lumix::copyString(m_last_dir, m_editor.getEngine().getDiskFileDevice()->getBasePath());
 }
 
 
@@ -1949,7 +1949,7 @@ bool ImportAssetDialog::isTextureDirValid() const
 	Lumix::PathUtils::normalize(
 		m_texture_output_dir, normalized_path, Lumix::lengthOf(normalized_path));
 
-	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath(0);
+	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
 	return Lumix::compareStringN(base_path, normalized_path, Lumix::stringLength(base_path)) == 0;
 }
 
@@ -2042,7 +2042,7 @@ void ImportAssetDialog::onGUI()
 			ImGui::SameLine();
 			if (ImGui::Button("...###browseoutput"))
 			{
-				auto* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath(0);
+				auto* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
 				PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir), base_path);
 			}
 

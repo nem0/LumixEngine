@@ -352,7 +352,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 	int define_mask,
 	const Lumix::ShaderCombinations::Defines& all_defines)
 {
-	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath(0);
+	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
 
 	for (int mask = 0; mask < 1 << Lumix::lengthOf(all_defines); ++mask)
 	{
@@ -538,7 +538,7 @@ void ShaderCompiler::compileAllPasses(const char* path,
 void ShaderCompiler::compile(const char* path)
 {
 	StringBuilder<Lumix::MAX_PATH_LENGTH> compiled_dir(
-		m_editor.getEngine().getDiskFileDevice()->getBasePath(0), "/shaders/compiled");
+		m_editor.getEngine().getDiskFileDevice()->getBasePath(), "/shaders/compiled");
 	if (!PlatformInterface::makePath(compiled_dir))
 	{
 		if (!PlatformInterface::dirExists(compiled_dir))
