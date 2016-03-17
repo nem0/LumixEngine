@@ -5,7 +5,6 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
-#include "core/fs/ifile.h"
 #include "core/iallocator.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
@@ -1689,7 +1688,7 @@ namespace Lumix
 			if (ImGui::Button("Save"))
 			{
 				auto& fs = m_app.getWorldEditor()->getEngine().getFileSystem();
-				auto* file = fs.open(fs.getDiskDevice(),
+				auto* file = fs.open(fs.getDefaultDevice(),
 					resource->getPath(),
 					Lumix::FS::Mode::CREATE_AND_WRITE);
 

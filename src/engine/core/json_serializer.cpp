@@ -1,5 +1,5 @@
 #include "json_serializer.h"
-#include "core/fs/ifile.h"
+#include "core/fs/file_system.h"
 #include "core/fs/ifile_device.h"
 #include "core/log.h"
 #include "core/math_utils.h"

@@ -1,5 +1,4 @@
 #include "core/FS/file_system.h"
-#include "core/FS/ifile.h"
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/fs/disk_file_device.h"
@@ -127,7 +126,7 @@ public:
 		m_file_system = Lumix::FS::FileSystem::create(m_allocator);
 
 		m_mem_file_device = LUMIX_NEW(m_allocator, Lumix::FS::MemoryFileDevice)(m_allocator);
-		m_disk_file_device = LUMIX_NEW(m_allocator, Lumix::FS::DiskFileDevice)("", "", m_allocator);
+		m_disk_file_device = LUMIX_NEW(m_allocator, Lumix::FS::DiskFileDevice)("disk", "", m_allocator);
 		m_pack_file_device = LUMIX_NEW(m_allocator, Lumix::FS::PackFileDevice)(m_allocator);
 
 		m_file_system->mount(m_mem_file_device);

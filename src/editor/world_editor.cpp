@@ -10,7 +10,6 @@
 #include "core/fs/disk_file_device.h"
 #include "core/fs/tcp_file_device.h"
 #include "core/fs/tcp_file_server.h"
-#include "core/fs/ifile.h"
 #include "core/geometry.h"
 #include "core/input_system.h"
 #include "core/json_serializer.h"

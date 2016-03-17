@@ -1,7 +1,6 @@
 #include "shader_compiler.h"
 #include "core/FS/disk_file_device.h"
 #include "core/FS/file_system.h"
-#include "core/FS/ifile.h"
 #include "core/FS/os_file.h"
 #include "core/log.h"
 #include "core/mt/thread.h"

@@ -1,6 +1,5 @@
 #include "clip_manager.h"
 #include "core/iallocator.h"
-#include "core/fs/ifile.h"
 #include "core/resource.h"
 #include "core/string.h"
 #include "lumix.h"

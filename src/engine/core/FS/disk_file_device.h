@@ -14,16 +14,17 @@ namespace Lumix
 		class LUMIX_ENGINE_API DiskFileDevice : public IFileDevice
 		{
 		public:
-			DiskFileDevice(const char* base_path0, const char* base_path1, IAllocator& allocator);
+			DiskFileDevice(const char* name, const char* base_path, IAllocator& allocator);
 
 			IFile* createFile(IFile* child) override;
 			void destroyFile(IFile* file) override;
-			const char* getBasePath(int index) const { return m_base_paths[index]; }
-			const char* name() const override { return "disk"; }
+			const char* getBasePath(int /*todo remove*/) const { return m_base_path; }
+			const char* name() const override { return m_name; }
 		
 		private:
 			IAllocator& m_allocator;
-			char m_base_paths[2][MAX_PATH_LENGTH];
+			char m_base_path[MAX_PATH_LENGTH];
+			char m_name[20];
 		};
 	} // ~namespace FS
 } // ~namespace Lumix

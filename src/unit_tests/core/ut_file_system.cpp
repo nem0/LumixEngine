@@ -3,7 +3,6 @@
 #include "core/fs/file_system.h"
 #include "core/fs/disk_file_device.h"
 #include "core/fs/file_events_device.h"
-#include "core/fs/ifile.h"
 #include "core/path.h"
 
 namespace
@@ -28,7 +27,7 @@ void UT_file_events_device(const char* params)
 	Lumix::PathManager path_manager(allocator);
 	file_system = Lumix::FS::FileSystem::create(allocator);
 
-	disk_file_device = LUMIX_NEW(allocator, Lumix::FS::DiskFileDevice)("", "", allocator);
+	disk_file_device = LUMIX_NEW(allocator, Lumix::FS::DiskFileDevice)("disk", "", allocator);
 	file_event_device = LUMIX_NEW(allocator, Lumix::FS::FileEventsDevice)(allocator);
 	file_event_device->OnEvent.bind<fs_event_cb>();
 

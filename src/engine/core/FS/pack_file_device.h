@@ -1,9 +1,10 @@
-#pragma once#pragma once
+#pragma once
 
 #include "core/fs/ifile_device.h"
 #include "core/fs/os_file.h"
 #include "core/hash_map.h"
 #include "lumix.h"
+
 
 namespace Lumix
 {
