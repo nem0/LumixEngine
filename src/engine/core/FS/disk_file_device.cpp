@@ -22,15 +22,22 @@ namespace Lumix
 			}
 
 			IFileDevice& getDevice() override
-			{ 
+			{
 				return m_device;
 			}
 
 			bool open(const Path& path, Mode mode) override
 			{
 				char tmp[MAX_PATH_LENGTH];
-				copyString(tmp, m_device.getBasePath());
-				catString(tmp, path.c_str());
+				if (path.length() > 1 && path.c_str()[1] == ':')
+				{
+					copyString(tmp, path.c_str());
+				}
+				else
+				{
+					copyString(tmp, m_device.getBasePath());
+					catString(tmp, path.c_str());
+				}
 				if (!OsFile::fileExists(tmp) && m_fallthrough)
 				{
 					m_use_fallthrough = true;
