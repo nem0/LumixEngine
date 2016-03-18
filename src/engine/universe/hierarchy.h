@@ -52,7 +52,10 @@ namespace Lumix
 
 			virtual ~Hierarchy() {}
 
+			virtual void setLocalPosition(ComponentIndex cmp, const Vec3& position) = 0;
+			virtual Vec3 getLocalPosition(ComponentIndex cmp) = 0;
 			virtual void setLocalRotation(Entity entity, const Quat& rotation) = 0;
+			virtual Quat getLocalRotation(ComponentIndex cmp) = 0;
 			virtual void setParent(ComponentIndex cmp, Entity parent) = 0;
 			virtual Entity getParent(ComponentIndex cmp) = 0;
 			virtual Array<Child>* getChildren(Entity parent) = 0;

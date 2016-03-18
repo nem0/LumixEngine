@@ -1737,7 +1737,7 @@ public:
 
 	void saveUniverse(const Path& path, bool save_path) override
 	{
-		g_log_info.log("Editor") << "saving universe " << path << "...";
+		g_log_info.log("Editor") << "Saving universe " << path << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
 		char bkp_path[MAX_PATH_LENGTH];
 		copyString(bkp_path, path.c_str());

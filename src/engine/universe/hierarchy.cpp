@@ -149,6 +149,44 @@ public:
 	}
 
 
+	void setLocalPosition(ComponentIndex cmp, const Vec3& position) override
+	{
+		Parents::iterator parent_iter = m_parents.find(cmp);
+
+		if (parent_iter.isValid())
+		{
+			Quat parent_rot = m_universe.getRotation(parent_iter.value());
+			Vec3 parent_pos = m_universe.getPosition(parent_iter.value());
+			m_universe.setPosition(cmp, parent_pos + parent_rot * position);
+			return;
+		}
+
+		m_universe.setPosition(cmp, position);
+	}
+
+
+	Vec3 getLocalPosition(ComponentIndex cmp) override
+	{
+		Parents::iterator parent_iter = m_parents.find(cmp);
+
+		if (parent_iter.isValid())
+		{
+			auto child_iter = m_children.find(parent_iter.value());
+			ASSERT(child_iter.isValid());
+
+			for (auto& child : *child_iter.value())
+			{
+				if (child.m_entity == cmp)
+				{
+					return child.m_local_matrix.getTranslation();
+				}
+			}
+		}
+
+		return m_universe.getPosition(cmp);
+	}
+
+
 	void setLocalRotation(Entity entity, const Quat& rotation) override
 	{
 		Parents::iterator parent_iter = m_parents.find(entity);
@@ -163,6 +201,29 @@ public:
 		m_universe.setRotation(entity, rotation);
 	}
 
+
+	Quat getLocalRotation(ComponentIndex cmp) override
+	{
+		Parents::iterator parent_iter = m_parents.find(cmp);
+
+		if (parent_iter.isValid())
+		{
+			auto child_iter = m_children.find(parent_iter.value());
+			ASSERT(child_iter.isValid());
+
+			for (auto& child : *child_iter.value())
+			{
+				if (child.m_entity == cmp)
+				{
+					Quat rot;
+					child.m_local_matrix.getRotation(rot);
+					return rot;
+				}
+			}
+		}
+
+		return m_universe.getRotation(cmp);
+	}
 
 	const Children& getAllChildren() const override { return m_children; }
 
