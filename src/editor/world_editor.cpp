@@ -1744,6 +1744,11 @@ public:
 		catString(bkp_path, ".bkp");
 		copyFile(path.c_str(), bkp_path);
 		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::CREATE_AND_WRITE);
+		if (!file)
+		{
+			g_log_error.log("Editor") << "Could not create/open " << path.c_str();
+			return;
+		}
 		save(*file);
 		fs.close(*file);
 		if (save_path) m_universe_path = path;
