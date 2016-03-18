@@ -7,8 +7,6 @@ namespace Lumix
 {
 	namespace MT
 	{
-		static uint32 s_main_thread_id = 0;
-
 		void sleep(uint32 milliseconds) { ::Sleep(milliseconds); }
 
 		uint32 getCPUsCount()
@@ -32,8 +30,6 @@ namespace Lumix
 			return proc_number.Number;
 		}
 
-		bool isMainThread() { return s_main_thread_id == ::GetCurrentThreadId(); }
-		void setMainThread() { s_main_thread_id = ::GetCurrentThreadId(); }
 		static const DWORD MS_VC_EXCEPTION = 0x406D1388;
 
 #pragma pack(push,8)

@@ -1132,7 +1132,6 @@ public:
 	#pragma pack()
 
 
-
 	void packDataScan(const char* dir_path, Lumix::Array<PackFileInfo>& infos, Lumix::Array<PackFileInfo::Path>& paths)
 	{
 		auto* iter = PlatformInterface::createFileIterator(dir_path, m_allocator);

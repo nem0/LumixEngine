@@ -22,10 +22,6 @@ LUMIX_ENGINE_API uint32 getCPUsCount();
 LUMIX_ENGINE_API uint32 getCurrentThreadID();
 LUMIX_ENGINE_API uint32 getProccessAffinityMask();
 
-LUMIX_ENGINE_API bool isMainThread();
-LUMIX_ENGINE_API void setMainThread();
-
-
 } //! namespace MT
 
 
