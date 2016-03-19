@@ -1701,6 +1701,8 @@ public:
 		m_mouse_x = (float)x;
 		m_mouse_y = (float)y;
 
+		static const float MOUSE_MULTIPLIER = 1 / 200.0f;
+
 		switch (m_mouse_mode)
 		{
 			case MouseMode::CUSTOM:
@@ -1712,7 +1714,7 @@ public:
 			}
 			break;
 			case MouseMode::NAVIGATE: rotateCamera(relx, rely); break;
-			case MouseMode::PAN: panCamera(relx, rely); break;
+			case MouseMode::PAN: panCamera(relx * MOUSE_MULTIPLIER, rely * MOUSE_MULTIPLIER); break;
 		}
 	}
 
@@ -2548,7 +2550,7 @@ public:
 	}
 
 
-	void navigate(float forward, float right, float speed) override
+	void navigate(float forward, float right, float up, float speed) override
 	{
 		Universe* universe = getUniverse();
 		Vec3 pos = universe->getPosition(m_camera);
@@ -2558,6 +2560,7 @@ public:
 
 		pos += rot * Vec3(0, 0, -1) * forward * speed;
 		pos += rot * Vec3(1, 0, 0) * right * speed;
+		pos += rot * Vec3(0, 1, 0) * up * speed;
 		universe->setPosition(m_camera, pos);
 	}
 
@@ -2654,22 +2657,20 @@ public:
 	}
 
 
-	void panCamera(int x, int y)
+	void panCamera(float x, float y)
 	{
 		Universe* universe = getUniverse();
 		Vec3 pos = universe->getPosition(m_camera);
 		Quat rot = universe->getRotation(m_camera);
 
-		static const float MOUSE_MULTIPLIER = 1 / 200.0f;
-
 		if(m_is_orbit)
 		{
-			m_orbit_delta.x += x * MOUSE_MULTIPLIER;
-			m_orbit_delta.y += y * MOUSE_MULTIPLIER;
+			m_orbit_delta.x += x;
+			m_orbit_delta.y += y;
 		}
 
-		pos += rot * Vec3(1, 0, 0) * (float)x * MOUSE_MULTIPLIER;
-		pos += rot * Vec3(0, -1, 0) * (float)y * MOUSE_MULTIPLIER;
+		pos += rot * Vec3(x, 0, 0);
+		pos += rot * Vec3(0, -y, 0);
 
 		universe->setPosition(m_camera, pos);
 	}
