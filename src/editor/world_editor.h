@@ -120,7 +120,7 @@ public:
 	virtual void setEntityName(Entity entity, const char* name) = 0;
 	virtual void snapDown() = 0;
 	virtual void toggleGameMode() = 0;
-	virtual void navigate(float forward, float right, float speed) = 0;
+	virtual void navigate(float forward, float right, float up, float speed) = 0;
 	virtual void setProperty(uint32 component,
 		int index,
 		IPropertyDescriptor& property,

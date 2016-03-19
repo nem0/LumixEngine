@@ -119,21 +119,29 @@ void SceneView::update()
 	{
 		speed *= 10;
 	}
+	if (ImGui::GetIO().KeysDown['Q'])
+	{
+		m_editor->navigate(0, 0, -1.0f, speed);
+	}
+	if (ImGui::GetIO().KeysDown['E'])
+	{
+		m_editor->navigate(0, 0, 1.0f, speed);
+	}
 	if (ImGui::GetIO().KeysDown['W'])
 	{
-		m_editor->navigate(1.0f, 0, speed);
+		m_editor->navigate(1.0f, 0, 0, speed);
 	}
 	if (ImGui::GetIO().KeysDown['S'])
 	{
-		m_editor->navigate(-1.0f, 0, speed);
+		m_editor->navigate(-1.0f, 0, 0, speed);
 	}
 	if (ImGui::GetIO().KeysDown['A'])
 	{
-		m_editor->navigate(0.0f, -1.0f, speed);
+		m_editor->navigate(0.0f, -1.0f, 0, speed);
 	}
 	if (ImGui::GetIO().KeysDown['D'])
 	{
-		m_editor->navigate(0.0f, 1.0f, speed);
+		m_editor->navigate(0.0f, 1.0f, 0, speed);
 	}
 }
 
