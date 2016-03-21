@@ -10,9 +10,8 @@ namespace Lumix
 {
 	namespace FS
 	{
-		class DiskFile : public IFile
+		struct DiskFile : public IFile
 		{
-		public:
 			DiskFile(IFile* fallthrough, DiskFileDevice& device, IAllocator& allocator)
 				: m_device(device)
 				, m_allocator(allocator)
@@ -20,6 +19,13 @@ namespace Lumix
 			{
 				m_use_fallthrough = false;
 			}
+
+
+			~DiskFile()
+			{
+				if (m_fallthrough) m_fallthrough->release();
+			}
+
 
 			IFileDevice& getDevice() override
 			{
@@ -51,7 +57,7 @@ namespace Lumix
 				if (m_fallthrough) m_fallthrough->close();
 				m_file.close();
 				m_use_fallthrough = false;
-				}
+			}
 
 			bool read(void* buffer, size_t size) override
 			{
@@ -88,9 +94,6 @@ namespace Lumix
 				if (m_use_fallthrough) return m_fallthrough->pos();
 				return m_file.pos();
 			}
-
-		private:
-			virtual ~DiskFile() {}
 
 			DiskFileDevice& m_device;
 			IAllocator& m_allocator;
