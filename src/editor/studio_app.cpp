@@ -58,6 +58,7 @@ public:
 		, m_settings(m_allocator)
 		, m_plugins(m_allocator)
 	{
+		m_confirm_load = m_confirm_new = m_confirm_exit = false;
 		m_exit_code = 0;
 		g_app = this;
 		m_template_name[0] = '\0';
@@ -372,13 +373,31 @@ public:
 	}
 
 
-	void exit() { m_finished = true; }
-
-	void newUniverse()
-	{
-		m_editor->newUniverse();
-		m_time_to_autosave = float(m_settings.m_autosave_time);
+	void exit() {
+		if (m_editor->isUniverseChanged())
+		{
+			m_confirm_exit = true;
+		}
+		else
+		{
+			m_finished = true;
+		}
 	}
+
+
+	void newUniverse() 
+	{ 
+		if (m_editor->isUniverseChanged())
+		{
+			m_confirm_new = true;
+		}
+		else
+		{
+			m_editor->newUniverse();
+			m_time_to_autosave = float(m_settings.m_autosave_time);
+		}
+	}
+
 
 	bool hasPluginFocus()
 	{
@@ -484,133 +503,220 @@ public:
 		return *m_actions[0];
 	}
 
+	
+	void entityMenu()
+	{
+		if (!ImGui::BeginMenu("Entity")) return;
+
+		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
+		doMenuItem(getAction("createEntity"), false, true);
+		doMenuItem(getAction("destroyEntity"), false, is_any_entity_selected);
+
+		if (ImGui::BeginMenu("Create template", is_any_entity_selected))
+		{
+			static char name[255] = "";
+			ImGui::InputText("Name###templatename", name, sizeof(name));
+			if (ImGui::Button("Create"))
+			{
+				auto entity = m_editor->getSelectedEntities()[0];
+				auto& system = m_editor->getEntityTemplateSystem();
+				system.createTemplateFromEntity(name, entity);
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndMenu();
+		}
+		if (ImGui::MenuItem("Instantiate template",
+			nullptr,
+			nullptr,
+			m_selected_template_name.length() > 0))
+		{
+			Lumix::Vec3 pos = m_editor->getCameraRaycastHit();
+			m_editor->getEntityTemplateSystem().createInstance(
+				m_selected_template_name.c_str(), pos, Lumix::Quat(0, 0, 0, 1), 1);
+		}
+
+		doMenuItem(getAction("showEntities"), false, is_any_entity_selected);
+		doMenuItem(getAction("hideEntities"), false, is_any_entity_selected);
+		ImGui::EndMenu();
+	}
+
+
+	void editMenu()
+	{
+		if (!ImGui::BeginMenu("Edit")) return;
+
+		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
+		doMenuItem(getAction("undo"), false, m_editor->canUndo());
+		doMenuItem(getAction("redo"), false, m_editor->canRedo());
+		ImGui::Separator();
+		doMenuItem(getAction("copy"), false, is_any_entity_selected);
+		doMenuItem(getAction("paste"), false, m_editor->canPasteEntities());
+		ImGui::Separator();
+		doMenuItem(getAction("orbitCamera"),
+			m_editor->isOrbitCamera(),
+			is_any_entity_selected || m_editor->isOrbitCamera());
+		doMenuItem(getAction("toggleGizmoMode"), false, is_any_entity_selected);
+		doMenuItem(getAction("togglePivotMode"), false, is_any_entity_selected);
+		doMenuItem(getAction("toggleCoordSystem"), false, is_any_entity_selected);
+		if (ImGui::BeginMenu("View", true))
+		{
+			doMenuItem(getAction("viewTop"), false, true);
+			doMenuItem(getAction("viewFront"), false, true);
+			doMenuItem(getAction("viewSide"), false, true);
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Select"))
+		{
+			if (ImGui::MenuItem("Same mesh", nullptr, nullptr, is_any_entity_selected))
+				m_editor->selectEntitiesWithSameMesh();
+			ImGui::EndMenu();
+		}
+		ImGui::EndMenu();
+	}
+
+
+	void fileMenu()
+	{
+		if (!ImGui::BeginMenu("File")) return;
+
+		doMenuItem(getAction("newUniverse"), false, true);
+		if (ImGui::BeginMenu("Open"))
+		{
+			auto& universes = m_asset_browser->getResources(0);
+			for (auto& univ : universes)
+			{
+				if (ImGui::MenuItem(univ.c_str()))
+				{
+					if (m_editor->isUniverseChanged())
+					{
+						Lumix::copyString(m_universe_to_load, univ.c_str());
+						m_confirm_load = true;
+					}
+					else
+					{
+						m_time_to_autosave = float(m_settings.m_autosave_time);
+						m_editor->loadUniverse(univ);
+						setTitle(univ.c_str());
+					}
+				}
+			}
+			ImGui::EndMenu();
+		}
+		doMenuItem(getAction("save"), false, !m_editor->isGameMode());
+		doMenuItem(getAction("saveAs"), false, !m_editor->isGameMode());
+		doMenuItem(getAction("exit"), false, true);
+		ImGui::EndMenu();
+	}
+
+
+	void toolsMenu()
+	{
+		if (!ImGui::BeginMenu("Tools")) return;
+
+		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
+		doMenuItem(getAction("lookAtSelected"), false, is_any_entity_selected);
+		doMenuItem(getAction("toggleGameMode"), m_editor->isGameMode(), true);
+		doMenuItem(getAction("toggleMeasure"), m_editor->isMeasureToolActive(), true);
+		doMenuItem(getAction("snapDown"), false, is_any_entity_selected);
+		doMenuItem(getAction("autosnapDown"), m_editor->getGizmo().isAutosnapDown(), true);
+		if (ImGui::MenuItem("Save commands")) saveUndoStack();
+		if (ImGui::MenuItem("Load commands")) loadAndExecuteCommands();
+		if (ImGui::MenuItem("Pack data")) packData();
+		ImGui::EndMenu();
+	}
+
+
+	void viewMenu()
+	{
+		if (!ImGui::BeginMenu("View")) return;
+
+		ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
+		ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
+		ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
+		ImGui::MenuItem("Import asset", nullptr, &m_import_asset_dialog->m_is_opened);
+		ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
+		ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
+		ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
+		ImGui::MenuItem("Settings", nullptr, &m_settings.m_is_opened);
+		ImGui::Separator();
+		for (auto* plugin : m_plugins)
+		{
+			if (plugin->m_action)
+			{
+				doMenuItem(*plugin->m_action, false, true);
+			}
+		}
+		ImGui::EndMenu();
+	}
+
 
 	void showMainMenu()
 	{
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
+		if (m_confirm_exit)
+		{
+			ImGui::OpenPopup("confirm_exit");
+			m_confirm_exit = false;
+		}
+		if (ImGui::BeginPopupModal("confirm_exit"))
+		{
+			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
+			if (ImGui::Button("Continue"))
+			{
+				m_finished = true;
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
+		if (m_confirm_new)
+		{
+			ImGui::OpenPopup("confirm_new");
+			m_confirm_new = false;
+		}
+		if (ImGui::BeginPopupModal("confirm_new"))
+		{
+			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
+			if (ImGui::Button("Continue"))
+			{
+				m_editor->newUniverse();
+				m_time_to_autosave = float(m_settings.m_autosave_time);
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
+		
+		if (m_confirm_load)
+		{
+			ImGui::OpenPopup("confirm_load");
+			m_confirm_load = false;
+		}
+		if(ImGui::BeginPopupModal("confirm_load"))
+		{
+			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
+			if (ImGui::Button("Continue"))
+			{
+				m_time_to_autosave = float(m_settings.m_autosave_time);
+				m_editor->loadUniverse(Lumix::Path(m_universe_to_load));
+				setTitle(m_universe_to_load);
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
+
 		if (ImGui::BeginMainMenuBar())
 		{
-			if (ImGui::BeginMenu("File"))
-			{
-				doMenuItem(getAction("newUniverse"), false, true);
-				if (ImGui::BeginMenu("Open"))
-				{
-					auto& universes = m_asset_browser->getResources(0);
-					for (auto& univ : universes)
-					{
-						if (ImGui::MenuItem(univ.c_str()))
-						{
-							m_time_to_autosave = float(m_settings.m_autosave_time);
-							m_editor->loadUniverse(univ);
-							setTitle(univ.c_str());
-						}
-					}
-					ImGui::EndMenu();
-				}
-				doMenuItem(getAction("save"), false, !m_editor->isGameMode());
-				doMenuItem(getAction("saveAs"), false, !m_editor->isGameMode());
-				doMenuItem(getAction("exit"), false, true);
-				ImGui::EndMenu();
-			}
-
-			if (ImGui::BeginMenu("Edit"))
-			{
-				doMenuItem(getAction("undo"), false, m_editor->canUndo());
-				doMenuItem(getAction("redo"), false, m_editor->canRedo());
-				ImGui::Separator();
-				doMenuItem(getAction("copy"), false, is_any_entity_selected);
-				doMenuItem(getAction("paste"), false, m_editor->canPasteEntities());
-				ImGui::Separator();
-				doMenuItem(getAction("orbitCamera"),
-					m_editor->isOrbitCamera(),
-					is_any_entity_selected || m_editor->isOrbitCamera());
-				doMenuItem(getAction("toggleGizmoMode"), false, is_any_entity_selected);
-				doMenuItem(getAction("togglePivotMode"), false, is_any_entity_selected);
-				doMenuItem(getAction("toggleCoordSystem"), false, is_any_entity_selected);
-				if (ImGui::BeginMenu("View", true))
-				{
-					doMenuItem(getAction("viewTop"), false, true);
-					doMenuItem(getAction("viewFront"), false, true);
-					doMenuItem(getAction("viewSide"), false, true);
-					ImGui::EndMenu();
-				}
-				if (ImGui::BeginMenu("Select"))
-				{
-					if (ImGui::MenuItem("Same mesh", nullptr, nullptr, is_any_entity_selected))
-						m_editor->selectEntitiesWithSameMesh();
-					ImGui::EndMenu();
-				}
-				ImGui::EndMenu();
-			}
-
-			if (ImGui::BeginMenu("Entity"))
-			{
-				doMenuItem(getAction("createEntity"), false, true);
-				doMenuItem(getAction("destroyEntity"), false, is_any_entity_selected);
-
-				if (ImGui::BeginMenu("Create template", is_any_entity_selected))
-				{
-					static char name[255] = "";
-					ImGui::InputText("Name###templatename", name, sizeof(name));
-					if (ImGui::Button("Create"))
-					{
-						auto entity = m_editor->getSelectedEntities()[0];
-						auto& system = m_editor->getEntityTemplateSystem();
-						system.createTemplateFromEntity(name, entity);
-						ImGui::CloseCurrentPopup();
-					}
-					ImGui::EndMenu();
-				}
-				if (ImGui::MenuItem("Instantiate template",
-						nullptr,
-						nullptr,
-						m_selected_template_name.length() > 0))
-				{
-					Lumix::Vec3 pos = m_editor->getCameraRaycastHit();
-					m_editor->getEntityTemplateSystem().createInstance(
-						m_selected_template_name.c_str(), pos, Lumix::Quat(0, 0, 0, 1), 1);
-				}
-
-				doMenuItem(getAction("showEntities"), false, is_any_entity_selected);
-				doMenuItem(getAction("hideEntities"), false, is_any_entity_selected);
-				ImGui::EndMenu();
-			}
-
-
-			if (ImGui::BeginMenu("Tools"))
-			{
-				doMenuItem(getAction("lookAtSelected"), false, is_any_entity_selected);
-				doMenuItem(getAction("toggleGameMode"), m_editor->isGameMode(), true);
-				doMenuItem(getAction("toggleMeasure"), m_editor->isMeasureToolActive(), true);
-				doMenuItem(getAction("snapDown"), false, is_any_entity_selected);
-				doMenuItem(getAction("autosnapDown"), m_editor->getGizmo().isAutosnapDown(), true);
-				if (ImGui::MenuItem("Save commands")) saveUndoStack();
-				if (ImGui::MenuItem("Load commands")) loadAndExecuteCommands();
-				if (ImGui::MenuItem("Pack data")) packData();
-				ImGui::EndMenu();
-			}
-
-
-			if (ImGui::BeginMenu("View"))
-			{
-				ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
-				ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
-				ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
-				ImGui::MenuItem("Import asset", nullptr, &m_import_asset_dialog->m_is_opened);
-				ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
-				ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
-				ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
-				ImGui::MenuItem("Settings", nullptr, &m_settings.m_is_opened);
-				ImGui::Separator();
-				for (auto* plugin : m_plugins)
-				{
-					if (plugin->m_action)
-					{
-						doMenuItem(*plugin->m_action, false, true);
-					}
-				}
-				ImGui::EndMenu();
-			}
+			fileMenu();
+			editMenu();
+			entityMenu();
+			toolsMenu();
+			viewMenu();
+			
 			StringBuilder<200> stats("");
 			if (m_engine->getFileSystem().hasWork()) stats << "Loading... | ";
 			stats << "FPS: ";
@@ -1243,7 +1349,19 @@ public:
 				float frame_time;
 				{
 					PROFILE_BLOCK("tick");
-					m_finished = !PlatformInterface::processSystemEvents();
+					if (PlatformInterface::isQuitRequested())
+					{
+						PlatformInterface::clearQuitRequest();
+						if (m_editor->isUniverseChanged())
+						{
+							m_confirm_exit = true;
+						}
+						else
+						{
+							m_finished = true;
+						}
+					}
+					m_finished = m_finished || !PlatformInterface::processSystemEvents();
 					if (!m_finished) update();
 					frame_time = timer->tick();
 				}
@@ -1481,6 +1599,10 @@ public:
 	Lumix::Array<Action*> m_actions;
 	Lumix::Array<IPlugin*> m_plugins;
 	Lumix::WorldEditor* m_editor;
+	bool m_confirm_exit;
+	bool m_confirm_load;
+	bool m_confirm_new;
+	char m_universe_to_load[Lumix::MAX_PATH_LENGTH];
 	AssetBrowser* m_asset_browser;
 	PropertyGrid* m_property_grid;
 	LogUI* m_log_ui;
