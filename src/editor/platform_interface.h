@@ -120,6 +120,7 @@ namespace PlatformInterface
 	LUMIX_EDITOR_API bool isProcessFinished(Process& process);
 	LUMIX_EDITOR_API int getProcessExitCode(Process& process);
 	LUMIX_EDITOR_API int getProcessOutput(Process& process, char* buf, int buf_size);
-
+	LUMIX_EDITOR_API bool isQuitRequested();
+	LUMIX_EDITOR_API void clearQuitRequest();
 
 } // namespace PlatformInterface

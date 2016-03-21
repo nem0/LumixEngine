@@ -1737,6 +1737,9 @@ public:
 	float getMouseY() const override { return m_mouse_y; }
 
 
+	bool isUniverseChanged() const override { return m_is_universe_changed; }
+
+
 	void saveUniverse(const Path& path, bool save_path) override
 	{
 		g_log_info.log("Editor") << "Saving universe " << path << "...";
@@ -1752,6 +1755,7 @@ public:
 			return;
 		}
 		save(*file);
+		m_is_universe_changed = false;
 		fs.close(*file);
 		if (save_path) m_universe_path = path;
 	}
@@ -2028,6 +2032,7 @@ public:
 
 	void executeCommand(IEditorCommand* command) override
 	{
+		m_is_universe_changed = true;
 		if (m_undo_index >= 0 && command->getType() == m_undo_stack[m_undo_index]->getType())
 		{
 			if (command->merge(*m_undo_stack[m_undo_index]))
@@ -2307,10 +2312,10 @@ public:
 		if (success)
 		{
 			resetAndLoad(file);
-		char path[MAX_PATH_LENGTH];
-		copyString(path, sizeof(path), m_universe_path.c_str());
-		catString(path, sizeof(path), ".lst");
-		copyFile(m_universe_path.c_str(), path);
+			char path[MAX_PATH_LENGTH];
+			copyString(path, sizeof(path), m_universe_path.c_str());
+			catString(path, sizeof(path), ".lst");
+			copyFile(m_universe_path.c_str(), path);
 		}
 		m_universe_loaded.invoke();
 	}
@@ -2894,6 +2899,7 @@ public:
 	{
 		ASSERT(!m_universe);
 
+		m_is_universe_changed = false;
 		destroyUndoStack();
 		m_universe = &m_engine->createUniverse();
 		Universe* universe = m_universe;
@@ -3270,6 +3276,7 @@ private:
 	EntityGroups m_entity_groups;
 	RenderInterface* m_render_interface;
 	uint32 m_current_group_type;
+	bool m_is_universe_changed;
 };
 
 
