@@ -186,7 +186,7 @@ namespace Lumix
 				{
 					if ((!script.m_script || !script.m_script->isReady()) && script.m_state)
 					{
-						destroy(script);
+						m_scene.destroy(script);
 						continue;
 					}
 
@@ -726,7 +726,7 @@ namespace Lumix
 		}
 
 
-		static void destroy(ScriptInstance& inst)
+		void destroy(ScriptInstance& inst)
 		{
 			lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
 			if (lua_getfield(inst.m_state, -1, "onDestroy") != LUA_TFUNCTION)
@@ -741,6 +741,15 @@ namespace Lumix
 					lua_pop(inst.m_state, 1);
 				}
 				lua_pop(inst.m_state, 1);
+			}
+
+			for(int i = 0; i < m_updates.size(); ++i)
+			{
+				if(m_updates[i].environment == inst.m_environment)
+				{
+					m_updates.eraseFast(i);
+					break;
+				}
 			}
 
 			luaL_unref(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
