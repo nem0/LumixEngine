@@ -49,6 +49,113 @@ enum class VertexAttributeDef : Lumix::uint32
 };
 
 
+struct PreprocessedMesh
+{
+	PreprocessedMesh(Lumix::IAllocator& allocator)
+		: map_to_input(allocator)
+		, map_from_input(allocator)
+		, indices(allocator)
+	{
+	}
+
+	aiMesh* mesh;
+	Lumix::Array<unsigned int> map_to_input;
+	Lumix::Array<unsigned int> map_from_input;
+	Lumix::Array<Lumix::int32> indices;
+};
+
+
+static bool hasSimilarFace(const aiMesh& mesh, Lumix::Array<aiFace*>& faces, const aiFace& face)
+{
+	static const float MAX_ERROR = 0.001f;
+	auto isSame = [](const aiVector3D& a, const aiVector3D& b){
+		return fabs(a.x - b.x) < MAX_ERROR && fabs(a.y - b.y) < MAX_ERROR && fabs(a.z - b.z) < MAX_ERROR;
+	};
+	auto f0 = mesh.mVertices[face.mIndices[0]];
+	auto f1 = mesh.mVertices[face.mIndices[1]];
+	auto f2 = mesh.mVertices[face.mIndices[2]];
+	for (auto* tmp : faces)
+	{
+		auto v0 = mesh.mVertices[tmp->mIndices[0]];
+		auto v1 = mesh.mVertices[tmp->mIndices[1]];
+		auto v2 = mesh.mVertices[tmp->mIndices[2]];
+		if (fabs(v0.x - f0.x) < MAX_ERROR
+			|| fabs(v1.x - f0.x) < MAX_ERROR
+			|| fabs(v2.x - f0.x) < MAX_ERROR)
+		{
+			if (isSame(v0, f0))
+			{
+				if (isSame(v1, f1) && isSame(v2, f2))
+					return true;
+				if (isSame(v1, f2) && isSame(v2, f1))
+					return true;
+			}
+			if (isSame(v0, f1))
+			{
+				if (isSame(v1, f2) && isSame(v2, f0))
+					return true;
+				if (isSame(v1, f0) && isSame(v2, f2))
+					return true;
+			}
+			if (isSame(v0, f2))
+			{
+				if (isSame(v1, f1) && isSame(v2, f0))
+					return true;
+				if (isSame(v1, f0) && isSame(v2, f1))
+					return true;
+			}
+		}
+	}
+	return false;
+}
+
+
+enum class Preprocesses
+{
+	REMOVE_DOUBLES = 1
+};
+
+
+static void preprocessMesh(aiMesh& in, PreprocessedMesh& out, Lumix::uint32 flags, Lumix::IAllocator& allocator)
+{
+	out.mesh = &in;
+	Lumix::Array<aiFace*> faces(allocator);
+
+	bool remove_doubles = (flags & (Lumix::uint32)Preprocesses::REMOVE_DOUBLES) != 0;
+	for (unsigned int f = 0; f < in.mNumFaces; ++f)
+	{
+		auto& face = in.mFaces[f];
+		ASSERT(face.mNumIndices == 3);
+		if (!remove_doubles || !hasSimilarFace(in, faces, face)) faces.push(&face);
+	}
+
+	out.map_to_input.reserve(faces.size() * 3);
+	out.map_from_input.resize(in.mNumFaces * 3);
+	for(unsigned int& i : out.map_from_input) i = 0xffffFFFF;
+
+	for(auto& face : faces)
+	{
+		for(int i = 0; i < 3; ++i)
+		{
+			if(out.map_from_input[face->mIndices[i]] == 0xffffFFFF)
+			{
+				out.map_to_input.push(face->mIndices[i]);
+				out.map_from_input[face->mIndices[i]] = out.map_to_input.size() - 1;
+			}
+		}
+	}
+
+	out.indices.reserve(faces.size() * 3);
+	for(auto& face : faces)
+	{
+		for(int i = 0; i < 3; ++i)
+		{
+			out.indices.push(out.map_from_input[face->mIndices[i]]);
+		}
+	}
+}
+
+
 static void getRelativePath(Lumix::WorldEditor& editor, char* relative_path, int max_length, const char* source)
 {
 	char tmp[Lumix::MAX_PATH_LENGTH];
@@ -405,6 +512,7 @@ struct ConvertTask : public Lumix::MT::Task
 		, m_filtered_meshes(dialog.m_editor.getAllocator())
 		, m_scale(scale)
 		, m_nodes(dialog.m_editor.getAllocator())
+		, m_preprocessed_meshes(dialog.m_editor.getAllocator())
 	{
 	}
 
@@ -928,29 +1036,26 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void fillSkinInfo(const aiScene* scene, Lumix::Array<SkinInfo>& infos, int vertices_count) const
+	void fillSkinInfo(const PreprocessedMesh& mesh, Lumix::Array<SkinInfo>& infos) const
 	{
-		infos.resize(vertices_count);
-		bool any_bones = false;
+		if(mesh.mesh->mNumBones == 0) return;
 
-		int offset = 0;
-		for (auto* mesh : m_filtered_meshes)
+		infos.resize(mesh.map_to_input.size());
+
+		for (unsigned int j = 0; j < mesh.mesh->mNumBones; ++j)
 		{
-			for (unsigned int j = 0; j < mesh->mNumBones; ++j)
+			const aiBone* bone = mesh.mesh->mBones[j];
+			int bone_index = getNodeIndex(bone);
+			ASSERT(bone_index >= 0)
+			for (unsigned int k = 0; k < bone->mNumWeights; ++k)
 			{
-				any_bones = true;
-				const aiBone* bone = mesh->mBones[j];
-				int bone_index = getNodeIndex(bone);
-				ASSERT(bone_index >= 0)
-				for (unsigned int k = 0; k < bone->mNumWeights; ++k)
-				{
-					auto& info = infos[offset + bone->mWeights[k].mVertexId];
-					addBoneInfluence(info, bone->mWeights[k].mWeight, bone_index);
-				}
+				int idx = mesh.map_from_input[bone->mWeights[k].mVertexId];
+				ASSERT(idx == bone->mWeights[k].mVertexId);
+				ASSERT(idx < mesh.map_to_input.size());
+				auto& info = infos[idx];
+				addBoneInfluence(info, bone->mWeights[k].mWeight, bone_index);
 			}
-			offset += mesh->mNumVertices;
 		}
-		if (!any_bones) return;
 
 		int invalid_vertices = 0;
 		for (auto& info : infos)
@@ -1062,61 +1167,50 @@ struct ConvertTask : public Lumix::MT::Task
 		Lumix::int32 indices_count = 0;
 		int vertices_count = 0;
 		Lumix::int32 vertices_size = 0;
-		for (auto* mesh : m_filtered_meshes)
+		for (auto& mesh : m_preprocessed_meshes)
 		{
-			indices_count += mesh->mNumFaces * 3;
-			vertices_count += mesh->mNumVertices;
-			vertices_size += mesh->mNumVertices * getVertexSize(mesh);
+			indices_count += mesh.indices.size();
+			vertices_count += mesh.map_to_input.size();
+			vertices_size += mesh.map_to_input.size() * getVertexSize(mesh.mesh);
 		}
 
 		file.write((const char*)&indices_count, sizeof(indices_count));
-		Lumix::int32 polygon_idx = 0;
-		for (auto* mesh : m_filtered_meshes)
+		for (auto& mesh : m_preprocessed_meshes)
 		{
-			for (unsigned int j = 0; j < mesh->mNumFaces; ++j)
-			{
-				polygon_idx = mesh->mFaces[j].mIndices[0];
-				file.write((const char*)&polygon_idx, sizeof(polygon_idx));
-				polygon_idx = mesh->mFaces[j].mIndices[1];
-				file.write((const char*)&polygon_idx, sizeof(polygon_idx));
-				polygon_idx = mesh->mFaces[j].mIndices[2];
-				file.write((const char*)&polygon_idx, sizeof(polygon_idx));
-			}
+			file.write(&mesh.indices[0], mesh.indices.size() * sizeof(mesh.indices[0]));
 		}
 
 		file.write((const char*)&vertices_size, sizeof(vertices_size));
 
-		Lumix::Array<SkinInfo> skin_infos(m_dialog.m_editor.getAllocator());
-		fillSkinInfo(scene, skin_infos, vertices_count);
-
-		int skin_index = 0;
-
-		for (auto* mesh : m_filtered_meshes)
+		for (auto& mesh : m_preprocessed_meshes)
 		{
-			auto mesh_matrix = getGlobalTransform(getNode(mesh, scene->mRootNode));
+			auto mesh_matrix = getGlobalTransform(getNode(mesh.mesh, scene->mRootNode));
 			auto normal_matrix = mesh_matrix;
 			normal_matrix.a4 = normal_matrix.b4 = normal_matrix.c4 = 0;
-			bool is_skinned = isSkinned(mesh);
-			for (unsigned int j = 0; j < mesh->mNumVertices; ++j)
+			bool is_skinned = isSkinned(mesh.mesh);
+
+			Lumix::Array<SkinInfo> skin_infos(m_dialog.m_editor.getAllocator());
+			fillSkinInfo(mesh, skin_infos);
+
+			int skin_index = 0;
+			for (auto j : mesh.map_to_input)
 			{
 				if (is_skinned)
 				{
-					file.write((const char*)skin_infos[skin_index].weights,
-						sizeof(skin_infos[skin_index].weights));
-					file.write((const char*)skin_infos[skin_index].bone_indices,
-						sizeof(skin_infos[skin_index].bone_indices));
+					file.write((const char*)skin_infos[skin_index].weights, sizeof(skin_infos[j].weights));
+					file.write((const char*)skin_infos[skin_index].bone_indices, sizeof(skin_infos[j].bone_indices));
+					++skin_index;
 				}
-				++skin_index;
 
-				auto v = mesh_matrix * mesh->mVertices[j];
+				auto v = mesh_matrix * mesh.mesh->mVertices[j];
 
 				Lumix::Vec3 position = fixOrientation(v);
 				position *= m_scale;
 				file.write((const char*)&position, sizeof(position));
 
-				if (mesh->mColors[0])
+				if (mesh.mesh->mColors[0])
 				{
-					auto assimp_color = mesh->mColors[0][j];
+					auto assimp_color = mesh.mesh->mColors[0][j];
 					Lumix::uint8 color[4];
 					color[0] = Lumix::uint8(assimp_color.r * 255);
 					color[1] = Lumix::uint8(assimp_color.g * 255);
@@ -1125,24 +1219,24 @@ struct ConvertTask : public Lumix::MT::Task
 					file.write(color, sizeof(color));
 				}
 
-				auto tmp_normal = normal_matrix * mesh->mNormals[j];
+				auto tmp_normal = normal_matrix * mesh.mesh->mNormals[j];
 				tmp_normal.Normalize();
 				Lumix::Vec3 normal = fixOrientation(tmp_normal);
 				Lumix::uint32 int_normal = packF4u(normal);
 				file.write((const char*)&int_normal, sizeof(int_normal));
 
-				if (mesh->mTangents)
+				if (mesh.mesh->mTangents)
 				{
-					auto tmp_tangent = normal_matrix * mesh->mTangents[j];
+					auto tmp_tangent = normal_matrix * mesh.mesh->mTangents[j];
 					tmp_tangent.Normalize();
 					Lumix::Vec3 tangent = fixOrientation(tmp_tangent);
 					Lumix::uint32 int_tangent = packF4u(tangent);
 					file.write((const char*)&int_tangent, sizeof(int_tangent));
 				}
 
-				if (mesh->mTextureCoords[0])
+				if (mesh.mesh->mTextureCoords[0])
 				{
-					auto uv = mesh->mTextureCoords[0][j];
+					auto uv = mesh.mesh->mTextureCoords[0][j];
 					uv.y = -uv.y;
 					file.write((const char*)&uv, sizeof(uv.x) + sizeof(uv.y));
 				}
@@ -1235,45 +1329,45 @@ struct ConvertTask : public Lumix::MT::Task
 		file.write((const char*)&mesh_count, sizeof(mesh_count));
 		Lumix::int32 attribute_array_offset = 0;
 		Lumix::int32 indices_offset = 0;
-		for (auto* mesh : m_filtered_meshes)
+		for (auto& mesh : m_preprocessed_meshes)
 		{
-			int vertex_size = getVertexSize(mesh);
+			int vertex_size = getVertexSize(mesh.mesh);
 			aiString material_name;
-			scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_NAME, material_name);
+			scene->mMaterials[mesh.mesh->mMaterialIndex]->Get(AI_MATKEY_NAME, material_name);
 			Lumix::int32 length = Lumix::stringLength(material_name.C_Str());
 			file.write((const char*)&length, sizeof(length));
 			file.write((const char*)material_name.C_Str(), length);
 
 			file.write((const char*)&attribute_array_offset, sizeof(attribute_array_offset));
-			Lumix::int32 attribute_array_size = mesh->mNumVertices * vertex_size;
+			Lumix::int32 attribute_array_size = mesh.map_to_input.size() * vertex_size;
 			attribute_array_offset += attribute_array_size;
 			file.write((const char*)&attribute_array_size, sizeof(attribute_array_size));
 
 			file.write((const char*)&indices_offset, sizeof(indices_offset));
-			Lumix::int32 mesh_tri_count = mesh->mNumFaces;
-			indices_offset += mesh->mNumFaces * 3;
+			Lumix::int32 mesh_tri_count = mesh.indices.size() / 3;
+			indices_offset += mesh.indices.size();
 			file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
-			aiString mesh_name = getMeshName(scene, mesh);
+			aiString mesh_name = getMeshName(scene, mesh.mesh);
 			length = Lumix::stringLength(mesh_name.C_Str());
 
 			file.write((const char*)&length, sizeof(length));
 			file.write((const char*)mesh_name.C_Str(), length);
 
-			Lumix::int32 attribute_count = getAttributeCount(mesh);
+			Lumix::int32 attribute_count = getAttributeCount(mesh.mesh);
 			file.write((const char*)&attribute_count, sizeof(attribute_count));
 
-			if (isSkinned(mesh))
+			if (isSkinned(mesh.mesh))
 			{
 				writeAttribute("in_weights", VertexAttributeDef::FLOAT4, file);
 				writeAttribute("in_indices", VertexAttributeDef::SHORT4, file);
 			}
 
 			writeAttribute("in_position", VertexAttributeDef::POSITION, file);
-			if (mesh->mColors[0]) writeAttribute("in_colors", VertexAttributeDef::BYTE4, file);
+			if (mesh.mesh->mColors[0]) writeAttribute("in_colors", VertexAttributeDef::BYTE4, file);
 			writeAttribute("in_normal", VertexAttributeDef::BYTE4, file);
-			if (mesh->mTangents) writeAttribute("in_tangents", VertexAttributeDef::BYTE4, file);
-			if (mesh->mTextureCoords[0]) writeAttribute("in_tex_coords", VertexAttributeDef::FLOAT2, file);
+			if (mesh.mesh->mTangents) writeAttribute("in_tangents", VertexAttributeDef::BYTE4, file);
+			if (mesh.mesh->mTextureCoords[0]) writeAttribute("in_tex_coords", VertexAttributeDef::FLOAT2, file);
 		}
 	}
 
@@ -1664,10 +1758,10 @@ struct ConvertTask : public Lumix::MT::Task
 		PathBuilder path(m_dialog.m_output_dir);
 		path << "/" << basename << ".msh";
 
+		Lumix::IAllocator& allocator = m_dialog.m_editor.getAllocator();
 		Lumix::FS::OsFile file;
-		
-		if (!file.open(path,
-			Lumix::FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
+
+		if (!file.open(path, Lumix::FS::Mode::CREATE_AND_WRITE, allocator))
 		{
 			m_dialog.setMessage(
 				StringBuilder<Lumix::MAX_PATH_LENGTH + 15>("Failed to open ", path));
@@ -1677,6 +1771,14 @@ struct ConvertTask : public Lumix::MT::Task
 		filterMeshes();
 		gatherNodes();
 
+		m_preprocessed_meshes.reserve(m_filtered_meshes.size());
+		Lumix::uint32 preprocess_flags = 0;
+		if (m_dialog.m_remove_doubles) preprocess_flags |= (Lumix::uint32)Preprocesses::REMOVE_DOUBLES;
+		for(auto* mesh : m_filtered_meshes)
+		{
+			preprocessMesh(*mesh, m_preprocessed_meshes.emplace(allocator), preprocess_flags, allocator);
+		}
+
 		writeModelHeader(file);
 		writeMeshes(file);
 		writeGeometry(file);
@@ -1684,9 +1786,11 @@ struct ConvertTask : public Lumix::MT::Task
 		writeLods(file);
 
 		file.close();
+		m_preprocessed_meshes.clear();
 		return true;
 	}
 
+	Lumix::Array<PreprocessedMesh> m_preprocessed_meshes;
 	Lumix::Array<aiMesh*> m_filtered_meshes;
 	ImportAssetDialog& m_dialog;
 	Lumix::Array<aiNode*> m_nodes;
@@ -1714,6 +1818,7 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	, m_convert_to_dds(false)
 	, m_convert_to_raw(false)
 	, m_import_textures(true)
+	, m_remove_doubles(false)
 	, m_raw_texture_scale(1)
 	, m_mesh_scale(1)
 {
@@ -2061,6 +2166,7 @@ void ImportAssetDialog::onGUI()
 			if (m_import_model)
 			{
 				ImGui::Indent();
+				ImGui::Checkbox("Remove doubles", &m_remove_doubles);
 				ImGui::DragFloat("Scale", &m_mesh_scale, 0.01f, 0.001f, 0);
 				ImGui::Combo("Orientation", &(int&)m_orientation, "Y up\0Z up\0-Z up\0-X up\0");
 				ImGui::Unindent();
@@ -2071,7 +2177,11 @@ void ImportAssetDialog::onGUI()
 				ImGui::Checkbox(StringBuilder<50>("Import materials (", scene->mNumMaterials, ")"),
 					&m_import_materials);
 				ImGui::Checkbox("Import textures", &m_import_textures);
-				if(m_import_textures) ImGui::Checkbox("Convert to DDS", &m_convert_to_dds);
+				if (m_import_textures)
+				{
+					ImGui::SameLine();
+					ImGui::Checkbox("Convert to DDS", &m_convert_to_dds);
+				}
 			}
 			if (scene->HasAnimations())
 			{
