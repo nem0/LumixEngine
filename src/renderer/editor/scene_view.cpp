@@ -91,8 +91,31 @@ bool SceneView::init(LogUI& log_ui, Lumix::WorldEditor& editor, Lumix::Array<Act
 	m_toggle_gizmo_step_action =
 		LUMIX_NEW(editor.getAllocator(), Action)("Enable/disable gizmo step", "toggleGizmoStep");
 	m_toggle_gizmo_step_action->is_global = false;
-
 	actions.push(m_toggle_gizmo_step_action);
+
+	m_move_forward_action = LUMIX_NEW(editor.getAllocator(), Action)("Move forward", "moveForward");
+	m_move_forward_action->is_global = false;
+	actions.push(m_move_forward_action);
+
+	m_move_back_action = LUMIX_NEW(editor.getAllocator(), Action)("Move back", "moveBack");
+	m_move_back_action->is_global = false;
+	actions.push(m_move_back_action);
+
+	m_move_left_action = LUMIX_NEW(editor.getAllocator(), Action)("Move left", "moveLeft");
+	m_move_left_action->is_global = false;
+	actions.push(m_move_left_action);
+
+	m_move_right_action = LUMIX_NEW(editor.getAllocator(), Action)("Move right", "moveRight");
+	m_move_right_action->is_global = false;
+	actions.push(m_move_right_action);
+
+	m_move_up_action = LUMIX_NEW(editor.getAllocator(), Action)("Move up", "moveUp");
+	m_move_up_action->is_global = false;
+	actions.push(m_move_up_action);
+
+	m_move_down_action = LUMIX_NEW(editor.getAllocator(), Action)("Move down", "moveDown");
+	m_move_down_action->is_global = false;
+	actions.push(m_move_down_action);
 
 	return true;
 }
@@ -105,44 +128,22 @@ void SceneView::update()
 	if (!m_is_opened) return;
 	if (ImGui::GetIO().KeyCtrl) return;
 
-	m_camera_speed =
-		Lumix::Math::maximum(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
+	m_camera_speed = Lumix::Math::maximum(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
 
 	int screen_x = int(ImGui::GetIO().MousePos.x);
 	int screen_y = int(ImGui::GetIO().MousePos.y);
-	bool is_inside = screen_x >= m_screen_x && screen_y >= m_screen_y &&
-					 screen_x <= m_screen_x + m_width && screen_y <= m_screen_y + m_height;
+	bool is_inside = screen_x >= m_screen_x && screen_y >= m_screen_y && screen_x <= m_screen_x + m_width &&
+					 screen_y <= m_screen_y + m_height;
 	if (!is_inside) return;
 
 	float speed = m_camera_speed;
-	if (ImGui::GetIO().KeyShift)
-	{
-		speed *= 10;
-	}
-	if (ImGui::GetIO().KeysDown['Q'])
-	{
-		m_editor->navigate(0, 0, -1.0f, speed);
-	}
-	if (ImGui::GetIO().KeysDown['E'])
-	{
-		m_editor->navigate(0, 0, 1.0f, speed);
-	}
-	if (ImGui::GetIO().KeysDown['W'])
-	{
-		m_editor->navigate(1.0f, 0, 0, speed);
-	}
-	if (ImGui::GetIO().KeysDown['S'])
-	{
-		m_editor->navigate(-1.0f, 0, 0, speed);
-	}
-	if (ImGui::GetIO().KeysDown['A'])
-	{
-		m_editor->navigate(0.0f, -1.0f, 0, speed);
-	}
-	if (ImGui::GetIO().KeysDown['D'])
-	{
-		m_editor->navigate(0.0f, 1.0f, 0, speed);
-	}
+	if (ImGui::GetIO().KeyShift) speed *= 10;
+	if (m_move_forward_action->isActive()) m_editor->navigate(1.0f, 0, 0, speed);
+	if (m_move_back_action->isActive()) m_editor->navigate(-1.0f, 0, 0, speed);
+	if (m_move_left_action->isActive()) m_editor->navigate(0.0f, -1.0f, 0, speed);
+	if (m_move_right_action->isActive()) m_editor->navigate(0.0f, 1.0f, 0, speed);
+	if (m_move_down_action->isActive()) m_editor->navigate(0, 0, -1.0f, speed);
+	if (m_move_up_action->isActive()) m_editor->navigate(0, 0, 1.0f, speed);
 }
 
 

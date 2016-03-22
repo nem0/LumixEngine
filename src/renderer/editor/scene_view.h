@@ -41,6 +41,12 @@ class SceneView
 	private:
 		bool m_is_mouse_captured;
 		Action* m_toggle_gizmo_step_action;
+		Action* m_move_forward_action;
+		Action* m_move_back_action;
+		Action* m_move_left_action;
+		Action* m_move_right_action;
+		Action* m_move_up_action;
+		Action* m_move_down_action;
 		bool m_is_mouse_hovering_window;
 		bool m_is_opened;
 		int m_screen_x;
