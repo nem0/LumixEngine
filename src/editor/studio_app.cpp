@@ -1522,11 +1522,11 @@ public:
 		initIMGUI();
 
 		PlatformInterface::setSystemEventHandler(&m_handler);
-		loadSettings();
 
 		if (!m_metadata.load()) Lumix::g_log_info.log("Editor") << "Could not load metadata";
 
 		setStudioApp();
+		loadSettings();
 	}
 
 
