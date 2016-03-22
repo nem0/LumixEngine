@@ -12,7 +12,6 @@ namespace Lumix
 		public:
 			MeasureTool();
 
-			void tick() override {}
 			bool onEntityMouseDown(const RayCastModelHit& hit, int x, int y) override;
 			void onMouseMove(int, int, int, int) override {}
 			void onMouseUp(int, int, MouseButton::Value) override {}
