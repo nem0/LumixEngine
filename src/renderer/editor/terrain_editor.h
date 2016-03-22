@@ -35,7 +35,6 @@ public:
 	TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions);
 	~TerrainEditor();
 
-	void tick() override;
 	bool onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int) override;
 	void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/) override;
 	void onMouseUp(int, int, Lumix::MouseButton::Value) override;

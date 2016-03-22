@@ -1516,10 +1516,6 @@ public:
 			m_gizmo->add(m_selected_entities[0]);
 		}
 
-		for (int i = 0; i < m_plugins.size(); ++i)
-		{
-			m_plugins[i]->tick();
-		}
 		createEditorLines();
 		for (auto& i : m_is_mouse_click) i = false;
 	}
