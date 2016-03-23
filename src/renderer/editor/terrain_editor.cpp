@@ -655,6 +655,7 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	, m_flat_height(0)
 	, m_is_enabled(false)
 	, m_size_spread(1, 1)
+	, m_y_spread(0, 0)
 {
 	editor.registerEditorCommandCreator("paint_terrain", createPaintTerrainCommand);
 
@@ -1096,11 +1097,12 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 
 			float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
 			float dist = Lumix::Math::randFloat(0, 1.0f) * m_terrain_brush_size;
+			float y = Lumix::Math::randFloat(m_y_spread.x, m_y_spread.y);
 			Lumix::Vec3 pos(center.x + cos(angle) * dist, 0, center.z + sin(angle) * dist);
 			Lumix::Vec3 terrain_pos = inv_terrain_matrix.multiplyPosition(pos);
 			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= size.x && terrain_pos.z <= size.y)
 			{
-				pos.y = scene->getTerrainHeightAt(m_component.index, terrain_pos.x, terrain_pos.z);
+				pos.y = scene->getTerrainHeightAt(m_component.index, terrain_pos.x, terrain_pos.z) + y;
 				pos.y += terrain_matrix.getTranslation().y;
 				if(!isOBBCollision(*scene, meshes, pos, model, scale))
 				{
@@ -1430,6 +1432,8 @@ void TerrainEditor::onGUI()
 				}
 				ImGui::DragFloat2("Size spread", &m_size_spread.x, 0.01f);
 				m_size_spread.x = Lumix::Math::minimum(m_size_spread.x, m_size_spread.y);
+				ImGui::DragFloat2("Y spread", &m_y_spread.x, 0.01f);
+				m_y_spread.x = Lumix::Math::minimum(m_y_spread.x, m_y_spread.y);
 			}
 		}
 		break;
