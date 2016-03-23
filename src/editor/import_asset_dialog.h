@@ -20,10 +20,50 @@ class WorldEditor;
 
 namespace MT
 {
-	class Task;
+class Task;
 }
 
 }
+
+
+struct ImportTexture
+{
+	struct aiTexture* texture;
+	char path[Lumix::MAX_PATH_LENGTH];
+	char src[Lumix::MAX_PATH_LENGTH];
+	bool import;
+	bool to_dds;
+	bool is_valid;
+};
+
+
+struct ImportMaterial
+{
+	struct aiMaterial* material;
+	bool import;
+	int texture_count;
+	ImportTexture textures[16];
+};
+
+
+struct ImportMesh
+{
+	ImportMesh(Lumix::IAllocator& allocator)
+		: map_to_input(allocator)
+		, map_from_input(allocator)
+		, indices(allocator)
+	{
+	}
+
+	int lod;
+	bool import;
+	bool import_physics;
+	struct aiMesh* mesh;
+	Lumix::Array<unsigned int> map_to_input;
+	Lumix::Array<unsigned int> map_from_input;
+	Lumix::Array<Lumix::int32> indices;
+};
+
 
 
 class LUMIX_EDITOR_API ImportAssetDialog
@@ -64,18 +104,18 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		void convert();
 		void getMessage(char* msg, int max_size);
 		bool hasMessage();
-		bool checkTextures();
-		bool checkTexture(const char* source_dir, const char* path, const char* message);
 		void importTexture();
 		bool isTextureDirValid() const;
+		void onMaterialsGUI();
+		void onMeshesGUI();
+		void onImageGUI();
 
 	private:
 		Lumix::WorldEditor& m_editor;
-		Lumix::Array<Lumix::string> m_saved_textures;
-		Lumix::Array<Lumix::string> m_saved_embedded_textures;
+		Lumix::Array<Lumix::uint32> m_saved_textures;
 		Assimp::Importer m_importer;
-		Lumix::AssociativeArray<Lumix::string, Lumix::string> m_path_mapping;
-		Lumix::BinaryArray m_mesh_mask;
+		Lumix::Array<ImportMesh> m_meshes;
+		Lumix::Array<ImportMaterial> m_materials;
 		char m_import_message[1024];
 		float m_progress_fraction;
 		char m_message[1024];
@@ -86,16 +126,12 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		bool m_source_exists;
 		bool m_optimize_mesh_on_import;
 		bool m_gen_smooth_normal;
-		bool m_import_materials;
 		bool m_convert_to_dds;
-		bool m_import_textures;
 		bool m_convert_to_raw;
 		bool m_import_animations;
-		bool m_import_physics;
-		bool m_import_model;
+		bool m_make_convex;
 		bool m_is_converting;
 		bool m_is_importing;
-		bool m_make_convex;
 		bool m_remove_doubles;
 		bool m_is_importing_texture;
 		float m_raw_texture_scale;
