@@ -15,7 +15,7 @@ class Frustum;
 class IAllocator;
 class LIFOAllocator;
 class Material;
-class Mesh;
+struct Mesh;
 class Model;
 class Path;
 class Pose;

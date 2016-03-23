@@ -1372,9 +1372,7 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	static void writeAttribute(const char* attribute_name,
-		VertexAttributeDef attribute_type,
-		Lumix::FS::OsFile& file)
+	static void writeAttribute(const char* attribute_name, VertexAttributeDef attribute_type, Lumix::FS::OsFile& file)
 	{
 		Lumix::uint32 length = Lumix::stringLength(attribute_name);
 		file.write((const char*)&length, sizeof(length));

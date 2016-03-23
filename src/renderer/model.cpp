@@ -13,7 +13,6 @@
 #include "renderer/material.h"
 #include "renderer/model_manager.h"
 #include "renderer/pose.h"
-#include "renderer/ray_cast_model_hit.h"
 
 #include <cfloat>
 #include <cmath>

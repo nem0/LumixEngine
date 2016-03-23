@@ -35,8 +35,8 @@
 #include "iplugin.h"
 #include "plugin_manager.h"
 #include "render_interface.h"
+#include "renderer/model.h"
 #include "renderer/pipeline.h"
-#include "renderer/ray_cast_model_hit.h"
 #include "renderer/render_scene.h"
 #include "universe/universe.h"
 

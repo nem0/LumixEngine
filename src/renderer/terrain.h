@@ -19,7 +19,7 @@ class IAllocator;
 class LIFOAllocator;
 class Material;
 struct Matrix;
-class Mesh;
+struct Mesh;
 class Model;
 class OutputBlob;
 struct RayCastModelHit;
@@ -41,13 +41,13 @@ class Terrain
 				~GrassType();
 
 				void grassLoaded(Resource::State, Resource::State);
-	
+
 				Model* m_grass_model;
 				Terrain& m_terrain;
 				int32 m_ground;
 				int32 m_density;
 		};
-		
+
 		class GrassPatch
 		{
 			public:

@@ -29,7 +29,6 @@
 #include "renderer/particle_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/pose.h"
-#include "renderer/ray_cast_model_hit.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/terrain.h"

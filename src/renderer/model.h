@@ -17,10 +17,10 @@ namespace Lumix
 
 class Frustum;
 class Material;
+struct Mesh;
 class Model;
 class Pose;
 class ResourceManager;
-struct RayCastModelHit;
 
 
 namespace FS
@@ -30,9 +30,21 @@ class IFile;
 }
 
 
-class LUMIX_RENDERER_API Mesh
+struct LUMIX_RENDERER_API RayCastModelHit
 {
-public:
+	bool m_is_hit;
+	float m_t;
+	Vec3 m_origin;
+	Vec3 m_dir;
+	Mesh* m_mesh;
+	ComponentIndex m_component;
+	Entity m_entity;
+	uint32 m_component_type;
+};
+
+
+struct LUMIX_RENDERER_API Mesh
+{
 	Mesh(const bgfx::VertexDecl& def,
 		 Material* mat,
 		 int attribute_array_offset,
