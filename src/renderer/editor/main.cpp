@@ -27,7 +27,6 @@
 #include "renderer/model_manager.h"
 #include "renderer/particle_system.h"
 #include "renderer/pipeline.h"
-#include "renderer/ray_cast_model_hit.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
