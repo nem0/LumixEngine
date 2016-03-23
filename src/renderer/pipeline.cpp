@@ -1,6 +1,5 @@
 #include "pipeline.h"
 
-#include "renderer/pipeline.h"
 #include "core/crc32.h"
 #include "core/fs/disk_file_device.h"
 #include "core/fs/file_system.h"
@@ -701,7 +700,7 @@ struct PipelineImpl : public Pipeline
 			m_bgfx_view, (uint16_t)m_view_x, (uint16_t)m_view_y, (uint16)m_width, (uint16)m_height);
 	}
 
-	
+
 	void finishInstances()
 	{
 		for (int i = 0; i < lengthOf(m_instances_data); ++i)
@@ -1728,7 +1727,7 @@ struct PipelineImpl : public Pipeline
 			float ratio = float(m_width) / m_height;
 			Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
 			Matrix camera_matrix = universe.getPositionAndRotation(camera_entity);
-			Matrix view_matrix = camera_matrix; 
+			Matrix view_matrix = camera_matrix;
 			view_matrix.fastInverse();
 			projection_matrix.setPerspective(
 				Math::degreesToRadians(fov), ratio, near_plane, far_plane);
@@ -2183,7 +2182,7 @@ struct PipelineImpl : public Pipeline
 		finishInstances();
 	}
 
-	
+
 	void renderMeshes(const Array<Array<RenderableMesh>>& meshes)
 	{
 		PROFILE_FUNCTION();
@@ -2371,7 +2370,7 @@ struct PipelineImpl : public Pipeline
 	bool isReady() const override { return m_is_ready; }
 
 
-	void setScene(RenderScene* scene) override 
+	void setScene(RenderScene* scene) override
 	{
 		for (int i = m_first_postprocess_framebuffer; i < m_framebuffers.size(); ++i)
 		{
@@ -2624,7 +2623,7 @@ int setUniform(lua_State* L)
 	}
 
 	if (uniform_idx >= pipeline->m_uniforms.size()) luaL_argerror(L, 2, "unknown uniform");
-	
+
 	pipeline->m_views[pipeline->m_view_idx].command_buffer.beginAppend();
 	pipeline->m_views[pipeline->m_view_idx].command_buffer.setUniform(pipeline->m_uniforms[uniform_idx], tmp, len);
 	pipeline->m_views[pipeline->m_view_idx].command_buffer.end();
