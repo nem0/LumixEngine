@@ -66,6 +66,44 @@ template <int SIZE> bool catString(char(&destination)[SIZE], const char* source)
 	return catString(destination, SIZE, source);
 }
 
+
+template <int size> struct StaticString
+{
+	explicit StaticString(const char* str) { Lumix::copyString(data, size, str); }
+
+	template <typename... Args> StaticString(const char* str, Args... args)
+	{
+		Lumix::copyString(data, size, str);
+		[](...) {}((add(args), 0)...);
+	}
+
+	template <typename T> StaticString& operator<<(T value)
+	{
+		add(value);
+		return *this;
+	}
+
+	template <int size> void add(StaticString<size>& value) { Lumix::catString(data, size, value.data); }
+	void add(const char* value) { Lumix::catString(data, size, value); }
+	void add(char* value) { Lumix::catString(data, size, value); }
+
+	void add(float value)
+	{
+		int len = Lumix::stringLength(data);
+		Lumix::toCString(value, data + len, size - len, 3);
+	}
+
+	template <typename T> void add(T value)
+	{
+		int len = Lumix::stringLength(data);
+		Lumix::toCString(value, data + len, size - len);
+	}
+
+	operator const char*() { return data; }
+	char data[size];
+};
+
+
 template <class T> class base_string
 {
 public:

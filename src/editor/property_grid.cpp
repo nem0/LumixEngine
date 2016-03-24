@@ -57,7 +57,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	desc.get(cmp, index, stream);
 	Lumix::InputBlob tmp(stream);
 
-	StringBuilder<100> desc_name(desc.getName(), "###", (Lumix::uint64)&desc);
+	Lumix::StaticString<100> desc_name(desc.getName(), "###", (Lumix::uint64)&desc);
 
 	switch (desc.getType())
 	{
@@ -110,7 +110,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		{
 			m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
 		}
-		if (ImGui::BeginPopupContextItem(StringBuilder<50>(desc_name, "pu")))
+		if (ImGui::BeginPopupContextItem(Lumix::StaticString<50>(desc_name, "pu")))
 		{
 			if (ImGui::ColorPicker(&v.x, false))
 			{
@@ -167,7 +167,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		auto& resource_descriptor = dynamic_cast<Lumix::ResourcePropertyDescriptorBase&>(desc);
 		auto rm_type = resource_descriptor.getResourceType();
 		if (m_asset_browser.resourceInput(desc.getName(),
-				StringBuilder<20>("", (Lumix::uint64)&desc),
+				Lumix::StaticString<20>("", (Lumix::uint64)&desc),
 				buf,
 				sizeof(buf),
 				rm_type))
@@ -376,7 +376,7 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 
 void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescriptor& desc)
 {
-	StringBuilder<100> desc_name(desc.getName(), "###", (Lumix::uint64)&desc);
+	Lumix::StaticString<100> desc_name(desc.getName(), "###", (Lumix::uint64)&desc);
 
 	if (!ImGui::CollapsingHeader(desc_name, nullptr, true, true)) return;
 
@@ -429,7 +429,7 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 		ImGui::Text("Remove dependents first.");
 	}
 	else if (ImGui::Button(
-		StringBuilder<30>("Remove component###", cmp.type)))
+		Lumix::StaticString<30>("Remove component###", cmp.type)))
 	{
 		m_editor.destroyComponent(cmp);
 		ImGui::PopID();
@@ -462,8 +462,8 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 	getEntityListDisplayName(m_editor, buf, sizeof(buf), entity);
 	ImGui::LabelText("", buf);
 	ImGui::SameLine();
-	StringBuilder<30> popup_name("pu", str_id);
-	if (ImGui::Button(StringBuilder<30>("...###br", str_id)))
+	Lumix::StaticString<30> popup_name("pu", str_id);
+	if (ImGui::Button(Lumix::StaticString<30>("...###br", str_id)))
 	{
 		ImGui::OpenPopup(popup_name);
 	}

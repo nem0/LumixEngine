@@ -465,7 +465,7 @@ namespace {
 						for (int j = 0; j <= i; ++j)
 						{
 							bool b = scene->canLayersCollide(i, j);
-							if (ImGui::Checkbox(StringBuilder<10>("###", i, "-") << j, &b))
+							if (ImGui::Checkbox(StaticString<10>("###", i, "-") << j, &b))
 							{
 								scene->setLayersCanCollide(i, j, b);
 							}

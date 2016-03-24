@@ -1999,7 +1999,7 @@ void ShaderEditor::onGUILeftColumn()
 	ImGui::Separator();
 	for (int i = 0; i < Lumix::lengthOf(m_textures); ++i)
 	{
-		ImGui::InputText(StringBuilder<10>("###tex", i), m_textures[i], sizeof(m_textures[i]));
+		ImGui::InputText(Lumix::StaticString<10>("###tex", i), m_textures[i], sizeof(m_textures[i]));
 	}
 
 	ImGui::PopItemWidth();
@@ -2217,7 +2217,7 @@ void ShaderEditor::onGUIMenu()
 
 void ShaderEditor::onGUI()
 {
-	StringBuilder<Lumix::MAX_PATH_LENGTH + 25> title("Shader Editor");
+	Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 25> title("Shader Editor");
 	if (m_path.isValid()) title << " - " << m_path.c_str();
 	title << "###Shader Editor";
 	if (ImGui::BeginDock(title, &m_is_opened, ImGuiWindowFlags_MenuBar))
