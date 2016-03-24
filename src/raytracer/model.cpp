@@ -5,6 +5,7 @@
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/log.h"
+#include "ray_cast_model_hit.h"
 
 
 namespace Lumix
@@ -13,7 +14,6 @@ namespace Lumix
 
 Model::Model(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
-	, m_bounding_radius()
 	, m_sizeX(0)
 	, m_sizeY(0)
 	, m_sizeZ(0),
@@ -35,12 +35,10 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 {
 	RayCastModelHit hit;
 	hit.m_is_hit = false;
-	if (!isReady())
-	{
-		return hit;
-	}
+	//if (!isReady())
+		//return hit;
 
-	Matrix inv = model_transform;
+	/*Matrix inv = model_transform;
 	inv.inverse();
 	Vec3 local_origin = inv.multiplyPosition(origin);
 	Vec3 local_dir = static_cast<Vec3>(inv * Vec4(dir.x, dir.y, dir.z, 0));
@@ -102,7 +100,7 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 		}
 		vertex_offset += m_meshes[mesh_index].attribute_array_size /
 			m_meshes[mesh_index].vertex_def.getStride();
-	}
+	}*/
 	hit.m_origin = origin;
 	hit.m_dir = dir;
 	return hit;
@@ -119,6 +117,7 @@ bool Model::parseData(FS::IFile& file)
 	m_data.resize(size);
 
 	file.read(m_data.begin(), size * sizeof(uint8));
+	return true;
 }
 
 
@@ -142,20 +141,6 @@ bool Model::load(FS::IFile& file)
 void Model::unload(void)
 {
 	//m_allocator
-
-	auto* material_manager = m_resource_manager.get(ResourceManager::MATERIAL);
-	for (int i = 0; i < m_meshes.size(); ++i)
-	{
-		removeDependency(*m_meshes[i].material);
-		material_manager->unload(*m_meshes[i].material);
-	}
-	m_meshes.clear();
-	m_bones.clear();
-
-	if (bgfx::isValid(m_vertices_handle)) bgfx::destroyVertexBuffer(m_vertices_handle);
-	if (bgfx::isValid(m_indices_handle)) bgfx::destroyIndexBuffer(m_indices_handle);
-	m_indices_handle = BGFX_INVALID_HANDLE;
-	m_vertices_handle = BGFX_INVALID_HANDLE;
 }
 
 

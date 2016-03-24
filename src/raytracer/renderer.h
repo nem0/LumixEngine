@@ -2,6 +2,7 @@
 
 #include "lumix.h"
 #include "iplugin.h"
+#include "core/path.h"
 
 
 namespace Lumix
@@ -14,8 +15,6 @@ public:
 	virtual ~Renderer() {}
 	virtual void frame() = 0;
 	virtual void resize(int width, int height) = 0;
-	virtual int getViewCounter() const = 0;
-	virtual void viewCounterAdd() = 0;
 	virtual void makeScreenshot(const Path& filename) = 0;
 
 	virtual Engine& getEngine() = 0;

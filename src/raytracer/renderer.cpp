@@ -1,6 +1,7 @@
 #include "renderer.h"
 
 #include "iplugin.h"
+#include "core/crc32.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
 #include <bgfx/bgfx.h>
@@ -10,8 +11,11 @@
 #include "engine.h"
 #include "core/profiler.h"
 #include <cfloat>
-
+#include "renderer/model_manager.h"
+#include "renderer/shader_manager.h"
 #include "render_scene.h"
+#include "core/resource_manager.h"
+//#include ""
 
 
 namespace bx
@@ -59,83 +63,11 @@ namespace Lumix
 static void registerProperties(IAllocator& allocator)
 {
 	PropertyRegister::registerComponentType("camera", "Camera");
-	PropertyRegister::registerComponentType("global_light", "Global light");
-	PropertyRegister::registerComponentType("renderable", "Mesh");
-
-	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, StringPropertyDescriptor<RenderScene>)("Slot",
-							  &RenderScene::getCameraSlot,
-							  &RenderScene::setCameraSlot,
-							  allocator));
-	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("FOV",
-							  &RenderScene::getCameraFOV,
-							  &RenderScene::setCameraFOV,
-							  1.0f,
-							  179.0f,
-							  1.0f,
-							  allocator));
-	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Near",
-							  &RenderScene::getCameraNearPlane,
-							  &RenderScene::setCameraNearPlane,
-							  0.0f,
-							  FLT_MAX,
-							  0.0f,
-							  allocator));
-	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Far",
-							  &RenderScene::getCameraFarPlane,
-							  &RenderScene::setCameraFarPlane,
-							  0.0f,
-							  FLT_MAX,
-							  0.0f,
-							  allocator));
-
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Ambient color",
-							  &RenderScene::getLightAmbientColor,
-							  &RenderScene::setLightAmbientColor,
-							  allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Diffuse color",
-							  &RenderScene::getGlobalLightColor,
-							  &RenderScene::setGlobalLightColor,
-							  allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Specular color",
-							  &RenderScene::getGlobalLightSpecular,
-							  &RenderScene::setGlobalLightSpecular,
-							  allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Ambient intensity",
-							  &RenderScene::getLightAmbientIntensity,
-							  &RenderScene::setLightAmbientIntensity,
-							  0.0f,
-							  FLT_MAX,
-							  0.05f,
-							  allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Diffuse intensity",
-							  &RenderScene::getGlobalLightIntensity,
-							  &RenderScene::setGlobalLightIntensity,
-							  0.0f,
-							  FLT_MAX,
-							  0.05f,
-							  allocator));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Specular intensity",
-							  &RenderScene::getGlobalLightSpecularIntensity,
-							  &RenderScene::setGlobalLightSpecularIntensity,
-							  0,
-							  FLT_MAX,
-							  0.01f,
-							  allocator));
+	PropertyRegister::registerComponentType("renderable_model", "Model");
 }
 
 
-static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
-static const uint32 RENDERABLE_HASH = crc32("renderable");
+static const uint32 RENDERABLE_MODEL = crc32("renderable_model");
 static const uint32 CAMERA_HASH = crc32("camera");
 
 
@@ -288,6 +220,9 @@ struct RendererImpl : public Renderer
 		, m_allocator(engine.getAllocator())
 		, m_bgfx_allocator(m_allocator)
 		, m_callback_stub(*this)
+		, m_model_manager(m_allocator, *this)
+		, m_shader_manager(*this, m_allocator)
+		, m_shader_binary_manager(*this, m_allocator)
 	{
 		registerProperties(engine.getAllocator());
 		bgfx::PlatformData d;
@@ -301,10 +236,19 @@ struct RendererImpl : public Renderer
 		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub, &m_bgfx_allocator);
 		bgfx::reset(800, 600);
 		bgfx::setDebug(BGFX_DEBUG_TEXT);
+
+		ResourceManager& manager = engine.getResourceManager();
+		m_model_manager.create(ResourceManager::MODEL, manager);
+		m_shader_manager.create(ResourceManager::SHADER, manager);
+		m_shader_binary_manager.create(ResourceManager::SHADER_BINARY, manager);
 	}
 
 	~RendererImpl()
 	{
+		m_model_manager.destroy();
+		m_shader_manager.destroy();
+		m_shader_binary_manager.destroy();
+
 		bgfx::frame();
 		bgfx::frame();
 		bgfx::shutdown();
@@ -351,19 +295,6 @@ struct RendererImpl : public Renderer
 	{
 		PROFILE_FUNCTION();
 		bgfx::frame();
-		m_view_counter = 0;
-	}
-
-
-	int getViewCounter() const override
-	{
-		return m_view_counter;
-	}
-
-
-	void viewCounterAdd() override
-	{
-		++m_view_counter;
 	}
 
 
@@ -371,7 +302,10 @@ struct RendererImpl : public Renderer
 	IAllocator& m_allocator;
 	CallbackStub m_callback_stub;
 	BGFXAllocator m_bgfx_allocator;
-	int m_view_counter;
+
+	ModelManager m_model_manager;
+	ShaderManager m_shader_manager;
+	ShaderBinaryManager m_shader_binary_manager;
 };
 
 
