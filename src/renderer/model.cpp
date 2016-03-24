@@ -88,10 +88,7 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 {
 	RayCastModelHit hit;
 	hit.m_is_hit = false;
-	if (!isReady())
-	{
-		return hit;
-	}
+	if (!isReady()) return hit;
 
 	Matrix inv = model_transform;
 	inv.inverse();
@@ -99,18 +96,28 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 	Vec3 local_dir = static_cast<Vec3>(inv * Vec4(dir.x, dir.y, dir.z, 0));
 
 	const Array<Vec3>& vertices = m_vertices;
-	const Array<int32>& indices = m_indices;
+	uint16* indices16 = (uint16*)&m_indices[0];
+	uint32* indices32 = (uint32*)&m_indices[0];
 	int vertex_offset = 0;
+	bool is16 = m_flags & (uint32)Model::Flags::INDICES_16BIT;
 	for (int mesh_index = 0; mesh_index < m_meshes.size(); ++mesh_index)
 	{
-		int indices_end = m_meshes[mesh_index].indices_offset +
-						  m_meshes[mesh_index].indices_count;
-		for (int i = m_meshes[mesh_index].indices_offset; i < indices_end;
-			 i += 3)
+		int indices_end = m_meshes[mesh_index].indices_offset + m_meshes[mesh_index].indices_count;
+		for(int i = m_meshes[mesh_index].indices_offset; i < indices_end; i += 3)
 		{
-			Vec3 p0 = vertices[vertex_offset + indices[i]];
-			Vec3 p1 = vertices[vertex_offset + indices[i + 1]];
-			Vec3 p2 = vertices[vertex_offset + indices[i + 2]];
+			Vec3 p0, p1, p2;
+			if(is16)
+			{
+				p0 = vertices[vertex_offset + indices16[i]];
+				p1 = vertices[vertex_offset + indices16[i + 1]];
+				p2 = vertices[vertex_offset + indices16[i + 2]];
+			}
+			else
+			{
+				p0 = vertices[vertex_offset + indices32[i]];
+				p1 = vertices[vertex_offset + indices32[i + 1]];
+				p2 = vertices[vertex_offset + indices32[i + 2]];
+			}
 			Vec3 normal = crossProduct(p1 - p0, p2 - p0);
 			float q = dotProduct(normal, local_dir);
 			if (q == 0)
@@ -263,7 +270,6 @@ void Model::create(const bgfx::VertexDecl& def,
 	ASSERT(!bgfx::isValid(m_indices_handle));
 	auto* mem = bgfx::copy(indices_data, indices_size);
 	m_indices_handle = bgfx::createIndexBuffer(mem, BGFX_BUFFER_INDEX32);
-	m_indices_size = indices_size;
 
 	m_meshes.emplace(def,
 					 material,
@@ -280,7 +286,7 @@ void Model::create(const bgfx::VertexDecl& def,
 	lod.to_mesh = 0;
 	m_lods[0] = lod;
 
-	m_indices.resize(indices_size / sizeof(m_indices[0]));
+	m_indices.resize(indices_size);
 	copyMemory(&m_indices[0], indices_data, indices_size);
 
 	m_vertices.resize(attributes_size / def.getStride());
@@ -299,23 +305,16 @@ void Model::computeRuntimeData(const uint8* vertices)
 
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
-		int mesh_vertex_count =
-			m_meshes[i].attribute_array_size / m_meshes[i].vertex_def.getStride();
+		int mesh_vertex_count = m_meshes[i].attribute_array_size / m_meshes[i].vertex_def.getStride();
 		int mesh_attributes_array_offset = m_meshes[i].attribute_array_offset;
 		int mesh_vertex_size = m_meshes[i].vertex_def.getStride();
-		int mesh_position_attribute_offset =
-			m_meshes[i].vertex_def.getOffset(bgfx::Attrib::Position);
+		int mesh_position_attribute_offset = m_meshes[i].vertex_def.getOffset(bgfx::Attrib::Position);
 		for (int j = 0; j < mesh_vertex_count; ++j)
 		{
-			m_vertices[index] =
-				*(const Vec3*)&vertices[mesh_attributes_array_offset +
-										j * mesh_vertex_size +
-										mesh_position_attribute_offset];
-			bounding_radius_squared = Math::maximum(
-				bounding_radius_squared,
-				dotProduct(m_vertices[index], m_vertices[index]) > 0
-					? m_vertices[index].squaredLength()
-					: 0);
+			m_vertices[index] = *(const Vec3*)&vertices[mesh_attributes_array_offset + j * mesh_vertex_size +
+														mesh_position_attribute_offset];
+			bounding_radius_squared = Math::maximum(bounding_radius_squared,
+				dotProduct(m_vertices[index], m_vertices[index]) > 0 ? m_vertices[index].squaredLength() : 0);
 			min_vertex.x = Math::minimum(min_vertex.x, m_vertices[index].x);
 			min_vertex.y = Math::minimum(min_vertex.y, m_vertices[index].y);
 			min_vertex.z = Math::minimum(min_vertex.z, m_vertices[index].z);
@@ -337,8 +336,9 @@ bool Model::parseGeometry(FS::IFile& file)
 	file.read(&indices_count, sizeof(indices_count));
 	if (indices_count <= 0) return false;
 
-	m_indices.resize(indices_count);
-	file.read(&m_indices[0], sizeof(m_indices[0]) * indices_count);
+	int index_size = (m_flags & (uint32)Model::Flags::INDICES_16BIT) ? 2 : 4;
+	m_indices.resize(indices_count * index_size);
+	file.read(&m_indices[0], index_size * indices_count);
 
 	int32 vertices_size = 0;
 	file.read(&vertices_size, sizeof(vertices_size));
@@ -351,9 +351,9 @@ bool Model::parseGeometry(FS::IFile& file)
 	m_vertices_size = vertices_size;
 
 	ASSERT(!bgfx::isValid(m_indices_handle));
-	m_indices_size = sizeof(m_indices[0]) * indices_count;
-	const bgfx::Memory* mem = bgfx::copy(&m_indices[0], m_indices_size);
-	m_indices_handle = bgfx::createIndexBuffer(mem, BGFX_BUFFER_INDEX32);
+	int indices_size = index_size * indices_count;
+	const bgfx::Memory* mem = bgfx::copy(&m_indices[0], indices_size);
+	m_indices_handle = bgfx::createIndexBuffer(mem, index_size == 4 ? BGFX_BUFFER_INDEX32 : 0);
 
 	int vertex_count = 0;
 	for (int i = 0; i < m_meshes.size(); ++i)
@@ -541,12 +541,26 @@ bool Model::load(FS::IFile& file)
 	PROFILE_FUNCTION();
 	FileHeader header;
 	file.read(&header, sizeof(header));
-	if (header.m_magic == FILE_MAGIC 
-		&& header.m_version <= (uint32)FileVersion::LATEST 
-		&& parseMeshes(file) 
-		&& parseGeometry(file) 
-		&& parseBones(file) 
-		&& parseLODs(file))
+
+	if (header.magic != FILE_MAGIC)
+	{
+		g_log_warning.log("Renderer") << "Corrupted model " << getPath().c_str();
+		return false;
+	}
+
+	if(header.version > (uint32)FileVersion::LATEST)
+	{
+		g_log_warning.log("Renderer") << "Unsupported version of model " << getPath().c_str();
+		return false;
+	}
+
+	m_flags = 0;
+	if(header.version > (uint32)FileVersion::WITH_FLAGS)
+	{
+		file.read(&m_flags, sizeof(m_flags));
+	}
+
+	if (parseMeshes(file) && parseGeometry(file) && parseBones(file) && parseLODs(file))
 	{
 		m_size = file.size();
 		return true;
