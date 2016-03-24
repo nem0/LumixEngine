@@ -28,7 +28,7 @@
 #include "utils.h"
 
 
-typedef StringBuilder<Lumix::MAX_PATH_LENGTH> PathBuilder;
+typedef Lumix::StaticString<Lumix::MAX_PATH_LENGTH> PathBuilder;
 
 
 enum class VertexAttributeDef : Lumix::uint32
@@ -243,7 +243,7 @@ static crn_bool ddsConvertCallback(crn_uint32 phase_index,
 	float fraction = phase_index / float(total_phases) +
 					 (subphase_index / float(total_subphases)) / total_phases;
 	data->dialog->setImportMessage(
-		StringBuilder<Lumix::MAX_PATH_LENGTH + 50>("Saving ", data->dest_path), fraction);
+		Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 50>("Saving ", data->dest_path), fraction);
 
 	return !data->cancel_requested;
 }
@@ -260,7 +260,7 @@ static bool saveAsRaw(ImportAssetDialog& dialog,
 {
 	ASSERT(image_data);
 
-	dialog.setImportMessage(StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Saving ") << dest_path, -1);
+	dialog.setImportMessage(Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 30>("Saving ") << dest_path, -1);
 
 	Lumix::FS::OsFile file;
 	if (!file.open(dest_path,
@@ -268,7 +268,7 @@ static bool saveAsRaw(ImportAssetDialog& dialog,
 			dialog.getEditor().getAllocator()))
 	{
 		dialog.setMessage(
-			StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Could not save ") << dest_path);
+			Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 30>("Could not save ") << dest_path);
 		return false;
 	}
 
@@ -300,7 +300,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 {
 	ASSERT(image_data);
 
-	dialog.setImportMessage(StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Saving ") << dest_path, 0);
+	dialog.setImportMessage(Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 30>("Saving ") << dest_path, 0);
 	
 	dialog.getDDSConvertCallbackData().dialog = &dialog;
 	dialog.getDDSConvertCallbackData().dest_path = dest_path;
@@ -326,7 +326,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 	if (!data)
 	{
 		dialog.setMessage(
-			StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Could not convert ") << source_path);
+			Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 30>("Could not convert ") << source_path);
 		return false;
 	}
 
@@ -336,7 +336,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 			dialog.getEditor().getAllocator()))
 	{
 		dialog.setMessage(
-			StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Could not save ") << dest_path);
+			Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 30>("Could not save ") << dest_path);
 		crn_free_block(data);
 		return false;
 	}
@@ -401,7 +401,7 @@ struct ImportTextureTask : public Lumix::MT::Task
 
 		if (!data)
 		{
-			m_dialog.setMessage(StringBuilder<Lumix::MAX_PATH_LENGTH + 200>("Could not load ")
+			m_dialog.setMessage(Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 200>("Could not load ")
 								<< m_dialog.m_source
 								<< " : "
 								<< stbi_failure_reason());
@@ -449,7 +449,7 @@ struct ImportTextureTask : public Lumix::MT::Task
 			if (!Lumix::copyFile(m_dialog.m_source, dest_path))
 			{
 				m_dialog.setMessage(
-					StringBuilder<Lumix::MAX_PATH_LENGTH * 2 + 30>("Could not copy ")
+					Lumix::StaticString<Lumix::MAX_PATH_LENGTH * 2 + 30>("Could not copy ")
 					<< m_dialog.m_source
 					<< " to "
 					<< dest_path);
@@ -473,7 +473,7 @@ struct ImportTask : public Lumix::MT::Task
 		bool Update(float percentage) override
 		{
 			task->m_dialog.setImportMessage(
-				StringBuilder<50>("Importing... "), percentage);
+				Lumix::StaticString<50>("Importing... "), percentage);
 
 			return !cancel_requested;
 		}
@@ -656,7 +656,7 @@ struct ConvertTask : public Lumix::MT::Task
 			auto data = stbi_load(texture.src, &image_width, &image_height, &image_comp, 4);
 			if (!data)
 			{
-				StringBuilder<Lumix::MAX_PATH_LENGTH + 20> error_msg("Could not load image ", texture.src);
+				Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 20> error_msg("Could not load image ", texture.src);
 				m_dialog.setMessage(error_msg);
 				return false;
 			}
@@ -672,7 +672,7 @@ struct ConvertTask : public Lumix::MT::Task
 			{
 				stbi_image_free(data);
 				m_dialog.setMessage(
-					StringBuilder<Lumix::MAX_PATH_LENGTH * 2 + 20>("Error converting ", texture.src, " to ", dest));
+					Lumix::StaticString<Lumix::MAX_PATH_LENGTH * 2 + 20>("Error converting ", texture.src, " to ", dest));
 				return false;
 			}
 			stbi_image_free(data);
@@ -683,14 +683,14 @@ struct ConvertTask : public Lumix::MT::Task
 			{
 				if (!PlatformInterface::fileExists(texture.src))
 				{
-					m_dialog.setMessage(StringBuilder<Lumix::MAX_PATH_LENGTH + 20>(texture.src, " not found"));
+					m_dialog.setMessage(Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 20>(texture.src, " not found"));
 					return false;
 				}
 			}
 			else if (!Lumix::copyFile(texture.src, dest))
 			{
 				m_dialog.setMessage(
-					StringBuilder<Lumix::MAX_PATH_LENGTH * 2 + 20>("Error copying ", texture.src, " to ", dest));
+					Lumix::StaticString<Lumix::MAX_PATH_LENGTH * 2 + 20>("Error copying ", texture.src, " to ", dest));
 				return false;
 			}
 		}
@@ -913,12 +913,11 @@ struct ConvertTask : public Lumix::MT::Task
 		output_material_name << "/" << material_name.C_Str() << ".mat";
 
 		m_dialog.setImportMessage(
-			StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Converting ") << output_material_name, -1);
+			Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 30>("Converting ") << output_material_name, -1);
 		Lumix::FS::OsFile file;
 		if (!file.open(output_material_name, Lumix::FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
 		{
-			m_dialog.setMessage(StringBuilder<20 + Lumix::MAX_PATH_LENGTH>(
-				"Could not create ", output_material_name));
+			m_dialog.setMessage(Lumix::StaticString<20 + Lumix::MAX_PATH_LENGTH>("Could not create ", output_material_name));
 			return false;
 		}
 
@@ -1579,19 +1578,19 @@ struct ConvertTask : public Lumix::MT::Task
 			if (!mesh.mesh->HasNormals())
 			{
 				m_dialog.setMessage(
-					StringBuilder<256>("Mesh ", getMeshName(scene, mesh.mesh).C_Str(), " has no normals."));
+					Lumix::StaticString<256>("Mesh ", getMeshName(scene, mesh.mesh).C_Str(), " has no normals."));
 				return false;
 			}
 			if(!mesh.mesh->HasPositions())
 			{
 				m_dialog.setMessage(
-					StringBuilder<256>("Mesh ", getMeshName(scene, mesh.mesh).C_Str(), " has no positions."));
+					Lumix::StaticString<256>("Mesh ", getMeshName(scene, mesh.mesh).C_Str(), " has no positions."));
 				return false;
 			}
 			if(!mesh.mesh->HasTextureCoords(0))
 			{
 				m_dialog.setMessage(
-					StringBuilder<256>("Mesh ", getMeshName(scene, mesh.mesh).C_Str(), " has no texture coords."));
+					Lumix::StaticString<256>("Mesh ", getMeshName(scene, mesh.mesh).C_Str(), " has no texture coords."));
 				return false;
 			}
 		}
@@ -1670,7 +1669,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 		if (!file.open(path, Lumix::FS::Mode::CREATE_AND_WRITE, allocator))
 		{
-			m_dialog.setMessage(StringBuilder<Lumix::MAX_PATH_LENGTH + 15>("Failed to open ", path));
+			m_dialog.setMessage(Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 15>("Failed to open ", path));
 			return false;
 		}
 
@@ -1746,8 +1745,7 @@ static bool isImage(const char* path)
 	char ext[10];
 	Lumix::PathUtils::getExtension(ext, sizeof(ext), path);
 
-	static const char* image_extensions[] = {
-		"jpg", "jpeg", "png", "tga", "bmp", "psd", "gif", "hdr", "pic", "pnm"};
+	static const char* image_extensions[] = {"jpg", "jpeg", "png", "tga", "bmp", "psd", "gif", "hdr", "pic", "pnm"};
 	for (auto image_ext : image_extensions)
 	{
 		if (Lumix::compareString(ext, image_ext) == 0)
@@ -1883,7 +1881,7 @@ bool ImportAssetDialog::isTextureDirValid() const
 
 void ImportAssetDialog::onMaterialsGUI()
 {
-	StringBuilder<30> label("Materials (");
+	Lumix::StaticString<30> label("Materials (");
 	label << m_materials.size() << ")###Materials";
 	if (!ImGui::CollapsingHeader(label)) return;
 
@@ -1921,34 +1919,32 @@ void ImportAssetDialog::onMaterialsGUI()
 		{
 			ImGui::Checkbox("Import material", &mat.import);
 
-			if (ImGui::CollapsingHeader("Textures"))
+			ImGui::Columns(4);
+			ImGui::Text("Path"); ImGui::NextColumn();
+			ImGui::Text("Import"); ImGui::NextColumn();
+			ImGui::Text("Convert to DDS"); ImGui::NextColumn();
+			ImGui::Text("Source"); ImGui::NextColumn();
+			ImGui::Separator();
+			for(int i = 0; i < mat.texture_count; ++i)
 			{
-				for (int i = 0; i < mat.texture_count; ++i)
+				ImGui::Text(mat.textures[i].path);
+				ImGui::NextColumn();
+				ImGui::Checkbox(Lumix::StaticString<20>("###imp", i), &mat.textures[i].import);
+				ImGui::NextColumn();
+				ImGui::Checkbox(Lumix::StaticString<20>("###dds", i), &mat.textures[i].to_dds);
+				ImGui::NextColumn();
+				if (ImGui::Button(Lumix::StaticString<50>("Browse###brw", i)))
 				{
-					if (ImGui::TreeNode(mat.textures[i].path))
+					if (PlatformInterface::getOpenFilename(
+							mat.textures[i].src, Lumix::lengthOf(mat.textures[i].src), "All\0*.*\0", nullptr))
 					{
-						ImGui::Checkbox("Import", &mat.textures[i].import);
-						if (mat.textures[i].import)
-						{
-							ImGui::SameLine();
-							ImGui::Checkbox("Convert to DDS", &mat.textures[i].to_dds);
-							ImGui::Text(mat.textures[i].src);
-							ImGui::SameLine();
-							if (ImGui::Button("Browse"))
-							{
-								if (PlatformInterface::getOpenFilename(mat.textures[i].src,
-										Lumix::lengthOf(mat.textures[i].src),
-										"All\0*.*\0",
-										nullptr))
-								{
-									mat.textures[i].is_valid = true;
-								}
-							}
-						}
-						ImGui::TreePop();
+						mat.textures[i].is_valid = true;
 					}
 				}
+				ImGui::SameLine();
+				ImGui::Text(mat.textures[i].src);
 			}
+			ImGui::Columns();
 
 			ImGui::TreePop();
 		}
@@ -1959,7 +1955,7 @@ void ImportAssetDialog::onMaterialsGUI()
 
 void ImportAssetDialog::onMeshesGUI()
 {
-	StringBuilder<30> label("Meshes (");
+	Lumix::StaticString<30> label("Meshes (");
 	label << m_meshes.size() << ")###Meshes";
 	if (!ImGui::CollapsingHeader(label)) return;
 
@@ -1990,10 +1986,10 @@ void ImportAssetDialog::onMeshesGUI()
 		ImGui::Text(material_name.C_Str());
 		ImGui::NextColumn();
 
-		ImGui::Checkbox(StringBuilder<30>("###mesh", (Lumix::uint64)&mesh), &mesh.import);
+		ImGui::Checkbox(Lumix::StaticString<30>("###mesh", (Lumix::uint64)&mesh), &mesh.import);
 		if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("ContextMesh");
 		ImGui::NextColumn();
-		ImGui::Checkbox(StringBuilder<30>("###phy", (Lumix::uint64)&mesh), &mesh.import_physics);
+		ImGui::Checkbox(Lumix::StaticString<30>("###phy", (Lumix::uint64)&mesh), &mesh.import_physics);
 		if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("ContextPhy");
 		ImGui::NextColumn();
 	}
@@ -2143,7 +2139,7 @@ void ImportAssetDialog::onGUI()
 			if (scene->HasAnimations())
 			{
 				ImGui::Checkbox(
-					StringBuilder<50>("Import animations (", scene->mNumAnimations, ")"), &m_import_animations);
+					Lumix::StaticString<50>("Import animations (", scene->mNumAnimations, ")"), &m_import_animations);
 			}
 
 			onMeshesGUI();

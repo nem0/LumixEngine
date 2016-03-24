@@ -16,13 +16,13 @@ static Settings* g_instance = nullptr;
 
 static void shortcutInput(int& shortcut)
 {
-	StringBuilder<50> popup_name("");
+	Lumix::StaticString<50> popup_name("");
 	popup_name << (Lumix::int64)&shortcut;
 
 	char key_string[30];
 	PlatformInterface::getKeyName(shortcut, key_string, 30);
 
-	StringBuilder<50> button_label(key_string);
+	Lumix::StaticString<50> button_label(key_string);
 	button_label << "###" << (Lumix::int64)&shortcut;
 
 	if (ImGui::Button(button_label, ImVec2(50, 0))) shortcut = -1;

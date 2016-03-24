@@ -1343,7 +1343,7 @@ void TerrainEditor::onGUI()
 				for (int i = 0; i < tex->getAtlasSize() * tex->getAtlasSize(); ++i)
 				{
 					if (i % 4 != 0) ImGui::SameLine();
-					if (ImGui::RadioButton(StringBuilder<20>("", i, "###rb", i), m_texture_idx == i))
+					if (ImGui::RadioButton(Lumix::StaticString<20>("", i, "###rb", i), m_texture_idx == i))
 					{
 						m_texture_idx = i;
 					}

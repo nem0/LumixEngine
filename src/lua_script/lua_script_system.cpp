@@ -1639,7 +1639,7 @@ namespace Lumix
 									Lumix::Entity e;
 									Lumix::fromCString(buf, sizeof(buf), &e);
 									if (grid.entityInput(property_name,
-											StringBuilder<50>(property_name, cmp.index),
+											StaticString<50>(property_name, cmp.index),
 											e))
 									{
 										Lumix::toCString(e, buf, sizeof(buf));

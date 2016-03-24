@@ -633,7 +633,7 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 					case Lumix::Profiler::BlockType::TIME:
 					{
 						auto frame = m_current_frame < 0 ? block->m_frames.back() : block->m_frames[m_current_frame];
-						if (ImGui::Selectable(StringBuilder<50>("") << frame * 1000.0f << "###t" << (Lumix::int64)block,
+						if (ImGui::Selectable(Lumix::StaticString<50>("") << frame * 1000.0f << "###t" << (Lumix::int64)block,
 								m_current_block == block))
 						{
 							m_current_block = block;
@@ -648,7 +648,7 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 					{
 						int int_value =
 							m_current_frame < 0 ? block->m_int_values.back() : block->m_int_values[m_current_frame];
-						if (ImGui::Selectable(StringBuilder<50>("") << int_value << "###c" << (Lumix::int64)block,
+						if (ImGui::Selectable(Lumix::StaticString<50>("") << int_value << "###c" << (Lumix::int64)block,
 								m_current_block == block,
 								ImGuiSelectableFlags_SpanAllColumns))
 						{

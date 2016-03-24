@@ -76,8 +76,8 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 			fs.close(*file);
 
 			auto& engine = m_app.getWorldEditor()->getEngine();
-			StringBuilder<MAX_PATH_LENGTH> src_full_path("");
-			StringBuilder<MAX_PATH_LENGTH> dest_full_path("");
+			StaticString<MAX_PATH_LENGTH> src_full_path("");
+			StaticString<MAX_PATH_LENGTH> dest_full_path("");
 			if (engine.getPatchFileDevice())
 			{
 				src_full_path << engine.getPatchFileDevice()->getBasePath() << tmp_path;
@@ -174,15 +174,15 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 			auto* texture = material->getTexture(i);
 			copyString(buf, texture ? texture->getPath().c_str() : "");
 			if (m_app.getAssetBrowser()->resourceInput(
-				slot.m_name, StringBuilder<30>("", (uint64)&slot), buf, sizeof(buf), TEXTURE_HASH))
+				slot.m_name, StaticString<30>("", (uint64)&slot), buf, sizeof(buf), TEXTURE_HASH))
 			{
 				material->setTexturePath(i, Path(buf));
 			}
 			if (!texture) continue;
 
 			ImGui::SameLine();
-			StringBuilder<100> popup_name("pu", (uint64)texture, slot.m_name);
-			if (ImGui::Button(StringBuilder<100>("Advanced###adv", (uint64)texture, slot.m_name)))
+			StaticString<100> popup_name("pu", (uint64)texture, slot.m_name);
+			if (ImGui::Button(StaticString<100>("Advanced###adv", (uint64)texture, slot.m_name)))
 			{
 				ImGui::OpenPopup(popup_name);
 			}
@@ -218,7 +218,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 				{
 					int size = texture->getAtlasSize() - 2;
 					const char values[] = { '2', 'x', '2', 0, '3', 'x', '3', 0, '4', 'x', '4', 0, 0 };
-					if (ImGui::Combo(StringBuilder<30>("Atlas size###", i), &size, values))
+					if (ImGui::Combo(StaticString<30>("Atlas size###", i), &size, values))
 					{
 						texture->setAtlasSize(size + 2);
 					}
@@ -255,7 +255,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 						{
 							material->createCommandBuffer();
 						}
-						if(ImGui::BeginPopupContextItem(StringBuilder<50>(shader_uniform.name, "pu")))
+						if(ImGui::BeginPopupContextItem(StaticString<50>(shader_uniform.name, "pu")))
 						{
 							if(ImGui::ColorPicker(uniform.vec3, false))
 							{
@@ -628,7 +628,7 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 		char basename[MAX_PATH_LENGTH];
 		PathUtils::getBasename(
 			basename, lengthOf(basename), resource->getPath().c_str());
-		StringBuilder<MAX_PATH_LENGTH> path("/shaders/", basename);
+		StaticString<MAX_PATH_LENGTH> path("/shaders/", basename);
 		if (ImGui::Button("Open vertex shader"))
 		{
 			path << "_vs.sc";

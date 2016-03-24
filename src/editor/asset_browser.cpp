@@ -7,6 +7,7 @@
 #include "core/resource.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/string.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "file_system_watcher.h"
@@ -285,16 +286,16 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	ImGui::PushItemWidth(item_w - ImGui::CalcTextSize("...View").x - style.FramePadding.x * 4 -
 						 style.ItemSpacing.x * 2);
 
-	if (ImGui::InputText(StringBuilder<30>("###", str_id), buf, max_size)) return true;
+	if (ImGui::InputText(Lumix::StaticString<30>("###", str_id), buf, max_size)) return true;
 
 	ImGui::SameLine();
-	StringBuilder<50> popup_name("pu", str_id);
-	if (ImGui::Button(StringBuilder<30>("...###browse", str_id)))
+	Lumix::StaticString<50> popup_name("pu", str_id);
+	if (ImGui::Button(Lumix::StaticString<30>("...###browse", str_id)))
 	{
 		ImGui::OpenPopup(popup_name);
 	}
 	ImGui::SameLine();
-	if (ImGui::Button(StringBuilder<30>("View###go", str_id)))
+	if (ImGui::Button(Lumix::StaticString<30>("View###go", str_id)))
 	{
 		m_is_focus_requested = true;
 		m_is_opened = true;
@@ -341,7 +342,7 @@ void AssetBrowser::openInExternalEditor(const char* path)
 {
 	if (m_editor.getEngine().getPatchFileDevice())
 	{
-		StringBuilder<Lumix::MAX_PATH_LENGTH> full_path(m_editor.getEngine().getPatchFileDevice()->getBasePath());
+		Lumix::StaticString<Lumix::MAX_PATH_LENGTH> full_path(m_editor.getEngine().getPatchFileDevice()->getBasePath());
 		full_path << path;
 		if (PlatformInterface::fileExists(full_path))
 		{
@@ -350,7 +351,7 @@ void AssetBrowser::openInExternalEditor(const char* path)
 		}
 	}
 
-	StringBuilder<Lumix::MAX_PATH_LENGTH> full_path(m_editor.getEngine().getDiskFileDevice()->getBasePath());
+	Lumix::StaticString<Lumix::MAX_PATH_LENGTH> full_path(m_editor.getEngine().getDiskFileDevice()->getBasePath());
 	full_path << path;
 	PlatformInterface::shellExecuteOpen(full_path);
 }
