@@ -272,7 +272,7 @@ public:
 			showMainMenu();
 			if (ImGui::GetIO().DisplaySize.y > 0)
 			{
-				auto pos = ImVec2(0, ImGui::GetWindowFontSize() + ImGui::GetStyle().FramePadding.y * 2);
+				auto pos = ImVec2(0, ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2);
 				auto size = ImGui::GetIO().DisplaySize;
 				size.y -= pos.y;
 				ImGui::RootDock(pos, size);

@@ -674,7 +674,7 @@ struct DockContext
 			{
 				SameLine(0, 15);
 
-				const char* text_end = FindTextDisplayEnd(dock_tab->label);
+				const char* text_end = FindRenderedTextEnd(dock_tab->label);
 				ImVec2 size(CalcTextSize(dock_tab->label, text_end).x, line_height);
 				if (InvisibleButton(dock_tab->label, size))
 				{
