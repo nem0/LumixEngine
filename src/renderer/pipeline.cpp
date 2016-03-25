@@ -439,6 +439,7 @@ struct PipelineImpl : public Pipeline
 
 	void createUniforms()
 	{
+		m_grass_max_dist_uniform = bgfx::createUniform("u_grassMaxDist", bgfx::UniformType::Vec4);
 		m_texture_size_uniform = bgfx::createUniform("u_textureSize", bgfx::UniformType::Vec4);
 		m_cam_params = bgfx::createUniform("u_camParams", bgfx::UniformType::Vec4);
 		m_cam_proj_uniform = bgfx::createUniform("u_camProj", bgfx::UniformType::Mat4);
@@ -494,6 +495,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::destroyUniform(m_cam_view_uniform);
 		bgfx::destroyUniform(m_cam_proj_uniform);
 		bgfx::destroyUniform(m_cam_params);
+		bgfx::destroyUniform(m_grass_max_dist_uniform);
 		bgfx::destroyUniform(m_cam_inv_view_uniform);
 		bgfx::destroyUniform(m_texture_size_uniform);
 	}
@@ -2108,29 +2110,31 @@ struct PipelineImpl : public Pipeline
 
 	void renderGrass(const GrassInfo& grass)
 	{
-		if (!bgfx::checkAvailInstanceDataBuffer(grass.m_matrix_count, sizeof(Matrix))) return;
+		if (!bgfx::checkAvailInstanceDataBuffer(grass.matrix_count, sizeof(Matrix))) return;
 
 		const bgfx::InstanceDataBuffer* idb =
-			bgfx::allocInstanceDataBuffer(grass.m_matrix_count, sizeof(Matrix));
-		copyMemory(idb->data, &grass.m_matrices[0], grass.m_matrix_count * sizeof(Matrix));
-		const Mesh& mesh = grass.m_model->getMesh(0);
+			bgfx::allocInstanceDataBuffer(grass.matrix_count, sizeof(Matrix));
+		copyMemory(idb->data, &grass.matrices[0], grass.matrix_count * sizeof(Matrix));
+		const Mesh& mesh = grass.model->getMesh(0);
 		Material* material = mesh.material;
 
 		auto& view = m_views[m_current_render_views[0]];
 		executeCommandBuffer(material->getCommandBuffer(), material);
 		executeCommandBuffer(view.command_buffer.buffer, material);
+		;
+		bgfx::setUniform(m_grass_max_dist_uniform, &Vec4(grass.type_distance, 0, 0, 0));
 
-		bgfx::setVertexBuffer(grass.m_model->getVerticesHandle(),
+		bgfx::setVertexBuffer(grass.model->getVerticesHandle(),
 			mesh.attribute_array_offset / mesh.vertex_def.getStride(),
 			mesh.attribute_array_size / mesh.vertex_def.getStride());
 		bgfx::setIndexBuffer(
-			grass.m_model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
+			grass.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material->getRenderStates());
-		bgfx::setInstanceDataBuffer(idb, grass.m_matrix_count);
+		bgfx::setInstanceDataBuffer(idb, grass.matrix_count);
 		++m_stats.m_draw_call_count;
-		m_stats.m_instance_count += grass.m_matrix_count;
-		m_stats.m_triangle_count += grass.m_matrix_count * mesh.indices_count;
+		m_stats.m_instance_count += grass.matrix_count;
+		m_stats.m_triangle_count += grass.matrix_count * mesh.indices_count;
 		bgfx::submit(view.bgfx_id, material->getShaderInstance().m_program_handles[view.pass_idx]);
 	}
 
@@ -2499,6 +2503,7 @@ struct PipelineImpl : public Pipeline
 	bgfx::UniformHandle m_cam_inv_proj_uniform;
 	bgfx::UniformHandle m_cam_inv_viewproj_uniform;
 	bgfx::UniformHandle m_texture_size_uniform;
+	bgfx::UniformHandle m_grass_max_dist_uniform;
 	int m_global_textures_count;
 
 	Material* m_debug_line_material;
