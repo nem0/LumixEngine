@@ -575,9 +575,10 @@ void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Com
 				if (!patch.m_matrices.empty())
 				{
 					GrassInfo& info = infos.emplace();
-					info.m_matrices = &patch.m_matrices[0];
-					info.m_matrix_count = patch.m_matrices.size();
-					info.m_model = patch.m_type->m_grass_model;
+					info.matrices = &patch.m_matrices[0];
+					info.matrix_count = patch.m_matrices.size();
+					info.model = patch.m_type->m_grass_model;
+					info.type_distance = patch.m_type->m_distance;
 				}
 			}
 		}

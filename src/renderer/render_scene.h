@@ -81,9 +81,10 @@ struct RenderableMesh
 
 struct GrassInfo
 {
-	Model* m_model;
-	const Matrix* m_matrices;
-	int m_matrix_count;
+	Model* model;
+	const Matrix* matrices;
+	int matrix_count;
+	float type_distance;
 };
 
 
