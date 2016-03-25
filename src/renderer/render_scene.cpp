@@ -60,24 +60,6 @@ static const uint32 CAMERA_HASH = crc32("camera");
 static const uint32 TERRAIN_HASH = crc32("terrain");
 
 
-enum class RenderSceneVersion : int32
-{
-	PARTICLES,
-	WHOLE_LIGHTS,
-	PARTICLE_EMITTERS_SPAWN_COUNT,
-	PARTICLES_FORCE_MODULE,
-	PARTICLES_SAVE_SIZE_ALPHA,
-	RENDERABLE_MATERIALS,
-	GLOBAL_LIGHT_SPECULAR,
-	SPECULAR_INTENSITY,
-	RENDER_PARAMS,
-	RENDER_PARAMS_REMOVED,
-
-	LATEST,
-	INVALID = -1,
-};
-
-
 struct PointLight
 {
 	Vec3 m_diffuse_color;
@@ -821,7 +803,7 @@ public:
 		serializer.read(m_active_global_light_uid);
 	}
 
-	void deserializeTerrains(InputBlob& serializer)
+	void deserializeTerrains(InputBlob& serializer, RenderSceneVersion version)
 	{
 		int32 size = 0;
 		serializer.read(size);
@@ -848,7 +830,7 @@ public:
 						m_renderer, INVALID_ENTITY, *this, m_allocator);
 				}
 				Terrain* terrain = m_terrains[i];
-				terrain->deserialize(serializer, m_universe, *this, i);
+				terrain->deserialize(serializer, m_universe, *this, i, (int)version);
 			}
 			else
 			{
@@ -869,7 +851,7 @@ public:
 		deserializeCameras(serializer);
 		deserializeRenderables(serializer, (RenderSceneVersion)version);
 		deserializeLights(serializer, (RenderSceneVersion)version);
-		deserializeTerrains(serializer);
+		deserializeTerrains(serializer, (RenderSceneVersion)version);
 		if (version >= 0) deserializeParticleEmitters(serializer, version);
 		if (version >= (int)RenderSceneVersion::RENDER_PARAMS &&
 			version < (int)RenderSceneVersion::RENDER_PARAMS_REMOVED)
@@ -1943,15 +1925,15 @@ public:
 	}
 
 
-	int getGrassDistance(ComponentIndex cmp) override
+	float getGrassDistance(ComponentIndex cmp, int index) override
 	{
-		return m_terrains[cmp]->getGrassDistance();
+		return m_terrains[cmp]->getGrassTypeDistance(index);
 	}
 
 
-	void setGrassDistance(ComponentIndex cmp, int value) override
+	void setGrassDistance(ComponentIndex cmp, int index, float value) override
 	{
-		m_terrains[cmp]->setGrassDistance(value);
+		m_terrains[cmp]->setGrassTypeDistance(index, value);
 	}
 
 
