@@ -2121,7 +2121,6 @@ struct PipelineImpl : public Pipeline
 		auto& view = m_views[m_current_render_views[0]];
 		executeCommandBuffer(material->getCommandBuffer(), material);
 		executeCommandBuffer(view.command_buffer.buffer, material);
-		;
 		bgfx::setUniform(m_grass_max_dist_uniform, &Vec4(grass.type_distance, 0, 0, 0));
 
 		bgfx::setVertexBuffer(grass.model->getVerticesHandle(),
