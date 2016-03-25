@@ -28,6 +28,25 @@ template <typename T> class Array;
 template <typename T> class DelegateList;
 
 
+enum class RenderSceneVersion : int32
+{
+	PARTICLES,
+	WHOLE_LIGHTS,
+	PARTICLE_EMITTERS_SPAWN_COUNT,
+	PARTICLES_FORCE_MODULE,
+	PARTICLES_SAVE_SIZE_ALPHA,
+	RENDERABLE_MATERIALS,
+	GLOBAL_LIGHT_SPECULAR,
+	SPECULAR_INTENSITY,
+	RENDER_PARAMS,
+	RENDER_PARAMS_REMOVED,
+	GRASS_TYPE_DISTANCE,
+
+	LATEST,
+	INVALID = -1,
+};
+
+
 struct TerrainInfo
 {
 	Shader* m_shader;
@@ -291,8 +310,8 @@ public:
 	virtual ComponentIndex getNextTerrain(ComponentIndex cmp) = 0;
 
 	virtual bool isGrassEnabled() const = 0;
-	virtual int getGrassDistance(ComponentIndex cmp) = 0;
-	virtual void setGrassDistance(ComponentIndex cmp, int value) = 0;
+	virtual float getGrassDistance(ComponentIndex cmp, int index) = 0;
+	virtual void setGrassDistance(ComponentIndex cmp, int index, float value) = 0;
 	virtual void enableGrass(bool enabled) = 0;
 	virtual void setGrassPath(ComponentIndex cmp, int index, const Path& path) = 0;
 	virtual Path getGrassPath(ComponentIndex cmp, int index) = 0;

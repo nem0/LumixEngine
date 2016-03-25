@@ -242,6 +242,7 @@ Terrain::GrassType::GrassType(Terrain& terrain)
 	m_grass_model = nullptr;
 	m_ground = 0;
 	m_density = 10;
+	m_distance = 50;
 }
 
 
@@ -280,10 +281,30 @@ void Terrain::setGrassTypeDensity(int index, int density)
 }
 
 
-int Terrain::getGrassTypeDensity(int index)
+int Terrain::getGrassTypeDensity(int index) const
 {
 	GrassType& type = *m_grass_types[index];
 	return type.m_density;
+}
+
+
+void Terrain::setGrassTypeDistance(int index, float distance)
+{
+	forceGrassUpdate();
+	m_grass_distance = 0;
+	for (auto* type : m_grass_types)
+	{
+		m_grass_distance = Math::maximum(m_grass_distance, int(distance / GRASS_QUAD_RADIUS + 0.99f));
+	}
+	GrassType& type = *m_grass_types[index];
+	type.m_distance = Math::clamp(distance, 1.0f, FLT_MAX);
+}
+
+
+float Terrain::getGrassTypeDistance(int index) const
+{
+	GrassType& type = *m_grass_types[index];
+	return type.m_distance;
 }
 
 
@@ -296,7 +317,7 @@ void Terrain::setGrassTypeGround(int index, int ground)
 }
 	
 	
-int Terrain::getGrassTypeGround(int index)
+int Terrain::getGrassTypeGround(int index) const
 {
 	GrassType& type = *m_grass_types[index];
 	return type.m_ground;
@@ -539,15 +560,18 @@ void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Com
 	
 	Universe& universe = m_scene.getUniverse();
 	Matrix mtx = universe.getMatrix(m_entity);
+	Vec3 frustum_position = frustum.position;
 	for (auto* quad : quads)
 	{
 		Vec3 quad_center(quad->pos.x + GRASS_QUAD_SIZE * 0.5f, quad->pos.y, quad->pos.z + GRASS_QUAD_SIZE * 0.5f);
 		quad_center = mtx.multiplyPosition(quad_center);
-		if(frustum.isSphereInside(quad_center, quad->radius)) 
+		if (frustum.isSphereInside(quad_center, quad->radius))
 		{
-			for(int patch_idx = 0; patch_idx < quad->m_patches.size(); ++patch_idx)
+			float dist2 = (quad_center - frustum_position).squaredLength();
+			for (int patch_idx = 0; patch_idx < quad->m_patches.size(); ++patch_idx)
 			{
 				const GrassPatch& patch = quad->m_patches[patch_idx];
+				if (patch.m_type->m_distance * patch.m_type->m_distance < dist2) continue;
 				if (!patch.m_matrices.empty())
 				{
 					GrassInfo& info = infos.emplace();
@@ -585,7 +609,7 @@ void Terrain::setMaterial(Material* material)
 	}
 }
 
-void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene, int index)
+void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene, int index, int version)
 {
 	serializer.read(m_entity);
 	serializer.read(m_layer_mask);
@@ -612,12 +636,16 @@ void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene
 		serializer.readString(path, MAX_PATH_LENGTH);
 		serializer.read(m_grass_types[i]->m_ground);
 		serializer.read(m_grass_types[i]->m_density);
+		if (version > (int)RenderSceneVersion::GRASS_TYPE_DISTANCE)
+		{
+			serializer.read(m_grass_types[i]->m_distance);
+		}
 		setGrassTypePath(i, Path(path));
 	}
 	universe.addComponent(m_entity, TERRAIN_HASH, &scene, index);
 }
 
-
+	
 void Terrain::serialize(OutputBlob& serializer)
 {
 	serializer.write(m_entity);
@@ -633,6 +661,7 @@ void Terrain::serialize(OutputBlob& serializer)
 		serializer.writeString(type.m_grass_model ? type.m_grass_model->getPath().c_str() : "");
 		serializer.write(type.m_ground);
 		serializer.write(type.m_density);
+		serializer.write(type.m_distance);
 	}
 }
 
