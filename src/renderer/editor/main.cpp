@@ -480,14 +480,22 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 			ImGui::Text("# of meshes"); ImGui::NextColumn();
 			ImGui::Separator();
 			int lod_count = 1;
-			for (int i = 0; i < Model::MAX_LOD_COUNT - 1 && lods[i + 1].to_mesh >= 0; ++i)
+			bool is_infinite_lod = false;
+			for (int i = 0; i < Model::MAX_LOD_COUNT && lods[i].to_mesh >= 0; ++i)
 			{
 				ImGui::PushID(i);
 				ImGui::Text("%d", i); ImGui::NextColumn();
-				float dist = sqrt(lods[i].distance);
-				if (ImGui::DragFloat("", &dist))
+				if (lods[i].distance == FLT_MAX)
 				{
-					lods[i].distance = dist * dist;
+					ImGui::Text("Infinite");
+				}
+				else
+				{
+					float dist = sqrt(lods[i].distance);
+					if (ImGui::DragFloat("", &dist))
+					{
+						lods[i].distance = dist * dist;
+					}
 				}
 				ImGui::NextColumn();
 				ImGui::Text("%d", lods[i].to_mesh - lods[i].from_mesh + 1); ImGui::NextColumn();
@@ -495,9 +503,6 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 				ImGui::PopID();
 			}
 
-			ImGui::Text("%d", lod_count - 1); ImGui::NextColumn();
-			ImGui::Text("INFINITE"); ImGui::NextColumn();
-			ImGui::Text("%d", lods[lod_count - 1].to_mesh - lods[lod_count - 1].from_mesh + 1);
 			ImGui::Columns(1);
 		}
 

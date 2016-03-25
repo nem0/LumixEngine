@@ -2527,22 +2527,22 @@ public:
 			crc32("scale_entity"), &WorldEditorImpl::constructEditorCommand<ScaleEntityCommand>);
 		m_editor_command_creators.insert(
 			crc32("move_entity"), &WorldEditorImpl::constructEditorCommand<MoveEntityCommand>);
-		m_editor_command_creators.insert(crc32("set_entity_name"),
-			&WorldEditorImpl::constructEditorCommand<SetEntityNameCommand>);
+		m_editor_command_creators.insert(
+			crc32("set_entity_name"), &WorldEditorImpl::constructEditorCommand<SetEntityNameCommand>);
 		m_editor_command_creators.insert(
 			crc32("paste_entity"), &WorldEditorImpl::constructEditorCommand<PasteEntityCommand>);
 		m_editor_command_creators.insert(crc32("remove_array_property_item"),
 			&WorldEditorImpl::constructEditorCommand<RemoveArrayPropertyItemCommand>);
-		m_editor_command_creators.insert(crc32("add_array_property_item"),
-			&WorldEditorImpl::constructEditorCommand<AddArrayPropertyItemCommand>);
+		m_editor_command_creators.insert(
+			crc32("add_array_property_item"), &WorldEditorImpl::constructEditorCommand<AddArrayPropertyItemCommand>);
 		m_editor_command_creators.insert(
 			crc32("set_property"), &WorldEditorImpl::constructEditorCommand<SetPropertyCommand>);
 		m_editor_command_creators.insert(
 			crc32("add_component"), &WorldEditorImpl::constructEditorCommand<AddComponentCommand>);
-		m_editor_command_creators.insert(crc32("destroy_entities"),
-			&WorldEditorImpl::constructEditorCommand<DestroyEntitiesCommand>);
-		m_editor_command_creators.insert(crc32("destroy_component"),
-			&WorldEditorImpl::constructEditorCommand<DestroyComponentCommand>);
+		m_editor_command_creators.insert(
+			crc32("destroy_entities"), &WorldEditorImpl::constructEditorCommand<DestroyEntitiesCommand>);
+		m_editor_command_creators.insert(
+			crc32("destroy_component"), &WorldEditorImpl::constructEditorCommand<DestroyComponentCommand>);
 		m_editor_command_creators.insert(
 			crc32("add_entity"), &WorldEditorImpl::constructEditorCommand<AddEntityCommand>);
 

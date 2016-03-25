@@ -39,6 +39,7 @@ struct ImportTexture
 
 struct ImportMaterial
 {
+	const struct aiScene* scene;
 	struct aiMaterial* material;
 	bool import;
 	int texture_count;
@@ -59,6 +60,7 @@ struct ImportMesh
 	bool import;
 	bool import_physics;
 	struct aiMesh* mesh;
+	const aiScene* scene;
 	Lumix::Array<unsigned int> map_to_input;
 	Lumix::Array<unsigned int> map_from_input;
 	Lumix::Array<Lumix::int32> indices;
@@ -109,11 +111,12 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		void onMaterialsGUI();
 		void onMeshesGUI();
 		void onImageGUI();
+		void onLODsGUI();
 
 	private:
 		Lumix::WorldEditor& m_editor;
 		Lumix::Array<Lumix::uint32> m_saved_textures;
-		Assimp::Importer m_importer;
+		Lumix::Array<Assimp::Importer> m_importers;
 		Lumix::Array<ImportMesh> m_meshes;
 		Lumix::Array<ImportMaterial> m_materials;
 		char m_import_message[1024];
@@ -121,9 +124,9 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		char m_message[1024];
 		char m_last_dir[Lumix::MAX_PATH_LENGTH];
 		char m_source[Lumix::MAX_PATH_LENGTH];
+		char m_output_filename[Lumix::MAX_PATH_LENGTH];
 		char m_output_dir[Lumix::MAX_PATH_LENGTH];
 		char m_texture_output_dir[Lumix::MAX_PATH_LENGTH];
-		bool m_source_exists;
 		bool m_optimize_mesh_on_import;
 		bool m_gen_smooth_normal;
 		bool m_convert_to_dds;
@@ -136,6 +139,7 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		bool m_is_importing_texture;
 		float m_raw_texture_scale;
 		float m_mesh_scale;
+		float m_lods[4];
 		Orientation m_orientation;
 		Lumix::MT::Task* m_task;
 		Lumix::MT::SpinMutex m_mutex;
