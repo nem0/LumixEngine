@@ -93,11 +93,11 @@ static aiString getMeshName(const aiScene* scene, const aiMesh* mesh)
 }
 
 
-static int getMeshLOD(const aiScene* scene, const aiMesh* mesh)
+static float getMeshLODFactor(const aiScene* scene, const aiMesh* mesh)
 {
 	const char* mesh_name = getMeshName(scene, mesh).C_Str();
 	int len = Lumix::stringLength(mesh_name);
-	if (len < 5) return -1;
+	if (len < 5) return FLT_MAX;
 
 	const char* last = mesh_name + len - 1;
 	while (last > mesh_name && *last >= '0' && *last <= '9')
@@ -105,8 +105,40 @@ static int getMeshLOD(const aiScene* scene, const aiMesh* mesh)
 		--last;
 	}
 	++last;
-	if (last < mesh_name + 4) return -1;
-	if (Lumix::compareIStringN(last - 4, "_LOD", 4) != 0) return -1;
+	if (last < mesh_name + 4) return FLT_MAX;
+	if (Lumix::compareIStringN(last - 4, "_LOD", 4) != 0) return FLT_MAX;
+	const char* end_of_factor = last - 4;
+	const char* begin_factor = end_of_factor - 1;
+	if (begin_factor <= mesh_name) return FLT_MAX;
+
+	while (*begin_factor != '_' && begin_factor > mesh_name)
+	{
+		--begin_factor;
+	}
+	++begin_factor;
+
+	if (begin_factor == end_of_factor) return FLT_MAX;
+	int factor;
+	Lumix::fromCString(begin_factor, int(end_of_factor - begin_factor), &factor);
+
+	return float(factor);
+}
+
+
+static int getMeshLOD(const aiScene* scene, const aiMesh* mesh)
+{
+	const char* mesh_name = getMeshName(scene, mesh).C_Str();
+	int len = Lumix::stringLength(mesh_name);
+	if (len < 5) return 0;
+
+	const char* last = mesh_name + len - 1;
+	while (last > mesh_name && *last >= '0' && *last <= '9')
+	{
+		--last;
+	}
+	++last;
+	if (last < mesh_name + 4) return 0;
+	if (Lumix::compareIStringN(last - 4, "_LOD", 4) != 0) return 0;
 
 	int lod;
 	Lumix::fromCString(last, len - int(last - mesh_name), &lod);
@@ -465,7 +497,7 @@ struct ImportTask : public Lumix::MT::Task
 		: Task(dialog.m_editor.getAllocator())
 		, m_dialog(dialog)
 	{
-		m_dialog.m_importer.SetProgressHandler(&m_progress_handler);
+		m_dialog.m_importers.back().SetProgressHandler(&m_progress_handler);
 		struct MyStream : public Assimp::LogStream
 		{
 			void write(const char* message) { Lumix::g_log_warning.log("Editor") << message; }
@@ -477,7 +509,7 @@ struct ImportTask : public Lumix::MT::Task
 	}
 
 
-	~ImportTask() { m_dialog.m_importer.SetProgressHandler(nullptr); }
+	~ImportTask() { m_dialog.m_importers.back().SetProgressHandler(nullptr); }
 
 
 	int task() override
@@ -485,30 +517,31 @@ struct ImportTask : public Lumix::MT::Task
 		m_progress_handler.task = this;
 		m_progress_handler.cancel_requested = false;
 		Lumix::enableFloatingPointTraps(false);
-		m_dialog.m_importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, aiComponent_LIGHTS | aiComponent_CAMERAS);
+		m_dialog.m_importers.back().SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, aiComponent_LIGHTS | aiComponent_CAMERAS);
 		unsigned int flags = aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent | aiProcess_GenUVCoords |
 							 aiProcess_RemoveRedundantMaterials | aiProcess_Triangulate | aiProcess_FindInvalidData |
 							 aiProcess_OptimizeGraph | aiProcess_ValidateDataStructure | aiProcess_CalcTangentSpace;
 		flags |= m_dialog.m_gen_smooth_normal ? aiProcess_GenSmoothNormals : aiProcess_GenNormals;
 		flags |= m_dialog.m_optimize_mesh_on_import ? aiProcess_OptimizeMeshes : 0;
-		const aiScene* scene = m_dialog.m_importer.ReadFile(m_dialog.m_source, flags);
+		const aiScene* scene = m_dialog.m_importers.back().ReadFile(m_dialog.m_source, flags);
 		if (!scene || !scene->mMeshes)
 		{
-			m_dialog.m_importer.FreeScene();
-			const char* msg = m_dialog.m_importer.GetErrorString();
+			m_dialog.m_importers.back().FreeScene();
+			const char* msg = m_dialog.m_importers.back().GetErrorString();
 			m_dialog.setMessage(msg);
-			Lumix::g_log_error.log("Editor") << m_dialog.m_importer.GetErrorString();
+			Lumix::g_log_error.log("Editor") << m_dialog.m_importers.back().GetErrorString();
+			m_dialog.m_importers.pop();
 		}
 		else
 		{
-			m_dialog.m_meshes.clear();
-			m_dialog.m_meshes.reserve(scene->mNumMeshes);
+			m_dialog.m_meshes.reserve(Lumix::Math::maximum(scene->mNumMeshes + m_dialog.m_meshes.size(), 100U));
 
 			char src_dir[Lumix::MAX_PATH_LENGTH];
 			Lumix::PathUtils::getDir(src_dir, Lumix::lengthOf(src_dir), m_dialog.m_source);
 			for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
 			{
 				auto& material = m_dialog.m_materials.emplace();
+				material.scene = scene;
 				material.import = true;
 				material.material = scene->mMaterials[i];
 				material.texture_count = 0;
@@ -547,22 +580,21 @@ struct ImportTask : public Lumix::MT::Task
 			for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 			{
 				auto& mesh = m_dialog.m_meshes.emplace(m_dialog.m_editor.getAllocator());
+				mesh.scene = scene;
 				mesh.import = true;
 				mesh.import_physics = false;
 				mesh.mesh = scene->mMeshes[i];
 				mesh.lod = getMeshLOD(scene, mesh.mesh);
+				float f = getMeshLODFactor(scene, mesh.mesh);
+				if(f < FLT_MAX) m_dialog.m_lods[mesh.lod] = f;
 			}
-			static ImportTask* that = nullptr;
-			that = this;
-			auto cmpMeshes = [](const void* a, const void* b) -> int {
-				auto scene = that->m_dialog.m_importer.GetScene();
-				auto a_mesh = static_cast<const ImportMesh*>(a);
-				auto b_mesh = static_cast<const ImportMesh*>(b);
-				return a_mesh->lod - b_mesh->lod;
-			};
-
-			qsort(&m_dialog.m_meshes[0], m_dialog.m_meshes.size(), sizeof(m_dialog.m_meshes[0]), cmpMeshes);
 		}
+
+		for (int i = 1; i < Lumix::lengthOf(m_dialog.m_lods); ++i)
+		{
+			if (m_dialog.m_lods[i - 1] < 0) m_dialog.m_lods[i] = -1;
+		}
+
 
 		Lumix::enableFloatingPointTraps(true);
 
@@ -764,91 +796,93 @@ struct ConvertTask : public Lumix::MT::Task
 		if (!m_dialog.m_import_animations) return true;
 
 		m_dialog.setImportMessage("Importing animations...", 0);
-		const aiScene* scene = m_dialog.m_importer.GetScene();
-
+		
 		bool failed = false;
-		for (unsigned int i = 0; i < scene->mNumAnimations; ++i)
+		for (auto& importer : m_dialog.m_importers)
 		{
-			m_dialog.setImportMessage("Importing animations...", (float)i / scene->mNumAnimations);
-			auto* animation = scene->mAnimations[i];
-
-			Lumix::FS::OsFile file;
-			PathBuilder ani_path(m_dialog.m_output_dir);
-			if (animation->mName.length > 0)
+			const aiScene* scene = importer.GetScene();
+			for (unsigned int i = 0; i < scene->mNumAnimations; ++i)
 			{
-				char tmp[Lumix::MAX_PATH_LENGTH];
-				Lumix::copyString(tmp, animation->mName.C_Str());
-				char* c = tmp;
-				while (*c)
+				m_dialog.setImportMessage("Importing animations...", (float)i / scene->mNumAnimations);
+				auto* animation = scene->mAnimations[i];
+
+				Lumix::FS::OsFile file;
+				PathBuilder ani_path(m_dialog.m_output_dir);
+				if (animation->mName.length > 0)
 				{
-					if (!isValidFilenameChar(*c)) *c = '_';
-					++c;
+					char tmp[Lumix::MAX_PATH_LENGTH];
+					Lumix::copyString(tmp, animation->mName.C_Str());
+					char* c = tmp;
+					while (*c)
+					{
+						if (!isValidFilenameChar(*c)) *c = '_';
+						++c;
+					}
+					ani_path << "/" << tmp << ".ani";
 				}
-				ani_path << "/" << tmp << ".ani";
-			}
-			else
-			{
-				ani_path << "/"
-						 << "anim" << i << ".ani";
-			}
-
-			if (!file.open(ani_path, Lumix::FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
-			{
-				Lumix::g_log_error.log("Editor") << "Could not create file " << ani_path;
-				failed = true;
-				continue;
-			}
-
-			Lumix::Animation::Header header;
-			header.fps = Lumix::uint32(animation->mTicksPerSecond == 0
-										   ? 25
-										   : (animation->mTicksPerSecond == 1 ? 30 : animation->mTicksPerSecond));
-			header.magic = Lumix::Animation::HEADER_MAGIC;
-			header.version = 1;
-
-			file.write(&header, sizeof(header));
-			float anim_length = getLength(animation);
-			int frame_count = Lumix::Math::maximum(int(anim_length * header.fps), 1);
-			file.write(&frame_count, sizeof(frame_count));
-			int bone_count = (int)animation->mNumChannels;
-			file.write(&bone_count, sizeof(bone_count));
-
-			Lumix::Array<Lumix::Vec3> positions(m_dialog.m_editor.getAllocator());
-			Lumix::Array<Lumix::Quat> rotations(m_dialog.m_editor.getAllocator());
-
-			positions.resize(bone_count * frame_count);
-			rotations.resize(bone_count * frame_count);
-
-			for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
-			{
-				const aiNodeAnim* channel = animation->mChannels[channel_idx];
-				auto global_transform = getGlobalTransform(getNode(channel->mNodeName, scene->mRootNode)->mParent);
-				aiVector3t<float> scale;
-				aiVector3t<float> dummy_pos;
-				aiQuaterniont<float> dummy_rot;
-				global_transform.Decompose(scale, dummy_rot, dummy_pos);
-				for (int frame = 0; frame < frame_count; ++frame)
+				else
 				{
-					auto pos = getPosition(channel, frame, header.fps) * m_dialog.m_mesh_scale;
-					pos.x *= scale.x;
-					pos.y *= scale.y;
-					pos.z *= scale.z;
-					positions[frame * bone_count + channel_idx] = pos;
-					rotations[frame * bone_count + channel_idx] = getRotation(channel, frame, header.fps);
+					ani_path << "/" << "anim" << i << ".ani";
 				}
+
+				if (!file.open(ani_path, Lumix::FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
+				{
+					Lumix::g_log_error.log("Editor") << "Could not create file " << ani_path;
+					failed = true;
+					continue;
+				}
+
+				Lumix::Animation::Header header;
+				header.fps = Lumix::uint32(animation->mTicksPerSecond == 0
+											   ? 25
+											   : (animation->mTicksPerSecond == 1 ? 30 : animation->mTicksPerSecond));
+				header.magic = Lumix::Animation::HEADER_MAGIC;
+				header.version = 1;
+
+				file.write(&header, sizeof(header));
+				float anim_length = getLength(animation);
+				int frame_count = Lumix::Math::maximum(int(anim_length * header.fps), 1);
+				file.write(&frame_count, sizeof(frame_count));
+				int bone_count = (int)animation->mNumChannels;
+				file.write(&bone_count, sizeof(bone_count));
+
+				Lumix::Array<Lumix::Vec3> positions(m_dialog.m_editor.getAllocator());
+				Lumix::Array<Lumix::Quat> rotations(m_dialog.m_editor.getAllocator());
+
+				positions.resize(bone_count * frame_count);
+				rotations.resize(bone_count * frame_count);
+
+				for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
+				{
+					const aiNodeAnim* channel = animation->mChannels[channel_idx];
+					auto global_transform = getGlobalTransform(getNode(channel->mNodeName, scene->mRootNode)->mParent);
+					aiVector3t<float> scale;
+					aiVector3t<float> dummy_pos;
+					aiQuaterniont<float> dummy_rot;
+					global_transform.Decompose(scale, dummy_rot, dummy_pos);
+					for (int frame = 0; frame < frame_count; ++frame)
+					{
+						auto pos = getPosition(channel, frame, header.fps) * m_dialog.m_mesh_scale;
+						pos.x *= scale.x;
+						pos.y *= scale.y;
+						pos.z *= scale.z;
+						positions[frame * bone_count + channel_idx] = pos;
+						rotations[frame * bone_count + channel_idx] = getRotation(channel, frame, header.fps);
+					}
+				}
+
+				file.write((const char*)&positions[0], sizeof(positions[0]) * positions.size());
+				file.write((const char*)&rotations[0], sizeof(rotations[0]) * rotations.size());
+				for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
+				{
+					const aiNodeAnim* channel = animation->mChannels[channel_idx];
+					uint32_t hash = Lumix::crc32(channel->mNodeName.C_Str());
+					file.write((const char*)&hash, sizeof(hash));
+				}
+
+
+				file.close();
 			}
-
-			file.write((const char*)&positions[0], sizeof(positions[0]) * positions.size());
-			file.write((const char*)&rotations[0], sizeof(rotations[0]) * rotations.size());
-			for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
-			{
-				const aiNodeAnim* channel = animation->mChannels[channel_idx];
-				uint32_t hash = Lumix::crc32(channel->mNodeName.C_Str());
-				file.write((const char*)&hash, sizeof(hash));
-			}
-
-
-			file.close();
 		}
 
 		return !failed;
@@ -891,9 +925,8 @@ struct ConvertTask : public Lumix::MT::Task
 			return false;
 		}
 
-		const aiScene* scene = m_dialog.m_importer.GetScene();
 		file.writeText("{\n\t\"shader\" : \"shaders/");
-		file.writeText(isSkinned(scene, material.material) ? "skinned" : "rigid");
+		file.writeText(isSkinned(material.scene, material.material) ? "skinned" : "rigid");
 		file.writeText(".shd\"\n");
 
 		for (int i = 0; i < material.texture_count; ++i)
@@ -920,6 +953,17 @@ struct ConvertTask : public Lumix::MT::Task
 
 	int task() override
 	{
+		static ConvertTask* that = nullptr;
+		that = this;
+		auto cmpMeshes = [](const void* a, const void* b) -> int {
+			auto scene = that->m_dialog.m_importers.back().GetScene();
+			auto a_mesh = static_cast<const ImportMesh*>(a);
+			auto b_mesh = static_cast<const ImportMesh*>(b);
+			return a_mesh->lod - b_mesh->lod;
+		};
+
+		qsort(&m_dialog.m_meshes[0], m_dialog.m_meshes.size(), sizeof(m_dialog.m_meshes[0]), cmpMeshes);
+
 		if (saveLumixPhysics() && saveLumixModel() && saveLumixMaterials() && saveLumixAnimations())
 		{
 			m_dialog.setMessage("Success.");
@@ -1060,13 +1104,12 @@ struct ConvertTask : public Lumix::MT::Task
 	{
 		Lumix::Array<aiNode*> tmp(m_dialog.m_editor.getAllocator());
 		m_nodes.clear();
-		const aiScene* scene = m_dialog.m_importer.GetScene();
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if(!mesh.import) continue;
 			for (unsigned int j = 0; j < mesh.mesh->mNumBones; ++j)
 			{
-				auto* node = getNode(mesh.mesh->mBones[j]->mName, scene->mRootNode);
+				auto* node = getNode(mesh.mesh->mBones[j]->mName, mesh.scene->mRootNode);
 				while (node && node->mNumMeshes == 0)
 				{
 					if (tmp.indexOf(node) >= 0) break;
@@ -1100,7 +1143,6 @@ struct ConvertTask : public Lumix::MT::Task
 
 	void writeGeometry(Lumix::FS::OsFile& file) const
 	{
-		const aiScene* scene = m_dialog.m_importer.GetScene();
 		Lumix::int32 indices_count = 0;
 		int vertices_count = 0;
 		Lumix::int32 vertices_size = 0;
@@ -1123,7 +1165,6 @@ struct ConvertTask : public Lumix::MT::Task
 					{
 						Lumix::uint16 index = mesh.indices[i];
 						file.write(&index, sizeof(index));
-
 					}
 				}
 			}
@@ -1141,7 +1182,7 @@ struct ConvertTask : public Lumix::MT::Task
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (!mesh.import) continue;
-			auto mesh_matrix = getGlobalTransform(getNode(mesh.mesh, scene->mRootNode));
+			auto mesh_matrix = getGlobalTransform(getNode(mesh.scene, mesh.mesh, mesh.scene->mRootNode));
 			auto normal_matrix = mesh_matrix;
 			normal_matrix.a4 = normal_matrix.b4 = normal_matrix.c4 = 0;
 			bool is_skinned = isSkinned(mesh.mesh);
@@ -1232,7 +1273,6 @@ struct ConvertTask : public Lumix::MT::Task
 
 	void writeMeshes(Lumix::FS::OsFile& file)
 	{
-		const aiScene* scene = m_dialog.m_importer.GetScene();
 		Lumix::int32 mesh_count = 0;
 		for (int i = 0; i < m_dialog.m_meshes.size(); ++i)
 		{
@@ -1248,7 +1288,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 			int vertex_size = getVertexSize(mesh.mesh);
 			aiString material_name;
-			scene->mMaterials[mesh.mesh->mMaterialIndex]->Get(AI_MATKEY_NAME, material_name);
+			mesh.scene->mMaterials[mesh.mesh->mMaterialIndex]->Get(AI_MATKEY_NAME, material_name);
 			Lumix::int32 length = Lumix::stringLength(material_name.C_Str());
 			file.write((const char*)&length, sizeof(length));
 			file.write((const char*)material_name.C_Str(), length);
@@ -1263,7 +1303,7 @@ struct ConvertTask : public Lumix::MT::Task
 			indices_offset += mesh.indices.size();
 			file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
-			aiString mesh_name = getMeshName(scene, mesh.mesh);
+			aiString mesh_name = getMeshName(mesh.scene, mesh.mesh);
 			length = Lumix::stringLength(mesh_name.C_Str());
 
 			file.write((const char*)&length, sizeof(length));
@@ -1300,42 +1340,27 @@ struct ConvertTask : public Lumix::MT::Task
 
 	void writeLods(Lumix::FS::OsFile& file) const
 	{
-		Lumix::int32 lod_count = -1;
+		Lumix::int32 lod_count = 1;
 		Lumix::int32 last_mesh_idx = -1;
 		Lumix::int32 lods[8] = {};
-		float factors[8];
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (!mesh.import) continue;
 
 			++last_mesh_idx;
-			if (mesh.lod < 0 || mesh.lod >= Lumix::lengthOf(factors)) break;
-			factors[mesh.lod] = getMeshLODFactor(mesh.mesh);
-			factors[mesh.lod] *= factors[mesh.lod];
-			lod_count = Lumix::Math::maximum(lod_count, mesh.lod + 1);
+			if (mesh.lod >= Lumix::lengthOf(m_dialog.m_lods)) continue;
+			lod_count = mesh.lod + 1;
 			lods[mesh.lod] = last_mesh_idx;
 		}
 
+		file.write((const char*)&lod_count, sizeof(lod_count));
 
-		if (m_dialog.m_meshes[0].lod < 0)
+		for (int i = 0; i < lod_count; ++i)
 		{
-			lod_count = 1;
-			file.write((const char*)&lod_count, sizeof(lod_count));
-			file.write((const char*)&last_mesh_idx, sizeof(last_mesh_idx));
-			float distance = FLT_MAX;
-			file.write((const char*)&distance, sizeof(distance));
-		}
-		else
-		{
-			file.write((const char*)&lod_count, sizeof(lod_count));
-
-			for (int i = 0; i < lod_count; ++i)
-			{
-				Lumix::int32 to_mesh = lods[i];
-				file.write((const char*)&to_mesh, sizeof(to_mesh));
-				float factor = i == lod_count - 1 ? FLT_MAX : factors[i];
-				file.write((const char*)&factor, sizeof(factor));
-			}
+			Lumix::int32 to_mesh = lods[i];
+			file.write((const char*)&to_mesh, sizeof(to_mesh));
+			float factor = m_dialog.m_lods[i] < 0 ? FLT_MAX : m_dialog.m_lods[i] * m_dialog.m_lods[i];
+			file.write((const char*)&factor, sizeof(factor));
 		}
 	}
 
@@ -1352,9 +1377,8 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	aiNode* getNode(aiMesh* mesh, aiNode* node) const
+	static aiNode* getNode(const aiScene* scene, aiMesh* mesh, aiNode* node)
 	{
-		const aiScene* scene = m_dialog.m_importer.GetScene();
 		for (unsigned int i = 0; i < node->mNumMeshes; ++i)
 		{
 			if (mesh == scene->mMeshes[node->mMeshes[i]]) return node;
@@ -1362,10 +1386,9 @@ struct ConvertTask : public Lumix::MT::Task
 
 		for (unsigned int i = 0; i < node->mNumChildren; ++i)
 		{
-			auto* x = getNode(mesh, node->mChildren[i]);
+			auto* x = getNode(scene, mesh, node->mChildren[i]);
 			if (x) return x;
 		}
-
 		return nullptr;
 	}
 
@@ -1384,9 +1407,8 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	aiBone* getBone(aiNode* node)
+	static aiBone* getBone(const aiScene* scene, aiNode* node)
 	{
-		const aiScene* scene = m_dialog.m_importer.GetScene();
 		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 		{
 			auto* mesh = scene->mMeshes[i];
@@ -1399,9 +1421,8 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	aiNode* getMeshNode(aiNode* node)
+	static aiNode* getMeshNode(const aiScene* scene, aiNode* node)
 	{
-		const aiScene* scene = m_dialog.m_importer.GetScene();
 		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 		{
 			auto* mesh = scene->mMeshes[i];
@@ -1409,9 +1430,22 @@ struct ConvertTask : public Lumix::MT::Task
 			{
 				if (mesh->mBones[j]->mName == node->mName)
 				{
-					return getNode(mesh, scene->mRootNode);
+					return getNode(scene, mesh, scene->mRootNode);
 				}
 			}
+		}
+		return nullptr;
+	}
+
+
+	const aiScene* getNodeScene(aiNode* node)
+	{
+		auto* root = node;
+		while (root->mParent) root = root->mParent;
+
+		for (auto& i : m_dialog.m_importers)
+		{
+			if (i.GetScene()->mRootNode == root) return i.GetScene();
 		}
 		return nullptr;
 	}
@@ -1425,6 +1459,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 		for (auto* node : m_nodes)
 		{
+			auto* scene = getNodeScene(node);
 			Lumix::int32 len = Lumix::stringLength(node->mName.C_Str());
 			file.write((const char*)&len, sizeof(len));
 			file.write(node->mName.C_Str(), node->mName.length);
@@ -1444,13 +1479,13 @@ struct ConvertTask : public Lumix::MT::Task
 			aiQuaterniont<float> rot;
 			aiVector3t<float> pos;
 			aiVector3t<float> scale;
-			auto bone = getBone(node);
+			auto bone = getBone(scene, node);
 			if (bone)
 			{
 				aiMatrix4x4 mtx;
 				mtx = bone->mOffsetMatrix;
 				mtx.Inverse();
-				mtx = getGlobalTransform(getMeshNode(node)) * mtx;
+				mtx = getGlobalTransform(getMeshNode(scene, node)) * mtx;
 				mtx.Decompose(scale, rot, pos);
 			}
 			else
@@ -1556,28 +1591,36 @@ struct ConvertTask : public Lumix::MT::Task
 
 	bool checkModel() const
 	{
-		auto* scene = m_dialog.m_importer.GetScene();
+		int imported_meshes = 0;
+		int skinned_meshes = 0;
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (!mesh.import) continue;
+			++imported_meshes;
+			if (isSkinned(mesh.mesh)) ++skinned_meshes;
 			if (!mesh.mesh->HasNormals())
 			{
 				m_dialog.setMessage(
-					Lumix::StaticString<256>("Mesh ", getMeshName(scene, mesh.mesh).C_Str(), " has no normals."));
+					Lumix::StaticString<256>("Mesh ", getMeshName(mesh.scene, mesh.mesh).C_Str(), " has no normals."));
 				return false;
 			}
 			if (!mesh.mesh->HasPositions())
 			{
-				m_dialog.setMessage(
-					Lumix::StaticString<256>("Mesh ", getMeshName(scene, mesh.mesh).C_Str(), " has no positions."));
+				m_dialog.setMessage(Lumix::StaticString<256>(
+					"Mesh ", getMeshName(mesh.scene, mesh.mesh).C_Str(), " has no positions."));
 				return false;
 			}
 			if (!mesh.mesh->HasTextureCoords(0))
 			{
 				m_dialog.setMessage(Lumix::StaticString<256>(
-					"Mesh ", getMeshName(scene, mesh.mesh).C_Str(), " has no texture coords."));
+					"Mesh ", getMeshName(mesh.scene, mesh.mesh).C_Str(), " has no texture coords."));
 				return false;
 			}
+		}
+		if (skinned_meshes != 0 && skinned_meshes != imported_meshes)
+		{
+			m_dialog.setMessage("Not all meshes have bones");
+			return false;
 		}
 		return true;
 	}
@@ -1607,42 +1650,10 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	float getMeshLODFactor(const aiMesh* mesh) const
-	{
-		auto* scene = m_dialog.m_importer.GetScene();
-		const char* mesh_name = getMeshName(scene, mesh).C_Str();
-		int len = Lumix::stringLength(mesh_name);
-		if (len < 5) return FLT_MAX;
-
-		const char* last = mesh_name + len - 1;
-		while (last > mesh_name && *last >= '0' && *last <= '9')
-		{
-			--last;
-		}
-		++last;
-		if (last < mesh_name + 4) FLT_MAX;
-		if (Lumix::compareIStringN(last - 4, "_LOD", 4) != 0) return FLT_MAX;
-		const char* end_of_factor = last - 4;
-		const char* begin_factor = end_of_factor - 1;
-		if (begin_factor <= mesh_name) return FLT_MAX;
-
-		while (*begin_factor != '_' && begin_factor > mesh_name)
-		{
-			--begin_factor;
-		}
-		++begin_factor;
-
-		if (begin_factor == end_of_factor) return FLT_MAX;
-		int factor;
-		Lumix::fromCString(begin_factor, int(end_of_factor - begin_factor), &factor);
-
-		return float(factor);
-	}
-
-
 	bool saveLumixModel()
 	{
 		ASSERT(m_dialog.m_output_dir[0] != '\0');
+		ASSERT(m_dialog.m_output_filename[0] != '\0');
 		bool import_any = false;
 		for (auto& mesh : m_dialog.m_meshes)
 		{
@@ -1659,10 +1670,8 @@ struct ConvertTask : public Lumix::MT::Task
 		PlatformInterface::makePath(m_dialog.m_output_dir);
 		if (m_dialog.m_texture_output_dir[0]) PlatformInterface::makePath(m_dialog.m_texture_output_dir);
 
-		char basename[Lumix::MAX_PATH_LENGTH];
-		Lumix::PathUtils::getBasename(basename, sizeof(basename), m_dialog.m_source);
 		PathBuilder path(m_dialog.m_output_dir);
-		path << "/" << basename << ".msh";
+		path << "/" << m_dialog.m_output_filename << ".msh";
 
 		Lumix::IAllocator& allocator = m_dialog.m_editor.getAllocator();
 		Lumix::FS::OsFile file;
@@ -1700,8 +1709,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 
 ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metadata)
-	: m_source_exists(false)
-	, m_metadata(metadata)
+	: m_metadata(metadata)
 	, m_task(nullptr)
 	, m_editor(editor)
 	, m_is_converting(false)
@@ -1717,7 +1725,12 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	, m_mesh_scale(1)
 	, m_meshes(editor.getAllocator())
 	, m_materials(editor.getAllocator())
+	, m_importers(editor.getAllocator())
 {
+	m_lods[0] = 10;
+	m_lods[1] = 100;
+	m_lods[2] = 1000;
+	m_lods[3] = -10000;
 	m_orientation = Y_UP;
 	m_is_opened = false;
 	m_message[0] = '\0';
@@ -1725,6 +1738,7 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	m_task = nullptr;
 	m_source[0] = '\0';
 	m_output_dir[0] = '\0';
+	m_output_filename[0] = '\0';
 	m_texture_output_dir[0] = '\0';
 	Lumix::copyString(m_last_dir, m_editor.getEngine().getDiskFileDevice()->getBasePath());
 }
@@ -1745,7 +1759,8 @@ static bool isImage(const char* path)
 	char ext[10];
 	Lumix::PathUtils::getExtension(ext, sizeof(ext), path);
 
-	static const char* image_extensions[] = {"jpg", "jpeg", "png", "tga", "bmp", "psd", "gif", "hdr", "pic", "pnm"};
+	static const char* image_extensions[] = {
+		"dds", "jpg", "jpeg", "png", "tga", "bmp", "psd", "gif", "hdr", "pic", "pnm"};
 	for (auto image_ext : image_extensions)
 	{
 		if (Lumix::compareString(ext, image_ext) == 0)
@@ -1759,26 +1774,22 @@ static bool isImage(const char* path)
 
 void ImportAssetDialog::checkSource()
 {
-	if (m_output_dir[0] == '\0')
-	{
-		Lumix::PathUtils::getDir(m_output_dir, sizeof(m_output_dir), m_source);
-	}
+	if (!PlatformInterface::fileExists(m_source)) return;
+	if (m_output_dir[0] == '\0') Lumix::PathUtils::getDir(m_output_dir, sizeof(m_output_dir), m_source);
+	if (m_output_filename[0] == '\0') Lumix::PathUtils::getBasename(m_output_filename, sizeof(m_output_filename), m_source);
 
-	m_source_exists = PlatformInterface::fileExists(m_source);
-
-	if (!m_source_exists || isImage(m_source))
+	if (isImage(m_source))
 	{
 		m_materials.clear();
 		m_meshes.clear();
-		m_importer.FreeScene();
+		m_importers.clear();
 		return;
 	}
 
 	m_import_animations = false;
 
 	ASSERT(!m_task);
-	m_materials.clear();
-	m_meshes.clear();
+	m_importers.emplace();
 	setImportMessage("Importing...", -1);
 	m_is_importing = true;
 	m_task = LUMIX_NEW(m_editor.getAllocator(), ImportTask)(*this);
@@ -1880,7 +1891,6 @@ void ImportAssetDialog::onMaterialsGUI()
 	label << m_materials.size() << ")###Materials";
 	if (!ImGui::CollapsingHeader(label)) return;
 
-	auto* scene = m_importer.GetScene();
 	ImGui::Indent();
 	if (ImGui::Button("Import all materials"))
 	{
@@ -1952,15 +1962,33 @@ void ImportAssetDialog::onMaterialsGUI()
 }
 
 
+void ImportAssetDialog::onLODsGUI()
+{
+	if (!ImGui::CollapsingHeader("LODs")) return;
+	for (int i = 0; i < Lumix::lengthOf(m_lods); ++i)
+	{
+		bool b = m_lods[i] < 0;
+		if (ImGui::Checkbox(Lumix::StaticString<20>("Infinite###lod_inf", i), &b))
+		{
+			m_lods[i] *= -1;
+		}
+		if (m_lods[i] >= 0)
+		{
+			ImGui::SameLine();
+			ImGui::DragFloat(Lumix::StaticString<10>("LOD ", i), &m_lods[i], 1.0f, 1.0f, FLT_MAX);
+		}
+	}
+}
+
+
 void ImportAssetDialog::onMeshesGUI()
 {
 	Lumix::StaticString<30> label("Meshes (");
 	label << m_meshes.size() << ")###Meshes";
 	if (!ImGui::CollapsingHeader(label)) return;
 
-	auto* scene = m_importer.GetScene();
 	ImGui::Indent();
-	ImGui::Columns(4);
+	ImGui::Columns(5);
 
 	ImGui::Text("Mesh");
 	ImGui::NextColumn();
@@ -1970,16 +1998,18 @@ void ImportAssetDialog::onMeshesGUI()
 	ImGui::NextColumn();
 	ImGui::Text("Import physics");
 	ImGui::NextColumn();
+	ImGui::Text("LOD");
+	ImGui::NextColumn();
 	ImGui::Separator();
 
 	for (auto& mesh : m_meshes)
 	{
 		const char* name = mesh.mesh->mName.C_Str();
-		if (name[0] == 0) name = getMeshName(scene, mesh.mesh).C_Str();
+		if (name[0] == 0) name = getMeshName(mesh.scene, mesh.mesh).C_Str();
 		ImGui::Text(name);
 		ImGui::NextColumn();
 
-		auto* material = scene->mMaterials[mesh.mesh->mMaterialIndex];
+		auto* material = mesh.scene->mMaterials[mesh.mesh->mMaterialIndex];
 		aiString material_name;
 		material->Get(AI_MATKEY_NAME, material_name);
 		ImGui::Text(material_name.C_Str());
@@ -1990,6 +2020,8 @@ void ImportAssetDialog::onMeshesGUI()
 		ImGui::NextColumn();
 		ImGui::Checkbox(Lumix::StaticString<30>("###phy", (Lumix::uint64)&mesh), &mesh.import_physics);
 		if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("ContextPhy");
+		ImGui::NextColumn();
+		ImGui::Combo(Lumix::StaticString<30>("###lod", (Lumix::uint64)&mesh), &mesh.lod, "LOD 1\0LOD 2\0LOD 3\0LOD 4\0");
 		ImGui::NextColumn();
 	}
 	ImGui::Columns();
@@ -2046,11 +2078,7 @@ void ImportAssetDialog::onImageGUI()
 		PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir), base_path);
 	}
 
-	if (ImGui::Button("Import texture"))
-	{
-		importTexture();
-	}
-	ImGui::EndDock();
+	if (ImGui::Button("Import texture")) importTexture();
 }
 
 
@@ -2104,25 +2132,34 @@ void ImportAssetDialog::onGUI()
 			return;
 		}
 
-		if (ImGui::InputText("Source", m_source, sizeof(m_source))) checkSource();
-
-		ImGui::SameLine();
-		if (ImGui::Button("..."))
-		{
-			PlatformInterface::getOpenFilename(m_source, sizeof(m_source), "All\0*.*\0", m_source);
-			checkSource();
-		}
-
 		if (m_is_importing || m_is_converting)
 		{
 			ImGui::EndDock();
 			return;
 		}
 
+		if (ImGui::Button("Add source"))
+		{
+			PlatformInterface::getOpenFilename(m_source, sizeof(m_source), "All\0*.*\0", m_source);
+			checkSource();
+			if (m_is_importing || m_is_converting)
+			{
+				ImGui::EndDock();
+				return;
+			}
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Clear all sources"))
+		{
+			m_importers.clear();
+			m_materials.clear();
+			m_meshes.clear();
+			m_output_filename[0] = '\0';
+		}
+
 		onImageGUI();
 
-		auto* scene = m_importer.GetScene();
-		if (scene)
+		if (!m_importers.empty())
 		{
 			if (ImGui::CollapsingHeader("Advanced"))
 			{
@@ -2135,15 +2172,24 @@ void ImportAssetDialog::onGUI()
 				ImGui::Combo("Orientation", &(int&)m_orientation, "Y up\0Z up\0-Z up\0-X up\0");
 				ImGui::Checkbox("Make physics convex", &m_make_convex);
 			}
-			if (scene->HasAnimations())
+			int animations_count = 0;
+			for (auto& i : m_importers)
+			{
+				auto* scene = i.GetScene();
+				animations_count += scene->mNumAnimations;
+			}
+
+			if (animations_count > 0)
 			{
 				ImGui::Checkbox(
-					Lumix::StaticString<50>("Import animations (", scene->mNumAnimations, ")"), &m_import_animations);
+					Lumix::StaticString<50>("Import animations (", animations_count, ")"), &m_import_animations);
 			}
 
 			onMeshesGUI();
+			onLODsGUI();
 			onMaterialsGUI();
 
+			ImGui::InputText("Output filename", m_output_filename, sizeof(m_output_filename));
 			ImGui::InputText("Output directory", m_output_dir, sizeof(m_output_dir));
 			ImGui::SameLine();
 			if (ImGui::Button("...###browseoutput"))
