@@ -112,7 +112,6 @@ struct EditorIconsImpl : public EditorIcons
 		if (m_editor.getEditCamera().entity == entity) return;
 
 		static const uint32 RENDERABLE_HASH = crc32("renderable");
-		static const uint32 RENDERER_HASH = crc32("renderer");
 		static const uint32 PHYSICAL_CONTROLLER_HASH = crc32("physical_controller");
 		static const uint32 BOX_RIGID_ACTOR_HASH = crc32("box_rigid_actor");
 		static const uint32 CAMERA_HASH = crc32("camera");

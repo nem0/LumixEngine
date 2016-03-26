@@ -471,7 +471,6 @@ struct NavigationScene : public IScene
 				const rcSpan* span = m_debug_heightfield->spans[x + z * width];
 				while(span)
 				{
-					char atype = span->area;
 					Vec3 mins(fx, orig.y + span->smin * cell_height, fz);
 					Vec3 maxs(fx + CELL_SIZE, orig.y + span->smax * cell_height, fz + CELL_SIZE);
 					render_scene->addDebugCubeSolid(mins, maxs, 0xffff00ff, 0);

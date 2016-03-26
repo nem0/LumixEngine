@@ -569,9 +569,9 @@ struct PipelineImpl : public Pipeline
 					bgfx::setIndexBuffer(m_particle_index_buffer);
 					bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 					bgfx::setState(view.render_state | material->getRenderStates());
-					++m_stats.m_draw_call_count;
-					m_stats.m_instance_count += PARTICLE_BATCH_SIZE;
-					m_stats.m_triangle_count += PARTICLE_BATCH_SIZE * 2;
+					++m_stats.draw_call_count;
+					m_stats.instance_count += PARTICLE_BATCH_SIZE;
+					m_stats.triangle_count += PARTICLE_BATCH_SIZE * 2;
 					bgfx::submit(view.bgfx_id, material->getShaderInstance().m_program_handles[view.pass_idx]);
 				}
 
@@ -593,9 +593,9 @@ struct PipelineImpl : public Pipeline
 		bgfx::setIndexBuffer(m_particle_index_buffer);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material->getRenderStates());
-		++m_stats.m_draw_call_count;
-		m_stats.m_instance_count += instance_count;
-		m_stats.m_triangle_count += instance_count * 2;
+		++m_stats.draw_call_count;
+		m_stats.instance_count += instance_count;
+		m_stats.triangle_count += instance_count * 2;
 		bgfx::submit(view.bgfx_id, material->getShaderInstance().m_program_handles[view.pass_idx]);
 	}
 
@@ -665,9 +665,9 @@ struct PipelineImpl : public Pipeline
 		bgfx::setState(view.render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(data.buffer, data.instance_count);
 		ShaderInstance& shader_instance = mesh.material->getShaderInstance();
-		++m_stats.m_draw_call_count;
-		m_stats.m_instance_count += data.instance_count;
-		m_stats.m_triangle_count += data.instance_count * mesh.indices_count / 3;
+		++m_stats.draw_call_count;
+		m_stats.instance_count += data.instance_count;
+		m_stats.triangle_count += data.instance_count * mesh.indices_count / 3;
 		bgfx::submit(view.bgfx_id, shader_instance.m_program_handles[view.pass_idx]);
 
 		data.buffer = nullptr;
@@ -887,9 +887,9 @@ struct PipelineImpl : public Pipeline
 		executeCommandBuffer(m_views[m_view_idx].command_buffer.buffer, material);
 		bgfx::setVertexBuffer(m_cube_vb);
 		bgfx::setIndexBuffer(m_cube_ib);
-		++m_stats.m_draw_call_count;
-		m_stats.m_instance_count += instance_count;
-		m_stats.m_triangle_count +=	instance_count * 12;
+		++m_stats.draw_call_count;
+		m_stats.instance_count += instance_count;
+		m_stats.triangle_count +=	instance_count * 12;
 		bgfx::submit(m_bgfx_view, material->getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
@@ -1749,9 +1749,9 @@ struct PipelineImpl : public Pipeline
 		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::setVertexBuffer(&vb);
-		++m_stats.m_draw_call_count;
-		++m_stats.m_instance_count;
-		m_stats.m_triangle_count += 2;
+		++m_stats.draw_call_count;
+		++m_stats.instance_count;
+		m_stats.triangle_count += 2;
 		bgfx::submit(m_bgfx_view, material->getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
@@ -1881,9 +1881,9 @@ struct PipelineImpl : public Pipeline
 					renderable.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
 				bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 				bgfx::setState(view.render_state | material->getRenderStates());
-				++m_stats.m_draw_call_count;
-				++m_stats.m_instance_count;
-				m_stats.m_triangle_count += mesh.indices_count / 3;
+				++m_stats.draw_call_count;
+				++m_stats.instance_count;
+				m_stats.triangle_count += mesh.indices_count / 3;
 				bgfx::submit(view.bgfx_id, shader_instance.m_program_handles[view.pass_idx]);
 			}
 		}
@@ -1915,9 +1915,9 @@ struct PipelineImpl : public Pipeline
 		bgfx::setTransform(&mtx.m11);
 		bgfx::setVertexBuffer(&vertex_buffer);
 		bgfx::setIndexBuffer(&index_buffer, first_index, num_indices);
-		++m_stats.m_draw_call_count;
-		++m_stats.m_instance_count;
-		m_stats.m_triangle_count += num_indices / 3;
+		++m_stats.draw_call_count;
+		++m_stats.instance_count;
+		m_stats.triangle_count += num_indices / 3;
 		bgfx::submit(m_bgfx_view, program_handle);
 	}
 
@@ -2099,9 +2099,9 @@ struct PipelineImpl : public Pipeline
 		bgfx::setState(view.render_state | mesh.material->getRenderStates());
 		bgfx::setInstanceDataBuffer(instance_buffer, m_terrain_instances[index].m_count);
 		auto shader_instance = material->getShaderInstance().m_program_handles[view.pass_idx];
-		++m_stats.m_draw_call_count;
-		m_stats.m_instance_count += m_terrain_instances[index].m_count;
-		m_stats.m_triangle_count += m_terrain_instances[index].m_count * mesh_part_indices_count;
+		++m_stats.draw_call_count;
+		m_stats.instance_count += m_terrain_instances[index].m_count;
+		m_stats.triangle_count += m_terrain_instances[index].m_count * mesh_part_indices_count;
 		bgfx::submit(view.bgfx_id, shader_instance);
 
 		m_terrain_instances[index].m_count = 0;
@@ -2112,8 +2112,7 @@ struct PipelineImpl : public Pipeline
 	{
 		if (!bgfx::checkAvailInstanceDataBuffer(grass.matrix_count, sizeof(Matrix))) return;
 
-		const bgfx::InstanceDataBuffer* idb =
-			bgfx::allocInstanceDataBuffer(grass.matrix_count, sizeof(Matrix));
+		const bgfx::InstanceDataBuffer* idb = bgfx::allocInstanceDataBuffer(grass.matrix_count, sizeof(Matrix));
 		copyMemory(idb->data, &grass.matrices[0], grass.matrix_count * sizeof(Matrix));
 		const Mesh& mesh = grass.model->getMesh(0);
 		Material* material = mesh.material;
@@ -2126,14 +2125,13 @@ struct PipelineImpl : public Pipeline
 		bgfx::setVertexBuffer(grass.model->getVerticesHandle(),
 			mesh.attribute_array_offset / mesh.vertex_def.getStride(),
 			mesh.attribute_array_size / mesh.vertex_def.getStride());
-		bgfx::setIndexBuffer(
-			grass.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
+		bgfx::setIndexBuffer(grass.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(idb, grass.matrix_count);
-		++m_stats.m_draw_call_count;
-		m_stats.m_instance_count += grass.matrix_count;
-		m_stats.m_triangle_count += grass.matrix_count * mesh.indices_count;
+		++m_stats.draw_call_count;
+		m_stats.instance_count += grass.matrix_count;
+		m_stats.triangle_count += grass.matrix_count * mesh.indices_count;
 		bgfx::submit(view.bgfx_id, material->getShaderInstance().m_program_handles[view.pass_idx]);
 	}
 
