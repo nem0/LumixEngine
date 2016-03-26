@@ -1339,8 +1339,8 @@ private:
 
 		AddEntityCommand(WorldEditorImpl& editor, const Vec3& position)
 			: m_editor(editor)
+			, m_position(position)
 		{
-			m_position = position;
 			m_entity = INVALID_ENTITY;
 		}
 

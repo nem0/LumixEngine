@@ -1144,13 +1144,11 @@ struct ConvertTask : public Lumix::MT::Task
 	void writeGeometry(Lumix::FS::OsFile& file) const
 	{
 		Lumix::int32 indices_count = 0;
-		int vertices_count = 0;
 		Lumix::int32 vertices_size = 0;
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (!mesh.import) continue;
 			indices_count += mesh.indices.size();
-			vertices_count += mesh.map_to_input.size();
 			vertices_size += mesh.map_to_input.size() * getVertexSize(mesh.mesh);
 		}
 
@@ -1519,7 +1517,7 @@ struct ConvertTask : public Lumix::MT::Task
 		{
 			if (m.import_physics)
 			{
-				bool any = true;
+				any = true;
 				break;
 			}
 		}

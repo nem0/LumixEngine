@@ -280,10 +280,10 @@ void SceneView::onGUI()
 					ImGuiWindowFlags_ShowBorders))
 		{
 			const auto& stats = m_pipeline->getStats();
-			ImGui::LabelText("Draw calls", "%d", stats.m_draw_call_count);
-			ImGui::LabelText("Instances", "%d", stats.m_instance_count);
+			ImGui::LabelText("Draw calls", "%d", stats.draw_call_count);
+			ImGui::LabelText("Instances", "%d", stats.instance_count);
 			char buf[30];
-			Lumix::toCStringPretty(stats.m_triangle_count, buf, Lumix::lengthOf(buf));
+			Lumix::toCStringPretty(stats.triangle_count, buf, Lumix::lengthOf(buf));
 			ImGui::LabelText("Triangles", buf);
 			ImGui::LabelText("Resolution", "%dx%d", m_pipeline->getWidth(), m_pipeline->getHeight());
 			ImGui::LabelText("FPS", "%.2f", m_editor->getEngine().getFPS());

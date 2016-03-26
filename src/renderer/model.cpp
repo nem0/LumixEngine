@@ -30,7 +30,7 @@ Mesh::Mesh(const bgfx::VertexDecl& def,
 		   int index_count,
 		   const char* name,
 		   IAllocator& allocator)
-	: name(allocator)
+	: name(name, allocator)
 	, vertex_def(def)
 {
 	this->material = mat;
@@ -38,7 +38,6 @@ Mesh::Mesh(const bgfx::VertexDecl& def,
 	this->attribute_array_size = attribute_array_size;
 	this->indices_offset = indices_offset;
 	this->indices_count = index_count;
-	this->name = name;
 	this->instance_idx = -1;
 }
 

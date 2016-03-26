@@ -31,9 +31,8 @@ class RenderScene;
 struct Vec4;
 
 
-class CommandBufferGenerator
+struct CommandBufferGenerator
 {
-public:
 	CommandBufferGenerator();
 
 	void setTexture(uint8 stage,
@@ -61,9 +60,9 @@ class LUMIX_RENDERER_API Pipeline
 	public:
 		struct Stats
 		{
-			int m_draw_call_count;
-			int m_instance_count;
-			int m_triangle_count;
+			int draw_call_count;
+			int instance_count;
+			int triangle_count;
 		};
 
 		struct CustomCommandHandler

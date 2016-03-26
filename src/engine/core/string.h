@@ -75,6 +75,7 @@ template <int size> struct StaticString
 	{
 		Lumix::copyString(data, size, str);
 		int tmp[] = {(add(args), 0)...};
+		(void)tmp;
 	}
 
 	template <typename T> StaticString& operator<<(T value)
