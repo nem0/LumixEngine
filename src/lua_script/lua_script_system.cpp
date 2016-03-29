@@ -293,6 +293,7 @@ namespace Lumix
 			: m_system(system)
 			, m_universe(ctx)
 			, m_global_state(nullptr)
+			, m_global_lua_thread_ref(-1)
 			, m_scripts(system.getAllocator())
 			, m_updates(system.getAllocator())
 			, m_entity_script_map(system.getAllocator())
@@ -358,6 +359,11 @@ namespace Lumix
 
 		~LuaScriptSceneImpl()
 		{
+			if (m_global_lua_thread_ref != -1)
+			{
+				luaL_unref(m_system.m_engine.getState(), LUA_REGISTRYINDEX, m_global_lua_thread_ref);
+			}
+
 			unloadAllScripts();
 		}
 
@@ -604,7 +610,10 @@ namespace Lumix
 
 			m_is_api_registered = true;
 
-			m_global_state = lua_newthread(m_system.m_engine.getState());
+			lua_State* engine_state = m_system.m_engine.getState();
+			m_global_state = lua_newthread(engine_state);
+			lua_pushvalue(engine_state, -1);
+			m_global_lua_thread_ref = luaL_ref(engine_state, LUA_REGISTRYINDEX);
 			for (auto* scene : m_universe.getScenes())
 			{
 				const char* name = scene->getPlugin().getName();
@@ -1194,6 +1203,7 @@ namespace Lumix
 		HashMap<Entity, ComponentIndex> m_entity_script_map;
 		AssociativeArray<uint32, string> m_property_names;
 		lua_State* m_global_state;
+		int m_global_lua_thread_ref;
 		Universe& m_universe;
 		Array<UpdateData> m_updates;
 		FunctionCall m_function_call;
