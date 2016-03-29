@@ -230,7 +230,7 @@ namespace Lumix
 					lua_setupvalue(script.m_state, -2, 1); // function's environment
 
 					m_scene.m_current_script_instance = &script;
-					errors = errors || lua_pcall(script.m_state, 0, LUA_MULTRET, 0) != LUA_OK;
+					errors = errors || lua_pcall(script.m_state, 0, 0, 0) != LUA_OK;
 					if (errors)
 					{
 						g_log_error.log("Lua Script") << script.m_script->getPath() << ": "
@@ -669,7 +669,7 @@ namespace Lumix
 			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
 			lua_setupvalue(script.m_state, -2, 1);
 
-			errors = errors || lua_pcall(state, 0, LUA_MULTRET, 0) != LUA_OK;
+			errors = errors || lua_pcall(state, 0, 0, 0) != LUA_OK;
 
 			if (errors)
 			{
@@ -1057,13 +1057,17 @@ namespace Lumix
 
 			for (auto& i : m_updates)
 			{
-				lua_rawgeti(i.state, LUA_REGISTRYINDEX, i.environment);
+				if (lua_rawgeti(i.state, LUA_REGISTRYINDEX, i.environment) != LUA_TTABLE)
+				{
+					ASSERT(false);
+				}
 				if (lua_getfield(i.state, -1, "update") != LUA_TFUNCTION)
 				{
 					lua_pop(i.state, 2);
 					continue;
 				}
 
+				auto t = lua_gettop(i.state);
 				lua_pushnumber(i.state, time_delta);
 				if (lua_pcall(i.state, 1, 0, 0) != LUA_OK)
 				{

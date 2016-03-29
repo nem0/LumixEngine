@@ -1125,7 +1125,7 @@ public:
 		lua_State* L = m_engine->getState();
 		bool errors =
 			luaL_loadbuffer(L, src, Lumix::stringLength(src), script_name) != LUA_OK;
-		errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
+		errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
 		if (errors)
 		{
 			Lumix::g_log_error.log("Editor") << script_name << ": " << lua_tostring(L, -1);

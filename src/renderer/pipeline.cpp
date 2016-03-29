@@ -399,7 +399,7 @@ struct PipelineImpl : public Pipeline
 
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		lua_setupvalue(m_lua_state, -2, 1);
-		errors = lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
+		errors = lua_pcall(m_lua_state, 0, 0, 0) != LUA_OK;
 		if (errors)
 		{
 			g_log_error.log("Renderer") << m_path.c_str() << ": " << lua_tostring(m_lua_state, -1);
@@ -2295,7 +2295,7 @@ struct PipelineImpl : public Pipeline
 		catString(tmp, "\") end");
 
 		bool errors = luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp), nullptr) != LUA_OK;
-		errors = errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
+		errors = errors || lua_pcall(m_lua_state, 0, 0, 0) != LUA_OK;
 
 		if (errors)
 		{
