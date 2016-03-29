@@ -363,6 +363,53 @@ public:
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_RTHUMB_Y", InputSystem::RTHUMB_Y);
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_RTRIGGER", InputSystem::RTRIGGER);
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_LTRIGGER", InputSystem::LTRIGGER);
+
+		installLuaPackageLoader();
+	}
+
+
+	void installLuaPackageLoader() const
+	{
+		auto x = lua_getglobal(m_state, "package");
+		auto y = lua_getfield(m_state, -1, "searchers");
+		int numLoaders = 0;
+		lua_pushnil(m_state);
+		while (lua_next(m_state, -2) != 0)
+		{
+			lua_pop(m_state, 1);
+			numLoaders++;
+		}
+
+		lua_pushinteger(m_state, numLoaders + 1);
+		lua_pushcfunction(m_state, LUA_packageLoader);
+		lua_rawset(m_state, -3);
+		lua_pop(m_state, 2);
+	}
+
+
+	static int LUA_packageLoader(lua_State* L)
+	{
+		const char* module = LuaWrapper::toType<const char*>(L, 1);
+		StaticString<MAX_PATH_LENGTH> tmp(module);
+		tmp << ".lua";
+		lua_getglobal(L, "g_engine");
+		auto* engine = (Engine*)lua_touserdata(L, -1);
+		lua_pop(L, 1);
+		auto& fs = engine->getFileSystem();
+		auto* file = fs.open(fs.getDefaultDevice(), Path(tmp), FS::Mode::OPEN_AND_READ);
+		if (!file)
+		{
+			g_log_error.log("Engine") << "Failed to open file " << tmp;
+			StaticString<MAX_PATH_LENGTH + 40> msg("Failed to open file ");
+			msg << tmp;
+			lua_pushstring(L, msg);
+		}
+		else if (luaL_loadbuffer(L, (const char*)file->getBuffer(), file->size(), tmp) != LUA_OK)
+		{
+			g_log_error.log("Engine") << "Failed to load package " << tmp << ": " << lua_tostring(L, -1);
+		}
+		if (file) fs.close(*file);
+		return 1;
 	}
 
 
