@@ -1261,8 +1261,15 @@ public:
 			if(!includeFileInPack(normalized_path)) continue;
 
 			auto& out_path = paths.emplace();
-			Lumix::copyString(out_path, Lumix::lengthOf(out_path), dir_path);
-			Lumix::catString(out_path, Lumix::lengthOf(out_path), normalized_path);
+			if(dir_path[0] == '.')
+			{
+				Lumix::copyString(out_path, Lumix::lengthOf(out_path), normalized_path);
+			}
+			else
+			{
+				Lumix::copyString(out_path, Lumix::lengthOf(out_path), dir_path);
+				Lumix::catString(out_path, Lumix::lengthOf(out_path), normalized_path);
+			}
 			auto& out_info = infos.emplace();
 			out_info.hash = Lumix::crc32(out_path);
 			out_info.size = PlatformInterface::getFileSize(out_path);
