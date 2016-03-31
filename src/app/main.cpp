@@ -40,6 +40,13 @@ public:
 	~App() { ASSERT(!m_universe); }
 
 
+	static LRESULT msgProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
+	{
+		if (Msg == WM_CLOSE) PostQuitMessage(0);
+		return DefWindowProc(hWnd, Msg, wParam, lParam);
+	}
+
+
 	HWND createWindow()
 	{
 		HINSTANCE hInst = GetModuleHandle(NULL);
@@ -47,7 +54,7 @@ public:
 		wnd = {};
 		wnd.cbSize = sizeof(wnd);
 		wnd.style = CS_HREDRAW | CS_VREDRAW;
-		wnd.lpfnWndProc = DefWindowProc;
+		wnd.lpfnWndProc = msgProc;
 		wnd.hInstance = hInst;
 		wnd.hIcon = LoadIcon(NULL, IDI_APPLICATION);
 		wnd.hCursor = LoadCursor(NULL, IDC_ARROW);
