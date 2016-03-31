@@ -60,7 +60,7 @@ public:
 
 	void init()
 	{
-		Lumix::copyString(m_pipeline_path, "piplines/app.lua");
+		Lumix::copyString(m_pipeline_path, "pipelines/app.lua");
 		Lumix::copyString(m_startup_script_path, "startup.lua");
 		char cmd_line[1024];
 		Lumix::getCommandLine(cmd_line, Lumix::lengthOf(cmd_line));
