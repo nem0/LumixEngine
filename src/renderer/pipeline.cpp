@@ -360,7 +360,11 @@ struct PipelineImpl : public Pipeline
 
 	void onFileLoaded(FS::IFile& file, bool success)
 	{
-		if(!success) return;
+		if (!success)
+		{
+			g_log_error.log("Renderer") << "Failed to load " << m_path;
+			return;
+		}
 
 		cleanup();
 
