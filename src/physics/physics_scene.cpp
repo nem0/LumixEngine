@@ -292,16 +292,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void sendMessage(uint32 type, void*) override
-	{
-		static const uint32 register_hash = crc32("registerLuaAPI");
-		if (type == register_hash)
-		{
-			registerLuaAPI();
-		}
-	}
-
-
 	void enableVisualization()
 	{
 		m_scene->setVisualizationParameter(
@@ -778,11 +768,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void registerLuaAPI()
 	{
-		auto* scene = m_universe.getScene(crc32("lua_script"));
-		if (!scene) return;
-
-		m_script_scene = static_cast<LuaScriptScene*>(scene);
-		auto* L = m_script_scene->getGlobalState();
+		auto* L = m_engine->getState();
 
 		#define REGISTER_FUNCTION(name) \
 			do {\
@@ -1705,6 +1691,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
 	impl->m_universe.entityTransformed().bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityMoved>(
 		impl);
 	impl->m_engine = &engine;
+	impl->registerLuaAPI();
 	physx::PxSceneDesc sceneDesc(system.getPhysics()->getTolerancesScale());
 	sceneDesc.gravity = physx::PxVec3(0.0f, -9.8f, 0.0f);
 	if (!sceneDesc.cpuDispatcher)

@@ -149,14 +149,10 @@ uint32 Texture::getPixel(float x, float y) const
 	int w4 = (int)(fx * fy * 256.0f);
 
 	uint8 res[4];
-	res[0] =
-		(uint8)((p1[0] * w1 + p2[0] * w2 + p3[0] * w3 + p4[0] * w4) >> 8);
-	res[1] =
-		(uint8)((p1[1] * w1 + p2[1] * w2 + p3[1] * w3 + p4[1] * w4) >> 8);
-	res[2] =
-		(uint8)((p1[2] * w1 + p2[2] * w2 + p3[2] * w3 + p4[2] * w4) >> 8);
-	res[3] =
-		(uint8)((p1[3] * w1 + p2[3] * w2 + p3[3] * w3 + p4[3] * w4) >> 8);
+	res[0] = (uint8)((p1[0] * w1 + p2[0] * w2 + p3[0] * w3 + p4[0] * w4) >> 8);
+	res[1] = (uint8)((p1[1] * w1 + p2[1] * w2 + p3[1] * w3 + p4[1] * w4) >> 8);
+	res[2] = (uint8)((p1[2] * w1 + p2[2] * w2 + p3[2] * w3 + p4[2] * w4) >> 8);
+	res[3] = (uint8)((p1[3] * w1 + p2[3] * w2 + p3[3] * w3 + p4[3] * w4) >> 8);
 
 	return *(uint32*)res;
 }

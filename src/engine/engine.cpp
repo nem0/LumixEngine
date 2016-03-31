@@ -21,7 +21,6 @@
 #include "plugin_manager.h"
 #include "universe/hierarchy.h"
 #include "universe/universe.h"
-#include <lua.hpp>
 
 
 namespace Lumix
@@ -114,6 +113,24 @@ public:
 		m_fps_timer = Timer::create(m_allocator);
 		m_fps_frame = 0;
 		PropertyRegister::init(m_allocator);
+	}
+
+
+	static bool LUA_hasFilesystemWork(Engine* engine)
+	{
+		return engine->getFileSystem().hasWork();
+	}
+
+
+	static void LUA_processFilesystemWork(Engine* engine)
+	{
+		engine->getFileSystem().updateAsyncTransactions();
+	}
+
+
+	static void LUA_startGame(Engine* engine, Universe* universe)
+	{
+		if(engine && universe) engine->startGame(*universe);
 	}
 
 
@@ -347,7 +364,9 @@ public:
 		REGISTER_FUNCTION(addInputAction);
 		REGISTER_FUNCTION(logError);
 		REGISTER_FUNCTION(logInfo);
-
+		REGISTER_FUNCTION(startGame);
+		REGISTER_FUNCTION(hasFilesystemWork);
+		REGISTER_FUNCTION(processFilesystemWork);
 
 		#undef REGISTER_FUNCTION
 
@@ -516,6 +535,17 @@ public:
 			{
 				universe->addScene(scene);
 			}
+		}
+
+		for (auto* scene : universe->getScenes())
+		{
+			const char* name = scene->getPlugin().getName();
+			char tmp[128];
+
+			copyString(tmp, "g_scene_");
+			catString(tmp, name);
+			lua_pushlightuserdata(m_state, scene);
+			lua_setglobal(m_state, tmp);
 		}
 
 		return *universe;
@@ -771,6 +801,23 @@ public:
 		}
 		m_path_manager.clear();
 		return true;
+	}
+
+
+	void runScript(const char* src, int src_length, const char* path) override
+	{
+		if (luaL_loadbuffer(m_state, src, src_length, path) != LUA_OK)
+		{
+			g_log_error.log("Engine") << path << ": " << lua_tostring(m_state, -1);
+			lua_pop(m_state, 1);
+			return;
+		}
+
+		if (lua_pcall(m_state, 0, 0, 0) != LUA_OK)
+		{
+			g_log_error.log("Engine") << path << ": " << lua_tostring(m_state, -1);
+			lua_pop(m_state, 1);
+		}
 	}
 
 

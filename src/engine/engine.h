@@ -74,6 +74,7 @@ public:
 	virtual void nextFrame() = 0;
 	virtual PathManager& getPathManager() = 0;
 	virtual lua_State* getState() = 0;
+	virtual void runScript(const char* src, int src_length, const char* path) = 0;
 
 protected:
 	Engine() {}

@@ -86,6 +86,7 @@ struct AudioSceneImpl : public AudioScene
 			i.entity = INVALID_ENTITY;
 			i.buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
 		}
+		registerLuaAPI();
 	}
 
 
@@ -104,23 +105,9 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	void sendMessage(uint32 type, void*) override
-	{
-		static const uint32 register_hash = crc32("registerLuaAPI");
-		if (type == register_hash)
-		{
-			registerLuaAPI();
-		}
-	}
-
-
 	void registerLuaAPI()
 	{
-		auto* scene = m_universe.getScene(crc32("lua_script"));
-		if (!scene) return;
-
-		auto* script_scene = static_cast<LuaScriptScene*>(scene);
-		lua_State* L = script_scene->getGlobalState();
+		lua_State* L = m_system.getEngine().getState();
 
 		#define REGISTER_FUNCTION(F) \
 			do { \

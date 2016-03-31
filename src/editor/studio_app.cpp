@@ -1340,6 +1340,22 @@ public:
 		}
 
 		file.close();
+
+		const char* bin_files[] = {
+			"nvToolsExt64_1.dll",
+			"PhysX3CharacterKinematicCHECKED_x64.dll",
+			"PhysX3CHECKED_x64.dll",
+			"PhysX3CommonCHECKED_x64.dll",
+			"PhysX3CookingCHECKED_x64.dll"
+		};
+		for(auto& file : bin_files)
+		{
+			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> tmp(dest);
+			tmp << "/" << file;
+			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> src("bin/");
+			src << file;
+			PlatformInterface::copyFile(src, tmp);
+		}
 	}
 
 
