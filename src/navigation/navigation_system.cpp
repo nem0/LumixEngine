@@ -117,6 +117,7 @@ struct NavigationScene : public IScene
 		m_debug_heightfield = nullptr;
 		m_debug_contours = nullptr;
 		setGeneratorParams(0.3f, 0.1f, 0.3f, 2.0f, 60.0f, 1.5f);
+		registerLuaAPI();
 	}
 
 
@@ -168,13 +169,6 @@ struct NavigationScene : public IScene
 		REGISTER_FUNCTION(setGeneratorParams);
 
 		#undef REGISTER_FUNCTION
-	}
-
-
-	void sendMessage(uint32 type, void*) override
-	{
-		static const uint32 register_hash = crc32("registerLuaAPI");
-		if (type == register_hash) registerLuaAPI();
 	}
 
 

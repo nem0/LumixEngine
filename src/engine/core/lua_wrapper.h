@@ -81,6 +81,10 @@ template <> inline const char* typeToString<int>()
 {
 	return "number|integer";
 }
+template <> inline const char* typeToString<uint32>()
+{
+	return "number|integer";
+}
 template <> inline const char* typeToString<const char*>()
 {
 	return "string";
@@ -162,6 +166,10 @@ template <> inline void pushLua(lua_State* L, const char* value)
 	lua_pushstring(L, value);
 }
 template <> inline void pushLua(lua_State* L, int value)
+{
+	lua_pushinteger(L, value);
+}
+template <> inline void pushLua(lua_State* L, unsigned int value)
 {
 	lua_pushinteger(L, value);
 }

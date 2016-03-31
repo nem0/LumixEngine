@@ -39,7 +39,6 @@ public:
 	virtual IFunctionCall* beginFunctionCall(ComponentIndex cmp, int scr_index, const char* function) = 0;
 	virtual void endFunctionCall(IFunctionCall& caller) = 0;
 	virtual int getScriptCount(ComponentIndex cmp) = 0;
-	virtual lua_State* getGlobalState() = 0;
 	virtual lua_State* getState(ComponentIndex cmp, int scr_index) = 0;
 };
 

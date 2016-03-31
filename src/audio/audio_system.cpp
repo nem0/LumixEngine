@@ -75,9 +75,8 @@ struct AudioSystemImpl : public AudioSystem
 	}
 
 
+	Engine& getEngine() override { return m_engine; }
 	AudioDevice& getDevice() override { return *m_device; }
-
-
 	ClipManager& getClipManager() override { return m_manager; }
 
 

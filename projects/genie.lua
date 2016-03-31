@@ -303,13 +303,13 @@ project "unit_tests"
 	useLua()
 	defaultConfigurations()
 
-project "render_test"
+project "app"
 	kind "WindowedApp"
 
 	debugdir "../../LumixEngine_data"
 
-	files { "../src/render_test/**.h", "../src/render_test/**.cpp" }
-	includedirs { "../src", "../src/render_test", "../external/bgfx/include" }
+	files { "../src/app/**.h", "../src/app/**.cpp" }
+	includedirs { "../src", "../src/app", "../external/bgfx/include" }
 	if _OPTIONS["static-plugins"] then	
 		forceLink("s_animation_plugin_register")
 		forceLink("s_audio_plugin_register")
@@ -333,7 +333,6 @@ project "render_test"
 		linkPhysX()
 	end
 	links { "engine", "animation", "renderer" }
-
 	
 	useLua()
 	defaultConfigurations()

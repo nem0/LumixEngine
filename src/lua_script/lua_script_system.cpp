@@ -182,6 +182,7 @@ namespace Lumix
 
 			void onScriptLoaded(Resource::State, Resource::State)
 			{
+				lua_State* L = m_scene.m_system.m_engine.getState();
 				for (auto& script : m_scripts)
 				{
 					if ((!script.m_script || !script.m_script->isReady()) && script.m_state)
@@ -196,7 +197,7 @@ namespace Lumix
 
 					script.m_environment = -1;
 
-					script.m_state = lua_newthread(m_scene.m_global_state);
+					script.m_state = lua_newthread(L);
 					lua_newtable(script.m_state);
 					// reference environment
 					lua_pushvalue(script.m_state, -1);
@@ -292,8 +293,6 @@ namespace Lumix
 		LuaScriptSceneImpl(LuaScriptSystemImpl& system, Universe& ctx)
 			: m_system(system)
 			, m_universe(ctx)
-			, m_global_state(nullptr)
-			, m_global_lua_thread_ref(-1)
 			, m_scripts(system.getAllocator())
 			, m_updates(system.getAllocator())
 			, m_entity_script_map(system.getAllocator())
@@ -301,6 +300,7 @@ namespace Lumix
 		{
 			m_function_call.is_in_progress = false;
 			m_is_api_registered = false;
+			registerAPI();
 		}
 
 
@@ -340,7 +340,6 @@ namespace Lumix
 		void endFunctionCall(IFunctionCall& caller)
 		{
 			ASSERT(&caller == &m_function_call);
-			ASSERT(m_global_state);
 			ASSERT(m_function_call.is_in_progress);
 
 			m_function_call.is_in_progress = false;
@@ -359,11 +358,6 @@ namespace Lumix
 
 		~LuaScriptSceneImpl()
 		{
-			if (m_global_lua_thread_ref != -1)
-			{
-				luaL_unref(m_system.m_engine.getState(), LUA_REGISTRYINDEX, m_global_lua_thread_ref);
-			}
-
 			unloadAllScripts();
 		}
 
@@ -390,9 +384,6 @@ namespace Lumix
 		{
 			return m_scripts[cmp]->m_scripts[scr_index].m_state;
 		}
-
-
-		lua_State* getGlobalState() { return m_global_state; }
 
 
 		Universe& getUniverse() override { return m_universe; }
@@ -423,11 +414,12 @@ namespace Lumix
 
 		void registerPropertyAPI()
 		{
+			lua_State* L = m_system.m_engine.getState();
 			auto f = &LuaWrapper::wrap<decltype(&setPropertyType), &setPropertyType>;
-			LuaWrapper::createSystemFunction(m_global_state, "Editor", "setPropertyType", f);
-			LuaWrapper::createSystemVariable(m_global_state, "Editor", "BOOLEAN_PROPERTY", Property::BOOLEAN);
-			LuaWrapper::createSystemVariable(m_global_state, "Editor", "FLOAT_PROPERTY", Property::FLOAT);
-			LuaWrapper::createSystemVariable(m_global_state, "Editor", "ENTITY_PROPERTY", Property::ENTITY);
+			LuaWrapper::createSystemFunction(L, "Editor", "setPropertyType", f);
+			LuaWrapper::createSystemVariable(L, "Editor", "BOOLEAN_PROPERTY", Property::BOOLEAN);
+			LuaWrapper::createSystemVariable(L, "Editor", "FLOAT_PROPERTY", Property::FLOAT);
+			LuaWrapper::createSystemVariable(L, "Editor", "ENTITY_PROPERTY", Property::ENTITY);
 		}
 
 
@@ -563,14 +555,15 @@ namespace Lumix
 		void registerProperties()
 		{
 			int cmps_count = PropertyRegister::getComponentTypesCount();
+			lua_State* L = m_system.m_engine.getState();
 			for (int i = 0; i < cmps_count; ++i)
 			{
 				const char* cmp_name = PropertyRegister::getComponentTypeID(i);
-				lua_newtable(m_global_state);
-				lua_pushvalue(m_global_state, -1);
+				lua_newtable(L);
+				lua_pushvalue(L, -1);
 				char tmp[50];
 				convertPropertyToLuaName(cmp_name, tmp, lengthOf(tmp));
-				lua_setglobal(m_global_state, tmp);
+				lua_setglobal(L, tmp);
 
 				uint32 cmp_name_hash = crc32(cmp_name);
 				auto& descs = PropertyRegister::getDescriptors(cmp_name_hash);
@@ -587,19 +580,19 @@ namespace Lumix
 					{
 						case IPropertyDescriptor::VEC3:
 						case IPropertyDescriptor::COLOR:
-							lua_pushlightuserdata(m_global_state, desc);
-							lua_pushinteger(m_global_state, cmp_name_hash);
-							lua_pushcclosure(m_global_state, &LUA_setProperty, 2);
-							lua_setfield(m_global_state, -2, setter);
+							lua_pushlightuserdata(L, desc);
+							lua_pushinteger(L, cmp_name_hash);
+							lua_pushcclosure(L, &LUA_setProperty, 2);
+							lua_setfield(L, -2, setter);
 
-							lua_pushlightuserdata(m_global_state, desc);
-							lua_pushinteger(m_global_state, cmp_name_hash);
-							lua_pushcclosure(m_global_state, &LUA_getProperty, 2);
-							lua_setfield(m_global_state, -2, getter);
+							lua_pushlightuserdata(L, desc);
+							lua_pushinteger(L, cmp_name_hash);
+							lua_pushcclosure(L, &LUA_getProperty, 2);
+							lua_setfield(L, -2, getter);
 							break;
 					}
 				}
-				lua_pop(m_global_state, 1);
+				lua_pop(L, 1);
 			}
 		}
 
@@ -611,31 +604,13 @@ namespace Lumix
 			m_is_api_registered = true;
 
 			lua_State* engine_state = m_system.m_engine.getState();
-			m_global_state = lua_newthread(engine_state);
-			lua_pushvalue(engine_state, -1);
-			m_global_lua_thread_ref = luaL_ref(engine_state, LUA_REGISTRYINDEX);
-			for (auto* scene : m_universe.getScenes())
-			{
-				const char* name = scene->getPlugin().getName();
-				char tmp[128];
-
-				copyString(tmp, "g_scene_");
-				catString(tmp, name);
-				lua_pushlightuserdata(m_global_state, scene);
-				lua_setglobal(m_global_state, tmp);
-			}
-
-			lua_pushlightuserdata(m_global_state, &m_universe);
-			lua_setglobal(m_global_state, "g_universe");
+			
+			lua_pushlightuserdata(engine_state, &m_universe);
+			lua_setglobal(engine_state, "g_universe");
 			LuaWrapper::createSystemFunction(
-				m_global_state, "LuaScript", "getEnvironment", &LuaScriptSceneImpl::getEnvironment);
+				engine_state, "LuaScript", "getEnvironment", &LuaScriptSceneImpl::getEnvironment);
 			registerProperties();
 			registerPropertyAPI();
-			uint32 register_msg = crc32("registerLuaAPI");
-			for (auto* i : m_universe.getScenes())
-			{
-				i->sendMessage(register_msg, nullptr);
-			}
 		}
 
 
@@ -1062,7 +1037,7 @@ namespace Lumix
 
 		void update(float time_delta, bool paused) override
 		{
-			if (!m_global_state || paused) { return; }
+			if (paused) return;
 
 			for (auto& i : m_updates)
 			{
@@ -1202,8 +1177,6 @@ namespace Lumix
 		Array<ScriptComponent*> m_scripts;
 		HashMap<Entity, ComponentIndex> m_entity_script_map;
 		AssociativeArray<uint32, string> m_property_names;
-		lua_State* m_global_state;
-		int m_global_lua_thread_ref;
 		Universe& m_universe;
 		Array<UpdateData> m_updates;
 		FunctionCall m_function_call;

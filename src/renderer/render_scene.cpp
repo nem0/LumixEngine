@@ -188,6 +188,7 @@ public:
 			CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
 		m_time = 0;
 		m_renderables.reserve(5000);
+		registerLuaAPI();
 	}
 
 
@@ -1852,6 +1853,33 @@ public:
 	}
 
 
+	static unsigned int LUA_compareTGA(RenderSceneImpl* scene, const char* path, const char* path_preimage, int min_diff)
+	{
+		auto& fs = scene->m_engine.getFileSystem();
+		auto file1 = fs.open(fs.getDefaultDevice(), Lumix::Path(path), Lumix::FS::Mode::OPEN_AND_READ);
+		auto file2 = fs.open(fs.getDefaultDevice(), Lumix::Path(path_preimage), Lumix::FS::Mode::OPEN_AND_READ);
+		if (!file1)
+		{
+			if (file2) fs.close(*file2);
+			Lumix::g_log_error.log("render_test") << "Failed to open " << path;
+			return 0xffffFFFF;
+		}
+		else if (!file2)
+		{
+			fs.close(*file1);
+			Lumix::g_log_error.log("render_test") << "Failed to open " << path_preimage;
+			return 0xffffFFFF;
+		}
+		return Lumix::Texture::compareTGA(scene->m_allocator, file1, file2, min_diff);
+	}
+
+
+	static void LUA_makeScreenshot(RenderSceneImpl* scene, const char* path)
+	{
+		scene->m_renderer.makeScreenshot(Path(path));
+	}
+
+
 	static void LUA_setRenderableMaterial(RenderScene* scene,
 		ComponentIndex cmp,
 		int index,
@@ -1863,12 +1891,7 @@ public:
 
 	void registerLuaAPI()
 	{
-		auto* scene = m_universe.getScene(crc32("lua_script"));
-		if (!scene) return;
-
-		auto* script_scene = static_cast<LuaScriptScene*>(scene);
-
-		lua_State* L = script_scene->getGlobalState();
+		lua_State* L = m_engine.getState();
 		Pipeline::registerLuaAPI(L);
 
 		#define REGISTER_FUNCTION(F)\
@@ -1902,21 +1925,14 @@ public:
 		REGISTER_FUNCTION(getMaterialTexture);
 		REGISTER_FUNCTION(setRenderableMaterial);
 		REGISTER_FUNCTION(setRenderablePath);
-		
+		REGISTER_FUNCTION(makeScreenshot);
+		REGISTER_FUNCTION(compareTGA);
+
 		LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", LUA_castCameraRay);
 
 		#undef REGISTER_FUNCTION
 	}
 
-
-	void sendMessage(uint32 type, void*) override
-	{
-		static const uint32 register_hash = crc32("registerLuaAPI");
-		if (type == register_hash)
-		{
-			registerLuaAPI();
-		}
-	}
 
 
 	bool isGrassEnabled() const override
