@@ -40,6 +40,8 @@ newaction {
 
 		os.copyfile(path.join(src_dir, "studio.exe"), path.join(dst_dir, "studio.exe"))
 		os.copyfile(path.join(src_dir, "studio.pdb"), path.join(dst_dir, "studio.pdb"))
+		os.copyfile(path.join(src_dir, "app.exe"), path.join(dst_dir, "app.exe"))
+		os.copyfile(path.join(src_dir, "app.pdb"), path.join(dst_dir, "app.pdb"))
 	end
 }
 
@@ -76,6 +78,8 @@ newaction {
 
 		os.copyfile(path.join(src_dir, "studio.exe"), path.join(dst_dir, "studio.exe"))
 		os.copyfile(path.join(src_dir, "studio.pdb"), path.join(dst_dir, "studio.pdb"))
+		os.copyfile(path.join(src_dir, "app.exe"), path.join(dst_dir, "app.exe"))
+		os.copyfile(path.join(src_dir, "app.pdb"), path.join(dst_dir, "app.pdb"))
 	end
 }
 

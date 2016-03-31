@@ -1281,10 +1281,12 @@ public:
 	void packData()
 	{
 		char dest[Lumix::MAX_PATH_LENGTH];
-		if (!PlatformInterface::getOpenDirectory(dest, Lumix::lengthOf(dest), ".")) return;
+		char dest_dir[Lumix::MAX_PATH_LENGTH];
+		if (!PlatformInterface::getOpenDirectory(dest_dir, Lumix::lengthOf(dest_dir), ".")) return;
 
 		static const char* OUT_FILENAME = "data.pak";
-		Lumix::catString(dest, "/");
+		Lumix::catString(dest_dir, "/");
+		Lumix::copyString(dest, dest_dir);
 		Lumix::catString(dest, OUT_FILENAME);
 		Lumix::Array<PackFileInfo> infos(m_allocator);
 		Lumix::Array<PackFileInfo::Path> paths(m_allocator);
@@ -1342,6 +1344,8 @@ public:
 		file.close();
 
 		const char* bin_files[] = {
+			"app.exe",
+			"assimp.dll",
 			"nvToolsExt64_1.dll",
 			"PhysX3CharacterKinematicCHECKED_x64.dll",
 			"PhysX3CHECKED_x64.dll",
@@ -1350,11 +1354,20 @@ public:
 		};
 		for(auto& file : bin_files)
 		{
-			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> tmp(dest);
-			tmp << "/" << file;
+			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> tmp(dest_dir);
+			tmp << file;
 			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> src("bin/");
 			src << file;
-			PlatformInterface::copyFile(src, tmp);
+			if (!PlatformInterface::copyFile(src, tmp))
+			{
+				Lumix::g_log_error.log("Editor") << "Failed to copy " << src << " to " << tmp;
+			}
+		}
+		Lumix::StaticString<Lumix::MAX_PATH_LENGTH> tmp(dest_dir);
+		tmp << "startup.lua";
+		if (!PlatformInterface::copyFile("startup.lua", tmp))
+		{
+			Lumix::g_log_error.log("Editor") << "Failed to copy startup.lua to " << tmp;
 		}
 	}
 
