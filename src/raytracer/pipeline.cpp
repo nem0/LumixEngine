@@ -118,7 +118,7 @@ void CommandBufferGenerator::end()
 
 struct PipelineImpl : public Pipeline
 {
-	PipelineImpl(Renderer& renderer, const Path& path, IAllocator& allocator)
+	PipelineImpl(Renderer& renderer, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_renderer(renderer)
 		, m_is_ready(false)
@@ -363,9 +363,9 @@ struct PipelineImpl : public Pipeline
 };
 
 
-Pipeline* Pipeline::create(Renderer& renderer, const Path& path, IAllocator& allocator)
+Pipeline* Pipeline::create(Renderer& renderer, IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, PipelineImpl)(renderer, path, allocator);
+	return LUMIX_NEW(allocator, PipelineImpl)(renderer, allocator);
 }
 
 

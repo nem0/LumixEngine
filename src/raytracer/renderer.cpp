@@ -311,7 +311,7 @@ struct RendererImpl : public Renderer
 
 extern "C"
 {
-	LUMIX_PLUGIN_ENTRY(renderer)
+	LUMIX_PLUGIN_ENTRY(raytracer)
 	{
 		RendererImpl* r = LUMIX_NEW(engine.getAllocator(), RendererImpl)(engine);
 		if (r->create())
