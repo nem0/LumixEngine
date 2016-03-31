@@ -54,10 +54,7 @@ public:
 		wnd.lpszClassName = "App";
 		wnd.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 		RegisterClassExA(&wnd);
-		auto hwnd = CreateWindowA("App", "App", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 800, 600, NULL, NULL, hInst, 0);
-
-		m_hwnd = hwnd;
-		return hwnd;
+		return CreateWindowA("App", "App", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 800, 600, NULL, NULL, hInst, 0);
 	}
 
 
@@ -84,7 +81,7 @@ public:
 			}
 		}
 
-		auto hwnd = createWindow();
+		HWND hwnd = createWindow();
 
 		Lumix::g_log_info.getCallback().bind<outputToVS>();
 		Lumix::g_log_warning.getCallback().bind<outputToVS>();
@@ -140,7 +137,7 @@ public:
 			return;
 		}
 
-		m_engine->runScript((const char*)file.getBuffer(), file.size(), m_startup_script_path);
+		m_engine->runScript((const char*)file.getBuffer(), (int)file.size(), m_startup_script_path);
 	}
 
 
@@ -309,7 +306,6 @@ private:
 	Lumix::FS::PackFileDevice* m_pack_file_device;
 	bool m_finished;
 	int m_exit_code;
-	HWND m_hwnd;
 	char m_startup_script_path[Lumix::MAX_PATH_LENGTH];
 	char m_pipeline_path[Lumix::MAX_PATH_LENGTH];
 };
