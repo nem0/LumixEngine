@@ -40,7 +40,7 @@ public:
 	~App() { ASSERT(!m_universe); }
 
 
-	static LRESULT msgProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
+	static LRESULT CALLBACK msgProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 	{
 		if (Msg == WM_CLOSE) PostQuitMessage(0);
 		return DefWindowProc(hWnd, Msg, wParam, lParam);
