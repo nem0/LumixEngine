@@ -644,6 +644,7 @@ struct RendererImpl : public Renderer
 			.end();
 
 		m_default_shader = static_cast<Shader*>(m_shader_manager.load(Path("shaders/default.shd")));
+		RenderScene::registerLuaAPI(m_engine.getState());
 	}
 
 	~RendererImpl()

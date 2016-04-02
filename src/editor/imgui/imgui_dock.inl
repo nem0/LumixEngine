@@ -1076,7 +1076,6 @@ struct DockContext
 		}
 		lua_pop(L, 1);
 
-		int i = 0;
 		if (lua_getglobal(L, "docks") == LUA_TTABLE)
 		{
 			lua_pushnil(L);
@@ -1142,7 +1141,6 @@ struct DockContext
 					lua_pop(L, 5);
 				}
 				lua_pop(L, 1);
-				++i;
 			}
 		}
 		lua_pop(L, 1);

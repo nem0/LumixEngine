@@ -188,7 +188,6 @@ public:
 			CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
 		m_time = 0;
 		m_renderables.reserve(5000);
-		registerLuaAPI();
 	}
 
 
@@ -1887,52 +1886,6 @@ public:
 	{
 		scene->setRenderableMaterial(cmp, index, Path(path));
 	}
-
-
-	void registerLuaAPI()
-	{
-		lua_State* L = m_engine.getState();
-		Pipeline::registerLuaAPI(L);
-
-		#define REGISTER_FUNCTION(F)\
-			do { \
-			auto f = &LuaWrapper::wrapMethod<RenderSceneImpl, decltype(&RenderSceneImpl::F), &RenderSceneImpl::F>; \
-			LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
-			} while(false) \
-
-		REGISTER_FUNCTION(setFogDensity);
-		REGISTER_FUNCTION(setFogBottom);
-		REGISTER_FUNCTION(setFogHeight);
-		REGISTER_FUNCTION(setFogColor);
-		REGISTER_FUNCTION(getFogDensity);
-		REGISTER_FUNCTION(getFogBottom);
-		REGISTER_FUNCTION(getFogHeight);
-		REGISTER_FUNCTION(getFogColor);
-		REGISTER_FUNCTION(getCameraSlot);
-		REGISTER_FUNCTION(getCameraComponent);
-		REGISTER_FUNCTION(getRenderableComponent);
-		REGISTER_FUNCTION(addDebugCross);
-		REGISTER_FUNCTION(getTerrainMaterial);
-
-		#undef REGISTER_FUNCTION
-
-		#define REGISTER_FUNCTION(F)\
-			do { \
-			auto f = &LuaWrapper::wrap<decltype(&RenderSceneImpl::LUA_##F), &RenderSceneImpl::LUA_##F>; \
-			LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
-			} while(false) \
-
-		REGISTER_FUNCTION(getMaterialTexture);
-		REGISTER_FUNCTION(setRenderableMaterial);
-		REGISTER_FUNCTION(setRenderablePath);
-		REGISTER_FUNCTION(makeScreenshot);
-		REGISTER_FUNCTION(compareTGA);
-
-		LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", LUA_castCameraRay);
-
-		#undef REGISTER_FUNCTION
-	}
-
 
 
 	bool isGrassEnabled() const override
@@ -3781,4 +3734,50 @@ void RenderScene::destroyInstance(RenderScene* scene)
 {
 	LUMIX_DELETE(scene->getAllocator(), static_cast<RenderSceneImpl*>(scene));
 }
+
+
+void RenderScene::registerLuaAPI(lua_State* L)
+{
+	Pipeline::registerLuaAPI(L);
+
+	#define REGISTER_FUNCTION(F)\
+		do { \
+		auto f = &LuaWrapper::wrapMethod<RenderSceneImpl, decltype(&RenderSceneImpl::F), &RenderSceneImpl::F>; \
+		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
+		} while(false) \
+
+	REGISTER_FUNCTION(setFogDensity);
+	REGISTER_FUNCTION(setFogBottom);
+	REGISTER_FUNCTION(setFogHeight);
+	REGISTER_FUNCTION(setFogColor);
+	REGISTER_FUNCTION(getFogDensity);
+	REGISTER_FUNCTION(getFogBottom);
+	REGISTER_FUNCTION(getFogHeight);
+	REGISTER_FUNCTION(getFogColor);
+	REGISTER_FUNCTION(getCameraSlot);
+	REGISTER_FUNCTION(getCameraComponent);
+	REGISTER_FUNCTION(getRenderableComponent);
+	REGISTER_FUNCTION(addDebugCross);
+	REGISTER_FUNCTION(getTerrainMaterial);
+
+	#undef REGISTER_FUNCTION
+
+	#define REGISTER_FUNCTION(F)\
+		do { \
+		auto f = &LuaWrapper::wrap<decltype(&RenderSceneImpl::LUA_##F), &RenderSceneImpl::LUA_##F>; \
+		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
+		} while(false) \
+
+	REGISTER_FUNCTION(getMaterialTexture);
+	REGISTER_FUNCTION(setRenderableMaterial);
+	REGISTER_FUNCTION(setRenderablePath);
+	REGISTER_FUNCTION(makeScreenshot);
+	REGISTER_FUNCTION(compareTGA);
+
+	LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", &RenderSceneImpl::LUA_castCameraRay);
+
+	#undef REGISTER_FUNCTION
 }
+
+
+} // namespace Lumix

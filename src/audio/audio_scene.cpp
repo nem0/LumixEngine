@@ -86,7 +86,6 @@ struct AudioSceneImpl : public AudioScene
 			i.entity = INVALID_ENTITY;
 			i.buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
 		}
-		registerLuaAPI();
 	}
 
 
@@ -102,24 +101,6 @@ struct AudioSceneImpl : public AudioScene
 		if (clip) return play(entity, clip, is_3d);
 
 		return -1;
-	}
-
-
-	void registerLuaAPI()
-	{
-		lua_State* L = m_system.getEngine().getState();
-
-		#define REGISTER_FUNCTION(F) \
-			do { \
-			auto f = &LuaWrapper::wrapMethod<AudioSceneImpl, decltype(&AudioSceneImpl::F), &AudioSceneImpl::F>; \
-			LuaWrapper::createSystemFunction(L, "Audio", #F, f); \
-			} while(false) \
-
-		REGISTER_FUNCTION(setEcho);
-		REGISTER_FUNCTION(playSound);
-		REGISTER_FUNCTION(setVolume);
-
-		#undef REGISTER_FUNCTION
 	}
 
 
@@ -690,6 +671,24 @@ void AudioScene::destroyInstance(AudioScene* scene)
 {
 	LUMIX_DELETE(static_cast<AudioSceneImpl*>(scene)->m_allocator, scene);
 }
+
+
+void AudioScene::registerLuaAPI(lua_State* L)
+{
+	#define REGISTER_FUNCTION(F) \
+		do { \
+		auto f = &LuaWrapper::wrapMethod<AudioSceneImpl, decltype(&AudioSceneImpl::F), &AudioSceneImpl::F>; \
+		LuaWrapper::createSystemFunction(L, "Audio", #F, f); \
+		} while(false) \
+
+	REGISTER_FUNCTION(setEcho);
+	REGISTER_FUNCTION(playSound);
+	REGISTER_FUNCTION(setVolume);
+
+	#undef REGISTER_FUNCTION
+}
+
+
 
 
 } // namespace Lumix

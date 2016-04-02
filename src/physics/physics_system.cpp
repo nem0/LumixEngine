@@ -205,6 +205,7 @@ namespace Lumix
 		{
 			registerProperties(engine.getAllocator());
 			m_manager.create(ResourceManager::PHYSICS, engine.getResourceManager());
+			PhysicsScene::registerLuaAPI(m_engine.getState());
 		}
 
 		bool create() override;

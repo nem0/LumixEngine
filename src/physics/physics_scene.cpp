@@ -766,28 +766,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void registerLuaAPI()
-	{
-		auto* L = m_engine->getState();
-
-		#define REGISTER_FUNCTION(name) \
-			do {\
-				auto f = &LuaWrapper::wrapMethod<PhysicsSceneImpl, decltype(&PhysicsSceneImpl::name), &PhysicsSceneImpl::name>; \
-				LuaWrapper::createSystemFunction(L, "Physics", #name, f); \
-			} while(false) \
-
-		REGISTER_FUNCTION(getActorComponent);
-		REGISTER_FUNCTION(putToSleep);
-		REGISTER_FUNCTION(getActorSpeed);
-		REGISTER_FUNCTION(applyForceToActor);
-		REGISTER_FUNCTION(moveController);
-		REGISTER_FUNCTION(raycast);
-
-		#undef REGISTER_FUNCTION
+	void startGame() override
+	{ 
+		auto* scene = m_universe.getScene(crc32("lua_script"));
+		m_script_scene = static_cast<LuaScriptScene*>(scene);
+		m_is_game_running = true; 
 	}
-
-
-	void startGame() override { m_is_game_running = true; }
 
 
 	void stopGame() override { m_is_game_running = false; }
@@ -1691,7 +1675,6 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
 	impl->m_universe.entityTransformed().bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityMoved>(
 		impl);
 	impl->m_engine = &engine;
-	impl->registerLuaAPI();
 	physx::PxSceneDesc sceneDesc(system.getPhysics()->getTolerancesScale());
 	sceneDesc.gravity = physx::PxVec3(0.0f, -9.8f, 0.0f);
 	if (!sceneDesc.cpuDispatcher)
@@ -1835,6 +1818,25 @@ void Heightfield::heightmapLoaded(Resource::State, Resource::State new_state)
 	{
 		m_scene->heightmapLoaded(this);
 	}
+}
+
+
+void PhysicsScene::registerLuaAPI(lua_State* L)
+{
+	#define REGISTER_FUNCTION(name) \
+		do {\
+			auto f = &LuaWrapper::wrapMethod<PhysicsSceneImpl, decltype(&PhysicsSceneImpl::name), &PhysicsSceneImpl::name>; \
+			LuaWrapper::createSystemFunction(L, "Physics", #name, f); \
+		} while(false) \
+
+	REGISTER_FUNCTION(getActorComponent);
+	REGISTER_FUNCTION(putToSleep);
+	REGISTER_FUNCTION(getActorSpeed);
+	REGISTER_FUNCTION(applyForceToActor);
+	REGISTER_FUNCTION(moveController);
+	REGISTER_FUNCTION(raycast);
+
+	#undef REGISTER_FUNCTION
 }
 
 

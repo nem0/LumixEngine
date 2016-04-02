@@ -72,6 +72,7 @@ struct AudioSystemImpl : public AudioSystem
 		, m_device(nullptr)
 	{
 		registerProperties(engine.getAllocator());
+		AudioScene::registerLuaAPI(m_engine.getState());
 	}
 
 
