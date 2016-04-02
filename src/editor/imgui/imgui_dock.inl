@@ -1160,6 +1160,7 @@ void ShutdownDock()
 		g_dock.m_docks[i]->~Dock();
 		MemFree(g_dock.m_docks[i]);
 	}
+	g_dock.m_docks.clear();
 }
 
 
