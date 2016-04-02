@@ -107,6 +107,7 @@ namespace Lumix
 			LuaScript* m_script;
 			lua_State* m_state;
 			int m_environment;
+			int m_thread_ref;
 			Array<Property> m_properties;
 		};
 
@@ -198,6 +199,8 @@ namespace Lumix
 					script.m_environment = -1;
 
 					script.m_state = lua_newthread(L);
+					lua_pushvalue(L, -1);
+					script.m_thread_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 					lua_newtable(script.m_state);
 					// reference environment
 					lua_pushvalue(script.m_state, -1);
@@ -736,6 +739,7 @@ namespace Lumix
 				}
 			}
 
+			luaL_unref(inst.m_state, LUA_REGISTRYINDEX, inst.m_thread_ref);
 			luaL_unref(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
 			inst.m_state = nullptr;
 		}
