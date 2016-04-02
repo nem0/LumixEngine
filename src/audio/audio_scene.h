@@ -4,6 +4,9 @@
 #include "engine/iplugin.h"
 
 
+struct lua_State;
+
+
 namespace Lumix
 {
 
@@ -32,6 +35,7 @@ public:
 		Universe& universe,
 		class IAllocator& allocator);
 	static void destroyInstance(AudioScene* scene);
+	static void registerLuaAPI(lua_State* L);
 
 	virtual int getClipCount() const = 0;
 	virtual const char* getClipName(int index) = 0;

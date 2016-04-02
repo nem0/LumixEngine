@@ -29,6 +29,7 @@ namespace Lumix
 
 static const int CELLS_PER_TILE_SIDE = 256;
 static const float CELL_SIZE = 0.3f;
+void registerLuaAPI(lua_State* L);
 
 
 struct NavigationSystem : public IPlugin
@@ -41,6 +42,7 @@ struct NavigationSystem : public IPlugin
 		s_instance = this;
 		dtAllocSetCustom(&detourAlloc, &detourFree);
 		rcAllocSetCustom(&recastAlloc, &recastFree);
+		registerLuaAPI(m_engine.getState());
 	}
 
 
@@ -117,7 +119,6 @@ struct NavigationScene : public IScene
 		m_debug_heightfield = nullptr;
 		m_debug_contours = nullptr;
 		setGeneratorParams(0.3f, 0.1f, 0.3f, 2.0f, 60.0f, 1.5f);
-		registerLuaAPI();
 	}
 
 
@@ -143,32 +144,6 @@ struct NavigationScene : public IScene
 		m_debug_compact_heightfield = nullptr;
 		m_debug_heightfield = nullptr;
 		m_debug_contours = nullptr;
-	}
-
-
-	void registerLuaAPI()
-	{
-		lua_State* L = m_system.m_engine.getState();
-		#define REGISTER_FUNCTION(name) \
-			do {\
-				auto f = &LuaWrapper::wrapMethod<NavigationScene, decltype(&NavigationScene::name), &NavigationScene::name>; \
-				LuaWrapper::createSystemFunction(L, "Navigation", #name, f); \
-			} while(false) \
-
-		REGISTER_FUNCTION(generateNavmesh);
-		REGISTER_FUNCTION(navigate);
-		REGISTER_FUNCTION(debugDrawNavmesh);
-		REGISTER_FUNCTION(debugDrawCompactHeightfield);
-		REGISTER_FUNCTION(debugDrawHeightfield);
-		REGISTER_FUNCTION(debugDrawPaths);
-		REGISTER_FUNCTION(getPolygonCount);
-		REGISTER_FUNCTION(debugDrawContours);
-		REGISTER_FUNCTION(generateTile);
-		REGISTER_FUNCTION(save);
-		REGISTER_FUNCTION(load);
-		REGISTER_FUNCTION(setGeneratorParams);
-
-		#undef REGISTER_FUNCTION
 	}
 
 
@@ -935,6 +910,31 @@ void NavigationSystem::destroyScene(IScene* scene)
 LUMIX_PLUGIN_ENTRY(navigation)
 {
 	return LUMIX_NEW(engine.getAllocator(), NavigationSystem)(engine);
+}
+
+
+static void registerLuaAPI(lua_State* L)
+{
+	#define REGISTER_FUNCTION(name) \
+		do {\
+			auto f = &LuaWrapper::wrapMethod<NavigationScene, decltype(&NavigationScene::name), &NavigationScene::name>; \
+			LuaWrapper::createSystemFunction(L, "Navigation", #name, f); \
+		} while(false) \
+
+	REGISTER_FUNCTION(generateNavmesh);
+	REGISTER_FUNCTION(navigate);
+	REGISTER_FUNCTION(debugDrawNavmesh);
+	REGISTER_FUNCTION(debugDrawCompactHeightfield);
+	REGISTER_FUNCTION(debugDrawHeightfield);
+	REGISTER_FUNCTION(debugDrawPaths);
+	REGISTER_FUNCTION(getPolygonCount);
+	REGISTER_FUNCTION(debugDrawContours);
+	REGISTER_FUNCTION(generateTile);
+	REGISTER_FUNCTION(save);
+	REGISTER_FUNCTION(load);
+	REGISTER_FUNCTION(setGeneratorParams);
+
+	#undef REGISTER_FUNCTION
 }
 
 

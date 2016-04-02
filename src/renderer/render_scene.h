@@ -6,6 +6,9 @@
 #include "iplugin.h"
 
 
+struct lua_State;
+
+
 namespace Lumix
 {
 
@@ -132,6 +135,7 @@ public:
 		bool is_forward_rendered,
 		IAllocator& allocator);
 	static void destroyInstance(RenderScene* scene);
+	static void registerLuaAPI(lua_State* L);
 
 	virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, ComponentIndex ignore) = 0;
 
