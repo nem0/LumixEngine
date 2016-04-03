@@ -54,13 +54,6 @@ namespace Lumix
 		}
 
 
-		void clear() override
-		{
-			m_mouse_rel_x = 0;
-			m_mouse_rel_y = 0;
-		}
-
-
 		void enable(bool enabled) override
 		{
 			m_is_enabled = enabled;
@@ -83,6 +76,8 @@ namespace Lumix
 				}
 				m_last_checked_controller = (m_last_checked_controller + 1) % XUSER_MAX_COUNT;
 			}
+			m_mouse_rel_x = 0;
+			m_mouse_rel_y = 0;
 		}
 
 
