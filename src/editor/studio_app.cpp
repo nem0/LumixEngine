@@ -113,8 +113,6 @@ public:
 		m_log_ui->update(time_delta);
 
 		onGUI();
-
-		m_engine->getInputSystem().clear();
 	}
 
 
@@ -186,6 +184,19 @@ public:
 				}
 				ImGui::Separator();
 
+				ImGui::Text("Version 0.22. - News");
+				ImGui::BulletText("default studio settings");
+				ImGui::BulletText("navigation");
+				ImGui::BulletText("merge meshes during import");
+				ImGui::BulletText("advanced CPU profiler view");
+				ImGui::BulletText("patch file device");
+				ImGui::BulletText("pack file device");
+				ImGui::BulletText("ask to save before quit / new / open");
+				ImGui::BulletText("new terrian painting features");
+				ImGui::BulletText("16bit mesh indices");
+				ImGui::BulletText("distance per grass type");
+				ImGui::BulletText("lua's require goes through engine");
+				ImGui::BulletText("game packing");
 				ImGui::Text("Version 0.21. - News");
 				ImGui::BulletText("copy / paste multiple entities at once");
 				ImGui::BulletText("stencil support");

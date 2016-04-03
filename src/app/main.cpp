@@ -6,6 +6,7 @@
 #include "core/fs/file_system.h"
 #include "core/fs/memory_file_device.h"
 #include "core/fs/pack_file_device.h"
+#include "core/input_system.h"
 #include "core/log.h"
 #include "core/lua_wrapper.h"
 #include "core/mt/thread.h"
@@ -14,6 +15,7 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/system.h"
+#include "core/timer.h"
 #include "debug/debug.h"
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
@@ -34,20 +36,63 @@ public:
 	{
 		m_universe = nullptr;
 		m_exit_code = 0;
+		m_frame_timer = Lumix::Timer::create(m_allocator);
+		ASSERT(!s_instance);
+		s_instance = this;
+		m_pipeline = nullptr;
 	}
 
 
-	~App() { ASSERT(!m_universe); }
-
-
-	static LRESULT CALLBACK msgProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
+	~App()
 	{
-		if (Msg == WM_CLOSE) PostQuitMessage(0);
-		return DefWindowProc(hWnd, Msg, wParam, lParam);
+		Lumix::Timer::destroy(m_frame_timer);
+		ASSERT(!m_universe);
+		s_instance = nullptr;
 	}
 
 
-	HWND createWindow()
+	LRESULT onMessage(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+	{
+		switch (msg)
+		{
+			case WM_CLOSE: PostQuitMessage(0); break;
+			case WM_MOVE:
+			case WM_SIZE: onResize(); break;
+			case WM_QUIT: m_finished = true; break;
+			case WM_INPUT: handleRawInput(lparam); break;
+		}
+		return DefWindowProc(hwnd, msg, wparam, lparam);
+	}
+
+
+	static LRESULT CALLBACK msgProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+	{
+		if (!s_instance || !s_instance->m_pipeline) return DefWindowProc(hwnd, msg, wparam, lparam);
+
+		return s_instance->onMessage(hwnd, msg, wparam, lparam);
+	}
+
+
+	void onResize()
+	{
+		RECT rect;
+		RECT screen_rect;
+		GetClientRect(m_hwnd, &rect);
+		GetWindowRect(m_hwnd, &screen_rect);
+		int w = rect.right - rect.left;
+		int h = rect.bottom - rect.top;
+		if (w > 0)
+		{
+			ClipCursor(&screen_rect);
+			m_pipeline->setViewport(0, 0, w, h);
+			Lumix::Renderer* renderer =
+				static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+			renderer->resize(w, h);
+		}
+	}
+
+
+	void createWindow()
 	{
 		HINSTANCE hInst = GetModuleHandle(NULL);
 		WNDCLASSEX wnd;
@@ -61,7 +106,14 @@ public:
 		wnd.lpszClassName = "App";
 		wnd.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 		RegisterClassExA(&wnd);
-		return CreateWindowA("App", "App", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 800, 600, NULL, NULL, hInst, 0);
+		m_hwnd = CreateWindowA("App", "App", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 800, 600, NULL, NULL, hInst, 0);
+
+		RAWINPUTDEVICE Rid;
+		Rid.usUsagePage = 0x01;
+		Rid.usUsage = 0x02;
+		Rid.dwFlags = 0;
+		Rid.hwndTarget = 0;
+		RegisterRawInputDevices(&Rid, 1, sizeof(Rid));
 	}
 
 
@@ -88,7 +140,7 @@ public:
 			}
 		}
 
-		HWND hwnd = createWindow();
+		createWindow();
 
 		Lumix::g_log_info.getCallback().bind<outputToVS>();
 		Lumix::g_log_warning.getCallback().bind<outputToVS>();
@@ -115,7 +167,7 @@ public:
 
 		m_engine = Lumix::Engine::create("", "", m_file_system, m_allocator);
 		Lumix::Engine::PlatformData platform_data;
-		platform_data.window_handle = hwnd;
+		platform_data.window_handle = m_hwnd;
 		m_engine->setPlatformData(platform_data);
 
 		m_engine->getPluginManager().load("renderer");
@@ -123,9 +175,16 @@ public:
 		m_engine->getPluginManager().load("audio");
 		m_engine->getPluginManager().load("lua_script");
 		m_engine->getPluginManager().load("physics");
+		m_engine->getInputSystem().enable(true);
 		Lumix::Renderer* renderer = static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 		m_pipeline = Lumix::Pipeline::create(*renderer, Lumix::Path(m_pipeline_path), m_engine->getAllocator());
 		m_pipeline->load();
+
+		while (m_engine->getFileSystem().hasWork())
+		{
+			Lumix::MT::sleep(100);
+			m_engine->getFileSystem().updateAsyncTransactions();
+		}
 
 		m_universe = &m_engine->createUniverse();
 		m_pipeline->setScene((Lumix::RenderScene*)m_universe->getScene(Lumix::crc32("renderer")));
@@ -133,6 +192,9 @@ public:
 		renderer->resize(600, 400);
 
 		registerLuaAPI();
+
+		while (ShowCursor(false) >= 0);
+		onResize();
 	}
 
 
@@ -234,7 +296,29 @@ public:
 	int getExitCode() const { return m_exit_code; }
 
 
-	void handleRawInput(LPARAM lParam) {}
+	void handleRawInput(LPARAM lParam)
+	{
+		UINT dwSize;
+		char data[sizeof(RAWINPUT) * 10];
+
+		GetRawInputData((HRAWINPUT)lParam, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER));
+		if (dwSize > sizeof(data)) return;
+
+		if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, data, &dwSize, sizeof(RAWINPUTHEADER)) !=
+			dwSize) return;
+
+		RAWINPUT* raw = (RAWINPUT*)data;
+		if (raw->header.dwType == RIM_TYPEMOUSE &&
+			raw->data.mouse.usFlags == MOUSE_MOVE_RELATIVE)
+		{
+			POINT p;
+			GetCursorPos(&p);
+			ScreenToClient(m_hwnd, &p);
+			auto& input_system = m_engine->getInputSystem();
+			input_system.injectMouseXMove(float(raw->data.mouse.lLastX));
+			input_system.injectMouseYMove(float(raw->data.mouse.lLastY));
+		}
+	}
 
 
 	void handleEvents()
@@ -245,11 +329,7 @@ public:
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 
-			switch (msg.message)
-			{
-				case WM_QUIT: m_finished = true; break;
-				case WM_INPUT: handleRawInput(msg.lParam); break;
-			}
+			onMessage(msg.hwnd, msg.message, msg.wParam, msg.lParam);
 		}
 	}
 
@@ -281,13 +361,17 @@ public:
 
 	void frame()
 	{
+		float frame_time = m_frame_timer->tick();
 		m_engine->update(*m_universe);
-		m_pipeline->setViewport(0, 0, 600, 400);
 		m_pipeline->render();
 		auto* renderer = m_engine->getPluginManager().getPlugin("renderer");
 		static_cast<Lumix::Renderer*>(renderer)->frame();
 		m_engine->getFileSystem().updateAsyncTransactions();
-		Lumix::MT::sleep(100);
+		if (frame_time < 1 / 60.0f)
+		{
+			PROFILE_BLOCK("sleep");
+			Lumix::MT::sleep(Lumix::uint32(1000 / 60.0f - frame_time * 1000));
+		}
 		handleEvents();
 	}
 
@@ -311,11 +395,18 @@ private:
 	Lumix::FS::MemoryFileDevice* m_mem_file_device;
 	Lumix::FS::DiskFileDevice* m_disk_file_device;
 	Lumix::FS::PackFileDevice* m_pack_file_device;
+	Lumix::Timer* m_frame_timer;
 	bool m_finished;
 	int m_exit_code;
 	char m_startup_script_path[Lumix::MAX_PATH_LENGTH];
 	char m_pipeline_path[Lumix::MAX_PATH_LENGTH];
+	HWND m_hwnd;
+
+	static App* s_instance;
 };
+
+
+App* App::s_instance = nullptr;
 
 
 INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)

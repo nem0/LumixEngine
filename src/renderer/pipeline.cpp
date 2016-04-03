@@ -395,9 +395,7 @@ struct PipelineImpl : public Pipeline
 		}
 
 		bool errors =
-			luaL_loadbuffer(
-				m_lua_state, (const char*)file.getBuffer(), file.size(), m_path.c_str()) !=
-			LUA_OK;
+			luaL_loadbuffer(m_lua_state, (const char*)file.getBuffer(), file.size(), m_path.c_str()) != LUA_OK;
 		if (errors)
 		{
 			g_log_error.log("Renderer") << m_path.c_str() << ": " << lua_tostring(m_lua_state, -1);
