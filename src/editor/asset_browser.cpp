@@ -219,15 +219,15 @@ void AssetBrowser::onGUI()
 	auto getter = [](void* data, int idx, const char** out) -> bool
 	{
 		auto& browser = *static_cast<AssetBrowser*>(data);
-		*out = idx == 0 ? "Universe" : browser.m_plugins[idx - 1]->getName();
+		*out = browser.m_plugins[idx]->getName();
 		return true;
 	};
 
-	ImGui::Combo("Type", &m_current_type, getter, this, 1 + m_plugins.size());
+	ImGui::Combo("Type", &m_current_type, getter, this, m_plugins.size());
 	ImGui::InputText("Filter", m_filter, sizeof(m_filter));
 
 	ImGui::ListBoxHeader("Resources");
-	auto& resources = m_resources[m_current_type];
+	auto& resources = m_resources[m_current_type + 1];
 
 	for (auto& resource : resources)
 	{
