@@ -19,7 +19,7 @@ namespace Lumix
 	{
 		Manager* Manager::s_instance = NULL;
 
-		static const int32_t C_MAX_TRANS = 16;
+		static const int32 C_MAX_TRANS = 16;
 
 		struct UnitTestPair
 		{
@@ -30,8 +30,9 @@ namespace Lumix
 
 		struct FailInfo
 		{
+			char m_message[1024];
 			const char* m_file_name;
-			uint32_t m_line;
+			uint32 m_line;
 		};
 
 		typedef MT::Transaction<UnitTestPair> AsynTest;
@@ -47,7 +48,7 @@ namespace Lumix
 			{
 			}
 
-			virtual int task() override
+			int task() override
 			{
 				while(!m_tests_todo->isAborted())
 				{
@@ -81,7 +82,7 @@ namespace Lumix
 		public:
 			void registerFunction(const char* name, Manager::unitTestFunc func, const char* params)
 			{
-				UnitTestPair& pair = m_unit_tests.pushEmpty();
+				UnitTestPair& pair = m_unit_tests.emplace();
 				pair.name = name;
 				pair.parameters = params;
 				pair.func = func;
@@ -158,42 +159,41 @@ namespace Lumix
 
 			void dumpResults() const
 			{
-				
 				if (m_fails > 0)
 				{
 					g_log_info.log("unit") << "----------Fails----------";
-					for (int i = 0; i < m_failed_tests.size(); i++) 
+					for (auto& i : m_failed_tests) 
 					{
-						g_log_info.log("unit") << m_failed_tests[i].m_file_name << "(" << m_failed_tests[i].m_line << ")";
+						g_log_info.log("unit") << i.m_message << " : " << i.m_file_name << "(" << i.m_line << ")";
 					}
+					ASSERT(false);
 				}
 
-				#ifdef APPVEYOR
-					FILE* fout = fopen("tests.xml", "w");
+				FILE* fout = fopen("tests.xml", "w");
 
-					fprintf(fout, "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\"?>"
-						"<test-results  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"nunit_schema_2.5.xsd\" name=\"Lumix\" total=\"%d\" errors=\"0\" failures=\"%d\" not-run=\"0\" inconclusive=\"0\" ignored=\"0\" skipped=\"0\" invalid=\"0\">"
-						"<culture-info current-culture=\"\" current-uiculture=\"\" />"
-						, m_failed_tests.size(), m_failed_tests.size());
+				fprintf(fout, "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\"?>"
+					"<test-results  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"nunit_schema_2.5.xsd\" name=\"Lumix\" total=\"%d\" errors=\"0\" failures=\"%d\" not-run=\"0\" inconclusive=\"0\" ignored=\"0\" skipped=\"0\" invalid=\"0\">"
+					"<culture-info current-culture=\"\" current-uiculture=\"\" />"
+					, m_failed_tests.size(), m_failed_tests.size());
 
-					for (int i = 0; i < m_failed_tests.size(); i++)
-					{
-						fprintf(fout, "<test-suite type=\"Powershell\" name=\"%s\" executed=\"True\" result=\"Failure\" success=\"False\" time=\"0\" asserts=\"0\"> <results>"
-							"<test-case name=\"line %d\" executed=\"True\" result=\"Failure\" success=\"False\" time=\"0.1443834\" asserts=\"0\"> 	<failure> 		<message>error message</message> 	<stack-trace></stack-trace> 	</failure> </test-case></results> </test-suite> 	", m_failed_tests[i].m_file_name, m_failed_tests[i].m_line);
-					}
+				for (int i = 0; i < m_failed_tests.size(); i++)
+				{
+					fprintf(fout, "<test-suite type=\"Powershell\" name=\"%s\" executed=\"True\" result=\"Failure\" success=\"False\" time=\"0\" asserts=\"0\"> <results>"
+						"<test-case name=\"line %d\" executed=\"True\" result=\"Failure\" success=\"False\" time=\"0.1443834\" asserts=\"0\"> 	<failure> 		<message>error message</message> 	<stack-trace></stack-trace> 	</failure> </test-case></results> </test-suite> 	", m_failed_tests[i].m_file_name, m_failed_tests[i].m_line);
+				}
 
-					fprintf(fout, "</test-results>");
-					fclose(fout);
-				#endif
+				fprintf(fout, "</test-results>");
+				fclose(fout);
 
 				g_log_info.log("unit") << "--------- Results ---------";
 				g_log_info.log("unit") << "Fails:     " << m_fails;
 				g_log_info.log("unit") << "---------------------------";
 			}
 
-			void handleFail(const char* file_name, uint32_t line)
+			void handleFail(const char* msg, const char* file_name, uint32 line)
 			{	
-				FailInfo& fi = m_failed_tests.pushEmpty();
+				FailInfo& fi = m_failed_tests.emplace();
+				Lumix::copyString(fi.m_message, msg);
 				fi.m_file_name = file_name;
 				fi.m_line = line;
 				m_fails++;
@@ -212,11 +212,10 @@ namespace Lumix
 				m_task.run();
 			}
 
-			ManagerImpl(IAllocator& allocator)
+			explicit ManagerImpl(IAllocator& allocator)
 				: m_fails(0)
 				, m_task(&m_trans_queue, allocator)
 				, m_in_progress(allocator)
-				, m_trans_queue(allocator)
 				, m_allocator(allocator)
 				, m_unit_tests(allocator)
 				, m_failed_tests(allocator)
@@ -264,7 +263,7 @@ namespace Lumix
 			}
 			
 			IAllocator& m_allocator;
-			uint32_t m_fails;
+			uint32 m_fails;
 
 			UnitTestTable	m_unit_tests;
 			FailedTestTable m_failed_tests;
@@ -299,19 +298,19 @@ namespace Lumix
 			m_impl->dumpResults();
 		}
 
-		void Manager::handleFail(const char* file_name, uint32_t line)
+		void Manager::handleFail(const char* msg, const char* file_name, uint32 line)
 		{
-			m_impl->handleFail(file_name, line);
+			m_impl->handleFail(msg, file_name, line);
 		}
 
 		Manager::Manager(IAllocator& allocator)
 		{
-			m_impl = allocator.newObject<ManagerImpl>(allocator);
+			m_impl = LUMIX_NEW(allocator, ManagerImpl)(allocator);
 		}
 
 		Manager::~Manager()
 		{
-			m_impl->getAllocator().deleteObject(m_impl);
+			LUMIX_DELETE(m_impl->getAllocator(), m_impl);
 		}
 	} //~UnitTest
 } //~UnitTest

@@ -17,11 +17,10 @@ namespace
 			value = 2;
 		}
 
-		int32_t value;
+		int32 value;
 	};
 
 	typedef Lumix::MT::LockFreeFixedQueue<Test, 16> Queue;
-	typedef Lumix::MT::LockFreeFixedQueue<Test, 16, true> PodQueue;
 
 	class TestTaskConsumer : public Lumix::MT::Task
 	{
@@ -40,7 +39,7 @@ namespace
 			while (!m_queue->isAborted())
 			{
 				Test* test = m_queue->pop(true);
-				if (NULL == test)
+				if (nullptr == test)
 					break;
 
 				m_sum += test->value;
@@ -51,17 +50,17 @@ namespace
 			return 0;
 		}
 
-		int32_t getSum() { return m_sum; }
+		int32 getSum() { return m_sum; }
 
 	private:
 		Queue* m_queue;
-		int32_t m_sum;
+		int32 m_sum;
 	};
 
-	void UT_fixed_lock_queue_non_trivial_constructors(const char* params)
+	void UT_fixed_lock_queue(const char* params)
 	{
 		Lumix::DefaultAllocator allocator;
-		Queue queue(allocator);
+		Queue queue;
 		TestTaskConsumer testTaskConsumer(&queue, allocator);
 		testTaskConsumer.create("TestTaskConsumer_Task");
 		testTaskConsumer.run();
@@ -82,71 +81,8 @@ namespace
 		queue.abort();
 		testTaskConsumer.destroy();
 
-		LUMIX_EXPECT_EQ(RUN_COUNT, testTaskConsumer.getSum());
-	};
-
-	class TestTaskPodConsumer : public Lumix::MT::Task
-	{
-	public:
-		TestTaskPodConsumer(PodQueue* queue, Lumix::IAllocator& allocator)
-			: Lumix::MT::Task(allocator)
-			, m_queue(queue)
-			, m_sum(0)
-		{}
-
-		~TestTaskPodConsumer()
-		{}
-
-		int task()
-		{
-			while (!m_queue->isAborted())
-			{
-				Test* test = m_queue->pop(true);
-				if (NULL == test)
-					break;
-
-				m_sum += test->value;
-				test->value++;
-
-				m_queue->dealoc(test, true);
-			}
-			return 0;
-		}
-
-		int32_t getSum() { return m_sum; }
-
-	private:
-		PodQueue* m_queue;
-		int32_t m_sum;
-	};
-
-	void UT_fixed_lock_queue_trivial_constructors(const char* params)
-	{
-		PodQueue queue;
-		Lumix::DefaultAllocator allocator;
-		TestTaskPodConsumer testTaskPodConsumer(&queue, allocator);
-		testTaskPodConsumer.create("TestTaskPodConsumer_Task");
-		testTaskPodConsumer.run();
-
-		const int RUN_COUNT = 512;
-
-		for (int i = 0; i < RUN_COUNT; i++)
-		{
-			Test* test = queue.alloc(true);
-			queue.push(test, true);
-		}
-
-		while (!queue.isEmpty())
-		{
-			Lumix::MT::yield();
-		}
-
-		queue.abort();
-		testTaskPodConsumer.destroy();
-
-		LUMIX_EXPECT_EQ(8448, testTaskPodConsumer.getSum());
+		LUMIX_EXPECT(RUN_COUNT == testTaskConsumer.getSum());
 	};
 }
 
-REGISTER_TEST("unit_tests/core/multi_thread/fixed_lock_queue_non_trivial_constructors", UT_fixed_lock_queue_non_trivial_constructors, "");
-REGISTER_TEST("unit_tests/core/multi_thread/fixed_lock_queue_trivial_constructors", UT_fixed_lock_queue_trivial_constructors, "");
+REGISTER_TEST("unit_tests/core/multi_thread/fixed_lock_queue", UT_fixed_lock_queue, "");

@@ -1,5 +1,6 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "core/vec3.h"
+#include "core/vec.h"
+#include <cmath>
 
 
 void UT_vec3(const char* params)
@@ -7,17 +8,17 @@ void UT_vec3(const char* params)
 	Lumix::DefaultAllocator allocator;
 
 	Lumix::Vec3 v(0, 0, 0);
-	LUMIX_EXPECT_EQ(v.x, 0);
-	LUMIX_EXPECT_EQ(v.y, 0);
-	LUMIX_EXPECT_EQ(v.z, 0);
+	LUMIX_EXPECT(v.x == 0);
+	LUMIX_EXPECT(v.y == 0);
+	LUMIX_EXPECT(v.z == 0);
 
 	LUMIX_EXPECT_CLOSE_EQ(v.length(), 0, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.squaredLength(), 0, 0.001f);
 
 	Lumix::Vec3 v2(1, 0, 0);
-	LUMIX_EXPECT_EQ(v2.x, 1);
-	LUMIX_EXPECT_EQ(v2.y, 0);
-	LUMIX_EXPECT_EQ(v2.z, 0);
+	LUMIX_EXPECT(v2.x == 1);
+	LUMIX_EXPECT(v2.y == 0);
+	LUMIX_EXPECT(v2.z == 0);
 
 	LUMIX_EXPECT_CLOSE_EQ(v2.length(), 1, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v2.squaredLength(), 1, 0.001f);
@@ -26,9 +27,9 @@ void UT_vec3(const char* params)
 	LUMIX_EXPECT_CLOSE_EQ(v2.squaredLength(), 1, 0.001f);
 
 	v2.set(1, 2, 3);
-	LUMIX_EXPECT_EQ(v2.x, 1);
-	LUMIX_EXPECT_EQ(v2.y, 2);
-	LUMIX_EXPECT_EQ(v2.z, 3);
+	LUMIX_EXPECT(v2.x == 1);
+	LUMIX_EXPECT(v2.y == 2);
+	LUMIX_EXPECT(v2.z == 3);
 
 	LUMIX_EXPECT_CLOSE_EQ(v2.length(), 3.74165750f, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v2.squaredLength(), 3.74165750f * 3.74165750f, 0.001f);

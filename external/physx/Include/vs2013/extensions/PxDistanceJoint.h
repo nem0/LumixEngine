@@ -1,0 +1,294 @@
+// This code contains NVIDIA Confidential Information and is disclosed to you
+// under a form of NVIDIA software license agreement provided separately to you.
+//
+// Notice
+// NVIDIA Corporation and its licensors retain all intellectual property and
+// proprietary rights in and to this software and related documentation and
+// any modifications thereto. Any use, reproduction, disclosure, or
+// distribution of this software and related documentation without an express
+// license agreement from NVIDIA Corporation is strictly prohibited.
+//
+// ALL NVIDIA DESIGN SPECIFICATIONS, CODE ARE PROVIDED "AS IS.". NVIDIA MAKES
+// NO WARRANTIES, EXPRESSED, IMPLIED, STATUTORY, OR OTHERWISE WITH RESPECT TO
+// THE MATERIALS, AND EXPRESSLY DISCLAIMS ALL IMPLIED WARRANTIES OF NONINFRINGEMENT,
+// MERCHANTABILITY, AND FITNESS FOR A PARTICULAR PURPOSE.
+//
+// Information and code furnished is believed to be accurate and reliable.
+// However, NVIDIA Corporation assumes no responsibility for the consequences of use of such
+// information or for any infringement of patents or other rights of third parties that may
+// result from its use. No license is granted by implication or otherwise under any patent
+// or patent rights of NVIDIA Corporation. Details are subject to change without notice.
+// This code supersedes and replaces all information previously supplied.
+// NVIDIA Corporation products are not authorized for use as critical
+// components in life support devices or systems without express written approval of
+// NVIDIA Corporation.
+//
+// Copyright (c) 2008-2014 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
+// Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
+
+
+#ifndef PX_DISTANCEJOINT_H
+#define PX_DISTANCEJOINT_H
+/** \addtogroup extensions
+  @{
+*/
+
+#include "extensions/PxJoint.h"
+
+#ifndef PX_DOXYGEN
+namespace physx
+{
+#endif
+
+class PxDistanceJoint;
+
+/**
+\brief Create a distance Joint.
+
+ \param[in] physics the physics SDK
+ \param[in] actor0 an actor to which the joint is attached. NULL may be used to attach the joint to a specific point in the world frame
+ \param[in] localFrame0 the position and orientation of the joint relative to actor0
+ \param[in] actor1 an actor to which the joint is attached. NULL may be used to attach the joint to a specific point in the world frame
+ \param[in] localFrame1 the position and orientation of the joint relative to actor1 
+
+@see PxDistanceJoint
+*/
+
+PxDistanceJoint*	PxDistanceJointCreate(PxPhysics& physics, 
+									 	  PxRigidActor* actor0, const PxTransform& localFrame0, 
+										  PxRigidActor* actor1, const PxTransform& localFrame1);
+
+
+/** 
+\brief flags for configuring the drive of a PxDistanceJoint
+
+@see PxDistanceJoint
+*/
+
+struct PxDistanceJointFlag
+{
+	enum Enum
+	{
+		eMAX_DISTANCE_ENABLED	= 1<<1,
+		eMIN_DISTANCE_ENABLED	= 1<<2,
+		eSPRING_ENABLED			= 1<<3
+	};
+};
+
+typedef PxFlags<PxDistanceJointFlag::Enum, PxU16> PxDistanceJointFlags;
+PX_FLAGS_OPERATORS(PxDistanceJointFlag::Enum, PxU16)
+
+/**
+\brief a joint that maintains an upper or lower bound (or both) on the distance between two points on different objects
+
+@see PxDistanceJointCreate PxJoint
+*/
+class PxDistanceJoint : public PxJoint
+{
+public:
+
+
+	/**
+	\brief Return the current distance of the joint
+	*/
+
+	virtual PxReal					getDistance() const									= 0;
+	
+	/**
+	\brief Set the allowed minimum distance for the joint.
+
+	The minimum	distance must be no more than the maximum distance
+
+	<b>Default</b> 0.0f
+	<b>Range</b> [0, PX_MAX_F32)
+
+	\param[in] distance the minimum distance
+
+	@see PxDistanceJoint::minDistance, PxDistanceJointFlag::eMIN_DISTANCE_ENABLED getMinDistance()
+	*/
+
+	virtual void					setMinDistance(PxReal distance)						= 0;
+
+	/**
+	\brief Get the allowed minimum distance for the joint.
+
+	\return the allowed minimum distance
+
+	@see PxDistanceJoint::minDistance, PxDistanceJointFlag::eMIN_DISTANCE_ENABLED setMinDistance()
+	*/
+
+	virtual PxReal					getMinDistance()							const	= 0;
+
+
+	/**
+	\brief Set the allowed maximum distance for the joint.
+
+	The maximum	distance must be no less than the minimum distance. 
+
+	<b>Default</b> 0.0f
+	<b>Range</b> [0, PX_MAX_F32)
+
+	\param[in] distance the maximum distance
+
+	@see PxDistanceJoint::maxDistance, PxDistanceJointFlag::eMAX_DISTANCE_ENABLED getMinDistance()
+	*/
+
+	virtual void					setMaxDistance(PxReal distance)						= 0;
+
+	/**
+	\brief Get the allowed maximum distance for the joint.
+
+	\return the allowed maximum distance
+
+	@see PxDistanceJoint::maxDistance, PxDistanceJointFlag::eMAX_DISTANCE_ENABLED setMaxDistance()
+	*/
+
+	virtual PxReal					getMaxDistance()							const	= 0;
+
+
+	/**
+	\brief Set the error tolerance of the joint.
+
+	\param[in] tolerance the distance beyond the allowed range at which the joint becomes active
+
+	@see PxDistanceJoint::tolerance, getTolerance()
+	*/
+
+	virtual void					setTolerance(PxReal tolerance)						= 0;
+
+
+	/**
+	\brief Get the error tolerance of the joint.
+
+	\brief the distance beyond the joint's [min, max] range before the joint becomes active.
+
+	<b>Default</b> 0.25f * PxTolerancesScale::length
+	<b>Range</b> (0, PX_MAX_F32)
+
+	This value should be used to ensure that if the minimum distance is zero and the 
+	spring function is in use, the rest length of the spring is non-zero. 
+
+	@see PxDistanceJoint::tolerance, setTolerance()
+	*/
+	virtual PxReal					getTolerance()								const	= 0;
+
+	/**
+	\brief Set the strength of the joint spring.
+
+	The spring is used if enabled, and the distance exceeds the range [min-error, max+error].
+
+	<b>Default</b> 0.0f
+	<b>Range</b> [0, PX_MAX_F32)
+
+	\param[in] stiffness the spring strength of the joint
+
+	@see PxDistanceJointFlag::eSPRING_ENABLED getStiffness()
+	*/
+
+	virtual void					setStiffness(PxReal stiffness)					= 0;
+
+	/**
+	\brief Get the strength of the joint spring.
+
+	\return stiffness the spring strength of the joint
+
+	@see PxDistanceJointFlag::eSPRING_ENABLED setStiffness()
+	*/
+
+	virtual PxReal					getStiffness()									const	= 0;
+
+
+	/**
+	\brief Set the damping of the joint spring.
+
+	The spring is used if enabled, and the distance exceeds the range [min-error, max+error].
+
+	<b>Default</b> 0.0f
+	<b>Range</b> [0, PX_MAX_F32)
+
+	\param[in] damping the degree of damping of the joint spring of the joint
+
+	@see PxDistanceJointFlag::eSPRING_ENABLED setDamping()
+	*/
+
+	virtual void					setDamping(PxReal damping)							= 0;
+	
+
+	/**
+	\brief Get the damping of the joint spring.
+
+	\return the degree of damping of the joint spring of the joint
+
+	@see PxDistanceJointFlag::eSPRING_ENABLED setDamping()
+	*/
+
+	virtual PxReal					getDamping()									const	= 0;
+
+	/**
+	\brief Set the flags specific to the Distance Joint.
+
+	<b>Default</b> PxDistanceJointFlag::eMAX_DISTANCE_ENABLED
+
+	\param[in] flags The joint flags.
+
+	@see PxDistanceJointFlag setFlag() getFlags()
+	*/
+
+	virtual void					setDistanceJointFlags(PxDistanceJointFlags flags) = 0;
+
+
+	/**
+	\brief Set a single flag specific to a Distance Joint to true or false.
+
+	\param[in] flag The flag to set or clear.
+	\param[in] value the value to which to set the flag
+
+	@see PxDistanceJointFlag, getFlags() setFlags()
+	*/
+
+	virtual void					setDistanceJointFlag(PxDistanceJointFlag::Enum flag, bool value) = 0;
+
+	/**
+	\brief Get the flags specific to the Distance Joint.
+
+	\return the joint flags
+
+	@see PxDistanceJoint::flags, PxDistanceJointFlag setFlag() setFlags()
+	*/
+
+	virtual PxDistanceJointFlags	getDistanceJointFlags(void)					const	= 0;
+
+	/**
+	\brief Returns string name of PxDistanceJoint, used for serialization
+	*/
+	virtual	const char*				getConcreteTypeName() const { return "PxDistanceJoint"; }
+
+protected:
+
+	//serialization
+
+	/**
+	\brief Constructor
+	*/
+	PX_INLINE						PxDistanceJoint(PxType concreteType, PxBaseFlags baseFlags) : PxJoint(concreteType, baseFlags) {}
+
+	/**
+	\brief Deserialization constructor
+	*/
+	PX_INLINE						PxDistanceJoint(PxBaseFlags baseFlags)	: PxJoint(baseFlags) {}
+
+	/**
+	\brief Returns whether a given type name matches with the type of this instance
+	*/							
+	virtual	bool					isKindOf(const char* name)	const { return !strcmp("PxDistanceJoint", name) || PxJoint::isKindOf(name);	}
+
+	//~serialization
+};
+
+#ifndef PX_DOXYGEN
+} // namespace physx
+#endif
+
+/** @} */
+#endif

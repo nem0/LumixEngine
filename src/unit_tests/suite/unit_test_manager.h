@@ -17,15 +17,15 @@ namespace Lumix
 
 			static Manager& instance()
 			{
-				if (NULL == s_instance)
+				if (nullptr == s_instance)
 				{
-					s_instance = getAllocator().newObject<Manager>(getAllocator());
+					s_instance = LUMIX_NEW(getAllocator(), Manager)(getAllocator());
 				}
 
 				return *s_instance;
 			}
 
-			static void release() { getAllocator().deleteObject(s_instance); s_instance = NULL; }
+			static void release() { LUMIX_DELETE(getAllocator(), s_instance); s_instance = nullptr; }
 
 
 			void registerFunction(const char* name, unitTestFunc func, const char* params);
@@ -34,7 +34,7 @@ namespace Lumix
 			void runTests(const char* filter_tests);
 			void dumpResults() const;
 
-			void handleFail(const char* file_name, uint32_t line);
+			void handleFail(const char* msg, const char* file_name, uint32 line);
 
 			Manager(IAllocator& allocator);
 			~Manager();
@@ -55,7 +55,18 @@ namespace Lumix
 			~Helper() {}
 		};
 	} //~UnitTest
-} //~UnitTest
+} //~Lumix
+
+#ifdef _WIN64
+#define LUMIX_FORCE_SYMBOL(symbol) \
+		__pragma(comment(linker, "/INCLUDE:" STRINGIZE(symbol)))
+#else
+#define LUMIX_FORCE_SYMBOL(symbol) \
+		__pragma(comment(linker, "/INCLUDE:_" STRINGIZE(symbol)))
+#endif
+
+#define JOIN_STRINGS_2(A, B) A ## B
+#define JOIN_STRINGS(A, B) JOIN_STRINGS_2(A, B)
 
 #define REGISTER_TEST(name, method, params) \
 namespace { extern "C" Lumix::UnitTest::Helper JOIN_STRINGS(JOIN_STRINGS(test_register_, method), __LINE__)(name, method, params); } \

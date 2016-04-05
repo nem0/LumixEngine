@@ -1,74 +1,84 @@
 #pragma once
 
 
-#include "core/lumix.h"
-#include "core/array.h"
+#include "lumix.h"
+
+
+struct lua_State;
 
 
 namespace Lumix
 {
-	namespace FS
+namespace FS
+{
+class DiskFileDevice;
+class FileSystem;
+}
+
+namespace MTJD
+{
+class Manager;
+}
+
+class InputBlob;
+class IAllocator;
+class InputSystem;
+class OutputBlob;
+class PathManager;
+class PluginManager;
+class ResourceManager;
+class Universe;
+
+
+class LUMIX_ENGINE_API Engine
+{
+public:
+	struct PlatformData
 	{
-			class FileSystem;
-	}
-
-	class Hierarchy;
-	namespace MTJD
-	{
-		class Manager;
-	}
-
-	class InputBlob;
-	class EditorServer;
-	class InputSystem;
-	class IPlugin;
-	class IScene;
-	class JsonSerializer;
-	class OutputBlob;
-	class PluginManager;
-	class Renderer;
-	class ResourceManager;
-	class Universe;
-	class WorldEditor;
-
-
-	class LUMIX_ENGINE_API Engine
-	{
-		public:
-			virtual ~Engine() {}
-
-			static Engine* create(const char* base_path, FS::FileSystem* fs, WorldEditor* editor, IAllocator& allocator);
-			static void destroy(Engine* engine);
-
-			virtual Universe* createUniverse() = 0;
-			virtual void destroyUniverse() = 0;
-
-			virtual WorldEditor* getWorldEditor() const = 0;
-			virtual FS::FileSystem& getFileSystem() = 0;
-			virtual Renderer& getRenderer() = 0;
-			virtual InputSystem& getInputSystem() = 0;
-			virtual PluginManager& getPluginManager() = 0;
-			virtual IPlugin* loadPlugin(const char* name) = 0;
-			virtual Universe* getUniverse() const = 0;
-			virtual Hierarchy* getHierarchy() const = 0;
-			virtual const Array<IScene*>& getScenes() const = 0;
-			virtual IScene* getScene(uint32_t type) const = 0;
-			virtual IScene* getSceneByComponentType(uint32_t type) const = 0;
-			virtual MTJD::Manager& getMTJDManager() = 0;
-
-			virtual IAllocator& getAllocator() = 0;
-			virtual ResourceManager& getResourceManager() = 0;
-
-			virtual const char* getBasePath() const = 0;
-			virtual void update(bool is_game_running, float time_delta_multiplier, float forced_time_delta) = 0;
-			virtual uint32_t serialize(OutputBlob& serializer) = 0;
-			virtual bool deserialize(InputBlob& serializer) = 0;
-			virtual float getFPS() const = 0;
-			virtual float getLastTimeDelta() = 0;
-
-		protected:
-			Engine() {}
+		void* window_handle;
 	};
-	
+
+public:
+	virtual ~Engine() {}
+
+	static Engine* create(const char* base_path0,
+		const char* base_path1,
+		FS::FileSystem* fs,
+		IAllocator& allocator);
+	static void destroy(Engine* engine, IAllocator& allocator);
+
+	virtual Universe& createUniverse() = 0;
+	virtual void destroyUniverse(Universe& context) = 0;
+	virtual void setPlatformData(const PlatformData& data) = 0;
+	virtual const PlatformData& getPlatformData() = 0;
+
+	virtual FS::FileSystem& getFileSystem() = 0;
+	virtual FS::DiskFileDevice* getDiskFileDevice() = 0;
+	virtual FS::DiskFileDevice* getPatchFileDevice() = 0;
+	virtual InputSystem& getInputSystem() = 0;
+	virtual PluginManager& getPluginManager() = 0;
+	virtual MTJD::Manager& getMTJDManager() = 0;
+	virtual ResourceManager& getResourceManager() = 0;
+	virtual IAllocator& getAllocator() = 0;
+
+	virtual void startGame(Universe& context) = 0;
+	virtual void stopGame(Universe& context) = 0;
+
+	virtual void update(Universe& context) = 0;
+	virtual uint32 serialize(Universe& ctx, OutputBlob& serializer) = 0;
+	virtual bool deserialize(Universe& ctx, InputBlob& serializer) = 0;
+	virtual float getFPS() const = 0;
+	virtual float getLastTimeDelta() = 0;
+	virtual void setTimeMultiplier(float multiplier) = 0;
+	virtual void pause(bool pause) = 0;
+	virtual void nextFrame() = 0;
+	virtual PathManager& getPathManager() = 0;
+	virtual lua_State* getState() = 0;
+	virtual void runScript(const char* src, int src_length, const char* path) = 0;
+
+protected:
+	Engine() {}
+};
+
 
 } // ~namespace Lumix

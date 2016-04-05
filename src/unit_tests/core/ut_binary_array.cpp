@@ -8,33 +8,33 @@ void UT_binary_array(const char* params)
 	Lumix::DefaultAllocator allocator;
 
 	Lumix::BinaryArray array(allocator);
-	LUMIX_EXPECT_EQ(array.size(), 0);
+	LUMIX_EXPECT(array.size() == 0);
 	for (int i = 0; i < 100; ++i)
 	{
 		array.push(true);
 	}
 	for (int i = 0; i < 100; ++i)
 	{
-		LUMIX_EXPECT_TRUE(array[i]);
+		LUMIX_EXPECT((bool)array[i]);
 	}
-	LUMIX_EXPECT_EQ(array.getRaw()[0], 0xffffFFFF);
+	LUMIX_EXPECT(array.getRaw()[0] == 0xffffFFFF);
 	for (int i = 0; i < 100; ++i)
 	{
 		array.push(false);
 	}
 	for (int i = 100; i < 200; ++i)
 	{
-		LUMIX_EXPECT_FALSE(array[i]);
+		LUMIX_EXPECT(!array[i]);
 	}
-	LUMIX_EXPECT_EQ(array.size(), 200);
+	LUMIX_EXPECT(array.size() == 200);
 	for (int i = 0; i < 150; ++i)
 	{
 		array.pop();
 	}
-	LUMIX_EXPECT_EQ(array.size(), 50);
-	LUMIX_EXPECT_EQ(array.getRawSize(), 2);
-	LUMIX_EXPECT_EQ(array.getRaw()[0], 0xffffFFFF);
-	
+	LUMIX_EXPECT(array.size() == 50);
+	LUMIX_EXPECT(array.getRawSize() == 2);
+	LUMIX_EXPECT(array.getRaw()[0] == 0xffffFFFF);
+
 	array.clear();
 	for (int i = 0; i < 100; ++i)
 	{
@@ -43,8 +43,21 @@ void UT_binary_array(const char* params)
 
 	array.erase(50);
 	array.erase(2);
-	LUMIX_EXPECT_EQ(array.getRaw()[0], 0);
-	LUMIX_EXPECT_EQ(array.getRaw()[1], 0);
+	LUMIX_EXPECT(array.getRaw()[0] == 0);
+	LUMIX_EXPECT(array.getRaw()[1] == 0);
+
+
+	Lumix::BinaryArray array2(allocator);
+	for (int i = 0; i < 128; ++i)
+	{
+		array2.push(true);
+	}
+	for (int i = 0; i < 64; ++i)
+	{
+		array2.erase((i * 13) % array2.size());
+		LUMIX_EXPECT(array2.getRaw()[0] == 0xffffFFFF);
+		LUMIX_EXPECT(array2.getRaw()[1] == 0xffffFFFF);
+	}
 }
 
 REGISTER_TEST("unit_tests/core/binary_array", UT_binary_array, "")

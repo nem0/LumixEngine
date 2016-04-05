@@ -1,90 +1,36 @@
 #pragma once
 
 
-#include "core/lumix.h"
-#include "core/vec3.h"
-#include "universe/universe.h"
-#include "graphics/model.h"
+#include "lumix.h"
 
 
 namespace Lumix
 {
 
 
-class Event;
-class IRenderDevice;
-struct Matrix;
-class Universe;
 class WorldEditor;
 
 
-class LUMIX_ENGINE_API Gizmo
+class LUMIX_EDITOR_API Gizmo
 {
 	public:
-		enum class Flags : uint32_t
-		{
-			FIXED_STEP = 1
-		};
+		static Gizmo* create(WorldEditor& editor);
+		static void destroy(Gizmo& gizmo);
 
-		enum class TransformOperation : uint32_t
-		{
-			ROTATE,
-			TRANSLATE
-		};
+		virtual ~Gizmo() {}
 
-		enum class TransformMode : uint32_t
-		{
-			X,
-			Y,
-			Z,
-			CAMERA_XZ
-		};
-
-		enum class PivotMode
-		{
-			CENTER,
-			OBJECT_PIVOT
-		};
-
-		enum class CoordSystem
-		{
-			LOCAL,
-			WORLD
-		};
-
-	public:
-		Gizmo(WorldEditor& editor);
-		~Gizmo();
-
-		void create();
-		void destroy();
-		void updateScale(Component camera);
-		void setUniverse(Universe* universe);
-		void startTransform(Component camera, int x, int y, TransformMode mode);
-		void transform(Component camera, TransformOperation operation, int x, int y, int relx, int rely, int flags);
-		void render(IRenderDevice& render_device);
-		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
-		void togglePivotMode();
-		void toggleCoordSystem();
-
-	private:
-		void getMatrix(Matrix& mtx);
-		void getEnityMatrix(Matrix& mtx, int selection_index);
-		Vec3 getMousePlaneIntersection(Component camera, int x, int y);
-		void rotate(int relx, int rely, int flags);
-		float computeRotateAngle(int relx, int rely, int flags);
-
-	private:
-		WorldEditor& m_editor;
-		Universe* m_universe;
-		TransformMode m_transform_mode;
-		Vec3 m_transform_point;
-		int m_relx_accum;
-		int m_rely_accum;
-		class Model* m_model;
-		float m_scale;
-		PivotMode m_pivot_mode;
-		CoordSystem m_coord_system;
+		virtual bool isActive() const = 0;
+		virtual void add(Entity entity) = 0;
+		virtual void render() = 0;
+		virtual void toggleMode() = 0;
+		virtual void togglePivot() = 0;
+		virtual void toggleCoordSystem() = 0;
+		virtual int getStep() const = 0;
+		virtual void setStep(int step) = 0;
+		virtual void enableStep(bool enable) = 0;
+		virtual bool isAutosnapDown() const = 0;
+		virtual void setAutosnapDown(bool snap) = 0;
+		virtual bool isTranslateMode() const = 0;
 };
 
 

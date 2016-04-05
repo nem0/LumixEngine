@@ -35,27 +35,27 @@ void UT_delegate(const char* params)
 	Lumix::DefaultAllocator allocator;
 
 	Lumix::Delegate<void> d1;
-	
+
 	d1.bind<&test>();
 	d1.invoke();
 
-	LUMIX_EXPECT_EQ(x, 10);
+	LUMIX_EXPECT(x == 10);
 
 	Lumix::Delegate<void (int)> d2;
 	d2.bind<&test2>();
 	d2.invoke(20);
-	LUMIX_EXPECT_EQ(x, 20);
+	LUMIX_EXPECT(x == 20);
 
 	S s;
 	d1.bind<S, &S::test>(&s);
 	d1.invoke();
-	LUMIX_EXPECT_EQ(x, 20);
-	LUMIX_EXPECT_EQ(s.m, 10);
+	LUMIX_EXPECT(x == 20);
+	LUMIX_EXPECT(s.m == 10);
 
 	d2.bind<S, &S::test2>(&s);
 	d2.invoke(30);
-	LUMIX_EXPECT_EQ(x, 20);
-	LUMIX_EXPECT_EQ(s.m, 30);
+	LUMIX_EXPECT(x == 20);
+	LUMIX_EXPECT(s.m == 30);
 }
 
 REGISTER_TEST("unit_tests/core/delegate", UT_delegate, "")

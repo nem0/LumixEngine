@@ -21,7 +21,7 @@ struct Vec3;
 class LUMIX_ANIMATION_API AnimationManager : public ResourceManagerBase
 {
 public:
-	AnimationManager(IAllocator& allocator) 
+	explicit AnimationManager(IAllocator& allocator) 
 		: ResourceManagerBase(allocator)
 		, m_allocator(allocator)
 	{}
@@ -29,8 +29,8 @@ public:
 	IAllocator& getAllocator() { return m_allocator; }
 
 protected:
-	virtual Resource* createResource(const Path& path) override;
-	virtual void destroyResource(Resource& resource) override;
+	Resource* createResource(const Path& path) override;
+	void destroyResource(Resource& resource) override;
 
 private:
 	IAllocator& m_allocator;
@@ -40,14 +40,14 @@ private:
 class LUMIX_ANIMATION_API Animation : public Resource
 {
 	public:
-		static const uint32_t HEADER_MAGIC = 0x5f4c4146; // '_LAF'
+		static const uint32 HEADER_MAGIC = 0x5f4c4146; // '_LAF'
 
 	public:
 		struct Header
 		{
-			uint32_t magic;
-			uint32_t version;
-			uint32_t fps;
+			uint32 magic;
+			uint32 version;
+			uint32 fps;
 		};
 
 	public:
@@ -62,15 +62,15 @@ class LUMIX_ANIMATION_API Animation : public Resource
 	private:
 		IAllocator& getAllocator();
 
-		virtual void doUnload(void) override;
-		virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;
+		void unload() override;
+		bool load(FS::IFile& file) override;
 
 	private:
 		int	m_frame_count;
 		int	m_bone_count;
 		Vec3* m_positions;
 		Quat* m_rotations;
-		uint32_t* m_bones;
+		uint32* m_bones;
 		int m_fps;
 };
 

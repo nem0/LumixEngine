@@ -1,8 +1,9 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
-#include <Windows.h>
 #include "core/log.h"
-#include <stdio.h>
+#include "core/pc/simple_win.h"
+#include <cstdio>
+
 
 namespace Lumix
 {
@@ -10,14 +11,13 @@ namespace Lumix
 	{
 		void outputToVS(const char* system, const char* message)
 		{
-			StackAllocator<2048> allocator;
-			string tmp(allocator);
-			tmp = system;
-			tmp += ": ";
-			tmp += message;
-			tmp += "\r";
+			char tmp[2048];
+			copyString(tmp, system);
+			catString(tmp, ": ");
+			catString(tmp, message);
+			catString(tmp, "\r");
 
-			OutputDebugString(tmp.c_str());
+			OutputDebugString(tmp);
 		}
 
 		void outputToConsole(const char* system, const char* message)

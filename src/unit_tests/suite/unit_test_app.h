@@ -7,7 +7,7 @@ namespace Lumix
 		struct App
 		{
 			void init();
-			void run(int32_t argc, const char* argv[]);
+			void run(int32 argc, const char* argv[]);
 			void exit();
 		};
 	} //~UnitTest

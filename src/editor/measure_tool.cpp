@@ -1,6 +1,6 @@
 #include "measure_tool.h"
-#include "graphics/ray_cast_model_hit.h"
-#include "graphics/render_scene.h"
+#include "renderer/model.h"
+#include "renderer/render_scene.h"
 
 
 namespace Lumix
@@ -24,7 +24,7 @@ namespace Lumix
 				m_is_from_set = false;
 				m_to = hit.m_origin + hit.m_dir * hit.m_t;
 			}
-			m_distance_measured.invoke(getDistance());
+			if(m_distance_measured.isValid()) m_distance_measured.invoke(getDistance());
 			return true;
 		}
 		return false;
@@ -35,7 +35,10 @@ namespace Lumix
 	{
 		if (m_is_enabled)
 		{
-			scene.addDebugLine(m_from, m_to, Vec3(0, 1, 0), 0);
+			static const uint32 COLOR = 0x00ff00ff;
+			scene.addDebugCross(m_from, 0.3f, COLOR, 0);
+			scene.addDebugCross(m_to, 0.3f, COLOR, 0);
+			scene.addDebugLine(m_from, m_to, COLOR, 0);
 		}
 	}
 }

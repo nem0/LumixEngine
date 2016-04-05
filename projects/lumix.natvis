@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+	<Type Name="Lumix::Array&lt;*&gt;">
+		<DisplayString Condition="m_data == nullptr">size={m_size}</DisplayString>
+		<DisplayString Condition="m_data != nullptr">size={m_size} [0]=>{m_data[0]}</DisplayString>
+		<Expand>
+			<ArrayItems>
+				<Size>m_size</Size>
+				<ValuePointer>m_data</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+</AutoVisualizer>

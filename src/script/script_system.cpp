@@ -393,6 +393,7 @@ namespace Lumix
 				if (m_engine.getWorldEditor())
 				{
 					IAllocator& allocator = m_engine.getWorldEditor()->getAllocator();
+#error todo m_engine.getWorldEditor()->registerComponentType(...
 					m_engine.getWorldEditor()->registerProperty("script", allocator.newObject<FilePropertyDescriptor<ScriptSceneImpl> >("source", (void (ScriptSceneImpl::*)(Component, string&))&ScriptSceneImpl::getScriptPath, &ScriptSceneImpl::setScriptPath, "Script (*.cpp)", allocator));
 				}
 				return true;

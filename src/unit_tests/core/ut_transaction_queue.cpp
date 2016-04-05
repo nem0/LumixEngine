@@ -9,9 +9,9 @@ namespace
 {
 	struct Test
 	{
-		uint32_t idx;
-		int32_t proc_count;
-		uint32_t thread_id;
+		uint32 idx;
+		int32 proc_count;
+		uint32 thread_id;
 	};
 
 	typedef Lumix::MT::Transaction<Test> AsynTrans;
@@ -34,7 +34,7 @@ namespace
 			while (!m_trans_queue->isAborted())
 			{
 				AsynTrans* tr = m_trans_queue->pop(true);
-				if (NULL == tr)
+				if (nullptr == tr)
 					break;
 
 				tr->data.proc_count++;
@@ -87,16 +87,16 @@ namespace
 	void UT_tq_heavy_usage(const char* params)
 	{
 		Lumix::DefaultAllocator allocator;
-		const size_t itemsCount = 1200000;
+		const uint32 itemsCount = 1200000;
 		Test* testItems = (Test*)allocator.allocate(sizeof(Test) * itemsCount);
-		for (size_t i = 0; i < itemsCount; i++)
+		for (uint32 i = 0; i < itemsCount; i++)
 		{
 			testItems[i].idx = i;
 			testItems[i].proc_count = 0;
 			testItems[i].thread_id = Lumix::MT::getCurrentThreadID();
 		}
 
-		TransQueue trans_queue(allocator);
+		TransQueue trans_queue;
 
 		TestTaskConsumer cons1(&trans_queue, testItems, allocator);
 		TestTaskConsumer cons2(&trans_queue, testItems, allocator);
@@ -155,9 +155,9 @@ namespace
 
 		for (size_t i = 0; i < itemsCount; i++)
 		{
-			LUMIX_EXPECT_EQ(testItems[i].idx, i);
-			LUMIX_EXPECT_EQ(testItems[i].proc_count, 1);
-			LUMIX_EXPECT_NE(testItems[i].thread_id, Lumix::MT::getCurrentThreadID());
+			LUMIX_EXPECT(testItems[i].idx == i);
+			LUMIX_EXPECT(testItems[i].proc_count == 1);
+			LUMIX_EXPECT(testItems[i].thread_id != Lumix::MT::getCurrentThreadID());
 		}
 
 		allocator.deallocate(testItems);
@@ -168,16 +168,16 @@ namespace
 	void UT_tq_push(const char* params)
 	{
 		Lumix::DefaultAllocator allocator;
-		const size_t itemsCount = 1200000;
+		const uint32 itemsCount = 1200000;
 		Test* testItems = (Test*)allocator.allocate(sizeof(Test) * itemsCount);
-		for (size_t i = 0; i < itemsCount; i++)
+		for (uint32 i = 0; i < itemsCount; i++)
 		{
 			testItems[i].idx = i;
 			testItems[i].proc_count = 0;
 			testItems[i].thread_id = Lumix::MT::getCurrentThreadID();
 		}
 
-		TransQueue trans_queue(allocator);
+		TransQueue trans_queue;
 
 		TestTaskProducer prod(&trans_queue, &testItems[0], itemsCount, allocator);
 		TestTaskConsumer cons(&trans_queue, testItems, allocator);
@@ -202,9 +202,9 @@ namespace
 
 		for (size_t i = 0; i < itemsCount; i++)
 		{
-			LUMIX_EXPECT_EQ(testItems[i].idx, i);
-			LUMIX_EXPECT_EQ(testItems[i].proc_count, 1);
-			LUMIX_EXPECT_NE(testItems[i].thread_id, Lumix::MT::getCurrentThreadID());
+			LUMIX_EXPECT(testItems[i].idx == i);
+			LUMIX_EXPECT(testItems[i].proc_count == 1);
+			LUMIX_EXPECT(testItems[i].thread_id != Lumix::MT::getCurrentThreadID());
 		}
 
 		allocator.deallocate(testItems);

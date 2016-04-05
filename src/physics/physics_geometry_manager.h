@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/lumix.h"
+#include "lumix.h"
 #include "core/resource.h"
 #include "core/resource_manager_base.h"
 
@@ -32,8 +32,8 @@ class LUMIX_PHYSICS_API PhysicsGeometryManager : public ResourceManagerBase
 		PhysicsSystem& getSystem() { return m_system; }
 
 	protected:
-		virtual Resource* createResource(const Path& path) override;
-		virtual void destroyResource(Resource& resource) override;
+		Resource* createResource(const Path& path) override;
+		void destroyResource(Resource& resource) override;
 
 	private:
 		IAllocator& m_allocator;
@@ -44,15 +44,15 @@ class LUMIX_PHYSICS_API PhysicsGeometryManager : public ResourceManagerBase
 class LUMIX_PHYSICS_API PhysicsGeometry : public Resource
 {
 	public:
-		static const uint32_t HEADER_MAGIC = 0x5f4c5046; // '_LPF'
+		static const uint32 HEADER_MAGIC = 0x5f4c5046; // '_LPF'
 		struct Header
 		{
-			uint32_t m_magic;
-			uint32_t m_version;
-			uint32_t m_convex;
+			uint32 m_magic;
+			uint32 m_version;
+			uint32 m_convex;
 		};
 
-		enum class Versions : uint32_t
+		enum class Versions : uint32
 		{
 			FIRST,
 
@@ -68,8 +68,8 @@ class LUMIX_PHYSICS_API PhysicsGeometry : public Resource
 	private:
 		IAllocator& getAllocator();
 
-		virtual void doUnload(void) override;
-		virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;
+		void unload(void) override;
+		bool load(FS::IFile& file) override;
 
 	private:
 		physx::PxGeometry* m_geometry;

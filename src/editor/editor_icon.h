@@ -1,55 +1,39 @@
 #pragma once
 
 
-#include "universe/universe.h"
+#include "core/matrix.h"
 
 
 namespace Lumix
 {
 
 
-struct Component;
 class Engine;
-struct Entity;
-class IRenderDevice;
 class Model;
+class Pipeline;
 class RenderScene;
+class WorldEditor;
 
 
-class EditorIcon
+class EditorIcons
 {
 	public:
-		enum Type
+		struct Hit
 		{
-			PHYSICAL_CONTROLLER,
-			PHYSICAL_BOX,
-			CAMERA,
-			LIGHT,
-			TERRAIN,
-			ENTITY,
-			COUNT
+			Entity entity;
+			float t;
 		};
 
 	public:
-		EditorIcon(Engine& engine, RenderScene& scene, const Entity& entity);
-		~EditorIcon();
-		void render(IRenderDevice& render_device);
-		void show();
-		void hide();
-		float hit(const Vec3& origin, const Vec3& dir) const;
-		Entity getEntity() const { return m_entity; }
+		static EditorIcons* create(WorldEditor& editor);
+		static void destroy(EditorIcons& icons);
 
-		static bool loadIcons(Engine& engine);
-		static void unloadIcons();
+		virtual ~EditorIcons() {}
 
-	private:
-		RenderScene* m_scene;
-		Entity m_entity;
-		Model* m_model;
-		Matrix m_matrix;
-		float m_scale;
-		bool m_is_visible;
-		Type m_type;
+		virtual void setRenderInterface(class RenderInterface* render_interface) = 0;
+		virtual void clear() = 0;
+		virtual void render() = 0;
+		virtual Hit raycast(const Vec3& origin, const Vec3& dir) = 0;
 };
 
 
