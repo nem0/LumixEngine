@@ -1170,15 +1170,15 @@ public:
 
 		Lumix::LuaWrapper::createSystemVariable(L, "Editor", "editor", this);
 
-		#define REGISTER_FUNCTION(F, name) \
+		#define REGISTER_FUNCTION(F) \
 			do { \
-				auto* f = &Lumix::LuaWrapper::wrapMethod<StudioAppImpl, decltype(&StudioAppImpl::F), &StudioAppImpl::F>; \
-				Lumix::LuaWrapper::createSystemFunction(L, "Editor", name, f); \
+				auto* f = &Lumix::LuaWrapper::wrapMethod<StudioAppImpl, decltype(&StudioAppImpl::LUA_##F), &StudioAppImpl::LUA_##F>; \
+				Lumix::LuaWrapper::createSystemFunction(L, "Editor", #F, f); \
 			} while(false) \
 
-		REGISTER_FUNCTION(LUA_runTest, "runTest");
-		REGISTER_FUNCTION(LUA_exit, "exit");
-		REGISTER_FUNCTION(LUA_createEntityTemplate, "createEntityTemplate");
+		REGISTER_FUNCTION(runTest);
+		REGISTER_FUNCTION(exit);
+		REGISTER_FUNCTION(createEntityTemplate);
 
 		#undef REGISTER_FUNCTION
 	}
