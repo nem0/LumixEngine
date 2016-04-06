@@ -1164,6 +1164,13 @@ public:
 	}
 
 
+	static int importAsset(lua_State* L)
+	{
+		auto* app = Lumix::LuaWrapper::checkArg<StudioAppImpl*>(L, 1);
+		return app->m_import_asset_dialog->importAsset(L);
+	}
+
+
 	void createLua()
 	{
 		lua_State* L = m_engine->getState();
@@ -1181,6 +1188,8 @@ public:
 		REGISTER_FUNCTION(createEntityTemplate);
 
 		#undef REGISTER_FUNCTION
+
+		Lumix::LuaWrapper::createSystemFunction(L, "Editor", "importAsset", &importAsset);
 	}
 
 
