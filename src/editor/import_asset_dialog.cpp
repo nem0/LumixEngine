@@ -5,7 +5,9 @@
 #include "assimp/scene.h"
 #include "core/FS/disk_file_device.h"
 #include "core/FS/os_file.h"
+#include "core/lua_wrapper.h"
 #include "core/MT/task.h"
+#include "core/MT/thread.h"
 #include "core/crc32.h"
 #include "core/log.h"
 #include "core/math_utils.h"
@@ -1825,7 +1827,7 @@ bool ImportAssetDialog::hasMessage()
 }
 
 
-void ImportAssetDialog::convert()
+void ImportAssetDialog::convert(bool use_ui)
 {
 	ASSERT(!m_task);
 
@@ -1835,7 +1837,7 @@ void ImportAssetDialog::convert()
 		{
 			if (!material.textures[i].is_valid && material.textures[i].import)
 			{
-				ImGui::OpenPopup("Invalid texture");
+				if(use_ui) ImGui::OpenPopup("Invalid texture");
 				return;
 			}
 		}
@@ -2080,6 +2082,119 @@ void ImportAssetDialog::onImageGUI()
 }
 
 
+int ImportAssetDialog::importAsset(lua_State* L)
+{
+	m_importers.clear();
+	m_materials.clear();
+	m_meshes.clear();
+	m_output_filename[0] = '\0';
+	m_is_opened = true;
+
+	Lumix::LuaWrapper::checkTableArg(L, 2);
+	lua_pushvalue(L, 2);
+	lua_pushnil(L);
+	while (lua_next(L, -2) != 0)
+	{
+		if(!lua_istable(L, -1))
+		{
+			lua_pop(L, 1);
+			continue;
+		}
+
+		if (lua_getfield(L, -1, "src") != LUA_TSTRING)
+		{
+			lua_pop(L, 2); // "src" and inputs table item
+			continue;
+		}
+		Lumix::copyString(m_source, Lumix::LuaWrapper::toType<const char*>(L, -1));
+		lua_pop(L, 1); // "src"
+
+		checkSource();
+		if (m_is_importing) checkTask(true);
+
+		if (lua_getfield(L, -1, "materials") == LUA_TTABLE)
+		{
+			ImportMaterial* material = &m_materials[m_materials.size() - m_importers.back().GetScene()->mNumMaterials];
+			lua_pushnil(L);
+			while (lua_next(L, -2) != 0) // for each material
+			{
+				if (lua_istable(L, -1))
+				{
+					if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
+					{
+						material->import = Lumix::LuaWrapper::toType<bool>(L, -1);
+					}
+					lua_pop(L, 1); // "import"
+
+					if (lua_getfield(L, -1, "textures") == LUA_TTABLE)
+					{
+						lua_pushnil(L);
+						ImportTexture* texture = material->textures;
+						while (lua_next(L, -2) != 0) // for each texture
+						{
+							if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
+							{
+								texture->import = Lumix::LuaWrapper::toType<bool>(L, -1);
+							}
+							lua_pop(L, 1); // "import"
+
+							if (lua_getfield(L, -1, "to_dds") == LUA_TBOOLEAN)
+							{
+								texture->to_dds = Lumix::LuaWrapper::toType<bool>(L, -1);
+							}
+							lua_pop(L, 1); // "to_dds"
+
+							if (lua_getfield(L, -1, "src") == LUA_TSTRING)
+							{
+								Lumix::copyString(texture->src, Lumix::LuaWrapper::toType<const char*>(L, -1));
+								texture->is_valid = PlatformInterface::fileExists(texture->src);
+							}
+							lua_pop(L, 1); // "src"
+
+							++texture;
+							lua_pop(L, 1); // textures table item
+
+							if (texture - material->textures > material->texture_count) break;
+						}
+					}
+					lua_pop(L, 1); // "textures"
+				}
+
+				++material;
+				lua_pop(L, 1); // materials table item
+			}
+		}
+		lua_pop(L, 1); // "materials"
+
+		lua_pop(L, 1); // inputs table item
+	}
+	lua_pop(L, 1);
+	convert(false);
+	if (m_is_converting) checkTask(true);
+
+	return 0;
+}
+
+
+void ImportAssetDialog::checkTask(bool wait)
+{
+	if (!m_task) return;
+	if (!wait && !m_task->isFinished()) return;
+
+	if (wait)
+	{
+		while (!m_task->isFinished()) Lumix::MT::sleep(200);
+	}
+
+	m_task->destroy();
+	LUMIX_DELETE(m_editor.getAllocator(), m_task);
+	m_task = nullptr;
+	m_is_importing = false;
+	m_is_converting = false;
+	m_is_importing_texture = false;
+}
+
+
 void ImportAssetDialog::onGUI()
 {
 	if (ImGui::BeginDock("Import Asset", &m_is_opened))
@@ -2111,15 +2226,7 @@ void ImportAssetDialog::onGUI()
 				}
 			}
 
-			if (m_task && m_task->isFinished())
-			{
-				m_task->destroy();
-				LUMIX_DELETE(m_editor.getAllocator(), m_task);
-				m_task = nullptr;
-				m_is_importing = false;
-				m_is_converting = false;
-				m_is_importing_texture = false;
-			}
+			checkTask(false);
 
 			{
 				Lumix::MT::SpinLock lock(m_mutex);
@@ -2217,7 +2324,7 @@ void ImportAssetDialog::onGUI()
 				}
 				else if (ImGui::Button("Convert"))
 				{
-					convert();
+					convert(true);
 				}
 			}
 

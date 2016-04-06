@@ -97,13 +97,15 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		Lumix::WorldEditor& getEditor() { return m_editor; }
 		void onGUI();
 		DDSConvertCallbackData& getDDSConvertCallbackData() { return m_dds_convert_callback; }
+		int importAsset(lua_State* L);
 
 	public:
 		bool m_is_opened;
 
 	private:
 		void checkSource();
-		void convert();
+		void checkTask(bool wait);
+		void convert(bool use_ui);
 		void getMessage(char* msg, int max_size);
 		bool hasMessage();
 		void importTexture();
