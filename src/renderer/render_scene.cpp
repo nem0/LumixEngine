@@ -3746,14 +3746,6 @@ void RenderScene::registerLuaAPI(lua_State* L)
 		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
 		} while(false) \
 
-	REGISTER_FUNCTION(setFogDensity);
-	REGISTER_FUNCTION(setFogBottom);
-	REGISTER_FUNCTION(setFogHeight);
-	REGISTER_FUNCTION(setFogColor);
-	REGISTER_FUNCTION(getFogDensity);
-	REGISTER_FUNCTION(getFogBottom);
-	REGISTER_FUNCTION(getFogHeight);
-	REGISTER_FUNCTION(getFogColor);
 	REGISTER_FUNCTION(getCameraSlot);
 	REGISTER_FUNCTION(getCameraComponent);
 	REGISTER_FUNCTION(getRenderableComponent);

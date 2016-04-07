@@ -581,6 +581,9 @@ namespace Lumix
 					catString(getter, tmp);
 					switch (desc->getType())
 					{
+						case IPropertyDescriptor::DECIMAL:
+						case IPropertyDescriptor::INTEGER:
+						case IPropertyDescriptor::BOOL:
 						case IPropertyDescriptor::VEC3:
 						case IPropertyDescriptor::COLOR:
 							lua_pushlightuserdata(L, desc);
