@@ -17,12 +17,19 @@
 #include "debug/floating_points.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "engine/plugin_manager.h"
 #include "imgui/imgui.h"
 #include "import_asset_dialog.h"
 #include "metadata.h"
 #include "physics/physics_geometry_manager.h"
 #include "platform_interface.h"
+#include "renderer/frame_buffer.h"
 #include "renderer/model.h"
+#include "renderer/pipeline.h"
+#include "renderer/render_scene.h"
+#include "renderer/renderer.h"
+#include "renderer/texture.h"
+#include "universe/universe.h"
 #ifndef STATIC_PLUGINS
 #define STB_IMAGE_IMPLEMENTATION
 #endif
@@ -2079,6 +2086,75 @@ void ImportAssetDialog::onImageGUI()
 	}
 
 	if (ImGui::Button("Import texture")) importTexture();
+}
+
+
+static bool createBillboard(const Lumix::Path& mesh_path,
+	const Lumix::Path& out_path,
+	Lumix::Engine& engine,
+	Lumix::Vec2 texture_size)
+{
+	auto& universe = engine.createUniverse();
+
+	auto* renderer = static_cast<Lumix::Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+	if (!renderer) return false;
+
+	auto* render_scene = static_cast<Lumix::RenderScene*>(universe.getScene(Lumix::crc32("renderer")));
+	if (!render_scene) return false;
+
+	auto* pipeline = Lumix::Pipeline::create(*renderer, Lumix::Path("pipelines/preview.lua"), engine.getAllocator());
+	pipeline->load();
+
+	auto mesh_entity = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 0 });
+	auto mesh_cmp = render_scene->createComponent(Lumix::crc32("renderable"), mesh_entity);
+	render_scene->setRenderablePath(mesh_cmp, mesh_path);
+
+	auto camera_entity = universe.createEntity({ 0, 0, 5 }, { 0, 0, 0, 0 });
+	auto camera_cmp = render_scene->createComponent(Lumix::crc32("camera"), camera_entity);
+	render_scene->setCameraSlot(camera_cmp, "main");
+
+	auto light_entity = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 0 });
+	auto light_cmp = render_scene->createComponent(Lumix::crc32("global_light"), light_entity);
+
+	while (engine.getFileSystem().hasWork()) engine.getFileSystem().updateAsyncTransactions();
+
+	pipeline->setScene(render_scene);
+	pipeline->setViewport(0, 0, int(texture_size.x), int(texture_size.y));
+	pipeline->render();
+
+	bgfx::TextureHandle texture = bgfx::createTexture2D(
+		int(texture_size.x), int(texture_size.y), 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
+
+	renderer->viewCounterAdd();
+	bgfx::touch(renderer->getViewCounter());
+	bgfx::setViewName(renderer->getViewCounter(), "billboard_blit");
+	bgfx::TextureHandle color_renderbuffer = pipeline->getFramebuffer("default")->getRenderbufferHandle(0);
+	bgfx::blit(renderer->getViewCounter(), texture, 0, 0, color_renderbuffer);
+
+	renderer->viewCounterAdd();
+	bgfx::setViewName(renderer->getViewCounter(), "billboard_read");
+	Lumix::Array<Lumix::uint8> data(engine.getAllocator());
+	data.resize(int(texture_size.x * texture_size.y) * 4);
+	bgfx::readTexture(texture, &data[0]);
+	bgfx::touch(renderer->getViewCounter());
+	bgfx::frame(); // submit
+	bgfx::frame(); // wait for gpu
+
+	auto& fs = engine.getFileSystem();
+	auto* file = fs.open(fs.getDefaultDevice(), out_path, Lumix::FS::Mode::CREATE_AND_WRITE);
+	Lumix::Texture::saveTGA(engine.getAllocator(),
+		file,
+		int(texture_size.x),
+		int(texture_size.y),
+		4,
+		(Lumix::uint8*)&data[0],
+		out_path);
+	fs.close(*file);
+
+	bgfx::destroyTexture(texture);
+	Lumix::Pipeline::destroy(pipeline);
+	engine.destroyUniverse(universe);
+	return true;
 }
 
 
