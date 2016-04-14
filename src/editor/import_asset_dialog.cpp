@@ -2109,14 +2109,20 @@ static bool createBillboard(const Lumix::Path& mesh_path,
 	auto mesh_cmp = render_scene->createComponent(Lumix::crc32("renderable"), mesh_entity);
 	render_scene->setRenderablePath(mesh_cmp, mesh_path);
 
-	auto camera_entity = universe.createEntity({ 0, 0, 5 }, { 0, 0, 0, 0 });
-	auto camera_cmp = render_scene->createComponent(Lumix::crc32("camera"), camera_entity);
-	render_scene->setCameraSlot(camera_cmp, "main");
 
 	auto light_entity = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 0 });
 	auto light_cmp = render_scene->createComponent(Lumix::crc32("global_light"), light_entity);
 
 	while (engine.getFileSystem().hasWork()) engine.getFileSystem().updateAsyncTransactions();
+
+	auto* model = render_scene->getRenderableModel(mesh_cmp);
+	Lumix::AABB aabb = model->getAABB();
+	float size = Lumix::Math::maximum(aabb.max.x - aabb.min.x, aabb.max.y - aabb.min.y);
+	Lumix::Vec3 camera_pos((aabb.max.x + aabb.min.x) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + size * 0.51f);
+	auto camera_entity = universe.createEntity(camera_pos, { 0, 0, 0, 0 });
+	auto camera_cmp = render_scene->createComponent(Lumix::crc32("camera"), camera_entity);
+	render_scene->setCameraSlot(camera_cmp, "main");
+	render_scene->setCameraFOV(camera_cmp, 90);
 
 	pipeline->setScene(render_scene);
 	pipeline->setViewport(0, 0, int(texture_size.x), int(texture_size.y));
