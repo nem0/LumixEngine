@@ -1850,8 +1850,8 @@ public:
 	{
 		ComponentUID cmp = getComponent(m_camera, CAMERA_HASH);
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-		float width = scene->getCameraWidth(cmp.index);
-		float height = scene->getCameraHeight(cmp.index);
+		float width = scene->getCameraScreenWidth(cmp.index);
+		float height = scene->getCameraScreenHeight(cmp.index);
 		return addEntityAt((int)width >> 1, (int)height >> 1);
 	}
 
@@ -1889,15 +1889,14 @@ public:
 		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
 		RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
 		Universe* universe = getUniverse();
-		float camera_x = scene->getCameraWidth(camera_cmp.index);
-		float camera_y = scene->getCameraHeight(camera_cmp.index);
+		float camera_x = scene->getCameraScreenWidth(camera_cmp.index);
+		float camera_y = scene->getCameraScreenHeight(camera_cmp.index);
 		camera_x *= 0.5f;
 		camera_y *= 0.5f;
 
 		Vec3 origin;
 		Vec3 dir;
-		scene->getRay(
-			camera_cmp.index, (float)camera_x, (float)camera_y, origin, dir);
+		scene->getRay(camera_cmp.index, (float)camera_x, (float)camera_y, origin, dir);
 		RayCastModelHit hit = scene->castRay(origin, dir, INVALID_COMPONENT);
 		Vec3 pos;
 		if (hit.m_is_hit)
@@ -1906,8 +1905,7 @@ public:
 		}
 		else
 		{
-			pos = universe->getPosition(m_camera) +
-				  universe->getRotation(m_camera) * Vec3(0, 0, -2);
+			pos = universe->getPosition(m_camera) + universe->getRotation(m_camera) * Vec3(0, 0, -2);
 		}
 		return pos;
 	}

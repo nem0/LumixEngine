@@ -213,10 +213,24 @@ static void registerProperties(IAllocator& allocator)
 							  ResourceManager::MATERIAL,
 							  allocator));
 
-	PropertyRegister::add(
-		"camera",
-		LUMIX_NEW(allocator, StringPropertyDescriptor<RenderScene>)(
-			"Slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot, allocator));
+	PropertyRegister::add("camera",
+		LUMIX_NEW(allocator, StringPropertyDescriptor<RenderScene>)("Slot",
+							  &RenderScene::getCameraSlot,
+							  &RenderScene::setCameraSlot,
+							  allocator));
+	PropertyRegister::add("camera",
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Orthographic size",
+							  &RenderScene::getCameraOrthoSize,
+							  &RenderScene::setCameraOrthoSize,
+							  0.0f,
+							  FLT_MAX,
+							  1.0f,
+							  allocator));
+	PropertyRegister::add("camera",
+		LUMIX_NEW(allocator, BoolPropertyDescriptor<RenderScene>)("Orthographic",
+							  &RenderScene::isCameraOrtho,
+							  &RenderScene::setCameraOrtho,
+							  allocator));
 	PropertyRegister::add("camera",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("FOV",
 							  &RenderScene::getCameraFOV,

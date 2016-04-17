@@ -26,15 +26,15 @@ void Frustum::computeOrtho(const Vec3& position,
 	planes[(uint32)Sides::NEAR_PLANE].set(-z, near_center);
 	planes[(uint32)Sides::FAR_PLANE].set(z, far_center);
 
-	planes[(uint32)Sides::TOP_PLANE].set(-y, near_center + y * (height * 0.5f));
-	planes[(uint32)Sides::BOTTOM_PLANE].set(y, near_center - y * (height * 0.5f));
+	planes[(uint32)Sides::TOP_PLANE].set(-y, near_center + y * height);
+	planes[(uint32)Sides::BOTTOM_PLANE].set(y, near_center - y * height);
 
-	planes[(uint32)Sides::LEFT_PLANE].set(x, near_center - x * (width * 0.5f));
-	planes[(uint32)Sides::RIGHT_PLANE].set(-x, near_center + x * (width * 0.5f));
+	planes[(uint32)Sides::LEFT_PLANE].set(x, near_center - x * width);
+	planes[(uint32)Sides::RIGHT_PLANE].set(-x, near_center + x * width);
 
 	center = (near_center + far_center) * 0.5f;
 	float z_diff = far_distance - near_distance;
-	radius = sqrt(width * width + height * height + z_diff * z_diff) * 0.5f;
+	radius = sqrt(4 * width * width + 4 * height * height + z_diff * z_diff) * 0.5f;
 	this->position = position;
 }
 

@@ -913,8 +913,8 @@ void TerrainEditor::removeEntities(const Lumix::RayCastModelHit& hit)
 	frustum.computeOrtho(hit.m_origin + hit.m_dir * hit.m_t,
 		Lumix::Vec3(0, 0, 1),
 		Lumix::Vec3(0, 1, 0),
-		2 * m_terrain_brush_size,
-		2 * m_terrain_brush_size,
+		m_terrain_brush_size,
+		m_terrain_brush_size,
 		-m_terrain_brush_size,
 		m_terrain_brush_size);
 
@@ -1080,8 +1080,8 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 		frustum.computeOrtho(center,
 			Lumix::Vec3(0, 0, 1),
 			Lumix::Vec3(0, 1, 0),
-			2 * m_terrain_brush_size,
-			2 * m_terrain_brush_size,
+			m_terrain_brush_size,
+			m_terrain_brush_size,
 			-m_terrain_brush_size,
 			m_terrain_brush_size);
 		auto& meshes = scene->getRenderableInfos(frustum, frustum.position);

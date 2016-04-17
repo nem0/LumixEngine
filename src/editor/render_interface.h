@@ -30,6 +30,8 @@ public:
 
 	virtual AABB getEntityAABB(Universe& universe, Entity entity) = 0;
 	virtual float getCameraFOV(ComponentIndex cmp) = 0;
+	virtual bool isCameraOrtho(ComponentIndex cmp) = 0;
+	virtual float getCameraOrthoSize(ComponentIndex cmp) = 0;
 	virtual float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Matrix& mtx) = 0;
 	virtual void renderModel(ModelHandle model, const Matrix& mtx) = 0;
 	virtual ModelHandle loadModel(Lumix::Path& path) = 0;

@@ -44,6 +44,7 @@ enum class RenderSceneVersion : int32
 	RENDER_PARAMS,
 	RENDER_PARAMS_REMOVED,
 	GRASS_TYPE_DISTANCE,
+	ORTHO_CAMERA,
 
 	LATEST,
 	INVALID = -1,
@@ -126,6 +127,7 @@ enum class RenderableType
 	TERRAIN
 };
 
+
 class LUMIX_RENDERER_API RenderScene : public IScene
 {
 public:
@@ -207,6 +209,7 @@ public:
 	virtual const Array<DebugLine>& getDebugLines() const = 0;
 	virtual const Array<DebugPoint>& getDebugPoints() const = 0;
 
+	virtual Matrix getCameraProjection(ComponentIndex camera) = 0;
 	virtual Entity getCameraEntity(ComponentIndex camera) const = 0;
 	virtual ComponentIndex getCameraInSlot(const char* slot) = 0;
 	virtual float getCameraFOV(ComponentIndex camera) = 0;
@@ -215,11 +218,15 @@ public:
 	virtual void setCameraNearPlane(ComponentIndex camera, float near) = 0;
 	virtual float getCameraFarPlane(ComponentIndex camera) = 0;
 	virtual float getCameraNearPlane(ComponentIndex camera) = 0;
-	virtual float getCameraWidth(ComponentIndex camera) = 0;
-	virtual float getCameraHeight(ComponentIndex camera) = 0;
+	virtual float getCameraScreenWidth(ComponentIndex camera) = 0;
+	virtual float getCameraScreenHeight(ComponentIndex camera) = 0;
 	virtual void setCameraSlot(ComponentIndex camera, const char* slot) = 0;
 	virtual const char* getCameraSlot(ComponentIndex camera) = 0;
-	virtual void setCameraSize(ComponentIndex camera, int w, int h) = 0;
+	virtual void setCameraScreenSize(ComponentIndex camera, int w, int h) = 0;
+	virtual bool isCameraOrtho(ComponentIndex camera) = 0;
+	virtual void setCameraOrtho(ComponentIndex camera, bool is_ortho) = 0;
+	virtual float getCameraOrthoSize(ComponentIndex camera) = 0;
+	virtual void setCameraOrthoSize(ComponentIndex camera, float value) = 0;
 
 	virtual class ParticleEmitter* getParticleEmitter(ComponentIndex cmp) = 0;
 	virtual void resetParticleEmitter(ComponentIndex cmp) = 0;
