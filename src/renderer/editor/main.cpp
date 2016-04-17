@@ -840,6 +840,18 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		}
 
 
+		float getCameraOrthoSize(ComponentIndex cmp) override
+		{
+			return m_render_scene->getCameraOrthoSize(cmp);
+		}
+
+
+		bool isCameraOrtho(ComponentIndex cmp) override
+		{
+			return m_render_scene->isCameraOrtho(cmp);
+		}
+
+
 		float getCameraFOV(ComponentIndex cmp) override
 		{
 			return m_render_scene->getCameraFOV(cmp);
@@ -1381,8 +1393,8 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 			Vec3 dir = universe.getRotation(cmp.entity) * Vec3(0, 0, -1);
 			Vec3 right = universe.getRotation(cmp.entity) * Vec3(1, 0, 0);
 			Vec3 up = universe.getRotation(cmp.entity) * Vec3(0, 1, 0);
-			float w = scene->getCameraWidth(cmp.index);
-			float h = scene->getCameraHeight(cmp.index);
+			float w = scene->getCameraScreenWidth(cmp.index);
+			float h = scene->getCameraScreenHeight(cmp.index);
 			float ratio = h < 1.0f ? 1 : w / h;
 
 			scene->addDebugFrustum(

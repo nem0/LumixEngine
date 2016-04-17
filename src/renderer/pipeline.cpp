@@ -687,7 +687,7 @@ struct PipelineImpl : public Pipeline
 		ComponentIndex cmp = m_scene->getCameraInSlot(slot);
 		if (cmp < 0) return;
 
-		m_scene->setCameraSize(cmp, m_width, m_height);
+		m_scene->setCameraScreenSize(cmp, m_width, m_height);
 		m_applied_camera = cmp;
 		m_camera_frustum = m_scene->getCameraFrustum(cmp);
 
@@ -698,6 +698,7 @@ struct PipelineImpl : public Pipeline
 		float ratio = float(m_width) / m_height;
 		projection_matrix.setPerspective(
 			Math::degreesToRadians(fov), ratio, near_plane, far_plane);
+		projection_matrix = m_scene->getCameraProjection(cmp);
 
 		Universe& universe = m_scene->getUniverse();
 		Matrix mtx = universe.getMatrix(m_scene->getCameraEntity(cmp));
@@ -1217,7 +1218,7 @@ struct PipelineImpl : public Pipeline
 		Universe& universe = m_scene->getUniverse();
 		ComponentIndex light_cmp = m_scene->getActiveGlobalLight();
 		if (light_cmp < 0 || m_applied_camera < 0) return;
-		float camera_height = m_scene->getCameraHeight(m_applied_camera);
+		float camera_height = m_scene->getCameraScreenHeight(m_applied_camera);
 		if (!camera_height) return;
 
 		Matrix light_mtx = universe.getMatrix(m_scene->getGlobalLightEntity(light_cmp));
@@ -1226,7 +1227,7 @@ struct PipelineImpl : public Pipeline
 		float shadowmap_width = (float)m_current_framebuffer->getWidth();
 		float viewports[] = { 0, 0, 0.5f, 0, 0, 0.5f, 0.5f, 0.5f };
 		float camera_fov = Math::degreesToRadians(m_scene->getCameraFOV(m_applied_camera));
-		float camera_ratio = m_scene->getCameraWidth(m_applied_camera) / camera_height;
+		float camera_ratio = m_scene->getCameraScreenWidth(m_applied_camera) / camera_height;
 		Vec4 cascades = m_scene->getShadowmapCascades(light_cmp);
 		float split_distances[] = { 0.01f, cascades.x, cascades.y, cascades.z, cascades.w };
 		m_is_rendering_in_shadowmap = true;
@@ -1272,8 +1273,8 @@ struct PipelineImpl : public Pipeline
 		shadow_camera_frustum.computeOrtho(shadow_cam_pos,
 			-light_forward,
 			light_mtx.getYVector(),
-			bb_size * 2,
-			bb_size * 2,
+			bb_size,
+			bb_size,
 			SHADOW_CAM_NEAR,
 			SHADOW_CAM_FAR);
 		m_current_render_views = &m_view_idx;
