@@ -3,7 +3,7 @@
 
 #include "lumix.h"
 #include "core/iallocator.h"
-#include "core/mt/sync.h"
+#include "core/MT/sync.h"
 
 
 namespace Lumix
