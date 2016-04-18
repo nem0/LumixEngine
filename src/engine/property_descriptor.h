@@ -3,8 +3,9 @@
 #include "core/blob.h"
 #include "core/path.h"
 #include "core/string.h"
+#include "iplugin.h"
 #include "iproperty_descriptor.h"
-#include "universe\universe.h"
+#include "universe/universe.h"
 
 
 namespace Lumix
@@ -538,16 +539,21 @@ class ResourcePropertyDescriptor : public FilePropertyDescriptor<T>,
 								   public ResourcePropertyDescriptorBase
 {
 public:
+	using Getter = typename FilePropertyDescriptor<T>::Getter;
+	using Setter = typename FilePropertyDescriptor<T>::Setter;
+	using ArrayGetter = typename FilePropertyDescriptor<T>::ArrayGetter;
+	using ArraySetter = typename FilePropertyDescriptor<T>::ArraySetter;
+
 	ResourcePropertyDescriptor(const char* name,
 		Getter getter,
 		Setter setter,
 		const char* file_type,
 		uint32 resource_type,
 		IAllocator& allocator)
-		: FilePropertyDescriptor(name, getter, setter, file_type, allocator)
+		: FilePropertyDescriptor<T>(name, getter, setter, file_type, allocator)
 		, ResourcePropertyDescriptorBase(resource_type)
 	{
-		m_type = IPropertyDescriptor::RESOURCE;
+		IPropertyDescriptor::m_type = IPropertyDescriptor::RESOURCE;
 	}
 
 	ResourcePropertyDescriptor(const char* name,
@@ -556,10 +562,10 @@ public:
 		const char* file_type,
 		uint32 resource_type,
 		IAllocator& allocator)
-		: FilePropertyDescriptor(name, getter, setter, file_type, allocator)
+		: FilePropertyDescriptor<T>(name, getter, setter, file_type, allocator)
 		, ResourcePropertyDescriptorBase(resource_type)
 	{
-		m_type = IPropertyDescriptor::RESOURCE;
+		IPropertyDescriptor::m_type = IPropertyDescriptor::RESOURCE;
 	}
 
 };
@@ -803,10 +809,15 @@ private:
 template <class S> class ColorPropertyDescriptor : public SimplePropertyDescriptor<Vec3, S>
 {
 public:
+	using Getter = typename SimplePropertyDescriptor<Vec3, S>::Getter;
+	using Setter = typename SimplePropertyDescriptor<Vec3, S>::Setter;
+	using ArrayGetter = typename SimplePropertyDescriptor<Vec3, S>::ArrayGetter;
+	using ArraySetter = typename SimplePropertyDescriptor<Vec3, S>::ArraySetter;
+
 	ColorPropertyDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
 		: SimplePropertyDescriptor<Vec3, S>(name, _getter, _setter, allocator)
 	{
-		m_type = COLOR;
+		IPropertyDescriptor::m_type = IPropertyDescriptor::COLOR;
 	}
 };
 
