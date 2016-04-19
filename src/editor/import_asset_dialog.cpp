@@ -1038,7 +1038,7 @@ struct ConvertTask : public Lumix::MT::Task
 		{
 			const aiBone* bone = mesh.mesh->mBones[j];
 			int bone_index = getNodeIndex(bone);
-			ASSERT(bone_index >= 0)
+			ASSERT(bone_index >= 0);
 			for (unsigned int k = 0; k < bone->mNumWeights; ++k)
 			{
 				int idx = mesh.map_from_input[bone->mWeights[k].mVertexId];
@@ -2309,6 +2309,15 @@ void ImportAssetDialog::checkTask(bool wait)
 
 void ImportAssetDialog::onGUI()
 {
+	static bool once = false;
+	if (!once)
+	{
+		createBillboard(Lumix::Path("models/trees/pine1.msh"), Lumix::Path("a.tga"), m_editor.getEngine(), 256);
+		createBillboard(Lumix::Path("models/trees/pine3.msh"), Lumix::Path("b.tga"), m_editor.getEngine(), 256);
+		createBillboard(Lumix::Path("models/utils/cube/cube.msh"), Lumix::Path("c.tga"), m_editor.getEngine(), 256);
+		once = true;
+	}
+
 	if (ImGui::BeginDock("Import Asset", &m_is_opened))
 	{
 		if (hasMessage())

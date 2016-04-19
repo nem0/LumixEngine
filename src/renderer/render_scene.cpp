@@ -3203,7 +3203,7 @@ public:
 			model->getPose(*r.pose);
 		}
 		r.matrix = m_universe.getMatrix(r.entity);
-		ASSERT(!r.meshes || r.custom_meshes)
+		ASSERT(!r.meshes || r.custom_meshes);
 		if (r.meshes)
 		{
 			allocateCustomMeshes(r, model->getMeshCount());
