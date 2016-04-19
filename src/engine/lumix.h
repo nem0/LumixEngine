@@ -1,6 +1,8 @@
 #pragma once
 
-#include <cstdlib>
+#ifndef _WIN32
+#include <cstdlib> // for abort
+#endif
 
 #ifdef _WIN32
 	#ifdef _WIN64
