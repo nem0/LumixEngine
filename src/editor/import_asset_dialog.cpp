@@ -2089,10 +2089,23 @@ void ImportAssetDialog::onImageGUI()
 }
 
 
+static int nextPowOf2(int value)
+{
+	ASSERT(value > 0);
+	int ret = value - 1;
+	ret |= ret >> 1;
+	ret |= ret >> 2;
+	ret |= ret >> 3;
+	ret |= ret >> 8;
+	ret |= ret >> 16;
+	return ret + 1;
+}
+
+
 static bool createBillboard(const Lumix::Path& mesh_path,
 	const Lumix::Path& out_path,
 	Lumix::Engine& engine,
-	Lumix::Vec2 texture_size)
+	float texture_size)
 {
 	auto& universe = engine.createUniverse();
 
@@ -2105,31 +2118,48 @@ static bool createBillboard(const Lumix::Path& mesh_path,
 	auto* pipeline = Lumix::Pipeline::create(*renderer, Lumix::Path("pipelines/preview.lua"), engine.getAllocator());
 	pipeline->load();
 
-	auto mesh_entity = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 0 });
+	auto mesh_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
 	auto mesh_cmp = render_scene->createComponent(Lumix::crc32("renderable"), mesh_entity);
 	render_scene->setRenderablePath(mesh_cmp, mesh_path);
 
+	auto mesh_side_entity = universe.createEntity({0, 0, 0}, {Lumix::Vec3(0, 1, 0), Lumix::Math::PI * 0.5f});
+	auto mesh_side_cmp = render_scene->createComponent(Lumix::crc32("renderable"), mesh_side_entity);
+	render_scene->setRenderablePath(mesh_side_cmp, mesh_path);
 
-	auto light_entity = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 0 });
+	auto light_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
 	auto light_cmp = render_scene->createComponent(Lumix::crc32("global_light"), light_entity);
 
 	while (engine.getFileSystem().hasWork()) engine.getFileSystem().updateAsyncTransactions();
 
 	auto* model = render_scene->getRenderableModel(mesh_cmp);
 	Lumix::AABB aabb = model->getAABB();
-	float size = Lumix::Math::maximum(aabb.max.x - aabb.min.x, aabb.max.y - aabb.min.y);
-	Lumix::Vec3 camera_pos((aabb.max.x + aabb.min.x) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + size * 0.51f);
+	Lumix::Vec3 size = aabb.max - aabb.min;
+	universe.setPosition(mesh_side_entity, { (size.x + size.z) * 0.5f, 0, 0 });
+	int width, height;
+	if (size.x + size.z > size.y)
+	{
+		width = int(texture_size);
+		height = nextPowOf2(int(width / (size.x + size.z) * size.y));
+	}
+	else
+	{
+		height = int(texture_size);
+		width = nextPowOf2(int(height * (size.x + size.z) / size.y));
+	}
+	Lumix::Vec3 camera_pos(
+		(aabb.min.x + aabb.max.x + size.z) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + 5);
 	auto camera_entity = universe.createEntity(camera_pos, { 0, 0, 0, 0 });
 	auto camera_cmp = render_scene->createComponent(Lumix::crc32("camera"), camera_entity);
+	render_scene->setCameraOrtho(camera_cmp, true);
+	render_scene->setCameraOrthoSize(camera_cmp, (aabb.max.y - aabb.min.y) * 0.5f);
 	render_scene->setCameraSlot(camera_cmp, "main");
-	render_scene->setCameraFOV(camera_cmp, 90);
 
 	pipeline->setScene(render_scene);
-	pipeline->setViewport(0, 0, int(texture_size.x), int(texture_size.y));
+	pipeline->setViewport(0, 0, width, height);
 	pipeline->render();
 
-	bgfx::TextureHandle texture = bgfx::createTexture2D(
-		int(texture_size.x), int(texture_size.y), 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
+	bgfx::TextureHandle texture =
+		bgfx::createTexture2D(width, height, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
 
 	renderer->viewCounterAdd();
 	bgfx::touch(renderer->getViewCounter());
@@ -2140,7 +2170,7 @@ static bool createBillboard(const Lumix::Path& mesh_path,
 	renderer->viewCounterAdd();
 	bgfx::setViewName(renderer->getViewCounter(), "billboard_read");
 	Lumix::Array<Lumix::uint8> data(engine.getAllocator());
-	data.resize(int(texture_size.x * texture_size.y) * 4);
+	data.resize(width * height * 4);
 	bgfx::readTexture(texture, &data[0]);
 	bgfx::touch(renderer->getViewCounter());
 	bgfx::frame(); // submit
@@ -2150,8 +2180,8 @@ static bool createBillboard(const Lumix::Path& mesh_path,
 	auto* file = fs.open(fs.getDefaultDevice(), out_path, Lumix::FS::Mode::CREATE_AND_WRITE);
 	Lumix::Texture::saveTGA(engine.getAllocator(),
 		file,
-		int(texture_size.x),
-		int(texture_size.y),
+		width,
+		height,
 		4,
 		(Lumix::uint8*)&data[0],
 		out_path);
