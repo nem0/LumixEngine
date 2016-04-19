@@ -84,7 +84,7 @@ template <int size> struct StaticString
 		return *this;
 	}
 
-	template <int size> void add(StaticString<size>& value) { Lumix::catString(data, size, value.data); }
+	template <int value_size> void add(StaticString<value_size>& value) { Lumix::catString(data, size, value.data); }
 	void add(const char* value) { Lumix::catString(data, size, value); }
 	void add(char* value) { Lumix::catString(data, size, value); }
 
@@ -275,7 +275,7 @@ public:
 		return *this;
 	}
 
-	template <class V> base_string<T>& cat(V value)
+	template <class V> base_string& cat(V value)
 	{
 		char tmp[30];
 		toCString(value, tmp, 30);
@@ -283,7 +283,7 @@ public:
 		return *this;
 	}
 
-	template <> base_string<T>& cat<float>(float value)
+	base_string& cat(float value)
 	{
 		char tmp[40];
 		toCString(value, tmp, 30, 10);
@@ -291,13 +291,13 @@ public:
 		return *this;
 	}
 
-	template <> base_string<T>& cat<char*>(char* value)
+	base_string& cat(char* value)
 	{
 		*this += value;
 		return *this;
 	}
 
-	template <> base_string<T>& cat<const char*>(const char* value)
+	base_string& cat(const char* value)
 	{
 		*this += value;
 		return *this;
