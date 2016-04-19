@@ -2309,15 +2309,6 @@ void ImportAssetDialog::checkTask(bool wait)
 
 void ImportAssetDialog::onGUI()
 {
-	static bool once = false;
-	if (!once)
-	{
-		createBillboard(Lumix::Path("models/trees/pine1.msh"), Lumix::Path("a.tga"), m_editor.getEngine(), 256);
-		createBillboard(Lumix::Path("models/trees/pine3.msh"), Lumix::Path("b.tga"), m_editor.getEngine(), 256);
-		createBillboard(Lumix::Path("models/utils/cube/cube.msh"), Lumix::Path("c.tga"), m_editor.getEngine(), 256);
-		once = true;
-	}
-
 	if (ImGui::BeginDock("Import Asset", &m_is_opened))
 	{
 		if (hasMessage())
