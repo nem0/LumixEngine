@@ -1927,7 +1927,7 @@ void ImportAssetDialog::onMaterialsGUI()
 	{
 		aiString material_name;
 		mat.material->Get(AI_MATKEY_NAME, material_name);
-		if (ImGui::TreeNode(material_name.C_Str()))
+		if (ImGui::TreeNode(mat.material, material_name.C_Str()))
 		{
 			ImGui::Checkbox("Import material", &mat.import);
 
