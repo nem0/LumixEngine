@@ -87,19 +87,16 @@ function defaultConfigurations()
 	configuration "Debug"
 		targetdir(BINARY_DIR .. "Debug")
 		defines { "DEBUG" }
-		buildoptions { "-std=c++11" }
 		flags { "Symbols", "WinMain" }
 
 	configuration "Release"
 		targetdir(BINARY_DIR .. "Release")
 		defines { "NDEBUG" }
-		buildoptions { "-std=c++11" }
 		flags { "Optimize", "WinMain" }
 
 	configuration "RelWithDebInfo"
 		targetdir(BINARY_DIR .. "RelWithDebInfo")
 		defines { "NDEBUG" }
-		buildoptions { "-std=c++11" }
 		flags { "Symbols", "Optimize", "WinMain" }
 		
 	configuration {}
