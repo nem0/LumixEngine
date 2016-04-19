@@ -1,5 +1,8 @@
 #pragma once
 
+#ifndef _WIN32
+#include <cstdlib> // for abort
+#endif
 
 #ifdef _WIN32
 	#ifdef _WIN64
@@ -7,7 +10,13 @@
 	#else
 		#define PLATFORM32
 	#endif
-#else 
+#elif defined(__linux__)
+	#ifdef __x86_64__
+		#define PLATFORM64
+	#else
+		#define PLATFORM32
+	#endif
+#else
 #error Platform not supported
 #endif
 
@@ -29,7 +38,7 @@ typedef unsigned int uint32;
 typedef long long int64;
 typedef unsigned long long uint64;
 
-#ifdef _WIN64
+#ifdef PLATFORM64
 	typedef uint64 uintptr;
 #else
 	typedef uint32 uintptr;
@@ -59,20 +68,29 @@ namespace Lumix
 
 
 #ifndef ASSERT
-	#ifdef _WIN32
-		#ifdef NDEBUG
-			#define ASSERT(x) { false ? (void)(x) : 0; } 
+	#ifdef NDEBUG
+		#define ASSERT(x) { false ? (void)(x) : 0; } 
+	#else
+		#ifdef _WIN32
+			#define LUMIX_DEBUG_BREAK __debugbreak
 		#else
-			#define ASSERT(x) { const volatile bool lumix_assert_b____ = !(x); if(lumix_assert_b____) __debugbreak(); } 
+			#define LUMIX_DEBUG_BREAK abort
 		#endif
+		#define ASSERT(x) do { const volatile bool lumix_assert_b____ = !(x); if(lumix_assert_b____) LUMIX_DEBUG_BREAK(); } while (false)
 	#endif
 #endif
 
-
-#define LUMIX_LIBRARY_EXPORT __declspec(dllexport)
-#define LUMIX_LIBRARY_IMPORT __declspec(dllimport)
-#define LUMIX_FORCE_INLINE __forceinline
-#define LUMIX_RESTRICT __restrict
+#ifdef _WIN32
+	#define LUMIX_LIBRARY_EXPORT __declspec(dllexport)
+	#define LUMIX_LIBRARY_IMPORT __declspec(dllimport)
+	#define LUMIX_FORCE_INLINE __forceinline
+	#define LUMIX_RESTRICT __restrict
+#else 
+	#define LUMIX_LIBRARY_EXPORT __attribute__((visibility("default")))
+	#define LUMIX_LIBRARY_IMPORT 
+	#define LUMIX_FORCE_INLINE __attribute__((always_inline)) inline
+	#define LUMIX_RESTRICT __restrict__
+#endif
 
 #ifdef STATIC_PLUGINS
 	#define LUMIX_AUDIO_API
