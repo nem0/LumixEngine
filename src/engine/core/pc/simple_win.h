@@ -2,7 +2,9 @@
 
 
 #define PASCAL __stdcall
-#define _W64 __w64
+#ifndef _W64 
+	#define _W64 __w64
+#endif
 #define WSADESCRIPTION_LEN 256
 #define WSASYS_STATUS_LEN 128
 #define IPPROTO_TCP 6
