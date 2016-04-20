@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/MTJD/enums.h"
-#include "core/MTJD/group.h"
+#include "core/mtjd/enums.h"
+#include "core/mtjd/group.h"
 
 namespace Lumix
 {
