@@ -288,9 +288,9 @@ template <int N> struct FunctionCaller
 											 lua_State* L,
 											 Args... args)
 	{
-		typedef std::tuple_element<sizeof...(ArgsF)-N,
-								   std::tuple<ArgsF...>>::type T;
-		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		typedef typename std::tuple_element<sizeof...(ArgsF)-N,
+			std::tuple<ArgsF...>>::type T;
+		typedef typename std::remove_cv<typename std::remove_reference<T>::type>::type RealT;
 		checkArg<RealT>(L, sizeof...(ArgsF)-N + 1);
 		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 1);
 		return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
@@ -301,9 +301,9 @@ template <int N> struct FunctionCaller
 		lua_State* L,
 		Args... args)
 	{
-		typedef std::tuple_element<sizeof...(ArgsF)-N,
+		typedef typename std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
-		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		typedef typename std::remove_cv<typename std::remove_reference<T>::type>::type RealT;
 		checkArg<RealT>(L, sizeof...(ArgsF)-N + 1);
 		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 1);
 		return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
@@ -314,9 +314,9 @@ template <int N> struct FunctionCaller
 		lua_State* L,
 		Args... args)
 	{
-		typedef std::tuple_element<sizeof...(ArgsF)-N,
+		typedef typename std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
-		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		typedef typename std::remove_cv<typename std::remove_reference<T>::type>::type RealT;
 		checkArg<RealT>(L, sizeof...(ArgsF)-N + 2);
 
 		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 2);
@@ -328,9 +328,9 @@ template <int N> struct FunctionCaller
 		lua_State* L,
 		Args... args)
 	{
-		typedef std::tuple_element<sizeof...(ArgsF)-N,
+		typedef typename std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
-		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		typedef typename std::remove_cv<typename std::remove_reference<T>::type>::type RealT;
 		checkArg<RealT>(L, sizeof...(ArgsF)-N + 2);
 		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 2);
 		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
