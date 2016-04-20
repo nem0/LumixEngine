@@ -169,21 +169,24 @@ public:
 			if (lua_isstring(L, -1))
 			{
 				const char* str = lua_tostring(L, -1);
-				desc.set(cmp, -1, InputBlob(str, stringLength(str)));
+				InputBlob input_blob(str, stringLength(str));
+				desc.set(cmp, -1, input_blob);
 			}
 			break;
 		case IPropertyDescriptor::DECIMAL:
 			if (lua_isnumber(L, -1))
 			{
 				float f = (float)lua_tonumber(L, -1);
-				desc.set(cmp, -1, InputBlob(&f, sizeof(f)));
+				InputBlob input_blob(&f, sizeof(f));
+				desc.set(cmp, -1, input_blob);
 			}
 			break;
 		case IPropertyDescriptor::BOOL:
 			if (lua_isboolean(L, -1))
 			{
 				bool b = lua_toboolean(L, -1) != 0;
-				desc.set(cmp, -1, InputBlob(&b, sizeof(b)));
+				InputBlob input_blob(&b, sizeof(b));
+				desc.set(cmp, -1, input_blob);
 			}
 			break;
 		case IPropertyDescriptor::VEC3:
@@ -191,7 +194,8 @@ public:
 			if (lua_istable(L, -1))
 			{
 				auto v = LuaWrapper::toType<Vec3>(L, -1);
-				desc.set(cmp, -1, InputBlob(&v, sizeof(v)));
+				InputBlob input_blob(&v, sizeof(v));
+				desc.set(cmp, -1, input_blob);
 			}
 			break;
 		default:

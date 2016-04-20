@@ -8,7 +8,7 @@ namespace FS
 {
 
 
-class LUMIX_ENGINE_API IFile;
+class IFile;
 
 
 class LUMIX_ENGINE_API IFileDevice
