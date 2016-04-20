@@ -1,7 +1,7 @@
 #include "lumix.h"
-#include "core/MTJD/base_entry.h"
+#include "core/mtjd/base_entry.h"
 
-#include "core/MTJD/manager.h"
+#include "core/mtjd/manager.h"
 
 namespace Lumix
 {

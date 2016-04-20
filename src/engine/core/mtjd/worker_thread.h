@@ -4,7 +4,7 @@
 #include "core/mt/task.h"
 #include "core/mt/lock_free_fixed_queue.h"
 
-#include "core/MTJD/manager.h"
+#include "core/mtjd/manager.h"
 
 namespace Lumix
 {

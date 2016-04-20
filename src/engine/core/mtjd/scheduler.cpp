@@ -1,6 +1,6 @@
 #include "lumix.h"
-#include "core/MTJD/scheduler.h"
-#include "core/MTJD/manager.h"
+#include "core/mtjd/scheduler.h"
+#include "core/mtjd/manager.h"
 #include "core/profiler.h"
 
 

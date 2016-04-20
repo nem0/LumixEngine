@@ -4,7 +4,7 @@
 #include "core/timer.h"
 #include "core/log.h"
 
-#include "core/MTJD/manager.h"
+#include "core/mtjd/manager.h"
 
 #include "renderer/culling_system.h"
 
