@@ -1,5 +1,5 @@
 #include "lumix.h"
-#include "core/MTJD/group.h"
+#include "core/mtjd/group.h"
 #include "core/mt/atomic.h"
 #include "core/mt/sync.h"
 

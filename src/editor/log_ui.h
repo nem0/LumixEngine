@@ -2,7 +2,7 @@
 
 
 #include "core/array.h"
-#include "core/MT/sync.h"
+#include "core/mt/sync.h"
 #include "core/string.h"
 
 
