@@ -23,7 +23,7 @@ namespace Lumix
 			int getPos() const { return m_pos; }
 			void write(const void* data, int size);
 			void writeString(const char* string);
-			template <class T> void write(const T& value);
+			template <class T> inline void write(const T& value);
 			void clear();
 
 			OutputBlob& operator << (const char* str);
@@ -38,12 +38,12 @@ namespace Lumix
 			IAllocator* m_allocator;
 	};
 
-	template <class T> void OutputBlob::write(const T& value)
+	template <class T> inline void OutputBlob::write(const T& value)
 	{
 		write(&value, sizeof(T));
 	}
 
-	template <> void OutputBlob::write<bool>(const bool& value)
+	template <> inline void OutputBlob::write<bool>(const bool& value)
 	{
 		uint8 v = value;
 		write(&v, sizeof(v));
@@ -58,7 +58,7 @@ namespace Lumix
 			bool read(void* data, int size);
 			bool readString(char* data, int max_size);
 			template <class T> void read(T& value) { read(&value, sizeof(T)); }
-			template <class T> T read();
+			template <class T> inline T read();
 			const void* skip(int size);
 			const void* getData() const { return (const void*)m_data; }
 			int getSize() const { return m_size; }
@@ -72,14 +72,14 @@ namespace Lumix
 			int m_pos;
 	};
 
-	template <class T> T InputBlob::read()
+	template <class T> inline T InputBlob::read()
 	{
 		T v;
 		read(&v, sizeof(v));
 		return v;
 	}
 
-	template <> bool InputBlob::read<bool>()
+	template <> inline bool InputBlob::read<bool>()
 	{
 		uint8 v;
 		read(&v, sizeof(v));
