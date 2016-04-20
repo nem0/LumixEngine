@@ -18,7 +18,7 @@
 
 ![Editor screenshot](https://cloud.githubusercontent.com/assets/153526/13830772/2b2b17a4-ebcf-11e5-8bdd-dec086cebd60.png)
 
-3rd party libraries
+[3rd party libraries](https://github.com/nem0/lumixengine_3rdparty)
 
 * [bgfx](https://github.com/bkaradzic/bgfx)
 * [lua](https://github.com/LuaDist/lua)
