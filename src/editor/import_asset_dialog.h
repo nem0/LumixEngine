@@ -129,6 +129,7 @@ class LUMIX_EDITOR_API ImportAssetDialog
 		char m_output_filename[Lumix::MAX_PATH_LENGTH];
 		char m_output_dir[Lumix::MAX_PATH_LENGTH];
 		char m_texture_output_dir[Lumix::MAX_PATH_LENGTH];
+		bool m_create_billboard_lod;
 		bool m_optimize_mesh_on_import;
 		bool m_gen_smooth_normal;
 		bool m_convert_to_dds;

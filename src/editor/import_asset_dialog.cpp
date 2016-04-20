@@ -58,6 +58,17 @@ enum class VertexAttributeDef : Lumix::uint32
 };
 
 
+#pragma pack(1)
+struct BillboardVertex
+{
+	Lumix::Vec3 pos;
+	Lumix::uint8 normal[4];
+	Lumix::uint8 tangent[4];
+	Lumix::Vec2 uv;
+};
+#pragma pack()
+
+
 static const aiNode* getOwner(const aiNode* node, int mesh_index)
 {
 	for (int i = 0; i < (int)node->mNumMeshes; ++i)
@@ -657,7 +668,7 @@ struct ConvertTask : public Lumix::MT::Task
 			material_file << "/" << from_root_path;
 		}
 		material_file << texture_info.m_basename << ".";
-		material_file << (m_dialog.m_convert_to_dds ? "dds" : texture_info.m_extension);
+		material_file << (texture.to_dds ? "dds" : texture_info.m_extension);
 		material_file << (is_srgb ? "\", \"srgb\" : true\n }\n" : "\"\n }\n");
 
 		if (!texture.import) return true;
@@ -1161,6 +1172,12 @@ struct ConvertTask : public Lumix::MT::Task
 			vertices_size += mesh.map_to_input.size() * getVertexSize(mesh.mesh);
 		}
 
+		if (m_dialog.m_create_billboard_lod)
+		{
+			indices_count += 4*3;
+			vertices_size += 8 * sizeof(BillboardVertex);
+		}
+
 		file.write((const char*)&indices_count, sizeof(indices_count));
 		if(areIndices16Bit())
 		{
@@ -1175,6 +1192,12 @@ struct ConvertTask : public Lumix::MT::Task
 					}
 				}
 			}
+
+			if (m_dialog.m_create_billboard_lod)
+			{
+				Lumix::uint16 indices[] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
+				file.write(indices, sizeof(indices));
+			}
 		}
 		else
 		{
@@ -1182,10 +1205,18 @@ struct ConvertTask : public Lumix::MT::Task
 			{
 				if(mesh.import) file.write(&mesh.indices[0], mesh.indices.size() * sizeof(mesh.indices[0]));
 			}
+
+			if (m_dialog.m_create_billboard_lod)
+			{
+				Lumix::uint32 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 };
+				file.write(indices, sizeof(indices));
+			}
 		}
 
 		file.write((const char*)&vertices_size, sizeof(vertices_size));
 
+		Lumix::Vec3 min(0, 0, 0);
+		Lumix::Vec3 max(0, 0, 0);
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (!mesh.import) continue;
@@ -1211,6 +1242,14 @@ struct ConvertTask : public Lumix::MT::Task
 
 				Lumix::Vec3 position = fixOrientation(v);
 				position *= m_scale;
+
+				min.x = Lumix::Math::minimum(min.x, position.x);
+				min.y = Lumix::Math::minimum(min.y, position.y);
+				min.z = Lumix::Math::minimum(min.z, position.z);
+				max.x = Lumix::Math::maximum(max.x, position.x);
+				max.y = Lumix::Math::maximum(max.y, position.y);
+				max.z = Lumix::Math::maximum(max.z, position.z);
+
 				file.write((const char*)&position, sizeof(position));
 
 				if (mesh.mesh->mColors[0])
@@ -1247,6 +1286,24 @@ struct ConvertTask : public Lumix::MT::Task
 				}
 			}
 		}
+
+		if (m_dialog.m_create_billboard_lod)
+		{
+			Lumix::Vec3 size = max - min;
+			float uvs[] = {0.0f, 0.5f, 1.0f}; // TODO UVs
+			BillboardVertex vertices[8] = {
+				{ { min.x, min.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[0], 0 } },
+				{ { max.x, min.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[1], 0 } },
+				{ { max.x, max.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[1], 1 } },
+				{ { min.x, max.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[0], 1 } },
+
+				{ { 0, min.y, min.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[1], 0 } },
+				{ { 0, min.y, max.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[2], 0 } },
+				{ { 0, max.y, max.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[2], 1 } },
+				{ { 0, max.y, min.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[1], 1 } }
+			};
+			file.write(vertices, sizeof(vertices));
+		}
 	}
 
 
@@ -1278,6 +1335,42 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
+	void writeBillboardMesh(Lumix::FS::OsFile& file, Lumix::int32 attribute_array_offset, Lumix::int32 indices_offset)
+	{
+		if (!m_dialog.m_create_billboard_lod) return;
+
+		int vertex_size = sizeof(BillboardVertex);
+		const char* material_name = "billboard";
+		Lumix::int32 length = Lumix::stringLength(material_name);
+		file.write((const char*)&length, sizeof(length));
+		file.write(material_name, length);
+
+		file.write((const char*)&attribute_array_offset, sizeof(attribute_array_offset));
+		Lumix::int32 attribute_array_size = 8 * vertex_size;
+		attribute_array_offset += attribute_array_size;
+		file.write((const char*)&attribute_array_size, sizeof(attribute_array_size));
+
+		file.write((const char*)&indices_offset, sizeof(indices_offset));
+		Lumix::int32 mesh_tri_count = 4;
+		indices_offset += mesh_tri_count * 3;
+		file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
+
+		const char* mesh_name = "billboard";
+		length = Lumix::stringLength(mesh_name);
+
+		file.write((const char*)&length, sizeof(length));
+		file.write(mesh_name, length);
+
+		Lumix::int32 attribute_count = 4;
+		file.write((const char*)&attribute_count, sizeof(attribute_count));
+
+		writeAttribute("in_position", VertexAttributeDef::POSITION, file);
+		writeAttribute("in_normal", VertexAttributeDef::BYTE4, file);
+		writeAttribute("in_tangents", VertexAttributeDef::BYTE4, file);
+		writeAttribute("in_tex_coords", VertexAttributeDef::FLOAT2, file);
+	}
+
+
 	void writeMeshes(Lumix::FS::OsFile& file)
 	{
 		Lumix::int32 mesh_count = 0;
@@ -1285,6 +1378,7 @@ struct ConvertTask : public Lumix::MT::Task
 		{
 			if (m_dialog.m_meshes[i].import) ++mesh_count;
 		}
+		if (m_dialog.m_create_billboard_lod) ++mesh_count;
 
 		file.write((const char*)&mesh_count, sizeof(mesh_count));
 		Lumix::int32 attribute_array_offset = 0;
@@ -1331,6 +1425,8 @@ struct ConvertTask : public Lumix::MT::Task
 			if (mesh.mesh->mTangents) writeAttribute("in_tangents", VertexAttributeDef::BYTE4, file);
 			if (mesh.mesh->mTextureCoords[0]) writeAttribute("in_tex_coords", VertexAttributeDef::FLOAT2, file);
 		}
+
+		writeBillboardMesh(file, attribute_array_offset, indices_offset);
 	}
 
 
@@ -1358,6 +1454,12 @@ struct ConvertTask : public Lumix::MT::Task
 			if (mesh.lod >= Lumix::lengthOf(m_dialog.m_lods)) continue;
 			lod_count = mesh.lod + 1;
 			lods[mesh.lod] = last_mesh_idx;
+		}
+
+		if (m_dialog.m_create_billboard_lod)
+		{
+			lods[lod_count] = last_mesh_idx + 1;
+			++lod_count;
 		}
 
 		file.write((const char*)&lod_count, sizeof(lod_count));
@@ -1728,6 +1830,7 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	, m_convert_to_dds(false)
 	, m_convert_to_raw(false)
 	, m_remove_doubles(false)
+	, m_create_billboard_lod(false)
 	, m_raw_texture_scale(1)
 	, m_mesh_scale(1)
 	, m_meshes(editor.getAllocator())
@@ -2202,8 +2305,11 @@ int ImportAssetDialog::importAsset(lua_State* L)
 	m_output_filename[0] = '\0';
 	m_is_opened = true;
 
-	Lumix::LuaWrapper::checkTableArg(L, 2);
-	lua_pushvalue(L, 2);
+	const char* output_dir = Lumix::LuaWrapper::checkArg<const char*>(L, 2);
+	Lumix::copyString(m_output_dir, output_dir);
+	Lumix::LuaWrapper::checkTableArg(L, 3);
+	m_create_billboard_lod = Lumix::LuaWrapper::checkArg<bool>(L, 4);
+	lua_pushvalue(L, 3);
 	lua_pushnil(L);
 	while (lua_next(L, -2) != 0)
 	{
@@ -2380,8 +2486,8 @@ void ImportAssetDialog::onGUI()
 		{
 			if (ImGui::CollapsingHeader("Advanced"))
 			{
+				//ImGui::Checkbox("Create billboard LOD", &m_create_billboard_lod);
 				if (ImGui::Checkbox("Optimize meshes", &m_optimize_mesh_on_import)) checkSource();
-				ImGui::SameLine();
 				if (ImGui::Checkbox("Smooth normals", &m_gen_smooth_normal)) checkSource();
 
 				ImGui::Checkbox("Remove doubles", &m_remove_doubles);
