@@ -27,7 +27,11 @@ int compareStringN(const char* lhs, const char* rhs, int length)
 
 int compareIStringN(const char* lhs, const char* rhs, int length)
 {
+#ifdef _WIN32
 	return strnicmp(lhs, rhs, length);
+#else
+	return strncasecmp(lhs, rhs, length);
+#endif
 }
 
 
