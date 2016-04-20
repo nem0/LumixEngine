@@ -922,6 +922,39 @@ struct ConvertTask : public Lumix::MT::Task
 			if (!material.import) continue;
 			if (!saveMaterial(material, source_mesh_dir, &undefined_count)) return false;
 		}
+
+		if (m_dialog.m_create_billboard_lod)
+		{
+			Lumix::FS::OsFile file;
+			PathBuilder output_material_name(m_dialog.m_output_dir, "/billboard.mat");
+			if (!file.open(output_material_name, Lumix::FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
+			{
+				m_dialog.setMessage(
+					Lumix::StaticString<20 + Lumix::MAX_PATH_LENGTH>("Could not create ", output_material_name));
+				return false;
+			}
+			file << "{\n\t\"shader\" : \"shaders/rigid.shd\"\n";
+			file << "\t, \"texture\" : {\n\t\t\"source\" : \"";
+			if (m_dialog.m_texture_output_dir[0])
+			{
+				char from_root_path[Lumix::MAX_PATH_LENGTH];
+				getRelativePath(
+					m_dialog.m_editor, from_root_path, Lumix::lengthOf(from_root_path), m_dialog.m_texture_output_dir);
+				PathBuilder texture_path(from_root_path, "billboard.dds");
+				Lumix::copyFile("models/utils/cube/default.dds", texture_path);
+				file << "/" << texture_path;
+			}
+			else
+			{
+				file << "billboard.dds";
+				PathBuilder texture_path(m_dialog.m_output_dir, "/billboard.dds");
+				Lumix::copyFile("models/utils/cube/default.dds", texture_path);
+			}
+
+			file << "\", \"srgb\" : true\n }\n";
+			file.write("}", 1);
+			file.close();
+		}
 		return true;
 	}
 
@@ -2305,86 +2338,101 @@ int ImportAssetDialog::importAsset(lua_State* L)
 	m_output_filename[0] = '\0';
 	m_is_opened = true;
 
-	const char* output_dir = Lumix::LuaWrapper::checkArg<const char*>(L, 2);
-	Lumix::copyString(m_output_dir, output_dir);
-	Lumix::LuaWrapper::checkTableArg(L, 3);
-	m_create_billboard_lod = Lumix::LuaWrapper::checkArg<bool>(L, 4);
-	lua_pushvalue(L, 3);
-	lua_pushnil(L);
-	while (lua_next(L, -2) != 0)
+	Lumix::LuaWrapper::checkTableArg(L, 2);
+	if (lua_getfield(L, 2, "output_dir") == LUA_TSTRING)
 	{
-		if(!lua_istable(L, -1))
-		{
-			lua_pop(L, 1);
-			continue;
-		}
+		Lumix::copyString(m_output_dir, Lumix::LuaWrapper::toType<const char*>(L, -1));
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "create_billboard") == LUA_TBOOLEAN)
+	{
+		m_create_billboard_lod = Lumix::LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "scale") == LUA_TNUMBER)
+	{
+		m_mesh_scale = Lumix::LuaWrapper::toType<float>(L, -1);
+	}
+	lua_pop(L, 1);
 
-		if (lua_getfield(L, -1, "src") != LUA_TSTRING)
+	if (lua_getfield(L, 2, "srcs") == LUA_TTABLE)
+	{
+		lua_pushnil(L);
+		while (lua_next(L, -2) != 0)
 		{
-			lua_pop(L, 2); // "src" and inputs table item
-			continue;
-		}
-		Lumix::copyString(m_source, Lumix::LuaWrapper::toType<const char*>(L, -1));
-		lua_pop(L, 1); // "src"
-
-		checkSource();
-		if (m_is_importing) checkTask(true);
-
-		if (lua_getfield(L, -1, "materials") == LUA_TTABLE)
-		{
-			ImportMaterial* material = &m_materials[m_materials.size() - m_importers.back().GetScene()->mNumMaterials];
-			lua_pushnil(L);
-			while (lua_next(L, -2) != 0) // for each material
+			if (!lua_istable(L, -1))
 			{
-				if (lua_istable(L, -1))
-				{
-					if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
-					{
-						material->import = Lumix::LuaWrapper::toType<bool>(L, -1);
-					}
-					lua_pop(L, 1); // "import"
-
-					if (lua_getfield(L, -1, "textures") == LUA_TTABLE)
-					{
-						lua_pushnil(L);
-						ImportTexture* texture = material->textures;
-						while (lua_next(L, -2) != 0) // for each texture
-						{
-							if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
-							{
-								texture->import = Lumix::LuaWrapper::toType<bool>(L, -1);
-							}
-							lua_pop(L, 1); // "import"
-
-							if (lua_getfield(L, -1, "to_dds") == LUA_TBOOLEAN)
-							{
-								texture->to_dds = Lumix::LuaWrapper::toType<bool>(L, -1);
-							}
-							lua_pop(L, 1); // "to_dds"
-
-							if (lua_getfield(L, -1, "src") == LUA_TSTRING)
-							{
-								Lumix::copyString(texture->src, Lumix::LuaWrapper::toType<const char*>(L, -1));
-								texture->is_valid = PlatformInterface::fileExists(texture->src);
-							}
-							lua_pop(L, 1); // "src"
-
-							++texture;
-							lua_pop(L, 1); // textures table item
-
-							if (texture - material->textures > material->texture_count) break;
-						}
-					}
-					lua_pop(L, 1); // "textures"
-				}
-
-				++material;
-				lua_pop(L, 1); // materials table item
+				lua_pop(L, 1);
+				continue;
 			}
-		}
-		lua_pop(L, 1); // "materials"
 
-		lua_pop(L, 1); // inputs table item
+			if (lua_getfield(L, -1, "src") != LUA_TSTRING)
+			{
+				lua_pop(L, 2); // "src" and inputs table item
+				continue;
+			}
+			Lumix::copyString(m_source, Lumix::LuaWrapper::toType<const char*>(L, -1));
+			lua_pop(L, 1); // "src"
+
+			checkSource();
+			if (m_is_importing) checkTask(true);
+
+			if (lua_getfield(L, -1, "materials") == LUA_TTABLE)
+			{
+				ImportMaterial* material = &m_materials[m_materials.size() - m_importers.back().GetScene()->mNumMaterials];
+				lua_pushnil(L);
+				while (lua_next(L, -2) != 0) // for each material
+				{
+					if (lua_istable(L, -1))
+					{
+						if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
+						{
+							material->import = Lumix::LuaWrapper::toType<bool>(L, -1);
+						}
+						lua_pop(L, 1); // "import"
+
+						if (lua_getfield(L, -1, "textures") == LUA_TTABLE)
+						{
+							lua_pushnil(L);
+							ImportTexture* texture = material->textures;
+							while (lua_next(L, -2) != 0) // for each texture
+							{
+								if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
+								{
+									texture->import = Lumix::LuaWrapper::toType<bool>(L, -1);
+								}
+								lua_pop(L, 1); // "import"
+
+								if (lua_getfield(L, -1, "to_dds") == LUA_TBOOLEAN)
+								{
+									texture->to_dds = Lumix::LuaWrapper::toType<bool>(L, -1);
+								}
+								lua_pop(L, 1); // "to_dds"
+
+								if (lua_getfield(L, -1, "src") == LUA_TSTRING)
+								{
+									Lumix::copyString(texture->src, Lumix::LuaWrapper::toType<const char*>(L, -1));
+									texture->is_valid = PlatformInterface::fileExists(texture->src);
+								}
+								lua_pop(L, 1); // "src"
+
+								++texture;
+								lua_pop(L, 1); // textures table item
+
+								if (texture - material->textures > material->texture_count) break;
+							}
+						}
+						lua_pop(L, 1); // "textures"
+					}
+
+					++material;
+					lua_pop(L, 1); // materials table item
+				}
+			}
+			lua_pop(L, 1); // "materials"
+
+			lua_pop(L, 1); // inputs table item
+		}
 	}
 	lua_pop(L, 1);
 	convert(false);

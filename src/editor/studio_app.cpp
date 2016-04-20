@@ -1374,10 +1374,8 @@ public:
 		};
 		for(auto& file : bin_files)
 		{
-			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> tmp(dest_dir);
-			tmp << file;
-			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> src("bin/");
-			src << file;
+			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> tmp(dest_dir, file);
+			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> src("bin/", file);
 			if (!PlatformInterface::copyFile(src, tmp))
 			{
 				Lumix::g_log_error.log("Editor") << "Failed to copy " << src << " to " << tmp;
