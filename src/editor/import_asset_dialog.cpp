@@ -2270,6 +2270,8 @@ static bool createBillboard(const Lumix::Path& mesh_path,
 	while (engine.getFileSystem().hasWork()) engine.getFileSystem().updateAsyncTransactions();
 
 	auto* model = render_scene->getRenderableModel(mesh_cmp);
+	auto* lods = model->getLODs();
+	lods[0].distance = FLT_MAX;
 	Lumix::AABB aabb = model->getAABB();
 	Lumix::Vec3 size = aabb.max - aabb.min;
 	universe.setPosition(mesh_side_entity, { (size.x + size.z) * 0.5f, 0, 0 });
