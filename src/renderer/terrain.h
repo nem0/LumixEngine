@@ -19,7 +19,7 @@ class IAllocator;
 class LIFOAllocator;
 class Material;
 struct Matrix;
-class Mesh;
+struct Mesh;
 class Model;
 class OutputBlob;
 struct RayCastModelHit;
@@ -41,13 +41,14 @@ class Terrain
 				~GrassType();
 
 				void grassLoaded(Resource::State, Resource::State);
-	
+
 				Model* m_grass_model;
 				Terrain& m_terrain;
 				int32 m_ground;
 				int32 m_density;
+				float m_distance;
 		};
-		
+
 		class GrassPatch
 		{
 			public:
@@ -94,17 +95,17 @@ class Terrain
 		AABB getAABB() const;
 		int getWidth() const { return m_width; }
 		int getHeight() const { return m_height; }
-		int getGrassTypeGround(int index);
-		int getGrassTypeDensity(int index);
+		int getGrassTypeGround(int index) const;
+		int getGrassTypeDensity(int index) const;
+		float getGrassTypeDistance(int index) const;
 		int getGrassTypeCount() const { return m_grass_types.size(); }
-		int getGrassDistance() const { return m_grass_distance; }
 
 		void setXZScale(float scale) { m_scale.x = scale; m_scale.z = scale; }
 		void setYScale(float scale) { m_scale.y = scale; }
 		void setGrassTypePath(int index, const Path& path);
 		void setGrassTypeGround(int index, int ground);
 		void setGrassTypeDensity(int index, int density);
-		void setGrassDistance(int value) { m_grass_distance = value; forceGrassUpdate(); }
+		void setGrassTypeDistance(int index, float value);
 		void setMaterial(Material* material);
 
 		void getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos, LIFOAllocator& allocator);
@@ -112,7 +113,7 @@ class Terrain
 
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 		void serialize(OutputBlob& serializer);
-		void deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene, int index);
+		void deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene, int index, int version);
 
 		void addGrassType(int index);
 		void removeGrassType(int index);

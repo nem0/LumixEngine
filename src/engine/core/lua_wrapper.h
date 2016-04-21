@@ -81,6 +81,10 @@ template <> inline const char* typeToString<int>()
 {
 	return "number|integer";
 }
+template <> inline const char* typeToString<uint32>()
+{
+	return "number|integer";
+}
 template <> inline const char* typeToString<const char*>()
 {
 	return "string";
@@ -162,6 +166,10 @@ template <> inline void pushLua(lua_State* L, const char* value)
 	lua_pushstring(L, value);
 }
 template <> inline void pushLua(lua_State* L, int value)
+{
+	lua_pushinteger(L, value);
+}
+template <> inline void pushLua(lua_State* L, unsigned int value)
 {
 	lua_pushinteger(L, value);
 }
@@ -280,9 +288,9 @@ template <int N> struct FunctionCaller
 											 lua_State* L,
 											 Args... args)
 	{
-		typedef std::tuple_element<sizeof...(ArgsF)-N,
-								   std::tuple<ArgsF...>>::type T;
-		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		typedef typename std::tuple_element<sizeof...(ArgsF)-N,
+			std::tuple<ArgsF...>>::type T;
+		typedef typename std::remove_cv<typename std::remove_reference<T>::type>::type RealT;
 		checkArg<RealT>(L, sizeof...(ArgsF)-N + 1);
 		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 1);
 		return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
@@ -293,9 +301,9 @@ template <int N> struct FunctionCaller
 		lua_State* L,
 		Args... args)
 	{
-		typedef std::tuple_element<sizeof...(ArgsF)-N,
+		typedef typename std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
-		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		typedef typename std::remove_cv<typename std::remove_reference<T>::type>::type RealT;
 		checkArg<RealT>(L, sizeof...(ArgsF)-N + 1);
 		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 1);
 		return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
@@ -306,9 +314,9 @@ template <int N> struct FunctionCaller
 		lua_State* L,
 		Args... args)
 	{
-		typedef std::tuple_element<sizeof...(ArgsF)-N,
+		typedef typename std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
-		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		typedef typename std::remove_cv<typename std::remove_reference<T>::type>::type RealT;
 		checkArg<RealT>(L, sizeof...(ArgsF)-N + 2);
 
 		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 2);
@@ -320,9 +328,9 @@ template <int N> struct FunctionCaller
 		lua_State* L,
 		Args... args)
 	{
-		typedef std::tuple_element<sizeof...(ArgsF)-N,
+		typedef typename std::tuple_element<sizeof...(ArgsF)-N,
 			std::tuple<ArgsF... >> ::type T;
-		typedef std::remove_cv<std::remove_reference<T>::type>::type RealT;
+		typedef typename std::remove_cv<typename std::remove_reference<T>::type>::type RealT;
 		checkArg<RealT>(L, sizeof...(ArgsF)-N + 2);
 		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 2);
 		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);

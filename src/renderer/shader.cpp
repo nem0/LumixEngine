@@ -1,7 +1,6 @@
 #include "renderer/shader.h"
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
-#include "core/fs/ifile.h"
 #include "core/lua_wrapper.h"
 #include "core/log.h"
 #include "core/path_utils.h"
@@ -417,7 +416,7 @@ bool Shader::load(FS::IFile& file)
 	m_render_states = BGFX_STATE_CULL_CW | BGFX_STATE_DEPTH_TEST_LEQUAL;
 
 	bool errors = luaL_loadbuffer(L, (const char*)file.getBuffer(), file.size(), "") != LUA_OK;
-	errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
+	errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
 	if (errors)
 	{
 		g_log_error.log("Renderer") << getPath().c_str() << ": " << lua_tostring(L, -1);
@@ -519,7 +518,7 @@ bool Shader::getShaderCombinations(Renderer& renderer,
 	registerFunctions(nullptr, output, &renderer, L);
 
 	bool errors = luaL_loadbuffer(L, shader_content, stringLength(shader_content), "") != LUA_OK;
-	errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
+	errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
 	if (errors)
 	{
 		g_log_error.log("Renderer") << lua_tostring(L, -1);

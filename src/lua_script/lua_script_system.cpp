@@ -5,7 +5,6 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
-#include "core/fs/ifile.h"
 #include "core/iallocator.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
@@ -108,6 +107,7 @@ namespace Lumix
 			LuaScript* m_script;
 			lua_State* m_state;
 			int m_environment;
+			int m_thread_ref;
 			Array<Property> m_properties;
 		};
 
@@ -183,11 +183,12 @@ namespace Lumix
 
 			void onScriptLoaded(Resource::State, Resource::State)
 			{
+				lua_State* L = m_scene.m_system.m_engine.getState();
 				for (auto& script : m_scripts)
 				{
 					if ((!script.m_script || !script.m_script->isReady()) && script.m_state)
 					{
-						destroy(script);
+						m_scene.destroy(script);
 						continue;
 					}
 
@@ -197,7 +198,9 @@ namespace Lumix
 
 					script.m_environment = -1;
 
-					script.m_state = lua_newthread(m_scene.m_global_state);
+					script.m_state = lua_newthread(L);
+					lua_pushvalue(L, -1);
+					script.m_thread_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 					lua_newtable(script.m_state);
 					// reference environment
 					lua_pushvalue(script.m_state, -1);
@@ -231,7 +234,7 @@ namespace Lumix
 					lua_setupvalue(script.m_state, -2, 1); // function's environment
 
 					m_scene.m_current_script_instance = &script;
-					errors = errors || lua_pcall(script.m_state, 0, LUA_MULTRET, 0) != LUA_OK;
+					errors = errors || lua_pcall(script.m_state, 0, 0, 0) != LUA_OK;
 					if (errors)
 					{
 						g_log_error.log("Lua Script") << script.m_script->getPath() << ": "
@@ -293,7 +296,6 @@ namespace Lumix
 		LuaScriptSceneImpl(LuaScriptSystemImpl& system, Universe& ctx)
 			: m_system(system)
 			, m_universe(ctx)
-			, m_global_state(nullptr)
 			, m_scripts(system.getAllocator())
 			, m_updates(system.getAllocator())
 			, m_entity_script_map(system.getAllocator())
@@ -301,6 +303,7 @@ namespace Lumix
 		{
 			m_function_call.is_in_progress = false;
 			m_is_api_registered = false;
+			registerAPI();
 		}
 
 
@@ -340,7 +343,6 @@ namespace Lumix
 		void endFunctionCall(IFunctionCall& caller)
 		{
 			ASSERT(&caller == &m_function_call);
-			ASSERT(m_global_state);
 			ASSERT(m_function_call.is_in_progress);
 
 			m_function_call.is_in_progress = false;
@@ -387,9 +389,6 @@ namespace Lumix
 		}
 
 
-		lua_State* getGlobalState() { return m_global_state; }
-
-
 		Universe& getUniverse() override { return m_universe; }
 
 
@@ -418,11 +417,12 @@ namespace Lumix
 
 		void registerPropertyAPI()
 		{
+			lua_State* L = m_system.m_engine.getState();
 			auto f = &LuaWrapper::wrap<decltype(&setPropertyType), &setPropertyType>;
-			LuaWrapper::createSystemFunction(m_global_state, "Editor", "setPropertyType", f);
-			LuaWrapper::createSystemVariable(m_global_state, "Editor", "BOOLEAN_PROPERTY", Property::BOOLEAN);
-			LuaWrapper::createSystemVariable(m_global_state, "Editor", "FLOAT_PROPERTY", Property::FLOAT);
-			LuaWrapper::createSystemVariable(m_global_state, "Editor", "ENTITY_PROPERTY", Property::ENTITY);
+			LuaWrapper::createSystemFunction(L, "Editor", "setPropertyType", f);
+			LuaWrapper::createSystemVariable(L, "Editor", "BOOLEAN_PROPERTY", Property::BOOLEAN);
+			LuaWrapper::createSystemVariable(L, "Editor", "FLOAT_PROPERTY", Property::FLOAT);
+			LuaWrapper::createSystemVariable(L, "Editor", "ENTITY_PROPERTY", Property::ENTITY);
 		}
 
 
@@ -558,14 +558,15 @@ namespace Lumix
 		void registerProperties()
 		{
 			int cmps_count = PropertyRegister::getComponentTypesCount();
+			lua_State* L = m_system.m_engine.getState();
 			for (int i = 0; i < cmps_count; ++i)
 			{
 				const char* cmp_name = PropertyRegister::getComponentTypeID(i);
-				lua_newtable(m_global_state);
-				lua_pushvalue(m_global_state, -1);
+				lua_newtable(L);
+				lua_pushvalue(L, -1);
 				char tmp[50];
 				convertPropertyToLuaName(cmp_name, tmp, lengthOf(tmp));
-				lua_setglobal(m_global_state, tmp);
+				lua_setglobal(L, tmp);
 
 				uint32 cmp_name_hash = crc32(cmp_name);
 				auto& descs = PropertyRegister::getDescriptors(cmp_name_hash);
@@ -580,21 +581,24 @@ namespace Lumix
 					catString(getter, tmp);
 					switch (desc->getType())
 					{
+						case IPropertyDescriptor::DECIMAL:
+						case IPropertyDescriptor::INTEGER:
+						case IPropertyDescriptor::BOOL:
 						case IPropertyDescriptor::VEC3:
 						case IPropertyDescriptor::COLOR:
-							lua_pushlightuserdata(m_global_state, desc);
-							lua_pushinteger(m_global_state, cmp_name_hash);
-							lua_pushcclosure(m_global_state, &LUA_setProperty, 2);
-							lua_setfield(m_global_state, -2, setter);
+							lua_pushlightuserdata(L, desc);
+							lua_pushinteger(L, cmp_name_hash);
+							lua_pushcclosure(L, &LUA_setProperty, 2);
+							lua_setfield(L, -2, setter);
 
-							lua_pushlightuserdata(m_global_state, desc);
-							lua_pushinteger(m_global_state, cmp_name_hash);
-							lua_pushcclosure(m_global_state, &LUA_getProperty, 2);
-							lua_setfield(m_global_state, -2, getter);
+							lua_pushlightuserdata(L, desc);
+							lua_pushinteger(L, cmp_name_hash);
+							lua_pushcclosure(L, &LUA_getProperty, 2);
+							lua_setfield(L, -2, getter);
 							break;
 					}
 				}
-				lua_pop(m_global_state, 1);
+				lua_pop(L, 1);
 			}
 		}
 
@@ -605,29 +609,14 @@ namespace Lumix
 
 			m_is_api_registered = true;
 
-			m_global_state = lua_newthread(m_system.m_engine.getState());
-			for (auto* scene : m_universe.getScenes())
-			{
-				const char* name = scene->getPlugin().getName();
-				char tmp[128];
-
-				copyString(tmp, "g_scene_");
-				catString(tmp, name);
-				lua_pushlightuserdata(m_global_state, scene);
-				lua_setglobal(m_global_state, tmp);
-			}
-
-			lua_pushlightuserdata(m_global_state, &m_universe);
-			lua_setglobal(m_global_state, "g_universe");
+			lua_State* engine_state = m_system.m_engine.getState();
+			
+			lua_pushlightuserdata(engine_state, &m_universe);
+			lua_setglobal(engine_state, "g_universe");
 			LuaWrapper::createSystemFunction(
-				m_global_state, "LuaScript", "getEnvironment", &LuaScriptSceneImpl::getEnvironment);
+				engine_state, "LuaScript", "getEnvironment", &LuaScriptSceneImpl::getEnvironment);
 			registerProperties();
 			registerPropertyAPI();
-			uint32 register_msg = crc32("registerLuaAPI");
-			for (auto* i : m_universe.getScenes())
-			{
-				i->sendMessage(register_msg, nullptr);
-			}
 		}
 
 
@@ -670,7 +659,7 @@ namespace Lumix
 			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
 			lua_setupvalue(script.m_state, -2, 1);
 
-			errors = errors || lua_pcall(state, 0, LUA_MULTRET, 0) != LUA_OK;
+			errors = errors || lua_pcall(state, 0, 0, 0) != LUA_OK;
 
 			if (errors)
 			{
@@ -727,7 +716,7 @@ namespace Lumix
 		}
 
 
-		static void destroy(ScriptInstance& inst)
+		void destroy(ScriptInstance& inst)
 		{
 			lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
 			if (lua_getfield(inst.m_state, -1, "onDestroy") != LUA_TFUNCTION)
@@ -744,6 +733,16 @@ namespace Lumix
 				lua_pop(inst.m_state, 1);
 			}
 
+			for(int i = 0; i < m_updates.size(); ++i)
+			{
+				if(m_updates[i].environment == inst.m_environment)
+				{
+					m_updates.eraseFast(i);
+					break;
+				}
+			}
+
+			luaL_unref(inst.m_state, LUA_REGISTRYINDEX, inst.m_thread_ref);
 			luaL_unref(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
 			inst.m_state = nullptr;
 		}
@@ -1045,17 +1044,21 @@ namespace Lumix
 
 		void update(float time_delta, bool paused) override
 		{
-			if (!m_global_state || paused) { return; }
+			if (paused) return;
 
 			for (auto& i : m_updates)
 			{
-				lua_rawgeti(i.state, LUA_REGISTRYINDEX, i.environment);
+				if (lua_rawgeti(i.state, LUA_REGISTRYINDEX, i.environment) != LUA_TTABLE)
+				{
+					ASSERT(false);
+				}
 				if (lua_getfield(i.state, -1, "update") != LUA_TFUNCTION)
 				{
 					lua_pop(i.state, 2);
 					continue;
 				}
 
+				auto t = lua_gettop(i.state);
 				lua_pushnumber(i.state, time_delta);
 				if (lua_pcall(i.state, 1, 0, 0) != LUA_OK)
 				{
@@ -1181,7 +1184,6 @@ namespace Lumix
 		Array<ScriptComponent*> m_scripts;
 		HashMap<Entity, ComponentIndex> m_entity_script_map;
 		AssociativeArray<uint32, string> m_property_names;
-		lua_State* m_global_state;
 		Universe& m_universe;
 		Array<UpdateData> m_updates;
 		FunctionCall m_function_call;
@@ -1631,7 +1633,7 @@ namespace Lumix
 									Lumix::Entity e;
 									Lumix::fromCString(buf, sizeof(buf), &e);
 									if (grid.entityInput(property_name,
-											StringBuilder<50>(property_name, cmp.index),
+											StaticString<50>(property_name, cmp.index),
 											e))
 									{
 										Lumix::toCString(e, buf, sizeof(buf));
@@ -1689,9 +1691,9 @@ namespace Lumix
 			if (ImGui::Button("Save"))
 			{
 				auto& fs = m_app.getWorldEditor()->getEngine().getFileSystem();
-				auto* file = fs.open(fs.getDiskDevice(),
+				auto* file = fs.open(fs.getDefaultDevice(),
 					resource->getPath(),
-					Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
+					Lumix::FS::Mode::CREATE_AND_WRITE);
 
 				if (!file)
 				{

@@ -1,6 +1,5 @@
 #include "physics_geometry_manager.h"
 #include "core/fs/file_system.h"
-#include "core/fs/ifile.h"
 #include "core/resource_manager.h"
 #include "core/string.h"
 #include "core/vec.h"

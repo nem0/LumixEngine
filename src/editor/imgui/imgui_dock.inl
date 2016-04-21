@@ -674,7 +674,7 @@ struct DockContext
 			{
 				SameLine(0, 15);
 
-				const char* text_end = FindTextDisplayEnd(dock_tab->label);
+				const char* text_end = FindRenderedTextEnd(dock_tab->label);
 				ImVec2 size(CalcTextSize(dock_tab->label, text_end).x, line_height);
 				if (InvisibleButton(dock_tab->label, size))
 				{
@@ -1076,7 +1076,6 @@ struct DockContext
 		}
 		lua_pop(L, 1);
 
-		int i = 0;
 		if (lua_getglobal(L, "docks") == LUA_TTABLE)
 		{
 			lua_pushnil(L);
@@ -1142,7 +1141,6 @@ struct DockContext
 					lua_pop(L, 5);
 				}
 				lua_pop(L, 1);
-				++i;
 			}
 		}
 		lua_pop(L, 1);
@@ -1160,6 +1158,7 @@ void ShutdownDock()
 		g_dock.m_docks[i]->~Dock();
 		MemFree(g_dock.m_docks[i]);
 	}
+	g_dock.m_docks.clear();
 }
 
 

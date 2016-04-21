@@ -1,5 +1,5 @@
 #include "measure_tool.h"
-#include "renderer/ray_cast_model_hit.h"
+#include "renderer/model.h"
 #include "renderer/render_scene.h"
 
 

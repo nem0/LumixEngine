@@ -1,6 +1,5 @@
 #include "animation/animation.h"
 #include "core/fs/file_system.h"
-#include "core/fs/ifile.h"
 #include "core/log.h"
 #include "core/matrix.h"
 #include "core/profiler.h"

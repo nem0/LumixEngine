@@ -35,7 +35,6 @@ public:
 	TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions);
 	~TerrainEditor();
 
-	void tick() override;
 	bool onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int) override;
 	void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/) override;
 	void onMouseUp(int, int, Lumix::MouseButton::Value) override;
@@ -86,6 +85,7 @@ private:
 	Lumix::BinaryArray m_brush_mask;
 	Lumix::Texture* m_brush_texture;
 	Lumix::Vec2 m_size_spread;
+	Lumix::Vec2 m_y_spread;
 	bool m_is_align_with_normal;
 	bool m_is_rotate_x;
 	bool m_is_rotate_y;

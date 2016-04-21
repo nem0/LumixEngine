@@ -213,10 +213,24 @@ static void registerProperties(IAllocator& allocator)
 							  ResourceManager::MATERIAL,
 							  allocator));
 
-	PropertyRegister::add(
-		"camera",
-		LUMIX_NEW(allocator, StringPropertyDescriptor<RenderScene>)(
-			"Slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot, allocator));
+	PropertyRegister::add("camera",
+		LUMIX_NEW(allocator, StringPropertyDescriptor<RenderScene>)("Slot",
+							  &RenderScene::getCameraSlot,
+							  &RenderScene::setCameraSlot,
+							  allocator));
+	PropertyRegister::add("camera",
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Orthographic size",
+							  &RenderScene::getCameraOrthoSize,
+							  &RenderScene::setCameraOrthoSize,
+							  0.0f,
+							  FLT_MAX,
+							  1.0f,
+							  allocator));
+	PropertyRegister::add("camera",
+		LUMIX_NEW(allocator, BoolPropertyDescriptor<RenderScene>)("Orthographic",
+							  &RenderScene::isCameraOrtho,
+							  &RenderScene::setCameraOrtho,
+							  allocator));
 	PropertyRegister::add("camera",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("FOV",
 							  &RenderScene::getCameraFOV,
@@ -415,12 +429,6 @@ static void registerProperties(IAllocator& allocator)
 							  0.0f,
 							  allocator));
 
-	PropertyRegister::add("terrain",
-		LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)("Grass distance",
-							  &RenderScene::getGrassDistance,
-							  &RenderScene::setGrassDistance,
-							  allocator));
-
 	auto grass = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Grass",
 		&RenderScene::getGrassCount,
 		&RenderScene::addGrass,
@@ -431,6 +439,13 @@ static void registerProperties(IAllocator& allocator)
 		&RenderScene::setGrassPath,
 		"Mesh (*.msh)",
 		ResourceManager::MODEL,
+		allocator));
+	grass->addChild(LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Distance",
+		&RenderScene::getGrassDistance,
+		&RenderScene::setGrassDistance,
+		1.0f,
+		FLT_MAX,
+		1.0f,
 		allocator));
 	auto ground = LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)(
 		"Ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround, allocator);
@@ -560,7 +575,7 @@ struct RendererImpl : public Renderer
 			header.dataType = 2;
 
 			Lumix::FS::OsFile file;
-			if(!file.open(filePath, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE, m_renderer.m_allocator))
+			if(!file.open(filePath, Lumix::FS::Mode::CREATE_AND_WRITE, m_renderer.m_allocator))
 			{
 				g_log_error.log("Renderer") << "Failed to save screenshot to " << filePath;
 				return;
@@ -643,6 +658,7 @@ struct RendererImpl : public Renderer
 			.end();
 
 		m_default_shader = static_cast<Shader*>(m_shader_manager.load(Path("shaders/default.shd")));
+		RenderScene::registerLuaAPI(m_engine.getState());
 	}
 
 	~RendererImpl()

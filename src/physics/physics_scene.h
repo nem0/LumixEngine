@@ -8,6 +8,9 @@
 #include "iplugin.h"
 
 
+struct lua_State;
+
+
 namespace Lumix
 {
 
@@ -31,6 +34,7 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 	public:
 		static PhysicsScene* create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator);
 		static void destroy(PhysicsScene* scene);
+		static void registerLuaAPI(lua_State* L);
 
 		virtual ~PhysicsScene() {}
 		virtual void render(RenderScene& render_scene) = 0;

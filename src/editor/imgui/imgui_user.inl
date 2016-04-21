@@ -683,7 +683,10 @@ bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use)
 }
 
 
-void IntervalGraph(const float* value_pairs, int value_pairs_count, float scale_min, float scele_max)
+void IntervalGraph(const unsigned long long* value_pairs,
+	int value_pairs_count,
+	unsigned long long scale_min,
+	unsigned long long scele_max)
 {
 	ImGuiWindow* window = GetCurrentWindow();
 	if (window->SkipItems) return;
@@ -699,15 +702,14 @@ void IntervalGraph(const float* value_pairs, int value_pairs_count, float scale_
 	ItemSize(total_bb, style.FramePadding.y);
 	if (!ItemAdd(total_bb, NULL)) return;
 
-
-	float graph_length = scele_max - scale_min;
+	double graph_length = double(scele_max - scale_min);
 	const ImU32 col_base = GetColorU32(ImGuiCol_PlotHistogram);
 
 	for (int i = 0; i < value_pairs_count; ++i)
 	{
-		ImVec2 tmp = frame_bb.Min + ImVec2((value_pairs[i * 2] - scale_min) / graph_length * graph_size.x, 0);
+		ImVec2 tmp = frame_bb.Min + ImVec2(float((value_pairs[i * 2] - scale_min) / graph_length * graph_size.x), 0);
 		window->DrawList->AddRectFilled(
-			tmp, tmp + ImVec2(ImMax(1.0f, value_pairs[i * 2 + 1] / graph_length * graph_size.x), graph_size.y), col_base);
+			tmp, tmp + ImVec2(ImMax(1.0f, float(value_pairs[i * 2 + 1] / graph_length * graph_size.x)), graph_size.y), col_base);
 	}
 }
 

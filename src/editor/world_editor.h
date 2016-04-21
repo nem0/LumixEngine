@@ -52,14 +52,9 @@ public:
 	public:
 		virtual ~Plugin() {}
 
-		virtual void tick() {}
-		virtual bool onEntityMouseDown(const RayCastModelHit& /*hit*/, int /*x*/, int /*y*/)
-		{
-			return false;
-		}
+		virtual bool onEntityMouseDown(const RayCastModelHit& /*hit*/, int /*x*/, int /*y*/) { return false; }
 		virtual void onMouseUp(int /*x*/, int /*y*/, MouseButton::Value /*button*/) {}
 		virtual void onMouseMove(int /*x*/, int /*y*/, int /*rel_x*/, int /*rel_y*/) {}
-
 		virtual bool showGizmo(ComponentUID /*cmp*/) { return false; }
 	};
 
@@ -120,7 +115,7 @@ public:
 	virtual void setEntityName(Entity entity, const char* name) = 0;
 	virtual void snapDown() = 0;
 	virtual void toggleGameMode() = 0;
-	virtual void navigate(float forward, float right, float speed) = 0;
+	virtual void navigate(float forward, float right, float up, float speed) = 0;
 	virtual void setProperty(uint32 component,
 		int index,
 		IPropertyDescriptor& property,
@@ -174,6 +169,7 @@ public:
 	virtual class EntityGroups& getEntityGroups() = 0;
 	virtual void setMouseSensitivity(float x, float y) = 0;
 	virtual Vec2 getMouseSensitivity() = 0;
+	virtual bool isUniverseChanged() const = 0;
 
 protected:
 	virtual ~WorldEditor() {}

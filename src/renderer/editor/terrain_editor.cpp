@@ -21,7 +21,6 @@
 #include "engine/property_register.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
-#include "renderer/ray_cast_model_hit.h"
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
 #include "renderer/terrain.h"
@@ -150,7 +149,7 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 			serializer.deserializeArrayItem(item.m_color.z, 0);
 		}
 		serializer.deserializeArrayEnd();
-		
+
 		serializer.deserializeArrayBegin("mask");
 		m_mask.clear();
 		int i = 0;
@@ -210,7 +209,7 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 private:
 	struct Item
 	{
-		Rectangle getBoundingRectangle(int max_x, int max_z) const 
+		Rectangle getBoundingRectangle(int max_x, int max_z) const
 		{
 			Rectangle r;
 			r.m_from_x = Lumix::Math::maximum(0, int(m_local_pos.x - m_radius - 0.5f));
@@ -259,11 +258,7 @@ private:
 	}
 
 
-	Lumix::uint16 computeAverage16(const Lumix::Texture* texture,
-							  int from_x,
-							  int to_x,
-							  int from_y,
-							  int to_y)
+	Lumix::uint16 computeAverage16(const Lumix::Texture* texture, int from_x, int to_x, int from_y, int to_y)
 	{
 		ASSERT(texture->getBytesPerPixel() == 2);
 		Lumix::uint32 sum = 0;
@@ -281,20 +276,16 @@ private:
 
 	float getAttenuation(Item& item, int i, int j) const
 	{
-		float dist = sqrt(
-			(item.m_local_pos.x - 0.5f - i) * (item.m_local_pos.x - 0.5f - i) +
-			(item.m_local_pos.z - 0.5f - j) * (item.m_local_pos.z - 0.5f - j));
+		float dist = sqrt((item.m_local_pos.x - 0.5f - i) * (item.m_local_pos.x - 0.5f - i) +
+						  (item.m_local_pos.z - 0.5f - j) * (item.m_local_pos.z - 0.5f - j));
 		return 1.0f - Lumix::Math::minimum(dist / item.m_radius, 1.0f);
 	}
 
 
-	void rasterColorItem(Lumix::Texture* texture,
-						 Lumix::Array<Lumix::uint8>& data,
-						 Item& item)
+	void rasterColorItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item)
 	{
 		int texture_width = texture->getWidth();
-		Rectangle r =
-			item.getBoundingRectangle(texture_width, texture->getHeight());
+		Rectangle r = item.getBoundingRectangle(texture_width, texture->getHeight());
 
 		if (texture->getBytesPerPixel() != 4)
 		{
@@ -336,13 +327,10 @@ private:
 	}
 
 
-	void rasterLayerItem(Lumix::Texture* texture,
-						 Lumix::Array<Lumix::uint8>& data,
-						 Item& item)
+	void rasterLayerItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item)
 	{
 		int texture_width = texture->getWidth();
-		Rectangle r =
-			item.getBoundingRectangle(texture_width, texture->getHeight());
+		Rectangle r = item.getBoundingRectangle(texture_width, texture->getHeight());
 
 		if (texture->getBytesPerPixel() != 4)
 		{
@@ -445,7 +433,7 @@ private:
 		else if (m_type == TerrainEditor::FLAT_HEIGHT)
 		{
 			rasterFlatHeightItem(texture, data, item);
-			return;		
+			return;
 		}
 
 		ASSERT(texture->getBytesPerPixel() == 2);
@@ -455,8 +443,7 @@ private:
 		rect = item.getBoundingRectangle(texture_width, texture->getHeight());
 
 		const float STRENGTH_MULTIPLICATOR = 256.0f;
-		float amount =
-			Lumix::Math::maximum(item.m_amount * item.m_amount * STRENGTH_MULTIPLICATOR, 1.0f);
+		float amount = Lumix::Math::maximum(item.m_amount * item.m_amount * STRENGTH_MULTIPLICATOR, 1.0f);
 
 		for (int i = rect.m_from_x, end = rect.m_to_x; i < end; ++i)
 		{
@@ -481,9 +468,7 @@ private:
 		int bpp = texture->getBytesPerPixel();
 		Rectangle rect;
 		getBoundingRectangle(texture, rect);
-		m_new_data.resize(bpp * Lumix::Math::maximum(1,
-									 (rect.m_to_x - rect.m_from_x) *
-										 (rect.m_to_y - rect.m_from_y)));
+		m_new_data.resize(bpp * Lumix::Math::maximum(1, (rect.m_to_x - rect.m_from_x) * (rect.m_to_y - rect.m_from_y)));
 		Lumix::copyMemory(&m_new_data[0], &m_old_data[0], m_new_data.size());
 
 		for (int item_index = 0; item_index < m_items.size(); ++item_index)
@@ -504,8 +489,7 @@ private:
 		m_y = rect.m_from_y;
 		m_width = rect.m_to_x - rect.m_from_x;
 		m_height = rect.m_to_y - rect.m_from_y;
-		m_old_data.resize(bpp * (rect.m_to_x - rect.m_from_x) *
-						  (rect.m_to_y - rect.m_from_y));
+		m_old_data.resize(bpp * (rect.m_to_x - rect.m_from_x) * (rect.m_to_y - rect.m_from_y));
 
 		int index = 0;
 		for (int j = rect.m_from_y, end2 = rect.m_to_y; j < end2; ++j)
@@ -514,9 +498,7 @@ private:
 			{
 				for (int k = 0; k < bpp; ++k)
 				{
-					m_old_data[index] =
-						texture->getData()[(i + j * texture->getWidth()) * bpp +
-										   k];
+					m_old_data[index] = texture->getData()[(i + j * texture->getWidth()) * bpp + k];
 					++index;
 				}
 			}
@@ -536,8 +518,7 @@ private:
 				int index = bpp * (i + j * texture->getWidth());
 				for (int k = 0; k < bpp; ++k)
 				{
-					texture->getData()[index + k] =
-						data[bpp * (i - m_x + (j - m_y) * m_width) + k];
+					texture->getData()[index + k] = data[bpp * (i - m_x + (j - m_y) * m_width) + k];
 				}
 			}
 		}
@@ -673,6 +654,7 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	, m_flat_height(0)
 	, m_is_enabled(false)
 	, m_size_spread(1, 1)
+	, m_y_spread(0, 0)
 {
 	editor.registerEditorCommandCreator("paint_terrain", createPaintTerrainCommand);
 
@@ -804,37 +786,6 @@ void TerrainEditor::drawCursor(Lumix::RenderScene& scene,
 }
 
 
-void TerrainEditor::tick()
-{
-	PROFILE_FUNCTION();
-	if (!m_component.isValid()) return;
-	if (m_type == NOT_SET) return;
-	if (!m_is_enabled) return;
-
-	float mouse_x = m_world_editor.getMouseX();
-	float mouse_y = m_world_editor.getMouseY();
-
-	for (auto entity : m_world_editor.getSelectedEntities())
-	{
-		Lumix::ComponentUID terrain = m_world_editor.getComponent(entity, TERRAIN_HASH);
-		if (!terrain.isValid()) continue;
-
-		Lumix::ComponentUID camera_cmp = m_world_editor.getEditCamera();
-		Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.scene);
-		Lumix::Vec3 origin, dir;
-		scene->getRay(camera_cmp.index, (float)mouse_x, (float)mouse_y, origin, dir);
-		Lumix::RayCastModelHit hit = scene->castRayTerrain(terrain.index, origin, dir);
-
-		if (hit.m_is_hit)
-		{
-			Lumix::Vec3 center = hit.m_origin + hit.m_dir * hit.m_t;
-			drawCursor(*scene, terrain, center);
-			return;
-		}
-	}
-}
-
-
 void TerrainEditor::detectModifiers()
 {
 	bool is_height_tool = m_type == LOWER_HEIGHT || m_type == RAISE_HEIGHT ||
@@ -899,6 +850,9 @@ Lumix::uint16 TerrainEditor::getHeight(const Lumix::Vec3& world_pos)
 
 bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int)
 {
+	if (m_world_editor.getSelectedEntities().size() != 1) return false;
+	auto terrain = m_world_editor.getComponent(m_world_editor.getSelectedEntities()[0], TERRAIN_HASH);
+	if (terrain.index == Lumix::INVALID_COMPONENT) return false;
 	if (!m_is_enabled) return false;
 	if (m_type == NOT_SET || !m_component.isValid()) return false;
 
@@ -959,8 +913,8 @@ void TerrainEditor::removeEntities(const Lumix::RayCastModelHit& hit)
 	frustum.computeOrtho(hit.m_origin + hit.m_dir * hit.m_t,
 		Lumix::Vec3(0, 0, 1),
 		Lumix::Vec3(0, 1, 0),
-		2 * m_terrain_brush_size,
-		2 * m_terrain_brush_size,
+		m_terrain_brush_size,
+		m_terrain_brush_size,
 		-m_terrain_brush_size,
 		m_terrain_brush_size);
 
@@ -1126,8 +1080,8 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 		frustum.computeOrtho(center,
 			Lumix::Vec3(0, 0, 1),
 			Lumix::Vec3(0, 1, 0),
-			2 * m_terrain_brush_size,
-			2 * m_terrain_brush_size,
+			m_terrain_brush_size,
+			m_terrain_brush_size,
 			-m_terrain_brush_size,
 			m_terrain_brush_size);
 		auto& meshes = scene->getRenderableInfos(frustum, frustum.position);
@@ -1142,11 +1096,12 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 
 			float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
 			float dist = Lumix::Math::randFloat(0, 1.0f) * m_terrain_brush_size;
+			float y = Lumix::Math::randFloat(m_y_spread.x, m_y_spread.y);
 			Lumix::Vec3 pos(center.x + cos(angle) * dist, 0, center.z + sin(angle) * dist);
 			Lumix::Vec3 terrain_pos = inv_terrain_matrix.multiplyPosition(pos);
 			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= size.x && terrain_pos.z <= size.y)
 			{
-				pos.y = scene->getTerrainHeightAt(m_component.index, terrain_pos.x, terrain_pos.z);
+				pos.y = scene->getTerrainHeightAt(m_component.index, terrain_pos.x, terrain_pos.z) + y;
 				pos.y += terrain_matrix.getTranslation().y;
 				if(!isOBBCollision(*scene, meshes, pos, model, scale))
 				{
@@ -1388,7 +1343,7 @@ void TerrainEditor::onGUI()
 				for (int i = 0; i < tex->getAtlasSize() * tex->getAtlasSize(); ++i)
 				{
 					if (i % 4 != 0) ImGui::SameLine();
-					if (ImGui::RadioButton(StringBuilder<20>("", i, "###rb", i), m_texture_idx == i))
+					if (ImGui::RadioButton(Lumix::StaticString<20>("", i, "###rb", i), m_texture_idx == i))
 					{
 						m_texture_idx = i;
 					}
@@ -1476,10 +1431,38 @@ void TerrainEditor::onGUI()
 				}
 				ImGui::DragFloat2("Size spread", &m_size_spread.x, 0.01f);
 				m_size_spread.x = Lumix::Math::minimum(m_size_spread.x, m_size_spread.y);
+				ImGui::DragFloat2("Y spread", &m_y_spread.x, 0.01f);
+				m_y_spread.x = Lumix::Math::minimum(m_y_spread.x, m_y_spread.y);
 			}
 		}
 		break;
 		default: ASSERT(false); break;
+	}
+
+	if(!m_component.isValid()) return;
+	if(m_type == NOT_SET) return;
+	if(!m_is_enabled) return;
+
+	float mouse_x = m_world_editor.getMouseX();
+	float mouse_y = m_world_editor.getMouseY();
+
+	for(auto entity : m_world_editor.getSelectedEntities())
+	{
+		Lumix::ComponentUID terrain = m_world_editor.getComponent(entity, TERRAIN_HASH);
+		if(!terrain.isValid()) continue;
+
+		Lumix::ComponentUID camera_cmp = m_world_editor.getEditCamera();
+		Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.scene);
+		Lumix::Vec3 origin, dir;
+		scene->getRay(camera_cmp.index, (float)mouse_x, (float)mouse_y, origin, dir);
+		Lumix::RayCastModelHit hit = scene->castRayTerrain(terrain.index, origin, dir);
+
+		if(hit.m_is_hit)
+		{
+			Lumix::Vec3 center = hit.m_origin + hit.m_dir * hit.m_t;
+			drawCursor(*scene, terrain, center);
+			return;
+		}
 	}
 }
 

@@ -21,7 +21,6 @@
 #include "plugin_manager.h"
 #include "universe/hierarchy.h"
 #include "universe/universe.h"
-#include <lua.hpp>
 
 
 namespace Lumix
@@ -81,18 +80,31 @@ public:
 			m_file_system = FS::FileSystem::create(m_allocator);
 
 			m_mem_file_device = LUMIX_NEW(m_allocator, FS::MemoryFileDevice)(m_allocator);
-			m_disk_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)(base_path0, base_path1, m_allocator);
+			m_disk_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)("disk", base_path0, m_allocator);
 
 			m_file_system->mount(m_mem_file_device);
 			m_file_system->mount(m_disk_file_device);
-			m_file_system->setDefaultDevice("memory:disk");
-			m_file_system->setSaveGameDevice("memory:disk");
+			bool is_patching = base_path1[0] != 0 && compareString(base_path0, base_path1) != 0;
+			if (is_patching)
+			{
+				m_patch_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)("patch", base_path1, m_allocator);
+				m_file_system->mount(m_patch_file_device);
+				m_file_system->setDefaultDevice("memory:patch:disk");
+				m_file_system->setSaveGameDevice("memory:disk");
+			}
+			else
+			{
+				m_patch_file_device = nullptr;
+				m_file_system->setDefaultDevice("memory:disk");
+				m_file_system->setSaveGameDevice("memory:disk");
+			}
 		}
 		else
 		{
 			m_file_system = fs;
 			m_mem_file_device = nullptr;
 			m_disk_file_device = nullptr;
+			m_patch_file_device = nullptr;
 		}
 
 		m_resource_manager.create(*m_file_system);
@@ -101,6 +113,24 @@ public:
 		m_fps_timer = Timer::create(m_allocator);
 		m_fps_frame = 0;
 		PropertyRegister::init(m_allocator);
+	}
+
+
+	static bool LUA_hasFilesystemWork(Engine* engine)
+	{
+		return engine->getFileSystem().hasWork();
+	}
+
+
+	static void LUA_processFilesystemWork(Engine* engine)
+	{
+		engine->getFileSystem().updateAsyncTransactions();
+	}
+
+
+	static void LUA_startGame(Engine* engine, Universe* universe)
+	{
+		if(engine && universe) engine->startGame(*universe);
 	}
 
 
@@ -139,21 +169,24 @@ public:
 			if (lua_isstring(L, -1))
 			{
 				const char* str = lua_tostring(L, -1);
-				desc.set(cmp, -1, InputBlob(str, stringLength(str)));
+				InputBlob input_blob(str, stringLength(str));
+				desc.set(cmp, -1, input_blob);
 			}
 			break;
 		case IPropertyDescriptor::DECIMAL:
 			if (lua_isnumber(L, -1))
 			{
 				float f = (float)lua_tonumber(L, -1);
-				desc.set(cmp, -1, InputBlob(&f, sizeof(f)));
+				InputBlob input_blob(&f, sizeof(f));
+				desc.set(cmp, -1, input_blob);
 			}
 			break;
 		case IPropertyDescriptor::BOOL:
 			if (lua_isboolean(L, -1))
 			{
 				bool b = lua_toboolean(L, -1) != 0;
-				desc.set(cmp, -1, InputBlob(&b, sizeof(b)));
+				InputBlob input_blob(&b, sizeof(b));
+				desc.set(cmp, -1, input_blob);
 			}
 			break;
 		case IPropertyDescriptor::VEC3:
@@ -161,7 +194,8 @@ public:
 			if (lua_istable(L, -1))
 			{
 				auto v = LuaWrapper::toType<Vec3>(L, -1);
-				desc.set(cmp, -1, InputBlob(&v, sizeof(v)));
+				InputBlob input_blob(&v, sizeof(v));
+				desc.set(cmp, -1, input_blob);
 			}
 			break;
 		default:
@@ -334,12 +368,71 @@ public:
 		REGISTER_FUNCTION(addInputAction);
 		REGISTER_FUNCTION(logError);
 		REGISTER_FUNCTION(logInfo);
-
+		REGISTER_FUNCTION(startGame);
+		REGISTER_FUNCTION(hasFilesystemWork);
+		REGISTER_FUNCTION(processFilesystemWork);
 
 		#undef REGISTER_FUNCTION
 
 		LuaWrapper::createSystemFunction(m_state, "Engine", "createEntityEx", &LUA_createEntityEx);
 		LuaWrapper::createSystemFunction(m_state, "Engine", "multVecQuat", &LUA_multVecQuat);
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_DOWN", InputSystem::DOWN);
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_PRESSED", InputSystem::PRESSED);
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_MOUSE_X", InputSystem::MOUSE_X);
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_MOUSE_Y", InputSystem::MOUSE_Y);
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_LTHUMB_X", InputSystem::LTHUMB_X);
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_LTHUMB_Y", InputSystem::LTHUMB_Y);
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_RTHUMB_X", InputSystem::RTHUMB_X);
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_RTHUMB_Y", InputSystem::RTHUMB_Y);
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_RTRIGGER", InputSystem::RTRIGGER);
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_LTRIGGER", InputSystem::LTRIGGER);
+
+		installLuaPackageLoader();
+	}
+
+
+	void installLuaPackageLoader() const
+	{
+		auto x = lua_getglobal(m_state, "package");
+		auto y = lua_getfield(m_state, -1, "searchers");
+		int numLoaders = 0;
+		lua_pushnil(m_state);
+		while (lua_next(m_state, -2) != 0)
+		{
+			lua_pop(m_state, 1);
+			numLoaders++;
+		}
+
+		lua_pushinteger(m_state, numLoaders + 1);
+		lua_pushcfunction(m_state, LUA_packageLoader);
+		lua_rawset(m_state, -3);
+		lua_pop(m_state, 2);
+	}
+
+
+	static int LUA_packageLoader(lua_State* L)
+	{
+		const char* module = LuaWrapper::toType<const char*>(L, 1);
+		StaticString<MAX_PATH_LENGTH> tmp(module);
+		tmp << ".lua";
+		lua_getglobal(L, "g_engine");
+		auto* engine = (Engine*)lua_touserdata(L, -1);
+		lua_pop(L, 1);
+		auto& fs = engine->getFileSystem();
+		auto* file = fs.open(fs.getDefaultDevice(), Path(tmp), FS::Mode::OPEN_AND_READ);
+		if (!file)
+		{
+			g_log_error.log("Engine") << "Failed to open file " << tmp;
+			StaticString<MAX_PATH_LENGTH + 40> msg("Failed to open file ");
+			msg << tmp;
+			lua_pushstring(L, msg);
+		}
+		else if (luaL_loadbuffer(L, (const char*)file->getBuffer(), file->size(), tmp) != LUA_OK)
+		{
+			g_log_error.log("Engine") << "Failed to load package " << tmp << ": " << lua_tostring(L, -1);
+		}
+		if (file) fs.close(*file);
+		return 1;
 	}
 
 
@@ -366,7 +459,12 @@ public:
 		PropertyRegister::add(
 			"hierarchy",
 			LUMIX_NEW(m_allocator, EntityPropertyDescriptor<Hierarchy>)(
-				"parent", &Hierarchy::getParent, &Hierarchy::setParent, m_allocator));
+				"Parent", &Hierarchy::getParent, &Hierarchy::setParent, m_allocator));
+		PropertyRegister::add("hierarchy",
+			LUMIX_NEW(m_allocator, SimplePropertyDescriptor<Vec3, Hierarchy>)("Relative position",
+								  &Hierarchy::getLocalPosition,
+								  &Hierarchy::setLocalPosition,
+								  m_allocator));
 	}
 
 
@@ -405,6 +503,7 @@ public:
 			FS::FileSystem::destroy(m_file_system);
 			LUMIX_DELETE(m_allocator, m_mem_file_device);
 			LUMIX_DELETE(m_allocator, m_disk_file_device);
+			LUMIX_DELETE(m_allocator, m_patch_file_device);
 		}
 
 		m_resource_manager.destroy();
@@ -442,6 +541,17 @@ public:
 			}
 		}
 
+		for (auto* scene : universe->getScenes())
+		{
+			const char* name = scene->getPlugin().getName();
+			char tmp[128];
+
+			copyString(tmp, "g_scene_");
+			catString(tmp, name);
+			lua_pushlightuserdata(m_state, scene);
+			lua_setglobal(m_state, tmp);
+		}
+
 		return *universe;
 	}
 
@@ -471,6 +581,7 @@ public:
 
 	FS::FileSystem& getFileSystem() override { return *m_file_system; }
 	FS::DiskFileDevice* getDiskFileDevice() override { return m_disk_file_device; }
+	FS::DiskFileDevice* getPatchFileDevice() override { return m_patch_file_device; }
 
 	void startGame(Universe& context) override
 	{
@@ -697,6 +808,23 @@ public:
 	}
 
 
+	void runScript(const char* src, int src_length, const char* path) override
+	{
+		if (luaL_loadbuffer(m_state, src, src_length, path) != LUA_OK)
+		{
+			g_log_error.log("Engine") << path << ": " << lua_tostring(m_state, -1);
+			lua_pop(m_state, 1);
+			return;
+		}
+
+		if (lua_pcall(m_state, 0, 0, 0) != LUA_OK)
+		{
+			g_log_error.log("Engine") << path << ": " << lua_tostring(m_state, -1);
+			lua_pop(m_state, 1);
+		}
+	}
+
+
 	lua_State* getState() override { return m_state; }
 	PathManager& getPathManager() override{ return m_path_manager; }
 	float getLastTimeDelta() override { return m_last_time_delta; }
@@ -723,6 +851,7 @@ private:
 	FS::FileSystem* m_file_system;
 	FS::MemoryFileDevice* m_mem_file_device;
 	FS::DiskFileDevice* m_disk_file_device;
+	FS::DiskFileDevice* m_patch_file_device;
 
 	ResourceManager m_resource_manager;
 	
@@ -780,7 +909,7 @@ Engine* Engine::create(const char* base_path0,
 	Profiler::setThreadName("Main");
 	installUnhandledExceptionHandler();
 
-	g_is_error_file_opened = g_error_file.open("error.log", FS::Mode::CREATE | FS::Mode::WRITE, allocator);
+	g_is_error_file_opened = g_error_file.open("error.log", FS::Mode::CREATE_AND_WRITE, allocator);
 
 	g_log_error.getCallback().bind<logErrorToFile>();
 	g_log_info.getCallback().bind<showLogInVS>();

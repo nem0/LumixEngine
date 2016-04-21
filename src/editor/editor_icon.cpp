@@ -39,6 +39,9 @@ const char* ICONS[(int)IconType::COUNT] =
 };
 
 
+static const float ORTHO_SIZE_SCALE = 1 / 20.0f;
+
+
 struct EditorIconsImpl : public EditorIcons
 {
 	explicit EditorIconsImpl(WorldEditor& editor)
@@ -112,7 +115,6 @@ struct EditorIconsImpl : public EditorIcons
 		if (m_editor.getEditCamera().entity == entity) return;
 
 		static const uint32 RENDERABLE_HASH = crc32("renderable");
-		static const uint32 RENDERER_HASH = crc32("renderer");
 		static const uint32 PHYSICAL_CONTROLLER_HASH = crc32("physical_controller");
 		static const uint32 BOX_RIGID_ACTOR_HASH = crc32("box_rigid_actor");
 		static const uint32 CAMERA_HASH = crc32("camera");
@@ -181,6 +183,8 @@ struct EditorIconsImpl : public EditorIcons
 		if(camera < 0) return hit;
 		Matrix mtx = universe.getMatrix(m_editor.getEditCamera().entity);
 		Vec3 camera_pos = mtx.getTranslation();
+		bool is_ortho = render_interface->isCameraOrtho(camera);
+		float ortho_size = render_interface->getCameraOrthoSize(camera);
 
 		for(auto& icon : m_icons)
 		{
@@ -188,7 +192,14 @@ struct EditorIconsImpl : public EditorIcons
 
 			mtx.setTranslation(position);
 			Matrix tmp = mtx;
-			tmp.multiply3x3(icon.scale > 0 ? icon.scale : 1);
+			if (is_ortho)
+			{
+				tmp.multiply3x3(ortho_size * ORTHO_SIZE_SCALE);
+			}
+			else
+			{
+				tmp.multiply3x3(icon.scale > 0 ? icon.scale : 1);
+			}
 
 			float t = m_editor.getRenderInterface()->castRay(m_models[(int)icon.type], origin, dir, tmp);
 			if(t >= 0 && (t < hit.t || hit.t < 0))
@@ -236,6 +247,8 @@ struct EditorIconsImpl : public EditorIcons
 		Matrix mtx = universe.getMatrix(m_editor.getEditCamera().entity);
 		Vec3 camera_pos = mtx.getTranslation();
 		float fov = m_editor.getRenderInterface()->getCameraFOV(camera);
+		bool is_ortho = m_editor.getRenderInterface()->isCameraOrtho(camera);
+		float ortho_size = is_ortho ? m_editor.getRenderInterface()->getCameraOrthoSize(camera) : 1;
 
 		for(auto& icon : m_icons)
 		{
@@ -247,7 +260,14 @@ struct EditorIconsImpl : public EditorIcons
 			icon.scale = tan(Math::degreesToRadians(fov) * 0.5f) * distance / scaleFactor;
 			mtx.setTranslation(position);
 			Matrix scaled_mtx = mtx;
-			scaled_mtx.multiply3x3(icon.scale > 0 ? icon.scale : 1);
+			if (is_ortho)
+			{
+				scaled_mtx.multiply3x3(ortho_size * ORTHO_SIZE_SCALE);
+			}
+			else
+			{
+				scaled_mtx.multiply3x3(icon.scale > 0 ? icon.scale : 1);
+			}
 
 			render_interface->renderModel(m_models[(int)icon.type], scaled_mtx);
 		}

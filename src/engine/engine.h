@@ -54,6 +54,7 @@ public:
 
 	virtual FS::FileSystem& getFileSystem() = 0;
 	virtual FS::DiskFileDevice* getDiskFileDevice() = 0;
+	virtual FS::DiskFileDevice* getPatchFileDevice() = 0;
 	virtual InputSystem& getInputSystem() = 0;
 	virtual PluginManager& getPluginManager() = 0;
 	virtual MTJD::Manager& getMTJDManager() = 0;
@@ -73,6 +74,7 @@ public:
 	virtual void nextFrame() = 0;
 	virtual PathManager& getPathManager() = 0;
 	virtual lua_State* getState() = 0;
+	virtual void runScript(const char* src, int src_length, const char* path) = 0;
 
 protected:
 	Engine() {}

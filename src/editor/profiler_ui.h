@@ -1,6 +1,9 @@
 #pragma once
 
 
+#include "lumix.h"
+
+
 namespace Lumix
 {
 class Engine;
@@ -17,6 +20,6 @@ public:
 	static void destroy(ProfilerUI& ui);
 
 	bool m_is_opened;
-	float m_frame_start;
-	float m_frame_end;
+	Lumix::uint64 m_frame_start;
+	Lumix::uint64 m_frame_end;
 };

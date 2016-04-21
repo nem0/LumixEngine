@@ -72,12 +72,12 @@ struct AudioSystemImpl : public AudioSystem
 		, m_device(nullptr)
 	{
 		registerProperties(engine.getAllocator());
+		AudioScene::registerLuaAPI(m_engine.getState());
 	}
 
 
+	Engine& getEngine() override { return m_engine; }
 	AudioDevice& getDevice() override { return *m_device; }
-
-
 	ClipManager& getClipManager() override { return m_manager; }
 
 

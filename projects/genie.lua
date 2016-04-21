@@ -23,13 +23,13 @@ newaction {
 			os.copyfile(path.join(src_dir, filename .. ".pdb"), path.join(dst_dir, filename .. ".pdb"))
 		end
 		
-		installDllWithPdb "animation"
-		installDllWithPdb "audio"
-		installDllWithPdb "editor"
-		installDllWithPdb "engine"
-		installDllWithPdb "lua_script"
-		installDllWithPdb "physics"
-		installDllWithPdb "renderer"
+		--installDllWithPdb "animation"
+		--installDllWithPdb "audio"
+		--installDllWithPdb "editor"
+		--installDllWithPdb "engine"
+		--installDllWithPdb "lua_script"
+		--installDllWithPdb "physics"
+		--installDllWithPdb "renderer"
 		installDllWithPdb "assimp"
 		
 		installDll "PhysX3CommonCHECKED_x64"
@@ -40,6 +40,8 @@ newaction {
 
 		os.copyfile(path.join(src_dir, "studio.exe"), path.join(dst_dir, "studio.exe"))
 		os.copyfile(path.join(src_dir, "studio.pdb"), path.join(dst_dir, "studio.pdb"))
+		os.copyfile(path.join(src_dir, "app.exe"), path.join(dst_dir, "app.exe"))
+		os.copyfile(path.join(src_dir, "app.pdb"), path.join(dst_dir, "app.pdb"))
 	end
 }
 
@@ -59,13 +61,13 @@ newaction {
 			os.copyfile(path.join(src_dir, filename .. ".pdb"), path.join(dst_dir, filename .. ".pdb"))
 		end
 		
-		installDllWithPdb "animation"
-		installDllWithPdb "audio"
-		installDllWithPdb "editor"
-		installDllWithPdb "engine"
-		installDllWithPdb "lua_script"
-		installDllWithPdb "physics"
-		installDllWithPdb "renderer"
+		--installDllWithPdb "animation"
+		--installDllWithPdb "audio"
+		--installDllWithPdb "editor"
+		--installDllWithPdb "engine"
+		--installDllWithPdb "lua_script"
+		--installDllWithPdb "physics"
+		--installDllWithPdb "renderer"
 		installDllWithPdb "assimp"
 		
 		installDll "PhysX3CommonCHECKED_x86"
@@ -76,6 +78,8 @@ newaction {
 
 		os.copyfile(path.join(src_dir, "studio.exe"), path.join(dst_dir, "studio.exe"))
 		os.copyfile(path.join(src_dir, "studio.pdb"), path.join(dst_dir, "studio.pdb"))
+		os.copyfile(path.join(src_dir, "app.exe"), path.join(dst_dir, "app.exe"))
+		os.copyfile(path.join(src_dir, "app.pdb"), path.join(dst_dir, "app.pdb"))
 	end
 }
 
@@ -303,13 +307,13 @@ project "unit_tests"
 	useLua()
 	defaultConfigurations()
 
-project "render_test"
+project "app"
 	kind "WindowedApp"
 
 	debugdir "../../LumixEngine_data"
 
-	files { "../src/render_test/**.h", "../src/render_test/**.cpp" }
-	includedirs { "../src", "../src/render_test", "../external/bgfx/include" }
+	files { "../src/app/**.h", "../src/app/**.cpp" }
+	includedirs { "../src", "../src/app", "../external/bgfx/include" }
 	if _OPTIONS["static-plugins"] then	
 		forceLink("s_animation_plugin_register")
 		forceLink("s_audio_plugin_register")
@@ -333,7 +337,6 @@ project "render_test"
 		linkPhysX()
 	end
 	links { "engine", "animation", "renderer" }
-
 	
 	useLua()
 	defaultConfigurations()

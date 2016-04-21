@@ -3,8 +3,7 @@
 #include "core/array.h"
 #include "core/blob.h"
 #include "core/crc32.h"
-#include "core/FS/file_system.h"
-#include "core/FS/ifile.h"
+#include "core/fs/file_system.h"
 #include "core/geometry.h"
 #include "core/json_serializer.h"
 #include "core/lifo_allocator.h"
@@ -30,7 +29,6 @@
 #include "renderer/particle_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/pose.h"
-#include "renderer/ray_cast_model_hit.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/terrain.h"
@@ -60,24 +58,6 @@ static const uint32 PARTICLE_EMITTER_SIZE_HASH = crc32("particle_emitter_size");
 static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
 static const uint32 CAMERA_HASH = crc32("camera");
 static const uint32 TERRAIN_HASH = crc32("terrain");
-
-
-enum class RenderSceneVersion : int32
-{
-	PARTICLES,
-	WHOLE_LIGHTS,
-	PARTICLE_EMITTERS_SPAWN_COUNT,
-	PARTICLES_FORCE_MODULE,
-	PARTICLES_SAVE_SIZE_ALPHA,
-	RENDERABLE_MATERIALS,
-	GLOBAL_LIGHT_SPECULAR,
-	SPECULAR_INTENSITY,
-	RENDER_PARAMS,
-	RENDER_PARAMS_REMOVED,
-
-	LATEST,
-	INVALID = -1,
-};
 
 
 struct PointLight
@@ -117,16 +97,17 @@ struct Camera
 {
 	static const int MAX_SLOT_LENGTH = 30;
 
-	Entity m_entity;
-	float m_fov;
-	float m_aspect;
-	float m_near;
-	float m_far;
-	float m_width;
-	float m_height;
-	bool m_is_active;
-	bool m_is_free;
-	char m_slot[MAX_SLOT_LENGTH + 1];
+	Entity entity;
+	float fov;
+	float aspect;
+	float near;
+	float far;
+	float ortho_size;
+	float screen_width;
+	float screen_height;
+	bool is_free;
+	bool is_ortho;
+	char slot[MAX_SLOT_LENGTH + 1];
 };
 
 
@@ -305,7 +286,7 @@ public:
 		{
 			for (int i = 0; i < m_cameras.size(); ++i)
 			{
-				if (!m_cameras[i].m_is_free && m_cameras[i].m_entity == entity) return i;
+				if (!m_cameras[i].is_free && m_cameras[i].entity == entity) return i;
 			}
 			return INVALID_COMPONENT;
 		}
@@ -341,58 +322,73 @@ public:
 
 
 
-	void getRay(ComponentIndex camera,
+	void getRay(ComponentIndex camera_index,
 		float x,
 		float y,
 		Vec3& origin,
 		Vec3& dir) override
 	{
-		Vec3 camera_pos = m_universe.getPosition(m_cameras[camera].m_entity);
-		float width = m_cameras[camera].m_width;
-		float height = m_cameras[camera].m_height;
+		Camera& camera = m_cameras[camera_index];
+		origin = m_universe.getPosition(camera.entity);
+
+		float width = camera.screen_width;
+		float height = camera.screen_height;
+		if (width <= 0 || height <= 0)
+		{
+			dir = m_universe.getRotation(camera.entity) * Vec3(0, 0, 1);
+			return;
+		}
+
 		float nx = 2 * (x / width) - 1;
 		float ny = 2 * ((height - y) / height) - 1;
 
-		float fov = m_cameras[camera].m_fov;
-		float near_plane = m_cameras[camera].m_near;
-		float far_plane = m_cameras[camera].m_far;
-		float ratio = width / height;
+		Matrix projection_matrix = getCameraProjection(camera_index);
+		Matrix view_matrix = m_universe.getMatrix(camera.entity);
 
-		Matrix projection_matrix;
-		projection_matrix.setPerspective(
-			Math::degreesToRadians(fov), ratio, near_plane, far_plane);
-		Matrix view_matrix = m_universe.getMatrix(m_cameras[camera].m_entity);
+		if (camera.is_ortho)
+		{
+			float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
+			origin += view_matrix.getXVector() * nx * camera.ortho_size * ratio
+				+ view_matrix.getYVector() * ny * camera.ortho_size;
+		}
+
 		view_matrix.inverse();
 		Matrix inverted = (projection_matrix * view_matrix);
 		inverted.inverse();
+
 		Vec4 p0 = inverted * Vec4(nx, ny, -1, 1);
 		Vec4 p1 = inverted * Vec4(nx, ny, 1, 1);
-		p0.x /= p0.w;
-		p0.y /= p0.w;
-		p0.z /= p0.w;
-		p1.x /= p1.w;
-		p1.y /= p1.w;
-		p1.z /= p1.w;
-		origin = camera_pos;
-		dir.x = p1.x - p0.x;
-		dir.y = p1.y - p0.y;
-		dir.z = p1.z - p0.z;
+		p0 *= 1 / p0.w;
+		p1 *= 1 / p1.w;
+		dir = p1 - p0;
 		dir.normalize();
 	}
 
 
-	Frustum getCameraFrustum(ComponentIndex camera) const override
+	Frustum getCameraFrustum(ComponentIndex cmp) const override
 	{
-		Matrix mtx = m_universe.getMatrix(m_cameras[camera].m_entity);
+		const Camera& camera = m_cameras[cmp];
+		Matrix mtx = m_universe.getMatrix(camera.entity);
 		Frustum ret;
+		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
+		if (camera.is_ortho)
+		{
+			ret.computeOrtho(mtx.getTranslation(),
+				mtx.getZVector(),
+				mtx.getYVector(),
+				camera.ortho_size * ratio,
+				camera.ortho_size,
+				camera.near,
+				camera.far);
+			return ret;
+		}
 		ret.computePerspective(mtx.getTranslation(),
-							   mtx.getZVector(),
-							   mtx.getYVector(),
-							   Math::degreesToRadians(m_cameras[camera].m_fov),
-							   m_cameras[camera].m_width /
-								   m_cameras[camera].m_height,
-							   m_cameras[camera].m_near,
-							   m_cameras[camera].m_far);
+			mtx.getZVector(),
+			mtx.getYVector(),
+			Math::degreesToRadians(camera.fov),
+			ratio,
+			camera.near,
+			camera.far);
 
 		return ret;
 	}
@@ -474,13 +470,14 @@ public:
 		for (int i = 0, c = m_cameras.size(); i < c; ++i)
 		{
 			Camera& camera = m_cameras[i];
-			serializer.write(camera.m_entity);
-			serializer.write(camera.m_far);
-			serializer.write(camera.m_fov);
-			serializer.write(camera.m_is_active);
-			serializer.write(camera.m_is_free);
-			serializer.write(camera.m_near);
-			serializer.writeString(camera.m_slot);
+			serializer.write(camera.entity);
+			serializer.write(camera.far);
+			serializer.write(camera.fov);
+			serializer.write(camera.is_ortho);
+			serializer.write(camera.ortho_size);
+			serializer.write(camera.is_free);
+			serializer.write(camera.near);
+			serializer.writeString(camera.slot);
 		}
 	}
 
@@ -668,7 +665,7 @@ public:
 	}
 
 
-	void deserializeCameras(InputBlob& serializer)
+	void deserializeCameras(InputBlob& serializer, RenderSceneVersion version)
 	{
 		int32 size;
 		serializer.read(size);
@@ -676,17 +673,26 @@ public:
 		for (int i = 0; i < size; ++i)
 		{
 			Camera& camera = m_cameras[i];
-			serializer.read(camera.m_entity);
-			serializer.read(camera.m_far);
-			serializer.read(camera.m_fov);
-			serializer.read(camera.m_is_active);
-			serializer.read(camera.m_is_free);
-			serializer.read(camera.m_near);
-			serializer.readString(camera.m_slot, sizeof(camera.m_slot));
-
-			if (!camera.m_is_free)
+			serializer.read(camera.entity);
+			serializer.read(camera.far);
+			serializer.read(camera.fov);
+			serializer.read(camera.is_ortho);
+			if (version <= RenderSceneVersion::ORTHO_CAMERA)
 			{
-				m_universe.addComponent(m_cameras[i].m_entity, CAMERA_HASH, this, i);
+				camera.is_ortho = false;
+				camera.ortho_size = 10;
+			}
+			else
+			{
+				serializer.read(camera.ortho_size);
+			}
+			serializer.read(camera.is_free);
+			serializer.read(camera.near);
+			serializer.readString(camera.slot, sizeof(camera.slot));
+
+			if (!camera.is_free)
+			{
+				m_universe.addComponent(m_cameras[i].entity, CAMERA_HASH, this, i);
 			}
 		}
 	}
@@ -823,7 +829,7 @@ public:
 		serializer.read(m_active_global_light_uid);
 	}
 
-	void deserializeTerrains(InputBlob& serializer)
+	void deserializeTerrains(InputBlob& serializer, RenderSceneVersion version)
 	{
 		int32 size = 0;
 		serializer.read(size);
@@ -850,7 +856,7 @@ public:
 						m_renderer, INVALID_ENTITY, *this, m_allocator);
 				}
 				Terrain* terrain = m_terrains[i];
-				terrain->deserialize(serializer, m_universe, *this, i);
+				terrain->deserialize(serializer, m_universe, *this, i, (int)version);
 			}
 			else
 			{
@@ -868,10 +874,10 @@ public:
 
 	void deserialize(InputBlob& serializer, int version) override
 	{
-		deserializeCameras(serializer);
+		deserializeCameras(serializer, (RenderSceneVersion)version);
 		deserializeRenderables(serializer, (RenderSceneVersion)version);
 		deserializeLights(serializer, (RenderSceneVersion)version);
-		deserializeTerrains(serializer);
+		deserializeTerrains(serializer, (RenderSceneVersion)version);
 		if (version >= 0) deserializeParticleEmitters(serializer, version);
 		if (version >= (int)RenderSceneVersion::RENDER_PARAMS &&
 			version < (int)RenderSceneVersion::RENDER_PARAMS_REMOVED)
@@ -933,8 +939,8 @@ public:
 
 	void destroyCamera(ComponentIndex component)
 	{
-		Entity entity = m_cameras[component].m_entity;
-		m_cameras[component].m_is_free = true;
+		Entity entity = m_cameras[component].entity;
+		m_cameras[component].is_free = true;
 		m_universe.destroyComponent(entity, CAMERA_HASH, this, component);
 	}
 
@@ -1340,16 +1346,17 @@ public:
 	ComponentIndex createCamera(Entity entity)
 	{
 		Camera& camera = m_cameras.emplace();
-		camera.m_is_free = false;
-		camera.m_is_active = false;
-		camera.m_entity = entity;
-		camera.m_fov = 60;
-		camera.m_width = 800;
-		camera.m_height = 600;
-		camera.m_aspect = 800.0f / 600.0f;
-		camera.m_near = 0.1f;
-		camera.m_far = 10000.0f;
-		camera.m_slot[0] = '\0';
+		camera.is_free = false;
+		camera.is_ortho = false;
+		camera.ortho_size = 10;
+		camera.entity = entity;
+		camera.fov = 60;
+		camera.screen_width = 800;
+		camera.screen_height = 600;
+		camera.aspect = 800.0f / 600.0f;
+		camera.near = 0.1f;
+		camera.far = 10000.0f;
+		camera.slot[0] = '\0';
 		m_universe.addComponent(entity, CAMERA_HASH, this, m_cameras.size() - 1);
 		return m_cameras.size() - 1;
 	}
@@ -1558,12 +1565,12 @@ public:
 		const PointLight& light = m_point_lights[index];
 		Frustum frustum;
 		frustum.computeOrtho(m_universe.getPosition(light.m_entity),
-							 Vec3(1, 0, 0),
-							 Vec3(0, 1, 0),
-							 2.0f * light.m_range,
-							 2.0f * light.m_range,
-							 -light.m_range,
-							 light.m_range);
+			Vec3(1, 0, 0),
+			Vec3(0, 1, 0),
+			light.m_range,
+			light.m_range,
+			-light.m_range,
+			light.m_range);
 
 		return frustum;
 	}
@@ -1847,8 +1854,8 @@ public:
 		const char* slot = LuaWrapper::checkArg<const char*>(L, 2);
 
 		ComponentIndex camera_cmp = scene->getCameraInSlot(slot);
-		Vec3 origin = scene->m_universe.getPosition(scene->m_cameras[camera_cmp].m_entity);
-		Quat rot = scene->m_universe.getRotation(scene->m_cameras[camera_cmp].m_entity);
+		Vec3 origin = scene->m_universe.getPosition(scene->m_cameras[camera_cmp].entity);
+		Quat rot = scene->m_universe.getRotation(scene->m_cameras[camera_cmp].entity);
 
 		RayCastModelHit hit = scene->castRay(origin, rot * Vec3(0, 0, -1), INVALID_COMPONENT);
 		LuaWrapper::pushLua(L, hit.m_is_hit);
@@ -1872,6 +1879,33 @@ public:
 	}
 
 
+	static unsigned int LUA_compareTGA(RenderSceneImpl* scene, const char* path, const char* path_preimage, int min_diff)
+	{
+		auto& fs = scene->m_engine.getFileSystem();
+		auto file1 = fs.open(fs.getDefaultDevice(), Lumix::Path(path), Lumix::FS::Mode::OPEN_AND_READ);
+		auto file2 = fs.open(fs.getDefaultDevice(), Lumix::Path(path_preimage), Lumix::FS::Mode::OPEN_AND_READ);
+		if (!file1)
+		{
+			if (file2) fs.close(*file2);
+			Lumix::g_log_error.log("render_test") << "Failed to open " << path;
+			return 0xffffFFFF;
+		}
+		else if (!file2)
+		{
+			fs.close(*file1);
+			Lumix::g_log_error.log("render_test") << "Failed to open " << path_preimage;
+			return 0xffffFFFF;
+		}
+		return Lumix::Texture::compareTGA(scene->m_allocator, file1, file2, min_diff);
+	}
+
+
+	static void LUA_makeScreenshot(RenderSceneImpl* scene, const char* path)
+	{
+		scene->m_renderer.makeScreenshot(Path(path));
+	}
+
+
 	static void LUA_setRenderableMaterial(RenderScene* scene,
 		ComponentIndex cmp,
 		int index,
@@ -1881,79 +1915,21 @@ public:
 	}
 
 
-	void registerLuaAPI()
-	{
-		auto* scene = m_universe.getScene(crc32("lua_script"));
-		if (!scene) return;
-
-		auto* script_scene = static_cast<LuaScriptScene*>(scene);
-
-		lua_State* L = script_scene->getGlobalState();
-		Pipeline::registerLuaAPI(L);
-
-		#define REGISTER_FUNCTION(F)\
-			do { \
-			auto f = &LuaWrapper::wrapMethod<RenderSceneImpl, decltype(&RenderSceneImpl::F), &RenderSceneImpl::F>; \
-			LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
-			} while(false) \
-
-		REGISTER_FUNCTION(setFogDensity);
-		REGISTER_FUNCTION(setFogBottom);
-		REGISTER_FUNCTION(setFogHeight);
-		REGISTER_FUNCTION(setFogColor);
-		REGISTER_FUNCTION(getFogDensity);
-		REGISTER_FUNCTION(getFogBottom);
-		REGISTER_FUNCTION(getFogHeight);
-		REGISTER_FUNCTION(getFogColor);
-		REGISTER_FUNCTION(getCameraSlot);
-		REGISTER_FUNCTION(getCameraComponent);
-		REGISTER_FUNCTION(getRenderableComponent);
-		REGISTER_FUNCTION(addDebugCross);
-		REGISTER_FUNCTION(getTerrainMaterial);
-
-		#undef REGISTER_FUNCTION
-
-		#define REGISTER_FUNCTION(F)\
-			do { \
-			auto f = &LuaWrapper::wrap<decltype(&RenderSceneImpl::LUA_##F), &RenderSceneImpl::LUA_##F>; \
-			LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
-			} while(false) \
-
-		REGISTER_FUNCTION(getMaterialTexture);
-		REGISTER_FUNCTION(setRenderableMaterial);
-		REGISTER_FUNCTION(setRenderablePath);
-		
-		LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", LUA_castCameraRay);
-
-		#undef REGISTER_FUNCTION
-	}
-
-
-	void sendMessage(uint32 type, void*) override
-	{
-		static const uint32 register_hash = crc32("registerLuaAPI");
-		if (type == register_hash)
-		{
-			registerLuaAPI();
-		}
-	}
-
-
 	bool isGrassEnabled() const override
 	{
 		return m_is_grass_enabled;
 	}
 
 
-	int getGrassDistance(ComponentIndex cmp) override
+	float getGrassDistance(ComponentIndex cmp, int index) override
 	{
-		return m_terrains[cmp]->getGrassDistance();
+		return m_terrains[cmp]->getGrassTypeDistance(index);
 	}
 
 
-	void setGrassDistance(ComponentIndex cmp, int value) override
+	void setGrassDistance(ComponentIndex cmp, int index, float value) override
 	{
-		m_terrains[cmp]->setGrassDistance(value);
+		m_terrains[cmp]->setGrassTypeDistance(index, value);
 	}
 
 
@@ -2195,7 +2171,7 @@ public:
 
 	Entity getCameraEntity(ComponentIndex camera) const override
 	{
-		return m_cameras[camera].m_entity;
+		return m_cameras[camera].entity;
 	}
 
 
@@ -2290,7 +2266,7 @@ public:
 
 	void setCameraSlot(ComponentIndex camera, const char* slot) override
 	{
-		copyString(m_cameras[camera].m_slot, Camera::MAX_SLOT_LENGTH, slot);
+		copyString(m_cameras[camera].slot, lengthOf(m_cameras[camera].slot), slot);
 	}
 
 
@@ -2298,65 +2274,103 @@ public:
 	{
 		for (int i = 0; i < m_cameras.size(); ++i)
 		{
-			if (m_cameras[i].m_entity == entity) return i;
+			if (m_cameras[i].entity == entity) return i;
 		}
 		return INVALID_COMPONENT;
 	}
 
 	const char* getCameraSlot(ComponentIndex camera) override
 	{
-		return m_cameras[camera].m_slot;
+		return m_cameras[camera].slot;
 	}
 
 	float getCameraFOV(ComponentIndex camera) override
 	{
-		return m_cameras[camera].m_fov;
+		return m_cameras[camera].fov;
 	}
 
 	void setCameraFOV(ComponentIndex camera, float fov) override
 	{
-		m_cameras[camera].m_fov = fov;
+		m_cameras[camera].fov = fov;
 	}
 
 	void setCameraNearPlane(ComponentIndex camera,
 									float near_plane) override
 	{
-		m_cameras[camera].m_near = near_plane;
+		m_cameras[camera].near = near_plane;
 	}
 
 	float getCameraNearPlane(ComponentIndex camera) override
 	{
-		return m_cameras[camera].m_near;
+		return m_cameras[camera].near;
 	}
 
 	void setCameraFarPlane(ComponentIndex camera,
 								   float far_plane) override
 	{
-		m_cameras[camera].m_far = far_plane;
+		m_cameras[camera].far = far_plane;
 	}
 
 	float getCameraFarPlane(ComponentIndex camera) override
 	{
-		return m_cameras[camera].m_far;
+		return m_cameras[camera].far;
 	}
 
-	float getCameraWidth(ComponentIndex camera) override
+	float getCameraScreenWidth(ComponentIndex camera) override
 	{
-		return m_cameras[camera].m_width;
-	}
-
-
-	float getCameraHeight(ComponentIndex camera) override
-	{
-		return m_cameras[camera].m_height;
+		return m_cameras[camera].screen_width;
 	}
 
 
-	void setCameraSize(ComponentIndex camera, int w, int h) override
+	float getCameraScreenHeight(ComponentIndex camera) override
 	{
-		m_cameras[camera].m_width = (float)w;
-		m_cameras[camera].m_height = (float)h;
-		m_cameras[camera].m_aspect = w / (float)h;
+		return m_cameras[camera].screen_height;
+	}
+
+
+	Matrix getCameraProjection(ComponentIndex cmp) override
+	{
+		Camera& camera = m_cameras[cmp];
+		Matrix mtx;
+		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
+		if (camera.is_ortho)
+		{
+			mtx.setOrtho(-camera.ortho_size * ratio,
+				camera.ortho_size * ratio,
+				camera.ortho_size,
+				-camera.ortho_size,
+				camera.near,
+				camera.far);
+		}
+		else
+		{
+			mtx.setPerspective(Math::degreesToRadians(camera.fov), ratio, camera.near, camera.far);
+		}
+		return mtx;
+	}
+
+
+	void setCameraScreenSize(ComponentIndex camera, int w, int h) override
+	{
+		m_cameras[camera].screen_width = (float)w;
+		m_cameras[camera].screen_height = (float)h;
+		m_cameras[camera].aspect = w / (float)h;
+	}
+
+
+	float getCameraOrthoSize(ComponentIndex camera) override { return m_cameras[camera].ortho_size; }
+	void setCameraOrthoSize(ComponentIndex camera, float value) override { m_cameras[camera].ortho_size = value; }
+
+
+	bool isCameraOrtho(ComponentIndex camera) override
+	{
+		return m_cameras[camera].is_ortho;
+	}
+
+
+	void setCameraOrtho(ComponentIndex camera, bool is_ortho) override
+	{
+		m_cameras[camera].is_ortho = is_ortho;
 	}
 
 
@@ -3125,8 +3139,7 @@ public:
 	{
 		for (int i = 0, c = m_cameras.size(); i < c; ++i)
 		{
-			if (!m_cameras[i].m_is_free &&
-				compareString(m_cameras[i].m_slot, slot) == 0)
+			if (!m_cameras[i].is_free && compareString(m_cameras[i].slot, slot) == 0)
 			{
 				return i;
 			}
@@ -3190,7 +3203,7 @@ public:
 			model->getPose(*r.pose);
 		}
 		r.matrix = m_universe.getMatrix(r.entity);
-		ASSERT(!r.meshes || r.custom_meshes)
+		ASSERT(!r.meshes || r.custom_meshes);
 		if (r.meshes)
 		{
 			allocateCustomMeshes(r, model->getMeshCount());
@@ -3785,4 +3798,42 @@ void RenderScene::destroyInstance(RenderScene* scene)
 {
 	LUMIX_DELETE(scene->getAllocator(), static_cast<RenderSceneImpl*>(scene));
 }
+
+
+void RenderScene::registerLuaAPI(lua_State* L)
+{
+	Pipeline::registerLuaAPI(L);
+
+	#define REGISTER_FUNCTION(F)\
+		do { \
+		auto f = &LuaWrapper::wrapMethod<RenderSceneImpl, decltype(&RenderSceneImpl::F), &RenderSceneImpl::F>; \
+		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
+		} while(false) \
+
+	REGISTER_FUNCTION(getCameraSlot);
+	REGISTER_FUNCTION(getCameraComponent);
+	REGISTER_FUNCTION(getRenderableComponent);
+	REGISTER_FUNCTION(addDebugCross);
+	REGISTER_FUNCTION(getTerrainMaterial);
+
+	#undef REGISTER_FUNCTION
+
+	#define REGISTER_FUNCTION(F)\
+		do { \
+		auto f = &LuaWrapper::wrap<decltype(&RenderSceneImpl::LUA_##F), &RenderSceneImpl::LUA_##F>; \
+		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
+		} while(false) \
+
+	REGISTER_FUNCTION(getMaterialTexture);
+	REGISTER_FUNCTION(setRenderableMaterial);
+	REGISTER_FUNCTION(setRenderablePath);
+	REGISTER_FUNCTION(makeScreenshot);
+	REGISTER_FUNCTION(compareTGA);
+
+	LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", &RenderSceneImpl::LUA_castCameraRay);
+
+	#undef REGISTER_FUNCTION
 }
+
+
+} // namespace Lumix

@@ -6,6 +6,9 @@
 #include "iplugin.h"
 
 
+struct lua_State;
+
+
 namespace Lumix
 {
 
@@ -15,7 +18,7 @@ class Frustum;
 class IAllocator;
 class LIFOAllocator;
 class Material;
-class Mesh;
+struct Mesh;
 class Model;
 class Path;
 class Pose;
@@ -26,6 +29,26 @@ class Terrain;
 class Universe;
 template <typename T> class Array;
 template <typename T> class DelegateList;
+
+
+enum class RenderSceneVersion : int32
+{
+	PARTICLES,
+	WHOLE_LIGHTS,
+	PARTICLE_EMITTERS_SPAWN_COUNT,
+	PARTICLES_FORCE_MODULE,
+	PARTICLES_SAVE_SIZE_ALPHA,
+	RENDERABLE_MATERIALS,
+	GLOBAL_LIGHT_SPECULAR,
+	SPECULAR_INTENSITY,
+	RENDER_PARAMS,
+	RENDER_PARAMS_REMOVED,
+	GRASS_TYPE_DISTANCE,
+	ORTHO_CAMERA,
+
+	LATEST,
+	INVALID = -1,
+};
 
 
 struct TerrainInfo
@@ -62,9 +85,10 @@ struct RenderableMesh
 
 struct GrassInfo
 {
-	Model* m_model;
-	const Matrix* m_matrices;
-	int m_matrix_count;
+	Model* model;
+	const Matrix* matrices;
+	int matrix_count;
+	float type_distance;
 };
 
 
@@ -103,6 +127,7 @@ enum class RenderableType
 	TERRAIN
 };
 
+
 class LUMIX_RENDERER_API RenderScene : public IScene
 {
 public:
@@ -112,6 +137,7 @@ public:
 		bool is_forward_rendered,
 		IAllocator& allocator);
 	static void destroyInstance(RenderScene* scene);
+	static void registerLuaAPI(lua_State* L);
 
 	virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, ComponentIndex ignore) = 0;
 
@@ -183,6 +209,7 @@ public:
 	virtual const Array<DebugLine>& getDebugLines() const = 0;
 	virtual const Array<DebugPoint>& getDebugPoints() const = 0;
 
+	virtual Matrix getCameraProjection(ComponentIndex camera) = 0;
 	virtual Entity getCameraEntity(ComponentIndex camera) const = 0;
 	virtual ComponentIndex getCameraInSlot(const char* slot) = 0;
 	virtual float getCameraFOV(ComponentIndex camera) = 0;
@@ -191,11 +218,15 @@ public:
 	virtual void setCameraNearPlane(ComponentIndex camera, float near) = 0;
 	virtual float getCameraFarPlane(ComponentIndex camera) = 0;
 	virtual float getCameraNearPlane(ComponentIndex camera) = 0;
-	virtual float getCameraWidth(ComponentIndex camera) = 0;
-	virtual float getCameraHeight(ComponentIndex camera) = 0;
+	virtual float getCameraScreenWidth(ComponentIndex camera) = 0;
+	virtual float getCameraScreenHeight(ComponentIndex camera) = 0;
 	virtual void setCameraSlot(ComponentIndex camera, const char* slot) = 0;
 	virtual const char* getCameraSlot(ComponentIndex camera) = 0;
-	virtual void setCameraSize(ComponentIndex camera, int w, int h) = 0;
+	virtual void setCameraScreenSize(ComponentIndex camera, int w, int h) = 0;
+	virtual bool isCameraOrtho(ComponentIndex camera) = 0;
+	virtual void setCameraOrtho(ComponentIndex camera, bool is_ortho) = 0;
+	virtual float getCameraOrthoSize(ComponentIndex camera) = 0;
+	virtual void setCameraOrthoSize(ComponentIndex camera, float value) = 0;
 
 	virtual class ParticleEmitter* getParticleEmitter(ComponentIndex cmp) = 0;
 	virtual void resetParticleEmitter(ComponentIndex cmp) = 0;
@@ -291,8 +322,8 @@ public:
 	virtual ComponentIndex getNextTerrain(ComponentIndex cmp) = 0;
 
 	virtual bool isGrassEnabled() const = 0;
-	virtual int getGrassDistance(ComponentIndex cmp) = 0;
-	virtual void setGrassDistance(ComponentIndex cmp, int value) = 0;
+	virtual float getGrassDistance(ComponentIndex cmp, int index) = 0;
+	virtual void setGrassDistance(ComponentIndex cmp, int index, float value) = 0;
 	virtual void enableGrass(bool enabled) = 0;
 	virtual void setGrassPath(ComponentIndex cmp, int index, const Path& path) = 0;
 	virtual Path getGrassPath(ComponentIndex cmp, int index) = 0;

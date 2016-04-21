@@ -16,13 +16,13 @@ static Settings* g_instance = nullptr;
 
 static void shortcutInput(int& shortcut)
 {
-	StringBuilder<50> popup_name("");
+	Lumix::StaticString<50> popup_name("");
 	popup_name << (Lumix::int64)&shortcut;
 
 	char key_string[30];
 	PlatformInterface::getKeyName(shortcut, key_string, 30);
 
-	StringBuilder<50> button_label(key_string);
+	Lumix::StaticString<50> button_label(key_string);
 	button_label << "###" << (Lumix::int64)&shortcut;
 
 	if (ImGui::Button(button_label, ImVec2(50, 0))) shortcut = -1;
@@ -128,7 +128,7 @@ bool Settings::load(Action** actions, int actions_count)
 	auto L = m_state;
 	bool has_settings = PlatformInterface::fileExists(SETTINGS_PATH);
 	bool errors = luaL_loadfile(L, has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH) != LUA_OK;
-	errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
+	errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
 	if (errors)
 	{
 		Lumix::g_log_error.log("Editor") << SETTINGS_PATH << ": " << lua_tostring(L, -1);
@@ -234,7 +234,7 @@ Settings* Settings::getInstance()
 bool Settings::save(Action** actions, int actions_count)
 {
 	Lumix::FS::OsFile file;
-	if (!file.open(SETTINGS_PATH, Lumix::FS::Mode::WRITE | Lumix::FS::Mode::CREATE, m_allocator)) return false;
+	if (!file.open(SETTINGS_PATH, Lumix::FS::Mode::CREATE_AND_WRITE, m_allocator)) return false;
 
 	file << "window = { x = " << m_window.x 
 		<< ", y = " << m_window.y 

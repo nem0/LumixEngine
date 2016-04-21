@@ -1,4 +1,4 @@
-version: 0.21.{build}
+version: 0.22.{build}
 os: Windows Server 2012 R2
 configuration: RelWithDebInfo
 before_build:
@@ -21,13 +21,13 @@ test_script:
             $wc.UploadFile($url, (Resolve-Path .\tests.xml))
 
 - ps: >-
-    & "..\projects\tmp\vs2013\bin\RelWithDebInfo\studio.exe" -run_script render_tests/main.lua | Write-Output
+    & "..\projects\tmp\vs2013\bin\RelWithDebInfo\studio.exe" -run_script unit_tests/render_tests/compile_shaders.lua | Write-Output
 
 - ps: >-
     & "..\projects\tmp\vs2013\bin\RelWithDebInfo\studio.exe" -run_script unit_tests/editor/main.lua | Write-Output
 
 - ps: >-
-    & "..\projects\tmp\vs2013\bin\RelWithDebInfo\render_test.exe" | Write-Output
+    & "..\projects\tmp\vs2013\bin\RelWithDebInfo\app.exe" -pipeline pipelines/render_test.lua -script unit_tests/render_tests/main.lua | Write-Output
 
 after_build:
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\vs2013\bin\RelWithDebInfo\animation.dll

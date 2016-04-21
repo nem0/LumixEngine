@@ -10,7 +10,6 @@
 #include "core/fs/disk_file_device.h"
 #include "core/fs/tcp_file_device.h"
 #include "core/fs/tcp_file_server.h"
-#include "core/fs/ifile.h"
 #include "core/geometry.h"
 #include "core/input_system.h"
 #include "core/json_serializer.h"
@@ -36,8 +35,8 @@
 #include "iplugin.h"
 #include "plugin_manager.h"
 #include "render_interface.h"
+#include "renderer/model.h"
 #include "renderer/pipeline.h"
-#include "renderer/ray_cast_model_hit.h"
 #include "renderer/render_scene.h"
 #include "universe/universe.h"
 
@@ -1340,8 +1339,8 @@ private:
 
 		AddEntityCommand(WorldEditorImpl& editor, const Vec3& position)
 			: m_editor(editor)
+			, m_position(position)
 		{
-			m_position = position;
 			m_entity = INVALID_ENTITY;
 		}
 
@@ -1517,10 +1516,6 @@ public:
 			m_gizmo->add(m_selected_entities[0]);
 		}
 
-		for (int i = 0; i < m_plugins.size(); ++i)
-		{
-			m_plugins[i]->tick();
-		}
 		createEditorLines();
 		for (auto& i : m_is_mouse_click) i = false;
 	}
@@ -1702,6 +1697,8 @@ public:
 		m_mouse_x = (float)x;
 		m_mouse_y = (float)y;
 
+		static const float MOUSE_MULTIPLIER = 1 / 200.0f;
+
 		switch (m_mouse_mode)
 		{
 			case MouseMode::CUSTOM:
@@ -1713,7 +1710,7 @@ public:
 			}
 			break;
 			case MouseMode::NAVIGATE: rotateCamera(relx, rely); break;
-			case MouseMode::PAN: panCamera(relx, rely); break;
+			case MouseMode::PAN: panCamera(relx * MOUSE_MULTIPLIER, rely * MOUSE_MULTIPLIER); break;
 		}
 	}
 
@@ -1736,16 +1733,25 @@ public:
 	float getMouseY() const override { return m_mouse_y; }
 
 
+	bool isUniverseChanged() const override { return m_is_universe_changed; }
+
+
 	void saveUniverse(const Path& path, bool save_path) override
 	{
-		g_log_info.log("Editor") << "saving universe " << path << "...";
+		g_log_info.log("Editor") << "Saving universe " << path << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
 		char bkp_path[MAX_PATH_LENGTH];
 		copyString(bkp_path, path.c_str());
 		catString(bkp_path, ".bkp");
 		copyFile(path.c_str(), bkp_path);
-		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::CREATE | FS::Mode::WRITE);
+		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::CREATE_AND_WRITE);
+		if (!file)
+		{
+			g_log_error.log("Editor") << "Could not create/open " << path.c_str();
+			return;
+		}
 		save(*file);
+		m_is_universe_changed = false;
 		fs.close(*file);
 		if (save_path) m_universe_path = path;
 	}
@@ -1844,8 +1850,8 @@ public:
 	{
 		ComponentUID cmp = getComponent(m_camera, CAMERA_HASH);
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-		float width = scene->getCameraWidth(cmp.index);
-		float height = scene->getCameraHeight(cmp.index);
+		float width = scene->getCameraScreenWidth(cmp.index);
+		float height = scene->getCameraScreenHeight(cmp.index);
 		return addEntityAt((int)width >> 1, (int)height >> 1);
 	}
 
@@ -1883,15 +1889,14 @@ public:
 		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
 		RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
 		Universe* universe = getUniverse();
-		float camera_x = scene->getCameraWidth(camera_cmp.index);
-		float camera_y = scene->getCameraHeight(camera_cmp.index);
+		float camera_x = scene->getCameraScreenWidth(camera_cmp.index);
+		float camera_y = scene->getCameraScreenHeight(camera_cmp.index);
 		camera_x *= 0.5f;
 		camera_y *= 0.5f;
 
 		Vec3 origin;
 		Vec3 dir;
-		scene->getRay(
-			camera_cmp.index, (float)camera_x, (float)camera_y, origin, dir);
+		scene->getRay(camera_cmp.index, (float)camera_x, (float)camera_y, origin, dir);
 		RayCastModelHit hit = scene->castRay(origin, dir, INVALID_COMPONENT);
 		Vec3 pos;
 		if (hit.m_is_hit)
@@ -1900,8 +1905,7 @@ public:
 		}
 		else
 		{
-			pos = universe->getPosition(m_camera) +
-				  universe->getRotation(m_camera) * Vec3(0, 0, -2);
+			pos = universe->getPosition(m_camera) + universe->getRotation(m_camera) * Vec3(0, 0, -2);
 		}
 		return pos;
 	}
@@ -2022,6 +2026,7 @@ public:
 
 	void executeCommand(IEditorCommand* command) override
 	{
+		m_is_universe_changed = true;
 		if (m_undo_index >= 0 && command->getType() == m_undo_stack[m_undo_index]->getType())
 		{
 			if (command->merge(*m_undo_stack[m_undo_index]))
@@ -2064,8 +2069,8 @@ public:
 		}
 		else
 		{
-			m_game_mode_file = m_engine->getFileSystem().open(
-				m_engine->getFileSystem().getMemoryDevice(), Lumix::Path(""), FS::Mode::WRITE);
+			auto& fs = m_engine->getFileSystem();
+			m_game_mode_file = fs.open(fs.getMemoryDevice(), Lumix::Path(""), FS::Mode::WRITE);
 			save(*m_game_mode_file);
 			m_is_game_mode = true;
 			m_engine->startGame(*m_universe);
@@ -2294,25 +2299,19 @@ public:
 		fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN_AND_READ, file_read_cb);
 	}
 
+
 	void loadMap(FS::IFile& file, bool success)
 	{
 		ASSERT(success);
 		if (success)
 		{
 			resetAndLoad(file);
+			char path[MAX_PATH_LENGTH];
+			copyString(path, sizeof(path), m_universe_path.c_str());
+			catString(path, sizeof(path), ".lst");
+			copyFile(m_universe_path.c_str(), path);
 		}
-		char path[MAX_PATH_LENGTH];
-		copyString(path, sizeof(path), m_universe_path.c_str());
-		catString(path, sizeof(path), ".lst");
-		copyFile(m_universe_path.c_str(), path);
 		m_universe_loaded.invoke();
-	}
-
-
-	bool isRelativePath(const char* path)
-	{
-		const char* base_path = m_engine->getDiskFileDevice()->getBasePath(0);
-		return compareStringN(base_path, path, stringLength(base_path)) == 0;
 	}
 
 
@@ -2526,22 +2525,22 @@ public:
 			crc32("scale_entity"), &WorldEditorImpl::constructEditorCommand<ScaleEntityCommand>);
 		m_editor_command_creators.insert(
 			crc32("move_entity"), &WorldEditorImpl::constructEditorCommand<MoveEntityCommand>);
-		m_editor_command_creators.insert(crc32("set_entity_name"),
-			&WorldEditorImpl::constructEditorCommand<SetEntityNameCommand>);
+		m_editor_command_creators.insert(
+			crc32("set_entity_name"), &WorldEditorImpl::constructEditorCommand<SetEntityNameCommand>);
 		m_editor_command_creators.insert(
 			crc32("paste_entity"), &WorldEditorImpl::constructEditorCommand<PasteEntityCommand>);
 		m_editor_command_creators.insert(crc32("remove_array_property_item"),
 			&WorldEditorImpl::constructEditorCommand<RemoveArrayPropertyItemCommand>);
-		m_editor_command_creators.insert(crc32("add_array_property_item"),
-			&WorldEditorImpl::constructEditorCommand<AddArrayPropertyItemCommand>);
+		m_editor_command_creators.insert(
+			crc32("add_array_property_item"), &WorldEditorImpl::constructEditorCommand<AddArrayPropertyItemCommand>);
 		m_editor_command_creators.insert(
 			crc32("set_property"), &WorldEditorImpl::constructEditorCommand<SetPropertyCommand>);
 		m_editor_command_creators.insert(
 			crc32("add_component"), &WorldEditorImpl::constructEditorCommand<AddComponentCommand>);
-		m_editor_command_creators.insert(crc32("destroy_entities"),
-			&WorldEditorImpl::constructEditorCommand<DestroyEntitiesCommand>);
-		m_editor_command_creators.insert(crc32("destroy_component"),
-			&WorldEditorImpl::constructEditorCommand<DestroyComponentCommand>);
+		m_editor_command_creators.insert(
+			crc32("destroy_entities"), &WorldEditorImpl::constructEditorCommand<DestroyEntitiesCommand>);
+		m_editor_command_creators.insert(
+			crc32("destroy_component"), &WorldEditorImpl::constructEditorCommand<DestroyComponentCommand>);
 		m_editor_command_creators.insert(
 			crc32("add_entity"), &WorldEditorImpl::constructEditorCommand<AddEntityCommand>);
 
@@ -2550,7 +2549,7 @@ public:
 	}
 
 
-	void navigate(float forward, float right, float speed) override
+	void navigate(float forward, float right, float up, float speed) override
 	{
 		Universe* universe = getUniverse();
 		Vec3 pos = universe->getPosition(m_camera);
@@ -2560,6 +2559,7 @@ public:
 
 		pos += rot * Vec3(0, 0, -1) * forward * speed;
 		pos += rot * Vec3(1, 0, 0) * right * speed;
+		pos += rot * Vec3(0, 1, 0) * up * speed;
 		universe->setPosition(m_camera, pos);
 	}
 
@@ -2656,22 +2656,20 @@ public:
 	}
 
 
-	void panCamera(int x, int y)
+	void panCamera(float x, float y)
 	{
 		Universe* universe = getUniverse();
 		Vec3 pos = universe->getPosition(m_camera);
 		Quat rot = universe->getRotation(m_camera);
 
-		static const float MOUSE_MULTIPLIER = 1 / 200.0f;
-
 		if(m_is_orbit)
 		{
-			m_orbit_delta.x += x * MOUSE_MULTIPLIER;
-			m_orbit_delta.y += y * MOUSE_MULTIPLIER;
+			m_orbit_delta.x += x;
+			m_orbit_delta.y += y;
 		}
 
-		pos += rot * Vec3(1, 0, 0) * (float)x * MOUSE_MULTIPLIER;
-		pos += rot * Vec3(0, -1, 0) * (float)y * MOUSE_MULTIPLIER;
+		pos += rot * Vec3(x, 0, 0);
+		pos += rot * Vec3(0, -y, 0);
 
 		universe->setPosition(m_camera, pos);
 	}
@@ -2895,6 +2893,7 @@ public:
 	{
 		ASSERT(!m_universe);
 
+		m_is_universe_changed = false;
 		destroyUndoStack();
 		m_universe = &m_engine->createUniverse();
 		Universe* universe = m_universe;
@@ -3015,7 +3014,7 @@ public:
 		FS::IFile* file = m_engine->getFileSystem().open(
 			m_engine->getFileSystem().getDiskDevice(),
 			path,
-			FS::Mode::CREATE | FS::Mode::WRITE);
+			FS::Mode::CREATE_AND_WRITE);
 		if (file)
 		{
 			JsonSerializer serializer(
@@ -3161,7 +3160,7 @@ public:
 		FS::IFile* file =
 			m_engine->getFileSystem().open(m_engine->getFileSystem().getMemoryDevice(),
 				Lumix::Path(""),
-				FS::Mode::CREATE | FS::Mode::WRITE);
+				FS::Mode::CREATE_AND_WRITE);
 		if (!file)
 		{
 			return false;
@@ -3271,6 +3270,7 @@ private:
 	EntityGroups m_entity_groups;
 	RenderInterface* m_render_interface;
 	uint32 m_current_group_type;
+	bool m_is_universe_changed;
 };
 
 

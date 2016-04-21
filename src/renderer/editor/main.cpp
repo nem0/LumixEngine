@@ -1,9 +1,8 @@
 #include "lumix.h"
 #include "core/crc32.h"
-#include "core/FS/disk_file_device.h"
-#include "core/FS/file_system.h"
-#include "core/FS/ifile.h"
-#include "core/FS/os_file.h"
+#include "core/fs/disk_file_device.h"
+#include "core/fs/file_system.h"
+#include "core/fs/os_file.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/lua_wrapper.h"
@@ -28,7 +27,6 @@
 #include "renderer/model_manager.h"
 #include "renderer/particle_system.h"
 #include "renderer/pipeline.h"
-#include "renderer/ray_cast_model_hit.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
@@ -65,7 +63,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 		strcat(tmp_path, ".tmp");
 		FS::IFile* file = fs.open(fs.getDefaultDevice(),
 			Path(tmp_path),
-			FS::Mode::CREATE | FS::Mode::WRITE);
+			FS::Mode::CREATE_AND_WRITE);
 		if (file)
 		{
 			DefaultAllocator allocator;
@@ -77,34 +75,32 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 			}
 			fs.close(*file);
 
-			StringBuilder<MAX_PATH_LENGTH> src_full_path(
-				m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(0));
-			StringBuilder<MAX_PATH_LENGTH> dest_full_path(
-				m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(0));
-			src_full_path << tmp_path;
-			dest_full_path << material->getPath().c_str();
-			if (!PlatformInterface::fileExists(src_full_path))
+			auto& engine = m_app.getWorldEditor()->getEngine();
+			StaticString<MAX_PATH_LENGTH> src_full_path("");
+			StaticString<MAX_PATH_LENGTH> dest_full_path("");
+			if (engine.getPatchFileDevice())
+			{
+				src_full_path << engine.getPatchFileDevice()->getBasePath() << tmp_path;
+				dest_full_path << engine.getPatchFileDevice()->getBasePath() << material->getPath().c_str();
+			}
+			if (!engine.getPatchFileDevice() || !PlatformInterface::fileExists(src_full_path))
 			{
 				src_full_path.data[0] = 0;
 				dest_full_path.data[0] = 0;
-				src_full_path << m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(1);
-				src_full_path << tmp_path;
-				dest_full_path << m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(1);
-				dest_full_path << material->getPath().c_str();
+				src_full_path << engine.getDiskFileDevice()->getBasePath() << tmp_path;
+				dest_full_path << engine.getDiskFileDevice()->getBasePath() << material->getPath().c_str();
 			}
 
 			PlatformInterface::deleteFile(dest_full_path);
 
 			if (!PlatformInterface::moveFile(src_full_path, dest_full_path))
 			{
-				g_log_error.log("Editor") << "Could not save file "
-											<< material->getPath().c_str();
+				g_log_error.log("Editor") << "Could not save file " << material->getPath().c_str();
 			}
 		}
 		else
 		{
-			g_log_error.log("Editor") << "Could not save file "
-				<< material->getPath().c_str();
+			g_log_error.log("Editor") << "Could not save file " << material->getPath().c_str();
 		}
 	}
 
@@ -178,15 +174,15 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 			auto* texture = material->getTexture(i);
 			copyString(buf, texture ? texture->getPath().c_str() : "");
 			if (m_app.getAssetBrowser()->resourceInput(
-				slot.m_name, StringBuilder<30>("", (uint64)&slot), buf, sizeof(buf), TEXTURE_HASH))
+				slot.m_name, StaticString<30>("", (uint64)&slot), buf, sizeof(buf), TEXTURE_HASH))
 			{
 				material->setTexturePath(i, Path(buf));
 			}
 			if (!texture) continue;
 
 			ImGui::SameLine();
-			StringBuilder<100> popup_name("pu", (uint64)texture, slot.m_name);
-			if (ImGui::Button(StringBuilder<100>("Advanced###adv", (uint64)texture, slot.m_name)))
+			StaticString<100> popup_name("pu", (uint64)texture, slot.m_name);
+			if (ImGui::Button(StaticString<100>("Advanced###adv", (uint64)texture, slot.m_name)))
 			{
 				ImGui::OpenPopup(popup_name);
 			}
@@ -222,7 +218,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 				{
 					int size = texture->getAtlasSize() - 2;
 					const char values[] = { '2', 'x', '2', 0, '3', 'x', '3', 0, '4', 'x', '4', 0, 0 };
-					if (ImGui::Combo(StringBuilder<30>("Atlas size###", i), &size, values))
+					if (ImGui::Combo(StaticString<30>("Atlas size###", i), &size, values))
 					{
 						texture->setAtlasSize(size + 2);
 					}
@@ -259,7 +255,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 						{
 							material->createCommandBuffer();
 						}
-						if(ImGui::BeginPopupContextItem(StringBuilder<50>(shader_uniform.name, "pu")))
+						if(ImGui::BeginPopupContextItem(StaticString<50>(shader_uniform.name, "pu")))
 						{
 							if(ImGui::ColorPicker(uniform.vec3, false))
 							{
@@ -484,14 +480,22 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 			ImGui::Text("# of meshes"); ImGui::NextColumn();
 			ImGui::Separator();
 			int lod_count = 1;
-			for (int i = 0; i < Model::MAX_LOD_COUNT - 1 && lods[i + 1].to_mesh >= 0; ++i)
+			bool is_infinite_lod = false;
+			for (int i = 0; i < Model::MAX_LOD_COUNT && lods[i].to_mesh >= 0; ++i)
 			{
 				ImGui::PushID(i);
 				ImGui::Text("%d", i); ImGui::NextColumn();
-				float dist = sqrt(lods[i].distance);
-				if (ImGui::DragFloat("", &dist))
+				if (lods[i].distance == FLT_MAX)
 				{
-					lods[i].distance = dist * dist;
+					ImGui::Text("Infinite");
+				}
+				else
+				{
+					float dist = sqrt(lods[i].distance);
+					if (ImGui::DragFloat("", &dist))
+					{
+						lods[i].distance = dist * dist;
+					}
 				}
 				ImGui::NextColumn();
 				ImGui::Text("%d", lods[i].to_mesh - lods[i].from_mesh + 1); ImGui::NextColumn();
@@ -499,9 +503,6 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 				ImGui::PopID();
 			}
 
-			ImGui::Text("%d", lod_count - 1); ImGui::NextColumn();
-			ImGui::Text("INFINITE"); ImGui::NextColumn();
-			ImGui::Text("%d", lods[lod_count - 1].to_mesh - lods[lod_count - 1].from_mesh + 1);
 			ImGui::Columns(1);
 		}
 
@@ -632,7 +633,7 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 		char basename[MAX_PATH_LENGTH];
 		PathUtils::getBasename(
 			basename, lengthOf(basename), resource->getPath().c_str());
-		StringBuilder<MAX_PATH_LENGTH> path("/shaders/", basename);
+		StaticString<MAX_PATH_LENGTH> path("/shaders/", basename);
 		if (ImGui::Button("Open vertex shader"))
 		{
 			path << "_vs.sc";
@@ -839,6 +840,18 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		}
 
 
+		float getCameraOrthoSize(ComponentIndex cmp) override
+		{
+			return m_render_scene->getCameraOrthoSize(cmp);
+		}
+
+
+		bool isCameraOrtho(ComponentIndex cmp) override
+		{
+			return m_render_scene->isCameraOrtho(cmp);
+		}
+
+
 		float getCameraFOV(ComponentIndex cmp) override
 		{
 			return m_render_scene->getCameraFOV(cmp);
@@ -1003,451 +1016,6 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 	StudioApp& m_app;
 	SceneView m_scene_view;
 	RenderInterfaceImpl* m_render_interface;
-};
-
-
-struct MeshMergerPlugin : public StudioApp::IPlugin
-{
-	explicit MeshMergerPlugin(StudioApp& _app)
-		: app(_app)
-		, models(_app.getWorldEditor()->getAllocator())
-	{
-		m_is_window_opened = false;
-		m_action =
-			LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Mesh Merger", "mesh_merger");
-		m_action->func.bind<MeshMergerPlugin, &MeshMergerPlugin::onAction>(this);
-		auto& engine = app.getWorldEditor()->getEngine();
-		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-		model_manager = &renderer->getModelManager();
-		output[0] = 0;
-		for (int i = 0; i < lengthOf(lods); ++i) lods[i] = (float)i;
-	}
-
-
-	~MeshMergerPlugin()
-	{
-		for (auto* model : models)
-		{
-			model_manager->unload(*model);
-		}
-	}
-
-
-	void onAction() { m_is_window_opened = !m_is_window_opened; }
-
-
-	enum class VertexAttributeDef : uint32
-	{
-		POSITION,
-		FLOAT1,
-		FLOAT2,
-		FLOAT3,
-		FLOAT4,
-		INT1,
-		INT2,
-		INT3,
-		INT4,
-		SHORT2,
-		SHORT4,
-		BYTE4,
-		NONE
-	};
-
-
-	static void writeAttribute(const char* attribute_name,
-		VertexAttributeDef attribute_type,
-		FS::OsFile& file)
-	{
-		uint32 length = stringLength(attribute_name);
-		file.write((const char*)&length, sizeof(length));
-		file.write(attribute_name, length);
-
-		uint32 type = (uint32)attribute_type;
-		file.write((const char*)&type, sizeof(type));
-	}
-
-
-	int getAttributeArrayOffset(Mesh& mesh)
-	{
-		int offset = 0;
-		for (auto& model : models)
-		{
-			for (int i = 0; i < model->getMeshCount(); ++i)
-			{
-				auto& tmp = model->getMesh(i);
-				if (&tmp == &mesh) return offset;
-				offset += tmp.attribute_array_size;
-			}
-		}
-		return offset;
-	}
-
-
-	int getIndicesOffset(Mesh& mesh)
-	{
-		int offset = 0;
-		for (auto& model : models)
-		{
-			for (int i = 0; i < model->getMeshCount(); ++i)
-			{
-				auto& tmp = model->getMesh(i);
-				if (&tmp == &mesh) return offset + tmp.indices_offset;
-			}
-			offset += model->getIndices().size();
-		}
-		return offset;
-	}
-
-
-	void writeMeshes(FS::OsFile& file)
-	{
-		Array<Mesh*> meshes(app.getWorldEditor()->getAllocator());
-		int mesh_count = 0;
-		for (auto* model : models)
-		{
-			mesh_count += model->getMeshCount();
-		}
-		file.write((const char*)&mesh_count, sizeof(mesh_count));
-		for (auto* model : models)
-		{
-			for (int i = 0; i < model->getMeshCount(); ++i)
-			{
-				auto& engine_mesh = model->getMesh(i);
-				int vertex_size = engine_mesh.vertex_def.getStride();
-				char material_name[MAX_PATH_LENGTH];
-				PathUtils::getBasename(material_name,
-					lengthOf(material_name),
-					engine_mesh.material->getPath().c_str());
-				int32 length = stringLength(material_name);
-				file.write((const char*)&length, sizeof(length));
-				file.write(material_name, length);
-
-				int32 attribute_array_offset = getAttributeArrayOffset(engine_mesh);
-				file.write((const char*)&attribute_array_offset, sizeof(attribute_array_offset));
-				int32 attribute_array_size = engine_mesh.attribute_array_size;
-				attribute_array_offset += attribute_array_size;
-				file.write((const char*)&attribute_array_size, sizeof(attribute_array_size));
-
-				int32 indices_offset = getIndicesOffset(engine_mesh);
-				file.write((const char*)&indices_offset, sizeof(indices_offset));
-				indices_offset += engine_mesh.indices_count;
-				int mesh_tri_count = engine_mesh.indices_count / 3;
-				file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
-
-				length = engine_mesh.name.length();
-
-				file.write((const char*)&length, sizeof(length));
-				file.write((const char*)engine_mesh.name.c_str(), length);
-
-				int32 attribute_count = 3;
-				if (engine_mesh.vertex_def.has(bgfx::Attrib::Color0)) ++attribute_count;
-				if (engine_mesh.vertex_def.has(bgfx::Attrib::Tangent)) ++attribute_count;
-
-				file.write((const char*)&attribute_count, sizeof(attribute_count));
-
-				writeAttribute("in_position", VertexAttributeDef::POSITION, file);
-				if (engine_mesh.vertex_def.has(bgfx::Attrib::Color0))
-				{
-					writeAttribute("in_colors", VertexAttributeDef::BYTE4, file);
-				}
-				writeAttribute("in_normal", VertexAttributeDef::BYTE4, file);
-				if (engine_mesh.vertex_def.has(bgfx::Attrib::Tangent))
-				{
-					writeAttribute("in_tangents", VertexAttributeDef::BYTE4, file);
-				}
-				writeAttribute("in_tex_coords", VertexAttributeDef::FLOAT2, file);
-			}
-		}
-	}
-
-
-	bool writeGeometry(FS::OsFile& file)
-	{
-		int32 indices_count = 0;
-		int32 vertices_size = 0;
-		for (auto& model : models)
-		{
-			indices_count += model->getIndices().size();
-			for (int i = 0; i < model->getMeshCount(); ++i)
-			{
-				auto& engine_mesh = model->getMesh(i);
-				vertices_size += engine_mesh.attribute_array_size;
-			}
-		}
-		file.write((const char*)&indices_count, sizeof(indices_count));
-
-		int32 polygon_idx = 0;
-		int indices_offset = 0;
-		for (auto& model : models)
-		{
-			const int* indices = &model->getIndices()[0];
-			for (int j = 0; j < model->getIndices().size(); ++j)
-			{
-				int tmp = indices_offset + indices[j];
-				file.write(&tmp, sizeof(tmp));
-			}
-		}
-
-		file.write((const char*)&vertices_size, sizeof(vertices_size));
-		for (auto& model : models)
-		{
-			auto& allocator = app.getWorldEditor()->getAllocator();
-			auto& fs = app.getWorldEditor()->getEngine().getFileSystem();
-			auto in_file = fs.open(fs.getDiskDevice(), model->getPath(), FS::Mode::OPEN_AND_READ);
-			if (!in_file)
-			{
-				g_log_error.log("Renderer") << "Failed to open \"" << model->getPath() << "\"";
-				return false;
-			}
-
-			Model::FileHeader header;
-			in_file->read(&header, sizeof(Model::FileHeader));
-			if (header.m_version != (uint32)Model::FileVersion::FIRST + 1)
-			{
-				g_log_error.log("Renderer") << model->getPath().c_str()
-											<< " has unsupported version";
-				return false;
-			}
-
-			int object_count = 0;
-			in_file->read(&object_count, sizeof(object_count));
-			for (int i = 0; i < object_count; ++i)
-			{
-				int32 str_size;
-				in_file->read(&str_size, sizeof(str_size));
-				char dummy[MAX_PATH_LENGTH];
-				in_file->read(dummy, str_size);
-
-				int32 idummy[4];
-				in_file->read(idummy, sizeof(idummy));
-
-				in_file->read(&str_size, sizeof(str_size));
-				in_file->read(dummy, str_size);
-
-				uint32 attribute_count;
-				in_file->read(&attribute_count, sizeof(attribute_count));
-				for (uint32 i = 0; i < attribute_count; ++i)
-				{
-					char tmp[50];
-					uint32 len;
-					in_file->read(&len, sizeof(len));
-					in_file->read(tmp, len);
-					uint32 type;
-					in_file->read(&type, sizeof(type));
-				}
-			}
-			int32 indices_count;
-			in_file->read(&indices_count, sizeof(indices_count));
-			in_file->seek(FS::SeekMode::CURRENT, indices_count * sizeof(int32));
-			int32 in_vertices_size;
-			in_file->read(&in_vertices_size, sizeof(in_vertices_size));
-			char buf[4096];
-			while (in_vertices_size)
-			{
-				int size = Math::minimum(in_vertices_size, lengthOf(buf));
-				in_file->read(buf, size);
-				file.write(buf, size);
-				in_vertices_size -= size;
-			}
-
-			fs.close(*in_file);
-		}
-		return true;
-	}
-
-
-	void writeLODs(FS::OsFile& file)
-	{
-		int lod_count = models.size();
-		if (lods[lod_count - 1] < 10e9)
-		{
-			lods[lod_count] = FLT_MAX;
-			++lod_count;
-		}
-		file.write((const char*)&lod_count, sizeof(lod_count));
-		int32 to_mesh = -1;
-		for (int i = 0; i < lod_count; ++i)
-		{
-			to_mesh += i < models.size() ? models[i]->getMeshCount() : 0;
-			file.write((const char*)&to_mesh, sizeof(to_mesh));
-			float squared_dist = lods[i] * lods[i];
-			file.write((const char*)&squared_dist, sizeof(squared_dist));
-		}
-	}
-
-
-	bool check()
-	{
-		for (auto* model : models)
-		{
-			if (model->getBoneCount() > 0)
-			{
-				g_log_error.log("Renderer") << "Skinned meshes are not supported";
-				return false;
-			}
-		}
-		return true;
-	}
-
-
-	void merge()
-	{
-		if (output[0] == 0) return;
-		if (!check()) return;
-
-		FS::OsFile file;
-		if (!file.open(
-				output, FS::Mode::WRITE | FS::Mode::CREATE, app.getWorldEditor()->getAllocator()))
-		{
-			g_log_error.log("Renderer") << "Failed to save \"" << output << "\"";
-			return;
-		}
-
-		Model::FileHeader header;
-		header.m_magic = Model::FILE_MAGIC;
-		header.m_version = (uint32)Model::FileVersion::FIRST;
-
-		file.write(&header, sizeof(header));
-		writeMeshes(file);
-		if (!writeGeometry(file))
-		{
-			file.close();
-			return;
-		}
-		int32 bone_count = 0;
-		file.write((const char*)&bone_count, sizeof(bone_count));
-		writeLODs(file);
-
-		auto* disk_device = app.getWorldEditor()->getEngine().getDiskFileDevice();
-		char dir[MAX_PATH_LENGTH];
-		PathUtils::getDir(dir, lengthOf(dir), output);
-		for (auto& model : models)
-		{
-			for (int i = 0; i < model->getMeshCount(); ++i)
-			{
-				auto& engine_mesh = model->getMesh(i);
-				char src[MAX_PATH_LENGTH];
-				copyString(src, disk_device->getBasePath(0));
-				catString(src, engine_mesh.material->getPath().c_str());
-				char dest[MAX_PATH_LENGTH];
-				copyString(dest, dir);
-				char mat_basename[MAX_PATH_LENGTH];
-				PathUtils::getBasename(
-					mat_basename, lengthOf(mat_basename), engine_mesh.material->getPath().c_str());
-				catString(dest, mat_basename);
-				catString(dest, ".mat");
-				if (!PlatformInterface::copyFile(src, dest))
-				{
-					copyString(src, disk_device->getBasePath(1));
-					catString(src, engine_mesh.material->getPath().c_str());
-					if (!PlatformInterface::copyFile(src, dest))
-					{
-						g_log_error.log("Renderer") << "Failed to copy "
-													<< engine_mesh.material->getPath();
-					}
-				}
-			}
-		}
-
-		file.close();
-	}
-
-
-	void onWindowGUI() override
-	{
-		if (ImGui::BeginDock("Mesh Merger", &m_is_window_opened))
-		{
-			ImGui::InputText("Output", output, sizeof(output));
-			ImGui::SameLine();
-			if (ImGui::Button("...###browseoutput"))
-			{
-				auto* base_path =
-					app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath(0);
-				PlatformInterface::getSaveFilename(output, sizeof(output), base_path, "msh");
-			}
-			if (ImGui::Button("Merge")) merge();
-
-			if (ImGui::CollapsingHeader("Sources", nullptr, true, true))
-			{
-				char buf[MAX_PATH_LENGTH];
-				ImGui::Columns(2);
-				if (!models.empty())
-				{
-					ImGui::Text("Model");
-					ImGui::NextColumn();
-					ImGui::Text("Distance");
-					ImGui::NextColumn();
-				}
-				for (int i = 0; i < models.size(); ++i)
-				{
-					auto& model = models[i];
-					ImGui::PushID(model);
-					buf[0] = 0;
-					copyString(buf, model->getPath().c_str());
-					if (app.getAssetBrowser()->resourceInput(
-							"Model", "model", buf, lengthOf(buf), ResourceManager::MODEL))
-					{
-						if (model) model_manager->unload(*model);
-						if (buf[0] != 0)
-						{
-							model = static_cast<Model*>(model_manager->load(Path(buf)));
-						}
-						else
-						{
-							models.erase(i);
-							ImGui::PopID();
-							break;
-						}
-					}
-					ImGui::NextColumn();
-					if (lods[i] < 10e9)
-					{
-						ImGui::DragFloat("",
-							&lods[i],
-							1,
-							i > 0 ? lods[i - 1] : 0,
-							i < models.size() - 1 ? lods[i + 1] : 10e8f);
-						ImGui::SameLine();
-					}
-					if (i == models.size() - 1)
-					{
-						bool b = lods[i] > 10e9;
-						if (ImGui::Checkbox("Infinite", &b))
-						{
-							lods[i] = b ? FLT_MAX : 0;
-						}
-					}
-					ImGui::NextColumn();
-					ImGui::PopID();
-				}
-				ImGui::Columns();
-				buf[0] = 0;
-				ImGui::PushID(models.size());
-				if (app.getAssetBrowser()->resourceInput(
-						"Model", "model", buf, lengthOf(buf), ResourceManager::MODEL))
-				{
-					auto& model = models.emplace();
-					model = static_cast<Model*>(model_manager->load(Path(buf)));
-				}
-				ImGui::PopID();
-			}
-		}
-		ImGui::EndDock();
-	}
-
-
-	bool hasFocus() override { return false; }
-
-
-	void update(float) override {}
-
-
-	StudioApp& app;
-	bool m_is_window_opened;
-	Array<Model*> models;
-	float lods[16];
-	char output[MAX_PATH_LENGTH];
-	ModelManager* model_manager;
 };
 
 
@@ -1825,8 +1393,8 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 			Vec3 dir = universe.getRotation(cmp.entity) * Vec3(0, 0, -1);
 			Vec3 right = universe.getRotation(cmp.entity) * Vec3(1, 0, 0);
 			Vec3 up = universe.getRotation(cmp.entity) * Vec3(0, 1, 0);
-			float w = scene->getCameraWidth(cmp.index);
-			float h = scene->getCameraHeight(cmp.index);
+			float w = scene->getCameraScreenWidth(cmp.index);
+			float h = scene->getCameraScreenHeight(cmp.index);
 			float ratio = h < 1.0f ? 1 : w / h;
 
 			scene->addDebugFrustum(
@@ -1877,9 +1445,6 @@ LUMIX_STUDIO_ENTRY(renderer)
 
 	auto* terrain_plugin = LUMIX_NEW(allocator, TerrainPlugin)(app);
 	app.getPropertyGrid()->addPlugin(*terrain_plugin);
-
-	auto* mesh_merger_plugin = LUMIX_NEW(allocator, MeshMergerPlugin)(app);
-	app.addPlugin(*mesh_merger_plugin);
 
 	auto* scene_view_plugin = LUMIX_NEW(allocator, SceneViewPlugin)(app);
 	app.addPlugin(*scene_view_plugin);

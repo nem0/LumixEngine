@@ -129,24 +129,25 @@ struct GizmoImpl : public Gizmo
 	}
 
 
-	float getScale(const Vec3& camera_pos, float fov, const Vec3& pos, float entity_scale)
+	float getScale(const Vec3& camera_pos, float fov, const Vec3& pos, float entity_scale, bool is_ortho)
 	{
+		if (is_ortho) return 2;
 		float scale = tanf(fov * Math::PI / 180 * 0.5f) * (pos - camera_pos).length() * 2;
 		return scale / (10 / entity_scale);
 	}
 
 
-	void renderTranslateGizmo(Entity entity, const Vec3& camera_pos, float fov)
+	void renderTranslateGizmo(Entity entity, const Vec3& camera_pos, const Vec3& camera_dir, float fov, bool is_ortho)
 	{
 		bool is_active = entity == m_entities[m_active];
 
 		Matrix scale_mtx = Matrix::IDENTITY;
 		Matrix gizmo_mtx = getMatrix(entity);
 		auto entity_pos = gizmo_mtx.getTranslation();
-		float scale = getScale(camera_pos, fov, entity_pos, gizmo_mtx.getXVector().length());
+		float scale = getScale(camera_pos, fov, entity_pos, gizmo_mtx.getXVector().length(), is_ortho);
 		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
 			
-		Vec3 camera_dir = camera_pos - entity_pos;
+		Vec3 to_entity_dir = is_ortho ? camera_dir : camera_pos - entity_pos;
 		Matrix mtx = gizmo_mtx * scale_mtx;
 
 		RenderInterface::Vertex vertices[9];
@@ -172,9 +173,9 @@ struct GizmoImpl : public Gizmo
 
 		m_editor.getRenderInterface()->render(mtx, indices, 6, vertices, 6, true);
 
-		if (dotProduct(gizmo_mtx.getXVector(), camera_dir) < 0) mtx.setXVector(-mtx.getXVector());
-		if (dotProduct(gizmo_mtx.getYVector(), camera_dir) < 0) mtx.setYVector(-mtx.getYVector());
-		if (dotProduct(gizmo_mtx.getZVector(), camera_dir) < 0) mtx.setZVector(-mtx.getZVector());
+		if (dotProduct(gizmo_mtx.getXVector(), to_entity_dir) < 0) mtx.setXVector(-mtx.getXVector());
+		if (dotProduct(gizmo_mtx.getYVector(), to_entity_dir) < 0) mtx.setYVector(-mtx.getYVector());
+		if (dotProduct(gizmo_mtx.getZVector(), to_entity_dir) < 0) mtx.setZVector(-mtx.getZVector());
 
 		vertices[0].position = Vec3(0, 0, 0);
 		vertices[0].color = m_transform_axis == Axis::XY && is_active ? SELECTED_COLOR : Z_COLOR;
@@ -293,17 +294,17 @@ struct GizmoImpl : public Gizmo
 	};
 
 
-	void renderRotateGizmo(Entity entity, const Vec3& camera_pos, float fov)
+	void renderRotateGizmo(Entity entity, const Vec3& camera_pos, const Vec3& camera_dir, float fov, bool is_ortho)
 	{
 		bool is_active = entity == m_entities[m_active];
 
 		Matrix scale_mtx = Matrix::IDENTITY;
 		Matrix gizmo_mtx = getMatrix(entity);
 		auto entity_pos = gizmo_mtx.getTranslation();
-		float scale = getScale(camera_pos, fov, entity_pos, gizmo_mtx.getXVector().length());
+		float scale = getScale(camera_pos, fov, entity_pos, gizmo_mtx.getXVector().length(), is_ortho);
 		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
 
-		Vec3 camera_dir = camera_pos - entity_pos;
+		Vec3 to_entity_dir = is_ortho ? camera_dir : camera_pos - entity_pos;
 		Matrix mtx = gizmo_mtx * scale_mtx;
 
 		Vec3 pos = mtx.getTranslation();
@@ -311,9 +312,9 @@ struct GizmoImpl : public Gizmo
 		Vec3 up(0, 1, 0);
 		Vec3 dir(0, 0, 1);
 
-		if (dotProduct(gizmo_mtx.getXVector(), camera_dir) < 0) right = -right;
-		if (dotProduct(gizmo_mtx.getYVector(), camera_dir) < 0) up = -up;
-		if (dotProduct(gizmo_mtx.getZVector(), camera_dir) < 0) dir = -dir;
+		if (dotProduct(gizmo_mtx.getXVector(), to_entity_dir) < 0) right = -right;
+		if (dotProduct(gizmo_mtx.getYVector(), to_entity_dir) < 0) up = -up;
+		if (dotProduct(gizmo_mtx.getZVector(), to_entity_dir) < 0) dir = -dir;
 		
 		if (!m_is_dragging)
 		{
@@ -355,7 +356,7 @@ struct GizmoImpl : public Gizmo
 	}
 
 
-	void collide(const Vec3& camera_pos, float fov)
+	void collide(const Vec3& camera_pos, const Vec3& camera_dir, float fov, bool is_ortho)
 	{
 		if (m_is_dragging) return;
 
@@ -371,10 +372,10 @@ struct GizmoImpl : public Gizmo
 			Matrix scale_mtx = Matrix::IDENTITY;
 			Matrix gizmo_mtx = getMatrix(m_entities[i]);
 			auto entity_pos = gizmo_mtx.getTranslation();
-			float scale = getScale(camera_pos, fov, entity_pos, gizmo_mtx.getXVector().length());
+			float scale = getScale(camera_pos, fov, entity_pos, gizmo_mtx.getXVector().length(), is_ortho);
 			scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
 
-			Vec3 camera_dir = camera_pos - entity_pos;
+			Vec3 to_entity_dir = is_ortho ? camera_dir : camera_pos - entity_pos;
 			Matrix mtx = gizmo_mtx * scale_mtx;
 			Vec3 pos = mtx.getTranslation();
 
@@ -382,9 +383,9 @@ struct GizmoImpl : public Gizmo
 			{
 				Matrix triangle_mtx = mtx;
 
-				if (dotProduct(gizmo_mtx.getXVector(), camera_dir) < 0) triangle_mtx.setXVector(-triangle_mtx.getXVector());
-				if (dotProduct(gizmo_mtx.getYVector(), camera_dir) < 0) triangle_mtx.setYVector(-triangle_mtx.getYVector());
-				if (dotProduct(gizmo_mtx.getZVector(), camera_dir) < 0) triangle_mtx.setZVector(-triangle_mtx.getZVector());
+				if (dotProduct(gizmo_mtx.getXVector(), to_entity_dir) < 0) triangle_mtx.setXVector(-triangle_mtx.getXVector());
+				if (dotProduct(gizmo_mtx.getYVector(), to_entity_dir) < 0) triangle_mtx.setYVector(-triangle_mtx.getYVector());
+				if (dotProduct(gizmo_mtx.getZVector(), to_entity_dir) < 0) triangle_mtx.setZVector(-triangle_mtx.getZVector());
 
 				float t, tmin = FLT_MAX;
 				bool hit = Math::getRayTriangleIntersection(
@@ -666,21 +667,23 @@ struct GizmoImpl : public Gizmo
 	{
 		auto edit_camera = m_editor.getEditCamera();
 		auto scene = static_cast<RenderScene*>(edit_camera.scene);
+		bool is_ortho = scene->isCameraOrtho(edit_camera.index);
 		auto camera_pos = m_editor.getUniverse()->getPosition(edit_camera.entity);
+		auto camera_dir = m_editor.getUniverse()->getRotation(edit_camera.entity) * Vec3(0, 0, -1);
 		float fov = scene->getCameraFOV(edit_camera.index);
 
-		collide(camera_pos, fov);
+		collide(camera_pos, camera_dir, fov, is_ortho);
 		transform();
 
 		for (int i = 0; i < m_count; ++i)
 		{
 			if (m_mode == Mode::TRANSLATE)
 			{
-				renderTranslateGizmo(m_entities[i], camera_pos, fov);
+				renderTranslateGizmo(m_entities[i], camera_pos, camera_dir, fov, is_ortho);
 			}
 			else
 			{
-				renderRotateGizmo(m_entities[i], camera_pos, fov);
+				renderRotateGizmo(m_entities[i], camera_pos, camera_dir, fov, is_ortho);
 			}
 		}
 

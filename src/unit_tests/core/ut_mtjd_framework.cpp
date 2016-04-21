@@ -1,6 +1,6 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "core/MTJD/job.h"
-#include "core/MTJD/manager.h"
+#include "core/mtjd/job.h"
+#include "core/mtjd/manager.h"
 
 
 namespace
@@ -192,5 +192,5 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 	allocator.deallocate(jobs);
 }
 
-REGISTER_TEST("unit_tests/core/MTJD/frameworkTest", UT_MTJDFrameworkTest, "")
-REGISTER_TEST("unit_tests/core/MTJD/frameworkDependencyTest", UT_MTJDFrameworkDependencyTest, "")
+REGISTER_TEST("unit_tests/core/mtjd/frameworkTest", UT_MTJDFrameworkTest, "")
+REGISTER_TEST("unit_tests/core/mtjd/frameworkDependencyTest", UT_MTJDFrameworkDependencyTest, "")

@@ -2,6 +2,7 @@
 #include "core/associative_array.h"
 #include "core/profiler.h"
 #include "core/string.h"
+#include "core/vec.h"
 
 #include <windows.h>
 #include <Xinput.h>
@@ -19,8 +20,8 @@ namespace Lumix
 			: m_actions(allocator)
 			, m_allocator(allocator)
 			, m_is_enabled(false)
-			, m_mouse_rel_x(0)
-			, m_mouse_rel_y(0)
+			, m_mouse_rel_pos(0, 0)
+			, m_injected_mouse_rel_pos(0, 0)
 			, m_xinput_library(nullptr)
 			, m_xinput_get_state(nullptr)
 		{
@@ -54,13 +55,6 @@ namespace Lumix
 		}
 
 
-		void clear() override
-		{
-			m_mouse_rel_x = 0;
-			m_mouse_rel_y = 0;
-		}
-
-
 		void enable(bool enabled) override
 		{
 			m_is_enabled = enabled;
@@ -83,18 +77,20 @@ namespace Lumix
 				}
 				m_last_checked_controller = (m_last_checked_controller + 1) % XUSER_MAX_COUNT;
 			}
+			m_mouse_rel_pos = m_injected_mouse_rel_pos;
+			m_injected_mouse_rel_pos = { 0, 0 };
 		}
 
 
 		void injectMouseXMove(float value) override
 		{
-			m_mouse_rel_x = value;
+			m_injected_mouse_rel_pos.x = value;
 		}
 
 
 		void injectMouseYMove(float value) override
 		{
-			m_mouse_rel_y = value;
+			m_injected_mouse_rel_pos.y = value;
 		}
 
 
@@ -117,13 +113,13 @@ namespace Lumix
 
 		float getMouseXMove() const override
 		{
-			return m_mouse_rel_x;
+			return m_mouse_rel_pos.x;
 		}
 
 
 		float getMouseYMove() const override
 		{
-			return m_mouse_rel_y;
+			return m_mouse_rel_pos.y;
 		}
 
 
@@ -147,8 +143,8 @@ namespace Lumix
 									   ? 1.0f
 									   : 0;
 						}
-					case InputType::MOUSE_X: return m_mouse_rel_x;
-					case InputType::MOUSE_Y: return m_mouse_rel_y;
+					case InputType::MOUSE_X: return m_mouse_rel_pos.x;
+					case InputType::MOUSE_Y: return m_mouse_rel_pos.y;
 				};
 
 				if (!m_xinput_connected[value.controller_id]) return 0;
@@ -194,8 +190,8 @@ namespace Lumix
 
 		IAllocator& m_allocator;
 		AssociativeArray<uint32, Action> m_actions;
-		float m_mouse_rel_x;
-		float m_mouse_rel_y;
+		Vec2 m_injected_mouse_rel_pos;
+		Vec2 m_mouse_rel_pos;
 		bool m_is_enabled;
 		HMODULE m_xinput_library;
 		XInputGetState_fn_ptr m_xinput_get_state;

@@ -16,6 +16,7 @@ namespace PlatformInterface
 	{
 		PlatformData()
 		{
+			m_is_quit_requested = false;
 			for (int i = 0; i < Lumix::lengthOf(m_key_map); ++i)
 			{
 				m_key_map[i] = -1;
@@ -47,6 +48,7 @@ namespace PlatformInterface
 
 		HWND m_hwnd;
 		bool m_is_mouse_tracked;
+		bool m_is_quit_requested;
 		SystemEventHandler* m_handler;
 		int m_key_map[512];
 		int m_system_key_map[512];
@@ -271,6 +273,17 @@ namespace PlatformInterface
 	}
 
 
+	void clearQuitRequest()
+	{
+		g_platform_data.m_is_quit_requested = false;
+	}
+
+
+	bool isQuitRequested()
+	{
+		return g_platform_data.m_is_quit_requested;
+	}
+
 
 	static LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
@@ -317,7 +330,7 @@ namespace PlatformInterface
 					screen_rect.left, screen_rect.top, rect.right - rect.left, rect.bottom - rect.top);
 			}
 			break;
-			case WM_CLOSE: PostQuitMessage(0); break;
+			case WM_CLOSE: g_platform_data.m_is_quit_requested = true; return true;
 			case WM_MOUSELEAVE:
 			{
 				g_platform_data.m_is_mouse_tracked = false;

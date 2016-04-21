@@ -3,7 +3,6 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
-#include "core/fs/ifile.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/lua_wrapper.h"
@@ -290,16 +289,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		send(e1, e2, position);
 		send(e2, e1, position);
-	}
-
-
-	void sendMessage(uint32 type, void*) override
-	{
-		static const uint32 register_hash = crc32("registerLuaAPI");
-		if (type == register_hash)
-		{
-			registerLuaAPI();
-		}
 	}
 
 
@@ -777,32 +766,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void registerLuaAPI()
-	{
+	void startGame() override
+	{ 
 		auto* scene = m_universe.getScene(crc32("lua_script"));
-		if (!scene) return;
-
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
-		auto* L = m_script_scene->getGlobalState();
-
-		#define REGISTER_FUNCTION(name) \
-			do {\
-				auto f = &LuaWrapper::wrapMethod<PhysicsSceneImpl, decltype(&PhysicsSceneImpl::name), &PhysicsSceneImpl::name>; \
-				LuaWrapper::createSystemFunction(L, "Physics", #name, f); \
-			} while(false) \
-
-		REGISTER_FUNCTION(getActorComponent);
-		REGISTER_FUNCTION(putToSleep);
-		REGISTER_FUNCTION(getActorSpeed);
-		REGISTER_FUNCTION(applyForceToActor);
-		REGISTER_FUNCTION(moveController);
-		REGISTER_FUNCTION(raycast);
-
-		#undef REGISTER_FUNCTION
+		m_is_game_running = true; 
 	}
-
-
-	void startGame() override { m_is_game_running = true; }
 
 
 	void stopGame() override { m_is_game_running = false; }
@@ -1849,6 +1818,25 @@ void Heightfield::heightmapLoaded(Resource::State, Resource::State new_state)
 	{
 		m_scene->heightmapLoaded(this);
 	}
+}
+
+
+void PhysicsScene::registerLuaAPI(lua_State* L)
+{
+	#define REGISTER_FUNCTION(name) \
+		do {\
+			auto f = &LuaWrapper::wrapMethod<PhysicsSceneImpl, decltype(&PhysicsSceneImpl::name), &PhysicsSceneImpl::name>; \
+			LuaWrapper::createSystemFunction(L, "Physics", #name, f); \
+		} while(false) \
+
+	REGISTER_FUNCTION(getActorComponent);
+	REGISTER_FUNCTION(putToSleep);
+	REGISTER_FUNCTION(getActorSpeed);
+	REGISTER_FUNCTION(applyForceToActor);
+	REGISTER_FUNCTION(moveController);
+	REGISTER_FUNCTION(raycast);
+
+	#undef REGISTER_FUNCTION
 }
 
 

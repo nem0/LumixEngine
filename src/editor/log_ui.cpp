@@ -181,8 +181,8 @@ void LogUI::onGUI()
 		{
 			for (int i = 0; i < m_messages.size(); ++i)
 			{
-				m_messages[i].clear();
-				m_new_message_count[i] = 0;
+				m_messages[m_current_tab].clear();
+				m_new_message_count[m_current_tab] = 0;
 			}
 		}
 

@@ -18,8 +18,8 @@ struct Block
 {
 	struct Hit
 	{
-		float m_length;
-		float m_start;
+		uint64 m_length;
+		uint64 m_start;
 	};
 
 
@@ -102,13 +102,13 @@ Block* getBlockNext(Block* block)
 }
 
 
-float getBlockHitStart(Block* block, int hit_index)
+uint64 getBlockHitStart(Block* block, int hit_index)
 {
 		return block->m_hits[hit_index].m_start;
 }
 
 
-float getBlockHitLength(Block* block, int hit_index)
+uint64 getBlockHitLength(Block* block, int hit_index)
 {
 	return block->m_hits[hit_index].m_length;
 }
@@ -117,17 +117,6 @@ float getBlockHitLength(Block* block, int hit_index)
 int getBlockHitCount(Block* block)
 {
 	return block->m_hits.size();
-}
-
-
-float getBlockLength(Block* block)
-{
-	float ret = 0;
-	for (int i = 0, c = block->m_hits.size(); i < c; ++i)
-	{
-		ret += block->m_hits[i].m_length;
-	}
-	return ret;
 }
 
 
@@ -177,6 +166,18 @@ struct Instance
 
 
 Instance g_instance;
+
+
+float getBlockLength(Block* block)
+{
+	uint64 ret = 0;
+	for(int i = 0, c = block->m_hits.size(); i < c; ++i)
+	{
+		ret += block->m_hits[i].m_length;
+	}
+	return float(ret / (double)g_instance.timer->getFrequency());
+}
+
 
 struct BlockInfo
 {
@@ -273,7 +274,7 @@ void beginBlock(const char* name)
 	auto data = getBlock(name);
 
 	auto& hit = data.block->m_hits.emplace();
-	hit.m_start = g_instance.timer->getTimeSinceStart();
+	hit.m_start = g_instance.timer->getRawTimeSinceStart();
 	hit.m_length = 0;
 }
 
@@ -334,9 +335,9 @@ int getThreadCount()
 }
 
 
-float now()
+uint64 now()
 {
-	return g_instance.timer->getTimeSinceStart();
+	return g_instance.timer->getRawTimeSinceStart();
 }
 
 
@@ -362,7 +363,7 @@ void endBlock()
 	}
 
 	ASSERT(thread_data->current_block);
-	float now = g_instance.timer->getTimeSinceStart();
+	uint64 now = g_instance.timer->getRawTimeSinceStart();
 	thread_data->current_block->m_hits.back().m_length = now - thread_data->current_block->m_hits.back().m_start;
 	thread_data->current_block = thread_data->current_block->m_parent;
 }
@@ -374,7 +375,7 @@ void frame()
 
 	MT::SpinLock lock(g_instance.m_mutex);
 	g_instance.frame_listeners.invoke();
-	float now = g_instance.timer->getTimeSinceStart();
+	uint64 now = g_instance.timer->getRawTimeSinceStart();
 
 	for (auto* i : g_instance.threads)
 	{
