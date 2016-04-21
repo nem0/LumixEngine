@@ -563,6 +563,7 @@ struct ImportTask : public Lumix::MT::Task
 				auto& material = m_dialog.m_materials.emplace();
 				material.scene = scene;
 				material.import = true;
+				material.alpha_cutout = false;
 				material.material = scene->mMaterials[i];
 				material.texture_count = 0;
 				auto types = {aiTextureType_DIFFUSE, aiTextureType_NORMALS, aiTextureType_HEIGHT};
@@ -981,6 +982,7 @@ struct ConvertTask : public Lumix::MT::Task
 		file.writeText("{\n\t\"shader\" : \"shaders/");
 		file.writeText(isSkinned(material.scene, material.material) ? "skinned" : "rigid");
 		file.writeText(".shd\"\n");
+		if (material.alpha_cutout) file << ",\n\t\"defines\" : [\"ALPHA_CUTOUT\"]";
 
 		for (int i = 0; i < material.texture_count; ++i)
 		{
@@ -2066,6 +2068,7 @@ void ImportAssetDialog::onMaterialsGUI()
 		if (ImGui::TreeNode(mat.material, material_name.C_Str()))
 		{
 			ImGui::Checkbox("Import material", &mat.import);
+			ImGui::Checkbox("Alpha cutout material", &mat.alpha_cutout);
 
 			ImGui::Columns(4);
 			ImGui::Text("Path");
@@ -2390,6 +2393,12 @@ int ImportAssetDialog::importAsset(lua_State* L)
 							material->import = Lumix::LuaWrapper::toType<bool>(L, -1);
 						}
 						lua_pop(L, 1); // "import"
+
+						if (lua_getfield(L, -1, "alpha_cutout") == LUA_TBOOLEAN)
+						{
+							material->alpha_cutout = Lumix::LuaWrapper::toType<bool>(L, -1);
+						}
+						lua_pop(L, 1); // "alpha_cutout"
 
 						if (lua_getfield(L, -1, "textures") == LUA_TTABLE)
 						{
