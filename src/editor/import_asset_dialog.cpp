@@ -952,8 +952,7 @@ struct ConvertTask : public Lumix::MT::Task
 				Lumix::copyFile("models/utils/cube/default.dds", texture_path);
 			}
 
-			file << "\", \"srgb\" : true\n }\n";
-			file.write("}", 1);
+			file << "\"}\n}";
 			file.close();
 		}
 		return true;
