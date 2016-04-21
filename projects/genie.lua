@@ -244,19 +244,6 @@ project "renderer"
 	
 	defaultConfigurations()
 
-project "raytracer"
-	libType()
-
-	files { "../src/raytracer/**.h", "../src/raytracer/**.cpp" }
-	includedirs { "../src", "../external/bgfx/include" }
-	defines { "BUILDING_RENDERER" }
-	links { "engine", "psapi", "editor" }
-	useLua()
-
-	linkLib("bgfx")
-	
-	defaultConfigurations()
-
 project "animation"
 	libType()
 
