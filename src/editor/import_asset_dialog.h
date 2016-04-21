@@ -42,6 +42,7 @@ struct ImportMaterial
 	const struct aiScene* scene;
 	struct aiMaterial* material;
 	bool import;
+	bool alpha_cutout;
 	int texture_count;
 	ImportTexture textures[16];
 };
