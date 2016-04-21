@@ -107,7 +107,6 @@ private:
 	int m_texture_count;
 	Array<Uniform> m_uniforms;
 	IAllocator& m_allocator;
-	bgfx::ProgramHandle m_program_id;
 	uint64 m_render_states;
 	Vec3 m_color;
 	float m_shininess;
