@@ -34,7 +34,7 @@ void Frustum::computeOrtho(const Vec3& position,
 
 	center = (near_center + far_center) * 0.5f;
 	float z_diff = far_distance - near_distance;
-	radius = sqrt(4 * width * width + 4 * height * height + z_diff * z_diff) * 0.5f;
+	radius = std::sqrt(4 * width * width + 4 * height * height + z_diff * z_diff) * 0.5f;
 	this->position = position;
 }
 
@@ -98,7 +98,7 @@ void Frustum::computePerspective(const Vec3& position,
 	Vec3 corner2 = far_center + x * far_width + y * far_height;
 
 	float size = (corner1 - corner2).length();
-	size = Math::maximum(sqrt(far_width * far_width * 4 + far_height * far_height * 4), size);
+	size = Math::maximum(std::sqrt(far_width * far_width * 4 + far_height * far_height * 4), size);
 	this->radius = size * 0.5f;
 	this->position = position;
 	this->direction = direction;
