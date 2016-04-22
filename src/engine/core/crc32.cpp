@@ -1,4 +1,4 @@
-#include "core/crc32.h"
+#include "engine/core/crc32.h"
 
 
 namespace Lumix

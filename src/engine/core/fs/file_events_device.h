@@ -3,10 +3,10 @@
 #define FILE_EVENT_DEVICE
 #ifdef FILE_EVENT_DEVICE
 
-#include "lumix.h"
-#include "core/fs/ifile_device.h"
+#include "engine/lumix.h"
+#include "engine/core/fs/ifile_device.h"
 
-#include "core/delegate.h"
+#include "engine/core/delegate.h"
 
 namespace Lumix
 {

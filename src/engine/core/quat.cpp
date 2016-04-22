@@ -1,8 +1,8 @@
-#include "core/quat.h"
+#include "engine/core/quat.h"
 #include <cmath>
-#include "core/vec.h"
-#include "core/math_utils.h"
-#include "core/matrix.h"
+#include "engine/core/vec.h"
+#include "engine/core/math_utils.h"
+#include "engine/core/matrix.h"
 
 
 namespace Lumix

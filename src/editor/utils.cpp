@@ -1,12 +1,12 @@
 #include "utils.h"
-#include "core/crc32.h"
-#include "core/math_utils.h"
-#include "core/path.h"
-#include "core/path_utils.h"
+#include "engine/core/crc32.h"
+#include "engine/core/math_utils.h"
+#include "engine/core/path.h"
+#include "engine/core/path_utils.h"
 #include "editor/world_editor.h"
 #include "imgui/imgui.h"
 #include "renderer/render_scene.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 
 
 void getEntityListDisplayName(Lumix::WorldEditor& editor,

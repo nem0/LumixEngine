@@ -1,5 +1,5 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "core/delegate.h"
+#include "engine/core/delegate.h"
 
 static int x = 0;
 

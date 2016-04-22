@@ -1,10 +1,10 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
-#include "core/geometry.h"
-#include "core/timer.h"
-#include "core/log.h"
+#include "engine/core/geometry.h"
+#include "engine/core/timer.h"
+#include "engine/core/log.h"
 
-#include "core/mtjd/manager.h"
+#include "engine/core/mtjd/manager.h"
 
 #include "renderer/culling_system.h"
 

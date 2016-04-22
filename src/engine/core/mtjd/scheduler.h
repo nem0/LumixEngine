@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/mt/Task.h"
-#include "core/mt/sync.h"
+#include "engine/core/mt/Task.h"
+#include "engine/core/mt/sync.h"
 
 namespace Lumix
 {

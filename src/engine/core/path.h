@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/associative_array.h"
-#include "core/mt/sync.h"
+#include "engine/core/associative_array.h"
+#include "engine/core/mt/sync.h"
 
 
 namespace Lumix

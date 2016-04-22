@@ -1,14 +1,14 @@
 #include "renderer.h"
 
-#include "core/array.h"
-#include "core/crc32.h"
-#include "core/fs/os_file.h"
-#include "core/lifo_allocator.h"
-#include "core/log.h"
-#include "core/profiler.h"
-#include "core/resource_manager.h"
-#include "debug/debug.h"
-#include "engine.h"
+#include "engine/core/array.h"
+#include "engine/core/crc32.h"
+#include "engine/core/fs/os_file.h"
+#include "engine/core/lifo_allocator.h"
+#include "engine/core/log.h"
+#include "engine/core/profiler.h"
+#include "engine/core/resource_manager.h"
+#include "engine/debug/debug.h"
+#include "engine/engine.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
 #include "renderer/material.h"
@@ -20,7 +20,7 @@
 #include "renderer/shader_manager.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #include <bgfx/bgfx.h>
 #include <cfloat>
 #include <cstdio>

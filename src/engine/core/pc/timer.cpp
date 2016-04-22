@@ -1,8 +1,8 @@
-#include "lumix.h"
-#include "core/iallocator.h"
-#include "core/timer.h"
+#include "engine/lumix.h"
+#include "engine/core/iallocator.h"
+#include "engine/core/timer.h"
 
-#include "core/pc/simple_win.h"
+#include "engine/core/pc/simple_win.h"
 
 namespace Lumix
 {

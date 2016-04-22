@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "lumix.h"
-#include "core/geometry.h"
-#include "core/matrix.h"
-#include "core/path.h"
-#include "core/vec.h"
+#include "engine/lumix.h"
+#include "engine/core/geometry.h"
+#include "engine/core/matrix.h"
+#include "engine/core/path.h"
+#include "engine/core/vec.h"
 
 
 namespace Lumix

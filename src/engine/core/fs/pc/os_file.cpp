@@ -1,8 +1,8 @@
-#include "core/fs/os_file.h"
-#include "core/iallocator.h"
-#include "core/pc/simple_win.h"
-#include "core/string.h"
-#include "lumix.h"
+#include "engine/core/fs/os_file.h"
+#include "engine/core/iallocator.h"
+#include "engine/core/pc/simple_win.h"
+#include "engine/core/string.h"
+#include "engine/lumix.h"
 
 
 namespace Lumix

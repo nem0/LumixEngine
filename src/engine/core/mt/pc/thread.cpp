@@ -1,6 +1,6 @@
-#include "lumix.h"
-#include "core/mt/thread.h"
-#include "core/pc/simple_win.h"
+#include "engine/lumix.h"
+#include "engine/core/mt/thread.h"
+#include "engine/core/pc/simple_win.h"
 
 
 namespace Lumix

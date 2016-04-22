@@ -1,10 +1,10 @@
-#include "core/fs/tcp_file_device.h"
-#include "core/iallocator.h"
-#include "core/blob.h"
-#include "core/fs/file_system.h"
-#include "core/mt/sync.h"
-#include "core/path.h"
-#include "core/network.h"
+#include "engine/core/fs/tcp_file_device.h"
+#include "engine/core/iallocator.h"
+#include "engine/core/blob.h"
+#include "engine/core/fs/file_system.h"
+#include "engine/core/mt/sync.h"
+#include "engine/core/path.h"
+#include "engine/core/network.h"
 
 
 namespace Lumix

@@ -1,16 +1,16 @@
-#include "core/fs/file_system.h"
+#include "engine/core/fs/file_system.h"
 
-#include "core/array.h"
-#include "core/base_proxy_allocator.h"
-#include "core/fs/disk_file_device.h"
-#include "core/fs/file_system.h"
-#include "core/mt/lock_free_fixed_queue.h"
-#include "core/mt/task.h"
-#include "core/mt/transaction.h"
-#include "core/path.h"
-#include "core/profiler.h"
-#include "core/queue.h"
-#include "core/string.h"
+#include "engine/core/array.h"
+#include "engine/core/base_proxy_allocator.h"
+#include "engine/core/fs/disk_file_device.h"
+#include "engine/core/fs/file_system.h"
+#include "engine/core/mt/lock_free_fixed_queue.h"
+#include "engine/core/mt/task.h"
+#include "engine/core/mt/transaction.h"
+#include "engine/core/path.h"
+#include "engine/core/profiler.h"
+#include "engine/core/queue.h"
+#include "engine/core/string.h"
 
 
 namespace Lumix

@@ -1,10 +1,10 @@
 #pragma once
 
 
-#include "core/array.h"
-#include "core/resource.h"
-#include "core/resource_manager_base.h"
-#include "core/string.h"
+#include "engine/core/array.h"
+#include "engine/core/resource.h"
+#include "engine/core/resource_manager_base.h"
+#include "engine/core/string.h"
 
 
 namespace Lumix

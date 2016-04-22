@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/array.h"
+#include "engine/core/array.h"
 
 
 namespace Lumix

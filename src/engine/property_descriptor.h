@@ -1,11 +1,11 @@
 #pragma once
 
-#include "core/blob.h"
-#include "core/path.h"
-#include "core/string.h"
-#include "iplugin.h"
-#include "iproperty_descriptor.h"
-#include "universe/universe.h"
+#include "engine/core/blob.h"
+#include "engine/core/path.h"
+#include "engine/core/string.h"
+#include "engine/iplugin.h"
+#include "engine/iproperty_descriptor.h"
+#include "engine/universe/universe.h"
 
 
 namespace Lumix

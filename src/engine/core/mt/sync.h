@@ -1,5 +1,5 @@
 #pragma once
-#include "lumix.h"
+#include "engine/lumix.h"
 
 namespace Lumix
 {

@@ -1,11 +1,11 @@
-#include "lumix.h"
-#include "core/resource_manager_base.h"
+#include "engine/lumix.h"
+#include "engine/core/resource_manager_base.h"
 
-#include "core/crc32.h"
-#include "core/path.h"
-#include "core/path_utils.h"
-#include "core/resource.h"
-#include "core/resource_manager.h"
+#include "engine/core/crc32.h"
+#include "engine/core/path.h"
+#include "engine/core/path_utils.h"
+#include "engine/core/resource.h"
+#include "engine/core/resource_manager.h"
 
 namespace Lumix
 {

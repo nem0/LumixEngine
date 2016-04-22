@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "core/array.h"
-#include "core/delegate.h"
+#include "engine/core/array.h"
+#include "engine/core/delegate.h"
 
 
 namespace Lumix

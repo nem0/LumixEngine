@@ -1,9 +1,9 @@
 #pragma once
 
 
-#include "lumix.h"
-#include "core/matrix.h"
-#include "iplugin.h"
+#include "engine/lumix.h"
+#include "engine/core/matrix.h"
+#include "engine/iplugin.h"
 
 
 struct lua_State;

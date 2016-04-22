@@ -1,11 +1,11 @@
 #include "terrain_editor.h"
-#include "core/blob.h"
-#include "core/crc32.h"
-#include "core/geometry.h"
-#include "core/json_serializer.h"
-#include "core/profiler.h"
-#include "core/resource_manager.h"
-#include "core/resource_manager_base.h"
+#include "engine/core/blob.h"
+#include "engine/core/crc32.h"
+#include "engine/core/geometry.h"
+#include "engine/core/json_serializer.h"
+#include "engine/core/profiler.h"
+#include "engine/core/resource_manager.h"
+#include "engine/core/resource_manager_base.h"
 #include "editor/entity_template_system.h"
 #include "editor/ieditor_command.h"
 #include "editor/imgui/imgui.h"
@@ -16,7 +16,7 @@
 #endif
 #include "editor/stb/stb_image.h"
 #include "editor/utils.h"
-#include "engine.h"
+#include "engine/engine.h"
 #include "engine/iproperty_descriptor.h"
 #include "engine/property_register.h"
 #include "renderer/material.h"
@@ -24,7 +24,7 @@
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
 #include "renderer/terrain.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #include <cmath>
 
 

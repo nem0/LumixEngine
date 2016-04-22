@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "lumix.h"
-#include "core/array.h"
+#include "engine/lumix.h"
+#include "engine/core/array.h"
 
 
 #ifdef STATIC_PLUGINS

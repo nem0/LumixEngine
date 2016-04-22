@@ -1,8 +1,8 @@
-#include "core/fs/memory_file_device.h"
-#include "core/iallocator.h"
-#include "core/fs/file_system.h"
-#include "core/math_utils.h"
-#include "core/string.h"
+#include "engine/core/fs/memory_file_device.h"
+#include "engine/core/iallocator.h"
+#include "engine/core/fs/file_system.h"
+#include "engine/core/math_utils.h"
+#include "engine/core/string.h"
 
 
 namespace Lumix
