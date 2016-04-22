@@ -1,4 +1,4 @@
-#include "lumix.h"
+#include "engine/lumix.h"
 #include "renderer/model.h"
 
 #include "engine/core/array.h"

@@ -22,7 +22,7 @@
 #include "editor/entity_groups.h"
 #include "editor/entity_template_system.h"
 #include "editor/world_editor.h"
-#include "engine.h"
+#include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "import_asset_dialog.h"
 #include "log_ui.h"

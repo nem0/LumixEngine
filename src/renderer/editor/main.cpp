@@ -1,4 +1,4 @@
-#include "lumix.h"
+#include "engine/lumix.h"
 #include "engine/core/crc32.h"
 #include "engine/core/fs/disk_file_device.h"
 #include "engine/core/fs/file_system.h"

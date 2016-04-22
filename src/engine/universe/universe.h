@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "lumix.h"
+#include "engine/lumix.h"
 #include "engine/core/array.h"
 #include "engine/core/associative_array.h"
 #include "engine/core/delegate_list.h"

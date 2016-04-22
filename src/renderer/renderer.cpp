@@ -8,7 +8,7 @@
 #include "engine/core/profiler.h"
 #include "engine/core/resource_manager.h"
 #include "engine/debug/debug.h"
-#include "engine.h"
+#include "engine/engine.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
 #include "renderer/material.h"

@@ -1,4 +1,4 @@
-#include "lumix.h"
+#include "engine/lumix.h"
 #include "engine/debug/floating_points.h"
 #include "unit_tests/suite/unit_test_app.h"
 

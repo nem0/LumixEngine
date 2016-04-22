@@ -19,12 +19,12 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
-#include "engine.h"
+#include "engine/engine.h"
 #include "engine/property_register.h"
 #include "engine/property_descriptor.h"
-#include "iplugin.h"
+#include "engine/iplugin.h"
 #include "lua_script/lua_script_manager.h"
-#include "plugin_manager.h"
+#include "engine/plugin_manager.h"
 #include "engine/universe/universe.h"
 
 

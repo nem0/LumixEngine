@@ -2,7 +2,7 @@
 #include "engine/core/iallocator.h"
 #include "engine/core/resource.h"
 #include "engine/core/string.h"
-#include "lumix.h"
+#include "engine/lumix.h"
 #define STB_VORBIS_HEADER_ONLY
 #include "stb_vorbis.c"
 #include <cstdlib>

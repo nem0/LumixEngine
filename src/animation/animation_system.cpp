@@ -11,7 +11,7 @@
 #include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
-#include "engine.h"
+#include "engine/engine.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
 #include "renderer/model.h"

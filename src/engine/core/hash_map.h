@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "lumix.h"
+#include "engine/lumix.h"
 #include "engine/core/iallocator.h"
 #include "engine/core/math_utils.h"
 #include "engine/core/string.h"

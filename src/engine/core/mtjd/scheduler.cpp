@@ -1,4 +1,4 @@
-#include "lumix.h"
+#include "engine/lumix.h"
 #include "engine/core/mtjd/scheduler.h"
 #include "engine/core/mtjd/manager.h"
 #include "engine/core/profiler.h"

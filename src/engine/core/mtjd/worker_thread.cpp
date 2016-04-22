@@ -1,4 +1,4 @@
-#include "lumix.h"
+#include "engine/lumix.h"
 #include "engine/core/mtjd/worker_thread.h"
 
 #include "engine/core/mtjd/manager.h"

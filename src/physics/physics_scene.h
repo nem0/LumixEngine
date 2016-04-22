@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "lumix.h"
+#include "engine/lumix.h"
 #include "engine/core/iallocator.h"
 #include "engine/core/path.h"
 #include "engine/core/vec.h"
-#include "iplugin.h"
+#include "engine/iplugin.h"
 
 
 struct lua_State;

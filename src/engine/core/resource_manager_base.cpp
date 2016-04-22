@@ -1,4 +1,4 @@
-#include "lumix.h"
+#include "engine/lumix.h"
 #include "engine/core/resource_manager_base.h"
 
 #include "engine/core/crc32.h"

@@ -1,4 +1,4 @@
-#include "lumix.h"
+#include "engine/lumix.h"
 #include "renderer/shader_manager.h"
 
 #include "engine/core/resource.h"
