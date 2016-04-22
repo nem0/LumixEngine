@@ -1,6 +1,6 @@
 #pragma once
 
-#include "lumix.h"
+#include "engine/lumix.h"
 #include "engine/core/fs/ifile_device.h"
 
 namespace Lumix

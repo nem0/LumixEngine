@@ -6,7 +6,7 @@
 #include "engine/core/resource_manager_base.h"
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
-#include "engine.h"
+#include "engine/engine.h"
 #include "render_interface.h"
 #include "renderer/render_scene.h"
 #include "engine/universe/universe.h"

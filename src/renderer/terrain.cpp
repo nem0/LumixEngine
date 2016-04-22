@@ -9,7 +9,7 @@
 #include "engine/core/profiler.h"
 #include "engine/core/resource_manager.h"
 #include "engine/core/resource_manager_base.h"
-#include "engine.h"
+#include "engine/engine.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"

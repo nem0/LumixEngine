@@ -4,7 +4,7 @@
 #include "engine/core/matrix.h"
 #include "engine/core/resource_manager.h"
 #include "engine/core/resource_manager_base.h"
-#include "engine.h"
+#include "engine/engine.h"
 #include "render_interface.h"
 #include "engine/universe/universe.h"
 #include "world_editor.h"

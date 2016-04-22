@@ -7,7 +7,7 @@
 #include "engine/core/binary_array.h"
 #include "engine/core/mt/sync.h"
 #include "engine/core/string.h"
-#include "lumix.h"
+#include "engine/lumix.h"
 
 
 class Metadata;

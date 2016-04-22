@@ -11,7 +11,7 @@
 #include "engine/core/profiler.h"
 #include "engine/core/resource_manager.h"
 #include "engine/core/resource_manager_base.h"
-#include "engine.h"
+#include "engine/engine.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"

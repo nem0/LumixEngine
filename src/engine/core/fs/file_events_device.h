@@ -3,7 +3,7 @@
 #define FILE_EVENT_DEVICE
 #ifdef FILE_EVENT_DEVICE
 
-#include "lumix.h"
+#include "engine/lumix.h"
 #include "engine/core/fs/ifile_device.h"
 
 #include "engine/core/delegate.h"

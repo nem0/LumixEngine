@@ -1,4 +1,4 @@
-#include "engine.h"
+#include "engine/engine.h"
 #include "engine/core/blob.h"
 #include "engine/core/crc32.h"
 #include "engine/core/fs/os_file.h"
@@ -18,7 +18,7 @@
 #include "engine/iplugin.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
-#include "plugin_manager.h"
+#include "engine/plugin_manager.h"
 #include "engine/universe/hierarchy.h"
 #include "engine/universe/universe.h"
 

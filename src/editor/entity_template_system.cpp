@@ -7,8 +7,8 @@
 #include "engine/core/string.h"
 #include "editor/ieditor_command.h"
 #include "editor/world_editor.h"
-#include "engine.h"
-#include "iplugin.h"
+#include "engine/engine.h"
+#include "engine/iplugin.h"
 #include "engine/universe/universe.h"
 #include <cstdlib>
 

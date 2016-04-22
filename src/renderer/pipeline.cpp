@@ -8,7 +8,7 @@
 #include "engine/core/log.h"
 #include "engine/core/lua_wrapper.h"
 #include "engine/core/profiler.h"
-#include "engine.h"
+#include "engine/engine.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"

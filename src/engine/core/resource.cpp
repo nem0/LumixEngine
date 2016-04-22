@@ -1,4 +1,4 @@
-#include "lumix.h"
+#include "engine/lumix.h"
 #include "engine/core/resource.h"
 #include "engine/core/fs/file_system.h"
 #include "engine/core/log.h"

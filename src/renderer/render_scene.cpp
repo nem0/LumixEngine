@@ -18,7 +18,7 @@
 #include "engine/core/resource_manager_base.h"
 #include "engine/core/timer.h"
 
-#include "engine.h"
+#include "engine/engine.h"
 
 #include "lua_script/lua_script_system.h"
 

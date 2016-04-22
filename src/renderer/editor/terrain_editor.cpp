@@ -16,7 +16,7 @@
 #endif
 #include "editor/stb/stb_image.h"
 #include "editor/utils.h"
-#include "engine.h"
+#include "engine/engine.h"
 #include "engine/iproperty_descriptor.h"
 #include "engine/property_register.h"
 #include "renderer/material.h"

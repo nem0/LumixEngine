@@ -11,7 +11,7 @@
 #include "engine/core/resource_manager_base.h"
 #include "engine/core/system.h"
 #include "editor/world_editor.h"
-#include "engine.h"
+#include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "renderer/renderer.h"
 #include "editor/asset_browser.h"

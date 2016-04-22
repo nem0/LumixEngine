@@ -1,4 +1,4 @@
-#include "lumix.h"
+#include "engine/lumix.h"
 #include "engine/core/mtjd/base_entry.h"
 
 #include "engine/core/mtjd/manager.h"
