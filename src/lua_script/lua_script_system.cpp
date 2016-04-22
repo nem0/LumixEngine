@@ -25,7 +25,7 @@
 #include "iplugin.h"
 #include "lua_script/lua_script_manager.h"
 #include "plugin_manager.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 
 
 namespace Lumix

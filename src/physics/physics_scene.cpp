@@ -17,7 +17,7 @@
 #include "renderer/texture.h"
 #include "physics/physics_system.h"
 #include "physics/physics_geometry_manager.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #include <PxPhysicsAPI.h>
 
 

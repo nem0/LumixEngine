@@ -1,5 +1,5 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 
 
 namespace

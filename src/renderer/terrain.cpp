@@ -15,7 +15,7 @@
 #include "renderer/render_scene.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #include <cfloat>
 #include <cmath>
 

@@ -24,7 +24,7 @@
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #include <cstdio>
 #include <windows.h>
 

@@ -12,7 +12,7 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "lua_script/lua_script_system.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 
 
 namespace Lumix

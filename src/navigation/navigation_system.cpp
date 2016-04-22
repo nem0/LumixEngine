@@ -14,7 +14,7 @@
 #include "renderer/material.h"
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #include <cmath>
 #include <DetourAlloc.h>
 #include <DetourNavMesh.h>
