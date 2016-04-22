@@ -2,7 +2,7 @@
 
 #include "engine/core/array.h"
 #include "engine/core/hash_map.h"
-#include "debug/debug.h"
+#include "engine/debug/debug.h"
 
 namespace
 {

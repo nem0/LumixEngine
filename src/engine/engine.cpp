@@ -14,7 +14,7 @@
 #include "engine/core/fs/file_system.h"
 #include "engine/core/fs/memory_file_device.h"
 #include "engine/core/mtjd/manager.h"
-#include "debug/debug.h"
+#include "engine/debug/debug.h"
 #include "engine/iplugin.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"

@@ -11,7 +11,7 @@
 #include "engine/core/resource_manager.h"
 #include "engine/core/resource_manager_base.h"
 #include "engine/core/timer.h"
-#include "debug/debug.h"
+#include "engine/debug/debug.h"
 #include "engine/engine.h"
 #include "imgui/imgui.h"
 #include "utils.h"

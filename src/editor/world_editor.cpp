@@ -22,7 +22,7 @@
 #include "engine/core/resource_manager_base.h"
 #include "engine/core/system.h"
 #include "engine/core/timer.h"
-#include "debug/debug.h"
+#include "engine/debug/debug.h"
 #include "editor/entity_groups.h"
 #include "editor/editor_icon.h"
 #include "editor/entity_template_system.h"
