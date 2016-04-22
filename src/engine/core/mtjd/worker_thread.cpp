@@ -1,8 +1,8 @@
 #include "lumix.h"
-#include "core/mtjd/worker_thread.h"
+#include "engine/core/mtjd/worker_thread.h"
 
-#include "core/mtjd/manager.h"
-#include "core/mtjd/job.h"
+#include "engine/core/mtjd/manager.h"
+#include "engine/core/mtjd/job.h"
 
 #define PROFILE_START
 #define PROFILE_STOP

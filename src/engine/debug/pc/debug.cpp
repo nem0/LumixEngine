@@ -1,7 +1,7 @@
 #include "debug/debug.h"
-#include "core/mt/atomic.h"
-#include "core/string.h"
-#include "core/system.h"
+#include "engine/core/mt/atomic.h"
+#include "engine/core/string.h"
+#include "engine/core/system.h"
 #include <windows.h>
 #include <DbgHelp.h>
 #include <mapi.h>

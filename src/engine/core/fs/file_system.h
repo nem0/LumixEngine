@@ -1,7 +1,7 @@
 #pragma once
 
 #include "lumix.h"
-#include "core/delegate.h"
+#include "engine/core/delegate.h"
 
 namespace Lumix
 {

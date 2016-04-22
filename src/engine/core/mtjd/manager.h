@@ -6,8 +6,8 @@
 
 #define TYPE MULTI_THREAD
 
-#include "core/mt/lock_free_fixed_queue.h"
-#include "core/mt/transaction.h"
+#include "engine/core/mt/lock_free_fixed_queue.h"
+#include "engine/core/mt/transaction.h"
 
 
 namespace Lumix

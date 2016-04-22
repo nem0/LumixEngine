@@ -1,8 +1,8 @@
 #include "hierarchy.h"
-#include "core/blob.h"
-#include "core/crc32.h"
-#include "core/hash_map.h"
-#include "core/json_serializer.h"
+#include "engine/core/blob.h"
+#include "engine/core/crc32.h"
+#include "engine/core/hash_map.h"
+#include "engine/core/json_serializer.h"
 #include "engine/engine.h"
 #include "universe.h"
 

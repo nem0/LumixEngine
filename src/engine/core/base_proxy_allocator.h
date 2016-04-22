@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "core/iallocator.h"
-#include "core/mt/atomic.h"
+#include "engine/core/iallocator.h"
+#include "engine/core/mt/atomic.h"
 
 
 namespace Lumix

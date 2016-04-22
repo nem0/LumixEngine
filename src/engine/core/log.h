@@ -2,8 +2,8 @@
 
 
 #include "lumix.h"
-#include "core/delegate_list.h"
-#include "core/string.h"
+#include "engine/core/delegate_list.h"
+#include "engine/core/string.h"
 
 
 namespace Lumix

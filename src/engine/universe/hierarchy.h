@@ -2,8 +2,8 @@
 
 
 #include "lumix.h"
-#include "core/matrix.h"
-#include "core/hash_map.h"
+#include "engine/core/matrix.h"
+#include "engine/core/hash_map.h"
 #include "engine/iplugin.h"
 
 

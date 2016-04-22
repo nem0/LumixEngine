@@ -1,11 +1,11 @@
 #include "lumix.h"
-#include "core/path.h"
+#include "engine/core/path.h"
 
-#include "core/blob.h"
-#include "core/crc32.h"
-#include "core/mt/sync.h"
-#include "core/path_utils.h"
-#include "core/string.h"
+#include "engine/core/blob.h"
+#include "engine/core/crc32.h"
+#include "engine/core/mt/sync.h"
+#include "engine/core/path_utils.h"
+#include "engine/core/string.h"
 
 
 namespace Lumix

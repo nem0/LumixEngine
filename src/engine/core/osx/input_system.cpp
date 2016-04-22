@@ -1,6 +1,6 @@
 #include "input_system.h"
-#include "core/map.h"
-#include "core/string.h"
+#include "engine/core/map.h"
+#include "engine/core/string.h"
 
 
 namespace Lux

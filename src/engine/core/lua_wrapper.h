@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "core/log.h"
-#include "core/vec.h"
+#include "engine/core/log.h"
+#include "engine/core/vec.h"
 #include <lua.hpp>
 #include <lauxlib.h>
 #include <tuple>

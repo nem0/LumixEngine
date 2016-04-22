@@ -1,8 +1,8 @@
-#include "core/network.h"
-#include "core/iallocator.h"
-#include "core/string.h"
+#include "engine/core/network.h"
+#include "engine/core/iallocator.h"
+#include "engine/core/string.h"
 
-#include "core/pc/simple_win.h"
+#include "engine/core/pc/simple_win.h"
 
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "wininet.lib")

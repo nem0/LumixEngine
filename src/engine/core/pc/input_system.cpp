@@ -1,8 +1,8 @@
-#include "core/input_system.h"
-#include "core/associative_array.h"
-#include "core/profiler.h"
-#include "core/string.h"
-#include "core/vec.h"
+#include "engine/core/input_system.h"
+#include "engine/core/associative_array.h"
+#include "engine/core/profiler.h"
+#include "engine/core/string.h"
+#include "engine/core/vec.h"
 
 #include <windows.h>
 #include <Xinput.h>

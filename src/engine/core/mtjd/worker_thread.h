@@ -1,10 +1,10 @@
 #pragma once
 
 
-#include "core/mt/task.h"
-#include "core/mt/lock_free_fixed_queue.h"
+#include "engine/core/mt/task.h"
+#include "engine/core/mt/lock_free_fixed_queue.h"
 
-#include "core/mtjd/manager.h"
+#include "engine/core/mtjd/manager.h"
 
 namespace Lumix
 {
