@@ -3,7 +3,7 @@
 #include "engine/core/log.h"
 #include "engine/core/profiler.h"
 #include "engine/core/system.h"
-#include "debug/debug.h"
+#include "engine/debug/debug.h"
 #include "engine.h"
 #include "iplugin.h"
 

@@ -14,7 +14,7 @@
 #include "engine/core/path_utils.h"
 #include "engine/core/system.h"
 #include "crnlib.h"
-#include "debug/floating_points.h"
+#include "engine/debug/floating_points.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"

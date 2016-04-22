@@ -7,7 +7,7 @@
 #include "engine/core/log.h"
 #include "engine/core/profiler.h"
 #include "engine/core/resource_manager.h"
-#include "debug/debug.h"
+#include "engine/debug/debug.h"
 #include "engine.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"

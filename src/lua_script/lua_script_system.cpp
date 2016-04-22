@@ -11,7 +11,7 @@
 #include "engine/core/lua_wrapper.h"
 #include "engine/core/path_utils.h"
 #include "engine/core/resource_manager.h"
-#include "debug/debug.h"
+#include "engine/debug/debug.h"
 #include "editor/asset_browser.h"
 #include "editor/ieditor_command.h"
 #include "editor/imgui/imgui.h"
