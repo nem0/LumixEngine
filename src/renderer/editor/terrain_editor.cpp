@@ -24,7 +24,7 @@
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
 #include "renderer/terrain.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #include <cmath>
 
 

@@ -4,7 +4,7 @@
 #include "engine/core/lumix.h"
 #include "engine/core/string.h"
 #include "engine/iplugin.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 
 
 namespace Lumix

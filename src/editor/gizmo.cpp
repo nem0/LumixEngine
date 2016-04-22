@@ -9,7 +9,7 @@
 #include "engine.h"
 #include "render_interface.h"
 #include "renderer/render_scene.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #include <cfloat>
 #include <cmath>
 

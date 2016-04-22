@@ -29,7 +29,7 @@
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #ifndef STATIC_PLUGINS
 #define STB_IMAGE_IMPLEMENTATION
 #endif

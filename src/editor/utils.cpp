@@ -6,7 +6,7 @@
 #include "editor/world_editor.h"
 #include "imgui/imgui.h"
 #include "renderer/render_scene.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 
 
 void getEntityListDisplayName(Lumix::WorldEditor& editor,

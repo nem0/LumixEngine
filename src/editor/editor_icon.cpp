@@ -6,7 +6,7 @@
 #include "engine/core/resource_manager_base.h"
 #include "engine.h"
 #include "render_interface.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #include "world_editor.h"
 #include <cmath>
 

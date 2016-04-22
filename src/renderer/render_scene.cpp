@@ -34,7 +34,7 @@
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
 
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #include <cmath>
 
 

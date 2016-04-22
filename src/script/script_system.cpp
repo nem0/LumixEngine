@@ -10,7 +10,7 @@
 #include "engine/core/array.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 
 
 static const uint32_t SCRIPT_HASH = crc32("script");

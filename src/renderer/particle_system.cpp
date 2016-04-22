@@ -9,7 +9,7 @@
 #include "editor/world_editor.h"
 #include "renderer/material.h"
 #include "renderer/render_scene.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #include <cmath>
 
 

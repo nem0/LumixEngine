@@ -20,7 +20,7 @@
 #include "renderer/shader_manager.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #include <bgfx/bgfx.h>
 #include <cfloat>
 #include <cstdio>
