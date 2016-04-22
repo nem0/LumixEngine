@@ -1,5 +1,5 @@
-#include "property_descriptor.h"
-#include "core/crc32.h"
+#include "engine/property_descriptor.h"
+#include "engine/core/crc32.h"
 #include <cfloat>
 #include <cstdint>
 

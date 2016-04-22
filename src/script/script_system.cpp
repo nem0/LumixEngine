@@ -1,16 +1,16 @@
 #include "script_system.h"
 #include <Windows.h>
-#include "core/iallocator.h"
-#include "core/crc32.h"
-#include "core/fs/file_system.h"
-#include "core/fs/ifile.h"
-#include "core/json_serializer.h"
-#include "core/library.h"
-#include "core/log.h"
-#include "core/array.h"
+#include "engine/core/iallocator.h"
+#include "engine/core/crc32.h"
+#include "engine/core/fs/file_system.h"
+#include "engine/core/fs/ifile.h"
+#include "engine/core/json_serializer.h"
+#include "engine/core/library.h"
+#include "engine/core/log.h"
+#include "engine/core/array.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 
 
 static const uint32_t SCRIPT_HASH = crc32("script");

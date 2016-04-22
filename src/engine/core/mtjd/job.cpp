@@ -1,7 +1,7 @@
-#include "lumix.h"
-#include "core/mtjd/job.h"
+#include "engine/lumix.h"
+#include "engine/core/mtjd/job.h"
 
-#include "core/mtjd/manager.h"
+#include "engine/core/mtjd/manager.h"
 
 namespace Lumix
 {

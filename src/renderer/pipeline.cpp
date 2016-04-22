@@ -1,14 +1,14 @@
 #include "pipeline.h"
 
-#include "core/crc32.h"
-#include "core/fs/disk_file_device.h"
-#include "core/fs/file_system.h"
-#include "core/geometry.h"
-#include "core/lifo_allocator.h"
-#include "core/log.h"
-#include "core/lua_wrapper.h"
-#include "core/profiler.h"
-#include "engine.h"
+#include "engine/core/crc32.h"
+#include "engine/core/fs/disk_file_device.h"
+#include "engine/core/fs/file_system.h"
+#include "engine/core/geometry.h"
+#include "engine/core/lifo_allocator.h"
+#include "engine/core/log.h"
+#include "engine/core/lua_wrapper.h"
+#include "engine/core/profiler.h"
+#include "engine/engine.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
@@ -21,7 +21,7 @@
 #include "renderer/shader.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #include <bgfx/bgfx.h>
 #include <cmath>
 

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "lumix.h"
-#include "core/array.h"
-#include "core/delegate_list.h"
-#include "universe/component.h"
+#include "engine/lumix.h"
+#include "engine/core/array.h"
+#include "engine/core/delegate_list.h"
+#include "engine/universe/component.h"
 
 
 namespace Lumix

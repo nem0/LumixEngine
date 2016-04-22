@@ -1,8 +1,8 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
-#include "core/quat.h"
-#include "core/matrix.h"
-#include "core/math_utils.h"
+#include "engine/core/quat.h"
+#include "engine/core/matrix.h"
+#include "engine/core/math_utils.h"
 
 #include <cmath>
 

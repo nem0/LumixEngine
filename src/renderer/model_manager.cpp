@@ -1,7 +1,7 @@
-#include "lumix.h"
+#include "engine/lumix.h"
 #include "renderer/model_manager.h"
 
-#include "core/resource.h"
+#include "engine/core/resource.h"
 #include "renderer/model.h"
 
 namespace Lumix

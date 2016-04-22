@@ -1,6 +1,6 @@
 #include "model_generator.h"
-#include "core/resource_manager.h"
-#include "core/resource_manager_base.h"
+#include "engine/core/resource_manager.h"
+#include "engine/core/resource_manager_base.h"
 #include "renderer/model.h"
 
 

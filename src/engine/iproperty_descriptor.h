@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "core/array.h"
-#include "universe/universe.h"
+#include "engine/core/array.h"
+#include "engine/universe/universe.h"
 
 
 namespace Lumix

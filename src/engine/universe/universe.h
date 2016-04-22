@@ -1,14 +1,14 @@
 #pragma once
 
 
-#include "lumix.h"
-#include "core/array.h"
-#include "core/associative_array.h"
-#include "core/delegate_list.h"
-#include "core/quat.h"
-#include "core/string.h"
-#include "core/vec.h"
-#include "universe/component.h"
+#include "engine/lumix.h"
+#include "engine/core/array.h"
+#include "engine/core/associative_array.h"
+#include "engine/core/delegate_list.h"
+#include "engine/core/quat.h"
+#include "engine/core/string.h"
+#include "engine/core/vec.h"
+#include "engine/universe/component.h"
 
 
 namespace Lumix

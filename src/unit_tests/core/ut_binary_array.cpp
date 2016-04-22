@@ -1,5 +1,5 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "core/binary_array.h"
+#include "engine/core/binary_array.h"
 #include <cstdio>
 
 

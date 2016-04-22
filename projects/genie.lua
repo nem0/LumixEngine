@@ -195,7 +195,7 @@ solution "LumixEngine"
 	configurations { "Debug", "Release", "RelWithDebInfo" }
 	platforms { "x32", "x64" }
 	flags { "FatalWarnings", "NoPCH" }
-	includedirs {"../src", "../src/engine"}
+	includedirs {"../src"}
 	location(LOCATION)
 	language "C++"
 	startproject "studio"

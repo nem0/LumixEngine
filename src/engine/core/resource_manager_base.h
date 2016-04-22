@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/hash_map.h"
+#include "engine/core/hash_map.h"
 
 
 namespace Lumix

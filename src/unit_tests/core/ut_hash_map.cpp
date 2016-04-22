@@ -1,8 +1,8 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
-#include "core/array.h"
-#include "core/hash_map.h"
-#include "debug/debug.h"
+#include "engine/core/array.h"
+#include "engine/core/hash_map.h"
+#include "engine/debug/debug.h"
 
 namespace
 {

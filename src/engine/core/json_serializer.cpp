@@ -1,9 +1,9 @@
 #include "json_serializer.h"
-#include "core/fs/file_system.h"
-#include "core/fs/ifile_device.h"
-#include "core/log.h"
-#include "core/math_utils.h"
-#include "core/path.h"
+#include "engine/core/fs/file_system.h"
+#include "engine/core/fs/ifile_device.h"
+#include "engine/core/log.h"
+#include "engine/core/math_utils.h"
+#include "engine/core/path.h"
 #include <cstdlib>
 
 

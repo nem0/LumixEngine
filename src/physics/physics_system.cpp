@@ -3,20 +3,20 @@
 #include <PxPhysicsAPI.h>
 
 #include "cooking/PxCooking.h"
-#include "core/base_proxy_allocator.h"
-#include "core/crc32.h"
-#include "core/log.h"
-#include "core/resource_manager.h"
+#include "engine/core/base_proxy_allocator.h"
+#include "engine/core/crc32.h"
+#include "engine/core/log.h"
+#include "engine/core/resource_manager.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
-#include "engine.h"
+#include "engine/engine.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
 #include "renderer/render_scene.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 
 
 namespace Lumix

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "lumix.h"
-#include "iplugin.h"
+#include "engine/lumix.h"
+#include "engine/iplugin.h"
 
 
 namespace bgfx

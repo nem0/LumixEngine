@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/resource.h"
+#include "engine/core/resource.h"
 #include <bgfx/bgfx.h>
 
 

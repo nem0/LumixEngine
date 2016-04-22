@@ -1,7 +1,7 @@
-#include "lumix.h"
-#include "core/mtjd/scheduler.h"
-#include "core/mtjd/manager.h"
-#include "core/profiler.h"
+#include "engine/lumix.h"
+#include "engine/core/mtjd/scheduler.h"
+#include "engine/core/mtjd/manager.h"
+#include "engine/core/profiler.h"
 
 
 namespace Lumix

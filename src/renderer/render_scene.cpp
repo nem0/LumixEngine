@@ -1,24 +1,24 @@
 #include "render_scene.h"
 
-#include "core/array.h"
-#include "core/blob.h"
-#include "core/crc32.h"
-#include "core/fs/file_system.h"
-#include "core/geometry.h"
-#include "core/json_serializer.h"
-#include "core/lifo_allocator.h"
-#include "core/log.h"
-#include "core/lua_wrapper.h"
-#include "core/math_utils.h"
-#include "core/mtjd/generic_job.h"
-#include "core/mtjd/job.h"
-#include "core/mtjd/manager.h"
-#include "core/profiler.h"
-#include "core/resource_manager.h"
-#include "core/resource_manager_base.h"
-#include "core/timer.h"
+#include "engine/core/array.h"
+#include "engine/core/blob.h"
+#include "engine/core/crc32.h"
+#include "engine/core/fs/file_system.h"
+#include "engine/core/geometry.h"
+#include "engine/core/json_serializer.h"
+#include "engine/core/lifo_allocator.h"
+#include "engine/core/log.h"
+#include "engine/core/lua_wrapper.h"
+#include "engine/core/math_utils.h"
+#include "engine/core/mtjd/generic_job.h"
+#include "engine/core/mtjd/job.h"
+#include "engine/core/mtjd/manager.h"
+#include "engine/core/profiler.h"
+#include "engine/core/resource_manager.h"
+#include "engine/core/resource_manager_base.h"
+#include "engine/core/timer.h"
 
-#include "engine.h"
+#include "engine/engine.h"
 
 #include "lua_script/lua_script_system.h"
 
@@ -34,7 +34,7 @@
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
 
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #include <cmath>
 
 

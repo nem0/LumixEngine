@@ -1,5 +1,5 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "core/command_line_parser.h"
+#include "engine/core/command_line_parser.h"
 
 
 void UT_command_line_parser(const char* params)

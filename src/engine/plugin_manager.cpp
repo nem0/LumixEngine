@@ -1,11 +1,11 @@
-#include "plugin_manager.h"
-#include "core/array.h"
-#include "core/log.h"
-#include "core/profiler.h"
-#include "core/system.h"
-#include "debug/debug.h"
-#include "engine.h"
-#include "iplugin.h"
+#include "engine/plugin_manager.h"
+#include "engine/core/array.h"
+#include "engine/core/log.h"
+#include "engine/core/profiler.h"
+#include "engine/core/system.h"
+#include "engine/debug/debug.h"
+#include "engine/engine.h"
+#include "engine/iplugin.h"
 
 
 namespace Lumix 
