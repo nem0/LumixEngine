@@ -1,7 +1,7 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
-#include "core/fs/disk_file_device.h"
-#include "core/fs/file_system.h"
+#include "engine/core/fs/disk_file_device.h"
+#include "engine/core/fs/file_system.h"
 #include "renderer/texture.h"
 
 namespace

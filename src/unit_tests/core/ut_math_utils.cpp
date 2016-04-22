@@ -1,5 +1,5 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "core/math_utils.h"
+#include "engine/core/math_utils.h"
 
 
 void UT_math_utils_abs_signum(const char* params)

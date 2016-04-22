@@ -2,7 +2,7 @@
 
 
 #include "lumix.h"
-#include "core/matrix.h"
+#include "engine/core/matrix.h"
 #include "iplugin.h"
 
 

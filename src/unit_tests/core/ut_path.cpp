@@ -1,8 +1,8 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
-#include "core/path.h"
-#include "core/crc32.h"
-#include "core/string.h"
+#include "engine/core/path.h"
+#include "engine/core/crc32.h"
+#include "engine/core/string.h"
 
 const char src_path[] = "Unit\\Test\\PATH_1231231.EXT";
 const char res_path[] = "unit/test/path_1231231.ext";

@@ -2,11 +2,11 @@
 
 
 #include "assimp/Importer.hpp"
-#include "core/array.h"
-#include "core/associative_array.h"
-#include "core/binary_array.h"
-#include "core/mt/sync.h"
-#include "core/string.h"
+#include "engine/core/array.h"
+#include "engine/core/associative_array.h"
+#include "engine/core/binary_array.h"
+#include "engine/core/mt/sync.h"
+#include "engine/core/string.h"
 #include "lumix.h"
 
 

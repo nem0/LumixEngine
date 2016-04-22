@@ -1,9 +1,9 @@
 #pragma once
 
 
-#include "core/array.h"
-#include "core/resource.h"
-#include "core/vec.h"
+#include "engine/core/array.h"
+#include "engine/core/resource.h"
+#include "engine/core/vec.h"
 #include <bgfx/bgfx.h>
 
 

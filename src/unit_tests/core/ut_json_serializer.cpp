@@ -1,8 +1,8 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "core/fs/file_system.h"
-#include "core/fs/memory_file_device.h"
-#include "core/json_serializer.h"
-#include "core/path.h"
+#include "engine/core/fs/file_system.h"
+#include "engine/core/fs/memory_file_device.h"
+#include "engine/core/json_serializer.h"
+#include "engine/core/path.h"
 #include <cstdio>
 
 

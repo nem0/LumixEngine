@@ -1,8 +1,8 @@
 #include "lua_script_manager.h"
 
-#include "core/crc32.h"
-#include "core/log.h"
-#include "core/fs/file_system.h"
+#include "engine/core/crc32.h"
+#include "engine/core/log.h"
+#include "engine/core/fs/file_system.h"
 
 
 namespace Lumix

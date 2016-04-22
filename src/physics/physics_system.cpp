@@ -3,10 +3,10 @@
 #include <PxPhysicsAPI.h>
 
 #include "cooking/PxCooking.h"
-#include "core/base_proxy_allocator.h"
-#include "core/crc32.h"
-#include "core/log.h"
-#include "core/resource_manager.h"
+#include "engine/core/base_proxy_allocator.h"
+#include "engine/core/crc32.h"
+#include "engine/core/log.h"
+#include "engine/core/resource_manager.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"

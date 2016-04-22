@@ -1,6 +1,6 @@
 #include "entity_groups.h"
-#include "core/blob.h"
-#include "core/string.h"
+#include "engine/core/blob.h"
+#include "engine/core/string.h"
 #include "universe/universe.h"
 
 
