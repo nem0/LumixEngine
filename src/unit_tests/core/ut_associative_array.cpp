@@ -1,5 +1,5 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "core/associative_array.h"
+#include "engine/core/associative_array.h"
 
 
 void UT_associative_array(const char* params)

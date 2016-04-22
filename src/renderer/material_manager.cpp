@@ -1,7 +1,7 @@
 #include "lumix.h"
 #include "renderer/material_manager.h"
 
-#include "core/resource.h"
+#include "engine/core/resource.h"
 #include "renderer/material.h"
 
 namespace Lumix

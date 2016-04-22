@@ -1,6 +1,6 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "core/blob.h"
-#include "core/string.h"
+#include "engine/core/blob.h"
+#include "engine/core/string.h"
 
 
 void UT_blob(const char* params)

@@ -1,8 +1,8 @@
 #include "physics_geometry_manager.h"
-#include "core/fs/file_system.h"
-#include "core/resource_manager.h"
-#include "core/string.h"
-#include "core/vec.h"
+#include "engine/core/fs/file_system.h"
+#include "engine/core/resource_manager.h"
+#include "engine/core/string.h"
+#include "engine/core/vec.h"
 #include "physics/physics_system.h"
 #include <PxPhysicsAPI.h>
 

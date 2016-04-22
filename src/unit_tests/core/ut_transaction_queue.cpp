@@ -1,9 +1,9 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
-#include "core/mt/lock_free_fixed_queue.h"
-#include "core/mt/transaction.h"
-#include "core/mt/task.h"
-#include "core/mt/thread.h"
+#include "engine/core/mt/lock_free_fixed_queue.h"
+#include "engine/core/mt/transaction.h"
+#include "engine/core/mt/task.h"
+#include "engine/core/mt/thread.h"
 
 namespace
 {

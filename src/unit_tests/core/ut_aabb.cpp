@@ -1,5 +1,5 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "core/geometry.h"
+#include "engine/core/geometry.h"
 
 
 void UT_aabb(const char* params)

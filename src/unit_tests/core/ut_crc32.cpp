@@ -1,5 +1,5 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "core/crc32.h"
+#include "engine/core/crc32.h"
 
 
 void UT_crc32(const char* params)

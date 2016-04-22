@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "core/math_utils.h"
-#include "core/string.h"
+#include "engine/core/math_utils.h"
+#include "engine/core/string.h"
 
 
 namespace Lumix
