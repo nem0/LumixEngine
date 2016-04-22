@@ -1,7 +1,7 @@
-#include "core/log.h"
-#include "core/array.h"
-#include "core/path.h"
-#include "core/string.h"
+#include "engine/core/log.h"
+#include "engine/core/array.h"
+#include "engine/core/path.h"
+#include "engine/core/string.h"
 
 
 namespace Lumix

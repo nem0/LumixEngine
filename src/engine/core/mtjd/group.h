@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/mtjd/base_entry.h"
+#include "engine/core/mtjd/base_entry.h"
 
 namespace Lumix
 {

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "lumix.h"
-#include "core/fs/file_system.h"
+#include "engine/core/fs/file_system.h"
 
 namespace Lumix
 {

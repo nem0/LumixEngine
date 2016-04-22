@@ -2,7 +2,7 @@
 
 
 #include "lumix.h"
-#include "core/vec.h"
+#include "engine/core/vec.h"
 
 
 namespace Lumix

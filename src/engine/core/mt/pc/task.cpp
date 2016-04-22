@@ -1,9 +1,9 @@
 #include "lumix.h"
-#include "core/iallocator.h"
-#include "core/mt/task.h"
-#include "core/mt/thread.h"
-#include "core/pc/simple_win.h"
-#include "core/profiler.h"
+#include "engine/core/iallocator.h"
+#include "engine/core/mt/task.h"
+#include "engine/core/mt/thread.h"
+#include "engine/core/pc/simple_win.h"
+#include "engine/core/profiler.h"
 
 
 

@@ -1,6 +1,6 @@
 #include "binary_array.h"
-#include "core/iallocator.h"
-#include "core/string.h"
+#include "engine/core/iallocator.h"
+#include "engine/core/string.h"
 
 
 namespace Lumix

@@ -1,5 +1,5 @@
 #include "iplugin.h"
-#include "core/string.h"
+#include "engine/core/string.h"
 
 
 namespace Lumix

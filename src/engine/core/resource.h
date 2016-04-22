@@ -1,9 +1,9 @@
 #pragma once
 
 
-#include "core/fs/file_system.h"
-#include "core/delegate_list.h"
-#include "core/path.h"
+#include "engine/core/fs/file_system.h"
+#include "engine/core/delegate_list.h"
+#include "engine/core/path.h"
 
 
 namespace Lumix

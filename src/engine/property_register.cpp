@@ -1,6 +1,6 @@
 #include "property_register.h"
-#include "core/associative_array.h"
-#include "core/crc32.h"
+#include "engine/core/associative_array.h"
+#include "engine/core/crc32.h"
 #include "engine/iproperty_descriptor.h"
 
 

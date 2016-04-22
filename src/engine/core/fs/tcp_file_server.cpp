@@ -1,14 +1,14 @@
-#include "core/fs/tcp_file_server.h"
+#include "engine/core/fs/tcp_file_server.h"
 
-#include "core/array.h"
-#include "core/free_list.h"
-#include "core/fs/os_file.h"
-#include "core/fs/tcp_file_device.h"
-#include "core/mt/task.h"
-#include "core/path.h"
-#include "core/profiler.h"
-#include "core/string.h"
-#include "core/network.h"
+#include "engine/core/array.h"
+#include "engine/core/free_list.h"
+#include "engine/core/fs/os_file.h"
+#include "engine/core/fs/tcp_file_device.h"
+#include "engine/core/mt/task.h"
+#include "engine/core/path.h"
+#include "engine/core/profiler.h"
+#include "engine/core/string.h"
+#include "engine/core/network.h"
 
 
 namespace Lumix

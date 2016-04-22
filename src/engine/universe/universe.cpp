@@ -1,8 +1,8 @@
 #include "universe.h"
-#include "core/blob.h"
-#include "core/crc32.h"
-#include "core/matrix.h"
-#include "core/json_serializer.h"
+#include "engine/core/blob.h"
+#include "engine/core/crc32.h"
+#include "engine/core/matrix.h"
+#include "engine/core/json_serializer.h"
 #include "engine/iplugin.h"
 #include <cstdint>
 
