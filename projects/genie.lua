@@ -98,6 +98,9 @@ function defaultConfigurations()
 		targetdir(BINARY_DIR .. "RelWithDebInfo")
 		defines { "NDEBUG" }
 		flags { "Symbols", "Optimize", "WinMain" }
+
+	configuration "not windows"
+		buildoptions { "-std=c++11" }
 		
 	configuration {}
 		files { "lumix.natvis" }
@@ -207,13 +210,18 @@ project "engine"
 	libType()
 
 	files { "../src/engine/**.h", "../src/engine/**.cpp", "genie.lua" }
-	excludes { "../src/engine/**/osx/*"}
 
 	defines { "BUILDING_ENGINE" }
 	includedirs { "../external/lua/include" }
 	if not _OPTIONS["static-plugins"] then
 		linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
 	end
+
+	configuration "not macosx"
+		excludes { "../src/engine/**/osx/*"}
+	configuration "not windows"
+		excludes { "../src/engine/**/pc/*"}
+	configuration {}
 
 	linkLib("lua")
 
@@ -223,7 +231,11 @@ project "physics"
 	libType()
 
 	files { "../src/physics/**.h", "../src/physics/**.cpp" }
-	excludes { "../src/engine/**/osx/*"}
+
+	configuration "not macosx"
+		excludes { "../src/engine/**/osx/*"}
+	configuration {}
+
 	includedirs { "../external/physx/include/" .. ide_dir, "../external/bgfx/include" }
 	defines { "BUILDING_PHYSICS" }
 	links { "engine", "renderer", "editor" }
