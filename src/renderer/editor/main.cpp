@@ -192,26 +192,31 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 				bool is_srgb = (texture->getFlags() & BGFX_TEXTURE_SRGB) != 0;
 				if (ImGui::Checkbox("SRGB", &is_srgb))
 				{
+					ImGui::CloseCurrentPopup();
 					texture->setFlag(BGFX_TEXTURE_SRGB, is_srgb);
 				}
 				bool u_clamp = (texture->getFlags() & BGFX_TEXTURE_U_CLAMP) != 0;
 				if (ImGui::Checkbox("u clamp", &u_clamp))
 				{
+					ImGui::CloseCurrentPopup();
 					texture->setFlag(BGFX_TEXTURE_U_CLAMP, u_clamp);
 				}
 				bool v_clamp = (texture->getFlags() & BGFX_TEXTURE_V_CLAMP) != 0;
 				if (ImGui::Checkbox("v clamp", &v_clamp))
 				{
+					ImGui::CloseCurrentPopup();
 					texture->setFlag(BGFX_TEXTURE_V_CLAMP, v_clamp);
 				}
 				bool min_point = (texture->getFlags() & BGFX_TEXTURE_MIN_POINT) != 0;
 				if (ImGui::Checkbox("Min point", &min_point))
 				{
+					ImGui::CloseCurrentPopup();
 					texture->setFlag(BGFX_TEXTURE_MIN_POINT, min_point);
 				}
 				bool mag_point = (texture->getFlags() & BGFX_TEXTURE_MAG_POINT) != 0;
 				if (ImGui::Checkbox("Mag point", &mag_point))
 				{
+					ImGui::CloseCurrentPopup();
 					texture->setFlag(BGFX_TEXTURE_MAG_POINT, mag_point);
 				}
 				if (slot.m_is_atlas)
@@ -220,6 +225,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 					const char values[] = { '2', 'x', '2', 0, '3', 'x', '3', 0, '4', 'x', '4', 0, 0 };
 					if (ImGui::Combo(StaticString<30>("Atlas size###", i), &size, values))
 					{
+						ImGui::CloseCurrentPopup();
 						texture->setAtlasSize(size + 2);
 					}
 				}

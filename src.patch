@@ -1,0 +1,273 @@
+diff --git a/src/editor/import_asset_dialog.cpp b/src/editor/import_asset_dialog.cpp
+index 428ab41..fe93707 100644
+--- a/src/editor/import_asset_dialog.cpp
++++ b/src/editor/import_asset_dialog.cpp
+@@ -1,5 +1,4 @@
+ #include "animation/animation.h"
+-#include "asset_browser.h"
+ #include "assimp/DefaultLogger.hpp"
+ #include "assimp/ProgressHandler.hpp"
+ #include "assimp/postprocess.h"
+@@ -1060,25 +1059,28 @@ struct ConvertTask : public Lumix::MT::Task
+ 		{
+ 			if(m_dialog.m_create_billboard_lod)
+ 			{
+-				Lumix::MT::SpinLock lock(m_dialog.m_mutex);
+-				PathBuilder mesh_path(m_dialog.m_output_dir);
+-				mesh_path << "/" << m_dialog.m_output_filename << ".msh";
+-				Lumix::copyString(m_dialog.m_create_billboard_mesh, mesh_path);
+-				if (m_dialog.m_texture_output_dir[0])
+-				{
+-					char from_root_path[Lumix::MAX_PATH_LENGTH];
+-					getRelativePath(m_dialog.m_editor,
+-						from_root_path,
+-						Lumix::lengthOf(from_root_path),
+-						m_dialog.m_texture_output_dir);
+-					PathBuilder texture_path(from_root_path, "billboard.dds");
+-					Lumix::copyString(m_dialog.m_create_billboard_out_path, texture_path);
+-				}
+-				else
+-				{
+-					PathBuilder texture_path(m_dialog.m_output_dir, "/billboard.dds");
+-					Lumix::copyString(m_dialog.m_create_billboard_out_path, texture_path);
+-				}
++				{ 
++					Lumix::MT::SpinLock lock(m_dialog.m_mutex);
++					PathBuilder mesh_path(m_dialog.m_output_dir);
++					mesh_path << "/" << m_dialog.m_output_filename << ".msh";
++					Lumix::copyString(m_dialog.m_create_billboard_mesh, mesh_path);
++					if (m_dialog.m_texture_output_dir[0])
++					{
++						char from_root_path[Lumix::MAX_PATH_LENGTH];
++						getRelativePath(m_dialog.m_editor,
++							from_root_path,
++							Lumix::lengthOf(from_root_path),
++							m_dialog.m_texture_output_dir);
++						PathBuilder texture_path(from_root_path, "billboard.dds");
++						Lumix::copyString(m_dialog.m_create_billboard_out_path, texture_path);
++					}
++					else
++					{
++						PathBuilder texture_path(m_dialog.m_output_dir, "/billboard.dds");
++						Lumix::copyString(m_dialog.m_create_billboard_out_path, texture_path);
++					}
++				} // unlock
++				m_dialog.m_billboard_done.wait();
+ 			}
+ 			m_dialog.setMessage("Success.");
+ 		}
+@@ -1354,7 +1356,7 @@ struct ConvertTask : public Lumix::MT::Task
+ 		if (m_dialog.m_create_billboard_lod)
+ 		{
+ 			Lumix::Vec3 size = max - min;
+-			float uvs[] = { 0.0f, 0.5f, 1.0f }; // TODO UVs
++			float uvs[] = { 0.0f, 0.5f, 1.0f };
+ 
+ 			if (size.x + size.z < size.y)
+ 			{
+@@ -1923,9 +1925,8 @@ struct ConvertTask : public Lumix::MT::Task
+ }; // struct ConvertTask
+ 
+ 
+-ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metadata, AssetBrowser& asset_browser)
++ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metadata)
+ 	: m_metadata(metadata)
+-	, m_asset_browser(asset_browser)
+ 	, m_task(nullptr)
+ 	, m_editor(editor)
+ 	, m_is_converting(false)
+@@ -1943,6 +1944,7 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
+ 	, m_meshes(editor.getAllocator())
+ 	, m_materials(editor.getAllocator())
+ 	, m_importers(editor.getAllocator())
++	, m_billboard_done(0, 1)
+ {
+ 	m_lods[0] = 10;
+ 	m_lods[1] = 100;
+@@ -2423,12 +2425,14 @@ static bool createBillboard(ImportAssetDialog& dialog,
+ 	lods[0].distance = FLT_MAX;
+ 	Lumix::AABB aabb = model->getAABB();
+ 	Lumix::Vec3 size = aabb.max - aabb.min;
+-	universe.setPosition(mesh_side_entity, { (size.x + size.z) * 0.5f, 0, 0 });
++	universe.setPosition(mesh_side_entity, { (aabb.max.x - aabb.min.z), 0, 0 });
+ 	int width, height;
++	float camera_size = size.y * 0.5f;
+ 	if (size.x + size.z > size.y)
+ 	{
+ 		width = texture_size;
+ 		height = nextPowOf2(int(width / (size.x + size.z) * size.y));
++		camera_size *= (size.x + size.z) / size.y;
+ 	}
+ 	else
+ 	{
+@@ -2440,7 +2444,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
+ 	auto camera_entity = universe.createEntity(camera_pos, { 0, 0, 0, 0 });
+ 	auto camera_cmp = render_scene->createComponent(Lumix::crc32("camera"), camera_entity);
+ 	render_scene->setCameraOrtho(camera_cmp, true);
+-	render_scene->setCameraOrthoSize(camera_cmp, (aabb.max.y - aabb.min.y) * 0.5f);
++	render_scene->setCameraOrthoSize(camera_cmp, camera_size);
+ 	render_scene->setCameraSlot(camera_cmp, "main");
+ 
+ 	pipeline->setScene(render_scene);
+@@ -2468,10 +2472,10 @@ static bool createBillboard(ImportAssetDialog& dialog,
+ 	preprocessBillboard(&data[0], width, height, engine.getAllocator());
+ 	auto& fs = engine.getFileSystem();
+ 	bool result = saveAsDDS(dialog, fs, "billboard", (Lumix::uint8*)&data[0], width, height, true, out_path.c_str());
+-
++	/*
+ 	bgfx::destroyTexture(texture);
+ 	Lumix::Pipeline::destroy(pipeline);
+-	engine.destroyUniverse(universe);
++	engine.destroyUniverse(universe);*/
+ 	return result;
+ }
+ 
+@@ -2521,7 +2525,7 @@ int ImportAssetDialog::importAsset(lua_State* L)
+ 			lua_pop(L, 1); // "src"
+ 
+ 			checkSource();
+-			if (m_is_importing) checkTask(true);
++			if (m_is_importing) checkTask(true, false);
+ 
+ 			if (lua_getfield(L, -1, "materials") == LUA_TTABLE)
+ 			{
+@@ -2594,20 +2598,24 @@ int ImportAssetDialog::importAsset(lua_State* L)
+ 	}
+ 	lua_pop(L, 1);
+ 	convert(false);
+-	if (m_is_converting) checkTask(true);
++	if (m_is_converting) checkTask(true, true);
+ 
+ 	return 0;
+ }
+ 
+ 
+-void ImportAssetDialog::checkTask(bool wait)
++void ImportAssetDialog::checkTask(bool wait, bool update_while_wait)
+ {
+ 	if (!m_task) return;
+ 	if (!wait && !m_task->isFinished()) return;
+ 
+ 	if (wait)
+ 	{
+-		while (!m_task->isFinished()) Lumix::MT::sleep(200);
++		while (!m_task->isFinished())
++		{
++			if (update_while_wait) update();
++			Lumix::MT::sleep(200);
++		}
+ 	}
+ 
+ 	m_task->destroy();
+@@ -2619,7 +2627,7 @@ void ImportAssetDialog::checkTask(bool wait)
+ }
+ 
+ 
+-void ImportAssetDialog::checkBillboard()
++void ImportAssetDialog::update()
+ {
+ 	m_mutex.lock();
+ 	if (m_create_billboard_mesh[0] != 0)
+@@ -2632,6 +2640,7 @@ void ImportAssetDialog::checkBillboard()
+ 
+ 		m_mutex.lock();
+ 		m_create_billboard_mesh[0] = '\0';
++		m_billboard_done.signal();
+ 	}
+ 	m_mutex.unlock();
+ }
+@@ -2639,9 +2648,6 @@ void ImportAssetDialog::checkBillboard()
+ 
+ void ImportAssetDialog::onGUI()
+ {
+-	// TODO what if onGUI is not called
+-	checkBillboard();
+-
+ 	if (ImGui::BeginDock("Import Asset", &m_is_opened))
+ 	{
+ 		if (hasMessage())
+@@ -2671,7 +2677,7 @@ void ImportAssetDialog::onGUI()
+ 				}
+ 			}
+ 
+-			checkTask(false);
++			checkTask(false, false);
+ 
+ 			{
+ 				Lumix::MT::SpinLock lock(m_mutex);
+diff --git a/src/editor/import_asset_dialog.h b/src/editor/import_asset_dialog.h
+index 2037f3e..5676c38 100644
+--- a/src/editor/import_asset_dialog.h
++++ b/src/editor/import_asset_dialog.h
+@@ -10,7 +10,6 @@
+ #include "lumix.h"
+ 
+ 
+-class AssetBrowser;
+ class Metadata;
+ 
+ 
+@@ -93,7 +92,7 @@ class LUMIX_EDITOR_API ImportAssetDialog
+ 		};
+ 
+ 	public:
+-		ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metadata, AssetBrowser& asset_browser);
++		ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metadata);
+ 		~ImportAssetDialog();
+ 		void setMessage(const char* message);
+ 		void setImportMessage(const char* message, float progress_fraction);
+@@ -101,13 +100,14 @@ class LUMIX_EDITOR_API ImportAssetDialog
+ 		void onGUI();
+ 		DDSConvertCallbackData& getDDSConvertCallbackData() { return m_dds_convert_callback; }
+ 		int importAsset(lua_State* L);
++		void update();
+ 
+ 	public:
+ 		bool m_is_opened;
+ 
+ 	private:
+ 		void checkSource();
+-		void checkTask(bool wait);
++		void checkTask(bool wait, bool update_while_wait);
+ 		void convert(bool use_ui);
+ 		void getMessage(char* msg, int max_size);
+ 		bool hasMessage();
+@@ -117,7 +117,6 @@ class LUMIX_EDITOR_API ImportAssetDialog
+ 		void onMeshesGUI();
+ 		void onImageGUI();
+ 		void onLODsGUI();
+-		void checkBillboard();
+ 
+ 	private:
+ 		Lumix::WorldEditor& m_editor;
+@@ -152,7 +151,7 @@ class LUMIX_EDITOR_API ImportAssetDialog
+ 		Orientation m_orientation;
+ 		Lumix::MT::Task* m_task;
+ 		Lumix::MT::SpinMutex m_mutex;
++		Lumix::MT::Semaphore m_billboard_done;
+ 		Metadata& m_metadata;
+-		AssetBrowser& m_asset_browser;
+ 		DDSConvertCallbackData m_dds_convert_callback;
+ };
+\ No newline at end of file
+diff --git a/src/editor/studio_app.cpp b/src/editor/studio_app.cpp
+index ab7706c..59193f9 100644
+--- a/src/editor/studio_app.cpp
++++ b/src/editor/studio_app.cpp
+@@ -111,6 +111,7 @@ public:
+ 		}
+ 		m_asset_browser->update();
+ 		m_log_ui->update(time_delta);
++		m_import_asset_dialog->update();
+ 
+ 		onGUI();
+ 	}
+@@ -1571,7 +1572,7 @@ public:
+ 		auto engine_allocator = static_cast<Lumix::Debug::Allocator*>(&m_engine->getAllocator());
+ 		m_profiler_ui = ProfilerUI::create(*m_engine);
+ 		m_log_ui = LUMIX_NEW(m_allocator, LogUI)(m_editor->getAllocator());
+-		m_import_asset_dialog = LUMIX_NEW(m_allocator, ImportAssetDialog)(*m_editor, m_metadata, *m_asset_browser);
++		m_import_asset_dialog = LUMIX_NEW(m_allocator, ImportAssetDialog)(*m_editor, m_metadata);
+ 
+ 		initIMGUI();
+ 
