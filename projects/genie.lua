@@ -101,32 +101,30 @@ function defaultConfigurations()
 
 	configuration "not windows"
 		buildoptions { "-std=c++11" }
+		linkoptions { "-lpthread" }
 		
 	configuration {}
 		files { "lumix.natvis" }
 	
 end
 
+function linkLibWithPlatform(lib, platform_bit, platform, conf)
+	configuration { "x" .. platform_bit, conf }
+		libdirs {"../external/" .. lib .. "/lib/" .. platform .. platform_bit .. "_" .. ide_dir .. "/" .. conf}
+
+end
+
 function linkLib(lib)
 	links {lib}
 
-	configuration { "x64", "Debug" }
-		libdirs {"../external/" .. lib .. "/lib/win64_" .. ide_dir .. "/debug"}
-
-	configuration { "x64", "Release" }
-		libdirs {"../external/" .. lib .. "/lib/win64_" .. ide_dir .. "/release"}
-
-	configuration { "x64", "RelWithDebInfo" }
-		libdirs {"../external/" .. lib .. "/lib/win64_" .. ide_dir .. "/release"}
-
-	configuration { "x32", "Debug" }
-		libdirs {"../external/" .. lib .. "/lib/win32_" .. ide_dir .. "/debug"}
-
-	configuration { "x32", "Release" }
-		libdirs {"../external/" .. lib .. "/lib/win32_" .. ide_dir .. "/release"}
-
-	configuration { "x32", "RelWithDebInfo" }
-		libdirs {"../external/" .. lib .. "/lib/win32_" .. ide_dir .. "/release"}
+	for _,platform_bit in ipairs({"32", "64"}) do
+		for conf,conf_dir in pairs({Debug="debug", Release="release", RelWithDebInfo="release"}) do
+			for platform,target_platform in pairs({win="windows", linux="linux"}) do
+				configuration { "x" .. platform_bit, conf, target_platform }
+					libdirs {"../external/" .. lib .. "/lib/" .. platform .. platform_bit .. "_" .. ide_dir .. "/" .. conf_dir}
+			end
+		end
+	end
 
 	configuration {}
 end
@@ -213,10 +211,11 @@ project "engine"
 
 	defines { "BUILDING_ENGINE" }
 	includedirs { "../external/lua/include" }
-	if not _OPTIONS["static-plugins"] then
-		linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
-	end
 
+	configuration "windows"
+		if not _OPTIONS["static-plugins"] then
+			linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
+		end
 	configuration "not macosx"
 		excludes { "../src/engine/**/osx/*"}
 	configuration "not windows"
