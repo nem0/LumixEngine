@@ -211,17 +211,17 @@ project "engine"
 
 	files { "../src/engine/**.h", "../src/engine/**.cpp", "genie.lua" }
 
-	configuration "not macosx"
-		excludes { "../src/engine/**/osx/*"}
-
-	configuration "not windows"
-		excludes { "../src/engine/**/pc/*"}
-
 	defines { "BUILDING_ENGINE" }
 	includedirs { "../external/lua/include" }
 	if not _OPTIONS["static-plugins"] then
 		linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
 	end
+
+	configuration "not macosx"
+		excludes { "../src/engine/**/osx/*"}
+	configuration "not windows"
+		excludes { "../src/engine/**/pc/*"}
+	configuration {}
 
 	linkLib("lua")
 
@@ -234,6 +234,7 @@ project "physics"
 
 	configuration "not macosx"
 		excludes { "../src/engine/**/osx/*"}
+	configuration {}
 
 	includedirs { "../external/physx/include/" .. ide_dir, "../external/bgfx/include" }
 	defines { "BUILDING_PHYSICS" }
