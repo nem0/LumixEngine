@@ -67,7 +67,7 @@ namespace Lumix
 				MT::SpinLock lock(m_spin_mutex);
 				m_stream->write(op);
 				m_stream->write(m_file);
-				m_stream->write(size);
+				m_stream->write((uint64)size);
 
 				m_stream->read(buffer, size);
 				bool successful = false;
@@ -83,7 +83,7 @@ namespace Lumix
 				MT::SpinLock lock(m_spin_mutex);
 				m_stream->write(op);
 				m_stream->write(m_file);
-				m_stream->write(size);
+				m_stream->write((uint64)size);
 				m_stream->write(buffer, size);
 
 				bool successful = false;
@@ -119,7 +119,7 @@ namespace Lumix
 				m_stream->write(op);
 				m_stream->write(m_file);
 				m_stream->write(base);
-				m_stream->write(pos);
+				m_stream->write((uint64)pos);
 
 				int32 ret = 0;
 				m_stream->read(ret);
