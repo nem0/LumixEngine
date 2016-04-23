@@ -200,11 +200,7 @@ struct ManagerImpl : public Manager
 
 	uint32 getAffinityMask(uint32) const
 	{
-#if defined(_WIN32) || defined(_WIN64)
 		return MT::getProccessAffinityMask();
-#else
-#error "Not Supported!"
-#endif
 	}
 
 	IAllocator&			m_allocator;
