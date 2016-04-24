@@ -280,7 +280,7 @@ struct ProfilerUIImpl : public ProfilerUI
 			{
 				if (m_filter[0] == 0 || Lumix::stristr(log.path, m_filter) != 0)
 				{
-					ImGui::Text(log.path);
+					ImGui::Text("%s", log.path);
 					ImGui::NextColumn();
 					ImGui::Text("%f", log.time * 1000.0f);
 					ImGui::NextColumn();
@@ -801,12 +801,12 @@ void ProfilerUIImpl::onGUIResources()
 				continue;
 			}
 
-			ImGui::Text(iter.value()->getPath().c_str());
+			ImGui::Text("%s", iter.value()->getPath().c_str());
 			ImGui::NextColumn();
 			ImGui::Text("%.3fKB", iter.value()->size() / 1024.0f);
 			sum += iter.value()->size();
 			ImGui::NextColumn();
-			ImGui::Text(getResourceStateString(iter.value()->getState()));
+			ImGui::Text("%s", getResourceStateString(iter.value()->getState()));
 			ImGui::NextColumn();
 			ImGui::Text("%u", iter.value()->getRefCount());
 			ImGui::NextColumn();
@@ -916,7 +916,7 @@ void ProfilerUIImpl::showAllocationTree(AllocationStackNode* node, int column)
 			Lumix::copyString(fn_name, "N/A");
 		}
 
-		if (ImGui::TreeNode(node, fn_name))
+		if (ImGui::TreeNode(node, "%s", fn_name))
 		{
 			node->m_opened = true;
 			for (auto* child : node->m_children)
@@ -995,7 +995,7 @@ static void showThreadColumn(ProfilerUIImpl& profiler, Column column)
 		}
 		else
 		{
-			if (ImGui::TreeNode(root, thread_name))
+			if (ImGui::TreeNode(root, "%s", thread_name))
 			{
 				profiler.m_threads[i].opened = true;
 				profiler.showProfileBlock(root, column);

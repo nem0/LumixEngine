@@ -460,7 +460,7 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 		item_w - ImGui::CalcTextSize("...").x - style.FramePadding.x * 2 - style.ItemSpacing.x);
 	char buf[50];
 	getEntityListDisplayName(m_editor, buf, sizeof(buf), entity);
-	ImGui::LabelText("", buf);
+	ImGui::LabelText("", "%s", buf);
 	ImGui::SameLine();
 	Lumix::StaticString<30> popup_name("pu", str_id);
 	if (ImGui::Button(Lumix::StaticString<30>("...###br", str_id)))
@@ -469,7 +469,7 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 	}
 
 	ImGui::SameLine();
-	ImGui::Text(label);
+	ImGui::Text("%s", label);
 	ImGui::PopItemWidth();
 
 	if (ImGui::BeginPopup(popup_name))

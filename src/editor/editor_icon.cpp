@@ -227,7 +227,8 @@ struct EditorIconsImpl : public EditorIcons
 		{
 			for (int i = 0; i < lengthOf(ICONS); ++i)
 			{
-				m_models[i] = m_render_interface->loadModel(Path(ICONS[i]));
+				Path path(ICONS[i]);
+				m_models[i] = m_render_interface->loadModel(path);
 			}
 		}
 	}
