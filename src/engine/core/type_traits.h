@@ -3,37 +3,32 @@
 namespace Lumix
 {
 
-template <bool, class T = void> struct myenable_if {};
-template <class T> struct myenable_if<true, T> {using type = T;};
-
-template <bool B, class T> using myenable_if_t = typename myenable_if<B, T>::type;
-
-template <class T> struct remove_reference
+template <class T> struct RemoveReference
 { // remove rvalue reference
     typedef T type;
 };
 
 
-template <class T> struct remove_reference<T&>
+template <class T> struct RemoveReference<T&>
 { // remove rvalue reference
     typedef T type;
 };
 
-template <class T> struct remove_reference<T&&>
+template <class T> struct RemoveReference<T&&>
 { // remove rvalue reference
     typedef T type;
 };
 
-template <class T> using remove_reference_t = typename remove_reference<T>::type;
+template <class T> using RemoveReferenceT = typename RemoveReference<T>::type;
 
-template <class T> inline T&& myforward(remove_reference_t<T>& _Arg)
+template <class T> inline T&& myforward(RemoveReferenceT<T>& t)
 {
-    return (static_cast<T&&>(_Arg));
+    return (static_cast<T&&>(t));
 }
 
-template <class T> inline remove_reference_t<T>&& mymove(T&& t)
+template <class T> inline RemoveReferenceT<T>&& mymove(T&& t)
 {
-    return static_cast<remove_reference_t<T>&&>(t);
+    return static_cast<RemoveReferenceT<T>&&>(t);
 }
 
 } // ~namespace Lumix
