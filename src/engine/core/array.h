@@ -7,7 +7,7 @@
 namespace Lumix
 {
 
-template <class T> inline void swap(T &lhs, T &rhs)
+template <class T> inline void myswap(T &lhs, T &rhs)
 {
 	T tmp = mymove(lhs);
 	lhs = mymove(rhs);
@@ -25,7 +25,7 @@ public:
 		m_size = 0;
 	}
 
-	explicit Array(const Array& rhs)
+	Array(const Array& rhs)
 		: m_allocator(rhs.m_allocator)
 	{
 		m_data = nullptr;
@@ -34,7 +34,7 @@ public:
 		*this = rhs;
 	}
 
-	explicit Array(Array&& rhs)
+	Array(Array&& rhs)
 		: m_allocator(rhs.m_allocator)
 	{
 		m_data = rhs.m_data;
@@ -57,11 +57,11 @@ public:
 	{
 		ASSERT(&rhs.m_allocator == &m_allocator);
 
-		using Lumix::swap;
+		using Lumix::myswap;
 
-		swap(rhs.m_capacity, m_capacity);
-		swap(rhs.m_size, m_size);
-		swap(rhs.m_data, m_data);
+		myswap(rhs.m_capacity, m_capacity);
+		myswap(rhs.m_size, m_size);
+		myswap(rhs.m_data, m_data);
 	}
 
 
@@ -146,8 +146,8 @@ public:
 		{
 			if (index != m_size - 1)
 			{
-				using Lumix::swap;
-				swap(m_data[index], m_data[m_size - 1]);
+				using Lumix::myswap;
+				myswap(m_data[index], m_data[m_size - 1]);
 			}
 			m_data[m_size - 1].~T();
 			--m_size;

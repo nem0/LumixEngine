@@ -34,6 +34,7 @@
 #include "settings.h"
 #include "studio_app.h"
 #include "utils.h"
+#include <array>
 
 
 class StudioAppImpl* g_app;
@@ -1253,7 +1254,7 @@ public:
 		Lumix::uint64 offset;
 		Lumix::uint64 size;
 
-		typedef char Path[Lumix::MAX_PATH_LENGTH];
+		using Path = std::array<char, Lumix::MAX_PATH_LENGTH>;
 	};
 	#pragma pack()
 
@@ -1283,16 +1284,16 @@ public:
 			auto& out_path = paths.emplace();
 			if(dir_path[0] == '.')
 			{
-				Lumix::copyString(out_path, Lumix::lengthOf(out_path), normalized_path);
+				Lumix::copyString(out_path.data(), out_path.size(), normalized_path);
 			}
 			else
 			{
-				Lumix::copyString(out_path, Lumix::lengthOf(out_path), dir_path);
-				Lumix::catString(out_path, Lumix::lengthOf(out_path), normalized_path);
+				Lumix::copyString(out_path.data(), out_path.size(), dir_path);
+				Lumix::catString(out_path.data(), out_path.size(), normalized_path);
 			}
 			auto& out_info = infos.emplace();
-			out_info.hash = Lumix::crc32(out_path);
-			out_info.size = PlatformInterface::getFileSize(out_path);
+			out_info.hash = Lumix::crc32(out_path.data());
+			out_info.size = PlatformInterface::getFileSize(out_path.data());
 			out_info.offset = ~0UL;
 		}
 	}
@@ -1339,11 +1340,11 @@ public:
 		for (auto& path : paths)
 		{
 			Lumix::FS::OsFile src;
-			size_t src_size = PlatformInterface::getFileSize(path);
-			if (!src.open(path, Lumix::FS::Mode::OPEN_AND_READ, m_allocator))
+			size_t src_size = PlatformInterface::getFileSize(path.data());
+			if (!src.open(path.data(), Lumix::FS::Mode::OPEN_AND_READ, m_allocator))
 			{
 				file.close();
-				Lumix::g_log_error.log("Editor") << "Could not open " << path;
+				Lumix::g_log_error.log("Editor") << "Could not open " << path.data();
 				return;
 			}
 			Lumix::uint8 buf[4096];
@@ -1353,7 +1354,7 @@ public:
 				if (!src.read(buf, batch_size))
 				{
 					file.close();
-					Lumix::g_log_error.log("Editor") << "Could not read " << path;
+					Lumix::g_log_error.log("Editor") << "Could not read " << path.data();
 					return;
 				}
 				file.write(buf, batch_size);
