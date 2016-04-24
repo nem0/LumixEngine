@@ -222,7 +222,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 				if (slot.m_is_atlas)
 				{
 					int size = texture->getAtlasSize() - 2;
-					const char values[] = { '2', 'x', '2', 0, '3', 'x', '3', 0, '4', 'x', '4', 0, 0 };
+					const char* values = "2x2\0" "3x3\0" "4x4\0";
 					if (ImGui::Combo(StaticString<30>("Atlas size###", i), &size, values))
 					{
 						ImGui::CloseCurrentPopup();
