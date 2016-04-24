@@ -302,7 +302,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 		m_wanted_resource = buf;
 	}
 	ImGui::SameLine();
-	ImGui::Text(label);
+	ImGui::Text("%s", label);
 	ImGui::PopItemWidth();
 
 	if (ImGui::BeginResizablePopup(popup_name, ImVec2(300, 300)))
@@ -363,7 +363,7 @@ void AssetBrowser::onGUIResource()
 
 	const char* path = m_selected_resource->getPath().c_str();
 	ImGui::Separator();
-	ImGui::LabelText("Selected resource", path);
+	ImGui::LabelText("Selected resource", "%s", path);
 	if (!m_history.empty() && ImGui::Button("Back"))
 	{
 		selectResource(m_history.back());
@@ -383,7 +383,7 @@ void AssetBrowser::onGUIResource()
 	if (m_metadata.getString(
 			m_selected_resource->getPath().getHash(), SOURCE_HASH, source, Lumix::lengthOf(source)))
 	{
-		ImGui::LabelText("Source", source);
+		ImGui::LabelText("Source", "%s", source);
 	}
 
 	auto resource_type = getResourceType(path);

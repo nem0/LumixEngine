@@ -313,7 +313,7 @@ void Settings::showShortcutSettings(Action** actions, int actions_count)
 		Action& a = *actions[i];
 		if (m_filter[0] == 0 || Lumix::stristr(a.label, m_filter) != 0)
 		{
-			ImGui::Text(a.label);
+			ImGui::Text("%s", a.label);
 			ImGui::NextColumn();
 			shortcutInput(a.shortcut[0]);
 			ImGui::NextColumn();

@@ -2064,7 +2064,7 @@ void ImportAssetDialog::onMaterialsGUI()
 	{
 		aiString material_name;
 		mat.material->Get(AI_MATKEY_NAME, material_name);
-		if (ImGui::TreeNode(mat.material, material_name.C_Str()))
+		if (ImGui::TreeNode(mat.material, "%s", material_name.C_Str()))
 		{
 			ImGui::Checkbox("Import material", &mat.import);
 			ImGui::Checkbox("Alpha cutout material", &mat.alpha_cutout);
@@ -2081,7 +2081,7 @@ void ImportAssetDialog::onMaterialsGUI()
 			ImGui::Separator();
 			for (int i = 0; i < mat.texture_count; ++i)
 			{
-				ImGui::Text(mat.textures[i].path);
+				ImGui::Text("%s", mat.textures[i].path);
 				ImGui::NextColumn();
 				ImGui::Checkbox(Lumix::StaticString<20>("###imp", i), &mat.textures[i].import);
 				ImGui::NextColumn();
@@ -2096,7 +2096,7 @@ void ImportAssetDialog::onMaterialsGUI()
 					}
 				}
 				ImGui::SameLine();
-				ImGui::Text(mat.textures[i].src);
+				ImGui::Text("%s", mat.textures[i].src);
 			}
 			ImGui::Columns();
 
@@ -2151,13 +2151,13 @@ void ImportAssetDialog::onMeshesGUI()
 	{
 		const char* name = mesh.mesh->mName.C_Str();
 		if (name[0] == 0) name = getMeshName(mesh.scene, mesh.mesh).C_Str();
-		ImGui::Text(name);
+		ImGui::Text("%s", name);
 		ImGui::NextColumn();
 
 		auto* material = mesh.scene->mMaterials[mesh.mesh->mMaterialIndex];
 		aiString material_name;
 		material->Get(AI_MATKEY_NAME, material_name);
-		ImGui::Text(material_name.C_Str());
+		ImGui::Text("%s", material_name.C_Str());
 		ImGui::NextColumn();
 
 		ImGui::Checkbox(Lumix::StaticString<30>("###mesh", (Lumix::uint64)&mesh), &mesh.import);
@@ -2479,7 +2479,7 @@ void ImportAssetDialog::onGUI()
 		{
 			char msg[1024];
 			getMessage(msg, sizeof(msg));
-			ImGui::Text(msg);
+			ImGui::Text("%s", msg);
 			if (ImGui::Button("OK"))
 			{
 				setMessage("");
@@ -2506,7 +2506,7 @@ void ImportAssetDialog::onGUI()
 
 			{
 				Lumix::MT::SpinLock lock(m_mutex);
-				ImGui::Text(m_import_message);
+				ImGui::Text("%s", m_import_message);
 				if (m_progress_fraction >= 0) ImGui::ProgressBar(m_progress_fraction);
 			}
 			ImGui::EndDock();

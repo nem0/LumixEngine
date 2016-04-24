@@ -7,16 +7,25 @@
 #pragma once
 
 //---- Define assertion handler. Defaults to calling assert().
-#define IM_ASSERT(_EXPR)  do { if(!(_EXPR)) __debugbreak(); } while(false)
+#ifdef _WIN32
+    #define IM_ASSERT(_EXPR)  do { if(!(_EXPR)) __debugbreak(); } while(false)
+#endif
 
 //---- Define attributes of all API symbols declarations, e.g. for DLL under Windows.
 #ifdef STATIC_PLUGINS
 	#define IMGUI_API
 #else
+    #ifdef _WIN32
+        #define IMGUI_LIBRARY_EXPORT __declspec(dllexport)
+        #define IMGUI_LIBRARY_IMPORT __declspec(dllimport)
+    #else
+        #define IMGUI_LIBRARY_EXPORT __attribute__((visibility("default")))
+        #define IMGUI_LIBRARY_IMPORT
+    #endif
 	#ifdef BUILDING_EDITOR
-		#define IMGUI_API __declspec( dllexport )
+		#define IMGUI_API IMGUI_LIBRARY_EXPORT
 	#else
-		#define IMGUI_API __declspec( dllimport )
+		#define IMGUI_API IMGUI_LIBRARY_IMPORT
 	#endif
 #endif
 
