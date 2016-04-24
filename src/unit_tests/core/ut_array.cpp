@@ -83,5 +83,70 @@ void UT_array_erase(const char* params)
 	LUMIX_EXPECT(array1.size() == 15);
 }
 
+void UT_array_move(const char* params)
+{
+	Lumix::DefaultAllocator allocator;
+	Lumix::Array<int> array1(allocator);
+
+	for (int i = 0; i < 20; ++i)
+	{
+		array1.push(i * 5);
+	}
+
+	Lumix::Array<int> array2 = Lumix::mymove(array1);
+	LUMIX_EXPECT(array1.size() == 0);
+	LUMIX_EXPECT(array1.capacity() == 0);
+	LUMIX_EXPECT(array2.size() == 20);
+}
+
+namespace
+{
+class HasBackref
+{
+public:
+	HasBackref()
+		: m_backref(this)
+	{
+	}
+
+	~HasBackref()
+	{
+		m_backref = nullptr;
+	}
+
+	HasBackref(const HasBackref& rhs)
+		: m_backref(this)
+	{
+	}
+
+	void operator=(const HasBackref& rhs)
+	{
+	}
+
+	const HasBackref* backref() const { return m_backref; }
+
+private:
+	HasBackref* m_backref;
+};
+}
+
+void UT_array_safeInsert(const char* params)
+{
+	Lumix::DefaultAllocator allocator;
+	Lumix::Array<HasBackref> array(allocator);
+	for (int i = 0; i < 10; ++i) {
+		array.push(HasBackref());
+	}
+	for (int i = 0; i < 10; ++i) {
+		LUMIX_EXPECT(&array[i] == array[i].backref());
+	}
+	array.insert(5, HasBackref());
+	for (int i = 0; i < 10; ++i) {
+		LUMIX_EXPECT(&array[i] == array[i].backref());
+	}
+}
+
 REGISTER_TEST("unit_tests/core/array", UT_array, "")
 REGISTER_TEST("unit_tests/core/array/erase", UT_array_erase, "")
+REGISTER_TEST("unit_tests/core/array/move", UT_array_move, "")
+REGISTER_TEST("unit_tests/core/array/safeInsert", UT_array_safeInsert, "")
