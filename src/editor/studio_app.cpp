@@ -735,7 +735,7 @@ public:
 			if (!PlatformInterface::isWindowActive()) stats << " - inactive window";
 			auto stats_size = ImGui::CalcTextSize(stats);
 			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
-			ImGui::Text(stats);
+			ImGui::Text("%s", (const char*)stats);
 
 			if (m_log_ui->getUnreadErrorCount() == 1)
 			{
@@ -750,7 +750,7 @@ public:
 				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
 				auto error_stats_size = ImGui::CalcTextSize(error_stats);
 				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x - error_stats_size.x);
-				ImGui::TextColored(ImVec4(1, 0, 0, 1), error_stats);
+				ImGui::TextColored(ImVec4(1, 0, 0, 1), "%s", (const char*)error_stats);
 			}
 
 			ImGui::EndMainMenuBar();

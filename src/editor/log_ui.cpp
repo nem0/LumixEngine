@@ -126,7 +126,7 @@ void LogUI::showNotifications()
 	for (int i = 0; i < m_notifications.size(); ++i)
 	{
 		if (i > 0) ImGui::Separator();
-		ImGui::Text(m_notifications[i].message.c_str());
+		ImGui::Text("%s", m_notifications[i].message.c_str());
 	}
 	ImGui::End();
 }
@@ -197,7 +197,7 @@ void LogUI::onGUI()
 				const char* msg = (*messages)[i].c_str();
 				if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
 				{
-					ImGui::Text(msg);
+					ImGui::Text("%s", msg);
 				}
 			}
 		}

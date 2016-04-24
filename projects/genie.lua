@@ -132,8 +132,10 @@ end
 function useLua()
 	if _OPTIONS["static-plugins"] then
 		linkLib("lua")
-	else		
-		defines { "LUA_BUILD_AS_DLL" }
+	else
+		configuration "windows"
+			defines { "LUA_BUILD_AS_DLL" }
+		configuration {}
 	end
 	includedirs { "../external/lua/include" }
 end
