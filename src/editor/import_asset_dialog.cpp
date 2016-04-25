@@ -69,6 +69,22 @@ struct BillboardVertex
 #pragma pack()
 
 
+static bool isSkinned(const aiMesh* mesh) { return mesh->mNumBones > 0; }
+
+
+static bool isSkinned(const aiScene* scene, const aiMaterial* material)
+{
+	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+	{
+		if (scene->mMaterials[scene->mMeshes[i]->mMaterialIndex] == material && isSkinned(scene->mMeshes[i]))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+
 static const aiNode* getOwner(const aiNode* node, int mesh_index)
 {
 	for (int i = 0; i < (int)node->mNumMeshes; ++i)
@@ -566,6 +582,7 @@ struct ImportTask : public Lumix::MT::Task
 				material.alpha_cutout = false;
 				material.material = scene->mMaterials[i];
 				material.texture_count = 0;
+				Lumix::copyString(material.shader, isSkinned(scene, scene->mMaterials[i]) ? "skinned" : "rigid");
 				auto types = {aiTextureType_DIFFUSE, aiTextureType_NORMALS, aiTextureType_HEIGHT};
 				for (auto type : types)
 				{
@@ -979,7 +996,7 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 
 		file.writeText("{\n\t\"shader\" : \"shaders/");
-		file.writeText(isSkinned(material.scene, material.material) ? "skinned" : "rigid");
+		file.writeText(material.shader);
 		file.writeText(".shd\"\n");
 		if (material.alpha_cutout) file << ",\n\t\"defines\" : [\"ALPHA_CUTOUT\"]";
 
@@ -1023,22 +1040,6 @@ struct ConvertTask : public Lumix::MT::Task
 			m_dialog.setMessage("Success.");
 		}
 		return 0;
-	}
-
-
-	static bool isSkinned(const aiMesh* mesh) { return mesh->mNumBones > 0; }
-
-
-	static bool isSkinned(const aiScene* scene, const aiMaterial* material)
-	{
-		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
-		{
-			if (scene->mMaterials[scene->mMeshes[i]->mMaterialIndex] == material && isSkinned(scene->mMeshes[i]))
-			{
-				return true;
-			}
-		}
-		return false;
 	}
 
 
@@ -2359,6 +2360,12 @@ int ImportAssetDialog::importAsset(lua_State* L)
 	}
 	lua_pop(L, 1);
 
+	if (lua_getfield(L, 2, "output_dir") == LUA_TSTRING)
+	{
+		Lumix::copyString(m_output_dir, Lumix::LuaWrapper::toType<const char*>(L, -1));
+	}
+	lua_pop(L, 1);
+
 	if (lua_getfield(L, 2, "srcs") == LUA_TTABLE)
 	{
 		lua_pushnil(L);
@@ -2394,6 +2401,13 @@ int ImportAssetDialog::importAsset(lua_State* L)
 							material->import = Lumix::LuaWrapper::toType<bool>(L, -1);
 						}
 						lua_pop(L, 1); // "import"
+
+						if (lua_getfield(L, -1, "shader") == LUA_TSTRING)
+						{
+							Lumix::copyString(material->shader, Lumix::LuaWrapper::toType<const char*>(L, -1));
+						}
+						lua_pop(L, 1); // "import"
+
 
 						if (lua_getfield(L, -1, "alpha_cutout") == LUA_TBOOLEAN)
 						{
