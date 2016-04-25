@@ -69,7 +69,23 @@ struct BillboardVertex
 #pragma pack()
 
 
+static const int TEXTURE_SIZE = 512;
+
+
 static bool isSkinned(const aiMesh* mesh) { return mesh->mNumBones > 0; }
+
+
+static int ceilPowOf2(int value)
+{
+	ASSERT(value > 0);
+	int ret = value - 1;
+	ret |= ret >> 1;
+	ret |= ret >> 2;
+	ret |= ret >> 3;
+	ret |= ret >> 8;
+	ret |= ret >> 16;
+	return ret + 1;
+}
 
 
 static bool isSkinned(const aiScene* scene, const aiMaterial* material)
@@ -951,8 +967,10 @@ struct ConvertTask : public Lumix::MT::Task
 					Lumix::StaticString<20 + Lumix::MAX_PATH_LENGTH>("Could not create ", output_material_name));
 				return false;
 			}
-			file << "{\n\t\"shader\" : \"shaders/rigid.shd\"\n";
+			file << "{\n\t\"shader\" : \"shaders/billboard.shd\"\n";
+			file << "\t, \"defines\" : [\"ALPHA_CUTOUT\"]\n";
 			file << "\t, \"texture\" : {\n\t\t\"source\" : \"";
+
 			if (m_dialog.m_texture_output_dir[0])
 			{
 				char from_root_path[Lumix::MAX_PATH_LENGTH];
@@ -1196,31 +1214,15 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void writeGeometry(Lumix::FS::OsFile& file) const
+	void writeIndices(Lumix::FS::OsFile& file) const
 	{
-		Lumix::int32 indices_count = 0;
-		Lumix::int32 vertices_size = 0;
-		for (auto& mesh : m_dialog.m_meshes)
+		if (areIndices16Bit())
 		{
-			if (!mesh.import) continue;
-			indices_count += mesh.indices.size();
-			vertices_size += mesh.map_to_input.size() * getVertexSize(mesh.mesh);
-		}
-
-		if (m_dialog.m_create_billboard_lod)
-		{
-			indices_count += 4*3;
-			vertices_size += 8 * sizeof(BillboardVertex);
-		}
-
-		file.write((const char*)&indices_count, sizeof(indices_count));
-		if(areIndices16Bit())
-		{
-			for(auto& mesh : m_dialog.m_meshes)
+			for (auto& mesh : m_dialog.m_meshes)
 			{
-				if(mesh.import)
+				if (mesh.import)
 				{
-					for(int i = 0; i < mesh.indices.size(); ++i)
+					for (int i = 0; i < mesh.indices.size(); ++i)
 					{
 						Lumix::uint16 index = mesh.indices[i];
 						file.write(&index, sizeof(index));
@@ -1230,15 +1232,15 @@ struct ConvertTask : public Lumix::MT::Task
 
 			if (m_dialog.m_create_billboard_lod)
 			{
-				Lumix::uint16 indices[] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
+				Lumix::uint16 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 };
 				file.write(indices, sizeof(indices));
 			}
 		}
 		else
 		{
-			for(auto& mesh : m_dialog.m_meshes)
+			for (auto& mesh : m_dialog.m_meshes)
 			{
-				if(mesh.import) file.write(&mesh.indices[0], mesh.indices.size() * sizeof(mesh.indices[0]));
+				if (mesh.import) file.write(&mesh.indices[0], mesh.indices.size() * sizeof(mesh.indices[0]));
 			}
 
 			if (m_dialog.m_create_billboard_lod)
@@ -1247,8 +1249,11 @@ struct ConvertTask : public Lumix::MT::Task
 				file.write(indices, sizeof(indices));
 			}
 		}
+	}
 
-		file.write((const char*)&vertices_size, sizeof(vertices_size));
+
+	void writeVertices(Lumix::FS::OsFile& file) const
+	{
 
 		Lumix::Vec3 min(0, 0, 0);
 		Lumix::Vec3 max(0, 0, 0);
@@ -1325,20 +1330,58 @@ struct ConvertTask : public Lumix::MT::Task
 		if (m_dialog.m_create_billboard_lod)
 		{
 			Lumix::Vec3 size = max - min;
-			float uvs[] = {0.0f, 0.5f, 1.0f}; // TODO UVs
+			float uvs[] = { 0.0f, 0.5f, 1.0f }; // TODO UVs
+			if (size.x + size.z < size.y)
+			{
+				int width = int(TEXTURE_SIZE / size.y * (size.x + size.z));
+				int ceiled = ceilPowOf2(width);
+				int diff = ceiled - width;
+				uvs[0] = diff * 0.5f / float(ceiled);
+				uvs[2] = 1 - uvs[0];
+				uvs[1] = uvs[0] + size.x / (size.x + size.z) * (1 - 2 * uvs[0]);
+			}
+			else
+			{
+				uvs[1] = size.x / (size.x + size.z);
+			}
 			BillboardVertex vertices[8] = {
-				{ { min.x, min.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[0], 0 } },
-				{ { max.x, min.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[1], 0 } },
-				{ { max.x, max.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[1], 1 } },
-				{ { min.x, max.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[0], 1 } },
+				{ { min.x, min.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[0], 1 } },
+				{ { max.x, min.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[1], 1 } },
+				{ { max.x, max.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[1], 0 } },
+				{ { min.x, max.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[0], 0 } },
 
-				{ { 0, min.y, min.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[1], 0 } },
-				{ { 0, min.y, max.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[2], 0 } },
-				{ { 0, max.y, max.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[2], 1 } },
-				{ { 0, max.y, min.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[1], 1 } }
+				{ { 0, min.y, min.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[1], 1 } },
+				{ { 0, min.y, max.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[2], 1 } },
+				{ { 0, max.y, max.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[2], 0 } },
+				{ { 0, max.y, min.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[1], 0 } }
 			};
 			file.write(vertices, sizeof(vertices));
+		} 
+	}
+
+
+	void writeGeometry(Lumix::FS::OsFile& file) const
+	{
+		Lumix::int32 indices_count = 0;
+		Lumix::int32 vertices_size = 0;
+		for (auto& mesh : m_dialog.m_meshes)
+		{
+			if (!mesh.import) continue;
+			indices_count += mesh.indices.size();
+			vertices_size += mesh.map_to_input.size() * getVertexSize(mesh.mesh);
 		}
+
+		if (m_dialog.m_create_billboard_lod)
+		{
+			indices_count += 4*3;
+			vertices_size += 8 * sizeof(BillboardVertex);
+		}
+
+		file.write((const char*)&indices_count, sizeof(indices_count));
+		writeIndices(file);
+
+		file.write((const char*)&vertices_size, sizeof(vertices_size));
+		writeVertices(file);
 	}
 
 
@@ -2228,24 +2271,12 @@ void ImportAssetDialog::onImageGUI()
 }
 
 
-static int nextPowOf2(int value)
-{
-	ASSERT(value > 0);
-	int ret = value - 1;
-	ret |= ret >> 1;
-	ret |= ret >> 2;
-	ret |= ret >> 3;
-	ret |= ret >> 8;
-	ret |= ret >> 16;
-	return ret + 1;
-}
-
-
-static bool createBillboard(const Lumix::Path& mesh_path,
+static bool createBillboard(ImportAssetDialog& dialog,
+	const Lumix::Path& mesh_path,
 	const Lumix::Path& out_path,
-	Lumix::Engine& engine,
-	float texture_size)
+	int texture_size)
 {
+	auto& engine = dialog.getEditor().getEngine();
 	auto& universe = engine.createUniverse();
 
 	auto* renderer = static_cast<Lumix::Renderer*>(engine.getPluginManager().getPlugin("renderer"));
@@ -2275,25 +2306,27 @@ static bool createBillboard(const Lumix::Path& mesh_path,
 	lods[0].distance = FLT_MAX;
 	Lumix::AABB aabb = model->getAABB();
 	Lumix::Vec3 size = aabb.max - aabb.min;
-	universe.setPosition(mesh_side_entity, { (size.x + size.z) * 0.5f, 0, 0 });
-	int width, height;
-	if (size.x + size.z > size.y)
-	{
-		width = int(texture_size);
-		height = nextPowOf2(int(width / (size.x + size.z) * size.y));
-	}
-	else
-	{
-		height = int(texture_size);
-		width = nextPowOf2(int(height * (size.x + size.z) / size.y));
-	}
+	universe.setPosition(mesh_side_entity, { aabb.max.x - aabb.min.z, 0, 0 });
 	Lumix::Vec3 camera_pos(
 		(aabb.min.x + aabb.max.x + size.z) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + 5);
 	auto camera_entity = universe.createEntity(camera_pos, { 0, 0, 0, 0 });
 	auto camera_cmp = render_scene->createComponent(Lumix::crc32("camera"), camera_entity);
 	render_scene->setCameraOrtho(camera_cmp, true);
-	render_scene->setCameraOrthoSize(camera_cmp, (aabb.max.y - aabb.min.y) * 0.5f);
 	render_scene->setCameraSlot(camera_cmp, "main");
+	int width, height;
+	if (size.x + size.z > size.y)
+	{
+		width = texture_size;
+		int nonceiled_height = int(width / (size.x + size.z) * size.y);
+		height = ceilPowOf2(nonceiled_height);
+		render_scene->setCameraOrthoSize(camera_cmp, size.y * height / nonceiled_height *  0.5f);
+	}
+	else
+	{
+		height = texture_size;
+		width = ceilPowOf2(int(height * (size.x + size.z) / size.y));
+		render_scene->setCameraOrthoSize(camera_cmp, size.y * 0.5f);
+	}
 
 	pipeline->setScene(render_scene);
 	pipeline->setViewport(0, 0, width, height);
@@ -2317,7 +2350,9 @@ static bool createBillboard(const Lumix::Path& mesh_path,
 	bgfx::frame(); // submit
 	bgfx::frame(); // wait for gpu
 
-	auto& fs = engine.getFileSystem();
+	saveAsDDS(dialog, engine.getFileSystem(), "billboard_generator", (Lumix::uint8*)&data[0], width, height, true, out_path.c_str());
+
+/*	auto& fs = engine.getFileSystem();
 	auto* file = fs.open(fs.getDefaultDevice(), out_path, Lumix::FS::Mode::CREATE_AND_WRITE);
 	Lumix::Texture::saveTGA(engine.getAllocator(),
 		file,
@@ -2327,7 +2362,7 @@ static bool createBillboard(const Lumix::Path& mesh_path,
 		(Lumix::uint8*)&data[0],
 		out_path);
 	fs.close(*file);
-
+*/
 	bgfx::destroyTexture(texture);
 	Lumix::Pipeline::destroy(pipeline);
 	engine.destroyUniverse(universe);
