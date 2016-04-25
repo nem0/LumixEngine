@@ -10,6 +10,7 @@
 #include "engine/lumix.h"
 
 
+struct lua_State;
 class Metadata;
 
 
@@ -70,7 +71,7 @@ struct ImportMesh
 
 
 
-class LUMIX_EDITOR_API ImportAssetDialog
+class LUMIX_RENDERER_API ImportAssetDialog
 {
 	friend struct ImportTask;
 	friend struct ConvertTask;

@@ -25,7 +25,6 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
-#include "import_asset_dialog.h"
 #include "log_ui.h"
 #include "metadata.h"
 #include "imgui/imgui.h"
@@ -46,7 +45,6 @@ public:
 	StudioAppImpl()
 		: m_is_entity_list_opened(true)
 		, m_finished(false)
-		, m_import_asset_dialog(nullptr)
 		, m_is_entity_template_list_opened(false)
 		, m_selected_template_name(m_allocator)
 		, m_profiler_ui(nullptr)
@@ -300,7 +298,6 @@ public:
 				plugin->onWindowGUI();
 			}
 			m_settings.onGUI(&m_actions[0], m_actions.size());
-			m_import_asset_dialog->onGUI();
 		}
 
 		ImGui::Render();
@@ -645,7 +642,6 @@ public:
 		ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
 		ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
 		ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
-		ImGui::MenuItem("Import asset", nullptr, &m_import_asset_dialog->m_is_opened);
 		ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
 		ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
 		ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
@@ -952,7 +948,6 @@ public:
 		ProfilerUI::destroy(*m_profiler_ui);
 		LUMIX_DELETE(m_allocator, m_asset_browser);
 		LUMIX_DELETE(m_allocator, m_property_grid);
-		LUMIX_DELETE(m_allocator, m_import_asset_dialog);
 		LUMIX_DELETE(m_allocator, m_log_ui);
 		Lumix::WorldEditor::destroy(m_editor, m_allocator);
 		Lumix::Engine::destroy(m_engine, m_allocator);
@@ -1164,14 +1159,7 @@ public:
 		return m_editor->runTest(Lumix::Path(undo_stack_path), Lumix::Path(result_universe_path));
 	}
 
-
-	static int importAsset(lua_State* L)
-	{
-		auto* app = Lumix::LuaWrapper::checkArg<StudioAppImpl*>(L, 1);
-		return app->m_import_asset_dialog->importAsset(L);
-	}
-
-
+	
 	void createLua()
 	{
 		lua_State* L = m_engine->getState();
@@ -1189,8 +1177,6 @@ public:
 		REGISTER_FUNCTION(createEntityTemplate);
 
 		#undef REGISTER_FUNCTION
-
-		Lumix::LuaWrapper::createSystemFunction(L, "Editor", "importAsset", &importAsset);
 	}
 
 
@@ -1572,7 +1558,6 @@ public:
 		auto engine_allocator = static_cast<Lumix::Debug::Allocator*>(&m_engine->getAllocator());
 		m_profiler_ui = ProfilerUI::create(*m_engine);
 		m_log_ui = LUMIX_NEW(m_allocator, LogUI)(m_editor->getAllocator());
-		m_import_asset_dialog = LUMIX_NEW(m_allocator, ImportAssetDialog)(*m_editor, m_metadata);
 
 		initIMGUI();
 
@@ -1663,7 +1648,6 @@ public:
 	PropertyGrid* m_property_grid;
 	LogUI* m_log_ui;
 	ProfilerUI* m_profiler_ui;
-	ImportAssetDialog* m_import_asset_dialog;
 	Lumix::string m_selected_template_name;
 	Settings m_settings;
 	Metadata m_metadata;

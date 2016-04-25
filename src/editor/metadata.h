@@ -3,10 +3,9 @@
 
 #include "engine/core/associative_array.h"
 #include "engine/core/string.h"
-#include <cstdio>
 
 
-class Metadata
+class LUMIX_EDITOR_API Metadata
 {
 public:
 	explicit Metadata(Lumix::IAllocator& allocator);

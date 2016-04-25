@@ -1,3 +1,4 @@
+#include "import_asset_dialog.h"
 #include "animation/animation.h"
 #include "assimp/DefaultLogger.hpp"
 #include "assimp/ProgressHandler.hpp"
@@ -15,26 +16,22 @@
 #include "engine/core/system.h"
 #include "crnlib.h"
 #include "engine/debug/floating_points.h"
+#include "editor/imgui/imgui.h"
+#include "editor/metadata.h"
+#include "editor/platform_interface.h"
+#include "editor/stb/stb_image.h"
+#include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
-#include "imgui/imgui.h"
-#include "import_asset_dialog.h"
-#include "metadata.h"
+#include "engine/universe/universe.h"
 #include "physics/physics_geometry_manager.h"
-#include "platform_interface.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
-#include "engine/universe/universe.h"
-#ifndef STATIC_PLUGINS
-#define STB_IMAGE_IMPLEMENTATION
-#endif
-#include "stb/stb_image.h"
-#include "utils.h"
 
 
 typedef Lumix::StaticString<Lumix::MAX_PATH_LENGTH> PathBuilder;
@@ -174,6 +171,14 @@ static float getMeshLODFactor(const aiScene* scene, const aiMesh* mesh)
 	Lumix::fromCString(begin_factor, int(end_of_factor - begin_factor), &factor);
 
 	return float(factor);
+}
+
+
+static int importAsset(lua_State* L)
+{
+	// TODO register this
+/*	auto* app = Lumix::LuaWrapper::checkArg<StudioAppImpl*>(L, 1);
+	return app->m_import_asset_dialog->importAsset(L);*/
 }
 
 
