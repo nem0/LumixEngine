@@ -5,6 +5,7 @@
 #include "engine/core/command_line_parser.h"
 #include "engine/core/crc32.h"
 #include "engine/core/default_allocator.h"
+#include "engine/core/fixed_array.h"
 #include "engine/core/fs/file_system.h"
 #include "engine/core/fs/os_file.h"
 #include "engine/core/input_system.h"
@@ -34,7 +35,6 @@
 #include "settings.h"
 #include "studio_app.h"
 #include "utils.h"
-#include <array>
 
 
 class StudioAppImpl* g_app;
@@ -1254,7 +1254,7 @@ public:
 		Lumix::uint64 offset;
 		Lumix::uint64 size;
 
-		using Path = std::array<char, Lumix::MAX_PATH_LENGTH>;
+		using Path = Lumix::FixedArray<char, Lumix::MAX_PATH_LENGTH>;
 	};
 	#pragma pack()
 
