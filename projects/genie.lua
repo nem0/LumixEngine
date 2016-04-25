@@ -366,6 +366,10 @@ project "editor"
 	linkLib("assimp")
 	includedirs { "../src", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crnlib/include" }
 
+	configuration "not windows"
+		excludes { "../src/editor/pc/*"}
+	configuration {}
+
 	useLua()
 	defaultConfigurations()
 
