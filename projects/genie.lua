@@ -252,9 +252,11 @@ project "renderer"
 	libType()
 
 	files { "../src/renderer/**.h", "../src/renderer/**.cpp" }
-	includedirs { "../src", "../external/bgfx/include" }
+	includedirs { "../src", "../external/bgfx/include", "../external/assimp/include", "../external/crnlib/include" }
 	defines { "BUILDING_RENDERER" }
 	links { "engine", "psapi", "editor" }
+	linkLib("crnlib")
+	linkLib("assimp")
 	useLua()
 
 	linkLib("bgfx")
@@ -362,9 +364,7 @@ project "editor"
 	includedirs { "../src", "../src/editor", "../external/bgfx/include" }
 	defines { "BUILDING_EDITOR" }
 	links { "engine", "winmm" }
-	linkLib("crnlib")
-	linkLib("assimp")
-	includedirs { "../src", "../external/lua/include", "../external/bgfx/include", "../external/assimp/include", "../external/crnlib/include" }
+	includedirs { "../src", "../external/lua/include", "../external/bgfx/include" }
 
 	configuration "not windows"
 		excludes { "../src/editor/pc/*"}
