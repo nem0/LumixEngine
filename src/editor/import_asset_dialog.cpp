@@ -2271,6 +2271,87 @@ void ImportAssetDialog::onImageGUI()
 }
 
 
+static void preprocessBillboard(Lumix::uint32* pixels, int width, int height, Lumix::IAllocator& allocator)
+{
+	struct DistanceFieldCell
+	{
+		Lumix::uint32 distance;
+		Lumix::uint32 color;
+	};
+
+	Lumix::Array<DistanceFieldCell> distance_field(allocator);
+	distance_field.resize(width * height);
+
+	static const Lumix::uint32 ALPHA_MASK = 0xff000000;
+	
+	for (int j = 0; j < height; ++j)
+	{
+		for (int i = 0; i < width; ++i)
+		{
+			distance_field[i + j * width].color = pixels[i + j * width];
+			distance_field[i + j * width].distance = 0xffffFFFF;
+		}
+	}
+
+	for (int j = 1; j < height; ++j)
+	{
+		for (int i = 1; i < width; ++i)
+		{
+			int idx = i + j * width;
+			if ((pixels[idx] & ALPHA_MASK) != 0)
+			{
+				distance_field[idx].distance = 0;
+			}
+			else
+			{
+				if (distance_field[idx - 1].distance < distance_field[idx - width].distance)
+				{
+					distance_field[idx].distance = distance_field[idx - 1].distance + 1;
+					distance_field[idx].color =
+						distance_field[idx - 1].color & ~ALPHA_MASK | distance_field[idx].color & ALPHA_MASK;
+				}
+				else
+				{
+					distance_field[idx].distance = distance_field[idx - width].distance + 1;
+					distance_field[idx].color =
+						distance_field[idx - width].color & ~ALPHA_MASK | distance_field[idx].color & ALPHA_MASK;
+				}
+			}
+		}
+	}
+
+	for (int j = height - 2; j >= 0; --j)
+	{
+		for (int i = width - 2; i >= 0; --i)
+		{
+			int idx = i + j * width;
+			if (distance_field[idx + 1].distance < distance_field[idx + width].distance &&
+				distance_field[idx + 1].distance < distance_field[idx].distance)
+			{
+				distance_field[idx].distance = distance_field[idx + 1].distance + 1;
+				distance_field[idx].color =
+					distance_field[idx + 1].color & ~ALPHA_MASK | distance_field[idx].color & ALPHA_MASK;
+			}
+			else if (distance_field[idx + width].distance < distance_field[idx].distance)
+			{
+				distance_field[idx].distance = distance_field[idx + width].distance + 1;
+				distance_field[idx].color =
+					distance_field[idx + width].color & ~ALPHA_MASK | distance_field[idx].color & ALPHA_MASK;
+			}
+		}
+	}
+
+	for (int j = 0; j < height; ++j)
+	{
+		for (int i = 0; i < width; ++i)
+		{
+			pixels[i + j * width] = distance_field[i + j*width].color;
+		}
+	}
+
+}
+
+
 static bool createBillboard(ImportAssetDialog& dialog,
 	const Lumix::Path& mesh_path,
 	const Lumix::Path& out_path,
@@ -2350,6 +2431,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	bgfx::frame(); // submit
 	bgfx::frame(); // wait for gpu
 
+	preprocessBillboard((Lumix::uint32*)&data[0], width, height, engine.getAllocator());
 	saveAsDDS(dialog, engine.getFileSystem(), "billboard_generator", (Lumix::uint8*)&data[0], width, height, true, out_path.c_str());
 	bgfx::destroyTexture(texture);
 	Lumix::Pipeline::destroy(pipeline);
