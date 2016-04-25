@@ -44,6 +44,7 @@ struct ImportMaterial
 	bool import;
 	bool alpha_cutout;
 	int texture_count;
+	char shader[20];
 	ImportTexture textures[16];
 };
 
