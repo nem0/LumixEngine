@@ -1608,6 +1608,7 @@ public:
 					return;
 				}
 
+				if (a->shortcut[i] == -1) break;
 				if (!keysDown[a->shortcut[i]]) break;
 				if (a->shortcut[i] == (int)PlatformInterface::Keys::CONTROL) action_modifiers |= 1;
 				else if (a->shortcut[i] == (int)PlatformInterface::Keys::ALT) action_modifiers |= 2;
