@@ -329,6 +329,7 @@ struct PipelineImpl : public Pipeline
 	{
 		if (m_lua_state)
 		{
+			luaL_unref(m_renderer.getEngine().getState(), LUA_REGISTRYINDEX, m_lua_thread_ref);
 			luaL_unref(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 			m_lua_state = nullptr;
 		}
@@ -369,6 +370,8 @@ struct PipelineImpl : public Pipeline
 		cleanup();
 
 		m_lua_state = lua_newthread(m_renderer.getEngine().getState());
+		m_lua_thread_ref = luaL_ref(m_renderer.getEngine().getState(), LUA_REGISTRYINDEX);
+
 		lua_newtable(m_lua_state);
 		lua_pushvalue(m_lua_state, -1);
 		m_lua_env = luaL_ref(m_lua_state, LUA_REGISTRYINDEX);
@@ -421,6 +424,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 	lua_State* m_lua_state;
+	int m_lua_thread_ref;
 	int m_lua_env;
 	Stats m_stats;
 
@@ -511,6 +515,7 @@ struct PipelineImpl : public Pipeline
 	{
 		if(m_lua_state)
 		{
+			luaL_unref(m_renderer.getEngine().getState(), LUA_REGISTRYINDEX, m_lua_thread_ref);
 			luaL_unref(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		}
 
