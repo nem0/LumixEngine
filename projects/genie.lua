@@ -101,16 +101,10 @@ function defaultConfigurations()
 
 	configuration "not windows"
 		buildoptions { "-std=c++11" }
-		linkoptions { "-lpthread" }
-		
+		links { "pthread" }
+
 	configuration {}
 		files { "lumix.natvis" }
-	
-end
-
-function linkLibWithPlatform(lib, platform_bit, platform, conf)
-	configuration { "x" .. platform_bit, conf }
-		libdirs {"../external/" .. lib .. "/lib/" .. platform .. platform_bit .. "_" .. ide_dir .. "/" .. conf}
 
 end
 
@@ -361,10 +355,18 @@ project "editor"
 	libType()
 
 	files { "../src/editor/**.h", "../src/editor/**.cpp", "../src/editor/**.inl" }
-	includedirs { "../src", "../src/editor", "../external/bgfx/include" }
 	defines { "BUILDING_EDITOR" }
-	links { "engine", "winmm" }
-	includedirs { "../src", "../external/lua/include", "../external/bgfx/include" }
+	links { "engine" }
+	includedirs {
+		"../src",
+		"../src/editor",
+		"../external/lua/include",
+		"../external/bgfx/include",
+	}
+
+	configuration "windows"
+		links { "winmm" }
+	configuration {}
 
 	configuration "not windows"
 		excludes { "../src/editor/pc/*"}
