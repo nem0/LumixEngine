@@ -1330,7 +1330,7 @@ struct ConvertTask : public Lumix::MT::Task
 		if (m_dialog.m_create_billboard_lod)
 		{
 			Lumix::Vec3 size = max - min;
-			float uvs[] = { 0.0f, 0.5f, 1.0f }; // TODO UVs
+			float uvs[] = { 0.0f, 0.5f, 1.0f };
 			if (size.x + size.z < size.y)
 			{
 				int width = int(TEXTURE_SIZE / size.y * (size.x + size.z));
@@ -2351,18 +2351,6 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	bgfx::frame(); // wait for gpu
 
 	saveAsDDS(dialog, engine.getFileSystem(), "billboard_generator", (Lumix::uint8*)&data[0], width, height, true, out_path.c_str());
-
-/*	auto& fs = engine.getFileSystem();
-	auto* file = fs.open(fs.getDefaultDevice(), out_path, Lumix::FS::Mode::CREATE_AND_WRITE);
-	Lumix::Texture::saveTGA(engine.getAllocator(),
-		file,
-		width,
-		height,
-		4,
-		(Lumix::uint8*)&data[0],
-		out_path);
-	fs.close(*file);
-*/
 	bgfx::destroyTexture(texture);
 	Lumix::Pipeline::destroy(pipeline);
 	engine.destroyUniverse(universe);
@@ -2496,6 +2484,25 @@ int ImportAssetDialog::importAsset(lua_State* L)
 	lua_pop(L, 1);
 	convert(false);
 	if (m_is_converting) checkTask(true);
+
+	if (m_create_billboard_lod)
+	{
+		PathBuilder mesh_path(m_output_dir, "/");
+		mesh_path << m_output_filename << ".msh";
+
+		if (m_texture_output_dir[0])
+		{
+			char from_root_path[Lumix::MAX_PATH_LENGTH];
+			getRelativePath(m_editor, from_root_path, Lumix::lengthOf(from_root_path), m_texture_output_dir);
+			PathBuilder texture_path(from_root_path, "billboard.dds");
+			createBillboard(*this, Lumix::Path(mesh_path), Lumix::Path(texture_path), TEXTURE_SIZE);
+		}
+		else
+		{
+			PathBuilder texture_path(m_output_dir, "/billboard.dds");
+			createBillboard(*this, Lumix::Path(mesh_path), Lumix::Path(texture_path), TEXTURE_SIZE);
+		}
+	}
 
 	return 0;
 }
