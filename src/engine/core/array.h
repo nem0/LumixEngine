@@ -2,11 +2,17 @@
 
 
 #include "engine/core/iallocator.h"
-
+#include "engine/core/type_traits.h"
 
 namespace Lumix
 {
 
+template <class T> inline void myswap(T &lhs, T &rhs)
+{
+	T tmp = mymove(lhs);
+	lhs = mymove(rhs);
+	rhs = mymove(tmp);
+}
 
 template <typename T> class Array
 {
@@ -19,13 +25,25 @@ public:
 		m_size = 0;
 	}
 
-	explicit Array(const Array& rhs)
+	Array(const Array& rhs)
 		: m_allocator(rhs.m_allocator)
 	{
 		m_data = nullptr;
 		m_capacity = 0;
 		m_size = 0;
 		*this = rhs;
+	}
+
+	Array(Array&& rhs)
+		: m_allocator(rhs.m_allocator)
+	{
+		m_data = rhs.m_data;
+		m_capacity = rhs.m_capacity;
+		m_size = rhs.m_size;
+
+		rhs.m_data = nullptr;
+		rhs.m_capacity = 0;
+		rhs.m_size = 0;
 	}
 
 
@@ -39,17 +57,11 @@ public:
 	{
 		ASSERT(&rhs.m_allocator == &m_allocator);
 
-		int i = rhs.m_capacity;
-		rhs.m_capacity = m_capacity;
-		m_capacity = i;
+		using Lumix::myswap;
 
-		i = m_size;
-		m_size = rhs.m_size;
-		rhs.m_size = i;
-
-		T* p = rhs.m_data;
-		rhs.m_data = m_data;
-		m_data = p;
+		myswap(rhs.m_capacity, m_capacity);
+		myswap(rhs.m_size, m_size);
+		myswap(rhs.m_data, m_data);
 	}
 
 
@@ -73,15 +85,15 @@ public:
 	{
 		if (this != &rhs)
 		{
-			callDestructors(m_data, m_data + m_size);
-			m_allocator.deallocate(m_data);
-			m_data = (T*)m_allocator.allocate(rhs.m_capacity * sizeof(T));
-			m_capacity = rhs.m_capacity;
-			m_size = rhs.m_size;
-			for (int i = 0; i < m_size; ++i)
-			{
-				new (Lumix::NewPlaceholder(), (char*)(m_data + i)) T(rhs.m_data[i]);
-			}
+			Array(rhs).swap(*this);
+		}
+	}
+
+	void operator=(Array&& rhs)
+	{
+		if (this != &rhs)
+		{
+			Array(mymove(rhs)).swap(*this);
 		}
 	}
 
@@ -132,11 +144,12 @@ public:
 	{
 		if (index >= 0 && index < m_size)
 		{
-			m_data[index].~T();
 			if (index != m_size - 1)
 			{
-				moveMemory(m_data + index, m_data + m_size - 1, sizeof(T));
+				using Lumix::myswap;
+				myswap(m_data[index], m_data[m_size - 1]);
 			}
+			m_data[m_size - 1].~T();
 			--m_size;
 		}
 	}
@@ -156,69 +169,48 @@ public:
 
 	void insert(int index, const T& value)
 	{
-		if (m_size == m_capacity)
+		if (index == m_size)
 		{
-			grow();
+			push(value);
+			return;
 		}
-		moveMemory(m_data + index + 1, m_data + index, sizeof(T) * (m_size - index));
-		new (NewPlaceholder(), &m_data[index]) T(value);
-		++m_size;
+		makePlaceAt(index);
+		m_data[index] = value;
 	}
 
 
 	void erase(int index)
 	{
-		if (index >= 0 && index < m_size)
+		if (index < 0 && index >= m_size)
 		{
-			m_data[index].~T();
-			if (index < m_size - 1)
-			{
-				moveMemory(m_data + index, m_data + index + 1, sizeof(T) * (m_size - index - 1));
-			}
-			--m_size;
+			return;
 		}
+
+		for (int i = index; i < m_size - 1; ++i)
+		{
+			m_data[i] = mymove(m_data[i + 1]);
+		}
+		m_data[m_size - 1].~T();
+		--m_size;
 	}
 
 	void push(const T& value)
 	{
-		int size = m_size;
-		if (size == m_capacity)
-		{
-			grow();
-		}
-		new (NewPlaceholder(), (char*)(m_data + size)) T(value);
-		++size;
-		m_size = size;
+		ensureCapacity();
+		new (NewPlaceholder(), (char*)(m_data + m_size)) T(value);
+		++m_size;
 	}
 
-
-	template <class _Ty> struct remove_reference
-	{ // remove rvalue reference
-		typedef _Ty type;
-	};
-
-
-	template <class _Ty> struct remove_reference<_Ty&>
-	{ // remove rvalue reference
-		typedef _Ty type;
-	};
-
-	template <class _Ty> struct remove_reference<_Ty&&>
-	{ // remove rvalue reference
-		typedef _Ty type;
-	};
-
-	template <class _Ty> inline _Ty&& myforward(typename remove_reference<_Ty>::type& _Arg)
+	void push(T&& value)
 	{
-		return (static_cast<_Ty&&>(_Arg));
+		ensureCapacity();
+		new (NewPlaceholder(), (char*)(m_data + m_size)) T(mymove(value));
+		++m_size;
 	}
 
 	template <typename... Params> T& emplace(Params&&... params)
 	{
-		if (m_size == m_capacity)
-		{
-			grow();
-		}
+		ensureCapacity();
 		new (NewPlaceholder(), (char*)(m_data + m_size)) T(myforward<Params>(params)...);
 		++m_size;
 		return m_data[m_size - 1];
@@ -226,16 +218,13 @@ public:
 
 	template <typename... Params> T& emplaceAt(int idx, Params&&... params)
 	{
-		if (m_size == m_capacity)
+		if (idx == m_size)
 		{
-			grow();
+			return emplace(myforward<Params>(params)...);
 		}
-		for (int i = m_size - 1; i >= idx; --i)
-		{
-			copyMemory(&m_data[i + 1], &m_data[i], sizeof(m_data[i]));
-		}
-		new (NewPlaceholder(), (char*)(m_data + idx)) T(myforward<Params>(params)...);
-		++m_size;
+		makePlaceAt(idx);
+		T tmp(myforward<Params>(params)...);
+		m_data[idx] = mymove(tmp);
 		return m_data[idx];
 	}
 
@@ -272,64 +261,18 @@ public:
 		{
 			new (NewPlaceholder(), (char*)(m_data + i)) T();
 		}
-		callDestructors(m_data + size, m_data + m_size);
+		if (size < m_size)
+		{
+			callDestructors(m_data + size, m_data + m_size);
+		}
 		m_size = size;
-	}
-
-	void moveMemory(void* dest, const void* src, size_t count)
-	{
-		if(dest == src) return;
-
-		if(dest < src || dest >= (uint8*)src + count)
-		{
-			uint8* dest8 = (uint8*)dest;
-			const uint8* src8 = (const uint8*)src;
-
-			const uint8* src_end = src8 + count;
-			while(src8 != src_end)
-			{
-				*dest8 = *src8;
-				++src8;
-				++dest8;
-			}
-		}
-		else
-		{
-			uint8* dest8 = (uint8*)dest + count - 1;
-			const uint8* src8 = (const uint8*)src + count - 1;
-
-			while(src8 >= src)
-			{
-				*dest8 = *src8;
-				--src8;
-				--dest8;
-			}
-		}
-	}
-
-	void copyMemory(void* dest, const void* src, size_t count)
-	{
-		uint8* dest8 = (uint8*)dest;
-		const uint8* src8 = (const uint8*)src;
-
-		const uint8* src_end = src8 + count;
-		while(src8 != src_end)
-		{
-			*dest8 = *src8;
-			++src8;
-			++dest8;
-		}
 	}
 
 	void reserve(int capacity)
 	{
 		if (capacity > m_capacity)
 		{
-			T* newData = (T*)m_allocator.allocate(capacity * sizeof(T));
-			copyMemory(newData, m_data, sizeof(T) * m_size);
-			m_allocator.deallocate(m_data);
-			m_data = newData;
-			m_capacity = capacity;
+			growTo(capacity);
 		}
 	}
 
@@ -350,11 +293,47 @@ private:
 	void grow()
 	{
 		int newCapacity = m_capacity == 0 ? 4 : m_capacity * 2;
-		T* new_data = (T*)m_allocator.allocate(newCapacity * sizeof(T));
-		copyMemory(new_data, m_data, sizeof(T) * m_size);
-		m_allocator.deallocate(m_data);
-		m_data = new_data;
+		growTo(newCapacity);
+	}
+
+	void growFromEmpty(int newCapacity)
+	{
+		ASSERT(m_size == 0);
+		ASSERT(m_capacity == 0);
+		ASSERT(m_data == nullptr);
+		m_data = (T*)m_allocator.allocate(newCapacity * sizeof(T));
 		m_capacity = newCapacity;
+	}
+
+	void growTo(int newCapacity)
+	{
+		Array temp(m_allocator);
+		temp.growFromEmpty(newCapacity);
+		for (int i = 0; i < m_size; ++i)
+		{
+			temp.push(mymove(m_data[i]));
+		}
+		swap(temp);
+	}
+
+	void makePlaceAt(int idx)
+	{
+		ASSERT(idx >= 0 && idx < m_size);
+		ensureCapacity();
+		new (NewPlaceholder(), (char *)(m_data + m_size)) T(mymove(m_data[m_size-1]));
+		for (int i = m_size - 1; i - 1 >= idx; --i)
+		{
+			m_data[i] = mymove(m_data[i - 1]);
+		}
+		++m_size;
+	}
+
+	void ensureCapacity()
+	{
+		if (m_size == m_capacity)
+		{
+			grow();
+		}
 	}
 
 	void callDestructors(T* begin, T* end)
