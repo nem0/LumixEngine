@@ -169,7 +169,7 @@ public:
 	{
 		Parents::iterator parent_iter = m_parents.find(cmp);
 
-		if (parent_iter.isValid())
+		if (parent_iter.isValid() && parent_iter.value() != INVALID_ENTITY)
 		{
 			auto child_iter = m_children.find(parent_iter.value());
 			ASSERT(child_iter.isValid());
