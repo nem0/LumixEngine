@@ -3201,6 +3201,11 @@ public:
 			r.pose = LUMIX_NEW(m_allocator, Pose)(m_allocator);
 			r.pose->resize(model->getBoneCount());
 			model->getPose(*r.pose);
+			int skinned_define_idx = m_renderer.getShaderDefineIdx("SKINNED");
+			for (int i = 0; i < model->getMeshCount(); ++i)
+			{
+				model->getMesh(i).material->setDefine(skinned_define_idx, true);
+			}
 		}
 		r.matrix = m_universe.getMatrix(r.entity);
 		ASSERT(!r.meshes || r.custom_meshes);
