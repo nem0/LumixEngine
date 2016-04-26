@@ -2153,6 +2153,7 @@ void ImportAssetDialog::onMaterialsGUI()
 				}
 				ImGui::SameLine();
 				ImGui::Text("%s", mat.textures[i].src);
+				ImGui::NextColumn();
 			}
 			ImGui::Columns();
 
