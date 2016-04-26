@@ -177,9 +177,8 @@ static float getMeshLODFactor(const aiScene* scene, const aiMesh* mesh)
 
 static int importAsset(lua_State* L)
 {
-	// TODO register this
-/*	auto* app = Lumix::LuaWrapper::checkArg<StudioAppImpl*>(L, 1);
-	return app->m_import_asset_dialog->importAsset(L);*/
+	auto* dlg = Lumix::LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
+	return dlg->importAsset(L);
 }
 
 
@@ -1939,11 +1938,14 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	m_action = LUMIX_NEW(m_editor.getAllocator(), Action)("Import Asset", "import_asset");
 	m_action->func.bind<ImportAssetDialog, &ImportAssetDialog::onAction>(this);
 
+	Lumix::LuaWrapper::createSystemFunction(m_editor.getEngine().getState(), "Editor", "importAsset", &::importAsset);
+	Lumix::LuaWrapper::createSystemVariable(m_editor.getEngine().getState(), "Editor", "import_asset_dialog", this);
 }
 
 
 ImportAssetDialog::~ImportAssetDialog()
 {
+	Lumix::LuaWrapper::createSystemVariable(m_editor.getEngine().getState(), "Editor", "import_asset_dialog", nullptr);
 	if (m_task)
 	{
 		m_task->destroy();
