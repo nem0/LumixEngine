@@ -2704,6 +2704,12 @@ void ImportAssetDialog::onWindowGUI()
 				if (ImGui::Checkbox("Optimize meshes", &m_optimize_mesh_on_import)) checkSource();
 				if (ImGui::Checkbox("Smooth normals", &m_gen_smooth_normal)) checkSource();
 
+				if (m_is_importing || m_is_converting)
+				{
+					ImGui::EndDock();
+					return;
+				}
+
 				ImGui::Checkbox("Remove doubles", &m_remove_doubles);
 				ImGui::DragFloat("Scale", &m_mesh_scale, 0.01f, 0.001f, 0);
 				ImGui::Combo("Orientation", &(int&)m_orientation, "Y up\0Z up\0-Z up\0-X up\0");
@@ -2766,7 +2772,7 @@ void ImportAssetDialog::onWindowGUI()
 				{
 					for (int i = 0; i < mat.texture_count; ++i)
 					{
-						if (mat.textures[i].is_valid) continue;
+						if (mat.textures[i].is_valid || !mat.textures[i].import) continue;
 						ImGui::Text("Texture %s is not valid", mat.textures[i].path);
 					}
 				}
