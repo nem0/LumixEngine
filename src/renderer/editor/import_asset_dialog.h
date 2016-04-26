@@ -72,7 +72,7 @@ struct ImportMesh
 
 
 
-class LUMIX_RENDERER_API ImportAssetDialog : public StudioApp::IPlugin
+class ImportAssetDialog : public StudioApp::IPlugin
 {
 	friend struct ImportTask;
 	friend struct ConvertTask;
