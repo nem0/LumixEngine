@@ -20,6 +20,7 @@
 #include "editor/metadata.h"
 #include "editor/platform_interface.h"
 #include "editor/stb/stb_image.h"
+#include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
@@ -1900,25 +1901,25 @@ struct ConvertTask : public Lumix::MT::Task
 }; // struct ConvertTask
 
 
-ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metadata)
-	: m_metadata(metadata)
+ImportAssetDialog::ImportAssetDialog(StudioApp& app)
+	: m_metadata(*app.getMetadata())
 	, m_task(nullptr)
-	, m_editor(editor)
+	, m_editor(*app.getWorldEditor())
 	, m_is_converting(false)
 	, m_is_importing(false)
 	, m_is_importing_texture(false)
 	, m_mutex(false)
 	, m_make_convex(false)
-	, m_saved_textures(editor.getAllocator())
+	, m_saved_textures(app.getWorldEditor()->getAllocator())
 	, m_convert_to_dds(false)
 	, m_convert_to_raw(false)
 	, m_remove_doubles(false)
 	, m_create_billboard_lod(false)
 	, m_raw_texture_scale(1)
 	, m_mesh_scale(1)
-	, m_meshes(editor.getAllocator())
-	, m_materials(editor.getAllocator())
-	, m_importers(editor.getAllocator())
+	, m_meshes(app.getWorldEditor()->getAllocator())
+	, m_materials(app.getWorldEditor()->getAllocator())
+	, m_importers(app.getWorldEditor()->getAllocator())
 {
 	m_lods[0] = 10;
 	m_lods[1] = 100;
@@ -1934,6 +1935,10 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metad
 	m_output_filename[0] = '\0';
 	m_texture_output_dir[0] = '\0';
 	Lumix::copyString(m_last_dir, m_editor.getEngine().getDiskFileDevice()->getBasePath());
+
+	m_action = LUMIX_NEW(m_editor.getAllocator(), Action)("Import Asset", "import_asset");
+	m_action->func.bind<ImportAssetDialog, &ImportAssetDialog::onAction>(this);
+
 }
 
 
@@ -2614,7 +2619,13 @@ void ImportAssetDialog::checkTask(bool wait)
 }
 
 
-void ImportAssetDialog::onGUI()
+void ImportAssetDialog::onAction()
+{
+	m_is_opened = !m_is_opened;
+}
+
+
+void ImportAssetDialog::onWindowGUI()
 {
 	if (ImGui::BeginDock("Import Asset", &m_is_opened))
 	{

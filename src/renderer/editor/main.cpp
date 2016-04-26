@@ -22,6 +22,7 @@
 #include "engine/property_descriptor.h"
 #include "game_view.h"
 #include "editor/render_interface.h"
+#include "import_asset_dialog.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/model_manager.h"
@@ -1454,6 +1455,9 @@ LUMIX_STUDIO_ENTRY(renderer)
 
 	auto* scene_view_plugin = LUMIX_NEW(allocator, SceneViewPlugin)(app);
 	app.addPlugin(*scene_view_plugin);
+
+	auto* import_asset_plugin = LUMIX_NEW(allocator, ImportAssetDialog)(app);
+	app.addPlugin(*import_asset_plugin);
 
 	auto* game_view_plugin = LUMIX_NEW(allocator, GameViewPlugin)(app);
 	app.addPlugin(*game_view_plugin);
