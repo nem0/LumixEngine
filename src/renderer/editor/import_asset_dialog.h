@@ -8,6 +8,7 @@
 #include "engine/core/mt/sync.h"
 #include "engine/core/string.h"
 #include "engine/lumix.h"
+#include "editor/studio_app.h"
 
 
 struct lua_State;
@@ -71,7 +72,7 @@ struct ImportMesh
 
 
 
-class LUMIX_RENDERER_API ImportAssetDialog
+class LUMIX_RENDERER_API ImportAssetDialog : public StudioApp::IPlugin
 {
 	friend struct ImportTask;
 	friend struct ConvertTask;
@@ -93,12 +94,12 @@ class LUMIX_RENDERER_API ImportAssetDialog
 		};
 
 	public:
-		ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metadata);
+		ImportAssetDialog(StudioApp& app);
 		~ImportAssetDialog();
 		void setMessage(const char* message);
 		void setImportMessage(const char* message, float progress_fraction);
 		Lumix::WorldEditor& getEditor() { return m_editor; }
-		void onGUI();
+		void onWindowGUI() override;
 		DDSConvertCallbackData& getDDSConvertCallbackData() { return m_dds_convert_callback; }
 		int importAsset(lua_State* L);
 
@@ -117,6 +118,7 @@ class LUMIX_RENDERER_API ImportAssetDialog
 		void onMeshesGUI();
 		void onImageGUI();
 		void onLODsGUI();
+		void onAction();
 
 	private:
 		Lumix::WorldEditor& m_editor;

@@ -437,6 +437,7 @@ public:
 	int getExitCode() const override { return m_exit_code; }
 	AssetBrowser* getAssetBrowser() override { return m_asset_browser; }
 	PropertyGrid* getPropertyGrid() override { return m_property_grid; }
+	Metadata* getMetadata() override { return &m_metadata; }
 	LogUI* getLogUI() override { return m_log_ui; }
 	void toggleGameMode() { m_editor->toggleGameMode(); }
 
