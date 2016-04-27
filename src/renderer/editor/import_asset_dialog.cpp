@@ -4,6 +4,7 @@
 #include "assimp/ProgressHandler.hpp"
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
+#include "engine/core/blob.h"
 #include "engine/core/crc32.h"
 #include "engine/core/fs/disk_file_device.h"
 #include "engine/core/fs/os_file.h"
@@ -578,8 +579,8 @@ struct ImportTask : public Lumix::MT::Task
 		unsigned int flags = aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent | aiProcess_GenUVCoords |
 							 aiProcess_RemoveRedundantMaterials | aiProcess_Triangulate | aiProcess_FindInvalidData |
 							 aiProcess_OptimizeGraph | aiProcess_ValidateDataStructure | aiProcess_CalcTangentSpace;
-		flags |= m_dialog.m_gen_smooth_normal ? aiProcess_GenSmoothNormals : aiProcess_GenNormals;
-		flags |= m_dialog.m_optimize_mesh_on_import ? aiProcess_OptimizeMeshes : 0;
+		flags |= m_dialog.m_model.gen_smooth_normal ? aiProcess_GenSmoothNormals : aiProcess_GenNormals;
+		flags |= m_dialog.m_model.optimize_mesh_on_import ? aiProcess_OptimizeMeshes : 0;
 		const aiScene* scene = m_dialog.m_importers.back().ReadFile(m_dialog.m_source, flags);
 		if (!scene || !scene->mMeshes)
 		{
@@ -645,13 +646,13 @@ struct ImportTask : public Lumix::MT::Task
 				mesh.mesh = scene->mMeshes[i];
 				mesh.lod = getMeshLOD(scene, mesh.mesh);
 				float f = getMeshLODFactor(scene, mesh.mesh);
-				if(f < FLT_MAX) m_dialog.m_lods[mesh.lod] = f;
+				if (f < FLT_MAX) m_dialog.m_model.lods[mesh.lod] = f;
 			}
 		}
 
-		for (int i = 1; i < Lumix::lengthOf(m_dialog.m_lods); ++i)
+		for (int i = 1; i < Lumix::lengthOf(m_dialog.m_model.lods); ++i)
 		{
-			if (m_dialog.m_lods[i - 1] < 0) m_dialog.m_lods[i] = -1;
+			if (m_dialog.m_model.lods[i - 1] < 0) m_dialog.m_model.lods[i] = -1;
 		}
 
 
@@ -921,7 +922,7 @@ struct ConvertTask : public Lumix::MT::Task
 					global_transform.Decompose(scale, dummy_rot, dummy_pos);
 					for (int frame = 0; frame < frame_count; ++frame)
 					{
-						auto pos = getPosition(channel, frame, header.fps) * m_dialog.m_mesh_scale;
+						auto pos = getPosition(channel, frame, header.fps) * m_dialog.m_model.mesh_scale;
 						pos.x *= scale.x;
 						pos.y *= scale.y;
 						pos.z *= scale.z;
@@ -962,7 +963,7 @@ struct ConvertTask : public Lumix::MT::Task
 			if (!saveMaterial(material, source_mesh_dir, &undefined_count)) return false;
 		}
 
-		if (m_dialog.m_create_billboard_lod)
+		if (m_dialog.m_model.create_billboard_lod)
 		{
 			Lumix::FS::OsFile file;
 			PathBuilder output_material_name(m_dialog.m_output_dir, "/billboard.mat");
@@ -1207,7 +1208,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 	Lumix::Vec3 fixOrientation(const aiVector3D& v) const
 	{
-		switch (m_dialog.m_orientation)
+		switch (m_dialog.m_model.orientation)
 		{
 			case ImportAssetDialog::Y_UP: return Lumix::Vec3(v.x, v.y, v.z);
 			case ImportAssetDialog::Z_UP: return Lumix::Vec3(v.x, v.z, -v.y);
@@ -1235,7 +1236,7 @@ struct ConvertTask : public Lumix::MT::Task
 				}
 			}
 
-			if (m_dialog.m_create_billboard_lod)
+			if (m_dialog.m_model.create_billboard_lod)
 			{
 				Lumix::uint16 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 };
 				file.write(indices, sizeof(indices));
@@ -1248,7 +1249,7 @@ struct ConvertTask : public Lumix::MT::Task
 				if (mesh.import) file.write(&mesh.indices[0], mesh.indices.size() * sizeof(mesh.indices[0]));
 			}
 
-			if (m_dialog.m_create_billboard_lod)
+			if (m_dialog.m_model.create_billboard_lod)
 			{
 				Lumix::uint32 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 };
 				file.write(indices, sizeof(indices));
@@ -1332,7 +1333,7 @@ struct ConvertTask : public Lumix::MT::Task
 			}
 		}
 
-		if (m_dialog.m_create_billboard_lod)
+		if (m_dialog.m_model.create_billboard_lod)
 		{
 			Lumix::Vec3 size = max - min;
 			float uvs[] = { 0.0f, 0.5f, 1.0f };
@@ -1376,7 +1377,7 @@ struct ConvertTask : public Lumix::MT::Task
 			vertices_size += mesh.map_to_input.size() * getVertexSize(mesh.mesh);
 		}
 
-		if (m_dialog.m_create_billboard_lod)
+		if (m_dialog.m_model.create_billboard_lod)
 		{
 			indices_count += 4*3;
 			vertices_size += 8 * sizeof(BillboardVertex);
@@ -1420,7 +1421,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 	void writeBillboardMesh(Lumix::FS::OsFile& file, Lumix::int32 attribute_array_offset, Lumix::int32 indices_offset)
 	{
-		if (!m_dialog.m_create_billboard_lod) return;
+		if (!m_dialog.m_model.create_billboard_lod) return;
 
 		int vertex_size = sizeof(BillboardVertex);
 		const char* material_name = "billboard";
@@ -1461,7 +1462,7 @@ struct ConvertTask : public Lumix::MT::Task
 		{
 			if (m_dialog.m_meshes[i].import) ++mesh_count;
 		}
-		if (m_dialog.m_create_billboard_lod) ++mesh_count;
+		if (m_dialog.m_model.create_billboard_lod) ++mesh_count;
 
 		file.write((const char*)&mesh_count, sizeof(mesh_count));
 		Lumix::int32 attribute_array_offset = 0;
@@ -1534,12 +1535,12 @@ struct ConvertTask : public Lumix::MT::Task
 			if (!mesh.import) continue;
 
 			++last_mesh_idx;
-			if (mesh.lod >= Lumix::lengthOf(m_dialog.m_lods)) continue;
+			if (mesh.lod >= Lumix::lengthOf(m_dialog.m_model.lods)) continue;
 			lod_count = mesh.lod + 1;
 			lods[mesh.lod] = last_mesh_idx;
 		}
 
-		if (m_dialog.m_create_billboard_lod)
+		if (m_dialog.m_model.create_billboard_lod)
 		{
 			lods[lod_count] = last_mesh_idx + 1;
 			++lod_count;
@@ -1551,7 +1552,7 @@ struct ConvertTask : public Lumix::MT::Task
 		{
 			Lumix::int32 to_mesh = lods[i];
 			file.write((const char*)&to_mesh, sizeof(to_mesh));
-			float factor = m_dialog.m_lods[i] < 0 ? FLT_MAX : m_dialog.m_lods[i] * m_dialog.m_lods[i];
+			float factor = m_dialog.m_model.lods[i] < 0 ? FLT_MAX : m_dialog.m_model.lods[i] * m_dialog.m_model.lods[i];
 			file.write((const char*)&factor, sizeof(factor));
 		}
 	}
@@ -1684,7 +1685,7 @@ struct ConvertTask : public Lumix::MT::Task
 			{
 				getGlobalTransform(node).Decompose(scale, rot, pos);
 			}
-			pos *= m_dialog.m_mesh_scale;
+			pos *= m_dialog.m_model.mesh_scale;
 			file.write((const char*)&pos, sizeof(pos));
 			file.write((const char*)&rot.x, sizeof(rot.x));
 			file.write((const char*)&rot.y, sizeof(rot.y));
@@ -1699,7 +1700,7 @@ struct ConvertTask : public Lumix::MT::Task
 		Lumix::PhysicsGeometry::Header header;
 		header.m_magic = Lumix::PhysicsGeometry::HEADER_MAGIC;
 		header.m_version = (Lumix::uint32)Lumix::PhysicsGeometry::Versions::LAST;
-		header.m_convex = (Lumix::uint32)m_dialog.m_make_convex;
+		header.m_convex = (Lumix::uint32)m_dialog.m_model.make_convex;
 		file.write((const char*)&header, sizeof(header));
 	}
 
@@ -1747,7 +1748,7 @@ struct ConvertTask : public Lumix::MT::Task
 			}
 		}
 
-		if (!m_dialog.m_make_convex) writePhysiscTriMesh(file);
+		if (!m_dialog.m_model.make_convex) writePhysiscTriMesh(file);
 		file.close();
 
 		return true;
@@ -1877,7 +1878,7 @@ struct ConvertTask : public Lumix::MT::Task
 		gatherNodes();
 
 		Lumix::uint32 preprocess_flags = 0;
-		if (m_dialog.m_remove_doubles) preprocess_flags |= (Lumix::uint32)Preprocesses::REMOVE_DOUBLES;
+		if (m_dialog.m_model.remove_doubles) preprocess_flags |= (Lumix::uint32)Preprocesses::REMOVE_DOUBLES;
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (mesh.import) preprocessMesh(mesh, preprocess_flags, allocator);
@@ -1908,23 +1909,24 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	, m_is_importing(false)
 	, m_is_importing_texture(false)
 	, m_mutex(false)
-	, m_make_convex(false)
 	, m_saved_textures(app.getWorldEditor()->getAllocator())
 	, m_convert_to_dds(false)
 	, m_convert_to_raw(false)
-	, m_remove_doubles(false)
-	, m_create_billboard_lod(false)
 	, m_raw_texture_scale(1)
-	, m_mesh_scale(1)
 	, m_meshes(app.getWorldEditor()->getAllocator())
 	, m_materials(app.getWorldEditor()->getAllocator())
 	, m_importers(app.getWorldEditor()->getAllocator())
+	, m_sources(app.getWorldEditor()->getAllocator())
 {
-	m_lods[0] = 10;
-	m_lods[1] = 100;
-	m_lods[2] = 1000;
-	m_lods[3] = -10000;
-	m_orientation = Y_UP;
+	m_model.make_convex = false;
+	m_model.mesh_scale = 1;
+	m_model.remove_doubles = false;
+	m_model.create_billboard_lod = false;
+	m_model.lods[0] = 10;
+	m_model.lods[1] = 100;
+	m_model.lods[2] = 1000;
+	m_model.lods[3] = -10000;
+	m_model.orientation = Y_UP;
 	m_is_opened = false;
 	m_message[0] = '\0';
 	m_import_message[0] = '\0';
@@ -1990,6 +1992,7 @@ void ImportAssetDialog::checkSource()
 
 	ASSERT(!m_task);
 	m_importers.emplace();
+	m_sources.emplace(m_source);
 	setImportMessage("Importing...", -1);
 	m_is_importing = true;
 	m_task = LUMIX_NEW(m_editor.getAllocator(), ImportTask)(*this);
@@ -2027,6 +2030,46 @@ bool ImportAssetDialog::hasMessage()
 }
 
 
+void ImportAssetDialog::saveModelMetadata()
+{
+	PathBuilder model_path(m_output_dir, "/", m_output_filename, ".msh");
+	char tmp[Lumix::MAX_PATH_LENGTH];
+	Lumix::PathUtils::normalize(model_path, tmp, Lumix::lengthOf(tmp));
+	Lumix::uint32 model_path_hash = Lumix::crc32(tmp);
+
+	Lumix::OutputBlob blob(m_editor.getAllocator());
+	blob.reserve(1024);
+	blob.write(&m_model, sizeof(m_model));
+	blob.write(m_meshes.size());
+	for (auto& i : m_meshes)
+	{
+		blob.write(i.import);
+		blob.write(i.import_physics);
+		blob.write(i.lod);
+	}
+	blob.write(m_materials.size());
+	for (auto& i : m_materials)
+	{
+		blob.write(i.import);
+		blob.write(i.alpha_cutout);
+		blob.write(i.shader);
+		blob.write(i.texture_count);
+		for (int j = 0; j < i.texture_count; ++j)
+		{
+			auto& texture = i.textures[j];
+			blob.write(texture.import);
+			blob.write(texture.path);
+			blob.write(texture.src);
+			blob.write(texture.to_dds);
+		}
+	}
+	int sources_count = m_sources.size();
+	blob.write(sources_count);
+	blob.write(&m_sources[0], sizeof(m_sources) * m_sources.size());
+	m_metadata.setRawMemory(model_path_hash, Lumix::crc32("import_settings"), blob.getData(), blob.getPos());
+}
+
+
 void ImportAssetDialog::convert(bool use_ui)
 {
 	ASSERT(!m_task);
@@ -2043,9 +2086,11 @@ void ImportAssetDialog::convert(bool use_ui)
 		}
 	}
 
+	saveModelMetadata();
+
 	setImportMessage("Converting...", -1);
 	m_is_converting = true;
-	m_task = LUMIX_NEW(m_editor.getAllocator(), ConvertTask)(*this, m_mesh_scale);
+	m_task = LUMIX_NEW(m_editor.getAllocator(), ConvertTask)(*this, m_model.mesh_scale);
 	m_task->create("ConvertAssetTask");
 	m_task->run();
 }
@@ -2167,17 +2212,17 @@ void ImportAssetDialog::onMaterialsGUI()
 void ImportAssetDialog::onLODsGUI()
 {
 	if (!ImGui::CollapsingHeader("LODs")) return;
-	for (int i = 0; i < Lumix::lengthOf(m_lods); ++i)
+	for (int i = 0; i < Lumix::lengthOf(m_model.lods); ++i)
 	{
-		bool b = m_lods[i] < 0;
+		bool b = m_model.lods[i] < 0;
 		if (ImGui::Checkbox(Lumix::StaticString<20>("Infinite###lod_inf", i), &b))
 		{
-			m_lods[i] *= -1;
+			m_model.lods[i] *= -1;
 		}
-		if (m_lods[i] >= 0)
+		if (m_model.lods[i] >= 0)
 		{
 			ImGui::SameLine();
-			ImGui::DragFloat(Lumix::StaticString<10>("LOD ", i), &m_lods[i], 1.0f, 1.0f, FLT_MAX);
+			ImGui::DragFloat(Lumix::StaticString<10>("LOD ", i), &m_model.lods[i], 1.0f, 1.0f, FLT_MAX);
 		}
 	}
 }
@@ -2469,12 +2514,12 @@ int ImportAssetDialog::importAsset(lua_State* L)
 	lua_pop(L, 1);
 	if (lua_getfield(L, 2, "create_billboard") == LUA_TBOOLEAN)
 	{
-		m_create_billboard_lod = Lumix::LuaWrapper::toType<bool>(L, -1);
+		m_model.create_billboard_lod = Lumix::LuaWrapper::toType<bool>(L, -1);
 	}
 	lua_pop(L, 1);
 	if (lua_getfield(L, 2, "scale") == LUA_TNUMBER)
 	{
-		m_mesh_scale = Lumix::LuaWrapper::toType<float>(L, -1);
+		m_model.mesh_scale = Lumix::LuaWrapper::toType<float>(L, -1);
 	}
 	lua_pop(L, 1);
 
@@ -2580,7 +2625,7 @@ int ImportAssetDialog::importAsset(lua_State* L)
 	convert(false);
 	if (m_is_converting) checkTask(true);
 
-	if (m_create_billboard_lod)
+	if (m_model.create_billboard_lod)
 	{
 		PathBuilder mesh_path(m_output_dir, "/");
 		mesh_path << m_output_filename << ".msh";
@@ -2702,8 +2747,8 @@ void ImportAssetDialog::onWindowGUI()
 			if (ImGui::CollapsingHeader("Advanced"))
 			{
 				//ImGui::Checkbox("Create billboard LOD", &m_create_billboard_lod);
-				if (ImGui::Checkbox("Optimize meshes", &m_optimize_mesh_on_import)) checkSource();
-				if (ImGui::Checkbox("Smooth normals", &m_gen_smooth_normal)) checkSource();
+				if (ImGui::Checkbox("Optimize meshes", &m_model.optimize_mesh_on_import)) checkSource();
+				if (ImGui::Checkbox("Smooth normals", &m_model.gen_smooth_normal)) checkSource();
 
 				if (m_is_importing || m_is_converting)
 				{
@@ -2711,10 +2756,10 @@ void ImportAssetDialog::onWindowGUI()
 					return;
 				}
 
-				ImGui::Checkbox("Remove doubles", &m_remove_doubles);
-				ImGui::DragFloat("Scale", &m_mesh_scale, 0.01f, 0.001f, 0);
-				ImGui::Combo("Orientation", &(int&)m_orientation, "Y up\0Z up\0-Z up\0-X up\0");
-				ImGui::Checkbox("Make physics convex", &m_make_convex);
+				ImGui::Checkbox("Remove doubles", &m_model.remove_doubles);
+				ImGui::DragFloat("Scale", &m_model.mesh_scale, 0.01f, 0.001f, 0);
+				ImGui::Combo("Orientation", &(int&)m_model.orientation, "Y up\0Z up\0-Z up\0-X up\0");
+				ImGui::Checkbox("Make physics convex", &m_model.make_convex);
 			}
 			int animations_count = 0;
 			for (auto& i : m_importers)

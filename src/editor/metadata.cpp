@@ -96,6 +96,23 @@ bool Metadata::save()
 }
 
 
+Metadata::~Metadata()
+{
+	for (int i = 0; i < m_data.size(); ++i)
+	{
+		auto& x = m_data.at(i);
+		for (int j = 0; j < x.size(); ++j)
+		{
+			auto& data = x.at(j);
+			if (data.m_type == DataItem::RAW_MEMORY)
+			{
+				m_allocator.deallocate(data.m_raw.memory);
+			}
+		}
+	}
+}
+
+
 Metadata::DataItem* Metadata::getOrCreateData(Lumix::uint32 file, Lumix::uint32 key)
 {
 	int index = m_data.find(file);
@@ -125,6 +142,37 @@ const Metadata::DataItem* Metadata::getData(Lumix::uint32 file, Lumix::uint32 ke
 	if (index < 0) return nullptr;
 
 	return &file_data.at(index);
+}
+
+
+const void* Metadata::getRawMemory(Lumix::uint32 file, Lumix::uint32 key) const
+{
+	const auto* data = getData(file, key);
+	if (!data || data->m_type != DataItem::RAW_MEMORY) return nullptr;
+	return data->m_raw.memory;
+}
+
+
+size_t Metadata::getRawMemorySize(Lumix::uint32 file, Lumix::uint32 key) const
+{
+	const auto* data = getData(file, key);
+	if (!data || data->m_type != DataItem::RAW_MEMORY) return 0;
+	return data->m_raw.size;
+}
+
+
+
+bool Metadata::setRawMemory(Lumix::uint32 file, Lumix::uint32 key, const void* mem, size_t size)
+{
+	auto* data = getOrCreateData(file, key);
+	if (!data) return false;
+
+	data->m_type = DataItem::RAW_MEMORY;
+	data->m_raw.memory = m_allocator.allocate(size);
+	Lumix::copyMemory(data->m_raw.memory, mem, size);
+	data->m_raw.size = size;
+
+	return true;
 }
 
 
