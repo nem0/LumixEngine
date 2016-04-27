@@ -137,10 +137,10 @@ end
 function copyDlls(src_dir, platform_bit, platform_dir, dest_dir)
 	local physx_suffix
 	if platform_bit == 32 then
-		configuration { "x32", dest_dir }
+		configuration { "x32", dest_dir, "windows" }
 		physx_suffix = "x86"
 	else
-		configuration { "x64", dest_dir }
+		configuration { "x64", dest_dir, "windows" }
 		physx_suffix = "x64"
 	end
 
