@@ -119,14 +119,29 @@ class ImportAssetDialog : public StudioApp::IPlugin
 		void onImageGUI();
 		void onLODsGUI();
 		void onAction();
+		void saveModelMetadata();
 
 	private:
 		Lumix::WorldEditor& m_editor;
 		Lumix::Array<Lumix::uint32> m_saved_textures;
 		Lumix::Array<Assimp::Importer> m_importers;
+		Lumix::Array<Lumix::StaticString<Lumix::MAX_PATH_LENGTH> > m_sources;
 		Lumix::Array<ImportMesh> m_meshes;
 		Lumix::Array<ImportMaterial> m_materials;
 		char m_import_message[1024];
+		
+		struct ModelData
+		{
+			float mesh_scale;
+			float lods[4];
+			bool create_billboard_lod;
+			bool optimize_mesh_on_import;
+			bool gen_smooth_normal;
+			bool remove_doubles;
+			Orientation orientation;
+			bool make_convex;
+		} m_model;
+
 		float m_progress_fraction;
 		char m_message[1024];
 		char m_last_dir[Lumix::MAX_PATH_LENGTH];
@@ -134,21 +149,13 @@ class ImportAssetDialog : public StudioApp::IPlugin
 		char m_output_filename[Lumix::MAX_PATH_LENGTH];
 		char m_output_dir[Lumix::MAX_PATH_LENGTH];
 		char m_texture_output_dir[Lumix::MAX_PATH_LENGTH];
-		bool m_create_billboard_lod;
-		bool m_optimize_mesh_on_import;
-		bool m_gen_smooth_normal;
 		bool m_convert_to_dds;
 		bool m_convert_to_raw;
 		bool m_import_animations;
-		bool m_make_convex;
 		bool m_is_converting;
 		bool m_is_importing;
-		bool m_remove_doubles;
 		bool m_is_importing_texture;
 		float m_raw_texture_scale;
-		float m_mesh_scale;
-		float m_lods[4];
-		Orientation m_orientation;
 		Lumix::MT::Task* m_task;
 		Lumix::MT::SpinMutex m_mutex;
 		Metadata& m_metadata;
