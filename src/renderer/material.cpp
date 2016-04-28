@@ -293,7 +293,6 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 		serializer.nextArrayItem();
 		serializer.deserializeObjectBegin();
 		char label[256];
-		auto uniform_type = bgfx::UniformType::End;
 		while (!serializer.isObjectEnd())
 		{
 			serializer.deserializeLabel(label, 255);
