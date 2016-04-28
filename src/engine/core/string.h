@@ -69,6 +69,10 @@ template <int SIZE> bool catString(char(&destination)[SIZE], const char* source)
 
 template <int size> struct StaticString
 {
+	StaticString() {
+		data[0] = '\0';
+	}
+
 	explicit StaticString(const char* str) { Lumix::copyString(data, size, str); }
 
 	template <typename... Args> StaticString(const char* str, Args... args)
@@ -100,7 +104,15 @@ template <int size> struct StaticString
 		Lumix::toCString(value, data + len, size - len);
 	}
 
-	operator const char*() { return data; }
+	bool operator<(const char* str) const {
+		return Lumix::compareString(data, str) < 0;
+	}
+
+	bool operator==(const char* str) const {
+		return Lumix::compareString(data, str) == 0;
+	}
+
+	operator const char*() const { return data; }
 	char data[size];
 };
 
