@@ -2529,6 +2529,32 @@ int ImportAssetDialog::importAsset(lua_State* L)
 	}
 	lua_pop(L, 1);
 
+	if (lua_getfield(L, 2, "lods") == LUA_TTABLE)
+	{
+		lua_pushnil(L);
+		int lod_index = 0;
+		while (lua_next(L, -2) != 0)
+		{
+			if (lod_index >= Lumix::lengthOf(m_model.lods))
+			{
+				Lumix::g_log_error.log("Editor") << "Only " << Lumix::lengthOf(m_model.lods) << " supported";
+				lua_pop(L, 1);
+				break;
+			}
+
+			m_model.lods[lod_index] = Lumix::LuaWrapper::toType<float>(L, -1);
+			++lod_index;
+			lua_pop(L, 1);
+		}
+	}
+	lua_pop(L, 1);
+
+	if (lua_getfield(L, 2, "texture_output_dir") == LUA_TSTRING)
+	{
+		Lumix::copyString(m_texture_output_dir, Lumix::LuaWrapper::toType<const char*>(L, -1));
+	}
+	lua_pop(L, 1);
+
 	if (lua_getfield(L, 2, "srcs") == LUA_TTABLE)
 	{
 		lua_pushnil(L);
@@ -2548,8 +2574,19 @@ int ImportAssetDialog::importAsset(lua_State* L)
 			Lumix::copyString(m_source, Lumix::LuaWrapper::toType<const char*>(L, -1));
 			lua_pop(L, 1); // "src"
 
+			int meshes_count = m_meshes.size();
 			checkSource();
 			if (m_is_importing) checkTask(true);
+
+			if (lua_getfield(L, -1, "lod") == LUA_TNUMBER)
+			{
+				int lod = Lumix::LuaWrapper::toType<int>(L, -1);
+				for (int i = meshes_count; i < m_meshes.size(); ++i)
+				{
+					m_meshes[i].lod = lod;
+				}
+			}
+			lua_pop(L, 1); // "lod"
 
 			if (lua_getfield(L, -1, "materials") == LUA_TTABLE)
 			{

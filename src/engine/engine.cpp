@@ -393,8 +393,6 @@ public:
 
 	void installLuaPackageLoader() const
 	{
-		auto x = lua_getglobal(m_state, "package");
-		auto y = lua_getfield(m_state, -1, "searchers");
 		int numLoaders = 0;
 		lua_pushnil(m_state);
 		while (lua_next(m_state, -2) != 0)
