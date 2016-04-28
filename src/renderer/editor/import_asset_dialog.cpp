@@ -2499,6 +2499,46 @@ static bool createBillboard(ImportAssetDialog& dialog,
 }
 
 
+static ImportMaterial* getMatchingMaterial(lua_State* L, ImportMaterial* materials, int count)
+{
+	auto x = lua_gettop(L);
+	if (lua_getfield(L, -1, "matching") == LUA_TFUNCTION)
+	{
+		for (int i = 0; i < count; ++i)
+		{
+			lua_pushvalue(L, -1); // duplicate "matching"
+			ImportMaterial& material = materials[i];
+			aiString material_name;
+			material.material->Get(AI_MATKEY_NAME, material_name);
+			Lumix::LuaWrapper::pushLua(L, i);
+			Lumix::LuaWrapper::pushLua(L, material_name.C_Str());
+			if (lua_pcall(L, 2, 1, 0) != LUA_OK)
+			{
+				Lumix::g_log_error.log("Editor") << "getMatchingMaterial" << ": " << lua_tostring(L, -1);
+				lua_pop(L, 1);
+			}
+			else
+			{
+				bool is_matching = Lumix::LuaWrapper::toType<bool>(L, -1);
+				lua_pop(L, 1);
+				if (is_matching)
+				{
+					lua_pop(L, 1); // "matching"
+					auto u = lua_gettop(L);
+					return &material;
+				}
+			}
+		}
+	}
+	else
+	{
+		Lumix::g_log_error.log("Editor") << "No \"matching\" found in table or it is not a function";
+	}
+	lua_pop(L, 1); // "matching"
+	return nullptr;
+}
+
+
 int ImportAssetDialog::importAsset(lua_State* L)
 {
 	m_importers.clear();
@@ -2591,12 +2631,21 @@ int ImportAssetDialog::importAsset(lua_State* L)
 
 			if (lua_getfield(L, -1, "materials") == LUA_TTABLE)
 			{
-				ImportMaterial* material = &m_materials[m_materials.size() - m_importers.back().GetScene()->mNumMaterials];
 				lua_pushnil(L);
 				while (lua_next(L, -2) != 0) // for each material
 				{
 					if (lua_istable(L, -1))
 					{
+						auto* scene = m_importers.back().GetScene();
+						ImportMaterial* material = getMatchingMaterial(
+							L, &m_materials[m_materials.size() - scene->mNumMaterials], scene->mNumMaterials);
+						if (!material)
+						{
+							Lumix::g_log_error.log("Editor") << "No matching material found";
+							lua_pop(L, 1); // materials table item
+							continue;
+						}
+						
 						if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
 						{
 							material->import = Lumix::LuaWrapper::toType<bool>(L, -1);
@@ -2650,7 +2699,6 @@ int ImportAssetDialog::importAsset(lua_State* L)
 						lua_pop(L, 1); // "textures"
 					}
 
-					++material;
 					lua_pop(L, 1); // materials table item
 				}
 			}
