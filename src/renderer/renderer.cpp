@@ -611,7 +611,7 @@ struct RendererImpl : public Renderer
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator())
 		, m_texture_manager(m_allocator)
-		, m_model_manager(m_allocator, *this)
+		, m_model_manager(m_allocator)
 		, m_material_manager(*this, m_allocator)
 		, m_shader_manager(*this, m_allocator)
 		, m_shader_binary_manager(*this, m_allocator)

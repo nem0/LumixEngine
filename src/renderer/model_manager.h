@@ -11,7 +11,7 @@ namespace Lumix
 	class LUMIX_RENDERER_API ModelManager : public ResourceManagerBase
 	{
 	public:
-		ModelManager(IAllocator& allocator, Renderer& renderer)
+		ModelManager(IAllocator& allocator)
 			: ResourceManagerBase(allocator)
 			, m_allocator(allocator)
 		{}

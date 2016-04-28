@@ -291,13 +291,13 @@ int Terrain::getGrassTypeDensity(int index) const
 void Terrain::setGrassTypeDistance(int index, float distance)
 {
 	forceGrassUpdate();
+	GrassType& type = *m_grass_types[index];
+	type.m_distance = Math::clamp(distance, 1.0f, FLT_MAX);
 	m_grass_distance = 0;
 	for (auto* type : m_grass_types)
 	{
-		m_grass_distance = Math::maximum(m_grass_distance, int(distance / GRASS_QUAD_RADIUS + 0.99f));
+		m_grass_distance = Math::maximum(m_grass_distance, int(type->m_distance / GRASS_QUAD_RADIUS + 0.99f));
 	}
-	GrassType& type = *m_grass_types[index];
-	type.m_distance = Math::clamp(distance, 1.0f, FLT_MAX);
 }
 
 

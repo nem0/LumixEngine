@@ -102,7 +102,7 @@ static bool isSkinned(const aiScene* scene, const aiMaterial* material)
 
 static const aiNode* getOwner(const aiNode* node, int mesh_index)
 {
-	for (int i = 0; i < (int)node->mNumMeshes; ++i)
+	for (unsigned int i = 0; i < (int)node->mNumMeshes; ++i)
 	{
 		if (node->mMeshes[i] == mesh_index) return node;
 	}
@@ -1051,7 +1051,6 @@ struct ConvertTask : public Lumix::MT::Task
 		static ConvertTask* that = nullptr;
 		that = this;
 		auto cmpMeshes = [](const void* a, const void* b) -> int {
-			auto scene = that->m_dialog.m_importers.back().GetScene();
 			auto a_mesh = static_cast<const ImportMesh*>(a);
 			auto b_mesh = static_cast<const ImportMesh*>(b);
 			return a_mesh->lod - b_mesh->lod;
@@ -1111,9 +1110,9 @@ struct ConvertTask : public Lumix::MT::Task
 			ASSERT(bone_index >= 0);
 			for (unsigned int k = 0; k < bone->mNumWeights; ++k)
 			{
-				int idx = mesh.map_from_input[bone->mWeights[k].mVertexId];
+				auto idx = mesh.map_from_input[bone->mWeights[k].mVertexId];
 				ASSERT(idx == bone->mWeights[k].mVertexId);
-				ASSERT(idx < mesh.map_to_input.size());
+				ASSERT(idx < (unsigned int)mesh.map_to_input.size());
 				auto& info = infos[idx];
 				addBoneInfluence(info, bone->mWeights[k].mWeight, bone_index);
 			}
@@ -2437,6 +2436,8 @@ static bool createBillboard(ImportAssetDialog& dialog,
 
 	auto light_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
 	auto light_cmp = render_scene->createComponent(Lumix::crc32("global_light"), light_entity);
+	render_scene->setGlobalLightIntensity(light_cmp, 0);
+	render_scene->setLightAmbientIntensity(light_cmp, 1);
 
 	while (engine.getFileSystem().hasWork()) engine.getFileSystem().updateAsyncTransactions();
 
