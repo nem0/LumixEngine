@@ -1755,7 +1755,8 @@ struct PipelineImpl : public Pipeline
 			bgfx::setUniform(m_cam_view_uniform, &view_matrix.m11);
 			bgfx::setUniform(m_cam_proj_uniform, &projection_matrix.m11);
 			bgfx::setUniform(m_cam_inv_view_uniform, &camera_matrix.m11);
-			bgfx::setUniform(m_cam_params, &Vec4(near_plane, far_plane, fov, ratio));
+			auto cam_params = Vec4(near_plane, far_plane, fov, ratio);
+			bgfx::setUniform(m_cam_params, &cam_params);
 		}
 
 		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
@@ -1880,7 +1881,8 @@ struct PipelineImpl : public Pipeline
 
 			for (int j = 0, c = material->getLayerCount(); j < c; ++j)
 			{
-				bgfx::setUniform(m_layer_uniform, &Vec4((j + 1) / (float)c, 0, 0, 0));
+				auto layer = Vec4((j + 1) / (float)c, 0, 0, 0);
+				bgfx::setUniform(m_layer_uniform, &layer);
 				bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.getCount());
 				executeCommandBuffer(material->getCommandBuffer(), material);
 				executeCommandBuffer(view.command_buffer.buffer, material);
@@ -1989,7 +1991,8 @@ struct PipelineImpl : public Pipeline
 				{
 					auto cmd = (SetUniformTimeCommand*)ip;
 					ip += sizeof(*cmd);
-					bgfx::setUniform(cmd->uniform, &Vec4(m_scene->getTime(), 0, 0, 0));
+					auto uniform_time = Vec4(m_scene->getTime(), 0, 0, 0);
+					bgfx::setUniform(cmd->uniform, &uniform_time);
 					break;
 				}
 				case BufferCommands::SET_UNIFORM_VEC4:
@@ -2132,7 +2135,8 @@ struct PipelineImpl : public Pipeline
 		auto& view = m_views[m_current_render_views[0]];
 		executeCommandBuffer(material->getCommandBuffer(), material);
 		executeCommandBuffer(view.command_buffer.buffer, material);
-		bgfx::setUniform(m_grass_max_dist_uniform, &Vec4(grass.type_distance, 0, 0, 0));
+		auto max_grass_distance = Vec4(grass.type_distance, 0, 0, 0);
+		bgfx::setUniform(m_grass_max_dist_uniform, &max_grass_distance);
 
 		bgfx::setVertexBuffer(grass.model->getVerticesHandle(),
 			mesh.attribute_array_offset / mesh.vertex_def.getStride(),

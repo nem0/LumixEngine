@@ -247,7 +247,7 @@ namespace {
 						continue;
 					}
 
-					if (ImGui::TreeNode((const void*)(intptr_t)clip_id, clip_info->name))
+					if (ImGui::TreeNode((const void*)(uintptr)clip_id, "%s", clip_info->name))
 					{
 						char buf[30];
 						Lumix::copyString(buf, Lumix::lengthOf(buf), clip_info->name);

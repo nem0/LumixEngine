@@ -260,7 +260,7 @@ static void uniform(lua_State* L, const char* name, const char* type)
 static void pass(lua_State* state, const char* name)
 {
 	auto* cmb = getCombinations(state);
-	copyString(cmb->m_passes[cmb->m_pass_count], name);
+	copyString(cmb->m_passes[cmb->m_pass_count].data, name);
 	cmb->m_vs_local_mask[cmb->m_pass_count] = 0;
 	cmb->m_fs_local_mask[cmb->m_pass_count] = 0;
 	++cmb->m_pass_count;

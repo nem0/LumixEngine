@@ -1,6 +1,7 @@
 #pragma once
 #include "engine/core/array.h"
 #include "engine/core/resource.h"
+#include "engine/core/string.h"
 #include <bgfx/bgfx.h>
 
 
@@ -47,7 +48,7 @@ struct LUMIX_RENDERER_API ShaderCombinations
 	ShaderCombinations();
 
 	typedef char Define[40];
-	typedef char Pass[20];
+	typedef StaticString<20> Pass;
 	typedef uint8 Defines[16];
 	typedef Pass Passes[32];
 

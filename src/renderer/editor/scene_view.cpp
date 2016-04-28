@@ -284,7 +284,7 @@ void SceneView::onGUI()
 			ImGui::LabelText("Instances", "%d", stats.instance_count);
 			char buf[30];
 			Lumix::toCStringPretty(stats.triangle_count, buf, Lumix::lengthOf(buf));
-			ImGui::LabelText("Triangles", buf);
+			ImGui::LabelText("Triangles", "%s", buf);
 			ImGui::LabelText("Resolution", "%dx%d", m_pipeline->getWidth(), m_pipeline->getHeight());
 			ImGui::LabelText("FPS", "%.2f", m_editor->getEngine().getFPS());
 			ImGui::LabelText("CPU time", "%.2f", m_pipeline->getCPUTime() * 1000.0f);
