@@ -378,8 +378,8 @@ struct ProfilerUIImpl : public ProfilerUI
 		Lumix::Array<float> m_frames;
 		struct Hit
 		{
-			Lumix::uint64 start;
-			Lumix::uint64 length;
+			unsigned long long start;
+			unsigned long long length;
 		};
 		Lumix::Array<Hit> m_hits;
 		Lumix::Array<int> m_int_values; // hit count in case of m_type == TIME

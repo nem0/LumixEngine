@@ -96,12 +96,12 @@ public:
 private:
 	union
 	{
-		struct Single
+		struct
 		{
 			Getter getter;
 			Setter setter;
 		} m_single;
-		struct Array
+		struct
 		{
 			ArrayGetter getter;
 			ArraySetter setter;
@@ -303,12 +303,12 @@ public:
 private:
 	union
 	{
-		struct Single
+		struct
 		{
 			Getter getter;
 			Setter setter;
 		} m_single;
-		struct Array
+		struct
 		{
 			ArrayGetter getter;
 			ArraySetter setter;
@@ -519,12 +519,12 @@ public:
 private:
 	union
 	{
-		struct Single
+		struct
 		{
 			Getter getter;
 			Setter setter;
 		} m_single;
-		struct Array
+		struct
 		{
 			ArrayGetter getter;
 			ArraySetter setter;

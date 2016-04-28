@@ -29,7 +29,7 @@ namespace Lumix
 
 static const int CELLS_PER_TILE_SIDE = 256;
 static const float CELL_SIZE = 0.3f;
-void registerLuaAPI(lua_State* L);
+static void registerLuaAPI(lua_State* L);
 
 
 struct NavigationSystem : public IPlugin
