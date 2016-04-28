@@ -374,7 +374,7 @@ namespace crnd
 
    const uint32 cIntBits = 32U;
 
-#ifdef _WIN64
+#if defined(_WIN64) || defined(__LP64__)
    typedef uint64 ptr_bits;
 #else
    typedef uint32 ptr_bits;
@@ -2526,7 +2526,7 @@ namespace crnd
          return NULL;
       }
 
-      CRND_ASSERT(((uint32)p_new & (CRND_MIN_ALLOC_ALIGNMENT - 1)) == 0);
+      CRND_ASSERT(((ptr_bits)p_new & (CRND_MIN_ALLOC_ALIGNMENT - 1)) == 0);
 
       return p_new;
    }
@@ -2551,7 +2551,7 @@ namespace crnd
       if (pActual_size)
          *pActual_size = actual_size;
 
-      CRND_ASSERT(((uint32)p_new & (CRND_MIN_ALLOC_ALIGNMENT - 1)) == 0);
+      CRND_ASSERT(((ptr_bits)p_new & (CRND_MIN_ALLOC_ALIGNMENT - 1)) == 0);
 
       return p_new;
    }
@@ -2819,15 +2819,15 @@ namespace crnd
          *pSize = 0;
 
       if ((!pData) || (data_size < cCRNHeaderMinSize))
-         return false;
+         return NULL;
 
       crn_header tmp_header;
       const crn_header* pHeader = crnd_get_header(tmp_header, pData, data_size);
       if (!pHeader)
-         return false;
+         return NULL;
 
       if (level_index >= pHeader->m_levels)
-         return false;
+         return NULL;
 
       uint32 cur_level_ofs = pHeader->m_level_ofs[level_index];
 
