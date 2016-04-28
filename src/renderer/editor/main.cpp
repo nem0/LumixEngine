@@ -280,7 +280,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 		{
 			if (material->isCustomFlag(1 << i))
 			{
-				ImGui::LabelText("Custom flag", Material::getCustomFlagName(i));
+				ImGui::LabelText("Custom flag", "%s", Material::getCustomFlagName(i));
 			}
 		}
 
@@ -464,7 +464,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 			ImGui::Columns(3);
 			for (int i = 0; i < model->getBoneCount(); ++i)
 			{
-				ImGui::Text(model->getBone(i).name.c_str());
+				ImGui::Text("%s", model->getBone(i).name.c_str());
 				ImGui::NextColumn();
 				auto pos = model->getBone(i).position;
 				ImGui::Text("%f; %f; %f", pos.x, pos.y, pos.z);
@@ -517,10 +517,10 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		for (int i = 0; i < model->getMeshCount(); ++i)
 		{
 			auto& mesh = model->getMesh(i);
-			if (ImGui::TreeNode(&mesh, mesh.name.length() > 0 ? mesh.name.c_str() : "N/A"))
+			if (ImGui::TreeNode(&mesh, "%s", mesh.name.length() > 0 ? mesh.name.c_str() : "N/A"))
 			{
 				ImGui::LabelText("Triangle count", "%d", mesh.indices_count / 3);
-				ImGui::LabelText("Material", mesh.material->getPath().c_str());
+				ImGui::LabelText("Material", "%s", mesh.material->getPath().c_str());
 				ImGui::SameLine();
 				if (ImGui::Button("->"))
 				{
@@ -664,9 +664,9 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 			for (int i = 0; i < shader->getTextureSlotCount(); ++i)
 			{
 				auto& slot = shader->getTextureSlot(i);
-				ImGui::Text(slot.m_name);
+				ImGui::Text("%s", slot.m_name);
 				ImGui::NextColumn();
-				ImGui::Text(slot.m_uniform);
+				ImGui::Text("%s", slot.m_uniform);
 				ImGui::NextColumn();
 			}
 			ImGui::Columns(1);
@@ -683,7 +683,7 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 			for(int i = 0; i < shader->getUniformCount(); ++i)
 			{
 				auto& uniform = shader->getUniform(i);
-				ImGui::Text(uniform.name);
+				ImGui::Text("%s", uniform.name);
 				ImGui::NextColumn();
 				switch(uniform.type)
 				{

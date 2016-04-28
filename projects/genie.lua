@@ -274,7 +274,13 @@ project "audio"
 	files { "../src/audio/**.h", "../src/audio/**.cpp", "../src/audio/**.c" }
 	includedirs { "../src", "../src/audio", "../external/bgfx/include" }
 	defines { "BUILDING_AUDIO" }
-	links { "engine", "dxguid", "editor" }
+	links { "engine", "editor" }
+
+	configuration "windows"
+		links { "dxguid" }
+	configuration "not windows"
+		excludes { "../src/audio/pc/*"}
+	configuration {}
 
 	useLua()
 	defaultConfigurations()

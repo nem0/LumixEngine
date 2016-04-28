@@ -42,7 +42,7 @@ private:
 			int m_int;
 			char m_string[Lumix::MAX_PATH_LENGTH];
 			
-			struct Raw
+			struct
 			{
 				void* memory;
 				size_t size;

@@ -7,6 +7,7 @@
 #include "engine/core/log.h"
 #include "engine/core/profiler.h"
 #include "engine/core/resource_manager.h"
+#include "engine/core/string.h"
 #include "engine/debug/debug.h"
 #include "engine/engine.h"
 #include "engine/property_descriptor.h"
@@ -735,15 +736,14 @@ struct RendererImpl : public Renderer
 	{
 		for (int i = 0; i < m_shader_defines.size(); ++i)
 		{
-			if (compareString(m_shader_defines[i], define) == 0)
+			if (m_shader_defines[i] == define)
 			{
 				ASSERT(i < 256);
 				return i;
 			}
 		}
 
-		auto& new_define = m_shader_defines.emplace();
-		copyString(new_define, define);
+		m_shader_defines.emplace(define);
 		return m_shader_defines.size() - 1;
 	}
 
@@ -752,14 +752,13 @@ struct RendererImpl : public Renderer
 	{
 		for (int i = 0; i < m_passes.size(); ++i)
 		{
-			if (compareString(m_passes[i], pass) == 0)
+			if (m_passes[i] == pass)
 			{
 				return i;
 			}
 		}
 
-		auto& new_pass = m_passes.emplace();
-		copyString(new_pass, pass);
+		m_passes.emplace(pass);
 		return m_passes.size() - 1;
 	}
 
@@ -814,7 +813,7 @@ struct RendererImpl : public Renderer
 	}
 
 
-	typedef char ShaderDefine[32];
+	using ShaderDefine = StaticString<32>;
 
 
 	Engine& m_engine;
