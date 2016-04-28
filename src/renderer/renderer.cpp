@@ -758,7 +758,7 @@ struct RendererImpl : public Renderer
 			}
 		}
 
-		auto& new_pass = m_passes.emplace(pass);
+		m_passes.emplace(pass);
 		return m_passes.size() - 1;
 	}
 
