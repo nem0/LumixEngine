@@ -1335,30 +1335,36 @@ struct ConvertTask : public Lumix::MT::Task
 		if (m_dialog.m_model.create_billboard_lod)
 		{
 			Lumix::Vec3 size = max - min;
-			float uvs[] = { 0.0f, 0.5f, 1.0f };
+			float u[] = { 0.0f, 0.5f, 1.0f };
+			float v[] = { 0.0f, 1.0f };
 			if (size.x + size.z < size.y)
 			{
 				int width = int(TEXTURE_SIZE / size.y * (size.x + size.z));
 				int ceiled = ceilPowOf2(width);
 				int diff = ceiled - width;
-				uvs[0] = diff * 0.5f / float(ceiled);
-				uvs[2] = 1 - uvs[0];
-				uvs[1] = uvs[0] + size.x / (size.x + size.z) * (1 - 2 * uvs[0]);
+				u[0] = diff * 0.5f / float(ceiled);
+				u[2] = 1 - u[0];
+				u[1] = u[0] + size.x / (size.x + size.z) * (1 - 2 * u[0]);
 			}
 			else
 			{
-				uvs[1] = size.x / (size.x + size.z);
+				u[1] = size.x / (size.x + size.z);
+				
+				float t = size.y / (size.x + size.z);
+
+				v[0] = 0.5f - t * 0.5f;
+				v[1] = 0.5f + t * 0.5f;
 			}
 			BillboardVertex vertices[8] = {
-				{ { min.x, min.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[0], 1 } },
-				{ { max.x, min.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[1], 1 } },
-				{ { max.x, max.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[1], 0 } },
-				{ { min.x, max.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[0], 0 } },
+				{ { min.x, min.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { u[0], v[1] } },
+				{ { max.x, min.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { u[1], v[1] } },
+				{ { max.x, max.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { u[1], v[0] } },
+				{ { min.x, max.y, 0 }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { u[0], v[0] } },
 
-				{ { 0, min.y, min.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[1], 1 } },
-				{ { 0, min.y, max.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[2], 1 } },
-				{ { 0, max.y, max.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[2], 0 } },
-				{ { 0, max.y, min.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { uvs[1], 0 } }
+				{ { 0, min.y, min.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { u[1], v[1] } },
+				{ { 0, min.y, max.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { u[2], v[1] } },
+				{ { 0, max.y, max.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { u[2], v[0] } },
+				{ { 0, max.y, min.z }, { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { u[1], v[0] } }
 			};
 			file.write(vertices, sizeof(vertices));
 		} 
