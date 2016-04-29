@@ -3,6 +3,7 @@
 #include "engine/core/fs/file_system.h"
 #include "engine/core/fs/os_file.h"
 #include "engine/core/path.h"
+#include "engine/core/path_utils.h"
 #include "engine/core/string.h"
 
 
@@ -107,7 +108,7 @@ namespace Lumix
 			: m_allocator(allocator)
 		{
 			copyString(m_name, name);
-			copyString(m_base_path, base_path);
+			PathUtils::normalize(base_path, m_base_path, Lumix::lengthOf(m_base_path));
 			if (m_base_path[0] != '\0') catString(m_base_path, "/");
 		}
 
