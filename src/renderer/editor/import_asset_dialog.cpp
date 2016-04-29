@@ -966,7 +966,7 @@ struct ConvertTask : public Lumix::MT::Task
 		if (m_dialog.m_model.create_billboard_lod)
 		{
 			Lumix::FS::OsFile file;
-			PathBuilder output_material_name(m_dialog.m_output_dir, "/billboard.mat");
+			PathBuilder output_material_name(m_dialog.m_output_dir, "/", m_dialog.m_output_filename, "_billboard.mat");
 			if (!file.open(output_material_name, Lumix::FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
 			{
 				m_dialog.setMessage(
@@ -982,14 +982,14 @@ struct ConvertTask : public Lumix::MT::Task
 				char from_root_path[Lumix::MAX_PATH_LENGTH];
 				getRelativePath(
 					m_dialog.m_editor, from_root_path, Lumix::lengthOf(from_root_path), m_dialog.m_texture_output_dir);
-				PathBuilder texture_path(from_root_path, "billboard.dds");
+				PathBuilder texture_path(from_root_path, m_dialog.m_output_filename, "_billboard.dds");
 				Lumix::copyFile("models/utils/cube/default.dds", texture_path);
 				file << "/" << texture_path;
 			}
 			else
 			{
 				file << "billboard.dds";
-				PathBuilder texture_path(m_dialog.m_output_dir, "/billboard.dds");
+				PathBuilder texture_path(m_dialog.m_output_dir, "/", m_dialog.m_output_filename, "_billboard.dds");
 				Lumix::copyFile("models/utils/cube/default.dds", texture_path);
 			}
 
@@ -1429,7 +1429,7 @@ struct ConvertTask : public Lumix::MT::Task
 		if (!m_dialog.m_model.create_billboard_lod) return;
 
 		int vertex_size = sizeof(BillboardVertex);
-		const char* material_name = "billboard";
+		Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 10> material_name(m_dialog.m_output_filename, "_billboard");
 		Lumix::int32 length = Lumix::stringLength(material_name);
 		file.write((const char*)&length, sizeof(length));
 		file.write(material_name, length);
@@ -2726,12 +2726,12 @@ int ImportAssetDialog::importAsset(lua_State* L)
 		{
 			char from_root_path[Lumix::MAX_PATH_LENGTH];
 			getRelativePath(m_editor, from_root_path, Lumix::lengthOf(from_root_path), m_texture_output_dir);
-			PathBuilder texture_path(from_root_path, "billboard.dds");
+			PathBuilder texture_path(from_root_path, m_output_filename, "_billboard.dds");
 			createBillboard(*this, Lumix::Path(mesh_path), Lumix::Path(texture_path), TEXTURE_SIZE);
 		}
 		else
 		{
-			PathBuilder texture_path(m_output_dir, "/billboard.dds");
+			PathBuilder texture_path(m_output_dir, "/", m_output_filename, " _billboard.dds");
 			createBillboard(*this, Lumix::Path(mesh_path), Lumix::Path(texture_path), TEXTURE_SIZE);
 		}
 	}
