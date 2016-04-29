@@ -308,7 +308,22 @@ static void getRelativePath(Lumix::WorldEditor& editor, char* relative_path, int
 	}
 	else
 	{
-		Lumix::copyString(relative_path, max_length, tmp);
+		const char* base_path = editor.getEngine().getPatchFileDevice()->getBasePath();
+		if (Lumix::compareStringN(base_path, tmp, Lumix::stringLength(base_path)) == 0)
+		{
+			int base_path_length = Lumix::stringLength(base_path);
+			const char* rel_path_start = tmp + base_path_length;
+			if (rel_path_start[0] == '/')
+			{
+				++rel_path_start;
+			}
+			Lumix::copyString(relative_path, max_length, rel_path_start);
+		}
+		else
+		{
+			Lumix::copyString(relative_path, max_length, tmp);
+		}
+
 	}
 }
 
@@ -366,7 +381,6 @@ static bool saveAsRaw(ImportAssetDialog& dialog,
 
 
 static bool saveAsDDS(ImportAssetDialog& dialog,
-	Lumix::FS::FileSystem& fs,
 	const char* source_path,
 	const Lumix::uint8* image_data,
 	int image_width,
@@ -492,7 +506,6 @@ struct ImportTextureTask : public Lumix::MT::Task
 			m_dialog.setImportMessage("Converting to DDS...", 0);
 
 			saveAsDDS(m_dialog,
-				m_dialog.m_editor.getEngine().getFileSystem(),
 				m_dialog.m_source,
 				data,
 				image_width,
@@ -730,7 +743,6 @@ struct ConvertTask : public Lumix::MT::Task
 			}
 
 			if (!saveAsDDS(m_dialog,
-					m_dialog.m_editor.getEngine().getFileSystem(),
 					texture.src,
 					data,
 					image_width,
@@ -982,9 +994,10 @@ struct ConvertTask : public Lumix::MT::Task
 				char from_root_path[Lumix::MAX_PATH_LENGTH];
 				getRelativePath(
 					m_dialog.m_editor, from_root_path, Lumix::lengthOf(from_root_path), m_dialog.m_texture_output_dir);
-				PathBuilder texture_path(from_root_path, m_dialog.m_output_filename, "_billboard.dds");
+				PathBuilder relative_texture_path(from_root_path, m_dialog.m_output_filename, "_billboard.dds");
+				PathBuilder texture_path(m_dialog.m_texture_output_dir, m_dialog.m_output_filename, "_billboard.dds");
 				Lumix::copyFile("models/utils/cube/default.dds", texture_path);
-				file << "/" << texture_path;
+				file << "/" << relative_texture_path;
 			}
 			else
 			{
@@ -2497,7 +2510,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	bgfx::frame(); // wait for gpu
 
 	preprocessBillboard((Lumix::uint32*)&data[0], width, height, engine.getAllocator());
-	saveAsDDS(dialog, engine.getFileSystem(), "billboard_generator", (Lumix::uint8*)&data[0], width, height, true, out_path.c_str());
+	saveAsDDS(dialog, "billboard_generator", (Lumix::uint8*)&data[0], width, height, true, out_path.c_str());
 	bgfx::destroyTexture(texture);
 	Lumix::Pipeline::destroy(pipeline);
 	engine.destroyUniverse(universe);
@@ -2724,9 +2737,7 @@ int ImportAssetDialog::importAsset(lua_State* L)
 
 		if (m_texture_output_dir[0])
 		{
-			char from_root_path[Lumix::MAX_PATH_LENGTH];
-			getRelativePath(m_editor, from_root_path, Lumix::lengthOf(from_root_path), m_texture_output_dir);
-			PathBuilder texture_path(from_root_path, m_output_filename, "_billboard.dds");
+			PathBuilder texture_path(m_texture_output_dir, m_output_filename, "_billboard.dds");
 			createBillboard(*this, Lumix::Path(mesh_path), Lumix::Path(texture_path), TEXTURE_SIZE);
 		}
 		else
