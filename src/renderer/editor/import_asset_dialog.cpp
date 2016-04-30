@@ -1992,9 +1992,9 @@ static bool isImage(const char* path)
 }
 
 
-void ImportAssetDialog::checkSource()
+bool ImportAssetDialog::checkSource()
 {
-	if (!PlatformInterface::fileExists(m_source)) return;
+	if (!PlatformInterface::fileExists(m_source)) return false;
 	if (m_output_dir[0] == '\0') Lumix::PathUtils::getDir(m_output_dir, sizeof(m_output_dir), m_source);
 	if (m_output_filename[0] == '\0') Lumix::PathUtils::getBasename(m_output_filename, sizeof(m_output_filename), m_source);
 
@@ -2003,7 +2003,7 @@ void ImportAssetDialog::checkSource()
 		m_materials.clear();
 		m_meshes.clear();
 		m_importers.clear();
-		return;
+		return true;
 	}
 
 	m_import_animations = false;
@@ -2016,6 +2016,7 @@ void ImportAssetDialog::checkSource()
 	m_task = LUMIX_NEW(m_editor.getAllocator(), ImportTask)(*this);
 	m_task->create("ImportAssetTask");
 	m_task->run();
+	return true;
 }
 
 
@@ -2635,7 +2636,12 @@ int ImportAssetDialog::importAsset(lua_State* L)
 			lua_pop(L, 1); // "src"
 
 			int meshes_count = m_meshes.size();
-			checkSource();
+			if (!checkSource())
+			{
+				lua_pop(L, 1); // inputs table item
+				Lumix::g_log_error.log("Editor") << "Could not import \"" << m_source << "\"";
+				continue;
+			}
 			if (m_is_importing) checkTask(true);
 
 			if (lua_getfield(L, -1, "lod") == LUA_TNUMBER)
@@ -2727,6 +2733,12 @@ int ImportAssetDialog::importAsset(lua_State* L)
 		}
 	}
 	lua_pop(L, 1);
+	if (m_importers.empty())
+	{
+		Lumix::g_log_error.log("Editor") << "Nothing to import";
+		return 0;
+	}
+
 	convert(false);
 	if (m_is_converting) checkTask(true);
 

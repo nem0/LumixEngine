@@ -107,7 +107,7 @@ class ImportAssetDialog : public StudioApp::IPlugin
 		bool m_is_opened;
 
 	private:
-		void checkSource();
+		bool checkSource();
 		void checkTask(bool wait);
 		void convert(bool use_ui);
 		void getMessage(char* msg, int max_size);
