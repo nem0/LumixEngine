@@ -2,7 +2,7 @@
 #include "engine/core/iallocator.h"
 #include "engine/core/timer.h"
 
-#include "engine/core/pc/simple_win.h"
+#include "engine/core/win/simple_win.h"
 
 namespace Lumix
 {
