@@ -223,7 +223,10 @@ namespace Lumix
 				char path[MAX_PATH_LENGTH];
 				serializer.readString(path, sizeof(path));
 				m_animables[i].animation = path[0] == '\0' ? nullptr : loadAnimation(Path(path));
-				m_universe.addComponent(m_animables[i].entity, ANIMABLE_HASH, this, i);
+				if ((m_animables[i].flags & Animable::FREE) == 0)
+				{
+					m_universe.addComponent(m_animables[i].entity, ANIMABLE_HASH, this, i);
+				}
 			}
 		}
 
