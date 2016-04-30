@@ -1,7 +1,7 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
 #include "engine/core/log.h"
-#include "engine/core/pc/simple_win.h"
+#include "engine/core/win/simple_win.h"
 #include <cstdio>
 
 
