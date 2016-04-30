@@ -215,7 +215,7 @@ project "engine"
 	configuration "not macosx"
 		excludes { "../src/engine/**/osx/*"}
 	configuration "not windows"
-		excludes { "../src/engine/**/pc/*"}
+		excludes { "../src/engine/**/win/*"}
 	configuration {}
 
 	linkLib("lua")
@@ -279,7 +279,7 @@ project "audio"
 	configuration "windows"
 		links { "dxguid" }
 	configuration "not windows"
-		excludes { "../src/audio/pc/*"}
+		excludes { "../src/audio/win/*"}
 	configuration {}
 
 	useLua()
@@ -375,7 +375,7 @@ project "editor"
 	configuration {}
 
 	configuration "not windows"
-		excludes { "../src/editor/pc/*"}
+		excludes { "../src/editor/win/*"}
 	configuration {}
 
 	useLua()
