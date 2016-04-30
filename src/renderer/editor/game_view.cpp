@@ -129,7 +129,7 @@ void GameView::onGui()
 				}
 			}
 			ImGui::SameLine();
-			if (ImGui::DragFloat("m_time_multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f))
+			if (ImGui::DragFloat("Time multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f))
 			{
 				m_editor->getEngine().setTimeMultiplier(m_time_multiplier);
 			}
