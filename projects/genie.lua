@@ -1,4 +1,4 @@
-local ide_dir = iif(_ACTION == nil, "vs2013", _ACTION)
+local ide_dir = iif(_ACTION == nil, "vs2015", _ACTION)
 local LOCATION = "tmp/" .. ide_dir
 local BINARY_DIR = LOCATION .. "/bin/"
 
@@ -11,7 +11,7 @@ newaction {
 	trigger = "install",
 	description = "Install in ../../LumixEngine_data/bin",
 	execute = function()
-		local src_dir = "tmp/vs2013/bin/RelWithDebInfo/"
+		local src_dir = "tmp/vs2015/bin/RelWithDebInfo/"
 		local dst_dir = "../../LumixEngine_data/bin/"
 		
 		function installDll(filename)
@@ -49,7 +49,7 @@ newaction {
 	trigger = "install32",
 	description = "Install 32bit in ../../LumixEngine_data/bin32",
 	execute = function()
-		local src_dir = "tmp/vs2013/bin/RelWithDebInfo/"
+		local src_dir = "tmp/vs2015/bin/RelWithDebInfo/"
 		local dst_dir = "../../LumixEngine_data/bin32/"
 		
 		function installDll(filename)
