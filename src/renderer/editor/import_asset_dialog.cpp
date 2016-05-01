@@ -1462,14 +1462,6 @@ struct ConvertTask : public Lumix::MT::Task
 
 		file.write((const char*)&length, sizeof(length));
 		file.write(mesh_name, length);
-
-		Lumix::int32 attribute_count = 4;
-		file.write((const char*)&attribute_count, sizeof(attribute_count));
-
-		writeAttribute("in_position", VertexAttributeDef::POSITION, file);
-		writeAttribute("in_normal", VertexAttributeDef::BYTE4, file);
-		writeAttribute("in_tangents", VertexAttributeDef::BYTE4, file);
-		writeAttribute("in_tex_coords", VertexAttributeDef::FLOAT2, file);
 	}
 
 
@@ -1511,35 +1503,16 @@ struct ConvertTask : public Lumix::MT::Task
 
 			file.write((const char*)&length, sizeof(length));
 			file.write((const char*)mesh_name.C_Str(), length);
-
-			Lumix::int32 attribute_count = getAttributeCount(mesh.mesh);
-			file.write((const char*)&attribute_count, sizeof(attribute_count));
-
-			if (isSkinned(mesh.mesh))
-			{
-				writeAttribute("in_weights", VertexAttributeDef::FLOAT4, file);
-				writeAttribute("in_indices", VertexAttributeDef::SHORT4, file);
-			}
-
-			writeAttribute("in_position", VertexAttributeDef::POSITION, file);
-			if (mesh.mesh->mColors[0]) writeAttribute("in_colors", VertexAttributeDef::BYTE4, file);
-			writeAttribute("in_normal", VertexAttributeDef::BYTE4, file);
-			if (mesh.mesh->mTangents) writeAttribute("in_tangents", VertexAttributeDef::BYTE4, file);
-			if (mesh.mesh->mTextureCoords[0]) writeAttribute("in_tex_coords", VertexAttributeDef::FLOAT2, file);
 		}
 
 		writeBillboardMesh(file, attribute_array_offset, indices_offset);
 	}
 
 
-	static void writeAttribute(const char* attribute_name, VertexAttributeDef attribute_type, Lumix::FS::OsFile& file)
+	static void writeAttribute(bgfx::Attrib::Enum attrib, Lumix::FS::OsFile& file)
 	{
-		Lumix::uint32 length = Lumix::stringLength(attribute_name);
-		file.write((const char*)&length, sizeof(length));
-		file.write(attribute_name, length);
-
-		Lumix::uint32 type = (Lumix::uint32)attribute_type;
-		file.write((const char*)&type, sizeof(type));
+		Lumix::int32 tmp = attrib;
+		file.write(&tmp, sizeof(tmp));
 	}
 
 
@@ -1858,6 +1831,30 @@ struct ConvertTask : public Lumix::MT::Task
 		file.write((const char*)&header, sizeof(header));
 		Lumix::uint32 flags = areIndices16Bit() ? (Lumix::uint32)Lumix::Model::Flags::INDICES_16BIT : 0;
 		file.write((const char*)&flags, sizeof(flags));
+
+		const aiMesh* mesh = nullptr;
+		for (const auto& i : m_dialog.m_meshes)
+		{
+			if (i.import)
+			{
+				mesh = i.mesh;
+				break;
+			}
+		}
+		Lumix::int32 attribute_count = getAttributeCount(mesh);
+		file.write((const char*)&attribute_count, sizeof(attribute_count));
+
+		if (isSkinned(mesh))
+		{
+			writeAttribute(bgfx::Attrib::Weight, file);
+			writeAttribute(bgfx::Attrib::Indices, file);
+		}
+
+		writeAttribute(bgfx::Attrib::Position, file);
+		if (mesh->mColors[0]) writeAttribute(bgfx::Attrib::Color0, file);
+		writeAttribute(bgfx::Attrib::Normal, file);
+		if (mesh->mTangents) writeAttribute(bgfx::Attrib::Tangent, file);
+		if (mesh->mTextureCoords[0]) writeAttribute(bgfx::Attrib::TexCoord0, file);
 	}
 
 
