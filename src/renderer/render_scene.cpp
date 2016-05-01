@@ -3221,12 +3221,7 @@ public:
 					r.meshes[i].material = src.material;
 				}
 				r.meshes[i].set(
-					src.vertex_def,
-					src.attribute_array_offset,
-					src.attribute_array_size,
-					src.indices_offset,
-					src.indices_count
-					);
+					src.attribute_array_offset, src.attribute_array_size, src.indices_offset, src.indices_count);
 			}
 		}
 		else
@@ -3323,8 +3318,7 @@ public:
 
 		for (int i = r.mesh_count; i < count; ++i)
 		{
-			new (NewPlaceholder(), new_meshes + i)
-				Mesh(m_renderer.getBasicVertexDecl(), nullptr, 0, 0, 0, 0, "", m_allocator);
+			new (NewPlaceholder(), new_meshes + i) Mesh(nullptr, 0, 0, 0, 0, "", m_allocator);
 		}
 		r.meshes = new_meshes;
 		r.mesh_count = count;

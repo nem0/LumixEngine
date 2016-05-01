@@ -22,16 +22,14 @@ namespace Lumix
 {
 
 
-Mesh::Mesh(const bgfx::VertexDecl& def,
-		   Material* mat,
-		   int attribute_array_offset,
-		   int attribute_array_size,
-		   int indices_offset,
-		   int index_count,
-		   const char* name,
-		   IAllocator& allocator)
+Mesh::Mesh(Material* mat,
+	int attribute_array_offset,
+	int attribute_array_size,
+	int indices_offset,
+	int index_count,
+	const char* name,
+	IAllocator& allocator)
 	: name(name, allocator)
-	, vertex_def(def)
 {
 	this->material = mat;
 	this->attribute_array_offset = attribute_array_offset;
@@ -42,13 +40,8 @@ Mesh::Mesh(const bgfx::VertexDecl& def,
 }
 
 
-void Mesh::set(const bgfx::VertexDecl& def,
-	int attribute_array_offset,
-	int attribute_array_size,
-	int indices_offset,
-	int index_count)
+void Mesh::set(int attribute_array_offset, int attribute_array_size, int indices_offset, int index_count)
 {
-	this->vertex_def = def;
 	this->attribute_array_offset = attribute_array_offset;
 	this->attribute_array_size = attribute_array_size;
 	this->indices_offset = indices_offset;
@@ -119,38 +112,25 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 			}
 			Vec3 normal = crossProduct(p1 - p0, p2 - p0);
 			float q = dotProduct(normal, local_dir);
-			if (q == 0)
-			{
-				continue;
-			}
+			if (q == 0)	continue;
+
 			float d = -dotProduct(normal, p0);
 			float t = -(dotProduct(normal, local_origin) + d) / q;
-			if (t < 0)
-			{
-				continue;
-			}
+			if (t < 0) continue;
+
 			Vec3 hit_point = local_origin + local_dir * t;
 
 			Vec3 edge0 = p1 - p0;
 			Vec3 VP0 = hit_point - p0;
-			if (dotProduct(normal, crossProduct(edge0, VP0)) < 0)
-			{
-				continue;
-			}
+			if (dotProduct(normal, crossProduct(edge0, VP0)) < 0) continue;
 
 			Vec3 edge1 = p2 - p1;
 			Vec3 VP1 = hit_point - p1;
-			if (dotProduct(normal, crossProduct(edge1, VP1)) < 0)
-			{
-				continue;
-			}
+			if (dotProduct(normal, crossProduct(edge1, VP1)) < 0) continue;
 
 			Vec3 edge2 = p0 - p2;
 			Vec3 VP2 = hit_point - p2;
-			if (dotProduct(normal, crossProduct(edge2, VP2)) < 0)
-			{
-				continue;
-			}
+			if (dotProduct(normal, crossProduct(edge2, VP2)) < 0) continue;
 
 			if (!hit.m_is_hit || hit.m_t > t)
 			{
@@ -159,8 +139,7 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 				hit.m_mesh = &m_meshes[mesh_index];
 			}
 		}
-		vertex_offset += m_meshes[mesh_index].attribute_array_size /
-						 m_meshes[mesh_index].vertex_def.getStride();
+		vertex_offset += m_meshes[mesh_index].attribute_array_size / m_vertex_decl.getStride();
 	}
 	hit.m_origin = origin;
 	hit.m_dir = dir;
@@ -193,9 +172,9 @@ void Model::getPose(Pose& pose)
 }
 
 
-bool Model::parseVertexDef(FS::IFile& file, bgfx::VertexDecl* vertex_definition)
+bool Model::parseVertexDecl(FS::IFile& file, bgfx::VertexDecl* vertex_decl)
 {
-	vertex_definition->begin();
+	vertex_decl->begin();
 
 	uint32 attribute_count;
 	file.read(&attribute_count, sizeof(attribute_count));
@@ -214,31 +193,31 @@ bool Model::parseVertexDef(FS::IFile& file, bgfx::VertexDecl* vertex_definition)
 
 		if (compareString(tmp, "in_position") == 0)
 		{
-			vertex_definition->add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float);
+			vertex_decl->add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float);
 		}
 		else if (compareString(tmp, "in_colors") == 0)
 		{
-			vertex_definition->add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true, false);
+			vertex_decl->add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true, false);
 		}
 		else if (compareString(tmp, "in_tex_coords") == 0)
 		{
-			vertex_definition->add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float);
+			vertex_decl->add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float);
 		}
 		else if (compareString(tmp, "in_normal") == 0)
 		{
-			vertex_definition->add(bgfx::Attrib::Normal, 4, bgfx::AttribType::Uint8, true, true);
+			vertex_decl->add(bgfx::Attrib::Normal, 4, bgfx::AttribType::Uint8, true, true);
 		}
 		else if (compareString(tmp, "in_tangents") == 0)
 		{
-			vertex_definition->add(bgfx::Attrib::Tangent, 4, bgfx::AttribType::Uint8, true, true);
+			vertex_decl->add(bgfx::Attrib::Tangent, 4, bgfx::AttribType::Uint8, true, true);
 		}
 		else if (compareString(tmp, "in_weights") == 0)
 		{
-			vertex_definition->add(bgfx::Attrib::Weight, 4, bgfx::AttribType::Float);
+			vertex_decl->add(bgfx::Attrib::Weight, 4, bgfx::AttribType::Float);
 		}
 		else if (compareString(tmp, "in_indices") == 0)
 		{
-			vertex_definition->add(bgfx::Attrib::Indices, 4, bgfx::AttribType::Int16, false, true);
+			vertex_decl->add(bgfx::Attrib::Indices, 4, bgfx::AttribType::Int16, false, true);
 		}
 		else
 		{
@@ -250,34 +229,79 @@ bool Model::parseVertexDef(FS::IFile& file, bgfx::VertexDecl* vertex_definition)
 		file.read(&type, sizeof(type));
 	}
 
-	vertex_definition->end();
+	vertex_decl->end();
 	return true;
 }
 
 
-void Model::create(const bgfx::VertexDecl& def,
-				   Material* material,
-				   const int* indices_data,
-				   int indices_size,
-				   const void* attributes_data,
-				   int attributes_size)
+bool Model::parseVertexDeclEx(FS::IFile& file, bgfx::VertexDecl* vertex_decl)
+{
+	vertex_decl->begin();
+
+	uint32 attribute_count;
+	file.read(&attribute_count, sizeof(attribute_count));
+
+	for (uint32 i = 0; i < attribute_count; ++i)
+	{
+		int32 attr;
+		file.read(&attr, sizeof(attr));
+
+		if (attr == bgfx::Attrib::Position)
+		{
+			vertex_decl->add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float);
+		}
+		else if (attr == bgfx::Attrib::Color0)
+		{
+			vertex_decl->add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true, false);
+		}
+		else if (attr == bgfx::Attrib::TexCoord0)
+		{
+			vertex_decl->add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float);
+		}
+		else if (attr == bgfx::Attrib::Normal)
+		{
+			vertex_decl->add(bgfx::Attrib::Normal, 4, bgfx::AttribType::Uint8, true, true);
+		}
+		else if (attr == bgfx::Attrib::Tangent)
+		{
+			vertex_decl->add(bgfx::Attrib::Tangent, 4, bgfx::AttribType::Uint8, true, true);
+		}
+		else if (attr == bgfx::Attrib::Weight)
+		{
+			vertex_decl->add(bgfx::Attrib::Weight, 4, bgfx::AttribType::Float);
+		}
+		else if (attr == bgfx::Attrib::Indices)
+		{
+			vertex_decl->add(bgfx::Attrib::Indices, 4, bgfx::AttribType::Int16, false, true);
+		}
+		else
+		{
+			ASSERT(false);
+			return false;
+		}
+	}
+
+	vertex_decl->end();
+	return true;
+}
+
+
+void Model::create(const bgfx::VertexDecl& vertex_decl,
+	Material* material,
+	const int* indices_data,
+	int indices_size,
+	const void* attributes_data,
+	int attributes_size)
 {
 	ASSERT(!bgfx::isValid(m_vertices_handle));
-	m_vertices_handle = bgfx::createVertexBuffer(bgfx::copy(attributes_data, attributes_size), def);
+	m_vertex_decl = vertex_decl;
+	m_vertices_handle = bgfx::createVertexBuffer(bgfx::copy(attributes_data, attributes_size), vertex_decl);
 	m_vertices_size = attributes_size;
 
 	ASSERT(!bgfx::isValid(m_indices_handle));
 	auto* mem = bgfx::copy(indices_data, indices_size);
 	m_indices_handle = bgfx::createIndexBuffer(mem, BGFX_BUFFER_INDEX32);
-
-	m_meshes.emplace(def,
-					 material,
-					 0,
-					 attributes_size,
-					 0,
-					 indices_size / int(sizeof(int)),
-					 "default",
-					 m_allocator);
+	m_meshes.emplace(material, 0, attributes_size, 0, indices_size / int(sizeof(int)), "default", m_allocator);
 
 	Model::LOD lod;
 	lod.distance = FLT_MAX;
@@ -288,7 +312,7 @@ void Model::create(const bgfx::VertexDecl& def,
 	m_indices.resize(indices_size);
 	copyMemory(&m_indices[0], indices_data, indices_size);
 
-	m_vertices.resize(attributes_size / def.getStride());
+	m_vertices.resize(attributes_size / vertex_decl.getStride());
 	computeRuntimeData((const uint8*)attributes_data);
 
 	onCreated(State::READY);
@@ -302,16 +326,16 @@ void Model::computeRuntimeData(const uint8* vertices)
 	Vec3 min_vertex(0, 0, 0);
 	Vec3 max_vertex(0, 0, 0);
 
+	int vertex_size = m_vertex_decl.getStride();
+	int position_attribute_offset = m_vertex_decl.getOffset(bgfx::Attrib::Position);
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
-		int mesh_vertex_count = m_meshes[i].attribute_array_size / m_meshes[i].vertex_def.getStride();
+		int mesh_vertex_count = m_meshes[i].attribute_array_size / m_vertex_decl.getStride();
 		int mesh_attributes_array_offset = m_meshes[i].attribute_array_offset;
-		int mesh_vertex_size = m_meshes[i].vertex_def.getStride();
-		int mesh_position_attribute_offset = m_meshes[i].vertex_def.getOffset(bgfx::Attrib::Position);
 		for (int j = 0; j < mesh_vertex_count; ++j)
 		{
-			m_vertices[index] = *(const Vec3*)&vertices[mesh_attributes_array_offset + j * mesh_vertex_size +
-														mesh_position_attribute_offset];
+			m_vertices[index] =
+				*(const Vec3*)&vertices[mesh_attributes_array_offset + j * vertex_size + position_attribute_offset];
 			bounding_radius_squared = Math::maximum(bounding_radius_squared,
 				dotProduct(m_vertices[index], m_vertices[index]) > 0 ? m_vertices[index].squaredLength() : 0);
 			min_vertex.x = Math::minimum(min_vertex.x, m_vertices[index].x);
@@ -346,7 +370,7 @@ bool Model::parseGeometry(FS::IFile& file)
 	ASSERT(!bgfx::isValid(m_vertices_handle));
 	const bgfx::Memory* vertices_mem = bgfx::alloc(vertices_size);
 	file.read(vertices_mem->data, vertices_size);
-	m_vertices_handle = bgfx::createVertexBuffer(vertices_mem, m_meshes[0].vertex_def);
+	m_vertices_handle = bgfx::createVertexBuffer(vertices_mem, m_vertex_decl);
 	m_vertices_size = vertices_size;
 
 	ASSERT(!bgfx::isValid(m_indices_handle));
@@ -357,7 +381,7 @@ bool Model::parseGeometry(FS::IFile& file)
 	int vertex_count = 0;
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
-		vertex_count += m_meshes[i].attribute_array_size / m_meshes[i].vertex_def.getStride();
+		vertex_count += m_meshes[i].attribute_array_size / m_vertex_decl.getStride();
 	}
 	m_vertices.resize(vertex_count);
 
@@ -454,7 +478,7 @@ int Model::getBoneIdx(const char* name)
 	return -1;
 }
 
-bool Model::parseMeshes(FS::IFile& file)
+bool Model::parseMeshes(FS::IFile& file, FileVersion version)
 {
 	int object_count = 0;
 	file.read(&object_count, sizeof(object_count));
@@ -501,10 +525,19 @@ bool Model::parseMeshes(FS::IFile& file)
 		mesh_name[str_size] = 0;
 		file.read(mesh_name, str_size);
 
-		bgfx::VertexDecl def;
-		parseVertexDef(file, &def);
-		m_meshes.emplace(def,
-						 material,
+		if (version <= FileVersion::SINGLE_VERTEX_DECL)
+		{
+			bgfx::VertexDecl vertex_decl;
+			parseVertexDecl(file, &vertex_decl);
+			if (i != 0 && m_vertex_decl.m_hash != vertex_decl.m_hash)
+			{
+				g_log_error.log("Renderer") << "Model " << getPath().c_str()
+					<< " contains meshes with different vertex declarations.";
+			}
+			if(i == 0) m_vertex_decl = vertex_decl;
+		}
+
+		m_meshes.emplace(material,
 						 attribute_array_offset,
 						 attribute_array_size,
 						 indices_offset,
@@ -559,7 +592,9 @@ bool Model::load(FS::IFile& file)
 		file.read(&m_flags, sizeof(m_flags));
 	}
 
-	if (parseMeshes(file) && parseGeometry(file) && parseBones(file) && parseLODs(file))
+	if (header.version > (uint32)FileVersion::SINGLE_VERTEX_DECL) parseVertexDeclEx(file, &m_vertex_decl);
+
+	if (parseMeshes(file, (FileVersion)header.version) && parseGeometry(file) && parseBones(file) && parseLODs(file))
 	{
 		m_size = file.size();
 		return true;

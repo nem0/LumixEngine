@@ -659,7 +659,7 @@ struct PipelineImpl : public Pipeline
 		Mesh& mesh = *data.mesh;
 		const Model& model = *data.model;
 		Material* material = mesh.material;
-		const uint16 stride = mesh.vertex_def.getStride();
+		const uint16 stride = model.getVertexDecl().getStride();
 
 		auto& view = m_views[m_current_render_views[0]];
 
@@ -1874,6 +1874,7 @@ struct PipelineImpl : public Pipeline
 			bone_mtx[bone_index] = bone_mtx[bone_index] * bone.inv_bind_matrix;
 		}
 
+		int stride = model.getVertexDecl().getStride();
 		for (int i = 0; i < m_current_render_view_count; ++i)
 		{
 			auto& view = m_views[m_current_render_views[i]];
@@ -1889,10 +1890,9 @@ struct PipelineImpl : public Pipeline
 
 				bgfx::setTransform(&renderable.matrix);
 				bgfx::setVertexBuffer(renderable.model->getVerticesHandle(),
-					mesh.attribute_array_offset / mesh.vertex_def.getStride(),
-					mesh.attribute_array_size / mesh.vertex_def.getStride());
-				bgfx::setIndexBuffer(
-					renderable.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
+					mesh.attribute_array_offset / stride,
+					mesh.attribute_array_size / stride);
+				bgfx::setIndexBuffer(renderable.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
 				bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 				bgfx::setState(view.render_state | material->getRenderStates());
 				++m_stats.draw_call_count;
@@ -2131,6 +2131,7 @@ struct PipelineImpl : public Pipeline
 		copyMemory(idb->data, &grass.matrices[0], grass.matrix_count * sizeof(Matrix));
 		const Mesh& mesh = grass.model->getMesh(0);
 		Material* material = mesh.material;
+		int stride = grass.model->getVertexDecl().getStride();
 
 		auto& view = m_views[m_current_render_views[0]];
 		executeCommandBuffer(material->getCommandBuffer(), material);
@@ -2138,9 +2139,8 @@ struct PipelineImpl : public Pipeline
 		auto max_grass_distance = Vec4(grass.type_distance, 0, 0, 0);
 		bgfx::setUniform(m_grass_max_dist_uniform, &max_grass_distance);
 
-		bgfx::setVertexBuffer(grass.model->getVerticesHandle(),
-			mesh.attribute_array_offset / mesh.vertex_def.getStride(),
-			mesh.attribute_array_size / mesh.vertex_def.getStride());
+		bgfx::setVertexBuffer(
+			grass.model->getVerticesHandle(), mesh.attribute_array_offset / stride, mesh.attribute_array_size / stride);
 		bgfx::setIndexBuffer(grass.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material->getRenderStates());

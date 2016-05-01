@@ -922,14 +922,8 @@ void Terrain::generateGeometry()
 	m_vertices_handle = bgfx::createVertexBuffer(bgfx::copy(&points[0], sizeof(points[0]) * points.size()), vertex_def);
 	auto* indices_mem = bgfx::copy(&indices[0], sizeof(indices[0]) * indices.size());
 	m_indices_handle = bgfx::createIndexBuffer(indices_mem);
-	m_mesh = LUMIX_NEW(m_allocator, Mesh)(vertex_def,
-		m_material,
-		0,
-		int(points.size() * sizeof(points[0])),
-		0,
-		int(indices.size()),
-		"terrain",
-		m_allocator);
+	m_mesh = LUMIX_NEW(m_allocator, Mesh)(
+		m_material, 0, int(points.size() * sizeof(points[0])), 0, int(indices.size()), "terrain", m_allocator);
 }
 
 TerrainQuad* Terrain::generateQuadTree(float size)

@@ -254,7 +254,8 @@ struct NavigationScene : public IScene
 			{
 				auto& mesh = model->getMesh(mesh_idx);
 				if (mesh.material->isCustomFlag(no_navigation_flag)) continue;
-				auto* vertices = &model->getVertices()[mesh.attribute_array_offset / mesh.vertex_def.getStride()];
+				auto* vertices =
+					&model->getVertices()[mesh.attribute_array_offset / model->getVertexDecl().getStride()];
 				for (int i = 0; i < mesh.indices_count; i += 3)
 				{
 					Vec3 a = mtx.multiplyPosition(vertices[indices[mesh.indices_offset + i]]);

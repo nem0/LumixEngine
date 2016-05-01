@@ -45,21 +45,16 @@ struct LUMIX_RENDERER_API RayCastModelHit
 
 struct LUMIX_RENDERER_API Mesh
 {
-	Mesh(const bgfx::VertexDecl& def,
-		 Material* mat,
-		 int attribute_array_offset,
-		 int attribute_array_size,
-		 int indices_offset,
-		 int index_count,
-		 const char* name,
-		 IAllocator& allocator);
-	void set(const bgfx::VertexDecl& def,
+	Mesh(Material* mat,
 		int attribute_array_offset,
 		int attribute_array_size,
 		int indices_offset,
-		int index_count);
+		int index_count,
+		const char* name,
+		IAllocator& allocator);
 
-	bgfx::VertexDecl vertex_def;
+	void set(int attribute_array_offset, int attribute_array_size, int indices_offset, int index_count);
+
 	int32 instance_idx;
 	int32 attribute_array_offset;
 	int32 attribute_array_size;
@@ -94,6 +89,7 @@ public:
 	{
 		FIRST,
 		WITH_FLAGS,
+		SINGLE_VERTEX_DECL,
 
 		LATEST // keep this last
 	};
@@ -142,6 +138,7 @@ public:
 	Mesh& getMesh(int index) { return m_meshes[index]; }
 	bgfx::VertexBufferHandle getVerticesHandle() const { return m_vertices_handle; }
 	bgfx::IndexBufferHandle getIndicesHandle() const { return m_indices_handle; }
+	bgfx::VertexDecl getVertexDecl() const { return m_vertex_decl; }
 	const Mesh& getMesh(int index) const { return m_meshes[index]; }
 	const Mesh* getMeshPtr(int index) const { return &m_meshes[index]; }
 	int getMeshCount() const { return m_meshes.size(); }
@@ -165,10 +162,11 @@ private:
 	Model(const Model&);
 	void operator=(const Model&);
 
-	bool parseVertexDef(FS::IFile& file, bgfx::VertexDecl* vertex_definition);
+	bool parseVertexDecl(FS::IFile& file, bgfx::VertexDecl* vertex_decl);
+	bool parseVertexDeclEx(FS::IFile& file, bgfx::VertexDecl* vertex_decl);
 	bool parseGeometry(FS::IFile& file);
 	bool parseBones(FS::IFile& file);
-	bool parseMeshes(FS::IFile& file);
+	bool parseMeshes(FS::IFile& file, FileVersion version);
 	bool parseLODs(FS::IFile& file);
 	int getBoneIdx(const char* name);
 	void computeRuntimeData(const uint8* vertices);
@@ -178,6 +176,7 @@ private:
 
 private:
 	IAllocator& m_allocator;
+	bgfx::VertexDecl m_vertex_decl;
 	bgfx::IndexBufferHandle m_indices_handle;
 	bgfx::VertexBufferHandle m_vertices_handle;
 	int m_vertices_size;
