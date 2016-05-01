@@ -1534,7 +1534,6 @@ namespace Lumix
 		};
 
 
-
 		explicit PropertyGridPlugin(StudioApp& app)
 			: m_app(app)
 		{
@@ -1572,11 +1571,11 @@ namespace Lumix
 			{
 				char buf[MAX_PATH_LENGTH];
 				copyString(buf, scene->getScriptPath(cmp.index, j).c_str());
-				char basename[50];
-				PathUtils::getBasename(basename, lengthOf(basename), buf);
-				if (basename[0] == 0) toCString(j, basename, lengthOf(basename));
-
-				if (ImGui::CollapsingHeader(basename))
+				StaticString<Lumix::MAX_PATH_LENGTH + 20> header;
+				PathUtils::getBasename(header.data, lengthOf(header.data), buf);
+				if (header.data[0] == 0) header << j;
+				header << "###" << j;
+				if (ImGui::CollapsingHeader(header))
 				{
 					ImGui::PushID(j);
 					if (ImGui::Button("Remove script"))
