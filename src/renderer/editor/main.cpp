@@ -865,6 +865,12 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		}
 
 
+		void getRay(ComponentIndex camera_index, float x, float y, Vec3& origin, Vec3& dir) override
+		{
+			m_render_scene->getRay(camera_index, x, y, origin, dir);
+		}
+
+
 		float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Matrix& mtx) override
 		{
 			RayCastModelHit hit = m_models[model]->castRay(origin, dir, mtx);
