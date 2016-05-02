@@ -32,6 +32,7 @@ public:
 	virtual float getCameraFOV(ComponentIndex cmp) = 0;
 	virtual bool isCameraOrtho(ComponentIndex cmp) = 0;
 	virtual float getCameraOrthoSize(ComponentIndex cmp) = 0;
+	virtual void getRay(ComponentIndex camera_index, float x, float y, Vec3& origin, Vec3& dir) = 0;
 	virtual float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Matrix& mtx) = 0;
 	virtual void renderModel(ModelHandle model, const Matrix& mtx) = 0;
 	virtual ModelHandle loadModel(Lumix::Path& path) = 0;

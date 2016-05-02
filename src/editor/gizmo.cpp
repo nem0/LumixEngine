@@ -8,7 +8,6 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "render_interface.h"
-#include "renderer/render_scene.h"
 #include "engine/universe/universe.h"
 #include <cfloat>
 #include <cmath>
@@ -361,9 +360,8 @@ struct GizmoImpl : public Gizmo
 		if (m_is_dragging) return;
 
 		auto edit_camera = m_editor.getEditCamera();
-		auto scene = static_cast<RenderScene*>(edit_camera.scene);
 		Vec3 origin, cursor_dir;
-		scene->getRay(edit_camera.index, m_editor.getMouseX(), m_editor.getMouseY(), origin, cursor_dir);
+		m_editor.getRenderInterface()->getRay(edit_camera.index, m_editor.getMouseX(), m_editor.getMouseY(), origin, cursor_dir);
 
 		m_transform_axis = Axis::NONE;
 		m_active = -1;
@@ -474,8 +472,7 @@ struct GizmoImpl : public Gizmo
 		auto gizmo_mtx = m_editor.getUniverse()->getMatrix(m_entities[m_active]);
 		auto camera = m_editor.getEditCamera();
 		Vec3 origin, dir;
-		auto* scene = static_cast<RenderScene*>(camera.scene);
-		scene->getRay(camera.index, m_editor.getMouseX(), m_editor.getMouseY(), origin, dir);
+		m_editor.getRenderInterface()->getRay(camera.index, m_editor.getMouseX(), m_editor.getMouseY(), origin, dir);
 		dir.normalize();
 		Matrix camera_mtx = m_editor.getUniverse()->getPositionAndRotation(camera.entity);
 		bool is_two_axed = m_transform_axis == Axis::XZ || m_transform_axis == Axis::XY ||
@@ -666,11 +663,11 @@ struct GizmoImpl : public Gizmo
 	void render() override
 	{
 		auto edit_camera = m_editor.getEditCamera();
-		auto scene = static_cast<RenderScene*>(edit_camera.scene);
-		bool is_ortho = scene->isCameraOrtho(edit_camera.index);
+		auto* render_interface = m_editor.getRenderInterface();
+		bool is_ortho = render_interface->isCameraOrtho(edit_camera.index);
 		auto camera_pos = m_editor.getUniverse()->getPosition(edit_camera.entity);
 		auto camera_dir = m_editor.getUniverse()->getRotation(edit_camera.entity) * Vec3(0, 0, -1);
-		float fov = scene->getCameraFOV(edit_camera.index);
+		float fov = render_interface->getCameraFOV(edit_camera.index);
 
 		collide(camera_pos, camera_dir, fov, is_ortho);
 		transform();
