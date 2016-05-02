@@ -21,7 +21,7 @@ class Material;
 struct Mesh;
 class Model;
 class Path;
-class Pose;
+struct  Pose;
 struct RayCastModelHit;
 class Renderer;
 class Shader;
@@ -45,6 +45,7 @@ enum class RenderSceneVersion : int32
 	RENDER_PARAMS_REMOVED,
 	GRASS_TYPE_DISTANCE,
 	ORTHO_CAMERA,
+	BONE_ATTACHMENTS,
 
 	LATEST,
 	INVALID = -1,
@@ -204,6 +205,11 @@ public:
 		float radius,
 		uint32 color,
 		float life) = 0;
+
+	virtual Entity getBoneAttachmentParent(ComponentIndex cmp) = 0;
+	virtual void setBoneAttachmentParent(ComponentIndex cmp, Entity entity) = 0;
+	virtual void setBoneAttachmentBone(ComponentIndex cmp, int value) = 0;
+	virtual int getBoneAttachmentBone(ComponentIndex cmp) = 0;
 
 	virtual const Array<DebugTriangle>& getDebugTriangles() const = 0;
 	virtual const Array<DebugLine>& getDebugLines() const = 0;

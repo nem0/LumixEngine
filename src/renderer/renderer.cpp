@@ -69,6 +69,67 @@ namespace Lumix
 {
 
 
+struct BonePropertyDescriptor : public IEnumPropertyDescriptor
+{
+	BonePropertyDescriptor(const char* name, IAllocator& allocator)
+		: IEnumPropertyDescriptor(allocator)
+	{
+		setName(name);
+		m_type = ENUM;
+	}
+
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		ASSERT(index == -1);
+		int value;
+		stream.read(&value, sizeof(value));
+		auto* render_scene = static_cast<RenderScene*>(cmp.scene);
+		render_scene->setBoneAttachmentBone(cmp.index, value);
+	}
+
+
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		ASSERT(index == -1);
+		auto* render_scene = static_cast<RenderScene*>(cmp.scene);
+		int value = render_scene->getBoneAttachmentBone(cmp.index);
+		int len = sizeof(value);
+		stream.write(&value, len);
+	}
+
+
+	ComponentIndex getRenderable(RenderScene* render_scene, ComponentIndex bone_attachment_cmp)
+	{
+		Entity parent_entity = render_scene->getBoneAttachmentParent(bone_attachment_cmp);
+		if (parent_entity == INVALID_ENTITY) return INVALID_COMPONENT;
+		ComponentIndex renderable = render_scene->getRenderableComponent(parent_entity);
+		return renderable;
+	}
+
+
+	int getEnumCount(IScene* scene, ComponentIndex cmp) override
+	{
+		auto* render_scene = static_cast<RenderScene*>(scene);
+		ComponentIndex renderable = getRenderable(render_scene, cmp);
+		if (renderable == INVALID_COMPONENT) return 0;
+		auto* model = render_scene->getRenderableModel(renderable);
+		if (!model || !model->isReady()) return 0;
+		return model->getBoneCount();
+	}
+
+
+	const char* getEnumItemName(IScene* scene, ComponentIndex cmp, int index) override
+	{
+		auto* render_scene = static_cast<RenderScene*>(scene);
+		ComponentIndex renderable = getRenderable(render_scene, cmp);
+		if (renderable == INVALID_COMPONENT) return "";
+		auto* model = render_scene->getRenderableModel(renderable);
+		if (!model) return "";
+		return model->getBone(index).name.c_str();
+	}
+};
+
+
 static void registerProperties(IAllocator& allocator)
 {
 	PropertyRegister::registerComponentType("camera", "Camera");
@@ -89,13 +150,20 @@ static void registerProperties(IAllocator& allocator)
 	PropertyRegister::registerComponentType("particle_emitter_size", "Particle emitter - size");
 	PropertyRegister::registerComponentType("point_light", "Point light");
 	PropertyRegister::registerComponentType("terrain", "Terrain");
+	PropertyRegister::registerComponentType("bone_attachment", "Bone attachment");
 
 	PropertyRegister::registerComponentDependency("particle_emitter_fade", "particle_emitter");
 	PropertyRegister::registerComponentDependency("particle_emitter_force", "particle_emitter");
 	PropertyRegister::registerComponentDependency(
 		"particle_emitter_linear_movement", "particle_emitter");
-	PropertyRegister::registerComponentDependency(
-		"particle_emitter_random_rotation", "particle_emitter");
+	PropertyRegister::registerComponentDependency("particle_emitter_random_rotation", "particle_emitter");
+
+	PropertyRegister::add("bone_attachment",
+		LUMIX_NEW(allocator, EntityPropertyDescriptor<RenderScene>)("Parent",
+							  &RenderScene::getBoneAttachmentParent,
+							  &RenderScene::setBoneAttachmentParent,
+							  allocator));
+	PropertyRegister::add("bone_attachment", LUMIX_NEW(allocator, BonePropertyDescriptor)("Bone", allocator));
 
 	PropertyRegister::add("particle_emitter_spawn_shape",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Radius",

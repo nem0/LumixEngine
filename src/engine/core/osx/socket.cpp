@@ -35,7 +35,7 @@ bool Socket::create(unsigned short port)
 
 Socket* Socket::accept()
 {
-	return LUX_NULL;;
+	return LUX_NULL;
 }
 
 bool Socket::send(const void* data, int size)

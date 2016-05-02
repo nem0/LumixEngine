@@ -1861,12 +1861,11 @@ struct PipelineImpl : public Pipeline
 
 		const Pose& pose = *renderable.pose;
 		const Model& model = *renderable.model;
-		Vec3* poss = pose.getPositions();
-		Quat* rots = pose.getRotations();
+		Vec3* poss = pose.positions;
+		Quat* rots = pose.rotations;
 
-		ASSERT(pose.getCount() <= lengthOf(bone_mtx));
-		for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count;
-		++bone_index)
+		ASSERT(pose.count <= lengthOf(bone_mtx));
+		for (int bone_index = 0, bone_count = pose.count; bone_index < bone_count; ++bone_index)
 		{
 			auto& bone = model.getBone(bone_index);
 			rots[bone_index].toMatrix(bone_mtx[bone_index]);
@@ -1884,7 +1883,7 @@ struct PipelineImpl : public Pipeline
 			{
 				auto layer = Vec4((j + 1) / (float)c, 0, 0, 0);
 				bgfx::setUniform(m_layer_uniform, &layer);
-				bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.getCount());
+				bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.count);
 				executeCommandBuffer(material->getCommandBuffer(), material);
 				executeCommandBuffer(view.command_buffer.buffer, material);
 
@@ -2187,7 +2186,7 @@ struct PipelineImpl : public Pipeline
 		for(auto& mesh : meshes)
 		{
 			Renderable& renderable = renderables[mesh.renderable];
-			if(renderable.pose && renderable.pose->getCount() > 0)
+			if(renderable.pose && renderable.pose->count > 0)
 			{
 				renderSkinnedMesh(renderable, mesh);
 			}
@@ -2212,7 +2211,7 @@ struct PipelineImpl : public Pipeline
 			for (auto& mesh : submeshes)
 			{
 				Renderable& renderable = renderables[mesh.renderable];
-				if (renderable.pose && renderable.pose->getCount() > 0)
+				if (renderable.pose && renderable.pose->count > 0)
 				{
 					renderSkinnedMesh(renderable, mesh);
 				}
