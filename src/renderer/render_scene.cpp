@@ -58,6 +58,7 @@ static const uint32 PARTICLE_EMITTER_SIZE_HASH = crc32("particle_emitter_size");
 static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
 static const uint32 CAMERA_HASH = crc32("camera");
 static const uint32 TERRAIN_HASH = crc32("terrain");
+static const uint32 BONE_ATTACHMENT_HASH = crc32("bone_attachment");
 
 
 struct PointLight
@@ -108,6 +109,15 @@ struct Camera
 	bool is_free;
 	bool is_ortho;
 	char slot[MAX_SLOT_LENGTH + 1];
+};
+
+
+struct BoneAttachment
+{
+	Entity entity;
+	Entity parent_entity;
+	int bone_index;
+	Matrix relative_matrix;
 };
 
 
@@ -182,11 +192,12 @@ public:
 		, m_is_game_running(false)
 		, m_particle_emitters(m_allocator)
 		, m_point_lights_map(m_allocator)
+		, m_bone_attachments(m_allocator)
 	{
-		m_universe.entityTransformed()
-			.bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
-		m_culling_system =
-			CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
+		m_is_updating_attachments = false;
+		m_universe.entityTransformed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
+		m_universe.entityDestroyed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
+		m_culling_system = CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
 		m_time = 0;
 		m_renderables.reserve(5000);
 	}
@@ -197,8 +208,8 @@ public:
 		auto& rm = m_engine.getResourceManager();
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
 
-		m_universe.entityTransformed()
-			.unbind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
+		m_universe.entityTransformed().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
+		m_universe.entityDestroyed().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
 
 		for (int i = 0; i < m_model_loaded_callbacks.size(); ++i)
 		{
@@ -394,6 +405,86 @@ public:
 	}
 
 
+	int getBoneAttachmentIdx(ComponentIndex cmp) const
+	{
+		for (int i = 0; i < m_bone_attachments.size(); ++i)
+		{
+			if (m_bone_attachments[i].entity == cmp) return i;
+		}
+		return -1;
+	}
+
+
+	void updateBoneAttachment(const BoneAttachment& bone_attachment)
+	{
+		if (bone_attachment.parent_entity == INVALID_ENTITY) return;
+		ComponentIndex renderable = getRenderableComponent(bone_attachment.parent_entity);
+		if (renderable == INVALID_COMPONENT) return;
+		auto* parent_pose = getPose(renderable);
+		if (!parent_pose) return;
+
+		Matrix parent_entity_mtx = m_universe.getMatrix(bone_attachment.parent_entity);
+		int idx = bone_attachment.bone_index;
+		if (idx < 0 || idx > parent_pose->count) return;
+		Matrix bone_mtx;
+		parent_pose->rotations[idx].toMatrix(bone_mtx);
+		bone_mtx.setTranslation(parent_pose->positions[idx]);
+		m_universe.setMatrix(bone_attachment.entity, parent_entity_mtx * bone_mtx * bone_attachment.relative_matrix);
+	}
+
+
+	Entity getBoneAttachmentParent(ComponentIndex cmp) override
+	{
+		int idx = getBoneAttachmentIdx(cmp);
+		return m_bone_attachments[idx].parent_entity;
+	}
+
+
+	void updateRelativeMatrix(BoneAttachment& attachment)
+	{
+		if (attachment.parent_entity == INVALID_ENTITY) return;
+		if (attachment.bone_index < 0) return;
+		ComponentIndex renderable = getRenderableComponent(attachment.parent_entity);
+		if (renderable == INVALID_COMPONENT) return;
+		Pose* pose = getPose(renderable);
+		if (!pose) return;
+		ASSERT(pose->is_absolute);
+		if (attachment.bone_index >= pose->count) return;
+		Matrix bone_matrix;
+		pose->rotations[attachment.bone_index].toMatrix(bone_matrix);
+		bone_matrix.setTranslation(pose->positions[attachment.bone_index]);
+
+		Matrix inv_parent_matrix = m_universe.getMatrix(attachment.parent_entity) * bone_matrix;
+		inv_parent_matrix.inverse();
+		Matrix child_matrix = m_universe.getMatrix(attachment.entity);
+		attachment.relative_matrix = inv_parent_matrix * child_matrix;
+	}
+
+
+	int getBoneAttachmentBone(ComponentIndex cmp) override
+	{
+		int idx = getBoneAttachmentIdx(cmp);
+		if (idx < 0) return -1;
+		return m_bone_attachments[idx].bone_index;
+	}
+
+
+	void setBoneAttachmentBone(ComponentIndex cmp, int value) override
+	{
+		int idx = getBoneAttachmentIdx(cmp);
+		if (idx < 0) return;
+		m_bone_attachments[idx].bone_index = value;
+		updateRelativeMatrix(m_bone_attachments[idx]);
+	}
+
+
+	void setBoneAttachmentParent(ComponentIndex cmp, Entity entity) override
+	{
+		int idx = getBoneAttachmentIdx(cmp);
+		m_bone_attachments[idx].parent_entity = entity;
+		updateRelativeMatrix(m_bone_attachments[idx]);
+	}
+
 	void startGame() override
 	{
 		m_is_game_running = true;
@@ -409,6 +500,16 @@ public:
 	void update(float dt, bool paused) override
 	{
 		PROFILE_FUNCTION();
+		if (m_is_game_running)
+		{
+			m_is_updating_attachments = true;
+			for (auto& bone_attachment : m_bone_attachments)
+			{
+				updateBoneAttachment(bone_attachment);
+			}
+			m_is_updating_attachments = false;
+		}
+
 		m_time += dt;
 		for (int i = m_debug_triangles.size() - 1; i >= 0; --i)
 		{
@@ -461,6 +562,18 @@ public:
 
 				emitter->update(dt);
 			}
+		}
+	}
+
+
+	void serializeBoneAttachments(OutputBlob& serializer)
+	{
+		serializer.write((int32)m_bone_attachments.size());
+		for (auto& attachment : m_bone_attachments)
+		{
+			serializer.write(attachment.bone_index);
+			serializer.write(attachment.entity);
+			serializer.write(attachment.parent_entity);
 		}
 	}
 
@@ -537,6 +650,25 @@ public:
 			{
 				serializer.write(false);
 			}
+		}
+	}
+
+
+	void deserializeBoneAttachments(InputBlob& serializer, int version)
+	{
+		if (version <= (int)RenderSceneVersion::BONE_ATTACHMENTS) return;
+
+		int32 count;
+		serializer.read(count);
+		m_bone_attachments.resize(count);
+		for (int i = 0; i < count; ++i)
+		{
+			serializer.read(m_bone_attachments[i].bone_index);
+			serializer.read(m_bone_attachments[i].entity);
+			serializer.read(m_bone_attachments[i].parent_entity);
+			updateRelativeMatrix(m_bone_attachments[i]);
+			m_universe.addComponent(
+				m_bone_attachments[i].entity, BONE_ATTACHMENT_HASH, this, m_bone_attachments[i].entity);
 		}
 	}
 
@@ -633,6 +765,7 @@ public:
 		serializeLights(serializer);
 		serializeTerrains(serializer);
 		serializeParticleEmitters(serializer);
+		serializeBoneAttachments(serializer);
 	}
 
 	void deserializeRenderParams(InputBlob& serializer)
@@ -884,6 +1017,16 @@ public:
 		{
 			deserializeRenderParams(serializer);
 		}
+		deserializeBoneAttachments(serializer, version);
+	}
+
+
+	void destroyBoneAttachment(ComponentIndex component)
+	{
+		int idx = getBoneAttachmentIdx(component);
+		Entity entity = m_bone_attachments[idx].entity;
+		m_bone_attachments.eraseFast(idx);
+		m_universe.destroyComponent(entity, BONE_ATTACHMENT_HASH, this, component);
 	}
 
 
@@ -1576,6 +1719,19 @@ public:
 	}
 
 
+	void onEntityDestroyed(Entity entity)
+	{
+		for (auto& i : m_bone_attachments)
+		{
+			if (i.parent_entity == entity)
+			{
+				i.parent_entity = INVALID_ENTITY;
+				break;
+			}
+		}
+	}
+
+
 	void onEntityMoved(Entity entity)
 	{
 		ComponentIndex cmp = (ComponentIndex)entity;
@@ -1624,6 +1780,28 @@ public:
 				break;
 			}
 		}
+
+		bool was_updating = m_is_updating_attachments;
+		m_is_updating_attachments = true;
+		for (auto& attachment : m_bone_attachments)
+		{
+			if (attachment.parent_entity == entity)
+			{
+				updateBoneAttachment(attachment);
+			}
+		}
+		m_is_updating_attachments = was_updating;
+
+		if (m_is_updating_attachments || m_is_game_running) return;
+		for (auto& attachment : m_bone_attachments)
+		{
+			if (attachment.entity == entity)
+			{
+				updateRelativeMatrix(attachment);
+				break;
+			}
+		}
+
 	}
 
 	Engine& getEngine() const override { return m_engine; }
@@ -3265,6 +3443,15 @@ public:
 				modelLoaded(model, i);
 			}
 		}
+
+		for (auto& attachment : m_bone_attachments)
+		{
+			if (m_renderables[attachment.parent_entity].entity != INVALID_ENTITY &&
+				m_renderables[attachment.parent_entity].model == model)
+			{
+				updateRelativeMatrix(attachment);
+			}
+		}
 	}
 
 
@@ -3625,6 +3812,18 @@ public:
 	}
 
 
+	ComponentIndex createBoneAttachment(Entity entity)
+	{
+		BoneAttachment& attachment = m_bone_attachments.emplace();
+		attachment.entity = entity;
+		attachment.parent_entity = INVALID_ENTITY;
+		attachment.bone_index = -1;
+
+		m_universe.addComponent(entity, BONE_ATTACHMENT_HASH, this, entity);
+		return entity;
+	}
+
+
 	ComponentIndex createRenderable(Entity entity)
 	{
 		while(entity >= m_renderables.size())
@@ -3688,9 +3887,8 @@ private:
 	int m_active_global_light_uid;
 	int m_global_light_last_uid;
 	Array<GlobalLight> m_global_lights;
-
 	Array<Camera> m_cameras;
-
+	Array<BoneAttachment> m_bone_attachments;
 	Array<Terrain*> m_terrains;
 	Universe& m_universe;
 	Renderer& m_renderer;
@@ -3704,6 +3902,7 @@ private:
 	MTJD::Group m_sync_point;
 	Array<MTJD::Job*> m_jobs;
 	float m_time;
+	bool m_is_updating_attachments;
 	bool m_is_forward_rendered;
 	bool m_is_grass_enabled;
 	bool m_is_game_running;
@@ -3718,19 +3917,16 @@ static struct
 	uint32 type;
 	ComponentIndex(RenderSceneImpl::*creator)(Entity);
 	void (RenderSceneImpl::*destroyer)(ComponentIndex);
-} COMPONENT_INFOS[] = {
-	{RENDERABLE_HASH, &RenderSceneImpl::createRenderable, &RenderSceneImpl::destroyRenderable},
+} COMPONENT_INFOS[] = {{RENDERABLE_HASH, &RenderSceneImpl::createRenderable, &RenderSceneImpl::destroyRenderable},
 	{GLOBAL_LIGHT_HASH, &RenderSceneImpl::createGlobalLight, &RenderSceneImpl::destroyGlobalLight},
 	{POINT_LIGHT_HASH, &RenderSceneImpl::createPointLight, &RenderSceneImpl::destroyPointLight},
 	{CAMERA_HASH, &RenderSceneImpl::createCamera, &RenderSceneImpl::destroyCamera},
 	{TERRAIN_HASH, &RenderSceneImpl::createTerrain, &RenderSceneImpl::destroyTerrain},
-	{PARTICLE_EMITTER_HASH,
-		&RenderSceneImpl::createParticleEmitter,
-		&RenderSceneImpl::destroyParticleEmitter},
+	{PARTICLE_EMITTER_HASH, &RenderSceneImpl::createParticleEmitter, &RenderSceneImpl::destroyParticleEmitter},
 	{PARTICLE_EMITTER_FADE_HASH,
 		&RenderSceneImpl::createParticleEmitterFade,
 		&RenderSceneImpl::destroyParticleEmitterFade},
-		{PARTICLE_EMITTER_FORCE_HASH,
+	{PARTICLE_EMITTER_FORCE_HASH,
 		&RenderSceneImpl::createParticleEmitterForce,
 		&RenderSceneImpl::destroyParticleEmitterForce},
 	{PARTICLE_EMITTER_ATTRACTOR_HASH,
@@ -3744,14 +3940,18 @@ static struct
 		&RenderSceneImpl::destroyParticleEmitterLinearMovement},
 	{PARTICLE_EMITTER_SPAWN_SHAPE_HASH,
 		&RenderSceneImpl::createParticleEmitterSpawnShape,
-		&RenderSceneImpl::destroyParticleEmitterSpawnShape },
+		&RenderSceneImpl::destroyParticleEmitterSpawnShape},
 	{PARTICLE_EMITTER_RANDOM_ROTATION_HASH,
 		&RenderSceneImpl::createParticleEmitterRandomRotation,
 		&RenderSceneImpl::destroyParticleEmitterRandomRotation},
 	{PARTICLE_EMITTER_PLANE_HASH,
 		&RenderSceneImpl::createParticleEmitterPlane,
 		&RenderSceneImpl::destroyParticleEmitterPlane},
+	{BONE_ATTACHMENT_HASH, &RenderSceneImpl::createBoneAttachment, &RenderSceneImpl::destroyBoneAttachment}
 };
+
+
+
 
 
 ComponentIndex RenderSceneImpl::createComponent(uint32 type, Entity entity)

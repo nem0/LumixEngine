@@ -866,10 +866,10 @@ public:
 	};
 
 
-	int getEnumCount(IScene* scene) override { return (static_cast<S*>(scene)->*m_enum_count_getter)(); }
+	int getEnumCount(IScene* scene, ComponentIndex) override { return (static_cast<S*>(scene)->*m_enum_count_getter)(); }
 
 
-	const char* getEnumItemName(IScene* scene, int index) override
+	const char* getEnumItemName(IScene* scene, ComponentIndex, int index) override
 	{
 		return (static_cast<S*>(scene)->*m_enum_name_getter)(index);
 	}

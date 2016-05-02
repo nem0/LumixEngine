@@ -13,7 +13,7 @@ namespace FS
 }
 
 class Model;
-class Pose;
+struct Pose;
 struct Quat;
 struct Vec3;
 
@@ -75,4 +75,4 @@ class LUMIX_ANIMATION_API Animation : public Resource
 };
 
 
-} // ~ namespace Lumix
+} // namespace Lumix

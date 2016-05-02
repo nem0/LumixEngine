@@ -36,7 +36,6 @@
 #include "engine/plugin_manager.h"
 #include "render_interface.h"
 #include "renderer/model.h"
-#include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "engine/universe/universe.h"
 
@@ -2507,7 +2506,7 @@ public:
 
 		m_engine = &engine;
 
-		const char* plugins[] = {"renderer", "animation", "audio", "physics", "lua_script"};
+		const char* plugins[] = { "renderer", "animation", "audio", "physics", "lua_script"};
 
 		PluginManager& plugin_manager = m_engine->getPluginManager();
 		for (auto* plugin_name : plugins)

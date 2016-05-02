@@ -19,7 +19,7 @@ class Frustum;
 class Material;
 struct Mesh;
 class Model;
-class Pose;
+struct Pose;
 class ResourceManager;
 
 

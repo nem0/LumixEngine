@@ -160,15 +160,15 @@ LODMeshIndices Model::getLODMeshIndices(float squared_distance) const
 
 void Model::getPose(Pose& pose)
 {
-	ASSERT(pose.getCount() == getBoneCount());
-	Vec3* pos = pose.getPositions();
-	Quat* rot = pose.getRotations();
+	ASSERT(pose.count == getBoneCount());
+	Vec3* pos = pose.positions;
+	Quat* rot = pose.rotations;
 	for (int i = 0, c = getBoneCount(); i < c; ++i)
 	{
 		pos[i] = m_bones[i].position;
 		rot[i] = m_bones[i].rotation;
 	}
-	pose.setIsAbsolute();
+	pose.is_absolute = true;
 }
 
 

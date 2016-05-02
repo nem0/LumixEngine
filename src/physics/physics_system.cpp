@@ -94,20 +94,20 @@ namespace Lumix
 		};
 
 
-		int getEnumCount(IScene* scene) override
+		int getEnumCount(IScene* scene, ComponentIndex) override
 		{
 			return static_cast<PhysicsScene*>(scene)->getCollisionsLayersCount();
 		}
 
 
-		const char* getEnumItemName(IScene* scene, int index) override
+		const char* getEnumItemName(IScene* scene, ComponentIndex, int index) override
 		{
 			auto* phy_scene = static_cast<PhysicsScene*>(scene);
 			return phy_scene->getCollisionLayerName(index);
 		}
 
 
-		void getEnumItemName(IScene* scene, int index, char* buf, int max_size) override {}
+		void getEnumItemName(IScene* scene, ComponentIndex, int index, char* buf, int max_size) override {}
 
 	private:
 		union
