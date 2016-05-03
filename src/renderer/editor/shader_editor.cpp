@@ -814,7 +814,7 @@ struct FloatConstNode : public ShaderEditor::Node
 
 	void generate(Lumix::OutputBlob&) override	{}
 
-	void printReference(Lumix::OutputBlob& blob)
+	void printReference(Lumix::OutputBlob& blob) override
 	{
 		blob << m_value;
 	}

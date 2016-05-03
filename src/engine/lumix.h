@@ -165,10 +165,12 @@ namespace Lumix
 #endif
 
 
-#pragma warning(disable : 4251)
-#pragma warning(disable : 4365)
-#pragma warning(disable : 4512)
-#pragma warning(disable : 4996)
-#if defined _MSC_VER && _MSC_VER == 1900 
-	#pragma warning(disable : 4091)
+#ifdef _MSC_VER
+	#pragma warning(disable : 4251)
+	#pragma warning(disable : 4365)
+	#pragma warning(disable : 4512)
+	#pragma warning(disable : 4996)
+	#if _MSC_VER == 1900 
+		#pragma warning(disable : 4091)
+	#endif
 #endif
