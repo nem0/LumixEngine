@@ -100,13 +100,13 @@ struct AudioSystemImpl : public AudioSystem
 	const char* getName() const override { return "audio"; }
 
 
-	IScene* createScene(Universe& ctx)
+	IScene* createScene(Universe& ctx) override
 	{
 		return AudioScene::createInstance(*this, ctx, m_engine.getAllocator());
 	}
 
 
-	void destroyScene(IScene* scene) { AudioScene::destroyInstance(static_cast<AudioScene*>(scene)); }
+	void destroyScene(IScene* scene) override { AudioScene::destroyInstance(static_cast<AudioScene*>(scene)); }
 
 
 	ClipManager m_manager;

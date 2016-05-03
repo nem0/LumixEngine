@@ -26,7 +26,9 @@
 #include "renderer/texture.h"
 #include "engine/universe/universe.h"
 #include <cstdio>
-#include <windows.h>
+#ifdef _MSC_VER
+	#include <windows.h>
+#endif
 
 
 class App

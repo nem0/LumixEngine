@@ -160,7 +160,7 @@ struct AnimationSceneImpl : public IScene
 	int getVersion() const override { return (int)AnimationSceneVersion::LATEST; }
 
 
-	void deserialize(InputBlob& serializer, int version)
+	void deserialize(InputBlob& serializer, int version) override
 	{
 		int32 count;
 		serializer.read(count);
