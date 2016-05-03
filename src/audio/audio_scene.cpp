@@ -597,7 +597,7 @@ struct AudioSceneImpl : public AudioScene
 		float wet_dry_mix,
 		float feedback,
 		float left_delay,
-		float right_delay)
+		float right_delay) override
 	{
 		ASSERT(sound_id >= 0 && sound_id < lengthOf(m_playing_sounds));
 		m_device.setEcho(m_playing_sounds[sound_id].buffer_id, wet_dry_mix, feedback, left_delay, right_delay);

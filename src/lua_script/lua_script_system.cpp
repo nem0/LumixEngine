@@ -340,7 +340,7 @@ namespace Lumix
 		}
 
 
-		void endFunctionCall(IFunctionCall& caller)
+		void endFunctionCall(IFunctionCall& caller) override
 		{
 			ASSERT(&caller == &m_function_call);
 			ASSERT(m_function_call.is_in_progress);
@@ -460,21 +460,24 @@ namespace Lumix
 				case IPropertyDescriptor::DECIMAL:
 				{
 					float v;
-					desc->get(cmp, -1, OutputBlob(&v, sizeof(v)));
+					OutputBlob blob(&v, sizeof(v));
+					desc->get(cmp, -1, blob);
 					LuaWrapper::pushLua(L, v);
 				}
 				break;
 				case IPropertyDescriptor::BOOL:
 				{
 					bool v;
-					desc->get(cmp, -1, OutputBlob(&v, sizeof(v)));
+					OutputBlob blob(&v, sizeof(v));
+					desc->get(cmp, -1, blob);
 					LuaWrapper::pushLua(L, v);
 				}
 				break;
 				case IPropertyDescriptor::INTEGER:
 				{
 					int v;
-					desc->get(cmp, -1, OutputBlob(&v, sizeof(v)));
+					OutputBlob blob(&v, sizeof(v));
+					desc->get(cmp, -1, blob);
 					LuaWrapper::pushLua(L, v);
 				}
 				break;
@@ -482,10 +485,12 @@ namespace Lumix
 				case IPropertyDescriptor::VEC3:
 				{
 					Vec3 v;
-					desc->get(cmp, -1, OutputBlob(&v, sizeof(v)));
+					OutputBlob blob(&v, sizeof(v));
+					desc->get(cmp, -1, blob);
 					LuaWrapper::pushLua(L, v);
 				}
 				break;
+				default: luaL_argerror(L, 1, "Unsupported property type"); break;
 			}
 			return 1;
 		}
@@ -505,28 +510,33 @@ namespace Lumix
 				case IPropertyDescriptor::DECIMAL:
 				{
 					auto v = LuaWrapper::checkArg<float>(L, 3);
-					desc->set(cmp, -1, InputBlob(&v, sizeof(v)));
+					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
 				}
 				break;
 				case IPropertyDescriptor::INTEGER:
 				{
 					auto v = LuaWrapper::checkArg<int>(L, 3);
-					desc->set(cmp, -1, InputBlob(&v, sizeof(v)));
+					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
 				}
 				break;
 				case IPropertyDescriptor::BOOL:
 				{
 					auto v = LuaWrapper::checkArg<bool>(L, 3);
-					desc->set(cmp, -1, InputBlob(&v, sizeof(v)));
+					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
 				}
 				break;
 				case IPropertyDescriptor::COLOR:
 				case IPropertyDescriptor::VEC3:
 				{
 					auto v = LuaWrapper::checkArg<Vec3>(L, 3);
-					desc->set(cmp, -1, InputBlob(&v, sizeof(v)));
+					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
 				}
 				break;
+				default: luaL_argerror(L, 1, "Unsupported property type"); break;
 			}
 			return 0;
 		}
@@ -574,11 +584,6 @@ namespace Lumix
 				char getter[50];
 				for (auto* desc : descs)
 				{
-					convertPropertyToLuaName(desc->getName(), tmp, lengthOf(tmp));
-					copyString(setter, "set");
-					copyString(getter, "get");
-					catString(setter, tmp);
-					catString(getter, tmp);
 					switch (desc->getType())
 					{
 						case IPropertyDescriptor::DECIMAL:
@@ -586,6 +591,11 @@ namespace Lumix
 						case IPropertyDescriptor::BOOL:
 						case IPropertyDescriptor::VEC3:
 						case IPropertyDescriptor::COLOR:
+							convertPropertyToLuaName(desc->getName(), tmp, lengthOf(tmp));
+							copyString(setter, "set");
+							copyString(getter, "get");
+							catString(setter, tmp);
+							catString(getter, tmp);
 							lua_pushlightuserdata(L, desc);
 							lua_pushinteger(L, cmp_name_hash);
 							lua_pushcclosure(L, &LUA_setProperty, 2);
@@ -596,6 +606,7 @@ namespace Lumix
 							lua_pushcclosure(L, &LUA_getProperty, 2);
 							lua_setfield(L, -2, getter);
 							break;
+						default: break;
 					}
 				}
 				lua_pop(L, 1);
@@ -1370,7 +1381,8 @@ namespace Lumix
 			void undo() override
 			{
 				scene->insertScript(cmp, scr_index);
-				scene->deserializeScript(cmp, scr_index, InputBlob(blob));
+				InputBlob input(blob);
+				scene->deserializeScript(cmp, scr_index, input);
 			}
 
 
