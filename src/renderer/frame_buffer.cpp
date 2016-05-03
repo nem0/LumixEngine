@@ -103,11 +103,16 @@ bool FrameBuffer::RenderBuffer::isDepth() const
 {
 	switch(m_format)
 	{
-		case bgfx::TextureFormat::D32:
+		case bgfx::TextureFormat::D0S8:
+		case bgfx::TextureFormat::D16:
+		case bgfx::TextureFormat::D16F:
 		case bgfx::TextureFormat::D24:
-			return true;
+		case bgfx::TextureFormat::D24F:
+		case bgfx::TextureFormat::D24S8:
+		case bgfx::TextureFormat::D32:
+		case bgfx::TextureFormat::D32F: return true;
+		default: return false;
 	}
-	return false;
 }
 
 

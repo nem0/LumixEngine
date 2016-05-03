@@ -247,7 +247,7 @@ public:
 	}
 
 
-	ParticleEmitter* getParticleEmitter(ComponentIndex cmp)
+	ParticleEmitter* getParticleEmitter(ComponentIndex cmp) override
 	{
 		return m_particle_emitters[cmp];
 	}
@@ -1854,7 +1854,7 @@ public:
 	}
 
 
-	Vec3 getTerrainNormalAt(ComponentIndex cmp, float x, float z)
+	Vec3 getTerrainNormalAt(ComponentIndex cmp, float x, float z) override
 	{
 		return m_terrains[cmp]->getNormal(x, z);
 	}
@@ -1925,7 +1925,7 @@ public:
 		m_terrains[cmp]->setYScale(scale);
 	}
 
-	float getTerrainYScale(ComponentIndex cmp) { return m_terrains[cmp]->getYScale(); }
+	float getTerrainYScale(ComponentIndex cmp) override { return m_terrains[cmp]->getYScale(); }
 
 
 	Pose* getPose(ComponentIndex cmp) override { return m_renderables[cmp].pose; }

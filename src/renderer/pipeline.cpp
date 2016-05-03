@@ -889,8 +889,8 @@ struct PipelineImpl : public Pipeline
 		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE); 
 		if (is_intersecting)
 		{
-			bgfx::setState((m_render_state | material->getRenderStates()) &
-				~BGFX_STATE_CULL_MASK & ~BGFX_STATE_DEPTH_TEST_MASK | BGFX_STATE_CULL_CCW);
+			auto state = m_render_state | material->getRenderStates();
+			bgfx::setState(((state & ~BGFX_STATE_CULL_MASK) & ~BGFX_STATE_DEPTH_TEST_MASK) | BGFX_STATE_CULL_CCW);
 		}
 		else
 		{

@@ -2382,13 +2382,13 @@ static void preprocessBillboard(Lumix::uint32* pixels, int width, int height, Lu
 				{
 					distance_field[idx].distance = distance_field[idx - 1].distance + 1;
 					distance_field[idx].color =
-						distance_field[idx - 1].color & ~ALPHA_MASK | distance_field[idx].color & ALPHA_MASK;
+						(distance_field[idx - 1].color & ~ALPHA_MASK) | (distance_field[idx].color & ALPHA_MASK);
 				}
 				else
 				{
 					distance_field[idx].distance = distance_field[idx - width].distance + 1;
 					distance_field[idx].color =
-						distance_field[idx - width].color & ~ALPHA_MASK | distance_field[idx].color & ALPHA_MASK;
+						(distance_field[idx - width].color & ~ALPHA_MASK) | (distance_field[idx].color & ALPHA_MASK);
 				}
 			}
 		}
@@ -2404,13 +2404,13 @@ static void preprocessBillboard(Lumix::uint32* pixels, int width, int height, Lu
 			{
 				distance_field[idx].distance = distance_field[idx + 1].distance + 1;
 				distance_field[idx].color =
-					distance_field[idx + 1].color & ~ALPHA_MASK | distance_field[idx].color & ALPHA_MASK;
+					(distance_field[idx + 1].color & ~ALPHA_MASK) | (distance_field[idx].color & ALPHA_MASK);
 			}
 			else if (distance_field[idx + width].distance < distance_field[idx].distance)
 			{
 				distance_field[idx].distance = distance_field[idx + width].distance + 1;
 				distance_field[idx].color =
-					distance_field[idx + width].color & ~ALPHA_MASK | distance_field[idx].color & ALPHA_MASK;
+					(distance_field[idx + width].color & ~ALPHA_MASK) | (distance_field[idx].color & ALPHA_MASK);
 			}
 		}
 	}
