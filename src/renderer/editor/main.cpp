@@ -122,12 +122,6 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 
 		int alpha_cutout_define = renderer->getShaderDefineIdx("ALPHA_CUTOUT");
 		
-		int layer_count = material->getLayerCount();
-		if (ImGui::DragInt("Layers", &layer_count))
-		{
-			material->setLayerCount(layer_count);
-		}
-		
 		if (material->hasDefine(alpha_cutout_define))
 		{
 			b = material->isDefined(alpha_cutout_define);
@@ -281,6 +275,18 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 			if (material->isCustomFlag(1 << i))
 			{
 				ImGui::LabelText("Custom flag", "%s", Material::getCustomFlagName(i));
+			}
+		}
+
+		if (material->getShader() && ImGui::CollapsingHeader("Layers"))
+		{
+			auto* shader = material->getShader();
+			for (int i = 0; i < shader->m_combintions.m_pass_count; ++i)
+			{
+				int idx = renderer->getPassIdx(shader->m_combintions.m_passes[i]);
+				int layers_count = material->getLayerCount(idx);
+				ImGui::DragInt(shader->m_combintions.m_passes[i], &layers_count, 1, 0, 256);
+				material->setLayerCount(idx, layers_count);
 			}
 		}
 

@@ -1879,7 +1879,7 @@ struct PipelineImpl : public Pipeline
 			auto& view = m_views[m_current_render_views[i]];
 			if (!bgfx::isValid(shader_instance.m_program_handles[view.pass_idx])) continue;
 
-			for (int j = 0, c = material->getLayerCount(); j < c; ++j)
+			for (int j = 0, c = material->getLayerCount(view.pass_idx); j < c; ++j)
 			{
 				auto layer = Vec4((j + 1) / (float)c, 0, 0, 0);
 				bgfx::setUniform(m_layer_uniform, &layer);
