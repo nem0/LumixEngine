@@ -492,7 +492,7 @@ struct DockContext
 		canvas->PushClipRectFullScreen();
 
 		ImU32 docked_color = GetColorU32(ImGuiCol_FrameBg);
-		docked_color = docked_color & 0x00ffFFFF | 0x80000000;
+		docked_color = (docked_color & 0x00ffFFFF) | 0x80000000;
 		dock.pos = GetIO().MousePos - m_drag_offset;
 		if (dest_dock)
 		{

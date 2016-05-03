@@ -19,7 +19,6 @@ struct Block;
 enum class BlockType
 {
 	TIME,
-	FLOAT,
 	INT
 };
 
@@ -42,7 +41,6 @@ LUMIX_ENGINE_API uint64 getBlockHitStart(Block* block, int hit_index);
 LUMIX_ENGINE_API uint64 getBlockHitLength(Block* block, int hit_index);
 LUMIX_ENGINE_API const char* getBlockName(Block* block);
 
-LUMIX_ENGINE_API void record(const char* name, float value);
 LUMIX_ENGINE_API void record(const char* name, int value);
 LUMIX_ENGINE_API void beginBlock(const char* name);
 LUMIX_ENGINE_API void endBlock();

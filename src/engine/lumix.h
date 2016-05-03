@@ -16,8 +16,10 @@
 	#else
 		#define PLATFORM32
 	#endif
+#elif defined(__EMSCRIPTEN__)
+	#define PLATFORM32
 #else
-#error Platform not supported
+	#error Platform not supported
 #endif
 
 #define STRINGIZE_2( _ ) #_
@@ -37,6 +39,9 @@ typedef int int32;
 typedef unsigned int uint32;
 
 #ifdef _WIN32
+	typedef long long int64;
+	typedef unsigned long long uint64;
+#elif defined __EMSCRIPTEN__
 	typedef long long int64;
 	typedef unsigned long long uint64;
 #else
