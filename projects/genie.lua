@@ -7,6 +7,15 @@ newoption {
 	description = "Plugins are static libraries.",
 }
 
+newoption {
+		trigger = "gcc",
+		value = "GCC",
+		description = "Choose GCC flavor",
+		allowed = {
+			{ "asmjs",           "Emscripten/asm.js"          }
+		}
+	}
+	
 newaction {
 	trigger = "install",
 	description = "Install in ../../LumixEngine_data/bin",
@@ -83,6 +92,22 @@ newaction {
 	end
 }
 
+if _ACTION == "gmake" then
+	if "asmjs" == _OPTIONS["gcc"] then
+
+		if not os.getenv("EMSCRIPTEN") then
+			print("Set EMSCRIPTEN enviroment variable.")
+		end
+
+		premake.gcc.cc   = "\"$(EMSCRIPTEN)/emcc\""
+		premake.gcc.cxx  = "\"$(EMSCRIPTEN)/em++\""
+		premake.gcc.ar   = "\"$(EMSCRIPTEN)/emar\""
+		premake.gcc.llvm = true
+		LOCATION = "tmp/gmake_asmjs"
+		BINARY_DIR = LOCATION .. "/bin/"
+	end
+end
+			
 function defaultConfigurations()
 	configuration "Debug"
 		targetdir(BINARY_DIR .. "Debug")

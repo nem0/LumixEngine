@@ -1,0 +1,1 @@
+genie.exe --static-plugins --gcc=asmjs gmake
