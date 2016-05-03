@@ -124,7 +124,7 @@ struct ManagerImpl : public Manager
 		}
 	}
 
-	void doScheduling()
+	void doScheduling() override
 	{
 #if TYPE == MULTI_THREAD
 

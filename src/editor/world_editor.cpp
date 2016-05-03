@@ -139,7 +139,7 @@ public:
 	}
 
 
-	bool merge(IEditorCommand& command)
+	bool merge(IEditorCommand& command) override
 	{
 		ASSERT(command.getType() == getType());
 		if (static_cast<SetEntityNameCommand&>(command).m_entity == m_entity)
@@ -184,7 +184,7 @@ public:
 	bool execute() override;
 
 
-	void serialize(JsonSerializer& serializer)
+	void serialize(JsonSerializer& serializer) override
 	{
 		serializer.serialize("pos_x", m_position.x);
 		serializer.serialize("pos_y", m_position.y);
@@ -200,7 +200,7 @@ public:
 	}
 
 
-	void deserialize(JsonSerializer& serializer)
+	void deserialize(JsonSerializer& serializer) override
 	{
 		serializer.deserialize("pos_x", m_position.x, 0);
 		serializer.deserialize("pos_y", m_position.y, 0);
@@ -242,7 +242,7 @@ public:
 	}
 
 
-	bool merge(IEditorCommand& command)
+	bool merge(IEditorCommand& command) override
 	{
 		ASSERT(command.getType() == getType());
 		return false;
@@ -375,7 +375,7 @@ public:
 	}
 
 
-	bool merge(IEditorCommand& command)
+	bool merge(IEditorCommand& command) override
 	{
 		ASSERT(command.getType() == getType());
 		MoveEntityCommand& my_command =
@@ -506,7 +506,7 @@ public:
 	}
 
 
-	bool merge(IEditorCommand& command)
+	bool merge(IEditorCommand& command) override
 	{
 		ASSERT(command.getType() == getType());
 		auto& my_command = static_cast<ScaleEntityCommand&>(command);
@@ -616,7 +616,7 @@ public:
 	}
 
 
-	bool merge(IEditorCommand&) { return false; }
+	bool merge(IEditorCommand&) override { return false; }
 
 private:
 	WorldEditor& m_editor;
@@ -692,7 +692,7 @@ public:
 	}
 
 
-	bool merge(IEditorCommand&) { return false; }
+	bool merge(IEditorCommand&) override { return false; }
 
 private:
 	ComponentUID m_component;
@@ -814,7 +814,7 @@ public:
 	}
 
 
-	bool merge(IEditorCommand& command)
+	bool merge(IEditorCommand& command) override
 	{
 		ASSERT(command.getType() == getType());
 		SetPropertyCommand& src = static_cast<SetPropertyCommand&>(command);
@@ -1207,7 +1207,7 @@ private:
 		}
 
 
-		void serialize(JsonSerializer& serializer)
+		void serialize(JsonSerializer& serializer) override 
 		{
 			serializer.serialize("entity", m_component.entity);
 			serializer.serialize("component", m_component.index);
@@ -1215,7 +1215,7 @@ private:
 		}
 
 
-		void deserialize(JsonSerializer& serializer)
+		void deserialize(JsonSerializer& serializer) override
 		{
 			serializer.deserialize("entity", m_component.entity, 0);
 			serializer.deserialize("component", m_component.index, 0);
@@ -1710,6 +1710,9 @@ public:
 			break;
 			case MouseMode::NAVIGATE: rotateCamera(relx, rely); break;
 			case MouseMode::PAN: panCamera(relx * MOUSE_MULTIPLIER, rely * MOUSE_MULTIPLIER); break;
+			case MouseMode::NONE:
+			case MouseMode::SELECT:
+				break;
 		}
 	}
 

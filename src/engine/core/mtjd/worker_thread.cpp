@@ -1,11 +1,8 @@
 #include "engine/lumix.h"
 #include "engine/core/mtjd/worker_thread.h"
-
 #include "engine/core/mtjd/manager.h"
 #include "engine/core/mtjd/job.h"
-
-#define PROFILE_START
-#define PROFILE_STOP
+#include "engine/core/profiler.h"
 
 namespace Lumix
 {
@@ -43,12 +40,12 @@ namespace Lumix
 				if (!tr)
 					break;
 
-				PROFILE_START("WorkerTask");
-				PROFILE_START(tr->data->getJobName());
+				Profiler::beginBlock("WorkerTask");
+				Profiler::beginBlock(tr->data->getJobName());
 				tr->data->execute();
 				tr->setCompleted();
-				PROFILE_STOP(tr->data->getJobName());
-				PROFILE_STOP("WorkerTask");
+				Profiler::endBlock();
+				Profiler::endBlock();
 
 				m_manager->doScheduling();
 			}

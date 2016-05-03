@@ -124,10 +124,10 @@ function defaultConfigurations()
 		defines { "NDEBUG" }
 		flags { "Symbols", "Optimize", "WinMain" }
 
-	configuration "not windows"
+	configuration "linux or gmake"
 		buildoptions { "-std=c++11" }
 		links { "pthread" }
-
+		
 	configuration {}
 		files { "lumix.natvis" }
 
@@ -239,7 +239,7 @@ project "engine"
 		end
 	configuration "not macosx"
 		excludes { "../src/engine/**/osx/*"}
-	configuration "not windows"
+	configuration "linux or gmake"
 		excludes { "../src/engine/**/win/*"}
 	configuration {}
 
@@ -303,7 +303,7 @@ project "audio"
 
 	configuration "windows"
 		links { "dxguid" }
-	configuration "not windows"
+	configuration "linux or gmake"
 		excludes { "../src/audio/win/*"}
 	configuration {}
 
@@ -399,7 +399,7 @@ project "editor"
 		links { "winmm" }
 	configuration {}
 
-	configuration "not windows"
+	configuration "linux or gmake"
 		excludes { "../src/editor/win/*"}
 	configuration {}
 
@@ -421,7 +421,7 @@ project "studio"
 	files { "../src/studio/**.cpp" }
 	includedirs { "../src" }
 
-	configuration "not windows"
+	configuration "linux or gmake"
 		excludes { "../src/studio/win/**.cpp" }
 	configuration "not linux"
 		excludes { "../src/studio/linux/**.cpp" }

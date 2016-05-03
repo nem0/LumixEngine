@@ -340,6 +340,9 @@ struct GizmoImpl : public Gizmo
 					axis1 = right;
 					axis2 = up;
 					break;
+				default:
+					ASSERT(false);
+					break;
 			}
 			renderQuarterRing(mtx, axis1, axis2, SELECTED_COLOR);
 			renderQuarterRing(mtx, -axis1, axis2, SELECTED_COLOR);
@@ -475,22 +478,16 @@ struct GizmoImpl : public Gizmo
 		m_editor.getRenderInterface()->getRay(camera.index, m_editor.getMouseX(), m_editor.getMouseY(), origin, dir);
 		dir.normalize();
 		Matrix camera_mtx = m_editor.getUniverse()->getPositionAndRotation(camera.entity);
-		bool is_two_axed = m_transform_axis == Axis::XZ || m_transform_axis == Axis::XY ||
-			m_transform_axis == Axis::YZ;
+		bool is_two_axed = m_transform_axis == Axis::XZ || m_transform_axis == Axis::XY || m_transform_axis == Axis::YZ;
 		if (is_two_axed)
 		{
 			Vec3 plane_normal;
 			switch (m_transform_axis)
 			{
-			case Axis::XZ:
-				plane_normal = gizmo_mtx.getYVector();
-				break;
-			case Axis::XY:
-				plane_normal = gizmo_mtx.getZVector();
-				break;
-			case Axis::YZ:
-				plane_normal = gizmo_mtx.getXVector();
-				break;
+				case Axis::XZ: plane_normal = gizmo_mtx.getYVector(); break;
+				case Axis::XY: plane_normal = gizmo_mtx.getZVector(); break;
+				case Axis::YZ: plane_normal = gizmo_mtx.getXVector(); break;
+				default: ASSERT(false); break;
 			}
 			float t;
 			if (Math::getRayPlaneIntersecion(origin, dir, gizmo_mtx.getTranslation(), plane_normal, t))
@@ -502,22 +499,16 @@ struct GizmoImpl : public Gizmo
 		Vec3 axis;
 		switch (m_transform_axis)
 		{
-		case Axis::X:
-			axis = gizmo_mtx.getXVector();
-			break;
-		case Axis::Y:
-			axis = gizmo_mtx.getYVector();
-			break;
-		case Axis::Z:
-			axis = gizmo_mtx.getZVector();
-			break;
+			case Axis::X: axis = gizmo_mtx.getXVector(); break;
+			case Axis::Y: axis = gizmo_mtx.getYVector(); break;
+			case Axis::Z: axis = gizmo_mtx.getZVector(); break;
+			default: ASSERT(false); break;
 		}
 		Vec3 pos = gizmo_mtx.getTranslation();
 		Vec3 normal = crossProduct(crossProduct(dir, axis), dir);
 		float d = dotProduct(origin - pos, normal) / dotProduct(axis, normal);
 		return axis * d + pos;
 	}
-
 
 
 	float computeRotateAngle(int relx, int rely)
@@ -563,6 +554,7 @@ struct GizmoImpl : public Gizmo
 			case Axis::X: axis = mtx.getXVector(); break;
 			case Axis::Y: axis = mtx.getYVector(); break;
 			case Axis::Z: axis = mtx.getZVector(); break;
+			default: ASSERT(false); break;
 		}
 		float angle = computeRotateAngle((int)relx, (int)rely);
 

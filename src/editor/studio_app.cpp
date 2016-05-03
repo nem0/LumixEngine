@@ -1378,7 +1378,7 @@ public:
 	}
 
 
-	void run()
+	void run() override
 	{
 		checkScriptCommandLine();
 
@@ -1518,7 +1518,7 @@ public:
 		}
 
 
-		void onChar(int key)
+		void onChar(int key) override
 		{
 			ImGui::GetIO().AddInputCharacter(key);
 		}

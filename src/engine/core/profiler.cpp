@@ -247,15 +247,6 @@ static BlockInfo getBlock(const char* name)
 }
 
 
-void record(const char* name, float value)
-{
-	auto data = getBlock(name);
-	data.block->m_type = BlockType::FLOAT;
-	data.block->m_values.float_value = value;
-	data.thread_data->current_block = data.block->m_parent;
-}
-
-
 void record(const char* name, int value)
 {
 	auto data = getBlock(name);
