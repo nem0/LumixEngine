@@ -816,6 +816,12 @@ struct RendererImpl : public Renderer
 	}
 
 
+	const char* getPassName(int idx) override
+	{
+		return m_passes[idx];
+	}
+
+
 	int getPassIdx(const char* pass) override
 	{
 		for (int i = 0; i < m_passes.size(); ++i)

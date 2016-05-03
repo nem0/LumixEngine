@@ -39,9 +39,9 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 	, m_shader_instance(nullptr)
 	, m_define_mask(0)
 	, m_command_buffer(nullptr)
-	, m_layer_count(1)
 	, m_custom_flags(0)
 {
+	for (auto& l : m_layer_count) l = 1;
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
 	{
@@ -145,7 +145,16 @@ bool Material::save(JsonSerializer& serializer)
 
 	serializer.beginObject();
 	serializer.serialize("shader", m_shader ? m_shader->getPath() : Path(""));
-	if (m_layer_count != 1)serializer.serialize("layer_count", m_layer_count);
+	for (int i = 0; i < lengthOf(m_layer_count); ++i)
+	{
+		if (m_layer_count[i] != 1)
+		{
+			serializer.beginObject("layer");
+				serializer.serialize("pass", renderer.getPassName(i));
+				serializer.serialize("count", m_layer_count[i]);
+			serializer.endObject();
+		}
+	}
 	for (int i = 0; i < m_texture_count; ++i)
 	{
 		char path[MAX_PATH_LENGTH];
@@ -706,6 +715,9 @@ bool Material::load(FS::IFile& file)
 {
 	PROFILE_FUNCTION();
 
+	auto* manager = getResourceManager().get(ResourceManager::MATERIAL);
+	auto& renderer = static_cast<MaterialManager*>(manager)->getRenderer();
+
 	m_render_states = 0;
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	m_uniforms.clear();
@@ -740,9 +752,28 @@ bool Material::load(FS::IFile& file)
 		{
 			serializer.deserialize(m_alpha_ref, 0.3f);
 		}
-		else if (compareString(label, "layer_count") == 0)
+		else if (compareString(label, "layer") == 0)
 		{
-			serializer.deserialize(m_layer_count, 1);
+			serializer.deserializeObjectBegin();
+			int pass = 0;
+			int layers_count = 1;
+			while (!serializer.isObjectEnd())
+			{
+				serializer.deserializeLabel(label, 255);
+				
+				if (compareString(label, "pass") == 0)
+				{
+					char pass_name[50];
+					serializer.deserialize(pass_name, lengthOf(pass_name), "");
+					pass = renderer.getPassIdx(pass_name);
+				}
+				else if (compareString(label, "count") == 0)
+				{
+					serializer.deserialize(layers_count, 1);
+				}
+			}
+			m_layer_count[pass] = layers_count;
+			serializer.deserializeObjectEnd();
 		}
 		else if (compareString(label, "color") == 0)
 		{
@@ -765,7 +796,7 @@ bool Material::load(FS::IFile& file)
 		}
 		else
 		{
-			g_log_warning.log("Renderer") << "Unknown parameter " << label << " in material "
+			g_log_error.log("Renderer") << "Unknown parameter " << label << " in material "
 										  << getPath();
 		}
 	}

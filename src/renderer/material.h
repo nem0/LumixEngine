@@ -73,8 +73,8 @@ public:
 	ShaderInstance& getShaderInstance() { ASSERT(m_shader_instance); return *m_shader_instance; }
 	const ShaderInstance& getShaderInstance() const { ASSERT(m_shader_instance); return *m_shader_instance; }
 	const uint8* getCommandBuffer() const { return m_command_buffer; }
-	int getLayerCount() const { return m_layer_count; }
-	void setLayerCount(int count) { m_layer_count = count; }
+	int getLayerCount(int pass_idx) const { return m_layer_count[pass_idx]; }
+	void setLayerCount(int pass_idx, int count) { m_layer_count[pass_idx] = (uint8)count; }
 	void createCommandBuffer();
 
 	void setDefine(uint8 define_idx, bool enabled);
@@ -113,7 +113,7 @@ private:
 	float m_alpha_ref;
 	uint32 m_define_mask;
 	uint8* m_command_buffer;
-	int m_layer_count;
+	uint8 m_layer_count[32];
 	uint32 m_custom_flags;
 };
 
