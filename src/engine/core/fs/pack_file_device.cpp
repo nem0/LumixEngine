@@ -28,7 +28,7 @@ public:
 		if (iter == m_device.m_files.end()) return false;
 		m_file = iter.value();
 		m_local_offset = 0;
-		return m_device.m_file.seek(SeekMode::BEGIN, (size_t)m_file.offset) == (size_t)m_file.offset;
+		return m_device.m_file.seek(SeekMode::BEGIN, (size_t)m_file.offset);
 	}
 
 
@@ -36,8 +36,7 @@ public:
 	{
 		if (m_device.m_offset != m_file.offset + m_local_offset)
 		{
-			if (m_device.m_file.seek(FS::SeekMode::BEGIN, size_t(m_file.offset + m_local_offset)) !=
-				size_t(m_file.offset + m_local_offset))
+			if (!m_device.m_file.seek(FS::SeekMode::BEGIN, size_t(m_file.offset + m_local_offset)))
 			{
 				return false;
 			}

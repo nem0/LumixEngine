@@ -26,8 +26,7 @@ namespace Lumix
 			size_t size();
 			size_t pos();
 
-			size_t seek(SeekMode base, size_t pos);
-			void writeEOF();
+			bool seek(SeekMode base, size_t pos);
 
 			OsFile& operator <<(const char* text);
 			OsFile& operator <<(int32 value);

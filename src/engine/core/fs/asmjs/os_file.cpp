@@ -1,8 +1,9 @@
 #include "engine/core/fs/os_file.h"
 #include "engine/core/iallocator.h"
-#include "engine/core/win/simple_win.h"
 #include "engine/core/string.h"
 #include "engine/lumix.h"
+#include <cstdio>
+#include <unistd.h>
 
 
 namespace Lumix
@@ -17,7 +18,7 @@ struct OsFileImpl
 	}
 
 	IAllocator& m_allocator;
-	HANDLE m_file;
+	FILE* m_file;
 };
 
 OsFile::OsFile()
@@ -32,38 +33,29 @@ OsFile::~OsFile()
 
 bool OsFile::open(const char* path, Mode mode, IAllocator& allocator)
 {
-	HANDLE hnd = ::CreateFile(path,
-		Mode::WRITE & mode ? GENERIC_WRITE : 0 | Mode::READ & mode ? GENERIC_READ : 0,
-		Mode::WRITE & mode ? 0 : FILE_SHARE_READ,
-		nullptr,
-		Mode::CREATE & mode ? CREATE_ALWAYS : OPEN_EXISTING,
-		FILE_ATTRIBUTE_NORMAL,
-		nullptr);
-
-
-	if (INVALID_HANDLE_VALUE != hnd)
+	FILE* fp = fopen(path, Mode::WRITE & mode ? "wb" : "rb");
+	if (fp)
 	{
 		OsFileImpl* impl = LUMIX_NEW(allocator, OsFileImpl)(allocator);
-		impl->m_file = hnd;
+		impl->m_file = fp;
 		m_impl = impl;
 
 		return true;
 	}
-
 	return false;
 }
 
 void OsFile::flush()
 {
 	ASSERT(nullptr != m_impl);
-	FlushFileBuffers(m_impl->m_file);
+	fflush(m_impl->m_file);
 }
 
 void OsFile::close()
 {
 	if (nullptr != m_impl)
 	{
-		::CloseHandle(m_impl->m_file);
+		fclose(m_impl->m_file);
 		LUMIX_DELETE(m_impl->m_allocator, m_impl);
 		m_impl = nullptr;
 	}
@@ -78,36 +70,37 @@ bool OsFile::writeText(const char* text)
 bool OsFile::write(const void* data, size_t size)
 {
 	ASSERT(nullptr != m_impl);
-	size_t written = 0;
-	::WriteFile(m_impl->m_file, data, (DWORD)size, (LPDWORD)&written, nullptr);
-	return size == written;
+	size_t written = fwrite(data, size, 1, m_impl->m_file);
+	return written == 1;
 }
 
 bool OsFile::read(void* data, size_t size)
 {
 	ASSERT(nullptr != m_impl);
-	size_t readed = 0;
-	::ReadFile(m_impl->m_file, data, (DWORD)size, (LPDWORD)&readed, nullptr);
-	return size == readed;
+	size_t read = fread(data, size, 1, m_impl->m_file);
+	return read == 1;
 }
 
 size_t OsFile::size()
 {
 	ASSERT(nullptr != m_impl);
-	return ::GetFileSize(m_impl->m_file, 0);
+	long pos = ftell(m_impl->m_file);
+	fseek(m_impl->m_file, 0, SEEK_END);
+	size_t size = (size_t)ftell(m_impl->m_file);
+	fseek(m_impl->m_file, pos, SEEK_SET);
+	return size;
 }
 
 bool OsFile::fileExists(const char* path)
 {
-	DWORD dwAttrib = GetFileAttributes(path);
-	return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
-		!(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+	return access(path, F_OK) != -1;
 }
 
 size_t OsFile::pos()
 {
 	ASSERT(nullptr != m_impl);
-	return ::SetFilePointer(m_impl->m_file, 0, nullptr, FILE_CURRENT);
+	long pos = ftell(m_impl->m_file);
+	return (size_t)pos;
 }
 
 bool OsFile::seek(SeekMode base, size_t pos)
@@ -117,17 +110,17 @@ bool OsFile::seek(SeekMode base, size_t pos)
 	switch (base)
 	{
 		case SeekMode::BEGIN:
-			dir = FILE_BEGIN;
+			dir = SEEK_SET;
 			break;
 		case SeekMode::END:
-			dir = FILE_END;
+			dir = SEEK_END;
 			break;
 		case SeekMode::CURRENT:
-			dir = FILE_CURRENT;
+			dir = SEEK_CUR;
 			break;
 	}
 
-	return ::SetFilePointer(m_impl->m_file, (LONG)pos, nullptr, dir) == (LONG)pos;
+	return fseek(m_impl->m_file, pos, dir) == 0;
 }
 
 
