@@ -43,7 +43,7 @@ if _OPTIONS["no-unit-tests"] or _ACTION == "gmake" then
 	build_unit_tests = false
 end
 
-if _OPTIONS["no-app"] or _ACTION == "gmake" then
+if _OPTIONS["no-app"] then
 	build_app = false
 end
 
@@ -132,6 +132,25 @@ newaction {
 	end
 }
 
+
+function strip()
+	configuration { "asmjs" }
+		postbuildcommands {
+			"$(SILENT) echo Running asmjs finalize.",
+			"$(SILENT) \"$(EMSCRIPTEN)/emcc\" -O2 "
+--				.. "-s EMTERPRETIFY=1 "
+--				.. "-s EMTERPRETIFY_ASYNC=1 "
+				.. "-s TOTAL_MEMORY=268435456 "
+--				.. "-s ALLOW_MEMORY_GROWTH=1 "
+--				.. "-s USE_WEBGL2=1 "
+				.. "--memory-init-file 1 "
+				.. "\"$(TARGET)\" -o \"$(TARGET)\".html "
+--				.. "--preload-file ../../../examples/runtime@/"
+		}
+
+	configuration {} -- reset configuration
+end
+
 		
 function defaultConfigurations()
 	configuration "Debug"
@@ -153,7 +172,7 @@ function defaultConfigurations()
 		buildoptions { "-std=c++11" }
 		links { "pthread" }
 
-	configuration { "gmake" }
+	configuration { "asmjs" }
 		buildoptions { "-std=c++11" }
 		
 	configuration {}
@@ -180,7 +199,7 @@ function useLua()
 	if _OPTIONS["static-plugins"] then
 		linkLib("lua")
 	else
-		configuration { "windows", "not gmake" }
+		configuration { "windows", "not asmjs" }
 			defines { "LUA_BUILD_AS_DLL" }
 		configuration {}
 	end
@@ -236,9 +255,9 @@ function linkPhysX()
 end
 
 function forceLink(name)
-	configuration { "x64", "windows", "not gmake" }
+	configuration { "x64", "windows", "not asmjs" }
 		linkoptions {"/INCLUDE:" .. name}
-	configuration { "x32", "windows", "not gmake" }
+	configuration { "x32", "windows", "not asmjs" }
 		linkoptions {"/INCLUDE:_" .. name}
 	configuration {}
 end
@@ -279,14 +298,22 @@ project "engine"
 	defines { "BUILDING_ENGINE" }
 	includedirs { "../external/lua/include" }
 
-	configuration { "windows", "not gmake" }
+	configuration { "windows", "not asmjs" }
 		if not _OPTIONS["static-plugins"] then
 			linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
 		end
 	configuration "not macosx"
 		excludes { "../src/engine/**/osx/*"}
-	configuration "linux or gmake"
+		
+	configuration "not windows"
 		excludes { "../src/engine/**/win/*"}
+
+	configuration "asmjs"
+		excludes { "../src/engine/**/win/*"}
+		
+	configuration "not asmjs" 
+		excludes { "../src/engine/**/asmjs/*"}
+		
 	configuration {}
 
 	linkLib("lua")
@@ -351,7 +378,7 @@ project "audio"
 
 	configuration "windows"
 		links { "dxguid" }
-	configuration "linux or gmake"
+	configuration "linux or asmjs"
 		excludes { "../src/audio/win/*"}
 	configuration {}
 
@@ -400,11 +427,22 @@ end
 
 if build_app then
 	project "app"
-		kind "WindowedApp"
+		
+		configuration { "asmjs" }
+			kind "ConsoleApp"
+			targetextension ".bc"
+			files { "../src/app/main_asmjs.cpp" }
+
+		configuration { "windows" }
+			kind "WindowedApp"
 
 		debugdir "../../LumixEngine_data"
 
-		files { "../src/app/**.h", "../src/app/**.cpp" }
+		configuration { "windows", "not asmjs" }
+			files { "../src/app/main_win.cpp" }
+		
+		configuration {}
+		
 		includedirs { "../src", "../src/app", "../external/bgfx/include" }
 		if _OPTIONS["static-plugins"] then	
 			forceLink("s_animation_plugin_register")
@@ -420,9 +458,22 @@ if build_app then
 			forceLink("setStudioApp_physics")
 			forceLink("setStudioApp_renderer")
 
-			links { "engine", "winmm", "audio", "animation", "renderer", "lua_script", "navigation", "physics", "psapi", "dxguid" }
-			linkLib("crnlib")
-			linkLib("assimp")
+			links { "engine", "audio", "animation", "renderer", "lua_script", "navigation" }
+			
+			if build_physics then
+				links { "physics" }
+			end
+
+			configuration { "windows", "not asmjs" }
+				links { "psapi", "dxguid", "winmm" }
+
+			configuration {}
+			
+			if _ACTION ~= "gmake" then
+				linkLib("crnlib")
+				linkLib("assimp")
+			end
+			
 			linkLib("bgfx")
 			linkLib("lua")
 			linkLib("recast")
@@ -432,6 +483,7 @@ if build_app then
 		
 		useLua()
 		defaultConfigurations()
+		strip()
 end
 
 project "editor"
@@ -447,10 +499,10 @@ project "editor"
 		"../external/bgfx/include",
 	}
 
-	configuration { "windows", "not gmake" }
+	configuration { "windows", "not asmjs" }
 		links { "winmm" }
 
-	configuration "linux or gmake"
+	configuration "linux or asmjs"
 		excludes { "../src/editor/win/*"}
 
 	configuration {}
@@ -467,7 +519,7 @@ if build_studio then
 		files { "../src/studio/**.cpp" }
 		includedirs { "../src" }
 
-		configuration "linux or gmake"
+		configuration "linux or asmjs"
 			excludes { "../src/studio/win/**.cpp" }
 		configuration "not linux"
 			excludes { "../src/studio/linux/**.cpp" }
@@ -499,7 +551,7 @@ if build_studio then
 			
 			linkPhysX()
 			
-			configuration { "windows", "not gmake" }
+			configuration { "windows", "not asmjs" }
 				links { "psapi", "dxguid", "winmm" }
 			
 			configuration {}
