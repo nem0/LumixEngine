@@ -16,7 +16,6 @@ namespace Lumix
 
 
 class InputBlob;
-class Event;
 struct Matrix;
 class OutputBlob;
 class Universe;

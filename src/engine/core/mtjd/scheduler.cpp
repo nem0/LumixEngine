@@ -10,8 +10,8 @@ namespace Lumix
 	{
 		Scheduler::Scheduler(Manager& manager, IAllocator& allocator)
 			: MT::Task(allocator)
-			, m_data_event(0)
-			, m_abort_event(0)
+			, m_data_event()
+			, m_abort_event()
 			, m_manager(manager)
 		{
 		}

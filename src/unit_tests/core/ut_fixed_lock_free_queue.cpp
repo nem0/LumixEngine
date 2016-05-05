@@ -63,7 +63,6 @@ namespace
 		Queue queue;
 		TestTaskConsumer testTaskConsumer(&queue, allocator);
 		testTaskConsumer.create("TestTaskConsumer_Task");
-		testTaskConsumer.run();
 
 		const int RUN_COUNT = 512;
 

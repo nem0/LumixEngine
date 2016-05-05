@@ -114,7 +114,6 @@ public:
 	{
 		m_task = LUMIX_NEW(m_allocator, FSTask)(&m_transaction_queue, m_allocator);
 		m_task->create("FSTask");
-		m_task->run();
 	}
 
 	~FileSystemImpl()

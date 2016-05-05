@@ -467,6 +467,9 @@ if build_app then
 			configuration { "windows", "not asmjs" }
 				links { "psapi", "dxguid", "winmm" }
 
+			configuration { "asmjs" }
+				links { "SDL" }
+				
 			configuration {}
 			
 			if _ACTION ~= "gmake" then
@@ -486,31 +489,33 @@ if build_app then
 		strip()
 end
 
-project "editor"
-	libType()
-
-	files { "../src/editor/**.h", "../src/editor/**.cpp", "../src/editor/**.inl" }
-	defines { "BUILDING_EDITOR" }
-	links { "engine" }
-	includedirs {
-		"../src",
-		"../src/editor",
-		"../external/lua/include",
-		"../external/bgfx/include",
-	}
-
-	configuration { "windows", "not asmjs" }
-		links { "winmm" }
-
-	configuration "linux or asmjs"
-		excludes { "../src/editor/win/*"}
-
-	configuration {}
-
-	useLua()
-	defaultConfigurations()
 
 if build_studio then
+	project "editor"
+		libType()
+
+		files { "../src/editor/**.h", "../src/editor/**.cpp", "../src/editor/**.inl" }
+		defines { "BUILDING_EDITOR" }
+		links { "engine" }
+		includedirs {
+			"../src",
+			"../src/editor",
+			"../external/lua/include",
+			"../external/bgfx/include",
+		}
+
+		configuration { "windows", "not asmjs" }
+			links { "winmm" }
+
+		configuration "linux or asmjs"
+			excludes { "../src/editor/win/*"}
+
+		configuration {}
+
+		useLua()
+		defaultConfigurations()
+
+
 	project "studio"
 		kind "WindowedApp"
 

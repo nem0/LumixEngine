@@ -87,10 +87,10 @@ namespace Lumix
 			}
 
 
-			size_t seek(SeekMode base, size_t pos) override
+			bool seek(SeekMode base, size_t pos) override
 			{
 				invokeEvent(EventType::SEEK_BEGIN, "", (int32)pos, base);
-				size_t ret = m_file.seek(base, pos);
+				bool ret = m_file.seek(base, pos);
 
 				invokeEvent(EventType::SEEK_FINISHED, "", (int32)ret, base);
 				return ret;

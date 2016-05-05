@@ -111,7 +111,7 @@ namespace Lumix
 				return (size_t)size;
 			}
 
-			size_t seek(SeekMode base, size_t pos) override
+			bool seek(SeekMode base, size_t pos) override
 			{
 				int32 op = TCPCommand::Seek;
 
@@ -121,10 +121,10 @@ namespace Lumix
 				m_stream->write(base);
 				m_stream->write((uint64)pos);
 
-				int32 ret = 0;
-				m_stream->read(ret);
+				uint8 res = 0;
+				m_stream->read(res);
 
-				return (size_t)ret;
+				return res != 0;
 			}
 
 			size_t pos() override

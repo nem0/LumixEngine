@@ -108,11 +108,6 @@ namespace
 		cons3.create("cons3");
 		cons4.create("cons4");
 
-		cons1.run();
-		cons2.run();
-		cons3.run();
-		cons4.run();
-
 		TestTaskProducer prod1(&trans_queue, &testItems[0], itemsCount / 4, allocator);
 		TestTaskProducer prod2(&trans_queue, &testItems[itemsCount / 4], itemsCount / 4, allocator);
 		TestTaskProducer prod3(&trans_queue, &testItems[itemsCount / 2], itemsCount / 4, allocator);
@@ -122,12 +117,7 @@ namespace
 		prod2.create("prod2");
 		prod3.create("prod3");
 		prod4.create("prod4");
-
-		prod1.run();
-		prod2.run();
-		prod3.run();
-		prod4.run();
-
+		
 		while (!prod1.isFinished()
 			|| !prod2.isFinished()
 			|| !prod3.isFinished()
@@ -183,11 +173,9 @@ namespace
 		TestTaskConsumer cons(&trans_queue, testItems, allocator);
 
 		prod.create("producer");
-		cons.create("consumer");
-
-		prod.run();
 		Lumix::MT::sleep(1000);
-		cons.run();
+
+		cons.create("consumer");
 
 		while (!prod.isFinished() || !trans_queue.isEmpty())
 			Lumix::MT::yield();

@@ -126,7 +126,7 @@ namespace Lumix
 				return m_size;
 			}
 
-			size_t seek(SeekMode base, size_t pos) override
+			bool seek(SeekMode base, size_t pos) override
 			{
 				switch(base)
 				{
@@ -147,8 +147,9 @@ namespace Lumix
 					break;
 				}
 
+				bool ret = m_pos <= m_size;
 				m_pos = Math::minimum(m_pos, m_size);
-				return m_pos;
+				return ret;
 			}
 
 			size_t pos() override

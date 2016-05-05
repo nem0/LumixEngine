@@ -2012,7 +2012,6 @@ bool ImportAssetDialog::checkSource()
 	m_is_importing = true;
 	m_task = LUMIX_NEW(m_editor.getAllocator(), ImportTask)(*this);
 	m_task->create("ImportAssetTask");
-	m_task->run();
 	return true;
 }
 
@@ -2108,7 +2107,6 @@ void ImportAssetDialog::convert(bool use_ui)
 	m_is_converting = true;
 	m_task = LUMIX_NEW(m_editor.getAllocator(), ConvertTask)(*this, m_model.mesh_scale);
 	m_task->create("ConvertAssetTask");
-	m_task->run();
 }
 
 
@@ -2131,7 +2129,6 @@ void ImportAssetDialog::importTexture()
 	m_is_importing_texture = true;
 	m_task = LUMIX_NEW(m_editor.getAllocator(), ImportTextureTask)(*this);
 	m_task->create("ImportTextureTask");
-	m_task->run();
 }
 
 

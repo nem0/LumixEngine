@@ -197,19 +197,12 @@ namespace Lumix
 				fi.m_file_name = file_name;
 				fi.m_line = line;
 				m_fails++;
-
-#if ASSERT_HANDLE_FAIL
-				ASSERT(false);
-#endif //ASSERT_HANDLE_FAIL
-
-				m_task.exit(10);
 			}
 
 			void spawnWorkerTask()
 			{
 				ASSERT(!m_task.isRunning());
 				m_task.create("TestWorkerTask");
-				m_task.run();
 			}
 
 			explicit ManagerImpl(IAllocator& allocator)

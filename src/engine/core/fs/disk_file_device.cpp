@@ -84,7 +84,7 @@ namespace Lumix
 				return m_file.size();
 			}
 
-			size_t seek(SeekMode base, size_t pos) override
+			bool seek(SeekMode base, size_t pos) override
 			{
 				if (m_use_fallthrough) return m_fallthrough->seek(base, pos);
 				return m_file.seek(base, pos);

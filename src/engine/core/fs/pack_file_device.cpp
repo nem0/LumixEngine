@@ -46,7 +46,7 @@ public:
 	}
 
 
-	size_t seek(SeekMode base, size_t pos) override
+	bool seek(SeekMode base, size_t pos) override
 	{
 		m_local_offset = pos;
 		return m_device.m_file.seek(SeekMode::BEGIN, size_t(m_file.offset + pos));
