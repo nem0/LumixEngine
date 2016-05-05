@@ -140,8 +140,8 @@ public:
 		stream->read(base);
 		stream->read(offset);
 
-		uint32 pos = (uint32)file->seek((SeekMode)base, offset);
-		stream->write(pos);
+		uint32 res = (uint8)file->seek((SeekMode)base, offset);
+		stream->write(res);
 	}
 
 
@@ -282,7 +282,6 @@ void TCPFileServer::start(const char* base_path, IAllocator& allocator)
 	m_impl = LUMIX_NEW(allocator, TCPFileServerImpl)(allocator);
 	m_impl->m_task.setBasePath(base_path);
 	m_impl->m_task.create("TCP File Server Task");
-	m_impl->m_task.run();
 }
 
 

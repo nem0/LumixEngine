@@ -58,8 +58,8 @@ void UT_file_events_device(const char* params)
 	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::SEEK_BEGIN & occured_event));
 	LUMIX_EXPECT(!(1 << (uint32)Lumix::FS::EventType::SEEK_FINISHED & occured_event));
 
-	size_t seek = file->seek(Lumix::FS::SeekMode::BEGIN, size - 4);
-	LUMIX_EXPECT(seek == size - 4);
+	bool seek_res = file->seek(Lumix::FS::SeekMode::BEGIN, size - 4);
+	LUMIX_EXPECT(seek_res);
 
 	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::SEEK_BEGIN & occured_event));
 	LUMIX_EXPECT(!!(1 << (uint32)Lumix::FS::EventType::SEEK_FINISHED & occured_event));

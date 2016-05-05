@@ -71,13 +71,6 @@ public:
 			m_task = nullptr;
 			return false;
 		}
-		if (!m_task->run())
-		{
-			m_task->destroy();
-			LUMIX_DELETE(m_allocator, m_task);
-			m_task = nullptr;
-			return false;
-		}
 		return true;
 	}
 

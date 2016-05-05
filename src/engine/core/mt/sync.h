@@ -36,7 +36,6 @@ public:
 	~Mutex();
 
 	void lock();
-	bool poll();
 
 	void unlock();
 
@@ -61,20 +60,12 @@ private:
 };
 
 
-enum class EventFlags : int
-{
-	SIGNALED = 0x1,
-	MANUAL_RESET = SIGNALED << 1,
-};
-
-
 typedef void* EventHandle;
-
 
 class LUMIX_ENGINE_API Event
 {
 public:
-	explicit Event(int flags);
+	explicit Event();
 	~Event();
 
 	void reset();

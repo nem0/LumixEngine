@@ -1,8 +1,6 @@
 #include "engine/core/mt/sync.h"
 #include "engine/core/mt/atomic.h"
 #include "engine/core/mt/thread.h"
-#include "engine/core/win/simple_win.h"
-
 
 
 namespace Lumix
@@ -11,81 +9,81 @@ namespace MT
 {
 
 
-Semaphore::Semaphore(int init_count, int max_count)
+Semaphore::Semaphore(int init_count, int /*max_count*/)
 {
-	m_id = ::CreateSemaphore(nullptr, init_count, max_count, nullptr);
+	m_id = nullptr;
 }
 
 Semaphore::~Semaphore()
 {
-	::CloseHandle(m_id);
 }
 
 void Semaphore::signal()
 {
-	::ReleaseSemaphore(m_id, 1, nullptr);
+	ASSERT(false);
 }
 
 void Semaphore::wait()
 {
-	::WaitForSingleObject(m_id, INFINITE);
+	ASSERT(false);
 }
 
 bool Semaphore::poll()
 {
-	return WAIT_OBJECT_0 == ::WaitForSingleObject(m_id, 0);
+	ASSERT(false);
+	return false;
 }
 
 
 Mutex::Mutex(bool locked)
 {
-	m_id = ::CreateMutex(nullptr, locked, nullptr);
+	m_id = nullptr;
 }
 
 Mutex::~Mutex()
 {
-	::CloseHandle(m_id);
 }
 
 void Mutex::lock()
 {
-	::WaitForSingleObject(m_id, INFINITE);
+	ASSERT(false);
 }
+
 
 void Mutex::unlock()
 {
-	::ReleaseMutex(m_id);
+	ASSERT(false);
 }
 
 
 Event::Event()
 {
-	m_id = ::CreateEvent(nullptr, TRUE, FALSE, nullptr);
+	m_id = nullptr;
 }
 
 Event::~Event()
 {
-	::CloseHandle(m_id);
 }
 
 void Event::reset()
 {
-	::ResetEvent(m_id);
+	ASSERT(false);
 }
 
 void Event::trigger()
 {
-	::SetEvent(m_id);
+	ASSERT(false);
 }
 
 void Event::wait()
 {
-	::WaitForSingleObject(m_id, INFINITE);
+	ASSERT(false);
 }
 
 bool Event::poll()
 {
-	return WAIT_OBJECT_0 == ::WaitForSingleObject(m_id, 0);
+	ASSERT(false);
+	return false;
 }
 
 

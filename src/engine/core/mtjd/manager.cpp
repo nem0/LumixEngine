@@ -30,7 +30,6 @@ struct ManagerImpl : public Manager
 		uint32 threads_num = getCpuThreadsCount();
 
 		m_scheduler.create("MTJD::Scheduler");
-		m_scheduler.run();
 
 		m_worker_tasks.reserve(threads_num);
 		for (uint32 i = 0; i < threads_num; ++i)
@@ -38,7 +37,6 @@ struct ManagerImpl : public Manager
 			m_worker_tasks.push(LUMIX_NEW(m_allocator, WorkerTask)(m_allocator));
 			m_worker_tasks[i]->create("MTJD::WorkerTask", this, &m_trans_queue);
 			m_worker_tasks[i]->setAffinityMask(getAffinityMask(i));
-			m_worker_tasks[i]->run();
 		}
 
 #endif // TYPE == MULTI_THREAD

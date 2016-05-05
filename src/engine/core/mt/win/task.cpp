@@ -76,16 +76,20 @@ namespace Lumix
 				m_implementation->m_exited = false;
 				m_implementation->m_thread_name = name;
 				m_implementation->m_handle = handle;
+				m_implementation->m_is_running = true;
+				
+				bool success = ::ResumeThread(m_implementation->m_handle) != -1;
+				if (success)
+				{
+					return true;
+				}
+				::CloseHandle(m_implementation->m_handle);
+				m_implementation->m_handle = nullptr;
+				return false;
 			}
-			return handle != nullptr;
+			return false;
 		}
-
-		bool Task::run()
-		{
-			m_implementation->m_is_running = true;
-			return ::ResumeThread(m_implementation->m_handle) != -1;
-		}
-
+		
 		bool Task::destroy()
 		{
 			while (m_implementation->m_is_running)
@@ -107,30 +111,9 @@ namespace Lumix
 			}
 		}
 
-		void Task::setPriority(uint32 priority)
-		{
-			m_implementation->m_priority = priority;
-			if (m_implementation->m_handle)
-			{
-				::SetThreadPriority(m_implementation->m_handle, priority);
-			}
-		}
-
 		uint32 Task::getAffinityMask() const
 		{
 			return m_implementation->m_affinity_mask;
-		}
-
-		uint32 Task::getPriority() const
-		{
-			return m_implementation->m_priority;
-		}
-
-		uint32 Task::getExitCode() const
-		{
-			uint32 exit_code = 0xffffFFFF;
-			::GetExitCodeThread(m_implementation->m_handle, (LPDWORD)&exit_code);
-			return exit_code;
 		}
 
 		bool Task::isRunning() const
@@ -161,13 +144,6 @@ namespace Lumix
 			{
 				yield();
 			}
-		}
-
-		void Task::exit(int32 exit_code)
-		{
-			m_implementation->m_exited = true;
-			m_implementation->m_is_running = false;
-			::ExitThread(exit_code);
 		}
 
 	} // namespace MT

@@ -69,7 +69,7 @@ public:
 	virtual const void* getBuffer() const = 0;
 	virtual size_t size() = 0;
 
-	virtual size_t seek(SeekMode base, size_t pos) = 0;
+	virtual bool seek(SeekMode base, size_t pos) = 0;
 	virtual size_t pos() = 0;
 
 	IFile& operator << (const char* text);
