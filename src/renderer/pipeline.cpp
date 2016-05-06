@@ -476,8 +476,6 @@ struct PipelineImpl : public Pipeline
 		m_bone_matrices_uniform =
 			bgfx::createUniform("u_boneMatrices", bgfx::UniformType::Mat4, 64);
 		m_layer_uniform = bgfx::createUniform("u_layer", bgfx::UniformType::Vec4);
-		m_mat_color_shininess_uniform =
-			bgfx::createUniform("u_materialColorShininess", bgfx::UniformType::Vec4);
 		m_terrain_matrix_uniform = bgfx::createUniform("u_terrainMatrix", bgfx::UniformType::Mat4);
 	}
 
@@ -486,7 +484,6 @@ struct PipelineImpl : public Pipeline
 	{
 		bgfx::destroyUniform(m_tex_shadowmap_uniform);
 		bgfx::destroyUniform(m_terrain_matrix_uniform);
-		bgfx::destroyUniform(m_mat_color_shininess_uniform);
 		bgfx::destroyUniform(m_bone_matrices_uniform);
 		bgfx::destroyUniform(m_layer_uniform);
 		bgfx::destroyUniform(m_terrain_scale_uniform);
@@ -2492,7 +2489,6 @@ struct PipelineImpl : public Pipeline
 	Array<GrassInfo> m_tmp_grasses;
 	Array<ComponentIndex> m_tmp_local_lights;
 
-	bgfx::UniformHandle m_mat_color_shininess_uniform;
 	bgfx::UniformHandle m_bone_matrices_uniform;
 	bgfx::UniformHandle m_layer_uniform;
 	bgfx::UniformHandle m_terrain_scale_uniform;
