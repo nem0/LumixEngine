@@ -61,10 +61,10 @@ Model::Model(const Path& path, ResourceManager& resource_manager, IAllocator& al
 	, m_vertices_handle(BGFX_INVALID_HANDLE)
 	, m_indices_handle(BGFX_INVALID_HANDLE)
 {
-	m_lods[0] = { -1, -1, -1 };
-	m_lods[1] = { -1, -1, -1 };
-	m_lods[2] = { -1, -1, -1 };
-	m_lods[3] = { -1, -1, -1 };
+	m_lods[0] = { 0, -1, FLT_MAX };
+	m_lods[1] = { 0, -1, FLT_MAX };
+	m_lods[2] = { 0, -1, FLT_MAX };
+	m_lods[3] = { 0, -1, FLT_MAX };
 }
 
 
