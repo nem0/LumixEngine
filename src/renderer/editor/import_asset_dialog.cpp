@@ -1035,6 +1035,13 @@ struct ConvertTask : public Lumix::MT::Task
 		file.writeText("{\n\t\"shader\" : \"shaders/");
 		file.writeText(material.shader);
 		file.writeText(".shd\"\n");
+		
+		aiColor4D color;
+		if (material.material->Get(AI_MATKEY_COLOR_DIFFUSE, color) == aiReturn_SUCCESS)
+		{
+			file << ",\n\t\"color\" : [" << color.r << ", " << color.g << ", " << color.b << "]";
+		}
+
 		if (material.alpha_cutout) file << ",\n\t\"defines\" : [\"ALPHA_CUTOUT\"]";
 
 		for (int i = 0; i < material.texture_count; ++i)
