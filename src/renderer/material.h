@@ -49,9 +49,9 @@ public:
 	~Material();
 
 	float getShininess() const { return m_shininess; }
-	void setShininess(float value) { m_shininess = value; }
+	void setShininess(float value) { m_shininess = value; createCommandBuffer(); }
 	Vec3 getColor() const { return m_color; }
-	void setColor(const Vec3& specular) { m_color = specular; }
+	void setColor(const Vec3& specular) { m_color = specular;  createCommandBuffer(); }
 	float getAlphaRef() const { return m_alpha_ref; }
 	void setAlphaRef(float value);
 	uint64 getRenderStates() const { return m_render_states; }
