@@ -50,6 +50,7 @@ public:
 		{
 			m_parents.insert(entity, INVALID_ENTITY);
 			m_universe.addComponent(entity, type, this, entity);
+			return entity;
 		}
 		return INVALID_COMPONENT;
 	}
