@@ -461,6 +461,22 @@ public:
 	}
 
 
+	Vec3 getBoneAttachmentPosition(ComponentIndex cmp) override
+	{
+		int idx = getBoneAttachmentIdx(cmp);
+		if (idx < 0) return {0, 0, 0};
+		return m_bone_attachments[idx].relative_matrix.getTranslation();
+	}
+
+
+	void setBoneAttachmentPosition(ComponentIndex cmp, const Vec3& pos) override
+	{
+		int idx = getBoneAttachmentIdx(cmp);
+		if (idx < 0) return;
+		return m_bone_attachments[idx].relative_matrix.setTranslation(pos);
+	}
+
+
 	int getBoneAttachmentBone(ComponentIndex cmp) override
 	{
 		int idx = getBoneAttachmentIdx(cmp);

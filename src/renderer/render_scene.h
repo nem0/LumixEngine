@@ -210,6 +210,8 @@ public:
 	virtual void setBoneAttachmentParent(ComponentIndex cmp, Entity entity) = 0;
 	virtual void setBoneAttachmentBone(ComponentIndex cmp, int value) = 0;
 	virtual int getBoneAttachmentBone(ComponentIndex cmp) = 0;
+	virtual Vec3 getBoneAttachmentPosition(ComponentIndex cmp) = 0;
+	virtual void setBoneAttachmentPosition(ComponentIndex cmp, const Vec3& pos) = 0;
 
 	virtual const Array<DebugTriangle>& getDebugTriangles() const = 0;
 	virtual const Array<DebugLine>& getDebugLines() const = 0;

@@ -164,7 +164,11 @@ static void registerProperties(IAllocator& allocator)
 							  &RenderScene::setBoneAttachmentParent,
 							  allocator));
 	PropertyRegister::add("bone_attachment", LUMIX_NEW(allocator, BonePropertyDescriptor)("Bone", allocator));
-
+	PropertyRegister::add("bone_attachment",
+		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, RenderScene>)("Relative position",
+			&RenderScene::getBoneAttachmentPosition,
+			&RenderScene::setBoneAttachmentPosition,
+			allocator));
 	PropertyRegister::add("particle_emitter_spawn_shape",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Radius",
 							  &RenderScene::getParticleEmitterShapeRadius,
