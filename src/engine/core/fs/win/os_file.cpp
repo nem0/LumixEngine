@@ -167,8 +167,8 @@ OsFile& OsFile::operator <<(uint64 value)
 
 OsFile& OsFile::operator <<(float value)
 {
-	char buf[30];
-	toCString(value, buf, lengthOf(buf), 1);
+	char buf[128];
+	toCString(value, buf, lengthOf(buf), 7);
 	write(buf, stringLength(buf));
 	return *this;
 }
