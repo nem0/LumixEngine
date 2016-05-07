@@ -8,17 +8,17 @@
 #include "engine/core/resource_manager_base.h"
 #include "editor/entity_template_system.h"
 #include "editor/ieditor_command.h"
-#include "editor/imgui/imgui.h"
 #include "editor/platform_interface.h"
 #define STB_IMAGE_IMPLEMENTATION
 #if defined _MSC_VER && _MSC_VER == 1900 
 #pragma warning(disable : 4312)
 #endif
-#include "editor/stb/stb_image.h"
+#include "stb/stb_image.h"
 #include "editor/utils.h"
 #include "engine/engine.h"
 #include "engine/iproperty_descriptor.h"
 #include "engine/property_register.h"
+#include "imgui/imgui.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
