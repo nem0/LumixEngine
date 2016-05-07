@@ -12,6 +12,9 @@
 #include <bgfx/bgfx.h>
 
 
+struct lua_State;
+
+
 namespace Lumix
 {
 
@@ -153,6 +156,8 @@ public:
 	LOD* getLODs() { return m_lods; }
 	Array<uint8>& getIndices() { return m_indices; }
 	const Array<Vec3>& getVertices() const { return m_vertices; }
+	
+	static void registerLuaAPI(lua_State* L);
 
 public:
 	static const uint32 FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
