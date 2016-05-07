@@ -17,16 +17,15 @@
 #include "engine/core/system.h"
 #include "crnlib.h"
 #include "engine/debug/floating_points.h"
-#include "editor/imgui/imgui.h"
 #include "editor/metadata.h"
 #include "editor/platform_interface.h"
-#include "editor/stb/stb_image.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "engine/universe/universe.h"
+#include "imgui/imgui.h"
 #include "physics/physics_geometry_manager.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/model.h"
@@ -34,6 +33,7 @@
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
+#include "stb/stb_image.h"
 
 
 typedef Lumix::StaticString<Lumix::MAX_PATH_LENGTH> PathBuilder;
