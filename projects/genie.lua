@@ -371,7 +371,11 @@ project "animation"
 project "audio"
 	libType()
 
-	files { "../src/audio/**.h", "../src/audio/**.cpp", "../src/audio/**.c" }
+	files { 
+		"../src/audio/**.h",
+		"../src/audio/**.cpp",
+		"../external/stb/stb_vorbis.cpp"
+	}
 	includedirs { "../src", "../src/audio", "../external/bgfx/include" }
 	defines { "BUILDING_AUDIO" }
 	links { "engine", "editor" }
