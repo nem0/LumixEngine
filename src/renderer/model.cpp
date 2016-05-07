@@ -5,6 +5,7 @@
 #include "engine/core/crc32.h"
 #include "engine/core/fs/file_system.h"
 #include "engine/core/log.h"
+#include "engine/core/lua_wrapper.h"
 #include "engine/core/path_utils.h"
 #include "engine/core/profiler.h"
 #include "engine/core/resource_manager.h"
@@ -603,6 +604,45 @@ bool Model::load(FS::IFile& file)
 	g_log_warning.log("Renderer") << "Error loading model " << getPath().c_str();
 	return false;
 }
+
+
+static Vec3 getBonePosition(Model* model, int bone_index)
+{
+	return model->getBone(bone_index).position;
+}
+
+
+static int getBoneParent(Model* model, int bone_index)
+{
+	return model->getBone(bone_index).parent_idx;
+}
+
+
+void Model::registerLuaAPI(lua_State* L)
+{
+	#define REGISTER_FUNCTION(F)\
+		do { \
+			auto f = &LuaWrapper::wrapMethod<Model, decltype(&Model::F), &Model::F>; \
+			LuaWrapper::createSystemFunction(L, "Model", #F, f); \
+		} while(false) \
+
+	REGISTER_FUNCTION(getBoneCount);
+
+	#undef REGISTER_FUNCTION
+	
+
+	#define REGISTER_FUNCTION(F)\
+		do { \
+			auto f = &LuaWrapper::wrap<decltype(&F), &F>; \
+			LuaWrapper::createSystemFunction(L, "Model", #F, f); \
+		} while(false) \
+
+	REGISTER_FUNCTION(getBonePosition);
+	REGISTER_FUNCTION(getBoneParent);
+
+	#undef REGISTER_FUNCTION
+}
+
 
 void Model::unload(void)
 {

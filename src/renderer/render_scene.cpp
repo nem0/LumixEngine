@@ -4018,6 +4018,7 @@ void RenderScene::destroyInstance(RenderScene* scene)
 void RenderScene::registerLuaAPI(lua_State* L)
 {
 	Pipeline::registerLuaAPI(L);
+	Model::registerLuaAPI(L);
 
 	#define REGISTER_FUNCTION(F)\
 		do { \
@@ -4028,7 +4029,9 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getCameraSlot);
 	REGISTER_FUNCTION(getCameraComponent);
 	REGISTER_FUNCTION(getRenderableComponent);
+	REGISTER_FUNCTION(getRenderableModel);
 	REGISTER_FUNCTION(addDebugCross);
+	REGISTER_FUNCTION(addDebugLine);
 	REGISTER_FUNCTION(getTerrainMaterial);
 
 	#undef REGISTER_FUNCTION
