@@ -36,13 +36,7 @@ Shader::~Shader()
 
 bool Shader::hasDefine(uint8 define_idx) const
 {
-	return (m_combintions.m_all_defines_mask & (1 << define_idx)) != 0;
-}
-
-
-ShaderInstance* Shader::getFirstInstance()
-{
-	return m_instances.empty() ? nullptr : m_instances[0];
+	return (m_combintions.all_defines_mask & (1 << define_idx)) != 0;
 }
 
 
@@ -50,7 +44,7 @@ ShaderInstance& Shader::getInstance(uint32 mask)
 {
 	for (int i = 0; i < m_instances.size(); ++i)
 	{
-		if (m_instances[i]->m_define_mask == mask)
+		if (m_instances[i]->define_mask == mask)
 		{
 			return *m_instances[i];
 		}
@@ -74,14 +68,14 @@ Renderer& Shader::getRenderer()
 }
 
 
-uint32 Shader::getDefineMaskFromDense(uint32 dense) const
+static uint32 getDefineMaskFromDense(const Shader& shader, uint32 dense)
 {
 	uint32 mask = 0;
 	for (int i = 0; i < sizeof(dense) * 8; ++i)
 	{
 		if (dense & (1 << i))
 		{
-			mask |= 1 << m_combintions.m_defines[i];
+			mask |= 1 << shader.m_combintions.defines[i];
 		}
 	}
 	return mask;
@@ -96,7 +90,7 @@ bool Shader::generateInstances()
 	}
 	m_instances.clear();
 
-	uint32 count = 1 << m_combintions.m_define_count;
+	uint32 count = 1 << m_combintions.define_count;
 
 	auto* binary_manager = m_resource_manager.get(ResourceManager::SHADER_BINARY);
 	char basename[MAX_PATH_LENGTH];
@@ -107,40 +101,28 @@ bool Shader::generateInstances()
 		ShaderInstance* instance = LUMIX_NEW(m_allocator, ShaderInstance)(*this);
 		m_instances.push(instance);
 
-		instance->m_define_mask = getDefineMaskFromDense(mask);
+		instance->define_mask = getDefineMaskFromDense(*this, mask);
 
-		for (int pass_idx = 0; pass_idx < m_combintions.m_pass_count; ++pass_idx)
+		for (int pass_idx = 0; pass_idx < m_combintions.pass_count; ++pass_idx)
 		{
-			const char* pass = m_combintions.m_passes[pass_idx];
-			char path[MAX_PATH_LENGTH];
-			copyString(path, "shaders/compiled/");
-			catString(path, basename);
-			catString(path, "_");
-			catString(path, pass);
-			char mask_str[10];
-			int actual_mask = mask & m_combintions.m_vs_local_mask[pass_idx];
-			toCString(actual_mask, mask_str, sizeof(mask_str));
-			catString(path, mask_str);
-			catString(path, "_vs.shb");
+			const char* pass = m_combintions.passes[pass_idx];
+			StaticString<MAX_PATH_LENGTH> path("shaders/compiled/");
+			int actual_mask = mask & m_combintions.vs_local_mask[pass_idx];
+			path << basename << "_" << pass << actual_mask << "_vs.shb";
 
 			Path vs_path(path);
 			auto* vs_binary = static_cast<ShaderBinary*>(binary_manager->load(vs_path));
 			addDependency(*vs_binary);
-			instance->m_binaries[pass_idx * 2] = vs_binary;
+			instance->binaries[pass_idx * 2] = vs_binary;
 
-			copyString(path, "shaders/compiled/");
-			catString(path, basename);
-			catString(path, "_");
-			catString(path, pass);
-			actual_mask = mask & m_combintions.m_fs_local_mask[pass_idx];
-			toCString(actual_mask, mask_str, sizeof(mask_str));
-			catString(path, mask_str);
-			catString(path, "_fs.shb");
+			path.data[0] = '\0';
+			actual_mask = mask & m_combintions.fs_local_mask[pass_idx];
+			path << "shaders/compiled/" << basename << "_" << pass << actual_mask << "_fs.shb";
 
 			Path fs_path(path);
 			auto* fs_binary = static_cast<ShaderBinary*>(binary_manager->load(fs_path));
 			addDependency(*fs_binary);
-			instance->m_binaries[pass_idx * 2 + 1] = fs_binary;
+			instance->binaries[pass_idx * 2 + 1] = fs_binary;
 		}
 	}
 	return true;
@@ -183,9 +165,9 @@ static void texture_slot(lua_State* state, const char* name, const char* uniform
 	auto* shader = getShader(state);
 	if (!shader) return;
 	auto& slot = shader->m_texture_slots[shader->m_texture_slot_count];
-	copyString(slot.m_name, name);
-	slot.m_uniform_handle = bgfx::createUniform(uniform, bgfx::UniformType::Int1);
-	copyString(slot.m_uniform, uniform);
+	copyString(slot.name, name);
+	slot.uniform_handle = bgfx::createUniform(uniform, bgfx::UniformType::Int1);
+	copyString(slot.uniform, uniform);
 	++shader->m_texture_slot_count;
 }
 
@@ -194,7 +176,7 @@ static void atlas(lua_State* L)
 {
 	auto* shader = getShader(L);
 	if (!shader) return;
-	shader->m_texture_slots[shader->m_texture_slot_count - 1].m_is_atlas = true;
+	shader->m_texture_slots[shader->m_texture_slot_count - 1].is_atlas = true;
 }
 
 
@@ -209,7 +191,7 @@ static void texture_define(lua_State* L, const char* define)
 	}
 	lua_pop(L, 1);
 	auto& slot = shader->m_texture_slots[shader->m_texture_slot_count - 1];
-	slot.m_define_idx = renderer->getShaderDefineIdx(lua_tostring(L, -1));
+	slot.define_idx = renderer->getShaderDefineIdx(lua_tostring(L, -1));
 }
 
 
@@ -260,26 +242,26 @@ static void uniform(lua_State* L, const char* name, const char* type)
 static void pass(lua_State* state, const char* name)
 {
 	auto* cmb = getCombinations(state);
-	copyString(cmb->m_passes[cmb->m_pass_count].data, name);
-	cmb->m_vs_local_mask[cmb->m_pass_count] = 0;
-	cmb->m_fs_local_mask[cmb->m_pass_count] = 0;
-	++cmb->m_pass_count;
+	copyString(cmb->passes[cmb->pass_count].data, name);
+	cmb->vs_local_mask[cmb->pass_count] = 0;
+	cmb->fs_local_mask[cmb->pass_count] = 0;
+	++cmb->pass_count;
 }
 
 
 static int indexOf(ShaderCombinations& combination, uint8 define_idx)
 {
-	for (int i = 0; i < combination.m_define_count; ++i)
+	for (int i = 0; i < combination.define_count; ++i)
 	{
-		if (combination.m_defines[i] == define_idx)
+		if (combination.defines[i] == define_idx)
 		{
 			return i;
 		}
 	}
 
-	combination.m_defines[combination.m_define_count] = define_idx;
-	++combination.m_define_count;
-	return combination.m_define_count - 1;
+	combination.defines[combination.define_count] = define_idx;
+	++combination.define_count;
+	return combination.define_count - 1;
 }
 
 
@@ -355,8 +337,8 @@ static void fs(lua_State* L)
 		{
 			const char* tmp = lua_tostring(L, -1);
 			int define_idx = renderer->getShaderDefineIdx(tmp);
-			cmb->m_all_defines_mask |= 1 << define_idx;
-			cmb->m_fs_local_mask[cmb->m_pass_count - 1] |= 1 << indexOf(*cmb, define_idx);
+			cmb->all_defines_mask |= 1 << define_idx;
+			cmb->fs_local_mask[cmb->pass_count - 1] |= 1 << indexOf(*cmb, define_idx);
 		}
 	}
 }
@@ -380,8 +362,8 @@ static void vs(lua_State* L)
 		{
 			const char* tmp = lua_tostring(L, -1);
 			int define_idx = renderer->getShaderDefineIdx(tmp);
-			cmb->m_all_defines_mask |= 1 << define_idx;
-			cmb->m_vs_local_mask[cmb->m_pass_count - 1] |= 1 << indexOf(*cmb, define_idx);
+			cmb->all_defines_mask |= 1 << define_idx;
+			cmb->vs_local_mask[cmb->pass_count - 1] |= 1 << indexOf(*cmb, define_idx);
 		}
 	}
 }
@@ -440,8 +422,8 @@ void Shader::onBeforeReady()
 {
 	for (auto* instance : m_instances)
 	{
-		auto** binaries = instance->m_binaries;
-		for (int i = 0; i < Lumix::lengthOf(instance->m_binaries); i += 2)
+		auto** binaries = instance->binaries;
+		for (int i = 0; i < Lumix::lengthOf(instance->binaries); i += 2)
 		{
 			if (!binaries[i] || !binaries[i + 1]) continue;
 
@@ -452,9 +434,9 @@ void Shader::onBeforeReady()
 			ASSERT(bgfx::isValid(program));
 
 			int pass_idx = i / 2;
-			int global_idx = getRenderer().getPassIdx(m_combintions.m_passes[pass_idx]);
+			int global_idx = getRenderer().getPassIdx(m_combintions.passes[pass_idx]);
 
-			instance->m_program_handles[global_idx] = program;
+			instance->program_handles[global_idx] = program;
 		}
 	}
 }
@@ -472,11 +454,11 @@ void Shader::unload(void)
 
 	for (int i = 0; i < m_texture_slot_count; ++i)
 	{
-		if (bgfx::isValid(m_texture_slots[i].m_uniform_handle))
+		if (bgfx::isValid(m_texture_slots[i].uniform_handle))
 		{
-			bgfx::destroyUniform(m_texture_slots[i].m_uniform_handle);
+			bgfx::destroyUniform(m_texture_slots[i].uniform_handle);
 		}
-		m_texture_slots[i].m_uniform_handle = BGFX_INVALID_HANDLE;
+		m_texture_slots[i].uniform_handle = BGFX_INVALID_HANDLE;
 	}
 	m_texture_slot_count = 0;
 
@@ -490,19 +472,19 @@ void Shader::unload(void)
 
 ShaderInstance::~ShaderInstance()
 {
-	for (int i = 0; i < lengthOf(m_program_handles); ++i)
+	for (int i = 0; i < lengthOf(program_handles); ++i)
 	{
-		if (bgfx::isValid(m_program_handles[i]))
+		if (bgfx::isValid(program_handles[i]))
 		{
-			bgfx::destroyProgram(m_program_handles[i]);
+			bgfx::destroyProgram(program_handles[i]);
 		}
 	}
 
-	for (auto* binary : m_binaries)
+	for (auto* binary : binaries)
 	{
 		if (!binary) continue;
 
-		m_shader.removeDependency(*binary);
+		shader.removeDependency(*binary);
 		auto* manager = binary->getResourceManager().get(ResourceManager::SHADER_BINARY);
 		manager->unload(*binary);
 	}
