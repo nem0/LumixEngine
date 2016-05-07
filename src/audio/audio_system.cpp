@@ -6,7 +6,6 @@
 #include "engine/core/path.h"
 #include "engine/core/resource_manager.h"
 #include "editor/asset_browser.h"
-#include "editor/imgui/imgui.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -15,6 +14,7 @@
 #include "engine/plugin_manager.h"
 #include "engine/property_register.h"
 #include "engine/property_descriptor.h"
+#include "imgui/imgui.h"
 #include "renderer/render_scene.h"
 
 
