@@ -1,17 +1,17 @@
 #include "game_view.h"
+#include "editor/platform_interface.h"
 #include "engine/core/crc32.h"
 #include "engine/core/input_system.h"
 #include "engine/core/profiler.h"
 #include "engine/core/resource_manager.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
+#include "imgui/imgui.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
-#include "editor/imgui/imgui.h"
-#include "editor/platform_interface.h"
 
 
 GameView::GameView()

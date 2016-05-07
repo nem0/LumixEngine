@@ -266,7 +266,7 @@ solution "LumixEngine"
 	configurations { "Debug", "Release", "RelWithDebInfo" }
 	platforms { "x32", "x64" }
 	flags { "FatalWarnings", "NoPCH" }
-	includedirs {"../src"}
+	includedirs {"../src", "../external"}
 	location(LOCATION)
 	language "C++"
 	startproject "studio"
@@ -494,7 +494,13 @@ if build_studio then
 	project "editor"
 		libType()
 
-		files { "../src/editor/**.h", "../src/editor/**.cpp", "../src/editor/**.inl" }
+		files {
+			"../src/editor/**.h",
+			"../src/editor/**.cpp",
+			"../external/imgui/**.h",
+			"../external/imgui/**.cpp",
+			"../external/imgui/**.inl"
+		}
 		defines { "BUILDING_EDITOR" }
 		links { "engine" }
 		includedirs {
@@ -502,6 +508,7 @@ if build_studio then
 			"../src/editor",
 			"../external/lua/include",
 			"../external/bgfx/include",
+			"../external"
 		}
 
 		configuration { "windows", "not asmjs" }
