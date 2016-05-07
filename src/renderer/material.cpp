@@ -204,10 +204,10 @@ bool Material::save(JsonSerializer& serializer)
 	serializer.endArray();
 
 	serializer.beginArray("uniforms");
-	for (int i = 0; i < m_shader->getUniformCount(); ++i)
+	for (int i = 0; i < m_shader->m_uniforms.size(); ++i)
 	{
 		serializer.beginObject();
-		const auto& uniform = m_shader->getUniform(i);
+		const auto& uniform = m_shader->m_uniforms[i];
 
 		serializer.serialize("name", uniform.name);
 		switch (uniform.type)
@@ -390,7 +390,7 @@ void Material::setTexture(int i, Texture* texture)
 	}
 	if (isReady() && m_shader)
 	{
-		int define_idx = m_shader->getTextureSlot(i).m_define_idx;
+		int define_idx = m_shader->m_texture_slots[i].define_idx;
 		if(define_idx >= 0)
 		{
 			if(m_textures[i])
@@ -424,10 +424,10 @@ void Material::createCommandBuffer()
 
 	CommandBufferGenerator generator;
 
-	for (int i = 0; i < m_shader->getUniformCount(); ++i)
+	for (int i = 0; i < m_shader->m_uniforms.size(); ++i)
 	{
 		const Material::Uniform& uniform = m_uniforms[i];
-		const Shader::Uniform& shader_uniform = m_shader->getUniform(i);
+		const Shader::Uniform& shader_uniform = m_shader->m_uniforms[i];
 
 		switch (shader_uniform.type)
 		{
@@ -443,12 +443,11 @@ void Material::createCommandBuffer()
 		}
 	}
 
-	for (int i = 0; i < m_shader->getTextureSlotCount(); ++i)
+	for (int i = 0; i < m_shader->m_texture_slot_count; ++i)
 	{
 		if (i >= m_texture_count || !m_textures[i]) continue;
 
-		generator.setTexture(
-			i, m_shader->getTextureSlot(i).m_uniform_handle, m_textures[i]->getTextureHandle());
+		generator.setTexture(i, m_shader->m_texture_slots[i].uniform_handle, m_textures[i]->getTextureHandle());
 	}
 
 	Vec4 color_shininess(m_color, m_shininess);
@@ -467,9 +466,9 @@ void Material::onBeforeReady()
 {
 	if (!m_shader) return;
 
-	for(int i = 0; i < m_shader->getUniformCount(); ++i)
+	for(int i = 0; i < m_shader->m_uniforms.size(); ++i)
 	{
-		auto& shader_uniform = m_shader->getUniform(i);
+		auto& shader_uniform = m_shader->m_uniforms[i];
 		bool found = false;
 		for(int j = i; j < m_uniforms.size(); ++j)
 		{
@@ -498,9 +497,9 @@ void Material::onBeforeReady()
 	m_render_states = BGFX_STATE_ALPHA_REF(alpha_ref);
 	m_render_states |= m_shader->m_render_states;
 
-	for(int i = 0; i < m_shader->getTextureSlotCount(); ++i)
+	for(int i = 0; i < m_shader->m_texture_slot_count; ++i)
 	{
-		int define_idx = m_shader->getTextureSlot(i).m_define_idx;
+		int define_idx = m_shader->m_texture_slots[i].define_idx;
 		if(define_idx >= 0)
 		{
 			if(m_textures[i])
@@ -540,17 +539,14 @@ void Material::setShader(Shader* shader)
 	else
 	{
 		m_shader = mat_manager->getRenderer().getDefaultShader();
-		m_shader_instance = m_shader->getFirstInstance();
+		m_shader_instance = m_shader->m_instances.empty() ? nullptr : m_shader->m_instances[0];
 	}
 }
 
 
 const char* Material::getTextureUniform(int i)
 {
-	if (i < m_shader->getTextureSlotCount())
-	{
-		return m_shader->getTextureSlot(i).m_uniform;
-	}
+	if (i < m_shader->m_texture_slot_count) return m_shader->m_texture_slots[i].uniform;
 	return "";
 }
 
@@ -562,9 +558,9 @@ Texture* Material::getTextureByUniform(const char* uniform) const
 		return nullptr;
 	}
 
-	for (int i = 0, c = m_shader->getTextureSlotCount(); i < c; ++i)
+	for (int i = 0, c = m_shader->m_texture_slot_count; i < c; ++i)
 	{
-		if (compareString(m_shader->getTextureSlot(i).m_uniform, uniform) == 0)
+		if (compareString(m_shader->m_texture_slots[i].uniform, uniform) == 0)
 		{
 			return m_textures[i];
 		}

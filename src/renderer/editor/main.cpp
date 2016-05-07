@@ -163,21 +163,21 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 			material->setShader(Path(buf));
 		}
 
-		for (int i = 0; i < material->getShader()->getTextureSlotCount(); ++i)
+		for (int i = 0; i < material->getShader()->m_texture_slot_count; ++i)
 		{
-			auto& slot = material->getShader()->getTextureSlot(i);
+			auto& slot = material->getShader()->m_texture_slots[i];
 			auto* texture = material->getTexture(i);
 			copyString(buf, texture ? texture->getPath().c_str() : "");
 			if (m_app.getAssetBrowser()->resourceInput(
-				slot.m_name, StaticString<30>("", (uint64)&slot), buf, sizeof(buf), TEXTURE_HASH))
+					slot.name, StaticString<30>("", (uint64)&slot), buf, sizeof(buf), TEXTURE_HASH))
 			{
 				material->setTexturePath(i, Path(buf));
 			}
 			if (!texture) continue;
 
 			ImGui::SameLine();
-			StaticString<100> popup_name("pu", (uint64)texture, slot.m_name);
-			if (ImGui::Button(StaticString<100>("Advanced###adv", (uint64)texture, slot.m_name)))
+			StaticString<100> popup_name("pu", (uint64)texture, slot.name);
+			if (ImGui::Button(StaticString<100>("Advanced###adv", (uint64)texture, slot.name)))
 			{
 				ImGui::OpenPopup(popup_name);
 			}
@@ -214,7 +214,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 					ImGui::CloseCurrentPopup();
 					texture->setFlag(BGFX_TEXTURE_MAG_POINT, mag_point);
 				}
-				if (slot.m_is_atlas)
+				if (slot.is_atlas)
 				{
 					int size = texture->getAtlasSize() - 2;
 					const char* values = "2x2\0" "3x3\0" "4x4\0";
@@ -233,10 +233,10 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 		auto* shader = material->getShader();
 		if(shader && material->isReady())
 		{
-			for(int i = 0; i < shader->getUniformCount(); ++i)
+			for(int i = 0; i < shader->m_uniforms.size(); ++i)
 			{
 				auto& uniform = material->getUniform(i);
-				auto& shader_uniform = shader->getUniform(i);
+				auto& shader_uniform = shader->m_uniforms[i];
 				switch(shader_uniform.type)
 				{
 					case Shader::Uniform::FLOAT:
@@ -281,11 +281,11 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 		if (material->getShader() && ImGui::CollapsingHeader("Layers"))
 		{
 			auto* shader = material->getShader();
-			for (int i = 0; i < shader->m_combintions.m_pass_count; ++i)
+			for (int i = 0; i < shader->m_combintions.pass_count; ++i)
 			{
-				int idx = renderer->getPassIdx(shader->m_combintions.m_passes[i]);
+				int idx = renderer->getPassIdx(shader->m_combintions.passes[i]);
 				int layers_count = material->getLayerCount(idx);
-				ImGui::DragInt(shader->m_combintions.m_passes[i], &layers_count, 1, 0, 256);
+				ImGui::DragInt(shader->m_combintions.passes[i], &layers_count, 1, 0, 256);
 				material->setLayerCount(idx, layers_count);
 			}
 		}
@@ -659,7 +659,7 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 			m_app.getAssetBrowser()->openInExternalEditor(path);
 		}
 
-		if (shader->getTextureSlotCount() > 0 && ImGui::CollapsingHeader("Texture slots", nullptr, true, true))
+		if (shader->m_texture_slot_count > 0 && ImGui::CollapsingHeader("Texture slots", nullptr, true, true))
 		{
 			ImGui::Columns(2);
 			ImGui::Text("name");
@@ -667,18 +667,18 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 			ImGui::Text("uniform");
 			ImGui::NextColumn();
 			ImGui::Separator();
-			for (int i = 0; i < shader->getTextureSlotCount(); ++i)
+			for (int i = 0; i < shader->m_texture_slot_count; ++i)
 			{
-				auto& slot = shader->getTextureSlot(i);
-				ImGui::Text("%s", slot.m_name);
+				auto& slot = shader->m_texture_slots[i];
+				ImGui::Text("%s", slot.name);
 				ImGui::NextColumn();
-				ImGui::Text("%s", slot.m_uniform);
+				ImGui::Text("%s", slot.uniform);
 				ImGui::NextColumn();
 			}
 			ImGui::Columns(1);
 		}
 
-		if(shader->getUniformCount() > 0 && ImGui::CollapsingHeader("Uniforms", nullptr, true, true))
+		if(!shader->m_uniforms.empty() && ImGui::CollapsingHeader("Uniforms", nullptr, true, true))
 		{
 			ImGui::Columns(2);
 			ImGui::Text("name");
@@ -686,9 +686,9 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 			ImGui::Text("type");
 			ImGui::NextColumn();
 			ImGui::Separator();
-			for(int i = 0; i < shader->getUniformCount(); ++i)
+			for(int i = 0; i < shader->m_uniforms.size(); ++i)
 			{
-				auto& uniform = shader->getUniform(i);
+				auto& uniform = shader->m_uniforms[i];
 				ImGui::Text("%s", uniform.name);
 				ImGui::NextColumn();
 				switch(uniform.type)
@@ -974,7 +974,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 				0,
 				indices_count,
 				flags,
-				m_shader->getInstance(0).m_program_handles[m_pipeline.getPassIdx()]);
+				m_shader->getInstance(0).program_handles[m_pipeline.getPassIdx()]);
 		}
 
 
@@ -1182,8 +1182,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 
 	void drawGUICmdList(ImDrawList* cmd_list)
 	{
-		Renderer* renderer =
-			static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+		Renderer* renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 
 		int num_indices = cmd_list->IdxBuffer.size();
 		int num_vertices = cmd_list->VtxBuffer.size();
@@ -1200,31 +1199,27 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		uint32 elem_offset = 0;
 		const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
 		const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
-		for(const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
+		for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
 		{
-			if(pcmd->UserCallback)
+			if (pcmd->UserCallback)
 			{
 				pcmd->UserCallback(cmd_list, pcmd);
 				elem_offset += pcmd->ElemCount;
 				continue;
 			}
 
-			if(0 == pcmd->ElemCount) continue;
+			if (0 == pcmd->ElemCount) continue;
 
-			m_gui_pipeline->setScissor(
-				uint16(Math::maximum(pcmd->ClipRect.x, 0.0f)),
+			m_gui_pipeline->setScissor(uint16(Math::maximum(pcmd->ClipRect.x, 0.0f)),
 				uint16(Math::maximum(pcmd->ClipRect.y, 0.0f)),
-				uint16(Math::minimum(pcmd->ClipRect.z, 65535.0f) -
-				Math::maximum(pcmd->ClipRect.x, 0.0f)),
-				uint16(Math::minimum(pcmd->ClipRect.w, 65535.0f) -
-				Math::maximum(pcmd->ClipRect.y, 0.0f)));
+				uint16(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
+				uint16(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
 
 			auto material = m_material;
 			int pass_idx = m_gui_pipeline->getPassIdx();
-			const auto& texture_id = pcmd->TextureId
-				? *(bgfx::TextureHandle*)pcmd->TextureId
-				: material->getTexture(0)->getTextureHandle();
-			auto texture_uniform = material->getShader()->getTextureSlot(0).m_uniform_handle;
+			const auto& texture_id =
+				pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : material->getTexture(0)->getTextureHandle();
+			auto texture_uniform = material->getShader()->m_texture_slots[0].uniform_handle;
 			m_gui_pipeline->setTexture(0, texture_id, texture_uniform);
 			m_gui_pipeline->render(vertex_buffer,
 				index_buffer,
@@ -1232,7 +1227,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 				elem_offset,
 				pcmd->ElemCount,
 				material->getRenderStates(),
-				material->getShaderInstance().m_program_handles[pass_idx]);
+				material->getShaderInstance().program_handles[pass_idx]);
 
 			elem_offset += pcmd->ElemCount;
 		}

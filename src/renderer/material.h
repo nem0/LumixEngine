@@ -18,7 +18,7 @@ namespace FS
 class JsonSerializer;
 class ResourceManager;
 class Shader;
-class ShaderInstance;
+struct ShaderInstance;
 class Texture;
 
 

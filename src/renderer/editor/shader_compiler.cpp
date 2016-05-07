@@ -98,13 +98,13 @@ bool ShaderCompiler::isChanged(const Lumix::ShaderCombinations& combinations,
 		shd_last_modified = PlatformInterface::getLastModified(tmp);
 	}
 
-	for (int i = 0; i < combinations.m_pass_count; ++i)
+	for (int i = 0; i < combinations.pass_count; ++i)
 	{
 		const char* pass_path =
-			Lumix::StaticString<Lumix::MAX_PATH_LENGTH>(bin_base_path, combinations.m_passes[i]);
-		for (int j = 0; j < 1 << Lumix::lengthOf(combinations.m_defines); ++j)
+			Lumix::StaticString<Lumix::MAX_PATH_LENGTH>(bin_base_path, combinations.passes[i]);
+		for (int j = 0; j < 1 << Lumix::lengthOf(combinations.defines); ++j)
 		{
-			if ((j & (~combinations.m_vs_local_mask[i])) == 0)
+			if ((j & (~combinations.vs_local_mask[i])) == 0)
 			{
 				const char* vs_bin_info =
 					Lumix::StaticString<Lumix::MAX_PATH_LENGTH>(pass_path, j, "_vs.shb");
@@ -114,7 +114,7 @@ bool ShaderCompiler::isChanged(const Lumix::ShaderCombinations& combinations,
 					return true;
 				}
 			}
-			if ((j & (~combinations.m_fs_local_mask[i])) == 0)
+			if ((j & (~combinations.fs_local_mask[i])) == 0)
 			{
 				const char* fs_bin_info =
 					Lumix::StaticString<Lumix::MAX_PATH_LENGTH>(pass_path, j, "_fs.shb");
@@ -524,13 +524,13 @@ void ShaderCompiler::compileAllPasses(const char* path,
 	const int* define_masks,
 	const Lumix::ShaderCombinations& combinations)
 {
-	for (int i = 0; i < combinations.m_pass_count; ++i)
+	for (int i = 0; i < combinations.pass_count; ++i)
 	{
 		compilePass(path,
 			is_vertex_shader,
-			combinations.m_passes[i],
+			combinations.passes[i],
 			define_masks[i],
-			combinations.m_defines);
+			combinations.defines);
 	}
 }
 
@@ -564,8 +564,8 @@ void ShaderCompiler::compile(const char* path)
 		Lumix::ShaderCombinations combinations;
 		Lumix::Shader::getShaderCombinations(getRenderer(), &data[0], &combinations);
 
-		compileAllPasses(path, false, combinations.m_fs_local_mask, combinations);
-		compileAllPasses(path, true, combinations.m_vs_local_mask, combinations);
+		compileAllPasses(path, false, combinations.fs_local_mask, combinations);
+		compileAllPasses(path, true, combinations.vs_local_mask, combinations);
 	}
 	else
 	{
@@ -608,8 +608,8 @@ void ShaderCompiler::compileAll(bool wait)
 			Lumix::ShaderCombinations combinations;
 			Lumix::Shader::getShaderCombinations(getRenderer(), &data[0], &combinations);
 
-			compileAllPasses(shd_path, false, combinations.m_fs_local_mask, combinations);
-			compileAllPasses(shd_path, true, combinations.m_vs_local_mask, combinations);
+			compileAllPasses(shd_path, false, combinations.fs_local_mask, combinations);
+			compileAllPasses(shd_path, true, combinations.vs_local_mask, combinations);
 
 			fs.close(*file);
 		}
