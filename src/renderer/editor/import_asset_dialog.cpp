@@ -639,16 +639,6 @@ struct ImportTask : public Lumix::MT::Task
 						++material.texture_count;
 					}
 				}
-				if (material.texture_count == 0)
-				{
-					auto& t = material.textures[material.texture_count];
-					Lumix::copyString(t.path, PathBuilder("diffuse") << i << ".dds");
-					Lumix::copyString(t.src, t.path);
-					t.import = true;
-					t.to_dds = true;
-					t.is_valid = false;
-					++material.texture_count;
-				}
 			}
 			for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 			{
@@ -1049,17 +1039,6 @@ struct ConvertTask : public Lumix::MT::Task
 			saveTexture(material.textures[i], source_mesh_dir, file, true);
 		}
 
-		if (material.texture_count == 0)
-		{
-			ImportTexture texture;
-			texture.import = true;
-			texture.to_dds = true;
-			texture.texture = nullptr;
-			Lumix::copyString(texture.path, PathBuilder("undefined") << *undefined_count << ".dds");
-			saveTexture(texture, source_mesh_dir, file, true);
-			++*undefined_count;
-		}
-
 		file.write("}", 1);
 		file.close();
 		return true;
@@ -1419,9 +1398,9 @@ struct ConvertTask : public Lumix::MT::Task
 	static int getAttributeCount(const aiMesh* mesh)
 	{
 		int count = 2; // position, normal
-		if (mesh->mTextureCoords[0]) ++count;
+		if (mesh->HasTextureCoords(0)) ++count;
 		if (isSkinned(mesh)) count += 2;
-		if (mesh->mColors[0]) ++count;
+		if (mesh->HasVertexColors(0)) ++count;
 		if (mesh->mTangents) ++count;
 		return count;
 	}
@@ -1436,9 +1415,9 @@ struct ConvertTask : public Lumix::MT::Task
 		static const int COLOR_SIZE = sizeof(Lumix::uint8) * 4;
 		static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(Lumix::uint16) * 4;
 		int size = POSITION_SIZE + NORMAL_SIZE;
-		if (mesh->mTextureCoords[0]) size += UV_SIZE;
+		if (mesh->HasTextureCoords(0)) size += UV_SIZE;
 		if (mesh->mTangents) size += TANGENT_SIZE;
-		if (mesh->mColors[0]) size += COLOR_SIZE;
+		if (mesh->HasVertexColors(0)) size += COLOR_SIZE;
 		if (isSkinned(mesh)) size += BONE_INDICES_WEIGHTS_SIZE;
 		return size;
 	}
@@ -1801,12 +1780,6 @@ struct ConvertTask : public Lumix::MT::Task
 					"Mesh ", getMeshName(mesh.scene, mesh.mesh).C_Str(), " has no positions."));
 				return false;
 			}
-			if (!mesh.mesh->HasTextureCoords(0))
-			{
-				m_dialog.setMessage(Lumix::StaticString<256>(
-					"Mesh ", getMeshName(mesh.scene, mesh.mesh).C_Str(), " has no texture coords."));
-				return false;
-			}
 		}
 		if (skinned_meshes != 0 && skinned_meshes != imported_meshes)
 		{
@@ -1858,10 +1831,10 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 
 		writeAttribute(bgfx::Attrib::Position, file);
-		if (mesh->mColors[0]) writeAttribute(bgfx::Attrib::Color0, file);
+		if (mesh->HasVertexColors(0)) writeAttribute(bgfx::Attrib::Color0, file);
 		writeAttribute(bgfx::Attrib::Normal, file);
 		if (mesh->mTangents) writeAttribute(bgfx::Attrib::Tangent, file);
-		if (mesh->mTextureCoords[0]) writeAttribute(bgfx::Attrib::TexCoord0, file);
+		if (mesh->HasTextureCoords(0)) writeAttribute(bgfx::Attrib::TexCoord0, file);
 	}
 
 
