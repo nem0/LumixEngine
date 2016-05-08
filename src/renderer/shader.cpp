@@ -24,6 +24,7 @@ Shader::Shader(const Path& path, ResourceManager& resource_manager, IAllocator& 
 	, m_texture_slot_count(0)
 	, m_uniforms(m_allocator)
 	, m_render_states(0)
+	, m_all_defines_mask(0)
 {
 }
 
@@ -42,6 +43,7 @@ bool Shader::hasDefine(uint8 define_idx) const
 
 ShaderInstance& Shader::getInstance(uint32 mask)
 {
+	mask = mask & m_all_defines_mask;
 	for (int i = 0; i < m_instances.size(); ++i)
 	{
 		if (m_instances[i]->define_mask == mask)
@@ -102,6 +104,7 @@ bool Shader::generateInstances()
 		m_instances.push(instance);
 
 		instance->define_mask = getDefineMaskFromDense(*this, mask);
+		m_all_defines_mask |= instance->define_mask;
 
 		for (int pass_idx = 0; pass_idx < m_combintions.pass_count; ++pass_idx)
 		{
