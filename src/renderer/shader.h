@@ -133,6 +133,7 @@ public:
 
 	IAllocator& m_allocator;
 	Array<ShaderInstance*> m_instances;
+	uint32 m_all_defines_mask;
 	ShaderCombinations m_combintions;
 	uint64 m_render_states;
 	TextureSlot m_texture_slots[MAX_TEXTURE_SLOT_COUNT];

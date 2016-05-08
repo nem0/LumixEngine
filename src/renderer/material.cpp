@@ -132,6 +132,7 @@ void Material::unload(void)
 		}
 	}
 	m_texture_count = 0;
+	m_define_mask = 0;
 }
 
 
