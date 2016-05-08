@@ -60,7 +60,7 @@ void Mutex::unlock()
 
 Event::Event()
 {
-	m_id = ::CreateEvent(nullptr, TRUE, FALSE, nullptr);
+	m_id = ::CreateEvent(nullptr, FALSE, FALSE, nullptr);
 }
 
 Event::~Event()
