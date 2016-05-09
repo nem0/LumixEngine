@@ -1290,6 +1290,34 @@ namespace Lumix
 	}
 
 
+	int Image(lua_State* L)
+	{
+		auto* texture_id = Lumix::LuaWrapper::checkArg<void*>(L, 1);
+		float size_x = Lumix::LuaWrapper::checkArg<float>(L, 2);
+		float size_y = Lumix::LuaWrapper::checkArg<float>(L, 3);
+		ImGui::Image(texture_id, ImVec2(size_x, size_y));
+		return 0;
+	}
+
+
+	int Begin(lua_State* L)
+	{
+		auto* label = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
+		bool res = ImGui::Begin(label);
+		lua_pushboolean(L, res);
+		return 1;
+	}
+
+
+	int BeginDock(lua_State* L)
+	{
+		auto* label = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
+		bool res = ImGui::BeginDock(label);
+		lua_pushboolean(L, res);
+		return 1;
+	}
+
+
 	int SameLine(lua_State* L)
 	{
 		ImGui::SameLine();
@@ -1565,6 +1593,14 @@ namespace Lumix
 			registerCFunction(L, "Button", &Button);
 			registerCFunction(L, "Checkbox", &Checkbox);
 			registerCFunction(L, "SameLine", &SameLine);
+			registerCFunction(L, "BeginPopup", &LuaWrapper::wrap<decltype(&ImGui::BeginPopup), &ImGui::BeginPopup>);
+			registerCFunction(L, "EndPopup", &LuaWrapper::wrap<decltype(&ImGui::EndPopup), &ImGui::EndPopup>);
+			registerCFunction(L, "OpenPopup", &LuaWrapper::wrap<decltype(&ImGui::OpenPopup), &ImGui::OpenPopup>);
+			registerCFunction(L, "BeginDock", &LuaWrapper::wrap<decltype(&BeginDock), &BeginDock>);
+			registerCFunction(L, "EndDock", &LuaWrapper::wrap<decltype(&ImGui::EndDock), &ImGui::EndDock>);
+			registerCFunction(L, "Begin", &LuaWrapper::wrap<decltype(&Begin), &Begin>);
+			registerCFunction(L, "End", &LuaWrapper::wrap<decltype(&ImGui::End), &ImGui::End>);
+			registerCFunction(L, "Image", &LuaWrapper::wrap<decltype(&Image), &Image>);
 
 			lua_pop(L, 1);
 
