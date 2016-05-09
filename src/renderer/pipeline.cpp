@@ -1437,6 +1437,25 @@ struct PipelineImpl : public Pipeline
 		}
 	}
 
+
+	void callLuaFunction(const char* function) override
+	{
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		if (lua_getfield(m_lua_state, -1, function) != LUA_TFUNCTION)
+		{
+			lua_pop(m_lua_state, 2);
+			return;
+		}
+
+		if (lua_pcall(m_lua_state, 0, 0, 0) != LUA_OK)
+		{
+			g_log_warning.log("Renderer") << lua_tostring(m_lua_state, -1);
+			lua_pop(m_lua_state, 1);
+		}
+		lua_pop(m_lua_state, 1);
+	}
+
+
 	int getPassIdx() const override
 	{
 		return m_pass_idx;
