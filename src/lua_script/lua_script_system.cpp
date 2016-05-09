@@ -1290,6 +1290,13 @@ namespace Lumix
 	}
 
 
+	int SameLine(lua_State* L)
+	{
+		ImGui::SameLine();
+		return 0;
+	}
+
+
 	void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 	{
 		lua_pushvalue(L, -1);
@@ -1557,6 +1564,7 @@ namespace Lumix
 			registerCFunction(L, "DragFloat", &DragFloat);
 			registerCFunction(L, "Button", &Button);
 			registerCFunction(L, "Checkbox", &Checkbox);
+			registerCFunction(L, "SameLine", &SameLine);
 
 			lua_pop(L, 1);
 
