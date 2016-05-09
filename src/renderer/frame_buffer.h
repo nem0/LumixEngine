@@ -56,6 +56,15 @@ class FrameBuffer
 		void resize(int width, int height);
 		Vec2 getSizeRatio() const { return m_declaration.m_size_ratio; }
 		const char* getName() const { return m_declaration.m_name; }
+		
+		
+		RenderBuffer& getRenderbuffer(int idx)
+		{
+			ASSERT(idx < m_declaration.m_renderbuffers_count);
+			return m_declaration.m_renderbuffers[idx];
+		}
+		
+		
 		bgfx::TextureHandle getRenderbufferHandle(int idx) const 
 		{
 			if (idx >= m_declaration.m_renderbuffers_count ) return BGFX_INVALID_HANDLE;

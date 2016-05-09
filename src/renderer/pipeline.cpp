@@ -922,6 +922,14 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	void* getRenderbuffer(const char* framebuffer_name, int renderbuffer_index)
+	{
+		auto* fb = getFramebuffer(framebuffer_name);
+		if (!fb) return nullptr;
+		return &fb->getRenderbuffer(renderbuffer_index).m_handle;
+	}
+
+
 	void setMaterialDefine(int material_idx, const char* define, bool enabled)
 	{
 		auto define_idx = m_renderer.getShaderDefineIdx(define);
@@ -2752,6 +2760,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(postprocessCallback);
 	REGISTER_FUNCTION(removeFramebuffer);
 	REGISTER_FUNCTION(setMaterialDefine);
+	REGISTER_FUNCTION(getRenderbuffer);
 
 	#undef REGISTER_FUNCTION
 
