@@ -261,6 +261,8 @@ void SceneView::onGUI()
 
 		ImGui::SameLine();
 		ImGui::Checkbox("Stats", &m_show_stats);
+
+		m_pipeline->callLuaFunction("onGUI");
 	}
 
 	ImGui::EndDock();
