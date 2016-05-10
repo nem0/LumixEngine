@@ -235,6 +235,7 @@ public:
 	virtual void setCameraOrtho(ComponentIndex camera, bool is_ortho) = 0;
 	virtual float getCameraOrthoSize(ComponentIndex camera) = 0;
 	virtual void setCameraOrthoSize(ComponentIndex camera, float value) = 0;
+	virtual Vec2 getCameraScreenSize(ComponentIndex camera) = 0;
 
 	virtual class ParticleEmitter* getParticleEmitter(ComponentIndex cmp) = 0;
 	virtual void resetParticleEmitter(ComponentIndex cmp) = 0;
