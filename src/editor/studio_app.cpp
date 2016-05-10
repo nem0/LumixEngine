@@ -1077,6 +1077,28 @@ public:
 	}
 
 
+	void loadUniverseFromCommandLine()
+	{
+		char cmd_line[2048];
+		char path[Lumix::MAX_PATH_LENGTH];
+		Lumix::getCommandLine(cmd_line, Lumix::lengthOf(cmd_line));
+
+		Lumix::CommandLineParser parser(cmd_line);
+		while (parser.next())
+		{
+			if (!parser.currentEquals("-open")) continue;
+			if (!parser.next()) break;
+
+			parser.getCurrent(path, Lumix::lengthOf(path));
+			Lumix::Path tmp(path);
+			m_editor->loadUniverse(tmp);
+			setTitle(path);
+			m_is_welcome_screen_opened = false;
+			break;
+		}
+	}
+
+
 	static void checkDataDirCommandLine(char* dir, int max_size)
 	{
 		char cmd_line[2048];
@@ -1568,6 +1590,7 @@ public:
 
 		setStudioApp();
 		loadSettings();
+		loadUniverseFromCommandLine();
 	}
 
 
