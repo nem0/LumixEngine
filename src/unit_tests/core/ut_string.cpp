@@ -1,5 +1,5 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "engine/core/string.h"
+#include "engine/string.h"
 #include <cstdio>
 
 

@@ -2,12 +2,12 @@
 
 
 #include "engine/lumix.h"
-#include "engine/core/array.h"
-#include "engine/core/associative_array.h"
-#include "engine/core/delegate_list.h"
-#include "engine/core/quat.h"
-#include "engine/core/string.h"
-#include "engine/core/vec.h"
+#include "engine/array.h"
+#include "engine/associative_array.h"
+#include "engine/delegate_list.h"
+#include "engine/quat.h"
+#include "engine/string.h"
+#include "engine/vec.h"
 #include "engine/universe/component.h"
 
 

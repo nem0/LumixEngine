@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/core/delegate.h"
-#include "engine/core/path.h"
+#include "engine/delegate.h"
+#include "engine/path.h"
 
 
 class LUMIX_EDITOR_API FileSystemWatcher

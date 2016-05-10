@@ -1,9 +1,9 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
-#include "engine/core/fs/file_system.h"
-#include "engine/core/fs/disk_file_device.h"
-#include "engine/core/fs/file_events_device.h"
-#include "engine/core/path.h"
+#include "engine/fs/file_system.h"
+#include "engine/fs/disk_file_device.h"
+#include "engine/fs/file_events_device.h"
+#include "engine/path.h"
 
 namespace
 {

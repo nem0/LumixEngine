@@ -2,7 +2,7 @@
 
 
 #include "engine/lumix.h"
-#include "engine/core/vec.h"
+#include "engine/vec.h"
 #include <bgfx/bgfx.h>
 
 

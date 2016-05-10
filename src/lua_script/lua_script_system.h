@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "engine/core/path.h"
-#include "engine/core/string.h"
+#include "engine/path.h"
+#include "engine/string.h"
 #include "engine/iplugin.h"
 
 

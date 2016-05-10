@@ -1,6 +1,6 @@
 #include "platform_interface.h"
-#include "engine/core/iallocator.h"
-#include "engine/core/string.h"
+#include "engine/iallocator.h"
+#include "engine/string.h"
 #include "imgui/imgui.h"
 
 

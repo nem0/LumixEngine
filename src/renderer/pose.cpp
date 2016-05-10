@@ -1,8 +1,8 @@
 #include "renderer/pose.h"
-#include "engine/core/matrix.h"
-#include "engine/core/quat.h"
-#include "engine/core/profiler.h"
-#include "engine/core/vec.h"
+#include "engine/matrix.h"
+#include "engine/quat.h"
+#include "engine/profiler.h"
+#include "engine/vec.h"
 #include "renderer/model.h"
 
 

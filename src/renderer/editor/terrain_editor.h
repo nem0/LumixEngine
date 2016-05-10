@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "engine/core/binary_array.h"
-#include "engine/core/vec.h"
+#include "engine/binary_array.h"
+#include "engine/vec.h"
 #include "editor/world_editor.h"
 #include "editor/utils.h"
 

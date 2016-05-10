@@ -2,9 +2,9 @@
 
 
 #include "engine/lumix.h"
-#include "engine/core/iallocator.h"
-#include "engine/core/path.h"
-#include "engine/core/vec.h"
+#include "engine/iallocator.h"
+#include "engine/path.h"
+#include "engine/vec.h"
 #include "engine/iplugin.h"
 
 

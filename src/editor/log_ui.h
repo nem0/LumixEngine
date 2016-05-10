@@ -1,9 +1,9 @@
 #pragma once
 
 
-#include "engine/core/array.h"
-#include "engine/core/mt/sync.h"
-#include "engine/core/string.h"
+#include "engine/array.h"
+#include "engine/mt/sync.h"
+#include "engine/string.h"
 
 
 class LUMIX_EDITOR_API LogUI

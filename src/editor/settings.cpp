@@ -1,6 +1,6 @@
 #include "settings.h"
-#include "engine/core/fs/os_file.h"
-#include "engine/core/log.h"
+#include "engine/fs/os_file.h"
+#include "engine/log.h"
 #include "engine/debug/debug.h"
 #include "imgui/imgui.h"
 #include "platform_interface.h"

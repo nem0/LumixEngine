@@ -1,9 +1,9 @@
-#include "engine/core/mt/task.h"
-#include "engine/core/profiler.h"
-#include "engine/core/string.h"
+#include "engine/mt/task.h"
+#include "engine/profiler.h"
+#include "engine/string.h"
 #include "file_system_watcher.h"
 
-#include "engine/core/win/simple_win.h"
+#include "engine/win/simple_win.h"
 
 
 class FileSystemWatcherPC;

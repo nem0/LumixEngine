@@ -1,8 +1,8 @@
 #include "renderer/frame_buffer.h"
-#include "engine/core/json_serializer.h"
-#include "engine/core/log.h"
-#include "engine/core/string.h"
-#include "engine/core/vec.h"
+#include "engine/json_serializer.h"
+#include "engine/log.h"
+#include "engine/string.h"
+#include "engine/vec.h"
 #include <bgfx/bgfx.h>
 #include <lua.hpp>
 #include <lauxlib.h>

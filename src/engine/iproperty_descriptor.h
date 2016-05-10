@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "engine/core/array.h"
+#include "engine/array.h"
 #include "engine/universe/universe.h"
 
 

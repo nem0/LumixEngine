@@ -2,8 +2,8 @@
 
 
 #include "engine/lumix.h"
-#include "engine/core/iallocator.h"
-#include "engine/core/mt/sync.h"
+#include "engine/iallocator.h"
+#include "engine/mt/sync.h"
 
 
 namespace Lumix

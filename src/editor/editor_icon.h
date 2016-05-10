@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "engine/core/matrix.h"
+#include "engine/matrix.h"
 
 
 namespace Lumix

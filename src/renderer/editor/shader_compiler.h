@@ -1,9 +1,9 @@
 #pragma once
 
 
-#include "engine/core/associative_array.h"
-#include "engine/core/mt/sync.h"
-#include "engine/core/string.h"
+#include "engine/associative_array.h"
+#include "engine/mt/sync.h"
+#include "engine/string.h"
 #include "renderer/shader.h"
 
 

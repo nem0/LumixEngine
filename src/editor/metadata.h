@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "engine/core/associative_array.h"
-#include "engine/core/string.h"
+#include "engine/associative_array.h"
+#include "engine/string.h"
 
 
 class LUMIX_EDITOR_API Metadata
