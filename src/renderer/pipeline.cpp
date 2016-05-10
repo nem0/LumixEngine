@@ -1448,6 +1448,8 @@ struct PipelineImpl : public Pipeline
 
 	void callLuaFunction(const char* function) override
 	{
+		if (!m_lua_state) return;
+
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		if (lua_getfield(m_lua_state, -1, function) != LUA_TFUNCTION)
 		{
