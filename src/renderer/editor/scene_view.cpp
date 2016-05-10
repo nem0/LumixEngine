@@ -86,7 +86,6 @@ bool SceneView::init(LogUI& log_ui, Lumix::WorldEditor& editor, Lumix::Array<Act
 
 	editor.universeCreated().bind<SceneView, &SceneView::onUniverseCreated>(this);
 	editor.universeDestroyed().bind<SceneView, &SceneView::onUniverseDestroyed>(this);
-	onUniverseCreated();
 
 	m_toggle_gizmo_step_action =
 		LUMIX_NEW(editor.getAllocator(), Action)("Enable/disable gizmo step", "toggleGizmoStep");

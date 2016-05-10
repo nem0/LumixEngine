@@ -575,12 +575,6 @@ public:
 			doMenuItem(getAction("viewSide"), false, true);
 			ImGui::EndMenu();
 		}
-		if (ImGui::BeginMenu("Select"))
-		{
-			if (ImGui::MenuItem("Same mesh", nullptr, nullptr, is_any_entity_selected))
-				m_editor->selectEntitiesWithSameMesh();
-			ImGui::EndMenu();
-		}
 		ImGui::EndMenu();
 	}
 
