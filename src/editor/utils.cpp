@@ -3,24 +3,21 @@
 #include "engine/math_utils.h"
 #include "engine/path.h"
 #include "engine/path_utils.h"
+#include "editor/render_interface.h"
 #include "editor/world_editor.h"
 #include "imgui/imgui.h"
-#include "renderer/render_scene.h"
 #include "engine/universe/universe.h"
 
 
-void getEntityListDisplayName(Lumix::WorldEditor& editor,
-	char* buf,
-	int max_size,
-	Lumix::Entity entity)
+void getEntityListDisplayName(Lumix::WorldEditor& editor, char* buf, int max_size, Lumix::Entity entity)
 {
 	const char* name = editor.getUniverse()->getEntityName(entity);
 	static const Lumix::uint32 RENDERABLE_HASH = Lumix::crc32("renderable");
 	Lumix::ComponentUID renderable = editor.getComponent(entity, RENDERABLE_HASH);
 	if (renderable.isValid())
 	{
-		auto* scene = static_cast<Lumix::RenderScene*>(renderable.scene);
-		auto path = scene->getRenderablePath(renderable.index);
+		auto* render_interface = editor.getRenderInterface();
+		auto path = render_interface->getRenderablePath(renderable.index);
 		if (path.isValid())
 		{
 			char basename[Lumix::MAX_PATH_LENGTH];

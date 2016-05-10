@@ -506,7 +506,6 @@ if build_studio then
 			"../src",
 			"../src/editor",
 			"../external/lua/include",
-			"../external/bgfx/include",
 			"../external"
 		}
 
@@ -517,7 +516,6 @@ if build_studio then
 
 		useLua()
 		defaultConfigurations()
-
 
 	project "studio"
 		kind "WindowedApp"

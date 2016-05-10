@@ -829,6 +829,20 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		}
 
 
+		WorldEditor::RayHit castRay(const Vec3& origin, const Vec3& dir, ComponentIndex ignored) override
+		{
+			auto hit = m_render_scene->castRay(origin, dir, ignored);
+
+			return {hit.m_is_hit, hit.m_t, hit.m_entity, hit.m_origin + hit.m_dir * hit.m_t};
+		}
+
+
+		void getRay(ComponentIndex camera_index, float x, float y, Vec3& origin, Vec3& dir) override
+		{
+			m_render_scene->getRay(camera_index, x, y, origin, dir);
+		}
+
+
 		void addDebugLine(const Vec3& from, const Vec3& to, uint32 color, float life) override
 		{
 			m_render_scene->addDebugLine(from, to, color, life);
@@ -871,6 +885,24 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		}
 
 
+		void setCameraSlot(ComponentIndex cmp, const char* slot) override
+		{
+			m_render_scene->setCameraSlot(cmp, slot);
+		}
+
+
+		ComponentIndex getCameraInSlot(const char* slot) override
+		{
+			return m_render_scene->getCameraInSlot(slot);
+		}
+
+
+		Entity getCameraEntity(ComponentIndex cmp) override
+		{
+			return m_render_scene->getCameraEntity(cmp);
+		}
+
+
 		Vec2 getCameraScreenSize(ComponentIndex cmp) override
 		{
 			return m_render_scene->getCameraScreenSize(cmp);
@@ -892,12 +924,6 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		float getCameraFOV(ComponentIndex cmp) override
 		{
 			return m_render_scene->getCameraFOV(cmp);
-		}
-
-
-		void getRay(ComponentIndex camera_index, float x, float y, Vec3& origin, Vec3& dir) override
-		{
-			m_render_scene->getRay(camera_index, x, y, origin, dir);
 		}
 
 
@@ -928,7 +954,6 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 
 			editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
 			editor.universeDestroyed().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
-			onUniverseCreated();
 		}
 
 
@@ -977,6 +1002,12 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 			ComponentIndex cmp = m_render_scene->getRenderableComponent(entity);
 			if (cmp == INVALID_COMPONENT) return;
 			m_render_scene->hideRenderable(cmp);
+		}
+
+
+		Path getRenderablePath(ComponentIndex cmp) override
+		{
+			return m_render_scene->getRenderablePath(cmp);
 		}
 
 

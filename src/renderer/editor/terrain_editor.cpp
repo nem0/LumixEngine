@@ -848,7 +848,7 @@ Lumix::uint16 TerrainEditor::getHeight(const Lumix::Vec3& world_pos)
 }
 
 
-bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int)
+bool TerrainEditor::onEntityMouseDown(const Lumix::WorldEditor::RayHit& hit, int, int)
 {
 	if (m_world_editor.getSelectedEntities().size() != 1) return false;
 	auto terrain = m_world_editor.getComponent(m_world_editor.getSelectedEntities()[0], TERRAIN_HASH);
@@ -860,9 +860,9 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, in
 
 	for (int i = m_world_editor.getSelectedEntities().size() - 1; i >= 0; --i)
 	{
-		if (m_world_editor.getSelectedEntities()[i] == hit.m_entity && m_component.isValid())
+		if (m_world_editor.getSelectedEntities()[i] == hit.entity && m_component.isValid())
 		{
-			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
+			Lumix::Vec3 hit_pos = hit.pos;
 			switch (m_type)
 			{
 				case FLAT_HEIGHT:
@@ -872,16 +872,16 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, in
 					}
 					else
 					{
-						paint(hit, m_type, false);
+						paint(hit.pos, m_type, false);
 					}
 					break;
 				case RAISE_HEIGHT:
 				case LOWER_HEIGHT:
 				case SMOOTH_HEIGHT:
 				case COLOR:
-				case LAYER: paint(hit, m_type, false); break;
-				case ENTITY: paintEntities(hit); break;
-				case REMOVE_ENTITY: removeEntities(hit); break;
+				case LAYER: paint(hit.pos, m_type, false); break;
+				case ENTITY: paintEntities(hit.pos); break;
+				case REMOVE_ENTITY: removeEntities(hit.pos); break;
 				default: ASSERT(false); break;
 			}
 			return true;
@@ -891,7 +891,7 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, in
 }
 
 
-void TerrainEditor::removeEntities(const Lumix::RayCastModelHit& hit)
+void TerrainEditor::removeEntities(const Lumix::Vec3& hit_pos)
 {
 	if (m_selected_entity_templates.empty()) return;
 	auto& template_system = m_world_editor.getEntityTemplateSystem();
@@ -910,7 +910,7 @@ void TerrainEditor::removeEntities(const Lumix::RayCastModelHit& hit)
 	{
 		hashes.push(Lumix::crc32(template_names[template_idx].c_str()));
 	}
-	frustum.computeOrtho(hit.m_origin + hit.m_dir * hit.m_t,
+	frustum.computeOrtho(hit_pos,
 		Lumix::Vec3(0, 0, 1),
 		Lumix::Vec3(0, 1, 0),
 		m_terrain_brush_size,
@@ -1042,7 +1042,7 @@ static bool isOBBCollision(Lumix::RenderScene& scene,
 }
 
 
-void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
+void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 {
 	PROFILE_FUNCTION();
 	if (m_selected_entity_templates.empty()) return;
@@ -1076,8 +1076,7 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 		}
 
 		Lumix::Frustum frustum;
-		auto center = hit.m_origin + hit.m_dir * hit.m_t;
-		frustum.computeOrtho(center,
+		frustum.computeOrtho(hit_pos,
 			Lumix::Vec3(0, 0, 1),
 			Lumix::Vec3(0, 1, 0),
 			m_terrain_brush_size,
@@ -1097,7 +1096,7 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 			float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
 			float dist = Lumix::Math::randFloat(0, 1.0f) * m_terrain_brush_size;
 			float y = Lumix::Math::randFloat(m_y_spread.x, m_y_spread.y);
-			Lumix::Vec3 pos(center.x + cos(angle) * dist, 0, center.z + sin(angle) * dist);
+			Lumix::Vec3 pos(hit_pos.x + cos(angle) * dist, 0, hit_pos.z + sin(angle) * dist);
 			Lumix::Vec3 terrain_pos = inv_terrain_matrix.multiplyPosition(pos);
 			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= size.x && terrain_pos.z <= size.y)
 			{
@@ -1158,16 +1157,13 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 	detectModifiers();
 
 	Lumix::ComponentUID camera_cmp = m_world_editor.getEditCamera();
-	Lumix::RenderScene* scene =
-		static_cast<Lumix::RenderScene*>(camera_cmp.scene);
+	Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.scene);
 	Lumix::Vec3 origin, dir;
 	scene->getRay(camera_cmp.index, (float)x, (float)y, origin, dir);
-	Lumix::RayCastModelHit hit =
-		scene->castRayTerrain(m_component.index, origin, dir);
+	Lumix::RayCastModelHit hit = scene->castRayTerrain(m_component.index, origin, dir);
 	if (hit.m_is_hit)
 	{
-		Lumix::ComponentUID terrain =
-			m_world_editor.getComponent(hit.m_entity, Lumix::crc32("terrain"));
+		Lumix::ComponentUID terrain = m_world_editor.getComponent(hit.m_entity, Lumix::crc32("terrain"));
 		if (terrain.isValid())
 		{
 			switch (m_type)
@@ -1177,11 +1173,9 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 				case LOWER_HEIGHT:
 				case SMOOTH_HEIGHT:
 				case COLOR:
-				case LAYER:
-					paint(hit, m_type, true);
-					break;
-				case ENTITY: paintEntities(hit); break;
-				case REMOVE_ENTITY: removeEntities(hit); break;
+				case LAYER: paint(hit.m_origin + hit.m_dir * hit.m_t, m_type, true); break;
+				case ENTITY: paintEntities(hit.m_origin + hit.m_dir * hit.m_t); break;
+				case REMOVE_ENTITY: removeEntities(hit.m_origin + hit.m_dir * hit.m_t); break;
 				default: ASSERT(false); break;
 			}
 		}
@@ -1467,24 +1461,18 @@ void TerrainEditor::onGUI()
 }
 
 
-void TerrainEditor::paint(const Lumix::RayCastModelHit& hit,
-						  Type type,
-						  bool old_stroke)
+void TerrainEditor::paint(const Lumix::Vec3& hit_pos, Type type, bool old_stroke)
 {
-	Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
-
-	PaintTerrainCommand* command =
-		LUMIX_NEW(m_world_editor.getAllocator(), PaintTerrainCommand)(
-			m_world_editor,
-			type,
-			m_texture_idx,
-			hit_pos,
-			m_brush_mask,
-			m_terrain_brush_size,
-			m_terrain_brush_strength,
-			m_flat_height,
-			m_color,
-			m_component,
-			old_stroke);
+	PaintTerrainCommand* command = LUMIX_NEW(m_world_editor.getAllocator(), PaintTerrainCommand)(m_world_editor,
+		type,
+		m_texture_idx,
+		hit_pos,
+		m_brush_mask,
+		m_terrain_brush_size,
+		m_terrain_brush_strength,
+		m_flat_height,
+		m_color,
+		m_component,
+		old_stroke);
 	m_world_editor.executeCommand(command);
 }

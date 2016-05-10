@@ -1,5 +1,4 @@
 #include "measure_tool.h"
-#include "renderer/model.h"
 #include "editor/render_interface.h"
 
 
@@ -10,19 +9,19 @@ namespace Lumix
 	{ }
 
 
-	bool MeasureTool::onEntityMouseDown(const RayCastModelHit& hit, int, int)
+	bool MeasureTool::onEntityMouseDown(const WorldEditor::RayHit& hit, int, int)
 	{
 		if (!m_is_enabled) return false;
 
 		if (!m_is_from_set)
 		{
-			m_from = hit.m_origin + hit.m_dir * hit.m_t;
+			m_from = hit.pos;
 			m_is_from_set = true;
 		}
 		else
 		{
 			m_is_from_set = false;
-			m_to = hit.m_origin + hit.m_dir * hit.m_t;
+			m_to = hit.pos;
 		}
 		if(m_distance_measured.isValid()) m_distance_measured.invoke(getDistance());
 		return true;

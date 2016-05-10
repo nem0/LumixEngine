@@ -4,6 +4,7 @@
 #include "engine/array.h"
 #include "engine/delegate_list.h"
 #include "engine/universe/component.h"
+#include "engine/vec.h"
 
 
 namespace Lumix
@@ -21,8 +22,6 @@ class RenderInterface;
 struct Quat;
 struct RayCastModelHit;
 class Universe;
-struct Vec2;
-struct Vec3;
 
 struct MouseButton
 {
@@ -47,12 +46,20 @@ public:
 		CONTROL = 2
 	};
 
+	struct RayHit
+	{
+		bool is_hit;
+		float t;
+		Entity entity;
+		Vec3 pos;
+	};
+
 	class LUMIX_EDITOR_API Plugin
 	{
 	public:
 		virtual ~Plugin() {}
 
-		virtual bool onEntityMouseDown(const RayCastModelHit& /*hit*/, int /*x*/, int /*y*/) { return false; }
+		virtual bool onEntityMouseDown(const RayHit& /*hit*/, int /*x*/, int /*y*/) { return false; }
 		virtual void onMouseUp(int /*x*/, int /*y*/, MouseButton::Value /*button*/) {}
 		virtual void onMouseMove(int /*x*/, int /*y*/, int /*rel_x*/, int /*rel_y*/) {}
 		virtual bool showGizmo(ComponentUID /*cmp*/) { return false; }
@@ -103,7 +110,6 @@ public:
 	virtual Entity addEntity() = 0;
 	virtual void destroyEntities(const Entity* entities, int count) = 0;
 	virtual void selectEntities(const Entity* entities, int count) = 0;
-	virtual void selectEntitiesWithSameMesh() = 0;
 	virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
 	virtual void setEntitiesPositions(const Entity* entities, const Vec3* positions, int count) = 0;
 	virtual void setEntitiesScales(const Entity* entities, const float* scales, int count) = 0;
