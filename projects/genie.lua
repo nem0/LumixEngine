@@ -309,16 +309,13 @@ project "engine"
 
 	defines { "BUILDING_ENGINE" }
 	includedirs { "../external/lua/include" }
+	linkLib("lua")
 
 	configuration { "windows", "not asmjs" }
 		if not _OPTIONS["static-plugins"] then
 			linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
 		end
 		
-	configuration {}
-
-	linkLib("lua")
-
 	defaultConfigurations()
 
 if build_physics then
@@ -332,7 +329,6 @@ if build_physics then
 		links { "engine", "renderer", "editor" }
 
 		useLua()
-
 		linkPhysX()
 
 		defaultConfigurations()
@@ -345,13 +341,16 @@ project "renderer"
 	files { "../src/renderer/**.h", "../src/renderer/**.cpp" }
 	includedirs { "../src", "../external/bgfx/include", "../external/assimp/include", "../external/crnlib/include" }
 	defines { "BUILDING_RENDERER" }
-	links { "engine", "psapi", "editor" }
-	linkLib("crnlib")
-	linkLib("assimp")
-	useLua()
+	links { "engine", "editor" }
 
-	linkLib("bgfx")
+	linkLib "crnlib"
+	linkLib "assimp"
+	linkLib "bgfx"
+	useLua()
 	
+	configuration { "windows", "not asmjs" }
+		links { "psapi" }
+
 	defaultConfigurations()
 
 project "animation"
@@ -400,7 +399,7 @@ project "lua_script"
 	libType()
 
 	files { "../src/lua_script/**.h", "../src/lua_script/**.cpp" }
-	includedirs { "../src", "../src/lua_script", "../external/lua/include", "../external/bgfx/include" }
+	includedirs { "../src", "../src/lua_script", "../external/bgfx/include" }
 	defines { "BUILDING_LUA_SCRIPT" }
 	links { "editor", "engine", "renderer" }
 
@@ -410,13 +409,14 @@ project "lua_script"
 if build_unit_tests then
 	project "unit_tests"
 		kind "ConsoleApp"
+		debugdir "../../LumixEngine_data"
 
 		files { "../src/unit_tests/**.h", "../src/unit_tests/**.cpp" }
 		includedirs { "../src", "../src/unit_tests", "../external/bgfx/include" }
 		links { "engine", "animation", "renderer" }
 		if _OPTIONS["static-plugins"] then	
 			links { "engine", "winmm", "psapi" }
-			linkLib("bgfx")
+			linkLib "bgfx"
 		end
 
 		useLua()
@@ -426,6 +426,7 @@ end
 
 if build_app then
 	project "app"
+		debugdir "../../LumixEngine_data"
 		
 		configuration { "asmjs" }
 			kind "ConsoleApp"
@@ -434,8 +435,6 @@ if build_app then
 
 		configuration { "windows" }
 			kind "WindowedApp"
-
-		debugdir "../../LumixEngine_data"
 
 		configuration { "windows", "not asmjs" }
 			files { "../src/app/main_win.cpp" }
@@ -472,13 +471,13 @@ if build_app then
 			configuration {}
 			
 			if _ACTION ~= "gmake" then
-				linkLib("crnlib")
-				linkLib("assimp")
+				linkLib "crnlib"
+				linkLib "assimp"
 			end
 			
-			linkLib("bgfx")
-			linkLib("lua")
-			linkLib("recast")
+			linkLib "bgfx"
+			linkLib "lua"
+			linkLib "recast"
 			linkPhysX()
 		end
 		links { "engine", "animation", "renderer" }
@@ -505,7 +504,6 @@ if build_studio then
 		includedirs {
 			"../src",
 			"../src/editor",
-			"../external/lua/include",
 			"../external"
 		}
 
@@ -543,11 +541,11 @@ if build_studio then
 			if build_physics then
 				links { "physics" }
 			end
-			linkLib("crnlib")
-			linkLib("assimp")
-			linkLib("bgfx")
-			linkLib("lua")
-			linkLib("recast")
+			linkLib "crnlib"
+			linkLib "assimp"
+			linkLib "bgfx"
+			linkLib "lua"
+			linkLib "recast"
 			
 			linkPhysX()
 			
