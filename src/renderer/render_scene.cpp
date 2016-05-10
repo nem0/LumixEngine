@@ -1957,9 +1957,8 @@ public:
 	{
 		if (!m_renderables[cmp].model || !m_renderables[cmp].model->isReady()) return;
 
-		Sphere sphere(m_universe.getPosition(m_renderables[cmp].entity),
-			m_renderables[cmp].model->getBoundingRadius());
-		m_culling_system->addStatic(cmp, sphere);
+		Sphere sphere(m_universe.getPosition(m_renderables[cmp].entity), m_renderables[cmp].model->getBoundingRadius());
+		if(!m_culling_system->isAdded(cmp)) m_culling_system->addStatic(cmp, sphere);
 	}
 
 
@@ -2549,6 +2548,12 @@ public:
 		m_cameras[camera].screen_width = (float)w;
 		m_cameras[camera].screen_height = (float)h;
 		m_cameras[camera].aspect = w / (float)h;
+	}
+
+
+	Vec2 getCameraScreenSize(ComponentIndex camera) override
+	{
+		return Vec2(m_cameras[camera].screen_width, m_cameras[camera].screen_width);
 	}
 
 

@@ -1445,7 +1445,6 @@ public:
 		if (m_selected_entities.empty()) return;
 
 		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
-		RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
 		Universe* universe = getUniverse();
 
 		if (m_selected_entities.size() > 1)
@@ -1453,12 +1452,11 @@ public:
 			AABB aabb = m_render_interface->getEntityAABB(*universe, m_selected_entities[0]);
 			for (int i = 1; i < m_selected_entities.size(); ++i)
 			{
-				AABB entity_aabb =
-					m_render_interface->getEntityAABB(*universe, m_selected_entities[i]);
+				AABB entity_aabb = m_render_interface->getEntityAABB(*universe, m_selected_entities[i]);
 				aabb.merge(entity_aabb);
 			}
 
-			scene->addDebugCube(aabb.min, aabb.max, 0xffffff00, 0);
+			m_render_interface->addDebugCube(aabb.min, aabb.max, 0xffffff00, 0);
 			return;
 		}
 
@@ -1468,8 +1466,7 @@ public:
 		{
 			for (auto* plugin : m_plugins)
 			{
-				if (plugin->showGizmo(cmp))
-					break;
+				if (plugin->showGizmo(cmp)) break;
 			}
 		}
 	}
@@ -1477,12 +1474,11 @@ public:
 
 	void createEditorLines()
 	{
+		ASSERT(m_render_interface);
+
 		PROFILE_FUNCTION();
 		showGizmos();
-
-		RenderScene* scene =
-			static_cast<RenderScene*>(m_universe->getScene(crc32("renderer")));
-		m_measure_tool->createEditorLines(*scene);
+		m_measure_tool->createEditorLines(*m_render_interface);
 	}
 
 
@@ -1851,10 +1847,8 @@ public:
 	Entity addEntity() override
 	{
 		ComponentUID cmp = getComponent(m_camera, CAMERA_HASH);
-		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-		float width = scene->getCameraScreenWidth(cmp.index);
-		float height = scene->getCameraScreenHeight(cmp.index);
-		return addEntityAt((int)width >> 1, (int)height >> 1);
+		Vec2 size = m_render_interface->getCameraScreenSize(cmp.index);
+		return addEntityAt((int)size.x >> 1, (int)size.y >> 1);
 	}
 
 
@@ -1866,8 +1860,7 @@ public:
 		Vec3 origin;
 		Vec3 dir;
 
-		scene->getRay(
-			camera_cmp.index, (float)camera_x, (float)camera_y, origin, dir);
+		scene->getRay(camera_cmp.index, (float)camera_x, (float)camera_y, origin, dir);
 		RayCastModelHit hit = scene->castRay(origin, dir, INVALID_COMPONENT);
 		Vec3 pos;
 		if (hit.m_is_hit)
@@ -1876,8 +1869,7 @@ public:
 		}
 		else
 		{
-			pos = universe->getPosition(m_camera) +
-				  universe->getRotation(m_camera) * Vec3(0, 0, -2);
+			pos = universe->getPosition(m_camera) + universe->getRotation(m_camera) * Vec3(0, 0, -2);
 		}
 		AddEntityCommand* command = LUMIX_NEW(m_allocator, AddEntityCommand)(*this, pos);
 		executeCommand(command);
@@ -1891,14 +1883,12 @@ public:
 		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
 		RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
 		Universe* universe = getUniverse();
-		float camera_x = scene->getCameraScreenWidth(camera_cmp.index);
-		float camera_y = scene->getCameraScreenHeight(camera_cmp.index);
-		camera_x *= 0.5f;
-		camera_y *= 0.5f;
+		Vec2 screen_size = m_render_interface->getCameraScreenSize(camera_cmp.index);
+		screen_size *= 0.5f;
 
 		Vec3 origin;
 		Vec3 dir;
-		scene->getRay(camera_cmp.index, (float)camera_x, (float)camera_y, origin, dir);
+		scene->getRay(camera_cmp.index, (float)screen_size.x, (float)screen_size.y, origin, dir);
 		RayCastModelHit hit = scene->castRay(origin, dir, INVALID_COMPONENT);
 		Vec3 pos;
 		if (hit.m_is_hit)
@@ -2111,25 +2101,16 @@ public:
 	{
 		for (int i = 0, c = count; i < c; ++i)
 		{
-			ComponentUID cmp = getComponent(entities[i], RENDERABLE_HASH);
-			if (cmp.isValid())
-			{
-				static_cast<RenderScene*>(cmp.scene)->showRenderable(cmp.index);
-			}
+			m_render_interface->showEntity(entities[i]);
 		}
 	}
 
 
 	void showSelectedEntities() override
 	{
-		for (int i = 0, c = m_selected_entities.size(); i < c; ++i)
+		for (auto entity : m_selected_entities)
 		{
-			ComponentUID cmp =
-				getComponent(m_selected_entities[i], RENDERABLE_HASH);
-			if (cmp.isValid())
-			{
-				static_cast<RenderScene*>(cmp.scene)->showRenderable(cmp.index);
-			}
+			m_render_interface->showEntity(entity);
 		}
 	}
 
@@ -2138,24 +2119,16 @@ public:
 	{
 		for (int i = 0, c = count; i < c; ++i)
 		{
-			ComponentUID cmp = getComponent(entities[i], RENDERABLE_HASH);
-			if (cmp.isValid())
-			{
-				static_cast<RenderScene*>(cmp.scene)->hideRenderable(cmp.index);
-			}
+			m_render_interface->hideEntity(entities[i]);
 		}
 	}
 
 
 	void hideSelectedEntities() override
 	{
-		for (int i = 0, c = m_selected_entities.size(); i < c; ++i)
+		for (auto entity : m_selected_entities)
 		{
-			ComponentUID cmp = getComponent(m_selected_entities[i], RENDERABLE_HASH);
-			if (cmp.isValid())
-			{
-				static_cast<RenderScene*>(cmp.scene)->hideRenderable(cmp.index);
-			}
+			m_render_interface->hideEntity(entity);
 		}
 	}
 
@@ -3216,18 +3189,6 @@ private:
 		Quat m_to_rot;
 		float m_t;
 		float m_speed;
-	};
-
-	struct ComponentType
-	{
-		explicit ComponentType(IAllocator& allocator)
-			: m_name(allocator)
-			, m_id(allocator)
-		{
-		}
-
-		string m_name;
-		string m_id;
 	};
 
 	Debug::Allocator m_allocator;

@@ -823,6 +823,24 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		}
 
 
+		void addDebugCross(const Vec3& pos, float size, uint32 color, float life) override
+		{
+			m_render_scene->addDebugCross(pos, size, color, life);
+		}
+
+
+		void addDebugLine(const Vec3& from, const Vec3& to, uint32 color, float life) override
+		{
+			m_render_scene->addDebugLine(from, to, color, life);
+		}
+
+
+		void addDebugCube(const Vec3& minimum, const Vec3& maximum, uint32 color, float life) override
+		{
+			m_render_scene->addDebugCube(minimum, maximum, color, life);
+		}
+
+
 		AABB getEntityAABB(Universe& universe, Entity entity) override
 		{
 			AABB aabb;
@@ -850,6 +868,12 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 			auto* model = m_models[handle];
 			model->getResourceManager().get(ResourceManager::MODEL)->unload(*model);
 			m_models.erase(handle);
+		}
+
+
+		Vec2 getCameraScreenSize(ComponentIndex cmp) override
+		{
+			return m_render_scene->getCameraScreenSize(cmp);
 		}
 
 
@@ -937,6 +961,22 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 			Model* model = m_render_scene->getRenderableModel(cmp);
 			if (!model) return Vec3(0, 0, 0);
 			return (model->getAABB().min + model->getAABB().max) * 0.5f;
+		}
+
+
+		void showEntity(Entity entity) override
+		{
+			ComponentIndex cmp = m_render_scene->getRenderableComponent(entity);
+			if (cmp == INVALID_COMPONENT) return;
+			m_render_scene->showRenderable(cmp);
+		}
+
+
+		void hideEntity(Entity entity) override
+		{
+			ComponentIndex cmp = m_render_scene->getRenderableComponent(entity);
+			if (cmp == INVALID_COMPONENT) return;
+			m_render_scene->hideRenderable(cmp);
 		}
 
 

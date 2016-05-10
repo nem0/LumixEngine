@@ -37,6 +37,7 @@ namespace Lumix
 		virtual void cullToFrustum(const Frustum& frustum, int64 layer_mask) = 0;
 		virtual void cullToFrustumAsync(const Frustum& frustum, int64 layer_mask) = 0;
 
+		virtual bool isAdded(ComponentIndex renderable) = 0;
 		virtual void addStatic(ComponentIndex renderable, const Sphere& sphere) = 0;
 		virtual void removeStatic(ComponentIndex renderable) = 0;
 
