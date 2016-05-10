@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/core/resource_manager_base.h"
+#include "engine/resource_manager_base.h"
 
 namespace Lumix
 {

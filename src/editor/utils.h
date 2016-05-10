@@ -2,8 +2,8 @@
 
 
 #include "engine/lumix.h"
-#include "engine/core/delegate.h"
-#include "engine/core/string.h"
+#include "engine/delegate.h"
+#include "engine/string.h"
 #include "imgui/imgui.h"
 
 

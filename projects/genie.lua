@@ -270,6 +270,18 @@ solution "LumixEngine"
 	location(LOCATION)
 	language "C++"
 	startproject "studio"
+	configuration "not macosx"
+		excludes { "../src/**/osx/*"}
+		
+	configuration "not windows"
+		excludes { "../src/**/win/*"}
+
+	configuration "asmjs"
+		excludes { "../src/**/win/*"}
+		
+	configuration "not asmjs" 
+		excludes { "../src/**/asmjs/*"}
+	
 	if _OPTIONS["static-plugins"] then
 		defines {"STATIC_PLUGINS"}
 	end
@@ -302,17 +314,6 @@ project "engine"
 		if not _OPTIONS["static-plugins"] then
 			linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
 		end
-	configuration "not macosx"
-		excludes { "../src/engine/**/osx/*"}
-		
-	configuration "not windows"
-		excludes { "../src/engine/**/win/*"}
-
-	configuration "asmjs"
-		excludes { "../src/engine/**/win/*"}
-		
-	configuration "not asmjs" 
-		excludes { "../src/engine/**/asmjs/*"}
 		
 	configuration {}
 
@@ -325,10 +326,6 @@ if build_physics then
 		libType()
 
 		files { "../src/physics/**.h", "../src/physics/**.cpp" }
-
-		configuration "not macosx"
-			excludes { "../src/engine/**/osx/*"}
-		configuration {}
 
 		includedirs { "../external/physx/include/" .. ide_dir, "../external/bgfx/include" }
 		defines { "BUILDING_PHYSICS" }
@@ -382,8 +379,6 @@ project "audio"
 
 	configuration "windows"
 		links { "dxguid" }
-	configuration "linux or asmjs"
-		excludes { "../src/audio/win/*"}
 	configuration {}
 
 	useLua()
@@ -518,9 +513,6 @@ if build_studio then
 		configuration { "windows", "not asmjs" }
 			links { "winmm" }
 
-		configuration "linux or asmjs"
-			excludes { "../src/editor/win/*"}
-
 		configuration {}
 
 		useLua()
@@ -534,12 +526,6 @@ if build_studio then
 
 		files { "../src/studio/**.cpp" }
 		includedirs { "../src" }
-
-		configuration "linux or asmjs"
-			excludes { "../src/studio/win/**.cpp" }
-		configuration "not linux"
-			excludes { "../src/studio/linux/**.cpp" }
-		configuration {}
 
 		if _OPTIONS["static-plugins"] then	
 			forceLink("s_animation_plugin_register")

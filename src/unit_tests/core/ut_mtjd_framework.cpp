@@ -1,6 +1,6 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "engine/core/mtjd/job.h"
-#include "engine/core/mtjd/manager.h"
+#include "engine/mtjd/job.h"
+#include "engine/mtjd/manager.h"
 
 
 namespace

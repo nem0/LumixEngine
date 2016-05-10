@@ -1,7 +1,7 @@
 #include "engine/lumix.h"
 #include "renderer/shader_manager.h"
 
-#include "engine/core/resource.h"
+#include "engine/resource.h"
 #include "renderer/shader.h"
 
 namespace Lumix

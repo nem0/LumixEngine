@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "engine/core/array.h"
-#include "engine/core/path.h"
+#include "engine/array.h"
+#include "engine/path.h"
 #include "imgui/imgui.h"
 
 

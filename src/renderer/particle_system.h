@@ -2,8 +2,8 @@
 
 
 #include "engine/lumix.h"
-#include "engine/core/array.h"
-#include "engine/core/vec.h"
+#include "engine/array.h"
+#include "engine/vec.h"
 
 
 namespace Lumix

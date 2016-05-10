@@ -1,8 +1,8 @@
 #pragma once
 
 #include "engine/lumix.h"
-#include "engine/core/array.h"
-#include "engine/core/delegate_list.h"
+#include "engine/array.h"
+#include "engine/delegate_list.h"
 #include "engine/universe/component.h"
 
 

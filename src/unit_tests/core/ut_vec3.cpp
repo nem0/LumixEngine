@@ -1,5 +1,5 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "engine/core/vec.h"
+#include "engine/vec.h"
 #include <cmath>
 
 

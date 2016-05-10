@@ -1,10 +1,10 @@
 #pragma once
 
 
-#include "engine/core/array.h"
-#include "engine/core/delegate_list.h"
-#include "engine/core/path.h"
-#include "engine/core/mt/sync.h"
+#include "engine/array.h"
+#include "engine/delegate_list.h"
+#include "engine/path.h"
+#include "engine/mt/sync.h"
 
 
 namespace Lumix

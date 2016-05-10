@@ -1,7 +1,7 @@
 #include "engine/debug/debug.h"
-#include "engine/core/mt/atomic.h"
-#include "engine/core/string.h"
-#include "engine/core/system.h"
+#include "engine/mt/atomic.h"
+#include "engine/string.h"
+#include "engine/system.h"
 #include <cstdlib>
 #include <cstdio>
 

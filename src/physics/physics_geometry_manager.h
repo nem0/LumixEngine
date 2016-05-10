@@ -2,8 +2,8 @@
 
 
 #include "engine/lumix.h"
-#include "engine/core/resource.h"
-#include "engine/core/resource_manager_base.h"
+#include "engine/resource.h"
+#include "engine/resource_manager_base.h"
 
 
 namespace physx

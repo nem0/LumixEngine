@@ -2,7 +2,7 @@
 
 
 #include "engine/lumix.h"
-#include "engine/core/array.h"
+#include "engine/array.h"
 
 
 namespace Lumix

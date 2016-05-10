@@ -1,5 +1,5 @@
 #include "log_ui.h"
-#include "engine/core/log.h"
+#include "engine/log.h"
 #include "imgui/imgui.h"
 
 

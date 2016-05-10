@@ -1,7 +1,7 @@
 #include "engine/lumix.h"
 #include "renderer/texture_manager.h"
 
-#include "engine/core/resource.h"
+#include "engine/resource.h"
 #include "renderer/texture.h"
 
 namespace Lumix

@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "engine/core/vec.h"
+#include "engine/vec.h"
 #include "world_editor.h"
 
 

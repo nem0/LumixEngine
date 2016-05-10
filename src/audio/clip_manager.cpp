@@ -1,7 +1,7 @@
 #include "clip_manager.h"
-#include "engine/core/iallocator.h"
-#include "engine/core/resource.h"
-#include "engine/core/string.h"
+#include "engine/iallocator.h"
+#include "engine/resource.h"
+#include "engine/string.h"
 #include "engine/lumix.h"
 #define STB_VORBIS_HEADER_ONLY
 #include "stb/stb_vorbis.cpp"

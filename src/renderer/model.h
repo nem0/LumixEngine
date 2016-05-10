@@ -1,14 +1,14 @@
 #pragma once
 
 
-#include "engine/core/array.h"
-#include "engine/core/geometry.h"
-#include "engine/core/hash_map.h"
-#include "engine/core/matrix.h"
-#include "engine/core/quat.h"
-#include "engine/core/string.h"
-#include "engine/core/vec.h"
-#include "engine/core/resource.h"
+#include "engine/array.h"
+#include "engine/geometry.h"
+#include "engine/hash_map.h"
+#include "engine/matrix.h"
+#include "engine/quat.h"
+#include "engine/string.h"
+#include "engine/vec.h"
+#include "engine/resource.h"
 #include <bgfx/bgfx.h>
 
 

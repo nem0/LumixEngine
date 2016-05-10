@@ -1,12 +1,12 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
-#include "engine/core/log.h"
-#include "engine/core/mt/lock_free_fixed_queue.h"
-#include "engine/core/mt/task.h"
-#include "engine/core/mt/thread.h"
-#include "engine/core/mt/transaction.h"
-#include "engine/core/queue.h"
-#include "engine/core/array.h"
+#include "engine/log.h"
+#include "engine/mt/lock_free_fixed_queue.h"
+#include "engine/mt/task.h"
+#include "engine/mt/thread.h"
+#include "engine/mt/transaction.h"
+#include "engine/queue.h"
+#include "engine/array.h"
 
 #include <Windows.h>
 #include <cstdio>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "engine/lumix.h"
-#include "engine/core/delegate.h"
+#include "engine/delegate.h"
 
 
 struct lua_State;
