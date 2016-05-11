@@ -2443,7 +2443,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	universe.setPosition(mesh_side_entity, { aabb.max.x - aabb.min.z, 0, 0 });
 	Lumix::Vec3 camera_pos(
 		(aabb.min.x + aabb.max.x + size.z) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + 5);
-	auto camera_entity = universe.createEntity(camera_pos, { 0, 0, 0, 0 });
+	auto camera_entity = universe.createEntity(camera_pos, { 0, 0, 0, 1 });
 	auto camera_cmp = render_scene->createComponent(Lumix::crc32("camera"), camera_entity);
 	render_scene->setCameraOrtho(camera_cmp, true);
 	render_scene->setCameraSlot(camera_cmp, "main");
