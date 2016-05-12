@@ -40,12 +40,6 @@ public:
 	typedef Array<ComponentUID> ComponentList;
 	typedef class IEditorCommand* (*EditorCommandCreator)(WorldEditor&);
 
-	enum class MouseFlags : int
-	{
-		ALT = 1,
-		CONTROL = 2
-	};
-
 	struct RayHit
 	{
 		bool is_hit;
@@ -130,9 +124,7 @@ public:
 	virtual void setSnapMode(bool enable) = 0;
 	virtual void setAdditiveSelection(bool additive) = 0;
 	virtual void addArrayPropertyItem(const ComponentUID& cmp, IArrayDescriptor& property) = 0;
-	virtual void removeArrayPropertyItem(const ComponentUID& cmp,
-		int index,
-		IArrayDescriptor& property) = 0;
+	virtual void removeArrayPropertyItem(const ComponentUID& cmp, int index, IArrayDescriptor& property) = 0;
 	virtual bool isMouseDown(MouseButton::Value button) const = 0;
 	virtual bool isMouseClick(MouseButton::Value button) const = 0;
 	virtual void onMouseDown(int x, int y, MouseButton::Value button) = 0;
@@ -167,10 +159,8 @@ public:
 
 	virtual void saveUndoStack(const Path& path) = 0;
 	virtual bool executeUndoStack(const Path& path) = 0;
-	virtual bool runTest(const Path& undo_stack_path,
-						 const Path& result_universe_path) = 0;
-	virtual void registerEditorCommandCreator(const char* command_type,
-											  EditorCommandCreator) = 0;
+	virtual bool runTest(const Path& undo_stack_path, const Path& result_universe_path) = 0;
+	virtual void registerEditorCommandCreator(const char* command_type, EditorCommandCreator) = 0;
 	virtual bool isGameMode() const = 0;
 	virtual class EntityGroups& getEntityGroups() = 0;
 	virtual void setMouseSensitivity(float x, float y) = 0;

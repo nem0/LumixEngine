@@ -41,6 +41,12 @@ int compareString(const char* lhs, const char* rhs)
 }
 
 
+int equalStrings(const char* lhs, const char* rhs)
+{
+	return strcmp(lhs, rhs) == 0;
+}
+
+
 int stringLength(const char* str)
 {
 	return (int)strlen(str);
