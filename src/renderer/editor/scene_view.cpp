@@ -226,8 +226,7 @@ void SceneView::onGUI()
 			}
 			if(m_is_mouse_captured)
 			{
-				PlatformInterface::clipCursor(
-					content_min.x, content_min.y, content_max.x, content_max.y);
+				PlatformInterface::clipCursor(content_min.x, content_min.y, content_max.x, content_max.y);
 				for (int i = 0; i < 3; ++i)
 				{
 					auto rel_mp = ImGui::GetMousePos();
