@@ -36,10 +36,10 @@ struct TGAHeader
 Texture::Texture(const Path& path,
 				 ResourceManager& resource_manager,
 				 IAllocator& _allocator)
-	: Resource(path, resource_manager, allocator)
+	: Resource(path, resource_manager, _allocator)
 	, data_reference(0)
 	, allocator(_allocator)
-	, data(allocator)
+	, data(_allocator)
 	, bytes_per_pixel(-1)
 	, depth(-1)
 {
