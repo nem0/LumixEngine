@@ -75,7 +75,7 @@ void UT_blob(const char* params)
 	LUMIX_EXPECT(i == i2);
 	LUMIX_EXPECT(ui == ui2);
 	LUMIX_EXPECT(f == f2);
-	LUMIX_EXPECT(Lumix::compareString(tmp, "test string") == 0);
+	LUMIX_EXPECT(Lumix::equalStrings(tmp, "test string"));
 	LUMIX_EXPECT(Lumix::compareMemory(&s, &s2, sizeof(s)) == 0);
 
 	input.rewind();
@@ -92,7 +92,7 @@ void UT_blob(const char* params)
 	LUMIX_EXPECT(i == i2);
 	LUMIX_EXPECT(ui == ui2);
 	LUMIX_EXPECT(f == f2);
-	LUMIX_EXPECT(Lumix::compareString(tmp, "test string") == 0);
+	LUMIX_EXPECT(Lumix::equalStrings(tmp, "test string"));
 	LUMIX_EXPECT(Lumix::compareMemory(&s, &s2, sizeof(s)) == 0);
 
 	LUMIX_EXPECT(input.getSize() == blob.getPos());

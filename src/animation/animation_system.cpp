@@ -417,7 +417,7 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 
 	uint32 getResourceType(const char* ext) override
 	{
-		if (compareString(ext, "ani") == 0) return ResourceManager::ANIMATION;
+		if (equalStrings(ext, "ani")) return ResourceManager::ANIMATION;
 		return 0;
 	}
 

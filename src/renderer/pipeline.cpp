@@ -743,7 +743,7 @@ struct PipelineImpl : public Pipeline
 	{
 		for (int i = 0, c = m_framebuffers.size(); i < c; ++i)
 		{
-			if (compareString(m_framebuffers[i]->getName(), framebuffer_name) == 0)
+			if (equalStrings(m_framebuffers[i]->getName(), framebuffer_name))
 			{
 				return m_framebuffers[i];
 			}
@@ -754,7 +754,7 @@ struct PipelineImpl : public Pipeline
 
 	void setFramebuffer(const char* framebuffer_name)
 	{
-		if (compareString(framebuffer_name, "default") == 0)
+		if (equalStrings(framebuffer_name, "default"))
 		{
 			m_current_framebuffer = m_default_framebuffer;
 			if (m_current_framebuffer)
@@ -908,7 +908,7 @@ struct PipelineImpl : public Pipeline
 		for (int i = 0; i < m_framebuffers.size(); ++i)
 		{
 			auto* f = m_framebuffers[i];
-			if (compareString(f->getName(), framebuffer_name) == 0)
+			if (equalStrings(f->getName(), framebuffer_name))
 			{
 				LUMIX_DELETE(m_allocator, m_framebuffers[i]);
 				if (m_first_postprocess_framebuffer > i)
@@ -2386,9 +2386,9 @@ struct PipelineImpl : public Pipeline
 	void enableBlending(const char* mode)
 	{
 		uint64 mode_value = 0;
-		if (compareString(mode, "alpha") == 0) mode_value = BGFX_STATE_BLEND_ALPHA;
-		else if (compareString(mode, "add") == 0) mode_value = BGFX_STATE_BLEND_ADD;
-		else if (compareString(mode, "multiply") == 0) mode_value = BGFX_STATE_BLEND_MULTIPLY;
+		if (equalStrings(mode, "alpha")) mode_value = BGFX_STATE_BLEND_ALPHA;
+		else if (equalStrings(mode, "add")) mode_value = BGFX_STATE_BLEND_ADD;
+		else if (equalStrings(mode, "multiply")) mode_value = BGFX_STATE_BLEND_MULTIPLY;
 
 		m_render_state |= mode_value;
 		m_views[m_view_idx].render_state = m_render_state;
@@ -2606,7 +2606,7 @@ int addFramebuffer(lua_State* L)
 	}
 	auto* fb = LUMIX_NEW(pipeline->m_allocator, FrameBuffer)(decl);
 	pipeline->m_framebuffers.push(fb);
-	if(compareString(decl.m_name, "default") == 0) pipeline->m_default_framebuffer = fb;
+	if(equalStrings(decl.m_name, "default")) pipeline->m_default_framebuffer = fb;
 
 	return 0;
 }

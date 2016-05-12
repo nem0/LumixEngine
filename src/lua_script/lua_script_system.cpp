@@ -1662,7 +1662,7 @@ namespace Lumix
 							{
 								case LuaScriptSceneImpl::Property::BOOLEAN:
 								{
-									bool b = compareString(buf, "true") == 0;
+									bool b = equalStrings(buf, "true");
 									if (ImGui::Checkbox(property_name, &b))
 									{
 										auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
@@ -1771,7 +1771,7 @@ namespace Lumix
 
 		Lumix::uint32 getResourceType(const char* ext) override
 		{
-			if (compareString(ext, "lua") == 0) return LUA_SCRIPT_HASH;
+			if (equalStrings(ext, "lua")) return LUA_SCRIPT_HASH;
 			return 0;
 		}
 

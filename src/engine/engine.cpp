@@ -84,7 +84,7 @@ public:
 
 			m_file_system->mount(m_mem_file_device);
 			m_file_system->mount(m_disk_file_device);
-			bool is_patching = base_path1[0] != 0 && compareString(base_path0, base_path1) != 0;
+			bool is_patching = base_path1[0] != 0 && !equalStrings(base_path0, base_path1);
 			if (is_patching)
 			{
 				m_patch_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)("patch", base_path1, m_allocator);
@@ -218,7 +218,7 @@ public:
 		while (lua_next(L, -2) != 0)
 		{
 			const char* parameter_name = luaL_checkstring(L, -2);
-			if (compareString(parameter_name, "position") == 0)
+			if (equalStrings(parameter_name, "position"))
 			{
 				auto pos = LuaWrapper::toType<Vec3>(L, -1);
 				ctx->setPosition(e, pos);

@@ -192,31 +192,31 @@ bool Model::parseVertexDecl(FS::IFile& file, bgfx::VertexDecl* vertex_decl)
 		file.read(tmp, len);
 		tmp[len] = '\0';
 
-		if (compareString(tmp, "in_position") == 0)
+		if (equalStrings(tmp, "in_position"))
 		{
 			vertex_decl->add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float);
 		}
-		else if (compareString(tmp, "in_colors") == 0)
+		else if (equalStrings(tmp, "in_colors"))
 		{
 			vertex_decl->add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true, false);
 		}
-		else if (compareString(tmp, "in_tex_coords") == 0)
+		else if (equalStrings(tmp, "in_tex_coords"))
 		{
 			vertex_decl->add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float);
 		}
-		else if (compareString(tmp, "in_normal") == 0)
+		else if (equalStrings(tmp, "in_normal"))
 		{
 			vertex_decl->add(bgfx::Attrib::Normal, 4, bgfx::AttribType::Uint8, true, true);
 		}
-		else if (compareString(tmp, "in_tangents") == 0)
+		else if (equalStrings(tmp, "in_tangents"))
 		{
 			vertex_decl->add(bgfx::Attrib::Tangent, 4, bgfx::AttribType::Uint8, true, true);
 		}
-		else if (compareString(tmp, "in_weights") == 0)
+		else if (equalStrings(tmp, "in_weights"))
 		{
 			vertex_decl->add(bgfx::Attrib::Weight, 4, bgfx::AttribType::Float);
 		}
-		else if (compareString(tmp, "in_indices") == 0)
+		else if (equalStrings(tmp, "in_indices"))
 		{
 			vertex_decl->add(bgfx::Attrib::Indices, 4, bgfx::AttribType::Int16, false, true);
 		}

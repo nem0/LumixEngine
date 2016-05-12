@@ -507,7 +507,7 @@ public:
 	{
 		for (auto* a : m_actions)
 		{
-			if (Lumix::compareString(a->name, name) == 0) return *a;
+			if (Lumix::equalStrings(a->name, name)) return *a;
 		}
 		ASSERT(false);
 		return *m_actions[0];
@@ -1235,8 +1235,8 @@ public:
 		if (filename[0] == '.') return false;
 		if (Lumix::compareStringN("bin/", filename, 4) == 0) return false;
 		if (Lumix::compareStringN("bin32/", filename, 4) == 0) return false;
-		if (Lumix::compareString("data.pak", filename) == 0) return false;
-		if (Lumix::compareString("error.log", filename) == 0) return false;
+		if (Lumix::equalStrings("data.pak", filename)) return false;
+		if (Lumix::equalStrings("error.log", filename)) return false;
 		return true;
 	}
 
@@ -1727,7 +1727,7 @@ void StudioApp::StaticPluginRegister::create(const char* name, StudioApp& app)
 	auto* i = s_first_plugin;
 	while (i)
 	{
-		if (Lumix::compareString(name, i->name) == 0)
+		if (Lumix::equalStrings(name, i->name))
 		{
 			i->creator(app);
 			return;

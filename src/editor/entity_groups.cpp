@@ -23,7 +23,7 @@ int EntityGroups::getGroup(const char* name) const
 {
 	for (int i = 0, c = m_group_infos.size(); i < c; ++i)
 	{
-		if (compareString(m_group_infos[i].name, name) == 0) return i;
+		if (equalStrings(m_group_infos[i].name, name)) return i;
 	}
 	return -1;
 }
@@ -74,7 +74,7 @@ void EntityGroups::createGroup(const char* name)
 	if (name[0] == 0) return;
 	for (auto& i : m_group_infos)
 	{
-		if (compareString(i.name, name) == 0) return;
+		if (equalStrings(i.name, name)) return;
 	}
 
 	m_groups.emplace(m_allocator);

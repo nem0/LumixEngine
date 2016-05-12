@@ -718,7 +718,7 @@ struct ConvertTask : public Lumix::MT::Task
 		bool is_already_saved = m_dialog.m_saved_textures.indexOf(Lumix::crc32(texture.src)) >= 0;
 		if (is_already_saved) return true;
 
-		bool is_src_dds = Lumix::compareString(texture_info.m_extension, "dds") == 0;
+		bool is_src_dds = Lumix::equalStrings(texture_info.m_extension, "dds");
 		PathBuilder dest(m_dialog.m_texture_output_dir[0] ? m_dialog.m_texture_output_dir : m_dialog.m_output_dir);
 		dest << "/" << texture_info.m_basename << (texture.to_dds ? ".dds" : texture_info.m_extension);
 		if (texture.to_dds && !is_src_dds)
@@ -749,7 +749,7 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 		else
 		{
-			if (Lumix::compareString(texture.src, dest) == 0)
+			if (Lumix::equalStrings(texture.src, dest))
 			{
 				if (!PlatformInterface::fileExists(texture.src))
 				{
@@ -1960,7 +1960,7 @@ static bool isImage(const char* path)
 		"dds", "jpg", "jpeg", "png", "tga", "bmp", "psd", "gif", "hdr", "pic", "pnm"};
 	for (auto image_ext : image_extensions)
 	{
-		if (Lumix::compareString(ext, image_ext) == 0)
+		if (Lumix::equalStrings(ext, image_ext))
 		{
 			return true;
 		}

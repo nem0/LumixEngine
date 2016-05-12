@@ -3338,7 +3338,7 @@ public:
 	{
 		for (int i = 0, c = m_cameras.size(); i < c; ++i)
 		{
-			if (!m_cameras[i].is_free && compareString(m_cameras[i].slot, slot) == 0)
+			if (!m_cameras[i].is_free && equalStrings(m_cameras[i].slot, slot))
 			{
 				return i;
 			}
