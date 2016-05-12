@@ -44,7 +44,8 @@ Texture::Texture(const Path& path,
 	, m_depth(-1)
 {
 	m_atlas_size = -1;
-	m_flags = 0;
+	m_bgfx_flags = 0;
+	m_is_cubemap = false;
 	m_texture_handle = BGFX_INVALID_HANDLE;
 }
 
@@ -57,9 +58,9 @@ Texture::~Texture()
 
 void Texture::setFlag(uint32 flag, bool value)
 {
-	uint32 new_flags = m_flags & ~flag;
+	uint32 new_flags = m_bgfx_flags & ~flag;
 	new_flags |= value ? flag : 0;
-	m_flags = new_flags;
+	m_bgfx_flags = new_flags;
 
 	getResourceManager().get(ResourceManager::TEXTURE)->reload(*this);
 }
@@ -67,14 +68,14 @@ void Texture::setFlag(uint32 flag, bool value)
 
 void Texture::setFlags(uint32 flags)
 {
-	if (isReady() && m_flags != flags)
+	if (isReady() && m_bgfx_flags != flags)
 	{
 		g_log_warning.log("Renderer")
 			<< "Trying to set different flags for texture " << getPath().c_str()
 			<< ". They are ignored.";
 		return;
 	}
-	m_flags = flags;
+	m_bgfx_flags = flags;
 }
 
 
@@ -92,13 +93,13 @@ bool Texture::create(int w, int h, void* data)
 			(uint16_t)h,
 			1,
 			bgfx::TextureFormat::RGBA8,
-			m_flags,
+			m_bgfx_flags,
 			bgfx::copy(data, w * h * 4));
 	}
 	else
 	{
 		m_texture_handle =
-			bgfx::createTexture2D((uint16_t)w, (uint16_t)h, 1, bgfx::TextureFormat::RGBA8, m_flags);
+			bgfx::createTexture2D((uint16_t)w, (uint16_t)h, 1, bgfx::TextureFormat::RGBA8, m_bgfx_flags);
 	}
 
 
@@ -373,7 +374,7 @@ bool Texture::loadRaw(FS::IFile& file)
 	}
 
 	m_texture_handle = bgfx::createTexture2D(
-		(uint16_t)m_width, (uint16_t)m_height, 1, bgfx::TextureFormat::R32F, m_flags, nullptr);
+		(uint16_t)m_width, (uint16_t)m_height, 1, bgfx::TextureFormat::R32F, m_bgfx_flags, nullptr);
 	bgfx::updateTexture2D(
 		m_texture_handle,
 		0,
@@ -383,6 +384,7 @@ bool Texture::loadRaw(FS::IFile& file)
 		(uint16_t)m_height,
 		mem);
 	m_depth = 1;
+	m_is_cubemap = false;
 	return bgfx::isValid(m_texture_handle);
 }
 
@@ -409,6 +411,7 @@ bool Texture::loadTGA(FS::IFile& file)
 
 	m_width = header.width;
 	m_height = header.height;
+	m_is_cubemap = false;
 	TextureManager* manager = static_cast<TextureManager*>(
 		getResourceManager().get(ResourceManager::TEXTURE));
 	if (m_data_reference)
@@ -445,7 +448,7 @@ bool Texture::loadTGA(FS::IFile& file)
 		header.height,
 		1,
 		bgfx::TextureFormat::RGBA8,
-		m_flags,
+		m_bgfx_flags,
 		0);
 	bgfx::updateTexture2D(
 		m_texture_handle,
@@ -485,13 +488,14 @@ bool Texture::loadDDS(FS::IFile& file)
 	bgfx::TextureInfo info;
 	m_texture_handle =
 		bgfx::createTexture(bgfx::copy(file.getBuffer(), (uint32)file.size()),
-							m_flags,
+							m_bgfx_flags,
 							0,
 							&info);
 	m_BPP = -1;
 	m_width = info.width;
 	m_height = info.height;
 	m_depth = info.depth;
+	m_is_cubemap = info.cubeMap;
 	return bgfx::isValid(m_texture_handle);
 }
 

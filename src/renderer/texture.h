@@ -25,6 +25,7 @@ class LUMIX_RENDERER_API Texture : public Resource
 		int getDepth() const { return m_depth; }
 		int getWidth() const { return m_width; }
 		int getHeight() const { return m_height; }
+		bool isCubemap() const { return m_is_cubemap; }
 		int getBytesPerPixel() const { return m_BPP; }
 		const uint8* getData() const { return m_data.empty() ? nullptr : &m_data[0]; }
 		uint8* getData() { return m_data.empty() ? nullptr : &m_data[0]; }
@@ -34,7 +35,7 @@ class LUMIX_RENDERER_API Texture : public Resource
 		void save();
 		void setFlags(uint32 flags);
 		void setFlag(uint32 flag, bool value);
-		uint32 getFlags() const { return m_flags; }
+		uint32 getFlags() const { return m_bgfx_flags; }
 		uint32 getPixelNearest(int x, int y) const;
 		uint32 getPixel(float x, float y) const;
 		bgfx::TextureHandle getTextureHandle() const { return m_texture_handle; }
@@ -62,7 +63,8 @@ class LUMIX_RENDERER_API Texture : public Resource
 		int m_BPP;
 		int m_depth;
 		int m_data_reference;
-		uint32 m_flags;
+		uint32 m_bgfx_flags;
+		bool m_is_cubemap;
 		Array<uint8> m_data;
 		bgfx::TextureHandle m_texture_handle;
 };

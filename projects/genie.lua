@@ -52,7 +52,8 @@ newoption {
 		value = "GCC",
 		description = "Choose GCC flavor",
 		allowed = {
-			{ "asmjs",           "Emscripten/asm.js"          }
+			{ "asmjs",           "Emscripten/asm.js"          },
+			{ "android-x86",     "Android - x86"              }
 		}
 	}
 	
@@ -147,8 +148,14 @@ function strip()
 				.. "\"$(TARGET)\" -o \"$(TARGET)\".html "
 --				.. "--preload-file ../../../examples/runtime@/"
 		}
+		
+	configuration { "android-x86", "Release" }
+		postbuildcommands {
+			"$(SILENT) echo Stripping symbols.",
+			"$(SILENT) $(ANDROID_NDK_X86)/bin/i686-linux-android-strip -s \"$(TARGET)\""
+		}
 
-	configuration {} -- reset configuration
+	configuration {}
 end
 
 		
@@ -185,13 +192,16 @@ function linkLib(lib)
 
 	for _,platform_bit in ipairs({"32", "64"}) do
 		for conf,conf_dir in pairs({Debug="debug", Release="release", RelWithDebInfo="release"}) do
-			for platform,target_platform in pairs({win="windows", linux="linux"}) do
+			for platform,target_platform in pairs({win="windows", linux="linux", }) do
 				configuration { "x" .. platform_bit, conf, target_platform }
 					libdirs {"../external/" .. lib .. "/lib/" .. platform .. platform_bit .. "_" .. ide_dir .. "/" .. conf_dir}
 			end
 		end
 	end
-
+	for conf,conf_dir in pairs({Debug="debug", Release="release", RelWithDebInfo="release"}) do
+		configuration { "android-x86", conf }
+			libdirs {"../external/" .. lib .. "/lib/android-x86_gmake/" .. conf_dir}
+	end
 	configuration {}
 end
 
@@ -255,14 +265,109 @@ function linkPhysX()
 end
 
 function forceLink(name)
-	configuration { "x64", "windows", "not asmjs" }
+	configuration { "x64", "windows", "not asmjs", "not android-*" }
 		linkoptions {"/INCLUDE:" .. name}
-	configuration { "x32", "windows", "not asmjs" }
+	configuration { "x32", "windows", "not asmjs", "not android-*" }
 		linkoptions {"/INCLUDE:_" .. name}
 	configuration {}
 end
 
 solution "LumixEngine"
+	if _ACTION == "gmake" then
+		configuration { "android-*" }
+			flags {
+				"NoImportLib",
+			}
+			includedirs {
+				"$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/4.9/include",
+				"$(ANDROID_NDK_ROOT)/sources/android/native_app_glue",
+			}
+			linkoptions {
+				"-nostdlib",
+				"-static-libgcc",
+			}
+			links {
+				"c",
+				"dl",
+				"m",
+				"android",
+				"log",
+				"gnustl_static",
+				"gcc",
+			}
+			buildoptions {
+				"-fPIC",
+				"-no-canonical-prefixes",
+				"-Wa,--noexecstack",
+				"-fstack-protector",
+				"-ffunction-sections",
+				"-Wno-psabi",
+				"-Wunused-value",
+				"-Wundef",
+			}
+			buildoptions_cpp {
+				"-std=c++0x",
+			}
+			linkoptions {
+				"-no-canonical-prefixes",
+				"-Wl,--no-undefined",
+				"-Wl,-z,noexecstack",
+				"-Wl,-z,relro",
+				"-Wl,-z,now",
+			}
+		
+		configuration { "android-x86" }
+			androidPlatform = "android-24"
+			libdirs {
+				path.join(_libDir, "lib/android-x86"),
+				"$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/4.9/libs/x86",
+			}
+			includedirs {
+				"$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/4.9/libs/x86/include",
+			}
+			buildoptions {
+				"--sysroot=" .. path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86"),
+				"-march=i686",
+				"-mtune=atom",
+				"-mstackrealign",
+				"-msse3",
+				"-mfpmath=sse",
+				"-Wunused-value",
+				"-Wundef",
+			}
+			linkoptions {
+				"--sysroot=" .. path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86"),
+				path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86/usr/lib/crtbegin_so.o"),
+				path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86/usr/lib/crtend_so.o"),
+			}
+
+		configuration {}	
+	
+		if "asmjs" == _OPTIONS["gcc"] then
+			if not os.getenv("EMSCRIPTEN") then
+				print("Set EMSCRIPTEN enviroment variable.")
+			end
+			premake.gcc.cc   = "\"$(EMSCRIPTEN)/emcc\""
+			premake.gcc.cxx  = "\"$(EMSCRIPTEN)/em++\""
+			premake.gcc.ar   = "\"$(EMSCRIPTEN)/emar\""
+			_G["premake"].gcc.llvm = true
+			premake.gcc.llvm = true
+			LOCATION = "tmp/emscripten_gmake"
+		
+		elseif "android-x86" == _OPTIONS["gcc"] then
+			if not os.getenv("ANDROID_NDK_X86") or not os.getenv("ANDROID_NDK_ROOT") then
+				print("Set ANDROID_NDK_X86 and ANDROID_NDK_ROOT envrionment variables.")
+			end
+
+			premake.gcc.cc  = "\"$(ANDROID_NDK_X86)/bin/i686-linux-android-gcc\""
+			premake.gcc.cxx = "\"$(ANDROID_NDK_X86)/bin/i686-linux-android-g++\""
+			premake.gcc.ar  = "\"$(ANDROID_NDK_X86)/bin/i686-linux-android-ar\""
+			LOCATION = "tmp/android-x86_gmake"
+
+		end
+		BINARY_DIR = LOCATION .. "/bin/"
+	end
+	
 	configurations { "Debug", "Release", "RelWithDebInfo" }
 	platforms { "x32", "x64" }
 	flags { "FatalWarnings", "NoPCH" }
@@ -278,28 +383,15 @@ solution "LumixEngine"
 
 	configuration "asmjs"
 		excludes { "../src/**/win/*"}
+
+	configuration "android-*"
+		excludes { "../src/**/win/*"}
 		
 	configuration "not asmjs" 
 		excludes { "../src/**/asmjs/*"}
 	
 	if _OPTIONS["static-plugins"] then
 		defines {"STATIC_PLUGINS"}
-	end
-	
-	if _ACTION == "gmake" then
-		if "asmjs" == _OPTIONS["gcc"] then
-
-			if not os.getenv("EMSCRIPTEN") then
-				print("Set EMSCRIPTEN enviroment variable.")
-			end
-			premake.gcc.cc   = "\"$(EMSCRIPTEN)/emcc\""
-			premake.gcc.cxx  = "\"$(EMSCRIPTEN)/em++\""
-			premake.gcc.ar   = "\"$(EMSCRIPTEN)/emar\""
-			_G["premake"].gcc.llvm = true
-			premake.gcc.llvm = true
-			LOCATION = "tmp/gmake"
-			BINARY_DIR = LOCATION .. "/bin/"
-		end
 	end
 	
 project "engine"
@@ -311,7 +403,7 @@ project "engine"
 	includedirs { "../external/lua/include" }
 	linkLib("lua")
 
-	configuration { "windows", "not asmjs" }
+	configuration { "windows", "not asmjs", "not android-*" }
 		if not _OPTIONS["static-plugins"] then
 			linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
 		end
@@ -433,10 +525,13 @@ if build_app then
 			targetextension ".bc"
 			files { "../src/app/main_asmjs.cpp" }
 
-		configuration { "windows" }
+		configuration { "windows", "not android-*" }
 			kind "WindowedApp"
 
-		configuration { "windows", "not asmjs" }
+		configuration { "windows", "android-*" }
+			kind "ConsoleApp"
+
+		configuration { "windows", "not asmjs", "not android-*" }
 			files { "../src/app/main_win.cpp" }
 		
 		configuration {}
@@ -462,7 +557,7 @@ if build_app then
 				links { "physics" }
 			end
 
-			configuration { "windows", "not asmjs" }
+			configuration { "windows", "not asmjs", "not android-*" }
 				links { "psapi", "dxguid", "winmm" }
 
 			configuration { "asmjs" }

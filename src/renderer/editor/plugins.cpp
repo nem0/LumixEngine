@@ -44,9 +44,12 @@
 using namespace Lumix;
 
 
-static const uint32 TEXTURE_HASH = ResourceManager::TEXTURE;
-static const uint32 SHADER_HASH = ResourceManager::SHADER;
-static const uint32 MATERIAL_HASH = crc32("MATERIAL");
+static const uint32 PARTICLE_EMITTER_HASH = crc32("particle_emitter");
+static const uint32 TERRAIN_HASH = crc32("terrain");
+static const uint32 CAMERA_HASH = crc32("camera");
+static const uint32 POINT_LIGHT_HASH = crc32("point_light");
+static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
+static const uint32 RENDERABLE_HASH = crc32("renderable");
 
 
 struct MaterialPlugin : public AssetBrowser::IPlugin
@@ -61,47 +64,43 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 	{
 		FS::FileSystem& fs = m_app.getWorldEditor()->getEngine().getFileSystem();
 		// use temporary because otherwise the material is reloaded during saving
-		char tmp_path[MAX_PATH_LENGTH];
-		strcpy(tmp_path, material->getPath().c_str());
-		strcat(tmp_path, ".tmp");
-		FS::IFile* file = fs.open(fs.getDefaultDevice(),
-			Path(tmp_path),
-			FS::Mode::CREATE_AND_WRITE);
-		if (file)
+		StaticString<MAX_PATH_LENGTH> tmp_path(material->getPath().c_str(), ".tmp");
+		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(tmp_path), FS::Mode::CREATE_AND_WRITE);
+		if (!file)
 		{
-			DefaultAllocator allocator;
-			JsonSerializer serializer(
-				*file, JsonSerializer::AccessMode::WRITE, material->getPath(), allocator);
-			if (!material->save(serializer))
-			{
-				g_log_error.log("Editor") << "Error saving " << material->getPath().c_str();
-			}
-			fs.close(*file);
-
-			auto& engine = m_app.getWorldEditor()->getEngine();
-			StaticString<MAX_PATH_LENGTH> src_full_path("");
-			StaticString<MAX_PATH_LENGTH> dest_full_path("");
-			if (engine.getPatchFileDevice())
-			{
-				src_full_path << engine.getPatchFileDevice()->getBasePath() << tmp_path;
-				dest_full_path << engine.getPatchFileDevice()->getBasePath() << material->getPath().c_str();
-			}
-			if (!engine.getPatchFileDevice() || !PlatformInterface::fileExists(src_full_path))
-			{
-				src_full_path.data[0] = 0;
-				dest_full_path.data[0] = 0;
-				src_full_path << engine.getDiskFileDevice()->getBasePath() << tmp_path;
-				dest_full_path << engine.getDiskFileDevice()->getBasePath() << material->getPath().c_str();
-			}
-
-			PlatformInterface::deleteFile(dest_full_path);
-
-			if (!PlatformInterface::moveFile(src_full_path, dest_full_path))
-			{
-				g_log_error.log("Editor") << "Could not save file " << material->getPath().c_str();
-			}
+			g_log_error.log("Editor") << "Could not save file " << material->getPath().c_str();
+			return;
 		}
-		else
+
+		auto& allocator = m_app.getWorldEditor()->getAllocator();
+		JsonSerializer serializer(*file, JsonSerializer::AccessMode::WRITE, material->getPath(), allocator);
+		if (!material->save(serializer))
+		{
+			g_log_error.log("Editor") << "Could not save file " << material->getPath().c_str();
+			fs.close(*file);
+			return;
+		}
+		fs.close(*file);
+
+		auto& engine = m_app.getWorldEditor()->getEngine();
+		StaticString<MAX_PATH_LENGTH> src_full_path;
+		StaticString<MAX_PATH_LENGTH> dest_full_path;
+		if (engine.getPatchFileDevice())
+		{
+			src_full_path << engine.getPatchFileDevice()->getBasePath() << tmp_path;
+			dest_full_path << engine.getPatchFileDevice()->getBasePath() << material->getPath().c_str();
+		}
+		if (!engine.getPatchFileDevice() || !PlatformInterface::fileExists(src_full_path))
+		{
+			src_full_path.data[0] = 0;
+			dest_full_path.data[0] = 0;
+			src_full_path << engine.getDiskFileDevice()->getBasePath() << tmp_path;
+			dest_full_path << engine.getDiskFileDevice()->getBasePath() << material->getPath().c_str();
+		}
+
+		PlatformInterface::deleteFile(dest_full_path);
+
+		if (!PlatformInterface::moveFile(src_full_path, dest_full_path))
 		{
 			g_log_error.log("Editor") << "Could not save file " << material->getPath().c_str();
 		}
@@ -110,7 +109,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 
 	bool onGUI(Resource* resource, uint32 type) override
 	{
-		if (type != MATERIAL_HASH) return false;
+		if (type != ResourceManager::MATERIAL) return false;
 
 		auto* material = static_cast<Material*>(resource);
 
@@ -158,9 +157,9 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 			material->setShininess(shininess);
 		}
 
-		char buf[256];
+		char buf[MAX_PATH_LENGTH];
 		copyString(buf, material->getShader() ? material->getShader()->getPath().c_str() : "");
-		if (m_app.getAssetBrowser()->resourceInput("Shader", "shader", buf, sizeof(buf), SHADER_HASH))
+		if (m_app.getAssetBrowser()->resourceInput("Shader", "shader", buf, sizeof(buf), ResourceManager::SHADER))
 		{
 			material->setShader(Path(buf));
 		}
@@ -171,51 +170,36 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 			auto* texture = material->getTexture(i);
 			copyString(buf, texture ? texture->getPath().c_str() : "");
 			if (m_app.getAssetBrowser()->resourceInput(
-					slot.name, StaticString<30>("", (uint64)&slot), buf, sizeof(buf), TEXTURE_HASH))
+					slot.name, StaticString<30>("", (uint64)&slot), buf, sizeof(buf), ResourceManager::TEXTURE))
 			{
 				material->setTexturePath(i, Path(buf));
 			}
 			if (!texture) continue;
 
 			ImGui::SameLine();
-			StaticString<100> popup_name("pu", (uint64)texture, slot.name);
-			if (ImGui::Button(StaticString<100>("Advanced###adv", (uint64)texture, slot.name)))
-			{
-				ImGui::OpenPopup(popup_name);
-			}
+			StaticString<50> popup_name("pu", (uint64)texture, slot.name);
+			StaticString<50> label("Advanced###adv", (uint64)texture, slot.name);
+			if (ImGui::Button(label)) ImGui::OpenPopup(popup_name);
 
 			if (ImGui::BeginPopup(popup_name))
 			{
-				bool is_srgb = (texture->getFlags() & BGFX_TEXTURE_SRGB) != 0;
-				if (ImGui::Checkbox("SRGB", &is_srgb))
+				static const struct { const char* name; uint32 value; } FLAGS[] = {
+					{"SRGB", BGFX_TEXTURE_SRGB},
+					{"u clamp", BGFX_TEXTURE_U_CLAMP},
+					{"v clamp", BGFX_TEXTURE_V_CLAMP},
+					{"Min point", BGFX_TEXTURE_MIN_POINT},
+					{"Mag point", BGFX_TEXTURE_MAG_POINT}};
+
+				for (auto& flag : FLAGS)
 				{
-					ImGui::CloseCurrentPopup();
-					texture->setFlag(BGFX_TEXTURE_SRGB, is_srgb);
+					bool b = (texture->getFlags() & flag.value) != 0;
+					if (ImGui::Checkbox(flag.name, &b))
+					{
+						ImGui::CloseCurrentPopup();
+						texture->setFlag(flag.value, b);
+					}
 				}
-				bool u_clamp = (texture->getFlags() & BGFX_TEXTURE_U_CLAMP) != 0;
-				if (ImGui::Checkbox("u clamp", &u_clamp))
-				{
-					ImGui::CloseCurrentPopup();
-					texture->setFlag(BGFX_TEXTURE_U_CLAMP, u_clamp);
-				}
-				bool v_clamp = (texture->getFlags() & BGFX_TEXTURE_V_CLAMP) != 0;
-				if (ImGui::Checkbox("v clamp", &v_clamp))
-				{
-					ImGui::CloseCurrentPopup();
-					texture->setFlag(BGFX_TEXTURE_V_CLAMP, v_clamp);
-				}
-				bool min_point = (texture->getFlags() & BGFX_TEXTURE_MIN_POINT) != 0;
-				if (ImGui::Checkbox("Min point", &min_point))
-				{
-					ImGui::CloseCurrentPopup();
-					texture->setFlag(BGFX_TEXTURE_MIN_POINT, min_point);
-				}
-				bool mag_point = (texture->getFlags() & BGFX_TEXTURE_MAG_POINT) != 0;
-				if (ImGui::Checkbox("Mag point", &mag_point))
-				{
-					ImGui::CloseCurrentPopup();
-					texture->setFlag(BGFX_TEXTURE_MAG_POINT, mag_point);
-				}
+
 				if (slot.is_atlas)
 				{
 					int size = texture->getAtlasSize() - 2;
@@ -227,9 +211,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 					}
 				}
 				ImGui::EndPopup();
-
 			}
-
 		}
 
 		auto* shader = material->getShader();
@@ -239,7 +221,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 			{
 				auto& uniform = material->getUniform(i);
 				auto& shader_uniform = shader->m_uniforms[i];
-				switch(shader_uniform.type)
+				switch (shader_uniform.type)
 				{
 					case Shader::Uniform::FLOAT:
 						if (ImGui::DragFloat(shader_uniform.name, &uniform.float_value))
@@ -248,22 +230,19 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 						}
 						break;
 					case Shader::Uniform::VEC3:
-						if(ImGui::DragFloat3(shader_uniform.name, uniform.vec3))
+						if (ImGui::DragFloat3(shader_uniform.name, uniform.vec3))
 						{
 							material->createCommandBuffer();
 						}
 						break;
 					case Shader::Uniform::COLOR:
-						if(ImGui::ColorEdit3(shader_uniform.name, uniform.vec3))
+						if (ImGui::ColorEdit3(shader_uniform.name, uniform.vec3))
 						{
 							material->createCommandBuffer();
 						}
-						if(ImGui::BeginPopupContextItem(StaticString<50>(shader_uniform.name, "pu")))
+						if (ImGui::BeginPopupContextItem(StaticString<40>(shader_uniform.name, "pu")))
 						{
-							if(ImGui::ColorPicker(uniform.vec3, false))
-							{
-								material->createCommandBuffer();
-							}
+							if (ImGui::ColorPicker(uniform.vec3, false)) material->createCommandBuffer();
 							ImGui::EndPopup();
 						}
 						break;
@@ -271,60 +250,42 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 					default: ASSERT(false); break;
 				}
 			}
-		}
-		for (int i = 0; i < 32; ++i)
-		{
-			if (material->isCustomFlag(1 << i))
+			for (int i = 0; i < 32; ++i)
 			{
-				ImGui::LabelText("Custom flag", "%s", Material::getCustomFlagName(i));
+				if (material->isCustomFlag(1 << i))
+				{
+					ImGui::LabelText("Custom flag", "%s", Material::getCustomFlagName(i));
+				}
 			}
-		}
 
-		if (material->getShader() && ImGui::CollapsingHeader("Layers"))
-		{
-			auto* shader = material->getShader();
-			for (int i = 0; i < shader->m_combintions.pass_count; ++i)
+			if (ImGui::CollapsingHeader("Layers"))
 			{
-				int idx = renderer->getPassIdx(shader->m_combintions.passes[i]);
-				int layers_count = material->getLayerCount(idx);
-				ImGui::DragInt(shader->m_combintions.passes[i], &layers_count, 1, 0, 256);
-				material->setLayerCount(idx, layers_count);
+				for (int i = 0; i < shader->m_combintions.pass_count; ++i)
+				{
+					int idx = renderer->getPassIdx(shader->m_combintions.passes[i]);
+					int layers_count = material->getLayerCount(idx);
+					ImGui::DragInt(shader->m_combintions.passes[i], &layers_count, 1, 0, 256);
+					material->setLayerCount(idx, layers_count);
+				}
 			}
-		}
-
+			}
 		return true;
 	}
 
 
-	void onResourceUnloaded(Resource* resource) override
-	{
-	}
-
-
-	const char* getName() const override
-	{
-		return "Material";
-	}
-
-
-	bool hasResourceManager(uint32 type) const override
-	{
-		return type == MATERIAL_HASH;
-	}
+	void onResourceUnloaded(Resource* resource) override {}
+	const char* getName() const override { return "Material"; }
+	bool hasResourceManager(uint32 type) const override { return type == ResourceManager::MATERIAL; }
 
 
 	uint32 getResourceType(const char* ext) override
 	{
-		if (compareString(ext, "mat") == 0) return MATERIAL_HASH;
-		return 0;
+		return equalStrings(ext, "mat") ? ResourceManager::MATERIAL : 0;
 	}
 
 
 	StudioApp& m_app;
 };
-
-
-static const uint32 MODEL_HASH = ResourceManager::MODEL;
 
 
 struct ModelPlugin : public AssetBrowser::IPlugin
@@ -337,7 +298,6 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		WorldEditor& m_editor;
 
 
-		Entity getEntity() const { return m_entity; }
 		explicit InsertMeshCommand(WorldEditor& editor)
 			: m_editor(editor)
 		{
@@ -398,18 +358,14 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 					break;
 				}
 			}
-			if (cmp >= 0)
-			{
-				static_cast<RenderScene*>(scene)->setRenderablePath(cmp, m_mesh_path);
-			}
+			if (cmp >= 0) static_cast<RenderScene*>(scene)->setRenderablePath(cmp, m_mesh_path);
 			return true;
 		}
 
 
 		void undo() override
 		{
-			const WorldEditor::ComponentList& cmps =
-				m_editor.getComponents(m_entity);
+			const WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entity);
 			for (int i = 0; i < cmps.size(); ++i)
 			{
 				cmps[i].scene->destroyComponent(cmps[i].index, cmps[i].type);
@@ -421,17 +377,12 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 
 		uint32 getType() override
 		{
-			static const uint32 type = crc32("insert_mesh");
-			return type;
+			static const uint32 TYPE = crc32("insert_mesh");
+			return TYPE;
 		}
 
 
-		bool merge(IEditorCommand&) override
-		{
-			return false;
-		}
-
-
+		bool merge(IEditorCommand&) override { return false; }
 	};
 
 
@@ -479,16 +430,20 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), engine.getAllocator());
 		m_pipeline->load();
+
 		auto mesh_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(crc32("renderer")));
 		m_mesh = render_scene->createComponent(crc32("renderable"), mesh_entity);
+		
 		auto light_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		auto light_cmp = render_scene->createComponent(crc32("global_light"), light_entity);
 		render_scene->setGlobalLightIntensity(light_cmp, 0);
 		render_scene->setLightAmbientIntensity(light_cmp, 1);
+		
 		m_camera_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		m_camera_cmp = render_scene->createComponent(crc32("camera"), m_camera_entity);
 		render_scene->setCameraSlot(m_camera_cmp, "editor");
+		
 		m_pipeline->setScene(render_scene);
 	}
 
@@ -575,14 +530,11 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 
 	bool onGUI(Resource* resource, uint32 type) override
 	{
-		if (type != MODEL_HASH) return false;
+		if (type != ResourceManager::MODEL) return false;
 
 		auto* model = static_cast<Model*>(resource);
 
-		if (ImGui::Button("Insert in scene"))
-		{
-			insertInScene(*m_app.getWorldEditor(), model);
-		}
+		if (ImGui::Button("Insert in scene")) insertInScene(*m_app.getWorldEditor(), model);
 
 		ImGui::LabelText("Bone count", "%d", model->getBoneCount());
 		if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones"))
@@ -662,28 +614,10 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 	}
 
 
-	void onResourceUnloaded(Resource* resource) override
-	{
-	}
-
-
-	const char* getName() const override
-	{
-		return "Model";
-	}
-
-
-	bool hasResourceManager(uint32 type) const override
-	{
-		return type == MODEL_HASH;
-	}
-
-
-	uint32 getResourceType(const char* ext) override
-	{
-		if (compareString(ext, "msh") == 0) return MODEL_HASH;
-		return 0;
-	}
+	void onResourceUnloaded(Resource* resource) override {}
+	const char* getName() const override { return "Model"; }
+	bool hasResourceManager(uint32 type) const override { return type == ResourceManager::MODEL; }
+	uint32 getResourceType(const char* ext) override { return equalStrings(ext, "msh") ? ResourceManager::MODEL : 0; }
 
 
 	StudioApp& m_app;
@@ -706,52 +640,54 @@ struct TexturePlugin : public AssetBrowser::IPlugin
 
 	bool onGUI(Resource* resource, uint32 type) override
 	{
-		if (type != TEXTURE_HASH) return false;
+		if (type != ResourceManager::TEXTURE) return false;
 
 		auto* texture = static_cast<Texture*>(resource);
 		if (texture->isFailure())
 		{
-			ImGui::Text("Texture failed to load");
+			ImGui::Text("Texture failed to load.");
 			return true;
 		}
 
 		ImGui::LabelText("Size", "%dx%d", texture->getWidth(), texture->getHeight());
 		ImGui::LabelText("BPP", "%d", texture->getBytesPerPixel());
+		if (texture->isCubemap())
+		{
+			ImGui::Text("Cubemap");
+			return true;
+		}
+
 		m_texture_handle = texture->getTextureHandle();
 		if (bgfx::isValid(m_texture_handle))
 		{
-			ImGui::Image(&m_texture_handle, ImVec2(200, 200));
-			if (ImGui::Button("Open"))
+			ImVec2 texture_size(200, 200);
+			if (texture->getWidth() > texture->getHeight())
 			{
-				m_app.getAssetBrowser()->openInExternalEditor(resource);
+				texture_size.y = texture_size.x * texture->getHeight() / texture->getWidth();
 			}
+			else
+			{
+				texture_size.x = texture_size.y * texture->getWidth() / texture->getHeight();
+			}
+
+			ImGui::Image(&m_texture_handle, texture_size);
+		
+			if (ImGui::Button("Open")) m_app.getAssetBrowser()->openInExternalEditor(resource);
 		}
 		return true;
 	}
 
 
-	void onResourceUnloaded(Resource* resource) override
-	{
-	}
-
-
-	const char* getName() const override
-	{
-		return "Texture";
-	}
-
-
-	bool hasResourceManager(uint32 type) const override
-	{
-		return type == TEXTURE_HASH;
-	}
+	void onResourceUnloaded(Resource* resource) override {}
+	const char* getName() const override { return "Texture"; }
+	bool hasResourceManager(uint32 type) const override { return type == ResourceManager::TEXTURE; }
 
 
 	uint32 getResourceType(const char* ext) override
 	{
-		if (compareString(ext, "tga") == 0) return TEXTURE_HASH;
-		if (compareString(ext, "dds") == 0) return TEXTURE_HASH;
-		if (compareString(ext, "raw") == 0) return TEXTURE_HASH;
+		if (equalStrings(ext, "tga")) return ResourceManager::TEXTURE;
+		if (equalStrings(ext, "dds")) return ResourceManager::TEXTURE;
+		if (equalStrings(ext, "raw")) return ResourceManager::TEXTURE;
 		return 0;
 	}
 
@@ -770,11 +706,11 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 
 	bool onGUI(Resource* resource, uint32 type) override
 	{
-		if (type != SHADER_HASH) return false;
+		if (type != ResourceManager::SHADER) return false;
+
 		auto* shader = static_cast<Shader*>(resource);
 		char basename[MAX_PATH_LENGTH];
-		PathUtils::getBasename(
-			basename, lengthOf(basename), resource->getPath().c_str());
+		PathUtils::getBasename(basename, lengthOf(basename), resource->getPath().c_str());
 		StaticString<MAX_PATH_LENGTH> path("/shaders/", basename);
 		if (ImGui::Button("Open vertex shader"))
 		{
@@ -807,7 +743,7 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 			ImGui::Columns(1);
 		}
 
-		if(!shader->m_uniforms.empty() && ImGui::CollapsingHeader("Uniforms", nullptr, true, true))
+		if (!shader->m_uniforms.empty() && ImGui::CollapsingHeader("Uniforms", nullptr, true, true))
 		{
 			ImGui::Columns(2);
 			ImGui::Text("name");
@@ -815,12 +751,12 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 			ImGui::Text("type");
 			ImGui::NextColumn();
 			ImGui::Separator();
-			for(int i = 0; i < shader->m_uniforms.size(); ++i)
+			for (int i = 0; i < shader->m_uniforms.size(); ++i)
 			{
 				auto& uniform = shader->m_uniforms[i];
 				ImGui::Text("%s", uniform.name);
 				ImGui::NextColumn();
-				switch(uniform.type)
+				switch (uniform.type)
 				{
 					case Shader::Uniform::COLOR: ImGui::Text("color"); break;
 					case Shader::Uniform::FLOAT: ImGui::Text("float"); break;
@@ -833,41 +769,19 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 				ImGui::NextColumn();
 			}
 			ImGui::Columns(1);
-
 		}
 		return true;
 	}
 
 
-	void onResourceUnloaded(Resource* resource) override
-	{
-	}
-
-
-	const char* getName() const override
-	{
-		return "Shader";
-	}
-
-
-	bool hasResourceManager(uint32 type) const override
-	{
-		return type == SHADER_HASH;
-	}
-
-
-	uint32 getResourceType(const char* ext) override
-	{
-		if (compareString(ext, "shd") == 0) return SHADER_HASH;
-		return 0;
-	}
+	void onResourceUnloaded(Resource* resource) override {}
+	const char* getName() const override { return "Shader"; }
+	bool hasResourceManager(uint32 type) const override { return type == ResourceManager::SHADER; }
+	uint32 getResourceType(const char* ext) override { return equalStrings(ext, "shd") ? ResourceManager::SHADER : 0; }
 
 
 	StudioApp& m_app;
 };
-
-
-static const uint32 PARTICLE_EMITTER_HASH = crc32("particle_emitter");
 
 
 struct EmitterPlugin : public PropertyGrid::IPlugin
@@ -904,9 +818,6 @@ struct EmitterPlugin : public PropertyGrid::IPlugin
 	float m_particle_emitter_timescale;
 	bool m_particle_emitter_updating;
 };
-
-
-static const uint32 TERRAIN_HASH = crc32("terrain");
 
 
 struct TerrainPlugin : public PropertyGrid::IPlugin
@@ -1150,22 +1061,18 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 			if (!m_shader->isReady()) return;
 
 			auto& renderer = static_cast<Renderer&>(m_render_scene->getPlugin());
-			if (!bgfx::checkAvailTransientBuffers(
-					vertices_count, renderer.getBasicVertexDecl(), indices_count))
+			if (!bgfx::checkAvailTransientBuffers(vertices_count, renderer.getBasicVertexDecl(), indices_count))
 			{
 				return;
 			}
 			bgfx::TransientVertexBuffer vertex_buffer;
 			bgfx::TransientIndexBuffer index_buffer;
-			bgfx::allocTransientVertexBuffer(
-				&vertex_buffer, vertices_count, renderer.getBasicVertexDecl());
+			bgfx::allocTransientVertexBuffer(&vertex_buffer, vertices_count, renderer.getBasicVertexDecl());
 			bgfx::allocTransientIndexBuffer(&index_buffer, indices_count);
 
-			copyMemory(vertex_buffer.data,
-				vertices,
-				vertices_count * renderer.getBasicVertexDecl().getStride());
+			copyMemory(vertex_buffer.data, vertices, vertices_count * renderer.getBasicVertexDecl().getStride());
 			copyMemory(index_buffer.data, indices, indices_count * sizeof(uint16));
-			
+
 			uint64 flags = BGFX_STATE_DEPTH_TEST_LEQUAL;
 			if (lines) flags |= BGFX_STATE_PT_LINES;
 			m_pipeline.render(vertex_buffer,
@@ -1208,12 +1115,9 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 	}
 
 
-	void onResourceChanged(const Path& path, const char* ext)
+	void onResourceChanged(const Path& path, const char* /*ext*/)
 	{
-		if (m_scene_view.getPipeline()->getPath() == path)
-		{
-			m_scene_view.getPipeline()->load();
-		}
+		if (m_scene_view.getPipeline()->getPath() == path) m_scene_view.getPipeline()->load();
 	}
 
 
@@ -1229,6 +1133,8 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getPipeline());
 		editor.setRenderInterface(m_render_interface);
 	}
+
+
 	void onAction() {}
 	void onWindowGUI() override { m_scene_view.onGUI(); }
 
@@ -1253,7 +1159,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		m_action->func.bind<GameViewPlugin, &GameViewPlugin::onAction>(this);
 		m_game_view.m_is_opened = false;
 		m_game_view.init(editor);
-		
+
 		auto& plugin_manager = editor.getEngine().getPluginManager();
 		auto* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 		Path path("pipelines/imgui.lua");
@@ -1271,8 +1177,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		unsigned char* pixels;
 		int width, height;
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-		auto* material_manager =
-			m_engine->getResourceManager().get(ResourceManager::MATERIAL);
+		auto* material_manager = m_engine->getResourceManager().get(ResourceManager::MATERIAL);
 		auto* resource = material_manager->load(Path("shaders/imgui.mat"));
 		m_material = static_cast<Material*>(resource);
 
@@ -1317,8 +1222,8 @@ struct GameViewPlugin : public StudioApp::IPlugin
 	void draw(ImDrawData* draw_data)
 	{
 		if (!m_gui_pipeline->isReady()) return;
-		if(!m_material || !m_material->isReady()) return;
-		if(!m_material->getTexture(0)) return;
+		if (!m_material || !m_material->isReady()) return;
+		if (!m_material->getTexture(0)) return;
 
 		int w = PlatformInterface::getWindowWidth();
 		int h = PlatformInterface::getWindowHeight();
@@ -1327,22 +1232,20 @@ struct GameViewPlugin : public StudioApp::IPlugin
 			m_width = w;
 			m_height = h;
 			auto& plugin_manager = m_app.getWorldEditor()->getEngine().getPluginManager();
-			auto* renderer =
-				static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
+			auto* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 			if (renderer) renderer->resize(m_width, m_height);
 		}
 
 		m_gui_pipeline->render();
 		setGUIProjection();
 
-		for(int i = 0; i < draw_data->CmdListsCount; ++i)
+		for (int i = 0; i < draw_data->CmdListsCount; ++i)
 		{
 			ImDrawList* cmd_list = draw_data->CmdLists[i];
 			drawGUICmdList(cmd_list);
 		}
 
-		Renderer* renderer =
-			static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+		Renderer* renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 
 		renderer->frame();
 	}
@@ -1350,23 +1253,14 @@ struct GameViewPlugin : public StudioApp::IPlugin
 
 	void onUniverseCreated()
 	{
-		auto* scene =
-			static_cast<RenderScene*>(m_app.getWorldEditor()->getScene(crc32("renderer")));
+		auto* scene = static_cast<RenderScene*>(m_app.getWorldEditor()->getScene(crc32("renderer")));
 
 		m_gui_pipeline->setScene(scene);
 	}
 
 
-	void onUniverseDestroyed()
-	{
-		m_gui_pipeline->setScene(nullptr);
-	}
-
-
-	static void imGuiCallback(ImDrawData* draw_data)
-	{
-		s_instance->draw(draw_data);
-	}
+	void onUniverseDestroyed() { m_gui_pipeline->setScene(nullptr); }
+	static void imGuiCallback(ImDrawData* draw_data) { s_instance->draw(draw_data); }
 
 
 	void setGUIProjection()
@@ -1460,30 +1354,20 @@ struct ShaderEditorPlugin : public StudioApp::IPlugin
 		m_action->func.bind<ShaderEditorPlugin, &ShaderEditorPlugin::onAction>(this);
 		m_shader_editor.m_is_opened = false;
 
-		m_compiler =
-			LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderCompiler)(app, *app.getLogUI());
-		
+		m_compiler = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderCompiler)(app, *app.getLogUI());
+
 		lua_State* L = app.getWorldEditor()->getEngine().getState();
 		LuaWrapper::createSystemVariable(L, "Editor", "shader_compiler", m_compiler);
-		auto* f = &LuaWrapper::wrapMethod<ShaderCompiler,
-			decltype(&ShaderCompiler::compileAll),
-			&ShaderCompiler::compileAll>;
+		auto* f =
+			&LuaWrapper::wrapMethod<ShaderCompiler, decltype(&ShaderCompiler::compileAll), &ShaderCompiler::compileAll>;
 		LuaWrapper::createSystemFunction(L, "Editor", "compileShaders", f);
 	}
 
 
-	void update(float) override
-	{
-		m_compiler->update();
-	}
+	~ShaderEditorPlugin() { LUMIX_DELETE(m_app.getWorldEditor()->getAllocator(), m_compiler); }
 
 
-	~ShaderEditorPlugin()
-	{
-		LUMIX_DELETE(m_app.getWorldEditor()->getAllocator(), m_compiler);
-	}
-
-
+	void update(float) override { m_compiler->update(); }
 	void onAction() { m_shader_editor.m_is_opened = !m_shader_editor.m_is_opened; }
 	void onWindowGUI() override { m_shader_editor.onGUI(); }
 	bool hasFocus() override { return m_shader_editor.isFocused(); }
@@ -1493,12 +1377,6 @@ struct ShaderEditorPlugin : public StudioApp::IPlugin
 	ShaderCompiler* m_compiler;
 	ShaderEditor m_shader_editor;
 };
-
-
-static const uint32 CAMERA_HASH = crc32("camera");
-static const uint32 POINT_LIGHT_HASH = crc32("point_light");
-static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
-static const uint32 RENDERABLE_HASH = crc32("renderable");
 
 
 struct WorldEditorPlugin : public WorldEditor::Plugin
