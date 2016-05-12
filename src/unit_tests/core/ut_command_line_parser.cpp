@@ -29,7 +29,7 @@ void UT_command_line_parser(const char* params)
 	LUMIX_EXPECT(parser.next());
 	LUMIX_EXPECT(parser.currentEquals("custom.dll"));
 	parser.getCurrent(tmp, Lumix::lengthOf(tmp));
-	LUMIX_EXPECT(Lumix::compareString(tmp, "custom.dll") == 0);
+	LUMIX_EXPECT(Lumix::equalStrings(tmp, "custom.dll"));
 
 	LUMIX_EXPECT(parser.next());
 	LUMIX_EXPECT(parser.currentEquals("-str"));
@@ -37,7 +37,7 @@ void UT_command_line_parser(const char* params)
 	LUMIX_EXPECT(parser.next());
 	LUMIX_EXPECT(parser.currentEquals("\"test\""));
 	parser.getCurrent(tmp, Lumix::lengthOf(tmp));
-	LUMIX_EXPECT(Lumix::compareString(tmp, "test") == 0);
+	LUMIX_EXPECT(Lumix::equalStrings(tmp, "test"));
 
 	LUMIX_EXPECT(parser.next());
 	LUMIX_EXPECT(parser.currentEquals("-str2"));
@@ -45,7 +45,7 @@ void UT_command_line_parser(const char* params)
 	LUMIX_EXPECT(parser.next());
 	LUMIX_EXPECT(parser.currentEquals("\"test with spaces\""));
 	parser.getCurrent(tmp, Lumix::lengthOf(tmp));
-	LUMIX_EXPECT(Lumix::compareString(tmp, "test with spaces") == 0);
+	LUMIX_EXPECT(Lumix::equalStrings(tmp, "test with spaces"));
 
 
 	LUMIX_EXPECT(!parser.next());
@@ -67,7 +67,7 @@ void UT_command_line_parser(const char* params)
 	Lumix::CommandLineParser parser6(" \" \" ");
 	LUMIX_EXPECT(parser6.next());
 	parser6.getCurrent(tmp, Lumix::lengthOf(tmp));
-	LUMIX_EXPECT(Lumix::compareString(tmp, " ") == 0);
+	LUMIX_EXPECT(Lumix::equalStrings(tmp, " "));
 	LUMIX_EXPECT(parser6.currentEquals("\" \""));
 	LUMIX_EXPECT(!parser6.next());
 }

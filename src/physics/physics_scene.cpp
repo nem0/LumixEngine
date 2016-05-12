@@ -1533,7 +1533,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				}
 
 				if (m_terrains[i]->m_heightmap == nullptr ||
-					compareString(tmp, m_terrains[i]->m_heightmap->getPath().c_str()) != 0)
+					!equalStrings(tmp, m_terrains[i]->m_heightmap->getPath().c_str()))
 				{
 					setHeightmap(i, Path(tmp));
 				}

@@ -205,32 +205,32 @@ static void uniform(lua_State* L, const char* name, const char* type)
 	auto& u = shader->m_uniforms.emplace();
 	copyString(u.name, name);
 	u.name_hash = crc32(name);
-	if (compareString(type, "float") == 0)
+	if (equalStrings(type, "float"))
 	{
 		u.type = Shader::Uniform::FLOAT;
 		u.handle = bgfx::createUniform(name, bgfx::UniformType::Vec4);
 	}
-	else if (compareString(type, "color") == 0)
+	else if (equalStrings(type, "color"))
 	{
 		u.type = Shader::Uniform::COLOR;
 		u.handle = bgfx::createUniform(name, bgfx::UniformType::Vec4);
 	}
-	else if (compareString(type, "int") == 0)
+	else if (equalStrings(type, "int"))
 	{
 		u.type = Shader::Uniform::INT;
 		u.handle = bgfx::createUniform(name, bgfx::UniformType::Int1);
 	}
-	else if (compareString(type, "matrix4") == 0)
+	else if (equalStrings(type, "matrix4"))
 	{
 		u.type = Shader::Uniform::MATRIX4;
 		u.handle = bgfx::createUniform(name, bgfx::UniformType::Mat4);
 	}
-	else if (compareString(type, "time") == 0)
+	else if (equalStrings(type, "time"))
 	{
 		u.type = Shader::Uniform::TIME;
 		u.handle = bgfx::createUniform(name, bgfx::UniformType::Vec4);
 	}
-	else if (compareString(type, "vec3") == 0)
+	else if (equalStrings(type, "vec3"))
 	{
 		u.type = Shader::Uniform::VEC3;
 		u.handle = bgfx::createUniform(name, bgfx::UniformType::Vec4);
@@ -272,11 +272,11 @@ static void alpha_blending(lua_State* L, const char* mode)
 {
 	Shader* shader = getShader(L);
 	if (!shader) return;
-	if (compareString(mode, "add") == 0)
+	if (equalStrings(mode, "add"))
 	{
 		shader->m_render_states |= BGFX_STATE_BLEND_ADD;
 	}
-	else if (compareString(mode, "alpha") == 0)
+	else if (equalStrings(mode, "alpha"))
 	{
 		shader->m_render_states |= BGFX_STATE_BLEND_ALPHA;
 	}

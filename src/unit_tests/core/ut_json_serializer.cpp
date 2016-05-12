@@ -76,7 +76,7 @@ void UT_json_serializer(const char* params)
 
 		char str[100];
 		serializer.deserialize("const_char", str, sizeof(str), "");
-		LUMIX_EXPECT(Lumix::compareString(str , "some string") == 0);
+		LUMIX_EXPECT(Lumix::equalStrings(str , "some string"));
 		LUMIX_EXPECT(serializer.isObjectEnd());
 
 		serializer.deserializeObjectEnd();

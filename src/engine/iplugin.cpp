@@ -25,7 +25,7 @@ namespace Lumix
 		auto* i = s_first_plugin;
 		while (i)
 		{
-			if (compareString(name, i->name) == 0)
+			if (equalStrings(name, i->name))
 			{
 				return i->creator(engine);
 			}

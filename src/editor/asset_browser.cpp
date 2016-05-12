@@ -31,7 +31,7 @@ Lumix::uint32 AssetBrowser::getResourceType(const char* path) const
 		auto type = plugin->getResourceType(ext);
 		if (type != 0) return type;
 	}
-	if (Lumix::compareString(ext, "unv") == 0) return UNIVERSE_HASH;
+	if (Lumix::equalStrings(ext, "unv")) return UNIVERSE_HASH;
 
 	return 0;
 }
@@ -271,7 +271,7 @@ void AssetBrowser::selectResource(const Lumix::Path& resource)
 	m_activate = true;
 	char ext[30];
 	Lumix::PathUtils::getExtension(ext, Lumix::lengthOf(ext), resource.c_str());
-	if (Lumix::compareString(ext, "unv") == 0) return;
+	if (Lumix::equalStrings(ext, "unv")) return;
 
 	auto& manager = m_editor.getEngine().getResourceManager();
 	auto* resource_manager = manager.get(getResourceType(resource.c_str()));
@@ -409,7 +409,7 @@ int AssetBrowser::getResourceTypeIndex(const char* ext)
 	}
 
 
-	if (Lumix::compareString(ext, "unv") == 0) return 0;
+	if (Lumix::equalStrings(ext, "unv")) return 0;
 	return -1;
 }
 

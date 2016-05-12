@@ -88,7 +88,7 @@ class PluginManagerImpl : public PluginManager
 		{
 			for (int i = 0; i < m_plugins.size(); ++i)
 			{
-				if (compareString(m_plugins[i]->getName(), name) == 0)
+				if (equalStrings(m_plugins[i]->getName(), name))
 				{
 					return m_plugins[i];
 				}

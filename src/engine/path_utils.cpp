@@ -112,7 +112,7 @@ bool hasExtension(const char* filename, const char* ext)
 	char tmp[20];
 	getExtension(tmp, sizeof(tmp), filename);
 
-	return compareString(tmp, ext) == 0;
+	return equalStrings(tmp, ext);
 }
 
 

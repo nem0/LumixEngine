@@ -11,49 +11,49 @@ void UT_string(const char* params)
 	{
 		Lumix::toCString(i, tmp, 100);
 		sprintf(tmp2, "%d", i);
-		LUMIX_EXPECT(Lumix::compareString(tmp, tmp2) == 0);
+		LUMIX_EXPECT(Lumix::equalStrings(tmp, tmp2));
 	}
 
 	for (uint32 i = 0; i < 100; ++i)
 	{
 		Lumix::toCString(i, tmp, 100);
 		sprintf(tmp2, "%u", i);
-		LUMIX_EXPECT(Lumix::compareString(tmp, tmp2) == 0);
+		LUMIX_EXPECT(Lumix::equalStrings(tmp, tmp2));
 	}
 
 	Lumix::toCStringPretty(123456, tmp, sizeof(tmp));
-	LUMIX_EXPECT(Lumix::compareString(tmp, "123 456") == 0);
+	LUMIX_EXPECT(Lumix::equalStrings(tmp, "123 456"));
 
 	Lumix::toCStringPretty(-123456, tmp, sizeof(tmp));
-	LUMIX_EXPECT(Lumix::compareString(tmp, "-123 456") == 0);
+	LUMIX_EXPECT(Lumix::equalStrings(tmp, "-123 456"));
 
 	Lumix::toCStringPretty(123456789, tmp, sizeof(tmp));
-	LUMIX_EXPECT(Lumix::compareString(tmp, "123 456 789") == 0);
+	LUMIX_EXPECT(Lumix::equalStrings(tmp, "123 456 789"));
 
 	Lumix::toCStringPretty(3456789, tmp, sizeof(tmp));
-	LUMIX_EXPECT(Lumix::compareString(tmp, "3 456 789") == 0);
+	LUMIX_EXPECT(Lumix::equalStrings(tmp, "3 456 789"));
 
 	Lumix::toCString((unsigned int)0xffffFFFF, tmp, 1000);
 	sprintf(tmp2, "%u", (unsigned int)0xffffFFFF);
-	LUMIX_EXPECT(Lumix::compareString(tmp, tmp2) == 0);
+	LUMIX_EXPECT(Lumix::equalStrings(tmp, tmp2));
 
 	for (float i = 100; i > -100; i -= 0.27f)
 	{
 		Lumix::toCString(i, tmp, 100, 6);
 		sprintf(tmp2, "%f", i);
-		LUMIX_EXPECT(Lumix::compareString(tmp, tmp2) == 0);
+		LUMIX_EXPECT(Lumix::equalStrings(tmp, tmp2));
 	}
 
 	float f = (float)0xffffFFFF;
 	f += 1000;
 	Lumix::toCString(f, tmp, 100, 6);
 	sprintf(tmp2, "%f", f);
-	LUMIX_EXPECT(Lumix::compareString(tmp, tmp2) == 0);
+	LUMIX_EXPECT(Lumix::equalStrings(tmp, tmp2));
 
 	f = -f;
 	Lumix::toCString(f, tmp, 100, 6);
 	sprintf(tmp2, "%f", f);
-	LUMIX_EXPECT(Lumix::compareString(tmp, tmp2) == 0);
+	LUMIX_EXPECT(Lumix::equalStrings(tmp, tmp2));
 
 	LUMIX_EXPECT(Lumix::stristr("abc", "def") == nullptr);
 	LUMIX_EXPECT(Lumix::stristr("abc", "abcdef") == nullptr);

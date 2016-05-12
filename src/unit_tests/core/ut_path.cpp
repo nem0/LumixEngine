@@ -13,7 +13,7 @@ void UT_path(const char* params)
 	Lumix::PathManager path_manager(allocator);
 	Lumix::Path path(src_path);
 
-	LUMIX_EXPECT(Lumix::compareString(path.c_str(), res_path) == 0);
+	LUMIX_EXPECT(Lumix::equalStrings(path.c_str(), res_path));
 
 	LUMIX_EXPECT(path.getHash() == Lumix::crc32(res_path));
 }

@@ -35,13 +35,7 @@ int compareIStringN(const char* lhs, const char* rhs, int length)
 }
 
 
-int compareString(const char* lhs, const char* rhs)
-{
-	return strcmp(lhs, rhs);
-}
-
-
-int equalStrings(const char* lhs, const char* rhs)
+bool equalStrings(const char* lhs, const char* rhs)
 {
 	return strcmp(lhs, rhs) == 0;
 }

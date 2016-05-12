@@ -204,9 +204,7 @@ void ShaderCompiler::onFileChanged(const char* path)
 {
 	char ext[10];
 	Lumix::PathUtils::getExtension(ext, sizeof(ext), path);
-	if (Lumix::compareString("sc", ext) != 0 && Lumix::compareString("shd", ext) != 0 &&
-		Lumix::compareString("sh", ext) != 0)
-		return;
+	if (!Lumix::equalStrings("sc", ext) && !Lumix::equalStrings("shd", ext) && !Lumix::equalStrings("sh", ext)) return;
 
 	char tmp[Lumix::MAX_PATH_LENGTH];
 	Lumix::copyString(tmp, "shaders/");
@@ -424,8 +422,8 @@ void ShaderCompiler::processChangedFiles()
 		int len = Lumix::stringLength(changed_file_path);
 		if (len <= 6) return;
 
-		if (Lumix::compareString(changed_file_path + len - 6, "_fs.sc") == 0 ||
-			Lumix::compareString(changed_file_path + len - 6, "_vs.sc") == 0)
+		if (Lumix::equalStrings(changed_file_path + len - 6, "_fs.sc") ||
+			Lumix::equalStrings(changed_file_path + len - 6, "_vs.sc"))
 		{
 			Lumix::copyString(
 				changed_file_path + len - 6, Lumix::lengthOf(changed_file_path) - len + 6, ".shd");

@@ -72,7 +72,7 @@ struct ProfilerUIImpl : public ProfilerUI
 		{
 			Lumix::catString(tmp, ":");
 			Lumix::catString(tmp, devices.m_devices[i]->name());
-			if (Lumix::compareString(devices.m_devices[i]->name(), "memory") == 0)
+			if (Lumix::equalStrings(devices.m_devices[i]->name(), "memory"))
 			{
 				Lumix::catString(tmp, ":events");
 			}
@@ -100,7 +100,7 @@ struct ProfilerUIImpl : public ProfilerUI
 		while (devices.m_devices[count] != nullptr) ++count;
 		for (int i = count - 1; i >= 0; --i)
 		{
-			if (Lumix::compareString(devices.m_devices[i]->name(), "events") != 0)
+			if (!Lumix::equalStrings(devices.m_devices[i]->name(), "events"))
 			{
 				if(i < count - 1) Lumix::catString(tmp, ":");
 				Lumix::catString(tmp, devices.m_devices[i]->name());

@@ -201,7 +201,7 @@ namespace {
 
 		Lumix::uint32 getResourceType(const char* ext) override
 		{
-			if (Lumix::compareString(ext, "ogg") == 0) return CLIP_HASH;
+			if (Lumix::equalStrings(ext, "ogg")) return CLIP_HASH;
 			return 0;
 		}
 

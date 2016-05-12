@@ -68,7 +68,7 @@ uint32 Material::getCustomFlag(const char* flag_name)
 {
 	for (int i = 0; i < s_custom_flags.count; ++i)
 	{
-		if (compareString(s_custom_flags.flags[i], flag_name) == 0) return 1 << i;
+		if (equalStrings(s_custom_flags.flags[i], flag_name)) return 1 << i;
 	}
 	if (s_custom_flags.count >= lengthOf(s_custom_flags.flags))
 	{
@@ -306,21 +306,21 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 		while (!serializer.isObjectEnd())
 		{
 			serializer.deserializeLabel(label, 255);
-			if (compareString(label, "name") == 0)
+			if (equalStrings(label, "name"))
 			{
 				char name[32];
 				serializer.deserialize(name, lengthOf(name), "");
 				uniform.name_hash = crc32(name);
 			}
-			else if (compareString(label, "int_value") == 0)
+			else if (equalStrings(label, "int_value"))
 			{
 				serializer.deserialize(uniform.int_value, 0);
 			}
-			else if (compareString(label, "float_value") == 0)
+			else if (equalStrings(label, "float_value"))
 			{
 				serializer.deserialize(uniform.float_value, 0);
 			}
-			else if (compareString(label, "matrix_value") == 0)
+			else if (equalStrings(label, "matrix_value"))
 			{
 				serializer.deserializeArrayBegin();
 				for (int i = 0; i < 16; ++i)
@@ -329,11 +329,11 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 				}
 				serializer.deserializeArrayEnd();
 			}
-			else if (compareString(label, "time") == 0)
+			else if (equalStrings(label, "time"))
 			{
 				serializer.deserialize(uniform.float_value, 0);
 			}
-			else if (compareString(label, "color") == 0)
+			else if (equalStrings(label, "color"))
 			{
 				serializer.deserializeArrayBegin();
 					serializer.deserializeArrayItem(uniform.vec3[0], 0);
@@ -341,7 +341,7 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 					serializer.deserializeArrayItem(uniform.vec3[2], 0);
 				serializer.deserializeArrayEnd();
 			}
-			else if (compareString(label, "vec3") == 0)
+			else if (equalStrings(label, "vec3"))
 			{
 				serializer.deserializeArrayBegin();
 					serializer.deserializeArrayItem(uniform.vec3[0], 0);
@@ -561,7 +561,7 @@ Texture* Material::getTextureByUniform(const char* uniform) const
 
 	for (int i = 0, c = m_shader->m_texture_slot_count; i < c; ++i)
 	{
-		if (compareString(m_shader->m_texture_slots[i].uniform, uniform) == 0)
+		if (equalStrings(m_shader->m_texture_slots[i].uniform, uniform))
 		{
 			return m_textures[i];
 		}
@@ -581,7 +581,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 	while (!serializer.isObjectEnd())
 	{
 		serializer.deserializeLabel(label, sizeof(label));
-		if (compareString(label, "source") == 0)
+		if (equalStrings(label, "source"))
 		{
 			serializer.deserialize(path, MAX_PATH_LENGTH, "");
 			if (path[0] != '\0')
@@ -601,18 +601,18 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 				addDependency(*m_textures[m_texture_count]);
 			}
 		}
-		else if (compareString(label, "atlas_size") == 0)
+		else if (equalStrings(label, "atlas_size"))
 		{
 			serializer.deserialize(atlas_size, -1);
 		}
-		else if (compareString(label, "min_filter") == 0)
+		else if (equalStrings(label, "min_filter"))
 		{
 			serializer.deserialize(label, sizeof(label), "");
-			if (compareString(label, "point") == 0)
+			if (equalStrings(label, "point"))
 			{
 				flags |= BGFX_TEXTURE_MIN_POINT;
 			}
-			else if (compareString(label, "anisotropic") == 0)
+			else if (equalStrings(label, "anisotropic"))
 			{
 				flags |= BGFX_TEXTURE_MIN_ANISOTROPIC;
 			}
@@ -622,14 +622,14 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 											<< "\" in material " << getPath();
 			}
 		}
-		else if (compareString(label, "mag_filter") == 0)
+		else if (equalStrings(label, "mag_filter"))
 		{
 			serializer.deserialize(label, sizeof(label), "");
-			if (compareString(label, "point") == 0)
+			if (equalStrings(label, "point"))
 			{
 				flags |= BGFX_TEXTURE_MAG_POINT;
 			}
-			else if (compareString(label, "anisotropic") == 0)
+			else if (equalStrings(label, "anisotropic"))
 			{
 				flags |= BGFX_TEXTURE_MAG_ANISOTROPIC;
 			}
@@ -639,7 +639,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 											<< "\" in material " << getPath();
 			}
 		}
-		else if (compareString(label, "u_clamp") == 0)
+		else if (equalStrings(label, "u_clamp"))
 		{
 			bool b;
 			serializer.deserialize(b, false);
@@ -648,7 +648,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 				flags |= BGFX_TEXTURE_U_CLAMP;
 			}
 		}
-		else if (compareString(label, "v_clamp") == 0)
+		else if (equalStrings(label, "v_clamp"))
 		{
 			bool b;
 			serializer.deserialize(b, false);
@@ -657,7 +657,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 				flags |= BGFX_TEXTURE_V_CLAMP;
 			}
 		}
-		else if (compareString(label, "w_clamp") == 0)
+		else if (equalStrings(label, "w_clamp"))
 		{
 			bool b;
 			serializer.deserialize(b, false);
@@ -666,11 +666,11 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 				flags |= BGFX_TEXTURE_W_CLAMP;
 			}
 		}
-		else if (compareString(label, "keep_data") == 0)
+		else if (equalStrings(label, "keep_data"))
 		{
 			serializer.deserialize(keep_data, false);
 		}
-		else if (compareString(label, "srgb") == 0)
+		else if (equalStrings(label, "srgb"))
 		{
 			bool is_srgb;
 			serializer.deserialize(is_srgb, false);
@@ -726,30 +726,30 @@ bool Material::load(FS::IFile& file)
 	while (!serializer.isObjectEnd())
 	{
 		serializer.deserializeLabel(label, 255);
-		if (compareString(label, "defines") == 0)
+		if (equalStrings(label, "defines"))
 		{
 			deserializeDefines(serializer);
 		}
-		else if (compareString(label, "custom_flags") == 0)
+		else if (equalStrings(label, "custom_flags"))
 		{
 			deserializeCustomFlags(serializer);
 		}
-		else if (compareString(label, "uniforms") == 0)
+		else if (equalStrings(label, "uniforms"))
 		{
 			deserializeUniforms(serializer);
 		}
-		else if (compareString(label, "texture") == 0)
+		else if (equalStrings(label, "texture"))
 		{
 			if (!deserializeTexture(serializer, material_dir))
 			{
 				return false;
 			}
 		}
-		else if (compareString(label, "alpha_ref") == 0)
+		else if (equalStrings(label, "alpha_ref"))
 		{
 			serializer.deserialize(m_alpha_ref, 0.3f);
 		}
-		else if (compareString(label, "layer") == 0)
+		else if (equalStrings(label, "layer"))
 		{
 			serializer.deserializeObjectBegin();
 			int pass = 0;
@@ -758,13 +758,13 @@ bool Material::load(FS::IFile& file)
 			{
 				serializer.deserializeLabel(label, 255);
 				
-				if (compareString(label, "pass") == 0)
+				if (equalStrings(label, "pass"))
 				{
 					char pass_name[50];
 					serializer.deserialize(pass_name, lengthOf(pass_name), "");
 					pass = renderer.getPassIdx(pass_name);
 				}
-				else if (compareString(label, "count") == 0)
+				else if (equalStrings(label, "count"))
 				{
 					serializer.deserialize(layers_count, 1);
 				}
@@ -772,7 +772,7 @@ bool Material::load(FS::IFile& file)
 			m_layer_count[pass] = layers_count;
 			serializer.deserializeObjectEnd();
 		}
-		else if (compareString(label, "color") == 0)
+		else if (equalStrings(label, "color"))
 		{
 			serializer.deserializeArrayBegin();
 			serializer.deserializeArrayItem(m_color.x, 1.0f);
@@ -780,11 +780,11 @@ bool Material::load(FS::IFile& file)
 			serializer.deserializeArrayItem(m_color.z, 1.0f);
 			serializer.deserializeArrayEnd();
 		}
-		else if (compareString(label, "shininess") == 0)
+		else if (equalStrings(label, "shininess"))
 		{
 			serializer.deserialize(m_shininess, 4.0f);
 		}
-		else if (compareString(label, "shader") == 0)
+		else if (equalStrings(label, "shader"))
 		{
 			Path path;
 			serializer.deserialize(path, Path(""));
