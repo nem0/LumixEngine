@@ -11,6 +11,9 @@
 #include "engine/network.h"
 
 
+#if !LUMIX_SINGLE_THREAD()
+
+
 namespace Lumix
 {
 
@@ -300,7 +303,10 @@ const char* TCPFileServer::getBasePath() const
 }
 
 
-} // ~namespace FS
+} // namespace FS
 
 
-} // ~namespace Lumix
+} // namespace Lumix
+
+
+#endif

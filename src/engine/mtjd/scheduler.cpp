@@ -4,38 +4,48 @@
 #include "engine/profiler.h"
 
 
+#if !LUMIX_SINGLE_THREAD()
+
+
 namespace Lumix
 {
-	namespace MTJD
+namespace MTJD
+{
+
+
+Scheduler::Scheduler(Manager& manager, IAllocator& allocator)
+	: MT::Task(allocator)
+	, m_data_event()
+	, m_abort_event()
+	, m_manager(manager)
+{
+}
+
+Scheduler::~Scheduler()
+{
+}
+
+int Scheduler::task()
+{
+	while (!isForceExit())
 	{
-		Scheduler::Scheduler(Manager& manager, IAllocator& allocator)
-			: MT::Task(allocator)
-			, m_data_event()
-			, m_abort_event()
-			, m_manager(manager)
-		{
-		}
+		m_data_event.wait();
 
-		Scheduler::~Scheduler()
-		{
-		}
+		PROFILE_BLOCK("Schedule")
+		m_manager.doScheduling();
+	}
 
-		int Scheduler::task()
-		{
-			while (!isForceExit())
-			{
-				m_data_event.wait();
+	return 0;
+}
 
-				PROFILE_BLOCK("Schedule")
-				m_manager.doScheduling();
-			}
+void Scheduler::dataSignal()
+{
+	m_data_event.trigger();
+}
 
-			return 0;
-		}
 
-		void Scheduler::dataSignal()
-		{
-			m_data_event.trigger();
-		}
-	} // namepsace MTJD
+} // namepsace MTJD
 } // namepsace Lumix
+
+
+#endif

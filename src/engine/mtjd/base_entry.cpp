@@ -12,27 +12,27 @@ namespace Lumix
 			, m_allocator(allocator)
 			, m_dependency_table(m_allocator)
 		{
-#if TYPE == MULTI_THREAD
+#if !LUMIX_SINGLE_THREAD()
 
 			m_sync_event = sync_event
 							   ? LUMIX_NEW(m_allocator, MT::Event)()
 							   : nullptr;
 
-#endif // TYPE == MULTI_THREAD
+#endif
 		}
 
 		BaseEntry::~BaseEntry()
 		{
-#if TYPE == MULTI_THREAD
+#if !LUMIX_SINGLE_THREAD()
 
 			LUMIX_DELETE(m_allocator, m_sync_event);
 
-#endif //TYPE == MULTI_THREAD
+#endif
 		}
 
 		void BaseEntry::addDependency(BaseEntry* entry)
 		{
-#if TYPE == MULTI_THREAD
+#if !LUMIX_SINGLE_THREAD()
 
 			m_dependency_table.push(entry);
 			if (m_dependency_count > 0)
@@ -40,22 +40,22 @@ namespace Lumix
 				entry->incrementDependency();
 			}
 
-#endif //TYPE == MULTI_THREAD
+#endif
 		}
 
 		void BaseEntry::sync()
 		{
-#if TYPE == MULTI_THREAD
+#if !LUMIX_SINGLE_THREAD()
 
 			ASSERT(nullptr != m_sync_event);
 			m_sync_event->wait();
 
-#endif //TYPE == MULTI_THREAD
+#endif
 		}
 
 		void BaseEntry::dependencyReady()
 		{
-#if TYPE == MULTI_THREAD
+#if !LUMIX_SINGLE_THREAD()
 			DependencyTable dependency_table(m_dependency_table);
 			m_dependency_table.clear();
 
@@ -69,7 +69,7 @@ namespace Lumix
 				m_sync_event->trigger();
 			}
 
-#endif // TYPE == MULTI_THREAD
+#endif
 		}
 	} // namepsace MTJD
 } // namepsace Lumix

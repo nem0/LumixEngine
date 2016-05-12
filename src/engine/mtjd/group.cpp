@@ -19,7 +19,7 @@ namespace Lumix
 
 		void Group::addStaticDependency(BaseEntry* entry)
 		{
-#if TYPE == MULTI_THREAD
+#if !LUMIX_SINGLE_THREAD()
 
 			m_static_dependency_table.push(entry);
 			if (m_dependency_count > 0)
@@ -27,12 +27,12 @@ namespace Lumix
 				entry->incrementDependency();
 			}
 
-#endif //TYPE == MULTI_THREAD
+#endif
 		}
 
 		void Group::incrementDependency()
 		{
-#if TYPE == MULTI_THREAD
+#if !LUMIX_SINGLE_THREAD()
 
 			int32 count = MT::atomicIncrement(&m_dependency_count);
 			if (1 == count)
@@ -40,12 +40,12 @@ namespace Lumix
 				dependencyNotReady();
 			}
 
-#endif //TYPE == MULTI_THREAD
+#endif
 		}
 
 		void Group::decrementDependency()
 		{
-#if TYPE == MULTI_THREAD
+#if !LUMIX_SINGLE_THREAD()
 
 			int32 count = MT::atomicDecrement(&m_dependency_count);
 			if (0 == count)
@@ -55,12 +55,12 @@ namespace Lumix
 
 			ASSERT(0 <= count);
 
-#endif //TYPE == MULTI_THREAD
+#endif
 		}
 
 		void Group::dependencyNotReady()
 		{
-#if TYPE == MULTI_THREAD
+#if !LUMIX_SINGLE_THREAD()
 
 			for (uint32 i = 0, c = m_static_dependency_table.size(); c > i; ++i)
 			{
@@ -77,12 +77,12 @@ namespace Lumix
 				m_sync_event->reset();
 			}
 
-#endif //TYPE == MULTI_THREAD
+#endif
 		}
 
 		void Group::dependencyReady()
 		{
-#if TYPE == MULTI_THREAD
+#if !LUMIX_SINGLE_THREAD()
 
 			BaseEntry::dependencyReady();
 
@@ -91,7 +91,7 @@ namespace Lumix
 				m_static_dependency_table[i]->decrementDependency();
 			}
 
-#endif //TYPE == MULTI_THREAD
+#endif
 		}
 	} // namepsace MTJD
 } // namepsace Lumix
