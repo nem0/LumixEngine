@@ -279,10 +279,10 @@ public:
 		}
 		else
 		{
-			showMainMenu();
+			float menu_height = showMainMenu();
 			if (ImGui::GetIO().DisplaySize.y > 0)
 			{
-				auto pos = ImVec2(0, ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2);
+				auto pos = ImVec2(0, menu_height);
 				auto size = ImGui::GetIO().DisplaySize;
 				size.y -= pos.y;
 				ImGui::RootDock(pos, size);
@@ -653,7 +653,7 @@ public:
 	}
 
 
-	void showMainMenu()
+	float showMainMenu()
 	{
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
 		if (m_confirm_exit)
@@ -712,6 +712,7 @@ public:
 			ImGui::EndPopup();
 		}
 
+		float menu_height = 0;
 		if (ImGui::BeginMainMenuBar())
 		{
 			fileMenu();
@@ -744,9 +745,10 @@ public:
 				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x - error_stats_size.x);
 				ImGui::TextColored(ImVec4(1, 0, 0, 1), "%s", (const char*)error_stats);
 			}
-
+			menu_height = ImGui::GetWindowSize().y;
 			ImGui::EndMainMenuBar();
 		}
+		return menu_height;
 	}
 
 
