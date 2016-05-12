@@ -368,6 +368,11 @@ solution "LumixEngine"
 		BINARY_DIR = LOCATION .. "/bin/"
 	end
 	
+	if not build_studio then
+		excludes { "../src/**/editor/*" }
+	end
+
+	
 	configurations { "Debug", "Release", "RelWithDebInfo" }
 	platforms { "x32", "x64" }
 	flags { "FatalWarnings", "NoPCH" }
@@ -545,12 +550,14 @@ if build_app then
 			forceLink("s_physics_plugin_register")
 			forceLink("s_renderer_plugin_register")
 
-			forceLink("setStudioApp_animation")
-			forceLink("setStudioApp_audio")
-			forceLink("setStudioApp_lua_script")
-			forceLink("setStudioApp_physics")
-			forceLink("setStudioApp_renderer")
-
+			if build_studio then
+				forceLink("setStudioApp_animation")
+				forceLink("setStudioApp_audio")
+				forceLink("setStudioApp_lua_script")
+				forceLink("setStudioApp_physics")
+				forceLink("setStudioApp_renderer")
+			end
+				
 			links { "engine", "audio", "animation", "renderer", "lua_script", "navigation" }
 			
 			if build_physics then

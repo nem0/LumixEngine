@@ -9,7 +9,6 @@
 #include "engine/matrix.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
-#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "lua_script/lua_script_system.h"
 #include "engine/universe/universe.h"

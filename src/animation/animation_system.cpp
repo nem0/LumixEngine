@@ -6,18 +6,14 @@
 #include "engine/json_serializer.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
-#include "editor/asset_browser.h"
-#include "editor/property_grid.h"
-#include "editor/studio_app.h"
-#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
-#include "imgui/imgui.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 #include "renderer/render_scene.h"
 #include "engine/universe/universe.h"
+#include <cfloat>
 
 
 namespace Lumix
@@ -45,7 +41,7 @@ enum class AnimationSceneVersion : int
 };
 
 
-struct AnimationSceneImpl : public IScene
+struct AnimationSceneImpl : public AnimationScene
 {
 	friend struct AnimationSystemImpl;
 
@@ -93,6 +89,24 @@ struct AnimationSceneImpl : public IScene
 			if (animable.flags & Animable::FREE) continue;
 			unloadAnimation(animable.animation);
 		}
+	}
+
+
+	float getAnimableTime(ComponentIndex cmp) override
+	{
+		return m_animables[cmp].time;
+	}
+
+
+	void setAnimableTime(ComponentIndex cmp, float time) override
+	{
+		m_animables[cmp].time = time;
+	}
+
+
+	Animation* getAnimableAnimation(ComponentIndex cmp) override
+	{
+		return m_animables[cmp].animation;
 	}
 
 	
@@ -228,7 +242,7 @@ struct AnimationSceneImpl : public IScene
 	}
 
 
-	void updateAnimable(ComponentIndex cmp, float time_delta)
+	void updateAnimable(ComponentIndex cmp, float time_delta) override
 	{
 		Animable& animable = m_animables[cmp];
 		if ((animable.flags & Animable::FREE) != 0) return;
@@ -263,7 +277,7 @@ struct AnimationSceneImpl : public IScene
 
 		for (int i = 0, c = m_animables.size(); i < c; ++i)
 		{
-			updateAnimable(i, time_delta);
+			AnimationSceneImpl::updateAnimable(i, time_delta);
 		}
 	}
 
@@ -376,105 +390,6 @@ private:
 	void operator=(const AnimationSystemImpl&);
 	AnimationSystemImpl(const AnimationSystemImpl&);
 };
-
-
-namespace
-{
-
-
-struct AssetBrowserPlugin : AssetBrowser::IPlugin
-{
-
-	explicit AssetBrowserPlugin(StudioApp& app)
-		: m_app(app)
-	{
-	}
-
-
-	bool onGUI(Lumix::Resource* resource, Lumix::uint32 type) override
-	{
-		if (type == ResourceManager::ANIMATION)
-		{
-			auto* animation = static_cast<Animation*>(resource);
-			ImGui::LabelText("FPS", "%d", animation->getFPS());
-			ImGui::LabelText("Length", "%.3fs", animation->getLength());
-			ImGui::LabelText("Frames", "%d", animation->getFrameCount());
-
-			return true;
-		}
-		return false;
-	}
-
-
-	void onResourceUnloaded(Resource* resource) override {}
-
-
-	const char* getName() const override { return "Animation"; }
-
-
-	bool hasResourceManager(uint32 type) const override { return type == ResourceManager::ANIMATION; }
-
-
-	uint32 getResourceType(const char* ext) override
-	{
-		if (equalStrings(ext, "ani")) return ResourceManager::ANIMATION;
-		return 0;
-	}
-
-
-	StudioApp& m_app;
-};
-
-
-struct PropertyGridPlugin : PropertyGrid::IPlugin
-{
-	explicit PropertyGridPlugin(StudioApp& app)
-		: m_app(app)
-	{
-		m_is_playing = false;
-	}
-
-
-	void onGUI(PropertyGrid& grid, Lumix::ComponentUID cmp) override
-	{
-		if (cmp.type != ANIMABLE_HASH) return;
-
-		auto* scene = static_cast<AnimationSceneImpl*>(cmp.scene);
-		auto& animable = scene->m_animables[cmp.index];
-		if (!animable.animation) return;
-		if (!animable.animation->isReady()) return;
-
-		ImGui::Checkbox("Preview", &m_is_playing);
-		if (ImGui::SliderFloat("Time", &animable.time, 0, animable.animation->getLength()))
-		{
-			scene->updateAnimable(cmp.index, 0);
-		}
-
-		if (m_is_playing)
-		{
-			float time_delta = m_app.getWorldEditor()->getEngine().getLastTimeDelta();
-			scene->updateAnimable(cmp.index, time_delta);
-		}
-	}
-
-
-	StudioApp& m_app;
-	bool m_is_playing;
-};
-
-
-} // anonymous namespace
-
-
-LUMIX_STUDIO_ENTRY(animation)
-{
-	auto& allocator = app.getWorldEditor()->getAllocator();
-	auto* ab_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(app);
-	app.getAssetBrowser()->addPlugin(*ab_plugin);
-
-	auto* pg_plugin = LUMIX_NEW(allocator, PropertyGridPlugin)(app);
-	app.getPropertyGrid()->addPlugin(*pg_plugin);
-}
 
 
 LUMIX_PLUGIN_ENTRY(animation)
