@@ -899,10 +899,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		PROFILE_FUNCTION();
 		Array<physx::PxHeightFieldSample> heights(m_allocator);
 
-		int width = terrain->m_heightmap->getWidth();
-		int height = terrain->m_heightmap->getHeight();
+		int width = terrain->m_heightmap->width;
+		int height = terrain->m_heightmap->height;
 		heights.resize(width * height);
-		int bytes_per_pixel = terrain->m_heightmap->getBytesPerPixel();
+		int bytes_per_pixel = terrain->m_heightmap->bytes_per_pixel;
 		if (bytes_per_pixel == 2)
 		{
 			PROFILE_BLOCK("copyData");

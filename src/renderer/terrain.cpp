@@ -412,9 +412,9 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch,
 		for (float dz = 0; dz < GRASS_QUAD_SIZE; dz += step)
 		{
 			uint32 pixel_value = splat_map->getPixelNearest(
-				int(splat_map->getWidth() * (quad_x + dx) /
+				int(splat_map->width * (quad_x + dx) /
 					(m_width * m_scale.x)),
-				int(splat_map->getHeight() * (quad_z + dz) /
+				int(splat_map->height * (quad_z + dz) /
 					(m_height * m_scale.x)));
 
 			int ground_index = pixel_value & 0xff;
@@ -740,11 +740,11 @@ float Terrain::getHeight(int x, int z) const
 	int texture_y = z;
 	Texture* t = m_heightmap;
 	int idx = Math::clamp(texture_x, 0, m_width) + Math::clamp(texture_y, 0, m_height) * m_width;
-	if (t->getBytesPerPixel() == 2)
+	if (t->bytes_per_pixel == 2)
 	{
 		return m_scale.y / 65535.0f * ((uint16*)t->getData())[idx];
 	}
-	else if(t->getBytesPerPixel() == 4)
+	else if(t->bytes_per_pixel == 4)
 	{
 		return ((m_scale.y / 255.0f) * ((uint8*)t->getData())[idx * 4]);
 	}
@@ -969,8 +969,8 @@ void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state)
 			LUMIX_DELETE(m_allocator, m_root);
 			if (m_heightmap && m_splatmap)
 			{
-				m_width = m_heightmap->getWidth();
-				m_height = m_heightmap->getHeight();
+				m_width = m_heightmap->width;
+				m_height = m_heightmap->height;
 				m_root = generateQuadTree((float)m_width);
 			}
 		}

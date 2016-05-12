@@ -2099,9 +2099,9 @@ struct PipelineImpl : public Pipeline
 		const Mesh& mesh = *info.m_terrain->getMesh();
 
 		Vec4 terrain_params(info.m_terrain->getRootSize(),
-			(float)detail_texture->getWidth(),
-			(float)detail_texture->getAtlasSize(),
-			(float)splat_texture->getWidth());
+			(float)detail_texture->width,
+			(float)detail_texture->atlas_size,
+			(float)splat_texture->width);
 		bgfx::setUniform(m_terrain_params_uniform, &terrain_params);
 		bgfx::setUniform(m_rel_camera_pos_uniform, &rel_cam_pos);
 		bgfx::setUniform(m_terrain_scale_uniform, &terrain_scale);
