@@ -17,8 +17,6 @@
 #include "engine/system.h"
 #include "engine/timer.h"
 #include "engine/debug/debug.h"
-#include "editor/gizmo.h"
-#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "renderer/pipeline.h"
