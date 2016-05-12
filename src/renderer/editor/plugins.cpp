@@ -192,7 +192,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 
 				for (auto& flag : FLAGS)
 				{
-					bool b = (texture->getFlags() & flag.value) != 0;
+					bool b = (texture->bgfx_flags & flag.value) != 0;
 					if (ImGui::Checkbox(flag.name, &b))
 					{
 						ImGui::CloseCurrentPopup();
@@ -202,12 +202,12 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 
 				if (slot.is_atlas)
 				{
-					int size = texture->getAtlasSize() - 2;
+					int size = texture->atlas_size - 2;
 					const char* values = "2x2\0" "3x3\0" "4x4\0";
 					if (ImGui::Combo(StaticString<30>("Atlas size###", i), &size, values))
 					{
 						ImGui::CloseCurrentPopup();
-						texture->setAtlasSize(size + 2);
+						texture->atlas_size = size + 2;
 					}
 				}
 				ImGui::EndPopup();
@@ -649,25 +649,25 @@ struct TexturePlugin : public AssetBrowser::IPlugin
 			return true;
 		}
 
-		ImGui::LabelText("Size", "%dx%d", texture->getWidth(), texture->getHeight());
-		ImGui::LabelText("BPP", "%d", texture->getBytesPerPixel());
-		if (texture->isCubemap())
+		ImGui::LabelText("Size", "%dx%d", texture->width, texture->height);
+		ImGui::LabelText("BPP", "%d", texture->bytes_per_pixel);
+		if (texture->is_cubemap)
 		{
 			ImGui::Text("Cubemap");
 			return true;
 		}
 
-		m_texture_handle = texture->getTextureHandle();
+		m_texture_handle = texture->handle;
 		if (bgfx::isValid(m_texture_handle))
 		{
 			ImVec2 texture_size(200, 200);
-			if (texture->getWidth() > texture->getHeight())
+			if (texture->width > texture->height)
 			{
-				texture_size.y = texture_size.x * texture->getHeight() / texture->getWidth();
+				texture_size.y = texture_size.x * texture->height / texture->width;
 			}
 			else
 			{
-				texture_size.x = texture_size.y * texture->getWidth() / texture->getHeight();
+				texture_size.x = texture_size.y * texture->width / texture->height;
 			}
 
 			ImGui::Image(&m_texture_handle, texture_size);
@@ -1312,7 +1312,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 			auto material = m_material;
 			int pass_idx = m_gui_pipeline->getPassIdx();
 			const auto& texture_id =
-				pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : material->getTexture(0)->getTextureHandle();
+				pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : material->getTexture(0)->handle;
 			auto texture_uniform = material->getShader()->m_texture_slots[0].uniform_handle;
 			m_gui_pipeline->setTexture(0, texture_id, texture_uniform);
 			m_gui_pipeline->render(vertex_buffer,

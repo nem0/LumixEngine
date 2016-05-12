@@ -260,9 +260,9 @@ private:
 
 	Lumix::uint16 computeAverage16(const Lumix::Texture* texture, int from_x, int to_x, int from_y, int to_y)
 	{
-		ASSERT(texture->getBytesPerPixel() == 2);
+		ASSERT(texture->bytes_per_pixel == 2);
 		Lumix::uint32 sum = 0;
-		int texture_width = texture->getWidth();
+		int texture_width = texture->width;
 		for (int i = from_x, end = to_x; i < end; ++i)
 		{
 			for (int j = from_y, end2 = to_y; j < end2; ++j)
@@ -284,10 +284,10 @@ private:
 
 	void rasterColorItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item)
 	{
-		int texture_width = texture->getWidth();
-		Rectangle r = item.getBoundingRectangle(texture_width, texture->getHeight());
+		int texture_width = texture->width;
+		Rectangle r = item.getBoundingRectangle(texture_width, texture->height);
 
-		if (texture->getBytesPerPixel() != 4)
+		if (texture->bytes_per_pixel != 4)
 		{
 			ASSERT(false);
 			return;
@@ -329,10 +329,10 @@ private:
 
 	void rasterLayerItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item)
 	{
-		int texture_width = texture->getWidth();
-		Rectangle r = item.getBoundingRectangle(texture_width, texture->getHeight());
+		int texture_width = texture->width;
+		Rectangle r = item.getBoundingRectangle(texture_width, texture->height);
 
-		if (texture->getBytesPerPixel() != 4)
+		if (texture->bytes_per_pixel != 4)
 		{
 			ASSERT(false);
 			return;
@@ -373,11 +373,11 @@ private:
 
 	void rasterSmoothHeightItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item)
 	{
-		ASSERT(texture->getBytesPerPixel() == 2);
+		ASSERT(texture->bytes_per_pixel == 2);
 
-		int texture_width = texture->getWidth();
+		int texture_width = texture->width;
 		Rectangle rect;
-		rect = item.getBoundingRectangle(texture_width, texture->getHeight());
+		rect = item.getBoundingRectangle(texture_width, texture->height);
 
 		float avg = computeAverage16(texture, rect.m_from_x, rect.m_to_x, rect.m_from_y, rect.m_to_y);
 		for (int i = rect.m_from_x, end = rect.m_to_x; i < end; ++i)
@@ -396,11 +396,11 @@ private:
 
 	void rasterFlatHeightItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item)
 	{
-		ASSERT(texture->getBytesPerPixel() == 2);
+		ASSERT(texture->bytes_per_pixel == 2);
 
-		int texture_width = texture->getWidth();
+		int texture_width = texture->width;
 		Rectangle rect;
-		rect = item.getBoundingRectangle(texture_width, texture->getHeight());
+		rect = item.getBoundingRectangle(texture_width, texture->height);
 
 		for (int i = rect.m_from_x, end = rect.m_to_x; i < end; ++i)
 		{
@@ -436,11 +436,11 @@ private:
 			return;
 		}
 
-		ASSERT(texture->getBytesPerPixel() == 2);
+		ASSERT(texture->bytes_per_pixel == 2);
 
-		int texture_width = texture->getWidth();
+		int texture_width = texture->width;
 		Rectangle rect;
-		rect = item.getBoundingRectangle(texture_width, texture->getHeight());
+		rect = item.getBoundingRectangle(texture_width, texture->height);
 
 		const float STRENGTH_MULTIPLICATOR = 256.0f;
 		float amount = Lumix::Math::maximum(item.m_amount * item.m_amount * STRENGTH_MULTIPLICATOR, 1.0f);
@@ -465,7 +465,7 @@ private:
 	void generateNewData()
 	{
 		auto texture = getDestinationTexture();
-		int bpp = texture->getBytesPerPixel();
+		int bpp = texture->bytes_per_pixel;
 		Rectangle rect;
 		getBoundingRectangle(texture, rect);
 		m_new_data.resize(bpp * Lumix::Math::maximum(1, (rect.m_to_x - rect.m_from_x) * (rect.m_to_y - rect.m_from_y)));
@@ -482,7 +482,7 @@ private:
 	void saveOldData()
 	{
 		auto texture = getDestinationTexture();
-		int bpp = texture->getBytesPerPixel();
+		int bpp = texture->bytes_per_pixel;
 		Rectangle rect;
 		getBoundingRectangle(texture, rect);
 		m_x = rect.m_from_x;
@@ -498,7 +498,7 @@ private:
 			{
 				for (int k = 0; k < bpp; ++k)
 				{
-					m_old_data[index] = texture->getData()[(i + j * texture->getWidth()) * bpp + k];
+					m_old_data[index] = texture->getData()[(i + j * texture->width) * bpp + k];
 					++index;
 				}
 			}
@@ -509,13 +509,13 @@ private:
 	void applyData(Lumix::Array<Lumix::uint8>& data)
 	{
 		auto texture = getDestinationTexture();
-		int bpp = texture->getBytesPerPixel();
+		int bpp = texture->bytes_per_pixel;
 
 		for (int j = m_y; j < m_y + m_height; ++j)
 		{
 			for (int i = m_x; i < m_x + m_width; ++i)
 			{
-				int index = bpp * (i + j * texture->getWidth());
+				int index = bpp * (i + j * texture->width);
 				for (int k = 0; k < bpp; ++k)
 				{
 					texture->getData()[index + k] = data[bpp * (i - m_x + (j - m_y) * m_width) + k];
@@ -536,7 +536,7 @@ private:
 		getBoundingRectangle(texture, rect);
 
 		int new_w = rect.m_to_x - rect.m_from_x;
-		int bpp = texture->getBytesPerPixel();
+		int bpp = texture->bytes_per_pixel;
 		new_data.resize(bpp * new_w * (rect.m_to_y - rect.m_from_y));
 		old_data.resize(bpp * new_w * (rect.m_to_y - rect.m_from_y));
 
@@ -544,10 +544,10 @@ private:
 		for (int row = rect.m_from_y; row < rect.m_to_y; ++row)
 		{
 			Lumix::copyMemory(&new_data[(row - rect.m_from_y) * new_w * bpp],
-				&texture->getData()[row * bpp * texture->getWidth() + rect.m_from_x * bpp],
+				&texture->getData()[row * bpp * texture->width + rect.m_from_x * bpp],
 				bpp * new_w);
 			Lumix::copyMemory(&old_data[(row - rect.m_from_y) * new_w * bpp],
-				&texture->getData()[row * bpp * texture->getWidth() + rect.m_from_x * bpp],
+				&texture->getData()[row * bpp * texture->width + rect.m_from_x * bpp],
 				bpp * new_w);
 		}
 
@@ -578,9 +578,9 @@ private:
 		rect.m_from_x = Lumix::Math::maximum(int(item.m_local_pos.x - item.m_radius - 0.5f), 0);
 		rect.m_from_y = Lumix::Math::maximum(int(item.m_local_pos.z - item.m_radius - 0.5f), 0);
 		rect.m_to_x = Lumix::Math::minimum(int(item.m_local_pos.x + item.m_radius + 0.5f),
-						   texture->getWidth());
+						   texture->width);
 		rect.m_to_y = Lumix::Math::minimum(int(item.m_local_pos.z + item.m_radius + 0.5f),
-						   texture->getHeight());
+						   texture->height);
 		for (int i = 1; i < m_items.size(); ++i)
 		{
 			Item& item = m_items[i];
@@ -594,9 +594,9 @@ private:
 							   rect.m_to_y);
 		}
 		rect.m_from_x = Lumix::Math::maximum(rect.m_from_x, 0);
-		rect.m_to_x = Lumix::Math::minimum(rect.m_to_x, texture->getWidth());
+		rect.m_to_x = Lumix::Math::minimum(rect.m_to_x, texture->width);
 		rect.m_from_y = Lumix::Math::maximum(rect.m_from_y, 0);
-		rect.m_to_y = Lumix::Math::minimum(rect.m_to_y, texture->getHeight());
+		rect.m_to_y = Lumix::Math::minimum(rect.m_to_y, texture->height);
 	}
 
 
@@ -717,7 +717,7 @@ void TerrainEditor::nextTerrainTexture()
 	if (tex)
 	{
 		m_texture_idx =
-			Lumix::Math::minimum(tex->getAtlasSize() * tex->getAtlasSize() - 1, m_texture_idx + 1);
+			Lumix::Math::minimum(tex->atlas_size * tex->atlas_size - 1, m_texture_idx + 1);
 	}
 }
 
@@ -844,7 +844,7 @@ Lumix::uint16 TerrainEditor::getHeight(const Lumix::Vec3& world_pos)
 	if (!heightmap) return 0;
 
 	auto* data = (Lumix::uint16*)heightmap->getData();
-	return data[int(rel_pos.x) + int(rel_pos.z) * heightmap->getWidth()];
+	return data[int(rel_pos.x) + int(rel_pos.z) * heightmap->width];
 }
 
 
@@ -1254,7 +1254,7 @@ void TerrainEditor::onGUI()
 	{
 		if (m_brush_texture)
 		{
-			static auto th = m_brush_texture->getTextureHandle();
+			static auto th = m_brush_texture->handle;
 			ImGui::Image(&th, ImVec2(100, 100));
 			if (ImGui::Button("Clear mask"))
 			{
@@ -1334,7 +1334,7 @@ void TerrainEditor::onGUI()
 			Lumix::Texture* tex = getMaterial()->getTextureByUniform(TEX_COLOR_UNIFORM);
 			if (tex)
 			{
-				for (int i = 0; i < tex->getAtlasSize() * tex->getAtlasSize(); ++i)
+				for (int i = 0; i < tex->atlas_size * tex->atlas_size; ++i)
 				{
 					if (i % 4 != 0) ImGui::SameLine();
 					if (ImGui::RadioButton(Lumix::StaticString<20>("", i, "###rb", i), m_texture_idx == i))

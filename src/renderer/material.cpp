@@ -163,10 +163,10 @@ bool Material::save(JsonSerializer& serializer)
 		int atlas_size = -1;
 		if (m_textures[i])
 		{
-			flags = m_textures[i]->getFlags();
+			flags = m_textures[i]->bgfx_flags;
 			path[0] = '/';
 			Lumix::copyString(path + 1, MAX_PATH_LENGTH - 1, m_textures[i]->getPath().c_str());
-			atlas_size = m_textures[i]->getAtlasSize();
+			atlas_size = m_textures[i]->atlas_size;
 		}
 		else
 		{
@@ -385,7 +385,7 @@ void Material::setTexture(int i, Texture* texture)
 
 	if (old_texture)
 	{
-		if (texture) texture->setAtlasSize(old_texture->getAtlasSize());
+		if (texture) texture->atlas_size = old_texture->atlas_size;
 		removeDependency(*old_texture);
 		m_resource_manager.get(ResourceManager::TEXTURE)->unload(*old_texture);
 	}
@@ -448,7 +448,7 @@ void Material::createCommandBuffer()
 	{
 		if (i >= m_texture_count || !m_textures[i]) continue;
 
-		generator.setTexture(i, m_shader->m_texture_slots[i].uniform_handle, m_textures[i]->getTextureHandle());
+		generator.setTexture(i, m_shader->m_texture_slots[i].uniform_handle, m_textures[i]->handle);
 	}
 
 	Vec4 color_shininess(m_color, m_shininess);
@@ -685,7 +685,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 	}
 	if (m_textures[m_texture_count])
 	{
-		m_textures[m_texture_count]->setAtlasSize(atlas_size);
+		m_textures[m_texture_count]->atlas_size = atlas_size;
 		m_textures[m_texture_count]->setFlags(flags);
 
 		if (keep_data)
