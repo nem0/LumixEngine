@@ -3,6 +3,7 @@
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
+#include "engine/input_system.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -23,6 +24,7 @@
 #include "game_view.h"
 #include "editor/render_interface.h"
 #include "import_asset_dialog.h"
+#include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/model_manager.h"
@@ -334,6 +336,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		Entity m_entity;
 		WorldEditor& m_editor;
 
+
 		Entity getEntity() const { return m_entity; }
 		explicit InsertMeshCommand(WorldEditor& editor)
 			: m_editor(editor)
@@ -435,7 +438,22 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 	explicit ModelPlugin(StudioApp& app)
 		: m_app(app)
 	{
+		m_camera_cmp = INVALID_COMPONENT;
+		m_camera_entity = INVALID_ENTITY;
+		m_mesh = INVALID_COMPONENT;
+		m_pipeline = nullptr;
+		m_universe = nullptr;
 		m_app.getWorldEditor()->registerEditorCommandCreator("insert_mesh", createInsertMeshCommand);
+
+		createPreviewUniverse();
+	}
+
+
+	~ModelPlugin()
+	{
+		auto& engine = m_app.getWorldEditor()->getEngine();
+		engine.destroyUniverse(*m_universe);
+		Pipeline::destroy(m_pipeline);
 	}
 
 
@@ -447,10 +465,111 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 
 	static void insertInScene(WorldEditor& editor, Model* model)
 	{
-		auto* command = LUMIX_NEW(editor.getAllocator(), InsertMeshCommand)(
-			editor, editor.getCameraRaycastHit(), model->getPath());
+		auto* command =
+			LUMIX_NEW(editor.getAllocator(), InsertMeshCommand)(editor, editor.getCameraRaycastHit(), model->getPath());
 
 		editor.executeCommand(command);
+	}
+
+
+	void createPreviewUniverse()
+	{
+		auto& engine = m_app.getWorldEditor()->getEngine();
+		m_universe = &engine.createUniverse();
+		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), engine.getAllocator());
+		m_pipeline->load();
+		auto mesh_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(crc32("renderer")));
+		m_mesh = render_scene->createComponent(crc32("renderable"), mesh_entity);
+		auto light_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		auto light_cmp = render_scene->createComponent(crc32("global_light"), light_entity);
+		render_scene->setGlobalLightIntensity(light_cmp, 0);
+		render_scene->setLightAmbientIntensity(light_cmp, 1);
+		m_camera_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		m_camera_cmp = render_scene->createComponent(crc32("camera"), m_camera_entity);
+		render_scene->setCameraSlot(m_camera_cmp, "editor");
+		m_pipeline->setScene(render_scene);
+	}
+
+
+	void showPreview(Model& model)
+	{
+		auto& engine = m_app.getWorldEditor()->getEngine();
+		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(crc32("renderer")));
+		if (!render_scene) return;
+		if (!model.isReady()) return;
+
+		if (render_scene->getRenderableModel(m_mesh) != &model)
+		{
+			render_scene->setRenderablePath(m_mesh, model.getPath());
+			AABB aabb = model.getAABB();
+
+			m_universe->setRotation(m_camera_entity, {0, 0, 0, 1});
+			m_universe->setPosition(m_camera_entity,
+				{(aabb.max.x + aabb.min.x) * 0.5f,
+					(aabb.max.y + aabb.min.y) * 0.5f,
+					aabb.max.z + aabb.max.x - aabb.min.x});
+		}
+		ImVec2 image_size(ImGui::GetContentRegionAvailWidth(), ImGui::GetContentRegionAvailWidth());
+
+		m_pipeline->setViewport(0, 0, (int)image_size.x, (int)image_size.y);
+		m_pipeline->render();
+
+		auto content_min = ImGui::GetCursorScreenPos();
+		ImVec2 content_max(content_min.x + image_size.x, content_min.y + image_size.y);
+		ImGui::Image(&m_pipeline->getFramebuffer("default")->getRenderbuffer(0).m_handle, image_size);
+		bool mouse_down = ImGui::IsMouseDown(0) || ImGui::IsMouseDown(1);
+		if (m_is_mouse_captured && !mouse_down)
+		{
+			m_is_mouse_captured = false;
+			PlatformInterface::showCursor(true);
+			PlatformInterface::unclipCursor();
+		}
+		
+		if (ImGui::IsItemHovered() && mouse_down)
+		{
+			auto& input = engine.getInputSystem();
+			auto delta = Lumix::Vec2(input.getMouseXMove(), input.getMouseYMove());
+
+			if (!m_is_mouse_captured)
+			{
+				m_is_mouse_captured = true;
+				PlatformInterface::showCursor(false);
+			}
+
+			PlatformInterface::clipCursor(content_min.x, content_min.y, content_max.x, content_max.y);
+
+			if (delta.x != 0 || delta.y != 0)
+			{
+				const Vec2 MOUSE_SENSITIVITY(50, 50);
+				Vec3 pos = m_universe->getPosition(m_camera_entity);
+				Quat rot = m_universe->getRotation(m_camera_entity);
+				Quat old_rot = rot;
+
+				float yaw = -Math::signum(delta.x) * (Math::pow(Math::abs((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
+				Quat yaw_rot(Vec3(0, 1, 0), yaw);
+				rot = rot * yaw_rot;
+				rot.normalize();
+
+				Vec3 pitch_axis = rot * Vec3(1, 0, 0);
+				float pitch =
+					-Math::signum(delta.y) * (Math::pow(Math::abs((float)delta.y / MOUSE_SENSITIVITY.y), 1.2f));
+				Quat pitch_rot(pitch_axis, pitch);
+				rot = rot * pitch_rot;
+				rot.normalize();
+
+				Vec3 dir = rot * Vec3(0, 0, 1);
+				Vec3 origin = (model.getAABB().max + model.getAABB().min) * 0.5f;
+
+				float dist = (origin - pos).length();
+				pos = origin + dir * dist;
+
+				m_universe->setRotation(m_camera_entity, rot);
+				m_universe->setPosition(m_camera_entity, pos);
+			}
+
+		}
 	}
 
 
@@ -459,6 +578,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		if (type != MODEL_HASH) return false;
 
 		auto* model = static_cast<Model*>(resource);
+
 		if (ImGui::Button("Insert in scene"))
 		{
 			insertInScene(*m_app.getWorldEditor(), model);
@@ -535,6 +655,9 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 				ImGui::TreePop();
 			}
 		}
+
+		showPreview(*model);
+
 		return true;
 	}
 
@@ -564,6 +687,12 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 
 
 	StudioApp& m_app;
+	Universe* m_universe;
+	Pipeline* m_pipeline;
+	ComponentIndex m_mesh;
+	Entity m_camera_entity;
+	ComponentIndex m_camera_cmp;
+	bool m_is_mouse_captured;
 };
 
 
@@ -1513,11 +1642,11 @@ LUMIX_STUDIO_ENTRY(renderer)
 {
 	auto& allocator = app.getWorldEditor()->getAllocator();
 
-	auto* material_plugin = LUMIX_NEW(allocator, MaterialPlugin)(app);
-	app.getAssetBrowser()->addPlugin(*material_plugin);
-
 	auto* model_plugin = LUMIX_NEW(allocator, ModelPlugin)(app);
 	app.getAssetBrowser()->addPlugin(*model_plugin);
+
+	auto* material_plugin = LUMIX_NEW(allocator, MaterialPlugin)(app);
+	app.getAssetBrowser()->addPlugin(*material_plugin);
 
 	auto* texture_plugin = LUMIX_NEW(allocator, TexturePlugin)(app);
 	app.getAssetBrowser()->addPlugin(*texture_plugin);

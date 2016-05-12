@@ -3476,19 +3476,19 @@ public:
 	}
 
 
-	ModelLoadedCallback* getModelLoadedCallback(Model* model)
+	int getModelLoadedCallback(Model* model)
 	{
 		for (int i = 0; i < m_model_loaded_callbacks.size(); ++i)
 		{
 			if (m_model_loaded_callbacks[i]->m_model == model)
 			{
-				return m_model_loaded_callbacks[i];
+				return i;
 			}
 		}
 		ModelLoadedCallback* new_callback =
 			LUMIX_NEW(m_allocator, ModelLoadedCallback)(*this, model);
 		m_model_loaded_callbacks.push(new_callback);
-		return new_callback;
+		return m_model_loaded_callbacks.size() - 1;
 	}
 
 
@@ -3576,8 +3576,15 @@ public:
 			auto& rm = old_model->getResourceManager();
 			auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
 			freeCustomMeshes(m_renderables[component], material_manager);
-			ModelLoadedCallback* callback = getModelLoadedCallback(old_model);
+			int callback_idx = getModelLoadedCallback(old_model);
+			ModelLoadedCallback* callback = m_model_loaded_callbacks[callback_idx];
 			--callback->m_ref_count;
+			if (callback->m_ref_count == 0)
+			{
+				LUMIX_DELETE(m_allocator, callback);
+				m_model_loaded_callbacks.eraseFast(callback_idx);
+			}
+
 			if (old_model->isReady())
 			{
 				m_culling_system->removeStatic(component);
@@ -3591,7 +3598,7 @@ public:
 		m_renderables[component].pose = nullptr;
 		if (model)
 		{
-			ModelLoadedCallback* callback = getModelLoadedCallback(model);
+			ModelLoadedCallback* callback = m_model_loaded_callbacks[getModelLoadedCallback(model)];
 			++callback->m_ref_count;
 
 			if (model->isReady())
