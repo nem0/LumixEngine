@@ -341,22 +341,24 @@ public:
 			can_add--;
 		}
 
-		while (AsynTrans* tr = m_transaction_queue.pop(false))
-		{
-			PROFILE_BLOCK("transaction");
-			if ((tr->data.m_flags & E_IS_OPEN) == E_IS_OPEN)
+		#if LUMIX_SINGLE_THREAD()
+			while (AsynTrans* tr = m_transaction_queue.pop(false))
 			{
-				tr->data.m_flags |=
-					tr->data.m_file->open(Path(tr->data.m_path), tr->data.m_mode) ? E_SUCCESS : E_FAIL;
+				PROFILE_BLOCK("transaction");
+				if ((tr->data.m_flags & E_IS_OPEN) == E_IS_OPEN)
+				{
+					tr->data.m_flags |=
+						tr->data.m_file->open(Path(tr->data.m_path), tr->data.m_mode) ? E_SUCCESS : E_FAIL;
+				}
+				else if ((tr->data.m_flags & E_CLOSE) == E_CLOSE)
+				{
+					tr->data.m_file->close();
+					tr->data.m_file->release();
+					tr->data.m_file = nullptr;
+				}
+				tr->setCompleted();
 			}
-			else if ((tr->data.m_flags & E_CLOSE) == E_CLOSE)
-			{
-				tr->data.m_file->close();
-				tr->data.m_file->release();
-				tr->data.m_file = nullptr;
-			}
-			tr->setCompleted();
-		}
+		#endif
 	}
 
 	const DeviceList& getDefaultDevice() const override { return m_default_device; }
