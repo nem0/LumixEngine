@@ -2,6 +2,10 @@
 
 #include "engine/lumix.h"
 
+
+#if !LUMIX_SINGLE_THREAD()
+
+
 namespace Lumix
 {
 	class IAllocator;
@@ -24,3 +28,6 @@ namespace Lumix
 		};
 	}
 }
+
+
+#endif

@@ -2,39 +2,50 @@
 
 #include "engine/lumix.h"
 
+
+#if !LUMIX_SINGLE_THREAD()
+
+
 namespace Lumix
 {
-	class IAllocator;
 
-	namespace MT
-	{
-		class LUMIX_ENGINE_API Task
-		{
-		public:
-			Task(IAllocator& allocator);
-			virtual ~Task();
+class IAllocator;
 
-			virtual int task() = 0;
+namespace MT
+{
 
-			bool create(const char* name);
-			bool destroy();
 
-			void setAffinityMask(uint32 affinity_mask);
+class LUMIX_ENGINE_API Task
+{
+public:
+	Task(IAllocator& allocator);
+	virtual ~Task();
 
-			uint32 getAffinityMask() const;
+	virtual int task() = 0;
 
-			bool isRunning() const;
-			bool isFinished() const;
-			bool isForceExit() const;
+	bool create(const char* name);
+	bool destroy();
 
-			void forceExit(bool wait);
+	void setAffinityMask(uint32 affinity_mask);
 
-		protected:
-			IAllocator& getAllocator();
+	uint32 getAffinityMask() const;
 
-		private:
-			struct TaskImpl* m_implementation;
-		};
+	bool isRunning() const;
+	bool isFinished() const;
+	bool isForceExit() const;
 
-	} // !namespace MT
-} // !namespace Lumix
+	void forceExit(bool wait);
+
+protected:
+	IAllocator& getAllocator();
+
+private:
+	struct TaskImpl* m_implementation;
+};
+
+
+} // namespace MT
+} // namespace Lumix
+
+
+#endif

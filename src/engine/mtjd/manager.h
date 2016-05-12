@@ -1,11 +1,6 @@
 #pragma once
 
 
-#define SINGLE_THREAD 0
-#define MULTI_THREAD 1
-
-#define TYPE MULTI_THREAD
-
 #include "engine/mt/lock_free_fixed_queue.h"
 #include "engine/mt/transaction.h"
 

@@ -8,7 +8,7 @@ namespace Lumix
 {
 	namespace MTJD
 	{
-#if TYPE == MULTI_THREAD
+#if !LUMIX_SINGLE_THREAD()
 
 		WorkerTask::WorkerTask(IAllocator& allocator)
 			: Task(allocator)
@@ -53,6 +53,6 @@ namespace Lumix
 			return 0;
 		}
 
-#endif // TYPE == MULTI_THREAD
+#endif
 	} // namepsace MTJD
 } // namepsace Lumix

@@ -6,25 +6,38 @@
 
 #include "engine/mtjd/manager.h"
 
+
+#if !LUMIX_SINGLE_THREAD()
+
+
 namespace Lumix
 {
-	class IAllocator;
 
-	namespace MTJD
-	{
-		class WorkerTask : public MT::Task
-		{
-		public:
-			WorkerTask(IAllocator& allocator);
-			~WorkerTask();
 
-			bool create(const char* name, Manager* manager, Manager::JobTransQueue* trans_queue);
+class IAllocator;
 
-			virtual int task();
+namespace MTJD
+{
 
-		private:
-			Manager::JobTransQueue*	m_trans_queue;
-			Manager* m_manager;
-		};
-	} // namepsace MTJD
+
+class WorkerTask : public MT::Task
+{
+public:
+	WorkerTask(IAllocator& allocator);
+	~WorkerTask();
+
+	bool create(const char* name, Manager* manager, Manager::JobTransQueue* trans_queue);
+
+	virtual int task();
+
+private:
+	Manager::JobTransQueue* m_trans_queue;
+	Manager* m_manager;
+};
+
+
+} // namepsace MTJD
 } // namepsace Lumix
+
+
+#endif

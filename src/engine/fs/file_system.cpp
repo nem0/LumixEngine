@@ -60,6 +60,9 @@ IFile& IFile::operator<<(const char* text)
 }
 
 
+#if !LUMIX_SINGLE_THREAD()
+
+
 class FSTask : public MT::Task
 {
 public:
@@ -103,6 +106,10 @@ private:
 	TransQueue* m_trans_queue;
 };
 
+
+#endif
+
+
 class FileSystemImpl : public FileSystem
 {
 public:
@@ -112,14 +119,19 @@ public:
 		, m_pending(m_allocator)
 		, m_devices(m_allocator)
 	{
-		m_task = LUMIX_NEW(m_allocator, FSTask)(&m_transaction_queue, m_allocator);
-		m_task->create("FSTask");
+		#if !LUMIX_SINGLE_THREAD()
+			m_task = LUMIX_NEW(m_allocator, FSTask)(&m_transaction_queue, m_allocator);
+			m_task->create("FSTask");
+		#endif
 	}
 
 	~FileSystemImpl()
 	{
-		m_task->stop();
-		m_task->destroy();
+		#if !LUMIX_SINGLE_THREAD()
+			m_task->stop();
+			m_task->destroy();
+			LUMIX_DELETE(m_allocator, m_task);
+		#endif
 		while (!m_in_progress.empty())
 		{
 			auto* trans = m_in_progress.front();
@@ -130,7 +142,6 @@ public:
 		{
 			close(*i.m_file);
 		}
-		LUMIX_DELETE(m_allocator, m_task);
 	}
 
 	BaseProxyAllocator& getAllocator() { return m_allocator; }
@@ -329,6 +340,23 @@ public:
 			}
 			can_add--;
 		}
+
+		while (AsynTrans* tr = m_transaction_queue.pop(false))
+		{
+			PROFILE_BLOCK("transaction");
+			if ((tr->data.m_flags & E_IS_OPEN) == E_IS_OPEN)
+			{
+				tr->data.m_flags |=
+					tr->data.m_file->open(Path(tr->data.m_path), tr->data.m_mode) ? E_SUCCESS : E_FAIL;
+			}
+			else if ((tr->data.m_flags & E_CLOSE) == E_CLOSE)
+			{
+				tr->data.m_file->close();
+				tr->data.m_file->release();
+				tr->data.m_file = nullptr;
+			}
+			tr->setCompleted();
+		}
 	}
 
 	const DeviceList& getDefaultDevice() const override { return m_default_device; }
@@ -347,15 +375,11 @@ public:
 
 	static void closeAsync(IFile&, bool) {}
 
-	void destroy()
-	{
-		m_transaction_queue.abort();
-		m_task->destroy();
-	}
-
 private:
 	BaseProxyAllocator m_allocator;
-	FSTask* m_task;
+	#if !LUMIX_SINGLE_THREAD()
+		FSTask* m_task;
+	#endif
 	DevicesTable m_devices;
 
 	ItemsTable m_pending;

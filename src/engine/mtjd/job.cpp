@@ -29,17 +29,17 @@ Job::~Job()
 
 void Job::incrementDependency()
 {
-#if TYPE == MULTI_THREAD
+#if !LUMIX_SINGLE_THREAD()
 
 	MT::atomicIncrement(&m_dependency_count);
 	ASSERT(!m_scheduled);
 
-#endif // TYPE == MULTI_THREAD
+#endif
 }
 
 void Job::decrementDependency()
 {
-#if TYPE == MULTI_THREAD
+#if !LUMIX_SINGLE_THREAD()
 
 	uint32 count = MT::atomicDecrement(&m_dependency_count);
 	if (1 == count)
@@ -47,7 +47,7 @@ void Job::decrementDependency()
 		m_manager.schedule(this);
 	}
 
-#endif // TYPE == MULTI_THREAD
+#endif
 }
 
 void Job::onExecuted()
