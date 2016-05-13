@@ -1235,14 +1235,13 @@ struct PipelineImpl : public Pipeline
 		m_global_light_shadowmap = m_current_framebuffer;
 		float shadowmap_height = (float)m_current_framebuffer->getHeight();
 		float shadowmap_width = (float)m_current_framebuffer->getWidth();
-		float viewports[] = { 0, 0, 0.5f, 0, 0, 0.5f, 0.5f, 0.5f };
+		float viewports[] = {0, 0, 0.5f, 0, 0, 0.5f, 0.5f, 0.5f};
 		float camera_fov = Math::degreesToRadians(m_scene->getCameraFOV(m_applied_camera));
 		float camera_ratio = m_scene->getCameraScreenWidth(m_applied_camera) / camera_height;
 		Vec4 cascades = m_scene->getShadowmapCascades(light_cmp);
-		float split_distances[] = { 0.01f, cascades.x, cascades.y, cascades.z, cascades.w };
+		float split_distances[] = {0.01f, cascades.x, cascades.y, cascades.z, cascades.w};
 		m_is_rendering_in_shadowmap = true;
-		bgfx::setViewClear(
-			m_bgfx_view, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
+		bgfx::setViewClear(m_bgfx_view, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
 		bgfx::touch(m_bgfx_view);
 		float* viewport = viewports + split_index * 2;
 		bgfx::setViewRect(m_bgfx_view,
@@ -1251,9 +1250,9 @@ struct PipelineImpl : public Pipeline
 			(uint16)(0.5f * shadowmap_width - 2),
 			(uint16)(0.5f * shadowmap_height - 2));
 
-		Frustum frustum;
+		Frustum camera_frustum;
 		Matrix camera_matrix = universe.getMatrix(m_scene->getCameraEntity(m_applied_camera));
-		frustum.computePerspective(camera_matrix.getTranslation(),
+		camera_frustum.computePerspective(camera_matrix.getTranslation(),
 			camera_matrix.getZVector(),
 			camera_matrix.getYVector(),
 			camera_fov,
@@ -1261,32 +1260,23 @@ struct PipelineImpl : public Pipeline
 			split_distances[split_index],
 			split_distances[split_index + 1]);
 
-		Vec3 shadow_cam_pos = camera_matrix.getTranslation();
-		float bb_size = frustum.radius;
-		shadow_cam_pos =
-			shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
+		Vec3 shadow_cam_pos = camera_frustum.center;
+		float bb_size = camera_frustum.radius * 0.5f;
+		shadow_cam_pos = shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
 
 		Matrix projection_matrix;
-		projection_matrix.setOrtho(
-			bb_size, -bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
+		projection_matrix.setOrtho(bb_size, -bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
 		Vec3 light_forward = light_mtx.getZVector();
 		shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
 		Matrix view_matrix;
-		view_matrix.lookAt(
-			shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
+		view_matrix.lookAt(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
 		bgfx::setViewTransform(m_bgfx_view, &view_matrix.m11, &projection_matrix.m11);
-		static const Matrix biasMatrix(
-			0.5, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
+		static const Matrix biasMatrix(0.5, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
 		m_shadow_viewprojection[split_index] = biasMatrix * (projection_matrix * view_matrix);
 
 		Frustum shadow_camera_frustum;
-		shadow_camera_frustum.computeOrtho(shadow_cam_pos,
-			-light_forward,
-			light_mtx.getYVector(),
-			bb_size,
-			bb_size,
-			SHADOW_CAM_NEAR,
-			SHADOW_CAM_FAR);
+		shadow_camera_frustum.computeOrtho(
+			shadow_cam_pos, -light_forward, light_mtx.getYVector(), bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
 		m_current_render_views = &m_view_idx;
 		m_current_render_view_count = 1;
 		renderAll(shadow_camera_frustum, false, camera_matrix.getTranslation());
