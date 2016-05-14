@@ -471,6 +471,16 @@ namespace Lumix
 					LuaWrapper::pushLua(L, v);
 				}
 				break;
+				case IPropertyDescriptor::RESOURCE:
+				case IPropertyDescriptor::FILE:
+				case IPropertyDescriptor::STRING:
+				{
+					char buf[1024];
+					OutputBlob blob(buf, sizeof(buf));
+					desc->get(cmp, -1, blob);
+					LuaWrapper::pushLua(L, buf);
+				}
+				break;
 				case IPropertyDescriptor::COLOR:
 				case IPropertyDescriptor::VEC3:
 				{
@@ -515,6 +525,15 @@ namespace Lumix
 				{
 					auto v = LuaWrapper::checkArg<bool>(L, 3);
 					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
+				}
+				break;
+				case IPropertyDescriptor::RESOURCE:
+				case IPropertyDescriptor::FILE:
+				case IPropertyDescriptor::STRING:
+				{
+					auto* v = LuaWrapper::checkArg<const char*>(L, 3);
+					InputBlob blob(v, stringLength(v) + 1);
 					desc->set(cmp, -1, blob);
 				}
 				break;
@@ -581,6 +600,9 @@ namespace Lumix
 						case IPropertyDescriptor::BOOL:
 						case IPropertyDescriptor::VEC3:
 						case IPropertyDescriptor::COLOR:
+						case IPropertyDescriptor::RESOURCE:
+						case IPropertyDescriptor::FILE:
+						case IPropertyDescriptor::STRING:
 							convertPropertyToLuaName(desc->getName(), tmp, lengthOf(tmp));
 							copyString(setter, "set");
 							copyString(getter, "get");
