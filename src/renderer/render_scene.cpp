@@ -2553,7 +2553,7 @@ public:
 
 	Vec2 getCameraScreenSize(ComponentIndex camera) override
 	{
-		return Vec2(m_cameras[camera].screen_width, m_cameras[camera].screen_width);
+		return Vec2(m_cameras[camera].screen_width, m_cameras[camera].screen_height);
 	}
 
 
