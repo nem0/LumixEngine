@@ -25,6 +25,7 @@ enum Column
 {
 	NAME,
 	TIME,
+	EXCLUSIVE_TIME,
 	HIT_COUNT,
 	HITS
 };
@@ -325,16 +326,6 @@ struct ProfilerUIImpl : public ProfilerUI
 		}
 		ImGui::EndDock();
 	}
-
-
-	enum class Values
-	{
-		NAME,
-		LENGTH,
-		LENGTH_EXCLUSIVE,
-		HIT_COUNT,
-		COUNT
-	};
 
 
 	struct OpenedFile
@@ -656,6 +647,40 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 						}
 					}
 					break;
+					default: ASSERT(false); break;
+				}
+
+				block = block->m_next;
+			}
+			return;
+		case EXCLUSIVE_TIME:
+			while (block)
+			{
+				switch (block->m_type)
+				{
+					case Lumix::Profiler::BlockType::TIME:
+					{
+						auto frame = m_current_frame < 0 ? block->m_frames.back() : block->m_frames[m_current_frame];
+						auto* child = block->m_first_child;
+						while (child)
+						{
+							frame -= m_current_frame < 0 ? child->m_frames.back() : child->m_frames[m_current_frame];
+							child = child->m_next;
+						}
+
+						if (ImGui::Selectable(
+								Lumix::StaticString<50>("") << frame * 1000.0f << "###t" << (Lumix::int64)block,
+								m_current_block == block))
+						{
+							m_current_block = block;
+						}
+						if (block->m_is_opened)
+						{
+							showProfileBlock(block->m_first_child, column);
+						}
+					}
+					break;
+					case Lumix::Profiler::BlockType::INT: break;
 					default: ASSERT(false); break;
 				}
 
@@ -1025,9 +1050,17 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 	if (m_threads.empty()) return;
 
-	ImGui::Columns(4, "cpuc");
+	ImGui::Columns(5, "cpuc");
+	ImGui::Text("Name"); ImGui::NextColumn();
+	ImGui::Text("Inclusive time"); ImGui::NextColumn();
+	ImGui::Text("Exclusive time"); ImGui::NextColumn();
+	ImGui::Text("Hit count"); ImGui::NextColumn();
+	ImGui::Text("Hits"); ImGui::NextColumn();
+	ImGui::Separator();
+
 	showThreadColumn(*this, NAME);
 	showThreadColumn(*this, TIME);
+	showThreadColumn(*this, EXCLUSIVE_TIME);
 	showThreadColumn(*this, HIT_COUNT);
 	showThreadColumn(*this, HITS);
 	ImGui::Columns(1);
