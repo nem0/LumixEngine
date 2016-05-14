@@ -559,10 +559,11 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		if (lods[0].to_mesh >= 0)
 		{
 			ImGui::Separator();
-			ImGui::Columns(3);
+			ImGui::Columns(4);
 			ImGui::Text("LOD"); ImGui::NextColumn();
 			ImGui::Text("Distance"); ImGui::NextColumn();
 			ImGui::Text("# of meshes"); ImGui::NextColumn();
+			ImGui::Text("# of triangles"); ImGui::NextColumn();
 			ImGui::Separator();
 			int lod_count = 1;
 			bool is_infinite_lod = false;
@@ -584,6 +585,13 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 				}
 				ImGui::NextColumn();
 				ImGui::Text("%d", lods[i].to_mesh - lods[i].from_mesh + 1); ImGui::NextColumn();
+				int tri_count = 0;
+				for (int j = lods[i].from_mesh; j <= lods[i].to_mesh; ++j)
+				{
+					tri_count += model->getMesh(j).indices_count / 3;
+				}
+
+				ImGui::Text("%d", tri_count); ImGui::NextColumn();
 				++lod_count;
 				ImGui::PopID();
 			}
