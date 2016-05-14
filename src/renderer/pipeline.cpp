@@ -1172,9 +1172,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderLocalLightShadowmaps(ComponentIndex camera,
-		FrameBuffer** fbs,
-		int framebuffers_count)
+	void renderLocalLightShadowmaps(ComponentIndex camera, FrameBuffer** fbs, int framebuffers_count)
 	{
 		if (camera < 0) return;
 
