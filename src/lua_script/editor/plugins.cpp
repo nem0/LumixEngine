@@ -535,6 +535,53 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 };
 
 
+struct ConsolePlugin : public StudioApp::IPlugin
+{
+	ConsolePlugin(StudioApp& _app)
+		: app(_app)
+	{
+		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Script Console", "script_console");
+		m_action->func.bind<ConsolePlugin, &ConsolePlugin::toggleOpened>(this);
+		opened = false;
+		buf[0] = '\0';
+	}
+
+
+	void toggleOpened()
+	{
+		opened = !opened;
+	}
+
+
+	void onWindowGUI() override
+	{
+		if (ImGui::BeginDock("Script console", &opened))
+		{
+			if (ImGui::Button("Execute"))
+			{
+				lua_State* L = app.getWorldEditor()->getEngine().getState();
+				bool errors = luaL_loadbuffer(L, buf, stringLength(buf), nullptr) != LUA_OK;
+				errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
+
+				if (errors)
+				{
+					g_log_error.log("Lua Script") << lua_tostring(L, -1);
+					lua_pop(L, 1);
+				}
+
+			}
+			ImGui::InputTextMultiline("", buf, lengthOf(buf), ImVec2(-1, -1));
+		}
+		ImGui::EndDock();
+	}
+
+
+	StudioApp& app;
+	bool opened;
+	char buf[4096];
+};
+
+
 } // anonoymous namespace
 
 
@@ -568,6 +615,9 @@ LUMIX_STUDIO_ENTRY(lua_script)
 
 	auto* asset_browser_plugin = LUMIX_NEW(editor.getAllocator(), AssetBrowserPlugin)(app);
 	app.getAssetBrowser()->addPlugin(*asset_browser_plugin);
+
+	auto* console_plugin = LUMIX_NEW(editor.getAllocator(), ConsolePlugin)(app);
+	app.addPlugin(*console_plugin);
 }
 
 

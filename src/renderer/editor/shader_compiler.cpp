@@ -372,7 +372,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			Lumix::StaticString<1024> args(" -f ");
 
 			args << source_path << " -o \"" << out_path << "\" --depends --platform windows --type "
-				<< (is_vertex_shader ? "vertex -O4 --profile vs_5_0" : "fragment -O4 --profile ps_5_0")
+				<< (is_vertex_shader ? "vertex -O3 --profile vs_5_0" : "fragment -O3 --profile ps_5_0")
 				<< " --define " << pass << ";";
 			for (int i = 0; i < Lumix::lengthOf(all_defines); ++i)
 			{
