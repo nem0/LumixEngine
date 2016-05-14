@@ -165,6 +165,10 @@ template <> inline void pushLua(lua_State* L, const char* value)
 {
 	lua_pushstring(L, value);
 }
+template <> inline void pushLua(lua_State* L, char* value)
+{
+	lua_pushstring(L, value);
+}
 template <> inline void pushLua(lua_State* L, int value)
 {
 	lua_pushinteger(L, value);
