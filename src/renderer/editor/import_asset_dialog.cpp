@@ -2552,6 +2552,11 @@ int ImportAssetDialog::importAsset(lua_State* L)
 		m_model.create_billboard_lod = Lumix::LuaWrapper::toType<bool>(L, -1);
 	}
 	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "remove_doubles") == LUA_TBOOLEAN)
+	{
+		m_model.remove_doubles = Lumix::LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1);
 	if (lua_getfield(L, 2, "scale") == LUA_TNUMBER)
 	{
 		m_model.mesh_scale = Lumix::LuaWrapper::toType<float>(L, -1);
