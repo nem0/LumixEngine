@@ -289,6 +289,8 @@ void SceneView::onGUI()
 			ImGui::LabelText("FPS", "%.2f", m_editor->getEngine().getFPS());
 			ImGui::LabelText("CPU time", "%.2f", m_pipeline->getCPUTime() * 1000.0f);
 			ImGui::LabelText("GPU time", "%.2f", m_pipeline->getGPUTime() * 1000.0f);
+			ImGui::LabelText("Waiting for submit", "%.2f", m_pipeline->getWaitSubmitTime() * 1000.0f);
+			ImGui::LabelText("Waiting for render thread", "%.2f", m_pipeline->getGPUTime() * 1000.0f);
 		}
 		ImGui::End();
 		ImGui::PopStyleColor();

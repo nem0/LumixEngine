@@ -1660,6 +1660,20 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	float getWaitSubmitTime() const override
+	{
+		auto* stats = bgfx::getStats();
+		return float(double(stats->waitSubmit) / (double)stats->cpuTimerFreq);
+	}
+
+
+	float getWaitRenderTime() const override
+	{
+		auto* stats = bgfx::getStats();
+		return float(double(stats->waitRender) / (double)stats->cpuTimerFreq);
+	}
+
+
 	float getGPUTime() const override
 	{
 		auto* stats = bgfx::getStats();
