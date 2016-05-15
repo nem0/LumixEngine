@@ -111,6 +111,8 @@ class LUMIX_RENDERER_API Pipeline
 		virtual Path& getPath() = 0;
 		virtual float getCPUTime() const = 0;
 		virtual float getGPUTime() const = 0;
+		virtual float getWaitSubmitTime() const = 0;
+		virtual float getWaitRenderTime() const = 0;
 		virtual void callLuaFunction(const char* func) = 0;
 };
 
