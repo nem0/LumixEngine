@@ -1472,8 +1472,6 @@ public:
 
 	void createEditorLines()
 	{
-		ASSERT(m_render_interface);
-
 		PROFILE_FUNCTION();
 		showGizmos();
 		m_measure_tool->createEditorLines(*m_render_interface);
