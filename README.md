@@ -26,7 +26,7 @@
 * [crunch/crnlib](https://github.com/richgel999/crunch)
 * [assimp](https://github.com/assimp/assimp)
 * [PhysX](https://developer.nvidia.com/physx-sdk)
-* [ImGui](https://github.com/ocornut/imgui)
+* [dear imgui](https://github.com/ocornut/imgui)
 * [stb](https://github.com/nothings/stb)
 
 Project generator
