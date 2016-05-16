@@ -92,9 +92,64 @@ public:
 	}
 
 
+	void guiBeginFrame()
+	{
+		PROFILE_FUNCTION();
+
+		ImGuiIO& io = ImGui::GetIO();
+		io.DisplaySize = ImVec2((float)PlatformInterface::getWindowWidth(),
+			(float)PlatformInterface::getWindowHeight());
+		io.DeltaTime = m_engine->getLastTimeDelta();
+		io.KeyCtrl = PlatformInterface::isPressed((int)PlatformInterface::Keys::CONTROL);
+		io.KeyShift = PlatformInterface::isPressed((int)PlatformInterface::Keys::SHIFT);
+		io.KeyAlt = PlatformInterface::isPressed((int)PlatformInterface::Keys::ALT);
+		io.KeysDown[(int)PlatformInterface::Keys::ALT] = io.KeyAlt;
+		io.KeysDown[(int)PlatformInterface::Keys::SHIFT] = io.KeyShift;
+		io.KeysDown[(int)PlatformInterface::Keys::CONTROL] = io.KeyCtrl;
+
+		PlatformInterface::setCursor(io.MouseDrawCursor ? PlatformInterface::Cursor::NONE
+			: PlatformInterface::Cursor::DEFAULT);
+
+		ImGui::NewFrame();
+	}
+
+
+	void guiEndFrame()
+	{
+		if (m_is_welcome_screen_opened)
+		{
+			showWelcomeScreen();
+		}
+		else
+		{
+			float menu_height = showMainMenu();
+			if (ImGui::GetIO().DisplaySize.y > 0)
+			{
+				auto pos = ImVec2(0, menu_height);
+				auto size = ImGui::GetIO().DisplaySize;
+				size.y -= pos.y;
+				ImGui::RootDock(pos, size);
+			}
+			m_profiler_ui->onGUI();
+			m_asset_browser->onGUI();
+			m_log_ui->onGUI();
+			m_property_grid->onGUI();
+			showEntityList();
+			showEntityTemplateList();
+			for (auto* plugin : m_plugins)
+			{
+				plugin->onWindowGUI();
+			}
+			m_settings.onGUI(&m_actions[0], m_actions.size());
+		}
+		ImGui::Render();
+	}
+
 	void update()
 	{
 		PROFILE_FUNCTION();
+		guiBeginFrame();
+
 		float time_delta = m_editor->getEngine().getLastTimeDelta();
 
 		m_time_to_autosave -= time_delta;
@@ -111,7 +166,7 @@ public:
 		m_asset_browser->update();
 		m_log_ui->update(time_delta);
 
-		onGUI();
+		guiEndFrame();
 	}
 
 
@@ -250,57 +305,6 @@ public:
 			ImGui::EndChild();
 		}
 		ImGui::End();
-	}
-
-
-	void onGUI()
-	{
-		PROFILE_FUNCTION();
-
-		ImGuiIO& io = ImGui::GetIO();
-		io.DisplaySize = ImVec2((float)PlatformInterface::getWindowWidth(),
-			(float)PlatformInterface::getWindowHeight());
-		io.DeltaTime = m_engine->getLastTimeDelta();
-		io.KeyCtrl = PlatformInterface::isPressed((int)PlatformInterface::Keys::CONTROL);
-		io.KeyShift = PlatformInterface::isPressed((int)PlatformInterface::Keys::SHIFT);
-		io.KeyAlt = PlatformInterface::isPressed((int)PlatformInterface::Keys::ALT);
-		io.KeysDown[(int)PlatformInterface::Keys::ALT] = io.KeyAlt;
-		io.KeysDown[(int)PlatformInterface::Keys::SHIFT] = io.KeyShift;
-		io.KeysDown[(int)PlatformInterface::Keys::CONTROL] = io.KeyCtrl;
-
-		PlatformInterface::setCursor(io.MouseDrawCursor ? PlatformInterface::Cursor::NONE
-														: PlatformInterface::Cursor::DEFAULT);
-
-		ImGui::NewFrame();
-
-		if (m_is_welcome_screen_opened)
-		{
-			showWelcomeScreen();
-		}
-		else
-		{
-			float menu_height = showMainMenu();
-			if (ImGui::GetIO().DisplaySize.y > 0)
-			{
-				auto pos = ImVec2(0, menu_height);
-				auto size = ImGui::GetIO().DisplaySize;
-				size.y -= pos.y;
-				ImGui::RootDock(pos, size);
-			}
-			m_profiler_ui->onGUI();
-			m_asset_browser->onGUI();
-			m_log_ui->onGUI();
-			m_property_grid->onGUI();
-			showEntityList();
-			showEntityTemplateList();
-			for (auto* plugin : m_plugins)
-			{
-				plugin->onWindowGUI();
-			}
-			m_settings.onGUI(&m_actions[0], m_actions.size());
-		}
-
-		ImGui::Render();
 	}
 
 
