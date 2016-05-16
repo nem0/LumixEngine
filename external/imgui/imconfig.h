@@ -22,7 +22,7 @@
         #define IMGUI_LIBRARY_EXPORT __attribute__((visibility("default")))
         #define IMGUI_LIBRARY_IMPORT
     #endif
-	#ifdef BUILDING_EDITOR
+	#ifdef BUILDING_ENGINE
 		#define IMGUI_API IMGUI_LIBRARY_EXPORT
 	#else
 		#define IMGUI_API IMGUI_LIBRARY_IMPORT

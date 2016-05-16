@@ -402,7 +402,13 @@ solution "LumixEngine"
 project "engine"
 	libType()
 
-	files { "../src/engine/**.h", "../src/engine/**.cpp", "genie.lua" }
+	files { "../src/engine/**.h",
+			"../src/engine/**.cpp",
+			"genie.lua",
+			"../external/imgui/**.h",
+			"../external/imgui/**.cpp",
+			"../external/imgui/**.inl"
+	}
 
 	defines { "BUILDING_ENGINE" }
 	includedirs { "../external/lua/include" }
@@ -596,10 +602,7 @@ if build_studio then
 
 		files {
 			"../src/editor/**.h",
-			"../src/editor/**.cpp",
-			"../external/imgui/**.h",
-			"../external/imgui/**.cpp",
-			"../external/imgui/**.inl"
+			"../src/editor/**.cpp"
 		}
 		defines { "BUILDING_EDITOR" }
 		links { "engine" }
