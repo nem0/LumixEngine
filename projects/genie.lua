@@ -375,11 +375,20 @@ solution "LumixEngine"
 	
 	configurations { "Debug", "Release", "RelWithDebInfo" }
 	platforms { "x32", "x64" }
-	flags { "FatalWarnings", "NoPCH" }
+	flags { 
+		"FatalWarnings", 
+		"NoPCH", 
+		"NoExceptions", 
+		"NoEditAndContinue"
+	}
 	includedirs {"../src", "../external"}
 	location(LOCATION)
 	language "C++"
 	startproject "studio"
+
+	configuration { "vs*" }
+		defines { "_HAS_EXCEPTIONS=0" }
+
 	configuration "not macosx"
 		excludes { "../src/**/osx/*"}
 		
