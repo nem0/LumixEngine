@@ -24,6 +24,8 @@ namespace Lumix
 	static const uint32 MESH_ACTOR_HASH = crc32("mesh_rigid_actor");
 	static const uint32 CONTROLLER_HASH = crc32("physical_controller");
 	static const uint32 HEIGHTFIELD_HASH = crc32("physical_heightfield");
+	static const uint32 TEXTURE_HASH = crc32("TEXTURE");
+	static const uint32 PHYSICS_HASH = crc32("PHYSICS");
 
 
 	class PhysicsLayerPropertyDescriptor : public IEnumPropertyDescriptor
@@ -167,7 +169,7 @@ namespace Lumix
 			&PhysicsScene::getHeightmap,
 			&PhysicsScene::setHeightmap,
 			"Image (*.raw)",
-			ResourceManager::TEXTURE,
+			TEXTURE_HASH,
 			allocator));
 		PropertyRegister::add("physical_heightfield",
 			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("XZ scale",
@@ -201,7 +203,7 @@ namespace Lumix
 			, m_manager(*this, engine.getAllocator())
 		{
 			registerProperties(engine.getAllocator());
-			m_manager.create(ResourceManager::PHYSICS, engine.getResourceManager());
+			m_manager.create(PHYSICS_HASH, engine.getResourceManager());
 			PhysicsScene::registerLuaAPI(m_engine.getState());
 		}
 

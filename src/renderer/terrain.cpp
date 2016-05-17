@@ -37,6 +37,8 @@ static const uint32 BRUSH_POSITION_HASH = crc32("brush_position");
 static const uint32 BRUSH_SIZE_HASH = crc32("brush_size");
 static const uint32 MAP_SIZE_HASH = crc32("map_size");
 static const uint32 CAMERA_POS_HASH = crc32("camera_pos");
+static const uint32 MODEL_HASH = crc32("MODEL");
+static const uint32 MATERIAL_HASH = crc32("MATERIAL");
 static const char* TEX_COLOR_UNIFORM = "u_texColor";
 
 struct Sample
@@ -204,7 +206,7 @@ Terrain::GrassType::~GrassType()
 {
 	if (m_grass_model)
 	{
-		m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_grass_model);
+		m_grass_model->getResourceManager().get(MODEL_HASH)->unload(*m_grass_model);
 		m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(this);
 	}
 }
@@ -358,13 +360,13 @@ void Terrain::setGrassTypePath(int index, const Path& path)
 	GrassType& type = *m_grass_types[index];
 	if (type.m_grass_model)
 	{
-		type.m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*type.m_grass_model);
+		type.m_grass_model->getResourceManager().get(MODEL_HASH)->unload(*type.m_grass_model);
 		type.m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(&type);
 		type.m_grass_model = nullptr;
 	}
 	if (path.isValid())
 	{
-		type.m_grass_model = static_cast<Model*>(m_scene.getEngine().getResourceManager().get(ResourceManager::MODEL)->load(path));
+		type.m_grass_model = static_cast<Model*>(m_scene.getEngine().getResourceManager().get(MODEL_HASH)->load(path));
 		type.m_grass_model->onLoaded<GrassType, &GrassType::grassLoaded>(&type);
 	}
 }
@@ -592,7 +594,7 @@ void Terrain::setMaterial(Material* material)
 	{
 		if (m_material)
 		{
-			m_material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*m_material);
+			m_material->getResourceManager().get(MATERIAL_HASH)->unload(*m_material);
 			m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(this);
 		}
 		m_material = material;
@@ -606,7 +608,7 @@ void Terrain::setMaterial(Material* material)
 	}
 	else if(material)
 	{
-		material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*material);
+		material->getResourceManager().get(MATERIAL_HASH)->unload(*material);
 	}
 }
 
@@ -616,7 +618,7 @@ void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene
 	serializer.read(m_layer_mask);
 	char path[MAX_PATH_LENGTH];
 	serializer.readString(path, MAX_PATH_LENGTH);
-	setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path))));
+	setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(MATERIAL_HASH)->load(Path(path))));
 	serializer.read(m_scale.x);
 	serializer.read(m_scale.y);
 	m_scale.z = m_scale.x;

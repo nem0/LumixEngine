@@ -50,6 +50,10 @@ static const uint32 CAMERA_HASH = crc32("camera");
 static const uint32 POINT_LIGHT_HASH = crc32("point_light");
 static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
 static const uint32 RENDERABLE_HASH = crc32("renderable");
+static const uint32 MATERIAL_HASH = crc32("MATERIAL");
+static const uint32 SHADER_HASH = crc32("SHADER");
+static const uint32 TEXTURE_HASH = crc32("TEXTURE");
+static const uint32 MODEL_HASH = crc32("MODEL");
 
 
 struct MaterialPlugin : public AssetBrowser::IPlugin
@@ -109,7 +113,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 
 	bool onGUI(Resource* resource, uint32 type) override
 	{
-		if (type != ResourceManager::MATERIAL) return false;
+		if (type != MATERIAL_HASH) return false;
 
 		auto* material = static_cast<Material*>(resource);
 
@@ -159,7 +163,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 
 		char buf[MAX_PATH_LENGTH];
 		copyString(buf, material->getShader() ? material->getShader()->getPath().c_str() : "");
-		if (m_app.getAssetBrowser()->resourceInput("Shader", "shader", buf, sizeof(buf), ResourceManager::SHADER))
+		if (m_app.getAssetBrowser()->resourceInput("Shader", "shader", buf, sizeof(buf), SHADER_HASH))
 		{
 			material->setShader(Path(buf));
 		}
@@ -170,7 +174,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 			auto* texture = material->getTexture(i);
 			copyString(buf, texture ? texture->getPath().c_str() : "");
 			if (m_app.getAssetBrowser()->resourceInput(
-					slot.name, StaticString<30>("", (uint64)&slot), buf, sizeof(buf), ResourceManager::TEXTURE))
+					slot.name, StaticString<30>("", (uint64)&slot), buf, sizeof(buf), TEXTURE_HASH))
 			{
 				material->setTexturePath(i, Path(buf));
 			}
@@ -275,12 +279,12 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Material"; }
-	bool hasResourceManager(uint32 type) const override { return type == ResourceManager::MATERIAL; }
+	bool hasResourceManager(uint32 type) const override { return type == MATERIAL_HASH; }
 
 
 	uint32 getResourceType(const char* ext) override
 	{
-		return equalStrings(ext, "mat") ? ResourceManager::MATERIAL : 0;
+		return equalStrings(ext, "mat") ? MATERIAL_HASH : 0;
 	}
 
 
@@ -530,7 +534,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 
 	bool onGUI(Resource* resource, uint32 type) override
 	{
-		if (type != ResourceManager::MODEL) return false;
+		if (type != MODEL_HASH) return false;
 
 		auto* model = static_cast<Model*>(resource);
 
@@ -624,8 +628,8 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Model"; }
-	bool hasResourceManager(uint32 type) const override { return type == ResourceManager::MODEL; }
-	uint32 getResourceType(const char* ext) override { return equalStrings(ext, "msh") ? ResourceManager::MODEL : 0; }
+	bool hasResourceManager(uint32 type) const override { return type == MODEL_HASH; }
+	uint32 getResourceType(const char* ext) override { return equalStrings(ext, "msh") ? MODEL_HASH : 0; }
 
 
 	StudioApp& m_app;
@@ -648,7 +652,7 @@ struct TexturePlugin : public AssetBrowser::IPlugin
 
 	bool onGUI(Resource* resource, uint32 type) override
 	{
-		if (type != ResourceManager::TEXTURE) return false;
+		if (type != TEXTURE_HASH) return false;
 
 		auto* texture = static_cast<Texture*>(resource);
 		if (texture->isFailure())
@@ -688,14 +692,14 @@ struct TexturePlugin : public AssetBrowser::IPlugin
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Texture"; }
-	bool hasResourceManager(uint32 type) const override { return type == ResourceManager::TEXTURE; }
+	bool hasResourceManager(uint32 type) const override { return type == TEXTURE_HASH; }
 
 
 	uint32 getResourceType(const char* ext) override
 	{
-		if (equalStrings(ext, "tga")) return ResourceManager::TEXTURE;
-		if (equalStrings(ext, "dds")) return ResourceManager::TEXTURE;
-		if (equalStrings(ext, "raw")) return ResourceManager::TEXTURE;
+		if (equalStrings(ext, "tga")) return TEXTURE_HASH;
+		if (equalStrings(ext, "dds")) return TEXTURE_HASH;
+		if (equalStrings(ext, "raw")) return TEXTURE_HASH;
 		return 0;
 	}
 
@@ -714,7 +718,7 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 
 	bool onGUI(Resource* resource, uint32 type) override
 	{
-		if (type != ResourceManager::SHADER) return false;
+		if (type != SHADER_HASH) return false;
 
 		auto* shader = static_cast<Shader*>(resource);
 		char basename[MAX_PATH_LENGTH];
@@ -784,8 +788,8 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Shader"; }
-	bool hasResourceManager(uint32 type) const override { return type == ResourceManager::SHADER; }
-	uint32 getResourceType(const char* ext) override { return equalStrings(ext, "shd") ? ResourceManager::SHADER : 0; }
+	bool hasResourceManager(uint32 type) const override { return type == SHADER_HASH; }
+	uint32 getResourceType(const char* ext) override { return equalStrings(ext, "shd") ? SHADER_HASH : 0; }
 
 
 	StudioApp& m_app;
@@ -865,7 +869,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		ModelHandle loadModel(Path& path) override
 		{
 			auto& rm = m_editor.getEngine().getResourceManager();
-			m_models.insert(m_model_index, static_cast<Model*>(rm.get(ResourceManager::MODEL)->load(path)));
+			m_models.insert(m_model_index, static_cast<Model*>(rm.get(MODEL_HASH)->load(path)));
 			++m_model_index;
 			return m_model_index - 1;
 		}
@@ -928,7 +932,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		void unloadModel(ModelHandle handle) override
 		{
 			auto* model = m_models[handle];
-			model->getResourceManager().get(ResourceManager::MODEL)->unload(*model);
+			model->getResourceManager().get(MODEL_HASH)->unload(*model);
 			m_models.erase(handle);
 		}
 
@@ -998,7 +1002,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 			m_model_index = -1;
 			auto& rm = m_editor.getEngine().getResourceManager();
 			Path shader_path("shaders/debugline.shd");
-			m_shader = static_cast<Shader*>(rm.get(ResourceManager::SHADER)->load(shader_path));
+			m_shader = static_cast<Shader*>(rm.get(SHADER_HASH)->load(shader_path));
 
 			editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
 			editor.universeDestroyed().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
@@ -1008,7 +1012,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		~RenderInterfaceImpl()
 		{
 			auto& rm = m_editor.getEngine().getResourceManager();
-			rm.get(ResourceManager::SHADER)->unload(*m_shader);
+			rm.get(SHADER_HASH)->unload(*m_shader);
 
 			m_editor.universeCreated().unbind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
 			m_editor.universeDestroyed().unbind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
@@ -1185,7 +1189,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		unsigned char* pixels;
 		int width, height;
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-		auto* material_manager = m_engine->getResourceManager().get(ResourceManager::MATERIAL);
+		auto* material_manager = m_engine->getResourceManager().get(MATERIAL_HASH);
 		auto* resource = material_manager->load(Path("shaders/imgui.mat"));
 		m_material = static_cast<Material*>(resource);
 
@@ -1223,7 +1227,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		texture->destroy();
 		LUMIX_DELETE(m_app.getWorldEditor()->getAllocator(), texture);
 
-		m_material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*m_material);
+		m_material->getResourceManager().get(MATERIAL_HASH)->unload(*m_material);
 	}
 
 

@@ -1,3 +1,4 @@
+#include "engine/crc32.h"
 #include "engine/fs/file_system.h"
 #include "engine/log.h"
 #include "engine/math_utils.h"
@@ -12,6 +13,9 @@
 
 namespace Lumix
 {
+
+
+static const uint32 TEXTURE_HASH = crc32("TEXTURE");
 
 
 #pragma pack(1)
@@ -62,7 +66,7 @@ void Texture::setFlag(uint32 flag, bool value)
 	new_flags |= value ? flag : 0;
 	bgfx_flags = new_flags;
 
-	getResourceManager().get(ResourceManager::TEXTURE)->reload(*this);
+	getResourceManager().get(TEXTURE_HASH)->reload(*this);
 }
 
 
@@ -396,7 +400,7 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 	texture.width = header.width;
 	texture.height = header.height;
 	texture.is_cubemap = false;
-	TextureManager* manager = static_cast<TextureManager*>(texture.getResourceManager().get(ResourceManager::TEXTURE));
+	TextureManager* manager = static_cast<TextureManager*>(texture.getResourceManager().get(TEXTURE_HASH));
 	if (texture.data_reference)
 	{
 		texture.data.resize(image_size);
@@ -449,7 +453,7 @@ void Texture::addDataReference()
 	++data_reference;
 	if (data_reference == 1 && isReady())
 	{
-		m_resource_manager.get(ResourceManager::TEXTURE)->reload(*this);
+		m_resource_manager.get(TEXTURE_HASH)->reload(*this);
 	}
 }
 

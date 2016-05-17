@@ -21,6 +21,7 @@ namespace Lumix
 
 static const uint32 RENDERABLE_HASH = crc32("renderable");
 static const uint32 ANIMABLE_HASH = crc32("animable");
+static const uint32 ANIMATION_HASH = crc32("ANIMATION");
 
 namespace FS
 {
@@ -141,7 +142,7 @@ struct AnimationSceneImpl : public AnimationScene
 		if (!animation) return;
 
 		auto& rm = animation->getResourceManager();
-		auto* animation_manager = rm.get(ResourceManager::ANIMATION);
+		auto* animation_manager = rm.get(ANIMATION_HASH);
 		animation_manager->unload(*animation);
 	}
 
@@ -285,7 +286,7 @@ struct AnimationSceneImpl : public AnimationScene
 	Animation* loadAnimation(const Path& path)
 	{
 		ResourceManager& rm = m_engine.getResourceManager();
-		return static_cast<Animation*>(rm.get(ResourceManager::ANIMATION)->load(path));
+		return static_cast<Animation*>(rm.get(ANIMATION_HASH)->load(path));
 	}
 	
 
@@ -341,7 +342,7 @@ struct AnimationSystemImpl : public IPlugin
 								  &AnimationSceneImpl::getAnimation,
 								  &AnimationSceneImpl::setAnimation,
 								  "Animation (*.ani)",
-								  ResourceManager::ANIMATION,
+								  ANIMATION_HASH,
 								  m_allocator));
 		PropertyRegister::add("animable",
 			LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationSceneImpl>)("Start time",
@@ -375,7 +376,7 @@ struct AnimationSystemImpl : public IPlugin
 
 	bool create() override
 	{
-		animation_manager.create(ResourceManager::ANIMATION, m_engine.getResourceManager());
+		animation_manager.create(ANIMATION_HASH, m_engine.getResourceManager());
 		return true;
 	}
 

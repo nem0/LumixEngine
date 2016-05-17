@@ -19,7 +19,12 @@ namespace Lumix
 
 
 static const uint32 SHADOWMAP_HASH = crc32("shadowmap");
+static const uint32 TEXTURE_HASH = crc32("TEXTURE");
+static const uint32 SHADER_HASH = crc32("SHADER");
+static const uint32 MATERIAL_HASH = crc32("MATERIAL");
 static const float DEFAULT_ALPHA_REF_VALUE = 0.3f;
+
+
 static struct CustomFlags
 {
 	char flags[32][32];
@@ -122,7 +127,7 @@ void Material::unload(void)
 	m_uniforms.clear();
 	setShader(nullptr);
 
-	ResourceManagerBase* texture_manager = m_resource_manager.get(ResourceManager::TEXTURE);
+	ResourceManagerBase* texture_manager = m_resource_manager.get(TEXTURE_HASH);
 	for (int i = 0; i < m_texture_count; i++)
 	{
 		if (m_textures[i])
@@ -141,7 +146,7 @@ bool Material::save(JsonSerializer& serializer)
 	if(!isReady()) return false;
 	if(!m_shader) return false;
 
-	auto* manager = getResourceManager().get(ResourceManager::MATERIAL);
+	auto* manager = getResourceManager().get(MATERIAL_HASH);
 	auto& renderer = static_cast<MaterialManager*>(manager)->getRenderer();
 
 	serializer.beginObject();
@@ -279,7 +284,7 @@ void Material::deserializeCustomFlags(JsonSerializer& serializer)
 
 void Material::deserializeDefines(JsonSerializer& serializer)
 {
-	auto* manager = getResourceManager().get(ResourceManager::MATERIAL);
+	auto* manager = getResourceManager().get(MATERIAL_HASH);
 	auto& renderer = static_cast<MaterialManager*>(manager)->getRenderer();
 	serializer.deserializeArrayBegin();
 	m_define_mask = 0;
@@ -369,7 +374,7 @@ void Material::setTexturePath(int i, const Path& path)
 	else
 	{
 		Texture* texture =
-			static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(path));
+			static_cast<Texture*>(m_resource_manager.get(TEXTURE_HASH)->load(path));
 		setTexture(i, texture);
 	}
 }
@@ -387,7 +392,7 @@ void Material::setTexture(int i, Texture* texture)
 	{
 		if (texture) texture->atlas_size = old_texture->atlas_size;
 		removeDependency(*old_texture);
-		m_resource_manager.get(ResourceManager::TEXTURE)->unload(*old_texture);
+		m_resource_manager.get(TEXTURE_HASH)->unload(*old_texture);
 	}
 	if (isReady() && m_shader)
 	{
@@ -412,7 +417,7 @@ void Material::setTexture(int i, Texture* texture)
 
 void Material::setShader(const Path& path)
 {
-	Shader* shader = static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(path));
+	Shader* shader = static_cast<Shader*>(m_resource_manager.get(SHADER_HASH)->load(path));
 	setShader(shader);
 }
 
@@ -452,7 +457,7 @@ void Material::createCommandBuffer()
 	}
 
 	Vec4 color_shininess(m_color, m_shininess);
-	auto* material_manager = getResourceManager().get(ResourceManager::MATERIAL);
+	auto* material_manager = getResourceManager().get(MATERIAL_HASH);
 	auto& renderer = static_cast<MaterialManager*>(material_manager)->getRenderer();
 	auto& uniform = renderer.getMaterialColorShininessUniform();
 	generator.setUniform(uniform, color_shininess);
@@ -521,7 +526,7 @@ void Material::onBeforeReady()
 
 void Material::setShader(Shader* shader)
 {
-	auto* manager = getResourceManager().get(ResourceManager::MATERIAL);
+	auto* manager = getResourceManager().get(MATERIAL_HASH);
 	auto* mat_manager = static_cast<MaterialManager*>(manager);
 
 	if (m_shader && m_shader != mat_manager->getRenderer().getDefaultShader())
@@ -529,7 +534,7 @@ void Material::setShader(Shader* shader)
 		Shader* shader = m_shader;
 		m_shader = nullptr;
 		removeDependency(*shader);
-		m_resource_manager.get(ResourceManager::SHADER)->unload(*shader);
+		m_resource_manager.get(SHADER_HASH)->unload(*shader);
 	}
 	m_shader = shader;
 	if (m_shader)
@@ -596,7 +601,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 				{
 					copyString(texture_path, path);
 				}
-				auto* mng = m_resource_manager.get(ResourceManager::TEXTURE);
+				auto* mng = m_resource_manager.get(TEXTURE_HASH);
 				m_textures[m_texture_count] = static_cast<Texture*>(mng->load(Path(texture_path)));
 				addDependency(*m_textures[m_texture_count]);
 			}
@@ -712,7 +717,7 @@ bool Material::load(FS::IFile& file)
 {
 	PROFILE_FUNCTION();
 
-	auto* manager = getResourceManager().get(ResourceManager::MATERIAL);
+	auto* manager = getResourceManager().get(MATERIAL_HASH);
 	auto& renderer = static_cast<MaterialManager*>(manager)->getRenderer();
 
 	m_render_states = 0;
@@ -788,7 +793,7 @@ bool Material::load(FS::IFile& file)
 		{
 			Path path;
 			serializer.deserialize(path, Path(""));
-			auto* manager = m_resource_manager.get(ResourceManager::SHADER);
+			auto* manager = m_resource_manager.get(SHADER_HASH);
 			setShader(static_cast<Shader*>(manager->load(Path(path))));
 		}
 		else

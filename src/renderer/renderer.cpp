@@ -69,6 +69,17 @@ namespace Lumix
 {
 
 
+static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
+static const uint32 POINT_LIGHT_HASH = crc32("point_light");
+static const uint32 RENDERABLE_HASH = crc32("renderable");
+static const uint32 CAMERA_HASH = crc32("camera");
+static const uint32 MATERIAL_HASH = crc32("MATERIAL");
+static const uint32 MODEL_HASH = crc32("MODEL");
+static const uint32 SHADER_HASH = crc32("SHADER");
+static const uint32 TEXTURE_HASH = crc32("TEXTURE");
+static const uint32 SHADER_BINARY_HASH = crc32("SHADER_BINARY");
+
+
 struct BonePropertyDescriptor : public IEnumPropertyDescriptor
 {
 	BonePropertyDescriptor(const char* name, IAllocator& allocator)
@@ -283,7 +294,7 @@ static void registerProperties(IAllocator& allocator)
 							  &RenderScene::getParticleEmitterMaterialPath,
 							  &RenderScene::setParticleEmitterMaterialPath,
 							  "Material (*.mat)",
-							  ResourceManager::MATERIAL,
+							  MATERIAL_HASH,
 							  allocator));
 
 	PropertyRegister::add("camera",
@@ -334,7 +345,7 @@ static void registerProperties(IAllocator& allocator)
 							  &RenderScene::getRenderablePath,
 							  &RenderScene::setRenderablePath,
 							  "Mesh (*.msh)",
-							  ResourceManager::MODEL,
+							  MODEL_HASH,
 							  allocator));
 
 	auto renderable_material = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Materials",
@@ -346,7 +357,7 @@ static void registerProperties(IAllocator& allocator)
 		&RenderScene::getRenderableMaterial,
 		&RenderScene::setRenderableMaterial,
 		"Material (*.mat)",
-		ResourceManager::MATERIAL,
+		MATERIAL_HASH,
 		allocator));
 	PropertyRegister::add("renderable", renderable_material);
 
@@ -483,7 +494,7 @@ static void registerProperties(IAllocator& allocator)
 							  &RenderScene::getTerrainMaterialPath,
 							  &RenderScene::setTerrainMaterialPath,
 							  "Material (*.mat)",
-							  ResourceManager::MATERIAL,
+							  MATERIAL_HASH,
 							  allocator));
 	PropertyRegister::add("terrain",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("XZ scale",
@@ -511,7 +522,7 @@ static void registerProperties(IAllocator& allocator)
 		&RenderScene::getGrassPath,
 		&RenderScene::setGrassPath,
 		"Mesh (*.msh)",
-		ResourceManager::MODEL,
+		MODEL_HASH,
 		allocator));
 	grass->addChild(LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Distance",
 		&RenderScene::getGrassDistance,
@@ -528,12 +539,6 @@ static void registerProperties(IAllocator& allocator)
 		"Density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity, allocator));
 	PropertyRegister::add("terrain", grass);
 }
-
-
-static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
-static const uint32 POINT_LIGHT_HASH = crc32("point_light");
-static const uint32 RENDERABLE_HASH = crc32("renderable");
-static const uint32 CAMERA_HASH = crc32("camera");
 
 
 struct BGFXAllocator : public bx::AllocatorI
@@ -708,11 +713,11 @@ struct RendererImpl : public Renderer
 		bgfx::setDebug(BGFX_DEBUG_TEXT);
 
 		ResourceManager& manager = engine.getResourceManager();
-		m_texture_manager.create(ResourceManager::TEXTURE, manager);
-		m_model_manager.create(ResourceManager::MODEL, manager);
-		m_material_manager.create(ResourceManager::MATERIAL, manager);
-		m_shader_manager.create(ResourceManager::SHADER, manager);
-		m_shader_binary_manager.create(ResourceManager::SHADER_BINARY, manager);
+		m_texture_manager.create(TEXTURE_HASH, manager);
+		m_model_manager.create(MODEL_HASH, manager);
+		m_material_manager.create(MATERIAL_HASH, manager);
+		m_shader_manager.create(SHADER_HASH, manager);
+		m_shader_binary_manager.create(SHADER_BINARY_HASH, manager);
 
 		m_current_pass_hash = crc32("MAIN");
 		m_view_counter = 0;

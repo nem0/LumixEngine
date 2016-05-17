@@ -1,4 +1,5 @@
 #include "shader_compiler.h"
+#include "engine/crc32.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
@@ -20,6 +21,9 @@
 #include "editor/platform_interface.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
+
+
+static const Lumix::uint32 SHADER_HASH = Lumix::crc32("SHADER");
 
 
 ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
@@ -318,8 +322,7 @@ void ShaderCompiler::reloadShaders()
 {
 	m_to_reload.removeDuplicates();
 
-	auto shader_manager =
-		m_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::SHADER);
+	auto shader_manager = m_editor.getEngine().getResourceManager().get(SHADER_HASH);
 	for (auto& path : m_to_reload)
 	{
 		shader_manager->reload(Lumix::Path(path.c_str()));

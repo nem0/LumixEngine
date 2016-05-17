@@ -30,6 +30,7 @@
 
 static const Lumix::uint32 RENDERABLE_HASH = Lumix::crc32("renderable");
 static const Lumix::uint32 TERRAIN_HASH = Lumix::crc32("terrain");
+static const Lumix::uint32 MATERIAL_HASH = Lumix::crc32("MATERIAL");
 static const char* HEIGHTMAP_UNIFORM = "u_texHeightmap";
 static const char* SPLATMAP_UNIFORM = "u_texSplatmap";
 static const char* COLORMAP_UNIFORM = "u_texColormap";
@@ -233,7 +234,7 @@ private:
 		return static_cast<Lumix::Material*>(
 			m_world_editor.getEngine()
 				.getResourceManager()
-				.get(Lumix::ResourceManager::MATERIAL)
+				.get(MATERIAL_HASH)
 				->get(Lumix::Path(material->getPath().c_str())));
 	}
 
