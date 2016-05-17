@@ -14,14 +14,8 @@ namespace PropertyRegister
 
 struct ComponentType
 {
-	explicit ComponentType(IAllocator& allocator)
-		: m_name(allocator)
-		, m_id(allocator)
-	{
-	}
-
-	string m_name;
-	string m_id;
+	char m_label[50];
+	char m_id[50];
 
 	uint32 m_id_hash;
 	uint32 m_dependency;
@@ -113,9 +107,10 @@ const IPropertyDescriptor* getDescriptor(const char* component_type, const char*
 
 void registerComponentDependency(const char* id, const char* dependency_id)
 {
+	uint32 id_hash = crc32(id);
 	for (ComponentType& cmp_type : *g_component_types)
 	{
-		if (cmp_type.m_id == id)
+		if (cmp_type.m_id_hash == id_hash)
 		{
 			cmp_type.m_dependency = crc32(dependency_id);
 			return;
@@ -138,11 +133,24 @@ bool componentDepends(uint32 dependent, uint32 dependency)
 }
 
 
-void registerComponentType(const char* id, const char* name)
+void registerComponentType(const char* id, const char* label)
 {
-	ComponentType& type = g_component_types->emplace(*g_allocator);
-	type.m_name = name;
-	type.m_id = id;
+	for (int i = 0; i < g_component_types->size(); ++i)
+	{
+		if (compareString((*g_component_types)[i].m_label, label) > 0)
+		{
+			ComponentType type;
+			copyString(type.m_label, label);
+			copyString(type.m_id, id);
+			type.m_id_hash = crc32(id);
+			type.m_dependency = 0;
+			g_component_types->insert(i, type);
+			return;
+		}
+	}
+	ComponentType& type = g_component_types->emplace();
+	copyString(type.m_label, label);
+	copyString(type.m_id, id);
 	type.m_id_hash = crc32(id);
 	type.m_dependency = 0;
 }
@@ -154,15 +162,15 @@ int getComponentTypesCount()
 }
 
 
-const char* getComponentTypeName(int index)
+const char* getComponentTypeLabel(int index)
 {
-	return (*g_component_types)[index].m_name.c_str();
+	return (*g_component_types)[index].m_label;
 }
 
 
 const char* getComponentTypeID(int index)
 {
-	return (*g_component_types)[index].m_id.c_str();
+	return (*g_component_types)[index].m_id;
 }
 
 
