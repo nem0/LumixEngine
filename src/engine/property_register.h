@@ -28,9 +28,9 @@ LUMIX_ENGINE_API Array<IPropertyDescriptor*>& getDescriptors(uint32 type);
 
 LUMIX_ENGINE_API void registerComponentDependency(const char* id, const char* dependency_id);
 LUMIX_ENGINE_API bool componentDepends(uint32 dependent, uint32 dependency);
-LUMIX_ENGINE_API void registerComponentType(const char* name, const char* title);
+LUMIX_ENGINE_API void registerComponentType(const char* id, const char* label);
 LUMIX_ENGINE_API int getComponentTypesCount();
-LUMIX_ENGINE_API const char* getComponentTypeName(int index);
+LUMIX_ENGINE_API const char* getComponentTypeLabel(int index);
 LUMIX_ENGINE_API const char* getComponentTypeID(int index);
 
 

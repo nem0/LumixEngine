@@ -21,7 +21,7 @@ const char* PropertyGrid::getComponentTypeName(Lumix::ComponentUID cmp) const
 	{
 		if (cmp.type == Lumix::crc32(Lumix::PropertyRegister::getComponentTypeID(i)))
 		{
-			return Lumix::PropertyRegister::getComponentTypeName(i);
+			return Lumix::PropertyRegister::getComponentTypeLabel(i);
 		}
 	}
 	return "Unknown";
@@ -564,7 +564,7 @@ void PropertyGrid::onGUI()
 		{
 			for (int i = 0; i < Lumix::PropertyRegister::getComponentTypesCount(); ++i)
 			{
-				if (ImGui::Selectable(Lumix::PropertyRegister::getComponentTypeName(i)))
+				if (ImGui::Selectable(Lumix::PropertyRegister::getComponentTypeLabel(i)))
 				{
 					m_editor.addComponent(
 						Lumix::crc32(Lumix::PropertyRegister::getComponentTypeID(i)));
