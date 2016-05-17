@@ -1,4 +1,5 @@
 #include "profiler_ui.h"
+#include "engine/crc32.h"
 #include "engine/fs/file_events_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
@@ -784,13 +785,13 @@ void ProfilerUIImpl::onGUIResources()
 
 	ImGui::InputText("filter###resource_filter", m_resource_filter, Lumix::lengthOf(m_resource_filter));
 
-	Lumix::uint32 manager_types[] = { Lumix::ResourceManager::ANIMATION,
-		Lumix::ResourceManager::MATERIAL,
-		Lumix::ResourceManager::MODEL,
-		Lumix::ResourceManager::PHYSICS,
-		Lumix::ResourceManager::SHADER,
-		Lumix::ResourceManager::TEXTURE};
-	const char* manager_names[] = {
+	static const Lumix::uint32 manager_types[] = { Lumix::crc32("ANIMATION"),
+		Lumix::crc32("MATERIAL"),
+		Lumix::crc32("MODEL"),
+		Lumix::crc32("PHYSICS"),
+		Lumix::crc32("SHADER"),
+		Lumix::crc32("TEXTURE") };
+	static const char* manager_names[] = {
 		"Animations",
 		"Materials",
 		"Models",

@@ -29,6 +29,8 @@ static const uint32 BOX_ACTOR_HASH = crc32("box_rigid_actor");
 static const uint32 MESH_ACTOR_HASH = crc32("mesh_rigid_actor");
 static const uint32 CONTROLLER_HASH = crc32("physical_controller");
 static const uint32 HEIGHTFIELD_HASH = crc32("physical_heightfield");
+static const uint32 TEXTURE_HASH = crc32("TEXTURE");
+static const uint32 PHYSICS_HASH = crc32("PHYSICS");
 
 
 enum class PhysicsSceneVersion : int
@@ -599,11 +601,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto* old_hm = m_terrains[cmp]->m_heightmap;
 		if (old_hm)
 		{
-			resource_manager.get(ResourceManager::TEXTURE)->unload(*old_hm);
+			resource_manager.get(TEXTURE_HASH)->unload(*old_hm);
 			auto& cb = old_hm->getObserverCb();
 			cb.unbind<Heightfield, &Heightfield::heightmapLoaded>(m_terrains[cmp]);
 		}
-		auto* texture_manager = resource_manager.get(ResourceManager::TEXTURE);
+		auto* texture_manager = resource_manager.get(TEXTURE_HASH);
 		if (str.isValid())
 		{
 			auto* new_hm = static_cast<Texture*>(texture_manager->load(str));
@@ -635,7 +637,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			return;
 		}
 
-		ResourceManagerBase* manager = m_engine->getResourceManager().get(ResourceManager::PHYSICS);
+		ResourceManagerBase* manager = m_engine->getResourceManager().get(PHYSICS_HASH);
 		PhysicsGeometry* geom_res = static_cast<PhysicsGeometry*>(manager->load(str));
 
 		m_actors[cmp]->setPhysxActor(nullptr);
@@ -1340,7 +1342,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				char tmp[MAX_PATH_LENGTH];
 				serializer.readString(tmp, sizeof(tmp));
-				ResourceManagerBase* manager = m_engine->getResourceManager().get(ResourceManager::PHYSICS);
+				ResourceManagerBase* manager = m_engine->getResourceManager().get(PHYSICS_HASH);
 				auto* geometry = manager->load(Lumix::Path(tmp));
 				m_actors[idx]->setResource(static_cast<PhysicsGeometry*>(geometry));
 				m_universe.addComponent(m_actors[idx]->getEntity(), MESH_ACTOR_HASH, this, idx);
@@ -1779,7 +1781,7 @@ void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* resource)
 	if (m_resource)
 	{
 		m_resource->getObserverCb().unbind<RigidActor, &RigidActor::onStateChanged>(this);
-		m_resource->getResourceManager().get(ResourceManager::PHYSICS)->unload(*m_resource);
+		m_resource->getResourceManager().get(PHYSICS_HASH)->unload(*m_resource);
 	}
 	m_resource = resource;
 	if (resource)
@@ -1804,7 +1806,7 @@ Heightfield::~Heightfield()
 	if (m_heightmap)
 	{
 		m_heightmap->getResourceManager()
-			.get(ResourceManager::TEXTURE)
+			.get(TEXTURE_HASH)
 			->unload(*m_heightmap);
 		m_heightmap->getObserverCb().unbind<Heightfield, &Heightfield::heightmapLoaded>(
 			this);

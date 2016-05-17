@@ -59,6 +59,8 @@ static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
 static const uint32 CAMERA_HASH = crc32("camera");
 static const uint32 TERRAIN_HASH = crc32("terrain");
 static const uint32 BONE_ATTACHMENT_HASH = crc32("bone_attachment");
+static const uint32 MATERIAL_HASH = crc32("MATERIAL");
+static const uint32 MODEL_HASH = crc32("MODEL");
 
 
 struct PointLight
@@ -206,7 +208,7 @@ public:
 	~RenderSceneImpl()
 	{
 		auto& rm = m_engine.getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
+		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_HASH));
 
 		m_universe.entityTransformed().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 		m_universe.entityDestroyed().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
@@ -232,7 +234,7 @@ public:
 			{
 				auto& manager = i.model->getResourceManager();
 				freeCustomMeshes(i, material_manager);
-				manager.get(ResourceManager::MODEL)->unload(*i.model);
+				manager.get(MODEL_HASH)->unload(*i.model);
 				LUMIX_DELETE(m_allocator, i.pose);
 			}
 		}
@@ -881,9 +883,7 @@ public:
 
 				if (path != 0)
 				{
-					auto* model = static_cast<Model*>(m_engine.getResourceManager()
-														  .get(ResourceManager::MODEL)
-														  ->load(Path(path)));
+					auto* model = static_cast<Model*>(m_engine.getResourceManager().get(MODEL_HASH)->load(Path(path)));
 					setModel(r.entity, model);
 				}
 
@@ -899,7 +899,7 @@ public:
 							char path[MAX_PATH_LENGTH];
 							serializer.readString(path, lengthOf(path));
 							Material* material = static_cast<Material*>(
-								m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path)));
+								m_engine.getResourceManager().get(MATERIAL_HASH)->load(Path(path)));
 							r.meshes[j].material = material;
 						}
 					}
@@ -1899,7 +1899,7 @@ public:
 		if (path.isValid())
 		{
 			Material* material = static_cast<Material*>(
-				m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(path));
+				m_engine.getResourceManager().get(MATERIAL_HASH)->load(path));
 			m_terrains[cmp]->setMaterial(material);
 		}
 		else
@@ -1990,7 +1990,7 @@ public:
 	{
 		Renderable& r = m_renderables[cmp];
 
-		auto* manager = m_engine.getResourceManager().get(ResourceManager::MODEL);
+		auto* manager = m_engine.getResourceManager().get(MODEL_HASH);
 		if (path.isValid())
 		{
 			Model* model = static_cast<Model*>(manager->load(path));
@@ -3386,7 +3386,7 @@ public:
 	void modelLoaded(Model* model, ComponentIndex component)
 	{
 		auto& rm = m_engine.getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
+		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_HASH));
 
 		auto& r = m_renderables[component];
 		float bounding_radius = r.model->getBoundingRadius();
@@ -3497,7 +3497,7 @@ public:
 		if (r.custom_meshes && r.mesh_count == count) return;
 
 		auto& rm = r.model->getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
+		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_HASH));
 
 		auto* new_meshes = (Mesh*)m_allocator.allocate(count * sizeof(Mesh));
 		if (r.meshes)
@@ -3540,7 +3540,7 @@ public:
 		if (r.meshes && r.mesh_count > index && path == r.meshes[index].material->getPath()) return;
 
 		auto& rm = r.model->getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
+		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_HASH));
 
 		int new_count = Math::maximum(int8(index + 1), r.mesh_count);
 		allocateCustomMeshes(r, new_count);
@@ -3568,13 +3568,13 @@ public:
 		bool no_change = model == old_model && old_model;
 		if (no_change)
 		{
-			old_model->getResourceManager().get(ResourceManager::MODEL)->unload(*old_model);
+			old_model->getResourceManager().get(MODEL_HASH)->unload(*old_model);
 			return;
 		}
 		if (old_model)
 		{
 			auto& rm = old_model->getResourceManager();
-			auto* material_manager = static_cast<MaterialManager*>(rm.get(ResourceManager::MATERIAL));
+			auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_HASH));
 			freeCustomMeshes(m_renderables[component], material_manager);
 			int callback_idx = getModelLoadedCallback(old_model);
 			ModelLoadedCallback* callback = m_model_loaded_callbacks[callback_idx];
@@ -3589,7 +3589,7 @@ public:
 			{
 				m_culling_system->removeStatic(component);
 			}
-			old_model->getResourceManager().get(ResourceManager::MODEL)->unload(*old_model);
+			old_model->getResourceManager().get(MODEL_HASH)->unload(*old_model);
 		}
 		m_renderables[component].model = model;
 		m_renderables[component].meshes = nullptr;
@@ -3880,7 +3880,7 @@ public:
 	{
 		if (!m_particle_emitters[cmp]) return;
 
-		auto* manager = m_engine.getResourceManager().get(ResourceManager::MATERIAL);
+		auto* manager = m_engine.getResourceManager().get(MATERIAL_HASH);
 		Material* material = static_cast<Material*>(manager->load(path));
 		m_particle_emitters[cmp]->setMaterial(material);
 	}

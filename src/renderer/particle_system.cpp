@@ -13,6 +13,13 @@
 #include <cmath>
 
 
+namespace Lumix
+{
+
+
+static const uint32 MATERIAL_HASH = crc32("MATERIAL");
+
+
 enum class ParticleEmitterVersion : int
 {
 	SPAWN_COUNT,
@@ -21,10 +28,6 @@ enum class ParticleEmitterVersion : int
 	LATEST,
 	INVALID = -1
 };
-
-
-namespace Lumix
-{
 
 
 template <typename T>
@@ -625,7 +628,7 @@ void ParticleEmitter::setMaterial(Material* material)
 {
 	if (m_material)
 	{
-		auto* manager = m_material->getResourceManager().get(ResourceManager::MATERIAL);
+		auto* manager = m_material->getResourceManager().get(MATERIAL_HASH);
 		manager->unload(*m_material);
 	}
 	m_material = material;
@@ -722,7 +725,7 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager, boo
 	blob.read(m_entity);
 	char path[MAX_PATH_LENGTH];
 	blob.readString(path, lengthOf(path));
-	auto material_manager = manager.get(ResourceManager::MATERIAL);
+	auto material_manager = manager.get(MATERIAL_HASH);
 	auto material = static_cast<Material*>(material_manager->load(Lumix::Path(path)));
 	setMaterial(material);
 

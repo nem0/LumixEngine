@@ -18,6 +18,7 @@ namespace
 
 
 static const uint32 ANIMABLE_HASH = crc32("animable");
+static const uint32 ANIMATION_HASH = crc32("ANIMATION");
 
 
 struct AssetBrowserPlugin : AssetBrowser::IPlugin
@@ -31,7 +32,7 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 
 	bool onGUI(Lumix::Resource* resource, Lumix::uint32 type) override
 	{
-		if (type == ResourceManager::ANIMATION)
+		if (type == ANIMATION_HASH)
 		{
 			auto* animation = static_cast<Animation*>(resource);
 			ImGui::LabelText("FPS", "%d", animation->getFPS());
@@ -50,12 +51,12 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	const char* getName() const override { return "Animation"; }
 
 
-	bool hasResourceManager(uint32 type) const override { return type == ResourceManager::ANIMATION; }
+	bool hasResourceManager(uint32 type) const override { return type == ANIMATION_HASH; }
 
 
 	uint32 getResourceType(const char* ext) override
 	{
-		if (equalStrings(ext, "ani")) return ResourceManager::ANIMATION;
+		if (equalStrings(ext, "ani")) return ANIMATION_HASH;
 		return 0;
 	}
 
