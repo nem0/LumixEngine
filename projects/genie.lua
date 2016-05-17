@@ -379,6 +379,7 @@ solution "LumixEngine"
 		"FatalWarnings", 
 		"NoPCH", 
 		"NoExceptions", 
+		"NoRTTI", 
 		"NoEditAndContinue"
 	}
 	includedirs {"../src", "../external"}

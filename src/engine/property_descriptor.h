@@ -535,8 +535,7 @@ private:
 
 
 template <class T>
-class ResourcePropertyDescriptor : public FilePropertyDescriptor<T>,
-								   public ResourcePropertyDescriptorBase
+class ResourcePropertyDescriptor : public IResourcePropertyDescriptor
 {
 public:
 	using Getter = typename FilePropertyDescriptor<T>::Getter;
@@ -550,10 +549,11 @@ public:
 		const char* file_type,
 		uint32 resource_type,
 		IAllocator& allocator)
-		: FilePropertyDescriptor<T>(name, getter, setter, file_type, allocator)
-		, ResourcePropertyDescriptorBase(resource_type)
+		: IResourcePropertyDescriptor(allocator)
+		, m_file_descriptor(name, getter, setter, file_type, allocator)
+		, m_resource_type(resource_type)
 	{
-		IPropertyDescriptor::m_type = IPropertyDescriptor::RESOURCE;
+		setName(name);
 	}
 
 	ResourcePropertyDescriptor(const char* name,
@@ -562,12 +562,27 @@ public:
 		const char* file_type,
 		uint32 resource_type,
 		IAllocator& allocator)
-		: FilePropertyDescriptor<T>(name, getter, setter, file_type, allocator)
-		, ResourcePropertyDescriptorBase(resource_type)
+		: IResourcePropertyDescriptor(allocator)
+		, m_file_descriptor(name, getter, setter, file_type, allocator)
+		, m_resource_type(resource_type)
 	{
-		IPropertyDescriptor::m_type = IPropertyDescriptor::RESOURCE;
+		setName(name);
 	}
 
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		m_file_descriptor.set(cmp, index, stream);
+	}
+
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		m_file_descriptor.get(cmp, index, stream);
+	}
+
+	uint32 getResourceType() override { return m_resource_type; }
+
+	uint32 m_resource_type;
+	FilePropertyDescriptor<T> m_file_descriptor;
 };
 
 

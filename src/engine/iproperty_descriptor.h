@@ -78,14 +78,16 @@ protected:
 };
 
 
-class ResourcePropertyDescriptorBase
+class IResourcePropertyDescriptor : public IPropertyDescriptor
 {
 public:
-	ResourcePropertyDescriptorBase(uint32 resource_type) { m_resource_type = resource_type; }
+	IResourcePropertyDescriptor(IAllocator& allocator)
+		: IPropertyDescriptor(allocator)
+	{
+		IPropertyDescriptor::m_type = IPropertyDescriptor::RESOURCE;
+	}
 
-	uint32 getResourceType() { return m_resource_type; }
-
-	uint32 m_resource_type;
+	virtual uint32 getResourceType() = 0;
 };
 
 
