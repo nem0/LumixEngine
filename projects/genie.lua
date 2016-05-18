@@ -421,6 +421,9 @@ solution "LumixEngine"
 	configuration "not macosx"
 		excludes { "../src/**/osx/*"}
 		
+	configuration "not linux"
+		excludes { "../src/**/linux/*"}
+		
 	configuration "not windows"
 		excludes { "../src/**/win/*"}
 
