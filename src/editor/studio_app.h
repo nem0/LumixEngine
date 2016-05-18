@@ -8,7 +8,7 @@
 #ifdef STATIC_PLUGINS
 	#define LUMIX_STUDIO_ENTRY(plugin_name) \
 		extern "C" void setStudioApp_##plugin_name(StudioApp& app); \
-		extern "C" StudioApp::StaticPluginRegister s_##plugin_name##_editor_register(#plugin_name, setStudioApp_##plugin_name); \
+		extern "C" { StudioApp::StaticPluginRegister s_##plugin_name##_editor_register(#plugin_name, setStudioApp_##plugin_name); } \
 		extern "C" void setStudioApp_##plugin_name(StudioApp& app)
 #else
 	#define LUMIX_STUDIO_ENTRY(plugin_name) \
