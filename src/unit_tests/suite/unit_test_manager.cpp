@@ -8,7 +8,6 @@
 #include "engine/queue.h"
 #include "engine/array.h"
 
-#include <Windows.h>
 #include <cstdio>
 
 //#define ASSERT_HANDLE_FAIL

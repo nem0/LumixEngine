@@ -5,6 +5,7 @@
 #include "engine/delegate_list.h"
 #include "engine/default_allocator.h"
 #include "engine/hash_map.h"
+#include "engine/mt/thread.h"
 
 
 namespace Lumix
@@ -23,9 +24,9 @@ enum class BlockType
 };
 
 
-LUMIX_ENGINE_API uint32 getThreadID(int index);
+LUMIX_ENGINE_API MT::ThreadID getThreadID(int index);
 LUMIX_ENGINE_API void setThreadName(const char* name);
-LUMIX_ENGINE_API const char* getThreadName(uint32 thread_id);
+LUMIX_ENGINE_API const char* getThreadName(MT::ThreadID thread_id);
 LUMIX_ENGINE_API int getThreadIndex(uint32 id);
 LUMIX_ENGINE_API int getThreadCount();
 

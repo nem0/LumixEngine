@@ -319,7 +319,7 @@ solution "LumixEngine"
 				"-Wundef",
 			}
 			buildoptions_cpp {
-				"-std=c++0x",
+				"-std=c++11",
 			}
 			linkoptions {
 				"-no-canonical-prefixes",
@@ -353,7 +353,7 @@ solution "LumixEngine"
 				path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86/usr/lib/crtbegin_so.o"),
 				path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86/usr/lib/crtend_so.o"),
 			}
-
+	
 		configuration {}	
 	
 		if "asmjs" == _OPTIONS["gcc"] then
@@ -400,6 +400,42 @@ solution "LumixEngine"
 		excludes { "../src/**/editor/*" }
 	end
 
+	configuration { "linux-*" }
+		links { "dl" }
+		buildoptions {
+			"-fPIC",
+			"-no-canonical-prefixes",
+			"-Wa,--noexecstack",
+			"-fstack-protector",
+			"-ffunction-sections",
+			"-Wno-psabi",
+			"-Wunused-value",
+			"-Wundef",
+		}
+	
+	configuration { "linux-gcc or linux-clang" }
+		buildoptions {
+			"-msse2",
+			"-Wunused-value",
+			"-Wundef",
+		}
+		links {
+			"rt",
+			"dl",
+		}
+		linkoptions {
+			"-Wl,--gc-sections",
+		}
+	
+	configuration { "linux-*", "x32" }
+		buildoptions {
+			"-m32",
+		}
+
+	configuration { "linux-*", "x64" }
+		buildoptions {
+			"-m64",
+		}
 	
 	configurations { "Debug", "Release", "RelWithDebInfo" }
 	platforms { "x32", "x64" }
@@ -487,8 +523,10 @@ project "renderer"
 	defines { "BUILDING_RENDERER" }
 	links { "engine", "editor" }
 
-	linkLib "crnlib"
-	linkLib "assimp"
+	if build_studio then
+		linkLib "crnlib"
+		linkLib "assimp"
+	end
 	linkLib "bgfx"
 	useLua()
 	
@@ -559,8 +597,11 @@ if build_unit_tests then
 		includedirs { "../src", "../src/unit_tests", "../external/bgfx/include" }
 		links { "engine", "animation", "renderer" }
 		if _OPTIONS["static-plugins"] then	
-			links { "engine", "winmm", "psapi" }
-			linkLib "bgfx"
+			configuration { "vs*" }
+				links { "winmm", "psapi" }
+			configuration {} 
+				links { "engine",  }
+				linkLib "bgfx"
 		end
 
 		useLua()
@@ -585,6 +626,7 @@ if build_app then
 
 		configuration { "linux-*" }
 			files { "../src/app/main_linux.cpp" }
+			links { "GL", "X11" }
 		
 		configuration {}
 		
