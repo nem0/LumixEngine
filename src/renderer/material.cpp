@@ -38,7 +38,7 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 	, m_uniforms(allocator)
 	, m_allocator(allocator)
 	, m_texture_count(0)
-	, m_render_states(0)
+	, m_render_states(BGFX_STATE_CULL_CW)
 	, m_color(1, 1, 1)
 	, m_shininess(4)
 	, m_shader_instance(nullptr)
@@ -500,7 +500,7 @@ void Material::onBeforeReady()
 	}
 
 	uint8 alpha_ref = uint8(m_alpha_ref * 255.0f);
-	m_render_states = BGFX_STATE_ALPHA_REF(alpha_ref);
+	m_render_states = (m_render_states & ~BGFX_STATE_ALPHA_REF_MASK) | BGFX_STATE_ALPHA_REF(alpha_ref);
 	m_render_states |= m_shader->m_render_states;
 
 	for(int i = 0; i < m_shader->m_texture_slot_count; ++i)
@@ -720,7 +720,7 @@ bool Material::load(FS::IFile& file)
 	auto* manager = getResourceManager().get(MATERIAL_HASH);
 	auto& renderer = static_cast<MaterialManager*>(manager)->getRenderer();
 
-	m_render_states = 0;
+	m_render_states = BGFX_STATE_CULL_CW;
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	m_uniforms.clear();
 	JsonSerializer serializer(file, JsonSerializer::READ, getPath(), m_allocator);
@@ -753,6 +753,19 @@ bool Material::load(FS::IFile& file)
 		else if (equalStrings(label, "alpha_ref"))
 		{
 			serializer.deserialize(m_alpha_ref, 0.3f);
+		}
+		else if (equalStrings(label, "backface_culling"))
+		{
+			bool b = true;
+			serializer.deserialize(b, true);
+			if (b)
+			{
+				m_render_states |= BGFX_STATE_CULL_CW;
+			}
+			else
+			{
+				m_render_states &= ~BGFX_STATE_CULL_MASK;
+			}
 		}
 		else if (equalStrings(label, "layer"))
 		{

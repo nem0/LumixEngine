@@ -291,21 +291,6 @@ static void alpha_blending(lua_State* L, const char* mode)
 }
 
 
-static void backface_culling(lua_State* L, bool enabled)
-{
-	Shader* shader = getShader(L);
-	if (!shader) return;
-	if (enabled)
-	{
-		shader->m_render_states |= BGFX_STATE_CULL_CW;
-	}
-	else
-	{
-		shader->m_render_states &= ~BGFX_STATE_CULL_MASK;
-	}
-}
-
-
 static void depth_test(lua_State* L, bool enabled)
 {
 	Shader* shader = nullptr;
@@ -387,7 +372,6 @@ static void registerFunctions(Shader* shader, ShaderCombinations* combinations, 
 	registerCFunction(L, "pass", &LuaWrapper::wrap<decltype(&pass), pass>);
 	registerCFunction(L, "fs", &LuaWrapper::wrap<decltype(&fs), fs>);
 	registerCFunction(L, "vs", &LuaWrapper::wrap<decltype(&vs), vs>);
-	registerCFunction(L, "backface_culling", &LuaWrapper::wrap<decltype(&backface_culling), backface_culling>);
 	registerCFunction(L, "depth_test", &LuaWrapper::wrap<decltype(&depth_test), depth_test>);
 	registerCFunction(L, "alpha_blending", &LuaWrapper::wrap<decltype(&alpha_blending), alpha_blending>);
 	registerCFunction(L, "texture_slot", &LuaWrapper::wrap<decltype(&texture_slot), texture_slot>);
@@ -402,7 +386,7 @@ bool Shader::load(FS::IFile& file)
 	lua_State* L = luaL_newstate();
 	luaL_openlibs(L);
 	registerFunctions(this, &m_combintions, &getRenderer(), L);
-	m_render_states = BGFX_STATE_CULL_CW | BGFX_STATE_DEPTH_TEST_LEQUAL;
+	m_render_states = BGFX_STATE_DEPTH_TEST_LEQUAL;
 
 	bool errors = luaL_loadbuffer(L, (const char*)file.getBuffer(), file.size(), "") != LUA_OK;
 	errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
