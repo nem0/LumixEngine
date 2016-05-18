@@ -401,7 +401,6 @@ solution "LumixEngine"
 	end
 
 	configuration { "linux-*" }
-		links { "dl" }
 		buildoptions {
 			"-fPIC",
 			"-no-canonical-prefixes",
@@ -411,13 +410,7 @@ solution "LumixEngine"
 			"-Wno-psabi",
 			"-Wunused-value",
 			"-Wundef",
-		}
-	
-	configuration { "linux-gcc or linux-clang" }
-		buildoptions {
 			"-msse2",
-			"-Wunused-value",
-			"-Wundef",
 		}
 		links {
 			"rt",
@@ -436,6 +429,8 @@ solution "LumixEngine"
 		buildoptions {
 			"-m64",
 		}
+
+	configuration {}
 	
 	configurations { "Debug", "Release", "RelWithDebInfo" }
 	platforms { "x32", "x64" }
