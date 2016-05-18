@@ -20,7 +20,7 @@ namespace Lumix
 			return num;
 		}
 
-		uint32 getCurrentThreadID() { return ::GetCurrentThreadId(); }
+		ThreadID getCurrentThreadID() { return ::GetCurrentThreadId(); }
 
 		uint32 getProccessAffinityMask()
 		{
@@ -42,7 +42,7 @@ namespace Lumix
 		} THREADNAME_INFO;
 #pragma pack(pop)
 
-		void setThreadName(uint32 thread_id, const char* thread_name)
+		void setThreadName(ThreadID thread_id, const char* thread_name)
 		{
 			THREADNAME_INFO info;
 			info.type = 0x1000;

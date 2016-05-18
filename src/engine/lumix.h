@@ -3,7 +3,7 @@
 #define LUMIX_SINGLE_THREAD() 0
 
 #ifndef _WIN32
-#include <cstdlib> // for abort
+	#include <signal.h> // SIGTRAP
 #endif
 
 #ifdef _WIN32
@@ -90,9 +90,9 @@ namespace Lumix
 		#define ASSERT(x) { false ? (void)(x) : 0; } 
 	#else
 		#ifdef _WIN32
-			#define LUMIX_DEBUG_BREAK __debugbreak
+			#define LUMIX_DEBUG_BREAK() __debugbreak()
 		#else
-			#define LUMIX_DEBUG_BREAK abort
+			#define LUMIX_DEBUG_BREAK()  raise(SIGTRAP) 
 		#endif
 		#define ASSERT(x) do { const volatile bool lumix_assert_b____ = !(x); if(lumix_assert_b____) LUMIX_DEBUG_BREAK(); } while (false)
 	#endif

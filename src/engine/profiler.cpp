@@ -158,7 +158,7 @@ struct Instance
 
 	DefaultAllocator allocator;
 	DelegateList<void()> frame_listeners;
-	HashMap<uint32, ThreadData*> threads;
+	HashMap<MT::ThreadID, ThreadData*> threads;
 	ThreadData main_thread;
 	Timer* timer;
 	MT::SpinMutex m_mutex;
@@ -270,7 +270,7 @@ void beginBlock(const char* name)
 }
 
 
-const char* getThreadName(uint32 thread_id)
+const char* getThreadName(MT::ThreadID thread_id)
 {
 	auto iter = g_instance.threads.find(thread_id);
 	if (iter == g_instance.threads.end()) return "N/A";
@@ -281,7 +281,7 @@ const char* getThreadName(uint32 thread_id)
 void setThreadName(const char* name)
 {
 	MT::SpinLock lock(g_instance.m_mutex);
-	uint32 thread_id = MT::getCurrentThreadID();
+	MT::ThreadID thread_id = MT::getCurrentThreadID();
 	auto iter = g_instance.threads.find(thread_id);
 	if (iter == g_instance.threads.end())
 	{
@@ -292,7 +292,7 @@ void setThreadName(const char* name)
 }
 
 
-uint32 getThreadID(int index)
+MT::ThreadID getThreadID(int index)
 {
 	auto iter = g_instance.threads.begin();
 	auto end = g_instance.threads.end();
@@ -305,7 +305,7 @@ uint32 getThreadID(int index)
 }
 
 
-int getThreadIndex(uint32 id)
+int getThreadIndex(MT::ThreadID id)
 {
 	auto iter = g_instance.threads.begin();
 	auto end = g_instance.threads.end();
@@ -332,7 +332,7 @@ uint64 now()
 }
 
 
-Block* getRootBlock(uint32 thread_id)
+Block* getRootBlock(MT::ThreadID thread_id)
 {
 	auto iter = g_instance.threads.find(thread_id);
 	if (!iter.isValid()) return nullptr;

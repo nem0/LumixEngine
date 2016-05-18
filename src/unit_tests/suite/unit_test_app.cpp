@@ -1,7 +1,9 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
 #include "engine/log.h"
-#include "engine/win/simple_win.h"
+#ifdef _WIN32
+	#include "engine/win/simple_win.h"
+#endif
 #include <cstdio>
 
 
@@ -16,8 +18,10 @@ namespace Lumix
 			catString(tmp, ": ");
 			catString(tmp, message);
 			catString(tmp, "\r");
-
-			OutputDebugString(tmp);
+			
+			#ifdef _WIN32
+				OutputDebugString(tmp);
+			#endif
 		}
 
 		void outputToConsole(const char* system, const char* message)
