@@ -1,4 +1,14 @@
 local ide_dir = iif(_ACTION == nil, "vs2015", _ACTION)
+if _ACTION == "gmake" then
+	if "linux-gcc" == _OPTIONS["gcc"] then
+		ide_dir = "gcc"
+	elseif "linux-gcc-5" == _OPTIONS["gcc"] then
+		ide_dir = "gcc5"
+	elseif "linux-clang" == _OPTIONS["gcc"] then
+		ide_dir = "clang"
+	end
+end
+
 local LOCATION = "tmp/" .. ide_dir
 local BINARY_DIR = LOCATION .. "/bin/"
 local build_physics = true
@@ -31,15 +41,15 @@ newoption {
 	description = "Do not build Studio."
 }
 
-if _OPTIONS["no-physics"] or _ACTION == "gmake" then
+if _OPTIONS["no-physics"] then
 	build_physics = false
 end
 
-if _OPTIONS["no-studio"] or _ACTION == "gmake" then
+if _OPTIONS["no-studio"] then
 	build_studio = false
 end
 
-if _OPTIONS["no-unit-tests"] or _ACTION == "gmake" then
+if _OPTIONS["no-unit-tests"] then
 	build_unit_tests = false
 end
 
@@ -52,8 +62,11 @@ newoption {
 		value = "GCC",
 		description = "Choose GCC flavor",
 		allowed = {
-			{ "asmjs",           "Emscripten/asm.js"          },
-			{ "android-x86",     "Android - x86"              }
+			{ "asmjs",          	"Emscripten/asm.js"       	 		},
+			{ "android-x86",    	"Android - x86"            	 		},
+			{ "linux-gcc", 			"Linux (GCC compiler)" 				},
+			{ "linux-gcc-5", 		"Linux (GCC-5 compiler)"			},
+			{ "linux-clang", 		"Linux (Clang compiler)"			}
 		}
 	}
 	
@@ -363,6 +376,21 @@ solution "LumixEngine"
 			premake.gcc.cxx = "\"$(ANDROID_NDK_X86)/bin/i686-linux-android-g++\""
 			premake.gcc.ar  = "\"$(ANDROID_NDK_X86)/bin/i686-linux-android-ar\""
 			LOCATION = "tmp/android-x86_gmake"
+		
+		elseif "linux-gcc" == _OPTIONS["gcc"] then
+			LOCATION = "tmp/gcc"
+
+		elseif "linux-gcc-5" == _OPTIONS["gcc"] then
+			premake.gcc.cc  = "gcc-5"
+			premake.gcc.cxx = "g++-5"
+			premake.gcc.ar  = "ar"
+			LOCATION = "tmp/gcc5"
+			
+		elseif "linux-clang" == _OPTIONS["gcc"] then
+			premake.gcc.cc  = "clang"
+			premake.gcc.cxx = "clang++"
+			premake.gcc.ar  = "ar"
+			LOCATION = "tmp/clang"
 
 		end
 		BINARY_DIR = LOCATION .. "/bin/"
@@ -540,20 +568,20 @@ end
 if build_app then
 	project "app"
 		debugdir "../../LumixEngine_data"
+		kind "ConsoleApp"
 		
 		configuration { "asmjs" }
-			kind "ConsoleApp"
 			targetextension ".bc"
 			files { "../src/app/main_asmjs.cpp" }
 
 		configuration { "windows", "not android-*" }
 			kind "WindowedApp"
 
-		configuration { "windows", "android-*" }
-			kind "ConsoleApp"
-
 		configuration { "windows", "not asmjs", "not android-*" }
 			files { "../src/app/main_win.cpp" }
+
+		configuration { "linux-*" }
+			files { "../src/app/main_linux.cpp" }
 		
 		configuration {}
 		
