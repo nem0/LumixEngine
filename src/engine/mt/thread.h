@@ -33,7 +33,7 @@ LUMIX_ENGINE_API inline void yield()
 LUMIX_ENGINE_API uint32 getCPUsCount();
 
 LUMIX_ENGINE_API ThreadID getCurrentThreadID();
-LUMIX_ENGINE_API uint32 getProccessAffinityMask();
+LUMIX_ENGINE_API uint32 getThreadAffinityMask();
 
 } //! namespace MT
 

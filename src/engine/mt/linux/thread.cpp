@@ -29,7 +29,7 @@ ThreadID getCurrentThreadID()
 	return pthread_self();
 }
 
-uint32 getProccessAffinityMask()
+uint32 getThreadAffinityMask()
 {
 	cpu_set_t affinity;
 	int r = pthread_getaffinity_np(pthread_self(), sizeof(affinity), &affinity);

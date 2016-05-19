@@ -11,79 +11,166 @@ namespace MT
 
 Semaphore::Semaphore(int init_count, int /*max_count*/)
 {
-	m_id = nullptr;
+	m_id.count = init_count;
+	int res = pthread_mutex_init(&m_id.mutex, nullptr);
+	ASSERT(res == 0);
+	res = pthread_cond_init(&m_id.cond, nullptr);
+	ASSERT(res == 0);
 }
 
 Semaphore::~Semaphore()
 {
+	int res = pthread_mutex_destroy(&m_id.mutex);
+	ASSERT(res == 0);
+	res = pthread_cond_destroy(&m_id.cond);
+	ASSERT(res == 0);
 }
 
 void Semaphore::signal()
 {
-	ASSERT(false);
+	int res = pthread_mutex_lock(&m_id.mutex);
+	ASSERT(res == 0);
+	res = pthread_cond_signal(&m_id.cond);
+	ASSERT(res == 0);
+	++m_id.count;
+	res = pthread_mutex_unlock(&m_id.mutex);
+	ASSERT(res == 0);
 }
 
 void Semaphore::wait()
 {
-	ASSERT(false);
+	int res = pthread_mutex_lock(&m_id.mutex);
+	ASSERT(res == 0);
+	
+	while(m_id.count <= 0)
+	{
+		res = pthread_cond_wait(&m_id.cond, &m_id.mutex);
+		ASSERT(res == 0);
+	}
+	
+	--m_id.count;
+	
+	res = pthread_mutex_unlock(&m_id.mutex);
+	ASSERT(res == 0);
 }
 
 bool Semaphore::poll()
 {
-	ASSERT(false);
-	return false;
+	int res = pthread_mutex_lock(&m_id.mutex);
+	ASSERT(res == 0);
+	
+	bool ret = false;
+	if(m_id.count > 0)
+	{
+		--m_id.count;
+		ret = true;
+	}
+
+	res = pthread_mutex_unlock(&m_id.mutex);
+	ASSERT(res == 0);
+	
+	return ret;
 }
 
 
 Mutex::Mutex(bool locked)
 {
-	m_id = nullptr;
+	int res = pthread_mutex_init(&m_id, nullptr);
+	ASSERT(res == 0);
 }
 
 Mutex::~Mutex()
 {
+	int res = pthread_mutex_destroy(&m_id);
+	ASSERT(res == 0);
 }
 
 void Mutex::lock()
 {
-	ASSERT(false);
+	int res = pthread_mutex_lock(&m_id);
+	ASSERT(res == 0);
 }
 
 
 void Mutex::unlock()
 {
-	ASSERT(false);
+	int res = pthread_mutex_unlock(&m_id);
+	ASSERT(res == 0);
 }
 
 
 Event::Event()
 {
-	m_id = nullptr;
+	m_id.signaled = false;
+	int res = pthread_mutex_init(&m_id.mutex, nullptr);
+	ASSERT(res == 0);
+	res = pthread_cond_init(&m_id.cond, nullptr);
+	ASSERT(res == 0);
 }
 
 Event::~Event()
 {
+	int res = pthread_mutex_destroy(&m_id.mutex);
+	ASSERT(res == 0);
+	res = pthread_cond_destroy(&m_id.cond);
+	ASSERT(res == 0);
 }
 
 void Event::reset()
 {
-	ASSERT(false);
+	int res = pthread_mutex_lock(&m_id.mutex);
+	ASSERT(res == 0);
+	res = pthread_cond_signal(&m_id.cond);
+	ASSERT(res == 0);
+	m_id.signaled = false;
+	res = pthread_mutex_unlock(&m_id.mutex);
+	ASSERT(res == 0);
 }
 
 void Event::trigger()
 {
-	ASSERT(false);
+	int res = pthread_mutex_lock(&m_id.mutex);
+	ASSERT(res == 0);
+	res = pthread_cond_signal(&m_id.cond);
+	ASSERT(res == 0);
+	m_id.signaled = true;
+	res = pthread_mutex_unlock(&m_id.mutex);
+	ASSERT(res == 0);
 }
 
 void Event::wait()
 {
-	ASSERT(false);
+	int res = pthread_mutex_lock(&m_id.mutex);
+	ASSERT(res == 0);
+	
+	while (!m_id.signaled)
+	{
+		res = pthread_cond_wait(&m_id.cond, &m_id.mutex);
+		ASSERT(res == 0);
+	}
+	
+	m_id.signaled = false;
+	
+	res = pthread_mutex_unlock(&m_id.mutex);
+	ASSERT(res == 0);
 }
 
 bool Event::poll()
 {
-	ASSERT(false);
-	return false;
+	int res = pthread_mutex_lock(&m_id.mutex);
+	ASSERT(res == 0);
+	
+	bool ret = false;
+	if (m_id.signaled)
+	{
+		m_id.signaled = false;
+		ret = true;
+	}
+
+	res = pthread_mutex_unlock(&m_id.mutex);
+	ASSERT(res == 0);
+	
+	return ret;
 }
 
 
