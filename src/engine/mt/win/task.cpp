@@ -56,7 +56,7 @@ Task::Task(IAllocator& allocator)
 {
 	TaskImpl* impl = LUMIX_NEW(allocator, TaskImpl)(allocator);
 	impl->m_handle = nullptr;
-	impl->m_affinity_mask = getProccessAffinityMask();
+	impl->m_affinity_mask = getThreadAffinityMask();
 	impl->m_priority = ::GetThreadPriority(GetCurrentThread());
 	impl->m_is_running = false;
 	impl->m_force_exit = false;
