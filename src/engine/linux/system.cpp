@@ -19,11 +19,35 @@ namespace Lumix
 		printf("%s", text);
 	}
 
+	
+	static int s_argc = 0;
+	static char** s_argv = nullptr;
+	
+	
+	void setCommandLine(int argc, char* argv[])
+	{
+		s_argc = argc;
+		s_argv = argv;
+	}
+	
 
 	bool getCommandLine(char* output, int max_size)
 	{
-		ASSERT(false);
-		return false;
+		if (max_size <=0) return false;
+		if (s_argc < 2)
+		{
+			*output = '\0';
+		}
+		else
+		{
+			copyString(output, max_size, s_argv[1]);
+			for (int i = 2; i < s_argc; ++i)
+			{
+				catString(output, max_size, " ");
+				catString(output, max_size, s_argv[i]);
+			}
+		}
+		return true;
 	}
 
 

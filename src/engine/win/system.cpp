@@ -17,6 +17,12 @@ namespace Lumix
 		MessageBox(NULL, text, "Message", MB_OK);
 	}
 
+	
+	void setCommandLine(int, char**)
+	{
+		ASSERT(false);
+	}
+	
 
 	bool getCommandLine(char* output, int max_size)
 	{

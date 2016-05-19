@@ -122,19 +122,22 @@ class PluginManagerImpl : public PluginManager
 						g_log_error.log("Core") << "createPlugin failed.";
 						LUMIX_DELETE(m_engine.getAllocator(), plugin);
 						ASSERT(false);
-						return nullptr;
 					}
-					m_plugins.push(plugin);
-					m_libraries.push(lib);
-					m_library_loaded.invoke(lib);
-					g_log_info.log("Core") << "Plugin loaded.";
-					Lumix::Debug::StackTree::refreshModuleList();
-					return plugin;
+					else
+					{
+						m_plugins.push(plugin);
+						m_libraries.push(lib);
+						m_library_loaded.invoke(lib);
+						g_log_info.log("Core") << "Plugin loaded.";
+						Lumix::Debug::StackTree::refreshModuleList();
+						return plugin;
+					}
 				}
 				else
 				{
 					g_log_error.log("Core") << "No createPlugin function in plugin.";
 				}
+				unloadLibrary(lib);
 			}
 			else
 			{
@@ -147,8 +150,7 @@ class PluginManagerImpl : public PluginManager
 				}
 				g_log_warning.log("Core") << "Failed to load plugin.";
 			}
-			unloadLibrary(lib);
-			return 0;
+			return nullptr;
 		}
 
 
