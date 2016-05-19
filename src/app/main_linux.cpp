@@ -391,6 +391,7 @@ App* App::s_instance = nullptr;
 
 int main(int argc, char* argv[])
 {
+	Lumix::setCommandLine(argc, argv);
 	App app;
 	app.init();
 	app.run();

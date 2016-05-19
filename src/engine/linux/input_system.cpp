@@ -11,7 +11,7 @@ namespace Lumix
 	{
 		InputSystemImpl(IAllocator& allocator) : m_allocator(allocator) {}
 
-		bool create() { return false; }
+		bool create() { return true; }
 
 		void enable(bool enabled) override {}
 		void update(float dt) override {}
