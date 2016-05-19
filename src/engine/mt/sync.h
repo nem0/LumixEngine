@@ -1,5 +1,8 @@
 #pragma once
 #include "engine/lumix.h"
+#ifdef __linux__
+	#include <pthread.h>
+#endif
 
 namespace Lumix
 {
@@ -7,8 +10,28 @@ namespace MT
 {
 
 
-typedef void* SemaphoreHandle;
-
+#if defined _WIN32
+	typedef void* SemaphoreHandle;
+	typedef void* MutexHandle;
+	typedef void* EventHandle;
+	typedef volatile int32 SpinMutexHandle;
+#elif defined __linux__
+	struct SemaphoreHandle
+	{
+		pthread_mutex_t mutex;
+		pthread_cond_t cond;
+		int32 count;
+	};
+	typedef pthread_mutex_t MutexHandle;
+	struct EventHandle
+	{
+		pthread_mutex_t mutex;
+		pthread_cond_t cond;
+		bool signaled;
+	};
+	typedef volatile int32 SpinMutexHandle;
+#endif
+	
 
 class LUMIX_ENGINE_API Semaphore
 {
@@ -24,9 +47,6 @@ public:
 private:
 	SemaphoreHandle m_id;
 };
-
-
-typedef void* MutexHandle;
 
 
 class LUMIX_ENGINE_API Mutex
@@ -60,8 +80,6 @@ private:
 };
 
 
-typedef void* EventHandle;
-
 class LUMIX_ENGINE_API Event
 {
 public:
@@ -78,9 +96,6 @@ public:
 private:
 	EventHandle m_id;
 };
-
-
-typedef volatile int32 SpinMutexHandle;
 
 
 class LUMIX_ENGINE_API SpinMutex

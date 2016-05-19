@@ -22,7 +22,7 @@ namespace Lumix
 
 		ThreadID getCurrentThreadID() { return ::GetCurrentThreadId(); }
 
-		uint32 getProccessAffinityMask()
+		uint32 getThreadAffinityMask()
 		{
 			PROCESSOR_NUMBER proc_number;
 			BOOL ret = ::GetThreadIdealProcessorEx(::GetCurrentThread(), &proc_number);

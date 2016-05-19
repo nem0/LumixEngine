@@ -200,7 +200,7 @@ struct ManagerImpl : public Manager
 
 	uint32 getAffinityMask(uint32) const
 	{
-		return MT::getProccessAffinityMask();
+		return MT::getThreadAffinityMask();
 	}
 
 	IAllocator&			m_allocator;
