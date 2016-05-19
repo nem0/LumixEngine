@@ -13,11 +13,21 @@ namespace MT
 
 void sleep(uint32 milliseconds)
 {
-	timespec t;
-	t.tv_sec = milliseconds / 1000;
-	t.tv_nsec = (milliseconds % 1000) * 1000000;
-	clock_nanosleep(CLOCK_MONOTONIC, 0, &t, nullptr);
+	if (milliseconds)
+	{
+		timespec t;
+		t.tv_sec = milliseconds / 1000;
+		t.tv_nsec = (milliseconds % 1000) * 1000000;
+		clock_nanosleep(CLOCK_MONOTONIC, 0, &t, nullptr);
+	}
 }
+
+
+void yield()
+{
+	pthread_yield();
+}
+
 
 uint32 getCPUsCount()
 {

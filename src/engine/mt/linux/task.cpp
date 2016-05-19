@@ -119,7 +119,10 @@ void Task::forceExit(bool wait)
 {
 	m_implementation->force_exit = true;
 
-	pthread_join(m_implementation->handle, nullptr);
+	if (wait)
+	{
+		pthread_join(m_implementation->handle, nullptr);
+	}
 }
 
 } // namespace MT
