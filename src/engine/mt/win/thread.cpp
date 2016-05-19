@@ -8,7 +8,8 @@ namespace Lumix
 	namespace MT
 	{
 		void sleep(uint32 milliseconds) { ::Sleep(milliseconds); }
-
+		void yield() { sleep(0); }
+		
 		uint32 getCPUsCount()
 		{
 			SYSTEM_INFO sys_info;
