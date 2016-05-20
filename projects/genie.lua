@@ -278,6 +278,7 @@ function linkPhysX()
 end
 
 function forceLink(name)
+
 	configuration { "x64", "windows", "not asmjs", "not android-*" }
 		linkoptions {"/INCLUDE:" .. name}
 	configuration { "x32", "windows", "not asmjs", "not android-*" }
@@ -516,9 +517,10 @@ project "renderer"
 	files { "../src/renderer/**.h", "../src/renderer/**.cpp" }
 	includedirs { "../src", "../external/bgfx/include", "../external/assimp/include", "../external/crnlib/include" }
 	defines { "BUILDING_RENDERER" }
-	links { "engine", "editor" }
-
+	links { "engine" }
+	
 	if build_studio then
+		links { "editor" }
 		linkLib "crnlib"
 		linkLib "assimp"
 	end
@@ -537,8 +539,12 @@ project "animation"
 	includedirs { "../src" }
 	includedirs { "../external/bgfx/include" }
 	defines { "BUILDING_ANIMATION" }
-	links { "engine", "renderer", "editor" }
+	links { "engine", "renderer" }
 
+	if build_studio then
+		links { "editor" }
+	end
+	
 	defaultConfigurations()
 
 project "audio"
@@ -551,7 +557,11 @@ project "audio"
 	}
 	includedirs { "../src", "../src/audio", "../external/bgfx/include" }
 	defines { "BUILDING_AUDIO" }
-	links { "engine", "editor" }
+	links { "engine" }
+
+	if build_studio then
+		links { "editor" }
+	end
 
 	configuration "windows"
 		links { "dxguid" }
@@ -566,8 +576,12 @@ project "navigation"
 	files { "../src/navigation/**.h", "../src/navigation/**.cpp" }
 	includedirs { "../src", "../src/navigation", "../external/recast/include" }
 	includedirs { "../external/bgfx/include" }
-	links { "engine", "editor", "renderer" }
+	links { "engine", "renderer" }
 	linkLib "recast"
+	
+	if build_studio then
+		links { "editor" }
+	end
 	
 	useLua()
 	defaultConfigurations()
@@ -578,7 +592,11 @@ project "lua_script"
 	files { "../src/lua_script/**.h", "../src/lua_script/**.cpp" }
 	includedirs { "../src", "../src/lua_script", "../external/bgfx/include" }
 	defines { "BUILDING_LUA_SCRIPT" }
-	links { "editor", "engine", "renderer" }
+	links { "engine", "renderer" }
+
+	if build_studio then
+		links { "editor" }
+	end
 
 	useLua()
 	defaultConfigurations()
@@ -590,12 +608,11 @@ if build_unit_tests then
 
 		files { "../src/unit_tests/**.h", "../src/unit_tests/**.cpp" }
 		includedirs { "../src", "../src/unit_tests", "../external/bgfx/include" }
-		links { "engine", "animation", "renderer" }
+		links { "animation", "renderer", "engine" }
 		if _OPTIONS["static-plugins"] then	
 			configuration { "vs*" }
 				links { "winmm", "psapi" }
 			configuration {} 
-				links { "engine",  }
 				linkLib "bgfx"
 		end
 
@@ -608,22 +625,6 @@ if build_app then
 	project "app"
 		debugdir "../../LumixEngine_data"
 		kind "ConsoleApp"
-		
-		configuration { "asmjs" }
-			targetextension ".bc"
-			files { "../src/app/main_asmjs.cpp" }
-
-		configuration { "windows", "not android-*" }
-			kind "WindowedApp"
-
-		configuration { "windows", "not asmjs", "not android-*" }
-			files { "../src/app/main_win.cpp" }
-
-		configuration { "linux-*" }
-			files { "../src/app/main_linux.cpp" }
-			links { "GL", "X11" }
-		
-		configuration {}
 		
 		includedirs { "../src", "../src/app", "../external/bgfx/include" }
 		if _OPTIONS["static-plugins"] then	
@@ -642,7 +643,7 @@ if build_app then
 				forceLink("setStudioApp_renderer")
 			end
 				
-			links { "engine", "audio", "animation", "renderer", "lua_script", "navigation" }
+			links { "audio", "animation", "renderer", "lua_script", "navigation", "engine" }
 			
 			if build_physics then
 				links { "physics" }
@@ -667,6 +668,22 @@ if build_app then
 			linkPhysX()
 		end
 		links { "engine", "animation", "renderer" }
+		
+		configuration { "asmjs" }
+			targetextension ".bc"
+			files { "../src/app/main_asmjs.cpp" }
+
+		configuration { "windows", "not android-*" }
+			kind "WindowedApp"
+
+		configuration { "windows", "not asmjs", "not android-*" }
+			files { "../src/app/main_win.cpp" }
+
+		configuration { "linux-*" }
+			files { "../src/app/main_linux.cpp" }
+			links { "GL", "X11" }
+		
+		configuration {}
 		
 		useLua()
 		defaultConfigurations()
