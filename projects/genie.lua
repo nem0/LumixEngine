@@ -279,9 +279,11 @@ end
 
 function forceLink(name)
 
-	configuration { "x64", "windows", "not asmjs", "not android-*" }
+	configuration { "linux-*" }
+		linkoptions {"-u " .. name}
+	configuration { "x64", "vs*" }
 		linkoptions {"/INCLUDE:" .. name}
-	configuration { "x32", "windows", "not asmjs", "not android-*" }
+	configuration { "x32", "vs*" }
 		linkoptions {"/INCLUDE:_" .. name}
 	configuration {}
 end
@@ -525,6 +527,9 @@ project "renderer"
 		linkLib "assimp"
 	end
 	linkLib "bgfx"
+	configuration { "linux-*" }
+		links { "GL", "X11" }
+	configuration {}
 	useLua()
 	
 	configuration { "windows", "not asmjs" }
@@ -649,7 +654,7 @@ if build_app then
 				links { "physics" }
 			end
 
-			configuration { "windows", "not asmjs", "not android-*" }
+			configuration { "vs*" }
 				links { "psapi", "dxguid", "winmm" }
 
 			configuration { "asmjs" }
@@ -657,7 +662,7 @@ if build_app then
 				
 			configuration {}
 			
-			if _ACTION ~= "gmake" then
+			if build_studio then
 				linkLib "crnlib"
 				linkLib "assimp"
 			end
@@ -666,8 +671,9 @@ if build_app then
 			linkLib "lua"
 			linkLib "recast"
 			linkPhysX()
+		else
+			links { "engine" }
 		end
-		links { "engine", "animation", "renderer" }
 		
 		configuration { "asmjs" }
 			targetextension ".bc"

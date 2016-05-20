@@ -701,11 +701,13 @@ struct RendererImpl : public Renderer
 	{
 		registerProperties(engine.getAllocator());
 		bgfx::PlatformData d;
-		void* platform_data = engine.getPlatformData().window_handle;
-		if (platform_data)
+		void* window_handle = engine.getPlatformData().window_handle;
+		void* display = engine.getPlatformData().display;
+		if (window_handle)
 		{
 			setMemory(&d, 0, sizeof(d));
-			d.nwh = platform_data;
+			d.nwh = window_handle;
+			d.ndt = display;
 			bgfx::setPlatformData(d);
 		}
 		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub, &m_bgfx_allocator);

@@ -70,6 +70,7 @@ public:
 		, m_paused(false)
 		, m_next_frame(false)
 	{
+		m_platform_data = {};
 		m_state = lua_newstate(luaAllocator, &m_allocator);
 		luaL_openlibs(m_state);
 		registerLuaAPI();
