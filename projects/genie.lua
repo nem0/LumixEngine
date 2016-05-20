@@ -672,7 +672,7 @@ if build_app then
 			linkLib "recast"
 			linkPhysX()
 		else
-			links { "engine" }
+			links { "renderer", "engine" }
 		end
 		
 		configuration { "asmjs" }
