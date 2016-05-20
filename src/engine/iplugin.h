@@ -70,7 +70,7 @@ namespace Lumix
 #ifdef STATIC_PLUGINS
 	#define LUMIX_PLUGIN_ENTRY(plugin_name)                                           \
 		extern "C" Lumix::IPlugin* createPlugin_##plugin_name(Lumix::Engine& engine); \
-		extern "C" { StaticPluginRegister __attribute__((used)) s_##plugin_name##_plugin_register(          \
+		extern "C" { StaticPluginRegister LUMIX_ATTRIBUTE_USED s_##plugin_name##_plugin_register(          \
 			#plugin_name, createPlugin_##plugin_name); }                              \
 		extern "C" Lumix::IPlugin* createPlugin_##plugin_name(Lumix::Engine& engine)
 #else
