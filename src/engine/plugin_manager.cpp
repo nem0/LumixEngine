@@ -107,7 +107,13 @@ class PluginManagerImpl : public PluginManager
 		{
 			char path_with_ext[MAX_PATH_LENGTH];
 			copyString(path_with_ext, path);
-			catString(path_with_ext, ".dll");
+			#ifdef _WIN32
+				catString(path_with_ext, ".dll");
+			#elif defined __linux__
+				catString(path_with_ext, ".so");
+			#else 
+				#error Unknown platform
+			#endif
 			g_log_info.log("Core") << "loading plugin " << path_with_ext;
 			typedef IPlugin* (*PluginCreator)(Engine&);
 			auto* lib = loadLibrary(path_with_ext);

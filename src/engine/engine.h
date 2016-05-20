@@ -36,6 +36,7 @@ public:
 	struct PlatformData
 	{
 		void* window_handle;
+		void* display;
 	};
 
 public:

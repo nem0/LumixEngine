@@ -1,4 +1,4 @@
-/*#include "engine/network.h"
+#include "engine/network.h"
 #include "engine/iallocator.h"
 #include "engine/string.h"
 
@@ -17,13 +17,13 @@ TCPAcceptor::TCPAcceptor(IAllocator& allocator)
 
 TCPAcceptor::~TCPAcceptor()
 {
-	::closesocket(m_socket);
+//	::closesocket(m_socket);
 }
 
 
 bool TCPAcceptor::start(const char* ip, uint16 port)
 {
-	WORD sockVer;
+/*	WORD sockVer;
 	WSADATA wsaData;
 	sockVer = 2 | (2 << 8);
 	if (WSAStartup(sockVer, &wsaData) != 0) return false;
@@ -42,7 +42,9 @@ bool TCPAcceptor::start(const char* ip, uint16 port)
 
 	m_socket = socket;
 
-	return ::listen(socket, 10) == 0;
+	return ::listen(socket, 10) == 0;*/
+	ASSERT(false);
+	return false;
 }
 
 
@@ -54,8 +56,10 @@ void TCPAcceptor::close(TCPStream* stream)
 
 TCPStream* TCPAcceptor::accept()
 {
-	SOCKET socket = ::accept(m_socket, nullptr, nullptr);
-	return LUMIX_NEW(m_allocator, TCPStream)(socket);
+	/*SOCKET socket = ::accept(m_socket, nullptr, nullptr);
+	return LUMIX_NEW(m_allocator, TCPStream)(socket);*/
+	ASSERT(false);
+	return nullptr;
 }
 
 
@@ -68,13 +72,14 @@ TCPConnector::TCPConnector(IAllocator& allocator)
 
 TCPConnector::~TCPConnector()
 {
-	::closesocket(m_socket);
+	//::closesocket(m_socket);
+	ASSERT(false);
 }
 
 
 TCPStream* TCPConnector::connect(const char* ip, uint16 port)
 {
-	WORD sockVer;
+	/*WORD sockVer;
 	WSADATA wsaData;
 	sockVer = 2 | (2 << 8);
 	if (WSAStartup(sockVer, &wsaData) != 0) return nullptr;
@@ -92,7 +97,9 @@ TCPStream* TCPConnector::connect(const char* ip, uint16 port)
 	if (::connect(socket, (LPSOCKADDR)&sin, sizeof(sin)) != 0) return nullptr;
 
 	m_socket = socket;
-	return LUMIX_NEW(m_allocator, TCPStream)(socket);
+	return LUMIX_NEW(m_allocator, TCPStream)(socket);*/
+	ASSERT(false);
+	return nullptr;
 }
 
 void TCPConnector::close(TCPStream* stream)
@@ -103,35 +110,40 @@ void TCPConnector::close(TCPStream* stream)
 
 TCPStream::~TCPStream()
 {
-	::closesocket(m_socket);
+//	::closesocket(m_socket);
+	ASSERT(false);
 }
 
 
 bool TCPStream::readString(char* string, uint32 max_size)
 {
-	uint32 len = 0;
+	/*uint32 len = 0;
 	bool ret = true;
 	ret &= read(len);
 	ASSERT(len < max_size);
 	ret &= read((void*)string, len);
 
-	return ret;
+	return ret;*/
+	ASSERT(false);
+	return false;
 }
 
 
 bool TCPStream::writeString(const char* string)
 {
-	uint32 len = (uint32)stringLength(string) + 1;
+	/*uint32 len = (uint32)stringLength(string) + 1;
 	bool ret = write(len);
 	ret &= write((const void*)string, len);
 
-	return ret;
+	return ret;*/
+	ASSERT(false);
+	return false;
 }
 
 
 bool TCPStream::read(void* buffer, size_t size)
 {
-	int32 to_receive = (int32)size;
+	/*int32 to_receive = (int32)size;
 	char* ptr = static_cast<char*>(buffer);
 
 	do
@@ -152,17 +164,20 @@ bool TCPStream::read(void* buffer, size_t size)
 			}
 		}
 	} while (to_receive > 0);
-	return true;
+	return true;*/
+	ASSERT(false);
+	return false;
 }
 
 
 bool TCPStream::write(const void* buffer, size_t size)
 {
-	int send = ::send(m_socket, static_cast<const char*>(buffer), (int)size, 0);
-	return (size_t)send == size;
+	/*int send = ::send(m_socket, static_cast<const char*>(buffer), (int)size, 0);
+	return (size_t)send == size;*/
+	ASSERT(false);
+	return false;
 }
 
 
 } // namespace Net
 } // namespace Lumix
-*/

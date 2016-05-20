@@ -26,7 +26,7 @@
 #include "renderer/texture.h"
 #include "engine/universe/universe.h"
 #include <cstdio>
-
+#include <X11/Xlib.h>
 
 struct App
 {
@@ -88,32 +88,19 @@ struct App
 			renderer->resize(w, h);
 		}
 	}
+*/
 
-
-	void createWindow()
+	bool createWindow()
 	{
-		HINSTANCE hInst = GetModuleHandle(NULL);
-		WNDCLASSEX wnd;
-		wnd = {};
-		wnd.cbSize = sizeof(wnd);
-		wnd.style = CS_HREDRAW | CS_VREDRAW;
-		wnd.lpfnWndProc = msgProc;
-		wnd.hInstance = hInst;
-		wnd.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-		wnd.hCursor = LoadCursor(NULL, IDC_ARROW);
-		wnd.lpszClassName = "App";
-		wnd.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
-		RegisterClassExA(&wnd);
-		m_hwnd = CreateWindowA("App", "App", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 800, 600, NULL, NULL, hInst, 0);
-
-		RAWINPUTDEVICE Rid;
-		Rid.usUsagePage = 0x01;
-		Rid.usUsage = 0x02;
-		Rid.dwFlags = 0;
-		Rid.hwndTarget = 0;
-		RegisterRawInputDevices(&Rid, 1, sizeof(Rid));
+		m_display = XOpenDisplay(nullptr);
+		if (!m_display) return false;
+		
+		int s = DefaultScreen(m_display);
+		m_window = XCreateSimpleWindow(m_display, RootWindow(m_display, s), 10, 10, 100, 100, 1
+			, BlackPixel(m_display, s), WhitePixel(m_display, s));
+		XSelectInput(m_display, m_window, ExposureMask | KeyPressMask);
+		XMapWindow(m_display, m_window);
 	}
-	*/
 
 	void init()
 	{
@@ -138,7 +125,7 @@ struct App
 			}
 		}
 
-		// createWindow(); // TODO
+		createWindow();
 
 		Lumix::g_log_info.getCallback().bind<outputToConsole>();
 		Lumix::g_log_warning.getCallback().bind<outputToConsole>();
@@ -161,7 +148,8 @@ struct App
 
 		m_engine = Lumix::Engine::create("", "", m_file_system, m_allocator);
 		Lumix::Engine::PlatformData platform_data;
-		// platform_data.window_handle = m_hwnd; // TODO
+		platform_data.window_handle = (void*)(uintptr_t)m_window;
+		platform_data.display = m_display;
 		m_engine->setPlatformData(platform_data);
 
 		m_engine->getPluginManager().load("renderer");
@@ -283,6 +271,8 @@ struct App
 		m_engine = nullptr;
 		m_pipeline = nullptr;
 		m_universe = nullptr;
+		
+		XCloseDisplay(m_display);
 	}
 	
 
@@ -312,20 +302,18 @@ struct App
 			input_system.injectMouseYMove(float(raw->data.mouse.lLastY));
 		}
 	}
-
+*/
 
 	void handleEvents()
 	{
-		MSG msg;
-		while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
+		XEvent e;
+		while (XPending(m_display) > 0)
 		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-
-			onMessage(msg.hwnd, msg.message, msg.wParam, msg.lParam);
+			XNextEvent(m_display, &e);
+			if (e.type == KeyPress) break;
 		}
 	}
-*/
+
 
 	static void outputToConsole(const char* system, const char* message) 
 	{
@@ -353,7 +341,7 @@ struct App
 			PROFILE_BLOCK("sleep");
 			Lumix::MT::sleep(Lumix::uint32(1000 / 60.0f - frame_time * 1000));
 		}
-//		handleEvents(); // TODO
+		handleEvents();
 	}
 
 	void run()
@@ -380,7 +368,8 @@ private:
 	int m_exit_code;
 	char m_startup_script_path[Lumix::MAX_PATH_LENGTH];
 	char m_pipeline_path[Lumix::MAX_PATH_LENGTH];
-	//HWND m_hwnd;
+	Display* m_display;
+	Window m_window;
 
 	static App* s_instance;
 };
