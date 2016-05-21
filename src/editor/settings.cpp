@@ -106,6 +106,7 @@ Settings::Settings(Lumix::IAllocator& allocator)
 	m_is_profiler_opened = false;
 	m_is_properties_opened = false;
 	m_is_crash_reporting_enabled = true;
+	m_force_no_crash_report = false;
 	m_mouse_sensitivity_x = m_mouse_sensitivity_y = 1000.0f;
 	m_autosave_time = 300;
 
@@ -155,7 +156,7 @@ bool Settings::load(Action** actions, int actions_count)
 	m_is_profiler_opened = getBoolean(L, "profiler_opened", false);
 	m_is_properties_opened = getBoolean(L, "properties_opened", false);
 	m_is_crash_reporting_enabled = getBoolean(L, "error_reporting_enabled", true);
-	Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
+	Lumix::enableCrashReporting(m_is_crash_reporting_enabled && !m_force_no_crash_report);
 	m_autosave_time = getInteger(L, "autosave_time", 300);
 	m_mouse_sensitivity_x = getFloat(L, "mouse_sensitivity_x", 200.0f);
 	m_mouse_sensitivity_y = getFloat(L, "mouse_sensitivity_y", 200.0f);
@@ -340,9 +341,16 @@ void Settings::onGUI(Action** actions, int actions_count)
 		if (ImGui::CollapsingHeader("General"))
 		{
 			ImGui::DragInt("Autosave time (seconds)", &m_autosave_time);
-			if (ImGui::Checkbox("Crash reporting", &m_is_crash_reporting_enabled))
+			if (m_force_no_crash_report)
 			{
-				Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
+				ImGui::Text("Crash reporting disabled from command line");
+			}
+			else
+			{
+				if (ImGui::Checkbox("Crash reporting", &m_is_crash_reporting_enabled))
+				{
+					Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
+				}
 			}
 			ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity_x, 0.1f, 500.0f);
 		}

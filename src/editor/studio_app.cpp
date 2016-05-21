@@ -988,6 +988,19 @@ public:
 
 	void loadSettings()
 	{
+		char cmd_line[2048];
+		Lumix::getCommandLine(cmd_line, Lumix::lengthOf(cmd_line));
+
+		Lumix::CommandLineParser parser(cmd_line);
+		while (parser.next())
+		{
+			if (!parser.currentEquals("-no_crash_report")) continue;
+
+			m_settings.m_force_no_crash_report = true;
+			break;
+		}
+
+
 		m_settings.load(&m_actions[0], m_actions.size());
 
 		m_asset_browser->m_is_opened = m_settings.m_is_asset_browser_opened;
