@@ -1000,7 +1000,6 @@ public:
 			break;
 		}
 
-
 		m_settings.load(&m_actions[0], m_actions.size());
 
 		m_asset_browser->m_is_opened = m_settings.m_is_asset_browser_opened;
@@ -1016,10 +1015,8 @@ public:
 		}
 		else if (m_settings.m_window.w > 0)
 		{
-			PlatformInterface::moveWindow(m_settings.m_window.x,
-				m_settings.m_window.y,
-				m_settings.m_window.w,
-				m_settings.m_window.h);
+			PlatformInterface::moveWindow(
+				m_settings.m_window.x, m_settings.m_window.y, m_settings.m_window.w, m_settings.m_window.h);
 		}
 	}
 
@@ -1585,6 +1582,7 @@ public:
 		platform_data.window_handle = PlatformInterface::getWindowHandle();
 		m_engine->setPlatformData(platform_data);
 		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine, m_allocator);
+		m_settings.m_editor = m_editor;
 		loadUserPlugins();
 
 		addActions();

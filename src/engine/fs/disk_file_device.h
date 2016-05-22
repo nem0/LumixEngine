@@ -19,6 +19,7 @@ namespace Lumix
 			IFile* createFile(IFile* child) override;
 			void destroyFile(IFile* file) override;
 			const char* getBasePath() const { return m_base_path; }
+			void setBasePath(const char* path);
 			const char* name() const override { return m_name; }
 		
 		private:

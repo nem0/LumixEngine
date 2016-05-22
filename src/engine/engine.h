@@ -53,6 +53,7 @@ public:
 	virtual void setPlatformData(const PlatformData& data) = 0;
 	virtual const PlatformData& getPlatformData() = 0;
 
+	virtual void setPatchPath(const char* path) = 0;
 	virtual FS::FileSystem& getFileSystem() = 0;
 	virtual FS::DiskFileDevice* getDiskFileDevice() = 0;
 	virtual FS::DiskFileDevice* getPatchFileDevice() = 0;

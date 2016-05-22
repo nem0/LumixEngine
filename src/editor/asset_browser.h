@@ -79,6 +79,7 @@ private:
 	FileSystemWatcher* m_watchers[2];
 	int m_current_type;
 	char m_filter[128];
+	char m_patch_base_path[Lumix::MAX_PATH_LENGTH];
 	Lumix::Path m_wanted_resource;
 	bool m_autoreload_changed_resource;
 	bool m_is_focus_requested;
