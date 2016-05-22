@@ -1,4 +1,6 @@
 #include "settings.h"
+#include "editor/world_editor.h"
+#include "engine/engine.h"
 #include "engine/fs/os_file.h"
 #include "engine/log.h"
 #include "engine/debug/debug.h"
@@ -11,7 +13,6 @@
 
 static const char DEFAULT_SETTINGS_PATH[] = "studio_default.ini";
 static const char SETTINGS_PATH[] = "studio.ini";
-static Settings* g_instance = nullptr;
 
 
 static void shortcutInput(int& shortcut)
@@ -93,8 +94,8 @@ static int getInteger(lua_State* L, const char* name, int default_value)
 Settings::Settings(Lumix::IAllocator& allocator)
 	: m_allocator(allocator)
 {
-	ASSERT(!g_instance);
-	g_instance = this;
+	m_data_dir[0] = '\0';
+	m_editor = nullptr;
 	m_filter[0] = 0;
 	m_is_maximized = true;
 	m_window.x = m_window.y = 0;
@@ -119,7 +120,6 @@ Settings::Settings(Lumix::IAllocator& allocator)
 
 Settings::~Settings()
 {
-	g_instance = nullptr;
 	lua_close(m_state);
 }
 
@@ -160,6 +160,10 @@ bool Settings::load(Action** actions, int actions_count)
 	m_autosave_time = getInteger(L, "autosave_time", 300);
 	m_mouse_sensitivity_x = getFloat(L, "mouse_sensitivity_x", 200.0f);
 	m_mouse_sensitivity_y = getFloat(L, "mouse_sensitivity_y", 200.0f);
+
+	if (lua_getglobal(L, "data_dir") == LUA_TSTRING) Lumix::copyString(m_data_dir, lua_tostring(L, -1));
+	lua_pop(L, 1);
+	m_editor->getEngine().setPatchPath(m_data_dir);
 
 	if (lua_getglobal(L, "actions") == LUA_TTABLE)
 	{
@@ -226,12 +230,6 @@ bool Settings::getValue(const char* name, bool default_value) const
 }
 
 
-Settings* Settings::getInstance()
-{
-	return g_instance;
-}
-
-
 bool Settings::save(Action** actions, int actions_count)
 {
 	Lumix::FS::OsFile file;
@@ -259,6 +257,16 @@ bool Settings::save(Action** actions, int actions_count)
 	file << "mouse_sensitivity_x = " << m_mouse_sensitivity_x << "\n";
 	file << "mouse_sensitivity_y = " << m_mouse_sensitivity_y << "\n";
 	file << "autosave_time = " << m_autosave_time << "\n";
+	
+	file << "data_dir = \"";
+	const char* c = m_data_dir;
+	while (*c)
+	{
+		if (*c == '\\') file << "\\\\";
+		else file << *c;
+		++c;
+	}
+	file << "\"\n";
 
 	file << "custom = {\n";
 	lua_getglobal(m_state, "custom");
@@ -353,6 +361,26 @@ void Settings::onGUI(Action** actions, int actions_count)
 				}
 			}
 			ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity_x, 0.1f, 500.0f);
+
+			ImGui::AlignFirstTextHeightToWidgets();
+			ImGui::Text("%s", m_data_dir[0] != '\0' ? m_data_dir : "Not set");
+			ImGui::SameLine();
+			if (m_data_dir[0] != '\0')
+			{
+				if (ImGui::Button("Clear"))
+				{
+					m_data_dir[0] = '\0';
+					m_editor->getEngine().setPatchPath(nullptr);
+				}
+				ImGui::SameLine();
+			}
+			if (ImGui::Button("Set data directory"))
+			{
+				if (PlatformInterface::getOpenDirectory(m_data_dir, sizeof(m_data_dir), nullptr))
+				{
+					m_editor->getEngine().setPatchPath(m_data_dir);
+				}
+			}
 		}
 
 		if (ImGui::CollapsingHeader("Shortcuts")) showShortcutSettings(actions, actions_count);

@@ -513,6 +513,35 @@ public:
 	}
 
 
+	void setPatchPath(const char* path) override
+	{
+		if (!path || path[0] == '\0')
+		{
+			if(m_patch_file_device)
+			{
+				m_file_system->setDefaultDevice("memory:disk");
+				m_file_system->unMount(m_patch_file_device);
+				LUMIX_DELETE(m_allocator, m_patch_file_device);
+				m_patch_file_device = nullptr;
+			}
+
+			return;
+		}
+
+		if (!m_patch_file_device)
+		{
+			m_patch_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)("patch", path, m_allocator);
+			m_file_system->mount(m_patch_file_device);
+			m_file_system->setDefaultDevice("memory:patch:disk");
+			m_file_system->setSaveGameDevice("memory:disk");
+		}
+		else
+		{
+			m_patch_file_device->setBasePath(path);
+		}
+	}
+
+
 	void setPlatformData(const PlatformData& data) override
 	{
 		m_platform_data = data;

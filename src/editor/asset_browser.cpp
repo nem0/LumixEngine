@@ -130,6 +130,13 @@ int AssetBrowser::getTypeIndexFromManagerType(Lumix::uint32 type) const
 void AssetBrowser::update()
 {
 	PROFILE_FUNCTION();
+
+	auto* patch = m_editor.getEngine().getPatchFileDevice();
+	if ((patch && !Lumix::equalStrings(patch->getBasePath(), m_patch_base_path)) ||
+		(!patch && m_patch_base_path[0] != '\0'))
+	{
+		findResources();
+	}
 	if (!m_is_update_enabled) return;
 	bool is_empty;
 	{
@@ -380,8 +387,7 @@ void AssetBrowser::onGUIResource()
 	}
 
 	char source[Lumix::MAX_PATH_LENGTH];
-	if (m_metadata.getString(
-			m_selected_resource->getPath().getHash(), SOURCE_HASH, source, Lumix::lengthOf(source)))
+	if (m_metadata.getString(m_selected_resource->getPath().getHash(), SOURCE_HASH, source, Lumix::lengthOf(source)))
 	{
 		ImGui::LabelText("Source", "%s", source);
 	}
@@ -474,5 +480,13 @@ void AssetBrowser::findResources()
 	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
 	processDir(base_path, Lumix::stringLength(base_path));
 	auto* patch_device = m_editor.getEngine().getPatchFileDevice();
-	if (patch_device) processDir(patch_device->getBasePath(), Lumix::stringLength(patch_device->getBasePath()));
+	if (patch_device)
+	{
+		processDir(patch_device->getBasePath(), Lumix::stringLength(patch_device->getBasePath()));
+		Lumix::copyString(m_patch_base_path, patch_device->getBasePath());
+	}
+	else
+	{
+		m_patch_base_path[0] = '\0';
+	}
 }

@@ -7,6 +7,7 @@
 namespace Lumix
 {
 	class IAllocator;
+	class WorldEditor;
 }
 
 
@@ -40,13 +41,13 @@ struct LUMIX_EDITOR_API Settings
 	bool m_force_no_crash_report;
 	float m_mouse_sensitivity_x;
 	float m_mouse_sensitivity_y;
+	char m_data_dir[Lumix::MAX_PATH_LENGTH];
+	Lumix::WorldEditor* m_editor;
 
 	int m_autosave_time;
 
 	explicit Settings(Lumix::IAllocator& allocator);
 	~Settings();
-
-	static Settings* getInstance();
 
 	bool save(Action** actions, int actions_count);
 	bool load(Action** actions, int actions_count);
