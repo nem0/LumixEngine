@@ -664,18 +664,17 @@ if build_app then
 				links { "SDL" }
 				
 			configuration {}
-			
-			if build_studio then
-				linkLib "crnlib"
-				linkLib "assimp"
-			end
-			
-			linkLib "bgfx"
-			linkLib "lua"
-			linkLib "recast"
 		else
-			links { "renderer", "engine" }
+			links { "renderer", "editor", "engine" }
 		end
+		if build_studio then
+			linkLib "crnlib"
+			linkLib "assimp"
+		end
+		
+		linkLib "bgfx"
+		linkLib "lua"
+		linkLib "recast"
 		
 		configuration { "asmjs" }
 			targetextension ".bc"
