@@ -208,6 +208,7 @@ function linkLib(lib)
 			for platform,target_platform in pairs({win="windows", linux="linux", }) do
 				configuration { "x" .. platform_bit, conf, target_platform }
 					libdirs {"../external/" .. lib .. "/lib/" .. platform .. platform_bit .. "_" .. ide_dir .. "/" .. conf_dir}
+					libdirs {"../external/" .. lib .. "/dll/" .. platform .. platform_bit .. "_" .. ide_dir .. "/" .. conf_dir}
 			end
 		end
 	end
@@ -648,12 +649,14 @@ if build_app then
 				forceLink("setStudioApp_renderer")
 			end
 				
-			links { "audio", "animation", "renderer", "lua_script", "navigation", "engine" }
-			
 			if build_physics then
 				links { "physics" }
+				linkPhysX()
 			end
-
+			links { "audio", "animation", "renderer", "lua_script", "navigation" }
+			if build_studio then links {"editor"} end
+			links {"engine"}
+			
 			configuration { "vs*" }
 				links { "psapi", "dxguid", "winmm" }
 
@@ -670,7 +673,6 @@ if build_app then
 			linkLib "bgfx"
 			linkLib "lua"
 			linkLib "recast"
-			linkPhysX()
 		else
 			links { "renderer", "engine" }
 		end
@@ -743,10 +745,10 @@ if build_studio then
 			forceLink("setStudioApp_physics")
 			forceLink("setStudioApp_renderer")
 
-			links { "engine", "audio", "animation", "renderer", "lua_script", "navigation" }
 			if build_physics then
 				links { "physics" }
 			end
+			links { "audio", "animation", "renderer", "lua_script", "navigation", "editor", "engine" }
 			linkLib "crnlib"
 			linkLib "assimp"
 			linkLib "bgfx"
@@ -755,12 +757,13 @@ if build_studio then
 			
 			linkPhysX()
 			
-			configuration { "windows", "not asmjs" }
+			configuration { "vs*" }
 				links { "psapi", "dxguid", "winmm" }
 			
 			configuration {}
+		else
+			links { "renderer", "editor", "engine" }
 		end
-		links { "editor" }
 
 		useLua()
 		defaultConfigurations()
