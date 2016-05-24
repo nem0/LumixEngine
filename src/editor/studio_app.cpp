@@ -1578,9 +1578,7 @@ public:
 		checkDataDirCommandLine(data_dir_path, Lumix::lengthOf(data_dir_path));
 		m_engine = Lumix::Engine::create(current_dir, data_dir_path, nullptr, m_allocator);
 		createLua();
-		Lumix::Engine::PlatformData platform_data;
-		platform_data.window_handle = PlatformInterface::getWindowHandle();
-		m_engine->setPlatformData(platform_data);
+		m_engine->setPlatformData(PlatformInterface::getPlatformData());
 		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine, m_allocator);
 		m_settings.m_editor = m_editor;
 		loadUserPlugins();

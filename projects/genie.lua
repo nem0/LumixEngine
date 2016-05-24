@@ -756,6 +756,10 @@ if build_studio then
 			
 			linkPhysX()
 			
+			configuration { "linux-*" }
+				links { "GL", "X11" }
+				linkoptions { "-Wl,-rpath '-Wl,$$ORIGIN'" }
+
 			configuration { "vs*" }
 				links { "psapi", "dxguid", "winmm" }
 			

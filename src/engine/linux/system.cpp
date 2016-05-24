@@ -53,7 +53,7 @@ namespace Lumix
 
 	void* loadLibrary(const char* path)
 	{
-		return dlopen(path, 0);
+		return dlopen(path, RTLD_LOCAL | RTLD_LAZY);
 	}
 
 
