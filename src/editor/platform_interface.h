@@ -2,6 +2,7 @@
 
 
 #include "engine/lumix.h"
+#include "engine/engine.h"
 
 
 namespace Lumix
@@ -85,6 +86,7 @@ namespace PlatformInterface
 	LUMIX_EDITOR_API int getWindowHeight();
 	LUMIX_EDITOR_API void createWindow(SystemEventHandler* handler);
 	LUMIX_EDITOR_API void* getWindowHandle();
+	LUMIX_EDITOR_API Lumix::Engine::PlatformData getPlatformData();
 	LUMIX_EDITOR_API void setSystemEventHandler(SystemEventHandler* handler);
 	LUMIX_EDITOR_API void setWindowTitle(const char* title);
 	LUMIX_EDITOR_API bool isMaximized();

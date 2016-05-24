@@ -406,6 +406,14 @@ namespace PlatformInterface
 		g_platform_data.m_handler = handler;
 	}
 
+	
+	Lumix::Engine::PlatformData getPlatformData()
+	{
+		Lumix::Engine::PlatformData ret = {};
+		ret.window_handle = g_platform_data.m_hwnd;
+		return ret;
+	}
+	
 
 	void* getWindowHandle()
 	{

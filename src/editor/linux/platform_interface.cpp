@@ -2,6 +2,8 @@
 #include "engine/iallocator.h"
 #include "engine/string.h"
 #include "imgui/imgui.h"
+#include <cstdint>
+#include <X11/Xlib.h>
 
 
 namespace PlatformInterface
@@ -11,11 +13,11 @@ namespace PlatformInterface
 	{
 		PlatformData()
 		{
-			m_is_quit_requested = false;
-			for (int i = 0; i < Lumix::lengthOf(m_key_map); ++i)
+			is_quit_requested = false;
+			for (int i = 0; i < Lumix::lengthOf(key_map); ++i)
 			{
-				m_key_map[i] = -1;
-				m_system_key_map[i] = -1;
+				key_map[i] = -1;
+				system_key_map[i] = -1;
 			}
 /*
 			m_key_map[(int)Keys::ALT] = VK_MENU;
@@ -35,18 +37,19 @@ namespace PlatformInterface
 			m_key_map[(int)Keys::ENTER] = VK_RETURN;
 			m_key_map[(int)Keys::ESCAPE] = VK_ESCAPE;
 */
-			for (int i = 0; i < Lumix::lengthOf(m_key_map); ++i)
+			for (int i = 0; i < Lumix::lengthOf(key_map); ++i)
 			{
-				if (m_key_map[i] != -1) m_system_key_map[m_key_map[i]] = i;
+				if (key_map[i] != -1) system_key_map[key_map[i]] = i;
 			}
 		}
 
-		//HWND m_hwnd;
-		bool m_is_mouse_tracked;
-		bool m_is_quit_requested;
-		SystemEventHandler* m_handler;
-		int m_key_map[512];
-		int m_system_key_map[512];
+		Window window_handle;
+		Display* display;
+		bool is_mouse_tracked;
+		bool is_quit_requested;
+		SystemEventHandler* handler;
+		int key_map[512];
+		int system_key_map[512];
 	};
 
 
@@ -97,9 +100,9 @@ namespace PlatformInterface
 
 	static int getSystemKey(int key)
 	{
-		if (g_platform_data.m_key_map[key] != -1)
+		if (g_platform_data.key_map[key] != -1)
 		{
-			return g_platform_data.m_key_map[key];
+			return g_platform_data.key_map[key];
 		}
 		else
 		{
@@ -110,9 +113,9 @@ namespace PlatformInterface
 
 	static int getKeyFromSystem(int key)
 	{
-		if (g_platform_data.m_system_key_map[key] != -1)
+		if (g_platform_data.system_key_map[key] != -1)
 		{
-			return g_platform_data.m_system_key_map[key];
+			return g_platform_data.system_key_map[key];
 		}
 		else
 		{
@@ -164,7 +167,6 @@ namespace PlatformInterface
 
 	void maximizeWindow()
 	{
-		//ShowWindow(g_platform_data.m_hwnd, SW_MAXIMIZE);
 	}
 
 
@@ -388,67 +390,50 @@ namespace PlatformInterface
 	
 	bool processSystemEvents()
 	{
-/*		bool want_quit = false;
-		MSG msg;
-		while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
+		bool want_quit = false;
+		XEvent e;
+		while (XPending(g_platform_data.display) > 0)
 		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-
-			if (msg.message == WM_QUIT)
-			{
-				want_quit = true;
-			}
+			XNextEvent(g_platform_data.display, &e);
+			if (e.type == KeyPress) want_quit = true;
 		}
-		return !want_quit;*/
-		return false;
+		return !want_quit;
 	}
 
 
 	void setSystemEventHandler(SystemEventHandler* handler)
 	{
-		g_platform_data.m_handler = handler;
+		g_platform_data.handler = handler;
 	}
 
+	
+	Lumix::Engine::PlatformData getPlatformData()
+	{
+		Lumix::Engine::PlatformData ret = {};
+		ret.window_handle = (void*)(uintptr_t)g_platform_data.window_handle;
+		ret.display = g_platform_data.display;
+		return ret;
+	}
+	
 
 	void* getWindowHandle()
 	{
-		//return g_platform_data.m_hwnd;
-		return nullptr;
+		return (void*)(uintptr_t)g_platform_data.window_handle;
 	}
 
 
 	void createWindow(SystemEventHandler* handler)
 	{
-	/*	g_platform_data.m_handler = handler;
-
-		HINSTANCE hInst = GetModuleHandle(NULL);
-		WNDCLASSEX wnd;
-		memset(&wnd, 0, sizeof(wnd));
-		wnd.cbSize = sizeof(wnd);
-		wnd.style = CS_HREDRAW | CS_VREDRAW;
-		wnd.lpfnWndProc = msgProc;
-		wnd.hInstance = hInst;
-		wnd.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-		wnd.hCursor = LoadCursor(NULL, IDC_ARROW);
-		wnd.lpszClassName = "lmxa";
-		wnd.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
-		RegisterClassExA(&wnd);
-		g_platform_data.m_hwnd = CreateWindowA(
-			"lmxa", "lmxa", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 800, 600, NULL, NULL, hInst, 0);
-		SetWindowTextA(g_platform_data.m_hwnd, "Lumix Studio");
-
-		RAWINPUTDEVICE Rid;
-		Rid.usUsagePage = 0x01;
-		Rid.usUsage = 0x02;
-		Rid.dwFlags = 0;
-		Rid.hwndTarget = 0;
-		RegisterRawInputDevices(&Rid, 1, sizeof(Rid));
-
-		timeBeginPeriod(1);
-		trackMouse();
-
-		ImGui::GetIO().ImeWindowHandle = g_platform_data.m_hwnd;*/
+		Display* display = XOpenDisplay(nullptr);
+		if (!display) return;
+		
+		int s = DefaultScreen(display);
+		Window window = XCreateSimpleWindow(display, RootWindow(display, s), 10, 10, 100, 100, 1
+			, BlackPixel(display, s), WhitePixel(display, s));
+		XSelectInput(display, window, ExposureMask | KeyPressMask);
+		XMapWindow(display, window);
+		g_platform_data.display = display;
+		g_platform_data.window_handle = window;
 	}
 
 
