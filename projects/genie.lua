@@ -445,7 +445,7 @@ solution "LumixEngine"
 		"NoRTTI", 
 		"NoEditAndContinue"
 	}
-	includedirs {"../src", "../external", "../external/sdl/include" }
+	includedirs {"../src", "../external", "../external/SDL/include" }
 	location(LOCATION)
 	language "C++"
 	startproject "studio"
