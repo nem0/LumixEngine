@@ -1021,7 +1021,7 @@ public:
 		addAction<&StudioAppImpl::save>("Save", "save", KMOD_CTRL, 'S', -1);
 		addAction<&StudioAppImpl::saveAs>("Save As",
 			"saveAs",
-			MOD_CONTROL,
+			KMOD_CTRL,
 			KMOD_SHIFT,
 			'S');
 		addAction<&StudioAppImpl::exit>("Exit", "exit", KMOD_CTRL, 'X', -1);
