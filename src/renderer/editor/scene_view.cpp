@@ -1,14 +1,14 @@
 #include "scene_view.h"
+#include "editor/gizmo.h"
+#include "editor/log_ui.h"
+#include "editor/platform_interface.h"
+#include "editor/settings.h"
 #include "engine/crc32.h"
 #include "engine/input_system.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
-#include "editor/gizmo.h"
-#include "editor/log_ui.h"
-#include "editor/platform_interface.h"
-#include "editor/settings.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "imgui/imgui.h"
@@ -16,6 +16,7 @@
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
+#include <SDL.h>
 
 
 SceneView::SceneView()
@@ -127,13 +128,13 @@ void SceneView::update()
 	if (!m_is_opened) return;
 	if (ImGui::GetIO().KeyCtrl) return;
 
-	m_camera_speed = Lumix::Math::maximum(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
-
 	int screen_x = int(ImGui::GetIO().MousePos.x);
 	int screen_y = int(ImGui::GetIO().MousePos.y);
 	bool is_inside = screen_x >= m_screen_x && screen_y >= m_screen_y && screen_x <= m_screen_x + m_width &&
 					 screen_y <= m_screen_y + m_height;
 	if (!is_inside) return;
+
+	m_camera_speed = Lumix::Math::maximum(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
 
 	float speed = m_camera_speed;
 	if (ImGui::GetIO().KeyShift) speed *= 10;
@@ -162,8 +163,8 @@ void SceneView::captureMouse(bool capture)
 {
 	if(m_is_mouse_captured == capture) return;
 	m_is_mouse_captured = capture;
-	PlatformInterface::showCursor(!m_is_mouse_captured);
-	if(!m_is_mouse_captured) PlatformInterface::unclipCursor();
+	SDL_ShowCursor(m_is_mouse_captured ? 0 : 1);
+	SDL_SetRelativeMouseMode(capture ? SDL_TRUE : SDL_FALSE);
 }
 
 
@@ -178,7 +179,7 @@ void SceneView::onGUI()
 		title = "Scene View | errors in log###Scene View";
 	}
 
-	if (ImGui::BeginDock(title))
+	if (ImGui::BeginDock(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse))
 	{
 		m_is_opened = true;
 		auto size = ImGui::GetContentRegionAvail();
@@ -209,7 +210,7 @@ void SceneView::onGUI()
 					if (ImGui::IsMouseClicked(i))
 					{
 						ImGui::ResetActiveID();
-						captureMouse(true);
+						if(i == 1) captureMouse(true);
 						m_editor->onMouseDown((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
 						break;
 					}
@@ -224,19 +225,15 @@ void SceneView::onGUI()
 					m_editor->onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)delta.x, (int)delta.y);
 				}
 			}
-			if(m_is_mouse_captured)
+			for (int i = 0; i < 3; ++i)
 			{
-				PlatformInterface::clipCursor(content_min.x, content_min.y, content_max.x, content_max.y);
-				for (int i = 0; i < 3; ++i)
+				auto rel_mp = ImGui::GetMousePos();
+				rel_mp.x -= m_screen_x;
+				rel_mp.y -= m_screen_y;
+				if (ImGui::IsMouseReleased(i))
 				{
-					auto rel_mp = ImGui::GetMousePos();
-					rel_mp.x -= m_screen_x;
-					rel_mp.y -= m_screen_y;
-					if (ImGui::IsMouseReleased(i))
-					{
-						captureMouse(false);
-						m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
-					}
+					if (i == 1) captureMouse(false);
+					m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
 				}
 			}
 			m_pipeline->render();

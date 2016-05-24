@@ -39,6 +39,7 @@
 #include "shader_compiler.h"
 #include "terrain_editor.h"
 #include <cmath>
+#include <SDL.h>
 
 
 using namespace Lumix;
@@ -482,8 +483,8 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		if (m_is_mouse_captured && !mouse_down)
 		{
 			m_is_mouse_captured = false;
-			PlatformInterface::showCursor(true);
-			PlatformInterface::unclipCursor();
+			SDL_ShowCursor(1);
+			SDL_SetRelativeMouseMode(SDL_FALSE);
 		}
 		
 		if (ImGui::IsItemHovered() && mouse_down)
@@ -494,10 +495,10 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 			if (!m_is_mouse_captured)
 			{
 				m_is_mouse_captured = true;
-				PlatformInterface::showCursor(false);
+				SDL_ShowCursor(0);
 			}
 
-			PlatformInterface::clipCursor(content_min.x, content_min.y, content_max.x, content_max.y);
+			SDL_SetRelativeMouseMode(SDL_TRUE);
 
 			if (delta.x != 0 || delta.y != 0)
 			{
@@ -1163,6 +1164,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 
 	explicit GameViewPlugin(StudioApp& app)
 		: m_app(app)
+		, m_game_view(app)
 	{
 		m_width = m_height = -1;
 		auto& editor = *app.getWorldEditor();
@@ -1178,8 +1180,8 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		m_gui_pipeline = Pipeline::create(*renderer, path, m_engine->getAllocator());
 		m_gui_pipeline->load();
 
-		int w = PlatformInterface::getWindowWidth();
-		int h = PlatformInterface::getWindowHeight();
+		int w, h;
+		SDL_GetWindowSize(m_app.getWindow(), &w, &h);
 		m_gui_pipeline->setViewport(0, 0, w, h);
 		renderer->resize(w, h);
 		onUniverseCreated();
@@ -1237,8 +1239,8 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		if (!m_material || !m_material->isReady()) return;
 		if (!m_material->getTexture(0)) return;
 
-		int w = PlatformInterface::getWindowWidth();
-		int h = PlatformInterface::getWindowHeight();
+		int w, h;
+		SDL_GetWindowSize(m_app.getWindow(), &w, &h);
 		if (w != m_width || h != m_height)
 		{
 			m_width = w;

@@ -16,6 +16,9 @@
 #endif
 
 
+struct SDL_Window;
+
+
 namespace Lumix
 {
 class WorldEditor;
@@ -63,6 +66,7 @@ public:
 	virtual int getExitCode() const = 0;
 	virtual void runScript(const char* src, const char* script_name) = 0;
 	virtual Lumix::Array<Action*>& getActions() = 0;
+	virtual SDL_Window* getWindow() = 0;
 
 	virtual ~StudioApp() {}
 	virtual void run() = 0;

@@ -247,6 +247,7 @@ namespace Lumix
 		virtual void reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line);
 	};
 
+
 	IScene* PhysicsSystemImpl::createScene(Universe& ctx)
 	{
 		return PhysicsScene::create(*this, ctx, m_engine, m_allocator);
@@ -312,23 +313,20 @@ namespace Lumix
 
 	bool PhysicsSystemImpl::connect2VisualDebugger()
 	{
-		if (m_physics->getPvdConnectionManager() == nullptr)
-			return false;
+		if (m_physics->getPvdConnectionManager() == nullptr) return false;
 
 		const char* pvd_host_ip = "127.0.0.1";
 		int port = 5425;
 		unsigned int timeout = 100;
 		physx::PxVisualDebuggerConnectionFlags connectionFlags = physx::PxVisualDebuggerExt::getAllConnectionFlags();
 
-		auto* theConnection = physx::PxVisualDebuggerExt::createConnection(m_physics->getPvdConnectionManager(), pvd_host_ip, port, timeout, connectionFlags);
+		auto* theConnection = physx::PxVisualDebuggerExt::createConnection(
+			m_physics->getPvdConnectionManager(), pvd_host_ip, port, timeout, connectionFlags);
 		return theConnection != nullptr;
 	}
 
 
-	void CustomErrorCallback::reportError(physx::PxErrorCode::Enum,
-		const char* message,
-		const char*,
-		int)
+	void CustomErrorCallback::reportError(physx::PxErrorCode::Enum, const char* message, const char*, int)
 	{
 		g_log_error.log("Physics") << message;
 	}

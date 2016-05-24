@@ -6,6 +6,7 @@
 
 
 struct PlatformData;
+class StudioApp;
 
 
 namespace Lumix
@@ -19,7 +20,7 @@ namespace Lumix
 class GameView
 {
 public:
-	GameView();
+	GameView(StudioApp& app);
 	~GameView();
 
 	void init(Lumix::WorldEditor& editor);
@@ -27,12 +28,12 @@ public:
 	void onGui();
 	void setScene(Lumix::RenderScene* scene);
 	bool isMouseCaptured() const { return m_is_mouse_captured; }
+	void captureMouse(bool capture);
 
 public:
 	bool m_is_opened;
 
 private:
-	void captureMouse(bool capture);
 	void onUniverseCreated();
 	void onUniverseDestroyed();
 
@@ -44,4 +45,5 @@ private:
 	bool m_is_mouse_hovering_window;
 	float m_time_multiplier;
 	bool m_paused;
+	StudioApp& m_studio_app;
 };

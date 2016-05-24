@@ -445,7 +445,7 @@ solution "LumixEngine"
 		"NoRTTI", 
 		"NoEditAndContinue"
 	}
-	includedirs {"../src", "../external"}
+	includedirs {"../src", "../external", "../external/sdl/include" }
 	location(LOCATION)
 	language "C++"
 	startproject "studio"
@@ -660,9 +660,6 @@ if build_app then
 			configuration { "vs*" }
 				links { "psapi", "dxguid", "winmm" }
 
-			configuration { "asmjs" }
-				links { "SDL" }
-				
 			configuration {}
 		else
 			links { "renderer", "editor", "engine" }
@@ -692,6 +689,11 @@ if build_app then
 		
 		configuration {}
 		
+		linkLib "SDL"
+		configuration {"vs*"}
+			links { "winmm", "imm32", "version" }
+		configuration {}
+
 		useLua()
 		defaultConfigurations()
 		strip()
@@ -768,6 +770,12 @@ if build_studio then
 			links { "renderer", "editor", "engine" }
 		end
 
+		linkLib "SDL"
+
+		configuration {"vs*"}
+			links { "winmm", "imm32", "version" }
+		configuration {}
+		
 		useLua()
 		defaultConfigurations()
 		

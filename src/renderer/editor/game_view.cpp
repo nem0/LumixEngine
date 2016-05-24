@@ -1,5 +1,5 @@
 #include "game_view.h"
-#include "editor/platform_interface.h"
+#include "editor/studio_app.h"
 #include "engine/crc32.h"
 #include "engine/input_system.h"
 #include "engine/profiler.h"
@@ -12,10 +12,12 @@
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
+#include <SDL.h>
 
 
-GameView::GameView()
-	: m_is_opened(true)
+GameView::GameView(StudioApp& app)
+	: m_studio_app(app)
+	, m_is_opened(true)
 	, m_pipeline(nullptr)
 	, m_is_mouse_captured(false)
 	, m_editor(nullptr)
@@ -78,8 +80,8 @@ void GameView::captureMouse(bool capture)
 {
 	m_is_mouse_captured = capture;
 	m_editor->getEngine().getInputSystem().enable(m_is_mouse_captured);
-	PlatformInterface::showCursor(!m_is_mouse_captured);
-	if (!m_is_mouse_captured) PlatformInterface::unclipCursor();
+	SDL_ShowCursor(m_is_mouse_captured ? 0 : 1);
+	SDL_SetRelativeMouseMode(capture ? SDL_TRUE : SDL_FALSE);
 }
 
 
@@ -90,9 +92,9 @@ void GameView::onGui()
 
 	auto& io = ImGui::GetIO();
 
-	bool is_foreground_win = PlatformInterface::isWindowActive();
-	if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] ||
-								   !m_editor->isGameMode() || !is_foreground_win))
+	bool is_focus = (SDL_GetWindowFlags(m_studio_app.getWindow()) & SDL_WINDOW_INPUT_FOCUS) != 0;
+	if (m_is_mouse_captured &&
+		(io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor->isGameMode() || !is_focus))
 	{
 		captureMouse(false);
 	}
@@ -138,9 +140,6 @@ void GameView::onGui()
 
 		if (m_is_mouse_captured)
 		{
-			PlatformInterface::clipCursor(
-				content_min.x, content_min.y, content_max.x, content_max.y);
-
 			if (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor->isGameMode())
 			{
 				captureMouse(false);

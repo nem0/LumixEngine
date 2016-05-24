@@ -34,6 +34,8 @@
 #include "settings.h"
 #include "studio_app.h"
 #include "utils.h"
+#include <SDL.h>
+#include <SDL_syswm.h>
 
 
 class StudioAppImpl* g_app;
@@ -97,18 +99,13 @@ public:
 		PROFILE_FUNCTION();
 
 		ImGuiIO& io = ImGui::GetIO();
-		io.DisplaySize = ImVec2((float)PlatformInterface::getWindowWidth(),
-			(float)PlatformInterface::getWindowHeight());
+		int w, h;
+		SDL_GetWindowSize(m_window, &w, &h);
+		io.DisplaySize = ImVec2((float)w, (float)h);
 		io.DeltaTime = m_engine->getLastTimeDelta();
-		io.KeyCtrl = PlatformInterface::isPressed((int)PlatformInterface::Keys::CONTROL);
-		io.KeyShift = PlatformInterface::isPressed((int)PlatformInterface::Keys::SHIFT);
-		io.KeyAlt = PlatformInterface::isPressed((int)PlatformInterface::Keys::ALT);
-		io.KeysDown[(int)PlatformInterface::Keys::ALT] = io.KeyAlt;
-		io.KeysDown[(int)PlatformInterface::Keys::SHIFT] = io.KeyShift;
-		io.KeysDown[(int)PlatformInterface::Keys::CONTROL] = io.KeyCtrl;
-
-		PlatformInterface::setCursor(io.MouseDrawCursor ? PlatformInterface::Cursor::NONE
-			: PlatformInterface::Cursor::DEFAULT);
+		io.KeyShift = ((SDL_GetModState() & KMOD_SHIFT) != 0);
+		io.KeyCtrl = ((SDL_GetModState() & KMOD_CTRL) != 0);
+		io.KeyAlt = ((SDL_GetModState() & KMOD_ALT) != 0);
 
 		ImGui::NewFrame();
 	}
@@ -174,8 +171,9 @@ public:
 	{
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
 								 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
-		ImVec2 size((float)PlatformInterface::getWindowWidth(),
-			(float)PlatformInterface::getWindowHeight());
+		int w, h;
+		SDL_GetWindowSize(m_window, &w, &h);
+		ImVec2 size((float)w, (float)h);
 		if (ImGui::Begin("Welcome", nullptr, size, -1, flags))
 		{
 			ImGui::Text("Welcome to Lumix Studio");
@@ -212,14 +210,12 @@ public:
 			{
 				if (ImGui::Button("Wiki"))
 				{
-					PlatformInterface::shellExecuteOpen(
-						"https://github.com/nem0/LumixEngine/wiki");
+					PlatformInterface::shellExecuteOpen("https://github.com/nem0/LumixEngine/wiki");
 				}
 
 				if (ImGui::Button("Download new version"))
 				{
-					PlatformInterface::shellExecuteOpen(
-						"https://github.com/nem0/lumixengine_data/archive/master.zip");
+					PlatformInterface::shellExecuteOpen("https://github.com/nem0/lumixengine_data/archive/master.zip");
 				}
 
 				if (ImGui::Button("Show major releases"))
@@ -313,7 +309,7 @@ public:
 		char tmp[100];
 		Lumix::copyString(tmp, "Lumix Studio - ");
 		Lumix::catString(tmp, title);
-		PlatformInterface::setWindowTitle(tmp);
+		SDL_SetWindowTitle(m_window, tmp);
 	}
 
 
@@ -322,8 +318,7 @@ public:
 		buf[0] = 0;
 		for (int i = 0; i < Lumix::lengthOf(action.shortcut); ++i)
 		{
-			char str[30];
-			PlatformInterface::getKeyName(action.shortcut[i], str, Lumix::lengthOf(str));
+			const char* str = SDL_GetKeyName(action.shortcut[i]);
 			if (str[0] == 0) return;
 			if (i > 0) Lumix::catString(buf, max_size, " - ");
 			Lumix::catString(buf, max_size, str);
@@ -358,14 +353,12 @@ public:
 		else
 		{
 			char filename[Lumix::MAX_PATH_LENGTH];
-			if (PlatformInterface::getSaveFilename(
-				filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
+			if (PlatformInterface::getSaveFilename(filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
 			{
 				m_editor->saveUniverse(Lumix::Path(filename), true);
 				setTitle(filename);
 			}
 		}
-
 	}
 
 
@@ -386,7 +379,8 @@ public:
 	}
 
 
-	void exit() {
+	void exit()
+	{
 		if (m_editor->isUniverseChanged())
 		{
 			m_confirm_exit = true;
@@ -480,8 +474,7 @@ public:
 	void saveUndoStack()
 	{
 		char filename[Lumix::MAX_PATH_LENGTH];
-		if (PlatformInterface::getSaveFilename(
-				filename, Lumix::lengthOf(filename), "JSON files\0*.json\0", "json"))
+		if (PlatformInterface::getSaveFilename(filename, Lumix::lengthOf(filename), "JSON files\0*.json\0", "json"))
 		{
 			m_editor->saveUndoStack(Lumix::Path(filename));
 		}
@@ -729,7 +722,7 @@ public:
 			if (m_engine->getFileSystem().hasWork()) stats << "Loading... | ";
 			stats << "FPS: ";
 			stats << m_engine->getFPS();
-			if (!PlatformInterface::isWindowActive()) stats << " - inactive window";
+			if ((SDL_GetWindowFlags(m_window) & SDL_WINDOW_INPUT_FOCUS) == 0) stats << " - inactive window";
 			auto stats_size = ImGui::CalcTextSize(stats);
 			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
 			ImGui::Text("%s", (const char*)stats);
@@ -955,7 +948,8 @@ public:
 		m_engine = nullptr;
 		m_editor = nullptr;
 
-		PlatformInterface::shutdown();
+		SDL_DestroyWindow(m_window);
+		SDL_Quit();
 	}
 
 
@@ -964,25 +958,25 @@ public:
 		ImGuiIO& io = ImGui::GetIO();
 		io.Fonts->AddFontFromFileTTF("bin/VeraMono.ttf", 13);
 
-		io.KeyMap[ImGuiKey_Tab] = (int)PlatformInterface::Keys::TAB;
-		io.KeyMap[ImGuiKey_LeftArrow] = (int)PlatformInterface::Keys::LEFT;
-		io.KeyMap[ImGuiKey_RightArrow] = (int)PlatformInterface::Keys::RIGHT;
-		io.KeyMap[ImGuiKey_UpArrow] = (int)PlatformInterface::Keys::UP;
-		io.KeyMap[ImGuiKey_DownArrow] = (int)PlatformInterface::Keys::DOWN;
-		io.KeyMap[ImGuiKey_PageUp] = (int)PlatformInterface::Keys::PAGE_UP;
-		io.KeyMap[ImGuiKey_PageDown] = (int)PlatformInterface::Keys::PAGE_DOWN;
-		io.KeyMap[ImGuiKey_Home] = (int)PlatformInterface::Keys::HOME;
-		io.KeyMap[ImGuiKey_End] = (int)PlatformInterface::Keys::END;
-		io.KeyMap[ImGuiKey_Delete] = (int)PlatformInterface::Keys::DEL;
-		io.KeyMap[ImGuiKey_Backspace] = (int)PlatformInterface::Keys::BACKSPACE;
-		io.KeyMap[ImGuiKey_Enter] = (int)PlatformInterface::Keys::ENTER;
-		io.KeyMap[ImGuiKey_Escape] = (int)PlatformInterface::Keys::ESCAPE;
-		io.KeyMap[ImGuiKey_A] = 'A';
-		io.KeyMap[ImGuiKey_C] = 'C';
-		io.KeyMap[ImGuiKey_V] = 'V';
-		io.KeyMap[ImGuiKey_X] = 'X';
-		io.KeyMap[ImGuiKey_Y] = 'Y';
-		io.KeyMap[ImGuiKey_Z] = 'Z';
+		io.KeyMap[ImGuiKey_Tab] = SDLK_TAB;
+		io.KeyMap[ImGuiKey_LeftArrow] = SDL_SCANCODE_LEFT;
+		io.KeyMap[ImGuiKey_RightArrow] = SDL_SCANCODE_RIGHT;
+		io.KeyMap[ImGuiKey_UpArrow] = SDL_SCANCODE_UP;
+		io.KeyMap[ImGuiKey_DownArrow] = SDL_SCANCODE_DOWN;
+		io.KeyMap[ImGuiKey_PageUp] = SDL_SCANCODE_PAGEUP;
+		io.KeyMap[ImGuiKey_PageDown] = SDL_SCANCODE_PAGEDOWN;
+		io.KeyMap[ImGuiKey_Home] = SDL_SCANCODE_HOME;
+		io.KeyMap[ImGuiKey_End] = SDL_SCANCODE_END;
+		io.KeyMap[ImGuiKey_Delete] = SDLK_DELETE;
+		io.KeyMap[ImGuiKey_Backspace] = SDLK_BACKSPACE;
+		io.KeyMap[ImGuiKey_Enter] = SDLK_RETURN;
+		io.KeyMap[ImGuiKey_Escape] = SDLK_ESCAPE;
+		io.KeyMap[ImGuiKey_A] = SDLK_a;
+		io.KeyMap[ImGuiKey_C] = SDLK_c;
+		io.KeyMap[ImGuiKey_V] = SDLK_v;
+		io.KeyMap[ImGuiKey_X] = SDLK_x;
+		io.KeyMap[ImGuiKey_Y] = SDLK_y;
+		io.KeyMap[ImGuiKey_Z] = SDLK_z;
 	}
 
 
@@ -1011,12 +1005,12 @@ public:
 
 		if (m_settings.m_is_maximized)
 		{
-			PlatformInterface::maximizeWindow();
+			SDL_MaximizeWindow(m_window);
 		}
 		else if (m_settings.m_window.w > 0)
 		{
-			PlatformInterface::moveWindow(
-				m_settings.m_window.x, m_settings.m_window.y, m_settings.m_window.w, m_settings.m_window.h);
+			SDL_SetWindowPosition(m_window, m_settings.m_window.x, m_settings.m_window.y);
+			SDL_SetWindowSize(m_window, m_settings.m_window.w, m_settings.m_window.h);
 		}
 	}
 
@@ -1024,23 +1018,22 @@ public:
 	void addActions()
 	{
 		addAction<&StudioAppImpl::newUniverse>("New", "newUniverse");
-		addAction<&StudioAppImpl::save>("Save", "save", (int)PlatformInterface::Keys::CONTROL, 'S', -1);
+		addAction<&StudioAppImpl::save>("Save", "save", KMOD_CTRL, 'S', -1);
 		addAction<&StudioAppImpl::saveAs>("Save As",
 			"saveAs",
-			(int)PlatformInterface::Keys::CONTROL,
-			(int)PlatformInterface::Keys::SHIFT,
+			MOD_CONTROL,
+			KMOD_SHIFT,
 			'S');
-		addAction<&StudioAppImpl::exit>("Exit", "exit", (int)PlatformInterface::Keys::CONTROL, 'X', -1);
+		addAction<&StudioAppImpl::exit>("Exit", "exit", KMOD_CTRL, 'X', -1);
 
 		addAction<&StudioAppImpl::redo>("Redo",
 			"redo",
-			(int)PlatformInterface::Keys::CONTROL,
-			(int)PlatformInterface::Keys::SHIFT,
+			KMOD_CTRL,
+			KMOD_SHIFT,
 			'Z');
-		addAction<&StudioAppImpl::undo>("Undo", "undo", (int)PlatformInterface::Keys::CONTROL, 'Z', -1);
-		addAction<&StudioAppImpl::copy>("Copy", "copy", (int)PlatformInterface::Keys::CONTROL, 'C', -1);
-		addAction<&StudioAppImpl::paste>(
-			"Paste", "paste", (int)PlatformInterface::Keys::CONTROL, 'V', -1);
+		addAction<&StudioAppImpl::undo>("Undo", "undo", KMOD_CTRL, 'Z', -1);
+		addAction<&StudioAppImpl::copy>("Copy", "copy", KMOD_CTRL, 'C', -1);
+		addAction<&StudioAppImpl::paste>("Paste", "paste", KMOD_CTRL, 'V', -1);
 		addAction<&StudioAppImpl::toggleOrbitCamera>("Orbit camera", "orbitCamera");
 		addAction<&StudioAppImpl::toggleGizmoMode>("Translate/Rotate", "toggleGizmoMode");
 		addAction<&StudioAppImpl::setTopView>("Top", "viewTop");
@@ -1050,8 +1043,7 @@ public:
 		addAction<&StudioAppImpl::toggleCoordSystem>("Local/Global", "toggleCoordSystem");
 
 		addAction<&StudioAppImpl::createEntity>("Create", "createEntity");
-		addAction<&StudioAppImpl::destroyEntity>(
-			"Destroy", "destroyEntity", (int)PlatformInterface::Keys::DEL, -1, -1);
+		addAction<&StudioAppImpl::destroyEntity>("Destroy", "destroyEntity", SDLK_DELETE, -1, -1);
 		addAction<&StudioAppImpl::showEntities>("Show", "showEntities");
 		addAction<&StudioAppImpl::hideEntities>("Hide", "hideEntities");
 
@@ -1282,16 +1274,16 @@ public:
 	{
 		auto* iter = PlatformInterface::createFileIterator(dir_path, m_allocator);
 		PlatformInterface::FileInfo info;
-		while(PlatformInterface::getNextFile(iter, &info))
+		while (PlatformInterface::getNextFile(iter, &info))
 		{
 			char normalized_path[Lumix::MAX_PATH_LENGTH];
 			Lumix::PathUtils::normalize(info.filename, normalized_path, Lumix::lengthOf(normalized_path));
-			if(info.is_directory)
+			if (info.is_directory)
 			{
-				if(!includeDirInPack(normalized_path)) continue;
+				if (!includeDirInPack(normalized_path)) continue;
 
-				char dir[Lumix::MAX_PATH_LENGTH] = { 0 };
-				if(dir_path[0] != '.') Lumix::copyString(dir, dir_path);
+				char dir[Lumix::MAX_PATH_LENGTH] = {0};
+				if (dir_path[0] != '.') Lumix::copyString(dir, dir_path);
 				Lumix::catString(dir, info.filename);
 				Lumix::catString(dir, "/");
 				packDataScan(dir, infos, paths);
@@ -1410,6 +1402,83 @@ public:
 	}
 
 
+	bool processSystemEvents()
+	{
+		bool want_quit = false;
+		SDL_Event event;
+		auto& io = ImGui::GetIO();
+		while (SDL_PollEvent(&event))
+		{
+			switch (event.type)
+			{
+				case SDL_WINDOWEVENT:
+					switch (event.window.event)
+					{
+						case SDL_WINDOWEVENT_MOVED:
+						case SDL_WINDOWEVENT_SIZE_CHANGED:
+						{
+							int x, y, w, h;
+							SDL_GetWindowSize(m_window, &w, &h);
+							SDL_GetWindowPosition(m_window, &x, &y);
+							onWindowTransformed(x, y, w, h);
+						}
+						break;
+					}
+					break;
+				case SDL_QUIT: exit(); break;
+				case SDL_MOUSEBUTTONDOWN:
+					m_editor->setAdditiveSelection(io.KeyCtrl);
+					m_editor->setSnapMode(io.KeyShift);
+					switch (event.button.button)
+					{
+						case SDL_BUTTON_LEFT: io.MouseDown[0] = true; break;
+						case SDL_BUTTON_RIGHT: io.MouseDown[1] = true; break;
+						case SDL_BUTTON_MIDDLE: io.MouseDown[2] = true; break;
+					}
+					break;
+				case SDL_MOUSEBUTTONUP:
+					switch (event.button.button)
+					{
+						case SDL_BUTTON_LEFT: io.MouseDown[0] = false; break;
+						case SDL_BUTTON_RIGHT: io.MouseDown[1] = false; break;
+						case SDL_BUTTON_MIDDLE: io.MouseDown[2] = false; break;
+					}
+					break;
+				case SDL_MOUSEMOTION:
+				{
+					auto& input_system = m_editor->getEngine().getInputSystem();
+					input_system.injectMouseXMove(float(event.motion.xrel));
+					input_system.injectMouseYMove(float(event.motion.yrel));
+					if (SDL_GetRelativeMouseMode() == SDL_FALSE)
+					{
+						io.MousePos.x = (float)event.motion.x;
+						io.MousePos.y = (float)event.motion.y;
+					}
+				}
+				break;
+				case SDL_TEXTINPUT: io.AddInputCharactersUTF8(event.text.text); break;
+				case SDL_KEYDOWN:
+				case SDL_KEYUP:
+				{
+					int key = event.key.keysym.sym & ~SDLK_SCANCODE_MASK;
+					io.KeysDown[key] = (event.type == SDL_KEYDOWN);
+					io.KeyShift = ((SDL_GetModState() & KMOD_SHIFT) != 0);
+					io.KeyCtrl = ((SDL_GetModState() & KMOD_CTRL) != 0);
+					io.KeyAlt = ((SDL_GetModState() & KMOD_ALT) != 0);
+					checkShortcuts();
+				}
+				break;
+				case SDL_MOUSEWHEEL:
+				{
+					io.MouseWheel = float(event.wheel.x != 0 ? event.wheel.x : event.wheel.y);
+					break;
+				}
+			}
+		}
+		return !want_quit;
+	}
+
+
 	void run() override
 	{
 		checkScriptCommandLine();
@@ -1423,24 +1492,12 @@ public:
 				float frame_time;
 				{
 					PROFILE_BLOCK("tick");
-					if (PlatformInterface::isQuitRequested())
-					{
-						PlatformInterface::clearQuitRequest();
-						if (m_editor->isUniverseChanged())
-						{
-							m_confirm_exit = true;
-						}
-						else
-						{
-							m_finished = true;
-						}
-					}
-					m_finished = m_finished || !PlatformInterface::processSystemEvents();
+					m_finished = m_finished || !processSystemEvents();
 					if (!m_finished) update();
 					frame_time = timer->tick();
 				}
 
-				float wanted_fps = PlatformInterface::isWindowActive() ? 60.0f : 5.0f;
+				float wanted_fps = (SDL_GetWindowFlags(m_window) & SDL_WINDOW_INPUT_FOCUS) != 0 ? 60.0f : 5.0f;
 				if (frame_time < 1 / wanted_fps)
 				{
 					PROFILE_BLOCK("sleep");
@@ -1470,107 +1527,14 @@ public:
 	}
 
 
-	struct SystemEventHandler : public PlatformInterface::SystemEventHandler
-	{
-		void onWindowTransformed(int x, int y, int w, int h) override
-		{
-			m_app->onWindowTransformed(x, y, w, h);
-		}
-
-
-		void onMouseLeftWindow() override { m_app->clearInputs(); }
-
-
-		void onMouseMove(int x, int y, int rel_x, int rel_y) override
-		{
-			m_mouse_x = x;
-			m_mouse_y = y;
-			auto& input_system = m_app->m_editor->getEngine().getInputSystem();
-			input_system.injectMouseXMove(float(rel_x));
-			input_system.injectMouseYMove(float(rel_y));
-
-			ImGuiIO& io = ImGui::GetIO();
-			io.MousePos.x = (float)x;
-			io.MousePos.y = (float)y;
-		}
-
-
-		void onMouseWheel(int amount) override
-		{
-			ImGui::GetIO().MouseWheel = amount / 600.0f;
-		}
-
-
-		void onMouseButtonDown(MouseButton button) override
-		{
-			switch (button)
-			{
-				case PlatformInterface::SystemEventHandler::MouseButton::LEFT:
-					m_app->m_editor->setAdditiveSelection(ImGui::GetIO().KeyCtrl);
-					m_app->m_editor->setSnapMode(ImGui::GetIO().KeyShift);
-					ImGui::GetIO().MouseDown[0] = true;
-					break;
-				case PlatformInterface::SystemEventHandler::MouseButton::RIGHT:
-					ImGui::GetIO().MouseDown[1] = true;
-					break;
-				case PlatformInterface::SystemEventHandler::MouseButton::MIDDLE:
-					ImGui::GetIO().MouseDown[2] = true;
-					break;
-			}
-		}
-
-
-		void onMouseButtonUp(MouseButton button) override
-		{
-			switch (button)
-			{
-				case PlatformInterface::SystemEventHandler::MouseButton::LEFT:
-					ImGui::GetIO().MouseDown[0] = false;
-					break;
-				case PlatformInterface::SystemEventHandler::MouseButton::RIGHT:
-					ImGui::GetIO().MouseDown[1] = false;
-					break;
-				case PlatformInterface::SystemEventHandler::MouseButton::MIDDLE:
-					ImGui::GetIO().MouseDown[2] = false;
-					break;
-			}
-		}
-
-
-		void onKeyDown(int key) override
-		{
-			ImGui::GetIO().KeysDown[key] = true;
-			m_app->checkShortcuts();
-		}
-
-
-		void onKeyUp(int key) override
-		{
-			ImGui::GetIO().KeysDown[key] = false;
-		}
-
-
-		void onChar(int key) override
-		{
-			ImGui::GetIO().AddInputCharacter(key);
-		}
-
-
-		int m_mouse_x;
-		int m_mouse_y;
-		StudioAppImpl* m_app;
-	};
-
-
-	SystemEventHandler m_handler;
-
-
 	void init()
 	{
-		checkWorkingDirector();
-		m_handler.m_app = this;
-		PlatformInterface::createWindow(nullptr);
+		SDL_SetMainReady();
+		SDL_Init(SDL_INIT_VIDEO);
 
+		checkWorkingDirector();
+		m_window = SDL_CreateWindow("test", 0, 0, 800, 600, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+		
 		char current_dir[Lumix::MAX_PATH_LENGTH];
 		PlatformInterface::getCurrentDirectory(current_dir, Lumix::lengthOf(current_dir));
 
@@ -1578,7 +1542,17 @@ public:
 		checkDataDirCommandLine(data_dir_path, Lumix::lengthOf(data_dir_path));
 		m_engine = Lumix::Engine::create(current_dir, data_dir_path, nullptr, m_allocator);
 		createLua();
-		m_engine->setPlatformData(PlatformInterface::getPlatformData());
+
+		SDL_SysWMinfo window_info;
+		SDL_VERSION(&window_info.version);
+		SDL_GetWindowWMInfo(m_window, &window_info);
+		Lumix::Engine::PlatformData platform_data = {};
+		#ifdef _WIN32
+			platform_data.window_handle = window_info.info.win.window;
+			ImGui::GetIO().ImeWindowHandle = window_info.info.win.window;
+		#endif
+		m_engine->setPlatformData(platform_data);
+
 		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine, m_allocator);
 		m_settings.m_editor = m_editor;
 		loadUserPlugins();
@@ -1593,8 +1567,6 @@ public:
 
 		initIMGUI();
 
-		PlatformInterface::setSystemEventHandler(&m_handler);
-
 		if (!m_metadata.load()) Lumix::g_log_info.log("Editor") << "Could not load metadata";
 
 		setStudioApp();
@@ -1603,16 +1575,13 @@ public:
 	}
 
 
-
 	void checkShortcuts()
 	{
 		if (ImGui::IsAnyItemActive()) return;
 
-		auto& io = ImGui::GetIO();
-		bool* keysDown = io.KeysDown;
-		Lumix::uint8 pressed_modifiers = io.KeyCtrl ? 1 : 0;
-		pressed_modifiers |= io.KeyAlt ? 2 : 0;
-		pressed_modifiers |= io.KeyShift ? 4 : 0;
+		int key_count;
+		auto* state = SDL_GetKeyboardState(&key_count);
+		Lumix::uint32 pressed_modifiers = SDL_GetModState() & (KMOD_CTRL | KMOD_ALT | KMOD_SHIFT);
 		for (auto* a : m_actions)
 		{
 			if (!a->is_global || a->shortcut[0] == -1) continue;
@@ -1620,18 +1589,23 @@ public:
 			Lumix::uint8 action_modifiers = 0;
 			for (int i = 0; i < Lumix::lengthOf(a->shortcut) + 1; ++i)
 			{
-				if ((a->shortcut[i] == -1 || i == Lumix::lengthOf(a->shortcut)) &&
+				if ((i == Lumix::lengthOf(a->shortcut) || a->shortcut[i] == -1) &&
 					action_modifiers == pressed_modifiers)
 				{
 					a->func.invoke();
 					return;
 				}
 
+				if (i == Lumix::lengthOf(a->shortcut)) break;
 				if (a->shortcut[i] == -1) break;
-				if (!keysDown[a->shortcut[i]]) break;
-				if (a->shortcut[i] == (int)PlatformInterface::Keys::CONTROL) action_modifiers |= 1;
-				else if (a->shortcut[i] == (int)PlatformInterface::Keys::ALT) action_modifiers |= 2;
-				else if (a->shortcut[i] == (int)PlatformInterface::Keys::SHIFT) action_modifiers |= 4;
+				if (a->shortcut[i] >= key_count) break;
+				if (!state[a->shortcut[i]]) break;
+				if (a->shortcut[i] == SDL_SCANCODE_LCTRL) action_modifiers |= KMOD_LCTRL;
+				else if (a->shortcut[i] == SDL_SCANCODE_LALT) action_modifiers |= KMOD_LALT;
+				else if (a->shortcut[i] == SDL_SCANCODE_LSHIFT) action_modifiers |= KMOD_LSHIFT;
+				else if (a->shortcut[i] == SDL_SCANCODE_RCTRL) action_modifiers |= KMOD_RCTRL;
+				else if (a->shortcut[i] == SDL_SCANCODE_RALT) action_modifiers |= KMOD_RALT;
+				else if (a->shortcut[i] == SDL_SCANCODE_RSHIFT) action_modifiers |= KMOD_RSHIFT;
 			}
 		}
 	}
@@ -1645,7 +1619,7 @@ public:
 		m_settings.m_window.y = y;
 		m_settings.m_window.w = width;
 		m_settings.m_window.h = height;
-		m_settings.m_is_maximized = PlatformInterface::isMaximized();
+		m_settings.m_is_maximized = (SDL_GetWindowFlags(m_window) & SDL_WINDOW_MAXIMIZED) != 0;
 	}
 
 
@@ -1660,6 +1634,12 @@ public:
 	}
 	
 
+	SDL_Window* getWindow() override
+	{
+		return m_window;
+	}
+
+
 	Lumix::WorldEditor* getWorldEditor() override
 	{
 		return m_editor;
@@ -1668,6 +1648,7 @@ public:
 
 	Lumix::DefaultAllocator m_allocator;
 	Lumix::Engine* m_engine;
+	SDL_Window* m_window;
 
 	float m_time_to_autosave;
 	Lumix::Array<Action*> m_actions;
