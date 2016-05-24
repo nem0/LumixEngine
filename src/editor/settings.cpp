@@ -9,6 +9,7 @@
 #include "utils.h"
 #include <cstdio>
 #include <lua.hpp>
+#include <SDL.h>
 
 
 static const char DEFAULT_SETTINGS_PATH[] = "studio_default.ini";
@@ -20,20 +21,19 @@ static void shortcutInput(int& shortcut)
 	Lumix::StaticString<50> popup_name("");
 	popup_name << (Lumix::int64)&shortcut;
 
-	char key_string[30];
-	PlatformInterface::getKeyName(shortcut, key_string, 30);
-
-	Lumix::StaticString<50> button_label(key_string);
+	Lumix::StaticString<50> button_label(SDL_GetKeyName(SDL_GetKeyFromScancode((SDL_Scancode)shortcut)));
 	button_label << "###" << (Lumix::int64)&shortcut;
 
 	if (ImGui::Button(button_label, ImVec2(50, 0))) shortcut = -1;
 
 	auto& io = ImGui::GetIO();
+	int key_count;
+	auto* state = SDL_GetKeyboardState(&key_count);
 	if (ImGui::IsItemHovered())
 	{
-		for (int i = 0; i < Lumix::lengthOf(ImGui::GetIO().KeysDown); ++i)
+		for (int i = 0; i < key_count; ++i)
 		{
-			if (io.KeysDown[i])
+			if (state[i])
 			{
 				shortcut = i;
 				break;

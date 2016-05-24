@@ -5,6 +5,7 @@
 #include "engine/delegate.h"
 #include "engine/string.h"
 #include "imgui/imgui.h"
+#include <SDL.h>
 
 
 struct Action
@@ -35,9 +36,10 @@ struct Action
 	bool isActive()
 	{
 		if (ImGui::IsAnyItemActive()) return false;
-
-		bool* keysDown = ImGui::GetIO().KeysDown;
 		if (shortcut[0] == -1) return false;
+
+		int key_count;
+		auto* state = SDL_GetKeyboardState(&key_count);
 
 		for (int i = 0; i < Lumix::lengthOf(shortcut) + 1; ++i)
 		{
@@ -46,7 +48,7 @@ struct Action
 				return true;
 			}
 
-			if (!keysDown[shortcut[i]]) return false;
+			if (shortcut[i] >= key_count || !state[shortcut[i]]) return false;
 		}
 		return false;
 	}
