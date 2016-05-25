@@ -4,50 +4,39 @@
 #include "imgui/imgui.h"
 #include <cstdint>
 #include <X11/Xlib.h>
-
+#include <dirent.h>
 
 namespace PlatformInterface
 {
 
 	struct FileIterator
 	{
-/*		HANDLE handle;
-		Lumix::IAllocator* allocator;
-		WIN32_FIND_DATAA ffd;
-		bool is_valid;*/
 	};
 
 
 	FileIterator* createFileIterator(const char* path, Lumix::IAllocator& allocator)
 	{
-		//char tmp[Lumix::MAX_PATH_LENGTH];
-		//Lumix::copyString(tmp, path);
-		//Lumix::catString(tmp, "/*");
-		auto* iter = LUMIX_NEW(allocator, FileIterator);
-		//iter->allocator = &allocator;
-		//iter->handle = FindFirstFile(tmp, &iter->ffd);
-		//iter->is_valid = iter->handle != NULL;
-		return iter;
+		return (FileIterator*)opendir(path);
 	}
 
 
 	void destroyFileIterator(FileIterator* iterator)
 	{
-	/*	FindClose(iterator->handle);
-		LUMIX_DELETE(*iterator->allocator, iterator);*/
+		closedir((DIR*)iterator);
 	}
 
 
 	bool getNextFile(FileIterator* iterator, FileInfo* info)
 	{
-		/*if (!iterator->is_valid) return false;
-
-		info->is_directory = (iterator->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-		Lumix::copyString(info->filename, iterator->ffd.cFileName);
-
-		iterator->is_valid = FindNextFile(iterator->handle, &iterator->ffd) == TRUE;
-		return true;*/
-		return false;
+		if(!iterator) return false;
+		
+		auto* dir = (DIR*)iterator; 
+		auto* dir_ent = readdir(dir);
+		if (!dir_ent) return false;
+		
+		info->is_directory = dir_ent->d_type == DT_DIR;
+		Lumix::copyString(info->filename, dir_ent->d_name);
+		return true;
 	}
 
 

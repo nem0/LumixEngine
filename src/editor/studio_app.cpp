@@ -1550,6 +1550,9 @@ public:
 		#ifdef _WIN32
 			platform_data.window_handle = window_info.info.win.window;
 			ImGui::GetIO().ImeWindowHandle = window_info.info.win.window;
+		#elif defined(__linux__)
+			platform_data.window_handle = (void*)(uintptr_t)window_info.info.x11.window;
+			platform_data.display = window_info.info.x11.display;
 		#endif
 		m_engine->setPlatformData(platform_data);
 
