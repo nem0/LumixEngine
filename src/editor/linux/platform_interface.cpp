@@ -144,22 +144,6 @@ namespace PlatformInterface
 		}
 		else
 		{
-			Lumix::CommandLineParser parser(args);
-			char* args_array[256];
-			char** i = args_array;
-			*i = (char*)cmd;
-			++i;
-			while(i - args_array < Lumix::lengthOf(args_array) - 2 && parser.next())
-			{
-				char tmp[1024];
-				parser.getCurrent(tmp, Lumix::lengthOf(tmp));
-				int len = Lumix::stringLength(tmp) + 1;
-				auto* copy = (char*)malloc(len);
-				Lumix::copyString(copy, len, tmp);
-				*i = copy;
-				++i;
-			}
-			*i = nullptr;
 			close(process->pipes[1]);
 		}
 		return process;

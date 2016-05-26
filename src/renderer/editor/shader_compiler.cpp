@@ -379,7 +379,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 				args << (is_vertex_shader ? "--profile vs_5_0" : "--profile ps_5_0");
 
 			#elif defined __linux__
-				args << "--platform linux ";
+				args << "--platform linux --profile 140 ";
 			#else
 				#error Platform not supported
 			#endif
