@@ -16,8 +16,10 @@ void normalize(const char* path, char* out, uint32 max_size)
 
 	if (path[0] == '.' && (path[1] == '\\' || path[1] == '/'))
 		++path;
-	if (path[0] == '\\' || path[0] == '/')
-		++path;
+	#ifdef __WIN32
+		if (path[0] == '\\' || path[0] == '/')
+			++path;
+	#endif
 	while (*path != '\0' && i < max_size)
 	{
 		bool is_current_slash = *path == '\\' || *path == '/';
@@ -29,7 +31,9 @@ void normalize(const char* path, char* out, uint32 max_size)
 		}
 
 		*out = *path == '\\' ? '/' : *path;
-		*out = *path >= 'A' && *path <= 'Z' ? *path - 'A' + 'a' : *out;
+		#ifdef _WIN32
+			*out = *path >= 'A' && *path <= 'Z' ? *path - 'A' + 'a' : *out;
+		#endif
 
 		path++;
 		out++;

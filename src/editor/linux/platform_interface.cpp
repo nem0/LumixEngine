@@ -1,10 +1,20 @@
 #include "platform_interface.h"
+#include "engine/command_line_parser.h"
 #include "engine/iallocator.h"
 #include "engine/string.h"
 #include "imgui/imgui.h"
+#include <cerrno>
 #include <cstdint>
-#include <X11/Xlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <dirent.h>
+#include <fcntl.h>
+#include <sys/sendfile.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <X11/Xlib.h>
+
 
 namespace PlatformInterface
 {
@@ -42,112 +52,124 @@ namespace PlatformInterface
 
 	void getCurrentDirectory(char* buffer, int buffer_size)
 	{
-		//GetCurrentDirectory(buffer_size, buffer);
+		getcwd(buffer, buffer_size);
+		
 	}
 
 	
 	struct Process
 	{
-		/*explicit Process(Lumix::IAllocator& allocator)
+		explicit Process(Lumix::IAllocator& allocator)
 			: allocator(allocator)
 		{
 		}
 
-		PROCESS_INFORMATION process_info;
-		HANDLE output_read_pipe;
-		HANDLE output_write_pipe;
-		Lumix::IAllocator& allocator;*/
+		Lumix::IAllocator& allocator;
+		pid_t handle;
+		int pipes[2];
+		int exit_code;
 	};
 
 
 	bool isProcessFinished(Process& process)
 	{
-		/*DWORD exit_code;
-		if (GetExitCodeProcess(process.process_info.hProcess, &exit_code) == FALSE) return true;
-		return exit_code != STILL_ACTIVE;*/
-		return false;
+		if (process.handle == -1) return true;
+		int status;
+		int success = waitpid(process.handle, &status, WNOHANG);
+		if (success == 0) return false;
+		process.exit_code = WEXITSTATUS(status);
+		process.handle = -1;
+		return true;
 	}
 
 
 	int getProcessExitCode(Process& process)
 	{
-		/*DWORD exit_code;
-		if (GetExitCodeProcess(process.process_info.hProcess, &exit_code) == FALSE) return -1;
-		return (int)exit_code;*/
-		return 0;
+		if (process.handle != -1) 
+		{
+			int status;
+			int success = waitpid(process.handle, &status, WNOHANG);
+			ASSERT (success != -1 && success != 0);
+			process.exit_code = WEXITSTATUS(status);
+			process.handle = -1;
+		}
+		return process.exit_code;
 	}
 
 
 	void destroyProcess(Process& process)
 	{
-		/*CloseHandle(process.output_read_pipe);
-		CloseHandle(process.process_info.hProcess);
-		CloseHandle(process.process_info.hThread);
-		LUMIX_DELETE(process.allocator, &process);*/
+		if (process.handle != -1)
+		{
+			kill(process.handle, SIGKILL);
+			int status;
+			waitpid(process.handle, &status, 0);
+		}
+		LUMIX_DELETE(process.allocator, &process);
 	}
 
 
 	Process* createProcess(const char* cmd, const char* args, Lumix::IAllocator& allocator)
 	{
-		/*auto* process = LUMIX_NEW(allocator, Process)(allocator);
-
-		SECURITY_ATTRIBUTES sec_attrs;
-		sec_attrs.nLength = sizeof(SECURITY_ATTRIBUTES);
-		sec_attrs.bInheritHandle = TRUE;
-		sec_attrs.lpSecurityDescriptor = NULL;
-		if (CreatePipe(&process->output_read_pipe, &process->output_write_pipe, &sec_attrs, 0) ==
-			FALSE)
+		auto* process = LUMIX_NEW(allocator, Process)(allocator);
+		int res = pipe(process->pipes);
+		ASSERT(res == 0);
+		
+		process->handle = fork();
+		ASSERT(process->handle != -1);
+		if(process->handle == 0)
 		{
-			LUMIX_DELETE(allocator, process);
-			return nullptr;
+			close(process->pipes[0]);
+			dup2(process->pipes[1], STDOUT_FILENO);
+			dup2(process->pipes[1], STDERR_FILENO);
+			
+			Lumix::CommandLineParser parser(args);
+			char* args_array[256];
+			char** i = args_array;
+			*i = (char*)cmd;
+			++i;
+			while(i - args_array < Lumix::lengthOf(args_array) - 2 && parser.next())
+			{
+				char tmp[1024];
+				parser.getCurrent(tmp, Lumix::lengthOf(tmp));
+				int len = Lumix::stringLength(tmp) + 1;
+				auto* copy = (char*)malloc(len);
+				Lumix::copyString(copy, len, tmp);
+				*i = copy;
+				++i;
+			}
+			*i = nullptr;
+
+			execv(cmd, args_array);
 		}
-		if (SetHandleInformation(process->output_read_pipe, HANDLE_FLAG_INHERIT, 0) == FALSE)
+		else
 		{
-			LUMIX_DELETE(allocator, process);
-			return nullptr;
+			Lumix::CommandLineParser parser(args);
+			char* args_array[256];
+			char** i = args_array;
+			*i = (char*)cmd;
+			++i;
+			while(i - args_array < Lumix::lengthOf(args_array) - 2 && parser.next())
+			{
+				char tmp[1024];
+				parser.getCurrent(tmp, Lumix::lengthOf(tmp));
+				int len = Lumix::stringLength(tmp) + 1;
+				auto* copy = (char*)malloc(len);
+				Lumix::copyString(copy, len, tmp);
+				*i = copy;
+				++i;
+			}
+			*i = nullptr;
+			close(process->pipes[1]);
 		}
-
-		STARTUPINFO suinfo;
-		ZeroMemory(&suinfo, sizeof(suinfo));
-		suinfo.cb = sizeof(suinfo);
-		suinfo.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
-		suinfo.wShowWindow = SW_HIDE;
-		suinfo.hStdOutput = process->output_write_pipe;
-		suinfo.hStdError = process->output_write_pipe;
-
-		char rw_args[1024];
-		Lumix::copyString(rw_args, args);
-		auto create_process_ret = CreateProcess(
-			cmd,
-			rw_args,
-			NULL,
-			NULL,
-			TRUE,
-			NORMAL_PRIORITY_CLASS,
-			NULL,
-			NULL,
-			&suinfo,
-			&process->process_info);
-
-		if (create_process_ret == FALSE)
-		{
-			LUMIX_DELETE(allocator, process);
-			return nullptr;
-		}
-
-		CloseHandle(process->output_write_pipe);
-
-		return process;*/
-		return nullptr;
+		return process;
 	}
 
 
 	int getProcessOutput(Process& process, char* buf, int buf_size)
 	{
-		/*DWORD read;
-		if (ReadFile(process.output_read_pipe, buf, buf_size, &read, NULL) == FALSE) return -1;
-		return read;*/
-		return -1;
+		size_t ret = read(process.pipes[0], buf, buf_size);
+		return (int)ret;
 	}
 
 
@@ -275,90 +297,73 @@ namespace PlatformInterface
 
 	bool shellExecuteOpen(const char* path)
 	{
-		//return (uintptr_t)ShellExecute(NULL, NULL, path, NULL, NULL, SW_SHOW) > 32;
-		return false;
+		return system(path) == 0;
 	}
 
 
 	bool deleteFile(const char* path)
 	{
-		//return DeleteFile(path) == TRUE;
-		return false;
+		return unlink(path) == 0;
 	}
 
 
 	bool moveFile(const char* from, const char* to)
 	{
-		//return MoveFile(from, to) == TRUE;
-		return false;
+		return rename(from, to) == 0;
 	}
 
 
 	bool copyFile(const char* from, const char* to)
 	{
-		//return CopyFile(from, to, FALSE) == TRUE;
+		int source = open(from, O_RDONLY, 0);
+		int dest = open(to, O_WRONLY | O_CREAT, 0644);
+
+		struct stat stat_source;
+		fstat(source, &stat_source);
+
+		sendfile(dest, source, 0, stat_source.st_size);
+
+		close(source);
+		close(dest);
+
 		return false;
 	}
 
 
 	size_t getFileSize(const char* path)
 	{
-		/*WIN32_FILE_ATTRIBUTE_DATA fad;
-		if(!GetFileAttributesEx(path, GetFileExInfoStandard, &fad))	return -1; 
-		LARGE_INTEGER size;
-		size.HighPart = fad.nFileSizeHigh;
-		size.LowPart = fad.nFileSizeLow;
-		return (size_t)size.QuadPart;*/
-		return 0;
+		struct stat tmp;
+		stat(path, &tmp);
+		return tmp.st_size;
 	}
 
 
 	bool fileExists(const char* path)
 	{
-		/*DWORD dwAttrib = GetFileAttributes(path);
-		return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
-			!(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));*/
-		return false;
+		struct stat tmp;
+		return ((stat(path, &tmp) == 0) && (((tmp.st_mode) & S_IFMT) != S_IFDIR));
 	}
 
 
 	bool dirExists(const char* path)
 	{
-		/*DWORD dwAttrib = GetFileAttributes(path);
-		return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
-			(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));*/
-		return false;
+		struct stat tmp;
+		return ((stat(path, &tmp) == 0) && (((tmp.st_mode) & S_IFMT) == S_IFDIR));
 	}
 
 	
 	Lumix::uint64 getLastModified(const char* file)
 	{
-		/*FILETIME ft;
-		HANDLE handle = CreateFile(file,
-			GENERIC_READ,
-			0,
-			NULL,
-			OPEN_EXISTING,
-			FILE_ATTRIBUTE_NORMAL,
-			NULL);
-		if (GetFileTime(handle, NULL, NULL, &ft) == FALSE)
-		{
-			return 0;
-		}
-		CloseHandle(handle);
-
-		ULARGE_INTEGER i;
-		i.LowPart = ft.dwLowDateTime;
-		i.HighPart = ft.dwHighDateTime;
-		return i.QuadPart;*/
-		return 0;
+		struct stat tmp;
+		Lumix::uint64 ret = 0;
+		ret = tmp.st_mtim.tv_sec * 1000 + Lumix::uint64(tmp.st_mtim.tv_nsec / 1000000);
+		return ret;
 	}
 
 
 	bool makePath(const char* path)
 	{
-		//return SHCreateDirectoryEx(NULL, path, NULL) == ERROR_SUCCESS;
-		return false;
+		return mkdir(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == 0;
 	}
 
 

@@ -146,7 +146,7 @@ void ShaderCompiler::makeUpToDate()
 		char basename[Lumix::MAX_PATH_LENGTH];
 		Lumix::PathUtils::getBasename(basename, sizeof(basename), info.filename);
 		if (!Lumix::PathUtils::hasExtension(info.filename, "shd")) continue;
-		const char* shd_path = Lumix::StaticString<Lumix::MAX_PATH_LENGTH>("shaders/", info.filename);
+		Lumix::StaticString<Lumix::MAX_PATH_LENGTH> shd_path("shaders/", info.filename);
 		auto* file =
 			fs.open(fs.getDiskDevice(), Lumix::Path(shd_path), Lumix::FS::Mode::OPEN_AND_READ);
 
@@ -166,8 +166,7 @@ void ShaderCompiler::makeUpToDate()
 		Lumix::ShaderCombinations combinations;
 		Lumix::Shader::getShaderCombinations(getRenderer(), &data[0], &combinations);
 
-		const char* bin_base_path =
-			Lumix::StaticString<Lumix::MAX_PATH_LENGTH>("shaders/compiled/", basename, "_");
+		Lumix::StaticString<Lumix::MAX_PATH_LENGTH> bin_base_path("shaders/compiled/", basename, "_");
 		if (isChanged(combinations, bin_base_path, shd_path))
 		{
 			src_list.emplace(shd_path, m_editor.getAllocator());
@@ -362,7 +361,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			updateNotifications();
 			char basename[Lumix::MAX_PATH_LENGTH];
 			Lumix::PathUtils::getBasename(basename, sizeof(basename), shd_path);
-			const char* source_path = Lumix::StaticString<Lumix::MAX_PATH_LENGTH>(
+			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> source_path (
 				"\"shaders/", basename, is_vertex_shader ? "_vs.sc\"" : "_fs.sc\"");
 			char out_path[Lumix::MAX_PATH_LENGTH];
 			Lumix::copyString(out_path, base_path);
@@ -374,8 +373,18 @@ void ShaderCompiler::compilePass(const char* shd_path,
 
 			Lumix::StaticString<1024> args(" -f ");
 
-			args << source_path << " -o \"" << out_path << "\" --depends --platform windows --type "
-				<< (is_vertex_shader ? "vertex -O3 --profile vs_5_0" : "fragment -O3 --profile ps_5_0")
+			args << source_path << " -o \"" << out_path << "\" --depends ";
+			#ifdef _WIN32
+				args << "--platform windows ";
+				args << (is_vertex_shader ? "--profile vs_5_0" : "--profile ps_5_0");
+
+			#elif defined __linux__
+				args << "--platform linux ";
+			#else
+				#error Platform not supported
+			#endif
+			args << "--type "
+				<< (is_vertex_shader ? "vertex -O3" : "fragment -O3")
 				<< " --define " << pass << ";";
 			for (int i = 0; i < Lumix::lengthOf(all_defines); ++i)
 			{
@@ -385,8 +394,14 @@ void ShaderCompiler::compilePass(const char* shd_path,
 				}
 			}
 
-			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> cmd(base_path, "/shaders/shaderc.exe");
-
+			#ifdef _WIN32
+				Lumix::StaticString<Lumix::MAX_PATH_LENGTH> cmd(base_path, "/shaders/shaderc.exe");
+			#elif defined __linux__
+				Lumix::StaticString<Lumix::MAX_PATH_LENGTH> cmd(base_path, "/shaders/shaderc");
+			#else
+				#error Platform not supported
+			#endif
+			
 			PlatformInterface::deleteFile(out_path);
 			auto* process = PlatformInterface::createProcess(cmd, args, m_editor.getAllocator());
 			if (!process)
