@@ -721,6 +721,13 @@ if build_studio then
 
 		configuration {}
 
+		if not _OPTIONS["static-plugins"] then	
+			linkLib "SDL"
+			configuration {"vs*"}
+				links { "winmm", "imm32", "version" }
+			configuration {}
+		end
+		
 		useLua()
 		defaultConfigurations()
 
