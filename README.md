@@ -29,6 +29,7 @@
 * [PhysX](https://developer.nvidia.com/physx-sdk)
 * [dear imgui](https://github.com/ocornut/imgui)
 * [stb](https://github.com/nothings/stb)
+* [SDL](https://www.libsdl.org/)
 
 Project generator
 * [Genie](https://github.com/bkaradzic/genie)
