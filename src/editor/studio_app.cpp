@@ -1388,14 +1388,14 @@ public:
 		{
 			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> tmp(dest_dir, file);
 			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> src("bin/", file);
-			if (!PlatformInterface::copyFile(src, tmp))
+			if (!Lumix::copyFile(src, tmp))
 			{
 				Lumix::g_log_error.log("Editor") << "Failed to copy " << src << " to " << tmp;
 			}
 		}
 		Lumix::StaticString<Lumix::MAX_PATH_LENGTH> tmp(dest_dir);
 		tmp << "startup.lua";
-		if (!PlatformInterface::copyFile("startup.lua", tmp))
+		if (!Lumix::copyFile("startup.lua", tmp))
 		{
 			Lumix::g_log_error.log("Editor") << "Failed to copy startup.lua to " << tmp;
 		}
