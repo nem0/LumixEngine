@@ -383,7 +383,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			#else
 				#error Platform not supported
 			#endif
-			args << "--type "
+			args << " --type "
 				<< (is_vertex_shader ? "vertex -O3" : "fragment -O3")
 				<< " --define " << pass << ";";
 			for (int i = 0; i < Lumix::lengthOf(all_defines); ++i)
