@@ -9,7 +9,17 @@ namespace Lumix
 {
 	bool copyFile(const char* from, const char* to)
 	{
-		ASSERT(false);
+		int source = open(from, O_RDONLY, 0);
+		int dest = open(to, O_WRONLY | O_CREAT, 0644);
+
+		struct stat stat_source;
+		fstat(source, &stat_source);
+
+		sendfile(dest, source, 0, stat_source.st_size);
+
+		close(source);
+		close(dest);
+
 		return false;
 	}
 

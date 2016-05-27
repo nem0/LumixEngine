@@ -294,12 +294,6 @@ namespace PlatformInterface
 	}
 
 
-	bool copyFile(const char* from, const char* to)
-	{
-		return CopyFile(from, to, FALSE) == TRUE;
-	}
-
-
 	size_t getFileSize(const char* path)
 	{
 		WIN32_FILE_ATTRIBUTE_DATA fad;
