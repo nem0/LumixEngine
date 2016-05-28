@@ -3,6 +3,10 @@
 #include "engine/string.h"
 #include <cstdio>
 #include <dlfcn.h>
+#include <fcntl.h>
+#include <sys/sendfile.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 
 namespace Lumix
