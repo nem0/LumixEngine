@@ -1950,7 +1950,7 @@ void ShaderEditor::onGUIRightColumn()
 		m_new_link_info.is_active = false;
 	}
 
-	if(ImGui::IsMouseClicked(1))
+	if(ImGui::IsMouseClicked(1) && ImGui::IsWindowHovered())
 	{
 		ImGui::OpenPopup("context_menu");
 	}
