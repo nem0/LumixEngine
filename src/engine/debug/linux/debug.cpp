@@ -349,7 +349,6 @@ void Allocator::deallocate(void* user_ptr)
 
 void enableCrashReporting(bool enable)
 {
-	ASSERT(!enable); // not supported on asmjs
 	g_is_crash_reporting_enabled = false;
 }
 
