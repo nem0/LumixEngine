@@ -6,7 +6,6 @@
 #include "engine/debug/debug.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
-#include <SDL.h>
 
 
 namespace Lumix 
@@ -40,7 +39,7 @@ class PluginManagerImpl : public PluginManager
 
 			for (int i = 0; i < m_libraries.size(); ++i)
 			{
-				SDL_UnloadObject(m_libraries[i]);
+				unloadLibrary(m_libraries[i]);
 			}
 		}
 
@@ -117,10 +116,10 @@ class PluginManagerImpl : public PluginManager
 			#endif
 			g_log_info.log("Core") << "loading plugin " << path_with_ext;
 			typedef IPlugin* (*PluginCreator)(Engine&);
-			auto* lib = SDL_LoadObject(path_with_ext);
+			auto* lib = loadLibrary(path_with_ext);
 			if (lib)
 			{
-				auto creator = (PluginCreator)SDL_LoadFunction(lib, "createPlugin");
+				PluginCreator creator = (PluginCreator)getLibrarySymbol(lib, "createPlugin");
 				if (creator)
 				{
 					IPlugin* plugin = creator(m_engine);
@@ -144,7 +143,7 @@ class PluginManagerImpl : public PluginManager
 				{
 					g_log_error.log("Core") << "No createPlugin function in plugin.";
 				}
-				SDL_UnloadObject(lib);
+				unloadLibrary(lib);
 			}
 			else
 			{

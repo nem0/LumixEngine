@@ -63,4 +63,22 @@ namespace Lumix
 		}
 		return true;
 	}
+
+
+	void* loadLibrary(const char* path)
+	{
+		return dlopen(path, RTLD_LOCAL | RTLD_LAZY);
+	}
+
+
+	void unloadLibrary(void* handle)
+	{
+		dlclose(handle);
+	}
+
+
+	void* getLibrarySymbol(void* handle, const char* name)
+	{
+		return dlsym(handle, name);
+	}
 }
