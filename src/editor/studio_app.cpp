@@ -1483,18 +1483,18 @@ public:
 	{
 		checkScriptCommandLine();
 
-		Lumix::Timer timer;
+		Lumix::Timer* timer = Lumix::Timer::create(m_allocator);
 		while (!m_finished)
 		{
 			{
-				timer.tick();
+				timer->tick();
 				PROFILE_BLOCK("all");
 				float frame_time;
 				{
 					PROFILE_BLOCK("tick");
 					m_finished = m_finished || !processSystemEvents();
 					if (!m_finished) update();
-					frame_time = timer.tick();
+					frame_time = timer->tick();
 				}
 
 				float wanted_fps = (SDL_GetWindowFlags(m_window) & SDL_WINDOW_INPUT_FOCUS) != 0 ? 60.0f : 5.0f;
@@ -1506,6 +1506,7 @@ public:
 			}
 			Lumix::Profiler::frame();
 		}
+		Lumix::Timer::destroy(timer);
 	}
 
 
