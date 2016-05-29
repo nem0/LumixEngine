@@ -31,6 +31,7 @@ ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
 	, m_editor(*app.getWorldEditor())
 	, m_log_ui(log_ui)
 	, m_dependencies(m_editor.getAllocator())
+	, m_to_compile(m_editor.getAllocator())
 	, m_to_reload(m_editor.getAllocator())
 	, m_processes(m_editor.getAllocator())
 	, m_changed_files(m_editor.getAllocator())
@@ -198,7 +199,7 @@ void ShaderCompiler::makeUpToDate()
 	src_list.removeDuplicates();
 	for (auto src : src_list)
 	{
-		compile(src.c_str());
+		m_to_compile.emplace(src.c_str(), m_editor.getAllocator());
 	}
 }
 
@@ -439,7 +440,6 @@ void ShaderCompiler::processChangedFiles()
 	{
 		int len = Lumix::stringLength(changed_file_path);
 		if (len <= 6) return;
-
 		if (Lumix::equalStrings(changed_file_path + len - 6, "_fs.sc") ||
 			Lumix::equalStrings(changed_file_path + len - 6, "_vs.sc"))
 		{
@@ -453,7 +453,7 @@ void ShaderCompiler::processChangedFiles()
 	{
 		if (Lumix::PathUtils::hasExtension(changed_file_path, "shd"))
 		{
-			compile(changed_file_path);
+			m_to_compile.emplace(changed_file_path, m_editor.getAllocator());
 		}
 		else
 		{
@@ -473,7 +473,7 @@ void ShaderCompiler::processChangedFiles()
 
 			for (auto& src : src_list)
 			{
-				compile(src.c_str());
+				m_to_compile.emplace(src.c_str(), m_editor.getAllocator());
 			}
 		}
 	}
@@ -532,6 +532,12 @@ void ShaderCompiler::update()
 	m_app.getAssetBrowser()->enableUpdate(!m_is_compiling);
 
 	processChangedFiles();
+
+	if (m_processes.size() < 4 && !m_to_compile.empty())
+	{
+		compile(m_to_compile.back().c_str());
+		m_to_compile.pop();
+	}
 }
 
 
