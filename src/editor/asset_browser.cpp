@@ -290,12 +290,21 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 {
 	float item_w = ImGui::CalcItemWidth();
 	auto& style = ImGui::GetStyle();
-	ImGui::PushItemWidth(item_w - ImGui::CalcTextSize("...View").x - style.FramePadding.x * 4 -
-						 style.ItemSpacing.x * 2);
+	float text_width = Lumix::Math::maximum(
+		50.0f, item_w - ImGui::CalcTextSize("...View").x - style.FramePadding.x * 4 - style.ItemSpacing.x * 2);
 
-	if (ImGui::InputText(Lumix::StaticString<30>("###", str_id), buf, max_size)) return true;
-
+	char* c = buf + Lumix::stringLength(buf);
+	while (c > buf && *c != '/' && *c != '\\') --c;
+	if (*c == '/' || *c == '\\') ++c;
+	
+	auto pos = ImGui::GetCursorPos();
+	pos.x += text_width;
+	ImGui::AlignFirstTextHeightToWidgets();
+	ImGui::PushTextWrapPos(text_width);
+	ImGui::Text("%s", c);
+	ImGui::PopTextWrapPos();
 	ImGui::SameLine();
+	ImGui::SetCursorPos(pos);
 	Lumix::StaticString<50> popup_name("pu", str_id);
 	if (ImGui::Button(Lumix::StaticString<30>("...###browse", str_id)))
 	{
@@ -310,7 +319,6 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	}
 	ImGui::SameLine();
 	ImGui::Text("%s", label);
-	ImGui::PopItemWidth();
 
 	if (ImGui::BeginResizablePopup(popup_name, ImVec2(300, 300)))
 	{
