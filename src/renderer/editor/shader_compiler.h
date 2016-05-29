@@ -73,6 +73,7 @@ private:
 	FileSystemWatcher* m_watcher;
 	int m_notifications_id;
 	Lumix::AssociativeArray<Lumix::string, Lumix::Array<Lumix::string>> m_dependencies;
+	Lumix::Array<Lumix::string> m_to_compile;
 	Lumix::Array<Lumix::string> m_to_reload;
 	Lumix::Array<ProcessInfo> m_processes;
 	Lumix::Array<Lumix::string> m_changed_files;
