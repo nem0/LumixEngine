@@ -24,4 +24,24 @@ namespace Lumix
 		ASSERT(false);
 		return false;
 	}
+
+
+	void* loadLibrary(const char* path)
+	{
+		ASSERT(false);
+		return nullptr;
+	}
+
+
+	void unloadLibrary(void* handle)
+	{
+		ASSERT(false);
+	}
+
+
+	void* getLibrarySymbol(void* handle, const char* name)
+	{
+		ASSERT(false);
+		return nullptr;
+	}
 }
