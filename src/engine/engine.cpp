@@ -110,8 +110,6 @@ public:
 
 		m_resource_manager.create(*m_file_system);
 
-		m_timer = Timer::create(m_allocator);
-		m_fps_timer = Timer::create(m_allocator);
 		m_fps_frame = 0;
 		PropertyRegister::init(m_allocator);
 	}
@@ -495,8 +493,6 @@ public:
 	~EngineImpl()
 	{
 		PropertyRegister::shutdown();
-		Timer::destroy(m_timer);
-		Timer::destroy(m_fps_timer);
 		PluginManager::destroy(m_plugin_manager);
 		if (m_input_system) InputSystem::destroy(*m_input_system);
 		if (m_disk_file_device)
@@ -658,12 +654,12 @@ public:
 		PROFILE_FUNCTION();
 		float dt;
 		++m_fps_frame;
-		if (m_fps_timer->getTimeSinceTick() > 0.5f)
+		if (m_fps_timer.getTimeSinceTick() > 0.5f)
 		{
-			m_fps = m_fps_frame / m_fps_timer->tick();
+			m_fps = m_fps_frame / m_fps_timer.tick();
 			m_fps_frame = 0;
 		}
-		dt = m_timer->tick() * m_time_multiplier;
+		dt = m_timer.tick() * m_time_multiplier;
 		if (m_next_frame)
 		{
 			m_paused = false;
@@ -890,8 +886,8 @@ private:
 	Array<ComponentType> m_component_types;
 	PluginManager* m_plugin_manager;
 	InputSystem* m_input_system;
-	Timer* m_timer;
-	Timer* m_fps_timer;
+	Timer m_timer;
+	Timer m_fps_timer;
 	int m_fps_frame;
 	float m_time_multiplier;
 	float m_fps;

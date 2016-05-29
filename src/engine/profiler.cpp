@@ -142,13 +142,11 @@ struct Instance
 		, m_mutex(false)
 	{
 		threads.insert(MT::getCurrentThreadID(), &main_thread);
-		timer = Timer::create(allocator);
 	}
 
 
 	~Instance()
 	{
-		Timer::destroy(timer);
 		for (auto* i : threads)
 		{
 			if (i != &main_thread) LUMIX_DELETE(allocator, i);
@@ -160,7 +158,7 @@ struct Instance
 	DelegateList<void()> frame_listeners;
 	HashMap<MT::ThreadID, ThreadData*> threads;
 	ThreadData main_thread;
-	Timer* timer;
+	Timer timer;
 	MT::SpinMutex m_mutex;
 };
 
@@ -175,7 +173,7 @@ float getBlockLength(Block* block)
 	{
 		ret += block->m_hits[i].m_length;
 	}
-	return float(ret / (double)g_instance.timer->getFrequency());
+	return float(ret / (double)g_instance.timer.getFrequency());
 }
 
 
@@ -265,7 +263,7 @@ void beginBlock(const char* name)
 	auto data = getBlock(name);
 
 	auto& hit = data.block->m_hits.emplace();
-	hit.m_start = g_instance.timer->getRawTimeSinceStart();
+	hit.m_start = g_instance.timer.getRawTimeSinceStart();
 	hit.m_length = 0;
 }
 
@@ -328,7 +326,7 @@ int getThreadCount()
 
 uint64 now()
 {
-	return g_instance.timer->getRawTimeSinceStart();
+	return g_instance.timer.getRawTimeSinceStart();
 }
 
 
@@ -354,7 +352,7 @@ void endBlock()
 	}
 
 	ASSERT(thread_data->current_block);
-	uint64 now = g_instance.timer->getRawTimeSinceStart();
+	uint64 now = g_instance.timer.getRawTimeSinceStart();
 	thread_data->current_block->m_hits.back().m_length = now - thread_data->current_block->m_hits.back().m_start;
 	thread_data->current_block = thread_data->current_block->m_parent;
 }
@@ -366,7 +364,7 @@ void frame()
 
 	MT::SpinLock lock(g_instance.m_mutex);
 	g_instance.frame_listeners.invoke();
-	uint64 now = g_instance.timer->getRawTimeSinceStart();
+	uint64 now = g_instance.timer.getRawTimeSinceStart();
 
 	for (auto* i : g_instance.threads)
 	{
