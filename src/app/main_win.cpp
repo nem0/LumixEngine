@@ -36,7 +36,6 @@ public:
 	{
 		m_universe = nullptr;
 		m_exit_code = 0;
-		m_frame_timer = Lumix::Timer::create(m_allocator);
 		ASSERT(!s_instance);
 		s_instance = this;
 		m_pipeline = nullptr;
@@ -45,7 +44,6 @@ public:
 
 	~App()
 	{
-		Lumix::Timer::destroy(m_frame_timer);
 		ASSERT(!m_universe);
 		s_instance = nullptr;
 	}
@@ -361,7 +359,7 @@ public:
 
 	void frame()
 	{
-		float frame_time = m_frame_timer->tick();
+		float frame_time = m_frame_timer.tick();
 		m_engine->update(*m_universe);
 		m_pipeline->render();
 		auto* renderer = m_engine->getPluginManager().getPlugin("renderer");
@@ -395,7 +393,7 @@ private:
 	Lumix::FS::MemoryFileDevice* m_mem_file_device;
 	Lumix::FS::DiskFileDevice* m_disk_file_device;
 	Lumix::FS::PackFileDevice* m_pack_file_device;
-	Lumix::Timer* m_frame_timer;
+	Lumix::Timer m_frame_timer;
 	bool m_finished;
 	int m_exit_code;
 	char m_startup_script_path[Lumix::MAX_PATH_LENGTH];

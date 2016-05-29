@@ -2324,7 +2324,7 @@ public:
 			return;
 		}
 
-		Timer* timer = Timer::create(m_allocator);
+		Timer timer;
 		g_log_info.log("Editor") << "Parsing universe...";
 		InputBlob blob(file.getBuffer(), (int)file.size());
 		uint32 hash = 0;
@@ -2345,7 +2345,6 @@ public:
 		}
 		if (crc32((const uint8*)blob.getData() + hashed_offset, blob.getSize() - hashed_offset) != hash)
 		{
-			Timer::destroy(timer);
 			g_log_error.log("Editor") << "Corrupted file.";
 			newUniverse();
 			m_is_loading = false;
@@ -2364,13 +2363,12 @@ public:
 			}
 			m_camera = m_render_interface->getCameraEntity(m_render_interface->getCameraInSlot("editor"));
 
-			g_log_info.log("Editor") << "Universe parsed in " << timer->getTimeSinceStart() << " seconds";
+			g_log_info.log("Editor") << "Universe parsed in " << timer.getTimeSinceStart() << " seconds";
 		}
 		else
 		{
 			newUniverse();
 		}
-		Timer::destroy(timer);
 		m_is_loading = false;
 	}
 
