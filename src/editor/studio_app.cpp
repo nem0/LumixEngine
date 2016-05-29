@@ -318,7 +318,7 @@ public:
 		buf[0] = 0;
 		for (int i = 0; i < Lumix::lengthOf(action.shortcut); ++i)
 		{
-			const char* str = SDL_GetKeyName(action.shortcut[i]);
+			const char* str = SDL_GetKeyName(SDL_GetKeyFromScancode((SDL_Scancode)action.shortcut[i]));
 			if (str[0] == 0) return;
 			if (i > 0) Lumix::catString(buf, max_size, " - ");
 			Lumix::catString(buf, max_size, str);
