@@ -528,7 +528,7 @@ void ShaderCompiler::update()
 			}
 		}
 	}
-	m_is_compiling = !m_processes.empty();
+	m_is_compiling = !m_processes.empty() || !m_to_compile.empty();
 	m_app.getAssetBrowser()->enableUpdate(!m_is_compiling);
 
 	processChangedFiles();
@@ -604,6 +604,18 @@ void ShaderCompiler::compileAll(bool wait)
 		return;
 	}
 
+	Lumix::StaticString<Lumix::MAX_PATH_LENGTH> compiled_dir(
+		m_editor.getEngine().getDiskFileDevice()->getBasePath(), "/shaders/compiled");
+	if (!PlatformInterface::makePath(compiled_dir))
+	{
+		if (!PlatformInterface::dirExists(compiled_dir))
+		{
+			Lumix::messageBox("Could not create directory shaders/compiled. Please create it and "
+				"restart the editor");
+		}
+		return;
+	}
+
 	m_is_compiling = true;
 	m_app.getAssetBrowser()->enableUpdate(!m_is_compiling);
 
@@ -643,8 +655,5 @@ void ShaderCompiler::compileAll(bool wait)
 
 	PlatformInterface::destroyFileIterator(iter);
 
-	if(wait)
-	{
-		this->wait();
-	}
+	if(wait) this->wait();
 }
