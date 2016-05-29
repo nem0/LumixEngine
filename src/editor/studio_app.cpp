@@ -1145,7 +1145,7 @@ public:
 		#else
 			for (auto* lib : plugin_manager.getLibraries())
 			{
-				auto* f = (void (*)(StudioApp&))Lumix::getLibrarySymbol(lib, "setStudioApp");
+				auto* f = (void (*)(StudioApp&))SDL_LoadFunction(lib, "setStudioApp");
 				if (f) f(*this);
 			}
 		#endif
