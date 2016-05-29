@@ -63,6 +63,8 @@ namespace
 			culling_system = Lumix::CullingSystem::create(*mtjd_manager, allocator);
 			culling_system->insert(spheres, renderables);
 
+			Lumix::ScopedTimer timer("Culling System", allocator);
+
 			culling_system->cullToFrustum(clipping_frustum, 1);
 			const Lumix::CullingSystem::Results& result = culling_system->getResult();
 
@@ -110,6 +112,8 @@ namespace
 
 			culling_system = Lumix::CullingSystem::create(*mtjd_manager, allocator);
 			culling_system->insert(spheres, renderables);
+
+			Lumix::ScopedTimer timer("Culling System Async", allocator);
 
 			culling_system->cullToFrustumAsync(clipping_frustum, 1);
 

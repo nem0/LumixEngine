@@ -488,16 +488,12 @@ project "engine"
 
 	defines { "BUILDING_ENGINE" }
 	includedirs { "../external/lua/include" }
-	linkLib "lua"
+	linkLib("lua")
 
-	
-	if not _OPTIONS["static-plugins"] then
-		linkLib "SDL"
-	
-		configuration { "vs20*" }
-			links { "winmm", "psapi", "imm32", "version" }
+	configuration { "windows", "not asmjs", "not android-*" }
+		if not _OPTIONS["static-plugins"] then
 			linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
-	end
+		end
 		
 	defaultConfigurations()
 
@@ -619,11 +615,9 @@ if build_unit_tests then
 		files { "../src/unit_tests/**.h", "../src/unit_tests/**.cpp" }
 		includedirs { "../src", "../src/unit_tests", "../external/bgfx/include" }
 		links { "animation", "renderer", "engine" }
-
 		if _OPTIONS["static-plugins"] then	
-			linkLib "SDL"
-			configuration { "vs20*" }
-				links { "winmm", "psapi", "imm32", "version" }
+			configuration { "vs*" }
+				links { "winmm", "psapi" }
 			configuration {} 
 				linkLib "bgfx"
 		end
@@ -695,9 +689,7 @@ if build_app then
 		
 		configuration {}
 		
-		if _OPTIONS["static-plugins"] then	
-			linkLib "SDL"
-		end
+		linkLib "SDL"
 		configuration {"vs*"}
 			links { "winmm", "imm32", "version" }
 		configuration {}
@@ -730,6 +722,7 @@ if build_studio then
 		configuration {}
 
 		if not _OPTIONS["static-plugins"] then	
+			linkLib "SDL"
 			configuration {"vs*"}
 				links { "winmm", "imm32", "version" }
 			configuration {}
@@ -784,9 +777,7 @@ if build_studio then
 			links { "renderer", "editor", "engine" }
 		end
 
-		if _OPTIONS["static-plugins"] then	
-			linkLib "SDL"
-		end
+		linkLib "SDL"
 
 		configuration {"vs*"}
 			links { "winmm", "imm32", "version" }

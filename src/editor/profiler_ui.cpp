@@ -63,6 +63,7 @@ struct ProfilerUIImpl : public ProfilerUI
 		m_filter[0] = 0;
 		m_resource_filter[0] = 0;
 
+		m_timer = Lumix::Timer::create(engine.getAllocator());
 		m_device.OnEvent.bind<ProfilerUIImpl, &ProfilerUIImpl::onFileSystemEvent>(this);
 		engine.getFileSystem().mount(&m_device);
 		const auto& devices = engine.getFileSystem().getDefaultDevice();
@@ -112,6 +113,7 @@ struct ProfilerUIImpl : public ProfilerUI
 		m_allocation_root->clear(m_allocator);
 		LUMIX_DELETE(m_allocator, m_allocation_root);
 		Lumix::Profiler::getFrameListeners().unbind<ProfilerUIImpl, &ProfilerUIImpl::onFrame>(this);
+		Lumix::Timer::destroy(m_timer);
 	}
 
 
@@ -120,7 +122,7 @@ struct ProfilerUIImpl : public ProfilerUI
 		if (event.type == Lumix::FS::EventType::OPEN_BEGIN)
 		{
 			auto& file = m_opened_files.emplace();
-			file.start = m_timer.getTimeSinceStart();
+			file.start = m_timer->getTimeSinceStart();
 			file.last_read = file.start;
 			file.bytes = 0;
 			file.handle = event.handle;
@@ -145,7 +147,7 @@ struct ProfilerUIImpl : public ProfilerUI
 				{
 					m_opened_files[i].bytes += event.param;
 					Lumix::MT::atomicAdd(&m_bytes_read, event.param);
-					m_opened_files[i].last_read = m_timer.getTimeSinceStart();
+					m_opened_files[i].last_read = m_timer->getTimeSinceStart();
 					return;
 				}
 			}
@@ -446,7 +448,7 @@ struct ProfilerUIImpl : public ProfilerUI
 	Lumix::Array<Log> m_logs;
 	Lumix::FS::FileEventsDevice m_device;
 	Lumix::Engine& m_engine;
-	Lumix::Timer m_timer;
+	Lumix::Timer* m_timer;
 	int m_transfer_rates[100];
 	int m_current_transfer_rate;
 	volatile int m_bytes_read;
