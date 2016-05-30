@@ -1,12 +1,10 @@
 local ide_dir = iif(_ACTION == nil, "vs2015", _ACTION)
-if _ACTION == "gmake" then
-	if "linux-gcc" == _OPTIONS["gcc"] then
-		ide_dir = "gcc"
-	elseif "linux-gcc-5" == _OPTIONS["gcc"] then
-		ide_dir = "gcc5"
-	elseif "linux-clang" == _OPTIONS["gcc"] then
-		ide_dir = "clang"
-	end
+if "linux-gcc" == _OPTIONS["gcc"] then
+	ide_dir = "gcc"
+elseif "linux-gcc-5" == _OPTIONS["gcc"] then
+	ide_dir = "gcc5"
+elseif "linux-clang" == _OPTIONS["gcc"] then
+	ide_dir = "clang"
 end
 
 local LOCATION = "tmp/" .. ide_dir
@@ -406,7 +404,7 @@ solution "LumixEngine"
 	end
 	
 	if not build_studio then
-		excludes { "../src/**/editor/*" }
+		removefiles { "../src/**/editor/*" }
 	end
 
 	configuration { "linux-*" }
@@ -459,22 +457,22 @@ solution "LumixEngine"
 		defines { "_HAS_EXCEPTIONS=0" }
 
 	configuration "not macosx"
-		excludes { "../src/**/osx/*"}
+		removefiles { "../src/**/osx/*"}
 		
 	configuration "not linux"
-		excludes { "../src/**/linux/*"}
+		removefiles { "../src/**/linux/*"}
 		
 	configuration "not windows"
-		excludes { "../src/**/win/*"}
+		removefiles { "../src/**/win/*"}
 
 	configuration "asmjs"
-		excludes { "../src/**/win/*"}
+		removefiles { "../src/**/win/*"}
 
 	configuration "android-*"
-		excludes { "../src/**/win/*"}
+		removefiles { "../src/**/win/*"}
 		
 	configuration "not asmjs" 
-		excludes { "../src/**/asmjs/*"}
+		removefiles { "../src/**/asmjs/*"}
 	
 	if _OPTIONS["static-plugins"] then
 		defines {"STATIC_PLUGINS"}
