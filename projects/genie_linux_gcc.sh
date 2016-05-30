@@ -1,0 +1,1 @@
+./genie_linux --static-plugins --no-physics --no-unit-tests --gcc=linux-gcc gmake
