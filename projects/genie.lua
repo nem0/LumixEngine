@@ -248,6 +248,11 @@ function copyDlls(src_dir, platform_bit, platform_dir, dest_dir)
 		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CharacterKinematicCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
 		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\""
 	}
+
+	configuration { "linux-*" }
+		postbuildcommands {
+			"cp ../../../external/assimp/dll/" .. platform_dir .. "_" .. ide_dir .. "/" .. src_dir .. "/libassimp.so bin/" .. dest_dir,
+		}
 end
 
 function libType()
@@ -786,10 +791,17 @@ if build_studio then
 		useLua()
 		defaultConfigurations()
 		
-		copyDlls("Debug", 32, "win32", "Debug")
-		copyDlls("Debug", 64, "win64", "Debug")
-		copyDlls("Release", 32, "win32", "Release")
-		copyDlls("Release", 64, "win64", "Release")
-		copyDlls("Release", 32, "win32", "RelWithDebInfo")
-		copyDlls("Release", 64, "win64", "RelWithDebInfo")
+		if _ACTION == "vs2015" then
+			copyDlls("Debug", 32, "win32", "Debug")
+			copyDlls("Debug", 64, "win64", "Debug")
+			copyDlls("Release", 32, "win32", "Release")
+			copyDlls("Release", 64, "win64", "Release")
+			copyDlls("Release", 32, "win32", "RelWithDebInfo")
+			copyDlls("Release", 64, "win64", "RelWithDebInfo")
+		end
+		
+		if "linux-gcc" == _OPTIONS["gcc"] then
+			copyDlls("debug", 64, "linux64", "Debug")
+			copyDlls("release", 64, "linux64", "Release")
+		end
 end
