@@ -1423,6 +1423,7 @@ public:
 							onWindowTransformed(x, y, w, h);
 						}
 						break;
+						case SDL_WINDOWEVENT_CLOSE: exit(); break;
 					}
 					break;
 				case SDL_QUIT: exit(); break;
