@@ -1533,7 +1533,7 @@ public:
 		SDL_Init(SDL_INIT_VIDEO);
 
 		checkWorkingDirector();
-		m_window = SDL_CreateWindow("test", 0, 0, 800, 600, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+		m_window = SDL_CreateWindow("Lumix Studio", 0, 0, 800, 600, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 		
 		char current_dir[Lumix::MAX_PATH_LENGTH];
 		PlatformInterface::getCurrentDirectory(current_dir, Lumix::lengthOf(current_dir));
