@@ -156,7 +156,8 @@ public:
 	LOD* getLODs() { return m_lods; }
 	Array<uint8>& getIndices() { return m_indices; }
 	const Array<Vec3>& getVertices() const { return m_vertices; }
-	
+	uint32 getFlags() const { return m_flags;	}
+
 	static void registerLuaAPI(lua_State* L);
 
 public:
