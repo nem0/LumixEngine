@@ -243,6 +243,8 @@ struct NavigationScene : public IScene
 			ASSERT(model->isReady());
 
 			auto& indices = model->getIndices();
+			bool is16 = model->getFlags() & (uint32)Model::Flags::INDICES_16BIT;
+
 			Entity entity = render_scene->getRenderableEntity(renderable);
 			Matrix mtx = m_universe.getMatrix(entity);
 			AABB model_aabb = model->getAABB();
@@ -256,15 +258,33 @@ struct NavigationScene : public IScene
 				if (mesh.material->isCustomFlag(no_navigation_flag)) continue;
 				auto* vertices =
 					&model->getVertices()[mesh.attribute_array_offset / model->getVertexDecl().getStride()];
-				for (int i = 0; i < mesh.indices_count; i += 3)
+				if (is16)
 				{
-					Vec3 a = mtx.multiplyPosition(vertices[indices[mesh.indices_offset + i]]);
-					Vec3 b = mtx.multiplyPosition(vertices[indices[mesh.indices_offset + i + 1]]);
-					Vec3 c = mtx.multiplyPosition(vertices[indices[mesh.indices_offset + i + 2]]);
+					uint16* indices16 = (uint16*)&model->getIndices()[0];
+					for (int i = 0; i < mesh.indices_count; i += 3)
+					{
+						Vec3 a = mtx.multiplyPosition(vertices[indices16[mesh.indices_offset + i]]);
+						Vec3 b = mtx.multiplyPosition(vertices[indices16[mesh.indices_offset + i + 1]]);
+						Vec3 c = mtx.multiplyPosition(vertices[indices16[mesh.indices_offset + i + 2]]);
 
-					Vec3 n = crossProduct(a - b, a - c).normalized();
-					uint8 area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
-					rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
+						Vec3 n = crossProduct(a - b, a - c).normalized();
+						uint8 area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
+						rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
+					}
+				}
+				else
+				{
+					uint32* indices32 = (uint32*)&model->getIndices()[0];
+					for (int i = 0; i < mesh.indices_count; i += 3)
+					{
+						Vec3 a = mtx.multiplyPosition(vertices[indices32[mesh.indices_offset + i]]);
+						Vec3 b = mtx.multiplyPosition(vertices[indices32[mesh.indices_offset + i + 1]]);
+						Vec3 c = mtx.multiplyPosition(vertices[indices32[mesh.indices_offset + i + 2]]);
+
+						Vec3 n = crossProduct(a - b, a - c).normalized();
+						uint8 area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
+						rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
+					}
 				}
 			}
 		}
@@ -638,7 +658,8 @@ struct NavigationScene : public IScene
 			g_log_error.log("Navigation") << "Could not generate navmesh: Out of memory 'solid'.";
 			return false;
 		}
-		if(!rcCreateHeightfield(&ctx, *solid, m_config.width, m_config.height, m_config.bmin, m_config.bmax, m_config.cs, m_config.ch))
+		if (!rcCreateHeightfield(
+				&ctx, *solid, m_config.width, m_config.height, m_config.bmin, m_config.bmax, m_config.cs, m_config.ch))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not create solid heightfield.";
 			return false;
@@ -651,33 +672,33 @@ struct NavigationScene : public IScene
 
 		rcCompactHeightfield* chf = rcAllocCompactHeightfield();
 		m_debug_compact_heightfield = keep_data ? chf : nullptr;
-		if(!chf)
+		if (!chf)
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Out of memory 'chf'.";
 			return false;
 		}
 
-		if(!rcBuildCompactHeightfield(&ctx, m_config.walkableHeight, m_config.walkableClimb, *solid, *chf))
+		if (!rcBuildCompactHeightfield(&ctx, m_config.walkableHeight, m_config.walkableClimb, *solid, *chf))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not build compact data.";
 			return false;
 		}
 
-		if(!m_debug_heightfield) rcFreeHeightField(solid);
+		if (!m_debug_heightfield) rcFreeHeightField(solid);
 
-		if(!rcErodeWalkableArea(&ctx, m_config.walkableRadius, *chf))
+		if (!rcErodeWalkableArea(&ctx, m_config.walkableRadius, *chf))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not erode.";
 			return false;
 		}
 
-		if(!rcBuildDistanceField(&ctx, *chf))
+		if (!rcBuildDistanceField(&ctx, *chf))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not build distance field.";
 			return false;
 		}
 
-		if(!rcBuildRegions(&ctx, *chf, m_config.borderSize, m_config.minRegionArea, m_config.mergeRegionArea))
+		if (!rcBuildRegions(&ctx, *chf, m_config.borderSize, m_config.minRegionArea, m_config.mergeRegionArea))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not build regions.";
 			return false;
@@ -685,49 +706,50 @@ struct NavigationScene : public IScene
 
 		rcContourSet* cset = rcAllocContourSet();
 		m_debug_contours = keep_data ? cset : nullptr;
-		if(!cset)
+		if (!cset)
 		{
 			ctx.log(RC_LOG_ERROR, "Could not generate navmesh: Out of memory 'cset'.");
 			return false;
 		}
-		if(!rcBuildContours(&ctx, *chf, m_config.maxSimplificationError, m_config.maxEdgeLen, *cset))
+		if (!rcBuildContours(&ctx, *chf, m_config.maxSimplificationError, m_config.maxEdgeLen, *cset))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not create contours.";
 			return false;
 		}
 
 		m_polymesh = rcAllocPolyMesh();
-		if(!m_polymesh)
+		if (!m_polymesh)
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Out of memory 'm_polymesh'.";
 			return false;
 		}
-		if(!rcBuildPolyMesh(&ctx, *cset, m_config.maxVertsPerPoly, *m_polymesh))
+		if (!rcBuildPolyMesh(&ctx, *cset, m_config.maxVertsPerPoly, *m_polymesh))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not triangulate contours.";
 			return false;
 		}
 
 		m_detail_mesh = rcAllocPolyMeshDetail();
-		if(!m_detail_mesh)
+		if (!m_detail_mesh)
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Out of memory 'pmdtl'.";
 			return false;
 		}
 
-		if(!rcBuildPolyMeshDetail(&ctx, *m_polymesh, *chf, m_config.detailSampleDist, m_config.detailSampleMaxError, *m_detail_mesh))
+		if (!rcBuildPolyMeshDetail(
+				&ctx, *m_polymesh, *chf, m_config.detailSampleDist, m_config.detailSampleMaxError, *m_detail_mesh))
 		{
 			g_log_error.log("Navigation") << "Could not generate navmesh: Could not build detail mesh.";
 			return false;
 		}
 
-		if(!m_debug_compact_heightfield) rcFreeCompactHeightfield(chf);
-		if(!m_debug_contours) rcFreeContourSet(cset);
+		if (!m_debug_compact_heightfield) rcFreeCompactHeightfield(chf);
+		if (!m_debug_contours) rcFreeContourSet(cset);
 
 		unsigned char* nav_data = 0;
 		int nav_data_size = 0;
 
-		for(int i = 0; i < m_polymesh->npolys; ++i)
+		for (int i = 0; i < m_polymesh->npolys; ++i)
 		{
 			m_polymesh->flags[i] = m_polymesh->areas[i] == RC_WALKABLE_AREA ? 1 : 0;
 		}
@@ -756,12 +778,12 @@ struct NavigationScene : public IScene
 		params.ch = m_config.ch;
 		params.buildBvTree = false;
 
-		if(!dtCreateNavMeshData(&params, &nav_data, &nav_data_size))
+		if (!dtCreateNavMeshData(&params, &nav_data, &nav_data_size))
 		{
 			g_log_error.log("Navigation") << "Could not build Detour navmesh.";
 			return false;
 		}
-		if(dtStatusFailed(m_navmesh->addTile(nav_data, nav_data_size, DT_TILE_FREE_DATA, 0, nullptr)))
+		if (dtStatusFailed(m_navmesh->addTile(nav_data, nav_data_size, DT_TILE_FREE_DATA, 0, nullptr)))
 		{
 			g_log_error.log("Navigation") << "Could not add Detour tile.";
 			return false;
