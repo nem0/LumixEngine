@@ -161,9 +161,12 @@ bool Settings::load(Action** actions, int actions_count)
 	m_mouse_sensitivity_x = getFloat(L, "mouse_sensitivity_x", 200.0f);
 	m_mouse_sensitivity_y = getFloat(L, "mouse_sensitivity_y", 200.0f);
 
-	if (lua_getglobal(L, "data_dir") == LUA_TSTRING) Lumix::copyString(m_data_dir, lua_tostring(L, -1));
-	lua_pop(L, 1);
-	m_editor->getEngine().setPatchPath(m_data_dir);
+	if (!m_editor->getEngine().getPatchFileDevice())
+	{
+		if (lua_getglobal(L, "data_dir") == LUA_TSTRING) Lumix::copyString(m_data_dir, lua_tostring(L, -1));
+		lua_pop(L, 1);
+		m_editor->getEngine().setPatchPath(m_data_dir);
+	}
 
 	if (lua_getglobal(L, "actions") == LUA_TTABLE)
 	{
