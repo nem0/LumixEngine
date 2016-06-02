@@ -1402,9 +1402,8 @@ public:
 	}
 
 
-	bool processSystemEvents()
+	void processSystemEvents()
 	{
-		bool want_quit = false;
 		SDL_Event event;
 		auto& io = ImGui::GetIO();
 		while (SDL_PollEvent(&event))
@@ -1476,7 +1475,6 @@ public:
 				}
 			}
 		}
-		return !want_quit;
 	}
 
 
@@ -1493,7 +1491,7 @@ public:
 				float frame_time;
 				{
 					PROFILE_BLOCK("tick");
-					m_finished = m_finished || !processSystemEvents();
+					processSystemEvents();
 					if (!m_finished) update();
 					frame_time = timer->tick();
 				}
