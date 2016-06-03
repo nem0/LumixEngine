@@ -55,7 +55,7 @@ private:
 	Lumix::WorldEditor& m_editor;
 	AssetBrowser& m_asset_browser;
 	Lumix::Array<IPlugin*> m_plugins;
-	char m_filter[128];
+	char m_component_filter[32];
 
 	float m_particle_emitter_timescale;
 	bool m_particle_emitter_updating;
