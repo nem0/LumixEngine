@@ -138,7 +138,7 @@ bool ShaderCompiler::isChanged(const Lumix::ShaderCombinations& combinations,
 void ShaderCompiler::makeUpToDate()
 {
 	auto* iter = PlatformInterface::createFileIterator("shaders", m_editor.getAllocator());
-
+	bool is_opengl = getRenderer().isOpenGL();
 	Lumix::Array<Lumix::string> src_list(m_editor.getAllocator());
 	auto& fs = m_editor.getEngine().getFileSystem();
 	PlatformInterface::FileInfo info;
@@ -167,7 +167,8 @@ void ShaderCompiler::makeUpToDate()
 		Lumix::ShaderCombinations combinations;
 		Lumix::Shader::getShaderCombinations(getRenderer(), &data[0], &combinations);
 
-		Lumix::StaticString<Lumix::MAX_PATH_LENGTH> bin_base_path("shaders/compiled/", basename, "_");
+		Lumix::StaticString<Lumix::MAX_PATH_LENGTH> bin_base_path(
+			"shaders/compiled", is_opengl ? "_gl/" : "/", basename, "_");
 		if (isChanged(combinations, bin_base_path, shd_path))
 		{
 			src_list.emplace(shd_path, m_editor.getAllocator());
@@ -240,7 +241,9 @@ static bool readLine(Lumix::FS::IFile* file, char* out, int max_size)
 void ShaderCompiler::parseDependencies()
 {
 	m_dependencies.clear();
-	auto* iter = PlatformInterface::createFileIterator("shaders/compiled", m_editor.getAllocator());
+	bool is_opengl = getRenderer().isOpenGL();
+	Lumix::StaticString<30> compiled_dir("shaders/compiled", is_opengl ? "_gl" : "");
+	auto* iter = PlatformInterface::createFileIterator(compiled_dir, m_editor.getAllocator());
 
 	auto& fs = m_editor.getEngine().getFileSystem();
 	PlatformInterface::FileInfo info;
@@ -249,7 +252,7 @@ void ShaderCompiler::parseDependencies()
 		if (!Lumix::PathUtils::hasExtension(info.filename, "d")) continue;
 
 		auto* file = fs.open(fs.getDiskDevice(),
-			Lumix::Path(Lumix::StaticString<Lumix::MAX_PATH_LENGTH>("shaders/compiled/", info.filename)),
+			Lumix::Path(Lumix::StaticString<Lumix::MAX_PATH_LENGTH>(compiled_dir, "/", info.filename)),
 			Lumix::FS::Mode::READ | Lumix::FS::Mode::OPEN);
 		if (!file)
 		{
@@ -354,6 +357,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 	const Lumix::ShaderCombinations::Defines& all_defines)
 {
 	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
+	bool is_opengl = getRenderer().isOpenGL();
 
 	for (int mask = 0; mask < 1 << Lumix::lengthOf(all_defines); ++mask)
 	{
@@ -366,7 +370,8 @@ void ShaderCompiler::compilePass(const char* shd_path,
 				"\"shaders/", basename, is_vertex_shader ? "_vs.sc\"" : "_fs.sc\"");
 			char out_path[Lumix::MAX_PATH_LENGTH];
 			Lumix::copyString(out_path, base_path);
-			Lumix::catString(out_path, "/shaders/compiled/");
+			Lumix::catString(out_path, "/shaders/compiled");
+			Lumix::catString(out_path, is_opengl ? "_gl/" : "/");
 			Lumix::catString(out_path, basename);
 			Lumix::catString(out_path, "_");
 			Lumix::catString(out_path, Lumix::StaticString<30>(pass, mask));
@@ -375,15 +380,14 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			Lumix::StaticString<1024> args(" -f ");
 
 			args << source_path << " -o \"" << out_path << "\" --depends ";
-			#ifdef _WIN32
-				args << "--platform windows ";
-				args << (is_vertex_shader ? "--profile vs_5_0" : "--profile ps_5_0");
-
-			#elif defined __linux__
+			if (getRenderer().isOpenGL())
+			{
 				args << "--platform linux --profile 140 ";
-			#else
-				#error Platform not supported
-			#endif
+			}
+			else
+			{
+				args << "--platform windows " << (is_vertex_shader ? "--profile vs_5_0" : "--profile ps_5_0");
+			}
 			args << " --type "
 				<< (is_vertex_shader ? "vertex -O3" : "fragment -O3")
 				<< " --define " << pass << ";";
@@ -561,6 +565,7 @@ void ShaderCompiler::compile(const char* path)
 {
 	Lumix::StaticString<Lumix::MAX_PATH_LENGTH> compiled_dir(
 		m_editor.getEngine().getDiskFileDevice()->getBasePath(), "/shaders/compiled");
+	if (getRenderer().isOpenGL()) compiled_dir << "_gl";
 	if (!PlatformInterface::makePath(compiled_dir))
 	{
 		if (!PlatformInterface::dirExists(compiled_dir))
@@ -606,6 +611,7 @@ void ShaderCompiler::compileAll(bool wait)
 
 	Lumix::StaticString<Lumix::MAX_PATH_LENGTH> compiled_dir(
 		m_editor.getEngine().getDiskFileDevice()->getBasePath(), "/shaders/compiled");
+	if (getRenderer().isOpenGL()) compiled_dir << "_gl";
 	if (!PlatformInterface::makePath(compiled_dir))
 	{
 		if (!PlatformInterface::dirExists(compiled_dir))

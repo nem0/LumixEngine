@@ -58,5 +58,6 @@ class SceneView
 		Lumix::Pipeline* m_pipeline;
 		bgfx::TextureHandle m_texture_handle;
 		bool m_show_stats;
+		bool m_is_opengl;
 		LogUI* m_log_ui;
 };
