@@ -155,7 +155,9 @@ public:
 		m_file_system = Lumix::FS::FileSystem::create(m_allocator);
 
 		m_mem_file_device = LUMIX_NEW(m_allocator, Lumix::FS::MemoryFileDevice)(m_allocator);
-		m_disk_file_device = LUMIX_NEW(m_allocator, Lumix::FS::DiskFileDevice)("disk", "", m_allocator);
+		char current_dir[Lumix::MAX_PATH_LENGTH];
+		GetCurrentDirectory(sizeof(current_dir), current_dir);
+		m_disk_file_device = LUMIX_NEW(m_allocator, Lumix::FS::DiskFileDevice)("disk", current_dir, m_allocator);
 		m_pack_file_device = LUMIX_NEW(m_allocator, Lumix::FS::PackFileDevice)(m_allocator);
 
 		m_file_system->mount(m_mem_file_device);
@@ -165,7 +167,7 @@ public:
 		m_file_system->setDefaultDevice("memory:disk:pack");
 		m_file_system->setSaveGameDevice("memory:disk");
 
-		m_engine = Lumix::Engine::create("", "", m_file_system, m_allocator);
+		m_engine = Lumix::Engine::create(current_dir, "", m_file_system, m_allocator);
 		Lumix::Engine::PlatformData platform_data;
 		platform_data.window_handle = m_hwnd;
 		m_engine->setPlatformData(platform_data);
@@ -173,6 +175,7 @@ public:
 		m_engine->getPluginManager().load("renderer");
 		m_engine->getPluginManager().load("animation");
 		m_engine->getPluginManager().load("audio");
+		m_engine->getPluginManager().load("navigation");
 		m_engine->getPluginManager().load("lua_script");
 		m_engine->getPluginManager().load("physics");
 		m_engine->getInputSystem().enable(true);

@@ -9,6 +9,7 @@
 #include "engine/lua_wrapper.h"
 #include "engine/profiler.h"
 #include "engine/engine.h"
+#include "imgui/imgui.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
@@ -32,6 +33,7 @@ namespace Lumix
 
 static const float SHADOW_CAM_NEAR = 50.0f;
 static const float SHADOW_CAM_FAR = 5000.0f;
+static bool is_opengl = false;
 
 
 struct InstanceData
@@ -257,6 +259,7 @@ struct PipelineImpl : public Pipeline
 		, m_is_rendering_in_shadowmap(false)
 		, m_is_ready(false)
 	{
+		is_opengl = renderer.isOpenGL();
 		m_first_postprocess_framebuffer = 0;
 		m_deferred_point_light_vertex_decl.begin()
 			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
@@ -693,22 +696,13 @@ struct PipelineImpl : public Pipeline
 		m_applied_camera = cmp;
 		m_camera_frustum = m_scene->getCameraFrustum(cmp);
 
-		Matrix projection_matrix;
-		float fov = m_scene->getCameraFOV(cmp);
-		float near_plane = m_scene->getCameraNearPlane(cmp);
-		float far_plane = m_scene->getCameraFarPlane(cmp);
-		float ratio = float(m_width) / m_height;
-		projection_matrix.setPerspective(
-			Math::degreesToRadians(fov), ratio, near_plane, far_plane);
-		projection_matrix = m_scene->getCameraProjection(cmp);
+		Matrix projection_matrix = m_scene->getCameraProjection(cmp);
 
 		Universe& universe = m_scene->getUniverse();
-		Matrix mtx = universe.getMatrix(m_scene->getCameraEntity(cmp));
-		mtx.fastInverse();
-		bgfx::setViewTransform(m_bgfx_view, &mtx.m11, &projection_matrix.m11);
-
-		bgfx::setViewRect(
-			m_bgfx_view, (uint16_t)m_view_x, (uint16_t)m_view_y, (uint16)m_width, (uint16)m_height);
+		Matrix view = universe.getMatrix(m_scene->getCameraEntity(cmp));
+		view.fastInverse();
+		bgfx::setViewTransform(m_bgfx_view, &view.m11, &projection_matrix.m11);
+		bgfx::setViewRect(m_bgfx_view, (uint16_t)m_view_x, (uint16_t)m_view_y, (uint16)m_width, (uint16)m_height);
 	}
 
 
@@ -1076,7 +1070,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::setViewRect(m_bgfx_view, 0, 0, shadowmap_width, shadowmap_height);
 
 		Matrix projection_matrix;
-		projection_matrix.setPerspective(Math::degreesToRadians(fov), 1, 0.01f, range);
+		projection_matrix.setPerspective(Math::degreesToRadians(fov), 1, 0.01f, range, is_opengl);
 		Matrix view_matrix;
 		view_matrix.lookAt(pos, pos - mtx.getZVector(), mtx.getYVector());
 		bgfx::setViewTransform(m_bgfx_view, &view_matrix.m11, &projection_matrix.m11);
@@ -1084,9 +1078,10 @@ struct PipelineImpl : public Pipeline
 		PointLightShadowmap& s = m_point_light_shadowmaps.emplace();
 		s.m_framebuffer = m_current_framebuffer;
 		s.m_light = light;
+		float ymul = is_opengl ? 0.5f : -0.5f;
 		static const Matrix biasMatrix(
 			0.5,  0.0, 0.0, 0.0,
-			0.0, -0.5, 0.0, 0.0,
+			0.0, ymul, 0.0, 0.0,
 			0.0,  0.0, 0.5, 0.0,
 			0.5,  0.5, 0.5, 1.0);
 		s.m_matrices[0] = biasMatrix * (projection_matrix * view_matrix);
@@ -1141,7 +1136,7 @@ struct PipelineImpl : public Pipeline
 			float aspect = tanf(fovx * 0.5f) / tanf(fovy * 0.5f);
 
 			Matrix projection_matrix;
-			projection_matrix.setPerspective(fovx, aspect, 0.01f, range);
+			projection_matrix.setPerspective(fovx, aspect, 0.01f, range, is_opengl);
 
 			Matrix view_matrix;
 			view_matrix.fromEuler(YPR[i][0], YPR[i][1], YPR[i][2]);
@@ -1159,8 +1154,9 @@ struct PipelineImpl : public Pipeline
 
 			bgfx::setViewTransform(m_bgfx_view, &view_matrix.m11, &projection_matrix.m11);
 
+			float ymul = is_opengl ? 0.5f : -0.5f;
 			static const Matrix biasMatrix(
-				0.5, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
+				0.5, 0.0, 0.0, 0.0, 0.0, ymul, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
 			shadowmap_info.m_matrices[i] = biasMatrix * (projection_matrix * view_matrix);
 
 			m_tmp_meshes.clear();
@@ -1233,7 +1229,8 @@ struct PipelineImpl : public Pipeline
 		m_global_light_shadowmap = m_current_framebuffer;
 		float shadowmap_height = (float)m_current_framebuffer->getHeight();
 		float shadowmap_width = (float)m_current_framebuffer->getWidth();
-		float viewports[] = {0, 0, 0.5f, 0, 0, 0.5f, 0.5f, 0.5f};
+		float viewports[] = { 0, 0, 0.5f, 0, 0, 0.5f, 0.5f, 0.5f };
+		float viewports_gl[] = { 0, 0.5f, 0.5f, 0.5f, 0, 0, 0.5f, 0};
 		float camera_fov = Math::degreesToRadians(m_scene->getCameraFOV(m_applied_camera));
 		float camera_ratio = m_scene->getCameraScreenWidth(m_applied_camera) / camera_height;
 		Vec4 cascades = m_scene->getShadowmapCascades(light_cmp);
@@ -1241,7 +1238,7 @@ struct PipelineImpl : public Pipeline
 		m_is_rendering_in_shadowmap = true;
 		bgfx::setViewClear(m_bgfx_view, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
 		bgfx::touch(m_bgfx_view);
-		float* viewport = viewports + split_index * 2;
+		float* viewport = (is_opengl ? viewports_gl : viewports) + split_index * 2;
 		bgfx::setViewRect(m_bgfx_view,
 			(uint16)(1 + shadowmap_width * viewport[0]),
 			(uint16)(1 + shadowmap_height * viewport[1]),
@@ -1263,13 +1260,14 @@ struct PipelineImpl : public Pipeline
 		shadow_cam_pos = shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
 
 		Matrix projection_matrix;
-		projection_matrix.setOrtho(bb_size, -bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
+		projection_matrix.setOrtho(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, is_opengl);
 		Vec3 light_forward = light_mtx.getZVector();
 		shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
 		Matrix view_matrix;
 		view_matrix.lookAt(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
 		bgfx::setViewTransform(m_bgfx_view, &view_matrix.m11, &projection_matrix.m11);
-		static const Matrix biasMatrix(0.5, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
+		float ymul = is_opengl ? 0.5f : -0.5f;
+		static const Matrix biasMatrix(0.5, 0.0, 0.0, 0.0, 0.0, ymul, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
 		m_shadow_viewprojection[split_index] = biasMatrix * (projection_matrix * view_matrix);
 
 		Frustum shadow_camera_frustum;
@@ -1681,7 +1679,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void drawQuad(float x, float y, float w, float h, int material_index)
+	void drawQuad(float left, float top, float w, float h, int material_index)
 	{
 		Material* material = m_materials[material_index];
 		if (!material->isReady() || !bgfx::checkAvailTransientVertexBuffer(3, m_base_vertex_decl))
@@ -1691,7 +1689,7 @@ struct PipelineImpl : public Pipeline
 		}
 
 		Matrix projection_mtx;
-		projection_mtx.setOrtho(-1, 1, 1, -1, 0, 30);
+		projection_mtx.setOrtho(0, 1, 0, 1, 0, 30, is_opengl);
 
 		bgfx::setViewTransform(m_bgfx_view, &Matrix::IDENTITY.m11, &projection_mtx.m11);
 		if (m_current_framebuffer)
@@ -1710,46 +1708,51 @@ struct PipelineImpl : public Pipeline
 		bgfx::TransientVertexBuffer vb;
 		bgfx::allocTransientVertexBuffer(&vb, 6, m_base_vertex_decl);
 		BaseVertex* vertex = (BaseVertex*)vb.data;
-		float x2 = x + w;
-		float y2 = y + h;
+		float right = left + w;
+		float bottom = top + h;
+		if (!is_opengl)
+		{
+			top = 1-top;
+			bottom = 1-bottom;
+		}
 
-		vertex[0].x = x;
-		vertex[0].y = y;
+		vertex[0].x = left;
+		vertex[0].y = top;
 		vertex[0].z = 0;
 		vertex[0].rgba = 0xffffffff;
 		vertex[0].u = 0;
 		vertex[0].v = 0;
 
-		vertex[1].x = x2;
-		vertex[1].y = y;
+		vertex[1].x = right;
+		vertex[1].y = top;
 		vertex[1].z = 0;
 		vertex[1].rgba = 0xffffffff;
 		vertex[1].u = 1;
 		vertex[1].v = 0;
 
-		vertex[2].x = x2;
-		vertex[2].y = y2;
+		vertex[2].x = right;
+		vertex[2].y = bottom;
 		vertex[2].z = 0;
 		vertex[2].rgba = 0xffffffff;
 		vertex[2].u = 1;
 		vertex[2].v = 1;
 
-		vertex[3].x = x;
-		vertex[3].y = y;
+		vertex[3].x = left;
+		vertex[3].y = top;
 		vertex[3].z = 0;
 		vertex[3].rgba = 0xffffffff;
 		vertex[3].u = 0;
 		vertex[3].v = 0;
 
-		vertex[4].x = x2;
-		vertex[4].y = y2;
+		vertex[4].x = right;
+		vertex[4].y = bottom;
 		vertex[4].z = 0;
 		vertex[4].rgba = 0xffffffff;
 		vertex[4].u = 1;
 		vertex[4].v = 1;
 
-		vertex[5].x = x;
-		vertex[5].y = y2;
+		vertex[5].x = left;
+		vertex[5].y = bottom;
 		vertex[5].z = 0;
 		vertex[5].rgba = 0xffffffff;
 		vertex[5].u = 0;
@@ -1767,11 +1770,10 @@ struct PipelineImpl : public Pipeline
 			float far_plane = m_scene->getCameraFarPlane(m_applied_camera);
 			float ratio = float(m_width) / m_height;
 			Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
-			Matrix camera_matrix = universe.getPositionAndRotation(camera_entity);
-			Matrix view_matrix = camera_matrix;
+			Matrix inv_view_matrix = universe.getPositionAndRotation(camera_entity);
+			Matrix view_matrix = inv_view_matrix;
 			view_matrix.fastInverse();
-			projection_matrix.setPerspective(
-				Math::degreesToRadians(fov), ratio, near_plane, far_plane);
+			projection_matrix.setPerspective(Math::degreesToRadians(fov), ratio, near_plane, far_plane, is_opengl);
 			Matrix inv_projection = projection_matrix;
 			inv_projection.inverse();
 			Matrix inv_view_proj = projection_matrix * view_matrix;
@@ -1781,13 +1783,13 @@ struct PipelineImpl : public Pipeline
 			bgfx::setUniform(m_cam_inv_viewproj_uniform, &inv_view_proj.m11);
 			bgfx::setUniform(m_cam_view_uniform, &view_matrix.m11);
 			bgfx::setUniform(m_cam_proj_uniform, &projection_matrix.m11);
-			bgfx::setUniform(m_cam_inv_view_uniform, &camera_matrix.m11);
+			bgfx::setUniform(m_cam_inv_view_uniform, &inv_view_matrix.m11);
 			auto cam_params = Vec4(near_plane, far_plane, fov, ratio);
 			bgfx::setUniform(m_cam_params, &cam_params);
 		}
 
 		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
-		bgfx::setState(m_render_state | material->getRenderStates());
+		bgfx::setState((m_render_state | material->getRenderStates()) & ~BGFX_STATE_CULL_MASK);
 		bgfx::setVertexBuffer(&vb);
 		++m_stats.draw_call_count;
 		++m_stats.instance_count;

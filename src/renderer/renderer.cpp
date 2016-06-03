@@ -1,6 +1,7 @@
 #include "renderer.h"
 
 #include "engine/array.h"
+#include "engine/command_line_parser.h"
 #include "engine/crc32.h"
 #include "engine/fs/os_file.h"
 #include "engine/lifo_allocator.h"
@@ -12,6 +13,7 @@
 #include "engine/engine.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
+#include "engine/system.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
 #include "renderer/model.h"
@@ -710,7 +712,21 @@ struct RendererImpl : public Renderer
 			d.ndt = display;
 			bgfx::setPlatformData(d);
 		}
-		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub, &m_bgfx_allocator);
+		char cmd_line[4096];
+		bgfx::RendererType::Enum renderer_type = bgfx::RendererType::Count;
+		Lumix::getCommandLine(cmd_line, Lumix::lengthOf(cmd_line));
+		Lumix::CommandLineParser cmd_line_parser(cmd_line);
+		while (cmd_line_parser.next())
+		{
+			if (cmd_line_parser.currentEquals("-opengl"))
+			{
+				renderer_type = bgfx::RendererType::OpenGL;
+				break;
+			}
+		}
+
+		bool res = bgfx::init(renderer_type, 0, 0, &m_callback_stub, &m_bgfx_allocator);
+		ASSERT(res);
 		bgfx::reset(800, 600);
 		bgfx::setDebug(BGFX_DEBUG_TEXT);
 
@@ -754,6 +770,13 @@ struct RendererImpl : public Renderer
 		bgfx::frame();
 		bgfx::frame();
 		bgfx::shutdown();
+	}
+
+
+	bool isOpenGL() const override
+	{
+		return bgfx::getRendererType() == bgfx::RendererType::OpenGL ||
+			   bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
 	}
 
 

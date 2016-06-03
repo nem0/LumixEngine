@@ -1282,7 +1282,9 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		float width = ImGui::GetIO().DisplaySize.x;
 		float height = ImGui::GetIO().DisplaySize.y;
 		Matrix ortho;
-		ortho.setOrtho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
+		bool is_opengl = bgfx::getRendererType() == bgfx::RendererType::OpenGL ||
+						 bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
+		ortho.setOrtho(0.0f, width, height, 0.0f, -1.0f, 1.0f, is_opengl);
 		m_gui_pipeline->setViewport(0, 0, (int)width, (int)height);
 		m_gui_pipeline->setViewProjection(ortho, (int)width, (int)height);
 	}

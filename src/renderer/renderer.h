@@ -46,6 +46,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual ModelManager& getModelManager() = 0;
 		virtual Shader* getDefaultShader() = 0;
 		virtual const bgfx::UniformHandle& getMaterialColorShininessUniform() const = 0;
+		virtual bool isOpenGL() const = 0;
 
 		virtual Engine& getEngine() = 0;
 }; 

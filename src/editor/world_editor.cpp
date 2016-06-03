@@ -2648,15 +2648,13 @@ public:
 		Quat rot = universe->getRotation(m_camera);
 		Quat old_rot = rot;
 
-		float yaw =
-			-Math::signum(x) * (Math::pow(Math::abs((float)x / m_mouse_sensitivity.x), 1.2f));
+		float yaw = -Math::signum(x) * (Math::pow(Math::abs((float)x / m_mouse_sensitivity.x), 1.2f));
 		Quat yaw_rot(Vec3(0, 1, 0), yaw);
 		rot = rot * yaw_rot;
 		rot.normalize();
 
 		Vec3 pitch_axis = rot * Vec3(1, 0, 0);
-		float pitch =
-			-Math::signum(y) * (Math::pow(Math::abs((float)y / m_mouse_sensitivity.y), 1.2f));
+		float pitch = -Math::signum(y) * (Math::pow(Math::abs((float)y / m_mouse_sensitivity.y), 1.2f));
 		Quat pitch_rot(pitch_axis, pitch);
 		rot = rot * pitch_rot;
 		rot.normalize();

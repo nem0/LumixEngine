@@ -61,6 +61,7 @@ static const uint32 TERRAIN_HASH = crc32("terrain");
 static const uint32 BONE_ATTACHMENT_HASH = crc32("bone_attachment");
 static const uint32 MATERIAL_HASH = crc32("MATERIAL");
 static const uint32 MODEL_HASH = crc32("MODEL");
+static bool is_opengl = false;
 
 
 struct PointLight
@@ -196,6 +197,7 @@ public:
 		, m_point_lights_map(m_allocator)
 		, m_bone_attachments(m_allocator)
 	{
+		is_opengl = renderer.isOpenGL();
 		m_is_updating_attachments = false;
 		m_universe.entityTransformed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 		m_universe.entityDestroyed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
@@ -2472,53 +2474,15 @@ public:
 		return INVALID_COMPONENT;
 	}
 
-	const char* getCameraSlot(ComponentIndex camera) override
-	{
-		return m_cameras[camera].slot;
-	}
-
-	float getCameraFOV(ComponentIndex camera) override
-	{
-		return m_cameras[camera].fov;
-	}
-
-	void setCameraFOV(ComponentIndex camera, float fov) override
-	{
-		m_cameras[camera].fov = fov;
-	}
-
-	void setCameraNearPlane(ComponentIndex camera,
-									float near_plane) override
-	{
-		m_cameras[camera].near = near_plane;
-	}
-
-	float getCameraNearPlane(ComponentIndex camera) override
-	{
-		return m_cameras[camera].near;
-	}
-
-	void setCameraFarPlane(ComponentIndex camera,
-								   float far_plane) override
-	{
-		m_cameras[camera].far = far_plane;
-	}
-
-	float getCameraFarPlane(ComponentIndex camera) override
-	{
-		return m_cameras[camera].far;
-	}
-
-	float getCameraScreenWidth(ComponentIndex camera) override
-	{
-		return m_cameras[camera].screen_width;
-	}
-
-
-	float getCameraScreenHeight(ComponentIndex camera) override
-	{
-		return m_cameras[camera].screen_height;
-	}
+	const char* getCameraSlot(ComponentIndex camera) override { return m_cameras[camera].slot; }
+	float getCameraFOV(ComponentIndex camera) override { return m_cameras[camera].fov; }
+	void setCameraFOV(ComponentIndex camera, float fov) override { m_cameras[camera].fov = fov; }
+	void setCameraNearPlane(ComponentIndex camera, float near_plane) override { m_cameras[camera].near = near_plane; }
+	float getCameraNearPlane(ComponentIndex camera) override { return m_cameras[camera].near; }
+	void setCameraFarPlane(ComponentIndex camera, float far_plane) override { m_cameras[camera].far = far_plane; }
+	float getCameraFarPlane(ComponentIndex camera) override { return m_cameras[camera].far; }
+	float getCameraScreenWidth(ComponentIndex camera) override { return m_cameras[camera].screen_width; }
+	float getCameraScreenHeight(ComponentIndex camera) override { return m_cameras[camera].screen_height; }
 
 
 	Matrix getCameraProjection(ComponentIndex cmp) override
@@ -2530,14 +2494,15 @@ public:
 		{
 			mtx.setOrtho(-camera.ortho_size * ratio,
 				camera.ortho_size * ratio,
-				camera.ortho_size,
 				-camera.ortho_size,
+				camera.ortho_size,
 				camera.near,
-				camera.far);
+				camera.far,
+				is_opengl);
 		}
 		else
 		{
-			mtx.setPerspective(Math::degreesToRadians(camera.fov), ratio, camera.near, camera.far);
+			mtx.setPerspective(Math::degreesToRadians(camera.fov), ratio, camera.near, camera.far, is_opengl);
 		}
 		return mtx;
 	}
@@ -2559,36 +2524,13 @@ public:
 
 	float getCameraOrthoSize(ComponentIndex camera) override { return m_cameras[camera].ortho_size; }
 	void setCameraOrthoSize(ComponentIndex camera, float value) override { m_cameras[camera].ortho_size = value; }
+	bool isCameraOrtho(ComponentIndex camera) override { return m_cameras[camera].is_ortho; }
+	void setCameraOrtho(ComponentIndex camera, bool is_ortho) override { m_cameras[camera].is_ortho = is_ortho; }
 
 
-	bool isCameraOrtho(ComponentIndex camera) override
-	{
-		return m_cameras[camera].is_ortho;
-	}
-
-
-	void setCameraOrtho(ComponentIndex camera, bool is_ortho) override
-	{
-		m_cameras[camera].is_ortho = is_ortho;
-	}
-
-
-	const Array<DebugTriangle>& getDebugTriangles() const override
-	{
-		return m_debug_triangles;
-	}
-
-
-	const Array<DebugLine>& getDebugLines() const override
-	{
-		return m_debug_lines;
-	}
-
-
-	const Array<DebugPoint>& getDebugPoints() const override
-	{
-		return m_debug_points;
-	}
+	const Array<DebugTriangle>& getDebugTriangles() const override { return m_debug_triangles; }
+	const Array<DebugLine>& getDebugLines() const override { return m_debug_lines; }
+	const Array<DebugPoint>& getDebugPoints() const override { return m_debug_points; }
 
 
 	void addDebugSphere(const Vec3& center,

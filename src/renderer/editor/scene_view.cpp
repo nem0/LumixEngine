@@ -27,6 +27,7 @@ SceneView::SceneView()
 	m_is_mouse_captured = false;
 	m_show_stats = false;
 	m_log_ui = nullptr;
+	m_is_opengl = false;
 }
 
 
@@ -76,7 +77,7 @@ bool SceneView::init(LogUI& log_ui, Lumix::WorldEditor& editor, Lumix::Array<Act
 	auto& engine = editor.getEngine();
 	auto& allocator = engine.getAllocator();
 	auto* renderer = static_cast<Lumix::Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-
+	m_is_opengl = renderer->isOpenGL();
 	Lumix::Path path("pipelines/main.lua");
 	m_pipeline = Lumix::Pipeline::create(*renderer, path, engine.getAllocator());
 	m_pipeline->load();
@@ -197,7 +198,14 @@ void SceneView::onGUI()
 			m_height = int(size.y);
 			auto content_min = ImGui::GetCursorScreenPos();
 			ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
-			ImGui::Image(&m_texture_handle, size);
+			if (m_is_opengl)
+			{
+				ImGui::Image(&m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
+			}
+			else
+			{
+				ImGui::Image(&m_texture_handle, size);
+			}
 			view_pos = content_min;
 			auto rel_mp = ImGui::GetMousePos();
 			rel_mp.x -= m_screen_x;

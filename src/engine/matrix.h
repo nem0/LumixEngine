@@ -179,37 +179,37 @@ struct LUMIX_ENGINE_API Matrix
 	}
 
 
-	void setOrtho(float left, float right, float top, float bottom, float z_near, float z_far)
+	void setOrtho(float left, float right, float bottom, float top, float z_near, float z_far, bool is_opengl)
 	{
 		*this = IDENTITY;
 		m11 = 2 / (right - left);
 		m22 = 2 / (top - bottom);
-		m33 = -1 / (z_far - z_near);
+		m33 = (is_opengl ? -2 : -1) / (z_far - z_near);
 		m41 = (right + left) / (left - right);
 		m42 = (top + bottom) / (bottom - top);
-		m43 = z_near / (z_near - z_far);
+		m43 = is_opengl ? (z_near + z_far) / (z_near - z_far) : z_near / (z_near - z_far);
 	}
 
 
-	void setPerspective(float fov, float ratio, float near_plane, float far_plane);
+	void setPerspective(float fov, float ratio, float near_plane, float far_plane, bool is_opengl);
 
 
 	void fromEuler(float yaw, float pitch, float roll);
 
 
-	void lookAt(const Vec3& pos, const Vec3& center, const Vec3& up)
+	void lookAt(const Vec3& eye, const Vec3& at, const Vec3& up)
 	{
 		*this = Matrix::IDENTITY;
-		Vec3 f = center - pos;
+		Vec3 f = eye - at;
 		f.normalize();
-		Vec3 r = crossProduct(f, up);
+		Vec3 r = crossProduct(up, f);
 		r.normalize();
-		Vec3 u = crossProduct(r, f);
+		Vec3 u = crossProduct(f, r);
 		setXVector(r);
 		setYVector(u);
-		setZVector(-f);
+		setZVector(f);
 		transpose();
-		setTranslation(Vec3(-dotProduct(r, pos), -dotProduct(u, pos), dotProduct(f, pos)));
+		setTranslation(Vec3(-dotProduct(r, eye), -dotProduct(u, eye), -dotProduct(f, eye)));
 	}
 
 
