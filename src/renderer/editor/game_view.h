@@ -45,5 +45,6 @@ private:
 	bool m_is_mouse_hovering_window;
 	float m_time_multiplier;
 	bool m_paused;
+	bool m_is_opengl;
 	StudioApp& m_studio_app;
 };
