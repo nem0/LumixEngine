@@ -118,31 +118,21 @@ bool FrameBuffer::RenderBuffer::isDepth() const
 
 static bgfx::TextureFormat::Enum getFormat(const char* name) 
 {
-	if (equalStrings(name, "depth32"))
+	static const struct { const char* name; bgfx::TextureFormat::Enum value; } FORMATS[] = {
+		{ "depth32", bgfx::TextureFormat::D32 },
+		{ "depth24", bgfx::TextureFormat::D24 },
+		{ "depth24stencil8", bgfx::TextureFormat::D24S8 },
+		{ "rgba8", bgfx::TextureFormat::RGBA8 },
+		{ "rgba16f", bgfx::TextureFormat::RGBA16F },
+		{ "r32f", bgfx::TextureFormat::R32F },
+	};
+
+	for (auto& i : FORMATS)
 	{
-		return bgfx::TextureFormat::D32;
+		if (equalStrings(i.name, name)) return i.value;
 	}
-	else if (equalStrings(name, "depth24"))
-	{
-		return bgfx::TextureFormat::D24;
-	}
-	else if (equalStrings(name, "rgba8"))
-	{
-		return bgfx::TextureFormat::RGBA8;
-	}
-	else if (equalStrings(name, "rgba16f"))
-	{
-		return bgfx::TextureFormat::RGBA16F;
-	}
-	else if (equalStrings(name, "r32f"))
-	{
-		return bgfx::TextureFormat::R32F;
-	}
-	else
-	{
-		g_log_error.log("Renderer") << "Uknown texture format " << name;
-		return bgfx::TextureFormat::RGBA8;
-	}
+	g_log_error.log("Renderer") << "Uknown texture format " << name;
+	return bgfx::TextureFormat::RGBA8;
 }
 
 
