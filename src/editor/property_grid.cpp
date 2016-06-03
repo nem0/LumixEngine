@@ -38,7 +38,7 @@ PropertyGrid::PropertyGrid(Lumix::WorldEditor& editor,
 {
 	m_particle_emitter_updating = true;
 	m_particle_emitter_timescale = 1.0f;
-	m_filter[0] = '\0';
+	m_component_filter[0] = '\0';
 }
 
 
@@ -562,12 +562,14 @@ void PropertyGrid::onGUI()
 		}
 		if (ImGui::BeginPopup("AddComponentPopup"))
 		{
+			ImGui::InputText("Filter", m_component_filter, sizeof(m_component_filter));
 			for (int i = 0; i < Lumix::PropertyRegister::getComponentTypesCount(); ++i)
 			{
-				if (ImGui::Selectable(Lumix::PropertyRegister::getComponentTypeLabel(i)))
+				const char* label = Lumix::PropertyRegister::getComponentTypeLabel(i);
+
+				if ((!m_component_filter[0] || Lumix::stristr(label, m_component_filter)) && ImGui::Selectable(label))
 				{
-					m_editor.addComponent(
-						Lumix::crc32(Lumix::PropertyRegister::getComponentTypeID(i)));
+					m_editor.addComponent(Lumix::crc32(Lumix::PropertyRegister::getComponentTypeID(i)));
 					break;
 				}
 			}
