@@ -1100,19 +1100,18 @@ struct PipelineImpl : public Pipeline
 
 		float viewports[] = {0, 0, 0.5, 0, 0, 0.5, 0.5, 0.5};
 
+		static const float YPR_gl[4][3] = {
+			{ Math::degreesToRadians(-90.0f), Math::degreesToRadians(-27.36780516f), Math::degreesToRadians(0.0f) },
+			{ Math::degreesToRadians(90.0f), Math::degreesToRadians(-27.36780516f), Math::degreesToRadians(0.0f) },
+			{ Math::degreesToRadians(0.0f), Math::degreesToRadians(27.36780516f), Math::degreesToRadians(0.0f) },
+			{ Math::degreesToRadians(180.0f), Math::degreesToRadians(27.36780516f), Math::degreesToRadians(0.0f) },
+		};
+
 		static const float YPR[4][3] = {
-			{Math::degreesToRadians(0.0f),
-			 Math::degreesToRadians(27.36780516f),
-			 Math::degreesToRadians(0.0f)},
-			{Math::degreesToRadians(180.0f),
-			 Math::degreesToRadians(27.36780516f),
-			 Math::degreesToRadians(0.0f)},
-			{Math::degreesToRadians(-90.0f),
-			 Math::degreesToRadians(-27.36780516f),
-			 Math::degreesToRadians(0.0f)},
-			{Math::degreesToRadians(90.0f),
-			 Math::degreesToRadians(-27.36780516f),
-			 Math::degreesToRadians(0.0f)},
+			{Math::degreesToRadians(0.0f), Math::degreesToRadians(27.36780516f), Math::degreesToRadians(0.0f)},
+			{Math::degreesToRadians(180.0f), Math::degreesToRadians(27.36780516f), Math::degreesToRadians(0.0f)},
+			{Math::degreesToRadians(-90.0f), Math::degreesToRadians(-27.36780516f), Math::degreesToRadians(0.0f)},
+			{Math::degreesToRadians(90.0f), Math::degreesToRadians(-27.36780516f), Math::degreesToRadians(0.0f)},
 		};
 
 		PointLightShadowmap& shadowmap_info = m_point_light_shadowmaps.emplace();
@@ -1139,7 +1138,14 @@ struct PipelineImpl : public Pipeline
 			projection_matrix.setPerspective(fovx, aspect, 0.01f, range, is_opengl);
 
 			Matrix view_matrix;
-			view_matrix.fromEuler(YPR[i][0], YPR[i][1], YPR[i][2]);
+			if (is_opengl)
+			{
+				view_matrix.fromEuler(YPR_gl[i][0], YPR_gl[i][1], YPR_gl[i][2]);
+			}
+			else
+			{
+				view_matrix.fromEuler(YPR[i][0], YPR[i][1], YPR[i][2]);
+			}
 			view_matrix.setTranslation(light_pos);
 			Frustum frustum;
 			frustum.computePerspective(light_pos,
