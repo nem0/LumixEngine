@@ -1917,9 +1917,9 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	m_model.mesh_scale = 1;
 	m_model.remove_doubles = false;
 	m_model.create_billboard_lod = false;
-	m_model.lods[0] = 10;
-	m_model.lods[1] = 100;
-	m_model.lods[2] = 1000;
+	m_model.lods[0] = -10;
+	m_model.lods[1] = -100;
+	m_model.lods[2] = -1000;
 	m_model.lods[3] = -10000;
 	m_model.orientation = Y_UP;
 	m_is_opened = false;
