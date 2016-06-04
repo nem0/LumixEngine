@@ -63,6 +63,7 @@ public:
 		m_exit_code = 0;
 		g_app = this;
 		m_template_name[0] = '\0';
+		m_open_filter[0] = '\0';
 		init();
 	}
 
@@ -583,10 +584,12 @@ public:
 		doMenuItem(getAction("newUniverse"), false, true);
 		if (ImGui::BeginMenu("Open"))
 		{
+			ImGui::InputText("Filter", m_open_filter, sizeof(m_open_filter));
 			auto& universes = m_asset_browser->getResources(0);
 			for (auto& univ : universes)
 			{
-				if (ImGui::MenuItem(univ.c_str()))
+				if ((m_open_filter[0] == '\0' || Lumix::stristr(univ.c_str(), m_open_filter)) &&
+					ImGui::MenuItem(univ.c_str()))
 				{
 					if (m_editor->isUniverseChanged())
 					{
@@ -1668,6 +1671,7 @@ public:
 	Settings m_settings;
 	Metadata m_metadata;
 	char m_template_name[100];
+	char m_open_filter[64];
 
 	bool m_finished;
 	int m_exit_code;
