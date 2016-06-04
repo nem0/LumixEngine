@@ -122,7 +122,7 @@ bool Metadata::save()
 				break;
 				case DataItem::RAW_MEMORY:
 				{
-					int len = value.m_raw.size;
+					int len = (int)value.m_raw.size;
 					file.write(&len, sizeof(len));
 					file.write(value.m_raw.memory, len);
 				}
