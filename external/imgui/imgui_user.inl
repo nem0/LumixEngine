@@ -421,8 +421,8 @@ void EndNode(ImVec2& pos)
     }
 
     draw_list->ChannelsSetCurrent(0);
-    draw_list->AddRectFilled(node_pos, node_pos + size, ImColor(60, 60, 60), 4.0f);
-    draw_list->AddRect(node_pos, node_pos + size, ImColor(100, 100, 100), 4.0f);
+    draw_list->AddRectFilled(node_pos, node_pos + size, ImColor(230, 230, 230), 4.0f);
+    draw_list->AddRect(node_pos, node_pos + size, ImColor(150, 150, 150), 4.0f);
 
     PopID();
     draw_list->ChannelsMerge();
