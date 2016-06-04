@@ -101,9 +101,8 @@ struct Sphere
 };
 
 
-class LUMIX_ENGINE_API Frustum
+struct LUMIX_ENGINE_API Frustum
 {
-public:
 	void computeOrtho(const Vec3& position,
 		const Vec3& direction,
 		const Vec3& up,

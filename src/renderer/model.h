@@ -18,7 +18,7 @@ struct lua_State;
 namespace Lumix
 {
 
-class Frustum;
+struct Frustum;
 class Material;
 struct Mesh;
 class Model;

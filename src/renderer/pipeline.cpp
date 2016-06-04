@@ -753,8 +753,7 @@ struct PipelineImpl : public Pipeline
 			m_current_framebuffer = m_default_framebuffer;
 			if (m_current_framebuffer)
 			{
-				bgfx::setViewFrameBuffer(m_bgfx_view,
-										 m_current_framebuffer->getHandle());
+				bgfx::setViewFrameBuffer(m_bgfx_view, m_current_framebuffer->getHandle());
 			}
 			else
 			{
@@ -765,13 +764,11 @@ struct PipelineImpl : public Pipeline
 		m_current_framebuffer = getFramebuffer(framebuffer_name);
 		if (m_current_framebuffer)
 		{
-			bgfx::setViewFrameBuffer(m_bgfx_view,
-									 m_current_framebuffer->getHandle());
+			bgfx::setViewFrameBuffer(m_bgfx_view, m_current_framebuffer->getHandle());
 		}
 		else
 		{
-			g_log_warning.log("Renderer") << "Framebuffer " << framebuffer_name
-										  << " not found";
+			g_log_warning.log("Renderer") << "Framebuffer " << framebuffer_name << " not found";
 		}
 	}
 
@@ -782,10 +779,7 @@ struct PipelineImpl : public Pipeline
 	int getHeight() override { return m_height; }
 
 
-	float getFPS()
-	{
-		return m_renderer.getEngine().getFPS();
-	}
+	float getFPS() { return m_renderer.getEngine().getFPS(); }
 
 
 	void executeCustomCommand(const char* name)

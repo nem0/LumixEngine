@@ -14,7 +14,7 @@ namespace Lumix
 
 struct AABB;
 class Engine;
-class Frustum;
+struct Frustum;
 class IAllocator;
 class LIFOAllocator;
 class Material;
