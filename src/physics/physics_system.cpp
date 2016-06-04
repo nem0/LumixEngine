@@ -14,6 +14,7 @@
 #include "physics/physics_scene.h"
 #include "renderer/render_scene.h"
 #include "engine/universe/universe.h"
+#include <cstdlib>
 
 
 namespace Lumix
@@ -263,18 +264,33 @@ namespace Lumix
 	class AssertNullAllocator : public physx::PxAllocatorCallback
 	{
 	public:
-		void* allocate(size_t size, const char*, const char*, int) override
-		{
-			void* ret = _aligned_malloc(size, 16);
-			// g_log_info.log("Physics") << "Allocated " << size << " bytes for " << typeName << "
-			// from " << filename << "(" << line << ")";
-			ASSERT(ret);
-			return ret;
-		}
-		void deallocate(void* ptr) override
-		{
-			_aligned_free(ptr);
-		}
+		#ifdef _WIN32
+			void* allocate(size_t size, const char*, const char*, int) override
+			{
+				void* ret = _aligned_malloc(size, 16);
+				// g_log_info.log("Physics") << "Allocated " << size << " bytes for " << typeName << "
+				// from " << filename << "(" << line << ")";
+				ASSERT(ret);
+				return ret;
+			}
+			void deallocate(void* ptr) override
+			{
+				_aligned_free(ptr);
+			}
+		#else
+			void* allocate(size_t size, const char*, const char*, int) override
+			{
+				void* ret = aligned_alloc(16, size);
+				// g_log_info.log("Physics") << "Allocated " << size << " bytes for " << typeName << "
+				// from " << filename << "(" << line << ")";
+				ASSERT(ret);
+				return ret;
+			}
+			void deallocate(void* ptr) override
+			{
+				free(ptr);
+			}
+		#endif
 	};
 
 

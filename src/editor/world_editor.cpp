@@ -2470,7 +2470,7 @@ public:
 
 		m_engine = &engine;
 
-		const char* plugins[] = { "renderer", "animation", "audio", "physics", "lua_script"};
+		const char* plugins[] = { "renderer", "animation", "audio", "physics", "navigation", "lua_script"};
 
 		PluginManager& plugin_manager = m_engine->getPluginManager();
 		for (auto* plugin_name : plugins)

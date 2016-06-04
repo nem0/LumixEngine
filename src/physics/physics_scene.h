@@ -16,6 +16,7 @@ namespace Lumix
 
 
 class Engine;
+class PhysicsSystem;
 class RenderScene;
 class Universe;
 

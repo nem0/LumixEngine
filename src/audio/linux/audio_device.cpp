@@ -48,9 +48,10 @@ public:
 static AudioDeviceImpl g_null_device;
 
 
+
 AudioDevice* AudioDevice::create(Engine& engine)
 {
-	return nullptr;
+	return &g_null_device;
 }
 
 
