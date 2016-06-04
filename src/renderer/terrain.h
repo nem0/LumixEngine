@@ -13,7 +13,7 @@ namespace Lumix
 
 
 struct AABB;
-class Frustum;
+struct Frustum;
 struct GrassInfo;
 class IAllocator;
 class LIFOAllocator;

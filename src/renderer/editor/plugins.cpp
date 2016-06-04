@@ -1487,26 +1487,47 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 	}
 
 
+	void showCameraGizmo(ComponentUID cmp)
+	{
+		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
+		Universe& universe = scene->getUniverse();
+		Vec3 pos = universe.getPosition(cmp.entity);
+
+		bool is_ortho = scene->isCameraOrtho(cmp.index);
+		float near_distance = scene->getCameraNearPlane(cmp.index);
+		float far_distance = scene->getCameraFarPlane(cmp.index);
+		Vec3 dir = universe.getRotation(cmp.entity) * Vec3(0, 0, -1);
+		Vec3 right = universe.getRotation(cmp.entity) * Vec3(1, 0, 0);
+		Vec3 up = universe.getRotation(cmp.entity) * Vec3(0, 1, 0);
+		float w = scene->getCameraScreenWidth(cmp.index);
+		float h = scene->getCameraScreenHeight(cmp.index);
+		float ratio = h < 1.0f ? 1 : w / h;
+
+		if (is_ortho)
+		{
+			float ortho_size = scene->getCameraOrthoSize(cmp.index);
+			Vec3 center = pos;
+			center += (far_distance - near_distance) * dir * 0.5f;
+			scene->addDebugCube(center,
+				(far_distance - near_distance) * dir * 0.5f,
+				ortho_size * up,
+				ortho_size * ratio * right,
+				0xffff0000,
+				0);
+		}
+		else
+		{
+			float fov = scene->getCameraFOV(cmp.index);
+			scene->addDebugFrustum(pos, dir, up, fov, ratio, near_distance, far_distance, 0xffff0000, 0);
+		}
+	}
+
+
 	bool showGizmo(ComponentUID cmp) override 
 	{
 		if (cmp.type == CAMERA_HASH)
 		{
-			RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-			Universe& universe = scene->getUniverse();
-			Vec3 pos = universe.getPosition(cmp.entity);
-
-			float fov = scene->getCameraFOV(cmp.index);
-			float near_distance = scene->getCameraNearPlane(cmp.index);
-			float far_distance = scene->getCameraFarPlane(cmp.index);
-			Vec3 dir = universe.getRotation(cmp.entity) * Vec3(0, 0, -1);
-			Vec3 right = universe.getRotation(cmp.entity) * Vec3(1, 0, 0);
-			Vec3 up = universe.getRotation(cmp.entity) * Vec3(0, 1, 0);
-			float w = scene->getCameraScreenWidth(cmp.index);
-			float h = scene->getCameraScreenHeight(cmp.index);
-			float ratio = h < 1.0f ? 1 : w / h;
-
-			scene->addDebugFrustum(
-				pos, dir, up, fov, ratio, near_distance, far_distance, 0xffff0000, 0);
+			showCameraGizmo(cmp);
 			return true;
 		}
 		if (cmp.type == POINT_LIGHT_HASH)

@@ -16,7 +16,7 @@ namespace Lumix
 	{
 		class Manager;
 	}
-	class Frustum;
+	struct Frustum;
 
 	class LUMIX_RENDERER_API CullingSystem
 	{

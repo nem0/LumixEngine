@@ -141,6 +141,12 @@ struct LUMIX_ENGINE_API Vec3
 };
 
 
+inline Vec3 operator *(float f, const Vec3& v)
+{
+	return Vec3(f * v.x, f * v.y, f * v.z);
+}
+
+
 struct LUMIX_ENGINE_API Vec4
 {
 	Vec4() {}
