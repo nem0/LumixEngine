@@ -2133,8 +2133,7 @@ void ShaderEditor::generatePasses(Lumix::OutputBlob& blob)
 
 	for (int i = 0; i < pass; ++i)
 	{
-		if (i > 0) blob << ", ";
-		blob << "\"" << passes[i] << "\"";
+		blob << "pass \"" << passes[i] << "\"\n";
 	}
 }
 
@@ -2154,28 +2153,17 @@ void ShaderEditor::generateMain(const char* path)
 		return;
 	}
 
-	fputs("passes = {", fp);
-
 	Lumix::OutputBlob blob(m_allocator);
 	generatePasses(blob);
 	fwrite(blob.getData(), 1, blob.getPos(), fp);
-	fputs("}\n"
-		  "vs_combinations = {\"\"}\n"
-		  "fs_combinations = {\"\"}\n"
-		  "texture_slots = {\n",
-		  fp);
 
 	bool first = true;
 	for(const auto& texture : m_textures)
 	{
 		if(!texture[0]) continue;
 
-		if (!first) fputs(", ", fp);
-		first = false;
-		fprintf(fp, "{ name = \"%s\", uniform = \"%s\" }", texture, texture);
+		fprintf(fp, "texture_slot(\"%s\", \"%s\")\n", texture, texture);
 	}
-
-	fputs("}\n", fp);
 
 	fclose(fp);
 }
