@@ -4,6 +4,15 @@
 
 
 static const char* METADATA_FILENAME = "metadata.bin";
+static const Lumix::uint32 METADATA_MAGIC = 0x4D455441; // 'META'
+
+
+enum class MetadataVersion : Lumix::int32
+{
+	FIRST,
+
+	LATEST
+};
 
 
 Metadata::Metadata(Lumix::IAllocator& allocator)
@@ -20,6 +29,20 @@ bool Metadata::load()
 
 	m_data.clear();
 	int count;
+	Lumix::uint32 magic;
+	file.read(&magic, sizeof(magic));
+	if (magic != METADATA_MAGIC)
+	{
+		file.close();
+		return false;
+	}
+	Lumix::int32 version;
+	file.read(&version, sizeof(version));
+	if (version > (int)MetadataVersion::LATEST)
+	{
+		file.close();
+		return false;
+	}
 	file.read(&count, sizeof(count));
 	for (int i = 0; i < count; ++i)
 	{
@@ -46,6 +69,14 @@ bool Metadata::load()
 					file.read(value.m_string, len);
 				}
 				break;
+				case DataItem::RAW_MEMORY:
+				{
+					int len;
+					file.read(&len, sizeof(len));
+					value.m_raw.memory = m_allocator.allocate(len);
+					file.read(value.m_raw.memory, len);
+				}
+				break;
 				default: ASSERT(false); break;
 			}
 		}
@@ -61,6 +92,9 @@ bool Metadata::save()
 	Lumix::FS::OsFile file;
 	if (!file.open(METADATA_FILENAME, Lumix::FS::Mode::CREATE_AND_WRITE, m_allocator)) return false;
 
+	file.write(&METADATA_MAGIC, sizeof(METADATA_MAGIC));
+	Lumix::int32 version = (int)MetadataVersion::LATEST;
+	file.write(&version, sizeof(version));
 	int count = m_data.size();
 	file.write(&count, sizeof(count));
 	for (int i = 0; i < m_data.size(); ++i)
@@ -84,6 +118,13 @@ bool Metadata::save()
 					int len = Lumix::stringLength(value.m_string);
 					file.write(&len, sizeof(len));
 					file.write(value.m_string, len);
+				}
+				break;
+				case DataItem::RAW_MEMORY:
+				{
+					int len = value.m_raw.size;
+					file.write(&len, sizeof(len));
+					file.write(value.m_raw.memory, len);
 				}
 				break;
 				default: ASSERT(false); break;
