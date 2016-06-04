@@ -173,7 +173,7 @@ end
 function defaultConfigurations()
 	configuration "Debug"
 		targetdir(BINARY_DIR .. "Debug")
-		defines { "DEBUG" }
+		defines { "DEBUG", "_DEBUG" }
 		flags { "Symbols", "WinMain" }
 
 	configuration "Release"
@@ -250,6 +250,10 @@ function copyDlls(src_dir, platform_bit, platform_dir, dest_dir)
 	configuration { "linux-*" }
 		postbuildcommands {
 			"cp ../../../external/assimp/dll/" .. platform_dir .. "_" .. ide_dir .. "/" .. src_dir .. "/libassimp.so bin/" .. dest_dir,
+			"cp ../../../external/physx/dll/linux64_gcc/libPhysX3CommonCHECKED_".. physx_suffix .. ".so bin/" .. dest_dir,
+			"cp ../../../external/physx/dll/linux64_gcc/libPhysX3CookingCHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir,
+			"cp ../../../external/physx/dll/linux64_gcc/libPhysX3CharacterKinematicCHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir,
+			"cp ../../../external/physx/dll/linux64_gcc/libPhysX3CHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir
 		}
 end
 
@@ -263,12 +267,16 @@ end
 
 function linkPhysX()
 	if build_physics then
-		configuration { "x64" }
+		configuration { "x64", "vs20*" }
 			libdirs {"../external/physx/lib/" .. ide_dir .. "/win64"}
 			links {"PhysX3CHECKED_x64", "PhysX3CommonCHECKED_x64", "PhysX3CharacterKinematicCHECKED_x64", "PhysX3CookingCHECKED_x64" }
-		configuration { "x32" }
+		configuration { "x32", "vs20*" }
 			libdirs {"../external/physx/lib/" .. ide_dir .. "/win32"}
 			links {"PhysX3CHECKED_x86", "PhysX3CommonCHECKED_x86", "PhysX3CharacterKinematicCHECKED_x86", "PhysX3CookingCHECKED_x86"}
+		configuration { "x64", "linux-*" }
+			libdirs {"../external/physx/lib/linux64_gcc", "../external/physx/dll/linux64_gcc"}
+			links {"PhysX3CHECKED_x64", "PhysX3CommonCHECKED_x64", "PhysX3CharacterKinematicCHECKED_x64", "PhysX3CookingCHECKED_x64" }
+		
 
 		configuration { "Debug" }
 			links { "PhysX3ExtensionsDEBUG", "PhysXVisualDebuggerSDKDEBUG" }
@@ -419,10 +427,6 @@ solution "LumixEngine"
 			"-Wundef",
 			"-msse2",
 		}
-		links {
-			"rt",
-			"dl",
-		}
 		linkoptions {
 			"-Wl,--gc-sections",
 		}
@@ -491,13 +495,15 @@ project "engine"
 
 	defines { "BUILDING_ENGINE" }
 	includedirs { "../external/lua/include" }
-	linkLib("lua")
+	
+	linkLib "lua"
 
-	configuration { "windows", "not asmjs", "not android-*" }
+	configuration { "vs20*" }
 		if not _OPTIONS["static-plugins"] then
 			linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
 		end
-		
+
+
 	defaultConfigurations()
 
 if build_physics then
@@ -506,7 +512,7 @@ if build_physics then
 
 		files { "../src/physics/**.h", "../src/physics/**.cpp" }
 
-		includedirs { "../external/physx/include/" .. ide_dir, "../external/bgfx/include" }
+		includedirs { "../external/physx/include/", "../external/bgfx/include" }
 		defines { "BUILDING_PHYSICS" }
 		links { "engine", "renderer", "editor" }
 
@@ -688,7 +694,7 @@ if build_app then
 
 		configuration { "linux-*" }
 			files { "../src/app/main_linux.cpp" }
-			links { "GL", "X11" }
+			links { "GL", "X11", "dl", "rt" }
 		
 		configuration {}
 		
@@ -769,7 +775,7 @@ if build_studio then
 			linkPhysX()
 			
 			configuration { "linux-*" }
-				links { "GL", "X11" }
+				links { "GL", "X11", "dl", "rt" }
 				linkoptions { "-Wl,-rpath '-Wl,$$ORIGIN'" }
 
 			configuration { "vs*" }

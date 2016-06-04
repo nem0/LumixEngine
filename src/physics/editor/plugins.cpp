@@ -133,7 +133,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 					auto* layer_name = scene->getCollisionLayerName(i);
 					float offset = basic_offset + i * 35.0f;
 					ImGui::SetColumnOffset(-1, offset);
-					ImGui::Text(layer_name);
+					ImGui::Text("%s", layer_name);
 					ImGui::NextColumn();
 				}
 				ImGui::PopTextWrapPos();
@@ -141,7 +141,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 				ImGui::Separator();
 				for (int i = 0, c = scene->getCollisionsLayersCount(); i < c; ++i)
 				{
-					ImGui::Text(scene->getCollisionLayerName(i));
+					ImGui::Text("%s", scene->getCollisionLayerName(i));
 					ImGui::NextColumn();
 
 					for (int j = 0; j <= i; ++j)
