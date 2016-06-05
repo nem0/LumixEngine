@@ -389,7 +389,7 @@ void BeginNode(ImGuiID id, ImVec2 screen_pos)
     last_node_id = id;
     node_pos = screen_pos;
     SetCursorScreenPos(screen_pos + GetStyle().WindowPadding);
-    PushItemWidth(200);
+    PushItemWidth(150);
     ImDrawList* draw_list = GetWindowDrawList();
     draw_list->ChannelsSplit(2);
     draw_list->ChannelsSetCurrent(1);
@@ -400,12 +400,12 @@ void BeginNode(ImGuiID id, ImVec2 screen_pos)
 void EndNode(ImVec2& pos)
 {
     ImDrawList* draw_list = GetWindowDrawList();
-
-    EndGroup();
+	ImGui::SameLine();
+	float width = GetCursorScreenPos().x - node_pos.x;
+	EndGroup();
     PopItemWidth();
-
     float height = GetCursorScreenPos().y - node_pos.y;
-    ImVec2 size(200, height + GetStyle().WindowPadding.y);
+    ImVec2 size(width + GetStyle().WindowPadding.x, height + GetStyle().WindowPadding.y);
     SetCursorScreenPos(node_pos);
 
     SetNextWindowPos(node_pos);
