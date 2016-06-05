@@ -276,6 +276,22 @@ namespace PlatformInterface
 	}
 
 
+	void copyToClipboard(const char* text)
+	{
+		if (!OpenClipboard(NULL)) return;
+		int len = Lumix::stringLength(text);
+		HGLOBAL mem_handle = GlobalAlloc(GMEM_MOVEABLE, len * sizeof(char));
+		if (!mem_handle) return;
+
+		char* mem = (char*)GlobalLock(mem_handle);
+		Lumix::copyString(mem, len, text);
+		GlobalUnlock(mem_handle);
+		EmptyClipboard();
+		SetClipboardData(CF_TEXT, mem_handle);
+		CloseClipboard();
+	}
+
+
 	bool shellExecuteOpen(const char* path)
 	{
 		return (uintptr_t)ShellExecute(NULL, NULL, path, NULL, NULL, SW_SHOW) > 32;

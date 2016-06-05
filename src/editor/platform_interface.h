@@ -30,6 +30,7 @@ namespace PlatformInterface
 	LUMIX_EDITOR_API bool getSaveFilename(char* out, int max_size, const char* filter, const char* default_extension);
 	LUMIX_EDITOR_API bool getOpenDirectory(char* out, int max_size, const char* starting_dir);
 	LUMIX_EDITOR_API bool shellExecuteOpen(const char* path);
+	LUMIX_EDITOR_API void copyToClipboard(const char* text);
 
 	LUMIX_EDITOR_API bool deleteFile(const char* path);
 	LUMIX_EDITOR_API bool moveFile(const char* from, const char* to);

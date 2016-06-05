@@ -1,4 +1,5 @@
 #include "log_ui.h"
+#include "editor/platform_interface.h"
 #include "engine/log.h"
 #include "imgui/imgui.h"
 
@@ -189,6 +190,33 @@ void LogUI::onGUI()
 		ImGui::SameLine();
 		char filter[128] = "";
 		ImGui::InputText("Filter", filter, sizeof(filter));
+		int len = 0;
+		if (ImGui::Button("Copy to clipboard"))
+		{
+			for (int i = 0; i < messages->size(); ++i)
+			{
+				const char* msg = (*messages)[i].c_str();
+				if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
+				{
+					len += Lumix::stringLength(msg);
+				}
+			}
+
+			char* mem = (char*)m_allocator.allocate(len);
+			mem[0] = '\0';
+			for (int i = 0; i < messages->size(); ++i)
+			{
+				const char* msg = (*messages)[i].c_str();
+				if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
+				{
+					Lumix::catString(mem, len, msg);
+					Lumix::catString(mem, len, "\n");
+				}
+			}
+
+			PlatformInterface::copyToClipboard(mem);
+			m_allocator.deallocate(mem);
+		}
 
 		if (ImGui::BeginChild("log_messages"))
 		{

@@ -5,6 +5,7 @@
 #ifndef _W64 
 	#define _W64 __w64
 #endif
+#define CF_TEXT 1
 #define WSADESCRIPTION_LEN 256
 #define WSASYS_STATUS_LEN 128
 #define IPPROTO_TCP 6
@@ -564,5 +565,7 @@ WINBASEAPI BOOL WINAPI FindClose(HANDLE hFindFile);
 WINBASEAPI BOOL WINAPI FindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData);
 WINBASEAPI VOID WINAPI OutputDebugStringA(LPCSTR lpOutputString);
 WINBASEAPI DWORD WINAPI GetFileAttributesA(LPCSTR lpFileName);
+WINUSERAPI BOOL WINAPI OpenClipboard(HWND hWndNewOwner);
+WINUSERAPI HANDLE WINAPI SetClipboardData(UINT uFormat, HANDLE hMem);
 
 }
