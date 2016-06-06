@@ -1,0 +1,9 @@
+language: cpp
+compiler: gcc
+git:
+    depth: 1
+before_script:
+    - cd projects
+    - sh genie_linux_gcc.sh
+    - cd tmp/gcc
+script: make config=debug64
