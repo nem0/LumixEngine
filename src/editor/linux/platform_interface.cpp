@@ -333,6 +333,11 @@ namespace PlatformInterface
 		return mkdir(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == 0;
 	}
 
+	
+	void copyToClipboard(const char* text)
+	{
+		ASSERT(false); // TODO
+	}
 
 
 } // namespace PlatformInterface
