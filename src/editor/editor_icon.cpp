@@ -1,4 +1,5 @@
 #include "editor_icon.h"
+#include "editor/platform_interface.h"
 #include "engine/crc32.h"
 #include "engine/math_utils.h"
 #include "engine/matrix.h"
@@ -30,12 +31,12 @@ enum class IconType
 
 const char* ICONS[(int)IconType::COUNT] =
 {
-	"models/editor/phy_controller_icon.msh",
-	"models/editor/phy_box_icon.msh",
-	"models/editor/camera_icon.msh",
-	"models/editor/directional_light_icon.msh",
-	"models/editor/terrain_icon.msh",
-	"models/editor/icon.msh"
+	"phy_controller_icon",
+	"phy_box_icon",
+	"camera_icon",
+	"directional_light_icon",
+	"terrain_icon",
+	"icon"
 };
 
 
@@ -227,8 +228,20 @@ struct EditorIconsImpl : public EditorIcons
 		{
 			for (int i = 0; i < lengthOf(ICONS); ++i)
 			{
-				Path path(ICONS[i]);
-				m_models[i] = m_render_interface->loadModel(path);
+				StaticString<MAX_PATH_LENGTH> tmp("models/editor/", ICONS[i], "_3d.msh");
+				m_is_3d[i] = PlatformInterface::fileExists(tmp);
+				if (m_is_3d[i])
+				{
+					Path path(tmp);
+					m_models[i] = m_render_interface->loadModel(path);
+				}
+				else
+				{
+					tmp.data[0] = '\0';
+					tmp << "models/editor/" << ICONS[i] << ".msh";
+					Path path(tmp);
+					m_models[i] = m_render_interface->loadModel(path);
+				}
 			}
 		}
 	}
@@ -260,7 +273,7 @@ struct EditorIconsImpl : public EditorIcons
 
 			icon.scale = tan(Math::degreesToRadians(fov) * 0.5f) * distance / scaleFactor;
 			mtx.setTranslation(position);
-			Matrix scaled_mtx = mtx;
+			Matrix scaled_mtx = m_is_3d[(int)icon.type] ? universe.getMatrix(icon.entity) : mtx;
 			if (is_ortho)
 			{
 				scaled_mtx.multiply3x3(ortho_size * ORTHO_SIZE_SCALE);
@@ -283,6 +296,7 @@ struct EditorIconsImpl : public EditorIcons
 
 	Array<Icon> m_icons;
 	RenderInterface::ModelHandle m_models[(int)IconType::COUNT];
+	bool m_is_3d[(int)IconType::COUNT];
 	WorldEditor& m_editor;
 	RenderInterface* m_render_interface;
 };
