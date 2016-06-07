@@ -32,6 +32,9 @@ static struct CustomFlags
 } s_custom_flags = {};
 
 
+static uint8 DEFAULT_COMMAND_BUFFER = 0;
+
+
 Material::Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_shader(nullptr)
@@ -43,7 +46,7 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 	, m_shininess(4)
 	, m_shader_instance(nullptr)
 	, m_define_mask(0)
-	, m_command_buffer(nullptr)
+	, m_command_buffer(&DEFAULT_COMMAND_BUFFER)
 	, m_custom_flags(0)
 {
 	for (auto& l : m_layer_count) l = 1;
@@ -122,8 +125,8 @@ void Material::setDefine(uint8 define_idx, bool enabled)
 
 void Material::unload(void)
 {
-	m_allocator.deallocate(m_command_buffer);
-	m_command_buffer = nullptr;
+	if(m_command_buffer != &DEFAULT_COMMAND_BUFFER) m_allocator.deallocate(m_command_buffer);
+	m_command_buffer = &DEFAULT_COMMAND_BUFFER;
 	m_uniforms.clear();
 	setShader(nullptr);
 
@@ -424,8 +427,8 @@ void Material::setShader(const Path& path)
 
 void Material::createCommandBuffer()
 {
-	m_allocator.deallocate(m_command_buffer);
-	m_command_buffer = nullptr;
+	if (m_command_buffer != &DEFAULT_COMMAND_BUFFER) m_allocator.deallocate(m_command_buffer);
+	m_command_buffer = &DEFAULT_COMMAND_BUFFER;
 	if (!m_shader) return;
 
 	CommandBufferGenerator generator;
