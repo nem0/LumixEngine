@@ -968,6 +968,7 @@ struct DockContext
 		m_end_action = EndAction_EndChild;
 
 		PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
+		PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0, 0, 0, 0));
 		float tabbar_height = GetTextLineHeightWithSpacing();
 		if (tabbar(dock.getFirstTab(), opened != nullptr))
 		{
@@ -986,6 +987,7 @@ struct DockContext
 								 extra_flags;
 		bool ret = BeginChild(label, size, true, flags);
 		PopStyleColor();
+		PopStyleColor();
 		return ret;
 	}
 
@@ -999,7 +1001,9 @@ struct DockContext
 		else if (m_end_action == EndAction_EndChild)
 		{
 			PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
+			PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0, 0, 0, 0));
 			EndChild();
+			PopStyleColor();
 			PopStyleColor();
 		}
 		m_current = nullptr;
