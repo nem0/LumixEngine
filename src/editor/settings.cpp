@@ -16,6 +16,130 @@ static const char DEFAULT_SETTINGS_PATH[] = "studio_default.ini";
 static const char SETTINGS_PATH[] = "studio.ini";
 
 
+static void loadStyle(lua_State* L)
+{
+	if (lua_getglobal(L, "style") == LUA_TTABLE)
+	{
+		auto& style = ImGui::GetStyle();
+		#define LUMIX_READ_STYLE(name) \
+			if (lua_getfield(L, -1, #name) == LUA_TTABLE) { \
+				if (lua_rawgeti(L, -1, 1) == LUA_TNUMBER) style.Colors[ImGuiCol_##name].x = (float)lua_tonumber(L, -1); \
+				if (lua_rawgeti(L, -2, 2) == LUA_TNUMBER) style.Colors[ImGuiCol_##name].y = (float)lua_tonumber(L, -1); \
+				if (lua_rawgeti(L, -3, 3) == LUA_TNUMBER) style.Colors[ImGuiCol_##name].z = (float)lua_tonumber(L, -1); \
+				if (lua_rawgeti(L, -4, 4) == LUA_TNUMBER) style.Colors[ImGuiCol_##name].w = (float)lua_tonumber(L, -1); \
+				lua_pop(L, 4); \
+			} \
+			lua_pop(L, 1);
+
+		LUMIX_READ_STYLE(Text);
+		LUMIX_READ_STYLE(TextDisabled);
+		LUMIX_READ_STYLE(WindowBg);
+		LUMIX_READ_STYLE(ChildWindowBg);
+		LUMIX_READ_STYLE(Border);
+		LUMIX_READ_STYLE(BorderShadow);
+		LUMIX_READ_STYLE(FrameBg);
+		LUMIX_READ_STYLE(FrameBgHovered);
+		LUMIX_READ_STYLE(FrameBgActive);
+		LUMIX_READ_STYLE(TitleBg);
+		LUMIX_READ_STYLE(TitleBgCollapsed);
+		LUMIX_READ_STYLE(TitleBgActive);
+		LUMIX_READ_STYLE(MenuBarBg);
+		LUMIX_READ_STYLE(ScrollbarBg);
+		LUMIX_READ_STYLE(ScrollbarGrab);
+		LUMIX_READ_STYLE(ScrollbarGrabHovered);
+		LUMIX_READ_STYLE(ScrollbarGrabActive);
+		LUMIX_READ_STYLE(ComboBg);
+		LUMIX_READ_STYLE(CheckMark);
+		LUMIX_READ_STYLE(SliderGrab);
+		LUMIX_READ_STYLE(SliderGrabActive);
+		LUMIX_READ_STYLE(Button);
+		LUMIX_READ_STYLE(ButtonHovered);
+		LUMIX_READ_STYLE(ButtonActive);
+		LUMIX_READ_STYLE(Header);
+		LUMIX_READ_STYLE(HeaderHovered);
+		LUMIX_READ_STYLE(HeaderActive);
+		LUMIX_READ_STYLE(Column);
+		LUMIX_READ_STYLE(ColumnHovered);
+		LUMIX_READ_STYLE(ColumnActive);
+		LUMIX_READ_STYLE(ResizeGrip);
+		LUMIX_READ_STYLE(ResizeGripHovered);
+		LUMIX_READ_STYLE(ResizeGripActive);
+		LUMIX_READ_STYLE(CloseButton);
+		LUMIX_READ_STYLE(CloseButtonHovered);
+		LUMIX_READ_STYLE(CloseButtonActive);
+		LUMIX_READ_STYLE(PlotLines);
+		LUMIX_READ_STYLE(PlotLinesHovered);
+		LUMIX_READ_STYLE(PlotHistogram);
+		LUMIX_READ_STYLE(PlotHistogramHovered);
+		LUMIX_READ_STYLE(TextSelectedBg);
+		LUMIX_READ_STYLE(TooltipBg);
+		LUMIX_READ_STYLE(ModalWindowDarkening);
+
+		#undef LUMIX_READ_STYLE
+	}
+	lua_pop(L, 1);
+}
+
+
+static void saveStyle(Lumix::FS::OsFile& file)
+{
+	auto& style = ImGui::GetStyle();
+	file << "style = {";
+	#define LUMIX_WRITE_STYLE(name) \
+		file << #name << " = {" << style.Colors[ImGuiCol_##name].x \
+			<< ", " << style.Colors[ImGuiCol_##name].y \
+			<< ", " << style.Colors[ImGuiCol_##name].z \
+			<< ", " << style.Colors[ImGuiCol_##name].w << "},\n"
+
+	LUMIX_WRITE_STYLE(Text);
+	LUMIX_WRITE_STYLE(TextDisabled);
+	LUMIX_WRITE_STYLE(WindowBg);
+	LUMIX_WRITE_STYLE(ChildWindowBg);
+	LUMIX_WRITE_STYLE(Border);
+	LUMIX_WRITE_STYLE(BorderShadow);
+	LUMIX_WRITE_STYLE(FrameBg);
+	LUMIX_WRITE_STYLE(FrameBgHovered);
+	LUMIX_WRITE_STYLE(FrameBgActive);
+	LUMIX_WRITE_STYLE(TitleBg);
+	LUMIX_WRITE_STYLE(TitleBgCollapsed);
+	LUMIX_WRITE_STYLE(TitleBgActive);
+	LUMIX_WRITE_STYLE(MenuBarBg);
+	LUMIX_WRITE_STYLE(ScrollbarBg);
+	LUMIX_WRITE_STYLE(ScrollbarGrab);
+	LUMIX_WRITE_STYLE(ScrollbarGrabHovered);
+	LUMIX_WRITE_STYLE(ScrollbarGrabActive);
+	LUMIX_WRITE_STYLE(ComboBg);
+	LUMIX_WRITE_STYLE(CheckMark);
+	LUMIX_WRITE_STYLE(SliderGrab);
+	LUMIX_WRITE_STYLE(SliderGrabActive);
+	LUMIX_WRITE_STYLE(Button);
+	LUMIX_WRITE_STYLE(ButtonHovered);
+	LUMIX_WRITE_STYLE(ButtonActive);
+	LUMIX_WRITE_STYLE(Header);
+	LUMIX_WRITE_STYLE(HeaderHovered);
+	LUMIX_WRITE_STYLE(HeaderActive);
+	LUMIX_WRITE_STYLE(Column);
+	LUMIX_WRITE_STYLE(ColumnHovered);
+	LUMIX_WRITE_STYLE(ColumnActive);
+	LUMIX_WRITE_STYLE(ResizeGrip);
+	LUMIX_WRITE_STYLE(ResizeGripHovered);
+	LUMIX_WRITE_STYLE(ResizeGripActive);
+	LUMIX_WRITE_STYLE(CloseButton);
+	LUMIX_WRITE_STYLE(CloseButtonHovered);
+	LUMIX_WRITE_STYLE(CloseButtonActive);
+	LUMIX_WRITE_STYLE(PlotLines);
+	LUMIX_WRITE_STYLE(PlotLinesHovered);
+	LUMIX_WRITE_STYLE(PlotHistogram);
+	LUMIX_WRITE_STYLE(PlotHistogramHovered);
+	LUMIX_WRITE_STYLE(TextSelectedBg);
+	LUMIX_WRITE_STYLE(TooltipBg);
+	LUMIX_WRITE_STYLE(ModalWindowDarkening);
+
+	#undef LUMIX_WRITE_STYLE
+	file << "}\n";
+}
+
+
 static void shortcutInput(int& shortcut)
 {
 	Lumix::StaticString<50> popup_name("");
@@ -146,6 +270,8 @@ bool Settings::load(Action** actions, int actions_count)
 	}
 	lua_pop(L, 1);
 
+	loadStyle(L);
+
 	m_is_maximized = getBoolean(L, "maximized", true);
 	
 	m_is_opened = getBoolean(L, "settings_opened", false);
@@ -261,6 +387,8 @@ bool Settings::save(Action** actions, int actions_count)
 	file << "mouse_sensitivity_y = " << m_mouse_sensitivity_y << "\n";
 	file << "autosave_time = " << m_autosave_time << "\n";
 	
+	saveStyle(file);
+
 	file << "data_dir = \"";
 	const char* c = m_data_dir;
 	while (*c)
