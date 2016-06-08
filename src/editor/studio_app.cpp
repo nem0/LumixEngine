@@ -22,6 +22,7 @@
 #include "editor/gizmo.h"
 #include "editor/entity_groups.h"
 #include "editor/entity_template_system.h"
+#include "editor/render_interface.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
@@ -124,6 +125,49 @@ public:
 	}
 
 
+	float showMainToolbar(float menu_height)
+	{
+		ImGui::SetNextWindowPos(ImVec2(1, menu_height));
+		auto frame_padding = ImGui::GetStyle().FramePadding;
+		ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
+		float padding = frame_padding.y * 2;
+		ImVec4 active_color = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
+		ImVec4 inactive_color(0, 0, 0, 0);
+		if (ImGui::Begin("main_toolbar",
+				nullptr,
+				ImVec2(ImGui::GetIO().DisplaySize.x, 24 + padding),
+				-1,
+				ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
+					ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings))
+		{
+			auto& render_interface = *m_editor->getRenderInterface();
+			ImVec2 icon_size(24, 24);
+
+			for (int i = 0; i < m_actions.size(); ++i)
+			{
+				if(i > 0) ImGui::SameLine();
+				if (m_actions[i]->is_in_toolbar)
+				{
+					if (ImGui::ImageButton(m_actions[i]->icon, icon_size))
+					{
+						m_actions[i]->func.invoke();
+					}
+
+				}
+			}
+		}
+		ImGui::End();
+		ImGui::PopStyleVar(3);
+		ImGui::PopStyleColor(3);
+		return menu_height + 24 + padding;
+	}
+
+
 	void guiEndFrame()
 	{
 		if (m_is_welcome_screen_opened)
@@ -133,9 +177,10 @@ public:
 		else
 		{
 			float menu_height = showMainMenu();
+			float toolbar_bottom = showMainToolbar(menu_height);
 			if (ImGui::GetIO().DisplaySize.y > 0)
 			{
-				auto pos = ImVec2(0, menu_height);
+				auto pos = ImVec2(0, toolbar_bottom);
 				auto size = ImGui::GetIO().DisplaySize;
 				size.y -= pos.y;
 				ImGui::RootDock(pos, size);
@@ -973,6 +1018,7 @@ public:
 	void shutdown()
 	{
 		saveSettings();
+		unloadIcons();
 
 		while (m_editor->getEngine().getFileSystem().hasWork())
 		{
@@ -1580,6 +1626,35 @@ public:
 	}
 
 
+	void unloadIcons()
+	{
+		auto& render_interface = *m_editor->getRenderInterface();
+		for (auto* action : m_actions)
+		{
+			render_interface.unloadTexture(action->icon);
+		}
+	}
+
+
+	void loadIcons()
+	{
+		auto& render_interface = *m_editor->getRenderInterface();
+		for (auto* action : m_actions)
+		{
+			char tmp[Lumix::MAX_PATH_LENGTH];
+			action->getIconPath(tmp, Lumix::lengthOf(tmp));
+			if (PlatformInterface::fileExists(tmp))
+			{
+				action->icon = render_interface.loadTexture(Lumix::Path(tmp));
+			}
+			else
+			{
+				action->icon = nullptr;
+			}
+		}
+	}
+
+
 	void init()
 	{
 		SDL_SetMainReady();
@@ -1626,6 +1701,7 @@ public:
 		if (!m_metadata.load()) Lumix::g_log_info.log("Editor") << "Could not load metadata";
 
 		setStudioApp();
+		loadIcons();
 		loadSettings();
 		loadUniverseFromCommandLine();
 	}

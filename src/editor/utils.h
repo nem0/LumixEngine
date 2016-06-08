@@ -16,6 +16,7 @@ struct Action
 		this->name = name;
 		shortcut[0] = shortcut[1] = shortcut[2] = -1;
 		is_global = true;
+		is_in_toolbar = false;
 	}
 
 	Action(const char* label,
@@ -30,6 +31,7 @@ struct Action
 		shortcut[1] = shortcut1;
 		shortcut[2] = shortcut2;
 		is_global = true;
+		is_in_toolbar = false;
 	}
 
 
@@ -52,6 +54,29 @@ struct Action
 		}
 		return false;
 	}
+
+
+	void getIconPath(char* path, int max_size)
+	{
+		Lumix::copyString(path, max_size, "models/editor/icon_"); 
+		
+		char tmp[1024];
+		const char* c = name;
+		char* out = tmp;
+		while (*c)
+		{
+			if (*c >= 'A' && *c <= 'Z') *out = *c - ('A' - 'a');
+			else if (*c >= 'a' && *c <= 'z') *out = *c;
+			else *out = '_';
+			++out;
+			++c;
+		}
+		*out = 0;
+
+		Lumix::catString(path, max_size, tmp);
+		Lumix::catString(path, max_size, ".dds");
+	}
+
 
 
 	bool isRequested()
@@ -79,6 +104,8 @@ struct Action
 	const char* name;
 	const char* label;
 	bool is_global;
+	bool is_in_toolbar;
+	ImTextureID icon;
 	Lumix::Delegate<void> func;
 };
 

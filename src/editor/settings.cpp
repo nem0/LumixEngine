@@ -447,7 +447,19 @@ bool Settings::save(Action** actions, int actions_count)
 void Settings::showShortcutSettings(Action** actions, int actions_count)
 {
 	ImGui::InputText("Filter", m_filter, Lumix::lengthOf(m_filter));
-	ImGui::Columns(4);
+	ImGui::Columns(5);
+	ImGui::Text("Label");
+	ImGui::NextColumn();
+	ImGui::Text("Shortcut key 1");
+	ImGui::NextColumn();
+	ImGui::Text("Shortcut key 2");
+	ImGui::NextColumn();
+	ImGui::Text("Shortcut key 3");
+	ImGui::NextColumn();
+	ImGui::Text("In toolbar");
+	ImGui::NextColumn();
+	ImGui::Separator();
+
 	for (int i = 0; i < actions_count; ++i)
 	{
 		Action& a = *actions[i];
@@ -460,6 +472,13 @@ void Settings::showShortcutSettings(Action** actions, int actions_count)
 			shortcutInput(a.shortcut[1]);
 			ImGui::NextColumn();
 			shortcutInput(a.shortcut[2]);
+			ImGui::NextColumn();
+			char icon_path[Lumix::MAX_PATH_LENGTH];
+			a.getIconPath(icon_path, Lumix::lengthOf(icon_path));
+			if (PlatformInterface::fileExists(icon_path))
+			{
+				ImGui::Checkbox(Lumix::StaticString<50>("###tb", (Lumix::uint64)&a), &a.is_in_toolbar);
+			}
 			ImGui::NextColumn();
 		}
 	}
