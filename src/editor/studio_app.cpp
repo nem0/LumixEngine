@@ -127,6 +127,17 @@ public:
 
 	float showMainToolbar(float menu_height)
 	{
+		bool any_icon = false;
+		for (auto* action : m_actions)
+		{
+			if (action->is_in_toolbar)
+			{
+				any_icon = true;
+				break;
+			}
+		}
+		if (!any_icon) return menu_height;
+
 		ImGui::SetNextWindowPos(ImVec2(1, menu_height));
 		auto frame_padding = ImGui::GetStyle().FramePadding;
 		ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
