@@ -24,7 +24,6 @@
 #include "game_view.h"
 #include "editor/render_interface.h"
 #include "import_asset_dialog.h"
-#include "insert_mesh_command.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -310,7 +309,6 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		m_mesh = INVALID_COMPONENT;
 		m_pipeline = nullptr;
 		m_universe = nullptr;
-		m_app.getWorldEditor()->registerEditorCommandCreator("insert_mesh", createInsertMeshCommand);
 
 		createPreviewUniverse();
 	}
@@ -327,21 +325,6 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 	bool acceptExtension(const char* ext, Lumix::uint32 type) const override
 	{
 		return type == MODEL_HASH && equalStrings(ext, "msh");
-	}
-
-
-	static IEditorCommand* createInsertMeshCommand(WorldEditor& editor)
-	{
-		return LUMIX_NEW(editor.getAllocator(), InsertMeshCommand)(editor);
-	}
-
-
-	static void insertInScene(WorldEditor& editor, Model* model)
-	{
-		auto* command =
-			LUMIX_NEW(editor.getAllocator(), InsertMeshCommand)(editor, editor.getCameraRaycastHit(), model->getPath());
-
-		editor.executeCommand(command);
 	}
 
 
@@ -455,8 +438,6 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		if (type != MODEL_HASH) return false;
 
 		auto* model = static_cast<Model*>(resource);
-
-		if (ImGui::Button("Insert in scene")) insertInScene(*m_app.getWorldEditor(), model);
 
 		ImGui::LabelText("Bone count", "%d", model->getBoneCount());
 		if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones"))
