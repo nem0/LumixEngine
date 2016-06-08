@@ -24,6 +24,7 @@
 #include "game_view.h"
 #include "editor/render_interface.h"
 #include "import_asset_dialog.h"
+#include "insert_mesh_command.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -62,6 +63,12 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 	explicit MaterialPlugin(StudioApp& app)
 		: m_app(app)
 	{
+	}
+
+
+	bool acceptExtension(const char* ext, Lumix::uint32 type) const override
+	{
+		return type == MATERIAL_HASH && equalStrings(ext, "mat");
 	}
 
 
@@ -295,102 +302,6 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 
 struct ModelPlugin : public AssetBrowser::IPlugin
 {
-	struct InsertMeshCommand : public IEditorCommand
-	{
-		Vec3 m_position;
-		Path m_mesh_path;
-		Entity m_entity;
-		WorldEditor& m_editor;
-
-
-		explicit InsertMeshCommand(WorldEditor& editor)
-			: m_editor(editor)
-		{
-		}
-
-
-		InsertMeshCommand(WorldEditor& editor,
-			const Vec3& position,
-			const Path& mesh_path)
-			: m_mesh_path(mesh_path)
-			, m_position(position)
-			, m_editor(editor)
-		{
-		}
-
-
-		void serialize(JsonSerializer& serializer) override
-		{
-			serializer.serialize("path", m_mesh_path.c_str());
-			serializer.beginArray("pos");
-			serializer.serializeArrayItem(m_position.x);
-			serializer.serializeArrayItem(m_position.y);
-			serializer.serializeArrayItem(m_position.z);
-			serializer.endArray();
-		}
-
-
-		void deserialize(JsonSerializer& serializer) override
-		{
-			char path[MAX_PATH_LENGTH];
-			serializer.deserialize("path", path, sizeof(path), "");
-			m_mesh_path = path;
-			serializer.deserializeArrayBegin("pos");
-			serializer.deserializeArrayItem(m_position.x, 0);
-			serializer.deserializeArrayItem(m_position.y, 0);
-			serializer.deserializeArrayItem(m_position.z, 0);
-			serializer.deserializeArrayEnd();
-		}
-
-
-		bool execute() override
-		{
-			static const uint32 RENDERABLE_HASH = crc32("renderable");
-
-			Universe* universe = m_editor.getUniverse();
-			m_entity = universe->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
-			universe->setPosition(m_entity, m_position);
-			const Array<IScene*>& scenes = m_editor.getScenes();
-			ComponentIndex cmp = -1;
-			IScene* scene = nullptr;
-			for (int i = 0; i < scenes.size(); ++i)
-			{
-				cmp = scenes[i]->createComponent(RENDERABLE_HASH, m_entity);
-
-				if (cmp >= 0)
-				{
-					scene = scenes[i];
-					break;
-				}
-			}
-			if (cmp >= 0) static_cast<RenderScene*>(scene)->setRenderablePath(cmp, m_mesh_path);
-			return true;
-		}
-
-
-		void undo() override
-		{
-			const WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entity);
-			for (int i = 0; i < cmps.size(); ++i)
-			{
-				cmps[i].scene->destroyComponent(cmps[i].index, cmps[i].type);
-			}
-			m_editor.getUniverse()->destroyEntity(m_entity);
-			m_entity = INVALID_ENTITY;
-		}
-
-
-		uint32 getType() override
-		{
-			static const uint32 TYPE = crc32("insert_mesh");
-			return TYPE;
-		}
-
-
-		bool merge(IEditorCommand&) override { return false; }
-	};
-
-
 	explicit ModelPlugin(StudioApp& app)
 		: m_app(app)
 	{
@@ -410,6 +321,12 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		auto& engine = m_app.getWorldEditor()->getEngine();
 		engine.destroyUniverse(*m_universe);
 		Pipeline::destroy(m_pipeline);
+	}
+
+
+	bool acceptExtension(const char* ext, Lumix::uint32 type) const override
+	{
+		return type == MODEL_HASH && equalStrings(ext, "msh");
 	}
 
 
@@ -651,6 +568,9 @@ struct TexturePlugin : public AssetBrowser::IPlugin
 	}
 
 
+	bool acceptExtension(const char* ext, Lumix::uint32 type) const override { return false; }
+
+
 	bool onGUI(Resource* resource, uint32 type) override
 	{
 		if (type != TEXTURE_HASH) return false;
@@ -714,6 +634,12 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 	explicit ShaderPlugin(StudioApp& app)
 		: m_app(app)
 	{
+	}
+
+
+	bool acceptExtension(const char* ext, Lumix::uint32 type) const override
+	{
+		return type == SHADER_HASH && equalStrings("shd", ext);
 	}
 
 
@@ -1109,6 +1035,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 
 	explicit SceneViewPlugin(StudioApp& app)
 		: m_app(app)
+		, m_scene_view(app)
 	{
 		auto& editor = *app.getWorldEditor();
 		auto& allocator = editor.getAllocator();

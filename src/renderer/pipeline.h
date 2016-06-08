@@ -86,6 +86,7 @@ class LUMIX_RENDERER_API Pipeline
 
 		virtual FrameBuffer* getFramebuffer(const char* framebuffer_name) = 0;
 		virtual void setScene(RenderScene* scene) = 0;
+		virtual RenderScene* getScene() = 0;
 		virtual int getWidth() = 0;
 		virtual int getHeight() = 0;
 		virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;

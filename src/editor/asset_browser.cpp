@@ -1,4 +1,6 @@
 #include "asset_browser.h"
+#include "editor/studio_app.h"
+#include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/log.h"
@@ -8,7 +10,6 @@
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/string.h"
-#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "file_system_watcher.h"
 #include "metadata.h"
@@ -37,19 +38,21 @@ Lumix::uint32 AssetBrowser::getResourceType(const char* path) const
 }
 
 
-AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
-	: m_editor(editor)
-	, m_metadata(metadata)
-	, m_resources(editor.getAllocator())
+AssetBrowser::AssetBrowser(StudioApp& app)
+	: m_editor(*app.getWorldEditor())
+	, m_metadata(*app.getMetadata())
+	, m_resources(app.getWorldEditor()->getAllocator())
 	, m_selected_resource(nullptr)
 	, m_autoreload_changed_resource(true)
-	, m_changed_files(editor.getAllocator())
+	, m_changed_files(app.getWorldEditor()->getAllocator())
 	, m_is_focus_requested(false)
 	, m_changed_files_mutex(false)
-	, m_history(editor.getAllocator())
-	, m_plugins(editor.getAllocator())
-	, m_on_resource_changed(editor.getAllocator())
+	, m_history(app.getWorldEditor()->getAllocator())
+	, m_plugins(app.getWorldEditor()->getAllocator())
+	, m_on_resource_changed(app.getWorldEditor()->getAllocator())
+	, m_app(app)
 {
+	auto& editor = *app.getWorldEditor();
 	m_is_update_enabled = true;
 	m_filter[0] = '\0';
 	m_current_type = 0;
@@ -245,6 +248,11 @@ void AssetBrowser::onGUI()
 		{
 			selectResource(resource);
 		}
+		if (ImGui::IsMouseDragging())
+		if (ImGui::IsItemActive())
+		{
+			m_app.startDrag(StudioApp::DragData::PATH, resource.c_str(), Lumix::stringLength(resource.c_str()) + 1);
+		}
 	}
 	ImGui::ListBoxFooter();
 	onGUIResource();
@@ -286,6 +294,17 @@ void AssetBrowser::selectResource(const Lumix::Path& resource)
 }
 
 
+bool AssetBrowser::acceptExtension(const char* ext, Lumix::uint32 type)
+{
+	for (int i = 0; i < m_plugins.size(); ++i)
+	{
+		if (m_plugins[i]->acceptExtension(ext, type)) return true;
+	}
+
+	return false;
+}
+
+
 bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* buf, int max_size, Lumix::uint32 type)
 {
 	float item_w = ImGui::CalcItemWidth();
@@ -299,6 +318,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	
 	auto pos = ImGui::GetCursorPos();
 	pos.x += text_width;
+	ImGui::BeginGroup();
 	ImGui::AlignFirstTextHeightToWidgets();
 	ImGui::PushTextWrapPos(text_width);
 	ImGui::Text("%s", c);
@@ -309,6 +329,22 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	if (ImGui::Button(Lumix::StaticString<30>("...###browse", str_id)))
 	{
 		ImGui::OpenPopup(popup_name);
+	}
+	ImGui::EndGroup();
+	if (ImGui::IsItemHoveredRect())
+	{
+		m_app.enableDrop();
+		if (ImGui::IsMouseReleased(0) && m_app.getDragData().type == StudioApp::DragData::PATH)
+		{
+			char ext[10];
+			const char* path = (const char*)m_app.getDragData().data;
+			Lumix::PathUtils::getExtension(ext, Lumix::lengthOf(ext), path);
+			if (acceptExtension(ext, type))
+			{
+				Lumix::copyString(buf, max_size, path);
+				return true;
+			}
+		}
 	}
 	ImGui::SameLine();
 	if (ImGui::Button(Lumix::StaticString<30>("View###go", str_id)))
@@ -326,7 +362,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 		ImGui::InputText("Filter", filter, sizeof(filter));
 
 		ImGui::BeginChild("Resources", ImVec2(0, 0));
-		for (auto unv : getResources(getTypeIndexFromManagerType(type)))
+		for (auto& unv : getResources(getTypeIndexFromManagerType(type)))
 		{
 			if (filter[0] != '\0' && strstr(unv.c_str(), filter) == nullptr) continue;
 

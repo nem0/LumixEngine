@@ -17,6 +17,7 @@ namespace Lumix
 
 class FileSystemWatcher;
 class Metadata;
+class StudioApp;
 
 
 class LUMIX_EDITOR_API AssetBrowser
@@ -32,12 +33,13 @@ public:
 		virtual void onResourceUnloaded(Lumix::Resource* resource) = 0;
 		virtual const char* getName() const = 0;
 		virtual bool hasResourceManager(Lumix::uint32 type) const = 0;
+		virtual bool acceptExtension(const char* ext, Lumix::uint32 type) const = 0;
 	};
 
 	typedef Lumix::DelegateList<void(const Lumix::Path&, const char*)> OnResourceChanged;
 
 public:
-	AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata);
+	AssetBrowser(StudioApp& app);
 	~AssetBrowser();
 	void onGUI();
 	void update();
@@ -63,10 +65,12 @@ private:
 	void unloadResource();
 	void selectResource(Lumix::Resource* resource);
 	int getResourceTypeIndex(const char* ext);
+	bool acceptExtension(const char* ext, Lumix::uint32 type);
 
 	Lumix::uint32 getResourceType(const char* path) const;
 
 private:
+	StudioApp& m_app;
 	Metadata& m_metadata;
 	Lumix::Array<Lumix::Path> m_changed_files;
 	OnResourceChanged m_on_resource_changed;

@@ -59,6 +59,7 @@ public:
 		, m_settings(m_allocator)
 		, m_plugins(m_allocator)
 	{
+		m_drag_data = { DragData::NONE, nullptr, 0 };
 		m_confirm_load = m_confirm_new = m_confirm_exit = false;
 		m_exit_code = 0;
 		g_app = this;
@@ -70,6 +71,7 @@ public:
 
 	~StudioAppImpl()
 	{
+		m_allocator.deallocate(m_drag_data.data);
 		shutdown();
 		g_app = nullptr;
 	}
@@ -109,6 +111,16 @@ public:
 		io.KeyAlt = ((SDL_GetModState() & KMOD_ALT) != 0);
 
 		ImGui::NewFrame();
+		
+		m_drag_data.can_drop = false;
+		if (m_drag_data.type == DragData::PATH)
+		{
+			ImGui::BeginTooltip();
+			char tmp[Lumix::MAX_PATH_LENGTH];
+			Lumix::PathUtils::getFilename(tmp, Lumix::lengthOf(tmp), (const char*)m_drag_data.data);
+			ImGui::Text("%s", tmp);
+			ImGui::EndTooltip();
+		}
 	}
 
 
@@ -141,6 +153,14 @@ public:
 			m_settings.onGUI(&m_actions[0], m_actions.size());
 		}
 		ImGui::Render();
+
+		if (ImGui::GetIO().MouseReleased[0])
+		{
+			m_allocator.deallocate(m_drag_data.data);
+			m_drag_data.data = nullptr;
+			m_drag_data.size = 0;
+			m_drag_data.type = DragData::NONE;
+		}
 	}
 
 	void update()
@@ -899,6 +919,37 @@ public:
 	}
 
 
+	void enableDrop() override
+	{
+		m_drag_data.can_drop = true;
+	}
+
+
+	void startDrag(DragData::Type type, const void* data, int size) override
+	{
+		m_allocator.deallocate(m_drag_data.data);
+
+		m_drag_data.type = type;
+		if (size > 0)
+		{
+			m_drag_data.data = m_allocator.allocate(size);
+			Lumix::copyMemory(m_drag_data.data, data, size);
+			m_drag_data.size = size;
+		}
+		else
+		{
+			m_drag_data.data = nullptr;
+			m_drag_data.size = 0;
+		}
+	}
+
+
+	DragData getDragData() override
+	{
+		return m_drag_data;
+	}
+
+
 	void saveSettings()
 	{
 		m_settings.m_is_asset_browser_opened = m_asset_browser->m_is_opened;
@@ -1564,7 +1615,7 @@ public:
 
 		addActions();
 
-		m_asset_browser = LUMIX_NEW(m_allocator, AssetBrowser)(*m_editor, m_metadata);
+		m_asset_browser = LUMIX_NEW(m_allocator, AssetBrowser)(*this);
 		m_property_grid = LUMIX_NEW(m_allocator, PropertyGrid)(*m_editor, *m_asset_browser, m_actions);
 		auto engine_allocator = static_cast<Lumix::Debug::Allocator*>(&m_engine->getAllocator());
 		m_profiler_ui = ProfilerUI::create(*m_engine);
@@ -1679,6 +1730,7 @@ public:
 	bool m_is_welcome_screen_opened;
 	bool m_is_entity_list_opened;
 	bool m_is_entity_template_list_opened;
+	DragData m_drag_data;
 };
 
 

@@ -2415,6 +2415,12 @@ struct PipelineImpl : public Pipeline
 	bool isReady() const override { return m_is_ready; }
 
 
+	RenderScene* getScene() override
+	{
+		return m_scene;
+	}
+
+
 	void setScene(RenderScene* scene) override
 	{
 		for (int i = m_first_postprocess_framebuffer; i < m_framebuffers.size(); ++i)

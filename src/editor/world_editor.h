@@ -118,7 +118,7 @@ public:
 	virtual void navigate(float forward, float right, float up, float speed) = 0;
 	virtual void setProperty(uint32 component,
 		int index,
-		IPropertyDescriptor& property,
+		const IPropertyDescriptor& property,
 		const void* data,
 		int size) = 0;
 	virtual void setSnapMode(bool enable) = 0;

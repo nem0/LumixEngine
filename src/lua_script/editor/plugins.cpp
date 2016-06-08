@@ -481,6 +481,12 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
+	bool acceptExtension(const char* ext, Lumix::uint32 type) const override
+	{
+		return type == LUA_SCRIPT_HASH && equalStrings(".lua", ext);
+	}
+
+
 	bool onGUI(Lumix::Resource* resource, Lumix::uint32 type) override
 	{
 		if (type != LUA_SCRIPT_HASH) return false;

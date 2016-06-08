@@ -40,6 +40,19 @@ public:
 		struct Action* m_action;
 	};
 
+	struct DragData
+	{
+		enum Type
+		{
+			NONE,
+			PATH
+		};
+		Type type;
+		void* data;
+		int size;
+		bool can_drop;
+	};
+
 	struct LUMIX_EDITOR_API StaticPluginRegister
 	{
 		typedef void (*Creator)(StudioApp& app);
@@ -67,6 +80,9 @@ public:
 	virtual void runScript(const char* src, const char* script_name) = 0;
 	virtual Lumix::Array<Action*>& getActions() = 0;
 	virtual SDL_Window* getWindow() = 0;
+	virtual void startDrag(DragData::Type type, const void* data, int size) = 0;
+	virtual DragData getDragData() = 0;
+	virtual void enableDrop() = 0;
 
 	virtual ~StudioApp() {}
 	virtual void run() = 0;
