@@ -2832,6 +2832,7 @@ public:
 		universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(
 			this);
 
+		m_is_orbit = false;
 		m_selected_entities.clear();
 		m_universe_created.invoke();
 		m_entity_groups.setUniverse(universe);
