@@ -786,6 +786,25 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		}
 
 
+		ImTextureID loadTexture(Lumix::Path& path) override
+		{
+			auto& rm = m_editor.getEngine().getResourceManager();
+			auto* texture = static_cast<Texture*>(rm.get(TEXTURE_HASH)->load(path));
+			m_textures.insert(&texture->handle, texture);
+			return &texture->handle;
+		}
+		
+		
+		void unloadTexture(ImTextureID handle) override
+		{
+			auto iter = m_textures.find(handle);
+			if (iter == m_textures.end()) return;
+			auto* texture = iter.value();
+			texture->getResourceManager().get(TEXTURE_HASH)->unload(*texture);
+			m_textures.erase(iter);
+		}
+
+
 		void addDebugCross(const Vec3& pos, float size, uint32 color, float life) override
 		{
 			m_render_scene->addDebugCross(pos, size, color, life);
@@ -909,6 +928,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 			: m_pipeline(pipeline)
 			, m_editor(editor)
 			, m_models(editor.getAllocator())
+			, m_textures(editor.getAllocator())
 		{
 			m_model_index = -1;
 			auto& rm = m_editor.getEngine().getResourceManager();
@@ -1013,6 +1033,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		RenderScene* m_render_scene;
 		Pipeline& m_pipeline;
 		HashMap<int, Model*> m_models;
+		HashMap<void*, Texture*> m_textures;
 		int m_model_index;
 	};
 
