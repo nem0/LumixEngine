@@ -786,7 +786,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		}
 
 
-		ImTextureID loadTexture(Lumix::Path& path) override
+		ImTextureID loadTexture(const Lumix::Path& path) override
 		{
 			auto& rm = m_editor.getEngine().getResourceManager();
 			auto* texture = static_cast<Texture*>(rm.get(TEXTURE_HASH)->load(path));
