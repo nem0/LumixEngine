@@ -501,7 +501,6 @@ void ShaderCompiler::update()
 	{
 		if (PlatformInterface::isProcessFinished(*m_processes[i].process))
 		{
-
 			bool failed = PlatformInterface::getProcessExitCode(*m_processes[i].process) != 0;
 			if (failed)
 			{
@@ -512,9 +511,8 @@ void ShaderCompiler::update()
 
 				char buf[1024];
 				int read;
-				Lumix::g_log_error.log("Editor") << m_processes[i].path;
-				while ((read = PlatformInterface::getProcessOutput(
-							*m_processes[i].process, buf, sizeof(buf) - 1)) > 0)
+				Lumix::g_log_error.log("Editor") << "Failed to compile " << m_processes[i].path << ". Error log:";
+				while ((read = PlatformInterface::getProcessOutput(*m_processes[i].process, buf, sizeof(buf) - 1)) > 0)
 				{
 					buf[read] = 0;
 					Lumix::g_log_error.log("Editor") << buf;
@@ -563,6 +561,15 @@ void ShaderCompiler::compileAllPasses(const char* path,
 
 void ShaderCompiler::compile(const char* path)
 {
+	char basename[Lumix::MAX_PATH_LENGTH];
+	Lumix::PathUtils::getBasename(basename, Lumix::lengthOf(basename), path);
+	if (Lumix::findSubstring(basename, "_"))
+	{
+		Lumix::g_log_error.log("Editor") << "Shaders with underscore are not supported. " << path
+										 << " will not be compiled.";
+		return;
+	}
+
 	Lumix::StaticString<Lumix::MAX_PATH_LENGTH> compiled_dir(
 		m_editor.getEngine().getDiskFileDevice()->getBasePath(), "/shaders/compiled");
 	if (getRenderer().isOpenGL()) compiled_dir << "_gl";
