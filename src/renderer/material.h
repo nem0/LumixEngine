@@ -55,6 +55,8 @@ public:
 	float getAlphaRef() const { return m_alpha_ref; }
 	void setAlphaRef(float value);
 	uint64 getRenderStates() const { return m_render_states; }
+	void enableBackfaceCulling(bool enable);
+	bool isBackfaceCulling() const;
 
 	void setShader(Shader* shader);
 	void setShader(const Path& path);

@@ -134,6 +134,9 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 
 		int alpha_cutout_define = renderer->getShaderDefineIdx("ALPHA_CUTOUT");
 		
+		b = material->isBackfaceCulling();
+		if (ImGui::Checkbox("Backface culling", &b)) material->enableBackfaceCulling(b);
+
 		if (material->hasDefine(alpha_cutout_define))
 		{
 			b = material->isDefined(alpha_cutout_define);

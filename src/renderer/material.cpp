@@ -716,6 +716,25 @@ void Material::setAlphaRef(float value)
 }
 
 
+void Material::enableBackfaceCulling(bool enable)
+{
+	if (enable)
+	{
+		m_render_states |= BGFX_STATE_CULL_CW;
+	}
+	else
+	{
+		m_render_states &= ~BGFX_STATE_CULL_MASK;
+	}
+}
+
+
+bool Material::isBackfaceCulling() const
+{
+	return (m_render_states & BGFX_STATE_CULL_MASK) != 0;
+}
+
+
 bool Material::load(FS::IFile& file)
 {
 	PROFILE_FUNCTION();
