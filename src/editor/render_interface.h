@@ -43,7 +43,7 @@ public:
 	virtual ModelHandle loadModel(Lumix::Path& path) = 0;
 	virtual void unloadModel(ModelHandle handle) = 0;
 	virtual Vec3 getModelCenter(Entity entity) = 0;
-	virtual ImTextureID loadTexture(Lumix::Path& path) = 0;
+	virtual ImTextureID loadTexture(const Lumix::Path& path) = 0;
 	virtual void unloadTexture(ImTextureID handle) = 0;
 	virtual void addDebugCube(const Vec3& minimum, const Vec3& maximum, uint32 color, float life) = 0;
 	virtual void addDebugCross(const Vec3& pos, float size, uint32 color, float life) = 0;
