@@ -439,6 +439,8 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 
 		auto* model = static_cast<Model*>(resource);
 
+		showPreview(*model);
+
 		ImGui::LabelText("Bone count", "%d", model->getBoneCount());
 		if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones"))
 		{
@@ -518,8 +520,6 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 				ImGui::TreePop();
 			}
 		}
-
-		showPreview(*model);
 
 		return true;
 	}
