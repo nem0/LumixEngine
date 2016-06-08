@@ -3,23 +3,34 @@
 #include "editor/log_ui.h"
 #include "editor/platform_interface.h"
 #include "editor/settings.h"
+#include "editor/studio_app.h"
 #include "engine/crc32.h"
+#include "engine/engine.h"
 #include "engine/input_system.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
-#include "engine/engine.h"
+#include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
+#include "engine/property_register.h"
+#include "engine/universe/component.h"
+#include "engine/universe/universe.h"
 #include "imgui/imgui.h"
+#include "insert_mesh_command.h"
 #include "renderer/frame_buffer.h"
+#include "renderer/model.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include <SDL.h>
 
 
-SceneView::SceneView()
+static const Lumix::uint32 RENDERABLE_HASH = Lumix::crc32("renderable");
+
+
+SceneView::SceneView(StudioApp& app)
+	: m_app(app)
 {
 	m_pipeline = nullptr;
 	m_editor = nullptr;
@@ -169,6 +180,59 @@ void SceneView::captureMouse(bool capture)
 }
 
 
+Lumix::RayCastModelHit SceneView::castRay(float x, float y)
+{
+	auto* scene =  m_pipeline->getScene();
+	ASSERT(scene);
+	
+	Lumix::ComponentUID camera_cmp = m_editor->getEditCamera();
+	Lumix::Vec2 screen_size = scene->getCameraScreenSize(camera_cmp.index);
+	screen_size.x *= x;
+	screen_size.y *= y;
+
+	Lumix::Vec3 origin;
+	Lumix::Vec3 dir;
+	scene->getRay(camera_cmp.index, (float)screen_size.x, (float)screen_size.y, origin, dir);
+	return scene->castRay(origin, dir, Lumix::INVALID_COMPONENT);
+}
+
+
+void SceneView::handleDrop(float x, float y)
+{
+	const char* path = (const char*)m_app.getDragData().data;
+	auto hit = castRay(x, y);
+
+	if (hit.m_is_hit)
+	{
+		if (Lumix::PathUtils::hasExtension(path, "msh"))
+		{
+			auto* command = LUMIX_NEW(m_editor->getAllocator(), Lumix::InsertMeshCommand)(
+				*m_editor, hit.m_origin + hit.m_t * hit.m_dir, Lumix::Path(path));
+
+			m_editor->executeCommand(command);
+		}
+		else if (Lumix::PathUtils::hasExtension(path, "mat") && hit.m_mesh)
+		{
+			auto* desc = Lumix::PropertyRegister::getDescriptor(RENDERABLE_HASH, Lumix::crc32("Material"));
+			auto drag_data = m_app.getDragData();
+			m_editor->selectEntities(&hit.m_entity, 1);
+			auto* model = m_pipeline->getScene()->getRenderableModel(hit.m_component);
+			int mesh_index = 0;
+			for (int i = 0; i < model->getMeshCount(); ++i)
+			{
+				if (&model->getMesh(i) == hit.m_mesh)
+				{
+					mesh_index = i;
+					break;
+				}
+			}
+			
+			m_editor->setProperty(RENDERABLE_HASH, mesh_index, *desc, drag_data.data, drag_data.size);
+		}
+	}
+}
+
+
 void SceneView::onGUI()
 {
 	PROFILE_FUNCTION();
@@ -205,6 +269,16 @@ void SceneView::onGUI()
 			else
 			{
 				ImGui::Image(&m_texture_handle, size);
+			}
+			if (ImGui::IsItemHoveredRect())
+			{
+				m_app.enableDrop();
+				if (ImGui::IsMouseReleased(0) && m_app.getDragData().type == StudioApp::DragData::PATH)
+				{
+					float x = (ImGui::GetMousePos().x - content_min.x) / size.x;
+					float y = (ImGui::GetMousePos().y - content_min.y) / size.y;
+					handleDrop(x, y);
+				}
 			}
 			view_pos = content_min;
 			auto rel_mp = ImGui::GetMousePos();

@@ -41,6 +41,9 @@ struct AssetBrowserPlugin : public AssetBrowser::IPlugin
 	}
 
 
+	bool acceptExtension(const char* ext, Lumix::uint32 type) const override { return false; }
+
+
 	void stopAudio()
 	{
 		if (m_playing_clip < 0) return;

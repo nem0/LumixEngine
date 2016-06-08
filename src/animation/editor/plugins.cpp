@@ -30,6 +30,12 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
+	bool acceptExtension(const char* ext, Lumix::uint32 type) const override
+	{
+		return type == ANIMATION_HASH && equalStrings(ext, "anm");
+	}
+
+
 	bool onGUI(Lumix::Resource* resource, Lumix::uint32 type) override
 	{
 		if (type == ANIMATION_HASH)

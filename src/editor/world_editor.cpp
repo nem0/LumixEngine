@@ -2575,7 +2575,11 @@ public:
 	}
 
 
-	void setProperty(uint32 component, int index, IPropertyDescriptor& property, const void* data, int size) override
+	void setProperty(uint32 component,
+		int index,
+		const IPropertyDescriptor& property,
+		const void* data,
+		int size) override
 	{
 
 		ASSERT(m_selected_entities.size() == 1);
