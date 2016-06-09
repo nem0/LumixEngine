@@ -113,7 +113,6 @@ public:
 
 		ImGui::NewFrame();
 		
-		m_drag_data.can_drop = false;
 		if (m_drag_data.type == DragData::PATH)
 		{
 			ImGui::BeginTooltip();
@@ -972,12 +971,6 @@ public:
 			}
 		}
 		ImGui::EndDock();
-	}
-
-
-	void enableDrop() override
-	{
-		m_drag_data.can_drop = true;
 	}
 
 

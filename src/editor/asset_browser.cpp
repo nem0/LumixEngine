@@ -333,7 +333,6 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	ImGui::EndGroup();
 	if (ImGui::IsItemHoveredRect())
 	{
-		m_app.enableDrop();
 		if (ImGui::IsMouseReleased(0) && m_app.getDragData().type == StudioApp::DragData::PATH)
 		{
 			char ext[10];
