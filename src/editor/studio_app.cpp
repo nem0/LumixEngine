@@ -158,7 +158,7 @@ public:
 					}
 					if (ImGui::IsItemHovered())
 					{
-						ImGui::SetTooltip(m_actions[i]->label);
+						ImGui::SetTooltip("%s", m_actions[i]->label);
 					}
 				}
 			}
