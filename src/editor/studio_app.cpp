@@ -156,6 +156,10 @@ public:
 					{
 						m_actions[i]->func.invoke();
 					}
+					if (ImGui::IsItemHovered())
+					{
+						ImGui::SetTooltip(m_actions[i]->label);
+					}
 				}
 			}
 		}
