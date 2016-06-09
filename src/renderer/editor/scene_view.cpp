@@ -333,6 +333,42 @@ void SceneView::handleDrop(float x, float y)
 }
 
 
+void SceneView::onToolbar()
+{
+	static const char* actions_names[] = { "setTranslateGizmoMode",
+		"setRotateGizmoMode",
+		"setLocalCoordSystem",
+		"setGlobalCoordSystem",
+		"setPivotCenter",
+		"setPivotOrigin" };
+	Action* actions[sizeof(actions_names) / sizeof(actions_names[0])];
+	bool any_action = false;
+	for (int i = 0; i < Lumix::lengthOf(actions_names); ++i)
+	{
+		actions[i] = &m_app.getAction(actions_names[i]);
+		any_action = any_action || actions[i]->icon;
+	}
+	if (!any_action) return;
+
+	auto pos = ImGui::GetCursorScreenPos();
+	float w = ImGui::GetContentRegionAvail().x;
+	ImVec2 icon_size(24, 24);
+	if (ImGui::BeginToolbar("scene_view_toolbar", pos, ImVec2(w, 24)))
+	{
+		for (auto* action : actions)
+		{
+			if (!action->icon) continue;
+			ImGui::SameLine();
+			if (ImGui::ImageButton(action->icon, icon_size))
+			{
+				action->func.invoke();
+			}
+		}
+	}
+	ImGui::EndToolbar();
+}
+
+
 void SceneView::onGUI()
 {
 	PROFILE_FUNCTION();
@@ -347,6 +383,7 @@ void SceneView::onGUI()
 	if (ImGui::BeginDock(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse))
 	{
 		m_is_opened = true;
+		onToolbar();
 		auto size = ImGui::GetContentRegionAvail();
 		size.y -= ImGui::GetTextLineHeightWithSpacing();
 		auto* fb = m_pipeline->getFramebuffer("default");
