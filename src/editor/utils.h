@@ -43,6 +43,22 @@ struct Action
 	static bool falseConst() { return false; }
 
 
+	void toolbarButton()
+	{
+		if (!icon) return;
+		ImGui::SameLine();
+		if (ImGui::ImageButton(icon, ImVec2(24, 24)))
+		{
+			func.invoke();
+		}
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("%s", label);
+		}
+
+	}
+
+
 	bool isActive()
 	{
 		if (ImGui::IsAnyItemActive()) return false;

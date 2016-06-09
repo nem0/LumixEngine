@@ -145,22 +145,10 @@ public:
 				"main_toolbar", ImVec2(1, menu_height), ImVec2(ImGui::GetIO().DisplaySize.x, 24 + padding)))
 		{
 			auto& render_interface = *m_editor->getRenderInterface();
-			ImVec2 icon_size(24, 24);
 
 			for (int i = 0; i < m_actions.size(); ++i)
 			{
-				if (i > 0) ImGui::SameLine();
-				if (m_actions[i]->is_in_toolbar)
-				{
-					if (ImGui::ImageButton(m_actions[i]->icon, icon_size))
-					{
-						m_actions[i]->func.invoke();
-					}
-					if (ImGui::IsItemHovered())
-					{
-						ImGui::SetTooltip("%s", m_actions[i]->label);
-					}
-				}
+				if(m_actions[i]->is_in_toolbar) m_actions[i]->toolbarButton();
 			}
 		}
 		ImGui::EndToolbar();

@@ -355,15 +355,7 @@ void SceneView::onToolbar()
 	ImVec2 icon_size(24, 24);
 	if (ImGui::BeginToolbar("scene_view_toolbar", pos, ImVec2(w, 24)))
 	{
-		for (auto* action : actions)
-		{
-			if (!action->icon) continue;
-			ImGui::SameLine();
-			if (ImGui::ImageButton(action->icon, icon_size))
-			{
-				action->func.invoke();
-			}
-		}
+		for (auto* action : actions) action->toolbarButton();
 	}
 	ImGui::EndToolbar();
 }
