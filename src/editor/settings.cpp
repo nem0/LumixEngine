@@ -308,6 +308,11 @@ bool Settings::load(Action** actions, int actions_count)
 					}
 					lua_pop(L, 1);
 				}
+				if (lua_rawgeti(L, -1, 1 + Lumix::lengthOf(actions[i]->shortcut)) == LUA_TBOOLEAN)
+				{
+					actions[i]->is_in_toolbar = lua_toboolean(L, -1) != 0;
+				}
+				lua_pop(L, 1);
 			}
 			lua_pop(L, 1);
 		}
@@ -431,7 +436,9 @@ bool Settings::save(Action** actions, int actions_count)
 		file << "\t" << actions[i]->name << " = {" 
 			<< actions[i]->shortcut[0] << ", "
 			<< actions[i]->shortcut[1] << ", " 
-			<< actions[i]->shortcut[2] << "},\n";
+			<< actions[i]->shortcut[2] << ", "
+			<< (actions[i]->is_in_toolbar ? "true" : "false") 
+			<< "},\n";
 	}
 	file << "}\n";
 
