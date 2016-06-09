@@ -45,6 +45,14 @@ static const float ORTHO_SIZE_SCALE = 1 / 20.0f;
 
 struct EditorIconsImpl : public EditorIcons
 {
+	struct Icon
+	{
+		Entity entity;
+		IconType type;
+		float scale;
+	};
+
+
 	explicit EditorIconsImpl(WorldEditor& editor)
 		: m_editor(editor)
 		, m_icons(editor.getAllocator())
@@ -182,27 +190,16 @@ struct EditorIconsImpl : public EditorIcons
 		const auto& universe = *m_editor.getUniverse();
 		ComponentIndex camera = m_editor.getEditCamera().index;
 		if(camera < 0) return hit;
-		Matrix mtx = universe.getMatrix(m_editor.getEditCamera().entity);
-		Vec3 camera_pos = mtx.getTranslation();
+		Matrix camera_mtx = universe.getMatrix(m_editor.getEditCamera().entity);
+		Vec3 camera_pos = camera_mtx.getTranslation();
 		bool is_ortho = render_interface->isCameraOrtho(camera);
 		float ortho_size = render_interface->getCameraOrthoSize(camera);
 
 		for(auto& icon : m_icons)
 		{
-			Vec3 position = universe.getPosition(icon.entity);
-
-			mtx.setTranslation(position);
-			Matrix tmp = mtx;
-			if (is_ortho)
-			{
-				tmp.multiply3x3(ortho_size * ORTHO_SIZE_SCALE);
-			}
-			else
-			{
-				tmp.multiply3x3(icon.scale > 0 ? icon.scale : 1);
-			}
-
-			float t = m_editor.getRenderInterface()->castRay(m_models[(int)icon.type], origin, dir, tmp);
+			Matrix icon_matrix = getIconMatrix(icon, camera_mtx, is_ortho, ortho_size);
+			
+			float t = m_editor.getRenderInterface()->castRay(m_models[(int)icon.type], origin, dir, icon_matrix);
 			if(t >= 0 && (t < hit.t || hit.t < 0))
 			{
 				hit.t = t;
@@ -247,6 +244,30 @@ struct EditorIconsImpl : public EditorIcons
 	}
 
 
+	Matrix getIconMatrix(const Icon& icon, const Matrix& camera_matrix, bool is_ortho, float ortho_size) const
+	{
+		Matrix ret;
+		if (m_is_3d[(int)icon.type])
+		{
+			ret = m_editor.getUniverse()->getMatrix(icon.entity);
+		}
+		else
+		{
+			ret = camera_matrix;
+			ret.setTranslation(m_editor.getUniverse()->getPosition(icon.entity));
+		}
+		if (is_ortho)
+		{
+			ret.multiply3x3(ortho_size * ORTHO_SIZE_SCALE);
+		}
+		else
+		{
+			ret.multiply3x3(icon.scale > 0 ? icon.scale : 1);
+		}
+		return ret;
+	}
+
+
 	void render() override
 	{
 		static const float MIN_SCALE_FACTOR = 10;
@@ -258,8 +279,8 @@ struct EditorIconsImpl : public EditorIcons
 		const auto& universe = *m_editor.getUniverse();
 		ComponentIndex camera = m_editor.getEditCamera().index;
 		if(camera < 0) return;
-		Matrix mtx = universe.getMatrix(m_editor.getEditCamera().entity);
-		Vec3 camera_pos = mtx.getTranslation();
+		Matrix camera_mtx = universe.getMatrix(m_editor.getEditCamera().entity);
+		Vec3 camera_pos = camera_mtx.getTranslation();
 		float fov = m_editor.getRenderInterface()->getCameraFOV(camera);
 		bool is_ortho = m_editor.getRenderInterface()->isCameraOrtho(camera);
 		float ortho_size = is_ortho ? m_editor.getRenderInterface()->getCameraOrthoSize(camera) : 1;
@@ -268,31 +289,14 @@ struct EditorIconsImpl : public EditorIcons
 		{
 			Vec3 position = universe.getPosition(icon.entity);
 			float distance = (position - camera_pos).length();
-			float scaleFactor = MIN_SCALE_FACTOR + distance;
-			scaleFactor = Math::clamp(scaleFactor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
-
-			icon.scale = tan(Math::degreesToRadians(fov) * 0.5f) * distance / scaleFactor;
-			mtx.setTranslation(position);
-			Matrix scaled_mtx = m_is_3d[(int)icon.type] ? universe.getMatrix(icon.entity) : mtx;
-			if (is_ortho)
-			{
-				scaled_mtx.multiply3x3(ortho_size * ORTHO_SIZE_SCALE);
-			}
-			else
-			{
-				scaled_mtx.multiply3x3(icon.scale > 0 ? icon.scale : 1);
-			}
-
-			render_interface->renderModel(m_models[(int)icon.type], scaled_mtx);
+			float scale_factor = MIN_SCALE_FACTOR + distance;
+			scale_factor = Math::clamp(scale_factor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
+			icon.scale = tan(Math::degreesToRadians(fov) * 0.5f) * distance / scale_factor;
+			
+			Matrix icon_mtx = getIconMatrix(icon, camera_mtx, is_ortho, ortho_size);
+			render_interface->renderModel(m_models[(int)icon.type], icon_mtx);
 		}
 	}
-
-	struct Icon
-	{
-		Entity entity;
-		IconType type;
-		float scale;
-	};
 
 	Array<Icon> m_icons;
 	RenderInterface::ModelHandle m_models[(int)IconType::COUNT];
