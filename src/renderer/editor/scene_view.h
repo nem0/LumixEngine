@@ -40,6 +40,7 @@ class SceneView
 		void captureMouse(bool capture);
 		Lumix::RayCastModelHit castRay(float x, float y);
 		void handleDrop(float x, float y);
+		void onToolbar();
 
 	private:
 		StudioApp& m_app;
