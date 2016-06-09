@@ -392,11 +392,11 @@ public:
 	}
 
 
-	void doMenuItem(Action& a, bool selected, bool enabled)
+	void doMenuItem(Action& a, bool enabled)
 	{
 		char buf[20];
 		getShortcut(a, buf, sizeof(buf));
-		if (ImGui::MenuItem(a.label, buf, selected, enabled))
+		if (ImGui::MenuItem(a.label, buf, a.is_selected.invoke(), enabled))
 		{
 			a.func.invoke();
 		}
@@ -486,6 +486,7 @@ public:
 	void redo() { if (!hasPluginFocus()) m_editor->redo(); }
 	void copy() { m_editor->copyEntities(); }
 	void paste() { m_editor->pasteEntities(); }
+	bool isOrbitCamera() { return m_editor->isOrbitCamera(); }
 	void toggleOrbitCamera() { m_editor->setOrbitCamera(!m_editor->isOrbitCamera()); }
 	void setTopView() { m_editor->setTopView(); }
 	void setFrontView() { m_editor->setFrontView(); }
@@ -546,12 +547,24 @@ public:
 
 
 	template <void (StudioAppImpl::*func)()>
-	void addAction(const char* label, const char* name)
+	Action& addAction(const char* label, const char* name)
 	{
 		auto* a = LUMIX_NEW(m_editor->getAllocator(), Action)(label, name);
 		a->func.bind<StudioAppImpl, func>(this);
 		m_actions.push(a);
+		return *a;
 	}
+
+
+	template <void (StudioAppImpl::*func)(), bool (StudioAppImpl::*selected_func)()>
+	void addSelectableAction(const char* label, const char* name)
+	{
+		auto* a = LUMIX_NEW(m_editor->getAllocator(), Action)(label, name);
+		a->func.bind<StudioAppImpl, func>(this);
+		a->is_selected.bind<StudioAppImpl, selected_func>(this);
+		m_actions.push(a);
+	}
+
 
 
 	template <void (StudioAppImpl::*func)()>
@@ -580,8 +593,8 @@ public:
 		if (!ImGui::BeginMenu("Entity")) return;
 
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
-		doMenuItem(getAction("createEntity"), false, true);
-		doMenuItem(getAction("destroyEntity"), false, is_any_entity_selected);
+		doMenuItem(getAction("createEntity"), true);
+		doMenuItem(getAction("destroyEntity"), is_any_entity_selected);
 
 		if (ImGui::BeginMenu("Create template", is_any_entity_selected))
 		{
@@ -606,8 +619,8 @@ public:
 				m_selected_template_name.c_str(), pos, Lumix::Quat(0, 0, 0, 1), 1);
 		}
 
-		doMenuItem(getAction("showEntities"), false, is_any_entity_selected);
-		doMenuItem(getAction("hideEntities"), false, is_any_entity_selected);
+		doMenuItem(getAction("showEntities"), is_any_entity_selected);
+		doMenuItem(getAction("hideEntities"), is_any_entity_selected);
 		ImGui::EndMenu();
 	}
 
@@ -617,26 +630,24 @@ public:
 		if (!ImGui::BeginMenu("Edit")) return;
 
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
-		doMenuItem(getAction("undo"), false, m_editor->canUndo());
-		doMenuItem(getAction("redo"), false, m_editor->canRedo());
+		doMenuItem(getAction("undo"), m_editor->canUndo());
+		doMenuItem(getAction("redo"), m_editor->canRedo());
 		ImGui::Separator();
-		doMenuItem(getAction("copy"), false, is_any_entity_selected);
-		doMenuItem(getAction("paste"), false, m_editor->canPasteEntities());
+		doMenuItem(getAction("copy"), is_any_entity_selected);
+		doMenuItem(getAction("paste"), m_editor->canPasteEntities());
 		ImGui::Separator();
-		doMenuItem(getAction("orbitCamera"),
-			m_editor->isOrbitCamera(),
-			is_any_entity_selected || m_editor->isOrbitCamera());
-		doMenuItem(getAction("setTranslateGizmoMode"), m_editor->getGizmo().isTranslateMode(), true);
-		doMenuItem(getAction("setRotateGizmoMode"), m_editor->getGizmo().isRotateMode(), true);
-		doMenuItem(getAction("setPivotCenter"), m_editor->getGizmo().isPivotCenter(), true);
-		doMenuItem(getAction("setPivotOrigin"), m_editor->getGizmo().isPivotOrigin(), true);
-		doMenuItem(getAction("setLocalCoordSystem"), m_editor->getGizmo().isLocalCoordSystem(), true);
-		doMenuItem(getAction("setGlobalCoordSystem"), m_editor->getGizmo().isGlobalCoordSystem(), true);
+		doMenuItem(getAction("orbitCamera"), is_any_entity_selected || m_editor->isOrbitCamera());
+		doMenuItem(getAction("setTranslateGizmoMode"), true);
+		doMenuItem(getAction("setRotateGizmoMode"), true);
+		doMenuItem(getAction("setPivotCenter"), true);
+		doMenuItem(getAction("setPivotOrigin"), true);
+		doMenuItem(getAction("setLocalCoordSystem"), true);
+		doMenuItem(getAction("setGlobalCoordSystem"), true);
 		if (ImGui::BeginMenu("View", true))
 		{
-			doMenuItem(getAction("viewTop"), false, true);
-			doMenuItem(getAction("viewFront"), false, true);
-			doMenuItem(getAction("viewSide"), false, true);
+			doMenuItem(getAction("viewTop"), true);
+			doMenuItem(getAction("viewFront"), true);
+			doMenuItem(getAction("viewSide"), true);
 			ImGui::EndMenu();
 		}
 		ImGui::EndMenu();
@@ -647,7 +658,7 @@ public:
 	{
 		if (!ImGui::BeginMenu("File")) return;
 
-		doMenuItem(getAction("newUniverse"), false, true);
+		doMenuItem(getAction("newUniverse"), true);
 		if (ImGui::BeginMenu("Open"))
 		{
 			ImGui::InputText("Filter", m_open_filter, sizeof(m_open_filter));
@@ -672,9 +683,9 @@ public:
 			}
 			ImGui::EndMenu();
 		}
-		doMenuItem(getAction("save"), false, !m_editor->isGameMode());
-		doMenuItem(getAction("saveAs"), false, !m_editor->isGameMode());
-		doMenuItem(getAction("exit"), false, true);
+		doMenuItem(getAction("save"), !m_editor->isGameMode());
+		doMenuItem(getAction("saveAs"), !m_editor->isGameMode());
+		doMenuItem(getAction("exit"), true);
 		ImGui::EndMenu();
 	}
 
@@ -684,11 +695,11 @@ public:
 		if (!ImGui::BeginMenu("Tools")) return;
 
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
-		doMenuItem(getAction("lookAtSelected"), false, is_any_entity_selected);
-		doMenuItem(getAction("toggleGameMode"), m_editor->isGameMode(), true);
-		doMenuItem(getAction("toggleMeasure"), m_editor->isMeasureToolActive(), true);
-		doMenuItem(getAction("snapDown"), false, is_any_entity_selected);
-		doMenuItem(getAction("autosnapDown"), m_editor->getGizmo().isAutosnapDown(), true);
+		doMenuItem(getAction("lookAtSelected"), is_any_entity_selected);
+		doMenuItem(getAction("toggleGameMode"), true);
+		doMenuItem(getAction("toggleMeasure"), true);
+		doMenuItem(getAction("snapDown"), is_any_entity_selected);
+		doMenuItem(getAction("autosnapDown"), true);
 		if (ImGui::MenuItem("Save commands")) saveUndoStack();
 		if (ImGui::MenuItem("Load commands")) loadAndExecuteCommands();
 		if (ImGui::MenuItem("Pack data")) packData();
@@ -712,7 +723,7 @@ public:
 		{
 			if (plugin->m_action)
 			{
-				doMenuItem(*plugin->m_action, false, true);
+				doMenuItem(*plugin->m_action, true);
 			}
 		}
 		ImGui::EndMenu();
@@ -1129,25 +1140,35 @@ public:
 		addAction<&StudioAppImpl::undo>("Undo", "undo", KMOD_CTRL, 'Z', -1);
 		addAction<&StudioAppImpl::copy>("Copy", "copy", KMOD_CTRL, 'C', -1);
 		addAction<&StudioAppImpl::paste>("Paste", "paste", KMOD_CTRL, 'V', -1);
-		addAction<&StudioAppImpl::toggleOrbitCamera>("Orbit camera", "orbitCamera");
-		addAction<&StudioAppImpl::setTranslateGizmoMode>("Translate", "setTranslateGizmoMode");
-		addAction<&StudioAppImpl::setRotateGizmoMode>("Rotate", "setRotateGizmoMode");
+		addSelectableAction<&StudioAppImpl::toggleOrbitCamera, &StudioAppImpl::isOrbitCamera>(
+			"Orbit camera", "orbitCamera");
+		addAction<&StudioAppImpl::setTranslateGizmoMode>("Translate", "setTranslateGizmoMode")
+			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isTranslateMode>(&m_editor->getGizmo());
+		addAction<&StudioAppImpl::setRotateGizmoMode>("Rotate", "setRotateGizmoMode")
+			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isRotateMode>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::setTopView>("Top", "viewTop");
 		addAction<&StudioAppImpl::setFrontView>("Front", "viewFront");
 		addAction<&StudioAppImpl::setSideView>("Side", "viewSide");
-		addAction<&StudioAppImpl::setLocalCoordSystem>("Local", "setLocalCoordSystem");
-		addAction<&StudioAppImpl::setGlobalCoordSystem>("Global", "setGlobalCoordSystem");
-		addAction<&StudioAppImpl::setPivotCenter>("Center", "setPivotCenter");
-		addAction<&StudioAppImpl::setPivotOrigin>("Origin", "setPivotOrigin");
+		addAction<&StudioAppImpl::setLocalCoordSystem>("Local", "setLocalCoordSystem")
+			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isLocalCoordSystem>(&m_editor->getGizmo());
+		addAction<&StudioAppImpl::setGlobalCoordSystem>("Global", "setGlobalCoordSystem")
+			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isGlobalCoordSystem>(&m_editor->getGizmo());
+		addAction<&StudioAppImpl::setPivotCenter>("Center", "setPivotCenter")
+			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isPivotCenter>(&m_editor->getGizmo());
+		addAction<&StudioAppImpl::setPivotOrigin>("Origin", "setPivotOrigin")
+			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isPivotOrigin>(&m_editor->getGizmo());
 
 		addAction<&StudioAppImpl::createEntity>("Create", "createEntity");
 		addAction<&StudioAppImpl::destroyEntity>("Destroy", "destroyEntity", SDLK_DELETE, -1, -1);
 		addAction<&StudioAppImpl::showEntities>("Show", "showEntities");
 		addAction<&StudioAppImpl::hideEntities>("Hide", "hideEntities");
 
-		addAction<&StudioAppImpl::toggleGameMode>("Game Mode", "toggleGameMode");
-		addAction<&StudioAppImpl::toggleMeasure>("Toggle measure", "toggleMeasure");
-		addAction<&StudioAppImpl::autosnapDown>("Autosnap down", "autosnapDown");
+		addAction<&StudioAppImpl::toggleGameMode>("Game Mode", "toggleGameMode")
+			.is_selected.bind<Lumix::WorldEditor, &Lumix::WorldEditor::isGameMode>(m_editor);
+		addAction<&StudioAppImpl::toggleMeasure>("Toggle measure", "toggleMeasure")
+			.is_selected.bind<Lumix::WorldEditor, &Lumix::WorldEditor::isMeasureToolActive>(m_editor);
+		addAction<&StudioAppImpl::autosnapDown>("Autosnap down", "autosnapDown")
+			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isAutosnapDown>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::snapDown>("Snap down", "snapDown");
 		addAction<&StudioAppImpl::lookAtSelected>("Look at selected", "lookAtSelected");
 	}
