@@ -29,6 +29,11 @@ private:
 		return (static_cast<C*>(instance)->*Function)();
 	}
 
+	template <class C, R (C::*Function)() const> static LUMIX_FORCE_INLINE R ClassMethodStub(InstancePtr instance)
+	{
+		return (static_cast<C*>(instance)->*Function)();
+	}
+
 public:
 	Delegate(void)
 	{
@@ -43,6 +48,12 @@ public:
 	}
 
 	template <class C, R (C::*Function)()> void bind(C* instance)
+	{
+		m_stub.first = instance;
+		m_stub.second = &ClassMethodStub<C, Function>;
+	}
+
+	template <class C, R(C::*Function)() const> void bind(C* instance)
 	{
 		m_stub.first = instance;
 		m_stub.second = &ClassMethodStub<C, Function>;
