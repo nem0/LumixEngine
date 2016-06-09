@@ -372,7 +372,6 @@ void SceneView::onGUI()
 			}
 			if (ImGui::IsItemHoveredRect())
 			{
-				m_app.enableDrop();
 				if (ImGui::IsMouseReleased(0) && m_app.getDragData().type == StudioApp::DragData::PATH)
 				{
 					float x = (ImGui::GetMousePos().x - content_min.x) / size.x;
