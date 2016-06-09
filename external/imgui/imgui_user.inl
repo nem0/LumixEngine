@@ -9,6 +9,31 @@ namespace ImGui
 {
 
 
+bool BeginToolbar(const char* str_id, ImVec2 screen_pos, ImVec2 size)
+{
+	ImGui::SetNextWindowPos(screen_pos);
+	auto frame_padding = ImGui::GetStyle().FramePadding;
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
+	float padding = frame_padding.y * 2;
+	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
+	return ImGui::Begin(str_id, nullptr, size, -1, flags);
+}
+
+
+void EndToolbar()
+{
+	ImGui::End();
+	ImGui::PopStyleVar(3);
+	ImGui::PopStyleColor(3);
+}
+
+
 void ResetActiveID()
 {
 	SetActiveID(0);

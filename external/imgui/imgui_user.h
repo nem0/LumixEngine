@@ -32,6 +32,9 @@ IMGUI_API bool ColorPicker(float* col, bool alphabar);
 
 IMGUI_API void BringToFront();
 
+IMGUI_API bool BeginToolbar(const char* str_id, ImVec2 screen_pos, ImVec2 size);
+IMGUI_API void EndToolbar();
+
 IMGUI_API void BeginNode(ImGuiID id, ImVec2 screen_pos);
 IMGUI_API void EndNode(ImVec2& pos);
 IMGUI_API bool NodePin(ImGuiID id, ImVec2 screen_pos);

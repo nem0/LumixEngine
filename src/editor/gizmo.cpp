@@ -691,63 +691,32 @@ struct GizmoImpl : public Gizmo
 	}
 
 
-	void toggleMode() override 
+	void setTranslateMode() override
 	{
-		if (m_mode == Mode::ROTATE)
-		{
-			m_mode = Mode::TRANSLATE;
-		}
-		else if (m_mode == Mode::TRANSLATE)
-		{
-			m_mode = Mode::ROTATE;
-		}
-		else
-		{
-			ASSERT(false);
-		}
+		m_mode = Mode::TRANSLATE;
 	}
 
 
-	void togglePivot() override
+	void setRotateMode() override
 	{
-		if (m_pivot == Pivot::CENTER)
-		{
-			m_pivot = Pivot::OBJECT_PIVOT;
-		}
-		else if (m_pivot == Pivot::OBJECT_PIVOT)
-		{
-			m_pivot = Pivot::CENTER;
-		}
-		else
-		{
-			ASSERT(false);
-		}
+		m_mode = Mode::ROTATE;
 	}
 
-
-	void toggleCoordSystem() override
-	{
-		if (m_coord_system == CoordSystem::LOCAL)
-		{
-			m_coord_system = CoordSystem::WORLD;
-		}
-		else if (m_coord_system == CoordSystem::WORLD)
-		{
-			m_coord_system = CoordSystem::LOCAL;
-		}
-		else
-		{
-			ASSERT(false);
-		}
-	}
-
-
+	void setPivotCenter() override { m_pivot = Pivot::CENTER; }
+	void setPivotOrigin() override { m_pivot = Pivot::OBJECT_PIVOT; }
+	bool isPivotCenter() const override { return m_pivot == Pivot::CENTER; }
+	bool isPivotOrigin() const override { return m_pivot == Pivot::OBJECT_PIVOT; }
+	void setGlobalCoordSystem() override { m_coord_system = CoordSystem::WORLD; }
+	void setLocalCoordSystem() override { m_coord_system = CoordSystem::LOCAL; }
+	bool isLocalCoordSystem() const override { return m_coord_system == CoordSystem::LOCAL; }
+	bool isGlobalCoordSystem() const override { return m_coord_system == CoordSystem::WORLD; }
 	int getStep() const override { return m_steps[(int)m_mode]; }
 	void enableStep(bool enable) override { m_is_step = enable; }
 	void setStep(int step) override { m_steps[(int)m_mode] = step; }
 	bool isAutosnapDown() const override { return m_is_autosnap_down; }
 	void setAutosnapDown(bool snap) override { m_is_autosnap_down = snap; }
 	bool isTranslateMode() const override { return m_mode == Mode::TRANSLATE; }
+	bool isRotateMode() const override { return m_mode == Mode::ROTATE; }
 
 	Pivot m_pivot;
 	CoordSystem m_coord_system;
