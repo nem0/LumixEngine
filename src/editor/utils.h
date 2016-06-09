@@ -18,7 +18,9 @@ struct Action
 		is_global = true;
 		is_in_toolbar = false;
 		icon = nullptr;
+		is_selected.bind<falseConst>();
 	}
+
 
 	Action(const char* label,
 		const char* name,
@@ -34,7 +36,11 @@ struct Action
 		is_global = true;
 		is_in_toolbar = false;
 		icon = nullptr;
+		is_selected.bind<falseConst>();
 	}
+
+
+	static bool falseConst() { return false; }
 
 
 	bool isActive()
@@ -109,6 +115,7 @@ struct Action
 	bool is_in_toolbar;
 	ImTextureID icon;
 	Lumix::Delegate<void> func;
+	Lumix::Delegate<bool> is_selected;
 };
 
 
