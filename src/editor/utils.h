@@ -17,6 +17,7 @@ struct Action
 		shortcut[0] = shortcut[1] = shortcut[2] = -1;
 		is_global = true;
 		is_in_toolbar = false;
+		icon = nullptr;
 	}
 
 	Action(const char* label,
@@ -32,6 +33,7 @@ struct Action
 		shortcut[2] = shortcut2;
 		is_global = true;
 		is_in_toolbar = false;
+		icon = nullptr;
 	}
 
 

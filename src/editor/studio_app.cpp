@@ -137,43 +137,29 @@ public:
 		}
 		if (!any_icon) return menu_height;
 
-		ImGui::SetNextWindowPos(ImVec2(1, menu_height));
 		auto frame_padding = ImGui::GetStyle().FramePadding;
-		ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
-		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
 		float padding = frame_padding.y * 2;
 		ImVec4 active_color = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
 		ImVec4 inactive_color(0, 0, 0, 0);
-		if (ImGui::Begin("main_toolbar",
-				nullptr,
-				ImVec2(ImGui::GetIO().DisplaySize.x, 24 + padding),
-				-1,
-				ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
-					ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings))
+		if (ImGui::BeginToolbar(
+				"main_toolbar", ImVec2(1, menu_height), ImVec2(ImGui::GetIO().DisplaySize.x, 24 + padding)))
 		{
 			auto& render_interface = *m_editor->getRenderInterface();
 			ImVec2 icon_size(24, 24);
 
 			for (int i = 0; i < m_actions.size(); ++i)
 			{
-				if(i > 0) ImGui::SameLine();
+				if (i > 0) ImGui::SameLine();
 				if (m_actions[i]->is_in_toolbar)
 				{
 					if (ImGui::ImageButton(m_actions[i]->icon, icon_size))
 					{
 						m_actions[i]->func.invoke();
 					}
-
 				}
 			}
 		}
-		ImGui::End();
-		ImGui::PopStyleVar(3);
-		ImGui::PopStyleColor(3);
+		ImGui::EndToolbar();
 		return menu_height + 24 + padding;
 	}
 
@@ -500,8 +486,10 @@ public:
 	void setTopView() { m_editor->setTopView(); }
 	void setFrontView() { m_editor->setFrontView(); }
 	void setSideView() { m_editor->setSideView(); }
-	void togglePivotMode() { m_editor->getGizmo().togglePivot(); }
-	void toggleCoordSystem() { m_editor->getGizmo().toggleCoordSystem(); }
+	void setLocalCoordSystem() { m_editor->getGizmo().setLocalCoordSystem(); }
+	void setGlobalCoordSystem() { m_editor->getGizmo().setGlobalCoordSystem(); }
+	void setPivotOrigin() { m_editor->getGizmo().setPivotOrigin(); }
+	void setPivotCenter() { m_editor->getGizmo().setPivotCenter(); }
 	void createEntity() { m_editor->addEntity(); }
 	void showEntities() { m_editor->showSelectedEntities(); }
 	void hideEntities() { m_editor->hideSelectedEntities(); }
@@ -514,18 +502,14 @@ public:
 	Metadata* getMetadata() override { return &m_metadata; }
 	LogUI* getLogUI() override { return m_log_ui; }
 	void toggleGameMode() { m_editor->toggleGameMode(); }
+	void setTranslateGizmoMode() { m_editor->getGizmo().setTranslateMode(); }
+	void setRotateGizmoMode() { m_editor->getGizmo().setRotateMode(); }
 
 
 	void autosnapDown() 
 	{
 		auto& gizmo = m_editor->getGizmo();
 		gizmo.setAutosnapDown(!gizmo.isAutosnapDown());
-	}
-
-	void toggleGizmoMode() 
-	{
-		auto& gizmo = m_editor->getGizmo();
-		gizmo.toggleMode();
 	}
 
 
@@ -576,7 +560,7 @@ public:
 	}
 
 
-	Action& getAction(const char* name)
+	Action& getAction(const char* name) override
 	{
 		for (auto* a : m_actions)
 		{
@@ -638,9 +622,12 @@ public:
 		doMenuItem(getAction("orbitCamera"),
 			m_editor->isOrbitCamera(),
 			is_any_entity_selected || m_editor->isOrbitCamera());
-		doMenuItem(getAction("toggleGizmoMode"), false, is_any_entity_selected);
-		doMenuItem(getAction("togglePivotMode"), false, is_any_entity_selected);
-		doMenuItem(getAction("toggleCoordSystem"), false, is_any_entity_selected);
+		doMenuItem(getAction("setTranslateGizmoMode"), m_editor->getGizmo().isTranslateMode(), true);
+		doMenuItem(getAction("setRotateGizmoMode"), m_editor->getGizmo().isRotateMode(), true);
+		doMenuItem(getAction("setPivotCenter"), m_editor->getGizmo().isPivotCenter(), true);
+		doMenuItem(getAction("setPivotOrigin"), m_editor->getGizmo().isPivotOrigin(), true);
+		doMenuItem(getAction("setLocalCoordSystem"), m_editor->getGizmo().isLocalCoordSystem(), true);
+		doMenuItem(getAction("setGlobalCoordSystem"), m_editor->getGizmo().isGlobalCoordSystem(), true);
 		if (ImGui::BeginMenu("View", true))
 		{
 			doMenuItem(getAction("viewTop"), false, true);
@@ -1139,12 +1126,15 @@ public:
 		addAction<&StudioAppImpl::copy>("Copy", "copy", KMOD_CTRL, 'C', -1);
 		addAction<&StudioAppImpl::paste>("Paste", "paste", KMOD_CTRL, 'V', -1);
 		addAction<&StudioAppImpl::toggleOrbitCamera>("Orbit camera", "orbitCamera");
-		addAction<&StudioAppImpl::toggleGizmoMode>("Translate/Rotate", "toggleGizmoMode");
+		addAction<&StudioAppImpl::setTranslateGizmoMode>("Translate", "setTranslateGizmoMode");
+		addAction<&StudioAppImpl::setRotateGizmoMode>("Rotate", "setRotateGizmoMode");
 		addAction<&StudioAppImpl::setTopView>("Top", "viewTop");
 		addAction<&StudioAppImpl::setFrontView>("Front", "viewFront");
 		addAction<&StudioAppImpl::setSideView>("Side", "viewSide");
-		addAction<&StudioAppImpl::togglePivotMode>("Center/Pivot", "togglePivotMode");
-		addAction<&StudioAppImpl::toggleCoordSystem>("Local/Global", "toggleCoordSystem");
+		addAction<&StudioAppImpl::setLocalCoordSystem>("Local", "setLocalCoordSystem");
+		addAction<&StudioAppImpl::setGlobalCoordSystem>("Global", "setGlobalCoordSystem");
+		addAction<&StudioAppImpl::setPivotCenter>("Center", "setPivotCenter");
+		addAction<&StudioAppImpl::setPivotOrigin>("Origin", "setPivotOrigin");
 
 		addAction<&StudioAppImpl::createEntity>("Create", "createEntity");
 		addAction<&StudioAppImpl::destroyEntity>("Destroy", "destroyEntity", SDLK_DELETE, -1, -1);
