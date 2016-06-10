@@ -320,10 +320,19 @@ public:
 	static int LUA_multVecQuat(lua_State* L)
 	{
 		Vec3 v = LuaWrapper::checkArg<Vec3>(L, 1);
-		Vec3 axis = LuaWrapper::checkArg<Vec3>(L, 2);
-		float angle = LuaWrapper::checkArg<float>(L, 3);
+		Quat q;
+		if (LuaWrapper::isType<Quat>(L, 2))
+		{
+			q = LuaWrapper::checkArg<Quat>(L, 2);
+		}
+		else
+		{
+			Vec3 axis = LuaWrapper::checkArg<Vec3>(L, 2);
+			float angle = LuaWrapper::checkArg<float>(L, 3);
 
-		Quat q(axis, angle);
+			q = Quat(axis, angle);
+		}
+		
 		Vec3 res = q * v;
 
 		LuaWrapper::pushLua(L, res);
@@ -339,6 +348,17 @@ public:
 			return Vec3(0, 0, 0);
 		}
 		return universe->getPosition(entity);
+	}
+
+
+	static Quat LUA_getEntityRotation(Universe* universe, Entity entity)
+	{
+		if (entity == INVALID_ENTITY)
+		{
+			g_log_warning.log("Engine") << "Requesting rotation on invalid entity";
+			return Quat(0, 0, 0, 1);
+		}
+		return universe->getRotation(entity);
 	}
 
 
@@ -364,6 +384,7 @@ public:
 		REGISTER_FUNCTION(getEntityPosition);
 		REGISTER_FUNCTION(getEntityDirection);
 		REGISTER_FUNCTION(setEntityRotation);
+		REGISTER_FUNCTION(getEntityRotation);
 		REGISTER_FUNCTION(setEntityLocalRotation);
 		REGISTER_FUNCTION(getInputActionValue);
 		REGISTER_FUNCTION(addInputAction);

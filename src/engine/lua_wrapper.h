@@ -2,6 +2,7 @@
 
 
 #include "engine/log.h"
+#include "engine/quat.h"
 #include "engine/vec.h"
 #include <lua.hpp>
 #include <lauxlib.h>
@@ -33,6 +34,23 @@ template <> inline Vec3 toType(lua_State* L, int index)
 	lua_pop(L, 1);
 	lua_rawgeti(L, index, 3);
 	v.z = (float)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	return v;
+}
+template <> inline Quat toType(lua_State* L, int index)
+{
+	Quat v;
+	lua_rawgeti(L, index, 1);
+	v.x = (float)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	lua_rawgeti(L, index, 2);
+	v.y = (float)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	lua_rawgeti(L, index, 3);
+	v.z = (float)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	lua_rawgeti(L, index, 4);
+	v.w = (float)lua_tonumber(L, -1);
 	lua_pop(L, 1);
 	return v;
 }
@@ -105,7 +123,15 @@ template <> inline bool isType<int>(lua_State* L, int index)
 }
 template <> inline bool isType<Vec3>(lua_State* L, int index)
 {
-	return lua_istable(L, index) != 0;
+	return lua_istable(L, index) != 0 && lua_rawlen(L, index) == 3;
+}
+template <> inline bool isType<Vec2>(lua_State* L, int index)
+{
+	return lua_istable(L, index) != 0 && lua_rawlen(L, index) == 2;
+}
+template <> inline bool isType<Quat>(lua_State* L, int index)
+{
+	return lua_istable(L, index) != 0 && lua_rawlen(L, index) == 4;
 }
 template <> inline bool isType<uint32>(lua_State* L, int index)
 {
@@ -145,17 +171,30 @@ inline void pushLua(lua_State* L, const Vec3& value)
 {
 	lua_createtable(L, 3, 0);
 
-	lua_pushvalue(L, -1);
 	lua_pushnumber(L, value.x);
 	lua_rawseti(L, -2, 1);
 
-	lua_pushvalue(L, -1);
 	lua_pushnumber(L, value.y);
 	lua_rawseti(L, -2, 2);
 
-	lua_pushvalue(L, -1);
 	lua_pushnumber(L, value.z);
 	lua_rawseti(L, -2, 3);
+}
+inline void pushLua(lua_State* L, const Quat& value)
+{
+	lua_createtable(L, 4, 0);
+
+	lua_pushnumber(L, value.x);
+	lua_rawseti(L, -2, 1);
+
+	lua_pushnumber(L, value.y);
+	lua_rawseti(L, -2, 2);
+
+	lua_pushnumber(L, value.z);
+	lua_rawseti(L, -2, 3);
+
+	lua_pushnumber(L, value.w);
+	lua_rawseti(L, -2, 4);
 }
 template <> inline void pushLua(lua_State* L, bool value)
 {

@@ -1751,6 +1751,8 @@ public:
 
 	void save(FS::IFile& file)
 	{
+		while (m_engine->getFileSystem().hasWork()) m_engine->getFileSystem().updateAsyncTransactions();
+
 		ASSERT(m_universe);
 
 		OutputBlob blob(m_allocator);
