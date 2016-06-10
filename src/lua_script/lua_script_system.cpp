@@ -423,14 +423,21 @@ namespace Lumix
 			int scr_index = LuaWrapper::checkArg<int>(L, 3);
 
 			ComponentIndex cmp = scene->getComponent(entity);
-			int env = scene->getEnvironment(cmp, scr_index);
-			if (env < 0)
+			if (cmp == INVALID_COMPONENT)
 			{
 				lua_pushnil(L);
 			}
 			else
 			{
-				lua_rawgeti(L, LUA_REGISTRYINDEX, env);
+				int env = scene->getEnvironment(cmp, scr_index);
+				if (env < 0)
+				{
+					lua_pushnil(L);
+				}
+				else
+				{
+					lua_rawgeti(L, LUA_REGISTRYINDEX, env);
+				}
 			}
 			return 1;
 		}
@@ -636,10 +643,10 @@ namespace Lumix
 			
 			lua_pushlightuserdata(engine_state, &m_universe);
 			lua_setglobal(engine_state, "g_universe");
-			LuaWrapper::createSystemFunction(
-				engine_state, "LuaScript", "getEnvironment", &LuaScriptSceneImpl::getEnvironment);
 			registerProperties();
 			registerPropertyAPI();
+			LuaWrapper::createSystemFunction(
+				engine_state, "LuaScript", "getEnvironment", &LuaScriptSceneImpl::getEnvironment);
 		}
 
 

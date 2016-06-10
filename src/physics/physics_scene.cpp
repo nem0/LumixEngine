@@ -810,6 +810,25 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	static int LUA_raycast(lua_State* L)
+	{
+		auto* scene = LuaWrapper::checkArg<PhysicsSceneImpl*>(L, 1);
+		Vec3 origin = LuaWrapper::checkArg<Vec3>(L, 2);
+		Vec3 dir = LuaWrapper::checkArg<Vec3>(L, 3);
+
+		RaycastHit hit;
+		if (scene->raycastEx(origin, dir, FLT_MAX, hit))
+		{
+			LuaWrapper::pushLua(L, hit.entity != INVALID_ENTITY);
+			LuaWrapper::pushLua(L, hit.entity);
+			LuaWrapper::pushLua(L, hit.position);
+			return 3;
+		}
+		LuaWrapper::pushLua(L, false);
+		return 1;
+	}
+
+
 	Entity raycast(const Vec3& origin, const Vec3& dir) override
 	{
 		RaycastHit hit;
@@ -1836,7 +1855,8 @@ void PhysicsScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getActorSpeed);
 	REGISTER_FUNCTION(applyForceToActor);
 	REGISTER_FUNCTION(moveController);
-	REGISTER_FUNCTION(raycast);
+	
+	LuaWrapper::createSystemFunction(L, "Physics", "raycast", &PhysicsSceneImpl::LUA_raycast);
 
 	#undef REGISTER_FUNCTION
 }
