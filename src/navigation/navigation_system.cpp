@@ -560,6 +560,15 @@ struct NavigationScene : public IScene
 		if (!m_navquery) return;
 		if (entity == INVALID_ENTITY) return;
 
+		for (int i = 0; i < m_paths.size(); ++i)
+		{
+			if (m_paths[i].entity == entity)
+			{
+				m_paths.eraseFast(i);
+				break;
+			}
+		}
+
 		auto& path = m_paths.emplace();
 		path.speed = speed;
 		path.entity = entity;

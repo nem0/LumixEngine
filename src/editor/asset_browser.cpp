@@ -248,8 +248,7 @@ void AssetBrowser::onGUI()
 		{
 			selectResource(resource);
 		}
-		if (ImGui::IsMouseDragging())
-		if (ImGui::IsItemActive())
+		if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
 		{
 			m_app.startDrag(StudioApp::DragData::PATH, resource.c_str(), Lumix::stringLength(resource.c_str()) + 1);
 		}
