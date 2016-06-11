@@ -65,6 +65,17 @@ template <> inline Vec2 toType(lua_State* L, int index)
 	lua_pop(L, 1);
 	return v;
 }
+template <> inline Int2 toType(lua_State* L, int index)
+{
+	Int2 v;
+	lua_rawgeti(L, index, 1);
+	v.x = (int)lua_tointeger(L, -1);
+	lua_pop(L, 1);
+	lua_rawgeti(L, index, 2);
+	v.y = (int)lua_tointeger(L, -1);
+	lua_pop(L, 1);
+	return v;
+}
 template <> inline int64 toType(lua_State* L, int index)
 {
 	return (int64)lua_tointeger(L, index);
@@ -166,6 +177,26 @@ template <typename T> inline void pushLua(lua_State* L, T value)
 template <> inline void pushLua(lua_State* L, float value)
 {
 	lua_pushnumber(L, value);
+}
+inline void pushLua(lua_State* L, const Vec2& value)
+{
+	lua_createtable(L, 2, 0);
+
+	lua_pushnumber(L, value.x);
+	lua_rawseti(L, -2, 1);
+
+	lua_pushnumber(L, value.y);
+	lua_rawseti(L, -2, 2);
+}
+inline void pushLua(lua_State* L, const Int2& value)
+{
+	lua_createtable(L, 2, 0);
+
+	lua_pushinteger(L, value.x);
+	lua_rawseti(L, -2, 1);
+
+	lua_pushinteger(L, value.y);
+	lua_rawseti(L, -2, 2);
 }
 inline void pushLua(lua_State* L, const Vec3& value)
 {
