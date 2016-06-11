@@ -16,7 +16,7 @@ void normalize(const char* path, char* out, uint32 max_size)
 
 	if (path[0] == '.' && (path[1] == '\\' || path[1] == '/'))
 		++path;
-	#ifdef __WIN32
+	#ifdef _WIN32
 		if (path[0] == '\\' || path[0] == '/')
 			++path;
 	#endif
