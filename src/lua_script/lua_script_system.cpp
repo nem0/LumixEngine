@@ -497,6 +497,22 @@ namespace Lumix
 					LuaWrapper::pushLua(L, v);
 				}
 				break;
+				case IPropertyDescriptor::VEC2:
+				{
+					Vec2 v;
+					OutputBlob blob(&v, sizeof(v));
+					desc->get(cmp, -1, blob);
+					LuaWrapper::pushLua(L, v);
+				}
+				break;
+				case IPropertyDescriptor::INT2:
+				{
+					Int2 v;
+					OutputBlob blob(&v, sizeof(v));
+					desc->get(cmp, -1, blob);
+					LuaWrapper::pushLua(L, v);
+				}
+				break;
 				default: luaL_argerror(L, 1, "Unsupported property type"); break;
 			}
 			return 1;
@@ -548,6 +564,20 @@ namespace Lumix
 				case IPropertyDescriptor::VEC3:
 				{
 					auto v = LuaWrapper::checkArg<Vec3>(L, 3);
+					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
+				}
+				break;
+				case IPropertyDescriptor::VEC2:
+				{
+					auto v = LuaWrapper::checkArg<Vec2>(L, 3);
+					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
+				}
+				break;
+				case IPropertyDescriptor::INT2:
+				{
+					auto v = LuaWrapper::checkArg<Int2>(L, 3);
 					InputBlob blob(&v, sizeof(v));
 					desc->set(cmp, -1, blob);
 				}
@@ -606,6 +636,8 @@ namespace Lumix
 						case IPropertyDescriptor::INTEGER:
 						case IPropertyDescriptor::BOOL:
 						case IPropertyDescriptor::VEC3:
+						case IPropertyDescriptor::VEC2:
+						case IPropertyDescriptor::INT2:
 						case IPropertyDescriptor::COLOR:
 						case IPropertyDescriptor::RESOURCE:
 						case IPropertyDescriptor::FILE:

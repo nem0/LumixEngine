@@ -199,6 +199,22 @@ public:
 				desc.set(cmp, -1, input_blob);
 			}
 			break;
+		case IPropertyDescriptor::VEC2:
+			if (lua_istable(L, -1))
+			{
+				auto v = LuaWrapper::toType<Vec2>(L, -1);
+				InputBlob input_blob(&v, sizeof(v));
+				desc.set(cmp, -1, input_blob);
+			}
+			break;
+		case IPropertyDescriptor::INT2:
+			if (lua_istable(L, -1))
+			{
+				auto v = LuaWrapper::toType<Int2>(L, -1);
+				InputBlob input_blob(&v, sizeof(v));
+				desc.set(cmp, -1, input_blob);
+			}
+			break;
 		default:
 			g_log_error.log("Lua Script") << "Property " << desc.getName() << " has unsupported type";
 			break;
