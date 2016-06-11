@@ -927,17 +927,15 @@ struct PhysicsSceneImpl : public PhysicsScene
 		if (bytes_per_pixel == 2)
 		{
 			PROFILE_BLOCK("copyData");
-			const uint16* LUMIX_RESTRICT data =
-				(const uint16*)terrain->m_heightmap->getData();
+			const int16* LUMIX_RESTRICT data = (const int16*)terrain->m_heightmap->getData();
 			for (int j = 0; j < height; ++j)
 			{
 				int idx = j * width;
 				for (int i = 0; i < width; ++i)
 				{
 					int idx2 = j + i * height;
-					heights[idx].height = data[idx2];
-					heights[idx].materialIndex0 = heights[idx].materialIndex1 =
-						0;
+					heights[idx].height = physx::PxI16((int32)data[idx2] - 0x7fff);
+					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
 					heights[idx].setTessFlag();
 					++idx;
 				}
@@ -953,9 +951,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 				{
 					int idx = i + j * width;
 					int idx2 = j + i * height;
-					heights[idx].height = data[idx2 * bytes_per_pixel];
-					heights[idx].materialIndex0 = heights[idx].materialIndex1 =
-						0;
+					heights[idx].height = physx::PxI16((int32)data[idx2 * bytes_per_pixel] - 0x7f);
+					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
 					heights[idx].setTessFlag();
 				}
 			}
@@ -971,16 +968,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 			hfDesc.samples.stride = sizeof(physx::PxHeightFieldSample);
 			hfDesc.thickness = -1;
 
-			physx::PxHeightField* heightfield =
-				m_system->getPhysics()->createHeightField(hfDesc);
-			float height_scale =
-				bytes_per_pixel == 2 ? 1 / (256 * 256.0f - 1) : 1 / 255.0f;
+			physx::PxHeightField* heightfield = m_system->getPhysics()->createHeightField(hfDesc);
+			float height_scale = bytes_per_pixel == 2 ? 1 / (256 * 256.0f - 1) : 1 / 255.0f;
 			physx::PxHeightFieldGeometry hfGeom(heightfield,
-												physx::PxMeshGeometryFlags(),
-												height_scale *
-													terrain->m_y_scale,
-												terrain->m_xz_scale,
-												terrain->m_xz_scale);
+				physx::PxMeshGeometryFlags(),
+				height_scale * terrain->m_y_scale,
+				terrain->m_xz_scale,
+				terrain->m_xz_scale);
 			if (terrain->m_actor)
 			{
 				physx::PxRigidActor* actor = terrain->m_actor;
@@ -991,17 +985,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 			physx::PxTransform transform;
 			Matrix mtx = m_universe.getPositionAndRotation(terrain->m_entity);
+			mtx.translate(0, terrain->m_y_scale * 0.5f, 0);
 			matrix2Transform(mtx, transform);
 
 			physx::PxRigidActor* actor;
-			actor = PxCreateStatic(*m_system->getPhysics(),
-								   transform,
-								   hfGeom,
-								   *m_default_material);
+			actor = PxCreateStatic(*m_system->getPhysics(), transform, hfGeom, *m_default_material);
 			if (actor)
 			{
-				actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION,
-									width <= 1024);
+				actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, width <= 1024);
 				actor->userData = (void*)(intptr_t)terrain->m_entity;
 				m_scene->addActor(*actor);
 				terrain->m_actor = actor;
@@ -1019,9 +1010,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 			else
 			{
-				g_log_error.log("Physics")
-					<< "Could not create PhysX heightfield "
-					<< terrain->m_heightmap->getPath();
+				g_log_error.log("Physics") << "Could not create PhysX heightfield " << terrain->m_heightmap->getPath();
 			}
 		}
 	}
