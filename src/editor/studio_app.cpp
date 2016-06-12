@@ -61,6 +61,7 @@ public:
 		, m_settings(*this)
 		, m_plugins(m_allocator)
 	{
+		m_current_group = 0;
 		m_drag_data = { DragData::NONE, nullptr, 0 };
 		m_confirm_load = m_confirm_new = m_confirm_exit = false;
 		m_exit_code = 0;
@@ -856,119 +857,140 @@ public:
 	}
 
 
+	void showEntityListToolbar()
+	{
+		auto pos = ImGui::GetCursorScreenPos();
+		ImVec2 toolbar_size(ImGui::GetContentRegionAvailWidth(), 24);
+		ImGui::BeginToolbar("entity_list_toolbar", pos, toolbar_size);
+		auto& groups = m_editor->getEntityGroups();
+		if (getAction("createGroup").toolbarButton())
+		{
+			ImGui::OpenPopup("create_entity_group_popup");
+		}
+		if (groups.getGroupCount() > 1 && getAction("removeGroup").toolbarButton())
+		{
+			groups.deleteGroup(m_current_group);
+			m_current_group = m_current_group % groups.getGroupCount();
+		}
+		if (getAction("selectAssigned").toolbarButton())
+		{
+			m_editor->selectEntities(
+				groups.getGroupEntities(m_current_group), groups.getGroupEntitiesCount(m_current_group));
+		}
+		if (getAction("assignSelected").toolbarButton())
+		{
+			auto& selected = m_editor->getSelectedEntities();
+			for (auto e : selected)
+			{
+				groups.setGroup(e, m_current_group);
+			}
+		}
+		if (getAction("lock").toolbarButton()) groups.freezeGroup(m_current_group, true);
+		if (getAction("unlock").toolbarButton()) groups.freezeGroup(m_current_group, false);
+		if (getAction("show").toolbarButton())
+		{
+			m_editor->showEntities(
+				groups.getGroupEntities(m_current_group), groups.getGroupEntitiesCount(m_current_group));
+		}
+		if (getAction("hide").toolbarButton())
+		{
+			m_editor->hideEntities(
+				groups.getGroupEntities(m_current_group), groups.getGroupEntitiesCount(m_current_group));
+		}
+
+		if (ImGui::BeginPopup("create_entity_group_popup"))
+		{
+			static char group_name[20] = "";
+			ImGui::InputText("New group name", group_name, Lumix::lengthOf(group_name));
+			if (group_name[0] == 0)
+			{
+				ImGui::Text("Group name can not be empty");
+			}
+			else if (groups.getGroup(group_name) != -1) 
+			{
+				ImGui::Text("Group with that name already exists");
+			}
+			else if (ImGui::Button("Create"))
+			{
+				groups.createGroup(group_name);
+				group_name[0] = 0;
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndPopup();
+		}
+
+		ImGui::EndToolbar();
+		pos.y += 24 + ImGui::GetStyle().FramePadding.y * 2;
+		ImGui::SetCursorScreenPos(pos);
+	}
+
+
 	void showEntityList()
 	{
 		if (ImGui::BeginDock("Entity List", &m_is_entity_list_opened))
 		{
-			auto* universe = m_editor->getUniverse();
-
-			auto& groups = m_editor->getEntityGroups();
-			static char group_name[20] = "";
-			ImGui::InputText("New group name", group_name, Lumix::lengthOf(group_name));
-			if(ImGui::Button("Create group"))
+			showEntityListToolbar();
+			if (ImGui::BeginChild(""))
 			{
-				if(group_name[0] == 0)
-				{
-					Lumix::g_log_error.log("Editor") << "Group name can not be empty";
-				}
-				else if(groups.getGroup(group_name) != -1)
-				{
-					Lumix::g_log_error.log("Editor") << "Group with name " << group_name << " already exists";
-				}
-				else
-				{
-					groups.createGroup(group_name);
-				}
-				group_name[0] = 0;
-			}
-			ImGui::Separator();
+				auto* universe = m_editor->getUniverse();
+				auto& groups = m_editor->getEntityGroups();
 
-			for(int i = 0; i < groups.getGroupCount(); ++i)
-			{
-				auto* name = groups.getGroupName(i);
-				if(ImGui::TreeNode(name, "%s (%d)", name, groups.getGroupEntitiesCount(i)))
+				m_current_group = m_current_group % groups.getGroupCount();
+				for (int i = 0; i < groups.getGroupCount(); ++i)
 				{
-					struct ListBoxData
+					auto* name = groups.getGroupName(i);
+					int entities_count = groups.getGroupEntitiesCount(i);
+					const char* locked_text = groups.isGroupFrozen(i) ? "locked" : "";
+					const char* current_text = m_current_group == i ? "<-" : "";
+					if (ImGui::TreeNode(name, "%s (%d) %s %s", name, entities_count, locked_text, current_text))
 					{
-						Lumix::WorldEditor* m_editor;
-						Lumix::Universe* universe;
-						Lumix::EntityGroups* groups;
-						int group;
-						char buffer[1024];
-						static bool itemsGetter(void* data, int idx, const char** txt)
+						struct ListBoxData
 						{
-							auto* d = static_cast<ListBoxData*>(data);
-							auto* entities = d->groups->getGroupEntities(d->group);
-							getEntityListDisplayName(*d->m_editor, d->buffer, sizeof(d->buffer), entities[idx]);
-							*txt = d->buffer;
-							return true;
-						}
-					};
-					ListBoxData data;
-					data.universe = universe;
-					data.m_editor = m_editor;
-					data.group = i;
-					data.groups = &groups;
-					int current_item = -1;
-					if(ImGui::ListBox("Entities",
-						&current_item,
-						&ListBoxData::itemsGetter,
-						&data,
-						groups.getGroupEntitiesCount(i),
-						15))
-					{
-						auto e = groups.getGroupEntities(i)[current_item];
-						m_editor->selectEntities(&e, 1);
-					};
-
-					if(groups.getGroupCount() == 1)
-					{
-						ImGui::Text("Can not delete - at least one group must exists");
-					}
-					else if(ImGui::Button("Delete group"))
-					{
-						groups.deleteGroup(i);
-					}
-
-					if(ImGui::Button("Select all entities in group"))
-					{
-						m_editor->selectEntities(groups.getGroupEntities(i), groups.getGroupEntitiesCount(i));
-					}
-
-					if(ImGui::Button("Assign selected entities to group"))
-					{
-						auto& selected = m_editor->getSelectedEntities();
-						for(auto e : selected)
+							Lumix::WorldEditor* m_editor;
+							Lumix::Universe* universe;
+							Lumix::EntityGroups* groups;
+							int group;
+							char buffer[1024];
+							static bool itemsGetter(void* data, int idx, const char** txt)
+							{
+								auto* d = static_cast<ListBoxData*>(data);
+								auto* entities = d->groups->getGroupEntities(d->group);
+								getEntityListDisplayName(*d->m_editor, d->buffer, sizeof(d->buffer), entities[idx]);
+								*txt = d->buffer;
+								return true;
+							}
+						};
+						ListBoxData data;
+						data.universe = universe;
+						data.m_editor = m_editor;
+						data.group = i;
+						data.groups = &groups;
+						int current_item = -1;
+						ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - ImGui::GetStyle().FramePadding.x);
+						if (ImGui::ListBox("",
+							&current_item,
+							&ListBoxData::itemsGetter,
+							&data,
+							groups.getGroupEntitiesCount(i),
+							15))
 						{
-							groups.setGroup(e, i);
-						}
-					}
+							auto e = groups.getGroupEntities(i)[current_item];
+							m_editor->selectEntities(&e, 1);
+						};
+						ImGui::PopItemWidth();
 
-					if (ImGui::Button("Hide all"))
-					{
-						m_editor->hideEntities(groups.getGroupEntities(i), groups.getGroupEntitiesCount(i));
+						ImGui::TreePop();
 					}
-
-					if (ImGui::Button("Show all"))
-					{
-						m_editor->showEntities(groups.getGroupEntities(i), groups.getGroupEntitiesCount(i));
-					}
-
-					if (groups.isGroupFrozen(i) && ImGui::Button("Unfreeze"))
-					{
-						groups.freezeGroup(i, false);
-					}
-					else if (!groups.isGroupFrozen(i) && ImGui::Button("Freeze"))
-					{
-						groups.freezeGroup(i, true);
-					}
-
-					ImGui::TreePop();
+					if (ImGui::IsItemClicked()) m_current_group = i;
 				}
 			}
+			ImGui::EndChild();
 		}
 		ImGui::EndDock();
 	}
+
+
+	void dummy() {}
 
 
 	void startDrag(DragData::Type type, const void* data, int size) override
@@ -1172,6 +1194,15 @@ public:
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isEntityListOpened>(this);
 		addAction<&StudioAppImpl::toggleSettings>("Settings", "settings")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::areSettingsOpened>(this);
+
+		addAction<&StudioAppImpl::dummy>("Unhide entities from group", "show").is_global = false;
+		addAction<&StudioAppImpl::dummy>("Hide entities from group", "hide").is_global = false;
+		addAction<&StudioAppImpl::dummy>("Lock group", "lock").is_global = false;
+		addAction<&StudioAppImpl::dummy>("Unlock group", "unlock").is_global = false;
+		addAction<&StudioAppImpl::dummy>("Create group", "createGroup").is_global = false;
+		addAction<&StudioAppImpl::dummy>("Remove group", "removeGroup").is_global = false;
+		addAction<&StudioAppImpl::dummy>("Select assigned", "selectAssigned").is_global = false;
+		addAction<&StudioAppImpl::dummy>("Assigned selected", "assignSelected").is_global = false;
 	}
 
 
@@ -1823,6 +1854,7 @@ public:
 
 	bool m_finished;
 	int m_exit_code;
+	int m_current_group;
 
 	bool m_is_welcome_screen_opened;
 	bool m_is_entity_list_opened;

@@ -41,13 +41,18 @@ struct Action
 	static bool falseConst() { return false; }
 
 
-	void toolbarButton()
+	bool toolbarButton()
 	{
-		if (!icon) return;
+		if (!icon) return false;
 
 		ImVec4 col_active = ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered];
 		ImVec4 bg_color = is_selected.invoke() ? col_active : ImVec4(0, 0, 0, 0);
-		if (ImGui::ToolbarButton(icon, bg_color, label)) func.invoke();
+		if (ImGui::ToolbarButton(icon, bg_color, label))
+		{
+			func.invoke();
+			return true;
+		}
+		return false;
 	}
 
 
