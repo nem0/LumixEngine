@@ -236,7 +236,7 @@ struct DockContext
 	void putInBackground()
 	{
 		ImGuiWindow* win = GetCurrentWindow();
-		ImGuiState& g = *GImGui;
+		ImGuiContext& g = *GImGui;
 		if (g.Windows[0] == win) return;
 
 		for (int i = 0; i < g.Windows.Size; i++)
@@ -952,7 +952,7 @@ struct DockContext
 			dock.pos = GetWindowPos();
 			dock.size = GetWindowSize();
 
-			ImGuiState& g = *GImGui;
+			ImGuiContext& g = *GImGui;
 
 			if (g.ActiveId == GetCurrentWindow()->MoveID && g.IO.MouseDown[0])
 			{
