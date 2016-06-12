@@ -164,6 +164,7 @@ static void registerProperties(IAllocator& allocator)
 	PropertyRegister::registerComponentType("point_light", "Point light");
 	PropertyRegister::registerComponentType("terrain", "Terrain");
 	PropertyRegister::registerComponentType("bone_attachment", "Bone attachment");
+	PropertyRegister::registerComponentType("environment_probe", "Environment probe");
 
 	PropertyRegister::registerComponentDependency("particle_emitter_fade", "particle_emitter");
 	PropertyRegister::registerComponentDependency("particle_emitter_force", "particle_emitter");

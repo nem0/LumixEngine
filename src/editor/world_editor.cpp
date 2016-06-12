@@ -1745,7 +1745,12 @@ public:
 		save(*file);
 		m_is_universe_changed = false;
 		fs.close(*file);
-		if (save_path) m_universe_path = path;
+		
+		if (save_path)
+		{
+			m_universe_path = path;
+			m_universe->setPath(path);
+		}
 	}
 
 
@@ -2407,6 +2412,7 @@ public:
 	{
 		destroyUniverse();
 		createUniverse(false);
+		m_universe->setPath(m_universe_path);
 		load(file);
 	}
 
