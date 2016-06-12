@@ -72,7 +72,7 @@ static void loadStyle(lua_State* L)
 		LUMIX_READ_STYLE(PlotHistogram);
 		LUMIX_READ_STYLE(PlotHistogramHovered);
 		LUMIX_READ_STYLE(TextSelectedBg);
-		LUMIX_READ_STYLE(TooltipBg);
+		LUMIX_READ_STYLE(PopupBg);
 		LUMIX_READ_STYLE(ModalWindowDarkening);
 
 		#undef LUMIX_READ_STYLE
@@ -132,7 +132,7 @@ static void saveStyle(Lumix::FS::OsFile& file)
 	LUMIX_WRITE_STYLE(PlotHistogram);
 	LUMIX_WRITE_STYLE(PlotHistogramHovered);
 	LUMIX_WRITE_STYLE(TextSelectedBg);
-	LUMIX_WRITE_STYLE(TooltipBg);
+	LUMIX_WRITE_STYLE(PopupBg);
 	LUMIX_WRITE_STYLE(ModalWindowDarkening);
 
 	#undef LUMIX_WRITE_STYLE
@@ -594,7 +594,7 @@ void Settings::onGUI(Action** actions, int actions_count)
 						style.Colors[ImGuiCol_PlotHistogram] = ImVec4(0.90f, 0.70f, 0.00f, 1.00f);
 						style.Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(1.00f, 0.60f, 0.00f, 1.00f);
 						style.Colors[ImGuiCol_TextSelectedBg] = ImVec4(0.26f, 0.59f, 0.98f, 0.35f);
-						style.Colors[ImGuiCol_TooltipBg] = ImVec4(1.00f, 1.00f, 1.00f, 0.94f);
+						style.Colors[ImGuiCol_PopupBg] = ImVec4(1.00f, 1.00f, 1.00f, 0.94f);
 						style.Colors[ImGuiCol_ModalWindowDarkening] = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
 						break;
 					case 1:
@@ -639,7 +639,7 @@ void Settings::onGUI(Action** actions, int actions_count)
 						style.Colors[ImGuiCol_PlotHistogram] = ImVec4(0.10f, 0.30f, 1.00f, 1.00f);
 						style.Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(0.00f, 0.40f, 1.00f, 1.00f);
 						style.Colors[ImGuiCol_TextSelectedBg] = ImVec4(0.75f, 0.42f, 0.02f, 0.35f);
-						style.Colors[ImGuiCol_TooltipBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.94f);
+						style.Colors[ImGuiCol_PopupBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.94f);
 						style.Colors[ImGuiCol_ModalWindowDarkening] = ImVec4(0.06f, 0.06f, 0.06f, 0.35f);
 						break;
 				}

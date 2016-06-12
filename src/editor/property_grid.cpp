@@ -379,7 +379,7 @@ void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescr
 {
 	Lumix::StaticString<100> desc_name(desc.getName(), "###", (Lumix::uint64)&desc);
 
-	if (!ImGui::CollapsingHeader(desc_name, nullptr, true, true)) return;
+	if (!ImGui::CollapsingHeader(desc_name, nullptr, ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_DefaultOpen)) return;
 
 	int count = desc.getCount(cmp);
 	if (desc.canAdd() && ImGui::Button("Add"))
@@ -419,20 +419,30 @@ void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescr
 
 void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 {
-	if (!ImGui::CollapsingHeader(
-		getComponentTypeName(cmp), nullptr, true, true))
-		return;
-
-	ImGui::PushID(cmp.type);
+	ImGuiTreeNodeFlags flags =
+		ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode;
+	bool is_opened = ImGui::CollapsingHeader(getComponentTypeName(cmp), nullptr, flags);
 
 	if (!m_editor.canRemove(cmp))
 	{
 		ImGui::Text("Remove dependents first.");
 	}
-	else if (ImGui::Button(
-		Lumix::StaticString<30>("Remove component###", cmp.type)))
+	else
 	{
-		m_editor.destroyComponent(cmp);
+		ImGui::PushID(cmp.type);
+		float w = ImGui::GetContentRegionAvailWidth();
+		ImGui::SameLine(w - 45);
+		if (ImGui::Button(
+			Lumix::StaticString<30>("Remove###", cmp.type)))
+		{
+			m_editor.destroyComponent(cmp);
+			ImGui::PopID();
+			return;
+		}
+	}
+
+	if (!is_opened)
+	{
 		ImGui::PopID();
 		return;
 	}

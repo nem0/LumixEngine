@@ -650,7 +650,9 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 			m_app.getAssetBrowser()->openInExternalEditor(path);
 		}
 
-		if (shader->m_texture_slot_count > 0 && ImGui::CollapsingHeader("Texture slots", nullptr, true, true))
+		if (shader->m_texture_slot_count > 0 &&
+			ImGui::CollapsingHeader(
+				"Texture slots", nullptr, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed))
 		{
 			ImGui::Columns(2);
 			ImGui::Text("name");
@@ -669,7 +671,8 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 			ImGui::Columns(1);
 		}
 
-		if (!shader->m_uniforms.empty() && ImGui::CollapsingHeader("Uniforms", nullptr, true, true))
+		if (!shader->m_uniforms.empty() &&
+			ImGui::CollapsingHeader("Uniforms", nullptr, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed))
 		{
 			ImGui::Columns(2);
 			ImGui::Text("name");

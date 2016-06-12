@@ -1204,7 +1204,7 @@ void TerrainEditor::onGUI()
 	if (m_decrease_texture_idx->isRequested()) m_decrease_texture_idx->func.invoke();
 
 	auto* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
-	if (!ImGui::CollapsingHeader("Terrain editor", nullptr, true, true)) return;
+	if (!ImGui::CollapsingHeader("Terrain editor", nullptr, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed)) return;
 
 	ImGui::Checkbox("Editor enabled", &m_is_enabled);
 	if (!m_is_enabled) return;

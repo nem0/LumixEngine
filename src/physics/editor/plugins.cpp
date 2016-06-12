@@ -115,7 +115,8 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 				}
 			}
 
-			if (ImGui::CollapsingHeader("Collision matrix", nullptr, true, true))
+			if (ImGui::CollapsingHeader(
+					"Collision matrix", nullptr, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed))
 			{
 				ImGui::Columns(1 + scene->getCollisionsLayersCount());
 				ImGui::NextColumn();
