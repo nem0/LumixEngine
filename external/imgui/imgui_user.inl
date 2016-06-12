@@ -9,9 +9,8 @@ namespace ImGui
 {
 
 
-bool BeginToolbar(const char* str_id, ImVec2 screen_pos, ImVec2 size)
+bool ToolbarButton(ImTextureID texture, const ImVec4& bg_color, const char* tooltip)
 {
-	ImGui::SetNextWindowPos(screen_pos);
 	auto frame_padding = ImGui::GetStyle().FramePadding;
 	ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
 	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
@@ -19,18 +18,50 @@ bool BeginToolbar(const char* str_id, ImVec2 screen_pos, ImVec2 size)
 	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
+
+	bool ret = false;
+	ImGui::SameLine();
+	ImVec4 col_active = ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered];
+	if (ImGui::ImageButton(texture, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), -1, bg_color))
+	{
+		ret = true;
+	}
+	if (ImGui::IsItemHovered())
+	{
+		ImGui::SetTooltip("%s", tooltip);
+	}
+	ImGui::PopStyleColor(3);
+	ImGui::PopStyleVar(3);
+	return ret;
+}
+
+
+bool BeginToolbar(const char* str_id, ImVec2 screen_pos, ImVec2 size)
+{
+	ImGui::SetNextWindowPos(screen_pos);
+	auto frame_padding = ImGui::GetStyle().FramePadding;
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
 	float padding = frame_padding.y * 2;
 	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
 		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
-	return ImGui::Begin(str_id, nullptr, size, -1, flags);
+	bool ret = ImGui::Begin(str_id, nullptr, size, -1, flags);
+	ImGui::PopStyleVar(3);
+
+
+	return ret;
 }
 
 
 void EndToolbar()
 {
+	auto frame_padding = ImGui::GetStyle().FramePadding;
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
 	ImGui::End();
 	ImGui::PopStyleVar(3);
-	ImGui::PopStyleColor(3);
 }
 
 
