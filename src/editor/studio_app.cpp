@@ -78,7 +78,7 @@ public:
 	}
 
 
-	Lumix::Array<Action*>& getActions() override
+	const Lumix::Array<Action*>& getActions() override
 	{
 		return m_actions;
 	}
@@ -489,6 +489,12 @@ public:
 	void toggleMeasure() { m_editor->toggleMeasure(); }
 	void snapDown() { m_editor->snapDown(); }
 	void lookAtSelected() { m_editor->lookAtSelected(); }
+	void toggleSettings() { m_settings.m_is_opened = !m_settings.m_is_opened; }
+	bool areSettingsOpened() const { return m_settings.m_is_opened; }
+	void toggleEntityList() { m_is_entity_list_opened = !m_is_entity_list_opened; }
+	bool isEntityListOpened() const { return m_is_entity_list_opened; }
+	void toggleAssetBrowser() { m_asset_browser->m_is_opened = !m_asset_browser->m_is_opened; }
+	bool isAssetBrowserOpened() const { return m_asset_browser->m_is_opened; }
 	int getExitCode() const override { return m_exit_code; }
 	AssetBrowser* getAssetBrowser() override { return m_asset_browser; }
 	PropertyGrid* getPropertyGrid() override { return m_property_grid; }
@@ -534,25 +540,28 @@ public:
 	}
 
 
+	void addAction(Action* action) override
+	{
+		for (int i = 0; i < m_actions.size(); ++i)
+		{
+			if (Lumix::compareString(m_actions[i]->label, action->label) > 0)
+			{
+				m_actions.insert(i, action);
+				return;
+			}
+		}
+		m_actions.push(action);
+	}
+
+
 	template <void (StudioAppImpl::*func)()>
 	Action& addAction(const char* label, const char* name)
 	{
 		auto* a = LUMIX_NEW(m_editor->getAllocator(), Action)(label, name);
 		a->func.bind<StudioAppImpl, func>(this);
-		m_actions.push(a);
+		addAction(a);
 		return *a;
 	}
-
-
-	template <void (StudioAppImpl::*func)(), bool (StudioAppImpl::*selected_func)()>
-	void addSelectableAction(const char* label, const char* name)
-	{
-		auto* a = LUMIX_NEW(m_editor->getAllocator(), Action)(label, name);
-		a->func.bind<StudioAppImpl, func>(this);
-		a->is_selected.bind<StudioAppImpl, selected_func>(this);
-		m_actions.push(a);
-	}
-
 
 
 	template <void (StudioAppImpl::*func)()>
@@ -561,7 +570,7 @@ public:
 		auto* a = LUMIX_NEW(m_editor->getAllocator(), Action)(
 			label, name, shortcut0, shortcut1, shortcut2);
 		a->func.bind<StudioAppImpl, func>(this);
-		m_actions.push(a);
+		addAction(a);
 	}
 
 
@@ -700,12 +709,12 @@ public:
 		if (!ImGui::BeginMenu("View")) return;
 
 		ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
-		ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
+		doMenuItem(getAction("entityList"), true);
 		ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
 		ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
 		ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
 		ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
-		ImGui::MenuItem("Settings", nullptr, &m_settings.m_is_opened);
+		doMenuItem(getAction("settings"), true);
 		ImGui::Separator();
 		for (auto* plugin : m_plugins)
 		{
@@ -1128,8 +1137,8 @@ public:
 		addAction<&StudioAppImpl::undo>("Undo", "undo", KMOD_CTRL, 'Z', -1);
 		addAction<&StudioAppImpl::copy>("Copy", "copy", KMOD_CTRL, 'C', -1);
 		addAction<&StudioAppImpl::paste>("Paste", "paste", KMOD_CTRL, 'V', -1);
-		addSelectableAction<&StudioAppImpl::toggleOrbitCamera, &StudioAppImpl::isOrbitCamera>(
-			"Orbit camera", "orbitCamera");
+		addAction<&StudioAppImpl::toggleOrbitCamera>("Orbit camera", "orbitCamera")
+			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isOrbitCamera>(this);
 		addAction<&StudioAppImpl::setTranslateGizmoMode>("Translate", "setTranslateGizmoMode")
 			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isTranslateMode>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::setRotateGizmoMode>("Rotate", "setRotateGizmoMode")
@@ -1159,6 +1168,12 @@ public:
 			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isAutosnapDown>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::snapDown>("Snap down", "snapDown");
 		addAction<&StudioAppImpl::lookAtSelected>("Look at selected", "lookAtSelected");
+		addAction<&StudioAppImpl::toggleAssetBrowser>("Asset Browser", "assetBrowser")
+			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isAssetBrowserOpened>(this);
+		addAction<&StudioAppImpl::toggleEntityList>("Entity List", "entityList")
+			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isEntityListOpened>(this);
+		addAction<&StudioAppImpl::toggleSettings>("Settings", "settings")
+			.is_selected.bind<StudioAppImpl, &StudioAppImpl::areSettingsOpened>(this);
 	}
 
 
@@ -1230,7 +1245,7 @@ public:
 		m_plugins.push(&plugin);
 		if (plugin.m_action)
 		{
-			m_actions.push(plugin.m_action);
+			addAction(plugin.m_action);
 		}
 	}
 
