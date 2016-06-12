@@ -32,7 +32,7 @@ public:
 		NOT_SET
 	};
 
-	TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions);
+	TerrainEditor(Lumix::WorldEditor& editor, class StudioApp& app);
 	~TerrainEditor();
 
 	bool onEntityMouseDown(const Lumix::WorldEditor::RayHit& hit, int, int) override;

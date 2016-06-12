@@ -9,6 +9,7 @@
 #include "editor/entity_template_system.h"
 #include "editor/ieditor_command.h"
 #include "editor/platform_interface.h"
+#include "editor/studio_app.h"
 #define STB_IMAGE_IMPLEMENTATION
 #if defined _MSC_VER && _MSC_VER == 1900 
 #pragma warning(disable : 4312)
@@ -645,7 +646,7 @@ static Lumix::IEditorCommand* createPaintTerrainCommand(Lumix::WorldEditor& edit
 }
 
 
-TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
+TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, StudioApp& app)
 	: m_world_editor(editor)
 	, m_color(1, 1, 1)
 	, m_current_brush(0)
@@ -658,7 +659,6 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	, m_y_spread(0, 0)
 {
 	editor.registerEditorCommandCreator("paint_terrain", createPaintTerrainCommand);
-
 	m_increase_brush_size =
 		LUMIX_NEW(editor.getAllocator(), Action)("Increase brush size", "increaseBrushSize");
 	m_increase_brush_size->is_global = false;
@@ -667,8 +667,8 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 		LUMIX_NEW(editor.getAllocator(), Action)("Decrease brush size", "decreaseBrushSize");
 	m_decrease_brush_size->func.bind<TerrainEditor, &TerrainEditor::decreaseBrushSize>(this);
 	m_decrease_brush_size->is_global = false;
-	actions.push(m_increase_brush_size);
-	actions.push(m_decrease_brush_size);
+	app.addAction(m_increase_brush_size);
+	app.addAction(m_decrease_brush_size);
 
 	m_increase_texture_idx =
 		LUMIX_NEW(editor.getAllocator(), Action)("Next terrain texture", "nextTerrainTexture");
@@ -678,8 +678,8 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 		LUMIX_NEW(editor.getAllocator(), Action)("Previous terrain texture", "prevTerrainTexture");
 	m_decrease_texture_idx->func.bind<TerrainEditor, &TerrainEditor::prevTerrainTexture>(this);
 	m_decrease_texture_idx->is_global = false;
-	actions.push(m_increase_texture_idx);
-	actions.push(m_decrease_texture_idx);
+	app.addAction(m_increase_texture_idx);
+	app.addAction(m_decrease_texture_idx);
 
 	m_smooth_terrain_action =
 		LUMIX_NEW(editor.getAllocator(), Action)("Smooth terrain", "smoothTerrain");
@@ -687,13 +687,13 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	m_lower_terrain_action =
 		LUMIX_NEW(editor.getAllocator(), Action)("Lower terrain", "lowerTerrain");
 	m_lower_terrain_action->is_global = false;
-	actions.push(m_smooth_terrain_action);
-	actions.push(m_lower_terrain_action);
+	app.addAction(m_smooth_terrain_action);
+	app.addAction(m_lower_terrain_action);
 
 	m_remove_entity_action = LUMIX_NEW(editor.getAllocator(), Action)(
 		"Remove entities from terrain", "removeEntitiesFromTerrain");
 	m_remove_entity_action->is_global = false;
-	actions.push(m_remove_entity_action);
+	app.addAction(m_remove_entity_action);
 
 	editor.addPlugin(*this);
 	m_terrain_brush_size = 10;

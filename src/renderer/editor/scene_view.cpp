@@ -139,6 +139,50 @@ SceneView::SceneView(StudioApp& app)
 	m_log_ui = nullptr;
 	m_is_opengl = false;
 	m_app.getWorldEditor()->registerEditorCommandCreator("insert_mesh", createInsertMeshCommand);
+
+	m_log_ui = m_app.getLogUI();
+	m_editor = m_app.getWorldEditor();
+	auto& engine = m_editor->getEngine();
+	auto& allocator = engine.getAllocator();
+	auto* renderer = static_cast<Lumix::Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+	m_is_opengl = renderer->isOpenGL();
+	Lumix::Path path("pipelines/main.lua");
+	m_pipeline = Lumix::Pipeline::create(*renderer, path, engine.getAllocator());
+	m_pipeline->load();
+	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<SceneView, &SceneView::renderGizmos>(this);
+	m_pipeline->addCustomCommandHandler("renderIcons").callback.bind<SceneView, &SceneView::renderIcons>(this);
+
+	m_editor->universeCreated().bind<SceneView, &SceneView::onUniverseCreated>(this);
+	m_editor->universeDestroyed().bind<SceneView, &SceneView::onUniverseDestroyed>(this);
+
+	m_toggle_gizmo_step_action =
+		LUMIX_NEW(m_editor->getAllocator(), Action)("Enable/disable gizmo step", "toggleGizmoStep");
+	m_toggle_gizmo_step_action->is_global = false;
+	m_app.addAction(m_toggle_gizmo_step_action);
+
+	m_move_forward_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Move forward", "moveForward");
+	m_move_forward_action->is_global = false;
+	m_app.addAction(m_move_forward_action);
+
+	m_move_back_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Move back", "moveBack");
+	m_move_back_action->is_global = false;
+	m_app.addAction(m_move_back_action);
+
+	m_move_left_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Move left", "moveLeft");
+	m_move_left_action->is_global = false;
+	m_app.addAction(m_move_left_action);
+
+	m_move_right_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Move right", "moveRight");
+	m_move_right_action->is_global = false;
+	m_app.addAction(m_move_right_action);
+
+	m_move_up_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Move up", "moveUp");
+	m_move_up_action->is_global = false;
+	m_app.addAction(m_move_up_action);
+
+	m_move_down_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Move down", "moveDown");
+	m_move_down_action->is_global = false;
+	m_app.addAction(m_move_down_action);
 }
 
 
@@ -178,58 +222,6 @@ void SceneView::onUniverseCreated()
 void SceneView::onUniverseDestroyed()
 {
 	m_pipeline->setScene(nullptr);
-}
-
-
-bool SceneView::init(LogUI& log_ui, Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
-{
-	m_log_ui = &log_ui;
-	m_editor = &editor;
-	auto& engine = editor.getEngine();
-	auto& allocator = engine.getAllocator();
-	auto* renderer = static_cast<Lumix::Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-	m_is_opengl = renderer->isOpenGL();
-	Lumix::Path path("pipelines/main.lua");
-	m_pipeline = Lumix::Pipeline::create(*renderer, path, engine.getAllocator());
-	m_pipeline->load();
-	m_pipeline->addCustomCommandHandler("renderGizmos")
-		.callback.bind<SceneView, &SceneView::renderGizmos>(this);
-	m_pipeline->addCustomCommandHandler("renderIcons")
-		.callback.bind<SceneView, &SceneView::renderIcons>(this);
-
-	editor.universeCreated().bind<SceneView, &SceneView::onUniverseCreated>(this);
-	editor.universeDestroyed().bind<SceneView, &SceneView::onUniverseDestroyed>(this);
-
-	m_toggle_gizmo_step_action =
-		LUMIX_NEW(editor.getAllocator(), Action)("Enable/disable gizmo step", "toggleGizmoStep");
-	m_toggle_gizmo_step_action->is_global = false;
-	actions.push(m_toggle_gizmo_step_action);
-
-	m_move_forward_action = LUMIX_NEW(editor.getAllocator(), Action)("Move forward", "moveForward");
-	m_move_forward_action->is_global = false;
-	actions.push(m_move_forward_action);
-
-	m_move_back_action = LUMIX_NEW(editor.getAllocator(), Action)("Move back", "moveBack");
-	m_move_back_action->is_global = false;
-	actions.push(m_move_back_action);
-
-	m_move_left_action = LUMIX_NEW(editor.getAllocator(), Action)("Move left", "moveLeft");
-	m_move_left_action->is_global = false;
-	actions.push(m_move_left_action);
-
-	m_move_right_action = LUMIX_NEW(editor.getAllocator(), Action)("Move right", "moveRight");
-	m_move_right_action->is_global = false;
-	actions.push(m_move_right_action);
-
-	m_move_up_action = LUMIX_NEW(editor.getAllocator(), Action)("Move up", "moveUp");
-	m_move_up_action->is_global = false;
-	actions.push(m_move_up_action);
-
-	m_move_down_action = LUMIX_NEW(editor.getAllocator(), Action)("Move down", "moveDown");
-	m_move_down_action->is_global = false;
-	actions.push(m_move_down_action);
-
-	return true;
 }
 
 

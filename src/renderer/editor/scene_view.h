@@ -25,7 +25,6 @@ class SceneView
 		~SceneView();
 
 		void update();
-		bool init(LogUI& log_ui, Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions);
 		void setScene(Lumix::RenderScene* scene);
 		void shutdown();
 		void onGUI();

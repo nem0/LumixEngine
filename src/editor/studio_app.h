@@ -77,7 +77,8 @@ public:
 	virtual void removePlugin(IPlugin& plugin) = 0;
 	virtual int getExitCode() const = 0;
 	virtual void runScript(const char* src, const char* script_name) = 0;
-	virtual Lumix::Array<Action*>& getActions() = 0;
+	virtual const Lumix::Array<Action*>& getActions() = 0;
+	virtual void addAction(Action* action) = 0;
 	virtual Action& getAction(const char* name) = 0;
 	virtual SDL_Window* getWindow() = 0;
 	virtual void startDrag(DragData::Type type, const void* data, int size) = 0;

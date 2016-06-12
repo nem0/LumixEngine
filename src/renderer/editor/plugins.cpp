@@ -749,7 +749,7 @@ struct TerrainPlugin : public PropertyGrid::IPlugin
 		: m_app(app)
 	{
 		auto& editor = *app.getWorldEditor();
-		m_terrain_editor = LUMIX_NEW(editor.getAllocator(), TerrainEditor)(editor, app.getActions());
+		m_terrain_editor = LUMIX_NEW(editor.getAllocator(), TerrainEditor)(editor, app);
 	}
 
 
@@ -1046,7 +1046,6 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		auto& allocator = editor.getAllocator();
 		m_action = LUMIX_NEW(allocator, Action)("Scene View", "scene_view");
 		m_action->func.bind<SceneViewPlugin, &SceneViewPlugin::onAction>(this);
-		m_scene_view.init(*app.getLogUI(), editor, app.getActions());
 		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getPipeline());
 		editor.setRenderInterface(m_render_interface);
 		m_app.getAssetBrowser()->resourceChanged().bind<SceneViewPlugin, &SceneViewPlugin::onResourceChanged>(this);
@@ -1298,7 +1297,7 @@ struct ShaderEditorPlugin : public StudioApp::IPlugin
 		: m_shader_editor(app.getWorldEditor()->getAllocator())
 		, m_app(app)
 	{
-		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Shader Editor", "shader_editor");
+		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Shader Editor", "shaderEditor");
 		m_action->func.bind<ShaderEditorPlugin, &ShaderEditorPlugin::onAction>(this);
 		m_shader_editor.m_is_opened = false;
 
