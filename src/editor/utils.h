@@ -16,7 +16,6 @@ struct Action
 		this->name = name;
 		shortcut[0] = shortcut[1] = shortcut[2] = -1;
 		is_global = true;
-		is_in_toolbar = false;
 		icon = nullptr;
 		is_selected.bind<falseConst>();
 	}
@@ -34,7 +33,6 @@ struct Action
 		shortcut[1] = shortcut1;
 		shortcut[2] = shortcut2;
 		is_global = true;
-		is_in_toolbar = false;
 		icon = nullptr;
 		is_selected.bind<falseConst>();
 	}
@@ -122,7 +120,6 @@ struct Action
 	const char* name;
 	const char* label;
 	bool is_global;
-	bool is_in_toolbar;
 	ImTextureID icon;
 	Lumix::Delegate<void> func;
 	Lumix::Delegate<bool> is_selected;

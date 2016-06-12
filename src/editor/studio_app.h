@@ -78,6 +78,7 @@ public:
 	virtual int getExitCode() const = 0;
 	virtual void runScript(const char* src, const char* script_name) = 0;
 	virtual const Lumix::Array<Action*>& getActions() = 0;
+	virtual Lumix::Array<Action*>& getToolbarActions() = 0;
 	virtual void addAction(Action* action) = 0;
 	virtual Action& getAction(const char* name) = 0;
 	virtual SDL_Window* getWindow() = 0;

@@ -13,6 +13,7 @@ namespace Lumix
 
 struct Action;
 struct lua_State;
+class StudioApp;
 
 
 struct LUMIX_EDITOR_API Settings
@@ -46,21 +47,22 @@ struct LUMIX_EDITOR_API Settings
 
 	int m_autosave_time;
 
-	explicit Settings(Lumix::IAllocator& allocator);
+	explicit Settings(StudioApp& app);
 	~Settings();
 
-	bool save(Action** actions, int actions_count);
-	bool load(Action** actions, int actions_count);
-	void onGUI(Action** actions, int actions_count);
+	bool save();
+	bool load();
+	void onGUI();
 	void setValue(const char* name, bool value);
 	void setValue(const char* name, int value);
 	int getValue(const char* name, int default_value) const;
 	bool getValue(const char* name, bool default_value) const;
 
 private:
-	Lumix::IAllocator& m_allocator;
+	StudioApp& m_app;
 	lua_State* m_state;
 
 private:
-	void showShortcutSettings(Action** actions, int actions_count);
+	void showShortcutSettings();
+	void showToolbarSettings();
 };
