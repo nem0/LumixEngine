@@ -474,38 +474,30 @@ bool Settings::save()
 
 void Settings::showToolbarSettings()
 {
-	ImGui::Columns(4);
 	auto& actions = m_app.getToolbarActions();
-	for (int i = 0, c = actions.size(); i < c; ++i)
+	static Action* dragged = nullptr;
+	
+	for (auto* action : actions)
 	{
-		auto* action = actions[i];
-		ImGui::PushID(i);
-		ImGui::Text("%s", action->label);
-		ImGui::NextColumn();
-		if (i > 0 && ImGui::Button("Up"))
+		ImGui::ImageButton(action->icon, ImVec2(24, 24));
+		if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(0))
 		{
-			auto* tmp = actions[i - 1];
-			actions[i - 1] = actions[i];
-			actions[i] = tmp;
-		}
-		ImGui::NextColumn();
-		if (i < c - 1 && ImGui::Button("Down"))
-		{
-			auto* tmp = actions[i + 1];
-			actions[i + 1] = actions[i];
-			actions[i] = tmp;
-		}
-		ImGui::NextColumn();
-		if (ImGui::Button("Remove")) 
-		{
-			actions.erase(i);
-			ImGui::PopID();
+			actions.insert(actions.indexOf(action), dragged);
+			dragged = nullptr;
 			break;
 		}
-		ImGui::NextColumn();
-		ImGui::PopID();
+		if (ImGui::IsItemActive() && ImGui::IsMouseDragging())
+		{
+			dragged = action;
+			actions.eraseItem(action);
+			break;
+		}
+		ImGui::SameLine();
 	}
-	ImGui::Columns();
+	ImGui::NewLine();
+
+	if (dragged) ImGui::SetTooltip(dragged->label);
+	if (ImGui::IsMouseReleased(0)) dragged = nullptr;
 
 	static int tmp = 0;
 	auto getter = [](void* data, int idx, const char** out) -> bool {
@@ -517,7 +509,7 @@ void Settings::showToolbarSettings()
 	int count = 0;
 	for (auto* action : m_app.getActions())
 	{
-		if (action->icon)
+		if (action->icon && action->is_global)
 		{
 			tools[count] = action;
 			++count;
