@@ -7,6 +7,7 @@ namespace
 	void UT_universe(const char* params)
 	{
 		Lumix::DefaultAllocator allocator;
+		Lumix::PathManager path_manager(allocator);
 		Lumix::Universe universe(allocator);
 		LUMIX_EXPECT(universe.getEntityCount() == 0);
 		LUMIX_EXPECT(!universe.hasEntity(-1));
