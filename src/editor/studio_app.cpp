@@ -54,10 +54,11 @@ public:
 		, m_asset_browser(nullptr)
 		, m_property_grid(nullptr)
 		, m_actions(m_allocator)
+		, m_toolbar_actions(m_allocator)
 		, m_metadata(m_allocator)
 		, m_is_welcome_screen_opened(true)
 		, m_editor(nullptr)
-		, m_settings(m_allocator)
+		, m_settings(*this)
 		, m_plugins(m_allocator)
 	{
 		m_drag_data = { DragData::NONE, nullptr, 0 };
@@ -81,6 +82,12 @@ public:
 	const Lumix::Array<Action*>& getActions() override
 	{
 		return m_actions;
+	}
+
+
+	Lumix::Array<Action*>& getToolbarActions() override
+	{
+		return m_toolbar_actions;
 	}
 
 
@@ -126,16 +133,7 @@ public:
 
 	float showMainToolbar(float menu_height)
 	{
-		bool any_icon = false;
-		for (auto* action : m_actions)
-		{
-			if (action->is_in_toolbar)
-			{
-				any_icon = true;
-				break;
-			}
-		}
-		if (!any_icon) return menu_height;
+		if (m_toolbar_actions.empty()) return menu_height;
 
 		auto frame_padding = ImGui::GetStyle().FramePadding;
 		float padding = frame_padding.y * 2;
@@ -146,9 +144,9 @@ public:
 		{
 			auto& render_interface = *m_editor->getRenderInterface();
 
-			for (int i = 0; i < m_actions.size(); ++i)
+			for (auto* action : m_toolbar_actions)
 			{
-				if(m_actions[i]->is_in_toolbar) m_actions[i]->toolbarButton();
+				action->toolbarButton();
 			}
 		}
 		ImGui::EndToolbar();
@@ -183,7 +181,7 @@ public:
 			{
 				plugin->onWindowGUI();
 			}
-			m_settings.onGUI(&m_actions[0], m_actions.size());
+			m_settings.onGUI();
 		}
 		ImGui::Render();
 
@@ -1009,7 +1007,7 @@ public:
 		m_settings.m_mouse_sensitivity_x = m_editor->getMouseSensitivity().x;
 		m_settings.m_mouse_sensitivity_y = m_editor->getMouseSensitivity().y;
 
-		m_settings.save(&m_actions[0], m_actions.size());
+		m_settings.save();
 
 		if (!m_metadata.save())
 		{
@@ -1097,7 +1095,7 @@ public:
 			break;
 		}
 
-		m_settings.load(&m_actions[0], m_actions.size());
+		m_settings.load();
 
 		m_asset_browser->m_is_opened = m_settings.m_is_asset_browser_opened;
 		m_is_entity_list_opened = m_settings.m_is_entity_list_opened;
@@ -1806,6 +1804,7 @@ public:
 
 	float m_time_to_autosave;
 	Lumix::Array<Action*> m_actions;
+	Lumix::Array<Action*> m_toolbar_actions;
 	Lumix::Array<IPlugin*> m_plugins;
 	Lumix::WorldEditor* m_editor;
 	bool m_confirm_exit;

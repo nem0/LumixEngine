@@ -1,4 +1,5 @@
 #include "settings.h"
+#include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/fs/os_file.h"
@@ -215,8 +216,8 @@ static int getInteger(lua_State* L, const char* name, int default_value)
 }
 
 
-Settings::Settings(Lumix::IAllocator& allocator)
-	: m_allocator(allocator)
+Settings::Settings(StudioApp& app)
+	: m_app(app)
 {
 	m_data_dir[0] = '\0';
 	m_editor = nullptr;
@@ -248,7 +249,7 @@ Settings::~Settings()
 }
 
 
-bool Settings::load(Action** actions, int actions_count)
+bool Settings::load()
 {
 	auto L = m_state;
 	bool has_settings = PlatformInterface::fileExists(SETTINGS_PATH);
@@ -294,9 +295,10 @@ bool Settings::load(Action** actions, int actions_count)
 		m_editor->getEngine().setPatchPath(m_data_dir);
 	}
 
+	auto& actions = m_app.getActions();
 	if (lua_getglobal(L, "actions") == LUA_TTABLE)
 	{
-		for (int i = 0; i < actions_count; ++i)
+		for (int i = 0; i < actions.size(); ++i)
 		{
 			if (lua_getfield(L, -1, actions[i]->name) == LUA_TTABLE)
 			{
@@ -308,11 +310,23 @@ bool Settings::load(Action** actions, int actions_count)
 					}
 					lua_pop(L, 1);
 				}
-				if (lua_rawgeti(L, -1, 1 + Lumix::lengthOf(actions[i]->shortcut)) == LUA_TBOOLEAN)
-				{
-					actions[i]->is_in_toolbar = lua_toboolean(L, -1) != 0;
-				}
-				lua_pop(L, 1);
+			}
+			lua_pop(L, 1);
+		}
+	}
+	lua_pop(L, 1);
+
+	m_app.getToolbarActions().clear();
+	if (lua_getglobal(L, "toolbar") == LUA_TTABLE)
+	{
+		int len = (int)lua_rawlen(L, -1);
+		for (int i = 0; i < len; ++i)
+		{
+			if (lua_rawgeti(L, -1, i + 1) == LUA_TSTRING)
+			{
+				const char* action_name = lua_tostring(L, -1);
+				auto& action = m_app.getAction(action_name);
+				m_app.getToolbarActions().push(&action);
 			}
 			lua_pop(L, 1);
 		}
@@ -364,10 +378,12 @@ bool Settings::getValue(const char* name, bool default_value) const
 }
 
 
-bool Settings::save(Action** actions, int actions_count)
+bool Settings::save()
 {
+	auto& actions = m_app.getActions();
 	Lumix::FS::OsFile file;
-	if (!file.open(SETTINGS_PATH, Lumix::FS::Mode::CREATE_AND_WRITE, m_allocator)) return false;
+	auto& allocator = m_app.getWorldEditor()->getAllocator();
+	if (!file.open(SETTINGS_PATH, Lumix::FS::Mode::CREATE_AND_WRITE, allocator)) return false;
 
 	file << "window = { x = " << m_window.x 
 		<< ", y = " << m_window.y 
@@ -431,14 +447,19 @@ bool Settings::save(Action** actions, int actions_count)
 	file << "}\n";
 
 	file << "actions = {\n";
-	for (int i = 0; i < actions_count; ++i)
+	for (int i = 0; i < actions.size(); ++i)
 	{
 		file << "\t" << actions[i]->name << " = {" 
 			<< actions[i]->shortcut[0] << ", "
 			<< actions[i]->shortcut[1] << ", " 
-			<< actions[i]->shortcut[2] << ", "
-			<< (actions[i]->is_in_toolbar ? "true" : "false") 
-			<< "},\n";
+			<< actions[i]->shortcut[2] << "},\n";
+	}
+	file << "}\n";
+
+	file << "toolbar = {\n";
+	for (auto* action : m_app.getToolbarActions())
+	{
+		file << "\t\"" << action->name << "\",\n";
 	}
 	file << "}\n";
 
@@ -451,10 +472,71 @@ bool Settings::save(Action** actions, int actions_count)
 
 
 
-void Settings::showShortcutSettings(Action** actions, int actions_count)
+void Settings::showToolbarSettings()
 {
+	ImGui::Columns(4);
+	auto& actions = m_app.getToolbarActions();
+	for (int i = 0, c = actions.size(); i < c; ++i)
+	{
+		auto* action = actions[i];
+		ImGui::PushID(i);
+		ImGui::Text("%s", action->label);
+		ImGui::NextColumn();
+		if (i > 0 && ImGui::Button("Up"))
+		{
+			auto* tmp = actions[i - 1];
+			actions[i - 1] = actions[i];
+			actions[i] = tmp;
+		}
+		ImGui::NextColumn();
+		if (i < c - 1 && ImGui::Button("Down"))
+		{
+			auto* tmp = actions[i + 1];
+			actions[i + 1] = actions[i];
+			actions[i] = tmp;
+		}
+		ImGui::NextColumn();
+		if (ImGui::Button("Remove")) 
+		{
+			actions.erase(i);
+			ImGui::PopID();
+			break;
+		}
+		ImGui::NextColumn();
+		ImGui::PopID();
+	}
+	ImGui::Columns();
+
+	static int tmp = 0;
+	auto getter = [](void* data, int idx, const char** out) -> bool {
+		Action** tools = (Action**)data;
+		*out = tools[idx]->label;
+		return true;
+	};
+	Action* tools[1024];
+	int count = 0;
+	for (auto* action : m_app.getActions())
+	{
+		if (action->icon)
+		{
+			tools[count] = action;
+			++count;
+		}
+	}
+	ImGui::Combo("", &tmp, getter, tools, count);
+	ImGui::SameLine();
+	if (ImGui::Button("Add"))
+	{
+		actions.push(tools[tmp]);
+	}
+}
+
+
+void Settings::showShortcutSettings()
+{
+	auto& actions = m_app.getActions();
 	ImGui::InputText("Filter", m_filter, Lumix::lengthOf(m_filter));
-	ImGui::Columns(5);
+	ImGui::Columns(4);
 	ImGui::Text("Label");
 	ImGui::NextColumn();
 	ImGui::Text("Shortcut key 1");
@@ -463,11 +545,9 @@ void Settings::showShortcutSettings(Action** actions, int actions_count)
 	ImGui::NextColumn();
 	ImGui::Text("Shortcut key 3");
 	ImGui::NextColumn();
-	ImGui::Text("In toolbar");
-	ImGui::NextColumn();
 	ImGui::Separator();
 
-	for (int i = 0; i < actions_count; ++i)
+	for (int i = 0; i < actions.size(); ++i)
 	{
 		Action& a = *actions[i];
 		if (m_filter[0] == 0 || Lumix::stristr(a.label, m_filter) != 0)
@@ -481,26 +561,20 @@ void Settings::showShortcutSettings(Action** actions, int actions_count)
 			ImGui::NextColumn();
 			shortcutInput(a.shortcut[2]);
 			ImGui::NextColumn();
-			char icon_path[Lumix::MAX_PATH_LENGTH];
-			a.getIconPath(icon_path, Lumix::lengthOf(icon_path));
-			if (PlatformInterface::fileExists(icon_path))
-			{
-				ImGui::Checkbox(Lumix::StaticString<50>("###tb", (Lumix::uint64)&a), &a.is_in_toolbar);
-			}
-			ImGui::NextColumn();
 		}
 	}
 	ImGui::Columns(1);
+
 }
 
 
-void Settings::onGUI(Action** actions, int actions_count)
+void Settings::onGUI()
 {
 	if (ImGui::BeginDock("Settings", &m_is_opened))
 	{
-		if (ImGui::Button("Save")) save(actions, actions_count);
+		if (ImGui::Button("Save")) save();
 		ImGui::SameLine();
-		if (ImGui::Button("Reload")) load(actions, actions_count);
+		if (ImGui::Button("Reload")) load();
 		ImGui::SameLine();
 		ImGui::Text("Settings are saved when the application closes");
 
@@ -541,7 +615,8 @@ void Settings::onGUI(Action** actions, int actions_count)
 			}
 		}
 
-		if (ImGui::CollapsingHeader("Shortcuts")) showShortcutSettings(actions, actions_count);
+		if (ImGui::CollapsingHeader("Shortcuts")) showShortcutSettings();
+		if (ImGui::CollapsingHeader("Toolbar")) showToolbarSettings();
 		if (ImGui::CollapsingHeader("Style"))
 		{
 			static int selected = 0;
