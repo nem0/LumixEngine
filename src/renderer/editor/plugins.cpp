@@ -1,4 +1,12 @@
 #include "engine/lumix.h"
+#include "editor/asset_browser.h"
+#include "editor/ieditor_command.h"
+#include "editor/platform_interface.h"
+#include "editor/property_grid.h"
+#include "editor/render_interface.h"
+#include "editor/studio_app.h"
+#include "editor/utils.h"
+#include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
@@ -10,19 +18,11 @@
 #include "engine/path_utils.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
-#include "editor/asset_browser.h"
-#include "editor/ieditor_command.h"
-#include "editor/platform_interface.h"
-#include "editor/property_grid.h"
-#include "editor/studio_app.h"
-#include "editor/utils.h"
-#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "engine/property_register.h"
 #include "engine/property_descriptor.h"
 #include "game_view.h"
-#include "editor/render_interface.h"
 #include "import_asset_dialog.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
@@ -39,6 +39,7 @@
 #include "shader_compiler.h"
 #include "terrain_editor.h"
 #include <cmath>
+#include <crnlib.h>
 #include <SDL.h>
 
 
@@ -51,6 +52,8 @@ static const uint32 CAMERA_HASH = crc32("camera");
 static const uint32 POINT_LIGHT_HASH = crc32("point_light");
 static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
 static const uint32 RENDERABLE_HASH = crc32("renderable");
+static const uint32 RENDERER_HASH = crc32("renderer");
+static const uint32 ENVIRONMENT_PROBE_HASH = crc32("environment_probe");
 static const uint32 MATERIAL_HASH = crc32("MATERIAL");
 static const uint32 SHADER_HASH = crc32("SHADER");
 static const uint32 TEXTURE_HASH = crc32("TEXTURE");
@@ -704,6 +707,218 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 
 
 	StudioApp& m_app;
+};
+
+
+struct EnvironmentProbePlugin : public PropertyGrid::IPlugin
+{
+	explicit EnvironmentProbePlugin(StudioApp& app)
+		: m_app(app)
+	{
+		auto* world_editor = app.getWorldEditor();
+		auto& plugin_manager = world_editor->getEngine().getPluginManager();
+		Renderer*  renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
+		auto& allocator = world_editor->getAllocator();
+		Lumix::Path pipeline_path("pipelines/game_view.lua");
+		m_pipeline = Pipeline::create(*renderer, pipeline_path, allocator);
+		m_pipeline->load();
+	}
+
+
+	~EnvironmentProbePlugin()
+	{
+		Pipeline::destroy(m_pipeline);
+	}
+
+
+	bool saveCubemap(ComponentUID cmp, const Array<uint8>& data, int texture_size)
+	{
+		crn_uint32 size;
+		crn_comp_params comp_params;
+		comp_params.m_width = texture_size;
+		comp_params.m_height = texture_size;
+		comp_params.m_file_type = cCRNFileTypeDDS;
+		comp_params.m_format = cCRNFmtDXT1;
+		comp_params.m_quality_level = cCRNMinQualityLevel;
+		comp_params.m_dxt_quality = cCRNDXTQualitySuperFast;
+		comp_params.m_dxt_compressor_type = cCRNDXTCompressorRYG;
+		comp_params.m_pProgress_func = nullptr;
+		comp_params.m_pProgress_func_data = nullptr;
+		comp_params.m_num_helper_threads = 3;
+		comp_params.m_faces = 6;
+		for (int i = 0; i < 6; ++i)
+		{
+			comp_params.m_pImages[i][0] = (Lumix::uint32*)&data[i * texture_size * texture_size * 4];
+		}
+		crn_mipmap_params mipmap_params;
+		mipmap_params.m_mode = cCRNMipModeGenerateMips;
+
+		void* compressed_data = crn_compress(comp_params, mipmap_params, size);
+		if (!compressed_data)
+		{
+			g_log_error.log("Editor") << "Failed to compress the probe.";
+			return false;
+		}
+
+		Lumix::FS::OsFile file;
+		const char* base_path = m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath();
+		uint64 universe_guid = m_app.getWorldEditor()->getUniverse()->getPath().getHash();
+		Lumix::StaticString<Lumix::MAX_PATH_LENGTH> path(base_path, "universes/", universe_guid);
+		if (!PlatformInterface::makePath(path)) g_log_error.log("Editor") << "Failed to create " << path;
+		path << "/probes/";
+		if (!PlatformInterface::makePath(path)) g_log_error.log("Editor") << "Failed to create " << path;
+		path << cmp.index << ".dds";
+		auto& allocator = m_app.getWorldEditor()->getAllocator();
+		if (!file.open(path, Lumix::FS::Mode::CREATE_AND_WRITE, allocator))
+		{
+			g_log_error.log("Editor") << "Failed to create " << path;
+			crn_free_block(compressed_data);
+			return false;
+		}
+
+		file.write((const char*)compressed_data, size);
+		file.close();
+		crn_free_block(compressed_data);
+		return true;
+	}
+
+
+	void flipY(uint32* data, int texture_size)
+	{
+		for (int y = 0; y < texture_size / 2; ++y)
+		{
+			for (int x = 0; x < texture_size; ++x)
+			{
+				uint32 t = data[x + y * texture_size];
+				data[x + y * texture_size] = data[x + (texture_size - y - 1) * texture_size];
+				data[x + (texture_size - y - 1) * texture_size] = t;
+			}
+		}
+	}
+
+
+	void flipX(uint32* data, int texture_size)
+	{
+		for (int y = 0; y < texture_size; ++y)
+		{
+			uint32* tmp = (uint32*)&data[y * texture_size];
+			for (int x = 0; x < texture_size / 2; ++x)
+			{
+				uint32 t = tmp[x];
+				tmp[x] = tmp[texture_size - x - 1];
+				tmp[texture_size - x - 1] = t;
+			}
+		}
+	}
+
+
+	void generateCubemap(ComponentUID cmp)
+	{
+		static const int TEXTURE_SIZE = 1024;
+
+		Universe* universe = m_app.getWorldEditor()->getUniverse();
+		if (!universe->getPath().isValid())
+		{
+			g_log_error.log("Editor") << "Universe must be saved before environment probe can be generated.";
+			return;
+		}
+
+		WorldEditor* world_editor = m_app.getWorldEditor();
+		Engine& engine = world_editor->getEngine();
+		auto& plugin_manager = engine.getPluginManager();
+		IAllocator& allocator = engine.getAllocator();
+		Lumix::Array<Lumix::uint8> data(allocator);
+		data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
+
+		bgfx::TextureHandle texture =
+			bgfx::createTexture2D(TEXTURE_SIZE, TEXTURE_SIZE, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
+		
+		Vec3 probe_position = universe->getPosition(cmp.entity);
+		auto* scene = static_cast<RenderScene*>(universe->getScene(crc32("renderer")));
+		ComponentIndex original_camera = scene->getCameraInSlot("main");
+
+		if(original_camera != INVALID_COMPONENT) scene->setCameraSlot(original_camera, "");
+		Entity camera_entity = universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		ComponentIndex camera_cmp = scene->createComponent(CAMERA_HASH, camera_entity);
+		scene->setCameraSlot(camera_cmp, "main");
+		scene->setCameraFOV(camera_cmp, 90);
+
+		m_pipeline->setScene(scene);
+		m_pipeline->setViewport(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+
+		Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
+
+		Vec3 dirs[] = {{-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}};
+		Vec3 ups[] = {{0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, 1, 0}};
+		Vec3 ups_opengl[] = { { 0, -1, 0 },{ 0, -1, 0 },{ 0, 0, 1 },{ 0, 0, -1 },{ 0, -1, 0 },{ 0, -1, 0 } };
+
+		renderer->frame(); // submit
+		renderer->frame(); // wait for gpu
+
+		bool is_opengl = renderer->isOpenGL();
+		for (int i = 0; i < 6; ++i)
+		{
+			Matrix mtx = Matrix::IDENTITY;
+			mtx.setTranslation(probe_position);
+			Vec3 side = crossProduct(is_opengl ? ups_opengl[i] : ups[i], dirs[i]);
+			mtx.setZVector(dirs[i]);
+			mtx.setYVector(is_opengl ? ups_opengl[i] : ups[i]);
+			mtx.setXVector(side);
+			universe->setMatrix(camera_entity, mtx);
+			m_pipeline->render();
+
+			renderer->viewCounterAdd();
+			bgfx::touch(renderer->getViewCounter());
+			bgfx::setViewName(renderer->getViewCounter(), "probe_blit");
+			auto* default_framebuffer = m_pipeline->getFramebuffer("default");
+			bgfx::TextureHandle color_renderbuffer = default_framebuffer->getRenderbufferHandle(0);
+			bgfx::blit(renderer->getViewCounter(), texture, 0, 0, color_renderbuffer);
+
+			renderer->viewCounterAdd();
+			bgfx::setViewName(renderer->getViewCounter(), "probe_read");
+			bgfx::readTexture(texture, &data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4]);
+			bgfx::touch(renderer->getViewCounter());
+			renderer->frame(); // submit
+			renderer->frame(); // wait for gpu
+
+			if (is_opengl) continue;
+
+			uint32* tmp = (uint32*)&data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4];
+			if (i == 2 || i == 3)
+			{
+				flipY(tmp, TEXTURE_SIZE);
+			}
+			else
+			{
+				flipX(tmp, TEXTURE_SIZE);
+			}
+		}
+		saveCubemap(cmp, data, TEXTURE_SIZE);
+		bgfx::destroyTexture(texture);
+		
+		scene->destroyComponent(camera_cmp, CAMERA_HASH);
+		universe->destroyEntity(camera_entity);
+		if (original_camera != INVALID_COMPONENT) scene->setCameraSlot(original_camera, "main");
+
+		scene->reloadEnvironmentProbe(cmp.index);
+	}
+
+
+	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
+	{
+		if (cmp.type != ENVIRONMENT_PROBE_HASH) return;
+
+		auto* scene = static_cast<RenderScene*>(cmp.scene);
+		auto* texture = scene->getEnvironmentProbeTexture(cmp.index);
+		ImGui::LabelText("Path", "%s", texture->getPath().c_str());
+		if (ImGui::Button("View")) m_app.getAssetBrowser()->selectResource(texture->getPath());
+		ImGui::SameLine();
+		if (ImGui::Button("Generate")) generateCubemap(cmp);
+	}
+
+
+	StudioApp& m_app;
+	Pipeline* m_pipeline;
 };
 
 
@@ -1502,6 +1717,9 @@ LUMIX_STUDIO_ENTRY(renderer)
 
 	auto* emitter_plugin = LUMIX_NEW(allocator, EmitterPlugin)(app);
 	app.getPropertyGrid()->addPlugin(*emitter_plugin);
+
+	auto* env_probe_plugin = LUMIX_NEW(allocator, EnvironmentProbePlugin)(app);
+	app.getPropertyGrid()->addPlugin(*env_probe_plugin);
 
 	auto* terrain_plugin = LUMIX_NEW(allocator, TerrainPlugin)(app);
 	app.getPropertyGrid()->addPlugin(*terrain_plugin);

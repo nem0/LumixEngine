@@ -13,6 +13,7 @@
 #include "engine/mtjd/generic_job.h"
 #include "engine/mtjd/job.h"
 #include "engine/mtjd/manager.h"
+#include "engine/path_utils.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
@@ -33,6 +34,7 @@
 #include "renderer/shader.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
+#include "renderer/texture_manager.h"
 
 #include "engine/universe/universe.h"
 #include <cmath>
@@ -59,7 +61,9 @@ static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
 static const uint32 CAMERA_HASH = crc32("camera");
 static const uint32 TERRAIN_HASH = crc32("terrain");
 static const uint32 BONE_ATTACHMENT_HASH = crc32("bone_attachment");
+static const uint32 ENVIRONMENT_PROBE_HASH = crc32("environment_probe");
 static const uint32 MATERIAL_HASH = crc32("MATERIAL");
+static const uint32 TEXTURE_HASH = crc32("TEXTURE");
 static const uint32 MODEL_HASH = crc32("MODEL");
 static bool is_opengl = false;
 
@@ -112,6 +116,12 @@ struct Camera
 	bool is_free;
 	bool is_ortho;
 	char slot[MAX_SLOT_LENGTH + 1];
+};
+
+
+struct EnvironmentProbe
+{
+	Texture* texture;
 };
 
 
@@ -196,6 +206,7 @@ public:
 		, m_particle_emitters(m_allocator)
 		, m_point_lights_map(m_allocator)
 		, m_bone_attachments(m_allocator)
+		, m_environment_probes(m_allocator)
 	{
 		is_opengl = renderer.isOpenGL();
 		m_is_updating_attachments = false;
@@ -239,6 +250,12 @@ public:
 				manager.get(MODEL_HASH)->unload(*i.model);
 				LUMIX_DELETE(m_allocator, i.pose);
 			}
+		}
+
+		for (int i = 0, c = m_environment_probes.size(); i < c; ++i)
+		{
+			auto& probe = m_environment_probes.at(i);
+			if (probe.texture) probe.texture->getResourceManager().get(TEXTURE_HASH)->unload(*probe.texture);
 		}
 
 		CullingSystem::destroy(*m_culling_system);
@@ -674,6 +691,51 @@ public:
 	}
 
 
+	void serializeEnvironmentProbes(OutputBlob& serializer)
+	{
+		int32 count = m_environment_probes.size();
+		serializer.write(count);
+		for (int i = 0; i < count; ++i)
+		{
+			auto& probe = m_environment_probes.at(i);
+			Entity entity = m_environment_probes.getKey(i);
+			serializer.write(entity);
+		}
+	}
+
+
+	void deserializeEnvironmentProbes(InputBlob& serializer)
+	{
+		int32 count;
+		serializer.read(count);
+		for (int i = 0, c = m_environment_probes.size(); i < c; ++i)
+		{
+			auto& probe = m_environment_probes.at(i);
+			if (probe.texture)
+			{
+				probe.texture->getResourceManager().get(TEXTURE_HASH)->unload(*probe.texture);
+			}
+		}
+
+		m_environment_probes.clear();
+		m_environment_probes.reserve(count);
+		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_HASH);
+		uint64 universe_guid = m_universe.getPath().getHash();
+		StaticString<Lumix::MAX_PATH_LENGTH> probe_dir("universes/", universe_guid, "/probes/");
+		for (int i = 0; i < count; ++i)
+		{
+			Entity entity;
+			serializer.read(entity);
+			EnvironmentProbe probe;
+			StaticString<Lumix::MAX_PATH_LENGTH> path_str(probe_dir, entity, ".dds");
+			Path path(path_str);
+			probe.texture = static_cast<Texture*>(texture_manager->load(path));
+			m_environment_probes.insert(entity, probe);
+			m_universe.addComponent(entity, ENVIRONMENT_PROBE_HASH, this, entity);
+		}
+	}
+
+
 	void deserializeBoneAttachments(InputBlob& serializer, int version)
 	{
 		if (version <= (int)RenderSceneVersion::BONE_ATTACHMENTS) return;
@@ -786,6 +848,7 @@ public:
 		serializeTerrains(serializer);
 		serializeParticleEmitters(serializer);
 		serializeBoneAttachments(serializer);
+		serializeEnvironmentProbes(serializer);
 	}
 
 	void deserializeRenderParams(InputBlob& serializer)
@@ -1036,6 +1099,7 @@ public:
 			deserializeRenderParams(serializer);
 		}
 		deserializeBoneAttachments(serializer, version);
+		if (version > (int)RenderSceneVersion::ENVIRONMENT_PROBES) deserializeEnvironmentProbes(serializer);
 	}
 
 
@@ -1045,6 +1109,16 @@ public:
 		Entity entity = m_bone_attachments[idx].entity;
 		m_bone_attachments.eraseFast(idx);
 		m_universe.destroyComponent(entity, BONE_ATTACHMENT_HASH, this, component);
+	}
+
+
+	void destroyEnvironmentProbe(ComponentIndex component)
+	{
+		Entity entity = (Entity)component;
+		auto& probe = m_environment_probes[entity];
+		if (probe.texture) probe.texture->getResourceManager().get(TEXTURE_HASH)->unload(*probe.texture);
+		m_environment_probes.erase(entity);
+		m_universe.destroyComponent(entity, ENVIRONMENT_PROBE_HASH, this, component);
 	}
 
 
@@ -3275,6 +3349,20 @@ public:
 		return m_global_lights[getGlobalLightIndex(cmp)].m_entity;
 	}
 
+	void reloadEnvironmentProbe(ComponentIndex cmp) override
+	{
+		auto& probe = m_environment_probes[cmp];
+		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_HASH);
+		if (probe.texture) texture_manager->unload(*probe.texture);
+		uint64 universe_guid = m_universe.getPath().getHash();
+		StaticString<Lumix::MAX_PATH_LENGTH> path("universes/", universe_guid, "/probes/", cmp, ".dds");
+		probe.texture = static_cast<Texture*>(texture_manager->load(Path(path)));
+	}
+
+	Texture* getEnvironmentProbeTexture(ComponentIndex cmp) const
+	{
+		return m_environment_probes[cmp].texture;
+	}
 
 	ComponentIndex getCameraInSlot(const char* slot) override
 	{
@@ -3782,6 +3870,18 @@ public:
 	}
 
 
+	ComponentIndex createEnvironmentProbe(Entity entity)
+	{
+		EnvironmentProbe probe;
+		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_HASH);
+		probe.texture = static_cast<Texture*>(texture_manager->load(Path("models/editor/default_probe.dds")));
+		m_environment_probes.insert(entity, probe);
+
+		m_universe.addComponent(entity, ENVIRONMENT_PROBE_HASH, this, entity);
+		return entity;
+	}
+
+
 	ComponentIndex createBoneAttachment(Entity entity)
 	{
 		BoneAttachment& attachment = m_bone_attachments.emplace();
@@ -3859,6 +3959,7 @@ private:
 	Array<GlobalLight> m_global_lights;
 	Array<Camera> m_cameras;
 	Array<BoneAttachment> m_bone_attachments;
+	AssociativeArray<Entity, EnvironmentProbe> m_environment_probes;
 	Array<Terrain*> m_terrains;
 	Universe& m_universe;
 	Renderer& m_renderer;
@@ -3917,11 +4018,9 @@ static struct
 	{PARTICLE_EMITTER_PLANE_HASH,
 		&RenderSceneImpl::createParticleEmitterPlane,
 		&RenderSceneImpl::destroyParticleEmitterPlane},
-	{BONE_ATTACHMENT_HASH, &RenderSceneImpl::createBoneAttachment, &RenderSceneImpl::destroyBoneAttachment}
+	{BONE_ATTACHMENT_HASH, &RenderSceneImpl::createBoneAttachment, &RenderSceneImpl::destroyBoneAttachment},
+	{ENVIRONMENT_PROBE_HASH, &RenderSceneImpl::createEnvironmentProbe, &RenderSceneImpl::destroyEnvironmentProbe}
 };
-
-
-
 
 
 ComponentIndex RenderSceneImpl::createComponent(uint32 type, Entity entity)

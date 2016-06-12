@@ -5,6 +5,7 @@
 #include "engine/array.h"
 #include "engine/associative_array.h"
 #include "engine/delegate_list.h"
+#include "engine/path.h"
 #include "engine/quat.h"
 #include "engine/string.h"
 #include "engine/vec.h"
@@ -55,6 +56,8 @@ public:
 	float getScale(Entity entity);
 	const Vec3& getPosition(Entity entity) const;
 	const Quat& getRotation(Entity entity) const;
+	Lumix::Path getPath() const { return m_path; }
+	void setPath(const Lumix::Path& path) { m_path = path; }
 
 	DelegateList<void(Entity)>& entityTransformed() { return m_entity_moved; }
 	DelegateList<void(Entity)>& entityCreated() { return m_entity_created; }
@@ -91,6 +94,7 @@ private:
 	DelegateList<void(const ComponentUID&)> m_component_destroyed;
 	DelegateList<void(const ComponentUID&)> m_component_added;
 	int m_first_free_slot;
+	Lumix::Path m_path;
 };
 
 

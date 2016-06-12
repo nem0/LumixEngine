@@ -164,7 +164,8 @@ namespace Lumix
 				}
 				else
 				{
-					return m_data[m_data.insert(Pair(key, Value()))].m_value;
+					ASSERT(false);
+					return m_data[0].m_value;
 				}
 			}
 

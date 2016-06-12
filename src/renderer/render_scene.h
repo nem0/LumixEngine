@@ -26,6 +26,7 @@ struct RayCastModelHit;
 class Renderer;
 class Shader;
 class Terrain;
+class Texture;
 class Universe;
 template <typename T> class Array;
 template <typename T> class DelegateList;
@@ -46,6 +47,7 @@ enum class RenderSceneVersion : int32
 	GRASS_TYPE_DISTANCE,
 	ORTHO_CAMERA,
 	BONE_ATTACHMENTS,
+	ENVIRONMENT_PROBES,
 
 	LATEST,
 	INVALID = -1,
@@ -389,6 +391,9 @@ public:
 	virtual void setPointLightSpecularColor(ComponentIndex cmp, const Vec3& color) = 0;
 	virtual float getPointLightSpecularIntensity(ComponentIndex cmp) = 0;
 	virtual void setPointLightSpecularIntensity(ComponentIndex cmp, float color) = 0;
+
+	virtual Texture* getEnvironmentProbeTexture(ComponentIndex cmp) const = 0;
+	virtual void reloadEnvironmentProbe(ComponentIndex cmp) = 0;
 
 protected:
 	virtual ~RenderScene() {}
