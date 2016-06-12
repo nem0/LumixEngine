@@ -46,18 +46,10 @@ struct Action
 	void toolbarButton()
 	{
 		if (!icon) return;
-		ImGui::SameLine();
+
 		ImVec4 col_active = ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered];
 		ImVec4 bg_color = is_selected.invoke() ? col_active : ImVec4(0, 0, 0, 0);
-		if (ImGui::ImageButton(icon, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), -1, bg_color))
-		{
-			func.invoke();
-		}
-		if (ImGui::IsItemHovered())
-		{
-			ImGui::SetTooltip("%s", label);
-		}
-
+		if (ImGui::ToolbarButton(icon, bg_color, label)) func.invoke();
 	}
 
 

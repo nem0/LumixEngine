@@ -333,22 +333,47 @@ void SceneView::onToolbar()
 		"setGlobalCoordSystem",
 		"setPivotCenter",
 		"setPivotOrigin" };
-	Action* actions[sizeof(actions_names) / sizeof(actions_names[0])];
-	bool any_action = false;
-	for (int i = 0; i < Lumix::lengthOf(actions_names); ++i)
-	{
-		actions[i] = &m_app.getAction(actions_names[i]);
-		any_action = any_action || actions[i]->icon;
-	}
-	if (!any_action) return;
 
 	auto pos = ImGui::GetCursorScreenPos();
 	float w = ImGui::GetContentRegionAvail().x;
 	ImVec2 icon_size(24, 24);
 	if (ImGui::BeginToolbar("scene_view_toolbar", pos, ImVec2(w, 24)))
 	{
-		for (auto* action : actions) action->toolbarButton();
+		for (auto* action_name : actions_names)
+		{
+			auto& action = m_app.getAction(action_name);
+			action.toolbarButton();
+		}
 	}
+
+	ImGui::PushItemWidth(50);
+	ImGui::SameLine();
+	pos = ImGui::GetCursorPos();
+	pos.y += (24 - ImGui::GetTextLineHeightWithSpacing()) / 2;
+	ImGui::SetCursorPos(pos);
+	ImGui::DragFloat("Camera speed", &m_camera_speed, 0.1f, 0.01f, 999.0f, "%.2f");
+	
+	ImGui::SameLine();
+	int step = m_editor->getGizmo().getStep();
+	if (ImGui::DragInt("Gizmo step", &step, 1.0f, 0, 200))
+	{
+		m_editor->getGizmo().setStep(step);
+	}
+
+	ImGui::SameLine();
+	ImGui::Checkbox("Stats", &m_show_stats);
+
+	ImGui::SameLine();
+	m_pipeline->callLuaFunction("onGUI");
+
+	if (m_editor->isMeasureToolActive())
+	{
+		ImGui::SameLine();
+		ImGui::Text(" | Measured distance: %f", m_editor->getMeasuredDistance());
+	}
+
+	ImGui::PopItemWidth();
+
 	ImGui::EndToolbar();
 }
 
@@ -369,7 +394,6 @@ void SceneView::onGUI()
 		m_is_opened = true;
 		onToolbar();
 		auto size = ImGui::GetContentRegionAvail();
-		size.y -= ImGui::GetTextLineHeightWithSpacing();
 		auto* fb = m_pipeline->getFramebuffer("default");
 		if (size.x > 0 && size.y > 0 && fb)
 		{
@@ -440,34 +464,15 @@ void SceneView::onGUI()
 			}
 			m_pipeline->render();
 		}
-
-		ImGui::PushItemWidth(60);
-		ImGui::DragFloat("Camera speed", &m_camera_speed, 0.1f, 0.01f, 999.0f, "%.2f");
-		ImGui::SameLine();
-		if (m_editor->isMeasureToolActive())
-		{
-			ImGui::Text("| Measured distance: %f", m_editor->getMeasuredDistance());
-		}
-
-		ImGui::SameLine();
-		int step = m_editor->getGizmo().getStep();
-		if (ImGui::DragInt("Gizmo step", &step, 1.0f, 0, 200))
-		{
-			m_editor->getGizmo().setStep(step);
-		}
-
-		ImGui::SameLine();
-		ImGui::Checkbox("Stats", &m_show_stats);
-
-		m_pipeline->callLuaFunction("onGUI");
 	}
 
 	ImGui::EndDock();
 
 	if(m_show_stats)
 	{
+		float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
 		view_pos.x += ImGui::GetStyle().FramePadding.x;
-		view_pos.y += ImGui::GetStyle().FramePadding.y;
+		view_pos.y += ImGui::GetStyle().FramePadding.y + toolbar_height;
 		ImGui::SetNextWindowPos(view_pos);
 		auto col = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
 		col.w = 0.3f;
