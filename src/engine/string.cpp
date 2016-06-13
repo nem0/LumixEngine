@@ -71,6 +71,15 @@ void copyMemory(void* dest, const void* src, size_t count)
 }
 
 
+bool endsWith(const char* str, const char* substr)
+{
+	int len = stringLength(str);
+	int len2 = stringLength(substr);
+	if (len2 > len) return false;
+	return equalStrings(str + len - len2, substr);
+}
+
+
 const char* stristr(const char* haystack, const char* needle)
 {
 	const char* c = haystack;

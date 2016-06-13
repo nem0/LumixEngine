@@ -246,6 +246,7 @@ public:
 				auto& universes = m_asset_browser->getResources(0);
 				for (auto& univ : universes)
 				{
+					if (Lumix::endsWith(univ.c_str(), "_autosave.unv")) continue;
 					if (ImGui::MenuItem(univ.c_str()))
 					{
 						m_editor->loadUniverse(univ);
@@ -661,6 +662,7 @@ public:
 			auto& universes = m_asset_browser->getResources(0);
 			for (auto& univ : universes)
 			{
+				if (Lumix::endsWith(univ.c_str(), "_autosave.unv")) continue;
 				if ((m_open_filter[0] == '\0' || Lumix::stristr(univ.c_str(), m_open_filter)) &&
 					ImGui::MenuItem(univ.c_str()))
 				{
