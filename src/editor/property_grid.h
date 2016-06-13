@@ -24,6 +24,7 @@ class LUMIX_EDITOR_API PropertyGrid
 public:
 	struct IPlugin
 	{
+		virtual ~IPlugin() {}
 		virtual void onGUI(PropertyGrid& grid, Lumix::ComponentUID cmp) = 0;
 	};
 
