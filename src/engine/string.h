@@ -43,6 +43,7 @@ LUMIX_ENGINE_API void copyMemory(void* dest, const void* src, size_t count);
 LUMIX_ENGINE_API void moveMemory(void* dest, const void* src, size_t count);
 LUMIX_ENGINE_API void setMemory(void* ptr, uint8 value, size_t num);
 LUMIX_ENGINE_API const char* findSubstring(const char* str, const char* substr);
+LUMIX_ENGINE_API bool endsWith(const char* str, const char* substr);
 
 
 inline bool isLetter(char c)
