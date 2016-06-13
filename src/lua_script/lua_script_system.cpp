@@ -1279,7 +1279,7 @@ namespace Lumix
 	{
 		m_script_manager.create(crc32("lua_script"), engine.getResourceManager());
 
-		PropertyRegister::registerComponentType("lua_script", "Lua script");
+		PropertyRegister::registerComponentType("lua_script");
 	}
 
 

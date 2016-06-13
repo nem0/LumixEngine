@@ -609,9 +609,59 @@ IEditorCommand* createRemoveScriptCommand(WorldEditor& editor)
 }
 
 
+struct AddComponentPlugin : public PropertyGrid::IAddComponentPlugin
+{
+	AddComponentPlugin(StudioApp& _app)
+		: app(_app)
+	{
+	}
+
+
+	void onGUI() override
+	{
+		if (!ImGui::BeginMenu(getLabel())) return;
+
+		char buf[Lumix::MAX_PATH_LENGTH];
+		auto* asset_browser = app.getAssetBrowser();
+		if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), LUA_SCRIPT_HASH, 300))
+		{
+			auto& editor = *app.getWorldEditor();
+			editor.addComponent(LUA_SCRIPT_HASH);
+
+			auto& allocator = editor.getAllocator();
+			auto* cmd = LUMIX_NEW(allocator, PropertyGridPlugin::AddScriptCommand);
+			
+			cmd->scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_HASH));
+			Entity entity = editor.getSelectedEntities()[0];
+			cmd->cmp = editor.getComponent(entity, LUA_SCRIPT_HASH).index;
+			editor.executeCommand(cmd);
+
+			auto* set_source_cmd = LUMIX_NEW(allocator, PropertyGridPlugin::SetPropertyCommand)(
+				cmd->scene, cmd->cmp, 0, "-source", buf, allocator);
+			editor.executeCommand(set_source_cmd);
+
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndMenu();
+	}
+
+
+	const char* getLabel() const override 
+	{
+		return "Lua Script";
+	}
+
+
+	StudioApp& app;
+};
+
+
 LUMIX_STUDIO_ENTRY(lua_script)
 {
 	auto& editor = *app.getWorldEditor();
+	auto* cmp_plugin = LUMIX_NEW(editor.getAllocator(), AddComponentPlugin)(app);
+	app.getPropertyGrid()->registerComponent("lua_script", "Lua Script", *cmp_plugin);
+
 	editor.registerEditorCommandCreator("add_script", createAddScriptCommand);
 	editor.registerEditorCommandCreator("remove_script", createRemoveScriptCommand);
 	editor.registerEditorCommandCreator("set_script_property", createSetPropertyCommand);

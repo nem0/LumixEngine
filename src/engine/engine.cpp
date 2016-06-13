@@ -493,7 +493,7 @@ public:
 
 	void registerProperties()
 	{
-		PropertyRegister::registerComponentType("hierarchy", "Hierarchy");
+		PropertyRegister::registerComponentType("hierarchy");
 		PropertyRegister::add(
 			"hierarchy",
 			LUMIX_NEW(m_allocator, EntityPropertyDescriptor<Hierarchy>)(

@@ -52,6 +52,7 @@ public:
 	void openInExternalEditor(const char* path);
 	void enableUpdate(bool enable) { m_is_update_enabled = enable; }
 	OnResourceChanged& resourceChanged() { return m_on_resource_changed; }
+	bool resourceList(char* buf, int max_size, Lumix::uint32 type, float height);
 
 public:
 	bool m_is_opened;

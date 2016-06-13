@@ -145,26 +145,22 @@ struct BonePropertyDescriptor : public IEnumPropertyDescriptor
 
 static void registerProperties(IAllocator& allocator)
 {
-	PropertyRegister::registerComponentType("camera", "Camera");
-	PropertyRegister::registerComponentType("global_light", "Global light");
-	PropertyRegister::registerComponentType("renderable", "Mesh");
-	PropertyRegister::registerComponentType("particle_emitter", "Particle emitter");
-	PropertyRegister::registerComponentType(
-		"particle_emitter_spawn_shape", "Particle emitter - spawn shape");
-	PropertyRegister::registerComponentType("particle_emitter_fade", "Particle emitter - fade");
-	PropertyRegister::registerComponentType("particle_emitter_plane", "Particle emitter - plane");
-	PropertyRegister::registerComponentType("particle_emitter_force", "Particle emitter - force");
-	PropertyRegister::registerComponentType(
-		"particle_emitter_attractor", "Particle emitter - attractor");
-	PropertyRegister::registerComponentType(
-		"particle_emitter_linear_movement", "Particle emitter - linear movement");
-	PropertyRegister::registerComponentType(
-		"particle_emitter_random_rotation", "Particle emitter - random rotation");
-	PropertyRegister::registerComponentType("particle_emitter_size", "Particle emitter - size");
-	PropertyRegister::registerComponentType("point_light", "Point light");
-	PropertyRegister::registerComponentType("terrain", "Terrain");
-	PropertyRegister::registerComponentType("bone_attachment", "Bone attachment");
-	PropertyRegister::registerComponentType("environment_probe", "Environment probe");
+	PropertyRegister::registerComponentType("camera");
+	PropertyRegister::registerComponentType("global_light");
+	PropertyRegister::registerComponentType("renderable");
+	PropertyRegister::registerComponentType("particle_emitter");
+	PropertyRegister::registerComponentType("particle_emitter_spawn_shape");
+	PropertyRegister::registerComponentType("particle_emitter_fade");
+	PropertyRegister::registerComponentType("particle_emitter_plane");
+	PropertyRegister::registerComponentType("particle_emitter_force");
+	PropertyRegister::registerComponentType("particle_emitter_attractor");
+	PropertyRegister::registerComponentType("particle_emitter_linear_movement");
+	PropertyRegister::registerComponentType("particle_emitter_random_rotation");
+	PropertyRegister::registerComponentType("particle_emitter_size");
+	PropertyRegister::registerComponentType("point_light");
+	PropertyRegister::registerComponentType("terrain");
+	PropertyRegister::registerComponentType("bone_attachment");
+	PropertyRegister::registerComponentType("environment_probe");
 
 	PropertyRegister::registerComponentDependency("particle_emitter_fade", "particle_emitter");
 	PropertyRegister::registerComponentDependency("particle_emitter_force", "particle_emitter");

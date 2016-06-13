@@ -1705,6 +1705,25 @@ extern "C" {
 
 LUMIX_STUDIO_ENTRY(renderer)
 {
+	auto& property_grid = *app.getPropertyGrid();
+
+	property_grid.registerComponent("camera", "Camera");
+	property_grid.registerComponent("global_light", "Global light");
+	property_grid.registerComponentWithResource("renderable", "Mesh", MODEL_HASH, "Source");
+	property_grid.registerComponentWithResource("particle_emitter", "Particle emitter", MATERIAL_HASH, "Material");
+	property_grid.registerComponent("particle_emitter_spawn_shape", "Particle emitter - spawn shape");
+	property_grid.registerComponent("particle_emitter_fade", "Particle emitter - fade");
+	property_grid.registerComponent("particle_emitter_plane", "Particle emitter - plane");
+	property_grid.registerComponent("particle_emitter_force", "Particle emitter - force");
+	property_grid.registerComponent("particle_emitter_attractor", "Particle emitter - attractor");
+	property_grid.registerComponent("particle_emitter_linear_movement", "Particle emitter - linear movement");
+	property_grid.registerComponent("particle_emitter_random_rotation", "Particle emitter - random rotation");
+	property_grid.registerComponent("particle_emitter_size", "Particle emitter - size");
+	property_grid.registerComponent("point_light", "Point light");
+	property_grid.registerComponentWithResource("terrain", "Terrain", MATERIAL_HASH, "Material");
+	property_grid.registerComponent("bone_attachment", "Bone attachment");
+	property_grid.registerComponent("environment_probe", "Environment probe");
+
 	auto& allocator = app.getWorldEditor()->getAllocator();
 
 	auto* model_plugin = LUMIX_NEW(allocator, ModelPlugin)(app);

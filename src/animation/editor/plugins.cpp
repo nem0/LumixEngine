@@ -115,6 +115,8 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin
 
 LUMIX_STUDIO_ENTRY(animation)
 {
+	app.getPropertyGrid()->registerComponentWithResource("animable", "Animable", ANIMATION_HASH, "Animation");
+
 	auto& allocator = app.getWorldEditor()->getAllocator();
 	auto* ab_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(app);
 	app.getAssetBrowser()->addPlugin(*ab_plugin);

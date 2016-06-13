@@ -15,19 +15,6 @@
 #include <cstdlib>
 
 
-const char* PropertyGrid::getComponentTypeName(Lumix::ComponentUID cmp) const
-{
-	for (int i = 0; i < Lumix::PropertyRegister::getComponentTypesCount(); ++i)
-	{
-		if (cmp.type == Lumix::crc32(Lumix::PropertyRegister::getComponentTypeID(i)))
-		{
-			return Lumix::PropertyRegister::getComponentTypeLabel(i);
-		}
-	}
-	return "Unknown";
-}
-
-
 PropertyGrid::PropertyGrid(Lumix::WorldEditor& editor,
 	AssetBrowser& asset_browser,
 	Lumix::Array<Action*>& actions)
@@ -35,16 +22,24 @@ PropertyGrid::PropertyGrid(Lumix::WorldEditor& editor,
 	, m_editor(editor)
 	, m_asset_browser(asset_browser)
 	, m_plugins(editor.getAllocator())
+	, m_add_cmp_plugins(editor.getAllocator())
+	, m_component_labels(editor.getAllocator())
 {
 	m_particle_emitter_updating = true;
 	m_particle_emitter_timescale = 1.0f;
 	m_component_filter[0] = '\0';
+	registerComponent("hierarchy", "Hierarchy");
 }
 
 
 PropertyGrid::~PropertyGrid()
 {
 	for (auto* i : m_plugins)
+	{
+		LUMIX_DELETE(m_editor.getAllocator(), i);
+	}
+
+	for (auto* i : m_add_cmp_plugins)
 	{
 		LUMIX_DELETE(m_editor.getAllocator(), i);
 	}
@@ -417,6 +412,14 @@ void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescr
 }
 
 
+const char* PropertyGrid::getComponentTypeName(Lumix::ComponentUID cmp) const
+{
+	auto iter = m_component_labels.find(cmp.type);
+	if (iter == m_component_labels.end()) return "Unknown";
+	return iter.value().c_str();
+}
+
+
 void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 {
 	ImGuiTreeNodeFlags flags =
@@ -561,6 +564,104 @@ void PropertyGrid::showCoreProperties(Lumix::Entity entity)
 }
 
 
+void PropertyGrid::addPlugin(IAddComponentPlugin& plugin)
+{
+	int i = 0;
+	while (i < m_add_cmp_plugins.size() && Lumix::compareString(plugin.getLabel(), m_add_cmp_plugins[i]->getLabel()) > 0)
+	{
+		++i;
+	}
+	m_add_cmp_plugins.insert(i, &plugin);
+}
+
+
+void PropertyGrid::registerComponentWithResource(const char* id,
+	const char* label,
+	Lumix::uint32 resource_type,
+	const char* property_name)
+{
+	struct Plugin : public IAddComponentPlugin
+	{
+		void onGUI() override
+		{
+			if (!ImGui::BeginMenu(label)) return;
+			auto* desc = Lumix::PropertyRegister::getDescriptor(id, property_id);
+			char buf[Lumix::MAX_PATH_LENGTH];
+			if (property_grid->m_asset_browser.resourceList(buf, Lumix::lengthOf(buf), resource_type, 300))
+			{
+				auto& editor = property_grid->m_editor;
+				editor.addComponent(id);
+				editor.setProperty(id, -1, *desc, buf, Lumix::stringLength(buf) + 1);
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndMenu();
+		}
+
+
+		const char* getLabel() const override
+		{
+			return label;
+		}
+
+		PropertyGrid* property_grid;
+		Lumix::uint32 id;
+		Lumix::uint32 resource_type;
+		Lumix::uint32 property_id;
+		char label[50];
+	};
+
+	auto& allocator = m_editor.getAllocator();
+	auto* plugin = LUMIX_NEW(allocator, Plugin);
+	plugin->property_grid = this;
+	plugin->id = Lumix::crc32(id);
+	plugin->property_id = Lumix::crc32(property_name);
+	plugin->resource_type = resource_type;
+	Lumix::copyString(plugin->label, label);
+	addPlugin(*plugin);
+
+	m_component_labels.insert(plugin->id, Lumix::string(label, allocator));
+}
+
+
+void PropertyGrid::registerComponent(const char* id, const char* label, IAddComponentPlugin& plugin)
+{
+	addPlugin(plugin);
+	auto& allocator = m_editor.getAllocator();
+	m_component_labels.insert(Lumix::crc32(id), Lumix::string(label, allocator));
+}
+
+
+void PropertyGrid::registerComponent(const char* id, const char* label)
+{
+	struct Plugin : public IAddComponentPlugin
+	{
+		void onGUI() override
+		{
+			if (ImGui::Selectable(label)) property_grid->m_editor.addComponent(id);
+		}
+
+
+		const char* getLabel() const override
+		{
+			return label;
+		}
+
+		PropertyGrid* property_grid;
+		Lumix::uint32 id;
+		char label[50];
+	};
+
+	auto& allocator = m_editor.getAllocator();
+	auto* plugin = LUMIX_NEW(allocator, Plugin);
+	plugin->property_grid = this;
+	plugin->id = Lumix::crc32(id);
+	Lumix::copyString(plugin->label, label);
+	addPlugin(*plugin);
+
+	m_component_labels.insert(plugin->id, Lumix::string(label, allocator));
+}
+
+
 void PropertyGrid::onGUI()
 {
 	auto& ents = m_editor.getSelectedEntities();
@@ -573,15 +674,11 @@ void PropertyGrid::onGUI()
 		if (ImGui::BeginPopup("AddComponentPopup"))
 		{
 			ImGui::InputText("Filter", m_component_filter, sizeof(m_component_filter));
-			for (int i = 0; i < Lumix::PropertyRegister::getComponentTypesCount(); ++i)
+			for (auto* plugin : m_add_cmp_plugins)
 			{
-				const char* label = Lumix::PropertyRegister::getComponentTypeLabel(i);
+				const char* label = plugin->getLabel();
 
-				if ((!m_component_filter[0] || Lumix::stristr(label, m_component_filter)) && ImGui::Selectable(label))
-				{
-					m_editor.addComponent(Lumix::crc32(Lumix::PropertyRegister::getComponentTypeID(i)));
-					break;
-				}
+				if (!m_component_filter[0] || Lumix::stristr(label, m_component_filter)) plugin->onGUI();
 			}
 			ImGui::EndPopup();
 		}

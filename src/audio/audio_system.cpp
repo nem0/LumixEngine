@@ -26,9 +26,9 @@ namespace Lumix
 
 static void registerProperties(Lumix::IAllocator& allocator)
 {
-	PropertyRegister::registerComponentType("ambient_sound", "Ambient sound");
-	PropertyRegister::registerComponentType("audio_listener", "Audio listener");
-	PropertyRegister::registerComponentType("echo_zone", "Echo zone");
+	PropertyRegister::registerComponentType("ambient_sound");
+	PropertyRegister::registerComponentType("audio_listener");
+	PropertyRegister::registerComponentType("echo_zone");
 
 	PropertyRegister::add("ambient_sound",
 		LUMIX_NEW(allocator, EnumPropertyDescriptor<AudioScene>)("Sound",

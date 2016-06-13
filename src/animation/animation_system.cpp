@@ -335,7 +335,7 @@ struct AnimationSystemImpl : public IPlugin
 		, m_engine(engine)
 		, animation_manager(m_allocator)
 	{
-		PropertyRegister::registerComponentType("animable", "Animable");
+		PropertyRegister::registerComponentType("animable");
 
 		PropertyRegister::add("animable",
 			LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationSceneImpl>)("Animation",

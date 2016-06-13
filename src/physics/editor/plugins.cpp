@@ -4,6 +4,7 @@
 
 #include "engine/crc32.h"
 #include "engine/math_utils.h"
+#include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -177,6 +178,11 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 
 LUMIX_STUDIO_ENTRY(physics)
 {
+	app.getPropertyGrid()->registerComponent("box_rigid_actor", "Physics Box");
+	app.getPropertyGrid()->registerComponent("physical_controller", "Physics Controller");
+	app.getPropertyGrid()->registerComponent("mesh_rigid_actor", "Physics Mesh");
+	app.getPropertyGrid()->registerComponent("physical_heightfield", "Physics Heightfield");
+
 	StudioAppPlugin* plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), StudioAppPlugin)(*app.getWorldEditor());
 	app.addPlugin(*plugin);
 

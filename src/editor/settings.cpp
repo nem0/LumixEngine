@@ -477,9 +477,10 @@ void Settings::showToolbarSettings()
 	auto& actions = m_app.getToolbarActions();
 	static Action* dragged = nullptr;
 	
+	ImVec4 tint_color = ImGui::GetStyle().Colors[ImGuiCol_Text];
 	for (auto* action : actions)
 	{
-		ImGui::ImageButton(action->icon, ImVec2(24, 24));
+		ImGui::ImageButton(action->icon, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), -1, ImVec4(0, 0, 0, 0), tint_color);
 		if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(0))
 		{
 			actions.insert(actions.indexOf(action), dragged);
