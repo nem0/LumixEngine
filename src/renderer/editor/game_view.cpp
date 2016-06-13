@@ -6,6 +6,7 @@
 #include "engine/resource_manager.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
+#include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
@@ -36,7 +37,7 @@ GameView::~GameView()
 
 void GameView::onUniverseCreated()
 {
-	auto* scene = m_editor->getScene(Lumix::crc32("renderer"));
+	auto* scene = m_editor->getUniverse()->getScene(Lumix::crc32("renderer"));
 	m_pipeline->setScene(static_cast<Lumix::RenderScene*>(scene));
 }
 
