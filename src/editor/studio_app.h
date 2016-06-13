@@ -21,6 +21,7 @@ struct SDL_Window;
 
 namespace Lumix
 {
+struct ComponentUID;
 class WorldEditor;
 }
 
@@ -38,6 +39,13 @@ public:
 		virtual void update(float) {}
 
 		struct Action* m_action;
+	};
+
+	struct IAddComponentPlugin
+	{
+		virtual ~IAddComponentPlugin() {}
+		virtual void onGUI(bool create_entity) = 0;
+		virtual const char* getLabel() const = 0;
 	};
 
 	struct DragData
@@ -75,6 +83,14 @@ public:
 	virtual Lumix::WorldEditor* getWorldEditor() = 0;
 	virtual void addPlugin(IPlugin& plugin) = 0;
 	virtual void removePlugin(IPlugin& plugin) = 0;
+	virtual const char* getComponentTypeName(Lumix::ComponentUID cmp) const = 0;
+	virtual void registerComponent(const char* id, const char* label) = 0;
+	virtual void registerComponent(const char* id, const char* label, IAddComponentPlugin& plugin) = 0;
+	virtual void registerComponentWithResource(const char* id,
+		const char* label,
+		Lumix::uint32 resource_type,
+		const char* property_name) = 0;
+	virtual const Lumix::Array<IAddComponentPlugin*>& getAddComponentPlugins() const = 0;
 	virtual int getExitCode() const = 0;
 	virtual void runScript(const char* src, const char* script_name) = 0;
 	virtual const Lumix::Array<Action*>& getActions() = 0;

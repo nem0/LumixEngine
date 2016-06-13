@@ -17,6 +17,7 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
+#include "engine/property_register.h"
 #include "engine/quat.h"
 #include "engine/resource_manager.h"
 #include "engine/system.h"
@@ -61,6 +62,8 @@ public:
 		, m_editor(nullptr)
 		, m_settings(*this)
 		, m_plugins(m_allocator)
+		, m_add_cmp_plugins(m_allocator)
+		, m_component_labels(m_allocator)
 	{
 		m_current_group = 0;
 		m_drag_data = { DragData::NONE, nullptr, 0 };
@@ -70,6 +73,7 @@ public:
 		m_template_name[0] = '\0';
 		m_open_filter[0] = '\0';
 		init();
+		registerComponent("hierarchy", "Hierarchy");
 	}
 
 
@@ -79,6 +83,137 @@ public:
 		shutdown();
 		g_app = nullptr;
 	}
+
+
+	const char* getComponentTypeName(Lumix::ComponentUID cmp) const override
+	{
+		auto iter = m_component_labels.find(cmp.type);
+		if (iter == m_component_labels.end()) return "Unknown";
+		return iter.value().c_str();
+	}
+
+
+	const Lumix::Array<IAddComponentPlugin*>& getAddComponentPlugins() const override { return m_add_cmp_plugins; }
+
+
+	void addPlugin(IAddComponentPlugin& plugin)
+	{
+		int i = 0;
+		while (i < m_add_cmp_plugins.size() && Lumix::compareString(plugin.getLabel(), m_add_cmp_plugins[i]->getLabel()) > 0)
+		{
+			++i;
+		}
+		m_add_cmp_plugins.insert(i, &plugin);
+	}
+
+
+	void registerComponentWithResource(const char* id,
+		const char* label,
+		Lumix::uint32 resource_type,
+		const char* property_name) override
+	{
+		struct Plugin : public IAddComponentPlugin
+		{
+			void onGUI(bool create_entity) override
+			{
+				if (!ImGui::BeginMenu(label)) return;
+				auto* desc = Lumix::PropertyRegister::getDescriptor(id, property_id);
+				char buf[Lumix::MAX_PATH_LENGTH];
+				if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), resource_type, 300))
+				{
+					if (create_entity)
+					{
+						Lumix::Entity entity = editor->addEntity();
+						editor->selectEntities(&entity, 1);
+					}
+
+					editor->addComponent(id);
+					editor->setProperty(id, -1, *desc, buf, Lumix::stringLength(buf) + 1);
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::EndMenu();
+			}
+
+
+			const char* getLabel() const override
+			{
+				return label;
+			}
+
+			PropertyGrid* property_grid;
+			AssetBrowser* asset_browser;
+			Lumix::WorldEditor* editor;
+			Lumix::uint32 id;
+			Lumix::uint32 resource_type;
+			Lumix::uint32 property_id;
+			char label[50];
+		};
+
+		auto& allocator = m_editor->getAllocator();
+		auto* plugin = LUMIX_NEW(allocator, Plugin);
+		plugin->property_grid = m_property_grid;
+		plugin->asset_browser = m_asset_browser;
+		plugin->id = Lumix::crc32(id);
+		plugin->editor = m_editor;
+		plugin->property_id = Lumix::crc32(property_name);
+		plugin->resource_type = resource_type;
+		Lumix::copyString(plugin->label, label);
+		addPlugin(*plugin);
+
+		m_component_labels.insert(plugin->id, Lumix::string(label, allocator));
+	}
+
+
+	void registerComponent(const char* id, const char* label, IAddComponentPlugin& plugin) override
+	{
+		addPlugin(plugin);
+		auto& allocator = m_editor->getAllocator();
+		m_component_labels.insert(Lumix::crc32(id), Lumix::string(label, allocator));
+	}
+
+
+	void registerComponent(const char* id, const char* label) override
+	{
+		struct Plugin : public IAddComponentPlugin
+		{
+			void onGUI(bool create_entity) override
+			{
+				if (ImGui::Selectable(label))
+				{
+					if (create_entity)
+					{
+						Lumix::Entity entity = editor->addEntity();
+						editor->selectEntities(&entity, 1);
+					}
+
+					editor->addComponent(id);
+				}
+			}
+
+
+			const char* getLabel() const override
+			{
+				return label;
+			}
+
+			Lumix::WorldEditor* editor;
+			PropertyGrid* property_grid;
+			Lumix::uint32 id;
+			char label[50];
+		};
+
+		auto& allocator = m_editor->getAllocator();
+		auto* plugin = LUMIX_NEW(allocator, Plugin);
+		plugin->property_grid = m_property_grid;
+		plugin->editor = m_editor;
+		plugin->id = Lumix::crc32(id);
+		Lumix::copyString(plugin->label, label);
+		addPlugin(*plugin);
+
+		m_component_labels.insert(plugin->id, Lumix::string(label, allocator));
+	}
+
+
 
 
 	const Lumix::Array<Action*>& getActions() override
@@ -585,13 +720,32 @@ public:
 		return *m_actions[0];
 	}
 
+
+	void onCreateEntityWithComponentGUI()
+	{
+		doMenuItem(getAction("createEntity"), true);
+		ImGui::Separator();
+		ImGui::InputText("Filter", m_component_filter, sizeof(m_component_filter));
+		for (auto* plugin : m_add_cmp_plugins)
+		{
+			const char* label = plugin->getLabel();
+
+			if (!m_component_filter[0] || Lumix::stristr(label, m_component_filter)) plugin->onGUI(true);
+		}
+
+	}
+
 	
 	void entityMenu()
 	{
 		if (!ImGui::BeginMenu("Entity")) return;
 
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
-		doMenuItem(getAction("createEntity"), true);
+		if (ImGui::BeginMenu("Create"))
+		{
+			onCreateEntityWithComponentGUI();
+			ImGui::EndMenu();
+		}
 		doMenuItem(getAction("destroyEntity"), is_any_entity_selected);
 
 		if (ImGui::BeginMenu("Create template", is_any_entity_selected))
@@ -1059,6 +1213,12 @@ public:
 		}
 		m_plugins.clear();
 
+		for (auto* i : m_add_cmp_plugins)
+		{
+			LUMIX_DELETE(m_editor->getAllocator(), i);
+		}
+		m_add_cmp_plugins.clear();
+
 		for (auto* a : m_actions)
 		{
 			LUMIX_DELETE(m_editor->getAllocator(), a);
@@ -1178,7 +1338,7 @@ public:
 		addAction<&StudioAppImpl::setPivotOrigin>("Origin", "setPivotOrigin")
 			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isPivotOrigin>(&m_editor->getGizmo());
 
-		addAction<&StudioAppImpl::createEntity>("Create", "createEntity");
+		addAction<&StudioAppImpl::createEntity>("Create empty", "createEntity");
 		addAction<&StudioAppImpl::destroyEntity>("Destroy", "destroyEntity", SDLK_DELETE, -1, -1);
 		addAction<&StudioAppImpl::showEntities>("Show", "showEntities");
 		addAction<&StudioAppImpl::hideEntities>("Hide", "hideEntities");
@@ -1745,7 +1905,7 @@ public:
 		addActions();
 
 		m_asset_browser = LUMIX_NEW(m_allocator, AssetBrowser)(*this);
-		m_property_grid = LUMIX_NEW(m_allocator, PropertyGrid)(*m_editor, *m_asset_browser, m_actions);
+		m_property_grid = LUMIX_NEW(m_allocator, PropertyGrid)(*this);
 		auto engine_allocator = static_cast<Lumix::Debug::Allocator*>(&m_engine->getAllocator());
 		m_profiler_ui = ProfilerUI::create(*m_engine);
 		m_log_ui = LUMIX_NEW(m_allocator, LogUI)(m_editor->getAllocator());
@@ -1840,6 +2000,8 @@ public:
 	Lumix::Array<Action*> m_actions;
 	Lumix::Array<Action*> m_toolbar_actions;
 	Lumix::Array<IPlugin*> m_plugins;
+	Lumix::Array<IAddComponentPlugin*> m_add_cmp_plugins;
+	Lumix::HashMap<Lumix::uint32, Lumix::string> m_component_labels;
 	Lumix::WorldEditor* m_editor;
 	bool m_confirm_exit;
 	bool m_confirm_load;
@@ -1854,6 +2016,7 @@ public:
 	Metadata m_metadata;
 	char m_template_name[100];
 	char m_open_filter[64];
+	char m_component_filter[32];
 
 	bool m_finished;
 	int m_exit_code;
