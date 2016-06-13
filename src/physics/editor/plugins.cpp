@@ -178,10 +178,10 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 
 LUMIX_STUDIO_ENTRY(physics)
 {
-	app.getPropertyGrid()->registerComponent("box_rigid_actor", "Physics Box");
-	app.getPropertyGrid()->registerComponent("physical_controller", "Physics Controller");
-	app.getPropertyGrid()->registerComponent("mesh_rigid_actor", "Physics Mesh");
-	app.getPropertyGrid()->registerComponent("physical_heightfield", "Physics Heightfield");
+	app.registerComponent("box_rigid_actor", "Physics Box");
+	app.registerComponent("physical_controller", "Physics Controller");
+	app.registerComponent("mesh_rigid_actor", "Physics Mesh");
+	app.registerComponent("physical_heightfield", "Physics Heightfield");
 
 	StudioAppPlugin* plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), StudioAppPlugin)(*app.getWorldEditor());
 	app.addPlugin(*plugin);

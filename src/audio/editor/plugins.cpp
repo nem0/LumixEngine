@@ -222,9 +222,9 @@ struct EditorPlugin : public WorldEditor::Plugin
 
 LUMIX_STUDIO_ENTRY(audio)
 {
-	app.getPropertyGrid()->registerComponent("ambient_sound", "Ambient sound");
-	app.getPropertyGrid()->registerComponent("audio_listener", "Audio listener");
-	app.getPropertyGrid()->registerComponent("echo_zone", "Echo zone");
+	app.registerComponent("ambient_sound", "Ambient sound");
+	app.registerComponent("audio_listener", "Audio listener");
+	app.registerComponent("echo_zone", "Echo zone");
 
 	auto& editor = *app.getWorldEditor();
 	auto& allocator = editor.getAllocator();

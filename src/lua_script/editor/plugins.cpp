@@ -609,7 +609,7 @@ IEditorCommand* createRemoveScriptCommand(WorldEditor& editor)
 }
 
 
-struct AddComponentPlugin : public PropertyGrid::IAddComponentPlugin
+struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 {
 	AddComponentPlugin(StudioApp& _app)
 		: app(_app)
@@ -617,7 +617,7 @@ struct AddComponentPlugin : public PropertyGrid::IAddComponentPlugin
 	}
 
 
-	void onGUI() override
+	void onGUI(bool create_entity) override
 	{
 		if (!ImGui::BeginMenu(getLabel())) return;
 
@@ -626,6 +626,11 @@ struct AddComponentPlugin : public PropertyGrid::IAddComponentPlugin
 		if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), LUA_SCRIPT_HASH, 300))
 		{
 			auto& editor = *app.getWorldEditor();
+			if (create_entity)
+			{
+				Entity entity = editor.addEntity();
+				editor.selectEntities(&entity, 1);
+			}
 			editor.addComponent(LUA_SCRIPT_HASH);
 
 			auto& allocator = editor.getAllocator();
@@ -660,7 +665,7 @@ LUMIX_STUDIO_ENTRY(lua_script)
 {
 	auto& editor = *app.getWorldEditor();
 	auto* cmp_plugin = LUMIX_NEW(editor.getAllocator(), AddComponentPlugin)(app);
-	app.getPropertyGrid()->registerComponent("lua_script", "Lua Script", *cmp_plugin);
+	app.registerComponent("lua_script", "Lua Script", *cmp_plugin);
 
 	editor.registerEditorCommandCreator("add_script", createAddScriptCommand);
 	editor.registerEditorCommandCreator("remove_script", createRemoveScriptCommand);
