@@ -4,7 +4,9 @@
 #include "engine/blob.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
+#include "engine/debug/debug.h"
 #include "engine/default_allocator.h"
+#include "engine/engine.h"
 #include "engine/fixed_array.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
@@ -13,19 +15,18 @@
 #include "engine/lua_wrapper.h"
 #include "engine/mt/thread.h"
 #include "engine/path_utils.h"
+#include "engine/plugin_manager.h"
 #include "engine/profiler.h"
 #include "engine/quat.h"
 #include "engine/resource_manager.h"
 #include "engine/system.h"
 #include "engine/timer.h"
-#include "engine/debug/debug.h"
+#include "engine/universe/universe.h"
 #include "editor/gizmo.h"
 #include "editor/entity_groups.h"
 #include "editor/entity_template_system.h"
 #include "editor/render_interface.h"
 #include "editor/world_editor.h"
-#include "engine/engine.h"
-#include "engine/plugin_manager.h"
 #include "log_ui.h"
 #include "metadata.h"
 #include "imgui/imgui.h"
@@ -95,11 +96,11 @@ public:
 	void autosave()
 	{
 		m_time_to_autosave = float(m_settings.m_autosave_time);
-		if (!m_editor->getUniversePath().isValid()) return;
+		if (!m_editor->getUniverse()->getPath().isValid()) return;
 		if (m_editor->isGameMode()) return;
 
 		char filename[Lumix::MAX_PATH_LENGTH];
-		Lumix::copyString(filename, m_editor->getUniversePath().c_str());
+		Lumix::copyString(filename, m_editor->getUniverse()->getPath().c_str());
 		Lumix::catString(filename, "_autosave.unv");
 
 		m_editor->saveUniverse(Lumix::Path(filename), false);
@@ -400,9 +401,9 @@ public:
 		}
 
 		m_time_to_autosave = float(m_settings.m_autosave_time);
-		if (m_editor->getUniversePath().isValid())
+		if (m_editor->getUniverse()->getPath().isValid())
 		{
-			m_editor->saveUniverse(m_editor->getUniversePath(), true);
+			m_editor->saveUniverse(m_editor->getUniverse()->getPath(), true);
 		}
 		else
 		{

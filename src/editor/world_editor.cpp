@@ -1730,11 +1730,7 @@ public:
 		m_is_universe_changed = false;
 		fs.close(*file);
 		
-		if (save_path)
-		{
-			m_universe_path = path;
-			m_universe->setPath(path);
-		}
+		if (save_path) m_universe->setPath(path);
 	}
 
 
@@ -2244,7 +2240,9 @@ public:
 	void loadUniverse(const Path& path) override
 	{
 		if (m_is_game_mode) stopGameMode(false);
-		m_universe_path = path;
+		destroyUniverse();
+		createUniverse(true);
+		m_universe->setPath(path);
 		g_log_info.log("Editor") << "Loading universe " << path << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
 		FS::ReadCallback file_read_cb;
@@ -2258,18 +2256,17 @@ public:
 		ASSERT(success);
 		if (success)
 		{
-			resetAndLoad(file);
+			load(file);
 			char path[MAX_PATH_LENGTH];
-			copyString(path, sizeof(path), m_universe_path.c_str());
+			copyString(path, sizeof(path), m_universe->getPath().c_str());
 			catString(path, sizeof(path), ".lst");
-			copyFile(m_universe_path.c_str(), path);
+			copyFile(m_universe->getPath().c_str(), path);
 		}
 	}
 
 
 	void newUniverse() override
 	{
-		m_universe_path = "";
 		destroyUniverse();
 		createUniverse(true);
 		g_log_info.log("Editor") << "Universe created.";
@@ -2387,15 +2384,6 @@ public:
 	}
 
 
-	void resetAndLoad(FS::IFile& file)
-	{
-		destroyUniverse();
-		createUniverse(false);
-		m_universe->setPath(m_universe_path);
-		load(file);
-	}
-
-
 	template <typename T>
 	static IEditorCommand* constructEditorCommand(WorldEditor& editor)
 	{
@@ -2433,7 +2421,6 @@ public:
 		, m_camera(INVALID_ENTITY)
 		, m_editor_command_creators(m_allocator)
 		, m_is_loading(false)
-		, m_universe_path("")
 		, m_universe(nullptr)
 		, m_is_orbit(false)
 		, m_gizmo_use_step(false)
@@ -2728,9 +2715,6 @@ public:
 		m_engine->destroyUniverse(*m_universe);
 		m_universe = nullptr;
 	}
-
-
-	Path getUniversePath() const override { return m_universe_path; }
 
 
 	DelegateList<void()>& universeCreated() override
@@ -3128,7 +3112,6 @@ private:
 	bool m_is_mouse_down[3];
 	bool m_is_mouse_click[3];
 
-	Path m_universe_path;
 	Array<Plugin*> m_plugins;
 	MeasureTool* m_measure_tool;
 	Plugin* m_mouse_handling_plugin;
