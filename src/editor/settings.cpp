@@ -496,7 +496,7 @@ void Settings::showToolbarSettings()
 	}
 	ImGui::NewLine();
 
-	if (dragged) ImGui::SetTooltip(dragged->label);
+	if (dragged) ImGui::SetTooltip("%s", dragged->label);
 	if (ImGui::IsMouseReleased(0)) dragged = nullptr;
 
 	static int tmp = 0;
