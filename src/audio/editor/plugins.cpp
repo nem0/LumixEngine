@@ -3,6 +3,7 @@
 #include "audio_scene.h"
 #include "clip_manager.h"
 #include "editor/asset_browser.h"
+#include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -221,6 +222,10 @@ struct EditorPlugin : public WorldEditor::Plugin
 
 LUMIX_STUDIO_ENTRY(audio)
 {
+	app.getPropertyGrid()->registerComponent("ambient_sound", "Ambient sound");
+	app.getPropertyGrid()->registerComponent("audio_listener", "Audio listener");
+	app.getPropertyGrid()->registerComponent("echo_zone", "Echo zone");
+
 	auto& editor = *app.getWorldEditor();
 	auto& allocator = editor.getAllocator();
 

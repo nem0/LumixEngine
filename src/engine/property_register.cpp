@@ -14,7 +14,6 @@ namespace PropertyRegister
 
 struct ComponentType
 {
-	char m_label[50];
 	char m_id[50];
 
 	uint32 m_id_hash;
@@ -133,23 +132,9 @@ bool componentDepends(uint32 dependent, uint32 dependency)
 }
 
 
-void registerComponentType(const char* id, const char* label)
+void registerComponentType(const char* id)
 {
-	for (int i = 0; i < g_component_types->size(); ++i)
-	{
-		if (compareString((*g_component_types)[i].m_label, label) > 0)
-		{
-			ComponentType type;
-			copyString(type.m_label, label);
-			copyString(type.m_id, id);
-			type.m_id_hash = crc32(id);
-			type.m_dependency = 0;
-			g_component_types->insert(i, type);
-			return;
-		}
-	}
 	ComponentType& type = g_component_types->emplace();
-	copyString(type.m_label, label);
 	copyString(type.m_id, id);
 	type.m_id_hash = crc32(id);
 	type.m_dependency = 0;
@@ -159,12 +144,6 @@ void registerComponentType(const char* id, const char* label)
 int getComponentTypesCount()
 {
 	return g_component_types->size();
-}
-
-
-const char* getComponentTypeLabel(int index)
-{
-	return (*g_component_types)[index].m_label;
 }
 
 

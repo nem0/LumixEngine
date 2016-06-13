@@ -356,27 +356,36 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 
 	if (ImGui::BeginResizablePopup(popup_name, ImVec2(300, 300)))
 	{
-		static char filter[128] = "";
-		ImGui::InputText("Filter", filter, sizeof(filter));
-
-		ImGui::BeginChild("Resources", ImVec2(0, 0));
-		for (auto& unv : getResources(getTypeIndexFromManagerType(type)))
+		if (resourceList(buf, max_size, type, 0))
 		{
-			if (filter[0] != '\0' && strstr(unv.c_str(), filter) == nullptr) continue;
-
-			if (ImGui::Selectable(unv.c_str(), false))
-			{
-				Lumix::copyString(buf, max_size, unv.c_str());
-				ImGui::EndChild();
-				ImGui::EndPopup();
-				return true;
-			}
+			ImGui::EndPopup();
+			return true;
 		}
-
-		ImGui::EndChild();
 		ImGui::EndPopup();
 	}
+	return false;
+}
 
+
+bool AssetBrowser::resourceList(char* buf, int max_size, Lumix::uint32 type, float height)
+{
+	static char filter[128] = "";
+	ImGui::InputText("Filter", filter, sizeof(filter));
+
+	ImGui::BeginChild("Resources", ImVec2(0, height));
+	for (auto& unv : getResources(getTypeIndexFromManagerType(type)))
+	{
+		if (filter[0] != '\0' && strstr(unv.c_str(), filter) == nullptr) continue;
+
+		if (ImGui::Selectable(unv.c_str(), false))
+		{
+			Lumix::copyString(buf, max_size, unv.c_str());
+			ImGui::EndChild();
+			return true;
+		}
+	}
+
+	ImGui::EndChild();
 	return false;
 }
 

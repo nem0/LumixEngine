@@ -21,8 +21,8 @@ bool ToolbarButton(ImTextureID texture, const ImVec4& bg_color, const char* tool
 
 	bool ret = false;
 	ImGui::SameLine();
-	ImVec4 col_active = ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered];
-	if (ImGui::ImageButton(texture, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), -1, bg_color))
+	ImVec4 tint_color = ImGui::GetStyle().Colors[ImGuiCol_Text];
+	if (ImGui::ImageButton(texture, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), -1, bg_color, tint_color))
 	{
 		ret = true;
 	}
