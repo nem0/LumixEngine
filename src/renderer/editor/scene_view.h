@@ -40,6 +40,7 @@ class SceneView
 		Lumix::RayCastModelHit castRay(float x, float y);
 		void handleDrop(float x, float y);
 		void onToolbar();
+		void resetCameraSpeed();
 
 	private:
 		StudioApp& m_app;
@@ -51,6 +52,7 @@ class SceneView
 		Action* m_move_right_action;
 		Action* m_move_up_action;
 		Action* m_move_down_action;
+		Action* m_camera_speed_action;
 		bool m_is_mouse_hovering_window;
 		bool m_is_opened;
 		int m_screen_x;

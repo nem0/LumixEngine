@@ -131,13 +131,9 @@ static Lumix::IEditorCommand* createInsertMeshCommand(Lumix::WorldEditor& editor
 SceneView::SceneView(StudioApp& app)
 	: m_app(app)
 {
-	m_pipeline = nullptr;
-	m_editor = nullptr;
 	m_camera_speed = 0.1f;
 	m_is_mouse_captured = false;
 	m_show_stats = false;
-	m_log_ui = nullptr;
-	m_is_opengl = false;
 	m_app.getWorldEditor()->registerEditorCommandCreator("insert_mesh", createInsertMeshCommand);
 
 	m_log_ui = m_app.getLogUI();
@@ -183,6 +179,17 @@ SceneView::SceneView(StudioApp& app)
 	m_move_down_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Move down", "moveDown");
 	m_move_down_action->is_global = false;
 	m_app.addAction(m_move_down_action);
+
+	m_camera_speed_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Camera speed", "cameraSpeed");
+	m_camera_speed_action->is_global = false;
+	m_camera_speed_action->func.bind<SceneView, &SceneView::resetCameraSpeed>(this);
+	m_app.addAction(m_camera_speed_action);
+}
+
+
+void SceneView::resetCameraSpeed()
+{
+	m_camera_speed = 0.1f;
 }
 
 
@@ -346,29 +353,52 @@ void SceneView::onToolbar()
 		}
 	}
 
+	m_app.getAction("cameraSpeed").toolbarButton();
+
 	ImGui::PushItemWidth(50);
 	ImGui::SameLine();
+	float offset = (24 - ImGui::GetTextLineHeightWithSpacing()) / 2;
 	pos = ImGui::GetCursorPos();
-	pos.y += (24 - ImGui::GetTextLineHeightWithSpacing()) / 2;
+	pos.y += offset;
 	ImGui::SetCursorPos(pos);
-	ImGui::DragFloat("Camera speed", &m_camera_speed, 0.1f, 0.01f, 999.0f, "%.2f");
+	ImGui::DragFloat("##camera_speed", &m_camera_speed, 0.1f, 0.01f, 999.0f, "%.2f");
+	
+	int step = m_editor->getGizmo().getStep();
+	Action* mode_action;
+	if (m_editor->getGizmo().isTranslateMode())
+	{
+		mode_action = &m_app.getAction("setTranslateGizmoMode");
+	}
+	else
+	{
+		mode_action = &m_app.getAction("setRotateGizmoMode");
+	}
 	
 	ImGui::SameLine();
-	int step = m_editor->getGizmo().getStep();
-	if (ImGui::DragInt("Gizmo step", &step, 1.0f, 0, 200))
+	pos = ImGui::GetCursorPos();
+	pos.y -= offset;
+	ImGui::SetCursorPos(pos);
+	ImGui::Image(mode_action->icon, ImVec2(24, 24));
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Snap amount");
+
+	ImGui::SameLine();
+	pos = ImGui::GetCursorPos();
+	pos.y += offset;
+	ImGui::SetCursorPos(pos);
+	if (ImGui::DragInt("##gizmoStep", &step, 1.0f, 0, 200))
 	{
 		m_editor->getGizmo().setStep(step);
 	}
 
-	ImGui::SameLine();
+	ImGui::SameLine(0, 20);
 	ImGui::Checkbox("Stats", &m_show_stats);
 
-	ImGui::SameLine();
+	ImGui::SameLine(0, 20);
 	m_pipeline->callLuaFunction("onGUI");
 
 	if (m_editor->isMeasureToolActive())
 	{
-		ImGui::SameLine();
+		ImGui::SameLine(0, 20);
 		ImGui::Text(" | Measured distance: %f", m_editor->getMeasuredDistance());
 	}
 
