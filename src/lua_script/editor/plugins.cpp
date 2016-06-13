@@ -121,7 +121,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 
 		explicit AddScriptCommand(WorldEditor& editor)
 		{
-			scene = static_cast<LuaScriptScene*>(editor.getScene(crc32("lua_script")));
+			scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
 		}
 
 
@@ -162,7 +162,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 		explicit RemoveScriptCommand(WorldEditor& editor)
 			: blob(editor.getAllocator())
 		{
-			scene = static_cast<LuaScriptScene*>(editor.getScene(crc32("lua_script")));
+			scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
 		}
 
 
@@ -225,7 +225,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 			, value(editor.getAllocator())
 			, old_value(editor.getAllocator())
 		{
-			scene = static_cast<LuaScriptScene*>(editor.getScene(crc32("lua_script")));
+			scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
 		}
 
 

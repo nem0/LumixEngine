@@ -81,7 +81,7 @@ struct InsertMeshCommand : public Lumix::IEditorCommand
 		auto* universe = m_editor.getUniverse();
 		m_entity = universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		universe->setPosition(m_entity, m_position);
-		const auto& scenes = m_editor.getScenes();
+		const auto& scenes = universe->getScenes();
 		Lumix::ComponentIndex cmp = -1;
 		Lumix::IScene* scene = nullptr;
 		for (int i = 0; i < scenes.size(); ++i)
@@ -214,7 +214,7 @@ void SceneView::shutdown()
 
 void SceneView::onUniverseCreated()
 {
-	auto* scene = m_editor->getScene(Lumix::crc32("renderer"));
+	auto* scene = m_editor->getUniverse()->getScene(Lumix::crc32("renderer"));
 	m_pipeline->setScene(static_cast<Lumix::RenderScene*>(scene));
 }
 

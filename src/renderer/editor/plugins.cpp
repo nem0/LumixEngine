@@ -1416,7 +1416,8 @@ struct GameViewPlugin : public StudioApp::IPlugin
 
 	void onUniverseCreated()
 	{
-		auto* scene = static_cast<RenderScene*>(m_app.getWorldEditor()->getScene(crc32("renderer")));
+		auto* universe = m_app.getWorldEditor()->getUniverse();
+		auto* scene = static_cast<RenderScene*>(universe->getScene(crc32("renderer")));
 
 		m_gui_pipeline->setScene(scene);
 	}

@@ -73,8 +73,6 @@ public:
 	virtual IEditorCommand* createEditorCommand(uint32 command_type) = 0;
 	virtual Engine& getEngine() = 0;
 	virtual Universe* getUniverse() = 0;
-	virtual const Array<IScene*>& getScenes() const = 0;
-	virtual IScene* getScene(uint32 hash) = 0;
 	virtual IScene* getSceneByComponentType(uint32 hash) = 0;
 	virtual IAllocator& getAllocator() = 0;
 	virtual void renderIcons() = 0;
@@ -141,9 +139,6 @@ public:
 	virtual DelegateList<void(const Array<Entity>&)>& entitySelected() = 0;
 	virtual DelegateList<void()>& universeCreated() = 0;
 	virtual DelegateList<void()>& universeDestroyed() = 0;
-	virtual DelegateList<void()>& universeLoaded() = 0;
-	virtual DelegateList<void(Entity, const char*)>& entityNameSet() = 0;
-	virtual DelegateList<void(ComponentUID, const IPropertyDescriptor&)>& propertySet() = 0;
 
 	virtual void addPlugin(Plugin& plugin) = 0;
 	virtual void removePlugin(Plugin& plugin) = 0;

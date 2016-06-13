@@ -35,7 +35,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 		PhysicsScene* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
 		if (cmp.type == CONTROLLER_HASH)
 		{
-			auto* scene = static_cast<RenderScene*>(m_editor.getScene(crc32("renderer")));
+			auto* scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(crc32("renderer")));
 			float height = phy_scene->getControllerHeight(cmp.index);
 			float radius = phy_scene->getControllerRadius(cmp.index);
 
@@ -47,7 +47,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 
 		if (cmp.type == BOX_ACTOR_HASH)
 		{
-			auto* scene = static_cast<RenderScene*>(m_editor.getScene(crc32("renderer")));
+			auto* scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(crc32("renderer")));
 			Vec3 extents = phy_scene->getHalfExtents(cmp.index);
 
 			Universe& universe = scene->getUniverse();
@@ -85,7 +85,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 
 	void onWindowGUI() override
 	{
-		auto* scene = static_cast<PhysicsScene*>(m_editor.getScene(crc32("physics")));
+		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
 		if (ImGui::BeginDock("Physics", &m_is_window_opened))
 		{
 			if (ImGui::CollapsingHeader("Layers"))

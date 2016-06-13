@@ -129,8 +129,8 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 		{
 			ImGui::InputText("Filter", m_filter, Lumix::lengthOf(m_filter));
 
-			auto* audio_scene =
-				static_cast<Lumix::AudioScene*>(m_app.getWorldEditor()->getScene(Lumix::crc32("audio")));
+			auto universe = m_app.getWorldEditor()->getUniverse();
+			auto* audio_scene = static_cast<Lumix::AudioScene*>(universe->getScene(Lumix::crc32("audio")));
 			int clip_count = audio_scene->getClipCount();
 			for (int clip_id = 0; clip_id < clip_count; ++clip_id)
 			{
@@ -204,7 +204,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 			Universe& universe = audio_scene->getUniverse();
 			Vec3 pos = universe.getPosition(cmp.entity);
 
-			auto* scene = static_cast<RenderScene*>(m_editor.getScene(crc32("renderer")));
+			auto* scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 			if (!scene) return true;
 			scene->addDebugSphere(pos, radius, 0xff0000ff, 0);
 			return true;

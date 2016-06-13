@@ -118,7 +118,6 @@ public:
 	bool execute() override
 	{
 		m_editor.getUniverse()->setEntityName(m_entity, m_new_name.c_str());
-		m_editor.entityNameSet().invoke(m_entity, m_new_name.c_str());
 		return true;
 	}
 
@@ -126,7 +125,6 @@ public:
 	void undo() override
 	{
 		m_editor.getUniverse()->setEntityName(m_entity, m_old_name.c_str());
-		m_editor.entityNameSet().invoke(m_entity, m_old_name.c_str());
 	}
 
 
@@ -868,7 +866,6 @@ public:
 				m_property_descriptor->set(component, -1, stream);
 			}
 		}
-		m_editor.propertySet().invoke(component, *m_property_descriptor);
 	}
 
 
@@ -965,7 +962,7 @@ private:
 
 		bool execute() override
 		{
-			const Array<IScene*>& scenes = m_editor.getScenes();
+			const Array<IScene*>& scenes = m_editor.getUniverse()->getScenes();
 
 			for (int j = 0; j < m_entities.size(); ++j)
 			{
@@ -1126,7 +1123,7 @@ private:
 		void undo() override
 		{
 			Universe* universe = m_editor.getUniverse();
-			const Array<IScene*>& scenes = m_editor.getScenes();
+			const Array<IScene*>& scenes = universe->getScenes();
 			InputBlob blob(m_old_values);
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
@@ -1226,7 +1223,7 @@ private:
 		void undo() override
 		{
 			uint32 template_hash = m_editor.m_template_system->getTemplate(m_component.entity);
-			const Array<IScene*>& scenes = m_editor.getScenes();
+			const Array<IScene*>& scenes = m_editor.getUniverse()->getScenes();
 
 			if (template_hash == 0)
 			{
@@ -1416,19 +1413,6 @@ public:
 	}
 
 
-	IScene* getScene(uint32 hash) override
-	{
-		for (auto* scene : m_universe->getScenes())
-		{
-			if (crc32(scene->getPlugin().getName()) == hash)
-			{
-				return scene;
-			}
-		}
-		return nullptr;
-	}
-
-	
 	Universe* getUniverse() override
 	{
 		return m_universe; 
@@ -2082,10 +2066,6 @@ public:
 		}
 		m_engine->getFileSystem().close(*m_game_mode_file);
 		m_game_mode_file = nullptr;
-		if (reload)
-		{
-			m_universe_loaded.invoke();
-		}
 	}
 
 
@@ -2179,7 +2159,7 @@ public:
 	{
 		ComponentUID clone = ComponentUID::INVALID;
 
-		const Array<IScene*>& scenes = getScenes();
+		const Array<IScene*>& scenes = m_universe->getScenes();
 		for (int i = 0; i < scenes.size(); ++i)
 		{
 			clone = ComponentUID(entity,
@@ -2284,7 +2264,6 @@ public:
 			catString(path, sizeof(path), ".lst");
 			copyFile(m_universe_path.c_str(), path);
 		}
-		m_universe_loaded.invoke();
 	}
 
 
@@ -2443,12 +2422,9 @@ public:
 		: m_allocator(allocator)
 		, m_engine(nullptr)
 		, m_components(m_allocator)
-		, m_entity_name_set(m_allocator)
 		, m_entity_selected(m_allocator)
 		, m_universe_destroyed(m_allocator)
 		, m_universe_created(m_allocator)
-		, m_universe_loaded(m_allocator)
-		, m_property_set(m_allocator)
 		, m_selected_entities(m_allocator)
 		, m_editor_icons(nullptr)
 		, m_plugins(m_allocator)
@@ -2775,25 +2751,6 @@ public:
 	}
 
 
-	DelegateList<void()>& universeLoaded() override
-	{
-		return m_universe_loaded;
-	}
-
-	
-	DelegateList<void(ComponentUID, const IPropertyDescriptor&)>&
-	propertySet() override
-	{
-		return m_property_set;
-	}
-
-
-	DelegateList<void(Entity, const char*)>& entityNameSet() override
-	{
-		return m_entity_name_set;
-	}
-
-
 	void destroyUndoStack()
 	{
 		m_undo_index = -1;
@@ -2807,7 +2764,7 @@ public:
 
 	ComponentUID createComponent(uint32 hash, Entity entity)
 	{
-		const Array<IScene*>& scenes = getScenes();
+		const Array<IScene*>& scenes = m_universe->getScenes();
 		ComponentUID cmp;
 		for (int i = 0; i < scenes.size(); ++i)
 		{
@@ -3121,12 +3078,6 @@ public:
 	}
 
 
-	const Array<IScene*>& getScenes() const override
-	{
-		return m_universe->getScenes();
-	}
-
-
 private:
 	struct MouseMode
 	{
@@ -3173,10 +3124,7 @@ private:
 	Entity m_camera;
 	DelegateList<void()> m_universe_destroyed;
 	DelegateList<void()> m_universe_created;
-	DelegateList<void()> m_universe_loaded;
-	DelegateList<void(ComponentUID, const IPropertyDescriptor&)> m_property_set;
 	DelegateList<void(const Array<Entity>&)> m_entity_selected;
-	DelegateList<void(Entity, const char*)> m_entity_name_set;
 	bool m_is_mouse_down[3];
 	bool m_is_mouse_click[3];
 
