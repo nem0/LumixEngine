@@ -10,22 +10,25 @@ language: cpp
 compiler: gcc
 git:
     depth: 1
+before_install:
+  - curl -s http://gamedev.sk/files/coverity.cer | sudo tee -a /etc/ssl/certs/ca-certificates.crt
 before_script:
+    - sudo apt-get install ca-certificates
     - cd projects
     - sh genie_linux_gcc.sh
     - cd tmp/gcc
 script: if [ "${COVERITY_SCAN_BRANCH}" != 1 ]; then make config=debug64 ; fi
    
 addons:
+  apt:
+    packages:
+      - ca-certificates
   coverity_scan:
     project:
       name: "nem0/LumixEngine"
       description: "3D game engine"
     notification_email: mikulas.florek@gamedev.sk
-    build_command_prepend:
-        - cd projects
-        - sh genie_linux_gcc.sh
-        - cd tmp/gcc
+    build_command_prepend: 
     build_command: make config=debug64
     branch_pattern: coverity_scan
 
