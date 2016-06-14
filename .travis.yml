@@ -1,3 +1,9 @@
+env:
+  global:
+   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+   #   via the "travis encrypt" command using the project repo's public key
+   - secure: "dSuM+3RYoesuXyEt0oAGl/RD8PQQux8kVzWfjYxJMq8FoI1NuHKxHAWW5uCMoZhCya/VGxvA6wysF8gHIeMBuL5KJuA3u9TnnwFUMShfAwN35XGAAGLjHeIM4o2LiRk6FRfLb78PG8UyN/r3YRcgYYXYIJ/88UuaMJQIUAL/JZw="
+
 sudo: required
 dist: trusty
 language: cpp
@@ -8,4 +14,18 @@ before_script:
     - cd projects
     - sh genie_linux_gcc.sh
     - cd tmp/gcc
-script: make config=debug64
+script: make config=debug64   
+   
+addons:
+  coverity_scan:
+    project:
+      name: "nem0/LumixEngine"
+      description: "3D game engine"
+    notification_email: mikulas.florek@gamedev.sk
+    build_command_prepend:
+        - cd projects
+        - sh genie_linux_gcc.sh
+        - cd tmp/gcc
+    build_command: make config=debug64
+    branch_pattern: coverity_scan
+
