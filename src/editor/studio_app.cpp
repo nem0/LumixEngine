@@ -160,7 +160,7 @@ public:
 		Lumix::copyString(plugin->label, label);
 		addPlugin(*plugin);
 
-		m_component_labels.insert(plugin->id, Lumix::string(label, allocator));
+		m_component_labels.insert(plugin->id, Lumix::string(label, m_allocator));
 	}
 
 
@@ -168,7 +168,7 @@ public:
 	{
 		addPlugin(plugin);
 		auto& allocator = m_editor->getAllocator();
-		m_component_labels.insert(Lumix::crc32(id), Lumix::string(label, allocator));
+		m_component_labels.insert(Lumix::crc32(id), Lumix::string(label, m_allocator));
 	}
 
 
@@ -210,7 +210,7 @@ public:
 		Lumix::copyString(plugin->label, label);
 		addPlugin(*plugin);
 
-		m_component_labels.insert(plugin->id, Lumix::string(label, allocator));
+		m_component_labels.insert(plugin->id, Lumix::string(label, m_allocator));
 	}
 
 
