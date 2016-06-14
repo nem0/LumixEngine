@@ -783,7 +783,7 @@ void ProfilerUIImpl::onGUIResources()
 {
 	if (!ImGui::CollapsingHeader("Resources")) return;
 
-	ImGui::InputText("filter###resource_filter", m_resource_filter, Lumix::lengthOf(m_resource_filter));
+	ImGui::FilterInput("filter###resource_filter", m_resource_filter, Lumix::lengthOf(m_resource_filter));
 
 	static const Lumix::uint32 manager_types[] = { Lumix::crc32("ANIMATION"),
 		Lumix::crc32("MATERIAL"),

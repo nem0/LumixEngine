@@ -725,7 +725,7 @@ public:
 	{
 		doMenuItem(getAction("createEntity"), true);
 		ImGui::Separator();
-		ImGui::InputText("Filter", m_component_filter, sizeof(m_component_filter));
+		ImGui::FilterInput("Filter", m_component_filter, sizeof(m_component_filter));
 		for (auto* plugin : m_add_cmp_plugins)
 		{
 			const char* label = plugin->getLabel();
@@ -813,7 +813,7 @@ public:
 		doMenuItem(getAction("newUniverse"), true);
 		if (ImGui::BeginMenu("Open"))
 		{
-			ImGui::InputText("Filter", m_open_filter, sizeof(m_open_filter));
+			ImGui::FilterInput("Filter", m_open_filter, sizeof(m_open_filter));
 			auto& universes = m_asset_browser->getResources(0);
 			for (auto& univ : universes)
 			{

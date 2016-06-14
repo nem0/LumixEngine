@@ -771,6 +771,26 @@ void IntervalGraph(const unsigned long long* value_pairs,
 }
 
 
+bool FilterInput(const char* label, char* buf, size_t buf_size)
+{
+	auto pos = GetCursorPos();
+	PushItemWidth(GetContentRegionAvail().x);
+	char tmp[32];
+	strcpy(tmp, "##");
+	strcat(tmp, label);
+	bool ret = InputText(tmp, buf, buf_size);
+	if (buf[0] == 0 && !IsItemActive())
+	{
+		pos.x += GetStyle().FramePadding.x;
+		SetCursorPos(pos);
+		AlignFirstTextHeightToWidgets();
+		TextColored(GetStyle().Colors[ImGuiCol_TextDisabled], "Filter");
+	}
+	PopItemWidth();
+	return ret;
+}
+
+
 } // namespace ImGui
 
 

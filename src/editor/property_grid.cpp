@@ -558,7 +558,7 @@ void PropertyGrid::onGUI()
 		}
 		if (ImGui::BeginPopup("AddComponentPopup"))
 		{
-			ImGui::InputText("Filter", m_component_filter, sizeof(m_component_filter));
+			ImGui::FilterInput("Filter", m_component_filter, sizeof(m_component_filter));
 			for (auto* plugin : m_app.getAddComponentPlugins())
 			{
 				const char* label = plugin->getLabel();
