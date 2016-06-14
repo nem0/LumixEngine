@@ -481,7 +481,7 @@ void Settings::showToolbarSettings()
 	for (auto* action : actions)
 	{
 		ImGui::ImageButton(action->icon, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), -1, ImVec4(0, 0, 0, 0), tint_color);
-		if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(0))
+		if (dragged && ImGui::IsItemHovered() && ImGui::IsMouseReleased(0))
 		{
 			actions.insert(actions.indexOf(action), dragged);
 			dragged = nullptr;
