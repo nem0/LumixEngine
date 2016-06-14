@@ -528,7 +528,7 @@ void Settings::showToolbarSettings()
 void Settings::showShortcutSettings()
 {
 	auto& actions = m_app.getActions();
-	ImGui::InputText("Filter", m_filter, Lumix::lengthOf(m_filter));
+	ImGui::FilterInput("Filter", m_filter, Lumix::lengthOf(m_filter));
 	ImGui::Columns(4);
 	ImGui::Text("Label");
 	ImGui::NextColumn();

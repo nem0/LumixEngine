@@ -233,8 +233,9 @@ void AssetBrowser::onGUI()
 		return true;
 	};
 
+	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
 	ImGui::Combo("Type", &m_current_type, getter, this, m_plugins.size());
-	ImGui::InputText("Filter", m_filter, sizeof(m_filter));
+	ImGui::FilterInput("Filter", m_filter, sizeof(m_filter));
 
 	ImGui::ListBoxHeader("Resources");
 	auto& resources = m_resources[m_current_type + 1];
@@ -254,6 +255,7 @@ void AssetBrowser::onGUI()
 		}
 	}
 	ImGui::ListBoxFooter();
+	ImGui::PopItemWidth();
 	onGUIResource();
 	ImGui::EndDock();
 }
@@ -370,7 +372,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 bool AssetBrowser::resourceList(char* buf, int max_size, Lumix::uint32 type, float height)
 {
 	static char filter[128] = "";
-	ImGui::InputText("Filter", filter, sizeof(filter));
+	ImGui::FilterInput("Filter", filter, sizeof(filter));
 
 	ImGui::BeginChild("Resources", ImVec2(0, height));
 	for (auto& unv : getResources(getTypeIndexFromManagerType(type)))
