@@ -46,6 +46,7 @@ bool BeginToolbar(const char* str_id, ImVec2 screen_pos, ImVec2 size)
 	float padding = frame_padding.y * 2;
 	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
 		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
+	ImGui::SetNextWindowSize(size);
 	bool ret = ImGui::Begin(str_id, nullptr, size, -1, flags);
 	ImGui::PopStyleVar(3);
 
