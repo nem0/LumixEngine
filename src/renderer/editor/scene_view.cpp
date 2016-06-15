@@ -339,7 +339,10 @@ void SceneView::onToolbar()
 		"setLocalCoordSystem",
 		"setGlobalCoordSystem",
 		"setPivotCenter",
-		"setPivotOrigin" };
+		"setPivotOrigin",
+		"viewTop",
+		"viewFront",
+		"viewSide" };
 
 	auto pos = ImGui::GetCursorScreenPos();
 	float w = ImGui::GetContentRegionAvail().x;
