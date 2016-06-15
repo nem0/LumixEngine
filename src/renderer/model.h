@@ -185,7 +185,6 @@ private:
 	bgfx::VertexDecl m_vertex_decl;
 	bgfx::IndexBufferHandle m_indices_handle;
 	bgfx::VertexBufferHandle m_vertices_handle;
-	int m_vertices_size;
 	Array<Mesh> m_meshes;
 	Array<Bone> m_bones;
 	Array<uint8> m_indices;

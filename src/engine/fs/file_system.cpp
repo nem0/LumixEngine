@@ -29,8 +29,6 @@ enum TransFlags
 
 struct AsyncItem
 {
-	AsyncItem() {}
-
 	IFile* m_file;
 	ReadCallback m_cb;
 	Mode m_mode;
@@ -119,6 +117,10 @@ public:
 		, m_pending(m_allocator)
 		, m_devices(m_allocator)
 	{
+		m_disk_device.m_devices[0] = nullptr;
+		m_memory_device.m_devices[0] = nullptr;
+		m_default_device.m_devices[0] = nullptr;
+		m_save_game_device.m_devices[0] = nullptr;
 		#if !LUMIX_SINGLE_THREAD()
 			m_task = LUMIX_NEW(m_allocator, FSTask)(&m_transaction_queue, m_allocator);
 			m_task->create("FSTask");

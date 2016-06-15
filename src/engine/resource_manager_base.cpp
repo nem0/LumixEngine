@@ -147,6 +147,7 @@ namespace Lumix
 		: m_size(0)
 		, m_resources(allocator)
 		, m_allocator(allocator)
+		, m_owner(nullptr)
 	{ }
 
 	ResourceManagerBase::~ResourceManagerBase()

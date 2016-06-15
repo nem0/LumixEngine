@@ -32,12 +32,13 @@ void AnimationManager::destroyResource(Resource& resource)
 
 Animation::Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
+	, m_bone_count(-1)
+	, m_rotations(nullptr)
+	, m_positions(nullptr)
+	, m_bones(nullptr)
+	, m_frame_count(0)
+	, m_fps(30)
 {
-	m_rotations = nullptr;
-	m_positions = nullptr;
-	m_bones = nullptr;
-	m_frame_count = 0;
-	m_fps = 30;
 }
 
 

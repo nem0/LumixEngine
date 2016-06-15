@@ -63,7 +63,6 @@ public:
 		, m_mtjd_manager(nullptr)
 		, m_fps(0)
 		, m_is_game_running(false)
-		, m_component_types(m_allocator)
 		, m_last_time_delta(0)
 		, m_path_manager(m_allocator)
 		, m_time_multiplier(1.0f)
@@ -905,22 +904,6 @@ public:
 	float getLastTimeDelta() override { return m_last_time_delta; }
 
 private:
-	struct ComponentType
-	{
-		explicit ComponentType(IAllocator& allocator)
-			: m_name(allocator)
-			, m_id(allocator)
-		{
-		}
-
-		string m_name;
-		string m_id;
-
-		uint32 m_id_hash;
-		uint32 m_dependency;
-	};
-
-private:
 	Debug::Allocator m_allocator;
 
 	FS::FileSystem* m_file_system;
@@ -932,7 +915,6 @@ private:
 	
 	MTJD::Manager* m_mtjd_manager;
 
-	Array<ComponentType> m_component_types;
 	PluginManager* m_plugin_manager;
 	InputSystem* m_input_system;
 	Timer* m_timer;

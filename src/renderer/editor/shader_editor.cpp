@@ -462,6 +462,7 @@ ShaderEditor::Node::Node(int type, ShaderEditor& editor)
 	, m_outputs(editor.m_allocator)
 	, m_type(type)
 	, m_editor(editor)
+	, m_id(0xffffFFFF)
 {
 }
 
@@ -1393,6 +1394,7 @@ struct CreateNodeCommand : public ShaderEditor::ICommand
 		, m_pos(pos)
 		, m_id(id)
 		, m_shader_type(shader_type)
+		, m_node(nullptr)
 		, ICommand(editor)
 	{
 	}
