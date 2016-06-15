@@ -170,12 +170,8 @@ bool copyString(char* destination, int length, const char* source)
 		++destination;
 		++source;
 	}
-	if (length > 0)
-	{
-		*destination = 0;
-		return *source == '\0';
-	}
-	return false;
+	*destination = 0;
+	return *source == '\0';
 }
 
 
@@ -599,16 +595,9 @@ bool toCString(float value, char* output, int length, int after_point)
 		--length;
 		--after_point;
 	}
-	if (length > 0)
-	{
-		*c = 0;
-		if ((int)(dec_part + 0.5f))
-			increment(output, c - 1, length > 1);
-	}
-	else
-	{
-		return false;
-	}
+	*c = 0;
+	if ((int)(dec_part + 0.5f))
+		increment(output, c - 1, length > 1);
 	return true;
 }
 

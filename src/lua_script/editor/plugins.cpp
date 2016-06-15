@@ -537,7 +537,6 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 
 	StudioApp& m_app;
 	char m_text_buffer[8192];
-	bool m_is_opened;
 };
 
 
@@ -545,10 +544,10 @@ struct ConsolePlugin : public StudioApp::IPlugin
 {
 	ConsolePlugin(StudioApp& _app)
 		: app(_app)
+		, opened(false)
 	{
 		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Script Console", "script_console");
 		m_action->func.bind<ConsolePlugin, &ConsolePlugin::toggleOpened>(this);
-		opened = false;
 		buf[0] = '\0';
 	}
 

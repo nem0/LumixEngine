@@ -82,6 +82,12 @@ template <int size> struct StaticString
 		(void)tmp;
 	}
 
+	template <int value_size> StaticString& operator<<(StaticString<value_size>& value)
+	{
+		add(value);
+		return *this;
+	}
+
 	template <typename T> StaticString& operator<<(T value)
 	{
 		add(value);

@@ -724,10 +724,7 @@ bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use)
 	ImGuiWindowFlags flags = ImGuiWindowFlags_ShowBorders | ImGuiWindowFlags_Popup | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
 
 	char name[32];
-	if (flags & ImGuiWindowFlags_ChildMenu)
-		ImFormatString(name, 20, "##menu_%d", g.CurrentPopupStack.Size);
-	else
-		ImFormatString(name, 20, "##popup_%08x", id);
+	ImFormatString(name, 20, "##popup_%08x", id);
 	float alpha = 1.0f;
 
 	bool opened = ImGui::Begin(name, NULL, size_on_first_use, alpha, flags);

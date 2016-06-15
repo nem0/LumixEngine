@@ -6,6 +6,9 @@ namespace Lumix
 {
 	MeasureTool::MeasureTool()
 		: m_is_enabled(false)
+		, m_is_from_set(false)
+		, m_from(0, 0, 0)
+		, m_to(0, 0, 0)
 	{ }
 
 

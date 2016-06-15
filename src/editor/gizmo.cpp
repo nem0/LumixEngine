@@ -67,19 +67,22 @@ struct GizmoImpl : public Gizmo
 
 	explicit GizmoImpl(WorldEditor& editor)
 		: m_editor(editor)
+		, m_mode(Mode::TRANSLATE)
+		, m_pivot(Pivot::CENTER)
+		, m_coord_system(CoordSystem::LOCAL)
+		, m_is_autosnap_down(false)
+		, m_count(0)
+		, m_transform_axis(Axis::X)
+		, m_active(-1)
+		, m_is_step(false)
+		, m_relx_accum(0)
+		, m_rely_accum(0)
+		, m_is_dragging(false)
+		, m_mouse_x(0)
+		, m_mouse_y(0)
 	{
-		m_mode = Mode::TRANSLATE;
-		m_pivot = Pivot::CENTER;
-		m_coord_system = CoordSystem::LOCAL;
-		m_is_autosnap_down = false;
 		m_steps[int(Mode::TRANSLATE)] = 10;
 		m_steps[int(Mode::ROTATE)] = 45;
-		m_count = 0;
-		m_transform_axis = Axis::X;
-		m_active = -1;
-		m_is_step = false;
-		m_relx_accum = m_rely_accum = 0;
-		m_is_dragging = false;
 		editor.universeDestroyed().bind<GizmoImpl, &GizmoImpl::onUniverseDestroyed>(this);
 	}
 

@@ -110,14 +110,16 @@ struct NavigationScene : public IScene
 		, m_universe(universe)
 		, m_system(system)
 		, m_paths(m_allocator)
+		, m_detail_mesh(nullptr)
+		, m_polymesh(nullptr)
+		, m_navquery(nullptr)
+		, m_navmesh(nullptr)
+		, m_debug_compact_heightfield(nullptr)
+		, m_debug_heightfield(nullptr)
+		, m_debug_contours(nullptr)
+		, m_num_tiles_x(0)
+		, m_num_tiles_z(0)
 	{
-		m_detail_mesh = nullptr;
-		m_polymesh = nullptr;
-		m_navquery = nullptr;
-		m_navmesh = nullptr;
-		m_debug_compact_heightfield = nullptr;
-		m_debug_heightfield = nullptr;
-		m_debug_contours = nullptr;
 		setGeneratorParams(0.3f, 0.1f, 0.3f, 2.0f, 60.0f, 1.5f);
 	}
 

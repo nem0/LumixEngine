@@ -1621,6 +1621,7 @@ public:
 			out_info.size = PlatformInterface::getFileSize(out_path.data());
 			out_info.offset = ~0UL;
 		}
+		PlatformInterface::destroyFileIterator(iter);
 	}
 
 
@@ -1932,7 +1933,7 @@ public:
 		{
 			if (!a->is_global || a->shortcut[0] == -1) continue;
 
-			Lumix::uint8 action_modifiers = 0;
+			Lumix::uint32 action_modifiers = 0;
 			for (int i = 0; i < Lumix::lengthOf(a->shortcut) + 1; ++i)
 			{
 				if ((i == Lumix::lengthOf(a->shortcut) || a->shortcut[i] == -1) &&

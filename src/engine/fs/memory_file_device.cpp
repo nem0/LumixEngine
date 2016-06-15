@@ -135,7 +135,7 @@ namespace Lumix
 					m_pos = pos;
 					break;
 				case SeekMode::CURRENT:
-					ASSERT(0 <= (int32)m_pos + pos && (int32)m_pos + pos <= (int32)m_size);
+					ASSERT(0 <= int32(m_pos + pos) && int32(m_pos + pos) <= int32(m_size));
 					m_pos += pos;
 					break;
 				case SeekMode::END:

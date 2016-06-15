@@ -77,7 +77,9 @@ Renderer& Shader::getRenderer()
 static uint32 getDefineMaskFromDense(const Shader& shader, uint32 dense)
 {
 	uint32 mask = 0;
-	for (int i = 0; i < sizeof(dense) * 8; ++i)
+	int defines_count = Math::minimum(lengthOf(shader.m_combintions.defines), int(sizeof(dense) * 8));
+
+	for (int i = 0; i < defines_count; ++i)
 	{
 		if (dense & (1 << i))
 		{
@@ -189,16 +191,30 @@ static void atlas(lua_State* L)
 }
 
 
-static void texture_define(lua_State* L, const char* define)
+static Renderer* getRendererGlobal(lua_State* L)
 {
-	auto* shader = getShader(L);
-	if (!shader) return;
 	Renderer* renderer = nullptr;
 	if (lua_getglobal(L, "renderer") == LUA_TLIGHTUSERDATA)
 	{
 		renderer = LuaWrapper::toType<Renderer*>(L, -1);
 	}
 	lua_pop(L, 1);
+
+	if (!renderer)
+	{
+		g_log_error.log("Renderer") << "Error executing function texture_define, missing renderer global variable";
+	}
+	return renderer;
+}
+
+
+static void texture_define(lua_State* L, const char* define)
+{
+	auto* shader = getShader(L);
+	if (!shader) return;
+	Renderer* renderer = getRendererGlobal(L);
+	if (!renderer) return;
+
 	auto& slot = shader->m_texture_slots[shader->m_texture_slot_count - 1];
 	slot.define_idx = renderer->getShaderDefineIdx(lua_tostring(L, -1));
 }
@@ -316,12 +332,8 @@ static void depth_test(lua_State* L, bool enabled)
 static void fs(lua_State* L)
 {
 	auto* cmb = getCombinations(L);
-	Renderer* renderer = nullptr;
-	if (lua_getglobal(L, "renderer") == LUA_TLIGHTUSERDATA)
-	{
-		renderer = LuaWrapper::toType<Renderer*>(L, -1);
-	}
-	lua_pop(L, 1);
+	Renderer* renderer = getRendererGlobal(L);
+	if (!renderer) return;
 
 	LuaWrapper::checkTableArg(L, 1);
 	int len = (int)lua_rawlen(L, 1);
@@ -341,12 +353,8 @@ static void fs(lua_State* L)
 static void vs(lua_State* L)
 {
 	auto* cmb = getCombinations(L);
-	Renderer* renderer = nullptr;
-	if (lua_getglobal(L, "renderer") == LUA_TLIGHTUSERDATA)
-	{
-		renderer = LuaWrapper::toType<Renderer*>(L, -1);
-	}
-	lua_pop(L, 1);
+	Renderer* renderer = getRendererGlobal(L);
+	if (!renderer) return;
 
 	LuaWrapper::checkTableArg(L, 1);
 	int len = (int)lua_rawlen(L, 1);

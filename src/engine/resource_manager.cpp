@@ -8,6 +8,7 @@ namespace Lumix
 	ResourceManager::ResourceManager(IAllocator& allocator) 
 		: m_resource_managers(allocator)
 		, m_allocator(allocator)
+		, m_file_system(nullptr)
 	{
 	}
 
