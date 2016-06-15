@@ -66,7 +66,7 @@ struct Action
 
 		for (int i = 0; i < Lumix::lengthOf(shortcut) + 1; ++i)
 		{
-			if (shortcut[i] == -1 || i == Lumix::lengthOf(shortcut))
+			if (i == Lumix::lengthOf(shortcut) || shortcut[i] == -1)
 			{
 				return true;
 			}
@@ -110,7 +110,7 @@ struct Action
 
 		for (int i = 0; i < Lumix::lengthOf(shortcut) + 1; ++i)
 		{
-			if (shortcut[i] == -1 || i == Lumix::lengthOf(shortcut))
+			if (i == Lumix::lengthOf(shortcut) || shortcut[i] == -1)
 			{
 				return true;
 			}
