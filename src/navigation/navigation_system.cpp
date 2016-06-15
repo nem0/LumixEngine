@@ -10,6 +10,7 @@
 #include "engine/vec.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
+#include "lua_script/lua_script_system.h"
 #include "renderer/model.h"
 #include "renderer/material.h"
 #include "renderer/render_scene.h"
@@ -293,6 +294,23 @@ struct NavigationScene : public IScene
 	}
 
 
+	void onPathFinished(Path& path)
+	{
+		if (!m_script_scene) return;
+
+		auto cmp = m_script_scene->getComponent(path.entity);
+		if (cmp == INVALID_COMPONENT) return;
+
+		for (int i = 0, c = m_script_scene->getScriptCount(cmp); i < c; ++i)
+		{
+			auto* call = m_script_scene->beginFunctionCall(cmp, i, "onPathFinished");
+			if (!call) continue;
+
+			m_script_scene->endFunctionCall(*call);
+		}
+	}
+
+
 	void update(float time_delta, bool paused) override
 	{
 		for(auto& path : m_paths)
@@ -318,9 +336,16 @@ struct NavigationScene : public IScene
 				m_universe.setRotation(path.entity, wanted_rot);
 			}
 		}
-		for(int i = m_paths.size() - 1; i >= 0; --i)
+		for (auto& path : m_paths)
 		{
-			if(m_paths[i].current_index == m_paths[i].vertex_count)
+			if (path.current_index == path.vertex_count)
+			{
+				onPathFinished(path);
+			}
+		}
+		for (int i = m_paths.size() - 1; i >= 0; --i)
+		{
+			if (m_paths[i].current_index == m_paths[i].vertex_count)
 			{
 				m_paths.eraseFast(i);
 			}
@@ -554,6 +579,19 @@ struct NavigationScene : public IScene
 			}
 			render_scene->addDebugLine(vertices[0], vertices[vert - vertices - 1], 0xff0000ff, 0);
 		}
+	}
+
+
+	void stopGame() override
+	{
+		m_paths.clear();
+	}
+
+
+	void startGame() override
+	{
+		auto* scene = m_universe.getScene(crc32("lua_script"));
+		m_script_scene = static_cast<LuaScriptScene*>(scene);
 	}
 
 
@@ -925,6 +963,7 @@ struct NavigationScene : public IScene
 	rcConfig m_config;
 	int m_num_tiles_x;
 	int m_num_tiles_z;
+	LuaScriptScene* m_script_scene;
 };
 
 
