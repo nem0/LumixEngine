@@ -899,7 +899,8 @@ struct DockContext
 			tmp = *c == getLocationCode(tmp->children[0]) ? tmp->children[0] : tmp->children[1];
 			if(tmp) --c;
 		}
-		doDock(dock, tmp ? tmp : prev, tmp ? Slot_Tab : getSlotFromLocationCode(*c));
+		if (tmp && tmp->children[0]) tmp = tmp->parent;
+		doDock(dock, tmp ? tmp : prev, tmp && !tmp->children[0] ? Slot_Tab : getSlotFromLocationCode(*c));
 	}
 
 
