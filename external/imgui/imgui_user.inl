@@ -788,6 +788,22 @@ bool FilterInput(const char* label, char* buf, size_t buf_size)
 }
 
 
+void HSplitter(const char* str_id, ImVec2* size)
+{
+	ImVec2 screen_pos = GetCursorScreenPos();
+	InvisibleButton(str_id, ImVec2(-1, 3));
+	ImVec2 end_pos = screen_pos + GetItemRectSize();
+	ImGuiWindow* win = GetCurrentWindow();
+	ImVec4* colors = GetStyle().Colors;
+	ImU32 color = GetColorU32(IsItemActive() || IsItemHovered() ? colors[ImGuiCol_ButtonActive] : colors[ImGuiCol_Button]);
+	win->DrawList->AddRectFilled(screen_pos, end_pos, color);
+	if (ImGui::IsItemActive())
+	{
+		size->y = ImMax(1.0f, ImGui::GetIO().MouseDelta.y + size->y);
+	}
+}
+
+
 } // namespace ImGui
 
 
