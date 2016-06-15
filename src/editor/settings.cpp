@@ -218,23 +218,25 @@ static int getInteger(lua_State* L, const char* name, int default_value)
 
 Settings::Settings(StudioApp& app)
 	: m_app(app)
+	, m_is_opened(false)
+	, m_editor(nullptr)
+	, m_is_maximized(true)
+	, m_is_entity_list_opened(false)
+	, m_is_entity_template_list_opened(false)
+	, m_is_asset_browser_opened(false)
+	, m_is_log_opened(false)
+	, m_is_profiler_opened(false)
+	, m_is_properties_opened(false)
+	, m_is_crash_reporting_enabled(true)
+	, m_force_no_crash_report(false)
+	, m_mouse_sensitivity_x(1000.0f)
+	, m_mouse_sensitivity_y(1000.0f)
+	, m_autosave_time(300)
 {
 	m_data_dir[0] = '\0';
-	m_editor = nullptr;
 	m_filter[0] = 0;
-	m_is_maximized = true;
 	m_window.x = m_window.y = 0;
 	m_window.w = m_window.h = -1;
-	m_is_entity_list_opened = false;
-	m_is_entity_template_list_opened = false;
-	m_is_asset_browser_opened = false;
-	m_is_log_opened = false;
-	m_is_profiler_opened = false;
-	m_is_properties_opened = false;
-	m_is_crash_reporting_enabled = true;
-	m_force_no_crash_report = false;
-	m_mouse_sensitivity_x = m_mouse_sensitivity_y = 1000.0f;
-	m_autosave_time = 300;
 
 	m_state = luaL_newstate();
 	luaL_openlibs(m_state);

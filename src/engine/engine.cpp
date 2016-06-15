@@ -431,8 +431,16 @@ public:
 
 	void installLuaPackageLoader() const
 	{
-		lua_getglobal(m_state, "package");
-		lua_getfield(m_state, -1, "searchers");
+		if (lua_getglobal(m_state, "package") != LUA_TTABLE)
+		{
+			g_log_error.log("Engine") << "Lua \"package\" is not a table";
+			return;
+		};
+		if (lua_getfield(m_state, -1, "searchers") != LUA_TTABLE)
+		{
+			g_log_error.log("Engine") << "Lua \"package.searchers\" is not a table";
+			return;
+		}
 		int numLoaders = 0;
 		lua_pushnil(m_state);
 		while (lua_next(m_state, -2) != 0)

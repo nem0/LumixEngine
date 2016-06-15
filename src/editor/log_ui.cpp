@@ -11,8 +11,10 @@ LogUI::LogUI(Lumix::IAllocator& allocator)
 	, m_notifications(allocator)
 	, m_last_uid(1)
 	, m_guard(false)
+	, m_is_opened(false)
+	, m_are_notifications_hovered(false)
+	, m_move_notifications_to_front(false)
 {
-	m_is_opened = false;
 	Lumix::g_log_info.getCallback().bind<LogUI, &LogUI::onInfo>(this);
 	Lumix::g_log_error.getCallback().bind<LogUI, &LogUI::onError>(this);
 	Lumix::g_log_warning.getCallback().bind<LogUI, &LogUI::onWarning>(this);

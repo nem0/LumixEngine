@@ -3526,6 +3526,7 @@ public:
 	{
 		if (r.custom_meshes && r.mesh_count == count) return;
 
+		ASSERT(r.model);
 		auto& rm = r.model->getResourceManager();
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_HASH));
 
@@ -3574,6 +3575,7 @@ public:
 
 		int new_count = Math::maximum(int8(index + 1), r.mesh_count);
 		allocateCustomMeshes(r, new_count);
+		ASSERT(r.meshes);
 
 		if (r.meshes[index].material) material_manager->unload(*r.meshes[index].material);
 		auto* new_material = static_cast<Material*>(material_manager->load(path));

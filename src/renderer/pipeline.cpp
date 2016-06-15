@@ -943,7 +943,10 @@ struct PipelineImpl : public Pipeline
 			if(!L) continue;
 
 			int env = scr_scene->getEnvironment(scr_cmp, i);
-			lua_rawgeti(L, LUA_REGISTRYINDEX, env);
+			if (lua_rawgeti(L, LUA_REGISTRYINDEX, env) != LUA_TTABLE)
+			{
+				ASSERT(false);
+			}
 			if(lua_getfield(L, -1, "_IS_POSTPROCESS_INITIALIZED") == LUA_TNIL)
 			{
 				if(auto* call = scr_scene->beginFunctionCall(scr_cmp, i, "initPostprocess"))
@@ -951,7 +954,10 @@ struct PipelineImpl : public Pipeline
 					call->add(this);
 					call->addEnvironment(m_lua_env);
 					scr_scene->endFunctionCall(*call);
-					lua_rawgeti(L, LUA_REGISTRYINDEX, env);
+					if (lua_rawgeti(L, LUA_REGISTRYINDEX, env) != LUA_TTABLE)
+					{
+						ASSERT(false);
+					}
 					lua_pushboolean(L, 1);
 					lua_setfield(L, -2, "_IS_POSTPROCESS_INITIALIZED");
 				}

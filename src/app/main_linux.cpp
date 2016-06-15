@@ -100,6 +100,7 @@ struct App
 			, BlackPixel(m_display, s), WhitePixel(m_display, s));
 		XSelectInput(m_display, m_window, ExposureMask | KeyPressMask);
 		XMapWindow(m_display, m_window);
+		return true;
 	}
 
 	void init()

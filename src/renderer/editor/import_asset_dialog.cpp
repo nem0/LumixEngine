@@ -1821,6 +1821,7 @@ struct ConvertTask : public Lumix::MT::Task
 				break;
 			}
 		}
+		ASSERT(mesh);
 		Lumix::int32 attribute_count = getAttributeCount(mesh);
 		file.write((const char*)&attribute_count, sizeof(attribute_count));
 
@@ -2889,7 +2890,7 @@ void ImportAssetDialog::onWindowGUI()
 			{
 				if (PlatformInterface::getOpenDirectory(m_texture_output_dir, sizeof(m_texture_output_dir), m_last_dir))
 				{
-					Lumix::copyString(m_last_dir, m_output_dir);
+					Lumix::copyString(m_last_dir, m_texture_output_dir);
 				}
 			}
 

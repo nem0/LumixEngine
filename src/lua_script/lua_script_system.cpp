@@ -108,7 +108,8 @@ namespace Lumix
 				static const uint32 INDEX_HASH = crc32("__index");
 				static const uint32 THIS_HASH = crc32("this");
 				lua_State* L = inst.m_state;
-				lua_rawgeti(L, LUA_REGISTRYINDEX, inst.m_environment);
+				bool is_env_valid = lua_rawgeti(L, LUA_REGISTRYINDEX, inst.m_environment) == LUA_TTABLE;
+				ASSERT(is_env_valid);
 				lua_pushnil(L);
 				auto& allocator = m_scene.m_system.getAllocator();
 				while(lua_next(L, -2))
@@ -251,7 +252,8 @@ namespace Lumix
 
 			void addEnvironment(int env) override
 			{
-				lua_rawgeti(state, LUA_REGISTRYINDEX, env);
+				bool is_valid = lua_rawgeti(state, LUA_REGISTRYINDEX, env) == LUA_TTABLE;
+				ASSERT(is_valid);
 				++parameter_count;
 			}
 
@@ -295,7 +297,8 @@ namespace Lumix
 			auto& script = m_scripts[cmp]->m_scripts[scr_index];
 			if (!script.m_state) return nullptr;
 
-			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
+			bool is_env_valid = lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment) == LUA_TTABLE;
+			ASSERT(is_env_valid);
 			if (lua_getfield(script.m_state, -1, function) != LUA_TFUNCTION)
 			{
 				lua_pop(script.m_state, 2);
@@ -436,7 +439,8 @@ namespace Lumix
 				}
 				else
 				{
-					lua_rawgeti(L, LUA_REGISTRYINDEX, env);
+					bool is_valid = lua_rawgeti(L, LUA_REGISTRYINDEX, env) == LUA_TTABLE;
+					ASSERT(is_valid);
 				}
 			}
 			return 1;
@@ -718,7 +722,8 @@ namespace Lumix
 				return;
 			}
 
-			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
+			bool is_env_valid = lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment) == LUA_TTABLE;
+			ASSERT(is_env_valid);
 			lua_setupvalue(script.m_state, -2, 1);
 
 			errors = errors || lua_pcall(state, 0, 0, 0) != LUA_OK;
@@ -780,7 +785,8 @@ namespace Lumix
 
 		void destroy(ScriptInstance& inst)
 		{
-			lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
+			bool is_env_valid = lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment) == LUA_TTABLE;
+			ASSERT(is_env_valid);
 			if (lua_getfield(inst.m_state, -1, "onDestroy") != LUA_TFUNCTION)
 			{
 				lua_pop(inst.m_state, 2);
