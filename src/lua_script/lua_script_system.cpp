@@ -172,6 +172,7 @@ namespace Lumix
 					script.m_state = lua_newthread(L);
 					lua_pushvalue(L, -1);
 					script.m_thread_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+					lua_pop(L, 1);
 					lua_newtable(script.m_state);
 					// reference environment
 					lua_pushvalue(script.m_state, -1);
