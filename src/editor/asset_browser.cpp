@@ -237,7 +237,8 @@ void AssetBrowser::onGUI()
 	ImGui::Combo("Type", &m_current_type, getter, this, m_plugins.size());
 	ImGui::FilterInput("Filter", m_filter, sizeof(m_filter));
 
-	ImGui::ListBoxHeader("Resources");
+	static ImVec2 size(0, 200);
+	ImGui::ListBoxHeader("Resources", size);
 	auto& resources = m_resources[m_current_type + 1];
 
 	for (auto& resource : resources)
@@ -255,6 +256,8 @@ void AssetBrowser::onGUI()
 		}
 	}
 	ImGui::ListBoxFooter();
+	ImGui::HSplitter("splitter", &size);
+
 	ImGui::PopItemWidth();
 	onGUIResource();
 	ImGui::EndDock();
@@ -265,7 +268,6 @@ void AssetBrowser::selectResource(Lumix::Resource* resource)
 {
 	if (m_selected_resource) m_history.push(m_selected_resource->getPath());
 	if (m_history.size() > 20) m_history.erase(0);
-
 
 	m_wanted_resource = "";
 	unloadResource();
@@ -386,7 +388,6 @@ bool AssetBrowser::resourceList(char* buf, int max_size, Lumix::uint32 type, flo
 			return true;
 		}
 	}
-
 	ImGui::EndChild();
 	return false;
 }
