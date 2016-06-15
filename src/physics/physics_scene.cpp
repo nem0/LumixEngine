@@ -296,18 +296,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void enableVisualization()
 	{
-		m_scene->setVisualizationParameter(
-			physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
-		m_scene->setVisualizationParameter(
-			physx::PxVisualizationParameter::eSCALE, 1.0);
-		m_scene->setVisualizationParameter(
-			physx::PxVisualizationParameter::eACTOR_AXES, 1.0f);
-		m_scene->setVisualizationParameter(
-			physx::PxVisualizationParameter::eCOLLISION_AABBS, 1.0f);
-		m_scene->setVisualizationParameter(
-			physx::PxVisualizationParameter::eWORLD_AXES, 1.0f);
-		m_scene->setVisualizationParameter(
-			physx::PxVisualizationParameter::eCONTACT_POINT, 1.0f);
+		m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
+		m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 1.0);
+		m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eACTOR_AXES, 1.0f);
+		m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_AABBS, 1.0f);
+		m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eWORLD_AXES, 1.0f);
+		m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCONTACT_POINT, 1.0f);
 	}
 
 
