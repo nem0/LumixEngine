@@ -71,9 +71,9 @@ namespace Lumix
 		{
 			explicit ScriptInstance(IAllocator& allocator)
 				: m_properties(allocator)
+				, m_script(nullptr)
+				, m_state(nullptr)
 			{
-				m_script = nullptr;
-				m_state = nullptr;
 			}
 
 			LuaScript* m_script;
@@ -89,6 +89,7 @@ namespace Lumix
 			ScriptComponent(LuaScriptSceneImpl& scene, IAllocator& allocator)
 				: m_scripts(allocator)
 				, m_scene(scene)
+				, m_entity(INVALID_ENTITY)
 			{
 			}
 
@@ -112,14 +113,14 @@ namespace Lumix
 				ASSERT(is_env_valid);
 				lua_pushnil(L);
 				auto& allocator = m_scene.m_system.getAllocator();
-				while(lua_next(L, -2))
+				while (lua_next(L, -2))
 				{
-					if(lua_type(L, -1) != LUA_TFUNCTION)
+					if (lua_type(L, -1) != LUA_TFUNCTION)
 					{
 						const char* name = lua_tostring(L, -2);
 						uint32 hash = crc32(name);
 						m_scene.m_property_names.insert(hash, string(name, allocator));
-						if(hash != INDEX_HASH && hash != THIS_HASH)
+						if (hash != INDEX_HASH && hash != THIS_HASH)
 						{
 							auto* existing_prop = getProperty(inst, hash);
 							if (existing_prop)
@@ -128,14 +129,11 @@ namespace Lumix
 								{
 									switch (lua_type(inst.m_state, -1))
 									{
-										case LUA_TBOOLEAN:
-											existing_prop->type = Property::BOOLEAN;
-											break;
+										case LUA_TBOOLEAN: existing_prop->type = Property::BOOLEAN; break;
 										default: existing_prop->type = Property::FLOAT;
 									}
 								}
-								m_scene.applyProperty(
-									inst, *existing_prop, existing_prop->stored_value.c_str());
+								m_scene.applyProperty(inst, *existing_prop, existing_prop->stored_value.c_str());
 							}
 							else
 							{
@@ -934,18 +932,25 @@ namespace Lumix
 		}
 
 
-		void getPropertyValue(ComponentIndex cmp, int scr_index, const char* property_name, char* out, int max_size) override
+		void getPropertyValue(ComponentIndex cmp,
+			int scr_index,
+			const char* property_name,
+			char* out,
+			int max_size) override
 		{
 			ASSERT(max_size > 0);
 
 			uint32 hash = crc32(property_name);
 			auto& inst = m_scripts[cmp]->m_scripts[scr_index];
-			for (auto& prop : inst.m_properties)
+			if (inst.m_script->isReady())
 			{
-				if (prop.name_hash == hash)
+				for (auto& prop : inst.m_properties)
 				{
-					getProperty(prop, property_name, inst, out, max_size);
-					return;
+					if (prop.name_hash == hash)
+					{
+						getProperty(prop, property_name, inst, out, max_size);
+						return;
+					}
 				}
 			}
 			*out = '\0';
@@ -1047,7 +1052,8 @@ namespace Lumix
 					continue;
 				}
 
-				ScriptComponent& script = *LUMIX_NEW(m_system.getAllocator(), ScriptComponent)(*this, m_system.getAllocator());
+				auto& allocator = m_system.getAllocator();
+				ScriptComponent& script = *LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
 				m_scripts.push(&script);
 
 				int scr_count;
@@ -1056,7 +1062,7 @@ namespace Lumix
 				m_entity_script_map.insert(m_scripts[i]->m_entity, i);
 				for (int j = 0; j < scr_count; ++j)
 				{
-					auto& scr = script.m_scripts.emplace(m_system.m_allocator);
+					auto& scr = script.m_scripts.emplace(allocator);
 
 					char tmp[MAX_PATH_LENGTH];
 					serializer.readString(tmp, MAX_PATH_LENGTH);
@@ -1066,7 +1072,7 @@ namespace Lumix
 					scr.m_properties.reserve(prop_count);
 					for (int j = 0; j < prop_count; ++j)
 					{
-						Property& prop = scr.m_properties.emplace(m_system.getAllocator());
+						Property& prop = scr.m_properties.emplace(allocator);
 						prop.type = Property::ANY;
 						serializer.read(prop.name_hash);
 						char tmp[1024];
@@ -1238,8 +1244,16 @@ namespace Lumix
 			{
 				blob.write(prop.name_hash);
 				char tmp[1024];
-				getProperty(prop, getPropertyName(prop.name_hash), scr, tmp, lengthOf(tmp));
-				blob.writeString(tmp);
+				const char* property_name = getPropertyName(prop.name_hash);
+				if (!property_name)
+				{
+					blob.writeString(prop.stored_value.c_str());
+				}
+				else
+				{
+					getProperty(prop, property_name, scr, tmp, lengthOf(tmp));
+					blob.writeString(tmp);
+				}
 			}
 		}
 

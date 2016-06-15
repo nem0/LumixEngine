@@ -58,8 +58,7 @@ struct ProfilerUIImpl : public ProfilerUI
 		m_current_block = nullptr;
 		m_frame_start = m_frame_end = 0;
 		Lumix::Profiler::getFrameListeners().bind<ProfilerUIImpl, &ProfilerUIImpl::onFrame>(this);
-		m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(m_allocator);
-		m_allocation_root->m_stack_node = nullptr;
+		m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(nullptr, 0, m_allocator);
 		m_filter[0] = 0;
 		m_resource_filter[0] = 0;
 
@@ -380,9 +379,14 @@ struct ProfilerUIImpl : public ProfilerUI
 
 	struct AllocationStackNode
 	{
-		explicit AllocationStackNode(Lumix::IAllocator& allocator)
+		explicit AllocationStackNode(Lumix::Debug::StackNode* stack_node,
+			size_t inclusive_size,
+			Lumix::IAllocator& allocator)
 			: m_children(allocator)
 			, m_allocations(allocator)
+			, m_stack_node(stack_node)
+			, m_inclusive_size(inclusive_size)
+			, m_opened(false)
 		{
 		}
 
@@ -876,10 +880,8 @@ ProfilerUIImpl::AllocationStackNode* ProfilerUIImpl::getOrCreate(AllocationStack
 		}
 	}
 
-	auto new_node = LUMIX_NEW(m_allocator, AllocationStackNode)(m_allocator);
+	auto new_node = LUMIX_NEW(m_allocator, AllocationStackNode)(external_node, size, m_allocator);
 	my_node->m_children.push(new_node);
-	new_node->m_stack_node = external_node;
-	new_node->m_inclusive_size = size;
 	return new_node;
 }
 
@@ -902,8 +904,7 @@ void ProfilerUIImpl::refreshAllocations()
 {
 	m_allocation_root->clear(m_allocator);
 	LUMIX_DELETE(m_allocator, m_allocation_root);
-	m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(m_allocator);
-	m_allocation_root->m_stack_node = nullptr;
+	m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(nullptr, 0, m_allocator);
 
 	m_main_allocator.lock();
 	auto* current_info = m_main_allocator.getFirstAllocationInfo();

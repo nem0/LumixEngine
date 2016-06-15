@@ -161,6 +161,8 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 	{
 		explicit RemoveScriptCommand(WorldEditor& editor)
 			: blob(editor.getAllocator())
+			, scr_index(-1)
+			, cmp(INVALID_COMPONENT)
 		{
 			scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
 		}
@@ -168,6 +170,9 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 
 		explicit RemoveScriptCommand(IAllocator& allocator)
 			: blob(allocator)
+			, scene(nullptr)
+			, scr_index(-1)
+			, cmp(INVALID_COMPONENT)
 		{
 		}
 

@@ -28,6 +28,7 @@ private:
 				  static_cast<EntityTemplateSystemImpl&>(editor.getEntityTemplateSystem()))
 			, m_editor(editor)
 			, m_name(editor.getAllocator())
+			, m_entity(INVALID_ENTITY)
 		{
 		}
 
@@ -111,9 +112,13 @@ private:
 	{
 	public:
 		explicit CreateInstanceCommand(WorldEditor& editor)
-			: m_entity_system(
-				  static_cast<EntityTemplateSystemImpl&>(editor.getEntityTemplateSystem()))
+			: m_entity_system(static_cast<EntityTemplateSystemImpl&>(editor.getEntityTemplateSystem()))
 			, m_editor(editor)
+			, m_template_name_hash(0)
+			, m_position(0, 0, 0)
+			, m_rotation(0, 0, 0, 1)
+			, m_size(1)
+			, m_entity(INVALID_ENTITY)
 		{
 		}
 
@@ -125,11 +130,12 @@ private:
 			const Quat& rot,
 			float size)
 			: m_entity_system(entity_system)
+			, m_editor(editor)
 			, m_template_name_hash(crc32(template_name))
 			, m_position(position)
 			, m_rotation(rot)
 			, m_size(size)
-			, m_editor(editor)
+			, m_entity(INVALID_ENTITY)
 		{
 		}
 

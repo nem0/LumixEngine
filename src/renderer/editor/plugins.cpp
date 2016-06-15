@@ -577,8 +577,7 @@ struct TexturePlugin : public AssetBrowser::IPlugin
 			return true;
 		}
 
-		m_texture_handle = texture->handle;
-		if (bgfx::isValid(m_texture_handle))
+		if (bgfx::isValid(texture->handle))
 		{
 			ImVec2 texture_size(200, 200);
 			if (texture->width > texture->height)
@@ -590,7 +589,7 @@ struct TexturePlugin : public AssetBrowser::IPlugin
 				texture_size.x = texture_size.y * texture->width / texture->height;
 			}
 
-			ImGui::Image(&m_texture_handle, texture_size);
+			ImGui::Image(&texture->handle, texture_size);
 		
 			if (ImGui::Button("Open")) m_app.getAssetBrowser()->openInExternalEditor(resource);
 		}
@@ -611,7 +610,6 @@ struct TexturePlugin : public AssetBrowser::IPlugin
 		return 0;
 	}
 
-	bgfx::TextureHandle m_texture_handle;
 	StudioApp& m_app;
 };
 

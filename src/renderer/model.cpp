@@ -64,6 +64,8 @@ Model::Model(const Path& path, ResourceManager& resource_manager, IAllocator& al
 	, m_vertices(m_allocator)
 	, m_vertices_handle(BGFX_INVALID_HANDLE)
 	, m_indices_handle(BGFX_INVALID_HANDLE)
+	, m_first_nonroot_bone_index(0)
+	, m_flags(0)
 {
 	m_lods[0] = { 0, -1, FLT_MAX };
 	m_lods[1] = { 0, -1, FLT_MAX };
@@ -300,7 +302,6 @@ void Model::create(const bgfx::VertexDecl& vertex_decl,
 	ASSERT(!bgfx::isValid(m_vertices_handle));
 	m_vertex_decl = vertex_decl;
 	m_vertices_handle = bgfx::createVertexBuffer(bgfx::copy(attributes_data, attributes_size), vertex_decl);
-	m_vertices_size = attributes_size;
 
 	ASSERT(!bgfx::isValid(m_indices_handle));
 	auto* mem = bgfx::copy(indices_data, indices_size);
@@ -375,7 +376,6 @@ bool Model::parseGeometry(FS::IFile& file)
 	const bgfx::Memory* vertices_mem = bgfx::alloc(vertices_size);
 	file.read(vertices_mem->data, vertices_size);
 	m_vertices_handle = bgfx::createVertexBuffer(vertices_mem, m_vertex_decl);
-	m_vertices_size = vertices_size;
 
 	ASSERT(!bgfx::isValid(m_indices_handle));
 	int indices_size = index_size * indices_count;
@@ -448,8 +448,7 @@ bool Model::parseBones(FS::IFile& file)
 			b.parent_idx = getBoneIdx(b.parent.c_str());
 			if (b.parent_idx > i || b.parent_idx < 0)
 			{
-				g_log_error.log("Renderer") << "Invalid skeleton in "
-											<< getPath().c_str();
+				g_log_error.log("Renderer") << "Invalid skeleton in " << getPath().c_str();
 				return false;
 			}
 			if (m_first_nonroot_bone_index == -1)
