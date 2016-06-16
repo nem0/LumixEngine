@@ -216,6 +216,8 @@ namespace Lumix
 					lua_pop(script.m_state, 1);
 
 					detectProperties(script);
+
+					if (m_scene.m_is_game_running) m_scene.startScript(script);
 				}
 			}
 
@@ -273,9 +275,11 @@ namespace Lumix
 			, m_updates(system.getAllocator())
 			, m_entity_script_map(system.getAllocator())
 			, m_property_names(system.getAllocator())
+			, m_is_game_running(false)
+			, m_is_api_registered(false)
 		{
 			m_function_call.is_in_progress = false;
-			m_is_api_registered = false;
+			
 			registerAPI();
 		}
 
@@ -860,37 +864,52 @@ namespace Lumix
 		}
 
 
+		void startScript(ScriptInstance& instance)
+		{
+			if (lua_rawgeti(instance.m_state, LUA_REGISTRYINDEX, instance.m_environment) != LUA_TTABLE)
+			{
+				ASSERT(false);
+				lua_pop(instance.m_state, 1);
+				return;
+			}
+			if (lua_getfield(instance.m_state, -1, "update") == LUA_TFUNCTION)
+			{
+				auto& update_data = m_updates.emplace();
+				update_data.script = instance.m_script;
+				update_data.state = instance.m_state;
+				update_data.environment = instance.m_environment;
+			}
+			lua_pop(instance.m_state, 1);
+
+			if (lua_getfield(instance.m_state, -1, "init") != LUA_TFUNCTION)
+			{
+				lua_pop(instance.m_state, 2);
+				return;
+			}
+
+			if (lua_pcall(instance.m_state, 0, 0, 0) != LUA_OK)
+			{
+				g_log_error.log("Lua Script") << lua_tostring(instance.m_state, -1);
+				lua_pop(instance.m_state, 1);
+			}
+			lua_pop(instance.m_state, 1);
+		}
+
+
 		void startGame() override
 		{
-			for (auto* scr : m_scripts)
+			m_is_game_running = true;
+			for (int i = 0; i < m_scripts.size(); ++i)
 			{
+				auto* scr = m_scripts[i];
 				if (!scr) continue;
-				for (auto& i : scr->m_scripts)
+				for (int j = 0; j < scr->m_scripts.size(); ++j)
 				{
-					if (!i.m_script) continue;
+					auto& instance = scr->m_scripts[j];
+					if (!instance.m_script) continue;
+					if (!instance.m_script->isReady()) continue;
 
-					lua_rawgeti(i.m_state, LUA_REGISTRYINDEX, i.m_environment);
-					if (lua_getfield(i.m_state, -1, "update") == LUA_TFUNCTION)
-					{
-						auto& update_data = m_updates.emplace();
-						update_data.script = i.m_script;
-						update_data.state = i.m_state;
-						update_data.environment = i.m_environment;
-					}
-					lua_pop(i.m_state, 1);
-
-					if (lua_getfield(i.m_state, -1, "init") != LUA_TFUNCTION)
-					{
-						lua_pop(i.m_state, 2);
-						continue;
-					}
-
-					if (lua_pcall(i.m_state, 0, 0, 0) != LUA_OK)
-					{
-						g_log_error.log("Lua Script") << lua_tostring(i.m_state, -1);
-						lua_pop(i.m_state, 1);
-					}
-					lua_pop(i.m_state, 1);
+					startScript(instance);
 				}
 			}
 		}
@@ -898,6 +917,7 @@ namespace Lumix
 
 		void stopGame() override
 		{
+			m_is_game_running = false;
 			m_updates.clear();
 		}
 
@@ -1158,26 +1178,26 @@ namespace Lumix
 		{
 			if (paused) return;
 
-			for (auto& i : m_updates)
+			for (int i = 0, c = m_updates.size(); i < c; ++i)
 			{
-				if (lua_rawgeti(i.state, LUA_REGISTRYINDEX, i.environment) != LUA_TTABLE)
+				auto& update_item = m_updates[i];
+				if (lua_rawgeti(update_item.state, LUA_REGISTRYINDEX, update_item.environment) != LUA_TTABLE)
 				{
 					ASSERT(false);
 				}
-				if (lua_getfield(i.state, -1, "update") != LUA_TFUNCTION)
+				if (lua_getfield(update_item.state, -1, "update") != LUA_TFUNCTION)
 				{
-					lua_pop(i.state, 2);
+					lua_pop(update_item.state, 2);
 					continue;
 				}
 
-				auto t = lua_gettop(i.state);
-				lua_pushnumber(i.state, time_delta);
-				if (lua_pcall(i.state, 1, 0, 0) != LUA_OK)
+				lua_pushnumber(update_item.state, time_delta);
+				if (lua_pcall(update_item.state, 1, 0, 0) != LUA_OK)
 				{
-					g_log_error.log("Lua Script") << lua_tostring(i.state, -1);
-					lua_pop(i.state, 1);
+					g_log_error.log("Lua Script") << lua_tostring(update_item.state, -1);
+					lua_pop(update_item.state, 1);
 				}
-				lua_pop(i.state, 1);
+				lua_pop(update_item.state, 1);
 			}
 		}
 
@@ -1309,6 +1329,7 @@ namespace Lumix
 		FunctionCall m_function_call;
 		ScriptInstance* m_current_script_instance;
 		bool m_is_api_registered;
+		bool m_is_game_running;
 	};
 
 
