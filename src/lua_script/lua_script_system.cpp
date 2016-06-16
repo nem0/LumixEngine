@@ -159,7 +159,7 @@ namespace Lumix
 				{
 					if ((!script.m_script || !script.m_script->isReady()) && script.m_state)
 					{
-						m_scene.destroy(script);
+						m_scene.destroy(*this, script);
 						continue;
 					}
 
@@ -668,6 +668,12 @@ namespace Lumix
 		}
 
 
+		void setScriptSource(ComponentIndex cmp, int scr_index, const char* path)
+		{
+			setScriptPath(cmp, scr_index, Lumix::Path(path));
+		}
+
+
 		void registerAPI()
 		{
 			if (m_is_api_registered) return;
@@ -682,6 +688,19 @@ namespace Lumix
 			registerPropertyAPI();
 			LuaWrapper::createSystemFunction(
 				engine_state, "LuaScript", "getEnvironment", &LuaScriptSceneImpl::getEnvironment);
+			
+			#define REGISTER_FUNCTION(F) \
+				do { \
+					auto f = &LuaWrapper::wrapMethod<LuaScriptSceneImpl, \
+						decltype(&LuaScriptSceneImpl::F), \
+						&LuaScriptSceneImpl::F>; \
+					LuaWrapper::createSystemFunction(engine_state, "LuaScript", #F, f); \
+				} while(false)
+
+			REGISTER_FUNCTION(addScript);
+			REGISTER_FUNCTION(setScriptSource);
+
+			#undef REGISTER_FUNCTION
 		}
 
 
@@ -782,7 +801,7 @@ namespace Lumix
 		}
 
 
-		void destroy(ScriptInstance& inst)
+		void destroy(ScriptComponent& scr,  ScriptInstance& inst)
 		{
 			bool is_env_valid = lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment) == LUA_TTABLE;
 			ASSERT(is_env_valid);
@@ -809,6 +828,8 @@ namespace Lumix
 				}
 			}
 
+			inst.m_script->getObserverCb().unbind<ScriptComponent, &ScriptComponent::onScriptLoaded>(&scr);
+
 			luaL_unref(inst.m_state, LUA_REGISTRYINDEX, inst.m_thread_ref);
 			luaL_unref(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
 			inst.m_state = nullptr;
@@ -823,7 +844,7 @@ namespace Lumix
 			{
 				if (inst.m_state)
 				{
-					destroy(inst);
+					destroy(cmp, inst);
 				}
 				inst.m_state = nullptr;
 				inst.m_properties.clear();
@@ -831,9 +852,7 @@ namespace Lumix
 				cb.unbind<ScriptComponent, &ScriptComponent::onScriptLoaded>(&cmp);
 				m_system.getScriptManager().unload(*inst.m_script);
 			}
-			inst.m_script = path.isValid()
-								? static_cast<LuaScript*>(m_system.getScriptManager().load(path))
-								: nullptr;
+			inst.m_script = path.isValid() ? static_cast<LuaScript*>(m_system.getScriptManager().load(path)) : nullptr;
 			if (inst.m_script)
 			{
 				inst.m_script->onLoaded<ScriptComponent, &ScriptComponent::onScriptLoaded>(&cmp);
@@ -887,8 +906,8 @@ namespace Lumix
 		{
 			if (type != LUA_SCRIPT_HASH) return INVALID_COMPONENT;
 
-			ScriptComponent& script =
-				*LUMIX_NEW(m_system.getAllocator(), ScriptComponent)(*this, m_system.getAllocator());
+			auto& allocator = m_system.getAllocator();
+			ScriptComponent& script = *LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
 			ComponentIndex cmp = INVALID_COMPONENT;
 			for (int i = 0; i < m_scripts.size(); ++i)
 			{
@@ -922,7 +941,7 @@ namespace Lumix
 			}
 			for (auto& scr : m_scripts[component]->m_scripts)
 			{
-				if (scr.m_state) destroy(scr);
+				if (scr.m_state) destroy(*m_scripts[component], scr);
 				if (scr.m_script) m_system.getScriptManager().unload(*scr.m_script);
 			}
 			m_entity_script_map.erase(m_scripts[component]->m_entity);
