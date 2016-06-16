@@ -551,7 +551,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::destroyIndexBuffer(m_cube_ib);
 		bgfx::destroyIndexBuffer(m_particle_index_buffer);
 		bgfx::destroyVertexBuffer(m_particle_vertex_buffer);
-		bgfx::destroyDynamicIndexBuffer(m_debug_index_buffer);
+		if (bgfx::isValid(m_debug_index_buffer)) bgfx::destroyDynamicIndexBuffer(m_debug_index_buffer);
 		for (auto& handle : m_debug_vertex_buffers)
 		{
 			if (bgfx::isValid(handle)) bgfx::destroyDynamicVertexBuffer(handle);

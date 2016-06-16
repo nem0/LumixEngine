@@ -276,8 +276,8 @@ public:
 		float padding = frame_padding.y * 2;
 		ImVec4 active_color = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
 		ImVec4 inactive_color(0, 0, 0, 0);
-		if (ImGui::BeginToolbar(
-				"main_toolbar", ImVec2(1, menu_height), ImVec2(ImGui::GetIO().DisplaySize.x, 24 + padding)))
+		ImVec2 toolbar_size(ImGui::GetIO().DisplaySize.x, 24 + padding);
+		if (ImGui::BeginToolbar("main_toolbar", ImVec2(1, menu_height), toolbar_size))
 		{
 			auto& render_interface = *m_editor->getRenderInterface();
 
@@ -1016,8 +1016,7 @@ public:
 	void showEntityListToolbar()
 	{
 		auto pos = ImGui::GetCursorScreenPos();
-		ImVec2 toolbar_size(ImGui::GetContentRegionAvailWidth(), 24);
-		ImGui::BeginToolbar("entity_list_toolbar", pos, toolbar_size);
+		ImGui::BeginToolbar("entity_list_toolbar", pos, ImVec2(0, 24));
 		auto& groups = m_editor->getEntityGroups();
 		if (getAction("createGroup").toolbarButton())
 		{
@@ -1076,8 +1075,6 @@ public:
 		}
 
 		ImGui::EndToolbar();
-		pos.y += 24 + ImGui::GetStyle().FramePadding.y * 2;
-		ImGui::SetCursorScreenPos(pos);
 	}
 
 

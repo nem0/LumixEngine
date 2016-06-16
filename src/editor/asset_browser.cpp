@@ -51,30 +51,56 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	, m_plugins(app.getWorldEditor()->getAllocator())
 	, m_on_resource_changed(app.getWorldEditor()->getAllocator())
 	, m_app(app)
+	, m_is_update_enabled(true)
+	, m_current_type(0)
+	, m_is_opened(false)
+	, m_activate(false)
+	, m_history_index(-1)
 {
 	auto& editor = *app.getWorldEditor();
-	m_is_update_enabled = true;
+	auto& allocator = editor.getAllocator();
 	m_filter[0] = '\0';
-	m_current_type = 0;
-	m_is_opened = false;
-	m_activate = false;
-	m_resources.emplace(editor.getAllocator());
+	m_resources.emplace(allocator);
 
 	findResources();
 
 	const char* base_path = editor.getEngine().getDiskFileDevice()->getBasePath();
-	m_watchers[0] = FileSystemWatcher::create(base_path, editor.getAllocator());
+	m_watchers[0] = FileSystemWatcher::create(base_path, allocator);
 	m_watchers[0]->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
 	if (editor.getEngine().getPatchFileDevice())
 	{
 		base_path = editor.getEngine().getPatchFileDevice()->getBasePath();
-		m_watchers[1] = FileSystemWatcher::create(base_path, editor.getAllocator());
+		m_watchers[1] = FileSystemWatcher::create(base_path, allocator);
 		m_watchers[1]->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
 	}
 	else
 	{
 		m_watchers[1] = nullptr;
 	}
+
+	m_auto_reload_action = LUMIX_NEW(allocator, Action)("Auto-reload", "autoReload");
+	m_auto_reload_action->is_global = false;
+	m_auto_reload_action->func.bind<AssetBrowser, &AssetBrowser::toggleAutoreload>(this);
+	m_auto_reload_action->is_selected.bind<AssetBrowser, &AssetBrowser::isAutoreload>(this);
+	m_back_action = LUMIX_NEW(allocator, Action)("Back", "back");
+	m_back_action->is_global = false;
+	m_back_action->func.bind<AssetBrowser, &AssetBrowser::goBack>(this);
+	m_forward_action = LUMIX_NEW(allocator, Action)("Forward", "forward");
+	m_forward_action->is_global = false;
+	m_forward_action->func.bind<AssetBrowser, &AssetBrowser::goForward>(this);
+	m_refresh_action = LUMIX_NEW(allocator, Action)("Refresh", "refresh");
+	m_refresh_action->is_global = false;
+	m_refresh_action->func.bind<AssetBrowser, &AssetBrowser::findResources>(this);
+	m_app.addAction(m_auto_reload_action);
+	m_app.addAction(m_back_action);
+	m_app.addAction(m_forward_action);
+	m_app.addAction(m_refresh_action);
+}
+
+
+void AssetBrowser::toggleAutoreload()
+{
+	m_autoreload_changed_resource = !m_autoreload_changed_resource;
 }
 
 
@@ -197,11 +223,25 @@ void AssetBrowser::update()
 }
 
 
+void AssetBrowser::onToolbar()
+{
+	auto pos = ImGui::GetCursorScreenPos();
+	if (ImGui::BeginToolbar("asset_browser_toolbar", pos, ImVec2(0, 24)))
+	{
+		if (m_history_index > 0) m_back_action->toolbarButton();
+		if (m_history_index < m_history.size() - 1) m_forward_action->toolbarButton();
+		m_auto_reload_action->toolbarButton();
+		m_refresh_action->toolbarButton();
+	}
+	ImGui::EndToolbar();
+}
+
+
 void AssetBrowser::onGUI()
 {
 	if (m_wanted_resource.isValid())
 	{
-		selectResource(m_wanted_resource);
+		selectResource(m_wanted_resource, true);
 		m_wanted_resource = "";
 	}
 
@@ -213,61 +253,76 @@ void AssetBrowser::onGUI()
 		return;
 	}
 
-	if (m_activate) ImGui::SetDockActive();
-	m_activate = false;
+	onToolbar();
 
-	if (m_is_focus_requested)
+	if (ImGui::BeginChild("content"))
 	{
-		m_is_focus_requested = false;
-		ImGui::SetWindowFocus();
-	}
+		if (m_activate) ImGui::SetDockActive();
+		m_activate = false;
 
-	if (ImGui::Button("Refresh")) findResources();
-	ImGui::SameLine();
-	ImGui::Checkbox("Autoreload", &m_autoreload_changed_resource);
-
-	auto getter = [](void* data, int idx, const char** out) -> bool
-	{
-		auto& browser = *static_cast<AssetBrowser*>(data);
-		*out = browser.m_plugins[idx]->getName();
-		return true;
-	};
-
-	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
-	ImGui::Combo("Type", &m_current_type, getter, this, m_plugins.size());
-	ImGui::FilterInput("Filter", m_filter, sizeof(m_filter));
-
-	static ImVec2 size(0, 200);
-	ImGui::ListBoxHeader("Resources", size);
-	auto& resources = m_resources[m_current_type + 1];
-
-	for (auto& resource : resources)
-	{
-		if (m_filter[0] != '\0' && strstr(resource.c_str(), m_filter) == nullptr) continue;
-
-		bool is_selected = m_selected_resource ? m_selected_resource->getPath() == resource : false;
-		if (ImGui::Selectable(resource.c_str(), is_selected))
+		if (m_is_focus_requested)
 		{
-			selectResource(resource);
+			m_is_focus_requested = false;
+			ImGui::SetWindowFocus();
 		}
-		if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
-		{
-			m_app.startDrag(StudioApp::DragData::PATH, resource.c_str(), Lumix::stringLength(resource.c_str()) + 1);
-		}
-	}
-	ImGui::ListBoxFooter();
-	ImGui::HSplitter("splitter", &size);
 
-	ImGui::PopItemWidth();
-	onGUIResource();
+		auto getter = [](void* data, int idx, const char** out) -> bool
+		{
+			auto& browser = *static_cast<AssetBrowser*>(data);
+			*out = browser.m_plugins[idx]->getName();
+			return true;
+		};
+
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+		ImGui::Combo("Type", &m_current_type, getter, this, m_plugins.size());
+		ImGui::FilterInput("Filter", m_filter, sizeof(m_filter));
+
+		static ImVec2 size(0, 200);
+		ImGui::ListBoxHeader("Resources", size);
+		auto& resources = m_resources[m_current_type + 1];
+
+		for (auto& resource : resources)
+		{
+			if (m_filter[0] != '\0' && strstr(resource.c_str(), m_filter) == nullptr) continue;
+
+			bool is_selected = m_selected_resource ? m_selected_resource->getPath() == resource : false;
+			if (ImGui::Selectable(resource.c_str(), is_selected))
+			{
+				selectResource(resource, true);
+			}
+			if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
+			{
+				m_app.startDrag(StudioApp::DragData::PATH, resource.c_str(), Lumix::stringLength(resource.c_str()) + 1);
+			}
+		}
+		ImGui::ListBoxFooter();
+		ImGui::HSplitter("splitter", &size);
+
+		ImGui::PopItemWidth();
+		onGUIResource();
+	}
+	ImGui::EndChild();
 	ImGui::EndDock();
 }
 
 
-void AssetBrowser::selectResource(Lumix::Resource* resource)
+void AssetBrowser::selectResource(Lumix::Resource* resource, bool record_history)
 {
-	if (m_selected_resource) m_history.push(m_selected_resource->getPath());
-	if (m_history.size() > 20) m_history.erase(0);
+	if (record_history)
+	{
+		while (m_history_index < m_history.size() - 1)
+		{
+			m_history.pop();
+		}
+		m_history_index++;
+		m_history.push(resource->getPath());
+
+		if (m_history.size() > 20)
+		{
+			--m_history_index;
+			m_history.erase(0);
+		}
+	}
 
 	m_wanted_resource = "";
 	unloadResource();
@@ -284,7 +339,7 @@ void AssetBrowser::addPlugin(IPlugin& plugin)
 }
 
 
-void AssetBrowser::selectResource(const Lumix::Path& resource)
+void AssetBrowser::selectResource(const Lumix::Path& resource, bool record_history)
 {
 	m_activate = true;
 	char ext[30];
@@ -293,7 +348,7 @@ void AssetBrowser::selectResource(const Lumix::Path& resource)
 
 	auto& manager = m_editor.getEngine().getResourceManager();
 	auto* resource_manager = manager.get(getResourceType(resource.c_str()));
-	if (resource_manager) selectResource(resource_manager->load(resource));
+	if (resource_manager) selectResource(resource_manager->load(resource), record_history);
 }
 
 
@@ -418,6 +473,21 @@ void AssetBrowser::openInExternalEditor(const char* path)
 }
 
 
+void AssetBrowser::goBack()
+{
+	if (m_history_index < 1) return;
+	m_history_index = Lumix::Math::maximum(0, m_history_index - 1);
+	selectResource(m_history[m_history_index], false);
+}
+
+
+void AssetBrowser::goForward()
+{
+	m_history_index = Lumix::Math::minimum(m_history_index + 1, m_history.size() - 1);
+	selectResource(m_history[m_history_index], false);
+}
+
+
 void AssetBrowser::onGUIResource()
 {
 	if (!m_selected_resource) return;
@@ -425,13 +495,6 @@ void AssetBrowser::onGUIResource()
 	const char* path = m_selected_resource->getPath().c_str();
 	ImGui::Separator();
 	ImGui::LabelText("Selected resource", "%s", path);
-	if (!m_history.empty() && ImGui::Button("Back"))
-	{
-		selectResource(m_history.back());
-		m_history.pop();
-		m_history.pop();
-		return;
-	}
 	ImGui::Separator();
 
 	if (!m_selected_resource->isReady() && !m_selected_resource->isFailure())

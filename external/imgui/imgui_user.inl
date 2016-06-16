@@ -38,18 +38,18 @@ bool ToolbarButton(ImTextureID texture, const ImVec4& bg_color, const char* tool
 
 bool BeginToolbar(const char* str_id, ImVec2 screen_pos, ImVec2 size)
 {
-	ImGui::SetNextWindowPos(screen_pos);
-	auto frame_padding = ImGui::GetStyle().FramePadding;
-	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
+	SetNextWindowPos(screen_pos);
+	ImVec2 frame_padding = GetStyle().FramePadding;
+	PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+	PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
+	PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
 	float padding = frame_padding.y * 2;
 	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
 		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
-	ImGui::SetNextWindowSize(size);
-	bool ret = ImGui::Begin(str_id, nullptr, size, -1, flags);
-	ImGui::PopStyleVar(3);
-
+	if (size.x == 0) size.x = GetContentRegionAvailWidth();
+	SetNextWindowSize(size);
+	bool ret = Begin(str_id, nullptr, size, -1, flags);
+	PopStyleVar(3);
 
 	return ret;
 }
@@ -58,11 +58,15 @@ bool BeginToolbar(const char* str_id, ImVec2 screen_pos, ImVec2 size)
 void EndToolbar()
 {
 	auto frame_padding = ImGui::GetStyle().FramePadding;
-	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
-	ImGui::End();
-	ImGui::PopStyleVar(3);
+	PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+	PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
+	PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
+	ImVec2 pos = GetWindowPos();
+	ImVec2 size = GetWindowSize();
+	End();
+	PopStyleVar(3);
+	ImGuiWindow* win = GetCurrentWindowRead();
+	if(GImGui->CurrentWindowStack.Size > 1) SetCursorScreenPos(pos + ImVec2(0, size.y + GetStyle().FramePadding.y * 2));
 }
 
 

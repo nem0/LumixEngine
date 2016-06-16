@@ -521,7 +521,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 				ImGui::SameLine();
 				if (ImGui::Button("->"))
 				{
-					m_app.getAssetBrowser()->selectResource(mesh.material->getPath());
+					m_app.getAssetBrowser()->selectResource(mesh.material->getPath(), true);
 				}
 				ImGui::TreePop();
 			}
@@ -912,7 +912,7 @@ struct EnvironmentProbePlugin : public PropertyGrid::IPlugin
 		auto* scene = static_cast<RenderScene*>(cmp.scene);
 		auto* texture = scene->getEnvironmentProbeTexture(cmp.index);
 		ImGui::LabelText("Path", "%s", texture->getPath().c_str());
-		if (ImGui::Button("View")) m_app.getAssetBrowser()->selectResource(texture->getPath());
+		if (ImGui::Button("View")) m_app.getAssetBrowser()->selectResource(texture->getPath(), true);
 		ImGui::SameLine();
 		if (ImGui::Button("Generate")) generateCubemap(cmp);
 	}
