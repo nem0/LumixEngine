@@ -469,8 +469,6 @@ struct NavigationScene : public IScene
 
 	void debugDrawHeightfield()
 	{
-		static const int MAX_CUBES = 2 << 10;
-
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 		if (!m_debug_heightfield) return;
@@ -493,8 +491,6 @@ struct NavigationScene : public IScene
 					render_scene->addDebugCubeSolid(mins, maxs, 0xffff00ff, 0);
 					render_scene->addDebugCube(mins, maxs, 0xff00aaff, 0);
 					span = span->next;
-					++rendered_cubes;
-					if (rendered_cubes > MAX_CUBES) return;
 				}
 			}
 		}
@@ -503,7 +499,7 @@ struct NavigationScene : public IScene
 
 	void debugDrawCompactHeightfield()
 	{
-		static const int MAX_CUBES = 2 << 10;
+		static const int MAX_CUBES = 0xffFF;
 		
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;

@@ -258,9 +258,20 @@ struct PipelineImpl : public Pipeline
 		, m_materials(allocator)
 		, m_is_rendering_in_shadowmap(false)
 		, m_is_ready(false)
+		, m_debug_index_buffer(BGFX_INVALID_HANDLE)
+		, m_first_postprocess_framebuffer(0)
+		, m_is_wireframe(false)
+		, m_view_x(0)
+		, m_view_y(0)
+		, m_scene(nullptr)
+		, m_width(-1)
+		, m_height(-1)
 	{
+		for (auto& handle : m_debug_vertex_buffers)
+		{
+			handle = BGFX_INVALID_HANDLE;
+		}
 		is_opengl = renderer.isOpenGL();
-		m_first_postprocess_framebuffer = 0;
 		m_deferred_point_light_vertex_decl.begin()
 			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
 			.end();
@@ -271,8 +282,6 @@ struct PipelineImpl : public Pipeline
 			.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
 			.end();
 
-		m_is_wireframe = false;
-		m_view_x = m_view_y = 0;
 		m_has_shadowmap_define_idx = m_renderer.getShaderDefineIdx("HAS_SHADOWMAP");
 
 		createUniforms();
@@ -280,8 +289,6 @@ struct PipelineImpl : public Pipeline
 		m_debug_line_material = static_cast<Material*>(
 			renderer.getMaterialManager().load(Lumix::Path("shaders/debug_line.mat")));
 
-		m_scene = nullptr;
-		m_width = m_height = -1;
 
 		createParticleBuffers();
 		createCubeBuffers();
@@ -544,6 +551,11 @@ struct PipelineImpl : public Pipeline
 		bgfx::destroyIndexBuffer(m_cube_ib);
 		bgfx::destroyIndexBuffer(m_particle_index_buffer);
 		bgfx::destroyVertexBuffer(m_particle_vertex_buffer);
+		bgfx::destroyDynamicIndexBuffer(m_debug_index_buffer);
+		for (auto& handle : m_debug_vertex_buffers)
+		{
+			if (bgfx::isValid(handle)) bgfx::destroyDynamicVertexBuffer(handle);
+		}
 	}
 
 
@@ -1288,6 +1300,15 @@ struct PipelineImpl : public Pipeline
 
 	void renderDebugShapes()
 	{
+		if (!bgfx::isValid(m_debug_index_buffer))
+		{
+			auto* mem = bgfx::alloc(0xffFF * 2);
+			uint16* data = (uint16*)mem->data;
+			for (uint16 i = 0; i < 0xffff; ++i) data[i] = i;
+			m_debug_index_buffer = bgfx::createDynamicIndexBuffer(mem);
+		}
+
+		m_debug_buffer_idx = 0;
 		renderDebugTriangles();
 		renderDebugLines();
 		renderDebugPoints();
@@ -1297,17 +1318,22 @@ struct PipelineImpl : public Pipeline
 	void renderDebugPoints()
 	{
 		const Array<DebugPoint>& points = m_scene->getDebugPoints();
-		if (points.empty() || !m_debug_line_material->isReady())
+		if (points.empty() || !m_debug_line_material->isReady()) return;
+
+		static const int BATCH_SIZE = 0xffff;
+
+		for (int j = 0; j < points.size() && m_debug_buffer_idx < lengthOf(m_debug_vertex_buffers);
+			j += BATCH_SIZE, ++m_debug_buffer_idx)
 		{
-			return;
-		}
-		bgfx::TransientVertexBuffer tvb;
-		bgfx::TransientIndexBuffer tib;
-		if (bgfx::allocTransientBuffers(
-				&tvb, m_base_vertex_decl, points.size(), &tib, points.size()))
-		{
-			BaseVertex* vertex = (BaseVertex*)tvb.data;
-			uint16* indices = (uint16*)tib.data;
+			if (!bgfx::isValid(m_debug_vertex_buffers[m_debug_buffer_idx]))
+			{
+				m_debug_vertex_buffers[m_debug_buffer_idx] = bgfx::createDynamicVertexBuffer(0xffFF, m_base_vertex_decl);
+			}
+
+			int point_count = Math::minimum(BATCH_SIZE, points.size() - j);
+			auto* mem = bgfx::alloc(sizeof(BaseVertex) * point_count);
+
+			BaseVertex* vertex = (BaseVertex*)mem->data;
 			for (int i = 0; i < points.size(); ++i)
 			{
 				const DebugPoint& point = points[i];
@@ -1317,18 +1343,16 @@ struct PipelineImpl : public Pipeline
 				vertex[0].z = point.pos.z;
 				vertex[0].u = vertex[0].v = 0;
 
-				indices[0] = i;
 				++vertex;
-				++indices;
 			}
 
-			bgfx::setVertexBuffer(&tvb);
-			bgfx::setIndexBuffer(&tib);
+			bgfx::updateDynamicVertexBuffer(m_debug_vertex_buffers[m_debug_buffer_idx], 0, mem);
+
+			bgfx::setVertexBuffer(m_debug_vertex_buffers[m_debug_buffer_idx]);
+			bgfx::setIndexBuffer(m_debug_index_buffer, 0, point_count);
 			bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
-			bgfx::setState(
-				m_render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_POINTS);
-			bgfx::submit(m_bgfx_view,
-				m_debug_line_material->getShaderInstance().program_handles[m_pass_idx]);
+			bgfx::setState(m_render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_POINTS);
+			bgfx::submit(m_bgfx_view, m_debug_line_material->getShaderInstance().program_handles[m_pass_idx]);
 		}
 	}
 
@@ -1338,47 +1362,45 @@ struct PipelineImpl : public Pipeline
 		const Array<DebugLine>& lines = m_scene->getDebugLines();
 		if (lines.empty() || !m_debug_line_material->isReady()) return;
 
-		bgfx::TransientVertexBuffer tvb;
-		bgfx::TransientIndexBuffer tib;
+		static const int BATCH_SIZE = 0xffff / 2;
 
-		static const int BATCH_SIZE = 1024 * 16;
-
-		for (int j = 0; j < lines.size(); j += BATCH_SIZE)
+		for (int j = 0; j < lines.size() && m_debug_buffer_idx < lengthOf(m_debug_vertex_buffers);
+			 j += BATCH_SIZE, ++m_debug_buffer_idx)
 		{
-			int count = Math::minimum(BATCH_SIZE, lines.size() - j);
-			if (bgfx::allocTransientBuffers(&tvb, m_base_vertex_decl, count * 2, &tib, count * 2))
+			if (!bgfx::isValid(m_debug_vertex_buffers[m_debug_buffer_idx]))
 			{
-				BaseVertex* vertex = (BaseVertex*)tvb.data;
-				uint16* indices = (uint16*)tib.data;
-				for (int i = 0; i < count; ++i)
-				{
-					const DebugLine& line = lines[j + i];
-					vertex[0].rgba = line.color;
-					vertex[0].x = line.from.x;
-					vertex[0].y = line.from.y;
-					vertex[0].z = line.from.z;
-					vertex[0].u = vertex[0].v = 0;
-
-					vertex[1].rgba = line.color;
-					vertex[1].x = line.to.x;
-					vertex[1].y = line.to.y;
-					vertex[1].z = line.to.z;
-					vertex[1].u = vertex[0].v = 0;
-
-					indices[0] = i * 2;
-					indices[1] = i * 2 + 1;
-					vertex += 2;
-					indices += 2;
-				}
-
-				bgfx::setVertexBuffer(&tvb);
-				bgfx::setIndexBuffer(&tib);
-				bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
-				bgfx::setState(m_render_state | m_debug_line_material->getRenderStates() |
-							   BGFX_STATE_PT_LINES);
-				bgfx::submit(m_bgfx_view,
-					m_debug_line_material->getShaderInstance().program_handles[m_pass_idx]);
+				m_debug_vertex_buffers[m_debug_buffer_idx] = bgfx::createDynamicVertexBuffer(0xffFF, m_base_vertex_decl);
 			}
+
+			int line_count = Math::minimum(BATCH_SIZE, lines.size() - j);
+			auto* mem = bgfx::alloc(sizeof(BaseVertex) * 2 * line_count);
+			
+			BaseVertex* vertex = (BaseVertex*)mem->data;
+			for (int i = 0; i < line_count; ++i)
+			{
+				const DebugLine& line = lines[j + i];
+				vertex[0].rgba = line.color;
+				vertex[0].x = line.from.x;
+				vertex[0].y = line.from.y;
+				vertex[0].z = line.from.z;
+				vertex[0].u = vertex[0].v = 0;
+
+				vertex[1].rgba = line.color;
+				vertex[1].x = line.to.x;
+				vertex[1].y = line.to.y;
+				vertex[1].z = line.to.z;
+				vertex[1].u = vertex[0].v = 0;
+
+				vertex += 2;
+			}
+
+			bgfx::updateDynamicVertexBuffer(m_debug_vertex_buffers[m_debug_buffer_idx], 0, mem);
+
+			bgfx::setVertexBuffer(m_debug_vertex_buffers[m_debug_buffer_idx]);
+			bgfx::setIndexBuffer(m_debug_index_buffer, 0, line_count * 2);
+			bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
+			bgfx::setState(m_render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_LINES);
+			bgfx::submit(m_bgfx_view, m_debug_line_material->getShaderInstance().program_handles[m_pass_idx]);
 		}
 	}
 
@@ -1388,52 +1410,51 @@ struct PipelineImpl : public Pipeline
 		const auto& tris = m_scene->getDebugTriangles();
 		if(tris.empty() || !m_debug_line_material->isReady()) return;
 
-		bgfx::TransientVertexBuffer tvb;
-		bgfx::TransientIndexBuffer tib;
+		static const int BATCH_SIZE = 0xffFF / 3;
 
-		static const int BATCH_SIZE = 1024 * 16;
-
-		for(int j = 0; j < tris.size(); j += BATCH_SIZE)
+		for (int j = 0; j < tris.size() && m_debug_buffer_idx < lengthOf(m_debug_vertex_buffers);
+			 j += BATCH_SIZE, ++m_debug_buffer_idx)
 		{
-			int count = Math::minimum(BATCH_SIZE, tris.size() - j);
-			if(bgfx::allocTransientBuffers(&tvb, m_base_vertex_decl, count * 3, &tib, count * 3))
+			if (!bgfx::isValid(m_debug_vertex_buffers[m_debug_buffer_idx]))
 			{
-				BaseVertex* vertex = (BaseVertex*)tvb.data;
-				uint16* indices = (uint16*)tib.data;
-				for(int i = 0; i < count; ++i)
-				{
-					const DebugTriangle& tri = tris[j + i];
-					vertex[0].rgba = tri.color;
-					vertex[0].x = tri.p0.x;
-					vertex[0].y = tri.p0.y;
-					vertex[0].z = tri.p0.z;
-					vertex[0].u = vertex[0].v = 0;
-
-					vertex[1].rgba = tri.color;
-					vertex[1].x = tri.p1.x;
-					vertex[1].y = tri.p1.y;
-					vertex[1].z = tri.p1.z;
-					vertex[1].u = vertex[0].v = 0;
-
-					vertex[2].rgba = tri.color;
-					vertex[2].x = tri.p2.x;
-					vertex[2].y = tri.p2.y;
-					vertex[2].z = tri.p2.z;
-					vertex[2].u = vertex[0].v = 0;
-
-					indices[0] = i * 3;
-					indices[1] = i * 3 + 1;
-					indices[2] = i * 3 + 2;
-					vertex += 3;
-					indices += 3;
-				}
-
-				bgfx::setVertexBuffer(&tvb);
-				bgfx::setIndexBuffer(&tib);
-				bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
-				bgfx::setState(m_render_state | m_debug_line_material->getRenderStates());
-				bgfx::submit(m_bgfx_view, m_debug_line_material->getShaderInstance().program_handles[m_pass_idx]);
+				m_debug_vertex_buffers[m_debug_buffer_idx] = bgfx::createDynamicVertexBuffer(0xffFF, m_base_vertex_decl);
 			}
+
+			int tri_count = Math::minimum(BATCH_SIZE, tris.size() - j);
+			auto* mem = bgfx::alloc(sizeof(BaseVertex) * 3 * tri_count);
+
+			BaseVertex* vertex = (BaseVertex*)mem->data;
+			for (int i = 0; i < tri_count; ++i)
+			{
+				const DebugTriangle& tri = tris[j + i];
+				vertex[0].rgba = tri.color;
+				vertex[0].x = tri.p0.x;
+				vertex[0].y = tri.p0.y;
+				vertex[0].z = tri.p0.z;
+				vertex[0].u = vertex[0].v = 0;
+
+				vertex[1].rgba = tri.color;
+				vertex[1].x = tri.p1.x;
+				vertex[1].y = tri.p1.y;
+				vertex[1].z = tri.p1.z;
+				vertex[1].u = vertex[0].v = 0;
+
+				vertex[2].rgba = tri.color;
+				vertex[2].x = tri.p2.x;
+				vertex[2].y = tri.p2.y;
+				vertex[2].z = tri.p2.z;
+				vertex[2].u = vertex[0].v = 0;
+
+				vertex += 3;
+			}
+
+			bgfx::updateDynamicVertexBuffer(m_debug_vertex_buffers[m_debug_buffer_idx], 0, mem);
+
+			bgfx::setVertexBuffer(m_debug_vertex_buffers[m_debug_buffer_idx]);
+			bgfx::setIndexBuffer(m_debug_index_buffer, 0, tri_count * 3);
+			bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
+			bgfx::setState(m_render_state | m_debug_line_material->getRenderStates());
+			bgfx::submit(m_bgfx_view, m_debug_line_material->getShaderInstance().program_handles[m_pass_idx]);
 		}
 	}
 
@@ -2559,6 +2580,9 @@ struct PipelineImpl : public Pipeline
 	int m_global_textures_count;
 
 	Material* m_debug_line_material;
+	bgfx::DynamicVertexBufferHandle m_debug_vertex_buffers[32];
+	bgfx::DynamicIndexBufferHandle m_debug_index_buffer;
+	int m_debug_buffer_idx;
 	int m_has_shadowmap_define_idx;
 	int m_first_postprocess_framebuffer;
 };
