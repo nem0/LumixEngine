@@ -26,6 +26,7 @@ GameView::GameView(StudioApp& app)
 	, m_time_multiplier(1.0f)
 	, m_paused(false)
 	, m_is_opengl(false)
+	, m_texture_handle(BGFX_INVALID_HANDLE)
 {
 }
 
@@ -119,14 +120,14 @@ void GameView::onGui()
 			m_pipeline->setViewport(0, 0, int(size.x), int(size.y));
 
 			auto* fb = m_pipeline->getFramebuffer("default");
-			bgfx::TextureHandle texture_handle = fb->getRenderbufferHandle(0);
+			m_texture_handle = fb->getRenderbufferHandle(0);
 			if (m_is_opengl)
 			{
-				ImGui::Image(&texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
+				ImGui::Image(&m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
 			}
 			else
 			{
-				ImGui::Image(&texture_handle, size);
+				ImGui::Image(&m_texture_handle, size);
 			}
 			if (ImGui::Checkbox("Pause", &m_paused))
 			{
