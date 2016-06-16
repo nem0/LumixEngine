@@ -345,9 +345,7 @@ void SceneView::onToolbar()
 		"viewSide" };
 
 	auto pos = ImGui::GetCursorScreenPos();
-	float w = ImGui::GetContentRegionAvail().x;
-	ImVec2 icon_size(24, 24);
-	if (ImGui::BeginToolbar("scene_view_toolbar", pos, ImVec2(w, 24)))
+	if (ImGui::BeginToolbar("scene_view_toolbar", pos, ImVec2(0, 24)))
 	{
 		for (auto* action_name : actions_names)
 		{

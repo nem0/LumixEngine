@@ -26,9 +26,6 @@ class Shader;
 class LUMIX_RENDERER_API Renderer : public IPlugin 
 {
 	public:
-		typedef void* TransientDataHandle;
-
-	public:
 		virtual ~Renderer() {}
 		virtual void frame() = 0;
 		virtual void resize(int width, int height) = 0;

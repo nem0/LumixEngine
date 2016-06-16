@@ -15,6 +15,7 @@ namespace Lumix
 }
 
 
+struct Action;
 class FileSystemWatcher;
 class Metadata;
 class StudioApp;
@@ -45,7 +46,7 @@ public:
 	void update();
 	const Lumix::Array<Lumix::Path>& getResources(int type) const;
 	int getTypeIndexFromManagerType(Lumix::uint32 type) const;
-	void selectResource(const Lumix::Path& resource);
+	void selectResource(const Lumix::Path& resource, bool record_history);
 	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, Lumix::uint32 type);
 	void addPlugin(IPlugin& plugin);
 	void openInExternalEditor(Lumix::Resource* resource);
@@ -64,9 +65,14 @@ private:
 	void addResource(const char* path, const char* filename);
 	void onGUIResource();
 	void unloadResource();
-	void selectResource(Lumix::Resource* resource);
+	void selectResource(Lumix::Resource* resource, bool record_history);
 	int getResourceTypeIndex(const char* ext);
 	bool acceptExtension(const char* ext, Lumix::uint32 type);
+	void onToolbar();
+	void goBack();
+	void goForward();
+	void toggleAutoreload();
+	bool isAutoreload() const { return m_autoreload_changed_resource; }
 
 	Lumix::uint32 getResourceType(const char* path) const;
 
@@ -76,6 +82,7 @@ private:
 	Lumix::Array<Lumix::Path> m_changed_files;
 	OnResourceChanged m_on_resource_changed;
 	Lumix::Array<Lumix::Path> m_history;
+	int m_history_index;
 	Lumix::Array<IPlugin*> m_plugins;
 	Lumix::MT::SpinMutex m_changed_files_mutex;
 	Lumix::Array<Lumix::Array<Lumix::Path> > m_resources;
@@ -90,4 +97,8 @@ private:
 	bool m_is_focus_requested;
 	bool m_activate;
 	bool m_is_update_enabled;
+	Action* m_auto_reload_action;
+	Action* m_back_action;
+	Action* m_forward_action;
+	Action* m_refresh_action;
 };
