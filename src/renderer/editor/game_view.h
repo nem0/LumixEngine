@@ -46,4 +46,5 @@ private:
 	bool m_paused;
 	bool m_is_opengl;
 	StudioApp& m_studio_app;
+	bgfx::TextureHandle m_texture_handle;
 };
