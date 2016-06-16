@@ -2944,14 +2944,14 @@ public:
 
 
 	void addDebugFrustum(const Vec3& position,
-								 const Vec3& direction,
-								 const Vec3& up,
-								 float fov,
-								 float ratio,
-								 float near_distance,
-								 float far_distance,
-								 uint32 color,
-								 float life) override
+		const Vec3& direction,
+		const Vec3& up,
+		float fov,
+		float ratio,
+		float near_distance,
+		float far_distance,
+		uint32 color,
+		float life) override
 	{
 		Vec3 points[8];
 		Vec3 near_center = position + direction * near_distance;
@@ -2966,7 +2966,7 @@ public:
 		points[2] = near_center - up_near - right_near;
 		points[3] = near_center - up_near + right_near;
 
-		Vec3 up_far = up  * far_distance * scale;
+		Vec3 up_far = up * far_distance * scale;
 		Vec3 right_far = right * (far_distance * scale * ratio);
 
 		points[4] = far_center + up_far + right_far;
@@ -2990,11 +2990,7 @@ public:
 		addDebugLine(points[3], points[7], color, life);
 	}
 
-	void addDebugCircle(const Vec3& center,
-		const Vec3& up,
-		float radius,
-		uint32 color,
-		float life) override
+	void addDebugCircle(const Vec3& center, const Vec3& up, float radius, uint32 color, float life) override
 	{
 		Vec3 z_vec(-up.y, up.x, 0);
 		Vec3 x_vec = crossProduct(up, z_vec);
@@ -3007,32 +3003,20 @@ public:
 			float a = i / 64.0f * 2 * Math::PI;
 			float x = cosf(a) * radius;
 			float z = sinf(a) * radius;
-			addDebugLine(center + x_vec * x + z_vec * z,
-				center + x_vec * prevx + z_vec * prevz,
-				color,
-				life);
+			addDebugLine(center + x_vec * x + z_vec * z, center + x_vec * prevx + z_vec * prevz, color, life);
 			prevx = x;
 			prevz = z;
 		}
 	}
 
-	void addDebugCross(const Vec3& center,
-							   float size,
-							   uint32 color,
-							   float life) override
+	void addDebugCross(const Vec3& center, float size, uint32 color, float life) override
 	{
-		addDebugLine(
-			center, Vec3(center.x - size, center.y, center.z), color, life);
-		addDebugLine(
-			center, Vec3(center.x + size, center.y, center.z), color, life);
-		addDebugLine(
-			center, Vec3(center.x, center.y - size, center.z), color, life);
-		addDebugLine(
-			center, Vec3(center.x, center.y + size, center.z), color, life);
-		addDebugLine(
-			center, Vec3(center.x, center.y, center.z - size), color, life);
-		addDebugLine(
-			center, Vec3(center.x, center.y, center.z + size), color, life);
+		addDebugLine(center, Vec3(center.x - size, center.y, center.z), color, life);
+		addDebugLine(center, Vec3(center.x + size, center.y, center.z), color, life);
+		addDebugLine(center, Vec3(center.x, center.y - size, center.z), color, life);
+		addDebugLine(center, Vec3(center.x, center.y + size, center.z), color, life);
+		addDebugLine(center, Vec3(center.x, center.y, center.z - size), color, life);
+		addDebugLine(center, Vec3(center.x, center.y, center.z + size), color, life);
 	}
 
 
@@ -3047,8 +3031,7 @@ public:
 
 	static uint32 ARGBToABGR(uint32 color)
 	{
-		return ((color & 0xff) << 16) | (color & 0xff00) | ((color & 0xff0000) >> 16) |
-			   (color & 0xff000000);
+		return ((color & 0xff) << 16) | (color & 0xff00) | ((color & 0xff0000) >> 16) | (color & 0xff000000);
 	}
 
 
@@ -3062,9 +3045,7 @@ public:
 	}
 
 
-	RayCastModelHit castRayTerrain(ComponentIndex terrain,
-		const Vec3& origin,
-		const Vec3& dir) override
+	RayCastModelHit castRayTerrain(ComponentIndex terrain, const Vec3& origin, const Vec3& dir) override
 	{
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
@@ -3079,9 +3060,7 @@ public:
 	}
 
 
-	RayCastModelHit castRay(const Vec3& origin,
-		const Vec3& dir,
-		ComponentIndex ignored_renderable) override
+	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, ComponentIndex ignored_renderable) override
 	{
 		PROFILE_FUNCTION();
 		RayCastModelHit hit;
@@ -3141,8 +3120,7 @@ public:
 	}
 
 
-	void setShadowmapCascades(ComponentIndex cmp,
-									  const Vec4& value) override
+	void setShadowmapCascades(ComponentIndex cmp, const Vec4& value) override
 	{
 		Vec4 valid_value = value;
 		valid_value.x = Math::maximum(valid_value.x, 0.02f);
