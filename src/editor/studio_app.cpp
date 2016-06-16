@@ -606,6 +606,14 @@ public:
 	}
 
 
+	void instantiateTemplate()
+	{
+		Lumix::Vec3 pos = m_editor->getCameraRaycastHit();
+		auto& template_system = m_editor->getEntityTemplateSystem();
+		template_system.createInstance(m_selected_template_name.c_str(), pos, Lumix::Quat(0, 0, 0, 1), 1);
+	}
+
+
 	void undo() { if (!hasPluginFocus()) m_editor->undo(); }
 	void redo() { if (!hasPluginFocus()) m_editor->redo(); }
 	void copy() { m_editor->copyEntities(); }
@@ -761,16 +769,7 @@ public:
 			}
 			ImGui::EndMenu();
 		}
-		if (ImGui::MenuItem("Instantiate template",
-			nullptr,
-			nullptr,
-			m_selected_template_name.length() > 0))
-		{
-			Lumix::Vec3 pos = m_editor->getCameraRaycastHit();
-			m_editor->getEntityTemplateSystem().createInstance(
-				m_selected_template_name.c_str(), pos, Lumix::Quat(0, 0, 0, 1), 1);
-		}
-
+		doMenuItem(getAction("instantiateTemplate"), m_selected_template_name.length() > 0);
 		doMenuItem(getAction("showEntities"), is_any_entity_selected);
 		doMenuItem(getAction("hideEntities"), is_any_entity_selected);
 		ImGui::EndMenu();
@@ -1342,6 +1341,7 @@ public:
 		addAction<&StudioAppImpl::destroyEntity>("Destroy", "destroyEntity", SDLK_DELETE, -1, -1);
 		addAction<&StudioAppImpl::showEntities>("Show", "showEntities");
 		addAction<&StudioAppImpl::hideEntities>("Hide", "hideEntities");
+		addAction<&StudioAppImpl::instantiateTemplate>("Instantiate template", "instantiateTemplate");
 
 		addAction<&StudioAppImpl::toggleGameMode>("Game Mode", "toggleGameMode")
 			.is_selected.bind<Lumix::WorldEditor, &Lumix::WorldEditor::isGameMode>(m_editor);
