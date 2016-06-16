@@ -73,6 +73,8 @@ namespace Lumix
 				: m_properties(allocator)
 				, m_script(nullptr)
 				, m_state(nullptr)
+				, m_environment(-1)
+				, m_thread_ref(-1)
 			{
 			}
 
@@ -672,6 +674,20 @@ namespace Lumix
 		}
 
 
+		LuaScript* preloadScript(const char* path)
+		{
+			auto* script_manager = m_system.m_engine.getResourceManager().get(LUA_SCRIPT_HASH);
+			return static_cast<LuaScript*>(script_manager->load(Path(path)));
+		}
+
+
+		void unloadScript(LuaScript* script)
+		{
+			if (!script) return;
+			script->getResourceManager().get(LUA_SCRIPT_HASH)->unload(*script);
+		}
+
+
 		void setScriptSource(ComponentIndex cmp, int scr_index, const char* path)
 		{
 			setScriptPath(cmp, scr_index, Lumix::Path(path));
@@ -703,6 +719,8 @@ namespace Lumix
 
 			REGISTER_FUNCTION(addScript);
 			REGISTER_FUNCTION(setScriptSource);
+			REGISTER_FUNCTION(preloadScript);
+			REGISTER_FUNCTION(unloadScript);
 
 			#undef REGISTER_FUNCTION
 		}
