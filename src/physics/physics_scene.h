@@ -68,7 +68,7 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 		virtual float getActorSpeed(ComponentIndex cmp) = 0;
 		virtual void putToSleep(ComponentIndex cmp) = 0;
 
-		virtual void moveController(ComponentIndex cmp, const Vec3& v, float dt) = 0;
+		virtual void moveController(ComponentIndex cmp, const Vec3& v) = 0;
 		virtual ComponentIndex getController(Entity entity) = 0;
 		virtual int getControllerLayer(ComponentIndex cmp) = 0;
 		virtual void setControllerLayer(ComponentIndex cmp, int layer) = 0;
