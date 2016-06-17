@@ -850,8 +850,6 @@ namespace Lumix
 				}
 			}
 
-			inst.m_script->getObserverCb().unbind<ScriptComponent, &ScriptComponent::onScriptLoaded>(&scr);
-
 			luaL_unref(inst.m_state, LUA_REGISTRYINDEX, inst.m_thread_ref);
 			luaL_unref(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
 			inst.m_state = nullptr;
@@ -864,11 +862,7 @@ namespace Lumix
 
 			if (inst.m_script)
 			{
-				if (inst.m_state)
-				{
-					destroy(cmp, inst);
-				}
-				inst.m_state = nullptr;
+				if (inst.m_state) destroy(cmp, inst);
 				inst.m_properties.clear();
 				auto& cb = inst.m_script->getObserverCb();
 				cb.unbind<ScriptComponent, &ScriptComponent::onScriptLoaded>(&cmp);
@@ -980,7 +974,12 @@ namespace Lumix
 			for (auto& scr : m_scripts[component]->m_scripts)
 			{
 				if (scr.m_state) destroy(*m_scripts[component], scr);
-				if (scr.m_script) m_system.getScriptManager().unload(*scr.m_script);
+				if (scr.m_script)
+				{
+					auto& cb = scr.m_script->getObserverCb();
+					cb.unbind<ScriptComponent, &ScriptComponent::onScriptLoaded>(m_scripts[component]);
+					m_system.getScriptManager().unload(*scr.m_script);
+				}
 			}
 			m_entity_script_map.erase(m_scripts[component]->m_entity);
 			auto* script = m_scripts[component];
