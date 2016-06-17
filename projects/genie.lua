@@ -654,6 +654,7 @@ if build_app then
 				forceLink("setStudioApp_animation")
 				forceLink("setStudioApp_audio")
 				forceLink("setStudioApp_lua_script")
+				forceLink("setStudioApp_navigation")
 				forceLink("setStudioApp_physics")
 				forceLink("setStudioApp_renderer")
 			end
@@ -759,6 +760,7 @@ if build_studio then
 			forceLink("setStudioApp_animation")
 			forceLink("setStudioApp_audio")
 			forceLink("setStudioApp_lua_script")
+			forceLink("setStudioApp_navigation")
 			forceLink("setStudioApp_physics")
 			forceLink("setStudioApp_renderer")
 

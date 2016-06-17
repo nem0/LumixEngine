@@ -798,7 +798,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void moveController(ComponentIndex cmp, const Vec3& v, float) override
+	void moveController(ComponentIndex cmp, const Vec3& v) override
 	{
 		m_controllers[cmp].m_frame_change += v;
 	}
