@@ -588,7 +588,7 @@ project "audio"
 project "navigation"
 	libType()
 
-	files { "../src/navigation/**.h", "../src/navigation/**.cpp" }
+	files { "../src/navigation/**.h", "../src/navigation/**.cpp", "../external/recast/src/**.cpp" }
 	includedirs { "../src", "../src/navigation", "../external/recast/include" }
 	includedirs { "../external/bgfx/include" }
 	links { "engine", "renderer" }
