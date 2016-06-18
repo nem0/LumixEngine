@@ -6,7 +6,6 @@
 #include "engine/engine.h"
 #include "engine/fs/os_file.h"
 #include "engine/iallocator.h"
-#include "engine/iplugin.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/profiler.h"
@@ -15,6 +14,7 @@
 #include "engine/vec.h"
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
+#include "navigation_system.h"
 #include "physics/physics_scene.h"
 #include "renderer/model.h"
 #include "renderer/material.h"
@@ -113,7 +113,7 @@ struct NavigationSystem : public IPlugin
 NavigationSystem* NavigationSystem::s_instance = nullptr;
 
 
-struct NavigationScene : public IScene
+struct NavigationSceneImpl : public NavigationScene
 {
 	enum class Version
 	{
@@ -123,7 +123,7 @@ struct NavigationScene : public IScene
 	};
 
 
-	NavigationScene(NavigationSystem& system, Universe& universe, IAllocator& allocator)
+	NavigationSceneImpl(NavigationSystem& system, Universe& universe, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_universe(universe)
 		, m_system(system)
@@ -143,7 +143,7 @@ struct NavigationScene : public IScene
 	}
 
 
-	~NavigationScene()
+	~NavigationSceneImpl()
 	{
 		clear();
 		for (auto* agent : m_agents) LUMIX_DELETE(m_allocator, agent);
@@ -422,7 +422,7 @@ struct NavigationScene : public IScene
 	}
 
 
-	void debugDrawContours()
+	void debugDrawContours() override
 	{
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
@@ -453,7 +453,13 @@ struct NavigationScene : public IScene
 	}
 
 
-	bool load(const char* path)
+	bool isNavmeshReady() const override
+	{
+		return m_navmesh != nullptr;
+	}
+
+
+	bool load(const char* path) override
 	{
 		clear();
 
@@ -495,7 +501,7 @@ struct NavigationScene : public IScene
 	}
 
 	
-	bool save(const char* path)
+	bool save(const char* path) override
 	{
 		if (!m_navmesh) return false;
 
@@ -522,7 +528,7 @@ struct NavigationScene : public IScene
 	}
 
 
-	void debugDrawHeightfield()
+	void debugDrawHeightfield() override
 	{
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
@@ -552,7 +558,7 @@ struct NavigationScene : public IScene
 	}
 
 
-	void debugDrawCompactHeightfield()
+	void debugDrawCompactHeightfield() override
 	{
 		static const int MAX_CUBES = 0xffFF;
 		
@@ -591,7 +597,7 @@ struct NavigationScene : public IScene
 	}
 
 
-	void debugDrawNavmesh()
+	void debugDrawNavmesh() override
 	{
 		if (!m_polymesh) return;
 		auto& mesh = *m_polymesh;
@@ -735,7 +741,15 @@ struct NavigationScene : public IScene
 	}
 
 
-	bool generateTile(int x, int z, bool keep_data)
+	bool generateTileAt(const Vec3& pos, bool keep_data) override
+	{
+		int x = int((pos.x - m_aabb.min.x + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
+		int z = int((pos.z - m_aabb.min.z + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
+		return generateTile(x, z, keep_data);
+	}
+
+
+	bool generateTile(int x, int z, bool keep_data) override
 	{
 		PROFILE_FUNCTION();
 		if (!m_navmesh) return false;
@@ -949,7 +963,7 @@ struct NavigationScene : public IScene
 	}
 
 
-	bool generateNavmesh()
+	bool generateNavmesh() override
 	{
 		PROFILE_FUNCTION();
 		clear();
@@ -1135,17 +1149,17 @@ void NavigationSystem::registerProperties()
 	auto& allocator = m_engine.getAllocator();
 	PropertyRegister::registerComponentType("navmesh_agent");
 	PropertyRegister::add("navmesh_agent",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<NavigationScene>)(
-			"radius", &NavigationScene::getAgentRadius, &NavigationScene::setAgentRadius, 0, 999.0f, 0.1f, allocator));
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<NavigationSceneImpl>)(
+			"radius", &NavigationSceneImpl::getAgentRadius, &NavigationSceneImpl::setAgentRadius, 0, 999.0f, 0.1f, allocator));
 	PropertyRegister::add("navmesh_agent",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<NavigationScene>)(
-			"height", &NavigationScene::getAgentHeight, &NavigationScene::setAgentHeight, 0, 999.0f, 0.1f, allocator));
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<NavigationSceneImpl>)(
+			"height", &NavigationSceneImpl::getAgentHeight, &NavigationSceneImpl::setAgentHeight, 0, 999.0f, 0.1f, allocator));
 }
 
 
 IScene* NavigationSystem::createScene(Universe& universe)
 {
-	return LUMIX_NEW(m_allocator, NavigationScene)(*this, universe, m_allocator);
+	return LUMIX_NEW(m_allocator, NavigationSceneImpl)(*this, universe, m_allocator);
 }
 
 
@@ -1166,7 +1180,7 @@ static void registerLuaAPI(lua_State* L)
 {
 	#define REGISTER_FUNCTION(name) \
 		do {\
-			auto f = &LuaWrapper::wrapMethod<NavigationScene, decltype(&NavigationScene::name), &NavigationScene::name>; \
+			auto f = &LuaWrapper::wrapMethod<NavigationSceneImpl, decltype(&NavigationSceneImpl::name), &NavigationSceneImpl::name>; \
 			LuaWrapper::createSystemFunction(L, "Navigation", #name, f); \
 		} while(false) \
 

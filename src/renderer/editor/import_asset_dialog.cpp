@@ -1935,9 +1935,16 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 
 	m_action = LUMIX_NEW(m_editor.getAllocator(), Action)("Import Asset", "import_asset");
 	m_action->func.bind<ImportAssetDialog, &ImportAssetDialog::onAction>(this);
+	m_action->is_selected.bind<ImportAssetDialog, &ImportAssetDialog::isOpened>(this);
 
 	Lumix::LuaWrapper::createSystemFunction(m_editor.getEngine().getState(), "Editor", "importAsset", &::importAsset);
 	Lumix::LuaWrapper::createSystemVariable(m_editor.getEngine().getState(), "Editor", "import_asset_dialog", this);
+}
+
+
+bool ImportAssetDialog::isOpened() const
+{
+	return m_is_opened;
 }
 
 

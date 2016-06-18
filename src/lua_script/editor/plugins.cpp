@@ -553,14 +553,13 @@ struct ConsolePlugin : public StudioApp::IPlugin
 	{
 		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Script Console", "script_console");
 		m_action->func.bind<ConsolePlugin, &ConsolePlugin::toggleOpened>(this);
+		m_action->is_selected.bind<ConsolePlugin, &ConsolePlugin::isOpened>(this);
 		buf[0] = '\0';
 	}
 
 
-	void toggleOpened()
-	{
-		opened = !opened;
-	}
+	bool isOpened() const { return opened; }
+	void toggleOpened() { opened = !opened; }
 
 
 	void onWindowGUI() override

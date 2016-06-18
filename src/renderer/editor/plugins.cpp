@@ -1318,6 +1318,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		m_engine = &editor.getEngine();
 		m_action = LUMIX_NEW(editor.getAllocator(), Action)("Game View", "game_view");
 		m_action->func.bind<GameViewPlugin, &GameViewPlugin::onAction>(this);
+		m_action->is_selected.bind<GameViewPlugin, &GameViewPlugin::isOpened>(this);
 		m_game_view.m_is_opened = false;
 		m_game_view.init(editor);
 
@@ -1364,6 +1365,9 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		shutdownImGui();
 		m_game_view.shutdown();
 	}
+
+
+	bool isOpened() const { return m_game_view.m_is_opened; }
 
 
 	void shutdownImGui()
@@ -1516,6 +1520,7 @@ struct ShaderEditorPlugin : public StudioApp::IPlugin
 	{
 		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Shader Editor", "shaderEditor");
 		m_action->func.bind<ShaderEditorPlugin, &ShaderEditorPlugin::onAction>(this);
+		m_action->is_selected.bind<ShaderEditorPlugin, &ShaderEditorPlugin::isOpened>(this);
 		m_shader_editor.m_is_opened = false;
 
 		m_compiler = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderCompiler)(app, *app.getLogUI());
@@ -1535,7 +1540,7 @@ struct ShaderEditorPlugin : public StudioApp::IPlugin
 	void onAction() { m_shader_editor.m_is_opened = !m_shader_editor.m_is_opened; }
 	void onWindowGUI() override { m_shader_editor.onGUI(); }
 	bool hasFocus() override { return m_shader_editor.isFocused(); }
-
+	bool isOpened() const { return m_shader_editor.m_is_opened; }
 
 	StudioApp& m_app;
 	ShaderCompiler* m_compiler;
