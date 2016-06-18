@@ -372,7 +372,7 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
-	void debugDrawPaths(Entity entity)
+	void debugDrawPath(Entity entity)
 	{
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
@@ -1189,7 +1189,7 @@ static void registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(debugDrawNavmesh);
 	REGISTER_FUNCTION(debugDrawCompactHeightfield);
 	REGISTER_FUNCTION(debugDrawHeightfield);
-	REGISTER_FUNCTION(debugDrawPaths);
+	REGISTER_FUNCTION(debugDrawPath);
 	REGISTER_FUNCTION(getPolygonCount);
 	REGISTER_FUNCTION(debugDrawContours);
 	REGISTER_FUNCTION(generateTile);
