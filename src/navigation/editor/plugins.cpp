@@ -94,6 +94,14 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 				static bool debug_draw_contours = false;
 				ImGui::Checkbox("Draw contours", &debug_draw_contours);
 				if (debug_draw_contours) scene->debugDrawContours();
+
+				auto& entities = app.getWorldEditor()->getSelectedEntities();
+				if (!entities.empty())
+				{
+					static bool debug_draw_path = false;
+					ImGui::Checkbox("Draw path", &debug_draw_path);
+					if (debug_draw_path) scene->debugDrawPath(entities[0]);
+				}
 			}
 		}
 		ImGui::EndDock();

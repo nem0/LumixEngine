@@ -19,6 +19,7 @@ public:
 	virtual void debugDrawHeightfield() = 0;
 	virtual void debugDrawContours() = 0;
 	virtual bool isNavmeshReady() const = 0;
+	virtual void debugDrawPath(Entity entity) = 0;
 };
 
 
