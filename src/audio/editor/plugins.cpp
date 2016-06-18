@@ -118,9 +118,11 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 		m_is_opened = false;
 		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Clip manager", "clip_manager");
 		m_action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
+		m_action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
 	}
 
 
+	bool isOpened() const { return m_is_opened; }
 	void onAction() { m_is_opened = !m_is_opened; }
 
 

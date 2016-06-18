@@ -120,6 +120,7 @@ class ImportAssetDialog : public StudioApp::IPlugin
 		void onLODsGUI();
 		void onAction();
 		void saveModelMetadata();
+		bool isOpened() const;
 
 	private:
 		Lumix::WorldEditor& m_editor;

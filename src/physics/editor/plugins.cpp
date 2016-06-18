@@ -77,8 +77,12 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 	{
 		m_action = LUMIX_NEW(m_editor.getAllocator(), Action)("Physics", "physics");
 		m_action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
+		m_action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
 		m_is_window_opened = false;
 	}
+
+
+	bool isOpened() const { return m_is_window_opened; }
 
 
 	void onAction() { m_is_window_opened = !m_is_window_opened; }
