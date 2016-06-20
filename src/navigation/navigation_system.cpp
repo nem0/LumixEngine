@@ -263,6 +263,7 @@ struct NavigationSceneImpl : public NavigationScene
 		if (!render_scene) return;
 
 		uint32 no_navigation_flag = Material::getCustomFlag("no_navigation");
+		uint32 nonwalkable_flag = Material::getCustomFlag("nonwalkable");
 		for (auto renderable = render_scene->getFirstRenderable(); renderable != INVALID_COMPONENT;
 			 renderable = render_scene->getNextRenderable(renderable))
 		{
@@ -284,6 +285,7 @@ struct NavigationSceneImpl : public NavigationScene
 			{
 				auto& mesh = model->getMesh(mesh_idx);
 				if (mesh.material->isCustomFlag(no_navigation_flag)) continue;
+				bool is_walkable = !mesh.material->isCustomFlag(nonwalkable_flag);
 				auto* vertices =
 					&model->getVertices()[mesh.attribute_array_offset / model->getVertexDecl().getStride()];
 				if (is16)
@@ -296,7 +298,7 @@ struct NavigationSceneImpl : public NavigationScene
 						Vec3 c = mtx.multiplyPosition(vertices[indices16[mesh.indices_offset + i + 2]]);
 
 						Vec3 n = crossProduct(a - b, a - c).normalized();
-						uint8 area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
+						uint8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
 						rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
 					}
 				}
@@ -310,7 +312,7 @@ struct NavigationSceneImpl : public NavigationScene
 						Vec3 c = mtx.multiplyPosition(vertices[indices32[mesh.indices_offset + i + 2]]);
 
 						Vec3 n = crossProduct(a - b, a - c).normalized();
-						uint8 area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
+						uint8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
 						rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
 					}
 				}
