@@ -10,7 +10,7 @@ namespace Lumix
 {
 
 
-class LUMIX_AUDIO_API Clip : public Resource
+class Clip : public Resource
 {
 public:
 	Clip(const Path& path, ResourceManager& manager, IAllocator& allocator)
@@ -34,7 +34,7 @@ private:
 };
 
 
-class LUMIX_AUDIO_API ClipManager : public ResourceManagerBase
+class ClipManager : public ResourceManagerBase
 {
 public:
 	explicit ClipManager(IAllocator& allocator)

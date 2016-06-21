@@ -18,7 +18,7 @@ struct Quat;
 struct Vec3;
 
 
-class LUMIX_ANIMATION_API AnimationManager : public ResourceManagerBase
+class AnimationManager : public ResourceManagerBase
 {
 public:
 	explicit AnimationManager(IAllocator& allocator) 
@@ -37,7 +37,7 @@ private:
 };
 
 
-class LUMIX_ANIMATION_API Animation : public Resource
+class Animation : public Resource
 {
 	public:
 		static const uint32 HEADER_MAGIC = 0x5f4c4146; // '_LAF'

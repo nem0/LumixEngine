@@ -33,6 +33,8 @@
 
 namespace Lumix
 {
+
+
 typedef char int8;
 typedef unsigned char uint8;
 typedef short int16;
@@ -62,35 +64,32 @@ typedef unsigned int uint32;
 	typedef uint32 uintptr;
 #endif
 
-	static_assert(sizeof(int64) == 8, "Incorrect size of int64");
-	static_assert(sizeof(int32) == 4, "Incorrect size of int32");
-	static_assert(sizeof(int16) == 2, "Incorrect size of int16");
-	static_assert(sizeof(int8) == 1, "Incorrect size of int8");
-}
+static_assert(sizeof(int64) == 8, "Incorrect size of int64");
+static_assert(sizeof(int32) == 4, "Incorrect size of int32");
+static_assert(sizeof(int16) == 2, "Incorrect size of int16");
+static_assert(sizeof(int8) == 1, "Incorrect size of int8");
 
-
-namespace Lumix
+const uint32 MAX_PATH_LENGTH = 260;
+typedef int ComponentIndex;
+typedef int Entity;
+struct ComponentType
 {
-	const uint32 MAX_PATH_LENGTH = 260;
-	typedef int ComponentIndex;
-	typedef int Entity;
-	struct ComponentType
-	{
-		int index;
-		bool operator==(const ComponentType& rhs) const { return rhs.index == index; };
-		bool operator<(const ComponentType& rhs) const { return rhs.index < index; };
-		bool operator>(const ComponentType& rhs) const { return rhs.index > index; };
-		bool operator!=(const ComponentType& rhs) const { return rhs.index != index; };
-	};
-	const int INVALID_ENTITY = -1;
-	const int INVALID_COMPONENT = -1;
+	int index;
+	bool operator==(const ComponentType& rhs) const { return rhs.index == index; };
+	bool operator<(const ComponentType& rhs) const { return rhs.index < index; };
+	bool operator>(const ComponentType& rhs) const { return rhs.index > index; };
+	bool operator!=(const ComponentType& rhs) const { return rhs.index != index; };
+};
+const int INVALID_ENTITY = -1;
+const int INVALID_COMPONENT = -1;
 
-	template <typename T, int count>
-	int lengthOf(const T(&)[count])
-	{
-		return count;
-	};
-}
+template <typename T, int count> int lengthOf(const T (&)[count])
+{
+	return count;
+};
+
+
+} // namespace Lumix
 
 
 #ifndef ASSERT
@@ -121,22 +120,6 @@ namespace Lumix
 #endif
 
 #ifdef STATIC_PLUGINS
-	#define LUMIX_AUDIO_API
-#elif defined BUILDING_AUDIO
-	#define LUMIX_AUDIO_API LUMIX_LIBRARY_EXPORT
-#else
-	#define LUMIX_AUDIO_API LUMIX_LIBRARY_IMPORT
-#endif
-
-#ifdef STATIC_PLUGINS
-	#define LUMIX_PHYSICS_API
-#elif defined BUILDING_PHYSICS
-	#define LUMIX_PHYSICS_API LUMIX_LIBRARY_EXPORT
-#else
-	#define LUMIX_PHYSICS_API LUMIX_LIBRARY_IMPORT
-#endif
-
-#ifdef STATIC_PLUGINS
 	#define LUMIX_ENGINE_API
 #elif defined BUILDING_ENGINE
 	#define LUMIX_ENGINE_API LUMIX_LIBRARY_EXPORT
@@ -159,23 +142,6 @@ namespace Lumix
 #else
 	#define LUMIX_RENDERER_API LUMIX_LIBRARY_IMPORT
 #endif
-
-#ifdef STATIC_PLUGINS
-	#define LUMIX_SCRIPT_API
-#elif defined BUILDING_SCRIPT
-	#define LUMIX_SCRIPT_API LUMIX_LIBRARY_EXPORT
-#else
-	#define LUMIX_SCRIPT_API LUMIX_LIBRARY_IMPORT
-#endif
-
-#ifdef STATIC_PLUGINS
-	#define LUMIX_ANIMATION_API
-#elif defined BUILDING_ANIMATION
-	#define LUMIX_ANIMATION_API LUMIX_LIBRARY_EXPORT
-#else
-	#define LUMIX_ANIMATION_API LUMIX_LIBRARY_IMPORT
-#endif
-
 
 #ifdef _MSC_VER
 	#pragma warning(disable : 4251)
