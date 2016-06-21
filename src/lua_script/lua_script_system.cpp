@@ -61,9 +61,7 @@ namespace Lumix
 		struct TimerData
 		{
 			float time;
-			LuaScript* script;
 			lua_State* state;
-			int environment;
 			int func;
 		};
 
@@ -691,11 +689,9 @@ namespace Lumix
 			TimerData& timer = scene->m_timers.emplace();
 			timer.time = time;
 			timer.state = L;
-			timer.script = scene->m_current_script_instance->m_script;
 			lua_pushvalue(L, 3);
 			timer.func = luaL_ref(L, LUA_REGISTRYINDEX);
 			lua_pop(L, 1);
-			timer.environment = scene->m_current_script_instance->m_environment;
 			return 0;
 		}
 
@@ -871,8 +867,9 @@ namespace Lumix
 
 			for (int i = 0; i < m_timers.size(); ++i)
 			{
-				if (m_timers[i].environment == inst.m_environment)
+				if (m_timers[i].state == inst.m_state)
 				{
+					luaL_unref(m_timers[i].state, LUA_REGISTRYINDEX, m_timers[i].func);
 					m_timers.eraseFast(i);
 					--i;
 				}
@@ -880,7 +877,7 @@ namespace Lumix
 
 			for(int i = 0; i < m_updates.size(); ++i)
 			{
-				if(m_updates[i].environment == inst.m_environment)
+				if(m_updates[i].state == inst.m_state)
 				{
 					m_updates.eraseFast(i);
 					break;
@@ -1237,10 +1234,6 @@ namespace Lumix
 				timer.time -= time_delta;
 				if (timer.time < 0)
 				{
-					if (lua_rawgeti(timer.state, LUA_REGISTRYINDEX, timer.environment) != LUA_TTABLE)
-					{
-						ASSERT(false);
-					}
 					if (lua_rawgeti(timer.state, LUA_REGISTRYINDEX, timer.func) != LUA_TFUNCTION)
 					{
 						ASSERT(false);
@@ -1251,7 +1244,6 @@ namespace Lumix
 						g_log_error.log("Lua Script") << lua_tostring(timer.state, -1);
 						lua_pop(timer.state, 1);
 					}
-					lua_pop(timer.state, 1);
 					timers_to_remove[timers_to_remove_count] = i;
 					++timers_to_remove_count;
 					if (timers_to_remove_count >= lengthOf(timers_to_remove))
