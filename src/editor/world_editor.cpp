@@ -4,7 +4,9 @@
 #include "engine/associative_array.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
+#include "engine/debug/debug.h"
 #include "engine/delegate_list.h"
+#include "engine/engine.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/memory_file_device.h"
 #include "engine/fs/disk_file_device.h"
@@ -12,38 +14,36 @@
 #include "engine/fs/tcp_file_server.h"
 #include "engine/geometry.h"
 #include "engine/input_system.h"
+#include "engine/iplugin.h"
+#include "engine/iproperty_descriptor.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/matrix.h"
+#include "editor/measure_tool.h"
 #include "engine/path.h"
 #include "engine/path_utils.h"
+#include "engine/plugin_manager.h"
 #include "engine/profiler.h"
+#include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/system.h"
 #include "engine/timer.h"
-#include "engine/debug/debug.h"
+#include "engine/universe/universe.h"
 #include "editor/entity_groups.h"
 #include "editor/editor_icon.h"
 #include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
-#include "editor/measure_tool.h"
-#include "engine/engine.h"
-#include "engine/iproperty_descriptor.h"
-#include "engine/property_register.h"
 #include "ieditor_command.h"
-#include "engine/iplugin.h"
-#include "engine/plugin_manager.h"
 #include "render_interface.h"
-#include "engine/universe/universe.h"
 
 
 namespace Lumix
 {
 
 
-static const uint32 RENDERABLE_HASH = crc32("renderable");
-static const uint32 CAMERA_HASH = crc32("camera");
+static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
+static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
 
 
 class BeginGroupCommand : public IEditorCommand
@@ -189,8 +189,7 @@ public:
 		serializer.beginArray("data");
 		for (int i = 0; i < m_blob.getPos(); ++i)
 		{
-			serializer.serializeArrayItem(
-				(int32)((const uint8*)m_blob.getData())[i]);
+			serializer.serializeArrayItem((int32)((const uint8*)m_blob.getData())[i]);
 		}
 		serializer.endArray();
 	}
@@ -220,11 +219,6 @@ public:
 	{
 		for (auto entity : m_entities)
 		{
-			const WorldEditor::ComponentList& cmps = m_editor.getComponents(entity);
-			for (int i = 0; i < cmps.size(); ++i)
-			{
-				cmps[i].scene->destroyComponent(cmps[i].index, cmps[i].type);
-			}
 			m_editor.getUniverse()->destroyEntity(entity);
 		}
 		m_entities.clear();
@@ -567,7 +561,7 @@ public:
 		serializer.serialize("inedx", m_index);
 		serializer.serialize("entity_index", m_component.entity);
 		serializer.serialize("component_index", m_component.index);
-		serializer.serialize("component_type", m_component.type);
+		serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_component.type));
 		serializer.serialize("property_name_hash", m_descriptor->getNameHash());
 	}
 
@@ -577,7 +571,9 @@ public:
 		serializer.deserialize("inedx", m_index, 0);
 		serializer.deserialize("entity_index", m_component.entity, 0);
 		serializer.deserialize("component_index", m_component.index, 0);
-		serializer.deserialize("component_type", m_component.type, 0);
+		uint32 hash;
+		serializer.deserialize("component_type", hash, 0);
+		m_component.type = PropertyRegister::getComponentTypeFromHash(hash);
 		m_component.scene = m_editor.getSceneByComponentType(m_component.type);
 		uint32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
@@ -648,7 +644,7 @@ public:
 		serializer.serialize("inedx", m_index);
 		serializer.serialize("entity_index", m_component.entity);
 		serializer.serialize("component_index", m_component.index);
-		serializer.serialize("component_type", m_component.type);
+		serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_component.type));
 		serializer.serialize("property_name_hash", m_descriptor->getNameHash());
 	}
 
@@ -658,7 +654,9 @@ public:
 		serializer.deserialize("inedx", m_index, 0);
 		serializer.deserialize("entity_index", m_component.entity, 0);
 		serializer.deserialize("component_index", m_component.index, 0);
-		serializer.deserialize("component_type", m_component.type, 0);
+		uint32 hash;
+		serializer.deserialize("component_type", hash, 0);
+		m_component.type = PropertyRegister::getComponentTypeFromHash(hash);
 		m_component.scene = m_editor.getSceneByComponentType(m_component.type);
 		uint32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
@@ -710,11 +708,11 @@ public:
 
 
 	SetPropertyCommand(WorldEditor& editor,
-					   Entity entity,
-					   uint32 component_type,
-					   const IPropertyDescriptor& property_descriptor,
-					   const void* data,
-					   int size)
+		Entity entity,
+		ComponentType component_type,
+		const IPropertyDescriptor& property_descriptor,
+		const void* data,
+		int size)
 		: m_component_type(component_type)
 		, m_entity(entity)
 		, m_property_descriptor(&property_descriptor)
@@ -730,12 +728,12 @@ public:
 
 
 	SetPropertyCommand(WorldEditor& editor,
-					   Entity entity,
-					   uint32 component_type,
-					   int index,
-					   const IPropertyDescriptor& property_descriptor,
-					   const void* data,
-					   int size)
+		Entity entity,
+		ComponentType component_type,
+		int index,
+		const IPropertyDescriptor& property_descriptor,
+		const void* data,
+		int size)
 		: m_component_type(component_type)
 		, m_entity(entity)
 		, m_property_descriptor(&property_descriptor)
@@ -754,7 +752,7 @@ public:
 	{
 		serializer.serialize("index", m_index);
 		serializer.serialize("entity_index", m_entity);
-		serializer.serialize("component_type", m_component_type);
+		serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_component_type));
 		serializer.beginArray("data");
 		for (int i = 0; i < m_new_value.getPos(); ++i)
 		{
@@ -771,7 +769,9 @@ public:
 	{
 		serializer.deserialize("index", m_index, 0);
 		serializer.deserialize("entity_index", m_entity, 0);
-		serializer.deserialize("component_type", m_component_type, 0);
+		uint32 hash;
+		serializer.deserialize("component_type", hash, 0);
+		m_component_type = PropertyRegister::getComponentTypeFromHash(hash);
 		serializer.deserializeArrayBegin("data");
 		m_new_value.clear();
 		while (!serializer.isArrayEnd())
@@ -871,7 +871,7 @@ public:
 
 private:
 	WorldEditor& m_editor;
-	uint32 m_component_type;
+	ComponentType m_component_type;
 	Entity m_entity;
 	OutputBlob m_new_value;
 	OutputBlob m_old_value;
@@ -894,7 +894,7 @@ private:
 
 		AddComponentCommand(WorldEditorImpl& editor,
 							const Array<Entity>& entities,
-							uint32 type)
+							ComponentType type)
 			: m_editor(editor)
 			, m_entities(editor.getAllocator())
 		{
@@ -926,7 +926,7 @@ private:
 
 		void serialize(JsonSerializer& serializer) override
 		{
-			serializer.serialize("component_type", m_type);
+			serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_type));
 			serializer.beginArray("entities");
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
@@ -938,7 +938,9 @@ private:
 
 		void deserialize(JsonSerializer& serializer) override
 		{
-			serializer.deserialize("component_type", m_type, 0);
+			uint32 hash;
+			serializer.deserialize("component_type", hash, 0);
+			m_type = PropertyRegister::getComponentTypeFromHash(hash);
 			m_entities.clear();
 			serializer.deserializeArrayBegin("entities");
 			while (!serializer.isArrayEnd())
@@ -995,7 +997,7 @@ private:
 
 
 	private:
-		uint32 m_type;
+		ComponentType m_type;
 		Array<Entity> m_entities;
 		WorldEditorImpl& m_editor;
 	};
@@ -1037,20 +1039,13 @@ private:
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
 				serializer.serializeArrayItem(m_entities[i]);
-				serializer.serializeArrayItem(
-					m_positons_rotations[i].m_position.x);
-				serializer.serializeArrayItem(
-					m_positons_rotations[i].m_position.y);
-				serializer.serializeArrayItem(
-					m_positons_rotations[i].m_position.z);
-				serializer.serializeArrayItem(
-					m_positons_rotations[i].m_rotation.x);
-				serializer.serializeArrayItem(
-					m_positons_rotations[i].m_rotation.y);
-				serializer.serializeArrayItem(
-					m_positons_rotations[i].m_rotation.z);
-				serializer.serializeArrayItem(
-					m_positons_rotations[i].m_rotation.w);
+				serializer.serializeArrayItem(m_positons_rotations[i].m_position.x);
+				serializer.serializeArrayItem(m_positons_rotations[i].m_position.y);
+				serializer.serializeArrayItem(m_positons_rotations[i].m_position.z);
+				serializer.serializeArrayItem(m_positons_rotations[i].m_rotation.x);
+				serializer.serializeArrayItem(m_positons_rotations[i].m_rotation.y);
+				serializer.serializeArrayItem(m_positons_rotations[i].m_rotation.z);
+				serializer.serializeArrayItem(m_positons_rotations[i].m_rotation.w);
 			}
 			serializer.endArray();
 		}
@@ -1066,20 +1061,13 @@ private:
 			for (int i = 0; i < count; ++i)
 			{
 				serializer.deserializeArrayItem(m_entities[i], 0);
-				serializer.deserializeArrayItem(
-					m_positons_rotations[i].m_position.x, 0);
-				serializer.deserializeArrayItem(
-					m_positons_rotations[i].m_position.y, 0);
-				serializer.deserializeArrayItem(
-					m_positons_rotations[i].m_position.z, 0);
-				serializer.deserializeArrayItem(
-					m_positons_rotations[i].m_rotation.x, 0);
-				serializer.deserializeArrayItem(
-					m_positons_rotations[i].m_rotation.y, 0);
-				serializer.deserializeArrayItem(
-					m_positons_rotations[i].m_rotation.z, 0);
-				serializer.deserializeArrayItem(
-					m_positons_rotations[i].m_rotation.w, 0);
+				serializer.deserializeArrayItem(m_positons_rotations[i].m_position.x, 0);
+				serializer.deserializeArrayItem(m_positons_rotations[i].m_position.y, 0);
+				serializer.deserializeArrayItem(m_positons_rotations[i].m_position.z, 0);
+				serializer.deserializeArrayItem(m_positons_rotations[i].m_rotation.x, 0);
+				serializer.deserializeArrayItem(m_positons_rotations[i].m_rotation.y, 0);
+				serializer.deserializeArrayItem(m_positons_rotations[i].m_rotation.z, 0);
+				serializer.deserializeArrayItem(m_positons_rotations[i].m_rotation.w, 0);
 			}
 			serializer.deserializeArrayEnd();
 		}
@@ -1092,23 +1080,20 @@ private:
 			m_old_values.clear();
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
-				const WorldEditor::ComponentList& cmps =
-					m_editor.getComponents(m_entities[i]);
+				const WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entities[i]);
 				PositionRotation pos_rot;
 				pos_rot.m_position = universe->getPosition(m_entities[i]);
 				pos_rot.m_rotation = universe->getRotation(m_entities[i]);
 				m_positons_rotations.push(pos_rot);
 				m_old_values.write((int)cmps.size());
-				for (int j = cmps.size() - 1; j >= 0; --j)
+				for (int j = 0; j < cmps.size(); ++j)
 				{
 					m_old_values.write(cmps[j].type);
-					Array<IPropertyDescriptor*>& props =
-						PropertyRegister::getDescriptors(cmps[j].type);
+					Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmps[j].type);
 					for (int k = 0; k < props.size(); ++k)
 					{
 						props[k]->get(cmps[j], -1, m_old_values);
 					}
-					cmps[j].scene->destroyComponent(cmps[j].index, cmps[j].type);
 				}
 
 				universe->destroyEntity(Entity(m_entities[i]));
@@ -1127,13 +1112,13 @@ private:
 			InputBlob blob(m_old_values);
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
-				Entity new_entity = universe->createEntity(
-					m_positons_rotations[i].m_position, m_positons_rotations[i].m_rotation);
+				Entity new_entity =
+					universe->createEntity(m_positons_rotations[i].m_position, m_positons_rotations[i].m_rotation);
 				int cmps_count;
 				blob.read(cmps_count);
-				for (int j = cmps_count - 1; j >= 0; --j)
+				for (int j = 0; j < cmps_count; ++j)
 				{
-					ComponentUID::Type cmp_type;
+					ComponentType cmp_type;
 					blob.read(cmp_type);
 					ComponentUID new_component;
 					for (int i = 0; i < scenes.size(); ++i)
@@ -1206,7 +1191,7 @@ private:
 		{
 			serializer.serialize("entity", m_component.entity);
 			serializer.serialize("component", m_component.index);
-			serializer.serialize("component_type", m_component.type);
+			serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_component.type));
 		}
 
 
@@ -1214,9 +1199,10 @@ private:
 		{
 			serializer.deserialize("entity", m_component.entity, 0);
 			serializer.deserialize("component", m_component.index, 0);
-			serializer.deserialize("component_type", m_component.type, 0);
-			m_component.scene =
-				m_editor.getSceneByComponentType(m_component.type);
+			uint32 hash;
+			serializer.deserialize("component_type", hash, 0);
+			m_component.type = PropertyRegister::getComponentTypeFromHash(hash);
+			m_component.scene = m_editor.getSceneByComponentType(m_component.type);
 		}
 
 
@@ -1400,7 +1386,7 @@ public:
 	IAllocator& getAllocator() override { return m_allocator; }
 
 
-	IScene* getSceneByComponentType(uint32 hash) override
+	IScene* getSceneByComponentType(ComponentType hash) override
 	{
 		for (auto* scene : m_universe->getScenes())
 		{
@@ -1426,7 +1412,7 @@ public:
 	{
 		if (m_selected_entities.empty()) return;
 
-		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
+		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_TYPE);
 		Universe* universe = getUniverse();
 
 		if (m_selected_entities.size() > 1)
@@ -1597,7 +1583,7 @@ public:
 		else if (button == MouseButton::LEFT)
 		{
 			Vec3 origin, dir;
-			ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
+			ComponentUID camera_cmp = getComponent(m_camera, CAMERA_TYPE);
 			if (camera_cmp.isValid())
 			{
 				m_render_interface->getRay(camera_cmp.index, (float)x, (float)y, origin, dir);
@@ -1783,7 +1769,7 @@ public:
 		{
 			Entity entity = m_selected_entities[i];
 
-			ComponentUID renderable = getComponent(m_selected_entities[i], RENDERABLE_HASH);
+			ComponentUID renderable = getComponent(m_selected_entities[i], RENDERABLE_TYPE);
 			Vec3 origin = universe->getPosition(entity);
 			auto hit = m_render_interface->castRay(origin, Vec3(0, -1, 0), renderable.index);
 			if (hit.is_hit)
@@ -1826,7 +1812,7 @@ public:
 
 	Entity addEntity() override
 	{
-		ComponentUID cmp = getComponent(m_camera, CAMERA_HASH);
+		ComponentUID cmp = getComponent(m_camera, CAMERA_TYPE);
 		Vec2 size = m_render_interface->getCameraScreenSize(cmp.index);
 		return addEntityAt((int)size.x >> 1, (int)size.y >> 1);
 	}
@@ -1834,7 +1820,7 @@ public:
 
 	Entity addEntityAt(int camera_x, int camera_y) override
 	{
-		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
+		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_TYPE);
 		Universe* universe = getUniverse();
 		Vec3 origin;
 		Vec3 dir;
@@ -1859,7 +1845,7 @@ public:
 
 	Vec3 getCameraRaycastHit() override
 	{
-		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
+		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_TYPE);
 		Universe* universe = getUniverse();
 		Vec2 screen_size = m_render_interface->getCameraScreenSize(camera_cmp.index);
 		screen_size *= 0.5f;
@@ -2123,10 +2109,9 @@ public:
 			m_copy_buffer.write(count);
 			for (int i = 0; i < count; ++i)
 			{
-				uint32 cmp_type = cmps[i].type;
+				uint32 cmp_type = PropertyRegister::getComponentTypeHash(cmps[i].type);
 				m_copy_buffer.write(cmp_type);
-				Array<IPropertyDescriptor*>& props =
-					PropertyRegister::getDescriptors(cmps[i].type);
+				Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmps[i].type);
 				int32 prop_count = props.size();
 				for (int j = 0; j < prop_count; ++j)
 				{
@@ -2193,7 +2178,7 @@ public:
 
 	void destroyComponent(const ComponentUID& component) override
 	{
-		if (component.entity == m_camera && component.type == CAMERA_HASH)
+		if (component.entity == m_camera && component.type == CAMERA_TYPE)
 		{
 			g_log_error.log("Editor")
 				<< "Can not destroy component from the editing camera";
@@ -2209,7 +2194,7 @@ public:
 	}
 
 
-	void addComponent(uint32 type_crc) override
+	void addComponent(ComponentType type_crc) override
 	{
 		if (!m_selected_entities.empty())
 		{
@@ -2370,7 +2355,7 @@ public:
 	}
 
 
-	ComponentUID getComponent(Entity entity, uint32 type) override
+	ComponentUID getComponent(Entity entity, ComponentType type) override
 	{
 		const Array<ComponentUID>& cmps = getComponents(entity);
 		for (int i = 0; i < cmps.size(); ++i)
@@ -2402,7 +2387,7 @@ public:
 
 	ComponentUID getEditCamera() override
 	{
-		return getComponent(m_camera, CAMERA_HASH);
+		return getComponent(m_camera, CAMERA_TYPE);
 	}
 
 
@@ -2546,7 +2531,7 @@ public:
 	}
 
 
-	void setProperty(uint32 component,
+	void setProperty(ComponentType component_type,
 		int index,
 		const IPropertyDescriptor& property,
 		const void* data,
@@ -2554,12 +2539,11 @@ public:
 	{
 
 		ASSERT(m_selected_entities.size() == 1);
-		uint32 component_hash = component;
-		ComponentUID cmp = getComponent(m_selected_entities[0], component_hash);
+		ComponentUID cmp = getComponent(m_selected_entities[0], component_type);
 		if (cmp.isValid())
 		{
 			static const uint32 SLOT_HASH = crc32("Slot");
-			if (component == CAMERA_HASH && property.getNameHash() == SLOT_HASH)
+			if (component_type == CAMERA_TYPE && property.getNameHash() == SLOT_HASH)
 			{
 				if (m_render_interface->getCameraEntity(cmp.index) == m_camera)
 				{
@@ -2746,16 +2730,13 @@ public:
 	}
 
 
-	ComponentUID createComponent(uint32 hash, Entity entity)
+	ComponentUID createComponent(ComponentType type, Entity entity)
 	{
 		const Array<IScene*>& scenes = m_universe->getScenes();
 		ComponentUID cmp;
 		for (int i = 0; i < scenes.size(); ++i)
 		{
-			cmp = ComponentUID(entity,
-							   hash,
-							   scenes[i],
-							   scenes[i]->createComponent(hash, entity));
+			cmp = ComponentUID(entity, type, scenes[i], scenes[i]->createComponent(type, entity));
 
 			if (cmp.isValid())
 			{
@@ -2790,7 +2771,7 @@ public:
 		{
 			m_camera = universe->createEntity(Vec3(0, 0, -5), Quat(Vec3(0, 1, 0), -Math::PI));
 			universe->setEntityName(m_camera, "editor_camera");
-			ComponentUID cmp = createComponent(CAMERA_HASH, m_camera);
+			ComponentUID cmp = createComponent(CAMERA_TYPE, m_camera);
 			ASSERT(cmp.isValid());
 			m_render_interface->setCameraSlot(cmp.index, "editor");
 		}
@@ -3174,10 +3155,10 @@ bool PasteEntityCommand::execute()
 		blob.read(count);
 		for (int i = 0; i < count; ++i)
 		{
-			uint32 type;
-			blob.read(type);
-			ComponentUID cmp =
-				static_cast<WorldEditorImpl&>(m_editor).createComponent(type, new_entity);
+			uint32 hash;
+			blob.read(hash);
+			ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
+			ComponentUID cmp = static_cast<WorldEditorImpl&>(m_editor).createComponent(type, new_entity);
 			Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(type);
 			for (int j = 0; j < props.size(); ++j)
 			{

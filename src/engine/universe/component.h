@@ -14,17 +14,15 @@ class IScene;
 struct LUMIX_ENGINE_API ComponentUID final
 {
 
-	typedef uint32 Type;
-
 	ComponentUID()
 	{
 		index = -1;
 		scene = nullptr;
 		entity = -1;
-		type = 0;
+		type = {-1};
 	}
 
-	ComponentUID(Entity _entity, uint32 _type, IScene* _scene, int _index)
+	ComponentUID(Entity _entity, ComponentType _type, IScene* _scene, int _index)
 		: entity(_entity)
 		, type(_type)
 		, scene(_scene)
@@ -33,7 +31,7 @@ struct LUMIX_ENGINE_API ComponentUID final
 	}
 
 	Entity entity; 
-	Type type;
+	ComponentType type;
 	IScene* scene;
 	ComponentIndex index;
 

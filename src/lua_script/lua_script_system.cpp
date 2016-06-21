@@ -33,6 +33,7 @@ namespace Lumix
 	};
 	
 	
+	static const ComponentType LUA_SCRIPT_TYPE = PropertyRegister::getComponentType("lua_script");
 	static const uint32 LUA_SCRIPT_HASH = crc32("lua_script");
 
 
@@ -462,7 +463,7 @@ namespace Lumix
 		static int LUA_getProperty(lua_State* L)
 		{
 			auto* desc = LuaWrapper::toType<IPropertyDescriptor*>(L, lua_upvalueindex(1));
-			auto type = LuaWrapper::toType<uint32>(L, lua_upvalueindex(2));
+			ComponentType type = { LuaWrapper::toType<int>(L, lua_upvalueindex(2)) };
 			ComponentUID cmp;
 			cmp.scene = LuaWrapper::checkArg<IScene*>(L, 1);
 			cmp.index = LuaWrapper::checkArg<ComponentIndex>(L, 2);
@@ -538,7 +539,7 @@ namespace Lumix
 		static int LUA_setProperty(lua_State* L)
 		{
 			auto* desc = LuaWrapper::toType<IPropertyDescriptor*>(L, lua_upvalueindex(1));
-			auto type = LuaWrapper::toType<uint32>(L, lua_upvalueindex(2));
+			ComponentType type = { LuaWrapper::toType<int>(L, lua_upvalueindex(2)) };
 			ComponentUID cmp;
 			cmp.scene = LuaWrapper::checkArg<IScene*>(L, 1);
 			cmp.index = LuaWrapper::checkArg<ComponentIndex>(L, 2);
@@ -640,8 +641,8 @@ namespace Lumix
 				convertPropertyToLuaName(cmp_name, tmp, lengthOf(tmp));
 				lua_setglobal(L, tmp);
 
-				uint32 cmp_name_hash = crc32(cmp_name);
-				auto& descs = PropertyRegister::getDescriptors(cmp_name_hash);
+				ComponentType cmp_type = PropertyRegister::getComponentType(cmp_name);
+				auto& descs = PropertyRegister::getDescriptors(cmp_type);
 				char setter[50];
 				char getter[50];
 				for (auto* desc : descs)
@@ -664,12 +665,12 @@ namespace Lumix
 							catString(setter, tmp);
 							catString(getter, tmp);
 							lua_pushlightuserdata(L, desc);
-							lua_pushinteger(L, cmp_name_hash);
+							lua_pushinteger(L, cmp_type.index);
 							lua_pushcclosure(L, &LUA_setProperty, 2);
 							lua_setfield(L, -2, setter);
 
 							lua_pushlightuserdata(L, desc);
-							lua_pushinteger(L, cmp_name_hash);
+							lua_pushinteger(L, cmp_type.index);
 							lua_pushcclosure(L, &LUA_getProperty, 2);
 							lua_setfield(L, -2, getter);
 							break;
@@ -969,9 +970,9 @@ namespace Lumix
 		}
 
 
-		ComponentIndex createComponent(uint32 type, Entity entity) override
+		ComponentIndex createComponent(ComponentType type, Entity entity) override
 		{
-			if (type != LUA_SCRIPT_HASH) return INVALID_COMPONENT;
+			if (type != LUA_SCRIPT_TYPE) return INVALID_COMPONENT;
 
 			auto& allocator = m_system.getAllocator();
 			ScriptComponent& script = *LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
@@ -998,9 +999,9 @@ namespace Lumix
 		}
 
 
-		void destroyComponent(ComponentIndex component, uint32 type) override
+		void destroyComponent(ComponentIndex component, ComponentType type) override
 		{
-			if (type != LUA_SCRIPT_HASH) return;
+			if (type != LUA_SCRIPT_TYPE) return;
 
 			for (auto& scr : m_scripts[component]->m_scripts)
 			{
@@ -1171,7 +1172,7 @@ namespace Lumix
 					setScriptPath(*m_scripts[i], scr, Path(tmp));
 				}
 				m_universe.addComponent(
-					Entity(m_scripts[i]->m_entity), LUA_SCRIPT_HASH, this, i);
+					Entity(m_scripts[i]->m_entity), LUA_SCRIPT_TYPE, this, i);
 			}
 		}
 
@@ -1214,7 +1215,7 @@ namespace Lumix
 					prop.stored_value = tmp;
 				}
 				setScriptPath(script, scr, Path(tmp));
-				m_universe.addComponent(m_scripts[i]->m_entity, LUA_SCRIPT_HASH, this, i);
+				m_universe.addComponent(m_scripts[i]->m_entity, LUA_SCRIPT_TYPE, this, i);
 			}
 		}
 
@@ -1284,7 +1285,7 @@ namespace Lumix
 		}
 
 
-		ComponentIndex getComponent(Entity entity, uint32 type) override
+		ComponentIndex getComponent(Entity entity, ComponentType type) override
 		{
 			ASSERT(ownComponentType(type));
 			auto iter = m_entity_script_map.find(entity);
@@ -1293,9 +1294,9 @@ namespace Lumix
 		}
 
 
-		bool ownComponentType(uint32 type) const override
+		bool ownComponentType(ComponentType type) const override
 		{
-			return type == LUA_SCRIPT_HASH;
+			return type == LUA_SCRIPT_TYPE;
 		}
 
 
@@ -1421,9 +1422,7 @@ namespace Lumix
 		, m_allocator(engine.getAllocator())
 		, m_script_manager(m_allocator)
 	{
-		m_script_manager.create(crc32("lua_script"), engine.getResourceManager());
-
-		PropertyRegister::registerComponentType("lua_script");
+		m_script_manager.create(LUA_SCRIPT_HASH, engine.getResourceManager());
 	}
 
 

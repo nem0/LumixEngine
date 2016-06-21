@@ -1,11 +1,11 @@
 #include "engine/lumix.h"
 #include "engine/resource_manager_base.h"
-
 #include "engine/crc32.h"
 #include "engine/path.h"
 #include "engine/path_utils.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
+
 
 namespace Lumix
 {
@@ -16,7 +16,7 @@ namespace Lumix
 	}
 
 	void ResourceManagerBase::destroy(void)
-	{ 
+	{
 		for (auto iter = m_resources.begin(), end = m_resources.end(); iter != end; ++iter)
 		{
 			Resource* resource = iter.value();

@@ -34,7 +34,7 @@ namespace Lumix
 {
 
 
-static const uint32 NAVMESH_AGENT_HASH = crc32("navmesh_agent");
+static const ComponentType NAVMESH_AGENT_TYPE = PropertyRegister::getComponentType("navmesh_agent");
 static const int CELLS_PER_TILE_SIDE = 256;
 static const float CELL_SIZE = 0.3f;
 static void registerLuaAPI(lua_State* L);
@@ -1041,9 +1041,9 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
-	ComponentIndex createComponent(uint32 type, Entity entity) override
+	ComponentIndex createComponent(ComponentType type, Entity entity) override
 	{
-		if (type == NAVMESH_AGENT_HASH)
+		if (type == NAVMESH_AGENT_TYPE)
 		{
 			Agent* agent = LUMIX_NEW(m_allocator, Agent);
 			agent->entity = entity;
@@ -1060,9 +1060,9 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
-	void destroyComponent(ComponentIndex component, uint32 type) override
+	void destroyComponent(ComponentIndex component, ComponentType type) override
 	{
-		if (type == NAVMESH_AGENT_HASH)
+		if (type == NAVMESH_AGENT_TYPE)
 		{
 			auto iter = m_agents.find(component);
 			Agent* agent = iter.value();
@@ -1108,7 +1108,7 @@ struct NavigationSceneImpl : public NavigationScene
 				serializer.read(agent->height);
 				agent->agent = -1;
 				m_agents.insert(cmp, agent);
-				m_universe.addComponent(cmp, NAVMESH_AGENT_HASH, this, cmp);
+				m_universe.addComponent(cmp, NAVMESH_AGENT_TYPE, this, cmp);
 			}
 		}
 	}
@@ -1139,8 +1139,12 @@ struct NavigationSceneImpl : public NavigationScene
 
 
 	IPlugin& getPlugin() const override { return m_system; }
-	bool ownComponentType(uint32 type) const override { return false; }
-	ComponentIndex getComponent(Entity entity, uint32 type) override { return INVALID_COMPONENT; }
+	bool ownComponentType(ComponentType type) const override { return type == NAVMESH_AGENT_TYPE; }
+	ComponentIndex getComponent(Entity entity, ComponentType type) override
+	{
+		if (type == NAVMESH_AGENT_TYPE) return entity;
+		return INVALID_COMPONENT;
+	}
 	Universe& getUniverse() override { return m_universe; }
 
 	IAllocator& m_allocator;
@@ -1169,7 +1173,6 @@ struct NavigationSceneImpl : public NavigationScene
 void NavigationSystem::registerProperties()
 {
 	auto& allocator = m_engine.getAllocator();
-	PropertyRegister::registerComponentType("navmesh_agent");
 	PropertyRegister::add("navmesh_agent",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<NavigationSceneImpl>)(
 			"radius", &NavigationSceneImpl::getAgentRadius, &NavigationSceneImpl::setAgentRadius, 0, 999.0f, 0.1f, allocator));

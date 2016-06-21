@@ -20,6 +20,7 @@
 #include "engine/mt/task.h"
 #include "engine/mt/thread.h"
 #include "engine/path_utils.h"
+#include "engine/property_register.h"
 #include "engine/system.h"
 #include "engine/debug/floating_points.h"
 #include "engine/engine.h"
@@ -2429,15 +2430,17 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	pipeline->load();
 
 	auto mesh_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
-	auto mesh_cmp = render_scene->createComponent(Lumix::crc32("renderable"), mesh_entity);
+	static const auto RENDERABLE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
+	auto mesh_cmp = render_scene->createComponent(RENDERABLE_TYPE, mesh_entity);
 	render_scene->setRenderablePath(mesh_cmp, mesh_path);
 
 	auto mesh_side_entity = universe.createEntity({0, 0, 0}, {Lumix::Vec3(0, 1, 0), Lumix::Math::PI * 0.5f});
-	auto mesh_side_cmp = render_scene->createComponent(Lumix::crc32("renderable"), mesh_side_entity);
+	auto mesh_side_cmp = render_scene->createComponent(RENDERABLE_TYPE, mesh_side_entity);
 	render_scene->setRenderablePath(mesh_side_cmp, mesh_path);
 
 	auto light_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
-	auto light_cmp = render_scene->createComponent(Lumix::crc32("global_light"), light_entity);
+	static const auto GLOBAL_LIGHT_TYPE = Lumix::PropertyRegister::getComponentType("global_light");
+	auto light_cmp = render_scene->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
 	render_scene->setGlobalLightIntensity(light_cmp, 0);
 	render_scene->setLightAmbientIntensity(light_cmp, 1);
 
@@ -2452,7 +2455,8 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	Lumix::Vec3 camera_pos(
 		(aabb.min.x + aabb.max.x + size.z) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + 5);
 	auto camera_entity = universe.createEntity(camera_pos, { 0, 0, 0, 1 });
-	auto camera_cmp = render_scene->createComponent(Lumix::crc32("camera"), camera_entity);
+	static const auto CAMERA_TYPE = Lumix::PropertyRegister::getComponentType("camera");
+	auto camera_cmp = render_scene->createComponent(CAMERA_TYPE, camera_entity);
 	render_scene->setCameraOrtho(camera_cmp, true);
 	render_scene->setCameraSlot(camera_cmp, "main");
 	int width, height;

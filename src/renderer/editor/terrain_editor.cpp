@@ -29,8 +29,8 @@
 #include <cmath>
 
 
-static const Lumix::uint32 RENDERABLE_HASH = Lumix::crc32("renderable");
-static const Lumix::uint32 TERRAIN_HASH = Lumix::crc32("terrain");
+static const Lumix::ComponentType RENDERABLE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
+static const Lumix::ComponentType TERRAIN_TYPE = Lumix::PropertyRegister::getComponentType("terrain");
 static const Lumix::uint32 MATERIAL_HASH = Lumix::crc32("MATERIAL");
 static const char* HEIGHTMAP_UNIFORM = "u_texHeightmap";
 static const char* SPLATMAP_UNIFORM = "u_texSplatmap";
@@ -852,7 +852,7 @@ Lumix::uint16 TerrainEditor::getHeight(const Lumix::Vec3& world_pos)
 bool TerrainEditor::onEntityMouseDown(const Lumix::WorldEditor::RayHit& hit, int, int)
 {
 	if (m_world_editor.getSelectedEntities().size() != 1) return false;
-	auto terrain = m_world_editor.getComponent(m_world_editor.getSelectedEntities()[0], TERRAIN_HASH);
+	auto terrain = m_world_editor.getComponent(m_world_editor.getSelectedEntities()[0], TERRAIN_TYPE);
 	if (terrain.index == Lumix::INVALID_COMPONENT) return false;
 	if (!m_is_enabled) return false;
 	if (m_type == NOT_SET || !m_component.isValid()) return false;
@@ -1071,7 +1071,7 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 			Lumix::uint32 hash = Lumix::crc32(template_names[idx].c_str());
 			Lumix::Entity tpl = template_system.getInstances(hash)[0];
 			if(tpl < 0) continue;
-			Lumix::ComponentUID renderable = m_world_editor.getComponent(tpl, RENDERABLE_HASH);
+			Lumix::ComponentUID renderable = m_world_editor.getComponent(tpl, RENDERABLE_TYPE);
 			if(!renderable.isValid()) continue;
 			tpls.push({renderable.index, idx});
 		}
@@ -1164,7 +1164,7 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 	Lumix::RayCastModelHit hit = scene->castRayTerrain(m_component.index, origin, dir);
 	if (hit.m_is_hit)
 	{
-		Lumix::ComponentUID terrain = m_world_editor.getComponent(hit.m_entity, Lumix::crc32("terrain"));
+		Lumix::ComponentUID terrain = m_world_editor.getComponent(hit.m_entity, TERRAIN_TYPE);
 		if (terrain.isValid())
 		{
 			switch (m_type)
@@ -1443,7 +1443,7 @@ void TerrainEditor::onGUI()
 
 	for(auto entity : m_world_editor.getSelectedEntities())
 	{
-		Lumix::ComponentUID terrain = m_world_editor.getComponent(entity, TERRAIN_HASH);
+		Lumix::ComponentUID terrain = m_world_editor.getComponent(entity, TERRAIN_TYPE);
 		if(!terrain.isValid()) continue;
 
 		Lumix::ComponentUID camera_cmp = m_world_editor.getEditCamera();

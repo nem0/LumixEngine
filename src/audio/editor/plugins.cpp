@@ -10,6 +10,7 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
+#include "engine/property_register.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "renderer/render_scene.h"
@@ -198,9 +199,9 @@ struct EditorPlugin : public WorldEditor::Plugin
 
 	bool showGizmo(ComponentUID cmp) override
 	{
-		static const uint32 ECHO_ZONE_HASH = crc32("echo_zone");
+		static const ComponentType ECHO_ZONE_TYPE = PropertyRegister::getComponentType("echo_zone");
 
-		if (cmp.type == ECHO_ZONE_HASH)
+		if (cmp.type == ECHO_ZONE_TYPE)
 		{
 			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
 			float radius = audio_scene->getEchoZoneRadius(cmp.index);

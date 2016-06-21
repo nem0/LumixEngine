@@ -46,14 +46,14 @@
 using namespace Lumix;
 
 
-static const uint32 PARTICLE_EMITTER_HASH = crc32("particle_emitter");
-static const uint32 TERRAIN_HASH = crc32("terrain");
-static const uint32 CAMERA_HASH = crc32("camera");
-static const uint32 POINT_LIGHT_HASH = crc32("point_light");
-static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
-static const uint32 RENDERABLE_HASH = crc32("renderable");
+static const ComponentType PARTICLE_EMITTER_TYPE = PropertyRegister::getComponentType("particle_emitter");
+static const ComponentType TERRAIN_TYPE = PropertyRegister::getComponentType("terrain");
+static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
+static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType("point_light");
+static const ComponentType GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
+static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
+static const ComponentType ENVIRONMENT_PROBE_TYPE = PropertyRegister::getComponentType("environment_probe");
 static const uint32 RENDERER_HASH = crc32("renderer");
-static const uint32 ENVIRONMENT_PROBE_HASH = crc32("environment_probe");
 static const uint32 MATERIAL_HASH = crc32("MATERIAL");
 static const uint32 SHADER_HASH = crc32("SHADER");
 static const uint32 TEXTURE_HASH = crc32("TEXTURE");
@@ -344,15 +344,15 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 
 		auto mesh_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(crc32("renderer")));
-		m_mesh = render_scene->createComponent(crc32("renderable"), mesh_entity);
+		m_mesh = render_scene->createComponent(RENDERABLE_TYPE, mesh_entity);
 		
 		auto light_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		auto light_cmp = render_scene->createComponent(crc32("global_light"), light_entity);
+		auto light_cmp = render_scene->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
 		render_scene->setGlobalLightIntensity(light_cmp, 0);
 		render_scene->setLightAmbientIntensity(light_cmp, 1);
 		
 		m_camera_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		m_camera_cmp = render_scene->createComponent(crc32("camera"), m_camera_entity);
+		m_camera_cmp = render_scene->createComponent(CAMERA_TYPE, m_camera_entity);
 		render_scene->setCameraSlot(m_camera_cmp, "editor");
 		
 		m_pipeline->setScene(render_scene);
@@ -840,7 +840,7 @@ struct EnvironmentProbePlugin : public PropertyGrid::IPlugin
 
 		if(original_camera != INVALID_COMPONENT) scene->setCameraSlot(original_camera, "");
 		Entity camera_entity = universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		ComponentIndex camera_cmp = scene->createComponent(CAMERA_HASH, camera_entity);
+		ComponentIndex camera_cmp = scene->createComponent(CAMERA_TYPE, camera_entity);
 		scene->setCameraSlot(camera_cmp, "main");
 		scene->setCameraFOV(camera_cmp, 90);
 
@@ -897,7 +897,7 @@ struct EnvironmentProbePlugin : public PropertyGrid::IPlugin
 		saveCubemap(cmp, data, TEXTURE_SIZE);
 		bgfx::destroyTexture(texture);
 		
-		scene->destroyComponent(camera_cmp, CAMERA_HASH);
+		scene->destroyComponent(camera_cmp, CAMERA_TYPE);
 		universe->destroyEntity(camera_entity);
 		if (original_camera != INVALID_COMPONENT) scene->setCameraSlot(original_camera, "main");
 
@@ -907,7 +907,7 @@ struct EnvironmentProbePlugin : public PropertyGrid::IPlugin
 
 	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
 	{
-		if (cmp.type != ENVIRONMENT_PROBE_HASH) return;
+		if (cmp.type != ENVIRONMENT_PROBE_TYPE) return;
 
 		auto* scene = static_cast<RenderScene*>(cmp.scene);
 		auto* texture = scene->getEnvironmentProbeTexture(cmp.index);
@@ -935,7 +935,7 @@ struct EmitterPlugin : public PropertyGrid::IPlugin
 
 	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
 	{
-		if (cmp.type != PARTICLE_EMITTER_HASH) return;
+		if (cmp.type != PARTICLE_EMITTER_TYPE) return;
 		
 		ImGui::Separator();
 		ImGui::Checkbox("Update", &m_particle_emitter_updating);
@@ -977,7 +977,7 @@ struct TerrainPlugin : public PropertyGrid::IPlugin
 
 	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
 	{
-		if (cmp.type != TERRAIN_HASH) return;
+		if (cmp.type != TERRAIN_TYPE) return;
 
 		m_terrain_editor->setComponent(cmp);
 		m_terrain_editor->onGUI();
@@ -1678,22 +1678,22 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 
 	bool showGizmo(ComponentUID cmp) override 
 	{
-		if (cmp.type == CAMERA_HASH)
+		if (cmp.type == CAMERA_TYPE)
 		{
 			showCameraGizmo(cmp);
 			return true;
 		}
-		if (cmp.type == POINT_LIGHT_HASH)
+		if (cmp.type == POINT_LIGHT_TYPE)
 		{
 			showPointLightGizmo(cmp);
 			return true;
 		}
-		if (cmp.type == GLOBAL_LIGHT_HASH)
+		if (cmp.type == GLOBAL_LIGHT_TYPE)
 		{
 			showGlobalLightGizmo(cmp);
 			return true;
 		}
-		if (cmp.type == RENDERABLE_HASH)
+		if (cmp.type == RENDERABLE_TYPE)
 		{
 			showRenderableGizmo(cmp);
 			return true;
@@ -1715,7 +1715,7 @@ LUMIX_STUDIO_ENTRY(renderer)
 	app.registerComponentWithResource("renderable", "Mesh", MODEL_HASH, "Source");
 	app.registerComponentWithResource("particle_emitter", "Particle emitter", MATERIAL_HASH, "Material");
 	app.registerComponent("particle_emitter_spawn_shape", "Particle emitter - spawn shape");
-	app.registerComponent("particle_emitter_fade", "Particle emitter - fade");
+	app.registerComponent("particle_emitter_alpha", "Particle emitter - alpha");
 	app.registerComponent("particle_emitter_plane", "Particle emitter - plane");
 	app.registerComponent("particle_emitter_force", "Particle emitter - force");
 	app.registerComponent("particle_emitter_attractor", "Particle emitter - attractor");

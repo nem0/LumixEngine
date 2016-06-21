@@ -31,6 +31,7 @@
 using namespace Lumix;
 
 
+static const ComponentType LUA_SCRIPT_TYPE = PropertyRegister::getComponentType("lua_script");
 static const uint32 LUA_SCRIPT_HASH = crc32("lua_script");
 
 
@@ -378,7 +379,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 
 	void onGUI(PropertyGrid& grid, Lumix::ComponentUID cmp) override
 	{
-		if (cmp.type != LUA_SCRIPT_HASH) return;
+		if (cmp.type != LUA_SCRIPT_TYPE) return;
 
 		auto* scene = static_cast<LuaScriptScene*>(cmp.scene);
 		auto& editor = *m_app.getWorldEditor();
@@ -644,14 +645,14 @@ struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 					Entity entity = editor.addEntity();
 					editor.selectEntities(&entity, 1);
 				}
-				editor.addComponent(LUA_SCRIPT_HASH);
+				editor.addComponent(LUA_SCRIPT_TYPE);
 
 				auto& allocator = editor.getAllocator();
 				auto* cmd = LUMIX_NEW(allocator, PropertyGridPlugin::AddScriptCommand);
 
 				cmd->scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_HASH));
 				Entity entity = editor.getSelectedEntities()[0];
-				cmd->cmp = editor.getComponent(entity, LUA_SCRIPT_HASH).index;
+				cmd->cmp = editor.getComponent(entity, LUA_SCRIPT_TYPE).index;
 				editor.executeCommand(cmd);
 
 				auto* set_source_cmd = LUMIX_NEW(allocator, PropertyGridPlugin::SetPropertyCommand)(

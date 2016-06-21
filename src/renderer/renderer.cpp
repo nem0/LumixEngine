@@ -71,10 +71,10 @@ namespace Lumix
 {
 
 
-static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
-static const uint32 POINT_LIGHT_HASH = crc32("point_light");
-static const uint32 RENDERABLE_HASH = crc32("renderable");
-static const uint32 CAMERA_HASH = crc32("camera");
+static const ComponentType GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
+static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType("point_light");
+static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
+static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
 static const uint32 MATERIAL_HASH = crc32("MATERIAL");
 static const uint32 MODEL_HASH = crc32("MODEL");
 static const uint32 SHADER_HASH = crc32("SHADER");
@@ -145,24 +145,7 @@ struct BonePropertyDescriptor : public IEnumPropertyDescriptor
 
 static void registerProperties(IAllocator& allocator)
 {
-	PropertyRegister::registerComponentType("camera");
-	PropertyRegister::registerComponentType("global_light");
-	PropertyRegister::registerComponentType("renderable");
-	PropertyRegister::registerComponentType("particle_emitter");
-	PropertyRegister::registerComponentType("particle_emitter_spawn_shape");
-	PropertyRegister::registerComponentType("particle_emitter_fade");
-	PropertyRegister::registerComponentType("particle_emitter_plane");
-	PropertyRegister::registerComponentType("particle_emitter_force");
-	PropertyRegister::registerComponentType("particle_emitter_attractor");
-	PropertyRegister::registerComponentType("particle_emitter_linear_movement");
-	PropertyRegister::registerComponentType("particle_emitter_random_rotation");
-	PropertyRegister::registerComponentType("particle_emitter_size");
-	PropertyRegister::registerComponentType("point_light");
-	PropertyRegister::registerComponentType("terrain");
-	PropertyRegister::registerComponentType("bone_attachment");
-	PropertyRegister::registerComponentType("environment_probe");
-
-	PropertyRegister::registerComponentDependency("particle_emitter_fade", "particle_emitter");
+	PropertyRegister::registerComponentDependency("particle_emitter_alpha", "particle_emitter");
 	PropertyRegister::registerComponentDependency("particle_emitter_force", "particle_emitter");
 	PropertyRegister::registerComponentDependency(
 		"particle_emitter_linear_movement", "particle_emitter");
@@ -228,7 +211,7 @@ static void registerProperties(IAllocator& allocator)
 			allocator));
 	PropertyRegister::add("particle_emitter_attractor", attractor_module_planes);
 
-	PropertyRegister::add("particle_emitter_fade",
+	PropertyRegister::add("particle_emitter_alpha",
 		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Alpha",
 							  &RenderScene::getParticleEmitterAlpha,
 							  &RenderScene::setParticleEmitterAlpha,

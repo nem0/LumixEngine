@@ -19,8 +19,7 @@
 namespace Lumix
 {
 
-static const uint32 RENDERABLE_HASH = crc32("renderable");
-static const uint32 ANIMABLE_HASH = crc32("animable");
+static const ComponentType ANIMABLE_TYPE = PropertyRegister::getComponentType("animable");
 static const uint32 ANIMATION_HASH = crc32("ANIMATION");
 
 namespace FS
@@ -116,7 +115,7 @@ struct AnimationSceneImpl : public AnimationScene
 	Universe& getUniverse() override { return m_universe; }
 
 
-	ComponentIndex getComponent(Entity entity, uint32 type) override
+	ComponentIndex getComponent(Entity entity, ComponentType type) override
 	{
 		ASSERT(ownComponentType(type));
 		for (int i = 0; i < m_animables.size(); ++i)
@@ -127,12 +126,12 @@ struct AnimationSceneImpl : public AnimationScene
 	}
 
 
-	bool ownComponentType(uint32 type) const override { return type == ANIMABLE_HASH; }
+	bool ownComponentType(ComponentType type) const override { return type == ANIMABLE_TYPE; }
 
 
-	ComponentIndex createComponent(uint32 type, Entity entity) override
+	ComponentIndex createComponent(ComponentType type, Entity entity) override
 	{
-		if (type == ANIMABLE_HASH) return createAnimable(entity);
+		if (type == ANIMABLE_TYPE) return createAnimable(entity);
 		return INVALID_COMPONENT;
 	}
 
@@ -147,9 +146,9 @@ struct AnimationSceneImpl : public AnimationScene
 	}
 
 
-	void destroyComponent(ComponentIndex component, uint32 type) override
+	void destroyComponent(ComponentIndex component, ComponentType type) override
 	{
-		if (type == ANIMABLE_HASH)
+		if (type == ANIMABLE_TYPE)
 		{
 			unloadAnimation(m_animables[component].animation);
 			m_animables[component].flags |= Animable::FREE;
@@ -217,7 +216,7 @@ struct AnimationSceneImpl : public AnimationScene
 			m_animables[i].animation = path[0] == '\0' ? nullptr : loadAnimation(Path(path));
 			if ((m_animables[i].flags & Animable::FREE) == 0)
 			{
-				m_universe.addComponent(m_animables[i].entity, ANIMABLE_HASH, this, i);
+				m_universe.addComponent(m_animables[i].entity, ANIMABLE_TYPE, this, i);
 			}
 		}
 	}
@@ -311,7 +310,7 @@ struct AnimationSceneImpl : public AnimationScene
 		animable.time_scale = 1;
 		animable.start_time = 0;
 
-		m_universe.addComponent(entity, ANIMABLE_HASH, this, cmp);
+		m_universe.addComponent(entity, ANIMABLE_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -335,8 +334,6 @@ struct AnimationSystemImpl : public IPlugin
 		, m_engine(engine)
 		, animation_manager(m_allocator)
 	{
-		PropertyRegister::registerComponentType("animable");
-
 		PropertyRegister::add("animable",
 			LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationSceneImpl>)("Animation",
 								  &AnimationSceneImpl::getAnimation,

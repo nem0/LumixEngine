@@ -409,17 +409,16 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 		ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode;
 	bool is_opened = ImGui::CollapsingHeader(m_app.getComponentTypeName(cmp), nullptr, flags);
 
+	ImGui::PushID(cmp.type.index);
 	if (!m_editor.canRemove(cmp))
 	{
 		ImGui::Text("Remove dependents first.");
 	}
 	else
 	{
-		ImGui::PushID(cmp.type);
 		float w = ImGui::GetContentRegionAvailWidth();
 		ImGui::SameLine(w - 45);
-		if (ImGui::Button(
-			Lumix::StaticString<30>("Remove###", cmp.type)))
+		if (ImGui::Button("Remove"))
 		{
 			m_editor.destroyComponent(cmp);
 			ImGui::PopID();

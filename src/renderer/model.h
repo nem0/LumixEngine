@@ -42,7 +42,7 @@ struct LUMIX_RENDERER_API RayCastModelHit
 	Mesh* m_mesh;
 	ComponentIndex m_component;
 	Entity m_entity;
-	uint32 m_component_type;
+	ComponentType m_component_type;
 };
 
 
