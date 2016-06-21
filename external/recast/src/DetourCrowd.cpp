@@ -16,6 +16,8 @@
 // 3. This notice may not be removed or altered from any source distribution.
 //
 
+// This source is altered
+
 #define _USE_MATH_DEFINES
 #include <string.h>
 #include <float.h>
@@ -1201,7 +1203,7 @@ void dtCrowd::update(const float dt, dtCrowdAgentDebugInfo* debug)
 				calcStraightSteerDirection(ag, dvel);
 			
 			// Calculate speed scale, which tells the agent to slowdown at the end of the path.
-			const float slowDownRadius = ag->params.radius*2;	// TODO: make less hacky.
+			const float slowDownRadius = 0.5f * ag->params.maxSpeed * ag->params.maxSpeed / ag->params.maxAcceleration;
 			const float speedScale = getDistanceToGoal(ag, slowDownRadius) / slowDownRadius;
 				
 			ag->desiredSpeed = ag->params.maxSpeed;
