@@ -4,6 +4,15 @@
 #include "engine/lumix.h"
 
 
+#ifdef STATIC_PLUGINS
+	#define LUMIX_AUDIO_API
+#elif defined BUILDING_AUDIO
+	#define LUMIX_AUDIO_API LUMIX_LIBRARY_EXPORT
+#else
+	#define LUMIX_AUDIO_API LUMIX_LIBRARY_IMPORT
+#endif
+
+
 namespace Lumix
 {
 
