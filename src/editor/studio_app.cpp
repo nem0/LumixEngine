@@ -117,20 +117,24 @@ public:
 			void onGUI(bool create_entity) override
 			{
 				if (!ImGui::BeginMenu(label)) return;
-				auto* desc = Lumix::PropertyRegister::getDescriptor(id, property_id);
-				char buf[Lumix::MAX_PATH_LENGTH];
-				if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), resource_type, 300))
+				if (ImGui::BeginChild("size", ImVec2(250, 250)))
 				{
-					if (create_entity)
+					auto* desc = Lumix::PropertyRegister::getDescriptor(id, property_id);
+					char buf[Lumix::MAX_PATH_LENGTH];
+					if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), resource_type, 300))
 					{
-						Lumix::Entity entity = editor->addEntity();
-						editor->selectEntities(&entity, 1);
-					}
+						if (create_entity)
+						{
+							Lumix::Entity entity = editor->addEntity();
+							editor->selectEntities(&entity, 1);
+						}
 
-					editor->addComponent(id);
-					editor->setProperty(id, -1, *desc, buf, Lumix::stringLength(buf) + 1);
-					ImGui::CloseCurrentPopup();
+						editor->addComponent(id);
+						editor->setProperty(id, -1, *desc, buf, Lumix::stringLength(buf) + 1);
+						ImGui::CloseCurrentPopup();
+					}
 				}
+				ImGui::EndChild();
 				ImGui::EndMenu();
 			}
 

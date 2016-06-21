@@ -431,7 +431,7 @@ bool AssetBrowser::resourceList(char* buf, int max_size, Lumix::uint32 type, flo
 	static char filter[128] = "";
 	ImGui::FilterInput("Filter", filter, sizeof(filter));
 
-	ImGui::BeginChild("Resources", ImVec2(250, height));
+	ImGui::BeginChild("Resources", ImVec2(0, height));
 	for (auto& unv : getResources(getTypeIndexFromManagerType(type)))
 	{
 		if (filter[0] != '\0' && strstr(unv.c_str(), filter) == nullptr) continue;

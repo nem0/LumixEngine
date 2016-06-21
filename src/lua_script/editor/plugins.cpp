@@ -632,33 +632,36 @@ struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 	void onGUI(bool create_entity) override
 	{
 		if (!ImGui::BeginMenu(getLabel())) return;
-
-		char buf[Lumix::MAX_PATH_LENGTH];
-		auto* asset_browser = app.getAssetBrowser();
-		if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), LUA_SCRIPT_HASH, 300))
+		if (ImGui::BeginChild("size", ImVec2(250, 250)))
 		{
-			auto& editor = *app.getWorldEditor();
-			if (create_entity)
+			char buf[Lumix::MAX_PATH_LENGTH];
+			auto* asset_browser = app.getAssetBrowser();
+			if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), LUA_SCRIPT_HASH, 300))
 			{
-				Entity entity = editor.addEntity();
-				editor.selectEntities(&entity, 1);
+				auto& editor = *app.getWorldEditor();
+				if (create_entity)
+				{
+					Entity entity = editor.addEntity();
+					editor.selectEntities(&entity, 1);
+				}
+				editor.addComponent(LUA_SCRIPT_HASH);
+
+				auto& allocator = editor.getAllocator();
+				auto* cmd = LUMIX_NEW(allocator, PropertyGridPlugin::AddScriptCommand);
+
+				cmd->scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_HASH));
+				Entity entity = editor.getSelectedEntities()[0];
+				cmd->cmp = editor.getComponent(entity, LUA_SCRIPT_HASH).index;
+				editor.executeCommand(cmd);
+
+				auto* set_source_cmd = LUMIX_NEW(allocator, PropertyGridPlugin::SetPropertyCommand)(
+					cmd->scene, cmd->cmp, 0, "-source", buf, allocator);
+				editor.executeCommand(set_source_cmd);
+
+				ImGui::CloseCurrentPopup();
 			}
-			editor.addComponent(LUA_SCRIPT_HASH);
-
-			auto& allocator = editor.getAllocator();
-			auto* cmd = LUMIX_NEW(allocator, PropertyGridPlugin::AddScriptCommand);
-			
-			cmd->scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_HASH));
-			Entity entity = editor.getSelectedEntities()[0];
-			cmd->cmp = editor.getComponent(entity, LUA_SCRIPT_HASH).index;
-			editor.executeCommand(cmd);
-
-			auto* set_source_cmd = LUMIX_NEW(allocator, PropertyGridPlugin::SetPropertyCommand)(
-				cmd->scene, cmd->cmp, 0, "-source", buf, allocator);
-			editor.executeCommand(set_source_cmd);
-
-			ImGui::CloseCurrentPopup();
 		}
+		ImGui::EndChild();
 		ImGui::EndMenu();
 	}
 
