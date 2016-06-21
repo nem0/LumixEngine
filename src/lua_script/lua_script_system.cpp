@@ -58,12 +58,20 @@ namespace Lumix
 
 	struct LuaScriptSceneImpl : public LuaScriptScene
 	{
+		struct TimerData
+		{
+			float time;
+			LuaScript* script;
+			lua_State* state;
+			int environment;
+			int func;
+		};
+
 		struct UpdateData
 		{
 			LuaScript* script;
 			lua_State* state;
 			int environment;
-			ComponentIndex cmp;
 		};
 
 
@@ -161,7 +169,7 @@ namespace Lumix
 				{
 					if ((!script.m_script || !script.m_script->isReady()) && script.m_state)
 					{
-						m_scene.destroy(*this, script);
+						m_scene.destroyInstance(*this, script);
 						continue;
 					}
 
@@ -275,6 +283,7 @@ namespace Lumix
 			, m_universe(ctx)
 			, m_scripts(system.getAllocator())
 			, m_updates(system.getAllocator())
+			, m_timers(system.getAllocator())
 			, m_entity_script_map(system.getAllocator())
 			, m_property_names(system.getAllocator())
 			, m_is_game_running(false)
@@ -674,6 +683,23 @@ namespace Lumix
 		}
 
 
+		static int setTimer(lua_State* L)
+		{
+			auto* scene = LuaWrapper::checkArg<LuaScriptSceneImpl*>(L, 1);
+			float time = LuaWrapper::checkArg<float>(L, 2);
+			if (!lua_isfunction(L, 3)) LuaWrapper::argError(L, 3, "function");
+			TimerData& timer = scene->m_timers.emplace();
+			timer.time = time;
+			timer.state = L;
+			timer.script = scene->m_current_script_instance->m_script;
+			lua_pushvalue(L, 3);
+			timer.func = luaL_ref(L, LUA_REGISTRYINDEX);
+			lua_pop(L, 1);
+			timer.environment = scene->m_current_script_instance->m_environment;
+			return 0;
+		}
+
+
 		LuaScript* preloadScript(const char* path)
 		{
 			auto* script_manager = m_system.m_engine.getResourceManager().get(LUA_SCRIPT_HASH);
@@ -723,6 +749,8 @@ namespace Lumix
 			REGISTER_FUNCTION(unloadScript);
 
 			#undef REGISTER_FUNCTION
+
+			LuaWrapper::createSystemFunction(engine_state, "LuaScript", "setTimer", &LuaScriptSceneImpl::setTimer);
 		}
 
 
@@ -823,7 +851,7 @@ namespace Lumix
 		}
 
 
-		void destroy(ScriptComponent& scr,  ScriptInstance& inst)
+		void destroyInstance(ScriptComponent& scr,  ScriptInstance& inst)
 		{
 			bool is_env_valid = lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment) == LUA_TTABLE;
 			ASSERT(is_env_valid);
@@ -839,6 +867,15 @@ namespace Lumix
 					lua_pop(inst.m_state, 1);
 				}
 				lua_pop(inst.m_state, 1);
+			}
+
+			for (int i = 0; i < m_timers.size(); ++i)
+			{
+				if (m_timers[i].environment == inst.m_environment)
+				{
+					m_timers.eraseFast(i);
+					--i;
+				}
 			}
 
 			for(int i = 0; i < m_updates.size(); ++i)
@@ -862,7 +899,7 @@ namespace Lumix
 
 			if (inst.m_script)
 			{
-				if (inst.m_state) destroy(cmp, inst);
+				if (inst.m_state) destroyInstance(cmp, inst);
 				inst.m_properties.clear();
 				auto& cb = inst.m_script->getObserverCb();
 				cb.unbind<ScriptComponent, &ScriptComponent::onScriptLoaded>(&cmp);
@@ -931,6 +968,7 @@ namespace Lumix
 		{
 			m_is_game_running = false;
 			m_updates.clear();
+			m_timers.clear();
 		}
 
 
@@ -967,13 +1005,9 @@ namespace Lumix
 		{
 			if (type != LUA_SCRIPT_HASH) return;
 
-			for (int i = 0, c = m_updates.size(); i < c; ++i)
-			{
-				if(m_updates[i].cmp == component) m_updates.erase(i);
-			}
 			for (auto& scr : m_scripts[component]->m_scripts)
 			{
-				if (scr.m_state) destroy(*m_scripts[component], scr);
+				if (scr.m_state) destroyInstance(*m_scripts[component], scr);
 				if (scr.m_script)
 				{
 					auto& cb = scr.m_script->getObserverCb();
@@ -1195,6 +1229,45 @@ namespace Lumix
 		{
 			if (paused) return;
 
+			int timers_to_remove[1024];
+			int timers_to_remove_count = 0;
+			for (int i = 0, c = m_timers.size(); i < c; ++i)
+			{
+				auto& timer = m_timers[i];
+				timer.time -= time_delta;
+				if (timer.time < 0)
+				{
+					if (lua_rawgeti(timer.state, LUA_REGISTRYINDEX, timer.environment) != LUA_TTABLE)
+					{
+						ASSERT(false);
+					}
+					if (lua_rawgeti(timer.state, LUA_REGISTRYINDEX, timer.func) != LUA_TFUNCTION)
+					{
+						ASSERT(false);
+					}
+
+					if (lua_pcall(timer.state, 0, 0, 0) != LUA_OK)
+					{
+						g_log_error.log("Lua Script") << lua_tostring(timer.state, -1);
+						lua_pop(timer.state, 1);
+					}
+					lua_pop(timer.state, 1);
+					timers_to_remove[timers_to_remove_count] = i;
+					++timers_to_remove_count;
+					if (timers_to_remove_count >= lengthOf(timers_to_remove))
+					{
+						g_log_error.log("Lua Script") << "Too many lua timers in one frame, some are not executed";
+						break;
+					}
+				}
+			}
+			for (int i = timers_to_remove_count - 1; i >= 0; --i)
+			{
+				auto& timer = m_timers[timers_to_remove[i]];
+				luaL_unref(timer.state, LUA_REGISTRYINDEX, timer.func);
+				m_timers.eraseFast(timers_to_remove[i]);
+			}
+
 			for (int i = 0, c = m_updates.size(); i < c; ++i)
 			{
 				auto& update_item = m_updates[i];
@@ -1343,6 +1416,7 @@ namespace Lumix
 		AssociativeArray<uint32, string> m_property_names;
 		Universe& m_universe;
 		Array<UpdateData> m_updates;
+		Array<TimerData> m_timers;
 		FunctionCall m_function_call;
 		ScriptInstance* m_current_script_instance;
 		bool m_is_api_registered;
