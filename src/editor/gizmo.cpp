@@ -1,14 +1,15 @@
 #include "engine/crc32.h"
+#include "engine/engine.h"
+#include "editor/gizmo.h"
 #include "engine/math_utils.h"
 #include "engine/matrix.h"
+#include "engine/property_register.h"
 #include "engine/quat.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
-#include "editor/gizmo.h"
-#include "editor/world_editor.h"
-#include "engine/engine.h"
-#include "render_interface.h"
 #include "engine/universe/universe.h"
+#include "editor/world_editor.h"
+#include "render_interface.h"
 #include <cfloat>
 #include <cmath>
 
@@ -17,7 +18,7 @@ namespace Lumix
 {
 
 
-static const uint32 RENDERABLE_HASH = crc32("renderable");
+static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
 static const float INFLUENCE_DISTANCE = 0.3f;
 static const uint32 X_COLOR = 0xff6363cf;
 static const uint32 Y_COLOR = 0xff63cf63;

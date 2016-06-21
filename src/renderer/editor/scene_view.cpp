@@ -27,7 +27,7 @@
 #include <SDL.h>
 
 
-static const Lumix::uint32 RENDERABLE_HASH = Lumix::crc32("renderable");
+static const Lumix::ComponentType RENDERABLE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
 
 
 struct InsertMeshCommand : public Lumix::IEditorCommand
@@ -86,7 +86,7 @@ struct InsertMeshCommand : public Lumix::IEditorCommand
 		Lumix::IScene* scene = nullptr;
 		for (int i = 0; i < scenes.size(); ++i)
 		{
-			cmp = scenes[i]->createComponent(RENDERABLE_HASH, m_entity);
+			cmp = scenes[i]->createComponent(RENDERABLE_TYPE, m_entity);
 
 			if (cmp >= 0)
 			{
@@ -101,11 +101,6 @@ struct InsertMeshCommand : public Lumix::IEditorCommand
 
 	void undo()
 	{
-		const auto& cmps = m_editor.getComponents(m_entity);
-		for (int i = 0; i < cmps.size(); ++i)
-		{
-			cmps[i].scene->destroyComponent(cmps[i].index, cmps[i].type);
-		}
 		m_editor.getUniverse()->destroyEntity(m_entity);
 		m_entity = Lumix::INVALID_ENTITY;
 	}
@@ -312,7 +307,7 @@ void SceneView::handleDrop(float x, float y)
 		}
 		else if (Lumix::PathUtils::hasExtension(path, "mat") && hit.m_mesh)
 		{
-			auto* desc = Lumix::PropertyRegister::getDescriptor(RENDERABLE_HASH, Lumix::crc32("Material"));
+			auto* desc = Lumix::PropertyRegister::getDescriptor(RENDERABLE_TYPE, Lumix::crc32("Material"));
 			auto drag_data = m_app.getDragData();
 			m_editor->selectEntities(&hit.m_entity, 1);
 			auto* model = m_pipeline->getScene()->getRenderableModel(hit.m_component);
@@ -326,7 +321,7 @@ void SceneView::handleDrop(float x, float y)
 				}
 			}
 			
-			m_editor->setProperty(RENDERABLE_HASH, mesh_index, *desc, drag_data.data, drag_data.size);
+			m_editor->setProperty(RENDERABLE_TYPE, mesh_index, *desc, drag_data.data, drag_data.size);
 		}
 	}
 }

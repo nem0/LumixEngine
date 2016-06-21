@@ -4,6 +4,7 @@
 
 #include "engine/crc32.h"
 #include "engine/math_utils.h"
+#include "engine/property_register.h"
 #include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
@@ -20,8 +21,8 @@ namespace
 {
 
 
-static const uint32 BOX_ACTOR_HASH = crc32("box_rigid_actor");
-static const uint32 CONTROLLER_HASH = crc32("physical_controller");
+static const ComponentType BOX_ACTOR_TYPE = PropertyRegister::getComponentType("box_rigid_actor");
+static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("physical_controller");
 
 
 struct EditorPlugin : public WorldEditor::Plugin
@@ -34,7 +35,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 	bool showGizmo(ComponentUID cmp) override
 	{
 		PhysicsScene* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
-		if (cmp.type == CONTROLLER_HASH)
+		if (cmp.type == CONTROLLER_TYPE)
 		{
 			auto* scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(crc32("renderer")));
 			float height = phy_scene->getControllerHeight(cmp.index);
@@ -46,7 +47,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 			return true;
 		}
 
-		if (cmp.type == BOX_ACTOR_HASH)
+		if (cmp.type == BOX_ACTOR_TYPE)
 		{
 			auto* scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(crc32("renderer")));
 			Vec3 extents = phy_scene->getHalfExtents(cmp.index);

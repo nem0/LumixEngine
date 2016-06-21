@@ -128,11 +128,6 @@ namespace Lumix
 
 	static void registerProperties(Lumix::IAllocator& allocator)
 	{
-		PropertyRegister::registerComponentType("box_rigid_actor");
-		PropertyRegister::registerComponentType("physical_controller");
-		PropertyRegister::registerComponentType("mesh_rigid_actor");
-		PropertyRegister::registerComponentType("physical_heightfield");
-
 		PropertyRegister::add("physical_controller",
 			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
 			&PhysicsScene::getControllerLayer,

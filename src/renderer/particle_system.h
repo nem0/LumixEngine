@@ -69,7 +69,7 @@ public:
 		virtual void update(float /*time_delta*/) {}
 		virtual void serialize(OutputBlob& blob) = 0;
 		virtual void deserialize(InputBlob& blob, int version) = 0;
-		virtual uint32 getType() const = 0;
+		virtual ComponentType getType() const = 0;
 		virtual void drawGizmo(WorldEditor& editor, RenderScene& scene) {}
 
 		ParticleEmitter& m_emitter;
@@ -82,9 +82,9 @@ public:
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob& blob) override;
 		void deserialize(InputBlob& blob, int version) override;
-		uint32 getType() const override { return s_type; }
+		ComponentType getType() const override { return s_type; }
 
-		static const uint32 s_type;
+		static const ComponentType s_type;
 		enum Shape : uint8
 		{
 			SPHERE
@@ -100,9 +100,9 @@ public:
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob& blob) override;
 		void deserialize(InputBlob& blob, int version) override;
-		uint32 getType() const override { return s_type; }
+		ComponentType getType() const override { return s_type; }
 
-		static const uint32 s_type;
+		static const ComponentType s_type;
 		Interval m_x;
 		Interval m_y;
 		Interval m_z;
@@ -115,10 +115,10 @@ public:
 		void serialize(OutputBlob& blob) override;
 		void deserialize(InputBlob& blob, int version) override;
 		void update(float time_delta) override;
-		uint32 getType() const override { return s_type; }
+		ComponentType getType() const override { return s_type; }
 		void drawGizmo(WorldEditor& editor, RenderScene& scene) override;
 
-		static const uint32 s_type;
+		static const ComponentType s_type;
 		Entity m_entities[8];
 		float m_bounce;
 		int m_count;
@@ -131,10 +131,10 @@ public:
 		void serialize(OutputBlob& blob) override;
 		void deserialize(InputBlob& blob, int version) override;
 		void update(float time_delta) override;
-		uint32 getType() const override { return s_type; }
+		ComponentType getType() const override { return s_type; }
 		void drawGizmo(WorldEditor& editor, RenderScene& scene) override;
 
-		static const uint32 s_type;
+		static const ComponentType s_type;
 		Entity m_entities[8];
 		float m_force;
 		int m_count;
@@ -147,9 +147,9 @@ public:
 		void serialize(OutputBlob& blob) override;
 		void deserialize(InputBlob& blob, int version) override;
 		void update(float time_delta) override;
-		uint32 getType() const override { return s_type; }
+		ComponentType getType() const override { return s_type; }
 
-		static const uint32 s_type;
+		static const ComponentType s_type;
 		Vec3 m_acceleration;
 	};
 
@@ -160,10 +160,10 @@ public:
 		void update(float time_delta) override;
 		void serialize(OutputBlob&) override;
 		void deserialize(InputBlob&, int) override;
-		uint32 getType() const override { return s_type; }
+		ComponentType getType() const override { return s_type; }
 		void sample();
 
-		static const uint32 s_type;
+		static const ComponentType s_type;
 
 		Array<Vec2> m_values;
 		Array<float> m_sampled;
@@ -176,10 +176,10 @@ public:
 		void update(float time_delta) override;
 		void serialize(OutputBlob&) override;
 		void deserialize(InputBlob&, int) override;
-		uint32 getType() const override { return s_type; }
+		ComponentType getType() const override { return s_type; }
 		void sample();
 
-		static const uint32 s_type;
+		static const ComponentType s_type;
 
 		Array<Vec2> m_values;
 		Array<float> m_sampled;
@@ -192,9 +192,9 @@ public:
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob&) override {}
 		void deserialize(InputBlob&, int) override {}
-		uint32 getType() const override { return s_type; }
+		ComponentType getType() const override { return s_type; }
 
-		static const uint32 s_type;
+		static const ComponentType s_type;
 	};
 
 
@@ -211,6 +211,7 @@ public:
 	void setMaterial(Material* material);
 	IAllocator& getAllocator() { return m_allocator; }
 	void addModule(ModuleBase* module);
+	ModuleBase* getModule(ComponentType hash);
 
 public:
 	Array<float> m_rel_life;

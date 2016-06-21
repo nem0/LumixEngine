@@ -198,11 +198,6 @@ private:
 
 		void undo() override
 		{
-			const WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entity);
-			for (int i = 0; i < cmps.size(); ++i)
-			{
-				cmps[i].scene->destroyComponent(cmps[i].index, cmps[i].type);
-			}
 			m_entity_system.m_universe->destroyEntity(m_entity);
 			m_entity = INVALID_ENTITY;
 		}

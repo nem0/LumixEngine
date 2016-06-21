@@ -107,7 +107,7 @@ public:
 	}
 
 
-	void registerComponentWithResource(const char* id,
+	void registerComponentWithResource(const char* type,
 		const char* label,
 		Lumix::uint32 resource_type,
 		const char* property_name) override
@@ -119,7 +119,7 @@ public:
 				if (!ImGui::BeginMenu(label)) return;
 				if (ImGui::BeginChild("size", ImVec2(250, 250)))
 				{
-					auto* desc = Lumix::PropertyRegister::getDescriptor(id, property_id);
+					auto* desc = Lumix::PropertyRegister::getDescriptor(type, property_id);
 					char buf[Lumix::MAX_PATH_LENGTH];
 					if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), resource_type, 300))
 					{
@@ -129,8 +129,8 @@ public:
 							editor->selectEntities(&entity, 1);
 						}
 
-						editor->addComponent(id);
-						editor->setProperty(id, -1, *desc, buf, Lumix::stringLength(buf) + 1);
+						editor->addComponent(type);
+						editor->setProperty(type, -1, *desc, buf, Lumix::stringLength(buf) + 1);
 						ImGui::CloseCurrentPopup();
 					}
 				}
@@ -147,7 +147,7 @@ public:
 			PropertyGrid* property_grid;
 			AssetBrowser* asset_browser;
 			Lumix::WorldEditor* editor;
-			Lumix::uint32 id;
+			Lumix::ComponentType type;
 			Lumix::uint32 resource_type;
 			Lumix::uint32 property_id;
 			char label[50];
@@ -157,14 +157,14 @@ public:
 		auto* plugin = LUMIX_NEW(allocator, Plugin);
 		plugin->property_grid = m_property_grid;
 		plugin->asset_browser = m_asset_browser;
-		plugin->id = Lumix::crc32(id);
+		plugin->type = Lumix::PropertyRegister::getComponentType(type);
 		plugin->editor = m_editor;
 		plugin->property_id = Lumix::crc32(property_name);
 		plugin->resource_type = resource_type;
 		Lumix::copyString(plugin->label, label);
 		addPlugin(*plugin);
 
-		m_component_labels.insert(plugin->id, Lumix::string(label, m_allocator));
+		m_component_labels.insert(plugin->type, Lumix::string(label, m_allocator));
 	}
 
 
@@ -172,11 +172,11 @@ public:
 	{
 		addPlugin(plugin);
 		auto& allocator = m_editor->getAllocator();
-		m_component_labels.insert(Lumix::crc32(id), Lumix::string(label, m_allocator));
+		m_component_labels.insert(Lumix::PropertyRegister::getComponentType(id), Lumix::string(label, m_allocator));
 	}
 
 
-	void registerComponent(const char* id, const char* label) override
+	void registerComponent(const char* type, const char* label) override
 	{
 		struct Plugin : public IAddComponentPlugin
 		{
@@ -190,7 +190,7 @@ public:
 						editor->selectEntities(&entity, 1);
 					}
 
-					editor->addComponent(id);
+					editor->addComponent(type);
 				}
 			}
 
@@ -202,7 +202,7 @@ public:
 
 			Lumix::WorldEditor* editor;
 			PropertyGrid* property_grid;
-			Lumix::uint32 id;
+			Lumix::ComponentType type;
 			char label[50];
 		};
 
@@ -210,11 +210,11 @@ public:
 		auto* plugin = LUMIX_NEW(allocator, Plugin);
 		plugin->property_grid = m_property_grid;
 		plugin->editor = m_editor;
-		plugin->id = Lumix::crc32(id);
+		plugin->type = Lumix::PropertyRegister::getComponentType(type);
 		Lumix::copyString(plugin->label, label);
 		addPlugin(*plugin);
 
-		m_component_labels.insert(plugin->id, Lumix::string(label, m_allocator));
+		m_component_labels.insert(plugin->type, Lumix::string(label, m_allocator));
 	}
 
 
@@ -2003,7 +2003,7 @@ public:
 	Lumix::Array<Action*> m_toolbar_actions;
 	Lumix::Array<IPlugin*> m_plugins;
 	Lumix::Array<IAddComponentPlugin*> m_add_cmp_plugins;
-	Lumix::HashMap<Lumix::uint32, Lumix::string> m_component_labels;
+	Lumix::HashMap<Lumix::ComponentType, Lumix::string> m_component_labels;
 	Lumix::WorldEditor* m_editor;
 	bool m_confirm_exit;
 	bool m_confirm_load;

@@ -1,19 +1,29 @@
 #include "editor_icon.h"
 #include "editor/platform_interface.h"
 #include "engine/crc32.h"
+#include "engine/engine.h"
 #include "engine/math_utils.h"
 #include "engine/matrix.h"
+#include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
-#include "engine/engine.h"
-#include "render_interface.h"
 #include "engine/universe/universe.h"
+#include "render_interface.h"
 #include "world_editor.h"
 #include <cmath>
 
 
 namespace Lumix
 {
+
+
+static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
+static const ComponentType PHYSICAL_CONTROLLER_TYPE = PropertyRegister::getComponentType("physical_controller");
+static const ComponentType BOX_RIGID_ACTOR_TYPE = PropertyRegister::getComponentType("box_rigid_actor");
+static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
+static const ComponentType GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
+static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType("point_light");
+static const ComponentType TERRAIN_TYPE = PropertyRegister::getComponentType("terrain");
 
 
 enum class IconType
@@ -123,19 +133,11 @@ struct EditorIconsImpl : public EditorIcons
 		if (entity == 0) return;
 		if (m_editor.getEditCamera().entity == entity) return;
 
-		static const uint32 RENDERABLE_HASH = crc32("renderable");
-		static const uint32 PHYSICAL_CONTROLLER_HASH = crc32("physical_controller");
-		static const uint32 BOX_RIGID_ACTOR_HASH = crc32("box_rigid_actor");
-		static const uint32 CAMERA_HASH = crc32("camera");
-		static const uint32 GLOBAL_LIGHT_HASH = crc32("global_light");
-		static const uint32 POINT_LIGHT_HASH = crc32("point_light");
-		static const uint32 TERRAIN_HASH = crc32("terrain");
-
 		const WorldEditor::ComponentList& cmps = m_editor.getComponents(entity);
 
 		for(auto& cmp : cmps)
 		{
-			if (cmp.type == RENDERABLE_HASH) return;
+			if (cmp.type == RENDERABLE_TYPE) return;
 		}
 
 		auto& icon = m_icons.emplace();
@@ -143,27 +145,27 @@ struct EditorIconsImpl : public EditorIcons
 		icon.type = IconType::ENTITY;
 		for(auto& cmp : cmps)
 		{
-			if(cmp.type == PHYSICAL_CONTROLLER_HASH)
+			if(cmp.type == PHYSICAL_CONTROLLER_TYPE)
 			{
 				icon.type = IconType::PHYSICAL_CONTROLLER;
 				break;
 			}
-			if(cmp.type == BOX_RIGID_ACTOR_HASH)
+			if(cmp.type == BOX_RIGID_ACTOR_TYPE)
 			{
 				icon.type = IconType::PHYSICAL_BOX;
 				break;
 			}
-			if(cmp.type == CAMERA_HASH)
+			if(cmp.type == CAMERA_TYPE)
 			{
 				icon.type = IconType::CAMERA;
 				break;
 			}
-			if(cmp.type == GLOBAL_LIGHT_HASH || cmp.type == POINT_LIGHT_HASH)
+			if(cmp.type == GLOBAL_LIGHT_TYPE || cmp.type == POINT_LIGHT_TYPE)
 			{
 				icon.type = IconType::LIGHT;
 				break;
 			}
-			if(cmp.type == TERRAIN_HASH)
+			if(cmp.type == TERRAIN_TYPE)
 			{
 				icon.type = IconType::TERRAIN;
 				break;

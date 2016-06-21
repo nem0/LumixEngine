@@ -74,6 +74,14 @@ namespace Lumix
 	const uint32 MAX_PATH_LENGTH = 260;
 	typedef int ComponentIndex;
 	typedef int Entity;
+	struct ComponentType
+	{
+		int index;
+		bool operator==(const ComponentType& rhs) const { return rhs.index == index; };
+		bool operator<(const ComponentType& rhs) const { return rhs.index < index; };
+		bool operator>(const ComponentType& rhs) const { return rhs.index > index; };
+		bool operator!=(const ComponentType& rhs) const { return rhs.index != index; };
+	};
 	const int INVALID_ENTITY = -1;
 	const int INVALID_COMPONENT = -1;
 

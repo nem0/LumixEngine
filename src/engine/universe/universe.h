@@ -32,8 +32,8 @@ public:
 	void createEntity(Entity entity);
 	Entity createEntity(const Vec3& position, const Quat& rotation);
 	void destroyEntity(Entity entity);
-	void addComponent(Entity entity, uint32 component_type, IScene* scene, int index);
-	void destroyComponent(Entity entity, uint32 component_type, IScene* scene, int index);
+	void addComponent(Entity entity, ComponentType component_type, IScene* scene, int index);
+	void destroyComponent(Entity entity, ComponentType component_type, IScene* scene, int index);
 	int getEntityCount() const { return m_transformations.size(); }
 
 	int getDenseIdx(Entity entity);
@@ -85,6 +85,7 @@ private:
 	IAllocator& m_allocator;
 	Array<IScene*> m_scenes;
 	Array<Transformation> m_transformations;
+	Array<uint64> m_components;
 	Array<int> m_entity_map;
 	AssociativeArray<uint32, uint32> m_name_to_id_map;
 	AssociativeArray<uint32, string> m_id_to_name_map;

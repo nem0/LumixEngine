@@ -9,6 +9,7 @@
 #include "engine/matrix.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
+#include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/engine.h"
@@ -25,10 +26,10 @@ namespace Lumix
 {
 
 
-static const uint32 BOX_ACTOR_HASH = crc32("box_rigid_actor");
-static const uint32 MESH_ACTOR_HASH = crc32("mesh_rigid_actor");
-static const uint32 CONTROLLER_HASH = crc32("physical_controller");
-static const uint32 HEIGHTFIELD_HASH = crc32("physical_heightfield");
+static const ComponentType BOX_ACTOR_TYPE = PropertyRegister::getComponentType("box_rigid_actor");
+static const ComponentType MESH_ACTOR_TYPE = PropertyRegister::getComponentType("mesh_rigid_actor");
+static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("physical_controller");
+static const ComponentType HEIGHTFIELD_TYPE = PropertyRegister::getComponentType("physical_heightfield");
 static const uint32 TEXTURE_HASH = crc32("TEXTURE");
 static const uint32 PHYSICS_HASH = crc32("PHYSICS");
 
@@ -308,17 +309,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 	Universe& getUniverse() override { return m_universe; }
 
 
-	bool ownComponentType(uint32 type) const override
+	bool ownComponentType(ComponentType type) const override
 	{
-		return type == BOX_ACTOR_HASH || type == MESH_ACTOR_HASH ||
-			   type == HEIGHTFIELD_HASH || type == CONTROLLER_HASH;
+		return type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE ||
+			   type == HEIGHTFIELD_TYPE || type == CONTROLLER_TYPE;
 	}
 
 
-	ComponentIndex getComponent(Entity entity, uint32 type) override
+	ComponentIndex getComponent(Entity entity, ComponentType type) override
 	{
 		ASSERT(ownComponentType(type));
-		if (type == BOX_ACTOR_HASH || type == MESH_ACTOR_HASH)
+		if (type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE)
 		{
 			for (int i = 0; i < m_actors.size(); ++i)
 			{
@@ -326,7 +327,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 			return INVALID_COMPONENT;
 		}
-		if (type == CONTROLLER_HASH)
+		if (type == CONTROLLER_TYPE)
 		{
 			for (int i = 0; i < m_controllers.size(); ++i)
 			{
@@ -334,7 +335,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 			return INVALID_COMPONENT;
 		}
-		if (type == HEIGHTFIELD_HASH)
+		if (type == HEIGHTFIELD_TYPE)
 		{
 			for (int i = 0; i < m_terrains.size(); ++i)
 			{
@@ -403,21 +404,21 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	ComponentIndex createComponent(uint32 component_type, Entity entity) override
+	ComponentIndex createComponent(ComponentType component_type, Entity entity) override
 	{
-		if (component_type == HEIGHTFIELD_HASH)
+		if (component_type == HEIGHTFIELD_TYPE)
 		{
 			return createHeightfield(entity);
 		}
-		else if (component_type == CONTROLLER_HASH)
+		else if (component_type == CONTROLLER_TYPE)
 		{
 			return createController(entity);
 		}
-		else if (component_type == BOX_ACTOR_HASH)
+		else if (component_type == BOX_ACTOR_TYPE)
 		{
 			return createBoxRigidActor(entity);
 		}
-		else if (component_type == MESH_ACTOR_HASH)
+		else if (component_type == MESH_ACTOR_TYPE)
 		{
 			return createMeshRigidActor(entity);
 		}
@@ -425,22 +426,22 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void destroyComponent(ComponentIndex cmp, uint32 type) override
+	void destroyComponent(ComponentIndex cmp, ComponentType type) override
 	{
-		if (type == HEIGHTFIELD_HASH)
+		if (type == HEIGHTFIELD_TYPE)
 		{
 			Entity entity = m_terrains[cmp]->m_entity;
 			LUMIX_DELETE(m_allocator, m_terrains[cmp]);
 			m_terrains[cmp] = nullptr;
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
-		else if (type == CONTROLLER_HASH)
+		else if (type == CONTROLLER_TYPE)
 		{
 			Entity entity = m_controllers[cmp].m_entity;
 			m_controllers[cmp].m_is_free = true;
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
-		else if (type == MESH_ACTOR_HASH || type == BOX_ACTOR_HASH)
+		else if (type == MESH_ACTOR_TYPE || type == BOX_ACTOR_TYPE)
 		{
 			Entity entity = m_actors[cmp]->getEntity();
 			m_actors[cmp]->setEntity(INVALID_ENTITY);
@@ -464,7 +465,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		terrain->m_actor = nullptr;
 		terrain->m_entity = entity;
 		m_universe.addComponent(
-			entity, HEIGHTFIELD_HASH, this, m_terrains.size() - 1);
+			entity, HEIGHTFIELD_TYPE, this, m_terrains.size() - 1);
 		return m_terrains.size() - 1;
 	}
 
@@ -502,7 +503,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			shapes[i]->setSimulationFilterData(data);
 		}
 
-		m_universe.addComponent(entity, CONTROLLER_HASH, this, m_controllers.size() - 1);
+		m_universe.addComponent(entity, CONTROLLER_TYPE, this, m_controllers.size() - 1);
 		return m_controllers.size() - 1;
 	}
 
@@ -525,7 +526,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
 		actor->setPhysxActor(physx_actor);
 
-		m_universe.addComponent(entity, BOX_ACTOR_HASH, this, m_actors.size() - 1);
+		m_universe.addComponent(entity, BOX_ACTOR_TYPE, this, m_actors.size() - 1);
 		return m_actors.size() - 1;
 	}
 
@@ -537,7 +538,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		actor->setEntity(entity);
 
 		m_universe.addComponent(
-			entity, MESH_ACTOR_HASH, this, m_actors.size() - 1);
+			entity, MESH_ACTOR_TYPE, this, m_actors.size() - 1);
 		return m_actors.size() - 1;
 	}
 
@@ -1336,7 +1337,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 						*m_system->getPhysics(), transform, box_geom, *m_default_material);
 				}
 				m_actors[idx]->setPhysxActor(actor);
-				m_universe.addComponent(m_actors[idx]->getEntity(), BOX_ACTOR_HASH, this, idx);
+				m_universe.addComponent(m_actors[idx]->getEntity(), BOX_ACTOR_TYPE, this, idx);
 			}
 			break;
 			case TRIMESH:
@@ -1347,7 +1348,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				ResourceManagerBase* manager = m_engine->getResourceManager().get(PHYSICS_HASH);
 				auto* geometry = manager->load(Lumix::Path(tmp));
 				m_actors[idx]->setResource(static_cast<PhysicsGeometry*>(geometry));
-				m_universe.addComponent(m_actors[idx]->getEntity(), MESH_ACTOR_HASH, this, idx);
+				m_universe.addComponent(m_actors[idx]->getEntity(), MESH_ACTOR_TYPE, this, idx);
 			}
 			break;
 			default:
@@ -1490,7 +1491,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				c.m_controller =
 					m_controller_manager->createController(*m_system->getPhysics(), m_scene, cDesc);
 				c.m_entity = e;
-				m_universe.addComponent(e, CONTROLLER_HASH, this, i);
+				m_universe.addComponent(e, CONTROLLER_TYPE, this, i);
 			}
 		}
 	}
@@ -1541,7 +1542,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				{
 					setHeightmap(i, Path(tmp));
 				}
-				m_universe.addComponent(m_terrains[i]->m_entity, HEIGHTFIELD_HASH, this, i);
+				m_universe.addComponent(m_terrains[i]->m_entity, HEIGHTFIELD_TYPE, this, i);
 			}
 		}
 	}

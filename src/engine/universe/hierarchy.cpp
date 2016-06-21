@@ -4,6 +4,7 @@
 #include "engine/hash_map.h"
 #include "engine/json_serializer.h"
 #include "engine/engine.h"
+#include "engine/property_register.h"
 #include "universe.h"
 
 
@@ -11,7 +12,7 @@ namespace Lumix
 {
 
 
-static const Lumix::uint32 HIERARCHY_HASH = Lumix::crc32("hierarchy");
+static const ComponentType HIERARCHY_TYPE_HANDLE = PropertyRegister::getComponentType("hierarchy");
 
 
 class HierarchyImpl : public Hierarchy
@@ -44,9 +45,9 @@ public:
 	}
 
 
-	ComponentIndex createComponent(uint32 type, Entity entity) override 
+	ComponentIndex createComponent(ComponentType type, Entity entity) override 
 	{
-		if (HIERARCHY_HASH == type)
+		if (HIERARCHY_TYPE_HANDLE == type)
 		{
 			m_parents.insert(entity, INVALID_ENTITY);
 			m_universe.addComponent(entity, type, this, entity);
@@ -56,9 +57,9 @@ public:
 	}
 
 
-	void destroyComponent(ComponentIndex component, uint32 type) override 
+	void destroyComponent(ComponentIndex component, ComponentType type) override 
 	{
-		if (HIERARCHY_HASH == type)
+		if (HIERARCHY_TYPE_HANDLE == type)
 		{
 			auto parent_iter = m_parents.find(component);
 
@@ -80,12 +81,12 @@ public:
 
 	IPlugin& getPlugin() const override { return m_system; }
 	void update(float time_delta, bool paused) override {}
-	bool ownComponentType(uint32 type) const override { return HIERARCHY_HASH == type; }
+	bool ownComponentType(ComponentType type) const override { return HIERARCHY_TYPE_HANDLE == type; }
 	Universe& getUniverse() override { return m_universe; }
 	IAllocator& getAllocator() { return m_allocator; }
 
 
-	ComponentIndex getComponent(Entity entity, uint32 type) override
+	ComponentIndex getComponent(Entity entity, ComponentType type) override
 	{
 		ASSERT(ownComponentType(type));
 		return m_parents.find(entity) != m_parents.end() ? entity : INVALID_COMPONENT;
@@ -305,7 +306,7 @@ public:
 			serializer.read(child);
 			serializer.read(parent);
 			setParent(Entity(child), Entity(parent));
-			m_universe.addComponent(child, HIERARCHY_HASH, this, child);
+			m_universe.addComponent(child, HIERARCHY_TYPE_HANDLE, this, child);
 		}
 	}
 

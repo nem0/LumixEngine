@@ -27,7 +27,7 @@ namespace Lumix
 {
 
 static const uint32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
-static const uint32 HIERARCHY_HASH = crc32("hierarchy");
+static const ComponentType HIERARCHY_TYPE = PropertyRegister::getComponentType("hierarchy");
 
 
 enum class SerializedEngineVersion : int32
@@ -138,15 +138,15 @@ public:
 	{
 		if (!scene) return -1;
 		Entity e(entity_idx);
-		uint32 hash = crc32(type);
-		if (scene->getComponent(e, hash) != INVALID_COMPONENT)
+		ComponentType handle = PropertyRegister::getComponentType(type);
+		if (scene->getComponent(e, handle) != INVALID_COMPONENT)
 		{
 			g_log_error.log("Lua Script") << "Component " << type << " already exists in entity "
 				<< entity_idx;
 			return -1;
 		}
 
-		return scene->createComponent(hash, e);
+		return scene->createComponent(handle, e);
 	}
 
 
@@ -241,10 +241,10 @@ public:
 			}
 			else
 			{
-				uint32 cmp_hash = crc32(parameter_name);
+				ComponentType type_handle = PropertyRegister::getComponentType(parameter_name);
 				for (auto* scene : ctx->getScenes())
 				{
-					ComponentUID cmp(e, cmp_hash, scene, scene->createComponent(cmp_hash, e));
+					ComponentUID cmp(e, type_handle, scene, scene->createComponent(type_handle, e));
 					if (cmp.isValid())
 					{
 						lua_pushvalue(L, -1);
@@ -252,7 +252,7 @@ public:
 						while (lua_next(L, -2) != 0)
 						{
 							const char* property_name = luaL_checkstring(L, -2);
-							auto* desc = PropertyRegister::getDescriptor(cmp_hash, crc32(property_name));
+							auto* desc = PropertyRegister::getDescriptor(type_handle, crc32(property_name));
 							if (!desc)
 							{
 								g_log_error.log("Lua Script") << "Unknown property " << property_name;
@@ -377,6 +377,12 @@ public:
 	}
 
 
+	static void LUA_destroyEntity(Universe* universe, Entity entity)
+	{
+		universe->destroyEntity(entity);
+	}
+
+
 	static Vec3 LUA_getEntityDirection(Universe* universe, Entity entity)
 	{
 		Quat rot = universe->getRotation(entity);
@@ -408,6 +414,7 @@ public:
 		REGISTER_FUNCTION(startGame);
 		REGISTER_FUNCTION(hasFilesystemWork);
 		REGISTER_FUNCTION(processFilesystemWork);
+		REGISTER_FUNCTION(destroyEntity);
 
 		#undef REGISTER_FUNCTION
 
@@ -500,7 +507,6 @@ public:
 
 	void registerProperties()
 	{
-		PropertyRegister::registerComponentType("hierarchy");
 		PropertyRegister::add(
 			"hierarchy",
 			LUMIX_NEW(m_allocator, EntityPropertyDescriptor<Hierarchy>)(
@@ -859,6 +865,7 @@ public:
 
 		if (header.m_version <= SerializedEngineVersion::HIERARCHY_COMPONENT)
 		{
+			static const uint32 HIERARCHY_HASH = crc32("hierarchy");
 			ctx.getScene(HIERARCHY_HASH)->deserialize(serializer, 0);
 		}
 

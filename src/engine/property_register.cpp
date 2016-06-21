@@ -12,21 +12,28 @@ namespace PropertyRegister
 {
 
 
-struct ComponentType
+struct ComponentTypeData
 {
 	char m_id[50];
 
 	uint32 m_id_hash;
-	uint32 m_dependency;
+	ComponentType m_dependency;
 };
 
 
-typedef AssociativeArray<uint32, Array<IPropertyDescriptor*>> PropertyMap;
+typedef AssociativeArray<ComponentType, Array<IPropertyDescriptor*>> PropertyMap;
 
 
 static PropertyMap* g_properties = nullptr;
-static Array<ComponentType>* g_component_types = nullptr;
 static IAllocator* g_allocator = nullptr;
+
+
+static Array<ComponentTypeData>& getComponentTypes()
+{
+	static DefaultAllocator allocator;
+	static Array<ComponentTypeData> types(allocator);
+	return types;
+}
 
 
 void init(IAllocator& allocator)
@@ -34,7 +41,6 @@ void init(IAllocator& allocator)
 	ASSERT(!g_properties);
 	g_properties = LUMIX_NEW(allocator, PropertyMap)(allocator);
 	g_allocator = &allocator;
-	g_component_types = LUMIX_NEW(allocator, Array<ComponentType>)(allocator);
 }
 
 
@@ -50,20 +56,18 @@ void shutdown()
 	}
 
 	LUMIX_DELETE(*g_allocator, g_properties);
-	LUMIX_DELETE(*g_allocator, g_component_types);
 	g_properties = nullptr;
 	g_allocator = nullptr;
-	g_component_types = nullptr;
 }
 
 
 void add(const char* component_type, IPropertyDescriptor* descriptor)
 {
-	getDescriptors(crc32(component_type)).push(descriptor);
+	getDescriptors(getComponentType(component_type)).push(descriptor);
 }
 
 
-Array<IPropertyDescriptor*>& getDescriptors(uint32 type)
+Array<IPropertyDescriptor*>& getDescriptors(ComponentType type)
 {
 	int props_index = g_properties->find(type);
 	if (props_index < 0)
@@ -75,7 +79,7 @@ Array<IPropertyDescriptor*>& getDescriptors(uint32 type)
 }
 
 
-const IPropertyDescriptor* getDescriptor(uint32 type, uint32 name_hash)
+const IPropertyDescriptor* getDescriptor(ComponentType type, uint32 name_hash)
 {
 	Array<IPropertyDescriptor*>& props = getDescriptors(type);
 	for (int i = 0; i < props.size(); ++i)
@@ -100,18 +104,18 @@ const IPropertyDescriptor* getDescriptor(uint32 type, uint32 name_hash)
 
 const IPropertyDescriptor* getDescriptor(const char* component_type, const char* property_name)
 {
-	return getDescriptor(crc32(component_type), crc32(property_name));
+	return getDescriptor(getComponentType(component_type), crc32(property_name));
 }
 
 
 void registerComponentDependency(const char* id, const char* dependency_id)
 {
 	uint32 id_hash = crc32(id);
-	for (ComponentType& cmp_type : *g_component_types)
+	for (ComponentTypeData& cmp_type : getComponentTypes())
 	{
 		if (cmp_type.m_id_hash == id_hash)
 		{
-			cmp_type.m_dependency = crc32(dependency_id);
+			cmp_type.m_dependency = getComponentType(dependency_id);
 			return;
 		}
 	}
@@ -119,37 +123,60 @@ void registerComponentDependency(const char* id, const char* dependency_id)
 }
 
 
-bool componentDepends(uint32 dependent, uint32 dependency)
+bool componentDepends(ComponentType dependent, ComponentType dependency)
 {
-	for (ComponentType& cmp_type : *g_component_types)
-	{
-		if (cmp_type.m_id_hash == dependent)
-		{
-			return cmp_type.m_dependency == dependency;
-		}
-	}
-	return false;
+	return getComponentTypes()[dependent.index].m_dependency == dependency;
 }
 
 
-void registerComponentType(const char* id)
+ComponentType getComponentTypeFromHash(uint32 hash)
 {
-	ComponentType& type = g_component_types->emplace();
+	for (int i = 0; i < getComponentTypes().size(); ++i)
+	{
+		if (getComponentTypes()[i].m_id_hash == hash)
+		{
+			return{ i };
+		}
+	}
+	ASSERT(false);
+	return {-1};
+}
+
+
+uint32 getComponentTypeHash(ComponentType type)
+{
+	return getComponentTypes()[type.index].m_id_hash;
+}
+
+
+ComponentType getComponentType(const char* id)
+{
+	uint32 id_hash = crc32(id);
+	for (int i = 0; i < getComponentTypes().size(); ++i)
+	{
+		if (getComponentTypes()[i].m_id_hash == id_hash)
+		{
+			return {i};
+		}
+	}
+
+	ComponentTypeData& type = getComponentTypes().emplace();
 	copyString(type.m_id, id);
-	type.m_id_hash = crc32(id);
-	type.m_dependency = 0;
+	type.m_id_hash = id_hash;
+	type.m_dependency = {-1};
+	return{ getComponentTypes().size() - 1 };
 }
 
 
 int getComponentTypesCount()
 {
-	return g_component_types->size();
+	return getComponentTypes().size();
 }
 
 
 const char* getComponentTypeID(int index)
 {
-	return (*g_component_types)[index].m_id;
+	return getComponentTypes()[index].m_id;
 }
 
 

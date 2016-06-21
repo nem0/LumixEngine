@@ -7,6 +7,7 @@
 #include "engine/log.h"
 #include "engine/math_utils.h"
 #include "engine/profiler.h"
+#include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/engine.h"
@@ -28,7 +29,7 @@ static const int GRASS_QUAD_SIZE = 10;
 static const float GRASS_QUAD_RADIUS = GRASS_QUAD_SIZE * 0.7072f;
 static const int GRID_SIZE = 16;
 static const int COPY_COUNT = 50;
-static const uint32 TERRAIN_HASH = crc32("terrain");
+static const ComponentType TERRAIN_HASH = PropertyRegister::getComponentType("terrain");
 static const uint32 MORPH_CONST_HASH = crc32("morph_const");
 static const uint32 QUAD_SIZE_HASH = crc32("quad_size");
 static const uint32 QUAD_MIN_HASH = crc32("quad_min");

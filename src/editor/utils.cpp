@@ -3,6 +3,7 @@
 #include "engine/math_utils.h"
 #include "engine/path.h"
 #include "engine/path_utils.h"
+#include "engine/property_register.h"
 #include "editor/render_interface.h"
 #include "editor/world_editor.h"
 #include "imgui/imgui.h"
@@ -12,8 +13,8 @@
 void getEntityListDisplayName(Lumix::WorldEditor& editor, char* buf, int max_size, Lumix::Entity entity)
 {
 	const char* name = editor.getUniverse()->getEntityName(entity);
-	static const Lumix::uint32 RENDERABLE_HASH = Lumix::crc32("renderable");
-	Lumix::ComponentUID renderable = editor.getComponent(entity, RENDERABLE_HASH);
+	static const auto RENDERABLE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
+	Lumix::ComponentUID renderable = editor.getComponent(entity, RENDERABLE_TYPE);
 	if (renderable.isValid())
 	{
 		auto* render_interface = editor.getRenderInterface();

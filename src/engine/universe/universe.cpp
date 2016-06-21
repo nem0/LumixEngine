@@ -1,9 +1,10 @@
 #include "universe.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
-#include "engine/matrix.h"
-#include "engine/json_serializer.h"
 #include "engine/iplugin.h"
+#include "engine/json_serializer.h"
+#include "engine/matrix.h"
+#include "engine/property_register.h"
 #include <cstdint>
 
 
@@ -24,6 +25,7 @@ Universe::Universe(IAllocator& allocator)
 	, m_name_to_id_map(m_allocator)
 	, m_id_to_name_map(m_allocator)
 	, m_transformations(m_allocator)
+	, m_components(m_allocator)
 	, m_component_added(m_allocator)
 	, m_component_destroyed(m_allocator)
 	, m_entity_created(m_allocator)
@@ -34,6 +36,7 @@ Universe::Universe(IAllocator& allocator)
 	, m_scenes(m_allocator)
 {
 	m_transformations.reserve(RESERVED_ENTITIES_COUNT);
+	m_components.reserve(RESERVED_ENTITIES_COUNT);
 	m_entity_map.reserve(RESERVED_ENTITIES_COUNT);
 }
 
@@ -194,6 +197,7 @@ void Universe::createEntity(Entity entity)
 	trans.rotation.set(0, 0, 0, 1);
 	trans.scale = 1;
 	trans.entity = entity;
+	m_components.emplace(0);
 
 	m_entity_created.invoke(entity);
 }
@@ -219,6 +223,7 @@ Entity Universe::createEntity(const Vec3& position, const Quat& rotation)
 	trans.rotation = rotation;
 	trans.scale = 1;
 	trans.entity = global_id;
+	m_components.emplace(0);
 	m_entity_created.invoke(global_id);
 
 	return global_id;
@@ -229,9 +234,29 @@ void Universe::destroyEntity(Entity entity)
 {
 	if (entity < 0 || m_entity_map[entity] < 0) return;
 
+	uint64 mask = m_components[m_entity_map[entity]];
+	for (int i = 0; i < 64; ++i)
+	{
+		if ((mask & ((uint64)1 << i)) != 0)
+		{
+			ComponentType type = {i};
+			auto original_mask = mask;
+			for (auto scene : m_scenes)
+			{
+				if (scene->ownComponentType(type))
+				{
+					scene->destroyComponent(scene->getComponent(entity, type), type);
+					mask = m_components[m_entity_map[entity]];
+					break;
+				}
+			}
+		}
+	}
+
 	int last_item_id = m_transformations.back().entity;
 	m_entity_map[last_item_id] = m_entity_map[entity];
 	m_transformations.eraseFast(m_entity_map[entity]);
+	m_components.eraseFast(m_entity_map[entity]);
 	m_entity_map[entity] = m_first_free_slot >= 0 ? -m_first_free_slot : INT32_MIN;
 
 	int name_index = m_id_to_name_map.find(entity);
@@ -288,8 +313,7 @@ Entity Universe::getNextEntity(Entity entity)
 void Universe::serialize(OutputBlob& serializer)
 {
 	serializer.write((int32)m_transformations.size());
-	serializer.write(
-		&m_transformations[0], sizeof(m_transformations[0]) * m_transformations.size());
+	serializer.write(&m_transformations[0], sizeof(m_transformations[0]) * m_transformations.size());
 	serializer.write((int32)m_id_to_name_map.size());
 	for (int i = 0, c = m_id_to_name_map.size(); i < c; ++i)
 	{
@@ -311,6 +335,8 @@ void Universe::deserialize(InputBlob& serializer)
 	int32 count;
 	serializer.read(count);
 	m_transformations.resize(count);
+	for (int i = 0, c = m_components.size(); i < c; ++i) m_components[i] = 0;
+	m_components.resize(count);
 
 	serializer.read(&m_transformations[0], sizeof(m_transformations[0]) * m_transformations.size());
 
@@ -352,15 +378,22 @@ float Universe::getScale(Entity entity)
 }
 
 
-void Universe::destroyComponent(Entity entity, uint32 component_type, IScene* scene, int index)
+void Universe::destroyComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentIndex index)
 {
+	auto mask = m_components[m_entity_map[entity]];
+	auto old_mask = mask;
+	mask &= ~((uint64)1 << component_type.index);
+	auto x = PropertyRegister::getComponentTypeID(component_type.index);
+	ASSERT(old_mask != mask);
+	m_components[m_entity_map[entity]] = mask;
 	m_component_destroyed.invoke(ComponentUID(entity, component_type, scene, index));
 }
 
 
-void Universe::addComponent(Entity entity, uint32 component_type, IScene* scene, int index)
+void Universe::addComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentIndex index)
 {
 	ComponentUID cmp(entity, component_type, scene, index);
+	m_components[m_entity_map[entity]] |= (uint64)1 << component_type.index;
 	m_component_added.invoke(cmp);
 }
 

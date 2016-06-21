@@ -1,6 +1,7 @@
 #include "animation/animation_system.h"
 #include "animation/animation.h"
 #include "engine/crc32.h"
+#include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "editor/asset_browser.h"
 #include "editor/property_grid.h"
@@ -17,7 +18,7 @@ namespace
 {
 
 
-static const uint32 ANIMABLE_HASH = crc32("animable");
+static const ComponentType ANIMABLE_HASH = PropertyRegister::getComponentType("animable");
 static const uint32 ANIMATION_HASH = crc32("ANIMATION");
 
 
