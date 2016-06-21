@@ -140,14 +140,30 @@ struct NavigationSceneImpl : public NavigationScene
 		, m_crowd(nullptr)
 	{
 		setGeneratorParams(0.3f, 0.1f, 0.3f, 2.0f, 60.0f, 1.5f);
+		m_universe.entityTransformed().bind<NavigationSceneImpl, &NavigationSceneImpl::onEntityMoved>(this);
 	}
 
 
 	~NavigationSceneImpl()
 	{
+		m_universe.entityTransformed().unbind<NavigationSceneImpl, &NavigationSceneImpl::onEntityMoved>(this);
 		clear();
 		for (auto* agent : m_agents) LUMIX_DELETE(m_allocator, agent);
 		m_agents.clear();
+	}
+
+
+	void onEntityMoved(Entity entity)
+	{
+		auto iter = m_agents.find(entity);
+		if (m_agents.end() == iter) return;
+		Vec3 pos = m_universe.getPosition(iter.key());
+		const dtCrowdAgent* dt_agent = m_crowd->getAgent(iter.value()->agent);
+		if ((pos - *(Vec3*)dt_agent->npos).squaredLength() > 0.1f)
+		{
+			m_crowd->removeAgent(iter.value()->agent);
+			addCrowdAgent(iter.value());
+		}
 	}
 
 
@@ -362,6 +378,7 @@ struct NavigationSceneImpl : public NavigationScene
 			{
 				if (!agent->is_finished)
 				{
+					m_crowd->resetMoveTarget(agent->agent);
 					agent->is_finished = true;
 					onPathFinished(agent);
 				}
@@ -689,7 +706,7 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
-	bool navigate(Entity entity, const Vec3& dest)
+	bool navigate(Entity entity, const Vec3& dest, float speed)
 	{
 		if (!m_navquery) return false;
 		if (!m_crowd) return false;
@@ -701,7 +718,9 @@ struct NavigationSceneImpl : public NavigationScene
 		dtQueryFilter filter;
 		static const float ext[] = { 1.0f, 2.0f, 1.0f };
 		m_navquery->findNearestPoly(&dest.x, ext, &filter, &end_poly_ref, 0);
-		auto* dt_agent = m_crowd->getAgent(agent.agent);
+		dtCrowdAgentParams params = m_crowd->getAgent(agent.agent)->params;
+		params.maxSpeed = speed;
+		m_crowd->updateAgentParameters(agent.agent, &params);
 		return m_crowd->requestMoveTarget(agent.agent, end_poly_ref, &dest.x);
 	}
 
@@ -1013,7 +1032,7 @@ struct NavigationSceneImpl : public NavigationScene
 		dtCrowdAgentParams params = {};
 		params.radius = agent->radius;
 		params.height = agent->height;
-		params.maxAcceleration = 30.0f;
+		params.maxAcceleration = 10.0f;
 		params.maxSpeed = 10.0f;
 		params.collisionQueryRange = params.radius * 12.0f;
 		params.pathOptimizationRange = params.radius * 30.0f;
@@ -1031,6 +1050,7 @@ struct NavigationSceneImpl : public NavigationScene
 			agent->radius = 0.5f;
 			agent->height = 2.0f;
 			agent->agent = -1;
+			agent->is_finished = true;
 			if (m_crowd) addCrowdAgent(agent);
 			m_agents.insert(entity, agent);
 			m_universe.addComponent(entity, type, this, entity);
