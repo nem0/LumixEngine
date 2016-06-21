@@ -49,6 +49,14 @@ int DragFloat(lua_State* L)
 }
 
 
+int Text(lua_State* L)
+{
+	auto* text = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
+	ImGui::Text("%s", text);
+	return 0;
+}
+
+
 int Button(lua_State* L)
 {
 	auto* label = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
@@ -352,6 +360,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 
 		registerCFunction(L, "DragFloat", &DragFloat);
 		registerCFunction(L, "Button", &Button);
+		registerCFunction(L, "Text", &Text);
 		registerCFunction(L, "Checkbox", &Checkbox);
 		registerCFunction(L, "SameLine", &SameLine);
 		registerCFunction(L, "BeginPopup", &LuaWrapper::wrap<decltype(&ImGui::BeginPopup), &ImGui::BeginPopup>);
