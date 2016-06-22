@@ -1070,7 +1070,7 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 		{
 			Lumix::uint32 hash = Lumix::crc32(template_names[idx].c_str());
 			Lumix::Entity tpl = template_system.getInstances(hash)[0];
-			if(tpl < 0) continue;
+			if(!isValid(tpl)) continue;
 			Lumix::ComponentUID renderable = m_world_editor.getComponent(tpl, RENDERABLE_TYPE);
 			if(!renderable.isValid()) continue;
 			tpls.push({renderable.index, idx});

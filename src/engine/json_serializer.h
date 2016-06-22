@@ -33,6 +33,7 @@ namespace Lumix
 			~JsonSerializer();
 
 			// serialize
+			void serialize(const char* label, Entity value);
 			void serialize(const char* label, uint32 value);
 			void serialize(const char* label, float value);
 			void serialize(const char* label, int32 value);
@@ -44,6 +45,7 @@ namespace Lumix
 			void endObject();
 			void beginArray(const char* label);
 			void endArray();
+			void serializeArrayItem(Entity value);
 			void serializeArrayItem(uint32 value);
 			void serializeArrayItem(int32 value);
 			void serializeArrayItem(int64 value);
@@ -52,6 +54,7 @@ namespace Lumix
 			void serializeArrayItem(const char* value);
 
 			// deserialize
+			void deserialize(const char* label, Entity& value, Entity default_value);
 			void deserialize(const char* label, uint32& value, uint32 default_value);
 			void deserialize(const char* label, float& value, float default_value);
 			void deserialize(const char* label, int32& value, int32 default_value);
@@ -67,6 +70,7 @@ namespace Lumix
 			void deserializeArrayBegin();
 			void deserializeArrayEnd();
 			bool isArrayEnd();
+			void deserializeArrayItem(Entity& value, Entity default_value);
 			void deserializeArrayItem(uint32& value, uint32 default_value);
 			void deserializeArrayItem(int32& value, int32 default_value);
 			void deserializeArrayItem(int64& value, int64 default_value);

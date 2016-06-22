@@ -50,8 +50,8 @@ public:
 		if (HIERARCHY_TYPE_HANDLE == type)
 		{
 			m_parents.insert(entity, INVALID_ENTITY);
-			m_universe.addComponent(entity, type, this, entity);
-			return entity;
+			m_universe.addComponent(entity, type, this, entity.index);
+			return entity.index;
 		}
 		return INVALID_COMPONENT;
 	}
@@ -61,11 +61,11 @@ public:
 	{
 		if (HIERARCHY_TYPE_HANDLE == type)
 		{
-			auto parent_iter = m_parents.find(component);
+			auto parent_iter = m_parents.find({component});
 
 			if (parent_iter.isValid())
 			{
-				auto iter = m_children.find(parent_iter.value());
+				auto iter = m_children.find({parent_iter.value()});
 				if (iter != m_children.end())
 				{
 					LUMIX_DELETE(m_allocator, iter.value());
@@ -74,7 +74,7 @@ public:
 				m_parents.erase(parent_iter);
 			}
 			
-			m_universe.destroyComponent(component, type, this, component);
+			m_universe.destroyComponent({component}, type, this, component);
 		}
 	}
 
@@ -89,7 +89,7 @@ public:
 	ComponentIndex getComponent(Entity entity, ComponentType type) override
 	{
 		ASSERT(ownComponentType(type));
-		return m_parents.find(entity) != m_parents.end() ? entity : INVALID_COMPONENT;
+		return m_parents.find(entity) != m_parents.end() ? entity.index : INVALID_COMPONENT;
 	}
 
 
@@ -153,39 +153,41 @@ public:
 
 	void setLocalPosition(ComponentIndex cmp, const Vec3& position) override
 	{
-		Parents::iterator parent_iter = m_parents.find(cmp);
+		Entity entity = {cmp};
+		Parents::iterator parent_iter = m_parents.find(entity);
 
 		if (parent_iter.isValid())
 		{
 			Quat parent_rot = m_universe.getRotation(parent_iter.value());
 			Vec3 parent_pos = m_universe.getPosition(parent_iter.value());
-			m_universe.setPosition(cmp, parent_pos + parent_rot * position);
+			m_universe.setPosition(entity, parent_pos + parent_rot * position);
 			return;
 		}
 
-		m_universe.setPosition(cmp, position);
+		m_universe.setPosition(entity, position);
 	}
 
 
 	Vec3 getLocalPosition(ComponentIndex cmp) override
 	{
-		Parents::iterator parent_iter = m_parents.find(cmp);
+		Entity entity = {cmp};
+		Parents::iterator parent_iter = m_parents.find(entity);
 
-		if (parent_iter.isValid() && parent_iter.value() != INVALID_ENTITY)
+		if (parent_iter.isValid() && isValid(parent_iter.value()))
 		{
 			auto child_iter = m_children.find(parent_iter.value());
 			ASSERT(child_iter.isValid());
 
 			for (auto& child : *child_iter.value())
 			{
-				if (child.m_entity == cmp)
+				if (child.m_entity == entity)
 				{
 					return child.m_local_matrix.getTranslation();
 				}
 			}
 		}
 
-		return m_universe.getPosition(cmp);
+		return m_universe.getPosition(entity);
 	}
 
 
@@ -206,7 +208,8 @@ public:
 
 	Quat getLocalRotation(ComponentIndex cmp) override
 	{
-		Parents::iterator parent_iter = m_parents.find(cmp);
+		Entity entity = {cmp};
+		Parents::iterator parent_iter = m_parents.find(entity);
 
 		if (parent_iter.isValid())
 		{
@@ -215,7 +218,7 @@ public:
 
 			for (auto& child : *child_iter.value())
 			{
-				if (child.m_entity == cmp)
+				if (child.m_entity == entity)
 				{
 					Quat rot;
 					child.m_local_matrix.getRotation(rot);
@@ -224,7 +227,7 @@ public:
 			}
 		}
 
-		return m_universe.getRotation(cmp);
+		return m_universe.getRotation(entity);
 	}
 
 	const Children& getAllChildren() const override { return m_children; }
@@ -232,17 +235,18 @@ public:
 
 	void setParent(ComponentIndex child, Entity parent) override
 	{
-		Parents::iterator old_parent_iter = m_parents.find(child);
+		Entity child_entity = {child};
+		Parents::iterator old_parent_iter = m_parents.find(child_entity);
 		if (old_parent_iter.isValid())
 		{
-			if (old_parent_iter.value() != INVALID_ENTITY)
+			if (isValid(old_parent_iter.value()))
 			{
 				Children::iterator child_iter = m_children.find(old_parent_iter.value());
 				ASSERT(child_iter.isValid());
 				Array<Child>& children = *child_iter.value();
 				for (int i = 0; i < children.size(); ++i)
 				{
-					if (children[i].m_entity == child)
+					if (children[i].m_entity == child_entity)
 					{
 						children.erase(i);
 						break;
@@ -252,9 +256,9 @@ public:
 			m_parents.erase(old_parent_iter);
 		}
 
-		if (parent >= 0)
+		if (isValid(parent))
 		{
-			m_parents.insert(child, parent);
+			m_parents.insert(child_entity, parent);
 
 			Children::iterator child_iter = m_children.find(parent);
 			if (!child_iter.isValid())
@@ -263,17 +267,18 @@ public:
 				child_iter = m_children.find(parent);
 			}
 			Child& c = child_iter.value()->emplace();
-			c.m_entity = child;
+			c.m_entity = child_entity;
 			Matrix inv_parent_matrix = m_universe.getPositionAndRotation(parent);
 			inv_parent_matrix.inverse();
-			c.m_local_matrix = inv_parent_matrix * m_universe.getPositionAndRotation(child);
+			c.m_local_matrix = inv_parent_matrix * m_universe.getPositionAndRotation(child_entity);
 		}
 	}
 
 
 	Entity getParent(ComponentIndex child) override
 	{
-		Parents::iterator parent_iter = m_parents.find(child);
+		Entity child_entity = {child};
+		Parents::iterator parent_iter = m_parents.find(child_entity);
 		if (parent_iter.isValid())
 		{
 			return Entity(parent_iter.value());
@@ -305,8 +310,8 @@ public:
 			int32 child, parent;
 			serializer.read(child);
 			serializer.read(parent);
-			setParent(Entity(child), Entity(parent));
-			m_universe.addComponent(child, HIERARCHY_TYPE_HANDLE, this, child);
+			setParent({child}, {parent});
+			m_universe.addComponent({child}, HIERARCHY_TYPE_HANDLE, this, child);
 		}
 	}
 

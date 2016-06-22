@@ -294,8 +294,8 @@ public:
 	{
 		if (type == RENDERABLE_TYPE)
 		{
-			if (entity >= m_renderables.size()) return INVALID_COMPONENT;
-			return m_renderables[entity].entity != INVALID_ENTITY ? entity : INVALID_COMPONENT;
+			if (entity.index >= m_renderables.size()) return INVALID_COMPONENT;
+			return isValid(m_renderables[entity.index].entity) ? entity.index : INVALID_COMPONENT;
 		}
 		if (type == POINT_LIGHT_TYPE)
 		{
@@ -463,7 +463,7 @@ public:
 	{
 		for (int i = 0; i < m_bone_attachments.size(); ++i)
 		{
-			if (m_bone_attachments[i].entity == cmp) return i;
+			if (m_bone_attachments[i].entity.index == cmp) return i;
 		}
 		return -1;
 	}
@@ -760,11 +760,11 @@ public:
 			Entity entity;
 			serializer.read(entity);
 			EnvironmentProbe probe;
-			StaticString<Lumix::MAX_PATH_LENGTH> path_str(probe_dir, entity, ".dds");
+			StaticString<Lumix::MAX_PATH_LENGTH> path_str(probe_dir, entity.index, ".dds");
 			Path path(path_str);
 			probe.texture = static_cast<Texture*>(texture_manager->load(path));
 			m_environment_probes.insert(entity, probe);
-			m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, entity);
+			m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, entity.index);
 		}
 	}
 
@@ -783,7 +783,7 @@ public:
 			serializer.read(m_bone_attachments[i].parent_entity);
 			updateRelativeMatrix(m_bone_attachments[i]);
 			m_universe.addComponent(
-				m_bone_attachments[i].entity, BONE_ATTACHMENT_TYPE, this, m_bone_attachments[i].entity);
+				m_bone_attachments[i].entity, BONE_ATTACHMENT_TYPE, this, m_bone_attachments[i].entity.index);
 		}
 	}
 
@@ -956,7 +956,7 @@ public:
 		{
 			auto& r = m_renderables.emplace();
 			serializer.read(r.entity);
-			ASSERT(r.entity == i || r.entity == INVALID_ENTITY);
+			ASSERT(r.entity.index == i || !isValid(r.entity));
 			r.model = nullptr;
 			r.pose = nullptr;
 			r.custom_meshes = false;
@@ -974,7 +974,7 @@ public:
 				if (path != 0)
 				{
 					auto* model = static_cast<Model*>(m_engine.getResourceManager().get(MODEL_HASH)->load(Path(path)));
-					setModel(r.entity, model);
+					setModel(r.entity.index, model);
 				}
 
 				if (version > RenderSceneVersion::RENDERABLE_MATERIALS)
@@ -995,7 +995,7 @@ public:
 					}
 				}
 
-				m_universe.addComponent(r.entity, RENDERABLE_TYPE, this, r.entity);
+				m_universe.addComponent(r.entity, RENDERABLE_TYPE, this, r.entity.index);
 			}
 		}
 	}
@@ -1139,7 +1139,7 @@ public:
 
 	void destroyEnvironmentProbe(ComponentIndex component)
 	{
-		Entity entity = (Entity)component;
+		Entity entity = {component};
 		auto& probe = m_environment_probes[entity];
 		if (probe.texture) probe.texture->getResourceManager().get(TEXTURE_HASH)->unload(*probe.texture);
 		m_environment_probes.erase(entity);
@@ -1820,7 +1820,7 @@ public:
 
 	ComponentIndex getRenderableComponent(Entity entity) override
 	{
-		ComponentIndex cmp = (ComponentIndex)entity;
+		ComponentIndex cmp = entity.index;
 		if (cmp >= m_renderables.size()) return INVALID_COMPONENT;
 		if (m_renderables[cmp].entity == INVALID_ENTITY) return INVALID_COMPONENT;
 		return cmp;
@@ -1858,7 +1858,7 @@ public:
 
 	void onEntityMoved(Entity entity)
 	{
-		ComponentIndex cmp = (ComponentIndex)entity;
+		ComponentIndex cmp = entity.index;
 
 		if (cmp < m_renderables.size() && m_renderables[cmp].entity != INVALID_ENTITY &&
 			m_renderables[cmp].model && m_renderables[cmp].model->isReady())
@@ -3361,7 +3361,7 @@ public:
 
 	void reloadEnvironmentProbe(ComponentIndex cmp) override
 	{
-		auto& probe = m_environment_probes[cmp];
+		auto& probe = m_environment_probes[{cmp}];
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_HASH);
 		if (probe.texture) texture_manager->unload(*probe.texture);
 		uint64 universe_guid = m_universe.getPath().getHash();
@@ -3371,7 +3371,7 @@ public:
 
 	Texture* getEnvironmentProbeTexture(ComponentIndex cmp) const
 	{
-		return m_environment_probes[cmp].texture;
+		return m_environment_probes[{cmp}].texture;
 	}
 
 	ComponentIndex getCameraInSlot(const char* slot) override
@@ -3507,8 +3507,8 @@ public:
 
 		for (auto& attachment : m_bone_attachments)
 		{
-			if (m_renderables[attachment.parent_entity].entity != INVALID_ENTITY &&
-				m_renderables[attachment.parent_entity].model == model)
+			if (isValid(m_renderables[attachment.parent_entity.index].entity) &&
+				m_renderables[attachment.parent_entity.index].model == model)
 			{
 				updateRelativeMatrix(attachment);
 			}
@@ -3889,8 +3889,8 @@ public:
 		probe.texture = static_cast<Texture*>(texture_manager->load(Path("models/editor/default_probe.dds")));
 		m_environment_probes.insert(entity, probe);
 
-		m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, entity);
-		return entity;
+		m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, entity.index);
+		return entity.index;
 	}
 
 
@@ -3901,21 +3901,21 @@ public:
 		attachment.parent_entity = INVALID_ENTITY;
 		attachment.bone_index = -1;
 
-		m_universe.addComponent(entity, BONE_ATTACHMENT_TYPE, this, entity);
-		return entity;
+		m_universe.addComponent(entity, BONE_ATTACHMENT_TYPE, this, entity.index);
+		return entity.index;
 	}
 
 
 	ComponentIndex createRenderable(Entity entity)
 	{
-		while(entity >= m_renderables.size())
+		while(entity.index >= m_renderables.size())
 		{
 			auto& r = m_renderables.emplace();
 			r.entity = INVALID_ENTITY;
 			r.model = nullptr;
 			r.pose = nullptr;
 		}
-		auto& r = m_renderables[entity];
+		auto& r = m_renderables[entity.index];
 		r.entity = entity;
 		r.model = nullptr;
 		r.layer_mask = 1;
@@ -3924,9 +3924,9 @@ public:
 		r.custom_meshes = false;
 		r.mesh_count = 0;
 		r.matrix = m_universe.getMatrix(entity);
-		m_universe.addComponent(entity, RENDERABLE_TYPE, this, entity);
+		m_universe.addComponent(entity, RENDERABLE_TYPE, this, entity.index);
 		m_renderable_created.invoke(m_renderables.size() - 1);
-		return entity;
+		return entity.index;
 	}
 
 

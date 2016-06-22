@@ -89,6 +89,12 @@ JsonSerializer::~JsonSerializer()
 #pragma region serialization
 
 
+void JsonSerializer::serialize(const char* label, Entity value)
+{
+	serialize(label, value.index);
+}
+
+
 void JsonSerializer::serialize(const char* label, unsigned int value)
 {
 	writeBlockComma();
@@ -227,6 +233,12 @@ void JsonSerializer::serializeArrayItem(unsigned int value)
 }
 
 
+void JsonSerializer::serializeArrayItem(Entity value)
+{
+	serializeArrayItem(value.index);
+}
+
+
 void JsonSerializer::serializeArrayItem(int value)
 {
 	writeBlockComma();
@@ -278,6 +290,11 @@ bool JsonSerializer::isNextBoolean() const
 	return false;
 }
 
+
+void JsonSerializer::deserialize(const char* label, Entity& value, Entity default_value)
+{
+	deserialize(label, value.index, default_value.index);
+}
 
 void JsonSerializer::deserialize(bool& value, bool default_value)
 {
@@ -525,6 +542,12 @@ void JsonSerializer::deserializeArrayItem(char* value, int max_length, const cha
 		deserializeToken();
 		copyString(value, max_length, default_value);
 	}
+}
+
+
+void JsonSerializer::deserializeArrayItem(Entity& value, Entity default_value)
+{
+	deserializeArrayItem(value.index, default_value.index);
 }
 
 

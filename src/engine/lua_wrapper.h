@@ -23,6 +23,10 @@ template <> inline int toType(lua_State* L, int index)
 {
 	return (int)lua_tointeger(L, index);
 }
+template <> inline Entity toType(lua_State* L, int index)
+{
+	return {(int)lua_tointeger(L, index)};
+}
 template <> inline Vec3 toType(lua_State* L, int index)
 {
 	Vec3 v;
@@ -177,6 +181,10 @@ template <typename T> inline void pushLua(lua_State* L, T value)
 template <> inline void pushLua(lua_State* L, float value)
 {
 	lua_pushnumber(L, value);
+}
+template <> inline void pushLua(lua_State* L, Entity value)
+{
+	lua_pushnumber(L, value.index);
 }
 inline void pushLua(lua_State* L, const Vec2& value)
 {

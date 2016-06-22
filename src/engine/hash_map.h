@@ -76,6 +76,16 @@ namespace Lumix
 	};
 
 	template<>
+	struct HashFunc<Entity>
+	{
+		static uint32 get(const Entity& key)
+		{
+			static_assert(sizeof(int32) == sizeof(key.index), "Check this");
+			return HashFunc<int32>::get(key.index);
+		}
+	};
+
+	template<>
 	struct HashFunc<uint32>
 	{
 		static uint32 get(const uint32& key)
