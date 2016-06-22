@@ -65,7 +65,7 @@ public:
 
 			if (parent_iter.isValid())
 			{
-				auto iter = m_children.find({parent_iter.value()});
+				auto iter = m_children.find(parent_iter.value());
 				if (iter != m_children.end())
 				{
 					LUMIX_DELETE(m_allocator, iter.value());
