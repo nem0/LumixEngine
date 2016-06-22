@@ -167,8 +167,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 				auto contact_count = cp.extractContacts(&contact, 1);
 
 				auto pos = toVec3(contact.position);
-				auto e1 = (Entity)(intptr_t)(pairHeader.actors[0]->userData);
-				auto e2 = (Entity)(intptr_t)(pairHeader.actors[1]->userData);
+				Entity e1 = { (int)(intptr_t)(pairHeader.actors[0]->userData) };
+				Entity e2 = { (int)(intptr_t)(pairHeader.actors[1]->userData) };
 				m_scene.onContact(e1, e2, pos);
 			}
 		}
@@ -282,7 +282,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				auto* call = m_script_scene->beginFunctionCall(cmp, i, "onContact");
 				if (!call) continue;
 
-				call->add(e2);
+				call->add(e2.index);
 				call->add(position.x);
 				call->add(position.y);
 				call->add(position.z);
@@ -854,11 +854,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 		result.position.x = hit.position.x;
 		result.position.y = hit.position.y;
 		result.position.z = hit.position.z;
-		result.entity = -1;
+		result.entity = INVALID_ENTITY;
 		if (hit.shape)
 		{
 			physx::PxRigidActor* actor = hit.shape->getActor();
-			if (actor && actor->userData) result.entity = (Entity)(intptr_t)actor->userData;
+			if (actor && actor->userData) result.entity = {(int)(intptr_t)actor->userData};
 		}
 		return status;
 	}
@@ -988,7 +988,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			if (actor)
 			{
 				actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, width <= 1024);
-				actor->userData = (void*)(intptr_t)terrain->m_entity;
+				actor->userData = (void*)(intptr_t)terrain->m_entity.index;
 				m_scene->addActor(*actor);
 				terrain->m_actor = actor;
 
@@ -1251,7 +1251,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 										   *m_default_material);
 				}
 				ASSERT(actor);
-				actor->userData = (void*)(intptr_t)m_actors[cmp]->getEntity();
+				actor->userData = (void*)(intptr_t)m_actors[cmp]->getEntity().index;
 				actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 				m_actors[cmp]->setPhysxActor(actor);
 			}
@@ -1368,7 +1368,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			serializer.write(isDynamic(i));
 			serializer.write(m_actors[i]->getEntity());
-			if (m_actors[i]->getEntity() != -1)
+			if (isValid(m_actors[i]->getEntity()))
 			{
 				serializeActor(serializer, i);
 			}
@@ -1435,7 +1435,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.read(e);
 			m_actors[i]->setEntity(e);
 
-			if (m_actors[i]->getEntity() != -1)
+			if (isValid(m_actors[i]->getEntity()))
 			{
 				deserializeActor(serializer, i, version);
 			}
@@ -1457,11 +1457,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_controllers.clear();
 		for (int i = 0; i < count; ++i)
 		{
-			int32 index;
+			Entity e;
 			bool is_free;
-			serializer.read(index);
+			serializer.read(e);
 			serializer.read(is_free);
-			Entity e(index);
 
 			Controller& c = m_controllers.emplace();
 			c.m_is_free = is_free;
@@ -1773,7 +1772,7 @@ void PhysicsSceneImpl::RigidActor::setPhysxActor(physx::PxRigidActor* actor)
 	{
 		m_scene.m_scene->addActor(*actor);
 		actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
-		actor->userData = (void*)(intptr_t)m_entity;
+		actor->userData = (void*)(intptr_t)m_entity.index;
 		m_scene.updateFilterData(actor, m_layer);
 	}
 }

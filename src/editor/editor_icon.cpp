@@ -130,7 +130,7 @@ struct EditorIconsImpl : public EditorIcons
 
 	void createIcon(Entity entity)
 	{
-		if (entity == 0) return;
+		if (!isValid(entity)) return;
 		if (m_editor.getEditCamera().entity == entity) return;
 
 		const WorldEditor::ComponentList& cmps = m_editor.getComponents(entity);

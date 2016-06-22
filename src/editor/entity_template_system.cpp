@@ -57,7 +57,7 @@ private:
 			char name[50];
 			serializer.deserialize("template_name", name, sizeof(name), "");
 			m_name = name;
-			serializer.deserialize("entity", m_entity, -1);
+			serializer.deserialize("entity", m_entity, INVALID_ENTITY);
 		}
 
 
@@ -158,7 +158,7 @@ private:
 		void deserialize(JsonSerializer& serializer) override
 		{
 			serializer.deserialize("template_name_hash", m_template_name_hash, 0);
-			serializer.deserialize("entity", m_entity, -1);
+			serializer.deserialize("entity", m_entity, INVALID_ENTITY);
 			serializer.deserialize("position_x", m_position.x, 0);
 			serializer.deserialize("position_y", m_position.y, 0);
 			serializer.deserialize("position_z", m_position.z, 0);
@@ -417,9 +417,9 @@ public:
 			Array<Entity>& entities = m_instances.get(hash);
 			for (int j = 0; j < instances_per_template; ++j)
 			{
-				int32 entity_index;
-				serializer.read(entity_index);
-				entities.push(Entity(entity_index));
+				Entity entity;
+				serializer.read(entity);
+				entities.push(entity);
 			}
 		}
 		m_updated.invoke();

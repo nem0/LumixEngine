@@ -137,7 +137,7 @@ public:
 	static ComponentIndex LUA_createComponent(IScene* scene, const char* type, int entity_idx)
 	{
 		if (!scene) return -1;
-		Entity e(entity_idx);
+		Entity e = {entity_idx};
 		ComponentType handle = PropertyRegister::getComponentType(type);
 		if (scene->getComponent(e, handle) != INVALID_COMPONENT)
 		{
@@ -291,7 +291,7 @@ public:
 	{
 		if (entity_index < 0 || entity_index > univ->getEntityCount()) return;
 
-		univ->setRotation(entity_index, Quat(axis, angle));
+		univ->setRotation({entity_index}, Quat(axis, angle));
 	}
 
 
@@ -300,7 +300,7 @@ public:
 		Vec3 axis,
 		float angle)
 	{
-		if (entity == INVALID_ENTITY) return;
+		if (isValid(entity)) return;
 
 		static_cast<Hierarchy*>(hierarchy)->setLocalRotation(entity, Quat(axis, angle));
 	}
@@ -357,7 +357,7 @@ public:
 
 	static Vec3 LUA_getEntityPosition(Universe* universe, Entity entity)
 	{
-		if (entity == INVALID_ENTITY)
+		if (isValid(entity))
 		{
 			g_log_warning.log("Engine") << "Requesting position on invalid entity";
 			return Vec3(0, 0, 0);
@@ -368,7 +368,7 @@ public:
 
 	static Quat LUA_getEntityRotation(Universe* universe, Entity entity)
 	{
-		if (entity == INVALID_ENTITY)
+		if (isValid(entity))
 		{
 			g_log_warning.log("Engine") << "Requesting rotation on invalid entity";
 			return Quat(0, 0, 0, 1);

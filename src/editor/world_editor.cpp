@@ -110,7 +110,7 @@ public:
 		char name[100];
 		serializer.deserialize("name", name, sizeof(name), "");
 		m_new_name = name;
-		serializer.deserialize("entity", m_entity, 0);
+		serializer.deserialize("entity", m_entity, INVALID_ENTITY);
 		m_old_name = m_editor.getUniverse()->getEntityName(m_entity);
 	}
 
@@ -318,7 +318,7 @@ public:
 		serializer.deserializeArrayBegin("entities");
 		for (int i = 0; i < m_entities.size(); ++i)
 		{
-			serializer.deserializeArrayItem(m_entities[i], 0);
+			serializer.deserializeArrayItem(m_entities[i], INVALID_ENTITY);
 			serializer.deserializeArrayItem(m_new_positions[i].x, 0);
 			serializer.deserializeArrayItem(m_new_positions[i].y, 0);
 			serializer.deserializeArrayItem(m_new_positions[i].z, 0);
@@ -458,7 +458,7 @@ public:
 		serializer.deserializeArrayBegin("entities");
 		for (int i = 0; i < m_entities.size(); ++i)
 		{
-			serializer.deserializeArrayItem(m_entities[i], 0);
+			serializer.deserializeArrayItem(m_entities[i], INVALID_ENTITY);
 			serializer.deserializeArrayItem(m_new_scales[i], 0);
 			m_old_scales[i] = universe->getScale(m_entities[i]);
 		}
@@ -569,7 +569,7 @@ public:
 	void deserialize(JsonSerializer& serializer) override
 	{
 		serializer.deserialize("inedx", m_index, 0);
-		serializer.deserialize("entity_index", m_component.entity, 0);
+		serializer.deserialize("entity_index", m_component.entity, INVALID_ENTITY);
 		serializer.deserialize("component_index", m_component.index, 0);
 		uint32 hash;
 		serializer.deserialize("component_type", hash, 0);
@@ -652,7 +652,7 @@ public:
 	void deserialize(JsonSerializer& serializer) override
 	{
 		serializer.deserialize("inedx", m_index, 0);
-		serializer.deserialize("entity_index", m_component.entity, 0);
+		serializer.deserialize("entity_index", m_component.entity, INVALID_ENTITY);
 		serializer.deserialize("component_index", m_component.index, 0);
 		uint32 hash;
 		serializer.deserialize("component_type", hash, 0);
@@ -768,7 +768,7 @@ public:
 	void deserialize(JsonSerializer& serializer) override
 	{
 		serializer.deserialize("index", m_index, 0);
-		serializer.deserialize("entity_index", m_entity, 0);
+		serializer.deserialize("entity_index", m_entity, INVALID_ENTITY);
 		uint32 hash;
 		serializer.deserialize("component_type", hash, 0);
 		m_component_type = PropertyRegister::getComponentTypeFromHash(hash);
@@ -946,7 +946,7 @@ private:
 			while (!serializer.isArrayEnd())
 			{
 				Entity& entity = m_entities.emplace();
-				serializer.deserializeArrayItem(entity, 0);
+				serializer.deserializeArrayItem(entity, INVALID_ENTITY);
 			}
 			serializer.deserializeArrayEnd();
 		}
@@ -1060,7 +1060,7 @@ private:
 			m_positons_rotations.resize(count);
 			for (int i = 0; i < count; ++i)
 			{
-				serializer.deserializeArrayItem(m_entities[i], 0);
+				serializer.deserializeArrayItem(m_entities[i], INVALID_ENTITY);
 				serializer.deserializeArrayItem(m_positons_rotations[i].m_position.x, 0);
 				serializer.deserializeArrayItem(m_positons_rotations[i].m_position.y, 0);
 				serializer.deserializeArrayItem(m_positons_rotations[i].m_position.z, 0);
@@ -1197,7 +1197,7 @@ private:
 
 		void deserialize(JsonSerializer& serializer) override
 		{
-			serializer.deserialize("entity", m_component.entity, 0);
+			serializer.deserialize("entity", m_component.entity, INVALID_ENTITY);
 			serializer.deserialize("component", m_component.index, 0);
 			uint32 hash;
 			serializer.deserialize("component_type", hash, 0);
@@ -1327,7 +1327,7 @@ private:
 
 		bool execute() override
 		{
-			if (m_entity < 0)
+			if (!isValid(m_entity))
 			{
 				m_entity = m_editor.getUniverse()->createEntity(m_position, Quat(0, 0, 0, 1));
 			}
@@ -1450,7 +1450,7 @@ public:
 
 	void updateGoTo()
 	{
-		if (m_camera < 0 || !m_go_to_parameters.m_is_active) return;
+		if (!isValid(m_camera) || !m_go_to_parameters.m_is_active) return;
 
 		float t = Math::easeInOut(m_go_to_parameters.m_t);
 		m_go_to_parameters.m_t += m_engine->getLastTimeDelta() * m_go_to_parameters.m_speed;
@@ -1921,18 +1921,17 @@ public:
 		int count) override
 	{
 		if (count <= 0) return;
-		IEditorCommand* command = LUMIX_NEW(m_allocator, MoveEntityCommand)(
-			*this, entities, positions, rotations, count, m_allocator);
+		IEditorCommand* command =
+			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, rotations, count, m_allocator);
 		executeCommand(command);
 	}
 
 
 	void setEntityName(Entity entity, const char* name) override
 	{
-		if (entity >= 0)
+		if (isValid(entity))
 		{
-			IEditorCommand* command =
-				LUMIX_NEW(m_allocator, SetEntityNameCommand)(*this, entity, name);
+			IEditorCommand* command = LUMIX_NEW(m_allocator, SetEntityNameCommand)(*this, entity, name);
 			executeCommand(command);
 		}
 	}

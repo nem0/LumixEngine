@@ -194,7 +194,7 @@ namespace Lumix
 					lua_setfield(script.m_state, -2, "__index");
 
 					// set this
-					lua_pushinteger(script.m_state, m_entity);
+					lua_pushinteger(script.m_state, m_entity.index);
 					lua_setfield(script.m_state, -2, "this");
 
 					lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
@@ -233,7 +233,7 @@ namespace Lumix
 
 			Array<ScriptInstance> m_scripts;
 			LuaScriptSceneImpl& m_scene;
-			int m_entity;
+			Entity m_entity;
 		};
 
 
@@ -1069,8 +1069,8 @@ namespace Lumix
 				break;
 				case Property::ENTITY:
 				{
-					Entity val = (Entity)lua_tointeger(scr.m_state, -1);
-					toCString(val, out, max_size);
+					Entity val = {(int)lua_tointeger(scr.m_state, -1)};
+					toCString(val.index, out, max_size);
 				}
 				break;
 				default: ASSERT(false); break;

@@ -71,7 +71,15 @@ static_assert(sizeof(int8) == 1, "Incorrect size of int8");
 
 const uint32 MAX_PATH_LENGTH = 260;
 typedef int ComponentIndex;
-typedef int Entity;
+struct Entity
+{
+	int index;
+	bool operator==(const Entity& rhs) const { return rhs.index == index; };
+	bool operator<(const Entity& rhs) const { return rhs.index < index; };
+	bool operator>(const Entity& rhs) const { return rhs.index > index; };
+	bool operator!=(const Entity& rhs) const { return rhs.index != index; };
+};
+inline bool isValid(Entity entity) { return entity.index >= 0; }
 struct ComponentType
 {
 	int index;
@@ -80,7 +88,7 @@ struct ComponentType
 	bool operator>(const ComponentType& rhs) const { return rhs.index > index; };
 	bool operator!=(const ComponentType& rhs) const { return rhs.index != index; };
 };
-const int INVALID_ENTITY = -1;
+const Entity INVALID_ENTITY = {-1};
 const int INVALID_COMPONENT = -1;
 
 template <typename T, int count> int lengthOf(const T (&)[count])

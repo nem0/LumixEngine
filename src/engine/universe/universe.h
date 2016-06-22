@@ -32,8 +32,8 @@ public:
 	void createEntity(Entity entity);
 	Entity createEntity(const Vec3& position, const Quat& rotation);
 	void destroyEntity(Entity entity);
-	void addComponent(Entity entity, ComponentType component_type, IScene* scene, int index);
-	void destroyComponent(Entity entity, ComponentType component_type, IScene* scene, int index);
+	void addComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentIndex index);
+	void destroyComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentIndex index);
 	int getEntityCount() const { return m_transformations.size(); }
 
 	int getDenseIdx(Entity entity);

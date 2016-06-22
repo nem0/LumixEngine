@@ -27,7 +27,7 @@ void getEntityListDisplayName(Lumix::WorldEditor& editor, char* buf, int max_siz
 			if (name && name[0] != '\0')
 				Lumix::copyString(buf, max_size, name);
 			else
-				Lumix::toCString(entity, buf, max_size);
+				Lumix::toCString(entity.index, buf, max_size);
 
 			Lumix::catString(buf, max_size, " - ");
 			Lumix::catString(buf, max_size, basename);
@@ -41,7 +41,7 @@ void getEntityListDisplayName(Lumix::WorldEditor& editor, char* buf, int max_siz
 	}
 	else
 	{
-		Lumix::toCString(entity, buf, max_size);
+		Lumix::toCString(entity.index, buf, max_size);
 	}
 }
 

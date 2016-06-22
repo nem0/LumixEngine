@@ -1053,8 +1053,8 @@ struct NavigationSceneImpl : public NavigationScene
 			agent->is_finished = true;
 			if (m_crowd) addCrowdAgent(agent);
 			m_agents.insert(entity, agent);
-			m_universe.addComponent(entity, type, this, entity);
-			return entity;
+			m_universe.addComponent(entity, type, this, entity.index);
+			return entity.index;
 		}
 		return INVALID_COMPONENT;
 	}
@@ -1064,12 +1064,12 @@ struct NavigationSceneImpl : public NavigationScene
 	{
 		if (type == NAVMESH_AGENT_TYPE)
 		{
-			auto iter = m_agents.find(component);
+			auto iter = m_agents.find({component});
 			Agent* agent = iter.value();
 			if (m_crowd && agent->agent >= 0) m_crowd->removeAgent(agent->agent);
 			LUMIX_DELETE(m_allocator, iter.value());
 			m_agents.erase(iter);
-			m_universe.destroyComponent(component, type, this, component);
+			m_universe.destroyComponent({component}, type, this, component);
 		}
 		else
 		{
@@ -1102,13 +1102,13 @@ struct NavigationSceneImpl : public NavigationScene
 			for (int i = 0; i < count; ++i)
 			{
 				Agent* agent = LUMIX_NEW(m_allocator, Agent);
-				ComponentIndex cmp;
-				serializer.read(cmp);
+				Entity entity;
+				serializer.read(entity);
 				serializer.read(agent->radius);
 				serializer.read(agent->height);
 				agent->agent = -1;
-				m_agents.insert(cmp, agent);
-				m_universe.addComponent(cmp, NAVMESH_AGENT_TYPE, this, cmp);
+				m_agents.insert(entity, agent);
+				m_universe.addComponent(entity, NAVMESH_AGENT_TYPE, this, entity.index);
 			}
 		}
 	}
@@ -1116,25 +1116,25 @@ struct NavigationSceneImpl : public NavigationScene
 
 	void setAgentRadius(ComponentIndex cmp, float radius)
 	{
-		m_agents[cmp]->radius = radius;
+		m_agents[{cmp}]->radius = radius;
 	}
 
 
 	float getAgentRadius(ComponentIndex cmp)
 	{
-		return m_agents[cmp]->radius;
+		return m_agents[{cmp}]->radius;
 	}
 
 
 	void setAgentHeight(ComponentIndex cmp, float height)
 	{
-		m_agents[cmp]->height = height;
+		m_agents[{cmp}]->height = height;
 	}
 
 
 	float getAgentHeight(ComponentIndex cmp)
 	{
-		return m_agents[cmp]->height;
+		return m_agents[{cmp}]->height;
 	}
 
 
@@ -1142,7 +1142,7 @@ struct NavigationSceneImpl : public NavigationScene
 	bool ownComponentType(ComponentType type) const override { return type == NAVMESH_AGENT_TYPE; }
 	ComponentIndex getComponent(Entity entity, ComponentType type) override
 	{
-		if (type == NAVMESH_AGENT_TYPE) return entity;
+		if (type == NAVMESH_AGENT_TYPE) return entity.index;
 		return INVALID_COMPONENT;
 	}
 	Universe& getUniverse() override { return m_universe; }
@@ -1154,7 +1154,7 @@ struct NavigationSceneImpl : public NavigationScene
 	dtNavMesh* m_navmesh;
 	dtNavMeshQuery* m_navquery;
 	rcPolyMeshDetail* m_detail_mesh;
-	HashMap<ComponentIndex, Agent*> m_agents;
+	HashMap<Entity, Agent*> m_agents;
 	int m_first_free_agent;
 	rcCompactHeightfield* m_debug_compact_heightfield;
 	rcHeightfield* m_debug_heightfield;

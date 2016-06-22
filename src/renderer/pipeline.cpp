@@ -2410,7 +2410,7 @@ struct PipelineImpl : public Pipeline
 
 	bool cameraExists(const char* slot_name)
 	{
-		return m_scene->getCameraInSlot(slot_name) != INVALID_ENTITY;
+		return m_scene->getCameraInSlot(slot_name) != INVALID_COMPONENT;
 	}
 
 

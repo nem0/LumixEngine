@@ -51,7 +51,7 @@ void EntityGroups::allEntitiesToDefault()
 	{
 		Entity entity = m_universe->getEntityFromDenseIdx(i);
 		m_groups[0].push(entity);
-		m_entity_to_group_map[entity] = 0;
+		m_entity_to_group_map[entity.index] = 0;
 	}
 }
 
@@ -116,15 +116,15 @@ int EntityGroups::getGroupEntitiesCount(int idx) const
 void EntityGroups::onEntityCreated(Entity entity)
 {
 	m_groups[0].push(entity);
-	if (entity >= m_entity_to_group_map.size()) m_entity_to_group_map.resize(entity + 1);
-	m_entity_to_group_map[entity] = 0;
+	if (entity.index >= m_entity_to_group_map.size()) m_entity_to_group_map.resize(entity.index + 1);
+	m_entity_to_group_map[entity.index] = 0;
 }
 
 
 void EntityGroups::onEntityDestroyed(Entity entity)
 {
 	removeFromGroup(entity);
-	m_entity_to_group_map[entity] = -1;
+	m_entity_to_group_map[entity.index] = -1;
 }
 
 
@@ -132,14 +132,14 @@ void EntityGroups::setGroup(Entity entity, int group)
 {
 	removeFromGroup(entity);
 	m_groups[group].push(entity);
-	m_entity_to_group_map[entity] = group;
+	m_entity_to_group_map[entity.index] = group;
 }
 
 
 void EntityGroups::removeFromGroup(Entity entity)
 {
-	m_groups[m_entity_to_group_map[entity]].eraseItemFast(entity);
-	m_entity_to_group_map[entity] = -1;
+	m_groups[m_entity_to_group_map[entity.index]].eraseItemFast(entity);
+	m_entity_to_group_map[entity.index] = -1;
 }
 
 
@@ -188,8 +188,8 @@ void EntityGroups::deserialize(InputBlob& blob)
 	{
 		for (auto e : m_groups[i])
 		{
-			if (e >= m_entity_to_group_map.size()) m_entity_to_group_map.resize(e + 1);
-			m_entity_to_group_map[e] = i;
+			if (e.index >= m_entity_to_group_map.size()) m_entity_to_group_map.resize(e.index + 1);
+			m_entity_to_group_map[e.index] = i;
 		}
 	}
 }

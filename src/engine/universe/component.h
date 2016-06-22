@@ -18,7 +18,7 @@ struct LUMIX_ENGINE_API ComponentUID final
 	{
 		index = -1;
 		scene = nullptr;
-		entity = -1;
+		entity = INVALID_ENTITY;
 		type = {-1};
 	}
 

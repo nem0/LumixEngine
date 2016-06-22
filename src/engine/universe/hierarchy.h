@@ -44,7 +44,7 @@ namespace Lumix
 					Matrix m_local_matrix;
 			};
 
-			typedef HashMap<int32, Array<Child>*> Children;
+			typedef HashMap<Entity, Array<Child>*> Children;
 
 		public:
 			static Hierarchy* create(IPlugin& system, Universe& universe, IAllocator& allocator);

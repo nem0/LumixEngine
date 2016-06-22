@@ -454,10 +454,10 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 						case LuaScriptScene::Property::ENTITY:
 						{
 							Lumix::Entity e;
-							Lumix::fromCString(buf, sizeof(buf), &e);
+							Lumix::fromCString(buf, sizeof(buf), &e.index);
 							if (grid.entityInput(property_name, StaticString<50>(property_name, cmp.index), e))
 							{
-								Lumix::toCString(e, buf, sizeof(buf));
+								Lumix::toCString(e.index, buf, sizeof(buf));
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
 									scene, cmp.index, j, property_name, buf, allocator);
 								editor.executeCommand(cmd);

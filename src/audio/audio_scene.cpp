@@ -95,7 +95,7 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	int playSound(int entity, const char* clip_name, bool is_3d)
+	int playSound(Entity entity, const char* clip_name, bool is_3d)
 	{
 		auto* clip = getClipInfo(clip_name);
 		if (clip) return play(entity, clip, is_3d);
