@@ -109,21 +109,25 @@ class Terrain
 		void setMaterial(Material* material);
 
 		void getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos, LIFOAllocator& allocator);
-		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentIndex camera);
+		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentHandle camera);
 
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 		void serialize(OutputBlob& serializer);
-		void deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene, int index, int version);
+		void deserialize(InputBlob& serializer,
+			Universe& universe,
+			RenderScene& scene,
+			ComponentHandle cmp,
+			int version);
 
 		void addGrassType(int index);
 		void removeGrassType(int index);
 		void forceGrassUpdate();
 
 	private: 
-		Array<Terrain::GrassQuad*>& getQuads(ComponentIndex camera);
+		Array<Terrain::GrassQuad*>& getQuads(ComponentHandle camera);
 		TerrainQuad* generateQuadTree(float size);
 		float getHeight(int x, int z) const;
-		void updateGrass(ComponentIndex camera);
+		void updateGrass(ComponentHandle camera);
 		void generateGrassTypeQuad(GrassPatch& patch,
 								   const Matrix& terrain_matrix,
 								   float quad_x,
@@ -150,8 +154,8 @@ class Terrain
 		RenderScene& m_scene;
 		Array<GrassType*> m_grass_types;
 		Array<GrassQuad*> m_free_grass_quads;
-		AssociativeArray<ComponentIndex, Array<GrassQuad*> > m_grass_quads;
-		AssociativeArray<ComponentIndex, Vec3> m_last_camera_position;
+		AssociativeArray<ComponentHandle, Array<GrassQuad*> > m_grass_quads;
+		AssociativeArray<ComponentHandle, Vec3> m_last_camera_position;
 		bool m_force_grass_update;
 		Renderer& m_renderer;
 };

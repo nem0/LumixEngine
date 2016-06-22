@@ -25,7 +25,11 @@ template <> inline int toType(lua_State* L, int index)
 }
 template <> inline Entity toType(lua_State* L, int index)
 {
-	return {(int)lua_tointeger(L, index)};
+	return{ (int)lua_tointeger(L, index) };
+}
+template <> inline ComponentHandle toType(lua_State* L, int index)
+{
+	return{ (int)lua_tointeger(L, index) };
 }
 template <> inline Vec3 toType(lua_State* L, int index)
 {
@@ -183,6 +187,10 @@ template <> inline void pushLua(lua_State* L, float value)
 	lua_pushnumber(L, value);
 }
 template <> inline void pushLua(lua_State* L, Entity value)
+{
+	lua_pushnumber(L, value.index);
+}
+template <> inline void pushLua(lua_State* L, ComponentHandle value)
 {
 	lua_pushnumber(L, value.index);
 }

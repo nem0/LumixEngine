@@ -540,9 +540,9 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 	StudioApp& m_app;
 	Universe* m_universe;
 	Pipeline* m_pipeline;
-	ComponentIndex m_mesh;
+	ComponentHandle m_mesh;
 	Entity m_camera_entity;
-	ComponentIndex m_camera_cmp;
+	ComponentHandle m_camera_cmp;
 	bool m_is_mouse_captured;
 };
 
@@ -768,7 +768,7 @@ struct EnvironmentProbePlugin : public PropertyGrid::IPlugin
 		if (!PlatformInterface::makePath(path)) g_log_error.log("Editor") << "Failed to create " << path;
 		path << "/probes/";
 		if (!PlatformInterface::makePath(path)) g_log_error.log("Editor") << "Failed to create " << path;
-		path << cmp.index << ".dds";
+		path << cmp.handle.index << ".dds";
 		auto& allocator = m_app.getWorldEditor()->getAllocator();
 		if (!file.open(path, Lumix::FS::Mode::CREATE_AND_WRITE, allocator))
 		{
@@ -836,11 +836,11 @@ struct EnvironmentProbePlugin : public PropertyGrid::IPlugin
 		
 		Vec3 probe_position = universe->getPosition(cmp.entity);
 		auto* scene = static_cast<RenderScene*>(universe->getScene(crc32("renderer")));
-		ComponentIndex original_camera = scene->getCameraInSlot("main");
+		ComponentHandle original_camera = scene->getCameraInSlot("main");
 
 		if(original_camera != INVALID_COMPONENT) scene->setCameraSlot(original_camera, "");
 		Entity camera_entity = universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		ComponentIndex camera_cmp = scene->createComponent(CAMERA_TYPE, camera_entity);
+		ComponentHandle camera_cmp = scene->createComponent(CAMERA_TYPE, camera_entity);
 		scene->setCameraSlot(camera_cmp, "main");
 		scene->setCameraFOV(camera_cmp, 90);
 
@@ -901,7 +901,7 @@ struct EnvironmentProbePlugin : public PropertyGrid::IPlugin
 		universe->destroyEntity(camera_entity);
 		if (original_camera != INVALID_COMPONENT) scene->setCameraSlot(original_camera, "main");
 
-		scene->reloadEnvironmentProbe(cmp.index);
+		scene->reloadEnvironmentProbe(cmp.handle);
 	}
 
 
@@ -910,7 +910,7 @@ struct EnvironmentProbePlugin : public PropertyGrid::IPlugin
 		if (cmp.type != ENVIRONMENT_PROBE_TYPE) return;
 
 		auto* scene = static_cast<RenderScene*>(cmp.scene);
-		auto* texture = scene->getEnvironmentProbeTexture(cmp.index);
+		auto* texture = scene->getEnvironmentProbeTexture(cmp.handle);
 		ImGui::LabelText("Path", "%s", texture->getPath().c_str());
 		if (ImGui::Button("View")) m_app.getAssetBrowser()->selectResource(texture->getPath(), true);
 		ImGui::SameLine();
@@ -941,14 +941,14 @@ struct EmitterPlugin : public PropertyGrid::IPlugin
 		ImGui::Checkbox("Update", &m_particle_emitter_updating);
 		auto* scene = static_cast<RenderScene*>(cmp.scene);
 		ImGui::SameLine();
-		if (ImGui::Button("Reset")) scene->resetParticleEmitter(cmp.index);
+		if (ImGui::Button("Reset")) scene->resetParticleEmitter(cmp.handle);
 
 		if (m_particle_emitter_updating)
 		{
 			ImGui::DragFloat("Timescale", &m_particle_emitter_timescale, 0.01f, 0.01f, 10000.0f);
 			float time_delta = m_app.getWorldEditor()->getEngine().getLastTimeDelta();
-			scene->updateEmitter(cmp.index, time_delta * m_particle_emitter_timescale);
-			scene->getParticleEmitter(cmp.index)->drawGizmo(*m_app.getWorldEditor(), *scene);
+			scene->updateEmitter(cmp.handle, time_delta * m_particle_emitter_timescale);
+			scene->getParticleEmitter(cmp.handle)->drawGizmo(*m_app.getWorldEditor(), *scene);
 		}
 	}
 
@@ -1027,7 +1027,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		}
 
 
-		WorldEditor::RayHit castRay(const Vec3& origin, const Vec3& dir, ComponentIndex ignored) override
+		WorldEditor::RayHit castRay(const Vec3& origin, const Vec3& dir, ComponentHandle ignored) override
 		{
 			auto hit = m_render_scene->castRay(origin, dir, ignored);
 
@@ -1035,7 +1035,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		}
 
 
-		void getRay(ComponentIndex camera_index, float x, float y, Vec3& origin, Vec3& dir) override
+		void getRay(ComponentHandle camera_index, float x, float y, Vec3& origin, Vec3& dir) override
 		{
 			m_render_scene->getRay(camera_index, x, y, origin, dir);
 		}
@@ -1083,43 +1083,43 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		}
 
 
-		void setCameraSlot(ComponentIndex cmp, const char* slot) override
+		void setCameraSlot(ComponentHandle cmp, const char* slot) override
 		{
 			m_render_scene->setCameraSlot(cmp, slot);
 		}
 
 
-		ComponentIndex getCameraInSlot(const char* slot) override
+		ComponentHandle getCameraInSlot(const char* slot) override
 		{
 			return m_render_scene->getCameraInSlot(slot);
 		}
 
 
-		Entity getCameraEntity(ComponentIndex cmp) override
+		Entity getCameraEntity(ComponentHandle cmp) override
 		{
 			return m_render_scene->getCameraEntity(cmp);
 		}
 
 
-		Vec2 getCameraScreenSize(ComponentIndex cmp) override
+		Vec2 getCameraScreenSize(ComponentHandle cmp) override
 		{
 			return m_render_scene->getCameraScreenSize(cmp);
 		}
 
 
-		float getCameraOrthoSize(ComponentIndex cmp) override
+		float getCameraOrthoSize(ComponentHandle cmp) override
 		{
 			return m_render_scene->getCameraOrthoSize(cmp);
 		}
 
 
-		bool isCameraOrtho(ComponentIndex cmp) override
+		bool isCameraOrtho(ComponentHandle cmp) override
 		{
 			return m_render_scene->isCameraOrtho(cmp);
 		}
 
 
-		float getCameraFOV(ComponentIndex cmp) override
+		float getCameraFOV(ComponentHandle cmp) override
 		{
 			return m_render_scene->getCameraFOV(cmp);
 		}
@@ -1190,7 +1190,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 
 		void showEntity(Entity entity) override
 		{
-			ComponentIndex cmp = m_render_scene->getRenderableComponent(entity);
+			ComponentHandle cmp = m_render_scene->getRenderableComponent(entity);
 			if (cmp == INVALID_COMPONENT) return;
 			m_render_scene->showRenderable(cmp);
 		}
@@ -1198,13 +1198,13 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 
 		void hideEntity(Entity entity) override
 		{
-			ComponentIndex cmp = m_render_scene->getRenderableComponent(entity);
+			ComponentHandle cmp = m_render_scene->getRenderableComponent(entity);
 			if (cmp == INVALID_COMPONENT) return;
 			m_render_scene->hideRenderable(cmp);
 		}
 
 
-		Path getRenderablePath(ComponentIndex cmp) override
+		Path getRenderablePath(ComponentHandle cmp) override
 		{
 			return m_render_scene->getRenderablePath(cmp);
 		}
@@ -1555,7 +1555,7 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 		RenderScene* scene = static_cast<RenderScene*>(light.scene);
 		Universe& universe = scene->getUniverse();
 
-		float range = scene->getLightRange(light.index);
+		float range = scene->getLightRange(light.handle);
 
 		Vec3 pos = universe.getPosition(light.entity);
 		scene->addDebugSphere(pos, range, 0xff0000ff, 0);
@@ -1582,7 +1582,7 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 	{
 		RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
 		Universe& universe = scene->getUniverse();
-		Model* model = scene->getRenderableModel(renderable.index);
+		Model* model = scene->getRenderableModel(renderable.handle);
 		Vec3 points[8];
 		if (!model) return;
 
@@ -1646,19 +1646,19 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 		Universe& universe = scene->getUniverse();
 		Vec3 pos = universe.getPosition(cmp.entity);
 
-		bool is_ortho = scene->isCameraOrtho(cmp.index);
-		float near_distance = scene->getCameraNearPlane(cmp.index);
-		float far_distance = scene->getCameraFarPlane(cmp.index);
+		bool is_ortho = scene->isCameraOrtho(cmp.handle);
+		float near_distance = scene->getCameraNearPlane(cmp.handle);
+		float far_distance = scene->getCameraFarPlane(cmp.handle);
 		Vec3 dir = universe.getRotation(cmp.entity) * Vec3(0, 0, -1);
 		Vec3 right = universe.getRotation(cmp.entity) * Vec3(1, 0, 0);
 		Vec3 up = universe.getRotation(cmp.entity) * Vec3(0, 1, 0);
-		float w = scene->getCameraScreenWidth(cmp.index);
-		float h = scene->getCameraScreenHeight(cmp.index);
+		float w = scene->getCameraScreenWidth(cmp.handle);
+		float h = scene->getCameraScreenHeight(cmp.handle);
 		float ratio = h < 1.0f ? 1 : w / h;
 
 		if (is_ortho)
 		{
-			float ortho_size = scene->getCameraOrthoSize(cmp.index);
+			float ortho_size = scene->getCameraOrthoSize(cmp.handle);
 			Vec3 center = pos;
 			center += (far_distance - near_distance) * dir * 0.5f;
 			scene->addDebugCube(center,
@@ -1670,7 +1670,7 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 		}
 		else
 		{
-			float fov = scene->getCameraFOV(cmp.index);
+			float fov = scene->getCameraFOV(cmp.handle);
 			scene->addDebugFrustum(pos, dir, up, fov, ratio, near_distance, far_distance, 0xffff0000, 0);
 		}
 	}

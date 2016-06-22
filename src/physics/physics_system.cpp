@@ -32,10 +32,10 @@ namespace Lumix
 	class PhysicsLayerPropertyDescriptor : public IEnumPropertyDescriptor
 	{
 	public:
-		typedef int (PhysicsScene::*Getter)(ComponentIndex);
-		typedef void (PhysicsScene::*Setter)(ComponentIndex, int);
-		typedef int (PhysicsScene::*ArrayGetter)(ComponentIndex, int);
-		typedef void (PhysicsScene::*ArraySetter)(ComponentIndex, int, int);
+		typedef int (PhysicsScene::*Getter)(ComponentHandle);
+		typedef void (PhysicsScene::*Setter)(ComponentHandle, int);
+		typedef int (PhysicsScene::*ArrayGetter)(ComponentHandle, int);
+		typedef void (PhysicsScene::*ArraySetter)(ComponentHandle, int, int);
 
 	public:
 		PhysicsLayerPropertyDescriptor(const char* name,
@@ -70,11 +70,11 @@ namespace Lumix
 			stream.read(&value, sizeof(value));
 			if (index == -1)
 			{
-				(static_cast<PhysicsScene*>(cmp.scene)->*m_single.setter)(cmp.index, value);
+				(static_cast<PhysicsScene*>(cmp.scene)->*m_single.setter)(cmp.handle, value);
 			}
 			else
 			{
-				(static_cast<PhysicsScene*>(cmp.scene)->*m_array.setter)(cmp.index, index, value);
+				(static_cast<PhysicsScene*>(cmp.scene)->*m_array.setter)(cmp.handle, index, value);
 			}
 		};
 
@@ -84,30 +84,30 @@ namespace Lumix
 			int value;
 			if (index == -1)
 			{
-				value = (static_cast<PhysicsScene*>(cmp.scene)->*m_single.getter)(cmp.index);
+				value = (static_cast<PhysicsScene*>(cmp.scene)->*m_single.getter)(cmp.handle);
 			}
 			else
 			{
-				value = (static_cast<PhysicsScene*>(cmp.scene)->*m_array.getter)(cmp.index, index);
+				value = (static_cast<PhysicsScene*>(cmp.scene)->*m_array.getter)(cmp.handle, index);
 			}
 			stream.write(&value, sizeof(value));
 		};
 
 
-		int getEnumCount(IScene* scene, ComponentIndex) override
+		int getEnumCount(IScene* scene, ComponentHandle) override
 		{
 			return static_cast<PhysicsScene*>(scene)->getCollisionsLayersCount();
 		}
 
 
-		const char* getEnumItemName(IScene* scene, ComponentIndex, int index) override
+		const char* getEnumItemName(IScene* scene, ComponentHandle, int index) override
 		{
 			auto* phy_scene = static_cast<PhysicsScene*>(scene);
 			return phy_scene->getCollisionLayerName(index);
 		}
 
 
-		void getEnumItemName(IScene* scene, ComponentIndex, int index, char* buf, int max_size) override {}
+		void getEnumItemName(IScene* scene, ComponentHandle, int index, char* buf, int max_size) override {}
 
 	private:
 		union

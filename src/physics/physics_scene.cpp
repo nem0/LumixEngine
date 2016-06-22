@@ -316,14 +316,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	ComponentIndex getComponent(Entity entity, ComponentType type) override
+	ComponentHandle getComponent(Entity entity, ComponentType type) override
 	{
 		ASSERT(ownComponentType(type));
 		if (type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE)
 		{
 			for (int i = 0; i < m_actors.size(); ++i)
 			{
-				if (m_actors[i] && m_actors[i]->getEntity() == entity) return i;
+				if (m_actors[i] && m_actors[i]->getEntity() == entity) return {i};
 			}
 			return INVALID_COMPONENT;
 		}
@@ -331,7 +331,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			for (int i = 0; i < m_controllers.size(); ++i)
 			{
-				if (!m_controllers[i].m_is_free && m_controllers[i].m_entity == entity) return i;
+				if (!m_controllers[i].m_is_free && m_controllers[i].m_entity == entity) return {i};
 			}
 			return INVALID_COMPONENT;
 		}
@@ -339,7 +339,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			for (int i = 0; i < m_terrains.size(); ++i)
 			{
-				if (m_terrains[i] && m_terrains[i]->m_entity == entity) return i;
+				if (m_terrains[i] && m_terrains[i]->m_entity == entity) return {i};
 			}
 			return INVALID_COMPONENT;
 		}
@@ -350,22 +350,22 @@ struct PhysicsSceneImpl : public PhysicsScene
 	IPlugin& getPlugin() const override { return *m_system; }
 
 
-	int getControllerLayer(ComponentIndex cmp) override
+	int getControllerLayer(ComponentHandle cmp) override
 	{
-		return m_controllers[cmp].m_layer;
+		return m_controllers[cmp.index].m_layer;
 	}
 
 
-	void setControllerLayer(ComponentIndex cmp, int layer) override
+	void setControllerLayer(ComponentHandle cmp, int layer) override
 	{
 		ASSERT(layer < lengthOf(m_layers_names));
-		m_controllers[cmp].m_layer = layer;
+		m_controllers[cmp.index].m_layer = layer;
 
 		physx::PxFilterData data;
 		data.word0 = 1 << layer;
 		data.word1 = m_collision_filter[layer];
 		physx::PxShape* shapes[8];
-		int shapes_count = m_controllers[cmp].m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
+		int shapes_count = m_controllers[cmp.index].m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
 		for (int i = 0; i < shapes_count; ++i)
 		{
 			shapes[i]->setSimulationFilterData(data);
@@ -373,29 +373,30 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void setActorLayer(ComponentIndex cmp, int layer) override
+	void setActorLayer(ComponentHandle cmp, int layer) override
 	{
 		ASSERT(layer < lengthOf(m_layers_names));
-		m_actors[cmp]->setLayer(layer);
-		updateFilterData(m_actors[cmp]->getPhysxActor(), m_actors[cmp]->getLayer());
+		auto* actor = m_actors[cmp.index];
+		actor->setLayer(layer);
+		updateFilterData(actor->getPhysxActor(), actor->getLayer());
 	}
 
 
-	int getActorLayer(ComponentIndex cmp) override { return m_actors[cmp]->getLayer(); }
-	int getHeightfieldLayer(ComponentIndex cmp) override { return m_terrains[cmp]->m_layer; }
+	int getActorLayer(ComponentHandle cmp) override { return m_actors[cmp.index]->getLayer(); }
+	int getHeightfieldLayer(ComponentHandle cmp) override { return m_terrains[cmp.index]->m_layer; }
 	
-	void setHeightfieldLayer(ComponentIndex cmp, int layer) override
+	void setHeightfieldLayer(ComponentHandle cmp, int layer) override
 	{
 		ASSERT(layer < lengthOf(m_layers_names));
-		m_terrains[cmp]->m_layer = layer;
+		m_terrains[cmp.index]->m_layer = layer;
 
-		if (m_terrains[cmp]->m_actor)
+		if (m_terrains[cmp.index]->m_actor)
 		{
 			physx::PxFilterData data;
 			data.word0 = 1 << layer;
 			data.word1 = m_collision_filter[layer];
 			physx::PxShape* shapes[8];
-			int shapes_count = m_terrains[cmp]->m_actor->getShapes(shapes, lengthOf(shapes));
+			int shapes_count = m_terrains[cmp.index]->m_actor->getShapes(shapes, lengthOf(shapes));
 			for (int i = 0; i < shapes_count; ++i)
 			{
 				shapes[i]->setSimulationFilterData(data);
@@ -404,7 +405,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	ComponentIndex createComponent(ComponentType component_type, Entity entity) override
+	ComponentHandle createComponent(ComponentType component_type, Entity entity) override
 	{
 		if (component_type == HEIGHTFIELD_TYPE)
 		{
@@ -426,27 +427,27 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void destroyComponent(ComponentIndex cmp, ComponentType type) override
+	void destroyComponent(ComponentHandle cmp, ComponentType type) override
 	{
 		if (type == HEIGHTFIELD_TYPE)
 		{
-			Entity entity = m_terrains[cmp]->m_entity;
-			LUMIX_DELETE(m_allocator, m_terrains[cmp]);
-			m_terrains[cmp] = nullptr;
+			Entity entity = m_terrains[cmp.index]->m_entity;
+			LUMIX_DELETE(m_allocator, m_terrains[cmp.index]);
+			m_terrains[cmp.index] = nullptr;
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
 		else if (type == CONTROLLER_TYPE)
 		{
-			Entity entity = m_controllers[cmp].m_entity;
-			m_controllers[cmp].m_is_free = true;
+			Entity entity = m_controllers[cmp.index].m_entity;
+			m_controllers[cmp.index].m_is_free = true;
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
 		else if (type == MESH_ACTOR_TYPE || type == BOX_ACTOR_TYPE)
 		{
-			Entity entity = m_actors[cmp]->getEntity();
-			m_actors[cmp]->setEntity(INVALID_ENTITY);
-			m_actors[cmp]->setPhysxActor(nullptr);
-			m_dynamic_actors.eraseItem(m_actors[cmp]);
+			Entity entity = m_actors[cmp.index]->getEntity();
+			m_actors[cmp.index]->setEntity(INVALID_ENTITY);
+			m_actors[cmp.index]->setPhysxActor(nullptr);
+			m_dynamic_actors.eraseItem(m_actors[cmp.index]);
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
 		else
@@ -456,7 +457,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	ComponentIndex createHeightfield(Entity entity)
+	ComponentHandle createHeightfield(Entity entity)
 	{
 		Heightfield* terrain = LUMIX_NEW(m_allocator, Heightfield)();
 		m_terrains.push(terrain);
@@ -464,13 +465,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 		terrain->m_scene = this;
 		terrain->m_actor = nullptr;
 		terrain->m_entity = entity;
-		m_universe.addComponent(
-			entity, HEIGHTFIELD_TYPE, this, m_terrains.size() - 1);
-		return m_terrains.size() - 1;
+		ComponentHandle cmp = {m_terrains.size() - 1};
+		m_universe.addComponent(entity, HEIGHTFIELD_TYPE, this, cmp);
+		return cmp;
 	}
 
 
-	ComponentIndex createController(Entity entity)
+	ComponentHandle createController(Entity entity)
 	{
 		physx::PxCapsuleControllerDesc cDesc;
 		cDesc.material = m_default_material;
@@ -503,12 +504,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 			shapes[i]->setSimulationFilterData(data);
 		}
 
-		m_universe.addComponent(entity, CONTROLLER_TYPE, this, m_controllers.size() - 1);
-		return m_controllers.size() - 1;
+		ComponentHandle cmp = { m_controllers.size() - 1 };
+		m_universe.addComponent(entity, CONTROLLER_TYPE, this, cmp);
+		return cmp;
 	}
 
 
-	ComponentIndex createBoxRigidActor(Entity entity)
+	ComponentHandle createBoxRigidActor(Entity entity)
 	{
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this);
 		m_actors.push(actor);
@@ -521,111 +523,114 @@ struct PhysicsSceneImpl : public PhysicsScene
 		physx::PxTransform transform;
 		Matrix mtx = m_universe.getPositionAndRotation(entity);
 		matrix2Transform(mtx, transform);
-		
+
 		physx::PxRigidStatic* physx_actor =
 			PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
 		actor->setPhysxActor(physx_actor);
 
-		m_universe.addComponent(entity, BOX_ACTOR_TYPE, this, m_actors.size() - 1);
-		return m_actors.size() - 1;
+		ComponentHandle cmp = {m_actors.size() - 1};
+		m_universe.addComponent(entity, BOX_ACTOR_TYPE, this, cmp);
+		return cmp;
 	}
 
 
-	ComponentIndex createMeshRigidActor(Entity entity)
+	ComponentHandle createMeshRigidActor(Entity entity)
 	{
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this);
 		m_actors.push(actor);
 		actor->setEntity(entity);
 
-		m_universe.addComponent(
-			entity, MESH_ACTOR_TYPE, this, m_actors.size() - 1);
-		return m_actors.size() - 1;
+		ComponentHandle cmp = {m_actors.size() - 1};
+		m_universe.addComponent(entity, MESH_ACTOR_TYPE, this, cmp);
+		return cmp;
 	}
 
 
-	Path getHeightmap(ComponentIndex cmp) override
+	Path getHeightmap(ComponentHandle cmp) override
 	{
-		return m_terrains[cmp]->m_heightmap
-				   ? m_terrains[cmp]->m_heightmap->getPath()
+		return m_terrains[cmp.index]->m_heightmap
+				   ? m_terrains[cmp.index]->m_heightmap->getPath()
 				   : Path("");
 	}
 
 
-	float getHeightmapXZScale(ComponentIndex cmp) override
+	float getHeightmapXZScale(ComponentHandle cmp) override
 	{
-		return m_terrains[cmp]->m_xz_scale;
+		return m_terrains[cmp.index]->m_xz_scale;
 	}
 
 
-	void setHeightmapXZScale(ComponentIndex cmp, float scale) override
+	void setHeightmapXZScale(ComponentHandle cmp, float scale) override
 	{
-		if (scale != m_terrains[cmp]->m_xz_scale)
+		auto* terrain = m_terrains[cmp.index];
+		if (scale != terrain->m_xz_scale)
 		{
-			m_terrains[cmp]->m_xz_scale = scale;
-			if (m_terrains[cmp]->m_heightmap &&
-				m_terrains[cmp]->m_heightmap->isReady())
+			terrain->m_xz_scale = scale;
+			if (terrain->m_heightmap && terrain->m_heightmap->isReady())
 			{
-				heightmapLoaded(m_terrains[cmp]);
+				heightmapLoaded(terrain);
 			}
 		}
 	}
 
 
-	float getHeightmapYScale(ComponentIndex cmp) override
+	float getHeightmapYScale(ComponentHandle cmp) override
 	{
-		return m_terrains[cmp]->m_y_scale;
+		return m_terrains[cmp.index]->m_y_scale;
 	}
 
 
-	void setHeightmapYScale(ComponentIndex cmp, float scale) override
+	void setHeightmapYScale(ComponentHandle cmp, float scale) override
 	{
-		if (scale != m_terrains[cmp]->m_y_scale)
+		auto* terrain = m_terrains[cmp.index];
+		if (scale != terrain->m_y_scale)
 		{
-			m_terrains[cmp]->m_y_scale = scale;
-			if (m_terrains[cmp]->m_heightmap && m_terrains[cmp]->m_heightmap->isReady())
+			terrain->m_y_scale = scale;
+			if (terrain->m_heightmap && terrain->m_heightmap->isReady())
 			{
-				heightmapLoaded(m_terrains[cmp]);
+				heightmapLoaded(terrain);
 			}
 		}
 	}
 
 
-	void setHeightmap(ComponentIndex cmp, const Path& str) override
+	void setHeightmap(ComponentHandle cmp, const Path& str) override
 	{
 		auto& resource_manager = m_engine->getResourceManager();
-		auto* old_hm = m_terrains[cmp]->m_heightmap;
+		auto* terrain = m_terrains[cmp.index];
+		auto* old_hm = terrain->m_heightmap;
 		if (old_hm)
 		{
 			resource_manager.get(TEXTURE_HASH)->unload(*old_hm);
 			auto& cb = old_hm->getObserverCb();
-			cb.unbind<Heightfield, &Heightfield::heightmapLoaded>(m_terrains[cmp]);
+			cb.unbind<Heightfield, &Heightfield::heightmapLoaded>(terrain);
 		}
 		auto* texture_manager = resource_manager.get(TEXTURE_HASH);
 		if (str.isValid())
 		{
 			auto* new_hm = static_cast<Texture*>(texture_manager->load(str));
-			m_terrains[cmp]->m_heightmap = new_hm;
-			new_hm->onLoaded<Heightfield, &Heightfield::heightmapLoaded>(m_terrains[cmp]);
+			terrain->m_heightmap = new_hm;
+			new_hm->onLoaded<Heightfield, &Heightfield::heightmapLoaded>(terrain);
 			new_hm->addDataReference();
 		}
 		else
 		{
-			m_terrains[cmp]->m_heightmap = nullptr;
+			terrain->m_heightmap = nullptr;
 		}
 	}
 
 
-	Path getShapeSource(ComponentIndex cmp) override
+	Path getShapeSource(ComponentHandle cmp) override
 	{
-		return m_actors[cmp]->getResource() ? m_actors[cmp]->getResource()->getPath() : Path("");
+		return m_actors[cmp.index]->getResource() ? m_actors[cmp.index]->getResource()->getPath() : Path("");
 	}
 
 
-	void setShapeSource(ComponentIndex cmp, const Path& str) override
+	void setShapeSource(ComponentHandle cmp, const Path& str) override
 	{
-		ASSERT(m_actors[cmp]);
+		ASSERT(m_actors[cmp.index]);
 		bool is_dynamic = isDynamic(cmp);
-		auto& actor = *m_actors[cmp];
+		auto& actor = *m_actors[cmp.index];
 		if (actor.getResource() && actor.getResource()->getPath() == str &&
 			(!actor.getPhysxActor() || is_dynamic == !actor.getPhysxActor()->isRigidStatic()))
 		{
@@ -635,8 +640,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		ResourceManagerBase* manager = m_engine->getResourceManager().get(PHYSICS_HASH);
 		PhysicsGeometry* geom_res = static_cast<PhysicsGeometry*>(manager->load(str));
 
-		m_actors[cmp]->setPhysxActor(nullptr);
-		m_actors[cmp]->setResource(geom_res);
+		actor.setPhysxActor(nullptr);
+		actor.setResource(geom_res);
 	}
 
 
@@ -723,7 +728,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		for (auto& i : m_queued_forces)
 		{
-			auto* actor = m_actors[i.cmp];
+			auto* actor = m_actors[i.cmp.index];
 			if (!actor->isDynamic())
 			{
 				g_log_warning.log("Physics") << "Trying to apply force to static object";
@@ -753,56 +758,43 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	ComponentIndex getActorComponent(Entity entity) override
+	ComponentHandle getActorComponent(Entity entity) override
 	{
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
-			if (m_actors[i]->getEntity() == entity) return i;
+			if (m_actors[i]->getEntity() == entity) return {i};
 		}
-		return -1;
+		return INVALID_COMPONENT;
 	}
 
 
 	void startGame() override
-	{ 
+	{
 		auto* scene = m_universe.getScene(crc32("lua_script"));
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
-		m_is_game_running = true; 
+		m_is_game_running = true;
 	}
 
 
 	void stopGame() override { m_is_game_running = false; }
+	float getControllerRadius(ComponentHandle cmp) override { return m_controllers[cmp.index].m_radius; }
+	float getControllerHeight(ComponentHandle cmp) override { return m_controllers[cmp.index].m_height; }
 
 
-	float getControllerRadius(ComponentIndex cmp) override
-	{
-		return m_controllers[cmp].m_radius;
-	}
-
-
-	float getControllerHeight(ComponentIndex cmp) override
-	{
-		return m_controllers[cmp].m_height;
-	}
-
-
-	ComponentIndex getController(Entity entity) override
+	ComponentHandle getController(Entity entity) override
 	{
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
 			if (m_controllers[i].m_entity == entity)
 			{
-				return i;
+				return {i};
 			}
 		}
 		return INVALID_COMPONENT;
 	}
 
 
-	void moveController(ComponentIndex cmp, const Vec3& v) override
-	{
-		m_controllers[cmp].m_frame_change += v;
-	}
+	void moveController(ComponentHandle cmp, const Vec3& v) override { m_controllers[cmp.index].m_frame_change += v; }
 
 
 	static int LUA_raycast(lua_State* L)
@@ -832,22 +824,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	bool raycastEx(const Vec3& origin,
-		const Vec3& dir,
-		float distance,
-		RaycastHit& result) override
+	bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result) override
 	{
 		physx::PxVec3 physx_origin(origin.x, origin.y, origin.z);
 		physx::PxVec3 unit_dir(dir.x, dir.y, dir.z);
 		physx::PxReal max_distance = distance;
 		physx::PxRaycastHit hit;
 
-		const physx::PxSceneQueryFlags outputFlags = physx::PxSceneQueryFlag::eDISTANCE |
-													 physx::PxSceneQueryFlag::eIMPACT |
-													 physx::PxSceneQueryFlag::eNORMAL;
+		const physx::PxSceneQueryFlags outputFlags =
+			physx::PxSceneQueryFlag::eDISTANCE | physx::PxSceneQueryFlag::eIMPACT | physx::PxSceneQueryFlag::eNORMAL;
 
-		bool status =
-			m_scene->raycastSingle(physx_origin, unit_dir, max_distance, outputFlags, hit);
+		bool status = m_scene->raycastSingle(physx_origin, unit_dir, max_distance, outputFlags, hit);
 		result.normal.x = hit.normal.x;
 		result.normal.y = hit.normal.y;
 		result.normal.z = hit.normal.z;
@@ -1151,9 +1138,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	bool isDynamic(ComponentIndex cmp) override
+	bool isDynamic(ComponentHandle cmp) override
 	{
-		RigidActor* actor = m_actors[cmp];
+		RigidActor* actor = m_actors[cmp.index];
 		return isDynamic(actor);
 	}
 
@@ -1171,13 +1158,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	Vec3 getHalfExtents(ComponentIndex cmp) override
+	Vec3 getHalfExtents(ComponentHandle cmp) override
 	{
 		Vec3 size;
-		physx::PxRigidActor* actor = m_actors[cmp]->getPhysxActor();
+		physx::PxRigidActor* actor = m_actors[cmp.index]->getPhysxActor();
 		physx::PxShape* shapes;
 		if (actor->getNbShapes() == 1 &&
-			m_actors[cmp]->getPhysxActor()->getShapes(&shapes, 1))
+			m_actors[cmp.index]->getPhysxActor()->getShapes(&shapes, 1))
 		{
 			physx::PxVec3& half = shapes->getGeometry().box().halfExtents;
 			size.x = half.x;
@@ -1188,12 +1175,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void setHalfExtents(ComponentIndex cmp, const Vec3& size) override
+	void setHalfExtents(ComponentHandle cmp, const Vec3& size) override
 	{
-		physx::PxRigidActor* actor = m_actors[cmp]->getPhysxActor();
+		physx::PxRigidActor* actor = m_actors[cmp.index]->getPhysxActor();
 		physx::PxShape* shapes;
-		if (actor->getNbShapes() == 1 &&
-			m_actors[cmp]->getPhysxActor()->getShapes(&shapes, 1))
+		if (actor->getNbShapes() == 1 && m_actors[cmp.index]->getPhysxActor()->getShapes(&shapes, 1))
 		{
 			physx::PxBoxGeometry box;
 			bool is_box = shapes->getBoxGeometry(box);
@@ -1207,54 +1193,43 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void setIsDynamic(ComponentIndex cmp, bool new_value) override
+	void setIsDynamic(ComponentHandle cmp, bool new_value) override
 	{
-		RigidActor* actor = m_actors[cmp];
+		RigidActor* actor = m_actors[cmp.index];
 		int dynamic_index = m_dynamic_actors.indexOf(actor);
 		bool is_dynamic = dynamic_index != -1;
-		if (is_dynamic != new_value)
+		if (is_dynamic == new_value) return;
+
+		actor->setDynamic(new_value);
+		if (new_value)
 		{
-			m_actors[cmp]->setDynamic(new_value);
+			m_dynamic_actors.push(actor);
+		}
+		else
+		{
+			m_dynamic_actors.eraseItemFast(actor);
+		}
+		physx::PxShape* shapes;
+		if (actor->getPhysxActor()->getNbShapes() == 1 && actor->getPhysxActor()->getShapes(&shapes, 1, 0))
+		{
+			physx::PxGeometryHolder geom = shapes->getGeometry();
+
+			physx::PxTransform transform;
+			matrix2Transform(m_universe.getPositionAndRotation(actor->getEntity()), transform);
+
+			physx::PxRigidActor* physx_actor;
 			if (new_value)
 			{
-				m_dynamic_actors.push(actor);
+				physx_actor = PxCreateDynamic(*m_system->getPhysics(), transform, geom.any(), *m_default_material, 1.0f);
 			}
 			else
 			{
-				m_dynamic_actors.eraseItemFast(actor);
+				physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, geom.any(), *m_default_material);
 			}
-			physx::PxShape* shapes;
-			if (m_actors[cmp]->getPhysxActor()->getNbShapes() == 1 &&
-				m_actors[cmp]->getPhysxActor()->getShapes(&shapes, 1, 0))
-			{
-				physx::PxGeometryHolder geom = shapes->getGeometry();
-
-				physx::PxTransform transform;
-				matrix2Transform(
-					m_universe.getPositionAndRotation(m_actors[cmp]->getEntity()),
-					transform);
-
-				physx::PxRigidActor* actor;
-				if (new_value)
-				{
-					actor = PxCreateDynamic(*m_system->getPhysics(),
-											transform,
-											geom.any(),
-											*m_default_material,
-											1.0f);
-				}
-				else
-				{
-					actor = PxCreateStatic(*m_system->getPhysics(),
-										   transform,
-										   geom.any(),
-										   *m_default_material);
-				}
-				ASSERT(actor);
-				actor->userData = (void*)(intptr_t)m_actors[cmp]->getEntity().index;
-				actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
-				m_actors[cmp]->setPhysxActor(actor);
-			}
+			ASSERT(actor);
+			physx_actor->userData = (void*)(intptr_t)actor->getEntity().index;
+			physx_actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+			actor->setPhysxActor(physx_actor);
 		}
 	}
 
@@ -1305,11 +1280,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deserializeActor(InputBlob& serializer, int idx, int version)
+	void deserializeActor(InputBlob& serializer, ComponentHandle cmp, int version)
 	{
 		int layer = 0;
 		if (version > (int)PhysicsSceneVersion::LAYERS) serializer.read(layer);
-		m_actors[idx]->setLayer(layer);
+		auto* actor = m_actors[cmp.index];
+		actor->setLayer(layer);
 
 		ActorType type;
 		serializer.read((int32&)type);
@@ -1320,24 +1296,23 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				physx::PxBoxGeometry box_geom;
 				physx::PxTransform transform;
-				Matrix mtx = m_universe.getPositionAndRotation(m_actors[idx]->getEntity());
+				Matrix mtx = m_universe.getPositionAndRotation(actor->getEntity());
 				matrix2Transform(mtx, transform);
 				serializer.read(box_geom.halfExtents.x);
 				serializer.read(box_geom.halfExtents.y);
 				serializer.read(box_geom.halfExtents.z);
-				physx::PxRigidActor* actor;
-				if (isDynamic(idx))
+				physx::PxRigidActor* physx_actor;
+				if (isDynamic(cmp))
 				{
-					actor = PxCreateDynamic(
-						*m_system->getPhysics(), transform, box_geom, *m_default_material, 1.0f);
+					physx_actor =
+						PxCreateDynamic(*m_system->getPhysics(), transform, box_geom, *m_default_material, 1.0f);
 				}
 				else
 				{
-					actor = PxCreateStatic(
-						*m_system->getPhysics(), transform, box_geom, *m_default_material);
+					physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, box_geom, *m_default_material);
 				}
-				m_actors[idx]->setPhysxActor(actor);
-				m_universe.addComponent(m_actors[idx]->getEntity(), BOX_ACTOR_TYPE, this, idx);
+				actor->setPhysxActor(physx_actor);
+				m_universe.addComponent(actor->getEntity(), BOX_ACTOR_TYPE, this, cmp);
 			}
 			break;
 			case TRIMESH:
@@ -1347,8 +1322,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 				serializer.readString(tmp, sizeof(tmp));
 				ResourceManagerBase* manager = m_engine->getResourceManager().get(PHYSICS_HASH);
 				auto* geometry = manager->load(Lumix::Path(tmp));
-				m_actors[idx]->setResource(static_cast<PhysicsGeometry*>(geometry));
-				m_universe.addComponent(m_actors[idx]->getEntity(), MESH_ACTOR_TYPE, this, idx);
+				actor->setResource(static_cast<PhysicsGeometry*>(geometry));
+				m_universe.addComponent(actor->getEntity(), MESH_ACTOR_TYPE, this, cmp);
 			}
 			break;
 			default:
@@ -1366,7 +1341,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		serializer.write((int32)m_actors.size());
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
-			serializer.write(isDynamic(i));
+			serializer.write(isDynamic({i}));
 			serializer.write(m_actors[i]->getEntity());
 			if (isValid(m_actors[i]->getEntity()))
 			{
@@ -1437,7 +1412,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 			if (isValid(m_actors[i]->getEntity()))
 			{
-				deserializeActor(serializer, i, version);
+				deserializeActor(serializer, {i}, version);
 			}
 		}
 	}
@@ -1466,32 +1441,30 @@ struct PhysicsSceneImpl : public PhysicsScene
 			c.m_is_free = is_free;
 			c.m_frame_change.set(0, 0, 0);
 
-			if (!is_free)
+			if (is_free) continue;
+
+			if (version > (int)PhysicsSceneVersion::LAYERS)
 			{
-				if (version > (int)PhysicsSceneVersion::LAYERS)
-				{
-					serializer.read(c.m_layer);
-				}
-				else
-				{
-					c.m_layer = 0;
-				}
-				physx::PxCapsuleControllerDesc cDesc;
-				cDesc.material = m_default_material;
-				cDesc.height = 1.8f;
-				cDesc.radius = 0.25f;
-				cDesc.slopeLimit = 0.0f;
-				cDesc.contactOffset = 0.1f;
-				cDesc.stepOffset = 0.02f;
-				cDesc.callback = nullptr;
-				cDesc.behaviorCallback = nullptr;
-				Vec3 position = m_universe.getPosition(e);
-				cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
-				c.m_controller =
-					m_controller_manager->createController(*m_system->getPhysics(), m_scene, cDesc);
-				c.m_entity = e;
-				m_universe.addComponent(e, CONTROLLER_TYPE, this, i);
+				serializer.read(c.m_layer);
 			}
+			else
+			{
+				c.m_layer = 0;
+			}
+			physx::PxCapsuleControllerDesc cDesc;
+			cDesc.material = m_default_material;
+			cDesc.height = 1.8f;
+			cDesc.radius = 0.25f;
+			cDesc.slopeLimit = 0.0f;
+			cDesc.contactOffset = 0.1f;
+			cDesc.stepOffset = 0.02f;
+			cDesc.callback = nullptr;
+			cDesc.behaviorCallback = nullptr;
+			Vec3 position = m_universe.getPosition(e);
+			cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
+			c.m_controller = m_controller_manager->createController(*m_system->getPhysics(), m_scene, cDesc);
+			c.m_entity = e;
+			m_universe.addComponent(e, CONTROLLER_TYPE, this, {i});
 		}
 	}
 
@@ -1539,9 +1512,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 				if (m_terrains[i]->m_heightmap == nullptr ||
 					!equalStrings(tmp, m_terrains[i]->m_heightmap->getPath().c_str()))
 				{
-					setHeightmap(i, Path(tmp));
+					setHeightmap({i}, Path(tmp));
 				}
-				m_universe.addComponent(m_terrains[i]->m_entity, HEIGHTFIELD_TYPE, this, i);
+				m_universe.addComponent(m_terrains[i]->m_entity, HEIGHTFIELD_TYPE, this, {i});
 			}
 		}
 	}
@@ -1570,9 +1543,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 	int getVersion() const override { return (int)PhysicsSceneVersion::LATEST; }
 
 
-	float getActorSpeed(ComponentIndex cmp) override
+	float getActorSpeed(ComponentHandle cmp) override
 	{
-		auto* actor = m_actors[cmp];
+		auto* actor = m_actors[cmp.index];
 		if (!actor->isDynamic())
 		{
 			g_log_warning.log("Physics") << "Trying to get speed of static object";
@@ -1585,9 +1558,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void putToSleep(ComponentIndex cmp) override
+	void putToSleep(ComponentHandle cmp) override
 	{
-		auto* actor = m_actors[cmp];
+		auto* actor = m_actors[cmp.index];
 		if (!actor->isDynamic())
 		{
 			g_log_warning.log("Physics") << "Trying to put static object to sleep";
@@ -1600,7 +1573,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void applyForceToActor(ComponentIndex cmp, const Vec3& force) override
+	void applyForceToActor(ComponentHandle cmp, const Vec3& force) override
 	{
 		auto& i = m_queued_forces.emplace();
 		i.cmp = cmp;
@@ -1631,7 +1604,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	struct QueuedForce
 	{
-		ComponentIndex cmp;
+		ComponentHandle cmp;
 		Vec3 force;
 	};
 

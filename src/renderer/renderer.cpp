@@ -97,7 +97,7 @@ struct BonePropertyDescriptor : public IEnumPropertyDescriptor
 		int value;
 		stream.read(&value, sizeof(value));
 		auto* render_scene = static_cast<RenderScene*>(cmp.scene);
-		render_scene->setBoneAttachmentBone(cmp.index, value);
+		render_scene->setBoneAttachmentBone(cmp.handle, value);
 	}
 
 
@@ -105,25 +105,25 @@ struct BonePropertyDescriptor : public IEnumPropertyDescriptor
 	{
 		ASSERT(index == -1);
 		auto* render_scene = static_cast<RenderScene*>(cmp.scene);
-		int value = render_scene->getBoneAttachmentBone(cmp.index);
+		int value = render_scene->getBoneAttachmentBone(cmp.handle);
 		int len = sizeof(value);
 		stream.write(&value, len);
 	}
 
 
-	ComponentIndex getRenderable(RenderScene* render_scene, ComponentIndex bone_attachment_cmp)
+	ComponentHandle getRenderable(RenderScene* render_scene, ComponentHandle bone_attachment_cmp)
 	{
 		Entity parent_entity = render_scene->getBoneAttachmentParent(bone_attachment_cmp);
 		if (parent_entity == INVALID_ENTITY) return INVALID_COMPONENT;
-		ComponentIndex renderable = render_scene->getRenderableComponent(parent_entity);
+		ComponentHandle renderable = render_scene->getRenderableComponent(parent_entity);
 		return renderable;
 	}
 
 
-	int getEnumCount(IScene* scene, ComponentIndex cmp) override
+	int getEnumCount(IScene* scene, ComponentHandle cmp) override
 	{
 		auto* render_scene = static_cast<RenderScene*>(scene);
-		ComponentIndex renderable = getRenderable(render_scene, cmp);
+		ComponentHandle renderable = getRenderable(render_scene, cmp);
 		if (renderable == INVALID_COMPONENT) return 0;
 		auto* model = render_scene->getRenderableModel(renderable);
 		if (!model || !model->isReady()) return 0;
@@ -131,10 +131,10 @@ struct BonePropertyDescriptor : public IEnumPropertyDescriptor
 	}
 
 
-	const char* getEnumItemName(IScene* scene, ComponentIndex cmp, int index) override
+	const char* getEnumItemName(IScene* scene, ComponentHandle cmp, int index) override
 	{
 		auto* render_scene = static_cast<RenderScene*>(scene);
-		ComponentIndex renderable = getRenderable(render_scene, cmp);
+		ComponentHandle renderable = getRenderable(render_scene, cmp);
 		if (renderable == INVALID_COMPONENT) return "";
 		auto* model = render_scene->getRenderableModel(renderable);
 		if (!model) return "";

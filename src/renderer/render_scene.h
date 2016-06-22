@@ -81,7 +81,7 @@ struct Renderable
 
 struct RenderableMesh
 {
-	ComponentIndex renderable;
+	ComponentHandle renderable;
 	Mesh* mesh;
 };
 
@@ -142,24 +142,24 @@ public:
 	static void destroyInstance(RenderScene* scene);
 	static void registerLuaAPI(lua_State* L);
 
-	virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, ComponentIndex ignore) = 0;
+	virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, ComponentHandle ignore) = 0;
 
-	virtual RayCastModelHit castRayTerrain(ComponentIndex terrain,
+	virtual RayCastModelHit castRayTerrain(ComponentHandle terrain,
 		const Vec3& origin,
 		const Vec3& dir) = 0;
 
-	virtual void getRay(ComponentIndex camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
+	virtual void getRay(ComponentHandle camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 
-	virtual Frustum getCameraFrustum(ComponentIndex camera) const = 0;
+	virtual Frustum getCameraFrustum(ComponentHandle camera) const = 0;
 	virtual float getTime() const = 0;
 	virtual Engine& getEngine() const = 0;
 	virtual IAllocator& getAllocator() = 0;
 
-	virtual Pose* getPose(ComponentIndex cmp) = 0;
-	virtual ComponentIndex getActiveGlobalLight() = 0;
-	virtual void setActiveGlobalLight(ComponentIndex cmp) = 0;
-	virtual Vec4 getShadowmapCascades(ComponentIndex cmp) = 0;
-	virtual void setShadowmapCascades(ComponentIndex cmp, const Vec4& value) = 0;
+	virtual Pose* getPose(ComponentHandle cmp) = 0;
+	virtual ComponentHandle getActiveGlobalLight() = 0;
+	virtual void setActiveGlobalLight(ComponentHandle cmp) = 0;
+	virtual Vec4 getShadowmapCascades(ComponentHandle cmp) = 0;
+	virtual void setShadowmapCascades(ComponentHandle cmp, const Vec4& value) = 0;
 
 	virtual void addDebugTriangle(const Vec3& p0,
 		const Vec3& p1,
@@ -208,192 +208,192 @@ public:
 		uint32 color,
 		float life) = 0;
 
-	virtual Entity getBoneAttachmentParent(ComponentIndex cmp) = 0;
-	virtual void setBoneAttachmentParent(ComponentIndex cmp, Entity entity) = 0;
-	virtual void setBoneAttachmentBone(ComponentIndex cmp, int value) = 0;
-	virtual int getBoneAttachmentBone(ComponentIndex cmp) = 0;
-	virtual Vec3 getBoneAttachmentPosition(ComponentIndex cmp) = 0;
-	virtual void setBoneAttachmentPosition(ComponentIndex cmp, const Vec3& pos) = 0;
+	virtual Entity getBoneAttachmentParent(ComponentHandle cmp) = 0;
+	virtual void setBoneAttachmentParent(ComponentHandle cmp, Entity entity) = 0;
+	virtual void setBoneAttachmentBone(ComponentHandle cmp, int value) = 0;
+	virtual int getBoneAttachmentBone(ComponentHandle cmp) = 0;
+	virtual Vec3 getBoneAttachmentPosition(ComponentHandle cmp) = 0;
+	virtual void setBoneAttachmentPosition(ComponentHandle cmp, const Vec3& pos) = 0;
 
 	virtual const Array<DebugTriangle>& getDebugTriangles() const = 0;
 	virtual const Array<DebugLine>& getDebugLines() const = 0;
 	virtual const Array<DebugPoint>& getDebugPoints() const = 0;
 
-	virtual Matrix getCameraProjection(ComponentIndex camera) = 0;
-	virtual Entity getCameraEntity(ComponentIndex camera) const = 0;
-	virtual ComponentIndex getCameraInSlot(const char* slot) = 0;
-	virtual float getCameraFOV(ComponentIndex camera) = 0;
-	virtual void setCameraFOV(ComponentIndex camera, float fov) = 0;
-	virtual void setCameraFarPlane(ComponentIndex camera, float far) = 0;
-	virtual void setCameraNearPlane(ComponentIndex camera, float near) = 0;
-	virtual float getCameraFarPlane(ComponentIndex camera) = 0;
-	virtual float getCameraNearPlane(ComponentIndex camera) = 0;
-	virtual float getCameraScreenWidth(ComponentIndex camera) = 0;
-	virtual float getCameraScreenHeight(ComponentIndex camera) = 0;
-	virtual void setCameraSlot(ComponentIndex camera, const char* slot) = 0;
-	virtual const char* getCameraSlot(ComponentIndex camera) = 0;
-	virtual void setCameraScreenSize(ComponentIndex camera, int w, int h) = 0;
-	virtual bool isCameraOrtho(ComponentIndex camera) = 0;
-	virtual void setCameraOrtho(ComponentIndex camera, bool is_ortho) = 0;
-	virtual float getCameraOrthoSize(ComponentIndex camera) = 0;
-	virtual void setCameraOrthoSize(ComponentIndex camera, float value) = 0;
-	virtual Vec2 getCameraScreenSize(ComponentIndex camera) = 0;
+	virtual Matrix getCameraProjection(ComponentHandle camera) = 0;
+	virtual Entity getCameraEntity(ComponentHandle camera) const = 0;
+	virtual ComponentHandle getCameraInSlot(const char* slot) = 0;
+	virtual float getCameraFOV(ComponentHandle camera) = 0;
+	virtual void setCameraFOV(ComponentHandle camera, float fov) = 0;
+	virtual void setCameraFarPlane(ComponentHandle camera, float far) = 0;
+	virtual void setCameraNearPlane(ComponentHandle camera, float near) = 0;
+	virtual float getCameraFarPlane(ComponentHandle camera) = 0;
+	virtual float getCameraNearPlane(ComponentHandle camera) = 0;
+	virtual float getCameraScreenWidth(ComponentHandle camera) = 0;
+	virtual float getCameraScreenHeight(ComponentHandle camera) = 0;
+	virtual void setCameraSlot(ComponentHandle camera, const char* slot) = 0;
+	virtual const char* getCameraSlot(ComponentHandle camera) = 0;
+	virtual void setCameraScreenSize(ComponentHandle camera, int w, int h) = 0;
+	virtual bool isCameraOrtho(ComponentHandle camera) = 0;
+	virtual void setCameraOrtho(ComponentHandle camera, bool is_ortho) = 0;
+	virtual float getCameraOrthoSize(ComponentHandle camera) = 0;
+	virtual void setCameraOrthoSize(ComponentHandle camera, float value) = 0;
+	virtual Vec2 getCameraScreenSize(ComponentHandle camera) = 0;
 
-	virtual class ParticleEmitter* getParticleEmitter(ComponentIndex cmp) = 0;
-	virtual void resetParticleEmitter(ComponentIndex cmp) = 0;
-	virtual void updateEmitter(ComponentIndex cmp, float time_delta) = 0;
+	virtual class ParticleEmitter* getParticleEmitter(ComponentHandle cmp) = 0;
+	virtual void resetParticleEmitter(ComponentHandle cmp) = 0;
+	virtual void updateEmitter(ComponentHandle cmp, float time_delta) = 0;
 	virtual const Array<class ParticleEmitter*>& getParticleEmitters() const = 0;
-	virtual const Vec2* getParticleEmitterAlpha(ComponentIndex cmp) = 0;
-	virtual int getParticleEmitterAlphaCount(ComponentIndex cmp) = 0;
-	virtual const Vec2* getParticleEmitterSize(ComponentIndex cmp) = 0;
-	virtual int getParticleEmitterSizeCount(ComponentIndex cmp) = 0;
-	virtual Vec3 getParticleEmitterAcceleration(ComponentIndex cmp) = 0;
-	virtual Vec2 getParticleEmitterLinearMovementX(ComponentIndex cmp) = 0;
-	virtual Vec2 getParticleEmitterLinearMovementY(ComponentIndex cmp) = 0;
-	virtual Vec2 getParticleEmitterLinearMovementZ(ComponentIndex cmp) = 0;
-	virtual Vec2 getParticleEmitterInitialLife(ComponentIndex cmp) = 0;
-	virtual Int2 getParticleEmitterSpawnCount(ComponentIndex cmp) = 0;
-	virtual Vec2 getParticleEmitterSpawnPeriod(ComponentIndex cmp) = 0;
-	virtual Vec2 getParticleEmitterInitialSize(ComponentIndex cmp) = 0;
-	virtual void setParticleEmitterAlpha(ComponentIndex cmp, const Vec2* value, int count) = 0;
-	virtual void setParticleEmitterSize(ComponentIndex cmp, const Vec2* values, int count) = 0;
-	virtual void setParticleEmitterAcceleration(ComponentIndex cmp, const Vec3& value) = 0;
-	virtual void setParticleEmitterLinearMovementX(ComponentIndex cmp, const Vec2& value) = 0;
-	virtual void setParticleEmitterLinearMovementY(ComponentIndex cmp, const Vec2& value) = 0;
-	virtual void setParticleEmitterLinearMovementZ(ComponentIndex cmp, const Vec2& value) = 0;
-	virtual void setParticleEmitterInitialLife(ComponentIndex cmp, const Vec2& value) = 0;
-	virtual void setParticleEmitterSpawnCount(ComponentIndex cmp, const Int2& value) = 0;
-	virtual void setParticleEmitterSpawnPeriod(ComponentIndex cmp, const Vec2& value) = 0;
-	virtual void setParticleEmitterInitialSize(ComponentIndex cmp, const Vec2& value) = 0;
-	virtual void setParticleEmitterMaterialPath(ComponentIndex cmp, const Path& path) = 0;
-	virtual Path getParticleEmitterMaterialPath(ComponentIndex cmp) = 0;
-	virtual int getParticleEmitterPlaneCount(ComponentIndex cmp) = 0;
-	virtual void addParticleEmitterPlane(ComponentIndex cmp, int index) = 0;
-	virtual void removeParticleEmitterPlane(ComponentIndex cmp, int index) = 0;
-	virtual Entity getParticleEmitterPlaneEntity(ComponentIndex cmp, int index) = 0;
-	virtual void setParticleEmitterPlaneEntity(ComponentIndex cmp, int index, Entity entity) = 0;
-	virtual float getParticleEmitterPlaneBounce(ComponentIndex cmp) = 0;
-	virtual void setParticleEmitterPlaneBounce(ComponentIndex cmp, float value) = 0;
-	virtual float getParticleEmitterShapeRadius(ComponentIndex cmp) = 0;
-	virtual void setParticleEmitterShapeRadius(ComponentIndex cmp, float value) = 0;
+	virtual const Vec2* getParticleEmitterAlpha(ComponentHandle cmp) = 0;
+	virtual int getParticleEmitterAlphaCount(ComponentHandle cmp) = 0;
+	virtual const Vec2* getParticleEmitterSize(ComponentHandle cmp) = 0;
+	virtual int getParticleEmitterSizeCount(ComponentHandle cmp) = 0;
+	virtual Vec3 getParticleEmitterAcceleration(ComponentHandle cmp) = 0;
+	virtual Vec2 getParticleEmitterLinearMovementX(ComponentHandle cmp) = 0;
+	virtual Vec2 getParticleEmitterLinearMovementY(ComponentHandle cmp) = 0;
+	virtual Vec2 getParticleEmitterLinearMovementZ(ComponentHandle cmp) = 0;
+	virtual Vec2 getParticleEmitterInitialLife(ComponentHandle cmp) = 0;
+	virtual Int2 getParticleEmitterSpawnCount(ComponentHandle cmp) = 0;
+	virtual Vec2 getParticleEmitterSpawnPeriod(ComponentHandle cmp) = 0;
+	virtual Vec2 getParticleEmitterInitialSize(ComponentHandle cmp) = 0;
+	virtual void setParticleEmitterAlpha(ComponentHandle cmp, const Vec2* value, int count) = 0;
+	virtual void setParticleEmitterSize(ComponentHandle cmp, const Vec2* values, int count) = 0;
+	virtual void setParticleEmitterAcceleration(ComponentHandle cmp, const Vec3& value) = 0;
+	virtual void setParticleEmitterLinearMovementX(ComponentHandle cmp, const Vec2& value) = 0;
+	virtual void setParticleEmitterLinearMovementY(ComponentHandle cmp, const Vec2& value) = 0;
+	virtual void setParticleEmitterLinearMovementZ(ComponentHandle cmp, const Vec2& value) = 0;
+	virtual void setParticleEmitterInitialLife(ComponentHandle cmp, const Vec2& value) = 0;
+	virtual void setParticleEmitterSpawnCount(ComponentHandle cmp, const Int2& value) = 0;
+	virtual void setParticleEmitterSpawnPeriod(ComponentHandle cmp, const Vec2& value) = 0;
+	virtual void setParticleEmitterInitialSize(ComponentHandle cmp, const Vec2& value) = 0;
+	virtual void setParticleEmitterMaterialPath(ComponentHandle cmp, const Path& path) = 0;
+	virtual Path getParticleEmitterMaterialPath(ComponentHandle cmp) = 0;
+	virtual int getParticleEmitterPlaneCount(ComponentHandle cmp) = 0;
+	virtual void addParticleEmitterPlane(ComponentHandle cmp, int index) = 0;
+	virtual void removeParticleEmitterPlane(ComponentHandle cmp, int index) = 0;
+	virtual Entity getParticleEmitterPlaneEntity(ComponentHandle cmp, int index) = 0;
+	virtual void setParticleEmitterPlaneEntity(ComponentHandle cmp, int index, Entity entity) = 0;
+	virtual float getParticleEmitterPlaneBounce(ComponentHandle cmp) = 0;
+	virtual void setParticleEmitterPlaneBounce(ComponentHandle cmp, float value) = 0;
+	virtual float getParticleEmitterShapeRadius(ComponentHandle cmp) = 0;
+	virtual void setParticleEmitterShapeRadius(ComponentHandle cmp, float value) = 0;
 
-	virtual int getParticleEmitterAttractorCount(ComponentIndex cmp) = 0;
-	virtual void addParticleEmitterAttractor(ComponentIndex cmp, int index) = 0;
-	virtual void removeParticleEmitterAttractor(ComponentIndex cmp, int index) = 0;
-	virtual Entity getParticleEmitterAttractorEntity(ComponentIndex cmp, int index) = 0;
-	virtual void setParticleEmitterAttractorEntity(ComponentIndex cmp,
+	virtual int getParticleEmitterAttractorCount(ComponentHandle cmp) = 0;
+	virtual void addParticleEmitterAttractor(ComponentHandle cmp, int index) = 0;
+	virtual void removeParticleEmitterAttractor(ComponentHandle cmp, int index) = 0;
+	virtual Entity getParticleEmitterAttractorEntity(ComponentHandle cmp, int index) = 0;
+	virtual void setParticleEmitterAttractorEntity(ComponentHandle cmp,
 		int index,
 		Entity entity) = 0;
-	virtual float getParticleEmitterAttractorForce(ComponentIndex cmp) = 0;
-	virtual void setParticleEmitterAttractorForce(ComponentIndex cmp, float value) = 0;
+	virtual float getParticleEmitterAttractorForce(ComponentHandle cmp) = 0;
+	virtual void setParticleEmitterAttractorForce(ComponentHandle cmp, float value) = 0;
 
-	virtual DelegateList<void(ComponentIndex)>& renderableCreated() = 0;
-	virtual DelegateList<void(ComponentIndex)>& renderableDestroyed() = 0;
-	virtual void showRenderable(ComponentIndex cmp) = 0;
-	virtual void hideRenderable(ComponentIndex cmp) = 0;
-	virtual ComponentIndex getRenderableComponent(Entity entity) = 0;
-	virtual Renderable* getRenderable(ComponentIndex cmp) = 0;
+	virtual DelegateList<void(ComponentHandle)>& renderableCreated() = 0;
+	virtual DelegateList<void(ComponentHandle)>& renderableDestroyed() = 0;
+	virtual void showRenderable(ComponentHandle cmp) = 0;
+	virtual void hideRenderable(ComponentHandle cmp) = 0;
+	virtual ComponentHandle getRenderableComponent(Entity entity) = 0;
+	virtual Renderable* getRenderable(ComponentHandle cmp) = 0;
 	virtual Renderable* getRenderables() = 0;
-	virtual Path getRenderablePath(ComponentIndex cmp) = 0;
-	virtual void setRenderableMaterial(ComponentIndex cmp, int index, const Path& path) = 0;
-	virtual Path getRenderableMaterial(ComponentIndex cmp, int index) = 0;
-	virtual int getRenderableMaterialsCount(ComponentIndex cmp) = 0;
-	virtual void setRenderableLayer(ComponentIndex cmp, const int32& layer) = 0;
-	virtual void setRenderablePath(ComponentIndex cmp, const Path& path) = 0;
+	virtual Path getRenderablePath(ComponentHandle cmp) = 0;
+	virtual void setRenderableMaterial(ComponentHandle cmp, int index, const Path& path) = 0;
+	virtual Path getRenderableMaterial(ComponentHandle cmp, int index) = 0;
+	virtual int getRenderableMaterialsCount(ComponentHandle cmp) = 0;
+	virtual void setRenderableLayer(ComponentHandle cmp, const int32& layer) = 0;
+	virtual void setRenderablePath(ComponentHandle cmp, const Path& path) = 0;
 	virtual Array<Array<RenderableMesh>>& getRenderableInfos(const Frustum& frustum,
 		const Vec3& lod_ref_point) = 0;
 	virtual void getRenderableEntities(const Frustum& frustum, Array<Entity>& entities) = 0;
-	virtual Entity getRenderableEntity(ComponentIndex cmp) = 0;
-	virtual ComponentIndex getFirstRenderable() = 0;
-	virtual ComponentIndex getNextRenderable(ComponentIndex cmp) = 0;
-	virtual Model* getRenderableModel(ComponentIndex cmp) = 0;
+	virtual Entity getRenderableEntity(ComponentHandle cmp) = 0;
+	virtual ComponentHandle getFirstRenderable() = 0;
+	virtual ComponentHandle getNextRenderable(ComponentHandle cmp) = 0;
+	virtual Model* getRenderableModel(ComponentHandle cmp) = 0;
 
 	virtual void getGrassInfos(const Frustum& frustum,
 		Array<GrassInfo>& infos,
-		ComponentIndex camera) = 0;
-	virtual void forceGrassUpdate(ComponentIndex cmp) = 0;
+		ComponentHandle camera) = 0;
+	virtual void forceGrassUpdate(ComponentHandle cmp) = 0;
 	virtual void getTerrainInfos(Array<const TerrainInfo*>& infos,
 		const Vec3& camera_pos,
 		LIFOAllocator& allocator) = 0;
-	virtual float getTerrainHeightAt(ComponentIndex cmp, float x, float z) = 0;
-	virtual Vec3 getTerrainNormalAt(ComponentIndex cmp, float x, float z) = 0;
-	virtual void setTerrainMaterialPath(ComponentIndex cmp, const Path& path) = 0;
-	virtual Path getTerrainMaterialPath(ComponentIndex cmp) = 0;
-	virtual Material* getTerrainMaterial(ComponentIndex cmp) = 0;
-	virtual void setTerrainXZScale(ComponentIndex cmp, float scale) = 0;
-	virtual float getTerrainXZScale(ComponentIndex cmp) = 0;
-	virtual void setTerrainYScale(ComponentIndex cmp, float scale) = 0;
-	virtual float getTerrainYScale(ComponentIndex cmp) = 0;
-	virtual Vec2 getTerrainSize(ComponentIndex cmp) = 0;
-	virtual AABB getTerrainAABB(ComponentIndex cmp) = 0;
-	virtual ComponentIndex getTerrainComponent(Entity entity) = 0;
-	virtual Entity getTerrainEntity(ComponentIndex cmp) = 0;
-	virtual Vec2 getTerrainResolution(ComponentIndex cmp) = 0;
-	virtual ComponentIndex getFirstTerrain() = 0;
-	virtual ComponentIndex getNextTerrain(ComponentIndex cmp) = 0;
+	virtual float getTerrainHeightAt(ComponentHandle cmp, float x, float z) = 0;
+	virtual Vec3 getTerrainNormalAt(ComponentHandle cmp, float x, float z) = 0;
+	virtual void setTerrainMaterialPath(ComponentHandle cmp, const Path& path) = 0;
+	virtual Path getTerrainMaterialPath(ComponentHandle cmp) = 0;
+	virtual Material* getTerrainMaterial(ComponentHandle cmp) = 0;
+	virtual void setTerrainXZScale(ComponentHandle cmp, float scale) = 0;
+	virtual float getTerrainXZScale(ComponentHandle cmp) = 0;
+	virtual void setTerrainYScale(ComponentHandle cmp, float scale) = 0;
+	virtual float getTerrainYScale(ComponentHandle cmp) = 0;
+	virtual Vec2 getTerrainSize(ComponentHandle cmp) = 0;
+	virtual AABB getTerrainAABB(ComponentHandle cmp) = 0;
+	virtual ComponentHandle getTerrainComponent(Entity entity) = 0;
+	virtual Entity getTerrainEntity(ComponentHandle cmp) = 0;
+	virtual Vec2 getTerrainResolution(ComponentHandle cmp) = 0;
+	virtual ComponentHandle getFirstTerrain() = 0;
+	virtual ComponentHandle getNextTerrain(ComponentHandle cmp) = 0;
 
 	virtual bool isGrassEnabled() const = 0;
-	virtual float getGrassDistance(ComponentIndex cmp, int index) = 0;
-	virtual void setGrassDistance(ComponentIndex cmp, int index, float value) = 0;
+	virtual float getGrassDistance(ComponentHandle cmp, int index) = 0;
+	virtual void setGrassDistance(ComponentHandle cmp, int index, float value) = 0;
 	virtual void enableGrass(bool enabled) = 0;
-	virtual void setGrassPath(ComponentIndex cmp, int index, const Path& path) = 0;
-	virtual Path getGrassPath(ComponentIndex cmp, int index) = 0;
-	virtual void setGrassGround(ComponentIndex cmp, int index, int ground) = 0;
-	virtual int getGrassGround(ComponentIndex cmp, int index) = 0;
-	virtual void setGrassDensity(ComponentIndex cmp, int index, int density) = 0;
-	virtual int getGrassDensity(ComponentIndex cmp, int index) = 0;
-	virtual int getGrassCount(ComponentIndex cmp) = 0;
-	virtual void addGrass(ComponentIndex cmp, int index) = 0;
-	virtual void removeGrass(ComponentIndex cmp, int index) = 0;
+	virtual void setGrassPath(ComponentHandle cmp, int index, const Path& path) = 0;
+	virtual Path getGrassPath(ComponentHandle cmp, int index) = 0;
+	virtual void setGrassGround(ComponentHandle cmp, int index, int ground) = 0;
+	virtual int getGrassGround(ComponentHandle cmp, int index) = 0;
+	virtual void setGrassDensity(ComponentHandle cmp, int index, int density) = 0;
+	virtual int getGrassDensity(ComponentHandle cmp, int index) = 0;
+	virtual int getGrassCount(ComponentHandle cmp) = 0;
+	virtual void addGrass(ComponentHandle cmp, int index) = 0;
+	virtual void removeGrass(ComponentHandle cmp, int index) = 0;
 
-	virtual int getClosestPointLights(const Vec3& pos, ComponentIndex* lights, int max_lights) = 0;
-	virtual void getPointLights(const Frustum& frustum, Array<ComponentIndex>& lights) = 0;
-	virtual void getPointLightInfluencedGeometry(ComponentIndex light_cmp,
+	virtual int getClosestPointLights(const Vec3& pos, ComponentHandle* lights, int max_lights) = 0;
+	virtual void getPointLights(const Frustum& frustum, Array<ComponentHandle>& lights) = 0;
+	virtual void getPointLightInfluencedGeometry(ComponentHandle light_cmp,
 		Array<RenderableMesh>& infos) = 0;
-	virtual void getPointLightInfluencedGeometry(ComponentIndex light_cmp,
+	virtual void getPointLightInfluencedGeometry(ComponentHandle light_cmp,
 		const Frustum& frustum,
 		Array<RenderableMesh>& infos) = 0;
-	virtual void setLightCastShadows(ComponentIndex cmp, bool cast_shadows) = 0;
-	virtual bool getLightCastShadows(ComponentIndex cmp) = 0;
-	virtual float getLightAttenuation(ComponentIndex cmp) = 0;
-	virtual void setLightAttenuation(ComponentIndex cmp, float attenuation) = 0;
-	virtual float getLightFOV(ComponentIndex cmp) = 0;
-	virtual void setLightFOV(ComponentIndex cmp, float fov) = 0;
-	virtual float getLightRange(ComponentIndex cmp) = 0;
-	virtual void setLightRange(ComponentIndex cmp, float value) = 0;
-	virtual void setPointLightIntensity(ComponentIndex cmp, float intensity) = 0;
-	virtual void setGlobalLightIntensity(ComponentIndex cmp, float intensity) = 0;
-	virtual void setPointLightColor(ComponentIndex cmp, const Vec3& color) = 0;
-	virtual void setGlobalLightColor(ComponentIndex cmp, const Vec3& color) = 0;
-	virtual void setGlobalLightSpecular(ComponentIndex cmp, const Vec3& color) = 0;
-	virtual void setGlobalLightSpecularIntensity(ComponentIndex cmp, float intensity) = 0;
-	virtual void setLightAmbientIntensity(ComponentIndex cmp, float intensity) = 0;
-	virtual void setLightAmbientColor(ComponentIndex cmp, const Vec3& color) = 0;
-	virtual void setFogDensity(ComponentIndex cmp, float density) = 0;
-	virtual void setFogColor(ComponentIndex cmp, const Vec3& color) = 0;
-	virtual float getPointLightIntensity(ComponentIndex cmp) = 0;
-	virtual Entity getPointLightEntity(ComponentIndex cmp) const = 0;
-	virtual Entity getGlobalLightEntity(ComponentIndex cmp) const = 0;
-	virtual float getGlobalLightIntensity(ComponentIndex cmp) = 0;
-	virtual Vec3 getPointLightColor(ComponentIndex cmp) = 0;
-	virtual Vec3 getGlobalLightColor(ComponentIndex cmp) = 0;
-	virtual Vec3 getGlobalLightSpecular(ComponentIndex cmp) = 0;
-	virtual float getGlobalLightSpecularIntensity(ComponentIndex cmp) = 0;
-	virtual float getLightAmbientIntensity(ComponentIndex cmp) = 0;
-	virtual Vec3 getLightAmbientColor(ComponentIndex cmp) = 0;
-	virtual float getFogDensity(ComponentIndex cmp) = 0;
-	virtual float getFogBottom(ComponentIndex cmp) = 0;
-	virtual float getFogHeight(ComponentIndex cmp) = 0;
-	virtual void setFogBottom(ComponentIndex cmp, float value) = 0;
-	virtual void setFogHeight(ComponentIndex cmp, float value) = 0;
-	virtual Vec3 getFogColor(ComponentIndex cmp) = 0;
-	virtual Vec3 getPointLightSpecularColor(ComponentIndex cmp) = 0;
-	virtual void setPointLightSpecularColor(ComponentIndex cmp, const Vec3& color) = 0;
-	virtual float getPointLightSpecularIntensity(ComponentIndex cmp) = 0;
-	virtual void setPointLightSpecularIntensity(ComponentIndex cmp, float color) = 0;
+	virtual void setLightCastShadows(ComponentHandle cmp, bool cast_shadows) = 0;
+	virtual bool getLightCastShadows(ComponentHandle cmp) = 0;
+	virtual float getLightAttenuation(ComponentHandle cmp) = 0;
+	virtual void setLightAttenuation(ComponentHandle cmp, float attenuation) = 0;
+	virtual float getLightFOV(ComponentHandle cmp) = 0;
+	virtual void setLightFOV(ComponentHandle cmp, float fov) = 0;
+	virtual float getLightRange(ComponentHandle cmp) = 0;
+	virtual void setLightRange(ComponentHandle cmp, float value) = 0;
+	virtual void setPointLightIntensity(ComponentHandle cmp, float intensity) = 0;
+	virtual void setGlobalLightIntensity(ComponentHandle cmp, float intensity) = 0;
+	virtual void setPointLightColor(ComponentHandle cmp, const Vec3& color) = 0;
+	virtual void setGlobalLightColor(ComponentHandle cmp, const Vec3& color) = 0;
+	virtual void setGlobalLightSpecular(ComponentHandle cmp, const Vec3& color) = 0;
+	virtual void setGlobalLightSpecularIntensity(ComponentHandle cmp, float intensity) = 0;
+	virtual void setLightAmbientIntensity(ComponentHandle cmp, float intensity) = 0;
+	virtual void setLightAmbientColor(ComponentHandle cmp, const Vec3& color) = 0;
+	virtual void setFogDensity(ComponentHandle cmp, float density) = 0;
+	virtual void setFogColor(ComponentHandle cmp, const Vec3& color) = 0;
+	virtual float getPointLightIntensity(ComponentHandle cmp) = 0;
+	virtual Entity getPointLightEntity(ComponentHandle cmp) const = 0;
+	virtual Entity getGlobalLightEntity(ComponentHandle cmp) const = 0;
+	virtual float getGlobalLightIntensity(ComponentHandle cmp) = 0;
+	virtual Vec3 getPointLightColor(ComponentHandle cmp) = 0;
+	virtual Vec3 getGlobalLightColor(ComponentHandle cmp) = 0;
+	virtual Vec3 getGlobalLightSpecular(ComponentHandle cmp) = 0;
+	virtual float getGlobalLightSpecularIntensity(ComponentHandle cmp) = 0;
+	virtual float getLightAmbientIntensity(ComponentHandle cmp) = 0;
+	virtual Vec3 getLightAmbientColor(ComponentHandle cmp) = 0;
+	virtual float getFogDensity(ComponentHandle cmp) = 0;
+	virtual float getFogBottom(ComponentHandle cmp) = 0;
+	virtual float getFogHeight(ComponentHandle cmp) = 0;
+	virtual void setFogBottom(ComponentHandle cmp, float value) = 0;
+	virtual void setFogHeight(ComponentHandle cmp, float value) = 0;
+	virtual Vec3 getFogColor(ComponentHandle cmp) = 0;
+	virtual Vec3 getPointLightSpecularColor(ComponentHandle cmp) = 0;
+	virtual void setPointLightSpecularColor(ComponentHandle cmp, const Vec3& color) = 0;
+	virtual float getPointLightSpecularIntensity(ComponentHandle cmp) = 0;
+	virtual void setPointLightSpecularIntensity(ComponentHandle cmp, float color) = 0;
 
-	virtual Texture* getEnvironmentProbeTexture(ComponentIndex cmp) const = 0;
-	virtual void reloadEnvironmentProbe(ComponentIndex cmp) = 0;
+	virtual Texture* getEnvironmentProbeTexture(ComponentHandle cmp) const = 0;
+	virtual void reloadEnvironmentProbe(ComponentHandle cmp) = 0;
 
 protected:
 	virtual ~RenderScene() {}

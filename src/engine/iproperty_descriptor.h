@@ -99,9 +99,9 @@ public:
 	{
 	}
 
-	virtual int getEnumCount(IScene* scene, ComponentIndex cmp) = 0;
-	virtual const char* getEnumItemName(IScene* scene, ComponentIndex cmp, int index) = 0;
-	virtual void getEnumItemName(IScene* scene, ComponentIndex cmp, int index, char* buf, int max_size) {}
+	virtual int getEnumCount(IScene* scene, ComponentHandle cmp) = 0;
+	virtual const char* getEnumItemName(IScene* scene, ComponentHandle cmp, int index) = 0;
+	virtual void getEnumItemName(IScene* scene, ComponentHandle cmp, int index, char* buf, int max_size) {}
 };
 
 

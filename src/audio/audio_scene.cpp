@@ -44,14 +44,14 @@ struct EchoZone
 	Entity entity;
 	float radius;
 	float delay;
-	ComponentIndex component;
+	ComponentHandle component;
 };
 
 
 struct AmbientSound
 {
 	Entity entity;
-	ComponentIndex component;
+	ComponentHandle component;
 	AudioScene::ClipInfo* clip;
 	bool is_3d;
 	int playing_sound;
@@ -78,8 +78,8 @@ struct AudioSceneImpl : public AudioScene
 		, m_ambient_sounds(allocator)
 		, m_echo_zones(allocator)
 	{
-		m_last_echo_zone_id = 0;
-		m_last_ambient_sound_id = 0;
+		m_last_echo_zone_cmp.index = 0;
+		m_last_ambient_sound_cmp.index = 0;
 		m_listener.entity = INVALID_ENTITY;
 		for (auto& i : m_playing_sounds)
 		{
@@ -137,13 +137,13 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	bool isAmbientSound3D(ComponentIndex cmp) override
+	bool isAmbientSound3D(ComponentHandle cmp) override
 	{
 		return m_ambient_sounds[getAmbientSoundIdx(cmp)].is_3d;
 	}
 
 
-	void setAmbientSound3D(ComponentIndex cmp, bool is_3d) override
+	void setAmbientSound3D(ComponentHandle cmp, bool is_3d) override
 	{
 		m_ambient_sounds[getAmbientSoundIdx(cmp)].is_3d = is_3d;
 	}
@@ -176,7 +176,7 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	ComponentIndex createListener(Entity entity)
+	ComponentHandle createListener(Entity entity)
 	{
 		if (m_listener.entity != INVALID_ENTITY)
 		{
@@ -185,12 +185,12 @@ struct AudioSceneImpl : public AudioScene
 		}
 
 		m_listener.entity = entity;
-		m_universe.addComponent(entity, LISTENER_TYPE, this, 0);
-		return 0;
+		m_universe.addComponent(entity, LISTENER_TYPE, this, {0});
+		return {0};
 	}
 
 
-	ClipInfo* getAmbientSoundClip(ComponentIndex cmp) override
+	ClipInfo* getAmbientSoundClip(ComponentHandle cmp) override
 	{
 		return m_ambient_sounds[getAmbientSoundIdx(cmp)].clip;
 	}
@@ -206,29 +206,30 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	int getAmbientSoundClipIndex(ComponentIndex cmp) override
+	int getAmbientSoundClipIndex(ComponentHandle cmp) override
 	{
 		return m_clips.indexOf(m_ambient_sounds[getAmbientSoundIdx(cmp)].clip);
 	}
 
 
-	void setAmbientSoundClipIndex(ComponentIndex cmp, int index) override
+	void setAmbientSoundClipIndex(ComponentHandle cmp, int index) override
 	{
 		m_ambient_sounds[getAmbientSoundIdx(cmp)].clip = m_clips[index];
 	}
 
 
-	void setAmbientSoundClip(ComponentIndex cmp, ClipInfo* clip) override
+	void setAmbientSoundClip(ComponentHandle cmp, ClipInfo* clip) override
 	{
 		m_ambient_sounds[getAmbientSoundIdx(cmp)].clip = clip;
 	}
 
 
-	ComponentIndex createEchoZone(Entity entity)
+	ComponentHandle createEchoZone(Entity entity)
 	{
 		auto& zone = m_echo_zones.emplace();
 		zone.entity = entity;
-		zone.component = ++m_last_echo_zone_id;
+		++m_last_echo_zone_cmp.index;
+		zone.component = m_last_echo_zone_cmp;
 		zone.delay = 500.0f;
 		zone.radius = 10;
 		m_universe.addComponent(entity, ECHO_ZONE_TYPE, this, zone.component);
@@ -236,31 +237,31 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	float getEchoZoneDelay(ComponentIndex cmp) override
+	float getEchoZoneDelay(ComponentHandle cmp) override
 	{
 		return m_echo_zones[getEchoZoneIdx(cmp)].delay;
 	}
 
 
-	void setEchoZoneDelay(ComponentIndex cmp, float delay) override
+	void setEchoZoneDelay(ComponentHandle cmp, float delay) override
 	{
 		m_echo_zones[getEchoZoneIdx(cmp)].delay = delay;
 	}
 
 
-	float getEchoZoneRadius(ComponentIndex cmp) override
+	float getEchoZoneRadius(ComponentHandle cmp) override
 	{
 		return m_echo_zones[getEchoZoneIdx(cmp)].radius;
 	}
 	
 	
-	void setEchoZoneRadius(ComponentIndex cmp, float radius) override
+	void setEchoZoneRadius(ComponentHandle cmp, float radius) override
 	{
 		m_echo_zones[getEchoZoneIdx(cmp)].radius = radius;
 	}
 
 
-	int getEchoZoneIdx(ComponentIndex component)
+	int getEchoZoneIdx(ComponentHandle component)
 	{
 		for(int i = 0, c = m_echo_zones.size(); i < c; ++i)
 		{
@@ -270,7 +271,7 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	void destroyEchoZone(ComponentIndex component)
+	void destroyEchoZone(ComponentHandle component)
 	{
 		int idx = getEchoZoneIdx(component);
 		auto entity = m_echo_zones[idx].entity;
@@ -280,10 +281,11 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	ComponentIndex createAmbientSound(Entity entity)
+	ComponentHandle createAmbientSound(Entity entity)
 	{
 		auto& sound = m_ambient_sounds.emplace();
-		sound.component = ++m_last_ambient_sound_id;
+		++m_last_ambient_sound_cmp.index;
+		sound.component = m_last_ambient_sound_cmp;
 		sound.entity = entity;
 		sound.clip = nullptr;
 		sound.playing_sound = -1;
@@ -292,10 +294,10 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	ComponentIndex createComponent(ComponentType type, Entity entity) override;
+	ComponentHandle createComponent(ComponentType type, Entity entity) override;
 
 
-	int getAmbientSoundIdx(ComponentIndex component) const
+	int getAmbientSoundIdx(ComponentHandle component) const
 	{
 		for (int i = 0, c = m_ambient_sounds.size(); i < c; ++i)
 		{
@@ -305,16 +307,16 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	void destroyListener(ComponentIndex component)
+	void destroyListener(ComponentHandle component)
 	{
-		ASSERT(component == 0);
+		ASSERT(component.index == 0);
 		auto entity = m_listener.entity;
 		m_listener.entity = INVALID_ENTITY;
 		m_universe.destroyComponent(entity, LISTENER_TYPE, this, component);
 	}
 
 
-	void destroyAmbientSound(ComponentIndex component)
+	void destroyAmbientSound(ComponentHandle component)
 	{
 		int idx = getAmbientSoundIdx(component);
 		auto entity = m_ambient_sounds[idx].entity;
@@ -323,7 +325,7 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	void destroyComponent(ComponentIndex component, ComponentType type) override;
+	void destroyComponent(ComponentHandle component, ComponentType type) override;
 
 
 	void serialize(OutputBlob& serializer) override
@@ -340,7 +342,7 @@ struct AudioSceneImpl : public AudioScene
 			serializer.writeString(clip->clip->getPath().c_str());
 		}
 
-		serializer.write(m_last_ambient_sound_id);
+		serializer.write(m_last_ambient_sound_cmp);
 		serializer.write(m_ambient_sounds.size());
 		for (auto& i : m_ambient_sounds)
 		{
@@ -375,7 +377,7 @@ struct AudioSceneImpl : public AudioScene
 		serializer.read(m_listener.entity);
 		if (m_listener.entity != INVALID_ENTITY)
 		{
-			m_universe.addComponent(m_listener.entity, LISTENER_TYPE, this, 0);
+			m_universe.addComponent(m_listener.entity, LISTENER_TYPE, this, {0});
 		}
 
 		int count = 0;
@@ -403,7 +405,7 @@ struct AudioSceneImpl : public AudioScene
 			clip->clip = static_cast<Clip*>(m_system.getClipManager().load(Path(path)));
 		}
 
-		serializer.read(m_last_ambient_sound_id);
+		serializer.read(m_last_ambient_sound_cmp);
 		serializer.read(count);
 		m_ambient_sounds.resize(count);
 		for (int i = 0; i < count; ++i)
@@ -442,9 +444,13 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	ComponentIndex getComponent(Entity entity, ComponentType type) override
+	ComponentHandle getComponent(Entity entity, ComponentType type) override
 	{
-		if (type == LISTENER_TYPE) return m_listener.entity == entity ? 0 : INVALID_COMPONENT;
+		if (type == LISTENER_TYPE)
+		{
+			ComponentHandle listener_cmp = { 0 };
+			return m_listener.entity == entity ? listener_cmp : INVALID_COMPONENT;
+		}
 
 		if (type == AMBIENT_SOUND_TYPE)
 		{
@@ -616,10 +622,10 @@ struct AudioSceneImpl : public AudioScene
 	Universe& getUniverse() override { return m_universe; }
 	IPlugin& getPlugin() const override { return m_system; }
 
-	int m_last_ambient_sound_id;
+	ComponentHandle m_last_ambient_sound_cmp;
 	Array<AmbientSound> m_ambient_sounds;
 	Array<EchoZone> m_echo_zones;
-	int m_last_echo_zone_id;
+	ComponentHandle m_last_echo_zone_cmp;
 	AudioDevice& m_device;
 	Listener m_listener;
 	IAllocator& m_allocator;
@@ -633,8 +639,8 @@ struct AudioSceneImpl : public AudioScene
 static struct
 {
 	ComponentType type;
-	ComponentIndex(AudioSceneImpl::*creator)(Entity);
-	void (AudioSceneImpl::*destroyer)(ComponentIndex);
+	ComponentHandle(AudioSceneImpl::*creator)(Entity);
+	void (AudioSceneImpl::*destroyer)(ComponentHandle);
 } COMPONENT_INFOS[] = {
 	{ LISTENER_TYPE, &AudioSceneImpl::createListener, &AudioSceneImpl::destroyListener },
 	{ AMBIENT_SOUND_TYPE, &AudioSceneImpl::createAmbientSound, &AudioSceneImpl::destroyAmbientSound },
@@ -642,7 +648,7 @@ static struct
 };
 
 
-ComponentIndex AudioSceneImpl::createComponent(ComponentType type, Entity entity)
+ComponentHandle AudioSceneImpl::createComponent(ComponentType type, Entity entity)
 {
 	for(auto& i : COMPONENT_INFOS)
 	{
@@ -656,7 +662,7 @@ ComponentIndex AudioSceneImpl::createComponent(ComponentType type, Entity entity
 }
 
 
-void AudioSceneImpl::destroyComponent(ComponentIndex component, ComponentType type)
+void AudioSceneImpl::destroyComponent(ComponentHandle component, ComponentType type)
 {
 	for(auto& i : COMPONENT_INFOS)
 	{

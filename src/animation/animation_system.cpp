@@ -92,21 +92,21 @@ struct AnimationSceneImpl : public AnimationScene
 	}
 
 
-	float getAnimableTime(ComponentIndex cmp) override
+	float getAnimableTime(ComponentHandle cmp) override
 	{
-		return m_animables[cmp].time;
+		return m_animables[cmp.index].time;
 	}
 
 
-	void setAnimableTime(ComponentIndex cmp, float time) override
+	void setAnimableTime(ComponentHandle cmp, float time) override
 	{
-		m_animables[cmp].time = time;
+		m_animables[cmp.index].time = time;
 	}
 
 
-	Animation* getAnimableAnimation(ComponentIndex cmp) override
+	Animation* getAnimableAnimation(ComponentHandle cmp) override
 	{
-		return m_animables[cmp].animation;
+		return m_animables[cmp.index].animation;
 	}
 
 	
@@ -115,12 +115,12 @@ struct AnimationSceneImpl : public AnimationScene
 	Universe& getUniverse() override { return m_universe; }
 
 
-	ComponentIndex getComponent(Entity entity, ComponentType type) override
+	ComponentHandle getComponent(Entity entity, ComponentType type) override
 	{
 		ASSERT(ownComponentType(type));
 		for (int i = 0; i < m_animables.size(); ++i)
 		{
-			if ((m_animables[i].flags & Animable::FREE) == 0 && m_animables[i].entity == entity) return i;
+			if ((m_animables[i].flags & Animable::FREE) == 0 && m_animables[i].entity == entity) return {i};
 		}
 		return INVALID_COMPONENT;
 	}
@@ -129,7 +129,7 @@ struct AnimationSceneImpl : public AnimationScene
 	bool ownComponentType(ComponentType type) const override { return type == ANIMABLE_TYPE; }
 
 
-	ComponentIndex createComponent(ComponentType type, Entity entity) override
+	ComponentHandle createComponent(ComponentType type, Entity entity) override
 	{
 		if (type == ANIMABLE_TYPE) return createAnimable(entity);
 		return INVALID_COMPONENT;
@@ -146,13 +146,13 @@ struct AnimationSceneImpl : public AnimationScene
 	}
 
 
-	void destroyComponent(ComponentIndex component, ComponentType type) override
+	void destroyComponent(ComponentHandle component, ComponentType type) override
 	{
 		if (type == ANIMABLE_TYPE)
 		{
-			unloadAnimation(m_animables[component].animation);
-			m_animables[component].flags |= Animable::FREE;
-			m_universe.destroyComponent(m_animables[component].entity, type, this, component);
+			unloadAnimation(m_animables[component.index].animation);
+			m_animables[component.index].flags |= Animable::FREE;
+			m_universe.destroyComponent(m_animables[component.index].entity, type, this, component);
 		}
 	}
 
@@ -216,38 +216,38 @@ struct AnimationSceneImpl : public AnimationScene
 			m_animables[i].animation = path[0] == '\0' ? nullptr : loadAnimation(Path(path));
 			if ((m_animables[i].flags & Animable::FREE) == 0)
 			{
-				m_universe.addComponent(m_animables[i].entity, ANIMABLE_TYPE, this, i);
+				m_universe.addComponent(m_animables[i].entity, ANIMABLE_TYPE, this, {i});
 			}
 		}
 	}
 
 
-	float getTimeScale(ComponentIndex cmp) { return m_animables[cmp].time_scale; }
-	void setTimeScale(ComponentIndex cmp, float time_scale) { m_animables[cmp].time_scale = time_scale; }
-	float getStartTime(ComponentIndex cmp) { return m_animables[cmp].start_time; }
-	void setStartTime(ComponentIndex cmp, float time) { m_animables[cmp].start_time = time; }
+	float getTimeScale(ComponentHandle cmp) { return m_animables[cmp.index].time_scale; }
+	void setTimeScale(ComponentHandle cmp, float time_scale) { m_animables[cmp.index].time_scale = time_scale; }
+	float getStartTime(ComponentHandle cmp) { return m_animables[cmp.index].start_time; }
+	void setStartTime(ComponentHandle cmp, float time) { m_animables[cmp.index].start_time = time; }
 
 
-	Path getAnimation(ComponentIndex cmp)
+	Path getAnimation(ComponentHandle cmp)
 	{
-		return m_animables[cmp].animation ? m_animables[cmp].animation->getPath() : Path("");
+		return m_animables[cmp.index].animation ? m_animables[cmp.index].animation->getPath() : Path("");
 	}
 
 
-	void setAnimation(ComponentIndex cmp, const Path& path)
+	void setAnimation(ComponentHandle cmp, const Path& path)
 	{
-		unloadAnimation(m_animables[cmp].animation);
-		m_animables[cmp].animation = loadAnimation(path);
-		m_animables[cmp].time = 0;
+		unloadAnimation(m_animables[cmp.index].animation);
+		m_animables[cmp.index].animation = loadAnimation(path);
+		m_animables[cmp.index].time = 0;
 	}
 
 
-	void updateAnimable(ComponentIndex cmp, float time_delta) override
+	void updateAnimable(ComponentHandle cmp, float time_delta) override
 	{
-		Animable& animable = m_animables[cmp];
+		Animable& animable = m_animables[cmp.index];
 		if ((animable.flags & Animable::FREE) != 0) return;
 		if (!animable.animation || !animable.animation->isReady()) return;
-		ComponentIndex renderable = m_render_scene->getRenderableComponent(animable.entity);
+		ComponentHandle renderable = m_render_scene->getRenderableComponent(animable.entity);
 		if (renderable == INVALID_COMPONENT) return;
 
 		auto* pose = m_render_scene->getPose(renderable);
@@ -277,7 +277,7 @@ struct AnimationSceneImpl : public AnimationScene
 
 		for (int i = 0, c = m_animables.size(); i < c; ++i)
 		{
-			AnimationSceneImpl::updateAnimable(i, time_delta);
+			AnimationSceneImpl::updateAnimable({i}, time_delta);
 		}
 	}
 
@@ -289,7 +289,7 @@ struct AnimationSceneImpl : public AnimationScene
 	}
 	
 
-	ComponentIndex createAnimable(Entity entity)
+	ComponentHandle createAnimable(Entity entity)
 	{
 		Animable* src = nullptr;
 		int cmp = m_animables.size();
@@ -310,8 +310,8 @@ struct AnimationSceneImpl : public AnimationScene
 		animable.time_scale = 1;
 		animable.start_time = 0;
 
-		m_universe.addComponent(entity, ANIMABLE_TYPE, this, cmp);
-		return cmp;
+		m_universe.addComponent(entity, ANIMABLE_TYPE, this, {cmp});
+		return {cmp};
 	}
 
 

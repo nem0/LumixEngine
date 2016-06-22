@@ -37,12 +37,12 @@ namespace
 	{
 		Lumix::DefaultAllocator allocator;
 		Lumix::Array<Lumix::Sphere> spheres(allocator);
-		Lumix::Array<Lumix::ComponentIndex> renderables(allocator);
+		Lumix::Array<Lumix::ComponentHandle> renderables(allocator);
 		int renderable = 0;
 		for (float i = 0.f; i < 30000000.0f; i += 15.f)
 		{
 			spheres.push(Lumix::Sphere(i, 0.f, 50.f, 5.f));
-			renderables.push(renderable);
+			renderables.push({renderable});
 			++renderable;
 		}
 
@@ -73,7 +73,7 @@ namespace
 				const Lumix::CullingSystem::Subresults& subresult = result[i];
 				for (int j = 0; j < subresult.size(); ++j)
 				{
-					LUMIX_EXPECT(subresult[i] < 6);
+					LUMIX_EXPECT(subresult[i].index < 6);
 				}
 			}
 
@@ -87,12 +87,12 @@ namespace
 	{
 		Lumix::DefaultAllocator allocator;
 		Lumix::Array<Lumix::Sphere> spheres(allocator);
-		Lumix::Array<Lumix::ComponentIndex> renderables(allocator);
+		Lumix::Array<Lumix::ComponentHandle> renderables(allocator);
 		int renderable = 0;
 		for(float i = 0.f; i < 30000000.0f; i += 15.f)
 		{
 			spheres.push(Lumix::Sphere(i, 0.f, 50.f, 5.f));
-			renderables.push(renderable);
+			renderables.push({renderable});
 			++renderable;
 		}
 
@@ -124,7 +124,7 @@ namespace
 				const Lumix::CullingSystem::Subresults& subresult = result[i];
 				for (int j = 0; j < subresult.size(); ++j)
 				{
-					LUMIX_EXPECT(subresult[i] < 6);
+					LUMIX_EXPECT(subresult[i].index < 6);
 				}
 			}
 

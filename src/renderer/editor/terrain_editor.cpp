@@ -89,12 +89,10 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 		}
 
 		m_width = m_height = m_x = m_y = -1;
-		Lumix::Matrix entity_mtx =
-			editor.getUniverse()->getMatrix(terrain.entity);
+		Lumix::Matrix entity_mtx = editor.getUniverse()->getMatrix(terrain.entity);
 		entity_mtx.fastInverse();
 		Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
-		float xz_scale = static_cast<Lumix::RenderScene*>(terrain.scene)
-							 ->getTerrainXZScale(terrain.index);
+		float xz_scale = static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainXZScale(terrain.handle);
 		local_pos = local_pos / xz_scale;
 		local_pos.y = -1;
 
@@ -230,13 +228,11 @@ private:
 private:
 	Lumix::Material* getMaterial()
 	{
-		auto* material = static_cast<Lumix::RenderScene*>(m_terrain.scene)
-							 ->getTerrainMaterial(m_terrain.index);
-		return static_cast<Lumix::Material*>(
-			m_world_editor.getEngine()
-				.getResourceManager()
-				.get(MATERIAL_HASH)
-				->get(Lumix::Path(material->getPath().c_str())));
+		auto* material = static_cast<Lumix::RenderScene*>(m_terrain.scene)->getTerrainMaterial(m_terrain.handle);
+		return static_cast<Lumix::Material*>(m_world_editor.getEngine()
+												 .getResourceManager()
+												 .get(MATERIAL_HASH)
+												 ->get(Lumix::Path(material->getPath().c_str())));
 	}
 
 
@@ -525,7 +521,7 @@ private:
 			}
 		}
 		texture->onDataUpdated(m_x, m_y, m_width, m_height);
-		static_cast<Lumix::RenderScene*>(m_terrain.scene)->forceGrassUpdate(m_terrain.index);
+		static_cast<Lumix::RenderScene*>(m_terrain.scene)->forceGrassUpdate(m_terrain.handle);
 	}
 
 
@@ -636,7 +632,7 @@ TerrainEditor::~TerrainEditor()
 void TerrainEditor::onUniverseDestroyed()
 {
 	m_component.scene = nullptr;
-	m_component.index = Lumix::INVALID_COMPONENT;
+	m_component.handle = Lumix::INVALID_COMPONENT;
 }
 
 
@@ -713,7 +709,7 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, StudioApp& app)
 void TerrainEditor::nextTerrainTexture()
 {
 	auto* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
-	auto* material = scene->getTerrainMaterial(m_component.index);
+	auto* material = scene->getTerrainMaterial(m_component.handle);
 	Lumix::Texture* tex = material->getTextureByUniform(TEX_COLOR_UNIFORM);
 	if (tex)
 	{
@@ -773,11 +769,11 @@ void TerrainEditor::drawCursor(Lumix::RenderScene& scene,
 		float angle = i * angle_step;
 		float next_angle = i * angle_step + angle_step;
 		Lumix::Vec3 local_from = local_center + Lumix::Vec3(cos(angle), 0, sin(angle)) * brush_size;
-		local_from.y = scene.getTerrainHeightAt(terrain.index, local_from.x, local_from.z);
+		local_from.y = scene.getTerrainHeightAt(terrain.handle, local_from.x, local_from.z);
 		local_from.y += 0.25f;
 		Lumix::Vec3 local_to =
 			local_center + Lumix::Vec3(cos(next_angle), 0, sin(next_angle)) * brush_size;
-		local_to.y = scene.getTerrainHeightAt(terrain.index, local_to.x, local_to.z);
+		local_to.y = scene.getTerrainHeightAt(terrain.handle, local_to.x, local_to.z);
 		local_to.y += 0.25f;
 
 		Lumix::Vec3 from = terrain_matrix.multiplyPosition(local_from);
@@ -853,7 +849,7 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::WorldEditor::RayHit& hit, int
 {
 	if (m_world_editor.getSelectedEntities().size() != 1) return false;
 	auto terrain = m_world_editor.getComponent(m_world_editor.getSelectedEntities()[0], TERRAIN_TYPE);
-	if (terrain.index == Lumix::INVALID_COMPONENT) return false;
+	if (terrain.handle == Lumix::INVALID_COMPONENT) return false;
 	if (!m_is_enabled) return false;
 	if (m_type == NOT_SET || !m_component.isValid()) return false;
 
@@ -1060,7 +1056,7 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 
 		struct Tpl
 		{
-			Lumix::ComponentIndex cmp;
+			Lumix::ComponentHandle cmp;
 			int template_idx;
 		};
 
@@ -1073,7 +1069,7 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 			if(!isValid(tpl)) continue;
 			Lumix::ComponentUID renderable = m_world_editor.getComponent(tpl, RENDERABLE_TYPE);
 			if(!renderable.isValid()) continue;
-			tpls.push({renderable.index, idx});
+			tpls.push({renderable.handle, idx});
 		}
 
 		Lumix::Frustum frustum;
@@ -1086,7 +1082,7 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 			m_terrain_brush_size);
 		auto& meshes = scene->getRenderableInfos(frustum, frustum.position);
 
-		Lumix::Vec2 size = scene->getTerrainSize(m_component.index);
+		Lumix::Vec2 size = scene->getTerrainSize(m_component.handle);
 		float scale = 1.0f - Lumix::Math::maximum(0.01f, m_terrain_brush_strength);
 		for (int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f; ++i)
 		{
@@ -1101,7 +1097,7 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 			Lumix::Vec3 terrain_pos = inv_terrain_matrix.multiplyPosition(pos);
 			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= size.x && terrain_pos.z <= size.y)
 			{
-				pos.y = scene->getTerrainHeightAt(m_component.index, terrain_pos.x, terrain_pos.z) + y;
+				pos.y = scene->getTerrainHeightAt(m_component.handle, terrain_pos.x, terrain_pos.z) + y;
 				pos.y += terrain_matrix.getTranslation().y;
 				if(!isOBBCollision(*scene, meshes, pos, model, scale))
 				{
@@ -1109,7 +1105,7 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 					if(m_is_align_with_normal)
 					{
 						Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
-						Lumix::Vec3 normal = scene->getTerrainNormalAt(m_component.index, pos.x, pos.z);
+						Lumix::Vec3 normal = scene->getTerrainNormalAt(m_component.handle, pos.x, pos.z);
 						Lumix::Vec3 dir = Lumix::crossProduct(normal, Lumix::Vec3(1, 0, 0)).normalized();
 						Lumix::Matrix mtx = Lumix::Matrix::IDENTITY;
 						mtx.setXVector(Lumix::crossProduct(normal, dir));
@@ -1160,8 +1156,8 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 	Lumix::ComponentUID camera_cmp = m_world_editor.getEditCamera();
 	Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.scene);
 	Lumix::Vec3 origin, dir;
-	scene->getRay(camera_cmp.index, (float)x, (float)y, origin, dir);
-	Lumix::RayCastModelHit hit = scene->castRayTerrain(m_component.index, origin, dir);
+	scene->getRay(camera_cmp.handle, (float)x, (float)y, origin, dir);
+	Lumix::RayCastModelHit hit = scene->castRayTerrain(m_component.handle, origin, dir);
 	if (hit.m_is_hit)
 	{
 		Lumix::ComponentUID terrain = m_world_editor.getComponent(hit.m_entity, TERRAIN_TYPE);
@@ -1192,7 +1188,7 @@ void TerrainEditor::onMouseUp(int, int, Lumix::MouseButton::Value)
 Lumix::Material* TerrainEditor::getMaterial()
 {
 	auto* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
-	return scene->getTerrainMaterial(m_component.index);
+	return scene->getTerrainMaterial(m_component.handle);
 }
 
 
@@ -1449,8 +1445,8 @@ void TerrainEditor::onGUI()
 		Lumix::ComponentUID camera_cmp = m_world_editor.getEditCamera();
 		Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.scene);
 		Lumix::Vec3 origin, dir;
-		scene->getRay(camera_cmp.index, (float)mouse_x, (float)mouse_y, origin, dir);
-		Lumix::RayCastModelHit hit = scene->castRayTerrain(terrain.index, origin, dir);
+		scene->getRay(camera_cmp.handle, (float)mouse_x, (float)mouse_y, origin, dir);
+		Lumix::RayCastModelHit hit = scene->castRayTerrain(terrain.handle, origin, dir);
 
 		if(hit.m_is_hit)
 		{

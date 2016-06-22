@@ -387,7 +387,7 @@ void Terrain::forceGrassUpdate()
 	}
 }
 
-Array<Terrain::GrassQuad*>& Terrain::getQuads(ComponentIndex camera)
+Array<Terrain::GrassQuad*>& Terrain::getQuads(ComponentHandle camera)
 {
 	int quads_index = m_grass_quads.find(camera);
 	if (quads_index < 0)
@@ -442,7 +442,7 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch,
 }
 
 
-void Terrain::updateGrass(ComponentIndex camera)
+void Terrain::updateGrass(ComponentHandle camera)
 {
 	PROFILE_FUNCTION();
 	if (!m_splatmap)
@@ -554,7 +554,7 @@ void Terrain::GrassType::grassLoaded(Resource::State, Resource::State)
 }
 
 
-void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentIndex camera)
+void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentHandle camera)
 {
 	if (!m_material || !m_material->isReady()) return;
 
@@ -613,7 +613,11 @@ void Terrain::setMaterial(Material* material)
 	}
 }
 
-void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene, int index, int version)
+void Terrain::deserialize(InputBlob& serializer,
+	Universe& universe,
+	RenderScene& scene,
+	ComponentHandle cmp,
+	int version)
 {
 	serializer.read(m_entity);
 	serializer.read(m_layer_mask);
@@ -646,7 +650,7 @@ void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene
 		}
 		setGrassTypePath(i, Path(path));
 	}
-	universe.addComponent(m_entity, TERRAIN_HASH, &scene, index);
+	universe.addComponent(m_entity, TERRAIN_HASH, &scene, cmp);
 }
 
 	

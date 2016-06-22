@@ -40,7 +40,7 @@ struct LUMIX_RENDERER_API RayCastModelHit
 	Vec3 m_origin;
 	Vec3 m_dir;
 	Mesh* m_mesh;
-	ComponentIndex m_component;
+	ComponentHandle m_component;
 	Entity m_entity;
 	ComponentType m_component_type;
 };

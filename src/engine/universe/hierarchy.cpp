@@ -45,23 +45,24 @@ public:
 	}
 
 
-	ComponentIndex createComponent(ComponentType type, Entity entity) override 
+	ComponentHandle createComponent(ComponentType type, Entity entity) override 
 	{
 		if (HIERARCHY_TYPE_HANDLE == type)
 		{
 			m_parents.insert(entity, INVALID_ENTITY);
-			m_universe.addComponent(entity, type, this, entity.index);
-			return entity.index;
+			m_universe.addComponent(entity, type, this, {entity.index});
+			return {entity.index};
 		}
 		return INVALID_COMPONENT;
 	}
 
 
-	void destroyComponent(ComponentIndex component, ComponentType type) override 
+	void destroyComponent(ComponentHandle component, ComponentType type) override 
 	{
 		if (HIERARCHY_TYPE_HANDLE == type)
 		{
-			auto parent_iter = m_parents.find({component});
+			Entity entity = {component.index};
+			auto parent_iter = m_parents.find(entity);
 
 			if (parent_iter.isValid())
 			{
@@ -74,7 +75,7 @@ public:
 				m_parents.erase(parent_iter);
 			}
 			
-			m_universe.destroyComponent({component}, type, this, component);
+			m_universe.destroyComponent(entity, type, this, component);
 		}
 	}
 
@@ -86,10 +87,11 @@ public:
 	IAllocator& getAllocator() { return m_allocator; }
 
 
-	ComponentIndex getComponent(Entity entity, ComponentType type) override
+	ComponentHandle getComponent(Entity entity, ComponentType type) override
 	{
 		ASSERT(ownComponentType(type));
-		return m_parents.find(entity) != m_parents.end() ? entity.index : INVALID_COMPONENT;
+		ComponentHandle cmp = {entity.index};
+		return m_parents.find(entity) != m_parents.end() ? cmp : INVALID_COMPONENT;
 	}
 
 
@@ -151,9 +153,9 @@ public:
 	}
 
 
-	void setLocalPosition(ComponentIndex cmp, const Vec3& position) override
+	void setLocalPosition(ComponentHandle cmp, const Vec3& position) override
 	{
-		Entity entity = {cmp};
+		Entity entity = {cmp.index};
 		Parents::iterator parent_iter = m_parents.find(entity);
 
 		if (parent_iter.isValid())
@@ -168,9 +170,9 @@ public:
 	}
 
 
-	Vec3 getLocalPosition(ComponentIndex cmp) override
+	Vec3 getLocalPosition(ComponentHandle cmp) override
 	{
-		Entity entity = {cmp};
+		Entity entity = {cmp.index};
 		Parents::iterator parent_iter = m_parents.find(entity);
 
 		if (parent_iter.isValid() && isValid(parent_iter.value()))
@@ -206,9 +208,9 @@ public:
 	}
 
 
-	Quat getLocalRotation(ComponentIndex cmp) override
+	Quat getLocalRotation(ComponentHandle cmp) override
 	{
-		Entity entity = {cmp};
+		Entity entity = {cmp.index};
 		Parents::iterator parent_iter = m_parents.find(entity);
 
 		if (parent_iter.isValid())
@@ -233,9 +235,9 @@ public:
 	const Children& getAllChildren() const override { return m_children; }
 
 
-	void setParent(ComponentIndex child, Entity parent) override
+	void setParent(ComponentHandle child, Entity parent) override
 	{
-		Entity child_entity = {child};
+		Entity child_entity = {child.index};
 		Parents::iterator old_parent_iter = m_parents.find(child_entity);
 		if (old_parent_iter.isValid())
 		{
@@ -275,9 +277,9 @@ public:
 	}
 
 
-	Entity getParent(ComponentIndex child) override
+	Entity getParent(ComponentHandle child) override
 	{
-		Entity child_entity = {child};
+		Entity child_entity = {child.index};
 		Parents::iterator parent_iter = m_parents.find(child_entity);
 		if (parent_iter.isValid())
 		{
@@ -307,11 +309,12 @@ public:
 		serializer.read(size);
 		for (int i = 0; i < size; ++i)
 		{
-			int32 child, parent;
+			Entity child, parent;
 			serializer.read(child);
 			serializer.read(parent);
-			setParent({child}, {parent});
-			m_universe.addComponent({child}, HIERARCHY_TYPE_HANDLE, this, child);
+			ComponentHandle cmp = {child.index};
+			setParent(cmp, parent);
+			m_universe.addComponent(child, HIERARCHY_TYPE_HANDLE, this, cmp);
 		}
 	}
 

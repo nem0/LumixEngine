@@ -231,12 +231,12 @@ void PropertyGrid::showEnumProperty(Lumix::ComponentUID cmp, int index, Lumix::I
 	Lumix::OutputBlob blob(m_editor.getAllocator());
 	desc.get(cmp, index, blob);
 	int value = *(int*)blob.getData();
-	int count = desc.getEnumCount(cmp.scene, cmp.index);
+	int count = desc.getEnumCount(cmp.scene, cmp.handle);
 
 	struct Data
 	{
 		Lumix::IEnumPropertyDescriptor* descriptor;
-		Lumix::ComponentIndex cmp;
+		Lumix::ComponentHandle cmp;
 		Lumix::IScene* scene;
 	};
 
@@ -256,7 +256,7 @@ void PropertyGrid::showEnumProperty(Lumix::ComponentUID cmp, int index, Lumix::I
 	};
 
 	Data data;
-	data.cmp = cmp.index;
+	data.cmp = cmp.handle;
 	data.scene = cmp.scene;
 	data.descriptor = &desc;
 

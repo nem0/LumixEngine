@@ -95,6 +95,12 @@ void JsonSerializer::serialize(const char* label, Entity value)
 }
 
 
+void JsonSerializer::serialize(const char* label, ComponentHandle value)
+{
+	serialize(label, value.index);
+}
+
+
 void JsonSerializer::serialize(const char* label, unsigned int value)
 {
 	writeBlockComma();
@@ -239,6 +245,12 @@ void JsonSerializer::serializeArrayItem(Entity value)
 }
 
 
+void JsonSerializer::serializeArrayItem(ComponentHandle value)
+{
+	serializeArrayItem(value.index);
+}
+
+
 void JsonSerializer::serializeArrayItem(int value)
 {
 	writeBlockComma();
@@ -295,6 +307,13 @@ void JsonSerializer::deserialize(const char* label, Entity& value, Entity defaul
 {
 	deserialize(label, value.index, default_value.index);
 }
+
+
+void JsonSerializer::deserialize(const char* label, ComponentHandle& value, ComponentHandle default_value)
+{
+	deserialize(label, value.index, default_value.index);
+}
+
 
 void JsonSerializer::deserialize(bool& value, bool default_value)
 {
@@ -546,6 +565,12 @@ void JsonSerializer::deserializeArrayItem(char* value, int max_length, const cha
 
 
 void JsonSerializer::deserializeArrayItem(Entity& value, Entity default_value)
+{
+	deserializeArrayItem(value.index, default_value.index);
+}
+
+
+void JsonSerializer::deserializeArrayItem(ComponentHandle& value, ComponentHandle default_value)
 {
 	deserializeArrayItem(value.index, default_value.index);
 }
