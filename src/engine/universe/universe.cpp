@@ -378,7 +378,7 @@ float Universe::getScale(Entity entity)
 }
 
 
-void Universe::destroyComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentIndex index)
+void Universe::destroyComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index)
 {
 	auto mask = m_components[m_entity_map[entity.index]];
 	auto old_mask = mask;
@@ -390,7 +390,7 @@ void Universe::destroyComponent(Entity entity, ComponentType component_type, ISc
 }
 
 
-void Universe::addComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentIndex index)
+void Universe::addComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index)
 {
 	ComponentUID cmp(entity, component_type, scene, index);
 	m_components[m_entity_map[entity.index]] |= (uint64)1 << component_type.index;

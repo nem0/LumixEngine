@@ -18,7 +18,7 @@ void getEntityListDisplayName(Lumix::WorldEditor& editor, char* buf, int max_siz
 	if (renderable.isValid())
 	{
 		auto* render_interface = editor.getRenderInterface();
-		auto path = render_interface->getRenderablePath(renderable.index);
+		auto path = render_interface->getRenderablePath(renderable.handle);
 		if (path.isValid())
 		{
 			char basename[Lumix::MAX_PATH_LENGTH];

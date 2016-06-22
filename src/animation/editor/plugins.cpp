@@ -86,22 +86,22 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin
 		if (cmp.type != ANIMABLE_HASH) return;
 
 		auto* scene = static_cast<AnimationScene*>(cmp.scene);
-		auto* animation = scene->getAnimableAnimation(cmp.index);
+		auto* animation = scene->getAnimableAnimation(cmp.handle);
 		if (!animation) return;
 		if (!animation->isReady()) return;
 
 		ImGui::Checkbox("Preview", &m_is_playing);
-		float time = scene->getAnimableTime(cmp.index);
+		float time = scene->getAnimableTime(cmp.handle);
 		if (ImGui::SliderFloat("Time", &time, 0, animation->getLength()))
 		{
-			scene->setAnimableTime(cmp.index, time);
-			scene->updateAnimable(cmp.index, 0);
+			scene->setAnimableTime(cmp.handle, time);
+			scene->updateAnimable(cmp.handle, 0);
 		}
 
 		if (m_is_playing)
 		{
 			float time_delta = m_app.getWorldEditor()->getEngine().getLastTimeDelta();
-			scene->updateAnimable(cmp.index, time_delta);
+			scene->updateAnimable(cmp.handle, time_delta);
 		}
 	}
 

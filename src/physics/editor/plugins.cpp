@@ -38,8 +38,8 @@ struct EditorPlugin : public WorldEditor::Plugin
 		if (cmp.type == CONTROLLER_TYPE)
 		{
 			auto* scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(crc32("renderer")));
-			float height = phy_scene->getControllerHeight(cmp.index);
-			float radius = phy_scene->getControllerRadius(cmp.index);
+			float height = phy_scene->getControllerHeight(cmp.handle);
+			float radius = phy_scene->getControllerRadius(cmp.handle);
 
 			Universe& universe = scene->getUniverse();
 			Vec3 pos = universe.getPosition(cmp.entity);
@@ -50,7 +50,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 		if (cmp.type == BOX_ACTOR_TYPE)
 		{
 			auto* scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(crc32("renderer")));
-			Vec3 extents = phy_scene->getHalfExtents(cmp.index);
+			Vec3 extents = phy_scene->getHalfExtents(cmp.handle);
 
 			Universe& universe = scene->getUniverse();
 			Matrix mtx = universe.getPositionAndRotation(cmp.entity);

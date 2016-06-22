@@ -560,7 +560,7 @@ public:
 	{
 		serializer.serialize("inedx", m_index);
 		serializer.serialize("entity_index", m_component.entity);
-		serializer.serialize("component_index", m_component.index);
+		serializer.serialize("component_index", m_component.handle);
 		serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_component.type));
 		serializer.serialize("property_name_hash", m_descriptor->getNameHash());
 	}
@@ -570,7 +570,7 @@ public:
 	{
 		serializer.deserialize("inedx", m_index, 0);
 		serializer.deserialize("entity_index", m_component.entity, INVALID_ENTITY);
-		serializer.deserialize("component_index", m_component.index, 0);
+		serializer.deserialize("component_index", m_component.handle, INVALID_COMPONENT);
 		uint32 hash;
 		serializer.deserialize("component_type", hash, 0);
 		m_component.type = PropertyRegister::getComponentTypeFromHash(hash);
@@ -643,7 +643,7 @@ public:
 	{
 		serializer.serialize("inedx", m_index);
 		serializer.serialize("entity_index", m_component.entity);
-		serializer.serialize("component_index", m_component.index);
+		serializer.serialize("component_index", m_component.handle);
 		serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_component.type));
 		serializer.serialize("property_name_hash", m_descriptor->getNameHash());
 	}
@@ -653,7 +653,7 @@ public:
 	{
 		serializer.deserialize("inedx", m_index, 0);
 		serializer.deserialize("entity_index", m_component.entity, INVALID_ENTITY);
-		serializer.deserialize("component_index", m_component.index, 0);
+		serializer.deserialize("component_index", m_component.handle, INVALID_COMPONENT);
 		uint32 hash;
 		serializer.deserialize("component_type", hash, 0);
 		m_component.type = PropertyRegister::getComponentTypeFromHash(hash);
@@ -991,7 +991,7 @@ private:
 			{
 				const ComponentUID& cmp =
 					m_editor.getComponent(m_entities[i], m_type);
-				cmp.scene->destroyComponent(cmp.index, cmp.type);
+				cmp.scene->destroyComponent(cmp.handle, cmp.type);
 			}
 		}
 
@@ -1123,7 +1123,7 @@ private:
 					ComponentUID new_component;
 					for (int i = 0; i < scenes.size(); ++i)
 					{
-						new_component.index = scenes[i]->createComponent(cmp_type, new_entity);
+						new_component.handle = scenes[i]->createComponent(cmp_type, new_entity);
 						new_component.entity = new_entity;
 						new_component.scene = scenes[i];
 						new_component.type = cmp_type;
@@ -1190,7 +1190,7 @@ private:
 		void serialize(JsonSerializer& serializer) override 
 		{
 			serializer.serialize("entity", m_component.entity);
-			serializer.serialize("component", m_component.index);
+			serializer.serialize("component", m_component.handle);
 			serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_component.type));
 		}
 
@@ -1198,7 +1198,7 @@ private:
 		void deserialize(JsonSerializer& serializer) override
 		{
 			serializer.deserialize("entity", m_component.entity, INVALID_ENTITY);
-			serializer.deserialize("component", m_component.index, 0);
+			serializer.deserialize("component", m_component.handle, INVALID_COMPONENT);
 			uint32 hash;
 			serializer.deserialize("component_type", hash, 0);
 			m_component.type = PropertyRegister::getComponentTypeFromHash(hash);
@@ -1215,11 +1215,11 @@ private:
 			{
 				for (int i = 0; i < scenes.size(); ++i)
 				{
-					ComponentIndex cmp =
+					ComponentHandle cmp =
 						scenes[i]->createComponent(m_component.type, m_component.entity);
-					if (cmp != INVALID_COMPONENT)
+					if (isValid(cmp))
 					{
-						m_component.index = cmp;
+						m_component.handle = cmp;
 						m_component.scene = scenes[i];
 						break;
 					}
@@ -1289,13 +1289,13 @@ private:
 					ComponentUID cmp = m_editor.getComponent(instances[i], m_component.type);
 					if (cmp.isValid())
 					{
-						cmp.scene->destroyComponent(cmp.index, cmp.type);
+						cmp.scene->destroyComponent(cmp.handle, cmp.type);
 					}
 				}
 			}
 			else
 			{
-				m_component.scene->destroyComponent(m_component.index, m_component.type);
+				m_component.scene->destroyComponent(m_component.handle, m_component.type);
 			}
 			return true;
 		}
@@ -1586,7 +1586,7 @@ public:
 			ComponentUID camera_cmp = getComponent(m_camera, CAMERA_TYPE);
 			if (camera_cmp.isValid())
 			{
-				m_render_interface->getRay(camera_cmp.index, (float)x, (float)y, origin, dir);
+				m_render_interface->getRay(camera_cmp.handle, (float)x, (float)y, origin, dir);
 				auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
 				if (m_gizmo->isActive()) return;
 
@@ -1771,14 +1771,14 @@ public:
 
 			ComponentUID renderable = getComponent(m_selected_entities[i], RENDERABLE_TYPE);
 			Vec3 origin = universe->getPosition(entity);
-			auto hit = m_render_interface->castRay(origin, Vec3(0, -1, 0), renderable.index);
+			auto hit = m_render_interface->castRay(origin, Vec3(0, -1, 0), renderable.handle);
 			if (hit.is_hit)
 			{
 				new_positions.push(origin + Vec3(0, -hit.t, 0));
 			}
 			else
 			{
-				hit = m_render_interface->castRay(origin, Vec3(0, 1, 0), renderable.index);
+				hit = m_render_interface->castRay(origin, Vec3(0, 1, 0), renderable.handle);
 				if (hit.is_hit)
 				{
 					new_positions.push(origin + Vec3(0, hit.t, 0));
@@ -1813,7 +1813,7 @@ public:
 	Entity addEntity() override
 	{
 		ComponentUID cmp = getComponent(m_camera, CAMERA_TYPE);
-		Vec2 size = m_render_interface->getCameraScreenSize(cmp.index);
+		Vec2 size = m_render_interface->getCameraScreenSize(cmp.handle);
 		return addEntityAt((int)size.x >> 1, (int)size.y >> 1);
 	}
 
@@ -1825,7 +1825,7 @@ public:
 		Vec3 origin;
 		Vec3 dir;
 
-		m_render_interface->getRay(camera_cmp.index, (float)camera_x, (float)camera_y, origin, dir);
+		m_render_interface->getRay(camera_cmp.handle, (float)camera_x, (float)camera_y, origin, dir);
 		auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
 		Vec3 pos;
 		if (hit.is_hit)
@@ -1847,12 +1847,12 @@ public:
 	{
 		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_TYPE);
 		Universe* universe = getUniverse();
-		Vec2 screen_size = m_render_interface->getCameraScreenSize(camera_cmp.index);
+		Vec2 screen_size = m_render_interface->getCameraScreenSize(camera_cmp.handle);
 		screen_size *= 0.5f;
 
 		Vec3 origin;
 		Vec3 dir;
-		m_render_interface->getRay(camera_cmp.index, (float)screen_size.x, (float)screen_size.y, origin, dir);
+		m_render_interface->getRay(camera_cmp.handle, (float)screen_size.x, (float)screen_size.y, origin, dir);
 		auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
 		Vec3 pos;
 		if (hit.is_hit)
@@ -2544,7 +2544,7 @@ public:
 			static const uint32 SLOT_HASH = crc32("Slot");
 			if (component_type == CAMERA_TYPE && property.getNameHash() == SLOT_HASH)
 			{
-				if (m_render_interface->getCameraEntity(cmp.index) == m_camera)
+				if (m_render_interface->getCameraEntity(cmp.handle) == m_camera)
 				{
 					return;
 				}
@@ -2772,7 +2772,7 @@ public:
 			universe->setEntityName(m_camera, "editor_camera");
 			ComponentUID cmp = createComponent(CAMERA_TYPE, m_camera);
 			ASSERT(cmp.isValid());
-			m_render_interface->setCameraSlot(cmp.index, "editor");
+			m_render_interface->setCameraSlot(cmp.handle, "editor");
 		}
 	}
 

@@ -368,7 +368,7 @@ struct GizmoImpl : public Gizmo
 
 		auto edit_camera = m_editor.getEditCamera();
 		Vec3 origin, cursor_dir;
-		m_editor.getRenderInterface()->getRay(edit_camera.index, m_editor.getMouseX(), m_editor.getMouseY(), origin, cursor_dir);
+		m_editor.getRenderInterface()->getRay(edit_camera.handle, m_editor.getMouseX(), m_editor.getMouseY(), origin, cursor_dir);
 
 		m_transform_axis = Axis::NONE;
 		m_active = -1;
@@ -479,7 +479,7 @@ struct GizmoImpl : public Gizmo
 		auto gizmo_mtx = m_editor.getUniverse()->getMatrix(m_entities[m_active]);
 		auto camera = m_editor.getEditCamera();
 		Vec3 origin, dir;
-		m_editor.getRenderInterface()->getRay(camera.index, m_editor.getMouseX(), m_editor.getMouseY(), origin, dir);
+		m_editor.getRenderInterface()->getRay(camera.handle, m_editor.getMouseX(), m_editor.getMouseY(), origin, dir);
 		dir.normalize();
 		Matrix camera_mtx = m_editor.getUniverse()->getPositionAndRotation(camera.entity);
 		bool is_two_axed = m_transform_axis == Axis::XZ || m_transform_axis == Axis::XY || m_transform_axis == Axis::YZ;
@@ -660,10 +660,10 @@ struct GizmoImpl : public Gizmo
 	{
 		auto edit_camera = m_editor.getEditCamera();
 		auto* render_interface = m_editor.getRenderInterface();
-		bool is_ortho = render_interface->isCameraOrtho(edit_camera.index);
+		bool is_ortho = render_interface->isCameraOrtho(edit_camera.handle);
 		auto camera_pos = m_editor.getUniverse()->getPosition(edit_camera.entity);
 		auto camera_dir = m_editor.getUniverse()->getRotation(edit_camera.entity) * Vec3(0, 0, -1);
-		float fov = render_interface->getCameraFOV(edit_camera.index);
+		float fov = render_interface->getCameraFOV(edit_camera.handle);
 
 		collide(camera_pos, camera_dir, fov, is_ortho);
 		transform();

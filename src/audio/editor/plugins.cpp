@@ -204,7 +204,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 		if (cmp.type == ECHO_ZONE_TYPE)
 		{
 			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
-			float radius = audio_scene->getEchoZoneRadius(cmp.index);
+			float radius = audio_scene->getEchoZoneRadius(cmp.handle);
 			Universe& universe = audio_scene->getUniverse();
 			Vec3 pos = universe.getPosition(cmp.entity);
 

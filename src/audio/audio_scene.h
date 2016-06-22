@@ -46,17 +46,17 @@ public:
 	virtual void removeClip(ClipInfo* clip) = 0;
 	virtual void setClip(int clip_id, const Lumix::Path& path) = 0;
 
-	virtual float getEchoZoneRadius(ComponentIndex cmp) = 0;
-	virtual void setEchoZoneRadius(ComponentIndex cmp, float radius) = 0;
-	virtual float getEchoZoneDelay(ComponentIndex cmp) = 0;
-	virtual void setEchoZoneDelay(ComponentIndex cmp, float delay) = 0;
+	virtual float getEchoZoneRadius(ComponentHandle cmp) = 0;
+	virtual void setEchoZoneRadius(ComponentHandle cmp, float radius) = 0;
+	virtual float getEchoZoneDelay(ComponentHandle cmp) = 0;
+	virtual void setEchoZoneDelay(ComponentHandle cmp, float delay) = 0;
 
-	virtual ClipInfo* getAmbientSoundClip(ComponentIndex cmp) = 0;
-	virtual int getAmbientSoundClipIndex(ComponentIndex cmp) = 0;
-	virtual void setAmbientSoundClipIndex(ComponentIndex cmp, int index) = 0;
-	virtual void setAmbientSoundClip(ComponentIndex cmp, ClipInfo* clip) = 0;
-	virtual bool isAmbientSound3D(ComponentIndex cmp) = 0;
-	virtual void setAmbientSound3D(ComponentIndex cmp, bool is_3d) = 0;
+	virtual ClipInfo* getAmbientSoundClip(ComponentHandle cmp) = 0;
+	virtual int getAmbientSoundClipIndex(ComponentHandle cmp) = 0;
+	virtual void setAmbientSoundClipIndex(ComponentHandle cmp, int index) = 0;
+	virtual void setAmbientSoundClip(ComponentHandle cmp, ClipInfo* clip) = 0;
+	virtual bool isAmbientSound3D(ComponentHandle cmp) = 0;
+	virtual void setAmbientSound3D(ComponentHandle cmp, bool is_3d) = 0;
 
 	virtual SoundHandle play(Entity entity, ClipInfo* clip, bool is_3d) = 0;
 	virtual void stop(SoundHandle sound_id) = 0;

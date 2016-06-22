@@ -218,7 +218,7 @@ struct NavigationSceneImpl : public NavigationScene
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 
-		ComponentIndex cmp = render_scene->getFirstTerrain();
+		ComponentHandle cmp = render_scene->getFirstTerrain();
 		while (cmp != INVALID_COMPONENT)
 		{
 			Entity entity = render_scene->getTerrainEntity(cmp);
@@ -947,7 +947,7 @@ struct NavigationSceneImpl : public NavigationScene
 			m_aabb.merge(model_bb);
 		}
 
-		ComponentIndex cmp = render_scene->getFirstTerrain();
+		ComponentHandle cmp = render_scene->getFirstTerrain();
 		while (cmp != INVALID_COMPONENT)
 		{
 			AABB terrain_aabb = render_scene->getTerrainAABB(cmp);
@@ -1041,7 +1041,7 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
-	ComponentIndex createComponent(ComponentType type, Entity entity) override
+	ComponentHandle createComponent(ComponentType type, Entity entity) override
 	{
 		if (type == NAVMESH_AGENT_TYPE)
 		{
@@ -1053,23 +1053,25 @@ struct NavigationSceneImpl : public NavigationScene
 			agent->is_finished = true;
 			if (m_crowd) addCrowdAgent(agent);
 			m_agents.insert(entity, agent);
-			m_universe.addComponent(entity, type, this, entity.index);
-			return entity.index;
+			ComponentHandle cmp = {entity.index};
+			m_universe.addComponent(entity, type, this, cmp);
+			return cmp;
 		}
 		return INVALID_COMPONENT;
 	}
 
 
-	void destroyComponent(ComponentIndex component, ComponentType type) override
+	void destroyComponent(ComponentHandle component, ComponentType type) override
 	{
 		if (type == NAVMESH_AGENT_TYPE)
 		{
-			auto iter = m_agents.find({component});
+			Entity entity = { component.index };
+			auto iter = m_agents.find(entity);
 			Agent* agent = iter.value();
 			if (m_crowd && agent->agent >= 0) m_crowd->removeAgent(agent->agent);
 			LUMIX_DELETE(m_allocator, iter.value());
 			m_agents.erase(iter);
-			m_universe.destroyComponent({component}, type, this, component);
+			m_universe.destroyComponent(entity, type, this, component);
 		}
 		else
 		{
@@ -1108,41 +1110,46 @@ struct NavigationSceneImpl : public NavigationScene
 				serializer.read(agent->height);
 				agent->agent = -1;
 				m_agents.insert(entity, agent);
-				m_universe.addComponent(entity, NAVMESH_AGENT_TYPE, this, entity.index);
+				ComponentHandle cmp = { entity.index };
+				m_universe.addComponent(entity, NAVMESH_AGENT_TYPE, this, cmp);
 			}
 		}
 	}
 
 
-	void setAgentRadius(ComponentIndex cmp, float radius)
+	void setAgentRadius(ComponentHandle cmp, float radius)
 	{
-		m_agents[{cmp}]->radius = radius;
+		Entity entity = {cmp.index};
+		m_agents[entity]->radius = radius;
 	}
 
 
-	float getAgentRadius(ComponentIndex cmp)
+	float getAgentRadius(ComponentHandle cmp)
 	{
-		return m_agents[{cmp}]->radius;
+		Entity entity = { cmp.index };
+		return m_agents[entity]->radius;
 	}
 
 
-	void setAgentHeight(ComponentIndex cmp, float height)
+	void setAgentHeight(ComponentHandle cmp, float height)
 	{
-		m_agents[{cmp}]->height = height;
+		Entity entity = { cmp.index };
+		m_agents[entity]->height = height;
 	}
 
 
-	float getAgentHeight(ComponentIndex cmp)
+	float getAgentHeight(ComponentHandle cmp)
 	{
-		return m_agents[{cmp}]->height;
+		Entity entity = {cmp.index};
+		return m_agents[entity]->height;
 	}
 
 
 	IPlugin& getPlugin() const override { return m_system; }
 	bool ownComponentType(ComponentType type) const override { return type == NAVMESH_AGENT_TYPE; }
-	ComponentIndex getComponent(Entity entity, ComponentType type) override
+	ComponentHandle getComponent(Entity entity, ComponentType type) override
 	{
-		if (type == NAVMESH_AGENT_TYPE) return entity.index;
+		if (type == NAVMESH_AGENT_TYPE) return {entity.index};
 		return INVALID_COMPONENT;
 	}
 	Universe& getUniverse() override { return m_universe; }

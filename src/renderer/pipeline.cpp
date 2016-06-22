@@ -701,8 +701,8 @@ struct PipelineImpl : public Pipeline
 
 	void applyCamera(const char* slot)
 	{
-		ComponentIndex cmp = m_scene->getCameraInSlot(slot);
-		if (cmp < 0) return;
+		ComponentHandle cmp = m_scene->getCameraInSlot(slot);
+		if (!isValid(cmp)) return;
 
 		m_scene->setCameraScreenSize(cmp, m_width, m_height);
 		m_applied_camera = cmp;
@@ -941,11 +941,11 @@ struct PipelineImpl : public Pipeline
 	{
 		auto scr_scene = static_cast<LuaScriptScene*>(m_scene->getUniverse().getScene(crc32("lua_script")));
 		if (!scr_scene) return false;
-		ComponentIndex camera = m_scene->getCameraInSlot(camera_slot);
+		ComponentHandle camera = m_scene->getCameraInSlot(camera_slot);
 		if (camera == INVALID_COMPONENT) return false;
 
 		Entity camera_entity = m_scene->getCameraEntity(camera);
-		ComponentIndex scr_cmp = scr_scene->getComponent(camera_entity);
+		ComponentHandle scr_cmp = scr_scene->getComponent(camera_entity);
 		if (scr_cmp == INVALID_COMPONENT) return false;
 
 		bool ret = false;
@@ -1065,7 +1065,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderSpotLightShadowmap(ComponentIndex light)
+	void renderSpotLightShadowmap(ComponentHandle light)
 	{
 		newView("point_light");
 
@@ -1102,7 +1102,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderOmniLightShadowmap(ComponentIndex light)
+	void renderOmniLightShadowmap(ComponentHandle light)
 	{
 		Entity light_entity = m_scene->getPointLightEntity(light);
 		Vec3 light_pos = m_scene->getUniverse().getPosition(light_entity);
@@ -1186,15 +1186,15 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderLocalLightShadowmaps(ComponentIndex camera, FrameBuffer** fbs, int framebuffers_count)
+	void renderLocalLightShadowmaps(ComponentHandle camera, FrameBuffer** fbs, int framebuffers_count)
 	{
-		if (camera < 0) return;
+		if (!isValid(camera)) return;
 
 		Universe& universe = m_scene->getUniverse();
 		Entity camera_entity = m_scene->getCameraEntity(camera);
 		Vec3 camera_pos = universe.getPosition(camera_entity);
 
-		ComponentIndex lights[16];
+		ComponentHandle lights[16];
 		int light_count = m_scene->getClosestPointLights(camera_pos, lights, lengthOf(lights));
 
 		int fb_index = 0;
@@ -1238,8 +1238,8 @@ struct PipelineImpl : public Pipeline
 	void renderShadowmap(int split_index)
 	{
 		Universe& universe = m_scene->getUniverse();
-		ComponentIndex light_cmp = m_scene->getActiveGlobalLight();
-		if (light_cmp < 0 || m_applied_camera < 0) return;
+		ComponentHandle light_cmp = m_scene->getActiveGlobalLight();
+		if (!isValid(light_cmp) || !isValid(m_applied_camera)) return;
 		float camera_height = m_scene->getCameraScreenHeight(m_applied_camera);
 		if (!camera_height) return;
 
@@ -1485,9 +1485,9 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void setPointLightUniforms(ComponentIndex light_cmp)
+	void setPointLightUniforms(ComponentHandle light_cmp)
 	{
-		if (light_cmp < 0) return;
+		if (!isValid(light_cmp)) return;
 
 		Universe& universe = m_scene->getUniverse();
 		Entity light_entity = m_scene->getPointLightEntity(light_cmp);
@@ -1637,7 +1637,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderPointLightInfluencedGeometry(ComponentIndex light)
+	void renderPointLightInfluencedGeometry(ComponentHandle light)
 	{
 		PROFILE_FUNCTION();
 
@@ -1653,7 +1653,7 @@ struct PipelineImpl : public Pipeline
 	{
 		PROFILE_FUNCTION();
 
-		Array<ComponentIndex> lights(m_allocator);
+		Array<ComponentHandle> lights(m_allocator);
 		m_scene->getPointLights(frustum, lights);
 		for (int i = 0; i < lights.size(); ++i)
 		{
@@ -1661,7 +1661,7 @@ struct PipelineImpl : public Pipeline
 			m_tmp_meshes.clear();
 			m_tmp_terrains.clear();
 
-			ComponentIndex light = lights[i];
+			ComponentHandle light = lights[i];
 			m_is_current_light_global = false;
 			setPointLightUniforms(light);
 			m_scene->getPointLightInfluencedGeometry(light, frustum, m_tmp_meshes);
@@ -1788,7 +1788,7 @@ struct PipelineImpl : public Pipeline
 		executeCommandBuffer(material->getCommandBuffer(), material);
 		executeCommandBuffer(m_views[m_view_idx].command_buffer.buffer, material);
 
-		if (m_applied_camera >= 0)
+		if (isValid(m_applied_camera))
 		{
 			Matrix projection_matrix;
 			Universe& universe = m_scene->getUniverse();
@@ -1829,7 +1829,7 @@ struct PipelineImpl : public Pipeline
 	{
 		PROFILE_FUNCTION();
 
-		if (m_applied_camera < 0) return;
+		if (!isValid(m_applied_camera)) return;
 
 		m_tmp_grasses.clear();
 		m_tmp_terrains.clear();
@@ -2241,7 +2241,7 @@ struct PipelineImpl : public Pipeline
 		PROFILE_INT("mesh count", meshes.size());
 		for(auto& mesh : meshes)
 		{
-			Renderable& renderable = renderables[mesh.renderable];
+			Renderable& renderable = renderables[mesh.renderable.index];
 			if(renderable.pose && renderable.pose->count > 0)
 			{
 				renderSkinnedMesh(renderable, mesh);
@@ -2266,7 +2266,7 @@ struct PipelineImpl : public Pipeline
 			mesh_count += submeshes.size();
 			for (auto& mesh : submeshes)
 			{
-				Renderable& renderable = renderables[mesh.renderable];
+				Renderable& renderable = renderables[mesh.renderable.index];
 				if (renderable.pose && renderable.pose->count > 0)
 				{
 					renderSkinnedMesh(renderable, mesh);
@@ -2492,7 +2492,7 @@ struct PipelineImpl : public Pipeline
 
 	struct PointLightShadowmap
 	{
-		ComponentIndex m_light;
+		ComponentHandle m_light;
 		FrameBuffer* m_framebuffer;
 		Matrix m_matrices[4];
 	};
@@ -2529,7 +2529,7 @@ struct PipelineImpl : public Pipeline
 	FrameBuffer* m_global_light_shadowmap;
 	InstanceData m_instances_data[128];
 	int m_instance_data_idx;
-	ComponentIndex m_applied_camera;
+	ComponentHandle m_applied_camera;
 	bgfx::VertexBufferHandle m_cube_vb;
 	bgfx::IndexBufferHandle m_cube_ib;
 	bool m_is_current_light_global;
@@ -2552,7 +2552,7 @@ struct PipelineImpl : public Pipeline
 	Array<RenderableMesh> m_tmp_meshes;
 	Array<const TerrainInfo*> m_tmp_terrains;
 	Array<GrassInfo> m_tmp_grasses;
-	Array<ComponentIndex> m_tmp_local_lights;
+	Array<ComponentHandle> m_tmp_local_lights;
 
 	bgfx::UniformHandle m_bone_matrices_uniform;
 	bgfx::UniformHandle m_layer_uniform;
@@ -2730,7 +2730,7 @@ int renderLocalLightsShadowmaps(lua_State* L)
 	}
 
 	RenderScene* scene = pipeline->m_scene;
-	ComponentIndex camera = scene->getCameraInSlot(camera_slot);
+	ComponentHandle camera = scene->getCameraInSlot(camera_slot);
 	pipeline->renderLocalLightShadowmaps(camera, fbs, len);
 
 	return 0;

@@ -16,32 +16,32 @@ struct LUMIX_ENGINE_API ComponentUID final
 
 	ComponentUID()
 	{
-		index = -1;
+		handle = INVALID_COMPONENT;
 		scene = nullptr;
 		entity = INVALID_ENTITY;
 		type = {-1};
 	}
 
-	ComponentUID(Entity _entity, ComponentType _type, IScene* _scene, int _index)
+	ComponentUID(Entity _entity, ComponentType _type, IScene* _scene, ComponentHandle _handle)
 		: entity(_entity)
 		, type(_type)
 		, scene(_scene)
-		, index(_index)
+		, handle(_handle)
 	{
 	}
 
 	Entity entity; 
 	ComponentType type;
 	IScene* scene;
-	ComponentIndex index;
+	ComponentHandle handle;
 
 	static const ComponentUID INVALID;
 
 	bool operator==(const ComponentUID& rhs) const
 	{
-		return type == rhs.type && scene == rhs.scene && index == rhs.index;
+		return type == rhs.type && scene == rhs.scene && handle == rhs.handle;
 	}
-	bool isValid() const { return index >= 0; }
+	bool isValid() const { return Lumix::isValid(handle); }
 };
 
 

@@ -82,19 +82,19 @@ struct InsertMeshCommand : public Lumix::IEditorCommand
 		m_entity = universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		universe->setPosition(m_entity, m_position);
 		const auto& scenes = universe->getScenes();
-		Lumix::ComponentIndex cmp = -1;
+		Lumix::ComponentHandle cmp = Lumix::INVALID_COMPONENT;
 		Lumix::IScene* scene = nullptr;
 		for (int i = 0; i < scenes.size(); ++i)
 		{
 			cmp = scenes[i]->createComponent(RENDERABLE_TYPE, m_entity);
 
-			if (cmp >= 0)
+			if (isValid(cmp))
 			{
 				scene = scenes[i];
 				break;
 			}
 		}
-		if (cmp >= 0) static_cast<Lumix::RenderScene*>(scene)->setRenderablePath(cmp, m_mesh_path);
+		if (isValid(cmp)) static_cast<Lumix::RenderScene*>(scene)->setRenderablePath(cmp, m_mesh_path);
 		return true;
 	}
 
@@ -280,13 +280,13 @@ Lumix::RayCastModelHit SceneView::castRay(float x, float y)
 	ASSERT(scene);
 	
 	Lumix::ComponentUID camera_cmp = m_editor->getEditCamera();
-	Lumix::Vec2 screen_size = scene->getCameraScreenSize(camera_cmp.index);
+	Lumix::Vec2 screen_size = scene->getCameraScreenSize(camera_cmp.handle);
 	screen_size.x *= x;
 	screen_size.y *= y;
 
 	Lumix::Vec3 origin;
 	Lumix::Vec3 dir;
-	scene->getRay(camera_cmp.index, (float)screen_size.x, (float)screen_size.y, origin, dir);
+	scene->getRay(camera_cmp.handle, (float)screen_size.x, (float)screen_size.y, origin, dir);
 	return scene->castRay(origin, dir, Lumix::INVALID_COMPONENT);
 }
 

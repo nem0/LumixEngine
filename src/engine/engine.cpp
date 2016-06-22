@@ -134,16 +134,16 @@ public:
 	}
 
 
-	static ComponentIndex LUA_createComponent(IScene* scene, const char* type, int entity_idx)
+	static ComponentHandle LUA_createComponent(IScene* scene, const char* type, int entity_idx)
 	{
-		if (!scene) return -1;
+		if (!scene) return INVALID_COMPONENT;
 		Entity e = {entity_idx};
 		ComponentType handle = PropertyRegister::getComponentType(type);
 		if (scene->getComponent(e, handle) != INVALID_COMPONENT)
 		{
 			g_log_error.log("Lua Script") << "Component " << type << " already exists in entity "
 				<< entity_idx;
-			return -1;
+			return INVALID_COMPONENT;
 		}
 
 		return scene->createComponent(handle, e);

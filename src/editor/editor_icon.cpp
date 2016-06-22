@@ -190,8 +190,8 @@ struct EditorIconsImpl : public EditorIcons
 		if(!render_interface) return hit;
 
 		const auto& universe = *m_editor.getUniverse();
-		ComponentIndex camera = m_editor.getEditCamera().index;
-		if(camera < 0) return hit;
+		ComponentHandle camera = m_editor.getEditCamera().handle;
+		if (!isValid(camera)) return hit;
 		Matrix camera_mtx = universe.getMatrix(m_editor.getEditCamera().entity);
 		Vec3 camera_pos = camera_mtx.getTranslation();
 		bool is_ortho = render_interface->isCameraOrtho(camera);
@@ -279,8 +279,8 @@ struct EditorIconsImpl : public EditorIcons
 		if(!render_interface) return;
 
 		const auto& universe = *m_editor.getUniverse();
-		ComponentIndex camera = m_editor.getEditCamera().index;
-		if(camera < 0) return;
+		ComponentHandle camera = m_editor.getEditCamera().handle;
+		if (!isValid(camera)) return;
 		Matrix camera_mtx = universe.getMatrix(m_editor.getEditCamera().entity);
 		Vec3 camera_pos = camera_mtx.getTranslation();
 		float fov = m_editor.getRenderInterface()->getCameraFOV(camera);
