@@ -669,7 +669,10 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 						auto* child = block->m_first_child;
 						while (child)
 						{
-							frame -= m_current_frame < 0 ? child->m_frames.back() : child->m_frames[m_current_frame];
+							if (child->m_type == Lumix::Profiler::BlockType::TIME)
+							{
+								frame -= m_current_frame < 0 ? child->m_frames.back() : child->m_frames[m_current_frame];
+							}
 							child = child->m_next;
 						}
 
@@ -685,7 +688,7 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 						}
 					}
 					break;
-					case Lumix::Profiler::BlockType::INT: break;
+					case Lumix::Profiler::BlockType::INT: ImGui::NewLine(); break;
 					default: ASSERT(false); break;
 				}
 
