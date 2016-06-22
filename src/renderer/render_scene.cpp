@@ -3840,7 +3840,7 @@ public:
 		light.m_fog_color.set(1, 1, 1);
 		light.m_fog_density = 0;
 		++m_global_light_last_cmp.index;
-		light.m_component = {m_global_light_last_cmp};
+		light.m_component = m_global_light_last_cmp;
 		light.m_cascades.set(3, 8, 100, 300);
 		light.m_fog_bottom = 0.0f;
 		light.m_fog_height = 10.0f;
@@ -3865,7 +3865,7 @@ public:
 		light.m_diffuse_color.set(1, 1, 1);
 		light.m_diffuse_intensity = 1;
 		++m_point_light_last_cmp.index;
-		light.m_component = {m_point_light_last_cmp};
+		light.m_component = m_point_light_last_cmp;
 		light.m_fov = 999;
 		light.m_specular_color.set(1, 1, 1);
 		light.m_specular_intensity = 1;
