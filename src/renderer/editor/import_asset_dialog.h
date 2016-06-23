@@ -51,6 +51,15 @@ struct ImportMaterial
 };
 
 
+struct ImportAnimation
+{
+	bool import;
+	struct aiAnimation* animation;
+	const aiScene* scene;
+	char output_filename[Lumix::MAX_PATH_LENGTH];
+};
+
+
 struct ImportMesh
 {
 	ImportMesh(Lumix::IAllocator& allocator)
@@ -116,6 +125,7 @@ class ImportAssetDialog : public StudioApp::IPlugin
 		bool isTextureDirValid() const;
 		void onMaterialsGUI();
 		void onMeshesGUI();
+		void onAnimationsGUI();
 		void onImageGUI();
 		void onLODsGUI();
 		void onAction();
@@ -127,6 +137,7 @@ class ImportAssetDialog : public StudioApp::IPlugin
 		Lumix::Array<Lumix::uint32> m_saved_textures;
 		Lumix::Array<Assimp::Importer> m_importers;
 		Lumix::Array<Lumix::StaticString<Lumix::MAX_PATH_LENGTH> > m_sources;
+		Lumix::Array<ImportAnimation> m_animations;
 		Lumix::Array<ImportMesh> m_meshes;
 		Lumix::Array<ImportMaterial> m_materials;
 		char m_import_message[1024];
@@ -147,12 +158,11 @@ class ImportAssetDialog : public StudioApp::IPlugin
 		char m_message[1024];
 		char m_last_dir[Lumix::MAX_PATH_LENGTH];
 		char m_source[Lumix::MAX_PATH_LENGTH];
-		char m_output_filename[Lumix::MAX_PATH_LENGTH];
+		char m_mesh_output_filename[Lumix::MAX_PATH_LENGTH];
 		char m_output_dir[Lumix::MAX_PATH_LENGTH];
 		char m_texture_output_dir[Lumix::MAX_PATH_LENGTH];
 		bool m_convert_to_dds;
 		bool m_convert_to_raw;
-		bool m_import_animations;
 		bool m_is_converting;
 		bool m_is_importing;
 		bool m_is_importing_texture;

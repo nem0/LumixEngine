@@ -37,10 +37,13 @@
 #include "stb/stb_image.h"
 
 
-typedef Lumix::StaticString<Lumix::MAX_PATH_LENGTH> PathBuilder;
+using namespace Lumix;
 
 
-enum class VertexAttributeDef : Lumix::uint32
+typedef StaticString<MAX_PATH_LENGTH> PathBuilder;
+
+
+enum class VertexAttributeDef : uint32
 {
 	POSITION,
 	FLOAT1,
@@ -61,10 +64,10 @@ enum class VertexAttributeDef : Lumix::uint32
 #pragma pack(1)
 struct BillboardVertex
 {
-	Lumix::Vec3 pos;
-	Lumix::uint8 normal[4];
-	Lumix::uint8 tangent[4];
-	Lumix::Vec2 uv;
+	Vec3 pos;
+	uint8 normal[4];
+	uint8 tangent[4];
+	Vec2 uv;
 };
 #pragma pack()
 
@@ -132,7 +135,7 @@ static const aiNode* getOwner(const aiScene* scene, const aiMesh* mesh)
 static aiString getMeshName(const aiScene* scene, const aiMesh* mesh)
 {
 	aiString mesh_name = mesh->mName;
-	int length = Lumix::stringLength(mesh_name.C_Str());
+	int length = stringLength(mesh_name.C_Str());
 	if (length == 0)
 	{
 		const auto* node = getOwner(scene, mesh);
@@ -148,7 +151,7 @@ static aiString getMeshName(const aiScene* scene, const aiMesh* mesh)
 static float getMeshLODFactor(const aiScene* scene, const aiMesh* mesh)
 {
 	const char* mesh_name = getMeshName(scene, mesh).C_Str();
-	int len = Lumix::stringLength(mesh_name);
+	int len = stringLength(mesh_name);
 	if (len < 5) return FLT_MAX;
 
 	const char* last = mesh_name + len - 1;
@@ -158,7 +161,7 @@ static float getMeshLODFactor(const aiScene* scene, const aiMesh* mesh)
 	}
 	++last;
 	if (last < mesh_name + 4) return FLT_MAX;
-	if (Lumix::compareIStringN(last - 4, "_LOD", 4) != 0) return FLT_MAX;
+	if (compareIStringN(last - 4, "_LOD", 4) != 0) return FLT_MAX;
 	const char* end_of_factor = last - 4;
 	const char* begin_factor = end_of_factor - 1;
 	if (begin_factor <= mesh_name) return FLT_MAX;
@@ -171,7 +174,7 @@ static float getMeshLODFactor(const aiScene* scene, const aiMesh* mesh)
 
 	if (begin_factor == end_of_factor) return FLT_MAX;
 	int factor;
-	Lumix::fromCString(begin_factor, int(end_of_factor - begin_factor), &factor);
+	fromCString(begin_factor, int(end_of_factor - begin_factor), &factor);
 
 	return float(factor);
 }
@@ -179,7 +182,7 @@ static float getMeshLODFactor(const aiScene* scene, const aiMesh* mesh)
 
 static int importAsset(lua_State* L)
 {
-	auto* dlg = Lumix::LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
+	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
 	return dlg->importAsset(L);
 }
 
@@ -187,7 +190,7 @@ static int importAsset(lua_State* L)
 static int getMeshLOD(const aiScene* scene, const aiMesh* mesh)
 {
 	const char* mesh_name = getMeshName(scene, mesh).C_Str();
-	int len = Lumix::stringLength(mesh_name);
+	int len = stringLength(mesh_name);
 	if (len < 5) return 0;
 
 	const char* last = mesh_name + len - 1;
@@ -197,16 +200,16 @@ static int getMeshLOD(const aiScene* scene, const aiMesh* mesh)
 	}
 	++last;
 	if (last < mesh_name + 4) return 0;
-	if (Lumix::compareIStringN(last - 4, "_LOD", 4) != 0) return 0;
+	if (compareIStringN(last - 4, "_LOD", 4) != 0) return 0;
 
 	int lod;
-	Lumix::fromCString(last, len - int(last - mesh_name), &lod);
+	fromCString(last, len - int(last - mesh_name), &lod);
 
 	return lod;
 }
 
 
-static bool hasSimilarFace(const aiMesh& mesh, Lumix::Array<aiFace*>& faces, const aiFace& face)
+static bool hasSimilarFace(const aiMesh& mesh, Array<aiFace*>& faces, const aiFace& face)
 {
 	static const float MAX_ERROR = 0.001f;
 	auto isSame = [](const aiVector3D& a, const aiVector3D& b) {
@@ -249,14 +252,14 @@ enum class Preprocesses
 };
 
 
-static void preprocessMesh(ImportMesh& mesh, Lumix::uint32 flags, Lumix::IAllocator& allocator)
+static void preprocessMesh(ImportMesh& mesh, uint32 flags, IAllocator& allocator)
 {
-	Lumix::Array<aiFace*> faces(allocator);
+	Array<aiFace*> faces(allocator);
 	mesh.map_from_input.clear();
 	mesh.map_to_input.clear();
 	mesh.indices.clear();
 
-	bool remove_doubles = (flags & (Lumix::uint32)Preprocesses::REMOVE_DOUBLES) != 0;
+	bool remove_doubles = (flags & (uint32)Preprocesses::REMOVE_DOUBLES) != 0;
 	for (unsigned int f = 0; f < mesh.mesh->mNumFaces; ++f)
 	{
 		auto& face = mesh.mesh->mFaces[f];
@@ -291,38 +294,38 @@ static void preprocessMesh(ImportMesh& mesh, Lumix::uint32 flags, Lumix::IAlloca
 }
 
 
-static void getRelativePath(Lumix::WorldEditor& editor, char* relative_path, int max_length, const char* source)
+static void getRelativePath(WorldEditor& editor, char* relative_path, int max_length, const char* source)
 {
-	char tmp[Lumix::MAX_PATH_LENGTH];
-	Lumix::PathUtils::normalize(source, tmp, sizeof(tmp));
+	char tmp[MAX_PATH_LENGTH];
+	PathUtils::normalize(source, tmp, sizeof(tmp));
 
 	const char* base_path = editor.getEngine().getDiskFileDevice()->getBasePath();
-	if (Lumix::compareStringN(base_path, tmp, Lumix::stringLength(base_path)) == 0)
+	if (compareStringN(base_path, tmp, stringLength(base_path)) == 0)
 	{
-		int base_path_length = Lumix::stringLength(base_path);
+		int base_path_length = stringLength(base_path);
 		const char* rel_path_start = tmp + base_path_length;
 		if (rel_path_start[0] == '/')
 		{
 			++rel_path_start;
 		}
-		Lumix::copyString(relative_path, max_length, rel_path_start);
+		copyString(relative_path, max_length, rel_path_start);
 	}
 	else
 	{
 		const char* base_path = editor.getEngine().getPatchFileDevice()->getBasePath();
-		if (Lumix::compareStringN(base_path, tmp, Lumix::stringLength(base_path)) == 0)
+		if (compareStringN(base_path, tmp, stringLength(base_path)) == 0)
 		{
-			int base_path_length = Lumix::stringLength(base_path);
+			int base_path_length = stringLength(base_path);
 			const char* rel_path_start = tmp + base_path_length;
 			if (rel_path_start[0] == '/')
 			{
 				++rel_path_start;
 			}
-			Lumix::copyString(relative_path, max_length, rel_path_start);
+			copyString(relative_path, max_length, rel_path_start);
 		}
 		else
 		{
-			Lumix::copyString(relative_path, max_length, tmp);
+			copyString(relative_path, max_length, tmp);
 		}
 
 	}
@@ -339,39 +342,39 @@ static crn_bool ddsConvertCallback(crn_uint32 phase_index,
 
 	float fraction = phase_index / float(total_phases) + (subphase_index / float(total_subphases)) / total_phases;
 	data->dialog->setImportMessage(
-		Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 50>("Saving ", data->dest_path), fraction);
+		StaticString<MAX_PATH_LENGTH + 50>("Saving ", data->dest_path), fraction);
 
 	return !data->cancel_requested;
 }
 
 
 static bool saveAsRaw(ImportAssetDialog& dialog,
-	Lumix::FS::FileSystem& fs,
-	const Lumix::uint8* image_data,
+	FS::FileSystem& fs,
+	const uint8* image_data,
 	int image_width,
 	int image_height,
 	const char* dest_path,
 	float scale,
-	Lumix::IAllocator& allocator)
+	IAllocator& allocator)
 {
 	ASSERT(image_data);
 
-	dialog.setImportMessage(Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 30>("Saving ") << dest_path, -1);
+	dialog.setImportMessage(StaticString<MAX_PATH_LENGTH + 30>("Saving ") << dest_path, -1);
 
-	Lumix::FS::OsFile file;
-	if (!file.open(dest_path, Lumix::FS::Mode::CREATE_AND_WRITE, dialog.getEditor().getAllocator()))
+	FS::OsFile file;
+	if (!file.open(dest_path, FS::Mode::CREATE_AND_WRITE, dialog.getEditor().getAllocator()))
 	{
-		dialog.setMessage(Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 30>("Could not save ") << dest_path);
+		dialog.setMessage(StaticString<MAX_PATH_LENGTH + 30>("Could not save ") << dest_path);
 		return false;
 	}
 
-	Lumix::Array<Lumix::uint16> data(allocator);
+	Array<uint16> data(allocator);
 	data.resize(image_width * image_height);
 	for (int j = 0; j < image_height; ++j)
 	{
 		for (int i = 0; i < image_width; ++i)
 		{
-			data[i + j * image_width] = Lumix::uint16(scale * image_data[(i + j * image_width) * 4]);
+			data[i + j * image_width] = uint16(scale * image_data[(i + j * image_width) * 4]);
 		}
 	}
 
@@ -383,7 +386,7 @@ static bool saveAsRaw(ImportAssetDialog& dialog,
 
 static bool saveAsDDS(ImportAssetDialog& dialog,
 	const char* source_path,
-	const Lumix::uint8* image_data,
+	const uint8* image_data,
 	int image_width,
 	int image_height,
 	bool alpha,
@@ -391,7 +394,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 {
 	ASSERT(image_data);
 
-	dialog.setImportMessage(Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 30>("Saving ") << dest_path, 0);
+	dialog.setImportMessage(StaticString<MAX_PATH_LENGTH + 30>("Saving ") << dest_path, 0);
 
 	dialog.getDDSConvertCallbackData().dialog = &dialog;
 	dialog.getDDSConvertCallbackData().dest_path = dest_path;
@@ -409,21 +412,21 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 	comp_params.m_pProgress_func = ddsConvertCallback;
 	comp_params.m_pProgress_func_data = &dialog.getDDSConvertCallbackData();
 	comp_params.m_num_helper_threads = 3;
-	comp_params.m_pImages[0][0] = (Lumix::uint32*)image_data;
+	comp_params.m_pImages[0][0] = (uint32*)image_data;
 	crn_mipmap_params mipmap_params;
 	mipmap_params.m_mode = cCRNMipModeGenerateMips;
 
 	void* data = crn_compress(comp_params, mipmap_params, size);
 	if (!data)
 	{
-		dialog.setMessage(Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 30>("Could not convert ") << source_path);
+		dialog.setMessage(StaticString<MAX_PATH_LENGTH + 30>("Could not convert ") << source_path);
 		return false;
 	}
 
-	Lumix::FS::OsFile file;
-	if (!file.open(dest_path, Lumix::FS::Mode::CREATE_AND_WRITE, dialog.getEditor().getAllocator()))
+	FS::OsFile file;
+	if (!file.open(dest_path, FS::Mode::CREATE_AND_WRITE, dialog.getEditor().getAllocator()))
 	{
-		dialog.setMessage(Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 30>("Could not save ") << dest_path);
+		dialog.setMessage(StaticString<MAX_PATH_LENGTH + 30>("Could not save ") << dest_path);
 		crn_free_block(data);
 		return false;
 	}
@@ -435,7 +438,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 }
 
 
-struct ImportTextureTask : public Lumix::MT::Task
+struct ImportTextureTask : public MT::Task
 {
 	explicit ImportTextureTask(ImportAssetDialog& dialog)
 		: Task(dialog.m_editor.getAllocator())
@@ -451,14 +454,14 @@ struct ImportTextureTask : public Lumix::MT::Task
 		char* out,
 		int max_size)
 	{
-		char basename[Lumix::MAX_PATH_LENGTH];
-		Lumix::PathUtils::getBasename(basename, sizeof(basename), source);
+		char basename[MAX_PATH_LENGTH];
+		PathUtils::getBasename(basename, sizeof(basename), source);
 
 		if (to_dds)
 		{
 			PathBuilder dest_path(output_dir);
 			dest_path << "/" << basename << ".dds";
-			Lumix::copyString(out, max_size, dest_path);
+			copyString(out, max_size, dest_path);
 			return;
 		}
 
@@ -466,15 +469,15 @@ struct ImportTextureTask : public Lumix::MT::Task
 		{
 			PathBuilder dest_path(output_dir);
 			dest_path << "/" << basename << ".raw";
-			Lumix::copyString(out, max_size, dest_path);
+			copyString(out, max_size, dest_path);
 			return;
 		}
 
-		char ext[Lumix::MAX_PATH_LENGTH];
-		Lumix::PathUtils::getExtension(ext, sizeof(ext), source);
+		char ext[MAX_PATH_LENGTH];
+		PathUtils::getExtension(ext, sizeof(ext), source);
 		PathBuilder dest_path(output_dir);
 		dest_path << "/" << basename << "." << ext;
-		Lumix::copyString(out, max_size, dest_path);
+		copyString(out, max_size, dest_path);
 	}
 
 
@@ -489,18 +492,18 @@ struct ImportTextureTask : public Lumix::MT::Task
 		if (!data)
 		{
 			m_dialog.setMessage(
-				Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 200>("Could not load ") << m_dialog.m_source << " : "
+				StaticString<MAX_PATH_LENGTH + 200>("Could not load ") << m_dialog.m_source << " : "
 																					 << stbi_failure_reason());
 			return -1;
 		}
 
-		char dest_path[Lumix::MAX_PATH_LENGTH];
+		char dest_path[MAX_PATH_LENGTH];
 		getDestinationPath(m_dialog.m_output_dir,
 			m_dialog.m_source,
 			m_dialog.m_convert_to_dds,
 			m_dialog.m_convert_to_raw,
 			dest_path,
-			Lumix::lengthOf(dest_path));
+			lengthOf(dest_path));
 
 		if (m_dialog.m_convert_to_dds)
 		{
@@ -531,9 +534,9 @@ struct ImportTextureTask : public Lumix::MT::Task
 		{
 			m_dialog.setImportMessage("Copying...", -1);
 
-			if (!Lumix::copyFile(m_dialog.m_source, dest_path))
+			if (!copyFile(m_dialog.m_source, dest_path))
 			{
-				m_dialog.setMessage(Lumix::StaticString<Lumix::MAX_PATH_LENGTH * 2 + 30>("Could not copy ")
+				m_dialog.setMessage(StaticString<MAX_PATH_LENGTH * 2 + 30>("Could not copy ")
 									<< m_dialog.m_source
 									<< " to "
 									<< dest_path);
@@ -550,13 +553,13 @@ struct ImportTextureTask : public Lumix::MT::Task
 }; // struct ImportTextureTask
 
 
-struct ImportTask : public Lumix::MT::Task
+struct ImportTask : public MT::Task
 {
 	struct ProgressHandler : public Assimp::ProgressHandler
 	{
 		bool Update(float percentage) override
 		{
-			task->m_dialog.setImportMessage(Lumix::StaticString<50>("Importing... "), percentage);
+			task->m_dialog.setImportMessage(StaticString<50>("Importing... "), percentage);
 
 			return !cancel_requested;
 		}
@@ -572,7 +575,7 @@ struct ImportTask : public Lumix::MT::Task
 		m_dialog.m_importers.back().SetProgressHandler(&m_progress_handler);
 		struct MyStream : public Assimp::LogStream
 		{
-			void write(const char* message) { Lumix::g_log_warning.log("Editor") << message; }
+			void write(const char* message) { g_log_warning.log("Editor") << message; }
 		};
 		const unsigned int severity = Assimp::Logger::Err;
 		Assimp::DefaultLogger::create(ASSIMP_DEFAULT_LOG_NAME, Assimp::Logger::NORMAL, 0, nullptr);
@@ -584,32 +587,46 @@ struct ImportTask : public Lumix::MT::Task
 	~ImportTask() { m_dialog.m_importers.back().SetProgressHandler(nullptr); }
 
 
+	bool isValidFilenameChar(char c)
+	{
+		if (c >= 'A' && c <= 'Z') return true;
+		if (c >= 'a' && c <= 'z') return true;
+		if (c >= '0' && c <= '9') return true;
+		return false;
+	}
+
+
 	int task() override
 	{
 		m_progress_handler.task = this;
 		m_progress_handler.cancel_requested = false;
-		Lumix::enableFloatingPointTraps(false);
-		m_dialog.m_importers.back().SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, aiComponent_LIGHTS | aiComponent_CAMERAS);
+		enableFloatingPointTraps(false);
+		
+		auto& importer = m_dialog.m_importers.back();
+		importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, aiComponent_LIGHTS | aiComponent_CAMERAS);
+
 		unsigned int flags = aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent | aiProcess_GenUVCoords |
 							 aiProcess_RemoveRedundantMaterials | aiProcess_Triangulate | aiProcess_FindInvalidData |
 							 aiProcess_OptimizeGraph | aiProcess_ValidateDataStructure | aiProcess_CalcTangentSpace;
 		flags |= m_dialog.m_model.gen_smooth_normal ? aiProcess_GenSmoothNormals : aiProcess_GenNormals;
 		flags |= m_dialog.m_model.optimize_mesh_on_import ? aiProcess_OptimizeMeshes : 0;
-		const aiScene* scene = m_dialog.m_importers.back().ReadFile(m_dialog.m_source, flags);
+
+		const aiScene* scene = importer.ReadFile(m_dialog.m_source, flags);
 		if (!scene)
 		{
-			m_dialog.m_importers.back().FreeScene();
-			const char* msg = m_dialog.m_importers.back().GetErrorString();
+			importer.FreeScene();
+			const char* msg = importer.GetErrorString();
 			m_dialog.setMessage(msg);
-			Lumix::g_log_error.log("Editor") << m_dialog.m_importers.back().GetErrorString();
+			g_log_error.log("Editor") << msg;
 			m_dialog.m_importers.pop();
 		}
 		else
 		{
-			m_dialog.m_meshes.reserve(Lumix::Math::maximum(scene->mNumMeshes + m_dialog.m_meshes.size(), 100U));
+			unsigned int new_mesh_count = scene->mNumMeshes + m_dialog.m_meshes.size();
+			m_dialog.m_meshes.reserve(Math::maximum(new_mesh_count, 100U));
 
-			char src_dir[Lumix::MAX_PATH_LENGTH];
-			Lumix::PathUtils::getDir(src_dir, Lumix::lengthOf(src_dir), m_dialog.m_source);
+			char src_dir[MAX_PATH_LENGTH];
+			PathUtils::getDir(src_dir, lengthOf(src_dir), m_dialog.m_source);
 			for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
 			{
 				auto& material = m_dialog.m_materials.emplace();
@@ -618,7 +635,7 @@ struct ImportTask : public Lumix::MT::Task
 				material.alpha_cutout = false;
 				material.material = scene->mMaterials[i];
 				material.texture_count = 0;
-				Lumix::copyString(material.shader, isSkinned(scene, scene->mMaterials[i]) ? "skinned" : "rigid");
+				copyString(material.shader, isSkinned(scene, scene->mMaterials[i]) ? "skinned" : "rigid");
 				auto types = {aiTextureType_DIFFUSE, aiTextureType_NORMALS, aiTextureType_HEIGHT};
 				for (auto type : types)
 				{
@@ -626,17 +643,13 @@ struct ImportTask : public Lumix::MT::Task
 					{
 						aiString texture_path;
 						material.material->GetTexture(type, j, &texture_path);
-						Lumix::copyString(material.textures[material.texture_count].path,
-							texture_path.C_Str()[0] ? texture_path.C_Str() : "");
-						Lumix::copyString(material.textures[material.texture_count].src, src_dir);
-						if (texture_path.C_Str()[0])
-						{
-							Lumix::catString(material.textures[material.texture_count].src, texture_path.C_Str());
-						}
-						material.textures[material.texture_count].import = true;
-						material.textures[material.texture_count].to_dds = true;
-						material.textures[material.texture_count].is_valid =
-							PlatformInterface::fileExists(material.textures[material.texture_count].src);
+						auto& texture = material.textures[material.texture_count];
+						copyString(texture.path, texture_path.C_Str()[0] ? texture_path.C_Str() : "");
+						copyString(texture.src, src_dir);
+						if (texture_path.C_Str()[0]) catString(texture.src, texture_path.C_Str());
+						texture.import = true;
+						texture.to_dds = true;
+						texture.is_valid = PlatformInterface::fileExists(texture.src);
 						++material.texture_count;
 					}
 				}
@@ -652,15 +665,55 @@ struct ImportTask : public Lumix::MT::Task
 				float f = getMeshLODFactor(scene, mesh.mesh);
 				if (f < FLT_MAX) m_dialog.m_model.lods[mesh.lod] = f;
 			}
+			for (unsigned int j = 0; j < scene->mNumAnimations; ++j)
+			{
+				auto& animation = m_dialog.m_animations.emplace();
+				animation.animation = scene->mAnimations[j];
+				animation.scene = scene;
+				animation.import = true;
+
+				PathBuilder path;
+				Lumix::PathUtils::getBasename(path.data, Lumix::lengthOf(path.data), m_dialog.m_source);
+				for (int i = 0; i < m_dialog.m_animations.size() - 1; ++i)
+				{
+					if (equalStrings(path.data, m_dialog.m_animations[i].output_filename))
+					{
+						if (animation.animation->mName.length > 0)
+						{
+							char tmp[MAX_PATH_LENGTH];
+							copyString(tmp, animation.animation->mName.C_Str());
+							char* c = tmp;
+							while (*c)
+							{
+								if (!isValidFilenameChar(*c)) *c = '_';
+								++c;
+							}
+							path << tmp;
+						}
+						break;
+					}
+				}
+				for (int i = 0; i < m_dialog.m_animations.size() - 1; ++i)
+				{
+					if (equalStrings(path.data, m_dialog.m_animations[i].output_filename))
+					{
+						path << j;
+						i = -1;
+						continue;
+					}
+				}
+
+				copyString(animation.output_filename, path.data);
+			}
 		}
 
-		for (int i = 1; i < Lumix::lengthOf(m_dialog.m_model.lods); ++i)
+		for (int i = 1; i < lengthOf(m_dialog.m_model.lods); ++i)
 		{
 			if (m_dialog.m_model.lods[i - 1] < 0) m_dialog.m_model.lods[i] = -1;
 		}
 
 
-		Lumix::enableFloatingPointTraps(true);
+		enableFloatingPointTraps(true);
 
 		return 0;
 	}
@@ -672,7 +725,7 @@ struct ImportTask : public Lumix::MT::Task
 }; // struct ImportTask
 
 
-struct ConvertTask : public Lumix::MT::Task
+struct ConvertTask : public MT::Task
 {
 	struct SkinInfo
 	{
@@ -683,7 +736,7 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 
 		float weights[4];
-		Lumix::uint16 bone_indices[4];
+		uint16 bone_indices[4];
 		int index;
 	};
 
@@ -699,16 +752,16 @@ struct ConvertTask : public Lumix::MT::Task
 
 	bool saveTexture(ImportTexture& texture,
 		const char* source_mesh_dir,
-		Lumix::FS::OsFile& material_file,
+		FS::OsFile& material_file,
 		bool is_srgb) const
 	{
-		Lumix::PathUtils::FileInfo texture_info(texture.src);
+		PathUtils::FileInfo texture_info(texture.src);
 		material_file << "\t, \"texture\" : {\n\t\t\"source\" : \"";
 		if (m_dialog.m_texture_output_dir[0])
 		{
-			char from_root_path[Lumix::MAX_PATH_LENGTH];
+			char from_root_path[MAX_PATH_LENGTH];
 			getRelativePath(
-				m_dialog.m_editor, from_root_path, Lumix::lengthOf(from_root_path), m_dialog.m_texture_output_dir);
+				m_dialog.m_editor, from_root_path, lengthOf(from_root_path), m_dialog.m_texture_output_dir);
 			material_file << "/" << from_root_path;
 		}
 		material_file << texture_info.m_basename << ".";
@@ -716,10 +769,10 @@ struct ConvertTask : public Lumix::MT::Task
 		material_file << (is_srgb ? "\", \"srgb\" : true\n }\n" : "\"\n }\n");
 
 		if (!texture.import) return true;
-		bool is_already_saved = m_dialog.m_saved_textures.indexOf(Lumix::crc32(texture.src)) >= 0;
+		bool is_already_saved = m_dialog.m_saved_textures.indexOf(crc32(texture.src)) >= 0;
 		if (is_already_saved) return true;
 
-		bool is_src_dds = Lumix::equalStrings(texture_info.m_extension, "dds");
+		bool is_src_dds = equalStrings(texture_info.m_extension, "dds");
 		PathBuilder dest(m_dialog.m_texture_output_dir[0] ? m_dialog.m_texture_output_dir : m_dialog.m_output_dir);
 		dest << "/" << texture_info.m_basename << (texture.to_dds ? ".dds" : texture_info.m_extension);
 		if (texture.to_dds && !is_src_dds)
@@ -728,7 +781,7 @@ struct ConvertTask : public Lumix::MT::Task
 			auto data = stbi_load(texture.src, &image_width, &image_height, &image_comp, 4);
 			if (!data)
 			{
-				Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 20> error_msg("Could not load image ", texture.src);
+				StaticString<MAX_PATH_LENGTH + 20> error_msg("Could not load image ", texture.src);
 				m_dialog.setMessage(error_msg);
 				return false;
 			}
@@ -742,7 +795,7 @@ struct ConvertTask : public Lumix::MT::Task
 					dest))
 			{
 				stbi_image_free(data);
-				m_dialog.setMessage(Lumix::StaticString<Lumix::MAX_PATH_LENGTH * 2 + 20>(
+				m_dialog.setMessage(StaticString<MAX_PATH_LENGTH * 2 + 20>(
 					"Error converting ", texture.src, " to ", dest));
 				return false;
 			}
@@ -750,28 +803,28 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 		else
 		{
-			if (Lumix::equalStrings(texture.src, dest))
+			if (equalStrings(texture.src, dest))
 			{
 				if (!PlatformInterface::fileExists(texture.src))
 				{
-					m_dialog.setMessage(Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 20>(texture.src, " not found"));
+					m_dialog.setMessage(StaticString<MAX_PATH_LENGTH + 20>(texture.src, " not found"));
 					return false;
 				}
 			}
-			else if (!Lumix::copyFile(texture.src, dest))
+			else if (!copyFile(texture.src, dest))
 			{
 				m_dialog.setMessage(
-					Lumix::StaticString<Lumix::MAX_PATH_LENGTH * 2 + 20>("Error copying ", texture.src, " to ", dest));
+					StaticString<MAX_PATH_LENGTH * 2 + 20>("Error copying ", texture.src, " to ", dest));
 				return false;
 			}
 		}
 
-		m_dialog.m_saved_textures.push(Lumix::crc32(texture.src));
+		m_dialog.m_saved_textures.push(crc32(texture.src));
 		return true;
 	}
 
 
-	Lumix::Vec3 getPosition(const aiNodeAnim* channel, int frame_idx, uint32_t fps)
+	Vec3 getPosition(const aiNodeAnim* channel, int frame_idx, uint32_t fps)
 	{
 		float time = frame_idx / (float)fps;
 		unsigned int i = 0;
@@ -783,7 +836,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 		if (i + 1 == channel->mNumPositionKeys)
 		{
-			return Lumix::Vec3(first.x, first.y, first.z);
+			return Vec3(first.x, first.y, first.z);
 		}
 		auto second = channel->mPositionKeys[i + 1].mValue;
 		float t = float((time - channel->mPositionKeys[i].mTime) /
@@ -793,11 +846,11 @@ struct ConvertTask : public Lumix::MT::Task
 
 		first += second;
 
-		return Lumix::Vec3(first.x, first.y, first.z);
+		return Vec3(first.x, first.y, first.z);
 	}
 
 
-	Lumix::Quat getRotation(const aiNodeAnim* channel, int frame_idx, uint32_t fps)
+	Quat getRotation(const aiNodeAnim* channel, int frame_idx, uint32_t fps)
 	{
 		float time = frame_idx / (float)fps;
 		unsigned int i = 0;
@@ -809,7 +862,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 		if (i + 1 == channel->mNumRotationKeys)
 		{
-			return Lumix::Quat(first.x, first.y, first.z, first.w);
+			return Quat(first.x, first.y, first.z, first.w);
 		}
 
 		auto second = channel->mRotationKeys[i + 1].mValue;
@@ -818,16 +871,7 @@ struct ConvertTask : public Lumix::MT::Task
 		aiQuaternion out;
 		aiQuaternion::Interpolate(out, first, second, t);
 
-		return Lumix::Quat(out.x, out.y, out.z, out.w);
-	}
-
-
-	bool isValidFilenameChar(char c)
-	{
-		if (c >= 'A' && c <= 'Z') return true;
-		if (c >= 'a' && c <= 'z') return true;
-		if (c >= '0' && c <= '9') return true;
-		return false;
+		return Quat(out.x, out.y, out.z, out.w);
 	}
 
 
@@ -839,15 +883,15 @@ struct ConvertTask : public Lumix::MT::Task
 			auto* channel = animation->mChannels[i];
 			for (unsigned int j = 0; j < channel->mNumPositionKeys; ++j)
 			{
-				length = Lumix::Math::maximum(length, (float)channel->mPositionKeys[j].mTime);
+				length = Math::maximum(length, (float)channel->mPositionKeys[j].mTime);
 			}
 			for (unsigned int j = 0; j < channel->mNumRotationKeys; ++j)
 			{
-				length = Lumix::Math::maximum(length, (float)channel->mRotationKeys[j].mTime);
+				length = Math::maximum(length, (float)channel->mRotationKeys[j].mTime);
 			}
 			for (unsigned int j = 0; j < channel->mNumScalingKeys; ++j)
 			{
-				length = Lumix::Math::maximum(length, (float)channel->mScalingKeys[j].mTime);
+				length = Math::maximum(length, (float)channel->mScalingKeys[j].mTime);
 			}
 		}
 		return length;
@@ -856,96 +900,83 @@ struct ConvertTask : public Lumix::MT::Task
 
 	bool saveLumixAnimations()
 	{
-		if (!m_dialog.m_import_animations) return true;
-
 		m_dialog.setImportMessage("Importing animations...", 0);
 		
 		bool failed = false;
-		for (auto& importer : m_dialog.m_importers)
+		int animation_index = 0;
+		int num_animations = 0;
+		for (auto& import_animation : m_dialog.m_animations)
 		{
-			const aiScene* scene = importer.GetScene();
-			for (unsigned int i = 0; i < scene->mNumAnimations; ++i)
+			if (import_animation.import) ++num_animations;
+		}
+
+		for(auto& import_animation : m_dialog.m_animations)
+		{
+			if (!import_animation.import) continue;
+			++animation_index;
+			const aiScene* scene = import_animation.scene;
+			m_dialog.setImportMessage("Importing animations...", (float)animation_index / num_animations);
+			auto* animation = import_animation.animation;
+
+			FS::OsFile file;
+			PathBuilder ani_path(m_dialog.m_output_dir, "/", import_animation.output_filename, ".ani");
+
+			if (!file.open(ani_path, FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
 			{
-				m_dialog.setImportMessage("Importing animations...", (float)i / scene->mNumAnimations);
-				auto* animation = scene->mAnimations[i];
-
-				Lumix::FS::OsFile file;
-				PathBuilder ani_path(m_dialog.m_output_dir);
-				if (animation->mName.length > 0)
-				{
-					char tmp[Lumix::MAX_PATH_LENGTH];
-					Lumix::copyString(tmp, animation->mName.C_Str());
-					char* c = tmp;
-					while (*c)
-					{
-						if (!isValidFilenameChar(*c)) *c = '_';
-						++c;
-					}
-					ani_path << "/" << tmp << ".ani";
-				}
-				else
-				{
-					ani_path << "/" << "anim" << i << ".ani";
-				}
-
-				if (!file.open(ani_path, Lumix::FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
-				{
-					Lumix::g_log_error.log("Editor") << "Could not create file " << ani_path;
-					failed = true;
-					continue;
-				}
-
-				Lumix::Animation::Header header;
-				header.fps = Lumix::uint32(animation->mTicksPerSecond == 0
-											   ? 25
-											   : (animation->mTicksPerSecond == 1 ? 30 : animation->mTicksPerSecond));
-				header.magic = Lumix::Animation::HEADER_MAGIC;
-				header.version = 1;
-
-				file.write(&header, sizeof(header));
-				float anim_length = getLength(animation);
-				int frame_count = Lumix::Math::maximum(int(anim_length * header.fps), 1);
-				file.write(&frame_count, sizeof(frame_count));
-				int bone_count = (int)animation->mNumChannels;
-				file.write(&bone_count, sizeof(bone_count));
-
-				Lumix::Array<Lumix::Vec3> positions(m_dialog.m_editor.getAllocator());
-				Lumix::Array<Lumix::Quat> rotations(m_dialog.m_editor.getAllocator());
-
-				positions.resize(bone_count * frame_count);
-				rotations.resize(bone_count * frame_count);
-
-				for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
-				{
-					const aiNodeAnim* channel = animation->mChannels[channel_idx];
-					auto global_transform = getGlobalTransform(getNode(channel->mNodeName, scene->mRootNode)->mParent);
-					aiVector3t<float> scale;
-					aiVector3t<float> dummy_pos;
-					aiQuaterniont<float> dummy_rot;
-					global_transform.Decompose(scale, dummy_rot, dummy_pos);
-					for (int frame = 0; frame < frame_count; ++frame)
-					{
-						auto pos = getPosition(channel, frame, header.fps) * m_dialog.m_model.mesh_scale;
-						pos.x *= scale.x;
-						pos.y *= scale.y;
-						pos.z *= scale.z;
-						positions[frame * bone_count + channel_idx] = pos;
-						rotations[frame * bone_count + channel_idx] = getRotation(channel, frame, header.fps);
-					}
-				}
-
-				file.write((const char*)&positions[0], sizeof(positions[0]) * positions.size());
-				file.write((const char*)&rotations[0], sizeof(rotations[0]) * rotations.size());
-				for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
-				{
-					const aiNodeAnim* channel = animation->mChannels[channel_idx];
-					uint32_t hash = Lumix::crc32(channel->mNodeName.C_Str());
-					file.write((const char*)&hash, sizeof(hash));
-				}
-
-
-				file.close();
+				g_log_error.log("Editor") << "Could not create file " << ani_path;
+				failed = true;
+				continue;
 			}
+
+			Animation::Header header;
+			header.fps = uint32(animation->mTicksPerSecond == 0
+											? 25
+											: (animation->mTicksPerSecond == 1 ? 30 : animation->mTicksPerSecond));
+			header.magic = Animation::HEADER_MAGIC;
+			header.version = 1;
+
+			file.write(&header, sizeof(header));
+			float anim_length = getLength(animation);
+			int frame_count = Math::maximum(int(anim_length * header.fps), 1);
+			file.write(&frame_count, sizeof(frame_count));
+			int bone_count = (int)animation->mNumChannels;
+			file.write(&bone_count, sizeof(bone_count));
+
+			Array<Vec3> positions(m_dialog.m_editor.getAllocator());
+			Array<Quat> rotations(m_dialog.m_editor.getAllocator());
+
+			positions.resize(bone_count * frame_count);
+			rotations.resize(bone_count * frame_count);
+
+			for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
+			{
+				const aiNodeAnim* channel = animation->mChannels[channel_idx];
+				auto global_transform = getGlobalTransform(getNode(channel->mNodeName, scene->mRootNode)->mParent);
+				aiVector3t<float> scale;
+				aiVector3t<float> dummy_pos;
+				aiQuaterniont<float> dummy_rot;
+				global_transform.Decompose(scale, dummy_rot, dummy_pos);
+				for (int frame = 0; frame < frame_count; ++frame)
+				{
+					auto pos = getPosition(channel, frame, header.fps) * m_dialog.m_model.mesh_scale;
+					pos.x *= scale.x;
+					pos.y *= scale.y;
+					pos.z *= scale.z;
+					positions[frame * bone_count + channel_idx] = pos;
+					rotations[frame * bone_count + channel_idx] = getRotation(channel, frame, header.fps);
+				}
+			}
+
+			file.write((const char*)&positions[0], sizeof(positions[0]) * positions.size());
+			file.write((const char*)&rotations[0], sizeof(rotations[0]) * rotations.size());
+			for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
+			{
+				const aiNodeAnim* channel = animation->mChannels[channel_idx];
+				uint32_t hash = crc32(channel->mNodeName.C_Str());
+				file.write((const char*)&hash, sizeof(hash));
+			}
+
+			file.close();
 		}
 
 		return !failed;
@@ -957,8 +988,8 @@ struct ConvertTask : public Lumix::MT::Task
 		m_dialog.m_saved_textures.clear();
 
 		int undefined_count = 0;
-		char source_mesh_dir[Lumix::MAX_PATH_LENGTH];
-		Lumix::PathUtils::getDir(source_mesh_dir, sizeof(source_mesh_dir), m_dialog.m_source);
+		char source_mesh_dir[MAX_PATH_LENGTH];
+		PathUtils::getDir(source_mesh_dir, sizeof(source_mesh_dir), m_dialog.m_source);
 
 		for (auto& material : m_dialog.m_materials)
 		{
@@ -968,12 +999,12 @@ struct ConvertTask : public Lumix::MT::Task
 
 		if (m_dialog.m_model.create_billboard_lod)
 		{
-			Lumix::FS::OsFile file;
-			PathBuilder output_material_name(m_dialog.m_output_dir, "/", m_dialog.m_output_filename, "_billboard.mat");
-			if (!file.open(output_material_name, Lumix::FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
+			FS::OsFile file;
+			PathBuilder output_material_name(m_dialog.m_output_dir, "/", m_dialog.m_mesh_output_filename, "_billboard.mat");
+			if (!file.open(output_material_name, FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
 			{
 				m_dialog.setMessage(
-					Lumix::StaticString<20 + Lumix::MAX_PATH_LENGTH>("Could not create ", output_material_name));
+					StaticString<20 + MAX_PATH_LENGTH>("Could not create ", output_material_name));
 				return false;
 			}
 			file << "{\n\t\"shader\" : \"shaders/billboard.shd\"\n";
@@ -982,19 +1013,19 @@ struct ConvertTask : public Lumix::MT::Task
 
 			if (m_dialog.m_texture_output_dir[0])
 			{
-				char from_root_path[Lumix::MAX_PATH_LENGTH];
+				char from_root_path[MAX_PATH_LENGTH];
 				getRelativePath(
-					m_dialog.m_editor, from_root_path, Lumix::lengthOf(from_root_path), m_dialog.m_texture_output_dir);
-				PathBuilder relative_texture_path(from_root_path, m_dialog.m_output_filename, "_billboard.dds");
-				PathBuilder texture_path(m_dialog.m_texture_output_dir, m_dialog.m_output_filename, "_billboard.dds");
-				Lumix::copyFile("models/utils/cube/default.dds", texture_path);
+					m_dialog.m_editor, from_root_path, lengthOf(from_root_path), m_dialog.m_texture_output_dir);
+				PathBuilder relative_texture_path(from_root_path, m_dialog.m_mesh_output_filename, "_billboard.dds");
+				PathBuilder texture_path(m_dialog.m_texture_output_dir, m_dialog.m_mesh_output_filename, "_billboard.dds");
+				copyFile("models/utils/cube/default.dds", texture_path);
 				file << "/" << relative_texture_path;
 			}
 			else
 			{
 				file << "billboard.dds";
-				PathBuilder texture_path(m_dialog.m_output_dir, "/", m_dialog.m_output_filename, "_billboard.dds");
-				Lumix::copyFile("models/utils/cube/default.dds", texture_path);
+				PathBuilder texture_path(m_dialog.m_output_dir, "/", m_dialog.m_mesh_output_filename, "_billboard.dds");
+				copyFile("models/utils/cube/default.dds", texture_path);
 			}
 
 			file << "\"}\n}";
@@ -1014,12 +1045,12 @@ struct ConvertTask : public Lumix::MT::Task
 		output_material_name << "/" << material_name.C_Str() << ".mat";
 
 		m_dialog.setImportMessage(
-			Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 30>("Converting ") << output_material_name, -1);
-		Lumix::FS::OsFile file;
-		if (!file.open(output_material_name, Lumix::FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
+			StaticString<MAX_PATH_LENGTH + 30>("Converting ") << output_material_name, -1);
+		FS::OsFile file;
+		if (!file.open(output_material_name, FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
 		{
 			m_dialog.setMessage(
-				Lumix::StaticString<20 + Lumix::MAX_PATH_LENGTH>("Could not create ", output_material_name));
+				StaticString<20 + MAX_PATH_LENGTH>("Could not create ", output_material_name));
 			return false;
 		}
 
@@ -1100,7 +1131,7 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void fillSkinInfo(const ImportMesh& mesh, Lumix::Array<SkinInfo>& infos) const
+	void fillSkinInfo(const ImportMesh& mesh, Array<SkinInfo>& infos) const
 	{
 		if (mesh.mesh->mNumBones == 0) return;
 
@@ -1139,17 +1170,17 @@ struct ConvertTask : public Lumix::MT::Task
 		}
 		if (invalid_vertices)
 		{
-			Lumix::g_log_error.log("Editor") << "Mesh contains " << invalid_vertices
+			g_log_error.log("Editor") << "Mesh contains " << invalid_vertices
 											 << " vertices not influenced by any bones.";
 		}
 	}
 
 
-	static Lumix::uint32 packuint32(Lumix::uint8 _x, Lumix::uint8 _y, Lumix::uint8 _z, Lumix::uint8 _w)
+	static uint32 packuint32(uint8 _x, uint8 _y, uint8 _z, uint8 _w)
 	{
 		union {
-			Lumix::uint32 ui32;
-			Lumix::uint8 arr[4];
+			uint32 ui32;
+			uint8 arr[4];
 		} un;
 
 		un.arr[0] = _x;
@@ -1161,17 +1192,17 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	static Lumix::uint32 packF4u(const Lumix::Vec3& vec)
+	static uint32 packF4u(const Vec3& vec)
 	{
-		const Lumix::uint8 xx = Lumix::uint8(vec.x * 127.0f + 128.0f);
-		const Lumix::uint8 yy = Lumix::uint8(vec.y * 127.0f + 128.0f);
-		const Lumix::uint8 zz = Lumix::uint8(vec.z * 127.0f + 128.0f);
-		const Lumix::uint8 ww = Lumix::uint8(0);
+		const uint8 xx = uint8(vec.x * 127.0f + 128.0f);
+		const uint8 yy = uint8(vec.y * 127.0f + 128.0f);
+		const uint8 zz = uint8(vec.z * 127.0f + 128.0f);
+		const uint8 ww = uint8(0);
 		return packuint32(xx, yy, zz, ww);
 	}
 
 
-	void sortParentFirst(aiNode* node, Lumix::Array<aiNode*>& out)
+	void sortParentFirst(aiNode* node, Array<aiNode*>& out)
 	{
 		if (!node) return;
 		if (out.indexOf(node) >= 0) return;
@@ -1183,7 +1214,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 	void gatherNodes()
 	{
-		Lumix::Array<aiNode*> tmp(m_dialog.m_editor.getAllocator());
+		Array<aiNode*> tmp(m_dialog.m_editor.getAllocator());
 		m_nodes.clear();
 		for (auto& mesh : m_dialog.m_meshes)
 		{
@@ -1208,21 +1239,21 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	Lumix::Vec3 fixOrientation(const aiVector3D& v) const
+	Vec3 fixOrientation(const aiVector3D& v) const
 	{
 		switch (m_dialog.m_model.orientation)
 		{
-			case ImportAssetDialog::Y_UP: return Lumix::Vec3(v.x, v.y, v.z);
-			case ImportAssetDialog::Z_UP: return Lumix::Vec3(v.x, v.z, -v.y);
-			case ImportAssetDialog::Z_MINUS_UP: return Lumix::Vec3(v.x, -v.z, v.y);
-			case ImportAssetDialog::X_MINUS_UP: return Lumix::Vec3(v.y, -v.x, v.z);
+			case ImportAssetDialog::Y_UP: return Vec3(v.x, v.y, v.z);
+			case ImportAssetDialog::Z_UP: return Vec3(v.x, v.z, -v.y);
+			case ImportAssetDialog::Z_MINUS_UP: return Vec3(v.x, -v.z, v.y);
+			case ImportAssetDialog::X_MINUS_UP: return Vec3(v.y, -v.x, v.z);
 		}
 		ASSERT(false);
-		return Lumix::Vec3(v.x, v.y, v.z);
+		return Vec3(v.x, v.y, v.z);
 	}
 
 
-	void writeIndices(Lumix::FS::OsFile& file) const
+	void writeIndices(FS::OsFile& file) const
 	{
 		if (areIndices16Bit())
 		{
@@ -1232,7 +1263,7 @@ struct ConvertTask : public Lumix::MT::Task
 				{
 					for (int i = 0; i < mesh.indices.size(); ++i)
 					{
-						Lumix::uint16 index = mesh.indices[i];
+						uint16 index = mesh.indices[i];
 						file.write(&index, sizeof(index));
 					}
 				}
@@ -1240,7 +1271,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 			if (m_dialog.m_model.create_billboard_lod)
 			{
-				Lumix::uint16 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 };
+				uint16 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 };
 				file.write(indices, sizeof(indices));
 			}
 		}
@@ -1253,18 +1284,18 @@ struct ConvertTask : public Lumix::MT::Task
 
 			if (m_dialog.m_model.create_billboard_lod)
 			{
-				Lumix::uint32 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 };
+				uint32 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 };
 				file.write(indices, sizeof(indices));
 			}
 		}
 	}
 
 
-	void writeVertices(Lumix::FS::OsFile& file) const
+	void writeVertices(FS::OsFile& file) const
 	{
 
-		Lumix::Vec3 min(0, 0, 0);
-		Lumix::Vec3 max(0, 0, 0);
+		Vec3 min(0, 0, 0);
+		Vec3 max(0, 0, 0);
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (!mesh.import) continue;
@@ -1273,7 +1304,7 @@ struct ConvertTask : public Lumix::MT::Task
 			normal_matrix.a4 = normal_matrix.b4 = normal_matrix.c4 = 0;
 			bool is_skinned = isSkinned(mesh.mesh);
 
-			Lumix::Array<SkinInfo> skin_infos(m_dialog.m_editor.getAllocator());
+			Array<SkinInfo> skin_infos(m_dialog.m_editor.getAllocator());
 			fillSkinInfo(mesh, skin_infos);
 
 			int skin_index = 0;
@@ -1288,41 +1319,41 @@ struct ConvertTask : public Lumix::MT::Task
 
 				auto v = mesh_matrix * mesh.mesh->mVertices[j];
 
-				Lumix::Vec3 position = fixOrientation(v);
+				Vec3 position = fixOrientation(v);
 				position *= m_scale;
 
-				min.x = Lumix::Math::minimum(min.x, position.x);
-				min.y = Lumix::Math::minimum(min.y, position.y);
-				min.z = Lumix::Math::minimum(min.z, position.z);
-				max.x = Lumix::Math::maximum(max.x, position.x);
-				max.y = Lumix::Math::maximum(max.y, position.y);
-				max.z = Lumix::Math::maximum(max.z, position.z);
+				min.x = Math::minimum(min.x, position.x);
+				min.y = Math::minimum(min.y, position.y);
+				min.z = Math::minimum(min.z, position.z);
+				max.x = Math::maximum(max.x, position.x);
+				max.y = Math::maximum(max.y, position.y);
+				max.z = Math::maximum(max.z, position.z);
 
 				file.write((const char*)&position, sizeof(position));
 
 				if (mesh.mesh->mColors[0])
 				{
 					auto assimp_color = mesh.mesh->mColors[0][j];
-					Lumix::uint8 color[4];
-					color[0] = Lumix::uint8(assimp_color.r * 255);
-					color[1] = Lumix::uint8(assimp_color.g * 255);
-					color[2] = Lumix::uint8(assimp_color.b * 255);
-					color[3] = Lumix::uint8(assimp_color.a * 255);
+					uint8 color[4];
+					color[0] = uint8(assimp_color.r * 255);
+					color[1] = uint8(assimp_color.g * 255);
+					color[2] = uint8(assimp_color.b * 255);
+					color[3] = uint8(assimp_color.a * 255);
 					file.write(color, sizeof(color));
 				}
 
 				auto tmp_normal = normal_matrix * mesh.mesh->mNormals[j];
 				tmp_normal.Normalize();
-				Lumix::Vec3 normal = fixOrientation(tmp_normal);
-				Lumix::uint32 int_normal = packF4u(normal);
+				Vec3 normal = fixOrientation(tmp_normal);
+				uint32 int_normal = packF4u(normal);
 				file.write((const char*)&int_normal, sizeof(int_normal));
 
 				if (mesh.mesh->mTangents)
 				{
 					auto tmp_tangent = normal_matrix * mesh.mesh->mTangents[j];
 					tmp_tangent.Normalize();
-					Lumix::Vec3 tangent = fixOrientation(tmp_tangent);
-					Lumix::uint32 int_tangent = packF4u(tangent);
+					Vec3 tangent = fixOrientation(tmp_tangent);
+					uint32 int_tangent = packF4u(tangent);
 					file.write((const char*)&int_tangent, sizeof(int_tangent));
 				}
 
@@ -1337,7 +1368,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 		if (m_dialog.m_model.create_billboard_lod)
 		{
-			Lumix::Vec3 size = max - min;
+			Vec3 size = max - min;
 			float u[] = { 0.0f, 0.5f, 1.0f };
 			float v[] = { 0.0f, 1.0f };
 			if (size.x + size.z < size.y)
@@ -1374,10 +1405,10 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void writeGeometry(Lumix::FS::OsFile& file) const
+	void writeGeometry(FS::OsFile& file) const
 	{
-		Lumix::int32 indices_count = 0;
-		Lumix::int32 vertices_size = 0;
+		int32 indices_count = 0;
+		int32 vertices_size = 0;
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (!mesh.import) continue;
@@ -1413,11 +1444,11 @@ struct ConvertTask : public Lumix::MT::Task
 	static int getVertexSize(const aiMesh* mesh)
 	{
 		static const int POSITION_SIZE = sizeof(float) * 3;
-		static const int NORMAL_SIZE = sizeof(Lumix::uint8) * 4;
-		static const int TANGENT_SIZE = sizeof(Lumix::uint8) * 4;
+		static const int NORMAL_SIZE = sizeof(uint8) * 4;
+		static const int TANGENT_SIZE = sizeof(uint8) * 4;
 		static const int UV_SIZE = sizeof(float) * 2;
-		static const int COLOR_SIZE = sizeof(Lumix::uint8) * 4;
-		static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(Lumix::uint16) * 4;
+		static const int COLOR_SIZE = sizeof(uint8) * 4;
+		static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(uint16) * 4;
 		int size = POSITION_SIZE + NORMAL_SIZE;
 		if (mesh->HasTextureCoords(0)) size += UV_SIZE;
 		if (mesh->mTangents) size += TANGENT_SIZE;
@@ -1427,37 +1458,37 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void writeBillboardMesh(Lumix::FS::OsFile& file, Lumix::int32 attribute_array_offset, Lumix::int32 indices_offset)
+	void writeBillboardMesh(FS::OsFile& file, int32 attribute_array_offset, int32 indices_offset)
 	{
 		if (!m_dialog.m_model.create_billboard_lod) return;
 
 		int vertex_size = sizeof(BillboardVertex);
-		Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 10> material_name(m_dialog.m_output_filename, "_billboard");
-		Lumix::int32 length = Lumix::stringLength(material_name);
+		StaticString<MAX_PATH_LENGTH + 10> material_name(m_dialog.m_mesh_output_filename, "_billboard");
+		int32 length = stringLength(material_name);
 		file.write((const char*)&length, sizeof(length));
 		file.write(material_name, length);
 
 		file.write((const char*)&attribute_array_offset, sizeof(attribute_array_offset));
-		Lumix::int32 attribute_array_size = 8 * vertex_size;
+		int32 attribute_array_size = 8 * vertex_size;
 		attribute_array_offset += attribute_array_size;
 		file.write((const char*)&attribute_array_size, sizeof(attribute_array_size));
 
 		file.write((const char*)&indices_offset, sizeof(indices_offset));
-		Lumix::int32 mesh_tri_count = 4;
+		int32 mesh_tri_count = 4;
 		indices_offset += mesh_tri_count * 3;
 		file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
 		const char* mesh_name = "billboard";
-		length = Lumix::stringLength(mesh_name);
+		length = stringLength(mesh_name);
 
 		file.write((const char*)&length, sizeof(length));
 		file.write(mesh_name, length);
 	}
 
 
-	void writeMeshes(Lumix::FS::OsFile& file)
+	void writeMeshes(FS::OsFile& file)
 	{
-		Lumix::int32 mesh_count = 0;
+		int32 mesh_count = 0;
 		for (int i = 0; i < m_dialog.m_meshes.size(); ++i)
 		{
 			if (m_dialog.m_meshes[i].import) ++mesh_count;
@@ -1465,8 +1496,8 @@ struct ConvertTask : public Lumix::MT::Task
 		if (m_dialog.m_model.create_billboard_lod) ++mesh_count;
 
 		file.write((const char*)&mesh_count, sizeof(mesh_count));
-		Lumix::int32 attribute_array_offset = 0;
-		Lumix::int32 indices_offset = 0;
+		int32 attribute_array_offset = 0;
+		int32 indices_offset = 0;
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (!mesh.import) continue;
@@ -1474,22 +1505,22 @@ struct ConvertTask : public Lumix::MT::Task
 			int vertex_size = getVertexSize(mesh.mesh);
 			aiString material_name;
 			mesh.scene->mMaterials[mesh.mesh->mMaterialIndex]->Get(AI_MATKEY_NAME, material_name);
-			Lumix::int32 length = Lumix::stringLength(material_name.C_Str());
+			int32 length = stringLength(material_name.C_Str());
 			file.write((const char*)&length, sizeof(length));
 			file.write((const char*)material_name.C_Str(), length);
 
 			file.write((const char*)&attribute_array_offset, sizeof(attribute_array_offset));
-			Lumix::int32 attribute_array_size = mesh.map_to_input.size() * vertex_size;
+			int32 attribute_array_size = mesh.map_to_input.size() * vertex_size;
 			attribute_array_offset += attribute_array_size;
 			file.write((const char*)&attribute_array_size, sizeof(attribute_array_size));
 
 			file.write((const char*)&indices_offset, sizeof(indices_offset));
-			Lumix::int32 mesh_tri_count = mesh.indices.size() / 3;
+			int32 mesh_tri_count = mesh.indices.size() / 3;
 			indices_offset += mesh.indices.size();
 			file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
 			aiString mesh_name = getMeshName(mesh.scene, mesh.mesh);
-			length = Lumix::stringLength(mesh_name.C_Str());
+			length = stringLength(mesh_name.C_Str());
 
 			file.write((const char*)&length, sizeof(length));
 			file.write((const char*)mesh_name.C_Str(), length);
@@ -1499,24 +1530,24 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	static void writeAttribute(bgfx::Attrib::Enum attrib, Lumix::FS::OsFile& file)
+	static void writeAttribute(bgfx::Attrib::Enum attrib, FS::OsFile& file)
 	{
-		Lumix::int32 tmp = attrib;
+		int32 tmp = attrib;
 		file.write(&tmp, sizeof(tmp));
 	}
 
 
-	void writeLods(Lumix::FS::OsFile& file) const
+	void writeLods(FS::OsFile& file) const
 	{
-		Lumix::int32 lod_count = 1;
-		Lumix::int32 last_mesh_idx = -1;
-		Lumix::int32 lods[8] = {};
+		int32 lod_count = 1;
+		int32 last_mesh_idx = -1;
+		int32 lods[8] = {};
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (!mesh.import) continue;
 
 			++last_mesh_idx;
-			if (mesh.lod >= Lumix::lengthOf(m_dialog.m_model.lods)) continue;
+			if (mesh.lod >= lengthOf(m_dialog.m_model.lods)) continue;
 			lod_count = mesh.lod + 1;
 			lods[mesh.lod] = last_mesh_idx;
 		}
@@ -1531,7 +1562,7 @@ struct ConvertTask : public Lumix::MT::Task
 
 		for (int i = 0; i < lod_count; ++i)
 		{
-			Lumix::int32 to_mesh = lods[i];
+			int32 to_mesh = lods[i];
 			file.write((const char*)&to_mesh, sizeof(to_mesh));
 			float factor = m_dialog.m_model.lods[i] < 0 ? FLT_MAX : m_dialog.m_model.lods[i] * m_dialog.m_model.lods[i];
 			file.write((const char*)&factor, sizeof(factor));
@@ -1625,28 +1656,28 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void writeSkeleton(Lumix::FS::OsFile& file)
+	void writeSkeleton(FS::OsFile& file)
 	{
-		Lumix::int32 count = m_nodes.size();
+		int32 count = m_nodes.size();
 		if (count == 1) count = 0;
 		file.write((const char*)&count, sizeof(count));
 
 		for (auto* node : m_nodes)
 		{
 			auto* scene = getNodeScene(node);
-			Lumix::int32 len = Lumix::stringLength(node->mName.C_Str());
+			int32 len = stringLength(node->mName.C_Str());
 			file.write((const char*)&len, sizeof(len));
 			file.write(node->mName.C_Str(), node->mName.length);
 
 			if (node->mParent)
 			{
-				Lumix::int32 len = Lumix::stringLength(node->mParent->mName.C_Str());
+				int32 len = stringLength(node->mParent->mName.C_Str());
 				file.write((const char*)&len, sizeof(len));
 				file.write(node->mParent->mName.C_Str(), node->mParent->mName.length);
 			}
 			else
 			{
-				Lumix::int32 len = 0;
+				int32 len = 0;
 				file.write((const char*)&len, sizeof(len));
 			}
 
@@ -1676,12 +1707,12 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void writePhysicsHeader(Lumix::FS::OsFile& file) const
+	void writePhysicsHeader(FS::OsFile& file) const
 	{
-		Lumix::PhysicsGeometry::Header header;
-		header.m_magic = Lumix::PhysicsGeometry::HEADER_MAGIC;
-		header.m_version = (Lumix::uint32)Lumix::PhysicsGeometry::Versions::LAST;
-		header.m_convex = (Lumix::uint32)m_dialog.m_model.make_convex;
+		PhysicsGeometry::Header header;
+		header.m_magic = PhysicsGeometry::HEADER_MAGIC;
+		header.m_version = (uint32)PhysicsGeometry::Versions::LAST;
+		header.m_convex = (uint32)m_dialog.m_model.make_convex;
 		file.write((const char*)&header, sizeof(header));
 	}
 
@@ -1701,23 +1732,23 @@ struct ConvertTask : public Lumix::MT::Task
 		if (!any) return true;
 
 		m_dialog.setImportMessage("Importing physics...", -1);
-		char filename[Lumix::MAX_PATH_LENGTH];
-		Lumix::PathUtils::getBasename(filename, sizeof(filename), m_dialog.m_source);
-		Lumix::catString(filename, ".phy");
+		char filename[MAX_PATH_LENGTH];
+		PathUtils::getBasename(filename, sizeof(filename), m_dialog.m_source);
+		catString(filename, ".phy");
 		PathBuilder phy_path(m_dialog.m_output_dir);
 		phy_path << "/" << filename;
-		Lumix::FS::OsFile file;
-		if (!file.open(phy_path, Lumix::FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
+		FS::OsFile file;
+		if (!file.open(phy_path, FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
 		{
-			Lumix::g_log_error.log("Editor") << "Could not create file " << phy_path;
+			g_log_error.log("Editor") << "Could not create file " << phy_path;
 			return false;
 		}
 
 		writePhysicsHeader(file);
-		Lumix::int32 count = 0;
+		int32 count = 0;
 		for (auto& mesh : m_dialog.m_meshes)
 		{
-			if (mesh.import_physics) count += (Lumix::int32)mesh.mesh->mNumVertices;
+			if (mesh.import_physics) count += (int32)mesh.mesh->mNumVertices;
 		}
 		file.write((const char*)&count, sizeof(count));
 		for (auto& mesh : m_dialog.m_meshes)
@@ -1736,7 +1767,7 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void writePhysiscTriMesh(Lumix::FS::OsFile& file)
+	void writePhysiscTriMesh(FS::OsFile& file)
 	{
 		int count = 0;
 		for (auto& mesh : m_dialog.m_meshes)
@@ -1751,7 +1782,7 @@ struct ConvertTask : public Lumix::MT::Task
 			for (unsigned int j = 0; j < mesh.mesh->mNumFaces; ++j)
 			{
 				ASSERT(mesh.mesh->mFaces[j].mNumIndices == 3);
-				Lumix::uint32 index = mesh.mesh->mFaces[j].mIndices[0] + offset;
+				uint32 index = mesh.mesh->mFaces[j].mIndices[0] + offset;
 				file.write((const char*)&index, sizeof(index));
 				index = mesh.mesh->mFaces[j].mIndices[1] + offset;
 				file.write((const char*)&index, sizeof(index));
@@ -1775,12 +1806,12 @@ struct ConvertTask : public Lumix::MT::Task
 			if (!mesh.mesh->HasNormals())
 			{
 				m_dialog.setMessage(
-					Lumix::StaticString<256>("Mesh ", getMeshName(mesh.scene, mesh.mesh).C_Str(), " has no normals."));
+					StaticString<256>("Mesh ", getMeshName(mesh.scene, mesh.mesh).C_Str(), " has no normals."));
 				return false;
 			}
 			if (!mesh.mesh->HasPositions())
 			{
-				m_dialog.setMessage(Lumix::StaticString<256>(
+				m_dialog.setMessage(StaticString<256>(
 					"Mesh ", getMeshName(mesh.scene, mesh.mesh).C_Str(), " has no positions."));
 				return false;
 			}
@@ -1807,13 +1838,13 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 
-	void writeModelHeader(Lumix::FS::OsFile& file) const
+	void writeModelHeader(FS::OsFile& file) const
 	{
-		Lumix::Model::FileHeader header;
-		header.magic = Lumix::Model::FILE_MAGIC;
-		header.version = (Lumix::uint32)Lumix::Model::FileVersion::LATEST;
+		Model::FileHeader header;
+		header.magic = Model::FILE_MAGIC;
+		header.version = (uint32)Model::FileVersion::LATEST;
 		file.write((const char*)&header, sizeof(header));
-		Lumix::uint32 flags = areIndices16Bit() ? (Lumix::uint32)Lumix::Model::Flags::INDICES_16BIT : 0;
+		uint32 flags = areIndices16Bit() ? (uint32)Model::Flags::INDICES_16BIT : 0;
 		file.write((const char*)&flags, sizeof(flags));
 
 		const aiMesh* mesh = nullptr;
@@ -1826,7 +1857,7 @@ struct ConvertTask : public Lumix::MT::Task
 			}
 		}
 		ASSERT(mesh);
-		Lumix::int32 attribute_count = getAttributeCount(mesh);
+		int32 attribute_count = getAttributeCount(mesh);
 		file.write((const char*)&attribute_count, sizeof(attribute_count));
 
 		if (isSkinned(mesh))
@@ -1846,7 +1877,7 @@ struct ConvertTask : public Lumix::MT::Task
 	bool saveLumixModel()
 	{
 		ASSERT(m_dialog.m_output_dir[0] != '\0');
-		ASSERT(m_dialog.m_output_filename[0] != '\0');
+		ASSERT(m_dialog.m_mesh_output_filename[0] != '\0');
 		bool import_any = false;
 		for (auto& mesh : m_dialog.m_meshes)
 		{
@@ -1864,21 +1895,21 @@ struct ConvertTask : public Lumix::MT::Task
 		if (m_dialog.m_texture_output_dir[0]) PlatformInterface::makePath(m_dialog.m_texture_output_dir);
 
 		PathBuilder path(m_dialog.m_output_dir);
-		path << "/" << m_dialog.m_output_filename << ".msh";
+		path << "/" << m_dialog.m_mesh_output_filename << ".msh";
 
-		Lumix::IAllocator& allocator = m_dialog.m_editor.getAllocator();
-		Lumix::FS::OsFile file;
+		IAllocator& allocator = m_dialog.m_editor.getAllocator();
+		FS::OsFile file;
 
-		if (!file.open(path, Lumix::FS::Mode::CREATE_AND_WRITE, allocator))
+		if (!file.open(path, FS::Mode::CREATE_AND_WRITE, allocator))
 		{
-			m_dialog.setMessage(Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 15>("Failed to open ", path));
+			m_dialog.setMessage(StaticString<MAX_PATH_LENGTH + 15>("Failed to open ", path));
 			return false;
 		}
 
 		gatherNodes();
 
-		Lumix::uint32 preprocess_flags = 0;
-		if (m_dialog.m_model.remove_doubles) preprocess_flags |= (Lumix::uint32)Preprocesses::REMOVE_DOUBLES;
+		uint32 preprocess_flags = 0;
+		if (m_dialog.m_model.remove_doubles) preprocess_flags |= (uint32)Preprocesses::REMOVE_DOUBLES;
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (mesh.import) preprocessMesh(mesh, preprocess_flags, allocator);
@@ -1895,7 +1926,7 @@ struct ConvertTask : public Lumix::MT::Task
 	}
 
 	ImportAssetDialog& m_dialog;
-	Lumix::Array<aiNode*> m_nodes;
+	Array<aiNode*> m_nodes;
 	float m_scale;
 
 }; // struct ConvertTask
@@ -1917,6 +1948,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	, m_materials(app.getWorldEditor()->getAllocator())
 	, m_importers(app.getWorldEditor()->getAllocator())
 	, m_sources(app.getWorldEditor()->getAllocator())
+	, m_animations(app.getWorldEditor()->getAllocator())
 {
 	m_model.make_convex = false;
 	m_model.mesh_scale = 1;
@@ -1933,16 +1965,16 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	m_task = nullptr;
 	m_source[0] = '\0';
 	m_output_dir[0] = '\0';
-	m_output_filename[0] = '\0';
+	m_mesh_output_filename[0] = '\0';
 	m_texture_output_dir[0] = '\0';
-	Lumix::copyString(m_last_dir, m_editor.getEngine().getDiskFileDevice()->getBasePath());
+	copyString(m_last_dir, m_editor.getEngine().getDiskFileDevice()->getBasePath());
 
 	m_action = LUMIX_NEW(m_editor.getAllocator(), Action)("Import Asset", "import_asset");
 	m_action->func.bind<ImportAssetDialog, &ImportAssetDialog::onAction>(this);
 	m_action->is_selected.bind<ImportAssetDialog, &ImportAssetDialog::isOpened>(this);
 
-	Lumix::LuaWrapper::createSystemFunction(m_editor.getEngine().getState(), "Editor", "importAsset", &::importAsset);
-	Lumix::LuaWrapper::createSystemVariable(m_editor.getEngine().getState(), "Editor", "import_asset_dialog", this);
+	LuaWrapper::createSystemFunction(m_editor.getEngine().getState(), "Editor", "importAsset", &::importAsset);
+	LuaWrapper::createSystemVariable(m_editor.getEngine().getState(), "Editor", "import_asset_dialog", this);
 }
 
 
@@ -1954,7 +1986,7 @@ bool ImportAssetDialog::isOpened() const
 
 ImportAssetDialog::~ImportAssetDialog()
 {
-	Lumix::LuaWrapper::createSystemVariable(m_editor.getEngine().getState(), "Editor", "import_asset_dialog", nullptr);
+	LuaWrapper::createSystemVariable(m_editor.getEngine().getState(), "Editor", "import_asset_dialog", nullptr);
 	if (m_task)
 	{
 		m_task->destroy();
@@ -1966,13 +1998,13 @@ ImportAssetDialog::~ImportAssetDialog()
 static bool isImage(const char* path)
 {
 	char ext[10];
-	Lumix::PathUtils::getExtension(ext, sizeof(ext), path);
+	PathUtils::getExtension(ext, sizeof(ext), path);
 
 	static const char* image_extensions[] = {
 		"dds", "jpg", "jpeg", "png", "tga", "bmp", "psd", "gif", "hdr", "pic", "pnm"};
 	for (auto image_ext : image_extensions)
 	{
-		if (Lumix::equalStrings(ext, image_ext))
+		if (equalStrings(ext, image_ext))
 		{
 			return true;
 		}
@@ -1984,18 +2016,17 @@ static bool isImage(const char* path)
 bool ImportAssetDialog::checkSource()
 {
 	if (!PlatformInterface::fileExists(m_source)) return false;
-	if (m_output_dir[0] == '\0') Lumix::PathUtils::getDir(m_output_dir, sizeof(m_output_dir), m_source);
-	if (m_output_filename[0] == '\0') Lumix::PathUtils::getBasename(m_output_filename, sizeof(m_output_filename), m_source);
+	if (m_output_dir[0] == '\0') PathUtils::getDir(m_output_dir, sizeof(m_output_dir), m_source);
+	if (m_mesh_output_filename[0] == '\0') PathUtils::getBasename(m_mesh_output_filename, sizeof(m_mesh_output_filename), m_source);
 
 	if (isImage(m_source))
 	{
+		m_animations.clear();
 		m_materials.clear();
 		m_meshes.clear();
 		m_importers.clear();
 		return true;
 	}
-
-	m_import_animations = false;
 
 	ASSERT(!m_task);
 	m_importers.emplace();
@@ -2010,41 +2041,41 @@ bool ImportAssetDialog::checkSource()
 
 void ImportAssetDialog::setMessage(const char* message)
 {
-	Lumix::MT::SpinLock lock(m_mutex);
-	Lumix::copyString(m_message, message);
+	MT::SpinLock lock(m_mutex);
+	copyString(m_message, message);
 }
 
 
 void ImportAssetDialog::setImportMessage(const char* message, float progress_fraction)
 {
-	Lumix::MT::SpinLock lock(m_mutex);
-	Lumix::copyString(m_import_message, message);
+	MT::SpinLock lock(m_mutex);
+	copyString(m_import_message, message);
 	m_progress_fraction = progress_fraction;
 }
 
 
 void ImportAssetDialog::getMessage(char* msg, int max_size)
 {
-	Lumix::MT::SpinLock lock(m_mutex);
-	Lumix::copyString(msg, max_size, m_message);
+	MT::SpinLock lock(m_mutex);
+	copyString(msg, max_size, m_message);
 }
 
 
 bool ImportAssetDialog::hasMessage()
 {
-	Lumix::MT::SpinLock lock(m_mutex);
+	MT::SpinLock lock(m_mutex);
 	return m_message[0] != '\0';
 }
 
 
 void ImportAssetDialog::saveModelMetadata()
 {
-	PathBuilder model_path(m_output_dir, "/", m_output_filename, ".msh");
-	char tmp[Lumix::MAX_PATH_LENGTH];
-	Lumix::PathUtils::normalize(model_path, tmp, Lumix::lengthOf(tmp));
-	Lumix::uint32 model_path_hash = Lumix::crc32(tmp);
+	PathBuilder model_path(m_output_dir, "/", m_mesh_output_filename, ".msh");
+	char tmp[MAX_PATH_LENGTH];
+	PathUtils::normalize(model_path, tmp, lengthOf(tmp));
+	uint32 model_path_hash = crc32(tmp);
 
-	Lumix::OutputBlob blob(m_editor.getAllocator());
+	OutputBlob blob(m_editor.getAllocator());
 	blob.reserve(1024);
 	blob.write(&m_model, sizeof(m_model));
 	blob.write(m_meshes.size());
@@ -2073,7 +2104,7 @@ void ImportAssetDialog::saveModelMetadata()
 	int sources_count = m_sources.size();
 	blob.write(sources_count);
 	blob.write(&m_sources[0], sizeof(m_sources) * m_sources.size());
-	m_metadata.setRawMemory(model_path_hash, Lumix::crc32("import_settings"), blob.getData(), blob.getPos());
+	m_metadata.setRawMemory(model_path_hash, crc32("import_settings"), blob.getData(), blob.getPos());
 }
 
 
@@ -2107,16 +2138,16 @@ void ImportAssetDialog::importTexture()
 	ASSERT(!m_task);
 	setImportMessage("Importing texture...", 0);
 
-	char dest_path[Lumix::MAX_PATH_LENGTH];
+	char dest_path[MAX_PATH_LENGTH];
 	ImportTextureTask::getDestinationPath(
-		m_output_dir, m_source, m_convert_to_dds, m_convert_to_raw, dest_path, Lumix::lengthOf(dest_path));
+		m_output_dir, m_source, m_convert_to_dds, m_convert_to_raw, dest_path, lengthOf(dest_path));
 
-	char tmp[Lumix::MAX_PATH_LENGTH];
-	Lumix::PathUtils::normalize(dest_path, tmp, Lumix::lengthOf(tmp));
-	getRelativePath(m_editor, dest_path, Lumix::lengthOf(dest_path), tmp);
-	Lumix::uint32 hash = Lumix::crc32(dest_path);
+	char tmp[MAX_PATH_LENGTH];
+	PathUtils::normalize(dest_path, tmp, lengthOf(tmp));
+	getRelativePath(m_editor, dest_path, lengthOf(dest_path), tmp);
+	uint32 hash = crc32(dest_path);
 
-	m_metadata.setString(hash, Lumix::crc32("source"), m_source);
+	m_metadata.setString(hash, crc32("source"), m_source);
 
 	m_is_importing_texture = true;
 	m_task = LUMIX_NEW(m_editor.getAllocator(), ImportTextureTask)(*this);
@@ -2127,17 +2158,17 @@ void ImportAssetDialog::importTexture()
 bool ImportAssetDialog::isTextureDirValid() const
 {
 	if (!m_texture_output_dir[0]) return true;
-	char normalized_path[Lumix::MAX_PATH_LENGTH];
-	Lumix::PathUtils::normalize(m_texture_output_dir, normalized_path, Lumix::lengthOf(normalized_path));
+	char normalized_path[MAX_PATH_LENGTH];
+	PathUtils::normalize(m_texture_output_dir, normalized_path, lengthOf(normalized_path));
 
 	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
-	return Lumix::compareStringN(base_path, normalized_path, Lumix::stringLength(base_path)) == 0;
+	return compareStringN(base_path, normalized_path, stringLength(base_path)) == 0;
 }
 
 
 void ImportAssetDialog::onMaterialsGUI()
 {
-	Lumix::StaticString<30> label("Materials (");
+	StaticString<30> label("Materials (");
 	label << m_materials.size() << ")###Materials";
 	if (!ImGui::CollapsingHeader(label)) return;
 
@@ -2189,14 +2220,14 @@ void ImportAssetDialog::onMaterialsGUI()
 			{
 				ImGui::Text("%s", mat.textures[i].path);
 				ImGui::NextColumn();
-				ImGui::Checkbox(Lumix::StaticString<20>("###imp", i), &mat.textures[i].import);
+				ImGui::Checkbox(StaticString<20>("###imp", i), &mat.textures[i].import);
 				ImGui::NextColumn();
-				ImGui::Checkbox(Lumix::StaticString<20>("###dds", i), &mat.textures[i].to_dds);
+				ImGui::Checkbox(StaticString<20>("###dds", i), &mat.textures[i].to_dds);
 				ImGui::NextColumn();
-				if (ImGui::Button(Lumix::StaticString<50>("Browse###brw", i)))
+				if (ImGui::Button(StaticString<50>("Browse###brw", i)))
 				{
 					if (PlatformInterface::getOpenFilename(
-							mat.textures[i].src, Lumix::lengthOf(mat.textures[i].src), "All\0*.*\0", nullptr))
+							mat.textures[i].src, lengthOf(mat.textures[i].src), "All\0*.*\0", nullptr))
 					{
 						mat.textures[i].is_valid = true;
 					}
@@ -2217,27 +2248,62 @@ void ImportAssetDialog::onMaterialsGUI()
 void ImportAssetDialog::onLODsGUI()
 {
 	if (!ImGui::CollapsingHeader("LODs")) return;
-	for (int i = 0; i < Lumix::lengthOf(m_model.lods); ++i)
+	for (int i = 0; i < lengthOf(m_model.lods); ++i)
 	{
 		bool b = m_model.lods[i] < 0;
-		if (ImGui::Checkbox(Lumix::StaticString<20>("Infinite###lod_inf", i), &b))
+		if (ImGui::Checkbox(StaticString<20>("Infinite###lod_inf", i), &b))
 		{
 			m_model.lods[i] *= -1;
 		}
 		if (m_model.lods[i] >= 0)
 		{
 			ImGui::SameLine();
-			ImGui::DragFloat(Lumix::StaticString<10>("LOD ", i), &m_model.lods[i], 1.0f, 1.0f, FLT_MAX);
+			ImGui::DragFloat(StaticString<10>("LOD ", i), &m_model.lods[i], 1.0f, 1.0f, FLT_MAX);
 		}
 	}
 }
 
 
+void ImportAssetDialog::onAnimationsGUI()
+{
+	StaticString<30> label("Animations (");
+	label << m_animations.size() << ")###Animations";
+	if (!ImGui::CollapsingHeader(label)) return;
+
+	ImGui::Indent();
+	ImGui::Columns(2);
+	
+	ImGui::Text("Name");
+	ImGui::NextColumn();
+	ImGui::Text("Import");
+	ImGui::NextColumn();
+	ImGui::Separator();
+
+	ImGui::PushID("anims");
+	for (int i = 0; i < m_animations.size(); ++i)
+	{
+		auto& animation = m_animations[i];
+		ImGui::PushID(i);
+		ImGui::InputText("", animation.output_filename, lengthOf(animation.output_filename));
+		ImGui::NextColumn();
+		ImGui::Checkbox("", &animation.import);
+		ImGui::NextColumn();
+		ImGui::PopID();
+	}
+
+	ImGui::PopID();
+	ImGui::Columns();
+	ImGui::Unindent();
+}
+
+
 void ImportAssetDialog::onMeshesGUI()
 {
-	Lumix::StaticString<30> label("Meshes (");
+	StaticString<30> label("Meshes (");
 	label << m_meshes.size() << ")###Meshes";
 	if (!ImGui::CollapsingHeader(label)) return;
+
+	ImGui::InputText("Output mesh filename", m_mesh_output_filename, sizeof(m_mesh_output_filename));
 
 	ImGui::Indent();
 	ImGui::Columns(5);
@@ -2267,13 +2333,13 @@ void ImportAssetDialog::onMeshesGUI()
 		ImGui::Text("%s", material_name.C_Str());
 		ImGui::NextColumn();
 
-		ImGui::Checkbox(Lumix::StaticString<30>("###mesh", (Lumix::uint64)&mesh), &mesh.import);
+		ImGui::Checkbox(StaticString<30>("###mesh", (uint64)&mesh), &mesh.import);
 		if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("ContextMesh");
 		ImGui::NextColumn();
-		ImGui::Checkbox(Lumix::StaticString<30>("###phy", (Lumix::uint64)&mesh), &mesh.import_physics);
+		ImGui::Checkbox(StaticString<30>("###phy", (uint64)&mesh), &mesh.import_physics);
 		if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("ContextPhy");
 		ImGui::NextColumn();
-		ImGui::Combo(Lumix::StaticString<30>("###lod", (Lumix::uint64)&mesh), &mesh.lod, "LOD 1\0LOD 2\0LOD 3\0LOD 4\0");
+		ImGui::Combo(StaticString<30>("###lod", (uint64)&mesh), &mesh.lod, "LOD 1\0LOD 2\0LOD 3\0LOD 4\0");
 		ImGui::NextColumn();
 	}
 	ImGui::Columns();
@@ -2334,18 +2400,18 @@ void ImportAssetDialog::onImageGUI()
 }
 
 
-static void preprocessBillboard(Lumix::uint32* pixels, int width, int height, Lumix::IAllocator& allocator)
+static void preprocessBillboard(uint32* pixels, int width, int height, IAllocator& allocator)
 {
 	struct DistanceFieldCell
 	{
-		Lumix::uint32 distance;
-		Lumix::uint32 color;
+		uint32 distance;
+		uint32 color;
 	};
 
-	Lumix::Array<DistanceFieldCell> distance_field(allocator);
+	Array<DistanceFieldCell> distance_field(allocator);
 	distance_field.resize(width * height);
 
-	static const Lumix::uint32 ALPHA_MASK = 0xff000000;
+	static const uint32 ALPHA_MASK = 0xff000000;
 	
 	for (int j = 0; j < height; ++j)
 	{
@@ -2416,33 +2482,33 @@ static void preprocessBillboard(Lumix::uint32* pixels, int width, int height, Lu
 
 
 static bool createBillboard(ImportAssetDialog& dialog,
-	const Lumix::Path& mesh_path,
-	const Lumix::Path& out_path,
+	const Path& mesh_path,
+	const Path& out_path,
 	int texture_size)
 {
 	auto& engine = dialog.getEditor().getEngine();
 	auto& universe = engine.createUniverse();
 
-	auto* renderer = static_cast<Lumix::Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	if (!renderer) return false;
 
-	auto* render_scene = static_cast<Lumix::RenderScene*>(universe.getScene(Lumix::crc32("renderer")));
+	auto* render_scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 	if (!render_scene) return false;
 
-	auto* pipeline = Lumix::Pipeline::create(*renderer, Lumix::Path("pipelines/preview.lua"), engine.getAllocator());
+	auto* pipeline = Pipeline::create(*renderer, Path("pipelines/preview.lua"), engine.getAllocator());
 	pipeline->load();
 
 	auto mesh_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
-	static const auto RENDERABLE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
+	static const auto RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
 	auto mesh_cmp = render_scene->createComponent(RENDERABLE_TYPE, mesh_entity);
 	render_scene->setRenderablePath(mesh_cmp, mesh_path);
 
-	auto mesh_side_entity = universe.createEntity({0, 0, 0}, {Lumix::Vec3(0, 1, 0), Lumix::Math::PI * 0.5f});
+	auto mesh_side_entity = universe.createEntity({0, 0, 0}, {Vec3(0, 1, 0), Math::PI * 0.5f});
 	auto mesh_side_cmp = render_scene->createComponent(RENDERABLE_TYPE, mesh_side_entity);
 	render_scene->setRenderablePath(mesh_side_cmp, mesh_path);
 
 	auto light_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
-	static const auto GLOBAL_LIGHT_TYPE = Lumix::PropertyRegister::getComponentType("global_light");
+	static const auto GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
 	auto light_cmp = render_scene->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
 	render_scene->setGlobalLightIntensity(light_cmp, 0);
 	render_scene->setLightAmbientIntensity(light_cmp, 1);
@@ -2452,13 +2518,13 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	auto* model = render_scene->getRenderableModel(mesh_cmp);
 	auto* lods = model->getLODs();
 	lods[0].distance = FLT_MAX;
-	Lumix::AABB aabb = model->getAABB();
-	Lumix::Vec3 size = aabb.max - aabb.min;
+	AABB aabb = model->getAABB();
+	Vec3 size = aabb.max - aabb.min;
 	universe.setPosition(mesh_side_entity, { aabb.max.x - aabb.min.z, 0, 0 });
-	Lumix::Vec3 camera_pos(
+	Vec3 camera_pos(
 		(aabb.min.x + aabb.max.x + size.z) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + 5);
 	auto camera_entity = universe.createEntity(camera_pos, { 0, 0, 0, 1 });
-	static const auto CAMERA_TYPE = Lumix::PropertyRegister::getComponentType("camera");
+	static const auto CAMERA_TYPE = PropertyRegister::getComponentType("camera");
 	auto camera_cmp = render_scene->createComponent(CAMERA_TYPE, camera_entity);
 	render_scene->setCameraOrtho(camera_cmp, true);
 	render_scene->setCameraSlot(camera_cmp, "main");
@@ -2492,17 +2558,17 @@ static bool createBillboard(ImportAssetDialog& dialog,
 
 	renderer->viewCounterAdd();
 	bgfx::setViewName(renderer->getViewCounter(), "billboard_read");
-	Lumix::Array<Lumix::uint8> data(engine.getAllocator());
+	Array<uint8> data(engine.getAllocator());
 	data.resize(width * height * 4);
 	bgfx::readTexture(texture, &data[0]);
 	bgfx::touch(renderer->getViewCounter());
 	bgfx::frame(); // submit
 	bgfx::frame(); // wait for gpu
 
-	preprocessBillboard((Lumix::uint32*)&data[0], width, height, engine.getAllocator());
-	saveAsDDS(dialog, "billboard_generator", (Lumix::uint8*)&data[0], width, height, true, out_path.c_str());
+	preprocessBillboard((uint32*)&data[0], width, height, engine.getAllocator());
+	saveAsDDS(dialog, "billboard_generator", (uint8*)&data[0], width, height, true, out_path.c_str());
 	bgfx::destroyTexture(texture);
-	Lumix::Pipeline::destroy(pipeline);
+	Pipeline::destroy(pipeline);
 	engine.destroyUniverse(universe);
 	return true;
 }
@@ -2519,16 +2585,16 @@ static ImportMaterial* getMatchingMaterial(lua_State* L, ImportMaterial* materia
 			ImportMaterial& material = materials[i];
 			aiString material_name;
 			material.material->Get(AI_MATKEY_NAME, material_name);
-			Lumix::LuaWrapper::pushLua(L, i);
-			Lumix::LuaWrapper::pushLua(L, material_name.C_Str());
+			LuaWrapper::pushLua(L, i);
+			LuaWrapper::pushLua(L, material_name.C_Str());
 			if (lua_pcall(L, 2, 1, 0) != LUA_OK)
 			{
-				Lumix::g_log_error.log("Editor") << "getMatchingMaterial" << ": " << lua_tostring(L, -1);
+				g_log_error.log("Editor") << "getMatchingMaterial" << ": " << lua_tostring(L, -1);
 				lua_pop(L, 1);
 			}
 			else
 			{
-				bool is_matching = Lumix::LuaWrapper::toType<bool>(L, -1);
+				bool is_matching = LuaWrapper::toType<bool>(L, -1);
 				lua_pop(L, 1);
 				if (is_matching)
 				{
@@ -2541,7 +2607,7 @@ static ImportMaterial* getMatchingMaterial(lua_State* L, ImportMaterial* materia
 	}
 	else
 	{
-		Lumix::g_log_error.log("Editor") << "No \"matching\" found in table or it is not a function";
+		g_log_error.log("Editor") << "No \"matching\" found in table or it is not a function";
 	}
 	lua_pop(L, 1); // "matching"
 	return nullptr;
@@ -2551,36 +2617,37 @@ static ImportMaterial* getMatchingMaterial(lua_State* L, ImportMaterial* materia
 int ImportAssetDialog::importAsset(lua_State* L)
 {
 	m_importers.clear();
+	m_animations.clear();
 	m_materials.clear();
 	m_meshes.clear();
-	m_output_filename[0] = '\0';
+	m_mesh_output_filename[0] = '\0';
 	m_is_opened = true;
 
-	Lumix::LuaWrapper::checkTableArg(L, 2);
+	LuaWrapper::checkTableArg(L, 2);
 	if (lua_getfield(L, 2, "output_dir") == LUA_TSTRING)
 	{
-		Lumix::copyString(m_output_dir, Lumix::LuaWrapper::toType<const char*>(L, -1));
+		copyString(m_output_dir, LuaWrapper::toType<const char*>(L, -1));
 	}
 	lua_pop(L, 1);
 	if (lua_getfield(L, 2, "create_billboard") == LUA_TBOOLEAN)
 	{
-		m_model.create_billboard_lod = Lumix::LuaWrapper::toType<bool>(L, -1);
+		m_model.create_billboard_lod = LuaWrapper::toType<bool>(L, -1);
 	}
 	lua_pop(L, 1);
 	if (lua_getfield(L, 2, "remove_doubles") == LUA_TBOOLEAN)
 	{
-		m_model.remove_doubles = Lumix::LuaWrapper::toType<bool>(L, -1);
+		m_model.remove_doubles = LuaWrapper::toType<bool>(L, -1);
 	}
 	lua_pop(L, 1);
 	if (lua_getfield(L, 2, "scale") == LUA_TNUMBER)
 	{
-		m_model.mesh_scale = Lumix::LuaWrapper::toType<float>(L, -1);
+		m_model.mesh_scale = LuaWrapper::toType<float>(L, -1);
 	}
 	lua_pop(L, 1);
 
 	if (lua_getfield(L, 2, "output_dir") == LUA_TSTRING)
 	{
-		Lumix::copyString(m_output_dir, Lumix::LuaWrapper::toType<const char*>(L, -1));
+		copyString(m_output_dir, LuaWrapper::toType<const char*>(L, -1));
 	}
 	lua_pop(L, 1);
 
@@ -2590,14 +2657,14 @@ int ImportAssetDialog::importAsset(lua_State* L)
 		int lod_index = 0;
 		while (lua_next(L, -2) != 0)
 		{
-			if (lod_index >= Lumix::lengthOf(m_model.lods))
+			if (lod_index >= lengthOf(m_model.lods))
 			{
-				Lumix::g_log_error.log("Editor") << "Only " << Lumix::lengthOf(m_model.lods) << " supported";
+				g_log_error.log("Editor") << "Only " << lengthOf(m_model.lods) << " supported";
 				lua_pop(L, 1);
 				break;
 			}
 
-			m_model.lods[lod_index] = Lumix::LuaWrapper::toType<float>(L, -1);
+			m_model.lods[lod_index] = LuaWrapper::toType<float>(L, -1);
 			++lod_index;
 			lua_pop(L, 1);
 		}
@@ -2606,7 +2673,7 @@ int ImportAssetDialog::importAsset(lua_State* L)
 
 	if (lua_getfield(L, 2, "texture_output_dir") == LUA_TSTRING)
 	{
-		Lumix::copyString(m_texture_output_dir, Lumix::LuaWrapper::toType<const char*>(L, -1));
+		copyString(m_texture_output_dir, LuaWrapper::toType<const char*>(L, -1));
 	}
 	lua_pop(L, 1);
 
@@ -2626,21 +2693,21 @@ int ImportAssetDialog::importAsset(lua_State* L)
 				lua_pop(L, 2); // "src" and inputs table item
 				continue;
 			}
-			Lumix::copyString(m_source, Lumix::LuaWrapper::toType<const char*>(L, -1));
+			copyString(m_source, LuaWrapper::toType<const char*>(L, -1));
 			lua_pop(L, 1); // "src"
 
 			int meshes_count = m_meshes.size();
 			if (!checkSource())
 			{
 				lua_pop(L, 1); // inputs table item
-				Lumix::g_log_error.log("Editor") << "Could not import \"" << m_source << "\"";
+				g_log_error.log("Editor") << "Could not import \"" << m_source << "\"";
 				continue;
 			}
 			if (m_is_importing) checkTask(true);
 
 			if (lua_getfield(L, -1, "lod") == LUA_TNUMBER)
 			{
-				int lod = Lumix::LuaWrapper::toType<int>(L, -1);
+				int lod = LuaWrapper::toType<int>(L, -1);
 				for (int i = meshes_count; i < m_meshes.size(); ++i)
 				{
 					m_meshes[i].lod = lod;
@@ -2660,27 +2727,27 @@ int ImportAssetDialog::importAsset(lua_State* L)
 							L, &m_materials[m_materials.size() - scene->mNumMaterials], scene->mNumMaterials);
 						if (!material)
 						{
-							Lumix::g_log_error.log("Editor") << "No matching material found";
+							g_log_error.log("Editor") << "No matching material found";
 							lua_pop(L, 1); // materials table item
 							continue;
 						}
 						
 						if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
 						{
-							material->import = Lumix::LuaWrapper::toType<bool>(L, -1);
+							material->import = LuaWrapper::toType<bool>(L, -1);
 						}
 						lua_pop(L, 1); // "import"
 
 						if (lua_getfield(L, -1, "shader") == LUA_TSTRING)
 						{
-							Lumix::copyString(material->shader, Lumix::LuaWrapper::toType<const char*>(L, -1));
+							copyString(material->shader, LuaWrapper::toType<const char*>(L, -1));
 						}
 						lua_pop(L, 1); // "import"
 
 
 						if (lua_getfield(L, -1, "alpha_cutout") == LUA_TBOOLEAN)
 						{
-							material->alpha_cutout = Lumix::LuaWrapper::toType<bool>(L, -1);
+							material->alpha_cutout = LuaWrapper::toType<bool>(L, -1);
 						}
 						lua_pop(L, 1); // "alpha_cutout"
 
@@ -2692,19 +2759,19 @@ int ImportAssetDialog::importAsset(lua_State* L)
 							{
 								if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
 								{
-									texture->import = Lumix::LuaWrapper::toType<bool>(L, -1);
+									texture->import = LuaWrapper::toType<bool>(L, -1);
 								}
 								lua_pop(L, 1); // "import"
 
 								if (lua_getfield(L, -1, "to_dds") == LUA_TBOOLEAN)
 								{
-									texture->to_dds = Lumix::LuaWrapper::toType<bool>(L, -1);
+									texture->to_dds = LuaWrapper::toType<bool>(L, -1);
 								}
 								lua_pop(L, 1); // "to_dds"
 
 								if (lua_getfield(L, -1, "src") == LUA_TSTRING)
 								{
-									Lumix::copyString(texture->src, Lumix::LuaWrapper::toType<const char*>(L, -1));
+									copyString(texture->src, LuaWrapper::toType<const char*>(L, -1));
 									texture->is_valid = PlatformInterface::fileExists(texture->src);
 								}
 								lua_pop(L, 1); // "src"
@@ -2729,7 +2796,7 @@ int ImportAssetDialog::importAsset(lua_State* L)
 	lua_pop(L, 1);
 	if (m_importers.empty())
 	{
-		Lumix::g_log_error.log("Editor") << "Nothing to import";
+		g_log_error.log("Editor") << "Nothing to import";
 		return 0;
 	}
 
@@ -2739,17 +2806,17 @@ int ImportAssetDialog::importAsset(lua_State* L)
 	if (m_model.create_billboard_lod)
 	{
 		PathBuilder mesh_path(m_output_dir, "/");
-		mesh_path << m_output_filename << ".msh";
+		mesh_path << m_mesh_output_filename << ".msh";
 
 		if (m_texture_output_dir[0])
 		{
-			PathBuilder texture_path(m_texture_output_dir, m_output_filename, "_billboard.dds");
-			createBillboard(*this, Lumix::Path(mesh_path), Lumix::Path(texture_path), TEXTURE_SIZE);
+			PathBuilder texture_path(m_texture_output_dir, m_mesh_output_filename, "_billboard.dds");
+			createBillboard(*this, Path(mesh_path), Path(texture_path), TEXTURE_SIZE);
 		}
 		else
 		{
-			PathBuilder texture_path(m_output_dir, "/", m_output_filename, " _billboard.dds");
-			createBillboard(*this, Lumix::Path(mesh_path), Lumix::Path(texture_path), TEXTURE_SIZE);
+			PathBuilder texture_path(m_output_dir, "/", m_mesh_output_filename, " _billboard.dds");
+			createBillboard(*this, Path(mesh_path), Path(texture_path), TEXTURE_SIZE);
 		}
 	}
 
@@ -2764,7 +2831,7 @@ void ImportAssetDialog::checkTask(bool wait)
 
 	if (wait)
 	{
-		while (!m_task->isFinished()) Lumix::MT::sleep(200);
+		while (!m_task->isFinished()) MT::sleep(200);
 	}
 
 	m_task->destroy();
@@ -2816,7 +2883,7 @@ void ImportAssetDialog::onWindowGUI()
 			checkTask(false);
 
 			{
-				Lumix::MT::SpinLock lock(m_mutex);
+				MT::SpinLock lock(m_mutex);
 				ImGui::Text("%s", m_import_message);
 				if (m_progress_fraction >= 0) ImGui::ProgressBar(m_progress_fraction);
 			}
@@ -2844,9 +2911,10 @@ void ImportAssetDialog::onWindowGUI()
 		if (ImGui::Button("Clear all sources"))
 		{
 			m_importers.clear();
+			m_animations.clear();
 			m_materials.clear();
 			m_meshes.clear();
-			m_output_filename[0] = '\0';
+			m_mesh_output_filename[0] = '\0';
 		}
 
 		onImageGUI();
@@ -2870,54 +2938,45 @@ void ImportAssetDialog::onWindowGUI()
 				ImGui::Combo("Orientation", &(int&)m_model.orientation, "Y up\0Z up\0-Z up\0-X up\0");
 				ImGui::Checkbox("Make physics convex", &m_model.make_convex);
 			}
-			int animations_count = 0;
-			for (auto& i : m_importers)
-			{
-				auto* scene = i.GetScene();
-				animations_count += scene->mNumAnimations;
-			}
-
-			if (animations_count > 0)
-			{
-				ImGui::Checkbox(
-					Lumix::StaticString<50>("Import animations (", animations_count, ")"), &m_import_animations);
-			}
 
 			onMeshesGUI();
 			onLODsGUI();
 			onMaterialsGUI();
+			onAnimationsGUI();
 
-			ImGui::InputText("Output filename", m_output_filename, sizeof(m_output_filename));
-			ImGui::InputText("Output directory", m_output_dir, sizeof(m_output_dir));
-			ImGui::SameLine();
-			if (ImGui::Button("...###browseoutput"))
+			if (ImGui::CollapsingHeader("Output", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				if (PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir), m_last_dir))
+				ImGui::InputText("Output directory", m_output_dir, sizeof(m_output_dir));
+				ImGui::SameLine();
+				if (ImGui::Button("...###browseoutput"))
 				{
-					Lumix::copyString(m_last_dir, m_output_dir);
+					if (PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir), m_last_dir))
+					{
+						copyString(m_last_dir, m_output_dir);
+					}
 				}
-			}
 
-			ImGui::InputText("Texture output directory", m_texture_output_dir, sizeof(m_texture_output_dir));
-			ImGui::SameLine();
-			if (ImGui::Button("...###browsetextureoutput"))
-			{
-				if (PlatformInterface::getOpenDirectory(m_texture_output_dir, sizeof(m_texture_output_dir), m_last_dir))
+				ImGui::InputText("Texture output directory", m_texture_output_dir, sizeof(m_texture_output_dir));
+				ImGui::SameLine();
+				if (ImGui::Button("...###browsetextureoutput"))
 				{
-					Lumix::copyString(m_last_dir, m_texture_output_dir);
+					if (PlatformInterface::getOpenDirectory(m_texture_output_dir, sizeof(m_texture_output_dir), m_last_dir))
+					{
+						copyString(m_last_dir, m_texture_output_dir);
+					}
 				}
-			}
 
-			if (m_output_dir[0] != '\0')
-			{
-				if (!isTextureDirValid())
+				if (m_output_dir[0] != '\0')
 				{
-					ImGui::Text("Texture output directory must be an ancestor of the working "
-								"directory or empty.");
-				}
-				else if (ImGui::Button("Convert"))
-				{
-					convert(true);
+					if (!isTextureDirValid())
+					{
+						ImGui::Text("Texture output directory must be an ancestor of the working "
+							"directory or empty.");
+					}
+					else if (ImGui::Button("Convert"))
+					{
+						convert(true);
+					}
 				}
 			}
 
