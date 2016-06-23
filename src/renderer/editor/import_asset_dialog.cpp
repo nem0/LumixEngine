@@ -596,7 +596,7 @@ struct ImportTask : public Lumix::MT::Task
 		flags |= m_dialog.m_model.gen_smooth_normal ? aiProcess_GenSmoothNormals : aiProcess_GenNormals;
 		flags |= m_dialog.m_model.optimize_mesh_on_import ? aiProcess_OptimizeMeshes : 0;
 		const aiScene* scene = m_dialog.m_importers.back().ReadFile(m_dialog.m_source, flags);
-		if (!scene || !scene->mMeshes)
+		if (!scene)
 		{
 			m_dialog.m_importers.back().FreeScene();
 			const char* msg = m_dialog.m_importers.back().GetErrorString();
@@ -1056,7 +1056,10 @@ struct ConvertTask : public Lumix::MT::Task
 			return a_mesh->lod - b_mesh->lod;
 		};
 
-		qsort(&m_dialog.m_meshes[0], m_dialog.m_meshes.size(), sizeof(m_dialog.m_meshes[0]), cmpMeshes);
+		if (!m_dialog.m_meshes.empty())
+		{
+			qsort(&m_dialog.m_meshes[0], m_dialog.m_meshes.size(), sizeof(m_dialog.m_meshes[0]), cmpMeshes);
+		}
 
 		if (saveLumixPhysics() && saveLumixModel() && saveLumixMaterials() && saveLumixAnimations())
 		{
