@@ -250,6 +250,7 @@ void Universe::destroyEntity(Entity entity)
 					break;
 				}
 			}
+			ASSERT(original_mask != mask);
 		}
 	}
 

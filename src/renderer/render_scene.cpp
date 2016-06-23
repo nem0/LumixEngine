@@ -339,27 +339,23 @@ public:
 			return INVALID_COMPONENT;
 		}
 
-		static const struct
-		{
-			ComponentType cmp_type;
-			ComponentType module_type;
-		} EMITTER_MODULES[] = {{PARTICLE_EMITTER_ATTRACTOR_HASH, ParticleEmitter::AttractorModule::s_type},
-			{PARTICLE_EMITTER_FORCE_HASH, ParticleEmitter::AlphaModule::s_type},
-			{PARTICLE_EMITTER_ALPHA_TYPE, ParticleEmitter::ForceModule::s_type},
-			{PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH, ParticleEmitter::LinearMovementModule::s_type},
-			{PARTICLE_EMITTER_PLANE_HASH, ParticleEmitter::PlaneModule::s_type},
-			{PARTICLE_EMITTER_RANDOM_ROTATION_HASH, ParticleEmitter::RandomRotationModule::s_type},
-			{PARTICLE_EMITTER_SIZE_HASH, ParticleEmitter::SizeModule::s_type},
-			{PARTICLE_EMITTER_SPAWN_SHAPE_HASH, ParticleEmitter::SpawnShapeModule::s_type}};
+		static const ComponentType EMITTER_MODULES[] = {ParticleEmitter::AttractorModule::s_type,
+			ParticleEmitter::AlphaModule::s_type,
+			ParticleEmitter::ForceModule::s_type,
+			ParticleEmitter::LinearMovementModule::s_type,
+			ParticleEmitter::PlaneModule::s_type,
+			ParticleEmitter::RandomRotationModule::s_type,
+			ParticleEmitter::SizeModule::s_type,
+			ParticleEmitter::SpawnShapeModule::s_type};
 
 		for (auto& module : EMITTER_MODULES)
 		{
-			if (module.cmp_type == type)
+			if (module == type)
 			{
 				for (int i = 0; i < m_particle_emitters.size(); ++i)
 				{
-					if (!m_particle_emitters[i] || m_particle_emitters[i]->m_entity != entity) return INVALID_COMPONENT;
-					if (m_particle_emitters[i]->getModule(module.module_type)) return {i};
+					if (!m_particle_emitters[i] || m_particle_emitters[i]->m_entity != entity) continue;
+					if (m_particle_emitters[i]->getModule(type)) return {i};
 				}
 				return INVALID_COMPONENT;
 			}
