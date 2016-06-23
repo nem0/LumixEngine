@@ -300,7 +300,7 @@ public:
 		Vec3 axis,
 		float angle)
 	{
-		if (isValid(entity)) return;
+		if (!isValid(entity)) return;
 
 		static_cast<Hierarchy*>(hierarchy)->setLocalRotation(entity, Quat(axis, angle));
 	}
