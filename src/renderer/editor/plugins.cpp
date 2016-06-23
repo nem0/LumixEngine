@@ -1708,8 +1708,6 @@ extern "C" {
 
 LUMIX_STUDIO_ENTRY(renderer)
 {
-	auto& property_grid = *app.getPropertyGrid();
-
 	app.registerComponent("camera", "Camera");
 	app.registerComponent("global_light", "Global light");
 	app.registerComponentWithResource("renderable", "Mesh", MODEL_HASH, "Source");
@@ -1729,42 +1727,23 @@ LUMIX_STUDIO_ENTRY(renderer)
 
 	auto& allocator = app.getWorldEditor()->getAllocator();
 
-	auto* model_plugin = LUMIX_NEW(allocator, ModelPlugin)(app);
-	app.getAssetBrowser()->addPlugin(*model_plugin);
+	auto& asset_browser = *app.getAssetBrowser();
+	asset_browser.addPlugin(*LUMIX_NEW(allocator, ModelPlugin)(app));
+	asset_browser.addPlugin(*LUMIX_NEW(allocator, MaterialPlugin)(app));
+	asset_browser.addPlugin(*LUMIX_NEW(allocator, TexturePlugin)(app));
+	asset_browser.addPlugin(*LUMIX_NEW(allocator, ShaderPlugin)(app));
 
-	auto* material_plugin = LUMIX_NEW(allocator, MaterialPlugin)(app);
-	app.getAssetBrowser()->addPlugin(*material_plugin);
+	auto& property_grid = *app.getPropertyGrid();
+	property_grid.addPlugin(*LUMIX_NEW(allocator, EmitterPlugin)(app));
+	property_grid.addPlugin(*LUMIX_NEW(allocator, EnvironmentProbePlugin)(app));
+	property_grid.addPlugin(*LUMIX_NEW(allocator, TerrainPlugin)(app));
 
-	auto* texture_plugin = LUMIX_NEW(allocator, TexturePlugin)(app);
-	app.getAssetBrowser()->addPlugin(*texture_plugin);
+	app.addPlugin(*LUMIX_NEW(allocator, SceneViewPlugin)(app));
+	app.addPlugin(*LUMIX_NEW(allocator, ImportAssetDialog)(app));
+	app.addPlugin(*LUMIX_NEW(allocator, GameViewPlugin)(app));
+	app.addPlugin(*LUMIX_NEW(allocator, ShaderEditorPlugin)(app));
 
-	auto* shader_plugin = LUMIX_NEW(allocator, ShaderPlugin)(app);
-	app.getAssetBrowser()->addPlugin(*shader_plugin);
-
-	auto* emitter_plugin = LUMIX_NEW(allocator, EmitterPlugin)(app);
-	app.getPropertyGrid()->addPlugin(*emitter_plugin);
-
-	auto* env_probe_plugin = LUMIX_NEW(allocator, EnvironmentProbePlugin)(app);
-	app.getPropertyGrid()->addPlugin(*env_probe_plugin);
-
-	auto* terrain_plugin = LUMIX_NEW(allocator, TerrainPlugin)(app);
-	app.getPropertyGrid()->addPlugin(*terrain_plugin);
-
-	auto* scene_view_plugin = LUMIX_NEW(allocator, SceneViewPlugin)(app);
-	app.addPlugin(*scene_view_plugin);
-
-	auto* import_asset_plugin = LUMIX_NEW(allocator, ImportAssetDialog)(app);
-	app.addPlugin(*import_asset_plugin);
-
-	auto* game_view_plugin = LUMIX_NEW(allocator, GameViewPlugin)(app);
-	app.addPlugin(*game_view_plugin);
-
-	auto* shader_editor_plugin =
-		LUMIX_NEW(allocator, ShaderEditorPlugin)(app);
-	app.addPlugin(*shader_editor_plugin);
-
-	auto* world_editor_plugin = LUMIX_NEW(allocator, WorldEditorPlugin)();
-	app.getWorldEditor()->addPlugin(*world_editor_plugin);
+	app.getWorldEditor()->addPlugin(*LUMIX_NEW(allocator, WorldEditorPlugin)());
 }
 
 

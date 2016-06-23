@@ -188,11 +188,10 @@ LUMIX_STUDIO_ENTRY(physics)
 	app.registerComponent("mesh_rigid_actor", "Physics Mesh");
 	app.registerComponent("physical_heightfield", "Physics Heightfield");
 
-	StudioAppPlugin* plugin = LUMIX_NEW(app.getWorldEditor()->getAllocator(), StudioAppPlugin)(*app.getWorldEditor());
-	app.addPlugin(*plugin);
-
 	auto& editor = *app.getWorldEditor();
-	auto* editor_plugin = LUMIX_NEW(editor.getAllocator(), EditorPlugin)(editor);
-	editor.addPlugin(*editor_plugin);
+	auto& allocator = editor.getAllocator();
+
+	app.addPlugin(*LUMIX_NEW(allocator, StudioAppPlugin)(editor));
+	editor.addPlugin(*LUMIX_NEW(allocator, EditorPlugin)(editor));
 }
 
