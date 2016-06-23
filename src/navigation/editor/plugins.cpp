@@ -120,7 +120,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 LUMIX_STUDIO_ENTRY(navigation)
 {
 	auto& allocator = app.getWorldEditor()->getAllocator();
-	StudioAppPlugin* studio_app_plugin = LUMIX_NEW(allocator, StudioAppPlugin)(app);
+	auto* studio_app_plugin = LUMIX_NEW(allocator, StudioAppPlugin)(app);
 	app.addPlugin(*studio_app_plugin);
 
 	app.registerComponent("navmesh_agent", "Navmesh Agent");

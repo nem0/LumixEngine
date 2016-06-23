@@ -118,6 +118,14 @@ template <> inline const char* typeToString<int>()
 {
 	return "number|integer";
 }
+template <> inline const char* typeToString<Entity>()
+{
+	return "entity";
+}
+template <> inline const char* typeToString<ComponentHandle>()
+{
+	return "component";
+}
 template <> inline const char* typeToString<uint32>()
 {
 	return "number|integer";
@@ -137,6 +145,14 @@ template <typename T> inline bool isType(lua_State* L, int index)
 	return lua_islightuserdata(L, index) != 0;
 }
 template <> inline bool isType<int>(lua_State* L, int index)
+{
+	return lua_isinteger(L, index) != 0;
+}
+template <> inline bool isType<Entity>(lua_State* L, int index)
+{
+	return lua_isinteger(L, index) != 0;
+}
+template <> inline bool isType<ComponentHandle>(lua_State* L, int index)
 {
 	return lua_isinteger(L, index) != 0;
 }
@@ -188,11 +204,11 @@ template <> inline void pushLua(lua_State* L, float value)
 }
 template <> inline void pushLua(lua_State* L, Entity value)
 {
-	lua_pushnumber(L, value.index);
+	lua_pushinteger(L, value.index);
 }
 template <> inline void pushLua(lua_State* L, ComponentHandle value)
 {
-	lua_pushnumber(L, value.index);
+	lua_pushinteger(L, value.index);
 }
 inline void pushLua(lua_State* L, const Vec2& value)
 {

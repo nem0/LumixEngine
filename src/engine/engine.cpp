@@ -357,7 +357,7 @@ public:
 
 	static Vec3 LUA_getEntityPosition(Universe* universe, Entity entity)
 	{
-		if (isValid(entity))
+		if (!isValid(entity))
 		{
 			g_log_warning.log("Engine") << "Requesting position on invalid entity";
 			return Vec3(0, 0, 0);
@@ -368,7 +368,7 @@ public:
 
 	static Quat LUA_getEntityRotation(Universe* universe, Entity entity)
 	{
-		if (isValid(entity))
+		if (!isValid(entity))
 		{
 			g_log_warning.log("Engine") << "Requesting rotation on invalid entity";
 			return Quat(0, 0, 0, 1);
@@ -962,7 +962,6 @@ static void logErrorToFile(const char*, const char* message)
 	g_error_file.write(message, stringLength(message));
 	g_error_file.flush();
 }
-
 
 Engine* Engine::create(const char* base_path0,
 	const char* base_path1,
