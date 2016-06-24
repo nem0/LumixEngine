@@ -30,6 +30,7 @@ static const ComponentType BOX_ACTOR_TYPE = PropertyRegister::getComponentType("
 static const ComponentType MESH_ACTOR_TYPE = PropertyRegister::getComponentType("mesh_rigid_actor");
 static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("physical_controller");
 static const ComponentType HEIGHTFIELD_TYPE = PropertyRegister::getComponentType("physical_heightfield");
+static const ComponentType DISTANCE_JOINT_TYPE = PropertyRegister::getComponentType("distance_joint");
 static const uint32 TEXTURE_HASH = crc32("TEXTURE");
 static const uint32 PHYSICS_HASH = crc32("PHYSICS");
 
@@ -37,6 +38,7 @@ static const uint32 PHYSICS_HASH = crc32("PHYSICS");
 enum class PhysicsSceneVersion : int
 {
 	LAYERS,
+	JOINTS,
 
 	LATEST
 };
@@ -125,6 +127,17 @@ static void matrix2Transform(const Matrix& mtx, physx::PxTransform& transform)
 	transform.q.z = q.z;
 	transform.q.w = q.w;
 }
+
+
+struct DistanceJoint
+{
+	Entity other_entity;
+	physx::PxDistanceJoint* physx;
+	float damping;
+	float stiffness;
+	float tolerance;
+	Vec2 distance_limit;
+};
 
 
 struct Heightfield
@@ -239,6 +252,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		, m_contact_callback(*this)
 		, m_queued_forces(m_allocator)
 		, m_layers_count(2)
+		, m_distance_joints(m_allocator)
+		, m_script_scene(nullptr)
 	{
 		setMemory(m_layers_names, 0, sizeof(m_layers_names));
 		for (int i = 0; i < lengthOf(m_layers_names); ++i)
@@ -251,7 +266,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 		}
 
 		m_queued_forces.reserve(64);
-		m_script_scene = nullptr;
 	}
 
 
@@ -311,8 +325,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	bool ownComponentType(ComponentType type) const override
 	{
-		return type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE ||
-			   type == HEIGHTFIELD_TYPE || type == CONTROLLER_TYPE;
+		return type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == HEIGHTFIELD_TYPE ||
+			   type == CONTROLLER_TYPE || type == DISTANCE_JOINT_TYPE;
 	}
 
 
@@ -342,6 +356,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 				if (m_terrains[i] && m_terrains[i]->m_entity == entity) return {i};
 			}
 			return INVALID_COMPONENT;
+		}
+		if (type == DISTANCE_JOINT_TYPE)
+		{
+			int index = m_distance_joints.find(entity);
+			if(index < 0) return INVALID_COMPONENT;
+			return {entity.index};
 		}
 		return INVALID_COMPONENT;
 	}
@@ -385,6 +405,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	int getActorLayer(ComponentHandle cmp) override { return m_actors[cmp.index]->getLayer(); }
 	int getHeightfieldLayer(ComponentHandle cmp) override { return m_terrains[cmp.index]->m_layer; }
 	
+
 	void setHeightfieldLayer(ComponentHandle cmp, int layer) override
 	{
 		ASSERT(layer < lengthOf(m_layers_names));
@@ -405,9 +426,65 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	float getDistanceJointDamping(ComponentHandle cmp) override { return m_distance_joints[{cmp.index}].damping; }
+
+
+	void setDistanceJointDamping(ComponentHandle cmp, float value) override
+	{
+		m_distance_joints[{cmp.index}].damping = value;
+	}
+
+
+	float getDistanceJointStiffness(ComponentHandle cmp) override { return m_distance_joints[{cmp.index}].stiffness; }
+
+
+	void setDistanceJointStiffness(ComponentHandle cmp, float value) override
+	{
+		m_distance_joints[{cmp.index}].stiffness = value;
+	}
+
+
+	float getDistanceJointTolerance(ComponentHandle cmp) override { return m_distance_joints[{cmp.index}].tolerance; }
+
+
+	void setDistanceJointTolerance(ComponentHandle cmp, float value) override
+	{
+		m_distance_joints[{cmp.index}].tolerance = value;
+	}
+
+
+	Entity getDistanceJointConnectedBody(ComponentHandle cmp) override
+	{
+		return m_distance_joints[{cmp.index}].other_entity;
+	}
+
+
+	void setDistanceJointConnectedBody(ComponentHandle cmp, Entity entity) override
+	{
+		ASSERT(entity.index != cmp.index);
+		m_distance_joints[{cmp.index}].other_entity = entity;
+	}
+
+
+	Vec2 getDistanceJointLimits(ComponentHandle cmp) override
+	{
+		return m_distance_joints[{cmp.index}].distance_limit;
+	}
+
+
+	void setDistanceJointLimits(ComponentHandle cmp, const Vec2& value) override
+	{
+		m_distance_joints[{cmp.index}].distance_limit = value;
+	}
+
+
 	ComponentHandle createComponent(ComponentType component_type, Entity entity) override
 	{
-		if (component_type == HEIGHTFIELD_TYPE)
+		if (component_type == DISTANCE_JOINT_TYPE)
+		{
+			return createDistanceJoint(entity);
+		}
+		else if (component_type == HEIGHTFIELD_TYPE)
 		{
 			return createHeightfield(entity);
 		}
@@ -450,10 +527,35 @@ struct PhysicsSceneImpl : public PhysicsScene
 			m_dynamic_actors.eraseItem(m_actors[cmp.index]);
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
+		else if (type == DISTANCE_JOINT_TYPE)
+		{
+			Entity entity = {cmp.index};
+			auto& joint = m_distance_joints[entity];
+			joint.physx->release();
+			m_distance_joints.erase(entity);
+			m_universe.destroyComponent(entity, type, this, cmp);
+		}
 		else
 		{
 			ASSERT(false);
 		}
+	}
+
+
+	ComponentHandle createDistanceJoint(Entity entity)
+	{
+		DistanceJoint joint;
+		joint.physx = nullptr;
+		joint.other_entity = INVALID_ENTITY;
+		joint.stiffness = -1;
+		joint.damping = -1;
+		joint.tolerance = 0.025f;
+		joint.distance_limit.set(-1, 10);
+		m_distance_joints.insert(entity, joint);
+
+		ComponentHandle cmp = {entity.index};
+		m_universe.addComponent(entity, DISTANCE_JOINT_TYPE, this, cmp);
+		return cmp;
 	}
 
 
@@ -768,15 +870,91 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	void deinitDistanceJoints()
+	{
+		for (int i = 0, c = m_distance_joints.size(); i < c; ++i)
+		{
+			auto& joint = m_distance_joints.at(i);
+			if (joint.physx)
+			{
+				joint.physx->release();
+				joint.physx = nullptr;
+			}
+		}
+	}
+
+
+	void initDistanceJoints()
+	{
+		for (int i = 0, c = m_distance_joints.size(); i < c; ++i)
+		{
+			auto& joint = m_distance_joints.at(i);
+			Entity entity = m_distance_joints.getKey(i);
+
+			physx::PxRigidActor* actors[2] = { nullptr, nullptr };
+			for (auto* actor : m_actors)
+			{
+				if (actor->getEntity() == entity) actors[0] = actor->getPhysxActor();
+				if (actor->getEntity() == joint.other_entity) actors[1] = actor->getPhysxActor();
+			}
+
+			if (!actors[0] || !actors[1]) continue;
+
+			physx::PxTransform identity = physx::PxTransform::createIdentity();
+			joint.physx = physx::PxDistanceJointCreate(*m_system->getPhysics(), actors[0], identity, actors[1], identity);
+			if (!joint.physx)
+			{
+				g_log_error.log("Physics") << "Failed to create joint between " << entity.index << " and "
+										   << joint.other_entity.index;
+				continue;
+			}
+
+			physx::PxDistanceJointFlags flags;
+			if (joint.distance_limit.y >= 0)
+			{
+				flags |= physx::PxDistanceJointFlag::eMAX_DISTANCE_ENABLED;
+				joint.physx->setMaxDistance(joint.distance_limit.y);
+				auto x = joint.physx->getMaxDistance();
+				x = x;
+			}
+			if (joint.distance_limit.x >= 0)
+			{
+				flags |= physx::PxDistanceJointFlag::eMIN_DISTANCE_ENABLED;
+				joint.physx->setMinDistance(joint.distance_limit.x);
+			}
+			if (joint.damping >= 0)
+			{
+				flags |= physx::PxDistanceJointFlag::eSPRING_ENABLED;
+				joint.physx->setDamping(joint.damping);
+			}
+			if (joint.stiffness >= 0)
+			{
+				flags |= physx::PxDistanceJointFlag::eSPRING_ENABLED;
+				joint.physx->setStiffness(joint.stiffness);
+			}
+			joint.physx->setTolerance(joint.tolerance);
+			joint.physx->setDistanceJointFlags(flags);
+		}
+	}
+
+
 	void startGame() override
 	{
 		auto* scene = m_universe.getScene(crc32("lua_script"));
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
 		m_is_game_running = true;
+
+		initDistanceJoints();
 	}
 
 
-	void stopGame() override { m_is_game_running = false; }
+	void stopGame() override
+	{
+		deinitDistanceJoints();
+		m_is_game_running = false;
+	}
+
+
 	float getControllerRadius(ComponentHandle cmp) override { return m_controllers[cmp.index].m_radius; }
 	float getControllerHeight(ComponentHandle cmp) override { return m_controllers[cmp.index].m_height; }
 
@@ -1377,7 +1555,25 @@ struct PhysicsSceneImpl : public PhysicsScene
 				serializer.write(false);
 			}
 		}
+		serializeJoints(serializer);
 	}
+
+
+	void serializeJoints(OutputBlob& serializer)
+	{
+		serializer.write(m_distance_joints.size());
+		for (int i = 0; i < m_distance_joints.size(); ++i)
+		{
+			const DistanceJoint& joint = m_distance_joints.at(i);
+			serializer.write(m_distance_joints.getKey(i));
+			serializer.write(joint.damping);
+			serializer.write(joint.stiffness);
+			serializer.write(joint.tolerance);
+			serializer.write(joint.distance_limit);
+			serializer.write(joint.other_entity);
+		}
+	}
+
 
 
 	void deserializeActors(InputBlob& serializer, int version)
@@ -1469,6 +1665,32 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	void deserializeJoints(InputBlob& serializer, int version)
+	{
+		if (version <= int(PhysicsSceneVersion::JOINTS)) return;
+
+		int count;
+		serializer.read(count);
+		m_distance_joints.clear();
+		m_distance_joints.reserve(count);
+		for (int i = 0; i < count; ++i)
+		{
+			Entity entity;
+			serializer.read(entity);
+			DistanceJoint joint;
+			serializer.read(joint.damping);
+			serializer.read(joint.stiffness);
+			serializer.read(joint.tolerance);
+			serializer.read(joint.distance_limit);
+			serializer.read(joint.other_entity);
+			joint.physx = nullptr;
+			m_distance_joints.insert(entity, joint);
+			ComponentHandle cmp = {entity.index};
+			m_universe.addComponent(entity, DISTANCE_JOINT_TYPE, this, cmp);
+		}
+	}
+
+
 	void deserializeTerrains(InputBlob& serializer, int version)
 	{
 		int32 count;
@@ -1532,6 +1754,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		deserializeActors(serializer, version);
 		deserializeControllers(serializer, version);
 		deserializeTerrains(serializer, version);
+		deserializeJoints(serializer, version);
 
 		updateFilterData();
 	}
@@ -1632,7 +1855,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 	physx::PxMaterial* m_default_material;
 	Array<RigidActor*> m_actors;
 	Array<RigidActor*> m_dynamic_actors;
-	bool m_is_game_running;
+	AssociativeArray<Entity, DistanceJoint> m_distance_joints;
+bool m_is_game_running;
 
 	Array<QueuedForce> m_queued_forces;
 	Array<Controller> m_controllers;

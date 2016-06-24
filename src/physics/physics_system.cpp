@@ -128,6 +128,41 @@ namespace Lumix
 
 	static void registerProperties(Lumix::IAllocator& allocator)
 	{
+		PropertyRegister::add("distance_joint",
+			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Damping",
+				&PhysicsScene::getDistanceJointDamping,
+				&PhysicsScene::setDistanceJointDamping,
+				0.0f,
+				FLT_MAX,
+				0.0f,
+				allocator));
+		PropertyRegister::add("distance_joint",
+			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Stiffness",
+				&PhysicsScene::getDistanceJointStiffness,
+				&PhysicsScene::setDistanceJointStiffness,
+				0.0f,
+				FLT_MAX,
+				0.0f,
+				allocator));
+		PropertyRegister::add("distance_joint",
+			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Tolerance",
+				&PhysicsScene::getDistanceJointTolerance,
+				&PhysicsScene::setDistanceJointTolerance,
+				0.0f,
+				FLT_MAX,
+				0.0f,
+				allocator));
+		PropertyRegister::add("distance_joint",
+			LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)("Connected body",
+				&PhysicsScene::getDistanceJointConnectedBody,
+				&PhysicsScene::setDistanceJointConnectedBody,
+				allocator));
+		PropertyRegister::add("distance_joint",
+			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)("Limits",
+				&PhysicsScene::getDistanceJointLimits,
+				&PhysicsScene::setDistanceJointLimits,
+				allocator));
+
 		PropertyRegister::add("physical_controller",
 			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
 			&PhysicsScene::getControllerLayer,
