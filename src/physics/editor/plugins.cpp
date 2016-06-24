@@ -183,6 +183,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 
 LUMIX_STUDIO_ENTRY(physics)
 {
+	app.registerComponent("distance_joint", "Distance Joint");
 	app.registerComponent("box_rigid_actor", "Physics Box");
 	app.registerComponent("physical_controller", "Physics Controller");
 	app.registerComponent("mesh_rigid_actor", "Physics Mesh");

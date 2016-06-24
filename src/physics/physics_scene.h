@@ -68,6 +68,17 @@ public:
 	virtual int getHeightfieldLayer(ComponentHandle cmp) = 0;
 	virtual void setHeightfieldLayer(ComponentHandle cmp, int layer) = 0;
 
+	virtual float getDistanceJointDamping(ComponentHandle cmp) = 0;
+	virtual void setDistanceJointDamping(ComponentHandle cmp, float value) = 0;
+	virtual float getDistanceJointStiffness(ComponentHandle cmp) = 0;
+	virtual void setDistanceJointStiffness(ComponentHandle cmp, float value) = 0;
+	virtual float getDistanceJointTolerance(ComponentHandle cmp) = 0;
+	virtual void setDistanceJointTolerance(ComponentHandle cmp, float value) = 0;
+	virtual Entity getDistanceJointConnectedBody(ComponentHandle cmp) = 0;
+	virtual void setDistanceJointConnectedBody(ComponentHandle cmp, Entity entity) = 0;
+	virtual Vec2 getDistanceJointLimits(ComponentHandle cmp) = 0;
+	virtual void setDistanceJointLimits(ComponentHandle cmp, const Vec2& value) = 0;
+
 	virtual void applyForceToActor(ComponentHandle cmp, const Vec3& force) = 0;
 	virtual float getActorSpeed(ComponentHandle cmp) = 0;
 	virtual void putToSleep(ComponentHandle cmp) = 0;
