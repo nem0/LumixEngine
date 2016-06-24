@@ -23,6 +23,7 @@ namespace
 
 static const ComponentType BOX_ACTOR_TYPE = PropertyRegister::getComponentType("box_rigid_actor");
 static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("physical_controller");
+static const ComponentType DISTANCE_JOINT_TYPE = PropertyRegister::getComponentType("distance_joint");
 
 
 struct EditorPlugin : public WorldEditor::Plugin
@@ -32,30 +33,82 @@ struct EditorPlugin : public WorldEditor::Plugin
 	{
 	}
 
+
+	void showDistanceJointGizmo(ComponentUID cmp)
+	{
+		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
+		auto* render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(crc32("renderer")));
+		if (!render_scene) return;
+		Universe& universe = render_scene->getUniverse();
+
+		Entity other_entity = phy_scene->getDistanceJointConnectedBody(cmp.handle);
+		if (!isValid(other_entity)) return;
+		Vec3 pos = universe.getPosition(cmp.entity);
+		Vec3 other_pos = universe.getPosition(other_entity);
+
+		Vec3 dir = other_pos - pos;
+		static const int SEGMENT_COUNT = 100;
+		static const int TWIST_COUNT = 5;
+
+		dir = dir * (1.0f / SEGMENT_COUNT);
+		float dir_len = dir.length();
+		Vec3 right = crossProduct(Vec3(1, 0, 0), dir);
+		right.normalize();
+		Vec3 up = crossProduct(dir, right).normalized();
+		right *= Math::minimum(1.0f, 5 * dir_len);
+		up *= Math::minimum(1.0f, 5 * dir_len);
+
+		Vec3 force = phy_scene->getDistanceJointLinearForce(cmp.handle);
+
+		float t = Math::minimum(force.length() / 10.0f, 1.0f);
+		uint32 color = 0xff000000 + (uint32(t * 0xff) << 16) + uint32((1 - t) * 0xff);
+		render_scene->addDebugLine(pos + right, pos, color, 0);
+		static const float ANGLE_STEP = Math::PI * 2 * float(TWIST_COUNT) / SEGMENT_COUNT;
+		float c = cosf(0);
+		float s = sinf(0);
+		for (int i = 0; i < SEGMENT_COUNT; ++i)
+		{
+			float angle = ANGLE_STEP * i;
+			float c2 = cosf(angle + ANGLE_STEP);
+			float s2 = sinf(angle + ANGLE_STEP);
+			render_scene->addDebugLine(pos + c * right + s * up, pos + c2 * right + s2 * up + dir, color, 0);
+			c = c2;
+			s = s2;
+			pos += dir;
+		}
+		render_scene->addDebugLine(pos + right, other_pos, color, 0);
+	}
+
 	bool showGizmo(ComponentUID cmp) override
 	{
-		PhysicsScene* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
+		auto* render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(crc32("renderer")));
+		if (!render_scene) return false;
+
+		Universe& universe = render_scene->getUniverse();
+		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
+		
 		if (cmp.type == CONTROLLER_TYPE)
 		{
-			auto* scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(crc32("renderer")));
 			float height = phy_scene->getControllerHeight(cmp.handle);
 			float radius = phy_scene->getControllerRadius(cmp.handle);
 
-			Universe& universe = scene->getUniverse();
 			Vec3 pos = universe.getPosition(cmp.entity);
-			scene->addDebugCapsule(pos, height, radius, 0xff0000ff, 0);
+			render_scene->addDebugCapsule(pos, height, radius, 0xff0000ff, 0);
+			return true;
+		}
+
+		if (cmp.type == DISTANCE_JOINT_TYPE)
+		{
+			showDistanceJointGizmo(cmp);
 			return true;
 		}
 
 		if (cmp.type == BOX_ACTOR_TYPE)
 		{
-			auto* scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(crc32("renderer")));
 			Vec3 extents = phy_scene->getHalfExtents(cmp.handle);
-
-			Universe& universe = scene->getUniverse();
 			Matrix mtx = universe.getPositionAndRotation(cmp.entity);
 
-			scene->addDebugCube(mtx.getTranslation(),
+			render_scene->addDebugCube(mtx.getTranslation(),
 				mtx.getXVector() * extents.x,
 				mtx.getYVector() * extents.y,
 				mtx.getZVector() * extents.z,
