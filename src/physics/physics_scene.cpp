@@ -426,6 +426,15 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	Vec3 getDistanceJointLinearForce(ComponentHandle cmp) override
+	{
+		if (!m_distance_joints[{cmp.index}].physx) return Vec3(0, 0, 0);
+		physx::PxVec3 linear, angular;
+		m_distance_joints[{cmp.index}].physx->getConstraint()->getForce(linear, angular);
+		return Vec3(linear.x, linear.y, linear.z);
+	}
+
+
 	float getDistanceJointDamping(ComponentHandle cmp) override { return m_distance_joints[{cmp.index}].damping; }
 
 

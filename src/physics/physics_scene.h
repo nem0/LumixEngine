@@ -78,6 +78,7 @@ public:
 	virtual void setDistanceJointConnectedBody(ComponentHandle cmp, Entity entity) = 0;
 	virtual Vec2 getDistanceJointLimits(ComponentHandle cmp) = 0;
 	virtual void setDistanceJointLimits(ComponentHandle cmp, const Vec2& value) = 0;
+	virtual Vec3 getDistanceJointLinearForce(ComponentHandle cmp) = 0;
 
 	virtual void applyForceToActor(ComponentHandle cmp, const Vec3& force) = 0;
 	virtual float getActorSpeed(ComponentHandle cmp) = 0;
