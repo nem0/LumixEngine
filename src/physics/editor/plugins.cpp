@@ -24,6 +24,8 @@ namespace
 static const ComponentType BOX_ACTOR_TYPE = PropertyRegister::getComponentType("box_rigid_actor");
 static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("physical_controller");
 static const ComponentType DISTANCE_JOINT_TYPE = PropertyRegister::getComponentType("distance_joint");
+static const ComponentType HINGE_JOINT_TYPE = PropertyRegister::getComponentType("hinge_joint");
+static const uint32 RENDERER_HASH = crc32("renderer");
 
 
 struct EditorPlugin : public WorldEditor::Plugin
@@ -37,12 +39,13 @@ struct EditorPlugin : public WorldEditor::Plugin
 	void showDistanceJointGizmo(ComponentUID cmp)
 	{
 		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
-		auto* render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(crc32("renderer")));
+		Universe& universe = phy_scene->getUniverse();
+		auto* render_scene = static_cast<RenderScene*>(universe.getScene(RENDERER_HASH));
 		if (!render_scene) return;
-		Universe& universe = render_scene->getUniverse();
 
 		Entity other_entity = phy_scene->getDistanceJointConnectedBody(cmp.handle);
 		if (!isValid(other_entity)) return;
+		
 		Vec3 pos = universe.getPosition(cmp.entity);
 		Vec3 other_pos = universe.getPosition(other_entity);
 
@@ -79,13 +82,53 @@ struct EditorPlugin : public WorldEditor::Plugin
 		render_scene->addDebugLine(pos + right, other_pos, color, 0);
 	}
 
+
+	void showHingeJointGizmo(ComponentUID cmp)
+	{
+		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
+		Universe& universe = phy_scene->getUniverse();
+		auto* render_scene = static_cast<RenderScene*>(universe.getScene(RENDERER_HASH));
+		if (!render_scene) return;
+
+		Entity other_entity = phy_scene->getHingeJointConnectedBody(cmp.handle);
+		if (!isValid(other_entity)) return;
+
+		Matrix mtx = universe.getMatrix(cmp.entity);
+		Vec3 axis_local_pos = phy_scene->getHingeJointAxisPosition(cmp.handle);
+		Vec3 axis_local_dir = phy_scene->getHingeJointAxisDirection(cmp.handle).normalized();
+
+		Vec3 axis_dir = (mtx * Vec4(axis_local_dir, 0)).xyz();
+		Vec3 axis_pos = mtx.multiplyPosition(axis_local_pos);
+		
+		Vec3 pos = mtx.getTranslation();
+		Vec3 other_pos = universe.getPosition(other_entity);
+
+		render_scene->addDebugLine(axis_pos - axis_dir, axis_pos + axis_dir, 0xff0000ff, 0);
+		render_scene->addDebugLine(pos, axis_pos, 0xff0000ff, 0);
+		render_scene->addDebugLine(other_pos, axis_pos, 0xff0000ff, 0);
+
+		Vec2 limit = phy_scene->getHingeJointLimit(cmp.handle);
+		bool use_limit = phy_scene->getHingeJointUseLimit(cmp.handle);
+		if (use_limit)
+		{
+			Vec3 init_pos = phy_scene->getHingeJointConnectedBodyInitialPosition(cmp.handle);
+
+			Vec3 null_dir = (init_pos - axis_pos).normalized();
+			Vec3 normal = crossProduct(axis_dir, null_dir).normalized();
+			Vec3 x = cosf(limit.x) * null_dir + sinf(limit.x) * normal;
+			render_scene->addDebugLine(axis_pos, axis_pos + 2 * x, 0xffff0000, 0);
+			Vec3 y = cosf(limit.y) * null_dir + sinf(limit.y) * normal;
+			render_scene->addDebugLine(axis_pos, axis_pos + 2 * y, 0xffff0000, 0);
+		}
+	}
+
+
 	bool showGizmo(ComponentUID cmp) override
 	{
-		auto* render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(crc32("renderer")));
-		if (!render_scene) return false;
-
-		Universe& universe = render_scene->getUniverse();
 		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
+		Universe& universe = phy_scene->getUniverse();
+		auto* render_scene = static_cast<RenderScene*>(universe.getScene(RENDERER_HASH));
+		if (!render_scene) return false;
 		
 		if (cmp.type == CONTROLLER_TYPE)
 		{
@@ -100,6 +143,12 @@ struct EditorPlugin : public WorldEditor::Plugin
 		if (cmp.type == DISTANCE_JOINT_TYPE)
 		{
 			showDistanceJointGizmo(cmp);
+			return true;
+		}
+
+		if (cmp.type == HINGE_JOINT_TYPE)
+		{
+			showHingeJointGizmo(cmp);
 			return true;
 		}
 
@@ -237,6 +286,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 LUMIX_STUDIO_ENTRY(physics)
 {
 	app.registerComponent("distance_joint", "Distance Joint");
+	app.registerComponent("hinge_joint", "Hinge Joint");
 	app.registerComponent("box_rigid_actor", "Physics Box");
 	app.registerComponent("physical_controller", "Physics Controller");
 	app.registerComponent("mesh_rigid_actor", "Physics Mesh");
