@@ -72,6 +72,12 @@ const char* Material::getCustomFlagName(int index)
 }
 
 
+int Material::getCustomFlagCount()
+{
+	return s_custom_flags.count;
+}
+
+
 uint32 Material::getCustomFlag(const char* flag_name)
 {
 	for (int i = 0; i < s_custom_flags.count; ++i)

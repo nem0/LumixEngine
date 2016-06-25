@@ -89,6 +89,7 @@ public:
 
 	static uint32 getCustomFlag(const char* flag_name);
 	static const char* getCustomFlagName(int index);
+	static int getCustomFlagCount();
 
 private:
 	void onBeforeReady() override;
