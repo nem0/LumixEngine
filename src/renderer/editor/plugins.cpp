@@ -285,7 +285,20 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 					material->setLayerCount(idx, layers_count);
 				}
 			}
+
+			if (Material::getCustomFlagCount() > 0 && ImGui::CollapsingHeader("Flags"))
+			{
+				for (int i = 0; i < Material::getCustomFlagCount(); ++i)
+				{
+					bool b = material->isCustomFlag(1 << i);
+					if (ImGui::Checkbox(Material::getCustomFlagName(i), &b))
+					{
+						if (b) material->setCustomFlag(1 << i);
+						else material->unsetCustomFlag(1 << i);
+					}
+				}
 			}
+		}
 		return true;
 	}
 
