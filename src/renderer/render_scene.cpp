@@ -447,7 +447,7 @@ public:
 		ret.computePerspective(mtx.getTranslation(),
 			mtx.getZVector(),
 			mtx.getYVector(),
-			Math::degreesToRadians(camera.fov),
+			camera.fov,
 			ratio,
 			camera.near,
 			camera.far);
@@ -917,6 +917,7 @@ public:
 			serializer.read(camera.entity);
 			serializer.read(camera.far);
 			serializer.read(camera.fov);
+			if (version <= RenderSceneVersion::FOV_RADIANS) camera.fov = Math::degreesToRadians(camera.fov);
 			serializer.read(camera.is_ortho);
 			if (version <= RenderSceneVersion::ORTHO_CAMERA)
 			{
@@ -1024,6 +1025,7 @@ public:
 				serializer.read(light.m_entity);
 				serializer.read(light.m_component);
 				serializer.read(light.m_fov);
+				if (version <= RenderSceneVersion::FOV_RADIANS) light.m_fov = Math::degreesToRadians(light.m_fov);
 				serializer.read(light.m_attenuation_param);
 				serializer.read(light.m_range);
 				serializer.read(light.m_cast_shadows);
@@ -1619,7 +1621,7 @@ public:
 		camera.is_ortho = false;
 		camera.ortho_size = 10;
 		camera.entity = entity;
-		camera.fov = 60;
+		camera.fov = Math::degreesToRadians(60);
 		camera.screen_width = 800;
 		camera.screen_height = 600;
 		camera.aspect = 800.0f / 600.0f;
@@ -2603,7 +2605,7 @@ public:
 		}
 		else
 		{
-			mtx.setPerspective(Math::degreesToRadians(camera.fov), ratio, camera.near, camera.far, is_opengl);
+			mtx.setPerspective(camera.fov, ratio, camera.near, camera.far, is_opengl);
 		}
 		return mtx;
 	}
@@ -2984,7 +2986,7 @@ public:
 		Vec3 near_center = position + direction * near_distance;
 		Vec3 far_center = position + direction * far_distance;
 		Vec3 right = crossProduct(direction, up);
-		float scale = (float)tan(Math::degreesToRadians(fov * 0.5f));
+		float scale = (float)tan(fov * 0.5f);
 		Vec3 up_near = up * near_distance * scale;
 		Vec3 right_near = right * (near_distance * scale * ratio);
 
@@ -3862,7 +3864,7 @@ public:
 		light.m_diffuse_intensity = 1;
 		++m_point_light_last_cmp.index;
 		light.m_component = m_point_light_last_cmp;
-		light.m_fov = 999;
+		light.m_fov = Math::degreesToRadians(360);
 		light.m_specular_color.set(1, 1, 1);
 		light.m_specular_intensity = 1;
 		light.m_cast_shadows = false;

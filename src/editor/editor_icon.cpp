@@ -293,7 +293,7 @@ struct EditorIconsImpl : public EditorIcons
 			float distance = (position - camera_pos).length();
 			float scale_factor = MIN_SCALE_FACTOR + distance;
 			scale_factor = Math::clamp(scale_factor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
-			icon.scale = tan(Math::degreesToRadians(fov) * 0.5f) * distance / scale_factor;
+			icon.scale = tan(fov * 0.5f) * distance / scale_factor;
 			
 			Matrix icon_mtx = getIconMatrix(icon, camera_mtx, is_ortho, ortho_size);
 			render_interface->renderModel(m_models[(int)icon.type], icon_mtx);

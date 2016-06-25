@@ -35,6 +35,7 @@ public:
 	IPropertyDescriptor(IAllocator& allocator)
 		: m_name(allocator)
 		, m_children(allocator)
+		, m_is_in_radians(false)
 	{
 	}
 	virtual ~IPropertyDescriptor() {}
@@ -49,8 +50,11 @@ public:
 	void addChild(IPropertyDescriptor* child) { m_children.push(child); }
 	const Array<IPropertyDescriptor*>& getChildren() const { return m_children; }
 	Array<IPropertyDescriptor*>& getChildren() { return m_children; }
+	IPropertyDescriptor& setIsInRadians(bool is) { m_is_in_radians = is; return *this; }
+	bool isInRadians() const { return m_is_in_radians; }
 
 protected:
+	bool m_is_in_radians;
 	uint32 m_name_hash;
 	string m_name;
 	Type m_type;
