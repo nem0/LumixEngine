@@ -654,7 +654,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			Entity entity = {cmp.index};
 			auto& joint = m_distance_joints[entity];
-			joint.physx->release();
+			if (joint.physx) joint.physx->release();
 			m_distance_joints.erase(entity);
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
@@ -662,7 +662,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			Entity entity = {cmp.index};
 			auto& joint = m_hinge_joints[entity];
-			joint.physx->release();
+			if(joint.physx) joint.physx->release();
 			m_hinge_joints.erase(entity);
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
