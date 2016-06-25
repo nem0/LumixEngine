@@ -31,6 +31,7 @@ static const ComponentType MESH_ACTOR_TYPE = PropertyRegister::getComponentType(
 static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("physical_controller");
 static const ComponentType HEIGHTFIELD_TYPE = PropertyRegister::getComponentType("physical_heightfield");
 static const ComponentType DISTANCE_JOINT_TYPE = PropertyRegister::getComponentType("distance_joint");
+static const ComponentType HINGE_JOINT_TYPE = PropertyRegister::getComponentType("hinge_joint");
 static const uint32 TEXTURE_HASH = crc32("TEXTURE");
 static const uint32 PHYSICS_HASH = crc32("PHYSICS");
 
@@ -39,6 +40,7 @@ enum class PhysicsSceneVersion : int
 {
 	LAYERS,
 	JOINTS,
+	HINGE_JOINT,
 
 	LATEST
 };
@@ -131,12 +133,27 @@ static void matrix2Transform(const Matrix& mtx, physx::PxTransform& transform)
 
 struct DistanceJoint
 {
-	Entity other_entity;
+	Entity connected_body;
 	physx::PxDistanceJoint* physx;
 	float damping;
 	float stiffness;
 	float tolerance;
 	Vec2 distance_limit;
+};
+
+
+struct HingeJoint
+{
+	Entity connected_body;
+	physx::PxRevoluteJoint* physx;
+	float damping;
+	float stiffness;
+	float tolerance;
+	Vec3 axis_position;
+	Vec3 axis_direction;
+	bool use_limit;
+	Vec2 limit;
+	Vec3 initial_pos;
 };
 
 
@@ -253,6 +270,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		, m_queued_forces(m_allocator)
 		, m_layers_count(2)
 		, m_distance_joints(m_allocator)
+		, m_hinge_joints(m_allocator)
 		, m_script_scene(nullptr)
 	{
 		setMemory(m_layers_names, 0, sizeof(m_layers_names));
@@ -326,7 +344,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	bool ownComponentType(ComponentType type) const override
 	{
 		return type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == HEIGHTFIELD_TYPE ||
-			   type == CONTROLLER_TYPE || type == DISTANCE_JOINT_TYPE;
+			   type == CONTROLLER_TYPE || type == DISTANCE_JOINT_TYPE || type == HINGE_JOINT_TYPE;
 	}
 
 
@@ -361,6 +379,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			int index = m_distance_joints.find(entity);
 			if(index < 0) return INVALID_COMPONENT;
+			return {entity.index};
+		}
+		if (type == HINGE_JOINT_TYPE)
+		{
+			int index = m_hinge_joints.find(entity);
+			if (index < 0) return INVALID_COMPONENT;
 			return {entity.index};
 		}
 		return INVALID_COMPONENT;
@@ -464,14 +488,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	Entity getDistanceJointConnectedBody(ComponentHandle cmp) override
 	{
-		return m_distance_joints[{cmp.index}].other_entity;
+		return m_distance_joints[{cmp.index}].connected_body;
 	}
 
 
 	void setDistanceJointConnectedBody(ComponentHandle cmp, Entity entity) override
 	{
 		ASSERT(entity.index != cmp.index);
-		m_distance_joints[{cmp.index}].other_entity = entity;
+		m_distance_joints[{cmp.index}].connected_body = entity;
 	}
 
 
@@ -487,11 +511,101 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	void setHingeJointAxisPosition(ComponentHandle cmp, const Vec3& value) override
+	{
+		m_hinge_joints[{cmp.index}].axis_position = value;
+	}
+
+
+	void setHingeJointAxisDirection(ComponentHandle cmp, const Vec3& value) override
+	{
+		m_hinge_joints[{cmp.index}].axis_direction = value;
+	}
+
+
+	Vec3 getHingeJointAxisPosition(ComponentHandle cmp) override
+	{
+		return m_hinge_joints[{cmp.index}].axis_position;
+	}
+
+
+	Vec3 getHingeJointAxisDirection(ComponentHandle cmp) override
+	{
+		return m_hinge_joints[{cmp.index}].axis_direction;
+	}
+
+
+	Entity getHingeJointConnectedBody(ComponentHandle cmp) override
+	{
+		return m_hinge_joints[{cmp.index}].connected_body;
+	}
+
+
+	bool getHingeJointUseLimit(ComponentHandle cmp) override
+	{
+		return m_hinge_joints[{cmp.index}].use_limit;
+	}
+
+
+	void setHingeJointUseLimit(ComponentHandle cmp, bool use_limit) override
+	{
+		m_hinge_joints[{cmp.index}].use_limit = use_limit;
+	}
+
+
+	Vec2 getHingeJointLimit(ComponentHandle cmp) override
+	{
+		return m_hinge_joints[{cmp.index}].limit;
+	}
+
+
+	Vec3 getHingeJointConnectedBodyInitialPosition(ComponentHandle cmp) override
+	{
+		auto& joint = m_hinge_joints[{cmp.index}];
+		if (!m_is_game_running && isValid(joint.connected_body)) return m_universe.getPosition(joint.connected_body);
+		return joint.initial_pos;
+	}
+
+
+	void setHingeJointLimit(ComponentHandle cmp, const Vec2& limit) override
+	{
+		m_hinge_joints[{cmp.index}].limit = limit;
+	}
+
+
+	void setHingeJointConnectedBody(ComponentHandle cmp, Entity entity) override
+	{
+		m_hinge_joints[{cmp.index}].connected_body = entity;
+	}
+
+
+	float getHingeJointDamping(ComponentHandle cmp) override { return m_hinge_joints[{cmp.index}].damping; }
+
+
+	void setHingeJointDamping(ComponentHandle cmp, float value) override
+	{
+		m_hinge_joints[{cmp.index}].damping = value;
+	}
+
+
+	float getHingeJointStiffness(ComponentHandle cmp) override { return m_hinge_joints[{cmp.index}].stiffness; }
+
+
+	void setHingeJointStiffness(ComponentHandle cmp, float value) override
+	{
+		m_hinge_joints[{cmp.index}].stiffness = value;
+	}
+
+
 	ComponentHandle createComponent(ComponentType component_type, Entity entity) override
 	{
 		if (component_type == DISTANCE_JOINT_TYPE)
 		{
 			return createDistanceJoint(entity);
+		}
+		else if (component_type == HINGE_JOINT_TYPE)
+		{
+			return createHingeJoint(entity);
 		}
 		else if (component_type == HEIGHTFIELD_TYPE)
 		{
@@ -544,6 +658,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 			m_distance_joints.erase(entity);
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
+		else if (type == HINGE_JOINT_TYPE)
+		{
+			Entity entity = {cmp.index};
+			auto& joint = m_hinge_joints[entity];
+			joint.physx->release();
+			m_hinge_joints.erase(entity);
+			m_universe.destroyComponent(entity, type, this, cmp);
+		}
 		else
 		{
 			ASSERT(false);
@@ -555,7 +677,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		DistanceJoint joint;
 		joint.physx = nullptr;
-		joint.other_entity = INVALID_ENTITY;
+		joint.connected_body = INVALID_ENTITY;
 		joint.stiffness = -1;
 		joint.damping = -1;
 		joint.tolerance = 0.025f;
@@ -564,6 +686,27 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, DISTANCE_JOINT_TYPE, this, cmp);
+		return cmp;
+	}
+
+
+	ComponentHandle createHingeJoint(Entity entity)
+	{
+		HingeJoint joint;
+		joint.physx = nullptr;
+		joint.connected_body = INVALID_ENTITY;
+		joint.stiffness = -1;
+		joint.damping = -1;
+		joint.tolerance = 0.025f;
+		joint.axis_direction.set(1, 0, 0);
+		joint.axis_position.set(0, 0, 0);
+		joint.use_limit = false;
+		joint.limit.set(-1, 1);
+		joint.initial_pos.set(0, 0, 0);
+		m_hinge_joints.insert(entity, joint);
+
+		ComponentHandle cmp = {entity.index};
+		m_universe.addComponent(entity, HINGE_JOINT_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -764,6 +907,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 
 	static Vec3 toVec3(const physx::PxVec3& v) { return Vec3(v.x, v.y, v.z); }
+	static physx::PxVec3 fromVec3(const Vec3& v) { return physx::PxVec3(v.x, v.y, v.z); }
+	static physx::PxQuat fromQuat(const Quat& v) { return physx::PxQuat(v.x, v.y, v.z, v.w); }
 
 
 	void render(RenderScene& render_scene) override
@@ -893,6 +1038,20 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	void deinitHingeJoints()
+	{
+		for (int i = 0, c = m_hinge_joints.size(); i < c; ++i)
+		{
+			auto& joint = m_hinge_joints.at(i);
+			if (joint.physx)
+			{
+				joint.physx->release();
+				joint.physx = nullptr;
+			}
+		}
+	}
+
+
 	void initDistanceJoints()
 	{
 		for (int i = 0, c = m_distance_joints.size(); i < c; ++i)
@@ -904,7 +1063,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			for (auto* actor : m_actors)
 			{
 				if (actor->getEntity() == entity) actors[0] = actor->getPhysxActor();
-				if (actor->getEntity() == joint.other_entity) actors[1] = actor->getPhysxActor();
+				if (actor->getEntity() == joint.connected_body) actors[1] = actor->getPhysxActor();
 			}
 
 			if (!actors[0] || !actors[1]) continue;
@@ -914,7 +1073,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			if (!joint.physx)
 			{
 				g_log_error.log("Physics") << "Failed to create joint between " << entity.index << " and "
-										   << joint.other_entity.index;
+										   << joint.connected_body.index;
 				continue;
 			}
 
@@ -947,6 +1106,59 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	void initHingeJoints()
+	{
+		for (int i = 0, c = m_hinge_joints.size(); i < c; ++i)
+		{
+			auto& joint = m_hinge_joints.at(i);
+			Entity entity = m_hinge_joints.getKey(i);
+
+			physx::PxRigidActor* actors[2] = { nullptr, nullptr };
+			for (auto* actor : m_actors)
+			{
+				if (actor->getEntity() == entity) actors[0] = actor->getPhysxActor();
+				if (actor->getEntity() == joint.connected_body) actors[1] = actor->getPhysxActor();
+			}
+
+			if (!actors[0] || !actors[1]) continue;
+
+			Vec3 pos0 = m_universe.getPosition(entity);
+			Quat rot0 = m_universe.getRotation(entity);
+			Vec3 pos1 = m_universe.getPosition(joint.connected_body);
+			Quat rot1 = m_universe.getRotation(joint.connected_body);
+			physx::PxTransform entity0_frame(fromVec3(pos0), fromQuat(rot0));
+			physx::PxTransform entity1_frame(fromVec3(pos1), fromQuat(rot1));
+
+			Vec3 local_axis_dir = joint.axis_direction.normalized();
+			Quat axis_quat = Quat::vec3ToVec3(Vec3(1, 0, 0), local_axis_dir);
+			physx::PxTransform axis_local_frame0(fromVec3(joint.axis_position), fromQuat(axis_quat));
+			physx::PxTransform axis_local_frame1 = entity1_frame.getInverse() * entity0_frame * axis_local_frame0;
+
+			joint.physx = physx::PxRevoluteJointCreate(
+				*m_system->getPhysics(), actors[0], axis_local_frame0, actors[1], axis_local_frame1);
+			if (!joint.physx)
+			{
+				g_log_error.log("Physics") << "Failed to create joint between " << entity.index << " and "
+										   << joint.connected_body.index;
+				continue;
+			}
+
+			joint.initial_pos = pos1;
+
+			if (joint.use_limit)
+			{
+				physx::PxRevoluteJointFlags flags;
+				flags |= physx::PxRevoluteJointFlag::eLIMIT_ENABLED;
+				joint.physx->setRevoluteJointFlags(flags);
+
+				physx::PxSpring spring(joint.stiffness, joint.damping);
+				physx::PxJointAngularLimitPair limit(joint.limit.x, joint.limit.y, 0.1f);
+				joint.physx->setLimit(limit);
+			}
+		}
+	}
+
+
 	void startGame() override
 	{
 		auto* scene = m_universe.getScene(crc32("lua_script"));
@@ -954,12 +1166,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_is_game_running = true;
 
 		initDistanceJoints();
+		initHingeJoints();
 	}
 
 
 	void stopGame() override
 	{
 		deinitDistanceJoints();
+		deinitHingeJoints();
 		m_is_game_running = false;
 	}
 
@@ -1049,8 +1263,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				Quat q = m_universe.getRotation(entity);
 				physx::PxQuat pquat(q.x, q.y, q.z, q.w);
 				physx::PxTransform trans(pvec, pquat);
-				m_dynamic_actors[i]->getPhysxActor()->setGlobalPose(trans,
-																	false);
+				m_dynamic_actors[i]->getPhysxActor()->setGlobalPose(trans, false);
 				return;
 			}
 		}
@@ -1579,7 +1792,22 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.write(joint.stiffness);
 			serializer.write(joint.tolerance);
 			serializer.write(joint.distance_limit);
-			serializer.write(joint.other_entity);
+			serializer.write(joint.connected_body);
+		}
+
+		serializer.write(m_hinge_joints.size());
+		for (int i = 0; i < m_hinge_joints.size(); ++i)
+		{
+			const HingeJoint& joint = m_hinge_joints.at(i);
+			serializer.write(m_hinge_joints.getKey(i));
+			serializer.write(joint.damping);
+			serializer.write(joint.stiffness);
+			serializer.write(joint.tolerance);
+			serializer.write(joint.connected_body);
+			serializer.write(joint.axis_position);
+			serializer.write(joint.axis_direction);
+			serializer.write(joint.use_limit);
+			serializer.write(joint.limit);
 		}
 	}
 
@@ -1691,11 +1919,33 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.read(joint.stiffness);
 			serializer.read(joint.tolerance);
 			serializer.read(joint.distance_limit);
-			serializer.read(joint.other_entity);
+			serializer.read(joint.connected_body);
 			joint.physx = nullptr;
 			m_distance_joints.insert(entity, joint);
 			ComponentHandle cmp = {entity.index};
 			m_universe.addComponent(entity, DISTANCE_JOINT_TYPE, this, cmp);
+		}
+
+		serializer.read(count);
+		m_hinge_joints.clear();
+		m_hinge_joints.reserve(count);
+		for (int i = 0; i < count; ++i)
+		{
+			Entity entity;
+			serializer.read(entity);
+			HingeJoint joint;
+			serializer.read(joint.damping);
+			serializer.read(joint.stiffness);
+			serializer.read(joint.tolerance);
+			serializer.read(joint.connected_body);
+			serializer.read(joint.axis_position);
+			serializer.read(joint.axis_direction);
+			serializer.read(joint.use_limit);
+			serializer.read(joint.limit);
+			joint.physx = nullptr;
+			m_hinge_joints.insert(entity, joint);
+			ComponentHandle cmp = {entity.index};
+			m_universe.addComponent(entity, HINGE_JOINT_TYPE, this, cmp);
 		}
 	}
 
@@ -1865,7 +2115,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 	Array<RigidActor*> m_actors;
 	Array<RigidActor*> m_dynamic_actors;
 	AssociativeArray<Entity, DistanceJoint> m_distance_joints;
-bool m_is_game_running;
+	AssociativeArray<Entity, HingeJoint> m_hinge_joints;
+	bool m_is_game_running;
 
 	Array<QueuedForce> m_queued_forces;
 	Array<Controller> m_controllers;

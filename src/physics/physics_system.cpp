@@ -163,6 +163,49 @@ namespace Lumix
 				&PhysicsScene::setDistanceJointLimits,
 				allocator));
 
+		PropertyRegister::add("hinge_joint",
+			LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)("Connected body",
+				&PhysicsScene::getHingeJointConnectedBody,
+				&PhysicsScene::setHingeJointConnectedBody,
+				allocator));
+		PropertyRegister::add("hinge_joint",
+			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Damping",
+				&PhysicsScene::getHingeJointDamping,
+				&PhysicsScene::setHingeJointDamping,
+				0.0f,
+				FLT_MAX,
+				0.0f,
+				allocator));
+		PropertyRegister::add("hinge_joint",
+			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Stiffness",
+				&PhysicsScene::getHingeJointStiffness,
+				&PhysicsScene::setHingeJointStiffness,
+				0.0f,
+				FLT_MAX,
+				0.0f,
+				allocator));
+		PropertyRegister::add("hinge_joint",
+			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)("Axis position",
+				&PhysicsScene::getHingeJointAxisPosition,
+				&PhysicsScene::setHingeJointAxisPosition,
+				allocator));
+		PropertyRegister::add("hinge_joint",
+			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)("Axis direction",
+				&PhysicsScene::getHingeJointAxisDirection,
+				&PhysicsScene::setHingeJointAxisDirection,
+				allocator));
+		PropertyRegister::add("hinge_joint",
+			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)("Use limit",
+				&PhysicsScene::getHingeJointUseLimit,
+				&PhysicsScene::setHingeJointUseLimit,
+				allocator));
+		PropertyRegister::add("hinge_joint",
+			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)("Limit",
+				&PhysicsScene::getHingeJointLimit,
+				&PhysicsScene::setHingeJointLimit,
+				allocator));
+
+
 		PropertyRegister::add("physical_controller",
 			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
 			&PhysicsScene::getControllerLayer,

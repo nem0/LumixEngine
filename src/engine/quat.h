@@ -37,6 +37,8 @@ struct LUMIX_ENGINE_API Quat
 	Quat operator *(const Quat& q) const;
 	Quat operator -() const;
 
+	static Quat vec3ToVec3(const Vec3& a, const Vec3& b);
+
 	float x, y, z, w;
 };
 

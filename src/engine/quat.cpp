@@ -38,6 +38,15 @@ Quat::Quat(const Vec3& axis, float angle)
 }
 
 
+Quat Quat::vec3ToVec3(const Vec3& a, const Vec3& b)
+{
+	float angle = acosf(dotProduct(a, b));
+	Vec3 normal = crossProduct(a, b);
+	float normal_len = normal.length();
+	return Quat(normal_len < 0.001f ? Vec3(0, 1, 0) : normal * (1 / normal_len), angle);
+}
+
+
 void Quat::fromEuler(const Vec3& euler)
 {
 	float ex = euler.x * 0.5f;

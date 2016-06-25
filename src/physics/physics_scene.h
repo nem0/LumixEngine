@@ -80,6 +80,22 @@ public:
 	virtual void setDistanceJointLimits(ComponentHandle cmp, const Vec2& value) = 0;
 	virtual Vec3 getDistanceJointLinearForce(ComponentHandle cmp) = 0;
 
+	virtual Entity getHingeJointConnectedBody(ComponentHandle cmp) = 0;
+	virtual void setHingeJointConnectedBody(ComponentHandle cmp, Entity entity) = 0;
+	virtual float getHingeJointDamping(ComponentHandle cmp) = 0;
+	virtual void setHingeJointDamping(ComponentHandle cmp, float value) = 0;
+	virtual float getHingeJointStiffness(ComponentHandle cmp) = 0;
+	virtual void setHingeJointStiffness(ComponentHandle cmp, float value) = 0;
+	virtual Vec3 getHingeJointAxisPosition(ComponentHandle cmp) = 0;
+	virtual void setHingeJointAxisPosition(ComponentHandle cmp, const Vec3& value) = 0;
+	virtual Vec3 getHingeJointAxisDirection(ComponentHandle cmp) = 0;
+	virtual void setHingeJointAxisDirection(ComponentHandle cmp, const Vec3& value) = 0;
+	virtual bool getHingeJointUseLimit(ComponentHandle cmp) = 0;
+	virtual void setHingeJointUseLimit(ComponentHandle cmp, bool use_limit) = 0;
+	virtual Vec2 getHingeJointLimit(ComponentHandle cmp) = 0;
+	virtual void setHingeJointLimit(ComponentHandle cmp, const Vec2& limit) = 0;
+	virtual Vec3 getHingeJointConnectedBodyInitialPosition(ComponentHandle cmp) = 0;
+
 	virtual void applyForceToActor(ComponentHandle cmp, const Vec3& force) = 0;
 	virtual float getActorSpeed(ComponentHandle cmp) = 0;
 	virtual void putToSleep(ComponentHandle cmp) = 0;
