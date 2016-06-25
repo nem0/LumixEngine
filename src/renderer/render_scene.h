@@ -48,6 +48,7 @@ enum class RenderSceneVersion : int32
 	ORTHO_CAMERA,
 	BONE_ATTACHMENTS,
 	ENVIRONMENT_PROBES,
+	FOV_RADIANS,
 
 	LATEST,
 	INVALID = -1,

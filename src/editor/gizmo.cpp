@@ -135,7 +135,7 @@ struct GizmoImpl : public Gizmo
 	float getScale(const Vec3& camera_pos, float fov, const Vec3& pos, float entity_scale, bool is_ortho)
 	{
 		if (is_ortho) return 2;
-		float scale = tanf(fov * Math::PI / 180 * 0.5f) * (pos - camera_pos).length() * 2;
+		float scale = tanf(fov * 0.5f) * (pos - camera_pos).length() * 2;
 		return scale / (10 / entity_scale);
 	}
 

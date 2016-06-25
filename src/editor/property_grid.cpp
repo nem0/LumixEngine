@@ -51,11 +51,13 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	{
 		float f;
 		tmp.read(f);
+		if (desc.isInRadians()) f = Lumix::Math::radiansToDegrees(f);
 		auto& d = static_cast<Lumix::IDecimalPropertyDescriptor&>(desc);
 		if ((d.getMax() - d.getMin()) / d.getStep() <= 100)
 		{
 			if (ImGui::SliderFloat(desc_name, &f, d.getMin(), d.getMax()))
 			{
+				if (desc.isInRadians()) f = Lumix::Math::degreesToRadians(f);
 				m_editor.setProperty(cmp.type, index, desc, &f, sizeof(f));
 			}
 		}
@@ -63,6 +65,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		{
 			if (ImGui::DragFloat(desc_name, &f, d.getStep(), d.getMin(), d.getMax()))
 			{
+				if (desc.isInRadians()) f = Lumix::Math::degreesToRadians(f);
 				m_editor.setProperty(cmp.type, index, desc, &f, sizeof(f));
 			}
 		}
@@ -110,8 +113,18 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	{
 		Lumix::Vec2 v;
 		tmp.read(v);
+		if (desc.isInRadians())
+		{
+			v.x = Lumix::Math::radiansToDegrees(v.x);
+			v.y = Lumix::Math::radiansToDegrees(v.y);
+		}
 		if (ImGui::DragFloat2(desc_name, &v.x))
 		{
+			if (desc.isInRadians())
+			{
+				v.x = Lumix::Math::degreesToRadians(v.x);
+				v.y = Lumix::Math::degreesToRadians(v.y);
+			}
 			m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
 		}
 		break;

@@ -200,11 +200,10 @@ namespace Lumix
 				&PhysicsScene::setHingeJointUseLimit,
 				allocator));
 		PropertyRegister::add("hinge_joint",
-			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)("Limit",
+			&(LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)("Limit",
 				&PhysicsScene::getHingeJointLimit,
 				&PhysicsScene::setHingeJointLimit,
-				allocator));
-
+				allocator))->setIsInRadians(true));
 
 		PropertyRegister::add("physical_controller",
 			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",

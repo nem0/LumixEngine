@@ -1017,7 +1017,7 @@ struct PipelineImpl : public Pipeline
 			float range = m_scene->getLightRange(light_cmp);
 			Vec3 light_dir = universe.getRotation(entity) * Vec3(0, 0, -1);
 			float attenuation = m_scene->getLightAttenuation(light_cmp);
-			float fov = Math::degreesToRadians(m_scene->getLightFOV(light_cmp));
+			float fov = m_scene->getLightFOV(light_cmp);
 			float intensity = m_scene->getPointLightIntensity(light_cmp);
 			intensity *= intensity;
 			Vec3 color = m_scene->getPointLightColor(light_cmp) * intensity;
@@ -1082,7 +1082,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::setViewRect(m_bgfx_view, 0, 0, shadowmap_width, shadowmap_height);
 
 		Matrix projection_matrix;
-		projection_matrix.setPerspective(Math::degreesToRadians(fov), 1, 0.01f, range, is_opengl);
+		projection_matrix.setPerspective(fov, 1, 0.01f, range, is_opengl);
 		Matrix view_matrix;
 		view_matrix.lookAt(pos, pos - mtx.getZVector(), mtx.getYVector());
 		bgfx::setViewTransform(m_bgfx_view, &view_matrix.m11, &projection_matrix.m11);
@@ -1206,7 +1206,7 @@ struct PipelineImpl : public Pipeline
 			float fov = m_scene->getLightFOV(lights[i]);
 
 			m_current_framebuffer = fbs[i];
-			if (fov < 180)
+			if (fov < Math::PI)
 			{
 				renderSpotLightShadowmap(lights[i]);
 			}
@@ -1249,7 +1249,7 @@ struct PipelineImpl : public Pipeline
 		float shadowmap_width = (float)m_current_framebuffer->getWidth();
 		float viewports[] = { 0, 0, 0.5f, 0, 0, 0.5f, 0.5f, 0.5f };
 		float viewports_gl[] = { 0, 0.5f, 0.5f, 0.5f, 0, 0, 0.5f, 0};
-		float camera_fov = Math::degreesToRadians(m_scene->getCameraFOV(m_applied_camera));
+		float camera_fov = m_scene->getCameraFOV(m_applied_camera);
 		float camera_ratio = m_scene->getCameraScreenWidth(m_applied_camera) / camera_height;
 		Vec4 cascades = m_scene->getShadowmapCascades(light_cmp);
 		float split_distances[] = {0.01f, cascades.x, cascades.y, cascades.z, cascades.w};
@@ -1493,7 +1493,7 @@ struct PipelineImpl : public Pipeline
 		Entity light_entity = m_scene->getPointLightEntity(light_cmp);
 		Vec3 light_pos = universe.getPosition(light_entity);
 		Vec3 light_dir = universe.getRotation(light_entity) * Vec3(0, 0, -1);
-		float fov = Math::degreesToRadians(m_scene->getLightFOV(light_cmp));
+		float fov = m_scene->getLightFOV(light_cmp);
 		float intensity = m_scene->getPointLightIntensity(light_cmp);
 		intensity *= intensity;
 		Vec3 color = m_scene->getPointLightColor(light_cmp) * intensity;
@@ -1521,7 +1521,7 @@ struct PipelineImpl : public Pipeline
 					shadowmap = info.m_framebuffer;
 					m_views[m_view_idx].command_buffer.setUniform(m_shadowmap_matrices_uniform,
 						&info.m_matrices[0],
-						m_scene->getLightFOV(light_cmp) > 180 ? 4 : 1);
+						m_scene->getLightFOV(light_cmp) > Math::PI ? 4 : 1);
 					break;
 				}
 			}
@@ -1800,7 +1800,7 @@ struct PipelineImpl : public Pipeline
 			Matrix inv_view_matrix = universe.getPositionAndRotation(camera_entity);
 			Matrix view_matrix = inv_view_matrix;
 			view_matrix.fastInverse();
-			projection_matrix.setPerspective(Math::degreesToRadians(fov), ratio, near_plane, far_plane, is_opengl);
+			projection_matrix.setPerspective(fov, ratio, near_plane, far_plane, is_opengl);
 			Matrix inv_projection = projection_matrix;
 			inv_projection.inverse();
 			Matrix inv_view_proj = projection_matrix * view_matrix;

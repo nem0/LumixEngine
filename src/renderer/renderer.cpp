@@ -298,13 +298,14 @@ static void registerProperties(IAllocator& allocator)
 							  &RenderScene::setCameraOrtho,
 							  allocator));
 	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("FOV",
+		&(LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("FOV",
 							  &RenderScene::getCameraFOV,
 							  &RenderScene::setCameraFOV,
-							  1.0f,
-							  179.0f,
-							  1.0f,
-							  allocator));
+							  1,
+							  179,
+							  1,
+							  allocator))
+							 ->setIsInRadians(true));
 	PropertyRegister::add("camera",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Near",
 							  &RenderScene::getCameraNearPlane,
@@ -443,13 +444,13 @@ static void registerProperties(IAllocator& allocator)
 							  0.05f,
 							  allocator));
 	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("FOV",
+		&(LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("FOV",
 							  &RenderScene::getLightFOV,
 							  &RenderScene::setLightFOV,
-							  0.0f,
-							  360.0f,
-							  5.0f,
-							  allocator));
+							  0,
+							  360,
+							  5,
+							  allocator))->setIsInRadians(true));
 	PropertyRegister::add("point_light",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Attenuation",
 							  &RenderScene::getLightAttenuation,
