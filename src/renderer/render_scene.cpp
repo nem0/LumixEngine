@@ -3058,6 +3058,32 @@ public:
 	}
 
 
+	void addDebugCone(const Vec3& vertex,
+		const Vec3& dir,
+		const Vec3& axis0,
+		const Vec3& axis1,
+		uint32 color,
+		float life) override
+	{
+		Vec3 base_center = vertex + dir;
+		Vec3 prev_p = base_center + axis0;
+		for (int i = 1; i <= 32; ++i)
+		{
+			float angle = i / 32.0f * 2 * Math::PI;
+			Vec3 x = cosf(angle) * axis0;
+			Vec3 z = sinf(angle) * axis1;
+			Vec3 p = base_center + x + z;
+			addDebugLine(p, prev_p, color, life);
+			prev_p = p;
+		}
+
+		addDebugLine(vertex, base_center + axis0, color, life);
+		addDebugLine(vertex, base_center - axis0, color, life);
+		addDebugLine(vertex, base_center + axis1, color, life);
+		addDebugLine(vertex, base_center - axis1, color, life);
+	}
+
+
 	static uint32 ARGBToABGR(uint32 color)
 	{
 		return ((color & 0xff) << 16) | (color & 0xff00) | ((color & 0xff0000) >> 16) | (color & 0xff000000);
