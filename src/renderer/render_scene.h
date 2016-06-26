@@ -168,6 +168,12 @@ public:
 		uint32 color,
 		float life) = 0;
 	virtual void addDebugPoint(const Vec3& pos, uint32 color, float life) = 0;
+	virtual void addDebugCone(const Vec3& vertex,
+		const Vec3& dir,
+		const Vec3& axis0,
+		const Vec3& axis1,
+		uint32 color,
+		float life) = 0;
 
 	virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32 color, float life) = 0;
 	virtual void addDebugCross(const Vec3& center, float size, uint32 color, float life) = 0;
