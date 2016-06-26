@@ -525,17 +525,14 @@ void PropertyGrid::showCoreProperties(Lumix::Entity entity)
 {
 	char name[256];
 	const char* tmp = m_editor.getUniverse()->getEntityName(entity);
+	
+	ImGui::LabelText("ID", "%d", entity.index);
+	
 	Lumix::copyString(name, tmp);
-	if (ImGui::InputText("Name", name, sizeof(name)))
-	{
-		m_editor.setEntityName(entity, name);
-	}
+	if (ImGui::InputText("Name", name, sizeof(name))) m_editor.setEntityName(entity, name);
 
 	auto pos = m_editor.getUniverse()->getPosition(entity);
-	if (ImGui::DragFloat3("Position", &pos.x))
-	{
-		m_editor.setEntitiesPositions(&entity, &pos, 1);
-	}
+	if (ImGui::DragFloat3("Position", &pos.x)) m_editor.setEntitiesPositions(&entity, &pos, 1);
 
 	auto rot = m_editor.getUniverse()->getRotation(entity);
 	auto euler = rot.toEuler();
