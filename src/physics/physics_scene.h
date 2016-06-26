@@ -79,6 +79,9 @@ public:
 	virtual Vec2 getDistanceJointLimits(ComponentHandle cmp) = 0;
 	virtual void setDistanceJointLimits(ComponentHandle cmp, const Vec2& value) = 0;
 	virtual Vec3 getDistanceJointLinearForce(ComponentHandle cmp) = 0;
+	virtual int getDistanceJointCount() = 0;
+	virtual ComponentHandle getDistanceJointComponent(int index) = 0;
+	virtual Entity getDistanceJointEntity(ComponentHandle cmp) = 0;
 
 	virtual Entity getHingeJointConnectedBody(ComponentHandle cmp) = 0;
 	virtual void setHingeJointConnectedBody(ComponentHandle cmp, Entity entity) = 0;
@@ -95,6 +98,9 @@ public:
 	virtual Vec2 getHingeJointLimit(ComponentHandle cmp) = 0;
 	virtual void setHingeJointLimit(ComponentHandle cmp, const Vec2& limit) = 0;
 	virtual Vec3 getHingeJointConnectedBodyInitialPosition(ComponentHandle cmp) = 0;
+	virtual int getHingeJointCount() = 0;
+	virtual ComponentHandle getHingeJointComponent(int index) = 0;
+	virtual Entity getHingeJointEntity(ComponentHandle cmp) = 0;
 
 	virtual void applyForceToActor(ComponentHandle cmp, const Vec3& force) = 0;
 	virtual float getActorSpeed(ComponentHandle cmp) = 0;

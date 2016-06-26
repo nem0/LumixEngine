@@ -344,7 +344,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	bool ownComponentType(ComponentType type) const override
 	{
 		return type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == HEIGHTFIELD_TYPE ||
-			   type == CONTROLLER_TYPE || type == DISTANCE_JOINT_TYPE || type == HINGE_JOINT_TYPE;
+			type == CONTROLLER_TYPE || type == DISTANCE_JOINT_TYPE || type == HINGE_JOINT_TYPE;
 	}
 
 
@@ -355,7 +355,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			for (int i = 0; i < m_actors.size(); ++i)
 			{
-				if (m_actors[i] && m_actors[i]->getEntity() == entity) return {i};
+				if (m_actors[i] && m_actors[i]->getEntity() == entity) return{ i };
 			}
 			return INVALID_COMPONENT;
 		}
@@ -363,7 +363,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			for (int i = 0; i < m_controllers.size(); ++i)
 			{
-				if (!m_controllers[i].m_is_free && m_controllers[i].m_entity == entity) return {i};
+				if (!m_controllers[i].m_is_free && m_controllers[i].m_entity == entity) return{ i };
 			}
 			return INVALID_COMPONENT;
 		}
@@ -371,21 +371,21 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			for (int i = 0; i < m_terrains.size(); ++i)
 			{
-				if (m_terrains[i] && m_terrains[i]->m_entity == entity) return {i};
+				if (m_terrains[i] && m_terrains[i]->m_entity == entity) return{ i };
 			}
 			return INVALID_COMPONENT;
 		}
 		if (type == DISTANCE_JOINT_TYPE)
 		{
 			int index = m_distance_joints.find(entity);
-			if(index < 0) return INVALID_COMPONENT;
-			return {entity.index};
+			if (index < 0) return INVALID_COMPONENT;
+			return{ entity.index };
 		}
 		if (type == HINGE_JOINT_TYPE)
 		{
 			int index = m_hinge_joints.find(entity);
 			if (index < 0) return INVALID_COMPONENT;
-			return {entity.index};
+			return{ entity.index };
 		}
 		return INVALID_COMPONENT;
 	}
@@ -428,7 +428,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	int getActorLayer(ComponentHandle cmp) override { return m_actors[cmp.index]->getLayer(); }
 	int getHeightfieldLayer(ComponentHandle cmp) override { return m_terrains[cmp.index]->m_layer; }
-	
+
 
 	void setHeightfieldLayer(ComponentHandle cmp, int layer) override
 	{
@@ -448,6 +448,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 		}
 	}
+
+
+	int getDistanceJointCount() override { return m_distance_joints.size(); }
+	ComponentHandle getDistanceJointComponent(int index) override { return {m_distance_joints.getKey(index).index}; }
+	Entity getDistanceJointEntity(ComponentHandle cmp) override { return {cmp.index}; }
 
 
 	Vec3 getDistanceJointLinearForce(ComponentHandle cmp) override
@@ -510,6 +515,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_distance_joints[{cmp.index}].distance_limit = value;
 	}
 
+
+	int getHingeJointCount() override { return m_hinge_joints.size(); }
+	ComponentHandle getHingeJointComponent(int index) override { return {m_hinge_joints.getKey(index).index}; }
+	Entity getHingeJointEntity(ComponentHandle cmp) override { return {cmp.index}; }
 
 	void setHingeJointAxisPosition(ComponentHandle cmp, const Vec3& value) override
 	{
