@@ -32,6 +32,7 @@ static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType(
 static const ComponentType HEIGHTFIELD_TYPE = PropertyRegister::getComponentType("physical_heightfield");
 static const ComponentType DISTANCE_JOINT_TYPE = PropertyRegister::getComponentType("distance_joint");
 static const ComponentType HINGE_JOINT_TYPE = PropertyRegister::getComponentType("hinge_joint");
+static const ComponentType SPHERICAL_JOINT_TYPE = PropertyRegister::getComponentType("spherical_joint");
 static const uint32 TEXTURE_HASH = crc32("TEXTURE");
 static const uint32 PHYSICS_HASH = crc32("PHYSICS");
 
@@ -41,6 +42,7 @@ enum class PhysicsSceneVersion : int
 	LAYERS,
 	JOINTS,
 	HINGE_JOINT,
+	SPHERICAL_JOINT,
 
 	LATEST
 };
@@ -139,6 +141,17 @@ struct DistanceJoint
 	float stiffness;
 	float tolerance;
 	Vec2 distance_limit;
+};
+
+
+struct SphericalJoint
+{
+	Entity connected_body;
+	physx::PxSphericalJoint* physx;
+	Vec3 axis_position;
+	Vec3 axis_direction;
+	bool use_limit;
+	Vec2 limit;
 };
 
 
@@ -271,6 +284,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		, m_layers_count(2)
 		, m_distance_joints(m_allocator)
 		, m_hinge_joints(m_allocator)
+		, m_spherical_joints(m_allocator)
 		, m_script_scene(nullptr)
 	{
 		setMemory(m_layers_names, 0, sizeof(m_layers_names));
@@ -344,7 +358,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 	bool ownComponentType(ComponentType type) const override
 	{
 		return type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == HEIGHTFIELD_TYPE ||
-			type == CONTROLLER_TYPE || type == DISTANCE_JOINT_TYPE || type == HINGE_JOINT_TYPE;
+			   type == CONTROLLER_TYPE || type == DISTANCE_JOINT_TYPE || type == HINGE_JOINT_TYPE ||
+			   type == SPHERICAL_JOINT_TYPE;
 	}
 
 
@@ -386,6 +401,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 			int index = m_hinge_joints.find(entity);
 			if (index < 0) return INVALID_COMPONENT;
 			return{ entity.index };
+		}
+		if (type == SPHERICAL_JOINT_TYPE)
+		{
+			int index = m_spherical_joints.find(entity);
+			if (index < 0) return INVALID_COMPONENT;
+			return {entity.index};
 		}
 		return INVALID_COMPONENT;
 	}
@@ -516,6 +537,93 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	Entity getSphericalJointConnectedBody(ComponentHandle cmp) override
+	{
+		return m_spherical_joints[{cmp.index}].connected_body;
+	}
+
+
+	int getSphericalJointCount() override { return m_spherical_joints.size(); }
+	ComponentHandle getSphericalJointComponent(int index) override { return {m_spherical_joints.getKey(index).index}; }
+	Entity getSphericalJointEntity(ComponentHandle cmp) override { return {cmp.index}; }
+
+
+	void setSphericalJointConnectedBody(ComponentHandle cmp, Entity entity) override
+	{
+		m_spherical_joints[{cmp.index}].connected_body = entity;
+	}
+
+
+	void setSphericalJointAxisPosition(ComponentHandle cmp, const Vec3& value) override
+	{
+		m_spherical_joints[{cmp.index}].axis_position = value;
+	}
+
+
+	void setSphericalJointAxisDirection(ComponentHandle cmp, const Vec3& value) override
+	{
+		m_spherical_joints[{cmp.index}].axis_direction = value;
+	}
+
+
+	Vec3 getSphericalJointAxisPosition(ComponentHandle cmp) override
+	{
+		return m_spherical_joints[{cmp.index}].axis_position;
+	}
+
+
+	Vec3 getSphericalJointAxisDirection(ComponentHandle cmp) override
+	{
+		return m_spherical_joints[{cmp.index}].axis_direction;
+	}
+
+
+	bool getSphericalJointUseLimit(ComponentHandle cmp) override
+	{
+		return m_spherical_joints[{cmp.index}].use_limit;
+	}
+
+
+	void setSphericalJointUseLimit(ComponentHandle cmp, bool use_limit) override
+	{
+		m_spherical_joints[{cmp.index}].use_limit = use_limit;
+	}
+
+
+	Vec2 getSphericalJointLimit(ComponentHandle cmp) override { return m_spherical_joints[{cmp.index}].limit; }
+
+
+	void setSphericalJointLimit(ComponentHandle cmp, const Vec2& limit) override
+	{
+		m_spherical_joints[{cmp.index}].limit = limit;
+	}
+
+
+	Matrix getSphericalJointConnectedBodyLocalFrame(ComponentHandle cmp) override
+	{
+		Entity entity = {cmp.index};
+		auto& joint = m_spherical_joints[entity];
+		if (!isValid(joint.connected_body)) return Matrix::IDENTITY;
+		
+		if (!joint.physx)
+		{
+			Matrix mtx0 = m_universe.getMatrix(entity);
+			Matrix mtx1 = m_universe.getMatrix(joint.connected_body);
+			Matrix local_frame0;
+			Quat::vec3ToVec3(Vec3(1, 0, 0), joint.axis_direction.normalized()).toMatrix(local_frame0);
+			local_frame0.setTranslation(joint.axis_position);
+			mtx1.inverse();
+			return mtx1 * (mtx0 * local_frame0);
+		}
+
+		physx::PxTransform px_local_frame = joint.physx->getLocalPose(physx::PxJointActorIndex::eACTOR1);
+		Matrix	local_frame;
+		toQuat(px_local_frame.q).toMatrix(local_frame);
+		local_frame.setTranslation(toVec3(px_local_frame.p));
+		return local_frame;
+	}
+
+
 	int getHingeJointCount() override { return m_hinge_joints.size(); }
 	ComponentHandle getHingeJointComponent(int index) override { return {m_hinge_joints.getKey(index).index}; }
 	Entity getHingeJointEntity(ComponentHandle cmp) override { return {cmp.index}; }
@@ -616,6 +724,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			return createHingeJoint(entity);
 		}
+		else if (component_type == SPHERICAL_JOINT_TYPE)
+		{
+			return createSphericalJoint(entity);
+		}
 		else if (component_type == HEIGHTFIELD_TYPE)
 		{
 			return createHeightfield(entity);
@@ -671,8 +783,16 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			Entity entity = {cmp.index};
 			auto& joint = m_hinge_joints[entity];
-			if(joint.physx) joint.physx->release();
+			if (joint.physx) joint.physx->release();
 			m_hinge_joints.erase(entity);
+			m_universe.destroyComponent(entity, type, this, cmp);
+		}
+		else if (type == SPHERICAL_JOINT_TYPE)
+		{
+			Entity entity = {cmp.index};
+			auto& joint = m_spherical_joints[entity];
+			if (joint.physx) joint.physx->release();
+			m_spherical_joints.erase(entity);
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
 		else
@@ -695,6 +815,23 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, DISTANCE_JOINT_TYPE, this, cmp);
+		return cmp;
+	}
+
+
+	ComponentHandle createSphericalJoint(Entity entity)
+	{
+		SphericalJoint joint;
+		joint.physx = nullptr;
+		joint.connected_body = INVALID_ENTITY;
+		joint.axis_direction.set(1, 0, 0);
+		joint.axis_position.set(0, 0, 0);
+		joint.use_limit = false;
+		joint.limit.set(Math::PI * 0.5f, Math::PI * 0.5f);
+		m_spherical_joints.insert(entity, joint);
+
+		ComponentHandle cmp = {entity.index};
+		m_universe.addComponent(entity, SPHERICAL_JOINT_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -917,12 +1054,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	static Vec3 toVec3(const physx::PxVec3& v) { return Vec3(v.x, v.y, v.z); }
 	static physx::PxVec3 fromVec3(const Vec3& v) { return physx::PxVec3(v.x, v.y, v.z); }
+	static Quat toQuat(const physx::PxQuat& v) { return Quat(v.x, v.y, v.z, v.w); }
 	static physx::PxQuat fromQuat(const Quat& v) { return physx::PxQuat(v.x, v.y, v.z, v.w); }
 
 
 	void render(RenderScene& render_scene) override
 	{
-		m_scene->getNbActors(physx::PxActorTypeSelectionFlag::eRIGID_STATIC);
 		const physx::PxRenderBuffer& rb = m_scene->getRenderBuffer();
 		const physx::PxU32 num_lines = rb.getNbLines();
 		if (num_lines)
@@ -934,6 +1071,16 @@ struct PhysicsSceneImpl : public PhysicsScene
 				Vec3 from = toVec3(line.pos0);
 				Vec3 to = toVec3(line.pos1);
 				render_scene.addDebugLine(from, to, line.color0, 0);
+			}
+		}
+		const physx::PxU32 num_tris = rb.getNbTriangles();
+		if (num_tris)
+		{
+			const physx::PxDebugTriangle* PX_RESTRICT tris = rb.getTriangles();
+			for (physx::PxU32 i = 0; i < num_tris; ++i)
+			{
+				const physx::PxDebugTriangle& tri = tris[i];
+				render_scene.addDebugTriangle(toVec3(tri.pos0), toVec3(tri.pos1), toVec3(tri.pos2), tri.color0, 0);
 			}
 		}
 	}
@@ -1061,6 +1208,20 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	void deinitSphericalJoints()
+	{
+		for (int i = 0, c = m_spherical_joints.size(); i < c; ++i)
+		{
+			auto& joint = m_spherical_joints.at(i);
+			if (joint.physx)
+			{
+				joint.physx->release();
+				joint.physx = nullptr;
+			}
+		}
+	}
+
+
 	void initDistanceJoints()
 	{
 		for (int i = 0, c = m_distance_joints.size(); i < c; ++i)
@@ -1115,6 +1276,53 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	void initSphericalJoints()
+	{
+		for (int i = 0, c = m_spherical_joints.size(); i < c; ++i)
+		{
+			auto& joint = m_spherical_joints.at(i);
+			Entity entity = m_spherical_joints.getKey(i);
+
+			physx::PxRigidActor* actors[2] = {nullptr, nullptr};
+			for (auto* actor : m_actors)
+			{
+				if (actor->getEntity() == entity) actors[0] = actor->getPhysxActor();
+				if (actor->getEntity() == joint.connected_body) actors[1] = actor->getPhysxActor();
+			}
+
+			if (!actors[0] || !actors[1]) continue;
+
+			Vec3 pos0 = m_universe.getPosition(entity);
+			Quat rot0 = m_universe.getRotation(entity);
+			Vec3 pos1 = m_universe.getPosition(joint.connected_body);
+			Quat rot1 = m_universe.getRotation(joint.connected_body);
+			physx::PxTransform entity0_frame(fromVec3(pos0), fromQuat(rot0));
+			physx::PxTransform entity1_frame(fromVec3(pos1), fromQuat(rot1));
+
+			Vec3 local_axis_dir = joint.axis_direction.normalized();
+			Quat axis_quat = Quat::vec3ToVec3(Vec3(1, 0, 0), local_axis_dir);
+			physx::PxTransform axis_local_frame0(fromVec3(joint.axis_position), fromQuat(axis_quat));
+			physx::PxTransform axis_local_frame1 = entity1_frame.getInverse() * entity0_frame * axis_local_frame0;
+
+			joint.physx = physx::PxSphericalJointCreate(
+				*m_system->getPhysics(), actors[0], axis_local_frame0, actors[1], axis_local_frame1);
+			if (!joint.physx)
+			{
+				g_log_error.log("Physics") << "Failed to create joint between " << entity.index << " and "
+										   << joint.connected_body.index;
+				continue;
+			}
+
+			if (joint.use_limit)
+			{
+				physx::PxJointLimitCone limit(joint.limit.x, joint.limit.y, 0.1f);
+				joint.physx->setSphericalJointFlag(physx::PxSphericalJointFlag::eLIMIT_ENABLED, true);
+				joint.physx->setLimitCone(limit);
+			}
+		}
+	}
+
+
 	void initHingeJoints()
 	{
 		for (int i = 0, c = m_hinge_joints.size(); i < c; ++i)
@@ -1161,7 +1369,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				joint.physx->setRevoluteJointFlags(flags);
 
 				physx::PxSpring spring(joint.stiffness, joint.damping);
-				physx::PxJointAngularLimitPair limit(joint.limit.x, joint.limit.y, 0.1f);
+				physx::PxJointAngularLimitPair limit(joint.limit.x, joint.limit.y, 0.01f);
 				joint.physx->setLimit(limit);
 			}
 		}
@@ -1176,6 +1384,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		initDistanceJoints();
 		initHingeJoints();
+		initSphericalJoints();
 	}
 
 
@@ -1183,6 +1392,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		deinitDistanceJoints();
 		deinitHingeJoints();
+		deinitSphericalJoints();
 		m_is_game_running = false;
 	}
 
@@ -1818,6 +2028,18 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.write(joint.use_limit);
 			serializer.write(joint.limit);
 		}
+
+		serializer.write(m_spherical_joints.size());
+		for (int i = 0; i < m_spherical_joints.size(); ++i)
+		{
+			const SphericalJoint& joint = m_spherical_joints.at(i);
+			serializer.write(m_spherical_joints.getKey(i));
+			serializer.write(joint.connected_body);
+			serializer.write(joint.axis_position);
+			serializer.write(joint.axis_direction);
+			serializer.write(joint.use_limit);
+			serializer.write(joint.limit);
+		}
 	}
 
 
@@ -1955,6 +2177,28 @@ struct PhysicsSceneImpl : public PhysicsScene
 			m_hinge_joints.insert(entity, joint);
 			ComponentHandle cmp = {entity.index};
 			m_universe.addComponent(entity, HINGE_JOINT_TYPE, this, cmp);
+		}
+
+		if (version > int(PhysicsSceneVersion::SPHERICAL_JOINT))
+		{
+			serializer.read(count);
+			m_spherical_joints.clear();
+			m_spherical_joints.reserve(count);
+			for (int i = 0; i < count; ++i)
+			{
+				Entity entity;
+				serializer.read(entity);
+				SphericalJoint joint;
+				serializer.read(joint.connected_body);
+				serializer.read(joint.axis_position);
+				serializer.read(joint.axis_direction);
+				serializer.read(joint.use_limit);
+				serializer.read(joint.limit);
+				joint.physx = nullptr;
+				m_spherical_joints.insert(entity, joint);
+				ComponentHandle cmp = {entity.index};
+				m_universe.addComponent(entity, SPHERICAL_JOINT_TYPE, this, cmp);
+			}
 		}
 	}
 
@@ -2125,6 +2369,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	Array<RigidActor*> m_dynamic_actors;
 	AssociativeArray<Entity, DistanceJoint> m_distance_joints;
 	AssociativeArray<Entity, HingeJoint> m_hinge_joints;
+	AssociativeArray<Entity, SphericalJoint> m_spherical_joints;
 	bool m_is_game_running;
 
 	Array<QueuedForce> m_queued_forces;
@@ -2311,4 +2556,4 @@ void PhysicsScene::registerLuaAPI(lua_State* L)
 }
 
 
-} // !namespace Lumix
+} // namespace Lumix

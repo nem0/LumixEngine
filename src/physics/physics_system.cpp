@@ -128,6 +128,32 @@ namespace Lumix
 
 	static void registerProperties(Lumix::IAllocator& allocator)
 	{
+		PropertyRegister::add("spherical_joint",
+			LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)("Connected body",
+				&PhysicsScene::getSphericalJointConnectedBody,
+				&PhysicsScene::setSphericalJointConnectedBody,
+				allocator));
+		PropertyRegister::add("spherical_joint",
+			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)("Axis position",
+				&PhysicsScene::getSphericalJointAxisPosition,
+				&PhysicsScene::setSphericalJointAxisPosition,
+				allocator));
+		PropertyRegister::add("spherical_joint",
+			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)("Axis direction",
+				&PhysicsScene::getSphericalJointAxisDirection,
+				&PhysicsScene::setSphericalJointAxisDirection,
+				allocator));
+		PropertyRegister::add("spherical_joint",
+			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)("Use limit",
+				&PhysicsScene::getSphericalJointUseLimit,
+				&PhysicsScene::setSphericalJointUseLimit,
+				allocator));
+		PropertyRegister::add("spherical_joint",
+			&(LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)("Limit",
+				&PhysicsScene::getSphericalJointLimit,
+				&PhysicsScene::setSphericalJointLimit,
+				allocator))->setIsInRadians(true));
+
 		PropertyRegister::add("distance_joint",
 			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Damping",
 				&PhysicsScene::getDistanceJointDamping,

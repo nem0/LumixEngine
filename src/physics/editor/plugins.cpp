@@ -25,6 +25,7 @@ static const ComponentType BOX_ACTOR_TYPE = PropertyRegister::getComponentType("
 static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("physical_controller");
 static const ComponentType DISTANCE_JOINT_TYPE = PropertyRegister::getComponentType("distance_joint");
 static const ComponentType HINGE_JOINT_TYPE = PropertyRegister::getComponentType("hinge_joint");
+static const ComponentType SPHERICAL_JOINT_TYPE = PropertyRegister::getComponentType("spherical_joint");
 static const uint32 RENDERER_HASH = crc32("renderer");
 
 
@@ -33,6 +34,58 @@ struct EditorPlugin : public WorldEditor::Plugin
 	explicit EditorPlugin(WorldEditor& editor)
 		: m_editor(editor)
 	{
+	}
+
+
+	static void showSphericalJointGizmo(ComponentUID cmp)
+	{
+		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
+		Universe& universe = phy_scene->getUniverse();
+		auto* render_scene = static_cast<RenderScene*>(universe.getScene(RENDERER_HASH));
+		if (!render_scene) return;
+
+		Entity other_entity = phy_scene->getSphericalJointConnectedBody(cmp.handle);
+		if (!isValid(other_entity)) return;
+
+		Matrix mtx = universe.getMatrix(cmp.entity);
+		Vec3 axis_local_pos = phy_scene->getSphericalJointAxisPosition(cmp.handle);
+		Vec3 axis_local_dir = phy_scene->getSphericalJointAxisDirection(cmp.handle).normalized();
+
+		Vec3 axis_dir = (mtx * Vec4(axis_local_dir, 0)).xyz();
+		Vec3 axis_pos = mtx.multiplyPosition(axis_local_pos);
+
+		Vec3 pos = mtx.getTranslation();
+		Vec3 other_pos = universe.getPosition(other_entity);
+
+		Matrix local_mtx;
+		Quat::vec3ToVec3(Vec3(1, 0, 0), axis_local_dir).toMatrix(local_mtx);
+		mtx = mtx * local_mtx;
+		render_scene->addDebugLine(axis_pos, axis_pos + mtx.getXVector(), 0xffff0000, 0);
+		render_scene->addDebugLine(axis_pos, axis_pos + mtx.getYVector(), 0xff00ff00, 0);
+		render_scene->addDebugLine(axis_pos, axis_pos + mtx.getZVector(), 0xff0000ff, 0);
+
+		Matrix local_frame1 = phy_scene->getSphericalJointConnectedBodyLocalFrame(cmp.handle);
+		Matrix global_frame1 = universe.getMatrix(other_entity) * local_frame1;
+		Vec3 frame1_pos = global_frame1.getTranslation();
+
+		Vec2 limit = phy_scene->getSphericalJointLimit(cmp.handle);
+		bool use_limit = phy_scene->getSphericalJointUseLimit(cmp.handle);
+		if (use_limit)
+		{
+			render_scene->addDebugLine(frame1_pos, other_pos, 0xffff0000, 0);
+			render_scene->addDebugCone(frame1_pos,
+				global_frame1.getXVector(),
+				global_frame1.getYVector() * tanf(limit.y),
+				global_frame1.getZVector() * tanf(limit.x),
+				0xff555555,
+				0);
+		}
+		else
+		{
+			render_scene->addDebugLine(frame1_pos, frame1_pos + global_frame1.getXVector(), 0xffff0000, 0);
+			render_scene->addDebugLine(frame1_pos, frame1_pos + global_frame1.getYVector(), 0xff00ff00, 0);
+			render_scene->addDebugLine(frame1_pos, frame1_pos + global_frame1.getZVector(), 0xff0000ff, 0);
+		}
 	}
 
 
@@ -149,6 +202,12 @@ struct EditorPlugin : public WorldEditor::Plugin
 		if (cmp.type == HINGE_JOINT_TYPE)
 		{
 			showHingeJointGizmo(cmp);
+			return true;
+		}
+
+		if (cmp.type == SPHERICAL_JOINT_TYPE)
+		{
+			showSphericalJointGizmo(cmp);
 			return true;
 		}
 
@@ -289,7 +348,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 			{
 				ComponentUID cmp;
 				cmp.handle = scene->getDistanceJointComponent(i);
-				cmp.type = HINGE_JOINT_TYPE;
+				cmp.type = DISTANCE_JOINT_TYPE;
 				cmp.scene = scene;
 				cmp.entity = scene->getDistanceJointEntity(cmp.handle);
 				EditorPlugin::showDistanceJointGizmo(cmp);
@@ -302,6 +361,44 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 				ImGui::NextColumn();
 
 				Entity other_entity = scene->getDistanceJointConnectedBody(cmp.handle);
+				getEntityListDisplayName(m_editor, tmp, Lumix::lengthOf(tmp), other_entity);
+				if (isValid(other_entity) && ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&other_entity, 1);
+				ImGui::NextColumn();
+				ImGui::PopID();
+			}
+			ImGui::Columns();
+			ImGui::PopID();
+		}
+	}
+
+	void onSphericalJointGUI()
+	{
+		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
+		int count = scene->getSphericalJointCount();
+		if (count > 0 && ImGui::CollapsingHeader("Spherical joints"))
+		{
+			ImGui::Columns(2);
+			ImGui::Text("From"); ImGui::NextColumn();
+			ImGui::Text("To"); ImGui::NextColumn();
+			ImGui::PushID("spherical_joints");
+			ImGui::Separator();
+			for (int i = 0; i < count; ++i)
+			{
+				ComponentUID cmp;
+				cmp.handle = scene->getSphericalJointComponent(i);
+				cmp.type = SPHERICAL_JOINT_TYPE;
+				cmp.scene = scene;
+				cmp.entity = scene->getSphericalJointEntity(cmp.handle);
+				EditorPlugin::showSphericalJointGizmo(cmp);
+
+				ImGui::PushID(i);
+				char tmp[256];
+				getEntityListDisplayName(m_editor, tmp, Lumix::lengthOf(tmp), cmp.entity);
+				bool b = false;
+				if (ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&cmp.entity, 1);
+				ImGui::NextColumn();
+
+				Entity other_entity = scene->getSphericalJointConnectedBody(cmp.handle);
 				getEntityListDisplayName(m_editor, tmp, Lumix::lengthOf(tmp), other_entity);
 				if (isValid(other_entity) && ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&other_entity, 1);
 				ImGui::NextColumn();
@@ -358,6 +455,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 		ImGui::Indent();
 		onHingeJointGUI();
 		onDistanceJointGUI();
+		onSphericalJointGUI();
 		ImGui::Unindent();
 	}
 
@@ -387,6 +485,7 @@ LUMIX_STUDIO_ENTRY(physics)
 {
 	app.registerComponent("distance_joint", "Distance Joint");
 	app.registerComponent("hinge_joint", "Hinge Joint");
+	app.registerComponent("spherical_joint", "Spherical Joint");
 	app.registerComponent("box_rigid_actor", "Physics Box");
 	app.registerComponent("physical_controller", "Physics Controller");
 	app.registerComponent("mesh_rigid_actor", "Physics Mesh");

@@ -3074,13 +3074,9 @@ public:
 			Vec3 z = sinf(angle) * axis1;
 			Vec3 p = base_center + x + z;
 			addDebugLine(p, prev_p, color, life);
+			addDebugLine(vertex, p, color, life);
 			prev_p = p;
 		}
-
-		addDebugLine(vertex, base_center + axis0, color, life);
-		addDebugLine(vertex, base_center - axis0, color, life);
-		addDebugLine(vertex, base_center + axis1, color, life);
-		addDebugLine(vertex, base_center - axis1, color, life);
 	}
 
 
