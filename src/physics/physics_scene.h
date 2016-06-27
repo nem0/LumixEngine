@@ -23,6 +23,7 @@ namespace Lumix
 
 class Engine;
 class IAllocator;
+struct Matrix;
 class Path;
 class PhysicsSystem;
 class RenderScene;
@@ -101,6 +102,21 @@ public:
 	virtual int getHingeJointCount() = 0;
 	virtual ComponentHandle getHingeJointComponent(int index) = 0;
 	virtual Entity getHingeJointEntity(ComponentHandle cmp) = 0;
+
+	virtual Entity getSphericalJointConnectedBody(ComponentHandle cmp) = 0;
+	virtual void setSphericalJointConnectedBody(ComponentHandle cmp, Entity entity) = 0;
+	virtual Vec3 getSphericalJointAxisPosition(ComponentHandle cmp) = 0;
+	virtual void setSphericalJointAxisPosition(ComponentHandle cmp, const Vec3& value) = 0;
+	virtual Vec3 getSphericalJointAxisDirection(ComponentHandle cmp) = 0;
+	virtual void setSphericalJointAxisDirection(ComponentHandle cmp, const Vec3& value) = 0;
+	virtual bool getSphericalJointUseLimit(ComponentHandle cmp) = 0;
+	virtual void setSphericalJointUseLimit(ComponentHandle cmp, bool use_limit) = 0;
+	virtual Vec2 getSphericalJointLimit(ComponentHandle cmp) = 0;
+	virtual void setSphericalJointLimit(ComponentHandle cmp, const Vec2& limit) = 0;
+	virtual Matrix getSphericalJointConnectedBodyLocalFrame(ComponentHandle cmp) = 0;
+	virtual int getSphericalJointCount() = 0;
+	virtual ComponentHandle getSphericalJointComponent(int index) = 0;
+	virtual Entity getSphericalJointEntity(ComponentHandle cmp) = 0;
 
 	virtual void applyForceToActor(ComponentHandle cmp, const Vec3& force) = 0;
 	virtual float getActorSpeed(ComponentHandle cmp) = 0;
