@@ -26,7 +26,6 @@ class IAllocator;
 struct Matrix;
 class Path;
 class PhysicsSystem;
-class RenderScene;
 class Universe;
 
 
@@ -41,12 +40,18 @@ struct RaycastHit
 class LUMIX_PHYSICS_API PhysicsScene : public IScene
 {
 public:
+	enum class ActorType
+	{
+		BOX,
+		MESH
+	};
+
 	static PhysicsScene* create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator);
 	static void destroy(PhysicsScene* scene);
 	static void registerLuaAPI(lua_State* L);
 
 	virtual ~PhysicsScene() {}
-	virtual void render(RenderScene& render_scene) = 0;
+	virtual void render() = 0;
 	virtual Entity raycast(const Vec3& origin, const Vec3& dir) = 0;
 	virtual bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result) = 0;
 	virtual PhysicsSystem& getSystem() const = 0;
@@ -136,6 +141,15 @@ public:
 	virtual int getCollisionsLayersCount() const = 0;
 	virtual void addCollisionLayer() = 0;
 	virtual void removeCollisionLayer() = 0;
+
+	virtual uint32 getDebugVisualizationFlags() const = 0;
+	virtual void setDebugVisualizationFlags(uint32 flags) = 0;
+	
+	virtual int getActorCount() const = 0;
+	virtual Entity getActorEntity(int index) = 0;
+	virtual ActorType getActorType(int index) = 0;
+	virtual bool isActorDebugEnabled(int index) const = 0;
+	virtual void enableActorDebug(int index, bool enable) const = 0;
 };
 
 
