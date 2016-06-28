@@ -2690,6 +2690,77 @@ public:
 	}
 
 
+	void addDebugHalfSphere(const Matrix& transform, float radius, bool top, uint32 color, float life)
+	{
+		Vec3 center = transform.getTranslation();
+		Vec3 x_vec = transform.getXVector();
+		Vec3 y_vec = transform.getYVector();
+		if (!top) y_vec *= -1;
+		Vec3 z_vec = transform.getZVector();
+		static const int COLS = 36;
+		static const int ROWS = COLS >> 1;
+		static const float STEP = Math::degreesToRadians(360.0f) / COLS;
+		int p2 = COLS >> 1;
+		for (int y = 0; y < ROWS >> 1; ++y)
+		{
+			float cy = cos(y * STEP);
+			float cy1 = cos((y + 1) * STEP);
+			float sy = sin(y * STEP);
+			float sy1 = sin((y + 1) * STEP);
+			float prev_ci = cos(-STEP);
+			float prev_si = sin(-STEP);
+
+			Vec3 y_offset = y_vec * sy;
+			Vec3 y_offset1 = y_vec * sy1;
+
+			for (int i = 0; i < COLS; ++i)
+			{
+				float ci = cos(i * STEP);
+				float si = sin(i * STEP);
+
+				addDebugLine(
+					center + radius * (x_vec * ci * cy + z_vec * si * cy + y_offset),
+					center + radius * (x_vec * prev_ci * cy + z_vec * prev_si * cy + y_offset),
+					color,
+					life);
+				addDebugLine(
+					center + radius * (x_vec * ci * cy + z_vec * si * cy + y_offset),
+					center + radius * (x_vec * ci * cy1 + z_vec * si * cy1 + y_offset1),
+					color,
+					life);
+
+/*				addDebugLine(Vec3(center.x + radius * ci * cy,
+					center.y + radius * sy,
+					center.z + radius * si * cy),
+					Vec3(center.x + radius * ci * cy1,
+						center.y + radius * sy1,
+						center.z + radius * si * cy1),
+					color,
+					life);
+
+				addDebugLine(Vec3(center.x + radius * ci * cy,
+					center.y + radius * sy,
+					center.z + radius * si * cy),
+					Vec3(center.x + radius * prev_ci * cy,
+						center.y + radius * sy,
+						center.z + radius * prev_si * cy),
+					color,
+					life);
+				addDebugLine(Vec3(center.x + radius * prev_ci * cy1,
+					center.y + radius * sy1,
+					center.z + radius * prev_si * cy1),
+					Vec3(center.x + radius * ci * cy1,
+						center.y + radius * sy1,
+						center.z + radius * si * cy1),
+					color,
+					life);*/
+				prev_ci = ci;
+				prev_si = si;
+			}
+		}
+	}
+
+
 	void addDebugHalfSphere(const Vec3& center, float radius, bool top, uint32 color, float life)
 	{
 		static const int COLS = 36;
@@ -2783,6 +2854,36 @@ public:
 				life);
 		}
 	}
+
+
+	void addDebugCapsule(const Matrix& transform,
+		float height,
+		float radius,
+		uint32 color,
+		float life) override
+	{
+		Vec3 x_vec = transform.getXVector();
+		Vec3 y_vec = transform.getYVector();
+		Vec3 z_vec = transform.getZVector();
+		Vec3 position = transform.getTranslation();
+
+		Matrix tmp = transform;
+		tmp.setTranslation(transform.getTranslation() + y_vec * radius);
+		addDebugHalfSphere(tmp, radius, false, color, life);
+		tmp.setTranslation(transform.getTranslation() + y_vec * (radius + height));
+		addDebugHalfSphere(tmp, radius, true, color, life);
+
+		Vec3 bottom = position + y_vec * radius;
+		Vec3 top = bottom + y_vec * height;
+		for (int i = 1; i <= 32; ++i)
+		{
+			float a = i / 32.0f * 2 * Math::PI;
+			float x = cosf(a) * radius;
+			float z = sinf(a) * radius;
+			addDebugLine(bottom + x_vec * x + z_vec * z, top + x_vec * x + z_vec * z, color, life);
+		}
+	}
+
 
 
 	void addDebugCylinder(const Vec3& position,

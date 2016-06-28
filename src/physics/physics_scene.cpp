@@ -27,6 +27,7 @@ namespace Lumix
 
 
 static const ComponentType BOX_ACTOR_TYPE = PropertyRegister::getComponentType("box_rigid_actor");
+static const ComponentType CAPSULE_ACTOR_TYPE = PropertyRegister::getComponentType("capsule_rigid_actor");
 static const ComponentType MESH_ACTOR_TYPE = PropertyRegister::getComponentType("mesh_rigid_actor");
 static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("physical_controller");
 static const ComponentType HEIGHTFIELD_TYPE = PropertyRegister::getComponentType("physical_heightfield");
@@ -43,6 +44,7 @@ enum class PhysicsSceneVersion : int
 	JOINTS,
 	HINGE_JOINT,
 	SPHERICAL_JOINT,
+	CAPSULE_ACTOR,
 
 	LATEST
 };
@@ -361,14 +363,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		return type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == HEIGHTFIELD_TYPE ||
 			   type == CONTROLLER_TYPE || type == DISTANCE_JOINT_TYPE || type == HINGE_JOINT_TYPE ||
-			   type == SPHERICAL_JOINT_TYPE;
+			   type == SPHERICAL_JOINT_TYPE || type == CAPSULE_ACTOR_TYPE;
 	}
 
 
 	ComponentHandle getComponent(Entity entity, ComponentType type) override
 	{
 		ASSERT(ownComponentType(type));
-		if (type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE)
+		if (type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == CAPSULE_ACTOR_TYPE)
 		{
 			for (int i = 0; i < m_actors.size(); ++i)
 			{
@@ -450,6 +452,62 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 
 	int getActorLayer(ComponentHandle cmp) override { return m_actors[cmp.index]->layer; }
+
+
+	float getCapsuleRadius(ComponentHandle cmp) override
+	{
+		physx::PxRigidActor* actor = m_actors[cmp.index]->physx_actor;
+		physx::PxShape* shapes;
+		ASSERT(actor->getNbShapes() == 1);
+		if (actor->getShapes(&shapes, 1) != 1) ASSERT(false);
+
+		return shapes->getGeometry().capsule().radius;
+	}
+
+
+	void setCapsuleRadius(ComponentHandle cmp, float value) override
+	{
+		if (value == 0) return;
+		physx::PxRigidActor* actor = m_actors[cmp.index]->physx_actor;
+		physx::PxShape* shapes;
+		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
+		{
+			physx::PxCapsuleGeometry capsule;
+			bool is_capsule = shapes->getCapsuleGeometry(capsule);
+			ASSERT(is_capsule);
+			capsule.radius = value;
+			shapes->setGeometry(capsule);
+		}
+	}
+	
+	
+	float getCapsuleHeight(ComponentHandle cmp) override
+	{
+		physx::PxRigidActor* actor = m_actors[cmp.index]->physx_actor;
+		physx::PxShape* shapes;
+		ASSERT(actor->getNbShapes() == 1);
+		if (actor->getShapes(&shapes, 1) != 1) ASSERT(false);
+
+		return shapes->getGeometry().capsule().halfHeight * 2;
+	}
+
+
+	void setCapsuleHeight(ComponentHandle cmp, float value) override
+	{
+		if (value == 0) return;
+		physx::PxRigidActor* actor = m_actors[cmp.index]->physx_actor;
+		physx::PxShape* shapes;
+		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
+		{
+			physx::PxCapsuleGeometry capsule;
+			bool is_capsule = shapes->getCapsuleGeometry(capsule);
+			ASSERT(is_capsule);
+			capsule.halfHeight = value * 0.5f;
+			shapes->setGeometry(capsule);
+		}
+	}
+
+	
 	int getHeightfieldLayer(ComponentHandle cmp) override { return m_terrains[cmp.index]->m_layer; }
 
 
@@ -742,6 +800,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			return createBoxRigidActor(entity);
 		}
+		else if (component_type == CAPSULE_ACTOR_TYPE)
+		{
+			return createCapsuleRigidActor(entity);
+		}
 		else if (component_type == MESH_ACTOR_TYPE)
 		{
 			return createMeshRigidActor(entity);
@@ -765,7 +827,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			m_controllers[cmp.index].m_is_free = true;
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
-		else if (type == MESH_ACTOR_TYPE || type == BOX_ACTOR_TYPE)
+		else if (type == MESH_ACTOR_TYPE || type == BOX_ACTOR_TYPE || type == CAPSULE_ACTOR_TYPE)
 		{
 			Entity entity = m_actors[cmp.index]->entity;
 			m_actors[cmp.index]->entity = INVALID_ENTITY;
@@ -906,8 +968,31 @@ struct PhysicsSceneImpl : public PhysicsScene
 			shapes[i]->setSimulationFilterData(data);
 		}
 
-		ComponentHandle cmp = { m_controllers.size() - 1 };
+		ComponentHandle cmp = {m_controllers.size() - 1};
 		m_universe.addComponent(entity, CONTROLLER_TYPE, this, cmp);
+		return cmp;
+	}
+
+
+	ComponentHandle createCapsuleRigidActor(Entity entity)
+	{
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::CAPSULE);
+		m_actors.push(actor);
+		actor->entity = entity;
+
+		physx::PxCapsuleGeometry geom;
+		geom.radius = 0.5f;
+		geom.halfHeight = 1;
+		physx::PxTransform transform;
+		Matrix mtx = m_universe.getPositionAndRotation(entity);
+		matrix2Transform(mtx, transform);
+
+		physx::PxRigidStatic* physx_actor =
+			PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
+		actor->setPhysxActor(physx_actor);
+
+		ComponentHandle cmp = {m_actors.size() - 1};
+		m_universe.addComponent(entity, CAPSULE_ACTOR_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -1058,6 +1143,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	int getActorCount() const override { return m_actors.size(); }
 	Entity getActorEntity(int index) override { return m_actors[index]->entity; }
 	ActorType getActorType(int index) override { return m_actors[index]->type; }
+	ComponentHandle getActorComponentHandle(int index) override { return {index}; }
 
 
 	bool isActorDebugEnabled(int index) const override
@@ -1892,6 +1978,16 @@ struct PhysicsSceneImpl : public PhysicsScene
 				serializer.write(geom.halfExtents.z);
 				break;
 			}
+			case ActorType::CAPSULE:
+			{
+				ASSERT(px_actor->getNbShapes() == 1);
+				px_actor->getShapes(&shapes, 1);
+				physx::PxCapsuleGeometry geom;
+				if (!shapes->getCapsuleGeometry(geom)) ASSERT(false);
+				serializer.write(geom.halfHeight);
+				serializer.write(geom.radius);
+				break;
+			}
 			case ActorType::MESH: serializer.writeString(resource ? resource->getPath().c_str() : ""); break;
 			default: ASSERT(false);
 		}
@@ -1929,6 +2025,28 @@ struct PhysicsSceneImpl : public PhysicsScene
 				}
 				actor->setPhysxActor(physx_actor);
 				m_universe.addComponent(actor->entity, BOX_ACTOR_TYPE, this, cmp);
+			}
+			break;
+			case ActorType::CAPSULE:
+			{
+				physx::PxCapsuleGeometry capsule_geom;
+				physx::PxTransform transform;
+				Matrix mtx = m_universe.getPositionAndRotation(actor->entity);
+				matrix2Transform(mtx, transform);
+				serializer.read(capsule_geom.halfHeight);
+				serializer.read(capsule_geom.radius);
+				physx::PxRigidActor* physx_actor;
+				if (isDynamic(cmp))
+				{
+					physx_actor =
+						PxCreateDynamic(*m_system->getPhysics(), transform, capsule_geom, *m_default_material, 1.0f);
+				}
+				else
+				{
+					physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, capsule_geom, *m_default_material);
+				}
+				actor->setPhysxActor(physx_actor);
+				m_universe.addComponent(actor->entity, CAPSULE_ACTOR_TYPE, this, cmp);
 			}
 			break;
 			case ActorType::MESH:
