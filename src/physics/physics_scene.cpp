@@ -27,6 +27,7 @@ namespace Lumix
 
 
 static const ComponentType BOX_ACTOR_TYPE = PropertyRegister::getComponentType("box_rigid_actor");
+static const ComponentType SPHERE_ACTOR_TYPE = PropertyRegister::getComponentType("sphere_rigid_actor");
 static const ComponentType CAPSULE_ACTOR_TYPE = PropertyRegister::getComponentType("capsule_rigid_actor");
 static const ComponentType MESH_ACTOR_TYPE = PropertyRegister::getComponentType("mesh_rigid_actor");
 static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("physical_controller");
@@ -45,6 +46,7 @@ enum class PhysicsSceneVersion : int
 	HINGE_JOINT,
 	SPHERICAL_JOINT,
 	CAPSULE_ACTOR,
+	SPHERE_ACTOR,
 
 	LATEST
 };
@@ -348,10 +350,19 @@ struct PhysicsSceneImpl : public PhysicsScene
 			m_scene->setVisualizationParameter(physx::PxVisualizationParameter::Enum(flag), flags & (1 << flag) ? 1.0f : 0.0f);
 		};
 
-		setFlag(physx::PxVisualizationParameter::eACTOR_AXES);
+		setFlag(physx::PxVisualizationParameter::eBODY_AXES);
+		setFlag(physx::PxVisualizationParameter::eBODY_LIN_VELOCITY);
+		setFlag(physx::PxVisualizationParameter::eBODY_ANG_VELOCITY);
+		setFlag(physx::PxVisualizationParameter::eCONTACT_NORMAL);
+		setFlag(physx::PxVisualizationParameter::eCONTACT_ERROR);
+		setFlag(physx::PxVisualizationParameter::eCONTACT_FORCE);
+		setFlag(physx::PxVisualizationParameter::eCOLLISION_AXES);
+		setFlag(physx::PxVisualizationParameter::eJOINT_LOCAL_FRAMES);
+		setFlag(physx::PxVisualizationParameter::eJOINT_LIMITS);
 		setFlag(physx::PxVisualizationParameter::eCOLLISION_SHAPES);
-		setFlag(physx::PxVisualizationParameter::eWORLD_AXES);
+		setFlag(physx::PxVisualizationParameter::eACTOR_AXES);
 		setFlag(physx::PxVisualizationParameter::eCOLLISION_AABBS);
+		setFlag(physx::PxVisualizationParameter::eWORLD_AXES);
 		setFlag(physx::PxVisualizationParameter::eCONTACT_POINT);
 	}
 
@@ -363,14 +374,15 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		return type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == HEIGHTFIELD_TYPE ||
 			   type == CONTROLLER_TYPE || type == DISTANCE_JOINT_TYPE || type == HINGE_JOINT_TYPE ||
-			   type == SPHERICAL_JOINT_TYPE || type == CAPSULE_ACTOR_TYPE;
+			   type == SPHERICAL_JOINT_TYPE || type == CAPSULE_ACTOR_TYPE || type == SPHERE_ACTOR_TYPE;
 	}
 
 
 	ComponentHandle getComponent(Entity entity, ComponentType type) override
 	{
 		ASSERT(ownComponentType(type));
-		if (type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == CAPSULE_ACTOR_TYPE)
+		if (type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == CAPSULE_ACTOR_TYPE ||
+			type == SPHERE_ACTOR_TYPE)
 		{
 			for (int i = 0; i < m_actors.size(); ++i)
 			{
@@ -452,6 +464,33 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 
 	int getActorLayer(ComponentHandle cmp) override { return m_actors[cmp.index]->layer; }
+
+
+	float getSphereRadius(ComponentHandle cmp) override
+	{
+		physx::PxRigidActor* actor = m_actors[cmp.index]->physx_actor;
+		physx::PxShape* shapes;
+		ASSERT(actor->getNbShapes() == 1);
+		if (actor->getShapes(&shapes, 1) != 1) ASSERT(false);
+
+		return shapes->getGeometry().sphere().radius;
+	}
+
+
+	void setSphereRadius(ComponentHandle cmp, float value) override
+	{
+		if (value == 0) return;
+		physx::PxRigidActor* actor = m_actors[cmp.index]->physx_actor;
+		physx::PxShape* shapes;
+		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
+		{
+			physx::PxSphereGeometry sphere;
+			bool is_sphere = shapes->getSphereGeometry(sphere);
+			ASSERT(is_sphere);
+			sphere.radius = value;
+			shapes->setGeometry(sphere);
+		}
+	}
 
 
 	float getCapsuleRadius(ComponentHandle cmp) override
@@ -736,11 +775,28 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	Vec3 getHingeJointConnectedBodyInitialPosition(ComponentHandle cmp) override
+	Matrix getHingeJointConnectedBodyLocalFrame(ComponentHandle cmp) override
 	{
-		auto& joint = m_hinge_joints[{cmp.index}];
-		if (!m_is_game_running && isValid(joint.connected_body)) return m_universe.getPosition(joint.connected_body);
-		return joint.initial_pos;
+		Entity entity = {cmp.index};
+		auto& joint = m_hinge_joints[entity];
+		if (!isValid(joint.connected_body)) return Matrix::IDENTITY;
+
+		if (!joint.physx)
+		{
+			Matrix mtx0 = m_universe.getMatrix(entity);
+			Matrix mtx1 = m_universe.getMatrix(joint.connected_body);
+			Matrix local_frame0;
+			Quat::vec3ToVec3(Vec3(1, 0, 0), joint.axis_direction.normalized()).toMatrix(local_frame0);
+			local_frame0.setTranslation(joint.axis_position);
+			mtx1.inverse();
+			return mtx1 * (mtx0 * local_frame0);
+		}
+
+		physx::PxTransform px_local_frame = joint.physx->getLocalPose(physx::PxJointActorIndex::eACTOR1);
+		Matrix	local_frame;
+		toQuat(px_local_frame.q).toMatrix(local_frame);
+		local_frame.setTranslation(toVec3(px_local_frame.p));
+		return local_frame;
 	}
 
 
@@ -800,6 +856,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			return createBoxRigidActor(entity);
 		}
+		else if (component_type == SPHERE_ACTOR_TYPE)
+		{
+			return createSphereRigidActor(entity);
+		}
 		else if (component_type == CAPSULE_ACTOR_TYPE)
 		{
 			return createCapsuleRigidActor(entity);
@@ -827,7 +887,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			m_controllers[cmp.index].m_is_free = true;
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
-		else if (type == MESH_ACTOR_TYPE || type == BOX_ACTOR_TYPE || type == CAPSULE_ACTOR_TYPE)
+		else if (type == MESH_ACTOR_TYPE || type == BOX_ACTOR_TYPE || type == CAPSULE_ACTOR_TYPE ||
+				 type == SPHERE_ACTOR_TYPE)
 		{
 			Entity entity = m_actors[cmp.index]->entity;
 			m_actors[cmp.index]->entity = INVALID_ENTITY;
@@ -1015,8 +1076,30 @@ struct PhysicsSceneImpl : public PhysicsScene
 			PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
 		actor->setPhysxActor(physx_actor);
 
-		ComponentHandle cmp = {m_actors.size() - 1};
+		ComponentHandle cmp = { m_actors.size() - 1 };
 		m_universe.addComponent(entity, BOX_ACTOR_TYPE, this, cmp);
+		return cmp;
+	}
+
+
+	ComponentHandle createSphereRigidActor(Entity entity)
+	{
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::SPHERE);
+		m_actors.push(actor);
+		actor->entity = entity;
+
+		physx::PxSphereGeometry geom;
+		geom.radius = 1;
+		physx::PxTransform transform;
+		Matrix mtx = m_universe.getPositionAndRotation(entity);
+		matrix2Transform(mtx, transform);
+
+		physx::PxRigidStatic* physx_actor =
+			PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
+		actor->setPhysxActor(physx_actor);
+
+		ComponentHandle cmp = {m_actors.size() - 1};
+		m_universe.addComponent(entity, SPHERE_ACTOR_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -1466,6 +1549,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 										   << joint.connected_body.index;
 				continue;
 			}
+
+			joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
 
 			joint.initial_pos = pos1;
 
@@ -1978,6 +2063,15 @@ struct PhysicsSceneImpl : public PhysicsScene
 				serializer.write(geom.halfExtents.z);
 				break;
 			}
+			case ActorType::SPHERE:
+			{
+				ASSERT(px_actor->getNbShapes() == 1);
+				px_actor->getShapes(&shapes, 1);
+				physx::PxSphereGeometry geom;
+				if (!shapes->getSphereGeometry(geom)) ASSERT(false);
+				serializer.write(geom.radius);
+				break;
+			}
 			case ActorType::CAPSULE:
 			{
 				ASSERT(px_actor->getNbShapes() == 1);
@@ -2025,6 +2119,27 @@ struct PhysicsSceneImpl : public PhysicsScene
 				}
 				actor->setPhysxActor(physx_actor);
 				m_universe.addComponent(actor->entity, BOX_ACTOR_TYPE, this, cmp);
+			}
+			break;
+			case ActorType::SPHERE:
+			{
+				physx::PxSphereGeometry sphere_geom;
+				physx::PxTransform transform;
+				Matrix mtx = m_universe.getPositionAndRotation(actor->entity);
+				matrix2Transform(mtx, transform);
+				serializer.read(sphere_geom.radius);
+				physx::PxRigidActor* physx_actor;
+				if (isDynamic(cmp))
+				{
+					physx_actor =
+						PxCreateDynamic(*m_system->getPhysics(), transform, sphere_geom, *m_default_material, 1.0f);
+				}
+				else
+				{
+					physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, sphere_geom, *m_default_material);
+				}
+				actor->setPhysxActor(physx_actor);
+				m_universe.addComponent(actor->entity, SPHERE_ACTOR_TYPE, this, cmp);
 			}
 			break;
 			case ActorType::CAPSULE:

@@ -24,6 +24,7 @@ namespace
 
 
 static const ComponentType BOX_ACTOR_TYPE = PropertyRegister::getComponentType("box_rigid_actor");
+static const ComponentType SPHERE_ACTOR_TYPE = PropertyRegister::getComponentType("sphere_rigid_actor");
 static const ComponentType CAPSULE_ACTOR_TYPE = PropertyRegister::getComponentType("capsule_rigid_actor");
 static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("physical_controller");
 static const ComponentType DISTANCE_JOINT_TYPE = PropertyRegister::getComponentType("distance_joint");
@@ -150,32 +151,36 @@ struct EditorPlugin : public WorldEditor::Plugin
 		Entity other_entity = phy_scene->getHingeJointConnectedBody(cmp.handle);
 		if (!isValid(other_entity)) return;
 
-		Matrix mtx = universe.getMatrix(cmp.entity);
-		Vec3 axis_local_pos = phy_scene->getHingeJointAxisPosition(cmp.handle);
-		Vec3 axis_local_dir = phy_scene->getHingeJointAxisDirection(cmp.handle).normalized();
-
-		Vec3 axis_dir = (mtx * Vec4(axis_local_dir, 0)).xyz();
-		Vec3 axis_pos = mtx.multiplyPosition(axis_local_pos);
-		
-		Vec3 pos = mtx.getTranslation();
-		Vec3 other_pos = universe.getPosition(other_entity);
-
-		render_scene->addDebugLine(axis_pos - axis_dir, axis_pos + axis_dir, 0xff0000ff, 0);
-		render_scene->addDebugLine(pos, axis_pos, 0xff0000ff, 0);
-		render_scene->addDebugLine(other_pos, axis_pos, 0xff0000ff, 0);
-
 		Vec2 limit = phy_scene->getHingeJointLimit(cmp.handle);
 		bool use_limit = phy_scene->getHingeJointUseLimit(cmp.handle);
 		if (use_limit)
 		{
-			Vec3 init_pos = phy_scene->getHingeJointConnectedBodyInitialPosition(cmp.handle);
+			Matrix local_frame1 = phy_scene->getHingeJointConnectedBodyLocalFrame(cmp.handle);
+			Matrix global_frame1 = universe.getMatrix(other_entity) * local_frame1;
+			Vec3 global_frame1_pos = global_frame1.getTranslation();
+			Vec3 y_vec = global_frame1.getYVector();
+			Vec3 z_vec = global_frame1.getZVector();
 
-			Vec3 null_dir = (init_pos - axis_pos).normalized();
-			Vec3 normal = crossProduct(axis_dir, null_dir).normalized();
-			Vec3 x = cosf(limit.x) * null_dir + sinf(limit.x) * normal;
-			render_scene->addDebugLine(axis_pos, axis_pos + 2 * x, 0xffff0000, 0);
-			Vec3 y = cosf(limit.y) * null_dir + sinf(limit.y) * normal;
-			render_scene->addDebugLine(axis_pos, axis_pos + 2 * y, 0xffff0000, 0);
+			render_scene->addDebugLine(global_frame1_pos, global_frame1_pos + global_frame1.getXVector(), 0xffff0000, 0);
+			render_scene->addDebugLine(global_frame1_pos, global_frame1_pos + global_frame1.getYVector(), 0xff00ff00, 0);
+			render_scene->addDebugLine(global_frame1_pos, global_frame1_pos + global_frame1.getZVector(), 0xff0000ff, 0);
+
+			render_scene->addDebugLine(
+				global_frame1_pos, global_frame1_pos + y_vec * sinf(limit.x) + z_vec * cosf(limit.x), 0xff555555, 0);
+			render_scene->addDebugLine(
+				global_frame1_pos, global_frame1_pos + y_vec * sinf(limit.y) + z_vec * cosf(limit.y), 0xff555555, 0);
+
+			
+			Vec3 prev_pos = global_frame1_pos + y_vec * sinf(limit.x) + z_vec * cosf(limit.x);
+			for (int i = 1; i <= 32; ++i)
+			{
+				float angle = limit.x + (limit.y - limit.x) * i / 32.0f;
+				float s = sinf(angle);
+				float c = cosf(angle);
+				Vec3 pos = global_frame1_pos + y_vec * s + z_vec * c;
+				render_scene->addDebugLine(pos, prev_pos, 0xff555555, 0);
+				prev_pos = pos;
+			}
 		}
 	}
 
@@ -194,6 +199,18 @@ struct EditorPlugin : public WorldEditor::Plugin
 			mtx.getZVector() * extents.z,
 			0xffff0000,
 			0);
+	}
+
+
+	static void showSphereActorGizmo(ComponentUID cmp, RenderScene& render_scene)
+	{
+		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
+		Universe& universe = phy_scene->getUniverse();
+
+		float radius = phy_scene->getSphereRadius(cmp.handle);
+		Matrix mtx = universe.getPositionAndRotation(cmp.entity);
+
+		render_scene.addDebugSphere(mtx.getTranslation(), radius, 0xffff0000, 0);
 	}
 
 
@@ -252,6 +269,12 @@ struct EditorPlugin : public WorldEditor::Plugin
 		if (cmp.type == BOX_ACTOR_TYPE)
 		{
 			showBoxActorGizmo(cmp, *render_scene);
+			return true;
+		}
+
+		if (cmp.type == SPHERE_ACTOR_TYPE)
+		{
+			showSphereActorGizmo(cmp, *render_scene);
 			return true;
 		}
 
@@ -553,6 +576,11 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 					cmp.type = BOX_ACTOR_TYPE;
 					EditorPlugin::showBoxActorGizmo(cmp, *render_scene);
 					break;
+				case PhysicsScene::ActorType::SPHERE:
+					ImGui::Text("%s", "sphere");
+					cmp.type = SPHERE_ACTOR_TYPE;
+					EditorPlugin::showSphereActorGizmo(cmp, *render_scene);
+					break;
 				case PhysicsScene::ActorType::MESH: ImGui::Text("%s", "mesh"); break;
 				case PhysicsScene::ActorType::CAPSULE: 
 					ImGui::Text("%s", "capsule"); 
@@ -657,6 +685,7 @@ LUMIX_STUDIO_ENTRY(physics)
 	app.registerComponent("hinge_joint", "Hinge Joint");
 	app.registerComponent("spherical_joint", "Spherical Joint");
 	app.registerComponent("box_rigid_actor", "Physics Box");
+	app.registerComponent("sphere_rigid_actor", "Physics Sphere");
 	app.registerComponent("capsule_rigid_actor", "Physics Capsule");
 	app.registerComponent("physical_controller", "Physics Controller");
 	app.registerComponent("mesh_rigid_actor", "Physics Mesh");
