@@ -1755,8 +1755,20 @@ struct ConvertTask : public MT::Task
 		{
 			if (mesh.import_physics)
 			{
-				file.write(
-					(const char*)mesh.mesh->mVertices, sizeof(mesh.mesh->mVertices[0]) * mesh.mesh->mNumVertices);
+				auto* verts = mesh.mesh->mVertices;
+				if (fabs(m_scale - 1.0f) < 0.001f)
+				{
+					file.write(verts, sizeof(verts[0]) * mesh.mesh->mNumVertices);
+				}
+				else
+				{
+					for (unsigned int i = 0; i < mesh.mesh->mNumVertices; ++i)
+					{
+						Vec3 v = *(Vec3*)&verts[i].x;
+						v *= m_scale;
+						file.write(&v, sizeof(v));
+					}
+				}
 			}
 		}
 
@@ -1772,7 +1784,7 @@ struct ConvertTask : public MT::Task
 		int count = 0;
 		for (auto& mesh : m_dialog.m_meshes)
 		{
-			if (mesh.import) count += (int)mesh.mesh->mNumFaces * 3;
+			if (mesh.import_physics) count += (int)mesh.mesh->mNumFaces * 3;
 		}
 		file.write((const char*)&count, sizeof(count));
 		int offset = 0;
