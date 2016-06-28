@@ -2048,7 +2048,7 @@ public:
 		}
 		m_engine->getFileSystem().close(*m_game_mode_file);
 		m_game_mode_file = nullptr;
-		selectEntities(&m_selected_entity_on_game_mode, 1);
+		if(isValid(m_selected_entity_on_game_mode)) selectEntities(&m_selected_entity_on_game_mode, 1);
 	}
 
 
