@@ -253,11 +253,12 @@ namespace Lumix
 			&PhysicsScene::setActorLayer,
 			allocator));
 		PropertyRegister::add("mesh_rigid_actor",
-			LUMIX_NEW(allocator, FilePropertyDescriptor<PhysicsScene>)("Source",
-			&PhysicsScene::getShapeSource,
-			&PhysicsScene::setShapeSource,
-			"Physics (*.pda)",
-			allocator));
+			LUMIX_NEW(allocator, ResourcePropertyDescriptor<PhysicsScene>)("Source",
+				&PhysicsScene::getShapeSource,
+				&PhysicsScene::setShapeSource,
+				"Physics (*.phy)",
+				PHYSICS_HASH,
+				allocator));
 		PropertyRegister::add("mesh_rigid_actor",
 			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
 			&PhysicsScene::getActorLayer,

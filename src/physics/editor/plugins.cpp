@@ -5,11 +5,13 @@
 #include "engine/crc32.h"
 #include "engine/math_utils.h"
 #include "engine/property_register.h"
+#include "editor/asset_browser.h"
 #include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/universe/universe.h"
+#include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
 #include "renderer/render_scene.h"
 
@@ -27,6 +29,7 @@ static const ComponentType DISTANCE_JOINT_TYPE = PropertyRegister::getComponentT
 static const ComponentType HINGE_JOINT_TYPE = PropertyRegister::getComponentType("hinge_joint");
 static const ComponentType SPHERICAL_JOINT_TYPE = PropertyRegister::getComponentType("spherical_joint");
 static const uint32 RENDERER_HASH = crc32("renderer");
+static const uint32 PHYSICS_HASH = crc32("PHYSICS");
 
 
 struct EditorPlugin : public WorldEditor::Plugin
@@ -448,14 +451,94 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 	}
 
 
+	void onVisualizationGUI()
+	{
+		if (!ImGui::CollapsingHeader("Visualization")) return;
+		
+		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
+
+		uint32 viz_flags = scene->getDebugVisualizationFlags();
+		auto flag_gui = [&viz_flags](const char* label, int flag) {
+			bool b = (viz_flags & (1 << flag)) != 0;
+			if (ImGui::Checkbox(label, &b))
+			{
+				if (b) viz_flags |= 1 << flag;
+				else  viz_flags &= ~(1 << flag);
+			}
+		};
+
+		flag_gui("Body axes", physx::PxVisualizationParameter::eBODY_AXES);
+		flag_gui("Body linear velocity", physx::PxVisualizationParameter::eBODY_LIN_VELOCITY);
+		flag_gui("Body angular velocity", physx::PxVisualizationParameter::eBODY_ANG_VELOCITY);
+		flag_gui("Contact normal", physx::PxVisualizationParameter::eCONTACT_NORMAL);
+		flag_gui("Contact error", physx::PxVisualizationParameter::eCONTACT_ERROR);
+		flag_gui("Contact force", physx::PxVisualizationParameter::eCONTACT_FORCE);
+		flag_gui("Collision axes", physx::PxVisualizationParameter::eCOLLISION_AXES);
+		flag_gui("Joint local frames", physx::PxVisualizationParameter::eJOINT_LOCAL_FRAMES);
+		flag_gui("Joint limits", physx::PxVisualizationParameter::eJOINT_LIMITS);
+		flag_gui("Collision shapes", physx::PxVisualizationParameter::eCOLLISION_SHAPES);
+		flag_gui("Actor axes", physx::PxVisualizationParameter::eACTOR_AXES);
+		flag_gui("Collision AABBs", physx::PxVisualizationParameter::eCOLLISION_AABBS);
+		flag_gui("World axes", physx::PxVisualizationParameter::eWORLD_AXES);
+		flag_gui("Contact points", physx::PxVisualizationParameter::eCONTACT_POINT);
+		scene->setDebugVisualizationFlags(viz_flags);
+	}
+
+
+	void onActorGUI()
+	{
+		if (!ImGui::CollapsingHeader("Actors")) return;
+
+		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
+		int count = scene->getActorCount();
+		if (!count) return;
+		
+		ImGui::Columns(3);
+		ImGui::Text("Entity"); ImGui::NextColumn();
+		ImGui::Text("Type"); ImGui::NextColumn();
+		ImGui::Text("Debug visualization"); ImGui::NextColumn();
+		ImGui::Separator();
+		for (int i = 0; i < count; ++i)
+		{
+			Entity entity = scene->getActorEntity(i);
+			if (!isValid(entity)) continue;
+			ImGui::PushID(i);
+			char tmp[255];
+			getEntityListDisplayName(m_editor, tmp, lengthOf(tmp), entity);
+			bool selected = false;
+			if (ImGui::Selectable(tmp, &selected)) m_editor.selectEntities(&entity, 1);
+			ImGui::NextColumn();
+			auto type = scene->getActorType(i);
+			switch (type)
+			{
+				case PhysicsScene::ActorType::BOX: ImGui::Text("%s", "box"); break;
+				case PhysicsScene::ActorType::MESH: ImGui::Text("%s", "mesh"); break;
+				default: ImGui::Text("%s", "unknown"); break;
+			}
+			ImGui::NextColumn();
+			bool is_debug_viz = scene->isActorDebugEnabled(i);
+			if (ImGui::Checkbox("", &is_debug_viz))
+			{
+				scene->enableActorDebug(i, is_debug_viz);
+			}
+			ImGui::NextColumn();
+			ImGui::PopID();
+		}
+		ImGui::Columns();
+	}
+
+
 	void onDebugGUI()
 	{
 		if (!ImGui::CollapsingHeader("Debug")) return;
 
 		ImGui::Indent();
+
+		onVisualizationGUI();
 		onHingeJointGUI();
 		onDistanceJointGUI();
 		onSphericalJointGUI();
+		onActorGUI();
 		ImGui::Unindent();
 	}
 
@@ -478,6 +561,47 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 };
 
 
+
+struct PhysicsGeometryPlugin : public AssetBrowser::IPlugin
+{
+	explicit PhysicsGeometryPlugin(StudioApp& app)
+		: m_app(app)
+	{
+	}
+
+
+	bool acceptExtension(const char* ext, Lumix::uint32 type) const override { return false; }
+
+
+	bool onGUI(Resource* resource, uint32 type) override
+	{
+		if (type != PHYSICS_HASH) return false;
+
+		auto* geom = static_cast<PhysicsGeometry*>(resource);
+		if (geom->isFailure())
+		{
+			ImGui::Text("Failed to load.");
+			return true;
+		}
+		return true;
+	}
+
+
+	void onResourceUnloaded(Resource* resource) override {}
+	const char* getName() const override { return "Physics geometry"; }
+	bool hasResourceManager(uint32 type) const override { return type == PHYSICS_HASH; }
+
+
+	uint32 getResourceType(const char* ext) override
+	{
+		if (equalStrings(ext, "phy")) return PHYSICS_HASH;
+		return 0;
+	}
+
+	StudioApp& m_app;
+};
+
+
 } // anonymous
 
 
@@ -496,5 +620,6 @@ LUMIX_STUDIO_ENTRY(physics)
 
 	app.addPlugin(*LUMIX_NEW(allocator, StudioAppPlugin)(editor));
 	editor.addPlugin(*LUMIX_NEW(allocator, EditorPlugin)(editor));
+	app.getAssetBrowser()->addPlugin(*LUMIX_NEW(allocator, PhysicsGeometryPlugin)(app));
 }
 

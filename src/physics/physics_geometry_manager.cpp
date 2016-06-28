@@ -1,6 +1,7 @@
 #include "physics_geometry_manager.h"
 #include "engine/crc32.h"
 #include "engine/fs/file_system.h"
+#include "engine/log.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
 #include "engine/vec.h"
@@ -112,15 +113,22 @@ bool PhysicsGeometry::load(FS::IFile& file)
 {
 	Header header;
 	file.read(&header, sizeof(header));
-	if (header.m_magic != HEADER_MAGIC || header.m_version > (uint32)Versions::LAST)
+	if (header.m_magic != HEADER_MAGIC)
 	{
+		g_log_warning.log("Physics") << "Corrupted geometry " << getPath().c_str();
+		return false;
+	}
+
+	if(header.m_version > (uint32)Versions::LAST)
+	{
+		g_log_warning.log("Physics") << "Unsupported version of geometry " << getPath().c_str();
 		return false;
 	}
 
 	auto* phy_manager = m_resource_manager.get(PHYSICS_HASH);
 	PhysicsSystem& system = static_cast<PhysicsGeometryManager*>(phy_manager)->getSystem();
 
-	uint32 num_verts;
+	int32 num_verts;
 	Array<Vec3> verts(getAllocator());
 	file.read(&num_verts, sizeof(num_verts));
 	verts.resize(num_verts);

@@ -227,47 +227,33 @@ struct PhysicsSceneImpl : public PhysicsScene
 	};
 
 
-	enum ActorType
-	{
-		BOX,
-		TRIMESH,
-		CONVEX
-	};
-
-
 	class RigidActor
 	{
 	public:
-		explicit RigidActor(PhysicsSceneImpl& scene)
-			: m_resource(nullptr)
-			, m_physx_actor(nullptr)
-			, m_scene(scene)
-			, m_is_dynamic(false)
-			, m_layer(0)
+		explicit RigidActor(PhysicsSceneImpl& _scene, ActorType _type)
+			: resource(nullptr)
+			, physx_actor(nullptr)
+			, scene(_scene)
+			, is_dynamic(false)
+			, layer(0)
+			, entity(INVALID_ENTITY)
+			, type(_type)
 		{
 		}
 
 		void setResource(PhysicsGeometry* resource);
-		void setEntity(Entity entity) { m_entity = entity; }
-		Entity getEntity() { return m_entity; }
 		void setPhysxActor(physx::PxRigidActor* actor);
-		physx::PxRigidActor* getPhysxActor() const { return m_physx_actor; }
-		PhysicsGeometry* getResource() const { return m_resource; }
-		bool isDynamic() const { return m_is_dynamic; }
-		void setDynamic(bool dynamic) { m_is_dynamic = dynamic; }
-		int getLayer() const { return m_layer; }
-		void setLayer(int layer) { m_layer = layer; }
+
+		Entity entity;
+		int layer;
+		bool is_dynamic;
+		physx::PxRigidActor* physx_actor;
+		PhysicsGeometry* resource;
+		PhysicsSceneImpl& scene;
+		ActorType type;
 
 	private:
 		void onStateChanged(Resource::State old_state, Resource::State new_state);
-
-	private:
-		physx::PxRigidActor* m_physx_actor;
-		PhysicsGeometry* m_resource;
-		Entity m_entity;
-		int m_layer;
-		PhysicsSceneImpl& m_scene;
-		bool m_is_dynamic;
 	};
 
 
@@ -286,6 +272,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		, m_hinge_joints(m_allocator)
 		, m_spherical_joints(m_allocator)
 		, m_script_scene(nullptr)
+		, m_debug_visualization_flags(0)
 	{
 		setMemory(m_layers_names, 0, sizeof(m_layers_names));
 		for (int i = 0; i < lengthOf(m_layers_names); ++i)
@@ -341,14 +328,29 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void enableVisualization()
+	uint32 getDebugVisualizationFlags() const override
 	{
-		m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
-		m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 1.0);
-		m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eACTOR_AXES, 1.0f);
-		m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_AABBS, 1.0f);
-		m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eWORLD_AXES, 1.0f);
-		m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCONTACT_POINT, 1.0f);
+		return m_debug_visualization_flags;
+	}
+
+
+	void setDebugVisualizationFlags(uint32 flags) override
+	{
+		if (flags == m_debug_visualization_flags) return;
+
+		m_debug_visualization_flags = flags;
+
+		m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, flags != 0 ? 1.0f : 0.0f);
+
+		auto setFlag = [this, flags](int flag) {
+			m_scene->setVisualizationParameter(physx::PxVisualizationParameter::Enum(flag), flags & (1 << flag) ? 1.0f : 0.0f);
+		};
+
+		setFlag(physx::PxVisualizationParameter::eACTOR_AXES);
+		setFlag(physx::PxVisualizationParameter::eCOLLISION_SHAPES);
+		setFlag(physx::PxVisualizationParameter::eWORLD_AXES);
+		setFlag(physx::PxVisualizationParameter::eCOLLISION_AABBS);
+		setFlag(physx::PxVisualizationParameter::eCONTACT_POINT);
 	}
 
 
@@ -370,7 +372,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			for (int i = 0; i < m_actors.size(); ++i)
 			{
-				if (m_actors[i] && m_actors[i]->getEntity() == entity) return{ i };
+				if (m_actors[i] && m_actors[i]->entity == entity) return{ i };
 			}
 			return INVALID_COMPONENT;
 		}
@@ -442,12 +444,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		ASSERT(layer < lengthOf(m_layers_names));
 		auto* actor = m_actors[cmp.index];
-		actor->setLayer(layer);
-		updateFilterData(actor->getPhysxActor(), actor->getLayer());
+		actor->layer = layer;
+		updateFilterData(actor->physx_actor, actor->layer);
 	}
 
 
-	int getActorLayer(ComponentHandle cmp) override { return m_actors[cmp.index]->getLayer(); }
+	int getActorLayer(ComponentHandle cmp) override { return m_actors[cmp.index]->layer; }
 	int getHeightfieldLayer(ComponentHandle cmp) override { return m_terrains[cmp.index]->m_layer; }
 
 
@@ -765,8 +767,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		}
 		else if (type == MESH_ACTOR_TYPE || type == BOX_ACTOR_TYPE)
 		{
-			Entity entity = m_actors[cmp.index]->getEntity();
-			m_actors[cmp.index]->setEntity(INVALID_ENTITY);
+			Entity entity = m_actors[cmp.index]->entity;
+			m_actors[cmp.index]->entity = INVALID_ENTITY;
 			m_actors[cmp.index]->setPhysxActor(nullptr);
 			m_dynamic_actors.eraseItem(m_actors[cmp.index]);
 			m_universe.destroyComponent(entity, type, this, cmp);
@@ -912,9 +914,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createBoxRigidActor(Entity entity)
 	{
-		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this);
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
 		m_actors.push(actor);
-		actor->setEntity(entity);
+		actor->entity = entity;
 
 		physx::PxBoxGeometry geom;
 		geom.halfExtents.x = 1;
@@ -936,9 +938,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createMeshRigidActor(Entity entity)
 	{
-		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this);
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::MESH);
 		m_actors.push(actor);
-		actor->setEntity(entity);
+		actor->entity = entity;
 
 		ComponentHandle cmp = {m_actors.size() - 1};
 		m_universe.addComponent(entity, MESH_ACTOR_TYPE, this, cmp);
@@ -948,16 +950,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	Path getHeightmap(ComponentHandle cmp) override
 	{
-		return m_terrains[cmp.index]->m_heightmap
-				   ? m_terrains[cmp.index]->m_heightmap->getPath()
-				   : Path("");
+		return m_terrains[cmp.index]->m_heightmap ? m_terrains[cmp.index]->m_heightmap->getPath() : Path("");
 	}
 
 
-	float getHeightmapXZScale(ComponentHandle cmp) override
-	{
-		return m_terrains[cmp.index]->m_xz_scale;
-	}
+	float getHeightmapXZScale(ComponentHandle cmp) override { return m_terrains[cmp.index]->m_xz_scale; }
 
 
 	void setHeightmapXZScale(ComponentHandle cmp, float scale) override
@@ -1022,7 +1019,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	Path getShapeSource(ComponentHandle cmp) override
 	{
-		return m_actors[cmp.index]->getResource() ? m_actors[cmp.index]->getResource()->getPath() : Path("");
+		return m_actors[cmp.index]->resource ? m_actors[cmp.index]->resource->getPath() : Path("");
 	}
 
 
@@ -1031,8 +1028,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		ASSERT(m_actors[cmp.index]);
 		bool is_dynamic = isDynamic(cmp);
 		auto& actor = *m_actors[cmp.index];
-		if (actor.getResource() && actor.getResource()->getPath() == str &&
-			(!actor.getPhysxActor() || is_dynamic == !actor.getPhysxActor()->isRigidStatic()))
+		if (actor.resource && actor.resource->getPath() == str &&
+			(!actor.physx_actor || is_dynamic == !actor.physx_actor->isRigidStatic()))
 		{
 			return;
 		}
@@ -1058,8 +1055,34 @@ struct PhysicsSceneImpl : public PhysicsScene
 	static physx::PxQuat fromQuat(const Quat& v) { return physx::PxQuat(v.x, v.y, v.z, v.w); }
 
 
-	void render(RenderScene& render_scene) override
+	int getActorCount() const override { return m_actors.size(); }
+	Entity getActorEntity(int index) override { return m_actors[index]->entity; }
+	ActorType getActorType(int index) override { return m_actors[index]->type; }
+
+
+	bool isActorDebugEnabled(int index) const override
 	{
+		auto* px_actor = m_actors[index]->physx_actor;
+		if (!px_actor) return false;
+		return px_actor->getActorFlags().isSet(physx::PxActorFlag::eVISUALIZATION);
+	}
+
+
+	void enableActorDebug(int index, bool enable) const override
+	{
+		auto* px_actor = m_actors[index]->physx_actor;
+		if (!px_actor) return;
+		px_actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, enable);
+		physx::PxShape* shape;
+		int count = px_actor->getShapes(&shape, 1);
+		ASSERT(count > 0);
+		shape->setFlag(physx::PxShapeFlag::eVISUALIZATION, enable);
+	}
+
+
+	void render() override
+	{
+		auto& render_scene = *static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		const physx::PxRenderBuffer& rb = m_scene->getRenderBuffer();
 		const physx::PxU32 num_lines = rb.getNbLines();
 		if (num_lines)
@@ -1091,11 +1114,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		PROFILE_FUNCTION();
 		for (auto* actor : m_dynamic_actors)
 		{
-			physx::PxTransform trans = actor->getPhysxActor()->getGlobalPose();
-			m_universe.setPosition(
-				actor->getEntity(), trans.p.x, trans.p.y, trans.p.z);
-			m_universe.setRotation(
-				actor->getEntity(), trans.q.x, trans.q.y, trans.q.z, trans.q.w);
+			physx::PxTransform trans = actor->physx_actor->getGlobalPose();
+			m_universe.setPosition(actor->entity, trans.p.x, trans.p.y, trans.p.z);
+			m_universe.setRotation(actor->entity, trans.q.x, trans.q.y, trans.q.z, trans.q.w);
 		}
 	}
 
@@ -1125,10 +1146,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			Vec3 dif = g + m_controllers[i].m_frame_change;
 			m_controllers[i].m_frame_change.set(0, 0, 0);
 			const physx::PxExtendedVec3& p = m_controllers[i].m_controller->getPosition();
-			m_controllers[i].m_controller->move(physx::PxVec3(dif.x, dif.y, dif.z),
-				0.01f,
-				time_delta,
-				physx::PxControllerFilters());
+			m_controllers[i].m_controller->move(
+				physx::PxVec3(dif.x, dif.y, dif.z), 0.01f, time_delta, physx::PxControllerFilters());
 
 			float y = (float)p.y - m_controllers[i].m_height * 0.5f - m_controllers[i].m_radius;
 			m_universe.setPosition(m_controllers[i].m_entity, (float)p.x, y, (float)p.z);
@@ -1141,13 +1160,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 		for (auto& i : m_queued_forces)
 		{
 			auto* actor = m_actors[i.cmp.index];
-			if (!actor->isDynamic())
+			if (!actor->is_dynamic)
 			{
 				g_log_warning.log("Physics") << "Trying to apply force to static object";
 				return;
 			}
 
-			auto* physx_actor = static_cast<physx::PxRigidDynamic*>(actor->getPhysxActor());
+			auto* physx_actor = static_cast<physx::PxRigidDynamic*>(actor->physx_actor);
 			if (!physx_actor) return;
 			physx::PxVec3 f(i.force.x, i.force.y, i.force.z);
 			physx_actor->addForce(f);
@@ -1167,6 +1186,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		fetchResults();
 		updateDynamicActors();
 		updateControllers(time_delta);
+		
+		render();
 	}
 
 
@@ -1174,7 +1195,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
-			if (m_actors[i]->getEntity() == entity) return {i};
+			if (m_actors[i]->entity == entity) return {i};
 		}
 		return INVALID_COMPONENT;
 	}
@@ -1232,8 +1253,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			physx::PxRigidActor* actors[2] = { nullptr, nullptr };
 			for (auto* actor : m_actors)
 			{
-				if (actor->getEntity() == entity) actors[0] = actor->getPhysxActor();
-				if (actor->getEntity() == joint.connected_body) actors[1] = actor->getPhysxActor();
+				if (actor->entity == entity) actors[0] = actor->physx_actor;
+				if (actor->entity == joint.connected_body) actors[1] = actor->physx_actor;
 			}
 
 			if (!actors[0] || !actors[1]) continue;
@@ -1286,8 +1307,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			physx::PxRigidActor* actors[2] = {nullptr, nullptr};
 			for (auto* actor : m_actors)
 			{
-				if (actor->getEntity() == entity) actors[0] = actor->getPhysxActor();
-				if (actor->getEntity() == joint.connected_body) actors[1] = actor->getPhysxActor();
+				if (actor->entity == entity) actors[0] = actor->physx_actor;
+				if (actor->entity == joint.connected_body) actors[1] = actor->physx_actor;
 			}
 
 			if (!actors[0] || !actors[1]) continue;
@@ -1333,8 +1354,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			physx::PxRigidActor* actors[2] = { nullptr, nullptr };
 			for (auto* actor : m_actors)
 			{
-				if (actor->getEntity() == entity) actors[0] = actor->getPhysxActor();
-				if (actor->getEntity() == joint.connected_body) actors[1] = actor->getPhysxActor();
+				if (actor->entity == entity) actors[0] = actor->physx_actor;
+				if (actor->entity == joint.connected_body) actors[1] = actor->physx_actor;
 			}
 
 			if (!actors[0] || !actors[1]) continue;
@@ -1475,14 +1496,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		for (int i = 0, c = m_dynamic_actors.size(); i < c; ++i)
 		{
-			if (m_dynamic_actors[i]->getEntity() == entity)
+			if (m_dynamic_actors[i]->entity == entity)
 			{
 				Vec3 pos = m_universe.getPosition(entity);
 				physx::PxVec3 pvec(pos.x, pos.y, pos.z);
 				Quat q = m_universe.getRotation(entity);
 				physx::PxQuat pquat(q.x, q.y, q.z, q.w);
 				physx::PxTransform trans(pvec, pquat);
-				m_dynamic_actors[i]->getPhysxActor()->setGlobalPose(trans, false);
+				m_dynamic_actors[i]->physx_actor->setGlobalPose(trans, false);
 				return;
 			}
 		}
@@ -1502,14 +1523,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		for (int i = 0, c = m_actors.size(); i < c; ++i)
 		{
-			if (m_actors[i]->getEntity() == entity)
+			if (m_actors[i]->entity == entity)
 			{
 				Vec3 pos = m_universe.getPosition(entity);
 				physx::PxVec3 pvec(pos.x, pos.y, pos.z);
 				Quat q = m_universe.getRotation(entity);
 				physx::PxQuat pquat(q.x, q.y, q.z, q.w);
 				physx::PxTransform trans(pvec, pquat);
-				m_actors[i]->getPhysxActor()->setGlobalPose(trans, false);
+				m_actors[i]->physx_actor->setGlobalPose(trans, false);
 				return;
 			}
 		}
@@ -1593,7 +1614,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 			actor = PxCreateStatic(*m_system->getPhysics(), transform, hfGeom, *m_default_material);
 			if (actor)
 			{
-				actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, width <= 1024);
 				actor->userData = (void*)(intptr_t)terrain->m_entity.index;
 				m_scene->addActor(*actor);
 				terrain->m_actor = actor;
@@ -1628,9 +1648,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_layers_count = Math::maximum(0, m_layers_count - 1);
 		for (auto* actor : m_actors)
 		{
-			if (!actor->getPhysxActor()) continue;
-			if (actor->getEntity() == INVALID_ENTITY) continue;
-			actor->setLayer(Math::minimum(m_layers_count - 1, actor->getLayer()));
+			if (!actor->physx_actor) continue;
+			if (actor->entity == INVALID_ENTITY) continue;
+			actor->layer = Math::minimum(m_layers_count - 1, actor->layer);
 		}
 		for (auto& controller : m_controllers)
 		{
@@ -1701,15 +1721,15 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		for (auto* actor : m_actors)
 		{
-			if (!actor->getPhysxActor()) continue;
-			if (actor->getEntity() == INVALID_ENTITY) continue;
+			if (!actor->physx_actor) continue;
+			if (actor->entity == INVALID_ENTITY) continue;
 
 			physx::PxFilterData data;
-			int actor_layer = actor->getLayer();
+			int actor_layer = actor->layer;
 			data.word0 = 1 << actor_layer;
 			data.word1 = m_collision_filter[actor_layer];
 			physx::PxShape* shapes[8];
-			int shapes_count = actor->getPhysxActor()->getShapes(shapes, lengthOf(shapes));
+			int shapes_count = actor->physx_actor->getShapes(shapes, lengthOf(shapes));
 			for (int i = 0; i < shapes_count; ++i)
 			{
 				shapes[i]->setSimulationFilterData(data);
@@ -1780,10 +1800,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 	Vec3 getHalfExtents(ComponentHandle cmp) override
 	{
 		Vec3 size;
-		physx::PxRigidActor* actor = m_actors[cmp.index]->getPhysxActor();
+		physx::PxRigidActor* actor = m_actors[cmp.index]->physx_actor;
 		physx::PxShape* shapes;
-		if (actor->getNbShapes() == 1 &&
-			m_actors[cmp.index]->getPhysxActor()->getShapes(&shapes, 1))
+		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
 		{
 			physx::PxVec3& half = shapes->getGeometry().box().halfExtents;
 			size.x = half.x;
@@ -1796,9 +1815,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void setHalfExtents(ComponentHandle cmp, const Vec3& size) override
 	{
-		physx::PxRigidActor* actor = m_actors[cmp.index]->getPhysxActor();
+		physx::PxRigidActor* actor = m_actors[cmp.index]->physx_actor;
 		physx::PxShape* shapes;
-		if (actor->getNbShapes() == 1 && m_actors[cmp.index]->getPhysxActor()->getShapes(&shapes, 1))
+		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
 		{
 			physx::PxBoxGeometry box;
 			bool is_box = shapes->getBoxGeometry(box);
@@ -1819,7 +1838,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		bool is_dynamic = dynamic_index != -1;
 		if (is_dynamic == new_value) return;
 
-		actor->setDynamic(new_value);
+		actor->is_dynamic = new_value;
 		if (new_value)
 		{
 			m_dynamic_actors.push(actor);
@@ -1829,12 +1848,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 			m_dynamic_actors.eraseItemFast(actor);
 		}
 		physx::PxShape* shapes;
-		if (actor->getPhysxActor()->getNbShapes() == 1 && actor->getPhysxActor()->getShapes(&shapes, 1, 0))
+		if (actor->physx_actor->getNbShapes() == 1 && actor->physx_actor->getShapes(&shapes, 1, 0))
 		{
 			physx::PxGeometryHolder geom = shapes->getGeometry();
 
 			physx::PxTransform transform;
-			matrix2Transform(m_universe.getPositionAndRotation(actor->getEntity()), transform);
+			matrix2Transform(m_universe.getPositionAndRotation(actor->entity), transform);
 
 			physx::PxRigidActor* physx_actor;
 			if (new_value)
@@ -1846,8 +1865,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, geom.any(), *m_default_material);
 			}
 			ASSERT(actor);
-			physx_actor->userData = (void*)(intptr_t)actor->getEntity().index;
-			physx_actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+			physx_actor->userData = (void*)(intptr_t)actor->entity.index;
 			actor->setPhysxActor(physx_actor);
 		}
 	}
@@ -1855,67 +1873,46 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void serializeActor(OutputBlob& serializer, int idx)
 	{
-		serializer.write(m_actors[idx]->getLayer());
+		auto* actor = m_actors[idx];
+		serializer.write(actor->layer);
 		physx::PxShape* shapes;
-		if (m_actors[idx]->getPhysxActor()->getNbShapes() == 1 &&
-			m_actors[idx]->getPhysxActor()->getShapes(&shapes, 1))
+		auto* px_actor = actor->physx_actor;
+		auto* resource = actor->resource;
+		serializer.write((int32)actor->type);
+		switch (actor->type)
 		{
-			physx::PxBoxGeometry geom;
-			physx::PxConvexMeshGeometry convex_geom;
-			physx::PxHeightFieldGeometry hf_geom;
-			physx::PxTriangleMeshGeometry trimesh_geom;
-			if (shapes->getBoxGeometry(geom))
+			case ActorType::BOX:
 			{
-				serializer.write((int32)BOX);
+				ASSERT(px_actor->getNbShapes() == 1);
+				px_actor->getShapes(&shapes, 1);
+				physx::PxBoxGeometry geom;
+				if (!shapes->getBoxGeometry(geom)) ASSERT(false);
 				serializer.write(geom.halfExtents.x);
 				serializer.write(geom.halfExtents.y);
 				serializer.write(geom.halfExtents.z);
+				break;
 			}
-			else if (shapes->getConvexMeshGeometry(convex_geom))
-			{
-				serializer.write((int32)CONVEX);
-				serializer.writeString(
-					m_actors[idx]->getResource()
-						? m_actors[idx]->getResource()->getPath().c_str()
-						: "");
-			}
-			else if (shapes->getTriangleMeshGeometry(trimesh_geom))
-			{
-				serializer.write((int32)TRIMESH);
-				serializer.writeString(
-					m_actors[idx]->getResource()
-						? m_actors[idx]->getResource()->getPath().c_str()
-						: "");
-			}
-			else
-			{
-				ASSERT(false);
-			}
-		}
-		else
-		{
-			ASSERT(false);
+			case ActorType::MESH: serializer.writeString(resource ? resource->getPath().c_str() : ""); break;
+			default: ASSERT(false);
 		}
 	}
 
 
 	void deserializeActor(InputBlob& serializer, ComponentHandle cmp, int version)
 	{
-		int layer = 0;
-		if (version > (int)PhysicsSceneVersion::LAYERS) serializer.read(layer);
 		auto* actor = m_actors[cmp.index];
-		actor->setLayer(layer);
+		actor->layer = 0;
+		if (version > (int)PhysicsSceneVersion::LAYERS) serializer.read(actor->layer);
 
-		ActorType type;
-		serializer.read((int32&)type);
+		serializer.read((int32&)actor->type);
 
-		switch (type)
+		switch (actor->type)
 		{
-			case BOX:
+			case ActorType::BOX:
 			{
 				physx::PxBoxGeometry box_geom;
 				physx::PxTransform transform;
-				Matrix mtx = m_universe.getPositionAndRotation(actor->getEntity());
+				Matrix mtx = m_universe.getPositionAndRotation(actor->entity);
 				matrix2Transform(mtx, transform);
 				serializer.read(box_geom.halfExtents.x);
 				serializer.read(box_geom.halfExtents.y);
@@ -1931,18 +1928,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 					physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, box_geom, *m_default_material);
 				}
 				actor->setPhysxActor(physx_actor);
-				m_universe.addComponent(actor->getEntity(), BOX_ACTOR_TYPE, this, cmp);
+				m_universe.addComponent(actor->entity, BOX_ACTOR_TYPE, this, cmp);
 			}
 			break;
-			case TRIMESH:
-			case CONVEX:
+			case ActorType::MESH:
 			{
 				char tmp[MAX_PATH_LENGTH];
 				serializer.readString(tmp, sizeof(tmp));
 				ResourceManagerBase* manager = m_engine->getResourceManager().get(PHYSICS_HASH);
 				auto* geometry = manager->load(Lumix::Path(tmp));
 				actor->setResource(static_cast<PhysicsGeometry*>(geometry));
-				m_universe.addComponent(actor->getEntity(), MESH_ACTOR_TYPE, this, cmp);
+				m_universe.addComponent(actor->entity, MESH_ACTOR_TYPE, this, cmp);
 			}
 			break;
 			default:
@@ -1961,8 +1957,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
 			serializer.write(isDynamic({i}));
-			serializer.write(m_actors[i]->getEntity());
-			if (isValid(m_actors[i]->getEntity()))
+			serializer.write(m_actors[i]->entity);
+			if (isValid(m_actors[i]->entity))
 			{
 				serializeActor(serializer, i);
 			}
@@ -2057,27 +2053,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_actors.resize(count);
 		for (int i = old_size; i < count; ++i)
 		{
-			RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this);
+			RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
 			m_actors[i] = actor;
 		}
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
-			bool is_dynamic;
-			serializer.read(is_dynamic);
-			if (is_dynamic)
-			{
-				m_dynamic_actors.push(m_actors[i]);
-			}
-			m_actors[i]->setDynamic(is_dynamic);
+			auto* actor = m_actors[i];
+			serializer.read(actor->is_dynamic);
+			if (actor->is_dynamic) m_dynamic_actors.push(actor);
 
-			Entity e;
-			serializer.read(e);
-			m_actors[i]->setEntity(e);
-
-			if (isValid(m_actors[i]->getEntity()))
-			{
-				deserializeActor(serializer, {i}, version);
-			}
+			serializer.read(actor->entity);
+			if (isValid(actor->entity)) deserializeActor(serializer, {i}, version);
 		}
 	}
 
@@ -2281,13 +2267,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	float getActorSpeed(ComponentHandle cmp) override
 	{
 		auto* actor = m_actors[cmp.index];
-		if (!actor->isDynamic())
+		if (!actor->is_dynamic)
 		{
 			g_log_warning.log("Physics") << "Trying to get speed of static object";
 			return 0;
 		}
 
-		auto* physx_actor = static_cast<physx::PxRigidDynamic*>(actor->getPhysxActor());
+		auto* physx_actor = static_cast<physx::PxRigidDynamic*>(actor->physx_actor);
 		if (!physx_actor) return 0;
 		return physx_actor->getLinearVelocity().magnitude();
 	}
@@ -2296,13 +2282,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void putToSleep(ComponentHandle cmp) override
 	{
 		auto* actor = m_actors[cmp.index];
-		if (!actor->isDynamic())
+		if (!actor->is_dynamic)
 		{
 			g_log_warning.log("Physics") << "Trying to put static object to sleep";
 			return;
 		}
 
-		auto* physx_actor = static_cast<physx::PxRigidDynamic*>(actor->getPhysxActor());
+		auto* physx_actor = static_cast<physx::PxRigidDynamic*>(actor->physx_actor);
 		if (!physx_actor) return;
 		physx_actor->putToSleep();
 	}
@@ -2371,6 +2357,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	AssociativeArray<Entity, HingeJoint> m_hinge_joints;
 	AssociativeArray<Entity, SphericalJoint> m_spherical_joints;
 	bool m_is_game_running;
+	uint32 m_debug_visualization_flags;
 
 	Array<QueuedForce> m_queued_forces;
 	Array<Controller> m_controllers;
@@ -2438,25 +2425,25 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		setPhysxActor(nullptr);
 
 		physx::PxTransform transform;
-		Matrix mtx = m_scene.getUniverse().getPositionAndRotation(m_entity);
+		Matrix mtx = scene.getUniverse().getPositionAndRotation(entity);
 		matrix2Transform(mtx, transform);
 
 		physx::PxRigidActor* actor;
-		bool is_dynamic = m_scene.isDynamic(this);
+		bool is_dynamic = scene.isDynamic(this);
 		if (is_dynamic)
 		{
-			actor = PxCreateDynamic(*m_scene.m_system->getPhysics(),
+			actor = PxCreateDynamic(*scene.m_system->getPhysics(),
 									transform,
-									*m_resource->getGeometry(),
-									*m_scene.m_default_material,
+									*resource->getGeometry(),
+									*scene.m_default_material,
 									1.0f);
 		}
 		else
 		{
-			actor = PxCreateStatic(*m_scene.m_system->getPhysics(),
+			actor = PxCreateStatic(*scene.m_system->getPhysics(),
 								   transform,
-								   *m_resource->getGeometry(),
-								   *m_scene.m_default_material);
+								   *resource->getGeometry(),
+								   *scene.m_default_material);
 		}
 		if (actor)
 		{
@@ -2465,7 +2452,7 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		else
 		{
 			g_log_error.log("Physics") << "Could not create PhysX mesh "
-									 << m_resource->getPath().c_str();
+									 << resource->getPath().c_str();
 		}
 	}
 }
@@ -2473,33 +2460,32 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 
 void PhysicsSceneImpl::RigidActor::setPhysxActor(physx::PxRigidActor* actor)
 {
-	if (m_physx_actor)
+	if (physx_actor)
 	{
-		m_scene.m_scene->removeActor(*m_physx_actor);
-		m_physx_actor->release();
+		scene.m_scene->removeActor(*physx_actor);
+		physx_actor->release();
 	}
-	m_physx_actor = actor;
+	physx_actor = actor;
 	if (actor)
 	{
-		m_scene.m_scene->addActor(*actor);
-		actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
-		actor->userData = (void*)(intptr_t)m_entity.index;
-		m_scene.updateFilterData(actor, m_layer);
+		scene.m_scene->addActor(*actor);
+		actor->userData = (void*)(intptr_t)entity.index;
+		scene.updateFilterData(actor, layer);
 	}
 }
 
 
-void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* resource)
+void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* _resource)
 {
-	if (m_resource)
-	{
-		m_resource->getObserverCb().unbind<RigidActor, &RigidActor::onStateChanged>(this);
-		m_resource->getResourceManager().get(PHYSICS_HASH)->unload(*m_resource);
-	}
-	m_resource = resource;
 	if (resource)
 	{
-		m_resource->onLoaded<RigidActor, &RigidActor::onStateChanged>(this);
+		resource->getObserverCb().unbind<RigidActor, &RigidActor::onStateChanged>(this);
+		resource->getResourceManager().get(PHYSICS_HASH)->unload(*resource);
+	}
+	resource = _resource;
+	if (resource)
+	{
+		resource->onLoaded<RigidActor, &RigidActor::onStateChanged>(this);
 	}
 }
 
