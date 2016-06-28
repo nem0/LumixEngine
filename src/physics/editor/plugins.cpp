@@ -24,6 +24,7 @@ namespace
 
 
 static const ComponentType BOX_ACTOR_TYPE = PropertyRegister::getComponentType("box_rigid_actor");
+static const ComponentType CAPSULE_ACTOR_TYPE = PropertyRegister::getComponentType("capsule_rigid_actor");
 static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("physical_controller");
 static const ComponentType DISTANCE_JOINT_TYPE = PropertyRegister::getComponentType("distance_joint");
 static const ComponentType HINGE_JOINT_TYPE = PropertyRegister::getComponentType("hinge_joint");
@@ -179,6 +180,40 @@ struct EditorPlugin : public WorldEditor::Plugin
 	}
 
 
+	static void showBoxActorGizmo(ComponentUID cmp, RenderScene& render_scene)
+	{
+		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
+		Universe& universe = phy_scene->getUniverse();
+
+		Vec3 extents = phy_scene->getHalfExtents(cmp.handle);
+		Matrix mtx = universe.getPositionAndRotation(cmp.entity);
+
+		render_scene.addDebugCube(mtx.getTranslation(),
+			mtx.getXVector() * extents.x,
+			mtx.getYVector() * extents.y,
+			mtx.getZVector() * extents.z,
+			0xffff0000,
+			0);
+	}
+
+
+	static void showCapsuleActorGizmo(ComponentUID cmp, RenderScene& render_scene)
+	{
+		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
+		Universe& universe = phy_scene->getUniverse();
+
+		float radius = phy_scene->getCapsuleRadius(cmp.handle);
+		float height = phy_scene->getCapsuleHeight(cmp.handle);
+		Matrix mtx = universe.getPositionAndRotation(cmp.entity);
+		Vec3 physx_capsule_up = mtx.getXVector();
+		mtx.setXVector(mtx.getYVector());
+		mtx.setYVector(physx_capsule_up);
+		Vec3 physx_capsule_center = mtx.getTranslation() - (height * 0.5f + radius) * physx_capsule_up;
+		mtx.setTranslation(physx_capsule_center);
+		render_scene.addDebugCapsule(mtx, height, radius, 0xffff0000, 0);
+	}
+
+
 	bool showGizmo(ComponentUID cmp) override
 	{
 		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
@@ -216,15 +251,13 @@ struct EditorPlugin : public WorldEditor::Plugin
 
 		if (cmp.type == BOX_ACTOR_TYPE)
 		{
-			Vec3 extents = phy_scene->getHalfExtents(cmp.handle);
-			Matrix mtx = universe.getPositionAndRotation(cmp.entity);
+			showBoxActorGizmo(cmp, *render_scene);
+			return true;
+		}
 
-			render_scene->addDebugCube(mtx.getTranslation(),
-				mtx.getXVector() * extents.x,
-				mtx.getYVector() * extents.y,
-				mtx.getZVector() * extents.z,
-				0xffff0000,
-				0);
+		if (cmp.type == CAPSULE_ACTOR_TYPE)
+		{
+			showCapsuleActorGizmo(cmp, *render_scene);
 			return true;
 		}
 
@@ -290,7 +323,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
 		if (ImGui::CollapsingHeader("Collision matrix"))
 		{
-			ImGui::Columns(1 + scene->getCollisionsLayersCount());
+			ImGui::Columns(1 + scene->getCollisionsLayersCount(), "collision_matrix_col");
 			ImGui::NextColumn();
 			ImGui::PushTextWrapPos(1);
 			float basic_offset = 0;
@@ -492,7 +525,8 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
 		int count = scene->getActorCount();
 		if (!count) return;
-		
+		auto* render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(RENDERER_HASH));
+
 		ImGui::Columns(3);
 		ImGui::Text("Entity"); ImGui::NextColumn();
 		ImGui::Text("Type"); ImGui::NextColumn();
@@ -500,19 +534,31 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 		ImGui::Separator();
 		for (int i = 0; i < count; ++i)
 		{
-			Entity entity = scene->getActorEntity(i);
-			if (!isValid(entity)) continue;
+			ComponentUID cmp;
+			cmp.entity = scene->getActorEntity(i);
+			if (!isValid(cmp.entity)) continue;
 			ImGui::PushID(i);
 			char tmp[255];
-			getEntityListDisplayName(m_editor, tmp, lengthOf(tmp), entity);
+			getEntityListDisplayName(m_editor, tmp, lengthOf(tmp), cmp.entity);
 			bool selected = false;
-			if (ImGui::Selectable(tmp, &selected)) m_editor.selectEntities(&entity, 1);
+			if (ImGui::Selectable(tmp, &selected)) m_editor.selectEntities(&cmp.entity, 1);
 			ImGui::NextColumn();
 			auto type = scene->getActorType(i);
+			cmp.handle = scene->getActorComponentHandle(i);
+			cmp.scene = scene;
 			switch (type)
 			{
-				case PhysicsScene::ActorType::BOX: ImGui::Text("%s", "box"); break;
+				case PhysicsScene::ActorType::BOX:
+					ImGui::Text("%s", "box");
+					cmp.type = BOX_ACTOR_TYPE;
+					EditorPlugin::showBoxActorGizmo(cmp, *render_scene);
+					break;
 				case PhysicsScene::ActorType::MESH: ImGui::Text("%s", "mesh"); break;
+				case PhysicsScene::ActorType::CAPSULE: 
+					ImGui::Text("%s", "capsule"); 
+					cmp.type = BOX_ACTOR_TYPE;
+					EditorPlugin::showCapsuleActorGizmo(cmp, *render_scene);
+					break;
 				default: ImGui::Text("%s", "unknown"); break;
 			}
 			ImGui::NextColumn();
@@ -611,6 +657,7 @@ LUMIX_STUDIO_ENTRY(physics)
 	app.registerComponent("hinge_joint", "Hinge Joint");
 	app.registerComponent("spherical_joint", "Spherical Joint");
 	app.registerComponent("box_rigid_actor", "Physics Box");
+	app.registerComponent("capsule_rigid_actor", "Physics Capsule");
 	app.registerComponent("physical_controller", "Physics Controller");
 	app.registerComponent("mesh_rigid_actor", "Physics Mesh");
 	app.registerComponent("physical_heightfield", "Physics Heightfield");

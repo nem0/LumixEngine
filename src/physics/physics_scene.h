@@ -43,7 +43,8 @@ public:
 	enum class ActorType
 	{
 		BOX,
-		MESH
+		MESH,
+		CAPSULE
 	};
 
 	static PhysicsScene* create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator);
@@ -73,6 +74,11 @@ public:
 	virtual void setHeightmapYScale(ComponentHandle cmp, float scale) = 0;
 	virtual int getHeightfieldLayer(ComponentHandle cmp) = 0;
 	virtual void setHeightfieldLayer(ComponentHandle cmp, int layer) = 0;
+
+	virtual float getCapsuleRadius(ComponentHandle cmp) = 0;
+	virtual void setCapsuleRadius(ComponentHandle cmp, float value) = 0;
+	virtual float getCapsuleHeight(ComponentHandle cmp) = 0;
+	virtual void setCapsuleHeight(ComponentHandle cmp, float value) = 0;
 
 	virtual float getDistanceJointDamping(ComponentHandle cmp) = 0;
 	virtual void setDistanceJointDamping(ComponentHandle cmp, float value) = 0;
@@ -150,6 +156,7 @@ public:
 	virtual ActorType getActorType(int index) = 0;
 	virtual bool isActorDebugEnabled(int index) const = 0;
 	virtual void enableActorDebug(int index, bool enable) const = 0;
+	virtual ComponentHandle getActorComponentHandle(int index) = 0;
 };
 
 

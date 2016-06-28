@@ -209,6 +209,12 @@ public:
 		uint32 color,
 		float life) = 0;
 
+	virtual void addDebugCapsule(const Matrix& transform,
+		float height,
+		float radius,
+		uint32 color,
+		float life) = 0;
+
 	virtual void addDebugCylinder(const Vec3& position,
 		const Vec3& up,
 		float radius,
