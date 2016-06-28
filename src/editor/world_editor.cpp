@@ -2024,6 +2024,7 @@ public:
 		}
 		else
 		{
+			m_selected_entity_on_game_mode = m_selected_entities.empty() ? INVALID_ENTITY : m_selected_entities[0];
 			auto& fs = m_engine->getFileSystem();
 			m_game_mode_file = fs.open(fs.getMemoryDevice(), Lumix::Path(""), FS::Mode::WRITE);
 			save(*m_game_mode_file);
@@ -2047,6 +2048,7 @@ public:
 		}
 		m_engine->getFileSystem().close(*m_game_mode_file);
 		m_game_mode_file = nullptr;
+		selectEntities(&m_selected_entity_on_game_mode, 1);
 	}
 
 
@@ -2392,7 +2394,6 @@ public:
 
 	WorldEditorImpl(const char* base_path, Engine& engine, IAllocator& allocator)
 		: m_allocator(allocator)
-		, m_engine(nullptr)
 		, m_components(m_allocator)
 		, m_entity_selected(m_allocator)
 		, m_universe_destroyed(m_allocator)
@@ -2412,18 +2413,19 @@ public:
 		, m_entity_groups(m_allocator)
 		, m_mouse_sensitivity(200, 200)
 		, m_render_interface(nullptr)
+		, m_selected_entity_on_game_mode(INVALID_ENTITY)
+		, m_mouse_handling_plugin(nullptr)
+		, m_is_game_mode(false)
+		, m_is_snap_mode(false)
+		, m_undo_index(-1)
+		, m_engine(&engine)
 	{
 		for (auto& i : m_is_mouse_down) i = false;
 		for (auto& i : m_is_mouse_click) i = false;
 		m_go_to_parameters.m_is_active = false;
-		m_undo_index = -1;
-		m_mouse_handling_plugin = nullptr;
-		m_is_game_mode = false;
-		m_is_snap_mode = false;
+		
 		m_measure_tool = LUMIX_NEW(m_allocator, MeasureTool)();
 		addPlugin(*m_measure_tool);
-
-		m_engine = &engine;
 
 		const char* plugins[] = { "renderer", "animation", "audio", "physics", "navigation", "lua_script"};
 
@@ -3086,6 +3088,7 @@ private:
 	FS::IFile* m_game_mode_file;
 	Engine* m_engine;
 	Entity m_camera;
+	Entity m_selected_entity_on_game_mode;
 	DelegateList<void()> m_universe_destroyed;
 	DelegateList<void()> m_universe_created;
 	DelegateList<void(const Array<Entity>&)> m_entity_selected;
