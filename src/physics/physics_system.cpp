@@ -128,6 +128,20 @@ namespace Lumix
 
 	static void registerProperties(Lumix::IAllocator& allocator)
 	{
+		PropertyRegister::add("sphere_rigid_actor",
+			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Radius",
+				&PhysicsScene::getSphereRadius,
+				&PhysicsScene::setSphereRadius,
+				0.0f,
+				FLT_MAX,
+				0.0f,
+				allocator));
+		PropertyRegister::add("sphere_rigid_actor",
+			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)("Dynamic",
+				&PhysicsScene::isDynamic,
+				&PhysicsScene::setIsDynamic,
+				allocator));
+
 		PropertyRegister::add("capsule_rigid_actor",
 			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Radius",
 				&PhysicsScene::getCapsuleRadius,

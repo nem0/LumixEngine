@@ -44,7 +44,8 @@ public:
 	{
 		BOX,
 		MESH,
-		CAPSULE
+		CAPSULE,
+		SPHERE
 	};
 
 	static PhysicsScene* create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator);
@@ -80,6 +81,9 @@ public:
 	virtual float getCapsuleHeight(ComponentHandle cmp) = 0;
 	virtual void setCapsuleHeight(ComponentHandle cmp, float value) = 0;
 
+	virtual float getSphereRadius(ComponentHandle cmp) = 0;
+	virtual void setSphereRadius(ComponentHandle cmp, float value) = 0;
+
 	virtual float getDistanceJointDamping(ComponentHandle cmp) = 0;
 	virtual void setDistanceJointDamping(ComponentHandle cmp, float value) = 0;
 	virtual float getDistanceJointStiffness(ComponentHandle cmp) = 0;
@@ -109,7 +113,7 @@ public:
 	virtual void setHingeJointUseLimit(ComponentHandle cmp, bool use_limit) = 0;
 	virtual Vec2 getHingeJointLimit(ComponentHandle cmp) = 0;
 	virtual void setHingeJointLimit(ComponentHandle cmp, const Vec2& limit) = 0;
-	virtual Vec3 getHingeJointConnectedBodyInitialPosition(ComponentHandle cmp) = 0;
+	virtual Matrix getHingeJointConnectedBodyLocalFrame(ComponentHandle cmp) = 0;
 	virtual int getHingeJointCount() = 0;
 	virtual ComponentHandle getHingeJointComponent(int index) = 0;
 	virtual Entity getHingeJointEntity(ComponentHandle cmp) = 0;
