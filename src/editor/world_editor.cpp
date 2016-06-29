@@ -1974,6 +1974,13 @@ public:
 
 	void executeCommand(IEditorCommand* command) override
 	{
+		if (m_is_game_mode)
+		{
+			command->execute();
+			LUMIX_DELETE(m_allocator, command);
+			return;
+		}
+
 		m_is_universe_changed = true;
 		if (m_undo_index >= 0 && command->getType() == m_undo_stack[m_undo_index]->getType())
 		{
@@ -2775,6 +2782,8 @@ public:
 
 	void undo() override
 	{
+		if (m_is_game_mode) return;
+
 		static const uint32 end_group_hash = crc32("end_group");
 		static const uint32 begin_group_hash = crc32("begin_group");
 
@@ -2800,6 +2809,8 @@ public:
 
 	void redo() override
 	{
+		if (m_is_game_mode) return;
+
 		static const uint32 end_group_hash = crc32("end_group");
 		static const uint32 begin_group_hash = crc32("begin_group");
 
