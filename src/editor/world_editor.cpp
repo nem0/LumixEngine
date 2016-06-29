@@ -2998,18 +2998,14 @@ public:
 		executeUndoStack(undo_stack_path);
 		while (m_engine->getFileSystem().hasWork()) m_engine->getFileSystem().updateAsyncTransactions();
 
-		FS::IFile* file =
-			m_engine->getFileSystem().open(m_engine->getFileSystem().getMemoryDevice(),
-				Lumix::Path(""),
-				FS::Mode::CREATE_AND_WRITE);
+		FS::IFile* file = m_engine->getFileSystem().open(
+			m_engine->getFileSystem().getMemoryDevice(), Lumix::Path(""), FS::Mode::CREATE_AND_WRITE);
 		if (!file)
 		{
 			return false;
 		}
-		FS::IFile* result_file =
-			m_engine->getFileSystem().open(m_engine->getFileSystem().getDefaultDevice(),
-				result_universe_path,
-				FS::Mode::OPEN_AND_READ);
+		FS::IFile* result_file = m_engine->getFileSystem().open(
+			m_engine->getFileSystem().getDefaultDevice(), result_universe_path, FS::Mode::OPEN_AND_READ);
 		if (!result_file)
 		{
 			m_engine->getFileSystem().close(*file);
@@ -3017,8 +3013,7 @@ public:
 		}
 		save(*file);
 		bool is_same = file->size() > 8 && result_file->size() > 8 &&
-					   *((const uint32*)result_file->getBuffer() + 3) ==
-						   *((const uint32*)file->getBuffer() + 3);
+					   *((const uint32*)result_file->getBuffer() + 3) == *((const uint32*)file->getBuffer() + 3);
 		m_engine->getFileSystem().close(*result_file);
 		m_engine->getFileSystem().close(*file);
 
