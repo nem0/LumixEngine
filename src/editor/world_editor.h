@@ -97,7 +97,6 @@ public:
 	virtual void addComponent(ComponentType type) = 0;
 	virtual void cloneComponent(const ComponentUID& src, Entity entity) = 0;
 	virtual void destroyComponent(const ComponentUID& cmp) = 0;
-	virtual bool canRemove(const ComponentUID& cmp) = 0;
 	virtual Entity addEntity() = 0;
 	virtual void destroyEntities(const Entity* entities, int count) = 0;
 	virtual void selectEntities(const Entity* entities, int count) = 0;

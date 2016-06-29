@@ -423,20 +423,13 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 	bool is_opened = ImGui::CollapsingHeader(m_app.getComponentTypeName(cmp), nullptr, flags);
 
 	ImGui::PushID(cmp.type.index);
-	if (!m_editor.canRemove(cmp))
+	float w = ImGui::GetContentRegionAvailWidth();
+	ImGui::SameLine(w - 45);
+	if (ImGui::Button("Remove"))
 	{
-		ImGui::Text("Remove dependents first.");
-	}
-	else
-	{
-		float w = ImGui::GetContentRegionAvailWidth();
-		ImGui::SameLine(w - 45);
-		if (ImGui::Button("Remove"))
-		{
-			m_editor.destroyComponent(cmp);
-			ImGui::PopID();
-			return;
-		}
+		m_editor.destroyComponent(cmp);
+		ImGui::PopID();
+		return;
 	}
 
 	if (!is_opened)

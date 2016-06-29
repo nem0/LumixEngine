@@ -145,12 +145,6 @@ struct BonePropertyDescriptor : public IEnumPropertyDescriptor
 
 static void registerProperties(IAllocator& allocator)
 {
-	PropertyRegister::registerComponentDependency("particle_emitter_alpha", "particle_emitter");
-	PropertyRegister::registerComponentDependency("particle_emitter_force", "particle_emitter");
-	PropertyRegister::registerComponentDependency(
-		"particle_emitter_linear_movement", "particle_emitter");
-	PropertyRegister::registerComponentDependency("particle_emitter_random_rotation", "particle_emitter");
-
 	PropertyRegister::add("bone_attachment",
 		LUMIX_NEW(allocator, EntityPropertyDescriptor<RenderScene>)("Parent",
 							  &RenderScene::getBoneAttachmentParent,

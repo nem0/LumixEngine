@@ -17,7 +17,6 @@ struct ComponentTypeData
 	char m_id[50];
 
 	uint32 m_id_hash;
-	ComponentType m_dependency;
 };
 
 
@@ -95,7 +94,6 @@ const IPropertyDescriptor* getDescriptor(ComponentType type, uint32 name_hash)
 			{
 				return children[j];
 			}
-
 		}
 	}
 	return nullptr;
@@ -108,34 +106,13 @@ const IPropertyDescriptor* getDescriptor(const char* component_type, const char*
 }
 
 
-void registerComponentDependency(const char* id, const char* dependency_id)
-{
-	uint32 id_hash = crc32(id);
-	for (ComponentTypeData& cmp_type : getComponentTypes())
-	{
-		if (cmp_type.m_id_hash == id_hash)
-		{
-			cmp_type.m_dependency = getComponentType(dependency_id);
-			return;
-		}
-	}
-	ASSERT(false);
-}
-
-
-bool componentDepends(ComponentType dependent, ComponentType dependency)
-{
-	return getComponentTypes()[dependent.index].m_dependency == dependency;
-}
-
-
 ComponentType getComponentTypeFromHash(uint32 hash)
 {
 	for (int i = 0; i < getComponentTypes().size(); ++i)
 	{
 		if (getComponentTypes()[i].m_id_hash == hash)
 		{
-			return{ i };
+			return {i};
 		}
 	}
 	ASSERT(false);
@@ -163,8 +140,7 @@ ComponentType getComponentType(const char* id)
 	ComponentTypeData& type = getComponentTypes().emplace();
 	copyString(type.m_id, id);
 	type.m_id_hash = id_hash;
-	type.m_dependency = {-1};
-	return{ getComponentTypes().size() - 1 };
+	return {getComponentTypes().size() - 1};
 }
 
 

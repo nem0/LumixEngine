@@ -25,8 +25,6 @@ LUMIX_ENGINE_API const IPropertyDescriptor* getDescriptor(const char* component_
 LUMIX_ENGINE_API Array<IPropertyDescriptor*>& getDescriptors(ComponentType type);
 
 
-LUMIX_ENGINE_API void registerComponentDependency(const char* id, const char* dependency_id);
-LUMIX_ENGINE_API bool componentDepends(ComponentType dependent, ComponentType dependency);
 LUMIX_ENGINE_API ComponentType getComponentType(const char* id);
 LUMIX_ENGINE_API uint32 getComponentTypeHash(ComponentType type);
 LUMIX_ENGINE_API ComponentType getComponentTypeFromHash(uint32 hash);
