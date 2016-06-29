@@ -203,6 +203,7 @@ public:
 	~ParticleEmitter();
 
 	void reset();
+	void init();
 	void drawGizmo(WorldEditor& editor, RenderScene& scene);
 	void serialize(OutputBlob& blob);
 	void deserialize(InputBlob& blob, ResourceManager& manager, bool has_version);
@@ -230,6 +231,7 @@ public:
 
 	Array<ModuleBase*> m_modules;
 	Entity m_entity;
+	bool m_is_valid;
 
 private:
 	void spawnParticle();

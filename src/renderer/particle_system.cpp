@@ -580,8 +580,7 @@ float Interval::getRandom() const
 
 
 ParticleEmitter::ParticleEmitter(Entity entity, Universe& universe, IAllocator& allocator)
-	: m_next_spawn_time(0)
-	, m_allocator(allocator)
+	: m_allocator(allocator)
 	, m_rel_life(allocator)
 	, m_life(allocator)
 	, m_modules(allocator)
@@ -593,14 +592,8 @@ ParticleEmitter::ParticleEmitter(Entity entity, Universe& universe, IAllocator& 
 	, m_universe(universe)
 	, m_entity(entity)
 	, m_size(allocator)
-	, m_material(nullptr)
 {
-	m_spawn_period.from = 1;
-	m_spawn_period.to = 2;
-	m_initial_life.from = 1;
-	m_initial_life.to = 2;
-	m_initial_size.from = 1;
-	m_initial_size.to = 1;
+	init();
 }
 
 
@@ -612,6 +605,20 @@ ParticleEmitter::~ParticleEmitter()
 	{
 		LUMIX_DELETE(m_allocator, module);
 	}
+}
+
+
+void ParticleEmitter::init()
+{
+	m_spawn_period.from = 1;
+	m_spawn_period.to = 2;
+	m_initial_life.from = 1;
+	m_initial_life.to = 2;
+	m_initial_size.from = 1;
+	m_initial_size.to = 1;
+	m_material = nullptr;
+	m_next_spawn_time = 0;
+	m_is_valid = true;
 }
 
 

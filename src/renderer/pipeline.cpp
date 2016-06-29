@@ -627,9 +627,10 @@ struct PipelineImpl : public Pipeline
 	{
 		PROFILE_FUNCTION();
 		const auto& emitters = m_scene->getParticleEmitters();
-		for (const auto* emitter : emitters)
+		for (int i = 0, c = emitters.size(); i < c; ++i)
 		{
-			if (!emitter) continue;
+			auto* emitter = emitters.at(i);
+			if (!emitter->m_is_valid) continue;
 
 			renderParticlesFromEmitter(*emitter);
 		}

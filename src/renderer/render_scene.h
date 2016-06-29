@@ -29,6 +29,7 @@ class Terrain;
 class Texture;
 class Universe;
 template <typename T> class Array;
+template <typename T, typename T2> class AssociativeArray;
 template <typename T> class DelegateList;
 
 
@@ -49,6 +50,7 @@ enum class RenderSceneVersion : int32
 	BONE_ATTACHMENTS,
 	ENVIRONMENT_PROBES,
 	FOV_RADIANS,
+	INDEPENDENT_PARTICLE_MODULES,
 
 	LATEST,
 	INVALID = -1,
@@ -255,7 +257,7 @@ public:
 	virtual class ParticleEmitter* getParticleEmitter(ComponentHandle cmp) = 0;
 	virtual void resetParticleEmitter(ComponentHandle cmp) = 0;
 	virtual void updateEmitter(ComponentHandle cmp, float time_delta) = 0;
-	virtual const Array<class ParticleEmitter*>& getParticleEmitters() const = 0;
+	virtual const AssociativeArray<Entity, class ParticleEmitter*>& getParticleEmitters() const = 0;
 	virtual const Vec2* getParticleEmitterAlpha(ComponentHandle cmp) = 0;
 	virtual int getParticleEmitterAlphaCount(ComponentHandle cmp) = 0;
 	virtual const Vec2* getParticleEmitterSize(ComponentHandle cmp) = 0;

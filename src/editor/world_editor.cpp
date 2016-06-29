@@ -968,20 +968,13 @@ private:
 
 			for (int j = 0; j < m_entities.size(); ++j)
 			{
-				for (int i = 0; i < scenes.size(); ++i)
+				for (auto* scene : scenes)
 				{
-					ComponentUID cmp(
-						m_entities[j],
-						m_type,
-						scenes[i],
-						scenes[i]->createComponent(m_type, m_entities[j]));
-					if (cmp.isValid())
-					{
-						break;
-					}
+					ComponentHandle cmp = scene->createComponent(m_type, m_entities[j]);
+					if (isValid(cmp)) return true;
 				}
 			}
-			return true;
+			return false;
 		}
 
 
@@ -2163,17 +2156,6 @@ public:
 			InputBlob blob(stream.getData(), stream.getPos());
 			properties[i]->set(clone, -1, blob);
 		}
-	}
-
-
-	bool canRemove(const ComponentUID& cmp) override
-	{
-		auto& cmps = getComponents(cmp.entity);
-		for (auto& possible_dependent : cmps)
-		{
-			if (PropertyRegister::componentDepends(possible_dependent.type, cmp.type)) return false;
-		}
-		return true;
 	}
 
 
