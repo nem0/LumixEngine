@@ -726,7 +726,7 @@ void ParticleEmitter::serialize(OutputBlob& blob)
 	blob.write(m_modules.size());
 	for (auto* module : m_modules)
 	{
-		blob.write(module->getType());
+		blob.write(PropertyRegister::getComponentTypeHash(module->getType()));
 		module->serialize(blob);
 	}
 }
@@ -762,8 +762,9 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager, boo
 		ParticleEmitter::ModuleBase* module = nullptr;
 		if (version > (int)ParticleEmitterVersion::COMPONENT_TYPE)
 		{
-			ComponentType type;
-			blob.read(type);
+			uint32 hash;
+			blob.read(hash);
+			ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
 			module = createModule(type, *this);
 		}
 		else
