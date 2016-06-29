@@ -2770,13 +2770,13 @@ public:
 
 	bool canUndo() const override
 	{
-		return m_undo_index < m_undo_stack.size() && m_undo_index >= 0;
+		return !m_is_game_mode && m_undo_index < m_undo_stack.size() && m_undo_index >= 0;
 	}
 
 
 	bool canRedo() const override
 	{
-		return m_undo_index + 1 < m_undo_stack.size();
+		return !m_is_game_mode && m_undo_index + 1 < m_undo_stack.size();
 	}
 
 
