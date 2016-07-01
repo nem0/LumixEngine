@@ -2,6 +2,7 @@
 #include "cooking/PxCooking.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
+#include "engine/engine.h"
 #include "engine/fs/file_system.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
@@ -12,13 +13,14 @@
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
-#include "engine/engine.h"
+#include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
+#include "physics/physics_geometry_manager.h"
+#include "physics/physics_system.h"
+#include "renderer/model.h"
+#include "renderer/pose.h"
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
-#include "physics/physics_system.h"
-#include "physics/physics_geometry_manager.h"
-#include "engine/universe/universe.h"
 #include <PxPhysicsAPI.h>
 
 
@@ -27,6 +29,7 @@ namespace Lumix
 
 
 static const ComponentType BOX_ACTOR_TYPE = PropertyRegister::getComponentType("box_rigid_actor");
+static const ComponentType RAGDOLL_TYPE = PropertyRegister::getComponentType("ragdoll");
 static const ComponentType SPHERE_ACTOR_TYPE = PropertyRegister::getComponentType("sphere_rigid_actor");
 static const ComponentType CAPSULE_ACTOR_TYPE = PropertyRegister::getComponentType("capsule_rigid_actor");
 static const ComponentType MESH_ACTOR_TYPE = PropertyRegister::getComponentType("mesh_rigid_actor");
@@ -37,6 +40,7 @@ static const ComponentType HINGE_JOINT_TYPE = PropertyRegister::getComponentType
 static const ComponentType SPHERICAL_JOINT_TYPE = PropertyRegister::getComponentType("spherical_joint");
 static const uint32 TEXTURE_HASH = crc32("TEXTURE");
 static const uint32 PHYSICS_HASH = crc32("PHYSICS");
+static const uint32 RENDERER_HASH = crc32("renderer");
 
 
 enum class PhysicsSceneVersion : int
@@ -47,8 +51,35 @@ enum class PhysicsSceneVersion : int
 	SPHERICAL_JOINT,
 	CAPSULE_ACTOR,
 	SPHERE_ACTOR,
+	RAGDOLLS,
 
 	LATEST
+};
+
+
+struct RagdollBone
+{
+	enum Type : int
+	{
+		BOX,
+		CAPSULE
+	};
+
+	int pose_bone_idx;
+	physx::PxRigidActor* actor;
+	physx::PxJoint* parent_joint;
+	RagdollBone* child;
+	RagdollBone* next;
+	RagdollBone* prev;
+	RagdollBone* parent;
+	Transform bind_transform;
+};
+
+
+struct Ragdoll
+{
+	Entity entity;
+	RagdollBone* root;
 };
 
 
@@ -123,18 +154,12 @@ struct InputStream : public physx::PxInputStream
 };
 
 
-static void matrix2Transform(const Matrix& mtx, physx::PxTransform& transform)
-{
-	transform.p.x = mtx.m41;
-	transform.p.y = mtx.m42;
-	transform.p.z = mtx.m43;
-	Quat q;
-	mtx.getRotation(q);
-	transform.q.x = q.x;
-	transform.q.y = q.y;
-	transform.q.z = q.z;
-	transform.q.w = q.w;
-}
+static Vec3 fromPhysx(const physx::PxVec3& v) { return Vec3(v.x, v.y, v.z); }
+static physx::PxVec3 toPhysx(const Vec3& v) { return physx::PxVec3(v.x, v.y, v.z); }
+static Quat fromPhysx(const physx::PxQuat& v) { return Quat(v.x, v.y, v.z, v.w); }
+static physx::PxQuat toPhysx(const Quat& v) { return physx::PxQuat(v.x, v.y, v.z, v.w); }
+static Transform fromPhysx(const physx::PxTransform& v) { return{ fromPhysx(v.p), fromPhysx(v.q) }; }
+static physx::PxTransform toPhysx(const Transform& v) { return {toPhysx(v.pos), toPhysx(v.rot)}; }
 
 
 struct DistanceJoint
@@ -213,7 +238,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				physx::PxContactPairPoint contact;
 				auto contact_count = cp.extractContacts(&contact, 1);
 
-				auto pos = toVec3(contact.position);
+				auto pos = fromPhysx(contact.position);
 				Entity e1 = { (int)(intptr_t)(pairHeader.actors[0]->userData) };
 				Entity e2 = { (int)(intptr_t)(pairHeader.actors[1]->userData) };
 				m_scene.onContact(e1, e2, pos);
@@ -265,6 +290,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		: m_allocator(allocator)
 		, m_controllers(m_allocator)
 		, m_actors(m_allocator)
+		, m_ragdolls(m_allocator)
 		, m_terrains(m_allocator)
 		, m_dynamic_actors(m_allocator)
 		, m_universe(context)
@@ -374,7 +400,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		return type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == HEIGHTFIELD_TYPE ||
 			   type == CONTROLLER_TYPE || type == DISTANCE_JOINT_TYPE || type == HINGE_JOINT_TYPE ||
-			   type == SPHERICAL_JOINT_TYPE || type == CAPSULE_ACTOR_TYPE || type == SPHERE_ACTOR_TYPE;
+			   type == SPHERICAL_JOINT_TYPE || type == CAPSULE_ACTOR_TYPE || type == SPHERE_ACTOR_TYPE ||
+			   type == RAGDOLL_TYPE;
 	}
 
 
@@ -386,8 +413,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			for (int i = 0; i < m_actors.size(); ++i)
 			{
-				if (m_actors[i] && m_actors[i]->entity == entity) return{ i };
+				if (m_actors[i] && m_actors[i]->entity == entity) return {i};
 			}
+			return INVALID_COMPONENT;
+		}
+		if (type == RAGDOLL_TYPE)
+		{
+			int idx = m_ragdolls.find(entity);
+			if (idx >= 0) return {entity.index};
 			return INVALID_COMPONENT;
 		}
 		if (type == CONTROLLER_TYPE)
@@ -698,28 +731,42 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	Matrix getSphericalJointConnectedBodyLocalFrame(ComponentHandle cmp) override
+	Transform getSphericalJointLocalFrame(ComponentHandle cmp) override
 	{
 		Entity entity = {cmp.index};
 		auto& joint = m_spherical_joints[entity];
-		if (!isValid(joint.connected_body)) return Matrix::IDENTITY;
-		
+		if (!isValid(entity)) return {Vec3(0, 0, 0), Quat(0, 0, 0, 1)};
+
 		if (!joint.physx)
 		{
-			Matrix mtx0 = m_universe.getMatrix(entity);
-			Matrix mtx1 = m_universe.getMatrix(joint.connected_body);
-			Matrix local_frame0;
-			Quat::vec3ToVec3(Vec3(1, 0, 0), joint.axis_direction.normalized()).toMatrix(local_frame0);
-			local_frame0.setTranslation(joint.axis_position);
-			mtx1.inverse();
-			return mtx1 * (mtx0 * local_frame0);
+			Transform entity0_pose = m_universe.getTransform(entity);
+			Transform entity1_pose = m_universe.getTransform(joint.connected_body);
+			Quat rot = Quat::vec3ToVec3(Vec3(1, 0, 0), joint.axis_direction.normalized());
+			return {joint.axis_position, rot};
+		}
+
+		physx::PxTransform px_local_frame = joint.physx->getLocalPose(physx::PxJointActorIndex::eACTOR0);
+		return {fromPhysx(px_local_frame.p), fromPhysx(px_local_frame.q)};
+	}
+
+
+	Transform getSphericalJointConnectedBodyLocalFrame(ComponentHandle cmp) override
+	{
+		Entity entity = {cmp.index};
+		auto& joint = m_spherical_joints[entity];
+		if (!isValid(joint.connected_body)) return {Vec3(0, 0, 0), Quat(0, 0, 0, 1)};
+
+		if (!joint.physx)
+		{
+			Transform entity0_pose = m_universe.getTransform(entity);
+			Transform entity1_pose = m_universe.getTransform(joint.connected_body);
+			Quat rot = Quat::vec3ToVec3(Vec3(1, 0, 0), joint.axis_direction.normalized());
+			Transform local_frame0 = {joint.axis_position, rot};
+			return entity1_pose.inverted() * (entity0_pose * local_frame0);
 		}
 
 		physx::PxTransform px_local_frame = joint.physx->getLocalPose(physx::PxJointActorIndex::eACTOR1);
-		Matrix	local_frame;
-		toQuat(px_local_frame.q).toMatrix(local_frame);
-		local_frame.setTranslation(toVec3(px_local_frame.p));
-		return local_frame;
+		return {fromPhysx(px_local_frame.p), fromPhysx(px_local_frame.q)};
 	}
 
 
@@ -775,28 +822,24 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	Matrix getHingeJointConnectedBodyLocalFrame(ComponentHandle cmp) override
+	Transform getHingeJointConnectedBodyLocalFrame(ComponentHandle cmp) override
 	{
 		Entity entity = {cmp.index};
 		auto& joint = m_hinge_joints[entity];
-		if (!isValid(joint.connected_body)) return Matrix::IDENTITY;
+		if (!isValid(joint.connected_body)) return {Vec3(0, 0, 0), Quat(0, 0, 0, 1)};
 
 		if (!joint.physx)
 		{
-			Matrix mtx0 = m_universe.getMatrix(entity);
-			Matrix mtx1 = m_universe.getMatrix(joint.connected_body);
-			Matrix local_frame0;
-			Quat::vec3ToVec3(Vec3(1, 0, 0), joint.axis_direction.normalized()).toMatrix(local_frame0);
-			local_frame0.setTranslation(joint.axis_position);
-			mtx1.inverse();
-			return mtx1 * (mtx0 * local_frame0);
+			Transform entity0_pose = m_universe.getTransform(entity);
+			Transform entity1_pose = m_universe.getTransform(joint.connected_body);
+			Transform local_frame0 = {joint.axis_position
+				, Quat::vec3ToVec3(Vec3(1, 0, 0), joint.axis_direction.normalized())
+			};
+			return entity1_pose.inverted() * entity0_pose * local_frame0;
 		}
 
 		physx::PxTransform px_local_frame = joint.physx->getLocalPose(physx::PxJointActorIndex::eACTOR1);
-		Matrix	local_frame;
-		toQuat(px_local_frame.q).toMatrix(local_frame);
-		local_frame.setTranslation(toVec3(px_local_frame.p));
-		return local_frame;
+		return {fromPhysx(px_local_frame.p), fromPhysx(px_local_frame.q)};
 	}
 
 
@@ -856,6 +899,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			return createBoxRigidActor(entity);
 		}
+		else if (component_type == RAGDOLL_TYPE)
+		{
+			return createRagdoll(entity);
+		}
 		else if (component_type == SPHERE_ACTOR_TYPE)
 		{
 			return createSphereRigidActor(entity);
@@ -894,6 +941,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 			m_actors[cmp.index]->entity = INVALID_ENTITY;
 			m_actors[cmp.index]->setPhysxActor(nullptr);
 			m_dynamic_actors.eraseItem(m_actors[cmp.index]);
+			m_universe.destroyComponent(entity, type, this, cmp);
+		}
+		else if (type == RAGDOLL_TYPE)
+		{
+			int idx = m_ragdolls.find({cmp.index});
+			Entity entity = m_ragdolls.at(idx).entity;
+			destroySkeleton(m_ragdolls.at(idx).root);
+			m_ragdolls.eraseAt(idx);
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
 		else if (type == DISTANCE_JOINT_TYPE)
@@ -1044,16 +1099,28 @@ struct PhysicsSceneImpl : public PhysicsScene
 		physx::PxCapsuleGeometry geom;
 		geom.radius = 0.5f;
 		geom.halfHeight = 1;
-		physx::PxTransform transform;
-		Matrix mtx = m_universe.getPositionAndRotation(entity);
-		matrix2Transform(mtx, transform);
+		Transform transform = m_universe.getTransform(entity);
+		physx::PxTransform px_transform = toPhysx(transform);
 
 		physx::PxRigidStatic* physx_actor =
-			PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
+			PxCreateStatic(*m_system->getPhysics(), px_transform, geom, *m_default_material);
 		actor->setPhysxActor(physx_actor);
 
 		ComponentHandle cmp = {m_actors.size() - 1};
 		m_universe.addComponent(entity, CAPSULE_ACTOR_TYPE, this, cmp);
+		return cmp;
+	}
+
+
+	ComponentHandle createRagdoll(Entity entity)
+	{
+		int idx = m_ragdolls.insert(entity, Ragdoll());
+		Ragdoll& ragdoll = m_ragdolls.at(idx);
+		ragdoll.entity = entity;
+		ragdoll.root = nullptr;
+
+		ComponentHandle cmp = {entity.index};
+		m_universe.addComponent(entity, RAGDOLL_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -1068,15 +1135,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 		geom.halfExtents.x = 1;
 		geom.halfExtents.y = 1;
 		geom.halfExtents.z = 1;
-		physx::PxTransform transform;
-		Matrix mtx = m_universe.getPositionAndRotation(entity);
-		matrix2Transform(mtx, transform);
+		Transform transform = m_universe.getTransform(entity);
+		physx::PxTransform px_transform = toPhysx(transform);
 
 		physx::PxRigidStatic* physx_actor =
-			PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
+			PxCreateStatic(*m_system->getPhysics(), px_transform, geom, *m_default_material);
 		actor->setPhysxActor(physx_actor);
 
-		ComponentHandle cmp = { m_actors.size() - 1 };
+		ComponentHandle cmp = {m_actors.size() - 1};
 		m_universe.addComponent(entity, BOX_ACTOR_TYPE, this, cmp);
 		return cmp;
 	}
@@ -1090,9 +1156,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		physx::PxSphereGeometry geom;
 		geom.radius = 1;
-		physx::PxTransform transform;
-		Matrix mtx = m_universe.getPositionAndRotation(entity);
-		matrix2Transform(mtx, transform);
+		physx::PxTransform transform = toPhysx(m_universe.getTransform(entity));
 
 		physx::PxRigidStatic* physx_actor =
 			PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
@@ -1217,12 +1281,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	static Vec3 toVec3(const physx::PxVec3& v) { return Vec3(v.x, v.y, v.z); }
-	static physx::PxVec3 fromVec3(const Vec3& v) { return physx::PxVec3(v.x, v.y, v.z); }
-	static Quat toQuat(const physx::PxQuat& v) { return Quat(v.x, v.y, v.z, v.w); }
-	static physx::PxQuat fromQuat(const Quat& v) { return physx::PxQuat(v.x, v.y, v.z, v.w); }
-
-
 	int getActorCount() const override { return m_actors.size(); }
 	Entity getActorEntity(int index) override { return m_actors[index]->entity; }
 	ActorType getActorType(int index) override { return m_actors[index]->type; }
@@ -1260,8 +1318,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			for (physx::PxU32 i = 0; i < num_lines; ++i)
 			{
 				const physx::PxDebugLine& line = lines[i];
-				Vec3 from = toVec3(line.pos0);
-				Vec3 to = toVec3(line.pos1);
+				Vec3 from = fromPhysx(line.pos0);
+				Vec3 to = fromPhysx(line.pos1);
 				render_scene.addDebugLine(from, to, line.color0, 0);
 			}
 		}
@@ -1272,7 +1330,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			for (physx::PxU32 i = 0; i < num_tris; ++i)
 			{
 				const physx::PxDebugTriangle& tri = tris[i];
-				render_scene.addDebugTriangle(toVec3(tri.pos0), toVec3(tri.pos1), toVec3(tri.pos2), tri.color0, 0);
+				render_scene.addDebugTriangle(fromPhysx(tri.pos0), fromPhysx(tri.pos1), fromPhysx(tri.pos2), tri.color0, 0);
 			}
 		}
 	}
@@ -1344,6 +1402,370 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	static RagdollBoneHandle getBone(RagdollBone* bone, int pose_bone_idx)
+	{
+		if (!bone) return nullptr;
+		if (bone->pose_bone_idx == pose_bone_idx) return bone;
+
+		auto* handle = getBone(bone->child, pose_bone_idx);
+		if (handle) return handle;
+			
+		handle = getBone(bone->next, pose_bone_idx);
+		if (handle) return handle;
+
+		return nullptr;
+	}
+
+
+	physx::PxCapsuleGeometry getCapsuleGeometry(RagdollBone* bone)
+	{
+		physx::PxShape* shape;
+		int count = bone->actor->getShapes(&shape, 1);
+		ASSERT(count == 1);
+
+		physx::PxCapsuleGeometry geom;
+		bool is_capsule = shape->getCapsuleGeometry(geom);
+		ASSERT(is_capsule);
+
+		return geom;
+	}
+
+
+	physx::PxJoint* getRagdollBoneJoint(RagdollBoneHandle bone) const override
+	{
+		return bone->parent_joint;
+	}
+
+
+	RagdollBoneHandle getRagdollRootBone(ComponentHandle cmp) const override
+	{
+		return m_ragdolls[{cmp.index}].root;
+	}
+
+
+	RagdollBoneHandle getRagdollBoneChild(RagdollBoneHandle bone) override
+	{
+		return bone->child;
+	}
+
+
+	RagdollBoneHandle getRagdollBoneSibling(RagdollBoneHandle bone) override
+	{
+		return bone->next;
+	}
+
+
+	float getRagdollBoneHeight(RagdollBoneHandle bone) override
+	{
+		return getCapsuleGeometry(bone).halfHeight * 2.0f;
+	}
+
+
+	float getRagdollBoneRadius(RagdollBoneHandle bone) override
+	{
+		return getCapsuleGeometry(bone).radius;
+	}
+
+
+	void setRagdollBoneHeight(RagdollBoneHandle bone, float value) override
+	{
+		if (value < 0) return;
+		auto geom = getCapsuleGeometry(bone);
+		geom.halfHeight = value * 0.5f;
+		physx::PxShape* shape;
+		bone->actor->getShapes(&shape, 1);
+		shape->setGeometry(geom);
+	}
+
+
+	void setRagdollBoneRadius(RagdollBoneHandle bone, float value) override
+	{
+		if (value < 0) return;
+		auto geom = getCapsuleGeometry(bone);
+		geom.radius = value;
+		physx::PxShape* shape;
+		bone->actor->getShapes(&shape, 1);
+		shape->setGeometry(geom);
+	}
+
+
+	Transform getRagdollBoneTransform(RagdollBoneHandle bone) override
+	{
+		auto px_pose = bone->actor->getGlobalPose();
+		return {fromPhysx(px_pose.p), fromPhysx(px_pose.q)};
+	}
+
+
+	void setRagdollBoneTransform(RagdollBoneHandle bone, const Transform& transform) override
+	{
+		bone->actor->setGlobalPose(toPhysx(transform));
+	}
+
+
+	RagdollBoneHandle getRagdollBoneByName(ComponentHandle cmp, uint32 bone_name_hash) override
+	{
+		Entity entity = {cmp.index};
+		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
+		ASSERT(render_scene);
+
+		ComponentHandle renderable = render_scene->getRenderableComponent(entity);
+		ASSERT(isValid(renderable));
+		Model* model = render_scene->getRenderableModel(renderable);
+		ASSERT(model && model->isReady());
+
+		auto iter = model->getBoneIndex(bone_name_hash);
+		ASSERT(iter.isValid());
+
+		return getBone(m_ragdolls[entity].root, iter.value());
+	}
+
+
+	RagdollBone* getPhyParent(ComponentHandle cmp, Model* model, int bone_index)
+	{
+		auto* bone = &model->getBone(bone_index);
+		if (bone->parent_idx < 0) return nullptr;
+		RagdollBone* phy_bone = nullptr;
+		do
+		{
+			bone = &model->getBone(bone->parent_idx);
+			phy_bone = getRagdollBoneByName(cmp, crc32(bone->name.c_str()));
+		} while (!phy_bone && bone->parent_idx >= 0);
+		return phy_bone;
+	}
+
+
+	void destroyRagdollBone(ComponentHandle cmp, RagdollBoneHandle bone) override
+	{
+		disconnect(m_ragdolls[{cmp.index}], bone);
+		bone->actor->release();
+		LUMIX_DELETE(m_allocator, bone);
+	}
+
+
+	void changeRagdollBoneJoint(RagdollBone* child, int type) override
+	{
+		if (child->parent_joint) child->parent_joint->release();
+
+		physx::PxJointConcreteType::Enum px_type = (physx::PxJointConcreteType::Enum)type;
+		auto d1 = child->actor->getGlobalPose().q.rotate(physx::PxVec3(1, 0, 0));
+		auto d2 = child->parent->actor->getGlobalPose().q.rotate(physx::PxVec3(1, 0, 0));
+		auto axis = d1.cross(d2).getNormalized();
+		auto pos = child->parent->actor->getGlobalPose().p;
+		physx::PxMat44 mat(d1, axis, d1.cross(axis).getNormalized(), pos);
+		physx::PxTransform tr0 = child->parent->actor->getGlobalPose().getInverse() * physx::PxTransform(mat);
+		physx::PxTransform tr1 = child->actor->getGlobalPose().getInverse() * child->parent->actor->getGlobalPose() * tr0;
+
+		physx::PxJoint* joint = nullptr;
+		switch (px_type)
+		{
+		case physx::PxJointConcreteType::eFIXED:
+			joint = physx::PxFixedJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
+			break;
+		case physx::PxJointConcreteType::eREVOLUTE:
+			joint = physx::PxRevoluteJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
+			((physx::PxRevoluteJoint*)joint)->setProjectionLinearTolerance(0.1f);
+			break;
+		case physx::PxJointConcreteType::eSPHERICAL:
+			joint = physx::PxSphericalJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
+			((physx::PxSphericalJoint*)joint)->setProjectionLinearTolerance(0.1f);
+			break;
+		}
+
+		joint->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
+		joint->setConstraintFlag(physx::PxConstraintFlag::eCOLLISION_ENABLED, false);
+		joint->setConstraintFlag(physx::PxConstraintFlag::ePROJECTION, true);
+		child->parent_joint = joint;
+	}
+
+
+	void disconnect(Ragdoll& ragdoll, RagdollBone* bone)
+	{
+		auto* child = bone->child;
+		auto* parent = bone->parent;
+		if (parent && parent->child == bone) parent->child = bone->next;
+		if (ragdoll.root == bone) ragdoll.root = bone->next;
+		if (bone->prev) bone->prev->next = bone->next;
+		if (bone->next) bone->next->prev = bone->prev;
+
+		while (child)
+		{
+			auto* next = child->next;
+
+			if (child->parent_joint) child->parent_joint->release();
+			child->parent_joint = nullptr;
+
+			if (parent)
+			{
+				child->next = parent->child;
+				child->prev = nullptr;
+				if (child->next) child->next->prev = child;
+				parent->child = child;
+				child->parent = parent;
+				changeRagdollBoneJoint(child, physx::PxJointConcreteType::eREVOLUTE);
+			}
+			else
+			{
+				child->parent = nullptr;
+				child->next = ragdoll.root;
+				child->prev = nullptr;
+				if (child->next) child->next->prev = child;
+				ragdoll.root = child;
+			}
+			child = next;
+		}
+		if (bone->parent_joint) bone->parent_joint->release();
+		bone->parent_joint = nullptr;
+
+		bone->parent = nullptr;
+		bone->child = nullptr;
+		bone->prev = nullptr;
+		bone->next = ragdoll.root;
+		if(bone->next) bone->next->prev = bone;
+	}
+
+
+	void connect(Ragdoll& ragdoll, RagdollBone* child, RagdollBone* parent)
+	{
+		ASSERT(!child->parent);
+		ASSERT(!child->child);
+		if (child->next) child->next->prev = child->prev;
+		if (child->prev) child->prev->next = child->next;
+		if (ragdoll.root == child) ragdoll.root = child->next;
+		child->next = parent->child;
+		if (child->next) child->next->prev = child;
+		parent->child = child;
+		child->parent = parent;
+		changeRagdollBoneJoint(child, physx::PxJointConcreteType::eREVOLUTE);
+	}
+
+
+	void findCloserChildren(Ragdoll& ragdoll, ComponentHandle cmp, Model* model, RagdollBone* bone)
+	{
+		for (auto* root = ragdoll.root; root; root = root->next)
+		{
+			if (root == bone) continue;
+
+			auto* tmp = getPhyParent(cmp, model, root->pose_bone_idx);
+			if (tmp != bone) continue;
+
+			disconnect(ragdoll, root);
+			connect(ragdoll, root, bone);
+			break;
+		}
+		if (!bone->parent) return;
+
+		for (auto* child = bone->parent->child; child; child = child->next)
+		{
+			if (child == bone) continue;
+
+			auto* tmp = getPhyParent(cmp, model, bone->pose_bone_idx);
+			if (tmp != bone) continue;
+
+			disconnect(ragdoll, child);
+			connect(ragdoll, child, bone);
+		}
+	}
+
+	Transform getNewBoneTransform(const Model* model, int bone_idx, float& length)
+	{
+		auto& bone = model->getBone(bone_idx);
+		auto& parent_bone = bone.parent_idx >= 0 ? model->getBone(bone.parent_idx) : bone;
+		Matrix mtx = Matrix::IDENTITY;
+		Vec3 dir = parent_bone.transform.pos - bone.transform.pos;
+		length = dir.length();
+		if (length > 0.001f)
+		{
+			mtx.setXVector(dir.normalized());
+			Vec3 y = Vec3(-dir.y, dir.x, 0);
+			if (y.squaredLength() < 0.001f)	y.set(dir.z, 0, -dir.x);
+			mtx.setYVector(y.normalized());
+			mtx.setZVector(crossProduct(dir, y).normalized());
+		}
+		mtx.setTranslation((bone.transform.pos + parent_bone.transform.pos) * 0.5f);
+		return mtx.toTransform();
+	}
+
+
+	RagdollBoneHandle createRagdollBone(ComponentHandle cmp, uint32 bone_name_hash) override
+	{
+		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
+		ASSERT(render_scene);
+		
+		Entity entity = { cmp.index };
+		ComponentHandle renderable = render_scene->getRenderableComponent(entity);
+		ASSERT(isValid(renderable));
+		Model* model = render_scene->getRenderableModel(renderable);
+		ASSERT(model && model->isReady());
+		auto iter = model->getBoneIndex(bone_name_hash);
+		ASSERT(iter.isValid());
+
+		auto* new_bone = LUMIX_NEW(m_allocator, RagdollBone);
+		new_bone->child = new_bone->next = new_bone->prev = new_bone->parent = nullptr;
+		new_bone->parent_joint = nullptr;
+		new_bone->pose_bone_idx = iter.value();
+		
+		float bone_height;
+		Transform transform = getNewBoneTransform(model, iter.value(), bone_height);
+		
+		new_bone->bind_transform = transform.inverted() * model->getBone(iter.value()).transform;
+		transform = m_universe.getTransform(entity) * transform;
+
+		physx::PxCapsuleGeometry geom;
+		geom.halfHeight = bone_height * 0.3f;
+		if (geom.halfHeight < 0.001f) geom.halfHeight = 1.0f;
+		geom.radius = geom.halfHeight * 0.5f;
+
+		physx::PxTransform px_transform = toPhysx(transform);
+		new_bone->actor = physx::PxCreateDynamic(m_scene->getPhysics(), px_transform, geom, *m_default_material, 1.0f);
+		new_bone->actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+		m_scene->addActor(*new_bone->actor);
+		updateFilterData(new_bone->actor, 0);
+
+		auto& ragdoll = m_ragdolls[entity];
+		new_bone->next = ragdoll.root;
+		if (new_bone->next) new_bone->next->prev = new_bone;
+		ragdoll.root = new_bone;
+		auto* parent = getPhyParent(cmp, model, iter.value());
+		if (parent) connect(ragdoll, new_bone, parent);
+
+		findCloserChildren(ragdoll, cmp, model, new_bone);
+
+		return new_bone;
+	}
+
+
+	void updateBone(const Transform& inv_root, RagdollBone* bone, Pose* pose)
+	{
+		if (!bone) return;
+			
+		physx::PxTransform bone_pose = bone->actor->getGlobalPose();
+
+		auto tr = inv_root * Transform(fromPhysx(bone_pose.p), fromPhysx(bone_pose.q)) * bone->bind_transform;
+		pose->rotations[bone->pose_bone_idx] = tr.rot;
+		pose->positions[bone->pose_bone_idx] = tr.pos;
+		updateBone(inv_root, bone->next, pose);
+		updateBone(inv_root, bone->child, pose);
+	}
+
+
+	void updateRagdolls()
+	{
+		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
+		if (!render_scene) return;
+		for (int i = 0, c = m_ragdolls.size(); i < c; ++i)
+		{
+			Ragdoll& ragdoll = m_ragdolls.at(i);
+			Transform root_transform;
+			root_transform.rot = m_universe.getRotation(ragdoll.entity);
+			root_transform.pos = m_universe.getPosition(ragdoll.entity);
+			ComponentHandle renderable = render_scene->getRenderableComponent(ragdoll.entity);
+			if (!isValid(renderable)) continue;
+			Pose* pose = render_scene->getPose(renderable);
+			if (pose) updateBone(root_transform.inverted(), ragdoll.root, pose);
+		}
+	}
+
+
 	void update(float time_delta, bool paused) override
 	{
 		if (!m_is_game_running || paused) return;
@@ -1353,6 +1775,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		time_delta = Math::minimum(1 / 20.0f, time_delta);
 		simulateScene(time_delta);
 		fetchResults();
+		updateRagdolls();
 		updateDynamicActors();
 		updateControllers(time_delta);
 		
@@ -1486,12 +1909,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 			Quat rot0 = m_universe.getRotation(entity);
 			Vec3 pos1 = m_universe.getPosition(joint.connected_body);
 			Quat rot1 = m_universe.getRotation(joint.connected_body);
-			physx::PxTransform entity0_frame(fromVec3(pos0), fromQuat(rot0));
-			physx::PxTransform entity1_frame(fromVec3(pos1), fromQuat(rot1));
+			physx::PxTransform entity0_frame(toPhysx(pos0), toPhysx(rot0));
+			physx::PxTransform entity1_frame(toPhysx(pos1), toPhysx(rot1));
 
 			Vec3 local_axis_dir = joint.axis_direction.normalized();
 			Quat axis_quat = Quat::vec3ToVec3(Vec3(1, 0, 0), local_axis_dir);
-			physx::PxTransform axis_local_frame0(fromVec3(joint.axis_position), fromQuat(axis_quat));
+			physx::PxTransform axis_local_frame0(toPhysx(joint.axis_position), toPhysx(axis_quat));
 			physx::PxTransform axis_local_frame1 = entity1_frame.getInverse() * entity0_frame * axis_local_frame0;
 
 			joint.physx = physx::PxSphericalJointCreate(
@@ -1533,12 +1956,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 			Quat rot0 = m_universe.getRotation(entity);
 			Vec3 pos1 = m_universe.getPosition(joint.connected_body);
 			Quat rot1 = m_universe.getRotation(joint.connected_body);
-			physx::PxTransform entity0_frame(fromVec3(pos0), fromQuat(rot0));
-			physx::PxTransform entity1_frame(fromVec3(pos1), fromQuat(rot1));
+			physx::PxTransform entity0_frame(toPhysx(pos0), toPhysx(rot0));
+			physx::PxTransform entity1_frame(toPhysx(pos1), toPhysx(rot1));
 
 			Vec3 local_axis_dir = joint.axis_direction.normalized();
 			Quat axis_quat = Quat::vec3ToVec3(Vec3(1, 0, 0), local_axis_dir);
-			physx::PxTransform axis_local_frame0(fromVec3(joint.axis_position), fromQuat(axis_quat));
+			physx::PxTransform axis_local_frame0(toPhysx(joint.axis_position), toPhysx(axis_quat));
 			physx::PxTransform axis_local_frame1 = entity1_frame.getInverse() * entity0_frame * axis_local_frame0;
 
 			joint.physx = physx::PxRevoluteJointCreate(
@@ -1776,10 +2199,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 				terrain->m_actor = nullptr;
 			}
 
-			physx::PxTransform transform;
-			Matrix mtx = m_universe.getPositionAndRotation(terrain->m_entity);
-			mtx.translate(0, terrain->m_y_scale * 0.5f, 0);
-			matrix2Transform(mtx, transform);
+			physx::PxTransform transform = toPhysx(m_universe.getTransform(terrain->m_entity));
+			transform.p.y += terrain->m_y_scale * 0.5f;
 
 			physx::PxRigidActor* actor;
 			actor = PxCreateStatic(*m_system->getPhysics(), transform, hfGeom, *m_default_material);
@@ -2022,9 +2443,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		if (actor->physx_actor->getNbShapes() == 1 && actor->physx_actor->getShapes(&shapes, 1, 0))
 		{
 			physx::PxGeometryHolder geom = shapes->getGeometry();
-
-			physx::PxTransform transform;
-			matrix2Transform(m_universe.getPositionAndRotation(actor->entity), transform);
+			physx::PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
 
 			physx::PxRigidActor* physx_actor;
 			if (new_value)
@@ -2101,9 +2520,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			case ActorType::BOX:
 			{
 				physx::PxBoxGeometry box_geom;
-				physx::PxTransform transform;
-				Matrix mtx = m_universe.getPositionAndRotation(actor->entity);
-				matrix2Transform(mtx, transform);
+				physx::PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
 				serializer.read(box_geom.halfExtents.x);
 				serializer.read(box_geom.halfExtents.y);
 				serializer.read(box_geom.halfExtents.z);
@@ -2124,9 +2541,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			case ActorType::SPHERE:
 			{
 				physx::PxSphereGeometry sphere_geom;
-				physx::PxTransform transform;
-				Matrix mtx = m_universe.getPositionAndRotation(actor->entity);
-				matrix2Transform(mtx, transform);
+				physx::PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
 				serializer.read(sphere_geom.radius);
 				physx::PxRigidActor* physx_actor;
 				if (isDynamic(cmp))
@@ -2145,9 +2560,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			case ActorType::CAPSULE:
 			{
 				physx::PxCapsuleGeometry capsule_geom;
-				physx::PxTransform transform;
-				Matrix mtx = m_universe.getPositionAndRotation(actor->entity);
-				matrix2Transform(mtx, transform);
+				physx::PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
 				serializer.read(capsule_geom.halfHeight);
 				serializer.read(capsule_geom.radius);
 				physx::PxRigidActor* physx_actor;
@@ -2213,9 +2626,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				serializer.write(true);
 				serializer.write(m_terrains[i]->m_entity);
-				serializer.writeString(m_terrains[i]->m_heightmap
-										   ? m_terrains[i]->m_heightmap->getPath().c_str()
-										   : "");
+				serializer.writeString(m_terrains[i]->m_heightmap ? m_terrains[i]->m_heightmap->getPath().c_str() : "");
 				serializer.write(m_terrains[i]->m_xz_scale);
 				serializer.write(m_terrains[i]->m_y_scale);
 				serializer.write(m_terrains[i]->m_layer);
@@ -2225,7 +2636,204 @@ struct PhysicsSceneImpl : public PhysicsScene
 				serializer.write(false);
 			}
 		}
+		serializeRagdolls(serializer);
 		serializeJoints(serializer);
+	}
+
+
+	void serializeRagdollJoint(RagdollBone* bone, OutputBlob& serializer)
+	{
+		serializer.write(bone->parent_joint != nullptr);
+		if (!bone->parent_joint) return;
+
+		serializer.write((int)bone->parent_joint->getConcreteType());
+		serializer.write(bone->parent_joint->getLocalPose(physx::PxJointActorIndex::eACTOR0));
+		serializer.write(bone->parent_joint->getLocalPose(physx::PxJointActorIndex::eACTOR1));
+
+		switch ((physx::PxJointConcreteType::Enum)bone->parent_joint->getConcreteType())
+		{
+			case physx::PxJointConcreteType::eFIXED: break;
+			case physx::PxJointConcreteType::eDISTANCE:
+			{
+				auto* joint = bone->parent_joint->is<physx::PxDistanceJoint>();
+				serializer.write(joint->getMinDistance());
+				serializer.write(joint->getMaxDistance());
+				serializer.write(joint->getTolerance());
+				serializer.write(joint->getStiffness());
+				serializer.write(joint->getDamping());
+				uint32 flags = (physx::PxU32)joint->getDistanceJointFlags();
+				serializer.write(flags);
+				break;
+			}
+			case physx::PxJointConcreteType::eREVOLUTE:
+			{
+				auto* joint = bone->parent_joint->is<physx::PxRevoluteJoint>();
+				serializer.write(joint->getLimit());
+				uint32 flags = (physx::PxU32)joint->getRevoluteJointFlags();
+				serializer.write(flags);
+				break;
+			}
+			default: ASSERT(false); break;
+		}
+	}
+
+
+	void serializeRagdollBone(RagdollBone* bone, OutputBlob& serializer)
+	{
+		if (!bone)
+		{
+			serializer.write(-1);
+			return;
+		}
+		serializer.write(bone->pose_bone_idx);
+		physx::PxTransform pose = bone->actor->getGlobalPose();
+		serializer.write(fromPhysx(pose));
+		serializer.write(bone->bind_transform);
+
+		physx::PxShape* shape;
+		int shape_count = bone->actor->getShapes(&shape, 1);
+		ASSERT(shape_count == 1);
+		physx::PxBoxGeometry box_geom;
+		if (shape->getBoxGeometry(box_geom))
+		{
+			serializer.write(RagdollBone::BOX);
+			serializer.write(box_geom.halfExtents);
+		}
+		else
+		{
+			physx::PxCapsuleGeometry capsule_geom;
+			bool is_capsule = shape->getCapsuleGeometry(capsule_geom);
+			ASSERT(is_capsule);
+			serializer.write(RagdollBone::CAPSULE);
+			serializer.write(capsule_geom.halfHeight);
+			serializer.write(capsule_geom.radius);
+		}
+
+		serializeRagdollBone(bone->child, serializer);
+		serializeRagdollBone(bone->next, serializer);
+
+		serializeRagdollJoint(bone, serializer);
+	}
+
+
+	void deserializeRagdollJoint(RagdollBone* bone, InputBlob& serializer)
+	{
+		bool has_joint;
+		serializer.read(has_joint);
+		if (!has_joint) return;
+
+		int type;
+		serializer.read(type);
+		changeRagdollBoneJoint(bone, type);
+
+		physx::PxTransform local_poses[2];
+		serializer.read(local_poses);
+		bone->parent_joint->setLocalPose(physx::PxJointActorIndex::eACTOR0, local_poses[0]);
+		bone->parent_joint->setLocalPose(physx::PxJointActorIndex::eACTOR1, local_poses[1]);
+
+		switch ((physx::PxJointConcreteType::Enum)type)
+		{
+			case physx::PxJointConcreteType::eFIXED: break;
+			case physx::PxJointConcreteType::eDISTANCE:
+			{
+				auto* joint = bone->parent_joint->is<physx::PxDistanceJoint>();
+				physx::PxReal value;
+				serializer.read(value);
+				joint->setMinDistance(value);
+				serializer.read(value);
+				joint->setMaxDistance(value);
+				serializer.read(value);
+				joint->setTolerance(value);
+				serializer.read(value);
+				joint->setStiffness(value);
+				serializer.read(value);
+				joint->setDamping(value);
+				uint32 flags;
+				serializer.read(flags);
+				joint->setDistanceJointFlags((physx::PxDistanceJointFlags)flags);
+				break;
+			}
+			case physx::PxJointConcreteType::eREVOLUTE:
+			{
+				auto* joint = bone->parent_joint->is<physx::PxRevoluteJoint>();
+				physx::PxJointAngularLimitPair limit(0, 0);
+				serializer.read(limit);
+				joint->setLimit(limit);
+				uint32 flags;
+				serializer.read(flags);
+				joint->setRevoluteJointFlags((physx::PxRevoluteJointFlags)flags);
+				break;
+			}
+			default: ASSERT(false); break;
+		}
+	}
+
+
+	RagdollBone* deserializeRagdollBone(RagdollBone* parent, InputBlob& serializer)
+	{
+		int pose_bone_idx;
+		serializer.read(pose_bone_idx);
+		if (pose_bone_idx < 0) return nullptr;
+		auto* bone = LUMIX_NEW(m_allocator, RagdollBone);
+		bone->pose_bone_idx = pose_bone_idx;
+		bone->parent_joint = nullptr;
+		bone->prev = nullptr;
+		Transform transform;
+		serializer.read(transform);
+		serializer.read(bone->bind_transform);
+
+		physx::PxTransform px_transform = toPhysx(transform);
+
+		RagdollBone::Type type;
+		serializer.read(type);
+		
+		switch (type)
+		{
+			case RagdollBone::CAPSULE:
+			{
+				physx::PxCapsuleGeometry shape;
+				serializer.read(shape.halfHeight);
+				serializer.read(shape.radius);
+				bone->actor =
+					physx::PxCreateDynamic(m_scene->getPhysics(), px_transform, shape, *m_default_material, 1.0f);
+				break;
+			}
+			case RagdollBone::BOX:
+			{
+				physx::PxBoxGeometry shape;
+				serializer.read(shape.halfExtents);
+				bone->actor =
+					physx::PxCreateDynamic(m_scene->getPhysics(), px_transform, shape, *m_default_material, 1.0f);
+				break;
+			}
+			default: ASSERT(false); break;
+		}
+		bone->actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+		m_scene->addActor(*bone->actor);
+		updateFilterData(bone->actor, 0);
+
+		bone->parent = parent;
+
+		bone->child = deserializeRagdollBone(bone, serializer);
+		bone->next = deserializeRagdollBone(parent, serializer);
+		if(bone->next) bone->next->prev = bone;
+
+		deserializeRagdollJoint(bone, serializer);
+
+		return bone;
+	}
+
+
+
+	void serializeRagdolls(OutputBlob& serializer)
+	{
+		serializer.write(m_ragdolls.size());
+		for (int i = 0, c = m_ragdolls.size(); i < c; ++i)
+		{
+			serializer.write(m_ragdolls.getKey(i));
+			const Ragdoll& ragdoll = m_ragdolls.at(i);
+			serializeRagdollBone(ragdoll.root, serializer);
+		}
 	}
 
 
@@ -2348,6 +2956,49 @@ struct PhysicsSceneImpl : public PhysicsScene
 			c.m_controller = m_controller_manager->createController(*m_system->getPhysics(), m_scene, cDesc);
 			c.m_entity = e;
 			m_universe.addComponent(e, CONTROLLER_TYPE, this, {i});
+		}
+	}
+
+
+	void destroySkeleton(RagdollBone* bone)
+	{
+		if (!bone) return;
+		destroySkeleton(bone->next);
+		destroySkeleton(bone->child);
+		if (bone->parent_joint) bone->parent_joint->release();
+		if (bone->actor) bone->actor->release();
+		LUMIX_DELETE(m_allocator, bone);
+	}
+
+
+	void clearRagdolls()
+	{
+		for (int i = 0, c = m_ragdolls.size(); i < c; ++i)
+		{
+			destroySkeleton(m_ragdolls.at(i).root);
+		}
+		m_ragdolls.clear();
+	}
+
+
+	void deserializeRagdolls(InputBlob& serializer, int version)
+	{
+		if (version <= int(PhysicsSceneVersion::RAGDOLLS)) return;
+			
+		clearRagdolls();
+		int count;
+		serializer.read(count);
+		m_ragdolls.reserve(count);
+		for (int i = 0; i < count; ++i)
+		{
+			Entity entity;
+			serializer.read(entity);
+			int idx = m_ragdolls.insert(entity, Ragdoll());
+			Ragdoll& ragdoll = m_ragdolls.at(i);
+			ragdoll.entity = entity;
+			ragdoll.root = deserializeRagdollBone(nullptr, serializer);
+			ComponentHandle cmp = {ragdoll.entity.index};
+			m_universe.addComponent(ragdoll.entity, RAGDOLL_TYPE, this, cmp);
 		}
 	}
 
@@ -2485,6 +3136,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		deserializeActors(serializer, version);
 		deserializeControllers(serializer, version);
 		deserializeTerrains(serializer, version);
+		deserializeRagdolls(serializer, version);
 		deserializeJoints(serializer, version);
 
 		updateFilterData();
@@ -2586,6 +3238,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	physx::PxMaterial* m_default_material;
 	Array<RigidActor*> m_actors;
 	Array<RigidActor*> m_dynamic_actors;
+	AssociativeArray<Entity, Ragdoll> m_ragdolls;
 	AssociativeArray<Entity, DistanceJoint> m_distance_joints;
 	AssociativeArray<Entity, HingeJoint> m_hinge_joints;
 	AssociativeArray<Entity, SphericalJoint> m_spherical_joints;
@@ -2657,9 +3310,7 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 	{
 		setPhysxActor(nullptr);
 
-		physx::PxTransform transform;
-		Matrix mtx = scene.getUniverse().getPositionAndRotation(entity);
-		matrix2Transform(mtx, transform);
+		physx::PxTransform transform = toPhysx(scene.getUniverse().getTransform(entity));
 
 		physx::PxRigidActor* actor;
 		bool is_dynamic = scene.isDynamic(this);

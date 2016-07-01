@@ -247,7 +247,7 @@ struct AABB
 
 		for (int j = 0; j < 8; ++j)
 		{
-			points[j] = matrix.multiplyPosition(points[j]);
+			points[j] = matrix.transform(points[j]);
 		}
 
 		Vec3 new_min = points[0];
@@ -266,21 +266,21 @@ struct AABB
 	void getCorners(const Matrix& matrix, Vec3* points) const
 	{
 		Vec3 p(min.x, min.y, min.z);
-		points[0] = matrix.multiplyPosition(p);
+		points[0] = matrix.transform(p);
 		p.set(min.x, min.y, max.z);
-		points[1] = matrix.multiplyPosition(p);
+		points[1] = matrix.transform(p);
 		p.set(min.x, max.y, min.z);
-		points[2] = matrix.multiplyPosition(p);
+		points[2] = matrix.transform(p);
 		p.set(min.x, max.y, max.z);
-		points[3] = matrix.multiplyPosition(p);
+		points[3] = matrix.transform(p);
 		p.set(max.x, min.y, min.z);
-		points[4] = matrix.multiplyPosition(p);
+		points[4] = matrix.transform(p);
 		p.set(max.x, min.y, max.z);
-		points[5] = matrix.multiplyPosition(p);
+		points[5] = matrix.transform(p);
 		p.set(max.x, max.y, min.z);
-		points[6] = matrix.multiplyPosition(p);
+		points[6] = matrix.transform(p);
 		p.set(max.x, max.y, max.z);
-		points[7] = matrix.multiplyPosition(p);
+		points[7] = matrix.transform(p);
 	}
 
 	Vec3 minCoords(const Vec3& a, const Vec3& b)

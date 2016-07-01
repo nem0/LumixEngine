@@ -612,6 +612,8 @@ public:
 
 	void instantiateTemplate()
 	{
+		if (m_selected_template_name.length() <= 0) return;
+
 		Lumix::Vec3 pos = m_editor->getCameraRaycastHit();
 		auto& template_system = m_editor->getEntityTemplateSystem();
 		template_system.createInstance(m_selected_template_name.c_str(), pos, Lumix::Quat(0, 0, 0, 1), 1);

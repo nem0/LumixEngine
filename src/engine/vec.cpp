@@ -51,24 +51,6 @@ float Vec3::length() const
 }
 
 
-void Vec3::rotateY(float angle)
-{
-	float x = this->x;
-	float z = this->z;
-	this->x = x * cos(angle) + sin(angle) * z;
-	this->z = x * -sin(angle) + cos(angle) * z;
-}
-
-
-void Vec3::rotateX(float angle)
-{
-	float y = this->y;
-	float z = this->z;
-	this->y = y * cos(angle) - sin(angle) * z;
-	this->z = y * sin(angle) + cos(angle) * z;
-}
-
-
 void Vec4::normalize()
 {
 	float x = this->x;

@@ -120,9 +120,8 @@ public:
 
 		string name;
 		string parent;
-		Vec3 position;
-		Quat rotation;
-		Matrix inv_bind_matrix;
+		Transform transform;
+		Transform inv_bind_transform;
 		int parent_idx;
 	};
 

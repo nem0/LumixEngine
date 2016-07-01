@@ -348,7 +348,7 @@ public:
 			q = Quat(axis, angle);
 		}
 		
-		Vec3 res = q * v;
+		Vec3 res = q.rotate(v);
 
 		LuaWrapper::pushLua(L, res);
 		return 1;
@@ -386,7 +386,7 @@ public:
 	static Vec3 LUA_getEntityDirection(Universe* universe, Entity entity)
 	{
 		Quat rot = universe->getRotation(entity);
-		return rot * Vec3(0, 0, 1);
+		return rot.rotate(Vec3(0, 0, 1));
 	}
 
 

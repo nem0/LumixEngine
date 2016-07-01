@@ -19,6 +19,7 @@ namespace Lumix
 class InputBlob;
 struct Matrix;
 class OutputBlob;
+struct Transform;
 class Universe;
 
 
@@ -48,6 +49,8 @@ public:
 	void setMatrix(Entity entity, const Matrix& mtx);
 	Matrix getPositionAndRotation(Entity entity) const;
 	Matrix getMatrix(Entity entity) const;
+	void setTransform(Entity entity, const Transform& transform);
+	Transform getTransform(Entity entity) const;
 	void setRotation(Entity entity, float x, float y, float z, float w);
 	void setRotation(Entity entity, const Quat& rot);
 	void setPosition(Entity entity, float x, float y, float z);

@@ -115,7 +115,7 @@ struct GizmoImpl : public Gizmo
 			Matrix scale_mtx = Matrix::IDENTITY;
 			scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
 			Vec3 center = m_editor.getRenderInterface()->getModelCenter(entity);
-			mtx.setTranslation((mtx * scale_mtx).multiplyPosition(center));
+			mtx.setTranslation((mtx * scale_mtx).transform(center));
 		}
 		else
 		{
@@ -568,13 +568,13 @@ struct GizmoImpl : public Gizmo
 			{
 				Vec3 pos = universe->getPosition(m_editor.getSelectedEntities()[i]);
 				Quat old_rot = universe->getRotation(m_editor.getSelectedEntities()[i]);
-				Quat new_rot = old_rot * Quat(axis, angle);
+				Quat new_rot = Quat(axis, angle) * old_rot;
 				new_rot.normalize();
 				new_rotations.push(new_rot);
 				Vec3 pdif = mtx.getTranslation() - pos;
 				old_rot.conjugate();
 				pos = -pdif;
-				pos = new_rot * (old_rot * pos);
+				pos = new_rot.rotate(old_rot.rotate(pos));
 				pos += mtx.getTranslation();
 
 				new_positions.push(pos);
@@ -587,7 +587,7 @@ struct GizmoImpl : public Gizmo
 		else
 		{
 			Quat old_rot = universe->getRotation(m_entities[m_active]);
-			Quat new_rot = old_rot * Quat(axis, angle);
+			Quat new_rot = Quat(axis, angle) * old_rot;
 			new_rot.normalize();
 			new_rotations.push(new_rot);
 			m_editor.setEntitiesRotations(&m_entities[m_active], &new_rotations[0], 1);
@@ -662,7 +662,7 @@ struct GizmoImpl : public Gizmo
 		auto* render_interface = m_editor.getRenderInterface();
 		bool is_ortho = render_interface->isCameraOrtho(edit_camera.handle);
 		auto camera_pos = m_editor.getUniverse()->getPosition(edit_camera.entity);
-		auto camera_dir = m_editor.getUniverse()->getRotation(edit_camera.entity) * Vec3(0, 0, -1);
+		auto camera_dir = m_editor.getUniverse()->getRotation(edit_camera.entity).rotate(Vec3(0, 0, -1));
 		float fov = render_interface->getCameraFOV(edit_camera.handle);
 
 		collide(camera_pos, camera_dir, fov, is_ortho);

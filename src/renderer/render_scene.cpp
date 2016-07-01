@@ -134,7 +134,7 @@ struct BoneAttachment
 	Entity entity;
 	Entity parent_entity;
 	int bone_index;
-	Matrix relative_matrix;
+	Transform relative_transform;
 };
 
 
@@ -396,7 +396,7 @@ public:
 		float height = camera.screen_height;
 		if (width <= 0 || height <= 0)
 		{
-			dir = m_universe.getRotation(camera.entity) * Vec3(0, 0, 1);
+			dir = m_universe.getRotation(camera.entity).rotate(Vec3(0, 0, 1));
 			return;
 		}
 
@@ -473,13 +473,12 @@ public:
 		auto* parent_pose = getPose(renderable);
 		if (!parent_pose) return;
 
-		Matrix parent_entity_mtx = m_universe.getMatrix(bone_attachment.parent_entity);
+		Transform parent_entity_transform = m_universe.getTransform(bone_attachment.parent_entity);
 		int idx = bone_attachment.bone_index;
 		if (idx < 0 || idx > parent_pose->count) return;
-		Matrix bone_mtx;
-		parent_pose->rotations[idx].toMatrix(bone_mtx);
-		bone_mtx.setTranslation(parent_pose->positions[idx]);
-		m_universe.setMatrix(bone_attachment.entity, parent_entity_mtx * bone_mtx * bone_attachment.relative_matrix);
+		Transform bone_transform = {parent_pose->positions[idx], parent_pose->rotations[idx]};
+		m_universe.setTransform(
+			bone_attachment.entity, parent_entity_transform * bone_transform * bone_attachment.relative_transform);
 	}
 
 
@@ -500,14 +499,12 @@ public:
 		if (!pose) return;
 		ASSERT(pose->is_absolute);
 		if (attachment.bone_index >= pose->count) return;
-		Matrix bone_matrix;
-		pose->rotations[attachment.bone_index].toMatrix(bone_matrix);
-		bone_matrix.setTranslation(pose->positions[attachment.bone_index]);
+		Transform bone_transform = {pose->positions[attachment.bone_index], pose->rotations[attachment.bone_index]};
 
-		Matrix inv_parent_matrix = m_universe.getMatrix(attachment.parent_entity) * bone_matrix;
-		inv_parent_matrix.inverse();
-		Matrix child_matrix = m_universe.getMatrix(attachment.entity);
-		attachment.relative_matrix = inv_parent_matrix * child_matrix;
+		Transform inv_parent_transform = m_universe.getTransform(attachment.parent_entity) * bone_transform;
+		inv_parent_transform = inv_parent_transform.inverted();
+		Transform child_transform = m_universe.getTransform(attachment.entity);
+		attachment.relative_transform = inv_parent_transform * child_transform;
 	}
 
 
@@ -515,7 +512,7 @@ public:
 	{
 		int idx = getBoneAttachmentIdx(cmp);
 		if (idx < 0) return {0, 0, 0};
-		return m_bone_attachments[idx].relative_matrix.getTranslation();
+		return m_bone_attachments[idx].relative_transform.pos;
 	}
 
 
@@ -523,7 +520,7 @@ public:
 	{
 		int idx = getBoneAttachmentIdx(cmp);
 		if (idx < 0) return;
-		return m_bone_attachments[idx].relative_matrix.setTranslation(pos);
+		m_bone_attachments[idx].relative_transform.pos = pos;
 	}
 
 
@@ -2092,7 +2089,7 @@ public:
 		Vec3 origin = scene->m_universe.getPosition(camera.entity);
 		Quat rot = scene->m_universe.getRotation(camera.entity);
 
-		RayCastModelHit hit = scene->castRay(origin, rot * Vec3(0, 0, -1), INVALID_COMPONENT);
+		RayCastModelHit hit = scene->castRay(origin, rot.rotate(Vec3(0, 0, -1)), INVALID_COMPONENT);
 		LuaWrapper::pushLua(L, hit.m_is_hit);
 		LuaWrapper::pushLua(L, hit.m_is_hit ? hit.m_origin + hit.m_dir * hit.m_t : Vec3(0, 0, 0));
 

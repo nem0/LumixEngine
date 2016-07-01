@@ -17,6 +17,12 @@
 struct lua_State;
 
 
+namespace physx
+{
+	class PxJoint;
+}
+
+
 namespace Lumix
 {
 
@@ -26,6 +32,8 @@ class IAllocator;
 struct Matrix;
 class Path;
 class PhysicsSystem;
+struct RagdollBone;
+struct Transform;
 class Universe;
 
 
@@ -40,6 +48,8 @@ struct RaycastHit
 class LUMIX_PHYSICS_API PhysicsScene : public IScene
 {
 public:
+	typedef RagdollBone* RagdollBoneHandle;
+
 	enum class ActorType
 	{
 		BOX,
@@ -113,7 +123,7 @@ public:
 	virtual void setHingeJointUseLimit(ComponentHandle cmp, bool use_limit) = 0;
 	virtual Vec2 getHingeJointLimit(ComponentHandle cmp) = 0;
 	virtual void setHingeJointLimit(ComponentHandle cmp, const Vec2& limit) = 0;
-	virtual Matrix getHingeJointConnectedBodyLocalFrame(ComponentHandle cmp) = 0;
+	virtual Transform getHingeJointConnectedBodyLocalFrame(ComponentHandle cmp) = 0;
 	virtual int getHingeJointCount() = 0;
 	virtual ComponentHandle getHingeJointComponent(int index) = 0;
 	virtual Entity getHingeJointEntity(ComponentHandle cmp) = 0;
@@ -128,7 +138,8 @@ public:
 	virtual void setSphericalJointUseLimit(ComponentHandle cmp, bool use_limit) = 0;
 	virtual Vec2 getSphericalJointLimit(ComponentHandle cmp) = 0;
 	virtual void setSphericalJointLimit(ComponentHandle cmp, const Vec2& limit) = 0;
-	virtual Matrix getSphericalJointConnectedBodyLocalFrame(ComponentHandle cmp) = 0;
+	virtual Transform getSphericalJointLocalFrame(ComponentHandle cmp) = 0;
+	virtual Transform getSphericalJointConnectedBodyLocalFrame(ComponentHandle cmp) = 0;
 	virtual int getSphericalJointCount() = 0;
 	virtual ComponentHandle getSphericalJointComponent(int index) = 0;
 	virtual Entity getSphericalJointEntity(ComponentHandle cmp) = 0;
@@ -143,6 +154,21 @@ public:
 	virtual void setControllerLayer(ComponentHandle cmp, int layer) = 0;
 	virtual float getControllerRadius(ComponentHandle cmp) = 0;
 	virtual float getControllerHeight(ComponentHandle cmp) = 0;
+
+	virtual RagdollBoneHandle createRagdollBone(ComponentHandle cmp, uint32 bone_name_hash) = 0;
+	virtual void destroyRagdollBone(ComponentHandle cmp, RagdollBoneHandle bone) = 0;
+	virtual physx::PxJoint* getRagdollBoneJoint(RagdollBoneHandle bone) const = 0;
+	virtual RagdollBoneHandle getRagdollRootBone(ComponentHandle cmp) const = 0;
+	virtual RagdollBoneHandle getRagdollBoneChild(RagdollBoneHandle bone) = 0;
+	virtual RagdollBoneHandle getRagdollBoneSibling(RagdollBoneHandle bone) = 0;
+	virtual RagdollBoneHandle getRagdollBoneByName(ComponentHandle cmp, uint32 bone_name_hash) = 0;
+	virtual float getRagdollBoneHeight(RagdollBoneHandle bone) = 0;
+	virtual float getRagdollBoneRadius(RagdollBoneHandle bone) = 0;
+	virtual void setRagdollBoneHeight(RagdollBoneHandle bone, float value) = 0;
+	virtual void setRagdollBoneRadius(RagdollBoneHandle bone, float value) = 0;
+	virtual Transform getRagdollBoneTransform(RagdollBoneHandle bone) = 0;
+	virtual void setRagdollBoneTransform(RagdollBoneHandle bone, const Transform& matrix) = 0;
+	virtual void changeRagdollBoneJoint(RagdollBone* child, int type) = 0;
 
 	virtual const char* getCollisionLayerName(int index) = 0;
 	virtual void setCollisionLayerName(int index, const char* name) = 0;

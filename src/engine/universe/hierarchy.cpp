@@ -117,12 +117,11 @@ public:
 		Children::iterator iter = m_children.find(entity);
 		if (iter.isValid())
 		{
-			Matrix parent_matrix = m_universe.getPositionAndRotation(entity);
+			Transform parent_transform = m_universe.getTransform(entity);
 			Array<Child>& children = *iter.value();
 			for (int i = 0, c = children.size(); i < c; ++i)
 			{
-				m_universe.setMatrix(
-					children[i].m_entity, parent_matrix * children[i].m_local_matrix);
+				m_universe.setTransform(children[i].m_entity, parent_transform * children[i].m_local_transform);
 			}
 		}
 		m_is_processing = was_processing;
@@ -141,10 +140,8 @@ public:
 				{
 					if (children[i].m_entity == entity)
 					{
-						Matrix inv_parent_matrix = m_universe.getPositionAndRotation(parent);
-						inv_parent_matrix.inverse();
-						children[i].m_local_matrix =
-							inv_parent_matrix * m_universe.getPositionAndRotation(entity);
+						Transform parent_transform = m_universe.getTransform(parent);
+						children[i].m_local_transform = parent_transform.inverted() * m_universe.getTransform(entity);
 						break;
 					}
 				}
@@ -162,7 +159,7 @@ public:
 		{
 			Quat parent_rot = m_universe.getRotation(parent_iter.value());
 			Vec3 parent_pos = m_universe.getPosition(parent_iter.value());
-			m_universe.setPosition(entity, parent_pos + parent_rot * position);
+			m_universe.setPosition(entity, parent_pos + parent_rot.rotate(position));
 			return;
 		}
 
@@ -184,7 +181,7 @@ public:
 			{
 				if (child.m_entity == entity)
 				{
-					return child.m_local_matrix.getTranslation();
+					return child.m_local_transform.pos;
 				}
 			}
 		}
@@ -200,7 +197,7 @@ public:
 		if (parent_iter.isValid())
 		{
 			Quat parent_rot = m_universe.getRotation(parent_iter.value());
-			m_universe.setRotation(entity, rotation * parent_rot);
+			m_universe.setRotation(entity, parent_rot * rotation);
 			return;
 		}
 
@@ -222,8 +219,7 @@ public:
 			{
 				if (child.m_entity == entity)
 				{
-					Quat rot;
-					child.m_local_matrix.getRotation(rot);
+					Quat rot = child.m_local_transform.rot;
 					return rot;
 				}
 			}
@@ -270,9 +266,8 @@ public:
 			}
 			Child& c = child_iter.value()->emplace();
 			c.m_entity = child_entity;
-			Matrix inv_parent_matrix = m_universe.getPositionAndRotation(parent);
-			inv_parent_matrix.inverse();
-			c.m_local_matrix = inv_parent_matrix * m_universe.getPositionAndRotation(child_entity);
+			Transform parent_transform = m_universe.getTransform(parent);
+			c.m_local_transform = parent_transform.inverted() * m_universe.getTransform(child_entity);
 		}
 	}
 

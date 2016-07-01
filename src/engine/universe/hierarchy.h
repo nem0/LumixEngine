@@ -41,7 +41,7 @@ namespace Lumix
 			{
 				public:
 					Entity m_entity;
-					Matrix m_local_matrix;
+					Transform m_local_transform;
 			};
 
 			typedef HashMap<Entity, Array<Child>*> Children;

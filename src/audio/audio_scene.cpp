@@ -110,8 +110,7 @@ struct AudioSceneImpl : public AudioScene
 		{
 			auto pos = m_universe.getPosition(m_listener.entity);
 			m_device.setListenerPosition(pos.x, pos.y, pos.z);
-			Matrix orientation;
-			m_universe.getRotation(m_listener.entity).toMatrix(orientation);
+			Matrix orientation = m_universe.getRotation(m_listener.entity).toMatrix();
 			auto front = orientation.getZVector();
 			auto up = orientation.getYVector();
 			m_device.setListenerOrientation(front.x, front.y, front.z, up.x, up.y, up.z);

@@ -1548,7 +1548,7 @@ public:
 				mtx.setZVector(dir);
 
 				positions.push(pos);
-				mtx.getRotation(rotations.emplace());
+				rotations.emplace(mtx.getRotation());
 			}
 		}
 		MoveEntityCommand* cmd = LUMIX_NEW(m_allocator, MoveEntityCommand)(*this,
@@ -1827,7 +1827,7 @@ public:
 		}
 		else
 		{
-			pos = universe->getPosition(m_camera) + universe->getRotation(m_camera) * Vec3(0, 0, -2);
+			pos = universe->getPosition(m_camera) + universe->getRotation(m_camera).rotate(Vec3(0, 0, -2));
 		}
 		AddEntityCommand* command = LUMIX_NEW(m_allocator, AddEntityCommand)(*this, pos);
 		executeCommand(command);
@@ -1854,7 +1854,7 @@ public:
 		}
 		else
 		{
-			pos = universe->getPosition(m_camera) + universe->getRotation(m_camera) * Vec3(0, 0, -2);
+			pos = universe->getPosition(m_camera) + universe->getRotation(m_camera).rotate(Vec3(0, 0, -2));
 		}
 		return pos;
 	}
@@ -2204,7 +2204,7 @@ public:
 		m_go_to_parameters.m_t = 0;
 		m_go_to_parameters.m_from = universe->getPosition(m_camera);
 		Quat camera_rot = universe->getRotation(m_camera);
-		Vec3 dir = camera_rot * Vec3(0, 0, 1);
+		Vec3 dir = camera_rot.rotate(Vec3(0, 0, 1));
 		m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + dir * 10;
 		float len = (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
 		m_go_to_parameters.m_speed = Math::maximum(100.0f / (len > 0 ? len : 1), 2.0f);
@@ -2465,9 +2465,9 @@ public:
 
 		right = m_is_orbit ? 0 : right;
 
-		pos += rot * Vec3(0, 0, -1) * forward * speed;
-		pos += rot * Vec3(1, 0, 0) * right * speed;
-		pos += rot * Vec3(0, 1, 0) * up * speed;
+		pos += rot.rotate(Vec3(0, 0, -1)) * forward * speed;
+		pos += rot.rotate(Vec3(1, 0, 0)) * right * speed;
+		pos += rot.rotate(Vec3(0, 1, 0)) * up * speed;
 		universe->setPosition(m_camera, pos);
 	}
 
@@ -2570,8 +2570,8 @@ public:
 			m_orbit_delta.y += y;
 		}
 
-		pos += rot * Vec3(x, 0, 0);
-		pos += rot * Vec3(0, -y, 0);
+		pos += rot.rotate(Vec3(x, 0, 0));
+		pos += rot.rotate(Vec3(0, -y, 0));
 
 		universe->setPosition(m_camera, pos);
 	}
@@ -2599,28 +2599,28 @@ public:
 
 		float yaw = -Math::signum(x) * (Math::pow(Math::abs((float)x / m_mouse_sensitivity.x), 1.2f));
 		Quat yaw_rot(Vec3(0, 1, 0), yaw);
-		rot = rot * yaw_rot;
+		rot = yaw_rot * rot;
 		rot.normalize();
 
-		Vec3 pitch_axis = rot * Vec3(1, 0, 0);
+		Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
 		float pitch = -Math::signum(y) * (Math::pow(Math::abs((float)y / m_mouse_sensitivity.y), 1.2f));
 		Quat pitch_rot(pitch_axis, pitch);
-		rot = rot * pitch_rot;
+		rot = pitch_rot * rot;
 		rot.normalize();
 
 		if (m_is_orbit && !m_selected_entities.empty())
 		{
-			Vec3 dir = rot * Vec3(0, 0, 1);
+			Vec3 dir = rot.rotate(Vec3(0, 0, 1));
 			Vec3 entity_pos = universe->getPosition(m_selected_entities[0]);
 			Vec3 nondelta_pos = pos;
 
-			nondelta_pos -= old_rot * Vec3(0, -1, 0) * m_orbit_delta.y;
-			nondelta_pos -= old_rot * Vec3(1, 0, 0) * m_orbit_delta.x;
+			nondelta_pos -= old_rot.rotate(Vec3(0, -1, 0)) * m_orbit_delta.y;
+			nondelta_pos -= old_rot.rotate(Vec3(1, 0, 0)) * m_orbit_delta.x;
 
 			float dist = (entity_pos - nondelta_pos).length();
 			pos = entity_pos + dir * dist;
-			pos += rot * Vec3(1, 0, 0) * m_orbit_delta.x;
-			pos += rot * Vec3(0, -1, 0) * m_orbit_delta.y;
+			pos += rot.rotate(Vec3(1, 0, 0)) * m_orbit_delta.x;
+			pos += rot.rotate(Vec3(0, -1, 0)) * m_orbit_delta.y;
 		}
 
 		universe->setRotation(m_camera, rot);
