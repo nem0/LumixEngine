@@ -200,8 +200,7 @@ struct NavigationSceneImpl : public NavigationScene
 
 	AABB getTerrainSpaceAABB(const Vec3& terrain_pos, const Quat& terrain_rot, const AABB& aabb_world_space)
 	{
-		Matrix mtx;
-		terrain_rot.toMatrix(mtx);
+		Matrix mtx = terrain_rot.toMatrix();
 		mtx.setTranslation(terrain_pos);
 		mtx.fastInverse();
 		AABB ret = aabb_world_space;
@@ -238,22 +237,22 @@ struct NavigationSceneImpl : public NavigationScene
 					float x = i * scaleXZ;
 					float z = j * scaleXZ;
 					float h0 = render_scene->getTerrainHeightAt(cmp, x, z);
-					Vec3 p0 = pos + rot * Vec3(x, h0, z);
+					Vec3 p0 = pos + rot.rotate(Vec3(x, h0, z));
 
 					x = (i + 1) * scaleXZ;
 					z = j * scaleXZ;
 					float h1 = render_scene->getTerrainHeightAt(cmp, x, z);
-					Vec3 p1 = pos + rot * Vec3(x, h1, z);
+					Vec3 p1 = pos + rot.rotate(Vec3(x, h1, z));
 
 					x = (i + 1) * scaleXZ;
 					z = (j + 1) * scaleXZ;
 					float h2 = render_scene->getTerrainHeightAt(cmp, x, z);
-					Vec3 p2 = pos + rot * Vec3(x, h2, z);
+					Vec3 p2 = pos + rot.rotate(Vec3(x, h2, z));
 
 					x = i * scaleXZ;
 					z = (j + 1) * scaleXZ;
 					float h3 = render_scene->getTerrainHeightAt(cmp, x, z);
-					Vec3 p3 = pos + rot * Vec3(x, h3, z);
+					Vec3 p3 = pos + rot.rotate(Vec3(x, h3, z));
 
 					Vec3 n = crossProduct(p1 - p0, p0 - p2).normalized();
 					uint8 area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
@@ -309,9 +308,9 @@ struct NavigationSceneImpl : public NavigationScene
 					uint16* indices16 = (uint16*)&model->getIndices()[0];
 					for (int i = 0; i < mesh.indices_count; i += 3)
 					{
-						Vec3 a = mtx.multiplyPosition(vertices[indices16[mesh.indices_offset + i]]);
-						Vec3 b = mtx.multiplyPosition(vertices[indices16[mesh.indices_offset + i + 1]]);
-						Vec3 c = mtx.multiplyPosition(vertices[indices16[mesh.indices_offset + i + 2]]);
+						Vec3 a = mtx.transform(vertices[indices16[mesh.indices_offset + i]]);
+						Vec3 b = mtx.transform(vertices[indices16[mesh.indices_offset + i + 1]]);
+						Vec3 c = mtx.transform(vertices[indices16[mesh.indices_offset + i + 2]]);
 
 						Vec3 n = crossProduct(a - b, a - c).normalized();
 						uint8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
@@ -323,9 +322,9 @@ struct NavigationSceneImpl : public NavigationScene
 					uint32* indices32 = (uint32*)&model->getIndices()[0];
 					for (int i = 0; i < mesh.indices_count; i += 3)
 					{
-						Vec3 a = mtx.multiplyPosition(vertices[indices32[mesh.indices_offset + i]]);
-						Vec3 b = mtx.multiplyPosition(vertices[indices32[mesh.indices_offset + i + 1]]);
-						Vec3 c = mtx.multiplyPosition(vertices[indices32[mesh.indices_offset + i + 2]]);
+						Vec3 a = mtx.transform(vertices[indices32[mesh.indices_offset + i]]);
+						Vec3 b = mtx.transform(vertices[indices32[mesh.indices_offset + i + 1]]);
+						Vec3 c = mtx.transform(vertices[indices32[mesh.indices_offset + i + 2]]);
 
 						Vec3 n = crossProduct(a - b, a - c).normalized();
 						uint8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;

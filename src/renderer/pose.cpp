@@ -67,8 +67,8 @@ void Pose::computeAbsolute(Model& model)
 	for (int i = model.getFirstNonrootBoneIndex(); i < count; ++i)
 	{
 		int parent = model.getBone(i).parent_idx;
-		positions[i] = rotations[parent] * positions[i] + positions[parent];
-		rotations[i] = rotations[i] * rotations[parent];
+		positions[i] = rotations[parent].rotate(positions[i]) + positions[parent];
+		rotations[i] = rotations[parent] * rotations[i];
 	}
 	is_absolute = true;
 }
@@ -81,20 +81,10 @@ void Pose::computeRelative(Model& model)
 	for (int i = count - 1; i >= model.getFirstNonrootBoneIndex(); --i)
 	{
 		int parent = model.getBone(i).parent_idx;
-		positions[i] = -rotations[parent] * (positions[i] - positions[parent]);
+		positions[i] = -rotations[parent].rotate(positions[i] - positions[parent]);
 		rotations[i] = rotations[i] * -rotations[parent];
 	}
 	is_absolute = false;
-}
-
-
-void Pose::setMatrices(Matrix* mtx) const
-{
-	for (int i = 0, c = count; i < c; ++i)
-	{
-		rotations[i].toMatrix(mtx[i]);
-		mtx[i].translate(positions[i]);
-	}
 }
 
 

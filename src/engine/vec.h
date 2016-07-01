@@ -132,10 +132,6 @@ struct LUMIX_ENGINE_API Vec3
 		return x * x + y * y + z * z;
 	}
 
-	void rotateY(float angle);
-
-	void rotateX(float angle);
-
 
 	float x, y, z;
 };
@@ -302,9 +298,7 @@ inline float dotProduct(const Vec3& op1, const Vec3& op2)
 
 inline Vec3 crossProduct(const Vec3& op1, const Vec3& op2)
 {
-	float x1 = op1.x;
-	float x2 = op2.x;
-	return Vec3(op1.y * op2.z - op1.z * op2.y, op1.z * x2 - x1 * op2.z, x1 * op2.y - op1.y * x2);
+	return Vec3(op1.y * op2.z - op1.z * op2.y, op1.z * op2.x - op1.x * op2.z, op1.x * op2.y - op1.y * op2.x);
 }
 
 

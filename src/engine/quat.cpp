@@ -96,12 +96,9 @@ void Quat::conjugate()
 }
 
 
-void Quat::conjugated(Quat& q)
+Quat Quat::conjugated() const
 {
-	q.x = x;
-	q.y = y;
-	q.z = z;
-	q.w = -w;
+	return Quat(x, y, z, -w);
 }
 
 
@@ -135,26 +132,22 @@ void nlerp(const Quat& q1, const Quat& q2, Quat* out, float t)
 }
 
 
-Quat Quat::operator *(const Quat& rhs) const
+Quat Quat::operator*(const Quat& rhs) const
 {
-	Quat tmp;
-
-	tmp.w = (rhs.w * w) - (rhs.x * x) - (rhs.y * y) - (rhs.z * z);
-	tmp.x = (rhs.w * x) + (rhs.x * w) + (rhs.y * z) - (rhs.z * y);
-	tmp.y = (rhs.w * y) + (rhs.y * w) + (rhs.z * x) - (rhs.x * z);
-	tmp.z = (rhs.w * z) + (rhs.z * w) + (rhs.x * y) - (rhs.y * x);
-
-	return tmp;
+	return Quat(w * rhs.x + rhs.w * x + y * rhs.z - rhs.y * z,
+		w * rhs.y + rhs.w * y + z * rhs.x - rhs.z * x,
+		w * rhs.z + rhs.w * z + x * rhs.y - rhs.x * y,
+		w * rhs.w - x * rhs.x - y * rhs.y - z * rhs.z);
 }
 
 
-Quat Quat::operator -() const
+Quat Quat::operator-() const
 {
 	return Quat(x, y, z, -w);
 }
 
 
-void Quat::toMatrix(Matrix& mtx) const
+Matrix Quat::toMatrix() const
 {
 	float fx = x + x;
 	float fy = y + y;
@@ -169,6 +162,7 @@ void Quat::toMatrix(Matrix& mtx) const
 	float fyz = fz*y;
 	float fzz = fz*z;
 
+	Matrix mtx;
 	mtx.m11 = 1.0f - (fyy + fzz);
 	mtx.m21 = fxy - fwz;
 	mtx.m31 = fxz + fwy;
@@ -181,6 +175,7 @@ void Quat::toMatrix(Matrix& mtx) const
 
 	mtx.m41 = mtx.m42 = mtx.m43 = mtx.m14 = mtx.m24 = mtx.m34 = 0;
 	mtx.m44 = 1;
+	return mtx;
 }
 
 

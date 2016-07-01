@@ -21,7 +21,6 @@ struct LUMIX_RENDERER_API Pose
 	~Pose();
 
 	void resize(int count);
-	void setMatrices(Matrix* mtx) const;
 	void computeAbsolute(Model& model);
 	void computeRelative(Model& model);
 	void blend(Pose& rhs, float weight);

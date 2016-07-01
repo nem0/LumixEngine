@@ -1016,7 +1016,7 @@ struct PipelineImpl : public Pipeline
 		{
 			auto entity = m_scene->getPointLightEntity(light_cmp);
 			float range = m_scene->getLightRange(light_cmp);
-			Vec3 light_dir = universe.getRotation(entity) * Vec3(0, 0, -1);
+			Vec3 light_dir = universe.getRotation(entity).rotate(Vec3(0, 0, -1));
 			float attenuation = m_scene->getLightAttenuation(light_cmp);
 			float fov = m_scene->getLightFOV(light_cmp);
 			float intensity = m_scene->getPointLightIntensity(light_cmp);
@@ -1227,11 +1227,11 @@ struct PipelineImpl : public Pipeline
 	{
 		Matrix inv = light_mtx;
 		inv.fastInverse();
-		Vec3 out = inv.multiplyPosition(shadow_cam_pos);
+		Vec3 out = inv.transform(shadow_cam_pos);
 		float align = 2 * frustum_radius / (shadowmap_width * 0.5f - 2);
 		out.x -= fmodf(out.x, align);
 		out.y -= fmodf(out.y, align);
-		out = light_mtx.multiplyPosition(out);
+		out = light_mtx.transform(out);
 		return out;
 	}
 
@@ -1493,7 +1493,7 @@ struct PipelineImpl : public Pipeline
 		Universe& universe = m_scene->getUniverse();
 		Entity light_entity = m_scene->getPointLightEntity(light_cmp);
 		Vec3 light_pos = universe.getPosition(light_entity);
-		Vec3 light_dir = universe.getRotation(light_entity) * Vec3(0, 0, -1);
+		Vec3 light_dir = universe.getRotation(light_entity).rotate(Vec3(0, 0, -1));
 		float fov = m_scene->getLightFOV(light_cmp);
 		float intensity = m_scene->getPointLightIntensity(light_cmp);
 		intensity *= intensity;
@@ -1567,7 +1567,7 @@ struct PipelineImpl : public Pipeline
 
 		Universe& universe = m_scene->getUniverse();
 		Entity light_entity = m_scene->getGlobalLightEntity(current_light);
-		Vec3 light_dir = universe.getRotation(light_entity) * Vec3(0, 0, 1);
+		Vec3 light_dir = universe.getRotation(light_entity).rotate(Vec3(0, 0, 1));
 		Vec3 diffuse_color = m_scene->getGlobalLightColor(current_light) *
 							 m_scene->getGlobalLightIntensity(current_light);
 		Vec3 ambient_color = m_scene->getLightAmbientColor(current_light) *
@@ -1925,9 +1925,8 @@ struct PipelineImpl : public Pipeline
 		for (int bone_index = 0, bone_count = pose.count; bone_index < bone_count; ++bone_index)
 		{
 			auto& bone = model.getBone(bone_index);
-			rots[bone_index].toMatrix(bone_mtx[bone_index]);
-			bone_mtx[bone_index].translate(poss[bone_index]);
-			bone_mtx[bone_index] = bone_mtx[bone_index] * bone.inv_bind_matrix;
+			Transform tmp = {poss[bone_index], rots[bone_index]};
+			bone_mtx[bone_index] = (tmp * bone.inv_bind_transform).toMatrix();
 		}
 
 		int stride = model.getVertexDecl().getStride();
@@ -2126,7 +2125,7 @@ struct PipelineImpl : public Pipeline
 			m_scene->getUniverse().getPosition(m_scene->getCameraEntity(m_applied_camera));
 
 		Vec4 rel_cam_pos(
-			inv_world_matrix.multiplyPosition(camera_pos) / info.m_terrain->getXZScale(), 1);
+			inv_world_matrix.transform(camera_pos) / info.m_terrain->getXZScale(), 1);
 		Vec4 terrain_scale(info.m_terrain->getScale(), 0);
 		const Mesh& mesh = *info.m_terrain->getMesh();
 

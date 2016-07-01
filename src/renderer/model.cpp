@@ -90,7 +90,7 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 
 	Matrix inv = model_transform;
 	inv.inverse();
-	Vec3 local_origin = inv.multiplyPosition(origin);
+	Vec3 local_origin = inv.transform(origin);
 	Vec3 local_dir = static_cast<Vec3>(inv * Vec4(dir.x, dir.y, dir.z, 0));
 
 	const Array<Vec3>& vertices = m_vertices;
@@ -171,8 +171,8 @@ void Model::getPose(Pose& pose)
 	Quat* rot = pose.rotations;
 	for (int i = 0, c = getBoneCount(); i < c; ++i)
 	{
-		pos[i] = m_bones[i].position;
-		rot[i] = m_bones[i].rotation;
+		pos[i] = m_bones[i].transform.pos;
+		rot[i] = m_bones[i].transform.rot;
 	}
 	pose.is_absolute = true;
 }
@@ -432,8 +432,8 @@ bool Model::parseBones(FS::IFile& file)
 		{
 			b.parent = "";
 		}
-		file.read(&b.position.x, sizeof(float) * 3);
-		file.read(&b.rotation.x, sizeof(float) * 4);
+		file.read(&b.transform.pos.x, sizeof(float) * 3);
+		file.read(&b.transform.rot.x, sizeof(float) * 4);
 	}
 	m_first_nonroot_bone_index = -1;
 	for (int i = 0; i < bone_count; ++i)
@@ -459,12 +459,7 @@ bool Model::parseBones(FS::IFile& file)
 	}
 	for (int i = 0; i < m_bones.size(); ++i)
 	{
-		m_bones[i].rotation.toMatrix(m_bones[i].inv_bind_matrix);
-		m_bones[i].inv_bind_matrix.translate(m_bones[i].position);
-	}
-	for (int i = 0; i < m_bones.size(); ++i)
-	{
-		m_bones[i].inv_bind_matrix.fastInverse();
+		m_bones[i].inv_bind_transform = m_bones[i].transform.inverted();
 	}
 	return true;
 }
@@ -610,7 +605,7 @@ bool Model::load(FS::IFile& file)
 
 static Vec3 getBonePosition(Model* model, int bone_index)
 {
-	return model->getBone(bone_index).position;
+	return model->getBone(bone_index).transform.pos;
 }
 
 

@@ -37,8 +37,7 @@ void UT_matrix(const char* params)
 	LUMIX_EXPECT_CLOSE_EQ(mtx.getTranslation().y, 0, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(mtx.getTranslation().z, 0, 0.001f);
 
-	Lumix::Quat rot;
-	mtx.getRotation(rot);
+	Lumix::Quat rot = mtx.getRotation();
 	LUMIX_EXPECT_CLOSE_EQ(rot.x, 0, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(rot.y, 0, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(rot.z, 0, 0.001f);
@@ -59,7 +58,7 @@ void UT_matrix(const char* params)
 	mtx.multiply3x3(1.0f);
 	expectSameMatrices(mtx, Lumix::Matrix::IDENTITY);
 
-	Lumix::Vec3 v = mtx.multiplyPosition(Lumix::Vec3(1, 2, 3));
+	Lumix::Vec3 v = mtx.transform(Lumix::Vec3(1, 2, 3));
 	LUMIX_EXPECT_CLOSE_EQ(v.x, 1, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.y, 2, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.z, 3, 0.001f);

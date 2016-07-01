@@ -8,6 +8,14 @@ namespace Lumix
 {
 
 
+Matrix Transform::toMatrix() const
+{
+	Matrix mtx = rot.toMatrix();
+	mtx.setTranslation(pos);
+	return mtx;
+}
+
+
 const Matrix Matrix::IDENTITY(
 	1, 0, 0, 0,
 	0, 1, 0, 0,
@@ -112,8 +120,9 @@ Matrix Matrix::operator *(const Matrix& rhs) const
 }
 
 
-void Matrix::getRotation(Quat& rot) const
+Quat Matrix::getRotation() const
 {
+	Quat rot;
 	float tr = m11 + m22 + m33;
 
 	if (tr > 0)
@@ -153,6 +162,7 @@ void Matrix::getRotation(Quat& rot) const
 		rot.y = (m32 + m23) * s;
 		rot.z = s * t;
 	}
+	return rot;
 }
 
 
@@ -198,7 +208,7 @@ void Matrix::multiply3x3(float scale)
 }
 
 
-Vec3 Matrix::multiplyPosition(const Vec3& rhs) const
+Vec3 Matrix::transform(const Vec3& rhs) const
 {
 	return Vec3(
 		m11 * rhs.x + m21 * rhs.y + m31 * rhs.z + m41,	

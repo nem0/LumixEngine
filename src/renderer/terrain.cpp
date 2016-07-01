@@ -433,9 +433,7 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch,
 			float z = quad_z + dz + step * Math::randFloat(-0.5f, 0.5f);
 			grass_mtx.setTranslation(Vec3(x, getHeight(x, z), z));
 			Quat q(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2));
-			Matrix rotMatrix;
-			q.toMatrix(rotMatrix);
-			grass_mtx = terrain_matrix * grass_mtx * rotMatrix;
+			grass_mtx = terrain_matrix * grass_mtx * q.toMatrix();
 			grass_mtx.multiply3x3(density + Math::randFloat(-0.1f, 0.1f));
 		}
 	}
@@ -471,7 +469,7 @@ void Terrain::updateGrass(ComponentHandle camera)
 	Matrix mtx = universe.getMatrix(m_entity);
 	Matrix inv_mtx = mtx;
 	inv_mtx.fastInverse();
-	Vec3 local_camera_pos = inv_mtx.multiplyPosition(camera_pos);
+	Vec3 local_camera_pos = inv_mtx.transform(camera_pos);
 	float cx = (int)(local_camera_pos.x / (GRASS_QUAD_SIZE)) * (float)GRASS_QUAD_SIZE;
 	float cz = (int)(local_camera_pos.z / (GRASS_QUAD_SIZE)) * (float)GRASS_QUAD_SIZE;
 	float from_quad_x = cx - (m_grass_distance >> 1) * GRASS_QUAD_SIZE;
@@ -567,7 +565,7 @@ void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Com
 	for (auto* quad : quads)
 	{
 		Vec3 quad_center(quad->pos.x + GRASS_QUAD_SIZE * 0.5f, quad->pos.y, quad->pos.z + GRASS_QUAD_SIZE * 0.5f);
-		quad_center = mtx.multiplyPosition(quad_center);
+		quad_center = mtx.transform(quad_center);
 		if (frustum.isSphereInside(quad_center, quad->radius))
 		{
 			float dist2 = (quad_center - frustum_position).squaredLength();
@@ -682,7 +680,7 @@ void Terrain::getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos,
 	Matrix matrix = m_scene.getUniverse().getMatrix(m_entity);
 	Matrix inv_matrix = matrix;
 	inv_matrix.fastInverse();
-	Vec3 local_camera_pos = inv_matrix.multiplyPosition(camera_pos);
+	Vec3 local_camera_pos = inv_matrix.transform(camera_pos);
 	local_camera_pos.x /= m_scale.x;
 	local_camera_pos.z /= m_scale.z;
 	m_root->getInfos(infos, local_camera_pos, this, matrix, allocator);
@@ -813,7 +811,7 @@ RayCastModelHit Terrain::castRay(const Vec3& origin, const Vec3& dir)
 	{
 		Matrix mtx = m_scene.getUniverse().getMatrix(m_entity);
 		mtx.fastInverse();
-		Vec3 rel_origin = mtx.multiplyPosition(origin);
+		Vec3 rel_origin = mtx.transform(origin);
 		Vec3 rel_dir = mtx * Vec4(dir, 0);
 		Vec3 start;
 		Vec3 size(m_root->m_size * m_scale.x, m_scale.y * 65535.0f, m_root->m_size * m_scale.x);

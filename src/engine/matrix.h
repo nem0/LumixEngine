@@ -2,6 +2,7 @@
 
 
 #include "engine/lumix.h"
+#include "engine/quat.h"
 #include "engine/vec.h"
 
 
@@ -10,6 +11,47 @@ namespace Lumix
 
 
 struct Quat;
+
+
+struct LUMIX_ENGINE_API Transform
+{
+	Transform() {}
+
+
+	Transform(const Vec3& _pos, const Quat& _rot)
+		: pos(_pos)
+		, rot(_rot)
+	{
+	}
+
+
+	Transform inverted() const
+	{
+		Transform result;
+		result.rot = rot.conjugated();
+		result.pos = result.rot.rotate(-pos);
+		return result;
+	}
+
+
+	Transform operator*(const Transform& rhs) const
+	{
+		return {rot.rotate(rhs.pos) + pos, rot * rhs.rot};
+	}
+
+
+	Vec3 transform(const Vec3& value) const
+	{
+		return pos + rot.rotate(value);
+	}
+
+
+	Matrix toMatrix() const;
+
+
+	Quat rot;
+	Vec3 pos;
+};
 
 
 struct LUMIX_ENGINE_API Matrix
@@ -80,7 +122,7 @@ struct LUMIX_ENGINE_API Matrix
 	}
 
 
-	float determinant()
+	float determinant() const
 	{
 		return
 			m14 * m23 * m32 * m41  -  m13 * m24 * m32 * m41  -  m14 * m22 * m33 * m41  +  m12 * m24 * m33 * m41 +
@@ -223,9 +265,10 @@ struct LUMIX_ENGINE_API Matrix
 		return Vec3(m41, m42, m43);
 	}
 
-	void getRotation(Quat& rot) const;
+	Transform toTransform() { return {getTranslation(), getRotation()}; }
+	Quat getRotation() const;
 	void transpose();
-	Vec3 multiplyPosition(const Vec3& pos) const;
+	Vec3 transform(const Vec3& pos) const;
 	void multiply3x3(float scale);
 	void setIdentity();
 

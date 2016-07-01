@@ -100,8 +100,7 @@ bool Universe::hasEntity(Entity entity) const
 
 void Universe::setMatrix(Entity entity, const Matrix& mtx)
 {
-	Quat rot;
-	mtx.getRotation(rot);
+	Quat rot = mtx.getRotation();
 	m_transformations[m_entity_map[entity.index]].position = mtx.getTranslation();
 	m_transformations[m_entity_map[entity.index]].rotation = rot;
 	entityTransformed().invoke(entity);
@@ -110,19 +109,32 @@ void Universe::setMatrix(Entity entity, const Matrix& mtx)
 
 Matrix Universe::getPositionAndRotation(Entity entity) const
 {
-	Matrix mtx;
 	auto& transform = m_transformations[m_entity_map[entity.index]];
-	transform.rotation.toMatrix(mtx);
+	Matrix mtx = transform.rotation.toMatrix();
 	mtx.setTranslation(transform.position);
 	return mtx;
 }
 
 
+void Universe::setTransform(Entity entity, const Transform& transform)
+{
+	auto& tmp = m_transformations[m_entity_map[entity.index]];
+	tmp.position = transform.pos;
+	tmp.rotation = transform.rot;
+}
+
+
+Transform Universe::getTransform(Entity entity) const
+{
+	auto& transform = m_transformations[m_entity_map[entity.index]];
+	return Transform(transform.position, transform.rotation);
+}
+
+
 Matrix Universe::getMatrix(Entity entity) const
 {
-	Matrix mtx;
 	auto& transform = m_transformations[m_entity_map[entity.index]];
-	transform.rotation.toMatrix(mtx);
+	Matrix mtx = transform.rotation.toMatrix();
 	mtx.setTranslation(transform.position);
 	mtx.multiply3x3(transform.scale);
 	return mtx;

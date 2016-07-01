@@ -41,55 +41,6 @@ void UT_vec3(const char* params)
 	LUMIX_EXPECT_CLOSE_EQ(v2.y, 2 * v2.x, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v2.z, 3 * v2.x, 0.001f);
 
-	Lumix::Vec3 v3(1, 0, 0);
-	v3.rotateX(0);
-	LUMIX_EXPECT_CLOSE_EQ(v3.x, 1, 0.001f);
-	LUMIX_EXPECT_CLOSE_EQ(v3.y, 0, 0.001f);
-	LUMIX_EXPECT_CLOSE_EQ(v3.z, 0, 0.001f);
-	v3.rotateX(10);
-	LUMIX_EXPECT_CLOSE_EQ(v3.x, 1, 0.001f);
-	LUMIX_EXPECT_CLOSE_EQ(v3.y, 0, 0.001f);
-	LUMIX_EXPECT_CLOSE_EQ(v3.z, 0, 0.001f);
-	v3.rotateX(-5);
-	LUMIX_EXPECT_CLOSE_EQ(v3.x, 1, 0.001f);
-	LUMIX_EXPECT_CLOSE_EQ(v3.y, 0, 0.001f);
-	LUMIX_EXPECT_CLOSE_EQ(v3.z, 0, 0.001f);
-
-	v3.rotateY(0);
-	LUMIX_EXPECT_CLOSE_EQ(v3.x, 1, 0.001f);
-	LUMIX_EXPECT_CLOSE_EQ(v3.y, 0, 0.001f);
-	LUMIX_EXPECT_CLOSE_EQ(v3.z, 0, 0.001f);
-	v3.rotateY(Lumix::Math::PI * 2);
-	LUMIX_EXPECT_CLOSE_EQ(v3.x, 1, 0.001f);
-	LUMIX_EXPECT_CLOSE_EQ(v3.y, 0, 0.001f);
-	LUMIX_EXPECT_CLOSE_EQ(v3.z, 0, 0.001f);
-	v3.rotateY(Lumix::Math::PI);
-	LUMIX_EXPECT_CLOSE_EQ(v3.x, -1, 0.001f);
-	LUMIX_EXPECT_CLOSE_EQ(v3.y, 0, 0.001f);
-	LUMIX_EXPECT_CLOSE_EQ(v3.z, 0, 0.001f);
-
-	for (float f = 0; f < Lumix::Math::PI * 2; f += 0.01f)
-	{
-		float x = cos(f);
-		float z = -sin(f);
-		v3.set(1, 0, 0);
-		v3.rotateY(f);
-		LUMIX_EXPECT_CLOSE_EQ(v3.x, x, 0.001f);
-		LUMIX_EXPECT_CLOSE_EQ(v3.y, 0, 0.001f);
-		LUMIX_EXPECT_CLOSE_EQ(v3.z, z, 0.001f);
-	}
-
-	for (float f = 0; f < Lumix::Math::PI * 2; f += 0.01f)
-	{
-		float y = cos(f);
-		float z = sin(f);
-		v3.set(0, 1, 0);
-		v3.rotateX(f);
-		LUMIX_EXPECT_CLOSE_EQ(v3.x, 0, 0.001f);
-		LUMIX_EXPECT_CLOSE_EQ(v3.y, y, 0.001f);
-		LUMIX_EXPECT_CLOSE_EQ(v3.z, z, 0.001f);
-	}
-
 	v = -Lumix::Vec3(1, 2, 3);
 	LUMIX_EXPECT_CLOSE_EQ(v.x, -1, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.y, -2, 0.001f);

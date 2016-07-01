@@ -428,17 +428,17 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 
 				float yaw = -Math::signum(delta.x) * (Math::pow(Math::abs((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
 				Quat yaw_rot(Vec3(0, 1, 0), yaw);
-				rot = rot * yaw_rot;
+				rot = yaw_rot * rot;
 				rot.normalize();
 
-				Vec3 pitch_axis = rot * Vec3(1, 0, 0);
+				Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
 				float pitch =
 					-Math::signum(delta.y) * (Math::pow(Math::abs((float)delta.y / MOUSE_SENSITIVITY.y), 1.2f));
 				Quat pitch_rot(pitch_axis, pitch);
-				rot = rot * pitch_rot;
+				rot = pitch_rot * rot;
 				rot.normalize();
 
-				Vec3 dir = rot * Vec3(0, 0, 1);
+				Vec3 dir = rot.rotate(Vec3(0, 0, 1));
 				Vec3 origin = (model.getAABB().max + model.getAABB().min) * 0.5f;
 
 				float dist = (origin - pos).length();
@@ -468,10 +468,10 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 			{
 				ImGui::Text("%s", model->getBone(i).name.c_str());
 				ImGui::NextColumn();
-				auto pos = model->getBone(i).position;
+				auto pos = model->getBone(i).transform.pos;
 				ImGui::Text("%f; %f; %f", pos.x, pos.y, pos.z);
 				ImGui::NextColumn();
-				auto rot = model->getBone(i).rotation;
+				auto rot = model->getBone(i).transform.rot;
 				ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
 				ImGui::NextColumn();
 			}
@@ -1612,7 +1612,7 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 
 		for (int j = 0; j < 8; ++j)
 		{
-			points[j] = mtx.multiplyPosition(points[j]);
+			points[j] = mtx.transform(points[j]);
 		}
 
 		Vec3 this_min = points[0];
@@ -1634,9 +1634,9 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 		Universe& universe = scene->getUniverse();
 		Vec3 pos = universe.getPosition(light.entity);
 
-		Vec3 dir = universe.getRotation(light.entity) * Vec3(0, 0, 1);
-		Vec3 right = universe.getRotation(light.entity) * Vec3(1, 0, 0);
-		Vec3 up = universe.getRotation(light.entity) * Vec3(0, 1, 0);
+		Vec3 dir = universe.getRotation(light.entity).rotate(Vec3(0, 0, 1));
+		Vec3 right = universe.getRotation(light.entity).rotate(Vec3(1, 0, 0));
+		Vec3 up = universe.getRotation(light.entity).rotate(Vec3(0, 1, 0));
 
 		scene->addDebugLine(pos, pos + dir, 0xff0000ff, 0);
 		scene->addDebugLine(pos + right, pos + dir + right, 0xff0000ff, 0);
@@ -1662,9 +1662,9 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 		bool is_ortho = scene->isCameraOrtho(cmp.handle);
 		float near_distance = scene->getCameraNearPlane(cmp.handle);
 		float far_distance = scene->getCameraFarPlane(cmp.handle);
-		Vec3 dir = universe.getRotation(cmp.entity) * Vec3(0, 0, -1);
-		Vec3 right = universe.getRotation(cmp.entity) * Vec3(1, 0, 0);
-		Vec3 up = universe.getRotation(cmp.entity) * Vec3(0, 1, 0);
+		Vec3 dir = universe.getRotation(cmp.entity).rotate(Vec3(0, 0, -1));
+		Vec3 right = universe.getRotation(cmp.entity).rotate(Vec3(1, 0, 0));
+		Vec3 up = universe.getRotation(cmp.entity).rotate(Vec3(0, 1, 0));
 		float w = scene->getCameraScreenWidth(cmp.handle);
 		float h = scene->getCameraScreenHeight(cmp.handle);
 		float ratio = h < 1.0f ? 1 : w / h;

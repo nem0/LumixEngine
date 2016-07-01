@@ -91,7 +91,7 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 		m_width = m_height = m_x = m_y = -1;
 		Lumix::Matrix entity_mtx = editor.getUniverse()->getMatrix(terrain.entity);
 		entity_mtx.fastInverse();
-		Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
+		Lumix::Vec3 local_pos = entity_mtx.transform(hit_pos);
 		float xz_scale = static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainXZScale(terrain.handle);
 		local_pos = local_pos / xz_scale;
 		local_pos.y = -1;
@@ -776,8 +776,8 @@ void TerrainEditor::drawCursor(Lumix::RenderScene& scene,
 		local_to.y = scene.getTerrainHeightAt(terrain.handle, local_to.x, local_to.z);
 		local_to.y += 0.25f;
 
-		Lumix::Vec3 from = terrain_matrix.multiplyPosition(local_from);
-		Lumix::Vec3 to = terrain_matrix.multiplyPosition(local_to);
+		Lumix::Vec3 from = terrain_matrix.transform(local_from);
+		Lumix::Vec3 to = terrain_matrix.transform(local_to);
 		scene.addDebugLine(from, to, 0xffff0000, 0);
 	}
 }
@@ -824,7 +824,7 @@ Lumix::Vec3 TerrainEditor::getRelativePosition(const Lumix::Vec3& world_pos) con
 	Lumix::Matrix inv_terrain_matrix = terrain_matrix;
 	inv_terrain_matrix.inverse();
 
-	return inv_terrain_matrix.multiplyPosition(world_pos);
+	return inv_terrain_matrix.transform(world_pos);
 }
 
 
@@ -1094,7 +1094,7 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 			float dist = Lumix::Math::randFloat(0, 1.0f) * m_terrain_brush_size;
 			float y = Lumix::Math::randFloat(m_y_spread.x, m_y_spread.y);
 			Lumix::Vec3 pos(hit_pos.x + cos(angle) * dist, 0, hit_pos.z + sin(angle) * dist);
-			Lumix::Vec3 terrain_pos = inv_terrain_matrix.multiplyPosition(pos);
+			Lumix::Vec3 terrain_pos = inv_terrain_matrix.transform(pos);
 			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= size.x && terrain_pos.z <= size.y)
 			{
 				pos.y = scene->getTerrainHeightAt(m_component.handle, terrain_pos.x, terrain_pos.z) + y;
@@ -1111,7 +1111,7 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 						mtx.setXVector(Lumix::crossProduct(normal, dir));
 						mtx.setYVector(normal);
 						mtx.setXVector(dir);
-						mtx.getRotation(rot);
+						rot = mtx.getRotation();
 					}
 					else
 					{
@@ -1119,21 +1119,21 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 						{
 							float angle = Lumix::Math::randFloat(m_rotate_x_spread.x, m_rotate_x_spread.y);
 							Lumix::Quat q(Lumix::Vec3(1, 0, 0), angle);
-							rot = rot * q;
+							rot = q * rot;
 						}
 
 						if (m_is_rotate_y)
 						{
 							float angle = Lumix::Math::randFloat(m_rotate_y_spread.x, m_rotate_y_spread.y);
 							Lumix::Quat q(Lumix::Vec3(0, 1, 0), angle);
-							rot = rot * q;
+							rot = q * rot;
 						}
 
 						if (m_is_rotate_z)
 						{
 							float angle = Lumix::Math::randFloat(m_rotate_z_spread.x, m_rotate_z_spread.y);
-							Lumix::Quat q(rot * Lumix::Vec3(0, 0, 1), angle);
-							rot = rot * q;
+							Lumix::Quat q(rot.rotate(Lumix::Vec3(0, 0, 1)), angle);
+							rot = q * rot;
 						}
 					}
 
