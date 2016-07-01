@@ -795,8 +795,11 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager, boo
 			}
 			ASSERT(module);
 		}
-		m_modules.push(module);
-		module->deserialize(blob, version);
+		if (module)
+		{
+			m_modules.push(module);
+			module->deserialize(blob, version);
+		}
 	}
 }
 

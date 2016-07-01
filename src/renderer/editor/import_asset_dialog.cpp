@@ -902,14 +902,15 @@ struct ConvertTask : public MT::Task
 	{
 		m_dialog.setImportMessage("Importing animations...", 0);
 		
-		bool failed = false;
 		int animation_index = 0;
 		int num_animations = 0;
 		for (auto& import_animation : m_dialog.m_animations)
 		{
 			if (import_animation.import) ++num_animations;
 		}
+		if (num_animations == 0) return true;
 
+		bool failed = false;
 		for(auto& import_animation : m_dialog.m_animations)
 		{
 			if (!import_animation.import) continue;

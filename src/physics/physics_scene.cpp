@@ -1558,22 +1558,28 @@ struct PhysicsSceneImpl : public PhysicsScene
 		physx::PxJoint* joint = nullptr;
 		switch (px_type)
 		{
-		case physx::PxJointConcreteType::eFIXED:
-			joint = physx::PxFixedJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
-			break;
-		case physx::PxJointConcreteType::eREVOLUTE:
-			joint = physx::PxRevoluteJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
-			((physx::PxRevoluteJoint*)joint)->setProjectionLinearTolerance(0.1f);
-			break;
-		case physx::PxJointConcreteType::eSPHERICAL:
-			joint = physx::PxSphericalJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
-			((physx::PxSphericalJoint*)joint)->setProjectionLinearTolerance(0.1f);
-			break;
+			case physx::PxJointConcreteType::eFIXED:
+				joint = physx::PxFixedJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
+				break;
+			case physx::PxJointConcreteType::eREVOLUTE:
+				joint =
+					physx::PxRevoluteJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
+				if (joint) ((physx::PxRevoluteJoint*)joint)->setProjectionLinearTolerance(0.1f);
+				break;
+			case physx::PxJointConcreteType::eSPHERICAL:
+				joint =
+					physx::PxSphericalJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
+				if (joint) ((physx::PxSphericalJoint*)joint)->setProjectionLinearTolerance(0.1f);
+				break;
+			default: ASSERT(false); break;
 		}
 
-		joint->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
-		joint->setConstraintFlag(physx::PxConstraintFlag::eCOLLISION_ENABLED, false);
-		joint->setConstraintFlag(physx::PxConstraintFlag::ePROJECTION, true);
+		if (joint)
+		{
+			joint->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
+			joint->setConstraintFlag(physx::PxConstraintFlag::eCOLLISION_ENABLED, false);
+			joint->setConstraintFlag(physx::PxConstraintFlag::ePROJECTION, true);
+		}
 		child->parent_joint = joint;
 	}
 
@@ -1865,8 +1871,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				flags |= physx::PxDistanceJointFlag::eMAX_DISTANCE_ENABLED;
 				joint.physx->setMaxDistance(joint.distance_limit.y);
-				auto x = joint.physx->getMaxDistance();
-				x = x;
 			}
 			if (joint.distance_limit.x >= 0)
 			{

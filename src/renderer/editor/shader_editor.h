@@ -106,7 +106,7 @@ private:
 
 	void nodePinMouseDown(Node* node, int pin_index, bool is_input);
 	void createConnection(Node* node, int pin_index, bool is_input);
-	void getSavePath();
+	bool getSavePath();
 	void clear();
 	void onGUILeftColumn();
 	void onGUIRightColumn();

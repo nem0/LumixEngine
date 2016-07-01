@@ -1837,11 +1837,15 @@ void ShaderEditor::load()
 }
 
 
-void ShaderEditor::getSavePath()
+bool ShaderEditor::getSavePath()
 {
 	char path[Lumix::MAX_PATH_LENGTH];
-	PlatformInterface::getSaveFilename(path, Lumix::lengthOf(path), "Shader edit data\0*.sed\0", "sed");
-	m_path = path;
+	if (PlatformInterface::getSaveFilename(path, Lumix::lengthOf(path), "Shader edit data\0*.sed\0", "sed"))
+	{
+		m_path = path;
+		return true;
+	}
+	return false;
 }
 
 
@@ -2182,8 +2186,7 @@ void ShaderEditor::onGUIMenu()
 			if (ImGui::MenuItem("Save", nullptr, false, m_path.isValid())) save(m_path.c_str());
 			if (ImGui::MenuItem("Save as"))
 			{
-				getSavePath();
-				if (m_path.isValid()) save(m_path.c_str());
+				if(getSavePath() && m_path.isValid()) save(m_path.c_str());
 			}
 			ImGui::EndMenu();
 		}
