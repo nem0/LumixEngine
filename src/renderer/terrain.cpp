@@ -199,6 +199,7 @@ Terrain::Terrain(Renderer& renderer, Entity entity, RenderScene& scene, IAllocat
 	, m_vertices_handle(BGFX_INVALID_HANDLE)
 	, m_indices_handle(BGFX_INVALID_HANDLE)
 	, m_grass_distance(5)
+	, m_force_grass_update(false)
 {
 	generateGeometry();
 }

@@ -79,7 +79,7 @@ struct InsertMeshCommand : public Lumix::IEditorCommand
 	bool execute()
 	{
 		auto* universe = m_editor.getUniverse();
-		m_entity = universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		m_entity = universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		universe->setPosition(m_entity, m_position);
 		const auto& scenes = universe->getScenes();
 		Lumix::ComponentHandle cmp = Lumix::INVALID_COMPONENT;

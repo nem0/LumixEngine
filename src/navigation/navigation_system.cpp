@@ -138,6 +138,8 @@ struct NavigationSceneImpl : public NavigationScene
 		, m_num_tiles_z(0)
 		, m_agents(m_allocator)
 		, m_crowd(nullptr)
+		, m_script_scene(nullptr)
+		, m_physics_scene(nullptr)
 	{
 		setGeneratorParams(0.3f, 0.1f, 0.3f, 2.0f, 60.0f, 1.5f);
 		m_universe.entityTransformed().bind<NavigationSceneImpl, &NavigationSceneImpl::onEntityMoved>(this);
@@ -1161,7 +1163,6 @@ struct NavigationSceneImpl : public NavigationScene
 	dtNavMeshQuery* m_navquery;
 	rcPolyMeshDetail* m_detail_mesh;
 	HashMap<Entity, Agent*> m_agents;
-	int m_first_free_agent;
 	rcCompactHeightfield* m_debug_compact_heightfield;
 	rcHeightfield* m_debug_heightfield;
 	rcContourSet* m_debug_contours;
