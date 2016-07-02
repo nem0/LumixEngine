@@ -546,12 +546,7 @@ public:
 		}
 		else
 		{
-			char filename[Lumix::MAX_PATH_LENGTH];
-			if (PlatformInterface::getSaveFilename(filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
-			{
-				m_editor->saveUniverse(Lumix::Path(filename), true);
-				setTitle(filename);
-			}
+			saveAs();
 		}
 	}
 
@@ -568,6 +563,7 @@ public:
 		char filename[Lumix::MAX_PATH_LENGTH];
 		if (PlatformInterface::getSaveFilename(filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
 		{
+			setTitle(filename);
 			m_editor->saveUniverse(Lumix::Path(filename), true);
 		}
 	}
