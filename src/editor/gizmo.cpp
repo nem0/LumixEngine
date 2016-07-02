@@ -732,12 +732,12 @@ struct GizmoImpl : public Gizmo
 	Vec3 m_transform_point;
 	bool m_is_dragging;
 	int m_active;
-	int m_count;
 	float m_mouse_x;
 	float m_mouse_y;
 	float m_relx_accum;
 	float m_rely_accum;
 	bool m_is_step;
+	int m_count;
 	Entity m_entities[MAX_GIZMOS];
 };
 

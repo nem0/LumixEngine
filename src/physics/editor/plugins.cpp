@@ -796,67 +796,65 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 		}
 
 		physx::PxJoint* joint = scene.getRagdollBoneJoint(bone_handle);
-		if (joint)
+		if (!joint) return;
+		int joint_type = 0;
+		switch (joint->getConcreteType())
 		{
-			int joint_type = 0;
-			switch (joint->getConcreteType())
+			case physx::PxJointType::eSPHERICAL:
 			{
-				case physx::PxJointType::eSPHERICAL:
-				{
-					auto* spherical = joint->is<physx::PxSphericalJoint>();
-					physx::PxJointLimitCone limit = spherical->getLimitCone();
-					bool changed = ImGui::DragFloat("Y angle", &limit.yAngle);
-					changed = ImGui::DragFloat("Z angle", &limit.zAngle) || changed;
-					changed = ImGui::DragFloat("Stiffness", &limit.stiffness) || changed;
-					changed = ImGui::DragFloat("Restitution", &limit.restitution) || changed;
-					changed = ImGui::DragFloat("Damping", &limit.damping) || changed;
-					changed = ImGui::DragFloat("Bounce threshold", &limit.bounceThreshold) || changed;
-					changed = ImGui::DragFloat("Contact distance", &limit.contactDistance) || changed;
-					if (changed) spherical->setLimitCone(limit);
-					joint_type = 2;
-					break;
-				}
+				auto* spherical = joint->is<physx::PxSphericalJoint>();
+				physx::PxJointLimitCone limit = spherical->getLimitCone();
+				bool changed = ImGui::DragFloat("Y angle", &limit.yAngle);
+				changed = ImGui::DragFloat("Z angle", &limit.zAngle) || changed;
+				changed = ImGui::DragFloat("Stiffness", &limit.stiffness) || changed;
+				changed = ImGui::DragFloat("Restitution", &limit.restitution) || changed;
+				changed = ImGui::DragFloat("Damping", &limit.damping) || changed;
+				changed = ImGui::DragFloat("Bounce threshold", &limit.bounceThreshold) || changed;
+				changed = ImGui::DragFloat("Contact distance", &limit.contactDistance) || changed;
+				if (changed) spherical->setLimitCone(limit);
+				joint_type = 2;
+				break;
+			}
 
-				case physx::PxJointType::eFIXED: joint_type = 1; break;
-				case physx::PxJointType::eREVOLUTE: 
-				{
-					auto* hinge = joint->is<physx::PxRevoluteJoint>();
-					physx::PxJointAngularLimitPair limit = hinge->getLimit();
-					bool changed = ImGui::DragFloat("Lower limit", &limit.lower);
-					changed = ImGui::DragFloat("Upper limit", &limit.upper) || changed;
-					changed = ImGui::DragFloat("Stiffness", &limit.stiffness) || changed;
-					changed = ImGui::DragFloat("Damping", &limit.damping) || changed;
-					changed = ImGui::DragFloat("Bounce threshold", &limit.bounceThreshold) || changed;
-					changed = ImGui::DragFloat("Contact distance", &limit.contactDistance) || changed;
-					changed = ImGui::DragFloat("Restitution", &limit.restitution) || changed;
-					if(changed) hinge->setLimit(limit);
-					joint_type = 0;
-					break;
-				}
+			case physx::PxJointType::eFIXED: joint_type = 1; break;
+			case physx::PxJointType::eREVOLUTE: 
+			{
+				auto* hinge = joint->is<physx::PxRevoluteJoint>();
+				physx::PxJointAngularLimitPair limit = hinge->getLimit();
+				bool changed = ImGui::DragFloat("Lower limit", &limit.lower);
+				changed = ImGui::DragFloat("Upper limit", &limit.upper) || changed;
+				changed = ImGui::DragFloat("Stiffness", &limit.stiffness) || changed;
+				changed = ImGui::DragFloat("Damping", &limit.damping) || changed;
+				changed = ImGui::DragFloat("Bounce threshold", &limit.bounceThreshold) || changed;
+				changed = ImGui::DragFloat("Contact distance", &limit.contactDistance) || changed;
+				changed = ImGui::DragFloat("Restitution", &limit.restitution) || changed;
+				if(changed) hinge->setLimit(limit);
+				joint_type = 0;
+				break;
+			}
+			default: ASSERT(false); break;
+		}
+		if (ImGui::Combo("Joint type", &joint_type, "Hinge\0Fixed\0Spherical\0"))
+		{
+			int px_type = physx::PxJointConcreteType::eFIXED;
+			switch (joint_type)
+			{
+				case 0: px_type = physx::PxJointConcreteType::eREVOLUTE; break;
+				case 1: px_type = physx::PxJointConcreteType::eFIXED; break;
+				case 2: px_type = physx::PxJointConcreteType::eSPHERICAL; break;
 				default: ASSERT(false); break;
 			}
-			if (ImGui::Combo("Joint type", &joint_type, "Hinge\0Fixed\0Spherical\0"))
-			{
-				int px_type = physx::PxJointConcreteType::eFIXED;
-				switch (joint_type)
-				{
-					case 0: px_type = physx::PxJointConcreteType::eREVOLUTE; break;
-					case 1: px_type = physx::PxJointConcreteType::eFIXED; break;
-					case 2: px_type = physx::PxJointConcreteType::eSPHERICAL; break;
-					default: ASSERT(false); break;
-				}
-				scene.changeRagdollBoneJoint(bone_handle, px_type);
-			}
+			scene.changeRagdollBoneJoint(bone_handle, px_type);
+		}
 
-			auto local_pose0 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR0);
-			auto original_pose = local_pose0;
-			if (ImGui::DragFloat3("Joint position", &local_pose0.p.x))
-			{
-				auto local_pose1 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR1);
-				local_pose1 = original_pose.getInverse() * local_pose0 * local_pose1;
-				joint->setLocalPose(physx::PxJointActorIndex::eACTOR1, local_pose1);
-				joint->setLocalPose(physx::PxJointActorIndex::eACTOR0, local_pose0);
-			}
+		auto local_pose0 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR0);
+		auto original_pose = local_pose0;
+		if (ImGui::DragFloat3("Joint position", &local_pose0.p.x))
+		{
+			auto local_pose1 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR1);
+			local_pose1 = original_pose.getInverse() * local_pose0 * local_pose1;
+			joint->setLocalPose(physx::PxJointActorIndex::eACTOR1, local_pose1);
+			joint->setLocalPose(physx::PxJointActorIndex::eACTOR0, local_pose0);
 		}
 	}
 
