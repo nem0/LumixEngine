@@ -908,7 +908,7 @@ public:
 
 	lua_State* getState() override { return m_state; }
 	PathManager& getPathManager() override{ return m_path_manager; }
-	float getLastTimeDelta() override { return m_last_time_delta; }
+	float getLastTimeDelta() override { return m_last_time_delta / m_time_multiplier; }
 
 private:
 	Debug::Allocator m_allocator;
