@@ -264,18 +264,18 @@ namespace Lumix
 
 		PropertyRegister::add("d6_joint",
 			LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)("Connected body",
-				&PhysicsScene::getD6JointConnectedBody,
-				&PhysicsScene::setD6JointConnectedBody,
+				&PhysicsScene::getJointConnectedBody,
+				&PhysicsScene::setJointConnectedBody,
 				allocator));
 		PropertyRegister::add("d6_joint",
 			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)("Axis position",
-				&PhysicsScene::getD6JointAxisPosition,
-				&PhysicsScene::setD6JointAxisPosition,
+				&PhysicsScene::getJointAxisPosition,
+				&PhysicsScene::setJointAxisPosition,
 				allocator));
 		PropertyRegister::add("d6_joint",
 			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)("Axis direction",
-				&PhysicsScene::getD6JointAxisDirection,
-				&PhysicsScene::setD6JointAxisDirection,
+				&PhysicsScene::getJointAxisDirection,
+				&PhysicsScene::setJointAxisDirection,
 				allocator));
 		PropertyRegister::add("d6_joint",
 			LUMIX_NEW(allocator, D6MotionDescriptor)("X motion",
@@ -328,18 +328,18 @@ namespace Lumix
 
 		PropertyRegister::add("spherical_joint",
 			LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)("Connected body",
-				&PhysicsScene::getSphericalJointConnectedBody,
-				&PhysicsScene::setSphericalJointConnectedBody,
+				&PhysicsScene::getJointConnectedBody,
+				&PhysicsScene::setJointConnectedBody,
 				allocator));
 		PropertyRegister::add("spherical_joint",
 			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)("Axis position",
-				&PhysicsScene::getSphericalJointAxisPosition,
-				&PhysicsScene::setSphericalJointAxisPosition,
+				&PhysicsScene::getJointAxisPosition,
+				&PhysicsScene::setJointAxisPosition,
 				allocator));
 		PropertyRegister::add("spherical_joint",
 			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)("Axis direction",
-				&PhysicsScene::getSphericalJointAxisDirection,
-				&PhysicsScene::setSphericalJointAxisDirection,
+				&PhysicsScene::getJointAxisDirection,
+				&PhysicsScene::setJointAxisDirection,
 				allocator));
 		PropertyRegister::add("spherical_joint",
 			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)("Use limit",
@@ -378,8 +378,8 @@ namespace Lumix
 				allocator));
 		PropertyRegister::add("distance_joint",
 			LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)("Connected body",
-				&PhysicsScene::getDistanceJointConnectedBody,
-				&PhysicsScene::setDistanceJointConnectedBody,
+				&PhysicsScene::getJointConnectedBody,
+				&PhysicsScene::setJointConnectedBody,
 				allocator));
 		PropertyRegister::add("distance_joint",
 			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)("Limits",
@@ -389,8 +389,8 @@ namespace Lumix
 
 		PropertyRegister::add("hinge_joint",
 			LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)("Connected body",
-				&PhysicsScene::getHingeJointConnectedBody,
-				&PhysicsScene::setHingeJointConnectedBody,
+				&PhysicsScene::getJointConnectedBody,
+				&PhysicsScene::setJointConnectedBody,
 				allocator));
 		PropertyRegister::add("hinge_joint",
 			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Damping",
@@ -410,13 +410,13 @@ namespace Lumix
 				allocator));
 		PropertyRegister::add("hinge_joint",
 			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)("Axis position",
-				&PhysicsScene::getHingeJointAxisPosition,
-				&PhysicsScene::setHingeJointAxisPosition,
+				&PhysicsScene::getJointAxisPosition,
+				&PhysicsScene::setJointAxisPosition,
 				allocator));
 		PropertyRegister::add("hinge_joint",
 			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)("Axis direction",
-				&PhysicsScene::getHingeJointAxisDirection,
-				&PhysicsScene::setHingeJointAxisDirection,
+				&PhysicsScene::getJointAxisDirection,
+				&PhysicsScene::setJointAxisDirection,
 				allocator));
 		PropertyRegister::add("hinge_joint",
 			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)("Use limit",

@@ -95,8 +95,6 @@ public:
 	virtual float getSphereRadius(ComponentHandle cmp) = 0;
 	virtual void setSphereRadius(ComponentHandle cmp, float value) = 0;
 
-	virtual Entity getD6JointConnectedBody(ComponentHandle cmp) = 0;
-	virtual void setD6JointConnectedBody(ComponentHandle cmp, Entity entity) = 0;
 	virtual physx::PxD6Motion::Enum getD6JointXMotion(ComponentHandle cmp) = 0;
 	virtual void setD6JointXMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) = 0;
 	virtual physx::PxD6Motion::Enum getD6JointYMotion(ComponentHandle cmp) = 0;
@@ -115,12 +113,6 @@ public:
 	virtual void setD6JointTwistLimit(ComponentHandle cmp, const Vec2& limit) = 0;
 	virtual Vec2 getD6JointSwingLimit(ComponentHandle cmp) = 0;
 	virtual void setD6JointSwingLimit(ComponentHandle cmp, const Vec2& limit) = 0;
-	virtual Vec3 getD6JointAxisPosition(ComponentHandle cmp) = 0;
-	virtual void setD6JointAxisPosition(ComponentHandle cmp, const Vec3& value) = 0;
-	virtual Vec3 getD6JointAxisDirection(ComponentHandle cmp) = 0;
-	virtual void setD6JointAxisDirection(ComponentHandle cmp, const Vec3& value) = 0;
-	virtual Transform getD6JointLocalFrame(ComponentHandle cmp) = 0;
-	virtual Transform getD6JointConnectedBodyLocalFrame(ComponentHandle cmp) = 0;
 
 	virtual float getDistanceJointDamping(ComponentHandle cmp) = 0;
 	virtual void setDistanceJointDamping(ComponentHandle cmp, float value) = 0;
@@ -128,49 +120,36 @@ public:
 	virtual void setDistanceJointStiffness(ComponentHandle cmp, float value) = 0;
 	virtual float getDistanceJointTolerance(ComponentHandle cmp) = 0;
 	virtual void setDistanceJointTolerance(ComponentHandle cmp, float value) = 0;
-	virtual Entity getDistanceJointConnectedBody(ComponentHandle cmp) = 0;
-	virtual void setDistanceJointConnectedBody(ComponentHandle cmp, Entity entity) = 0;
 	virtual Vec2 getDistanceJointLimits(ComponentHandle cmp) = 0;
 	virtual void setDistanceJointLimits(ComponentHandle cmp, const Vec2& value) = 0;
 	virtual Vec3 getDistanceJointLinearForce(ComponentHandle cmp) = 0;
-	virtual int getDistanceJointCount() = 0;
-	virtual ComponentHandle getDistanceJointComponent(int index) = 0;
-	virtual Entity getDistanceJointEntity(ComponentHandle cmp) = 0;
+	virtual int getJointCount() = 0;
+	virtual ComponentHandle getJointComponent(int index) = 0;
+	virtual Entity getJointEntity(ComponentHandle cmp) = 0;
 
-	virtual Entity getHingeJointConnectedBody(ComponentHandle cmp) = 0;
-	virtual void setHingeJointConnectedBody(ComponentHandle cmp, Entity entity) = 0;
 	virtual float getHingeJointDamping(ComponentHandle cmp) = 0;
 	virtual void setHingeJointDamping(ComponentHandle cmp, float value) = 0;
 	virtual float getHingeJointStiffness(ComponentHandle cmp) = 0;
 	virtual void setHingeJointStiffness(ComponentHandle cmp, float value) = 0;
-	virtual Vec3 getHingeJointAxisPosition(ComponentHandle cmp) = 0;
-	virtual void setHingeJointAxisPosition(ComponentHandle cmp, const Vec3& value) = 0;
-	virtual Vec3 getHingeJointAxisDirection(ComponentHandle cmp) = 0;
-	virtual void setHingeJointAxisDirection(ComponentHandle cmp, const Vec3& value) = 0;
 	virtual bool getHingeJointUseLimit(ComponentHandle cmp) = 0;
 	virtual void setHingeJointUseLimit(ComponentHandle cmp, bool use_limit) = 0;
 	virtual Vec2 getHingeJointLimit(ComponentHandle cmp) = 0;
 	virtual void setHingeJointLimit(ComponentHandle cmp, const Vec2& limit) = 0;
-	virtual Transform getHingeJointConnectedBodyLocalFrame(ComponentHandle cmp) = 0;
-	virtual int getHingeJointCount() = 0;
-	virtual ComponentHandle getHingeJointComponent(int index) = 0;
-	virtual Entity getHingeJointEntity(ComponentHandle cmp) = 0;
 
-	virtual Entity getSphericalJointConnectedBody(ComponentHandle cmp) = 0;
-	virtual void setSphericalJointConnectedBody(ComponentHandle cmp, Entity entity) = 0;
-	virtual Vec3 getSphericalJointAxisPosition(ComponentHandle cmp) = 0;
-	virtual void setSphericalJointAxisPosition(ComponentHandle cmp, const Vec3& value) = 0;
-	virtual Vec3 getSphericalJointAxisDirection(ComponentHandle cmp) = 0;
-	virtual void setSphericalJointAxisDirection(ComponentHandle cmp, const Vec3& value) = 0;
+	virtual Entity getJointConnectedBody(ComponentHandle cmp) = 0;
+	virtual void setJointConnectedBody(ComponentHandle cmp, Entity entity) = 0;
+	virtual Vec3 getJointAxisPosition(ComponentHandle cmp) = 0;
+	virtual void setJointAxisPosition(ComponentHandle cmp, const Vec3& value) = 0;
+	virtual Vec3 getJointAxisDirection(ComponentHandle cmp) = 0;
+	virtual void setJointAxisDirection(ComponentHandle cmp, const Vec3& value) = 0;
+	virtual Transform getJointLocalFrame(ComponentHandle cmp) = 0;
+	virtual Transform getJointConnectedBodyLocalFrame(ComponentHandle cmp) = 0;
+	virtual physx::PxJoint* getJoint(ComponentHandle cmp) = 0;
+
 	virtual bool getSphericalJointUseLimit(ComponentHandle cmp) = 0;
 	virtual void setSphericalJointUseLimit(ComponentHandle cmp, bool use_limit) = 0;
 	virtual Vec2 getSphericalJointLimit(ComponentHandle cmp) = 0;
 	virtual void setSphericalJointLimit(ComponentHandle cmp, const Vec2& limit) = 0;
-	virtual Transform getSphericalJointLocalFrame(ComponentHandle cmp) = 0;
-	virtual Transform getSphericalJointConnectedBodyLocalFrame(ComponentHandle cmp) = 0;
-	virtual int getSphericalJointCount() = 0;
-	virtual ComponentHandle getSphericalJointComponent(int index) = 0;
-	virtual Entity getSphericalJointEntity(ComponentHandle cmp) = 0;
 
 	virtual void applyForceToActor(ComponentHandle cmp, const Vec3& force) = 0;
 	virtual float getActorSpeed(ComponentHandle cmp) = 0;
