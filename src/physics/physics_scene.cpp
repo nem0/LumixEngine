@@ -626,6 +626,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto* joint = getDistanceJoint(cmp);
 		joint->setMinDistance(value.x);
 		joint->setMaxDistance(value.y);
+		joint->setDistanceJointFlag(physx::PxDistanceJointFlag::eMIN_DISTANCE_ENABLED, value.x > 0);
+		joint->setDistanceJointFlag(physx::PxDistanceJointFlag::eMAX_DISTANCE_ENABLED, value.y > 0);
 	}
 
 
@@ -1031,6 +1033,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			nullptr,
 			physx::PxTransform::createIdentity());
 		joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
+		static_cast<physx::PxDistanceJoint*>(joint.physx)->setDistanceJointFlag(physx::PxDistanceJointFlag::eSPRING_ENABLED, true);
 		m_joints.insert(entity, joint);
 
 		ComponentHandle cmp = {entity.index};
