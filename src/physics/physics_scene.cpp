@@ -54,6 +54,7 @@ enum class PhysicsSceneVersion : int
 	SPHERE_ACTOR,
 	RAGDOLLS,
 	D6_JOINT,
+	JOINT_REFACTOR,
 
 	LATEST
 };
@@ -164,53 +165,11 @@ static Transform fromPhysx(const physx::PxTransform& v) { return{ fromPhysx(v.p)
 static physx::PxTransform toPhysx(const Transform& v) { return {toPhysx(v.pos), toPhysx(v.rot)}; }
 
 
-struct DistanceJoint
+struct Joint
 {
 	Entity connected_body;
-	physx::PxDistanceJoint* physx;
-	float damping;
-	float stiffness;
-	float tolerance;
-	Vec2 distance_limit;
-};
-
-
-struct SphericalJoint
-{
-	Entity connected_body;
-	physx::PxSphericalJoint* physx;
-	Vec3 axis_position;
-	Vec3 axis_direction;
-	bool use_limit;
-	Vec2 limit;
-};
-
-
-struct D6Joint
-{
-	physx::PxD6Joint* physx;
-	Entity connected_body;
-	Vec3 axis_position;
-	Vec3 axis_direction;
-	physx::PxD6Motion::Enum motions[6];
-	float linear_limit;
-	Vec2 swing_limit;
-	Vec2 twist_limit;
-};
-
-
-struct HingeJoint
-{
-	Entity connected_body;
-	physx::PxRevoluteJoint* physx;
-	float damping;
-	float stiffness;
-	float tolerance;
-	Vec3 axis_position;
-	Vec3 axis_direction;
-	bool use_limit;
-	Vec2 limit;
-	Vec3 initial_pos;
+	physx::PxJoint* physx;
+	physx::PxTransform local_frame0;
 };
 
 
@@ -313,10 +272,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		, m_contact_callback(*this)
 		, m_queued_forces(m_allocator)
 		, m_layers_count(2)
-		, m_distance_joints(m_allocator)
-		, m_hinge_joints(m_allocator)
-		, m_spherical_joints(m_allocator)
-		, m_d6_joints(m_allocator)
+		, m_joints(m_allocator)
 		, m_script_scene(nullptr)
 		, m_debug_visualization_flags(0)
 	{
@@ -441,7 +397,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			for (int i = 0; i < m_controllers.size(); ++i)
 			{
-				if (!m_controllers[i].m_is_free && m_controllers[i].m_entity == entity) return{ i };
+				if (!m_controllers[i].m_is_free && m_controllers[i].m_entity == entity) return {i};
 			}
 			return INVALID_COMPONENT;
 		}
@@ -449,33 +405,22 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			for (int i = 0; i < m_terrains.size(); ++i)
 			{
-				if (m_terrains[i] && m_terrains[i]->m_entity == entity) return{ i };
+				if (m_terrains[i] && m_terrains[i]->m_entity == entity) return {i};
 			}
 			return INVALID_COMPONENT;
 		}
-		if (type == DISTANCE_JOINT_TYPE)
+		if (type == HINGE_JOINT_TYPE || type == SPHERICAL_JOINT_TYPE || type == DISTANCE_JOINT_TYPE ||
+			type == D6_JOINT_TYPE)
 		{
-			int index = m_distance_joints.find(entity);
+			int index = m_joints.find(entity);
 			if (index < 0) return INVALID_COMPONENT;
-			return{ entity.index };
-		}
-		if (type == HINGE_JOINT_TYPE)
-		{
-			int index = m_hinge_joints.find(entity);
-			if (index < 0) return INVALID_COMPONENT;
-			return{ entity.index };
+			return {entity.index};
 		}
 		if (type == SPHERICAL_JOINT_TYPE)
 		{
-			int index = m_spherical_joints.find(entity);
+			int index = m_joints.find(entity);
 			if (index < 0) return INVALID_COMPONENT;
-			return{ entity.index };
-		}
-		if (type == D6_JOINT_TYPE)
-		{
-			int index = m_d6_joints.find(entity);
-			if (index < 0) return INVALID_COMPONENT;
-			return{ entity.index };
+			return {entity.index};
 		}
 		return INVALID_COMPONENT;
 	}
@@ -623,443 +568,354 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	int getDistanceJointCount() override { return m_distance_joints.size(); }
-	ComponentHandle getDistanceJointComponent(int index) override { return {m_distance_joints.getKey(index).index}; }
-	Entity getDistanceJointEntity(ComponentHandle cmp) override { return {cmp.index}; }
+	int getJointCount() override { return m_joints.size(); }
+	ComponentHandle getJointComponent(int index) override { return {m_joints.getKey(index).index}; }
+	Entity getJointEntity(ComponentHandle cmp) override { return {cmp.index}; }
+
+
+	physx::PxDistanceJoint* getDistanceJoint(ComponentHandle cmp)
+	{
+		return static_cast<physx::PxDistanceJoint*>(m_joints[{cmp.index}].physx);
+	}
 
 
 	Vec3 getDistanceJointLinearForce(ComponentHandle cmp) override
 	{
-		if (!m_distance_joints[{cmp.index}].physx) return Vec3(0, 0, 0);
 		physx::PxVec3 linear, angular;
-		m_distance_joints[{cmp.index}].physx->getConstraint()->getForce(linear, angular);
+		getDistanceJoint(cmp)->getConstraint()->getForce(linear, angular);
 		return Vec3(linear.x, linear.y, linear.z);
 	}
 
 
-	float getDistanceJointDamping(ComponentHandle cmp) override { return m_distance_joints[{cmp.index}].damping; }
+	float getDistanceJointDamping(ComponentHandle cmp) override { return getDistanceJoint(cmp)->getDamping(); }
 
 
 	void setDistanceJointDamping(ComponentHandle cmp, float value) override
 	{
-		m_distance_joints[{cmp.index}].damping = value;
+		getDistanceJoint(cmp)->setDamping(value);
 	}
 
 
-	float getDistanceJointStiffness(ComponentHandle cmp) override { return m_distance_joints[{cmp.index}].stiffness; }
+	float getDistanceJointStiffness(ComponentHandle cmp) override { return getDistanceJoint(cmp)->getStiffness(); }
 
 
 	void setDistanceJointStiffness(ComponentHandle cmp, float value) override
 	{
-		m_distance_joints[{cmp.index}].stiffness = value;
+		getDistanceJoint(cmp)->setStiffness(value);
 	}
 
 
-	float getDistanceJointTolerance(ComponentHandle cmp) override { return m_distance_joints[{cmp.index}].tolerance; }
+	float getDistanceJointTolerance(ComponentHandle cmp) override { return getDistanceJoint(cmp)->getTolerance(); }
 
 
 	void setDistanceJointTolerance(ComponentHandle cmp, float value) override
 	{
-		m_distance_joints[{cmp.index}].tolerance = value;
-	}
-
-
-	Entity getDistanceJointConnectedBody(ComponentHandle cmp) override
-	{
-		return m_distance_joints[{cmp.index}].connected_body;
-	}
-
-
-	void setDistanceJointConnectedBody(ComponentHandle cmp, Entity entity) override
-	{
-		ASSERT(entity.index != cmp.index);
-		m_distance_joints[{cmp.index}].connected_body = entity;
+		getDistanceJoint(cmp)->setTolerance(value);
 	}
 
 
 	Vec2 getDistanceJointLimits(ComponentHandle cmp) override
 	{
-		return m_distance_joints[{cmp.index}].distance_limit;
+		auto* joint = getDistanceJoint(cmp);
+		return {joint->getMinDistance(), joint->getMaxDistance()};
 	}
 
 
 	void setDistanceJointLimits(ComponentHandle cmp, const Vec2& value) override
 	{
-		m_distance_joints[{cmp.index}].distance_limit = value;
+		auto* joint = getDistanceJoint(cmp);
+		joint->setMinDistance(value.x);
+		joint->setMaxDistance(value.y);
 	}
 
 
-	Vec3 getD6JointAxisPosition(ComponentHandle cmp) override { return m_d6_joints[{cmp.index}].axis_position; }
-
-
-	void setD6JointAxisPosition(ComponentHandle cmp, const Vec3& value) override
+	physx::PxD6Joint* getD6Joint(ComponentHandle cmp)
 	{
-		m_d6_joints[{cmp.index}].axis_position = value;
+		return static_cast<physx::PxD6Joint*>(m_joints[{cmp.index}].physx);
 	}
 
 
-	Vec3 getD6JointAxisDirection(ComponentHandle cmp) override
+	Vec2 getD6JointTwistLimit(ComponentHandle cmp) override
 	{
-		return m_d6_joints[{cmp.index}].axis_direction;
+		auto limit = getD6Joint(cmp)->getTwistLimit();
+		return {limit.lower, limit.upper};
 	}
-
-
-	Transform getD6JointLocalFrame(ComponentHandle cmp) override
-	{
-		Entity entity = {cmp.index};
-		auto& joint = m_d6_joints[entity];
-		if (!isValid(entity)) return {Vec3(0, 0, 0), Quat(0, 0, 0, 1)};
-
-		if (!joint.physx)
-		{
-			Transform entity0_pose = m_universe.getTransform(entity);
-			Transform entity1_pose = m_universe.getTransform(joint.connected_body);
-			Quat rot = Quat::vec3ToVec3(Vec3(1, 0, 0), joint.axis_direction.normalized());
-			return {joint.axis_position, rot};
-		}
-
-		physx::PxTransform px_local_frame = joint.physx->getLocalPose(physx::PxJointActorIndex::eACTOR0);
-		return {fromPhysx(px_local_frame.p), fromPhysx(px_local_frame.q)};
-	}
-
-
-	Transform getD6JointConnectedBodyLocalFrame(ComponentHandle cmp) override
-	{
-		Entity entity = {cmp.index};
-		auto& joint = m_d6_joints[entity];
-		if (!isValid(joint.connected_body)) return {Vec3(0, 0, 0), Quat(0, 0, 0, 1)};
-
-		if (!joint.physx)
-		{
-			Transform entity0_pose = m_universe.getTransform(entity);
-			Transform entity1_pose = m_universe.getTransform(joint.connected_body);
-			Quat rot = Quat::vec3ToVec3(Vec3(1, 0, 0), joint.axis_direction.normalized());
-			Transform local_frame0 = {joint.axis_position, rot};
-			return entity1_pose.inverted() * (entity0_pose * local_frame0);
-		}
-
-		physx::PxTransform px_local_frame = joint.physx->getLocalPose(physx::PxJointActorIndex::eACTOR1);
-		return {fromPhysx(px_local_frame.p), fromPhysx(px_local_frame.q)};
-	}
-
-
-	void setD6JointAxisDirection(ComponentHandle cmp, const Vec3& value) override
-	{
-		m_d6_joints[{cmp.index}].axis_direction = value;
-	}
-
-
-	Vec2 getD6JointTwistLimit(ComponentHandle cmp) override { return m_d6_joints[{cmp.index}].twist_limit; }
 
 
 	void setD6JointTwistLimit(ComponentHandle cmp, const Vec2& limit) override
 	{
-		m_d6_joints[{cmp.index}].twist_limit = limit;
+		auto* joint = getD6Joint(cmp);
+		auto px_limit = joint->getTwistLimit();
+		px_limit.lower = limit.x;
+		px_limit.upper = limit.y;
+		joint->setTwistLimit(px_limit);
 	}
 
 
-	Vec2 getD6JointSwingLimit(ComponentHandle cmp) override { return m_d6_joints[{cmp.index}].swing_limit; }
-	void setD6JointSwingLimit(ComponentHandle cmp, const Vec2& limit) { m_d6_joints[{cmp.index}].swing_limit = limit; }
+	Vec2 getD6JointSwingLimit(ComponentHandle cmp) override
+	{
+		auto limit = getD6Joint(cmp)->getSwingLimit();
+		return {limit.yAngle, limit.zAngle};
+	}
+
+
+	void setD6JointSwingLimit(ComponentHandle cmp, const Vec2& limit)
+	{
+		auto* joint = getD6Joint(cmp);
+		auto px_limit = joint->getSwingLimit();
+		px_limit.yAngle = limit.x;
+		px_limit.zAngle = limit.y;
+		joint->setSwingLimit(px_limit);
+	}
 
 
 	physx::PxD6Motion::Enum getD6JointXMotion(ComponentHandle cmp) override
 	{
-		return m_d6_joints[{cmp.index}].motions[physx::PxD6Axis::eX];
+		return getD6Joint(cmp)->getMotion(physx::PxD6Axis::eX);
 	}
 
 
 	void setD6JointXMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) override
 	{
-		m_d6_joints[{cmp.index}].motions[physx::PxD6Axis::eX] = (physx::PxD6Motion::Enum)motion;
+		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eX, (physx::PxD6Motion::Enum)motion);
 	}
 
 
 	physx::PxD6Motion::Enum getD6JointYMotion(ComponentHandle cmp) override
 	{
-		return m_d6_joints[{cmp.index}].motions[physx::PxD6Axis::eY];
+		return getD6Joint(cmp)->getMotion(physx::PxD6Axis::eY);
 	}
 
 
 	void setD6JointYMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) override
 	{
-		m_d6_joints[{cmp.index}].motions[physx::PxD6Axis::eY] = (physx::PxD6Motion::Enum)motion;
+		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eY, (physx::PxD6Motion::Enum)motion);
 	}
 
 
 	physx::PxD6Motion::Enum getD6JointSwing1Motion(ComponentHandle cmp) override
 	{
-		return m_d6_joints[{cmp.index}].motions[physx::PxD6Axis::eSWING1];
+		return getD6Joint(cmp)->getMotion(physx::PxD6Axis::eSWING1);
 	}
 
 
 	void setD6JointSwing1Motion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) override
 	{
-		m_d6_joints[{cmp.index}].motions[physx::PxD6Axis::eSWING1] = (physx::PxD6Motion::Enum)motion;
+		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eSWING1, (physx::PxD6Motion::Enum)motion);
 	}
 
 
 	physx::PxD6Motion::Enum getD6JointSwing2Motion(ComponentHandle cmp) override
 	{
-		return m_d6_joints[{cmp.index}].motions[physx::PxD6Axis::eSWING2];
+		return getD6Joint(cmp)->getMotion(physx::PxD6Axis::eSWING2);
 	}
 
 
 	void setD6JointSwing2Motion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) override
 	{
-		m_d6_joints[{cmp.index}].motions[physx::PxD6Axis::eSWING2] = (physx::PxD6Motion::Enum)motion;
+		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eSWING2, (physx::PxD6Motion::Enum)motion);
 	}
 
 
 	physx::PxD6Motion::Enum getD6JointTwistMotion(ComponentHandle cmp) override
 	{
-		return m_d6_joints[{cmp.index}].motions[physx::PxD6Axis::eTWIST];
+		return getD6Joint(cmp)->getMotion(physx::PxD6Axis::eTWIST);
 	}
 
 
 	void setD6JointTwistMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) override
 	{
-		m_d6_joints[{cmp.index}].motions[physx::PxD6Axis::eTWIST] = (physx::PxD6Motion::Enum)motion;
+		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eTWIST, (physx::PxD6Motion::Enum)motion);
 	}
 
 
 	physx::PxD6Motion::Enum getD6JointZMotion(ComponentHandle cmp) override
 	{
-		return m_d6_joints[{cmp.index}].motions[physx::PxD6Axis::eZ];
+		return getD6Joint(cmp)->getMotion(physx::PxD6Axis::eZ);
 	}
 
 
 	void setD6JointZMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) override
 	{
-		m_d6_joints[{cmp.index}].motions[physx::PxD6Axis::eZ] = (physx::PxD6Motion::Enum)motion;
+		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eZ, (physx::PxD6Motion::Enum)motion);
 	}
 
 
 	float getD6JointLinearLimit(ComponentHandle cmp) override
 	{
-		return m_d6_joints[{cmp.index}].linear_limit;
+		return getD6Joint(cmp)->getLinearLimit().value;
 	}
 
 
 	void setD6JointLinearLimit(ComponentHandle cmp, float limit) override
 	{
-		m_d6_joints[{cmp.index}].linear_limit = limit;
+		auto* joint = getD6Joint(cmp);
+		auto px_limit = joint->getLinearLimit();
+		px_limit.value = limit;
+		joint->setLinearLimit(px_limit);
 	}
 
 
-	Entity getD6JointConnectedBody(ComponentHandle cmp) override
+	Entity getJointConnectedBody(ComponentHandle cmp) override
 	{
-		return m_d6_joints[{cmp.index}].connected_body;
+		return m_joints[{cmp.index}].connected_body;
 	}
 
 
-	void setD6JointConnectedBody(ComponentHandle cmp, Entity entity) override
+	void setJointConnectedBody(ComponentHandle cmp, Entity entity) override
 	{
-		m_d6_joints[{cmp.index}].connected_body = entity;
+		m_joints[{cmp.index}].connected_body = entity;
 	}
 
 
-	Entity getSphericalJointConnectedBody(ComponentHandle cmp) override
+	void setJointAxisPosition(ComponentHandle cmp, const Vec3& value) override
 	{
-		return m_spherical_joints[{cmp.index}].connected_body;
+		auto& joint = m_joints[{cmp.index}];
+		joint.local_frame0.p = toPhysx(value);
+		joint.physx->setLocalPose(physx::PxJointActorIndex::eACTOR0, joint.local_frame0);
 	}
 
 
-	int getSphericalJointCount() override { return m_spherical_joints.size(); }
-	ComponentHandle getSphericalJointComponent(int index) override { return {m_spherical_joints.getKey(index).index}; }
-	Entity getSphericalJointEntity(ComponentHandle cmp) override { return {cmp.index}; }
-
-
-	void setSphericalJointConnectedBody(ComponentHandle cmp, Entity entity) override
+	void setJointAxisDirection(ComponentHandle cmp, const Vec3& value) override
 	{
-		m_spherical_joints[{cmp.index}].connected_body = entity;
+		auto& joint = m_joints[{cmp.index}];
+		joint.local_frame0.q = toPhysx(Quat::vec3ToVec3(Vec3(1, 0, 0), value));
+		joint.physx->setLocalPose(physx::PxJointActorIndex::eACTOR0, joint.local_frame0);
 	}
 
 
-	void setSphericalJointAxisPosition(ComponentHandle cmp, const Vec3& value) override
+	Vec3 getJointAxisPosition(ComponentHandle cmp) override
 	{
-		m_spherical_joints[{cmp.index}].axis_position = value;
+		return fromPhysx(m_joints[{cmp.index}].local_frame0.p);
 	}
 
 
-	void setSphericalJointAxisDirection(ComponentHandle cmp, const Vec3& value) override
+	Vec3 getJointAxisDirection(ComponentHandle cmp) override
 	{
-		m_spherical_joints[{cmp.index}].axis_direction = value;
-	}
-
-
-	Vec3 getSphericalJointAxisPosition(ComponentHandle cmp) override
-	{
-		return m_spherical_joints[{cmp.index}].axis_position;
-	}
-
-
-	Vec3 getSphericalJointAxisDirection(ComponentHandle cmp) override
-	{
-		return m_spherical_joints[{cmp.index}].axis_direction;
+		return fromPhysx(m_joints[{cmp.index}].local_frame0.q.rotate(physx::PxVec3(1, 0, 0)));
 	}
 
 
 	bool getSphericalJointUseLimit(ComponentHandle cmp) override
 	{
-		return m_spherical_joints[{cmp.index}].use_limit;
+		return static_cast<physx::PxSphericalJoint*>(m_joints[{cmp.index}].physx)
+			->getSphericalJointFlags()
+			.isSet(physx::PxSphericalJointFlag::eLIMIT_ENABLED);
 	}
 
 
 	void setSphericalJointUseLimit(ComponentHandle cmp, bool use_limit) override
 	{
-		m_spherical_joints[{cmp.index}].use_limit = use_limit;
+		return static_cast<physx::PxSphericalJoint*>(m_joints[{cmp.index}].physx)
+			->setSphericalJointFlag(physx::PxSphericalJointFlag::eLIMIT_ENABLED, use_limit);
 	}
 
 
-	Vec2 getSphericalJointLimit(ComponentHandle cmp) override { return m_spherical_joints[{cmp.index}].limit; }
+	Vec2 getSphericalJointLimit(ComponentHandle cmp) override
+	{
+		auto cone = static_cast<physx::PxSphericalJoint*>(m_joints[{cmp.index}].physx)->getLimitCone();
+		return {cone.yAngle, cone.zAngle};
+	}
 
 
 	void setSphericalJointLimit(ComponentHandle cmp, const Vec2& limit) override
 	{
-		m_spherical_joints[{cmp.index}].limit = limit;
+		auto* joint = static_cast<physx::PxSphericalJoint*>(m_joints[{cmp.index}].physx);
+		auto limit_cone = joint->getLimitCone();
+		limit_cone.yAngle = limit.x;
+		limit_cone.zAngle = limit.y;
+		joint->setLimitCone(limit_cone);
 	}
 
 
-	Transform getSphericalJointLocalFrame(ComponentHandle cmp) override
+	Transform getJointLocalFrame(ComponentHandle cmp) override
 	{
-		Entity entity = {cmp.index};
-		auto& joint = m_spherical_joints[entity];
-		if (!isValid(entity)) return {Vec3(0, 0, 0), Quat(0, 0, 0, 1)};
-
-		if (!joint.physx)
-		{
-			Transform entity0_pose = m_universe.getTransform(entity);
-			Transform entity1_pose = m_universe.getTransform(joint.connected_body);
-			Quat rot = Quat::vec3ToVec3(Vec3(1, 0, 0), joint.axis_direction.normalized());
-			return {joint.axis_position, rot};
-		}
-
-		physx::PxTransform px_local_frame = joint.physx->getLocalPose(physx::PxJointActorIndex::eACTOR0);
-		return {fromPhysx(px_local_frame.p), fromPhysx(px_local_frame.q)};
+		return fromPhysx(m_joints[{cmp.index}].local_frame0);
 	}
 
 
-	Transform getSphericalJointConnectedBodyLocalFrame(ComponentHandle cmp) override
+	physx::PxJoint* getJoint(ComponentHandle cmp) override
 	{
-		Entity entity = {cmp.index};
-		auto& joint = m_spherical_joints[entity];
+		return m_joints[{cmp.index}].physx;
+	}
+
+
+	Transform getJointConnectedBodyLocalFrame(ComponentHandle cmp) override
+	{
+		auto& joint = m_joints[{cmp.index}];
 		if (!isValid(joint.connected_body)) return {Vec3(0, 0, 0), Quat(0, 0, 0, 1)};
+		
+		physx::PxRigidActor* a0, *a1;
+		joint.physx->getActors(a0, a1);
+		if (a1) return fromPhysx(joint.physx->getLocalPose(physx::PxJointActorIndex::eACTOR1));
 
-		if (!joint.physx)
-		{
-			Transform entity0_pose = m_universe.getTransform(entity);
-			Transform entity1_pose = m_universe.getTransform(joint.connected_body);
-			Quat rot = Quat::vec3ToVec3(Vec3(1, 0, 0), joint.axis_direction.normalized());
-			Transform local_frame0 = {joint.axis_position, rot};
-			return entity1_pose.inverted() * (entity0_pose * local_frame0);
-		}
-
-		physx::PxTransform px_local_frame = joint.physx->getLocalPose(physx::PxJointActorIndex::eACTOR1);
-		return {fromPhysx(px_local_frame.p), fromPhysx(px_local_frame.q)};
-	}
-
-
-	int getHingeJointCount() override { return m_hinge_joints.size(); }
-	ComponentHandle getHingeJointComponent(int index) override { return {m_hinge_joints.getKey(index).index}; }
-	Entity getHingeJointEntity(ComponentHandle cmp) override { return {cmp.index}; }
-
-
-	void setHingeJointAxisPosition(ComponentHandle cmp, const Vec3& value) override
-	{
-		m_hinge_joints[{cmp.index}].axis_position = value;
-	}
-
-
-	void setHingeJointAxisDirection(ComponentHandle cmp, const Vec3& value) override
-	{
-		m_hinge_joints[{cmp.index}].axis_direction = value;
-	}
-
-
-	Vec3 getHingeJointAxisPosition(ComponentHandle cmp) override
-	{
-		return m_hinge_joints[{cmp.index}].axis_position;
-	}
-
-
-	Vec3 getHingeJointAxisDirection(ComponentHandle cmp) override
-	{
-		return m_hinge_joints[{cmp.index}].axis_direction;
-	}
-
-
-	Entity getHingeJointConnectedBody(ComponentHandle cmp) override
-	{
-		return m_hinge_joints[{cmp.index}].connected_body;
-	}
-
-
-	bool getHingeJointUseLimit(ComponentHandle cmp) override
-	{
-		return m_hinge_joints[{cmp.index}].use_limit;
+		Transform tr = m_universe.getTransform(joint.connected_body);
+		return tr.inverted() * m_universe.getTransform({cmp.index}) * fromPhysx(joint.local_frame0);
 	}
 
 
 	void setHingeJointUseLimit(ComponentHandle cmp, bool use_limit) override
 	{
-		m_hinge_joints[{cmp.index}].use_limit = use_limit;
+		auto* joint = static_cast<physx::PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
+		joint->setRevoluteJointFlag(physx::PxRevoluteJointFlag::eLIMIT_ENABLED, use_limit);
+	}
+
+
+	bool getHingeJointUseLimit(ComponentHandle cmp) override
+	{
+		auto* joint = static_cast<physx::PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
+		return joint->getRevoluteJointFlags().isSet(physx::PxRevoluteJointFlag::eLIMIT_ENABLED);
 	}
 
 
 	Vec2 getHingeJointLimit(ComponentHandle cmp) override
 	{
-		return m_hinge_joints[{cmp.index}].limit;
-	}
-
-
-	Transform getHingeJointConnectedBodyLocalFrame(ComponentHandle cmp) override
-	{
-		Entity entity = {cmp.index};
-		auto& joint = m_hinge_joints[entity];
-		if (!isValid(joint.connected_body)) return {Vec3(0, 0, 0), Quat(0, 0, 0, 1)};
-
-		if (!joint.physx)
-		{
-			Transform entity0_pose = m_universe.getTransform(entity);
-			Transform entity1_pose = m_universe.getTransform(joint.connected_body);
-			Transform local_frame0 = {joint.axis_position
-				, Quat::vec3ToVec3(Vec3(1, 0, 0), joint.axis_direction.normalized())
-			};
-			return entity1_pose.inverted() * entity0_pose * local_frame0;
-		}
-
-		physx::PxTransform px_local_frame = joint.physx->getLocalPose(physx::PxJointActorIndex::eACTOR1);
-		return {fromPhysx(px_local_frame.p), fromPhysx(px_local_frame.q)};
+		auto* joint = static_cast<physx::PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
+		physx::PxJointAngularLimitPair limit = joint->getLimit();
+		return {limit.lower, limit.upper};
 	}
 
 
 	void setHingeJointLimit(ComponentHandle cmp, const Vec2& limit) override
 	{
-		m_hinge_joints[{cmp.index}].limit = limit;
+		auto* joint = static_cast<physx::PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
+		physx::PxJointAngularLimitPair px_limit = joint->getLimit();
+		px_limit.lower = limit.x;
+		px_limit.upper = limit.y;
+		joint->setLimit(px_limit);
 	}
 
 
-	void setHingeJointConnectedBody(ComponentHandle cmp, Entity entity) override
+	float getHingeJointDamping(ComponentHandle cmp) override
 	{
-		m_hinge_joints[{cmp.index}].connected_body = entity;
+		auto* joint = static_cast<physx::PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
+		return joint->getLimit().damping;
 	}
-
-
-	float getHingeJointDamping(ComponentHandle cmp) override { return m_hinge_joints[{cmp.index}].damping; }
 
 
 	void setHingeJointDamping(ComponentHandle cmp, float value) override
 	{
-		m_hinge_joints[{cmp.index}].damping = value;
+		auto* joint = static_cast<physx::PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
+		physx::PxJointAngularLimitPair px_limit = joint->getLimit();
+		px_limit.damping = value;
+		joint->setLimit(px_limit);
+
 	}
 
 
-	float getHingeJointStiffness(ComponentHandle cmp) override { return m_hinge_joints[{cmp.index}].stiffness; }
+	float getHingeJointStiffness(ComponentHandle cmp) override
+	{
+		auto* joint = static_cast<physx::PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
+		return joint->getLimit().stiffness;
+	}
 
 
 	void setHingeJointStiffness(ComponentHandle cmp, float value) override
 	{
-		m_hinge_joints[{cmp.index}].stiffness = value;
+		auto* joint = static_cast<physx::PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
+		physx::PxJointAngularLimitPair px_limit = joint->getLimit();
+		px_limit.stiffness = value;
+		joint->setLimit(px_limit);
 	}
 
 
@@ -1147,36 +1003,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 			m_ragdolls.eraseAt(idx);
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
-		else if (type == DISTANCE_JOINT_TYPE)
+		else if (type == SPHERICAL_JOINT_TYPE || type == HINGE_JOINT_TYPE || type == DISTANCE_JOINT_TYPE ||
+				 type == D6_JOINT_TYPE)
 		{
 			Entity entity = {cmp.index};
-			auto& joint = m_distance_joints[entity];
+			auto& joint = m_joints[entity];
 			if (joint.physx) joint.physx->release();
-			m_distance_joints.erase(entity);
-			m_universe.destroyComponent(entity, type, this, cmp);
-		}
-		else if (type == HINGE_JOINT_TYPE)
-		{
-			Entity entity = {cmp.index};
-			auto& joint = m_hinge_joints[entity];
-			if (joint.physx) joint.physx->release();
-			m_hinge_joints.erase(entity);
-			m_universe.destroyComponent(entity, type, this, cmp);
-		}
-		else if (type == SPHERICAL_JOINT_TYPE)
-		{
-			Entity entity = {cmp.index};
-			auto& joint = m_spherical_joints[entity];
-			if (joint.physx) joint.physx->release();
-			m_spherical_joints.erase(entity);
-			m_universe.destroyComponent(entity, type, this, cmp);
-		}
-		else if (type == D6_JOINT_TYPE)
-		{
-			Entity entity = {cmp.index};
-			auto& joint = m_d6_joints[entity];
-			if (joint.physx) joint.physx->release();
-			m_d6_joints.erase(entity);
+			m_joints.erase(entity);
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
 		else
@@ -1188,14 +1021,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createDistanceJoint(Entity entity)
 	{
-		DistanceJoint joint;
-		joint.physx = nullptr;
+		Joint joint;
 		joint.connected_body = INVALID_ENTITY;
-		joint.stiffness = -1;
-		joint.damping = -1;
-		joint.tolerance = 0.025f;
-		joint.distance_limit.set(-1, 10);
-		m_distance_joints.insert(entity, joint);
+		joint.local_frame0.p = physx::PxVec3(0, 0, 0);
+		joint.local_frame0.q = physx::PxQuat(0, 0, 0, 1);
+		joint.physx = physx::PxDistanceJointCreate(m_scene->getPhysics(),
+			m_dummy_actor,
+			physx::PxTransform::createIdentity(),
+			nullptr,
+			physx::PxTransform::createIdentity());
+		joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
+		m_joints.insert(entity, joint);
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, DISTANCE_JOINT_TYPE, this, cmp);
@@ -1205,16 +1041,19 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createSphericalJoint(Entity entity)
 	{
-		SphericalJoint joint;
-		joint.physx = nullptr;
+		Joint joint;
 		joint.connected_body = INVALID_ENTITY;
-		joint.axis_direction.set(1, 0, 0);
-		joint.axis_position.set(0, 0, 0);
-		joint.use_limit = false;
-		joint.limit.set(Math::PI * 0.5f, Math::PI * 0.5f);
-		m_spherical_joints.insert(entity, joint);
+		joint.local_frame0.p = physx::PxVec3(0, 0, 0);
+		joint.local_frame0.q = physx::PxQuat(0, 0, 0, 1);
+		joint.physx = physx::PxSphericalJointCreate(m_scene->getPhysics(),
+			m_dummy_actor,
+			physx::PxTransform::createIdentity(),
+			nullptr,
+			physx::PxTransform::createIdentity());
+		joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
+		m_joints.insert(entity, joint);
 
-		ComponentHandle cmp = { entity.index };
+		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, SPHERICAL_JOINT_TYPE, this, cmp);
 		return cmp;
 	}
@@ -1222,17 +1061,21 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createD6Joint(Entity entity)
 	{
-		D6Joint joint;
-		joint.physx = nullptr;
+		Joint joint;
 		joint.connected_body = INVALID_ENTITY;
-		joint.axis_direction.set(1, 0, 0);
-		joint.axis_position.set(0, 0, 0);
-		joint.linear_limit = 10;
-		joint.swing_limit.set(Math::degreesToRadians(45), Math::degreesToRadians(45));
-		joint.twist_limit.set(-Math::degreesToRadians(45), Math::degreesToRadians(45));
-		for(auto& motion : joint.motions) motion = physx::PxD6Motion::eLOCKED;
-
-		m_d6_joints.insert(entity, joint);
+		joint.local_frame0.p = physx::PxVec3(0, 0, 0);
+		joint.local_frame0.q = physx::PxQuat(0, 0, 0, 1);
+		joint.physx = physx::PxD6JointCreate(m_scene->getPhysics(),
+			m_dummy_actor,
+			physx::PxTransform::createIdentity(),
+			nullptr,
+			physx::PxTransform::createIdentity());
+		auto* d6_joint = static_cast<physx::PxD6Joint*>(joint.physx);
+		auto linear_limit = d6_joint->getLinearLimit();
+		linear_limit.value = 1.0f;
+		d6_joint->setLinearLimit(linear_limit);
+		joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
+		m_joints.insert(entity, joint);
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, D6_JOINT_TYPE, this, cmp);
@@ -1242,20 +1085,19 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createHingeJoint(Entity entity)
 	{
-		HingeJoint joint;
-		joint.physx = nullptr;
+		Joint joint;
 		joint.connected_body = INVALID_ENTITY;
-		joint.stiffness = -1;
-		joint.damping = -1;
-		joint.tolerance = 0.025f;
-		joint.axis_direction.set(1, 0, 0);
-		joint.axis_position.set(0, 0, 0);
-		joint.use_limit = false;
-		joint.limit.set(-1, 1);
-		joint.initial_pos.set(0, 0, 0);
-		m_hinge_joints.insert(entity, joint);
+		joint.local_frame0.p = physx::PxVec3(0, 0, 0);
+		joint.local_frame0.q = physx::PxQuat(0, 0, 0, 1);
+		joint.physx = physx::PxRevoluteJointCreate(m_scene->getPhysics(),
+			m_dummy_actor,
+			physx::PxTransform::createIdentity(),
+			nullptr,
+			physx::PxTransform::createIdentity());
+		joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
+		m_joints.insert(entity, joint);
 
-		ComponentHandle cmp = {entity.index};
+		ComponentHandle cmp = { entity.index };
 		m_universe.addComponent(entity, HINGE_JOINT_TYPE, this, cmp);
 		return cmp;
 	}
@@ -2021,118 +1863,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deinitDistanceJoints()
+	void initJoints()
 	{
-		for (int i = 0, c = m_distance_joints.size(); i < c; ++i)
+		for (int i = 0, c = m_joints.size(); i < c; ++i)
 		{
-			auto& joint = m_distance_joints.at(i);
-			if (joint.physx)
-			{
-				joint.physx->release();
-				joint.physx = nullptr;
-			}
-		}
-	}
+			auto& joint = m_joints.at(i);
 
-
-	void deinitD6Joints()
-	{
-		for (int i = 0, c = m_d6_joints.size(); i < c; ++i)
-		{
-			auto& joint = m_d6_joints.at(i);
-			if (joint.physx)
-			{
-				joint.physx->release();
-				joint.physx = nullptr;
-			}
-		}
-	}
-
-
-	void deinitHingeJoints()
-	{
-		for (int i = 0, c = m_hinge_joints.size(); i < c; ++i)
-		{
-			auto& joint = m_hinge_joints.at(i);
-			if (joint.physx)
-			{
-				joint.physx->release();
-				joint.physx = nullptr;
-			}
-		}
-	}
-
-
-	void deinitSphericalJoints()
-	{
-		for (int i = 0, c = m_spherical_joints.size(); i < c; ++i)
-		{
-			auto& joint = m_spherical_joints.at(i);
-			if (joint.physx)
-			{
-				joint.physx->release();
-				joint.physx = nullptr;
-			}
-		}
-	}
-
-
-	void initDistanceJoints()
-	{
-		for (int i = 0, c = m_distance_joints.size(); i < c; ++i)
-		{
-			auto& joint = m_distance_joints.at(i);
-			Entity entity = m_distance_joints.getKey(i);
-
-			physx::PxRigidActor* actors[2] = { nullptr, nullptr };
-			int idx = m_actors.find(entity);
-			if (idx >= 0) actors[0] = m_actors.at(idx)->physx_actor;
-			idx = m_actors.find(joint.connected_body);
-			if (idx >= 0) actors[1] = m_actors.at(idx)->physx_actor;
-			if (!actors[0] || !actors[1]) continue;
-
-			physx::PxTransform identity = physx::PxTransform::createIdentity();
-			joint.physx = physx::PxDistanceJointCreate(*m_system->getPhysics(), actors[0], identity, actors[1], identity);
-			if (!joint.physx)
-			{
-				g_log_error.log("Physics") << "Failed to create joint between " << entity.index << " and "
-										   << joint.connected_body.index;
-				continue;
-			}
-
-			physx::PxDistanceJointFlags flags;
-			if (joint.distance_limit.y >= 0)
-			{
-				flags |= physx::PxDistanceJointFlag::eMAX_DISTANCE_ENABLED;
-				joint.physx->setMaxDistance(joint.distance_limit.y);
-			}
-			if (joint.distance_limit.x >= 0)
-			{
-				flags |= physx::PxDistanceJointFlag::eMIN_DISTANCE_ENABLED;
-				joint.physx->setMinDistance(joint.distance_limit.x);
-			}
-			if (joint.damping >= 0)
-			{
-				flags |= physx::PxDistanceJointFlag::eSPRING_ENABLED;
-				joint.physx->setDamping(joint.damping);
-			}
-			if (joint.stiffness >= 0)
-			{
-				flags |= physx::PxDistanceJointFlag::eSPRING_ENABLED;
-				joint.physx->setStiffness(joint.stiffness);
-			}
-			joint.physx->setTolerance(joint.tolerance);
-			joint.physx->setDistanceJointFlags(flags);
-		}
-	}
-
-
-	void initSphericalJoints()
-	{
-		for (int i = 0, c = m_spherical_joints.size(); i < c; ++i)
-		{
-			auto& joint = m_spherical_joints.at(i);
-			Entity entity = m_spherical_joints.getKey(i);
+			Entity entity = m_joints.getKey(i);
 
 			physx::PxRigidActor* actors[2] = { nullptr, nullptr };
 			int idx = m_actors.find(entity);
@@ -2148,135 +1885,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 			physx::PxTransform entity0_frame(toPhysx(pos0), toPhysx(rot0));
 			physx::PxTransform entity1_frame(toPhysx(pos1), toPhysx(rot1));
 
-			Vec3 local_axis_dir = joint.axis_direction.normalized();
-			Quat axis_quat = Quat::vec3ToVec3(Vec3(1, 0, 0), local_axis_dir);
-			physx::PxTransform axis_local_frame0(toPhysx(joint.axis_position), toPhysx(axis_quat));
-			physx::PxTransform axis_local_frame1 = entity1_frame.getInverse() * entity0_frame * axis_local_frame0;
+			physx::PxTransform axis_local_frame1 = entity1_frame.getInverse() * entity0_frame * joint.local_frame0;
 
-			joint.physx = physx::PxSphericalJointCreate(
-				*m_system->getPhysics(), actors[0], axis_local_frame0, actors[1], axis_local_frame1);
-			if (!joint.physx)
-			{
-				g_log_error.log("Physics") << "Failed to create joint between " << entity.index << " and "
-										   << joint.connected_body.index;
-				continue;
-			}
-
-			if (joint.use_limit)
-			{
-				physx::PxJointLimitCone limit(joint.limit.x, joint.limit.y, 0.1f);
-				joint.physx->setSphericalJointFlag(physx::PxSphericalJointFlag::eLIMIT_ENABLED, true);
-				joint.physx->setLimitCone(limit);
-			}
-		}
-	}
-
-
-	void initD6Joints()
-	{
-		for (int i = 0, c = m_d6_joints.size(); i < c; ++i)
-		{
-			auto& joint = m_d6_joints.at(i);
-			Entity entity = m_d6_joints.getKey(i);
-
-			physx::PxRigidActor* actors[2] = { nullptr, nullptr };
-			int idx = m_actors.find(entity);
-			if (idx >= 0) actors[0] = m_actors.at(idx)->physx_actor;
-			idx = m_actors.find(joint.connected_body);
-			if (idx >= 0) actors[1] = m_actors.at(idx)->physx_actor;
-			if (!actors[0] || !actors[1]) continue;
-
-			Vec3 pos0 = m_universe.getPosition(entity);
-			Quat rot0 = m_universe.getRotation(entity);
-			Vec3 pos1 = m_universe.getPosition(joint.connected_body);
-			Quat rot1 = m_universe.getRotation(joint.connected_body);
-			physx::PxTransform entity0_frame(toPhysx(pos0), toPhysx(rot0));
-			physx::PxTransform entity1_frame(toPhysx(pos1), toPhysx(rot1));
-
-			Vec3 local_axis_dir = joint.axis_direction.normalized();
-			Quat axis_quat = Quat::vec3ToVec3(Vec3(1, 0, 0), local_axis_dir);
-			physx::PxTransform axis_local_frame0(toPhysx(joint.axis_position), toPhysx(axis_quat));
-			physx::PxTransform axis_local_frame1 = entity1_frame.getInverse() * entity0_frame * axis_local_frame0;
-
-			joint.physx = physx::PxD6JointCreate(
-				*m_system->getPhysics(), actors[0], axis_local_frame0, actors[1], axis_local_frame1);
-			if (!joint.physx)
-			{
-				g_log_error.log("Physics") << "Failed to create joint between " << entity.index << " and "
-					<< joint.connected_body.index;
-				continue;
-			}
+			joint.physx->setLocalPose(physx::PxJointActorIndex::eACTOR0, joint.local_frame0);
+			joint.physx->setLocalPose(physx::PxJointActorIndex::eACTOR1, axis_local_frame1);
+			joint.physx->setActors(actors[0], actors[1]);
 			joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
-
-			joint.physx->setMotion(physx::PxD6Axis::eX, joint.motions[0]);
-			joint.physx->setMotion(physx::PxD6Axis::eY, joint.motions[1]);
-			joint.physx->setMotion(physx::PxD6Axis::eZ, joint.motions[2]);
-			joint.physx->setMotion(physx::PxD6Axis::eSWING1, joint.motions[3]);
-			joint.physx->setMotion(physx::PxD6Axis::eSWING2, joint.motions[4]);
-			joint.physx->setMotion(physx::PxD6Axis::eTWIST, joint.motions[5]);
-			physx::PxJointLinearLimit limit(joint.linear_limit, physx::PxSpring(10, 1));
-			limit.contactDistance = 0.1f;
-			limit.restitution = 0;
-			limit.bounceThreshold = 0;
-			joint.physx->setLinearLimit(limit);
-
-			physx::PxJointLimitCone swing_limit(joint.swing_limit.x, joint.swing_limit.y, 0.01f);
-			joint.physx->setSwingLimit(swing_limit);
-
-			physx::PxJointAngularLimitPair twist_limit(joint.twist_limit.x, joint.twist_limit.y, 0.01f);
-			joint.physx->setTwistLimit(twist_limit);
-		}
-	}
-
-	void initHingeJoints()
-	{
-		for (int i = 0, c = m_hinge_joints.size(); i < c; ++i)
-		{
-			auto& joint = m_hinge_joints.at(i);
-			Entity entity = m_hinge_joints.getKey(i);
-
-			physx::PxRigidActor* actors[2] = { nullptr, nullptr };
-			int idx = m_actors.find(entity);
-			if (idx >= 0) actors[0] = m_actors.at(idx)->physx_actor;
-			idx = m_actors.find(joint.connected_body);
-			if (idx >= 0) actors[1] = m_actors.at(idx)->physx_actor;
-			if (!actors[0] || !actors[1]) continue;
-
-			Vec3 pos0 = m_universe.getPosition(entity);
-			Quat rot0 = m_universe.getRotation(entity);
-			Vec3 pos1 = m_universe.getPosition(joint.connected_body);
-			Quat rot1 = m_universe.getRotation(joint.connected_body);
-			physx::PxTransform entity0_frame(toPhysx(pos0), toPhysx(rot0));
-			physx::PxTransform entity1_frame(toPhysx(pos1), toPhysx(rot1));
-
-			Vec3 local_axis_dir = joint.axis_direction.normalized();
-			Quat axis_quat = Quat::vec3ToVec3(Vec3(1, 0, 0), local_axis_dir);
-			physx::PxTransform axis_local_frame0(toPhysx(joint.axis_position), toPhysx(axis_quat));
-			physx::PxTransform axis_local_frame1 = entity1_frame.getInverse() * entity0_frame * axis_local_frame0;
-
-			joint.physx = physx::PxRevoluteJointCreate(
-				*m_system->getPhysics(), actors[0], axis_local_frame0, actors[1], axis_local_frame1);
-			if (!joint.physx)
-			{
-				g_log_error.log("Physics") << "Failed to create joint between " << entity.index << " and "
-										   << joint.connected_body.index;
-				continue;
-			}
-
-			joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
-
-			joint.initial_pos = pos1;
-
-			if (joint.use_limit)
-			{
-				physx::PxRevoluteJointFlags flags;
-				flags |= physx::PxRevoluteJointFlag::eLIMIT_ENABLED;
-				joint.physx->setRevoluteJointFlags(flags);
-
-				physx::PxSpring spring(joint.stiffness, joint.damping);
-				physx::PxJointAngularLimitPair limit(joint.limit.x, joint.limit.y, 0.01f);
-				joint.physx->setLimit(limit);
-			}
 		}
 	}
 
@@ -2287,19 +1901,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
 		m_is_game_running = true;
 
-		initDistanceJoints();
-		initHingeJoints();
-		initSphericalJoints();
-		initD6Joints();
+		initJoints();
 	}
 
 
 	void stopGame() override
 	{
-		deinitDistanceJoints();
-		deinitHingeJoints();
-		deinitSphericalJoints();
-		deinitD6Joints();
 		m_is_game_running = false;
 	}
 
@@ -3107,57 +2714,62 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void serializeJoints(OutputBlob& serializer)
 	{
-		serializer.write(m_distance_joints.size());
-		for (int i = 0; i < m_distance_joints.size(); ++i)
+		serializer.write(m_joints.size());
+		for (int i = 0; i < m_joints.size(); ++i)
 		{
-			const DistanceJoint& joint = m_distance_joints.at(i);
-			serializer.write(m_distance_joints.getKey(i));
-			serializer.write(joint.damping);
-			serializer.write(joint.stiffness);
-			serializer.write(joint.tolerance);
-			serializer.write(joint.distance_limit);
+			const Joint& joint = m_joints.at(i);
+			serializer.write(m_joints.getKey(i));
+			serializer.write((int)joint.physx->getConcreteType());
 			serializer.write(joint.connected_body);
-		}
-
-		serializer.write(m_hinge_joints.size());
-		for (int i = 0; i < m_hinge_joints.size(); ++i)
-		{
-			const HingeJoint& joint = m_hinge_joints.at(i);
-			serializer.write(m_hinge_joints.getKey(i));
-			serializer.write(joint.damping);
-			serializer.write(joint.stiffness);
-			serializer.write(joint.tolerance);
-			serializer.write(joint.connected_body);
-			serializer.write(joint.axis_position);
-			serializer.write(joint.axis_direction);
-			serializer.write(joint.use_limit);
-			serializer.write(joint.limit);
-		}
-
-		serializer.write(m_spherical_joints.size());
-		for (int i = 0; i < m_spherical_joints.size(); ++i)
-		{
-			const SphericalJoint& joint = m_spherical_joints.at(i);
-			serializer.write(m_spherical_joints.getKey(i));
-			serializer.write(joint.connected_body);
-			serializer.write(joint.axis_position);
-			serializer.write(joint.axis_direction);
-			serializer.write(joint.use_limit);
-			serializer.write(joint.limit);
-		}
-
-		serializer.write(m_d6_joints.size());
-		for (int i = 0; i < m_d6_joints.size(); ++i)
-		{
-			const D6Joint& joint = m_d6_joints.at(i);
-			serializer.write(m_d6_joints.getKey(i));
-			serializer.write(joint.connected_body);
-			serializer.write(joint.axis_position);
-			serializer.write(joint.axis_direction);
-			serializer.write(joint.motions);
-			serializer.write(joint.linear_limit);
-			serializer.write(joint.swing_limit);
-			serializer.write(joint.twist_limit);
+			serializer.write(joint.local_frame0);
+			switch ((physx::PxJointConcreteType::Enum)joint.physx->getConcreteType())
+			{
+				case physx::PxJointConcreteType::eSPHERICAL:
+				{
+					auto* px_joint = static_cast<physx::PxSphericalJoint*>(joint.physx);
+					uint32 flags = (uint32)px_joint->getSphericalJointFlags();
+					serializer.write(flags);
+					auto limit = px_joint->getLimitCone();
+					serializer.write(limit);
+					break;
+				}
+				case physx::PxJointConcreteType::eREVOLUTE:
+				{
+					auto* px_joint = static_cast<physx::PxRevoluteJoint*>(joint.physx);
+					uint32 flags = (uint32)px_joint->getRevoluteJointFlags();
+					serializer.write(flags);
+					auto limit = px_joint->getLimit();
+					serializer.write(limit);
+					break;
+				}
+				case physx::PxJointConcreteType::eDISTANCE:
+				{
+					auto* px_joint = static_cast<physx::PxDistanceJoint*>(joint.physx);
+					uint32 flags = (uint32)px_joint->getDistanceJointFlags();
+					serializer.write(flags);
+					serializer.write(px_joint->getDamping());
+					serializer.write(px_joint->getStiffness());
+					serializer.write(px_joint->getTolerance());
+					serializer.write(px_joint->getMinDistance());
+					serializer.write(px_joint->getMaxDistance());
+					break;
+				}
+				case physx::PxJointConcreteType::eD6:
+				{
+					auto* px_joint = static_cast<physx::PxD6Joint*>(joint.physx);
+					serializer.write(px_joint->getMotion(physx::PxD6Axis::eX));
+					serializer.write(px_joint->getMotion(physx::PxD6Axis::eY));
+					serializer.write(px_joint->getMotion(physx::PxD6Axis::eZ));
+					serializer.write(px_joint->getMotion(physx::PxD6Axis::eSWING1));
+					serializer.write(px_joint->getMotion(physx::PxD6Axis::eSWING2));
+					serializer.write(px_joint->getMotion(physx::PxD6Axis::eTWIST));
+					serializer.write(px_joint->getLinearLimit());
+					serializer.write(px_joint->getSwingLimit());
+					serializer.write(px_joint->getTwistLimit());
+					break;
+				}
+				default: ASSERT(false); break;
+			}
 		}
 	}
 
@@ -3289,95 +2901,120 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void deserializeJoints(InputBlob& serializer, int version)
 	{
-		if (version <= int(PhysicsSceneVersion::JOINTS)) return;
+		if (version <= int(PhysicsSceneVersion::JOINT_REFACTOR)) return;
 
 		int count;
 		serializer.read(count);
-		m_distance_joints.clear();
-		m_distance_joints.reserve(count);
+		for (int i = 0; i < m_joints.size(); ++i) m_joints.at(i).physx->release();
+		m_joints.clear();
+		m_joints.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
 			Entity entity;
 			serializer.read(entity);
-			DistanceJoint joint;
-			serializer.read(joint.damping);
-			serializer.read(joint.stiffness);
-			serializer.read(joint.tolerance);
-			serializer.read(joint.distance_limit);
+			Joint joint;
+			int type;
+			serializer.read(type);
 			serializer.read(joint.connected_body);
-			joint.physx = nullptr;
-			m_distance_joints.insert(entity, joint);
-			ComponentHandle cmp = {entity.index};
-			m_universe.addComponent(entity, DISTANCE_JOINT_TYPE, this, cmp);
-		}
-
-		serializer.read(count);
-		m_hinge_joints.clear();
-		m_hinge_joints.reserve(count);
-		for (int i = 0; i < count; ++i)
-		{
-			Entity entity;
-			serializer.read(entity);
-			HingeJoint joint;
-			serializer.read(joint.damping);
-			serializer.read(joint.stiffness);
-			serializer.read(joint.tolerance);
-			serializer.read(joint.connected_body);
-			serializer.read(joint.axis_position);
-			serializer.read(joint.axis_direction);
-			serializer.read(joint.use_limit);
-			serializer.read(joint.limit);
-			joint.physx = nullptr;
-			m_hinge_joints.insert(entity, joint);
-			ComponentHandle cmp = {entity.index};
-			m_universe.addComponent(entity, HINGE_JOINT_TYPE, this, cmp);
-		}
-
-		if (version > int(PhysicsSceneVersion::SPHERICAL_JOINT))
-		{
-			serializer.read(count);
-			m_spherical_joints.clear();
-			m_spherical_joints.reserve(count);
-			for (int i = 0; i < count; ++i)
+			serializer.read(joint.local_frame0);
+			ComponentType cmp_type;
+			switch (physx::PxJointConcreteType::Enum(type))
 			{
-				Entity entity;
-				serializer.read(entity);
-				SphericalJoint joint;
-				serializer.read(joint.connected_body);
-				serializer.read(joint.axis_position);
-				serializer.read(joint.axis_direction);
-				serializer.read(joint.use_limit);
-				serializer.read(joint.limit);
-				joint.physx = nullptr;
-				m_spherical_joints.insert(entity, joint);
-				ComponentHandle cmp = {entity.index};
-				m_universe.addComponent(entity, SPHERICAL_JOINT_TYPE, this, cmp);
+				case physx::PxJointConcreteType::eSPHERICAL:
+				{
+					cmp_type = SPHERICAL_JOINT_TYPE;
+					auto* px_joint = physx::PxSphericalJointCreate(m_scene->getPhysics(),
+						m_dummy_actor,
+						joint.local_frame0,
+						nullptr,
+						physx::PxTransform::createIdentity());
+					joint.physx = px_joint;
+					uint32 flags;
+					serializer.read(flags);
+					px_joint->setSphericalJointFlags(physx::PxSphericalJointFlags(flags));
+					physx::PxJointLimitCone limit(0, 0);
+					serializer.read(limit);
+					px_joint->setLimitCone(limit);
+					break;
+				}
+				case physx::PxJointConcreteType::eREVOLUTE:
+				{
+					cmp_type = HINGE_JOINT_TYPE;
+					auto* px_joint = physx::PxRevoluteJointCreate(m_scene->getPhysics(),
+						m_dummy_actor,
+						joint.local_frame0,
+						nullptr,
+						physx::PxTransform::createIdentity());
+					joint.physx = px_joint;
+					uint32 flags;
+					serializer.read(flags);
+					px_joint->setRevoluteJointFlags(physx::PxRevoluteJointFlags(flags));
+					physx::PxJointAngularLimitPair limit(0, 0);
+					serializer.read(limit);
+					px_joint->setLimit(limit);
+					break;
+				}
+				case physx::PxJointConcreteType::eDISTANCE:
+				{
+					cmp_type = DISTANCE_JOINT_TYPE;
+					auto* px_joint = physx::PxDistanceJointCreate(m_scene->getPhysics(),
+						m_dummy_actor,
+						joint.local_frame0,
+						nullptr,
+						physx::PxTransform::createIdentity());
+					joint.physx = px_joint;
+					uint32 flags;
+					serializer.read(flags);
+					px_joint->setDistanceJointFlags(physx::PxDistanceJointFlags(flags));
+					float tmp;
+					serializer.read(tmp);
+					px_joint->setDamping(tmp);
+					serializer.read(tmp);
+					px_joint->setStiffness(tmp);
+					serializer.read(tmp);
+					px_joint->setTolerance(tmp);
+					serializer.read(tmp);
+					px_joint->setMinDistance(tmp);
+					serializer.read(tmp);
+					px_joint->setMaxDistance(tmp);
+					break;
+				}
+				case physx::PxJointConcreteType::eD6:
+				{
+					cmp_type = D6_JOINT_TYPE;
+					auto* px_joint = physx::PxD6JointCreate(m_scene->getPhysics(),
+						m_dummy_actor,
+						joint.local_frame0,
+						nullptr,
+						physx::PxTransform::createIdentity());
+					joint.physx = px_joint;
+					int motions[6];
+					serializer.read(motions);
+					px_joint->setMotion(physx::PxD6Axis::eX, (physx::PxD6Motion::Enum)motions[0]);
+					px_joint->setMotion(physx::PxD6Axis::eY, (physx::PxD6Motion::Enum)motions[1]);
+					px_joint->setMotion(physx::PxD6Axis::eZ, (physx::PxD6Motion::Enum) motions[2]);
+					px_joint->setMotion(physx::PxD6Axis::eSWING1, (physx::PxD6Motion::Enum)motions[3]);
+					px_joint->setMotion(physx::PxD6Axis::eSWING2, (physx::PxD6Motion::Enum)motions[4]);
+					px_joint->setMotion(physx::PxD6Axis::eTWIST, (physx::PxD6Motion::Enum)motions[5]);
+					physx::PxJointLinearLimit linear_limit(0, physx::PxSpring(0, 0));
+					serializer.read(linear_limit);
+					px_joint->setLinearLimit(linear_limit);
+					physx::PxJointLimitCone swing_limit(0, 0);
+					serializer.read(swing_limit);
+					px_joint->setSwingLimit(swing_limit);
+					physx::PxJointAngularLimitPair twist_limit(0, 0);
+					serializer.read(twist_limit);
+					px_joint->setTwistLimit(twist_limit);
+					break;
+				}
+				default: ASSERT(false); break;
 			}
+
+			m_joints.insert(entity, joint);
+			ComponentHandle cmp = {entity.index};
+			m_universe.addComponent(entity, cmp_type, this, cmp);
 		}
 
-		if (version > int(PhysicsSceneVersion::D6_JOINT))
-		{
-			serializer.read(count);
-			m_d6_joints.clear();
-			m_d6_joints.reserve(count);
-			for (int i = 0; i < count; ++i)
-			{
-				Entity entity;
-				serializer.read(entity);
-				D6Joint joint;
-				serializer.read(joint.connected_body);
-				serializer.read(joint.axis_position);
-				serializer.read(joint.axis_direction);
-				serializer.read(joint.motions);
-				serializer.read(joint.linear_limit);
-				serializer.read(joint.swing_limit);
-				serializer.read(joint.twist_limit);
-				joint.physx = nullptr;
-				m_d6_joints.insert(entity, joint);
-				ComponentHandle cmp = {entity.index};
-				m_universe.addComponent(entity, D6_JOINT_TYPE, this, cmp);
-			}
-		}
 	}
 
 
@@ -3542,15 +3179,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	physx::PxScene* m_scene;
 	LuaScriptScene* m_script_scene;
 	PhysicsSystem* m_system;
+	physx::PxRigidDynamic* m_dummy_actor;
 	physx::PxControllerManager* m_controller_manager;
 	physx::PxMaterial* m_default_material;
 	AssociativeArray<Entity, RigidActor*> m_actors;
 	Array<RigidActor*> m_dynamic_actors;
 	AssociativeArray<Entity, Ragdoll> m_ragdolls;
-	AssociativeArray<Entity, DistanceJoint> m_distance_joints;
-	AssociativeArray<Entity, HingeJoint> m_hinge_joints;
-	AssociativeArray<Entity, SphericalJoint> m_spherical_joints;
-	AssociativeArray<Entity, D6Joint> m_d6_joints;
+	AssociativeArray<Entity, Joint> m_joints;
 	bool m_is_game_running;
 	uint32 m_debug_visualization_flags;
 
@@ -3599,6 +3234,9 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
 	impl->m_system = &system;
 	impl->m_default_material =
 		impl->m_system->getPhysics()->createMaterial(0.5, 0.5, 0.5);
+	physx::PxSphereGeometry geom(1);
+	impl->m_dummy_actor = physx::PxCreateDynamic(
+		impl->m_scene->getPhysics(), physx::PxTransform::createIdentity(), geom, *impl->m_default_material, 1);
 	return impl;
 }
 
@@ -3608,6 +3246,7 @@ void PhysicsScene::destroy(PhysicsScene* scene)
 	PhysicsSceneImpl* impl = static_cast<PhysicsSceneImpl*>(scene);
 	impl->m_controller_manager->release();
 	impl->m_default_material->release();
+	impl->m_dummy_actor->release();
 	impl->m_scene->release();
 	LUMIX_DELETE(impl->m_allocator, scene);
 }

@@ -52,10 +52,10 @@ struct EditorPlugin : public WorldEditor::Plugin
 		auto* render_scene = static_cast<RenderScene*>(universe.getScene(RENDERER_HASH));
 		if (!render_scene) return;
 
-		Entity other_entity = phy_scene->getD6JointConnectedBody(cmp.handle);
+		Entity other_entity = phy_scene->getJointConnectedBody(cmp.handle);
 		if (!isValid(other_entity)) return;
 
-		Transform local_frame0 = phy_scene->getD6JointLocalFrame(cmp.handle);
+		Transform local_frame0 = phy_scene->getJointLocalFrame(cmp.handle);
 		Transform global_frame0 = universe.getTransform(cmp.entity) * local_frame0;
 		Vec3 joint_pos = global_frame0.pos;
 		Matrix mtx0 = global_frame0.toMatrix();
@@ -64,7 +64,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getYVector(), 0xff00ff00, 0);
 		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getZVector(), 0xff0000ff, 0);
 
-		Transform local_frame1 = phy_scene->getD6JointConnectedBodyLocalFrame(cmp.handle);
+		Transform local_frame1 = phy_scene->getJointConnectedBodyLocalFrame(cmp.handle);
 		Transform global_frame1 = universe.getTransform(other_entity) * local_frame1;
 		Matrix mtx1 = global_frame1.toMatrix();
 
@@ -81,11 +81,11 @@ struct EditorPlugin : public WorldEditor::Plugin
 		auto* render_scene = static_cast<RenderScene*>(universe.getScene(RENDERER_HASH));
 		if (!render_scene) return;
 
-		Entity other_entity = phy_scene->getSphericalJointConnectedBody(cmp.handle);
+		Entity other_entity = phy_scene->getJointConnectedBody(cmp.handle);
 		if (!isValid(other_entity)) return;
 
 
-		Transform local_frame0 = phy_scene->getSphericalJointLocalFrame(cmp.handle);
+		Transform local_frame0 = phy_scene->getJointLocalFrame(cmp.handle);
 		Transform global_frame0 = universe.getTransform(cmp.entity) * local_frame0;
 		Vec3 joint_pos = global_frame0.pos;
 		Matrix mtx0 = global_frame0.toMatrix();
@@ -94,7 +94,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getYVector(), 0xff00ff00, 0);
 		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getZVector(), 0xff0000ff, 0);
 
-		Transform local_frame1 = phy_scene->getSphericalJointConnectedBodyLocalFrame(cmp.handle);
+		Transform local_frame1 = phy_scene->getJointConnectedBodyLocalFrame(cmp.handle);
 		Transform global_frame1 = universe.getTransform(other_entity) * local_frame1;
 		Matrix mtx1 = global_frame1.toMatrix();
 
@@ -130,7 +130,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 		auto* render_scene = static_cast<RenderScene*>(universe.getScene(RENDERER_HASH));
 		if (!render_scene) return;
 
-		Entity other_entity = phy_scene->getDistanceJointConnectedBody(cmp.handle);
+		Entity other_entity = phy_scene->getJointConnectedBody(cmp.handle);
 		if (!isValid(other_entity)) return;
 		
 		Vec3 pos = universe.getPosition(cmp.entity);
@@ -174,11 +174,11 @@ struct EditorPlugin : public WorldEditor::Plugin
 	static void showHingeJointGizmo(ComponentUID cmp)
 	{
 		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
-		Entity connected_body = phy_scene->getHingeJointConnectedBody(cmp.handle);
+		Entity connected_body = phy_scene->getJointConnectedBody(cmp.handle);
 		Vec2 limit = phy_scene->getHingeJointLimit(cmp.handle);
 		bool use_limit = phy_scene->getHingeJointUseLimit(cmp.handle);
 		if (!isValid(connected_body)) return;
-		Transform global_frame1 = phy_scene->getHingeJointConnectedBodyLocalFrame(cmp.handle);
+		Transform global_frame1 = phy_scene->getJointConnectedBodyLocalFrame(cmp.handle);
 		global_frame1 = phy_scene->getUniverse().getTransform(connected_body) * global_frame1;
 		showHingeJointGizmo(*phy_scene, limit, use_limit, global_frame1.toMatrix());
 	}
@@ -436,25 +436,42 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 	}
 
 
-	void onDistanceJointGUI()
+	void onJointGUI()
 	{
 		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
-		int count = scene->getDistanceJointCount();
-		if (count > 0 && ImGui::CollapsingHeader("Distance joints"))
+		int count = scene->getJointCount();
+		if (count > 0 && ImGui::CollapsingHeader("Joints"))
 		{
 			ImGui::Columns(2);
 			ImGui::Text("From"); ImGui::NextColumn();
 			ImGui::Text("To"); ImGui::NextColumn();
-			ImGui::PushID("distance_joints");
+			ImGui::PushID("joints");
 			ImGui::Separator();
 			for (int i = 0; i < count; ++i)
 			{
 				ComponentUID cmp;
-				cmp.handle = scene->getDistanceJointComponent(i);
-				cmp.type = DISTANCE_JOINT_TYPE;
+				cmp.handle = scene->getJointComponent(i);
 				cmp.scene = scene;
-				cmp.entity = scene->getDistanceJointEntity(cmp.handle);
-				EditorPlugin::showDistanceJointGizmo(cmp);
+				cmp.entity = scene->getJointEntity(cmp.handle);
+				switch ((physx::PxJointConcreteType::Enum)scene->getJoint(cmp.handle)->getConcreteType())
+				{
+					case physx::PxJointConcreteType::eDISTANCE:
+						cmp.type = DISTANCE_JOINT_TYPE;
+						EditorPlugin::showDistanceJointGizmo(cmp);
+						break;
+					case physx::PxJointConcreteType::eREVOLUTE:
+						cmp.type = HINGE_JOINT_TYPE;
+						EditorPlugin::showHingeJointGizmo(cmp);
+						break;
+					case physx::PxJointConcreteType::eSPHERICAL:
+						cmp.type = SPHERICAL_JOINT_TYPE;
+						EditorPlugin::showSphericalJointGizmo(cmp);
+						break;
+					case physx::PxJointConcreteType::eD6:
+						cmp.type = D6_JOINT_TYPE;
+						EditorPlugin::showD6JointGizmo(cmp);
+						break;
+				}
 
 				ImGui::PushID(i);
 				char tmp[256];
@@ -463,7 +480,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 				if (ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&cmp.entity, 1);
 				ImGui::NextColumn();
 
-				Entity other_entity = scene->getDistanceJointConnectedBody(cmp.handle);
+				Entity other_entity = scene->getJointConnectedBody(cmp.handle);
 				getEntityListDisplayName(m_editor, tmp, Lumix::lengthOf(tmp), other_entity);
 				if (isValid(other_entity) && ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&other_entity, 1);
 				ImGui::NextColumn();
@@ -471,82 +488,6 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 			}
 			ImGui::Columns();
 			ImGui::PopID();
-		}
-	}
-
-	void onSphericalJointGUI()
-	{
-		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
-		int count = scene->getSphericalJointCount();
-		if (count > 0 && ImGui::CollapsingHeader("Spherical joints"))
-		{
-			ImGui::Columns(2);
-			ImGui::Text("From"); ImGui::NextColumn();
-			ImGui::Text("To"); ImGui::NextColumn();
-			ImGui::PushID("spherical_joints");
-			ImGui::Separator();
-			for (int i = 0; i < count; ++i)
-			{
-				ComponentUID cmp;
-				cmp.handle = scene->getSphericalJointComponent(i);
-				cmp.type = SPHERICAL_JOINT_TYPE;
-				cmp.scene = scene;
-				cmp.entity = scene->getSphericalJointEntity(cmp.handle);
-				EditorPlugin::showSphericalJointGizmo(cmp);
-
-				ImGui::PushID(i);
-				char tmp[256];
-				getEntityListDisplayName(m_editor, tmp, Lumix::lengthOf(tmp), cmp.entity);
-				bool b = false;
-				if (ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&cmp.entity, 1);
-				ImGui::NextColumn();
-
-				Entity other_entity = scene->getSphericalJointConnectedBody(cmp.handle);
-				getEntityListDisplayName(m_editor, tmp, Lumix::lengthOf(tmp), other_entity);
-				if (isValid(other_entity) && ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&other_entity, 1);
-				ImGui::NextColumn();
-				ImGui::PopID();
-			}
-			ImGui::Columns();
-			ImGui::PopID();
-		}
-	}
-
-
-	void onHingeJointGUI()
-	{
-		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
-		int count = scene->getHingeJointCount();
-		if (count > 0 && ImGui::CollapsingHeader("Hinge joints"))
-		{
-			ImGui::Columns(2);
-			ImGui::Text("From"); ImGui::NextColumn();
-			ImGui::Text("To"); ImGui::NextColumn();
-			ImGui::Separator();
-			for (int i = 0; i < count; ++i)
-			{
-				ComponentUID cmp;
-				cmp.handle = scene->getHingeJointComponent(i);
-				cmp.type = HINGE_JOINT_TYPE;
-				cmp.scene = scene;
-				cmp.entity = scene->getHingeJointEntity(cmp.handle);
-				EditorPlugin::showHingeJointGizmo(cmp);
-
-				ImGui::PushID(i);
-				char tmp[256];
-				getEntityListDisplayName(m_editor, tmp, Lumix::lengthOf(tmp), cmp.entity);
-				bool b = false;
-				if (ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&cmp.entity, 1);
-				ImGui::NextColumn();
-
-				Entity other_entity = scene->getHingeJointConnectedBody(cmp.handle);
-				getEntityListDisplayName(m_editor, tmp, Lumix::lengthOf(tmp), other_entity);
-				if (ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&other_entity, 1);
-				ImGui::NextColumn();
-				ImGui::PopID();
-
-			}
-			ImGui::Columns();
 		}
 	}
 
@@ -653,9 +594,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 		ImGui::Indent();
 
 		onVisualizationGUI();
-		onHingeJointGUI();
-		onDistanceJointGUI();
-		onSphericalJointGUI();
+		onJointGUI();
 		onActorGUI();
 		ImGui::Unindent();
 	}
