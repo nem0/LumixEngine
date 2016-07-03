@@ -2037,9 +2037,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void deinitD6Joints()
 	{
-		for (int i = 0, c = m_hinge_joints.size(); i < c; ++i)
+		for (int i = 0, c = m_d6_joints.size(); i < c; ++i)
 		{
-			auto& joint = m_hinge_joints.at(i);
+			auto& joint = m_d6_joints.at(i);
 			if (joint.physx)
 			{
 				joint.physx->release();
