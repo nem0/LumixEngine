@@ -15,7 +15,6 @@
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
 #include "navigation_system.h"
-#include "physics/physics_scene.h"
 #include "renderer/model.h"
 #include "renderer/material.h"
 #include "renderer/render_scene.h"
@@ -139,7 +138,6 @@ struct NavigationSceneImpl : public NavigationScene
 		, m_agents(m_allocator)
 		, m_crowd(nullptr)
 		, m_script_scene(nullptr)
-		, m_physics_scene(nullptr)
 	{
 		setGeneratorParams(0.3f, 0.1f, 0.3f, 2.0f, 60.0f, 1.5f);
 		m_universe.entityTransformed().bind<NavigationSceneImpl, &NavigationSceneImpl::onEntityMoved>(this);
@@ -679,9 +677,6 @@ struct NavigationSceneImpl : public NavigationScene
 		auto* scene = m_universe.getScene(crc32("lua_script"));
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
 		
-		scene = m_universe.getScene(crc32("physics"));
-		m_physics_scene = static_cast<PhysicsScene*>(scene);
-
 		if (m_navmesh && !m_crowd) initCrowd();
 	}
 
@@ -1172,7 +1167,6 @@ struct NavigationSceneImpl : public NavigationScene
 	int m_num_tiles_x;
 	int m_num_tiles_z;
 	LuaScriptScene* m_script_scene;
-	PhysicsScene* m_physics_scene;
 	dtCrowd* m_crowd;
 };
 

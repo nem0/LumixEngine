@@ -32,6 +32,7 @@ static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType(
 static const ComponentType DISTANCE_JOINT_TYPE = PropertyRegister::getComponentType("distance_joint");
 static const ComponentType HINGE_JOINT_TYPE = PropertyRegister::getComponentType("hinge_joint");
 static const ComponentType SPHERICAL_JOINT_TYPE = PropertyRegister::getComponentType("spherical_joint");
+static const ComponentType D6_JOINT_TYPE = PropertyRegister::getComponentType("d6_joint");
 static const uint32 RENDERER_HASH = crc32("renderer");
 static const uint32 PHYSICS_HASH = crc32("PHYSICS");
 
@@ -41,6 +42,35 @@ struct EditorPlugin : public WorldEditor::Plugin
 	explicit EditorPlugin(WorldEditor& editor)
 		: m_editor(editor)
 	{
+	}
+
+
+	static void showD6JointGizmo(ComponentUID cmp)
+	{
+		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
+		Universe& universe = phy_scene->getUniverse();
+		auto* render_scene = static_cast<RenderScene*>(universe.getScene(RENDERER_HASH));
+		if (!render_scene) return;
+
+		Entity other_entity = phy_scene->getD6JointConnectedBody(cmp.handle);
+		if (!isValid(other_entity)) return;
+
+		Transform local_frame0 = phy_scene->getD6JointLocalFrame(cmp.handle);
+		Transform global_frame0 = universe.getTransform(cmp.entity) * local_frame0;
+		Vec3 joint_pos = global_frame0.pos;
+		Matrix mtx0 = global_frame0.toMatrix();
+
+		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getXVector(), 0xffff0000, 0);
+		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getYVector(), 0xff00ff00, 0);
+		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getZVector(), 0xff0000ff, 0);
+
+		Transform local_frame1 = phy_scene->getD6JointConnectedBodyLocalFrame(cmp.handle);
+		Transform global_frame1 = universe.getTransform(other_entity) * local_frame1;
+		Matrix mtx1 = global_frame1.toMatrix();
+
+		render_scene->addDebugLine(joint_pos, joint_pos + mtx1.getXVector(), 0xffff0000, 0);
+		render_scene->addDebugLine(joint_pos, joint_pos + mtx1.getYVector(), 0xff00ff00, 0);
+		render_scene->addDebugLine(joint_pos, joint_pos + mtx1.getZVector(), 0xff0000ff, 0);
 	}
 
 
@@ -270,6 +300,12 @@ struct EditorPlugin : public WorldEditor::Plugin
 		if (cmp.type == SPHERICAL_JOINT_TYPE)
 		{
 			showSphericalJointGizmo(cmp);
+			return true;
+		}
+
+		if (cmp.type == D6_JOINT_TYPE)
+		{
+			showD6JointGizmo(cmp);
 			return true;
 		}
 
@@ -928,6 +964,7 @@ LUMIX_STUDIO_ENTRY(physics)
 	app.registerComponent("distance_joint", "Distance Joint");
 	app.registerComponent("hinge_joint", "Hinge Joint");
 	app.registerComponent("spherical_joint", "Spherical Joint");
+	app.registerComponent("d6_joint", "D6 Joint");
 	app.registerComponent("box_rigid_actor", "Physics Box");
 	app.registerComponent("sphere_rigid_actor", "Physics Sphere");
 	app.registerComponent("capsule_rigid_actor", "Physics Capsule");
