@@ -338,7 +338,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
-			LUMIX_DELETE(m_allocator, m_actors[i]);
+			LUMIX_DELETE(m_allocator, m_actors.at(i));
 		}
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
@@ -427,11 +427,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		if (type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == CAPSULE_ACTOR_TYPE ||
 			type == SPHERE_ACTOR_TYPE)
 		{
-			for (int i = 0; i < m_actors.size(); ++i)
-			{
-				if (m_actors[i] && m_actors[i]->entity == entity) return {i};
-			}
-			return INVALID_COMPONENT;
+			int idx = m_actors.find(entity);
+			if (idx < 0) return INVALID_COMPONENT;
+			return {entity.index};
 		}
 		if (type == RAGDOLL_TYPE)
 		{
@@ -512,18 +510,18 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void setActorLayer(ComponentHandle cmp, int layer) override
 	{
 		ASSERT(layer < lengthOf(m_layers_names));
-		auto* actor = m_actors[cmp.index];
+		auto* actor = m_actors[{cmp.index}];
 		actor->layer = layer;
 		updateFilterData(actor->physx_actor, actor->layer);
 	}
 
 
-	int getActorLayer(ComponentHandle cmp) override { return m_actors[cmp.index]->layer; }
+	int getActorLayer(ComponentHandle cmp) override { return m_actors[{cmp.index}]->layer; }
 
 
 	float getSphereRadius(ComponentHandle cmp) override
 	{
-		physx::PxRigidActor* actor = m_actors[cmp.index]->physx_actor;
+		physx::PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
 		physx::PxShape* shapes;
 		ASSERT(actor->getNbShapes() == 1);
 		if (actor->getShapes(&shapes, 1) != 1) ASSERT(false);
@@ -535,7 +533,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void setSphereRadius(ComponentHandle cmp, float value) override
 	{
 		if (value == 0) return;
-		physx::PxRigidActor* actor = m_actors[cmp.index]->physx_actor;
+		physx::PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
 		physx::PxShape* shapes;
 		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
 		{
@@ -550,7 +548,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	float getCapsuleRadius(ComponentHandle cmp) override
 	{
-		physx::PxRigidActor* actor = m_actors[cmp.index]->physx_actor;
+		physx::PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
 		physx::PxShape* shapes;
 		ASSERT(actor->getNbShapes() == 1);
 		if (actor->getShapes(&shapes, 1) != 1) ASSERT(false);
@@ -562,7 +560,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void setCapsuleRadius(ComponentHandle cmp, float value) override
 	{
 		if (value == 0) return;
-		physx::PxRigidActor* actor = m_actors[cmp.index]->physx_actor;
+		physx::PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
 		physx::PxShape* shapes;
 		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
 		{
@@ -577,7 +575,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	
 	float getCapsuleHeight(ComponentHandle cmp) override
 	{
-		physx::PxRigidActor* actor = m_actors[cmp.index]->physx_actor;
+		physx::PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
 		physx::PxShape* shapes;
 		ASSERT(actor->getNbShapes() == 1);
 		if (actor->getShapes(&shapes, 1) != 1) ASSERT(false);
@@ -589,7 +587,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void setCapsuleHeight(ComponentHandle cmp, float value) override
 	{
 		if (value == 0) return;
-		physx::PxRigidActor* actor = m_actors[cmp.index]->physx_actor;
+		physx::PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
 		physx::PxShape* shapes;
 		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
 		{
@@ -1133,10 +1131,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 		else if (type == MESH_ACTOR_TYPE || type == BOX_ACTOR_TYPE || type == CAPSULE_ACTOR_TYPE ||
 				 type == SPHERE_ACTOR_TYPE)
 		{
-			Entity entity = m_actors[cmp.index]->entity;
-			m_actors[cmp.index]->entity = INVALID_ENTITY;
-			m_actors[cmp.index]->setPhysxActor(nullptr);
-			m_dynamic_actors.eraseItem(m_actors[cmp.index]);
+			Entity entity = {cmp.index};
+			auto* actor = m_actors[entity];
+			actor->setPhysxActor(nullptr);
+			LUMIX_DELETE(m_allocator, actor);
+			m_actors.erase(entity);
+			m_dynamic_actors.eraseItem(actor);
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
 		else if (type == RAGDOLL_TYPE)
@@ -1317,7 +1317,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	ComponentHandle createCapsuleRigidActor(Entity entity)
 	{
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::CAPSULE);
-		m_actors.push(actor);
+		m_actors.insert(entity, actor);
 		actor->entity = entity;
 
 		physx::PxCapsuleGeometry geom;
@@ -1352,7 +1352,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	ComponentHandle createBoxRigidActor(Entity entity)
 	{
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
-		m_actors.push(actor);
+		m_actors.insert(entity, actor);
 		actor->entity = entity;
 
 		physx::PxBoxGeometry geom;
@@ -1375,7 +1375,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	ComponentHandle createSphereRigidActor(Entity entity)
 	{
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::SPHERE);
-		m_actors.push(actor);
+		m_actors.insert(entity, actor);
 		actor->entity = entity;
 
 		physx::PxSphereGeometry geom;
@@ -1395,7 +1395,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	ComponentHandle createMeshRigidActor(Entity entity)
 	{
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::MESH);
-		m_actors.push(actor);
+		m_actors.insert(entity, actor);
 		actor->entity = entity;
 
 		ComponentHandle cmp = {m_actors.size() - 1};
@@ -1475,15 +1475,15 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	Path getShapeSource(ComponentHandle cmp) override
 	{
-		return m_actors[cmp.index]->resource ? m_actors[cmp.index]->resource->getPath() : Path("");
+		return m_actors[{cmp.index}]->resource ? m_actors[{cmp.index}]->resource->getPath() : Path("");
 	}
 
 
 	void setShapeSource(ComponentHandle cmp, const Path& str) override
 	{
-		ASSERT(m_actors[cmp.index]);
+		ASSERT(m_actors[{cmp.index}]);
 		bool is_dynamic = isDynamic(cmp);
-		auto& actor = *m_actors[cmp.index];
+		auto& actor = *m_actors[{cmp.index}];
 		if (actor.resource && actor.resource->getPath() == str &&
 			(!actor.physx_actor || is_dynamic == !actor.physx_actor->isRigidStatic()))
 		{
@@ -1506,14 +1506,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 
 	int getActorCount() const override { return m_actors.size(); }
-	Entity getActorEntity(int index) override { return m_actors[index]->entity; }
-	ActorType getActorType(int index) override { return m_actors[index]->type; }
+	Entity getActorEntity(int index) override { return m_actors.at(index)->entity; }
+	ActorType getActorType(int index) override { return m_actors.at(index)->type; }
 	ComponentHandle getActorComponentHandle(int index) override { return {index}; }
 
 
 	bool isActorDebugEnabled(int index) const override
 	{
-		auto* px_actor = m_actors[index]->physx_actor;
+		auto* px_actor = m_actors.at(index)->physx_actor;
 		if (!px_actor) return false;
 		return px_actor->getActorFlags().isSet(physx::PxActorFlag::eVISUALIZATION);
 	}
@@ -1521,7 +1521,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void enableActorDebug(int index, bool enable) const override
 	{
-		auto* px_actor = m_actors[index]->physx_actor;
+		auto* px_actor = m_actors.at(index)->physx_actor;
 		if (!px_actor) return;
 		px_actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, enable);
 		physx::PxShape* shape;
@@ -1610,7 +1610,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		for (auto& i : m_queued_forces)
 		{
-			auto* actor = m_actors[i.cmp.index];
+			auto* actor = m_actors[{i.cmp.index}];
 			if (!actor->is_dynamic)
 			{
 				g_log_warning.log("Physics") << "Trying to apply force to static object";
@@ -2015,11 +2015,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle getActorComponent(Entity entity) override
 	{
-		for (int i = 0; i < m_actors.size(); ++i)
-		{
-			if (m_actors[i]->entity == entity) return {i};
-		}
-		return INVALID_COMPONENT;
+		int idx = m_actors.find(entity);
+		if (idx < 0) return INVALID_COMPONENT;
+		return {entity.index};
 	}
 
 
@@ -2087,12 +2085,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 			Entity entity = m_distance_joints.getKey(i);
 
 			physx::PxRigidActor* actors[2] = { nullptr, nullptr };
-			for (auto* actor : m_actors)
-			{
-				if (actor->entity == entity) actors[0] = actor->physx_actor;
-				if (actor->entity == joint.connected_body) actors[1] = actor->physx_actor;
-			}
-
+			int idx = m_actors.find(entity);
+			if (idx >= 0) actors[0] = m_actors.at(idx)->physx_actor;
+			idx = m_actors.find(joint.connected_body);
+			if (idx >= 0) actors[1] = m_actors.at(idx)->physx_actor;
 			if (!actors[0] || !actors[1]) continue;
 
 			physx::PxTransform identity = physx::PxTransform::createIdentity();
@@ -2138,13 +2134,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 			auto& joint = m_spherical_joints.at(i);
 			Entity entity = m_spherical_joints.getKey(i);
 
-			physx::PxRigidActor* actors[2] = {nullptr, nullptr};
-			for (auto* actor : m_actors)
-			{
-				if (actor->entity == entity) actors[0] = actor->physx_actor;
-				if (actor->entity == joint.connected_body) actors[1] = actor->physx_actor;
-			}
-
+			physx::PxRigidActor* actors[2] = { nullptr, nullptr };
+			int idx = m_actors.find(entity);
+			if (idx >= 0) actors[0] = m_actors.at(idx)->physx_actor;
+			idx = m_actors.find(joint.connected_body);
+			if (idx >= 0) actors[1] = m_actors.at(idx)->physx_actor;
 			if (!actors[0] || !actors[1]) continue;
 
 			Vec3 pos0 = m_universe.getPosition(entity);
@@ -2186,12 +2180,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 			Entity entity = m_d6_joints.getKey(i);
 
 			physx::PxRigidActor* actors[2] = { nullptr, nullptr };
-			for (auto* actor : m_actors)
-			{
-				if (actor->entity == entity) actors[0] = actor->physx_actor;
-				if (actor->entity == joint.connected_body) actors[1] = actor->physx_actor;
-			}
-
+			int idx = m_actors.find(entity);
+			if (idx >= 0) actors[0] = m_actors.at(idx)->physx_actor;
+			idx = m_actors.find(joint.connected_body);
+			if (idx >= 0) actors[1] = m_actors.at(idx)->physx_actor;
 			if (!actors[0] || !actors[1]) continue;
 
 			Vec3 pos0 = m_universe.getPosition(entity);
@@ -2244,12 +2236,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 			Entity entity = m_hinge_joints.getKey(i);
 
 			physx::PxRigidActor* actors[2] = { nullptr, nullptr };
-			for (auto* actor : m_actors)
-			{
-				if (actor->entity == entity) actors[0] = actor->physx_actor;
-				if (actor->entity == joint.connected_body) actors[1] = actor->physx_actor;
-			}
-
+			int idx = m_actors.find(entity);
+			if (idx >= 0) actors[0] = m_actors.at(idx)->physx_actor;
+			idx = m_actors.find(joint.connected_body);
+			if (idx >= 0) actors[1] = m_actors.at(idx)->physx_actor;
 			if (!actors[0] || !actors[1]) continue;
 
 			Vec3 pos0 = m_universe.getPosition(entity);
@@ -2390,20 +2380,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void onEntityMoved(Entity entity)
 	{
-		for (int i = 0, c = m_dynamic_actors.size(); i < c; ++i)
-		{
-			if (m_dynamic_actors[i]->entity == entity)
-			{
-				Vec3 pos = m_universe.getPosition(entity);
-				physx::PxVec3 pvec(pos.x, pos.y, pos.z);
-				Quat q = m_universe.getRotation(entity);
-				physx::PxQuat pquat(q.x, q.y, q.z, q.w);
-				physx::PxTransform trans(pvec, pquat);
-				m_dynamic_actors[i]->physx_actor->setGlobalPose(trans, false);
-				return;
-			}
-		}
-
 		for (int i = 0, c = m_controllers.size(); i < c; ++i)
 		{
 			if (m_controllers[i].m_entity == entity)
@@ -2417,18 +2393,16 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 		}
 
-		for (int i = 0, c = m_actors.size(); i < c; ++i)
+		int idx = m_actors.find(entity);
+		if(idx >= 0)
 		{
-			if (m_actors[i]->entity == entity)
-			{
-				Vec3 pos = m_universe.getPosition(entity);
-				physx::PxVec3 pvec(pos.x, pos.y, pos.z);
-				Quat q = m_universe.getRotation(entity);
-				physx::PxQuat pquat(q.x, q.y, q.z, q.w);
-				physx::PxTransform trans(pvec, pquat);
-				m_actors[i]->physx_actor->setGlobalPose(trans, false);
-				return;
-			}
+			Vec3 pos = m_universe.getPosition(entity);
+			physx::PxVec3 pvec(pos.x, pos.y, pos.z);
+			Quat q = m_universe.getRotation(entity);
+			physx::PxQuat pquat(q.x, q.y, q.z, q.w);
+			physx::PxTransform trans(pvec, pquat);
+			m_actors.at(idx)->physx_actor->setGlobalPose(trans, false);
+			return;
 		}
 	}
 
@@ -2540,10 +2514,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void removeCollisionLayer() override
 	{
 		m_layers_count = Math::maximum(0, m_layers_count - 1);
-		for (auto* actor : m_actors)
+		for (int i = 0; i < m_actors.size(); ++i)
 		{
-			if (!actor->physx_actor) continue;
-			if (actor->entity == INVALID_ENTITY) continue;
+			auto* actor = m_actors.at(i);
 			actor->layer = Math::minimum(m_layers_count - 1, actor->layer);
 		}
 		for (auto& controller : m_controllers)
@@ -2613,11 +2586,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void updateFilterData()
 	{
-		for (auto* actor : m_actors)
+		for (int i = 0, c = m_actors.size(); i < c; ++i)
 		{
-			if (!actor->physx_actor) continue;
-			if (actor->entity == INVALID_ENTITY) continue;
-
+			auto* actor = m_actors.at(i);
 			physx::PxFilterData data;
 			int actor_layer = actor->layer;
 			data.word0 = 1 << actor_layer;
@@ -2673,7 +2644,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	bool isDynamic(ComponentHandle cmp) override
 	{
-		RigidActor* actor = m_actors[cmp.index];
+		RigidActor* actor = m_actors[{cmp.index}];
 		return isDynamic(actor);
 	}
 
@@ -2694,7 +2665,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	Vec3 getHalfExtents(ComponentHandle cmp) override
 	{
 		Vec3 size;
-		physx::PxRigidActor* actor = m_actors[cmp.index]->physx_actor;
+		physx::PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
 		physx::PxShape* shapes;
 		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
 		{
@@ -2709,7 +2680,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void setHalfExtents(ComponentHandle cmp, const Vec3& size) override
 	{
-		physx::PxRigidActor* actor = m_actors[cmp.index]->physx_actor;
+		physx::PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
 		physx::PxShape* shapes;
 		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
 		{
@@ -2727,7 +2698,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void setIsDynamic(ComponentHandle cmp, bool new_value) override
 	{
-		RigidActor* actor = m_actors[cmp.index];
+		RigidActor* actor = m_actors[{cmp.index}];
 		int dynamic_index = m_dynamic_actors.indexOf(actor);
 		bool is_dynamic = dynamic_index != -1;
 		if (is_dynamic == new_value) return;
@@ -2763,9 +2734,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void serializeActor(OutputBlob& serializer, int idx)
+	void serializeActor(OutputBlob& serializer, RigidActor* actor)
 	{
-		auto* actor = m_actors[idx];
 		serializer.write(actor->layer);
 		physx::PxShape* shapes;
 		auto* px_actor = actor->physx_actor;
@@ -2809,9 +2779,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deserializeActor(InputBlob& serializer, ComponentHandle cmp, int version)
+	void deserializeActor(InputBlob& serializer, RigidActor* actor, int version)
 	{
-		auto* actor = m_actors[cmp.index];
+		ComponentHandle cmp = {actor->entity.index};
 		actor->layer = 0;
 		if (version > (int)PhysicsSceneVersion::LAYERS) serializer.read(actor->layer);
 
@@ -2823,9 +2793,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				physx::PxBoxGeometry box_geom;
 				physx::PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
-				serializer.read(box_geom.halfExtents.x);
-				serializer.read(box_geom.halfExtents.y);
-				serializer.read(box_geom.halfExtents.z);
+				serializer.read(box_geom.halfExtents);
 				physx::PxRigidActor* physx_actor;
 				if (isDynamic(cmp))
 				{
@@ -2902,14 +2870,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 		serializer.write(m_layers_names);
 		serializer.write(m_collision_filter);
 		serializer.write((int32)m_actors.size());
-		for (int i = 0; i < m_actors.size(); ++i)
+		for (int i = 0, c = m_actors.size(); i < c; ++i)
 		{
-			serializer.write(isDynamic({i}));
-			serializer.write(m_actors[i]->entity);
-			if (isValid(m_actors[i]->entity))
-			{
-				serializeActor(serializer, i);
-			}
+			RigidActor* actor = m_actors.at(i);
+			serializer.write(isDynamic({actor->entity.index}));
+			serializer.write(actor->entity);
+			serializeActor(serializer, actor);
 		}
 		serializer.write((int32)m_controllers.size());
 		for (int i = 0; i < m_controllers.size(); ++i)
@@ -3202,25 +3168,27 @@ struct PhysicsSceneImpl : public PhysicsScene
 		int32 count;
 		m_dynamic_actors.clear();
 		serializer.read(count);
-		for (int i = count; i < m_actors.size(); ++i)
-		{
-			m_actors[i]->setPhysxActor(nullptr);
-		}
-		int old_size = m_actors.size();
-		m_actors.resize(count);
-		for (int i = old_size; i < count; ++i)
-		{
-			RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
-			m_actors[i] = actor;
-		}
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
-			auto* actor = m_actors[i];
+			m_actors.at(i)->setPhysxActor(nullptr);
+			LUMIX_DELETE(m_allocator, m_actors.at(i));
+		}
+		int old_size = m_actors.size();
+		m_actors.clear();
+		m_actors.reserve(count);
+		for (int i = 0; i < count; ++i)
+		{
+			RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
 			serializer.read(actor->is_dynamic);
-			if (actor->is_dynamic) m_dynamic_actors.push(actor);
-
 			serializer.read(actor->entity);
-			if (isValid(actor->entity)) deserializeActor(serializer, {i}, version);
+			if (!isValid(actor->entity))
+			{
+				LUMIX_DELETE(m_allocator, actor);
+				continue;
+			}
+			if (actor->is_dynamic) m_dynamic_actors.push(actor);
+			m_actors.insert(actor->entity, actor);
+			deserializeActor(serializer, actor, version);
 		}
 	}
 
@@ -3491,7 +3459,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	float getActorSpeed(ComponentHandle cmp) override
 	{
-		auto* actor = m_actors[cmp.index];
+		auto* actor = m_actors[{cmp.index}];
 		if (!actor->is_dynamic)
 		{
 			g_log_warning.log("Physics") << "Trying to get speed of static object";
@@ -3506,7 +3474,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void putToSleep(ComponentHandle cmp) override
 	{
-		auto* actor = m_actors[cmp.index];
+		auto* actor = m_actors[{cmp.index}];
 		if (!actor->is_dynamic)
 		{
 			g_log_warning.log("Physics") << "Trying to put static object to sleep";
@@ -3576,7 +3544,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	PhysicsSystem* m_system;
 	physx::PxControllerManager* m_controller_manager;
 	physx::PxMaterial* m_default_material;
-	Array<RigidActor*> m_actors;
+	AssociativeArray<Entity, RigidActor*> m_actors;
 	Array<RigidActor*> m_dynamic_actors;
 	AssociativeArray<Entity, Ragdoll> m_ragdolls;
 	AssociativeArray<Entity, DistanceJoint> m_distance_joints;
