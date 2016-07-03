@@ -25,6 +25,108 @@ namespace Lumix
 	static const uint32 PHYSICS_HASH = crc32("PHYSICS");
 
 
+	class D6MotionDescriptor : public IEnumPropertyDescriptor
+	{
+	public:
+		typedef physx::PxD6Motion::Enum(PhysicsScene::*Getter)(ComponentHandle);
+		typedef void (PhysicsScene::*Setter)(ComponentHandle, physx::PxD6Motion::Enum);
+		typedef physx::PxD6Motion::Enum(PhysicsScene::*ArrayGetter)(ComponentHandle, int);
+		typedef void (PhysicsScene::*ArraySetter)(ComponentHandle, int, physx::PxD6Motion::Enum);
+
+	public:
+		D6MotionDescriptor(const char* name,
+			Getter _getter,
+			Setter _setter,
+			IAllocator& allocator)
+			: IEnumPropertyDescriptor(allocator)
+		{
+			setName(name);
+			m_single.getter = _getter;
+			m_single.setter = _setter;
+			m_type = ENUM;
+		}
+
+
+		D6MotionDescriptor(const char* name,
+			ArrayGetter _getter,
+			ArraySetter _setter,
+			IAllocator& allocator)
+			: IEnumPropertyDescriptor(allocator)
+		{
+			setName(name);
+			m_array.getter = _getter;
+			m_array.setter = _setter;
+			m_type = ENUM;
+		}
+
+
+		void set(ComponentUID cmp, int index, InputBlob& stream) const override
+		{
+			int value;
+			stream.read(&value, sizeof(value));
+			if (index == -1)
+			{
+				(static_cast<PhysicsScene*>(cmp.scene)->*m_single.setter)(cmp.handle, (physx::PxD6Motion::Enum)value);
+			}
+			else
+			{
+				(static_cast<PhysicsScene*>(cmp.scene)->*m_array.setter)(cmp.handle, index, (physx::PxD6Motion::Enum)value);
+			}
+		};
+
+
+		void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+		{
+			physx::PxD6Motion::Enum value;
+			if (index == -1)
+			{
+				value = (static_cast<PhysicsScene*>(cmp.scene)->*m_single.getter)(cmp.handle);
+			}
+			else
+			{
+				value = (static_cast<PhysicsScene*>(cmp.scene)->*m_array.getter)(cmp.handle, index);
+			}
+			stream.write(&value, sizeof(value));
+		};
+
+
+		int getEnumCount(IScene* scene, ComponentHandle) override
+		{
+			return 3;
+		}
+
+
+		const char* getEnumItemName(IScene* scene, ComponentHandle, int index) override
+		{
+			switch ((physx::PxD6Motion::Enum)index)
+			{
+				case physx::PxD6Motion::eLOCKED: return "locked";
+				case physx::PxD6Motion::eLIMITED: return "limited";
+				case physx::PxD6Motion::eFREE: return "free";
+				default: ASSERT(false); return "Unknown";
+			}
+		}
+
+
+		void getEnumItemName(IScene* scene, ComponentHandle, int index, char* buf, int max_size) override {}
+
+	private:
+		union
+		{
+			struct
+			{
+				Getter getter;
+				Setter setter;
+			} m_single;
+			struct
+			{
+				ArrayGetter getter;
+				ArraySetter setter;
+			} m_array;
+		};
+	};
+
+
 	class PhysicsLayerPropertyDescriptor : public IEnumPropertyDescriptor
 	{
 	public:
@@ -160,6 +262,69 @@ namespace Lumix
 				&PhysicsScene::setIsDynamic,
 				allocator));
 
+		PropertyRegister::add("d6_joint",
+			LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)("Connected body",
+				&PhysicsScene::getD6JointConnectedBody,
+				&PhysicsScene::setD6JointConnectedBody,
+				allocator));
+		PropertyRegister::add("d6_joint",
+			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)("Axis position",
+				&PhysicsScene::getD6JointAxisPosition,
+				&PhysicsScene::setD6JointAxisPosition,
+				allocator));
+		PropertyRegister::add("d6_joint",
+			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)("Axis direction",
+				&PhysicsScene::getD6JointAxisDirection,
+				&PhysicsScene::setD6JointAxisDirection,
+				allocator));
+		PropertyRegister::add("d6_joint",
+			LUMIX_NEW(allocator, D6MotionDescriptor)("X motion",
+				&PhysicsScene::getD6JointXMotion,
+				&PhysicsScene::setD6JointXMotion,
+				allocator));
+		PropertyRegister::add("d6_joint",
+			LUMIX_NEW(allocator, D6MotionDescriptor)("Y motion",
+				&PhysicsScene::getD6JointYMotion,
+				&PhysicsScene::setD6JointYMotion,
+				allocator));
+		PropertyRegister::add("d6_joint",
+			LUMIX_NEW(allocator, D6MotionDescriptor)("Z motion",
+				&PhysicsScene::getD6JointZMotion,
+				&PhysicsScene::setD6JointZMotion,
+				allocator));
+		PropertyRegister::add("d6_joint",
+			LUMIX_NEW(allocator, D6MotionDescriptor)("Swing 1",
+				&PhysicsScene::getD6JointSwing1Motion,
+				&PhysicsScene::setD6JointSwing1Motion,
+				allocator));
+		PropertyRegister::add("d6_joint",
+			LUMIX_NEW(allocator, D6MotionDescriptor)("Swing 2",
+				&PhysicsScene::getD6JointSwing2Motion,
+				&PhysicsScene::setD6JointSwing2Motion,
+				allocator));
+		PropertyRegister::add("d6_joint",
+			LUMIX_NEW(allocator, D6MotionDescriptor)("Twist",
+				&PhysicsScene::getD6JointTwistMotion,
+				&PhysicsScene::setD6JointTwistMotion,
+				allocator));
+		PropertyRegister::add("d6_joint",
+			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Linear limit",
+				&PhysicsScene::getD6JointLinearLimit,
+				&PhysicsScene::setD6JointLinearLimit,
+				0.0f,
+				FLT_MAX,
+				0.0f,
+				allocator));
+		PropertyRegister::add("d6_joint",
+			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)("Swing limit",
+				&PhysicsScene::getD6JointSwingLimit,
+				&PhysicsScene::setD6JointSwingLimit,
+				allocator));
+		PropertyRegister::add("d6_joint",
+			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)("Twist limit",
+				&PhysicsScene::getD6JointTwistLimit,
+				&PhysicsScene::setD6JointTwistLimit,
+				allocator));
 
 		PropertyRegister::add("spherical_joint",
 			LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)("Connected body",

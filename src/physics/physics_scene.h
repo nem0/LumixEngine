@@ -4,6 +4,7 @@
 #include "engine/lumix.h"
 #include "engine/iplugin.h"
 #include "engine/vec.h"
+#include <extensions/PxD6Joint.h>
 
 #ifdef STATIC_PLUGINS
 	#define LUMIX_PHYSICS_API
@@ -93,6 +94,33 @@ public:
 
 	virtual float getSphereRadius(ComponentHandle cmp) = 0;
 	virtual void setSphereRadius(ComponentHandle cmp, float value) = 0;
+
+	virtual Entity getD6JointConnectedBody(ComponentHandle cmp) = 0;
+	virtual void setD6JointConnectedBody(ComponentHandle cmp, Entity entity) = 0;
+	virtual physx::PxD6Motion::Enum getD6JointXMotion(ComponentHandle cmp) = 0;
+	virtual void setD6JointXMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) = 0;
+	virtual physx::PxD6Motion::Enum getD6JointYMotion(ComponentHandle cmp) = 0;
+	virtual void setD6JointYMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) = 0;
+	virtual physx::PxD6Motion::Enum getD6JointZMotion(ComponentHandle cmp) = 0;
+	virtual void setD6JointZMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) = 0;
+	virtual physx::PxD6Motion::Enum getD6JointSwing1Motion(ComponentHandle cmp) = 0;
+	virtual void setD6JointSwing1Motion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) = 0;
+	virtual physx::PxD6Motion::Enum getD6JointSwing2Motion(ComponentHandle cmp) = 0;
+	virtual void setD6JointSwing2Motion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) = 0;
+	virtual physx::PxD6Motion::Enum getD6JointTwistMotion(ComponentHandle cmp) = 0;
+	virtual void setD6JointTwistMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) = 0;
+	virtual float getD6JointLinearLimit(ComponentHandle cmp) = 0;
+	virtual void setD6JointLinearLimit(ComponentHandle cmp, float limit) = 0;
+	virtual Vec2 getD6JointTwistLimit(ComponentHandle cmp) = 0;
+	virtual void setD6JointTwistLimit(ComponentHandle cmp, const Vec2& limit) = 0;
+	virtual Vec2 getD6JointSwingLimit(ComponentHandle cmp) = 0;
+	virtual void setD6JointSwingLimit(ComponentHandle cmp, const Vec2& limit) = 0;
+	virtual Vec3 getD6JointAxisPosition(ComponentHandle cmp) = 0;
+	virtual void setD6JointAxisPosition(ComponentHandle cmp, const Vec3& value) = 0;
+	virtual Vec3 getD6JointAxisDirection(ComponentHandle cmp) = 0;
+	virtual void setD6JointAxisDirection(ComponentHandle cmp, const Vec3& value) = 0;
+	virtual Transform getD6JointLocalFrame(ComponentHandle cmp) = 0;
+	virtual Transform getD6JointConnectedBodyLocalFrame(ComponentHandle cmp) = 0;
 
 	virtual float getDistanceJointDamping(ComponentHandle cmp) = 0;
 	virtual void setDistanceJointDamping(ComponentHandle cmp, float value) = 0;
