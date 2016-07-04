@@ -292,6 +292,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	~PhysicsSceneImpl()
 	{
+		for (int i = 0; i < m_ragdolls.size(); ++i)
+		{
+			destroySkeleton(m_ragdolls.at(i).root);
+		}
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
 			LUMIX_DELETE(m_allocator, m_actors.at(i));
