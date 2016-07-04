@@ -71,6 +71,8 @@ public:
 	virtual int getPropertyCount(ComponentHandle cmp, int scr_index) = 0;
 	virtual const char* getPropertyName(ComponentHandle cmp, int scr_index, int prop_index) = 0;
 	virtual Property::Type getPropertyType(ComponentHandle cmp, int scr_index, int prop_index) = 0;
+	virtual void getScriptData(ComponentHandle cmp, OutputBlob& blob) = 0;
+	virtual void setScriptData(ComponentHandle cmp, InputBlob& blob) = 0;
 };
 
 

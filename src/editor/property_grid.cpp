@@ -39,6 +39,7 @@ PropertyGrid::~PropertyGrid()
 
 void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lumix::ComponentUID cmp)
 {
+	if (desc.getType() == Lumix::IPropertyDescriptor::BLOB) return;
 	Lumix::OutputBlob stream(m_editor.getAllocator());
 	desc.get(cmp, index, stream);
 	Lumix::InputBlob tmp(stream);
@@ -194,6 +195,8 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		break;
 	case Lumix::IPropertyDescriptor::ENUM:
 		showEnumProperty(cmp, index, static_cast<Lumix::IEnumPropertyDescriptor&>(desc));
+		break;
+	case Lumix::IPropertyDescriptor::BLOB:
 		break;
 	default:
 		ASSERT(false);
