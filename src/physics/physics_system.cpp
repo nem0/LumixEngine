@@ -226,6 +226,12 @@ namespace Lumix
 
 	static void registerProperties(Lumix::IAllocator& allocator)
 	{
+		PropertyRegister::add("ragdoll",
+			LUMIX_NEW(allocator, BlobPropertyDescriptor<PhysicsScene>)("data",
+				&PhysicsScene::getRagdollData,
+				&PhysicsScene::setRagdollData,
+				allocator));
+
 		PropertyRegister::add("sphere_rigid_actor",
 			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Radius",
 				&PhysicsScene::getSphereRadius,

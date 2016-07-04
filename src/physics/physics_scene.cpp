@@ -1611,6 +1611,18 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	void getRagdollData(ComponentHandle cmp, OutputBlob& blob) override
+	{
+		serializeRagdollBone(m_ragdolls[{cmp.index}].root, blob);
+	}
+
+	
+	void setRagdollData(ComponentHandle cmp, InputBlob& blob) override
+	{
+		m_ragdolls[{cmp.index}].root = deserializeRagdollBone(nullptr, blob);
+	}
+
+
 	void changeRagdollBoneJoint(RagdollBone* child, int type) override
 	{
 		if (child->parent_joint) child->parent_joint->release();
