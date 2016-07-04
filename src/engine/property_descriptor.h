@@ -732,7 +732,7 @@ template <class S> class EntityPropertyDescriptor : public IPropertyDescriptor
 
 
 template <typename S>
-class LUMIX_ENGINE_API BlobPropertyDescriptor : public IPropertyDescriptor
+class BlobPropertyDescriptor : public IPropertyDescriptor
 {
 public:
 	typedef void (S::*Getter)(ComponentHandle, OutputBlob&);
