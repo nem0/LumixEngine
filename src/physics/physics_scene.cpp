@@ -1353,7 +1353,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	int getActorCount() const override { return m_actors.size(); }
 	Entity getActorEntity(int index) override { return m_actors.at(index)->entity; }
 	ActorType getActorType(int index) override { return m_actors.at(index)->type; }
-	ComponentHandle getActorComponentHandle(int index) override { return {index}; }
+	ComponentHandle getActorComponentHandle(int index) override { return {m_actors.getKey(index).index}; }
 
 
 	bool isActorDebugEnabled(int index) const override
