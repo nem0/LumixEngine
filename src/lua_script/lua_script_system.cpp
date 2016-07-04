@@ -365,6 +365,61 @@ namespace Lumix
 		}
 
 
+		void getScriptData(ComponentHandle cmp, OutputBlob& blob) override
+		{
+			auto* scr = m_scripts[cmp.index];
+			blob.write(scr->m_scripts.size());
+			for (int i = 0; i < scr->m_scripts.size(); ++i)
+			{
+				auto& inst = scr->m_scripts[i];
+				blob.writeString(inst.m_script ? inst.m_script->getPath().c_str() : "");
+				blob.write(inst.m_properties.size());
+				for (auto& prop : inst.m_properties)
+				{
+					blob.write(prop.name_hash);
+					blob.write(prop.type);
+					char tmp[1024];
+					tmp[0] = '\0';
+					const char* prop_name = getPropertyName(prop.name_hash);
+					if(prop_name) getPropertyValue(cmp, i, getPropertyName(prop.name_hash), tmp, lengthOf(tmp));
+					blob.writeString(prop_name ? tmp : prop.stored_value.c_str());
+				}
+			}
+		}
+
+
+		void setScriptData(ComponentHandle cmp, InputBlob& blob) override
+		{
+			auto* scr = m_scripts[cmp.index];
+			int count;
+			blob.read(count);
+			for (int i = 0; i < count; ++i)
+			{
+				int idx = addScript(cmp);
+				auto& inst = scr->m_scripts[idx];
+				char tmp[Lumix::MAX_PATH_LENGTH];
+				blob.readString(tmp, lengthOf(tmp));
+				setScriptPath(cmp, idx, Lumix::Path(tmp));
+				
+				int prop_count;
+				blob.read(prop_count);
+				for (int j = 0; j < prop_count; ++j)
+				{
+					uint32 hash;
+					blob.read(hash);
+					auto* prop = scr->getProperty(inst, hash);
+					if(!prop) prop = &scr->m_scripts[idx].m_properties.emplace(m_system.getAllocator());
+					prop->name_hash = hash;
+					blob.read(prop->type);
+					char tmp[1024];
+					blob.readString(tmp, lengthOf(tmp));
+					prop->stored_value = tmp;
+					if (scr->m_scripts[idx].m_state) applyProperty(scr->m_scripts[idx], *prop, tmp);
+				}
+			}
+		}
+
+
 		~LuaScriptSceneImpl()
 		{
 			unloadAllScripts();
@@ -1424,6 +1479,11 @@ namespace Lumix
 		, m_script_manager(m_allocator)
 	{
 		m_script_manager.create(LUA_SCRIPT_HASH, engine.getResourceManager());
+
+		auto& allocator = engine.getAllocator();
+		PropertyRegister::add("lua_script",
+			LUMIX_NEW(allocator, BlobPropertyDescriptor<LuaScriptScene>)(
+				"data", &LuaScriptScene::getScriptData, &LuaScriptScene::setScriptData, allocator));
 	}
 
 

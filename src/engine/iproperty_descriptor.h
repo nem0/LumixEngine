@@ -28,7 +28,8 @@ public:
 		SAMPLED_FUNCTION,
 		ENUM,
 		INT2,
-		ENTITY
+		ENTITY,
+		BLOB
 	};
 
 public:

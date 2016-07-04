@@ -731,6 +731,42 @@ template <class S> class EntityPropertyDescriptor : public IPropertyDescriptor
 };
 
 
+template <typename S>
+class LUMIX_ENGINE_API BlobPropertyDescriptor : public IPropertyDescriptor
+{
+public:
+	typedef void (S::*Getter)(ComponentHandle, OutputBlob&);
+	typedef void (S::*Setter)(ComponentHandle, InputBlob&);
+
+public:
+	BlobPropertyDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
+		: IPropertyDescriptor(allocator)
+	{
+		m_getter = _getter;
+		m_setter = _setter;
+		setName(name);
+		IPropertyDescriptor::m_type = IPropertyDescriptor::BLOB;
+	}
+
+
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		ASSERT(index < 0);
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.handle, stream);
+	}
+
+
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		ASSERT(index < 0);
+		(static_cast<S*>(cmp.scene)->*m_getter)(cmp.handle, stream);
+	}
+
+	Getter m_getter;
+	Setter m_setter;
+};
+
+
 template <class S> class DecimalPropertyDescriptor : public IDecimalPropertyDescriptor
 {
 public:
