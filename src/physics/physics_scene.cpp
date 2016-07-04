@@ -1179,7 +1179,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			PxCreateStatic(*m_system->getPhysics(), px_transform, geom, *m_default_material);
 		actor->setPhysxActor(physx_actor);
 
-		ComponentHandle cmp = {m_actors.size() - 1};
+		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, CAPSULE_ACTOR_TYPE, this, cmp);
 		return cmp;
 	}
@@ -1215,7 +1215,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			PxCreateStatic(*m_system->getPhysics(), px_transform, geom, *m_default_material);
 		actor->setPhysxActor(physx_actor);
 
-		ComponentHandle cmp = {m_actors.size() - 1};
+		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, BOX_ACTOR_TYPE, this, cmp);
 		return cmp;
 	}
@@ -1235,7 +1235,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
 		actor->setPhysxActor(physx_actor);
 
-		ComponentHandle cmp = {m_actors.size() - 1};
+		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, SPHERE_ACTOR_TYPE, this, cmp);
 		return cmp;
 	}
@@ -1247,7 +1247,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_actors.insert(entity, actor);
 		actor->entity = entity;
 
-		ComponentHandle cmp = {m_actors.size() - 1};
+		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, MESH_ACTOR_TYPE, this, cmp);
 		return cmp;
 	}
