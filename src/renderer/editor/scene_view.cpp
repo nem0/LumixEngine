@@ -1,4 +1,5 @@
 #include "scene_view.h"
+#include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
 #include "editor/ieditor_command.h"
 #include "editor/log_ui.h"
@@ -10,12 +11,12 @@
 #include "engine/input_system.h"
 #include "engine/json_serializer.h"
 #include "engine/path.h"
-#include "engine/profiler.h"
-#include "engine/resource_manager.h"
-#include "engine/string.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
+#include "engine/profiler.h"
 #include "engine/property_register.h"
+#include "engine/resource_manager.h"
+#include "engine/string.h"
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
@@ -298,6 +299,10 @@ void SceneView::handleDrop(float x, float y)
 
 	if (hit.m_is_hit)
 	{
+		if (Lumix::PathUtils::hasExtension(path, "fab"))
+		{
+			m_editor->getEntityTemplateSystem().instantiatePrefab(hit.m_origin + hit.m_t * hit.m_dir, Lumix::Path(path));
+		}
 		if (Lumix::PathUtils::hasExtension(path, "msh"))
 		{
 			auto* command = LUMIX_NEW(m_editor->getAllocator(), InsertMeshCommand)(

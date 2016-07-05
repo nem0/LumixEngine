@@ -8,18 +8,23 @@
 namespace Lumix
 {
 
+	class InputBlob;
+
+
 	class LUMIX_ENGINE_API OutputBlob
 	{
 		public:
 			explicit OutputBlob(IAllocator& allocator);
 			OutputBlob(void* data, int size);
 			OutputBlob(const OutputBlob& blob, IAllocator& allocator);
+			OutputBlob(const InputBlob& blob, IAllocator& allocator);
 			void operator =(const OutputBlob& rhs);
 			~OutputBlob();
 
+			void resize(int size);
 			void reserve(int size);
 			const void* getData() const { return m_data; }
-			//int getSize() const { return m_size; }
+			void* getMutableData() { return m_data; }
 			int getPos() const { return m_pos; }
 			void write(const void* data, int size);
 			void writeString(const char* string);

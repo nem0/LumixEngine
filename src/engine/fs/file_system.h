@@ -7,6 +7,7 @@ namespace Lumix
 {
 
 class IAllocator;
+class OutputBlob;
 class Path;
 
 
@@ -73,6 +74,7 @@ public:
 	virtual size_t pos() = 0;
 
 	IFile& operator << (const char* text);
+	void getContents(OutputBlob& blob);
 
 	void release();
 

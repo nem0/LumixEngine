@@ -40,6 +40,24 @@ namespace Lumix
 	}
 
 
+	OutputBlob::OutputBlob(const InputBlob& blob, IAllocator& allocator)
+		: m_allocator(&allocator)
+		, m_pos(blob.getSize())
+	{
+		if (blob.getSize() > 0)
+		{
+			m_data = allocator.allocate(blob.getSize());
+			copyMemory(m_data, blob.getData(), blob.getSize());
+			m_size = blob.getSize();
+		}
+		else
+		{
+			m_data = nullptr;
+			m_size = 0;
+		}
+	}
+
+
 	OutputBlob::~OutputBlob()
 	{
 		if (m_allocator) m_allocator->deallocate(m_data);
@@ -146,6 +164,21 @@ namespace Lumix
 		m_data = tmp;
 		m_size = size;
 	}
+
+
+	void OutputBlob::resize(int size)
+	{
+		m_pos = size;
+		if (size <= m_size) return;
+
+		ASSERT(m_allocator);
+		uint8* tmp = (uint8*)m_allocator->allocate(size);
+		copyMemory(tmp, m_data, m_size);
+		m_allocator->deallocate(m_data);
+		m_data = tmp;
+		m_size = size;
+	}
+
 
 
 	InputBlob::InputBlob(const void* data, int size)
