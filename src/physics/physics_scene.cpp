@@ -55,6 +55,7 @@ enum class PhysicsSceneVersion : int
 	RAGDOLLS,
 	D6_JOINT,
 	JOINT_REFACTOR,
+	D6_RAGDOLL_JOINT,
 
 	LATEST
 };
@@ -1656,6 +1657,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 					physx::PxSphericalJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
 				if (joint) ((physx::PxSphericalJoint*)joint)->setProjectionLinearTolerance(0.1f);
 				break;
+			case physx::PxJointConcreteType::eD6:
+				joint = physx::PxD6JointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
+				if (joint)
+				{
+					physx::PxD6Joint* d6 = ((physx::PxD6Joint*)joint);
+					d6->setProjectionLinearTolerance(0.1f);
+					physx::PxJointLinearLimit l = d6->getLinearLimit();
+					l.value = 10;
+					d6->setLinearLimit(l);
+				}
+				break;
 			default: ASSERT(false); break;
 		}
 
@@ -2567,6 +2579,20 @@ struct PhysicsSceneImpl : public PhysicsScene
 				serializer.write(flags);
 				break;
 			}
+			case physx::PxJointConcreteType::eD6:
+			{
+				auto* joint = bone->parent_joint->is<physx::PxD6Joint>();
+				serializer.write(joint->getLinearLimit());
+				serializer.write(joint->getSwingLimit());
+				serializer.write(joint->getTwistLimit());
+				serializer.write(joint->getMotion(physx::PxD6Axis::eX));
+				serializer.write(joint->getMotion(physx::PxD6Axis::eY));
+				serializer.write(joint->getMotion(physx::PxD6Axis::eZ));
+				serializer.write(joint->getMotion(physx::PxD6Axis::eSWING1));
+				serializer.write(joint->getMotion(physx::PxD6Axis::eSWING2));
+				serializer.write(joint->getMotion(physx::PxD6Axis::eTWIST));
+				break;
+			}
 			default: ASSERT(false); break;
 		}
 	}
@@ -2656,6 +2682,32 @@ struct PhysicsSceneImpl : public PhysicsScene
 				uint32 flags;
 				serializer.read(flags);
 				joint->setRevoluteJointFlags((physx::PxRevoluteJointFlags)flags);
+				break;
+			}
+			case physx::PxJointConcreteType::eD6:
+			{
+				auto* joint = bone->parent_joint->is<physx::PxD6Joint>();
+				
+				physx::PxJointLinearLimit linear_limit(0, physx::PxSpring(0, 0));
+				serializer.read(linear_limit);
+				joint->setLinearLimit(linear_limit);
+
+				physx::PxJointLimitCone swing_limit(0, 0);
+				serializer.read(swing_limit);
+				joint->setSwingLimit(swing_limit);
+
+				physx::PxJointAngularLimitPair twist_limit(0, 0);
+				serializer.read(twist_limit);
+				joint->setTwistLimit(twist_limit);
+
+				physx::PxD6Motion::Enum motions[6];
+				serializer.read(motions);
+				joint->setMotion(physx::PxD6Axis::eX, motions[0]);
+				joint->setMotion(physx::PxD6Axis::eY, motions[1]);
+				joint->setMotion(physx::PxD6Axis::eZ, motions[2]);
+				joint->setMotion(physx::PxD6Axis::eSWING1, motions[3]);
+				joint->setMotion(physx::PxD6Axis::eSWING2, motions[4]);
+				joint->setMotion(physx::PxD6Axis::eTWIST, motions[5]);
 				break;
 			}
 			default: ASSERT(false); break;
