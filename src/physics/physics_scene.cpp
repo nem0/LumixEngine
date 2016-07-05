@@ -2593,6 +2593,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 				serializer.write(joint->getMotion(physx::PxD6Axis::eTWIST));
 				break;
 			}
+			case physx::PxJointConcreteType::eSPHERICAL:
+			{
+				auto* joint = bone->parent_joint->is<physx::PxSphericalJoint>();
+				serializer.write(joint->getLimitCone());
+				uint32 flags = (physx::PxU32)joint->getSphericalJointFlags();
+				serializer.write(flags);
+				break;
+			}
 			default: ASSERT(false); break;
 		}
 	}
@@ -2682,6 +2690,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 				uint32 flags;
 				serializer.read(flags);
 				joint->setRevoluteJointFlags((physx::PxRevoluteJointFlags)flags);
+				break;
+			}
+			case physx::PxJointConcreteType::eSPHERICAL:
+			{
+				auto* joint = bone->parent_joint->is<physx::PxSphericalJoint>();
+				physx::PxJointLimitCone limit(0, 0);
+				serializer.read(limit);
+				joint->setLimitCone(limit);
+				uint32 flags;
+				serializer.read(flags);
+				joint->setSphericalJointFlags((physx::PxSphericalJointFlags)flags);
 				break;
 			}
 			case physx::PxJointConcreteType::eD6:
