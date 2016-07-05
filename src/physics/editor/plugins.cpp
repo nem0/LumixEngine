@@ -792,7 +792,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 			}
 
 			case physx::PxJointType::eFIXED: joint_type = 1; break;
-			case physx::PxJointType::eREVOLUTE: 
+			case physx::PxJointType::eREVOLUTE:
 			{
 				auto* hinge = joint->is<physx::PxRevoluteJoint>();
 				physx::PxJointAngularLimitPair limit = hinge->getLimit();
@@ -803,13 +803,44 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 				changed = ImGui::DragFloat("Bounce threshold", &limit.bounceThreshold) || changed;
 				changed = ImGui::DragFloat("Contact distance", &limit.contactDistance) || changed;
 				changed = ImGui::DragFloat("Restitution", &limit.restitution) || changed;
-				if(changed) hinge->setLimit(limit);
+				if (changed) hinge->setLimit(limit);
 				joint_type = 0;
+				break;
+			}
+			case physx::PxJointType::eD6:
+			{
+				auto* d6 = joint->is<physx::PxD6Joint>();
+				auto linear_limit = d6->getLinearLimit();
+				if (ImGui::DragFloat("Linear limit", &linear_limit.value)) d6->setLinearLimit(linear_limit);
+
+				auto swing_limit = d6->getSwingLimit();
+				if (ImGui::DragFloat("Swing limit", &swing_limit.yAngle)) d6->setSwingLimit(swing_limit);
+
+				auto twist_limit = d6->getTwistLimit();
+				Vec2 tmp = {twist_limit.lower, twist_limit.upper};
+				if (ImGui::DragFloat("Twist limit", &tmp.x))
+				{
+					twist_limit.lower = tmp.x;
+					twist_limit.upper = tmp.y;
+					d6->setTwistLimit(twist_limit);
+				}
+
+				for (int i = 0; i < 6; ++i)
+				{
+					const char* labels[] = {"X motion", "Y motion", "Z motion", "Swing 1", "Swing 2", "Twist"};
+					int motion = d6->getMotion(physx::PxD6Axis::Enum(i));
+					if (ImGui::Combo(labels[i], &motion, "Locked\0Limited\0Free\0"))
+					{
+						d6->setMotion(physx::PxD6Axis::Enum(i), physx::PxD6Motion::Enum(motion));
+					}
+				}
+
+				joint_type = 3;
 				break;
 			}
 			default: ASSERT(false); break;
 		}
-		if (ImGui::Combo("Joint type", &joint_type, "Hinge\0Fixed\0Spherical\0"))
+		if (ImGui::Combo("Joint type", &joint_type, "Hinge\0Fixed\0Spherical\0D6\0"))
 		{
 			int px_type = physx::PxJointConcreteType::eFIXED;
 			switch (joint_type)
@@ -817,9 +848,12 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 				case 0: px_type = physx::PxJointConcreteType::eREVOLUTE; break;
 				case 1: px_type = physx::PxJointConcreteType::eFIXED; break;
 				case 2: px_type = physx::PxJointConcreteType::eSPHERICAL; break;
+				case 3: px_type = physx::PxJointConcreteType::eD6; break;
 				default: ASSERT(false); break;
 			}
 			scene.changeRagdollBoneJoint(bone_handle, px_type);
+			joint = scene.getRagdollBoneJoint(bone_handle);
+			if (!joint) return;
 		}
 
 		auto local_pose0 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR0);
