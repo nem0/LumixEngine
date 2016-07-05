@@ -168,10 +168,19 @@ public:
 	}
 
 
-	PasteEntityCommand(WorldEditor& editor, OutputBlob& blob)
+	PasteEntityCommand(WorldEditor& editor, const OutputBlob& blob)
 		: m_blob(blob, editor.getAllocator())
 		, m_editor(editor)
 		, m_position(editor.getCameraRaycastHit())
+		, m_entities(editor.getAllocator())
+	{
+	}
+
+
+	PasteEntityCommand(WorldEditor& editor, const Vec3& pos, const InputBlob& blob)
+		: m_blob(blob, editor.getAllocator())
+		, m_editor(editor)
+		, m_position(pos)
 		, m_entities(editor.getAllocator())
 	{
 	}
@@ -238,11 +247,15 @@ public:
 		return false;
 	}
 
+
+	const Array<Entity>& getEntities() { return m_entities; }
+
+
 private:
 	OutputBlob m_blob;
 	WorldEditor& m_editor;
 	Vec3 m_position;
-	Lumix::Array<Entity> m_entities;
+	Array<Entity> m_entities;
 };
 
 
@@ -1008,9 +1021,7 @@ private:
 		}
 
 
-		DestroyEntitiesCommand(WorldEditorImpl& editor,
-							   const Entity* entities,
-							   int count)
+		DestroyEntitiesCommand(WorldEditorImpl& editor, const Entity* entities, int count)
 			: m_editor(editor)
 			, m_entities(editor.getAllocator())
 			, m_positons_rotations(editor.getAllocator())
@@ -1088,8 +1099,11 @@ private:
 						props[k]->get(cmps[j], -1, m_old_values);
 					}
 				}
+				uint32 tpl = m_editor.getEntityTemplateSystem().getTemplate(m_entities[i]);
+				m_old_values.write(tpl);
+				m_old_values.write(m_editor.getEntityTemplateSystem().getPrefabEntity(m_entities[i]));
 
-				universe->destroyEntity(Entity(m_entities[i]));
+				universe->destroyEntity(m_entities[i]);
 			}
 			return true;
 		}
@@ -1133,6 +1147,12 @@ private:
 						props[k]->set(new_component, -1, blob);
 					}
 				}
+				uint32 tpl;
+				blob.read(tpl);
+				if (tpl) m_editor.getEntityTemplateSystem().setTemplate(new_entity, tpl);
+				PrefabEntity prefab;
+				blob.read(prefab);
+				if (prefab.path_hash) m_editor.getEntityTemplateSystem().setPrefab(new_entity, prefab);
 			}
 		}
 
@@ -1516,8 +1536,8 @@ public:
 
 	void snapEntities(const Vec3& hit_pos)
 	{
-		Lumix::Array<Vec3> positions(m_allocator);
-		Lumix::Array<Quat> rotations(m_allocator);
+		Array<Vec3> positions(m_allocator);
+		Array<Quat> rotations(m_allocator);
 		if(m_gizmo->isTranslateMode())
 		{
 			for(auto e : m_selected_entities)
@@ -2026,7 +2046,7 @@ public:
 		{
 			m_selected_entity_on_game_mode = m_selected_entities.empty() ? INVALID_ENTITY : m_selected_entities[0];
 			auto& fs = m_engine->getFileSystem();
-			m_game_mode_file = fs.open(fs.getMemoryDevice(), Lumix::Path(""), FS::Mode::WRITE);
+			m_game_mode_file = fs.open(fs.getMemoryDevice(), Path(""), FS::Mode::WRITE);
 			save(*m_game_mode_file);
 			m_is_game_mode = true;
 			m_engine->startGame(*m_universe);
@@ -2094,32 +2114,39 @@ public:
 	}
 
 
+	void copyEntities(const Entity* entities, int count, OutputBlob& blob) override
+	{
+		blob.write(count);
+		for (int i = 0; i < count; ++i)
+		{
+			Entity entity = entities[i];
+			auto mtx = m_universe->getMatrix(entity);
+			blob.write(mtx);
+
+			const WorldEditor::ComponentList& cmps = getComponents(entity);
+			int32 count = cmps.size();
+			blob.write(count);
+			for (int i = 0; i < count; ++i)
+			{
+				uint32 cmp_type = PropertyRegister::getComponentTypeHash(cmps[i].type);
+				blob.write(cmp_type);
+				Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmps[i].type);
+				int32 prop_count = props.size();
+				for (int j = 0; j < prop_count; ++j)
+				{
+					props[j]->get(cmps[i], -1, blob);
+				}
+			}
+		}
+	}
+
+
 	void copyEntities() override
 	{
 		if (m_selected_entities.empty()) return;
 
 		m_copy_buffer.clear();
-		m_copy_buffer.write(m_selected_entities.size());
-		for (auto entity : m_selected_entities)
-		{
-			auto mtx = m_universe->getMatrix(entity);
-			m_copy_buffer.write(mtx);
-
-			const WorldEditor::ComponentList& cmps = getComponents(entity);
-			int32 count = cmps.size();
-			m_copy_buffer.write(count);
-			for (int i = 0; i < count; ++i)
-			{
-				uint32 cmp_type = PropertyRegister::getComponentTypeHash(cmps[i].type);
-				m_copy_buffer.write(cmp_type);
-				Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmps[i].type);
-				int32 prop_count = props.size();
-				for (int j = 0; j < prop_count; ++j)
-				{
-					props[j]->get(cmps[i], -1, m_copy_buffer);
-				}
-			}
-		}
+		copyEntities(&m_selected_entities[0], m_selected_entities.size(), m_copy_buffer);
 	}
 
 
@@ -2131,9 +2158,16 @@ public:
 
 	void pasteEntities() override
 	{
-		PasteEntityCommand* command =
-			LUMIX_NEW(m_allocator, PasteEntityCommand)(*this, m_copy_buffer);
+		PasteEntityCommand* command = LUMIX_NEW(m_allocator, PasteEntityCommand)(*this, m_copy_buffer);
 		executeCommand(command);
+	}
+
+
+	void pasteEntities(const Vec3& pos, InputBlob& blob, Array<Entity>& entities) override
+	{
+		PasteEntityCommand cmd(*this, pos, blob);
+		cmd.execute();
+		for (Entity entity : cmd.getEntities()) entities.push(entity);
 	}
 
 
@@ -2232,6 +2266,7 @@ public:
 		if (success)
 		{
 			load(file);
+			m_template_system->refreshPrefabs();
 			char path[MAX_PATH_LENGTH];
 			copyString(path, sizeof(path), m_universe->getPath().c_str());
 			catString(path, sizeof(path), ".lst");
@@ -2251,6 +2286,7 @@ public:
 	enum class SerializedVersion : int
 	{
 		ENTITY_GROUPS,
+		PREFABS,
 
 		LATEST
 	};
@@ -2311,7 +2347,7 @@ public:
 		}
 		if (m_engine->deserialize(*m_universe, blob))
 		{
-			m_template_system->deserialize(blob);
+			m_template_system->deserialize(blob, header.version > (int)SerializedVersion::PREFABS);
 			if (header.version > (int)SerializedVersion::ENTITY_GROUPS)
 			{
 				m_entity_groups.deserialize(blob);
@@ -3010,7 +3046,7 @@ public:
 		while (m_engine->getFileSystem().hasWork()) m_engine->getFileSystem().updateAsyncTransactions();
 
 		FS::IFile* file = m_engine->getFileSystem().open(
-			m_engine->getFileSystem().getMemoryDevice(), Lumix::Path(""), FS::Mode::CREATE_AND_WRITE);
+			m_engine->getFileSystem().getMemoryDevice(), Path(""), FS::Mode::CREATE_AND_WRITE);
 		if (!file)
 		{
 			return false;

@@ -2,6 +2,7 @@
 
 #include "engine/array.h"
 #include "engine/base_proxy_allocator.h"
+#include "engine/blob.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/mt/lock_free_fixed_queue.h"
@@ -55,6 +56,14 @@ IFile& IFile::operator<<(const char* text)
 {
 	write(text, stringLength(text));
 	return *this;
+}
+
+
+void IFile::getContents(OutputBlob& blob)
+{
+	size_t tmp = size();
+	blob.resize(tmp);
+	read(blob.getMutableData(), tmp);
 }
 
 

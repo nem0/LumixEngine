@@ -989,15 +989,49 @@ public:
 		{
 			if (m_editor->getSelectedEntities().size() == 1)
 			{
-				ImGui::InputText("Template name", m_template_name, Lumix::lengthOf(m_template_name));
-
-				if (ImGui::Button("Create from selected"))
+				if (ImGui::Button("Create template"))
 				{
-					auto entity = m_editor->getSelectedEntities()[0];
-					auto& system = m_editor->getEntityTemplateSystem();
-					system.createTemplateFromEntity(m_template_name, entity);
+					ImGui::OpenPopup("create template");
 				}
-				ImGui::Separator();
+				if (ImGui::BeginPopup("create template"))
+				{
+					ImGui::InputText("Template name", m_template_name, Lumix::lengthOf(m_template_name));
+					if (ImGui::Button("Create"))
+					{
+						auto entity = m_editor->getSelectedEntities()[0];
+						auto& system = m_editor->getEntityTemplateSystem();
+						system.createTemplateFromEntity(m_template_name, entity);
+						ImGui::CloseCurrentPopup();
+					}
+					ImGui::EndPopup();
+				}
+				ImGui::SameLine();
+			}
+			if (!m_editor->getSelectedEntities().empty())
+			{
+				auto& system = m_editor->getEntityTemplateSystem();
+				bool is_prefab = system.isPrefab();
+
+				if (is_prefab)
+				{
+					if (ImGui::Button("Apply")) system.applyPrefab();
+
+					ImGui::SameLine();
+					if (ImGui::Button("Revert")) system.refreshPrefabs();
+
+					ImGui::SameLine();
+					if (ImGui::Button("Select")) system.selectPrefab();
+				}
+
+				ImGui::SameLine();
+				if (ImGui::Button("Save prefab"))
+				{
+					char tmp[Lumix::MAX_PATH_LENGTH];
+					if (PlatformInterface::getSaveFilename(tmp, Lumix::lengthOf(tmp), "Prefabs\0*.fab\0", "fab"))
+					{
+						system.savePrefab(Lumix::Path(tmp));
+					}
+				}
 			}
 			ImGui::Text("Templates:");
 			auto& template_system = m_editor->getEntityTemplateSystem();
@@ -1005,7 +1039,8 @@ public:
 			for (auto& template_name : template_system.getTemplateNames())
 			{
 				bool b = m_selected_template_name == template_name;
-				if (ImGui::Selectable(template_name.c_str(), &b))
+				auto& instances = template_system.getInstances(Lumix::crc32(template_name.c_str()));
+				if (!instances.empty() && ImGui::Selectable(template_name.c_str(), &b))
 				{
 					m_selected_template_name = template_name;
 				}
@@ -1449,6 +1484,7 @@ public:
 
 	void setStudioApp()
 	{
+		m_editor->getEntityTemplateSystem().setStudioApp(*this);
 		auto& plugin_manager = m_editor->getEngine().getPluginManager();
 		#ifdef STATIC_PLUGINS
 			for (auto* plugin : plugin_manager.getPlugins())

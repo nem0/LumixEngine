@@ -417,4 +417,4 @@ bool Universe::nameExists(const char* name) const
 }
 
 
-} // !namespace Lumix
+} // namespace Lumix
