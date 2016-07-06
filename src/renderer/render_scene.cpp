@@ -1797,11 +1797,11 @@ public:
 		{
 			Renderable& r = m_renderables[index];
 			r.matrix = m_universe.getMatrix(entity);
-			m_culling_system->updateBoundingPosition(m_universe.getPosition(entity), cmp);
 			if (r.model && r.model->isReady())
 			{
-				float radius = m_universe.getScale(entity) * r.model->getBoundingRadius();
-				m_culling_system->updateBoundingRadius(radius, cmp);
+				Sphere sphere(
+					m_universe.getPosition(entity), m_universe.getScale(entity) * r.model->getBoundingRadius());
+				m_culling_system->updateBoundingSphere(sphere, cmp);
 			}
 
 			if(m_is_forward_rendered)

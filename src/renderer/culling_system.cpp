@@ -291,15 +291,10 @@ public:
 	}
 
 
-	void updateBoundingRadius(float radius, ComponentHandle renderable) override
+	void updateBoundingSphere(const Sphere& sphere, ComponentHandle renderable) override
 	{
-		m_spheres[m_renderable_to_sphere_map[renderable.index]].m_radius = radius;
-	}
-
-
-	void updateBoundingPosition(const Vec3& position, ComponentHandle renderable) override
-	{
-		m_spheres[m_renderable_to_sphere_map[renderable.index]].m_position = position;
+		int idx = m_renderable_to_sphere_map[renderable.index];
+		if (idx >= 0) m_spheres[idx] = sphere;
 	}
 
 
