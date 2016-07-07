@@ -2756,23 +2756,6 @@ public:
 	}
 
 
-	ComponentUID createComponent(ComponentType type, Entity entity)
-	{
-		const Array<IScene*>& scenes = m_universe->getScenes();
-		ComponentUID cmp;
-		for (int i = 0; i < scenes.size(); ++i)
-		{
-			cmp = ComponentUID(entity, type, scenes[i], scenes[i]->createComponent(type, entity));
-
-			if (cmp.isValid())
-			{
-				return cmp;
-			}
-		}
-		return ComponentUID::INVALID;
-	}
-
-
 	void createUniverse(bool create_basic_entities)
 	{
 		ASSERT(!m_universe);
@@ -2797,7 +2780,7 @@ public:
 		{
 			m_camera = universe->createEntity(Vec3(0, 0, -5), Quat(Vec3(0, 1, 0), -Math::PI));
 			universe->setEntityName(m_camera, "editor_camera");
-			ComponentUID cmp = createComponent(CAMERA_TYPE, m_camera);
+			ComponentUID cmp = m_engine->createComponent(*universe, m_camera, CAMERA_TYPE);
 			ASSERT(cmp.isValid());
 			m_render_interface->setCameraSlot(cmp.handle, "editor");
 		}
@@ -3184,7 +3167,7 @@ bool PasteEntityCommand::execute()
 			uint32 hash;
 			blob.read(hash);
 			ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
-			ComponentUID cmp = static_cast<WorldEditorImpl&>(m_editor).createComponent(type, new_entity);
+			ComponentUID cmp = m_editor.getEngine().createComponent(*universe, new_entity, type);
 			Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(type);
 			for (int j = 0; j < props.size(); ++j)
 			{
