@@ -157,6 +157,7 @@ struct NavigationSceneImpl : public NavigationScene
 	{
 		auto iter = m_agents.find(entity);
 		if (m_agents.end() == iter) return;
+		if (iter.value()->agent < 0) return;
 		Vec3 pos = m_universe.getPosition(iter.key());
 		const dtCrowdAgent* dt_agent = m_crowd->getAgent(iter.value()->agent);
 		if ((pos - *(Vec3*)dt_agent->npos).squaredLength() > 0.1f)
@@ -1100,14 +1101,13 @@ struct NavigationSceneImpl : public NavigationScene
 			for (int i = 0; i < count; ++i)
 			{
 				Agent* agent = LUMIX_NEW(m_allocator, Agent);
-				Entity entity;
-				serializer.read(entity);
+				serializer.read(agent->entity);
 				serializer.read(agent->radius);
 				serializer.read(agent->height);
 				agent->agent = -1;
-				m_agents.insert(entity, agent);
-				ComponentHandle cmp = { entity.index };
-				m_universe.addComponent(entity, NAVMESH_AGENT_TYPE, this, cmp);
+				m_agents.insert(agent->entity, agent);
+				ComponentHandle cmp = {agent->entity.index};
+				m_universe.addComponent(agent->entity, NAVMESH_AGENT_TYPE, this, cmp);
 			}
 		}
 	}
