@@ -106,7 +106,7 @@ private:
 			file.read(&data[0], data.size());
 			InputBlob blob(&data[0], data.size());
 			entities.clear();
-			editor.pasteEntities(position, blob, entities);
+			editor.getEngine().pasteEntities(position, *editor.getUniverse(), blob, entities);
 
 			auto& system = static_cast<EntityTemplateSystemImpl&>(editor.getEntityTemplateSystem());
 			if (record_instance)

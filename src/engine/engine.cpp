@@ -925,7 +925,7 @@ public:
 	}
 
 
-	void pasteEntities(const Vec3& position, Universe& universe, InputBlob& blob, Array<Entity>& entities)
+	void pasteEntities(const Vec3& position, Universe& universe, InputBlob& blob, Array<Entity>& entities) override
 	{
 		int entity_count;
 		blob.read(entity_count);

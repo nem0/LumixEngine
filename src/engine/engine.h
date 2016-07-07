@@ -29,6 +29,8 @@ class PathManager;
 class PluginManager;
 class ResourceManager;
 class Universe;
+struct Vec3;
+template <typename T> class Array;
 
 
 class LUMIX_ENGINE_API Engine
@@ -79,6 +81,7 @@ public:
 	virtual lua_State* getState() = 0;
 	virtual void runScript(const char* src, int src_length, const char* path) = 0;
 	virtual ComponentUID createComponent(Universe& universe, Entity entity, ComponentType type) = 0;
+	virtual void pasteEntities(const Vec3& position, Universe& universe, InputBlob& blob, Array<Entity>& entities) = 0;
 
 protected:
 	Engine() {}
