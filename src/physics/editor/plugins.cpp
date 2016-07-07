@@ -718,7 +718,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 			for (int i = 0; i < model->getBoneCount(); ++i)
 			{
 				auto& bone = model->getBone(i);
-				if (bone.parent_idx >= 0) break;
+				if (bone.parent_idx >= 0) continue;
 
 				showBoneListItem(*render_scene, mtx, *model, i, visualize_bones);
 			}
@@ -758,6 +758,9 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 			scene.destroyRagdollBone(cmp, bone_handle);
 			return;
 		}
+
+		bool is_kinematic = scene.isRagdollBoneKinematic(bone_handle);
+		if (ImGui::Checkbox("Kinematic", &is_kinematic)) scene.setRagdollBoneKinematic(bone_handle, is_kinematic);
 
 		float height = scene.getRagdollBoneHeight(bone_handle);
 		float radius = scene.getRagdollBoneRadius(bone_handle);
@@ -814,20 +817,26 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 				if (ImGui::DragFloat("Linear limit", &linear_limit.value)) d6->setLinearLimit(linear_limit);
 
 				auto swing_limit = d6->getSwingLimit();
-				if (ImGui::DragFloat("Swing limit", &swing_limit.yAngle)) d6->setSwingLimit(swing_limit);
+				Vec2 tmp = {Math::radiansToDegrees(swing_limit.yAngle), Math::radiansToDegrees(swing_limit.zAngle)};
+				if (ImGui::DragFloat2("Swing limit", &tmp.x))
+				{
+					swing_limit.yAngle = Math::degreesToRadians(tmp.x);
+					swing_limit.zAngle = Math::degreesToRadians(tmp.y);
+					d6->setSwingLimit(swing_limit);
+				}
 
 				auto twist_limit = d6->getTwistLimit();
-				Vec2 tmp = {twist_limit.lower, twist_limit.upper};
-				if (ImGui::DragFloat("Twist limit", &tmp.x))
+				tmp = {Math::radiansToDegrees(twist_limit.lower), Math::radiansToDegrees(twist_limit.upper)};
+				if (ImGui::DragFloat2("Twist limit", &tmp.x))
 				{
-					twist_limit.lower = tmp.x;
-					twist_limit.upper = tmp.y;
+					twist_limit.lower = Math::degreesToRadians(tmp.x);
+					twist_limit.upper = Math::degreesToRadians(tmp.y);
 					d6->setTwistLimit(twist_limit);
 				}
 
 				for (int i = 0; i < 6; ++i)
 				{
-					const char* labels[] = {"X motion", "Y motion", "Z motion", "Swing 1", "Swing 2", "Twist"};
+					const char* labels[] = {"X motion", "Y motion", "Z motion", "Twist", "Swing 1", "Swing 2"};
 					int motion = d6->getMotion(physx::PxD6Axis::Enum(i));
 					if (ImGui::Combo(labels[i], &motion, "Locked\0Limited\0Free\0"))
 					{

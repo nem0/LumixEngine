@@ -1799,9 +1799,9 @@ public:
 			r.matrix = m_universe.getMatrix(entity);
 			if (r.model && r.model->isReady())
 			{
-				Sphere sphere(
-					m_universe.getPosition(entity), m_universe.getScale(entity) * r.model->getBoundingRadius());
-				m_culling_system->updateBoundingSphere(sphere, cmp);
+				float radius = m_universe.getScale(entity) * r.model->getBoundingRadius();
+				Vec3 position = m_universe.getPosition(entity);
+				m_culling_system->updateBoundingSphere({position, radius}, cmp);
 			}
 
 			if(m_is_forward_rendered)

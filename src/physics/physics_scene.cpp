@@ -56,6 +56,7 @@ enum class PhysicsSceneVersion : int
 	D6_JOINT,
 	JOINT_REFACTOR,
 	D6_RAGDOLL_JOINT,
+	KINEMATIC_BONES,
 
 	LATEST
 };
@@ -77,6 +78,8 @@ struct RagdollBone
 	RagdollBone* prev;
 	RagdollBone* parent;
 	Transform bind_transform;
+	Transform inv_bind_transform;
+	bool is_kinematic;
 };
 
 
@@ -1624,7 +1627,20 @@ struct PhysicsSceneImpl : public PhysicsScene
 	
 	void setRagdollData(ComponentHandle cmp, InputBlob& blob) override
 	{
-		m_ragdolls[{cmp.index}].root = deserializeRagdollBone(nullptr, blob);
+		m_ragdolls[{cmp.index}].root = deserializeRagdollBone(nullptr, blob, (int)PhysicsSceneVersion::LATEST);
+	}
+
+
+	void setRagdollBoneKinematic(RagdollBoneHandle bone, bool is_kinematic) override
+	{
+		bone->is_kinematic = is_kinematic;
+		bone->actor->isRigidBody()->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, is_kinematic);
+	}
+
+
+	bool isRagdollBoneKinematic(RagdollBoneHandle bone) override
+	{
+		return bone->is_kinematic;
 	}
 
 
@@ -1637,6 +1653,19 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto d2 = child->parent->actor->getGlobalPose().q.rotate(physx::PxVec3(1, 0, 0));
 		auto axis = d1.cross(d2).getNormalized();
 		auto pos = child->parent->actor->getGlobalPose().p;
+		auto diff = (pos - child->actor->getGlobalPose().p).getNormalized();
+		if (diff.dot(d2) < 0) d2 = -d2;
+
+		physx::PxShape* shape;
+		if (child->parent->actor->getShapes(&shape, 1) == 1)
+		{
+			physx::PxCapsuleGeometry capsule;
+			if (shape->getCapsuleGeometry(capsule))
+			{
+				pos -= (capsule.halfHeight + capsule.radius) * d2;
+			}
+		}
+
 		physx::PxMat44 mat(d1, axis, d1.cross(axis).getNormalized(), pos);
 		physx::PxTransform tr0 = child->parent->actor->getGlobalPose().getInverse() * physx::PxTransform(mat);
 		physx::PxTransform tr1 = child->actor->getGlobalPose().getInverse() * child->parent->actor->getGlobalPose() * tr0;
@@ -1646,16 +1675,31 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			case physx::PxJointConcreteType::eFIXED:
 				joint = physx::PxFixedJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
+				if (joint)
+				{
+					auto* fixed_joint = static_cast<physx::PxFixedJoint*>(joint);
+					fixed_joint->setProjectionLinearTolerance(0.1f);
+					fixed_joint->setProjectionAngularTolerance(0.01f);
+				}
 				break;
 			case physx::PxJointConcreteType::eREVOLUTE:
 				joint =
 					physx::PxRevoluteJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
-				if (joint) ((physx::PxRevoluteJoint*)joint)->setProjectionLinearTolerance(0.1f);
+				if (joint)
+				{
+					auto* hinge = static_cast<physx::PxRevoluteJoint*>(joint);
+					hinge->setProjectionLinearTolerance(0.1f);
+					hinge->setProjectionAngularTolerance(0.01f);
+				}
 				break;
 			case physx::PxJointConcreteType::eSPHERICAL:
 				joint =
 					physx::PxSphericalJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
-				if (joint) ((physx::PxSphericalJoint*)joint)->setProjectionLinearTolerance(0.1f);
+				if (joint)
+				{
+					auto* spherical = static_cast<physx::PxSphericalJoint*>(joint);
+					spherical->setProjectionLinearTolerance(0.1f);
+				}
 				break;
 			case physx::PxJointConcreteType::eD6:
 				joint = physx::PxD6JointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
@@ -1663,9 +1707,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 				{
 					physx::PxD6Joint* d6 = ((physx::PxD6Joint*)joint);
 					d6->setProjectionLinearTolerance(0.1f);
+					d6->setProjectionAngularTolerance(0.01f);
 					physx::PxJointLinearLimit l = d6->getLinearLimit();
-					l.value = 10;
+					l.value = 0.01f;
 					d6->setLinearLimit(l);
+					d6->setMotion(physx::PxD6Axis::eSWING1, physx::PxD6Motion::eLIMITED);
+					d6->setMotion(physx::PxD6Axis::eSWING2, physx::PxD6Motion::eLIMITED);
+					d6->setSwingLimit(physx::PxJointLimitCone(Math::degreesToRadians(30), Math::degreesToRadians(30)));
 				}
 				break;
 			default: ASSERT(false); break;
@@ -1738,7 +1786,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		if (child->next) child->next->prev = child;
 		parent->child = child;
 		child->parent = parent;
-		changeRagdollBoneJoint(child, physx::PxJointConcreteType::eREVOLUTE);
+		changeRagdollBoneJoint(child, physx::PxJointConcreteType::eD6);
 	}
 
 
@@ -1805,12 +1853,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto* new_bone = LUMIX_NEW(m_allocator, RagdollBone);
 		new_bone->child = new_bone->next = new_bone->prev = new_bone->parent = nullptr;
 		new_bone->parent_joint = nullptr;
+		new_bone->is_kinematic = false;
 		new_bone->pose_bone_idx = iter.value();
 		
 		float bone_height;
 		Transform transform = getNewBoneTransform(model, iter.value(), bone_height);
 		
 		new_bone->bind_transform = transform.inverted() * model->getBone(iter.value()).transform;
+		new_bone->inv_bind_transform = new_bone->bind_transform.inverted();
 		transform = m_universe.getTransform(entity) * transform;
 
 		physx::PxCapsuleGeometry geom;
@@ -1837,17 +1887,37 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void updateBone(const Transform& inv_root, RagdollBone* bone, Pose* pose)
+	void setSkeletonPose(const Transform& root_transform, RagdollBone* bone, Pose* pose)
+	{
+		if (!bone) return;
+		
+		Transform bone_transform(Transform(pose->positions[bone->pose_bone_idx], pose->rotations[bone->pose_bone_idx]));
+		bone->actor->setGlobalPose(toPhysx(root_transform * bone_transform * bone->inv_bind_transform));
+
+		setSkeletonPose(root_transform, bone->next, pose);
+		setSkeletonPose(root_transform, bone->child, pose);
+	}
+
+
+	void updateBone(const Transform& root_transform, const Transform& inv_root, RagdollBone* bone, Pose* pose)
 	{
 		if (!bone) return;
 			
-		physx::PxTransform bone_pose = bone->actor->getGlobalPose();
+		if (bone->is_kinematic)
+		{
+			Transform bone_transform(Transform(pose->positions[bone->pose_bone_idx], pose->rotations[bone->pose_bone_idx]));
+			bone->actor->setGlobalPose(toPhysx(root_transform * bone_transform * bone->inv_bind_transform));
+		}
+		else
+		{
+			physx::PxTransform bone_pose = bone->actor->getGlobalPose();
+			auto tr = inv_root * Transform(fromPhysx(bone_pose.p), fromPhysx(bone_pose.q)) * bone->bind_transform;
+			pose->rotations[bone->pose_bone_idx] = tr.rot;
+			pose->positions[bone->pose_bone_idx] = tr.pos;
+		}
 
-		auto tr = inv_root * Transform(fromPhysx(bone_pose.p), fromPhysx(bone_pose.q)) * bone->bind_transform;
-		pose->rotations[bone->pose_bone_idx] = tr.rot;
-		pose->positions[bone->pose_bone_idx] = tr.pos;
-		updateBone(inv_root, bone->next, pose);
-		updateBone(inv_root, bone->child, pose);
+		updateBone(root_transform, inv_root, bone->next, pose);
+		updateBone(root_transform, inv_root, bone->child, pose);
 	}
 
 
@@ -1855,6 +1925,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
 		if (!render_scene) return;
+
 		for (int i = 0, c = m_ragdolls.size(); i < c; ++i)
 		{
 			Ragdoll& ragdoll = m_ragdolls.at(i);
@@ -1864,7 +1935,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			ComponentHandle renderable = render_scene->getRenderableComponent(ragdoll.entity);
 			if (!isValid(renderable)) continue;
 			Pose* pose = render_scene->getPose(renderable);
-			if (pose) updateBone(root_transform.inverted(), ragdoll.root, pose);
+			if (pose) updateBone(root_transform, root_transform.inverted(), ragdoll.root, pose);
 		}
 	}
 
@@ -2029,6 +2100,18 @@ struct PhysicsSceneImpl : public PhysicsScene
 				m_controllers[i].m_controller->setPosition(pvec);
 				return;
 			}
+		}
+
+		int ragdoll_idx = m_ragdolls.find(entity);
+		if (ragdoll_idx >= 0)
+		{
+			auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
+			if (!render_scene) return;
+			ComponentHandle renderable = render_scene->getRenderableComponent(entity);
+			if (!isValid(renderable)) return;
+			Pose* pose = render_scene->getPose(renderable);
+			setSkeletonPose(m_universe.getTransform(entity), m_ragdolls.at(ragdoll_idx).root, pose);
+			return;
 		}
 
 		int idx = m_actors.find(entity);
@@ -2636,6 +2719,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.write(capsule_geom.halfHeight);
 			serializer.write(capsule_geom.radius);
 		}
+		serializer.write(bone->actor->isRigidBody()->getRigidBodyFlags().isSet(physx::PxRigidBodyFlag::eKINEMATIC));
 
 		serializeRagdollBone(bone->child, serializer);
 		serializeRagdollBone(bone->next, serializer);
@@ -2734,7 +2818,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	RagdollBone* deserializeRagdollBone(RagdollBone* parent, InputBlob& serializer)
+	RagdollBone* deserializeRagdollBone(RagdollBone* parent, InputBlob& serializer, int version)
 	{
 		int pose_bone_idx;
 		serializer.read(pose_bone_idx);
@@ -2742,10 +2826,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto* bone = LUMIX_NEW(m_allocator, RagdollBone);
 		bone->pose_bone_idx = pose_bone_idx;
 		bone->parent_joint = nullptr;
+		bone->is_kinematic = false;
 		bone->prev = nullptr;
 		Transform transform;
 		serializer.read(transform);
 		serializer.read(bone->bind_transform);
+		bone->inv_bind_transform = bone->bind_transform.inverted();
 
 		physx::PxTransform px_transform = toPhysx(transform);
 
@@ -2773,14 +2859,20 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 			default: ASSERT(false); break;
 		}
+		if (version > (int)PhysicsSceneVersion::KINEMATIC_BONES)
+		{
+			serializer.read(bone->is_kinematic);
+		}
+		bone->actor->isRigidBody()->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, bone->is_kinematic);
+
 		bone->actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 		m_scene->addActor(*bone->actor);
 		updateFilterData(bone->actor, 0);
 
 		bone->parent = parent;
 
-		bone->child = deserializeRagdollBone(bone, serializer);
-		bone->next = deserializeRagdollBone(parent, serializer);
+		bone->child = deserializeRagdollBone(bone, serializer, version);
+		bone->next = deserializeRagdollBone(parent, serializer, version);
 		if(bone->next) bone->next->prev = bone;
 
 		deserializeRagdollJoint(bone, serializer);
@@ -2982,7 +3074,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			int idx = m_ragdolls.insert(entity, Ragdoll());
 			Ragdoll& ragdoll = m_ragdolls.at(i);
 			ragdoll.entity = entity;
-			ragdoll.root = deserializeRagdollBone(nullptr, serializer);
+			ragdoll.root = deserializeRagdollBone(nullptr, serializer, version);
 			ComponentHandle cmp = {ragdoll.entity.index};
 			m_universe.addComponent(ragdoll.entity, RAGDOLL_TYPE, this, cmp);
 		}
