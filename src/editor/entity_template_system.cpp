@@ -8,13 +8,12 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/fs/os_file.h"
+#include "engine/hash_map.h"
 #include "engine/iplugin.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/math_utils.h"
 #include "engine/resource.h"
-#include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "engine/string.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
@@ -32,58 +31,6 @@ struct PrefabInstance
 {
 	Vec3 position;
 	uint32 path_hash;
-};
-
-
-struct PrefabResource : public Resource
-{
-	PrefabResource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
-		: Resource(path, resource_manager, allocator)
-		, blob(allocator)
-	{
-	}
-
-
-	void unload(void) override
-	{
-	}
-
-
-	bool load(FS::IFile& file) override
-	{
-		return true;
-	}
-
-
-	Lumix::OutputBlob blob;
-};
-
-
-
-class PrefabResourceManager : public ResourceManagerBase
-{
-public:
-	PrefabResourceManager(IAllocator& allocator)
-		: m_allocator(allocator)
-		, ResourceManagerBase(allocator)
-	{}
-
-
-protected:
-	Resource* createResource(const Path& path) override
-	{
-		return LUMIX_NEW(m_allocator, PrefabResource)(path, getOwner(), m_allocator);
-	}
-
-
-	void destroyResource(Resource& resource) override
-	{
-		return LUMIX_DELETE(m_allocator, &static_cast<PrefabResource&>(resource));
-	}
-
-
-private:
-	IAllocator& m_allocator;
 };
 
 
@@ -445,7 +392,6 @@ private:
 public:
 	explicit EntityTemplateSystemImpl(WorldEditor& editor)
 		: m_editor(editor)
-		, m_prefab_resource_manager(editor.getEngine().getAllocator())
 		, m_prefab_entities(editor.getAllocator())
 		, m_prefab_instances(editor.getAllocator())
 		, m_universe(nullptr)
@@ -453,7 +399,6 @@ public:
 		, m_updated(editor.getAllocator())
 		, m_template_names(editor.getAllocator())
 	{
-		m_prefab_resource_manager.create(PREFAB_HASH, m_editor.getEngine().getResourceManager());
 		editor.universeCreated().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
 		editor.universeDestroyed().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
 		setUniverse(editor.getUniverse());
@@ -890,7 +835,6 @@ private:
 	Universe* m_universe;
 	WorldEditor& m_editor;
 	DelegateList<void()> m_updated;
-	PrefabResourceManager m_prefab_resource_manager;
 	HashMap<Entity, PrefabEntity> m_prefab_entities;
 	Array<PrefabInstance> m_prefab_instances;
 }; // class EntityTemplateSystemImpl

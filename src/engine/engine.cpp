@@ -16,6 +16,7 @@
 #include "engine/mtjd/manager.h"
 #include "engine/debug/debug.h"
 #include "engine/iplugin.h"
+#include "engine/prefab.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
 #include "engine/plugin_manager.h"
@@ -27,6 +28,7 @@ namespace Lumix
 {
 
 static const uint32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
+static const uint32 PREFAB_HASH = crc32("prefab");
 static const ComponentType HIERARCHY_TYPE = PropertyRegister::getComponentType("hierarchy");
 
 
@@ -59,6 +61,7 @@ class EngineImpl : public Engine
 public:
 	EngineImpl(const char* base_path0, const char* base_path1, FS::FileSystem* fs, IAllocator& allocator)
 		: m_allocator(allocator)
+		, m_prefab_resource_manager(m_allocator)
 		, m_resource_manager(m_allocator)
 		, m_mtjd_manager(nullptr)
 		, m_fps(0)
@@ -108,6 +111,7 @@ public:
 		}
 
 		m_resource_manager.create(*m_file_system);
+		m_prefab_resource_manager.create(PREFAB_HASH, m_resource_manager);
 
 		m_timer = Timer::create(m_allocator);
 		m_fps_timer = Timer::create(m_allocator);
@@ -415,9 +419,12 @@ public:
 		REGISTER_FUNCTION(hasFilesystemWork);
 		REGISTER_FUNCTION(processFilesystemWork);
 		REGISTER_FUNCTION(destroyEntity);
+		REGISTER_FUNCTION(preloadPrefab);
+		REGISTER_FUNCTION(unloadPrefab);
 
 		#undef REGISTER_FUNCTION
 
+		LuaWrapper::createSystemFunction(m_state, "Engine", "instantiatePrefab", &LUA_instantiatePrefab);
 		LuaWrapper::createSystemFunction(m_state, "Engine", "createEntityEx", &LUA_createEntityEx);
 		LuaWrapper::createSystemFunction(m_state, "Engine", "multVecQuat", &LUA_multVecQuat);
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_DOWN", InputSystem::DOWN);
@@ -889,6 +896,106 @@ public:
 	}
 
 
+	static void LUA_unloadPrefab(EngineImpl* engine, PrefabResource* prefab)
+	{
+		engine->m_prefab_resource_manager.unload(*prefab);
+	}
+
+
+	static PrefabResource* LUA_preloadPrefab(EngineImpl* engine, const char* path)
+	{
+		return static_cast<PrefabResource*>(engine->m_prefab_resource_manager.load(Path(path)));
+	}
+
+
+	ComponentUID createComponent(Universe& universe, Entity entity, ComponentType type)
+	{
+		const Array<IScene*>& scenes = universe.getScenes();
+		ComponentUID cmp;
+		for (int i = 0; i < scenes.size(); ++i)
+		{
+			cmp = ComponentUID(entity, type, scenes[i], scenes[i]->createComponent(type, entity));
+
+			if (cmp.isValid())
+			{
+				return cmp;
+			}
+		}
+		return ComponentUID::INVALID;
+	}
+
+
+	void pasteEntities(const Vec3& position, Universe& universe, InputBlob& blob, Array<Entity>& entities)
+	{
+		int entity_count;
+		blob.read(entity_count);
+		entities.reserve(entities.size() + entity_count);
+
+		Matrix base_matrix = Matrix::IDENTITY;
+		base_matrix.setTranslation(position);
+		for (int i = 0; i < entity_count; ++i)
+		{
+			Matrix mtx;
+			blob.read(mtx);
+			if (i == 0)
+			{
+				Matrix inv = mtx;
+				inv.inverse();
+				base_matrix.copy3x3(mtx);
+				base_matrix = base_matrix * inv;
+				mtx.setTranslation(position);
+			}
+			else
+			{
+				mtx = base_matrix * mtx;
+			}
+			Entity new_entity = universe.createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+			entities.push(new_entity);
+			universe.setMatrix(new_entity, mtx);
+			int32 count;
+			blob.read(count);
+			for (int i = 0; i < count; ++i)
+			{
+				uint32 hash;
+				blob.read(hash);
+				ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
+				ComponentUID cmp = createComponent(universe, new_entity, type);
+				Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(type);
+				for (int j = 0; j < props.size(); ++j)
+				{
+					props[j]->set(cmp, -1, blob);
+				}
+			}
+		}
+	}
+
+
+	static int LUA_instantiatePrefab(lua_State* L)
+	{
+		auto* engine = LuaWrapper::checkArg<EngineImpl*>(L, 1);
+		auto* universe = LuaWrapper::checkArg<Universe*>(L, 2);
+		Vec3 position = LuaWrapper::checkArg<Vec3>(L, 3);
+		auto* prefab = LuaWrapper::checkArg<PrefabResource*>(L, 4);
+		ASSERT(prefab->isReady());
+		if (!prefab->isReady())
+		{
+			g_log_error.log("Editor") << "Prefab " << prefab->getPath().c_str() << " is not ready, preload it.";
+			return 0;
+		}
+		InputBlob blob(prefab->blob.getData(), prefab->blob.getPos());
+		Array<Entity> entities(engine->m_allocator);
+		engine->pasteEntities(position, *universe, blob, entities);
+
+		lua_createtable(L, entities.size(), 0);
+		for (int i = 0; i < entities.size(); ++i)
+		{
+			LuaWrapper::pushLua(L, entities[i]);
+			lua_rawseti(L, -2, i + 1);
+		}
+		return 1;
+	}
+
+
 	void runScript(const char* src, int src_length, const char* path) override
 	{
 		if (luaL_loadbuffer(m_state, src, src_length, path) != LUA_OK)
@@ -923,6 +1030,7 @@ private:
 	MTJD::Manager* m_mtjd_manager;
 
 	PluginManager* m_plugin_manager;
+	PrefabResourceManager m_prefab_resource_manager;
 	InputSystem* m_input_system;
 	Timer* m_timer;
 	Timer* m_fps_timer;
