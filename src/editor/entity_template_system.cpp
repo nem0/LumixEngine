@@ -155,7 +155,7 @@ private:
 			}
 
 			Array<uint8> data(editor.getAllocator());
-			data.resize(file.size());
+			data.resize((int)file.size());
 			file.read(&data[0], data.size());
 			InputBlob blob(&data[0], data.size());
 			entities.clear();
