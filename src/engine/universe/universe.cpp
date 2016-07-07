@@ -391,6 +391,13 @@ float Universe::getScale(Entity entity)
 }
 
 
+bool Universe::hasComponent(Entity entity, ComponentType component_type) const
+{
+	uint64 mask = m_components[m_entity_map[entity.index]];
+	return (mask & (uint64(1) << component_type.index)) != 0;
+}
+
+
 void Universe::destroyComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index)
 {
 	auto mask = m_components[m_entity_map[entity.index]];
