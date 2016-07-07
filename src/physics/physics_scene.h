@@ -49,8 +49,6 @@ struct RaycastHit
 class LUMIX_PHYSICS_API PhysicsScene : public IScene
 {
 public:
-	typedef RagdollBone* RagdollBoneHandle;
-
 	enum class ActorType
 	{
 		BOX,
@@ -162,24 +160,27 @@ public:
 	virtual float getControllerRadius(ComponentHandle cmp) = 0;
 	virtual float getControllerHeight(ComponentHandle cmp) = 0;
 
-	virtual RagdollBoneHandle createRagdollBone(ComponentHandle cmp, uint32 bone_name_hash) = 0;
-	virtual void destroyRagdollBone(ComponentHandle cmp, RagdollBoneHandle bone) = 0;
-	virtual physx::PxJoint* getRagdollBoneJoint(RagdollBoneHandle bone) const = 0;
-	virtual RagdollBoneHandle getRagdollRootBone(ComponentHandle cmp) const = 0;
-	virtual RagdollBoneHandle getRagdollBoneChild(RagdollBoneHandle bone) = 0;
-	virtual RagdollBoneHandle getRagdollBoneSibling(RagdollBoneHandle bone) = 0;
-	virtual RagdollBoneHandle getRagdollBoneByName(ComponentHandle cmp, uint32 bone_name_hash) = 0;
-	virtual float getRagdollBoneHeight(RagdollBoneHandle bone) = 0;
-	virtual float getRagdollBoneRadius(RagdollBoneHandle bone) = 0;
-	virtual void setRagdollBoneHeight(RagdollBoneHandle bone, float value) = 0;
-	virtual void setRagdollBoneRadius(RagdollBoneHandle bone, float value) = 0;
-	virtual Transform getRagdollBoneTransform(RagdollBoneHandle bone) = 0;
-	virtual void setRagdollBoneTransform(RagdollBoneHandle bone, const Transform& matrix) = 0;
+	virtual RagdollBone* createRagdollBone(ComponentHandle cmp, uint32 bone_name_hash) = 0;
+	virtual void destroyRagdollBone(ComponentHandle cmp, RagdollBone* bone) = 0;
+	virtual physx::PxJoint* getRagdollBoneJoint(RagdollBone* bone) const = 0;
+	virtual RagdollBone* getRagdollRootBone(ComponentHandle cmp) const = 0;
+	virtual RagdollBone* getRagdollBoneChild(RagdollBone* bone) = 0;
+	virtual RagdollBone* getRagdollBoneSibling(RagdollBone* bone) = 0;
+	virtual RagdollBone* getRagdollBoneByName(ComponentHandle cmp, uint32 bone_name_hash) = 0;
+	virtual float getRagdollBoneHeight(RagdollBone* bone) = 0;
+	virtual float getRagdollBoneRadius(RagdollBone* bone) = 0;
+	virtual void setRagdollBoneHeight(RagdollBone* bone, float value) = 0;
+	virtual void setRagdollBoneRadius(RagdollBone* bone, float value) = 0;
+	virtual Transform getRagdollBoneTransform(RagdollBone* bone) = 0;
+	virtual void setRagdollBoneTransform(RagdollBone* bone, const Transform& matrix) = 0;
 	virtual void changeRagdollBoneJoint(RagdollBone* child, int type) = 0;
 	virtual void getRagdollData(ComponentHandle cmp, OutputBlob& blob) = 0;
 	virtual void setRagdollData(ComponentHandle cmp, InputBlob& blob) = 0;
-	virtual void setRagdollBoneKinematic(RagdollBoneHandle bone, bool is_kinematic) = 0;
-	virtual bool isRagdollBoneKinematic(RagdollBoneHandle bone) = 0;
+	virtual void setRagdollBoneKinematicRecursive(RagdollBone* bone, bool is_kinematic) = 0;
+	virtual void setRagdollBoneKinematic(RagdollBone* bone, bool is_kinematic) = 0;
+	virtual bool isRagdollBoneKinematic(RagdollBone* bone) = 0;
+	virtual void setRagdollLayer(ComponentHandle cmp, int layer) = 0;
+	virtual int getRagdollLayer(ComponentHandle cmp) = 0;
 
 	virtual const char* getCollisionLayerName(int index) = 0;
 	virtual void setCollisionLayerName(int index, const char* name) = 0;

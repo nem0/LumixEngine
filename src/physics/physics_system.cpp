@@ -231,6 +231,11 @@ namespace Lumix
 				&PhysicsScene::getRagdollData,
 				&PhysicsScene::setRagdollData,
 				allocator));
+		PropertyRegister::add("ragdoll",
+			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)("Layer",
+				&PhysicsScene::getRagdollLayer,
+				&PhysicsScene::setRagdollLayer,
+				allocator));
 
 		PropertyRegister::add("sphere_rigid_actor",
 			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Radius",
