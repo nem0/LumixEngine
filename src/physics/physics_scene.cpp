@@ -1912,6 +1912,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		physx::PxTransform px_transform = toPhysx(transform);
 		new_bone->actor = physx::PxCreateDynamic(m_scene->getPhysics(), px_transform, geom, *m_default_material, 1.0f);
+		new_bone->actor->userData = (void*)(intptr_t)entity.index;
 		new_bone->actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 		m_scene->addActor(*new_bone->actor);
 		updateFilterData(new_bone->actor, 0);
@@ -2158,6 +2159,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			ComponentHandle renderable = render_scene->getRenderableComponent(entity);
 			if (!isValid(renderable)) return;
 			Pose* pose = render_scene->getPose(renderable);
+			if (!pose) return;
 			setSkeletonPose(m_universe.getTransform(entity), m_ragdolls.at(ragdoll_idx).root, pose);
 			return;
 		}
@@ -2939,7 +2941,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			serializer.read(bone->is_kinematic);
 		}
-		bone->actor->isRigidBody()->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, bone->is_kinematic);
+		bone->actor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, bone->is_kinematic);
+		bone->actor->userData = (void*)(intptr_t)ragdoll.entity.index;
 
 		bone->actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 		m_scene->addActor(*bone->actor);
