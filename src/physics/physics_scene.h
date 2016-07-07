@@ -178,6 +178,8 @@ public:
 	virtual void changeRagdollBoneJoint(RagdollBone* child, int type) = 0;
 	virtual void getRagdollData(ComponentHandle cmp, OutputBlob& blob) = 0;
 	virtual void setRagdollData(ComponentHandle cmp, InputBlob& blob) = 0;
+	virtual void setRagdollBoneKinematic(RagdollBoneHandle bone, bool is_kinematic) = 0;
+	virtual bool isRagdollBoneKinematic(RagdollBoneHandle bone) = 0;
 
 	virtual const char* getCollisionLayerName(int index) = 0;
 	virtual void setCollisionLayerName(int index, const char* name) = 0;
