@@ -234,11 +234,12 @@ public:
 
 	static ComponentHandle LUA_getComponent(Universe* universe, Entity entity, int component_type)
 	{
-		if (!universe->hasComponent(entity, { component_type })) return INVALID_COMPONENT;
+		if (!universe->hasComponent(entity, {component_type})) return INVALID_COMPONENT;
+		ComponentType type = {component_type};
 		for (auto* scene : universe->getScenes())
 		{
-			ComponentHandle handle = scene->getComponent(entity, {component_type});
-			if (isValid(handle)) return handle;
+			if (!scene->ownComponentType(type)) continue;
+			return scene->getComponent(entity, type);
 		}
 		ASSERT(false);
 		return INVALID_COMPONENT;
