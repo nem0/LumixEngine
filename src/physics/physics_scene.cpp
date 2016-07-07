@@ -57,6 +57,7 @@ enum class PhysicsSceneVersion : int
 	JOINT_REFACTOR,
 	D6_RAGDOLL_JOINT,
 	KINEMATIC_BONES,
+	RAGDOLL_LAYER,
 
 	LATEST
 };
@@ -71,7 +72,7 @@ struct RagdollBone
 	};
 
 	int pose_bone_idx;
-	physx::PxRigidActor* actor;
+	physx::PxRigidDynamic* actor;
 	physx::PxJoint* parent_joint;
 	RagdollBone* child;
 	RagdollBone* next;
@@ -87,6 +88,7 @@ struct Ragdoll
 {
 	Entity entity;
 	RagdollBone* root;
+	int layer;
 };
 
 
@@ -457,6 +459,33 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			shapes[i]->setSimulationFilterData(data);
 		}
+	}
+
+
+	void setRagdollLayer(ComponentHandle cmp, int layer) override
+	{
+		auto& ragdoll = m_ragdolls[{cmp.index}];
+		ragdoll.layer = layer;
+		struct Tmp
+		{
+			void operator()(RagdollBone* bone, int layer)
+			{
+				if (!bone) return;
+				scene.updateFilterData(bone->actor, layer);
+				(*this)(bone->child, layer);
+				(*this)(bone->next, layer);
+			}
+
+			PhysicsSceneImpl& scene;
+		};
+		Tmp tmp{*this};
+		tmp(ragdoll.root, layer);
+	}
+
+
+	int getRagdollLayer(ComponentHandle cmp) override
+	{
+		return m_ragdolls[{cmp.index}].layer;
 	}
 
 
@@ -1195,6 +1224,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		Ragdoll& ragdoll = m_ragdolls.at(idx);
 		ragdoll.entity = entity;
 		ragdoll.root = nullptr;
+		ragdoll.layer = 0;
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, RAGDOLL_TYPE, this, cmp);
@@ -1479,7 +1509,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	static RagdollBoneHandle getBone(RagdollBone* bone, int pose_bone_idx)
+	static RagdollBone* getBone(RagdollBone* bone, int pose_bone_idx)
 	{
 		if (!bone) return nullptr;
 		if (bone->pose_bone_idx == pose_bone_idx) return bone;
@@ -1508,43 +1538,43 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	physx::PxJoint* getRagdollBoneJoint(RagdollBoneHandle bone) const override
+	physx::PxJoint* getRagdollBoneJoint(RagdollBone* bone) const override
 	{
 		return bone->parent_joint;
 	}
 
 
-	RagdollBoneHandle getRagdollRootBone(ComponentHandle cmp) const override
+	RagdollBone* getRagdollRootBone(ComponentHandle cmp) const override
 	{
 		return m_ragdolls[{cmp.index}].root;
 	}
 
 
-	RagdollBoneHandle getRagdollBoneChild(RagdollBoneHandle bone) override
+	RagdollBone* getRagdollBoneChild(RagdollBone* bone) override
 	{
 		return bone->child;
 	}
 
 
-	RagdollBoneHandle getRagdollBoneSibling(RagdollBoneHandle bone) override
+	RagdollBone* getRagdollBoneSibling(RagdollBone* bone) override
 	{
 		return bone->next;
 	}
 
 
-	float getRagdollBoneHeight(RagdollBoneHandle bone) override
+	float getRagdollBoneHeight(RagdollBone* bone) override
 	{
 		return getCapsuleGeometry(bone).halfHeight * 2.0f;
 	}
 
 
-	float getRagdollBoneRadius(RagdollBoneHandle bone) override
+	float getRagdollBoneRadius(RagdollBone* bone) override
 	{
 		return getCapsuleGeometry(bone).radius;
 	}
 
 
-	void setRagdollBoneHeight(RagdollBoneHandle bone, float value) override
+	void setRagdollBoneHeight(RagdollBone* bone, float value) override
 	{
 		if (value < 0) return;
 		auto geom = getCapsuleGeometry(bone);
@@ -1555,7 +1585,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void setRagdollBoneRadius(RagdollBoneHandle bone, float value) override
+	void setRagdollBoneRadius(RagdollBone* bone, float value) override
 	{
 		if (value < 0) return;
 		auto geom = getCapsuleGeometry(bone);
@@ -1566,20 +1596,20 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	Transform getRagdollBoneTransform(RagdollBoneHandle bone) override
+	Transform getRagdollBoneTransform(RagdollBone* bone) override
 	{
 		auto px_pose = bone->actor->getGlobalPose();
 		return {fromPhysx(px_pose.p), fromPhysx(px_pose.q)};
 	}
 
 
-	void setRagdollBoneTransform(RagdollBoneHandle bone, const Transform& transform) override
+	void setRagdollBoneTransform(RagdollBone* bone, const Transform& transform) override
 	{
 		bone->actor->setGlobalPose(toPhysx(transform));
 	}
 
 
-	RagdollBoneHandle getRagdollBoneByName(ComponentHandle cmp, uint32 bone_name_hash) override
+	RagdollBone* getRagdollBoneByName(ComponentHandle cmp, uint32 bone_name_hash) override
 	{
 		Entity entity = {cmp.index};
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
@@ -1611,7 +1641,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void destroyRagdollBone(ComponentHandle cmp, RagdollBoneHandle bone) override
+	void destroyRagdollBone(ComponentHandle cmp, RagdollBone* bone) override
 	{
 		disconnect(m_ragdolls[{cmp.index}], bone);
 		bone->actor->release();
@@ -1627,18 +1657,30 @@ struct PhysicsSceneImpl : public PhysicsScene
 	
 	void setRagdollData(ComponentHandle cmp, InputBlob& blob) override
 	{
-		m_ragdolls[{cmp.index}].root = deserializeRagdollBone(nullptr, blob, (int)PhysicsSceneVersion::LATEST);
+		auto& ragdoll = m_ragdolls[{cmp.index}];
+		ragdoll.root = deserializeRagdollBone(ragdoll, nullptr, blob, (int)PhysicsSceneVersion::LATEST);
 	}
 
 
-	void setRagdollBoneKinematic(RagdollBoneHandle bone, bool is_kinematic) override
+	void setRagdollBoneKinematic(RagdollBone* bone, bool is_kinematic) override
 	{
 		bone->is_kinematic = is_kinematic;
 		bone->actor->isRigidBody()->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, is_kinematic);
 	}
 
 
-	bool isRagdollBoneKinematic(RagdollBoneHandle bone) override
+	void setRagdollBoneKinematicRecursive(RagdollBone* bone, bool is_kinematic) override
+	{
+		if (!bone) return;
+		bone->is_kinematic = is_kinematic;
+		bone->actor->isRigidBody()->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, is_kinematic);
+		setRagdollBoneKinematicRecursive(bone->child, is_kinematic);
+		setRagdollBoneKinematicRecursive(bone->next, is_kinematic);
+	}
+
+
+
+	bool isRagdollBoneKinematic(RagdollBone* bone) override
 	{
 		return bone->is_kinematic;
 	}
@@ -1837,7 +1879,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	RagdollBoneHandle createRagdollBone(ComponentHandle cmp, uint32 bone_name_hash) override
+	RagdollBone* createRagdollBone(ComponentHandle cmp, uint32 bone_name_hash) override
 	{
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
 		ASSERT(render_scene);
@@ -1906,7 +1948,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		if (bone->is_kinematic)
 		{
 			Transform bone_transform(Transform(pose->positions[bone->pose_bone_idx], pose->rotations[bone->pose_bone_idx]));
-			bone->actor->setGlobalPose(toPhysx(root_transform * bone_transform * bone->inv_bind_transform));
+			bone->actor->setKinematicTarget(toPhysx(root_transform * bone_transform * bone->inv_bind_transform));
 		}
 		else
 		{
@@ -2027,6 +2069,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 		}
 		return INVALID_COMPONENT;
+	}
+
+
+	void setRagdollKinematic(ComponentHandle cmp, bool is_kinematic)
+	{
+		setRagdollBoneKinematicRecursive(m_ragdolls[{cmp.index}].root, is_kinematic);
 	}
 
 
@@ -2307,6 +2355,34 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void updateFilterData()
 	{
+		for (int i = 0, c = m_ragdolls.size(); i < c; ++i)
+		{
+			auto& ragdoll = m_ragdolls.at(i);
+			
+			struct Tmp
+			{
+				void operator()(RagdollBone* bone)
+				{
+					if (!bone) return;
+					int shapes_count = bone->actor->getShapes(shapes, lengthOf(shapes));
+					for (int i = 0; i < shapes_count; ++i)
+					{
+						shapes[i]->setSimulationFilterData(data);
+					}
+					(*this)(bone->child);
+					(*this)(bone->next);
+				};
+				physx::PxShape* shapes[8];
+				physx::PxFilterData data;
+			};
+
+			Tmp tmp;
+			int layer = ragdoll.layer;
+			tmp.data.word0 = 1 << layer;
+			tmp.data.word1 = m_collision_filter[layer];
+			tmp(ragdoll.root);
+		}
+
 		for (int i = 0, c = m_actors.size(); i < c; ++i)
 		{
 			auto* actor = m_actors.at(i);
@@ -2818,7 +2894,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	RagdollBone* deserializeRagdollBone(RagdollBone* parent, InputBlob& serializer, int version)
+	RagdollBone* deserializeRagdollBone(Ragdoll& ragdoll, RagdollBone* parent, InputBlob& serializer, int version)
 	{
 		int pose_bone_idx;
 		serializer.read(pose_bone_idx);
@@ -2867,12 +2943,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		bone->actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 		m_scene->addActor(*bone->actor);
-		updateFilterData(bone->actor, 0);
+		updateFilterData(bone->actor, ragdoll.layer);
 
 		bone->parent = parent;
 
-		bone->child = deserializeRagdollBone(bone, serializer, version);
-		bone->next = deserializeRagdollBone(parent, serializer, version);
+		bone->child = deserializeRagdollBone(ragdoll, bone, serializer, version);
+		bone->next = deserializeRagdollBone(ragdoll, parent, serializer, version);
 		if(bone->next) bone->next->prev = bone;
 
 		deserializeRagdollJoint(bone, serializer);
@@ -2889,6 +2965,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			serializer.write(m_ragdolls.getKey(i));
 			const Ragdoll& ragdoll = m_ragdolls.at(i);
+			serializer.write(ragdoll.layer);
 			serializeRagdollBone(ragdoll.root, serializer);
 		}
 	}
@@ -3073,8 +3150,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.read(entity);
 			int idx = m_ragdolls.insert(entity, Ragdoll());
 			Ragdoll& ragdoll = m_ragdolls.at(i);
+			ragdoll.layer = 0;
+			if (version > (int)PhysicsSceneVersion::RAGDOLL_LAYER) serializer.read(ragdoll.layer);
 			ragdoll.entity = entity;
-			ragdoll.root = deserializeRagdollBone(nullptr, serializer, version);
+			ragdoll.root = deserializeRagdollBone(ragdoll, nullptr, serializer, version);
 			ComponentHandle cmp = {ragdoll.entity.index};
 			m_universe.addComponent(ragdoll.entity, RAGDOLL_TYPE, this, cmp);
 		}
@@ -3549,6 +3628,7 @@ void PhysicsScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getActorSpeed);
 	REGISTER_FUNCTION(applyForceToActor);
 	REGISTER_FUNCTION(moveController);
+	REGISTER_FUNCTION(setRagdollKinematic);
 	
 	LuaWrapper::createSystemFunction(L, "Physics", "raycast", &PhysicsSceneImpl::LUA_raycast);
 

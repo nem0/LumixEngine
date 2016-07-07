@@ -623,10 +623,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 	}
 
 
-	void renderBone(RenderScene& render_scene,
-		PhysicsScene& phy_scene,
-		PhysicsScene::RagdollBoneHandle bone,
-		PhysicsScene::RagdollBoneHandle selected_bone)
+	void renderBone(RenderScene& render_scene, PhysicsScene& phy_scene, RagdollBone* bone, RagdollBone* selected_bone)
 	{
 		if (!bone) return;
 		bool is_selected = bone == selected_bone;
@@ -703,7 +700,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 		ImGui::SameLine();
 		static bool visualize_bones = true;
 		ImGui::Checkbox("Visualize bones", &visualize_bones);
-		PhysicsScene::RagdollBoneHandle selected_bone = nullptr;
+		RagdollBone* selected_bone = nullptr;
 		if (m_selected_bone >= 0 && m_selected_bone < model->getBoneCount())
 		{
 			uint32 hash = crc32(model->getBone(m_selected_bone).name.c_str());
@@ -712,6 +709,9 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 		if (visualize) renderBone(*render_scene, *phy_scene, phy_scene->getRagdollRootBone(cmp), selected_bone);
 		ImGui::SameLine();
 		if (ImGui::Button("Autogenerate")) autogeneratePhySkeleton(*phy_scene, cmp, model);
+		ImGui::SameLine();
+		auto* root = phy_scene->getRagdollRootBone(cmp);
+		if (ImGui::Button("All kinematic")) phy_scene->setRagdollBoneKinematicRecursive(root, true);
 
 		if (ImGui::BeginChild("bones", ImVec2(ImGui::GetContentRegionAvailWidth() * 0.5f, 0)))
 		{
