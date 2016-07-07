@@ -186,7 +186,16 @@ public:
 	}
 
 
-	bool execute() override;
+	bool execute() override
+	{
+		InputBlob blob(m_blob.getData(), m_blob.getPos());
+
+		m_entities.clear();
+		m_editor.getEngine().pasteEntities(m_position, *m_editor.getUniverse(), blob, m_entities);
+
+		return true;
+	}
+
 
 
 	void serialize(JsonSerializer& serializer) override
@@ -2163,14 +2172,6 @@ public:
 	}
 
 
-	void pasteEntities(const Vec3& pos, InputBlob& blob, Array<Entity>& entities) override
-	{
-		PasteEntityCommand cmd(*this, pos, blob);
-		cmd.execute();
-		for (Entity entity : cmd.getEntities()) entities.push(entity);
-	}
-
-
 	void cloneComponent(const ComponentUID& src, Entity entity) override
 	{
 		ComponentUID clone = ComponentUID::INVALID;
@@ -3131,53 +3132,4 @@ void WorldEditor::destroy(WorldEditor* editor, IAllocator& allocator)
 }
 
 
-bool PasteEntityCommand::execute()
-{
-	InputBlob blob(m_blob.getData(), m_blob.getPos());
-	Universe* universe = m_editor.getUniverse();
-	
-	int entity_count;
-	blob.read(entity_count);
-	m_entities.clear();
-	m_entities.reserve(entity_count);
-	Matrix base_matrix = Matrix::IDENTITY;
-	base_matrix.setTranslation(m_position);
-	for (int i = 0; i < entity_count; ++i)
-	{
-		Matrix mtx;
-		blob.read(mtx);
-		if (i == 0) 
-		{
-			Matrix inv = mtx;
-			inv.inverse();
-			base_matrix.copy3x3(mtx);
-			base_matrix = base_matrix * inv;
-			mtx.setTranslation(m_position);
-		}
-		else
-		{
-			mtx = base_matrix * mtx;
-		}
-		Entity new_entity = universe->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
-		universe->setMatrix(new_entity, mtx);
-		int32 count;
-		blob.read(count);
-		for (int i = 0; i < count; ++i)
-		{
-			uint32 hash;
-			blob.read(hash);
-			ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
-			ComponentUID cmp = m_editor.getEngine().createComponent(*universe, new_entity, type);
-			Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(type);
-			for (int j = 0; j < props.size(); ++j)
-			{
-				props[j]->set(cmp, -1, blob);
-			}
-		}
-		m_entities.push(new_entity);
-	}
-	return true;
-}
-
-
-} // !namespace Lumix
+} // namespace Lumix

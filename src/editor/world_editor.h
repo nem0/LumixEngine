@@ -94,7 +94,6 @@ public:
 	virtual void copyEntities(const Entity* entities, int count, OutputBlob& blob) = 0;
 	virtual void copyEntities() = 0;
 	virtual bool canPasteEntities() const = 0;
-	virtual void pasteEntities(const Vec3& pos, InputBlob& blob, Array<Entity>& entities) = 0;
 	virtual void pasteEntities() = 0;
 	virtual ComponentUID getComponent(Entity entity, ComponentType type) = 0;
 	virtual ComponentList& getComponents(Entity entity) = 0;
