@@ -225,6 +225,26 @@ public:
 	}
 
 
+
+	static int LUA_getComponentType(const char* component_type)
+	{
+		return PropertyRegister::getComponentType(component_type).index;
+	}
+
+
+	static ComponentHandle LUA_getComponent(Universe* universe, Entity entity, int component_type)
+	{
+		if (!universe->hasComponent(entity, { component_type })) return INVALID_COMPONENT;
+		for (auto* scene : universe->getScenes())
+		{
+			ComponentHandle handle = scene->getComponent(entity, {component_type});
+			if (isValid(handle)) return handle;
+		}
+		ASSERT(false);
+		return INVALID_COMPONENT;
+	}
+
+
 	static int LUA_createEntityEx(lua_State* L)
 	{
 		auto* engine = LuaWrapper::checkArg<Engine*>(L, 1);
@@ -421,6 +441,8 @@ public:
 		REGISTER_FUNCTION(destroyEntity);
 		REGISTER_FUNCTION(preloadPrefab);
 		REGISTER_FUNCTION(unloadPrefab);
+		REGISTER_FUNCTION(getComponent);
+		REGISTER_FUNCTION(getComponentType);
 
 		#undef REGISTER_FUNCTION
 

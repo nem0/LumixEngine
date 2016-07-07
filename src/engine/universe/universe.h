@@ -35,6 +35,7 @@ public:
 	void destroyEntity(Entity entity);
 	void addComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index);
 	void destroyComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index);
+	bool hasComponent(Entity entity, ComponentType component_type) const;
 	int getEntityCount() const { return m_transformations.size(); }
 
 	int getDenseIdx(Entity entity);
