@@ -62,7 +62,7 @@ IFile& IFile::operator<<(const char* text)
 void IFile::getContents(OutputBlob& blob)
 {
 	size_t tmp = size();
-	blob.resize(tmp);
+	blob.resize((int)tmp);
 	read(blob.getMutableData(), tmp);
 }
 
