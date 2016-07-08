@@ -2,6 +2,7 @@
 
 
 #include "engine/iallocator.h"
+#include "engine/string.h"
 
 
 namespace Lumix
@@ -276,50 +277,6 @@ public:
 		m_size = size;
 	}
 
-	void moveMemory(void* dest, const void* src, size_t count)
-	{
-		if(dest == src) return;
-
-		if(dest < src || dest >= (uint8*)src + count)
-		{
-			uint8* dest8 = (uint8*)dest;
-			const uint8* src8 = (const uint8*)src;
-
-			const uint8* src_end = src8 + count;
-			while(src8 != src_end)
-			{
-				*dest8 = *src8;
-				++src8;
-				++dest8;
-			}
-		}
-		else
-		{
-			uint8* dest8 = (uint8*)dest + count - 1;
-			const uint8* src8 = (const uint8*)src + count - 1;
-
-			while(src8 >= src)
-			{
-				*dest8 = *src8;
-				--src8;
-				--dest8;
-			}
-		}
-	}
-
-	void copyMemory(void* dest, const void* src, size_t count)
-	{
-		uint8* dest8 = (uint8*)dest;
-		const uint8* src8 = (const uint8*)src;
-
-		const uint8* src_end = src8 + count;
-		while(src8 != src_end)
-		{
-			*dest8 = *src8;
-			++src8;
-			++dest8;
-		}
-	}
 
 	void reserve(int capacity)
 	{
