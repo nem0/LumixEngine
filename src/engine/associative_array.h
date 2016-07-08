@@ -1,7 +1,8 @@
 #pragma once
 
 
-#include "engine/array.h"
+#include "engine/iallocator.h"
+#include "engine/string.h"
 
 
 namespace Lumix
