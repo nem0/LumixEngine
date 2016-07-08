@@ -349,7 +349,7 @@ struct NavigationSceneImpl : public NavigationScene
 			auto* call = m_script_scene->beginFunctionCall(cmp, i, "onPathFinished");
 			if (!call) continue;
 
-			m_script_scene->endFunctionCall(*call);
+			m_script_scene->endFunctionCall();
 		}
 	}
 

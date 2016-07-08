@@ -479,7 +479,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 				}
 				if (auto* call = scene->beginFunctionCall(cmp.handle, j, "onGUI"))
 				{
-					scene->endFunctionCall(*call);
+					scene->endFunctionCall();
 				}
 				ImGui::PopID();
 			}

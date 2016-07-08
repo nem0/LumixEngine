@@ -58,7 +58,7 @@ public:
 	virtual ComponentHandle getComponent(Entity entity) = 0;
 	virtual int getEnvironment(ComponentHandle cmp, int scr_index) = 0;
 	virtual IFunctionCall* beginFunctionCall(ComponentHandle cmp, int scr_index, const char* function) = 0;
-	virtual void endFunctionCall(IFunctionCall& caller) = 0;
+	virtual void endFunctionCall() = 0;
 	virtual int getScriptCount(ComponentHandle cmp) = 0;
 	virtual lua_State* getState(ComponentHandle cmp, int scr_index) = 0;
 	virtual void insertScript(ComponentHandle cmp, int idx) = 0;
