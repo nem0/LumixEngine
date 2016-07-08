@@ -966,7 +966,7 @@ struct PipelineImpl : public Pipeline
 				{
 					call->add(this);
 					call->addEnvironment(m_lua_env);
-					scr_scene->endFunctionCall(*call);
+					scr_scene->endFunctionCall();
 					if (lua_rawgeti(L, LUA_REGISTRYINDEX, env) != LUA_TTABLE)
 					{
 						ASSERT(false);
@@ -982,7 +982,7 @@ struct PipelineImpl : public Pipeline
 				ret = true;
 				call->add(this);
 				call->addEnvironment(m_lua_env);
-				scr_scene->endFunctionCall(*call);
+				scr_scene->endFunctionCall();
 			}
 		}
 		return ret;

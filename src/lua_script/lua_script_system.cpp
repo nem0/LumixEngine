@@ -28,6 +28,7 @@ namespace Lumix
 	enum class LuaScriptVersion
 	{
 		MULTIPLE_SCRIPTS,
+		REFACTOR,
 
 		LATEST
 	};
@@ -271,7 +272,7 @@ namespace Lumix
 			int parameter_count;
 			lua_State* state;
 			bool is_in_progress;
-			ComponentHandle cmp;
+			ScriptComponent* cmp;
 			int scr_index;
 		};
 
@@ -283,7 +284,6 @@ namespace Lumix
 			, m_scripts(system.getAllocator())
 			, m_updates(system.getAllocator())
 			, m_timers(system.getAllocator())
-			, m_entity_script_map(system.getAllocator())
 			, m_property_names(system.getAllocator())
 			, m_is_game_running(false)
 			, m_is_api_registered(false)
@@ -296,10 +296,8 @@ namespace Lumix
 
 		ComponentHandle getComponent(Entity entity) override
 		{
-			auto iter = m_entity_script_map.find(entity);
-			if (!iter.isValid()) return INVALID_COMPONENT;
-
-			return iter.value();
+			if (m_scripts.find(entity) == m_scripts.end()) return INVALID_COMPONENT;
+			return {entity.index};
 		}
 
 
@@ -307,7 +305,8 @@ namespace Lumix
 		{
 			ASSERT(!m_function_call.is_in_progress);
 
-			auto& script = m_scripts[cmp.index]->m_scripts[scr_index];
+			auto* script_cmp = m_scripts[{cmp.index}];
+			auto& script = script_cmp->m_scripts[scr_index];
 			if (!script.m_state) return nullptr;
 
 			bool is_env_valid = lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment) == LUA_TTABLE;
@@ -319,7 +318,7 @@ namespace Lumix
 			}
 
 			m_function_call.state = script.m_state;
-			m_function_call.cmp = cmp;
+			m_function_call.cmp = script_cmp;
 			m_function_call.is_in_progress = true;
 			m_function_call.parameter_count = 0;
 			m_function_call.scr_index = scr_index;
@@ -328,14 +327,13 @@ namespace Lumix
 		}
 
 
-		void endFunctionCall(IFunctionCall& caller) override
+		void endFunctionCall() override
 		{
-			ASSERT(&caller == &m_function_call);
 			ASSERT(m_function_call.is_in_progress);
 
 			m_function_call.is_in_progress = false;
 
-			auto& script = m_scripts[m_function_call.cmp.index]->m_scripts[m_function_call.scr_index];
+			auto& script = m_function_call.cmp->m_scripts[m_function_call.scr_index];
 			if (!script.m_state) return;
 
 			if (lua_pcall(script.m_state, m_function_call.parameter_count, 0, 0) != LUA_OK)
@@ -349,25 +347,25 @@ namespace Lumix
 
 		int getPropertyCount(ComponentHandle cmp, int scr_index) override
 		{
-			return m_scripts[cmp.index]->m_scripts[scr_index].m_properties.size();
+			return m_scripts[{cmp.index}]->m_scripts[scr_index].m_properties.size();
 		}
 
 
 		const char* getPropertyName(ComponentHandle cmp, int scr_index, int prop_index) override
 		{
-			return getPropertyName(m_scripts[cmp.index]->m_scripts[scr_index].m_properties[prop_index].name_hash);
+			return getPropertyName(m_scripts[{cmp.index}]->m_scripts[scr_index].m_properties[prop_index].name_hash);
 		}
 
 
 		Property::Type getPropertyType(ComponentHandle cmp, int scr_index, int prop_index) override
 		{
-			return m_scripts[cmp.index]->m_scripts[scr_index].m_properties[prop_index].type;
+			return m_scripts[{cmp.index}]->m_scripts[scr_index].m_properties[prop_index].type;
 		}
 
 
 		void getScriptData(ComponentHandle cmp, OutputBlob& blob) override
 		{
-			auto* scr = m_scripts[cmp.index];
+			auto* scr = m_scripts[{cmp.index}];
 			blob.write(scr->m_scripts.size());
 			for (int i = 0; i < scr->m_scripts.size(); ++i)
 			{
@@ -390,7 +388,7 @@ namespace Lumix
 
 		void setScriptData(ComponentHandle cmp, InputBlob& blob) override
 		{
-			auto* scr = m_scripts[cmp.index];
+			auto* scr = m_scripts[{cmp.index}];
 			int count;
 			blob.read(count);
 			for (int i = 0; i < count; ++i)
@@ -429,24 +427,23 @@ namespace Lumix
 		void unloadAllScripts()
 		{
 			Path invalid_path;
-			for (int i = 0; i < m_scripts.size(); ++i)
+			for (auto* script_cmp : m_scripts)
 			{
-				if (!m_scripts[i]) continue;
+				if (!script_cmp) continue;
 
-				for (auto script : m_scripts[i]->m_scripts)
+				for (auto script : script_cmp->m_scripts)
 				{
-					setScriptPath(*m_scripts[i], script, invalid_path);
+					setScriptPath(*script_cmp, script, invalid_path);
 				}
-				LUMIX_DELETE(m_system.getAllocator(), m_scripts[i]);
+				LUMIX_DELETE(m_system.getAllocator(), script_cmp);
 			}
-			m_entity_script_map.clear();
 			m_scripts.clear();
 		}
 
 
 		lua_State* getState(ComponentHandle cmp, int scr_index) override
 		{
-			return m_scripts[cmp.index]->m_scripts[scr_index].m_state;
+			return m_scripts[{cmp.index}]->m_scripts[scr_index].m_state;
 		}
 
 
@@ -808,7 +805,7 @@ namespace Lumix
 
 		int getEnvironment(ComponentHandle cmp, int scr_index) override
 		{
-			return m_scripts[cmp.index]->m_scripts[scr_index].m_environment;
+			return m_scripts[{cmp.index}]->m_scripts[scr_index].m_environment;
 		}
 
 
@@ -862,17 +859,18 @@ namespace Lumix
 			const char* name,
 			const char* value) override
 		{
-			if (!m_scripts[cmp.index]) return;
-			if(!m_scripts[cmp.index]->m_scripts[scr_index].m_state) return;
+			auto* script_cmp = m_scripts[{cmp.index}];
+			if (!script_cmp) return;
+			if(!script_cmp->m_scripts[scr_index].m_state) return;
 
 			Property& prop = getScriptProperty(cmp, scr_index, name);
-			applyProperty(m_scripts[cmp.index]->m_scripts[scr_index], prop, value);
+			applyProperty(script_cmp->m_scripts[scr_index], prop, value);
 		}
 
 
 		const char* getPropertyName(Lumix::ComponentHandle cmp, int scr_index, int index) const
 		{
-			auto& script = m_scripts[cmp.index]->m_scripts[scr_index];
+			auto& script = m_scripts[{cmp.index}]->m_scripts[scr_index];
 
 			return getPropertyName(script.m_properties[index].name_hash);
 		}
@@ -880,7 +878,7 @@ namespace Lumix
 
 		int getPropertyCount(Lumix::ComponentHandle cmp, int scr_index) const
 		{
-			auto& script = m_scripts[cmp.index]->m_scripts[scr_index];
+			auto& script = m_scripts[{cmp.index}]->m_scripts[scr_index];
 
 			return script.m_properties.size();
 		}
@@ -1001,9 +999,8 @@ namespace Lumix
 		void startGame() override
 		{
 			m_is_game_running = true;
-			for (int i = 0; i < m_scripts.size(); ++i)
+			for (auto* scr : m_scripts)
 			{
-				auto* scr = m_scripts[i];
 				if (!scr) continue;
 				for (int j = 0; j < scr->m_scripts.size(); ++j)
 				{
@@ -1030,24 +1027,10 @@ namespace Lumix
 			if (type != LUA_SCRIPT_TYPE) return INVALID_COMPONENT;
 
 			auto& allocator = m_system.getAllocator();
-			ScriptComponent& script = *LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
-			ComponentHandle cmp = INVALID_COMPONENT;
-			for (int i = 0; i < m_scripts.size(); ++i)
-			{
-				if (m_scripts[i] == nullptr)
-				{
-					cmp = {i};
-					m_scripts[i] = &script;
-					break;
-				}
-			}
-			if (!isValid(cmp))
-			{
-				cmp = {m_scripts.size()};
-				m_scripts.push(&script);
-			}
-			m_entity_script_map.insert(entity, cmp);
-			script.m_entity = entity;
+			ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
+			ComponentHandle cmp = {entity.index};
+			script->m_entity = entity;
+			m_scripts.insert(entity, script);
 			m_universe.addComponent(entity, type, this, cmp);
 
 			return cmp;
@@ -1058,7 +1041,8 @@ namespace Lumix
 		{
 			if (type != LUA_SCRIPT_TYPE) return;
 
-			auto* script = m_scripts[component.index];
+			Entity entity = {component.index};
+			auto* script = m_scripts[entity];
 			for (auto& scr : script->m_scripts)
 			{
 				if (scr.m_state) destroyInstance(*script, scr);
@@ -1069,10 +1053,9 @@ namespace Lumix
 					m_system.getScriptManager().unload(*scr.m_script);
 				}
 			}
-			m_entity_script_map.erase(script->m_entity);
-			m_scripts[component.index] = nullptr;
-			m_universe.destroyComponent(script->m_entity, type, this, component);
 			LUMIX_DELETE(m_system.getAllocator(), script);
+			m_scripts.erase(entity);
+			m_universe.destroyComponent(entity, type, this, component);
 		}
 
 
@@ -1085,7 +1068,7 @@ namespace Lumix
 			ASSERT(max_size > 0);
 
 			uint32 hash = crc32(property_name);
-			auto& inst = m_scripts[cmp.index]->m_scripts[scr_index];
+			auto& inst = m_scripts[{cmp.index}]->m_scripts[scr_index];
 			if (inst.m_script->isReady())
 			{
 				for (auto& prop : inst.m_properties)
@@ -1137,14 +1120,12 @@ namespace Lumix
 		void serialize(OutputBlob& serializer) override
 		{
 			serializer.write(m_scripts.size());
-			for (int i = 0; i < m_scripts.size(); ++i)
+			for (auto iter = m_scripts.begin(), end = m_scripts.end(); iter != end; ++iter)
 			{
-				serializer.write(m_scripts[i] ? true : false);
-				if (!m_scripts[i]) continue;
-
-				serializer.write(m_scripts[i]->m_entity);
-				serializer.write(m_scripts[i]->m_scripts.size());
-				for (auto& scr : m_scripts[i]->m_scripts)
+				ScriptComponent* script_cmp = iter.value();
+				serializer.write(script_cmp->m_entity);
+				serializer.write(script_cmp->m_scripts.size());
+				for (auto& scr : script_cmp->m_scripts)
 				{
 					serializer.writeString(scr.m_script ? scr.m_script->getPath().c_str() : "");
 					serializer.write(scr.m_properties.size());
@@ -1185,28 +1166,23 @@ namespace Lumix
 
 			int len = serializer.read<int>();
 			unloadAllScripts();
-			m_scripts.reserve(len);
+			m_scripts.rehash(len);
 			for (int i = 0; i < len; ++i)
 			{
-				bool is_valid;
-				serializer.read(is_valid);
-				if (!is_valid)
-				{
-					m_scripts.push(nullptr);
-					continue;
-				}
+				bool is_valid = true;
+				if (version <= (int)LuaScriptVersion::REFACTOR) serializer.read(is_valid);
+				if (!is_valid) continue;
 
 				auto& allocator = m_system.getAllocator();
-				ScriptComponent& script = *LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
-				m_scripts.push(&script);
+				ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
 
+				serializer.read(script->m_entity);
+				m_scripts.insert(script->m_entity, script);
 				int scr_count;
-				serializer.read(m_scripts[i]->m_entity);
 				serializer.read(scr_count);
-				m_entity_script_map.insert(m_scripts[i]->m_entity, {i});
 				for (int j = 0; j < scr_count; ++j)
 				{
-					auto& scr = script.m_scripts.emplace(allocator);
+					auto& scr = script->m_scripts.emplace(allocator);
 
 					char tmp[MAX_PATH_LENGTH];
 					serializer.readString(tmp, MAX_PATH_LENGTH);
@@ -1224,9 +1200,10 @@ namespace Lumix
 						serializer.readString(tmp, sizeof(tmp));
 						prop.stored_value = tmp;
 					}
-					setScriptPath(*m_scripts[i], scr, Path(tmp));
+					setScriptPath(*script, scr, Path(tmp));
 				}
-				m_universe.addComponent(Entity(m_scripts[i]->m_entity), LUA_SCRIPT_TYPE, this, {i});
+				ComponentHandle cmp = {script->m_entity.index};
+				m_universe.addComponent(script->m_entity, LUA_SCRIPT_TYPE, this, cmp);
 			}
 		}
 
@@ -1235,32 +1212,28 @@ namespace Lumix
 		{
 			int len = serializer.read<int>();
 			unloadAllScripts();
-			m_scripts.reserve(len);
+			m_scripts.rehash(len);
 			for (int i = 0; i < len; ++i)
 			{
 				bool is_valid;
 				serializer.read(is_valid);
-				if (!is_valid)
-				{
-					m_scripts.push(nullptr);
-					continue;
-				}
+				if (!is_valid) continue;
 
-				ScriptComponent& script = *LUMIX_NEW(m_system.getAllocator(), ScriptComponent)(*this, m_system.getAllocator());
-				m_scripts.push(&script);
-				serializer.read(m_scripts[i]->m_entity);
-				m_entity_script_map.insert(m_scripts[i]->m_entity, {i});
+				IAllocator& allocator = m_system.getAllocator();
+				ScriptComponent* script = LUMIX_NEW(m_system.getAllocator(), ScriptComponent)(*this, allocator);
+				serializer.read(script->m_entity);
+				m_scripts.insert(script->m_entity, script);
+
 				char tmp[MAX_PATH_LENGTH];
 				serializer.readString(tmp, MAX_PATH_LENGTH);
-				auto& scr = script.m_scripts.emplace(m_system.m_allocator);
+				auto& scr = script->m_scripts.emplace(m_system.m_allocator);
 				scr.m_state = nullptr;
 				int prop_count;
 				serializer.read(prop_count);
 				scr.m_properties.reserve(prop_count);
 				for (int j = 0; j < prop_count; ++j)
 				{
-					Property& prop =
-						scr.m_properties.emplace(m_system.getAllocator());
+					Property& prop = scr.m_properties.emplace(m_system.getAllocator());
 					prop.type = Property::ANY;
 					serializer.read(prop.name_hash);
 					char tmp[1024];
@@ -1268,8 +1241,9 @@ namespace Lumix
 					serializer.readString(tmp, sizeof(tmp));
 					prop.stored_value = tmp;
 				}
-				setScriptPath(script, scr, Path(tmp));
-				m_universe.addComponent(m_scripts[i]->m_entity, LUA_SCRIPT_TYPE, this, {i});
+				setScriptPath(*script, scr, Path(tmp));
+				ComponentHandle cmp = {script->m_entity.index};
+				m_universe.addComponent(script->m_entity, LUA_SCRIPT_TYPE, this, cmp);
 			}
 		}
 
@@ -1342,9 +1316,8 @@ namespace Lumix
 		ComponentHandle getComponent(Entity entity, ComponentType type) override
 		{
 			ASSERT(ownComponentType(type));
-			auto iter = m_entity_script_map.find(entity);
-			if (iter.isValid()) return iter.value();
-			return INVALID_COMPONENT;
+			if (m_scripts.find(entity) == m_scripts.end()) return INVALID_COMPONENT;
+			return {entity.index};
 		}
 
 
@@ -1357,7 +1330,8 @@ namespace Lumix
 		Property& getScriptProperty(ComponentHandle cmp, int scr_index, const char* name)
 		{
 			uint32 name_hash = crc32(name);
-			for (auto& prop : m_scripts[cmp.index]->m_scripts[scr_index].m_properties)
+			ScriptComponent* script_cmp = m_scripts[{cmp.index}];
+			for (auto& prop : script_cmp->m_scripts[scr_index].m_properties)
 			{
 				if (prop.name_hash == name_hash)
 				{
@@ -1365,8 +1339,8 @@ namespace Lumix
 				}
 			}
 
-			m_scripts[cmp.index]->m_scripts[scr_index].m_properties.emplace(m_system.getAllocator());
-			auto& prop = m_scripts[cmp.index]->m_scripts[scr_index].m_properties.back();
+			script_cmp->m_scripts[scr_index].m_properties.emplace(m_system.getAllocator());
+			auto& prop = script_cmp->m_scripts[scr_index].m_properties.back();
 			prop.name_hash = name_hash;
 			return prop;
 		}
@@ -1374,49 +1348,49 @@ namespace Lumix
 
 		Path getScriptPath(ComponentHandle cmp, int scr_index) override
 		{
-			auto& tmp = m_scripts[cmp.index]->m_scripts[scr_index];
+			auto& tmp = m_scripts[{cmp.index}]->m_scripts[scr_index];
 			return tmp.m_script ? tmp.m_script->getPath() : Path("");
 		}
 
 
 		void setScriptPath(ComponentHandle cmp, int scr_index, const Path& path) override
 		{
-			auto* tmp = m_scripts[cmp.index];
-			if (!tmp) return;
-			if (tmp->m_scripts.size() <= scr_index) return;
-			setScriptPath(*tmp, tmp->m_scripts[scr_index], path);
+			auto* script_cmp = m_scripts[{cmp.index}];
+			if (script_cmp->m_scripts.size() <= scr_index) return;
+			setScriptPath(*script_cmp, script_cmp->m_scripts[scr_index], path);
 		}
 
 
 		int getScriptCount(ComponentHandle cmp) override
 		{
-			return m_scripts[cmp.index]->m_scripts.size();
+			return m_scripts[{cmp.index}]->m_scripts.size();
 		}
 
 
 		void insertScript(ComponentHandle cmp, int idx) override
 		{
-			m_scripts[cmp.index]->m_scripts.emplaceAt(idx, m_system.m_allocator);
+			m_scripts[{cmp.index}]->m_scripts.emplaceAt(idx, m_system.m_allocator);
 		}
 
 
 		int addScript(ComponentHandle cmp) override
 		{
-			m_scripts[cmp.index]->m_scripts.emplace(m_system.m_allocator);
-			return m_scripts[cmp.index]->m_scripts.size() - 1;
+			ScriptComponent* script_cmp = m_scripts[{cmp.index}];
+			script_cmp->m_scripts.emplace(m_system.m_allocator);
+			return script_cmp->m_scripts.size() - 1;
 		}
 
 
 		void removeScript(ComponentHandle cmp, int scr_index) override
 		{
 			setScriptPath(cmp, scr_index, Path());
-			m_scripts[cmp.index]->m_scripts.eraseFast(scr_index);
+			m_scripts[{cmp.index}]->m_scripts.eraseFast(scr_index);
 		}
 
 
 		void serializeScript(ComponentHandle cmp, int scr_index, OutputBlob& blob) override
 		{
-			auto& scr = m_scripts[cmp.index]->m_scripts[scr_index];
+			auto& scr = m_scripts[{cmp.index}]->m_scripts[scr_index];
 			blob.writeString(scr.m_script ? scr.m_script->getPath().c_str() : "");
 			blob.write(scr.m_properties.size());
 			for (auto prop : scr.m_properties)
@@ -1439,7 +1413,7 @@ namespace Lumix
 
 		void deserializeScript(ComponentHandle cmp, int scr_index, InputBlob& blob) override
 		{
-			auto& scr = m_scripts[cmp.index]->m_scripts[scr_index];
+			auto& scr = m_scripts[{cmp.index}]->m_scripts[scr_index];
 			int count;
 			char path[MAX_PATH_LENGTH];
 			blob.readString(path, lengthOf(path));
@@ -1460,8 +1434,7 @@ namespace Lumix
 
 
 		LuaScriptSystemImpl& m_system;
-		Array<ScriptComponent*> m_scripts;
-		HashMap<Entity, ComponentHandle> m_entity_script_map;
+		HashMap<Entity, ScriptComponent*> m_scripts;
 		AssociativeArray<uint32, string> m_property_names;
 		Universe& m_universe;
 		Array<UpdateData> m_updates;

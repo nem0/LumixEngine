@@ -336,7 +336,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				call->add(position.x);
 				call->add(position.y);
 				call->add(position.z);
-				m_script_scene->endFunctionCall(*call);
+				m_script_scene->endFunctionCall();
 			}
 		};
 
