@@ -2920,26 +2920,29 @@ void ImportAssetDialog::onWindowGUI()
 				return;
 			}
 		}
-		ImGui::SameLine();
-		if (ImGui::Button("Clear all sources"))
+		if (!m_importers.empty())
 		{
-			m_importers.clear();
-			m_animations.clear();
-			m_materials.clear();
-			m_meshes.clear();
-			m_mesh_output_filename[0] = '\0';
+			ImGui::SameLine();
+			if (ImGui::Button("Clear all sources"))
+			{
+				m_importers.clear();
+				m_animations.clear();
+				m_materials.clear();
+				m_meshes.clear();
+				m_mesh_output_filename[0] = '\0';
+			}
 		}
 
 		onImageGUI();
 
+		ImGui::Checkbox("Optimize meshes", &m_model.optimize_mesh_on_import);
+		ImGui::SameLine();
+		ImGui::Checkbox("Smooth normals", &m_model.gen_smooth_normal);
 		if (!m_importers.empty())
 		{
 			if (ImGui::CollapsingHeader("Advanced"))
 			{
 				//ImGui::Checkbox("Create billboard LOD", &m_create_billboard_lod);
-				if (ImGui::Checkbox("Optimize meshes", &m_model.optimize_mesh_on_import)) checkSource();
-				if (ImGui::Checkbox("Smooth normals", &m_model.gen_smooth_normal)) checkSource();
-
 				if (m_is_importing || m_is_converting)
 				{
 					ImGui::EndDock();
