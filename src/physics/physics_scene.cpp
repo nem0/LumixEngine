@@ -58,6 +58,7 @@ enum class PhysicsSceneVersion : int
 	D6_RAGDOLL_JOINT,
 	KINEMATIC_BONES,
 	RAGDOLL_LAYER,
+	REFACTOR,
 
 	LATEST
 };
@@ -298,6 +299,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	~PhysicsSceneImpl()
 	{
+		for (int i = 0; i < m_controllers.size(); ++i)
+		{
+			m_controllers.at(i).m_controller->release();
+		}
 		for (int i = 0; i < m_ragdolls.size(); ++i)
 		{
 			destroySkeleton(m_ragdolls.at(i).root);
@@ -308,7 +313,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		}
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
-			LUMIX_DELETE(m_allocator, m_terrains[i]);
+			LUMIX_DELETE(m_allocator, m_terrains.at(i));
 		}
 	}
 
@@ -405,19 +410,15 @@ struct PhysicsSceneImpl : public PhysicsScene
 		}
 		if (type == CONTROLLER_TYPE)
 		{
-			for (int i = 0; i < m_controllers.size(); ++i)
-			{
-				if (!m_controllers[i].m_is_free && m_controllers[i].m_entity == entity) return {i};
-			}
-			return INVALID_COMPONENT;
+			int idx = m_controllers.find(entity);
+			if (idx < 0) return INVALID_COMPONENT;
+			return {entity.index};
 		}
 		if (type == HEIGHTFIELD_TYPE)
 		{
-			for (int i = 0; i < m_terrains.size(); ++i)
-			{
-				if (m_terrains[i] && m_terrains[i]->m_entity == entity) return {i};
-			}
-			return INVALID_COMPONENT;
+			int idx = m_terrains.find(entity);
+			if (idx < 0) return INVALID_COMPONENT;
+			return {entity.index};
 		}
 		if (type == HINGE_JOINT_TYPE || type == SPHERICAL_JOINT_TYPE || type == DISTANCE_JOINT_TYPE ||
 			type == D6_JOINT_TYPE)
@@ -441,20 +442,21 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	int getControllerLayer(ComponentHandle cmp) override
 	{
-		return m_controllers[cmp.index].m_layer;
+		return m_controllers[{cmp.index}].m_layer;
 	}
 
 
 	void setControllerLayer(ComponentHandle cmp, int layer) override
 	{
 		ASSERT(layer < lengthOf(m_layers_names));
-		m_controllers[cmp.index].m_layer = layer;
+		auto& controller = m_controllers[{cmp.index}];
+		controller.m_layer = layer;
 
 		physx::PxFilterData data;
 		data.word0 = 1 << layer;
 		data.word1 = m_collision_filter[layer];
 		physx::PxShape* shapes[8];
-		int shapes_count = m_controllers[cmp.index].m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
+		int shapes_count = controller.m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
 		for (int i = 0; i < shapes_count; ++i)
 		{
 			shapes[i]->setSimulationFilterData(data);
@@ -582,21 +584,22 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 	
-	int getHeightfieldLayer(ComponentHandle cmp) override { return m_terrains[cmp.index]->m_layer; }
+	int getHeightfieldLayer(ComponentHandle cmp) override { return m_terrains[{cmp.index}]->m_layer; }
 
 
 	void setHeightfieldLayer(ComponentHandle cmp, int layer) override
 	{
 		ASSERT(layer < lengthOf(m_layers_names));
-		m_terrains[cmp.index]->m_layer = layer;
+		auto* terrain = m_terrains[{cmp.index}];
+		terrain->m_layer = layer;
 
-		if (m_terrains[cmp.index]->m_actor)
+		if (terrain->m_actor)
 		{
 			physx::PxFilterData data;
 			data.word0 = 1 << layer;
 			data.word1 = m_collision_filter[layer];
 			physx::PxShape* shapes[8];
-			int shapes_count = m_terrains[cmp.index]->m_actor->getShapes(shapes, lengthOf(shapes));
+			int shapes_count = terrain->m_actor->getShapes(shapes, lengthOf(shapes));
 			for (int i = 0; i < shapes_count; ++i)
 			{
 				shapes[i]->setSimulationFilterData(data);
@@ -1012,15 +1015,16 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		if (type == HEIGHTFIELD_TYPE)
 		{
-			Entity entity = m_terrains[cmp.index]->m_entity;
-			LUMIX_DELETE(m_allocator, m_terrains[cmp.index]);
-			m_terrains[cmp.index] = nullptr;
+			Entity entity = {cmp.index};
+			LUMIX_DELETE(m_allocator, m_terrains[entity]);
+			m_terrains.erase(entity);
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
 		else if (type == CONTROLLER_TYPE)
 		{
-			Entity entity = m_controllers[cmp.index].m_entity;
-			m_controllers[cmp.index].m_is_free = true;
+			Entity entity = {cmp.index};
+			m_controllers[entity].m_controller->release();
+			m_controllers.erase(entity);
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
 		else if (type == MESH_ACTOR_TYPE || type == BOX_ACTOR_TYPE || type == CAPSULE_ACTOR_TYPE ||
@@ -1146,12 +1150,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 	ComponentHandle createHeightfield(Entity entity)
 	{
 		Heightfield* terrain = LUMIX_NEW(m_allocator, Heightfield)();
-		m_terrains.push(terrain);
+		m_terrains.insert(entity, terrain);
 		terrain->m_heightmap = nullptr;
 		terrain->m_scene = this;
 		terrain->m_actor = nullptr;
 		terrain->m_entity = entity;
-		ComponentHandle cmp = {m_terrains.size() - 1};
+		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, HEIGHTFIELD_TYPE, this, cmp);
 		return cmp;
 	}
@@ -1170,14 +1174,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 		cDesc.behaviorCallback = nullptr;
 		Vec3 position = m_universe.getPosition(entity);
 		cDesc.position.set(position.x, position.y, position.z);
-		PhysicsSceneImpl::Controller& c = m_controllers.emplace();
+		Controller c;
 		c.m_controller = m_controller_manager->createController(cDesc);
 		c.m_entity = entity;
-		c.m_is_free = false;
 		c.m_frame_change.set(0, 0, 0);
 		c.m_radius = cDesc.radius;
 		c.m_height = cDesc.height;
 		c.m_layer = 0;
+		m_controllers.insert(entity, c);
 
 		physx::PxFilterData data;
 		int controller_layer = c.m_layer;
@@ -1190,7 +1194,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			shapes[i]->setSimulationFilterData(data);
 		}
 
-		ComponentHandle cmp = {m_controllers.size() - 1};
+		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, CONTROLLER_TYPE, this, cmp);
 		return cmp;
 	}
@@ -1289,16 +1293,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	Path getHeightmap(ComponentHandle cmp) override
 	{
-		return m_terrains[cmp.index]->m_heightmap ? m_terrains[cmp.index]->m_heightmap->getPath() : Path("");
+		auto* terrain = m_terrains[{cmp.index}];
+		return terrain->m_heightmap ? terrain->m_heightmap->getPath() : Path("");
 	}
 
 
-	float getHeightmapXZScale(ComponentHandle cmp) override { return m_terrains[cmp.index]->m_xz_scale; }
+	float getHeightmapXZScale(ComponentHandle cmp) override { return m_terrains[{cmp.index}]->m_xz_scale; }
 
 
 	void setHeightmapXZScale(ComponentHandle cmp, float scale) override
 	{
-		auto* terrain = m_terrains[cmp.index];
+		auto* terrain = m_terrains[{cmp.index}];
 		if (scale != terrain->m_xz_scale)
 		{
 			terrain->m_xz_scale = scale;
@@ -1312,13 +1317,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	float getHeightmapYScale(ComponentHandle cmp) override
 	{
-		return m_terrains[cmp.index]->m_y_scale;
+		return m_terrains[{cmp.index}]->m_y_scale;
 	}
 
 
 	void setHeightmapYScale(ComponentHandle cmp, float scale) override
 	{
-		auto* terrain = m_terrains[cmp.index];
+		auto* terrain = m_terrains[{cmp.index}];
 		if (scale != terrain->m_y_scale)
 		{
 			terrain->m_y_scale = scale;
@@ -1333,7 +1338,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void setHeightmap(ComponentHandle cmp, const Path& str) override
 	{
 		auto& resource_manager = m_engine->getResourceManager();
-		auto* terrain = m_terrains[cmp.index];
+		auto* terrain = m_terrains[{cmp.index}];
 		auto* old_hm = terrain->m_heightmap;
 		if (old_hm)
 		{
@@ -1378,13 +1383,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		actor.setPhysxActor(nullptr);
 		actor.setResource(geom_res);
-	}
-
-
-	void setControllerPosition(int index, const Vec3& pos)
-	{
-		physx::PxExtendedVec3 p(pos.x, pos.y, pos.z);
-		m_controllers[index].m_controller->setPosition(p);
 	}
 
 
@@ -1475,16 +1473,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 		Vec3 g(0, time_delta * -9.8f, 0);
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
-			if (m_controllers[i].m_is_free) continue;
+			auto& controller = m_controllers.at(i);
+			Vec3 dif = g + controller.m_frame_change;
+			controller.m_frame_change.set(0, 0, 0);
+			const physx::PxExtendedVec3& p = controller.m_controller->getPosition();
+			controller.m_controller->move(toPhysx(dif), 0.01f, time_delta, physx::PxControllerFilters());
 
-			Vec3 dif = g + m_controllers[i].m_frame_change;
-			m_controllers[i].m_frame_change.set(0, 0, 0);
-			const physx::PxExtendedVec3& p = m_controllers[i].m_controller->getPosition();
-			m_controllers[i].m_controller->move(
-				physx::PxVec3(dif.x, dif.y, dif.z), 0.01f, time_delta, physx::PxControllerFilters());
-
-			float y = (float)p.y - m_controllers[i].m_height * 0.5f - m_controllers[i].m_radius;
-			m_universe.setPosition(m_controllers[i].m_entity, (float)p.x, y, (float)p.z);
+			float y = (float)p.y - controller.m_height * 0.5f - controller.m_radius;
+			m_universe.setPosition(controller.m_entity, (float)p.x, y, (float)p.z);
 		}
 	}
 
@@ -2056,20 +2052,15 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	float getControllerRadius(ComponentHandle cmp) override { return m_controllers[cmp.index].m_radius; }
-	float getControllerHeight(ComponentHandle cmp) override { return m_controllers[cmp.index].m_height; }
+	float getControllerRadius(ComponentHandle cmp) override { return m_controllers[{cmp.index}].m_radius; }
+	float getControllerHeight(ComponentHandle cmp) override { return m_controllers[{cmp.index}].m_height; }
 
 
 	ComponentHandle getController(Entity entity) override
 	{
-		for (int i = 0; i < m_controllers.size(); ++i)
-		{
-			if (m_controllers[i].m_entity == entity)
-			{
-				return {i};
-			}
-		}
-		return INVALID_COMPONENT;
+		int idx = m_controllers.find(entity);
+		if (idx < 0) return INVALID_COMPONENT;
+		return {entity.index};
 	}
 
 
@@ -2079,7 +2070,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void moveController(ComponentHandle cmp, const Vec3& v) override { m_controllers[cmp.index].m_frame_change += v; }
+	void moveController(ComponentHandle cmp, const Vec3& v) override { m_controllers[{cmp.index}].m_frame_change += v; }
 
 
 	static int LUA_raycast(lua_State* L)
@@ -2138,17 +2129,15 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void onEntityMoved(Entity entity)
 	{
-		for (int i = 0, c = m_controllers.size(); i < c; ++i)
+		int ctrl_idx = m_controllers.find(entity);
+		if(ctrl_idx >= 0)
 		{
-			if (m_controllers[i].m_entity == entity)
-			{
-				Vec3 pos = m_universe.getPosition(entity);
-				pos.y += m_controllers[i].m_height * 0.5f;
-				pos.y += m_controllers[i].m_radius;
-				physx::PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
-				m_controllers[i].m_controller->setPosition(pvec);
-				return;
-			}
+			auto& controller = m_controllers.at(ctrl_idx);
+			Vec3 pos = m_universe.getPosition(entity);
+			pos.y += controller.m_height * 0.5f;
+			pos.y += controller.m_radius;
+			physx::PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
+			controller.m_controller->setPosition(pvec);
 		}
 
 		int ragdoll_idx = m_ragdolls.find(entity);
@@ -2161,7 +2150,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 			Pose* pose = render_scene->getPose(renderable);
 			if (!pose) return;
 			setSkeletonPose(m_universe.getTransform(entity), m_ragdolls.at(ragdoll_idx).root, pose);
-			return;
 		}
 
 		int idx = m_actors.find(entity);
@@ -2173,7 +2161,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 			physx::PxQuat pquat(q.x, q.y, q.z, q.w);
 			physx::PxTransform trans(pvec, pquat);
 			m_actors.at(idx)->physx_actor->setGlobalPose(trans, false);
-			return;
 		}
 	}
 
@@ -2290,14 +2277,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 			auto* actor = m_actors.at(i);
 			actor->layer = Math::minimum(m_layers_count - 1, actor->layer);
 		}
-		for (auto& controller : m_controllers)
+		for (int i = 0; i < m_controllers.size(); ++i)
 		{
-			if (controller.m_is_free) continue;
+			auto& controller = m_controllers.at(i);
 			controller.m_layer = Math::minimum(m_layers_count - 1, controller.m_layer);
 		}
-		for (auto* terrain : m_terrains)
+		for (int i = 0; i < m_terrains.size(); ++i)
 		{
-			if (!terrain) continue;
+			auto* terrain = m_terrains.at(i);
 			if (!terrain->m_actor) continue;
 			terrain->m_layer = Math::minimum(m_layers_count - 1, terrain->m_layer);
 		}
@@ -2400,10 +2387,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 		}
 
-		for (auto& controller : m_controllers)
+		for (int i = 0; i < m_controllers.size(); ++i)
 		{
-			if (controller.m_is_free) continue;
-
+			auto& controller = m_controllers.at(i);
 			physx::PxFilterData data;
 			int controller_layer = controller.m_layer;
 			data.word0 = 1 << controller_layer;
@@ -2416,9 +2402,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 		}
 
-		for (auto* terrain : m_terrains)
+		for (int i = 0; i < m_terrains.size(); ++i)
 		{
-			if (!terrain) continue;
+			auto* terrain = m_terrains.at(i);
 			if (!terrain->m_actor) continue;
 
 			physx::PxFilterData data;
@@ -2679,29 +2665,19 @@ struct PhysicsSceneImpl : public PhysicsScene
 		serializer.write((int32)m_controllers.size());
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
-			serializer.write(m_controllers[i].m_entity);
-			serializer.write(m_controllers[i].m_is_free);
-			if (!m_controllers[i].m_is_free)
-			{
-				serializer.write(m_controllers[i].m_layer);
-			}
+			const auto& controller = m_controllers.at(i);
+			serializer.write(controller.m_entity);
+			serializer.write(controller.m_layer);
 		}
 		serializer.write((int32)m_terrains.size());
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
-			if (m_terrains[i])
-			{
-				serializer.write(true);
-				serializer.write(m_terrains[i]->m_entity);
-				serializer.writeString(m_terrains[i]->m_heightmap ? m_terrains[i]->m_heightmap->getPath().c_str() : "");
-				serializer.write(m_terrains[i]->m_xz_scale);
-				serializer.write(m_terrains[i]->m_y_scale);
-				serializer.write(m_terrains[i]->m_layer);
-			}
-			else
-			{
-				serializer.write(false);
-			}
+			auto* terrain = m_terrains.at(i);
+			serializer.write(terrain->m_entity);
+			serializer.writeString(terrain->m_heightmap ? terrain->m_heightmap->getPath().c_str() : "");
+			serializer.write(terrain->m_xz_scale);
+			serializer.write(terrain->m_y_scale);
+			serializer.write(terrain->m_layer);
 		}
 		serializeRagdolls(serializer);
 		serializeJoints(serializer);
@@ -3073,24 +3049,20 @@ struct PhysicsSceneImpl : public PhysicsScene
 		serializer.read(count);
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
-			if (!m_controllers[i].m_is_free)
-			{
-				m_controllers[i].m_controller->release();
-			}
+			m_controllers.at(i).m_controller->release();
 		}
 		m_controllers.clear();
 		for (int i = 0; i < count; ++i)
 		{
-			Entity e;
-			bool is_free;
-			serializer.read(e);
-			serializer.read(is_free);
-
-			Controller& c = m_controllers.emplace();
-			c.m_is_free = is_free;
-			c.m_frame_change.set(0, 0, 0);
+			Entity entity;
+			serializer.read(entity);
+			bool is_free = false;
+			if(version < (int)PhysicsSceneVersion::REFACTOR) serializer.read(is_free);
 
 			if (is_free) continue;
+
+			Controller c;
+			c.m_frame_change.set(0, 0, 0);
 
 			if (version > (int)PhysicsSceneVersion::LAYERS)
 			{
@@ -3109,11 +3081,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 			cDesc.stepOffset = 0.02f;
 			cDesc.callback = nullptr;
 			cDesc.behaviorCallback = nullptr;
-			Vec3 position = m_universe.getPosition(e);
+			Vec3 position = m_universe.getPosition(entity);
 			cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
 			c.m_controller = m_controller_manager->createController(*m_system->getPhysics(), m_scene, cDesc);
-			c.m_entity = e;
-			m_universe.addComponent(e, CONTROLLER_TYPE, this, {i});
+			c.m_entity = entity;
+			m_controllers.insert(entity, c);
+			m_universe.addComponent(entity, CONTROLLER_TYPE, this, {i});
 		}
 	}
 
@@ -3286,48 +3259,40 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		int32 count;
 		serializer.read(count);
-		for (int i = count; i < m_terrains.size(); ++i)
+		for (int i = 0; i < m_terrains.size(); ++i)
 		{
-			LUMIX_DELETE(m_allocator, m_terrains[i]);
-			m_terrains[i] = nullptr;
+			LUMIX_DELETE(m_allocator, m_terrains.at(i));
 		}
-		int old_size = m_terrains.size();
-		m_terrains.resize(count);
-		for (int i = old_size; i < count; ++i)
-		{
-			m_terrains[i] = nullptr;
-		}
+		m_terrains.clear();
 		for (int i = 0; i < count; ++i)
 		{
-			bool exists;
-			serializer.read(exists);
+			bool exists = true;
+			if(version <= (int)PhysicsSceneVersion::REFACTOR) serializer.read(exists);
 			if (exists)
 			{
-				if (!m_terrains[i])
-				{
-					m_terrains[i] = LUMIX_NEW(m_allocator, Heightfield);
-				}
-				m_terrains[i]->m_scene = this;
-				serializer.read(m_terrains[i]->m_entity);
+				auto* terrain = LUMIX_NEW(m_allocator, Heightfield);
+				terrain->m_scene = this;
+				serializer.read(terrain->m_entity);
 				char tmp[MAX_PATH_LENGTH];
 				serializer.readString(tmp, MAX_PATH_LENGTH);
-				serializer.read(m_terrains[i]->m_xz_scale);
-				serializer.read(m_terrains[i]->m_y_scale);
+				serializer.read(terrain->m_xz_scale);
+				serializer.read(terrain->m_y_scale);
 				if (version > (int)PhysicsSceneVersion::LAYERS)
 				{
-					serializer.read(m_terrains[i]->m_layer);
+					serializer.read(terrain->m_layer);
 				}
 				else
 				{
-					m_terrains[i]->m_layer = 0;
+					terrain->m_layer = 0;
 				}
 
-				if (m_terrains[i]->m_heightmap == nullptr ||
-					!equalStrings(tmp, m_terrains[i]->m_heightmap->getPath().c_str()))
+				m_terrains.insert(terrain->m_entity, terrain);
+				ComponentHandle cmp = {terrain->m_entity.index};
+				if (terrain->m_heightmap == nullptr || !equalStrings(tmp, terrain->m_heightmap->getPath().c_str()))
 				{
-					setHeightmap({i}, Path(tmp));
+					setHeightmap(cmp, Path(tmp));
 				}
-				m_universe.addComponent(m_terrains[i]->m_entity, HEIGHTFIELD_TYPE, this, {i});
+				m_universe.addComponent(terrain->m_entity, HEIGHTFIELD_TYPE, this, cmp);
 			}
 		}
 	}
@@ -3431,7 +3396,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 		Vec3 m_frame_change;
 		float m_radius;
 		float m_height;
-		bool m_is_free;
 		int m_layer;
 	};
 
@@ -3446,16 +3410,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 	physx::PxRigidDynamic* m_dummy_actor;
 	physx::PxControllerManager* m_controller_manager;
 	physx::PxMaterial* m_default_material;
+
 	AssociativeArray<Entity, RigidActor*> m_actors;
-	Array<RigidActor*> m_dynamic_actors;
 	AssociativeArray<Entity, Ragdoll> m_ragdolls;
 	AssociativeArray<Entity, Joint> m_joints;
+	AssociativeArray<Entity, Controller> m_controllers;
+	AssociativeArray<Entity, Heightfield*> m_terrains;
+
+	Array<RigidActor*> m_dynamic_actors;
 	bool m_is_game_running;
 	uint32 m_debug_visualization_flags;
-
 	Array<QueuedForce> m_queued_forces;
-	Array<Controller> m_controllers;
-	Array<Heightfield*> m_terrains;
 	uint32 m_collision_filter[32];
 	char m_layers_names[32][30];
 	int m_layers_count;
