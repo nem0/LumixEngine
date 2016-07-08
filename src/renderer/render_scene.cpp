@@ -117,7 +117,6 @@ struct Camera
 	float ortho_size;
 	float screen_width;
 	float screen_height;
-	bool is_free;
 	bool is_ortho;
 	char slot[MAX_SLOT_LENGTH + 1];
 };
@@ -235,9 +234,9 @@ public:
 			LUMIX_DELETE(m_allocator, m_model_loaded_callbacks[i]);
 		}
 
-		for (int i = 0; i < m_terrains.size(); ++i)
+		for (auto* terrain : m_terrains)
 		{
-			LUMIX_DELETE(m_allocator, m_terrains[i]);
+			LUMIX_DELETE(m_allocator, terrain);
 		}
 
 		for (int i = 0; i < m_particle_emitters.size(); ++i)
@@ -316,19 +315,15 @@ public:
 		}
 		if (type == CAMERA_TYPE)
 		{
-			for (int i = 0; i < m_cameras.size(); ++i)
-			{
-				if (!m_cameras[i].is_free && m_cameras[i].entity == entity) return {i};
-			}
-			return INVALID_COMPONENT;
+			auto iter = m_cameras.find(entity);
+			ComponentHandle cmp = {entity.index};
+			return iter.isValid() ? cmp : INVALID_COMPONENT;
 		}
 		if (type == TERRAIN_TYPE)
 		{
-			for (int i = 0; i < m_terrains.size(); ++i)
-			{
-				if (m_terrains[i] && m_terrains[i]->getEntity() == entity) return {i};
-			}
-			return INVALID_COMPONENT;
+			auto iter = m_terrains.find(entity);
+			if (!iter.isValid())return INVALID_COMPONENT;
+			return {entity.index};
 		}
 		if (type == PARTICLE_EMITTER_TYPE)
 		{
@@ -389,7 +384,7 @@ public:
 		Vec3& origin,
 		Vec3& dir) override
 	{
-		Camera& camera = m_cameras[camera_index.index];
+		Camera& camera = m_cameras[{camera_index.index}];
 		origin = m_universe.getPosition(camera.entity);
 
 		float width = camera.screen_width;
@@ -428,7 +423,7 @@ public:
 
 	Frustum getCameraFrustum(ComponentHandle cmp) const override
 	{
-		const Camera& camera = m_cameras[cmp.index];
+		const Camera& camera = m_cameras[{cmp.index}];
 		Matrix mtx = m_universe.getMatrix(camera.entity);
 		Frustum ret;
 		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
@@ -642,15 +637,13 @@ public:
 	void serializeCameras(OutputBlob& serializer)
 	{
 		serializer.write((int32)m_cameras.size());
-		for (int i = 0, c = m_cameras.size(); i < c; ++i)
+		for (auto& camera : m_cameras)
 		{
-			Camera& camera = m_cameras[i];
 			serializer.write(camera.entity);
 			serializer.write(camera.far);
 			serializer.write(camera.fov);
 			serializer.write(camera.is_ortho);
 			serializer.write(camera.ortho_size);
-			serializer.write(camera.is_free);
 			serializer.write(camera.near);
 			serializer.writeString(camera.slot);
 		}
@@ -701,17 +694,9 @@ public:
 	void serializeTerrains(OutputBlob& serializer)
 	{
 		serializer.write((int32)m_terrains.size());
-		for (int i = 0; i < m_terrains.size(); ++i)
+		for (auto* terrain : m_terrains)
 		{
-			if (m_terrains[i])
-			{
-				serializer.write(true);
-				m_terrains[i]->serialize(serializer);
-			}
-			else
-			{
-				serializer.write(false);
-			}
+			terrain->serialize(serializer);
 		}
 	}
 
@@ -905,10 +890,11 @@ public:
 	{
 		int32 size;
 		serializer.read(size);
-		m_cameras.resize(size);
+		m_cameras.clear();
+		m_cameras.rehash(size);
 		for (int i = 0; i < size; ++i)
 		{
-			Camera& camera = m_cameras[i];
+			Camera camera;
 			serializer.read(camera.entity);
 			serializer.read(camera.far);
 			serializer.read(camera.fov);
@@ -923,13 +909,18 @@ public:
 			{
 				serializer.read(camera.ortho_size);
 			}
-			serializer.read(camera.is_free);
-			serializer.read(camera.near);
-			serializer.readString(camera.slot, sizeof(camera.slot));
-
-			if (!camera.is_free)
+			bool is_free = false;
+			if (version <= RenderSceneVersion::CAMERA_AND_TERRAIN_REFACTOR)
 			{
-				m_universe.addComponent(m_cameras[i].entity, CAMERA_TYPE, this, {i});
+				serializer.read(is_free);
+			}
+			serializer.read(camera.near);
+			serializer.readString(camera.slot, lengthOf(camera.slot));
+
+			if (!is_free)
+			{
+				m_cameras.insert(camera.entity, camera);
+				m_universe.addComponent(camera.entity, CAMERA_TYPE, this, {camera.entity.index});
 			}
 		}
 	}
@@ -1068,35 +1059,25 @@ public:
 
 	void deserializeTerrains(InputBlob& serializer, RenderSceneVersion version)
 	{
+		for (auto* terrain : m_terrains)
+		{
+			LUMIX_DELETE(m_allocator, terrain);
+		}
+		m_terrains.clear();
 		int32 size = 0;
 		serializer.read(size);
-		int old_size = m_terrains.size();
-		for (int i = size; i < m_terrains.size(); ++i)
-		{
-			LUMIX_DELETE(m_allocator, m_terrains[i]);
-			m_terrains[i] = nullptr;
-		}
-		m_terrains.resize(size);
-		for (int i = old_size; i < size; ++i)
-		{
-			m_terrains[i] = nullptr;
-		}
 		for (int i = 0; i < size; ++i)
 		{
-			bool exists;
-			serializer.read(exists);
+			bool exists = true;
+			if (version <= RenderSceneVersion::CAMERA_AND_TERRAIN_REFACTOR)
+			{
+				serializer.read(exists);
+			}
 			if (exists)
 			{
-				if (!m_terrains[i])
-				{
-					m_terrains[i] = LUMIX_NEW(m_allocator, Terrain)(m_renderer, INVALID_ENTITY, *this, m_allocator);
-				}
-				Terrain* terrain = m_terrains[i];
-				terrain->deserialize(serializer, m_universe, *this, {i}, (int)version);
-			}
-			else
-			{
-				m_terrains[i] = nullptr;
+				auto* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, INVALID_ENTITY, *this, m_allocator);
+				terrain->deserialize(serializer, m_universe, *this, (int)version);
+				m_terrains.insert(terrain->getEntity(), terrain);
 			}
 		}
 	}
@@ -1186,7 +1167,7 @@ public:
 
 	void destroyPointLight(ComponentHandle component)
 	{
-		int index = getPointLightIndex(component);
+		int index = m_point_lights_map[component];
 		Entity entity = m_point_lights[index].m_entity;
 		m_point_lights.eraseFast(index);
 		m_point_lights_map.erase(component);
@@ -1201,17 +1182,17 @@ public:
 
 	void destroyCamera(ComponentHandle component)
 	{
-		Entity entity = m_cameras[component.index].entity;
-		m_cameras[component.index].is_free = true;
+		Entity entity = {component.index};
+		m_cameras.erase(entity);
 		m_universe.destroyComponent(entity, CAMERA_TYPE, this, component);
 	}
 
 
 	void destroyTerrain(ComponentHandle component)
 	{
-		Entity entity = m_terrains[component.index]->getEntity();
-		LUMIX_DELETE(m_allocator, m_terrains[component.index]);
-		m_terrains[component.index] = nullptr;
+		Entity entity = {component.index};
+		LUMIX_DELETE(m_allocator, m_terrains[entity]);
+		m_terrains.erase(entity);
 		m_universe.destroyComponent(entity, TERRAIN_TYPE, this, component);
 	}
 
@@ -1600,8 +1581,7 @@ public:
 
 	ComponentHandle createCamera(Entity entity)
 	{
-		Camera& camera = m_cameras.emplace();
-		camera.is_free = false;
+		Camera camera;
 		camera.is_ortho = false;
 		camera.ortho_size = 10;
 		camera.entity = entity;
@@ -1612,17 +1592,18 @@ public:
 		camera.near = 0.1f;
 		camera.far = 10000.0f;
 		camera.slot[0] = '\0';
-		m_universe.addComponent(entity, CAMERA_TYPE, this, {m_cameras.size() - 1});
-		return {m_cameras.size() - 1};
+		m_cameras.insert(entity, camera);
+		m_universe.addComponent(entity, CAMERA_TYPE, this, {entity.index});
+		return {entity.index};
 	}
 
 
 	ComponentHandle createTerrain(Entity entity)
 	{
 		Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
-		m_terrains.push(terrain);
-		m_universe.addComponent(entity, TERRAIN_TYPE, this, {m_terrains.size() - 1});
-		return {m_terrains.size() - 1};
+		m_terrains.insert(entity, terrain);
+		m_universe.addComponent(entity, TERRAIN_TYPE, this, {entity.index});
+		return {entity.index};
 	}
 
 
@@ -1760,7 +1741,7 @@ public:
 
 	Frustum getPointLightFrustum(ComponentHandle cmp) const
 	{
-		const PointLight& light = m_point_lights[getPointLightIndex(cmp)];
+		const PointLight& light = m_point_lights[m_point_lights_map[cmp]];
 		Frustum frustum;
 		frustum.computeOrtho(m_universe.getPosition(light.m_entity),
 			Vec3(1, 0, 0),
@@ -1865,13 +1846,13 @@ public:
 
 	Entity getTerrainEntity(ComponentHandle cmp) override
 	{
-		return m_terrains[cmp.index]->getEntity();
+		return {cmp.index};
 	}
 
 
 	Vec2 getTerrainResolution(ComponentHandle cmp) override
 	{
-		auto* terrain = m_terrains[cmp.index];
+		auto* terrain = m_terrains[{cmp.index}];
 		return Vec2((float)terrain->getWidth(), (float)terrain->getHeight());
 	}
 
@@ -1879,59 +1860,49 @@ public:
 	ComponentHandle getFirstTerrain() override
 	{
 		if (m_terrains.empty()) return INVALID_COMPONENT;
-		for (int i = 0; i < m_terrains.size(); ++i)
-		{
-			if (m_terrains[i]) return {i};
-		}
-		return INVALID_COMPONENT;
+		auto iter = m_terrains.begin();
+		return {iter.value()->getEntity().index};
 	}
 
 
 	ComponentHandle getNextTerrain(ComponentHandle cmp) override
 	{
-		for (int i = cmp.index + 1; i < m_terrains.size(); ++i)
-		{
-			if (m_terrains[i]) return {i};
-		}
-		return INVALID_COMPONENT;
+		auto iter = m_terrains.find({cmp.index});
+		++iter;
+		if (!iter.isValid()) return INVALID_COMPONENT;
+		return {iter.value()->getEntity().index};
 	}
 
 
 	ComponentHandle getTerrainComponent(Entity entity) override
 	{
-		for (int i = 0; i < m_terrains.size(); ++i)
-		{
-			auto* terrain = m_terrains[i];
-			if (terrain && terrain->getEntity() == entity)
-			{
-				return {i};
-			}
-		}
-		return INVALID_COMPONENT;
+		auto iter = m_terrains.find(entity);
+		if (!iter.isValid()) return INVALID_COMPONENT;
+		return {iter.value()->getEntity().index};
 	}
 
 
 	Vec3 getTerrainNormalAt(ComponentHandle cmp, float x, float z) override
 	{
-		return m_terrains[cmp.index]->getNormal(x, z);
+		return m_terrains[{cmp.index}]->getNormal(x, z);
 	}
 
 
 	float getTerrainHeightAt(ComponentHandle cmp, float x, float z) override
 	{
-		return m_terrains[cmp.index]->getHeight(x, z);
+		return m_terrains[{cmp.index}]->getHeight(x, z);
 	}
 
 
 	AABB getTerrainAABB(ComponentHandle cmp) override
 	{
-		return m_terrains[cmp.index]->getAABB();
+		return m_terrains[{cmp.index}]->getAABB();
 	}
 
 
 	Vec2 getTerrainSize(ComponentHandle cmp) override
 	{
-		return m_terrains[cmp.index]->getSize();
+		return m_terrains[{cmp.index}]->getSize();
 	}
 
 
@@ -1940,23 +1911,24 @@ public:
 		if (path.isValid())
 		{
 			Material* material = static_cast<Material*>(m_engine.getResourceManager().get(MATERIAL_HASH)->load(path));
-			m_terrains[cmp.index]->setMaterial(material);
+			m_terrains[{cmp.index}]->setMaterial(material);
 		}
 		else
 		{
-			m_terrains[cmp.index]->setMaterial(nullptr);
+			m_terrains[{cmp.index}]->setMaterial(nullptr);
 		}
 	}
 
 
-	Material* getTerrainMaterial(ComponentHandle cmp) override { return m_terrains[cmp.index]->getMaterial(); }
+	Material* getTerrainMaterial(ComponentHandle cmp) override { return m_terrains[{cmp.index}]->getMaterial(); }
 
 
 	Path getTerrainMaterialPath(ComponentHandle cmp) override
 	{
-		if (m_terrains[cmp.index]->getMaterial())
+		Terrain* terrain = m_terrains[{cmp.index}];
+		if (terrain->getMaterial())
 		{
-			return m_terrains[cmp.index]->getMaterial()->getPath();
+			return terrain->getMaterial()->getPath();
 		}
 		else
 		{
@@ -1967,18 +1939,18 @@ public:
 
 	void setTerrainXZScale(ComponentHandle cmp, float scale) override
 	{
-		m_terrains[cmp.index]->setXZScale(scale);
+		m_terrains[{cmp.index}]->setXZScale(scale);
 	}
 
-	float getTerrainXZScale(ComponentHandle cmp) override { return m_terrains[cmp.index]->getXZScale(); }
+	float getTerrainXZScale(ComponentHandle cmp) override { return m_terrains[{cmp.index}]->getXZScale(); }
 
 
 	void setTerrainYScale(ComponentHandle cmp, float scale) override
 	{
-		m_terrains[cmp.index]->setYScale(scale);
+		m_terrains[{cmp.index}]->setYScale(scale);
 	}
 
-	float getTerrainYScale(ComponentHandle cmp) override { return m_terrains[cmp.index]->getYScale(); }
+	float getTerrainYScale(ComponentHandle cmp) override { return m_terrains[{cmp.index}]->getYScale(); }
 
 
 	Pose* getPose(ComponentHandle cmp) override { return m_renderables[cmp.index].pose; }
@@ -2042,7 +2014,7 @@ public:
 	}
 
 
-	void forceGrassUpdate(ComponentHandle cmp) override { m_terrains[cmp.index]->forceGrassUpdate(); }
+	void forceGrassUpdate(ComponentHandle cmp) override { m_terrains[{cmp.index}]->forceGrassUpdate(); }
 
 
 	void getTerrainInfos(Array<const TerrainInfo*>& infos,
@@ -2051,12 +2023,9 @@ public:
 	{
 		PROFILE_FUNCTION();
 		infos.reserve(m_terrains.size());
-		for (int i = 0; i < m_terrains.size(); ++i)
+		for (auto* terrain : m_terrains)
 		{
-			if (m_terrains[i])
-			{
-				m_terrains[i]->getInfos(infos, camera_pos, frame_allocator);
-			}
+			terrain->getInfos(infos, camera_pos, frame_allocator);
 		}
 	}
 
@@ -2069,12 +2038,9 @@ public:
 
 		if (!m_is_grass_enabled) return;
 
-		for (int i = 0; i < m_terrains.size(); ++i)
+		for (auto* terrain : m_terrains)
 		{
-			if (m_terrains[i])
-			{
-				m_terrains[i]->getGrassInfos(frustum, infos, camera);
-			}
+			terrain->getGrassInfos(frustum, infos, camera);
 		}
 	}
 
@@ -2085,9 +2051,9 @@ public:
 		const char* slot = LuaWrapper::checkArg<const char*>(L, 2);
 
 		ComponentHandle camera_cmp = scene->getCameraInSlot(slot);
-		auto& camera = scene->m_cameras[camera_cmp.index];
-		Vec3 origin = scene->m_universe.getPosition(camera.entity);
-		Quat rot = scene->m_universe.getRotation(camera.entity);
+		Entity entity = {camera_cmp.index};
+		Vec3 origin = scene->m_universe.getPosition(entity);
+		Quat rot = scene->m_universe.getRotation(entity);
 
 		RayCastModelHit hit = scene->castRay(origin, rot.rotate(Vec3(0, 0, -1)), INVALID_COMPONENT);
 		LuaWrapper::pushLua(L, hit.m_is_hit);
@@ -2155,13 +2121,13 @@ public:
 
 	float getGrassDistance(ComponentHandle cmp, int index) override
 	{
-		return m_terrains[cmp.index]->getGrassTypeDistance(index);
+		return m_terrains[{cmp.index}]->getGrassTypeDistance(index);
 	}
 
 
 	void setGrassDistance(ComponentHandle cmp, int index, float value) override
 	{
-		m_terrains[cmp.index]->setGrassTypeDistance(index, value);
+		m_terrains[{cmp.index}]->setGrassTypeDistance(index, value);
 	}
 
 
@@ -2174,56 +2140,56 @@ public:
 	void
 	setGrassDensity(ComponentHandle cmp, int index, int density) override
 	{
-		m_terrains[cmp.index]->setGrassTypeDensity(index, density);
+		m_terrains[{cmp.index}]->setGrassTypeDensity(index, density);
 	}
 
 
 	int getGrassDensity(ComponentHandle cmp, int index) override
 	{
-		return m_terrains[cmp.index]->getGrassTypeDensity(index);
+		return m_terrains[{cmp.index}]->getGrassTypeDensity(index);
 	}
 
 
 	void
 	setGrassGround(ComponentHandle cmp, int index, int ground) override
 	{
-		m_terrains[cmp.index]->setGrassTypeGround(index, ground);
+		m_terrains[{cmp.index}]->setGrassTypeGround(index, ground);
 	}
 
 
 	int getGrassGround(ComponentHandle cmp, int index) override
 	{
-		return m_terrains[cmp.index]->getGrassTypeGround(index);
+		return m_terrains[{cmp.index}]->getGrassTypeGround(index);
 	}
 
 
 	void setGrassPath(ComponentHandle cmp, int index, const Path& path) override
 	{
-		m_terrains[cmp.index]->setGrassTypePath(index, path);
+		m_terrains[{cmp.index}]->setGrassTypePath(index, path);
 	}
 
 
 	Path getGrassPath(ComponentHandle cmp, int index) override
 	{
-		return m_terrains[cmp.index]->getGrassTypePath(index);
+		return m_terrains[{cmp.index}]->getGrassTypePath(index);
 	}
 
 
 	int getGrassCount(ComponentHandle cmp) override
 	{
-		return m_terrains[cmp.index]->getGrassTypeCount();
+		return m_terrains[{cmp.index}]->getGrassTypeCount();
 	}
 
 
 	void addGrass(ComponentHandle cmp, int index) override
 	{
-		m_terrains[cmp.index]->addGrassType(index);
+		m_terrains[{cmp.index}]->addGrassType(index);
 	}
 
 
 	void removeGrass(ComponentHandle cmp, int index) override
 	{
-		m_terrains[cmp.index]->removeGrassType(index);
+		m_terrains[{cmp.index}]->removeGrassType(index);
 	}
 
 
@@ -2399,18 +2365,18 @@ public:
 	}
 
 
-	Entity getCameraEntity(ComponentHandle camera) const override { return m_cameras[camera.index].entity; }
+	Entity getCameraEntity(ComponentHandle camera) const override { return {camera.index}; }
 
 
 	void setLightCastShadows(ComponentHandle cmp, bool cast_shadows) override
 	{
-		m_point_lights[getPointLightIndex(cmp)].m_cast_shadows = cast_shadows;
+		m_point_lights[m_point_lights_map[cmp]].m_cast_shadows = cast_shadows;
 	}
 
 
 	bool getLightCastShadows(ComponentHandle cmp) override
 	{
-		return m_point_lights[getPointLightIndex(cmp)].m_cast_shadows;
+		return m_point_lights[m_point_lights_map[cmp]].m_cast_shadows;
 	}
 
 
@@ -2420,7 +2386,7 @@ public:
 	{
 		PROFILE_FUNCTION();
 
-		int light_index = getPointLightIndex(light_cmp);
+		int light_index = m_point_lights_map[light_cmp];
 		for (int j = 0, cj = m_light_influenced_geometry[light_index].size(); j < cj; ++j)
 		{
 			ComponentHandle renderable_cmp = m_light_influenced_geometry[light_index][j];
@@ -2443,7 +2409,7 @@ public:
 	{
 		PROFILE_FUNCTION();
 
-		int light_index = getPointLightIndex(light_cmp);
+		int light_index = m_point_lights_map[light_cmp];
 		auto& geoms = m_light_influenced_geometry[light_index];
 		for (int j = 0, cj = geoms.size(); j < cj; ++j)
 		{
@@ -2491,34 +2457,32 @@ public:
 
 	void setCameraSlot(ComponentHandle cmp, const char* slot) override
 	{
-		auto& camera = m_cameras[cmp.index];
+		auto& camera = m_cameras[{cmp.index}];
 		copyString(camera.slot, lengthOf(camera.slot), slot);
 	}
 
 
 	ComponentHandle getCameraComponent(Entity entity)
 	{
-		for (int i = 0; i < m_cameras.size(); ++i)
-		{
-			if (m_cameras[i].entity == entity) return {i};
-		}
-		return INVALID_COMPONENT;
+		auto iter = m_cameras.find(entity);
+		if (!iter.isValid()) return INVALID_COMPONENT;
+		return {entity.index};
 	}
 
-	const char* getCameraSlot(ComponentHandle camera) override { return m_cameras[camera.index].slot; }
-	float getCameraFOV(ComponentHandle camera) override { return m_cameras[camera.index].fov; }
-	void setCameraFOV(ComponentHandle camera, float fov) override { m_cameras[camera.index].fov = fov; }
-	void setCameraNearPlane(ComponentHandle camera, float near_plane) override { m_cameras[camera.index].near = near_plane; }
-	float getCameraNearPlane(ComponentHandle camera) override { return m_cameras[camera.index].near; }
-	void setCameraFarPlane(ComponentHandle camera, float far_plane) override { m_cameras[camera.index].far = far_plane; }
-	float getCameraFarPlane(ComponentHandle camera) override { return m_cameras[camera.index].far; }
-	float getCameraScreenWidth(ComponentHandle camera) override { return m_cameras[camera.index].screen_width; }
-	float getCameraScreenHeight(ComponentHandle camera) override { return m_cameras[camera.index].screen_height; }
+	const char* getCameraSlot(ComponentHandle camera) override { return m_cameras[{camera.index}].slot; }
+	float getCameraFOV(ComponentHandle camera) override { return m_cameras[{camera.index}].fov; }
+	void setCameraFOV(ComponentHandle camera, float fov) override { m_cameras[{camera.index}].fov = fov; }
+	void setCameraNearPlane(ComponentHandle camera, float near_plane) override { m_cameras[{camera.index}].near = near_plane; }
+	float getCameraNearPlane(ComponentHandle camera) override { return m_cameras[{camera.index}].near; }
+	void setCameraFarPlane(ComponentHandle camera, float far_plane) override { m_cameras[{camera.index}].far = far_plane; }
+	float getCameraFarPlane(ComponentHandle camera) override { return m_cameras[{camera.index}].far; }
+	float getCameraScreenWidth(ComponentHandle camera) override { return m_cameras[{camera.index}].screen_width; }
+	float getCameraScreenHeight(ComponentHandle camera) override { return m_cameras[{camera.index}].screen_height; }
 
 
 	Matrix getCameraProjection(ComponentHandle cmp) override
 	{
-		Camera& camera = m_cameras[cmp.index];
+		Camera& camera = m_cameras[{cmp.index}];
 		Matrix mtx;
 		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
 		if (camera.is_ortho)
@@ -2541,22 +2505,24 @@ public:
 
 	void setCameraScreenSize(ComponentHandle camera, int w, int h) override
 	{
-		m_cameras[camera.index].screen_width = (float)w;
-		m_cameras[camera.index].screen_height = (float)h;
-		m_cameras[camera.index].aspect = w / (float)h;
+		auto& cam = m_cameras[{camera.index}];
+		cam.screen_width = (float)w;
+		cam.screen_height = (float)h;
+		cam.aspect = w / (float)h;
 	}
 
 
 	Vec2 getCameraScreenSize(ComponentHandle camera) override
 	{
-		return Vec2(m_cameras[camera.index].screen_width, m_cameras[camera.index].screen_height);
+		auto& cam = m_cameras[{camera.index}];
+		return Vec2(cam.screen_width, cam.screen_height);
 	}
 
 
-	float getCameraOrthoSize(ComponentHandle camera) override { return m_cameras[camera.index].ortho_size; }
-	void setCameraOrthoSize(ComponentHandle camera, float value) override { m_cameras[camera.index].ortho_size = value; }
-	bool isCameraOrtho(ComponentHandle camera) override { return m_cameras[camera.index].is_ortho; }
-	void setCameraOrtho(ComponentHandle camera, bool is_ortho) override { m_cameras[camera.index].is_ortho = is_ortho; }
+	float getCameraOrthoSize(ComponentHandle camera) override { return m_cameras[{camera.index}].ortho_size; }
+	void setCameraOrthoSize(ComponentHandle camera, float value) override { m_cameras[{camera.index}].ortho_size = value; }
+	bool isCameraOrtho(ComponentHandle camera) override { return m_cameras[{camera.index}].is_ortho; }
+	void setCameraOrtho(ComponentHandle camera, bool is_ortho) override { m_cameras[{camera.index}].is_ortho = is_ortho; }
 
 
 	const Array<DebugTriangle>& getDebugTriangles() const override { return m_debug_triangles; }
@@ -3125,17 +3091,18 @@ public:
 	}
 
 
-	RayCastModelHit castRayTerrain(ComponentHandle terrain, const Vec3& origin, const Vec3& dir) override
+	RayCastModelHit castRayTerrain(ComponentHandle cmp, const Vec3& origin, const Vec3& dir) override
 	{
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
-		if (m_terrains[terrain.index])
-		{
-			hit = m_terrains[terrain.index]->castRay(origin, dir);
-			hit.m_component = terrain;
-			hit.m_component_type = TERRAIN_TYPE;
-			hit.m_entity = m_terrains[terrain.index]->getEntity();
-		}
+		auto iter = m_terrains.find({cmp.index});
+		if (!iter.isValid()) return hit;
+
+		auto* terrain = iter.value();
+		hit = terrain->castRay(origin, dir);
+		hit.m_component = cmp;
+		hit.m_component_type = TERRAIN_TYPE;
+		hit.m_entity = terrain->getEntity();
 		return hit;
 	}
 
@@ -3170,30 +3137,21 @@ public:
 				}
 			}
 		}
-		for (int i = 0; i < m_terrains.size(); ++i)
+		for (auto* terrain : m_terrains)
 		{
-			if (m_terrains[i])
+			RayCastModelHit terrain_hit = terrain->castRay(origin, dir);
+			if (terrain_hit.m_is_hit && (!hit.m_is_hit || terrain_hit.m_t < hit.m_t))
 			{
-				RayCastModelHit terrain_hit = m_terrains[i]->castRay(origin, dir);
-				if (terrain_hit.m_is_hit && (!hit.m_is_hit || terrain_hit.m_t < hit.m_t))
-				{
-					terrain_hit.m_component = {i};
-					terrain_hit.m_component_type = TERRAIN_TYPE;
-					terrain_hit.m_entity = m_terrains[i]->getEntity();
-					hit = terrain_hit;
-				}
+				terrain_hit.m_component = {terrain->getEntity().index};
+				terrain_hit.m_component_type = TERRAIN_TYPE;
+				terrain_hit.m_entity = terrain->getEntity();
+				hit = terrain_hit;
 			}
 		}
 		return hit;
 	}
 
-
-	int getPointLightIndex(ComponentHandle cmp) const
-	{
-		return m_point_lights_map[cmp];
-	}
-
-
+	
 	Vec4 getShadowmapCascades(ComponentHandle cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_cascades;
@@ -3214,7 +3172,7 @@ public:
 
 	int getGlobalLightIndex(ComponentHandle cmp) const
 	{
-		for (int i = 0; i < m_global_lights.size(); ++i)
+		for (int i = 0, c = m_global_lights.size(); i < c; ++i)
 		{
 			if (m_global_lights[i].m_component == cmp)
 			{
@@ -3230,182 +3188,217 @@ public:
 		m_global_lights[getGlobalLightIndex(cmp)].m_fog_density = density;
 	}
 
+
 	void setFogColor(ComponentHandle cmp, const Vec3& color) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_fog_color = color;
 	}
+
 
 	float getFogDensity(ComponentHandle cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_density;
 	}
 
+
 	float getFogBottom(ComponentHandle cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_bottom;
 	}
+
 
 	void setFogBottom(ComponentHandle cmp, float bottom) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_fog_bottom = bottom;
 	}
 
+
 	float getFogHeight(ComponentHandle cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_height;
 	}
+
 
 	void setFogHeight(ComponentHandle cmp, float height) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_fog_height = height;
 	}
 
+
 	Vec3 getFogColor(ComponentHandle cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_color;
 	}
 
+
 	float getLightAttenuation(ComponentHandle cmp) override
 	{
-		return m_point_lights[getPointLightIndex(cmp)].m_attenuation_param;
+		return m_point_lights[m_point_lights_map[cmp]].m_attenuation_param;
 	}
 
-	void setLightAttenuation(ComponentHandle cmp,
-									 float attenuation) override
+
+	void setLightAttenuation(ComponentHandle cmp, float attenuation) override
 	{
-		int index = getPointLightIndex(cmp);
+		int index = m_point_lights_map[cmp];
 		m_point_lights[index].m_attenuation_param = attenuation;
 	}
 
+
 	float getLightRange(ComponentHandle cmp) override
 	{
-		return m_point_lights[getPointLightIndex(cmp)].m_range;
+		return m_point_lights[m_point_lights_map[cmp]].m_range;
 	}
+
 
 	void setLightRange(ComponentHandle cmp, float value) override
 	{
-		m_point_lights[getPointLightIndex(cmp)].m_range = value;
+		m_point_lights[m_point_lights_map[cmp]].m_range = value;
 	}
+
 
 	void setPointLightIntensity(ComponentHandle cmp, float intensity) override
 	{
-		m_point_lights[getPointLightIndex(cmp)].m_diffuse_intensity = intensity;
+		m_point_lights[m_point_lights_map[cmp]].m_diffuse_intensity = intensity;
 	}
+
 
 	void setGlobalLightIntensity(ComponentHandle cmp, float intensity) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_diffuse_intensity = intensity;
 	}
 
+
 	void setPointLightColor(ComponentHandle cmp, const Vec3& color) override
 	{
-		m_point_lights[getPointLightIndex(cmp)].m_diffuse_color = color;
+		m_point_lights[m_point_lights_map[cmp]].m_diffuse_color = color;
 	}
+
 
 	void setGlobalLightColor(ComponentHandle cmp, const Vec3& color) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_diffuse_color = color;
 	}
 
+
 	void setGlobalLightSpecular(ComponentHandle cmp, const Vec3& color) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_specular = color;
 	}
+
 
 	void setGlobalLightSpecularIntensity(ComponentHandle cmp, float intensity) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_specular_intensity = intensity;
 	}
 
+
 	void setLightAmbientIntensity(ComponentHandle cmp, float intensity) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_ambient_intensity = intensity;
 	}
+
 
 	void setLightAmbientColor(ComponentHandle cmp, const Vec3& color) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_ambient_color = color;
 	}
 
+
 	float getPointLightIntensity(ComponentHandle cmp) override
 	{
-		return m_point_lights[getPointLightIndex(cmp)].m_diffuse_intensity;
+		return m_point_lights[m_point_lights_map[cmp]].m_diffuse_intensity;
 	}
+
 
 	float getGlobalLightIntensity(ComponentHandle cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_diffuse_intensity;
 	}
 
+
 	Vec3 getPointLightColor(ComponentHandle cmp) override
 	{
-		return m_point_lights[getPointLightIndex(cmp)].m_diffuse_color;
+		return m_point_lights[m_point_lights_map[cmp]].m_diffuse_color;
 	}
+
 
 	void setPointLightSpecularColor(ComponentHandle cmp, const Vec3& color) override
 	{
-		m_point_lights[getPointLightIndex(cmp)].m_specular_color = color;
+		m_point_lights[m_point_lights_map[cmp]].m_specular_color = color;
 	}
+
 
 	Vec3 getPointLightSpecularColor(ComponentHandle cmp) override
 	{
-		return m_point_lights[getPointLightIndex(cmp)].m_specular_color;
+		return m_point_lights[m_point_lights_map[cmp]].m_specular_color;
 	}
+
 
 	void setPointLightSpecularIntensity(ComponentHandle cmp, float intensity) override
 	{
-		m_point_lights[getPointLightIndex(cmp)].m_specular_intensity = intensity;
+		m_point_lights[m_point_lights_map[cmp]].m_specular_intensity = intensity;
 	}
+
 
 	float getPointLightSpecularIntensity(ComponentHandle cmp) override
 	{
-		return m_point_lights[getPointLightIndex(cmp)].m_specular_intensity;
+		return m_point_lights[m_point_lights_map[cmp]].m_specular_intensity;
 	}
+
 
 	Vec3 getGlobalLightColor(ComponentHandle cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_diffuse_color;
 	}
 
+
 	Vec3 getGlobalLightSpecular(ComponentHandle cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_specular;
 	}
+
 
 	float getGlobalLightSpecularIntensity(ComponentHandle cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_specular_intensity;
 	}
 
+
 	float getLightAmbientIntensity(ComponentHandle cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_ambient_intensity;
 	}
+
 
 	Vec3 getLightAmbientColor(ComponentHandle cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_ambient_color;
 	}
 
+
 	void setActiveGlobalLight(ComponentHandle cmp) override
 	{
 		m_active_global_light_cmp = cmp;
 	}
 
+
 	ComponentHandle getActiveGlobalLight() override
 	{
 		return m_active_global_light_cmp;
-	};
+	}
+
 
 	Entity getPointLightEntity(ComponentHandle cmp) const override
 	{
-		return m_point_lights[getPointLightIndex(cmp)].m_entity;
+		return m_point_lights[m_point_lights_map[cmp]].m_entity;
 	}
+
 
 	Entity getGlobalLightEntity(ComponentHandle cmp) const override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_entity;
 	}
+
 
 	void reloadEnvironmentProbe(ComponentHandle cmp) override
 	{
@@ -3418,23 +3411,26 @@ public:
 		probe.texture = static_cast<Texture*>(texture_manager->load(Path(path)));
 	}
 
+
 	Texture* getEnvironmentProbeTexture(ComponentHandle cmp) const
 	{
 		Entity entity = { cmp.index };
 		return m_environment_probes[entity].texture;
 	}
 
+
 	ComponentHandle getCameraInSlot(const char* slot) override
 	{
-		for (int i = 0, c = m_cameras.size(); i < c; ++i)
+		for (const auto& camera : m_cameras)
 		{
-			if (!m_cameras[i].is_free && equalStrings(m_cameras[i].slot, slot))
+			if (equalStrings(camera.slot, slot))
 			{
-				return {i};
+				return {camera.entity.index};
 			}
 		}
 		return INVALID_COMPONENT;
 	}
+
 
 	float getTime() const override { return m_time; }
 
@@ -3868,13 +3864,13 @@ public:
 
 	float getLightFOV(ComponentHandle cmp) override
 	{
-		return m_point_lights[getPointLightIndex(cmp)].m_fov;
+		return m_point_lights[m_point_lights_map[cmp]].m_fov;
 	}
 
 
 	void setLightFOV(ComponentHandle cmp, float fov) override
 	{
-		m_point_lights[getPointLightIndex(cmp)].m_fov = fov;
+		m_point_lights[m_point_lights_map[cmp]].m_fov = fov;
 	}
 
 
@@ -4007,40 +4003,43 @@ public:
 		return m_particle_emitters;
 	}
 
-
 private:
 	IAllocator& m_allocator;
-	Array<ModelLoadedCallback*> m_model_loaded_callbacks;
-
-	Array<Renderable> m_renderables;
-
-	ComponentHandle m_point_light_last_cmp;
-	Array<PointLight> m_point_lights;
-	HashMap<ComponentHandle, int> m_point_lights_map;
-	Array<Array<ComponentHandle>> m_light_influenced_geometry;
-	ComponentHandle m_active_global_light_cmp;
-	ComponentHandle m_global_light_last_cmp;
-	Array<GlobalLight> m_global_lights;
-	Array<Camera> m_cameras;
-	Array<BoneAttachment> m_bone_attachments;
-	AssociativeArray<Entity, EnvironmentProbe> m_environment_probes;
-	Array<Terrain*> m_terrains;
 	Universe& m_universe;
 	Renderer& m_renderer;
 	Engine& m_engine;
+	CullingSystem* m_culling_system;
+
+	ComponentHandle m_point_light_last_cmp;
+	Array<Array<ComponentHandle>> m_light_influenced_geometry;
+	ComponentHandle m_active_global_light_cmp;
+	ComponentHandle m_global_light_last_cmp;
+	HashMap<ComponentHandle, int> m_point_lights_map;
+
+	Array<Renderable> m_renderables;
+	Array<GlobalLight> m_global_lights;
+	Array<PointLight> m_point_lights;
+	HashMap<Entity, Camera> m_cameras;
+	Array<BoneAttachment> m_bone_attachments;
+	AssociativeArray<Entity, EnvironmentProbe> m_environment_probes;
+	HashMap<Entity, Terrain*> m_terrains;
+	AssociativeArray<Entity, ParticleEmitter*> m_particle_emitters;
+
 	Array<DebugTriangle> m_debug_triangles;
 	Array<DebugLine> m_debug_lines;
 	Array<DebugPoint> m_debug_points;
-	CullingSystem* m_culling_system;
-	AssociativeArray<Entity, ParticleEmitter*> m_particle_emitters;
+
 	Array<Array<RenderableMesh>> m_temporary_infos;
 	MTJD::Group m_sync_point;
 	Array<MTJD::Job*> m_jobs;
+
 	float m_time;
 	bool m_is_updating_attachments;
 	bool m_is_forward_rendered;
 	bool m_is_grass_enabled;
 	bool m_is_game_running;
+
+	Array<ModelLoadedCallback*> m_model_loaded_callbacks;
 	DelegateList<void(ComponentHandle)> m_renderable_created;
 	DelegateList<void(ComponentHandle)> m_renderable_destroyed;
 };

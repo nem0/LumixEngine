@@ -615,10 +615,10 @@ void Terrain::setMaterial(Material* material)
 void Terrain::deserialize(InputBlob& serializer,
 	Universe& universe,
 	RenderScene& scene,
-	ComponentHandle cmp,
 	int version)
 {
 	serializer.read(m_entity);
+	ComponentHandle cmp = {m_entity.index};
 	serializer.read(m_layer_mask);
 	char path[MAX_PATH_LENGTH];
 	serializer.readString(path, MAX_PATH_LENGTH);

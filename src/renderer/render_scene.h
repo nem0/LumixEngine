@@ -51,6 +51,7 @@ enum class RenderSceneVersion : int32
 	ENVIRONMENT_PROBES,
 	FOV_RADIANS,
 	INDEPENDENT_PARTICLE_MODULES,
+	CAMERA_AND_TERRAIN_REFACTOR,
 
 	LATEST,
 	INVALID = -1,
@@ -146,11 +147,7 @@ public:
 	static void registerLuaAPI(lua_State* L);
 
 	virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, ComponentHandle ignore) = 0;
-
-	virtual RayCastModelHit castRayTerrain(ComponentHandle terrain,
-		const Vec3& origin,
-		const Vec3& dir) = 0;
-
+	virtual RayCastModelHit castRayTerrain(ComponentHandle terrain, const Vec3& origin, const Vec3& dir) = 0;
 	virtual void getRay(ComponentHandle camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 
 	virtual Frustum getCameraFrustum(ComponentHandle camera) const = 0;
