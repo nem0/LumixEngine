@@ -6,116 +6,43 @@
 
 namespace Lumix
 {
-
-	template <typename T> 
-	class SortedArray
-	{
-		public:
-			explicit SortedArray(IAllocator& allocator)
-				: m_data(allocator)
-			{}
-
-
-			int size() const { return m_data.size(); }
-
-
-			T& operator[](int index)
-			{
-				return m_data[index];
-			}
-
-
-			const T& operator[](int index) const
-			{
-				return m_data[index];
-			}
-
-
-			int insert(const T& value)
-			{
-				if (m_data.empty())
-				{
-					m_data.push(value);
-					return 0;
-				}
-				else
-				{
-					int i = index(value);
-					if (i >= 0 && ((i < m_data.size() && m_data[i] != value) || i == m_data.size()))
-					{
-						m_data.insert(i, value);
-						return i;
-					}
-				}
-				return -1;
-			}
-
-
-			bool contains(const T& value)
-			{
-				int i = index(value);
-				return i < m_data.size() && m_data[i] == value;
-			}
-
-
-			void clear()
-			{
-				m_data.clear();
-			}
-
-
-			void reserve(int capacity)
-			{
-				m_data.reserve(capacity);
-			}
-
-
-			void erase(int index)
-			{
-				m_data.erase(index);
-			}
-
-		private:
-			int index(const T& value) const
-			{
-				int l = 0;
-				int h = m_data.size() - 1;
-				while (l < h)
-				{
-					int mid = (l + h) >> 1;
-					if (m_data[mid] < value)
-					{
-						l = mid + 1;
-					}
-					else 
-					{
-						h = mid;
-					}
-				}
-				if (l + 1 == m_data.size() && m_data[l] < value)
-				{
-					return l + 1;
-				}
-				return l;
-			}
-
-		private:
-			Array<T> m_data;
-	};
-
-		
 	template <typename Key, typename Value>
 	class AssociativeArray
 	{
 		public:
 			explicit AssociativeArray(IAllocator& allocator)
-				: m_data(allocator)
+				: m_allocator(allocator)
+				, m_size(0)
+				, m_capacity(0)
+				, m_keys(nullptr)
+				, m_values(nullptr)
 			{}
+
+
+			~AssociativeArray()
+			{
+				callDestructors(m_keys, m_size);
+				callDestructors(m_values, m_size);
+				m_allocator.deallocate(m_keys);
+			}
 
 
 			int insert(const Key& key, const Value& value)
 			{
-				return m_data.insert(Pair(key, value));
+				if (m_capacity == m_size) reserve(m_capacity < 4 ? 4 : m_capacity * 2);
+
+				int i = index(key);
+				if (i >= 0 && ((i < m_size && m_keys[i] != key) || i == m_size))
+				{
+					moveMemory(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
+					moveMemory(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
+					new (NewPlaceholder(), &m_values[i]) Value(value);
+					new (NewPlaceholder(), &m_keys[i]) Key(key);
+					++m_size;
+
+					return i;
+				}
+				return -1;
 			}
 
 
@@ -126,7 +53,7 @@ namespace Lumix
 				{
 					return false;
 				}
-				value = m_data[i].m_value;
+				value = m_values[i];
 				return true;
 			}
 
@@ -134,11 +61,11 @@ namespace Lumix
 			int find(const Key& key) const
 			{
 				int l = 0;
-				int h = m_data.size() - 1;
+				int h = m_size - 1;
 				while (l < h)
 				{
 					int mid = (l + h) >> 1;
-					if (m_data[mid].m_key < key)
+					if (m_keys[mid] < key)
 					{
 						l = mid + 1;
 					}
@@ -147,7 +74,7 @@ namespace Lumix
 						h = mid;
 					}
 				}
-				if (l == h && m_data[l].m_key == key)
+				if (l == h && m_keys[l] == key)
 				{
 					return l;
 				}
@@ -160,12 +87,12 @@ namespace Lumix
 				int index = find(key);
 				if (index >= 0)
 				{
-					return m_data[index].m_value;
+					return m_values[index];
 				}
 				else
 				{
 					ASSERT(false);
-					return m_data[0].m_value;
+					return m_values[0];
 				}
 			}
 
@@ -175,18 +102,18 @@ namespace Lumix
 				int index = find(key);
 				if (index >= 0)
 				{
-					return m_data[index].m_value;
+					return m_values[index];
 				}
 				else
 				{
-					return m_data[m_data.insert(Pair(key, Value()))].m_value;
+					return m_values[insert(key, Value())];
 				}
 			}
 
 
 			int size() const
 			{
-				return m_data.size();
+				return m_size;
 			}
 
 
@@ -194,43 +121,66 @@ namespace Lumix
 			{
 				int index = find(key);
 				ASSERT(index >= 0);
-				return m_data[index].m_value;
+				return m_values[index];
 			}
 
 
 			Value& at(int index)
 			{
-				return m_data[index].m_value;
+				return m_values[index];
 			}
 
 
 			const Value& at(int index) const
 			{
-				return m_data[index].m_value;
+				return m_values[index];
 			}
 
 
 			void clear()
 			{
-				m_data.clear();
+				callDestructors(m_keys, m_size);
+				callDestructors(m_values, m_size);
+				m_size = 0;
 			}
 
 
-			void reserve(int capacity)
+			void reserve(int new_capacity)
 			{
-				m_data.reserve(capacity);
+				if (m_capacity >= new_capacity) return;
+				
+				uint8* new_data = (uint8*)m_allocator.allocate(new_capacity * (sizeof(Key) + sizeof(Value)));
+				
+				copyMemory(new_data, m_keys, sizeof(Key) * m_size);
+				copyMemory(new_data + sizeof(Key) * new_capacity, m_values, sizeof(Value) * m_size);
+
+				m_allocator.deallocate(m_keys);
+				m_keys = (Key*)new_data;
+				m_values = (Value*)(new_data + sizeof(Key) * new_capacity);
+
+				m_capacity = new_capacity;
 			}
 
 
 			const Key& getKey(int index)
 			{
-				return m_data[index].m_key;
+				return m_keys[index];
 			}
 
 
 			void eraseAt(int index)
 			{
-				m_data.erase(index);
+				if (index >= 0 && index < m_size)
+				{
+					m_values[index].~Value();
+					m_keys[index].~Key();
+					if (index < m_size - 1)
+					{
+						moveMemory(m_keys + index, m_keys + index + 1, sizeof(Key) * (m_size - index - 1));
+						moveMemory(m_values + index, m_values + index + 1, sizeof(Value) * (m_size - index - 1));
+					}
+					--m_size;
+				}
 			}
 
 
@@ -244,22 +194,44 @@ namespace Lumix
 			}
 
 		private:
-			struct Pair
+			template <typename T> void callDestructors(T* ptr, int count)
 			{
-				Pair() {}
-				Pair(const Key& key, const Value& value) : m_key(key), m_value(value) {}
+				for (int i = 0; i < count; ++i)
+				{
+					ptr[i].~T();
+				}
+			}
 
-				bool operator <(const Pair& rhs) const { return m_key < rhs.m_key; }
-				bool operator >(const Pair& rhs) const { return m_key > rhs.m_key; }
-				bool operator ==(const Pair& rhs) const { return m_key == rhs.m_key; }
-				bool operator !=(const Pair& rhs) const { return m_key != rhs.m_key; }
 
-				Key m_key;
-				Value m_value;
-			};
+			int index(const Key& key) const
+			{
+				int l = 0;
+				int h = m_size - 1;
+				while (l < h)
+				{
+					int mid = (l + h) >> 1;
+					if (m_keys[mid] < key)
+					{
+						l = mid + 1;
+					}
+					else
+					{
+						h = mid;
+					}
+				}
+				if (l + 1 == m_size && m_keys[l] < key)
+				{
+					return l + 1;
+				}
+				return l;
+			}
 
 		private:
-			SortedArray<Pair> m_data;
+			IAllocator& m_allocator;
+			Key* m_keys;
+			Value* m_values;
+			int m_size;
+			int m_capacity;
 	};
 
 
