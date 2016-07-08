@@ -125,6 +125,12 @@ namespace Lumix
 			}
 
 
+			Value* begin() { return m_values; }
+			Value* end() { return m_values + m_size; }
+			const Value* begin() const { return m_values; }
+			const Value* end() const { return m_values + m_size; }
+
+
 			Value& at(int index)
 			{
 				return m_values[index];

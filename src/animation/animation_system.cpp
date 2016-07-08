@@ -79,9 +79,8 @@ struct AnimationSceneImpl : public AnimationScene
 
 	~AnimationSceneImpl()
 	{
-		for (int i = 0; i < m_animables.size(); ++i)
+		for (Animable& animable : m_animables)
 		{
-			auto& animable = m_animables.at(i);
 			unloadAnimation(animable.animation);
 		}
 	}
@@ -158,9 +157,8 @@ struct AnimationSceneImpl : public AnimationScene
 	void serialize(OutputBlob& serializer) override
 	{
 		serializer.write((int32)m_animables.size());
-		for (int i = 0; i < m_animables.size(); ++i)
+		for (const Animable& animable : m_animables)
 		{
-			const auto& animable = m_animables.at(i);
 			serializer.write(animable.entity);
 			serializer.write(animable.time_scale);
 			serializer.write(animable.start_time);
@@ -176,9 +174,8 @@ struct AnimationSceneImpl : public AnimationScene
 	{
 		int32 count;
 		serializer.read(count);
-		for (int i = 0; i < m_animables.size(); ++i)
+		for (Animable& animable : m_animables)
 		{
-			auto& animable = m_animables.at(i);
 			unloadAnimation(animable.animation);
 		}
 		
@@ -278,9 +275,9 @@ struct AnimationSceneImpl : public AnimationScene
 		PROFILE_FUNCTION();
 		if (!m_is_game_running) return;
 
-		for (int i = 0, c = m_animables.size(); i < c; ++i)
+		for (Animable& animable : m_animables)
 		{
-			AnimationSceneImpl::updateAnimable(m_animables.at(i), time_delta);
+			AnimationSceneImpl::updateAnimable(animable, time_delta);
 		}
 	}
 

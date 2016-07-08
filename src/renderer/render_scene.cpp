@@ -239,9 +239,9 @@ public:
 			LUMIX_DELETE(m_allocator, terrain);
 		}
 
-		for (int i = 0; i < m_particle_emitters.size(); ++i)
+		for (auto* emitter : m_particle_emitters)
 		{
-			LUMIX_DELETE(m_allocator, m_particle_emitters.at(i));
+			LUMIX_DELETE(m_allocator, emitter);
 		}
 
 		for (auto& i : m_renderables)
@@ -255,9 +255,8 @@ public:
 			}
 		}
 
-		for (int i = 0, c = m_environment_probes.size(); i < c; ++i)
+		for (auto& probe : m_environment_probes)
 		{
-			auto& probe = m_environment_probes.at(i);
 			if (probe.texture) probe.texture->getResourceManager().get(TEXTURE_HASH)->unload(*probe.texture);
 		}
 
@@ -614,9 +613,8 @@ public:
 
 		if (m_is_game_running && !paused)
 		{
-			for (int i = 0, c = m_particle_emitters.size(); i < c; ++i)
+			for (auto* emitter : m_particle_emitters)
 			{
-				auto* emitter = m_particle_emitters.at(i);
 				if (emitter->m_is_valid) emitter->update(dt);
 			}
 		}
@@ -707,7 +705,6 @@ public:
 		serializer.write(count);
 		for (int i = 0; i < count; ++i)
 		{
-			auto& probe = m_environment_probes.at(i);
 			Entity entity = m_environment_probes.getKey(i);
 			serializer.write(entity);
 		}
@@ -771,7 +768,7 @@ public:
 	{
 		int count;
 		serializer.read(count);
-		for (int i = 0; i < m_particle_emitters.size(); ++i) LUMIX_DELETE(m_allocator, m_particle_emitters.at(i));
+		for (auto* emitter : m_particle_emitters) LUMIX_DELETE(m_allocator, emitter);
 		m_particle_emitters.clear();
 		m_particle_emitters.reserve(count);
 		for(int i = 0; i < count; ++i)
@@ -836,9 +833,8 @@ public:
 	void serializeParticleEmitters(OutputBlob& serializer)
 	{
 		serializer.write(m_particle_emitters.size());
-		for (int i = 0; i < m_particle_emitters.size(); ++i)
+		for (auto* emitter : m_particle_emitters)
 		{
-			auto* emitter = m_particle_emitters.at(i);
 			serializer.write(emitter->m_is_valid);
 			emitter->serialize(serializer);
 		}
