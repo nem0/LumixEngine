@@ -147,9 +147,8 @@ struct AudioSceneImpl : public AudioScene
 
 	void startGame() override
 	{
-		for (int i = 0; i < m_ambient_sounds.size(); ++i)
+		for (AmbientSound& sound : m_ambient_sounds)
 		{
-			auto& sound = m_ambient_sounds.at(i);
 			if (sound.clip) sound.playing_sound = play(sound.entity, sound.clip, sound.is_3d);
 		}
 	}
@@ -166,9 +165,9 @@ struct AudioSceneImpl : public AudioScene
 			}
 		}
 
-		for (int i = 0; i < m_ambient_sounds.size(); ++i)
+		for (AmbientSound& sound : m_ambient_sounds)
 		{
-			m_ambient_sounds.at(i).playing_sound = -1;
+			sound.playing_sound = -1;
 		}
 	}
 
@@ -318,17 +317,16 @@ struct AudioSceneImpl : public AudioScene
 		}
 
 		serializer.write(m_ambient_sounds.size());
-		for (int i = 0; i < m_ambient_sounds.size(); ++i)
+		for (const AmbientSound& sound : m_ambient_sounds)
 		{
-			const auto& sound = m_ambient_sounds.at(i);
 			serializer.write(m_clips.indexOf(sound.clip));
 			serializer.write(sound.entity);
 		}
 
 		serializer.write(m_echo_zones.size());
-		for (int i = 0; i < m_echo_zones.size(); ++i)
+		for (EchoZone& zone : m_echo_zones)
 		{
-			serializer.write(m_echo_zones.at(i));
+			serializer.write(zone);
 		}
 	}
 
@@ -475,9 +473,8 @@ struct AudioSceneImpl : public AudioScene
 			}
 		}
 
-		for (int i = 0; i < m_ambient_sounds.size(); ++i)
+		for (AmbientSound& sound : m_ambient_sounds)
 		{
-			auto& sound = m_ambient_sounds.at(i);
 			if (sound.clip == info)
 			{
 				sound.clip = nullptr;
@@ -552,9 +549,8 @@ struct AudioSceneImpl : public AudioScene
 				sound.time = 0;
 				sound.clip = clip_info;
 				
-				for (int j = 0; j < m_echo_zones.size(); ++j)
+				for (const EchoZone& zone : m_echo_zones)
 				{
-					const auto& zone = m_echo_zones.at(j);
 					float dist2 = (pos - m_universe.getPosition(zone.entity)).squaredLength();
 					float r2 = zone.radius * zone.radius;
 					if (dist2 > r2) continue;

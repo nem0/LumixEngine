@@ -299,21 +299,21 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	~PhysicsSceneImpl()
 	{
-		for (int i = 0; i < m_controllers.size(); ++i)
+		for (auto& controller : m_controllers)
 		{
-			m_controllers.at(i).m_controller->release();
+			controller.m_controller->release();
 		}
-		for (int i = 0; i < m_ragdolls.size(); ++i)
+		for (auto& ragdoll : m_ragdolls)
 		{
-			destroySkeleton(m_ragdolls.at(i).root);
+			destroySkeleton(ragdoll.root);
 		}
-		for (int i = 0; i < m_actors.size(); ++i)
+		for (auto* actor : m_actors)
 		{
-			LUMIX_DELETE(m_allocator, m_actors.at(i));
+			LUMIX_DELETE(m_allocator, actor);
 		}
-		for (int i = 0; i < m_terrains.size(); ++i)
+		for (auto* terrain : m_terrains)
 		{
-			LUMIX_DELETE(m_allocator, m_terrains.at(i));
+			LUMIX_DELETE(m_allocator, terrain);
 		}
 	}
 
@@ -1471,9 +1471,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		PROFILE_FUNCTION();
 		Vec3 g(0, time_delta * -9.8f, 0);
-		for (int i = 0; i < m_controllers.size(); ++i)
+		for (auto& controller : m_controllers)
 		{
-			auto& controller = m_controllers.at(i);
 			Vec3 dif = g + controller.m_frame_change;
 			controller.m_frame_change.set(0, 0, 0);
 			const physx::PxExtendedVec3& p = controller.m_controller->getPosition();
@@ -1965,9 +1964,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
 		if (!render_scene) return;
 
-		for (int i = 0, c = m_ragdolls.size(); i < c; ++i)
+		for (auto& ragdoll : m_ragdolls)
 		{
-			Ragdoll& ragdoll = m_ragdolls.at(i);
 			Transform root_transform;
 			root_transform.rot = m_universe.getRotation(ragdoll.entity);
 			root_transform.pos = m_universe.getPosition(ragdoll.entity);
@@ -2272,20 +2270,16 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void removeCollisionLayer() override
 	{
 		m_layers_count = Math::maximum(0, m_layers_count - 1);
-		for (int i = 0; i < m_actors.size(); ++i)
+		for (auto* actor : m_actors)
 		{
-			auto* actor = m_actors.at(i);
 			actor->layer = Math::minimum(m_layers_count - 1, actor->layer);
 		}
-		for (int i = 0; i < m_controllers.size(); ++i)
+		for (auto& controller : m_controllers)
 		{
-			auto& controller = m_controllers.at(i);
 			controller.m_layer = Math::minimum(m_layers_count - 1, controller.m_layer);
 		}
-		for (int i = 0; i < m_terrains.size(); ++i)
+		for (auto* terrain : m_terrains)
 		{
-			auto* terrain = m_terrains.at(i);
-			if (!terrain->m_actor) continue;
 			terrain->m_layer = Math::minimum(m_layers_count - 1, terrain->m_layer);
 		}
 
@@ -2344,10 +2338,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void updateFilterData()
 	{
-		for (int i = 0, c = m_ragdolls.size(); i < c; ++i)
+		for (auto& ragdoll : m_ragdolls)
 		{
-			auto& ragdoll = m_ragdolls.at(i);
-			
 			struct Tmp
 			{
 				void operator()(RagdollBone* bone)
@@ -2372,9 +2364,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			tmp(ragdoll.root);
 		}
 
-		for (int i = 0, c = m_actors.size(); i < c; ++i)
+		for (auto* actor : m_actors)
 		{
-			auto* actor = m_actors.at(i);
 			physx::PxFilterData data;
 			int actor_layer = actor->layer;
 			data.word0 = 1 << actor_layer;
@@ -2387,9 +2378,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 		}
 
-		for (int i = 0; i < m_controllers.size(); ++i)
+		for (auto& controller : m_controllers)
 		{
-			auto& controller = m_controllers.at(i);
 			physx::PxFilterData data;
 			int controller_layer = controller.m_layer;
 			data.word0 = 1 << controller_layer;
@@ -2402,9 +2392,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 		}
 
-		for (int i = 0; i < m_terrains.size(); ++i)
+		for (auto* terrain : m_terrains)
 		{
-			auto* terrain = m_terrains.at(i);
 			if (!terrain->m_actor) continue;
 
 			physx::PxFilterData data;
@@ -2655,24 +2644,21 @@ struct PhysicsSceneImpl : public PhysicsScene
 		serializer.write(m_layers_names);
 		serializer.write(m_collision_filter);
 		serializer.write((int32)m_actors.size());
-		for (int i = 0, c = m_actors.size(); i < c; ++i)
+		for (auto* actor : m_actors)
 		{
-			RigidActor* actor = m_actors.at(i);
 			serializer.write(isDynamic({actor->entity.index}));
 			serializer.write(actor->entity);
 			serializeActor(serializer, actor);
 		}
 		serializer.write((int32)m_controllers.size());
-		for (int i = 0; i < m_controllers.size(); ++i)
+		for (const auto& controller : m_controllers)
 		{
-			const auto& controller = m_controllers.at(i);
 			serializer.write(controller.m_entity);
 			serializer.write(controller.m_layer);
 		}
 		serializer.write((int32)m_terrains.size());
-		for (int i = 0; i < m_terrains.size(); ++i)
+		for (auto* terrain : m_terrains)
 		{
-			auto* terrain = m_terrains.at(i);
 			serializer.write(terrain->m_entity);
 			serializer.writeString(terrain->m_heightmap ? terrain->m_heightmap->getPath().c_str() : "");
 			serializer.write(terrain->m_xz_scale);
@@ -3018,12 +3004,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 		int32 count;
 		m_dynamic_actors.clear();
 		serializer.read(count);
-		for (int i = 0; i < m_actors.size(); ++i)
+		for (auto* actor : m_actors)
 		{
-			m_actors.at(i)->setPhysxActor(nullptr);
-			LUMIX_DELETE(m_allocator, m_actors.at(i));
+			actor->setPhysxActor(nullptr);
+			LUMIX_DELETE(m_allocator, actor);
 		}
-		int old_size = m_actors.size();
 		m_actors.clear();
 		m_actors.reserve(count);
 		for (int i = 0; i < count; ++i)
@@ -3047,9 +3032,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		int32 count;
 		serializer.read(count);
-		for (int i = 0; i < m_controllers.size(); ++i)
+		for (auto& controller : m_controllers)
 		{
-			m_controllers.at(i).m_controller->release();
+			controller.m_controller->release();
 		}
 		m_controllers.clear();
 		for (int i = 0; i < count; ++i)
@@ -3102,21 +3087,16 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void clearRagdolls()
-	{
-		for (int i = 0, c = m_ragdolls.size(); i < c; ++i)
-		{
-			destroySkeleton(m_ragdolls.at(i).root);
-		}
-		m_ragdolls.clear();
-	}
-
-
 	void deserializeRagdolls(InputBlob& serializer, int version)
 	{
 		if (version <= int(PhysicsSceneVersion::RAGDOLLS)) return;
 			
-		clearRagdolls();
+		for (auto& ragdoll : m_ragdolls)
+		{
+			destroySkeleton(ragdoll.root);
+		}
+		m_ragdolls.clear();
+
 		int count;
 		serializer.read(count);
 		m_ragdolls.reserve(count);
@@ -3259,9 +3239,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		int32 count;
 		serializer.read(count);
-		for (int i = 0; i < m_terrains.size(); ++i)
+		for (auto* terrain : m_terrains)
 		{
-			LUMIX_DELETE(m_allocator, m_terrains.at(i));
+			LUMIX_DELETE(m_allocator, terrain);
 		}
 		m_terrains.clear();
 		for (int i = 0; i < count; ++i)
