@@ -999,9 +999,14 @@ namespace Lumix
 		void startGame() override
 		{
 			m_is_game_running = true;
-			for (auto* scr : m_scripts)
+
+			// copy m_scripts to tmp, because scripts can create other scripts -> m_scripts is not const
+			Lumix::Array<ScriptComponent*> tmp(m_system.getAllocator());
+			tmp.reserve(m_scripts.size());
+			for (auto* scr : m_scripts) tmp.push(scr); 
+
+			for (auto* scr : tmp)
 			{
-				if (!scr) continue;
 				for (int j = 0; j < scr->m_scripts.size(); ++j)
 				{
 					auto& instance = scr->m_scripts[j];
