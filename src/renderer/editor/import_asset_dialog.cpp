@@ -1161,7 +1161,7 @@ struct ConvertTask : public MT::Task
 			{
 				++invalid_vertices;
 			}
-			if (sum < 0.999f)
+			if (fabs(sum - 1.0f) > 0.001f)
 			{
 				for (int i = 0; i < 4; ++i)
 				{
