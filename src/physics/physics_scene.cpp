@@ -299,22 +299,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	~PhysicsSceneImpl()
 	{
-		for (auto& controller : m_controllers)
-		{
-			controller.m_controller->release();
-		}
-		for (auto& ragdoll : m_ragdolls)
-		{
-			destroySkeleton(ragdoll.root);
-		}
-		for (auto* actor : m_actors)
-		{
-			LUMIX_DELETE(m_allocator, actor);
-		}
-		for (auto* terrain : m_terrains)
-		{
-			LUMIX_DELETE(m_allocator, terrain);
-		}
+		ASSERT(m_controllers.size() == 0);
+		ASSERT(m_ragdolls.size() == 0);
+		ASSERT(m_actors.size() == 0);
+		ASSERT(m_terrains.size() == 0);
 	}
 
 
@@ -3455,6 +3443,27 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
 void PhysicsScene::destroy(PhysicsScene* scene)
 {
 	PhysicsSceneImpl* impl = static_cast<PhysicsSceneImpl*>(scene);
+	for (auto& controller : impl->m_controllers)
+	{
+		controller.m_controller->release();
+	}
+	impl->m_controllers.clear();
+	for (auto& ragdoll : impl->m_ragdolls)
+	{
+		impl->destroySkeleton(ragdoll.root);
+	}
+	impl->m_ragdolls.clear();
+	for (auto* actor : impl->m_actors)
+	{
+		LUMIX_DELETE(impl->m_allocator, actor);
+	}
+	impl->m_actors.clear();
+	for (auto* terrain : impl->m_terrains)
+	{
+		LUMIX_DELETE(impl->m_allocator, terrain);
+	}
+	impl->m_terrains.clear();
+
 	impl->m_controller_manager->release();
 	impl->m_default_material->release();
 	impl->m_dummy_actor->release();
