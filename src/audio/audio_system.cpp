@@ -79,7 +79,6 @@ struct AudioSystemImpl : public AudioSystem
 	bool create() override
 	{
 		m_device = AudioDevice::create(m_engine);
-		if (!m_device) return false;
 		m_manager.create(CLIP_HASH, m_engine.getResourceManager());
 		return true;
 	}

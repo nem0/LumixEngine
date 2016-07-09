@@ -30,17 +30,6 @@ namespace Lumix
 			{
 				m_xinput_connected[i] = false;
 			}
-		}
-
-
-		~InputSystemImpl()
-		{
-			if (m_xinput_library) FreeLibrary(m_xinput_library);
-		}
-
-
-		bool create()
-		{
 			m_xinput_library = LoadLibrary("Xinput9_1_0.dll");
 			if (m_xinput_library)
 			{
@@ -51,7 +40,12 @@ namespace Lumix
 					m_xinput_library = nullptr;
 				}
 			}
-			return true;
+		}
+
+
+		~InputSystemImpl()
+		{
+			if (m_xinput_library) FreeLibrary(m_xinput_library);
 		}
 
 
@@ -203,13 +197,7 @@ namespace Lumix
 
 	InputSystem* InputSystem::create(IAllocator& allocator)
 	{
-		auto* system = LUMIX_NEW(allocator, InputSystemImpl)(allocator);
-		if (!system->create())
-		{
-			LUMIX_DELETE(allocator, system);
-			return nullptr;
-		}
-		return system;
+		return LUMIX_NEW(allocator, InputSystemImpl)(allocator);
 	}
 
 

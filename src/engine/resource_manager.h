@@ -21,7 +21,7 @@ class FileSystem;
 class ResourceManagerBase;
 
 
-class LUMIX_ENGINE_API ResourceManager final
+class LUMIX_ENGINE_API ResourceManager
 {
 	typedef HashMap<uint32, ResourceManagerBase*> ResourceManagerTable;
 
