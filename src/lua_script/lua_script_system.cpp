@@ -44,12 +44,11 @@ namespace Lumix
 		explicit LuaScriptSystemImpl(Engine& engine);
 		virtual ~LuaScriptSystemImpl();
 
-		IAllocator& getAllocator();
 		IScene* createScene(Universe& universe) override;
 		void destroyScene(IScene* scene) override;
-		bool create() override;
-		void destroy() override;
-		const char* getName() const override;
+		bool create() override { return true; }
+		void destroy() override {}
+		const char* getName() const override { return "lua_script"; }
 		LuaScriptManager& getScriptManager() { return m_script_manager; }
 
 		Engine& m_engine;
@@ -122,7 +121,7 @@ namespace Lumix
 				bool is_env_valid = lua_rawgeti(L, LUA_REGISTRYINDEX, inst.m_environment) == LUA_TTABLE;
 				ASSERT(is_env_valid);
 				lua_pushnil(L);
-				auto& allocator = m_scene.m_system.getAllocator();
+				auto& allocator = m_scene.m_system.m_allocator;
 				while (lua_next(L, -2))
 				{
 					if (lua_type(L, -1) != LUA_TFUNCTION)
@@ -281,10 +280,10 @@ namespace Lumix
 		LuaScriptSceneImpl(LuaScriptSystemImpl& system, Universe& ctx)
 			: m_system(system)
 			, m_universe(ctx)
-			, m_scripts(system.getAllocator())
-			, m_updates(system.getAllocator())
-			, m_timers(system.getAllocator())
-			, m_property_names(system.getAllocator())
+			, m_scripts(system.m_allocator)
+			, m_updates(system.m_allocator)
+			, m_timers(system.m_allocator)
+			, m_property_names(system.m_allocator)
 			, m_is_game_running(false)
 			, m_is_api_registered(false)
 		{
@@ -406,7 +405,7 @@ namespace Lumix
 					uint32 hash;
 					blob.read(hash);
 					auto* prop = scr->getProperty(inst, hash);
-					if(!prop) prop = &scr->m_scripts[idx].m_properties.emplace(m_system.getAllocator());
+					if(!prop) prop = &scr->m_scripts[idx].m_properties.emplace(m_system.m_allocator);
 					prop->name_hash = hash;
 					blob.read(prop->type);
 					char tmp[1024];
@@ -435,7 +434,7 @@ namespace Lumix
 				{
 					setScriptPath(*script_cmp, script, invalid_path);
 				}
-				LUMIX_DELETE(m_system.getAllocator(), script_cmp);
+				LUMIX_DELETE(m_system.m_allocator, script_cmp);
 			}
 			m_scripts.clear();
 		}
@@ -466,10 +465,10 @@ namespace Lumix
 				}
 			}
 
-			auto& prop = scene->m_current_script_instance->m_properties.emplace(scene->m_system.getAllocator());
+			auto& prop = scene->m_current_script_instance->m_properties.emplace(scene->m_system.m_allocator);
 			prop.name_hash = prop_name_hash;
 			prop.type = (Property::Type)type;
-			scene->m_property_names.insert(prop_name_hash, string(prop_name, scene->m_system.getAllocator()));
+			scene->m_property_names.insert(prop_name_hash, string(prop_name, scene->m_system.m_allocator));
 		}
 
 
@@ -1001,7 +1000,7 @@ namespace Lumix
 			m_is_game_running = true;
 
 			// copy m_scripts to tmp, because scripts can create other scripts -> m_scripts is not const
-			Lumix::Array<ScriptComponent*> tmp(m_system.getAllocator());
+			Lumix::Array<ScriptComponent*> tmp(m_system.m_allocator);
 			tmp.reserve(m_scripts.size());
 			for (auto* scr : m_scripts) tmp.push(scr); 
 
@@ -1031,7 +1030,7 @@ namespace Lumix
 		{
 			if (type != LUA_SCRIPT_TYPE) return INVALID_COMPONENT;
 
-			auto& allocator = m_system.getAllocator();
+			auto& allocator = m_system.m_allocator;
 			ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
 			ComponentHandle cmp = {entity.index};
 			script->m_entity = entity;
@@ -1058,7 +1057,7 @@ namespace Lumix
 					m_system.getScriptManager().unload(*scr.m_script);
 				}
 			}
-			LUMIX_DELETE(m_system.getAllocator(), script);
+			LUMIX_DELETE(m_system.m_allocator, script);
 			m_scripts.erase(entity);
 			m_universe.destroyComponent(entity, type, this, component);
 		}
@@ -1178,7 +1177,7 @@ namespace Lumix
 				if (version <= (int)LuaScriptVersion::REFACTOR) serializer.read(is_valid);
 				if (!is_valid) continue;
 
-				auto& allocator = m_system.getAllocator();
+				auto& allocator = m_system.m_allocator;
 				ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
 
 				serializer.read(script->m_entity);
@@ -1224,8 +1223,8 @@ namespace Lumix
 				serializer.read(is_valid);
 				if (!is_valid) continue;
 
-				IAllocator& allocator = m_system.getAllocator();
-				ScriptComponent* script = LUMIX_NEW(m_system.getAllocator(), ScriptComponent)(*this, allocator);
+				IAllocator& allocator = m_system.m_allocator;
+				ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
 				serializer.read(script->m_entity);
 				m_scripts.insert(script->m_entity, script);
 
@@ -1238,7 +1237,7 @@ namespace Lumix
 				scr.m_properties.reserve(prop_count);
 				for (int j = 0; j < prop_count; ++j)
 				{
-					Property& prop = scr.m_properties.emplace(m_system.getAllocator());
+					Property& prop = scr.m_properties.emplace(allocator);
 					prop.type = Property::ANY;
 					serializer.read(prop.name_hash);
 					char tmp[1024];
@@ -1344,7 +1343,7 @@ namespace Lumix
 				}
 			}
 
-			script_cmp->m_scripts[scr_index].m_properties.emplace(m_system.getAllocator());
+			script_cmp->m_scripts[scr_index].m_properties.emplace(m_system.m_allocator);
 			auto& prop = script_cmp->m_scripts[scr_index].m_properties.back();
 			prop.name_hash = name_hash;
 			return prop;
@@ -1471,12 +1470,6 @@ namespace Lumix
 	}
 
 
-	IAllocator& LuaScriptSystemImpl::getAllocator()
-	{
-		return m_allocator;
-	}
-
-
 	IScene* LuaScriptSystemImpl::createScene(Universe& ctx)
 	{
 		return LUMIX_NEW(m_allocator, LuaScriptSceneImpl)(*this, ctx);
@@ -1486,23 +1479,6 @@ namespace Lumix
 	void LuaScriptSystemImpl::destroyScene(IScene* scene)
 	{
 		LUMIX_DELETE(m_allocator, scene);
-	}
-
-
-	bool LuaScriptSystemImpl::create()
-	{
-		return true;
-	}
-
-
-	void LuaScriptSystemImpl::destroy()
-	{
-	}
-
-
-	const char* LuaScriptSystemImpl::getName() const
-	{
-		return "lua_script";
 	}
 
 

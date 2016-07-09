@@ -504,6 +504,42 @@ namespace Lumix
 	}
 
 
+	struct CustomErrorCallback : public physx::PxErrorCallback
+	{
+		void reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line) override
+		{
+			g_log_error.log("Physics") << message;
+		}
+	};
+
+
+	class AssertNullAllocator : public physx::PxAllocatorCallback
+	{
+	public:
+		#ifdef _WIN32
+			void* allocate(size_t size, const char*, const char*, int) override
+			{
+				void* ret = _aligned_malloc(size, 16);
+				// g_log_info.log("Physics") << "Allocated " << size << " bytes for " << typeName << "
+				// from " << filename << "(" << line << ")";
+				ASSERT(ret);
+				return ret;
+			}
+			void deallocate(void* ptr) override { _aligned_free(ptr); }
+		#else
+			void* allocate(size_t size, const char*, const char*, int) override
+			{
+				void* ret = aligned_alloc(16, size);
+				// g_log_info.log("Physics") << "Allocated " << size << " bytes for " << typeName << "
+				// from " << filename << "(" << line << ")";
+				ASSERT(ret);
+				return ret;
+			}
+			void deallocate(void* ptr) override { free(ptr); }
+		#endif
+	};
+
+
 	struct PhysicsSystemImpl : public PhysicsSystem
 	{
 		explicit PhysicsSystemImpl(Engine& engine)
@@ -516,10 +552,40 @@ namespace Lumix
 			PhysicsScene::registerLuaAPI(m_engine.getState());
 		}
 
-		bool create() override;
-		IScene* createScene(Universe& universe) override;
-		void destroyScene(IScene* scene) override;
-		void destroy() override;
+
+		bool create() override
+		{
+			m_physx_allocator = LUMIX_NEW(m_allocator, AssertNullAllocator);
+			m_error_callback = LUMIX_NEW(m_allocator, CustomErrorCallback);
+			m_foundation = PxCreateFoundation(PX_PHYSICS_VERSION, *m_physx_allocator, *m_error_callback);
+
+			m_physics = PxCreatePhysics(PX_PHYSICS_VERSION, *m_foundation, physx::PxTolerancesScale());
+
+			physx::PxTolerancesScale scale;
+			m_cooking = PxCreateCooking(PX_PHYSICS_VERSION, *m_foundation, physx::PxCookingParams(scale));
+			connect2VisualDebugger();
+			return true;
+		}
+
+
+		IScene* createScene(Universe& universe) override
+		{
+			return PhysicsScene::create(*this, universe, m_engine, m_allocator);
+		}
+
+
+		void destroyScene(IScene* scene) override { PhysicsScene::destroy(static_cast<PhysicsScene*>(scene)); }
+
+
+		void destroy() override
+		{
+			m_cooking->release();
+			m_physics->release();
+			m_foundation->release();
+			LUMIX_DELETE(m_allocator, m_physx_allocator);
+			LUMIX_DELETE(m_allocator, m_error_callback);
+		}
+
 
 		physx::PxPhysics* getPhysics() override
 		{
@@ -531,7 +597,20 @@ namespace Lumix
 			return m_cooking;
 		}
 
-		bool connect2VisualDebugger();
+		bool connect2VisualDebugger()
+		{
+			if (m_physics->getPvdConnectionManager() == nullptr) return false;
+
+			const char* pvd_host_ip = "127.0.0.1";
+			int port = 5425;
+			unsigned int timeout = 100;
+			physx::PxVisualDebuggerConnectionFlags connectionFlags =
+				physx::PxVisualDebuggerExt::getAllConnectionFlags();
+
+			auto* theConnection = physx::PxVisualDebuggerExt::createConnection(
+				m_physics->getPvdConnectionManager(), pvd_host_ip, port, timeout, connectionFlags);
+			return theConnection != nullptr;
+		}
 
 		physx::PxPhysics* m_physics;
 		physx::PxFoundation* m_foundation;
@@ -548,111 +627,6 @@ namespace Lumix
 	LUMIX_PLUGIN_ENTRY(physics)
 	{
 		return LUMIX_NEW(engine.getAllocator(), PhysicsSystemImpl)(engine);
-	}
-
-	
-	struct CustomErrorCallback : public physx::PxErrorCallback
-	{
-		virtual void reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line);
-	};
-
-
-	IScene* PhysicsSystemImpl::createScene(Universe& ctx)
-	{
-		return PhysicsScene::create(*this, ctx, m_engine, m_allocator);
-	}
-
-
-	void PhysicsSystemImpl::destroyScene(IScene* scene)
-	{
-		PhysicsScene::destroy(static_cast<PhysicsScene*>(scene));
-	}
-
-
-	class AssertNullAllocator : public physx::PxAllocatorCallback
-	{
-	public:
-		#ifdef _WIN32
-			void* allocate(size_t size, const char*, const char*, int) override
-			{
-				void* ret = _aligned_malloc(size, 16);
-				// g_log_info.log("Physics") << "Allocated " << size << " bytes for " << typeName << "
-				// from " << filename << "(" << line << ")";
-				ASSERT(ret);
-				return ret;
-			}
-			void deallocate(void* ptr) override
-			{
-				_aligned_free(ptr);
-			}
-		#else
-			void* allocate(size_t size, const char*, const char*, int) override
-			{
-				void* ret = aligned_alloc(16, size);
-				// g_log_info.log("Physics") << "Allocated " << size << " bytes for " << typeName << "
-				// from " << filename << "(" << line << ")";
-				ASSERT(ret);
-				return ret;
-			}
-			void deallocate(void* ptr) override
-			{
-				free(ptr);
-			}
-		#endif
-	};
-
-
-	bool PhysicsSystemImpl::create()
-	{
-		m_physx_allocator = LUMIX_NEW(m_allocator, AssertNullAllocator);
-		m_error_callback = LUMIX_NEW(m_allocator, CustomErrorCallback);
-		m_foundation = PxCreateFoundation(
-			PX_PHYSICS_VERSION,
-			*m_physx_allocator,
-			*m_error_callback
-			);
-
-		m_physics = PxCreatePhysics(
-			PX_PHYSICS_VERSION,
-			*m_foundation,
-			physx::PxTolerancesScale()
-			);
-
-		physx::PxTolerancesScale scale;
-		m_cooking = PxCreateCooking(PX_PHYSICS_VERSION, *m_foundation, physx::PxCookingParams(scale));
-		connect2VisualDebugger();
-		return true;
-	}
-
-
-	void PhysicsSystemImpl::destroy()
-	{
-		m_cooking->release();
-		m_physics->release();
-		m_foundation->release();
-		LUMIX_DELETE(m_allocator, m_physx_allocator);
-		LUMIX_DELETE(m_allocator, m_error_callback);
-	}
-
-
-	bool PhysicsSystemImpl::connect2VisualDebugger()
-	{
-		if (m_physics->getPvdConnectionManager() == nullptr) return false;
-
-		const char* pvd_host_ip = "127.0.0.1";
-		int port = 5425;
-		unsigned int timeout = 100;
-		physx::PxVisualDebuggerConnectionFlags connectionFlags = physx::PxVisualDebuggerExt::getAllConnectionFlags();
-
-		auto* theConnection = physx::PxVisualDebuggerExt::createConnection(
-			m_physics->getPvdConnectionManager(), pvd_host_ip, port, timeout, connectionFlags);
-		return theConnection != nullptr;
-	}
-
-
-	void CustomErrorCallback::reportError(physx::PxErrorCode::Enum, const char* message, const char*, int)
-	{
-		g_log_error.log("Physics") << message;
 	}
 
 

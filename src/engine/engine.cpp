@@ -32,6 +32,10 @@ static const uint32 PREFAB_HASH = crc32("prefab");
 static const ComponentType HIERARCHY_TYPE = PropertyRegister::getComponentType("hierarchy");
 
 
+static FS::OsFile g_error_file;
+static bool g_is_error_file_opened = false;
+
+
 enum class SerializedEngineVersion : int32
 {
 	BASE,
@@ -56,6 +60,23 @@ public:
 #pragma pack()
 
 
+static void showLogInVS(const char* system, const char* message)
+{
+	Debug::debugOutput(system);
+	Debug::debugOutput(" : ");
+	Debug::debugOutput(message);
+	Debug::debugOutput("\n");
+}
+
+
+static void logErrorToFile(const char*, const char* message)
+{
+	if (!g_is_error_file_opened) return;
+	g_error_file.write(message, stringLength(message));
+	g_error_file.flush();
+}
+
+
 class EngineImpl : public Engine
 {
 public:
@@ -72,6 +93,17 @@ public:
 		, m_paused(false)
 		, m_next_frame(false)
 	{
+		g_log_info.log("Core") << "Creating engine...";
+		Profiler::setThreadName("Main");
+		installUnhandledExceptionHandler();
+
+		g_is_error_file_opened = g_error_file.open("error.log", FS::Mode::CREATE_AND_WRITE, allocator);
+
+		g_log_error.getCallback().bind<logErrorToFile>();
+		g_log_info.getCallback().bind<showLogInVS>();
+		g_log_warning.getCallback().bind<showLogInVS>();
+		g_log_error.getCallback().bind<showLogInVS>();
+
 		m_platform_data = {};
 		m_state = lua_newstate(luaAllocator, &m_allocator);
 		luaL_openlibs(m_state);
@@ -117,6 +149,15 @@ public:
 		m_fps_timer = Timer::create(m_allocator);
 		m_fps_frame = 0;
 		PropertyRegister::init(m_allocator);
+
+		m_plugin_manager = PluginManager::create(*this);
+		HierarchyPlugin* hierarchy = LUMIX_NEW(m_allocator, HierarchyPlugin)(m_allocator);
+		m_plugin_manager->addPlugin(hierarchy);
+		m_input_system = InputSystem::create(m_allocator);
+
+		registerProperties();
+
+		g_log_info.log("Core") << "Engine created.";
 	}
 
 
@@ -549,29 +590,6 @@ public:
 	}
 
 
-	bool create()
-	{
-		m_plugin_manager = PluginManager::create(*this);
-		if (!m_plugin_manager)
-		{
-			return false;
-		}
-
-		HierarchyPlugin* hierarchy = LUMIX_NEW(m_allocator, HierarchyPlugin)(m_allocator);
-		m_plugin_manager->addPlugin(hierarchy);
-
-		m_input_system = InputSystem::create(m_allocator);
-		if (!m_input_system)
-		{
-			return false;
-		}
-
-		registerProperties();
-
-		return true;
-	}
-
-
 	~EngineImpl()
 	{
 		PropertyRegister::shutdown();
@@ -590,6 +608,8 @@ public:
 		m_resource_manager.destroy();
 		MTJD::Manager::destroy(*m_mtjd_manager);
 		lua_close(m_state);
+
+		g_error_file.close();
 	}
 
 
@@ -1074,59 +1094,18 @@ private:
 };
 
 
-static void showLogInVS(const char* system, const char* message)
-{
-	Debug::debugOutput(system);
-	Debug::debugOutput(" : ");
-	Debug::debugOutput(message);
-	Debug::debugOutput("\n");
-}
-
-
-static FS::OsFile g_error_file;
-static bool g_is_error_file_opened = false;
-
-
-static void logErrorToFile(const char*, const char* message)
-{
-	if (!g_is_error_file_opened) return;
-	g_error_file.write(message, stringLength(message));
-	g_error_file.flush();
-}
-
 Engine* Engine::create(const char* base_path0,
 	const char* base_path1,
 	FS::FileSystem* fs,
 	IAllocator& allocator)
 {
-	g_log_info.log("Core") << "Creating engine...";
-	Profiler::setThreadName("Main");
-	installUnhandledExceptionHandler();
-
-	g_is_error_file_opened = g_error_file.open("error.log", FS::Mode::CREATE_AND_WRITE, allocator);
-
-	g_log_error.getCallback().bind<logErrorToFile>();
-	g_log_info.getCallback().bind<showLogInVS>();
-	g_log_warning.getCallback().bind<showLogInVS>();
-	g_log_error.getCallback().bind<showLogInVS>();
-
-	EngineImpl* engine = LUMIX_NEW(allocator, EngineImpl)(base_path0, base_path1, fs, allocator);
-	if (!engine->create())
-	{
-		g_log_error.log("Core") << "Failed to create engine.";
-		LUMIX_DELETE(allocator, engine);
-		return nullptr;
-	}
-	g_log_info.log("Core") << "Engine created.";
-	return engine;
+	return LUMIX_NEW(allocator, EngineImpl)(base_path0, base_path1, fs, allocator);
 }
 
 
 void Engine::destroy(Engine* engine, IAllocator& allocator)
 {
 	LUMIX_DELETE(allocator, engine);
-
-	g_error_file.close();
 }
 
 
