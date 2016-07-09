@@ -1646,7 +1646,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void getRagdollData(ComponentHandle cmp, OutputBlob& blob) override
 	{
-		serializeRagdollBone(m_ragdolls[{cmp.index}].root, blob);
+		auto& ragdoll = m_ragdolls[{cmp.index}];
+		serializeRagdollBone(ragdoll, ragdoll.root, blob);
 	}
 
 	
@@ -2729,7 +2730,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void serializeRagdollBone(RagdollBone* bone, OutputBlob& serializer)
+	void serializeRagdollBone(const Ragdoll& ragdoll, RagdollBone* bone, OutputBlob& serializer)
 	{
 		if (!bone)
 		{
@@ -2738,6 +2739,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		}
 		serializer.write(bone->pose_bone_idx);
 		physx::PxTransform pose = bone->actor->getGlobalPose();
+		pose = toPhysx(m_universe.getTransform(ragdoll.entity)).getInverse() * pose;
 		serializer.write(fromPhysx(pose));
 		serializer.write(bone->bind_transform);
 
@@ -2761,8 +2763,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		}
 		serializer.write(bone->actor->isRigidBody()->getRigidBodyFlags().isSet(physx::PxRigidBodyFlag::eKINEMATIC));
 
-		serializeRagdollBone(bone->child, serializer);
-		serializeRagdollBone(bone->next, serializer);
+		serializeRagdollBone(ragdoll, bone->child, serializer);
+		serializeRagdollBone(ragdoll, bone->next, serializer);
 
 		serializeRagdollJoint(bone, serializer);
 	}
@@ -2873,7 +2875,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		serializer.read(bone->bind_transform);
 		bone->inv_bind_transform = bone->bind_transform.inverted();
 
-		physx::PxTransform px_transform = toPhysx(transform);
+		physx::PxTransform px_transform = toPhysx(m_universe.getTransform(ragdoll.entity)) * toPhysx(transform);
 
 		RagdollBone::Type type;
 		serializer.read(type);
@@ -2931,7 +2933,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.write(m_ragdolls.getKey(i));
 			const Ragdoll& ragdoll = m_ragdolls.at(i);
 			serializer.write(ragdoll.layer);
-			serializeRagdollBone(ragdoll.root, serializer);
+			serializeRagdollBone(ragdoll, ragdoll.root, serializer);
 		}
 	}
 
