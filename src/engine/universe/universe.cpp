@@ -121,6 +121,7 @@ void Universe::setTransform(Entity entity, const Transform& transform)
 	auto& tmp = m_transformations[m_entity_map[entity.index]];
 	tmp.position = transform.pos;
 	tmp.rotation = transform.rot;
+	entityTransformed().invoke(entity);
 }
 
 
