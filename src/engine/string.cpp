@@ -523,8 +523,9 @@ static bool increment(char* output, char* end, bool is_space_after)
 		while (c >= output)
 		{
 			*(c + 1) = *c;
-			++c;
+			--c;
 		}
+		++c;
 		*c = '1';
 		return true;
 	}
