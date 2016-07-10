@@ -108,7 +108,7 @@ class Terrain
 		void setGrassTypeDistance(int index, float value);
 		void setMaterial(Material* material);
 
-		void getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos, LIFOAllocator& allocator);
+		void getInfos(Array<TerrainInfo>& infos, const Vec3& camera_pos);
 		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentHandle camera);
 
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);

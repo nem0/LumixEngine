@@ -324,9 +324,7 @@ public:
 		Array<GrassInfo>& infos,
 		ComponentHandle camera) = 0;
 	virtual void forceGrassUpdate(ComponentHandle cmp) = 0;
-	virtual void getTerrainInfos(Array<const TerrainInfo*>& infos,
-		const Vec3& camera_pos,
-		LIFOAllocator& allocator) = 0;
+	virtual void getTerrainInfos(Array<TerrainInfo>& infos, const Vec3& camera_pos) = 0;
 	virtual float getTerrainHeightAt(ComponentHandle cmp, float x, float z) = 0;
 	virtual Vec3 getTerrainNormalAt(ComponentHandle cmp, float x, float z) = 0;
 	virtual void setTerrainMaterialPath(ComponentHandle cmp, const Path& path) = 0;
