@@ -26,31 +26,36 @@ namespace Lumix
 			}
 
 
-			void clear()
-			{
-				m_current = m_bucket;
-			}
-
-
 			void* allocate(size_t size) override
 			{
 				uint8* new_address = (uint8*)m_current;
 				ASSERT(new_address + size <= (uint8*)m_bucket + m_bucket_size);
-				m_current = new_address + size;
+				m_current = new_address + size + sizeof(size_t);
+				*(size_t*)(new_address + size) = size;
 				return new_address;
 			}
 
 
-			void deallocate(void*) override
+			void deallocate(void* ptr) override
 			{
-				ASSERT(false);
+				if (!ptr) return;
+				size_t last_size = *(size_t*)((uint8*)m_current - sizeof(size_t));
+				uint8* last_mem = (uint8*)m_current - last_size - sizeof(size_t);
+				ASSERT(last_mem == ptr);
+				m_current = ptr;
 			}
 
 
-			void* reallocate(void*, size_t) override
+			void* reallocate(void* ptr, size_t size) override
 			{
-				ASSERT(false);
-				return nullptr;
+				if (!ptr) return allocate(size);
+
+				size_t last_size = *(size_t*)((uint8*)m_current - sizeof(size_t));
+				uint8* last_mem = (uint8*)m_current - last_size - sizeof(size_t);
+				ASSERT(last_mem == ptr);
+				m_current = last_mem + size + sizeof(size_t);
+				*(size_t*)(last_mem + size) = size;
+				return ptr;
 			}
 
 

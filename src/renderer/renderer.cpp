@@ -673,7 +673,6 @@ struct RendererImpl : public Renderer
 		, m_passes(m_allocator)
 		, m_shader_defines(m_allocator)
 		, m_bgfx_allocator(m_allocator)
-		, m_frame_allocator(m_allocator, 10 * 1024 * 1024)
 		, m_callback_stub(*this)
 	{
 		registerProperties(engine.getAllocator());
@@ -884,12 +883,6 @@ struct RendererImpl : public Renderer
 	}
 
 
-	LIFOAllocator& getFrameAllocator() override
-	{
-		return m_frame_allocator;
-	}
-
-
 	Shader* getDefaultShader() override
 	{
 		return m_default_shader;
@@ -904,7 +897,6 @@ struct RendererImpl : public Renderer
 	Array<ShaderCombinations::Pass> m_passes;
 	Array<ShaderDefine> m_shader_defines;
 	CallbackStub m_callback_stub;
-	LIFOAllocator m_frame_allocator;
 	TextureManager m_texture_manager;
 	MaterialManager m_material_manager;
 	ShaderManager m_shader_manager;

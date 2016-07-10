@@ -308,12 +308,9 @@ public:
 private:
 	void grow()
 	{
-		int newCapacity = m_capacity == 0 ? 4 : m_capacity * 2;
-		T* new_data = (T*)m_allocator.allocate(newCapacity * sizeof(T));
-		copyMemory(new_data, m_data, sizeof(T) * m_size);
-		m_allocator.deallocate(m_data);
-		m_data = new_data;
-		m_capacity = newCapacity;
+		int new_capacity = m_capacity == 0 ? 4 : m_capacity * 2;
+		m_data = (T*)m_allocator.reallocate(m_data, new_capacity * sizeof(T));
+		m_capacity = new_capacity;
 	}
 
 	void callDestructors(T* begin, T* end)

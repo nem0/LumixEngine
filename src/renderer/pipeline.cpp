@@ -245,10 +245,6 @@ struct PipelineImpl : public Pipeline
 		, m_framebuffers(allocator)
 		, m_lua_state(nullptr)
 		, m_custom_commands_handlers(allocator)
-		, m_tmp_terrains(allocator)
-		, m_tmp_grasses(allocator)
-		, m_tmp_meshes(allocator)
-		, m_tmp_local_lights(allocator)
 		, m_uniforms(allocator)
 		, m_renderer(renderer)
 		, m_default_framebuffer(nullptr)
@@ -996,11 +992,11 @@ struct PipelineImpl : public Pipeline
 		auto* material = m_materials[material_index];
 		if (!material->isReady()) return;
 
-		m_tmp_local_lights.clear();
-		m_scene->getPointLights(m_camera_frustum, m_tmp_local_lights);
-		if (m_tmp_local_lights.empty()) return;
+		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
+		Array<ComponentHandle> local_lights(frame_allocator);
+		m_scene->getPointLights(m_camera_frustum, local_lights);
 
-		PROFILE_INT("light count", m_tmp_local_lights.size());
+		PROFILE_INT("light count", local_lights.size());
 		struct Data
 		{
 			Matrix mtx;
@@ -1012,7 +1008,7 @@ struct PipelineImpl : public Pipeline
 		const bgfx::InstanceDataBuffer* instance_buffer[2] = {nullptr, nullptr};
 		Data* instance_data[2] = { nullptr, nullptr };
 		Universe& universe = m_scene->getUniverse();
-		for(auto light_cmp : m_tmp_local_lights)
+		for(auto light_cmp : local_lights)
 		{
 			auto entity = m_scene->getPointLightEntity(light_cmp);
 			float range = m_scene->getLightRange(light_cmp);
@@ -1132,6 +1128,7 @@ struct PipelineImpl : public Pipeline
 		shadowmap_info.m_light = light;
 		//setPointLightUniforms(light);
 
+		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
 		for (int i = 0; i < 4; ++i)
 		{
 			newView("omnilight");
@@ -1178,11 +1175,11 @@ struct PipelineImpl : public Pipeline
 				0.5, 0.0, 0.0, 0.0, 0.0, ymul, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
 			shadowmap_info.m_matrices[i] = biasMatrix * (projection_matrix * view_matrix);
 
-			m_tmp_meshes.clear();
+			Array<RenderableMesh> tmp_meshes(frame_allocator);
 			m_is_current_light_global = false;
-			m_scene->getPointLightInfluencedGeometry(light, frustum, m_tmp_meshes);
+			m_scene->getPointLightInfluencedGeometry(light, frustum, tmp_meshes);
 
-			renderMeshes(m_tmp_meshes);
+			renderMeshes(tmp_meshes);
 		}
 	}
 
@@ -1642,11 +1639,9 @@ struct PipelineImpl : public Pipeline
 	{
 		PROFILE_FUNCTION();
 
-		m_tmp_meshes.clear();
-
-		m_scene->getPointLightInfluencedGeometry(light, m_tmp_meshes);
-
-		renderMeshes(m_tmp_meshes);
+		Array<RenderableMesh> tmp_meshes(m_renderer.getEngine().getLIFOAllocator());
+		m_scene->getPointLightInfluencedGeometry(light, tmp_meshes);
+		renderMeshes(tmp_meshes);
 	}
 
 
@@ -1656,25 +1651,31 @@ struct PipelineImpl : public Pipeline
 
 		Array<ComponentHandle> lights(m_allocator);
 		m_scene->getPointLights(frustum, lights);
+		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
+		m_is_current_light_global = false;
 		for (int i = 0; i < lights.size(); ++i)
 		{
-			m_tmp_grasses.clear();
-			m_tmp_meshes.clear();
-			m_tmp_terrains.clear();
-
 			ComponentHandle light = lights[i];
-			m_is_current_light_global = false;
 			setPointLightUniforms(light);
-			m_scene->getPointLightInfluencedGeometry(light, frustum, m_tmp_meshes);
 
-			m_scene->getTerrainInfos(m_tmp_terrains,
-				m_scene->getUniverse().getPosition(m_scene->getCameraEntity(m_applied_camera)),
-				m_renderer.getFrameAllocator());
+			{
+				Array<RenderableMesh> tmp_meshes(frame_allocator);
+				m_scene->getPointLightInfluencedGeometry(light, frustum, tmp_meshes);
+				renderMeshes(tmp_meshes);
+			}
 
-			m_scene->getGrassInfos(frustum, m_tmp_grasses, m_applied_camera);
-			renderMeshes(m_tmp_meshes);
-			renderTerrains(m_tmp_terrains);
-			renderGrasses(m_tmp_grasses);
+			{
+				Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
+				Array<TerrainInfo> tmp_terrains(frame_allocator);
+				m_scene->getTerrainInfos(tmp_terrains, m_scene->getUniverse().getPosition(camera_entity));
+				renderTerrains(tmp_terrains);
+			}
+
+			{
+				Array<GrassInfo> tmp_grasses(frame_allocator);
+				m_scene->getGrassInfos(frustum, tmp_grasses, m_applied_camera);
+				renderGrasses(tmp_grasses);
+			}
 		}
 	}
 
@@ -1832,24 +1833,26 @@ struct PipelineImpl : public Pipeline
 
 		if (!isValid(m_applied_camera)) return;
 
-		m_tmp_grasses.clear();
-		m_tmp_terrains.clear();
+		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
+		m_is_current_light_global = true;
 
 		auto& meshes = m_scene->getRenderableInfos(frustum, lod_ref_point);
-		Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
-		Vec3 camera_pos = m_scene->getUniverse().getPosition(camera_entity);
-		LIFOAllocator& frame_allocator = m_renderer.getFrameAllocator();
-		m_scene->getTerrainInfos(m_tmp_terrains, camera_pos, frame_allocator);
-
-		m_is_current_light_global = true;
+		renderMeshes(meshes);
 
 		if (render_grass)
 		{
-			m_scene->getGrassInfos(frustum, m_tmp_grasses, m_applied_camera);
-			renderGrasses(m_tmp_grasses);
+			Array<GrassInfo> tmp_grasses(frame_allocator);
+			m_scene->getGrassInfos(frustum, tmp_grasses, m_applied_camera);
+			renderGrasses(tmp_grasses);
 		}
-		renderTerrains(m_tmp_terrains);
-		renderMeshes(meshes);
+
+		{
+			Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
+			Vec3 camera_pos = m_scene->getUniverse().getPosition(camera_entity);
+			Array<TerrainInfo> tmp_terrains(frame_allocator);
+			m_scene->getTerrainInfos(tmp_terrains, camera_pos);
+			renderTerrains(tmp_terrains);
+		}
 	}
 
 
@@ -2217,13 +2220,13 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderTerrains(const Array<const TerrainInfo*>& terrains)
+	void renderTerrains(const Array<TerrainInfo>& terrains)
 	{
 		PROFILE_FUNCTION();
 		PROFILE_INT("terrain patches", terrains.size());
-		for (auto* info : terrains)
+		for (const auto& info : terrains)
 		{
-			renderTerrain(*info);
+			renderTerrain(info);
 		}
 		for (int i = 0; i < lengthOf(m_terrain_instances); ++i)
 		{
@@ -2349,8 +2352,6 @@ struct PipelineImpl : public Pipeline
 			lua_pop(m_lua_state, 1);
 		}
 		finishInstances();
-
-		m_renderer.getFrameAllocator().clear();
 	}
 
 
@@ -2549,10 +2550,6 @@ struct PipelineImpl : public Pipeline
 	bgfx::VertexBufferHandle m_particle_vertex_buffer;
 	bgfx::IndexBufferHandle m_particle_index_buffer;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
-	Array<RenderableMesh> m_tmp_meshes;
-	Array<const TerrainInfo*> m_tmp_terrains;
-	Array<GrassInfo> m_tmp_grasses;
-	Array<ComponentHandle> m_tmp_local_lights;
 
 	bgfx::UniformHandle m_bone_matrices_uniform;
 	bgfx::UniformHandle m_layer_uniform;

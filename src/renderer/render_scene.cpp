@@ -2013,15 +2013,13 @@ public:
 	void forceGrassUpdate(ComponentHandle cmp) override { m_terrains[{cmp.index}]->forceGrassUpdate(); }
 
 
-	void getTerrainInfos(Array<const TerrainInfo*>& infos,
-		const Vec3& camera_pos,
-		LIFOAllocator& frame_allocator) override
+	void getTerrainInfos(Array<TerrainInfo>& infos, const Vec3& camera_pos) override
 	{
 		PROFILE_FUNCTION();
 		infos.reserve(m_terrains.size());
 		for (auto* terrain : m_terrains)
 		{
-			terrain->getInfos(infos, camera_pos, frame_allocator);
+			terrain->getInfos(infos, camera_pos);
 		}
 	}
 
@@ -2437,8 +2435,7 @@ public:
 	}
 
 
-	Array<Array<RenderableMesh>>& getRenderableInfos(const Frustum& frustum,
-		const Vec3& lod_ref_point) override
+	Array<Array<RenderableMesh>>& getRenderableInfos(const Frustum& frustum, const Vec3& lod_ref_point) override
 	{
 		PROFILE_FUNCTION();
 

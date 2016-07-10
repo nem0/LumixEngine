@@ -137,11 +137,7 @@ struct TerrainQuad
 		return (size > 17 ? 2.25f : 1.25f) * Math::SQRT2 * size;
 	}
 
-	bool getInfos(Array<const TerrainInfo*>& infos,
-		const Vec3& camera_pos,
-		Terrain* terrain,
-		const Matrix& world_matrix,
-		LIFOAllocator& allocator)
+	bool getInfos(Array<TerrainInfo>& infos, const Vec3& camera_pos, Terrain* terrain, const Matrix& world_matrix)
 	{
 		float squared_dist = getSquaredDistance(camera_pos);
 		float r = getRadiusOuter(m_size);
@@ -151,18 +147,16 @@ struct TerrainQuad
 		Shader& shader = *terrain->getMesh()->material->getShader();
 		for (int i = 0; i < CHILD_COUNT; ++i)
 		{
-			if (!m_children[i] ||
-				!m_children[i]->getInfos(infos, camera_pos, terrain, world_matrix, allocator))
+			if (!m_children[i] || !m_children[i]->getInfos(infos, camera_pos, terrain, world_matrix))
 			{
-				TerrainInfo* data = (TerrainInfo*)allocator.allocate(sizeof(TerrainInfo));
-				data->m_morph_const = morph_const;
-				data->m_index = i;
-				data->m_terrain = terrain;
-				data->m_size = m_size;
-				data->m_min = m_min;
-				data->m_shader = &shader;
-				data->m_world_matrix = world_matrix;
-				infos.push(data);
+				TerrainInfo& data = infos.emplace();
+				data.m_morph_const = morph_const;
+				data.m_index = i;
+				data.m_terrain = terrain;
+				data.m_size = m_size;
+				data.m_min = m_min;
+				data.m_shader = &shader;
+				data.m_world_matrix = world_matrix;
 			}
 		}
 		return true;
@@ -673,7 +667,7 @@ void Terrain::serialize(OutputBlob& serializer)
 }
 
 
-void Terrain::getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos, LIFOAllocator& allocator)
+void Terrain::getInfos(Array<TerrainInfo>& infos, const Vec3& camera_pos)
 {
 	if (!m_root) return;
 	if (!m_material || !m_material->isReady()) return;
@@ -684,7 +678,7 @@ void Terrain::getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos,
 	Vec3 local_camera_pos = inv_matrix.transform(camera_pos);
 	local_camera_pos.x /= m_scale.x;
 	local_camera_pos.z /= m_scale.z;
-	m_root->getInfos(infos, local_camera_pos, this, matrix, allocator);
+	m_root->getInfos(infos, local_camera_pos, this, matrix);
 }
 
 

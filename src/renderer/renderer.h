@@ -36,7 +36,6 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual const char* getPassName(int idx) = 0;
 		virtual uint8 getShaderDefineIdx(const char* define) = 0;
 		virtual const char* getShaderDefine(int define_idx) = 0;
-		virtual LIFOAllocator& getFrameAllocator() = 0;
 		virtual const bgfx::VertexDecl& getBasicVertexDecl() const = 0;
 		virtual const bgfx::VertexDecl& getBasic2DVertexDecl() const = 0;
 		virtual MaterialManager& getMaterialManager() = 0;

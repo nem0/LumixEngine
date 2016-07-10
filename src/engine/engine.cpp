@@ -1,25 +1,26 @@
 #include "engine/engine.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
-#include "engine/fs/os_file.h"
-#include "engine/input_system.h"
-#include "engine/log.h"
-#include "engine/lua_wrapper.h"
-#include "engine/math_utils.h"
-#include "engine/path.h"
-#include "engine/profiler.h"
-#include "engine/resource_manager.h"
-#include "engine/timer.h"
+#include "engine/debug/debug.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/memory_file_device.h"
-#include "engine/mtjd/manager.h"
-#include "engine/debug/debug.h"
+#include "engine/fs/os_file.h"
+#include "engine/input_system.h"
 #include "engine/iplugin.h"
+#include "engine/lifo_allocator.h"
+#include "engine/log.h"
+#include "engine/lua_wrapper.h"
+#include "engine/math_utils.h"
+#include "engine/mtjd/manager.h"
+#include "engine/path.h"
+#include "engine/plugin_manager.h"
 #include "engine/prefab.h"
+#include "engine/profiler.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
-#include "engine/plugin_manager.h"
+#include "engine/resource_manager.h"
+#include "engine/timer.h"
 #include "engine/universe/hierarchy.h"
 #include "engine/universe/universe.h"
 
@@ -92,6 +93,7 @@ public:
 		, m_time_multiplier(1.0f)
 		, m_paused(false)
 		, m_next_frame(false)
+		, m_lifo_allocator(m_allocator, 10 * 1024 * 1024)
 	{
 		g_log_info.log("Core") << "Creating engine...";
 		Profiler::setThreadName("Main");
@@ -1026,7 +1028,7 @@ public:
 			return 0;
 		}
 		InputBlob blob(prefab->blob.getData(), prefab->blob.getPos());
-		Array<Entity> entities(engine->m_allocator);
+		Array<Entity> entities(engine->m_lifo_allocator);
 		engine->pasteEntities(position, *universe, blob, entities);
 
 		lua_createtable(L, entities.size(), 0);
@@ -1036,6 +1038,12 @@ public:
 			lua_rawseti(L, -2, i + 1);
 		}
 		return 1;
+	}
+
+
+	IAllocator& getLIFOAllocator() override
+	{
+		return m_lifo_allocator;
 	}
 
 
@@ -1062,6 +1070,7 @@ public:
 
 private:
 	Debug::Allocator m_allocator;
+	LIFOAllocator m_lifo_allocator;
 
 	FS::FileSystem* m_file_system;
 	FS::MemoryFileDevice* m_mem_file_device;
