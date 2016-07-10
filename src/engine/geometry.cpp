@@ -36,6 +36,11 @@ void Frustum::computeOrtho(const Vec3& position,
 	float z_diff = far_distance - near_distance;
 	radius = std::sqrt(4 * width * width + 4 * height * height + z_diff * z_diff) * 0.5f;
 	this->position = position;
+	this->fov = -1;
+	this->direction = direction;
+	this->up = up;
+	this->near_distance = near_distance;
+	this->far_distance = far_distance;
 }
 
 
