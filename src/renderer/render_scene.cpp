@@ -2946,17 +2946,66 @@ public:
 	}
 
 
+	void addDebugOrthoFrustum(const Frustum& frustum, uint32 color, float life)
+	{
+		Vec3 near_center = frustum.position - frustum.direction * frustum.near_distance;
+		Vec3 far_center = frustum.position - frustum.direction * frustum.far_distance;
+
+		float width = Math::abs(
+			frustum.planes[(int)Frustum::Sides::LEFT_PLANE].d + frustum.planes[(int)Frustum::Sides::RIGHT_PLANE].d);
+		float height = Math::abs(
+			frustum.planes[(int)Frustum::Sides::TOP_PLANE].d + frustum.planes[(int)Frustum::Sides::BOTTOM_PLANE].d);
+
+		Vec3 up = frustum.up.normalized() * height * 0.5f;
+		Vec3 right = crossProduct(frustum.direction, frustum.up) * width * 0.5f;
+
+		Vec3 points[8];
+
+		points[0] = near_center + up + right;
+		points[1] = near_center + up - right;
+		points[2] = near_center - up - right;
+		points[3] = near_center - up + right;
+
+		points[4] = far_center + up + right;
+		points[5] = far_center + up - right;
+		points[6] = far_center - up - right;
+		points[7] = far_center - up + right;
+
+		addDebugLine(points[0], points[1], color, life);
+		addDebugLine(points[1], points[2], color, life);
+		addDebugLine(points[2], points[3], color, life);
+		addDebugLine(points[3], points[0], color, life);
+
+		addDebugLine(points[4], points[5], color, life);
+		addDebugLine(points[5], points[6], color, life);
+		addDebugLine(points[6], points[7], color, life);
+		addDebugLine(points[7], points[4], color, life);
+
+		addDebugLine(points[0], points[4], color, life);
+		addDebugLine(points[1], points[5], color, life);
+		addDebugLine(points[2], points[6], color, life);
+		addDebugLine(points[3], points[7], color, life);
+	}
+
+
 	void addDebugFrustum(const Frustum& frustum, uint32 color, float life) override
 	{
-		addDebugFrustum(frustum.position,
-						frustum.direction,
-						frustum.up,
-						frustum.fov,
-						frustum.ratio,
-						frustum.near_distance,
-						frustum.far_distance,
-						color,
-						life);
+		if (frustum.fov < 0)
+		{
+			addDebugOrthoFrustum(frustum, color, life);
+		}
+		else
+		{
+			addDebugFrustum(frustum.position,
+				frustum.direction,
+				frustum.up,
+				frustum.fov,
+				frustum.ratio,
+				frustum.near_distance,
+				frustum.far_distance,
+				color,
+				life);
+		}
 	}
 
 
