@@ -416,7 +416,7 @@ namespace Lumix
 					uint32 hash;
 					blob.read(hash);
 					int prop_index = scr->getProperty(inst, hash);
-					if (prop_index >= 0)
+					if (prop_index < 0)
 					{
 						scr->m_scripts[idx].m_properties.emplace(m_system.m_allocator);
 						prop_index = scr->m_scripts[idx].m_properties.size() - 1;
