@@ -103,13 +103,13 @@ namespace Lumix
 			}
 
 
-			static Property* getProperty(ScriptInstance& inst, uint32 hash)
+			static int getProperty(ScriptInstance& inst, uint32 hash)
 			{
-				for(auto& i : inst.m_properties)
+				for(int i = 0, c = inst.m_properties.size(); i < c; ++i)
 				{
-					if(i.name_hash == hash) return &i;
+					if (inst.m_properties[i].name_hash == hash) return i;
 				}
-				return nullptr;
+				return -1;
 			}
 
 
@@ -122,6 +122,10 @@ namespace Lumix
 				ASSERT(is_env_valid);
 				lua_pushnil(L);
 				auto& allocator = m_scene.m_system.m_allocator;
+				BinaryArray valid_properties(m_scene.m_system.m_engine.getLIFOAllocator());
+				valid_properties.resize(inst.m_properties.size());
+				setMemory(valid_properties.getRaw(), 0, valid_properties.size() >> 3);
+
 				while (lua_next(L, -2))
 				{
 					if (lua_type(L, -1) != LUA_TFUNCTION)
@@ -131,18 +135,20 @@ namespace Lumix
 						m_scene.m_property_names.insert(hash, string(name, allocator));
 						if (hash != INDEX_HASH && hash != THIS_HASH)
 						{
-							auto* existing_prop = getProperty(inst, hash);
-							if (existing_prop)
+							int prop_index = getProperty(inst, hash);
+							if (prop_index >= 0)
 							{
-								if (existing_prop->type == Property::ANY)
+								valid_properties[prop_index] = true;
+								Property& existing_prop = inst.m_properties[prop_index];
+								if (existing_prop.type == Property::ANY)
 								{
 									switch (lua_type(inst.m_state, -1))
 									{
-										case LUA_TBOOLEAN: existing_prop->type = Property::BOOLEAN; break;
-										default: existing_prop->type = Property::FLOAT;
+										case LUA_TBOOLEAN: existing_prop.type = Property::BOOLEAN; break;
+										default: existing_prop.type = Property::FLOAT;
 									}
 								}
-								m_scene.applyProperty(inst, *existing_prop, existing_prop->stored_value.c_str());
+								m_scene.applyProperty(inst, existing_prop, existing_prop.stored_value.c_str());
 							}
 							else
 							{
@@ -157,6 +163,11 @@ namespace Lumix
 						}
 					}
 					lua_pop(L, 1);
+				}
+				for (int i = inst.m_properties.size() - 1; i >= 0; --i)
+				{
+					if (valid_properties[i]) continue;
+					inst.m_properties.eraseFast(i);
 				}
 			}
 
@@ -404,14 +415,19 @@ namespace Lumix
 				{
 					uint32 hash;
 					blob.read(hash);
-					auto* prop = scr->getProperty(inst, hash);
-					if(!prop) prop = &scr->m_scripts[idx].m_properties.emplace(m_system.m_allocator);
-					prop->name_hash = hash;
-					blob.read(prop->type);
+					int prop_index = scr->getProperty(inst, hash);
+					if (prop_index >= 0)
+					{
+						scr->m_scripts[idx].m_properties.emplace(m_system.m_allocator);
+						prop_index = scr->m_scripts[idx].m_properties.size() - 1;
+					}
+					auto& prop = scr->m_scripts[idx].m_properties[prop_index];
+					prop.name_hash = hash;
+					blob.read(prop.type);
 					char tmp[1024];
 					blob.readString(tmp, lengthOf(tmp));
-					prop->stored_value = tmp;
-					if (scr->m_scripts[idx].m_state) applyProperty(scr->m_scripts[idx], *prop, tmp);
+					prop.stored_value = tmp;
+					if (scr->m_scripts[idx].m_state) applyProperty(scr->m_scripts[idx], prop, tmp);
 				}
 			}
 		}
