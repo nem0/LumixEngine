@@ -146,7 +146,6 @@ struct NavigationSceneImpl : public NavigationScene
 	{
 		m_universe.entityTransformed().unbind<NavigationSceneImpl, &NavigationSceneImpl::onEntityMoved>(this);
 		clear();
-		for (auto* agent : m_agents) LUMIX_DELETE(m_allocator, agent);
 		m_agents.clear();
 	}
 
@@ -154,13 +153,13 @@ struct NavigationSceneImpl : public NavigationScene
 	void onEntityMoved(Entity entity)
 	{
 		auto iter = m_agents.find(entity);
-		if (m_agents.end() == iter) return;
-		if (iter.value()->agent < 0) return;
+		if (!iter.isValid()) return;
+		if (iter.value().agent < 0) return;
 		Vec3 pos = m_universe.getPosition(iter.key());
-		const dtCrowdAgent* dt_agent = m_crowd->getAgent(iter.value()->agent);
+		const dtCrowdAgent* dt_agent = m_crowd->getAgent(iter.value().agent);
 		if ((pos - *(Vec3*)dt_agent->npos).squaredLength() > 0.1f)
 		{
-			m_crowd->removeAgent(iter.value()->agent);
+			m_crowd->removeAgent(iter.value().agent);
 			addCrowdAgent(iter.value());
 		}
 	}
@@ -335,11 +334,11 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
-	void onPathFinished(Agent* agent)
+	void onPathFinished(const Agent& agent)
 	{
 		if (!m_script_scene) return;
 		
-		auto cmp = m_script_scene->getComponent(agent->entity);
+		auto cmp = m_script_scene->getComponent(agent.entity);
 		if (cmp == INVALID_COMPONENT) return;
 
 		for (int i = 0, c = m_script_scene->getScriptCount(cmp); i < c; ++i)
@@ -358,10 +357,10 @@ struct NavigationSceneImpl : public NavigationScene
 		if (!m_crowd) return;
 		m_crowd->update(time_delta, nullptr);
 
-		for (auto* agent : m_agents)
+		for (auto& agent : m_agents)
 		{
-			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent->agent);
-			m_universe.setPosition(agent->entity, *(Vec3*)dt_agent->npos);
+			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
+			m_universe.setPosition(agent.entity, *(Vec3*)dt_agent->npos);
 			Vec3 velocity = *(Vec3*)dt_agent->vel;
 			float speed = velocity.length();
 			if (speed > 0)
@@ -369,21 +368,21 @@ struct NavigationSceneImpl : public NavigationScene
 				velocity *= 1 / speed;
 				float yaw = atan2(velocity.x, velocity.z);
 				Quat rot(Vec3(0, 1, 0), yaw);
-				m_universe.setRotation(agent->entity, rot);
+				m_universe.setRotation(agent.entity, rot);
 			}
 
 			if (dt_agent->ncorners == 0)
 			{
-				if (!agent->is_finished)
+				if (!agent.is_finished)
 				{
-					m_crowd->resetMoveTarget(agent->agent);
-					agent->is_finished = true;
+					m_crowd->resetMoveTarget(agent.agent);
+					agent.is_finished = true;
 					onPathFinished(agent);
 				}
 			}
 			else
 			{
-				agent->is_finished = false;
+				agent.is_finished = false;
 			}
 		}
 	}
@@ -397,9 +396,9 @@ struct NavigationSceneImpl : public NavigationScene
 
 		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return;
-		Agent* agent = iter.value();
+		const Agent& agent = iter.value();
 
-		const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent->agent);
+		const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
 		const dtPolyRef* path = dt_agent->corridor.getPath();
 		const int npath = dt_agent->corridor.getPathCount();
 		for (int j = 0; j < npath; ++j)
@@ -660,10 +659,10 @@ struct NavigationSceneImpl : public NavigationScene
 	{
 		if (m_crowd)
 		{
-			for (auto* agent : m_agents)
+			for (Agent& agent : m_agents)
 			{
-				m_crowd->removeAgent(agent->agent);
-				agent->agent = -1;
+				m_crowd->removeAgent(agent.agent);
+				agent.agent = -1;
 			}
 			dtFreeCrowd(m_crowd);
 			m_crowd = nullptr;
@@ -693,7 +692,7 @@ struct NavigationSceneImpl : public NavigationScene
 		}
 		for (auto iter = m_agents.begin(), end = m_agents.end(); iter != end; ++iter)
 		{
-			Agent* agent = iter.value();
+			Agent& agent = iter.value();
 			addCrowdAgent(agent);
 		}
 
@@ -708,7 +707,7 @@ struct NavigationSceneImpl : public NavigationScene
 		if (entity == INVALID_ENTITY) return false;
 		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return false;
-		Agent& agent = *iter.value();
+		Agent& agent = iter.value();
 		dtPolyRef end_poly_ref;
 		dtQueryFilter filter;
 		static const float ext[] = { 1.0f, 2.0f, 1.0f };
@@ -1019,20 +1018,20 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
-	void addCrowdAgent(Agent* agent)
+	void addCrowdAgent(Agent& agent)
 	{
 		ASSERT(m_crowd);
 
-		Vec3 pos = m_universe.getPosition(agent->entity);
+		Vec3 pos = m_universe.getPosition(agent.entity);
 		dtCrowdAgentParams params = {};
-		params.radius = agent->radius;
-		params.height = agent->height;
+		params.radius = agent.radius;
+		params.height = agent.height;
 		params.maxAcceleration = 10.0f;
 		params.maxSpeed = 10.0f;
 		params.collisionQueryRange = params.radius * 12.0f;
 		params.pathOptimizationRange = params.radius * 30.0f;
 		params.updateFlags = DT_CROWD_ANTICIPATE_TURNS | DT_CROWD_SEPARATION | DT_CROWD_OBSTACLE_AVOIDANCE | DT_CROWD_OPTIMIZE_TOPO | DT_CROWD_OPTIMIZE_VIS;
-		agent->agent = m_crowd->addAgent(&pos.x, &params);
+		agent.agent = m_crowd->addAgent(&pos.x, &params);
 	}
 
 
@@ -1040,12 +1039,12 @@ struct NavigationSceneImpl : public NavigationScene
 	{
 		if (type == NAVMESH_AGENT_TYPE)
 		{
-			Agent* agent = LUMIX_NEW(m_allocator, Agent);
-			agent->entity = entity;
-			agent->radius = 0.5f;
-			agent->height = 2.0f;
-			agent->agent = -1;
-			agent->is_finished = true;
+			Agent agent;
+			agent.entity = entity;
+			agent.radius = 0.5f;
+			agent.height = 2.0f;
+			agent.agent = -1;
+			agent.is_finished = true;
 			if (m_crowd) addCrowdAgent(agent);
 			m_agents.insert(entity, agent);
 			ComponentHandle cmp = {entity.index};
@@ -1062,9 +1061,8 @@ struct NavigationSceneImpl : public NavigationScene
 		{
 			Entity entity = { component.index };
 			auto iter = m_agents.find(entity);
-			Agent* agent = iter.value();
-			if (m_crowd && agent->agent >= 0) m_crowd->removeAgent(agent->agent);
-			LUMIX_DELETE(m_allocator, iter.value());
+			const Agent& agent = iter.value();
+			if (m_crowd && agent.agent >= 0) m_crowd->removeAgent(agent.agent);
 			m_agents.erase(iter);
 			m_universe.destroyComponent(entity, type, this, component);
 		}
@@ -1082,15 +1080,14 @@ struct NavigationSceneImpl : public NavigationScene
 		for (auto iter = m_agents.begin(), end = m_agents.end(); iter != end; ++iter)
 		{
 			serializer.write(iter.key());
-			serializer.write(iter.value()->radius);
-			serializer.write(iter.value()->height);
+			serializer.write(iter.value().radius);
+			serializer.write(iter.value().height);
 		}
 	}
 
 
 	void deserialize(InputBlob& serializer, int version) override
 	{
-		for (auto* agent : m_agents) LUMIX_DELETE(m_allocator, agent);
 		m_agents.clear();
 		if (version > (int)Version::AGENTS)
 		{
@@ -1098,14 +1095,14 @@ struct NavigationSceneImpl : public NavigationScene
 			serializer.read(count);
 			for (int i = 0; i < count; ++i)
 			{
-				Agent* agent = LUMIX_NEW(m_allocator, Agent);
-				serializer.read(agent->entity);
-				serializer.read(agent->radius);
-				serializer.read(agent->height);
-				agent->agent = -1;
-				m_agents.insert(agent->entity, agent);
-				ComponentHandle cmp = {agent->entity.index};
-				m_universe.addComponent(agent->entity, NAVMESH_AGENT_TYPE, this, cmp);
+				Agent agent;
+				serializer.read(agent.entity);
+				serializer.read(agent.radius);
+				serializer.read(agent.height);
+				agent.agent = -1;
+				m_agents.insert(agent.entity, agent);
+				ComponentHandle cmp = {agent.entity.index};
+				m_universe.addComponent(agent.entity, NAVMESH_AGENT_TYPE, this, cmp);
 			}
 		}
 	}
@@ -1114,28 +1111,28 @@ struct NavigationSceneImpl : public NavigationScene
 	void setAgentRadius(ComponentHandle cmp, float radius)
 	{
 		Entity entity = {cmp.index};
-		m_agents[entity]->radius = radius;
+		m_agents[entity].radius = radius;
 	}
 
 
 	float getAgentRadius(ComponentHandle cmp)
 	{
 		Entity entity = { cmp.index };
-		return m_agents[entity]->radius;
+		return m_agents[entity].radius;
 	}
 
 
 	void setAgentHeight(ComponentHandle cmp, float height)
 	{
 		Entity entity = { cmp.index };
-		m_agents[entity]->height = height;
+		m_agents[entity].height = height;
 	}
 
 
 	float getAgentHeight(ComponentHandle cmp)
 	{
 		Entity entity = {cmp.index};
-		return m_agents[entity]->height;
+		return m_agents[entity].height;
 	}
 
 
@@ -1155,7 +1152,7 @@ struct NavigationSceneImpl : public NavigationScene
 	dtNavMesh* m_navmesh;
 	dtNavMeshQuery* m_navquery;
 	rcPolyMeshDetail* m_detail_mesh;
-	HashMap<Entity, Agent*> m_agents;
+	HashMap<Entity, Agent> m_agents;
 	rcCompactHeightfield* m_debug_compact_heightfield;
 	rcHeightfield* m_debug_heightfield;
 	rcContourSet* m_debug_contours;
