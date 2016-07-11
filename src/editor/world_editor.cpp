@@ -599,8 +599,8 @@ public:
 		m_component.scene = m_editor.getSceneByComponentType(m_component.type);
 		uint32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
-		m_descriptor = static_cast<const IArrayDescriptor*>(
-			PropertyRegister::getDescriptor(m_component.type, property_name_hash));
+		m_descriptor =
+			static_cast<const IArrayDescriptor*>(PropertyRegister::getDescriptor(m_component.type, property_name_hash));
 	}
 
 
@@ -617,8 +617,7 @@ public:
 		InputBlob old_values(m_old_values.getData(), m_old_values.getPos());
 		for (int i = 0, c = m_descriptor->getChildren().size(); i < c; ++i)
 		{
-			m_descriptor->getChildren()[i]->set(
-				m_component, m_index, old_values);
+			m_descriptor->getChildren()[i]->set(m_component, m_index, old_values);
 		}
 	}
 

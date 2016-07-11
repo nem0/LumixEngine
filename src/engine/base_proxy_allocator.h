@@ -40,6 +40,8 @@ public:
 
 	void* reallocate_aligned(void* ptr, size_t size, size_t align) override
 	{
+		if (!ptr) MT::atomicIncrement(&m_allocation_count);
+		if (size == 0) MT::atomicDecrement(&m_allocation_count);
 		return m_source.reallocate_aligned(ptr, size, align);
 	}
 
@@ -61,6 +63,8 @@ public:
 
 	void* reallocate(void* ptr, size_t size) override
 	{
+		if (!ptr) MT::atomicIncrement(&m_allocation_count);
+		if (size == 0) MT::atomicDecrement(&m_allocation_count);
 		return m_source.reallocate(ptr, size);
 	}
 
