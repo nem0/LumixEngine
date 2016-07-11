@@ -107,7 +107,6 @@ Allocator::Allocator(IAllocator& source)
 	: m_source(source)
 	, m_root(nullptr)
 	, m_mutex(false)
-	, m_stack_tree(LUMIX_NEW(m_source, Debug::StackTree))
 	, m_total_size(0)
 	, m_is_fill_enabled(true)
 	, m_are_guards_enabled(true)
@@ -138,12 +137,11 @@ Allocator::~Allocator()
 			char tmp[2048];
 			sprintf(tmp, "\nAllocation size : %zu, memory %p\n", info->m_size, info + sizeof(info));
 			debugOutput(tmp);
-			m_stack_tree->printCallstack(info->m_stack_leaf);
+			m_stack_tree.printCallstack(info->m_stack_leaf);
 			info = info->m_next;
 		}
 		ASSERT(false);
 	}
-	LUMIX_DELETE(m_source, m_stack_tree);
 }
 
 
@@ -286,7 +284,7 @@ void* Allocator::allocate(size_t size)
 	} // because of the SpinLock
 
 	void* user_ptr = getUserFromSystem(system_ptr);
-	info->m_stack_leaf = m_stack_tree->record();
+	info->m_stack_leaf = m_stack_tree.record();
 	info->m_size = size;
 	if (m_is_fill_enabled)
 	{
