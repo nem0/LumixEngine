@@ -356,6 +356,12 @@ struct GizmoImpl : public Gizmo
 	}
 
 
+	void clearEntities() override
+	{
+		m_count = 0;
+	}
+
+
 	bool isActive() const override
 	{
 		return m_active >= 0;

@@ -39,6 +39,7 @@ class LUMIX_EDITOR_API Gizmo
 		virtual void setPivotOrigin() = 0;
 		virtual bool isPivotCenter() const = 0;
 		virtual bool isPivotOrigin() const = 0;
+		virtual void clearEntities() = 0;
 
 };
 
