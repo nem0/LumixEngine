@@ -749,6 +749,20 @@ namespace Lumix
 		}
 
 
+
+		void cancelTimer(int timer_func)
+		{
+			for (int i = 0, c = m_timers.size(); i < c; ++i)
+			{
+				if (m_timers[i].func == timer_func)
+				{
+					m_timers.eraseFast(i);
+					break;
+				}
+			}
+		}
+
+
 		static int setTimer(lua_State* L)
 		{
 			auto* scene = LuaWrapper::checkArg<LuaScriptSceneImpl*>(L, 1);
@@ -760,7 +774,8 @@ namespace Lumix
 			lua_pushvalue(L, 3);
 			timer.func = luaL_ref(L, LUA_REGISTRYINDEX);
 			lua_pop(L, 1);
-			return 0;
+			LuaWrapper::pushLua(L, timer.func);
+			return 1;
 		}
 
 
@@ -811,6 +826,7 @@ namespace Lumix
 			REGISTER_FUNCTION(setScriptSource);
 			REGISTER_FUNCTION(preloadScript);
 			REGISTER_FUNCTION(unloadScript);
+			REGISTER_FUNCTION(cancelTimer);
 
 			#undef REGISTER_FUNCTION
 
