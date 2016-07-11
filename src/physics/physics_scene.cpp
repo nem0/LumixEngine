@@ -1846,19 +1846,22 @@ struct PhysicsSceneImpl : public PhysicsScene
 	Transform getNewBoneTransform(const Model* model, int bone_idx, float& length)
 	{
 		auto& bone = model->getBone(bone_idx);
-		auto& parent_bone = bone.parent_idx >= 0 ? model->getBone(bone.parent_idx) : bone;
-		Matrix mtx = Matrix::IDENTITY;
-		Vec3 dir = parent_bone.transform.pos - bone.transform.pos;
-		length = dir.length();
-		if (length > 0.001f)
+
+		length = 0.1f;
+		for (int i = 0; i < model->getBoneCount(); ++i)
 		{
-			mtx.setXVector(dir.normalized());
-			Vec3 y = Vec3(-dir.y, dir.x, 0);
-			if (y.squaredLength() < 0.001f)	y.set(dir.z, 0, -dir.x);
-			mtx.setYVector(y.normalized());
-			mtx.setZVector(crossProduct(dir, y).normalized());
+			if (model->getBone(i).parent_idx == bone_idx)
+			{
+				length = (bone.transform.pos - model->getBone(i).transform.pos).length();
+				break;
+			}
 		}
-		mtx.setTranslation((bone.transform.pos + parent_bone.transform.pos) * 0.5f);
+
+		Matrix mtx = bone.transform.toMatrix();
+		Vec3 x = mtx.getXVector();
+		mtx.setXVector(-mtx.getYVector());
+		mtx.setYVector(x);
+		mtx.setTranslation(mtx.getTranslation() - mtx.getXVector() * length * 0.5f);
 		return mtx.toTransform();
 	}
 
