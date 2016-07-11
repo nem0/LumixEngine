@@ -22,8 +22,6 @@ namespace Lumix
 	public:
 		explicit HierarchyPlugin(IAllocator& allocator) : m_allocator(allocator) {}
 
-		bool create() override { return true; }
-		void destroy() override {}
 		const char* getName() const override { return "hierarchy"; }
 
 		IScene* createScene(Universe&) override;

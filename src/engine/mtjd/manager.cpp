@@ -36,9 +36,9 @@ struct ManagerImpl : public Manager
 		m_worker_tasks.reserve(threads_num);
 		for (uint32 i = 0; i < threads_num; ++i)
 		{
-			m_worker_tasks.push(LUMIX_NEW(m_allocator, WorkerTask)(m_allocator));
-			m_worker_tasks[i]->create("MTJD::WorkerTask", this, &m_trans_queue);
-			m_worker_tasks[i]->setAffinityMask(getAffinityMask(i));
+			auto& task = m_worker_tasks.emplace(m_allocator);
+			task.create("MTJD::WorkerTask", this, &m_trans_queue);
+			task.setAffinityMask(getAffinityMask(i));
 		}
 
 #endif
@@ -54,10 +54,9 @@ struct ManagerImpl : public Manager
 			m_trans_queue.abort();
 		}
 
-		for (uint32 i = 0; i < threads_num; ++i)
+		for (auto& task : m_worker_tasks)
 		{
-			m_worker_tasks[i]->destroy();
-			LUMIX_DELETE(m_allocator, m_worker_tasks[i]);
+			task.destroy();
 		}
 
 		m_scheduler.forceExit(false);
@@ -207,7 +206,7 @@ struct ManagerImpl : public Manager
 	JobsTable			m_ready_to_execute[(size_t)Priority::Count];
 	JobTransQueue		m_trans_queue;
 	TransTable			m_pending_trans;
-	Array<WorkerTask*>	m_worker_tasks;
+	Array<WorkerTask>	m_worker_tasks;
 	#if !LUMIX_SINGLE_THREAD()
 		Scheduler			m_scheduler;
 	#endif

@@ -82,7 +82,7 @@ private:
 
 private:
 	IAllocator& m_source;
-	StackTree* m_stack_tree;
+	StackTree m_stack_tree;
 	MT::SpinMutex m_mutex;
 	AllocationInfo* m_root;
 	AllocationInfo m_sentinels[2];

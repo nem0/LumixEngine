@@ -790,12 +790,6 @@ struct RendererImpl : public Renderer
 	}
 
 
-	bool create() override { return true; }
-
-
-	void destroy() override {}
-
-
 	const char* getName() const override { return "renderer"; }
 
 
@@ -916,13 +910,7 @@ extern "C"
 {
 	LUMIX_PLUGIN_ENTRY(renderer)
 	{
-		RendererImpl* r = LUMIX_NEW(engine.getAllocator(), RendererImpl)(engine);
-		if (r->create())
-		{
-			return r;
-		}
-		LUMIX_DELETE(engine.getAllocator(), r);
-		return nullptr;
+		return LUMIX_NEW(engine.getAllocator(), RendererImpl)(engine);
 	}
 }
 

@@ -98,8 +98,6 @@ struct NavigationSystem : public IPlugin
 
 
 	void registerProperties();
-	bool create() override { return true; }
-	void destroy() override {}
 	const char* getName() const override { return "navigation"; }
 	IScene* createScene(Universe& universe) override;
 	void destroyScene(IScene* scene) override;

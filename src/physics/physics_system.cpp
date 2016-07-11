@@ -550,21 +550,22 @@ namespace Lumix
 			registerProperties(engine.getAllocator());
 			m_manager.create(PHYSICS_HASH, engine.getResourceManager());
 			PhysicsScene::registerLuaAPI(m_engine.getState());
-		}
 
-
-		bool create() override
-		{
-			m_physx_allocator = LUMIX_NEW(m_allocator, AssertNullAllocator);
-			m_error_callback = LUMIX_NEW(m_allocator, CustomErrorCallback);
-			m_foundation = PxCreateFoundation(PX_PHYSICS_VERSION, *m_physx_allocator, *m_error_callback);
+			m_foundation = PxCreateFoundation(PX_PHYSICS_VERSION, m_physx_allocator, m_error_callback);
 
 			m_physics = PxCreatePhysics(PX_PHYSICS_VERSION, *m_foundation, physx::PxTolerancesScale());
 
 			physx::PxTolerancesScale scale;
 			m_cooking = PxCreateCooking(PX_PHYSICS_VERSION, *m_foundation, physx::PxCookingParams(scale));
 			connect2VisualDebugger();
-			return true;
+		}
+
+
+		~PhysicsSystemImpl()
+		{
+			m_cooking->release();
+			m_physics->release();
+			m_foundation->release();
 		}
 
 
@@ -575,16 +576,6 @@ namespace Lumix
 
 
 		void destroyScene(IScene* scene) override { PhysicsScene::destroy(static_cast<PhysicsScene*>(scene)); }
-
-
-		void destroy() override
-		{
-			m_cooking->release();
-			m_physics->release();
-			m_foundation->release();
-			LUMIX_DELETE(m_allocator, m_physx_allocator);
-			LUMIX_DELETE(m_allocator, m_error_callback);
-		}
 
 
 		physx::PxPhysics* getPhysics() override
@@ -607,16 +598,16 @@ namespace Lumix
 			physx::PxVisualDebuggerConnectionFlags connectionFlags =
 				physx::PxVisualDebuggerExt::getAllConnectionFlags();
 
-			auto* theConnection = physx::PxVisualDebuggerExt::createConnection(
+			auto* connection = physx::PxVisualDebuggerExt::createConnection(
 				m_physics->getPvdConnectionManager(), pvd_host_ip, port, timeout, connectionFlags);
-			return theConnection != nullptr;
+			return connection != nullptr;
 		}
 
 		physx::PxPhysics* m_physics;
 		physx::PxFoundation* m_foundation;
 		physx::PxControllerManager* m_controller_manager;
-		physx::PxAllocatorCallback* m_physx_allocator;
-		physx::PxErrorCallback* m_error_callback;
+		AssertNullAllocator m_physx_allocator;
+		CustomErrorCallback m_error_callback;
 		physx::PxCooking* m_cooking;
 		PhysicsGeometryManager m_manager;
 		Engine& m_engine;

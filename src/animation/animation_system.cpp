@@ -324,6 +324,8 @@ struct AnimationSystemImpl : public IPlugin
 		, m_engine(engine)
 		, animation_manager(m_allocator)
 	{
+		animation_manager.create(ANIMATION_HASH, m_engine.getResourceManager());
+
 		PropertyRegister::add("animable",
 			LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationSceneImpl>)("Animation",
 								  &AnimationSceneImpl::getAnimation,
@@ -360,15 +362,6 @@ struct AnimationSystemImpl : public IPlugin
 
 	const char* getName() const override { return "animation"; }
 
-
-	bool create() override
-	{
-		animation_manager.create(ANIMATION_HASH, m_engine.getResourceManager());
-		return true;
-	}
-
-
-	void destroy() override {}
 
 	Lumix::IAllocator& m_allocator;
 	Engine& m_engine;
