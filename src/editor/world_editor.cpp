@@ -986,6 +986,7 @@ private:
 
 		bool execute() override
 		{
+			bool ret = false;
 			const Array<IScene*>& scenes = m_editor.getUniverse()->getScenes();
 
 			for (int j = 0; j < m_entities.size(); ++j)
@@ -993,10 +994,14 @@ private:
 				for (auto* scene : scenes)
 				{
 					ComponentHandle cmp = scene->createComponent(m_type, m_entities[j]);
-					if (isValid(cmp)) return true;
+					if (isValid(cmp))
+					{
+						ret = true;
+						break;
+					}
 				}
 			}
-			return false;
+			return ret;
 		}
 
 
