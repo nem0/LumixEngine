@@ -2068,6 +2068,7 @@ public:
 		ASSERT(m_universe);
 		m_engine->stopGame(*m_universe);
 		selectEntities(nullptr, 0);
+		m_gizmo->clearEntities();
 		m_editor_icons->clear();
 		m_is_game_mode = false;
 		if (reload)
