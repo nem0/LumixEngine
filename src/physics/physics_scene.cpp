@@ -572,22 +572,22 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 	
-	int getHeightfieldLayer(ComponentHandle cmp) override { return m_terrains[{cmp.index}]->m_layer; }
+	int getHeightfieldLayer(ComponentHandle cmp) override { return m_terrains[{cmp.index}].m_layer; }
 
 
 	void setHeightfieldLayer(ComponentHandle cmp, int layer) override
 	{
 		ASSERT(layer < lengthOf(m_layers_names));
-		auto* terrain = m_terrains[{cmp.index}];
-		terrain->m_layer = layer;
+		auto& terrain = m_terrains[{cmp.index}];
+		terrain.m_layer = layer;
 
-		if (terrain->m_actor)
+		if (terrain.m_actor)
 		{
 			physx::PxFilterData data;
 			data.word0 = 1 << layer;
 			data.word1 = m_collision_filter[layer];
 			physx::PxShape* shapes[8];
-			int shapes_count = terrain->m_actor->getShapes(shapes, lengthOf(shapes));
+			int shapes_count = terrain.m_actor->getShapes(shapes, lengthOf(shapes));
 			for (int i = 0; i < shapes_count; ++i)
 			{
 				shapes[i]->setSimulationFilterData(data);
@@ -1004,7 +1004,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 		if (type == HEIGHTFIELD_TYPE)
 		{
 			Entity entity = {cmp.index};
-			LUMIX_DELETE(m_allocator, m_terrains[entity]);
 			m_terrains.erase(entity);
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
@@ -1137,12 +1136,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createHeightfield(Entity entity)
 	{
-		Heightfield* terrain = LUMIX_NEW(m_allocator, Heightfield)();
+		Heightfield terrain;
+		terrain.m_heightmap = nullptr;
+		terrain.m_scene = this;
+		terrain.m_actor = nullptr;
+		terrain.m_entity = entity;
 		m_terrains.insert(entity, terrain);
-		terrain->m_heightmap = nullptr;
-		terrain->m_scene = this;
-		terrain->m_actor = nullptr;
-		terrain->m_entity = entity;
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, HEIGHTFIELD_TYPE, this, cmp);
 		return cmp;
@@ -1281,21 +1280,21 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	Path getHeightmap(ComponentHandle cmp) override
 	{
-		auto* terrain = m_terrains[{cmp.index}];
-		return terrain->m_heightmap ? terrain->m_heightmap->getPath() : Path("");
+		auto& terrain = m_terrains[{cmp.index}];
+		return terrain.m_heightmap ? terrain.m_heightmap->getPath() : Path("");
 	}
 
 
-	float getHeightmapXZScale(ComponentHandle cmp) override { return m_terrains[{cmp.index}]->m_xz_scale; }
+	float getHeightmapXZScale(ComponentHandle cmp) override { return m_terrains[{cmp.index}].m_xz_scale; }
 
 
 	void setHeightmapXZScale(ComponentHandle cmp, float scale) override
 	{
-		auto* terrain = m_terrains[{cmp.index}];
-		if (scale != terrain->m_xz_scale)
+		auto& terrain = m_terrains[{cmp.index}];
+		if (scale != terrain.m_xz_scale)
 		{
-			terrain->m_xz_scale = scale;
-			if (terrain->m_heightmap && terrain->m_heightmap->isReady())
+			terrain.m_xz_scale = scale;
+			if (terrain.m_heightmap && terrain.m_heightmap->isReady())
 			{
 				heightmapLoaded(terrain);
 			}
@@ -1305,17 +1304,17 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	float getHeightmapYScale(ComponentHandle cmp) override
 	{
-		return m_terrains[{cmp.index}]->m_y_scale;
+		return m_terrains[{cmp.index}].m_y_scale;
 	}
 
 
 	void setHeightmapYScale(ComponentHandle cmp, float scale) override
 	{
-		auto* terrain = m_terrains[{cmp.index}];
-		if (scale != terrain->m_y_scale)
+		auto& terrain = m_terrains[{cmp.index}];
+		if (scale != terrain.m_y_scale)
 		{
-			terrain->m_y_scale = scale;
-			if (terrain->m_heightmap && terrain->m_heightmap->isReady())
+			terrain.m_y_scale = scale;
+			if (terrain.m_heightmap && terrain.m_heightmap->isReady())
 			{
 				heightmapLoaded(terrain);
 			}
@@ -1326,25 +1325,25 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void setHeightmap(ComponentHandle cmp, const Path& str) override
 	{
 		auto& resource_manager = m_engine->getResourceManager();
-		auto* terrain = m_terrains[{cmp.index}];
-		auto* old_hm = terrain->m_heightmap;
+		auto& terrain = m_terrains[{cmp.index}];
+		auto* old_hm = terrain.m_heightmap;
 		if (old_hm)
 		{
 			resource_manager.get(TEXTURE_HASH)->unload(*old_hm);
 			auto& cb = old_hm->getObserverCb();
-			cb.unbind<Heightfield, &Heightfield::heightmapLoaded>(terrain);
+			cb.unbind<Heightfield, &Heightfield::heightmapLoaded>(&terrain);
 		}
 		auto* texture_manager = resource_manager.get(TEXTURE_HASH);
 		if (str.isValid())
 		{
 			auto* new_hm = static_cast<Texture*>(texture_manager->load(str));
-			terrain->m_heightmap = new_hm;
-			new_hm->onLoaded<Heightfield, &Heightfield::heightmapLoaded>(terrain);
+			terrain.m_heightmap = new_hm;
+			new_hm->onLoaded<Heightfield, &Heightfield::heightmapLoaded>(&terrain);
 			new_hm->addDataReference();
 		}
 		else
 		{
-			terrain->m_heightmap = nullptr;
+			terrain.m_heightmap = nullptr;
 		}
 	}
 
@@ -2159,19 +2158,19 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void heightmapLoaded(Heightfield* terrain)
+	void heightmapLoaded(Heightfield& terrain)
 	{
 		PROFILE_FUNCTION();
 		Array<physx::PxHeightFieldSample> heights(m_allocator);
 
-		int width = terrain->m_heightmap->width;
-		int height = terrain->m_heightmap->height;
+		int width = terrain.m_heightmap->width;
+		int height = terrain.m_heightmap->height;
 		heights.resize(width * height);
-		int bytes_per_pixel = terrain->m_heightmap->bytes_per_pixel;
+		int bytes_per_pixel = terrain.m_heightmap->bytes_per_pixel;
 		if (bytes_per_pixel == 2)
 		{
 			PROFILE_BLOCK("copyData");
-			const int16* LUMIX_RESTRICT data = (const int16*)terrain->m_heightmap->getData();
+			const int16* LUMIX_RESTRICT data = (const int16*)terrain.m_heightmap->getData();
 			for (int j = 0; j < height; ++j)
 			{
 				int idx = j * width;
@@ -2188,7 +2187,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		else
 		{
 			PROFILE_BLOCK("copyData");
-			const uint8* data = terrain->m_heightmap->getData();
+			const uint8* data = terrain.m_heightmap->getData();
 			for (int j = 0; j < height; ++j)
 			{
 				for (int i = 0; i < width; ++i)
@@ -2216,30 +2215,30 @@ struct PhysicsSceneImpl : public PhysicsScene
 			float height_scale = bytes_per_pixel == 2 ? 1 / (256 * 256.0f - 1) : 1 / 255.0f;
 			physx::PxHeightFieldGeometry hfGeom(heightfield,
 				physx::PxMeshGeometryFlags(),
-				height_scale * terrain->m_y_scale,
-				terrain->m_xz_scale,
-				terrain->m_xz_scale);
-			if (terrain->m_actor)
+				height_scale * terrain.m_y_scale,
+				terrain.m_xz_scale,
+				terrain.m_xz_scale);
+			if (terrain.m_actor)
 			{
-				physx::PxRigidActor* actor = terrain->m_actor;
+				physx::PxRigidActor* actor = terrain.m_actor;
 				m_scene->removeActor(*actor);
 				actor->release();
-				terrain->m_actor = nullptr;
+				terrain.m_actor = nullptr;
 			}
 
-			physx::PxTransform transform = toPhysx(m_universe.getTransform(terrain->m_entity));
-			transform.p.y += terrain->m_y_scale * 0.5f;
+			physx::PxTransform transform = toPhysx(m_universe.getTransform(terrain.m_entity));
+			transform.p.y += terrain.m_y_scale * 0.5f;
 
 			physx::PxRigidActor* actor;
 			actor = PxCreateStatic(*m_system->getPhysics(), transform, hfGeom, *m_default_material);
 			if (actor)
 			{
-				actor->userData = (void*)(intptr_t)terrain->m_entity.index;
+				actor->userData = (void*)(intptr_t)terrain.m_entity.index;
 				m_scene->addActor(*actor);
-				terrain->m_actor = actor;
+				terrain.m_actor = actor;
 
 				physx::PxFilterData data;
-				int terrain_layer = terrain->m_layer;
+				int terrain_layer = terrain.m_layer;
 				data.word0 = 1 << terrain_layer;
 				data.word1 = m_collision_filter[terrain_layer];
 				physx::PxShape* shapes[8];
@@ -2251,7 +2250,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 			else
 			{
-				g_log_error.log("Physics") << "Could not create PhysX heightfield " << terrain->m_heightmap->getPath();
+				g_log_error.log("Physics") << "Could not create PhysX heightfield " << terrain.m_heightmap->getPath();
 			}
 		}
 	}
@@ -2274,9 +2273,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			controller.m_layer = Math::minimum(m_layers_count - 1, controller.m_layer);
 		}
-		for (auto* terrain : m_terrains)
+		for (auto& terrain : m_terrains)
 		{
-			terrain->m_layer = Math::minimum(m_layers_count - 1, terrain->m_layer);
+			terrain.m_layer = Math::minimum(m_layers_count - 1, terrain.m_layer);
 		}
 
 		updateFilterData();
@@ -2388,16 +2387,16 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 		}
 
-		for (auto* terrain : m_terrains)
+		for (auto& terrain : m_terrains)
 		{
-			if (!terrain->m_actor) continue;
+			if (!terrain.m_actor) continue;
 
 			physx::PxFilterData data;
-			int terrain_layer = terrain->m_layer;
+			int terrain_layer = terrain.m_layer;
 			data.word0 = 1 << terrain_layer;
 			data.word1 = m_collision_filter[terrain_layer];
 			physx::PxShape* shapes[8];
-			int shapes_count = terrain->m_actor->getShapes(shapes, lengthOf(shapes));
+			int shapes_count = terrain.m_actor->getShapes(shapes, lengthOf(shapes));
 			for (int i = 0; i < shapes_count; ++i)
 			{
 				shapes[i]->setSimulationFilterData(data);
@@ -2653,13 +2652,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.write(controller.m_layer);
 		}
 		serializer.write((int32)m_terrains.size());
-		for (auto* terrain : m_terrains)
+		for (auto& terrain : m_terrains)
 		{
-			serializer.write(terrain->m_entity);
-			serializer.writeString(terrain->m_heightmap ? terrain->m_heightmap->getPath().c_str() : "");
-			serializer.write(terrain->m_xz_scale);
-			serializer.write(terrain->m_y_scale);
-			serializer.write(terrain->m_layer);
+			serializer.write(terrain.m_entity);
+			serializer.writeString(terrain.m_heightmap ? terrain.m_heightmap->getPath().c_str() : "");
+			serializer.write(terrain.m_xz_scale);
+			serializer.write(terrain.m_y_scale);
+			serializer.write(terrain.m_layer);
 		}
 		serializeRagdolls(serializer);
 		serializeJoints(serializer);
@@ -3238,10 +3237,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		int32 count;
 		serializer.read(count);
-		for (auto* terrain : m_terrains)
-		{
-			LUMIX_DELETE(m_allocator, terrain);
-		}
 		m_terrains.clear();
 		for (int i = 0; i < count; ++i)
 		{
@@ -3249,29 +3244,29 @@ struct PhysicsSceneImpl : public PhysicsScene
 			if(version <= (int)PhysicsSceneVersion::REFACTOR) serializer.read(exists);
 			if (exists)
 			{
-				auto* terrain = LUMIX_NEW(m_allocator, Heightfield);
-				terrain->m_scene = this;
-				serializer.read(terrain->m_entity);
+				Heightfield terrain;
+				terrain.m_scene = this;
+				serializer.read(terrain.m_entity);
 				char tmp[MAX_PATH_LENGTH];
 				serializer.readString(tmp, MAX_PATH_LENGTH);
-				serializer.read(terrain->m_xz_scale);
-				serializer.read(terrain->m_y_scale);
+				serializer.read(terrain.m_xz_scale);
+				serializer.read(terrain.m_y_scale);
 				if (version > (int)PhysicsSceneVersion::LAYERS)
 				{
-					serializer.read(terrain->m_layer);
+					serializer.read(terrain.m_layer);
 				}
 				else
 				{
-					terrain->m_layer = 0;
+					terrain.m_layer = 0;
 				}
 
-				m_terrains.insert(terrain->m_entity, terrain);
-				ComponentHandle cmp = {terrain->m_entity.index};
-				if (terrain->m_heightmap == nullptr || !equalStrings(tmp, terrain->m_heightmap->getPath().c_str()))
+				m_terrains.insert(terrain.m_entity, terrain);
+				ComponentHandle cmp = {terrain.m_entity.index};
+				if (terrain.m_heightmap == nullptr || !equalStrings(tmp, terrain.m_heightmap->getPath().c_str()))
 				{
 					setHeightmap(cmp, Path(tmp));
 				}
-				m_universe.addComponent(terrain->m_entity, HEIGHTFIELD_TYPE, this, cmp);
+				m_universe.addComponent(terrain.m_entity, HEIGHTFIELD_TYPE, this, cmp);
 			}
 		}
 	}
@@ -3394,7 +3389,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	AssociativeArray<Entity, Ragdoll> m_ragdolls;
 	AssociativeArray<Entity, Joint> m_joints;
 	AssociativeArray<Entity, Controller> m_controllers;
-	AssociativeArray<Entity, Heightfield*> m_terrains;
+	AssociativeArray<Entity, Heightfield> m_terrains;
 
 	Array<RigidActor*> m_dynamic_actors;
 	bool m_is_game_running;
@@ -3406,14 +3401,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 };
 
 
-PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
-	Universe& context,
-	Engine& engine,
-	IAllocator& allocator)
+PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator)
 {
 	PhysicsSceneImpl* impl = LUMIX_NEW(allocator, PhysicsSceneImpl)(context, allocator);
-	impl->m_universe.entityTransformed().bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityMoved>(
-		impl);
+	impl->m_universe.entityTransformed().bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityMoved>(impl);
 	impl->m_engine = &engine;
 	physx::PxSceneDesc sceneDesc(system.getPhysics()->getTolerancesScale());
 	sceneDesc.gravity = physx::PxVec3(0.0f, -9.8f, 0.0f);
@@ -3440,8 +3431,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
 	impl->m_controller_manager = PxCreateControllerManager(*impl->m_scene);
 
 	impl->m_system = &system;
-	impl->m_default_material =
-		impl->m_system->getPhysics()->createMaterial(0.5, 0.5, 0.5);
+	impl->m_default_material = impl->m_system->getPhysics()->createMaterial(0.5, 0.5, 0.5);
 	physx::PxSphereGeometry geom(1);
 	impl->m_dummy_actor = physx::PxCreateDynamic(
 		impl->m_scene->getPhysics(), physx::PxTransform::createIdentity(), geom, *impl->m_default_material, 1);
@@ -3467,10 +3457,6 @@ void PhysicsScene::destroy(PhysicsScene* scene)
 		LUMIX_DELETE(impl->m_allocator, actor);
 	}
 	impl->m_actors.clear();
-	for (auto* terrain : impl->m_terrains)
-	{
-		LUMIX_DELETE(impl->m_allocator, terrain);
-	}
 	impl->m_terrains.clear();
 
 	impl->m_controller_manager->release();
@@ -3493,18 +3479,13 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		bool is_dynamic = scene.isDynamic(this);
 		if (is_dynamic)
 		{
-			actor = PxCreateDynamic(*scene.m_system->getPhysics(),
-									transform,
-									*resource->getGeometry(),
-									*scene.m_default_material,
-									1.0f);
+			actor = PxCreateDynamic(
+				*scene.m_system->getPhysics(), transform, *resource->getGeometry(), *scene.m_default_material, 1.0f);
 		}
 		else
 		{
-			actor = PxCreateStatic(*scene.m_system->getPhysics(),
-								   transform,
-								   *resource->getGeometry(),
-								   *scene.m_default_material);
+			actor = PxCreateStatic(
+				*scene.m_system->getPhysics(), transform, *resource->getGeometry(), *scene.m_default_material);
 		}
 		if (actor)
 		{
@@ -3563,6 +3544,7 @@ Heightfield::Heightfield()
 
 Heightfield::~Heightfield()
 {
+	if(m_actor) m_actor->release();
 	if (m_heightmap)
 	{
 		m_heightmap->getResourceManager()
@@ -3578,7 +3560,7 @@ void Heightfield::heightmapLoaded(Resource::State, Resource::State new_state)
 {
 	if (new_state == Resource::State::READY)
 	{
-		m_scene->heightmapLoaded(this);
+		m_scene->heightmapLoaded(*this);
 	}
 }
 

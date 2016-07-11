@@ -46,8 +46,6 @@ namespace Lumix
 
 		IScene* createScene(Universe& universe) override;
 		void destroyScene(IScene* scene) override;
-		bool create() override { return true; }
-		void destroy() override {}
 		const char* getName() const override { return "lua_script"; }
 		LuaScriptManager& getScriptManager() { return m_script_manager; }
 

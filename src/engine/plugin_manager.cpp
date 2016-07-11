@@ -33,7 +33,6 @@ class PluginManagerImpl : public PluginManager
 		{
 			for (int i = m_plugins.size() - 1; i >= 0; --i)
 			{
-				m_plugins[i]->destroy();
 				LUMIX_DELETE(m_engine.getAllocator(), m_plugins[i]);
 			}
 
@@ -123,7 +122,7 @@ class PluginManagerImpl : public PluginManager
 				if (creator)
 				{
 					IPlugin* plugin = creator(m_engine);
-					if (!plugin || !plugin->create())
+					if (!plugin)
 					{
 						g_log_error.log("Core") << "createPlugin failed.";
 						LUMIX_DELETE(m_engine.getAllocator(), plugin);
@@ -148,7 +147,7 @@ class PluginManagerImpl : public PluginManager
 			else
 			{
 				auto* plugin = StaticPluginRegister::create(path, m_engine);
-				if (plugin && plugin->create())
+				if (plugin)
 				{
 					g_log_info.log("Core") << "Plugin loaded.";
 					m_plugins.push(plugin);

@@ -68,27 +68,21 @@ struct AudioSystemImpl : public AudioSystem
 	{
 		registerProperties(engine.getAllocator());
 		AudioScene::registerLuaAPI(m_engine.getState());
+		m_device = AudioDevice::create(m_engine);
+		m_manager.create(CLIP_HASH, m_engine.getResourceManager());
+	}
+
+
+	~AudioSystemImpl()
+	{
+		AudioDevice::destroy(*m_device);
+		m_manager.destroy();
 	}
 
 
 	Engine& getEngine() override { return m_engine; }
 	AudioDevice& getDevice() override { return *m_device; }
 	ClipManager& getClipManager() override { return m_manager; }
-
-
-	bool create() override
-	{
-		m_device = AudioDevice::create(m_engine);
-		m_manager.create(CLIP_HASH, m_engine.getResourceManager());
-		return true;
-	}
-
-
-	void destroy() override
-	{
-		AudioDevice::destroy(*m_device);
-		m_manager.destroy();
-	}
 
 
 	const char* getName() const override { return "audio"; }
