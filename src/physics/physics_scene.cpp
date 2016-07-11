@@ -1739,6 +1739,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 					d6->setLinearLimit(l);
 					d6->setMotion(physx::PxD6Axis::eSWING1, physx::PxD6Motion::eLIMITED);
 					d6->setMotion(physx::PxD6Axis::eSWING2, physx::PxD6Motion::eLIMITED);
+					d6->setProjectionAngularTolerance(0.01f);
+					d6->setProjectionLinearTolerance(0.1f);
 					d6->setSwingLimit(physx::PxJointLimitCone(Math::degreesToRadians(30), Math::degreesToRadians(30)));
 				}
 				break;
@@ -1899,8 +1901,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		physx::PxTransform px_transform = toPhysx(transform);
 		new_bone->actor = physx::PxCreateDynamic(m_scene->getPhysics(), px_transform, geom, *m_default_material, 1.0f);
+		new_bone->actor->isRigidDynamic()->setMass(0.0001f);
 		new_bone->actor->userData = (void*)(intptr_t)entity.index;
 		new_bone->actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+		new_bone->actor->isRigidDynamic()->setSolverIterationCounts(8, 8);
 		m_scene->addActor(*new_bone->actor);
 		updateFilterData(new_bone->actor, 0);
 
@@ -2897,6 +2901,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.read(bone->is_kinematic);
 		}
 		bone->actor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, bone->is_kinematic);
+		bone->actor->isRigidDynamic()->setSolverIterationCounts(8, 8);
+		bone->actor->isRigidDynamic()->setMass(0.0001f);
 		bone->actor->userData = (void*)(intptr_t)ragdoll.entity.index;
 
 		bone->actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
