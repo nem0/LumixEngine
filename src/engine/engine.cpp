@@ -580,15 +580,12 @@ public:
 
 	void registerProperties()
 	{
-		PropertyRegister::add(
-			"hierarchy",
-			LUMIX_NEW(m_allocator, EntityPropertyDescriptor<Hierarchy>)(
-				"Parent", &Hierarchy::getParent, &Hierarchy::setParent, m_allocator));
 		PropertyRegister::add("hierarchy",
-			LUMIX_NEW(m_allocator, SimplePropertyDescriptor<Vec3, Hierarchy>)("Relative position",
-								  &Hierarchy::getLocalPosition,
-								  &Hierarchy::setLocalPosition,
-								  m_allocator));
+			LUMIX_NEW(m_allocator, EntityPropertyDescriptor<Hierarchy>)(
+				"Parent", &Hierarchy::getParent, &Hierarchy::setParent));
+		PropertyRegister::add("hierarchy",
+			LUMIX_NEW(m_allocator, SimplePropertyDescriptor<Vec3, Hierarchy>)(
+				"Relative position", &Hierarchy::getLocalPosition, &Hierarchy::setLocalPosition));
 	}
 
 

@@ -87,14 +87,6 @@ const IPropertyDescriptor* getDescriptor(ComponentType type, uint32 name_hash)
 		{
 			return props[i];
 		}
-		auto& children = props[i]->getChildren();
-		for (int j = 0; j < children.size(); ++j)
-		{
-			if (children[j]->getNameHash() == name_hash)
-			{
-				return children[j];
-			}
-		}
 	}
 	return nullptr;
 }

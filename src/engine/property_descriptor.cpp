@@ -27,8 +27,7 @@ LUMIX_ENGINE_API int getIntPropertyMax()
 }
 
 
-IDecimalPropertyDescriptor::IDecimalPropertyDescriptor(IAllocator& allocator)
-	: IPropertyDescriptor(allocator)
+IDecimalPropertyDescriptor::IDecimalPropertyDescriptor()
 {
 	m_min = -FLT_MAX;
 	m_max = FLT_MAX;

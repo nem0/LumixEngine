@@ -328,27 +328,16 @@ struct AnimationSystemImpl : public IPlugin
 
 		PropertyRegister::add("animable",
 			LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationSceneImpl>)("Animation",
-								  &AnimationSceneImpl::getAnimation,
-								  &AnimationSceneImpl::setAnimation,
-								  "Animation (*.ani)",
-								  ANIMATION_HASH,
-								  m_allocator));
+				&AnimationSceneImpl::getAnimation,
+				&AnimationSceneImpl::setAnimation,
+				"Animation (*.ani)",
+				ANIMATION_HASH));
 		PropertyRegister::add("animable",
-			LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationSceneImpl>)("Start time",
-								  &AnimationSceneImpl::getStartTime,
-								  &AnimationSceneImpl::setStartTime,
-								  0,
-								  FLT_MAX,
-								  0.1f,
-								  m_allocator));
+			LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationSceneImpl>)(
+				"Start time", &AnimationSceneImpl::getStartTime, &AnimationSceneImpl::setStartTime, 0, FLT_MAX, 0.1f));
 		PropertyRegister::add("animable",
-			LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationSceneImpl>)("Time scale",
-								  &AnimationSceneImpl::getTimeScale,
-								  &AnimationSceneImpl::setTimeScale,
-								  0,
-								  FLT_MAX,
-								  0.1f,
-								  m_allocator));
+			LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationSceneImpl>)(
+				"Time scale", &AnimationSceneImpl::getTimeScale, &AnimationSceneImpl::setTimeScale, 0, FLT_MAX, 0.1f));
 	}
 
 	IScene* createScene(Universe& ctx) override

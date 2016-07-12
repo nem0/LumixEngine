@@ -98,6 +98,8 @@ template <int size> struct StaticString
 	void add(const char* value) { Lumix::catString(data, size, value); }
 	void add(char* value) { Lumix::catString(data, size, value); }
 
+	void operator=(const char* str) { copyString(data, str); }
+
 	void add(float value)
 	{
 		int len = Lumix::stringLength(data);

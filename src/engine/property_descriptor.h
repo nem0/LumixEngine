@@ -36,8 +36,7 @@ public:
 	typedef void (S::*ArraySetter)(ComponentHandle, int, const char*);
 
 public:
-	StringPropertyDescriptor(const char* name, Getter getter, Setter setter, IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	StringPropertyDescriptor(const char* name, Getter getter, Setter setter)
 	{
 		setName(name);
 		m_single.getter = getter;
@@ -124,20 +123,12 @@ public:
 		Remover remover,
 		IAllocator& allocator)
 		: IArrayDescriptor(allocator)
-		, m_allocator(allocator)
 	{
 		setName(name);
 		m_type = ARRAY;
 		m_counter = counter;
 		m_adder = adder;
 		m_remover = remover;
-	}
-	~ArrayDescriptor()
-	{
-		for (int i = 0; i < m_children.size(); ++i)
-		{
-			LUMIX_DELETE(m_allocator, m_children[i]);
-		}
 	}
 
 
@@ -217,7 +208,6 @@ public:
 
 
 private:
-	IAllocator& m_allocator;
 	Counter m_counter;
 	Adder m_adder;
 	Remover m_remover;
@@ -247,8 +237,7 @@ public:
 	}
 
 
-	IntPropertyDescriptor(const char* name, ArrayGetter _getter, ArraySetter _setter, IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	IntPropertyDescriptor(const char* name, ArrayGetter _getter, ArraySetter _setter)
 	{
 		setName(name);
 		m_array.getter = _getter;
@@ -327,8 +316,7 @@ public:
 	typedef void (S::*Setter)(ComponentHandle, bool);
 
 public:
-	BoolPropertyDescriptor(const char* name, Getter getter, Setter setter, IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	BoolPropertyDescriptor(const char* name, Getter getter, Setter setter)
 	{
 		setName(name);
 		m_getter = getter;
@@ -369,8 +357,7 @@ public:
 	typedef void (S::*ArraySetter)(ComponentHandle, int, const T&);
 
 public:
-	SimplePropertyDescriptor(const char* name, Getter getter, Setter setter, IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	SimplePropertyDescriptor(const char* name, Getter getter, Setter setter)
 	{
 		setName(name);
 		m_single.getter = getter;
@@ -447,12 +434,7 @@ public:
 	typedef void (S::*ArraySetter)(ComponentHandle, int, const Path&);
 
 public:
-	FilePropertyDescriptor(const char* name,
-		Getter getter,
-		Setter setter,
-		const char* file_type,
-		IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	FilePropertyDescriptor(const char* name, Getter getter, Setter setter, const char* file_type)
 	{
 		setName(name);
 		m_single.getter = getter;
@@ -462,12 +444,7 @@ public:
 	}
 
 
-	FilePropertyDescriptor(const char* name,
-		ArrayGetter getter,
-		ArraySetter setter,
-		const char* file_type,
-		IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	FilePropertyDescriptor(const char* name, ArrayGetter getter, ArraySetter setter, const char* file_type)
 	{
 		setName(name);
 		m_array.getter = getter;
@@ -547,10 +524,8 @@ public:
 		Getter getter,
 		Setter setter,
 		const char* file_type,
-		uint32 resource_type,
-		IAllocator& allocator)
-		: IResourcePropertyDescriptor(allocator)
-		, m_file_descriptor(name, getter, setter, file_type, allocator)
+		uint32 resource_type)
+		: m_file_descriptor(name, getter, setter, file_type)
 		, m_resource_type(resource_type)
 	{
 		setName(name);
@@ -560,10 +535,8 @@ public:
 		ArrayGetter getter,
 		ArraySetter setter,
 		const char* file_type,
-		uint32 resource_type,
-		IAllocator& allocator)
-		: IResourcePropertyDescriptor(allocator)
-		, m_file_descriptor(name, getter, setter, file_type, allocator)
+		uint32 resource_type)
+		: m_file_descriptor(name, getter, setter, file_type)
 		, m_resource_type(resource_type)
 	{
 		setName(name);
@@ -599,9 +572,7 @@ public:
 		Setter setter,
 		CountGetter count_getter,
 		float max_x,
-		float max_y,
-		IAllocator& allocator)
-		: ISampledFunctionDescriptor(allocator)
+		float max_y)
 	{
 		setName(name);
 		m_getter = getter;
@@ -648,18 +619,14 @@ private:
 
 template <class S> class EntityPropertyDescriptor : public IPropertyDescriptor
 {
-	public:
-	typedef Entity(S::*Getter)(ComponentHandle);
+public:
+	typedef Entity (S::*Getter)(ComponentHandle);
 	typedef void (S::*Setter)(ComponentHandle, Entity);
-	typedef Entity(S::*ArrayGetter)(ComponentHandle, int);
+	typedef Entity (S::*ArrayGetter)(ComponentHandle, int);
 	typedef void (S::*ArraySetter)(ComponentHandle, int, Entity);
 
-	public:
-	EntityPropertyDescriptor(const char* name,
-		Getter _getter,
-		Setter _setter,
-		IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+public:
+	EntityPropertyDescriptor(const char* name, Getter _getter, Setter _setter)
 	{
 		setName(name);
 		m_single.getter = _getter;
@@ -668,11 +635,7 @@ template <class S> class EntityPropertyDescriptor : public IPropertyDescriptor
 	}
 
 
-	EntityPropertyDescriptor(const char* name,
-		ArrayGetter _getter,
-		ArraySetter _setter,
-		IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	EntityPropertyDescriptor(const char* name, ArrayGetter _getter, ArraySetter _setter)
 	{
 		setName(name);
 		m_array.getter = _getter;
@@ -685,9 +648,8 @@ template <class S> class EntityPropertyDescriptor : public IPropertyDescriptor
 	{
 		int value;
 		stream.read(&value, sizeof(value));
-		auto entity =
-			value < 0 ? INVALID_ENTITY : cmp.scene->getUniverse().getEntityFromDenseIdx(value);
-		if(index == -1)
+		auto entity = value < 0 ? INVALID_ENTITY : cmp.scene->getUniverse().getEntityFromDenseIdx(value);
+		if (index == -1)
 		{
 			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.handle, entity);
 		}
@@ -701,7 +663,7 @@ template <class S> class EntityPropertyDescriptor : public IPropertyDescriptor
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		Entity value;
-		if(index == -1)
+		if (index == -1)
 		{
 			value = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.handle);
 		}
@@ -715,7 +677,7 @@ template <class S> class EntityPropertyDescriptor : public IPropertyDescriptor
 	};
 
 
-	private:
+private:
 	union {
 		struct
 		{
@@ -739,8 +701,7 @@ public:
 	typedef void (S::*Setter)(ComponentHandle, InputBlob&);
 
 public:
-	BlobPropertyDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	BlobPropertyDescriptor(const char* name, Getter _getter, Setter _setter)
 	{
 		m_getter = _getter;
 		m_setter = _setter;
@@ -781,9 +742,7 @@ public:
 		Setter _setter,
 		float min,
 		float max,
-		float step,
-		IAllocator& allocator)
-		: IDecimalPropertyDescriptor(allocator)
+		float step)
 	{
 		setName(name);
 		m_getter = _getter;
@@ -802,9 +761,7 @@ public:
 		ArraySetter _setter,
 		float min,
 		float max,
-		float step,
-		IAllocator& allocator)
-		: IDecimalPropertyDescriptor(allocator)
+		float step)
 	{
 		setName(name);
 		m_array_getter = _getter;
@@ -865,8 +822,8 @@ public:
 	using ArrayGetter = typename SimplePropertyDescriptor<Vec3, S>::ArrayGetter;
 	using ArraySetter = typename SimplePropertyDescriptor<Vec3, S>::ArraySetter;
 
-	ColorPropertyDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
-		: SimplePropertyDescriptor<Vec3, S>(name, _getter, _setter, allocator)
+	ColorPropertyDescriptor(const char* name, Getter _getter, Setter _setter)
+		: SimplePropertyDescriptor<Vec3, S>(name, _getter, _setter)
 	{
 		IPropertyDescriptor::m_type = IPropertyDescriptor::COLOR;
 	}
@@ -886,9 +843,7 @@ public:
 		Getter _getter,
 		Setter _setter,
 		EnumCountGetter count_getter,
-		EnumNameGetter enum_name_getter,
-		IAllocator& allocator)
-		: IEnumPropertyDescriptor(allocator)
+		EnumNameGetter enum_name_getter)
 	{
 		setName(name);
 		m_getter = _getter;

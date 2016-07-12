@@ -1171,10 +1171,10 @@ void NavigationSystem::registerProperties()
 	auto& allocator = m_engine.getAllocator();
 	PropertyRegister::add("navmesh_agent",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<NavigationSceneImpl>)(
-			"radius", &NavigationSceneImpl::getAgentRadius, &NavigationSceneImpl::setAgentRadius, 0, 999.0f, 0.1f, allocator));
+			"radius", &NavigationSceneImpl::getAgentRadius, &NavigationSceneImpl::setAgentRadius, 0, 999.0f, 0.1f));
 	PropertyRegister::add("navmesh_agent",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<NavigationSceneImpl>)(
-			"height", &NavigationSceneImpl::getAgentHeight, &NavigationSceneImpl::setAgentHeight, 0, 999.0f, 0.1f, allocator));
+			"height", &NavigationSceneImpl::getAgentHeight, &NavigationSceneImpl::setAgentHeight, 0, 999.0f, 0.1f));
 }
 
 
