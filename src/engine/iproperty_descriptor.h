@@ -33,10 +33,8 @@ public:
 	};
 
 public:
-	IPropertyDescriptor(IAllocator& allocator)
-		: m_name(allocator)
-		, m_children(allocator)
-		, m_is_in_radians(false)
+	IPropertyDescriptor()
+		: m_is_in_radians(false)
 	{
 	}
 	virtual ~IPropertyDescriptor() {}
@@ -46,27 +44,23 @@ public:
 
 	Type getType() const { return m_type; }
 	uint32 getNameHash() const { return m_name_hash; }
-	const char* getName() const { return m_name.c_str(); }
+	const char* getName() const { return m_name; }
 	void setName(const char* name);
-	void addChild(IPropertyDescriptor* child) { m_children.push(child); }
-	const Array<IPropertyDescriptor*>& getChildren() const { return m_children; }
-	Array<IPropertyDescriptor*>& getChildren() { return m_children; }
 	IPropertyDescriptor& setIsInRadians(bool is) { m_is_in_radians = is; return *this; }
 	bool isInRadians() const { return m_is_in_radians; }
 
 protected:
 	bool m_is_in_radians;
 	uint32 m_name_hash;
-	string m_name;
+	StaticString<32> m_name;
 	Type m_type;
-	Array<IPropertyDescriptor*> m_children;
 };
 
 
 class LUMIX_ENGINE_API IDecimalPropertyDescriptor : public IPropertyDescriptor
 {
 public:
-	IDecimalPropertyDescriptor(IAllocator& allocator);
+	IDecimalPropertyDescriptor();
 
 	float getMin() const { return m_min; }
 	float getMax() const { return m_max; }
@@ -86,8 +80,7 @@ protected:
 class IResourcePropertyDescriptor : public IPropertyDescriptor
 {
 public:
-	IResourcePropertyDescriptor(IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	IResourcePropertyDescriptor()
 	{
 		IPropertyDescriptor::m_type = IPropertyDescriptor::RESOURCE;
 	}
@@ -99,8 +92,7 @@ public:
 class IEnumPropertyDescriptor : public IPropertyDescriptor
 {
 public:
-	IEnumPropertyDescriptor(IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	IEnumPropertyDescriptor()
 	{
 	}
 
@@ -113,8 +105,7 @@ public:
 class ISampledFunctionDescriptor : public IPropertyDescriptor
 {
 public:
-	ISampledFunctionDescriptor(IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	ISampledFunctionDescriptor()
 	{
 	}
 
@@ -127,8 +118,17 @@ class IArrayDescriptor : public IPropertyDescriptor
 {
 public:
 	IArrayDescriptor(IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+		: m_children(allocator)
+		, m_allocator(allocator)
 	{
+	}
+
+	~IArrayDescriptor()
+	{
+		for (auto* child : m_children)
+		{
+			LUMIX_DELETE(m_allocator, child);
+		}
 	}
 
 	virtual void removeArrayItem(ComponentUID cmp, int index) const = 0;
@@ -136,6 +136,12 @@ public:
 	virtual int getCount(ComponentUID cmp) const = 0;
 	virtual bool canAdd() const = 0;
 	virtual bool canRemove() const = 0;
+	void addChild(IPropertyDescriptor* child) { m_children.push(child); }
+	const Array<IPropertyDescriptor*>& getChildren() const { return m_children; }
+
+protected:
+	Array<IPropertyDescriptor*> m_children;
+	IAllocator& m_allocator;
 };
 
 

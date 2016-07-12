@@ -84,8 +84,7 @@ static const uint32 SHADER_BINARY_HASH = crc32("SHADER_BINARY");
 
 struct BonePropertyDescriptor : public IEnumPropertyDescriptor
 {
-	BonePropertyDescriptor(const char* name, IAllocator& allocator)
-		: IEnumPropertyDescriptor(allocator)
+	BonePropertyDescriptor(const char* name)
 	{
 		setName(name);
 		m_type = ENUM;
@@ -146,374 +145,246 @@ struct BonePropertyDescriptor : public IEnumPropertyDescriptor
 static void registerProperties(IAllocator& allocator)
 {
 	PropertyRegister::add("bone_attachment",
-		LUMIX_NEW(allocator, EntityPropertyDescriptor<RenderScene>)("Parent",
-							  &RenderScene::getBoneAttachmentParent,
-							  &RenderScene::setBoneAttachmentParent,
-							  allocator));
-	PropertyRegister::add("bone_attachment", LUMIX_NEW(allocator, BonePropertyDescriptor)("Bone", allocator));
+		LUMIX_NEW(allocator, EntityPropertyDescriptor<RenderScene>)(
+			"Parent", &RenderScene::getBoneAttachmentParent, &RenderScene::setBoneAttachmentParent));
+	PropertyRegister::add("bone_attachment", LUMIX_NEW(allocator, BonePropertyDescriptor)("Bone"));
 	PropertyRegister::add("bone_attachment",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, RenderScene>)("Relative position",
-			&RenderScene::getBoneAttachmentPosition,
-			&RenderScene::setBoneAttachmentPosition,
-			allocator));
+		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, RenderScene>)(
+			"Relative position", &RenderScene::getBoneAttachmentPosition, &RenderScene::setBoneAttachmentPosition));
 	PropertyRegister::add("particle_emitter_spawn_shape",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Radius",
-							  &RenderScene::getParticleEmitterShapeRadius,
-							  &RenderScene::setParticleEmitterShapeRadius,
-							  0.0f,
-							  FLT_MAX,
-							  0.01f,
-							  allocator));
+			&RenderScene::getParticleEmitterShapeRadius,
+			&RenderScene::setParticleEmitterShapeRadius,
+			0.0f,
+			FLT_MAX,
+			0.01f));
 
 	PropertyRegister::add("particle_emitter_plane",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Bounce",
-							  &RenderScene::getParticleEmitterPlaneBounce,
-							  &RenderScene::setParticleEmitterPlaneBounce,
-							  0.0f,
-							  1.0f,
-							  0.01f,
-							  allocator));
+			&RenderScene::getParticleEmitterPlaneBounce,
+			&RenderScene::setParticleEmitterPlaneBounce,
+			0.0f,
+			1.0f,
+			0.01f));
 	auto plane_module_planes = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Planes",
 		&RenderScene::getParticleEmitterPlaneCount,
 		&RenderScene::addParticleEmitterPlane,
 		&RenderScene::removeParticleEmitterPlane,
 		allocator);
-	plane_module_planes->addChild(
-		LUMIX_NEW(allocator, EntityPropertyDescriptor<RenderScene>)("Entity",
-			&RenderScene::getParticleEmitterPlaneEntity,
-			&RenderScene::setParticleEmitterPlaneEntity,
-			allocator));
+	plane_module_planes->addChild(LUMIX_NEW(allocator, EntityPropertyDescriptor<RenderScene>)(
+		"Entity", &RenderScene::getParticleEmitterPlaneEntity, &RenderScene::setParticleEmitterPlaneEntity));
 	PropertyRegister::add("particle_emitter_plane", plane_module_planes);
 
 	PropertyRegister::add("particle_emitter_attractor",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Force",
-							  &RenderScene::getParticleEmitterAttractorForce,
-							  &RenderScene::setParticleEmitterAttractorForce,
-							  -FLT_MAX,
-							  FLT_MAX,
-							  0.01f,
-							  allocator));
+			&RenderScene::getParticleEmitterAttractorForce,
+			&RenderScene::setParticleEmitterAttractorForce,
+			-FLT_MAX,
+			FLT_MAX,
+			0.01f));
 	auto attractor_module_planes = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Attractors",
 		&RenderScene::getParticleEmitterAttractorCount,
 		&RenderScene::addParticleEmitterAttractor,
 		&RenderScene::removeParticleEmitterAttractor,
 		allocator);
-	attractor_module_planes->addChild(
-		LUMIX_NEW(allocator, EntityPropertyDescriptor<RenderScene>)("Entity",
-			&RenderScene::getParticleEmitterAttractorEntity,
-			&RenderScene::setParticleEmitterAttractorEntity,
-			allocator));
+	attractor_module_planes->addChild(LUMIX_NEW(allocator, EntityPropertyDescriptor<RenderScene>)(
+		"Entity", &RenderScene::getParticleEmitterAttractorEntity, &RenderScene::setParticleEmitterAttractorEntity));
 	PropertyRegister::add("particle_emitter_attractor", attractor_module_planes);
 
 	PropertyRegister::add("particle_emitter_alpha",
 		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Alpha",
-							  &RenderScene::getParticleEmitterAlpha,
-							  &RenderScene::setParticleEmitterAlpha,
-							  &RenderScene::getParticleEmitterAlphaCount,
-							  1,
-							  1,
-							  allocator));
+			&RenderScene::getParticleEmitterAlpha,
+			&RenderScene::setParticleEmitterAlpha,
+			&RenderScene::getParticleEmitterAlphaCount,
+			1,
+			1));
 
 	PropertyRegister::add("particle_emitter_force",
 		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, RenderScene>)("Acceleration",
-							  &RenderScene::getParticleEmitterAcceleration,
-							  &RenderScene::setParticleEmitterAcceleration,
-							  allocator));
+			&RenderScene::getParticleEmitterAcceleration,
+			&RenderScene::setParticleEmitterAcceleration));
 
 	PropertyRegister::add("particle_emitter_size",
 		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Size",
-							  &RenderScene::getParticleEmitterSize,
-							  &RenderScene::setParticleEmitterSize,
-							  &RenderScene::getParticleEmitterSizeCount,
-							  1,
-							  1,
-							  allocator));
+			&RenderScene::getParticleEmitterSize,
+			&RenderScene::setParticleEmitterSize,
+			&RenderScene::getParticleEmitterSizeCount,
+			1,
+			1));
 
 	PropertyRegister::add("particle_emitter_linear_movement",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("x",
-							  &RenderScene::getParticleEmitterLinearMovementX,
-							  &RenderScene::setParticleEmitterLinearMovementX,
-							  allocator));
+		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)(
+			"x", &RenderScene::getParticleEmitterLinearMovementX, &RenderScene::setParticleEmitterLinearMovementX));
 	PropertyRegister::add("particle_emitter_linear_movement",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("y",
-							  &RenderScene::getParticleEmitterLinearMovementY,
-							  &RenderScene::setParticleEmitterLinearMovementY,
-							  allocator));
+		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)(
+			"y", &RenderScene::getParticleEmitterLinearMovementY, &RenderScene::setParticleEmitterLinearMovementY));
 	PropertyRegister::add("particle_emitter_linear_movement",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("z",
-							  &RenderScene::getParticleEmitterLinearMovementZ,
-							  &RenderScene::setParticleEmitterLinearMovementZ,
-							  allocator));
+		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)(
+			"z", &RenderScene::getParticleEmitterLinearMovementZ, &RenderScene::setParticleEmitterLinearMovementZ));
 
 	PropertyRegister::add("particle_emitter",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("Life",
-							  &RenderScene::getParticleEmitterInitialLife,
-							  &RenderScene::setParticleEmitterInitialLife,
-							  allocator));
+		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)(
+			"Life", &RenderScene::getParticleEmitterInitialLife, &RenderScene::setParticleEmitterInitialLife));
 	PropertyRegister::add("particle_emitter",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("Initial size",
-							  &RenderScene::getParticleEmitterInitialSize,
-							  &RenderScene::setParticleEmitterInitialSize,
-							  allocator));
+		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)(
+			"Initial size", &RenderScene::getParticleEmitterInitialSize, &RenderScene::setParticleEmitterInitialSize));
 	PropertyRegister::add("particle_emitter",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)("Spawn period",
-							  &RenderScene::getParticleEmitterSpawnPeriod,
-							  &RenderScene::setParticleEmitterSpawnPeriod,
-							  allocator));
+		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, RenderScene>)(
+			"Spawn period", &RenderScene::getParticleEmitterSpawnPeriod, &RenderScene::setParticleEmitterSpawnPeriod));
 	PropertyRegister::add("particle_emitter",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Int2, RenderScene>)("Spawn count",
-							  &RenderScene::getParticleEmitterSpawnCount,
-							  &RenderScene::setParticleEmitterSpawnCount,
-							  allocator));
+		LUMIX_NEW(allocator, SimplePropertyDescriptor<Int2, RenderScene>)(
+			"Spawn count", &RenderScene::getParticleEmitterSpawnCount, &RenderScene::setParticleEmitterSpawnCount));
 	PropertyRegister::add("particle_emitter",
 		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",
-							  &RenderScene::getParticleEmitterMaterialPath,
-							  &RenderScene::setParticleEmitterMaterialPath,
-							  "Material (*.mat)",
-							  MATERIAL_HASH,
-							  allocator));
+			&RenderScene::getParticleEmitterMaterialPath,
+			&RenderScene::setParticleEmitterMaterialPath,
+			"Material (*.mat)",
+			MATERIAL_HASH));
 
 	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, StringPropertyDescriptor<RenderScene>)("Slot",
-							  &RenderScene::getCameraSlot,
-							  &RenderScene::setCameraSlot,
-							  allocator));
+		LUMIX_NEW(allocator, StringPropertyDescriptor<RenderScene>)(
+			"Slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot));
 	PropertyRegister::add("camera",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Orthographic size",
-							  &RenderScene::getCameraOrthoSize,
-							  &RenderScene::setCameraOrthoSize,
-							  0.0f,
-							  FLT_MAX,
-							  1.0f,
-							  allocator));
+			&RenderScene::getCameraOrthoSize,
+			&RenderScene::setCameraOrthoSize,
+			0.0f,
+			FLT_MAX,
+			1.0f));
 	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, BoolPropertyDescriptor<RenderScene>)("Orthographic",
-							  &RenderScene::isCameraOrtho,
-							  &RenderScene::setCameraOrtho,
-							  allocator));
+		LUMIX_NEW(allocator, BoolPropertyDescriptor<RenderScene>)(
+			"Orthographic", &RenderScene::isCameraOrtho, &RenderScene::setCameraOrtho));
 	PropertyRegister::add("camera",
-		&(LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("FOV",
-							  &RenderScene::getCameraFOV,
-							  &RenderScene::setCameraFOV,
-							  1,
-							  179,
-							  1,
-							  allocator))
-							 ->setIsInRadians(true));
+		&(LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)(
+			  "FOV", &RenderScene::getCameraFOV, &RenderScene::setCameraFOV, 1, 179, 1))
+			 ->setIsInRadians(true));
 	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Near",
-							  &RenderScene::getCameraNearPlane,
-							  &RenderScene::setCameraNearPlane,
-							  0.0f,
-							  FLT_MAX,
-							  0.0f,
-							  allocator));
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)(
+			"Near", &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane, 0.0f, FLT_MAX, 0.0f));
 	PropertyRegister::add("camera",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Far",
-							  &RenderScene::getCameraFarPlane,
-							  &RenderScene::setCameraFarPlane,
-							  0.0f,
-							  FLT_MAX,
-							  0.0f,
-							  allocator));
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)(
+			"Far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane, 0.0f, FLT_MAX, 0.0f));
 
 	PropertyRegister::add("renderable",
-		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Source",
-							  &RenderScene::getRenderablePath,
-							  &RenderScene::setRenderablePath,
-							  "Mesh (*.msh)",
-							  MODEL_HASH,
-							  allocator));
+		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)(
+			"Source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)", MODEL_HASH
 
-	auto renderable_material = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Materials",
-		&RenderScene::getRenderableMaterialsCount,
-		nullptr,
-		nullptr,
-		allocator);
+			));
+
+	auto renderable_material = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)(
+		"Materials", &RenderScene::getRenderableMaterialsCount, nullptr, nullptr, allocator);
 	renderable_material->addChild(LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",
 		&RenderScene::getRenderableMaterial,
 		&RenderScene::setRenderableMaterial,
 		"Material (*.mat)",
-		MATERIAL_HASH,
-		allocator));
+		MATERIAL_HASH));
 	PropertyRegister::add("renderable", renderable_material);
 
 	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Ambient color",
-							  &RenderScene::getLightAmbientColor,
-							  &RenderScene::setLightAmbientColor,
-							  allocator));
+		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)(
+			"Ambient color", &RenderScene::getLightAmbientColor, &RenderScene::setLightAmbientColor));
 	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Diffuse color",
-							  &RenderScene::getGlobalLightColor,
-							  &RenderScene::setGlobalLightColor,
-							  allocator));
+		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)(
+			"Diffuse color", &RenderScene::getGlobalLightColor, &RenderScene::setGlobalLightColor));
 	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Specular color",
-							  &RenderScene::getGlobalLightSpecular,
-							  &RenderScene::setGlobalLightSpecular,
-							  allocator));
+		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)(
+			"Specular color", &RenderScene::getGlobalLightSpecular, &RenderScene::setGlobalLightSpecular));
 	PropertyRegister::add("global_light",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Ambient intensity",
-							  &RenderScene::getLightAmbientIntensity,
-							  &RenderScene::setLightAmbientIntensity,
-							  0.0f,
-							  FLT_MAX,
-							  0.05f,
-							  allocator));
+			&RenderScene::getLightAmbientIntensity,
+			&RenderScene::setLightAmbientIntensity,
+			0.0f,
+			FLT_MAX,
+			0.05f));
 	PropertyRegister::add("global_light",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Diffuse intensity",
-							  &RenderScene::getGlobalLightIntensity,
-							  &RenderScene::setGlobalLightIntensity,
-							  0.0f,
-							  FLT_MAX,
-							  0.05f,
-							  allocator));
+			&RenderScene::getGlobalLightIntensity,
+			&RenderScene::setGlobalLightIntensity,
+			0.0f,
+			FLT_MAX,
+			0.05f));
 	PropertyRegister::add("global_light",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Specular intensity",
-							  &RenderScene::getGlobalLightSpecularIntensity,
-							  &RenderScene::setGlobalLightSpecularIntensity,
-							  0,
-							  FLT_MAX,
-							  0.01f,
-							  allocator));
+			&RenderScene::getGlobalLightSpecularIntensity,
+			&RenderScene::setGlobalLightSpecularIntensity,
+			0,
+			FLT_MAX,
+			0.01f));
 	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec4, RenderScene>)("Shadow cascades",
-							  &RenderScene::getShadowmapCascades,
-							  &RenderScene::setShadowmapCascades,
-							  allocator));
+		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec4, RenderScene>)(
+			"Shadow cascades", &RenderScene::getShadowmapCascades, &RenderScene::setShadowmapCascades));
 	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Fog density",
-							  &RenderScene::getFogDensity,
-							  &RenderScene::setFogDensity,
-							  0.0f,
-							  1.0f,
-							  0.01f,
-							  allocator));
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)(
+			"Fog density", &RenderScene::getFogDensity, &RenderScene::setFogDensity, 0.0f, 1.0f, 0.01f));
 	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Fog bottom",
-							  &RenderScene::getFogBottom,
-							  &RenderScene::setFogBottom,
-							  -FLT_MAX,
-							  FLT_MAX,
-							  1.0f,
-							  allocator));
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)(
+			"Fog bottom", &RenderScene::getFogBottom, &RenderScene::setFogBottom, -FLT_MAX, FLT_MAX, 1.0f));
 	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Fog height",
-							  &RenderScene::getFogHeight,
-							  &RenderScene::setFogHeight,
-							  0.01f,
-							  FLT_MAX,
-							  1.0f,
-							  allocator));
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)(
+			"Fog height", &RenderScene::getFogHeight, &RenderScene::setFogHeight, 0.01f, FLT_MAX, 1.0f));
 	PropertyRegister::add(
 		"global_light",
 		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)(
-			"Fog color", &RenderScene::getFogColor, &RenderScene::setFogColor, allocator));
+			"Fog color", &RenderScene::getFogColor, &RenderScene::setFogColor));
 
 	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Diffuse color",
-							  &RenderScene::getPointLightColor,
-							  &RenderScene::setPointLightColor,
-							  allocator));
+		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)(
+			"Diffuse color", &RenderScene::getPointLightColor, &RenderScene::setPointLightColor));
 	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)("Specular color",
-							  &RenderScene::getPointLightSpecularColor,
-							  &RenderScene::setPointLightSpecularColor,
-							  allocator));
+		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)(
+			"Specular color", &RenderScene::getPointLightSpecularColor, &RenderScene::setPointLightSpecularColor));
 	PropertyRegister::add("point_light",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Diffuse intensity",
-							  &RenderScene::getPointLightIntensity,
-							  &RenderScene::setPointLightIntensity,
-							  0.0f,
-							  FLT_MAX,
-							  0.05f,
-							  allocator));
+			&RenderScene::getPointLightIntensity,
+			&RenderScene::setPointLightIntensity,
+			0.0f,
+			FLT_MAX,
+			0.05f));
 	PropertyRegister::add("point_light",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Specular intensity",
-							  &RenderScene::getPointLightSpecularIntensity,
-							  &RenderScene::setPointLightSpecularIntensity,
-							  0.0f,
-							  FLT_MAX,
-							  0.05f,
-							  allocator));
+			&RenderScene::getPointLightSpecularIntensity,
+			&RenderScene::setPointLightSpecularIntensity,
+			0.0f,
+			FLT_MAX,
+			0.05f));
 	PropertyRegister::add("point_light",
-		&(LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("FOV",
-							  &RenderScene::getLightFOV,
-							  &RenderScene::setLightFOV,
-							  0,
-							  360,
-							  5,
-							  allocator))->setIsInRadians(true));
+		&(LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)(
+			  "FOV", &RenderScene::getLightFOV, &RenderScene::setLightFOV, 0, 360, 5))
+			 ->setIsInRadians(true));
 	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Attenuation",
-							  &RenderScene::getLightAttenuation,
-							  &RenderScene::setLightAttenuation,
-							  0.0f,
-							  1000.0f,
-							  0.1f,
-							  allocator));
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)(
+			"Attenuation", &RenderScene::getLightAttenuation, &RenderScene::setLightAttenuation, 0.0f, 1000.0f, 0.1f));
 	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Range",
-							  &RenderScene::getLightRange,
-							  &RenderScene::setLightRange,
-							  0.0f,
-							  FLT_MAX,
-							  1.0f,
-							  allocator));
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)(
+			"Range", &RenderScene::getLightRange, &RenderScene::setLightRange, 0.0f, FLT_MAX, 1.0f));
 	PropertyRegister::add("point_light",
-		LUMIX_NEW(allocator, BoolPropertyDescriptor<RenderScene>)("Cast shadows",
-							  &RenderScene::getLightCastShadows,
-							  &RenderScene::setLightCastShadows,
-							  allocator));
+		LUMIX_NEW(allocator, BoolPropertyDescriptor<RenderScene>)(
+			"Cast shadows", &RenderScene::getLightCastShadows, &RenderScene::setLightCastShadows));
 	PropertyRegister::add("terrain",
 		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",
-							  &RenderScene::getTerrainMaterialPath,
-							  &RenderScene::setTerrainMaterialPath,
-							  "Material (*.mat)",
-							  MATERIAL_HASH,
-							  allocator));
+			&RenderScene::getTerrainMaterialPath,
+			&RenderScene::setTerrainMaterialPath,
+			"Material (*.mat)",
+			MATERIAL_HASH));
 	PropertyRegister::add("terrain",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("XZ scale",
-							  &RenderScene::getTerrainXZScale,
-							  &RenderScene::setTerrainXZScale,
-							  0.0f,
-							  FLT_MAX,
-							  0.0f,
-							  allocator));
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)(
+			"XZ scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale, 0.0f, FLT_MAX, 0.0f));
 	PropertyRegister::add("terrain",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Height scale",
-							  &RenderScene::getTerrainYScale,
-							  &RenderScene::setTerrainYScale,
-							  0.0f,
-							  FLT_MAX,
-							  0.0f,
-							  allocator));
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)(
+			"Height scale", &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale, 0.0f, FLT_MAX, 0.0f));
 
-	auto grass = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)("Grass",
-		&RenderScene::getGrassCount,
-		&RenderScene::addGrass,
-		&RenderScene::removeGrass,
-		allocator);
-	grass->addChild(LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Mesh",
-		&RenderScene::getGrassPath,
-		&RenderScene::setGrassPath,
-		"Mesh (*.msh)",
-		MODEL_HASH,
-		allocator));
-	grass->addChild(LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Distance",
-		&RenderScene::getGrassDistance,
-		&RenderScene::setGrassDistance,
-		1.0f,
-		FLT_MAX,
-		1.0f,
-		allocator));
+	auto grass = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)(
+		"Grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass, allocator);
+	grass->addChild(LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)(
+		"Mesh", &RenderScene::getGrassPath, &RenderScene::setGrassPath, "Mesh (*.msh)", MODEL_HASH));
+	grass->addChild(LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)(
+		"Distance", &RenderScene::getGrassDistance, &RenderScene::setGrassDistance, 1.0f, FLT_MAX, 1.0f));
 	auto ground = LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)(
-		"Ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround, allocator);
+		"Ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround);
 	ground->setLimit(0, 4);
 	grass->addChild(ground);
 	grass->addChild(LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)(
-		"Density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity, allocator));
+		"Density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity));
 	PropertyRegister::add("terrain", grass);
 }
 

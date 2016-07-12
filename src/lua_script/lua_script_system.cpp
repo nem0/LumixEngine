@@ -1490,7 +1490,7 @@ namespace Lumix
 		auto& allocator = engine.getAllocator();
 		PropertyRegister::add("lua_script",
 			LUMIX_NEW(allocator, BlobPropertyDescriptor<LuaScriptScene>)(
-				"data", &LuaScriptScene::getScriptData, &LuaScriptScene::setScriptData, allocator));
+				"data", &LuaScriptScene::getScriptData, &LuaScriptScene::setScriptData));
 	}
 
 
