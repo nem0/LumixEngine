@@ -121,7 +121,8 @@ public:
 				{
 					auto* desc = Lumix::PropertyRegister::getDescriptor(type, property_id);
 					char buf[Lumix::MAX_PATH_LENGTH];
-					if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), resource_type, 300))
+					bool create_empty = ImGui::Selectable("Empty", false);
+					if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), resource_type, 300) || create_empty)
 					{
 						if (create_entity)
 						{
@@ -130,7 +131,7 @@ public:
 						}
 
 						editor->addComponent(type);
-						editor->setProperty(type, -1, *desc, buf, Lumix::stringLength(buf) + 1);
+						if(!create_empty) editor->setProperty(type, -1, *desc, buf, Lumix::stringLength(buf) + 1);
 						ImGui::CloseCurrentPopup();
 					}
 				}

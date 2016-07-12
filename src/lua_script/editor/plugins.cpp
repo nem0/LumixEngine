@@ -640,7 +640,8 @@ struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 		{
 			char buf[Lumix::MAX_PATH_LENGTH];
 			auto* asset_browser = app.getAssetBrowser();
-			if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), LUA_SCRIPT_HASH, 300))
+			bool create_empty = ImGui::Selectable("Empty", false);
+			if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), LUA_SCRIPT_HASH, 300) || create_empty)
 			{
 				auto& editor = *app.getWorldEditor();
 				if (create_entity)
@@ -658,9 +659,12 @@ struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 				cmd->cmp = editor.getComponent(entity, LUA_SCRIPT_TYPE).handle;
 				editor.executeCommand(cmd);
 
-				auto* set_source_cmd = LUMIX_NEW(allocator, PropertyGridPlugin::SetPropertyCommand)(
-					cmd->scene, cmd->cmp, 0, "-source", buf, allocator);
-				editor.executeCommand(set_source_cmd);
+				if (!create_empty)
+				{
+					auto* set_source_cmd = LUMIX_NEW(allocator, PropertyGridPlugin::SetPropertyCommand)(
+						cmd->scene, cmd->cmp, 0, "-source", buf, allocator);
+					editor.executeCommand(set_source_cmd);
+				}
 
 				ImGui::CloseCurrentPopup();
 			}
