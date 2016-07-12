@@ -374,7 +374,8 @@ struct GizmoImpl : public Gizmo
 
 		auto edit_camera = m_editor.getEditCamera();
 		Vec3 origin, cursor_dir;
-		m_editor.getRenderInterface()->getRay(edit_camera.handle, m_editor.getMouseX(), m_editor.getMouseY(), origin, cursor_dir);
+		m_editor.getRenderInterface()->getRay(
+			edit_camera.handle, m_editor.getMouseX(), m_editor.getMouseY(), origin, cursor_dir);
 
 		m_transform_axis = Axis::NONE;
 		m_active = -1;
@@ -392,29 +393,28 @@ struct GizmoImpl : public Gizmo
 
 			if (m_mode == Mode::TRANSLATE)
 			{
-				Matrix triangle_mtx = mtx;
+				Vec3 x = mtx.getXVector() * 0.5f;
+				Vec3 y = mtx.getYVector() * 0.5f;
+				Vec3 z = mtx.getZVector() * 0.5f;
 
-				if (dotProduct(gizmo_mtx.getXVector(), to_entity_dir) < 0) triangle_mtx.setXVector(-triangle_mtx.getXVector());
-				if (dotProduct(gizmo_mtx.getYVector(), to_entity_dir) < 0) triangle_mtx.setYVector(-triangle_mtx.getYVector());
-				if (dotProduct(gizmo_mtx.getZVector(), to_entity_dir) < 0) triangle_mtx.setZVector(-triangle_mtx.getZVector());
+				if (dotProduct(gizmo_mtx.getXVector(), to_entity_dir) < 0) x = -x;
+				if (dotProduct(gizmo_mtx.getYVector(), to_entity_dir) < 0) y = -y;
+				if (dotProduct(gizmo_mtx.getZVector(), to_entity_dir) < 0) z = -z;
 
 				float t, tmin = FLT_MAX;
-				bool hit = Math::getRayTriangleIntersection(
-					origin, cursor_dir, pos, pos + triangle_mtx.getXVector() * 0.5f, pos + triangle_mtx.getYVector() * 0.5f, &t);
+				bool hit = Math::getRayTriangleIntersection(origin, cursor_dir, pos, pos + x, pos + y, &t);
 				if (hit)
 				{
 					tmin = t;
 					m_transform_axis = Axis::XY;
 				}
-				hit = Math::getRayTriangleIntersection(
-					origin, cursor_dir, pos, pos + triangle_mtx.getYVector() * 0.5f, pos + triangle_mtx.getZVector() * 0.5f, &t);
+				hit = Math::getRayTriangleIntersection(origin, cursor_dir, pos, pos + y, pos + z, &t);
 				if (hit && t < tmin)
 				{
 					tmin = t;
 					m_transform_axis = Axis::YZ;
 				}
-				hit = Math::getRayTriangleIntersection(
-					origin, cursor_dir, pos, pos + triangle_mtx.getXVector() * 0.5f, pos + triangle_mtx.getZVector() * 0.5f, &t);
+				hit = Math::getRayTriangleIntersection(origin, cursor_dir, pos, pos + x, pos + z, &t);
 				if (hit && t < tmin)
 				{
 					m_transform_axis = Axis::XZ;
@@ -436,9 +436,12 @@ struct GizmoImpl : public Gizmo
 					continue;
 				}
 
-				if (x_dist < y_dist && x_dist < z_dist) m_transform_axis = Axis::X;
-				else if (y_dist < z_dist) m_transform_axis = Axis::Y;
-				else m_transform_axis = Axis::Z;
+				if (x_dist < y_dist && x_dist < z_dist)
+					m_transform_axis = Axis::X;
+				else if (y_dist < z_dist)
+					m_transform_axis = Axis::Y;
+				else
+					m_transform_axis = Axis::Z;
 
 				if (m_transform_axis != Axis::NONE)
 				{
@@ -446,31 +449,34 @@ struct GizmoImpl : public Gizmo
 					return;
 				}
 			}
-			
+
 			if (m_mode == Mode::ROTATE)
 			{
 				Vec3 hit;
 				if (Math::getRaySphereIntersection(origin, cursor_dir, pos, scale, hit))
 				{
-					auto x = gizmo_mtx.getXVector();
+					Vec3 x = gizmo_mtx.getXVector();
 					float x_dist = fabs(dotProduct(hit, x) - dotProduct(x, pos));
 
-					auto y = gizmo_mtx.getYVector();
+					Vec3 y = gizmo_mtx.getYVector();
 					float y_dist = fabs(dotProduct(hit, y) - dotProduct(y, pos));
 
-					auto z = gizmo_mtx.getZVector();
+					Vec3 z = gizmo_mtx.getZVector();
 					float z_dist = fabs(dotProduct(hit, z) - dotProduct(z, pos));
 
-					float qq = scale * 0.15f;
-					if (x_dist > qq && y_dist > qq && z_dist > qq)
+					float influence_dist = scale * 0.15f;
+					if (x_dist > influence_dist && y_dist > influence_dist && z_dist > influence_dist)
 					{
 						m_transform_axis = Axis::NONE;
 						return;
 					}
 
-					if (x_dist < y_dist && x_dist < z_dist) m_transform_axis = Axis::X;
-					else if (y_dist < z_dist) m_transform_axis = Axis::Y;
-					else m_transform_axis = Axis::Z;
+					if (x_dist < y_dist && x_dist < z_dist)
+						m_transform_axis = Axis::X;
+					else if (y_dist < z_dist)
+						m_transform_axis = Axis::Y;
+					else
+						m_transform_axis = Axis::Z;
 
 					m_active = i;
 					return;
