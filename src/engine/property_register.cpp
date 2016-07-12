@@ -87,6 +87,17 @@ const IPropertyDescriptor* getDescriptor(ComponentType type, uint32 name_hash)
 		{
 			return props[i];
 		}
+		if (props[i]->getType() == IPropertyDescriptor::ARRAY)
+		{
+			auto* array_desc = static_cast<IArrayDescriptor*>(props[i]);
+			for (auto* child : array_desc->getChildren())
+			{
+				if (child->getNameHash() == name_hash)
+				{
+					return child;
+				}
+			}
+		}
 	}
 	return nullptr;
 }
