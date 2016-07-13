@@ -38,6 +38,14 @@ static const uint32 RENDERER_HASH = crc32("renderer");
 static const uint32 PHYSICS_HASH = crc32("PHYSICS");
 
 
+static Vec3 fromPhysx(const physx::PxVec3& v) { return Vec3(v.x, v.y, v.z); }
+static physx::PxVec3 toPhysx(const Vec3& v) { return physx::PxVec3(v.x, v.y, v.z); }
+static Quat fromPhysx(const physx::PxQuat& v) { return Quat(v.x, v.y, v.z, v.w); }
+static physx::PxQuat toPhysx(const Quat& v) { return physx::PxQuat(v.x, v.y, v.z, v.w); }
+static Transform fromPhysx(const physx::PxTransform& v) { return{ fromPhysx(v.p), fromPhysx(v.q) }; }
+static physx::PxTransform toPhysx(const Transform& v) { return{ toPhysx(v.pos), toPhysx(v.rot) }; }
+
+
 struct EditorPlugin : public WorldEditor::Plugin
 {
 	explicit EditorPlugin(WorldEditor& editor)
@@ -46,32 +54,101 @@ struct EditorPlugin : public WorldEditor::Plugin
 	}
 
 
-	static void showD6JointGizmo(ComponentUID cmp)
+	static void showD6JointGizmo(const Transform& global_frame, RenderScene& render_scene, physx::PxD6Joint* joint)
 	{
-		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
-		Universe& universe = phy_scene->getUniverse();
-		auto* render_scene = static_cast<RenderScene*>(universe.getScene(RENDERER_HASH));
-		if (!render_scene) return;
+		physx::PxRigidActor* actors[2];
+		joint->getActors(actors[0], actors[1]);
 
-		Entity other_entity = phy_scene->getJointConnectedBody(cmp.handle);
-		if (!isValid(other_entity)) return;
-
-		Transform local_frame0 = phy_scene->getJointLocalFrame(cmp.handle);
-		Transform global_frame0 = universe.getTransform(cmp.entity) * local_frame0;
+		physx::PxTransform local_frame0 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR0);
+		Transform global_frame0 = global_frame * fromPhysx(local_frame0);
 		Vec3 joint_pos = global_frame0.pos;
 		Matrix mtx0 = global_frame0.toMatrix();
 
-		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getXVector(), 0xffff0000, 0);
-		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getYVector(), 0xff00ff00, 0);
-		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getZVector(), 0xff0000ff, 0);
+		render_scene.addDebugLine(joint_pos, joint_pos + mtx0.getXVector(), 0xffff0000, 0);
+		render_scene.addDebugLine(joint_pos, joint_pos + mtx0.getYVector(), 0xff00ff00, 0);
+		render_scene.addDebugLine(joint_pos, joint_pos + mtx0.getZVector(), 0xff0000ff, 0);
 
-		Transform local_frame1 = phy_scene->getJointConnectedBodyLocalFrame(cmp.handle);
-		Transform global_frame1 = universe.getTransform(other_entity) * local_frame1;
-		Matrix mtx1 = global_frame1.toMatrix();
+		Matrix mtx1 = global_frame0.toMatrix();
+		if (actors[1])
+		{
+			physx::PxTransform local_frame1 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR1);
+			Transform global_frame1 = fromPhysx(actors[1]->getGlobalPose() * local_frame1);
+			mtx1 = global_frame1.toMatrix();
 
-		render_scene->addDebugLine(joint_pos, joint_pos + mtx1.getXVector(), 0xffff0000, 0);
-		render_scene->addDebugLine(joint_pos, joint_pos + mtx1.getYVector(), 0xff00ff00, 0);
-		render_scene->addDebugLine(joint_pos, joint_pos + mtx1.getZVector(), 0xff0000ff, 0);
+			render_scene.addDebugLine(joint_pos, joint_pos + mtx1.getXVector(), 0xffff0000, 0);
+			render_scene.addDebugLine(joint_pos, joint_pos + mtx1.getYVector(), 0xff00ff00, 0);
+			render_scene.addDebugLine(joint_pos, joint_pos + mtx1.getZVector(), 0xff0000ff, 0);
+		}
+		bool is_swing1_limited = joint->getMotion(physx::PxD6Axis::eSWING1) == physx::PxD6Motion::eLIMITED;
+		bool is_swing2_limited = joint->getMotion(physx::PxD6Axis::eSWING2) == physx::PxD6Motion::eLIMITED;
+		if (is_swing1_limited && is_swing2_limited)
+		{
+			float swing1 = joint->getSwingLimit().yAngle;
+			float swing2 = joint->getSwingLimit().zAngle;
+			render_scene.addDebugCone(joint_pos,
+				mtx1.getXVector(),
+				mtx1.getYVector() * tanf(swing1),
+				mtx1.getZVector() * tanf(swing2),
+				0xff555555,
+				0);
+		}
+		else if (is_swing1_limited)
+		{
+			Vec3 x_vec = mtx1.getXVector();
+			Vec3 z_vec = mtx1.getZVector();
+			float swing1 = joint->getSwingLimit().yAngle;
+			Vec3 prev_pos = joint_pos + z_vec * sinf(-swing1) + x_vec * cosf(-swing1);
+			render_scene.addDebugLine(prev_pos, joint_pos, 0xff555555, 0);
+			for (int i = 1; i <= 32; ++i)
+			{
+				float angle = -swing1 + (2*swing1) * i / 32.0f;
+				float s = sinf(angle);
+				float c = cosf(angle);
+				Vec3 pos = joint_pos + z_vec * s + x_vec * c;
+				render_scene.addDebugLine(pos, prev_pos, 0xff555555, 0);
+				prev_pos = pos;
+			}
+			render_scene.addDebugLine(prev_pos, joint_pos, 0xff555555, 0);
+		}
+		else if (is_swing2_limited)
+		{
+			Vec3 y_vec = mtx1.getYVector();
+			Vec3 x_vec = mtx1.getXVector();
+			float swing2 = joint->getSwingLimit().zAngle;
+			Vec3 prev_pos = joint_pos + y_vec * sinf(-swing2) + x_vec * cosf(-swing2);
+			render_scene.addDebugLine(prev_pos, joint_pos, 0xff555555, 0);
+			for (int i = 1; i <= 32; ++i)
+			{
+				float angle = -swing2 + (2 * swing2) * i / 32.0f;
+				float s = sinf(angle);
+				float c = cosf(angle);
+				Vec3 pos = joint_pos + y_vec * s + x_vec * c;
+				render_scene.addDebugLine(pos, prev_pos, 0xff555555, 0);
+				prev_pos = pos;
+			}
+			render_scene.addDebugLine(prev_pos, joint_pos, 0xff555555, 0);
+		}
+
+		bool is_twist_limited = joint->getMotion(physx::PxD6Axis::eTWIST) == physx::PxD6Motion::eLIMITED;
+		if (is_twist_limited)
+		{
+			Vec3 y_vec = mtx1.getYVector();
+			Vec3 z_vec = mtx1.getZVector();
+			float lower = joint->getTwistLimit().lower;
+			float upper = joint->getTwistLimit().upper;
+			Vec3 prev_pos = joint_pos + y_vec * sinf(lower) + z_vec * cosf(lower);
+			render_scene.addDebugLine(prev_pos, joint_pos, 0xff555555, 0);
+			for (int i = 1; i <= 32; ++i)
+			{
+				float angle = lower + (upper - lower) * i / 32.0f;
+				float s = sinf(angle);
+				float c = cosf(angle);
+				Vec3 pos = joint_pos + y_vec * s + z_vec * c;
+				render_scene.addDebugLine(pos, prev_pos, 0xff555555, 0);
+				prev_pos = pos;
+			}
+			render_scene.addDebugLine(prev_pos, joint_pos, 0xff555555, 0);
+		}
 	}
 
 
@@ -306,7 +383,8 @@ struct EditorPlugin : public WorldEditor::Plugin
 
 		if (cmp.type == D6_JOINT_TYPE)
 		{
-			showD6JointGizmo(cmp);
+			physx::PxD6Joint* joint = static_cast<physx::PxD6Joint*>(phy_scene->getJoint(cmp.handle));
+			showD6JointGizmo(universe.getTransform(cmp.entity), *render_scene, joint);
 			return true;
 		}
 
@@ -440,6 +518,9 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 	void onJointGUI()
 	{
 		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
+		auto* render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(RENDERER_HASH));
+		if (!render_scene) return;
+
 		int count = scene->getJointCount();
 		if (count > 0 && ImGui::CollapsingHeader("Joints"))
 		{
@@ -454,6 +535,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 				cmp.handle = scene->getJointComponent(i);
 				cmp.scene = scene;
 				cmp.entity = scene->getJointEntity(cmp.handle);
+				physx::PxJoint* joint = scene->getJoint(cmp.handle);
 				switch ((physx::PxJointConcreteType::Enum)scene->getJoint(cmp.handle)->getConcreteType())
 				{
 					case physx::PxJointConcreteType::eDISTANCE:
@@ -470,7 +552,9 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 						break;
 					case physx::PxJointConcreteType::eD6:
 						cmp.type = D6_JOINT_TYPE;
-						EditorPlugin::showD6JointGizmo(cmp);
+						EditorPlugin::showD6JointGizmo(m_editor.getUniverse()->getTransform(cmp.entity),
+							*render_scene,
+							static_cast<physx::PxD6Joint*>(joint));
 						break;
 				}
 
@@ -649,6 +733,11 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 			Matrix mtx = Quat(pose.q.x, pose.q.y, pose.q.z, pose.q.w).toMatrix();
 			mtx.setTranslation(Vec3(pose.p.x, pose.p.y, pose.p.z));
 			if(joint->is<physx::PxRevoluteJoint>())	EditorPlugin::showHingeJointGizmo(phy_scene, Vec2(0, 0), false, mtx);
+			if (joint->is<physx::PxD6Joint>())
+			{
+				EditorPlugin::showD6JointGizmo(
+					fromPhysx(a0->getGlobalPose()), render_scene, static_cast<physx::PxD6Joint*>(joint));
+			}
 		}
 	}
 

@@ -268,12 +268,14 @@ namespace Lumix
 				0.0f,
 				FLT_MAX,
 				0.0f));
-		PropertyRegister::add("d6_joint",
-			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)(
-				"Swing limit", &PhysicsScene::getD6JointSwingLimit, &PhysicsScene::setD6JointSwingLimit));
-		PropertyRegister::add("d6_joint",
-			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)(
-				"Twist limit", &PhysicsScene::getD6JointTwistLimit, &PhysicsScene::setD6JointTwistLimit));
+		auto* d6_swing_limit_prop = LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)(
+			"Swing limit", &PhysicsScene::getD6JointSwingLimit, &PhysicsScene::setD6JointSwingLimit);
+		d6_swing_limit_prop->setIsInRadians(true);
+		PropertyRegister::add("d6_joint", d6_swing_limit_prop);
+		auto* d6_twist_limit_prop = LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)(
+			"Twist limit", &PhysicsScene::getD6JointTwistLimit, &PhysicsScene::setD6JointTwistLimit);
+		d6_twist_limit_prop->setIsInRadians(true);
+		PropertyRegister::add("d6_joint", d6_twist_limit_prop);
 
 		PropertyRegister::add("spherical_joint",
 			LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)(

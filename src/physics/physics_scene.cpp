@@ -693,8 +693,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		auto* joint = getD6Joint(cmp);
 		auto px_limit = joint->getSwingLimit();
-		px_limit.yAngle = limit.x;
-		px_limit.zAngle = limit.y;
+		px_limit.yAngle = Math::maximum(0.0f, limit.x);
+		px_limit.zAngle = Math::maximum(0.0f, limit.y);
 		joint->setSwingLimit(px_limit);
 	}
 

@@ -1810,6 +1810,10 @@ public:
 				{
 					int key = event.key.keysym.sym & ~SDLK_SCANCODE_MASK;
 					io.KeysDown[key] = (event.type == SDL_KEYDOWN);
+					if (event.key.keysym.scancode == SDL_SCANCODE_KP_ENTER)
+					{
+						io.KeysDown[SDLK_RETURN] = (event.type == SDL_KEYDOWN);
+					}
 					io.KeyShift = ((SDL_GetModState() & KMOD_SHIFT) != 0);
 					io.KeyCtrl = ((SDL_GetModState() & KMOD_CTRL) != 0);
 					io.KeyAlt = ((SDL_GetModState() & KMOD_ALT) != 0);
