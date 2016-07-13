@@ -116,26 +116,23 @@ public:
 		{
 			void onGUI(bool create_entity) override
 			{
+				ImGui::SetNextWindowSize(ImVec2(300, 300));
 				if (!ImGui::BeginMenu(label)) return;
-				if (ImGui::BeginChild("size", ImVec2(250, 250)))
+				auto* desc = Lumix::PropertyRegister::getDescriptor(type, property_id);
+				char buf[Lumix::MAX_PATH_LENGTH];
+				bool create_empty = ImGui::Selectable("Empty", false);
+				if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), resource_type, 0) || create_empty)
 				{
-					auto* desc = Lumix::PropertyRegister::getDescriptor(type, property_id);
-					char buf[Lumix::MAX_PATH_LENGTH];
-					bool create_empty = ImGui::Selectable("Empty", false);
-					if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), resource_type, 300) || create_empty)
+					if (create_entity)
 					{
-						if (create_entity)
-						{
-							Lumix::Entity entity = editor->addEntity();
-							editor->selectEntities(&entity, 1);
-						}
-
-						editor->addComponent(type);
-						if(!create_empty) editor->setProperty(type, -1, *desc, buf, Lumix::stringLength(buf) + 1);
-						ImGui::CloseCurrentPopup();
+						Lumix::Entity entity = editor->addEntity();
+						editor->selectEntities(&entity, 1);
 					}
+
+					editor->addComponent(type);
+					if(!create_empty) editor->setProperty(type, -1, *desc, buf, Lumix::stringLength(buf) + 1);
+					ImGui::CloseCurrentPopup();
 				}
-				ImGui::EndChild();
 				ImGui::EndMenu();
 			}
 

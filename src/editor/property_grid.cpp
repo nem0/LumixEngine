@@ -52,13 +52,13 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	{
 		float f;
 		tmp.read(f);
-		if (desc.isInRadians()) f = Lumix::Math::radiansToDegrees(f);
 		auto& d = static_cast<Lumix::IDecimalPropertyDescriptor&>(desc);
+		if (d.isInRadians()) f = Lumix::Math::radiansToDegrees(f);
 		if ((d.getMax() - d.getMin()) / d.getStep() <= 100)
 		{
 			if (ImGui::SliderFloat(desc_name, &f, d.getMin(), d.getMax()))
 			{
-				if (desc.isInRadians()) f = Lumix::Math::degreesToRadians(f);
+				if (d.isInRadians()) f = Lumix::Math::degreesToRadians(f);
 				m_editor.setProperty(cmp.type, index, desc, &f, sizeof(f));
 			}
 		}
@@ -66,7 +66,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		{
 			if (ImGui::DragFloat(desc_name, &f, d.getStep(), d.getMin(), d.getMax()))
 			{
-				if (desc.isInRadians()) f = Lumix::Math::degreesToRadians(f);
+				if (d.isInRadians()) f = Lumix::Math::degreesToRadians(f);
 				m_editor.setProperty(cmp.type, index, desc, &f, sizeof(f));
 			}
 		}
@@ -531,10 +531,7 @@ void PropertyGrid::showCoreProperties(Lumix::Entity entity)
 	if (ImGui::DragFloat3("Position", &pos.x)) m_editor.setEntitiesPositions(&entity, &pos, 1);
 
 	auto rot = m_editor.getUniverse()->getRotation(entity);
-	auto euler = rot.toEuler();
-	euler.x = Lumix::Math::radiansToDegrees(fmodf(euler.x, Lumix::Math::PI));
-	euler.y = Lumix::Math::radiansToDegrees(fmodf(euler.y, Lumix::Math::PI));
-	euler.z = Lumix::Math::radiansToDegrees(fmodf(euler.z, Lumix::Math::PI));
+	auto euler = Lumix::Math::radiansToDegrees(rot.toEuler());
 	if (ImGui::DragFloat3("Rotation", &euler.x))
 	{
 		euler.x = Lumix::Math::degreesToRadians(fmodf(euler.x, 180));

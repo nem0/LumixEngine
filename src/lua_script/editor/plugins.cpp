@@ -635,41 +635,38 @@ struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 
 	void onGUI(bool create_entity) override
 	{
+		ImGui::SetNextWindowSize(ImVec2(300, 300));
 		if (!ImGui::BeginMenu(getLabel())) return;
-		if (ImGui::BeginChild("size", ImVec2(250, 250)))
+		char buf[Lumix::MAX_PATH_LENGTH];
+		auto* asset_browser = app.getAssetBrowser();
+		bool create_empty = ImGui::Selectable("Empty", false);
+		if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), LUA_SCRIPT_HASH, 0) || create_empty)
 		{
-			char buf[Lumix::MAX_PATH_LENGTH];
-			auto* asset_browser = app.getAssetBrowser();
-			bool create_empty = ImGui::Selectable("Empty", false);
-			if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), LUA_SCRIPT_HASH, 300) || create_empty)
+			auto& editor = *app.getWorldEditor();
+			if (create_entity)
 			{
-				auto& editor = *app.getWorldEditor();
-				if (create_entity)
-				{
-					Entity entity = editor.addEntity();
-					editor.selectEntities(&entity, 1);
-				}
-				editor.addComponent(LUA_SCRIPT_TYPE);
-
-				auto& allocator = editor.getAllocator();
-				auto* cmd = LUMIX_NEW(allocator, PropertyGridPlugin::AddScriptCommand);
-
-				cmd->scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_HASH));
-				Entity entity = editor.getSelectedEntities()[0];
-				cmd->cmp = editor.getComponent(entity, LUA_SCRIPT_TYPE).handle;
-				editor.executeCommand(cmd);
-
-				if (!create_empty)
-				{
-					auto* set_source_cmd = LUMIX_NEW(allocator, PropertyGridPlugin::SetPropertyCommand)(
-						cmd->scene, cmd->cmp, 0, "-source", buf, allocator);
-					editor.executeCommand(set_source_cmd);
-				}
-
-				ImGui::CloseCurrentPopup();
+				Entity entity = editor.addEntity();
+				editor.selectEntities(&entity, 1);
 			}
+			editor.addComponent(LUA_SCRIPT_TYPE);
+
+			auto& allocator = editor.getAllocator();
+			auto* cmd = LUMIX_NEW(allocator, PropertyGridPlugin::AddScriptCommand);
+
+			cmd->scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_HASH));
+			Entity entity = editor.getSelectedEntities()[0];
+			cmd->cmp = editor.getComponent(entity, LUA_SCRIPT_TYPE).handle;
+			editor.executeCommand(cmd);
+
+			if (!create_empty)
+			{
+				auto* set_source_cmd = LUMIX_NEW(allocator, PropertyGridPlugin::SetPropertyCommand)(
+					cmd->scene, cmd->cmp, 0, "-source", buf, allocator);
+				editor.executeCommand(set_source_cmd);
+			}
+
+			ImGui::CloseCurrentPopup();
 		}
-		ImGui::EndChild();
 		ImGui::EndMenu();
 	}
 

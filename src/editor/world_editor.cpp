@@ -1498,6 +1498,7 @@ public:
 		PROFILE_FUNCTION();
 		updateGoTo();
 
+		m_mouse_rel_x = m_mouse_rel_y = 0;
 		if (!m_selected_entities.empty())
 		{
 			m_gizmo->add(m_selected_entities[0]);
@@ -1681,6 +1682,8 @@ public:
 		PROFILE_FUNCTION();
 		m_mouse_x = (float)x;
 		m_mouse_y = (float)y;
+		m_mouse_rel_x = (float)relx;
+		m_mouse_rel_y = (float)rely;
 
 		static const float MOUSE_MULTIPLIER = 1 / 200.0f;
 
@@ -1716,9 +1719,9 @@ public:
 
 
 	float getMouseX() const override { return m_mouse_x; }
-
-
 	float getMouseY() const override { return m_mouse_y; }
+	float getMouseRelX() const override { return m_mouse_rel_x; }
+	float getMouseRelY() const override { return m_mouse_rel_y; }
 
 
 	bool isUniverseChanged() const override { return m_is_universe_changed; }
@@ -3090,6 +3093,8 @@ private:
 	EditorIcons* m_editor_icons;
 	float m_mouse_x;
 	float m_mouse_y;
+	float m_mouse_rel_x;
+	float m_mouse_rel_y;
 	Vec2 m_orbit_delta;
 	Vec2 m_mouse_sensitivity;
 	bool m_gizmo_use_step;

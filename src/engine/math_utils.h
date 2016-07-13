@@ -105,10 +105,14 @@ LUMIX_FORCE_INLINE float degreesToRadians(float angle)
 	return angle * PI / 180.0f;
 }
 
+LUMIX_ENGINE_API Vec3 degreesToRadians(const Vec3& v);
+
 LUMIX_FORCE_INLINE float radiansToDegrees(float angle)
 {
 	return angle / PI * 180.0f;
 }
+
+LUMIX_ENGINE_API Vec3 radiansToDegrees(const Vec3& v);
 
 inline float easeInOut(float t)
 {

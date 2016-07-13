@@ -131,6 +131,8 @@ public:
 	virtual void onMouseUp(int x, int y, MouseButton::Value button) = 0;
 	virtual float getMouseX() const = 0;
 	virtual float getMouseY() const = 0;
+	virtual float getMouseRelX() const = 0;
+	virtual float getMouseRelY() const = 0;
 	virtual void lookAtSelected() = 0;
 	virtual bool isOrbitCamera() const = 0;
 	virtual void setOrbitCamera(bool enable) = 0;

@@ -3,6 +3,7 @@
 #include <PxPhysicsAPI.h>
 
 #include "editor/asset_browser.h"
+#include "editor/gizmo.h"
 #include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
@@ -768,8 +769,15 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 		if (ImGui::DragFloat("Radius", &radius)) scene.setRagdollBoneRadius(bone_handle, radius);
 
 		Transform transform = scene.getRagdollBoneTransform(bone_handle);
-		if (ImGui::DragFloat3("Position", &transform.pos.x))
+		bool changed_by_gizmo = m_editor.getGizmo().immediate(transform);
+		if (ImGui::DragFloat3("Position", &transform.pos.x) || changed_by_gizmo)
 		{
+			scene.setRagdollBoneTransform(bone_handle, transform);
+		}
+		Vec3 euler_angles = Math::radiansToDegrees(transform.rot.toEuler());
+		if (ImGui::DragFloat3("Rotation", &euler_angles.x))
+		{
+			transform.rot.fromEuler(Math::degreesToRadians(euler_angles));
 			scene.setRagdollBoneTransform(bone_handle, transform);
 		}
 

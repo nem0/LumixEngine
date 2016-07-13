@@ -1587,6 +1587,20 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void setRagdollBoneTransform(RagdollBone* bone, const Transform& transform) override
 	{
+		Entity entity = {(int)(intptr_t)bone->actor->userData};
+		
+		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
+		if (!render_scene) return;
+
+		ComponentHandle renderable = render_scene->getRenderableComponent(entity);
+		if (!isValid(renderable)) return;
+
+		Model* model = render_scene->getRenderableModel(renderable);
+		Transform entity_transform = m_universe.getTransform(entity);
+
+		bone->bind_transform =
+			(entity_transform.inverted() * transform).inverted() * model->getBone(bone->pose_bone_idx).transform;
+		bone->inv_bind_transform = bone->bind_transform.inverted();
 		bone->actor->setGlobalPose(toPhysx(transform));
 	}
 
