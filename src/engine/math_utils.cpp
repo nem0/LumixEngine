@@ -9,6 +9,15 @@ namespace Lumix
 namespace Math
 {
 
+Vec3 degreesToRadians(const Vec3& v)
+{
+	return Vec3(degreesToRadians(v.x), degreesToRadians(v.y), degreesToRadians(v.z));
+}
+
+Vec3 radiansToDegrees(const Vec3& v)
+{
+	return Vec3(radiansToDegrees(v.x), radiansToDegrees(v.y), radiansToDegrees(v.z));
+}
 
 bool getRayPlaneIntersecion(const Vec3& origin,
 	const Vec3& dir,
