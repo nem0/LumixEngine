@@ -33,26 +33,29 @@ namespace Lumix
 		float getActionValue(uint32 action) override { return 0; }
 
 
-		void injectMouseXMove(float value) override
+		void injectMouseXMove(float rel, float abs) override
 		{
-			m_injected_mouse_rel_pos.x = value;
+			m_injected_mouse_rel_pos.x = rel;
+			m_mouse_pos.x = abs;
 		}
 
 
-		void injectMouseYMove(float value) override
+		void injectMouseYMove(float rel, float abs) override
 		{
-			m_injected_mouse_rel_pos.y = value;
+			m_injected_mouse_rel_pos.y = rel;
+			m_mouse_pos.y = abs;
 		}
 
 
 		float getMouseXMove() const override { return m_mouse_rel_pos.x; }
 		float getMouseYMove() const override { return m_mouse_rel_pos.y; }
-
+		Vec2 getMousePos() const override { return m_mouse_pos; }
 
 		void addAction(uint32 action, InputType type, int key, int controller_id) override {}
 
 		IAllocator& m_allocator;
 		Vec2 m_injected_mouse_rel_pos;
+		Vec2 m_mouse_pos;
 		Vec2 m_mouse_rel_pos;
 	};
 
