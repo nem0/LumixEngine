@@ -19,6 +19,7 @@ namespace Lumix
 
 class GameView
 {
+friend struct GUIInterface;
 public:
 	GameView(StudioApp& app);
 	~GameView();
@@ -46,5 +47,8 @@ private:
 	bool m_paused;
 	bool m_is_opengl;
 	StudioApp& m_studio_app;
+	Lumix::Vec2 m_pos;
+	Lumix::Vec2 m_size;
 	bgfx::TextureHandle m_texture_handle;
+	struct GUIInterface* m_gui_interface;
 };

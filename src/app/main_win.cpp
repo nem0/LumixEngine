@@ -318,8 +318,8 @@ public:
 			GetCursorPos(&p);
 			ScreenToClient(m_hwnd, &p);
 			auto& input_system = m_engine->getInputSystem();
-			input_system.injectMouseXMove(float(raw->data.mouse.lLastX));
-			input_system.injectMouseYMove(float(raw->data.mouse.lLastY));
+			input_system.injectMouseXMove(float(raw->data.mouse.lLastX), 0);
+			input_system.injectMouseYMove(float(raw->data.mouse.lLastY), 0);
 		}
 	}
 

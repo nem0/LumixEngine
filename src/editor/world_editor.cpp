@@ -2461,7 +2461,7 @@ public:
 		m_measure_tool = LUMIX_NEW(m_allocator, MeasureTool)();
 		addPlugin(*m_measure_tool);
 
-		const char* plugins[] = { "renderer", "animation", "audio", "physics", "navigation", "lua_script"};
+		const char* plugins[] = { "renderer", "animation", "audio", "physics", "navigation", "lua_script", "gui"};
 
 		PluginManager& plugin_manager = m_engine->getPluginManager();
 		for (auto* plugin_name : plugins)

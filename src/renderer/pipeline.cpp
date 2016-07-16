@@ -1477,12 +1477,6 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	int getPassIdx() const override
-	{
-		return m_pass_idx;
-	}
-
-
 	void setPointLightUniforms(ComponentHandle light_cmp)
 	{
 		if (!isValid(light_cmp)) return;
@@ -1968,6 +1962,45 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	bool checkAvailTransientBuffers(uint32 num_vertices, const bgfx::VertexDecl& decl, uint32 num_indices) override
+	{
+		return bgfx::checkAvailTransientBuffers(num_vertices, decl, num_indices);
+	}
+
+
+	void allocTransientBuffers(bgfx::TransientVertexBuffer* tvb,
+		uint32 num_vertices,
+		const bgfx::VertexDecl& decl,
+		bgfx::TransientIndexBuffer* tib,
+		uint32 num_indices) override
+	{
+		bgfx::allocTransientIndexBuffer(tib, num_indices);
+		bgfx::allocTransientVertexBuffer(tvb, num_vertices, decl);
+	}
+
+
+	void destroyUniform(bgfx::UniformHandle uniform) override { bgfx::destroyUniform(uniform); }
+	
+	
+	bgfx::UniformHandle createTextureUniform(const char* name) override
+	{
+		return bgfx::createUniform(name, bgfx::UniformType::Int1);
+	}
+
+
+	bgfx::TextureHandle createTexture(int width, int height, const uint32* data) override
+	{
+		return bgfx::createTexture2D(
+			width, height, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::copy(data, 4 * width * height));
+	}
+
+
+	void destroyTexture(bgfx::TextureHandle texture) override
+	{
+		bgfx::destroyTexture(texture);
+	}
+
+
 	void setTexture(int slot, bgfx::TextureHandle texture, bgfx::UniformHandle uniform) override
 	{
 		bgfx::setTexture(slot, uniform, texture);
@@ -1980,7 +2013,7 @@ struct PipelineImpl : public Pipeline
 		int first_index,
 		int num_indices,
 		uint64 render_states,
-		bgfx::ProgramHandle program_handle) override
+		const ShaderInstance& shader_instance) override
 	{
 		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(m_render_state | render_states);
@@ -1990,7 +2023,7 @@ struct PipelineImpl : public Pipeline
 		++m_stats.draw_call_count;
 		++m_stats.instance_count;
 		m_stats.triangle_count += num_indices / 3;
-		bgfx::submit(m_bgfx_view, program_handle);
+		bgfx::submit(m_bgfx_view, shader_instance.program_handles[m_pass_idx]);
 	}
 
 

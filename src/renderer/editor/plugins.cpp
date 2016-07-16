@@ -1253,7 +1253,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 				0,
 				indices_count,
 				flags,
-				m_shader->getInstance(0).program_handles[m_pipeline.getPassIdx()]);
+				m_shader->getInstance(0));
 		}
 
 
@@ -1491,7 +1491,6 @@ struct GameViewPlugin : public StudioApp::IPlugin
 				uint16(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
 
 			auto material = m_material;
-			int pass_idx = m_gui_pipeline->getPassIdx();
 			const auto& texture_id =
 				pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : material->getTexture(0)->handle;
 			auto texture_uniform = material->getShader()->m_texture_slots[0].uniform_handle;
@@ -1502,7 +1501,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 				elem_offset,
 				pcmd->ElemCount,
 				material->getRenderStates(),
-				material->getShaderInstance().program_handles[pass_idx]);
+				material->getShaderInstance());
 
 			elem_offset += pcmd->ElemCount;
 		}
