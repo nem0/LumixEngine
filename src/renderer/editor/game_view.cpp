@@ -1,12 +1,13 @@
 #include "game_view.h"
 #include "editor/studio_app.h"
 #include "engine/crc32.h"
+#include "engine/engine.h"
 #include "engine/input_system.h"
+#include "engine/plugin_manager.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
-#include "engine/engine.h"
-#include "engine/plugin_manager.h"
 #include "engine/universe/universe.h"
+#include "gui/gui_system.h"
 #include "imgui/imgui.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
@@ -14,6 +15,21 @@
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include <SDL.h>
+
+
+struct GUIInterface : Lumix::GUISystem::Interface
+{
+	GUIInterface(GameView& game_view)
+		: m_game_view(game_view)
+	{
+	}
+
+	Lumix::Pipeline* getPipeline() override { return m_game_view.m_pipeline; }
+	Lumix::Vec2 getPos() const override { return m_game_view.m_pos; }
+	Lumix::Vec2 getSize() const override { return m_game_view.m_size; }
+
+	GameView& m_game_view;
+};
 
 
 GameView::GameView(StudioApp& app)
@@ -27,6 +43,7 @@ GameView::GameView(StudioApp& app)
 	, m_paused(false)
 	, m_is_opengl(false)
 	, m_texture_handle(BGFX_INVALID_HANDLE)
+	, m_gui_interface(nullptr)
 {
 }
 
@@ -62,6 +79,13 @@ void GameView::init(Lumix::WorldEditor& editor)
 	editor.universeCreated().bind<GameView, &GameView::onUniverseCreated>(this);
 	editor.universeDestroyed().bind<GameView, &GameView::onUniverseDestroyed>(this);
 	onUniverseCreated();
+
+	auto* gui = static_cast<Lumix::GUISystem*>(m_editor->getEngine().getPluginManager().getPlugin("gui"));
+	if (gui)
+	{
+		m_gui_interface = LUMIX_NEW(m_editor->getEngine().getAllocator(), GUIInterface)(*this);
+		gui->setInterface(m_gui_interface);
+	}
 }
 
 
@@ -69,6 +93,12 @@ void GameView::shutdown()
 {
 	m_editor->universeCreated().unbind<GameView, &GameView::onUniverseCreated>(this);
 	m_editor->universeDestroyed().unbind<GameView, &GameView::onUniverseDestroyed>(this);
+	auto* gui = static_cast<Lumix::GUISystem*>(m_editor->getEngine().getPluginManager().getPlugin("gui"));
+	if (gui)
+	{
+		gui->setInterface(nullptr);
+		LUMIX_DELETE(m_editor->getEngine().getAllocator(), m_gui_interface);
+	}
 	Lumix::Pipeline::destroy(m_pipeline);
 	m_pipeline = nullptr;
 }
@@ -113,9 +143,12 @@ void GameView::onGui()
 		auto size = ImGui::GetContentRegionAvail();
 		size.y -= ImGui::GetTextLineHeightWithSpacing();
 		ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
+		ImVec2 pos;
 		if (size.x > 0 && size.y > 0)
 		{
-			auto pos = ImGui::GetWindowPos();
+			pos = ImGui::GetWindowPos();
+			m_pos.x = pos.x;
+			m_pos.y = pos.y;
 			auto cp = ImGui::GetCursorPos();
 			m_pipeline->setViewport(0, 0, int(size.x), int(size.y));
 
@@ -129,6 +162,8 @@ void GameView::onGui()
 			{
 				ImGui::Image(&m_texture_handle, size);
 			}
+			m_size.x = ImGui::GetItemRectSize().x;
+			m_size.y = ImGui::GetItemRectSize().y;
 			if (ImGui::Checkbox("Pause", &m_paused))
 			{
 				m_editor->getEngine().pause(m_paused);
@@ -151,9 +186,48 @@ void GameView::onGui()
 
 		if (m_is_mouse_captured)
 		{
+			Lumix::InputSystem::InputEvent event;
+			if (ImGui::IsMouseReleased(0))
+			{
+				event.type = Lumix::InputSystem::InputEvent::POINTER_UP;
+				m_editor->getEngine().getInputSystem().injectEvent(event);
+			}
+			if (ImGui::IsMouseClicked(0))
+			{
+				event.type = Lumix::InputSystem::InputEvent::POINTER_DOWN;
+				m_editor->getEngine().getInputSystem().injectEvent(event);
+			}
+
 			if (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor->isGameMode())
 			{
 				captureMouse(false);
+			}
+			static bool was_down[512] = {};
+			auto& io = ImGui::GetIO();
+			auto& input = m_editor->getEngine().getInputSystem();
+			for (int i = 0; i < 512; ++i)
+			{
+				if (io.KeysDownDuration[i] == 0)
+				{
+					event.type = Lumix::InputSystem::InputEvent::KEY_DOWN;
+					event.key.sym = i;
+					input.injectEvent(event);
+					was_down[i] = true;
+				}
+				if (!io.KeysDown[i] && was_down[i])
+				{
+					was_down[i] = false;
+					event.type = Lumix::InputSystem::InputEvent::KEY_UP;
+					event.key.sym = i;
+					input.injectEvent(event);
+				}
+			}
+			static ImVec2 old_mouse_pos = io.MousePos;
+			if (io.MousePos.x != old_mouse_pos.x || io.MousePos.y != old_mouse_pos.y)
+			{
+				event.type = Lumix::InputSystem::InputEvent::POINTER_MOVE;
+				input.injectEvent(event);
+				old_mouse_pos = io.MousePos;
 			}
 		}
 

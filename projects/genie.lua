@@ -13,6 +13,7 @@ local build_physics = true
 local build_unit_tests = true
 local build_app = true
 local build_studio = true
+local build_gui = _ACTION == "vs2015"
 
 newoption {
 	trigger = "static-plugins",
@@ -22,6 +23,11 @@ newoption {
 newoption {
 	trigger = "no-physics",
 	description = "Do not build physics plugin."
+}
+
+newoption {
+	trigger = "no-gui",
+	description = "Do not build ingame GUI plugin."
 }
 
 newoption {
@@ -42,6 +48,11 @@ newoption {
 if _OPTIONS["no-physics"] then
 	build_physics = false
 end
+
+if _OPTIONS["no-gui"] then
+	build_gui = false
+end
+
 
 if _OPTIONS["no-studio"] then
 	build_studio = false
@@ -600,6 +611,28 @@ project "navigation"
 	
 	useLua()
 	defaultConfigurations()
+
+if build_gui then
+	project "gui"
+		libType()
+
+		files { "../src/gui/**.h", "../src/gui/**.cpp" }
+		includedirs { "../src", "../src/gui", "../external/turbobadger/include", "../external/bgfx/include" }
+		links { "engine", "renderer" }
+		linkLib "turbobadger"
+		linkLib "bgfx"
+		
+		configuration { "vs*" }
+			links { "winmm", "psapi" }
+		configuration {}
+
+		if build_studio then
+			links { "editor" }
+		end
+	
+		useLua()
+		defaultConfigurations()
+end
 	
 project "lua_script"
 	libType()
@@ -649,6 +682,7 @@ if build_app then
 			forceLink("s_navigation_plugin_register")
 			forceLink("s_physics_plugin_register")
 			forceLink("s_renderer_plugin_register")
+			forceLink("s_gui_plugin_register")
 
 			if build_studio then
 				forceLink("setStudioApp_animation")
@@ -657,13 +691,14 @@ if build_app then
 				forceLink("setStudioApp_navigation")
 				forceLink("setStudioApp_physics")
 				forceLink("setStudioApp_renderer")
+				--forceLink("setStudioApp_gui")
 			end
 				
 			if build_physics then
 				links { "physics" }
 				linkPhysX()
 			end
-			links { "audio", "animation", "renderer", "lua_script", "navigation" }
+			links { "audio", "animation", "renderer", "lua_script", "navigation", "gui" }
 			if build_studio then links {"editor"} end
 			links {"engine"}
 			
@@ -679,6 +714,7 @@ if build_app then
 			linkLib "assimp"
 		end
 		
+		linkLib "turbobadger"
 		linkLib "bgfx"
 		linkLib "lua"
 		linkLib "recast"
@@ -756,6 +792,7 @@ if build_studio then
 			forceLink("s_navigation_plugin_register")
 			forceLink("s_physics_plugin_register")
 			forceLink("s_renderer_plugin_register")
+			forceLink("s_gui_plugin_register")
 
 			forceLink("setStudioApp_animation")
 			forceLink("setStudioApp_audio")
@@ -767,9 +804,10 @@ if build_studio then
 			if build_physics then
 				links { "physics" }
 			end
-			links { "audio", "animation", "renderer", "lua_script", "navigation", "editor", "engine" }
+			links { "audio", "animation", "renderer", "lua_script", "navigation", "editor", "engine", "gui" }
 			linkLib "crnlib"
 			linkLib "assimp"
+			linkLib "turbobadger"
 			linkLib "bgfx"
 			linkLib "lua"
 			linkLib "recast"

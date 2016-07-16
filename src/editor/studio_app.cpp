@@ -1795,8 +1795,8 @@ public:
 				case SDL_MOUSEMOTION:
 				{
 					auto& input_system = m_editor->getEngine().getInputSystem();
-					input_system.injectMouseXMove(float(event.motion.xrel));
-					input_system.injectMouseYMove(float(event.motion.yrel));
+					input_system.injectMouseXMove(float(event.motion.xrel), float(event.motion.x));
+					input_system.injectMouseYMove(float(event.motion.yrel), float(event.motion.y));
 					if (SDL_GetRelativeMouseMode() == SDL_FALSE)
 					{
 						io.MousePos.x = (float)event.motion.x;
