@@ -704,6 +704,7 @@ if build_app then
 				linkPhysX()
 			end
 			if build_gui then
+				linkLib "turbobadger"
 				links { "gui" }
 			end
 			links { "audio", "animation", "renderer", "lua_script", "navigation" }
@@ -722,7 +723,6 @@ if build_app then
 			linkLib "assimp"
 		end
 		
-		linkLib "turbobadger"
 		linkLib "bgfx"
 		linkLib "lua"
 		linkLib "recast"
@@ -814,13 +814,13 @@ if build_studio then
 
 			if build_gui then
 				forceLink("s_gui_plugin_register")
+				linkLib "turbobadger"
 				links { "gui" }
 			end
 
 			links { "audio", "animation", "renderer", "lua_script", "navigation", "editor", "engine" }
 			linkLib "crnlib"
 			linkLib "assimp"
-			linkLib "turbobadger"
 			linkLib "bgfx"
 			linkLib "lua"
 			linkLib "recast"
