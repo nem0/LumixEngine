@@ -680,25 +680,33 @@ if build_app then
 			forceLink("s_audio_plugin_register")
 			forceLink("s_lua_script_plugin_register")
 			forceLink("s_navigation_plugin_register")
-			forceLink("s_physics_plugin_register")
 			forceLink("s_renderer_plugin_register")
-			forceLink("s_gui_plugin_register")
+			
+			if build_gui then
+				forceLink("s_gui_plugin_register")
+			end
 
 			if build_studio then
 				forceLink("setStudioApp_animation")
 				forceLink("setStudioApp_audio")
 				forceLink("setStudioApp_lua_script")
 				forceLink("setStudioApp_navigation")
-				forceLink("setStudioApp_physics")
 				forceLink("setStudioApp_renderer")
 				--forceLink("setStudioApp_gui")
 			end
 				
 			if build_physics then
+				forceLink("s_physics_plugin_register")
+				if build_studio then
+					forceLink("setStudioApp_physics")
+				end
 				links { "physics" }
 				linkPhysX()
 			end
-			links { "audio", "animation", "renderer", "lua_script", "navigation", "gui" }
+			if build_gui then
+				links { "gui" }
+			end
+			links { "audio", "animation", "renderer", "lua_script", "navigation" }
 			if build_studio then links {"editor"} end
 			links {"engine"}
 			
@@ -790,21 +798,26 @@ if build_studio then
 			forceLink("s_audio_plugin_register")
 			forceLink("s_lua_script_plugin_register")
 			forceLink("s_navigation_plugin_register")
-			forceLink("s_physics_plugin_register")
 			forceLink("s_renderer_plugin_register")
-			forceLink("s_gui_plugin_register")
 
 			forceLink("setStudioApp_animation")
 			forceLink("setStudioApp_audio")
 			forceLink("setStudioApp_lua_script")
 			forceLink("setStudioApp_navigation")
-			forceLink("setStudioApp_physics")
 			forceLink("setStudioApp_renderer")
 
 			if build_physics then
+				forceLink("s_physics_plugin_register")
+				forceLink("setStudioApp_physics")
 				links { "physics" }
 			end
-			links { "audio", "animation", "renderer", "lua_script", "navigation", "editor", "engine", "gui" }
+
+			if build_gui then
+				forceLink("s_gui_plugin_register")
+				links { "gui" }
+			end
+
+			links { "audio", "animation", "renderer", "lua_script", "navigation", "editor", "engine" }
 			linkLib "crnlib"
 			linkLib "assimp"
 			linkLib "turbobadger"
