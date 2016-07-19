@@ -1601,7 +1601,21 @@ struct PhysicsSceneImpl : public PhysicsScene
 		bone->bind_transform =
 			(entity_transform.inverted() * transform).inverted() * model->getBone(bone->pose_bone_idx).transform;
 		bone->inv_bind_transform = bone->bind_transform.inverted();
+		physx::PxTransform delta = toPhysx(transform).getInverse() * bone->actor->getGlobalPose();
 		bone->actor->setGlobalPose(toPhysx(transform));
+
+		if (bone->parent_joint)
+		{
+			physx::PxTransform local_pose1 = bone->parent_joint->getLocalPose(physx::PxJointActorIndex::eACTOR1);
+			bone->parent_joint->setLocalPose(physx::PxJointActorIndex::eACTOR1, delta * local_pose1);
+		}
+		auto* child = bone->child;
+		while (child)
+		{
+			physx::PxTransform local_pose0 = child->parent_joint->getLocalPose(physx::PxJointActorIndex::eACTOR0);
+			child->parent_joint->setLocalPose(physx::PxJointActorIndex::eACTOR0, delta * local_pose0);
+			child = child->next;
+		}
 	}
 
 
