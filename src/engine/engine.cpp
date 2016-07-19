@@ -748,7 +748,7 @@ public:
 
 	void setTimeMultiplier(float multiplier) override
 	{
-		m_time_multiplier = multiplier;
+		m_time_multiplier = Math::maximum(multiplier, 0.001f);
 	}
 
 
