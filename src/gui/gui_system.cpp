@@ -252,8 +252,6 @@ struct GUISystemImpl : public GUISystem
 
 		g_tb_lng->Load("gui/language/lng_en.tb.txt");
 		g_tb_skin->Load("gui/skin/skin.tb.txt");
-
-
 	}
 
 

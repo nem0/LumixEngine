@@ -151,6 +151,7 @@ namespace Lumix
 							else
 							{
 								auto& prop = inst.m_properties.emplace(allocator);
+								valid_properties.push(true);
 								switch (lua_type(inst.m_state, -1))
 								{
 									case LUA_TBOOLEAN: prop.type = Property::BOOLEAN; break;
