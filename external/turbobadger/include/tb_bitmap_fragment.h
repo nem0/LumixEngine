@@ -99,7 +99,7 @@ enum TB_VALIDATE_TYPE {
 };
 
 /** TBBitmapFragmentMap is used to pack multiple bitmaps into a single TBBitmap.
-	When initialized (in a size suitable for a TBBitmap) is also creates a software buffer
+	When initialized (in a size suitable for a TBBitmap) it also creates a software buffer
 	that will make up the TBBitmap when all fragments have been added. */
 class TBBitmapFragmentMap
 {

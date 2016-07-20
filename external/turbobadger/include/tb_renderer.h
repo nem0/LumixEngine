@@ -100,12 +100,6 @@ public:
 	/** Draw the bitmap tiled into dst_rect. */
 	virtual void DrawBitmapTile(const TBRect &dst_rect, TBBitmap *bitmap) = 0;
 
-	/** Draw a 1px thick rectangle outline. */
-	virtual void DrawRect(const TBRect &dst_rect, const TBColor &color) = 0;
-
-	/** Draw a filled rectangle. */
-	virtual void DrawRectFill(const TBRect &dst_rect, const TBColor &color) = 0;
-
 	/** Make sure the given bitmap fragment is flushed from any batching, because it may
 		be changed or deleted after this call. */
 	virtual void FlushBitmapFragment(TBBitmapFragment *bitmap_fragment) = 0;

@@ -333,7 +333,6 @@ public:
 	void Focus(bool focus);
 
 	void Clear(bool init_new = true);
-	bool Load(const char *filename);
 	bool SetText(const char *text, TB_CARET_POS pos = TB_CARET_POS_BEGINNING);
 	bool SetText(const char *text, int text_len, TB_CARET_POS pos = TB_CARET_POS_BEGINNING);
 	bool GetText(TBStr &text);

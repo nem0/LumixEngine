@@ -52,6 +52,13 @@ public:
 		increased with the length of the path (excluding the null termination). */
 	bool AppendPath(const char *full_path_and_filename);
 
+	/** Append file content at the end of the buffer. The append position will
+		be increased by the size of the file. It will always append null
+		termination (not included in append position).
+		Returns false of OOM or if loading failed.
+	*/
+	bool AppendFile(const char *filename);
+
 	/** Set the position (in bytes) in the buffer where Append should write. */
 	void SetAppendPos(int append_pos);
 
