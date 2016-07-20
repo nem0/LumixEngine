@@ -369,6 +369,12 @@ public:
 	/** Paint the overlay elements for the given skin element and state. */
 	void PaintSkinOverlay(const TBRect &dst_rect, TBSkinElement *element, SKIN_STATE state, TBSkinConditionContext &context);
 
+	/** Paint a rectangle outline inside dst_rect with the given thickness and color. */
+	void PaintRect(const TBRect &dst_rect, const TBColor &color, int thickness);
+
+	/** Paint a filled rectangle with the given color. */
+	void PaintRectFill(const TBRect &dst_rect, const TBColor &color);
+
 #ifdef TB_RUNTIME_DEBUG_INFO
 	/** Render the skin bitmaps on screen, to analyze fragment positioning. */
 	void Debug();
@@ -387,6 +393,7 @@ private:
 	TBBitmapFragmentManager m_frag_manager;				///< Fragment manager
 	TBDimensionConverter m_dim_conv;					///< Dimension converter
 	TBColor m_default_text_color;						///< Default text color for all skin elements
+	TBBitmapFragment *m_color_frag;						///< Used for painting single color.
 	float m_default_disabled_opacity;					///< Disabled opacity
 	float m_default_placeholder_opacity;				///< Placeholder opacity
 	int16 m_default_spacing;							///< Default layout spacing

@@ -81,7 +81,7 @@ protected:
 	bool m_squeezable;
 };
 
-/** TBButton is a regular button widget.
+/** TBButton is a regular button widget with auto repeat, toggle and group capabilities.
 	Has a text field in its internal layout by default. Other widgets can be added
 	under GetContentRoot(). */
 
