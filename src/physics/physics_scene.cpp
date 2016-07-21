@@ -294,6 +294,18 @@ struct PhysicsSceneImpl : public PhysicsScene
 		}
 
 		m_queued_forces.reserve(64);
+
+		context.registerComponentTypeScene(BOX_ACTOR_TYPE, this);
+		context.registerComponentTypeScene(MESH_ACTOR_TYPE, this);
+		context.registerComponentTypeScene(HEIGHTFIELD_TYPE, this);
+		context.registerComponentTypeScene(CONTROLLER_TYPE, this);
+		context.registerComponentTypeScene(DISTANCE_JOINT_TYPE, this);
+		context.registerComponentTypeScene(HINGE_JOINT_TYPE, this);
+		context.registerComponentTypeScene(CAPSULE_ACTOR_TYPE, this);
+		context.registerComponentTypeScene(SPHERE_ACTOR_TYPE, this);
+		context.registerComponentTypeScene(SPHERICAL_JOINT_TYPE, this);
+		context.registerComponentTypeScene(D6_JOINT_TYPE, this);
+		context.registerComponentTypeScene(RAGDOLL_TYPE, this);
 	}
 
 
@@ -371,18 +383,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 	Universe& getUniverse() override { return m_universe; }
 
 
-	bool ownComponentType(ComponentType type) const override
-	{
-		return type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == HEIGHTFIELD_TYPE ||
-			   type == CONTROLLER_TYPE || type == DISTANCE_JOINT_TYPE || type == HINGE_JOINT_TYPE ||
-			   type == SPHERICAL_JOINT_TYPE || type == CAPSULE_ACTOR_TYPE || type == SPHERE_ACTOR_TYPE ||
-			   type == RAGDOLL_TYPE || type == D6_JOINT_TYPE;
-	}
-
-
 	ComponentHandle getComponent(Entity entity, ComponentType type) override
 	{
-		ASSERT(ownComponentType(type));
 		if (type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == CAPSULE_ACTOR_TYPE ||
 			type == SPHERE_ACTOR_TYPE)
 		{

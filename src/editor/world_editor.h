@@ -75,7 +75,6 @@ public:
 	virtual IEditorCommand* createEditorCommand(uint32 command_type) = 0;
 	virtual Engine& getEngine() = 0;
 	virtual Universe* getUniverse() = 0;
-	virtual IScene* getSceneByComponentType(ComponentType hash) = 0;
 	virtual IAllocator& getAllocator() = 0;
 	virtual void renderIcons() = 0;
 	virtual ComponentUID getEditCamera() = 0;
@@ -95,8 +94,6 @@ public:
 	virtual void copyEntities() = 0;
 	virtual bool canPasteEntities() const = 0;
 	virtual void pasteEntities() = 0;
-	virtual ComponentUID getComponent(Entity entity, ComponentType type) = 0;
-	virtual ComponentList& getComponents(Entity entity) = 0;
 	virtual void addComponent(ComponentType type) = 0;
 	virtual void cloneComponent(const ComponentUID& src, Entity entity) = 0;
 	virtual void destroyComponent(const ComponentUID& cmp) = 0;

@@ -655,7 +655,7 @@ struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 
 			cmd->scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_HASH));
 			Entity entity = editor.getSelectedEntities()[0];
-			cmd->cmp = editor.getComponent(entity, LUA_SCRIPT_TYPE).handle;
+			cmd->cmp = editor.getUniverse()->getComponent(entity, LUA_SCRIPT_TYPE).handle;
 			editor.executeCommand(cmd);
 
 			if (!create_empty)

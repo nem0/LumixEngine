@@ -28,6 +28,7 @@ public:
 		, m_allocator(allocator)
 		, m_system(system)
 	{
+		universe.registerComponentTypeScene(HIERARCHY_TYPE_HANDLE, this);
 		m_is_processing = false;
 		universe.entityDestroyed().bind<HierarchyImpl, &HierarchyImpl::onEntityDestroyed>(this);
 		universe.entityTransformed().bind<HierarchyImpl, &HierarchyImpl::onEntityMoved>(this);
@@ -82,14 +83,12 @@ public:
 
 	IPlugin& getPlugin() const override { return m_system; }
 	void update(float time_delta, bool paused) override {}
-	bool ownComponentType(ComponentType type) const override { return HIERARCHY_TYPE_HANDLE == type; }
 	Universe& getUniverse() override { return m_universe; }
 	IAllocator& getAllocator() { return m_allocator; }
 
 
 	ComponentHandle getComponent(Entity entity, ComponentType type) override
 	{
-		ASSERT(ownComponentType(type));
 		ComponentHandle cmp = {entity.index};
 		return m_parents.find(entity) != m_parents.end() ? cmp : INVALID_COMPONENT;
 	}

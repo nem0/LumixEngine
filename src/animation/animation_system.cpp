@@ -73,6 +73,7 @@ struct AnimationSceneImpl : public AnimationScene
 				break;
 			}
 		}
+		universe.registerComponentTypeScene(ANIMABLE_TYPE, this);
 		ASSERT(m_render_scene);
 	}
 
@@ -116,12 +117,8 @@ struct AnimationSceneImpl : public AnimationScene
 			if (m_animables.find(entity) < 0) return INVALID_COMPONENT;
 			return {entity.index};
 		}
-		ASSERT(false);
 		return INVALID_COMPONENT;
 	}
-
-
-	bool ownComponentType(ComponentType type) const override { return type == ANIMABLE_TYPE; }
 
 
 	ComponentHandle createComponent(ComponentType type, Entity entity) override

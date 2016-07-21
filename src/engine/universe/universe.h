@@ -23,6 +23,12 @@ struct Transform;
 class Universe;
 
 
+enum
+{
+	MAX_COMPONENTS_TYPES_COUNT = 64
+};
+
+
 class LUMIX_ENGINE_API Universe
 {
 public:
@@ -36,6 +42,11 @@ public:
 	void addComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index);
 	void destroyComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index);
 	bool hasComponent(Entity entity, ComponentType component_type) const;
+	ComponentUID getComponent(Entity entity, ComponentType type) const;
+	ComponentUID getFirstComponent(Entity entity) const;
+	ComponentUID getNextComponent(const ComponentUID& cmp) const;
+	IScene* getScene(ComponentType type) const;
+	void registerComponentTypeScene(ComponentType type, IScene* scene);
 	int getEntityCount() const { return m_transformations.size(); }
 
 	int getDenseIdx(Entity entity);
@@ -88,6 +99,7 @@ private:
 private:
 	IAllocator& m_allocator;
 	Array<IScene*> m_scenes;
+	IScene* m_component_type_scene_map[MAX_COMPONENTS_TYPES_COUNT];
 	Array<Transformation> m_transformations;
 	Array<uint64> m_components;
 	Array<int> m_entity_map;

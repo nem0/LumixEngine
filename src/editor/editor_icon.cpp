@@ -133,17 +133,14 @@ struct EditorIconsImpl : public EditorIcons
 		if (!isValid(entity)) return;
 		if (m_editor.getEditCamera().entity == entity) return;
 
-		const WorldEditor::ComponentList& cmps = m_editor.getComponents(entity);
-
-		for(auto& cmp : cmps)
-		{
-			if (cmp.type == RENDERABLE_TYPE) return;
-		}
+		Universe& universe = *m_editor.getUniverse();
+		
+		if (universe.getComponent(entity, RENDERABLE_TYPE).isValid()) return;
 
 		auto& icon = m_icons.emplace();
 		icon.entity = entity;
 		icon.type = IconType::ENTITY;
-		for(auto& cmp : cmps)
+		for (ComponentUID cmp = universe.getFirstComponent(entity); cmp.isValid(); cmp = universe.getNextComponent(cmp))
 		{
 			if(cmp.type == PHYSICAL_CONTROLLER_TYPE)
 			{

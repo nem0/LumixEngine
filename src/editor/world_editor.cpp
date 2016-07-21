@@ -596,7 +596,7 @@ public:
 		uint32 hash;
 		serializer.deserialize("component_type", hash, 0);
 		m_component.type = PropertyRegister::getComponentTypeFromHash(hash);
-		m_component.scene = m_editor.getSceneByComponentType(m_component.type);
+		m_component.scene = m_editor.getUniverse()->getScene(m_component.type);
 		uint32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_descriptor =
@@ -678,7 +678,7 @@ public:
 		uint32 hash;
 		serializer.deserialize("component_type", hash, 0);
 		m_component.type = PropertyRegister::getComponentTypeFromHash(hash);
-		m_component.scene = m_editor.getSceneByComponentType(m_component.type);
+		m_component.scene = m_editor.getUniverse()->getScene(m_component.type);
 		uint32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_descriptor = static_cast<const IArrayDescriptor*>(
@@ -743,7 +743,7 @@ public:
 	{
 		m_index = -1;
 		m_new_value.write(data, size);
-		ComponentUID component = m_editor.getComponent(entity, component_type);
+		ComponentUID component = m_editor.getUniverse()->getComponent(entity, component_type);
 		m_property_descriptor->get(component, -1, m_old_value);
 	}
 
@@ -764,7 +764,7 @@ public:
 	{
 		m_index = index;
 		m_new_value.write(data, size);
-		ComponentUID component = m_editor.getComponent(entity, component_type);
+		ComponentUID component = m_editor.getUniverse()->getComponent(entity, component_type);
 		m_property_descriptor->get(component, m_index, m_old_value);
 	}
 
@@ -849,30 +849,24 @@ public:
 
 	void set(InputBlob& stream)
 	{
-		ComponentUID component = m_editor.getComponent(m_entity, m_component_type);
+		ComponentUID component = m_editor.getUniverse()->getComponent(m_entity, m_component_type);
 		uint32 template_hash = m_editor.getEntityTemplateSystem().getTemplate(m_entity);
 		if (template_hash)
 		{
-			const Array<Entity>& entities =
-				m_editor.getEntityTemplateSystem().getInstances(template_hash);
+			const Array<Entity>& entities = m_editor.getEntityTemplateSystem().getInstances(template_hash);
 			for (int i = 0, c = entities.size(); i < c; ++i)
 			{
 				stream.rewind();
-				const WorldEditor::ComponentList& cmps = m_editor.getComponents(entities[i]);
-				for (int j = 0, cj = cmps.size(); j < cj; ++j)
+				ComponentUID cmp = m_editor.getUniverse()->getComponent(entities[i], m_component_type);
+				if (!cmp.isValid()) continue;
+
+				if (m_index >= 0)
 				{
-					if (cmps[j].type == m_component_type)
-					{
-						if (m_index >= 0)
-						{
-							m_property_descriptor->set(cmps[j], m_index, stream);
-						}
-						else
-						{
-							m_property_descriptor->set(cmps[j], -1, stream);
-						}
-						break;
-					}
+					m_property_descriptor->set(cmp, m_index, stream);
+				}
+				else
+				{
+					m_property_descriptor->set(cmp, -1, stream);
 				}
 			}
 		}
@@ -923,7 +917,7 @@ private:
 			m_entities.reserve(entities.size());
 			for (int i = 0; i < entities.size(); ++i)
 			{
-				if (!m_editor.getComponent(entities[i], type).isValid())
+				if (!m_editor.getUniverse()->getComponent(entities[i], type).isValid())
 				{
 					uint32 tpl = editor.getEntityTemplateSystem().getTemplate(
 						entities[i]);
@@ -1008,8 +1002,7 @@ private:
 		{
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
-				const ComponentUID& cmp =
-					m_editor.getComponent(m_entities[i], m_type);
+				const ComponentUID& cmp = m_editor.getUniverse()->getComponent(m_entities[i], m_type);
 				cmp.scene->destroyComponent(cmp.handle, cmp.type);
 			}
 		}
@@ -1097,19 +1090,27 @@ private:
 			m_old_values.clear();
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
-				const WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entities[i]);
 				PositionRotation pos_rot;
 				pos_rot.m_position = universe->getPosition(m_entities[i]);
 				pos_rot.m_rotation = universe->getRotation(m_entities[i]);
 				m_positons_rotations.push(pos_rot);
-				m_old_values.write((int)cmps.size());
-				for (int j = 0; j < cmps.size(); ++j)
+				int count = 0;
+				for (ComponentUID cmp = universe->getFirstComponent(m_entities[i]);
+					cmp.isValid();
+					cmp = universe->getNextComponent(cmp))
 				{
-					m_old_values.write(cmps[j].type);
-					Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmps[j].type);
+					++count;
+				}
+				m_old_values.write(count);
+				for (ComponentUID cmp = universe->getFirstComponent(m_entities[i]);
+					cmp.isValid();
+					cmp = universe->getNextComponent(cmp))
+				{
+					m_old_values.write(cmp.type);
+					Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmp.type);
 					for (int k = 0; k < props.size(); ++k)
 					{
-						props[k]->get(cmps[j], -1, m_old_values);
+						props[k]->get(cmp, -1, m_old_values);
 					}
 				}
 				uint32 tpl = m_editor.getEntityTemplateSystem().getTemplate(m_entities[i]);
@@ -1228,7 +1229,7 @@ private:
 			uint32 hash;
 			serializer.deserialize("component_type", hash, 0);
 			m_component.type = PropertyRegister::getComponentTypeFromHash(hash);
-			m_component.scene = m_editor.getSceneByComponentType(m_component.type);
+			m_component.scene = m_editor.getUniverse()->getScene(m_component.type);
 		}
 
 
@@ -1312,7 +1313,7 @@ private:
 					m_editor.m_template_system->getInstances(template_hash);
 				for (int i = 0; i < instances.size(); ++i)
 				{
-					ComponentUID cmp = m_editor.getComponent(instances[i], m_component.type);
+					ComponentUID cmp = m_editor.getUniverse()->getComponent(instances[i], m_component.type);
 					if (cmp.isValid())
 					{
 						cmp.scene->destroyComponent(cmp.handle, cmp.type);
@@ -1412,19 +1413,6 @@ public:
 	IAllocator& getAllocator() override { return m_allocator; }
 
 
-	IScene* getSceneByComponentType(ComponentType hash) override
-	{
-		for (auto* scene : m_universe->getScenes())
-		{
-			if (scene->ownComponentType(hash))
-			{
-				return scene;
-			}
-		}
-		return nullptr;
-	}
-
-
 	Universe* getUniverse() override
 	{
 		return m_universe; 
@@ -1438,7 +1426,7 @@ public:
 	{
 		if (m_selected_entities.empty()) return;
 
-		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_TYPE);
+		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 		Universe* universe = getUniverse();
 
 		if (m_selected_entities.size() > 1)
@@ -1454,9 +1442,9 @@ public:
 			return;
 		}
 
-		const Array<ComponentUID>& cmps = getComponents(m_selected_entities[0]);
-
-		for (auto cmp : cmps)
+		for (ComponentUID cmp = universe->getFirstComponent(m_selected_entities[0]);
+			cmp.isValid();
+			cmp = universe->getNextComponent(cmp))
 		{
 			for (auto* plugin : m_plugins)
 			{
@@ -1610,7 +1598,7 @@ public:
 		else if (button == MouseButton::LEFT)
 		{
 			Vec3 origin, dir;
-			ComponentUID camera_cmp = getComponent(m_camera, CAMERA_TYPE);
+			ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 			if (camera_cmp.isValid())
 			{
 				m_render_interface->getRay(camera_cmp.handle, (float)x, (float)y, origin, dir);
@@ -1798,7 +1786,7 @@ public:
 		{
 			Entity entity = m_selected_entities[i];
 
-			ComponentUID renderable = getComponent(m_selected_entities[i], RENDERABLE_TYPE);
+			ComponentUID renderable = getUniverse()->getComponent(m_selected_entities[i], RENDERABLE_TYPE);
 			Vec3 origin = universe->getPosition(entity);
 			auto hit = m_render_interface->castRay(origin, Vec3(0, -1, 0), renderable.handle);
 			if (hit.is_hit)
@@ -1841,7 +1829,7 @@ public:
 
 	Entity addEntity() override
 	{
-		ComponentUID cmp = getComponent(m_camera, CAMERA_TYPE);
+		ComponentUID cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 		Vec2 size = m_render_interface->getCameraScreenSize(cmp.handle);
 		return addEntityAt((int)size.x >> 1, (int)size.y >> 1);
 	}
@@ -1849,7 +1837,7 @@ public:
 
 	Entity addEntityAt(int camera_x, int camera_y) override
 	{
-		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_TYPE);
+		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 		Universe* universe = getUniverse();
 		Vec3 origin;
 		Vec3 dir;
@@ -1874,7 +1862,7 @@ public:
 
 	Vec3 getCameraRaycastHit() override
 	{
-		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_TYPE);
+		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 		Universe* universe = getUniverse();
 		Vec2 screen_size = m_render_interface->getCameraScreenSize(camera_cmp.handle);
 		screen_size *= 0.5f;
@@ -2140,18 +2128,25 @@ public:
 			auto mtx = m_universe->getMatrix(entity);
 			blob.write(mtx);
 
-			const WorldEditor::ComponentList& cmps = getComponents(entity);
-			int32 count = cmps.size();
-			blob.write(count);
-			for (int i = 0; i < count; ++i)
+			int32 count = 0;
+			for (ComponentUID cmp = m_universe->getFirstComponent(entity); cmp.isValid();
+				 cmp = m_universe->getNextComponent(cmp))
 			{
-				uint32 cmp_type = PropertyRegister::getComponentTypeHash(cmps[i].type);
+				++count;
+			}
+
+			blob.write(count);
+			for (ComponentUID cmp = m_universe->getFirstComponent(entity);
+				cmp.isValid();
+				cmp = m_universe->getNextComponent(cmp))
+			{
+				uint32 cmp_type = PropertyRegister::getComponentTypeHash(cmp.type);
 				blob.write(cmp_type);
-				Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmps[i].type);
+				Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmp.type);
 				int32 prop_count = props.size();
 				for (int j = 0; j < prop_count; ++j)
 				{
-					props[j]->get(cmps[i], -1, blob);
+					props[j]->get(cmp, -1, blob);
 				}
 			}
 		}
@@ -2316,8 +2311,6 @@ public:
 	{
 		m_is_loading = true;
 		ASSERT(file.getBuffer());
-		m_components.clear();
-		m_components.reserve(5000);
 		Header header;
 		if (file.size() < sizeof(header))
 		{
@@ -2378,32 +2371,6 @@ public:
 	}
 
 
-	Array<ComponentUID>& getComponents(Entity entity) override
-	{
-		int cmps_index = m_components.find(entity);
-		if (cmps_index < 0)
-		{
-			m_components.insert(entity, Array<ComponentUID>(m_allocator));
-			cmps_index = m_components.find(entity);
-		}
-		return m_components.at(cmps_index);
-	}
-
-
-	ComponentUID getComponent(Entity entity, ComponentType type) override
-	{
-		const Array<ComponentUID>& cmps = getComponents(entity);
-		for (int i = 0; i < cmps.size(); ++i)
-		{
-			if (cmps[i].type == type)
-			{
-				return cmps[i];
-			}
-		}
-		return ComponentUID::INVALID;
-	}
-
-
 	template <typename T>
 	static IEditorCommand* constructEditorCommand(WorldEditor& editor)
 	{
@@ -2422,13 +2389,13 @@ public:
 
 	ComponentUID getEditCamera() override
 	{
-		return getComponent(m_camera, CAMERA_TYPE);
+		if (!isValid(m_camera)) return ComponentUID::INVALID;
+		return getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 	}
 
 
 	WorldEditorImpl(const char* base_path, Engine& engine, IAllocator& allocator)
 		: m_allocator(allocator)
-		, m_components(m_allocator)
 		, m_entity_selected(m_allocator)
 		, m_universe_destroyed(m_allocator)
 		, m_universe_created(m_allocator)
@@ -2574,7 +2541,7 @@ public:
 	{
 
 		ASSERT(m_selected_entities.size() == 1);
-		ComponentUID cmp = getComponent(m_selected_entities[0], component_type);
+		ComponentUID cmp = getUniverse()->getComponent(m_selected_entities[0], component_type);
 		if (cmp.isValid())
 		{
 			static const uint32 SLOT_HASH = crc32("Slot");
@@ -2702,19 +2669,8 @@ public:
 	}
 
 
-	void onComponentAdded(const ComponentUID& cmp)
-	{
-		getComponents(cmp.entity).push(cmp);
-	}
-
-	void onComponentDestroyed(const ComponentUID& cmp)
-	{
-		getComponents(cmp.entity).eraseItemFast(cmp);
-	}
-
 	void onEntityDestroyed(Entity entity)
 	{
-		m_components.erase(entity);
 		m_selected_entities.eraseItemFast(entity);
 	}
 
@@ -2728,7 +2684,6 @@ public:
 		destroyUndoStack();
 		m_universe_destroyed.invoke();
 		m_editor_icons->clear();
-		m_components.clear();
 		selectEntities(nullptr, 0);
 		m_camera = INVALID_ENTITY;
 		m_engine->destroyUniverse(*m_universe);
@@ -2774,11 +2729,7 @@ public:
 		m_universe = &m_engine->createUniverse();
 		Universe* universe = m_universe;
 
-		universe->componentAdded().bind<WorldEditorImpl, &WorldEditorImpl::onComponentAdded>(this);
-		universe->componentDestroyed()
-			.bind<WorldEditorImpl, &WorldEditorImpl::onComponentDestroyed>(this);
-		universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(
-			this);
+		universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
 
 		m_is_orbit = false;
 		m_selected_entities.clear();
@@ -3098,7 +3049,6 @@ private:
 	Vec2 m_orbit_delta;
 	Vec2 m_mouse_sensitivity;
 	bool m_gizmo_use_step;
-	AssociativeArray<Entity, Array<ComponentUID>> m_components;
 	bool m_is_game_mode;
 	bool m_is_orbit;
 	bool m_is_additive_selection;

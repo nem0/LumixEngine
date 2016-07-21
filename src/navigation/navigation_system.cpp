@@ -139,6 +139,7 @@ struct NavigationSceneImpl : public NavigationScene
 	{
 		setGeneratorParams(0.3f, 0.1f, 0.3f, 2.0f, 60.0f, 1.5f);
 		m_universe.entityTransformed().bind<NavigationSceneImpl, &NavigationSceneImpl::onEntityMoved>(this);
+		universe.registerComponentTypeScene(NAVMESH_AGENT_TYPE, this);
 	}
 
 
@@ -1137,7 +1138,6 @@ struct NavigationSceneImpl : public NavigationScene
 
 
 	IPlugin& getPlugin() const override { return m_system; }
-	bool ownComponentType(ComponentType type) const override { return type == NAVMESH_AGENT_TYPE; }
 	ComponentHandle getComponent(Entity entity, ComponentType type) override
 	{
 		if (type == NAVMESH_AGENT_TYPE) return {entity.index};

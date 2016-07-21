@@ -300,6 +300,7 @@ namespace Lumix
 			m_function_call.is_in_progress = false;
 			
 			registerAPI();
+			ctx.registerComponentTypeScene(LUA_SCRIPT_TYPE, this);
 		}
 
 
@@ -1350,15 +1351,8 @@ namespace Lumix
 
 		ComponentHandle getComponent(Entity entity, ComponentType type) override
 		{
-			ASSERT(ownComponentType(type));
 			if (m_scripts.find(entity) == m_scripts.end()) return INVALID_COMPONENT;
 			return {entity.index};
-		}
-
-
-		bool ownComponentType(ComponentType type) const override
-		{
-			return type == LUA_SCRIPT_TYPE;
 		}
 
 
