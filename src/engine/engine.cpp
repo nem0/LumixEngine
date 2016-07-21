@@ -281,8 +281,8 @@ public:
 		ComponentType type = {component_type};
 		for (auto* scene : universe->getScenes())
 		{
-			if (!scene->ownComponentType(type)) continue;
-			return scene->getComponent(entity, type);
+			ComponentHandle cmp = scene->getComponent(entity, type);
+			if (Lumix::isValid(cmp)) return cmp;
 		}
 		ASSERT(false);
 		return INVALID_COMPONENT;
@@ -664,6 +664,13 @@ public:
 		for (auto* plugin : plugins)
 		{
 			IScene* scene = plugin->createScene(*universe);
+			bool is_some_registered = false;
+			for (int i = 0; i < MAX_COMPONENTS_TYPES_COUNT; ++i)
+			{
+				ComponentType type = {i};
+				is_some_registered = is_some_registered || universe->getScene(type) == scene;
+			}
+			ASSERT(is_some_registered);
 			if (scene)
 			{
 				universe->addScene(scene);

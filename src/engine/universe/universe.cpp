@@ -38,6 +38,10 @@ Universe::Universe(IAllocator& allocator)
 	m_transformations.reserve(RESERVED_ENTITIES_COUNT);
 	m_components.reserve(RESERVED_ENTITIES_COUNT);
 	m_entity_map.reserve(RESERVED_ENTITIES_COUNT);
+	for (int i = 0; i < lengthOf(m_component_type_scene_map); ++i)
+	{
+		m_component_type_scene_map[i] = 0;
+	}
 }
 
 
@@ -248,21 +252,15 @@ void Universe::destroyEntity(Entity entity)
 	if (!isValid(entity) || m_entity_map[entity.index] < 0) return;
 
 	uint64 mask = m_components[m_entity_map[entity.index]];
-	for (int i = 0; i < 64; ++i)
+	for (int i = 0; i < MAX_COMPONENTS_TYPES_COUNT; ++i)
 	{
 		if ((mask & ((uint64)1 << i)) != 0)
 		{
 			ComponentType type = {i};
 			auto original_mask = mask;
-			for (auto scene : m_scenes)
-			{
-				if (scene->ownComponentType(type))
-				{
-					scene->destroyComponent(scene->getComponent(entity, type), type);
-					mask = m_components[m_entity_map[entity.index]];
-					break;
-				}
-			}
+			IScene* scene = m_component_type_scene_map[i];
+			scene->destroyComponent(scene->getComponent(entity, type), type);
+			mask = m_components[m_entity_map[entity.index]];
 			ASSERT(original_mask != mask);
 		}
 	}
@@ -389,6 +387,58 @@ float Universe::getScale(Entity entity)
 {
 	auto& transform = m_transformations[m_entity_map[entity.index]];
 	return transform.scale;
+}
+
+
+void Universe::registerComponentTypeScene(ComponentType type, IScene* scene)
+{
+	ASSERT(!m_component_type_scene_map[type.index]);
+	m_component_type_scene_map[type.index] = scene;
+}
+
+
+IScene* Universe::getScene(ComponentType type) const
+{
+	return m_component_type_scene_map[type.index];
+}
+
+
+ComponentUID Universe::getFirstComponent(Entity entity) const
+{
+	uint64 mask = m_components[m_entity_map[entity.index]];
+	for (int i = 0; i < MAX_COMPONENTS_TYPES_COUNT; ++i)
+	{
+		if ((mask & (uint64(1) << i)) != 0)
+		{
+			IScene* scene = m_component_type_scene_map[i];
+			return ComponentUID(entity, {i}, scene, scene->getComponent(entity, {i}));
+		}
+	}
+	return ComponentUID::INVALID;
+}
+
+
+ComponentUID Universe::getNextComponent(const ComponentUID& cmp) const
+{
+	uint64 mask = m_components[m_entity_map[cmp.entity.index]];
+	for (int i = cmp.type.index + 1; i < MAX_COMPONENTS_TYPES_COUNT; ++i)
+	{
+		if ((mask & (uint64(1) << i)) != 0)
+		{
+			IScene* scene = m_component_type_scene_map[i];
+			return ComponentUID(cmp.entity, {i}, scene, scene->getComponent(cmp.entity, {i}));
+		}
+	}
+	return ComponentUID::INVALID;
+}
+
+
+ComponentUID Universe::getComponent(Entity entity, ComponentType component_type) const
+{
+	uint64 mask = m_components[m_entity_map[entity.index]];
+	if ((mask & (uint64(1) << component_type.index)) == 0) return ComponentUID::INVALID;
+	IScene* scene = m_component_type_scene_map[component_type.index];
+	return ComponentUID(entity, component_type, scene, scene->getComponent(entity, component_type));
 }
 
 

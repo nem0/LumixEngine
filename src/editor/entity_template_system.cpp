@@ -345,11 +345,10 @@ private:
 
 				m_entity_system.m_instances.at(instance_index).push(m_entity);
 				Entity template_entity = m_entity_system.m_instances.at(instance_index)[0];
-				const WorldEditor::ComponentList& template_cmps =
-					m_editor.getComponents(template_entity);
-				for (int i = 0; i < template_cmps.size(); ++i)
+				for (ComponentUID cmp = universe->getFirstComponent(template_entity); cmp.isValid();
+					 cmp = universe->getNextComponent(cmp))
 				{
-					m_entity_system.m_editor.cloneComponent(template_cmps[i], m_entity);
+					m_entity_system.m_editor.cloneComponent(cmp, m_entity);
 				}
 			}
 			else

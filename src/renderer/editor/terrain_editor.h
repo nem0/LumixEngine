@@ -44,9 +44,7 @@ public:
 private:
 	void onUniverseDestroyed();
 	void detectModifiers();
-	void drawCursor(Lumix::RenderScene& scene,
-		const Lumix::ComponentUID& cmp,
-		const Lumix::Vec3& center);
+	void drawCursor(Lumix::RenderScene& scene, Lumix::ComponentHandle cmp, const Lumix::Vec3& center);
 	Lumix::Material* getMaterial();
 	void paint(const Lumix::Vec3& hit, TerrainEditor::Type type, bool new_stroke);
 

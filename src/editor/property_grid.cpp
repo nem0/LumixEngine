@@ -572,8 +572,9 @@ void PropertyGrid::onGUI()
 
 		showCoreProperties(ents[0]);
 
-		auto& cmps = m_editor.getComponents(ents[0]);
-		for (auto cmp : cmps)
+		Lumix::Universe& universe = *m_editor.getUniverse();
+		for (Lumix::ComponentUID cmp = universe.getFirstComponent(ents[0]); cmp.isValid();
+			 cmp = universe.getNextComponent(cmp))
 		{
 			showComponentProperties(cmp);
 		}

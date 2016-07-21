@@ -83,6 +83,9 @@ struct AudioSceneImpl : public AudioScene
 			i.entity = INVALID_ENTITY;
 			i.buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
 		}
+		context.registerComponentTypeScene(LISTENER_TYPE, this);
+		context.registerComponentTypeScene(AMBIENT_SOUND_TYPE, this);
+		context.registerComponentTypeScene(ECHO_ZONE_TYPE, this);
 	}
 
 
@@ -414,12 +417,6 @@ struct AudioSceneImpl : public AudioScene
 
 
 	int getVersion() const override { return (int)AudioSceneVersion::LAST; }
-
-
-	bool ownComponentType(ComponentType type) const override
-	{
-		return type == LISTENER_TYPE || type == AMBIENT_SOUND_TYPE || type == ECHO_ZONE_TYPE;
-	}
 
 
 	ComponentHandle getComponent(Entity entity, ComponentType type) override

@@ -180,46 +180,7 @@ public:
 		Engine& engine,
 		Universe& universe,
 		bool is_forward_rendered,
-		IAllocator& allocator)
-		: m_engine(engine)
-		, m_universe(universe)
-		, m_renderer(renderer)
-		, m_allocator(allocator)
-		, m_model_loaded_callbacks(m_allocator)
-		, m_renderables(m_allocator)
-		, m_cameras(m_allocator)
-		, m_terrains(m_allocator)
-		, m_point_lights(m_allocator)
-		, m_light_influenced_geometry(m_allocator)
-		, m_global_lights(m_allocator)
-		, m_debug_triangles(m_allocator)
-		, m_debug_lines(m_allocator)
-		, m_debug_points(m_allocator)
-		, m_temporary_infos(m_allocator)
-		, m_sync_point(true, m_allocator)
-		, m_jobs(m_allocator)
-		, m_active_global_light_cmp(INVALID_COMPONENT)
-		, m_global_light_last_cmp(INVALID_COMPONENT)
-		, m_point_light_last_cmp(INVALID_COMPONENT)
-		, m_is_forward_rendered(is_forward_rendered)
-		, m_renderable_created(m_allocator)
-		, m_renderable_destroyed(m_allocator)
-		, m_is_grass_enabled(true)
-		, m_is_game_running(false)
-		, m_particle_emitters(m_allocator)
-		, m_point_lights_map(m_allocator)
-		, m_bone_attachments(m_allocator)
-		, m_environment_probes(m_allocator)
-	{
-		is_opengl = renderer.isOpenGL();
-		m_is_updating_attachments = false;
-		m_universe.entityTransformed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
-		m_universe.entityDestroyed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
-		m_culling_system = CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
-		m_time = 0;
-		m_renderables.reserve(5000);
-	}
-
+		IAllocator& allocator);
 
 	~RenderSceneImpl()
 	{
@@ -283,9 +244,6 @@ public:
 
 
 	Universe& getUniverse() override { return m_universe; }
-
-
-	bool ownComponentType(ComponentType type) const override;
 
 
 	ComponentHandle getComponent(Entity entity, ComponentType type) override
@@ -4128,13 +4086,53 @@ static struct
 };
 
 
-bool RenderSceneImpl::ownComponentType(ComponentType type) const
+RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
+	Engine& engine,
+	Universe& universe,
+	bool is_forward_rendered,
+	IAllocator& allocator)
+	: m_engine(engine)
+	, m_universe(universe)
+	, m_renderer(renderer)
+	, m_allocator(allocator)
+	, m_model_loaded_callbacks(m_allocator)
+	, m_renderables(m_allocator)
+	, m_cameras(m_allocator)
+	, m_terrains(m_allocator)
+	, m_point_lights(m_allocator)
+	, m_light_influenced_geometry(m_allocator)
+	, m_global_lights(m_allocator)
+	, m_debug_triangles(m_allocator)
+	, m_debug_lines(m_allocator)
+	, m_debug_points(m_allocator)
+	, m_temporary_infos(m_allocator)
+	, m_sync_point(true, m_allocator)
+	, m_jobs(m_allocator)
+	, m_active_global_light_cmp(INVALID_COMPONENT)
+	, m_global_light_last_cmp(INVALID_COMPONENT)
+	, m_point_light_last_cmp(INVALID_COMPONENT)
+	, m_is_forward_rendered(is_forward_rendered)
+	, m_renderable_created(m_allocator)
+	, m_renderable_destroyed(m_allocator)
+	, m_is_grass_enabled(true)
+	, m_is_game_running(false)
+	, m_particle_emitters(m_allocator)
+	, m_point_lights_map(m_allocator)
+	, m_bone_attachments(m_allocator)
+	, m_environment_probes(m_allocator)
 {
+	is_opengl = renderer.isOpenGL();
+	m_is_updating_attachments = false;
+	m_universe.entityTransformed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
+	m_universe.entityDestroyed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
+	m_culling_system = CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
+	m_time = 0;
+	m_renderables.reserve(5000);
+
 	for (auto& i : COMPONENT_INFOS)
 	{
-		if (i.type == type) return true;
+		universe.registerComponentTypeScene(i.type, this);
 	}
-	return false;
 }
 
 
