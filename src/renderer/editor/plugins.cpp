@@ -49,6 +49,7 @@ using namespace Lumix;
 static const ComponentType PARTICLE_EMITTER_TYPE = PropertyRegister::getComponentType("particle_emitter");
 static const ComponentType TERRAIN_TYPE = PropertyRegister::getComponentType("terrain");
 static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
+static const ComponentType DECAL_TYPE = PropertyRegister::getComponentType("decal");
 static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType("point_light");
 static const ComponentType GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
 static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
@@ -1652,6 +1653,21 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 	}
 
 
+	void showDecalGizmo(ComponentUID cmp)
+	{
+		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
+		Universe& universe = scene->getUniverse();
+		Vec3 scale = scene->getDecalScale(cmp.handle);
+		Matrix mtx = universe.getMatrix(cmp.entity);
+		scene->addDebugCube(mtx.getTranslation(),
+			mtx.getXVector() * scale.x,
+			mtx.getYVector() * scale.y,
+			mtx.getZVector() * scale.z,
+			0xff0000ff,
+			0);
+	}
+
+
 	void showCameraGizmo(ComponentUID cmp)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
@@ -1695,6 +1711,11 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 			showCameraGizmo(cmp);
 			return true;
 		}
+		if (cmp.type == DECAL_TYPE)
+		{
+			showDecalGizmo(cmp);
+			return true;
+		}
 		if (cmp.type == POINT_LIGHT_TYPE)
 		{
 			showPointLightGizmo(cmp);
@@ -1733,6 +1754,7 @@ LUMIX_STUDIO_ENTRY(renderer)
 	app.registerComponent("particle_emitter_random_rotation", "Particle emitter - random rotation");
 	app.registerComponent("particle_emitter_size", "Particle emitter - size");
 	app.registerComponent("point_light", "Point light");
+	app.registerComponent("decal", "Decal");
 	app.registerComponentWithResource("terrain", "Terrain", MATERIAL_HASH, "Material");
 	app.registerComponent("bone_attachment", "Bone attachment");
 	app.registerComponent("environment_probe", "Environment probe");
