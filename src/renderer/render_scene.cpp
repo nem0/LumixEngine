@@ -46,6 +46,7 @@ namespace Lumix
 
 
 static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
+static const ComponentType DECAL_TYPE = PropertyRegister::getComponentType("decal");
 static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType("point_light");
 static const ComponentType PARTICLE_EMITTER_TYPE = PropertyRegister::getComponentType("particle_emitter");
 static const ComponentType PARTICLE_EMITTER_ALPHA_TYPE = PropertyRegister::getComponentType("particle_emitter_alpha");
@@ -70,6 +71,13 @@ static const uint32 MATERIAL_HASH = crc32("MATERIAL");
 static const uint32 TEXTURE_HASH = crc32("TEXTURE");
 static const uint32 MODEL_HASH = crc32("MODEL");
 static bool is_opengl = false;
+
+
+struct Decal : public DecalInfo
+{
+	Entity entity;
+	Vec3 scale;
+};
 
 
 struct PointLight
@@ -195,6 +203,11 @@ public:
 			LUMIX_DELETE(m_allocator, m_model_loaded_callbacks[i]);
 		}
 
+		for (Decal& decal : m_decals)
+		{
+			if(decal.material) material_manager->unload(*decal.material);
+		}
+
 		for (auto* terrain : m_terrains)
 		{
 			LUMIX_DELETE(m_allocator, terrain);
@@ -251,8 +264,20 @@ public:
 		if (type == RENDERABLE_TYPE)
 		{
 			if (entity.index >= m_renderables.size()) return INVALID_COMPONENT;
-			ComponentHandle cmp = {entity.index};
+			ComponentHandle cmp = { entity.index };
 			return isValid(m_renderables[entity.index].entity) ? cmp : INVALID_COMPONENT;
+		}
+		if (type == ENVIRONMENT_PROBE_TYPE)
+		{
+			int index = m_environment_probes.find(entity);
+			if (index < 0) return INVALID_COMPONENT;
+			return {entity.index};
+		}
+		if (type == DECAL_TYPE)
+		{
+			int index = m_decals.find(entity);
+			if (index < 0) return INVALID_COMPONENT;
+			return {entity.index};
 		}
 		if (type == POINT_LIGHT_TYPE)
 		{
@@ -657,6 +682,40 @@ public:
 	}
 
 
+	void deserializeDecals(InputBlob& serializer)
+	{
+		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_HASH);
+		int count;
+		serializer.read(count);
+		m_decals.clear();
+		m_decals.reserve(count);
+		for (int i = 0; i < count; ++i)
+		{
+			char tmp[MAX_PATH_LENGTH];
+			Decal decal;
+			serializer.read(decal.entity);
+			serializer.read(decal.scale);
+			serializer.readString(tmp, lengthOf(tmp));
+			decal.material = tmp[0] == '\0' ? nullptr : static_cast<Material*>(material_manager->load(Path(tmp)));
+			updateDecalInfo(decal);
+			m_decals.insert(decal.entity, decal);
+			m_universe.addComponent(decal.entity, DECAL_TYPE, this, {decal.entity.index});
+		}
+	}
+
+
+	void serializeDecals(OutputBlob& serializer)
+	{
+		serializer.write(m_decals.size());
+		for (auto& decal : m_decals)
+		{
+			serializer.write(decal.entity);
+			serializer.write(decal.scale);
+			serializer.writeString(decal.material ? decal.material->getPath().c_str() : "");
+		}
+	}
+
+
 	void serializeEnvironmentProbes(OutputBlob& serializer)
 	{
 		int32 count = m_environment_probes.size();
@@ -808,6 +867,7 @@ public:
 		serializeParticleEmitters(serializer);
 		serializeBoneAttachments(serializer);
 		serializeEnvironmentProbes(serializer);
+		serializeDecals(serializer);
 	}
 
 	void deserializeRenderParams(InputBlob& serializer)
@@ -1057,6 +1117,7 @@ public:
 		}
 		deserializeBoneAttachments(serializer, version);
 		if (version > (int)RenderSceneVersion::ENVIRONMENT_PROBES) deserializeEnvironmentProbes(serializer);
+		if (version > (int)RenderSceneVersion::DECAL) deserializeDecals(serializer);
 	}
 
 
@@ -1116,6 +1177,14 @@ public:
 			m_active_global_light_cmp = INVALID_COMPONENT;
 		}
 		m_global_lights.eraseFast(getGlobalLightIndex(component));
+	}
+
+
+	void destroyDecal(ComponentHandle component)
+	{
+		Entity entity = {component.index};
+		m_decals.erase(entity);
+		m_universe.destroyComponent(entity, DECAL_TYPE, this, component);
 	}
 
 
@@ -1763,6 +1832,12 @@ public:
 			}
 		}
 
+		int decal_idx = m_decals.find(entity);
+		if (decal_idx >= 0)
+		{
+			updateDecalInfo(m_decals.at(decal_idx));
+		}
+
 		for (int i = 0, c = m_point_lights.size(); i < c; ++i)
 		{
 			if (m_point_lights[i].m_entity == entity)
@@ -1875,6 +1950,57 @@ public:
 
 
 	Material* getTerrainMaterial(ComponentHandle cmp) override { return m_terrains[{cmp.index}]->getMaterial(); }
+
+
+	void setDecalScale(ComponentHandle cmp, const Vec3& value) override
+	{
+		Decal& decal = m_decals[{cmp.index}];
+		decal.scale = value;
+		updateDecalInfo(decal);
+	}
+
+
+	Vec3 getDecalScale(ComponentHandle cmp) override
+	{
+		return m_decals[{cmp.index}].scale;
+	}
+
+
+	void getDecals(const Frustum& frustum, Array<DecalInfo>& decals) override
+	{
+		decals.reserve(m_decals.size());
+		for (const Decal& decal : m_decals)
+		{
+			if (!decal.material || !decal.material->isReady()) continue;
+			if (frustum.isSphereInside(decal.position, decal.radius)) decals.push(decal);
+		}
+	}
+
+
+	void setDecalMaterialPath(ComponentHandle cmp, const Path& path) override
+	{
+		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_HASH);
+		Decal& decal = m_decals[{cmp.index}];
+		if (decal.material)
+		{
+			material_manager->unload(*decal.material);
+		}
+		if (path.isValid())
+		{
+			decal.material = static_cast<Material*>(material_manager->load(path));
+		}
+		else
+		{
+			decal.material = nullptr;
+		}
+	}
+
+
+	Path getDecalMaterialPath(ComponentHandle cmp) override
+	{
+		Decal& decal = m_decals[{cmp.index}];
+		return decal.material ? decal.material->getPath() : Path("");
+	}
 
 
 	Path getTerrainMaterialPath(ComponentHandle cmp) override
@@ -2344,7 +2470,7 @@ public:
 			ComponentHandle renderable_cmp = m_light_influenced_geometry[light_index][j];
 			Renderable& renderable = m_renderables[renderable_cmp.index];
 			const Sphere& sphere = m_culling_system->getSphere(renderable_cmp);
-			if (frustum.isSphereInside(sphere.m_position, sphere.m_radius))
+			if (frustum.isSphereInside(sphere.position, sphere.radius))
 			{
 				for (int k = 0, kc = renderable.model->getMeshCount(); k < kc; ++k)
 				{
@@ -3927,6 +4053,34 @@ public:
 	}
 
 
+	void updateDecalInfo(Decal& decal) const
+	{
+		decal.position = m_universe.getPosition(decal.entity);
+		decal.radius = decal.scale.length();
+		decal.mtx = m_universe.getMatrix(decal.entity);
+		decal.mtx.setXVector(decal.mtx.getXVector() * decal.scale.x);
+		decal.mtx.setYVector(decal.mtx.getYVector() * decal.scale.y);
+		decal.mtx.setZVector(decal.mtx.getZVector() * decal.scale.z);
+		decal.inv_mtx = decal.mtx;
+		decal.inv_mtx.inverse();
+	}
+
+
+	ComponentHandle createDecal(Entity entity)
+	{
+		Decal decal;
+		decal.material = nullptr;
+		decal.entity = entity;
+		decal.scale.set(1, 1, 1);
+		updateDecalInfo(decal);
+		m_decals.insert(entity, decal);
+
+		ComponentHandle cmp = {entity.index};
+		m_universe.addComponent(entity, DECAL_TYPE, this, cmp);
+		return cmp;
+	}
+
+
 	ComponentHandle createEnvironmentProbe(Entity entity)
 	{
 		EnvironmentProbe probe;
@@ -4016,6 +4170,7 @@ private:
 	ComponentHandle m_global_light_last_cmp;
 	HashMap<ComponentHandle, int> m_point_lights_map;
 
+	AssociativeArray<Entity, Decal> m_decals;
 	Array<Renderable> m_renderables;
 	Array<GlobalLight> m_global_lights;
 	Array<PointLight> m_point_lights;
@@ -4054,6 +4209,7 @@ static struct
 } COMPONENT_INFOS[] = {{RENDERABLE_TYPE, &RenderSceneImpl::createRenderable, &RenderSceneImpl::destroyRenderable},
 	{GLOBAL_LIGHT_TYPE, &RenderSceneImpl::createGlobalLight, &RenderSceneImpl::destroyGlobalLight},
 	{POINT_LIGHT_TYPE, &RenderSceneImpl::createPointLight, &RenderSceneImpl::destroyPointLight},
+	{DECAL_TYPE, &RenderSceneImpl::createDecal, &RenderSceneImpl::destroyDecal},
 	{CAMERA_TYPE, &RenderSceneImpl::createCamera, &RenderSceneImpl::destroyCamera},
 	{TERRAIN_TYPE, &RenderSceneImpl::createTerrain, &RenderSceneImpl::destroyTerrain},
 	{PARTICLE_EMITTER_TYPE, &RenderSceneImpl::createParticleEmitter, &RenderSceneImpl::destroyParticleEmitter},
@@ -4082,8 +4238,7 @@ static struct
 		&RenderSceneImpl::createParticleEmitterPlane,
 		&RenderSceneImpl::destroyParticleEmitterPlane},
 	{BONE_ATTACHMENT_TYPE, &RenderSceneImpl::createBoneAttachment, &RenderSceneImpl::destroyBoneAttachment},
-	{ENVIRONMENT_PROBE_TYPE, &RenderSceneImpl::createEnvironmentProbe, &RenderSceneImpl::destroyEnvironmentProbe}
-};
+	{ENVIRONMENT_PROBE_TYPE, &RenderSceneImpl::createEnvironmentProbe, &RenderSceneImpl::destroyEnvironmentProbe}};
 
 
 RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
@@ -4102,6 +4257,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_point_lights(m_allocator)
 	, m_light_influenced_geometry(m_allocator)
 	, m_global_lights(m_allocator)
+	, m_decals(m_allocator)
 	, m_debug_triangles(m_allocator)
 	, m_debug_lines(m_allocator)
 	, m_debug_points(m_allocator)

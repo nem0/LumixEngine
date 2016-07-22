@@ -483,6 +483,7 @@ struct PipelineImpl : public Pipeline
 			bgfx::createUniform("u_boneMatrices", bgfx::UniformType::Mat4, 64);
 		m_layer_uniform = bgfx::createUniform("u_layer", bgfx::UniformType::Vec4);
 		m_terrain_matrix_uniform = bgfx::createUniform("u_terrainMatrix", bgfx::UniformType::Mat4);
+		m_decal_matrix_uniform = bgfx::createUniform("u_decalMatrix", bgfx::UniformType::Mat4);
 	}
 
 
@@ -511,6 +512,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::destroyUniform(m_grass_max_dist_uniform);
 		bgfx::destroyUniform(m_cam_inv_view_uniform);
 		bgfx::destroyUniform(m_texture_size_uniform);
+		bgfx::destroyUniform(m_decal_matrix_uniform);
 	}
 
 
@@ -1058,6 +1060,42 @@ struct PipelineImpl : public Pipeline
 					int(instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx]->data),
 					buffer_idx == 0);
 			}
+		}
+	}
+
+
+	void renderDecalsVolumes()
+	{
+		PROFILE_FUNCTION();
+		if (m_applied_camera == INVALID_COMPONENT) return;
+
+		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
+		Array<DecalInfo> decals(frame_allocator);
+		m_scene->getDecals(m_camera_frustum, decals);
+
+		PROFILE_INT("decal count", decals.size());
+
+		const View& view = m_views[m_current_render_views[0]];
+		for (const DecalInfo& decal : decals)
+		{
+			if (m_camera_frustum.intersectNearPlane(decal.position, decal.radius))
+			{
+				auto state = m_render_state | decal.material->getRenderStates();
+				bgfx::setState(((state & ~BGFX_STATE_CULL_MASK) & ~BGFX_STATE_DEPTH_TEST_MASK) | BGFX_STATE_CULL_CCW);
+			}
+			else
+			{
+				bgfx::setState(view.render_state | decal.material->getRenderStates());
+			}
+			executeCommandBuffer(decal.material->getCommandBuffer(), decal.material);
+			executeCommandBuffer(view.command_buffer.buffer, decal.material);
+			bgfx::setUniform(m_decal_matrix_uniform, &decal.inv_mtx.m11);
+			bgfx::setTransform(&decal.mtx.m11);
+			bgfx::setVertexBuffer(m_cube_vb);
+			bgfx::setIndexBuffer(m_cube_ib);
+			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+			
+			bgfx::submit(m_bgfx_view, decal.material->getShaderInstance().program_handles[m_pass_idx]);
 		}
 	}
 
@@ -2598,6 +2636,7 @@ struct PipelineImpl : public Pipeline
 	bgfx::UniformHandle m_shadowmap_matrices_uniform;
 	bgfx::UniformHandle m_light_specular_uniform;
 	bgfx::UniformHandle m_terrain_matrix_uniform;
+	bgfx::UniformHandle m_decal_matrix_uniform;
 	bgfx::UniformHandle m_tex_shadowmap_uniform;
 	bgfx::UniformHandle m_cam_view_uniform;
 	bgfx::UniformHandle m_cam_proj_uniform;
@@ -2829,6 +2868,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(setStencilRMask);
 	REGISTER_FUNCTION(setStencilRef);
 	REGISTER_FUNCTION(renderLightVolumes);
+	REGISTER_FUNCTION(renderDecalsVolumes);
 	REGISTER_FUNCTION(postprocessCallback);
 	REGISTER_FUNCTION(removeFramebuffer);
 	REGISTER_FUNCTION(setMaterialDefine);

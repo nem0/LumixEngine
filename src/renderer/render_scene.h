@@ -52,6 +52,7 @@ enum class RenderSceneVersion : int32
 	FOV_RADIANS,
 	INDEPENDENT_PARTICLE_MODULES,
 	CAMERA_AND_TERRAIN_REFACTOR,
+	DECAL,
 
 	LATEST,
 	INVALID = -1,
@@ -67,6 +68,16 @@ struct TerrainInfo
 	float m_size;
 	Vec3 m_min;
 	int m_index;
+};
+
+
+struct DecalInfo
+{
+	Matrix mtx;
+	Matrix inv_mtx;
+	Material* material;
+	Vec3 position;
+	float radius;
 };
 
 
@@ -319,6 +330,12 @@ public:
 	virtual ComponentHandle getFirstRenderable() = 0;
 	virtual ComponentHandle getNextRenderable(ComponentHandle cmp) = 0;
 	virtual Model* getRenderableModel(ComponentHandle cmp) = 0;
+
+	virtual void setDecalMaterialPath(ComponentHandle cmp, const Path& path) = 0;
+	virtual Path getDecalMaterialPath(ComponentHandle cmp) = 0;
+	virtual void setDecalScale(ComponentHandle cmp, const Vec3& value) = 0;
+	virtual Vec3 getDecalScale(ComponentHandle cmp) = 0;
+	virtual void getDecals(const Frustum& frustum, Array<DecalInfo>& decals) = 0;
 
 	virtual void getGrassInfos(const Frustum& frustum,
 		Array<GrassInfo>& infos,

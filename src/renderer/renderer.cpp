@@ -360,6 +360,17 @@ static void registerProperties(IAllocator& allocator)
 	PropertyRegister::add("point_light",
 		LUMIX_NEW(allocator, BoolPropertyDescriptor<RenderScene>)(
 			"Cast shadows", &RenderScene::getLightCastShadows, &RenderScene::setLightCastShadows));
+
+	PropertyRegister::add("decal",
+		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",
+			&RenderScene::getDecalMaterialPath,
+			&RenderScene::setDecalMaterialPath,
+			"Material (*.mat)",
+			MATERIAL_HASH));
+	PropertyRegister::add("decal",
+		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, RenderScene>)(
+			"Scale", &RenderScene::getDecalScale, &RenderScene::setDecalScale));
+
 	PropertyRegister::add("terrain",
 		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",
 			&RenderScene::getTerrainMaterialPath,

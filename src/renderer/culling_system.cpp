@@ -33,7 +33,7 @@ static void doCulling(int start_index,
 	PROFILE_INT("objects", int(end - start));
 	for (const Sphere *sphere = start; sphere <= end; sphere++, ++i)
 	{
-		if (frustum->isSphereInside(sphere->m_position, sphere->m_radius) && ((layer_masks[i] & layer_mask) != 0))
+		if (frustum->isSphereInside(sphere->position, sphere->radius) && ((layer_masks[i] & layer_mask) != 0))
 		{
 			results.push(sphere_to_renderable_map[i]);
 		}
