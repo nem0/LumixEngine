@@ -653,15 +653,17 @@ struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 			auto& allocator = editor.getAllocator();
 			auto* cmd = LUMIX_NEW(allocator, PropertyGridPlugin::AddScriptCommand);
 
-			cmd->scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_HASH));
+			auto* script_scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_HASH));
 			Entity entity = editor.getSelectedEntities()[0];
-			cmd->cmp = editor.getUniverse()->getComponent(entity, LUA_SCRIPT_TYPE).handle;
+			ComponentHandle cmp = editor.getUniverse()->getComponent(entity, LUA_SCRIPT_TYPE).handle;
+			cmd->scene = script_scene;
+			cmd->cmp = cmp;
 			editor.executeCommand(cmd);
 
 			if (!create_empty)
 			{
 				auto* set_source_cmd = LUMIX_NEW(allocator, PropertyGridPlugin::SetPropertyCommand)(
-					cmd->scene, cmd->cmp, 0, "-source", buf, allocator);
+					script_scene, cmp, 0, "-source", buf, allocator);
 				editor.executeCommand(set_source_cmd);
 			}
 
