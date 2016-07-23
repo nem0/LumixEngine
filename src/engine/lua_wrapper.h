@@ -15,6 +15,25 @@ namespace LuaWrapper
 {
 
 
+struct Guard
+{
+	Guard(lua_State* L)
+		: state(L)
+	{
+		top = lua_gettop(L);
+	}
+
+	~Guard()
+	{
+		ASSERT(top == lua_gettop(state));
+	}
+
+
+	lua_State* state;
+	int top;
+};
+
+
 template <typename T> inline T toType(lua_State* L, int index)
 {
 	return (T)lua_touserdata(L, index);

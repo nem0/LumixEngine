@@ -176,36 +176,34 @@ namespace Lumix
 				lua_State* L = m_scene.m_system.m_engine.getState();
 				for (auto& script : m_scripts)
 				{
-					if ((!script.m_script || !script.m_script->isReady()) && script.m_state)
-					{
-						m_scene.destroyInstance(*this, script);
-						continue;
-					}
-
 					if (!script.m_script) continue;
 					if (!script.m_script->isReady()) continue;
-					if (script.m_state) continue;
 
-					script.m_environment = -1;
+					bool is_reload = true;
+					if (!script.m_state)
+					{
+						is_reload = false;
+						script.m_environment = -1;
 
-					script.m_state = lua_newthread(L);
-					lua_pushvalue(L, -1);
-					script.m_thread_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-					lua_pop(L, 1);
-					lua_newtable(script.m_state);
-					// reference environment
-					lua_pushvalue(script.m_state, -1);
-					script.m_environment = luaL_ref(script.m_state, LUA_REGISTRYINDEX);
+						script.m_state = lua_newthread(L);
+						lua_pushvalue(L, -1);
+						script.m_thread_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+						lua_pop(L, 1);
+						lua_newtable(script.m_state);
+						// reference environment
+						lua_pushvalue(script.m_state, -1);
+						script.m_environment = luaL_ref(script.m_state, LUA_REGISTRYINDEX);
 
-					// environment's metatable & __index
-					lua_pushvalue(script.m_state, -1);
-					lua_setmetatable(script.m_state, -2);
-					lua_pushglobaltable(script.m_state);
-					lua_setfield(script.m_state, -2, "__index");
+						// environment's metatable & __index
+						lua_pushvalue(script.m_state, -1);
+						lua_setmetatable(script.m_state, -2);
+						lua_pushglobaltable(script.m_state);
+						lua_setfield(script.m_state, -2, "__index");
 
-					// set this
-					lua_pushinteger(script.m_state, m_entity.index);
-					lua_setfield(script.m_state, -2, "this");
+						// set this
+						lua_pushinteger(script.m_state, m_entity.index);
+						lua_setfield(script.m_state, -2, "this");
+					}
 
 					lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
 					bool errors = luaL_loadbuffer(script.m_state,
@@ -236,7 +234,7 @@ namespace Lumix
 
 					detectProperties(script);
 
-					if (m_scene.m_is_game_running) m_scene.startScript(script);
+					if (m_scene.m_is_game_running) m_scene.startScript(script, is_reload);
 				}
 			}
 
@@ -995,8 +993,20 @@ namespace Lumix
 		}
 
 
-		void startScript(ScriptInstance& instance)
+		void startScript(ScriptInstance& instance, bool is_restart)
 		{
+			if (is_restart)
+			{
+				for (int i = 0; i < m_updates.size(); ++i)
+				{
+					if (m_updates[i].state == instance.m_state)
+					{
+						m_updates.eraseFast(i);
+						break;
+					}
+				}
+			}
+
 			if (lua_rawgeti(instance.m_state, LUA_REGISTRYINDEX, instance.m_environment) != LUA_TTABLE)
 			{
 				ASSERT(false);
@@ -1012,16 +1022,19 @@ namespace Lumix
 			}
 			lua_pop(instance.m_state, 1);
 
-			if (lua_getfield(instance.m_state, -1, "init") != LUA_TFUNCTION)
+			if (!is_restart)
 			{
-				lua_pop(instance.m_state, 2);
-				return;
-			}
+				if (lua_getfield(instance.m_state, -1, "init") != LUA_TFUNCTION)
+				{
+					lua_pop(instance.m_state, 2);
+					return;
+				}
 
-			if (lua_pcall(instance.m_state, 0, 0, 0) != LUA_OK)
-			{
-				g_log_error.log("Lua Script") << lua_tostring(instance.m_state, -1);
-				lua_pop(instance.m_state, 1);
+				if (lua_pcall(instance.m_state, 0, 0, 0) != LUA_OK)
+				{
+					g_log_error.log("Lua Script") << lua_tostring(instance.m_state, -1);
+					lua_pop(instance.m_state, 1);
+				}
 			}
 			lua_pop(instance.m_state, 1);
 		}
@@ -1044,7 +1057,7 @@ namespace Lumix
 					if (!instance.m_script) continue;
 					if (!instance.m_script->isReady()) continue;
 
-					startScript(instance);
+					startScript(instance, false);
 				}
 			}
 		}
@@ -1123,10 +1136,19 @@ namespace Lumix
 		void getProperty(Property& prop, const char* prop_name, ScriptInstance& scr, char* out, int max_size)
 		{
 			if(max_size <= 0) return;
+			if (!scr.m_state)
+			{
+				copyString(out, max_size, prop.stored_value.c_str());
+				return;
+			}
 
 			*out = '\0';
 			lua_rawgeti(scr.m_state, LUA_REGISTRYINDEX, scr.m_environment);
-			auto type = lua_getfield(scr.m_state, -1, prop_name);
+			if (lua_getfield(scr.m_state, -1, prop_name) == LUA_TNIL)
+			{
+				copyString(out, max_size, prop.stored_value.c_str());
+				return;
+			}
 			switch (prop.type)
 			{
 				case Property::BOOLEAN:
