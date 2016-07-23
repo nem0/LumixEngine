@@ -12,6 +12,11 @@
 
 void getEntityListDisplayName(Lumix::WorldEditor& editor, char* buf, int max_size, Lumix::Entity entity)
 {
+	if (!Lumix::isValid(entity))
+	{
+		*buf = '\0';
+		return;
+	}
 	const char* name = editor.getUniverse()->getEntityName(entity);
 	static const auto RENDERABLE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
 	Lumix::ComponentHandle renderable = editor.getUniverse()->getComponent(entity, RENDERABLE_TYPE).handle;
