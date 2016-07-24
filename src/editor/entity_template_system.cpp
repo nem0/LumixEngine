@@ -24,7 +24,7 @@ namespace Lumix
 {
 
 
-static const uint32 PREFAB_HASH = crc32("prefab");
+static const ResourceType PREFAB_TYPE("prefab");
 
 
 struct PrefabInstance
@@ -43,9 +43,9 @@ public:
 	{}
 
 
-	bool onGUI(Lumix::Resource* resource, Lumix::uint32 type) override
+	bool onGUI(Lumix::Resource* resource, Lumix::ResourceType type) override
 	{
-		if (type != PREFAB_HASH) return false;
+		if (type != PREFAB_TYPE) return false;
 
 		if (ImGui::Button("Instantiate"))
 		{
@@ -56,21 +56,21 @@ public:
 	}
 
 
-	Lumix::uint32 getResourceType(const char* ext)
+	Lumix::ResourceType getResourceType(const char* ext) override
 	{
-		if (equalStrings(ext, "fab")) return PREFAB_HASH;
-		return 0;
+		if (equalStrings(ext, "fab")) return PREFAB_TYPE;
+		return INVALID_RESOURCE_TYPE;
 	}
 	
 	
-	void onResourceUnloaded(Lumix::Resource* resource) {}
-	const char* getName() const { return "Prefab"; }
-	bool hasResourceManager(Lumix::uint32 type) const { return type == PREFAB_HASH; }
+	void onResourceUnloaded(Lumix::Resource* resource) override {}
+	const char* getName() const override { return "Prefab"; }
+	bool hasResourceManager(Lumix::ResourceType type) const override { return type == PREFAB_TYPE; }
 
 
-	bool acceptExtension(const char* ext, Lumix::uint32 type) const
+	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override
 	{
-		return type == PREFAB_HASH && equalStrings(ext, "fab");
+		return type == PREFAB_TYPE && equalStrings(ext, "fab");
 	}
 
 

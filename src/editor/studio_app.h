@@ -22,6 +22,7 @@ struct SDL_Window;
 namespace Lumix
 {
 struct ComponentUID;
+struct ResourceType;
 class WorldEditor;
 }
 
@@ -88,7 +89,7 @@ public:
 	virtual void registerComponent(const char* id, const char* label, IAddComponentPlugin& plugin) = 0;
 	virtual void registerComponentWithResource(const char* id,
 		const char* label,
-		Lumix::uint32 resource_type,
+		Lumix::ResourceType resource_type,
 		const char* property_name) = 0;
 	virtual const Lumix::Array<IAddComponentPlugin*>& getAddComponentPlugins() const = 0;
 	virtual int getExitCode() const = 0;

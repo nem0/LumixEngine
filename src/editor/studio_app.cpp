@@ -109,7 +109,7 @@ public:
 
 	void registerComponentWithResource(const char* type,
 		const char* label,
-		Lumix::uint32 resource_type,
+		Lumix::ResourceType resource_type,
 		const char* property_name) override
 	{
 		struct Plugin : public IAddComponentPlugin
@@ -146,7 +146,7 @@ public:
 			AssetBrowser* asset_browser;
 			Lumix::WorldEditor* editor;
 			Lumix::ComponentType type;
-			Lumix::uint32 resource_type;
+			Lumix::ResourceType resource_type;
 			Lumix::uint32 property_id;
 			char label[50];
 		};

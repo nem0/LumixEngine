@@ -19,7 +19,7 @@ namespace
 
 
 static const ComponentType ANIMABLE_HASH = PropertyRegister::getComponentType("animable");
-static const uint32 ANIMATION_HASH = crc32("ANIMATION");
+static const ResourceType ANIMATION_TYPE("animation");
 
 
 struct AssetBrowserPlugin : AssetBrowser::IPlugin
@@ -31,15 +31,15 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::uint32 type) const override
+	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override
 	{
-		return type == ANIMATION_HASH && equalStrings(ext, "anm");
+		return type == ANIMATION_TYPE && equalStrings(ext, "anm");
 	}
 
 
-	bool onGUI(Lumix::Resource* resource, Lumix::uint32 type) override
+	bool onGUI(Lumix::Resource* resource, Lumix::ResourceType type) override
 	{
-		if (type == ANIMATION_HASH)
+		if (type == ANIMATION_TYPE)
 		{
 			auto* animation = static_cast<Animation*>(resource);
 			ImGui::LabelText("FPS", "%d", animation->getFPS());
@@ -58,13 +58,13 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	const char* getName() const override { return "Animation"; }
 
 
-	bool hasResourceManager(uint32 type) const override { return type == ANIMATION_HASH; }
+	bool hasResourceManager(ResourceType type) const override { return type == ANIMATION_TYPE; }
 
 
-	uint32 getResourceType(const char* ext) override
+	ResourceType getResourceType(const char* ext) override
 	{
-		if (equalStrings(ext, "ani")) return ANIMATION_HASH;
-		return 0;
+		if (equalStrings(ext, "ani")) return ANIMATION_TYPE;
+		return INVALID_RESOURCE_TYPE;
 	}
 
 
@@ -116,7 +116,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin
 
 LUMIX_STUDIO_ENTRY(animation)
 {
-	app.registerComponentWithResource("animable", "Animable", ANIMATION_HASH, "Animation");
+	app.registerComponentWithResource("animable", "Animable", ANIMATION_TYPE, "Animation");
 
 	auto& allocator = app.getWorldEditor()->getAllocator();
 	auto* ab_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(app);

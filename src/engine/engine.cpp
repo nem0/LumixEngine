@@ -29,7 +29,7 @@ namespace Lumix
 {
 
 static const uint32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
-static const uint32 PREFAB_HASH = crc32("prefab");
+static const ResourceType PREFAB_TYPE("prefab");
 static const ComponentType HIERARCHY_TYPE = PropertyRegister::getComponentType("hierarchy");
 
 
@@ -145,7 +145,7 @@ public:
 		}
 
 		m_resource_manager.create(*m_file_system);
-		m_prefab_resource_manager.create(PREFAB_HASH, m_resource_manager);
+		m_prefab_resource_manager.create(PREFAB_TYPE, m_resource_manager);
 
 		m_timer = Timer::create(m_allocator);
 		m_fps_timer = Timer::create(m_allocator);

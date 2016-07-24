@@ -23,7 +23,7 @@ namespace Lumix
 {
 
 
-static const uint32 MATERIAL_HASH = crc32("MATERIAL");
+static const ResourceType MATERIAL_TYPE("material");
 
 
 Mesh::Mesh(Material* mat,
@@ -500,7 +500,7 @@ bool Model::parseMeshes(FS::IFile& file, FileVersion version)
 		catString(material_path, material_name);
 		catString(material_path, ".mat");
 
-		auto* material_manager = m_resource_manager.get(MATERIAL_HASH);
+		auto* material_manager = m_resource_manager.get(MATERIAL_TYPE);
 		Material* material = static_cast<Material*>(material_manager->load(Path(material_path)));
 
 		int32 attribute_array_offset = 0;
@@ -643,7 +643,7 @@ void Model::registerLuaAPI(lua_State* L)
 
 void Model::unload(void)
 {
-	auto* material_manager = m_resource_manager.get(MATERIAL_HASH);
+	auto* material_manager = m_resource_manager.get(MATERIAL_TYPE);
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
 		removeDependency(*m_meshes[i].material);

@@ -39,8 +39,8 @@ static const ComponentType DISTANCE_JOINT_TYPE = PropertyRegister::getComponentT
 static const ComponentType HINGE_JOINT_TYPE = PropertyRegister::getComponentType("hinge_joint");
 static const ComponentType SPHERICAL_JOINT_TYPE = PropertyRegister::getComponentType("spherical_joint");
 static const ComponentType D6_JOINT_TYPE = PropertyRegister::getComponentType("d6_joint");
-static const uint32 TEXTURE_HASH = crc32("TEXTURE");
-static const uint32 PHYSICS_HASH = crc32("PHYSICS");
+static const ResourceType TEXTURE_TYPE("texture");
+static const ResourceType PHYSICS_TYPE("physics");
 static const uint32 RENDERER_HASH = crc32("renderer");
 
 
@@ -1364,11 +1364,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto* old_hm = terrain.m_heightmap;
 		if (old_hm)
 		{
-			resource_manager.get(TEXTURE_HASH)->unload(*old_hm);
+			resource_manager.get(TEXTURE_TYPE)->unload(*old_hm);
 			auto& cb = old_hm->getObserverCb();
 			cb.unbind<Heightfield, &Heightfield::heightmapLoaded>(&terrain);
 		}
-		auto* texture_manager = resource_manager.get(TEXTURE_HASH);
+		auto* texture_manager = resource_manager.get(TEXTURE_TYPE);
 		if (str.isValid())
 		{
 			auto* new_hm = static_cast<Texture*>(texture_manager->load(str));
@@ -1400,7 +1400,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			return;
 		}
 
-		ResourceManagerBase* manager = m_engine->getResourceManager().get(PHYSICS_HASH);
+		ResourceManagerBase* manager = m_engine->getResourceManager().get(PHYSICS_TYPE);
 		PhysicsGeometry* geom_res = static_cast<PhysicsGeometry*>(manager->load(str));
 
 		actor.setPhysxActor(nullptr);
@@ -2683,7 +2683,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				char tmp[MAX_PATH_LENGTH];
 				serializer.readString(tmp, sizeof(tmp));
-				ResourceManagerBase* manager = m_engine->getResourceManager().get(PHYSICS_HASH);
+				ResourceManagerBase* manager = m_engine->getResourceManager().get(PHYSICS_TYPE);
 				auto* geometry = manager->load(Lumix::Path(tmp));
 				actor->setResource(static_cast<PhysicsGeometry*>(geometry));
 				m_universe.addComponent(actor->entity, MESH_ACTOR_TYPE, this, cmp);
@@ -3064,12 +3064,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		int32 count;
 		serializer.read(count);
-		for (auto* actor : m_actors)
-		{
-			actor->setPhysxActor(nullptr);
-			LUMIX_DELETE(m_allocator, actor);
-		}
-		m_actors.clear();
 		m_actors.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
@@ -3547,7 +3541,7 @@ void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* _resource)
 	if (resource)
 	{
 		resource->getObserverCb().unbind<RigidActor, &RigidActor::onStateChanged>(this);
-		resource->getResourceManager().get(PHYSICS_HASH)->unload(*resource);
+		resource->getResourceManager().get(PHYSICS_TYPE)->unload(*resource);
 	}
 	resource = _resource;
 	if (resource)
@@ -3573,7 +3567,7 @@ Heightfield::~Heightfield()
 	if (m_heightmap)
 	{
 		m_heightmap->getResourceManager()
-			.get(TEXTURE_HASH)
+			.get(TEXTURE_TYPE)
 			->unload(*m_heightmap);
 		m_heightmap->getObserverCb().unbind<Heightfield, &Heightfield::heightmapLoaded>(
 			this);

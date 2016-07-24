@@ -15,7 +15,7 @@ namespace Lumix
 {
 
 
-static const uint32 TEXTURE_HASH = crc32("TEXTURE");
+static const ResourceType TEXTURE_TYPE("texture");
 
 
 #pragma pack(1)
@@ -66,7 +66,7 @@ void Texture::setFlag(uint32 flag, bool value)
 	new_flags |= value ? flag : 0;
 	bgfx_flags = new_flags;
 
-	getResourceManager().get(TEXTURE_HASH)->reload(*this);
+	getResourceManager().get(TEXTURE_TYPE)->reload(*this);
 }
 
 
@@ -400,7 +400,7 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 	texture.width = header.width;
 	texture.height = header.height;
 	texture.is_cubemap = false;
-	TextureManager* manager = static_cast<TextureManager*>(texture.getResourceManager().get(TEXTURE_HASH));
+	TextureManager* manager = static_cast<TextureManager*>(texture.getResourceManager().get(TEXTURE_TYPE));
 	if (texture.data_reference)
 	{
 		texture.data.resize(image_size);
@@ -453,7 +453,7 @@ void Texture::addDataReference()
 	++data_reference;
 	if (data_reference == 1 && isReady())
 	{
-		m_resource_manager.get(TEXTURE_HASH)->reload(*this);
+		m_resource_manager.get(TEXTURE_TYPE)->reload(*this);
 	}
 }
 

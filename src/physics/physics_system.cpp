@@ -21,8 +21,8 @@ namespace Lumix
 {
 
 
-	static const uint32 TEXTURE_HASH = crc32("TEXTURE");
-	static const uint32 PHYSICS_HASH = crc32("PHYSICS");
+	static const ResourceType TEXTURE_TYPE("texture");
+	static const ResourceType PHYSICS_TYPE("physics");
 
 
 	class D6MotionDescriptor : public IEnumPropertyDescriptor
@@ -371,13 +371,13 @@ namespace Lumix
 				&PhysicsScene::getShapeSource,
 				&PhysicsScene::setShapeSource,
 				"Physics (*.phy)",
-				PHYSICS_HASH));
+				PHYSICS_TYPE));
 		PropertyRegister::add("mesh_rigid_actor",
 			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)(
 				"Layer", &PhysicsScene::getActorLayer, &PhysicsScene::setActorLayer));
 		PropertyRegister::add("physical_heightfield",
 			LUMIX_NEW(allocator, ResourcePropertyDescriptor<PhysicsScene>)(
-				"Heightmap", &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, "Image (*.raw)", TEXTURE_HASH));
+				"Heightmap", &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, "Image (*.raw)", TEXTURE_TYPE));
 		PropertyRegister::add("physical_heightfield",
 			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("XZ scale",
 				&PhysicsScene::getHeightmapXZScale,
@@ -438,7 +438,7 @@ namespace Lumix
 			, m_manager(*this, engine.getAllocator())
 		{
 			registerProperties(engine.getAllocator());
-			m_manager.create(PHYSICS_HASH, engine.getResourceManager());
+			m_manager.create(PHYSICS_TYPE, engine.getResourceManager());
 			PhysicsScene::registerLuaAPI(m_engine.getState());
 
 			m_foundation = PxCreateFoundation(PX_PHYSICS_VERSION, m_physx_allocator, m_error_callback);

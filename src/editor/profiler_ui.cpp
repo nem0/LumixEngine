@@ -792,12 +792,12 @@ void ProfilerUIImpl::onGUIResources()
 
 	ImGui::FilterInput("filter###resource_filter", m_resource_filter, Lumix::lengthOf(m_resource_filter));
 
-	static const Lumix::uint32 manager_types[] = { Lumix::crc32("ANIMATION"),
-		Lumix::crc32("MATERIAL"),
-		Lumix::crc32("MODEL"),
-		Lumix::crc32("PHYSICS"),
-		Lumix::crc32("SHADER"),
-		Lumix::crc32("TEXTURE") };
+	static const Lumix::ResourceType resource_types[] = { Lumix::ResourceType("animation"),
+		Lumix::ResourceType("material"),
+		Lumix::ResourceType("model"),
+		Lumix::ResourceType("physics"),
+		Lumix::ResourceType("shader"),
+		Lumix::ResourceType("texture") };
 	static const char* manager_names[] = {
 		"Animations",
 		"Materials",
@@ -806,14 +806,14 @@ void ProfilerUIImpl::onGUIResources()
 		"Shaders",
 		"Textures"
 	};
-	ASSERT(Lumix::lengthOf(manager_types) == Lumix::lengthOf(manager_names));
+	ASSERT(Lumix::lengthOf(resource_types) == Lumix::lengthOf(manager_names));
 	ImGui::Indent();
-	for (int i = 0; i < Lumix::lengthOf(manager_types); ++i)
+	for (int i = 0; i < Lumix::lengthOf(resource_types); ++i)
 	{
 		if (!ImGui::CollapsingHeader(manager_names[i])) continue;
 
-		auto* material_manager = m_resource_manager.get(manager_types[i]);
-		auto& resources = material_manager->getResourceTable();
+		auto* resource_manager = m_resource_manager.get(resource_types[i]);
+		auto& resources = resource_manager->getResourceTable();
 
 		ImGui::Columns(4, "resc");
 		ImGui::Text("Path");

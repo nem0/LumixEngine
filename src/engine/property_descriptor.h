@@ -1,10 +1,11 @@
 #pragma once
 
 #include "engine/blob.h"
-#include "engine/path.h"
-#include "engine/string.h"
 #include "engine/iplugin.h"
 #include "engine/iproperty_descriptor.h"
+#include "engine/path.h"
+#include "engine/resource.h"
+#include "engine/string.h"
 #include "engine/universe/universe.h"
 
 
@@ -524,7 +525,7 @@ public:
 		Getter getter,
 		Setter setter,
 		const char* file_type,
-		uint32 resource_type)
+		ResourceType resource_type)
 		: m_file_descriptor(name, getter, setter, file_type)
 		, m_resource_type(resource_type)
 	{
@@ -535,7 +536,7 @@ public:
 		ArrayGetter getter,
 		ArraySetter setter,
 		const char* file_type,
-		uint32 resource_type)
+		ResourceType resource_type)
 		: m_file_descriptor(name, getter, setter, file_type)
 		, m_resource_type(resource_type)
 	{
@@ -552,9 +553,9 @@ public:
 		m_file_descriptor.get(cmp, index, stream);
 	}
 
-	uint32 getResourceType() override { return m_resource_type; }
+	ResourceType getResourceType() override { return m_resource_type; }
 
-	uint32 m_resource_type;
+	ResourceType m_resource_type;
 	FilePropertyDescriptor<T> m_file_descriptor;
 };
 

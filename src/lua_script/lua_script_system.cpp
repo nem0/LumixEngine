@@ -35,7 +35,7 @@ namespace Lumix
 	
 	
 	static const ComponentType LUA_SCRIPT_TYPE = PropertyRegister::getComponentType("lua_script");
-	static const uint32 LUA_SCRIPT_HASH = crc32("lua_script");
+	static const ResourceType LUA_SCRIPT_RESOURCE_TYPE("lua_script");
 
 
 	class LuaScriptSystemImpl : public IPlugin
@@ -776,7 +776,7 @@ namespace Lumix
 
 		LuaScript* preloadScript(const char* path)
 		{
-			auto* script_manager = m_system.m_engine.getResourceManager().get(LUA_SCRIPT_HASH);
+			auto* script_manager = m_system.m_engine.getResourceManager().get(LUA_SCRIPT_RESOURCE_TYPE);
 			return static_cast<LuaScript*>(script_manager->load(Path(path)));
 		}
 
@@ -784,7 +784,7 @@ namespace Lumix
 		void unloadScript(LuaScript* script)
 		{
 			if (!script) return;
-			script->getResourceManager().get(LUA_SCRIPT_HASH)->unload(*script);
+			script->getResourceManager().get(LUA_SCRIPT_RESOURCE_TYPE)->unload(*script);
 		}
 
 
@@ -1497,7 +1497,7 @@ namespace Lumix
 		, m_allocator(engine.getAllocator())
 		, m_script_manager(m_allocator)
 	{
-		m_script_manager.create(LUA_SCRIPT_HASH, engine.getResourceManager());
+		m_script_manager.create(LUA_SCRIPT_RESOURCE_TYPE, engine.getResourceManager());
 
 		auto& allocator = engine.getAllocator();
 		PropertyRegister::add("lua_script",

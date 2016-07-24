@@ -16,6 +16,7 @@ class FileSystem;
 
 class Path;
 class Resource;
+struct ResourceType;
 class ResourceManager;
 
 
@@ -26,7 +27,7 @@ public:
 	typedef HashMap<uint32, Resource*> ResourceTable;
 
 public:
-	void create(uint32 id, ResourceManager& owner);
+	void create(ResourceType type, ResourceManager& owner);
 	void destroy();
 
 	Resource* get(const Path& path);

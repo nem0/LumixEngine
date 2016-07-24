@@ -9,9 +9,9 @@
 
 namespace Lumix
 {
-	void ResourceManagerBase::create(uint32 id, ResourceManager& owner)
+	void ResourceManagerBase::create(ResourceType type, ResourceManager& owner)
 	{
-		owner.add(id, this);
+		owner.add(type, this);
 		m_owner = &owner;
 	}
 
