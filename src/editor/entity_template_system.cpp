@@ -231,8 +231,7 @@ private:
 			if (m_entity_system.m_instances.find(name_hash) < 0)
 			{
 				m_entity_system.m_template_names.push(m_name);
-				m_entity_system.m_instances.insert(
-					name_hash, Array<Entity>(m_editor.getAllocator()));
+				m_entity_system.m_instances.emplace(name_hash, m_editor.getAllocator());
 				m_entity_system.m_instances.get(name_hash).push(m_entity);
 				m_entity_system.m_updated.invoke();
 			}
@@ -615,11 +614,13 @@ public:
 	void setTemplate(Entity entity, uint32 template_name_hash) override
 	{
 		int idx = m_instances.find(template_name_hash);
-		if (idx < 0)
+		if (idx >= 0)
 		{
-			idx = m_instances.insert(template_name_hash, Array<Entity>(m_editor.getAllocator()));
+			m_instances.at(idx).push(entity);
+			return;
 		}
-		m_instances.at(idx).push(entity);
+		auto& value = m_instances.emplace(template_name_hash, m_editor.getAllocator());
+		value.push(entity);
 	}
 
 
@@ -643,24 +644,16 @@ public:
 	const Array<Entity>& getInstances(uint32 template_name_hash) override
 	{
 		int instances_index = m_instances.find(template_name_hash);
-		if (instances_index < 0)
-		{
-			m_instances.insert(template_name_hash, Array<Entity>(m_editor.getAllocator()));
-			instances_index = m_instances.find(template_name_hash);
-		}
-		return m_instances.at(instances_index);
+		if (instances_index >= 0) return m_instances.at(instances_index);
+		return m_instances.emplace(template_name_hash, m_editor.getAllocator());
 	}
 
 
 	Array<Entity>& getMutableInstances(uint32 template_name_hash)
 	{
 		int instances_index = m_instances.find(template_name_hash);
-		if (instances_index < 0)
-		{
-			m_instances.insert(template_name_hash, Array<Entity>(m_editor.getAllocator()));
-			instances_index = m_instances.find(template_name_hash);
-		}
-		return m_instances.at(instances_index);
+		if (instances_index >= 0) return m_instances.at(instances_index);
+		return m_instances.emplace(template_name_hash, m_editor.getAllocator());
 	}
 
 
@@ -788,8 +781,7 @@ public:
 			serializer.read(hash);
 			int32 instances_per_template;
 			serializer.read(instances_per_template);
-			m_instances.insert(hash, Array<Entity>(m_editor.getAllocator()));
-			Array<Entity>& entities = m_instances.get(hash);
+			Array<Entity>& entities = m_instances.emplace(hash, m_editor.getAllocator());
 			for (int j = 0; j < instances_per_template; ++j)
 			{
 				Entity entity;

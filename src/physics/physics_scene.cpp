@@ -1084,7 +1084,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createDistanceJoint(Entity entity)
 	{
-		Joint joint;
+		if (m_joints.find(entity) >= 0) return INVALID_COMPONENT;
+		Joint& joint = m_joints.insert(entity);
 		joint.connected_body = INVALID_ENTITY;
 		joint.local_frame0.p = physx::PxVec3(0, 0, 0);
 		joint.local_frame0.q = physx::PxQuat(0, 0, 0, 1);
@@ -1095,7 +1096,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 			physx::PxTransform::createIdentity());
 		joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
 		static_cast<physx::PxDistanceJoint*>(joint.physx)->setDistanceJointFlag(physx::PxDistanceJointFlag::eSPRING_ENABLED, true);
-		m_joints.insert(entity, joint);
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, DISTANCE_JOINT_TYPE, this, cmp);
@@ -1105,7 +1105,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createSphericalJoint(Entity entity)
 	{
-		Joint joint;
+		if (m_joints.find(entity) >= 0) return INVALID_COMPONENT;
+		Joint& joint = m_joints.insert(entity);
 		joint.connected_body = INVALID_ENTITY;
 		joint.local_frame0.p = physx::PxVec3(0, 0, 0);
 		joint.local_frame0.q = physx::PxQuat(0, 0, 0, 1);
@@ -1115,7 +1116,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 			nullptr,
 			physx::PxTransform::createIdentity());
 		joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
-		m_joints.insert(entity, joint);
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, SPHERICAL_JOINT_TYPE, this, cmp);
@@ -1125,7 +1125,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createD6Joint(Entity entity)
 	{
-		Joint joint;
+		if (m_joints.find(entity) >= 0) return INVALID_COMPONENT;
+		Joint& joint = m_joints.insert(entity);
 		joint.connected_body = INVALID_ENTITY;
 		joint.local_frame0.p = physx::PxVec3(0, 0, 0);
 		joint.local_frame0.q = physx::PxQuat(0, 0, 0, 1);
@@ -1139,7 +1140,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 		linear_limit.value = 1.0f;
 		d6_joint->setLinearLimit(linear_limit);
 		joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
-		m_joints.insert(entity, joint);
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, D6_JOINT_TYPE, this, cmp);
@@ -1149,7 +1149,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createHingeJoint(Entity entity)
 	{
-		Joint joint;
+		if (m_joints.find(entity) >= 0) return INVALID_COMPONENT;
+		Joint& joint = m_joints.insert(entity);
 		joint.connected_body = INVALID_ENTITY;
 		joint.local_frame0.p = physx::PxVec3(0, 0, 0);
 		joint.local_frame0.q = physx::PxQuat(0, 0, 0, 1);
@@ -1159,7 +1160,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 			nullptr,
 			physx::PxTransform::createIdentity());
 		joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
-		m_joints.insert(entity, joint);
 
 		ComponentHandle cmp = { entity.index };
 		m_universe.addComponent(entity, HINGE_JOINT_TYPE, this, cmp);
@@ -1169,12 +1169,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createHeightfield(Entity entity)
 	{
-		Heightfield terrain;
+		Heightfield& terrain = m_terrains.insert(entity);
 		terrain.m_heightmap = nullptr;
 		terrain.m_scene = this;
 		terrain.m_actor = nullptr;
 		terrain.m_entity = entity;
-		m_terrains.insert(entity, terrain);
+
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, HEIGHTFIELD_TYPE, this, cmp);
 		return cmp;
@@ -1194,14 +1194,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 		cDesc.behaviorCallback = nullptr;
 		Vec3 position = m_universe.getPosition(entity);
 		cDesc.position.set(position.x, position.y, position.z);
-		Controller c;
+		Controller& c = m_controllers.insert(entity);
 		c.m_controller = m_controller_manager->createController(cDesc);
 		c.m_entity = entity;
 		c.m_frame_change.set(0, 0, 0);
 		c.m_radius = cDesc.radius;
 		c.m_height = cDesc.height;
 		c.m_layer = 0;
-		m_controllers.insert(entity, c);
 
 		physx::PxFilterData data;
 		int controller_layer = c.m_layer;
@@ -1222,6 +1221,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createCapsuleRigidActor(Entity entity)
 	{
+		if (m_actors.find(entity) >= 0) return INVALID_COMPONENT;
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::CAPSULE);
 		m_actors.insert(entity, actor);
 		actor->entity = entity;
@@ -1244,8 +1244,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createRagdoll(Entity entity)
 	{
-		int idx = m_ragdolls.insert(entity, Ragdoll());
-		Ragdoll& ragdoll = m_ragdolls.at(idx);
+		Ragdoll& ragdoll = m_ragdolls.insert(entity);
 		ragdoll.entity = entity;
 		ragdoll.root = nullptr;
 		ragdoll.layer = 0;
@@ -1258,6 +1257,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createBoxRigidActor(Entity entity)
 	{
+		if (m_actors.find(entity) >= 0) return INVALID_COMPONENT;
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
 		m_actors.insert(entity, actor);
 		actor->entity = entity;
@@ -1281,6 +1281,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createSphereRigidActor(Entity entity)
 	{
+		if (m_actors.find(entity) >= 0) return INVALID_COMPONENT;
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::SPHERE);
 		m_actors.insert(entity, actor);
 		actor->entity = entity;
@@ -1301,6 +1302,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	ComponentHandle createMeshRigidActor(Entity entity)
 	{
+		if (m_actors.find(entity) >= 0) return INVALID_COMPONENT;
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::MESH);
 		m_actors.insert(entity, actor);
 		actor->entity = entity;
@@ -3099,7 +3101,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 			if (is_free) continue;
 
-			Controller c;
+			Controller& c = m_controllers.insert(entity);
 			c.m_frame_change.set(0, 0, 0);
 
 			if (version > (int)PhysicsSceneVersion::LAYERS)
@@ -3123,7 +3125,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 			cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
 			c.m_controller = m_controller_manager->createController(*m_system->getPhysics(), m_scene, cDesc);
 			c.m_entity = entity;
-			m_controllers.insert(entity, c);
 			m_universe.addComponent(entity, CONTROLLER_TYPE, this, {i});
 		}
 	}
@@ -3151,8 +3152,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			Entity entity;
 			serializer.read(entity);
-			int idx = m_ragdolls.insert(entity, Ragdoll());
-			Ragdoll& ragdoll = m_ragdolls.at(i);
+			Ragdoll& ragdoll = m_ragdolls.insert(entity);
 			ragdoll.layer = 0;
 			if (version > (int)PhysicsSceneVersion::RAGDOLL_LAYER) serializer.read(ragdoll.layer);
 			ragdoll.entity = entity;
@@ -3174,7 +3174,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			Entity entity;
 			serializer.read(entity);
-			Joint joint;
+			Joint& joint = m_joints.insert(entity);
 			int type;
 			serializer.read(type);
 			serializer.read(joint.connected_body);
@@ -3272,7 +3272,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 				default: ASSERT(false); break;
 			}
 
-			m_joints.insert(entity, joint);
 			ComponentHandle cmp = {entity.index};
 			m_universe.addComponent(entity, cmp_type, this, cmp);
 		}

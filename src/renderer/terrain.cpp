@@ -387,7 +387,7 @@ Array<Terrain::GrassQuad*>& Terrain::getQuads(ComponentHandle camera)
 	int quads_index = m_grass_quads.find(camera);
 	if (quads_index < 0)
 	{
-		m_grass_quads.insert(camera, Array<GrassQuad*>(m_allocator));
+		m_grass_quads.emplace(camera, m_allocator);
 		quads_index = m_grass_quads.find(camera);
 	}
 	return m_grass_quads.at(quads_index);

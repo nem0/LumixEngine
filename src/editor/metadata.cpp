@@ -48,16 +48,14 @@ bool Metadata::load()
 	{
 		Lumix::uint32 key;
 		file.read(&key, sizeof(key));
-		int idx = m_data.insert(key, Lumix::AssociativeArray<Lumix::uint32, DataItem>(m_allocator));
+		auto& file_data = m_data.emplace(key, m_allocator);
 
-		auto& file_data = m_data.at(idx);
 		int inner_count;
 		file.read(&inner_count, sizeof(inner_count));
 		for (int j = 0; j < inner_count; ++j)
 		{
 			file.read(&key, sizeof(key));
-			int idx = file_data.insert(key, DataItem());
-			auto& value = file_data.at(idx);
+			DataItem& value = file_data.insert(key);
 			file.read(&value.m_type, sizeof(value.m_type));
 			switch (value.m_type)
 			{
@@ -164,12 +162,8 @@ Metadata::DataItem* Metadata::getOrCreateData(Lumix::uint32 file, Lumix::uint32 
 
 	auto& file_data = m_data.at(index);
 	index = file_data.find(key);
-	if (index < 0)
-	{
-		index = file_data.insert(key, DataItem());
-	}
-
-	return &file_data.at(index);
+	if (index >= 0) return &file_data.at(index);
+	return &file_data.insert(key);
 }
 
 

@@ -284,13 +284,12 @@ struct AnimationSceneImpl : public AnimationScene
 
 	ComponentHandle createAnimable(Entity entity)
 	{
-		Animable animable;
+		Animable& animable = m_animables.insert(entity);
 		animable.time = 0;
 		animable.animation = nullptr;
 		animable.entity = entity;
 		animable.time_scale = 1;
 		animable.start_time = 0;
-		m_animables.insert(entity, animable);
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, ANIMABLE_TYPE, this, cmp);
