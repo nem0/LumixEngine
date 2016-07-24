@@ -4,7 +4,6 @@
 
 #include "cooking/PxCooking.h"
 #include "engine/base_proxy_allocator.h"
-#include "engine/crc32.h"
 #include "engine/log.h"
 #include "engine/resource_manager.h"
 #include "engine/engine.h"

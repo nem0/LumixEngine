@@ -1,6 +1,5 @@
 #include "animation/animation_system.h"
 #include "animation/animation.h"
-#include "engine/crc32.h"
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "editor/asset_browser.h"

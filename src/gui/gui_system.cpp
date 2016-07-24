@@ -1,5 +1,4 @@
 ﻿#include "gui_system.h"
-#include "engine/crc32.h"
 #include "engine/delegate.h"
 #include "engine/delegate_list.h"
 #include "engine/engine.h"

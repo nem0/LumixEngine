@@ -1,5 +1,4 @@
 #include "profiler_ui.h"
-#include "engine/crc32.h"
 #include "engine/fs/file_events_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"

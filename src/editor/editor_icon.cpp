@@ -1,6 +1,5 @@
 #include "editor_icon.h"
 #include "editor/platform_interface.h"
-#include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/math_utils.h"
 #include "engine/matrix.h"

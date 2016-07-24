@@ -2,7 +2,6 @@
 #include "audio_device.h"
 #include "audio_scene.h"
 #include "clip_manager.h"
-#include "engine/crc32.h"
 #include "engine/path.h"
 #include "engine/resource_manager.h"
 #include "editor/asset_browser.h"

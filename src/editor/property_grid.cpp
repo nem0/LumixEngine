@@ -3,7 +3,6 @@
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/blob.h"
-#include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "engine/iproperty_descriptor.h"
