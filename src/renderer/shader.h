@@ -64,7 +64,7 @@ struct LUMIX_RENDERER_API ShaderCombinations
 class LUMIX_RENDERER_API ShaderBinary : public Resource
 {
 public:
-	ShaderBinary(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
+	ShaderBinary(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	bgfx::ShaderHandle getHandle() { return m_handle; }
 
 private:
@@ -122,7 +122,7 @@ public:
 	static const int MAX_TEXTURE_SLOT_COUNT = 16;
 
 public:
-	Shader(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
+	Shader(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	~Shader();
 
 	bool hasDefine(uint8 define_idx) const;

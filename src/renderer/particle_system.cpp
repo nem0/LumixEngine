@@ -639,8 +639,7 @@ void ParticleEmitter::setMaterial(Material* material)
 {
 	if (m_material)
 	{
-		auto* manager = m_material->getResourceManager().get(MATERIAL_TYPE);
-		manager->unload(*m_material);
+		m_material->getResourceManager().unload(*m_material);
 	}
 	m_material = material;
 }

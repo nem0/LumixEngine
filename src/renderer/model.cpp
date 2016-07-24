@@ -53,7 +53,7 @@ void Mesh::set(int attribute_array_offset, int attribute_array_size, int indices
 }
 
 
-Model::Model(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+Model::Model(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_bounding_radius()
 	, m_allocator(allocator)
@@ -500,7 +500,7 @@ bool Model::parseMeshes(FS::IFile& file, FileVersion version)
 		catString(material_path, material_name);
 		catString(material_path, ".mat");
 
-		auto* material_manager = m_resource_manager.get(MATERIAL_TYPE);
+		auto* material_manager = m_resource_manager.getOwner().get(MATERIAL_TYPE);
 		Material* material = static_cast<Material*>(material_manager->load(Path(material_path)));
 
 		int32 attribute_array_offset = 0;
@@ -643,7 +643,7 @@ void Model::registerLuaAPI(lua_State* L)
 
 void Model::unload(void)
 {
-	auto* material_manager = m_resource_manager.get(MATERIAL_TYPE);
+	auto* material_manager = m_resource_manager.getOwner().get(MATERIAL_TYPE);
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
 		removeDependency(*m_meshes[i].material);

@@ -12,7 +12,7 @@ namespace Lumix
 
 struct PrefabResource : public Resource
 {
-	PrefabResource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+	PrefabResource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
 		: Resource(path, resource_manager, allocator)
 		, blob(allocator)
 	{
@@ -46,7 +46,7 @@ public:
 protected:
 	Resource* createResource(const Path& path) override
 	{
-		return LUMIX_NEW(m_allocator, PrefabResource)(path, getOwner(), m_allocator);
+		return LUMIX_NEW(m_allocator, PrefabResource)(path, *this, m_allocator);
 	}
 
 

@@ -32,6 +32,7 @@
 static const Lumix::ComponentType RENDERABLE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
 static const Lumix::ComponentType TERRAIN_TYPE = Lumix::PropertyRegister::getComponentType("terrain");
 static const Lumix::ResourceType MATERIAL_TYPE("material");
+static const Lumix::ResourceType TEXTURE_TYPE("texture");
 static const char* HEIGHTMAP_UNIFORM = "u_texHeightmap";
 static const char* SPLATMAP_UNIFORM = "u_texSplatmap";
 static const char* COLORMAP_UNIFORM = "u_texColormap";
@@ -1287,7 +1288,7 @@ void TerrainEditor::onGUI()
 						LUMIX_DELETE(m_world_editor.getAllocator(), m_brush_texture);
 					}
 					m_brush_texture = LUMIX_NEW(m_world_editor.getAllocator(), Lumix::Texture)(
-						Lumix::Path("brush_texture"), rm, m_world_editor.getAllocator());
+						Lumix::Path("brush_texture"), *rm.get(TEXTURE_TYPE), m_world_editor.getAllocator());
 					m_brush_texture->create(image_width, image_height, data);
 
 					stbi_image_free(data);

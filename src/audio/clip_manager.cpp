@@ -35,7 +35,7 @@ bool Clip::load(FS::IFile& file)
 
 Resource* ClipManager::createResource(const Path& path)
 {
-	return LUMIX_NEW(m_allocator, Clip)(path, getOwner(), m_allocator);
+	return LUMIX_NEW(m_allocator, Clip)(path, *this, m_allocator);
 }
 
 

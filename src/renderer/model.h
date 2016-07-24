@@ -126,7 +126,7 @@ public:
 	};
 
 public:
-	Model(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
+	Model(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	~Model();
 
 	void create(const bgfx::VertexDecl& def,

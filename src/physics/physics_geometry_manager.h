@@ -60,7 +60,7 @@ class PhysicsGeometry : public Resource
 		};
 
 	public:
-		PhysicsGeometry(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
+		PhysicsGeometry(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 		~PhysicsGeometry();
 
 		physx::PxGeometry* getGeometry() { return m_geometry; }

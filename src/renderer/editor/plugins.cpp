@@ -1040,7 +1040,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 			auto iter = m_textures.find(handle);
 			if (iter == m_textures.end()) return;
 			auto* texture = iter.value();
-			texture->getResourceManager().get(TEXTURE_TYPE)->unload(*texture);
+			texture->getResourceManager().unload(*texture);
 			m_textures.erase(iter);
 		}
 
@@ -1102,7 +1102,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		void unloadModel(ModelHandle handle) override
 		{
 			auto* model = m_models[handle];
-			model->getResourceManager().get(MODEL_TYPE)->unload(*model);
+			model->getResourceManager().unload(*model);
 			m_models.erase(handle);
 		}
 
@@ -1368,7 +1368,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		m_material = static_cast<Material*>(resource);
 
 		Texture* texture = LUMIX_NEW(editor.getAllocator(), Texture)(
-			Path("font"), m_engine->getResourceManager(), editor.getAllocator());
+			Path("font"), *m_engine->getResourceManager().get(TEXTURE_TYPE), editor.getAllocator());
 
 		texture->create(width, height, pixels);
 		m_material->setTexture(0, texture);
@@ -1404,7 +1404,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		texture->destroy();
 		LUMIX_DELETE(m_app.getWorldEditor()->getAllocator(), texture);
 
-		m_material->getResourceManager().get(MATERIAL_TYPE)->unload(*m_material);
+		m_material->getResourceManager().unload(*m_material);
 	}
 
 

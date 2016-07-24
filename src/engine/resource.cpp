@@ -4,7 +4,10 @@
 #include "engine/log.h"
 #include "engine/lumix.h"
 #include "engine/path.h"
+#include "engine/resource.h"
 #include "engine/resource_manager.h"
+#include "engine/resource_manager_base.h"
+
 
 namespace Lumix
 {
@@ -17,7 +20,7 @@ ResourceType::ResourceType(const char* type_name)
 }
 
 
-Resource::Resource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+Resource::Resource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
 	: m_ref_count()
 	, m_empty_dep_count(1)
 	, m_failed_dep_count(0)
@@ -126,7 +129,7 @@ void Resource::doLoad()
 
 	if (m_is_waiting_for_load) return;
 	m_is_waiting_for_load = true;
-	FS::FileSystem& fs = m_resource_manager.getFileSystem();
+	FS::FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 	FS::ReadCallback cb;
 	cb.bind<Resource, &Resource::fileLoaded>(this);
 	fs.openAsync(fs.getDefaultDevice(), m_path, FS::Mode::OPEN_AND_READ, cb);

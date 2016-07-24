@@ -86,7 +86,7 @@ struct InputStream : public physx::PxInputStream
 
 Resource* PhysicsGeometryManager::createResource(const Path& path)
 {
-	return LUMIX_NEW(m_allocator, PhysicsGeometry)(path, getOwner(), m_allocator);
+	return LUMIX_NEW(m_allocator, PhysicsGeometry)(path, *this, m_allocator);
 }
 
 
@@ -96,7 +96,7 @@ void PhysicsGeometryManager::destroyResource(Resource& resource)
 }
 
 
-PhysicsGeometry::PhysicsGeometry(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+PhysicsGeometry::PhysicsGeometry(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_geometry(nullptr)
 {
@@ -124,8 +124,7 @@ bool PhysicsGeometry::load(FS::IFile& file)
 		return false;
 	}
 
-	auto* phy_manager = m_resource_manager.get(PHYSICS_TYPE);
-	PhysicsSystem& system = static_cast<PhysicsGeometryManager*>(phy_manager)->getSystem();
+	PhysicsSystem& system = static_cast<PhysicsGeometryManager&>(m_resource_manager).getSystem();
 
 	int32 num_verts;
 	Array<Vec3> verts(getAllocator());
@@ -190,7 +189,7 @@ bool PhysicsGeometry::load(FS::IFile& file)
 
 IAllocator& PhysicsGeometry::getAllocator()
 {
-	return static_cast<PhysicsGeometryManager*>(m_resource_manager.get(PHYSICS_TYPE))->getAllocator();
+	return static_cast<PhysicsGeometryManager&>(m_resource_manager).getAllocator();
 }
 
 

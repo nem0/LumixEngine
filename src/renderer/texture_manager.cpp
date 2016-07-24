@@ -23,7 +23,7 @@ namespace Lumix
 
 	Resource* TextureManager::createResource(const Path& path)
 	{
-		return LUMIX_NEW(m_allocator, Texture)(path, getOwner(), m_allocator);
+		return LUMIX_NEW(m_allocator, Texture)(path, *this, m_allocator);
 	}
 
 	void TextureManager::destroyResource(Resource& resource)

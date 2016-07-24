@@ -26,7 +26,7 @@ ShaderManager::~ShaderManager()
 
 Resource* ShaderManager::createResource(const Path& path)
 {
-	return LUMIX_NEW(m_allocator, Shader)(path, getOwner(), m_allocator);
+	return LUMIX_NEW(m_allocator, Shader)(path, *this, m_allocator);
 }
 
 
@@ -67,7 +67,7 @@ ShaderBinaryManager::~ShaderBinaryManager()
 
 Resource* ShaderBinaryManager::createResource(const Path& path)
 {
-	return LUMIX_NEW(m_allocator, ShaderBinary)(path, getOwner(), m_allocator);
+	return LUMIX_NEW(m_allocator, ShaderBinary)(path, *this, m_allocator);
 }
 
 

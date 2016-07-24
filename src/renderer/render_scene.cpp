@@ -155,14 +155,12 @@ private:
 			, m_ref_count(0)
 			, m_model(model)
 		{
-			m_model->getObserverCb().bind<ModelLoadedCallback, &ModelLoadedCallback::callback>(
-				this);
+			m_model->getObserverCb().bind<ModelLoadedCallback, &ModelLoadedCallback::callback>(this);
 		}
 
 		~ModelLoadedCallback()
 		{
-			m_model->getObserverCb().unbind<ModelLoadedCallback, &ModelLoadedCallback::callback>(
-				this);
+			m_model->getObserverCb().unbind<ModelLoadedCallback, &ModelLoadedCallback::callback>(this);
 		}
 
 		void callback(Resource::State old_state, Resource::State new_state)
@@ -230,9 +228,8 @@ public:
 		{
 			if (i.entity != INVALID_ENTITY && i.model)
 			{
-				auto& manager = i.model->getResourceManager();
 				freeCustomMeshes(i, material_manager);
-				manager.get(MODEL_TYPE)->unload(*i.model);
+				i.model->getResourceManager().unload(*i.model);
 				LUMIX_DELETE(m_allocator, i.pose);
 			}
 		}
@@ -241,7 +238,7 @@ public:
 
 		for (auto& probe : m_environment_probes)
 		{
-			if (probe.texture) probe.texture->getResourceManager().get(TEXTURE_TYPE)->unload(*probe.texture);
+			if (probe.texture) probe.texture->getResourceManager().unload(*probe.texture);
 		}
 		m_environment_probes.clear();
 	}
@@ -1113,7 +1110,7 @@ public:
 	{
 		Entity entity = {component.index};
 		auto& probe = m_environment_probes[entity];
-		if (probe.texture) probe.texture->getResourceManager().get(TEXTURE_TYPE)->unload(*probe.texture);
+		if (probe.texture) probe.texture->getResourceManager().unload(*probe.texture);
 		m_environment_probes.erase(entity);
 		m_universe.destroyComponent(entity, ENVIRONMENT_PROBE_TYPE, this, component);
 	}
@@ -3689,7 +3686,7 @@ public:
 
 		ASSERT(r.model);
 		auto& rm = r.model->getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_TYPE));
+		auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(MATERIAL_TYPE));
 
 		auto* new_meshes = (Mesh*)m_allocator.allocate(count * sizeof(Mesh));
 		if (r.meshes)
@@ -3736,7 +3733,7 @@ public:
 		if (r.meshes && r.mesh_count > index && path == r.meshes[index].material->getPath()) return;
 
 		auto& rm = r.model->getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_TYPE));
+		auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(MATERIAL_TYPE));
 
 		int new_count = Math::maximum(int8(index + 1), r.mesh_count);
 		allocateCustomMeshes(r, new_count);
@@ -3765,13 +3762,13 @@ public:
 		bool no_change = model == old_model && old_model;
 		if (no_change)
 		{
-			old_model->getResourceManager().get(MODEL_TYPE)->unload(*old_model);
+			old_model->getResourceManager().unload(*old_model);
 			return;
 		}
 		if (old_model)
 		{
 			auto& rm = old_model->getResourceManager();
-			auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_TYPE));
+			auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(MATERIAL_TYPE));
 			freeCustomMeshes(renderable, material_manager);
 			int callback_idx = getModelLoadedCallback(old_model);
 			ModelLoadedCallback* callback = m_model_loaded_callbacks[callback_idx];
@@ -3786,7 +3783,7 @@ public:
 			{
 				m_culling_system->removeStatic(component);
 			}
-			old_model->getResourceManager().get(MODEL_TYPE)->unload(*old_model);
+			old_model->getResourceManager().unload(*old_model);
 		}
 		renderable.model = model;
 		renderable.meshes = nullptr;

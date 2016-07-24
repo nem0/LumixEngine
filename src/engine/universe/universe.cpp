@@ -45,6 +45,12 @@ Universe::Universe(IAllocator& allocator)
 }
 
 
+IScene* Universe::getScene(ComponentType type) const
+{
+	return m_component_type_scene_map[type.index];
+}
+
+
 IScene* Universe::getScene(uint32 hash) const
 {
 	for (auto* scene : m_scenes)
@@ -403,12 +409,6 @@ void Universe::registerComponentTypeScene(ComponentType type, IScene* scene)
 {
 	ASSERT(!m_component_type_scene_map[type.index]);
 	m_component_type_scene_map[type.index] = scene;
-}
-
-
-IScene* Universe::getScene(ComponentType type) const
-{
-	return m_component_type_scene_map[type.index];
 }
 
 
