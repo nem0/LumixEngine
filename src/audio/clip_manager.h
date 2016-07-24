@@ -13,7 +13,7 @@ namespace Lumix
 class Clip : public Resource
 {
 public:
-	Clip(const Path& path, ResourceManager& manager, IAllocator& allocator)
+	Clip(const Path& path, ResourceManagerBase& manager, IAllocator& allocator)
 		: Resource(path, manager, allocator)
 		, m_data(allocator)
 	{

@@ -137,9 +137,7 @@ void AssetBrowser::unloadResource()
 	{
 		plugin->onResourceUnloaded(m_selected_resource);
 	}
-	m_selected_resource->getResourceManager()
-		.get(getResourceType(m_selected_resource->getPath().c_str()))
-		->unload(*m_selected_resource);
+	m_selected_resource->getResourceManager().unload(*m_selected_resource);
 
 	m_selected_resource = nullptr;
 }

@@ -49,12 +49,12 @@ public:
 
 	ResourceManagerBase(IAllocator& allocator);
 	virtual ~ResourceManagerBase();
+	ResourceManager& getOwner() const { return *m_owner; }
 
 protected:
 	virtual Resource* createResource(const Path& path) = 0;
 	virtual void destroyResource(Resource& resource) = 0;
 
-	ResourceManager& getOwner() const { return *m_owner; }
 private:
 	IAllocator& m_allocator;
 	uint32 m_size;

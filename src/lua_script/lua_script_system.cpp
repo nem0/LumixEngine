@@ -784,7 +784,7 @@ namespace Lumix
 		void unloadScript(LuaScript* script)
 		{
 			if (!script) return;
-			script->getResourceManager().get(LUA_SCRIPT_RESOURCE_TYPE)->unload(*script);
+			script->getResourceManager().unload(*script);
 		}
 
 

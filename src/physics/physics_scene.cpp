@@ -3541,7 +3541,7 @@ void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* _resource)
 	if (resource)
 	{
 		resource->getObserverCb().unbind<RigidActor, &RigidActor::onStateChanged>(this);
-		resource->getResourceManager().get(PHYSICS_TYPE)->unload(*resource);
+		resource->getResourceManager().unload(*resource);
 	}
 	resource = _resource;
 	if (resource)
@@ -3566,11 +3566,8 @@ Heightfield::~Heightfield()
 	if(m_actor) m_actor->release();
 	if (m_heightmap)
 	{
-		m_heightmap->getResourceManager()
-			.get(TEXTURE_TYPE)
-			->unload(*m_heightmap);
-		m_heightmap->getObserverCb().unbind<Heightfield, &Heightfield::heightmapLoaded>(
-			this);
+		m_heightmap->getResourceManager().unload(*m_heightmap);
+		m_heightmap->getObserverCb().unbind<Heightfield, &Heightfield::heightmapLoaded>(this);
 	}
 }
 

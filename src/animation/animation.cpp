@@ -19,7 +19,7 @@ static const ResourceType ANIMATION_TYPE("animation");
 
 Resource* AnimationManager::createResource(const Path& path)
 {
-	return LUMIX_NEW(m_allocator, Animation)(path, getOwner(), m_allocator);
+	return LUMIX_NEW(m_allocator, Animation)(path, *this, m_allocator);
 }
 
 
@@ -29,7 +29,7 @@ void AnimationManager::destroyResource(Resource& resource)
 }
 
 
-Animation::Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+Animation::Animation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_bone_count(-1)
 	, m_rotations(nullptr)
@@ -136,7 +136,7 @@ bool Animation::load(FS::IFile& file)
 
 IAllocator& Animation::getAllocator()
 {
-	return static_cast<AnimationManager*>(m_resource_manager.get(ANIMATION_TYPE))->getAllocator();
+	return static_cast<AnimationManager&>(m_resource_manager).getAllocator();
 }
 
 

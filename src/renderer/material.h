@@ -45,7 +45,7 @@ public:
 	};
 
 public:
-	Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
+	Material(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	~Material();
 
 	float getShininess() const { return m_shininess; }

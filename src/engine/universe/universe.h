@@ -45,7 +45,6 @@ public:
 	ComponentUID getComponent(Entity entity, ComponentType type) const;
 	ComponentUID getFirstComponent(Entity entity) const;
 	ComponentUID getNextComponent(const ComponentUID& cmp) const;
-	IScene* getScene(ComponentType type) const;
 	void registerComponentTypeScene(ComponentType type, IScene* scene);
 	int getEntityCount() const { return m_transformations.size(); }
 
@@ -83,6 +82,7 @@ public:
 	void serialize(OutputBlob& serializer);
 	void deserialize(InputBlob& serializer);
 
+	IScene* getScene(ComponentType type) const;
 	IScene* getScene(uint32 hash) const;
 	Array<IScene*>& getScenes();
 	void addScene(IScene* scene);

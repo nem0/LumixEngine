@@ -21,7 +21,7 @@ static const ResourceType SHADER_TYPE("shader");
 static const ResourceType SHADER_BINARY_TYPE("shader_binary");
 
 
-Shader::Shader(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+Shader::Shader(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_allocator(allocator)
 	, m_instances(m_allocator)
@@ -69,8 +69,7 @@ ShaderCombinations::ShaderCombinations()
 
 Renderer& Shader::getRenderer()
 {
-	auto* manager = m_resource_manager.get(SHADER_TYPE);
-	return static_cast<ShaderManager*>(manager)->getRenderer();
+	return static_cast<ShaderManager&>(m_resource_manager).getRenderer();
 }
 
 
@@ -101,7 +100,7 @@ bool Shader::generateInstances()
 
 	uint32 count = 1 << m_combintions.define_count;
 
-	auto* binary_manager = m_resource_manager.get(SHADER_BINARY_TYPE);
+	auto* binary_manager = m_resource_manager.getOwner().get(SHADER_BINARY_TYPE);
 	char basename[MAX_PATH_LENGTH];
 	PathUtils::getBasename(basename, sizeof(basename), getPath().c_str());
 
@@ -486,8 +485,7 @@ ShaderInstance::~ShaderInstance()
 		if (!binary) continue;
 
 		shader.removeDependency(*binary);
-		auto* manager = binary->getResourceManager().get(SHADER_BINARY_TYPE);
-		manager->unload(*binary);
+		binary->getResourceManager().unload(*binary);
 	}
 }
 
@@ -514,9 +512,7 @@ bool Shader::getShaderCombinations(Renderer& renderer,
 }
 
 
-ShaderBinary::ShaderBinary(const Path& path,
-	ResourceManager& resource_manager,
-	IAllocator& allocator)
+ShaderBinary::ShaderBinary(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_handle(BGFX_INVALID_HANDLE)
 {

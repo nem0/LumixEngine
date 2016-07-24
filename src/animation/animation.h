@@ -21,7 +21,7 @@ struct Vec3;
 class AnimationManager : public ResourceManagerBase
 {
 public:
-	explicit AnimationManager(IAllocator& allocator) 
+	explicit AnimationManager(IAllocator& allocator)
 		: ResourceManagerBase(allocator)
 		, m_allocator(allocator)
 	{}
@@ -51,7 +51,7 @@ class Animation : public Resource
 		};
 
 	public:
-		Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
+		Animation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 		~Animation();
 
 		void getPose(float time, Pose& pose, Model& model) const;

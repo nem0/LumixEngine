@@ -202,7 +202,7 @@ Terrain::GrassType::~GrassType()
 {
 	if (m_grass_model)
 	{
-		m_grass_model->getResourceManager().get(MODEL_TYPE)->unload(*m_grass_model);
+		m_grass_model->getResourceManager().unload(*m_grass_model);
 		m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(this);
 	}
 }
@@ -356,7 +356,7 @@ void Terrain::setGrassTypePath(int index, const Path& path)
 	GrassType& type = *m_grass_types[index];
 	if (type.m_grass_model)
 	{
-		type.m_grass_model->getResourceManager().get(MODEL_TYPE)->unload(*type.m_grass_model);
+		type.m_grass_model->getResourceManager().unload(*type.m_grass_model);
 		type.m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(&type);
 		type.m_grass_model = nullptr;
 	}
@@ -588,7 +588,7 @@ void Terrain::setMaterial(Material* material)
 	{
 		if (m_material)
 		{
-			m_material->getResourceManager().get(MATERIAL_TYPE)->unload(*m_material);
+			m_material->getResourceManager().unload(*m_material);
 			m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(this);
 		}
 		m_material = material;
@@ -602,7 +602,7 @@ void Terrain::setMaterial(Material* material)
 	}
 	else if(material)
 	{
-		material->getResourceManager().get(MATERIAL_TYPE)->unload(*material);
+		material->getResourceManager().unload(*material);
 	}
 }
 

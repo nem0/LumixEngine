@@ -9,9 +9,7 @@ namespace Lumix
 {
 
 
-LuaScript::LuaScript(const Path& path,
-					 ResourceManager& resource_manager,
-					 IAllocator& allocator)
+LuaScript::LuaScript(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_source_code(allocator)
 {
@@ -80,7 +78,7 @@ LuaScriptManager::~LuaScriptManager()
 
 Resource* LuaScriptManager::createResource(const Path& path)
 {
-	return LUMIX_NEW(m_allocator, LuaScript)(path, getOwner(), m_allocator);
+	return LUMIX_NEW(m_allocator, LuaScript)(path, *this, m_allocator);
 }
 
 

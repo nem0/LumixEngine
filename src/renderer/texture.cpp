@@ -36,9 +36,7 @@ struct TGAHeader
 #pragma pack()
 
 
-Texture::Texture(const Path& path,
-				 ResourceManager& resource_manager,
-				 IAllocator& _allocator)
+Texture::Texture(const Path& path, ResourceManagerBase& resource_manager, IAllocator& _allocator)
 	: Resource(path, resource_manager, _allocator)
 	, data_reference(0)
 	, allocator(_allocator)
@@ -65,7 +63,7 @@ void Texture::setFlag(uint32 flag, bool value)
 	new_flags |= value ? flag : 0;
 	bgfx_flags = new_flags;
 
-	getResourceManager().get(TEXTURE_TYPE)->reload(*this);
+	m_resource_manager.reload(*this);
 }
 
 
@@ -267,7 +265,7 @@ static void saveTGA(Texture& texture)
 		return;
 	}
 
-	FS::FileSystem& fs = texture.getResourceManager().getFileSystem();
+	FS::FileSystem& fs = texture.getResourceManager().getOwner().getFileSystem();
 	FS::IFile* file = fs.open(fs.getDefaultDevice(), texture.getPath(), FS::Mode::CREATE_AND_WRITE);
 
 	saveTGA(texture.allocator,
@@ -289,7 +287,7 @@ void Texture::save()
 	PathUtils::getExtension(ext, 5, getPath().c_str());
 	if (equalStrings(ext, "raw") && bytes_per_pixel == 2)
 	{
-		FS::FileSystem& fs = m_resource_manager.getFileSystem();
+		FS::FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 		FS::IFile* file = fs.open(fs.getDefaultDevice(), getPath(), FS::Mode::CREATE_AND_WRITE);
 
 		file->write(&data[0], data.size() * sizeof(data[0]));
@@ -399,12 +397,12 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 	texture.width = header.width;
 	texture.height = header.height;
 	texture.is_cubemap = false;
-	TextureManager* manager = static_cast<TextureManager*>(texture.getResourceManager().get(TEXTURE_TYPE));
+	TextureManager& manager = static_cast<TextureManager&>(texture.getResourceManager());
 	if (texture.data_reference)
 	{
 		texture.data.resize(image_size);
 	}
-	uint8* image_dest = texture.data_reference ? &texture.data[0] : (uint8*)manager->getBuffer(image_size);
+	uint8* image_dest = texture.data_reference ? &texture.data[0] : (uint8*)manager.getBuffer(image_size);
 
 	// Targa is BGR, swap to RGB, add alpha and flip Y axis
 	for (long y = 0; y < header.height; y++)
@@ -452,7 +450,7 @@ void Texture::addDataReference()
 	++data_reference;
 	if (data_reference == 1 && isReady())
 	{
-		m_resource_manager.get(TEXTURE_TYPE)->reload(*this);
+		m_resource_manager.reload(*this);
 	}
 }
 

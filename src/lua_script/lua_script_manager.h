@@ -14,9 +14,7 @@ namespace Lumix
 class LuaScript : public Resource
 {
 public:
-	LuaScript(const Path& path,
-			  ResourceManager& resource_manager,
-			  IAllocator& allocator);
+	LuaScript(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	virtual ~LuaScript();
 
 	void unload() override;

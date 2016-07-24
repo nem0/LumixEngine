@@ -80,15 +80,8 @@ struct GUIRenderer : public TBRendererBatcher
 
 	~GUIRenderer()
 	{
-		auto* material_manager = m_material->getResourceManager().get(ResourceType("material"));
-		material_manager->unload(*m_material);
-
-		if (m_pipeline)
-		{
-			m_pipeline->destroyUniform(m_texture_uniform);
-			auto* material_manager = m_material->getResourceManager().get(ResourceType("material"));
-			material_manager->unload(*m_material);
-		}
+		if (m_material) m_material->getResourceManager().unload(*m_material);
+		if (m_pipeline) m_pipeline->destroyUniform(m_texture_uniform);
 	}
 
 

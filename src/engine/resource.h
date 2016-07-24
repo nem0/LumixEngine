@@ -49,7 +49,7 @@ public:
 	ObserverCallback& getObserverCb() { return m_cb; }
 	size_t size() const { return m_size; }
 	const Path& getPath() const { return m_path; }
-	ResourceManager& getResourceManager() { return m_resource_manager; }
+	ResourceManagerBase& getResourceManager() { return m_resource_manager; }
 
 	template <typename C, void (C::*Function)(State, State)> void onLoaded(C* instance)
 	{
@@ -61,7 +61,7 @@ public:
 	}
 
 protected:
-	Resource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
+	Resource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	virtual ~Resource();
 
 	virtual void onBeforeReady() {}
@@ -78,7 +78,7 @@ protected:
 	State m_desired_state;
 	uint16 m_empty_dep_count;
 	size_t m_size;
-	ResourceManager& m_resource_manager;
+	ResourceManagerBase& m_resource_manager;
 
 protected:
 	void checkState();

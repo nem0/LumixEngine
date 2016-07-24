@@ -16,7 +16,7 @@ namespace FS
 class LUMIX_RENDERER_API Texture : public Resource
 {
 	public:
-		Texture(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
+		Texture(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 		~Texture();
 
 		bool create(int w, int h, void* data);

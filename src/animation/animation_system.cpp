@@ -124,9 +124,7 @@ struct AnimationSceneImpl : public AnimationScene
 	{
 		if (!animation) return;
 
-		auto& rm = animation->getResourceManager();
-		auto* animation_manager = rm.get(ANIMATION_TYPE);
-		animation_manager->unload(*animation);
+		animation->getResourceManager().unload(*animation);
 	}
 
 
