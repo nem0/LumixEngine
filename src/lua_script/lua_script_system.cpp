@@ -431,13 +431,7 @@ namespace Lumix
 		}
 
 
-		~LuaScriptSceneImpl()
-		{
-			unloadAllScripts();
-		}
-
-
-		void unloadAllScripts()
+		void clear() override
 		{
 			Path invalid_path;
 			for (auto* script_cmp : m_scripts)
@@ -1223,7 +1217,6 @@ namespace Lumix
 			}
 
 			int len = serializer.read<int>();
-			unloadAllScripts();
 			m_scripts.rehash(len);
 			for (int i = 0; i < len; ++i)
 			{
@@ -1269,7 +1262,6 @@ namespace Lumix
 		void deserializeOld(InputBlob& serializer)
 		{
 			int len = serializer.read<int>();
-			unloadAllScripts();
 			m_scripts.rehash(len);
 			for (int i = 0; i < len; ++i)
 			{

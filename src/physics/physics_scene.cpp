@@ -311,10 +311,41 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	~PhysicsSceneImpl()
 	{
-		ASSERT(m_controllers.size() == 0);
-		ASSERT(m_ragdolls.size() == 0);
-		ASSERT(m_actors.size() == 0);
-		ASSERT(m_terrains.size() == 0);
+		m_controller_manager->release();
+		m_default_material->release();
+		m_dummy_actor->release();
+		m_scene->release();
+	}
+
+
+	void clear() override
+	{
+		for (auto& controller : m_controllers)
+		{
+			controller.m_controller->release();
+		}
+		m_controllers.clear();
+
+		for (auto& ragdoll : m_ragdolls)
+		{
+			destroySkeleton(ragdoll.root);
+		}
+		m_ragdolls.clear();
+
+		for (auto& joint : m_joints)
+		{
+			joint.physx->release();
+		}
+		m_joints.clear();
+
+		for (auto* actor : m_actors)
+		{
+			LUMIX_DELETE(m_allocator, actor);
+		}
+		m_actors.clear();
+		m_dynamic_actors.clear();
+
+		m_terrains.clear();
 	}
 
 
@@ -3030,7 +3061,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void deserializeActors(InputBlob& serializer, int version)
 	{
 		int32 count;
-		m_dynamic_actors.clear();
 		serializer.read(count);
 		for (auto* actor : m_actors)
 		{
@@ -3060,11 +3090,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		int32 count;
 		serializer.read(count);
-		for (auto& controller : m_controllers)
-		{
-			controller.m_controller->release();
-		}
-		m_controllers.clear();
 		for (int i = 0; i < count; ++i)
 		{
 			Entity entity;
@@ -3119,12 +3144,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		if (version <= int(PhysicsSceneVersion::RAGDOLLS)) return;
 			
-		for (auto& ragdoll : m_ragdolls)
-		{
-			destroySkeleton(ragdoll.root);
-		}
-		m_ragdolls.clear();
-
 		int count;
 		serializer.read(count);
 		m_ragdolls.reserve(count);
@@ -3150,8 +3169,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		int count;
 		serializer.read(count);
-		for (int i = 0; i < m_joints.size(); ++i) m_joints.at(i).physx->release();
-		m_joints.clear();
 		m_joints.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
@@ -3267,7 +3284,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		int32 count;
 		serializer.read(count);
-		m_terrains.clear();
 		for (int i = 0; i < count; ++i)
 		{
 			bool exists = true;
@@ -3472,27 +3488,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Eng
 void PhysicsScene::destroy(PhysicsScene* scene)
 {
 	PhysicsSceneImpl* impl = static_cast<PhysicsSceneImpl*>(scene);
-	for (auto& controller : impl->m_controllers)
-	{
-		controller.m_controller->release();
-	}
-	impl->m_controllers.clear();
-	for (auto& ragdoll : impl->m_ragdolls)
-	{
-		impl->destroySkeleton(ragdoll.root);
-	}
-	impl->m_ragdolls.clear();
-	for (auto* actor : impl->m_actors)
-	{
-		LUMIX_DELETE(impl->m_allocator, actor);
-	}
-	impl->m_actors.clear();
-	impl->m_terrains.clear();
-
-	impl->m_controller_manager->release();
-	impl->m_default_material->release();
-	impl->m_dummy_actor->release();
-	impl->m_scene->release();
+	
 	LUMIX_DELETE(impl->m_allocator, scene);
 }
 

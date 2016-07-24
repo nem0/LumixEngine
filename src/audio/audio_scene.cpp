@@ -89,9 +89,16 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	~AudioSceneImpl()
+	void clear() override
 	{
-		clearClips();
+		for (auto* clip : m_clips)
+		{
+			clip->clip->getResourceManager().get(CLIP_RESOURCE_HASH)->unload(*clip->clip);
+			LUMIX_DELETE(m_allocator, clip);
+		}
+		m_clips.clear();
+		m_ambient_sounds.clear();
+		m_echo_zones.clear();
 	}
 
 
@@ -334,20 +341,9 @@ struct AudioSceneImpl : public AudioScene
 	}
 
 
-	void clearClips()
-	{
-		for (auto* clip : m_clips)
-		{
-			clip->clip->getResourceManager().get(CLIP_RESOURCE_HASH)->unload(*clip->clip);
-			LUMIX_DELETE(m_allocator, clip);
-		}
-		m_clips.clear();
-	}
-
-
 	void deserialize(InputBlob& serializer, int version) override
 	{
-		clearClips();
+		clear();
 
 		serializer.read(m_listener.entity);
 		if (m_listener.entity != INVALID_ENTITY)
@@ -383,7 +379,6 @@ struct AudioSceneImpl : public AudioScene
 		ComponentHandle dummy_cmp;
 		if (version <= (int)AudioSceneVersion::REFACTOR) serializer.read(dummy_cmp);
 		serializer.read(count);
-		m_ambient_sounds.clear();
 		for (int i = 0; i < count; ++i)
 		{
 			AmbientSound sound;
@@ -401,7 +396,6 @@ struct AudioSceneImpl : public AudioScene
 		if (version > (int)AudioSceneVersion::ECHO_ZONES)
 		{
 			serializer.read(count);
-			m_echo_zones.clear();
 
 			for (int i = 0; i < count; ++i)
 			{
