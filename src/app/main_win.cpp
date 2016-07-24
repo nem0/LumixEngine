@@ -264,6 +264,7 @@ public:
 			Lumix::g_log_error.log("App") << "Universe corrupted";
 			return;
 		}
+		m_universe->resetScenes();
 		bool deserialize_succeeded = m_engine->deserialize(*m_universe, blob);
 		if (!deserialize_succeeded)
 		{
