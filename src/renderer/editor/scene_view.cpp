@@ -82,20 +82,12 @@ struct InsertMeshCommand : public Lumix::IEditorCommand
 		auto* universe = m_editor.getUniverse();
 		m_entity = universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		universe->setPosition(m_entity, m_position);
-		const auto& scenes = universe->getScenes();
-		Lumix::ComponentHandle cmp = Lumix::INVALID_COMPONENT;
-		Lumix::IScene* scene = nullptr;
-		for (int i = 0; i < scenes.size(); ++i)
-		{
-			cmp = scenes[i]->createComponent(RENDERABLE_TYPE, m_entity);
+		auto* scene = static_cast<Lumix::RenderScene*>(universe->getScene(RENDERABLE_TYPE));
+		if (!scene) return false;
 
-			if (isValid(cmp))
-			{
-				scene = scenes[i];
-				break;
-			}
-		}
-		if (isValid(cmp)) static_cast<Lumix::RenderScene*>(scene)->setRenderablePath(cmp, m_mesh_path);
+		Lumix::ComponentHandle cmp = scene->createComponent(RENDERABLE_TYPE, m_entity);
+
+		if (isValid(cmp)) scene->setRenderablePath(cmp, m_mesh_path);
 		return true;
 	}
 

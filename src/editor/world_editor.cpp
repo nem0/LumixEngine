@@ -980,18 +980,14 @@ private:
 		bool execute() override
 		{
 			bool ret = false;
-			const Array<IScene*>& scenes = m_editor.getUniverse()->getScenes();
+			IScene* scene = m_editor.getUniverse()->getScene(m_type);
 
 			for (int j = 0; j < m_entities.size(); ++j)
 			{
-				for (auto* scene : scenes)
+				ComponentHandle cmp = scene->createComponent(m_type, m_entities[j]);
+				if (isValid(cmp))
 				{
-					ComponentHandle cmp = scene->createComponent(m_type, m_entities[j]);
-					if (isValid(cmp))
-					{
-						ret = true;
-						break;
-					}
+					ret = true;
 				}
 			}
 			return ret;
@@ -1129,7 +1125,6 @@ private:
 		void undo() override
 		{
 			Universe* universe = m_editor.getUniverse();
-			const Array<IScene*>& scenes = universe->getScenes();
 			InputBlob blob(m_old_values);
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
@@ -1142,17 +1137,12 @@ private:
 					ComponentType cmp_type;
 					blob.read(cmp_type);
 					ComponentUID new_component;
-					for (int i = 0; i < scenes.size(); ++i)
-					{
-						new_component.handle = scenes[i]->createComponent(cmp_type, new_entity);
-						new_component.entity = new_entity;
-						new_component.scene = scenes[i];
-						new_component.type = cmp_type;
-						if (new_component.isValid())
-						{
-							break;
-						}
-					}
+					IScene* scene = universe->getScene(cmp_type);
+					ASSERT(scene);
+					new_component.handle = scene->createComponent(cmp_type, new_entity);
+					new_component.entity = new_entity;
+					new_component.scene = scene;
+					new_component.type = cmp_type;
 
 					Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmp_type);
 
@@ -1236,24 +1226,15 @@ private:
 		void undo() override
 		{
 			uint32 template_hash = m_editor.m_template_system->getTemplate(m_component.entity);
-			const Array<IScene*>& scenes = m_editor.getUniverse()->getScenes();
-
+			IScene* scene = m_editor.getUniverse()->getScene(m_component.type);
+			ASSERT(scene);
 			if (template_hash == 0)
 			{
-				for (int i = 0; i < scenes.size(); ++i)
-				{
-					ComponentHandle cmp =
-						scenes[i]->createComponent(m_component.type, m_component.entity);
-					if (isValid(cmp))
-					{
-						m_component.handle = cmp;
-						m_component.scene = scenes[i];
-						break;
-					}
-				}
+				ComponentHandle cmp = scene->createComponent(m_component.type, m_component.entity);
+				m_component.handle = cmp;
+				m_component.scene = scene;
 				InputBlob blob(m_old_values);
-				const Array<IPropertyDescriptor*>& props =
-					PropertyRegister::getDescriptors(m_component.type);
+				const Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(m_component.type);
 				for (int i = 0; i < props.size(); ++i)
 				{
 					props[i]->set(m_component, -1, blob);
@@ -1261,27 +1242,16 @@ private:
 			}
 			else
 			{
-				const Array<Entity>& entities =
-					m_editor.m_template_system->getInstances(template_hash);
-				for (int entity_index = 0, c = entities.size(); entity_index < c; ++entity_index)
+				const Array<Entity>& entities = m_editor.m_template_system->getInstances(template_hash);
+				for (Entity entity : entities)
 				{
-					for (int scene_index = 0; scene_index < scenes.size(); ++scene_index)
+					ComponentUID cmp_new(
+						entity, m_component.type, scene, scene->createComponent(m_component.type, entity));
+					InputBlob blob(m_old_values);
+					const Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(m_component.type);
+					for (int i = 0; i < props.size(); ++i)
 					{
-						ComponentUID cmp_new(entities[entity_index],
-							m_component.type,
-							scenes[scene_index],
-							scenes[scene_index]->createComponent(
-								m_component.type, entities[entity_index]));
-						if (cmp_new.isValid())
-						{
-							InputBlob blob(m_old_values);
-							const Array<IPropertyDescriptor*>& props =
-								PropertyRegister::getDescriptors(m_component.type);
-							for (int i = 0; i < props.size(); ++i)
-							{
-								props[i]->set(cmp_new, -1, blob);
-							}
-						}
+						props[i]->set(cmp_new, -1, blob);
 					}
 				}
 			}
@@ -2178,20 +2148,8 @@ public:
 
 	void cloneComponent(const ComponentUID& src, Entity entity) override
 	{
-		ComponentUID clone = ComponentUID::INVALID;
-
-		const Array<IScene*>& scenes = m_universe->getScenes();
-		for (int i = 0; i < scenes.size(); ++i)
-		{
-			clone = ComponentUID(entity,
-								 src.type,
-								 scenes[i],
-								 scenes[i]->createComponent(src.type, entity));
-			if (clone.isValid())
-			{
-				break;
-			}
-		}
+		IScene* scene = m_universe->getScene(src.type);
+		ComponentUID clone(entity, src.type, scene, scene->createComponent(src.type, entity));
 
 		const auto& properties = PropertyRegister::getDescriptors(src.type);
 		OutputBlob stream(m_allocator);

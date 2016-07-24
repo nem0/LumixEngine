@@ -63,16 +63,7 @@ struct AnimationSceneImpl : public AnimationScene
 		, m_animables(allocator)
 	{
 		m_is_game_running = false;
-		m_render_scene = nullptr;
-		uint32 hash = crc32("renderer");
-		for (auto* scene : universe.getScenes())
-		{
-			if (crc32(scene->getPlugin().getName()) == hash)
-			{
-				m_render_scene = static_cast<RenderScene*>(scene);
-				break;
-			}
-		}
+		m_render_scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 		universe.registerComponentTypeScene(ANIMABLE_TYPE, this);
 		ASSERT(m_render_scene);
 	}

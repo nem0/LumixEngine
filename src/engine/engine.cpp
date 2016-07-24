@@ -279,11 +279,9 @@ public:
 	{
 		if (!universe->hasComponent(entity, {component_type})) return INVALID_COMPONENT;
 		ComponentType type = {component_type};
-		for (auto* scene : universe->getScenes())
-		{
-			ComponentHandle cmp = scene->getComponent(entity, type);
-			if (Lumix::isValid(cmp)) return cmp;
-		}
+		IScene* scene = universe->getScene(type);
+		if (scene) return scene->getComponent(entity, type);
+		
 		ASSERT(false);
 		return INVALID_COMPONENT;
 	}
@@ -309,10 +307,11 @@ public:
 			}
 			else
 			{
-				ComponentType type_handle = PropertyRegister::getComponentType(parameter_name);
-				for (auto* scene : ctx->getScenes())
+				ComponentType cmp_type = PropertyRegister::getComponentType(parameter_name);
+				IScene* scene = ctx->getScene(cmp_type);
+				if (scene)
 				{
-					ComponentUID cmp(e, type_handle, scene, scene->createComponent(type_handle, e));
+					ComponentUID cmp(e, cmp_type, scene, scene->createComponent(cmp_type, e));
 					if (cmp.isValid())
 					{
 						lua_pushvalue(L, -1);
@@ -320,7 +319,7 @@ public:
 						while (lua_next(L, -2) != 0)
 						{
 							const char* property_name = luaL_checkstring(L, -2);
-							auto* desc = PropertyRegister::getDescriptor(type_handle, crc32(property_name));
+							auto* desc = PropertyRegister::getDescriptor(cmp_type, crc32(property_name));
 							if (!desc)
 							{
 								g_log_error.log("Lua Script") << "Unknown property " << property_name;
@@ -333,7 +332,6 @@ public:
 							lua_pop(L, 1);
 						}
 						lua_pop(L, 1);
-						break;
 					}
 				}
 			}
@@ -664,13 +662,6 @@ public:
 		for (auto* plugin : plugins)
 		{
 			IScene* scene = plugin->createScene(*universe);
-			bool is_some_registered = false;
-			for (int i = 0; i < MAX_COMPONENTS_TYPES_COUNT; ++i)
-			{
-				ComponentType type = {i};
-				is_some_registered = is_some_registered || universe->getScene(type) == scene;
-			}
-			ASSERT(is_some_registered);
 			if (scene)
 			{
 				universe->addScene(scene);
@@ -960,18 +951,11 @@ public:
 
 	ComponentUID createComponent(Universe& universe, Entity entity, ComponentType type)
 	{
-		const Array<IScene*>& scenes = universe.getScenes();
 		ComponentUID cmp;
-		for (int i = 0; i < scenes.size(); ++i)
-		{
-			cmp = ComponentUID(entity, type, scenes[i], scenes[i]->createComponent(type, entity));
+		IScene* scene = universe.getScene(type);
+		if (!scene) return ComponentUID::INVALID;
 
-			if (cmp.isValid())
-			{
-				return cmp;
-			}
-		}
-		return ComponentUID::INVALID;
+		return ComponentUID(entity, type, scene, scene->createComponent(type, entity));
 	}
 
 
