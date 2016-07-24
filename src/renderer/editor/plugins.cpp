@@ -357,7 +357,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		m_pipeline->load();
 
 		auto mesh_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(crc32("renderer")));
+		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(RENDERER_HASH));
 		m_mesh = render_scene->createComponent(RENDERABLE_TYPE, mesh_entity);
 		
 		auto light_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
@@ -376,7 +376,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 	void showPreview(Model& model)
 	{
 		auto& engine = m_app.getWorldEditor()->getEngine();
-		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(crc32("renderer")));
+		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(RENDERER_HASH));
 		if (!render_scene) return;
 		if (!model.isReady()) return;
 
@@ -859,7 +859,7 @@ struct EnvironmentProbePlugin : public PropertyGrid::IPlugin
 			bgfx::createTexture2D(TEXTURE_SIZE, TEXTURE_SIZE, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
 		
 		Vec3 probe_position = universe->getPosition(cmp.entity);
-		auto* scene = static_cast<RenderScene*>(universe->getScene(crc32("renderer")));
+		auto* scene = static_cast<RenderScene*>(universe->getScene(RENDERER_HASH));
 		ComponentHandle original_camera = scene->getCameraInSlot("main");
 
 		if(original_camera != INVALID_COMPONENT) scene->setCameraSlot(original_camera, "");
@@ -1192,7 +1192,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 
 		void onUniverseCreated()
 		{
-			m_render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(crc32("renderer")));
+			m_render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(RENDERER_HASH));
 		}
 
 
@@ -1443,7 +1443,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 	void onUniverseCreated()
 	{
 		auto* universe = m_app.getWorldEditor()->getUniverse();
-		auto* scene = static_cast<RenderScene*>(universe->getScene(crc32("renderer")));
+		auto* scene = static_cast<RenderScene*>(universe->getScene(RENDERER_HASH));
 
 		m_gui_pipeline->setScene(scene);
 	}
