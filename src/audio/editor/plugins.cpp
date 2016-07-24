@@ -23,7 +23,7 @@ namespace
 {
 
 
-static const Lumix::uint32 CLIP_HASH = Lumix::crc32("CLIP");
+static const Lumix::ResourceType CLIP_TYPE("clip");
 
 
 struct AssetBrowserPlugin : public AssetBrowser::IPlugin
@@ -43,7 +43,7 @@ struct AssetBrowserPlugin : public AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::uint32 type) const override { return false; }
+	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override { return false; }
 
 
 	void stopAudio()
@@ -58,9 +58,9 @@ struct AssetBrowserPlugin : public AssetBrowser::IPlugin
 	const char* getName() const override { return "Audio"; }
 
 
-	bool onGUI(Lumix::Resource* resource, Lumix::uint32 type) override
+	bool onGUI(Lumix::Resource* resource, Lumix::ResourceType type) override
 	{
-		if (type != CLIP_HASH) return false;
+		if (type != CLIP_TYPE) return false;
 		auto* clip = static_cast<Lumix::Clip*>(resource);
 		ImGui::LabelText("Length", "%f", clip->getLengthSeconds());
 		auto& device = getAudioDevice(m_app.getWorldEditor()->getEngine());
@@ -95,13 +95,13 @@ struct AssetBrowserPlugin : public AssetBrowser::IPlugin
 	void onResourceUnloaded(Lumix::Resource*) override { stopAudio(); }
 
 
-	bool hasResourceManager(Lumix::uint32 type) const override { return type == CLIP_HASH; }
+	bool hasResourceManager(Lumix::ResourceType type) const override { return type == CLIP_TYPE; }
 
 
-	Lumix::uint32 getResourceType(const char* ext) override
+	Lumix::ResourceType getResourceType(const char* ext) override
 	{
-		if (Lumix::equalStrings(ext, "ogg")) return CLIP_HASH;
-		return 0;
+		if (Lumix::equalStrings(ext, "ogg")) return CLIP_TYPE;
+		return INVALID_RESOURCE_TYPE;
 	}
 
 	int m_playing_clip;
@@ -157,7 +157,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 					auto* clip = audio_scene->getClipInfo(clip_id)->clip;
 					char path[Lumix::MAX_PATH_LENGTH];
 					Lumix::copyString(path, clip ? clip->getPath().c_str() : "");
-					if (m_app.getAssetBrowser()->resourceInput("Clip", "", path, Lumix::lengthOf(path), CLIP_HASH))
+					if (m_app.getAssetBrowser()->resourceInput("Clip", "", path, Lumix::lengthOf(path), CLIP_TYPE))
 					{
 						audio_scene->setClip(clip_id, Lumix::Path(path));
 					}

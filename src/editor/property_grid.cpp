@@ -4,12 +4,13 @@
 #include "editor/world_editor.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
-#include "engine/math_utils.h"
-#include "engine/vec.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "engine/iproperty_descriptor.h"
+#include "engine/math_utils.h"
 #include "engine/property_register.h"
+#include "engine/resource.h"
+#include "engine/vec.h"
 #include "imgui/imgui.h"
 #include "utils.h"
 #include <cmath>
@@ -165,7 +166,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		char buf[1024];
 		Lumix::copyString(buf, (const char*)stream.getData());
 		auto& resource_descriptor = static_cast<Lumix::IResourcePropertyDescriptor&>(desc);
-		auto rm_type = resource_descriptor.getResourceType();
+		Lumix::ResourceType rm_type = resource_descriptor.getResourceType();
 		if (m_app.getAssetBrowser()->resourceInput(
 				desc.getName(), Lumix::StaticString<20>("", (Lumix::uint64)&desc), buf, sizeof(buf), rm_type))
 		{

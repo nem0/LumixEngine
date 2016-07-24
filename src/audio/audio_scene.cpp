@@ -31,7 +31,7 @@ enum class AudioSceneVersion : int
 static const ComponentType LISTENER_TYPE = PropertyRegister::getComponentType("audio_listener");
 static const ComponentType AMBIENT_SOUND_TYPE = PropertyRegister::getComponentType("ambient_sound");
 static const ComponentType ECHO_ZONE_TYPE = PropertyRegister::getComponentType("echo_zone");
-static const uint32 CLIP_RESOURCE_HASH = crc32("CLIP");
+static const ResourceType CLIP_RESOURCE_TYPE("clip");
 
 
 struct Listener
@@ -93,7 +93,7 @@ struct AudioSceneImpl : public AudioScene
 	{
 		for (auto* clip : m_clips)
 		{
-			clip->clip->getResourceManager().get(CLIP_RESOURCE_HASH)->unload(*clip->clip);
+			clip->clip->getResourceManager().get(CLIP_RESOURCE_TYPE)->unload(*clip->clip);
 			LUMIX_DELETE(m_allocator, clip);
 		}
 		m_clips.clear();
@@ -474,7 +474,7 @@ struct AudioSceneImpl : public AudioScene
 		auto* clip = info->clip;
 		if (clip)
 		{
-			clip->getResourceManager().get(CLIP_RESOURCE_HASH)->unload(*clip);
+			clip->getResourceManager().get(CLIP_RESOURCE_TYPE)->unload(*clip);
 		}
 		LUMIX_DELETE(m_allocator, info);
 		m_clips.eraseItem(info);
@@ -504,7 +504,7 @@ struct AudioSceneImpl : public AudioScene
 		auto* clip = m_clips[clip_id]->clip;
 		if (clip)
 		{
-			clip->getResourceManager().get(CLIP_RESOURCE_HASH)->unload(*clip);
+			clip->getResourceManager().get(CLIP_RESOURCE_TYPE)->unload(*clip);
 		}
 		auto* new_res = m_system.getClipManager().load(path);
 		m_clips[clip_id]->clip = static_cast<Clip*>(new_res);

@@ -1,12 +1,21 @@
-#include "engine/lumix.h"
 #include "engine/resource.h"
+#include "engine/crc32.h"
 #include "engine/fs/file_system.h"
 #include "engine/log.h"
+#include "engine/lumix.h"
 #include "engine/path.h"
 #include "engine/resource_manager.h"
 
 namespace Lumix
 {
+
+
+ResourceType::ResourceType(const char* type_name)
+{
+	ASSERT(type_name[0] == 0 || (type_name[0] >= 'a' && type_name[0] <= 'z'));
+	type = crc32(type_name);
+}
+
 
 Resource::Resource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: m_ref_count()

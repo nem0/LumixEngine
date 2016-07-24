@@ -18,23 +18,23 @@
 #include "utils.h"
 
 
-static const Lumix::uint32 UNIVERSE_HASH = Lumix::crc32("universe");
+static const Lumix::ResourceType UNIVERSE_TYPE("universe");
 static const Lumix::uint32 SOURCE_HASH = Lumix::crc32("source");
 
 
-Lumix::uint32 AssetBrowser::getResourceType(const char* path) const
+Lumix::ResourceType AssetBrowser::getResourceType(const char* path) const
 {
 	char ext[10];
 	Lumix::PathUtils::getExtension(ext, sizeof(ext), path);
 
 	for (auto* plugin : m_plugins)
 	{
-		auto type = plugin->getResourceType(ext);
-		if (type != 0) return type;
+		Lumix::ResourceType type = plugin->getResourceType(ext);
+		if (Lumix::isValid(type)) return type;
 	}
-	if (Lumix::equalStrings(ext, "unv")) return UNIVERSE_HASH;
+	if (Lumix::equalStrings(ext, "unv")) return UNIVERSE_TYPE;
 
-	return 0;
+	return Lumix::INVALID_RESOURCE_TYPE;
 }
 
 
@@ -121,8 +121,8 @@ AssetBrowser::~AssetBrowser()
 
 void AssetBrowser::onFileChanged(const char* path)
 {
-	Lumix::uint32 resource_type = getResourceType(path);
-	if (resource_type == 0) return;
+	Lumix::ResourceType resource_type = getResourceType(path);
+	if (!Lumix::isValid(resource_type)) return;
 
 	Lumix::MT::SpinLock lock(m_changed_files_mutex);
 	m_changed_files.push(Lumix::Path(path));
@@ -145,7 +145,7 @@ void AssetBrowser::unloadResource()
 }
 
 
-int AssetBrowser::getTypeIndexFromManagerType(Lumix::uint32 type) const
+int AssetBrowser::getTypeIndex(Lumix::ResourceType type) const
 {
 	for (int i = 0; i < m_plugins.size(); ++i)
 	{
@@ -188,8 +188,8 @@ void AssetBrowser::update()
 		Lumix::PathUtils::getExtension(ext, Lumix::lengthOf(ext), path.c_str());
 		m_on_resource_changed.invoke(path, ext);
 
-		Lumix::uint32 resource_type = getResourceType(path.c_str());
-		if (resource_type == 0) continue;
+		Lumix::ResourceType resource_type = getResourceType(path.c_str());
+		if (Lumix::isValid(resource_type)) continue;
 
 		if (m_autoreload_changed_resource) m_editor.getEngine().getResourceManager().reload(path);
 
@@ -207,7 +207,7 @@ void AssetBrowser::update()
 
 			if (!PlatformInterface::fileExists(tmp_path))
 			{
-				int index = getTypeIndexFromManagerType(resource_type);
+				int index = getTypeIndex(resource_type);
 				m_resources[index].eraseItemFast(path);
 				continue;
 			}
@@ -352,7 +352,7 @@ void AssetBrowser::selectResource(const Lumix::Path& resource, bool record_histo
 }
 
 
-bool AssetBrowser::acceptExtension(const char* ext, Lumix::uint32 type)
+bool AssetBrowser::acceptExtension(const char* ext, Lumix::ResourceType type)
 {
 	for (int i = 0; i < m_plugins.size(); ++i)
 	{
@@ -363,7 +363,7 @@ bool AssetBrowser::acceptExtension(const char* ext, Lumix::uint32 type)
 }
 
 
-bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* buf, int max_size, Lumix::uint32 type)
+bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* buf, int max_size, Lumix::ResourceType type)
 {
 	float item_w = ImGui::CalcItemWidth();
 	auto& style = ImGui::GetStyle();
@@ -426,13 +426,13 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 }
 
 
-bool AssetBrowser::resourceList(char* buf, int max_size, Lumix::uint32 type, float height)
+bool AssetBrowser::resourceList(char* buf, int max_size, Lumix::ResourceType type, float height)
 {
 	static char filter[128] = "";
 	ImGui::FilterInput("Filter", filter, sizeof(filter));
 
 	ImGui::BeginChild("Resources", ImVec2(0, height));
-	for (auto& unv : getResources(getTypeIndexFromManagerType(type)))
+	for (auto& unv : getResources(getTypeIndex(type)))
 	{
 		if (filter[0] != '\0' && strstr(unv.c_str(), filter) == nullptr) continue;
 
@@ -514,7 +514,7 @@ void AssetBrowser::onGUIResource()
 	{
 		if (plugin->onGUI(m_selected_resource, resource_type)) return;
 	}
-	ASSERT(resource_type == UNIVERSE_HASH); // unimplemented resource
+	ASSERT(resource_type == UNIVERSE_TYPE); // unimplemented resource
 }
 
 
@@ -528,7 +528,7 @@ int AssetBrowser::getResourceTypeIndex(const char* ext)
 {
 	for (int i = 0; i < m_plugins.size(); ++i)
 	{
-		if (m_plugins[i]->getResourceType(ext) != 0) return 1 + i;
+		if (Lumix::isValid(m_plugins[i]->getResourceType(ext))) return 1 + i;
 	}
 
 

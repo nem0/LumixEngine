@@ -23,7 +23,7 @@
 #include "editor/utils.h"
 
 
-static const Lumix::uint32 SHADER_HASH = Lumix::crc32("SHADER");
+static const Lumix::ResourceType SHADER_TYPE("shader");
 
 
 ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
@@ -325,7 +325,7 @@ void ShaderCompiler::reloadShaders()
 {
 	m_to_reload.removeDuplicates();
 
-	auto shader_manager = m_editor.getEngine().getResourceManager().get(SHADER_HASH);
+	auto shader_manager = m_editor.getEngine().getResourceManager().get(SHADER_TYPE);
 	for (auto& path : m_to_reload)
 	{
 		shader_manager->reload(Lumix::Path(path.c_str()));

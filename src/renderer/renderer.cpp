@@ -75,11 +75,11 @@ static const ComponentType GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentTyp
 static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType("point_light");
 static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
 static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
-static const uint32 MATERIAL_HASH = crc32("MATERIAL");
-static const uint32 MODEL_HASH = crc32("MODEL");
-static const uint32 SHADER_HASH = crc32("SHADER");
-static const uint32 TEXTURE_HASH = crc32("TEXTURE");
-static const uint32 SHADER_BINARY_HASH = crc32("SHADER_BINARY");
+static const ResourceType MATERIAL_TYPE("material");
+static const ResourceType MODEL_TYPE("model");
+static const ResourceType SHADER_TYPE("shader");
+static const ResourceType TEXTURE_TYPE("texture");
+static const ResourceType SHADER_BINARY_TYPE("shader_binary");
 
 
 struct BonePropertyDescriptor : public IEnumPropertyDescriptor
@@ -239,7 +239,7 @@ static void registerProperties(IAllocator& allocator)
 			&RenderScene::getParticleEmitterMaterialPath,
 			&RenderScene::setParticleEmitterMaterialPath,
 			"Material (*.mat)",
-			MATERIAL_HASH));
+			MATERIAL_TYPE));
 
 	PropertyRegister::add("camera",
 		LUMIX_NEW(allocator, StringPropertyDescriptor<RenderScene>)(
@@ -267,9 +267,7 @@ static void registerProperties(IAllocator& allocator)
 
 	PropertyRegister::add("renderable",
 		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)(
-			"Source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)", MODEL_HASH
-
-			));
+			"Source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)", MODEL_TYPE));
 
 	auto renderable_material = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)(
 		"Materials", &RenderScene::getRenderableMaterialsCount, nullptr, nullptr, allocator);
@@ -277,7 +275,7 @@ static void registerProperties(IAllocator& allocator)
 		&RenderScene::getRenderableMaterial,
 		&RenderScene::setRenderableMaterial,
 		"Material (*.mat)",
-		MATERIAL_HASH));
+		MATERIAL_TYPE));
 	PropertyRegister::add("renderable", renderable_material);
 
 	PropertyRegister::add("global_light",
@@ -366,7 +364,7 @@ static void registerProperties(IAllocator& allocator)
 			&RenderScene::getDecalMaterialPath,
 			&RenderScene::setDecalMaterialPath,
 			"Material (*.mat)",
-			MATERIAL_HASH));
+			MATERIAL_TYPE));
 	PropertyRegister::add("decal",
 		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, RenderScene>)(
 			"Scale", &RenderScene::getDecalScale, &RenderScene::setDecalScale));
@@ -376,7 +374,7 @@ static void registerProperties(IAllocator& allocator)
 			&RenderScene::getTerrainMaterialPath,
 			&RenderScene::setTerrainMaterialPath,
 			"Material (*.mat)",
-			MATERIAL_HASH));
+			MATERIAL_TYPE));
 	PropertyRegister::add("terrain",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)(
 			"XZ scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale, 0.0f, FLT_MAX, 0.0f));
@@ -387,7 +385,7 @@ static void registerProperties(IAllocator& allocator)
 	auto grass = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)(
 		"Grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass, allocator);
 	grass->addChild(LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)(
-		"Mesh", &RenderScene::getGrassPath, &RenderScene::setGrassPath, "Mesh (*.msh)", MODEL_HASH));
+		"Mesh", &RenderScene::getGrassPath, &RenderScene::setGrassPath, "Mesh (*.msh)", MODEL_TYPE));
 	grass->addChild(LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)(
 		"Distance", &RenderScene::getGrassDistance, &RenderScene::setGrassDistance, 1.0f, FLT_MAX, 1.0f));
 	auto ground = LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)(
@@ -587,11 +585,11 @@ struct RendererImpl : public Renderer
 		bgfx::setDebug(BGFX_DEBUG_TEXT);
 
 		ResourceManager& manager = engine.getResourceManager();
-		m_texture_manager.create(TEXTURE_HASH, manager);
-		m_model_manager.create(MODEL_HASH, manager);
-		m_material_manager.create(MATERIAL_HASH, manager);
-		m_shader_manager.create(SHADER_HASH, manager);
-		m_shader_binary_manager.create(SHADER_BINARY_HASH, manager);
+		m_texture_manager.create(TEXTURE_TYPE, manager);
+		m_model_manager.create(MODEL_TYPE, manager);
+		m_material_manager.create(MATERIAL_TYPE, manager);
+		m_shader_manager.create(SHADER_TYPE, manager);
+		m_shader_binary_manager.create(SHADER_BINARY_TYPE, manager);
 
 		m_current_pass_hash = crc32("MAIN");
 		m_view_counter = 0;

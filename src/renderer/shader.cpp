@@ -17,8 +17,8 @@ namespace Lumix
 {
 
 
-static const uint32 SHADER_HASH = crc32("SHADER");
-static const uint32 SHADER_BINARY_HASH = crc32("SHADER_BINARY");
+static const ResourceType SHADER_TYPE("shader");
+static const ResourceType SHADER_BINARY_TYPE("shader_binary");
 
 
 Shader::Shader(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
@@ -69,7 +69,7 @@ ShaderCombinations::ShaderCombinations()
 
 Renderer& Shader::getRenderer()
 {
-	auto* manager = m_resource_manager.get(SHADER_HASH);
+	auto* manager = m_resource_manager.get(SHADER_TYPE);
 	return static_cast<ShaderManager*>(manager)->getRenderer();
 }
 
@@ -101,7 +101,7 @@ bool Shader::generateInstances()
 
 	uint32 count = 1 << m_combintions.define_count;
 
-	auto* binary_manager = m_resource_manager.get(SHADER_BINARY_HASH);
+	auto* binary_manager = m_resource_manager.get(SHADER_BINARY_TYPE);
 	char basename[MAX_PATH_LENGTH];
 	PathUtils::getBasename(basename, sizeof(basename), getPath().c_str());
 
@@ -486,7 +486,7 @@ ShaderInstance::~ShaderInstance()
 		if (!binary) continue;
 
 		shader.removeDependency(*binary);
-		auto* manager = binary->getResourceManager().get(SHADER_BINARY_HASH);
+		auto* manager = binary->getResourceManager().get(SHADER_BINARY_TYPE);
 		manager->unload(*binary);
 	}
 }

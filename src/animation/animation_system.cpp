@@ -20,7 +20,7 @@ namespace Lumix
 {
 
 static const ComponentType ANIMABLE_TYPE = PropertyRegister::getComponentType("animable");
-static const uint32 ANIMATION_HASH = crc32("ANIMATION");
+static const ResourceType ANIMATION_TYPE("animation");
 
 namespace FS
 {
@@ -134,7 +134,7 @@ struct AnimationSceneImpl : public AnimationScene
 		if (!animation) return;
 
 		auto& rm = animation->getResourceManager();
-		auto* animation_manager = rm.get(ANIMATION_HASH);
+		auto* animation_manager = rm.get(ANIMATION_TYPE);
 		animation_manager->unload(*animation);
 	}
 
@@ -278,7 +278,7 @@ struct AnimationSceneImpl : public AnimationScene
 	Animation* loadAnimation(const Path& path)
 	{
 		ResourceManager& rm = m_engine.getResourceManager();
-		return static_cast<Animation*>(rm.get(ANIMATION_HASH)->load(path));
+		return static_cast<Animation*>(rm.get(ANIMATION_TYPE)->load(path));
 	}
 	
 
@@ -316,14 +316,14 @@ struct AnimationSystemImpl : public IPlugin
 		, m_engine(engine)
 		, animation_manager(m_allocator)
 	{
-		animation_manager.create(ANIMATION_HASH, m_engine.getResourceManager());
+		animation_manager.create(ANIMATION_TYPE, m_engine.getResourceManager());
 
 		PropertyRegister::add("animable",
 			LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationSceneImpl>)("Animation",
 				&AnimationSceneImpl::getAnimation,
 				&AnimationSceneImpl::setAnimation,
 				"Animation (*.ani)",
-				ANIMATION_HASH));
+				ANIMATION_TYPE));
 		PropertyRegister::add("animable",
 			LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationSceneImpl>)(
 				"Start time", &AnimationSceneImpl::getStartTime, &AnimationSceneImpl::setStartTime, 0, FLT_MAX, 0.1f));

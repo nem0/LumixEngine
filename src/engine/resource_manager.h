@@ -10,6 +10,7 @@ namespace Lumix
 
 class Path;
 class Resource;
+struct ResourceType;
 
 
 namespace FS
@@ -33,11 +34,11 @@ public:
 	void destroy();
 
 	IAllocator& getAllocator() { return m_allocator; }
-	ResourceManagerBase* get(uint32 id);
+	ResourceManagerBase* get(ResourceType type);
 	const ResourceManagerTable& getAll() const { return m_resource_managers; }
 
-	void add(uint32 id, ResourceManagerBase* rm);
-	void remove(uint32 id);
+	void add(ResourceType type, ResourceManagerBase* rm);
+	void remove(ResourceType type);
 	void reload(const Path& path);
 	void removeUnreferenced();
 

@@ -31,7 +31,7 @@
 
 static const Lumix::ComponentType RENDERABLE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
 static const Lumix::ComponentType TERRAIN_TYPE = Lumix::PropertyRegister::getComponentType("terrain");
-static const Lumix::uint32 MATERIAL_HASH = Lumix::crc32("MATERIAL");
+static const Lumix::ResourceType MATERIAL_TYPE("material");
 static const char* HEIGHTMAP_UNIFORM = "u_texHeightmap";
 static const char* SPLATMAP_UNIFORM = "u_texSplatmap";
 static const char* COLORMAP_UNIFORM = "u_texColormap";
@@ -231,7 +231,7 @@ private:
 		auto* material = static_cast<Lumix::RenderScene*>(m_terrain.scene)->getTerrainMaterial(m_terrain.handle);
 		return static_cast<Lumix::Material*>(m_world_editor.getEngine()
 												 .getResourceManager()
-												 .get(MATERIAL_HASH)
+												 .get(MATERIAL_TYPE)
 												 ->get(Lumix::Path(material->getPath().c_str())));
 	}
 

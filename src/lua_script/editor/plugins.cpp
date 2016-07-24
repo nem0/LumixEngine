@@ -32,7 +32,7 @@ using namespace Lumix;
 
 
 static const ComponentType LUA_SCRIPT_TYPE = PropertyRegister::getComponentType("lua_script");
-static const uint32 LUA_SCRIPT_HASH = crc32("lua_script");
+static const ResourceType LUA_SCRIPT_RESOURCE_TYPE("lua_script");
 
 
 namespace
@@ -417,7 +417,8 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 					ImGui::PopID();
 					break;
 				}
-				if (m_app.getAssetBrowser()->resourceInput("Source", "src", buf, lengthOf(buf), LUA_SCRIPT_HASH))
+				if (m_app.getAssetBrowser()->resourceInput(
+						"Source", "src", buf, lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE))
 				{
 					auto* cmd =
 						LUMIX_NEW(allocator, SetPropertyCommand)(scene, cmp.handle, j, "-source", buf, allocator);
@@ -499,15 +500,15 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::uint32 type) const override
+	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override
 	{
-		return type == LUA_SCRIPT_HASH && equalStrings(".lua", ext);
+		return type == LUA_SCRIPT_RESOURCE_TYPE && equalStrings(".lua", ext);
 	}
 
 
-	bool onGUI(Lumix::Resource* resource, Lumix::uint32 type) override
+	bool onGUI(Lumix::Resource* resource, Lumix::ResourceType type) override
 	{
-		if (type != LUA_SCRIPT_HASH) return false;
+		if (type != LUA_SCRIPT_RESOURCE_TYPE) return false;
 
 		auto* script = static_cast<Lumix::LuaScript*>(resource);
 
@@ -539,10 +540,10 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
-	Lumix::uint32 getResourceType(const char* ext) override
+	Lumix::ResourceType getResourceType(const char* ext) override
 	{
-		if (equalStrings(ext, "lua")) return LUA_SCRIPT_HASH;
-		return 0;
+		if (equalStrings(ext, "lua")) return LUA_SCRIPT_RESOURCE_TYPE;
+		return INVALID_RESOURCE_TYPE;
 	}
 
 
@@ -550,7 +551,7 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	const char* getName() const override { return "Lua Script"; }
 
 
-	bool hasResourceManager(Lumix::uint32 type) const override { return type == LUA_SCRIPT_HASH; }
+	bool hasResourceManager(Lumix::ResourceType type) const override { return type == LUA_SCRIPT_RESOURCE_TYPE; }
 
 
 	StudioApp& m_app;
@@ -640,7 +641,7 @@ struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 		char buf[Lumix::MAX_PATH_LENGTH];
 		auto* asset_browser = app.getAssetBrowser();
 		bool create_empty = ImGui::Selectable("Empty", false);
-		if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), LUA_SCRIPT_HASH, 0) || create_empty)
+		if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE, 0) || create_empty)
 		{
 			auto& editor = *app.getWorldEditor();
 			if (create_entity)
@@ -653,7 +654,7 @@ struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 			auto& allocator = editor.getAllocator();
 			auto* cmd = LUMIX_NEW(allocator, PropertyGridPlugin::AddScriptCommand);
 
-			auto* script_scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_HASH));
+			auto* script_scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_TYPE));
 			Entity entity = editor.getSelectedEntities()[0];
 			ComponentHandle cmp = editor.getUniverse()->getComponent(entity, LUA_SCRIPT_TYPE).handle;
 			cmd->scene = script_scene;

@@ -15,7 +15,7 @@ namespace Lumix
 {
 
 
-static const uint32 ANIMATION_HASH = crc32("ANIMATION");
+static const ResourceType ANIMATION_TYPE("animation");
 
 
 Resource* AnimationManager::createResource(const Path& path)
@@ -137,7 +137,7 @@ bool Animation::load(FS::IFile& file)
 
 IAllocator& Animation::getAllocator()
 {
-	return static_cast<AnimationManager*>(m_resource_manager.get(ANIMATION_HASH))->getAllocator();
+	return static_cast<AnimationManager*>(m_resource_manager.get(ANIMATION_TYPE))->getAllocator();
 }
 
 

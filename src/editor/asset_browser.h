@@ -11,6 +11,7 @@ namespace Lumix
 {
 	class Material;
 	class Resource;
+	struct ResourceType;
 	class WorldEditor;
 }
 
@@ -29,12 +30,12 @@ public:
 	public:
 		virtual ~IPlugin() {}
 
-		virtual bool onGUI(Lumix::Resource* resource, Lumix::uint32 type) = 0;
-		virtual Lumix::uint32 getResourceType(const char* ext) = 0;
+		virtual bool onGUI(Lumix::Resource* resource, Lumix::ResourceType type) = 0;
+		virtual Lumix::ResourceType getResourceType(const char* ext) = 0;
 		virtual void onResourceUnloaded(Lumix::Resource* resource) = 0;
 		virtual const char* getName() const = 0;
-		virtual bool hasResourceManager(Lumix::uint32 type) const = 0;
-		virtual bool acceptExtension(const char* ext, Lumix::uint32 type) const = 0;
+		virtual bool hasResourceManager(Lumix::ResourceType type) const = 0;
+		virtual bool acceptExtension(const char* ext, Lumix::ResourceType type) const = 0;
 	};
 
 	typedef Lumix::DelegateList<void(const Lumix::Path&, const char*)> OnResourceChanged;
@@ -45,15 +46,15 @@ public:
 	void onGUI();
 	void update();
 	const Lumix::Array<Lumix::Path>& getResources(int type) const;
-	int getTypeIndexFromManagerType(Lumix::uint32 type) const;
+	int getTypeIndex(Lumix::ResourceType type) const;
 	void selectResource(const Lumix::Path& resource, bool record_history);
-	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, Lumix::uint32 type);
+	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, Lumix::ResourceType type);
 	void addPlugin(IPlugin& plugin);
 	void openInExternalEditor(Lumix::Resource* resource);
 	void openInExternalEditor(const char* path);
 	void enableUpdate(bool enable) { m_is_update_enabled = enable; }
 	OnResourceChanged& resourceChanged() { return m_on_resource_changed; }
-	bool resourceList(char* buf, int max_size, Lumix::uint32 type, float height);
+	bool resourceList(char* buf, int max_size, Lumix::ResourceType type, float height);
 
 public:
 	bool m_is_opened;
@@ -67,14 +68,14 @@ private:
 	void unloadResource();
 	void selectResource(Lumix::Resource* resource, bool record_history);
 	int getResourceTypeIndex(const char* ext);
-	bool acceptExtension(const char* ext, Lumix::uint32 type);
+	bool acceptExtension(const char* ext, Lumix::ResourceType type);
 	void onToolbar();
 	void goBack();
 	void goForward();
 	void toggleAutoreload();
 	bool isAutoreload() const { return m_autoreload_changed_resource; }
 
-	Lumix::uint32 getResourceType(const char* path) const;
+	Lumix::ResourceType getResourceType(const char* path) const;
 
 private:
 	StudioApp& m_app;

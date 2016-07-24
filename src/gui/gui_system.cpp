@@ -73,7 +73,7 @@ struct GUIRenderer : public TBRendererBatcher
 			.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
 			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
 			.end();
-		auto* material_manager = engine.getResourceManager().get(crc32("MATERIAL"));
+		auto* material_manager = engine.getResourceManager().get(ResourceType("material"));
 		auto* resource = material_manager->load(Path("shaders/imgui.mat"));
 		m_material = static_cast<Material*>(resource);
 	}
@@ -81,13 +81,13 @@ struct GUIRenderer : public TBRendererBatcher
 
 	~GUIRenderer()
 	{
-		auto* material_manager = m_material->getResourceManager().get(crc32("MATERIAL"));
+		auto* material_manager = m_material->getResourceManager().get(ResourceType("material"));
 		material_manager->unload(*m_material);
 
 		if (m_pipeline)
 		{
 			m_pipeline->destroyUniform(m_texture_uniform);
-			auto* material_manager = m_material->getResourceManager().get(crc32("MATERIAL"));
+			auto* material_manager = m_material->getResourceManager().get(ResourceType("material"));
 			material_manager->unload(*m_material);
 		}
 	}

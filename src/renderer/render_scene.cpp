@@ -67,9 +67,9 @@ static const ComponentType TERRAIN_TYPE = PropertyRegister::getComponentType("te
 static const ComponentType BONE_ATTACHMENT_TYPE = PropertyRegister::getComponentType("bone_attachment");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = PropertyRegister::getComponentType("environment_probe");
 
-static const uint32 MATERIAL_HASH = crc32("MATERIAL");
-static const uint32 TEXTURE_HASH = crc32("TEXTURE");
-static const uint32 MODEL_HASH = crc32("MODEL");
+static const ResourceType MATERIAL_TYPE("material");
+static const ResourceType TEXTURE_TYPE("texture");
+static const ResourceType MODEL_TYPE("model");
 static bool is_opengl = false;
 
 
@@ -201,7 +201,7 @@ public:
 	void clear() override
 	{
 		auto& rm = m_engine.getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_HASH));
+		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_TYPE));
 
 		for (int i = 0; i < m_model_loaded_callbacks.size(); ++i)
 		{
@@ -233,7 +233,7 @@ public:
 			{
 				auto& manager = i.model->getResourceManager();
 				freeCustomMeshes(i, material_manager);
-				manager.get(MODEL_HASH)->unload(*i.model);
+				manager.get(MODEL_TYPE)->unload(*i.model);
 				LUMIX_DELETE(m_allocator, i.pose);
 			}
 		}
@@ -242,7 +242,7 @@ public:
 
 		for (auto& probe : m_environment_probes)
 		{
-			if (probe.texture) probe.texture->getResourceManager().get(TEXTURE_HASH)->unload(*probe.texture);
+			if (probe.texture) probe.texture->getResourceManager().get(TEXTURE_TYPE)->unload(*probe.texture);
 		}
 		m_environment_probes.clear();
 	}
@@ -694,7 +694,7 @@ public:
 
 	void deserializeDecals(InputBlob& serializer)
 	{
-		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_HASH);
+		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
 		int count;
 		serializer.read(count);
 		m_decals.reserve(count);
@@ -742,7 +742,7 @@ public:
 		int32 count;
 		serializer.read(count);
 		m_environment_probes.reserve(count);
-		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_HASH);
+		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
 		uint64 universe_guid = m_universe.getPath().getHash();
 		StaticString<Lumix::MAX_PATH_LENGTH> probe_dir("universes/", universe_guid, "/probes/");
 		for (int i = 0; i < count; ++i)
@@ -962,7 +962,7 @@ public:
 				ComponentHandle cmp = { r.entity.index };
 				if (path != 0)
 				{
-					auto* model = static_cast<Model*>(m_engine.getResourceManager().get(MODEL_HASH)->load(Path(path)));
+					auto* model = static_cast<Model*>(m_engine.getResourceManager().get(MODEL_TYPE)->load(Path(path)));
 					setModel(cmp, model);
 				}
 
@@ -978,7 +978,7 @@ public:
 							char path[MAX_PATH_LENGTH];
 							serializer.readString(path, lengthOf(path));
 							Material* material = static_cast<Material*>(
-								m_engine.getResourceManager().get(MATERIAL_HASH)->load(Path(path)));
+								m_engine.getResourceManager().get(MATERIAL_TYPE)->load(Path(path)));
 							r.meshes[j].material = material;
 						}
 					}
@@ -1114,7 +1114,7 @@ public:
 	{
 		Entity entity = {component.index};
 		auto& probe = m_environment_probes[entity];
-		if (probe.texture) probe.texture->getResourceManager().get(TEXTURE_HASH)->unload(*probe.texture);
+		if (probe.texture) probe.texture->getResourceManager().get(TEXTURE_TYPE)->unload(*probe.texture);
 		m_environment_probes.erase(entity);
 		m_universe.destroyComponent(entity, ENVIRONMENT_PROBE_TYPE, this, component);
 	}
@@ -1919,7 +1919,7 @@ public:
 	{
 		if (path.isValid())
 		{
-			Material* material = static_cast<Material*>(m_engine.getResourceManager().get(MATERIAL_HASH)->load(path));
+			Material* material = static_cast<Material*>(m_engine.getResourceManager().get(MATERIAL_TYPE)->load(path));
 			m_terrains[{cmp.index}]->setMaterial(material);
 		}
 		else
@@ -1959,7 +1959,7 @@ public:
 
 	void setDecalMaterialPath(ComponentHandle cmp, const Path& path) override
 	{
-		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_HASH);
+		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
 		Decal& decal = m_decals[{cmp.index}];
 		if (decal.material)
 		{
@@ -2060,7 +2060,7 @@ public:
 	{
 		Renderable& r = m_renderables[cmp.index];
 
-		auto* manager = m_engine.getResourceManager().get(MODEL_HASH);
+		auto* manager = m_engine.getResourceManager().get(MODEL_TYPE);
 		if (path.isValid())
 		{
 			Model* model = static_cast<Model*>(manager->load(path));
@@ -3510,7 +3510,7 @@ public:
 	{
 		Entity entity = {cmp.index};
 		auto& probe = m_environment_probes[entity];
-		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_HASH);
+		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
 		if (probe.texture) texture_manager->unload(*probe.texture);
 		uint64 universe_guid = m_universe.getPath().getHash();
 		StaticString<Lumix::MAX_PATH_LENGTH> path("universes/", universe_guid, "/probes/", cmp.index, ".dds");
@@ -3578,7 +3578,7 @@ public:
 	void modelLoaded(Model* model, ComponentHandle component)
 	{
 		auto& rm = m_engine.getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_HASH));
+		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_TYPE));
 
 		auto& r = m_renderables[component.index];
 		float bounding_radius = r.model->getBoundingRadius();
@@ -3690,7 +3690,7 @@ public:
 
 		ASSERT(r.model);
 		auto& rm = r.model->getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_HASH));
+		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_TYPE));
 
 		auto* new_meshes = (Mesh*)m_allocator.allocate(count * sizeof(Mesh));
 		if (r.meshes)
@@ -3737,7 +3737,7 @@ public:
 		if (r.meshes && r.mesh_count > index && path == r.meshes[index].material->getPath()) return;
 
 		auto& rm = r.model->getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_HASH));
+		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_TYPE));
 
 		int new_count = Math::maximum(int8(index + 1), r.mesh_count);
 		allocateCustomMeshes(r, new_count);
@@ -3766,13 +3766,13 @@ public:
 		bool no_change = model == old_model && old_model;
 		if (no_change)
 		{
-			old_model->getResourceManager().get(MODEL_HASH)->unload(*old_model);
+			old_model->getResourceManager().get(MODEL_TYPE)->unload(*old_model);
 			return;
 		}
 		if (old_model)
 		{
 			auto& rm = old_model->getResourceManager();
-			auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_HASH));
+			auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_TYPE));
 			freeCustomMeshes(renderable, material_manager);
 			int callback_idx = getModelLoadedCallback(old_model);
 			ModelLoadedCallback* callback = m_model_loaded_callbacks[callback_idx];
@@ -3787,7 +3787,7 @@ public:
 			{
 				m_culling_system->removeStatic(component);
 			}
-			old_model->getResourceManager().get(MODEL_HASH)->unload(*old_model);
+			old_model->getResourceManager().get(MODEL_TYPE)->unload(*old_model);
 		}
 		renderable.model = model;
 		renderable.meshes = nullptr;
@@ -4067,7 +4067,7 @@ public:
 	ComponentHandle createEnvironmentProbe(Entity entity)
 	{
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
-		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_HASH);
+		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
 		probe.texture = static_cast<Texture*>(texture_manager->load(Path("models/editor/default_probe.dds")));
 
 		ComponentHandle cmp = {entity.index};
@@ -4118,7 +4118,7 @@ public:
 	{
 		if (!m_particle_emitters[{cmp.index}]) return;
 
-		auto* manager = m_engine.getResourceManager().get(MATERIAL_HASH);
+		auto* manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
 		Material* material = static_cast<Material*>(manager->load(path));
 		m_particle_emitters[{cmp.index}]->setMaterial(material);
 	}

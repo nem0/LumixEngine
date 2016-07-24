@@ -85,7 +85,7 @@ public:
 		IPropertyDescriptor::m_type = IPropertyDescriptor::RESOURCE;
 	}
 
-	virtual uint32 getResourceType() = 0;
+	virtual struct ResourceType getResourceType() = 0;
 };
 
 

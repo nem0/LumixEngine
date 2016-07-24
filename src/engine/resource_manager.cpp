@@ -1,5 +1,6 @@
 #include "engine/lumix.h"
 #include "engine/path.h"
+#include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 
@@ -25,19 +26,19 @@ namespace Lumix
 	{
 	}
 	
-	ResourceManagerBase* ResourceManager::get(uint32 id)
+	ResourceManagerBase* ResourceManager::get(ResourceType type)
 	{
-		return m_resource_managers[id]; 
+		return m_resource_managers[type.type]; 
 	}
 
-	void ResourceManager::add(uint32 id, ResourceManagerBase* rm)
+	void ResourceManager::add(ResourceType type, ResourceManagerBase* rm)
 	{ 
-		m_resource_managers.insert(id, rm);
+		m_resource_managers.insert(type.type, rm);
 	}
 
-	void ResourceManager::remove(uint32 id) 
+	void ResourceManager::remove(ResourceType type)
 	{ 
-		m_resource_managers.erase(id); 
+		m_resource_managers.erase(type.type);
 	}
 
 	void ResourceManager::removeUnreferenced()

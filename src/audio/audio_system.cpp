@@ -17,7 +17,7 @@
 #include "renderer/render_scene.h"
 
 
-static const Lumix::uint32 CLIP_HASH = Lumix::crc32("CLIP");
+static const Lumix::ResourceType CLIP_TYPE("clip");
 
 
 namespace Lumix
@@ -64,7 +64,7 @@ struct AudioSystemImpl : public AudioSystem
 		registerProperties(engine.getAllocator());
 		AudioScene::registerLuaAPI(m_engine.getState());
 		m_device = AudioDevice::create(m_engine);
-		m_manager.create(CLIP_HASH, m_engine.getResourceManager());
+		m_manager.create(CLIP_TYPE, m_engine.getResourceManager());
 	}
 
 

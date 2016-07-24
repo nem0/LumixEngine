@@ -18,7 +18,7 @@ namespace Lumix
 {
 
 
-static const uint32 MATERIAL_HASH = crc32("MATERIAL");
+static const ResourceType MATERIAL_TYPE("material");
 
 
 enum class ParticleEmitterVersion : int
@@ -639,7 +639,7 @@ void ParticleEmitter::setMaterial(Material* material)
 {
 	if (m_material)
 	{
-		auto* manager = m_material->getResourceManager().get(MATERIAL_HASH);
+		auto* manager = m_material->getResourceManager().get(MATERIAL_TYPE);
 		manager->unload(*m_material);
 	}
 	m_material = material;
@@ -746,7 +746,7 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager, boo
 	blob.read(m_entity);
 	char path[MAX_PATH_LENGTH];
 	blob.readString(path, lengthOf(path));
-	auto material_manager = manager.get(MATERIAL_HASH);
+	auto material_manager = manager.get(MATERIAL_TYPE);
 	auto material = static_cast<Material*>(material_manager->load(Path(path)));
 	setMaterial(material);
 

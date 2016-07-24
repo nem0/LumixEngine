@@ -13,7 +13,7 @@ namespace Lumix
 {
 
 
-static const uint32 PHYSICS_HASH = crc32("PHYSICS");
+static const ResourceType PHYSICS_TYPE("physics");
 
 
 struct OutputStream : public physx::PxOutputStream
@@ -125,7 +125,7 @@ bool PhysicsGeometry::load(FS::IFile& file)
 		return false;
 	}
 
-	auto* phy_manager = m_resource_manager.get(PHYSICS_HASH);
+	auto* phy_manager = m_resource_manager.get(PHYSICS_TYPE);
 	PhysicsSystem& system = static_cast<PhysicsGeometryManager*>(phy_manager)->getSystem();
 
 	int32 num_verts;
@@ -191,7 +191,7 @@ bool PhysicsGeometry::load(FS::IFile& file)
 
 IAllocator& PhysicsGeometry::getAllocator()
 {
-	return static_cast<PhysicsGeometryManager*>(m_resource_manager.get(PHYSICS_HASH))->getAllocator();
+	return static_cast<PhysicsGeometryManager*>(m_resource_manager.get(PHYSICS_TYPE))->getAllocator();
 }
 
 
