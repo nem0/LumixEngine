@@ -232,11 +232,10 @@ struct AudioSceneImpl : public AudioScene
 
 	ComponentHandle createEchoZone(Entity entity)
 	{
-		EchoZone zone;
+		EchoZone& zone = m_echo_zones.insert(entity);
 		zone.entity = entity;
 		zone.delay = 500.0f;
 		zone.radius = 10;
-		m_echo_zones.insert(entity, zone);
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, ECHO_ZONE_TYPE, this, cmp);
 		return cmp;
@@ -278,11 +277,10 @@ struct AudioSceneImpl : public AudioScene
 
 	ComponentHandle createAmbientSound(Entity entity)
 	{
-		AmbientSound sound;
+		AmbientSound& sound = m_ambient_sounds.insert(entity);
 		sound.entity = entity;
 		sound.clip = nullptr;
 		sound.playing_sound = -1;
-		m_ambient_sounds.insert(entity, sound);
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, AMBIENT_SOUND_TYPE, this, cmp);
 		return cmp;

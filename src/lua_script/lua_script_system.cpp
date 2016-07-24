@@ -130,7 +130,10 @@ namespace Lumix
 					{
 						const char* name = lua_tostring(L, -2);
 						uint32 hash = crc32(name);
-						m_scene.m_property_names.insert(hash, string(name, allocator));
+						if (m_scene.m_property_names.find(hash) < 0)
+						{
+							m_scene.m_property_names.emplace(hash, name, allocator);
+						}
 						if (hash != INDEX_HASH && hash != THIS_HASH)
 						{
 							int prop_index = getProperty(inst, hash);
@@ -476,7 +479,7 @@ namespace Lumix
 			auto& prop = scene->m_current_script_instance->m_properties.emplace(scene->m_system.m_allocator);
 			prop.name_hash = prop_name_hash;
 			prop.type = (Property::Type)type;
-			scene->m_property_names.insert(prop_name_hash, string(prop_name, scene->m_system.m_allocator));
+			scene->m_property_names.emplace(prop_name_hash, prop_name, scene->m_system.m_allocator);
 		}
 
 

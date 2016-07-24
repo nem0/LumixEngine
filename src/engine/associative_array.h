@@ -28,6 +28,62 @@ namespace Lumix
 			}
 
 
+			Value& insert(const Key& key)
+			{
+				if (m_capacity == m_size) reserve(m_capacity < 4 ? 4 : m_capacity * 2);
+
+				int i = index(key);
+				ASSERT(i >= 0 && ((i < m_size && m_keys[i] != key) || i == m_size));
+				moveMemory(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
+				moveMemory(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
+				new (NewPlaceholder(), &m_values[i]) Value();
+				new (NewPlaceholder(), &m_keys[i]) Key(key);
+				++m_size;
+				return m_values[i];
+			}
+
+
+			template <class _Ty> struct remove_reference
+			{
+				typedef _Ty type;
+			};
+
+
+			template <class _Ty> struct remove_reference<_Ty&>
+			{
+				typedef _Ty type;
+			};
+
+
+			template <class _Ty> struct remove_reference<_Ty&&>
+			{
+				typedef _Ty type;
+			};
+
+
+			template <class _Ty> inline _Ty&& myforward(typename remove_reference<_Ty>::type& _Arg)
+			{
+				return (static_cast<_Ty&&>(_Arg));
+			}
+
+
+			template <typename... Params> Value& emplace(const Key& key, Params&&... params)
+			{
+				if (m_capacity == m_size) reserve(m_capacity < 4 ? 4 : m_capacity * 2);
+
+				int i = index(key);
+				ASSERT(i >= 0 && ((i < m_size && m_keys[i] != key) || i == m_size));
+
+				moveMemory(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
+				moveMemory(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
+				new (NewPlaceholder(), &m_values[i]) Value(myforward<Params>(params)...);
+				new (NewPlaceholder(), &m_keys[i]) Key(key);
+				++m_size;
+
+				return m_values[i];
+			}
+
+
 			int insert(const Key& key, const Value& value)
 			{
 				if (m_capacity == m_size) reserve(m_capacity < 4 ? 4 : m_capacity * 2);

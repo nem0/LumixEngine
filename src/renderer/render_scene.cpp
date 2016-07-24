@@ -749,11 +749,11 @@ public:
 		{
 			Entity entity;
 			serializer.read(entity);
-			EnvironmentProbe probe;
+			EnvironmentProbe& probe = m_environment_probes.insert(entity);
 			StaticString<Lumix::MAX_PATH_LENGTH> path_str(probe_dir, entity.index, ".dds");
 			Path path(path_str);
 			probe.texture = static_cast<Texture*>(texture_manager->load(path));
-			m_environment_probes.insert(entity, probe);
+			
 			ComponentHandle cmp = {entity.index};
 			m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, cmp);
 		}
@@ -4052,12 +4052,11 @@ public:
 
 	ComponentHandle createDecal(Entity entity)
 	{
-		Decal decal;
+		Decal& decal = m_decals.insert(entity);
 		decal.material = nullptr;
 		decal.entity = entity;
 		decal.scale.set(1, 1, 1);
 		updateDecalInfo(decal);
-		m_decals.insert(entity, decal);
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, DECAL_TYPE, this, cmp);
@@ -4067,10 +4066,9 @@ public:
 
 	ComponentHandle createEnvironmentProbe(Entity entity)
 	{
-		EnvironmentProbe probe;
+		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_HASH);
 		probe.texture = static_cast<Texture*>(texture_manager->load(Path("models/editor/default_probe.dds")));
-		m_environment_probes.insert(entity, probe);
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, cmp);

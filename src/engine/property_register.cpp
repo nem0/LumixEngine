@@ -71,7 +71,7 @@ Array<IPropertyDescriptor*>& getDescriptors(ComponentType type)
 	int props_index = g_properties->find(type);
 	if (props_index < 0)
 	{
-		g_properties->insert(type, Array<IPropertyDescriptor*>(*g_allocator));
+		g_properties->emplace(type, *g_allocator);
 		props_index = g_properties->find(type);
 	}
 	return g_properties->at(props_index);
