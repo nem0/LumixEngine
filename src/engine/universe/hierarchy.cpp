@@ -1,6 +1,5 @@
 #include "hierarchy.h"
 #include "engine/blob.h"
-#include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/hash_map.h"
 #include "engine/json_serializer.h"

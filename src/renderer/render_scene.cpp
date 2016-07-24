@@ -2,7 +2,6 @@
 
 #include "engine/array.h"
 #include "engine/blob.h"
-#include "engine/crc32.h"
 #include "engine/fs/file_system.h"
 #include "engine/geometry.h"
 #include "engine/json_serializer.h"

@@ -1,5 +1,4 @@
 #include "shader_compiler.h"
-#include "engine/crc32.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"

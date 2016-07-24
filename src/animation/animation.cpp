@@ -1,5 +1,4 @@
 #include "animation/animation.h"
-#include "engine/crc32.h"
 #include "engine/fs/file_system.h"
 #include "engine/log.h"
 #include "engine/matrix.h"
