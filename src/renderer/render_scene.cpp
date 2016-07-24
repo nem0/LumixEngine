@@ -3726,6 +3726,10 @@ public:
 				{
 					material_manager->unload(*r.meshes[i].material);
 				}
+				for (int i = 0; i < r.mesh_count; ++i)
+				{
+					r.meshes[i].~Mesh();
+				}
 				m_allocator.deallocate(r.meshes);
 			}
 			else
