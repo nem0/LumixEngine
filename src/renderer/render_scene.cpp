@@ -192,31 +192,40 @@ public:
 
 	~RenderSceneImpl()
 	{
-		auto& rm = m_engine.getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_HASH));
-
 		m_universe.entityTransformed().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 		m_universe.entityDestroyed().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
+		CullingSystem::destroy(*m_culling_system);
+	}
+
+
+	void clear() override
+	{
+		auto& rm = m_engine.getResourceManager();
+		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_HASH));
 
 		for (int i = 0; i < m_model_loaded_callbacks.size(); ++i)
 		{
 			LUMIX_DELETE(m_allocator, m_model_loaded_callbacks[i]);
 		}
+		m_model_loaded_callbacks.clear();
 
 		for (Decal& decal : m_decals)
 		{
-			if(decal.material) material_manager->unload(*decal.material);
+			if (decal.material) material_manager->unload(*decal.material);
 		}
+		m_decals.clear();
 
 		for (auto* terrain : m_terrains)
 		{
 			LUMIX_DELETE(m_allocator, terrain);
 		}
+		m_terrains.clear();
 
 		for (auto* emitter : m_particle_emitters)
 		{
 			LUMIX_DELETE(m_allocator, emitter);
 		}
+		m_particle_emitters.clear();
 
 		for (auto& i : m_renderables)
 		{
@@ -228,13 +237,14 @@ public:
 				LUMIX_DELETE(m_allocator, i.pose);
 			}
 		}
+		m_renderables.clear();
+		m_culling_system->clear();
 
 		for (auto& probe : m_environment_probes)
 		{
 			if (probe.texture) probe.texture->getResourceManager().get(TEXTURE_HASH)->unload(*probe.texture);
 		}
-
-		CullingSystem::destroy(*m_culling_system);
+		m_environment_probes.clear();
 	}
 
 
@@ -687,7 +697,6 @@ public:
 		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_HASH);
 		int count;
 		serializer.read(count);
-		m_decals.clear();
 		m_decals.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
@@ -732,16 +741,6 @@ public:
 	{
 		int32 count;
 		serializer.read(count);
-		for (int i = 0, c = m_environment_probes.size(); i < c; ++i)
-		{
-			auto& probe = m_environment_probes.at(i);
-			if (probe.texture)
-			{
-				probe.texture->getResourceManager().get(TEXTURE_HASH)->unload(*probe.texture);
-			}
-		}
-
-		m_environment_probes.clear();
 		m_environment_probes.reserve(count);
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_HASH);
 		uint64 universe_guid = m_universe.getPath().getHash();
@@ -785,8 +784,6 @@ public:
 	{
 		int count;
 		serializer.read(count);
-		for (auto* emitter : m_particle_emitters) LUMIX_DELETE(m_allocator, emitter);
-		m_particle_emitters.clear();
 		m_particle_emitters.reserve(count);
 		for(int i = 0; i < count; ++i)
 		{
@@ -904,7 +901,6 @@ public:
 	{
 		int32 size;
 		serializer.read(size);
-		m_cameras.clear();
 		m_cameras.rehash(size);
 		for (int i = 0; i < size; ++i)
 		{
@@ -943,15 +939,6 @@ public:
 	{
 		int32 size = 0;
 		serializer.read(size);
-		for (int i = 0; i < m_renderables.size(); ++i)
-		{
-			if (m_renderables[i].entity != INVALID_ENTITY)
-			{
-				setModel({i}, nullptr);
-			}
-		}
-		m_culling_system->clear();
-		m_renderables.clear();
 		m_renderables.reserve(size);
 		for (int i = 0; i < size; ++i)
 		{
@@ -1006,9 +993,7 @@ public:
 	{
 		int32 size = 0;
 		serializer.read(size);
-		m_point_lights_map.clear();
 		m_point_lights.resize(size);
-		m_light_influenced_geometry.clear();
 		for (int i = 0; i < size; ++i)
 		{
 			m_light_influenced_geometry.push(Array<ComponentHandle>(m_allocator));
@@ -1073,11 +1058,6 @@ public:
 
 	void deserializeTerrains(InputBlob& serializer, RenderSceneVersion version)
 	{
-		for (auto* terrain : m_terrains)
-		{
-			LUMIX_DELETE(m_allocator, terrain);
-		}
-		m_terrains.clear();
 		int32 size = 0;
 		serializer.read(size);
 		for (int i = 0; i < size; ++i)

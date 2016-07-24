@@ -2069,6 +2069,7 @@ public:
 		if (reload)
 		{
 			m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
+			m_universe->resetScenes();
 			load(*m_game_mode_file);
 		}
 		m_engine->getFileSystem().close(*m_game_mode_file);

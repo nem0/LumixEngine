@@ -146,7 +146,12 @@ struct NavigationSceneImpl : public NavigationScene
 	~NavigationSceneImpl()
 	{
 		m_universe.entityTransformed().unbind<NavigationSceneImpl, &NavigationSceneImpl::onEntityMoved>(this);
-		clear();
+		clearNavmesh();
+	}
+
+
+	void clear() override
+	{
 		m_agents.clear();
 	}
 
@@ -169,7 +174,7 @@ struct NavigationSceneImpl : public NavigationScene
 	int getVersion() const override { return (int)Version::LATEST; }
 
 
-	void clear()
+	void clearNavmesh()
 	{
 		rcFreePolyMeshDetail(m_detail_mesh);
 		rcFreePolyMesh(m_polymesh);
@@ -478,7 +483,7 @@ struct NavigationSceneImpl : public NavigationScene
 
 	bool load(const char* path) override
 	{
-		clear();
+		clearNavmesh();
 
 		FS::OsFile file;
 		if (!file.open(path, FS::Mode::OPEN_AND_READ, m_allocator)) return false;
@@ -982,7 +987,7 @@ struct NavigationSceneImpl : public NavigationScene
 	bool generateNavmesh() override
 	{
 		PROFILE_FUNCTION();
-		clear();
+		clearNavmesh();
 
 		if (!initNavmesh()) return false;
 
@@ -1089,22 +1094,21 @@ struct NavigationSceneImpl : public NavigationScene
 
 	void deserialize(InputBlob& serializer, int version) override
 	{
-		m_agents.clear();
-		if (version > (int)Version::AGENTS)
+		if (version <= (int)Version::AGENTS) return;
+
+		int count = 0;
+		serializer.read(count);
+		m_agents.rehash(count);
+		for (int i = 0; i < count; ++i)
 		{
-			int count = 0;
-			serializer.read(count);
-			for (int i = 0; i < count; ++i)
-			{
-				Agent agent;
-				serializer.read(agent.entity);
-				serializer.read(agent.radius);
-				serializer.read(agent.height);
-				agent.agent = -1;
-				m_agents.insert(agent.entity, agent);
-				ComponentHandle cmp = {agent.entity.index};
-				m_universe.addComponent(agent.entity, NAVMESH_AGENT_TYPE, this, cmp);
-			}
+			Agent agent;
+			serializer.read(agent.entity);
+			serializer.read(agent.radius);
+			serializer.read(agent.height);
+			agent.agent = -1;
+			m_agents.insert(agent.entity, agent);
+			ComponentHandle cmp = {agent.entity.index};
+			m_universe.addComponent(agent.entity, NAVMESH_AGENT_TYPE, this, cmp);
 		}
 	}
 

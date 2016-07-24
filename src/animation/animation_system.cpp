@@ -78,12 +78,13 @@ struct AnimationSceneImpl : public AnimationScene
 	}
 
 
-	~AnimationSceneImpl()
+	void clear() override
 	{
 		for (Animable& animable : m_animables)
 		{
 			unloadAnimation(animable.animation);
 		}
+		m_animables.clear();
 	}
 
 
@@ -171,12 +172,7 @@ struct AnimationSceneImpl : public AnimationScene
 	{
 		int32 count;
 		serializer.read(count);
-		for (Animable& animable : m_animables)
-		{
-			unloadAnimation(animable.animation);
-		}
-		
-		m_animables.clear();
+		m_animables.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
 			Animable animable;

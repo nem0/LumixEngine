@@ -702,6 +702,7 @@ public:
 		{
 			auto* scene = scenes[i];
 			scenes.pop();
+			scene->clear();
 			scene->getPlugin().destroyScene(scene);
 		}
 		LUMIX_DELETE(m_allocator, &universe);

@@ -30,6 +30,7 @@ namespace Lumix
 			virtual void startGame() {}
 			virtual void stopGame() {}
 			virtual int getVersion() const { return -1; }
+			virtual void clear() = 0;
 	};
 
 

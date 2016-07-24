@@ -124,9 +124,6 @@ public:
 	}
 
 
-	~CullingSystemImpl() {}
-
-
 	void clear() override
 	{
 		m_spheres.clear();

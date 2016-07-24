@@ -35,7 +35,7 @@ public:
 	}
 
 
-	~HierarchyImpl()
+	void clear() override
 	{
 		auto iter = m_children.begin(), end = m_children.end();
 		while (iter != end)
@@ -43,6 +43,8 @@ public:
 			LUMIX_DELETE(m_allocator, iter.value());
 			++iter;
 		}
+		m_children.clear();
+		m_parents.clear();
 	}
 
 
