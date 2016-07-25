@@ -11,6 +11,7 @@ namespace Lumix
 
 
 class ResourceManager;
+class ResourceManagerBase;
 
 
 struct LUMIX_ENGINE_API ResourceType
