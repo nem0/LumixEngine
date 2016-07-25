@@ -37,11 +37,20 @@ PropertyGrid::~PropertyGrid()
 }
 
 
-void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lumix::ComponentUID cmp)
+void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc,
+	int index,
+	const Lumix::Array<Lumix::Entity>& entities,
+	Lumix::ComponentType cmp_type)
 {
 	if (desc.getType() == Lumix::IPropertyDescriptor::BLOB) return;
+
 	Lumix::OutputBlob stream(m_editor.getAllocator());
-	desc.get(cmp, index, stream);
+	Lumix::ComponentUID first_entity_cmp;
+	first_entity_cmp.type = cmp_type;
+	first_entity_cmp.scene = m_editor.getUniverse()->getScene(cmp_type);
+	first_entity_cmp.entity = entities[0];
+	first_entity_cmp.handle = first_entity_cmp.scene->getComponent(entities[0], cmp_type);
+	desc.get(first_entity_cmp, index, stream);
 	Lumix::InputBlob tmp(stream);
 
 	Lumix::StaticString<100> desc_name(desc.getName(), "###", (Lumix::uint64)&desc);
@@ -59,7 +68,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 			if (ImGui::SliderFloat(desc_name, &f, d.getMin(), d.getMax()))
 			{
 				if (d.isInRadians()) f = Lumix::Math::degreesToRadians(f);
-				m_editor.setProperty(cmp.type, index, desc, &f, sizeof(f));
+				m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &f, sizeof(f));
 			}
 		}
 		else
@@ -67,7 +76,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 			if (ImGui::DragFloat(desc_name, &f, d.getStep(), d.getMin(), d.getMax()))
 			{
 				if (d.isInRadians()) f = Lumix::Math::degreesToRadians(f);
-				m_editor.setProperty(cmp.type, index, desc, &f, sizeof(f));
+				m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &f, sizeof(f));
 			}
 		}
 		break;
@@ -78,7 +87,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		tmp.read(i);
 		if (ImGui::DragInt(desc_name, &i))
 		{
-			m_editor.setProperty(cmp.type, index, desc, &i, sizeof(i));
+			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &i, sizeof(i));
 		}
 		break;
 	}
@@ -88,7 +97,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		tmp.read(b);
 		if (ImGui::Checkbox(desc_name, &b))
 		{
-			m_editor.setProperty(cmp.type, index, desc, &b, sizeof(b));
+			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &b, sizeof(b));
 		}
 		break;
 	}
@@ -98,13 +107,13 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		tmp.read(v);
 		if (ImGui::ColorEdit3(desc_name, &v.x))
 		{
-			m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
+			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &v, sizeof(v));
 		}
 		if (ImGui::BeginPopupContextItem(Lumix::StaticString<50>(desc_name, "pu")))
 		{
 			if (ImGui::ColorPicker(&v.x, false))
 			{
-				m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
+				m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &v, sizeof(v));
 			}
 			ImGui::EndPopup();
 		}
@@ -126,7 +135,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 				v.x = Lumix::Math::degreesToRadians(v.x);
 				v.y = Lumix::Math::degreesToRadians(v.y);
 			}
-			m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
+			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &v, sizeof(v));
 		}
 		break;
 	}
@@ -136,7 +145,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		tmp.read(v);
 		if (ImGui::DragInt2(desc_name, &v.x))
 		{
-			m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
+			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &v, sizeof(v));
 		}
 		break;
 	}
@@ -146,7 +155,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		tmp.read(v);
 		if (ImGui::DragFloat3(desc_name, &v.x))
 		{
-			m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
+			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &v, sizeof(v));
 		}
 		break;
 	}
@@ -156,7 +165,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		tmp.read(v);
 		if (ImGui::DragFloat4(desc_name, &v.x))
 		{
-			m_editor.setProperty(cmp.type, index, desc, &v, sizeof(v));
+			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &v, sizeof(v));
 		}
 		break;
 	}
@@ -169,7 +178,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		if (m_app.getAssetBrowser()->resourceInput(
 				desc.getName(), Lumix::StaticString<20>("", (Lumix::uint64)&desc), buf, sizeof(buf), rm_type))
 		{
-			m_editor.setProperty(cmp.type, index, desc, buf, Lumix::stringLength(buf) + 1);
+			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), buf, Lumix::stringLength(buf) + 1);
 		}
 		break;
 	}
@@ -180,24 +189,23 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		Lumix::copyString(buf, (const char*)stream.getData());
 		if (ImGui::InputText(desc_name, buf, sizeof(buf)))
 		{
-			m_editor.setProperty(cmp.type, index, desc, buf, Lumix::stringLength(buf) + 1);
+			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), buf, Lumix::stringLength(buf) + 1);
 		}
 		break;
 	}
 	case Lumix::IPropertyDescriptor::ARRAY:
-		showArrayProperty(cmp, static_cast<Lumix::IArrayDescriptor&>(desc));
+		showArrayProperty(entities, cmp_type, static_cast<Lumix::IArrayDescriptor&>(desc));
 		break;
 	case Lumix::IPropertyDescriptor::SAMPLED_FUNCTION:
-		showSampledFunctionProperty(cmp, static_cast<Lumix::ISampledFunctionDescriptor&>(desc));
+		showSampledFunctionProperty(entities, cmp_type, static_cast<Lumix::ISampledFunctionDescriptor&>(desc));
 		break;
 	case Lumix::IPropertyDescriptor::ENTITY:
-		showEntityProperty(cmp, index, static_cast<Lumix::IEnumPropertyDescriptor&>(desc));
+		showEntityProperty(entities, cmp_type, index, static_cast<Lumix::IEnumPropertyDescriptor&>(desc));
 		break;
 	case Lumix::IPropertyDescriptor::ENUM:
-		showEnumProperty(cmp, index, static_cast<Lumix::IEnumPropertyDescriptor&>(desc));
+		showEnumProperty(entities, cmp_type, index, static_cast<Lumix::IEnumPropertyDescriptor&>(desc));
 		break;
 	case Lumix::IPropertyDescriptor::BLOB:
-		break;
 	default:
 		ASSERT(false);
 		break;
@@ -205,25 +213,32 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 }
 
 
-void PropertyGrid::showEntityProperty(Lumix::ComponentUID cmp, int index, Lumix::IPropertyDescriptor& desc)
+void PropertyGrid::showEntityProperty(const Lumix::Array<Lumix::Entity>& entities,
+	Lumix::ComponentType cmp_type,
+	int index,
+	Lumix::IPropertyDescriptor& desc)
 {
 	Lumix::OutputBlob blob(m_editor.getAllocator());
+	
+	Lumix::ComponentUID cmp;
+	cmp.scene = m_editor.getUniverse()->getScene(cmp_type);
+	cmp.type = cmp_type;
+	cmp.entity = entities[0];
+	cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
 	desc.get(cmp, index, blob);
 	int value = *(int*)blob.getData();
-	auto& universe = cmp.scene->getUniverse();
-	int count = universe.getEntityCount();
+	int count = m_editor.getUniverse()->getEntityCount();
 
 	struct Data
 	{
 		Lumix::IPropertyDescriptor* descriptor;
-		Lumix::IScene* scene;
 		Lumix::WorldEditor* editor;
 	};
 
 	auto getter = [](void* data, int index, const char** out) -> bool {
 		auto* combo_data = static_cast<Data*>(data);
 		static char buf[128];
-		Lumix::Entity entity = combo_data->scene->getUniverse().getEntityFromDenseIdx(index);
+		Lumix::Entity entity = combo_data->editor->getUniverse()->getEntityFromDenseIdx(index);
 		getEntityListDisplayName(*combo_data->editor, buf, Lumix::lengthOf(buf), entity);
 		*out = buf;
 
@@ -231,19 +246,32 @@ void PropertyGrid::showEntityProperty(Lumix::ComponentUID cmp, int index, Lumix:
 	};
 
 	Data data;
-	data.scene = cmp.scene;
 	data.descriptor = &desc;
 	data.editor = &m_editor;
 
 	if(ImGui::Combo(desc.getName(), &value, getter, &data, count))
 	{
-		m_editor.setProperty(cmp.type, index, desc, &value, sizeof(value));
+		m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &value, sizeof(value));
 	}
 }
 
 
-void PropertyGrid::showEnumProperty(Lumix::ComponentUID cmp, int index, Lumix::IEnumPropertyDescriptor& desc)
+void PropertyGrid::showEnumProperty(const Lumix::Array<Lumix::Entity>& entities,
+	Lumix::ComponentType cmp_type,
+	int index,
+	Lumix::IEnumPropertyDescriptor& desc)
 {
+	if(entities.size() > 1)
+	{
+		ImGui::LabelText(desc.getName(), "Multi-object editing not supported.");
+		return;
+	}
+
+	Lumix::ComponentUID cmp;
+	cmp.type = cmp_type;
+	cmp.entity = entities[0];
+	cmp.scene = m_editor.getUniverse()->getScene(cmp_type);
+	cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
 	Lumix::OutputBlob blob(m_editor.getAllocator());
 	desc.get(cmp, index, blob);
 	int value = *(int*)blob.getData();
@@ -256,8 +284,7 @@ void PropertyGrid::showEnumProperty(Lumix::ComponentUID cmp, int index, Lumix::I
 		Lumix::IScene* scene;
 	};
 
-	auto getter = [](void* data, int index, const char** out) -> bool
-	{
+	auto getter = [](void* data, int index, const char** out) -> bool {
 		auto* combo_data = static_cast<Data*>(data);
 		*out = combo_data->descriptor->getEnumItemName(combo_data->scene, combo_data->cmp, index);
 		if (!*out)
@@ -276,16 +303,23 @@ void PropertyGrid::showEnumProperty(Lumix::ComponentUID cmp, int index, Lumix::I
 	data.scene = cmp.scene;
 	data.descriptor = &desc;
 
-	if(ImGui::Combo(desc.getName(), &value, getter, &data, count))
+	if (ImGui::Combo(desc.getName(), &value, getter, &data, count))
 	{
-		m_editor.setProperty(cmp.type, index, desc, &value, sizeof(value));
+		m_editor.setProperty(cmp.type, index, desc, &cmp.entity, 1, &value, sizeof(value));
 	}
 }
 
 
-void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::ISampledFunctionDescriptor& desc)
+void PropertyGrid::showSampledFunctionProperty(const Lumix::Array<Lumix::Entity>& entities,
+	Lumix::ComponentType cmp_type,
+	Lumix::ISampledFunctionDescriptor& desc)
 {
 	Lumix::OutputBlob blob(m_editor.getAllocator());
+	Lumix::ComponentUID cmp;
+	cmp.type = cmp_type;
+	cmp.entity = entities[0];
+	cmp.scene = m_editor.getUniverse()->getScene(cmp_type);
+	cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
 	desc.get(cmp, -1, blob);
 	int count;
 	Lumix::InputBlob input(blob);
@@ -372,16 +406,28 @@ void PropertyGrid::showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::I
 
 		f[0].x = 0;
 		f[count - 1].x = desc.getMaxX();
-		m_editor.setProperty(cmp.type, -1, desc, blob.getData(), blob.getPos());
+		m_editor.setProperty(cmp_type, -1, desc, &entities[0], entities.size(), blob.getData(), blob.getPos());
 	}
 }
 
 
-void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescriptor& desc)
+void PropertyGrid::showArrayProperty(const Lumix::Array<Lumix::Entity>& entities,
+	Lumix::ComponentType cmp_type,
+	Lumix::IArrayDescriptor& desc)
 {
+	Lumix::ComponentUID cmp;
+	cmp.type = cmp_type;
+	cmp.scene = m_editor.getUniverse()->getScene(cmp_type);
+	cmp.entity = entities[0];
+	cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
 	Lumix::StaticString<100> desc_name(desc.getName(), "###", (Lumix::uint64)&desc);
 
 	if (!ImGui::CollapsingHeader(desc_name, nullptr, ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_DefaultOpen)) return;
+	if (entities.size() > 1)
+	{
+		ImGui::Text("Multi-object editing not supported.");
+		return;
+	}
 
 	int count = desc.getCount(cmp);
 	if (desc.canAdd() && ImGui::Button("Add"))
@@ -410,7 +456,7 @@ void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescr
 			for (int j = 0; j < desc.getChildren().size(); ++j)
 			{
 				auto* child = desc.getChildren()[j];
-				showProperty(*child, i, cmp);
+				showProperty(*child, i, entities, cmp_type);
 			}
 			if (desc.canRemove()) ImGui::TreePop();
 		}
@@ -419,18 +465,18 @@ void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescr
 }
 
 
-void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
+void PropertyGrid::showComponentProperties(const Lumix::Array<Lumix::Entity>& entities, Lumix::ComponentType cmp_type)
 {
 	ImGuiTreeNodeFlags flags =
 		ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode;
-	bool is_opened = ImGui::CollapsingHeader(m_app.getComponentTypeName(cmp), nullptr, flags);
+	bool is_opened = ImGui::CollapsingHeader(m_app.getComponentTypeName(cmp_type), nullptr, flags);
 
-	ImGui::PushID(cmp.type.index);
+	ImGui::PushID(cmp_type.index);
 	float w = ImGui::GetContentRegionAvailWidth();
 	ImGui::SameLine(w - 45);
 	if (ImGui::Button("Remove"))
 	{
-		m_editor.destroyComponent(cmp);
+		m_editor.destroyComponent(&entities[0], entities.size(), cmp_type);
 		ImGui::PopID();
 		return;
 	}
@@ -441,16 +487,24 @@ void PropertyGrid::showComponentProperties(Lumix::ComponentUID cmp)
 		return;
 	}
 
-	auto& descs = Lumix::PropertyRegister::getDescriptors(cmp.type);
+	auto& descs = Lumix::PropertyRegister::getDescriptors(cmp_type);
 
 	for (auto* desc : descs)
 	{
-		showProperty(*desc, -1, cmp);
+		showProperty(*desc, -1, entities, cmp_type);
 	}
 
-	for (auto* i : m_plugins)
+	if (entities.size() == 1)
 	{
-		i->onGUI(*this, cmp);
+		Lumix::ComponentUID cmp;
+		cmp.type = cmp_type;
+		cmp.scene = m_editor.getUniverse()->getScene(cmp.type);
+		cmp.entity = entities[0];
+		cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
+		for (auto* i : m_plugins)
+		{
+			i->onGUI(*this, cmp);
+		}
 	}
 
 	ImGui::PopID();
@@ -552,7 +606,7 @@ void PropertyGrid::showCoreProperties(Lumix::Entity entity)
 void PropertyGrid::onGUI()
 {
 	auto& ents = m_editor.getSelectedEntities();
-	if (ImGui::BeginDock("Properties", &m_is_opened) && ents.size() == 1)
+	if (ImGui::BeginDock("Properties", &m_is_opened) && !ents.empty())
 	{
 		if (ImGui::Button("Add component"))
 		{
@@ -576,7 +630,7 @@ void PropertyGrid::onGUI()
 		for (Lumix::ComponentUID cmp = universe.getFirstComponent(ents[0]); cmp.isValid();
 			 cmp = universe.getNextComponent(cmp))
 		{
-			showComponentProperties(cmp);
+			showComponentProperties(ents, cmp.type);
 		}
 	}
 	ImGui::EndDock();

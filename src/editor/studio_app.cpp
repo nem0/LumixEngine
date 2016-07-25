@@ -85,9 +85,9 @@ public:
 	}
 
 
-	const char* getComponentTypeName(Lumix::ComponentUID cmp) const override
+	const char* getComponentTypeName(Lumix::ComponentType cmp_type) const override
 	{
-		auto iter = m_component_labels.find(cmp.type);
+		auto iter = m_component_labels.find(cmp_type);
 		if (iter == m_component_labels.end()) return "Unknown";
 		return iter.value().c_str();
 	}
@@ -130,7 +130,16 @@ public:
 					}
 
 					editor->addComponent(type);
-					if(!create_empty) editor->setProperty(type, -1, *desc, buf, Lumix::stringLength(buf) + 1);
+					if (!create_empty)
+					{
+						editor->setProperty(type,
+							-1,
+							*desc,
+							&editor->getSelectedEntities()[0],
+							editor->getSelectedEntities().size(),
+							buf,
+							Lumix::stringLength(buf) + 1);
+					}
 					ImGui::CloseCurrentPopup();
 				}
 				ImGui::EndMenu();

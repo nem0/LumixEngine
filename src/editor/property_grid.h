@@ -40,12 +40,25 @@ public:
 	bool m_is_opened;
 
 private:
-	void showProperty(Lumix::IPropertyDescriptor& desc, int index, Lumix::ComponentUID cmp);
-	void showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescriptor& desc);
-	void showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::ISampledFunctionDescriptor& desc);
-	void showEnumProperty(Lumix::ComponentUID cmp, int index, Lumix::IEnumPropertyDescriptor& desc);
-	void showEntityProperty(Lumix::ComponentUID cmp, int index, Lumix::IPropertyDescriptor& desc);
-	void showComponentProperties(Lumix::ComponentUID cmp);
+	void showProperty(Lumix::IPropertyDescriptor& desc,
+		int index,
+		const Lumix::Array<Lumix::Entity>& entities,
+		Lumix::ComponentType cmp_type);
+	void showArrayProperty(const Lumix::Array<Lumix::Entity>& entities,
+		Lumix::ComponentType cmp_type,
+		Lumix::IArrayDescriptor& desc);
+	void showSampledFunctionProperty(const Lumix::Array<Lumix::Entity>& entities,
+		Lumix::ComponentType cmp_type,
+		Lumix::ISampledFunctionDescriptor& desc);
+	void showEnumProperty(const Lumix::Array<Lumix::Entity>& entities,
+		Lumix::ComponentType cmp_type,
+		int index,
+		Lumix::IEnumPropertyDescriptor& desc);
+	void showEntityProperty(const Lumix::Array<Lumix::Entity>& entities,
+		Lumix::ComponentType cmp_type,
+		int index,
+		Lumix::IPropertyDescriptor& desc);
+	void showComponentProperties(const Lumix::Array<Lumix::Entity>& entities, Lumix::ComponentType cmp_type);
 	void showCoreProperties(Lumix::Entity entity);
 
 private:

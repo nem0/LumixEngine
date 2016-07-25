@@ -318,7 +318,7 @@ void SceneView::handleDrop(float x, float y)
 				}
 			}
 			
-			m_editor->setProperty(RENDERABLE_TYPE, mesh_index, *desc, drag_data.data, drag_data.size);
+			m_editor->setProperty(RENDERABLE_TYPE, mesh_index, *desc, &hit.m_entity, 1, drag_data.data, drag_data.size);
 		}
 	}
 }
