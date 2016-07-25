@@ -492,7 +492,7 @@ void SceneView::onGUI()
 
 	ImGui::EndDock();
 
-	if(m_show_stats)
+	if(m_show_stats && m_is_opened)
 	{
 		float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
 		view_pos.x += ImGui::GetStyle().FramePadding.x;
