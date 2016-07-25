@@ -37,7 +37,7 @@ public:
 		FAILURE,
 	};
 
-	typedef DelegateList<void(State, State)> ObserverCallback;
+	typedef DelegateList<void(State, State, Resource&)> ObserverCallback;
 
 public:
 	State getState() const { return m_current_state; }
@@ -51,12 +51,12 @@ public:
 	const Path& getPath() const { return m_path; }
 	ResourceManagerBase& getResourceManager() { return m_resource_manager; }
 
-	template <typename C, void (C::*Function)(State, State)> void onLoaded(C* instance)
+	template <typename C, void (C::*Function)(State, State, Resource&)> void onLoaded(C* instance)
 	{
 		m_cb.bind<C, Function>(instance);
 		if (isReady())
 		{
-			(instance->*Function)(State::READY, State::READY);
+			(instance->*Function)(State::READY, State::READY, *this);
 		}
 	}
 
@@ -86,7 +86,7 @@ protected:
 private:
 	void doLoad();
 	void fileLoaded(FS::IFile& file, bool success);
-	void onStateChanged(State old_state, State new_state);
+	void onStateChanged(State old_state, State new_state, Resource&);
 	uint32 addRef(void) { return ++m_ref_count; }
 	uint32 remRef(void) { return --m_ref_count; }
 

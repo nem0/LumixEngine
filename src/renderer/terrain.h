@@ -40,7 +40,7 @@ class Terrain
 				explicit GrassType(Terrain& terrain);
 				~GrassType();
 
-				void grassLoaded(Resource::State, Resource::State);
+				void grassLoaded(Resource::State, Resource::State, Resource&);
 
 				Model* m_grass_model;
 				Terrain& m_terrain;
@@ -129,7 +129,7 @@ class Terrain
 								   float quad_x,
 								   float quad_z);
 		void generateGeometry();
-		void onMaterialLoaded(Resource::State, Resource::State new_state);
+		void onMaterialLoaded(Resource::State, Resource::State new_state, Resource&);
 
 	private:
 		IAllocator& m_allocator;

@@ -147,32 +147,19 @@ struct BoneAttachment
 class RenderSceneImpl : public RenderScene
 {
 private:
-	class ModelLoadedCallback
+	struct ModelLoadedCallback
 	{
-	public:
 		ModelLoadedCallback(RenderSceneImpl& scene, Model* model)
 			: m_scene(scene)
 			, m_ref_count(0)
 			, m_model(model)
 		{
-			m_model->getObserverCb().bind<ModelLoadedCallback, &ModelLoadedCallback::callback>(this);
+			m_model->getObserverCb().bind<RenderSceneImpl, &RenderSceneImpl::modelStateChanged>(&scene);
 		}
 
 		~ModelLoadedCallback()
 		{
-			m_model->getObserverCb().unbind<ModelLoadedCallback, &ModelLoadedCallback::callback>(this);
-		}
-
-		void callback(Resource::State old_state, Resource::State new_state)
-		{
-			if (new_state == Resource::State::READY)
-			{
-				m_scene.modelLoaded(m_model);
-			}
-			else if (old_state == Resource::State::READY && new_state != Resource::State::READY)
-			{
-				m_scene.modelUnloaded(m_model);
-			}
+			m_model->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::modelStateChanged>(&m_scene);
 		}
 
 		Model* m_model;
@@ -195,15 +182,25 @@ public:
 	}
 
 
+	void modelStateChanged(Resource::State old_state, Resource::State new_state, Resource& resource)
+	{
+		Model* model = static_cast<Model*>(&resource);
+		if (new_state == Resource::State::READY)
+		{
+			modelLoaded(model);
+		}
+		else if (old_state == Resource::State::READY && new_state != Resource::State::READY)
+		{
+			modelUnloaded(model);
+		}
+	}
+
+
 	void clear() override
 	{
 		auto& rm = m_engine.getResourceManager();
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_TYPE));
 
-		for (int i = 0; i < m_model_loaded_callbacks.size(); ++i)
-		{
-			LUMIX_DELETE(m_allocator, m_model_loaded_callbacks[i]);
-		}
 		m_model_loaded_callbacks.clear();
 
 		for (Decal& decal : m_decals)
@@ -3664,19 +3661,11 @@ public:
 	}
 
 
-	int getModelLoadedCallback(Model* model)
+	ModelLoadedCallback& getModelLoadedCallback(Model* model)
 	{
-		for (int i = 0; i < m_model_loaded_callbacks.size(); ++i)
-		{
-			if (m_model_loaded_callbacks[i]->m_model == model)
-			{
-				return i;
-			}
-		}
-		ModelLoadedCallback* new_callback =
-			LUMIX_NEW(m_allocator, ModelLoadedCallback)(*this, model);
-		m_model_loaded_callbacks.push(new_callback);
-		return m_model_loaded_callbacks.size() - 1;
+		int idx = m_model_loaded_callbacks.find(model);
+		if (idx >= 0) return m_model_loaded_callbacks.at(idx);
+		return m_model_loaded_callbacks.emplace(model, *this, model);
 	}
 
 
@@ -3770,13 +3759,11 @@ public:
 			auto& rm = old_model->getResourceManager();
 			auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(MATERIAL_TYPE));
 			freeCustomMeshes(renderable, material_manager);
-			int callback_idx = getModelLoadedCallback(old_model);
-			ModelLoadedCallback* callback = m_model_loaded_callbacks[callback_idx];
-			--callback->m_ref_count;
-			if (callback->m_ref_count == 0)
+			ModelLoadedCallback& callback = getModelLoadedCallback(old_model);
+			--callback.m_ref_count;
+			if (callback.m_ref_count == 0)
 			{
-				LUMIX_DELETE(m_allocator, callback);
-				m_model_loaded_callbacks.eraseFast(callback_idx);
+				m_model_loaded_callbacks.erase(old_model);
 			}
 
 			if (old_model->isReady())
@@ -3792,8 +3779,8 @@ public:
 		renderable.pose = nullptr;
 		if (model)
 		{
-			ModelLoadedCallback* callback = m_model_loaded_callbacks[getModelLoadedCallback(model)];
-			++callback->m_ref_count;
+			ModelLoadedCallback& callback = getModelLoadedCallback(model);
+			++callback.m_ref_count;
 
 			if (model->isReady())
 			{
@@ -4172,7 +4159,7 @@ private:
 	bool m_is_grass_enabled;
 	bool m_is_game_running;
 
-	Array<ModelLoadedCallback*> m_model_loaded_callbacks;
+	AssociativeArray<Model*, ModelLoadedCallback> m_model_loaded_callbacks;
 	DelegateList<void(ComponentHandle)> m_renderable_created;
 	DelegateList<void(ComponentHandle)> m_renderable_destroyed;
 };

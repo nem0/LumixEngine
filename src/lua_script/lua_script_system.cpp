@@ -174,7 +174,7 @@ namespace Lumix
 			}
 
 
-			void onScriptLoaded(Resource::State, Resource::State)
+			void onScriptLoaded(Resource::State, Resource::State, Resource&)
 			{
 				lua_State* L = m_scene.m_system.m_engine.getState();
 				for (auto& script : m_scripts)

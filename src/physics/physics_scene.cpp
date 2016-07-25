@@ -184,7 +184,7 @@ struct Heightfield
 {
 	Heightfield();
 	~Heightfield();
-	void heightmapLoaded(Resource::State, Resource::State new_state);
+	void heightmapLoaded(Resource::State, Resource::State new_state, Resource&);
 
 	struct PhysicsSceneImpl* m_scene;
 	Entity m_entity;
@@ -263,7 +263,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		ActorType type;
 
 	private:
-		void onStateChanged(Resource::State old_state, Resource::State new_state);
+		void onStateChanged(Resource::State old_state, Resource::State new_state, Resource&);
 	};
 
 
@@ -3486,7 +3486,7 @@ void PhysicsScene::destroy(PhysicsScene* scene)
 }
 
 
-void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::State new_state)
+void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::State new_state, Resource&)
 {
 	if (new_state == Resource::State::READY)
 	{
@@ -3572,7 +3572,7 @@ Heightfield::~Heightfield()
 }
 
 
-void Heightfield::heightmapLoaded(Resource::State, Resource::State new_state)
+void Heightfield::heightmapLoaded(Resource::State, Resource::State new_state, Resource&)
 {
 	if (new_state == Resource::State::READY)
 	{

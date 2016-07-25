@@ -46,7 +46,7 @@ void Resource::checkState()
 	if (m_failed_dep_count > 0 && m_current_state != State::FAILURE)
 	{
 		m_current_state = State::FAILURE;
-		m_cb.invoke(old_state, m_current_state);
+		m_cb.invoke(old_state, m_current_state, *this);
 	}
 
 	if (m_failed_dep_count == 0)
@@ -56,13 +56,13 @@ void Resource::checkState()
 		{
 			onBeforeReady();
 			m_current_state = State::READY;
-			m_cb.invoke(old_state, m_current_state);
+			m_cb.invoke(old_state, m_current_state, *this);
 		}
 
 		if (m_empty_dep_count > 0 && m_current_state != State::EMPTY)
 		{
 			m_current_state = State::EMPTY;
-			m_cb.invoke(old_state, m_current_state);
+			m_cb.invoke(old_state, m_current_state, *this);
 		}
 	}
 }
@@ -158,7 +158,7 @@ void Resource::removeDependency(Resource& dependent_resource)
 }
 
 
-void Resource::onStateChanged(State old_state, State new_state)
+void Resource::onStateChanged(State old_state, State new_state, Resource&)
 {
 	ASSERT(old_state != new_state);
 	ASSERT(m_current_state != State::EMPTY || m_desired_state != State::EMPTY);
