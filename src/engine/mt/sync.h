@@ -49,37 +49,6 @@ private:
 };
 
 
-class LUMIX_ENGINE_API Mutex
-{
-public:
-	explicit Mutex(bool locked);
-	~Mutex();
-
-	void lock();
-
-	void unlock();
-
-private:
-	MutexHandle m_id;
-};
-
-
-class Lock
-{
-public:
-	Lock(Mutex& mutex)
-		: m_mutex(mutex)
-	{
-		mutex.lock();
-	}
-	~Lock() { m_mutex.unlock(); }
-
-private:
-	void operator=(const Lock&);
-	Mutex& m_mutex;
-};
-
-
 class LUMIX_ENGINE_API Event
 {
 public:

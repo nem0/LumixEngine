@@ -37,27 +37,6 @@ bool Semaphore::poll()
 }
 
 
-Mutex::Mutex(bool locked)
-{
-	m_id = ::CreateMutex(nullptr, locked, nullptr);
-}
-
-Mutex::~Mutex()
-{
-	::CloseHandle(m_id);
-}
-
-void Mutex::lock()
-{
-	::WaitForSingleObject(m_id, INFINITE);
-}
-
-void Mutex::unlock()
-{
-	::ReleaseMutex(m_id);
-}
-
-
 Event::Event()
 {
 	m_id = ::CreateEvent(nullptr, FALSE, FALSE, nullptr);
