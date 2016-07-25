@@ -59,7 +59,7 @@ private:
 		int index,
 		Lumix::IPropertyDescriptor& desc);
 	void showComponentProperties(const Lumix::Array<Lumix::Entity>& entities, Lumix::ComponentType cmp_type);
-	void showCoreProperties(Lumix::Entity entity);
+	void showCoreProperties(const Lumix::Array<Lumix::Entity>& entities);
 
 private:
 	StudioApp& m_app;
