@@ -541,7 +541,7 @@ void Terrain::updateGrass(ComponentHandle camera)
 }
 
 
-void Terrain::GrassType::grassLoaded(Resource::State, Resource::State)
+void Terrain::GrassType::grassLoaded(Resource::State, Resource::State, Resource&)
 {
 	m_terrain.forceGrassUpdate();
 }
@@ -936,7 +936,7 @@ TerrainQuad* Terrain::generateQuadTree(float size)
 	return root;
 }
 
-void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state)
+void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state, Resource&)
 {
 	PROFILE_FUNCTION();
 	if (new_state == Resource::State::READY)

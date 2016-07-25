@@ -187,7 +187,7 @@ void AssetBrowser::update()
 		m_on_resource_changed.invoke(path, ext);
 
 		Lumix::ResourceType resource_type = getResourceType(path.c_str());
-		if (Lumix::isValid(resource_type)) continue;
+		if (!Lumix::isValid(resource_type)) continue;
 
 		if (m_autoreload_changed_resource) m_editor.getEngine().getResourceManager().reload(path);
 
