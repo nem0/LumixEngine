@@ -390,8 +390,7 @@ public:
 	bool merge(IEditorCommand& command) override
 	{
 		ASSERT(command.getType() == getType());
-		MoveEntityCommand& my_command =
-			static_cast<MoveEntityCommand&>(command);
+		MoveEntityCommand& my_command = static_cast<MoveEntityCommand&>(command);
 		if (my_command.m_entities.size() == m_entities.size())
 		{
 			for (int i = 0, c = m_entities.size(); i < c; ++i)
@@ -428,8 +427,7 @@ class ScaleEntityCommand : public IEditorCommand
 {
 public:
 	explicit ScaleEntityCommand(WorldEditor& editor)
-		: m_new_scales(editor.getAllocator())
-		, m_old_scales(editor.getAllocator())
+		: m_old_scales(editor.getAllocator())
 		, m_entities(editor.getAllocator())
 		, m_editor(editor)
 	{
@@ -438,19 +436,18 @@ public:
 
 	ScaleEntityCommand(WorldEditor& editor,
 		const Entity* entities,
-		const float* new_scales,
 		int count,
+		float scale,
 		IAllocator& allocator)
-		: m_new_scales(allocator)
-		, m_old_scales(allocator)
+		: m_old_scales(allocator)
 		, m_entities(allocator)
 		, m_editor(editor)
+		, m_scale(scale)
 	{
 		Universe* universe = m_editor.getUniverse();
 		for (int i = count - 1; i >= 0; --i)
 		{
 			m_entities.push(entities[i]);
-			m_new_scales.push(new_scales[i]);
 			m_old_scales.push(universe->getScale(entities[i]));
 		}
 	}
@@ -458,12 +455,11 @@ public:
 
 	void serialize(JsonSerializer& serializer) override
 	{
-		serializer.serialize("count", m_entities.size());
+		serializer.serialize("scale", m_scale);
 		serializer.beginArray("entities");
 		for (int i = 0; i < m_entities.size(); ++i)
 		{
 			serializer.serializeArrayItem(m_entities[i]);
-			serializer.serializeArrayItem(m_new_scales[i]);
 		}
 		serializer.endArray();
 	}
@@ -473,16 +469,15 @@ public:
 	{
 		Universe* universe = m_editor.getUniverse();
 		int count;
+		serializer.deserialize("scale", m_scale, 1.0f);
 		serializer.deserialize("count", count, 0);
-		m_entities.resize(count);
-		m_new_scales.resize(count);
-		m_old_scales.resize(count);
 		serializer.deserializeArrayBegin("entities");
-		for (int i = 0; i < m_entities.size(); ++i)
+		while (!serializer.isArrayEnd())
 		{
-			serializer.deserializeArrayItem(m_entities[i], INVALID_ENTITY);
-			serializer.deserializeArrayItem(m_new_scales[i], 0);
-			m_old_scales[i] = universe->getScale(m_entities[i]);
+			Entity entity;
+			serializer.deserializeArrayItem(entity, INVALID_ENTITY);
+			m_entities.push(entity);
+			m_old_scales.push(universe->getScale(entity));
 		}
 		serializer.deserializeArrayEnd();
 	}
@@ -494,7 +489,7 @@ public:
 		for (int i = 0, c = m_entities.size(); i < c; ++i)
 		{
 			Entity entity = m_entities[i];
-			universe->setScale(entity, m_new_scales[i]);
+			universe->setScale(entity, m_scale);
 		}
 		return true;
 	}
@@ -531,10 +526,7 @@ public:
 					return false;
 				}
 			}
-			for (int i = 0, c = m_entities.size(); i < c; ++i)
-			{
-				my_command.m_new_scales[i] = m_new_scales[i];
-			}
+			my_command.m_scale = m_scale;
 			return true;
 		}
 		else
@@ -546,7 +538,7 @@ public:
 private:
 	WorldEditor& m_editor;
 	Array<Entity> m_entities;
-	Array<float> m_new_scales;
+	float m_scale;
 	Array<float> m_old_scales;
 };
 
@@ -1849,19 +1841,17 @@ public:
 	}
 
 
-	void setEntitiesScales(const Entity* entities, const float* scales, int count) override
+	void setEntitiesScale(const Entity* entities, int count, float scale) override
 	{
 		if (count <= 0) return;
 
 		IEditorCommand* command =
-			LUMIX_NEW(m_allocator, ScaleEntityCommand)(*this, entities, scales, count, m_allocator);
+			LUMIX_NEW(m_allocator, ScaleEntityCommand)(*this, entities, count, scale, m_allocator);
 		executeCommand(command);
 	}
 
 
-	void setEntitiesRotations(const Entity* entities,
-		const Quat* rotations,
-		int count) override
+	void setEntitiesRotations(const Entity* entities, const Quat* rotations, int count) override
 	{
 		ASSERT(entities && rotations);
 		if (count <= 0) return;
@@ -1872,15 +1862,35 @@ public:
 		{
 			positions.push(universe->getPosition(entities[i]));
 		}
-		IEditorCommand* command = LUMIX_NEW(m_allocator, MoveEntityCommand)(
-			*this, entities, &positions[0], rotations, count, m_allocator);
+		IEditorCommand* command =
+			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, &positions[0], rotations, count, m_allocator);
 		executeCommand(command);
 	}
 
 
-	void setEntitiesPositions(const Entity* entities,
-		const Vec3* positions,
-		int count) override
+	void setEntitiesCoordinate(const Entity* entities, int count, float value, Coordinate coord) override
+	{
+		ASSERT(entities);
+		if (count <= 0) return;
+
+		Universe* universe = getUniverse();
+		Array<Quat> rots(m_allocator);
+		Array<Vec3> poss(m_allocator);
+		rots.reserve(count);
+		poss.reserve(count);
+		for (int i = 0; i < count; ++i)
+		{
+			rots.push(universe->getRotation(entities[i]));
+			poss.push(universe->getPosition(entities[i]));
+			(&poss[i].x)[(int)coord] = value;
+		}
+		IEditorCommand* command =
+			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, &poss[0], &rots[0], count, m_allocator);
+		executeCommand(command);
+	}
+
+
+	void setEntitiesPositions(const Entity* entities, const Vec3* positions, int count) override
 	{
 		ASSERT(entities && positions);
 		if (count <= 0) return;
@@ -1891,8 +1901,8 @@ public:
 		{
 			rots.push(universe->getRotation(entities[i]));
 		}
-		IEditorCommand* command = LUMIX_NEW(m_allocator, MoveEntityCommand)(
-			*this, entities, positions, &rots[0], count, m_allocator);
+		IEditorCommand* command =
+			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, &rots[0], count, m_allocator);
 		executeCommand(command);
 	}
 

@@ -571,34 +571,63 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 }
 
 
-void PropertyGrid::showCoreProperties(Lumix::Entity entity)
+void PropertyGrid::showCoreProperties(const Lumix::Array<Lumix::Entity>& entities)
 {
-	char name[256];
-	const char* tmp = m_editor.getUniverse()->getEntityName(entity);
-	
-	ImGui::LabelText("ID", "%d", entity.index);
-	
-	Lumix::copyString(name, tmp);
-	if (ImGui::InputText("Name", name, sizeof(name))) m_editor.setEntityName(entity, name);
+	if (entities.size() == 1)
+	{
+		char name[256];
+		const char* tmp = m_editor.getUniverse()->getEntityName(entities[0]);
 
-	auto pos = m_editor.getUniverse()->getPosition(entity);
-	if (ImGui::DragFloat3("Position", &pos.x)) m_editor.setEntitiesPositions(&entity, &pos, 1);
+		ImGui::LabelText("ID", "%d", entities[0].index);
 
-	auto rot = m_editor.getUniverse()->getRotation(entity);
-	auto euler = Lumix::Math::radiansToDegrees(rot.toEuler());
+		Lumix::copyString(name, tmp);
+		if (ImGui::InputText("Name", name, sizeof(name))) m_editor.setEntityName(entities[0], name);
+	}
+	else
+	{
+		ImGui::LabelText("ID", "%s", "Multiple objects");
+		ImGui::LabelText("Name", "%s", "Multi-object editing not supported.");
+	}
+
+	Lumix::Vec3 pos = m_editor.getUniverse()->getPosition(entities[0]);
+	Lumix::Vec3 old_pos = pos;
+	if (ImGui::DragFloat3("Position", &pos.x))
+	{
+		Lumix::WorldEditor::Coordinate coord;
+		if (pos.x != old_pos.x) coord = Lumix::WorldEditor::Coordinate::X;
+		if (pos.y != old_pos.y) coord = Lumix::WorldEditor::Coordinate::Y;
+		if (pos.z != old_pos.z) coord = Lumix::WorldEditor::Coordinate::Z;
+		m_editor.setEntitiesCoordinate(&entities[0], entities.size(), (&pos.x)[(int)coord], coord);
+	}
+
+	Lumix::Universe* universe = m_editor.getUniverse();
+	Lumix::Quat rot = universe->getRotation(entities[0]);
+	Lumix::Vec3 old_euler = rot.toEuler();
+	Lumix::Vec3 euler = Lumix::Math::radiansToDegrees(old_euler);
 	if (ImGui::DragFloat3("Rotation", &euler.x))
 	{
 		euler.x = Lumix::Math::degreesToRadians(fmodf(euler.x, 180));
 		euler.y = Lumix::Math::degreesToRadians(fmodf(euler.y, 180));
 		euler.z = Lumix::Math::degreesToRadians(fmodf(euler.z, 180));
 		rot.fromEuler(euler);
-		m_editor.setEntitiesRotations(&entity, &rot, 1);
+		
+		Lumix::Array<Lumix::Quat> rots(m_editor.getAllocator());
+		for (Lumix::Entity entity : entities)
+		{
+			Lumix::Vec3 tmp = universe->getRotation(entity).toEuler();
+			
+			if (euler.x != old_euler.x) tmp.x = euler.x;
+			else if (euler.y != old_euler.y) tmp.y = euler.y;
+			else if (euler.z != old_euler.z) tmp.z = euler.z;
+			rots.emplace().fromEuler(tmp);
+		}
+		m_editor.setEntitiesRotations(&entities[0], &rots[0], entities.size());
 	}
 
-	float scale = m_editor.getUniverse()->getScale(entity);
+	float scale = m_editor.getUniverse()->getScale(entities[0]);
 	if (ImGui::DragFloat("Scale", &scale, 0.1f))
 	{
-		m_editor.setEntitiesScales(&entity, &scale, 1);
+		m_editor.setEntitiesScale(&entities[0], entities.size(), scale);
 	}
 }
 
@@ -624,7 +653,7 @@ void PropertyGrid::onGUI()
 			ImGui::EndPopup();
 		}
 
-		showCoreProperties(ents[0]);
+		showCoreProperties(ents);
 
 		Lumix::Universe& universe = *m_editor.getUniverse();
 		for (Lumix::ComponentUID cmp = universe.getFirstComponent(ents[0]); cmp.isValid();
