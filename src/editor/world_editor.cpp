@@ -722,6 +722,7 @@ class SetPropertyCommand : public IEditorCommand
 public:
 	explicit SetPropertyCommand(WorldEditor& editor)
 		: m_editor(editor)
+		, m_entities(editor.getAllocator())
 		, m_new_value(editor.getAllocator())
 		, m_old_value(editor.getAllocator())
 	{
@@ -729,67 +730,79 @@ public:
 
 
 	SetPropertyCommand(WorldEditor& editor,
-		Entity entity,
-		ComponentType component_type,
-		const IPropertyDescriptor& property_descriptor,
-		const void* data,
-		int size)
-		: m_component_type(component_type)
-		, m_entity(entity)
-		, m_property_descriptor(&property_descriptor)
-		, m_editor(editor)
-		, m_new_value(editor.getAllocator())
-		, m_old_value(editor.getAllocator())
-	{
-		m_index = -1;
-		m_new_value.write(data, size);
-		ComponentUID component = m_editor.getUniverse()->getComponent(entity, component_type);
-		m_property_descriptor->get(component, -1, m_old_value);
-	}
-
-
-	SetPropertyCommand(WorldEditor& editor,
-		Entity entity,
+		const Entity* entities,
+		int count,
 		ComponentType component_type,
 		int index,
 		const IPropertyDescriptor& property_descriptor,
 		const void* data,
 		int size)
 		: m_component_type(component_type)
-		, m_entity(entity)
+		, m_entities(editor.getAllocator())
 		, m_property_descriptor(&property_descriptor)
 		, m_editor(editor)
 		, m_new_value(editor.getAllocator())
 		, m_old_value(editor.getAllocator())
 	{
+		m_entities.reserve(count);
+		for (int i = 0; i < count; ++i)
+		{
+			if (!m_editor.getUniverse()->getComponent(entities[i], m_component_type).isValid()) continue;
+			uint32 tpl = editor.getEntityTemplateSystem().getTemplate(entities[i]);
+			if (tpl == 0)
+			{
+				ComponentUID component = m_editor.getUniverse()->getComponent(entities[i], component_type);
+				m_property_descriptor->get(component, -1, m_old_value);
+				m_entities.push(entities[i]);
+			}
+			else
+			{
+				const Array<Entity>& instances = editor.getEntityTemplateSystem().getInstances(tpl);
+				for (int i = 0; i < instances.size(); ++i)
+				{
+					ComponentUID component = m_editor.getUniverse()->getComponent(instances[i], component_type);
+					m_property_descriptor->get(component, -1, m_old_value);
+					m_entities.push(instances[i]);
+				}
+			}
+		}
+
 		m_index = index;
 		m_new_value.write(data, size);
-		ComponentUID component = m_editor.getUniverse()->getComponent(entity, component_type);
-		m_property_descriptor->get(component, m_index, m_old_value);
 	}
 
 
 	void serialize(JsonSerializer& serializer) override
 	{
 		serializer.serialize("index", m_index);
-		serializer.serialize("entity_index", m_entity);
+		serializer.beginArray("entities");
+		for (Entity entity : m_entities)
+		{
+			serializer.serializeArrayItem(entity);
+		}
+		serializer.endArray();
 		serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_component_type));
 		serializer.beginArray("data");
 		for (int i = 0; i < m_new_value.getPos(); ++i)
 		{
-			serializer.serializeArrayItem(
-				(int)((const uint8*)m_new_value.getData())[i]);
+			serializer.serializeArrayItem((int)((const uint8*)m_new_value.getData())[i]);
 		}
 		serializer.endArray();
-		serializer.serialize("property_name_hash",
-							 m_property_descriptor->getNameHash());
+		serializer.serialize("property_name_hash", m_property_descriptor->getNameHash());
 	}
 
 
 	void deserialize(JsonSerializer& serializer) override
 	{
 		serializer.deserialize("index", m_index, 0);
-		serializer.deserialize("entity_index", m_entity, INVALID_ENTITY);
+		serializer.deserializeArrayBegin("entities");
+		while (!serializer.isArrayEnd())
+		{
+			Entity entity;
+			serializer.deserializeArrayItem(entity, INVALID_ENTITY);
+			m_entities.push(entity);
+		}
+		serializer.deserializeArrayEnd();
 		uint32 hash;
 		serializer.deserialize("component_type", hash, 0);
 		m_component_type = PropertyRegister::getComponentTypeFromHash(hash);
@@ -804,15 +817,20 @@ public:
 		serializer.deserializeArrayEnd();
 		uint32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
-		m_property_descriptor =
-			PropertyRegister::getDescriptor(m_component_type, property_name_hash);
+		m_property_descriptor = PropertyRegister::getDescriptor(m_component_type, property_name_hash);
 	}
 
 
 	bool execute() override
 	{
+		// TODO do not change editor camera slot
 		InputBlob blob(m_new_value);
-		set(blob);
+		for (Entity entity : m_entities)
+		{
+			ComponentUID component = m_editor.getUniverse()->getComponent(entity, m_component_type);
+			blob.rewind();
+			m_property_descriptor->set(component, m_index, blob);
+		}
 		return true;
 	}
 
@@ -820,13 +838,17 @@ public:
 	void undo() override
 	{
 		InputBlob blob(m_old_value);
-		set(blob);
+		for (Entity entity : m_entities)
+		{
+			ComponentUID component = m_editor.getUniverse()->getComponent(entity, m_component_type);
+			m_property_descriptor->set(component, m_index, blob);
+		}
 	}
 
 
 	uint32 getType() override
 	{
-		static const uint32 hash = crc32("set_property");
+		static const uint32 hash = crc32("set_property_values");
 		return hash;
 	}
 
@@ -836,58 +858,25 @@ public:
 		ASSERT(command.getType() == getType());
 		SetPropertyCommand& src = static_cast<SetPropertyCommand&>(command);
 		if (m_component_type == src.m_component_type &&
-			m_entity == src.m_entity &&
+			m_entities.size() == src.m_entities.size() &&
 			src.m_property_descriptor == m_property_descriptor &&
 			m_index == src.m_index)
 		{
+			for (int i = 0, c = m_entities.size(); i < c; ++i)
+			{
+				if (m_entities[i] != src.m_entities[i]) return false;
+			}
+
 			src.m_new_value = m_new_value;
 			return true;
 		}
 		return false;
 	}
 
-
-	void set(InputBlob& stream)
-	{
-		ComponentUID component = m_editor.getUniverse()->getComponent(m_entity, m_component_type);
-		uint32 template_hash = m_editor.getEntityTemplateSystem().getTemplate(m_entity);
-		if (template_hash)
-		{
-			const Array<Entity>& entities = m_editor.getEntityTemplateSystem().getInstances(template_hash);
-			for (int i = 0, c = entities.size(); i < c; ++i)
-			{
-				stream.rewind();
-				ComponentUID cmp = m_editor.getUniverse()->getComponent(entities[i], m_component_type);
-				if (!cmp.isValid()) continue;
-
-				if (m_index >= 0)
-				{
-					m_property_descriptor->set(cmp, m_index, stream);
-				}
-				else
-				{
-					m_property_descriptor->set(cmp, -1, stream);
-				}
-			}
-		}
-		else
-		{
-			if (m_index >= 0)
-			{
-				m_property_descriptor->set(component, m_index, stream);
-			}
-			else
-			{
-				m_property_descriptor->set(component, -1, stream);
-			}
-		}
-	}
-
-
 private:
 	WorldEditor& m_editor;
 	ComponentType m_component_type;
-	Entity m_entity;
+	Lumix::Array<Entity> m_entities;
 	OutputBlob m_new_value;
 	OutputBlob m_old_value;
 	int m_index;
@@ -919,16 +908,14 @@ private:
 			{
 				if (!m_editor.getUniverse()->getComponent(entities[i], type).isValid())
 				{
-					uint32 tpl = editor.getEntityTemplateSystem().getTemplate(
-						entities[i]);
+					uint32 tpl = editor.getEntityTemplateSystem().getTemplate(entities[i]);
 					if (tpl == 0)
 					{
 						m_entities.push(entities[i]);
 					}
 					else
 					{
-						const Array<Entity>& instances =
-							editor.getEntityTemplateSystem().getInstances(tpl);
+						const Array<Entity>& instances = editor.getEntityTemplateSystem().getInstances(tpl);
 						for (int i = 0; i < instances.size(); ++i)
 						{
 							m_entities.push(instances[i]);
@@ -1191,68 +1178,82 @@ private:
 		explicit DestroyComponentCommand(WorldEditor& editor)
 			: m_editor(static_cast<WorldEditorImpl&>(editor))
 			, m_old_values(editor.getAllocator())
+			, m_entities(editor.getAllocator())
+			, m_cmp_type(INVALID_COMPONENT_TYPE)
 		{
 		}
 
 
-		DestroyComponentCommand(WorldEditorImpl& editor,
-								const ComponentUID& component)
-			: m_component(component)
+		DestroyComponentCommand(WorldEditorImpl& editor, const Entity* entities, int count, ComponentType cmp_type)
+			: m_cmp_type(cmp_type)
 			, m_editor(editor)
 			, m_old_values(editor.getAllocator())
+			, m_entities(editor.getAllocator())
 		{
+			m_entities.reserve(count);
+			for (int i = 0; i < count; ++i)
+			{
+				if (!m_editor.getUniverse()->getComponent(entities[i], m_cmp_type).isValid()) continue;
+				uint32 tpl = editor.getEntityTemplateSystem().getTemplate(entities[i]);
+				if (tpl == 0)
+				{
+					m_entities.push(entities[i]);
+				}
+				else
+				{
+					const Array<Entity>& instances = editor.getEntityTemplateSystem().getInstances(tpl);
+					for (int i = 0; i < instances.size(); ++i)
+					{
+						m_entities.push(instances[i]);
+					}
+				}
+			}
 		}
 
 
 		void serialize(JsonSerializer& serializer) override 
 		{
-			serializer.serialize("entity", m_component.entity);
-			serializer.serialize("component", m_component.handle);
-			serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_component.type));
+			serializer.beginArray("entities");
+			for (Entity entity : m_entities)
+			{
+				serializer.serializeArrayItem(entity);
+			}
+			serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_cmp_type));
 		}
 
 
 		void deserialize(JsonSerializer& serializer) override
 		{
-			serializer.deserialize("entity", m_component.entity, INVALID_ENTITY);
-			serializer.deserialize("component", m_component.handle, INVALID_COMPONENT);
+			serializer.deserializeArrayBegin("entities");
+			while (!serializer.isArrayEnd())
+			{
+				Entity entity;
+				serializer.deserializeArrayItem(entity, INVALID_ENTITY);
+				m_entities.push(entity);
+			}
+			serializer.deserializeArrayEnd();
+
 			uint32 hash;
 			serializer.deserialize("component_type", hash, 0);
-			m_component.type = PropertyRegister::getComponentTypeFromHash(hash);
-			m_component.scene = m_editor.getUniverse()->getScene(m_component.type);
+			m_cmp_type = PropertyRegister::getComponentTypeFromHash(hash);
 		}
 
 
 		void undo() override
 		{
-			uint32 template_hash = m_editor.m_template_system->getTemplate(m_component.entity);
-			IScene* scene = m_editor.getUniverse()->getScene(m_component.type);
-			ASSERT(scene);
-			if (template_hash == 0)
+			ComponentUID cmp;
+			cmp.scene = m_editor.getUniverse()->getScene(m_cmp_type);
+			cmp.type = m_cmp_type;
+			ASSERT(cmp.scene);
+			InputBlob blob(m_old_values);
+			const Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmp.type);
+			for (Entity entity : m_entities)
 			{
-				ComponentHandle cmp = scene->createComponent(m_component.type, m_component.entity);
-				m_component.handle = cmp;
-				m_component.scene = scene;
-				InputBlob blob(m_old_values);
-				const Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(m_component.type);
+				cmp.entity = entity;
+				cmp.handle = cmp.scene->createComponent(cmp.type, cmp.entity);
 				for (int i = 0; i < props.size(); ++i)
 				{
-					props[i]->set(m_component, -1, blob);
-				}
-			}
-			else
-			{
-				const Array<Entity>& entities = m_editor.m_template_system->getInstances(template_hash);
-				for (Entity entity : entities)
-				{
-					ComponentUID cmp_new(
-						entity, m_component.type, scene, scene->createComponent(m_component.type, entity));
-					InputBlob blob(m_old_values);
-					const Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(m_component.type);
-					for (int i = 0; i < props.size(); ++i)
-					{
-						props[i]->set(cmp_new, -1, blob);
-					}
+					props[i]->set(cmp, -1, blob);
 				}
 			}
 		}
@@ -1263,42 +1264,36 @@ private:
 
 		uint32 getType() override
 		{
-			static const uint32 hash = crc32("destroy_component");
+			static const uint32 hash = crc32("destroy_components");
 			return hash;
 		}
 
 
 		bool execute() override
 		{
-			Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(m_component.type);
-			for (int i = 0; i < props.size(); ++i)
+			Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(m_cmp_type);
+			ComponentUID cmp;
+			cmp.type = m_cmp_type;
+			cmp.scene = m_editor.getUniverse()->getScene(m_cmp_type);
+			if (m_entities.empty()) return false;
+			if (!cmp.scene) return false;
+
+			for (Entity entity : m_entities)
 			{
-				props[i]->get(m_component, -1, m_old_values);
-			}
-			uint32 template_hash =
-				m_editor.getEntityTemplateSystem().getTemplate(m_component.entity);
-			if (template_hash)
-			{
-				const Array<Entity>& instances =
-					m_editor.m_template_system->getInstances(template_hash);
-				for (int i = 0; i < instances.size(); ++i)
+				cmp.entity = entity;
+				cmp.handle = cmp.scene->getComponent(entity, m_cmp_type);
+				for (int i = 0; i < props.size(); ++i)
 				{
-					ComponentUID cmp = m_editor.getUniverse()->getComponent(instances[i], m_component.type);
-					if (cmp.isValid())
-					{
-						cmp.scene->destroyComponent(cmp.handle, cmp.type);
-					}
+					props[i]->get(cmp, -1, m_old_values);
 				}
-			}
-			else
-			{
-				m_component.scene->destroyComponent(m_component.handle, m_component.type);
+				cmp.scene->destroyComponent(cmp.handle, m_cmp_type);
 			}
 			return true;
 		}
 
 	private:
-		ComponentUID m_component;
+		Array<Entity> m_entities;
+		ComponentType m_cmp_type;
 		WorldEditorImpl& m_editor;
 		OutputBlob m_old_values;
 	};
@@ -2163,30 +2158,25 @@ public:
 	}
 
 
-	void destroyComponent(const ComponentUID& component) override
+	void destroyComponent(const Entity* entities, int count, ComponentType cmp_type) override
 	{
-		if (component.entity == m_camera && component.type == CAMERA_TYPE)
+		ASSERT(count > 0);
+		if (entities[0] == m_camera && cmp_type == CAMERA_TYPE)
 		{
-			g_log_error.log("Editor")
-				<< "Can not destroy component from the editing camera";
+			g_log_error.log("Editor") << "Can not destroy component from the editing camera";
 			return;
 		}
 
-		if (component.isValid())
-		{
-			IEditorCommand* command =
-				LUMIX_NEW(m_allocator, DestroyComponentCommand)(*this, component);
-			executeCommand(command);
-		}
+		IEditorCommand* command = LUMIX_NEW(m_allocator, DestroyComponentCommand)(*this, entities, count, cmp_type);
+		executeCommand(command);
 	}
 
 
-	void addComponent(ComponentType type_crc) override
+	void addComponent(ComponentType cmp_type) override
 	{
 		if (!m_selected_entities.empty())
 		{
-			IEditorCommand* command =
-				LUMIX_NEW(m_allocator, AddComponentCommand)(*this, m_selected_entities, type_crc);
+			IEditorCommand* command = LUMIX_NEW(m_allocator, AddComponentCommand)(*this, m_selected_entities, cmp_type);
 			executeCommand(command);
 		}
 	}
@@ -2413,13 +2403,13 @@ public:
 		m_editor_command_creators.insert(
 			crc32("add_array_property_item"), &WorldEditorImpl::constructEditorCommand<AddArrayPropertyItemCommand>);
 		m_editor_command_creators.insert(
-			crc32("set_property"), &WorldEditorImpl::constructEditorCommand<SetPropertyCommand>);
+			crc32("set_property_values"), &WorldEditorImpl::constructEditorCommand<SetPropertyCommand>);
 		m_editor_command_creators.insert(
 			crc32("add_component"), &WorldEditorImpl::constructEditorCommand<AddComponentCommand>);
 		m_editor_command_creators.insert(
 			crc32("destroy_entities"), &WorldEditorImpl::constructEditorCommand<DestroyEntitiesCommand>);
 		m_editor_command_creators.insert(
-			crc32("destroy_component"), &WorldEditorImpl::constructEditorCommand<DestroyComponentCommand>);
+			crc32("destroy_components"), &WorldEditorImpl::constructEditorCommand<DestroyComponentCommand>);
 		m_editor_command_creators.insert(
 			crc32("add_entity"), &WorldEditorImpl::constructEditorCommand<AddEntityCommand>);
 
@@ -2495,27 +2485,16 @@ public:
 	void setProperty(ComponentType component_type,
 		int index,
 		const IPropertyDescriptor& property,
+		const Entity* entities,
+		int count,
 		const void* data,
 		int size) override
 	{
-
-		ASSERT(m_selected_entities.size() == 1);
 		ComponentUID cmp = getUniverse()->getComponent(m_selected_entities[0], component_type);
-		if (cmp.isValid())
-		{
-			static const uint32 SLOT_HASH = crc32("Slot");
-			if (component_type == CAMERA_TYPE && property.getNameHash() == SLOT_HASH)
-			{
-				if (m_render_interface->getCameraEntity(cmp.handle) == m_camera)
-				{
-					return;
-				}
-			}
 
-			IEditorCommand* command =
-				LUMIX_NEW(m_allocator, SetPropertyCommand)(*this, cmp.entity, cmp.type, index, property, data, size);
-			executeCommand(command);
-		}
+		IEditorCommand* command = LUMIX_NEW(m_allocator, SetPropertyCommand)(
+			*this, entities, count, component_type, index, property, data, size);
+		executeCommand(command);
 	}
 
 

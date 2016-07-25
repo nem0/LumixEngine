@@ -97,6 +97,7 @@ struct ComponentType
 	bool operator>(const ComponentType& rhs) const { return rhs.index > index; };
 	bool operator!=(const ComponentType& rhs) const { return rhs.index != index; };
 };
+const ComponentType INVALID_COMPONENT_TYPE = {-1};
 const Entity INVALID_ENTITY = {-1};
 const ComponentHandle INVALID_COMPONENT = {-1};
 

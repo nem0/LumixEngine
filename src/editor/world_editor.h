@@ -96,7 +96,7 @@ public:
 	virtual void pasteEntities() = 0;
 	virtual void addComponent(ComponentType type) = 0;
 	virtual void cloneComponent(const ComponentUID& src, Entity entity) = 0;
-	virtual void destroyComponent(const ComponentUID& cmp) = 0;
+	virtual void destroyComponent(const Entity* entities, int count, ComponentType cmp_type) = 0;
 	virtual Entity addEntity() = 0;
 	virtual void destroyEntities(const Entity* entities, int count) = 0;
 	virtual void selectEntities(const Entity* entities, int count) = 0;
@@ -115,6 +115,8 @@ public:
 	virtual void setProperty(ComponentType component,
 		int index,
 		const IPropertyDescriptor& property,
+		const Entity* entities,
+		int count,
 		const void* data,
 		int size) = 0;
 	virtual void setSnapMode(bool enable) = 0;
