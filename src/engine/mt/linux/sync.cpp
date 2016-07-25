@@ -73,32 +73,6 @@ bool Semaphore::poll()
 }
 
 
-Mutex::Mutex(bool locked)
-{
-	int res = pthread_mutex_init(&m_id, nullptr);
-	ASSERT(res == 0);
-}
-
-Mutex::~Mutex()
-{
-	int res = pthread_mutex_destroy(&m_id);
-	ASSERT(res == 0);
-}
-
-void Mutex::lock()
-{
-	int res = pthread_mutex_lock(&m_id);
-	ASSERT(res == 0);
-}
-
-
-void Mutex::unlock()
-{
-	int res = pthread_mutex_unlock(&m_id);
-	ASSERT(res == 0);
-}
-
-
 Event::Event()
 {
 	m_id.signaled = false;
