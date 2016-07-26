@@ -180,10 +180,9 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 	void undo() override { applyData(m_old_data); }
 
 
-	Lumix::uint32 getType() override
+	const char* getType() override
 	{
-		static const Lumix::uint32 type = Lumix::crc32("paint_terrain");
-		return type;
+		return "paint_terrain";
 	}
 
 
@@ -193,15 +192,13 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 		{
 			return false;
 		}
-		PaintTerrainCommand& my_command =
-			static_cast<PaintTerrainCommand&>(command);
+		PaintTerrainCommand& my_command = static_cast<PaintTerrainCommand&>(command);
 		if (m_terrain == my_command.m_terrain && m_type == my_command.m_type &&
 			m_texture_idx == my_command.m_texture_idx)
 		{
 			my_command.m_items.push(m_items.back());
 			my_command.resizeData();
-			my_command.rasterItem(
-				getDestinationTexture(), my_command.m_new_data, m_items.back());
+			my_command.rasterItem(getDestinationTexture(), my_command.m_new_data, m_items.back());
 			return true;
 		}
 		return false;

@@ -99,10 +99,9 @@ struct InsertMeshCommand : public Lumix::IEditorCommand
 	}
 
 
-	Lumix::uint32 getType()
+	const char* getType() override
 	{
-		static const Lumix::uint32 TYPE = Lumix::crc32("insert_mesh");
-		return TYPE;
+		return "insert_mesh";
 	}
 
 
