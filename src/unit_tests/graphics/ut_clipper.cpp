@@ -25,7 +25,7 @@ namespace
 	TestFrustum test_frustum =
 	{
 		{ 0.f, 0.f, -5.f },
-		{ 0.f, 0.f, -1.f },
+		{ 0.f, 0.f, 1.f },
 		{ 0.f, 1.f, 0.f },
 		60.f,
 		2.32378864f,
