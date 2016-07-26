@@ -1210,6 +1210,7 @@ private:
 			{
 				serializer.serializeArrayItem(entity);
 			}
+			serializer.endArray();
 			serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_cmp_type));
 		}
 
