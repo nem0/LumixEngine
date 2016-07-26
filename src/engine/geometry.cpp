@@ -64,17 +64,17 @@ void Frustum::computePerspective(const Vec3& position,
 	Vec3 z = direction;
 	z.normalize();
 
-	Vec3 x = crossProduct(up, z);
+	Vec3 x = crossProduct(z, up);
 	x.normalize();
 
-	Vec3 y = crossProduct(z, x);
+	Vec3 y = crossProduct(x, z);
 
-	Vec3 near_center = position - z * near_distance;
-	Vec3 far_center = position - z * far_distance;
-	center = position - z * ((near_distance + far_distance)* 0.5f);
+	Vec3 near_center = position + z * near_distance;
+	Vec3 far_center = position + z * far_distance;
+	center = position + z * ((near_distance + far_distance)* 0.5f);
 
-	planes[(uint32)Sides::NEAR_PLANE].set(-z, near_center);
-	planes[(uint32)Sides::FAR_PLANE].set(z, far_center);
+	planes[(uint32)Sides::NEAR_PLANE].set(z, near_center);
+	planes[(uint32)Sides::FAR_PLANE].set(-z, far_center);
 
 	Vec3 aux = (near_center + y * near_height) - position;
 	aux.normalize();
@@ -100,7 +100,7 @@ void Frustum::computePerspective(const Vec3& position,
 	float far_width = far_height * ratio;
 
 	Vec3 corner1 = near_center + x * near_width + y * near_height;
-	Vec3 corner2 = far_center + x * far_width + y * far_height;
+	Vec3 corner2 = far_center - x * far_width - y * far_height;
 
 	float size = (corner1 - corner2).length();
 	size = Math::maximum(std::sqrt(far_width * far_width * 4 + far_height * far_height * 4), size);

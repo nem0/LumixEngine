@@ -424,7 +424,7 @@ public:
 			return ret;
 		}
 		ret.computePerspective(mtx.getTranslation(),
-			mtx.getZVector(),
+			-mtx.getZVector(),
 			mtx.getYVector(),
 			camera.fov,
 			ratio,

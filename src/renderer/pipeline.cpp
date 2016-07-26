@@ -635,9 +635,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void bindFramebufferTexture(const char* framebuffer_name,
-		int renderbuffer_idx,
-		int uniform_idx)
+	void bindFramebufferTexture(const char* framebuffer_name, int renderbuffer_idx, int uniform_idx)
 	{
 		FrameBuffer* fb = getFramebuffer(framebuffer_name);
 		if (!fb) return;
@@ -1197,7 +1195,7 @@ struct PipelineImpl : public Pipeline
 			view_matrix.setTranslation(light_pos);
 			Frustum frustum;
 			frustum.computePerspective(light_pos,
-				view_matrix.getZVector(),
+				-view_matrix.getZVector(),
 				view_matrix.getYVector(),
 				fovx,
 				aspect,
@@ -1302,7 +1300,7 @@ struct PipelineImpl : public Pipeline
 		Frustum camera_frustum;
 		Matrix camera_matrix = universe.getMatrix(m_scene->getCameraEntity(m_applied_camera));
 		camera_frustum.computePerspective(camera_matrix.getTranslation(),
-			camera_matrix.getZVector(),
+			-camera_matrix.getZVector(),
 			camera_matrix.getYVector(),
 			camera_fov,
 			camera_ratio,
@@ -1310,7 +1308,7 @@ struct PipelineImpl : public Pipeline
 			split_distances[split_index + 1]);
 
 		Vec3 shadow_cam_pos = camera_frustum.center;
-		float bb_size = camera_frustum.radius * 0.5f;
+		float bb_size = camera_frustum.radius;
 		shadow_cam_pos = shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
 
 		Matrix projection_matrix;
