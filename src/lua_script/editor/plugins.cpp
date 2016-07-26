@@ -153,11 +153,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 		}
 
 
-		uint32 getType() override
-		{
-			static const uint32 hash = crc32("add_script");
-			return hash;
-		}
+		const char* getType() override { return "add_script"; }
 
 
 		bool merge(IEditorCommand& command) override { return false; }
@@ -219,11 +215,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 		}
 
 
-		uint32 getType() override
-		{
-			static const uint32 hash = crc32("remove_script");
-			return hash;
-		}
+		const char* getType() override { return "remove_script"; }
 
 
 		bool merge(IEditorCommand& command) override { return false; }
@@ -326,11 +318,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 		}
 
 
-		uint32 getType() override
-		{
-			static const uint32 hash = crc32("set_script_property");
-			return hash;
-		}
+		const char* getType() override { return "set_script_property"; }
 
 
 		bool merge(IEditorCommand& command) override

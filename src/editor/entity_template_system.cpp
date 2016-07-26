@@ -167,10 +167,9 @@ private:
 		}
 
 
-		uint32 getType() override
+		const char* getType() override
 		{
-			static const uint32 hash = crc32("instantiate_prefab");
-			return hash;
+			return "instantiate_prefab";
 		}
 
 
@@ -255,10 +254,9 @@ private:
 		bool merge(IEditorCommand&) override { return false; }
 
 
-		uint32 getType() override
+		const char* getType() override
 		{
-			static const uint32 hash = crc32("create_entity_template");
-			return hash;
+			return "create_entity_template";
 		}
 
 
@@ -368,10 +366,9 @@ private:
 		bool merge(IEditorCommand&) override { return false; }
 
 
-		uint32 getType() override
+		const char* getType() override
 		{
-			static const uint32 hash = crc32("create_entity_template_instance");
-			return hash;
+			return "create_entity_template_instance";
 		}
 
 

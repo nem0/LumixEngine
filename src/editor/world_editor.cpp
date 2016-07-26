@@ -46,33 +46,31 @@ static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType(
 static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
 
 
-class BeginGroupCommand : public IEditorCommand
+struct BeginGroupCommand : public IEditorCommand
 {
-	bool execute() override { ASSERT(false); return false; }
+	BeginGroupCommand() {}
+	BeginGroupCommand(WorldEditor&) {}
+
+	bool execute() override { return true; }
 	void undo() override { ASSERT(false); }
 	void serialize(JsonSerializer& serializer) override {}
 	void deserialize(JsonSerializer& serializer) override {}
 	bool merge(IEditorCommand& command) override { ASSERT(false); return false; }
-	uint32 getType() override
-	{
-		static const uint32 type = crc32("begin_group");
-		return type;
-	}
+	const char* getType() override { return "begin_group"; }
 };
 
 
 struct EndGroupCommand : public IEditorCommand
 {
-	bool execute() override { ASSERT(false); return false; }
+	EndGroupCommand() {}
+	EndGroupCommand(WorldEditor&) {}
+
+	bool execute() override { return true; }
 	void undo() override { ASSERT(false); }
 	void serialize(JsonSerializer& serializer) override {}
 	void deserialize(JsonSerializer& serializer) override {}
 	bool merge(IEditorCommand& command) override { ASSERT(false); return false; }
-	uint32 getType() override
-	{
-		static const uint32 type = crc32("end_group");
-		return type;
-	}
+	const char* getType() override { return "end_group"; }
 
 	uint32 group_type;
 };
@@ -128,11 +126,7 @@ public:
 	}
 
 
-	uint32 getType() override
-	{
-		static const uint32 type = crc32("set_entity_name");
-		return type;
-	}
+	const char* getType() override { return "set_entity_name"; }
 
 
 	bool merge(IEditorCommand& command) override
@@ -243,11 +237,7 @@ public:
 	}
 
 
-	uint32 getType() override
-	{
-		static const uint32 type = crc32("paste_entity");
-		return type;
-	}
+	const char* getType() override { return "paste_entity"; }
 
 
 	bool merge(IEditorCommand& command) override
@@ -380,11 +370,7 @@ public:
 	}
 
 
-	uint32 getType() override
-	{
-		static const uint32 type = crc32("move_entity");
-		return type;
-	}
+	const char* getType() override { return "move_entity"; }
 
 
 	bool merge(IEditorCommand& command) override
@@ -506,11 +492,7 @@ public:
 	}
 
 
-	uint32 getType() override
-	{
-		static const uint32 type = crc32("scale_entity");
-		return type;
-	}
+	const char* getType() override { return "scale_entity"; }
 
 
 	bool merge(IEditorCommand& command) override
@@ -614,11 +596,7 @@ public:
 	}
 
 
-	uint32 getType() override
-	{
-		static const uint32 hash = crc32("remove_array_property_item");
-		return hash;
-	}
+	const char* getType() override { return "remove_array_property_item"; }
 
 
 	bool merge(IEditorCommand&) override { return false; }
@@ -692,11 +670,7 @@ public:
 	}
 
 
-	uint32 getType() override
-	{
-		static const uint32 hash = crc32("add_array_property_item");
-		return hash;
-	}
+	const char* getType() override { return "add_array_property_item"; }
 
 
 	bool merge(IEditorCommand&) override { return false; }
@@ -744,7 +718,7 @@ public:
 			if (tpl == 0)
 			{
 				ComponentUID component = m_editor.getUniverse()->getComponent(entities[i], component_type);
-				m_property_descriptor->get(component, -1, m_old_value);
+				m_property_descriptor->get(component, index, m_old_value);
 				m_entities.push(entities[i]);
 			}
 			else
@@ -753,7 +727,7 @@ public:
 				for (int i = 0; i < instances.size(); ++i)
 				{
 					ComponentUID component = m_editor.getUniverse()->getComponent(instances[i], component_type);
-					m_property_descriptor->get(component, -1, m_old_value);
+					m_property_descriptor->get(component, index, m_old_value);
 					m_entities.push(instances[i]);
 				}
 			}
@@ -838,11 +812,7 @@ public:
 	}
 
 
-	uint32 getType() override
-	{
-		static const uint32 hash = crc32("set_property_values");
-		return hash;
-	}
+	const char* getType() override { return "set_property_values"; }
 
 
 	bool merge(IEditorCommand& command) override
@@ -949,11 +919,7 @@ private:
 		bool merge(IEditorCommand&) override { return false; }
 
 
-		uint32 getType() override
-		{
-			static const uint32 hash = crc32("add_component");
-			return hash;
-		}
+		const char* getType() override { return "add_component"; }
 
 
 		bool execute() override
@@ -1140,11 +1106,7 @@ private:
 		}
 
 
-		uint32 getType() override
-		{
-			static const uint32 hash = crc32("destroy_entities");
-			return hash;
-		}
+		const char* getType() override { return "destroy_entities"; }
 
 
 	private:
@@ -1255,11 +1217,7 @@ private:
 		bool merge(IEditorCommand&) override { return false; }
 
 
-		uint32 getType() override
-		{
-			static const uint32 hash = crc32("destroy_components");
-			return hash;
-		}
+		const char* getType() override { return "destroy_components"; }
 
 
 		bool execute() override
@@ -1351,11 +1309,7 @@ private:
 		bool merge(IEditorCommand&) override { return false; }
 
 
-		uint32 getType() override
-		{
-			static const uint32 hash = crc32("add_entity");
-			return hash;
-		}
+		const char* getType() override { return "add_entity"; }
 
 
 		Entity getEntity() const { return m_entity; }
@@ -1944,7 +1898,7 @@ public:
 		if(m_undo_index >= 0)
 		{
 			static const uint32 end_group_hash = crc32("end_group");
-			if(m_undo_stack[m_undo_index]->getType() == end_group_hash)
+			if(crc32(m_undo_stack[m_undo_index]->getType()) == end_group_hash)
 			{
 				if(static_cast<EndGroupCommand*>(m_undo_stack[m_undo_index])->group_type == type)
 				{
@@ -2402,6 +2356,10 @@ public:
 		m_template_system = EntityTemplateSystem::create(*this);
 
 		m_editor_command_creators.insert(
+			crc32("begin_group"), &WorldEditorImpl::constructEditorCommand<BeginGroupCommand>);
+		m_editor_command_creators.insert(
+			crc32("end_group"), &WorldEditorImpl::constructEditorCommand<EndGroupCommand>);
+		m_editor_command_creators.insert(
 			crc32("scale_entity"), &WorldEditorImpl::constructEditorCommand<ScaleEntityCommand>);
 		m_editor_command_creators.insert(
 			crc32("move_entity"), &WorldEditorImpl::constructEditorCommand<MoveEntityCommand>);
@@ -2717,10 +2675,10 @@ public:
 
 		if (m_undo_index >= m_undo_stack.size() || m_undo_index < 0) return;
 
-		if(m_undo_stack[m_undo_index]->getType() == end_group_hash)
+		if(crc32(m_undo_stack[m_undo_index]->getType()) == end_group_hash)
 		{
 			--m_undo_index;
-			while(m_undo_stack[m_undo_index]->getType() != begin_group_hash)
+			while(crc32(m_undo_stack[m_undo_index]->getType()) != begin_group_hash)
 			{
 				m_undo_stack[m_undo_index]->undo();
 				--m_undo_index;
@@ -2745,10 +2703,10 @@ public:
 		if (m_undo_index + 1 >= m_undo_stack.size()) return;
 
 		++m_undo_index;
-		if(m_undo_stack[m_undo_index]->getType() == begin_group_hash)
+		if(crc32(m_undo_stack[m_undo_index]->getType()) == begin_group_hash)
 		{
 			++m_undo_index;
-			while(m_undo_stack[m_undo_index]->getType() != end_group_hash)
+			while(crc32(m_undo_stack[m_undo_index]->getType()) != end_group_hash)
 			{
 				m_undo_stack[m_undo_index]->execute();
 				++m_undo_index;
@@ -2787,31 +2745,25 @@ public:
 
 	void saveUndoStack(const Path& path) override
 	{
-		if (m_undo_stack.empty())
-		{
-			return;
-		}
-		FS::IFile* file = m_engine->getFileSystem().open(
-			m_engine->getFileSystem().getDiskDevice(),
-			path,
-			FS::Mode::CREATE_AND_WRITE);
+		if (m_undo_stack.empty()) return;
+
+		FS::FileSystem& fs = m_engine->getFileSystem();
+		FS::IFile* file = fs.open(fs.getDiskDevice(), path, FS::Mode::CREATE_AND_WRITE);
 		if (file)
 		{
-			JsonSerializer serializer(
-				*file, JsonSerializer::WRITE, path, m_allocator);
+			JsonSerializer serializer(*file, JsonSerializer::WRITE, path, m_allocator);
 			serializer.beginObject();
 			serializer.beginArray("commands");
 			for (int i = 0; i < m_undo_stack.size(); ++i)
 			{
 				serializer.beginObject();
-				serializer.serialize("undo_command_type",
-									 m_undo_stack[i]->getType());
+				serializer.serialize("undo_command_type", m_undo_stack[i]->getType());
 				m_undo_stack[i]->serialize(serializer);
 				serializer.endObject();
 			}
 			serializer.endArray();
 			serializer.endObject();
-			m_engine->getFileSystem().close(*file);
+			fs.close(*file);
 		}
 		else
 		{
@@ -2831,8 +2783,7 @@ public:
 	}
 
 
-	void registerEditorCommandCreator(const char* command_type,
-		EditorCommandCreator creator) override
+	void registerEditorCommandCreator(const char* command_type, EditorCommandCreator creator) override
 	{
 		m_editor_command_creators.insert(crc32(command_type), creator);
 	}
@@ -2853,12 +2804,12 @@ public:
 			{
 				serializer.nextArrayItem();
 				serializer.deserializeObjectBegin();
-				uint32 type;
-				serializer.deserialize("undo_command_type", type, 0);
-				IEditorCommand* command = createEditorCommand(type);
+				char type_name[256];
+				serializer.deserialize("undo_command_type", type_name, lengthOf(type_name), "");
+				IEditorCommand* command = createEditorCommand(crc32(type_name));
 				if (!command)
 				{
-					g_log_error.log("Editor") << "Unknown command " << type << " in " << path;
+					g_log_error.log("Editor") << "Unknown command " << type_name << " in " << path;
 					destroyUndoStack();
 					m_undo_index = -1;
 					m_engine->getFileSystem().close(*file);
