@@ -606,9 +606,10 @@ void PropertyGrid::showCoreProperties(const Lumix::Array<Lumix::Entity>& entitie
 	Lumix::Vec3 euler = Lumix::Math::radiansToDegrees(old_euler);
 	if (ImGui::DragFloat3("Rotation", &euler.x))
 	{
-		euler.x = Lumix::Math::degreesToRadians(fmodf(euler.x, 180));
-		euler.y = Lumix::Math::degreesToRadians(fmodf(euler.y, 180));
-		euler.z = Lumix::Math::degreesToRadians(fmodf(euler.z, 180));
+		if (euler.x <= -90.0f || euler.x >= 90.0f) euler.y = 0;
+		euler.x = Lumix::Math::degreesToRadians(Lumix::Math::clamp(euler.x, -90.0f, 90.0f));
+		euler.y = Lumix::Math::degreesToRadians(fmodf(euler.y + 180, 360.0f) - 180);
+		euler.z = Lumix::Math::degreesToRadians(fmodf(euler.z + 180, 360.0f) - 180);
 		rot.fromEuler(euler);
 		
 		Lumix::Array<Lumix::Quat> rots(m_editor.getAllocator());
@@ -616,9 +617,9 @@ void PropertyGrid::showCoreProperties(const Lumix::Array<Lumix::Entity>& entitie
 		{
 			Lumix::Vec3 tmp = universe->getRotation(entity).toEuler();
 			
-			if (euler.x != old_euler.x) tmp.x = euler.x;
-			else if (euler.y != old_euler.y) tmp.y = euler.y;
-			else if (euler.z != old_euler.z) tmp.z = euler.z;
+			if (fabs(euler.x - old_euler.x) > 0.01f) tmp.x = euler.x;
+			if (fabs(euler.y - old_euler.y) > 0.01f) tmp.y = euler.y;
+			if (fabs(euler.z - old_euler.z) > 0.01f) tmp.z = euler.z;
 			rots.emplace().fromEuler(tmp);
 		}
 		m_editor.setEntitiesRotations(&entities[0], &rots[0], entities.size());

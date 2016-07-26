@@ -49,6 +49,7 @@ Quat Quat::vec3ToVec3(const Vec3& a, const Vec3& b)
 
 void Quat::fromEuler(const Vec3& euler)
 {
+	ASSERT(euler.x >= -Math::HALF_PI && euler.x <= Math::HALF_PI);
 	float ex = euler.x * 0.5f;
 	float ey = euler.y * 0.5f;
 	float ez = euler.z * 0.5f;
