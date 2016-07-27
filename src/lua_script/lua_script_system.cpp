@@ -174,13 +174,14 @@ namespace Lumix
 			}
 
 
-			void onScriptLoaded(Resource::State, Resource::State, Resource&)
+			void onScriptLoaded(Resource::State, Resource::State, Resource& resource)
 			{
 				lua_State* L = m_scene.m_system.m_engine.getState();
 				for (auto& script : m_scripts)
 				{
 					if (!script.m_script) continue;
 					if (!script.m_script->isReady()) continue;
+					if (script.m_script != &resource) continue;
 
 					bool is_reload = true;
 					if (!script.m_state)
