@@ -4,7 +4,7 @@
 #include "engine/lumix.h"
 #include "engine/iplugin.h"
 #include "engine/vec.h"
-#include <extensions/PxD6Joint.h>
+
 
 #ifdef STATIC_PLUGINS
 	#define LUMIX_PHYSICS_API
@@ -49,6 +49,12 @@ struct RaycastHit
 class LUMIX_PHYSICS_API PhysicsScene : public IScene
 {
 public:
+	enum class D6Motion : int
+	{
+		LOCKED,
+		LIMITED,
+		FREE
+	};
 	enum class ActorType
 	{
 		BOX,
@@ -84,6 +90,13 @@ public:
 	virtual void setHeightmapYScale(ComponentHandle cmp, float scale) = 0;
 	virtual int getHeightfieldLayer(ComponentHandle cmp) = 0;
 	virtual void setHeightfieldLayer(ComponentHandle cmp, int layer) = 0;
+	virtual void updateHeighfieldData(ComponentHandle cmp,
+		int x,
+		int y,
+		int w,
+		int h,
+		const uint8* data,
+		int bytes_per_pixel) = 0;
 
 	virtual float getCapsuleRadius(ComponentHandle cmp) = 0;
 	virtual void setCapsuleRadius(ComponentHandle cmp, float value) = 0;
@@ -93,18 +106,18 @@ public:
 	virtual float getSphereRadius(ComponentHandle cmp) = 0;
 	virtual void setSphereRadius(ComponentHandle cmp, float value) = 0;
 
-	virtual physx::PxD6Motion::Enum getD6JointXMotion(ComponentHandle cmp) = 0;
-	virtual void setD6JointXMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) = 0;
-	virtual physx::PxD6Motion::Enum getD6JointYMotion(ComponentHandle cmp) = 0;
-	virtual void setD6JointYMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) = 0;
-	virtual physx::PxD6Motion::Enum getD6JointZMotion(ComponentHandle cmp) = 0;
-	virtual void setD6JointZMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) = 0;
-	virtual physx::PxD6Motion::Enum getD6JointSwing1Motion(ComponentHandle cmp) = 0;
-	virtual void setD6JointSwing1Motion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) = 0;
-	virtual physx::PxD6Motion::Enum getD6JointSwing2Motion(ComponentHandle cmp) = 0;
-	virtual void setD6JointSwing2Motion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) = 0;
-	virtual physx::PxD6Motion::Enum getD6JointTwistMotion(ComponentHandle cmp) = 0;
-	virtual void setD6JointTwistMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) = 0;
+	virtual D6Motion getD6JointXMotion(ComponentHandle cmp) = 0;
+	virtual void setD6JointXMotion(ComponentHandle cmp, D6Motion motion) = 0;
+	virtual D6Motion getD6JointYMotion(ComponentHandle cmp) = 0;
+	virtual void setD6JointYMotion(ComponentHandle cmp, D6Motion motion) = 0;
+	virtual D6Motion getD6JointZMotion(ComponentHandle cmp) = 0;
+	virtual void setD6JointZMotion(ComponentHandle cmp, D6Motion motion) = 0;
+	virtual D6Motion getD6JointSwing1Motion(ComponentHandle cmp) = 0;
+	virtual void setD6JointSwing1Motion(ComponentHandle cmp, D6Motion motion) = 0;
+	virtual D6Motion getD6JointSwing2Motion(ComponentHandle cmp) = 0;
+	virtual void setD6JointSwing2Motion(ComponentHandle cmp, D6Motion motion) = 0;
+	virtual D6Motion getD6JointTwistMotion(ComponentHandle cmp) = 0;
+	virtual void setD6JointTwistMotion(ComponentHandle cmp, D6Motion motion) = 0;
 	virtual float getD6JointLinearLimit(ComponentHandle cmp) = 0;
 	virtual void setD6JointLinearLimit(ComponentHandle cmp, float limit) = 0;
 	virtual Vec2 getD6JointTwistLimit(ComponentHandle cmp) = 0;
@@ -192,7 +205,8 @@ public:
 
 	virtual uint32 getDebugVisualizationFlags() const = 0;
 	virtual void setDebugVisualizationFlags(uint32 flags) = 0;
-	
+	virtual void setVisualizationCullingBox(const Vec3& min, const Vec3& max) = 0;
+
 	virtual int getActorCount() const = 0;
 	virtual Entity getActorEntity(int index) = 0;
 	virtual ActorType getActorType(int index) = 0;

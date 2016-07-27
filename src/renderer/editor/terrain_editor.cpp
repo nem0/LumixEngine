@@ -20,6 +20,7 @@
 #include "engine/iproperty_descriptor.h"
 #include "engine/property_register.h"
 #include "imgui/imgui.h"
+#include "physics/physics_scene.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
@@ -31,6 +32,7 @@
 
 static const Lumix::ComponentType RENDERABLE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
 static const Lumix::ComponentType TERRAIN_TYPE = Lumix::PropertyRegister::getComponentType("terrain");
+static const Lumix::ComponentType HEIGHTFIELD_TYPE = Lumix::PropertyRegister::getComponentType("physical_heightfield");
 static const Lumix::ResourceType MATERIAL_TYPE("material");
 static const Lumix::ResourceType TEXTURE_TYPE("texture");
 static const char* HEIGHTMAP_UNIFORM = "u_texHeightmap";
@@ -520,6 +522,15 @@ private:
 		}
 		texture->onDataUpdated(m_x, m_y, m_width, m_height);
 		static_cast<Lumix::RenderScene*>(m_terrain.scene)->forceGrassUpdate(m_terrain.handle);
+
+		Lumix::IScene* scene = m_world_editor.getUniverse()->getScene(Lumix::crc32("physics"));
+		if (!scene) return;
+
+		auto* phy_scene = static_cast<Lumix::PhysicsScene*>(scene);
+		Lumix::ComponentHandle cmp = scene->getComponent(m_terrain.entity, HEIGHTFIELD_TYPE);
+		if (!Lumix::isValid(cmp)) return;
+
+		phy_scene->updateHeighfieldData(cmp, m_x, m_y, m_width, m_height, &data[0], bpp);
 	}
 
 
@@ -653,39 +664,33 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, StudioApp& app)
 	, m_y_spread(0, 0)
 {
 	editor.registerEditorCommandCreator("paint_terrain", createPaintTerrainCommand);
-	m_increase_brush_size =
-		LUMIX_NEW(editor.getAllocator(), Action)("Increase brush size", "increaseBrushSize");
+	m_increase_brush_size = LUMIX_NEW(editor.getAllocator(), Action)("Increase brush size", "increaseBrushSize");
 	m_increase_brush_size->is_global = false;
 	m_increase_brush_size->func.bind<TerrainEditor, &TerrainEditor::increaseBrushSize>(this);
-	m_decrease_brush_size =
-		LUMIX_NEW(editor.getAllocator(), Action)("Decrease brush size", "decreaseBrushSize");
+	m_decrease_brush_size = LUMIX_NEW(editor.getAllocator(), Action)("Decrease brush size", "decreaseBrushSize");
 	m_decrease_brush_size->func.bind<TerrainEditor, &TerrainEditor::decreaseBrushSize>(this);
 	m_decrease_brush_size->is_global = false;
 	app.addAction(m_increase_brush_size);
 	app.addAction(m_decrease_brush_size);
 
-	m_increase_texture_idx =
-		LUMIX_NEW(editor.getAllocator(), Action)("Next terrain texture", "nextTerrainTexture");
+	m_increase_texture_idx = LUMIX_NEW(editor.getAllocator(), Action)("Next terrain texture", "nextTerrainTexture");
 	m_increase_texture_idx->is_global = false;
 	m_increase_texture_idx->func.bind<TerrainEditor, &TerrainEditor::nextTerrainTexture>(this);
-	m_decrease_texture_idx =
-		LUMIX_NEW(editor.getAllocator(), Action)("Previous terrain texture", "prevTerrainTexture");
+	m_decrease_texture_idx = LUMIX_NEW(editor.getAllocator(), Action)("Previous terrain texture", "prevTerrainTexture");
 	m_decrease_texture_idx->func.bind<TerrainEditor, &TerrainEditor::prevTerrainTexture>(this);
 	m_decrease_texture_idx->is_global = false;
 	app.addAction(m_increase_texture_idx);
 	app.addAction(m_decrease_texture_idx);
 
-	m_smooth_terrain_action =
-		LUMIX_NEW(editor.getAllocator(), Action)("Smooth terrain", "smoothTerrain");
+	m_smooth_terrain_action = LUMIX_NEW(editor.getAllocator(), Action)("Smooth terrain", "smoothTerrain");
 	m_smooth_terrain_action->is_global = false;
-	m_lower_terrain_action =
-		LUMIX_NEW(editor.getAllocator(), Action)("Lower terrain", "lowerTerrain");
+	m_lower_terrain_action = LUMIX_NEW(editor.getAllocator(), Action)("Lower terrain", "lowerTerrain");
 	m_lower_terrain_action->is_global = false;
 	app.addAction(m_smooth_terrain_action);
 	app.addAction(m_lower_terrain_action);
 
-	m_remove_entity_action = LUMIX_NEW(editor.getAllocator(), Action)(
-		"Remove entities from terrain", "removeEntitiesFromTerrain");
+	m_remove_entity_action =
+		LUMIX_NEW(editor.getAllocator(), Action)("Remove entities from terrain", "removeEntitiesFromTerrain");
 	m_remove_entity_action->is_global = false;
 	app.addAction(m_remove_entity_action);
 
