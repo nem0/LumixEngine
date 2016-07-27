@@ -27,10 +27,10 @@ namespace Lumix
 	class D6MotionDescriptor : public IEnumPropertyDescriptor
 	{
 	public:
-		typedef physx::PxD6Motion::Enum(PhysicsScene::*Getter)(ComponentHandle);
-		typedef void (PhysicsScene::*Setter)(ComponentHandle, physx::PxD6Motion::Enum);
-		typedef physx::PxD6Motion::Enum(PhysicsScene::*ArrayGetter)(ComponentHandle, int);
-		typedef void (PhysicsScene::*ArraySetter)(ComponentHandle, int, physx::PxD6Motion::Enum);
+		typedef PhysicsScene::D6Motion (PhysicsScene::*Getter)(ComponentHandle);
+		typedef void (PhysicsScene::*Setter)(ComponentHandle, PhysicsScene::D6Motion);
+		typedef PhysicsScene::D6Motion(PhysicsScene::*ArrayGetter)(ComponentHandle, int);
+		typedef void (PhysicsScene::*ArraySetter)(ComponentHandle, int, PhysicsScene::D6Motion);
 
 	public:
 		D6MotionDescriptor(const char* name, Getter _getter, Setter _setter)
@@ -57,18 +57,18 @@ namespace Lumix
 			stream.read(&value, sizeof(value));
 			if (index == -1)
 			{
-				(static_cast<PhysicsScene*>(cmp.scene)->*m_single.setter)(cmp.handle, (physx::PxD6Motion::Enum)value);
+				(static_cast<PhysicsScene*>(cmp.scene)->*m_single.setter)(cmp.handle, (PhysicsScene::D6Motion)value);
 			}
 			else
 			{
-				(static_cast<PhysicsScene*>(cmp.scene)->*m_array.setter)(cmp.handle, index, (physx::PxD6Motion::Enum)value);
+				(static_cast<PhysicsScene*>(cmp.scene)->*m_array.setter)(cmp.handle, index, (PhysicsScene::D6Motion)value);
 			}
 		};
 
 
 		void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 		{
-			physx::PxD6Motion::Enum value;
+			PhysicsScene::D6Motion value;
 			if (index == -1)
 			{
 				value = (static_cast<PhysicsScene*>(cmp.scene)->*m_single.getter)(cmp.handle);
@@ -89,11 +89,11 @@ namespace Lumix
 
 		const char* getEnumItemName(IScene* scene, ComponentHandle, int index) override
 		{
-			switch ((physx::PxD6Motion::Enum)index)
+			switch ((PhysicsScene::D6Motion)index)
 			{
-				case physx::PxD6Motion::eLOCKED: return "locked";
-				case physx::PxD6Motion::eLIMITED: return "limited";
-				case physx::PxD6Motion::eFREE: return "free";
+				case PhysicsScene::D6Motion::LOCKED: return "locked";
+				case PhysicsScene::D6Motion::LIMITED: return "limited";
+				case PhysicsScene::D6Motion::FREE: return "free";
 				default: ASSERT(false); return "Unknown";
 			}
 		}

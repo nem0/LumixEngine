@@ -579,9 +579,12 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 
 	void onVisualizationGUI()
 	{
-		if (!ImGui::CollapsingHeader("Visualization")) return;
-		
 		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
+		Vec3 camera_pos = m_editor.getUniverse()->getPosition(m_editor.getEditCamera().entity);
+		const Vec3 extents(20, 20, 20);
+		scene->setVisualizationCullingBox(camera_pos - extents, camera_pos + extents);
+
+		if (!ImGui::CollapsingHeader("Visualization")) return;
 
 		uint32 viz_flags = scene->getDebugVisualizationFlags();
 		auto flag_gui = [&viz_flags](const char* label, int flag) {
@@ -788,7 +791,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 		static bool visualize = true;
 		ImGui::Checkbox("Visualize physics", &visualize);
 		ImGui::SameLine();
-		static bool visualize_bones = true;
+		static bool visualize_bones = false;
 		ImGui::Checkbox("Visualize bones", &visualize_bones);
 		RagdollBone* selected_bone = nullptr;
 		if (m_selected_bone >= 0 && m_selected_bone < model->getBoneCount())

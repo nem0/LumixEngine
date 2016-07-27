@@ -411,6 +411,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	void setVisualizationCullingBox(const Vec3& min, const Vec3& max) override
+	{
+		physx::PxBounds3 box(toPhysx(min), toPhysx(max));
+		m_scene->setVisualizationCullingBox(box);
+	}
+
+
 	Universe& getUniverse() override { return m_universe; }
 
 
@@ -629,6 +636,70 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	void updateHeighfieldData(ComponentHandle cmp,
+		int x,
+		int y,
+		int width,
+		int height,
+		const uint8* src_data,
+		int bytes_per_pixel) override
+	{
+		PROFILE_FUNCTION();
+		Heightfield& terrain = m_terrains[{cmp.index}];
+		
+		physx::PxShape* shape;
+		terrain.m_actor->getShapes(&shape, 1);
+		physx::PxHeightFieldGeometry geom;
+		shape->getHeightFieldGeometry(geom);
+
+		Array<physx::PxHeightFieldSample> heights(m_allocator);
+
+		heights.resize(width * height);
+		if (bytes_per_pixel == 2)
+		{
+			const int16* LUMIX_RESTRICT data = (const int16*)src_data;
+			for (int j = 0; j < height; ++j)
+			{
+				for (int i = 0; i < width; ++i)
+				{
+					int idx = j + i * height;
+					int idx2 = i + j * width;
+					heights[idx].height = physx::PxI16((int32)data[idx2] - 0x7fff);
+					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
+					heights[idx].setTessFlag();
+				}
+			}
+		}
+		else
+		{
+			ASSERT(bytes_per_pixel == 1);
+			const uint8* LUMIX_RESTRICT data = src_data;
+			for (int j = 0; j < height; ++j)
+			{
+				for (int i = 0; i < width; ++i)
+				{
+					int idx = j + i * height;
+					int idx2 = i + j * width;
+					heights[idx].height = physx::PxI16((int32)data[idx2] - 0x7f);
+					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
+					heights[idx].setTessFlag();
+				}
+			}
+		}
+
+		physx::PxHeightFieldDesc hfDesc;
+		hfDesc.format = physx::PxHeightFieldFormat::eS16_TM;
+		hfDesc.nbColumns = height;
+		hfDesc.nbRows = width;
+		hfDesc.samples.data = &heights[0];
+		hfDesc.samples.stride = sizeof(physx::PxHeightFieldSample);
+		hfDesc.thickness = -1;
+
+		geom.heightField->modifySamples(y, x, hfDesc);
+		shape->setGeometry(geom);
+	}
+
+
 	int getJointCount() override { return m_joints.size(); }
 	ComponentHandle getJointComponent(int index) override { return {m_joints.getKey(index).index}; }
 	Entity getJointEntity(ComponentHandle cmp) override { return {cmp.index}; }
@@ -732,73 +803,73 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	physx::PxD6Motion::Enum getD6JointXMotion(ComponentHandle cmp) override
+	D6Motion getD6JointXMotion(ComponentHandle cmp) override
 	{
-		return getD6Joint(cmp)->getMotion(physx::PxD6Axis::eX);
+		return (D6Motion)getD6Joint(cmp)->getMotion(physx::PxD6Axis::eX);
 	}
 
 
-	void setD6JointXMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) override
+	void setD6JointXMotion(ComponentHandle cmp, D6Motion motion) override
 	{
 		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eX, (physx::PxD6Motion::Enum)motion);
 	}
 
 
-	physx::PxD6Motion::Enum getD6JointYMotion(ComponentHandle cmp) override
+	D6Motion getD6JointYMotion(ComponentHandle cmp) override
 	{
-		return getD6Joint(cmp)->getMotion(physx::PxD6Axis::eY);
+		return (D6Motion)getD6Joint(cmp)->getMotion(physx::PxD6Axis::eY);
 	}
 
 
-	void setD6JointYMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) override
+	void setD6JointYMotion(ComponentHandle cmp, D6Motion motion) override
 	{
 		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eY, (physx::PxD6Motion::Enum)motion);
 	}
 
 
-	physx::PxD6Motion::Enum getD6JointSwing1Motion(ComponentHandle cmp) override
+	D6Motion getD6JointSwing1Motion(ComponentHandle cmp) override
 	{
-		return getD6Joint(cmp)->getMotion(physx::PxD6Axis::eSWING1);
+		return (D6Motion)getD6Joint(cmp)->getMotion(physx::PxD6Axis::eSWING1);
 	}
 
 
-	void setD6JointSwing1Motion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) override
+	void setD6JointSwing1Motion(ComponentHandle cmp, D6Motion motion) override
 	{
 		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eSWING1, (physx::PxD6Motion::Enum)motion);
 	}
 
 
-	physx::PxD6Motion::Enum getD6JointSwing2Motion(ComponentHandle cmp) override
+	D6Motion getD6JointSwing2Motion(ComponentHandle cmp) override
 	{
-		return getD6Joint(cmp)->getMotion(physx::PxD6Axis::eSWING2);
+		return (D6Motion)getD6Joint(cmp)->getMotion(physx::PxD6Axis::eSWING2);
 	}
 
 
-	void setD6JointSwing2Motion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) override
+	void setD6JointSwing2Motion(ComponentHandle cmp, D6Motion motion) override
 	{
 		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eSWING2, (physx::PxD6Motion::Enum)motion);
 	}
 
 
-	physx::PxD6Motion::Enum getD6JointTwistMotion(ComponentHandle cmp) override
+	D6Motion getD6JointTwistMotion(ComponentHandle cmp) override
 	{
-		return getD6Joint(cmp)->getMotion(physx::PxD6Axis::eTWIST);
+		return (D6Motion)getD6Joint(cmp)->getMotion(physx::PxD6Axis::eTWIST);
 	}
 
 
-	void setD6JointTwistMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) override
+	void setD6JointTwistMotion(ComponentHandle cmp, D6Motion motion) override
 	{
 		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eTWIST, (physx::PxD6Motion::Enum)motion);
 	}
 
 
-	physx::PxD6Motion::Enum getD6JointZMotion(ComponentHandle cmp) override
+	D6Motion getD6JointZMotion(ComponentHandle cmp) override
 	{
-		return getD6Joint(cmp)->getMotion(physx::PxD6Axis::eZ);
+		return (D6Motion)getD6Joint(cmp)->getMotion(physx::PxD6Axis::eZ);
 	}
 
 
-	void setD6JointZMotion(ComponentHandle cmp, physx::PxD6Motion::Enum motion) override
+	void setD6JointZMotion(ComponentHandle cmp, D6Motion motion) override
 	{
 		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eZ, (physx::PxD6Motion::Enum)motion);
 	}
@@ -1438,7 +1509,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		auto& render_scene = *static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		const physx::PxRenderBuffer& rb = m_scene->getRenderBuffer();
-		const physx::PxU32 num_lines = rb.getNbLines();
+		const physx::PxU32 num_lines = Math::minimum(100000U, rb.getNbLines());
 		if (num_lines)
 		{
 			const physx::PxDebugLine* PX_RESTRICT lines = rb.getLines();
@@ -2315,6 +2386,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				g_log_error.log("Physics") << "Could not create PhysX heightfield " << terrain.m_heightmap->getPath();
 			}
+			terrain.m_actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 		}
 	}
 
