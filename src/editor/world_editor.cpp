@@ -1,5 +1,10 @@
 #include "world_editor.h"
 
+#include "editor/editor_icon.h"
+#include "editor/entity_groups.h"
+#include "editor/entity_template_system.h"
+#include "editor/gizmo.h"
+#include "editor/measure_tool.h"
 #include "engine/array.h"
 #include "engine/associative_array.h"
 #include "engine/blob.h"
@@ -7,9 +12,9 @@
 #include "engine/debug/debug.h"
 #include "engine/delegate_list.h"
 #include "engine/engine.h"
+#include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/memory_file_device.h"
-#include "engine/fs/disk_file_device.h"
 #include "engine/fs/tcp_file_device.h"
 #include "engine/fs/tcp_file_server.h"
 #include "engine/geometry.h"
@@ -19,21 +24,17 @@
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/matrix.h"
-#include "editor/measure_tool.h"
 #include "engine/path.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
 #include "engine/property_register.h"
+#include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/system.h"
 #include "engine/timer.h"
 #include "engine/universe/universe.h"
-#include "editor/entity_groups.h"
-#include "editor/editor_icon.h"
-#include "editor/entity_template_system.h"
-#include "editor/gizmo.h"
 #include "ieditor_command.h"
 #include "render_interface.h"
 
@@ -964,6 +965,7 @@ private:
 			, m_entities(editor.getAllocator())
 			, m_positons_rotations(editor.getAllocator())
 			, m_old_values(editor.getAllocator())
+			, m_resources(editor.getAllocator())
 		{
 		}
 
@@ -973,12 +975,22 @@ private:
 			, m_entities(editor.getAllocator())
 			, m_positons_rotations(editor.getAllocator())
 			, m_old_values(editor.getAllocator())
+			, m_resources(editor.getAllocator())
 		{
 			m_entities.reserve(count);
 			m_positons_rotations.reserve(m_entities.size());
 			for (int i = 0; i < count; ++i)
 			{
 				m_entities.push(entities[i]);
+			}
+		}
+
+
+		~DestroyEntitiesCommand()
+		{
+			for (Resource* resource : m_resources)
+			{
+				resource->getResourceManager().unload(*resource);
 			}
 		}
 
@@ -1029,6 +1041,7 @@ private:
 			Universe* universe = m_editor.getUniverse();
 			m_positons_rotations.clear();
 			m_old_values.clear();
+			ResourceManager& resource_manager = m_editor.getEngine().getResourceManager();
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
 				PositionRotation pos_rot;
@@ -1052,6 +1065,16 @@ private:
 					for (int k = 0; k < props.size(); ++k)
 					{
 						props[k]->get(cmp, -1, m_old_values);
+						if (props[k]->getType() == IPropertyDescriptor::RESOURCE)
+						{
+							auto* resource_prop = static_cast<IResourcePropertyDescriptor*>(props[k]);
+							ResourceType resource_type = resource_prop->getResourceType();
+							OutputBlob tmp(m_editor.getAllocator());
+							props[k]->get(cmp, -1, tmp);
+							Path path((const char*)tmp.getData());
+							Resource* resource = resource_manager.get(resource_type)->load(path);
+							m_resources.push(resource);
+						}
 					}
 				}
 				uint32 tpl = m_editor.getEntityTemplateSystem().getTemplate(m_entities[i]);
@@ -1123,6 +1146,7 @@ private:
 		Array<Entity> m_entities;
 		Array<PositionRotation> m_positons_rotations;
 		OutputBlob m_old_values;
+		Array<Resource*> m_resources;
 	};
 
 
@@ -1134,6 +1158,7 @@ private:
 			, m_old_values(editor.getAllocator())
 			, m_entities(editor.getAllocator())
 			, m_cmp_type(INVALID_COMPONENT_TYPE)
+			, m_resources(editor.getAllocator())
 		{
 		}
 
@@ -1143,6 +1168,7 @@ private:
 			, m_editor(editor)
 			, m_old_values(editor.getAllocator())
 			, m_entities(editor.getAllocator())
+			, m_resources(editor.getAllocator())
 		{
 			m_entities.reserve(count);
 			for (int i = 0; i < count; ++i)
@@ -1161,6 +1187,15 @@ private:
 						m_entities.push(instances[i]);
 					}
 				}
+			}
+		}
+
+
+		~DestroyComponentCommand()
+		{
+			for (Resource* resource : m_resources)
+			{
+				resource->getResourceManager().unload(*resource);
 			}
 		}
 
@@ -1228,6 +1263,7 @@ private:
 			cmp.scene = m_editor.getUniverse()->getScene(m_cmp_type);
 			if (m_entities.empty()) return false;
 			if (!cmp.scene) return false;
+			ResourceManager& resource_manager = m_editor.getEngine().getResourceManager();
 
 			for (Entity entity : m_entities)
 			{
@@ -1236,6 +1272,16 @@ private:
 				for (int i = 0; i < props.size(); ++i)
 				{
 					props[i]->get(cmp, -1, m_old_values);
+					if (props[i]->getType() == IPropertyDescriptor::RESOURCE)
+					{
+						auto* res_prop = static_cast<IResourcePropertyDescriptor*>(props[i]);
+						OutputBlob tmp(m_editor.getAllocator());
+						props[i]->get(cmp, -1, tmp);
+						ResourceType resource_type = res_prop->getResourceType();
+						Path path((const char*)tmp.getData());
+						Resource* resource = resource_manager.get(resource_type)->load(path);
+						m_resources.push(resource);
+					}
 				}
 				cmp.scene->destroyComponent(cmp.handle, m_cmp_type);
 			}
@@ -1247,6 +1293,7 @@ private:
 		ComponentType m_cmp_type;
 		WorldEditorImpl& m_editor;
 		OutputBlob m_old_values;
+		Array<Resource*> m_resources;
 	};
 
 
