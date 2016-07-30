@@ -153,17 +153,6 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 }
 
 
-LODMeshIndices Model::getLODMeshIndices(float squared_distance) const
-{
-	int i = 0;
-	while (squared_distance >= m_lods[i].distance)
-	{
-		++i;
-	}
-	return{ m_lods[i].from_mesh, m_lods[i].to_mesh };
-}
-
-
 void Model::getPose(Pose& pose)
 {
 	ASSERT(pose.count == getBoneCount());

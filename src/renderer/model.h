@@ -136,7 +136,13 @@ public:
 		const void* attributes_data,
 		int attributes_size);
 
-	LODMeshIndices getLODMeshIndices(float squared_distance) const;
+	LODMeshIndices getLODMeshIndices(float squared_distance) const
+	{
+		int i = 0;
+		while (squared_distance >= m_lods[i].distance) ++i;
+		return {m_lods[i].from_mesh, m_lods[i].to_mesh};
+	}
+
 	Mesh& getMesh(int index) { return m_meshes[index]; }
 	bgfx::VertexBufferHandle getVerticesHandle() const { return m_vertices_handle; }
 	bgfx::IndexBufferHandle getIndicesHandle() const { return m_indices_handle; }
@@ -197,4 +203,4 @@ private:
 };
 
 
-} // ~namespace Lumix
+} // namespace Lumix
