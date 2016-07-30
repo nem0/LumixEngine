@@ -82,7 +82,7 @@ namespace
 
 		LUMIX_EXPECT(hash_table.empty());
 
-		int32 values[10] = {
+		int32 values[] = {
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 		};
 
@@ -97,10 +97,14 @@ namespace
 		}
 
 		const HashTableType& const_hash_table = hash_table;
-		for (HashTableType::constIterator const_it = const_hash_table.begin(); const_it != const_hash_table.end(); ++const_it)
+		for (auto const_it = const_hash_table.begin(); const_it != const_hash_table.end(); ++const_it)
 		{
 			LUMIX_EXPECT(const_it.value() == values[const_it.key() - 1]);
 		}
+
+		hash_table.insert(15, 15);
+		hash_table.insert(26, 26);// 15 and 26 collide
+		hash_table.rehash(64);
 	}
 }
 

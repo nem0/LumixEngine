@@ -573,14 +573,15 @@ namespace Lumix
 		void grow(size_type ids_count)
 		{
 			size_type old_size = m_size;
+			size_type old_ids_count = m_max_id;
 			size_type new_ids_count = ids_count < 512 ? ids_count * 4 : ids_count * 2;
 			node_type* old = m_table;
 
 			init(new_ids_count);
-			copyTable(old, m_sentinel, ids_count);
+			copyTable(old, m_sentinel, old_ids_count);
 
 			m_size = old_size;
-			for (size_type i = 0; i < old_size; ++i)
+			for (size_type i = 0; i < old_ids_count; ++i)
 			{
 				node_type* n = &old[i];
 				if (n->m_next && n->m_next != m_sentinel)
