@@ -18,9 +18,21 @@ namespace Lumix
 	typedef __m128 float4;
 
 
+	LUMIX_FORCE_INLINE float4 f4LoadUnaligned(const void* src)
+	{
+		return _mm_loadu_ps((const float*)(src));
+	}
+
+
 	LUMIX_FORCE_INLINE float4 f4Load(const void* src)
 	{
 		return _mm_load_ps((const float*)(src));
+	}
+
+
+	LUMIX_FORCE_INLINE float4 f4Splat(float value)
+	{
+		return _mm_set_ps1(value);
 	}
 
 
@@ -90,9 +102,21 @@ namespace Lumix
 	};
 
 
+	LUMIX_FORCE_INLINE float4 f4LoadUnaligned(const void* src)
+	{
+		return *(const float4*)src;
+	}
+
+
 	LUMIX_FORCE_INLINE float4 f4Load(const void* src)
 	{
 		return *(const float4*)src;
+	}
+
+
+	LUMIX_FORCE_INLINE float4 f4Splat(float value)
+	{
+		return {value, value, value, value};
 	}
 
 

@@ -1,5 +1,6 @@
 #include "engine/matrix.h"
 #include "engine/quat.h"
+#include "engine/simd.h"
 #include "engine/vec.h"
 #include <cmath>
 
@@ -66,57 +67,62 @@ void Matrix::setPerspective(float fov, float ratio, float near_plane, float far_
 }
 
 
-
-void multiplicate(Matrix& result, const Matrix& op1, const Matrix& op2)
-{
-	ASSERT(&result != &op2);
-	ASSERT(&result != &op1); // use operator *
-
-	result.m11 = op1.m11 * op2.m11 + op1.m21 * op2.m12 + op1.m31 * op2.m13 + op1.m41 * op2.m14;
-	result.m21 = op1.m11 * op2.m21 + op1.m21 * op2.m22 + op1.m31 * op2.m23 + op1.m41 * op2.m24;
-	result.m31 = op1.m11 * op2.m31 + op1.m21 * op2.m32 + op1.m31 * op2.m33 + op1.m41 * op2.m34;
-	result.m41 = op1.m11 * op2.m41 + op1.m21 * op2.m42 + op1.m31 * op2.m43 + op1.m41 * op2.m44;
-
-	result.m12 = op1.m12 * op2.m11 + op1.m22 * op2.m12 + op1.m32 * op2.m13 + op1.m42 * op2.m14;
-	result.m22 = op1.m12 * op2.m21 + op1.m22 * op2.m22 + op1.m32 * op2.m23 + op1.m42 * op2.m24;
-	result.m32 = op1.m12 * op2.m31 + op1.m22 * op2.m32 + op1.m32 * op2.m33 + op1.m42 * op2.m34;
-	result.m42 = op1.m12 * op2.m41 + op1.m22 * op2.m42 + op1.m32 * op2.m43 + op1.m42 * op2.m44;
-
-	result.m13 = op1.m13 * op2.m11 + op1.m23 * op2.m12 + op1.m33 * op2.m13 + op1.m43 * op2.m14;
-	result.m23 = op1.m13 * op2.m21 + op1.m23 * op2.m22 + op1.m33 * op2.m23 + op1.m43 * op2.m24;
-	result.m33 = op1.m13 * op2.m31 + op1.m23 * op2.m32 + op1.m33 * op2.m33 + op1.m43 * op2.m34;
-	result.m43 = op1.m13 * op2.m41 + op1.m23 * op2.m42 + op1.m33 * op2.m43 + op1.m43 * op2.m44;
-
-	result.m14 = op1.m14 * op2.m11 + op1.m24 * op2.m12 + op1.m34 * op2.m13 + op1.m44 * op2.m14;
-	result.m24 = op1.m14 * op2.m21 + op1.m24 * op2.m22 + op1.m34 * op2.m23 + op1.m44 * op2.m24;
-	result.m34 = op1.m14 * op2.m31 + op1.m24 * op2.m32 + op1.m34 * op2.m33 + op1.m44 * op2.m34;
-	result.m44 = op1.m14 * op2.m41 + op1.m24 * op2.m42 + op1.m34 * op2.m43 + op1.m44 * op2.m44;
-}
-
-
 Matrix Matrix::operator *(const Matrix& rhs) const
 {
-	return Matrix(
-		this->m11 * rhs.m11 + this->m21 * rhs.m12 + this->m31 * rhs.m13 + this->m41 * rhs.m14,
-		this->m12 * rhs.m11 + this->m22 * rhs.m12 + this->m32 * rhs.m13 + this->m42 * rhs.m14,
-		this->m13 * rhs.m11 + this->m23 * rhs.m12 + this->m33 * rhs.m13 + this->m43 * rhs.m14,
-		this->m14 * rhs.m11 + this->m24 * rhs.m12 + this->m34 * rhs.m13 + this->m44 * rhs.m14,
+	Matrix out;
 
-		this->m11 * rhs.m21 + this->m21 * rhs.m22 + this->m31 * rhs.m23 + this->m41 * rhs.m24,
-		this->m12 * rhs.m21 + this->m22 * rhs.m22 + this->m32 * rhs.m23 + this->m42 * rhs.m24,
-		this->m13 * rhs.m21 + this->m23 * rhs.m22 + this->m33 * rhs.m23 + this->m43 * rhs.m24,
-		this->m14 * rhs.m21 + this->m24 * rhs.m22 + this->m34 * rhs.m23 + this->m44 * rhs.m24,
+	const float4 a = f4Load(&m11);
+	const float4 b = f4Load(&m21);
+	const float4 c = f4Load(&m31);
+	const float4 d = f4Load(&m41);
 
-		this->m11 * rhs.m31 + this->m21 * rhs.m32 + this->m31 * rhs.m33 + this->m41 * rhs.m34,
-		this->m12 * rhs.m31 + this->m22 * rhs.m32 + this->m32 * rhs.m33 + this->m42 * rhs.m34,
-		this->m13 * rhs.m31 + this->m23 * rhs.m32 + this->m33 * rhs.m33 + this->m43 * rhs.m34,
-		this->m14 * rhs.m31 + this->m24 * rhs.m32 + this->m34 * rhs.m33 + this->m44 * rhs.m34,
+	float4 t1, t2;
 
-		this->m11 * rhs.m41 + this->m21 * rhs.m42 + this->m31 * rhs.m43 + this->m41 * rhs.m44,
-		this->m12 * rhs.m41 + this->m22 * rhs.m42 + this->m32 * rhs.m43 + this->m42 * rhs.m44,
-		this->m13 * rhs.m41 + this->m23 * rhs.m42 + this->m33 * rhs.m43 + this->m43 * rhs.m44,
-		this->m14 * rhs.m41 + this->m24 * rhs.m42 + this->m34 * rhs.m43 + this->m44 * rhs.m44
-	);
+	t1 = f4Splat(rhs.m11);
+	t2 = f4Mul(a, t1);
+	t1 = f4Splat(rhs.m12);
+	t2 = f4Add(f4Mul(b, t1), t2);
+	t1 = f4Splat(rhs.m13);
+	t2 = f4Add(f4Mul(c, t1), t2);
+	t1 = f4Splat(rhs.m14);
+	t2 = f4Add(f4Mul(d, t1), t2);
+
+	f4Store(&out.m11, t2);
+
+	t1 = f4Splat(rhs.m21);
+	t2 = f4Mul(a, t1);
+	t1 = f4Splat(rhs.m22);
+	t2 = f4Add(f4Mul(b, t1), t2);
+	t1 = f4Splat(rhs.m23);
+	t2 = f4Add(f4Mul(c, t1), t2);
+	t1 = f4Splat(rhs.m24);
+	t2 = f4Add(f4Mul(d, t1), t2);
+
+	f4Store(&out.m21, t2);
+
+	t1 = f4Splat(rhs.m31);
+	t2 = f4Mul(a, t1);
+	t1 = f4Splat(rhs.m32);
+	t2 = f4Add(f4Mul(b, t1), t2);
+	t1 = f4Splat(rhs.m33);
+	t2 = f4Add(f4Mul(c, t1), t2);
+	t1 = f4Splat(rhs.m34);
+	t2 = f4Add(f4Mul(d, t1), t2);
+
+	f4Store(&out.m31, t2);
+
+	t1 = f4Splat(rhs.m41);
+	t2 = f4Mul(a, t1);
+	t1 = f4Splat(rhs.m42);
+	t2 = f4Add(f4Mul(b, t1), t2);
+	t1 = f4Splat(rhs.m43);
+	t2 = f4Add(f4Mul(c, t1), t2);
+	t1 = f4Splat(rhs.m44);
+	t2 = f4Add(f4Mul(d, t1), t2);
+
+	f4Store(&out.m41, t2);
+
+	return out;
 }
 
 
