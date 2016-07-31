@@ -108,8 +108,8 @@ namespace
 	}
 }
 
-REGISTER_TEST("unit_tests/core/hash_map/insert", UT_insert, "")
-REGISTER_TEST("unit_tests/core/hash_map/array", UT_array, "")
-REGISTER_TEST("unit_tests/core/hash_map/clear", UT_clear, "")
-REGISTER_TEST("unit_tests/core/hash_map/constIterator", UT_constIterator, "")
+REGISTER_TEST("unit_tests/engine/hash_map/insert", UT_insert, "")
+REGISTER_TEST("unit_tests/engine/hash_map/array", UT_array, "")
+REGISTER_TEST("unit_tests/engine/hash_map/clear", UT_clear, "")
+REGISTER_TEST("unit_tests/engine/hash_map/constIterator", UT_constIterator, "")
 

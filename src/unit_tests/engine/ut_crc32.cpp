@@ -19,4 +19,4 @@ void UT_crc32(const char* params)
 	LUMIX_EXPECT(Lumix::crc32("\xff\xff\x12") == 0x214461C5);
 }
 
-REGISTER_TEST("unit_tests/core/crc32", UT_crc32, "")
+REGISTER_TEST("unit_tests/engine/crc32", UT_crc32, "")

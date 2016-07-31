@@ -201,5 +201,5 @@ namespace
 	}
 }
 
-REGISTER_TEST("unit_tests/core/multi_thread/transaction_queue_heavy_usage", UT_tq_heavy_usage, "");
-REGISTER_TEST("unit_tests/core/multi_thread/transaction_queue_push", UT_tq_push, "");
+REGISTER_TEST("unit_tests/engine/multi_thread/transaction_queue_heavy_usage", UT_tq_heavy_usage, "");
+REGISTER_TEST("unit_tests/engine/multi_thread/transaction_queue_push", UT_tq_push, "");

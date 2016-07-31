@@ -106,4 +106,4 @@ void UT_blob(const char* params)
 	LUMIX_EXPECT(blob.getPos() == sizeof(b));
 }
 
-REGISTER_TEST("unit_tests/core/blob", UT_blob, "")
+REGISTER_TEST("unit_tests/engine/blob", UT_blob, "")

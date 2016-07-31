@@ -73,4 +73,4 @@ void UT_aabb(const char* params)
 	LUMIX_EXPECT(aabb3.max.z == aabb4.max.z);
 }
 
-REGISTER_TEST("unit_tests/core/aabb", UT_aabb, "")
+REGISTER_TEST("unit_tests/engine/aabb", UT_aabb, "")

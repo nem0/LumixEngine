@@ -151,9 +151,9 @@ void UT_math_utils_min_max(const char* params)
 }
 
 
-REGISTER_TEST("unit_tests/core/math_utils/abs_signum", UT_math_utils_abs_signum, "")
-REGISTER_TEST("unit_tests/core/math_utils/clamp", UT_math_utils_clamp, "")
-REGISTER_TEST("unit_tests/core/math_utils/math_utils_degrees_to_radians", UT_math_utils_degrees_to_radians, "")
-REGISTER_TEST("unit_tests/core/math_utils/math_utils_ease_in_out", UT_math_utils_ease_in_out, "")
-REGISTER_TEST("unit_tests/core/math_utils/is_pow_of_two", UT_math_utils_is_pow_of_two, "")
-REGISTER_TEST("unit_tests/core/math_utils/min_max", UT_math_utils_min_max, "")
+REGISTER_TEST("unit_tests/engine/math_utils/abs_signum", UT_math_utils_abs_signum, "")
+REGISTER_TEST("unit_tests/engine/math_utils/clamp", UT_math_utils_clamp, "")
+REGISTER_TEST("unit_tests/engine/math_utils/math_utils_degrees_to_radians", UT_math_utils_degrees_to_radians, "")
+REGISTER_TEST("unit_tests/engine/math_utils/math_utils_ease_in_out", UT_math_utils_ease_in_out, "")
+REGISTER_TEST("unit_tests/engine/math_utils/is_pow_of_two", UT_math_utils_is_pow_of_two, "")
+REGISTER_TEST("unit_tests/engine/math_utils/min_max", UT_math_utils_min_max, "")

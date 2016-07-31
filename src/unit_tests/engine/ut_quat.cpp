@@ -79,4 +79,4 @@ void UT_quat(const char* params)
 	}
 }
 
-REGISTER_TEST("unit_tests/core/quat", UT_quat, "")
+REGISTER_TEST("unit_tests/engine/quat", UT_quat, "")

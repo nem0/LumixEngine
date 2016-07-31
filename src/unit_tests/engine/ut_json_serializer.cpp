@@ -91,4 +91,4 @@ void UT_json_serializer(const char* params)
 	device.destroyFile(file);
 }
 
-REGISTER_TEST("unit_tests/core/json_serializer", UT_json_serializer, "")
+REGISTER_TEST("unit_tests/engine/json_serializer", UT_json_serializer, "")

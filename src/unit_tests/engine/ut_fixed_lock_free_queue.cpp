@@ -84,4 +84,4 @@ namespace
 	};
 }
 
-REGISTER_TEST("unit_tests/core/multi_thread/fixed_lock_queue", UT_fixed_lock_queue, "");
+REGISTER_TEST("unit_tests/engine/multi_thread/fixed_lock_queue", UT_fixed_lock_queue, "");

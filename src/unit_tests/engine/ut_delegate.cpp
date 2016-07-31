@@ -58,4 +58,4 @@ void UT_delegate(const char* params)
 	LUMIX_EXPECT(s.m == 30);
 }
 
-REGISTER_TEST("unit_tests/core/delegate", UT_delegate, "")
+REGISTER_TEST("unit_tests/engine/delegate", UT_delegate, "")

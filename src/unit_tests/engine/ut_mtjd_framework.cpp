@@ -192,5 +192,5 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 	allocator.deallocate(jobs);
 }
 
-REGISTER_TEST("unit_tests/core/mtjd/frameworkTest", UT_MTJDFrameworkTest, "")
-REGISTER_TEST("unit_tests/core/mtjd/frameworkDependencyTest", UT_MTJDFrameworkDependencyTest, "")
+REGISTER_TEST("unit_tests/engine/mtjd/frameworkTest", UT_MTJDFrameworkTest, "")
+REGISTER_TEST("unit_tests/engine/mtjd/frameworkDependencyTest", UT_MTJDFrameworkDependencyTest, "")

@@ -18,4 +18,4 @@ void UT_path(const char* params)
 	LUMIX_EXPECT(path.getHash() == Lumix::crc32(res_path));
 }
 
-REGISTER_TEST("unit_tests/core/path/path", UT_path, "")
+REGISTER_TEST("unit_tests/engine/path/path", UT_path, "")
