@@ -83,5 +83,5 @@ void UT_array_erase(const char* params)
 	LUMIX_EXPECT(array1.size() == 15);
 }
 
-REGISTER_TEST("unit_tests/core/array", UT_array, "")
-REGISTER_TEST("unit_tests/core/array/erase", UT_array_erase, "")
+REGISTER_TEST("unit_tests/engine/array", UT_array, "")
+REGISTER_TEST("unit_tests/engine/array/erase", UT_array_erase, "")

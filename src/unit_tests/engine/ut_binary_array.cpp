@@ -60,4 +60,4 @@ void UT_binary_array(const char* params)
 	}
 }
 
-REGISTER_TEST("unit_tests/core/binary_array", UT_binary_array, "")
+REGISTER_TEST("unit_tests/engine/binary_array", UT_binary_array, "")

@@ -72,4 +72,4 @@ void UT_command_line_parser(const char* params)
 	LUMIX_EXPECT(!parser6.next());
 }
 
-REGISTER_TEST("unit_tests/core/command_line_parser", UT_command_line_parser, "")
+REGISTER_TEST("unit_tests/engine/command_line_parser", UT_command_line_parser, "")

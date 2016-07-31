@@ -81,4 +81,4 @@ void UT_vec3(const char* params)
 
 }
 
-REGISTER_TEST("unit_tests/core/vec3", UT_vec3, "")
+REGISTER_TEST("unit_tests/engine/vec3", UT_vec3, "")

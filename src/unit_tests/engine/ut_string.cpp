@@ -69,4 +69,4 @@ void UT_string(const char* params)
 	LUMIX_EXPECT(Lumix::stristr("XYABcmn", "cMn") != nullptr);
 }
 
-REGISTER_TEST("unit_tests/core/string", UT_string, "")
+REGISTER_TEST("unit_tests/engine/string", UT_string, "")

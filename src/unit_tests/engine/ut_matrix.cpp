@@ -145,4 +145,4 @@ void UT_matrix(const char* params)
 }
 
 
-REGISTER_TEST("unit_tests/core/matrix", UT_matrix, "")
+REGISTER_TEST("unit_tests/engine/matrix", UT_matrix, "")

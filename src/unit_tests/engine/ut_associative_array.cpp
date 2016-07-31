@@ -44,4 +44,4 @@ void UT_associative_array(const char* params)
 	LUMIX_EXPECT(array1.size() == 0);
 }
 
-REGISTER_TEST("unit_tests/core/associative_array", UT_associative_array, "")
+REGISTER_TEST("unit_tests/engine/associative_array", UT_associative_array, "")

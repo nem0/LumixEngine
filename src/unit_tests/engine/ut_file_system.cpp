@@ -131,4 +131,4 @@ void UT_file_events_device(const char* params)
 
 } // anonymous namespace
 
-REGISTER_TEST("unit_tests/core/file_system/file_events_device", UT_file_events_device, "")
+REGISTER_TEST("unit_tests/engine/file_system/file_events_device", UT_file_events_device, "")
