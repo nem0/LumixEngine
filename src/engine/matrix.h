@@ -54,7 +54,7 @@ struct LUMIX_ENGINE_API Transform
 };
 
 
-struct LUMIX_ENGINE_API Matrix
+LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Matrix
 {
 	Matrix() {}
 
@@ -278,10 +278,7 @@ struct LUMIX_ENGINE_API Matrix
 	float m41, m42, m43, m44;
 
 	static const Matrix IDENTITY;
-};
-
-
-void multiplicate(Matrix& result, const Matrix& op1, const Matrix& op2);
+} LUMIX_ALIGN_END(16);
 
 
 } // !namespace Lumix
