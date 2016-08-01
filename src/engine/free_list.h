@@ -47,7 +47,7 @@ namespace Lumix
 		void* allocate_aligned(size_t size, size_t align) override
 		{
 			void* ptr = allocate(size);
-			ASSERT((intptr_t)ptr % align == 0);
+			ASSERT((uintptr)ptr % align == 0);
 			return ptr;
 		}
 
