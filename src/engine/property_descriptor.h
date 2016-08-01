@@ -1,11 +1,12 @@
 #pragma once
 
-#include "core/blob.h"
-#include "core/path.h"
-#include "core/string.h"
-#include "iplugin.h"
-#include "iproperty_descriptor.h"
-#include "universe/universe.h"
+#include "engine/blob.h"
+#include "engine/iplugin.h"
+#include "engine/iproperty_descriptor.h"
+#include "engine/path.h"
+#include "engine/resource.h"
+#include "engine/string.h"
+#include "engine/universe/universe.h"
 
 
 namespace Lumix
@@ -30,14 +31,13 @@ private:
 	static const int MAX_STRING_SIZE = 300;
 
 public:
-	typedef const char* (S::*Getter)(ComponentIndex);
-	typedef void (S::*Setter)(ComponentIndex, const char*);
-	typedef const char* (S::*ArrayGetter)(ComponentIndex, int);
-	typedef void (S::*ArraySetter)(ComponentIndex, int, const char*);
+	typedef const char* (S::*Getter)(ComponentHandle);
+	typedef void (S::*Setter)(ComponentHandle, const char*);
+	typedef const char* (S::*ArrayGetter)(ComponentHandle, int);
+	typedef void (S::*ArraySetter)(ComponentHandle, int, const char*);
 
 public:
-	StringPropertyDescriptor(const char* name, Getter getter, Setter setter, IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	StringPropertyDescriptor(const char* name, Getter getter, Setter setter)
 	{
 		setName(name);
 		m_single.getter = getter;
@@ -68,11 +68,11 @@ public:
 
 		if (index < 0)
 		{
-			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.index, tmp);
+			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.handle, tmp);
 		}
 		else
 		{
-			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.index, index, tmp);
+			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.handle, index, tmp);
 		}
 	}
 
@@ -82,11 +82,11 @@ public:
 		const char* value;
 		if (index < 0)
 		{
-			value = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.index);
+			value = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.handle);
 		}
 		else
 		{
-			value = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.index, index);
+			value = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.handle, index);
 		}
 		int len = stringLength(value) + 1;
 		stream.write(value, len);
@@ -96,12 +96,12 @@ public:
 private:
 	union
 	{
-		struct Single
+		struct
 		{
 			Getter getter;
 			Setter setter;
 		} m_single;
-		struct Array
+		struct
 		{
 			ArrayGetter getter;
 			ArraySetter setter;
@@ -113,9 +113,9 @@ private:
 template <class S> class ArrayDescriptor : public IArrayDescriptor
 {
 public:
-	typedef int (S::*Counter)(ComponentIndex);
-	typedef void (S::*Adder)(ComponentIndex, int);
-	typedef void (S::*Remover)(ComponentIndex, int);
+	typedef int (S::*Counter)(ComponentHandle);
+	typedef void (S::*Adder)(ComponentHandle, int);
+	typedef void (S::*Remover)(ComponentHandle, int);
 
 public:
 	ArrayDescriptor(const char* name,
@@ -124,20 +124,12 @@ public:
 		Remover remover,
 		IAllocator& allocator)
 		: IArrayDescriptor(allocator)
-		, m_allocator(allocator)
 	{
 		setName(name);
 		m_type = ARRAY;
 		m_counter = counter;
 		m_adder = adder;
 		m_remover = remover;
-	}
-	~ArrayDescriptor()
-	{
-		for (int i = 0; i < m_children.size(); ++i)
-		{
-			LUMIX_DELETE(m_allocator, m_children[i]);
-		}
 	}
 
 
@@ -188,19 +180,19 @@ public:
 
 	int getCount(ComponentUID cmp) const override
 	{
-		return (static_cast<S*>(cmp.scene)->*m_counter)(cmp.index);
+		return (static_cast<S*>(cmp.scene)->*m_counter)(cmp.handle);
 	}
 
 
 	void addArrayItem(ComponentUID cmp, int index) const override
 	{
-		if (m_adder) (static_cast<S*>(cmp.scene)->*m_adder)(cmp.index, index);
+		if (m_adder) (static_cast<S*>(cmp.scene)->*m_adder)(cmp.handle, index);
 	}
 
 
 	void removeArrayItem(ComponentUID cmp, int index) const override
 	{
-		(static_cast<S*>(cmp.scene)->*m_remover)(cmp.index, index);
+		(static_cast<S*>(cmp.scene)->*m_remover)(cmp.handle, index);
 	}
 
 
@@ -217,7 +209,6 @@ public:
 
 
 private:
-	IAllocator& m_allocator;
 	Counter m_counter;
 	Adder m_adder;
 	Remover m_remover;
@@ -227,10 +218,10 @@ private:
 template <class S> class IntPropertyDescriptor : public IPropertyDescriptor
 {
 public:
-	typedef int (S::*Getter)(ComponentIndex);
-	typedef void (S::*Setter)(ComponentIndex, int);
-	typedef int (S::*ArrayGetter)(ComponentIndex, int);
-	typedef void (S::*ArraySetter)(ComponentIndex, int, int);
+	typedef int (S::*Getter)(ComponentHandle);
+	typedef void (S::*Setter)(ComponentHandle, int);
+	typedef int (S::*ArrayGetter)(ComponentHandle, int);
+	typedef void (S::*ArraySetter)(ComponentHandle, int, int);
 
 public:
 	IntPropertyDescriptor() {}
@@ -247,8 +238,7 @@ public:
 	}
 
 
-	IntPropertyDescriptor(const char* name, ArrayGetter _getter, ArraySetter _setter, IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	IntPropertyDescriptor(const char* name, ArrayGetter _getter, ArraySetter _setter)
 	{
 		setName(name);
 		m_array.getter = _getter;
@@ -265,11 +255,11 @@ public:
 		stream.read(&i, sizeof(i));
 		if(index < 0)
 		{
-			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.index, i);
+			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.handle, i);
 		}
 		else
 		{
-			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.index, index, i);
+			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.handle, index, i);
 		}
 	};
 
@@ -279,11 +269,11 @@ public:
 		int32 i = 0;
 		if(index < 0)
 		{
-			i = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.index);
+			i = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.handle);
 		}
 		else
 		{
-			i = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.index, index);
+			i = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.handle, index);
 		}
 		stream.write(i);
 	};
@@ -303,12 +293,12 @@ public:
 private:
 	union
 	{
-		struct Single
+		struct
 		{
 			Getter getter;
 			Setter setter;
 		} m_single;
-		struct Array
+		struct
 		{
 			ArrayGetter getter;
 			ArraySetter setter;
@@ -323,12 +313,11 @@ private:
 template <class S> class BoolPropertyDescriptor : public IPropertyDescriptor
 {
 public:
-	typedef bool (S::*Getter)(ComponentIndex);
-	typedef void (S::*Setter)(ComponentIndex, bool);
+	typedef bool (S::*Getter)(ComponentHandle);
+	typedef void (S::*Setter)(ComponentHandle, bool);
 
 public:
-	BoolPropertyDescriptor(const char* name, Getter getter, Setter setter, IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	BoolPropertyDescriptor(const char* name, Getter getter, Setter setter)
 	{
 		setName(name);
 		m_getter = getter;
@@ -342,14 +331,14 @@ public:
 		ASSERT(index == -1);
 		bool b;
 		stream.read(&b, sizeof(b));
-		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, b);
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.handle, b);
 	};
 
 
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		bool b = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		bool b = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.handle);
 		int len = sizeof(b);
 		stream.write(&b, len);
 	};
@@ -363,14 +352,13 @@ private:
 template <typename T, class S> class SimplePropertyDescriptor : public IPropertyDescriptor
 {
 public:
-	typedef T (S::*Getter)(ComponentIndex);
-	typedef void (S::*Setter)(ComponentIndex, const T&);
-	typedef T(S::*ArrayGetter)(ComponentIndex, int);
-	typedef void (S::*ArraySetter)(ComponentIndex, int, const T&);
+	typedef T (S::*Getter)(ComponentHandle);
+	typedef void (S::*Setter)(ComponentHandle, const T&);
+	typedef T(S::*ArrayGetter)(ComponentHandle, int);
+	typedef void (S::*ArraySetter)(ComponentHandle, int, const T&);
 
 public:
-	SimplePropertyDescriptor(const char* name, Getter getter, Setter setter, IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	SimplePropertyDescriptor(const char* name, Getter getter, Setter setter)
 	{
 		setName(name);
 		m_single.getter = getter;
@@ -395,11 +383,11 @@ public:
 		stream.read(&v, sizeof(v));
 		if (index < 0)
 		{
-			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.index, v);
+			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.handle, v);
 		}
 		else
 		{
-			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.index, index, v);
+			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.handle, index, v);
 		}
 	};
 
@@ -409,12 +397,12 @@ public:
 		int len = sizeof(T);
 		if (index < 0)
 		{
-			T v = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.index);
+			T v = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.handle);
 			stream.write(&v, len);
 		}
 		else
 		{
-			T v = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.index, index);
+			T v = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.handle, index);
 			stream.write(&v, len);
 		}
 	};
@@ -441,18 +429,13 @@ template <class S>
 class FilePropertyDescriptor : public IPropertyDescriptor
 {
 public:
-	typedef Path (S::*Getter)(ComponentIndex);
-	typedef void (S::*Setter)(ComponentIndex, const Path&);
-	typedef Path (S::*ArrayGetter)(ComponentIndex, int);
-	typedef void (S::*ArraySetter)(ComponentIndex, int, const Path&);
+	typedef Path (S::*Getter)(ComponentHandle);
+	typedef void (S::*Setter)(ComponentHandle, const Path&);
+	typedef Path (S::*ArrayGetter)(ComponentHandle, int);
+	typedef void (S::*ArraySetter)(ComponentHandle, int, const Path&);
 
 public:
-	FilePropertyDescriptor(const char* name,
-		Getter getter,
-		Setter setter,
-		const char* file_type,
-		IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	FilePropertyDescriptor(const char* name, Getter getter, Setter setter, const char* file_type)
 	{
 		setName(name);
 		m_single.getter = getter;
@@ -462,12 +445,7 @@ public:
 	}
 
 
-	FilePropertyDescriptor(const char* name,
-		ArrayGetter getter,
-		ArraySetter setter,
-		const char* file_type,
-		IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	FilePropertyDescriptor(const char* name, ArrayGetter getter, ArraySetter setter, const char* file_type)
 	{
 		setName(name);
 		m_array.getter = getter;
@@ -490,11 +468,11 @@ public:
 
 		if(index < 0)
 		{
-			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.index, Path(tmp));
+			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.handle, Path(tmp));
 		}
 		else
 		{
-			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.index, index, Path(tmp));
+			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.handle, index, Path(tmp));
 		}
 	}
 
@@ -504,11 +482,11 @@ public:
 		Path value;
 		if(index < 0)
 		{
-			value = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.index);
+			value = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.handle);
 		}
 		else
 		{
-			value = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.index, index);
+			value = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.handle, index);
 		}
 		int len = value.length() + 1;
 		stream.write(value.c_str(), len);
@@ -519,12 +497,12 @@ public:
 private:
 	union
 	{
-		struct Single
+		struct
 		{
 			Getter getter;
 			Setter setter;
 		} m_single;
-		struct Array
+		struct
 		{
 			ArrayGetter getter;
 			ArraySetter setter;
@@ -535,8 +513,7 @@ private:
 
 
 template <class T>
-class ResourcePropertyDescriptor : public FilePropertyDescriptor<T>,
-								   public ResourcePropertyDescriptorBase
+class ResourcePropertyDescriptor : public IResourcePropertyDescriptor
 {
 public:
 	using Getter = typename FilePropertyDescriptor<T>::Getter;
@@ -548,35 +525,47 @@ public:
 		Getter getter,
 		Setter setter,
 		const char* file_type,
-		uint32 resource_type,
-		IAllocator& allocator)
-		: FilePropertyDescriptor<T>(name, getter, setter, file_type, allocator)
-		, ResourcePropertyDescriptorBase(resource_type)
+		ResourceType resource_type)
+		: m_file_descriptor(name, getter, setter, file_type)
+		, m_resource_type(resource_type)
 	{
-		IPropertyDescriptor::m_type = IPropertyDescriptor::RESOURCE;
+		setName(name);
 	}
 
 	ResourcePropertyDescriptor(const char* name,
 		ArrayGetter getter,
 		ArraySetter setter,
 		const char* file_type,
-		uint32 resource_type,
-		IAllocator& allocator)
-		: FilePropertyDescriptor<T>(name, getter, setter, file_type, allocator)
-		, ResourcePropertyDescriptorBase(resource_type)
+		ResourceType resource_type)
+		: m_file_descriptor(name, getter, setter, file_type)
+		, m_resource_type(resource_type)
 	{
-		IPropertyDescriptor::m_type = IPropertyDescriptor::RESOURCE;
+		setName(name);
 	}
 
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		m_file_descriptor.set(cmp, index, stream);
+	}
+
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		m_file_descriptor.get(cmp, index, stream);
+	}
+
+	ResourceType getResourceType() override { return m_resource_type; }
+
+	ResourceType m_resource_type;
+	FilePropertyDescriptor<T> m_file_descriptor;
 };
 
 
 template <class S> class SampledFunctionDescriptor : public ISampledFunctionDescriptor
 {
 public:
-	typedef const Lumix::Vec2* (S::*Getter)(ComponentIndex);
-	typedef int (S::*CountGetter)(ComponentIndex);
-	typedef void (S::*Setter)(ComponentIndex, const Lumix::Vec2*, int);
+	typedef const Lumix::Vec2* (S::*Getter)(ComponentHandle);
+	typedef int (S::*CountGetter)(ComponentHandle);
+	typedef void (S::*Setter)(ComponentHandle, const Lumix::Vec2*, int);
 
 public:
 	SampledFunctionDescriptor(const char* name,
@@ -584,9 +573,7 @@ public:
 		Setter setter,
 		CountGetter count_getter,
 		float max_x,
-		float max_y,
-		IAllocator& allocator)
-		: ISampledFunctionDescriptor(allocator)
+		float max_y)
 	{
 		setName(name);
 		m_getter = getter;
@@ -604,16 +591,16 @@ public:
 		int count;
 		stream.read(count);
 		auto* buf = (const Lumix::Vec2*)stream.skip(sizeof(Lumix::Vec2) * count);
-		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, buf, count);
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.handle, buf, count);
 	};
 
 
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		int count = (static_cast<S*>(cmp.scene)->*m_count_getter)(cmp.index);
+		int count = (static_cast<S*>(cmp.scene)->*m_count_getter)(cmp.handle);
 		stream.write(count);
-		const Lumix::Vec2* values = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		const Lumix::Vec2* values = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.handle);
 		stream.write(values, sizeof(values[0]) * count);
 	};
 
@@ -633,18 +620,14 @@ private:
 
 template <class S> class EntityPropertyDescriptor : public IPropertyDescriptor
 {
-	public:
-	typedef Entity(S::*Getter)(ComponentIndex);
-	typedef void (S::*Setter)(ComponentIndex, Entity);
-	typedef Entity(S::*ArrayGetter)(ComponentIndex, int);
-	typedef void (S::*ArraySetter)(ComponentIndex, int, Entity);
+public:
+	typedef Entity (S::*Getter)(ComponentHandle);
+	typedef void (S::*Setter)(ComponentHandle, Entity);
+	typedef Entity (S::*ArrayGetter)(ComponentHandle, int);
+	typedef void (S::*ArraySetter)(ComponentHandle, int, Entity);
 
-	public:
-	EntityPropertyDescriptor(const char* name,
-		Getter _getter,
-		Setter _setter,
-		IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+public:
+	EntityPropertyDescriptor(const char* name, Getter _getter, Setter _setter)
 	{
 		setName(name);
 		m_single.getter = _getter;
@@ -653,11 +636,7 @@ template <class S> class EntityPropertyDescriptor : public IPropertyDescriptor
 	}
 
 
-	EntityPropertyDescriptor(const char* name,
-		ArrayGetter _getter,
-		ArraySetter _setter,
-		IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	EntityPropertyDescriptor(const char* name, ArrayGetter _getter, ArraySetter _setter)
 	{
 		setName(name);
 		m_array.getter = _getter;
@@ -670,15 +649,14 @@ template <class S> class EntityPropertyDescriptor : public IPropertyDescriptor
 	{
 		int value;
 		stream.read(&value, sizeof(value));
-		auto entity =
-			value < 0 ? INVALID_ENTITY : cmp.scene->getUniverse().getEntityFromDenseIdx(value);
-		if(index == -1)
+		auto entity = value < 0 ? INVALID_ENTITY : cmp.scene->getUniverse().getEntityFromDenseIdx(value);
+		if (index == -1)
 		{
-			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.index, entity);
+			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.handle, entity);
 		}
 		else
 		{
-			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.index, index, entity);
+			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.handle, index, entity);
 		}
 	};
 
@@ -686,13 +664,13 @@ template <class S> class EntityPropertyDescriptor : public IPropertyDescriptor
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		Entity value;
-		if(index == -1)
+		if (index == -1)
 		{
-			value = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.index);
+			value = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.handle);
 		}
 		else
 		{
-			value = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.index, index);
+			value = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.handle, index);
 		}
 		auto dense_idx = cmp.scene->getUniverse().getDenseIdx(value);
 		int len = sizeof(dense_idx);
@@ -700,7 +678,7 @@ template <class S> class EntityPropertyDescriptor : public IPropertyDescriptor
 	};
 
 
-	private:
+private:
 	union {
 		struct
 		{
@@ -716,13 +694,48 @@ template <class S> class EntityPropertyDescriptor : public IPropertyDescriptor
 };
 
 
+template <typename S>
+class BlobPropertyDescriptor : public IPropertyDescriptor
+{
+public:
+	typedef void (S::*Getter)(ComponentHandle, OutputBlob&);
+	typedef void (S::*Setter)(ComponentHandle, InputBlob&);
+
+public:
+	BlobPropertyDescriptor(const char* name, Getter _getter, Setter _setter)
+	{
+		m_getter = _getter;
+		m_setter = _setter;
+		setName(name);
+		IPropertyDescriptor::m_type = IPropertyDescriptor::BLOB;
+	}
+
+
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		ASSERT(index < 0);
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.handle, stream);
+	}
+
+
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		ASSERT(index < 0);
+		(static_cast<S*>(cmp.scene)->*m_getter)(cmp.handle, stream);
+	}
+
+	Getter m_getter;
+	Setter m_setter;
+};
+
+
 template <class S> class DecimalPropertyDescriptor : public IDecimalPropertyDescriptor
 {
 public:
-	typedef float (S::*Getter)(ComponentIndex);
-	typedef void (S::*Setter)(ComponentIndex, float);
-	typedef float (S::*ArrayGetter)(ComponentIndex, int);
-	typedef void (S::*ArraySetter)(ComponentIndex, int,float);
+	typedef float (S::*Getter)(ComponentHandle);
+	typedef void (S::*Setter)(ComponentHandle, float);
+	typedef float (S::*ArrayGetter)(ComponentHandle, int);
+	typedef void (S::*ArraySetter)(ComponentHandle, int,float);
 
 public:
 	DecimalPropertyDescriptor(const char* name,
@@ -730,9 +743,7 @@ public:
 		Setter _setter,
 		float min,
 		float max,
-		float step,
-		IAllocator& allocator)
-		: IDecimalPropertyDescriptor(allocator)
+		float step)
 	{
 		setName(name);
 		m_getter = _getter;
@@ -751,9 +762,7 @@ public:
 		ArraySetter _setter,
 		float min,
 		float max,
-		float step,
-		IAllocator& allocator)
-		: IDecimalPropertyDescriptor(allocator)
+		float step)
 	{
 		setName(name);
 		m_array_getter = _getter;
@@ -774,11 +783,11 @@ public:
 		stream.read(&f, sizeof(f));
 		if(index >= 0)
 		{
-			(static_cast<S*>(cmp.scene)->*m_array_setter)(cmp.index, index, f);
+			(static_cast<S*>(cmp.scene)->*m_array_setter)(cmp.handle, index, f);
 		}
 		else
 		{
-			(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, f);
+			(static_cast<S*>(cmp.scene)->*m_setter)(cmp.handle, f);
 		}
 	};
 
@@ -788,11 +797,11 @@ public:
 		float f = 0;
 		if(index >= 0)
 		{
-			f = (static_cast<S*>(cmp.scene)->*m_array_getter)(cmp.index, index);
+			f = (static_cast<S*>(cmp.scene)->*m_array_getter)(cmp.handle, index);
 		}
 		else
 		{
-			f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+			f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.handle);
 		}
 		int len = sizeof(f);
 		stream.write(&f, len);
@@ -814,8 +823,8 @@ public:
 	using ArrayGetter = typename SimplePropertyDescriptor<Vec3, S>::ArrayGetter;
 	using ArraySetter = typename SimplePropertyDescriptor<Vec3, S>::ArraySetter;
 
-	ColorPropertyDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
-		: SimplePropertyDescriptor<Vec3, S>(name, _getter, _setter, allocator)
+	ColorPropertyDescriptor(const char* name, Getter _getter, Setter _setter)
+		: SimplePropertyDescriptor<Vec3, S>(name, _getter, _setter)
 	{
 		IPropertyDescriptor::m_type = IPropertyDescriptor::COLOR;
 	}
@@ -825,8 +834,8 @@ public:
 template <class S> class EnumPropertyDescriptor : public IEnumPropertyDescriptor
 {
 public:
-	typedef int (S::*Getter)(ComponentIndex);
-	typedef void (S::*Setter)(ComponentIndex, int);
+	typedef int (S::*Getter)(ComponentHandle);
+	typedef void (S::*Setter)(ComponentHandle, int);
 	typedef int (S::*EnumCountGetter)() const;
 	typedef const char* (S::*EnumNameGetter)(int);
 
@@ -835,9 +844,7 @@ public:
 		Getter _getter,
 		Setter _setter,
 		EnumCountGetter count_getter,
-		EnumNameGetter enum_name_getter,
-		IAllocator& allocator)
-		: IEnumPropertyDescriptor(allocator)
+		EnumNameGetter enum_name_getter)
 	{
 		setName(name);
 		m_getter = _getter;
@@ -853,23 +860,23 @@ public:
 		ASSERT(index == -1);
 		int value;
 		stream.read(&value, sizeof(value));
-		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, value);
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.handle, value);
 	};
 
 
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		int value = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		int value = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.handle);
 		int len = sizeof(value);
 		stream.write(&value, len);
 	};
 
 
-	int getEnumCount(IScene* scene) override { return (static_cast<S*>(scene)->*m_enum_count_getter)(); }
+	int getEnumCount(IScene* scene, ComponentHandle) override { return (static_cast<S*>(scene)->*m_enum_count_getter)(); }
 
 
-	const char* getEnumItemName(IScene* scene, int index) override
+	const char* getEnumItemName(IScene* scene, ComponentHandle, int index) override
 	{
 		return (static_cast<S*>(scene)->*m_enum_name_getter)(index);
 	}

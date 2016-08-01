@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "lumix.h"
-#include "iplugin.h"
+#include "engine/lumix.h"
+#include "engine/iplugin.h"
 
 
 namespace physx
@@ -19,7 +19,7 @@ namespace Lumix
 {
 
 
-class LUMIX_PHYSICS_API PhysicsSystem : public IPlugin
+class PhysicsSystem : public IPlugin
 {
 	friend class PhysicsScene;
 	friend struct PhysicsSceneImpl;
@@ -34,4 +34,4 @@ class LUMIX_PHYSICS_API PhysicsSystem : public IPlugin
 };
 
 
-} // !namespace Lumix
+} // namespace Lumix

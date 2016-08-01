@@ -1,21 +1,22 @@
 #include "terrain.h"
-#include "core/blob.h"
-#include "core/crc32.h"
-#include "core/geometry.h"
-#include "core/json_serializer.h"
-#include "core/lifo_allocator.h"
-#include "core/log.h"
-#include "core/math_utils.h"
-#include "core/profiler.h"
-#include "core/resource_manager.h"
-#include "core/resource_manager_base.h"
-#include "engine.h"
+#include "engine/blob.h"
+#include "engine/crc32.h"
+#include "engine/geometry.h"
+#include "engine/json_serializer.h"
+#include "engine/lifo_allocator.h"
+#include "engine/log.h"
+#include "engine/math_utils.h"
+#include "engine/profiler.h"
+#include "engine/property_register.h"
+#include "engine/resource_manager.h"
+#include "engine/resource_manager_base.h"
+#include "engine/engine.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #include <cfloat>
 #include <cmath>
 
@@ -28,7 +29,7 @@ static const int GRASS_QUAD_SIZE = 10;
 static const float GRASS_QUAD_RADIUS = GRASS_QUAD_SIZE * 0.7072f;
 static const int GRID_SIZE = 16;
 static const int COPY_COUNT = 50;
-static const uint32 TERRAIN_HASH = crc32("terrain");
+static const ComponentType TERRAIN_HASH = PropertyRegister::getComponentType("terrain");
 static const uint32 MORPH_CONST_HASH = crc32("morph_const");
 static const uint32 QUAD_SIZE_HASH = crc32("quad_size");
 static const uint32 QUAD_MIN_HASH = crc32("quad_min");
@@ -37,6 +38,8 @@ static const uint32 BRUSH_POSITION_HASH = crc32("brush_position");
 static const uint32 BRUSH_SIZE_HASH = crc32("brush_size");
 static const uint32 MAP_SIZE_HASH = crc32("map_size");
 static const uint32 CAMERA_POS_HASH = crc32("camera_pos");
+static const ResourceType MODEL_TYPE("model");
+static const ResourceType MATERIAL_TYPE("material");
 static const char* TEX_COLOR_UNIFORM = "u_texColor";
 
 struct Sample
@@ -134,11 +137,7 @@ struct TerrainQuad
 		return (size > 17 ? 2.25f : 1.25f) * Math::SQRT2 * size;
 	}
 
-	bool getInfos(Array<const TerrainInfo*>& infos,
-		const Vec3& camera_pos,
-		Terrain* terrain,
-		const Matrix& world_matrix,
-		LIFOAllocator& allocator)
+	bool getInfos(Array<TerrainInfo>& infos, const Vec3& camera_pos, Terrain* terrain, const Matrix& world_matrix)
 	{
 		float squared_dist = getSquaredDistance(camera_pos);
 		float r = getRadiusOuter(m_size);
@@ -148,18 +147,16 @@ struct TerrainQuad
 		Shader& shader = *terrain->getMesh()->material->getShader();
 		for (int i = 0; i < CHILD_COUNT; ++i)
 		{
-			if (!m_children[i] ||
-				!m_children[i]->getInfos(infos, camera_pos, terrain, world_matrix, allocator))
+			if (!m_children[i] || !m_children[i]->getInfos(infos, camera_pos, terrain, world_matrix))
 			{
-				TerrainInfo* data = (TerrainInfo*)allocator.allocate(sizeof(TerrainInfo));
-				data->m_morph_const = morph_const;
-				data->m_index = i;
-				data->m_terrain = terrain;
-				data->m_size = m_size;
-				data->m_min = m_min;
-				data->m_shader = &shader;
-				data->m_world_matrix = world_matrix;
-				infos.push(data);
+				TerrainInfo& data = infos.emplace();
+				data.m_morph_const = morph_const;
+				data.m_index = i;
+				data.m_terrain = terrain;
+				data.m_size = m_size;
+				data.m_min = m_min;
+				data.m_shader = &shader;
+				data.m_world_matrix = world_matrix;
 			}
 		}
 		return true;
@@ -196,6 +193,7 @@ Terrain::Terrain(Renderer& renderer, Entity entity, RenderScene& scene, IAllocat
 	, m_vertices_handle(BGFX_INVALID_HANDLE)
 	, m_indices_handle(BGFX_INVALID_HANDLE)
 	, m_grass_distance(5)
+	, m_force_grass_update(false)
 {
 	generateGeometry();
 }
@@ -204,7 +202,7 @@ Terrain::GrassType::~GrassType()
 {
 	if (m_grass_model)
 	{
-		m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_grass_model);
+		m_grass_model->getResourceManager().unload(*m_grass_model);
 		m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(this);
 	}
 }
@@ -291,13 +289,13 @@ int Terrain::getGrassTypeDensity(int index) const
 void Terrain::setGrassTypeDistance(int index, float distance)
 {
 	forceGrassUpdate();
+	GrassType& type = *m_grass_types[index];
+	type.m_distance = Math::clamp(distance, 1.0f, FLT_MAX);
 	m_grass_distance = 0;
 	for (auto* type : m_grass_types)
 	{
-		m_grass_distance = Math::maximum(m_grass_distance, int(distance / GRASS_QUAD_RADIUS + 0.99f));
+		m_grass_distance = Math::maximum(m_grass_distance, int(type->m_distance / GRASS_QUAD_RADIUS + 0.99f));
 	}
-	GrassType& type = *m_grass_types[index];
-	type.m_distance = Math::clamp(distance, 1.0f, FLT_MAX);
 }
 
 
@@ -358,13 +356,13 @@ void Terrain::setGrassTypePath(int index, const Path& path)
 	GrassType& type = *m_grass_types[index];
 	if (type.m_grass_model)
 	{
-		type.m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*type.m_grass_model);
+		type.m_grass_model->getResourceManager().unload(*type.m_grass_model);
 		type.m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(&type);
 		type.m_grass_model = nullptr;
 	}
 	if (path.isValid())
 	{
-		type.m_grass_model = static_cast<Model*>(m_scene.getEngine().getResourceManager().get(ResourceManager::MODEL)->load(path));
+		type.m_grass_model = static_cast<Model*>(m_scene.getEngine().getResourceManager().get(MODEL_TYPE)->load(path));
 		type.m_grass_model->onLoaded<GrassType, &GrassType::grassLoaded>(&type);
 	}
 }
@@ -384,12 +382,12 @@ void Terrain::forceGrassUpdate()
 	}
 }
 
-Array<Terrain::GrassQuad*>& Terrain::getQuads(ComponentIndex camera)
+Array<Terrain::GrassQuad*>& Terrain::getQuads(ComponentHandle camera)
 {
 	int quads_index = m_grass_quads.find(camera);
 	if (quads_index < 0)
 	{
-		m_grass_quads.insert(camera, Array<GrassQuad*>(m_allocator));
+		m_grass_quads.emplace(camera, m_allocator);
 		quads_index = m_grass_quads.find(camera);
 	}
 	return m_grass_quads.at(quads_index);
@@ -412,9 +410,9 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch,
 		for (float dz = 0; dz < GRASS_QUAD_SIZE; dz += step)
 		{
 			uint32 pixel_value = splat_map->getPixelNearest(
-				int(splat_map->getWidth() * (quad_x + dx) /
+				int(splat_map->width * (quad_x + dx) /
 					(m_width * m_scale.x)),
-				int(splat_map->getHeight() * (quad_z + dz) /
+				int(splat_map->height * (quad_z + dz) /
 					(m_height * m_scale.x)));
 
 			int ground_index = pixel_value & 0xff;
@@ -430,16 +428,14 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch,
 			float z = quad_z + dz + step * Math::randFloat(-0.5f, 0.5f);
 			grass_mtx.setTranslation(Vec3(x, getHeight(x, z), z));
 			Quat q(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2));
-			Matrix rotMatrix;
-			q.toMatrix(rotMatrix);
-			grass_mtx = terrain_matrix * grass_mtx * rotMatrix;
+			grass_mtx = terrain_matrix * grass_mtx * q.toMatrix();
 			grass_mtx.multiply3x3(density + Math::randFloat(-0.1f, 0.1f));
 		}
 	}
 }
 
 
-void Terrain::updateGrass(ComponentIndex camera)
+void Terrain::updateGrass(ComponentHandle camera)
 {
 	PROFILE_FUNCTION();
 	if (!m_splatmap)
@@ -468,7 +464,7 @@ void Terrain::updateGrass(ComponentIndex camera)
 	Matrix mtx = universe.getMatrix(m_entity);
 	Matrix inv_mtx = mtx;
 	inv_mtx.fastInverse();
-	Vec3 local_camera_pos = inv_mtx.multiplyPosition(camera_pos);
+	Vec3 local_camera_pos = inv_mtx.transform(camera_pos);
 	float cx = (int)(local_camera_pos.x / (GRASS_QUAD_SIZE)) * (float)GRASS_QUAD_SIZE;
 	float cz = (int)(local_camera_pos.z / (GRASS_QUAD_SIZE)) * (float)GRASS_QUAD_SIZE;
 	float from_quad_x = cx - (m_grass_distance >> 1) * GRASS_QUAD_SIZE;
@@ -545,13 +541,13 @@ void Terrain::updateGrass(ComponentIndex camera)
 }
 
 
-void Terrain::GrassType::grassLoaded(Resource::State, Resource::State)
+void Terrain::GrassType::grassLoaded(Resource::State, Resource::State, Resource&)
 {
 	m_terrain.forceGrassUpdate();
 }
 
 
-void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentIndex camera)
+void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentHandle camera)
 {
 	if (!m_material || !m_material->isReady()) return;
 
@@ -564,7 +560,7 @@ void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Com
 	for (auto* quad : quads)
 	{
 		Vec3 quad_center(quad->pos.x + GRASS_QUAD_SIZE * 0.5f, quad->pos.y, quad->pos.z + GRASS_QUAD_SIZE * 0.5f);
-		quad_center = mtx.multiplyPosition(quad_center);
+		quad_center = mtx.transform(quad_center);
 		if (frustum.isSphereInside(quad_center, quad->radius))
 		{
 			float dist2 = (quad_center - frustum_position).squaredLength();
@@ -592,7 +588,7 @@ void Terrain::setMaterial(Material* material)
 	{
 		if (m_material)
 		{
-			m_material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*m_material);
+			m_material->getResourceManager().unload(*m_material);
 			m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(this);
 		}
 		m_material = material;
@@ -606,17 +602,21 @@ void Terrain::setMaterial(Material* material)
 	}
 	else if(material)
 	{
-		material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*material);
+		material->getResourceManager().unload(*material);
 	}
 }
 
-void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene, int index, int version)
+void Terrain::deserialize(InputBlob& serializer,
+	Universe& universe,
+	RenderScene& scene,
+	int version)
 {
 	serializer.read(m_entity);
+	ComponentHandle cmp = {m_entity.index};
 	serializer.read(m_layer_mask);
 	char path[MAX_PATH_LENGTH];
 	serializer.readString(path, MAX_PATH_LENGTH);
-	setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path))));
+	setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(MATERIAL_TYPE)->load(Path(path))));
 	serializer.read(m_scale.x);
 	serializer.read(m_scale.y);
 	m_scale.z = m_scale.x;
@@ -643,7 +643,7 @@ void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene
 		}
 		setGrassTypePath(i, Path(path));
 	}
-	universe.addComponent(m_entity, TERRAIN_HASH, &scene, index);
+	universe.addComponent(m_entity, TERRAIN_HASH, &scene, cmp);
 }
 
 	
@@ -667,7 +667,7 @@ void Terrain::serialize(OutputBlob& serializer)
 }
 
 
-void Terrain::getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos, LIFOAllocator& allocator)
+void Terrain::getInfos(Array<TerrainInfo>& infos, const Vec3& camera_pos)
 {
 	if (!m_root) return;
 	if (!m_material || !m_material->isReady()) return;
@@ -675,10 +675,10 @@ void Terrain::getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos,
 	Matrix matrix = m_scene.getUniverse().getMatrix(m_entity);
 	Matrix inv_matrix = matrix;
 	inv_matrix.fastInverse();
-	Vec3 local_camera_pos = inv_matrix.multiplyPosition(camera_pos);
+	Vec3 local_camera_pos = inv_matrix.transform(camera_pos);
 	local_camera_pos.x /= m_scale.x;
 	local_camera_pos.z /= m_scale.z;
-	m_root->getInfos(infos, local_camera_pos, this, matrix, allocator);
+	m_root->getInfos(infos, local_camera_pos, this, matrix);
 }
 
 
@@ -740,11 +740,11 @@ float Terrain::getHeight(int x, int z) const
 	int texture_y = z;
 	Texture* t = m_heightmap;
 	int idx = Math::clamp(texture_x, 0, m_width) + Math::clamp(texture_y, 0, m_height) * m_width;
-	if (t->getBytesPerPixel() == 2)
+	if (t->bytes_per_pixel == 2)
 	{
 		return m_scale.y / 65535.0f * ((uint16*)t->getData())[idx];
 	}
-	else if(t->getBytesPerPixel() == 4)
+	else if(t->bytes_per_pixel == 4)
 	{
 		return ((m_scale.y / 255.0f) * ((uint8*)t->getData())[idx * 4]);
 	}
@@ -806,7 +806,7 @@ RayCastModelHit Terrain::castRay(const Vec3& origin, const Vec3& dir)
 	{
 		Matrix mtx = m_scene.getUniverse().getMatrix(m_entity);
 		mtx.fastInverse();
-		Vec3 rel_origin = mtx.multiplyPosition(origin);
+		Vec3 rel_origin = mtx.transform(origin);
 		Vec3 rel_dir = mtx * Vec4(dir, 0);
 		Vec3 start;
 		Vec3 size(m_root->m_size * m_scale.x, m_scale.y * 65535.0f, m_root->m_size * m_scale.x);
@@ -922,14 +922,8 @@ void Terrain::generateGeometry()
 	m_vertices_handle = bgfx::createVertexBuffer(bgfx::copy(&points[0], sizeof(points[0]) * points.size()), vertex_def);
 	auto* indices_mem = bgfx::copy(&indices[0], sizeof(indices[0]) * indices.size());
 	m_indices_handle = bgfx::createIndexBuffer(indices_mem);
-	m_mesh = LUMIX_NEW(m_allocator, Mesh)(vertex_def,
-		m_material,
-		0,
-		int(points.size() * sizeof(points[0])),
-		0,
-		int(indices.size()),
-		"terrain",
-		m_allocator);
+	m_mesh = LUMIX_NEW(m_allocator, Mesh)(
+		m_material, 0, int(points.size() * sizeof(points[0])), 0, int(indices.size()), "terrain", m_allocator);
 }
 
 TerrainQuad* Terrain::generateQuadTree(float size)
@@ -942,7 +936,7 @@ TerrainQuad* Terrain::generateQuadTree(float size)
 	return root;
 }
 
-void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state)
+void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state, Resource&)
 {
 	PROFILE_FUNCTION();
 	if (new_state == Resource::State::READY)
@@ -975,8 +969,8 @@ void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state)
 			LUMIX_DELETE(m_allocator, m_root);
 			if (m_heightmap && m_splatmap)
 			{
-				m_width = m_heightmap->getWidth();
-				m_height = m_heightmap->getHeight();
+				m_width = m_heightmap->width;
+				m_height = m_heightmap->height;
 				m_root = generateQuadTree((float)m_width);
 			}
 		}

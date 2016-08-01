@@ -1,8 +1,8 @@
 #include "renderer/frame_buffer.h"
-#include "core/json_serializer.h"
-#include "core/log.h"
-#include "core/string.h"
-#include "core/vec.h"
+#include "engine/json_serializer.h"
+#include "engine/log.h"
+#include "engine/string.h"
+#include "engine/vec.h"
 #include <bgfx/bgfx.h>
 #include <lua.hpp>
 #include <lauxlib.h>
@@ -103,41 +103,36 @@ bool FrameBuffer::RenderBuffer::isDepth() const
 {
 	switch(m_format)
 	{
-		case bgfx::TextureFormat::D32:
+		case bgfx::TextureFormat::D0S8:
+		case bgfx::TextureFormat::D16:
+		case bgfx::TextureFormat::D16F:
 		case bgfx::TextureFormat::D24:
-			return true;
+		case bgfx::TextureFormat::D24F:
+		case bgfx::TextureFormat::D24S8:
+		case bgfx::TextureFormat::D32:
+		case bgfx::TextureFormat::D32F: return true;
+		default: return false;
 	}
-	return false;
 }
 
 
 static bgfx::TextureFormat::Enum getFormat(const char* name) 
 {
-	if (compareString(name, "depth32") == 0)
+	static const struct { const char* name; bgfx::TextureFormat::Enum value; } FORMATS[] = {
+		{ "depth32", bgfx::TextureFormat::D32 },
+		{ "depth24", bgfx::TextureFormat::D24 },
+		{ "depth24stencil8", bgfx::TextureFormat::D24S8 },
+		{ "rgba8", bgfx::TextureFormat::RGBA8 },
+		{ "rgba16f", bgfx::TextureFormat::RGBA16F },
+		{ "r32f", bgfx::TextureFormat::R32F },
+	};
+
+	for (auto& i : FORMATS)
 	{
-		return bgfx::TextureFormat::D32;
+		if (equalStrings(i.name, name)) return i.value;
 	}
-	else if (compareString(name, "depth24") == 0)
-	{
-		return bgfx::TextureFormat::D24;
-	}
-	else if (compareString(name, "rgba8") == 0)
-	{
-		return bgfx::TextureFormat::RGBA8;
-	}
-	else if (compareString(name, "rgba16f") == 0)
-	{
-		return bgfx::TextureFormat::RGBA16F;
-	}
-	else if (compareString(name, "r32f") == 0)
-	{
-		return bgfx::TextureFormat::R32F;
-	}
-	else
-	{
-		g_log_error.log("Renderer") << "Uknown texture format " << name;
-		return bgfx::TextureFormat::RGBA8;
-	}
+	g_log_error.log("Renderer") << "Uknown texture format " << name;
+	return bgfx::TextureFormat::RGBA8;
 }
 
 

@@ -1,31 +1,182 @@
 #include "scene_view.h"
-#include "core/crc32.h"
-#include "core/input_system.h"
-#include "core/path.h"
-#include "core/profiler.h"
-#include "core/resource_manager.h"
-#include "core/string.h"
+#include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
-#include "editor/imgui/imgui.h"
+#include "editor/ieditor_command.h"
 #include "editor/log_ui.h"
 #include "editor/platform_interface.h"
 #include "editor/settings.h"
+#include "editor/studio_app.h"
+#include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/input_system.h"
+#include "engine/json_serializer.h"
+#include "engine/path.h"
+#include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
+#include "engine/profiler.h"
+#include "engine/property_register.h"
+#include "engine/resource_manager.h"
+#include "engine/string.h"
+#include "engine/universe/component.h"
+#include "engine/universe/universe.h"
+#include "imgui/imgui.h"
 #include "renderer/frame_buffer.h"
+#include "renderer/model.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
+#include <SDL.h>
 
 
-SceneView::SceneView()
+static const Lumix::ComponentType RENDERABLE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
+
+
+struct InsertMeshCommand : public Lumix::IEditorCommand
 {
-	m_pipeline = nullptr;
-	m_editor = nullptr;
+	Lumix::Vec3 m_position;
+	Lumix::Path m_mesh_path;
+	Lumix::Entity m_entity;
+	Lumix::WorldEditor& m_editor;
+
+
+	InsertMeshCommand(Lumix::WorldEditor& editor)
+		: m_editor(editor)
+	{
+	}
+
+
+	InsertMeshCommand(Lumix::WorldEditor& editor, const Lumix::Vec3& position, const Lumix::Path& mesh_path)
+		: m_mesh_path(mesh_path)
+		, m_position(position)
+		, m_editor(editor)
+	{
+	}
+
+
+	void serialize(Lumix::JsonSerializer& serializer)
+	{
+		serializer.serialize("path", m_mesh_path.c_str());
+		serializer.beginArray("pos");
+		serializer.serializeArrayItem(m_position.x);
+		serializer.serializeArrayItem(m_position.y);
+		serializer.serializeArrayItem(m_position.z);
+		serializer.endArray();
+	}
+
+
+	void deserialize(Lumix::JsonSerializer& serializer)
+	{
+		char path[Lumix::MAX_PATH_LENGTH];
+		serializer.deserialize("path", path, sizeof(path), "");
+		m_mesh_path = path;
+		serializer.deserializeArrayBegin("pos");
+		serializer.deserializeArrayItem(m_position.x, 0);
+		serializer.deserializeArrayItem(m_position.y, 0);
+		serializer.deserializeArrayItem(m_position.z, 0);
+		serializer.deserializeArrayEnd();
+	}
+
+
+	bool execute()
+	{
+		auto* universe = m_editor.getUniverse();
+		m_entity = universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
+		universe->setPosition(m_entity, m_position);
+		auto* scene = static_cast<Lumix::RenderScene*>(universe->getScene(RENDERABLE_TYPE));
+		if (!scene) return false;
+
+		Lumix::ComponentHandle cmp = scene->createComponent(RENDERABLE_TYPE, m_entity);
+
+		if (isValid(cmp)) scene->setRenderablePath(cmp, m_mesh_path);
+		return true;
+	}
+
+
+	void undo()
+	{
+		m_editor.getUniverse()->destroyEntity(m_entity);
+		m_entity = Lumix::INVALID_ENTITY;
+	}
+
+
+	const char* getType() override
+	{
+		return "insert_mesh";
+	}
+
+
+	bool merge(Lumix::IEditorCommand&) { return false; }
+};
+
+
+static Lumix::IEditorCommand* createInsertMeshCommand(Lumix::WorldEditor& editor)
+{
+	return LUMIX_NEW(editor.getAllocator(), InsertMeshCommand)(editor);
+}
+
+
+SceneView::SceneView(StudioApp& app)
+	: m_app(app)
+{
 	m_camera_speed = 0.1f;
 	m_is_mouse_captured = false;
 	m_show_stats = false;
-	m_log_ui = nullptr;
+	m_app.getWorldEditor()->registerEditorCommandCreator("insert_mesh", createInsertMeshCommand);
+
+	m_log_ui = m_app.getLogUI();
+	m_editor = m_app.getWorldEditor();
+	auto& engine = m_editor->getEngine();
+	auto& allocator = engine.getAllocator();
+	auto* renderer = static_cast<Lumix::Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+	m_is_opengl = renderer->isOpenGL();
+	Lumix::Path path("pipelines/main.lua");
+	m_pipeline = Lumix::Pipeline::create(*renderer, path, engine.getAllocator());
+	m_pipeline->load();
+	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<SceneView, &SceneView::renderGizmos>(this);
+	m_pipeline->addCustomCommandHandler("renderIcons").callback.bind<SceneView, &SceneView::renderIcons>(this);
+
+	m_editor->universeCreated().bind<SceneView, &SceneView::onUniverseCreated>(this);
+	m_editor->universeDestroyed().bind<SceneView, &SceneView::onUniverseDestroyed>(this);
+
+	m_toggle_gizmo_step_action =
+		LUMIX_NEW(m_editor->getAllocator(), Action)("Enable/disable gizmo step", "toggleGizmoStep");
+	m_toggle_gizmo_step_action->is_global = false;
+	m_app.addAction(m_toggle_gizmo_step_action);
+
+	m_move_forward_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Move forward", "moveForward");
+	m_move_forward_action->is_global = false;
+	m_app.addAction(m_move_forward_action);
+
+	m_move_back_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Move back", "moveBack");
+	m_move_back_action->is_global = false;
+	m_app.addAction(m_move_back_action);
+
+	m_move_left_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Move left", "moveLeft");
+	m_move_left_action->is_global = false;
+	m_app.addAction(m_move_left_action);
+
+	m_move_right_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Move right", "moveRight");
+	m_move_right_action->is_global = false;
+	m_app.addAction(m_move_right_action);
+
+	m_move_up_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Move up", "moveUp");
+	m_move_up_action->is_global = false;
+	m_app.addAction(m_move_up_action);
+
+	m_move_down_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Move down", "moveDown");
+	m_move_down_action->is_global = false;
+	m_app.addAction(m_move_down_action);
+
+	m_camera_speed_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Camera speed", "cameraSpeed");
+	m_camera_speed_action->is_global = false;
+	m_camera_speed_action->func.bind<SceneView, &SceneView::resetCameraSpeed>(this);
+	m_app.addAction(m_camera_speed_action);
+}
+
+
+void SceneView::resetCameraSpeed()
+{
+	m_camera_speed = 0.1f;
 }
 
 
@@ -57,7 +208,7 @@ void SceneView::shutdown()
 
 void SceneView::onUniverseCreated()
 {
-	auto* scene = m_editor->getScene(Lumix::crc32("renderer"));
+	auto* scene = m_editor->getUniverse()->getScene(Lumix::crc32("renderer"));
 	m_pipeline->setScene(static_cast<Lumix::RenderScene*>(scene));
 }
 
@@ -68,59 +219,6 @@ void SceneView::onUniverseDestroyed()
 }
 
 
-bool SceneView::init(LogUI& log_ui, Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
-{
-	m_log_ui = &log_ui;
-	m_editor = &editor;
-	auto& engine = editor.getEngine();
-	auto& allocator = engine.getAllocator();
-	auto* renderer = static_cast<Lumix::Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-
-	Lumix::Path path("pipelines/main.lua");
-	m_pipeline = Lumix::Pipeline::create(*renderer, path, engine.getAllocator());
-	m_pipeline->load();
-	m_pipeline->addCustomCommandHandler("renderGizmos")
-		.callback.bind<SceneView, &SceneView::renderGizmos>(this);
-	m_pipeline->addCustomCommandHandler("renderIcons")
-		.callback.bind<SceneView, &SceneView::renderIcons>(this);
-
-	editor.universeCreated().bind<SceneView, &SceneView::onUniverseCreated>(this);
-	editor.universeDestroyed().bind<SceneView, &SceneView::onUniverseDestroyed>(this);
-	onUniverseCreated();
-
-	m_toggle_gizmo_step_action =
-		LUMIX_NEW(editor.getAllocator(), Action)("Enable/disable gizmo step", "toggleGizmoStep");
-	m_toggle_gizmo_step_action->is_global = false;
-	actions.push(m_toggle_gizmo_step_action);
-
-	m_move_forward_action = LUMIX_NEW(editor.getAllocator(), Action)("Move forward", "moveForward");
-	m_move_forward_action->is_global = false;
-	actions.push(m_move_forward_action);
-
-	m_move_back_action = LUMIX_NEW(editor.getAllocator(), Action)("Move back", "moveBack");
-	m_move_back_action->is_global = false;
-	actions.push(m_move_back_action);
-
-	m_move_left_action = LUMIX_NEW(editor.getAllocator(), Action)("Move left", "moveLeft");
-	m_move_left_action->is_global = false;
-	actions.push(m_move_left_action);
-
-	m_move_right_action = LUMIX_NEW(editor.getAllocator(), Action)("Move right", "moveRight");
-	m_move_right_action->is_global = false;
-	actions.push(m_move_right_action);
-
-	m_move_up_action = LUMIX_NEW(editor.getAllocator(), Action)("Move up", "moveUp");
-	m_move_up_action->is_global = false;
-	actions.push(m_move_up_action);
-
-	m_move_down_action = LUMIX_NEW(editor.getAllocator(), Action)("Move down", "moveDown");
-	m_move_down_action->is_global = false;
-	actions.push(m_move_down_action);
-
-	return true;
-}
-
-
 void SceneView::update()
 {
 	PROFILE_FUNCTION();
@@ -128,13 +226,13 @@ void SceneView::update()
 	if (!m_is_opened) return;
 	if (ImGui::GetIO().KeyCtrl) return;
 
-	m_camera_speed = Lumix::Math::maximum(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
-
 	int screen_x = int(ImGui::GetIO().MousePos.x);
 	int screen_y = int(ImGui::GetIO().MousePos.y);
 	bool is_inside = screen_x >= m_screen_x && screen_y >= m_screen_y && screen_x <= m_screen_x + m_width &&
 					 screen_y <= m_screen_y + m_height;
 	if (!is_inside) return;
+
+	m_camera_speed = Lumix::Math::maximum(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
 
 	float speed = m_camera_speed;
 	if (ImGui::GetIO().KeyShift) speed *= 10;
@@ -163,8 +261,143 @@ void SceneView::captureMouse(bool capture)
 {
 	if(m_is_mouse_captured == capture) return;
 	m_is_mouse_captured = capture;
-	PlatformInterface::showCursor(!m_is_mouse_captured);
-	if(!m_is_mouse_captured) PlatformInterface::unclipCursor();
+	SDL_ShowCursor(m_is_mouse_captured ? 0 : 1);
+	SDL_SetRelativeMouseMode(capture ? SDL_TRUE : SDL_FALSE);
+}
+
+
+Lumix::RayCastModelHit SceneView::castRay(float x, float y)
+{
+	auto* scene =  m_pipeline->getScene();
+	ASSERT(scene);
+	
+	Lumix::ComponentUID camera_cmp = m_editor->getEditCamera();
+	Lumix::Vec2 screen_size = scene->getCameraScreenSize(camera_cmp.handle);
+	screen_size.x *= x;
+	screen_size.y *= y;
+
+	Lumix::Vec3 origin;
+	Lumix::Vec3 dir;
+	scene->getRay(camera_cmp.handle, (float)screen_size.x, (float)screen_size.y, origin, dir);
+	return scene->castRay(origin, dir, Lumix::INVALID_COMPONENT);
+}
+
+
+void SceneView::handleDrop(float x, float y)
+{
+	const char* path = (const char*)m_app.getDragData().data;
+	auto hit = castRay(x, y);
+
+	if (hit.m_is_hit)
+	{
+		if (Lumix::PathUtils::hasExtension(path, "fab"))
+		{
+			m_editor->getEntityTemplateSystem().instantiatePrefab(hit.m_origin + hit.m_t * hit.m_dir, Lumix::Path(path));
+		}
+		if (Lumix::PathUtils::hasExtension(path, "msh"))
+		{
+			auto* command = LUMIX_NEW(m_editor->getAllocator(), InsertMeshCommand)(
+				*m_editor, hit.m_origin + hit.m_t * hit.m_dir, Lumix::Path(path));
+
+			m_editor->executeCommand(command);
+		}
+		else if (Lumix::PathUtils::hasExtension(path, "mat") && hit.m_mesh)
+		{
+			auto* desc = Lumix::PropertyRegister::getDescriptor(RENDERABLE_TYPE, Lumix::crc32("Material"));
+			auto drag_data = m_app.getDragData();
+			m_editor->selectEntities(&hit.m_entity, 1);
+			auto* model = m_pipeline->getScene()->getRenderableModel(hit.m_component);
+			int mesh_index = 0;
+			for (int i = 0; i < model->getMeshCount(); ++i)
+			{
+				if (&model->getMesh(i) == hit.m_mesh)
+				{
+					mesh_index = i;
+					break;
+				}
+			}
+			
+			m_editor->setProperty(RENDERABLE_TYPE, mesh_index, *desc, &hit.m_entity, 1, drag_data.data, drag_data.size);
+		}
+	}
+}
+
+
+void SceneView::onToolbar()
+{
+	static const char* actions_names[] = { "setTranslateGizmoMode",
+		"setRotateGizmoMode",
+		"setLocalCoordSystem",
+		"setGlobalCoordSystem",
+		"setPivotCenter",
+		"setPivotOrigin",
+		"viewTop",
+		"viewFront",
+		"viewSide" };
+
+	auto pos = ImGui::GetCursorScreenPos();
+	if (ImGui::BeginToolbar("scene_view_toolbar", pos, ImVec2(0, 24)))
+	{
+		for (auto* action_name : actions_names)
+		{
+			auto& action = m_app.getAction(action_name);
+			action.toolbarButton();
+		}
+	}
+
+	m_app.getAction("cameraSpeed").toolbarButton();
+
+	ImGui::PushItemWidth(50);
+	ImGui::SameLine();
+	float offset = (24 - ImGui::GetTextLineHeightWithSpacing()) / 2;
+	pos = ImGui::GetCursorPos();
+	pos.y += offset;
+	ImGui::SetCursorPos(pos);
+	ImGui::DragFloat("##camera_speed", &m_camera_speed, 0.1f, 0.01f, 999.0f, "%.2f");
+	
+	int step = m_editor->getGizmo().getStep();
+	Action* mode_action;
+	if (m_editor->getGizmo().isTranslateMode())
+	{
+		mode_action = &m_app.getAction("setTranslateGizmoMode");
+	}
+	else
+	{
+		mode_action = &m_app.getAction("setRotateGizmoMode");
+	}
+	
+	ImGui::SameLine();
+	pos = ImGui::GetCursorPos();
+	pos.y -= offset;
+	ImGui::SetCursorPos(pos);
+	ImVec4 tint_color = ImGui::GetStyle().Colors[ImGuiCol_Text];
+	ImGui::Image(mode_action->icon, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), tint_color);
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Snap amount");
+
+	ImGui::SameLine();
+	pos = ImGui::GetCursorPos();
+	pos.y += offset;
+	ImGui::SetCursorPos(pos);
+	if (ImGui::DragInt("##gizmoStep", &step, 1.0f, 0, 200))
+	{
+		m_editor->getGizmo().setStep(step);
+	}
+
+	ImGui::SameLine(0, 20);
+	ImGui::Checkbox("Stats", &m_show_stats);
+
+	ImGui::SameLine(0, 20);
+	m_pipeline->callLuaFunction("onGUI");
+
+	if (m_editor->isMeasureToolActive())
+	{
+		ImGui::SameLine(0, 20);
+		ImGui::Text(" | Measured distance: %f", m_editor->getMeasuredDistance());
+	}
+
+	ImGui::PopItemWidth();
+
+	ImGui::EndToolbar();
 }
 
 
@@ -179,11 +412,11 @@ void SceneView::onGUI()
 		title = "Scene View | errors in log###Scene View";
 	}
 
-	if (ImGui::BeginDock(title))
+	if (ImGui::BeginDock(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse))
 	{
 		m_is_opened = true;
+		onToolbar();
 		auto size = ImGui::GetContentRegionAvail();
-		size.y -= ImGui::GetTextLineHeightWithSpacing();
 		auto* fb = m_pipeline->getFramebuffer("default");
 		if (size.x > 0 && size.y > 0 && fb)
 		{
@@ -197,7 +430,23 @@ void SceneView::onGUI()
 			m_height = int(size.y);
 			auto content_min = ImGui::GetCursorScreenPos();
 			ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
-			ImGui::Image(&m_texture_handle, size);
+			if (m_is_opengl)
+			{
+				ImGui::Image(&m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
+			}
+			else
+			{
+				ImGui::Image(&m_texture_handle, size);
+			}
+			if (ImGui::IsItemHoveredRect())
+			{
+				if (ImGui::IsMouseReleased(0) && m_app.getDragData().type == StudioApp::DragData::PATH)
+				{
+					float x = (ImGui::GetMousePos().x - content_min.x) / size.x;
+					float y = (ImGui::GetMousePos().y - content_min.y) / size.y;
+					handleDrop(x, y);
+				}
+			}
 			view_pos = content_min;
 			auto rel_mp = ImGui::GetMousePos();
 			rel_mp.x -= m_screen_x;
@@ -210,7 +459,7 @@ void SceneView::onGUI()
 					if (ImGui::IsMouseClicked(i))
 					{
 						ImGui::ResetActiveID();
-						captureMouse(true);
+						if(i == 1) captureMouse(true);
 						m_editor->onMouseDown((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
 						break;
 					}
@@ -225,50 +474,28 @@ void SceneView::onGUI()
 					m_editor->onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)delta.x, (int)delta.y);
 				}
 			}
-			if(m_is_mouse_captured)
+			for (int i = 0; i < 3; ++i)
 			{
-				PlatformInterface::clipCursor(
-					content_min.x, content_min.y, content_max.x, content_max.y);
-				for (int i = 0; i < 3; ++i)
+				auto rel_mp = ImGui::GetMousePos();
+				rel_mp.x -= m_screen_x;
+				rel_mp.y -= m_screen_y;
+				if (ImGui::IsMouseReleased(i))
 				{
-					auto rel_mp = ImGui::GetMousePos();
-					rel_mp.x -= m_screen_x;
-					rel_mp.y -= m_screen_y;
-					if (ImGui::IsMouseReleased(i))
-					{
-						captureMouse(false);
-						m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
-					}
+					if (i == 1) captureMouse(false);
+					m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
 				}
 			}
 			m_pipeline->render();
 		}
-
-		ImGui::PushItemWidth(60);
-		ImGui::DragFloat("Camera speed", &m_camera_speed, 0.1f, 0.01f, 999.0f, "%.2f");
-		ImGui::SameLine();
-		if (m_editor->isMeasureToolActive())
-		{
-			ImGui::Text("| Measured distance: %f", m_editor->getMeasuredDistance());
-		}
-
-		ImGui::SameLine();
-		int step = m_editor->getGizmo().getStep();
-		if (ImGui::DragInt("Gizmo step", &step, 1.0f, 0, 200))
-		{
-			m_editor->getGizmo().setStep(step);
-		}
-
-		ImGui::SameLine();
-		ImGui::Checkbox("Stats", &m_show_stats);
 	}
 
 	ImGui::EndDock();
 
-	if(m_show_stats)
+	if(m_show_stats && m_is_opened)
 	{
+		float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
 		view_pos.x += ImGui::GetStyle().FramePadding.x;
-		view_pos.y += ImGui::GetStyle().FramePadding.y;
+		view_pos.y += ImGui::GetStyle().FramePadding.y + toolbar_height;
 		ImGui::SetNextWindowPos(view_pos);
 		auto col = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
 		col.w = 0.3f;
@@ -284,11 +511,13 @@ void SceneView::onGUI()
 			ImGui::LabelText("Instances", "%d", stats.instance_count);
 			char buf[30];
 			Lumix::toCStringPretty(stats.triangle_count, buf, Lumix::lengthOf(buf));
-			ImGui::LabelText("Triangles", buf);
+			ImGui::LabelText("Triangles", "%s", buf);
 			ImGui::LabelText("Resolution", "%dx%d", m_pipeline->getWidth(), m_pipeline->getHeight());
 			ImGui::LabelText("FPS", "%.2f", m_editor->getEngine().getFPS());
 			ImGui::LabelText("CPU time", "%.2f", m_pipeline->getCPUTime() * 1000.0f);
 			ImGui::LabelText("GPU time", "%.2f", m_pipeline->getGPUTime() * 1000.0f);
+			ImGui::LabelText("Waiting for submit", "%.2f", m_pipeline->getWaitSubmitTime() * 1000.0f);
+			ImGui::LabelText("Waiting for render thread", "%.2f", m_pipeline->getGPUTime() * 1000.0f);
 		}
 		ImGui::End();
 		ImGui::PopStyleColor();

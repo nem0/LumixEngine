@@ -1,7 +1,7 @@
 #pragma once
 
-#include "lumix.h"
-#include "core/delegate.h"
+#include "engine/lumix.h"
+#include "engine/delegate.h"
 
 
 struct lua_State;
@@ -14,6 +14,7 @@ namespace bgfx
 	struct ProgramHandle;
 	struct TransientVertexBuffer;
 	struct TransientIndexBuffer;
+	struct VertexDecl;
 }
 
 
@@ -86,31 +87,46 @@ class LUMIX_RENDERER_API Pipeline
 
 		virtual FrameBuffer* getFramebuffer(const char* framebuffer_name) = 0;
 		virtual void setScene(RenderScene* scene) = 0;
+		virtual RenderScene* getScene() = 0;
 		virtual int getWidth() = 0;
 		virtual int getHeight() = 0;
 		virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;
 		virtual void setViewProjection(const Matrix& mtx, int width, int height) = 0;
 		virtual void setScissor(int x, int y, int width, int height) = 0;
+		virtual bool checkAvailTransientBuffers(uint32 num_vertices,
+			const bgfx::VertexDecl& decl,
+			uint32 num_indices) = 0;
+		virtual void allocTransientBuffers(bgfx::TransientVertexBuffer* tvb,
+			uint32 num_vertices,
+			const bgfx::VertexDecl& decl,
+			bgfx::TransientIndexBuffer* tib,
+			uint32 num_indices) = 0;
+		virtual bgfx::TextureHandle createTexture(int width, int height, const uint32* rgba_data) = 0;
+		virtual void destroyTexture(bgfx::TextureHandle texture) = 0;
 		virtual void setTexture(int slot,
 			bgfx::TextureHandle texture,
 			bgfx::UniformHandle uniform) = 0;
+		virtual void destroyUniform(bgfx::UniformHandle uniform) = 0;
+		virtual bgfx::UniformHandle createTextureUniform(const char* name) = 0;
 		virtual void render(const bgfx::TransientVertexBuffer& vertex_buffer,
 			const bgfx::TransientIndexBuffer& index_buffer,
 			const Matrix& mtx,
 			int first_index,
 			int num_indices,
 			uint64 render_states,
-			bgfx::ProgramHandle program_handle) = 0;
+			const struct ShaderInstance& shader_instance) = 0;
 		virtual void setWireframe(bool wireframe) = 0;
 		virtual void renderModel(Model& model, const Matrix& mtx) = 0;
 		virtual void toggleStats() = 0;
 		virtual void setWindowHandle(void* data) = 0;
-		virtual int getPassIdx() const = 0;
 		virtual bool isReady() const = 0;
 		virtual const Stats& getStats() = 0;
 		virtual Path& getPath() = 0;
 		virtual float getCPUTime() const = 0;
 		virtual float getGPUTime() const = 0;
+		virtual float getWaitSubmitTime() const = 0;
+		virtual float getWaitRenderTime() const = 0;
+		virtual void callLuaFunction(const char* func) = 0;
 };
 
 

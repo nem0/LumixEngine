@@ -1,17 +1,19 @@
 #pragma once
 
 
-#include "lumix.h"
+#include "engine/lumix.h"
 
 
 namespace Lumix
 {
 	class IAllocator;
+	class WorldEditor;
 }
 
 
 struct Action;
 struct lua_State;
+class StudioApp;
 
 
 struct LUMIX_EDITOR_API Settings
@@ -37,28 +39,30 @@ struct LUMIX_EDITOR_API Settings
 	bool m_is_profiler_opened;
 	bool m_is_properties_opened;
 	bool m_is_crash_reporting_enabled;
+	bool m_force_no_crash_report;
 	float m_mouse_sensitivity_x;
 	float m_mouse_sensitivity_y;
+	char m_data_dir[Lumix::MAX_PATH_LENGTH];
+	Lumix::WorldEditor* m_editor;
 
 	int m_autosave_time;
 
-	explicit Settings(Lumix::IAllocator& allocator);
+	explicit Settings(StudioApp& app);
 	~Settings();
 
-	static Settings* getInstance();
-
-	bool save(Action** actions, int actions_count);
-	bool load(Action** actions, int actions_count);
-	void onGUI(Action** actions, int actions_count);
+	bool save();
+	bool load();
+	void onGUI();
 	void setValue(const char* name, bool value);
 	void setValue(const char* name, int value);
 	int getValue(const char* name, int default_value) const;
 	bool getValue(const char* name, bool default_value) const;
 
 private:
-	Lumix::IAllocator& m_allocator;
+	StudioApp& m_app;
 	lua_State* m_state;
 
 private:
-	void showShortcutSettings(Action** actions, int actions_count);
+	void showShortcutSettings();
+	void showToolbarSettings();
 };

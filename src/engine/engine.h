@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "lumix.h"
+#include "engine/lumix.h"
 
 
 struct lua_State;
@@ -20,6 +20,7 @@ namespace MTJD
 class Manager;
 }
 
+struct ComponentUID;
 class InputBlob;
 class IAllocator;
 class InputSystem;
@@ -28,6 +29,8 @@ class PathManager;
 class PluginManager;
 class ResourceManager;
 class Universe;
+struct Vec3;
+template <typename T> class Array;
 
 
 class LUMIX_ENGINE_API Engine
@@ -36,6 +39,7 @@ public:
 	struct PlatformData
 	{
 		void* window_handle;
+		void* display;
 	};
 
 public:
@@ -52,6 +56,7 @@ public:
 	virtual void setPlatformData(const PlatformData& data) = 0;
 	virtual const PlatformData& getPlatformData() = 0;
 
+	virtual void setPatchPath(const char* path) = 0;
 	virtual FS::FileSystem& getFileSystem() = 0;
 	virtual FS::DiskFileDevice* getDiskFileDevice() = 0;
 	virtual FS::DiskFileDevice* getPatchFileDevice() = 0;
@@ -75,6 +80,9 @@ public:
 	virtual PathManager& getPathManager() = 0;
 	virtual lua_State* getState() = 0;
 	virtual void runScript(const char* src, int src_length, const char* path) = 0;
+	virtual ComponentUID createComponent(Universe& universe, Entity entity, ComponentType type) = 0;
+	virtual void pasteEntities(const Vec3& position, Universe& universe, InputBlob& blob, Array<Entity>& entities) = 0;
+	virtual IAllocator& getLIFOAllocator() = 0;
 
 protected:
 	Engine() {}

@@ -7,6 +7,7 @@
 
 
 class LogUI;
+class StudioApp;
 
 
 namespace Lumix
@@ -20,11 +21,10 @@ namespace Lumix
 class SceneView
 {
 	public:
-		SceneView();
+		SceneView(StudioApp& app);
 		~SceneView();
 
 		void update();
-		bool init(LogUI& log_ui, Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions);
 		void setScene(Lumix::RenderScene* scene);
 		void shutdown();
 		void onGUI();
@@ -37,8 +37,13 @@ class SceneView
 		void onUniverseCreated();
 		void onUniverseDestroyed();
 		void captureMouse(bool capture);
+		Lumix::RayCastModelHit castRay(float x, float y);
+		void handleDrop(float x, float y);
+		void onToolbar();
+		void resetCameraSpeed();
 
 	private:
+		StudioApp& m_app;
 		bool m_is_mouse_captured;
 		Action* m_toggle_gizmo_step_action;
 		Action* m_move_forward_action;
@@ -47,6 +52,7 @@ class SceneView
 		Action* m_move_right_action;
 		Action* m_move_up_action;
 		Action* m_move_down_action;
+		Action* m_camera_speed_action;
 		bool m_is_mouse_hovering_window;
 		bool m_is_opened;
 		int m_screen_x;
@@ -58,5 +64,6 @@ class SceneView
 		Lumix::Pipeline* m_pipeline;
 		bgfx::TextureHandle m_texture_handle;
 		bool m_show_stats;
+		bool m_is_opengl;
 		LogUI* m_log_ui;
 };

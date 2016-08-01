@@ -1,25 +1,28 @@
 #pragma once
 
 
-#include "core/array.h"
-#include "core/geometry.h"
-#include "core/hash_map.h"
-#include "core/matrix.h"
-#include "core/quat.h"
-#include "core/string.h"
-#include "core/vec.h"
-#include "core/resource.h"
+#include "engine/array.h"
+#include "engine/geometry.h"
+#include "engine/hash_map.h"
+#include "engine/matrix.h"
+#include "engine/quat.h"
+#include "engine/string.h"
+#include "engine/vec.h"
+#include "engine/resource.h"
 #include <bgfx/bgfx.h>
+
+
+struct lua_State;
 
 
 namespace Lumix
 {
 
-class Frustum;
+struct Frustum;
 class Material;
 struct Mesh;
 class Model;
-class Pose;
+struct Pose;
 class ResourceManager;
 
 
@@ -37,29 +40,24 @@ struct LUMIX_RENDERER_API RayCastModelHit
 	Vec3 m_origin;
 	Vec3 m_dir;
 	Mesh* m_mesh;
-	ComponentIndex m_component;
+	ComponentHandle m_component;
 	Entity m_entity;
-	uint32 m_component_type;
+	ComponentType m_component_type;
 };
 
 
 struct LUMIX_RENDERER_API Mesh
 {
-	Mesh(const bgfx::VertexDecl& def,
-		 Material* mat,
-		 int attribute_array_offset,
-		 int attribute_array_size,
-		 int indices_offset,
-		 int index_count,
-		 const char* name,
-		 IAllocator& allocator);
-	void set(const bgfx::VertexDecl& def,
+	Mesh(Material* mat,
 		int attribute_array_offset,
 		int attribute_array_size,
 		int indices_offset,
-		int index_count);
+		int index_count,
+		const char* name,
+		IAllocator& allocator);
 
-	bgfx::VertexDecl vertex_def;
+	void set(int attribute_array_offset, int attribute_array_size, int indices_offset, int index_count);
+
 	int32 instance_idx;
 	int32 attribute_array_offset;
 	int32 attribute_array_size;
@@ -94,6 +92,7 @@ public:
 	{
 		FIRST,
 		WITH_FLAGS,
+		SINGLE_VERTEX_DECL,
 
 		LATEST // keep this last
 	};
@@ -121,14 +120,13 @@ public:
 
 		string name;
 		string parent;
-		Vec3 position;
-		Quat rotation;
-		Matrix inv_bind_matrix;
+		Transform transform;
+		Transform inv_bind_transform;
 		int parent_idx;
 	};
 
 public:
-	Model(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
+	Model(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	~Model();
 
 	void create(const bgfx::VertexDecl& def,
@@ -138,10 +136,17 @@ public:
 		const void* attributes_data,
 		int attributes_size);
 
-	LODMeshIndices getLODMeshIndices(float squared_distance) const;
+	LODMeshIndices getLODMeshIndices(float squared_distance) const
+	{
+		int i = 0;
+		while (squared_distance >= m_lods[i].distance) ++i;
+		return {m_lods[i].from_mesh, m_lods[i].to_mesh};
+	}
+
 	Mesh& getMesh(int index) { return m_meshes[index]; }
 	bgfx::VertexBufferHandle getVerticesHandle() const { return m_vertices_handle; }
 	bgfx::IndexBufferHandle getIndicesHandle() const { return m_indices_handle; }
+	bgfx::VertexDecl getVertexDecl() const { return m_vertex_decl; }
 	const Mesh& getMesh(int index) const { return m_meshes[index]; }
 	const Mesh* getMeshPtr(int index) const { return &m_meshes[index]; }
 	int getMeshCount() const { return m_meshes.size(); }
@@ -156,6 +161,9 @@ public:
 	LOD* getLODs() { return m_lods; }
 	Array<uint8>& getIndices() { return m_indices; }
 	const Array<Vec3>& getVertices() const { return m_vertices; }
+	uint32 getFlags() const { return m_flags;	}
+
+	static void registerLuaAPI(lua_State* L);
 
 public:
 	static const uint32 FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
@@ -165,10 +173,11 @@ private:
 	Model(const Model&);
 	void operator=(const Model&);
 
-	bool parseVertexDef(FS::IFile& file, bgfx::VertexDecl* vertex_definition);
+	bool parseVertexDecl(FS::IFile& file, bgfx::VertexDecl* vertex_decl);
+	bool parseVertexDeclEx(FS::IFile& file, bgfx::VertexDecl* vertex_decl);
 	bool parseGeometry(FS::IFile& file);
 	bool parseBones(FS::IFile& file);
-	bool parseMeshes(FS::IFile& file);
+	bool parseMeshes(FS::IFile& file, FileVersion version);
 	bool parseLODs(FS::IFile& file);
 	int getBoneIdx(const char* name);
 	void computeRuntimeData(const uint8* vertices);
@@ -178,9 +187,9 @@ private:
 
 private:
 	IAllocator& m_allocator;
+	bgfx::VertexDecl m_vertex_decl;
 	bgfx::IndexBufferHandle m_indices_handle;
 	bgfx::VertexBufferHandle m_vertices_handle;
-	int m_vertices_size;
 	Array<Mesh> m_meshes;
 	Array<Bone> m_bones;
 	Array<uint8> m_indices;
@@ -194,4 +203,4 @@ private:
 };
 
 
-} // ~namespace Lumix
+} // namespace Lumix

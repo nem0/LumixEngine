@@ -1,9 +1,9 @@
 #pragma once
 
 
-#include "lumix.h"
-#include "core/iallocator.h"
-#include "core/mt/sync.h"
+#include "engine/lumix.h"
+#include "engine/iallocator.h"
+#include "engine/mt/sync.h"
 
 
 namespace Lumix
@@ -82,7 +82,7 @@ private:
 
 private:
 	IAllocator& m_source;
-	StackTree* m_stack_tree;
+	StackTree m_stack_tree;
 	MT::SpinMutex m_mutex;
 	AllocationInfo* m_root;
 	AllocationInfo m_sentinels[2];

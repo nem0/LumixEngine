@@ -1,14 +1,14 @@
-#include "lumix.h"
+#include "engine/lumix.h"
 #include "renderer/material_manager.h"
 
-#include "core/resource.h"
+#include "engine/resource.h"
 #include "renderer/material.h"
 
 namespace Lumix
 {
 	Resource* MaterialManager::createResource(const Path& path)
 	{
-		return LUMIX_NEW(m_allocator, Material)(path, getOwner(), m_allocator);
+		return LUMIX_NEW(m_allocator, Material)(path, *this, m_allocator);
 	}
 
 	void MaterialManager::destroyResource(Resource& resource)

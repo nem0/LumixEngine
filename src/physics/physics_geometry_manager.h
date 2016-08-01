@@ -1,9 +1,9 @@
 #pragma once
 
 
-#include "lumix.h"
-#include "core/resource.h"
-#include "core/resource_manager_base.h"
+#include "engine/lumix.h"
+#include "engine/resource.h"
+#include "engine/resource_manager_base.h"
 
 
 namespace physx
@@ -19,7 +19,7 @@ namespace Lumix
 class PhysicsSystem;
 
 
-class LUMIX_PHYSICS_API PhysicsGeometryManager : public ResourceManagerBase
+class PhysicsGeometryManager : public ResourceManagerBase
 {
 	public:
 		PhysicsGeometryManager(PhysicsSystem& system, IAllocator& allocator)
@@ -41,7 +41,7 @@ class LUMIX_PHYSICS_API PhysicsGeometryManager : public ResourceManagerBase
 };
 
 
-class LUMIX_PHYSICS_API PhysicsGeometry : public Resource
+class PhysicsGeometry : public Resource
 {
 	public:
 		static const uint32 HEADER_MAGIC = 0x5f4c5046; // '_LPF'
@@ -60,7 +60,7 @@ class LUMIX_PHYSICS_API PhysicsGeometry : public Resource
 		};
 
 	public:
-		PhysicsGeometry(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
+		PhysicsGeometry(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 		~PhysicsGeometry();
 
 		physx::PxGeometry* getGeometry() { return m_geometry; }

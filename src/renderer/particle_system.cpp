@@ -1,30 +1,35 @@
 #include "particle_system.h"
-#include "core/blob.h"
-#include "core/crc32.h"
-#include "core/math_utils.h"
-#include "core/profiler.h"
-#include "core/resource_manager.h"
-#include "core/resource_manager_base.h"
+#include "engine/blob.h"
+#include "engine/crc32.h"
+#include "engine/math_utils.h"
+#include "engine/profiler.h"
+#include "engine/property_register.h"
+#include "engine/resource_manager.h"
+#include "engine/resource_manager_base.h"
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
 #include "renderer/material.h"
 #include "renderer/render_scene.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 #include <cmath>
+
+
+namespace Lumix
+{
+
+
+static const ResourceType MATERIAL_TYPE("material");
 
 
 enum class ParticleEmitterVersion : int
 {
 	SPAWN_COUNT,
 	SIZE_ALPHA_SAVE,
+	COMPONENT_TYPE,
 
 	LATEST,
 	INVALID = -1
 };
-
-
-namespace Lumix
-{
 
 
 template <typename T>
@@ -34,10 +39,10 @@ static ParticleEmitter::ModuleBase* create(ParticleEmitter& emitter)
 }
 
 
-static ParticleEmitter::ModuleBase* createModule(uint32 type, ParticleEmitter& emitter)
+static ParticleEmitter::ModuleBase* createModule(ComponentType type, ParticleEmitter& emitter)
 {
 	typedef ParticleEmitter::ModuleBase* (*Creator)(ParticleEmitter& emitter);
-	static const struct { uint32 hash; Creator creator; } creators[] = {
+	static const struct { ComponentType type; Creator creator; } creators[] = {
 		{ ParticleEmitter::ForceModule::s_type, create<ParticleEmitter::ForceModule> },
 		{ ParticleEmitter::PlaneModule::s_type, create<ParticleEmitter::PlaneModule> },
 		{ ParticleEmitter::LinearMovementModule::s_type, create<ParticleEmitter::LinearMovementModule> },
@@ -50,7 +55,7 @@ static ParticleEmitter::ModuleBase* createModule(uint32 type, ParticleEmitter& e
 
 	for(auto& i : creators)
 	{
-		if(i.hash == type)
+		if(i.type == type)
 		{
 			return i.creator(emitter);
 		}
@@ -97,7 +102,7 @@ void ParticleEmitter::ForceModule::update(float time_delta)
 }
 
 
-const uint32 ParticleEmitter::ForceModule::s_type = Lumix::crc32("force");
+const ComponentType ParticleEmitter::ForceModule::s_type = PropertyRegister::getComponentType("particle_emitter_force");
 
 
 void ParticleEmitter::drawGizmo(WorldEditor& editor, RenderScene& scene)
@@ -177,8 +182,8 @@ void ParticleEmitter::AttractorModule::deserialize(InputBlob& blob, int)
 }
 
 
-const uint32 ParticleEmitter::AttractorModule::s_type = Lumix::crc32("attractor");
-
+const ComponentType ParticleEmitter::AttractorModule::s_type =
+	PropertyRegister::getComponentType("particle_emitter_attractor");
 
 
 ParticleEmitter::PlaneModule::PlaneModule(ParticleEmitter& emitter)
@@ -231,7 +236,7 @@ void ParticleEmitter::PlaneModule::update(float time_delta)
 		auto entity = m_entities[i];
 		if (entity == INVALID_ENTITY) continue;
 		if (!m_emitter.m_universe.hasEntity(entity)) continue;
-		Vec3 normal = m_emitter.m_universe.getRotation(entity) * Vec3(0, 1, 0);
+		Vec3 normal = m_emitter.m_universe.getRotation(entity).rotate(Vec3(0, 1, 0));
 		float D = -dotProduct(normal, m_emitter.m_universe.getPosition(entity));
 
 		for (int i = m_emitter.m_position.size() - 1; i >= 0; --i)
@@ -269,7 +274,7 @@ void ParticleEmitter::PlaneModule::deserialize(InputBlob& blob, int)
 }
 
 
-const uint32 ParticleEmitter::PlaneModule::s_type = Lumix::crc32("plane");
+const ComponentType ParticleEmitter::PlaneModule::s_type = PropertyRegister::getComponentType("particle_emitter_plane");
 
 
 ParticleEmitter::SpawnShapeModule::SpawnShapeModule(ParticleEmitter& emitter)
@@ -313,7 +318,8 @@ void ParticleEmitter::SpawnShapeModule::deserialize(InputBlob& blob, int)
 }
 
 
-const uint32 ParticleEmitter::SpawnShapeModule::s_type = Lumix::crc32("spawn_shape");
+const ComponentType ParticleEmitter::SpawnShapeModule::s_type =
+	PropertyRegister::getComponentType("particle_emitter_spawn_shape");
 
 
 ParticleEmitter::LinearMovementModule::LinearMovementModule(ParticleEmitter& emitter)
@@ -346,7 +352,8 @@ void ParticleEmitter::LinearMovementModule::deserialize(InputBlob& blob, int)
 }
 
 
-const uint32 ParticleEmitter::LinearMovementModule::s_type = Lumix::crc32("linear_movement");
+const ComponentType ParticleEmitter::LinearMovementModule::s_type =
+	PropertyRegister::getComponentType("particle_emitter_linear_movement");
 
 
 static void sampleBezier(float max_life, const Array<Vec2>& values, Array<float>& sampled)
@@ -447,7 +454,7 @@ void ParticleEmitter::AlphaModule::update(float)
 }
 
 
-const uint32 ParticleEmitter::AlphaModule::s_type = Lumix::crc32("alpha");
+const ComponentType ParticleEmitter::AlphaModule::s_type = PropertyRegister::getComponentType("particle_emitter_alpha");
 
 
 ParticleEmitter::SizeModule::SizeModule(ParticleEmitter& emitter)
@@ -514,7 +521,7 @@ void ParticleEmitter::SizeModule::update(float)
 }
 
 
-const uint32 ParticleEmitter::SizeModule::s_type = Lumix::crc32("size");
+const ComponentType ParticleEmitter::SizeModule::s_type = PropertyRegister::getComponentType("particle_emitter_size");
 
 
 ParticleEmitter::RandomRotationModule::RandomRotationModule(ParticleEmitter& emitter)
@@ -529,8 +536,8 @@ void ParticleEmitter::RandomRotationModule::spawnParticle(int index)
 }
 
 
-const uint32 ParticleEmitter::RandomRotationModule::s_type = Lumix::crc32("random_rotation");
-
+const ComponentType ParticleEmitter::RandomRotationModule::s_type =
+	PropertyRegister::getComponentType("particle_emitter_random_rotation");
 
 
 Interval::Interval()
@@ -573,8 +580,7 @@ float Interval::getRandom() const
 
 
 ParticleEmitter::ParticleEmitter(Entity entity, Universe& universe, IAllocator& allocator)
-	: m_next_spawn_time(0)
-	, m_allocator(allocator)
+	: m_allocator(allocator)
 	, m_rel_life(allocator)
 	, m_life(allocator)
 	, m_modules(allocator)
@@ -586,14 +592,8 @@ ParticleEmitter::ParticleEmitter(Entity entity, Universe& universe, IAllocator& 
 	, m_universe(universe)
 	, m_entity(entity)
 	, m_size(allocator)
-	, m_material(nullptr)
 {
-	m_spawn_period.from = 1;
-	m_spawn_period.to = 2;
-	m_initial_life.from = 1;
-	m_initial_life.to = 2;
-	m_initial_size.from = 1;
-	m_initial_size.to = 1;
+	init();
 }
 
 
@@ -605,6 +605,20 @@ ParticleEmitter::~ParticleEmitter()
 	{
 		LUMIX_DELETE(m_allocator, module);
 	}
+}
+
+
+void ParticleEmitter::init()
+{
+	m_spawn_period.from = 1;
+	m_spawn_period.to = 2;
+	m_initial_life.from = 1;
+	m_initial_life.to = 2;
+	m_initial_size.from = 1;
+	m_initial_size.to = 1;
+	m_material = nullptr;
+	m_next_spawn_time = 0;
+	m_is_valid = true;
 }
 
 
@@ -625,8 +639,7 @@ void ParticleEmitter::setMaterial(Material* material)
 {
 	if (m_material)
 	{
-		auto* manager = m_material->getResourceManager().get(ResourceManager::MATERIAL);
-		manager->unload(*m_material);
+		m_material->getResourceManager().unload(*m_material);
 	}
 	m_material = material;
 }
@@ -646,6 +659,16 @@ void ParticleEmitter::spawnParticle()
 	{
 		module->spawnParticle(m_life.size() - 1);
 	}
+}
+
+
+ParticleEmitter::ModuleBase* ParticleEmitter::getModule(ComponentType type)
+{
+	for (auto* module : m_modules)
+	{
+		if (module->getType() == type) return module;
+	}
+	return nullptr;
 }
 
 
@@ -702,7 +725,7 @@ void ParticleEmitter::serialize(OutputBlob& blob)
 	blob.write(m_modules.size());
 	for (auto* module : m_modules)
 	{
-		blob.write(module->getType());
+		blob.write(PropertyRegister::getComponentTypeHash(module->getType()));
 		module->serialize(blob);
 	}
 }
@@ -722,8 +745,8 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager, boo
 	blob.read(m_entity);
 	char path[MAX_PATH_LENGTH];
 	blob.readString(path, lengthOf(path));
-	auto material_manager = manager.get(ResourceManager::MATERIAL);
-	auto material = static_cast<Material*>(material_manager->load(Lumix::Path(path)));
+	auto material_manager = manager.get(MATERIAL_TYPE);
+	auto material = static_cast<Material*>(material_manager->load(Path(path)));
 	setMaterial(material);
 
 	int size;
@@ -735,11 +758,47 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager, boo
 	m_modules.clear();
 	for (int i = 0; i < size; ++i)
 	{
-		uint32 type;
-		blob.read(type);
-		auto* module = createModule(type, *this);
-		m_modules.push(module);
-		module->deserialize(blob, version);
+		ParticleEmitter::ModuleBase* module = nullptr;
+		if (version > (int)ParticleEmitterVersion::COMPONENT_TYPE)
+		{
+			uint32 hash;
+			blob.read(hash);
+			ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
+			module = createModule(type, *this);
+		}
+		else
+		{
+			uint32 type;
+			blob.read(type);
+			static const char* OLD_MODULE_NAMES[] = {"force",
+				"attractor",
+				"plane",
+				"spawn_shape",
+				"linear_movement",
+				"alpha",
+				"size",
+				"random_rotation"};
+
+			for (const char* old_name : OLD_MODULE_NAMES)
+			{
+				if (type == crc32(old_name))
+				{
+					char tmp[50];
+					copyString(tmp, "particle_emitter_");
+					catString(tmp, old_name);
+					type = crc32(tmp);
+
+					module = createModule(PropertyRegister::getComponentTypeFromHash(type), *this);
+					break;
+				}
+			}
+			ASSERT(module);
+		}
+		if (module)
+		{
+			m_modules.push(module);
+			module->deserialize(blob, version);
+		}
 	}
 }
 

@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "lumix.h"
+#include "engine/lumix.h"
 
 
 namespace Lumix
@@ -16,13 +16,13 @@ namespace Lumix
 	{
 		class Manager;
 	}
-	class Frustum;
+	struct Frustum;
 
 	class LUMIX_RENDERER_API CullingSystem
 	{
 	public:
 		typedef Array<Sphere> InputSpheres;
-		typedef Array<int> Subresults;
+		typedef Array<ComponentHandle> Subresults;
 		typedef Array<Subresults> Results;
 
 		CullingSystem() { }
@@ -37,16 +37,16 @@ namespace Lumix
 		virtual void cullToFrustum(const Frustum& frustum, int64 layer_mask) = 0;
 		virtual void cullToFrustumAsync(const Frustum& frustum, int64 layer_mask) = 0;
 
-		virtual void addStatic(ComponentIndex renderable, const Sphere& sphere) = 0;
-		virtual void removeStatic(ComponentIndex renderable) = 0;
+		virtual bool isAdded(ComponentHandle renderable) = 0;
+		virtual void addStatic(ComponentHandle renderable, const Sphere& sphere) = 0;
+		virtual void removeStatic(ComponentHandle renderable) = 0;
 
-		virtual void setLayerMask(ComponentIndex renderable, int64 layer) = 0;
-		virtual int64 getLayerMask(ComponentIndex renderable) = 0;
+		virtual void setLayerMask(ComponentHandle renderable, int64 layer) = 0;
+		virtual int64 getLayerMask(ComponentHandle renderable) = 0;
 
-		virtual void updateBoundingRadius(float radius, int index) = 0;
-		virtual void updateBoundingPosition(const Vec3& position, int index) = 0;
+		virtual void updateBoundingSphere(const Sphere& sphere, ComponentHandle renderable) = 0;
 
-		virtual void insert(const InputSpheres& spheres, const Array<ComponentIndex>& renderables) = 0;
-		virtual const Sphere& getSphere(ComponentIndex renderable) = 0;
+		virtual void insert(const InputSpheres& spheres, const Array<ComponentHandle>& renderables) = 0;
+		virtual const Sphere& getSphere(ComponentHandle renderable) = 0;
 	};
 } // ~namespace Lux

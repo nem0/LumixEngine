@@ -1,9 +1,9 @@
 #pragma once
 
 
-#include "lumix.h"
-#include "core/matrix.h"
-#include "core/hash_map.h"
+#include "engine/lumix.h"
+#include "engine/matrix.h"
+#include "engine/hash_map.h"
 #include "engine/iplugin.h"
 
 
@@ -22,8 +22,6 @@ namespace Lumix
 	public:
 		explicit HierarchyPlugin(IAllocator& allocator) : m_allocator(allocator) {}
 
-		bool create() override { return true; }
-		void destroy() override {}
 		const char* getName() const override { return "hierarchy"; }
 
 		IScene* createScene(Universe&) override;
@@ -41,10 +39,10 @@ namespace Lumix
 			{
 				public:
 					Entity m_entity;
-					Matrix m_local_matrix;
+					Transform m_local_transform;
 			};
 
-			typedef HashMap<int32, Array<Child>*> Children;
+			typedef HashMap<Entity, Array<Child>*> Children;
 
 		public:
 			static Hierarchy* create(IPlugin& system, Universe& universe, IAllocator& allocator);
@@ -52,12 +50,12 @@ namespace Lumix
 
 			virtual ~Hierarchy() {}
 
-			virtual void setLocalPosition(ComponentIndex cmp, const Vec3& position) = 0;
-			virtual Vec3 getLocalPosition(ComponentIndex cmp) = 0;
+			virtual void setLocalPosition(ComponentHandle cmp, const Vec3& position) = 0;
+			virtual Vec3 getLocalPosition(ComponentHandle cmp) = 0;
 			virtual void setLocalRotation(Entity entity, const Quat& rotation) = 0;
-			virtual Quat getLocalRotation(ComponentIndex cmp) = 0;
-			virtual void setParent(ComponentIndex cmp, Entity parent) = 0;
-			virtual Entity getParent(ComponentIndex cmp) = 0;
+			virtual Quat getLocalRotation(ComponentHandle cmp) = 0;
+			virtual void setParent(ComponentHandle cmp, Entity parent) = 0;
+			virtual Entity getParent(ComponentHandle cmp) = 0;
 			virtual Array<Child>* getChildren(Entity parent) = 0;
 			virtual const Children& getAllChildren() const = 0;
 	};

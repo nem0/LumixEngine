@@ -1,10 +1,10 @@
-#include "core/fs/file_system.h"
-#include "core/log.h"
-#include "core/math_utils.h"
-#include "core/path_utils.h"
-#include "core/profiler.h"
-#include "core/resource_manager.h"
-#include "core/resource_manager_base.h"
+#include "engine/fs/file_system.h"
+#include "engine/log.h"
+#include "engine/math_utils.h"
+#include "engine/path_utils.h"
+#include "engine/profiler.h"
+#include "engine/resource_manager.h"
+#include "engine/resource_manager_base.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
 #include <bgfx/bgfx.h>
@@ -12,6 +12,9 @@
 
 namespace Lumix
 {
+
+
+static const ResourceType TEXTURE_TYPE("texture");
 
 
 #pragma pack(1)
@@ -33,19 +36,18 @@ struct TGAHeader
 #pragma pack()
 
 
-Texture::Texture(const Path& path,
-				 ResourceManager& resource_manager,
-				 IAllocator& allocator)
-	: Resource(path, resource_manager, allocator)
-	, m_data_reference(0)
-	, m_allocator(allocator)
-	, m_data(m_allocator)
-	, m_BPP(-1)
-	, m_depth(-1)
+Texture::Texture(const Path& path, ResourceManagerBase& resource_manager, IAllocator& _allocator)
+	: Resource(path, resource_manager, _allocator)
+	, data_reference(0)
+	, allocator(_allocator)
+	, data(_allocator)
+	, bytes_per_pixel(-1)
+	, depth(-1)
 {
-	m_atlas_size = -1;
-	m_flags = 0;
-	m_texture_handle = BGFX_INVALID_HANDLE;
+	atlas_size = -1;
+	bgfx_flags = 0;
+	is_cubemap = false;
+	handle = BGFX_INVALID_HANDLE;
 }
 
 
@@ -57,24 +59,24 @@ Texture::~Texture()
 
 void Texture::setFlag(uint32 flag, bool value)
 {
-	uint32 new_flags = m_flags & ~flag;
+	uint32 new_flags = bgfx_flags & ~flag;
 	new_flags |= value ? flag : 0;
-	m_flags = new_flags;
+	bgfx_flags = new_flags;
 
-	getResourceManager().get(ResourceManager::TEXTURE)->reload(*this);
+	m_resource_manager.reload(*this);
 }
 
 
 void Texture::setFlags(uint32 flags)
 {
-	if (isReady() && m_flags != flags)
+	if (isReady() && bgfx_flags != flags)
 	{
 		g_log_warning.log("Renderer")
 			<< "Trying to set different flags for texture " << getPath().c_str()
 			<< ". They are ignored.";
 		return;
 	}
-	m_flags = flags;
+	bgfx_flags = flags;
 }
 
 
@@ -88,21 +90,21 @@ bool Texture::create(int w, int h, void* data)
 {
 	if (data)
 	{
-		m_texture_handle = bgfx::createTexture2D((uint16_t)w,
+		handle = bgfx::createTexture2D((uint16_t)w,
 			(uint16_t)h,
 			1,
 			bgfx::TextureFormat::RGBA8,
-			m_flags,
+			bgfx_flags,
 			bgfx::copy(data, w * h * 4));
 	}
 	else
 	{
-		m_texture_handle =
-			bgfx::createTexture2D((uint16_t)w, (uint16_t)h, 1, bgfx::TextureFormat::RGBA8, m_flags);
+		handle =
+			bgfx::createTexture2D((uint16_t)w, (uint16_t)h, 1, bgfx::TextureFormat::RGBA8, bgfx_flags);
 	}
 
 
-	bool isReady = bgfx::isValid(m_texture_handle);
+	bool isReady = bgfx::isValid(handle);
 	onCreated(isReady ? State::READY : State::FAILURE);
 
 	return isReady;
@@ -111,19 +113,15 @@ bool Texture::create(int w, int h, void* data)
 
 uint32 Texture::getPixelNearest(int x, int y) const
 {
-	if (m_data.empty() || x >= m_width || y >= m_height || x < 0 || y < 0 ||
-		getBytesPerPixel() != 4)
-	{
-		return 0;
-	}
+	if (data.empty() || x >= width || y >= height || x < 0 || y < 0 || bytes_per_pixel != 4) return 0;
 
-	return *(uint32*)&m_data[(x + y * m_width) * 4];
+	return *(uint32*)&data[(x + y * width) * 4];
 }
 
 
 uint32 Texture::getPixel(float x, float y) const
 {
-	if (m_data.empty() || x >= m_width || y >= m_height || x < 0 || y < 0)
+	if (data.empty() || x >= width || y >= height || x < 0 || y < 0)
 	{
 		return 0;
 	}
@@ -131,12 +129,12 @@ uint32 Texture::getPixel(float x, float y) const
 	// http://fastcpp.blogspot.sk/2011/06/bilinear-pixel-interpolation-using-sse.html
 	int px = (int)x;
 	int py = (int)y;
-	const uint32* p0 = (uint32*)&m_data[(px + py * m_width) * 4];
+	const uint32* p0 = (uint32*)&data[(px + py * width) * 4];
 
 	const uint8* p1 = (uint8*)p0;
 	const uint8* p2 = (uint8*)(p0 + 1);
-	const uint8* p3 = (uint8*)(p0 + m_width);
-	const uint8* p4 = (uint8*)(p0 + 1 + m_width);
+	const uint8* p3 = (uint8*)(p0 + width);
+	const uint8* p4 = (uint8*)(p0 + 1 + width);
 
 	float fx = x - px;
 	float fy = y - py;
@@ -211,19 +209,17 @@ unsigned int Texture::compareTGA(IAllocator& allocator,
 }
 
 
-bool Texture::saveTGA(IAllocator& allocator,
-					  FS::IFile* file,
-					  int width,
-					  int height,
-					  int bytes_per_pixel,
-					  const uint8* image_dest,
-					  const Path& path)
+static bool saveTGA(IAllocator& allocator,
+	FS::IFile* file,
+	int width,
+	int height,
+	int bytes_per_pixel,
+	const uint8* image_dest,
+	const Path& path)
 {
 	if (bytes_per_pixel != 4)
 	{
-		g_log_error.log("Renderer")
-			<< "Texture " << path.c_str()
-			<< " could not be saved, unsupported TGA format";
+		g_log_error.log("Renderer") << "Texture " << path.c_str() << " could not be saved, unsupported TGA format";
 		return false;
 	}
 
@@ -241,9 +237,7 @@ bool Texture::saveTGA(IAllocator& allocator,
 	for (long y = 0; y < header.height; y++)
 	{
 		long read_index = y * header.width * 4;
-		long write_index = ((header.imageDescriptor & 32) != 0)
-							   ? read_index
-							   : y * header.width * 4;
+		long write_index = ((header.imageDescriptor & 32) != 0) ? read_index : y * header.width * 4;
 		for (long x = 0; x < header.width; x++)
 		{
 			data[write_index + 0] = image_dest[write_index + 2];
@@ -262,22 +256,25 @@ bool Texture::saveTGA(IAllocator& allocator,
 }
 
 
-void Texture::saveTGA()
+static void saveTGA(Texture& texture)
 {
-	if (m_data.empty())
+	if (texture.data.empty())
 	{
-		g_log_error.log("Renderer")
-			<< "Texture " << getPath().c_str()
-			<< " could not be saved, no data was loaded";
+		g_log_error.log("Renderer") << "Texture " << texture.getPath().c_str()
+									<< " could not be saved, no data was loaded";
 		return;
 	}
 
-	FS::FileSystem& fs = m_resource_manager.getFileSystem();
-	FS::IFile* file = fs.open(fs.getDefaultDevice(),
-							  getPath(),
-							  FS::Mode::CREATE_AND_WRITE);
+	FS::FileSystem& fs = texture.getResourceManager().getOwner().getFileSystem();
+	FS::IFile* file = fs.open(fs.getDefaultDevice(), texture.getPath(), FS::Mode::CREATE_AND_WRITE);
 
-	saveTGA(m_allocator, file, m_width, m_height, m_BPP, &m_data[0], getPath());
+	saveTGA(texture.allocator,
+		file,
+		texture.width,
+		texture.height,
+		texture.bytes_per_pixel,
+		&texture.data[0],
+		texture.getPath());
 
 	fs.close(*file);
 }
@@ -288,24 +285,21 @@ void Texture::save()
 	char ext[5];
 	ext[0] = 0;
 	PathUtils::getExtension(ext, 5, getPath().c_str());
-	if (compareString(ext, "raw") == 0 && m_BPP == 2)
+	if (equalStrings(ext, "raw") && bytes_per_pixel == 2)
 	{
-		FS::FileSystem& fs = m_resource_manager.getFileSystem();
-		FS::IFile* file = fs.open(fs.getDefaultDevice(),
-								  getPath(),
-								  FS::Mode::CREATE_AND_WRITE);
+		FS::FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
+		FS::IFile* file = fs.open(fs.getDefaultDevice(), getPath(), FS::Mode::CREATE_AND_WRITE);
 
-		file->write(&m_data[0], m_data.size() * sizeof(m_data[0]));
+		file->write(&data[0], data.size() * sizeof(data[0]));
 		fs.close(*file);
 	}
-	else if (compareString(ext, "tga") == 0 && m_BPP == 4)
+	else if (equalStrings(ext, "tga") && bytes_per_pixel == 4)
 	{
-		saveTGA();
+		Lumix::saveTGA(*this);
 	}
 	else
 	{
-		g_log_error.log("Renderer") << "Texture " << getPath().c_str()
-									<< " can not be saved - unsupported format";
+		g_log_error.log("Renderer") << "Texture " << getPath().c_str() << " can not be saved - unsupported format";
 	}
 }
 
@@ -314,9 +308,9 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 {
 	const bgfx::Memory* mem = nullptr;
 
-	if (m_BPP == 2)
+	if (bytes_per_pixel == 2)
 	{
-		const uint16* src_mem = (const uint16*)&m_data[0];
+		const uint16* src_mem = (const uint16*)&data[0];
 		mem = bgfx::alloc(w * h * sizeof(float));
 		float* dst_mem = (float*)mem->data;
 
@@ -324,70 +318,63 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 		{
 			for (int i = 0; i < w; ++i)
 			{
-				dst_mem[i + j * w] = src_mem[x + i + (y + j) * m_width] / 65535.0f;
+				dst_mem[i + j * w] = src_mem[x + i + (y + j) * width] / 65535.0f;
 			}
 		}
 	}
 	else
 	{
-		const uint8* src_mem = (const uint8*)&m_data[0];
-		mem = bgfx::alloc(w * h * m_BPP);
+		const uint8* src_mem = (const uint8*)&data[0];
+		mem = bgfx::alloc(w * h * bytes_per_pixel);
 		uint8* dst_mem = mem->data;
 
 		for (int j = 0; j < h; ++j)
 		{
 			for (int i = 0; i < w; ++i)
 			{
-				copyMemory(&dst_mem[(i + j * w) * m_BPP],
-					&src_mem[(x + i + (y + j) * m_width) * m_BPP],
-					m_BPP);
+				copyMemory(&dst_mem[(i + j * w) * bytes_per_pixel],
+					&src_mem[(x + i + (y + j) * width) * bytes_per_pixel],
+					bytes_per_pixel);
 			}
 		}
 	}
-	bgfx::updateTexture2D(
-		m_texture_handle, 0, (uint16_t)x, (uint16_t)y, (uint16_t)w, (uint16_t)h, mem);
+	bgfx::updateTexture2D(handle, 0, (uint16_t)x, (uint16_t)y, (uint16_t)w, (uint16_t)h, mem);
 }
 
 
-bool Texture::loadRaw(FS::IFile& file)
+bool loadRaw(Texture& texture, FS::IFile& file)
 {
 	PROFILE_FUNCTION();
 	size_t size = file.size();
-	m_BPP = 2;
-	m_width = (int)sqrt(size / m_BPP);
-	m_height = m_width;
+	texture.bytes_per_pixel = 2;
+	texture.width = (int)sqrt(size / texture.bytes_per_pixel);
+	texture.height = texture.width;
 
-	if (m_data_reference)
+	if (texture.data_reference)
 	{
-		m_data.resize((int)size);
-		file.read(&m_data[0], size);
+		texture.data.resize((int)size);
+		file.read(&texture.data[0], size);
 	}
 
 	const uint16* src_mem = (const uint16*)file.getBuffer();
-	const bgfx::Memory* mem = bgfx::alloc(m_width * m_height * sizeof(float));
+	const bgfx::Memory* mem = bgfx::alloc(texture.width * texture.height * sizeof(float));
 	float* dst_mem = (float*)mem->data;
 
-	for (int i = 0; i < m_width * m_height; ++i)
+	for (int i = 0; i < texture.width * texture.height; ++i)
 	{
 		dst_mem[i] = src_mem[i] / 65535.0f;
 	}
 
-	m_texture_handle = bgfx::createTexture2D(
-		(uint16_t)m_width, (uint16_t)m_height, 1, bgfx::TextureFormat::R32F, m_flags, nullptr);
-	bgfx::updateTexture2D(
-		m_texture_handle,
-		0,
-		0,
-		0,
-		(uint16_t)m_width,
-		(uint16_t)m_height,
-		mem);
-	m_depth = 1;
-	return bgfx::isValid(m_texture_handle);
+	texture.handle = bgfx::createTexture2D(
+		(uint16_t)texture.width, (uint16_t)texture.height, 1, bgfx::TextureFormat::R32F, texture.bgfx_flags, nullptr);
+	bgfx::updateTexture2D(texture.handle, 0, 0, 0, (uint16_t)texture.width, (uint16_t)texture.height, mem);
+	texture.depth = 1;
+	texture.is_cubemap = false;
+	return bgfx::isValid(texture.handle);
 }
 
 
-bool Texture::loadTGA(FS::IFile& file)
+static bool loadTGA(Texture& texture, FS::IFile& file)
 {
 	PROFILE_FUNCTION();
 	TGAHeader header;
@@ -397,27 +384,25 @@ bool Texture::loadTGA(FS::IFile& file)
 	int image_size = header.width * header.height * 4;
 	if (header.dataType != 2)
 	{
-		g_log_error.log("Renderer") << "Unsupported texture format " << getPath().c_str();
+		g_log_error.log("Renderer") << "Unsupported texture format " << texture.getPath().c_str();
 		return false;
 	}
 
 	if (color_mode < 3)
 	{
-		g_log_error.log("Renderer") << "Unsupported color mode " << getPath().c_str();
+		g_log_error.log("Renderer") << "Unsupported color mode " << texture.getPath().c_str();
 		return false;
 	}
 
-	m_width = header.width;
-	m_height = header.height;
-	TextureManager* manager = static_cast<TextureManager*>(
-		getResourceManager().get(ResourceManager::TEXTURE));
-	if (m_data_reference)
+	texture.width = header.width;
+	texture.height = header.height;
+	texture.is_cubemap = false;
+	TextureManager& manager = static_cast<TextureManager&>(texture.getResourceManager());
+	if (texture.data_reference)
 	{
-		m_data.resize(image_size);
+		texture.data.resize(image_size);
 	}
-	uint8* image_dest = m_data_reference
-							  ? &m_data[0]
-							  : (uint8*)manager->getBuffer(image_size);
+	uint8* image_dest = texture.data_reference ? &texture.data[0] : (uint8*)manager.getBuffer(image_size);
 
 	// Targa is BGR, swap to RGB, add alpha and flip Y axis
 	for (long y = 0; y < header.height; y++)
@@ -438,61 +423,59 @@ bool Texture::loadTGA(FS::IFile& file)
 			write_index += 4;
 		}
 	}
-	m_BPP = 4;
+	texture.bytes_per_pixel = 4;
 
-	m_texture_handle = bgfx::createTexture2D(
+	texture.handle = bgfx::createTexture2D(
 		header.width,
 		header.height,
 		1,
 		bgfx::TextureFormat::RGBA8,
-		m_flags,
+		texture.bgfx_flags,
 		0);
 	bgfx::updateTexture2D(
-		m_texture_handle,
+		texture.handle,
 		0,
 		0,
 		0,
 		header.width,
 		header.height,
 		bgfx::copy(image_dest, header.width * header.height * 4));
-	m_depth = 1;
-	return bgfx::isValid(m_texture_handle);
+	texture.depth = 1;
+	return bgfx::isValid(texture.handle);
 }
 
 
 void Texture::addDataReference()
 {
-	++m_data_reference;
-	if (m_data_reference == 1 && isReady())
+	++data_reference;
+	if (data_reference == 1 && isReady())
 	{
-		m_resource_manager.get(ResourceManager::TEXTURE)->reload(*this);
+		m_resource_manager.reload(*this);
 	}
 }
 
 
 void Texture::removeDataReference()
 {
-	--m_data_reference;
-	if (m_data_reference == 0)
+	--data_reference;
+	if (data_reference == 0)
 	{
-		m_data.clear();
+		data.clear();
 	}
 }
 
 
-bool Texture::loadDDS(FS::IFile& file)
+static bool loadDDS(Texture& texture, FS::IFile& file)
 {
 	bgfx::TextureInfo info;
-	m_texture_handle =
-		bgfx::createTexture(bgfx::copy(file.getBuffer(), (uint32)file.size()),
-							m_flags,
-							0,
-							&info);
-	m_BPP = -1;
-	m_width = info.width;
-	m_height = info.height;
-	m_depth = info.depth;
-	return bgfx::isValid(m_texture_handle);
+	const auto* mem = bgfx::copy(file.getBuffer(), (uint32)file.size());
+	texture.handle = bgfx::createTexture(mem, texture.bgfx_flags, 0, &info);
+	texture.bytes_per_pixel = -1;
+	texture.width = info.width;
+	texture.height = info.height;
+	texture.depth = info.depth;
+	texture.is_cubemap = info.cubeMap;
+	return bgfx::isValid(texture.handle);
 }
 
 
@@ -503,17 +486,17 @@ bool Texture::load(FS::IFile& file)
 	const char* path = getPath().c_str();
 	size_t len = getPath().length();
 	bool loaded = false;
-	if (len > 3 && compareString(path + len - 4, ".dds") == 0)
+	if (len > 3 && equalStrings(path + len - 4, ".dds"))
 	{
-		loaded = loadDDS(file);
+		loaded = loadDDS(*this, file);
 	}
-	else if (len > 3 && compareString(path + len - 4, ".raw") == 0)
+	else if (len > 3 && equalStrings(path + len - 4, ".raw"))
 	{
-		loaded = loadRaw(file);
+		loaded = loadRaw(*this, file);
 	}
 	else
 	{
-		loaded = loadTGA(file);
+		loaded = loadTGA(*this, file);
 	}
 	if (!loaded)
 	{
@@ -528,12 +511,12 @@ bool Texture::load(FS::IFile& file)
 
 void Texture::unload(void)
 {
-	if (bgfx::isValid(m_texture_handle))
+	if (bgfx::isValid(handle))
 	{
-		bgfx::destroyTexture(m_texture_handle);
-		m_texture_handle = BGFX_INVALID_HANDLE;
+		bgfx::destroyTexture(handle);
+		handle = BGFX_INVALID_HANDLE;
 	}
-	m_data.clear();
+	data.clear();
 }
 
 

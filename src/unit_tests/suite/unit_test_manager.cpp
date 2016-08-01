@@ -1,14 +1,13 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
-#include "core/log.h"
-#include "core/mt/lock_free_fixed_queue.h"
-#include "core/mt/task.h"
-#include "core/mt/thread.h"
-#include "core/mt/transaction.h"
-#include "core/queue.h"
-#include "core/array.h"
+#include "engine/log.h"
+#include "engine/mt/lock_free_fixed_queue.h"
+#include "engine/mt/task.h"
+#include "engine/mt/thread.h"
+#include "engine/mt/transaction.h"
+#include "engine/queue.h"
+#include "engine/array.h"
 
-#include <Windows.h>
 #include <cstdio>
 
 //#define ASSERT_HANDLE_FAIL
@@ -197,19 +196,12 @@ namespace Lumix
 				fi.m_file_name = file_name;
 				fi.m_line = line;
 				m_fails++;
-
-#if ASSERT_HANDLE_FAIL
-				ASSERT(false);
-#endif //ASSERT_HANDLE_FAIL
-
-				m_task.exit(10);
 			}
 
 			void spawnWorkerTask()
 			{
 				ASSERT(!m_task.isRunning());
 				m_task.create("TestWorkerTask");
-				m_task.run();
 			}
 
 			explicit ManagerImpl(IAllocator& allocator)

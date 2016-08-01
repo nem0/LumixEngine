@@ -1,6 +1,6 @@
-#include "property_register.h"
-#include "core/associative_array.h"
-#include "core/crc32.h"
+#include "engine/property_register.h"
+#include "engine/associative_array.h"
+#include "engine/crc32.h"
 #include "engine/iproperty_descriptor.h"
 
 
@@ -12,28 +12,27 @@ namespace PropertyRegister
 {
 
 
-struct ComponentType
+struct ComponentTypeData
 {
-	explicit ComponentType(IAllocator& allocator)
-		: m_name(allocator)
-		, m_id(allocator)
-	{
-	}
-
-	string m_name;
-	string m_id;
+	char m_id[50];
 
 	uint32 m_id_hash;
-	uint32 m_dependency;
 };
 
 
-typedef AssociativeArray<uint32, Array<IPropertyDescriptor*>> PropertyMap;
+typedef AssociativeArray<ComponentType, Array<IPropertyDescriptor*>> PropertyMap;
 
 
 static PropertyMap* g_properties = nullptr;
-static Array<ComponentType>* g_component_types = nullptr;
 static IAllocator* g_allocator = nullptr;
+
+
+static Array<ComponentTypeData>& getComponentTypes()
+{
+	static DefaultAllocator allocator;
+	static Array<ComponentTypeData> types(allocator);
+	return types;
+}
 
 
 void init(IAllocator& allocator)
@@ -41,7 +40,6 @@ void init(IAllocator& allocator)
 	ASSERT(!g_properties);
 	g_properties = LUMIX_NEW(allocator, PropertyMap)(allocator);
 	g_allocator = &allocator;
-	g_component_types = LUMIX_NEW(allocator, Array<ComponentType>)(allocator);
 }
 
 
@@ -57,32 +55,30 @@ void shutdown()
 	}
 
 	LUMIX_DELETE(*g_allocator, g_properties);
-	LUMIX_DELETE(*g_allocator, g_component_types);
 	g_properties = nullptr;
 	g_allocator = nullptr;
-	g_component_types = nullptr;
 }
 
 
 void add(const char* component_type, IPropertyDescriptor* descriptor)
 {
-	getDescriptors(crc32(component_type)).push(descriptor);
+	getDescriptors(getComponentType(component_type)).push(descriptor);
 }
 
 
-Array<IPropertyDescriptor*>& getDescriptors(uint32 type)
+Array<IPropertyDescriptor*>& getDescriptors(ComponentType type)
 {
 	int props_index = g_properties->find(type);
 	if (props_index < 0)
 	{
-		g_properties->insert(type, Array<IPropertyDescriptor*>(*g_allocator));
+		g_properties->emplace(type, *g_allocator);
 		props_index = g_properties->find(type);
 	}
 	return g_properties->at(props_index);
 }
 
 
-const IPropertyDescriptor* getDescriptor(uint32 type, uint32 name_hash)
+const IPropertyDescriptor* getDescriptor(ComponentType type, uint32 name_hash)
 {
 	Array<IPropertyDescriptor*>& props = getDescriptors(type);
 	for (int i = 0; i < props.size(); ++i)
@@ -91,14 +87,16 @@ const IPropertyDescriptor* getDescriptor(uint32 type, uint32 name_hash)
 		{
 			return props[i];
 		}
-		auto& children = props[i]->getChildren();
-		for (int j = 0; j < children.size(); ++j)
+		if (props[i]->getType() == IPropertyDescriptor::ARRAY)
 		{
-			if (children[j]->getNameHash() == name_hash)
+			auto* array_desc = static_cast<IArrayDescriptor*>(props[i]);
+			for (auto* child : array_desc->getChildren())
 			{
-				return children[j];
+				if (child->getNameHash() == name_hash)
+				{
+					return child;
+				}
 			}
-
 		}
 	}
 	return nullptr;
@@ -107,62 +105,57 @@ const IPropertyDescriptor* getDescriptor(uint32 type, uint32 name_hash)
 
 const IPropertyDescriptor* getDescriptor(const char* component_type, const char* property_name)
 {
-	return getDescriptor(crc32(component_type), crc32(property_name));
+	return getDescriptor(getComponentType(component_type), crc32(property_name));
 }
 
 
-void registerComponentDependency(const char* id, const char* dependency_id)
+ComponentType getComponentTypeFromHash(uint32 hash)
 {
-	for (ComponentType& cmp_type : *g_component_types)
+	for (int i = 0; i < getComponentTypes().size(); ++i)
 	{
-		if (cmp_type.m_id == id)
+		if (getComponentTypes()[i].m_id_hash == hash)
 		{
-			cmp_type.m_dependency = crc32(dependency_id);
-			return;
+			return {i};
 		}
 	}
 	ASSERT(false);
+	return {-1};
 }
 
 
-bool componentDepends(uint32 dependent, uint32 dependency)
+uint32 getComponentTypeHash(ComponentType type)
 {
-	for (ComponentType& cmp_type : *g_component_types)
+	return getComponentTypes()[type.index].m_id_hash;
+}
+
+
+ComponentType getComponentType(const char* id)
+{
+	uint32 id_hash = crc32(id);
+	for (int i = 0; i < getComponentTypes().size(); ++i)
 	{
-		if (cmp_type.m_id_hash == dependent)
+		if (getComponentTypes()[i].m_id_hash == id_hash)
 		{
-			return cmp_type.m_dependency == dependency;
+			return {i};
 		}
 	}
-	return false;
-}
 
-
-void registerComponentType(const char* id, const char* name)
-{
-	ComponentType& type = g_component_types->emplace(*g_allocator);
-	type.m_name = name;
-	type.m_id = id;
-	type.m_id_hash = crc32(id);
-	type.m_dependency = 0;
+	ComponentTypeData& type = getComponentTypes().emplace();
+	copyString(type.m_id, id);
+	type.m_id_hash = id_hash;
+	return {getComponentTypes().size() - 1};
 }
 
 
 int getComponentTypesCount()
 {
-	return g_component_types->size();
-}
-
-
-const char* getComponentTypeName(int index)
-{
-	return (*g_component_types)[index].m_name.c_str();
+	return getComponentTypes().size();
 }
 
 
 const char* getComponentTypeID(int index)
 {
-	return (*g_component_types)[index].m_id.c_str();
+	return getComponentTypes()[index].m_id;
 }
 
 

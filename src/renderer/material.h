@@ -1,9 +1,9 @@
 #pragma once
 
 
-#include "core/array.h"
-#include "core/resource.h"
-#include "core/vec.h"
+#include "engine/array.h"
+#include "engine/resource.h"
+#include "engine/vec.h"
 #include <bgfx/bgfx.h>
 
 
@@ -18,7 +18,7 @@ namespace FS
 class JsonSerializer;
 class ResourceManager;
 class Shader;
-class ShaderInstance;
+struct ShaderInstance;
 class Texture;
 
 
@@ -45,16 +45,18 @@ public:
 	};
 
 public:
-	Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
+	Material(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	~Material();
 
 	float getShininess() const { return m_shininess; }
-	void setShininess(float value) { m_shininess = value; }
+	void setShininess(float value) { m_shininess = value; createCommandBuffer(); }
 	Vec3 getColor() const { return m_color; }
-	void setColor(const Vec3& specular) { m_color = specular; }
+	void setColor(const Vec3& specular) { m_color = specular;  createCommandBuffer(); }
 	float getAlphaRef() const { return m_alpha_ref; }
 	void setAlphaRef(float value);
 	uint64 getRenderStates() const { return m_render_states; }
+	void enableBackfaceCulling(bool enable);
+	bool isBackfaceCulling() const;
 
 	void setShader(Shader* shader);
 	void setShader(const Path& path);
@@ -73,8 +75,8 @@ public:
 	ShaderInstance& getShaderInstance() { ASSERT(m_shader_instance); return *m_shader_instance; }
 	const ShaderInstance& getShaderInstance() const { ASSERT(m_shader_instance); return *m_shader_instance; }
 	const uint8* getCommandBuffer() const { return m_command_buffer; }
-	int getLayerCount() const { return m_layer_count; }
-	void setLayerCount(int count) { m_layer_count = count; }
+	int getLayerCount(int pass_idx) const { return m_layer_count[pass_idx]; }
+	void setLayerCount(int pass_idx, int count) { m_layer_count[pass_idx] = (uint8)count; }
 	void createCommandBuffer();
 
 	void setDefine(uint8 define_idx, bool enabled);
@@ -87,6 +89,7 @@ public:
 
 	static uint32 getCustomFlag(const char* flag_name);
 	static const char* getCustomFlagName(int index);
+	static int getCustomFlagCount();
 
 private:
 	void onBeforeReady() override;
@@ -107,14 +110,13 @@ private:
 	int m_texture_count;
 	Array<Uniform> m_uniforms;
 	IAllocator& m_allocator;
-	bgfx::ProgramHandle m_program_id;
 	uint64 m_render_states;
 	Vec3 m_color;
 	float m_shininess;
 	float m_alpha_ref;
 	uint32 m_define_mask;
 	uint8* m_command_buffer;
-	int m_layer_count;
+	uint8 m_layer_count[32];
 	uint32 m_custom_flags;
 };
 

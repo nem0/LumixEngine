@@ -1,10 +1,10 @@
 #pragma once
 
 
-#include "core/array.h"
-#include "core/associative_array.h"
-#include "core/resource.h"
-#include "core/vec.h"
+#include "engine/array.h"
+#include "engine/associative_array.h"
+#include "engine/resource.h"
+#include "engine/vec.h"
 #include <bgfx/bgfx.h>
 
 
@@ -13,7 +13,7 @@ namespace Lumix
 
 
 struct AABB;
-class Frustum;
+struct Frustum;
 struct GrassInfo;
 class IAllocator;
 class LIFOAllocator;
@@ -40,7 +40,7 @@ class Terrain
 				explicit GrassType(Terrain& terrain);
 				~GrassType();
 
-				void grassLoaded(Resource::State, Resource::State);
+				void grassLoaded(Resource::State, Resource::State, Resource&);
 
 				Model* m_grass_model;
 				Terrain& m_terrain;
@@ -108,28 +108,28 @@ class Terrain
 		void setGrassTypeDistance(int index, float value);
 		void setMaterial(Material* material);
 
-		void getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos, LIFOAllocator& allocator);
-		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentIndex camera);
+		void getInfos(Array<TerrainInfo>& infos, const Vec3& camera_pos);
+		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentHandle camera);
 
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 		void serialize(OutputBlob& serializer);
-		void deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene, int index, int version);
+		void deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene, int version);
 
 		void addGrassType(int index);
 		void removeGrassType(int index);
 		void forceGrassUpdate();
 
 	private: 
-		Array<Terrain::GrassQuad*>& getQuads(ComponentIndex camera);
+		Array<Terrain::GrassQuad*>& getQuads(ComponentHandle camera);
 		TerrainQuad* generateQuadTree(float size);
 		float getHeight(int x, int z) const;
-		void updateGrass(ComponentIndex camera);
+		void updateGrass(ComponentHandle camera);
 		void generateGrassTypeQuad(GrassPatch& patch,
 								   const Matrix& terrain_matrix,
 								   float quad_x,
 								   float quad_z);
 		void generateGeometry();
-		void onMaterialLoaded(Resource::State, Resource::State new_state);
+		void onMaterialLoaded(Resource::State, Resource::State new_state, Resource&);
 
 	private:
 		IAllocator& m_allocator;
@@ -150,8 +150,8 @@ class Terrain
 		RenderScene& m_scene;
 		Array<GrassType*> m_grass_types;
 		Array<GrassQuad*> m_free_grass_quads;
-		AssociativeArray<ComponentIndex, Array<GrassQuad*> > m_grass_quads;
-		AssociativeArray<ComponentIndex, Vec3> m_last_camera_position;
+		AssociativeArray<ComponentHandle, Array<GrassQuad*> > m_grass_quads;
+		AssociativeArray<ComponentHandle, Vec3> m_last_camera_position;
 		bool m_force_grass_update;
 		Renderer& m_renderer;
 };

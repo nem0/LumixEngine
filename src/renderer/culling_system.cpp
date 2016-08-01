@@ -1,20 +1,20 @@
 #include "culling_system.h"
-#include "lumix.h"
+#include "engine/lumix.h"
 
-#include "core/binary_array.h"
-#include "core/free_list.h"
-#include "core/geometry.h"
-#include "core/profiler.h"
+#include "engine/binary_array.h"
+#include "engine/free_list.h"
+#include "engine/geometry.h"
+#include "engine/profiler.h"
 
-#include "core/mtjd/group.h"
-#include "core/mtjd/manager.h"
-#include "core/mtjd/job.h"
+#include "engine/mtjd/group.h"
+#include "engine/mtjd/manager.h"
+#include "engine/mtjd/job.h"
 
 namespace Lumix
 {
 typedef Array<int64> LayerMasks;
-typedef Array<ComponentIndex> RenderabletoSphereMap;
-typedef Array<int> SphereToRenderableMap;
+typedef Array<int> RenderabletoSphereMap;
+typedef Array<ComponentHandle> SphereToRenderableMap;
 
 static const int MIN_ENTITIES_PER_THREAD = 50;
 
@@ -23,7 +23,7 @@ static void doCulling(int start_index,
 	const Sphere* LUMIX_RESTRICT end,
 	const Frustum* LUMIX_RESTRICT frustum,
 	const int64* LUMIX_RESTRICT layer_masks,
-	const int* LUMIX_RESTRICT sphere_to_renderable_map,
+	const ComponentHandle* LUMIX_RESTRICT sphere_to_renderable_map,
 	int64 layer_mask,
 	CullingSystem::Subresults& results)
 {
@@ -33,8 +33,7 @@ static void doCulling(int start_index,
 	PROFILE_INT("objects", int(end - start));
 	for (const Sphere *sphere = start; sphere <= end; sphere++, ++i)
 	{
-		if (frustum->isSphereInside(sphere->m_position, sphere->m_radius) &&
-			((layer_masks[i] & layer_mask) != 0))
+		if (frustum->isSphereInside(sphere->position, sphere->radius) && ((layer_masks[i] & layer_mask) != 0))
 		{
 			results.push(sphere_to_renderable_map[i]);
 		}
@@ -123,9 +122,6 @@ public:
 			m_result.emplace(m_allocator);
 		}
 	}
-
-
-	~CullingSystemImpl() {}
 
 
 	void clear() override
@@ -237,21 +233,27 @@ public:
 	}
 
 
-	void setLayerMask(ComponentIndex renderable, int64 layer) override
+	void setLayerMask(ComponentHandle renderable, int64 layer) override
 	{
-		m_layer_masks[m_renderable_to_sphere_map[renderable]] = layer;
+		m_layer_masks[m_renderable_to_sphere_map[renderable.index]] = layer;
 	}
 
 
-	int64 getLayerMask(ComponentIndex renderable) override
+	int64 getLayerMask(ComponentHandle renderable) override
 	{
-		return m_layer_masks[m_renderable_to_sphere_map[renderable]];
+		return m_layer_masks[m_renderable_to_sphere_map[renderable.index]];
 	}
 
 
-	void addStatic(ComponentIndex renderable, const Sphere& sphere) override
+	bool isAdded(ComponentHandle renderable) override
 	{
-		if (renderable < m_renderable_to_sphere_map.size() && m_renderable_to_sphere_map[renderable] != -1)
+		return renderable.index < m_renderable_to_sphere_map.size() && m_renderable_to_sphere_map[renderable.index] != -1;
+	}
+
+
+	void addStatic(ComponentHandle renderable, const Sphere& sphere) override
+	{
+		if (renderable.index < m_renderable_to_sphere_map.size() && m_renderable_to_sphere_map[renderable.index] != -1)
 		{
 			ASSERT(false);
 			return;
@@ -259,22 +261,22 @@ public:
 
 		m_spheres.push(sphere);
 		m_sphere_to_renderable_map.push(renderable);
-		while(renderable >= m_renderable_to_sphere_map.size())
+		while(renderable.index >= m_renderable_to_sphere_map.size())
 		{
 			m_renderable_to_sphere_map.push(-1);
 		}
-		m_renderable_to_sphere_map[renderable] = m_spheres.size() - 1;
+		m_renderable_to_sphere_map[renderable.index] = m_spheres.size() - 1;
 		m_layer_masks.push(1);
 	}
 
 
-	void removeStatic(ComponentIndex renderable) override
+	void removeStatic(ComponentHandle renderable) override
 	{
-		int index = m_renderable_to_sphere_map[renderable];
+		int index = m_renderable_to_sphere_map[renderable.index];
 		if (index < 0) return;
 		ASSERT(index < m_spheres.size());
 
-		m_renderable_to_sphere_map[m_sphere_to_renderable_map.back()] = index;
+		m_renderable_to_sphere_map[m_sphere_to_renderable_map.back().index] = index;
 		m_spheres[index] = m_spheres.back();
 		m_sphere_to_renderable_map[index] = m_sphere_to_renderable_map.back();
 		m_layer_masks[index] = m_layer_masks.back();
@@ -282,41 +284,36 @@ public:
 		m_spheres.pop();
 		m_sphere_to_renderable_map.pop();
 		m_layer_masks.pop();
-		m_renderable_to_sphere_map[renderable] = -1;
+		m_renderable_to_sphere_map[renderable.index] = -1;
 	}
 
 
-	void updateBoundingRadius(float radius, ComponentIndex renderable) override
+	void updateBoundingSphere(const Sphere& sphere, ComponentHandle renderable) override
 	{
-		m_spheres[m_renderable_to_sphere_map[renderable]].m_radius = radius;
+		int idx = m_renderable_to_sphere_map[renderable.index];
+		if (idx >= 0) m_spheres[idx] = sphere;
 	}
 
 
-	void updateBoundingPosition(const Vec3& position, ComponentIndex renderable) override
-	{
-		m_spheres[m_renderable_to_sphere_map[renderable]].m_position = position;
-	}
-
-
-	void insert(const InputSpheres& spheres, const Array<ComponentIndex>& renderables) override
+	void insert(const InputSpheres& spheres, const Array<ComponentHandle>& renderables) override
 	{
 		for (int i = 0; i < spheres.size(); i++)
 		{
 			m_spheres.push(spheres[i]);
-			while(m_renderable_to_sphere_map.size() <= renderables[i])
+			while(m_renderable_to_sphere_map.size() <= renderables[i].index)
 			{
 				m_renderable_to_sphere_map.push(-1);
 			}
-			m_renderable_to_sphere_map[renderables[i]] = m_spheres.size() - 1;
+			m_renderable_to_sphere_map[renderables[i].index] = m_spheres.size() - 1;
 			m_sphere_to_renderable_map.push(renderables[i]);
 			m_layer_masks.push(1);
 		}
 	}
 
 
-	const Sphere& getSphere(ComponentIndex renderable) override
+	const Sphere& getSphere(ComponentHandle renderable) override
 	{
-		return m_spheres[m_renderable_to_sphere_map[renderable]];
+		return m_spheres[m_renderable_to_sphere_map[renderable.index]];
 	}
 
 

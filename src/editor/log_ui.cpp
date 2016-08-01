@@ -1,5 +1,6 @@
 #include "log_ui.h"
-#include "core/log.h"
+#include "editor/platform_interface.h"
+#include "engine/log.h"
 #include "imgui/imgui.h"
 
 
@@ -10,8 +11,10 @@ LogUI::LogUI(Lumix::IAllocator& allocator)
 	, m_notifications(allocator)
 	, m_last_uid(1)
 	, m_guard(false)
+	, m_is_opened(false)
+	, m_are_notifications_hovered(false)
+	, m_move_notifications_to_front(false)
 {
-	m_is_opened = false;
 	Lumix::g_log_info.getCallback().bind<LogUI, &LogUI::onInfo>(this);
 	Lumix::g_log_error.getCallback().bind<LogUI, &LogUI::onError>(this);
 	Lumix::g_log_warning.getCallback().bind<LogUI, &LogUI::onWarning>(this);
@@ -126,7 +129,7 @@ void LogUI::showNotifications()
 	for (int i = 0; i < m_notifications.size(); ++i)
 	{
 		if (i > 0) ImGui::Separator();
-		ImGui::Text(m_notifications[i].message.c_str());
+		ImGui::Text("%s", m_notifications[i].message.c_str());
 	}
 	ImGui::End();
 }
@@ -188,7 +191,34 @@ void LogUI::onGUI()
 
 		ImGui::SameLine();
 		char filter[128] = "";
-		ImGui::InputText("Filter", filter, sizeof(filter));
+		ImGui::FilterInput("Filter", filter, sizeof(filter));
+		int len = 0;
+		if (ImGui::Button("Copy to clipboard"))
+		{
+			for (int i = 0; i < messages->size(); ++i)
+			{
+				const char* msg = (*messages)[i].c_str();
+				if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
+				{
+					len += Lumix::stringLength(msg);
+				}
+			}
+
+			char* mem = (char*)m_allocator.allocate(len);
+			mem[0] = '\0';
+			for (int i = 0; i < messages->size(); ++i)
+			{
+				const char* msg = (*messages)[i].c_str();
+				if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
+				{
+					Lumix::catString(mem, len, msg);
+					Lumix::catString(mem, len, "\n");
+				}
+			}
+
+			PlatformInterface::copyToClipboard(mem);
+			m_allocator.deallocate(mem);
+		}
 
 		if (ImGui::BeginChild("log_messages"))
 		{
@@ -197,7 +227,7 @@ void LogUI::onGUI()
 				const char* msg = (*messages)[i].c_str();
 				if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
 				{
-					ImGui::Text(msg);
+					ImGui::Text("%s", msg);
 				}
 			}
 		}

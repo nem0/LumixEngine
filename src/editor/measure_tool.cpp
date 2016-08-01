@@ -1,44 +1,43 @@
 #include "measure_tool.h"
-#include "renderer/model.h"
-#include "renderer/render_scene.h"
+#include "editor/render_interface.h"
 
 
 namespace Lumix
 {
 	MeasureTool::MeasureTool()
 		: m_is_enabled(false)
+		, m_is_from_set(false)
+		, m_from(0, 0, 0)
+		, m_to(0, 0, 0)
 	{ }
 
 
-	bool MeasureTool::onEntityMouseDown(const RayCastModelHit& hit, int, int)
+	bool MeasureTool::onEntityMouseDown(const WorldEditor::RayHit& hit, int, int)
 	{
-		if (m_is_enabled)
+		if (!m_is_enabled) return false;
+
+		if (!m_is_from_set)
 		{
-			if (!m_is_from_set)
-			{
-				m_from = hit.m_origin + hit.m_dir * hit.m_t;
-				m_is_from_set = true;
-			}
-			else
-			{
-				m_is_from_set = false;
-				m_to = hit.m_origin + hit.m_dir * hit.m_t;
-			}
-			if(m_distance_measured.isValid()) m_distance_measured.invoke(getDistance());
-			return true;
+			m_from = hit.pos;
+			m_is_from_set = true;
 		}
-		return false;
+		else
+		{
+			m_is_from_set = false;
+			m_to = hit.pos;
+		}
+		if(m_distance_measured.isValid()) m_distance_measured.invoke(getDistance());
+		return true;
 	}
 
 
-	void MeasureTool::createEditorLines(class RenderScene& scene)
+	void MeasureTool::createEditorLines(RenderInterface& interface)
 	{
-		if (m_is_enabled)
-		{
-			static const uint32 COLOR = 0x00ff00ff;
-			scene.addDebugCross(m_from, 0.3f, COLOR, 0);
-			scene.addDebugCross(m_to, 0.3f, COLOR, 0);
-			scene.addDebugLine(m_from, m_to, COLOR, 0);
-		}
+		if (!m_is_enabled) return;
+		
+		static const uint32 COLOR = 0x00ff00ff;
+		interface.addDebugCross(m_from, 0.3f, COLOR, 0);
+		interface.addDebugCross(m_to, 0.3f, COLOR, 0);
+		interface.addDebugLine(m_from, m_to, COLOR, 0);
 	}
 }

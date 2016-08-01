@@ -1,19 +1,19 @@
 #pragma once
 
 
-#include "core/array.h"
-#include "core/resource.h"
-#include "core/resource_manager_base.h"
+#include "engine/array.h"
+#include "engine/resource.h"
+#include "engine/resource_manager_base.h"
 
 
 namespace Lumix
 {
 
 
-class LUMIX_AUDIO_API Clip : public Resource
+class Clip : public Resource
 {
 public:
-	Clip(const Path& path, ResourceManager& manager, IAllocator& allocator)
+	Clip(const Path& path, ResourceManagerBase& manager, IAllocator& allocator)
 		: Resource(path, manager, allocator)
 		, m_data(allocator)
 	{
@@ -34,7 +34,7 @@ private:
 };
 
 
-class LUMIX_AUDIO_API ClipManager : public ResourceManagerBase
+class ClipManager : public ResourceManagerBase
 {
 public:
 	explicit ClipManager(IAllocator& allocator)

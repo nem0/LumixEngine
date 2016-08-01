@@ -1,31 +1,24 @@
 #include "lua_script_system.h"
-#include "core/array.h"
-#include "core/base_proxy_allocator.h"
-#include "core/binary_array.h"
-#include "core/blob.h"
-#include "core/crc32.h"
-#include "core/fs/file_system.h"
-#include "core/iallocator.h"
-#include "core/json_serializer.h"
-#include "core/log.h"
-#include "core/lua_wrapper.h"
-#include "core/path_utils.h"
-#include "core/resource_manager.h"
-#include "debug/debug.h"
-#include "editor/asset_browser.h"
-#include "editor/ieditor_command.h"
-#include "editor/imgui/imgui.h"
-#include "editor/property_grid.h"
-#include "editor/studio_app.h"
-#include "editor/utils.h"
-#include "editor/world_editor.h"
-#include "engine.h"
+#include "engine/array.h"
+#include "engine/base_proxy_allocator.h"
+#include "engine/binary_array.h"
+#include "engine/blob.h"
+#include "engine/crc32.h"
+#include "engine/fs/file_system.h"
+#include "engine/iallocator.h"
+#include "engine/json_serializer.h"
+#include "engine/log.h"
+#include "engine/lua_wrapper.h"
+#include "engine/path_utils.h"
+#include "engine/resource_manager.h"
+#include "engine/debug/debug.h"
+#include "engine/engine.h"
 #include "engine/property_register.h"
 #include "engine/property_descriptor.h"
-#include "iplugin.h"
+#include "engine/iplugin.h"
 #include "lua_script/lua_script_manager.h"
-#include "plugin_manager.h"
-#include "universe/universe.h"
+#include "engine/plugin_manager.h"
+#include "engine/universe/universe.h"
 
 
 namespace Lumix
@@ -35,12 +28,14 @@ namespace Lumix
 	enum class LuaScriptVersion
 	{
 		MULTIPLE_SCRIPTS,
+		REFACTOR,
 
 		LATEST
 	};
 	
 	
-	static const uint32 LUA_SCRIPT_HASH = crc32("lua_script");
+	static const ComponentType LUA_SCRIPT_TYPE = PropertyRegister::getComponentType("lua_script");
+	static const ResourceType LUA_SCRIPT_RESOURCE_TYPE("lua_script");
 
 
 	class LuaScriptSystemImpl : public IPlugin
@@ -49,12 +44,9 @@ namespace Lumix
 		explicit LuaScriptSystemImpl(Engine& engine);
 		virtual ~LuaScriptSystemImpl();
 
-		IAllocator& getAllocator();
 		IScene* createScene(Universe& universe) override;
 		void destroyScene(IScene* scene) override;
-		bool create() override;
-		void destroy() override;
-		const char* getName() const override;
+		const char* getName() const override { return "lua_script"; }
 		LuaScriptManager& getScriptManager() { return m_script_manager; }
 
 		Engine& m_engine;
@@ -65,33 +57,18 @@ namespace Lumix
 
 	struct LuaScriptSceneImpl : public LuaScriptScene
 	{
-		struct Property
+		struct TimerData
 		{
-			enum Type : int
-			{
-				BOOLEAN,
-				FLOAT,
-				ENTITY,
-				ANY
-			};
-
-			explicit Property(IAllocator& allocator)
-				: stored_value(allocator)
-			{
-			}
-
-			uint32 name_hash;
-			Type type;
-			string stored_value;
+			float time;
+			lua_State* state;
+			int func;
 		};
-
 
 		struct UpdateData
 		{
 			LuaScript* script;
 			lua_State* state;
 			int environment;
-			ComponentIndex cmp;
 		};
 
 
@@ -99,9 +76,11 @@ namespace Lumix
 		{
 			explicit ScriptInstance(IAllocator& allocator)
 				: m_properties(allocator)
+				, m_script(nullptr)
+				, m_state(nullptr)
+				, m_environment(-1)
+				, m_thread_ref(-1)
 			{
-				m_script = nullptr;
-				m_state = nullptr;
 			}
 
 			LuaScript* m_script;
@@ -117,17 +96,18 @@ namespace Lumix
 			ScriptComponent(LuaScriptSceneImpl& scene, IAllocator& allocator)
 				: m_scripts(allocator)
 				, m_scene(scene)
+				, m_entity(INVALID_ENTITY)
 			{
 			}
 
 
-			static Property* getProperty(ScriptInstance& inst, uint32 hash)
+			static int getProperty(ScriptInstance& inst, uint32 hash)
 			{
-				for(auto& i : inst.m_properties)
+				for(int i = 0, c = inst.m_properties.size(); i < c; ++i)
 				{
-					if(i.name_hash == hash) return &i;
+					if (inst.m_properties[i].name_hash == hash) return i;
 				}
-				return nullptr;
+				return -1;
 			}
 
 
@@ -136,37 +116,45 @@ namespace Lumix
 				static const uint32 INDEX_HASH = crc32("__index");
 				static const uint32 THIS_HASH = crc32("this");
 				lua_State* L = inst.m_state;
-				lua_rawgeti(L, LUA_REGISTRYINDEX, inst.m_environment);
+				bool is_env_valid = lua_rawgeti(L, LUA_REGISTRYINDEX, inst.m_environment) == LUA_TTABLE;
+				ASSERT(is_env_valid);
 				lua_pushnil(L);
-				auto& allocator = m_scene.m_system.getAllocator();
-				while(lua_next(L, -2))
+				auto& allocator = m_scene.m_system.m_allocator;
+				BinaryArray valid_properties(m_scene.m_system.m_engine.getLIFOAllocator());
+				valid_properties.resize(inst.m_properties.size());
+				setMemory(valid_properties.getRaw(), 0, valid_properties.size() >> 3);
+
+				while (lua_next(L, -2))
 				{
-					if(lua_type(L, -1) != LUA_TFUNCTION)
+					if (lua_type(L, -1) != LUA_TFUNCTION)
 					{
 						const char* name = lua_tostring(L, -2);
 						uint32 hash = crc32(name);
-						m_scene.m_property_names.insert(hash, string(name, allocator));
-						if(hash != INDEX_HASH && hash != THIS_HASH)
+						if (m_scene.m_property_names.find(hash) < 0)
 						{
-							auto* existing_prop = getProperty(inst, hash);
-							if (existing_prop)
+							m_scene.m_property_names.emplace(hash, name, allocator);
+						}
+						if (hash != INDEX_HASH && hash != THIS_HASH)
+						{
+							int prop_index = getProperty(inst, hash);
+							if (prop_index >= 0)
 							{
-								if (existing_prop->type == Property::ANY)
+								valid_properties[prop_index] = true;
+								Property& existing_prop = inst.m_properties[prop_index];
+								if (existing_prop.type == Property::ANY)
 								{
 									switch (lua_type(inst.m_state, -1))
 									{
-										case LUA_TBOOLEAN:
-											existing_prop->type = Property::BOOLEAN;
-											break;
-										default: existing_prop->type = Property::FLOAT;
+										case LUA_TBOOLEAN: existing_prop.type = Property::BOOLEAN; break;
+										default: existing_prop.type = Property::FLOAT;
 									}
 								}
-								m_scene.applyProperty(
-									inst, *existing_prop, existing_prop->stored_value.c_str());
+								m_scene.applyProperty(inst, existing_prop, existing_prop.stored_value.c_str());
 							}
 							else
 							{
 								auto& prop = inst.m_properties.emplace(allocator);
+								valid_properties.push(true);
 								switch (lua_type(inst.m_state, -1))
 								{
 									case LUA_TBOOLEAN: prop.type = Property::BOOLEAN; break;
@@ -178,43 +166,48 @@ namespace Lumix
 					}
 					lua_pop(L, 1);
 				}
+				for (int i = inst.m_properties.size() - 1; i >= 0; --i)
+				{
+					if (valid_properties[i]) continue;
+					inst.m_properties.eraseFast(i);
+				}
 			}
 
 
-			void onScriptLoaded(Resource::State, Resource::State)
+			void onScriptLoaded(Resource::State, Resource::State, Resource& resource)
 			{
 				lua_State* L = m_scene.m_system.m_engine.getState();
 				for (auto& script : m_scripts)
 				{
-					if ((!script.m_script || !script.m_script->isReady()) && script.m_state)
-					{
-						m_scene.destroy(script);
-						continue;
-					}
-
 					if (!script.m_script) continue;
 					if (!script.m_script->isReady()) continue;
-					if (script.m_state) continue;
+					if (script.m_script != &resource) continue;
 
-					script.m_environment = -1;
+					bool is_reload = true;
+					if (!script.m_state)
+					{
+						is_reload = false;
+						script.m_environment = -1;
 
-					script.m_state = lua_newthread(L);
-					lua_pushvalue(L, -1);
-					script.m_thread_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-					lua_newtable(script.m_state);
-					// reference environment
-					lua_pushvalue(script.m_state, -1);
-					script.m_environment = luaL_ref(script.m_state, LUA_REGISTRYINDEX);
+						script.m_state = lua_newthread(L);
+						lua_pushvalue(L, -1);
+						script.m_thread_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+						lua_pop(L, 1);
+						lua_newtable(script.m_state);
+						// reference environment
+						lua_pushvalue(script.m_state, -1);
+						script.m_environment = luaL_ref(script.m_state, LUA_REGISTRYINDEX);
 
-					// environment's metatable & __index
-					lua_pushvalue(script.m_state, -1);
-					lua_setmetatable(script.m_state, -2);
-					lua_pushglobaltable(script.m_state);
-					lua_setfield(script.m_state, -2, "__index");
+						// environment's metatable & __index
+						lua_pushvalue(script.m_state, -1);
+						lua_setmetatable(script.m_state, -2);
+						lua_pushglobaltable(script.m_state);
+						lua_setfield(script.m_state, -2, "__index");
 
-					// set this
-					lua_pushinteger(script.m_state, m_entity);
-					lua_setfield(script.m_state, -2, "this");
+						// set this
+						lua_pushinteger(script.m_state, m_entity.index);
+						lua_setfield(script.m_state, -2, "this");
+					}
 
 					lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
 					bool errors = luaL_loadbuffer(script.m_state,
@@ -244,13 +237,15 @@ namespace Lumix
 					lua_pop(script.m_state, 1);
 
 					detectProperties(script);
+
+					if (m_scene.m_is_game_running) m_scene.startScript(script, is_reload);
 				}
 			}
 
 
 			Array<ScriptInstance> m_scripts;
 			LuaScriptSceneImpl& m_scene;
-			int m_entity;
+			Entity m_entity;
 		};
 
 
@@ -279,7 +274,8 @@ namespace Lumix
 
 			void addEnvironment(int env) override
 			{
-				lua_rawgeti(state, LUA_REGISTRYINDEX, env);
+				bool is_valid = lua_rawgeti(state, LUA_REGISTRYINDEX, env) == LUA_TTABLE;
+				ASSERT(is_valid);
 				++parameter_count;
 			}
 
@@ -287,7 +283,7 @@ namespace Lumix
 			int parameter_count;
 			lua_State* state;
 			bool is_in_progress;
-			ComponentIndex cmp;
+			ScriptComponent* cmp;
 			int scr_index;
 		};
 
@@ -296,34 +292,37 @@ namespace Lumix
 		LuaScriptSceneImpl(LuaScriptSystemImpl& system, Universe& ctx)
 			: m_system(system)
 			, m_universe(ctx)
-			, m_scripts(system.getAllocator())
-			, m_updates(system.getAllocator())
-			, m_entity_script_map(system.getAllocator())
-			, m_property_names(system.getAllocator())
+			, m_scripts(system.m_allocator)
+			, m_updates(system.m_allocator)
+			, m_timers(system.m_allocator)
+			, m_property_names(system.m_allocator)
+			, m_is_game_running(false)
+			, m_is_api_registered(false)
 		{
 			m_function_call.is_in_progress = false;
-			m_is_api_registered = false;
+			
 			registerAPI();
+			ctx.registerComponentTypeScene(LUA_SCRIPT_TYPE, this);
 		}
 
 
-		ComponentIndex getComponent(Entity entity) override
+		ComponentHandle getComponent(Entity entity) override
 		{
-			auto iter = m_entity_script_map.find(entity);
-			if (!iter.isValid()) return INVALID_COMPONENT;
-
-			return iter.value();
+			if (m_scripts.find(entity) == m_scripts.end()) return INVALID_COMPONENT;
+			return {entity.index};
 		}
 
 
-		IFunctionCall* beginFunctionCall(ComponentIndex cmp, int scr_index, const char* function) override
+		IFunctionCall* beginFunctionCall(ComponentHandle cmp, int scr_index, const char* function) override
 		{
 			ASSERT(!m_function_call.is_in_progress);
 
-			auto& script = m_scripts[cmp]->m_scripts[scr_index];
+			auto* script_cmp = m_scripts[{cmp.index}];
+			auto& script = script_cmp->m_scripts[scr_index];
 			if (!script.m_state) return nullptr;
 
-			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
+			bool is_env_valid = lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment) == LUA_TTABLE;
+			ASSERT(is_env_valid);
 			if (lua_getfield(script.m_state, -1, function) != LUA_TFUNCTION)
 			{
 				lua_pop(script.m_state, 2);
@@ -331,7 +330,7 @@ namespace Lumix
 			}
 
 			m_function_call.state = script.m_state;
-			m_function_call.cmp = cmp;
+			m_function_call.cmp = script_cmp;
 			m_function_call.is_in_progress = true;
 			m_function_call.parameter_count = 0;
 			m_function_call.scr_index = scr_index;
@@ -340,14 +339,13 @@ namespace Lumix
 		}
 
 
-		void endFunctionCall(IFunctionCall& caller)
+		void endFunctionCall() override
 		{
-			ASSERT(&caller == &m_function_call);
 			ASSERT(m_function_call.is_in_progress);
 
 			m_function_call.is_in_progress = false;
 
-			auto& script = m_scripts[m_function_call.cmp]->m_scripts[m_function_call.scr_index];
+			auto& script = m_function_call.cmp->m_scripts[m_function_call.scr_index];
 			if (!script.m_state) return;
 
 			if (lua_pcall(script.m_state, m_function_call.parameter_count, 0, 0) != LUA_OK)
@@ -359,33 +357,104 @@ namespace Lumix
 		}
 
 
-		~LuaScriptSceneImpl()
+		int getPropertyCount(ComponentHandle cmp, int scr_index) override
 		{
-			unloadAllScripts();
+			return m_scripts[{cmp.index}]->m_scripts[scr_index].m_properties.size();
 		}
 
 
-		void unloadAllScripts()
+		const char* getPropertyName(ComponentHandle cmp, int scr_index, int prop_index) override
+		{
+			return getPropertyName(m_scripts[{cmp.index}]->m_scripts[scr_index].m_properties[prop_index].name_hash);
+		}
+
+
+		Property::Type getPropertyType(ComponentHandle cmp, int scr_index, int prop_index) override
+		{
+			return m_scripts[{cmp.index}]->m_scripts[scr_index].m_properties[prop_index].type;
+		}
+
+
+		void getScriptData(ComponentHandle cmp, OutputBlob& blob) override
+		{
+			auto* scr = m_scripts[{cmp.index}];
+			blob.write(scr->m_scripts.size());
+			for (int i = 0; i < scr->m_scripts.size(); ++i)
+			{
+				auto& inst = scr->m_scripts[i];
+				blob.writeString(inst.m_script ? inst.m_script->getPath().c_str() : "");
+				blob.write(inst.m_properties.size());
+				for (auto& prop : inst.m_properties)
+				{
+					blob.write(prop.name_hash);
+					blob.write(prop.type);
+					char tmp[1024];
+					tmp[0] = '\0';
+					const char* prop_name = getPropertyName(prop.name_hash);
+					if(prop_name) getPropertyValue(cmp, i, getPropertyName(prop.name_hash), tmp, lengthOf(tmp));
+					blob.writeString(prop_name ? tmp : prop.stored_value.c_str());
+				}
+			}
+		}
+
+
+		void setScriptData(ComponentHandle cmp, InputBlob& blob) override
+		{
+			auto* scr = m_scripts[{cmp.index}];
+			int count;
+			blob.read(count);
+			for (int i = 0; i < count; ++i)
+			{
+				int idx = addScript(cmp);
+				auto& inst = scr->m_scripts[idx];
+				char tmp[Lumix::MAX_PATH_LENGTH];
+				blob.readString(tmp, lengthOf(tmp));
+				setScriptPath(cmp, idx, Lumix::Path(tmp));
+				
+				int prop_count;
+				blob.read(prop_count);
+				for (int j = 0; j < prop_count; ++j)
+				{
+					uint32 hash;
+					blob.read(hash);
+					int prop_index = scr->getProperty(inst, hash);
+					if (prop_index < 0)
+					{
+						scr->m_scripts[idx].m_properties.emplace(m_system.m_allocator);
+						prop_index = scr->m_scripts[idx].m_properties.size() - 1;
+					}
+					auto& prop = scr->m_scripts[idx].m_properties[prop_index];
+					prop.name_hash = hash;
+					blob.read(prop.type);
+					char tmp[1024];
+					blob.readString(tmp, lengthOf(tmp));
+					prop.stored_value = tmp;
+					if (scr->m_scripts[idx].m_state) applyProperty(scr->m_scripts[idx], prop, tmp);
+				}
+			}
+		}
+
+
+		void clear() override
 		{
 			Path invalid_path;
-			for (int i = 0; i < m_scripts.size(); ++i)
+			for (auto* script_cmp : m_scripts)
 			{
-				if (!m_scripts[i]) continue;
+				if (!script_cmp) continue;
 
-				for (auto script : m_scripts[i]->m_scripts)
+				for (auto script : script_cmp->m_scripts)
 				{
-					setScriptPath(*m_scripts[i], script, invalid_path);
+					setScriptPath(*script_cmp, script, invalid_path);
 				}
-				LUMIX_DELETE(m_system.getAllocator(), m_scripts[i]);
+				LUMIX_DELETE(m_system.m_allocator, script_cmp);
 			}
-			m_entity_script_map.clear();
 			m_scripts.clear();
 		}
 
 
-		lua_State* getState(ComponentIndex cmp, int scr_index) override
+		lua_State* getState(ComponentHandle cmp, int scr_index) override
 		{
-			return m_scripts[cmp]->m_scripts[scr_index].m_state;
+			return m_scripts[{cmp.index}]->m_scripts[scr_index].m_state;
 		}
 
 
@@ -408,10 +477,13 @@ namespace Lumix
 				}
 			}
 
-			auto& prop = scene->m_current_script_instance->m_properties.emplace(scene->m_system.getAllocator());
+			auto& prop = scene->m_current_script_instance->m_properties.emplace(scene->m_system.m_allocator);
 			prop.name_hash = prop_name_hash;
 			prop.type = (Property::Type)type;
-			scene->m_property_names.insert(prop_name_hash, string(prop_name, scene->m_system.getAllocator()));
+			if (scene->m_property_names.find(prop_name_hash) < 0)
+			{
+				scene->m_property_names.emplace(prop_name_hash, prop_name, scene->m_system.m_allocator);
+			}
 		}
 
 
@@ -432,15 +504,23 @@ namespace Lumix
 			Entity entity = LuaWrapper::checkArg<Entity>(L, 2);
 			int scr_index = LuaWrapper::checkArg<int>(L, 3);
 
-			ComponentIndex cmp = scene->getComponent(entity);
-			int env = scene->getEnvironment(cmp, scr_index);
-			if (env < 0)
+			ComponentHandle cmp = scene->getComponent(entity);
+			if (cmp == INVALID_COMPONENT)
 			{
 				lua_pushnil(L);
 			}
 			else
 			{
-				lua_rawgeti(L, LUA_REGISTRYINDEX, env);
+				int env = scene->getEnvironment(cmp, scr_index);
+				if (env < 0)
+				{
+					lua_pushnil(L);
+				}
+				else
+				{
+					bool is_valid = lua_rawgeti(L, LUA_REGISTRYINDEX, env) == LUA_TTABLE;
+					ASSERT(is_valid);
+				}
 			}
 			return 1;
 		}
@@ -449,10 +529,10 @@ namespace Lumix
 		static int LUA_getProperty(lua_State* L)
 		{
 			auto* desc = LuaWrapper::toType<IPropertyDescriptor*>(L, lua_upvalueindex(1));
-			auto type = LuaWrapper::toType<uint32>(L, lua_upvalueindex(2));
+			ComponentType type = { LuaWrapper::toType<int>(L, lua_upvalueindex(2)) };
 			ComponentUID cmp;
 			cmp.scene = LuaWrapper::checkArg<IScene*>(L, 1);
-			cmp.index = LuaWrapper::checkArg<ComponentIndex>(L, 2);
+			cmp.handle = LuaWrapper::checkArg<ComponentHandle>(L, 2);
 			cmp.type = type;
 			cmp.entity = INVALID_ENTITY;
 			switch (desc->getType())
@@ -460,32 +540,63 @@ namespace Lumix
 				case IPropertyDescriptor::DECIMAL:
 				{
 					float v;
-					desc->get(cmp, -1, OutputBlob(&v, sizeof(v)));
+					OutputBlob blob(&v, sizeof(v));
+					desc->get(cmp, -1, blob);
 					LuaWrapper::pushLua(L, v);
 				}
 				break;
 				case IPropertyDescriptor::BOOL:
 				{
 					bool v;
-					desc->get(cmp, -1, OutputBlob(&v, sizeof(v)));
+					OutputBlob blob(&v, sizeof(v));
+					desc->get(cmp, -1, blob);
 					LuaWrapper::pushLua(L, v);
 				}
 				break;
 				case IPropertyDescriptor::INTEGER:
 				{
 					int v;
-					desc->get(cmp, -1, OutputBlob(&v, sizeof(v)));
+					OutputBlob blob(&v, sizeof(v));
+					desc->get(cmp, -1, blob);
 					LuaWrapper::pushLua(L, v);
+				}
+				break;
+				case IPropertyDescriptor::RESOURCE:
+				case IPropertyDescriptor::FILE:
+				case IPropertyDescriptor::STRING:
+				{
+					char buf[1024];
+					OutputBlob blob(buf, sizeof(buf));
+					desc->get(cmp, -1, blob);
+					LuaWrapper::pushLua(L, buf);
 				}
 				break;
 				case IPropertyDescriptor::COLOR:
 				case IPropertyDescriptor::VEC3:
 				{
 					Vec3 v;
-					desc->get(cmp, -1, OutputBlob(&v, sizeof(v)));
+					OutputBlob blob(&v, sizeof(v));
+					desc->get(cmp, -1, blob);
 					LuaWrapper::pushLua(L, v);
 				}
 				break;
+				case IPropertyDescriptor::VEC2:
+				{
+					Vec2 v;
+					OutputBlob blob(&v, sizeof(v));
+					desc->get(cmp, -1, blob);
+					LuaWrapper::pushLua(L, v);
+				}
+				break;
+				case IPropertyDescriptor::INT2:
+				{
+					Int2 v;
+					OutputBlob blob(&v, sizeof(v));
+					desc->get(cmp, -1, blob);
+					LuaWrapper::pushLua(L, v);
+				}
+				break;
+				default: luaL_argerror(L, 1, "Unsupported property type"); break;
 			}
 			return 1;
 		}
@@ -494,10 +605,10 @@ namespace Lumix
 		static int LUA_setProperty(lua_State* L)
 		{
 			auto* desc = LuaWrapper::toType<IPropertyDescriptor*>(L, lua_upvalueindex(1));
-			auto type = LuaWrapper::toType<uint32>(L, lua_upvalueindex(2));
+			ComponentType type = { LuaWrapper::toType<int>(L, lua_upvalueindex(2)) };
 			ComponentUID cmp;
 			cmp.scene = LuaWrapper::checkArg<IScene*>(L, 1);
-			cmp.index = LuaWrapper::checkArg<ComponentIndex>(L, 2);
+			cmp.handle = LuaWrapper::checkArg<ComponentHandle>(L, 2);
 			cmp.type = type;
 			cmp.entity = INVALID_ENTITY;
 			switch(desc->getType())
@@ -505,28 +616,56 @@ namespace Lumix
 				case IPropertyDescriptor::DECIMAL:
 				{
 					auto v = LuaWrapper::checkArg<float>(L, 3);
-					desc->set(cmp, -1, InputBlob(&v, sizeof(v)));
+					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
 				}
 				break;
 				case IPropertyDescriptor::INTEGER:
 				{
 					auto v = LuaWrapper::checkArg<int>(L, 3);
-					desc->set(cmp, -1, InputBlob(&v, sizeof(v)));
+					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
 				}
 				break;
 				case IPropertyDescriptor::BOOL:
 				{
 					auto v = LuaWrapper::checkArg<bool>(L, 3);
-					desc->set(cmp, -1, InputBlob(&v, sizeof(v)));
+					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
+				}
+				break;
+				case IPropertyDescriptor::RESOURCE:
+				case IPropertyDescriptor::FILE:
+				case IPropertyDescriptor::STRING:
+				{
+					auto* v = LuaWrapper::checkArg<const char*>(L, 3);
+					InputBlob blob(v, stringLength(v) + 1);
+					desc->set(cmp, -1, blob);
 				}
 				break;
 				case IPropertyDescriptor::COLOR:
 				case IPropertyDescriptor::VEC3:
 				{
 					auto v = LuaWrapper::checkArg<Vec3>(L, 3);
-					desc->set(cmp, -1, InputBlob(&v, sizeof(v)));
+					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
 				}
 				break;
+				case IPropertyDescriptor::VEC2:
+				{
+					auto v = LuaWrapper::checkArg<Vec2>(L, 3);
+					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
+				}
+				break;
+				case IPropertyDescriptor::INT2:
+				{
+					auto v = LuaWrapper::checkArg<Int2>(L, 3);
+					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
+				}
+				break;
+				default: luaL_argerror(L, 1, "Unsupported property type"); break;
 			}
 			return 0;
 		}
@@ -568,38 +707,94 @@ namespace Lumix
 				convertPropertyToLuaName(cmp_name, tmp, lengthOf(tmp));
 				lua_setglobal(L, tmp);
 
-				uint32 cmp_name_hash = crc32(cmp_name);
-				auto& descs = PropertyRegister::getDescriptors(cmp_name_hash);
+				ComponentType cmp_type = PropertyRegister::getComponentType(cmp_name);
+				auto& descs = PropertyRegister::getDescriptors(cmp_type);
 				char setter[50];
 				char getter[50];
 				for (auto* desc : descs)
 				{
-					convertPropertyToLuaName(desc->getName(), tmp, lengthOf(tmp));
-					copyString(setter, "set");
-					copyString(getter, "get");
-					catString(setter, tmp);
-					catString(getter, tmp);
 					switch (desc->getType())
 					{
 						case IPropertyDescriptor::DECIMAL:
 						case IPropertyDescriptor::INTEGER:
 						case IPropertyDescriptor::BOOL:
 						case IPropertyDescriptor::VEC3:
+						case IPropertyDescriptor::VEC2:
+						case IPropertyDescriptor::INT2:
 						case IPropertyDescriptor::COLOR:
+						case IPropertyDescriptor::RESOURCE:
+						case IPropertyDescriptor::FILE:
+						case IPropertyDescriptor::STRING:
+							convertPropertyToLuaName(desc->getName(), tmp, lengthOf(tmp));
+							copyString(setter, "set");
+							copyString(getter, "get");
+							catString(setter, tmp);
+							catString(getter, tmp);
 							lua_pushlightuserdata(L, desc);
-							lua_pushinteger(L, cmp_name_hash);
+							lua_pushinteger(L, cmp_type.index);
 							lua_pushcclosure(L, &LUA_setProperty, 2);
 							lua_setfield(L, -2, setter);
 
 							lua_pushlightuserdata(L, desc);
-							lua_pushinteger(L, cmp_name_hash);
+							lua_pushinteger(L, cmp_type.index);
 							lua_pushcclosure(L, &LUA_getProperty, 2);
 							lua_setfield(L, -2, getter);
 							break;
+						default: break;
 					}
 				}
 				lua_pop(L, 1);
 			}
+		}
+
+
+
+		void cancelTimer(int timer_func)
+		{
+			for (int i = 0, c = m_timers.size(); i < c; ++i)
+			{
+				if (m_timers[i].func == timer_func)
+				{
+					m_timers.eraseFast(i);
+					break;
+				}
+			}
+		}
+
+
+		static int setTimer(lua_State* L)
+		{
+			auto* scene = LuaWrapper::checkArg<LuaScriptSceneImpl*>(L, 1);
+			float time = LuaWrapper::checkArg<float>(L, 2);
+			if (!lua_isfunction(L, 3)) LuaWrapper::argError(L, 3, "function");
+			TimerData& timer = scene->m_timers.emplace();
+			timer.time = time;
+			timer.state = L;
+			lua_pushvalue(L, 3);
+			timer.func = luaL_ref(L, LUA_REGISTRYINDEX);
+			lua_pop(L, 1);
+			LuaWrapper::pushLua(L, timer.func);
+			return 1;
+		}
+
+
+		LuaScript* preloadScript(const char* path)
+		{
+			auto* script_manager = m_system.m_engine.getResourceManager().get(LUA_SCRIPT_RESOURCE_TYPE);
+			return static_cast<LuaScript*>(script_manager->load(Path(path)));
+		}
+
+
+		void unloadScript(LuaScript* script)
+		{
+			if (!script) return;
+			script->getResourceManager().unload(*script);
+		}
+
+
+		void setScriptSource(ComponentHandle cmp, int scr_index, const char* path)
+		{
+			setScriptPath(cmp, scr_index, Lumix::Path(path));
 		}
 
 
@@ -613,16 +808,34 @@ namespace Lumix
 			
 			lua_pushlightuserdata(engine_state, &m_universe);
 			lua_setglobal(engine_state, "g_universe");
-			LuaWrapper::createSystemFunction(
-				engine_state, "LuaScript", "getEnvironment", &LuaScriptSceneImpl::getEnvironment);
 			registerProperties();
 			registerPropertyAPI();
+			LuaWrapper::createSystemFunction(
+				engine_state, "LuaScript", "getEnvironment", &LuaScriptSceneImpl::getEnvironment);
+			
+			#define REGISTER_FUNCTION(F) \
+				do { \
+					auto f = &LuaWrapper::wrapMethod<LuaScriptSceneImpl, \
+						decltype(&LuaScriptSceneImpl::F), \
+						&LuaScriptSceneImpl::F>; \
+					LuaWrapper::createSystemFunction(engine_state, "LuaScript", #F, f); \
+				} while(false)
+
+			REGISTER_FUNCTION(addScript);
+			REGISTER_FUNCTION(setScriptSource);
+			REGISTER_FUNCTION(preloadScript);
+			REGISTER_FUNCTION(unloadScript);
+			REGISTER_FUNCTION(cancelTimer);
+
+			#undef REGISTER_FUNCTION
+
+			LuaWrapper::createSystemFunction(engine_state, "LuaScript", "setTimer", &LuaScriptSceneImpl::setTimer);
 		}
 
 
-		int getEnvironment(ComponentIndex cmp, int scr_index) override
+		int getEnvironment(ComponentHandle cmp, int scr_index) override
 		{
-			return m_scripts[cmp]->m_scripts[scr_index].m_environment;
+			return m_scripts[{cmp.index}]->m_scripts[scr_index].m_environment;
 		}
 
 
@@ -656,7 +869,8 @@ namespace Lumix
 				return;
 			}
 
-			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
+			bool is_env_valid = lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment) == LUA_TTABLE;
+			ASSERT(is_env_valid);
 			lua_setupvalue(script.m_state, -2, 1);
 
 			errors = errors || lua_pcall(state, 0, 0, 0) != LUA_OK;
@@ -670,30 +884,31 @@ namespace Lumix
 		}
 
 
-		void setPropertyValue(Lumix::ComponentIndex cmp,
+		void setPropertyValue(Lumix::ComponentHandle cmp,
 			int scr_index,
 			const char* name,
-			const char* value)
+			const char* value) override
 		{
-			if (!m_scripts[cmp]) return;
-			if(!m_scripts[cmp]->m_scripts[scr_index].m_state) return;
+			auto* script_cmp = m_scripts[{cmp.index}];
+			if (!script_cmp) return;
+			if(!script_cmp->m_scripts[scr_index].m_state) return;
 
 			Property& prop = getScriptProperty(cmp, scr_index, name);
-			applyProperty(m_scripts[cmp]->m_scripts[scr_index], prop, value);
+			applyProperty(script_cmp->m_scripts[scr_index], prop, value);
 		}
 
 
-		const char* getPropertyName(Lumix::ComponentIndex cmp, int scr_index, int index) const
+		const char* getPropertyName(Lumix::ComponentHandle cmp, int scr_index, int index) const
 		{
-			auto& script = m_scripts[cmp]->m_scripts[scr_index];
+			auto& script = m_scripts[{cmp.index}]->m_scripts[scr_index];
 
 			return getPropertyName(script.m_properties[index].name_hash);
 		}
 
 
-		int getPropertyCount(Lumix::ComponentIndex cmp, int scr_index) const
+		int getPropertyCount(Lumix::ComponentHandle cmp, int scr_index) const
 		{
-			auto& script = m_scripts[cmp]->m_scripts[scr_index];
+			auto& script = m_scripts[{cmp.index}]->m_scripts[scr_index];
 
 			return script.m_properties.size();
 		}
@@ -716,9 +931,10 @@ namespace Lumix
 		}
 
 
-		void destroy(ScriptInstance& inst)
+		void destroyInstance(ScriptComponent& scr,  ScriptInstance& inst)
 		{
-			lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
+			bool is_env_valid = lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment) == LUA_TTABLE;
+			ASSERT(is_env_valid);
 			if (lua_getfield(inst.m_state, -1, "onDestroy") != LUA_TFUNCTION)
 			{
 				lua_pop(inst.m_state, 2);
@@ -733,9 +949,19 @@ namespace Lumix
 				lua_pop(inst.m_state, 1);
 			}
 
+			for (int i = 0; i < m_timers.size(); ++i)
+			{
+				if (m_timers[i].state == inst.m_state)
+				{
+					luaL_unref(m_timers[i].state, LUA_REGISTRYINDEX, m_timers[i].func);
+					m_timers.eraseFast(i);
+					--i;
+				}
+			}
+
 			for(int i = 0; i < m_updates.size(); ++i)
 			{
-				if(m_updates[i].environment == inst.m_environment)
+				if(m_updates[i].state == inst.m_state)
 				{
 					m_updates.eraseFast(i);
 					break;
@@ -754,19 +980,13 @@ namespace Lumix
 
 			if (inst.m_script)
 			{
-				if (inst.m_state)
-				{
-					destroy(inst);
-				}
-				inst.m_state = nullptr;
+				if (inst.m_state) destroyInstance(cmp, inst);
 				inst.m_properties.clear();
 				auto& cb = inst.m_script->getObserverCb();
 				cb.unbind<ScriptComponent, &ScriptComponent::onScriptLoaded>(&cmp);
 				m_system.getScriptManager().unload(*inst.m_script);
 			}
-			inst.m_script = path.isValid()
-								? static_cast<LuaScript*>(m_system.getScriptManager().load(path))
-								: nullptr;
+			inst.m_script = path.isValid() ? static_cast<LuaScript*>(m_system.getScriptManager().load(path)) : nullptr;
 			if (inst.m_script)
 			{
 				inst.m_script->onLoaded<ScriptComponent, &ScriptComponent::onScriptLoaded>(&cmp);
@@ -774,37 +994,71 @@ namespace Lumix
 		}
 
 
+		void startScript(ScriptInstance& instance, bool is_restart)
+		{
+			if (is_restart)
+			{
+				for (int i = 0; i < m_updates.size(); ++i)
+				{
+					if (m_updates[i].state == instance.m_state)
+					{
+						m_updates.eraseFast(i);
+						break;
+					}
+				}
+			}
+
+			if (lua_rawgeti(instance.m_state, LUA_REGISTRYINDEX, instance.m_environment) != LUA_TTABLE)
+			{
+				ASSERT(false);
+				lua_pop(instance.m_state, 1);
+				return;
+			}
+			if (lua_getfield(instance.m_state, -1, "update") == LUA_TFUNCTION)
+			{
+				auto& update_data = m_updates.emplace();
+				update_data.script = instance.m_script;
+				update_data.state = instance.m_state;
+				update_data.environment = instance.m_environment;
+			}
+			lua_pop(instance.m_state, 1);
+
+			if (!is_restart)
+			{
+				if (lua_getfield(instance.m_state, -1, "init") != LUA_TFUNCTION)
+				{
+					lua_pop(instance.m_state, 2);
+					return;
+				}
+
+				if (lua_pcall(instance.m_state, 0, 0, 0) != LUA_OK)
+				{
+					g_log_error.log("Lua Script") << lua_tostring(instance.m_state, -1);
+					lua_pop(instance.m_state, 1);
+				}
+			}
+			lua_pop(instance.m_state, 1);
+		}
+
+
 		void startGame() override
 		{
-			for (auto* scr : m_scripts)
+			m_is_game_running = true;
+
+			// copy m_scripts to tmp, because scripts can create other scripts -> m_scripts is not const
+			Lumix::Array<ScriptComponent*> tmp(m_system.m_allocator);
+			tmp.reserve(m_scripts.size());
+			for (auto* scr : m_scripts) tmp.push(scr); 
+
+			for (auto* scr : tmp)
 			{
-				if (!scr) continue;
-				for (auto& i : scr->m_scripts)
+				for (int j = 0; j < scr->m_scripts.size(); ++j)
 				{
-					if (!i.m_script) continue;
+					auto& instance = scr->m_scripts[j];
+					if (!instance.m_script) continue;
+					if (!instance.m_script->isReady()) continue;
 
-					lua_rawgeti(i.m_state, LUA_REGISTRYINDEX, i.m_environment);
-					if (lua_getfield(i.m_state, -1, "update") == LUA_TFUNCTION)
-					{
-						auto& update_data = m_updates.emplace();
-						update_data.script = i.m_script;
-						update_data.state = i.m_state;
-						update_data.environment = i.m_environment;
-					}
-					lua_pop(i.m_state, 1);
-
-					if (lua_getfield(i.m_state, -1, "init") != LUA_TFUNCTION)
-					{
-						lua_pop(i.m_state, 2);
-						continue;
-					}
-
-					if (lua_pcall(i.m_state, 0, 0, 0) != LUA_OK)
-					{
-						g_log_error.log("Lua Script") << lua_tostring(i.m_state, -1);
-						lua_pop(i.m_state, 1);
-					}
-					lua_pop(i.m_state, 1);
+					startScript(instance, false);
 				}
 			}
 		}
@@ -812,67 +1066,90 @@ namespace Lumix
 
 		void stopGame() override
 		{
+			m_is_game_running = false;
 			m_updates.clear();
+			m_timers.clear();
 		}
 
 
-		ComponentIndex createComponent(uint32 type, Entity entity) override
+		ComponentHandle createComponent(ComponentType type, Entity entity) override
 		{
-			if (type != LUA_SCRIPT_HASH) return INVALID_COMPONENT;
+			if (type != LUA_SCRIPT_TYPE) return INVALID_COMPONENT;
 
-			ScriptComponent& script =
-				*LUMIX_NEW(m_system.getAllocator(), ScriptComponent)(*this, m_system.getAllocator());
-			ComponentIndex cmp = INVALID_COMPONENT;
-			for (int i = 0; i < m_scripts.size(); ++i)
-			{
-				if (m_scripts[i] == nullptr)
-				{
-					cmp = i;
-					m_scripts[i] = &script;
-					break;
-				}
-			}
-			if (cmp == INVALID_COMPONENT)
-			{
-				cmp = m_scripts.size();
-				m_scripts.push(&script);
-			}
-			m_entity_script_map.insert(entity, cmp);
-			script.m_entity = entity;
+			auto& allocator = m_system.m_allocator;
+			ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
+			ComponentHandle cmp = {entity.index};
+			script->m_entity = entity;
+			m_scripts.insert(entity, script);
 			m_universe.addComponent(entity, type, this, cmp);
 
 			return cmp;
 		}
 
 
-		void destroyComponent(ComponentIndex component, uint32 type) override
+		void destroyComponent(ComponentHandle component, ComponentType type) override
 		{
-			if (type != LUA_SCRIPT_HASH) return;
+			if (type != LUA_SCRIPT_TYPE) return;
 
-			for (int i = 0, c = m_updates.size(); i < c; ++i)
+			Entity entity = {component.index};
+			auto* script = m_scripts[entity];
+			for (auto& scr : script->m_scripts)
 			{
-				if(m_updates[i].cmp == component) m_updates.erase(i);
+				if (scr.m_state) destroyInstance(*script, scr);
+				if (scr.m_script)
+				{
+					auto& cb = scr.m_script->getObserverCb();
+					cb.unbind<ScriptComponent, &ScriptComponent::onScriptLoaded>(script);
+					m_system.getScriptManager().unload(*scr.m_script);
+				}
 			}
-			for (auto& scr : m_scripts[component]->m_scripts)
+			LUMIX_DELETE(m_system.m_allocator, script);
+			m_scripts.erase(entity);
+			m_universe.destroyComponent(entity, type, this, component);
+		}
+
+
+		void getPropertyValue(ComponentHandle cmp,
+			int scr_index,
+			const char* property_name,
+			char* out,
+			int max_size) override
+		{
+			ASSERT(max_size > 0);
+
+			uint32 hash = crc32(property_name);
+			auto& inst = m_scripts[{cmp.index}]->m_scripts[scr_index];
+			if (inst.m_script->isReady())
 			{
-				if (scr.m_state) destroy(scr);
-				if (scr.m_script) m_system.getScriptManager().unload(*scr.m_script);
+				for (auto& prop : inst.m_properties)
+				{
+					if (prop.name_hash == hash)
+					{
+						getProperty(prop, property_name, inst, out, max_size);
+						return;
+					}
+				}
 			}
-			m_entity_script_map.erase(m_scripts[component]->m_entity);
-			auto* script = m_scripts[component];
-			m_scripts[component] = nullptr;
-			m_universe.destroyComponent(script->m_entity, type, this, component);
-			LUMIX_DELETE(m_system.getAllocator(), script);
+			*out = '\0';
 		}
 
 
 		void getProperty(Property& prop, const char* prop_name, ScriptInstance& scr, char* out, int max_size)
 		{
 			if(max_size <= 0) return;
+			if (!scr.m_state)
+			{
+				copyString(out, max_size, prop.stored_value.c_str());
+				return;
+			}
 
 			*out = '\0';
 			lua_rawgeti(scr.m_state, LUA_REGISTRYINDEX, scr.m_environment);
-			auto type = lua_getfield(scr.m_state, -1, prop_name);
+			if (lua_getfield(scr.m_state, -1, prop_name) == LUA_TNIL)
+			{
+				copyString(out, max_size, prop.stored_value.c_str());
+				return;
+			}
 			switch (prop.type)
 			{
 				case Property::BOOLEAN:
@@ -889,8 +1166,8 @@ namespace Lumix
 				break;
 				case Property::ENTITY:
 				{
-					Entity val = (Entity)lua_tointeger(scr.m_state, -1);
-					toCString(val, out, max_size);
+					Entity val = {(int)lua_tointeger(scr.m_state, -1)};
+					toCString(val.index, out, max_size);
 				}
 				break;
 				default: ASSERT(false); break;
@@ -902,14 +1179,12 @@ namespace Lumix
 		void serialize(OutputBlob& serializer) override
 		{
 			serializer.write(m_scripts.size());
-			for (int i = 0; i < m_scripts.size(); ++i)
+			for (auto iter = m_scripts.begin(), end = m_scripts.end(); iter != end; ++iter)
 			{
-				serializer.write(m_scripts[i] ? true : false);
-				if (!m_scripts[i]) continue;
-
-				serializer.write(m_scripts[i]->m_entity);
-				serializer.write(m_scripts[i]->m_scripts.size());
-				for (auto& scr : m_scripts[i]->m_scripts)
+				ScriptComponent* script_cmp = iter.value();
+				serializer.write(script_cmp->m_entity);
+				serializer.write(script_cmp->m_scripts.size());
+				for (auto& scr : script_cmp->m_scripts)
 				{
 					serializer.writeString(scr.m_script ? scr.m_script->getPath().c_str() : "");
 					serializer.write(scr.m_properties.size());
@@ -949,28 +1224,23 @@ namespace Lumix
 			}
 
 			int len = serializer.read<int>();
-			unloadAllScripts();
-			m_scripts.reserve(len);
+			m_scripts.rehash(len);
 			for (int i = 0; i < len; ++i)
 			{
-				bool is_valid;
-				serializer.read(is_valid);
-				if (!is_valid)
-				{
-					m_scripts.push(nullptr);
-					continue;
-				}
+				bool is_valid = true;
+				if (version <= (int)LuaScriptVersion::REFACTOR) serializer.read(is_valid);
+				if (!is_valid) continue;
 
-				ScriptComponent& script = *LUMIX_NEW(m_system.getAllocator(), ScriptComponent)(*this, m_system.getAllocator());
-				m_scripts.push(&script);
+				auto& allocator = m_system.m_allocator;
+				ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
 
+				serializer.read(script->m_entity);
+				m_scripts.insert(script->m_entity, script);
 				int scr_count;
-				serializer.read(m_scripts[i]->m_entity);
 				serializer.read(scr_count);
-				m_entity_script_map.insert(m_scripts[i]->m_entity, i);
 				for (int j = 0; j < scr_count; ++j)
 				{
-					auto& scr = script.m_scripts.emplace(m_system.m_allocator);
+					auto& scr = script->m_scripts.emplace(allocator);
 
 					char tmp[MAX_PATH_LENGTH];
 					serializer.readString(tmp, MAX_PATH_LENGTH);
@@ -980,7 +1250,7 @@ namespace Lumix
 					scr.m_properties.reserve(prop_count);
 					for (int j = 0; j < prop_count; ++j)
 					{
-						Property& prop = scr.m_properties.emplace(m_system.getAllocator());
+						Property& prop = scr.m_properties.emplace(allocator);
 						prop.type = Property::ANY;
 						serializer.read(prop.name_hash);
 						char tmp[1024];
@@ -988,10 +1258,10 @@ namespace Lumix
 						serializer.readString(tmp, sizeof(tmp));
 						prop.stored_value = tmp;
 					}
-					setScriptPath(*m_scripts[i], scr, Path(tmp));
+					setScriptPath(*script, scr, Path(tmp));
 				}
-				m_universe.addComponent(
-					Entity(m_scripts[i]->m_entity), LUA_SCRIPT_HASH, this, i);
+				ComponentHandle cmp = {script->m_entity.index};
+				m_universe.addComponent(script->m_entity, LUA_SCRIPT_TYPE, this, cmp);
 			}
 		}
 
@@ -999,33 +1269,28 @@ namespace Lumix
 		void deserializeOld(InputBlob& serializer)
 		{
 			int len = serializer.read<int>();
-			unloadAllScripts();
-			m_scripts.reserve(len);
+			m_scripts.rehash(len);
 			for (int i = 0; i < len; ++i)
 			{
 				bool is_valid;
 				serializer.read(is_valid);
-				if (!is_valid)
-				{
-					m_scripts.push(nullptr);
-					continue;
-				}
+				if (!is_valid) continue;
 
-				ScriptComponent& script = *LUMIX_NEW(m_system.getAllocator(), ScriptComponent)(*this, m_system.getAllocator());
-				m_scripts.push(&script);
-				serializer.read(m_scripts[i]->m_entity);
-				m_entity_script_map.insert(m_scripts[i]->m_entity, i);
+				IAllocator& allocator = m_system.m_allocator;
+				ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
+				serializer.read(script->m_entity);
+				m_scripts.insert(script->m_entity, script);
+
 				char tmp[MAX_PATH_LENGTH];
 				serializer.readString(tmp, MAX_PATH_LENGTH);
-				auto& scr = script.m_scripts.emplace(m_system.m_allocator);
+				auto& scr = script->m_scripts.emplace(m_system.m_allocator);
 				scr.m_state = nullptr;
 				int prop_count;
 				serializer.read(prop_count);
 				scr.m_properties.reserve(prop_count);
 				for (int j = 0; j < prop_count; ++j)
 				{
-					Property& prop =
-						scr.m_properties.emplace(m_system.getAllocator());
+					Property& prop = scr.m_properties.emplace(allocator);
 					prop.type = Property::ANY;
 					serializer.read(prop.name_hash);
 					char tmp[1024];
@@ -1033,8 +1298,9 @@ namespace Lumix
 					serializer.readString(tmp, sizeof(tmp));
 					prop.stored_value = tmp;
 				}
-				setScriptPath(script, scr, Path(tmp));
-				m_universe.addComponent(m_scripts[i]->m_entity, LUA_SCRIPT_HASH, this, i);
+				setScriptPath(*script, scr, Path(tmp));
+				ComponentHandle cmp = {script->m_entity.index};
+				m_universe.addComponent(script->m_entity, LUA_SCRIPT_TYPE, this, cmp);
 			}
 		}
 
@@ -1046,49 +1312,76 @@ namespace Lumix
 		{
 			if (paused) return;
 
-			for (auto& i : m_updates)
+			int timers_to_remove[1024];
+			int timers_to_remove_count = 0;
+			for (int i = 0, c = m_timers.size(); i < c; ++i)
 			{
-				if (lua_rawgeti(i.state, LUA_REGISTRYINDEX, i.environment) != LUA_TTABLE)
+				auto& timer = m_timers[i];
+				timer.time -= time_delta;
+				if (timer.time < 0)
+				{
+					if (lua_rawgeti(timer.state, LUA_REGISTRYINDEX, timer.func) != LUA_TFUNCTION)
+					{
+						ASSERT(false);
+					}
+
+					if (lua_pcall(timer.state, 0, 0, 0) != LUA_OK)
+					{
+						g_log_error.log("Lua Script") << lua_tostring(timer.state, -1);
+						lua_pop(timer.state, 1);
+					}
+					timers_to_remove[timers_to_remove_count] = i;
+					++timers_to_remove_count;
+					if (timers_to_remove_count >= lengthOf(timers_to_remove))
+					{
+						g_log_error.log("Lua Script") << "Too many lua timers in one frame, some are not executed";
+						break;
+					}
+				}
+			}
+			for (int i = timers_to_remove_count - 1; i >= 0; --i)
+			{
+				auto& timer = m_timers[timers_to_remove[i]];
+				luaL_unref(timer.state, LUA_REGISTRYINDEX, timer.func);
+				m_timers.eraseFast(timers_to_remove[i]);
+			}
+
+			for (int i = 0, c = m_updates.size(); i < c; ++i)
+			{
+				auto& update_item = m_updates[i];
+				if (lua_rawgeti(update_item.state, LUA_REGISTRYINDEX, update_item.environment) != LUA_TTABLE)
 				{
 					ASSERT(false);
 				}
-				if (lua_getfield(i.state, -1, "update") != LUA_TFUNCTION)
+				if (lua_getfield(update_item.state, -1, "update") != LUA_TFUNCTION)
 				{
-					lua_pop(i.state, 2);
+					lua_pop(update_item.state, 2);
 					continue;
 				}
 
-				auto t = lua_gettop(i.state);
-				lua_pushnumber(i.state, time_delta);
-				if (lua_pcall(i.state, 1, 0, 0) != LUA_OK)
+				lua_pushnumber(update_item.state, time_delta);
+				if (lua_pcall(update_item.state, 1, 0, 0) != LUA_OK)
 				{
-					g_log_error.log("Lua Script") << lua_tostring(i.state, -1);
-					lua_pop(i.state, 1);
+					g_log_error.log("Lua Script") << lua_tostring(update_item.state, -1);
+					lua_pop(update_item.state, 1);
 				}
-				lua_pop(i.state, 1);
+				lua_pop(update_item.state, 1);
 			}
 		}
 
 
-		ComponentIndex getComponent(Entity entity, uint32 type) override
+		ComponentHandle getComponent(Entity entity, ComponentType type) override
 		{
-			ASSERT(ownComponentType(type));
-			auto iter = m_entity_script_map.find(entity);
-			if (iter.isValid()) return iter.value();
-			return INVALID_COMPONENT;
+			if (m_scripts.find(entity) == m_scripts.end()) return INVALID_COMPONENT;
+			return {entity.index};
 		}
 
 
-		bool ownComponentType(uint32 type) const override
-		{
-			return type == LUA_SCRIPT_HASH;
-		}
-
-
-		Property& getScriptProperty(ComponentIndex cmp, int scr_index, const char* name)
+		Property& getScriptProperty(ComponentHandle cmp, int scr_index, const char* name)
 		{
 			uint32 name_hash = crc32(name);
-			for (auto& prop : m_scripts[cmp]->m_scripts[scr_index].m_properties)
+			ScriptComponent* script_cmp = m_scripts[{cmp.index}];
+			for (auto& prop : script_cmp->m_scripts[scr_index].m_properties)
 			{
 				if (prop.name_hash == name_hash)
 				{
@@ -1096,71 +1389,81 @@ namespace Lumix
 				}
 			}
 
-			m_scripts[cmp]->m_scripts[scr_index].m_properties.emplace(m_system.getAllocator());
-			auto& prop = m_scripts[cmp]->m_scripts[scr_index].m_properties.back();
+			script_cmp->m_scripts[scr_index].m_properties.emplace(m_system.m_allocator);
+			auto& prop = script_cmp->m_scripts[scr_index].m_properties.back();
 			prop.name_hash = name_hash;
 			return prop;
 		}
 
 
-		Path getScriptPath(ComponentIndex cmp, int scr_index) override
+		Path getScriptPath(ComponentHandle cmp, int scr_index) override
 		{
-			return m_scripts[cmp]->m_scripts[scr_index].m_script ? m_scripts[cmp]->m_scripts[scr_index].m_script->getPath() : Path("");
+			auto& tmp = m_scripts[{cmp.index}]->m_scripts[scr_index];
+			return tmp.m_script ? tmp.m_script->getPath() : Path("");
 		}
 
 
-		void setScriptPath(ComponentIndex cmp, int scr_index, const Path& path) override
+		void setScriptPath(ComponentHandle cmp, int scr_index, const Path& path) override
 		{
-			if (!m_scripts[cmp]) return;
-			if (m_scripts[cmp]->m_scripts.size() <= scr_index) return;
-			setScriptPath(*m_scripts[cmp], m_scripts[cmp]->m_scripts[scr_index], path);
+			auto* script_cmp = m_scripts[{cmp.index}];
+			if (script_cmp->m_scripts.size() <= scr_index) return;
+			setScriptPath(*script_cmp, script_cmp->m_scripts[scr_index], path);
 		}
 
 
-		int getScriptCount(ComponentIndex cmp) override
+		int getScriptCount(ComponentHandle cmp) override
 		{
-			return m_scripts[cmp]->m_scripts.size();
+			return m_scripts[{cmp.index}]->m_scripts.size();
 		}
 
 
-		void insertScript(ComponentIndex cmp, int idx)
+		void insertScript(ComponentHandle cmp, int idx) override
 		{
-			m_scripts[cmp]->m_scripts.emplaceAt(idx, m_system.m_allocator);
+			m_scripts[{cmp.index}]->m_scripts.emplaceAt(idx, m_system.m_allocator);
 		}
 
 
-		int addScript(ComponentIndex cmp)
+		int addScript(ComponentHandle cmp) override
 		{
-			m_scripts[cmp]->m_scripts.emplace(m_system.m_allocator);
-			return m_scripts[cmp]->m_scripts.size() - 1;
+			ScriptComponent* script_cmp = m_scripts[{cmp.index}];
+			script_cmp->m_scripts.emplace(m_system.m_allocator);
+			return script_cmp->m_scripts.size() - 1;
 		}
 
 
-		void removeScript(ComponentIndex cmp, int scr_index)
+		void removeScript(ComponentHandle cmp, int scr_index) override
 		{
 			setScriptPath(cmp, scr_index, Path());
-			m_scripts[cmp]->m_scripts.eraseFast(scr_index);
+			m_scripts[{cmp.index}]->m_scripts.eraseFast(scr_index);
 		}
 
 
-		void serializeScript(ComponentIndex cmp, int scr_index, OutputBlob& blob)
+		void serializeScript(ComponentHandle cmp, int scr_index, OutputBlob& blob) override
 		{
-			auto& scr = m_scripts[cmp]->m_scripts[scr_index];
+			auto& scr = m_scripts[{cmp.index}]->m_scripts[scr_index];
 			blob.writeString(scr.m_script ? scr.m_script->getPath().c_str() : "");
 			blob.write(scr.m_properties.size());
 			for (auto prop : scr.m_properties)
 			{
 				blob.write(prop.name_hash);
 				char tmp[1024];
-				getProperty(prop, getPropertyName(prop.name_hash), scr, tmp, lengthOf(tmp));
-				blob.writeString(tmp);
+				const char* property_name = getPropertyName(prop.name_hash);
+				if (!property_name)
+				{
+					blob.writeString(prop.stored_value.c_str());
+				}
+				else
+				{
+					getProperty(prop, property_name, scr, tmp, lengthOf(tmp));
+					blob.writeString(tmp);
+				}
 			}
 		}
 
 
-		void deserializeScript(ComponentIndex cmp, int scr_index, InputBlob& blob)
+		void deserializeScript(ComponentHandle cmp, int scr_index, InputBlob& blob) override
 		{
-			auto& scr = m_scripts[cmp]->m_scripts[scr_index];
+			auto& scr = m_scripts[{cmp.index}]->m_scripts[scr_index];
 			int count;
 			char path[MAX_PATH_LENGTH];
 			blob.readString(path, lengthOf(path));
@@ -1181,14 +1484,15 @@ namespace Lumix
 
 
 		LuaScriptSystemImpl& m_system;
-		Array<ScriptComponent*> m_scripts;
-		HashMap<Entity, ComponentIndex> m_entity_script_map;
+		HashMap<Entity, ScriptComponent*> m_scripts;
 		AssociativeArray<uint32, string> m_property_names;
 		Universe& m_universe;
 		Array<UpdateData> m_updates;
+		Array<TimerData> m_timers;
 		FunctionCall m_function_call;
 		ScriptInstance* m_current_script_instance;
 		bool m_is_api_registered;
+		bool m_is_game_running;
 	};
 
 
@@ -1197,21 +1501,18 @@ namespace Lumix
 		, m_allocator(engine.getAllocator())
 		, m_script_manager(m_allocator)
 	{
-		m_script_manager.create(crc32("lua_script"), engine.getResourceManager());
+		m_script_manager.create(LUA_SCRIPT_RESOURCE_TYPE, engine.getResourceManager());
 
-		PropertyRegister::registerComponentType("lua_script", "Lua script");
+		auto& allocator = engine.getAllocator();
+		PropertyRegister::add("lua_script",
+			LUMIX_NEW(allocator, BlobPropertyDescriptor<LuaScriptScene>)(
+				"data", &LuaScriptScene::getScriptData, &LuaScriptScene::setScriptData));
 	}
 
 
 	LuaScriptSystemImpl::~LuaScriptSystemImpl()
 	{
 		m_script_manager.destroy();
-	}
-
-
-	IAllocator& LuaScriptSystemImpl::getAllocator()
-	{
-		return m_allocator;
 	}
 
 
@@ -1224,552 +1525,6 @@ namespace Lumix
 	void LuaScriptSystemImpl::destroyScene(IScene* scene)
 	{
 		LUMIX_DELETE(m_allocator, scene);
-	}
-
-
-	bool LuaScriptSystemImpl::create()
-	{
-		return true;
-	}
-
-
-	void LuaScriptSystemImpl::destroy()
-	{
-	}
-
-
-	const char* LuaScriptSystemImpl::getName() const
-	{
-		return "lua_script";
-	}
-
-
-	namespace
-	{
-
-
-	int DragFloat(lua_State* L)
-	{
-		auto* name = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
-		float value = Lumix::LuaWrapper::checkArg<float>(L, 2);
-		bool changed = ImGui::DragFloat(name, &value);
-		lua_pushboolean(L, changed);
-		lua_pushnumber(L, value);
-		return 2;
-	}
-
-
-	int Button(lua_State* L)
-	{
-		auto* label = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
-		bool clicked = ImGui::Button(label);
-		lua_pushboolean(L, clicked);
-		return 1;
-	}
-
-
-	int Checkbox(lua_State* L)
-	{
-		auto* label = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
-		bool b = Lumix::LuaWrapper::checkArg<bool>(L, 2);
-		bool clicked = ImGui::Checkbox(label, &b);
-		lua_pushboolean(L, clicked);
-		lua_pushboolean(L, b);
-		return 2;
-	}
-
-
-	void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
-	{
-		lua_pushvalue(L, -1);
-		lua_pushcfunction(L, f);
-		lua_setfield(L, -2, name);
-	}
-
-
-	struct PropertyGridPlugin : public PropertyGrid::IPlugin
-	{
-		struct AddScriptCommand : public IEditorCommand
-		{
-			AddScriptCommand(){}
-			
-
-			explicit AddScriptCommand(WorldEditor& editor)
-			{
-				scene = static_cast<LuaScriptSceneImpl*>(editor.getScene(crc32("lua_script")));
-			}
-
-
-			bool execute() override
-			{
-				scr_index = scene->addScript(cmp);
-				return true;
-			}
-
-
-			void undo() override
-			{
-				scene->removeScript(cmp, scr_index);
-			}
-
-
-			void serialize(JsonSerializer& serializer) override
-			{
-				serializer.serialize("component", cmp);
-			}
-
-
-			void deserialize(JsonSerializer& serializer) override
-			{
-				serializer.deserialize("component", cmp, 0);
-			}
-
-
-			uint32 getType() override
-			{
-				static const uint32 hash = crc32("add_script");
-				return hash;
-			}
-
-
-			bool merge(IEditorCommand& command) override
-			{
-				return false;
-			}
-
-
-			LuaScriptSceneImpl* scene;
-			ComponentIndex cmp;
-			int scr_index;
-		};
-
-
-		struct RemoveScriptCommand : public IEditorCommand
-		{
-			explicit RemoveScriptCommand(WorldEditor& editor)
-				: blob(editor.getAllocator())
-			{
-				scene = static_cast<LuaScriptSceneImpl*>(editor.getScene(crc32("lua_script")));
-			}
-
-
-			explicit RemoveScriptCommand(IAllocator& allocator)
-				: blob(allocator)
-			{
-			}
-
-
-			bool execute() override
-			{
-				scene->serializeScript(cmp, scr_index, blob);
-				scene->removeScript(cmp, scr_index);
-				return true;
-			}
-
-
-			void undo() override
-			{
-				scene->insertScript(cmp, scr_index);
-				scene->deserializeScript(cmp, scr_index, InputBlob(blob));
-			}
-
-
-			void serialize(JsonSerializer& serializer) override
-			{
-				serializer.serialize("component", cmp);
-				serializer.serialize("scr_index", scr_index);
-			}
-
-
-			void deserialize(JsonSerializer& serializer) override
-			{
-				serializer.deserialize("component", cmp, 0);
-				serializer.deserialize("scr_index", scr_index, 0);
-			}
-
-
-			uint32 getType() override
-			{
-				static const uint32 hash = crc32("remove_script");
-				return hash;
-			}
-
-
-			bool merge(IEditorCommand& command) override
-			{
-				return false;
-			}
-
-			OutputBlob blob;
-			LuaScriptSceneImpl* scene;
-			ComponentIndex cmp;
-			int scr_index;
-		};
-
-
-		struct SetPropertyCommand : public IEditorCommand
-		{
-			explicit SetPropertyCommand(WorldEditor& editor)
-				: property_name(editor.getAllocator())
-				, value(editor.getAllocator())
-				, old_value(editor.getAllocator())
-			{
-				scene = static_cast<LuaScriptSceneImpl*>(editor.getScene(crc32("lua_script")));
-			}
-
-
-			SetPropertyCommand(LuaScriptSceneImpl* scene,
-				ComponentIndex cmp,
-				int scr_index,
-				const char* property_name,
-				const char* val,
-				IAllocator& allocator)
-				: property_name(property_name, allocator)
-				, value(val, allocator)
-				, old_value(allocator)
-				, component(cmp)
-				, script_index(scr_index)
-			{
-				this->scene = scene;
-				if (property_name[0] == '-')
-				{
-					old_value = scene->getScriptPath(component, script_index).c_str();
-				}
-				else
-				{
-					char tmp[1024];
-					tmp[0] = '\0';
-					auto& inst = scene->m_scripts[cmp]->m_scripts[scr_index];
-					uint32 prop_name_hash = crc32(property_name);
-					for (auto& prop : inst.m_properties)
-					{
-						if (prop.name_hash == prop_name_hash)
-						{
-							scene->getProperty(prop, property_name, inst, tmp, lengthOf(tmp));
-							break;
-						}
-					}
-					old_value = tmp;
-					return;
-				}
-			}
-
-
-			bool execute() override
-			{
-				if (property_name.length() > 0 && property_name[0] == '-')
-				{
-					scene->setScriptPath(component, script_index, Path(value.c_str()));
-				}
-				else
-				{
-					scene->setPropertyValue(component, script_index, property_name.c_str(), value.c_str());
-				}
-				return true;
-			}
-
-
-			void undo() override
-			{
-				if (property_name.length() > 0 && property_name[0] == '-')
-				{
-					scene->setScriptPath(component, script_index, Path(old_value.c_str()));
-				}
-				else
-				{
-					scene->setPropertyValue(component, script_index, property_name.c_str(), old_value.c_str());
-				}
-			}
-
-
-			void serialize(JsonSerializer& serializer) override
-			{
-				serializer.serialize("component", component);
-				serializer.serialize("script_index", script_index);
-				serializer.serialize("property_name", property_name.c_str());
-				serializer.serialize("value", value.c_str());
-				serializer.serialize("old_value", old_value.c_str());
-			}
-
-
-			void deserialize(JsonSerializer& serializer) override
-			{
-				serializer.deserialize("component", component, 0);
-				serializer.deserialize("script_index", script_index, 0);
-				char buf[256];
-				serializer.deserialize("property_name", buf, lengthOf(buf), "");
-				property_name = buf;
-				serializer.deserialize("value", buf, lengthOf(buf), "");
-				value = buf;
-				serializer.deserialize("old_value", buf, lengthOf(buf), "");
-				old_value = buf;
-			}
-			
-			
-			uint32 getType() override
-			{
-				static const uint32 hash = crc32("set_script_property");
-				return hash;
-			}
-
-
-			bool merge(IEditorCommand& command) override
-			{
-				auto& cmd = static_cast<SetPropertyCommand&>(command);
-				if (cmd.script_index == script_index && cmd.property_name == property_name)
-				{
-					cmd.value = value;
-					return true;
-				}
-				return false;
-			}
-
-
-			LuaScriptSceneImpl* scene;
-			string property_name;
-			string value;
-			string old_value;
-			ComponentIndex component;
-			int script_index;
-		};
-
-
-
-		explicit PropertyGridPlugin(StudioApp& app)
-			: m_app(app)
-		{
-			lua_State* L = app.getWorldEditor()->getEngine().getState();
-			lua_newtable(L);
-			lua_pushvalue(L, -1);
-			lua_setglobal(L, "ImGui");
-
-			registerCFunction(L, "DragFloat", &DragFloat);
-			registerCFunction(L, "Button", &Button);
-			registerCFunction(L, "Checkbox", &Checkbox);
-
-			lua_pop(L, 1);
-
-		}
-
-
-		void onGUI(PropertyGrid& grid, Lumix::ComponentUID cmp) override
-		{
-			if (cmp.type != LUA_SCRIPT_HASH) return;
-
-			auto* scene = static_cast<LuaScriptSceneImpl*>(cmp.scene);
-			auto& editor = *m_app.getWorldEditor();
-			auto& allocator = editor.getAllocator();
-
-			if (ImGui::Button("Add script"))
-			{
-				auto* cmd = LUMIX_NEW(allocator, AddScriptCommand);
-				cmd->scene = scene;
-				cmd->cmp = cmp.index;
-				editor.executeCommand(cmd);
-			}
-
-			for (int j = 0; j < scene->getScriptCount(cmp.index); ++j)
-			{
-				char buf[MAX_PATH_LENGTH];
-				copyString(buf, scene->getScriptPath(cmp.index, j).c_str());
-				char basename[50];
-				PathUtils::getBasename(basename, lengthOf(basename), buf);
-				if (basename[0] == 0) toCString(j, basename, lengthOf(basename));
-
-				if (ImGui::CollapsingHeader(basename))
-				{
-					ImGui::PushID(j);
-					if (ImGui::Button("Remove script"))
-					{
-						auto* cmd = LUMIX_NEW(allocator, RemoveScriptCommand)(allocator);
-						cmd->cmp = cmp.index;
-						cmd->scr_index = j;
-						cmd->scene = scene;
-						editor.executeCommand(cmd);
-						ImGui::PopID();
-						break;
-					}
-					if (m_app.getAssetBrowser()->resourceInput("Source", "src", buf, lengthOf(buf), LUA_SCRIPT_HASH))
-					{
-						auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(scene, cmp.index, j, "-source", buf, allocator);
-						editor.executeCommand(cmd);
-					}
-					auto& inst = scene->m_scripts[cmp.index]->m_scripts[j];
-					if (inst.m_state)
-					{
-						for (auto& prop : inst.m_properties)
-						{
-							char buf[256];
-							const char* property_name = scene->getPropertyName(prop.name_hash);
-							if (!property_name) continue;
-							scene->getProperty(prop, property_name, inst, buf, lengthOf(buf));
-							switch (prop.type)
-							{
-								case LuaScriptSceneImpl::Property::BOOLEAN:
-								{
-									bool b = compareString(buf, "true") == 0;
-									if (ImGui::Checkbox(property_name, &b))
-									{
-										auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
-											scene, cmp.index, j, property_name, b ? "true" : "false", allocator);
-										editor.executeCommand(cmd);
-									}
-								}
-								break;
-								case LuaScriptSceneImpl::Property::FLOAT:
-								{
-									float f = (float)atof(buf);
-									if (ImGui::DragFloat(property_name, &f))
-									{
-										Lumix::toCString(f, buf, sizeof(buf), 5);
-										auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
-											scene, cmp.index, j, property_name, buf, allocator);
-										editor.executeCommand(cmd);
-									}
-								}
-								break;
-								case LuaScriptSceneImpl::Property::ENTITY:
-								{
-									Lumix::Entity e;
-									Lumix::fromCString(buf, sizeof(buf), &e);
-									if (grid.entityInput(property_name,
-											StaticString<50>(property_name, cmp.index),
-											e))
-									{
-										Lumix::toCString(e, buf, sizeof(buf));
-										auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
-											scene, cmp.index, j, property_name, buf, allocator);
-										editor.executeCommand(cmd);
-									}
-								}
-								break;
-								case LuaScriptSceneImpl::Property::ANY:
-									if (ImGui::InputText(property_name, buf, sizeof(buf)))
-									{
-										auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
-											scene, cmp.index, j, property_name, buf, allocator);
-										editor.executeCommand(cmd);
-									}
-									break;
-							}
-						}
-						if (auto* call = scene->beginFunctionCall(cmp.index, j, "onGUI"))
-						{
-							scene->endFunctionCall(*call);
-						}
-					}
-					ImGui::PopID();
-				}
-			}
-
-		}
-
-		StudioApp& m_app;
-	};
-
-
-	struct AssetBrowserPlugin : AssetBrowser::IPlugin
-	{
-		explicit AssetBrowserPlugin(StudioApp& app)
-			: m_app(app)
-		{
-			m_text_buffer[0] = 0;
-		}
-
-
-		bool onGUI(Lumix::Resource* resource, Lumix::uint32 type) override
-		{
-			if (type != LUA_SCRIPT_HASH) return false;
-
-			auto* script = static_cast<Lumix::LuaScript*>(resource);
-
-			if (m_text_buffer[0] == '\0')
-			{
-				Lumix::copyString(m_text_buffer, script->getSourceCode());
-			}
-			ImGui::InputTextMultiline("Code", m_text_buffer, sizeof(m_text_buffer), ImVec2(0, 300));
-			if (ImGui::Button("Save"))
-			{
-				auto& fs = m_app.getWorldEditor()->getEngine().getFileSystem();
-				auto* file = fs.open(fs.getDefaultDevice(),
-					resource->getPath(),
-					Lumix::FS::Mode::CREATE_AND_WRITE);
-
-				if (!file)
-				{
-					Lumix::g_log_warning.log("Lua Script") << "Could not save "
-															  << resource->getPath();
-					return true;
-				}
-
-				file->write(m_text_buffer, Lumix::stringLength(m_text_buffer));
-				fs.close(*file);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Open in external editor"))
-			{
-				m_app.getAssetBrowser()->openInExternalEditor(resource);
-			}
-			return true;
-		}
-
-
-		Lumix::uint32 getResourceType(const char* ext) override
-		{
-			if (compareString(ext, "lua") == 0) return LUA_SCRIPT_HASH;
-			return 0;
-		}
-
-
-		void onResourceUnloaded(Lumix::Resource*) override { m_text_buffer[0] = 0; }
-		const char* getName() const override { return "Lua Script"; }
-
-
-		bool hasResourceManager(Lumix::uint32 type) const override 
-		{
-			return type == LUA_SCRIPT_HASH;
-		}
-
-
-		StudioApp& m_app;
-		char m_text_buffer[8192];
-		bool m_is_opened;
-	};
-
-
-	} // anonoymous namespace
-
-
-	IEditorCommand* createAddScriptCommand(WorldEditor& editor)
-	{
-		return LUMIX_NEW(editor.getAllocator(), PropertyGridPlugin::AddScriptCommand)(editor);
-	}
-
-
-	IEditorCommand* createSetPropertyCommand(WorldEditor& editor)
-	{
-		return LUMIX_NEW(editor.getAllocator(), PropertyGridPlugin::SetPropertyCommand)(editor);
-	}
-
-
-	IEditorCommand* createRemoveScriptCommand(WorldEditor& editor)
-	{
-		return LUMIX_NEW(editor.getAllocator(), PropertyGridPlugin::RemoveScriptCommand)(editor);
-	}
-
-
-	LUMIX_STUDIO_ENTRY(lua_script)
-	{
-		auto& editor = *app.getWorldEditor();
-		editor.registerEditorCommandCreator("add_script", createAddScriptCommand);
-		editor.registerEditorCommandCreator("remove_script", createRemoveScriptCommand);
-		editor.registerEditorCommandCreator("set_script_property", createSetPropertyCommand);
-
-		auto* plugin = LUMIX_NEW(editor.getAllocator(), PropertyGridPlugin)(app);
-		app.getPropertyGrid()->addPlugin(*plugin);
-
-		auto* asset_browser_plugin = LUMIX_NEW(editor.getAllocator(), AssetBrowserPlugin)(app);
-		app.getAssetBrowser()->addPlugin(*asset_browser_plugin);
 	}
 
 

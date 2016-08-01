@@ -1,22 +1,25 @@
 #include "animation/animation.h"
-#include "core/fs/file_system.h"
-#include "core/log.h"
-#include "core/matrix.h"
-#include "core/profiler.h"
-#include "core/quat.h"
-#include "core/resource_manager.h"
-#include "core/vec.h"
+#include "engine/fs/file_system.h"
+#include "engine/log.h"
+#include "engine/matrix.h"
+#include "engine/profiler.h"
+#include "engine/quat.h"
+#include "engine/resource_manager.h"
+#include "engine/vec.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 
 
 namespace Lumix
 {
-	
+
+
+static const ResourceType ANIMATION_TYPE("animation");
+
 
 Resource* AnimationManager::createResource(const Path& path)
 {
-	return LUMIX_NEW(m_allocator, Animation)(path, getOwner(), m_allocator);
+	return LUMIX_NEW(m_allocator, Animation)(path, *this, m_allocator);
 }
 
 
@@ -26,14 +29,15 @@ void AnimationManager::destroyResource(Resource& resource)
 }
 
 
-Animation::Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+Animation::Animation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
+	, m_bone_count(-1)
+	, m_rotations(nullptr)
+	, m_positions(nullptr)
+	, m_bones(nullptr)
+	, m_frame_count(0)
+	, m_fps(30)
 {
-	m_rotations = nullptr;
-	m_positions = nullptr;
-	m_bones = nullptr;
-	m_frame_count = 0;
-	m_fps = 30;
 }
 
 
@@ -53,8 +57,8 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 	{
 		int frame = (int)(time * m_fps);
 		frame = frame >= m_frame_count ? m_frame_count - 1 : frame;
-		Vec3* pos = pose.getPositions();
-		Quat* rot = pose.getRotations();
+		Vec3* pos = pose.positions;
+		Quat* rot = pose.rotations;
 		int off = frame * m_bone_count;
 		int off2 = off + m_bone_count;
 		float t = (time - frame / (float)m_fps) / (1.0f / m_fps);
@@ -85,7 +89,7 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 				}
 			}
 		}
-		pose.setIsRelative();
+		pose.is_absolute = false;
 		pose.computeAbsolute(model);
 	}
 }
@@ -99,7 +103,7 @@ bool Animation::load(FS::IFile& file)
 	allocator.deallocate(m_bones);
 	m_positions = nullptr;
 	m_rotations = nullptr;
-	m_bones = 0;
+	m_bones = nullptr;
 	m_frame_count = m_bone_count = 0;
 	Header header;
 	file.read(&header, sizeof(header));
@@ -132,7 +136,7 @@ bool Animation::load(FS::IFile& file)
 
 IAllocator& Animation::getAllocator()
 {
-	return static_cast<AnimationManager*>(m_resource_manager.get(ResourceManager::ANIMATION))->getAllocator();
+	return static_cast<AnimationManager&>(m_resource_manager).getAllocator();
 }
 
 

@@ -1,11 +1,11 @@
 #include "shader_editor.h"
-#include "core/blob.h"
-#include "core/crc32.h"
-#include "core/fs/os_file.h"
-#include "core/log.h"
-#include "core/math_utils.h"
-#include "core/path_utils.h"
-#include "core/string.h"
+#include "engine/blob.h"
+#include "engine/crc32.h"
+#include "engine/fs/os_file.h"
+#include "engine/log.h"
+#include "engine/math_utils.h"
+#include "engine/path_utils.h"
+#include "engine/string.h"
 #include "editor/platform_interface.h"
 #include "editor/utils.h"
 #include <cstdio>
@@ -462,6 +462,7 @@ ShaderEditor::Node::Node(int type, ShaderEditor& editor)
 	, m_outputs(editor.m_allocator)
 	, m_type(type)
 	, m_editor(editor)
+	, m_id(0xffffFFFF)
 {
 }
 
@@ -814,7 +815,7 @@ struct FloatConstNode : public ShaderEditor::Node
 
 	void generate(Lumix::OutputBlob&) override	{}
 
-	void printReference(Lumix::OutputBlob& blob)
+	void printReference(Lumix::OutputBlob& blob) override
 	{
 		blob << m_value;
 	}
@@ -844,7 +845,7 @@ struct ColorConstNode : public ShaderEditor::Node
 			 << m_color[2] << ", " << m_color[3] << ");\n";
 	}
 
-	void onGUI() override { ImGui::ColorEdit4("value", m_color); }
+	void onGUI() override { ImGui::ColorPicker(m_color, true); }
 
 	float m_color[4];
 };
@@ -1393,6 +1394,7 @@ struct CreateNodeCommand : public ShaderEditor::ICommand
 		, m_pos(pos)
 		, m_id(id)
 		, m_shader_type(shader_type)
+		, m_node(nullptr)
 		, ICommand(editor)
 	{
 	}
@@ -1835,11 +1837,15 @@ void ShaderEditor::load()
 }
 
 
-void ShaderEditor::getSavePath()
+bool ShaderEditor::getSavePath()
 {
 	char path[Lumix::MAX_PATH_LENGTH];
-	PlatformInterface::getSaveFilename(path, Lumix::lengthOf(path), "Shader edit data\0*.sed\0", "sed");
-	m_path = path;
+	if (PlatformInterface::getSaveFilename(path, Lumix::lengthOf(path), "Shader edit data\0*.sed\0", "sed"))
+	{
+		m_path = path;
+		return true;
+	}
+	return false;
 }
 
 
@@ -1950,7 +1956,7 @@ void ShaderEditor::onGUIRightColumn()
 		m_new_link_info.is_active = false;
 	}
 
-	if(ImGui::IsMouseClicked(1))
+	if(ImGui::IsMouseClicked(1) && ImGui::IsWindowHovered())
 	{
 		ImGui::OpenPopup("context_menu");
 	}
@@ -2133,8 +2139,7 @@ void ShaderEditor::generatePasses(Lumix::OutputBlob& blob)
 
 	for (int i = 0; i < pass; ++i)
 	{
-		if (i > 0) blob << ", ";
-		blob << "\"" << passes[i] << "\"";
+		blob << "pass \"" << passes[i] << "\"\n";
 	}
 }
 
@@ -2154,28 +2159,17 @@ void ShaderEditor::generateMain(const char* path)
 		return;
 	}
 
-	fputs("passes = {", fp);
-
 	Lumix::OutputBlob blob(m_allocator);
 	generatePasses(blob);
 	fwrite(blob.getData(), 1, blob.getPos(), fp);
-	fputs("}\n"
-		  "vs_combinations = {\"\"}\n"
-		  "fs_combinations = {\"\"}\n"
-		  "texture_slots = {\n",
-		  fp);
 
 	bool first = true;
 	for(const auto& texture : m_textures)
 	{
 		if(!texture[0]) continue;
 
-		if (!first) fputs(", ", fp);
-		first = false;
-		fprintf(fp, "{ name = \"%s\", uniform = \"%s\" }", texture, texture);
+		fprintf(fp, "texture_slot(\"%s\", \"%s\")\n", texture, texture);
 	}
-
-	fputs("}\n", fp);
 
 	fclose(fp);
 }
@@ -2192,8 +2186,7 @@ void ShaderEditor::onGUIMenu()
 			if (ImGui::MenuItem("Save", nullptr, false, m_path.isValid())) save(m_path.c_str());
 			if (ImGui::MenuItem("Save as"))
 			{
-				getSavePath();
-				if (m_path.isValid()) save(m_path.c_str());
+				if(getSavePath() && m_path.isValid()) save(m_path.c_str());
 			}
 			ImGui::EndMenu();
 		}

@@ -1,10 +1,10 @@
 #include "clip_manager.h"
-#include "core/iallocator.h"
-#include "core/resource.h"
-#include "core/string.h"
-#include "lumix.h"
+#include "engine/iallocator.h"
+#include "engine/resource.h"
+#include "engine/string.h"
+#include "engine/lumix.h"
 #define STB_VORBIS_HEADER_ONLY
-#include "stb_vorbis.c"
+#include "stb/stb_vorbis.cpp"
 #include <cstdlib>
 
 
@@ -35,7 +35,7 @@ bool Clip::load(FS::IFile& file)
 
 Resource* ClipManager::createResource(const Path& path)
 {
-	return LUMIX_NEW(m_allocator, Clip)(path, getOwner(), m_allocator);
+	return LUMIX_NEW(m_allocator, Clip)(path, *this, m_allocator);
 }
 
 

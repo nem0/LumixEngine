@@ -1,9 +1,9 @@
 #pragma once
 
 
-#include "core/array.h"
-#include "core/path.h"
-#include "editor/imgui/imgui.h"
+#include "engine/array.h"
+#include "engine/path.h"
+#include "imgui/imgui.h"
 
 
 namespace Lumix
@@ -106,7 +106,7 @@ private:
 
 	void nodePinMouseDown(Node* node, int pin_index, bool is_input);
 	void createConnection(Node* node, int pin_index, bool is_input);
-	void getSavePath();
+	bool getSavePath();
 	void clear();
 	void onGUILeftColumn();
 	void onGUIRightColumn();

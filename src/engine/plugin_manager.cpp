@@ -1,11 +1,11 @@
-#include "plugin_manager.h"
-#include "core/array.h"
-#include "core/log.h"
-#include "core/profiler.h"
-#include "core/system.h"
-#include "debug/debug.h"
-#include "engine.h"
-#include "iplugin.h"
+#include "engine/plugin_manager.h"
+#include "engine/array.h"
+#include "engine/log.h"
+#include "engine/profiler.h"
+#include "engine/system.h"
+#include "engine/debug/debug.h"
+#include "engine/engine.h"
+#include "engine/iplugin.h"
 
 
 namespace Lumix 
@@ -33,7 +33,6 @@ class PluginManagerImpl : public PluginManager
 		{
 			for (int i = m_plugins.size() - 1; i >= 0; --i)
 			{
-				m_plugins[i]->destroy();
 				LUMIX_DELETE(m_engine.getAllocator(), m_plugins[i]);
 			}
 
@@ -88,7 +87,7 @@ class PluginManagerImpl : public PluginManager
 		{
 			for (int i = 0; i < m_plugins.size(); ++i)
 			{
-				if (compareString(m_plugins[i]->getName(), name) == 0)
+				if (equalStrings(m_plugins[i]->getName(), name))
 				{
 					return m_plugins[i];
 				}
@@ -107,7 +106,13 @@ class PluginManagerImpl : public PluginManager
 		{
 			char path_with_ext[MAX_PATH_LENGTH];
 			copyString(path_with_ext, path);
-			catString(path_with_ext, ".dll");
+			#ifdef _WIN32
+				catString(path_with_ext, ".dll");
+			#elif defined __linux__
+				catString(path_with_ext, ".so");
+			#else 
+				#error Unknown platform
+			#endif
 			g_log_info.log("Core") << "loading plugin " << path_with_ext;
 			typedef IPlugin* (*PluginCreator)(Engine&);
 			auto* lib = loadLibrary(path_with_ext);
@@ -117,29 +122,32 @@ class PluginManagerImpl : public PluginManager
 				if (creator)
 				{
 					IPlugin* plugin = creator(m_engine);
-					if (!plugin || !plugin->create())
+					if (!plugin)
 					{
 						g_log_error.log("Core") << "createPlugin failed.";
 						LUMIX_DELETE(m_engine.getAllocator(), plugin);
 						ASSERT(false);
-						return nullptr;
 					}
-					m_plugins.push(plugin);
-					m_libraries.push(lib);
-					m_library_loaded.invoke(lib);
-					g_log_info.log("Core") << "Plugin loaded.";
-					Lumix::Debug::StackTree::refreshModuleList();
-					return plugin;
+					else
+					{
+						m_plugins.push(plugin);
+						m_libraries.push(lib);
+						m_library_loaded.invoke(lib);
+						g_log_info.log("Core") << "Plugin loaded.";
+						Lumix::Debug::StackTree::refreshModuleList();
+						return plugin;
+					}
 				}
 				else
 				{
 					g_log_error.log("Core") << "No createPlugin function in plugin.";
 				}
+				unloadLibrary(lib);
 			}
 			else
 			{
 				auto* plugin = StaticPluginRegister::create(path, m_engine);
-				if (plugin && plugin->create())
+				if (plugin)
 				{
 					g_log_info.log("Core") << "Plugin loaded.";
 					m_plugins.push(plugin);
@@ -147,8 +155,7 @@ class PluginManagerImpl : public PluginManager
 				}
 				g_log_warning.log("Core") << "Failed to load plugin.";
 			}
-			unloadLibrary(lib);
-			return 0;
+			return nullptr;
 		}
 
 

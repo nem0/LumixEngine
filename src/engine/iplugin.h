@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "lumix.h"
+#include "engine/lumix.h"
 
 
 namespace Lumix
@@ -19,18 +19,18 @@ namespace Lumix
 		public:
 			virtual ~IScene() {}
 
-			virtual ComponentIndex createComponent(uint32, Entity) = 0;
-			virtual void destroyComponent(ComponentIndex component, uint32 type) = 0;
+			virtual ComponentHandle createComponent(ComponentType, Entity) = 0;
+			virtual void destroyComponent(ComponentHandle component, ComponentType type) = 0;
 			virtual void serialize(OutputBlob& serializer) = 0;
 			virtual void deserialize(InputBlob& serializer, int version) = 0;
 			virtual IPlugin& getPlugin() const = 0;
 			virtual void update(float time_delta, bool paused) = 0;
-			virtual bool ownComponentType(uint32 type) const = 0;
-			virtual ComponentIndex getComponent(Entity entity, uint32 type) = 0;
+			virtual ComponentHandle getComponent(Entity entity, ComponentType type) = 0;
 			virtual Universe& getUniverse() = 0;
 			virtual void startGame() {}
 			virtual void stopGame() {}
 			virtual int getVersion() const { return -1; }
+			virtual void clear() = 0;
 	};
 
 
@@ -39,8 +39,6 @@ namespace Lumix
 		public:
 			virtual ~IPlugin();
 
-			virtual bool create() = 0;
-			virtual void destroy() = 0;
 			virtual void serialize(OutputBlob&) {}
 			virtual void deserialize(InputBlob&) {}
 			virtual void update(float) {}
@@ -70,8 +68,8 @@ namespace Lumix
 #ifdef STATIC_PLUGINS
 	#define LUMIX_PLUGIN_ENTRY(plugin_name)                                           \
 		extern "C" Lumix::IPlugin* createPlugin_##plugin_name(Lumix::Engine& engine); \
-		extern "C" StaticPluginRegister s_##plugin_name##_plugin_register(            \
-			#plugin_name, createPlugin_##plugin_name);                                \
+		extern "C" { StaticPluginRegister LUMIX_ATTRIBUTE_USED s_##plugin_name##_plugin_register(          \
+			#plugin_name, createPlugin_##plugin_name); }                              \
 		extern "C" Lumix::IPlugin* createPlugin_##plugin_name(Lumix::Engine& engine)
 #else
 	#define LUMIX_PLUGIN_ENTRY(plugin_name) \

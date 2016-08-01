@@ -1,14 +1,15 @@
 #include "asset_browser.h"
-#include "core/crc32.h"
-#include "core/fs/disk_file_device.h"
-#include "core/log.h"
-#include "core/path_utils.h"
-#include "core/profiler.h"
-#include "core/resource.h"
-#include "core/resource_manager.h"
-#include "core/resource_manager_base.h"
-#include "core/string.h"
+#include "editor/studio_app.h"
 #include "editor/world_editor.h"
+#include "engine/crc32.h"
+#include "engine/fs/disk_file_device.h"
+#include "engine/log.h"
+#include "engine/path_utils.h"
+#include "engine/profiler.h"
+#include "engine/resource.h"
+#include "engine/resource_manager.h"
+#include "engine/resource_manager_base.h"
+#include "engine/string.h"
 #include "engine/engine.h"
 #include "file_system_watcher.h"
 #include "metadata.h"
@@ -17,61 +18,89 @@
 #include "utils.h"
 
 
-static const Lumix::uint32 UNIVERSE_HASH = Lumix::crc32("universe");
+static const Lumix::ResourceType UNIVERSE_TYPE("universe");
 static const Lumix::uint32 SOURCE_HASH = Lumix::crc32("source");
 
 
-Lumix::uint32 AssetBrowser::getResourceType(const char* path) const
+Lumix::ResourceType AssetBrowser::getResourceType(const char* path) const
 {
 	char ext[10];
 	Lumix::PathUtils::getExtension(ext, sizeof(ext), path);
 
 	for (auto* plugin : m_plugins)
 	{
-		auto type = plugin->getResourceType(ext);
-		if (type != 0) return type;
+		Lumix::ResourceType type = plugin->getResourceType(ext);
+		if (Lumix::isValid(type)) return type;
 	}
-	if (Lumix::compareString(ext, "unv") == 0) return UNIVERSE_HASH;
+	if (Lumix::equalStrings(ext, "unv")) return UNIVERSE_TYPE;
 
-	return 0;
+	return Lumix::INVALID_RESOURCE_TYPE;
 }
 
 
-AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
-	: m_editor(editor)
-	, m_metadata(metadata)
-	, m_resources(editor.getAllocator())
+AssetBrowser::AssetBrowser(StudioApp& app)
+	: m_editor(*app.getWorldEditor())
+	, m_metadata(*app.getMetadata())
+	, m_resources(app.getWorldEditor()->getAllocator())
 	, m_selected_resource(nullptr)
 	, m_autoreload_changed_resource(true)
-	, m_changed_files(editor.getAllocator())
+	, m_changed_files(app.getWorldEditor()->getAllocator())
 	, m_is_focus_requested(false)
 	, m_changed_files_mutex(false)
-	, m_history(editor.getAllocator())
-	, m_plugins(editor.getAllocator())
-	, m_on_resource_changed(editor.getAllocator())
+	, m_history(app.getWorldEditor()->getAllocator())
+	, m_plugins(app.getWorldEditor()->getAllocator())
+	, m_on_resource_changed(app.getWorldEditor()->getAllocator())
+	, m_app(app)
+	, m_is_update_enabled(true)
+	, m_current_type(0)
+	, m_is_opened(false)
+	, m_activate(false)
+	, m_history_index(-1)
 {
-	m_is_update_enabled = true;
+	auto& editor = *app.getWorldEditor();
+	auto& allocator = editor.getAllocator();
 	m_filter[0] = '\0';
-	m_current_type = 0;
-	m_is_opened = false;
-	m_activate = false;
-	m_resources.emplace(editor.getAllocator());
+	m_resources.emplace(allocator);
 
 	findResources();
 
 	const char* base_path = editor.getEngine().getDiskFileDevice()->getBasePath();
-	m_watchers[0] = FileSystemWatcher::create(base_path, editor.getAllocator());
+	m_watchers[0] = FileSystemWatcher::create(base_path, allocator);
 	m_watchers[0]->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
 	if (editor.getEngine().getPatchFileDevice())
 	{
 		base_path = editor.getEngine().getPatchFileDevice()->getBasePath();
-		m_watchers[1] = FileSystemWatcher::create(base_path, editor.getAllocator());
+		m_watchers[1] = FileSystemWatcher::create(base_path, allocator);
 		m_watchers[1]->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
 	}
 	else
 	{
 		m_watchers[1] = nullptr;
 	}
+
+	m_auto_reload_action = LUMIX_NEW(allocator, Action)("Auto-reload", "autoReload");
+	m_auto_reload_action->is_global = false;
+	m_auto_reload_action->func.bind<AssetBrowser, &AssetBrowser::toggleAutoreload>(this);
+	m_auto_reload_action->is_selected.bind<AssetBrowser, &AssetBrowser::isAutoreload>(this);
+	m_back_action = LUMIX_NEW(allocator, Action)("Back", "back");
+	m_back_action->is_global = false;
+	m_back_action->func.bind<AssetBrowser, &AssetBrowser::goBack>(this);
+	m_forward_action = LUMIX_NEW(allocator, Action)("Forward", "forward");
+	m_forward_action->is_global = false;
+	m_forward_action->func.bind<AssetBrowser, &AssetBrowser::goForward>(this);
+	m_refresh_action = LUMIX_NEW(allocator, Action)("Refresh", "refresh");
+	m_refresh_action->is_global = false;
+	m_refresh_action->func.bind<AssetBrowser, &AssetBrowser::findResources>(this);
+	m_app.addAction(m_auto_reload_action);
+	m_app.addAction(m_back_action);
+	m_app.addAction(m_forward_action);
+	m_app.addAction(m_refresh_action);
+}
+
+
+void AssetBrowser::toggleAutoreload()
+{
+	m_autoreload_changed_resource = !m_autoreload_changed_resource;
 }
 
 
@@ -92,8 +121,8 @@ AssetBrowser::~AssetBrowser()
 
 void AssetBrowser::onFileChanged(const char* path)
 {
-	Lumix::uint32 resource_type = getResourceType(path);
-	if (resource_type == 0) return;
+	Lumix::ResourceType resource_type = getResourceType(path);
+	if (!Lumix::isValid(resource_type)) return;
 
 	Lumix::MT::SpinLock lock(m_changed_files_mutex);
 	m_changed_files.push(Lumix::Path(path));
@@ -108,15 +137,13 @@ void AssetBrowser::unloadResource()
 	{
 		plugin->onResourceUnloaded(m_selected_resource);
 	}
-	m_selected_resource->getResourceManager()
-		.get(getResourceType(m_selected_resource->getPath().c_str()))
-		->unload(*m_selected_resource);
+	m_selected_resource->getResourceManager().unload(*m_selected_resource);
 
 	m_selected_resource = nullptr;
 }
 
 
-int AssetBrowser::getTypeIndexFromManagerType(Lumix::uint32 type) const
+int AssetBrowser::getTypeIndex(Lumix::ResourceType type) const
 {
 	for (int i = 0; i < m_plugins.size(); ++i)
 	{
@@ -130,6 +157,13 @@ int AssetBrowser::getTypeIndexFromManagerType(Lumix::uint32 type) const
 void AssetBrowser::update()
 {
 	PROFILE_FUNCTION();
+
+	auto* patch = m_editor.getEngine().getPatchFileDevice();
+	if ((patch && !Lumix::equalStrings(patch->getBasePath(), m_patch_base_path)) ||
+		(!patch && m_patch_base_path[0] != '\0'))
+	{
+		findResources();
+	}
 	if (!m_is_update_enabled) return;
 	bool is_empty;
 	{
@@ -152,8 +186,8 @@ void AssetBrowser::update()
 		Lumix::PathUtils::getExtension(ext, Lumix::lengthOf(ext), path.c_str());
 		m_on_resource_changed.invoke(path, ext);
 
-		Lumix::uint32 resource_type = getResourceType(path.c_str());
-		if (resource_type == 0) continue;
+		Lumix::ResourceType resource_type = getResourceType(path.c_str());
+		if (!Lumix::isValid(resource_type)) continue;
 
 		if (m_autoreload_changed_resource) m_editor.getEngine().getResourceManager().reload(path);
 
@@ -171,7 +205,7 @@ void AssetBrowser::update()
 
 			if (!PlatformInterface::fileExists(tmp_path))
 			{
-				int index = getTypeIndexFromManagerType(resource_type);
+				int index = getTypeIndex(resource_type);
 				m_resources[index].eraseItemFast(path);
 				continue;
 			}
@@ -187,11 +221,25 @@ void AssetBrowser::update()
 }
 
 
+void AssetBrowser::onToolbar()
+{
+	auto pos = ImGui::GetCursorScreenPos();
+	if (ImGui::BeginToolbar("asset_browser_toolbar", pos, ImVec2(0, 24)))
+	{
+		if (m_history_index > 0) m_back_action->toolbarButton();
+		if (m_history_index < m_history.size() - 1) m_forward_action->toolbarButton();
+		m_auto_reload_action->toolbarButton();
+		m_refresh_action->toolbarButton();
+	}
+	ImGui::EndToolbar();
+}
+
+
 void AssetBrowser::onGUI()
 {
 	if (m_wanted_resource.isValid())
 	{
-		selectResource(m_wanted_resource);
+		selectResource(m_wanted_resource, true);
 		m_wanted_resource = "";
 	}
 
@@ -203,53 +251,76 @@ void AssetBrowser::onGUI()
 		return;
 	}
 
-	if (m_activate) ImGui::SetDockActive();
-	m_activate = false;
+	onToolbar();
 
-	if (m_is_focus_requested)
+	if (ImGui::BeginChild("content"))
 	{
-		m_is_focus_requested = false;
-		ImGui::SetWindowFocus();
-	}
+		if (m_activate) ImGui::SetDockActive();
+		m_activate = false;
 
-	if (ImGui::Button("Refresh")) findResources();
-	ImGui::SameLine();
-	ImGui::Checkbox("Autoreload", &m_autoreload_changed_resource);
-
-	auto getter = [](void* data, int idx, const char** out) -> bool
-	{
-		auto& browser = *static_cast<AssetBrowser*>(data);
-		*out = browser.m_plugins[idx]->getName();
-		return true;
-	};
-
-	ImGui::Combo("Type", &m_current_type, getter, this, m_plugins.size());
-	ImGui::InputText("Filter", m_filter, sizeof(m_filter));
-
-	ImGui::ListBoxHeader("Resources");
-	auto& resources = m_resources[m_current_type + 1];
-
-	for (auto& resource : resources)
-	{
-		if (m_filter[0] != '\0' && strstr(resource.c_str(), m_filter) == nullptr) continue;
-
-		bool is_selected = m_selected_resource ? m_selected_resource->getPath() == resource : false;
-		if (ImGui::Selectable(resource.c_str(), is_selected))
+		if (m_is_focus_requested)
 		{
-			selectResource(resource);
+			m_is_focus_requested = false;
+			ImGui::SetWindowFocus();
 		}
+
+		auto getter = [](void* data, int idx, const char** out) -> bool
+		{
+			auto& browser = *static_cast<AssetBrowser*>(data);
+			*out = browser.m_plugins[idx]->getName();
+			return true;
+		};
+
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+		ImGui::Combo("Type", &m_current_type, getter, this, m_plugins.size());
+		ImGui::FilterInput("Filter", m_filter, sizeof(m_filter));
+
+		static ImVec2 size(0, 200);
+		ImGui::ListBoxHeader("Resources", size);
+		auto& resources = m_resources[m_current_type + 1];
+
+		for (auto& resource : resources)
+		{
+			if (m_filter[0] != '\0' && strstr(resource.c_str(), m_filter) == nullptr) continue;
+
+			bool is_selected = m_selected_resource ? m_selected_resource->getPath() == resource : false;
+			if (ImGui::Selectable(resource.c_str(), is_selected))
+			{
+				selectResource(resource, true);
+			}
+			if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
+			{
+				m_app.startDrag(StudioApp::DragData::PATH, resource.c_str(), Lumix::stringLength(resource.c_str()) + 1);
+			}
+		}
+		ImGui::ListBoxFooter();
+		ImGui::HSplitter("splitter", &size);
+
+		ImGui::PopItemWidth();
+		onGUIResource();
 	}
-	ImGui::ListBoxFooter();
-	onGUIResource();
+	ImGui::EndChild();
 	ImGui::EndDock();
 }
 
 
-void AssetBrowser::selectResource(Lumix::Resource* resource)
+void AssetBrowser::selectResource(Lumix::Resource* resource, bool record_history)
 {
-	if (m_selected_resource) m_history.push(m_selected_resource->getPath());
-	if (m_history.size() > 20) m_history.erase(0);
+	if (record_history)
+	{
+		while (m_history_index < m_history.size() - 1)
+		{
+			m_history.pop();
+		}
+		m_history_index++;
+		m_history.push(resource->getPath());
 
+		if (m_history.size() > 20)
+		{
+			--m_history_index;
+			m_history.erase(0);
+		}
+	}
 
 	m_wanted_resource = "";
 	unloadResource();
@@ -266,33 +337,69 @@ void AssetBrowser::addPlugin(IPlugin& plugin)
 }
 
 
-void AssetBrowser::selectResource(const Lumix::Path& resource)
+void AssetBrowser::selectResource(const Lumix::Path& resource, bool record_history)
 {
 	m_activate = true;
 	char ext[30];
 	Lumix::PathUtils::getExtension(ext, Lumix::lengthOf(ext), resource.c_str());
-	if (Lumix::compareString(ext, "unv") == 0) return;
+	if (Lumix::equalStrings(ext, "unv")) return;
 
 	auto& manager = m_editor.getEngine().getResourceManager();
 	auto* resource_manager = manager.get(getResourceType(resource.c_str()));
-	if (resource_manager) selectResource(resource_manager->load(resource));
+	if (resource_manager) selectResource(resource_manager->load(resource), record_history);
 }
 
 
-bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* buf, int max_size, Lumix::uint32 type)
+bool AssetBrowser::acceptExtension(const char* ext, Lumix::ResourceType type)
+{
+	for (int i = 0; i < m_plugins.size(); ++i)
+	{
+		if (m_plugins[i]->acceptExtension(ext, type)) return true;
+	}
+
+	return false;
+}
+
+
+bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* buf, int max_size, Lumix::ResourceType type)
 {
 	float item_w = ImGui::CalcItemWidth();
 	auto& style = ImGui::GetStyle();
-	ImGui::PushItemWidth(item_w - ImGui::CalcTextSize("...View").x - style.FramePadding.x * 4 -
-						 style.ItemSpacing.x * 2);
+	float text_width = Lumix::Math::maximum(
+		50.0f, item_w - ImGui::CalcTextSize("...View").x - style.FramePadding.x * 4 - style.ItemSpacing.x * 2);
 
-	if (ImGui::InputText(Lumix::StaticString<30>("###", str_id), buf, max_size)) return true;
-
+	char* c = buf + Lumix::stringLength(buf);
+	while (c > buf && *c != '/' && *c != '\\') --c;
+	if (*c == '/' || *c == '\\') ++c;
+	
+	auto pos = ImGui::GetCursorPos();
+	pos.x += text_width;
+	ImGui::BeginGroup();
+	ImGui::AlignFirstTextHeightToWidgets();
+	ImGui::PushTextWrapPos(text_width);
+	ImGui::Text("%s", c);
+	ImGui::PopTextWrapPos();
 	ImGui::SameLine();
+	ImGui::SetCursorPos(pos);
 	Lumix::StaticString<50> popup_name("pu", str_id);
 	if (ImGui::Button(Lumix::StaticString<30>("...###browse", str_id)))
 	{
 		ImGui::OpenPopup(popup_name);
+	}
+	ImGui::EndGroup();
+	if (ImGui::IsItemHoveredRect())
+	{
+		if (ImGui::IsMouseReleased(0) && m_app.getDragData().type == StudioApp::DragData::PATH)
+		{
+			char ext[10];
+			const char* path = (const char*)m_app.getDragData().data;
+			Lumix::PathUtils::getExtension(ext, Lumix::lengthOf(ext), path);
+			if (acceptExtension(ext, type))
+			{
+				Lumix::copyString(buf, max_size, path);
+				return true;
+			}
+		}
 	}
 	ImGui::SameLine();
 	if (ImGui::Button(Lumix::StaticString<30>("View###go", str_id)))
@@ -302,32 +409,39 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 		m_wanted_resource = buf;
 	}
 	ImGui::SameLine();
-	ImGui::Text(label);
-	ImGui::PopItemWidth();
+	ImGui::Text("%s", label);
 
 	if (ImGui::BeginResizablePopup(popup_name, ImVec2(300, 300)))
 	{
-		static char filter[128] = "";
-		ImGui::InputText("Filter", filter, sizeof(filter));
-
-		ImGui::BeginChild("Resources", ImVec2(0, 0));
-		for (auto unv : getResources(getTypeIndexFromManagerType(type)))
+		if (resourceList(buf, max_size, type, 0))
 		{
-			if (filter[0] != '\0' && strstr(unv.c_str(), filter) == nullptr) continue;
-
-			if (ImGui::Selectable(unv.c_str(), false))
-			{
-				Lumix::copyString(buf, max_size, unv.c_str());
-				ImGui::EndChild();
-				ImGui::EndPopup();
-				return true;
-			}
+			ImGui::EndPopup();
+			return true;
 		}
-
-		ImGui::EndChild();
 		ImGui::EndPopup();
 	}
+	return false;
+}
 
+
+bool AssetBrowser::resourceList(char* buf, int max_size, Lumix::ResourceType type, float height)
+{
+	static char filter[128] = "";
+	ImGui::FilterInput("Filter", filter, sizeof(filter));
+
+	ImGui::BeginChild("Resources", ImVec2(0, height));
+	for (auto& unv : getResources(getTypeIndex(type)))
+	{
+		if (filter[0] != '\0' && strstr(unv.c_str(), filter) == nullptr) continue;
+
+		if (ImGui::Selectable(unv.c_str(), false))
+		{
+			Lumix::copyString(buf, max_size, unv.c_str());
+			ImGui::EndChild();
+			return true;
+		}
+	}
+	ImGui::EndChild();
 	return false;
 }
 
@@ -357,20 +471,28 @@ void AssetBrowser::openInExternalEditor(const char* path)
 }
 
 
+void AssetBrowser::goBack()
+{
+	if (m_history_index < 1) return;
+	m_history_index = Lumix::Math::maximum(0, m_history_index - 1);
+	selectResource(m_history[m_history_index], false);
+}
+
+
+void AssetBrowser::goForward()
+{
+	m_history_index = Lumix::Math::minimum(m_history_index + 1, m_history.size() - 1);
+	selectResource(m_history[m_history_index], false);
+}
+
+
 void AssetBrowser::onGUIResource()
 {
 	if (!m_selected_resource) return;
 
 	const char* path = m_selected_resource->getPath().c_str();
 	ImGui::Separator();
-	ImGui::LabelText("Selected resource", path);
-	if (!m_history.empty() && ImGui::Button("Back"))
-	{
-		selectResource(m_history.back());
-		m_history.pop();
-		m_history.pop();
-		return;
-	}
+	ImGui::LabelText("Selected resource", "%s", path);
 	ImGui::Separator();
 
 	if (!m_selected_resource->isReady() && !m_selected_resource->isFailure())
@@ -380,10 +502,9 @@ void AssetBrowser::onGUIResource()
 	}
 
 	char source[Lumix::MAX_PATH_LENGTH];
-	if (m_metadata.getString(
-			m_selected_resource->getPath().getHash(), SOURCE_HASH, source, Lumix::lengthOf(source)))
+	if (m_metadata.getString(m_selected_resource->getPath().getHash(), SOURCE_HASH, source, Lumix::lengthOf(source)))
 	{
-		ImGui::LabelText("Source", source);
+		ImGui::LabelText("Source", "%s", source);
 	}
 
 	auto resource_type = getResourceType(path);
@@ -391,7 +512,7 @@ void AssetBrowser::onGUIResource()
 	{
 		if (plugin->onGUI(m_selected_resource, resource_type)) return;
 	}
-	ASSERT(resource_type == UNIVERSE_HASH); // unimplemented resource
+	ASSERT(resource_type == UNIVERSE_TYPE); // unimplemented resource
 }
 
 
@@ -405,11 +526,11 @@ int AssetBrowser::getResourceTypeIndex(const char* ext)
 {
 	for (int i = 0; i < m_plugins.size(); ++i)
 	{
-		if (m_plugins[i]->getResourceType(ext) != 0) return 1 + i;
+		if (Lumix::isValid(m_plugins[i]->getResourceType(ext))) return 1 + i;
 	}
 
 
-	if (Lumix::compareString(ext, "unv") == 0) return 0;
+	if (Lumix::equalStrings(ext, "unv")) return 0;
 	return -1;
 }
 
@@ -474,5 +595,13 @@ void AssetBrowser::findResources()
 	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
 	processDir(base_path, Lumix::stringLength(base_path));
 	auto* patch_device = m_editor.getEngine().getPatchFileDevice();
-	if (patch_device) processDir(patch_device->getBasePath(), Lumix::stringLength(patch_device->getBasePath()));
+	if (patch_device)
+	{
+		processDir(patch_device->getBasePath(), Lumix::stringLength(patch_device->getBasePath()));
+		Lumix::copyString(m_patch_base_path, patch_device->getBasePath());
+	}
+	else
+	{
+		m_patch_base_path[0] = '\0';
+	}
 }

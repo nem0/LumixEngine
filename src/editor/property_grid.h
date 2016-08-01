@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "core/array.h"
-#include "universe/component.h"
+#include "engine/array.h"
+#include "engine/universe/component.h"
 
 
 namespace Lumix
@@ -15,8 +15,7 @@ class WorldEditor;
 }
 
 
-struct Action;
-class AssetBrowser;
+class StudioApp;
 
 
 class LUMIX_EDITOR_API PropertyGrid
@@ -24,13 +23,12 @@ class LUMIX_EDITOR_API PropertyGrid
 public:
 	struct IPlugin
 	{
+		virtual ~IPlugin() {}
 		virtual void onGUI(PropertyGrid& grid, Lumix::ComponentUID cmp) = 0;
 	};
 
 public:
-	PropertyGrid(Lumix::WorldEditor& editor,
-		AssetBrowser& asset_browser,
-		Lumix::Array<Action*>& actions);
+	PropertyGrid(StudioApp& app);
 	~PropertyGrid();
 
 	void addPlugin(IPlugin& plugin) { m_plugins.push(&plugin); }
@@ -42,20 +40,33 @@ public:
 	bool m_is_opened;
 
 private:
-	void showProperty(Lumix::IPropertyDescriptor& desc, int index, Lumix::ComponentUID cmp);
-	void showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescriptor& desc);
-	void showSampledFunctionProperty(Lumix::ComponentUID cmp, Lumix::ISampledFunctionDescriptor& desc);
-	void showEnumProperty(Lumix::ComponentUID cmp, int index, Lumix::IEnumPropertyDescriptor& desc);
-	void showEntityProperty(Lumix::ComponentUID cmp, int index, Lumix::IPropertyDescriptor& desc);
-	void showComponentProperties(Lumix::ComponentUID cmp);
-	void showCoreProperties(Lumix::Entity entity);
-	const char* getComponentTypeName(Lumix::ComponentUID cmp) const;
+	void showProperty(Lumix::IPropertyDescriptor& desc,
+		int index,
+		const Lumix::Array<Lumix::Entity>& entities,
+		Lumix::ComponentType cmp_type);
+	void showArrayProperty(const Lumix::Array<Lumix::Entity>& entities,
+		Lumix::ComponentType cmp_type,
+		Lumix::IArrayDescriptor& desc);
+	void showSampledFunctionProperty(const Lumix::Array<Lumix::Entity>& entities,
+		Lumix::ComponentType cmp_type,
+		Lumix::ISampledFunctionDescriptor& desc);
+	void showEnumProperty(const Lumix::Array<Lumix::Entity>& entities,
+		Lumix::ComponentType cmp_type,
+		int index,
+		Lumix::IEnumPropertyDescriptor& desc);
+	void showEntityProperty(const Lumix::Array<Lumix::Entity>& entities,
+		Lumix::ComponentType cmp_type,
+		int index,
+		Lumix::IPropertyDescriptor& desc);
+	void showComponentProperties(const Lumix::Array<Lumix::Entity>& entities, Lumix::ComponentType cmp_type);
+	void showCoreProperties(const Lumix::Array<Lumix::Entity>& entities);
 
 private:
+	StudioApp& m_app;
 	Lumix::WorldEditor& m_editor;
-	AssetBrowser& m_asset_browser;
 	Lumix::Array<IPlugin*> m_plugins;
-	char m_filter[128];
+	
+	char m_component_filter[32];
 
 	float m_particle_emitter_timescale;
 	bool m_particle_emitter_updating;

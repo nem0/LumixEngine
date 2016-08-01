@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "lumix.h"
-#include "core/array.h"
+#include "engine/lumix.h"
+#include "engine/array.h"
 
 
 namespace Lumix
@@ -21,7 +21,7 @@ public:
 
 	void setGroup(Entity entity, int group);
 	const Entity* getGroupEntities(int idx) const;
-	int getEntityGroup(Entity entity) const { return m_entity_to_group_map[entity]; }
+	int getEntityGroup(Entity entity) const { return m_entity_to_group_map[entity.index]; }
 	void createGroup(const char* name);
 	void deleteGroup(int idx);
 	int getGroup(const char* name) const;

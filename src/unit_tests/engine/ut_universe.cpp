@@ -1,5 +1,5 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
-#include "universe/universe.h"
+#include "engine/universe/universe.h"
 
 
 namespace
@@ -7,12 +7,13 @@ namespace
 	void UT_universe(const char* params)
 	{
 		Lumix::DefaultAllocator allocator;
+		Lumix::PathManager path_manager(allocator);
 		Lumix::Universe universe(allocator);
 		LUMIX_EXPECT(universe.getEntityCount() == 0);
-		LUMIX_EXPECT(!universe.hasEntity(-1));
-		LUMIX_EXPECT(!universe.hasEntity(0));
-		LUMIX_EXPECT(!universe.hasEntity(1));
-		LUMIX_EXPECT(!universe.hasEntity(100));
+		LUMIX_EXPECT(!universe.hasEntity(Lumix::INVALID_ENTITY));
+		LUMIX_EXPECT(!universe.hasEntity({0}));
+		LUMIX_EXPECT(!universe.hasEntity({1}));
+		LUMIX_EXPECT(!universe.hasEntity({100}));
 
 		static const int ENTITY_COUNT = 5;
 

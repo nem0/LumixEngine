@@ -1,0 +1,34 @@
+env:
+  global:
+   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+   #   via the "travis encrypt" command using the project repo's public key
+   - secure: "dSuM+3RYoesuXyEt0oAGl/RD8PQQux8kVzWfjYxJMq8FoI1NuHKxHAWW5uCMoZhCya/VGxvA6wysF8gHIeMBuL5KJuA3u9TnnwFUMShfAwN35XGAAGLjHeIM4o2LiRk6FRfLb78PG8UyN/r3YRcgYYXYIJ/88UuaMJQIUAL/JZw="
+
+sudo: required
+dist: trusty
+language: cpp
+compiler: gcc
+git:
+    depth: 1
+before_install:
+  - curl -s http://gamedev.sk/files/coverity.cer | sudo tee -a /etc/ssl/certs/ca-certificates.crt
+before_script:
+    - sudo apt-get install ca-certificates
+    - cd projects
+    - sh genie_linux_gcc.sh
+    - cd tmp/gcc
+script: if [ "${COVERITY_SCAN_BRANCH}" != 1 ]; then make config=debug64 ; fi
+   
+addons:
+  apt:
+    packages:
+      - ca-certificates
+  coverity_scan:
+    project:
+      name: "nem0/LumixEngine"
+      description: "3D game engine"
+    notification_email: mikulas.florek@gamedev.sk
+    build_command_prepend: 
+    build_command: make config=debug64
+    branch_pattern: coverity_scan
+

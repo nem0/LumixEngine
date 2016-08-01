@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "lumix.h"
+#include "engine/lumix.h"
 
 
 namespace Lumix
@@ -14,36 +14,34 @@ class IScene;
 struct LUMIX_ENGINE_API ComponentUID final
 {
 
-	typedef uint32 Type;
-
 	ComponentUID()
 	{
-		index = -1;
+		handle = INVALID_COMPONENT;
 		scene = nullptr;
-		entity = -1;
-		type = 0;
+		entity = INVALID_ENTITY;
+		type = {-1};
 	}
 
-	ComponentUID(Entity _entity, uint32 _type, IScene* _scene, int _index)
+	ComponentUID(Entity _entity, ComponentType _type, IScene* _scene, ComponentHandle _handle)
 		: entity(_entity)
 		, type(_type)
 		, scene(_scene)
-		, index(_index)
+		, handle(_handle)
 	{
 	}
 
 	Entity entity; 
-	Type type;
+	ComponentType type;
 	IScene* scene;
-	ComponentIndex index;
+	ComponentHandle handle;
 
 	static const ComponentUID INVALID;
 
 	bool operator==(const ComponentUID& rhs) const
 	{
-		return type == rhs.type && scene == rhs.scene && index == rhs.index;
+		return type == rhs.type && scene == rhs.scene && handle == rhs.handle;
 	}
-	bool isValid() const { return index >= 0; }
+	bool isValid() const { return Lumix::isValid(handle); }
 };
 
 

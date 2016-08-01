@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "core/binary_array.h"
-#include "core/vec.h"
+#include "engine/binary_array.h"
+#include "engine/vec.h"
 #include "editor/world_editor.h"
 #include "editor/utils.h"
 
@@ -32,10 +32,10 @@ public:
 		NOT_SET
 	};
 
-	TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions);
+	TerrainEditor(Lumix::WorldEditor& editor, class StudioApp& app);
 	~TerrainEditor();
 
-	bool onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int) override;
+	bool onEntityMouseDown(const Lumix::WorldEditor::RayHit& hit, int, int) override;
 	void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/) override;
 	void onMouseUp(int, int, Lumix::MouseButton::Value) override;
 	void onGUI();
@@ -44,18 +44,16 @@ public:
 private:
 	void onUniverseDestroyed();
 	void detectModifiers();
-	void drawCursor(Lumix::RenderScene& scene,
-		const Lumix::ComponentUID& cmp,
-		const Lumix::Vec3& center);
+	void drawCursor(Lumix::RenderScene& scene, Lumix::ComponentHandle cmp, const Lumix::Vec3& center);
 	Lumix::Material* getMaterial();
-	void paint(const Lumix::RayCastModelHit& hit, TerrainEditor::Type type, bool new_stroke);
+	void paint(const Lumix::Vec3& hit, TerrainEditor::Type type, bool new_stroke);
 
 	static void getProjections(const Lumix::Vec3& axis,
 		const Lumix::Vec3 vertices[8],
 		float& min,
 		float& max);
-	void removeEntities(const Lumix::RayCastModelHit& hit);
-	void paintEntities(const Lumix::RayCastModelHit& hit);
+	void removeEntities(const Lumix::Vec3& hit);
+	void paintEntities(const Lumix::Vec3& hit);
 	void increaseBrushSize();
 	void decreaseBrushSize();
 	void nextTerrainTexture();

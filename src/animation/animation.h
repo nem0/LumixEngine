@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/resource.h"
-#include "core/resource_manager_base.h"
+#include "engine/resource.h"
+#include "engine/resource_manager_base.h"
 
 namespace Lumix
 {
@@ -13,15 +13,15 @@ namespace FS
 }
 
 class Model;
-class Pose;
+struct Pose;
 struct Quat;
 struct Vec3;
 
 
-class LUMIX_ANIMATION_API AnimationManager : public ResourceManagerBase
+class AnimationManager : public ResourceManagerBase
 {
 public:
-	explicit AnimationManager(IAllocator& allocator) 
+	explicit AnimationManager(IAllocator& allocator)
 		: ResourceManagerBase(allocator)
 		, m_allocator(allocator)
 	{}
@@ -37,7 +37,7 @@ private:
 };
 
 
-class LUMIX_ANIMATION_API Animation : public Resource
+class Animation : public Resource
 {
 	public:
 		static const uint32 HEADER_MAGIC = 0x5f4c4146; // '_LAF'
@@ -51,7 +51,7 @@ class LUMIX_ANIMATION_API Animation : public Resource
 		};
 
 	public:
-		Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
+		Animation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 		~Animation();
 
 		void getPose(float time, Pose& pose, Model& model) const;
@@ -75,4 +75,4 @@ class LUMIX_ANIMATION_API Animation : public Resource
 };
 
 
-} // ~ namespace Lumix
+} // namespace Lumix

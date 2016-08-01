@@ -1,9 +1,18 @@
 #include "metadata.h"
-#include "core/fs/os_file.h"
+#include "engine/fs/os_file.h"
 #include <cstdio>
 
 
 static const char* METADATA_FILENAME = "metadata.bin";
+static const Lumix::uint32 METADATA_MAGIC = 0x4D455441; // 'META'
+
+
+enum class MetadataVersion : Lumix::int32
+{
+	FIRST,
+
+	LATEST
+};
 
 
 Metadata::Metadata(Lumix::IAllocator& allocator)
@@ -20,21 +29,33 @@ bool Metadata::load()
 
 	m_data.clear();
 	int count;
+	Lumix::uint32 magic;
+	file.read(&magic, sizeof(magic));
+	if (magic != METADATA_MAGIC)
+	{
+		file.close();
+		return false;
+	}
+	Lumix::int32 version;
+	file.read(&version, sizeof(version));
+	if (version > (int)MetadataVersion::LATEST)
+	{
+		file.close();
+		return false;
+	}
 	file.read(&count, sizeof(count));
 	for (int i = 0; i < count; ++i)
 	{
 		Lumix::uint32 key;
 		file.read(&key, sizeof(key));
-		int idx = m_data.insert(key, Lumix::AssociativeArray<Lumix::uint32, DataItem>(m_allocator));
+		auto& file_data = m_data.emplace(key, m_allocator);
 
-		auto& file_data = m_data.at(idx);
 		int inner_count;
 		file.read(&inner_count, sizeof(inner_count));
 		for (int j = 0; j < inner_count; ++j)
 		{
 			file.read(&key, sizeof(key));
-			int idx = file_data.insert(key, DataItem());
-			auto& value = file_data.at(idx);
+			DataItem& value = file_data.insert(key);
 			file.read(&value.m_type, sizeof(value.m_type));
 			switch (value.m_type)
 			{
@@ -44,6 +65,14 @@ bool Metadata::load()
 					int len;
 					file.read(&len, sizeof(len));
 					file.read(value.m_string, len);
+				}
+				break;
+				case DataItem::RAW_MEMORY:
+				{
+					int len;
+					file.read(&len, sizeof(len));
+					value.m_raw.memory = m_allocator.allocate(len);
+					file.read(value.m_raw.memory, len);
 				}
 				break;
 				default: ASSERT(false); break;
@@ -61,6 +90,9 @@ bool Metadata::save()
 	Lumix::FS::OsFile file;
 	if (!file.open(METADATA_FILENAME, Lumix::FS::Mode::CREATE_AND_WRITE, m_allocator)) return false;
 
+	file.write(&METADATA_MAGIC, sizeof(METADATA_MAGIC));
+	Lumix::int32 version = (int)MetadataVersion::LATEST;
+	file.write(&version, sizeof(version));
 	int count = m_data.size();
 	file.write(&count, sizeof(count));
 	for (int i = 0; i < m_data.size(); ++i)
@@ -86,6 +118,13 @@ bool Metadata::save()
 					file.write(value.m_string, len);
 				}
 				break;
+				case DataItem::RAW_MEMORY:
+				{
+					int len = (int)value.m_raw.size;
+					file.write(&len, sizeof(len));
+					file.write(value.m_raw.memory, len);
+				}
+				break;
 				default: ASSERT(false); break;
 			}
 		}
@@ -93,6 +132,23 @@ bool Metadata::save()
 
 	file.close();
 	return true;
+}
+
+
+Metadata::~Metadata()
+{
+	for (int i = 0; i < m_data.size(); ++i)
+	{
+		auto& x = m_data.at(i);
+		for (int j = 0; j < x.size(); ++j)
+		{
+			auto& data = x.at(j);
+			if (data.m_type == DataItem::RAW_MEMORY)
+			{
+				m_allocator.deallocate(data.m_raw.memory);
+			}
+		}
+	}
 }
 
 
@@ -106,12 +162,8 @@ Metadata::DataItem* Metadata::getOrCreateData(Lumix::uint32 file, Lumix::uint32 
 
 	auto& file_data = m_data.at(index);
 	index = file_data.find(key);
-	if (index < 0)
-	{
-		index = file_data.insert(key, DataItem());
-	}
-
-	return &file_data.at(index);
+	if (index >= 0) return &file_data.at(index);
+	return &file_data.insert(key);
 }
 
 
@@ -125,6 +177,37 @@ const Metadata::DataItem* Metadata::getData(Lumix::uint32 file, Lumix::uint32 ke
 	if (index < 0) return nullptr;
 
 	return &file_data.at(index);
+}
+
+
+const void* Metadata::getRawMemory(Lumix::uint32 file, Lumix::uint32 key) const
+{
+	const auto* data = getData(file, key);
+	if (!data || data->m_type != DataItem::RAW_MEMORY) return nullptr;
+	return data->m_raw.memory;
+}
+
+
+size_t Metadata::getRawMemorySize(Lumix::uint32 file, Lumix::uint32 key) const
+{
+	const auto* data = getData(file, key);
+	if (!data || data->m_type != DataItem::RAW_MEMORY) return 0;
+	return data->m_raw.size;
+}
+
+
+
+bool Metadata::setRawMemory(Lumix::uint32 file, Lumix::uint32 key, const void* mem, size_t size)
+{
+	auto* data = getOrCreateData(file, key);
+	if (!data) return false;
+
+	data->m_type = DataItem::RAW_MEMORY;
+	data->m_raw.memory = m_allocator.allocate(size);
+	Lumix::copyMemory(data->m_raw.memory, mem, size);
+	data->m_raw.size = size;
+
+	return true;
 }
 
 

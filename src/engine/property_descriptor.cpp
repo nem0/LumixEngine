@@ -1,5 +1,5 @@
-#include "property_descriptor.h"
-#include "core/crc32.h"
+#include "engine/property_descriptor.h"
+#include "engine/crc32.h"
 #include <cfloat>
 #include <cstdint>
 
@@ -27,8 +27,7 @@ LUMIX_ENGINE_API int getIntPropertyMax()
 }
 
 
-IDecimalPropertyDescriptor::IDecimalPropertyDescriptor(IAllocator& allocator)
-	: IPropertyDescriptor(allocator)
+IDecimalPropertyDescriptor::IDecimalPropertyDescriptor()
 {
 	m_min = -FLT_MAX;
 	m_max = FLT_MAX;

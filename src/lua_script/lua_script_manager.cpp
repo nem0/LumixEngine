@@ -1,17 +1,15 @@
 #include "lua_script_manager.h"
 
-#include "core/crc32.h"
-#include "core/log.h"
-#include "core/fs/file_system.h"
+#include "engine/crc32.h"
+#include "engine/log.h"
+#include "engine/fs/file_system.h"
 
 
 namespace Lumix
 {
 
 
-LuaScript::LuaScript(const Path& path,
-					 ResourceManager& resource_manager,
-					 IAllocator& allocator)
+LuaScript::LuaScript(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_source_code(allocator)
 {
@@ -80,7 +78,7 @@ LuaScriptManager::~LuaScriptManager()
 
 Resource* LuaScriptManager::createResource(const Path& path)
 {
-	return LUMIX_NEW(m_allocator, LuaScript)(path, getOwner(), m_allocator);
+	return LUMIX_NEW(m_allocator, LuaScript)(path, *this, m_allocator);
 }
 
 
