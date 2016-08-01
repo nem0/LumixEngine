@@ -61,21 +61,39 @@ namespace Lumix
 
 			void* allocate_aligned(size_t size, size_t align) override
 			{
-				ASSERT(false);
-				return nullptr;
+				size_t padding = (align - ((intptr_t)m_current % align)) % align;
+				uint8* new_address = (uint8*)m_current + padding;
+				ASSERT(new_address + size <= (uint8*)m_bucket + m_bucket_size);
+				m_current = new_address + size + sizeof(size_t);
+				*(size_t*)(new_address + size) = size + padding;
+				ASSERT((intptr_t)new_address % align == 0);
+				return new_address;
 			}
 
 
 			void deallocate_aligned(void* ptr) override
 			{
-				ASSERT(false);
+				if (!ptr) return;
+				size_t last_size_with_padding = *(size_t*)((uint8*)m_current - sizeof(size_t));
+				uint8* last_mem = (uint8*)m_current - last_size_with_padding - sizeof(size_t);
+				m_current = ptr;
 			}
 
 
 			void* reallocate_aligned(void* ptr, size_t size, size_t align) override
 			{
-				ASSERT(false);
-				return nullptr;
+				if (!ptr) return allocate(size);
+
+				size_t last_size_with_padding = *(size_t*)((uint8*)m_current - sizeof(size_t));
+				uint8* last_mem = (uint8*)m_current - last_size_with_padding - sizeof(size_t);
+
+				size_t padding = (align - ((intptr_t)last_mem % align)) % align;
+				uint8* new_address = (uint8*)last_mem + padding;
+				ASSERT(new_address + size <= (uint8*)m_bucket + m_bucket_size);
+				m_current = new_address + size + sizeof(size_t);
+				*(size_t*)(new_address + size) = size + padding;
+				ASSERT((intptr_t)new_address % align == 0);
+				return new_address;
 			}
 
 
