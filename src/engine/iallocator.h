@@ -25,7 +25,7 @@ inline void operator delete(void*, Lumix::NewPlaceholder,  void*)
 namespace Lumix
 {
 
-#define ALIGN_OF(T) __alignof(T)
+#define ALIGN_OF(...) __alignof(__VA_ARGS__)
 #define LUMIX_NEW(allocator, ...) new (Lumix::NewPlaceholder(), (allocator).allocate_aligned(sizeof(__VA_ARGS__), ALIGN_OF(__VA_ARGS__))) __VA_ARGS__
 #define LUMIX_DELETE(allocator, var) (allocator).deleteObject(var);
 
