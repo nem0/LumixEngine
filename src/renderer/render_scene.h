@@ -61,9 +61,9 @@ enum class RenderSceneVersion : int32
 
 struct TerrainInfo
 {
+	Matrix m_world_matrix;
 	Shader* m_shader;
 	Terrain* m_terrain;
-	Matrix m_world_matrix;
 	Vec3 m_morph_const;
 	float m_size;
 	Vec3 m_min;

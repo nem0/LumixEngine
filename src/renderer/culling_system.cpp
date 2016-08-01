@@ -31,12 +31,37 @@ static void doCulling(int start_index,
 	int i = start_index;
 	ASSERT(results.empty());
 	PROFILE_INT("objects", int(end - start));
+	float4 px = f4Load(frustum->xs);
+	float4 py = f4Load(frustum->ys);
+	float4 pz = f4Load(frustum->zs);
+	float4 pd = f4Load(frustum->ds);
+	float4 px2 = f4Load(&frustum->xs[4]);
+	float4 py2 = f4Load(&frustum->ys[4]);
+	float4 pz2 = f4Load(&frustum->zs[4]);
+	float4 pd2 = f4Load(&frustum->ds[4]);
+	
 	for (const Sphere *sphere = start; sphere <= end; sphere++, ++i)
 	{
-		if (frustum->isSphereInside(sphere->position, sphere->radius) && ((layer_masks[i] & layer_mask) != 0))
-		{
-			results.push(sphere_to_renderable_map[i]);
-		}
+		float4 cx = f4Splat(sphere->position.x);
+		float4 cy = f4Splat(sphere->position.y);
+		float4 cz = f4Splat(sphere->position.z);
+		float4 r = f4Splat(-sphere->radius);
+
+		float4 t = f4Mul(cx, px);
+		t = f4Add(t, f4Mul(cy, py));
+		t = f4Add(t, f4Mul(cz, pz));
+		t = f4Add(t, pd);
+		t = f4Sub(t, r);
+		if (f4MoveMask(t)) continue;
+
+		t = f4Mul(cx, px2);
+		t = f4Add(t, f4Mul(cy, py2));
+		t = f4Add(t, f4Mul(cz, pz2));
+		t = f4Add(t, pd2);
+		t = f4Sub(t, r);
+		if (f4MoveMask(t)) continue;
+
+		results.push(sphere_to_renderable_map[i]);
 	}
 }
 

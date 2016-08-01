@@ -3,6 +3,7 @@
 #include "engine/lumix.h"
 #include "engine/math_utils.h"
 #include "engine/matrix.h"
+#include "engine/simd.h"
 #include "engine/vec.h"
 
 
@@ -103,8 +104,10 @@ struct Sphere
 };
 
 
-struct LUMIX_ENGINE_API Frustum
+LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 {
+	Frustum();
+
 	void computeOrtho(const Vec3& position,
 		const Vec3& direction,
 		const Vec3& up,
@@ -128,8 +131,8 @@ struct LUMIX_ENGINE_API Frustum
 		float x = center.x;
 		float y = center.y;
 		float z = center.z;
-		const Plane& plane = planes[(uint32)Sides::NEAR_PLANE];
-		float distance = x * plane.normal.x + y * plane.normal.y + z * plane.normal.z + plane.d;
+		uint32 i = (uint32)Sides::NEAR_PLANE;
+		float distance = xs[i] * x + ys[i] * y + z * zs[i] + ds[i];
 		distance = distance < 0 ? -distance : distance;
 		return distance < radius;
 	}
@@ -137,33 +140,33 @@ struct LUMIX_ENGINE_API Frustum
 
 	bool isSphereInside(const Vec3& center, float radius) const
 	{
-		float x = center.x;
-		float y = center.y;
-		float z = center.z;
-		const Plane* plane = &planes[0];
-		float distance =
-			x * plane[0].normal.x + y * plane[0].normal.y + z * plane[0].normal.z + plane[0].d;
-		if (distance < -radius) return false;
+		float4 px = f4Load(xs);
+		float4 py = f4Load(ys);
+		float4 pz = f4Load(zs);
+		float4 pd = f4Load(ds);
 
-		distance =
-			x * plane[1].normal.x + y * plane[1].normal.y + z * plane[1].normal.z + plane[1].d;
-		if (distance < -radius) return false;
+		float4 cx = f4Splat(center.x);
+		float4 cy = f4Splat(center.y);
+		float4 cz = f4Splat(center.z);
 
-		distance =
-			x * plane[2].normal.x + y * plane[2].normal.y + z * plane[2].normal.z + plane[2].d;
-		if (distance < -radius) return false;
+		float4 t = f4Mul(cx, px);
+		t = f4Add(t, f4Mul(cy, py));
+		t = f4Add(t, f4Mul(cz, pz));
+		t = f4Add(t, pd);
+		t = f4Sub(t, f4Splat(-radius));
+		if(f4MoveMask(t)) return false; // TODO wrap _mm
 
-		distance =
-			x * plane[3].normal.x + y * plane[3].normal.y + z * plane[3].normal.z + plane[3].d;
-		if (distance < -radius) return false;
+		px = f4Load(&xs[4]);
+		py = f4Load(&ys[4]);
+		pz = f4Load(&zs[4]);
+		pd = f4Load(&ds[4]);
 
-		distance =
-			x * plane[4].normal.x + y * plane[4].normal.y + z * plane[4].normal.z + plane[4].d;
-		if (distance < -radius) return false;
-
-		distance =
-			x * plane[5].normal.x + y * plane[5].normal.y + z * plane[5].normal.z + plane[5].d;
-		if (distance < -radius) return false;
+		t = f4Mul(cx, px);
+		t = f4Add(t, f4Mul(cy, py));
+		t = f4Add(t, f4Mul(cz, pz));
+		t = f4Add(t, pd);
+		t = f4Sub(t, f4Splat(-radius));
+		if (f4MoveMask(t)) return false; // TODO wrap _mm
 
 		return true;
 	}
@@ -179,7 +182,13 @@ struct LUMIX_ENGINE_API Frustum
 		COUNT
 	};
 
-	Plane planes[(uint32)Sides::COUNT];
+	void setPlane(Sides side, const Vec3& normal, const Vec3& point);
+
+	float xs[8];
+	float ys[8];
+	float zs[8];
+	float ds[8];
+
 	Vec3 center;
 	Vec3 position;
 	Vec3 direction;
@@ -189,7 +198,7 @@ struct LUMIX_ENGINE_API Frustum
 	float near_distance;
 	float far_distance;
 	float radius;
-};
+} LUMIX_ALIGN_END(16);
 
 
 struct AABB

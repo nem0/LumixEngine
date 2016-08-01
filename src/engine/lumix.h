@@ -50,8 +50,8 @@ typedef unsigned int uint32;
 #elif defined __EMSCRIPTEN__
 	typedef long long int64;
 	typedef unsigned long long uint64;
-	#define LUMIX_ALIGN_BEGIN(_align) __attribute__( (aligned(_align) ) )
-	#define LUMIX_ALIGN_END(_align)
+	#define LUMIX_ALIGN_BEGIN(_align)
+	#define LUMIX_ALIGN_END(_align) __attribute__( (aligned(_align) ) )
 #else
 	#ifdef PLATFORM64
 		typedef long int64;
@@ -60,8 +60,8 @@ typedef unsigned int uint32;
 		typedef long long int64;
 		typedef unsigned long long uint64;
 	#endif
-	#define LUMIX_ALIGN_BEGIN(_align) __attribute__( (aligned(_align) ) )
-	#define LUMIX_ALIGN_END(_align)
+	#define LUMIX_ALIGN_BEGIN(_align)
+	#define LUMIX_ALIGN_END(_align) __attribute__( (aligned(_align) ) )
 #endif
 
 #ifdef PLATFORM64

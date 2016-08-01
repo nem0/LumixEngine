@@ -3008,10 +3008,10 @@ public:
 		Vec3 near_center = frustum.position - frustum.direction * frustum.near_distance;
 		Vec3 far_center = frustum.position - frustum.direction * frustum.far_distance;
 
-		float width = Math::abs(
-			frustum.planes[(int)Frustum::Sides::LEFT_PLANE].d + frustum.planes[(int)Frustum::Sides::RIGHT_PLANE].d);
-		float height = Math::abs(
-			frustum.planes[(int)Frustum::Sides::TOP_PLANE].d + frustum.planes[(int)Frustum::Sides::BOTTOM_PLANE].d);
+		float width =
+			Math::abs(frustum.ds[(int)Frustum::Sides::LEFT_PLANE] + frustum.ds[(int)Frustum::Sides::RIGHT_PLANE]);
+		float height =
+			Math::abs(frustum.ds[(int)Frustum::Sides::TOP_PLANE] + frustum.ds[(int)Frustum::Sides::BOTTOM_PLANE]);
 
 		Vec3 up = frustum.up.normalized() * height * 0.5f;
 		Vec3 right = crossProduct(frustum.direction, frustum.up) * width * 0.5f;
