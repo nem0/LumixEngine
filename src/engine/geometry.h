@@ -154,7 +154,7 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 		t = f4Add(t, f4Mul(cz, pz));
 		t = f4Add(t, pd);
 		t = f4Sub(t, f4Splat(-radius));
-		if(f4MoveMask(t)) return false; // TODO wrap _mm
+		if(f4MoveMask(t)) return false;
 
 		px = f4Load(&xs[4]);
 		py = f4Load(&ys[4]);
@@ -166,7 +166,7 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 		t = f4Add(t, f4Mul(cz, pz));
 		t = f4Add(t, pd);
 		t = f4Sub(t, f4Splat(-radius));
-		if (f4MoveMask(t)) return false; // TODO wrap _mm
+		if (f4MoveMask(t)) return false;
 
 		return true;
 	}
