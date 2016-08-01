@@ -75,8 +75,8 @@ public:
 		if (this != &rhs)
 		{
 			callDestructors(m_data, m_data + m_size);
-			m_allocator.deallocate(m_data);
-			m_data = (T*)m_allocator.allocate(rhs.m_capacity * sizeof(T));
+			m_allocator.deallocate_aligned(m_data);
+			m_data = (T*)m_allocator.allocate_aligned(rhs.m_capacity * sizeof(T), ALIGN_OF(T));
 			m_capacity = rhs.m_capacity;
 			m_size = rhs.m_size;
 			for (int i = 0; i < m_size; ++i)
@@ -89,7 +89,7 @@ public:
 	~Array()
 	{
 		callDestructors(m_data, m_data + m_size);
-		m_allocator.deallocate(m_data);
+		m_allocator.deallocate_aligned(m_data);
 	}
 
 	template <typename R>
@@ -282,9 +282,9 @@ public:
 	{
 		if (capacity > m_capacity)
 		{
-			T* newData = (T*)m_allocator.allocate(capacity * sizeof(T));
+			T* newData = (T*)m_allocator.allocate_aligned(capacity * sizeof(T), ALIGN_OF(T));
 			copyMemory(newData, m_data, sizeof(T) * m_size);
-			m_allocator.deallocate(m_data);
+			m_allocator.deallocate_aligned(m_data);
 			m_data = newData;
 			m_capacity = capacity;
 		}
@@ -309,7 +309,7 @@ private:
 	void grow()
 	{
 		int new_capacity = m_capacity == 0 ? 4 : m_capacity * 2;
-		m_data = (T*)m_allocator.reallocate(m_data, new_capacity * sizeof(T));
+		m_data = (T*)m_allocator.reallocate_aligned(m_data, new_capacity * sizeof(T), ALIGN_OF(T));
 		m_capacity = new_capacity;
 	}
 
