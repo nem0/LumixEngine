@@ -2316,10 +2316,9 @@ public:
 					for (int i = 0, c = results[subresult_index].size(); i < c; ++i)
 					{
 						Renderable* LUMIX_RESTRICT renderable = &renderables[raw_subresults[i].index];
-						Model* LUMIX_RESTRICT model = renderable->model;
-						float squared_distance =
-							(renderable->matrix.getTranslation() - ref_point).squaredLength();
+						float squared_distance = (renderable->matrix.getTranslation() - ref_point).squaredLength();
 
+						Model* LUMIX_RESTRICT model = renderable->model;
 						LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
 						for (int j = lod.from, c = lod.to; j <= c; ++j)
 						{

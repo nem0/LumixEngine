@@ -179,15 +179,17 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 		RIGHT_PLANE,
 		TOP_PLANE,
 		BOTTOM_PLANE,
+		EXTRA_PLANE0,
+		EXTRA_PLANE1,
 		COUNT
 	};
 
 	void setPlane(Sides side, const Vec3& normal, const Vec3& point);
 
-	float xs[8];
-	float ys[8];
-	float zs[8];
-	float ds[8];
+	float xs[(int)Sides::COUNT];
+	float ys[(int)Sides::COUNT];
+	float zs[(int)Sides::COUNT];
+	float ds[(int)Sides::COUNT];
 
 	Vec3 center;
 	Vec3 position;

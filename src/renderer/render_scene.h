@@ -83,9 +83,9 @@ struct DecalInfo
 
 struct Renderable
 {
-	Pose* pose;
-	Model* model;
 	Matrix matrix;
+	Model* model;
+	Pose* pose;
 	Entity entity;
 	int64 layer_mask;
 	Mesh* meshes;

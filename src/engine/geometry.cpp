@@ -34,6 +34,8 @@ void Frustum::computeOrtho(const Vec3& position,
 
 	setPlane(Sides::NEAR_PLANE, -z, near_center);
 	setPlane(Sides::FAR_PLANE, z, far_center);
+	setPlane(Sides::EXTRA_PLANE0, -z, near_center);
+	setPlane(Sides::EXTRA_PLANE1, z, far_center);
 
 	setPlane(Sides::TOP_PLANE, -y, near_center + y * height);
 	setPlane(Sides::BOTTOM_PLANE, y, near_center - y * height);
@@ -93,6 +95,8 @@ void Frustum::computePerspective(const Vec3& position,
 
 	setPlane(Sides::NEAR_PLANE, z, near_center);
 	setPlane(Sides::FAR_PLANE, -z, far_center);
+	setPlane(Sides::EXTRA_PLANE0, z, near_center);
+	setPlane(Sides::EXTRA_PLANE1, -z, far_center);
 
 	Vec3 aux = (near_center + y * near_height) - position;
 	aux.normalize();
