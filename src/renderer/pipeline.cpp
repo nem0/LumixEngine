@@ -1929,8 +1929,8 @@ struct PipelineImpl : public Pipeline
 				data.mesh = &mesh;
 				data.model = &model;
 			}
-			Matrix* mtcs = (Matrix*)data.buffer->data;
-			mtcs[data.instance_count] = mtx;
+			float* mtcs = (float*)data.buffer->data;
+			copyMemory(&mtcs[data.instance_count * 16], &mtx, sizeof(mtx));
 			++data.instance_count;
 
 			if (data.instance_count == InstanceData::MAX_INSTANCE_COUNT)
@@ -2087,8 +2087,8 @@ struct PipelineImpl : public Pipeline
 			info.mesh->instance_idx = instance_idx;
 		}
 		InstanceData& data = m_instances_data[instance_idx];
-		Matrix* mtcs = (Matrix*)data.buffer->data;
-		mtcs[data.instance_count] = renderable.matrix;
+		float* mtcs = (float*)data.buffer->data;
+		copyMemory(&mtcs[data.instance_count * 16], &renderable.matrix, sizeof(renderable.matrix));
 		++data.instance_count;
 
 		if (data.instance_count == InstanceData::MAX_INSTANCE_COUNT)

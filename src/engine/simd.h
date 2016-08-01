@@ -42,6 +42,12 @@ namespace Lumix
 	}
 
 
+	LUMIX_FORCE_INLINE int f4MoveMask(float4 a)
+	{
+		return _mm_movemask_ps(a);
+	}
+
+
 	LUMIX_FORCE_INLINE float4 f4Add(float4 a, float4 b)
 	{
 		return _mm_add_ps(a, b);
@@ -123,6 +129,15 @@ namespace Lumix
 	LUMIX_FORCE_INLINE void f4Store(void* dest, float4 src)
 	{
 		(*(float4*)dest) = src;
+	}
+
+
+	LUMIX_FORCE_INLINE int f4MoveMask(float4 a)
+	{
+		return (a.w < 0 ? (1 << 3) : 0) | 
+			(a.z < 0 ? (1 << 2) : 0) | 
+			(a.y < 0 ? (1 << 1) : 0) | 
+			(a.x < 0 ? 1 : 0);
 	}
 
 
