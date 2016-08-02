@@ -209,6 +209,8 @@ public:
 		}
 		m_decals.clear();
 
+		m_cameras.clear();
+
 		for (auto* terrain : m_terrains)
 		{
 			LUMIX_DELETE(m_allocator, terrain);

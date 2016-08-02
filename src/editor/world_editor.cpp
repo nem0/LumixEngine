@@ -1724,7 +1724,7 @@ public:
 	{
 		m_render_interface = interface;
 		m_editor_icons->setRenderInterface(m_render_interface);
-		createUniverse(true);
+		createUniverse();
 	}
 
 
@@ -2215,7 +2215,7 @@ public:
 	{
 		if (m_is_game_mode) stopGameMode(false);
 		destroyUniverse();
-		createUniverse(true);
+		createUniverse();
 		m_universe->setPath(path);
 		g_log_info.log("Editor") << "Loading universe " << path << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
@@ -2243,7 +2243,7 @@ public:
 	void newUniverse() override
 	{
 		destroyUniverse();
-		createUniverse(true);
+		createUniverse();
 		g_log_info.log("Editor") << "Universe created.";
 	}
 
@@ -2308,6 +2308,12 @@ public:
 			m_is_loading = false;
 			return;
 		}
+
+		if (isValid(m_camera))
+		{
+			m_universe->destroyEntity(m_camera);
+		}
+
 		if (m_engine->deserialize(*m_universe, blob))
 		{
 			m_template_system->deserialize(blob, header.version > (int)SerializedVersion::PREFABS);
@@ -2674,7 +2680,7 @@ public:
 	}
 
 
-	void createUniverse(bool create_basic_entities)
+	void createUniverse()
 	{
 		ASSERT(!m_universe);
 
@@ -2690,14 +2696,11 @@ public:
 		m_universe_created.invoke();
 		m_entity_groups.setUniverse(universe);
 
-		if (create_basic_entities)
-		{
-			m_camera = universe->createEntity(Vec3(0, 0, -5), Quat(Vec3(0, 1, 0), -Math::PI));
-			universe->setEntityName(m_camera, "editor_camera");
-			ComponentUID cmp = m_engine->createComponent(*universe, m_camera, CAMERA_TYPE);
-			ASSERT(cmp.isValid());
-			m_render_interface->setCameraSlot(cmp.handle, "editor");
-		}
+		m_camera = universe->createEntity(Vec3(0, 0, -5), Quat(Vec3(0, 1, 0), -Math::PI));
+		universe->setEntityName(m_camera, "editor_camera");
+		ComponentUID cmp = m_engine->createComponent(*universe, m_camera, CAMERA_TYPE);
+		ASSERT(cmp.isValid());
+		m_render_interface->setCameraSlot(cmp.handle, "editor");
 	}
 
 
