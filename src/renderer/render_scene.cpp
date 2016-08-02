@@ -2081,9 +2081,7 @@ public:
 	}
 
 
-	void getGrassInfos(const Frustum& frustum,
-		Array<GrassInfo>& infos,
-		ComponentHandle camera) override
+	void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentHandle camera) override
 	{
 		PROFILE_FUNCTION();
 

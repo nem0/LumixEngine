@@ -149,7 +149,6 @@ class Terrain
 		Texture* m_detail_texture;
 		RenderScene& m_scene;
 		Array<GrassType*> m_grass_types;
-		Array<GrassQuad*> m_free_grass_quads;
 		AssociativeArray<ComponentHandle, Array<GrassQuad*> > m_grass_quads;
 		AssociativeArray<ComponentHandle, Vec3> m_last_camera_position;
 		bool m_force_grass_update;
