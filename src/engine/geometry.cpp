@@ -32,16 +32,16 @@ void Frustum::computeOrtho(const Vec3& position,
 	x.normalize();
 	Vec3 y = crossProduct(z, x);
 
-	setPlane(Sides::NEAR_PLANE, -z, near_center);
-	setPlane(Sides::FAR_PLANE, z, far_center);
-	setPlane(Sides::EXTRA_PLANE0, -z, near_center);
-	setPlane(Sides::EXTRA_PLANE1, z, far_center);
+	setPlane(Planes::NEAR, -z, near_center);
+	setPlane(Planes::FAR, z, far_center);
+	setPlane(Planes::EXTRA0, -z, near_center);
+	setPlane(Planes::EXTRA1, z, far_center);
 
-	setPlane(Sides::TOP_PLANE, -y, near_center + y * height);
-	setPlane(Sides::BOTTOM_PLANE, y, near_center - y * height);
+	setPlane(Planes::TOP, -y, near_center + y * height);
+	setPlane(Planes::BOTTOM, y, near_center - y * height);
 
-	setPlane(Sides::LEFT_PLANE, x, near_center - x * width);
-	setPlane(Sides::RIGHT_PLANE, -x, near_center + x * width);
+	setPlane(Planes::LEFT, x, near_center - x * width);
+	setPlane(Planes::RIGHT, -x, near_center + x * width);
 
 	center = (near_center + far_center) * 0.5f;
 	float z_diff = far_distance - near_distance;
@@ -55,12 +55,21 @@ void Frustum::computeOrtho(const Vec3& position,
 }
 
 
-void Frustum::setPlane(Sides side, const Vec3& normal, const Vec3& point)
+void Frustum::setPlane(Planes side, const Vec3& normal, const Vec3& point)
 {
 	xs[(uint32)side] = normal.x;
 	ys[(uint32)side] = normal.y;
 	zs[(uint32)side] = normal.z;
 	ds[(uint32)side] = -dotProduct(point, normal);
+}
+
+
+void Frustum::setPlane(Planes side, const Vec3& normal, float d)
+{
+	xs[(uint32)side] = normal.x;
+	ys[(uint32)side] = normal.y;
+	zs[(uint32)side] = normal.z;
+	ds[(uint32)side] = d;
 }
 
 
@@ -93,30 +102,30 @@ void Frustum::computePerspective(const Vec3& position,
 	Vec3 far_center = position + z * far_distance;
 	center = position + z * ((near_distance + far_distance)* 0.5f);
 
-	setPlane(Sides::NEAR_PLANE, z, near_center);
-	setPlane(Sides::FAR_PLANE, -z, far_center);
-	setPlane(Sides::EXTRA_PLANE0, z, near_center);
-	setPlane(Sides::EXTRA_PLANE1, -z, far_center);
+	setPlane(Planes::NEAR, z, near_center);
+	setPlane(Planes::FAR, -z, far_center);
+	setPlane(Planes::EXTRA0, z, near_center);
+	setPlane(Planes::EXTRA1, -z, far_center);
 
 	Vec3 aux = (near_center + y * near_height) - position;
 	aux.normalize();
 	Vec3 normal = crossProduct(aux, x);
-	setPlane(Sides::TOP_PLANE, normal, near_center + y * near_height);
+	setPlane(Planes::TOP, normal, near_center + y * near_height);
 
 	aux = (near_center - y * near_height) - position;
 	aux.normalize();
 	normal = crossProduct(x, aux);
-	setPlane(Sides::BOTTOM_PLANE, normal, near_center - y * near_height);
+	setPlane(Planes::BOTTOM, normal, near_center - y * near_height);
 
 	aux = (near_center - x * near_width) - position;
 	aux.normalize();
 	normal = crossProduct(aux, y);
-	setPlane(Sides::LEFT_PLANE, normal, near_center - x * near_width);
+	setPlane(Planes::LEFT, normal, near_center - x * near_width);
 
 	aux = (near_center + x * near_width) - position;
 	aux.normalize();
 	normal = crossProduct(y, aux);
-	setPlane(Sides::RIGHT_PLANE, normal, near_center + x * near_width);
+	setPlane(Planes::RIGHT, normal, near_center + x * near_width);
 
 	float far_height = far_distance * tang;
 	float far_width = far_height * ratio;
