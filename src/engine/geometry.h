@@ -131,7 +131,7 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 		float x = center.x;
 		float y = center.y;
 		float z = center.z;
-		uint32 i = (uint32)Sides::NEAR_PLANE;
+		uint32 i = (uint32)Planes::NEAR;
 		float distance = xs[i] * x + ys[i] * y + z * zs[i] + ds[i];
 		distance = distance < 0 ? -distance : distance;
 		return distance < radius;
@@ -171,25 +171,35 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 		return true;
 	}
 
-	enum class Sides : uint32
+
+	enum class Planes : uint32
 	{
-		NEAR_PLANE,
-		FAR_PLANE,
-		LEFT_PLANE,
-		RIGHT_PLANE,
-		TOP_PLANE,
-		BOTTOM_PLANE,
-		EXTRA_PLANE0,
-		EXTRA_PLANE1,
+		NEAR,
+		FAR,
+		LEFT,
+		RIGHT,
+		TOP,
+		BOTTOM,
+		EXTRA0,
+		EXTRA1,
 		COUNT
 	};
 
-	void setPlane(Sides side, const Vec3& normal, const Vec3& point);
 
-	float xs[(int)Sides::COUNT];
-	float ys[(int)Sides::COUNT];
-	float zs[(int)Sides::COUNT];
-	float ds[(int)Sides::COUNT];
+	Vec3 getNormal(Planes side) const
+	{
+		return Vec3(xs[(int)side], ys[(int)side], zs[(int)side]);
+	}
+
+
+	void setPlane(Planes side, const Vec3& normal, const Vec3& point);
+	void setPlane(Planes side, const Vec3& normal, float d);
+
+
+	float xs[(int)Planes::COUNT];
+	float ys[(int)Planes::COUNT];
+	float zs[(int)Planes::COUNT];
+	float ds[(int)Planes::COUNT];
 
 	Vec3 center;
 	Vec3 position;

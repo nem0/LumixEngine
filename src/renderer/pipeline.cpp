@@ -1269,6 +1269,37 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	void findExtraShadowcasterPlanes(const Vec3& light_forward, const Frustum& camera_frustum, Frustum* shadow_camera_frustum)
+	{
+		static const Frustum::Planes planes[] = {
+			Frustum::Planes::LEFT, Frustum::Planes::TOP, Frustum::Planes::RIGHT, Frustum::Planes::BOTTOM };
+		bool prev_side = dotProduct(light_forward, camera_frustum.getNormal(planes[lengthOf(planes) - 1])) < 0;
+		int out_plane = (int)Frustum::Planes::EXTRA0;
+		for (int i = 0; i < lengthOf(planes); ++i)
+		{
+			bool side = dotProduct(light_forward, camera_frustum.getNormal(planes[i])) < 0;
+			if (prev_side != side)
+			{
+				Vec3 n0 = camera_frustum.getNormal(planes[i]);
+				Vec3 n1 = camera_frustum.getNormal(planes[(i + lengthOf(planes) - 1) % lengthOf(planes)]);
+				Vec3 line_dir = crossProduct(n1, n0);
+				Vec3 n = crossProduct(light_forward, line_dir);
+				float d = -dotProduct(camera_frustum.position, n);
+				if (dotProduct(camera_frustum.center, n) + d < 0)
+				{
+					n = -n;
+					d = -dotProduct(camera_frustum.position, n);
+				}
+				shadow_camera_frustum->setPlane((Frustum::Planes)out_plane, n, d);
+				++out_plane;
+				if (out_plane >(int)Frustum::Planes::EXTRA1) break;
+			}
+			prev_side = side;
+		}
+
+	}
+
+
 	void renderShadowmap(int split_index)
 	{
 		Universe& universe = m_scene->getUniverse();
@@ -1327,7 +1358,11 @@ struct PipelineImpl : public Pipeline
 			shadow_cam_pos, -light_forward, light_mtx.getYVector(), bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
 		m_current_render_views = &m_view_idx;
 		m_current_render_view_count = 1;
+
+		findExtraShadowcasterPlanes(light_forward, camera_frustum, &shadow_camera_frustum);
+
 		renderAll(shadow_camera_frustum, false, camera_matrix.getTranslation());
+
 		m_is_rendering_in_shadowmap = false;
 	}
 
