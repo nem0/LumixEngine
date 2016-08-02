@@ -444,8 +444,7 @@ void Terrain::updateGrass(ComponentHandle camera)
 	Entity camera_entity = m_scene.getCameraEntity(camera);
 	Vec3 camera_pos = universe.getPosition(camera_entity);
 
-	if ((m_last_camera_position[camera] - camera_pos).length() <= FLT_MIN && !m_force_grass_update)
-		return;
+	if ((m_last_camera_position[camera] - camera_pos).length() <= FLT_MIN && !m_force_grass_update) return;
 	m_last_camera_position[camera] = camera_pos;
 
 	m_force_grass_update = false;
@@ -494,7 +493,7 @@ void Terrain::updateGrass(ComponentHandle camera)
 			quads.push(quad);
 			quad->pos.x = quad_x;
 			quad->pos.z = quad_z;
-			quad->m_patches.clear();
+			quad->m_patches.reserve(m_grass_types.size());
 			srand((int)quad_x + (int)quad_z * m_grass_distance);
 
 			float min_y = FLT_MAX;
@@ -504,7 +503,6 @@ void Terrain::updateGrass(ComponentHandle camera)
 				Model* model = grass_type->m_grass_model;
 				if (!model || !model->isReady()) continue;
 				GrassPatch& patch = quad->m_patches.emplace(m_allocator);
-				patch.m_matrices.clear();
 				patch.m_type = grass_type;
 
 				generateGrassTypeQuad(patch, terrain_mtx, quad_x, quad_z);

@@ -2180,14 +2180,10 @@ public:
 	}
 
 
-	void enableGrass(bool enabled) override
-	{
-		m_is_grass_enabled = enabled;
-	}
+	void enableGrass(bool enabled) override { m_is_grass_enabled = enabled; }
 
 
-	void
-	setGrassDensity(ComponentHandle cmp, int index, int density) override
+	void setGrassDensity(ComponentHandle cmp, int index, int density) override
 	{
 		m_terrains[{cmp.index}]->setGrassTypeDensity(index, density);
 	}
@@ -2199,8 +2195,7 @@ public:
 	}
 
 
-	void
-	setGrassGround(ComponentHandle cmp, int index, int ground) override
+	void setGrassGround(ComponentHandle cmp, int index, int ground) override
 	{
 		m_terrains[{cmp.index}]->setGrassTypeGround(index, ground);
 	}
