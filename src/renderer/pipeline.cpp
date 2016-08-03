@@ -1625,7 +1625,7 @@ struct PipelineImpl : public Pipeline
 	void setActiveGlobalLightUniforms()
 	{
 		auto current_light = m_scene->getActiveGlobalLight();
-		if (current_light == INVALID_COMPONENT) return;
+		if (!isValid(current_light)) return;
 
 		Universe& universe = m_scene->getUniverse();
 		Entity light_entity = m_scene->getGlobalLightEntity(current_light);

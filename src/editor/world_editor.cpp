@@ -2047,6 +2047,7 @@ public:
 		{
 			m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
 			m_universe->resetScenes();
+			m_camera = INVALID_ENTITY;
 			load(*m_game_mode_file);
 		}
 		m_engine->getFileSystem().close(*m_game_mode_file);
