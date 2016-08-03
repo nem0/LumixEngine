@@ -4306,6 +4306,8 @@ void RenderScene::registerLuaAPI(lua_State* L)
 		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
 		} while(false) \
 
+	REGISTER_FUNCTION(getGlobalLightEntity);
+	REGISTER_FUNCTION(getActiveGlobalLight);
 	REGISTER_FUNCTION(getCameraSlot);
 	REGISTER_FUNCTION(getCameraComponent);
 	REGISTER_FUNCTION(getRenderableComponent);
