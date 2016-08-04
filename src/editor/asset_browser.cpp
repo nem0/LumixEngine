@@ -413,6 +413,12 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 
 	if (ImGui::BeginResizablePopup(popup_name, ImVec2(300, 300)))
 	{
+		if (ImGui::Selectable("Empty", false))
+		{
+			*buf = '\0';
+			ImGui::EndPopup();
+			return true;
+		}
 		if (resourceList(buf, max_size, type, 0))
 		{
 			ImGui::EndPopup();
