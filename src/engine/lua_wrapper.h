@@ -5,32 +5,12 @@
 #include "engine/matrix.h"
 #include <lua.hpp>
 #include <lauxlib.h> // must be after lua.hpp
-#include <tuple>
 
 
 namespace Lumix
 {
 namespace LuaWrapper
 {
-
-
-struct Guard
-{
-	Guard(lua_State* L)
-		: state(L)
-	{
-		top = lua_gettop(L);
-	}
-
-	~Guard()
-	{
-		ASSERT(top == lua_gettop(state));
-	}
-
-
-	lua_State* state;
-	int top;
-};
 
 
 template <typename T> inline T toType(lua_State* L, int index)
@@ -464,68 +444,122 @@ inline void checkTableArg(lua_State* L, int index)
 	}
 }
 
+template <class _Ty> struct remove_reference
+{
+	typedef _Ty type;
+};
+
+template <class _Ty> struct remove_reference<_Ty&>
+{
+	typedef _Ty type;
+};
+
+template <class _Ty> struct remove_reference<_Ty&&>
+{
+	typedef _Ty type;
+};
+
+template <class _Ty> struct remove_const
+{
+	typedef _Ty type;
+};
+
+template <class _Ty> struct remove_const<const _Ty>
+{
+	typedef _Ty type;
+};
+
+template <class _Ty> struct remove_volatile
+{
+	typedef _Ty type;
+};
+
+template <class _Ty> struct remove_volatile<volatile _Ty>
+{
+	typedef _Ty type;
+};
+
+template <class _Ty> struct remove_cv_reference
+{
+	typedef typename remove_const<typename remove_volatile<typename remove_reference<_Ty>::type>::type>::type type;
+};
+
+
+template <int N, typename... Args> struct Nth;
+
+
+template <int N, typename T, typename... Args> struct Nth<N, T, Args...>
+{
+	typedef typename Nth<N - 1, Args...>::type type;
+};
+
+
+template <typename T, typename... Args> struct Nth<0, T, Args...>
+{
+	typedef T type;
+};
 
 template <int N> struct FunctionCaller
 {
 	template <typename R, typename... ArgsF, typename... Args>
-	static LUMIX_FORCE_INLINE R callFunction(R (*f)(ArgsF...), lua_State* L, Args... args)
+	static LUMIX_FORCE_INLINE R callFunction(R (*f)(ArgsF...), lua_State* L, Args && ... args)
 	{
-		typedef typename std::tuple_element<sizeof...(ArgsF)-N, std::tuple<ArgsF...>>::type T;
-		typedef typename std::remove_cv<typename std::remove_reference<T>::type>::type RealT;
-		checkArg<RealT>(L, sizeof...(ArgsF)-N + 1);
-		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 1);
+		typedef typename Nth<sizeof...(ArgsF)-N, ArgsF...>::type T;
+		typedef typename remove_cv_reference<T>::type RealT;
+		checkArg<RealT>(L, sizeof...(ArgsF) - N + 1);
+		RealT a = toType<RealT>(L, sizeof...(ArgsF) - N + 1);
 		return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
 	}
 
 	template <typename R, typename... ArgsF, typename... Args>
-	static LUMIX_FORCE_INLINE R callFunction(R (*f)(lua_State*, ArgsF...), lua_State* L, Args... args)
+	static LUMIX_FORCE_INLINE R callFunction(R (*f)(lua_State*, ArgsF...), lua_State* L, Args && ... args)
 	{
-		typedef typename std::tuple_element<sizeof...(ArgsF)-N, std::tuple<ArgsF...>>::type T;
-		typedef typename std::remove_cv<typename std::remove_reference<T>::type>::type RealT;
-		checkArg<RealT>(L, sizeof...(ArgsF)-N + 1);
-		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 1);
+		typedef typename Nth<sizeof...(ArgsF)-N, ArgsF...>::type T;
+		typedef typename remove_cv_reference<T>::type RealT;
+		checkArg<RealT>(L, sizeof...(ArgsF) - N + 1);
+		RealT a = toType<RealT>(L, sizeof...(ArgsF) - N + 1);
 		return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
 	}
 
 	template <typename R, typename C, typename... ArgsF, typename... Args>
-	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(ArgsF...), lua_State* L, Args... args)
+	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(ArgsF...), lua_State* L, Args && ... args)
 	{
-		typedef typename std::tuple_element<sizeof...(ArgsF)-N, std::tuple<ArgsF...>>::type T;
-		typedef typename std::remove_cv<typename std::remove_reference<T>::type>::type RealT;
-		checkArg<RealT>(L, sizeof...(ArgsF)-N + 2);
+		typedef typename Nth<sizeof...(ArgsF)-N, ArgsF...>::type T;
+		typedef typename remove_cv_reference<T>::type RealT;
+		checkArg<RealT>(L, sizeof...(ArgsF) - N + 2);
 
-		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 2);
+		RealT a = toType<RealT>(L, sizeof...(ArgsF) - N + 2);
 		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
 	}
 
 	template <typename R, typename C, typename... ArgsF, typename... Args>
-	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(ArgsF...) const, lua_State* L, Args... args)
+	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(ArgsF...) const, lua_State* L, Args && ... args)
 	{
-		typedef typename std::tuple_element<sizeof...(ArgsF)-N, std::tuple<ArgsF...>>::type T;
-		typedef typename std::remove_cv<typename std::remove_reference<T>::type>::type RealT;
-		checkArg<RealT>(L, sizeof...(ArgsF)-N + 2);
+		typedef typename Nth<sizeof...(ArgsF)-N, ArgsF...>::type T;
+		typedef typename remove_cv_reference<T>::type RealT;
+		checkArg<RealT>(L, sizeof...(ArgsF) - N + 2);
 
-		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 2);
+		RealT a = toType<RealT>(L, sizeof...(ArgsF) - N + 2);
 		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
 	}
 
 	template <typename R, typename C, typename... ArgsF, typename... Args>
-	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(lua_State*, ArgsF...), lua_State* L, Args... args)
+	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(lua_State*, ArgsF...), lua_State* L, Args && ... args)
 	{
-		typedef typename std::tuple_element<sizeof...(ArgsF)-N, std::tuple<ArgsF...>>::type T;
-		typedef typename std::remove_cv<typename std::remove_reference<T>::type>::type RealT;
-		checkArg<RealT>(L, sizeof...(ArgsF)-N + 2);
-		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 2);
+		typedef typename Nth<sizeof...(ArgsF)-N, ArgsF...>::type T;
+		typedef typename remove_cv_reference<T>::type RealT;
+		checkArg<RealT>(L, sizeof...(ArgsF) - N + 2);
+		RealT a = toType<RealT>(L, sizeof...(ArgsF) - N + 2);
 		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
 	}
 
 	template <typename R, typename C, typename... ArgsF, typename... Args>
-	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(lua_State*, ArgsF...) const, lua_State* L, Args... args)
+	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(lua_State*, ArgsF...) const, lua_State* L, Args && ... args)
 	{
-		typedef typename std::tuple_element<sizeof...(ArgsF)-N, std::tuple<ArgsF...>>::type T;
-		typedef typename std::remove_cv<typename std::remove_reference<T>::type>::type RealT;
-		checkArg<RealT>(L, sizeof...(ArgsF)-N + 2);
-		RealT a = toType<RealT>(L, sizeof...(ArgsF)-N + 2);
+		typedef typename Nth<sizeof...(ArgsF)-N, ArgsF...>::type T;
+		typedef typename remove_cv_reference<T>::type RealT;
+		checkArg<RealT>(L, sizeof...(ArgsF) - N + 2);
+		RealT a = toType<RealT>(L, sizeof...(ArgsF) - N + 2);
 		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
 	}
 };
@@ -534,42 +568,42 @@ template <int N> struct FunctionCaller
 template <> struct FunctionCaller<0>
 {
 	template <typename R, typename... ArgsF, typename... Args>
-	static LUMIX_FORCE_INLINE R callFunction(R (*f)(ArgsF...), lua_State*, Args... args)
+	static LUMIX_FORCE_INLINE R callFunction(R (*f)(ArgsF...), lua_State*, Args && ... args)
 	{
 		return f(args...);
 	}
 
 
 	template <typename R, typename... ArgsF, typename... Args>
-	static LUMIX_FORCE_INLINE R callFunction(R (*f)(lua_State*, ArgsF...), lua_State* L, Args... args)
+	static LUMIX_FORCE_INLINE R callFunction(R (*f)(lua_State*, ArgsF...), lua_State* L, Args && ... args)
 	{
 		return f(L, args...);
 	}
 
 
 	template <typename R, typename C, typename... ArgsF, typename... Args>
-	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(ArgsF...), lua_State*, Args... args)
+	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(ArgsF...), lua_State*, Args && ... args)
 	{
 		return (inst->*f)(args...);
 	}
 
 
 	template <typename R, typename C, typename... ArgsF, typename... Args>
-	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(lua_State*, ArgsF...), lua_State* L, Args... args)
+	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(lua_State*, ArgsF...), lua_State* L, Args && ... args)
 	{
 		return (inst->*f)(L, args...);
 	}
 
 
 	template <typename R, typename C, typename... ArgsF, typename... Args>
-	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(ArgsF...) const, lua_State*, Args... args)
+	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(ArgsF...) const, lua_State*, Args && ... args)
 	{
 		return (inst->*f)(args...);
 	}
 
 
 	template <typename R, typename C, typename... ArgsF, typename... Args>
-	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(lua_State*, ArgsF...) const, lua_State* L, Args... args)
+	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(lua_State*, ArgsF...) const, lua_State* L, Args && ... args)
 	{
 		return (inst->*f)(L, args...);
 	}
