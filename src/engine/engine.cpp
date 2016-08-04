@@ -398,7 +398,7 @@ public:
 	}
 
 
-	static Vec4 LUA_multMatrixVec(Matrix m, Vec4 v)
+	static Vec4 LUA_multMatrixVec(const Matrix& m, const Vec4& v)
 	{
 		return m * v;
 	}
