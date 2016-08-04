@@ -287,6 +287,32 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 				}
 			}
 
+			
+			if (ImGui::CollapsingHeader("Defines"))
+			{
+				for (int define_idx = 0; define_idx < renderer->getShaderDefinesCount(); ++define_idx)
+				{
+					const char* define = renderer->getShaderDefine(define_idx);
+					if (!material->hasDefine(define_idx)) continue;
+					bool value = material->isDefined(define_idx);
+
+					auto isBuiltinDefine = [](const char* define) {
+						const char* BUILTIN_DEFINES[] = {"HAS_SHADOWMAP", "ALPHA_CUTOUT", "SKINNED"};
+						for (const char* builtin_define : BUILTIN_DEFINES)
+						{
+							if (equalStrings(builtin_define, define)) return true;
+						}
+						return false;
+					};
+
+					bool is_texture_define = material->isTextureDefine(define_idx);
+					if (!is_texture_define && !isBuiltinDefine(define) && ImGui::Checkbox(define, &value))
+					{
+						material->setDefine(define_idx, value);
+					}
+				}
+			}
+
 			if (Material::getCustomFlagCount() > 0 && ImGui::CollapsingHeader("Flags"))
 			{
 				for (int i = 0; i < Material::getCustomFlagCount(); ++i)

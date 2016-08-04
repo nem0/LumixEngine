@@ -676,6 +676,12 @@ struct RendererImpl : public Renderer
 	Engine& getEngine() override { return m_engine; }
 
 
+	int getShaderDefinesCount() const override
+	{
+		return m_shader_defines.size();
+	}
+
+
 	const char* getShaderDefine(int define_idx) override
 	{
 		return m_shader_defines[define_idx];
