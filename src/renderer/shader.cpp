@@ -345,6 +345,7 @@ static void fs(lua_State* L)
 			cmb->all_defines_mask |= 1 << define_idx;
 			cmb->fs_local_mask[cmb->pass_count - 1] |= 1 << indexOf(*cmb, define_idx);
 		}
+		lua_pop(L, 1);
 	}
 }
 
@@ -359,13 +360,14 @@ static void vs(lua_State* L)
 	int len = (int)lua_rawlen(L, 1);
 	for (int i = 0; i < len; ++i)
 	{
-		if (lua_rawgeti(L, -1, i + 1) == LUA_TSTRING)
+		if (lua_rawgeti(L, 1, i + 1) == LUA_TSTRING)
 		{
 			const char* tmp = lua_tostring(L, -1);
 			int define_idx = renderer->getShaderDefineIdx(tmp);
 			cmb->all_defines_mask |= 1 << define_idx;
 			cmb->vs_local_mask[cmb->pass_count - 1] |= 1 << indexOf(*cmb, define_idx);
 		}
+		lua_pop(L, 1);
 	}
 }
 
