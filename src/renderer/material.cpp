@@ -563,10 +563,7 @@ const char* Material::getTextureUniform(int i)
 
 Texture* Material::getTextureByUniform(const char* uniform) const
 {
-	if (!m_shader)
-	{
-		return nullptr;
-	}
+	if (!m_shader) return nullptr;
 
 	for (int i = 0, c = m_shader->m_texture_slot_count; i < c; ++i)
 	{
@@ -576,6 +573,21 @@ Texture* Material::getTextureByUniform(const char* uniform) const
 		}
 	}
 	return nullptr;
+}
+
+
+bool Material::isTextureDefine(uint8 define_idx) const
+{
+	if (!m_shader) return false;
+
+	for (int i = 0, c = m_shader->m_texture_slot_count; i < c; ++i)
+	{
+		if (m_shader->m_texture_slots[i].define_idx == define_idx)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 bool Material::deserializeTexture(JsonSerializer& serializer, const char* material_dir)

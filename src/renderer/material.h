@@ -66,6 +66,7 @@ public:
 	Texture* getTexture(int i) const { return i < m_texture_count ? m_textures[i] : nullptr; }
 	const char* getTextureUniform(int i);
 	Texture* getTextureByUniform(const char* uniform) const;
+	bool isTextureDefine(uint8 define_idx) const;
 	void setTexture(int i, Texture* texture);
 	void setTexturePath(int i, const Path& path);
 	bool save(JsonSerializer& serializer);
