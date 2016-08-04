@@ -398,6 +398,12 @@ public:
 	}
 
 
+	static Vec4 LUA_multMatrixVec(Matrix m, Vec4 v)
+	{
+		return m * v;
+	}
+
+
 	static int LUA_multVecQuat(lua_State* L)
 	{
 		Vec3 v = LuaWrapper::checkArg<Vec3>(L, 1);
@@ -485,6 +491,7 @@ public:
 		REGISTER_FUNCTION(unloadPrefab);
 		REGISTER_FUNCTION(getComponent);
 		REGISTER_FUNCTION(getComponentType);
+		REGISTER_FUNCTION(multMatrixVec);
 
 		#undef REGISTER_FUNCTION
 

@@ -2524,6 +2524,14 @@ public:
 	float getCameraScreenHeight(ComponentHandle camera) override { return m_cameras[{camera.index}].screen_height; }
 
 
+	Matrix getCameraViewProjection(ComponentHandle cmp) override
+	{
+		Matrix view = m_universe.getMatrix({cmp.index});
+		view.fastInverse();
+		return getCameraProjection(cmp) * view;
+	}
+
+
 	Matrix getCameraProjection(ComponentHandle cmp) override
 	{
 		Camera& camera = m_cameras[{cmp.index}];
@@ -4306,6 +4314,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
 		} while(false) \
 
+	REGISTER_FUNCTION(getCameraViewProjection);
 	REGISTER_FUNCTION(getGlobalLightEntity);
 	REGISTER_FUNCTION(getActiveGlobalLight);
 	REGISTER_FUNCTION(getCameraSlot);
