@@ -243,6 +243,7 @@ public:
 	virtual const Array<DebugPoint>& getDebugPoints() const = 0;
 
 	virtual Matrix getCameraProjection(ComponentHandle camera) = 0;
+	virtual Matrix getCameraViewProjection(ComponentHandle camera) = 0;
 	virtual Entity getCameraEntity(ComponentHandle camera) const = 0;
 	virtual ComponentHandle getCameraInSlot(const char* slot) = 0;
 	virtual float getCameraFOV(ComponentHandle camera) = 0;

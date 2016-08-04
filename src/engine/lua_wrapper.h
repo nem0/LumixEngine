@@ -2,10 +2,9 @@
 
 
 #include "engine/log.h"
-#include "engine/quat.h"
-#include "engine/vec.h"
+#include "engine/matrix.h"
 #include <lua.hpp>
-#include <lauxlib.h>
+#include <lauxlib.h> // must be after lua.hpp
 #include <tuple>
 
 
@@ -64,6 +63,23 @@ template <> inline Vec3 toType(lua_State* L, int index)
 	lua_pop(L, 1);
 	return v;
 }
+template <> inline Vec4 toType(lua_State* L, int index)
+{
+	Vec4 v;
+	lua_rawgeti(L, index, 1);
+	v.x = (float)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	lua_rawgeti(L, index, 2);
+	v.y = (float)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	lua_rawgeti(L, index, 3);
+	v.z = (float)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	lua_rawgeti(L, index, 4);
+	v.w = (float)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	return v;
+}
 template <> inline Quat toType(lua_State* L, int index)
 {
 	Quat v;
@@ -90,6 +106,18 @@ template <> inline Vec2 toType(lua_State* L, int index)
 	lua_rawgeti(L, index, 2);
 	v.y = (float)lua_tonumber(L, -1);
 	lua_pop(L, 1);
+	return v;
+}
+template <> inline Matrix toType(lua_State* L, int index)
+{
+	Matrix v;
+	for (int i = 0; i < 16; ++i)
+	{
+		lua_rawgeti(L, index, i + 1);
+		(&(v.m11))[i] = (float)lua_tonumber(L, -1);
+		lua_pop(L, 1);
+
+	}
 	return v;
 }
 template <> inline Int2 toType(lua_State* L, int index)
@@ -179,9 +207,17 @@ template <> inline bool isType<Vec3>(lua_State* L, int index)
 {
 	return lua_istable(L, index) != 0 && lua_rawlen(L, index) == 3;
 }
+template <> inline bool isType<Vec4>(lua_State* L, int index)
+{
+	return lua_istable(L, index) != 0 && lua_rawlen(L, index) == 4;
+}
 template <> inline bool isType<Vec2>(lua_State* L, int index)
 {
 	return lua_istable(L, index) != 0 && lua_rawlen(L, index) == 2;
+}
+template <> inline bool isType<Matrix>(lua_State* L, int index)
+{
+	return lua_istable(L, index) != 0 && lua_rawlen(L, index) == 16;
 }
 template <> inline bool isType<Quat>(lua_State* L, int index)
 {
@@ -239,6 +275,16 @@ inline void pushLua(lua_State* L, const Vec2& value)
 	lua_pushnumber(L, value.y);
 	lua_rawseti(L, -2, 2);
 }
+inline void pushLua(lua_State* L, const Matrix& value)
+{
+	lua_createtable(L, 16, 0);
+
+	for (int i = 0; i < 16; ++i)
+	{
+		lua_pushnumber(L, (&value.m11)[i]);
+		lua_rawseti(L, -2, i + 1);
+	}
+}
 inline void pushLua(lua_State* L, const Int2& value)
 {
 	lua_createtable(L, 2, 0);
@@ -261,6 +307,22 @@ inline void pushLua(lua_State* L, const Vec3& value)
 
 	lua_pushnumber(L, value.z);
 	lua_rawseti(L, -2, 3);
+}
+inline void pushLua(lua_State* L, const Vec4& value)
+{
+	lua_createtable(L, 4, 0);
+
+	lua_pushnumber(L, value.x);
+	lua_rawseti(L, -2, 1);
+
+	lua_pushnumber(L, value.y);
+	lua_rawseti(L, -2, 2);
+
+	lua_pushnumber(L, value.z);
+	lua_rawseti(L, -2, 3);
+
+	lua_pushnumber(L, value.w);
+	lua_rawseti(L, -2, 4);
 }
 inline void pushLua(lua_State* L, const Quat& value)
 {
