@@ -170,6 +170,7 @@ struct GUISystemImpl : public GUISystem
 
 	void showGUI(bool show)
 	{
+		m_interface->enableCursor(show);
 		m_root_widget.SetVisibility(show ? WIDGET_VISIBILITY_VISIBLE : WIDGET_VISIBILITY_GONE);
 	}
 

@@ -1926,6 +1926,7 @@ public:
 		
 		char current_dir[Lumix::MAX_PATH_LENGTH];
 		PlatformInterface::getCurrentDirectory(current_dir, Lumix::lengthOf(current_dir));
+		PlatformInterface::setWindow(m_window);
 
 		char data_dir_path[Lumix::MAX_PATH_LENGTH] = {};
 		checkDataDirCommandLine(data_dir_path, Lumix::lengthOf(data_dir_path));
