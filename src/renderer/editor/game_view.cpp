@@ -1,4 +1,5 @@
 #include "game_view.h"
+#include "editor/platform_interface.h"
 #include "editor/studio_app.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
@@ -27,6 +28,13 @@ struct GUIInterface : Lumix::GUISystem::Interface
 	Lumix::Pipeline* getPipeline() override { return m_game_view.m_pipeline; }
 	Lumix::Vec2 getPos() const override { return m_game_view.m_pos; }
 	Lumix::Vec2 getSize() const override { return m_game_view.m_size; }
+	
+	
+	void enableCursor(bool enable) override
+	{ 
+		m_game_view.enableIngameCursor(enable);
+	}
+
 
 	GameView& m_game_view;
 };
@@ -50,6 +58,16 @@ GameView::GameView(StudioApp& app)
 
 GameView::~GameView()
 {
+}
+
+
+void GameView::enableIngameCursor(bool enable)
+{
+	m_is_ingame_cursor = enable;
+	if (!m_is_mouse_captured) return;
+
+	SDL_ShowCursor(m_is_ingame_cursor ? 1 : 0);
+	SDL_SetRelativeMouseMode(m_is_ingame_cursor ? SDL_FALSE : SDL_TRUE);
 }
 
 
@@ -114,8 +132,8 @@ void GameView::captureMouse(bool capture)
 {
 	m_is_mouse_captured = capture;
 	m_editor->getEngine().getInputSystem().enable(m_is_mouse_captured);
-	SDL_ShowCursor(m_is_mouse_captured ? 0 : 1);
-	SDL_SetRelativeMouseMode(capture ? SDL_TRUE : SDL_FALSE);
+	SDL_ShowCursor(capture && !m_is_ingame_cursor ? 0 : 1);
+	SDL_SetRelativeMouseMode(capture && !m_is_ingame_cursor ? SDL_TRUE : SDL_FALSE);
 }
 
 
@@ -164,6 +182,17 @@ void GameView::onGui()
 			}
 			m_size.x = ImGui::GetItemRectSize().x;
 			m_size.y = ImGui::GetItemRectSize().y;
+
+			if (m_is_mouse_captured && m_is_ingame_cursor)
+			{
+				ImVec2 pos = ImGui::GetItemRectMin();
+				PlatformInterface::clipCursor((int)pos.x, (int)pos.y, (int)m_size.x, (int)m_size.y);
+			}
+			else
+			{
+				PlatformInterface::unclipCursor();
+			}
+
 			if (ImGui::Checkbox("Pause", &m_paused))
 			{
 				m_editor->getEngine().pause(m_paused);

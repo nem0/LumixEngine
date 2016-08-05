@@ -11,6 +11,9 @@ namespace Lumix
 }
 
 
+struct SDL_Window;
+
+
 namespace PlatformInterface
 {
 	struct FileInfo
@@ -39,6 +42,10 @@ namespace PlatformInterface
 	LUMIX_EDITOR_API bool dirExists(const char* path);
 	LUMIX_EDITOR_API Lumix::uint64 getLastModified(const char* file);
 	LUMIX_EDITOR_API bool makePath(const char* path);
+
+	LUMIX_EDITOR_API void setWindow(SDL_Window* window);
+	LUMIX_EDITOR_API void clipCursor(int x, int y, int w, int h);
+	LUMIX_EDITOR_API void unclipCursor();
 
 	struct Process;
 
