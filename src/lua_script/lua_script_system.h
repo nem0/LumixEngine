@@ -64,6 +64,7 @@ public:
 	virtual void insertScript(ComponentHandle cmp, int idx) = 0;
 	virtual int addScript(ComponentHandle cmp) = 0;
 	virtual void removeScript(ComponentHandle cmp, int scr_index) = 0;
+	virtual void moveScript(ComponentHandle cmp, int scr_index, bool up) = 0;
 	virtual void serializeScript(ComponentHandle cmp, int scr_index, OutputBlob& blob) = 0;
 	virtual void deserializeScript(ComponentHandle cmp, int scr_index, InputBlob& blob) = 0;
 	virtual void setPropertyValue(Lumix::ComponentHandle cmp, int scr_index, const char* name, const char* value) = 0;
