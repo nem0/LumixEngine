@@ -1431,6 +1431,18 @@ namespace Lumix
 		}
 
 
+		void moveScript(ComponentHandle cmp, int scr_index, bool up) override
+		{
+			auto* script_cmp = m_scripts[{cmp.index}];
+			if (!up && scr_index > script_cmp->m_scripts.size() - 2) return;
+			if (up && scr_index == 0) return;
+			int other = up ? scr_index - 1 : scr_index + 1;
+			ScriptInstance tmp = script_cmp->m_scripts[scr_index];
+			script_cmp->m_scripts[scr_index] = script_cmp->m_scripts[other];
+			script_cmp->m_scripts[other] = tmp;
+		}
+
+
 		void removeScript(ComponentHandle cmp, int scr_index) override
 		{
 			setScriptPath(cmp, scr_index, Path());

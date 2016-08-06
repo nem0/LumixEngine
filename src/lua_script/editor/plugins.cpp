@@ -165,6 +165,71 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 	};
 
 
+	struct MoveScriptCommand : public IEditorCommand
+	{
+		explicit MoveScriptCommand(WorldEditor& editor)
+			: blob(editor.getAllocator())
+			, scr_index(-1)
+			, cmp(INVALID_COMPONENT)
+			, up(true)
+		{
+			scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
+		}
+
+
+		explicit MoveScriptCommand(IAllocator& allocator)
+			: blob(allocator)
+			, scene(nullptr)
+			, scr_index(-1)
+			, cmp(INVALID_COMPONENT)
+			, up(true)
+		{
+		}
+
+
+		bool execute() override
+		{
+			scene->moveScript(cmp, scr_index, up);
+			return true;
+		}
+
+
+		void undo() override
+		{
+			scene->moveScript(cmp, up ? scr_index - 1 : scr_index + 1, !up);
+		}
+
+
+		void serialize(JsonSerializer& serializer) override
+		{
+			serializer.serialize("component", cmp);
+			serializer.serialize("scr_index", scr_index);
+			serializer.serialize("up", up);
+		}
+
+
+		void deserialize(JsonSerializer& serializer) override
+		{
+			serializer.deserialize("component", cmp, INVALID_COMPONENT);
+			serializer.deserialize("scr_index", scr_index, 0);
+			serializer.deserialize("up", up, false);
+		}
+
+
+		const char* getType() override { return "move_script"; }
+
+
+		bool merge(IEditorCommand& command) override { return false; }
+
+
+		OutputBlob blob;
+		LuaScriptScene* scene;
+		ComponentHandle cmp;
+		int scr_index;
+		bool up;
+	};
+
+
 	struct RemoveScriptCommand : public IEditorCommand
 	{
 		explicit RemoveScriptCommand(WorldEditor& editor)
@@ -405,6 +470,31 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 					ImGui::PopID();
 					break;
 				}
+				ImGui::SameLine();
+				if (ImGui::Button("Up"))
+				{
+					auto* cmd = LUMIX_NEW(allocator, MoveScriptCommand)(allocator);
+					cmd->cmp = cmp.handle;
+					cmd->scr_index = j;
+					cmd->scene = scene;
+					cmd->up = true;
+					editor.executeCommand(cmd);
+					ImGui::PopID();
+					break;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Down"))
+				{
+					auto* cmd = LUMIX_NEW(allocator, MoveScriptCommand)(allocator);
+					cmd->cmp = cmp.handle;
+					cmd->scr_index = j;
+					cmd->scene = scene;
+					cmd->up = false;
+					editor.executeCommand(cmd);
+					ImGui::PopID();
+					break;
+				}
+
 				if (m_app.getAssetBrowser()->resourceInput(
 						"Source", "src", buf, lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE))
 				{

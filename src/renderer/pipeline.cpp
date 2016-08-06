@@ -939,11 +939,11 @@ struct PipelineImpl : public Pipeline
 		auto scr_scene = static_cast<LuaScriptScene*>(m_scene->getUniverse().getScene(crc32("lua_script")));
 		if (!scr_scene) return false;
 		ComponentHandle camera = m_scene->getCameraInSlot(camera_slot);
-		if (camera == INVALID_COMPONENT) return false;
+		if (!isValid(camera)) return false;
 
 		Entity camera_entity = m_scene->getCameraEntity(camera);
 		ComponentHandle scr_cmp = scr_scene->getComponent(camera_entity);
-		if (scr_cmp == INVALID_COMPONENT) return false;
+		if (!isValid(scr_cmp)) return false;
 
 		bool ret = false;
 		for (int i = 0, c = scr_scene->getScriptCount(scr_cmp); i < c; ++i)
