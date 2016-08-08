@@ -11,27 +11,27 @@ namespace ImGui
 
 bool ToolbarButton(ImTextureID texture, const ImVec4& bg_color, const char* tooltip)
 {
-	auto frame_padding = ImGui::GetStyle().FramePadding;
-	ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
-	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
-	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
+	auto frame_padding = GetStyle().FramePadding;
+	PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+	PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+	PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+	PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+	PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
+	PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
 
 	bool ret = false;
-	ImGui::SameLine();
-	ImVec4 tint_color = ImGui::GetStyle().Colors[ImGuiCol_Text];
-	if (ImGui::ImageButton(texture, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), -1, bg_color, tint_color))
+	SameLine();
+	ImVec4 tint_color = GetStyle().Colors[ImGuiCol_Text];
+	if (ImageButton(texture, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), -1, bg_color, tint_color))
 	{
 		ret = true;
 	}
-	if (ImGui::IsItemHovered())
+	if (IsItemHovered())
 	{
-		ImGui::SetTooltip("%s", tooltip);
+		SetTooltip("%s", tooltip);
 	}
-	ImGui::PopStyleColor(3);
-	ImGui::PopStyleVar(3);
+	PopStyleColor(3);
+	PopStyleVar(3);
 	return ret;
 }
 
@@ -60,7 +60,7 @@ bool BeginToolbar(const char* str_id, ImVec2 screen_pos, ImVec2 size)
 
 void EndToolbar()
 {
-	auto frame_padding = ImGui::GetStyle().FramePadding;
+	auto frame_padding = GetStyle().FramePadding;
 	PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 	PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
 	PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
@@ -193,18 +193,18 @@ bool ColorPicker(float* col, bool alphabar)
     // https://github.com/ocornut/imgui/issues/346
     const float EDGE_SIZE = 200;
     const ImVec2 SV_PICKER_SIZE = ImVec2(EDGE_SIZE, EDGE_SIZE);
-    const float SPACING = ImGui::GetStyle().ItemInnerSpacing.x;
+    const float SPACING = GetStyle().ItemInnerSpacing.x;
     const float HUE_PICKER_WIDTH = 20.f;
     const float CROSSHAIR_SIZE = 7.0f;
 
     bool value_changed = false;
 
-    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    ImDrawList* draw_list = GetWindowDrawList();
 
-    ImVec2 picker_pos = ImGui::GetCursorScreenPos();
+    ImVec2 picker_pos = GetCursorScreenPos();
 
     float hue, saturation, value;
-    ImGui::ColorConvertRGBtoHSV(col[0], col[1], col[2], hue, saturation, value);
+    ColorConvertRGBtoHSV(col[0], col[1], col[2], hue, saturation, value);
 
     ImColor colors[] = { ImColor(255, 0, 0),
         ImColor(255, 255, 0),
@@ -255,8 +255,8 @@ bool ColorPicker(float* col, bool alphabar)
 
 
     ImVec4 cHueValue(1, 1, 1, 1);
-    ImGui::ColorConvertHSVtoRGB(hue, 1, 1, cHueValue.x, cHueValue.y, cHueValue.z);
-    ImU32 oHueColor = ImGui::ColorConvertFloat4ToU32(cHueValue);
+    ColorConvertHSVtoRGB(hue, 1, 1, cHueValue.x, cHueValue.y, cHueValue.z);
+    ImU32 oHueColor = ColorConvertFloat4ToU32(cHueValue);
 
     draw_list->AddRectFilledMultiColor(ImVec2(picker_pos.x, picker_pos.y),
         ImVec2(picker_pos.x + SV_PICKER_SIZE.x, picker_pos.y + SV_PICKER_SIZE.y),
@@ -284,12 +284,12 @@ bool ColorPicker(float* col, bool alphabar)
     draw_list->AddLine(
         ImVec2(p.x, p.y - CROSSHAIR_SIZE), ImVec2(p.x, p.y - 2), ImColor(255, 255, 255));
 
-    ImGui::InvisibleButton("saturation_value_selector", SV_PICKER_SIZE);
+    InvisibleButton("saturation_value_selector", SV_PICKER_SIZE);
 
-    if (ImGui::IsItemActive() && ImGui::GetIO().MouseDown[0])
+    if (IsItemActive() && GetIO().MouseDown[0])
     {
         ImVec2 mouse_pos_in_canvas = ImVec2(
-            ImGui::GetIO().MousePos.x - picker_pos.x, ImGui::GetIO().MousePos.y - picker_pos.y);
+            GetIO().MousePos.x - picker_pos.x, GetIO().MousePos.y - picker_pos.y);
 
         if (mouse_pos_in_canvas.x < 0)
             mouse_pos_in_canvas.x = 0;
@@ -306,13 +306,13 @@ bool ColorPicker(float* col, bool alphabar)
         value_changed = true;
     }
 
-    ImGui::SetCursorScreenPos(ImVec2(picker_pos.x + SPACING + SV_PICKER_SIZE.x, picker_pos.y));
-    ImGui::InvisibleButton("hue_selector", ImVec2(HUE_PICKER_WIDTH, SV_PICKER_SIZE.y));
+    SetCursorScreenPos(ImVec2(picker_pos.x + SPACING + SV_PICKER_SIZE.x, picker_pos.y));
+    InvisibleButton("hue_selector", ImVec2(HUE_PICKER_WIDTH, SV_PICKER_SIZE.y));
 
-    if (ImGui::GetIO().MouseDown[0] && (ImGui::IsItemHovered() || ImGui::IsItemActive()))
+    if (GetIO().MouseDown[0] && (IsItemHovered() || IsItemActive()))
     {
         ImVec2 mouse_pos_in_canvas = ImVec2(
-            ImGui::GetIO().MousePos.x - picker_pos.x, ImGui::GetIO().MousePos.y - picker_pos.y);
+            GetIO().MousePos.x - picker_pos.x, GetIO().MousePos.y - picker_pos.y);
 
         if (mouse_pos_in_canvas.y < 0)
             mouse_pos_in_canvas.y = 0;
@@ -325,14 +325,14 @@ bool ColorPicker(float* col, bool alphabar)
 
     if (alphabar)
     {
-        ImGui::SetCursorScreenPos(
+        SetCursorScreenPos(
             ImVec2(picker_pos.x + SPACING * 2 + HUE_PICKER_WIDTH + SV_PICKER_SIZE.x, picker_pos.y));
-        ImGui::InvisibleButton("alpha_selector", ImVec2(HUE_PICKER_WIDTH, SV_PICKER_SIZE.y));
+        InvisibleButton("alpha_selector", ImVec2(HUE_PICKER_WIDTH, SV_PICKER_SIZE.y));
 
-        if (ImGui::GetIO().MouseDown[0] && (ImGui::IsItemHovered() || ImGui::IsItemActive()))
+        if (GetIO().MouseDown[0] && (IsItemHovered() || IsItemActive()))
         {
             ImVec2 mouse_pos_in_canvas = ImVec2(
-                ImGui::GetIO().MousePos.x - picker_pos.x, ImGui::GetIO().MousePos.y - picker_pos.y);
+                GetIO().MousePos.x - picker_pos.x, GetIO().MousePos.y - picker_pos.y);
 
             if (mouse_pos_in_canvas.y < 0)
                 mouse_pos_in_canvas.y = 0;
@@ -353,13 +353,13 @@ bool ColorPicker(float* col, bool alphabar)
     col[2] = color.Value.z;
 
     bool widget_used;
-    ImGui::PushItemWidth((alphabar ? SPACING + HUE_PICKER_WIDTH : 0) + SV_PICKER_SIZE.x + SPACING +
-        HUE_PICKER_WIDTH - 2 * ImGui::GetStyle().FramePadding.x);
-    widget_used = alphabar ? ImGui::ColorEdit4("", col) : ImGui::ColorEdit3("", col);
-    ImGui::PopItemWidth();
+    PushItemWidth((alphabar ? SPACING + HUE_PICKER_WIDTH : 0) + SV_PICKER_SIZE.x + SPACING +
+        HUE_PICKER_WIDTH - 2 * GetStyle().FramePadding.x);
+    widget_used = alphabar ? ColorEdit4("", col) : ColorEdit3("", col);
+    PopItemWidth();
 
     float new_hue, new_sat, new_val;
-    ImGui::ColorConvertRGBtoHSV(col[0], col[1], col[2], new_hue, new_sat, new_val);
+    ColorConvertRGBtoHSV(col[0], col[1], col[2], new_hue, new_sat, new_val);
     if (new_hue <= 0 && hue > 0)
     {
         if (new_val <= 0 && value != new_val)
@@ -464,7 +464,7 @@ void BeginNode(ImGuiID id, ImVec2 screen_pos)
 void EndNode(ImVec2& pos)
 {
     ImDrawList* draw_list = GetWindowDrawList();
-	ImGui::SameLine();
+	SameLine();
 	float width = GetCursorScreenPos().x - node_pos.x;
 	EndGroup();
     PopItemWidth();
@@ -727,18 +727,18 @@ bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use)
 		return false;
 	}
 
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+	PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 	ImGuiWindowFlags flags = ImGuiWindowFlags_ShowBorders | ImGuiWindowFlags_Popup | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
 
 	char name[32];
 	ImFormatString(name, 20, "##popup_%08x", id);
 	float alpha = 1.0f;
 
-	bool opened = ImGui::Begin(name, NULL, size_on_first_use, alpha, flags);
+	bool opened = Begin(name, NULL, size_on_first_use, alpha, flags);
 	if (!(window->Flags & ImGuiWindowFlags_ShowBorders))
 		g.CurrentWindow->Flags &= ~ImGuiWindowFlags_ShowBorders;
 	if (!opened)
-		ImGui::EndPopup();
+		EndPopup();
 
 	return opened;
 }
@@ -755,7 +755,7 @@ void IntervalGraph(const unsigned long long* value_pairs,
 	ImGuiContext& g = *GImGui;
 	const ImGuiStyle& style = g.Style;
 
-	ImVec2 graph_size(CalcItemWidth() + (style.FramePadding.x * 2), ImGui::GetTextLineHeight());
+	ImVec2 graph_size(CalcItemWidth() + (style.FramePadding.x * 2), GetTextLineHeight());
 
 	const ImRect frame_bb(window->DC.CursorPos, window->DC.CursorPos + ImVec2(graph_size.x, graph_size.y));
 	const ImRect inner_bb(frame_bb.Min + style.FramePadding, frame_bb.Max - style.FramePadding);
@@ -804,10 +804,123 @@ void HSplitter(const char* str_id, ImVec2* size)
 	ImVec4* colors = GetStyle().Colors;
 	ImU32 color = GetColorU32(IsItemActive() || IsItemHovered() ? colors[ImGuiCol_ButtonActive] : colors[ImGuiCol_Button]);
 	win->DrawList->AddRectFilled(screen_pos, end_pos, color);
-	if (ImGui::IsItemActive())
+	if (IsItemActive())
 	{
-		size->y = ImMax(1.0f, ImGui::GetIO().MouseDelta.y + size->y);
+		size->y = ImMax(1.0f, GetIO().MouseDelta.y + size->y);
 	}
+}
+
+
+static float s_max_timeline_value;
+
+
+bool BeginTimeline(const char* str_id, float max_value)
+{
+	s_max_timeline_value = max_value;
+	return BeginChild(str_id);
+}
+
+
+static const float TIMELINE_RADIUS = 6;
+
+
+bool TimelineEvent(const char* str_id, float* values)
+{
+	ImGuiWindow* win = GetCurrentWindow();
+	const ImU32 inactive_color = ColorConvertFloat4ToU32(GImGui->Style.Colors[ImGuiCol_Button]);
+	const ImU32 active_color = ColorConvertFloat4ToU32(GImGui->Style.Colors[ImGuiCol_ButtonHovered]);
+	const ImU32 line_color = ColorConvertFloat4ToU32(GImGui->Style.Colors[ImGuiCol_ColumnActive]);
+	bool changed = false;
+	ImVec2 cursor_pos = win->DC.CursorPos;
+	
+	for (int i = 0; i < 2; ++i)
+	{
+		ImVec2 pos = cursor_pos;
+		pos.x += win->Size.x * values[i] / s_max_timeline_value + TIMELINE_RADIUS;
+		pos.y += TIMELINE_RADIUS;
+
+		SetCursorScreenPos(pos - ImVec2(TIMELINE_RADIUS, TIMELINE_RADIUS));
+		PushID(i);
+		InvisibleButton(str_id, ImVec2(2 * TIMELINE_RADIUS, 2 * TIMELINE_RADIUS));
+		if (IsItemActive() || IsItemHovered())
+		{
+			ImGui::SetTooltip("%f", values[i]);
+			ImVec2 a(pos.x, GetWindowContentRegionMin().y + win->Pos.y);
+			ImVec2 b(pos.x, GetWindowContentRegionMax().y + win->Pos.y);
+			win->DrawList->AddLine(a, b, line_color);
+		}
+		if (IsItemActive() && IsMouseDragging(0))
+		{
+			values[i] += GetIO().MouseDelta.x / win->Size.x * s_max_timeline_value;
+			changed = true;
+		}
+		PopID();
+		win->DrawList->AddCircleFilled(
+			pos, TIMELINE_RADIUS, IsItemActive() || IsItemHovered() ? active_color : inactive_color);
+	}
+	
+	ImVec2 start = cursor_pos;
+	start.x += win->Size.x * values[0] / s_max_timeline_value + 2 * TIMELINE_RADIUS;
+	start.y += TIMELINE_RADIUS * 0.5f;
+	ImVec2 end = start + ImVec2(win->Size.x * (values[1] - values[0]) / s_max_timeline_value - 2 * TIMELINE_RADIUS,
+							 TIMELINE_RADIUS);
+
+	PushID(-1);
+	SetCursorScreenPos(start);
+	InvisibleButton(str_id, end - start);
+	if (IsItemActive() && IsMouseDragging(0))
+	{
+		values[0] += GetIO().MouseDelta.x / win->Size.x * s_max_timeline_value;
+		values[1] += GetIO().MouseDelta.x / win->Size.x * s_max_timeline_value;
+		changed = true;
+	}
+	PopID();
+
+	SetCursorScreenPos(cursor_pos + ImVec2(0, GetTextLineHeightWithSpacing()));
+
+	win->DrawList->AddRectFilled(start, end, IsItemActive() || IsItemHovered() ? active_color : inactive_color);
+	
+	if (values[0] > values[1])
+	{
+		float tmp = values[0];
+		values[0] = values[1];
+		values[1] = tmp;
+	}
+	if (values[1] > s_max_timeline_value) values[1] = s_max_timeline_value;
+	if (values[0] < 0) values[0] = 0;
+	return changed;
+}
+
+
+void EndTimeline()
+{
+	ImGuiWindow* win = GetCurrentWindow();
+	
+	ImU32 color = ColorConvertFloat4ToU32(GImGui->Style.Colors[ImGuiCol_Button]);
+	ImU32 line_color = ColorConvertFloat4ToU32(GImGui->Style.Colors[ImGuiCol_Border]);
+	ImU32 text_color = ColorConvertFloat4ToU32(GImGui->Style.Colors[ImGuiCol_Text]);
+	float rounding = GImGui->Style.ScrollbarRounding;
+	ImVec2 start(GetWindowContentRegionMin().x + win->Pos.x,
+		GetWindowContentRegionMax().y - GetTextLineHeightWithSpacing() + win->Pos.y);
+	ImVec2 end = GetWindowContentRegionMax() + win->Pos;
+
+	win->DrawList->AddRectFilled(start, end, color, rounding);
+
+	const int LINE_COUNT = 5;
+	const ImVec2 text_offset(0, GetTextLineHeightWithSpacing());
+	for (int i = 0; i < LINE_COUNT; ++i)
+	{
+		ImVec2 a = GetWindowContentRegionMin() + win->Pos + ImVec2(TIMELINE_RADIUS, 0);
+		a.x += i * GetWindowContentRegionWidth() / LINE_COUNT;
+		ImVec2 b = a;
+		b.y = start.y;
+		win->DrawList->AddLine(a, b, line_color);
+		char tmp[256];
+		ImFormatString(tmp, sizeof(tmp), "%.2f", i * s_max_timeline_value / LINE_COUNT);
+		win->DrawList->AddText(b, text_color, tmp);
+	}
+
+	EndChild();
 }
 
 
