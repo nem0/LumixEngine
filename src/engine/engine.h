@@ -25,6 +25,7 @@ class InputBlob;
 class IAllocator;
 class InputSystem;
 class OutputBlob;
+class Path;
 class PathManager;
 class PluginManager;
 class ResourceManager;
@@ -83,6 +84,9 @@ public:
 	virtual ComponentUID createComponent(Universe& universe, Entity entity, ComponentType type) = 0;
 	virtual void pasteEntities(const Vec3& position, Universe& universe, InputBlob& blob, Array<Entity>& entities) = 0;
 	virtual IAllocator& getLIFOAllocator() = 0;
+	virtual class Resource* getLuaResource(int idx) const = 0;
+	virtual int addLuaResource(const Path& path, struct ResourceType type) = 0;
+	virtual void unloadLuaResource(int resource_idx) = 0;
 
 protected:
 	Engine() {}

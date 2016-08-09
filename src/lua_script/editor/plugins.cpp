@@ -554,6 +554,19 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 								editor.executeCommand(cmd);
 							}
 							break;
+						case LuaScriptScene::Property::RESOURCE:
+						{
+							ResourceType res_type = scene->getPropertyResourceType(cmp.handle, j, k);
+							if (m_app.getAssetBrowser()->resourceInput(
+									property_name, property_name, buf, lengthOf(buf), res_type))
+							{
+								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
+									scene, cmp.handle, j, property_name, buf, allocator);
+								editor.executeCommand(cmd);
+							}
+						}
+						break;
+						default: ASSERT(false); break;
 					}
 				}
 				if (auto* call = scene->beginFunctionCall(cmp.handle, j, "onGUI"))
