@@ -494,6 +494,7 @@ namespace Lumix
 			auto& prop = scene->m_current_script_instance->m_properties.emplace(scene->m_system.m_allocator);
 			prop.name_hash = prop_name_hash;
 			prop.type = (Property::Type)type;
+			prop.resource_type = resource_type;
 			if (scene->m_property_names.find(prop_name_hash) < 0)
 			{
 				scene->m_property_names.emplace(prop_name_hash, prop_name, scene->m_system.m_allocator);
