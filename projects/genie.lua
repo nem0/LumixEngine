@@ -117,44 +117,6 @@ newaction {
 	end
 }
 
-newaction {
-	trigger = "install32",
-	description = "Install 32bit in ../../LumixEngine_data/bin32",
-	execute = function()
-		local src_dir = "tmp/vs2015/bin/RelWithDebInfo/"
-		local dst_dir = "../../LumixEngine_data/bin32/"
-		
-		function installDll(filename)
-			os.copyfile(path.join(src_dir, filename .. ".dll"), path.join(dst_dir, filename .. ".dll"))
-		end
-
-		function installDllWithPdb(filename)
-			installDll(filename)
-			os.copyfile(path.join(src_dir, filename .. ".pdb"), path.join(dst_dir, filename .. ".pdb"))
-		end
-		
-		--installDllWithPdb "animation"
-		--installDllWithPdb "audio"
-		--installDllWithPdb "editor"
-		--installDllWithPdb "engine"
-		--installDllWithPdb "lua_script"
-		--installDllWithPdb "physics"
-		--installDllWithPdb "renderer"
-		installDllWithPdb "assimp"
-		
-		installDll "PhysX3CommonCHECKED_x86"
-		installDll "PhysX3CookingCHECKED_x86"
-		installDll "PhysX3CharacterKinematicCHECKED_x86"
-		installDll "PhysX3CHECKED_x86"
-		installDll "nvToolsExt32_1"
-
-		os.copyfile(path.join(src_dir, "studio.exe"), path.join(dst_dir, "studio.exe"))
-		os.copyfile(path.join(src_dir, "studio.pdb"), path.join(dst_dir, "studio.pdb"))
-		os.copyfile(path.join(src_dir, "app.exe"), path.join(dst_dir, "app.exe"))
-		os.copyfile(path.join(src_dir, "app.pdb"), path.join(dst_dir, "app.pdb"))
-	end
-}
-
 
 function strip()
 	configuration { "asmjs" }
@@ -212,13 +174,11 @@ end
 function linkLib(lib)
 	links {lib}
 
-	for _,platform_bit in ipairs({"32", "64"}) do
-		for conf,conf_dir in pairs({Debug="debug", Release="release", RelWithDebInfo="release"}) do
-			for platform,target_platform in pairs({win="windows", linux="linux", }) do
-				configuration { "x" .. platform_bit, conf, target_platform }
-					libdirs {"../external/" .. lib .. "/lib/" .. platform .. platform_bit .. "_" .. ide_dir .. "/" .. conf_dir}
-					libdirs {"../external/" .. lib .. "/dll/" .. platform .. platform_bit .. "_" .. ide_dir .. "/" .. conf_dir}
-			end
+	for conf,conf_dir in pairs({Debug="debug", Release="release", RelWithDebInfo="release"}) do
+		for platform,target_platform in pairs({win="windows", linux="linux", }) do
+			configuration { "x" .. "64", conf, target_platform }
+				libdirs {"../external/" .. lib .. "/lib/" .. platform .. "64" .. "_" .. ide_dir .. "/" .. conf_dir}
+				libdirs {"../external/" .. lib .. "/dll/" .. platform .. "64" .. "_" .. ide_dir .. "/" .. conf_dir}
 		end
 	end
 	for conf,conf_dir in pairs({Debug="debug", Release="release", RelWithDebInfo="release"}) do
@@ -239,19 +199,14 @@ function useLua()
 	includedirs { "../external/lua/include" }
 end
 
-function copyDlls(src_dir, platform_bit, platform_dir, dest_dir)
+function copyDlls(src_dir, platform_dir, dest_dir)
 	local physx_suffix
-	if platform_bit == 32 then
-		configuration { "x32", dest_dir, "windows" }
-		physx_suffix = "x86"
-	else
-		configuration { "x64", dest_dir, "windows" }
-		physx_suffix = "x64"
-	end
+	configuration { "x64", dest_dir, "windows" }
+	physx_suffix = "x64"
 
 	postbuildcommands {
 		"xcopy /Y \"$(SolutionDir)../../../external/assimp/dll/" .. platform_dir .. "_" .. ide_dir .. "/" .. src_dir .. "\\assimp.dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\nvToolsExt".. tostring(platform_bit) .. "_1.dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\nvToolsExt64_1.dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
 		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CommonCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
 		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CookingCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
 		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CharacterKinematicCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
@@ -281,9 +236,6 @@ function linkPhysX()
 		configuration { "x64", "vs20*" }
 			libdirs {"../external/physx/lib/" .. ide_dir .. "/win64"}
 			links {"PhysX3CHECKED_x64", "PhysX3CommonCHECKED_x64", "PhysX3CharacterKinematicCHECKED_x64", "PhysX3CookingCHECKED_x64" }
-		configuration { "x32", "vs20*" }
-			libdirs {"../external/physx/lib/" .. ide_dir .. "/win32"}
-			links {"PhysX3CHECKED_x86", "PhysX3CommonCHECKED_x86", "PhysX3CharacterKinematicCHECKED_x86", "PhysX3CookingCHECKED_x86"}
 		configuration { "x64", "linux-*" }
 			libdirs {"../external/physx/lib/linux64_gcc", "../external/physx/dll/linux64_gcc"}
 			links {"PhysX3CHECKED_x64", "PhysX3CommonCHECKED_x64", "PhysX3CharacterKinematicCHECKED_x64", "PhysX3CookingCHECKED_x64" }
@@ -306,8 +258,6 @@ function forceLink(name)
 		linkoptions {"-u " .. name}
 	configuration { "x64", "vs*" }
 		linkoptions {"/INCLUDE:" .. name}
-	configuration { "x32", "vs*" }
-		linkoptions {"/INCLUDE:_" .. name}
 	configuration {}
 end
 
@@ -455,7 +405,7 @@ solution "LumixEngine"
 	configuration {}
 	
 	configurations { "Debug", "Release", "RelWithDebInfo" }
-	platforms { "x32", "x64" }
+	platforms { "x64" }
 	flags { 
 		"FatalWarnings", 
 		"NoPCH", 
@@ -849,16 +799,13 @@ if build_studio then
 		defaultConfigurations()
 		
 		if _ACTION == "vs2015" then
-			copyDlls("Debug", 32, "win32", "Debug")
-			copyDlls("Debug", 64, "win64", "Debug")
-			copyDlls("Release", 32, "win32", "Release")
-			copyDlls("Release", 64, "win64", "Release")
-			copyDlls("Release", 32, "win32", "RelWithDebInfo")
-			copyDlls("Release", 64, "win64", "RelWithDebInfo")
+			copyDlls("Debug", "win64", "Debug")
+			copyDlls("Release", "win64", "Release")
+			copyDlls("Release", "win64", "RelWithDebInfo")
 		end
 		
 		if "linux-gcc" == _OPTIONS["gcc"] then
-			copyDlls("debug", 64, "linux64", "Debug")
-			copyDlls("release", 64, "linux64", "Release")
+			copyDlls("debug", "linux64", "Debug")
+			copyDlls("release", "linux64", "Release")
 		end
 end
