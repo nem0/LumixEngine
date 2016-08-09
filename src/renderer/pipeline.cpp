@@ -251,7 +251,6 @@ struct PipelineImpl : public Pipeline
 		, m_debug_line_material(nullptr)
 		, m_debug_flags(BGFX_DEBUG_TEXT)
 		, m_point_light_shadowmaps(allocator)
-		, m_materials(allocator)
 		, m_is_rendering_in_shadowmap(false)
 		, m_is_ready(false)
 		, m_debug_index_buffer(BGFX_INVALID_HANDLE)
@@ -284,7 +283,6 @@ struct PipelineImpl : public Pipeline
 
 		m_debug_line_material = static_cast<Material*>(
 			renderer.getMaterialManager().load(Lumix::Path("shaders/debug_line.mat")));
-
 
 		createParticleBuffers();
 		createCubeBuffers();
@@ -339,13 +337,6 @@ struct PipelineImpl : public Pipeline
 			luaL_unref(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 			m_lua_state = nullptr;
 		}
-
-		ResourceManagerBase& material_manager = m_renderer.getMaterialManager();
-		for (auto* material : m_materials)
-		{
-			material_manager.unload(*material);
-		}
-		m_materials.clear();
 
 		for (int i = 0; i < m_uniforms.size(); ++i)
 		{
@@ -524,12 +515,7 @@ struct PipelineImpl : public Pipeline
 			luaL_unref(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		}
 
-		ResourceManagerBase& material_manager = m_renderer.getMaterialManager();
-		for (auto* material : m_materials)
-		{
-			material_manager.unload(*material);
-		}
-		material_manager.unload(*m_debug_line_material);
+		m_debug_line_material->getResourceManager().unload(*m_debug_line_material);
 
 		destroyUniforms();
 
@@ -930,7 +916,9 @@ struct PipelineImpl : public Pipeline
 	void setMaterialDefine(int material_idx, const char* define, bool enabled)
 	{
 		auto define_idx = m_renderer.getShaderDefineIdx(define);
-		m_materials[material_idx]->setDefine(define_idx, enabled);
+		Resource* res = m_scene->getEngine().getLuaResource(material_idx);
+		Material* material = static_cast<Material*>(res);
+		material->setDefine(define_idx, enabled);
 	}
 
 
@@ -989,7 +977,8 @@ struct PipelineImpl : public Pipeline
 	{
 		PROFILE_FUNCTION();
 		if (m_applied_camera == INVALID_COMPONENT) return;
-		auto* material = m_materials[material_index];
+		Resource* res = m_scene->getEngine().getLuaResource(material_index);
+		Material* material = static_cast<Material*>(res);
 		if (!material->isReady()) return;
 
 		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
@@ -1775,7 +1764,8 @@ struct PipelineImpl : public Pipeline
 
 	void drawQuad(float left, float top, float w, float h, int material_index)
 	{
-		Material* material = m_materials[material_index];
+		Resource* res = m_scene->getEngine().getLuaResource(material_index);
+		Material* material = static_cast<Material*>(res);
 		if (!material->isReady() || !bgfx::checkAvailTransientVertexBuffer(3, m_base_vertex_decl))
 		{
 			bgfx::touch(m_bgfx_view);
@@ -2481,16 +2471,6 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	int loadMaterial(const char* path)
-	{
-		ResourceManagerBase& material_manager = m_renderer.getMaterialManager();
-		auto* material = static_cast<Material*>(material_manager.load(Lumix::Path(path)));
-
-		m_materials.push(material);
-		return m_materials.size() - 1;
-	}
-
-
 	int createUniform(const char* name)
 	{
 		bgfx::UniformHandle handle = bgfx::createUniform(name, bgfx::UniformType::Int1);
@@ -2629,7 +2609,6 @@ struct PipelineImpl : public Pipeline
 	FrameBuffer* m_default_framebuffer;
 	Array<FrameBuffer*> m_framebuffers;
 	Array<bgfx::UniformHandle> m_uniforms;
-	Array<Material*> m_materials;
 	Array<PointLightShadowmap> m_point_light_shadowmaps;
 	FrameBuffer* m_global_light_shadowmap;
 	InstanceData m_instances_data[128];
@@ -2884,7 +2863,6 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(renderDebugShapes);
 	REGISTER_FUNCTION(setFramebuffer);
 	REGISTER_FUNCTION(renderParticles);
-	REGISTER_FUNCTION(loadMaterial);
 	REGISTER_FUNCTION(executeCustomCommand);
 	REGISTER_FUNCTION(getFPS);
 	REGISTER_FUNCTION(createUniform);
