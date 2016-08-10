@@ -396,7 +396,7 @@ void* Allocator::reallocate(void* user_ptr, size_t size)
 void* Allocator::allocate_aligned(size_t size, size_t align)
 {
 #ifndef _DEBUG
-	return m_source.allocate(size);
+	return m_source.allocate_aligned(size, align);
 #else
 	void* system_ptr;
 	AllocationInfo* info;
@@ -442,7 +442,7 @@ void* Allocator::allocate_aligned(size_t size, size_t align)
 void Allocator::deallocate_aligned(void* user_ptr)
 {
 #ifndef _DEBUG
-	m_source.deallocate(user_ptr);
+	m_source.deallocate_aligned(user_ptr);
 #else
 	if (user_ptr)
 	{
