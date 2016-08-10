@@ -44,13 +44,13 @@ private:
 class LUMIX_ENGINE_API Allocator : public IAllocator
 {
 public:
-	class AllocationInfo
+	struct AllocationInfo
 	{
-	public:
-		AllocationInfo* m_previous;
-		AllocationInfo* m_next;
-		size_t m_size;
-		StackNode* m_stack_leaf;
+		AllocationInfo* previous;
+		AllocationInfo* next;
+		size_t size;
+		StackNode* stack_leaf;
+		uint16 align;
 	};
 
 public:
@@ -75,9 +75,10 @@ private:
 	inline size_t getAllocationOffset();
 	inline AllocationInfo* getAllocationInfoFromSystem(void* system_ptr);
 	inline AllocationInfo* getAllocationInfoFromUser(void* user_ptr);
-	inline void* getUserFromSystem(void* system_ptr);
-	inline void* getSystemFromUser(void* user_ptr);
+	inline uint8* getUserFromSystem(void* system_ptr, size_t align);
+	inline uint8* getSystemFromUser(void* user_ptr);
 	inline size_t getNeededMemory(size_t size);
+	inline size_t getNeededMemory(size_t size, size_t align);
 	inline void* getUserPtrFromAllocationInfo(AllocationInfo* info);
 
 private:
