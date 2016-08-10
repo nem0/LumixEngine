@@ -1777,23 +1777,23 @@ extern "C" {
 
 LUMIX_STUDIO_ENTRY(renderer)
 {
-	app.registerComponent("camera", "Camera");
-	app.registerComponent("global_light", "Global light");
-	app.registerComponentWithResource("renderable", "Mesh", MODEL_TYPE, "Source");
-	app.registerComponentWithResource("particle_emitter", "Particle emitter", MATERIAL_TYPE, "Material");
-	app.registerComponent("particle_emitter_spawn_shape", "Particle emitter - spawn shape");
-	app.registerComponent("particle_emitter_alpha", "Particle emitter - alpha");
-	app.registerComponent("particle_emitter_plane", "Particle emitter - plane");
-	app.registerComponent("particle_emitter_force", "Particle emitter - force");
-	app.registerComponent("particle_emitter_attractor", "Particle emitter - attractor");
-	app.registerComponent("particle_emitter_linear_movement", "Particle emitter - linear movement");
-	app.registerComponent("particle_emitter_random_rotation", "Particle emitter - random rotation");
-	app.registerComponent("particle_emitter_size", "Particle emitter - size");
-	app.registerComponent("point_light", "Point light");
-	app.registerComponent("decal", "Decal");
-	app.registerComponentWithResource("terrain", "Terrain", MATERIAL_TYPE, "Material");
-	app.registerComponent("bone_attachment", "Bone attachment");
-	app.registerComponent("environment_probe", "Environment probe");
+	app.registerComponent("camera", "Render/Camera");
+	app.registerComponent("global_light", "Render/Global light");
+	app.registerComponentWithResource("renderable", "Render/Mesh", MODEL_TYPE, "Source");
+	app.registerComponentWithResource("particle_emitter", "Render/Particle emitter/Emitter", MATERIAL_TYPE, "Material");
+	app.registerComponent("particle_emitter_spawn_shape", "Render/Particle emitter/Spawn shape");
+	app.registerComponent("particle_emitter_alpha", "Render/Particle emitter/Alpha");
+	app.registerComponent("particle_emitter_plane", "Render/Particle emitter/Plane");
+	app.registerComponent("particle_emitter_force", "Render/Particle emitter/Force");
+	app.registerComponent("particle_emitter_attractor", "Render/Particle emitter/Attractor");
+	app.registerComponent("particle_emitter_linear_movement", "Render/Particle emitter/Linear movement");
+	app.registerComponent("particle_emitter_random_rotation", "Render/Particle emitter/Random rotation");
+	app.registerComponent("particle_emitter_size", "Render/Particle emitter/Size");
+	app.registerComponent("point_light", "Render/Point light");
+	app.registerComponent("decal", "Render/Decal");
+	app.registerComponentWithResource("terrain", "Render/Terrain", MATERIAL_TYPE, "Material");
+	app.registerComponent("bone_attachment", "Render/Bone attachment");
+	app.registerComponent("environment_probe", "Render/Environment probe");
 
 	auto& allocator = app.getWorldEditor()->getAllocator();
 

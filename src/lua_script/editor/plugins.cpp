@@ -725,7 +725,7 @@ struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 	}
 
 
-	void onGUI(bool create_entity) override
+	void onGUI(bool create_entity, bool) override
 	{
 		ImGui::SetNextWindowSize(ImVec2(300, 300));
 		if (!ImGui::BeginMenu(getLabel())) return;

@@ -1112,7 +1112,7 @@ public:
 	float getLastTimeDelta() override { return m_last_time_delta / m_time_multiplier; }
 
 private:
-	Debug::Allocator m_allocator;
+	IAllocator& m_allocator;
 	LIFOAllocator m_lifo_allocator;
 
 	FS::FileSystem* m_file_system;

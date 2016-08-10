@@ -633,6 +633,35 @@ void PropertyGrid::showCoreProperties(const Lumix::Array<Lumix::Entity>& entitie
 }
 
 
+static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const char* filter)
+{
+	if (!node) return;
+
+	if (filter[0])
+	{
+		if (!node->plugin) showAddComponentNode(node->child, filter);
+		else if (Lumix::stristr(node->plugin->getLabel(), filter)) node->plugin->onGUI(false, true);
+		showAddComponentNode(node->next, filter);
+		return;
+	}
+
+	if (node->plugin)
+	{
+		node->plugin->onGUI(false, false);
+		showAddComponentNode(node->next, filter);
+		return;
+	}
+
+	const char* last = Lumix::reverseFind(node->label, nullptr, '/');
+	if (ImGui::BeginMenu(last ? last + 1 : node->label))
+	{
+		showAddComponentNode(node->child, filter);
+		ImGui::EndMenu();
+	}
+	showAddComponentNode(node->next, filter);
+}
+
+
 void PropertyGrid::onGUI()
 {
 	auto& ents = m_editor.getSelectedEntities();
@@ -645,12 +674,7 @@ void PropertyGrid::onGUI()
 		if (ImGui::BeginPopup("AddComponentPopup"))
 		{
 			ImGui::FilterInput("Filter", m_component_filter, sizeof(m_component_filter));
-			for (auto* plugin : m_app.getAddComponentPlugins())
-			{
-				const char* label = plugin->getLabel();
-
-				if (!m_component_filter[0] || Lumix::stristr(label, m_component_filter)) plugin->onGUI(false);
-			}
+			showAddComponentNode(m_app.getAddComponentTreeRoot().child, m_component_filter);
 			ImGui::EndPopup();
 		}
 
