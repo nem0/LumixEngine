@@ -891,12 +891,12 @@ ProfilerUIImpl::AllocationStackNode* ProfilerUIImpl::getOrCreate(AllocationStack
 void ProfilerUIImpl::addToTree(Lumix::Debug::Allocator::AllocationInfo* info)
 {
 	Lumix::Debug::StackNode* nodes[1024];
-	int count = Lumix::Debug::StackTree::getPath(info->m_stack_leaf, nodes, Lumix::lengthOf(nodes));
+	int count = Lumix::Debug::StackTree::getPath(info->stack_leaf, nodes, Lumix::lengthOf(nodes));
 
 	auto node = m_allocation_root;
 	for (int i = count - 1; i >= 0; --i)
 	{
-		node = getOrCreate(node, nodes[i], info->m_size);
+		node = getOrCreate(node, nodes[i], info->size);
 	}
 	node->m_allocations.push(info);
 }
@@ -914,7 +914,7 @@ void ProfilerUIImpl::refreshAllocations()
 	while (current_info)
 	{
 		addToTree(current_info);
-		current_info = current_info->m_next;
+		current_info = current_info->next;
 	}
 	m_main_allocator.unlock();
 }

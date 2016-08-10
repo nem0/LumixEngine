@@ -2987,7 +2987,7 @@ private:
 		float m_speed;
 	};
 
-	Debug::Allocator m_allocator;
+	IAllocator& m_allocator;
 	GoToParameters m_go_to_parameters;
 	Gizmo* m_gizmo;
 	Array<Entity> m_selected_entities;
