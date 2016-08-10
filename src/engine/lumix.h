@@ -28,9 +28,6 @@
 #define STRINGIZE( _ ) STRINGIZE_2( _ )
 
 
-#define TODO(msg) __pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : TODO: " msg))
-
-
 namespace Lumix
 {
 

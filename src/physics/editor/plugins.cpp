@@ -1043,17 +1043,17 @@ struct PhysicsGeometryPlugin : public AssetBrowser::IPlugin
 
 LUMIX_STUDIO_ENTRY(physics)
 {
-	app.registerComponent("distance_joint", "Distance Joint");
-	app.registerComponent("hinge_joint", "Hinge Joint");
-	app.registerComponent("spherical_joint", "Spherical Joint");
-	app.registerComponent("d6_joint", "D6 Joint");
-	app.registerComponent("box_rigid_actor", "Physics Box");
-	app.registerComponent("sphere_rigid_actor", "Physics Sphere");
-	app.registerComponent("capsule_rigid_actor", "Physics Capsule");
-	app.registerComponent("physical_controller", "Physics Controller");
-	app.registerComponent("mesh_rigid_actor", "Physics Mesh");
-	app.registerComponent("physical_heightfield", "Physics Heightfield");
-	app.registerComponent("ragdoll", "Ragdoll");
+	app.registerComponent("distance_joint", "Physics/Joints/Distance");
+	app.registerComponent("hinge_joint", "Physics/Joints/Hinge");
+	app.registerComponent("spherical_joint", "Physics/Joints/Spherical");
+	app.registerComponent("d6_joint", "Physics/Joints/D6");
+	app.registerComponent("box_rigid_actor", "Physics/Box");
+	app.registerComponent("sphere_rigid_actor", "Physics/Sphere");
+	app.registerComponent("capsule_rigid_actor", "Physics/Capsule");
+	app.registerComponent("physical_controller", "Physics/Controller");
+	app.registerComponent("mesh_rigid_actor", "Physics/Mesh");
+	app.registerComponent("physical_heightfield", "Physics/Heightfield");
+	app.registerComponent("ragdoll", "Physics/Ragdoll");
 
 	auto& editor = *app.getWorldEditor();
 	auto& allocator = editor.getAllocator();

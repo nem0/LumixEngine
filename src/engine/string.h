@@ -19,7 +19,7 @@ LUMIX_ENGINE_API bool toCString(int64 value, char* output, int length);
 LUMIX_ENGINE_API bool toCString(uint64 value, char* output, int length);
 LUMIX_ENGINE_API bool toCString(uint32 value, char* output, int length);
 LUMIX_ENGINE_API bool toCString(float value, char* output, int length, int after_point);
-LUMIX_ENGINE_API const char* reverseFind(const char* str, const char* from, char c);
+LUMIX_ENGINE_API const char* reverseFind(const char* begin_haystack, const char* end_haystack, char c);
 LUMIX_ENGINE_API const char* fromCString(const char* input, int length, int32* value);
 LUMIX_ENGINE_API const char* fromCString(const char* input, int length, int64* value);
 LUMIX_ENGINE_API const char* fromCString(const char* input, int length, uint32* value);

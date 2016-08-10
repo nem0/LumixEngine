@@ -45,8 +45,16 @@ public:
 	struct IAddComponentPlugin
 	{
 		virtual ~IAddComponentPlugin() {}
-		virtual void onGUI(bool create_entity) = 0;
+		virtual void onGUI(bool create_entity, bool from_filter) = 0;
 		virtual const char* getLabel() const = 0;
+	};
+
+	struct AddCmpTreeNode
+	{
+		IAddComponentPlugin* plugin = nullptr;
+		AddCmpTreeNode* child = nullptr;
+		AddCmpTreeNode* next = nullptr;
+		char label[50];
 	};
 
 	struct DragData
@@ -91,7 +99,7 @@ public:
 		const char* label,
 		Lumix::ResourceType resource_type,
 		const char* property_name) = 0;
-	virtual const Lumix::Array<IAddComponentPlugin*>& getAddComponentPlugins() const = 0;
+	virtual const AddCmpTreeNode& getAddComponentTreeRoot() const = 0;
 	virtual int getExitCode() const = 0;
 	virtual void runScript(const char* src, const char* script_name) = 0;
 	virtual const Lumix::Array<Action*>& getActions() = 0;
