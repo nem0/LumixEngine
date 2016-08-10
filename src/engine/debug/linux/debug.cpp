@@ -103,6 +103,7 @@ static const uint32 FREED_MEMORY_PATTERN = 0xDD;
 static const uint32 ALLOCATION_GUARD = 0xFDFDFDFD;
 
 
+
 Allocator::Allocator(IAllocator& source)
 	: m_source(source)
 	, m_root(nullptr)
@@ -111,15 +112,17 @@ Allocator::Allocator(IAllocator& source)
 	, m_is_fill_enabled(true)
 	, m_are_guards_enabled(true)
 {
-	m_sentinels[0].m_next = &m_sentinels[1];
-	m_sentinels[0].m_previous = nullptr;
-	m_sentinels[0].m_stack_leaf = nullptr;
-	m_sentinels[0].m_size = 0;
+	m_sentinels[0].next = &m_sentinels[1];
+	m_sentinels[0].previous = nullptr;
+	m_sentinels[0].stack_leaf = nullptr;
+	m_sentinels[0].size = 0;
+	m_sentinels[0].align = 0;
 
-	m_sentinels[1].m_next = nullptr;
-	m_sentinels[1].m_previous = &m_sentinels[0];
-	m_sentinels[1].m_stack_leaf = nullptr;
-	m_sentinels[1].m_size = 0;
+	m_sentinels[1].next = nullptr;
+	m_sentinels[1].previous = &m_sentinels[0];
+	m_sentinels[1].stack_leaf = nullptr;
+	m_sentinels[1].size = 0;
+	m_sentinels[1].align = 0;
 
 	m_root = &m_sentinels[1];
 }
@@ -130,15 +133,15 @@ Allocator::~Allocator()
 	AllocationInfo* last_sentinel = &m_sentinels[1];
 	if (m_root != last_sentinel)
 	{
-		debugOutput("Memory leaks detected!\n");
+		OutputDebugString("Memory leaks detected!\n");
 		AllocationInfo* info = m_root;
 		while (info != last_sentinel)
 		{
 			char tmp[2048];
-			sprintf(tmp, "\nAllocation size : %zu, memory %p\n", info->m_size, info + sizeof(info));
-			debugOutput(tmp);
-			m_stack_tree.printCallstack(info->m_stack_leaf);
-			info = info->m_next;
+			sprintf(tmp, "\nAllocation size : %Iu, memory %p\n", info->size, info + sizeof(info));
+			OutputDebugString(tmp);
+			m_stack_tree.printCallstack(info->stack_leaf);
+			info = info->next;
 		}
 		ASSERT(false);
 	}
@@ -167,9 +170,9 @@ void Allocator::checkGuards()
 		auto user_ptr = getUserPtrFromAllocationInfo(info);
 		void* system_ptr = getSystemFromUser(user_ptr);
 		ASSERT(*(uint32*)system_ptr == ALLOCATION_GUARD);
-		ASSERT(*(uint32*)((uint8*)user_ptr + info->m_size) == ALLOCATION_GUARD);
+		ASSERT(*(uint32*)((uint8*)user_ptr + info->size) == ALLOCATION_GUARD);
 
-		info = info->m_next;
+		info = info->next;
 	}
 }
 
@@ -182,15 +185,21 @@ size_t Allocator::getAllocationOffset()
 
 size_t Allocator::getNeededMemory(size_t size)
 {
-	return size + sizeof(AllocationInfo) +
-		   (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) << 1 : 0);
+	return size + sizeof(AllocationInfo) + (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) << 1 : 0);
+}
+
+
+size_t Allocator::getNeededMemory(size_t size, size_t align)
+{
+	return size + sizeof(AllocationInfo) + (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) << 1 : 0) +
+		align;
 }
 
 
 Allocator::AllocationInfo* Allocator::getAllocationInfoFromSystem(void* system_ptr)
 {
 	return (AllocationInfo*)(m_are_guards_enabled ? (uint8*)system_ptr + sizeof(ALLOCATION_GUARD)
-												  : system_ptr);
+		: system_ptr);
 }
 
 
@@ -206,17 +215,21 @@ Allocator::AllocationInfo* Allocator::getAllocationInfoFromUser(void* user_ptr)
 }
 
 
-void* Allocator::getUserFromSystem(void* system_ptr)
+uint8* Allocator::getUserFromSystem(void* system_ptr, size_t align)
 {
-	return (uint8*)system_ptr + (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0) +
-		   sizeof(AllocationInfo);
+	size_t diff = (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0) + sizeof(AllocationInfo);
+
+	if (align) diff += (align - diff % align) % align;
+	return (uint8*)system_ptr + diff;
 }
 
 
-void* Allocator::getSystemFromUser(void* user_ptr)
+uint8* Allocator::getSystemFromUser(void* user_ptr)
 {
-	return (uint8*)user_ptr - (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0) -
-		   sizeof(AllocationInfo);
+	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
+	size_t diff = (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0) + sizeof(AllocationInfo);
+	if (info->align) diff += (info->align - diff % info->align) % info->align;
+	return (uint8*)user_ptr - diff;
 }
 
 
@@ -232,7 +245,7 @@ void* Allocator::reallocate(void* user_ptr, size_t size)
 	if (!new_data) return nullptr;
 
 	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
-	copyMemory(new_data, user_ptr, info->m_size < size ? info->m_size : size);
+	copyMemory(new_data, user_ptr, info->size < size ? info->size : size);
 
 	deallocate(user_ptr);
 
@@ -243,19 +256,109 @@ void* Allocator::reallocate(void* user_ptr, size_t size)
 
 void* Allocator::allocate_aligned(size_t size, size_t align)
 {
+#ifndef _DEBUG
 	return m_source.allocate_aligned(size, align);
+#else
+	void* system_ptr;
+	AllocationInfo* info;
+	uint8* user_ptr;
+
+	size_t system_size = getNeededMemory(size, align);
+	{
+		MT::SpinLock lock(m_mutex);
+		system_ptr = m_source.allocate_aligned(system_size, align);
+		user_ptr = getUserFromSystem(system_ptr, align);
+		info = new (NewPlaceholder(), getAllocationInfoFromUser(user_ptr)) AllocationInfo();
+
+		info->previous = m_root->previous;
+		m_root->previous->next = info;
+
+		info->next = m_root;
+		m_root->previous = info;
+
+		m_root = info;
+
+		m_total_size += size;
+	} // because of the SpinLock
+
+	info->align = uint16(align);
+	info->stack_leaf = m_stack_tree.record();
+	info->size = size;
+	if (m_is_fill_enabled)
+	{
+		memset(user_ptr, UNINITIALIZED_MEMORY_PATTERN, size);
+	}
+
+	if (m_are_guards_enabled)
+	{
+		*(uint32*)system_ptr = ALLOCATION_GUARD;
+		*(uint32*)((uint8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) = ALLOCATION_GUARD;
+	}
+
+	return user_ptr;
+#endif
 }
 
 
-void Allocator::deallocate_aligned(void* ptr)
+void Allocator::deallocate_aligned(void* user_ptr)
 {
-	m_source.deallocate_aligned(ptr);
+#ifndef _DEBUG
+	m_source.deallocate_aligned(user_ptr);
+#else
+	if (user_ptr)
+	{
+		AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
+		void* system_ptr = getSystemFromUser(user_ptr);
+		if (m_is_fill_enabled)
+		{
+			memset(user_ptr, FREED_MEMORY_PATTERN, info->size);
+		}
+
+		if (m_are_guards_enabled)
+		{
+			ASSERT(*(uint32*)system_ptr == ALLOCATION_GUARD);
+			size_t system_size = getNeededMemory(info->size, info->align);
+			ASSERT(*(uint32*)((uint8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) == ALLOCATION_GUARD);
+		}
+
+		{
+			MT::SpinLock lock(m_mutex);
+			if (info == m_root)
+			{
+				m_root = info->next;
+			}
+			info->previous->next = info->next;
+			info->next->previous = info->previous;
+
+			m_total_size -= info->size;
+		} // because of the SpinLock
+
+		info->~AllocationInfo();
+
+		m_source.deallocate_aligned((void*)system_ptr);
+	}
+#endif
 }
 
 
-void* Allocator::reallocate_aligned(void* ptr, size_t size, size_t align)
+void* Allocator::reallocate_aligned(void* user_ptr, size_t size, size_t align)
 {
-	return m_source.reallocate_aligned(ptr, size, align);
+#ifndef _DEBUG
+	return m_source.reallocate_aligned(user_ptr, size, align);
+#else
+	if (user_ptr == nullptr) return allocate_aligned(size, align);
+	if (size == 0) return nullptr;
+
+	void* new_data = allocate_aligned(size, align);
+	if (!new_data) return nullptr;
+
+	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
+	copyMemory(new_data, user_ptr, info->size < size ? info->size : size);
+
+	deallocate_aligned(user_ptr);
+
+	return new_data;
+#endif
 }
 
 
@@ -272,20 +375,21 @@ void* Allocator::allocate(size_t size)
 		system_ptr = m_source.allocate(system_size);
 		info = new (NewPlaceholder(), getAllocationInfoFromSystem(system_ptr)) AllocationInfo();
 
-		info->m_previous = m_root->m_previous;
-		m_root->m_previous->m_next = info;
+		info->previous = m_root->previous;
+		m_root->previous->next = info;
 
-		info->m_next = m_root;
-		m_root->m_previous = info;
+		info->next = m_root;
+		m_root->previous = info;
 
 		m_root = info;
 
 		m_total_size += size;
 	} // because of the SpinLock
 
-	void* user_ptr = getUserFromSystem(system_ptr);
-	info->m_stack_leaf = m_stack_tree.record();
-	info->m_size = size;
+	void* user_ptr = getUserFromSystem(system_ptr, 0);
+	info->stack_leaf = m_stack_tree.record();
+	info->size = size;
+	info->align = 0;
 	if (m_is_fill_enabled)
 	{
 		memset(user_ptr, UNINITIALIZED_MEMORY_PATTERN, size);
@@ -312,25 +416,26 @@ void Allocator::deallocate(void* user_ptr)
 		void* system_ptr = getSystemFromUser(user_ptr);
 		if (m_is_fill_enabled)
 		{
-			memset(user_ptr, FREED_MEMORY_PATTERN, info->m_size);
+			memset(user_ptr, FREED_MEMORY_PATTERN, info->size);
 		}
 
 		if (m_are_guards_enabled)
 		{
 			ASSERT(*(uint32*)system_ptr == ALLOCATION_GUARD);
-			ASSERT(*(uint32*)((uint8*)user_ptr + info->m_size) == ALLOCATION_GUARD);
+			size_t system_size = getNeededMemory(info->size);
+			ASSERT(*(uint32*)((uint8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) == ALLOCATION_GUARD);
 		}
 
 		{
 			MT::SpinLock lock(m_mutex);
 			if (info == m_root)
 			{
-				m_root = info->m_next;
+				m_root = info->next;
 			}
-			info->m_previous->m_next = info->m_next;
-			info->m_next->m_previous = info->m_previous;
+			info->previous->next = info->next;
+			info->next->previous = info->previous;
 
-			m_total_size -= info->m_size;
+			m_total_size -= info->size;
 		} // because of the SpinLock
 
 		info->~AllocationInfo();
