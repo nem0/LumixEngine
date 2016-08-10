@@ -133,13 +133,13 @@ Allocator::~Allocator()
 	AllocationInfo* last_sentinel = &m_sentinels[1];
 	if (m_root != last_sentinel)
 	{
-		OutputDebugString("Memory leaks detected!\n");
+		debugOutput("Memory leaks detected!\n");
 		AllocationInfo* info = m_root;
 		while (info != last_sentinel)
 		{
 			char tmp[2048];
 			sprintf(tmp, "\nAllocation size : %Iu, memory %p\n", info->size, info + sizeof(info));
-			OutputDebugString(tmp);
+			debugOutput(tmp);
 			m_stack_tree.printCallstack(info->stack_leaf);
 			info = info->next;
 		}
