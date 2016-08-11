@@ -41,9 +41,6 @@
 #include <SDL_syswm.h>
 
 
-class StudioAppImpl* g_app;
-
-
 class StudioAppImpl : public StudioApp
 {
 public:
@@ -64,12 +61,15 @@ public:
 		, m_plugins(m_allocator)
 		, m_add_cmp_plugins(m_allocator)
 		, m_component_labels(m_allocator)
+		, m_current_group(0)
+		, m_confirm_load(false)
+		, m_confirm_new(false)
+		, m_confirm_exit(false)
+		, m_exit_code(0)
+		, m_allocator(m_main_allocator)
 	{
-		m_current_group = 0;
+		m_add_cmp_root.label[0] = '\0';
 		m_drag_data = { DragData::NONE, nullptr, 0 };
-		m_confirm_load = m_confirm_new = m_confirm_exit = false;
-		m_exit_code = 0;
-		g_app = this;
 		m_template_name[0] = '\0';
 		m_open_filter[0] = '\0';
 		init();
@@ -80,8 +80,56 @@ public:
 	~StudioAppImpl()
 	{
 		m_allocator.deallocate(m_drag_data.data);
-		shutdown();
-		g_app = nullptr;
+		saveSettings();
+		unloadIcons();
+
+		while (m_editor->getEngine().getFileSystem().hasWork())
+		{
+			m_editor->getEngine().getFileSystem().updateAsyncTransactions();
+		}
+
+		m_editor->newUniverse();
+
+		destroyAddCmpTreeNode(m_add_cmp_root.child);
+
+		for (auto* plugin : m_plugins)
+		{
+			LUMIX_DELETE(m_editor->getAllocator(), plugin);
+		}
+		m_plugins.clear();
+
+		for (auto* i : m_add_cmp_plugins)
+		{
+			LUMIX_DELETE(m_editor->getAllocator(), i);
+		}
+		m_add_cmp_plugins.clear();
+
+		for (auto* a : m_actions)
+		{
+			LUMIX_DELETE(m_editor->getAllocator(), a);
+		}
+		m_actions.clear();
+
+		ProfilerUI::destroy(*m_profiler_ui);
+		LUMIX_DELETE(m_allocator, m_asset_browser);
+		LUMIX_DELETE(m_allocator, m_property_grid);
+		LUMIX_DELETE(m_allocator, m_log_ui);
+		Lumix::WorldEditor::destroy(m_editor, m_allocator);
+		Lumix::Engine::destroy(m_engine, m_allocator);
+		m_engine = nullptr;
+		m_editor = nullptr;
+
+		SDL_DestroyWindow(m_window);
+		SDL_Quit();
+	}
+
+
+	void destroyAddCmpTreeNode(AddCmpTreeNode* node)
+	{
+		if (!node) return;
+		destroyAddCmpTreeNode(node->child);
+		destroyAddCmpTreeNode(node->next);
+		LUMIX_DELETE(m_allocator, node);
 	}
 
 
@@ -93,7 +141,7 @@ public:
 	}
 
 
-	const Lumix::Array<IAddComponentPlugin*>& getAddComponentPlugins() const override { return m_add_cmp_plugins; }
+	const AddCmpTreeNode& getAddComponentTreeRoot() const override { return m_add_cmp_root; }
 
 
 	void addPlugin(IAddComponentPlugin& plugin)
@@ -104,6 +152,59 @@ public:
 			++i;
 		}
 		m_add_cmp_plugins.insert(i, &plugin);
+
+		auto* node = LUMIX_NEW(m_allocator, AddCmpTreeNode);
+		Lumix::copyString(node->label, plugin.getLabel());
+		node->plugin = &plugin;
+		insertAddCmpNode(m_add_cmp_root, node);
+	}
+
+
+	void insertAddCmpNodeOrdered(AddCmpTreeNode& parent, AddCmpTreeNode* node)
+	{
+		if (!parent.child)
+		{
+			parent.child = node;
+			return;
+		}
+		if (Lumix::compareString(parent.child->label, node->label) > 0)
+		{
+			node->next = parent.child;
+			parent.child = node;
+			return;
+		}
+		auto* i = parent.child;
+		while (i->next && Lumix::compareString(i->next->label, node->label) < 0)
+		{
+			i = i->next;
+		}
+		node->next = i->next;
+		i->next = node;
+	}
+
+
+	void insertAddCmpNode(AddCmpTreeNode& parent, AddCmpTreeNode* node)
+	{
+		for (auto* i = parent.child; i; i = i->next)
+		{
+			if (!i->plugin && Lumix::startsWith(node->label, i->label))
+			{
+				insertAddCmpNode(*i, node);
+				return;
+			}
+		}
+		const char* rest = node->label + Lumix::stringLength(parent.label);
+		if (parent.label[0] != '\0') ++rest; // include '/'
+		const char* slash = Lumix::findSubstring(rest, "/");
+		if (!slash)
+		{
+			insertAddCmpNodeOrdered(parent, node);
+			return;
+		}
+		auto* new_group = LUMIX_NEW(m_allocator, AddCmpTreeNode);
+		Lumix::copyNString(new_group->label, (int)sizeof(new_group->label), node->label, int(slash - node->label));
+		insertAddCmpNodeOrdered(parent, new_group);
+		insertAddCmpNode(*new_group, node);
 	}
 
 
@@ -114,10 +215,11 @@ public:
 	{
 		struct Plugin : public IAddComponentPlugin
 		{
-			void onGUI(bool create_entity) override
+			void onGUI(bool create_entity, bool from_filter) override
 			{
 				ImGui::SetNextWindowSize(ImVec2(300, 300));
-				if (!ImGui::BeginMenu(label)) return;
+				const char* last = Lumix::reverseFind(label, nullptr, '/');
+				if (!ImGui::BeginMenu(last && !from_filter ? last + 1 : label)) return;
 				auto* desc = Lumix::PropertyRegister::getDescriptor(type, property_id);
 				char buf[Lumix::MAX_PATH_LENGTH];
 				bool create_empty = ImGui::Selectable("Empty", false);
@@ -187,9 +289,10 @@ public:
 	{
 		struct Plugin : public IAddComponentPlugin
 		{
-			void onGUI(bool create_entity) override
+			void onGUI(bool create_entity, bool from_filter) override
 			{
-				if (ImGui::Selectable(label))
+				const char* last = Lumix::reverseFind(label, nullptr, '/');
+				if (ImGui::Selectable(last && !from_filter ? last + 1 : label))
 				{
 					if (create_entity)
 					{
@@ -210,7 +313,7 @@ public:
 			Lumix::WorldEditor* editor;
 			PropertyGrid* property_grid;
 			Lumix::ComponentType type;
-			char label[50];
+			char label[64];
 		};
 
 		auto& allocator = m_editor->getAllocator();
@@ -738,18 +841,41 @@ public:
 	}
 
 
+	static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const char* filter)
+	{
+		if (!node) return;
+
+		if (filter[0])
+		{
+			if (!node->plugin) showAddComponentNode(node->child, filter);
+			else if (Lumix::stristr(node->plugin->getLabel(), filter)) node->plugin->onGUI(false, true);
+			showAddComponentNode(node->next, filter);
+			return;
+		}
+
+		if (node->plugin)
+		{
+			node->plugin->onGUI(false, false);
+			showAddComponentNode(node->next, filter);
+			return;
+		}
+
+		const char* last = Lumix::reverseFind(node->label, nullptr, '/');
+		if (ImGui::BeginMenu(last ? last + 1 : node->label))
+		{
+			showAddComponentNode(node->child, filter);
+			ImGui::EndMenu();
+		}
+		showAddComponentNode(node->next, filter);
+	}
+
+
 	void onCreateEntityWithComponentGUI()
 	{
 		doMenuItem(getAction("createEntity"), true);
 		ImGui::Separator();
 		ImGui::FilterInput("Filter", m_component_filter, sizeof(m_component_filter));
-		for (auto* plugin : m_add_cmp_plugins)
-		{
-			const char* label = plugin->getLabel();
-
-			if (!m_component_filter[0] || Lumix::stristr(label, m_component_filter)) plugin->onGUI(true);
-		}
-
+		showAddComponentNode(m_add_cmp_root.child, m_component_filter);
 	}
 
 	
@@ -1232,50 +1358,6 @@ public:
 		{
 			Lumix::g_log_warning.log("Editor") << "Could not save metadata";
 		}
-	}
-
-
-	void shutdown()
-	{
-		saveSettings();
-		unloadIcons();
-
-		while (m_editor->getEngine().getFileSystem().hasWork())
-		{
-			m_editor->getEngine().getFileSystem().updateAsyncTransactions();
-		}
-
-		m_editor->newUniverse();
-
-		for (auto* plugin : m_plugins)
-		{
-			LUMIX_DELETE(m_editor->getAllocator(), plugin);
-		}
-		m_plugins.clear();
-
-		for (auto* i : m_add_cmp_plugins)
-		{
-			LUMIX_DELETE(m_editor->getAllocator(), i);
-		}
-		m_add_cmp_plugins.clear();
-
-		for (auto* a : m_actions)
-		{
-			LUMIX_DELETE(m_editor->getAllocator(), a);
-		}
-		m_actions.clear();
-
-		ProfilerUI::destroy(*m_profiler_ui);
-		LUMIX_DELETE(m_allocator, m_asset_browser);
-		LUMIX_DELETE(m_allocator, m_property_grid);
-		LUMIX_DELETE(m_allocator, m_log_ui);
-		Lumix::WorldEditor::destroy(m_editor, m_allocator);
-		Lumix::Engine::destroy(m_engine, m_allocator);
-		m_engine = nullptr;
-		m_editor = nullptr;
-
-		SDL_DestroyWindow(m_window);
-		SDL_Quit();
 	}
 
 
@@ -1926,6 +2008,7 @@ public:
 		
 		char current_dir[Lumix::MAX_PATH_LENGTH];
 		PlatformInterface::getCurrentDirectory(current_dir, Lumix::lengthOf(current_dir));
+		PlatformInterface::setWindow(m_window);
 
 		char data_dir_path[Lumix::MAX_PATH_LENGTH] = {};
 		checkDataDirCommandLine(data_dir_path, Lumix::lengthOf(data_dir_path));
@@ -2039,7 +2122,8 @@ public:
 	}
 
 
-	Lumix::DefaultAllocator m_allocator;
+	Lumix::DefaultAllocator m_main_allocator;
+	Lumix::Debug::Allocator m_allocator;
 	Lumix::Engine* m_engine;
 	SDL_Window* m_window;
 
@@ -2048,6 +2132,7 @@ public:
 	Lumix::Array<Action*> m_toolbar_actions;
 	Lumix::Array<IPlugin*> m_plugins;
 	Lumix::Array<IAddComponentPlugin*> m_add_cmp_plugins;
+	AddCmpTreeNode m_add_cmp_root;
 	Lumix::HashMap<Lumix::ComponentType, Lumix::string> m_component_labels;
 	Lumix::WorldEditor* m_editor;
 	bool m_confirm_exit;

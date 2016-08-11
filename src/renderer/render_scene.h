@@ -61,9 +61,9 @@ enum class RenderSceneVersion : int32
 
 struct TerrainInfo
 {
+	Matrix m_world_matrix;
 	Shader* m_shader;
 	Terrain* m_terrain;
-	Matrix m_world_matrix;
 	Vec3 m_morph_const;
 	float m_size;
 	Vec3 m_min;
@@ -83,9 +83,9 @@ struct DecalInfo
 
 struct Renderable
 {
-	Pose* pose;
-	Model* model;
 	Matrix matrix;
+	Model* model;
+	Pose* pose;
 	Entity entity;
 	int64 layer_mask;
 	Mesh* meshes;
@@ -243,6 +243,7 @@ public:
 	virtual const Array<DebugPoint>& getDebugPoints() const = 0;
 
 	virtual Matrix getCameraProjection(ComponentHandle camera) = 0;
+	virtual Matrix getCameraViewProjection(ComponentHandle camera) = 0;
 	virtual Entity getCameraEntity(ComponentHandle camera) const = 0;
 	virtual ComponentHandle getCameraInSlot(const char* slot) = 0;
 	virtual float getCameraFOV(ComponentHandle camera) = 0;

@@ -165,6 +165,71 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 	};
 
 
+	struct MoveScriptCommand : public IEditorCommand
+	{
+		explicit MoveScriptCommand(WorldEditor& editor)
+			: blob(editor.getAllocator())
+			, scr_index(-1)
+			, cmp(INVALID_COMPONENT)
+			, up(true)
+		{
+			scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
+		}
+
+
+		explicit MoveScriptCommand(IAllocator& allocator)
+			: blob(allocator)
+			, scene(nullptr)
+			, scr_index(-1)
+			, cmp(INVALID_COMPONENT)
+			, up(true)
+		{
+		}
+
+
+		bool execute() override
+		{
+			scene->moveScript(cmp, scr_index, up);
+			return true;
+		}
+
+
+		void undo() override
+		{
+			scene->moveScript(cmp, up ? scr_index - 1 : scr_index + 1, !up);
+		}
+
+
+		void serialize(JsonSerializer& serializer) override
+		{
+			serializer.serialize("component", cmp);
+			serializer.serialize("scr_index", scr_index);
+			serializer.serialize("up", up);
+		}
+
+
+		void deserialize(JsonSerializer& serializer) override
+		{
+			serializer.deserialize("component", cmp, INVALID_COMPONENT);
+			serializer.deserialize("scr_index", scr_index, 0);
+			serializer.deserialize("up", up, false);
+		}
+
+
+		const char* getType() override { return "move_script"; }
+
+
+		bool merge(IEditorCommand& command) override { return false; }
+
+
+		OutputBlob blob;
+		LuaScriptScene* scene;
+		ComponentHandle cmp;
+		int scr_index;
+		bool up;
+	};
+
+
 	struct RemoveScriptCommand : public IEditorCommand
 	{
 		explicit RemoveScriptCommand(WorldEditor& editor)
@@ -405,6 +470,31 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 					ImGui::PopID();
 					break;
 				}
+				ImGui::SameLine();
+				if (ImGui::Button("Up"))
+				{
+					auto* cmd = LUMIX_NEW(allocator, MoveScriptCommand)(allocator);
+					cmd->cmp = cmp.handle;
+					cmd->scr_index = j;
+					cmd->scene = scene;
+					cmd->up = true;
+					editor.executeCommand(cmd);
+					ImGui::PopID();
+					break;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Down"))
+				{
+					auto* cmd = LUMIX_NEW(allocator, MoveScriptCommand)(allocator);
+					cmd->cmp = cmp.handle;
+					cmd->scr_index = j;
+					cmd->scene = scene;
+					cmd->up = false;
+					editor.executeCommand(cmd);
+					ImGui::PopID();
+					break;
+				}
+
 				if (m_app.getAssetBrowser()->resourceInput(
 						"Source", "src", buf, lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE))
 				{
@@ -464,6 +554,19 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 								editor.executeCommand(cmd);
 							}
 							break;
+						case LuaScriptScene::Property::RESOURCE:
+						{
+							ResourceType res_type = scene->getPropertyResourceType(cmp.handle, j, k);
+							if (m_app.getAssetBrowser()->resourceInput(
+									property_name, property_name, buf, lengthOf(buf), res_type))
+							{
+								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
+									scene, cmp.handle, j, property_name, buf, allocator);
+								editor.executeCommand(cmd);
+							}
+						}
+						break;
+						default: ASSERT(false); break;
 					}
 				}
 				if (auto* call = scene->beginFunctionCall(cmp.handle, j, "onGUI"))
@@ -622,7 +725,7 @@ struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 	}
 
 
-	void onGUI(bool create_entity) override
+	void onGUI(bool create_entity, bool) override
 	{
 		ImGui::SetNextWindowSize(ImVec2(300, 300));
 		if (!ImGui::BeginMenu(getLabel())) return;
@@ -637,13 +740,18 @@ struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 				Entity entity = editor.addEntity();
 				editor.selectEntities(&entity, 1);
 			}
-			editor.addComponent(LUA_SCRIPT_TYPE);
+			if (editor.getSelectedEntities().empty()) return;
+			Entity entity = editor.getSelectedEntities()[0];
+
+			if (!editor.getUniverse()->hasComponent(entity, LUA_SCRIPT_TYPE))
+			{
+				editor.addComponent(LUA_SCRIPT_TYPE);
+			}
 
 			auto& allocator = editor.getAllocator();
 			auto* cmd = LUMIX_NEW(allocator, PropertyGridPlugin::AddScriptCommand);
 
 			auto* script_scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_TYPE));
-			Entity entity = editor.getSelectedEntities()[0];
 			ComponentHandle cmp = editor.getUniverse()->getComponent(entity, LUA_SCRIPT_TYPE).handle;
 			cmd->scene = script_scene;
 			cmd->cmp = cmp;
@@ -651,8 +759,9 @@ struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 
 			if (!create_empty)
 			{
+				int scr_count = script_scene->getScriptCount(cmp);
 				auto* set_source_cmd = LUMIX_NEW(allocator, PropertyGridPlugin::SetPropertyCommand)(
-					script_scene, cmp, 0, "-source", buf, allocator);
+					script_scene, cmp, scr_count - 1, "-source", buf, allocator);
 				editor.executeCommand(set_source_cmd);
 			}
 

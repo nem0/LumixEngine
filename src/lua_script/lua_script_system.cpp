@@ -369,6 +369,12 @@ namespace Lumix
 		}
 
 
+		ResourceType getPropertyResourceType(ComponentHandle cmp, int scr_index, int prop_index) override
+		{
+			return m_scripts[{cmp.index}]->m_scripts[scr_index].m_properties[prop_index].resource_type;
+		}
+
+
 		Property::Type getPropertyType(ComponentHandle cmp, int scr_index, int prop_index) override
 		{
 			return m_scripts[{cmp.index}]->m_scripts[scr_index].m_properties[prop_index].type;
@@ -461,8 +467,15 @@ namespace Lumix
 		Universe& getUniverse() override { return m_universe; }
 
 
-		static void setPropertyType(lua_State* L, const char* prop_name, int type)
+		static int setPropertyType(lua_State* L)
 		{
+			const char* prop_name = LuaWrapper::checkArg<const char*>(L, 1);
+			int type = LuaWrapper::checkArg<int>(L, 2);
+			ResourceType resource_type;
+			if (type == Property::Type::RESOURCE)
+			{
+				resource_type = ResourceType(LuaWrapper::checkArg<const char*>(L, 3));
+			}
 			int tmp = lua_getglobal(L, "g_scene_lua_script");
 			ASSERT(tmp == LUA_TLIGHTUSERDATA);
 			auto* scene = LuaWrapper::toType<LuaScriptSceneImpl*>(L, -1);
@@ -472,18 +485,21 @@ namespace Lumix
 				if (prop.name_hash == prop_name_hash)
 				{
 					prop.type = (Property::Type)type;
+					prop.resource_type = resource_type;
 					lua_pop(L, -1);
-					return;
+					return 0;
 				}
 			}
 
 			auto& prop = scene->m_current_script_instance->m_properties.emplace(scene->m_system.m_allocator);
 			prop.name_hash = prop_name_hash;
 			prop.type = (Property::Type)type;
+			prop.resource_type = resource_type;
 			if (scene->m_property_names.find(prop_name_hash) < 0)
 			{
 				scene->m_property_names.emplace(prop_name_hash, prop_name, scene->m_system.m_allocator);
 			}
+			return 0;
 		}
 
 
@@ -495,6 +511,7 @@ namespace Lumix
 			LuaWrapper::createSystemVariable(L, "Editor", "BOOLEAN_PROPERTY", Property::BOOLEAN);
 			LuaWrapper::createSystemVariable(L, "Editor", "FLOAT_PROPERTY", Property::FLOAT);
 			LuaWrapper::createSystemVariable(L, "Editor", "ENTITY_PROPERTY", Property::ENTITY);
+			LuaWrapper::createSystemVariable(L, "Editor", "RESOURCE_PROPERTY", Property::RESOURCE);
 		}
 
 
@@ -847,12 +864,34 @@ namespace Lumix
 		}
 
 
+		void applyResourceProperty(ScriptInstance& script, const char* name, Property& prop, const char* value)
+		{
+			bool is_env_valid = lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment) == LUA_TTABLE;
+			ASSERT(is_env_valid);
+			lua_getfield(script.m_state, -1, name);
+			int res_idx = LuaWrapper::toType<int>(script.m_state, -1);
+			m_system.m_engine.unloadLuaResource(res_idx);
+			lua_pop(script.m_state, 1);
+
+			int new_res = m_system.m_engine.addLuaResource(Path(value), prop.resource_type);
+			lua_pushinteger(script.m_state, new_res);
+			lua_setfield(script.m_state, -2, name);
+			lua_pop(script.m_state, 1);
+		}
+
+
 		void applyProperty(ScriptInstance& script, Property& prop, const char* value)
 		{
 			if (!value) return;
 			lua_State* state = script.m_state;
 			const char* name = getPropertyName(prop.name_hash);
 			if (!name) return;
+
+			if (prop.type == Property::RESOURCE)
+			{
+				applyResourceProperty(script, name, prop, value);
+				return;
+			}
 
 			char tmp[1024];
 			copyString(tmp, name);
@@ -1170,6 +1209,13 @@ namespace Lumix
 					toCString(val.index, out, max_size);
 				}
 				break;
+				case Property::RESOURCE: 
+				{
+					int res_idx = LuaWrapper::toType<int>(scr.m_state, -1);
+					Resource* res = m_system.m_engine.getLuaResource(res_idx);
+					copyString(out, max_size, res ? res->getPath().c_str() : "");
+				}
+				break;
 				default: ASSERT(false); break;
 			}
 			lua_pop(scr.m_state, 2);
@@ -1428,6 +1474,18 @@ namespace Lumix
 			ScriptComponent* script_cmp = m_scripts[{cmp.index}];
 			script_cmp->m_scripts.emplace(m_system.m_allocator);
 			return script_cmp->m_scripts.size() - 1;
+		}
+
+
+		void moveScript(ComponentHandle cmp, int scr_index, bool up) override
+		{
+			auto* script_cmp = m_scripts[{cmp.index}];
+			if (!up && scr_index > script_cmp->m_scripts.size() - 2) return;
+			if (up && scr_index == 0) return;
+			int other = up ? scr_index - 1 : scr_index + 1;
+			ScriptInstance tmp = script_cmp->m_scripts[scr_index];
+			script_cmp->m_scripts[scr_index] = script_cmp->m_scripts[other];
+			script_cmp->m_scripts[other] = tmp;
 		}
 
 

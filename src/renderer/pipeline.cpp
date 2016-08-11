@@ -251,7 +251,6 @@ struct PipelineImpl : public Pipeline
 		, m_debug_line_material(nullptr)
 		, m_debug_flags(BGFX_DEBUG_TEXT)
 		, m_point_light_shadowmaps(allocator)
-		, m_materials(allocator)
 		, m_is_rendering_in_shadowmap(false)
 		, m_is_ready(false)
 		, m_debug_index_buffer(BGFX_INVALID_HANDLE)
@@ -284,7 +283,6 @@ struct PipelineImpl : public Pipeline
 
 		m_debug_line_material = static_cast<Material*>(
 			renderer.getMaterialManager().load(Lumix::Path("shaders/debug_line.mat")));
-
 
 		createParticleBuffers();
 		createCubeBuffers();
@@ -339,13 +337,6 @@ struct PipelineImpl : public Pipeline
 			luaL_unref(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 			m_lua_state = nullptr;
 		}
-
-		ResourceManagerBase& material_manager = m_renderer.getMaterialManager();
-		for (auto* material : m_materials)
-		{
-			material_manager.unload(*material);
-		}
-		m_materials.clear();
 
 		for (int i = 0; i < m_uniforms.size(); ++i)
 		{
@@ -524,12 +515,7 @@ struct PipelineImpl : public Pipeline
 			luaL_unref(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		}
 
-		ResourceManagerBase& material_manager = m_renderer.getMaterialManager();
-		for (auto* material : m_materials)
-		{
-			material_manager.unload(*material);
-		}
-		material_manager.unload(*m_debug_line_material);
+		m_debug_line_material->getResourceManager().unload(*m_debug_line_material);
 
 		destroyUniforms();
 
@@ -930,7 +916,9 @@ struct PipelineImpl : public Pipeline
 	void setMaterialDefine(int material_idx, const char* define, bool enabled)
 	{
 		auto define_idx = m_renderer.getShaderDefineIdx(define);
-		m_materials[material_idx]->setDefine(define_idx, enabled);
+		Resource* res = m_scene->getEngine().getLuaResource(material_idx);
+		Material* material = static_cast<Material*>(res);
+		material->setDefine(define_idx, enabled);
 	}
 
 
@@ -939,11 +927,11 @@ struct PipelineImpl : public Pipeline
 		auto scr_scene = static_cast<LuaScriptScene*>(m_scene->getUniverse().getScene(crc32("lua_script")));
 		if (!scr_scene) return false;
 		ComponentHandle camera = m_scene->getCameraInSlot(camera_slot);
-		if (camera == INVALID_COMPONENT) return false;
+		if (!isValid(camera)) return false;
 
 		Entity camera_entity = m_scene->getCameraEntity(camera);
 		ComponentHandle scr_cmp = scr_scene->getComponent(camera_entity);
-		if (scr_cmp == INVALID_COMPONENT) return false;
+		if (!isValid(scr_cmp)) return false;
 
 		bool ret = false;
 		for (int i = 0, c = scr_scene->getScriptCount(scr_cmp); i < c; ++i)
@@ -989,7 +977,8 @@ struct PipelineImpl : public Pipeline
 	{
 		PROFILE_FUNCTION();
 		if (m_applied_camera == INVALID_COMPONENT) return;
-		auto* material = m_materials[material_index];
+		Resource* res = m_scene->getEngine().getLuaResource(material_index);
+		Material* material = static_cast<Material*>(res);
 		if (!material->isReady()) return;
 
 		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
@@ -1269,6 +1258,37 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	void findExtraShadowcasterPlanes(const Vec3& light_forward, const Frustum& camera_frustum, Frustum* shadow_camera_frustum)
+	{
+		static const Frustum::Planes planes[] = {
+			Frustum::Planes::LEFT, Frustum::Planes::TOP, Frustum::Planes::RIGHT, Frustum::Planes::BOTTOM };
+		bool prev_side = dotProduct(light_forward, camera_frustum.getNormal(planes[lengthOf(planes) - 1])) < 0;
+		int out_plane = (int)Frustum::Planes::EXTRA0;
+		for (int i = 0; i < lengthOf(planes); ++i)
+		{
+			bool side = dotProduct(light_forward, camera_frustum.getNormal(planes[i])) < 0;
+			if (prev_side != side)
+			{
+				Vec3 n0 = camera_frustum.getNormal(planes[i]);
+				Vec3 n1 = camera_frustum.getNormal(planes[(i + lengthOf(planes) - 1) % lengthOf(planes)]);
+				Vec3 line_dir = crossProduct(n1, n0);
+				Vec3 n = crossProduct(light_forward, line_dir);
+				float d = -dotProduct(camera_frustum.position, n);
+				if (dotProduct(camera_frustum.center, n) + d < 0)
+				{
+					n = -n;
+					d = -dotProduct(camera_frustum.position, n);
+				}
+				shadow_camera_frustum->setPlane((Frustum::Planes)out_plane, n, d);
+				++out_plane;
+				if (out_plane >(int)Frustum::Planes::EXTRA1) break;
+			}
+			prev_side = side;
+		}
+
+	}
+
+
 	void renderShadowmap(int split_index)
 	{
 		Universe& universe = m_scene->getUniverse();
@@ -1327,7 +1347,11 @@ struct PipelineImpl : public Pipeline
 			shadow_cam_pos, -light_forward, light_mtx.getYVector(), bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
 		m_current_render_views = &m_view_idx;
 		m_current_render_view_count = 1;
+
+		findExtraShadowcasterPlanes(light_forward, camera_frustum, &shadow_camera_frustum);
+
 		renderAll(shadow_camera_frustum, false, camera_matrix.getTranslation());
+
 		m_is_rendering_in_shadowmap = false;
 	}
 
@@ -1590,7 +1614,7 @@ struct PipelineImpl : public Pipeline
 	void setActiveGlobalLightUniforms()
 	{
 		auto current_light = m_scene->getActiveGlobalLight();
-		if (current_light == INVALID_COMPONENT) return;
+		if (!isValid(current_light)) return;
 
 		Universe& universe = m_scene->getUniverse();
 		Entity light_entity = m_scene->getGlobalLightEntity(current_light);
@@ -1740,7 +1764,8 @@ struct PipelineImpl : public Pipeline
 
 	void drawQuad(float left, float top, float w, float h, int material_index)
 	{
-		Material* material = m_materials[material_index];
+		Resource* res = m_scene->getEngine().getLuaResource(material_index);
+		Material* material = static_cast<Material*>(res);
 		if (!material->isReady() || !bgfx::checkAvailTransientVertexBuffer(3, m_base_vertex_decl))
 		{
 			bgfx::touch(m_bgfx_view);
@@ -1929,8 +1954,8 @@ struct PipelineImpl : public Pipeline
 				data.mesh = &mesh;
 				data.model = &model;
 			}
-			Matrix* mtcs = (Matrix*)data.buffer->data;
-			mtcs[data.instance_count] = mtx;
+			float* mtcs = (float*)data.buffer->data;
+			copyMemory(&mtcs[data.instance_count * 16], &mtx, sizeof(mtx));
 			++data.instance_count;
 
 			if (data.instance_count == InstanceData::MAX_INSTANCE_COUNT)
@@ -2087,8 +2112,8 @@ struct PipelineImpl : public Pipeline
 			info.mesh->instance_idx = instance_idx;
 		}
 		InstanceData& data = m_instances_data[instance_idx];
-		Matrix* mtcs = (Matrix*)data.buffer->data;
-		mtcs[data.instance_count] = renderable.matrix;
+		float* mtcs = (float*)data.buffer->data;
+		copyMemory(&mtcs[data.instance_count * 16], &renderable.matrix, sizeof(renderable.matrix));
 		++data.instance_count;
 
 		if (data.instance_count == InstanceData::MAX_INSTANCE_COUNT)
@@ -2446,16 +2471,6 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	int loadMaterial(const char* path)
-	{
-		ResourceManagerBase& material_manager = m_renderer.getMaterialManager();
-		auto* material = static_cast<Material*>(material_manager.load(Lumix::Path(path)));
-
-		m_materials.push(material);
-		return m_materials.size() - 1;
-	}
-
-
 	int createUniform(const char* name)
 	{
 		bgfx::UniformHandle handle = bgfx::createUniform(name, bgfx::UniformType::Int1);
@@ -2594,7 +2609,6 @@ struct PipelineImpl : public Pipeline
 	FrameBuffer* m_default_framebuffer;
 	Array<FrameBuffer*> m_framebuffers;
 	Array<bgfx::UniformHandle> m_uniforms;
-	Array<Material*> m_materials;
 	Array<PointLightShadowmap> m_point_light_shadowmaps;
 	FrameBuffer* m_global_light_shadowmap;
 	InstanceData m_instances_data[128];
@@ -2849,7 +2863,6 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(renderDebugShapes);
 	REGISTER_FUNCTION(setFramebuffer);
 	REGISTER_FUNCTION(renderParticles);
-	REGISTER_FUNCTION(loadMaterial);
 	REGISTER_FUNCTION(executeCustomCommand);
 	REGISTER_FUNCTION(getFPS);
 	REGISTER_FUNCTION(createUniform);

@@ -175,22 +175,22 @@ bool copyString(char* destination, int length, const char* source)
 }
 
 
-const char* reverseFind(const char* str, const char* from, char c)
+const char* reverseFind(const char* begin_haystack, const char* end_haystack, char c)
 {
-	const char* tmp = from == nullptr ? nullptr : from - 1;
+	const char* tmp = end_haystack == nullptr ? nullptr : end_haystack - 1;
 	if (tmp == nullptr)
 	{
-		tmp = str;
+		tmp = begin_haystack;
 		while (*tmp)
 		{
 			++tmp;
 		}
 	}
-	while (tmp >= str && *tmp != c)
+	while (tmp >= begin_haystack && *tmp != c)
 	{
 		--tmp;
 	}
-	if (tmp >= str)
+	if (tmp >= begin_haystack)
 	{
 		return tmp;
 	}

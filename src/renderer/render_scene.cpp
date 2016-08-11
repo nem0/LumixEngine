@@ -209,6 +209,8 @@ public:
 		}
 		m_decals.clear();
 
+		m_cameras.clear();
+
 		for (auto* terrain : m_terrains)
 		{
 			LUMIX_DELETE(m_allocator, terrain);
@@ -2081,9 +2083,7 @@ public:
 	}
 
 
-	void getGrassInfos(const Frustum& frustum,
-		Array<GrassInfo>& infos,
-		ComponentHandle camera) override
+	void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentHandle camera) override
 	{
 		PROFILE_FUNCTION();
 
@@ -2182,14 +2182,10 @@ public:
 	}
 
 
-	void enableGrass(bool enabled) override
-	{
-		m_is_grass_enabled = enabled;
-	}
+	void enableGrass(bool enabled) override { m_is_grass_enabled = enabled; }
 
 
-	void
-	setGrassDensity(ComponentHandle cmp, int index, int density) override
+	void setGrassDensity(ComponentHandle cmp, int index, int density) override
 	{
 		m_terrains[{cmp.index}]->setGrassTypeDensity(index, density);
 	}
@@ -2201,8 +2197,7 @@ public:
 	}
 
 
-	void
-	setGrassGround(ComponentHandle cmp, int index, int ground) override
+	void setGrassGround(ComponentHandle cmp, int index, int ground) override
 	{
 		m_terrains[{cmp.index}]->setGrassTypeGround(index, ground);
 	}
@@ -2316,10 +2311,9 @@ public:
 					for (int i = 0, c = results[subresult_index].size(); i < c; ++i)
 					{
 						Renderable* LUMIX_RESTRICT renderable = &renderables[raw_subresults[i].index];
-						Model* LUMIX_RESTRICT model = renderable->model;
-						float squared_distance =
-							(renderable->matrix.getTranslation() - ref_point).squaredLength();
+						float squared_distance = (renderable->matrix.getTranslation() - ref_point).squaredLength();
 
+						Model* LUMIX_RESTRICT model = renderable->model;
 						LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
 						for (int j = lod.from, c = lod.to; j <= c; ++j)
 						{
@@ -2528,6 +2522,14 @@ public:
 	float getCameraFarPlane(ComponentHandle camera) override { return m_cameras[{camera.index}].far; }
 	float getCameraScreenWidth(ComponentHandle camera) override { return m_cameras[{camera.index}].screen_width; }
 	float getCameraScreenHeight(ComponentHandle camera) override { return m_cameras[{camera.index}].screen_height; }
+
+
+	Matrix getCameraViewProjection(ComponentHandle cmp) override
+	{
+		Matrix view = m_universe.getMatrix({cmp.index});
+		view.fastInverse();
+		return getCameraProjection(cmp) * view;
+	}
 
 
 	Matrix getCameraProjection(ComponentHandle cmp) override
@@ -3008,10 +3010,10 @@ public:
 		Vec3 near_center = frustum.position - frustum.direction * frustum.near_distance;
 		Vec3 far_center = frustum.position - frustum.direction * frustum.far_distance;
 
-		float width = Math::abs(
-			frustum.planes[(int)Frustum::Sides::LEFT_PLANE].d + frustum.planes[(int)Frustum::Sides::RIGHT_PLANE].d);
-		float height = Math::abs(
-			frustum.planes[(int)Frustum::Sides::TOP_PLANE].d + frustum.planes[(int)Frustum::Sides::BOTTOM_PLANE].d);
+		float width =
+			Math::abs(frustum.ds[(int)Frustum::Planes::LEFT] + frustum.ds[(int)Frustum::Planes::RIGHT]);
+		float height =
+			Math::abs(frustum.ds[(int)Frustum::Planes::TOP] + frustum.ds[(int)Frustum::Planes::BOTTOM]);
 
 		Vec3 up = frustum.up.normalized() * height * 0.5f;
 		Vec3 right = crossProduct(frustum.direction, frustum.up) * width * 0.5f;
@@ -4312,6 +4314,9 @@ void RenderScene::registerLuaAPI(lua_State* L)
 		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
 		} while(false) \
 
+	REGISTER_FUNCTION(getCameraViewProjection);
+	REGISTER_FUNCTION(getGlobalLightEntity);
+	REGISTER_FUNCTION(getActiveGlobalLight);
 	REGISTER_FUNCTION(getCameraSlot);
 	REGISTER_FUNCTION(getCameraComponent);
 	REGISTER_FUNCTION(getRenderableComponent);

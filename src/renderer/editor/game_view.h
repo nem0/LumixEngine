@@ -29,6 +29,7 @@ public:
 	void setScene(Lumix::RenderScene* scene);
 	bool isMouseCaptured() const { return m_is_mouse_captured; }
 	void captureMouse(bool capture);
+	void enableIngameCursor(bool enable);
 
 public:
 	bool m_is_opened;
@@ -38,16 +39,17 @@ private:
 	void onUniverseDestroyed();
 
 private:
-	bool m_is_mouse_captured;
 	Lumix::Pipeline* m_pipeline;
 	Lumix::WorldEditor* m_editor;
-	bool m_is_mouse_hovering_window;
 	float m_time_multiplier;
-	bool m_paused;
-	bool m_is_opengl;
 	StudioApp& m_studio_app;
 	Lumix::Vec2 m_pos;
 	Lumix::Vec2 m_size;
 	bgfx::TextureHandle m_texture_handle;
 	struct GUIInterface* m_gui_interface;
+	bool m_is_mouse_captured;
+	bool m_is_mouse_hovering_window;
+	bool m_is_ingame_cursor;
+	bool m_paused;
+	bool m_is_opengl;
 };

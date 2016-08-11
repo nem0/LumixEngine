@@ -25,7 +25,7 @@ namespace Lumix
 {
 
 
-static const int GRASS_QUAD_SIZE = 10;
+static const float  GRASS_QUAD_SIZE = 10.0f;
 static const float GRASS_QUAD_RADIUS = GRASS_QUAD_SIZE * 0.7072f;
 static const int GRID_SIZE = 16;
 static const int COPY_COUNT = 50;
@@ -188,7 +188,6 @@ Terrain::Terrain(Renderer& renderer, Entity entity, RenderScene& scene, IAllocat
 	, m_grass_quads(m_allocator)
 	, m_last_camera_position(m_allocator)
 	, m_grass_types(m_allocator)
-	, m_free_grass_quads(m_allocator)
 	, m_renderer(renderer)
 	, m_vertices_handle(BGFX_INVALID_HANDLE)
 	, m_indices_handle(BGFX_INVALID_HANDLE)
@@ -226,10 +225,6 @@ Terrain::~Terrain()
 		{
 			LUMIX_DELETE(m_allocator, quads[i]);
 		}
-	}
-	for (int i = 0; i < m_free_grass_quads.size(); ++i)
-	{
-		LUMIX_DELETE(m_allocator, m_free_grass_quads[i]);
 	}
 }
 
@@ -374,11 +369,11 @@ void Terrain::forceGrassUpdate()
 	for (int i = 0; i < m_grass_quads.size(); ++i)
 	{
 		Array<GrassQuad*>& quads = m_grass_quads.at(i);
-		while(!quads.empty())
+		for (GrassQuad* quad : quads)
 		{
-			m_free_grass_quads.push(quads.back());
-			quads.pop();
+			LUMIX_DELETE(m_allocator, quad);
 		}
+		quads.clear();
 	}
 }
 
@@ -394,32 +389,37 @@ Array<Terrain::GrassQuad*>& Terrain::getQuads(ComponentHandle camera)
 }
 
 
-void Terrain::generateGrassTypeQuad(GrassPatch& patch,
-									const Matrix& terrain_matrix,
-									float quad_x,
-									float quad_z)
+void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_matrix, float quad_x, float quad_z)
 {
-	if (!patch.m_type->m_grass_model || !patch.m_type->m_grass_model->isReady())
-		return;
+	ASSERT(quad_x >= 0);
+	ASSERT(quad_z >= 0);
+	ASSERT(!m_splatmap->data.empty());
+	ASSERT(m_splatmap->bytes_per_pixel == 4);
 
+	PROFILE_FUNCTION();
+	
+	const float DIV255 = 1 / 255.0f;
 	Texture* splat_map = m_splatmap;
 	float step = GRASS_QUAD_SIZE / (float)patch.m_type->m_density;
 
-	for (float dx = 0; dx < GRASS_QUAD_SIZE; dx += step)
+	float quad_width = Math::minimum(GRASS_QUAD_SIZE, splat_map->width - quad_x);
+	float quad_height = Math::minimum(GRASS_QUAD_SIZE, splat_map->height - quad_z);
+	float tx_step = splat_map->width / (m_width * m_scale.x);
+	float base_tx = tx_step * quad_x;
+
+	for (float dz = 0; dz < quad_height; dz += step)
 	{
-		for (float dz = 0; dz < GRASS_QUAD_SIZE; dz += step)
+		int y_offset = int(splat_map->height * (quad_z + dz) / (m_height * m_scale.x)) * splat_map->width;
+		uint32* splat_data = (uint32*)&splat_map->data[y_offset];
+		for (float dx = 0; dx < quad_width; dx += step)
 		{
-			uint32 pixel_value = splat_map->getPixelNearest(
-				int(splat_map->width * (quad_x + dx) /
-					(m_width * m_scale.x)),
-				int(splat_map->height * (quad_z + dz) /
-					(m_height * m_scale.x)));
+			int tx = int(base_tx + tx_step * dx);
+			uint32 pixel_value = *(uint32*)&splat_data[tx];
 
 			int ground_index = pixel_value & 0xff;
-			int weight = (pixel_value >> 8) & 0xff;
-			uint8 count = ground_index == patch.m_type->m_ground ? weight : 0;
-			float density = count / 255.0f;
+			if (ground_index != patch.m_type->m_ground) continue;
 
+			float density = ((pixel_value >> 8) & 0xff) * DIV255;
 			if (density < 0.25f) continue;
 
 			Matrix& grass_mtx = patch.m_matrices.emplace();
@@ -438,41 +438,29 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch,
 void Terrain::updateGrass(ComponentHandle camera)
 {
 	PROFILE_FUNCTION();
-	if (!m_splatmap)
-		return;
-
-	Array<GrassQuad*>& quads = getQuads(camera);
-
-	if (m_free_grass_quads.size() + quads.size() < m_grass_distance * m_grass_distance)
-	{
-		int new_count = m_grass_distance * m_grass_distance - quads.size();
-		for (int i = 0; i < new_count; ++i)
-		{
-			m_free_grass_quads.push(LUMIX_NEW(m_allocator, GrassQuad)(m_allocator));
-		}
-	}
+	if (!m_splatmap) return;
 
 	Universe& universe = m_scene.getUniverse();
 	Entity camera_entity = m_scene.getCameraEntity(camera);
 	Vec3 camera_pos = universe.getPosition(camera_entity);
 
-	if ((m_last_camera_position[camera] - camera_pos).length() <= FLT_MIN && !m_force_grass_update)
-		return;
+	if ((m_last_camera_position[camera] - camera_pos).length() <= FLT_MIN && !m_force_grass_update) return;
 	m_last_camera_position[camera] = camera_pos;
 
 	m_force_grass_update = false;
-	Matrix mtx = universe.getMatrix(m_entity);
-	Matrix inv_mtx = mtx;
+	Matrix terrain_mtx = universe.getMatrix(m_entity);
+	Matrix inv_mtx = terrain_mtx;
 	inv_mtx.fastInverse();
 	Vec3 local_camera_pos = inv_mtx.transform(camera_pos);
-	float cx = (int)(local_camera_pos.x / (GRASS_QUAD_SIZE)) * (float)GRASS_QUAD_SIZE;
-	float cz = (int)(local_camera_pos.z / (GRASS_QUAD_SIZE)) * (float)GRASS_QUAD_SIZE;
+	float cx = (int)(local_camera_pos.x / (GRASS_QUAD_SIZE)) * GRASS_QUAD_SIZE;
+	float cz = (int)(local_camera_pos.z / (GRASS_QUAD_SIZE)) * GRASS_QUAD_SIZE;
 	float from_quad_x = cx - (m_grass_distance >> 1) * GRASS_QUAD_SIZE;
 	float from_quad_z = cz - (m_grass_distance >> 1) * GRASS_QUAD_SIZE;
 	float to_quad_x = cx + (m_grass_distance >> 1) * GRASS_QUAD_SIZE;
 	float to_quad_z = cz + (m_grass_distance >> 1) * GRASS_QUAD_SIZE;
 
 	float old_bounds[4] = {FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX};
+	Array<GrassQuad*>& quads = getQuads(camera);
 	for (int i = quads.size() - 1; i >= 0; --i)
 	{
 		GrassQuad* quad = quads[i];
@@ -483,7 +471,7 @@ void Terrain::updateGrass(ComponentHandle camera)
 		if (quad->pos.x < from_quad_x || quad->pos.x > to_quad_x || quad->pos.z < from_quad_z ||
 			quad->pos.z > to_quad_z)
 		{
-			m_free_grass_quads.push(quads[i]);
+			LUMIX_DELETE(m_allocator, quads[i]);
 			quads.eraseFast(i);
 		}
 	}
@@ -491,6 +479,7 @@ void Terrain::updateGrass(ComponentHandle camera)
 	from_quad_x = Math::maximum(0.0f, from_quad_x);
 	from_quad_z = Math::maximum(0.0f, from_quad_z);
 
+	int old_quad_size = quads.size();
 	for (float quad_z = from_quad_z; quad_z <= to_quad_z; quad_z += GRASS_QUAD_SIZE)
 	{
 		for (float quad_x = from_quad_x; quad_x <= to_quad_x; quad_x += GRASS_QUAD_SIZE)
@@ -499,20 +488,12 @@ void Terrain::updateGrass(ComponentHandle camera)
 				quad_z <= old_bounds[3])
 				continue;
 
-			GrassQuad* quad = nullptr;
-			if (!m_free_grass_quads.empty())
-			{
-				quad = m_free_grass_quads.back();
-				m_free_grass_quads.pop();
-			}
-			else
-			{
-				quad = LUMIX_NEW(m_allocator, GrassQuad)(m_allocator);
-			}
+			PROFILE_BLOCK("generate quad");
+			GrassQuad* quad = LUMIX_NEW(m_allocator, GrassQuad)(m_allocator);
 			quads.push(quad);
 			quad->pos.x = quad_x;
 			quad->pos.z = quad_z;
-			quad->m_patches.clear();
+			quad->m_patches.reserve(m_grass_types.size());
 			srand((int)quad_x + (int)quad_z * m_grass_distance);
 
 			float min_y = FLT_MAX;
@@ -522,10 +503,9 @@ void Terrain::updateGrass(ComponentHandle camera)
 				Model* model = grass_type->m_grass_model;
 				if (!model || !model->isReady()) continue;
 				GrassPatch& patch = quad->m_patches.emplace(m_allocator);
-				patch.m_matrices.clear();
 				patch.m_type = grass_type;
 
-				generateGrassTypeQuad(patch, mtx, quad_x, quad_z);
+				generateGrassTypeQuad(patch, terrain_mtx, quad_x, quad_z);
 				for (auto mtx : patch.m_matrices)
 				{
 					min_y = Math::minimum(mtx.getTranslation().y, min_y);
@@ -534,7 +514,7 @@ void Terrain::updateGrass(ComponentHandle camera)
 			}
 
 			quad->pos.y = (max_y + min_y) * 0.5f;
-			quad->radius = Math::maximum((max_y - min_y) * 0.5f, (float)GRASS_QUAD_SIZE) * 1.42f;
+			quad->radius = Math::maximum((max_y - min_y) * 0.5f, GRASS_QUAD_SIZE) * Math::SQRT2;
 
 		}
 	}
@@ -707,10 +687,11 @@ Vec3 Terrain::getNormal(float x, float z)
 	
 float Terrain::getHeight(float x, float z) const
 {
-	int int_x = (int)(x / m_scale.x);
-	int int_z = (int)(z / m_scale.x);
-	float dec_x = (x - (int_x * m_scale.x)) / m_scale.x;
-	float dec_z = (z - (int_z * m_scale.x)) / m_scale.x;
+	float inv_scale = 1.0f / m_scale.x;
+	int int_x = (int)(x * inv_scale);
+	int int_z = (int)(z * inv_scale);
+	float dec_x = (x - (int_x * m_scale.x)) * inv_scale;
+	float dec_z = (z - (int_z * m_scale.x)) * inv_scale;
 	if (dec_z == 0 && dec_x == 0)
 	{
 		return getHeight(int_x, int_z);
@@ -734,19 +715,19 @@ float Terrain::getHeight(float x, float z) const
 
 float Terrain::getHeight(int x, int z) const
 {
+	const float DIV64K = 1.0f / 65535.0f;
+	const float DIV255 = 1.0f / 255.0f;
 	if (!m_heightmap) return 0;
 
-	int texture_x = x;
-	int texture_y = z;
 	Texture* t = m_heightmap;
-	int idx = Math::clamp(texture_x, 0, m_width) + Math::clamp(texture_y, 0, m_height) * m_width;
+	int idx = Math::clamp(x, 0, m_width) + Math::clamp(z, 0, m_height) * m_width;
 	if (t->bytes_per_pixel == 2)
 	{
-		return m_scale.y / 65535.0f * ((uint16*)t->getData())[idx];
+		return m_scale.y * DIV64K * ((uint16*)t->getData())[idx];
 	}
 	else if(t->bytes_per_pixel == 4)
 	{
-		return ((m_scale.y / 255.0f) * ((uint8*)t->getData())[idx * 4]);
+		return ((m_scale.y * DIV255) * ((uint8*)t->getData())[idx * 4]);
 	}
 	else
 	{

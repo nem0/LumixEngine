@@ -107,7 +107,9 @@ namespace Lumix
 
 	void ResourceManagerBase::unload(Resource& resource)
 	{
-		if(0 == resource.remRef())
+		int new_ref_count = resource.remRef();
+		ASSERT(new_ref_count >= 0);
+		if(new_ref_count == 0)
 		{
 			resource.doUnload();
 		}

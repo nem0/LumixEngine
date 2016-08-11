@@ -85,6 +85,8 @@ public:
 		: m_allocator(allocator)
 		, m_prefab_resource_manager(m_allocator)
 		, m_resource_manager(m_allocator)
+		, m_lua_resources(m_allocator)
+		, m_last_lua_resource_idx(-1)
 		, m_mtjd_manager(nullptr)
 		, m_fps(0)
 		, m_is_game_running(false)
@@ -361,6 +363,17 @@ public:
 	}
 
 
+	static int LUA_loadResource(EngineImpl* engine, const char* path, const char* type)
+	{
+		ResourceManagerBase* res_manager = engine->getResourceManager().get(ResourceType(type));
+		if (!res_manager) return -1;
+		Resource* res = res_manager->load(Path(path));
+		++engine->m_last_lua_resource_idx;
+		engine->m_lua_resources.insert(engine->m_last_lua_resource_idx, res);
+		return engine->m_last_lua_resource_idx;
+	}
+
+
 	static void LUA_setEntityLocalRotation(IScene* hierarchy,
 		Entity entity,
 		Vec3 axis,
@@ -395,6 +408,12 @@ public:
 	{
 		engine->getInputSystem().addAction(
 			action, Lumix::InputSystem::InputType(type), key, controller_id);
+	}
+
+
+	static Vec4 LUA_multMatrixVec(const Matrix& m, const Vec4& v)
+	{
+		return m * v;
 	}
 
 
@@ -465,6 +484,7 @@ public:
 			LuaWrapper::createSystemFunction(m_state, "Engine", #name, \
 				&LuaWrapper::wrap<decltype(&LUA_##name), LUA_##name>); \
 
+		REGISTER_FUNCTION(loadResource);
 		REGISTER_FUNCTION(createComponent);
 		REGISTER_FUNCTION(createEntity);
 		REGISTER_FUNCTION(setEntityPosition);
@@ -485,6 +505,7 @@ public:
 		REGISTER_FUNCTION(unloadPrefab);
 		REGISTER_FUNCTION(getComponent);
 		REGISTER_FUNCTION(getComponentType);
+		REGISTER_FUNCTION(multMatrixVec);
 
 		#undef REGISTER_FUNCTION
 
@@ -589,6 +610,11 @@ public:
 
 	~EngineImpl()
 	{
+		for (Resource* res : m_lua_resources)
+		{
+			res->getResourceManager().unload(*res);
+		}
+
 		PropertyRegister::shutdown();
 		Timer::destroy(m_timer);
 		Timer::destroy(m_fps_timer);
@@ -1030,6 +1056,34 @@ public:
 	}
 
 
+	void unloadLuaResource(int resource_idx) override
+	{
+		if (resource_idx < 0) return;
+		Resource* res = m_lua_resources[resource_idx];
+		m_lua_resources.erase(resource_idx);
+		res->getResourceManager().unload(*res);
+	}
+
+
+	int addLuaResource(const Path& path, ResourceType type) override
+	{
+		ResourceManagerBase* manager = m_resource_manager.get(type);
+		if (!manager) return -1;
+		Resource* res = manager->load(path);
+		++m_last_lua_resource_idx;
+		m_lua_resources.insert(m_last_lua_resource_idx, res);
+		return m_last_lua_resource_idx;
+	}
+
+
+	Resource* getLuaResource(int idx) const override
+	{
+		auto iter = m_lua_resources.find(idx);
+		if (iter.isValid()) return iter.value();
+		return nullptr;
+	}
+
+
 	IAllocator& getLIFOAllocator() override
 	{
 		return m_lifo_allocator;
@@ -1058,7 +1112,7 @@ public:
 	float getLastTimeDelta() override { return m_last_time_delta / m_time_multiplier; }
 
 private:
-	Debug::Allocator m_allocator;
+	IAllocator& m_allocator;
 	LIFOAllocator m_lifo_allocator;
 
 	FS::FileSystem* m_file_system;
@@ -1085,6 +1139,8 @@ private:
 	PlatformData m_platform_data;
 	PathManager m_path_manager;
 	lua_State* m_state;
+	HashMap<int, Resource*> m_lua_resources;
+	int m_last_lua_resource_idx;
 
 private:
 	void operator=(const EngineImpl&);

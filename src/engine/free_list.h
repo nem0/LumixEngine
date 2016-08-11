@@ -12,7 +12,7 @@ namespace Lumix
 		explicit FreeList(IAllocator& allocator)
 			: m_allocator(allocator)
 		{
-			m_heap = static_cast<T*>(allocator.allocate(sizeof(T) * chunk_size));
+			m_heap = static_cast<T*>(allocator.allocate_aligned(sizeof(T) * chunk_size, ALIGN_OF(T)));
 			m_pool_index = chunk_size;
 
 			for (int32 i = 0; i < chunk_size; i++)
@@ -23,7 +23,7 @@ namespace Lumix
 
 		~FreeList()
 		{
-			m_allocator.deallocate(m_heap);
+			m_allocator.deallocate_aligned(m_heap);
 		}
 
 		void* allocate(size_t size) override
@@ -46,8 +46,9 @@ namespace Lumix
 
 		void* allocate_aligned(size_t size, size_t align) override
 		{
-			ASSERT(size <= ALIGN_OF(T));
-			return allocate(size);
+			void* ptr = allocate(size);
+			ASSERT((uintptr)ptr % align == 0);
+			return ptr;
 		}
 
 

@@ -1,9 +1,10 @@
 #pragma once
 
 
-#include "engine/path.h"
-#include "engine/string.h"
 #include "engine/iplugin.h"
+#include "engine/path.h"
+#include "engine/resource.h"
+#include "engine/string.h"
 
 
 struct lua_State;
@@ -26,6 +27,7 @@ public:
 			BOOLEAN,
 			FLOAT,
 			ENTITY,
+			RESOURCE,
 			ANY
 		};
 
@@ -36,6 +38,7 @@ public:
 
 		uint32 name_hash;
 		Type type;
+		ResourceType resource_type;
 		string stored_value;
 	};
 
@@ -64,6 +67,7 @@ public:
 	virtual void insertScript(ComponentHandle cmp, int idx) = 0;
 	virtual int addScript(ComponentHandle cmp) = 0;
 	virtual void removeScript(ComponentHandle cmp, int scr_index) = 0;
+	virtual void moveScript(ComponentHandle cmp, int scr_index, bool up) = 0;
 	virtual void serializeScript(ComponentHandle cmp, int scr_index, OutputBlob& blob) = 0;
 	virtual void deserializeScript(ComponentHandle cmp, int scr_index, InputBlob& blob) = 0;
 	virtual void setPropertyValue(Lumix::ComponentHandle cmp, int scr_index, const char* name, const char* value) = 0;
@@ -71,6 +75,7 @@ public:
 	virtual int getPropertyCount(ComponentHandle cmp, int scr_index) = 0;
 	virtual const char* getPropertyName(ComponentHandle cmp, int scr_index, int prop_index) = 0;
 	virtual Property::Type getPropertyType(ComponentHandle cmp, int scr_index, int prop_index) = 0;
+	virtual ResourceType getPropertyResourceType(ComponentHandle cmp, int scr_index, int prop_index) = 0;
 	virtual void getScriptData(ComponentHandle cmp, OutputBlob& blob) = 0;
 	virtual void setScriptData(ComponentHandle cmp, InputBlob& blob) = 0;
 };

@@ -42,6 +42,12 @@ namespace Lumix
 	}
 
 
+	LUMIX_FORCE_INLINE int f4MoveMask(float4 a)
+	{
+		return _mm_movemask_ps(a);
+	}
+
+
 	LUMIX_FORCE_INLINE float4 f4Add(float4 a, float4 b)
 	{
 		return _mm_add_ps(a, b);
@@ -126,6 +132,15 @@ namespace Lumix
 	}
 
 
+	LUMIX_FORCE_INLINE int f4MoveMask(float4 a)
+	{
+		return (a.w < 0 ? (1 << 3) : 0) | 
+			(a.z < 0 ? (1 << 2) : 0) | 
+			(a.y < 0 ? (1 << 1) : 0) | 
+			(a.x < 0 ? 1 : 0);
+	}
+
+
 	LUMIX_FORCE_INLINE float4 f4Add(float4 a, float4 b)
 	{
 		return{
@@ -184,10 +199,10 @@ namespace Lumix
 	LUMIX_FORCE_INLINE float4 f4Sqrt(float4 a)
 	{
 		return{
-			sqrt(a.x),
-			sqrt(a.y),
-			sqrt(a.z),
-			sqrt(a.w)
+			(float)sqrt(a.x),
+			(float)sqrt(a.y),
+			(float)sqrt(a.z),
+			(float)sqrt(a.w)
 		};
 	}
 
@@ -195,10 +210,10 @@ namespace Lumix
 	LUMIX_FORCE_INLINE float4 f4Rsqrt(float4 a)
 	{
 		return{
-			1 / sqrt(a.x),
-			1 / sqrt(a.y),
-			1 / sqrt(a.z),
-			1 / sqrt(a.w)
+			1 / (float)sqrt(a.x),
+			1 / (float)sqrt(a.y),
+			1 / (float)sqrt(a.z),
+			1 / (float)sqrt(a.w)
 		};
 	}
 
