@@ -1,6 +1,8 @@
 #include "engine/blob.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
+#include "engine/debug/debug.h"
+#include "engine/engine.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/file_system.h"
@@ -11,28 +13,49 @@
 #include "engine/lua_wrapper.h"
 #include "engine/mt/thread.h"
 #include "engine/path_utils.h"
+#include "engine/plugin_manager.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/system.h"
 #include "engine/timer.h"
-#include "engine/debug/debug.h"
-#include "engine/engine.h"
-#include "engine/plugin_manager.h"
+#include "engine/universe/universe.h"
+#include "gui/gui_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
-#include "engine/universe/universe.h"
 #include <cstdio>
 #ifdef _MSC_VER
 	#include <windows.h>
 #endif
 
 
+struct GUIInterface : Lumix::GUISystem::Interface
+{
+	GUIInterface()
+	{
+	}
+
+	Lumix::Pipeline* getPipeline() override { return pipeline; }
+	Lumix::Vec2 getPos() const override { return Lumix::Vec2(0, 0); }
+	Lumix::Vec2 getSize() const override { return size; }
+
+
+	void enableCursor(bool enable) override
+	{
+	}
+
+
+	Lumix::Pipeline* pipeline;
+	Lumix::Vec2 size;
+};
+
+
 class App
 {
 public:
 	App()
+		: m_allocator(m_main_allocator)
 	{
 		m_universe = nullptr;
 		m_exit_code = 0;
@@ -178,6 +201,7 @@ public:
 		m_engine->getPluginManager().load("navigation");
 		m_engine->getPluginManager().load("lua_script");
 		m_engine->getPluginManager().load("physics");
+		m_engine->getPluginManager().load("gui");
 		m_engine->getInputSystem().enable(true);
 		Lumix::Renderer* renderer = static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 		m_pipeline = Lumix::Pipeline::create(*renderer, Lumix::Path(m_pipeline_path), m_engine->getAllocator());
@@ -196,6 +220,12 @@ public:
 
 		registerLuaAPI();
 
+		m_gui_interface = LUMIX_NEW(m_allocator, GUIInterface);
+		auto* gui_system = static_cast<Lumix::GUISystem*>(m_engine->getPluginManager().getPlugin("gui"));
+		m_gui_interface->pipeline = m_pipeline;
+
+		gui_system->setInterface(m_gui_interface);
+		
 		while (ShowCursor(false) >= 0);
 		onResize();
 	}
@@ -284,6 +314,10 @@ public:
 
 	void shutdown()
 	{
+		auto* gui_system = static_cast<Lumix::GUISystem*>(m_engine->getPluginManager().getPlugin("gui"));
+		gui_system->setInterface(nullptr);
+		LUMIX_DELETE(m_allocator, m_gui_interface);
+
 		m_engine->destroyUniverse(*m_universe);
 		Lumix::FS::FileSystem::destroy(m_file_system);
 		LUMIX_DELETE(m_allocator, m_disk_file_device);
@@ -391,7 +425,8 @@ public:
 
 
 private:
-	Lumix::DefaultAllocator m_allocator;
+	Lumix::DefaultAllocator m_main_allocator;
+	Lumix::Debug::Allocator m_allocator;
 	Lumix::Engine* m_engine;
 	Lumix::Universe* m_universe;
 	Lumix::Pipeline* m_pipeline;
@@ -400,6 +435,7 @@ private:
 	Lumix::FS::DiskFileDevice* m_disk_file_device;
 	Lumix::FS::PackFileDevice* m_pack_file_device;
 	Lumix::Timer* m_frame_timer;
+	GUIInterface* m_gui_interface;
 	bool m_finished;
 	int m_exit_code;
 	char m_startup_script_path[Lumix::MAX_PATH_LENGTH];
