@@ -56,13 +56,14 @@ class App
 public:
 	App()
 		: m_allocator(m_main_allocator)
+		, m_window_mode(false)
+		, m_universe(nullptr)
+		, m_exit_code(0)
+		, m_pipeline(nullptr)
 	{
-		m_universe = nullptr;
-		m_exit_code = 0;
 		m_frame_timer = Lumix::Timer::create(m_allocator);
 		ASSERT(!s_instance);
 		s_instance = this;
-		m_pipeline = nullptr;
 	}
 
 
@@ -129,7 +130,10 @@ public:
 		wnd.lpszClassName = "App";
 		wnd.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 		RegisterClassExA(&wnd);
+
 		m_hwnd = CreateWindowA("App", "App", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 800, 600, NULL, NULL, hInst, 0);
+
+		if(!m_window_mode) setFullscreenBorderless();
 
 		RAWINPUTDEVICE Rid;
 		Rid.usUsagePage = 0x01;
@@ -137,6 +141,27 @@ public:
 		Rid.dwFlags = 0;
 		Rid.hwndTarget = 0;
 		RegisterRawInputDevices(&Rid, 1, sizeof(Rid));
+	}
+
+
+	void setFullscreenBorderless()
+	{
+		HMONITOR hmon = MonitorFromWindow(m_hwnd, MONITOR_DEFAULTTONEAREST);
+		MONITORINFO mi = { sizeof(mi) };
+		if (!GetMonitorInfo(hmon, &mi)) return;
+
+		SetWindowLong(m_hwnd, GWL_STYLE, GetWindowLong(m_hwnd, GWL_STYLE) & ~(WS_CAPTION | WS_THICKFRAME));
+		SetWindowLong(m_hwnd,
+			GWL_EXSTYLE,
+			GetWindowLong(m_hwnd, GWL_EXSTYLE) &
+			~(WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE));
+		SetWindowPos(m_hwnd,
+			NULL,
+			mi.rcMonitor.left,
+			mi.rcMonitor.top,
+			mi.rcMonitor.right - mi.rcMonitor.left,
+			mi.rcMonitor.bottom - mi.rcMonitor.top,
+			SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 	}
 
 
@@ -149,7 +174,11 @@ public:
 		Lumix::CommandLineParser parser(cmd_line);
 		while (parser.next())
 		{
-			if (parser.currentEquals("-pipeline"))
+			if (parser.currentEquals("-window"))
+			{
+				m_window_mode = true;
+			}
+			else if (parser.currentEquals("-pipeline"))
 			{
 				if (!parser.next()) break;
 
@@ -437,6 +466,7 @@ private:
 	Lumix::Timer* m_frame_timer;
 	GUIInterface* m_gui_interface;
 	bool m_finished;
+	bool m_window_mode;
 	int m_exit_code;
 	char m_startup_script_path[Lumix::MAX_PATH_LENGTH];
 	char m_pipeline_path[Lumix::MAX_PATH_LENGTH];
