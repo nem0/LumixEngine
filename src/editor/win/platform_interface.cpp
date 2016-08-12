@@ -125,6 +125,7 @@ Process* createProcess(const char* cmd, const char* args, Lumix::IAllocator& all
 	suinfo.wShowWindow = SW_HIDE;
 	suinfo.hStdOutput = process->output_write_pipe;
 	suinfo.hStdError = process->output_write_pipe;
+	suinfo.hStdInput = INVALID_HANDLE_VALUE;
 
 	char rw_args[1024];
 	Lumix::copyString(rw_args, args);

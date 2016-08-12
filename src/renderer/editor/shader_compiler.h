@@ -63,8 +63,13 @@ private:
 private:
 	struct ProcessInfo
 	{
+		ProcessInfo(Lumix::IAllocator& allocator)
+			: output(allocator)
+		{
+		}
 		PlatformInterface::Process* process;
 		char path[Lumix::MAX_PATH_LENGTH];
+		Lumix::string output;
 	};
 
 private:
