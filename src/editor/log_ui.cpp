@@ -227,7 +227,7 @@ void LogUI::onGUI()
 				const char* msg = (*messages)[i].c_str();
 				if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
 				{
-					ImGui::Text("%s", msg);
+					ImGui::TextUnformatted(msg);
 				}
 			}
 		}

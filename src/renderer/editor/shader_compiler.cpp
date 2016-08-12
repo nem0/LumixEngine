@@ -414,7 +414,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			}
 			else
 			{
-				auto& p = m_processes.emplace();
+				auto& p = m_processes.emplace(m_editor.getAllocator());
 				p.process = process;
 				Lumix::copyString(p.path, out_path);
 			}
@@ -498,6 +498,15 @@ void ShaderCompiler::update()
 	PROFILE_FUNCTION();
 	for (int i = 0; i < m_processes.size(); ++i)
 	{
+
+		char tmp[4096];
+		int len;
+		while ((len = PlatformInterface::getProcessOutput(*m_processes[i].process, tmp, sizeof(tmp)-1)) >= 0)
+		{
+			tmp[len] = 0;
+			m_processes[i].output.cat(tmp);
+		}
+
 		if (PlatformInterface::isProcessFinished(*m_processes[i].process))
 		{
 			bool failed = PlatformInterface::getProcessExitCode(*m_processes[i].process) != 0;
@@ -508,14 +517,8 @@ void ShaderCompiler::update()
 					Lumix::messageBox("Could not compile imgui shader");
 				}
 
-				char buf[1024];
-				int read;
 				Lumix::g_log_error.log("Editor") << "Failed to compile " << m_processes[i].path << ". Error log:";
-				while ((read = PlatformInterface::getProcessOutput(*m_processes[i].process, buf, sizeof(buf) - 1)) > 0)
-				{
-					buf[read] = 0;
-					Lumix::g_log_error.log("Editor") << buf;
-				}
+				Lumix::g_log_error.log("Editor") << m_processes[i].output.c_str();
 			}
 
 			PlatformInterface::destroyProcess(*m_processes[i].process);
