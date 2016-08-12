@@ -46,6 +46,8 @@ namespace Lumix
 
 			virtual IScene* createScene(Universe&) { return nullptr; }
 			virtual void destroyScene(IScene*) { ASSERT(false); }
+			virtual void startGame() {}
+			virtual void stopGame() {}
 	};
 
 

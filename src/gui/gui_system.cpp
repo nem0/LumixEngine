@@ -44,6 +44,41 @@ namespace Lumix
 {
 
 
+struct GUISystemImpl;
+
+
+struct RootWidget : public TBWidget
+{
+	RootWidget(GUISystemImpl& system) : gui_system(system) {}
+
+	bool OnEvent(const TBWidgetEvent& ev) override;
+
+	GUISystemImpl& gui_system;
+};
+
+
+struct LuaEvent
+{
+	bool invoke()
+	{
+		if (lua_rawgeti(state, LUA_REGISTRYINDEX, function_ref) != LUA_TFUNCTION)
+		{
+			ASSERT(false);
+		}
+
+		if (lua_pcall(state, 0, 0, 0) != LUA_OK)
+		{
+			g_log_error.log("Gui") << lua_tostring(state, -1);
+			lua_pop(state, 1);
+		}
+		return true;
+	}
+
+	lua_State* state;
+	int function_ref;
+};
+
+
 struct BGFXBitmap : public TBBitmap
 {
 	int Width() override { return w; }
@@ -153,6 +188,8 @@ struct GUISystemImpl : public GUISystem
 		: m_engine(engine)
 		, m_renderer(engine)
 		, m_interface(nullptr)
+		, m_root_widget(*this)
+		, m_lua_events(engine.getAllocator())
 	{
 		tb_core_init(&m_renderer);
 
@@ -188,6 +225,31 @@ struct GUISystemImpl : public GUISystem
 	}
 
 
+	static int registerEvent(lua_State* L)
+	{
+		auto* gui = LuaWrapper::checkArg<GUISystemImpl*>(L, 1);
+		EVENT_TYPE event_type = (EVENT_TYPE)LuaWrapper::checkArg<int>(L, 2);
+		TBID widget_id = LuaWrapper::checkArg<const char*>(L, 3);
+		LuaEvent event;
+		event.state = L;
+		lua_pushvalue(L, 4);
+		event.function_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+		lua_pop(L, 1);
+		uint64 event_id = (uint64)event_type << 32 | (uint32)widget_id;
+		gui->m_lua_events.insert(event_id, event);
+		return 0;
+	}
+
+
+	void unregisterEvent(int event_type, const char* widget_id)
+	{
+		TBID tb_widget_id(widget_id);
+		uint64 event_id = (uint64)event_type << 32 | (uint32)tb_widget_id;
+		m_lua_events.erase(event_id);
+	}
+
+
+
 	void registerLuaAPI()
 	{
 		lua_State* L = m_engine.getState();
@@ -202,8 +264,12 @@ struct GUISystemImpl : public GUISystem
 		REGISTER_FUNCTION(showGUI);
 		REGISTER_FUNCTION(isGUIShown);
 		REGISTER_FUNCTION(loadFile);
+		REGISTER_FUNCTION(unregisterEvent);
+
+		LuaWrapper::createSystemFunction(L, "Gui", "registerEvent", &GUISystemImpl::registerEvent);
 
 		LuaWrapper::createSystemVariable(L, "Gui", "instance", this);
+		LuaWrapper::createSystemVariable(L, "Gui", "EVENT_TYPE_CLICK", EVENT_TYPE_CLICK);
 
 		#undef REGISTER_FUNCTION
 	}
@@ -305,14 +371,28 @@ struct GUISystemImpl : public GUISystem
 	}
 
 
+	void stopGame() override { m_lua_events.clear(); }
+
+
 	const char* getName() const override { return "gui"; }
 
 
 	Engine& m_engine;
-	TBWidget m_root_widget;
+	RootWidget m_root_widget;
 	GUIRenderer m_renderer;
 	Interface* m_interface;
+	HashMap<uint64, LuaEvent> m_lua_events;
 };
+
+
+bool RootWidget::OnEvent(const TBWidgetEvent& ev)
+{
+	uint64 event_id = (uint64)ev.type << 32 | (uint32)ev.target->GetID();
+	auto iter = gui_system.m_lua_events.find(event_id);
+	if (!iter.isValid()) return false;
+
+	return iter.value().invoke();
+}
 
 
 LUMIX_PLUGIN_ENTRY(gui)
