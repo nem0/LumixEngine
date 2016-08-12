@@ -745,6 +745,10 @@ public:
 		{
 			scene->startGame();
 		}
+		for (auto* plugin : m_plugin_manager->getPlugins())
+		{
+			plugin->startGame();
+		}
 	}
 
 
@@ -755,6 +759,10 @@ public:
 		for (auto* scene : context.getScenes())
 		{
 			scene->stopGame();
+		}
+		for (auto* plugin : m_plugin_manager->getPlugins())
+		{
+			plugin->stopGame();
 		}
 	}
 

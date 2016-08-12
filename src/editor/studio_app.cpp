@@ -1610,6 +1610,12 @@ public:
 	}
 
 
+	void LUA_exitGameMode()
+	{
+		m_editor->toggleGameMode();
+	}
+
+
 	void LUA_exit(int exit_code)
 	{
 		m_finished = true;
@@ -1637,6 +1643,7 @@ public:
 
 		REGISTER_FUNCTION(runTest);
 		REGISTER_FUNCTION(exit);
+		REGISTER_FUNCTION(exitGameMode);
 		REGISTER_FUNCTION(createEntityTemplate);
 
 		#undef REGISTER_FUNCTION

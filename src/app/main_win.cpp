@@ -147,14 +147,14 @@ public:
 	void setFullscreenBorderless()
 	{
 		HMONITOR hmon = MonitorFromWindow(m_hwnd, MONITOR_DEFAULTTONEAREST);
-		MONITORINFO mi = { sizeof(mi) };
+		MONITORINFO mi = {sizeof(mi)};
 		if (!GetMonitorInfo(hmon, &mi)) return;
 
 		SetWindowLong(m_hwnd, GWL_STYLE, GetWindowLong(m_hwnd, GWL_STYLE) & ~(WS_CAPTION | WS_THICKFRAME));
 		SetWindowLong(m_hwnd,
 			GWL_EXSTYLE,
 			GetWindowLong(m_hwnd, GWL_EXSTYLE) &
-			~(WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE));
+				~(WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE));
 		SetWindowPos(m_hwnd,
 			NULL,
 			mi.rcMonitor.left,
