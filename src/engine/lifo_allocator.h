@@ -82,7 +82,7 @@ namespace Lumix
 
 			void* reallocate_aligned(void* ptr, size_t size, size_t align) override
 			{
-				if (!ptr) return allocate(size);
+				if (!ptr) return allocate_aligned(size, align);
 
 				size_t last_size_with_padding = *(size_t*)((uint8*)m_current - sizeof(size_t));
 				uint8* last_mem = (uint8*)m_current - last_size_with_padding - sizeof(size_t);
