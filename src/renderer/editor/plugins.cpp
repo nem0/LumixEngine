@@ -680,7 +680,7 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 		auto* shader = static_cast<Shader*>(resource);
 		char basename[MAX_PATH_LENGTH];
 		PathUtils::getBasename(basename, lengthOf(basename), resource->getPath().c_str());
-		StaticString<MAX_PATH_LENGTH> path("/shaders/", basename);
+		StaticString<MAX_PATH_LENGTH> path("/pipelines/", basename);
 		if (ImGui::Button("Open vertex shader"))
 		{
 			path << "_vs.sc";
@@ -1198,7 +1198,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		{
 			m_model_index = -1;
 			auto& rm = m_editor.getEngine().getResourceManager();
-			Path shader_path("shaders/debugline.shd");
+			Path shader_path("pipelines/editor/debugline.shd");
 			m_shader = static_cast<Shader*>(rm.get(SHADER_TYPE)->load(shader_path));
 
 			editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
@@ -1374,7 +1374,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 
 		auto& plugin_manager = editor.getEngine().getPluginManager();
 		auto* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
-		Path path("pipelines/imgui.lua");
+		Path path("pipelines/imgui/imgui.lua");
 		m_gui_pipeline = Pipeline::create(*renderer, path, m_engine->getAllocator());
 		m_gui_pipeline->load();
 
@@ -1390,7 +1390,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		int width, height;
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 		auto* material_manager = m_engine->getResourceManager().get(MATERIAL_TYPE);
-		auto* resource = material_manager->load(Path("shaders/imgui.mat"));
+		auto* resource = material_manager->load(Path("pipelines/imgui/imgui.mat"));
 		m_material = static_cast<Material*>(resource);
 
 		Texture* texture = LUMIX_NEW(editor.getAllocator(), Texture)(
@@ -1577,7 +1577,7 @@ struct ShaderEditorPlugin : public StudioApp::IPlugin
 		lua_State* L = app.getWorldEditor()->getEngine().getState();
 		LuaWrapper::createSystemVariable(L, "Editor", "shader_compiler", m_compiler);
 		auto* f =
-			&LuaWrapper::wrapMethod<ShaderCompiler, decltype(&ShaderCompiler::compileAll), &ShaderCompiler::compileAll>;
+			&LuaWrapper::wrapMethod<ShaderCompiler, decltype(&ShaderCompiler::makeUpToDate), &ShaderCompiler::makeUpToDate>;
 		LuaWrapper::createSystemFunction(L, "Editor", "compileShaders", f);
 	}
 

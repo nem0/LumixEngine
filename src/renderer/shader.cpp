@@ -115,7 +115,7 @@ bool Shader::generateInstances()
 		for (int pass_idx = 0; pass_idx < m_combintions.pass_count; ++pass_idx)
 		{
 			const char* pass = m_combintions.passes[pass_idx];
-			StaticString<MAX_PATH_LENGTH> path("shaders/compiled", is_opengl ? "_gl/" : "/");
+			StaticString<MAX_PATH_LENGTH> path("pipelines/compiled", is_opengl ? "_gl/" : "/");
 			int actual_mask = mask & m_combintions.vs_local_mask[pass_idx];
 			path << basename << "_" << pass << actual_mask << "_vs.shb";
 
@@ -126,7 +126,7 @@ bool Shader::generateInstances()
 
 			path.data[0] = '\0';
 			actual_mask = mask & m_combintions.fs_local_mask[pass_idx];
-			path << "shaders/compiled" << (is_opengl ? "_gl/" : "/") << basename;
+			path << "pipelines/compiled" << (is_opengl ? "_gl/" : "/") << basename;
 			path << "_" << pass << actual_mask << "_fs.shb";
 
 			Path fs_path(path);
