@@ -1961,11 +1961,7 @@ public:
 
 	void checkWorkingDirector()
 	{
-		if (!PlatformInterface::dirExists("shaders"))
-		{
-			Lumix::messageBox("Shaders directory not found, please check working directory.");
-		}
-		else if (!PlatformInterface::dirExists("bin"))
+		if (!PlatformInterface::dirExists("bin"))
 		{
 			Lumix::messageBox("Bin directory not found, please check working directory.");
 		}
