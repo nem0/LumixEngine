@@ -108,7 +108,7 @@ struct GUIRenderer : public TBRendererBatcher
 			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
 			.end();
 		auto* material_manager = engine.getResourceManager().get(ResourceType("material"));
-		auto* resource = material_manager->load(Path("shaders/imgui.mat"));
+		auto* resource = material_manager->load(Path("pipelines/imgui/imgui.mat"));
 		m_material = static_cast<Material*>(resource);
 	}
 

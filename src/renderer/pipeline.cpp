@@ -282,7 +282,7 @@ struct PipelineImpl : public Pipeline
 		createUniforms();
 
 		m_debug_line_material = static_cast<Material*>(
-			renderer.getMaterialManager().load(Lumix::Path("shaders/debug_line.mat")));
+			renderer.getMaterialManager().load(Lumix::Path("pipelines/editor/debugline.mat")));
 
 		createParticleBuffers();
 		createCubeBuffers();

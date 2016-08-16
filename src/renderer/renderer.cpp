@@ -607,7 +607,7 @@ struct RendererImpl : public Renderer
 			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
 			.end();
 
-		m_default_shader = static_cast<Shader*>(m_shader_manager.load(Path("shaders/default.shd")));
+		m_default_shader = static_cast<Shader*>(m_shader_manager.load(Path("pipelines/common/default.shd")));
 		RenderScene::registerLuaAPI(m_engine.getState());
 	}
 

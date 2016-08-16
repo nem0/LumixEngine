@@ -635,7 +635,7 @@ struct ImportTask : public MT::Task
 				material.alpha_cutout = false;
 				material.material = scene->mMaterials[i];
 				material.texture_count = 0;
-				copyString(material.shader, isSkinned(scene, scene->mMaterials[i]) ? "skinned" : "rigid");
+				copyString(material.shader, "rigid/rigid");
 				auto types = {aiTextureType_DIFFUSE, aiTextureType_NORMALS, aiTextureType_HEIGHT};
 				for (auto type : types)
 				{
@@ -1008,7 +1008,7 @@ struct ConvertTask : public MT::Task
 					StaticString<20 + MAX_PATH_LENGTH>("Could not create ", output_material_name));
 				return false;
 			}
-			file << "{\n\t\"shader\" : \"shaders/billboard.shd\"\n";
+			file << "{\n\t\"shader\" : \"pipelines/billboard/billboard.shd\"\n";
 			file << "\t, \"defines\" : [\"ALPHA_CUTOUT\"]\n";
 			file << "\t, \"texture\" : {\n\t\t\"source\" : \"";
 
@@ -1055,7 +1055,7 @@ struct ConvertTask : public MT::Task
 			return false;
 		}
 
-		file.writeText("{\n\t\"shader\" : \"shaders/");
+		file.writeText("{\n\t\"shader\" : \"pipelines/");
 		file.writeText(material.shader);
 		file.writeText(".shd\"\n");
 		
