@@ -239,6 +239,30 @@ void CommandBufferGenerator::end()
 
 struct PipelineImpl : public Pipeline
 {
+	struct TerrainInstance
+	{
+		int m_count;
+		const TerrainInfo* m_infos[64];
+	};
+
+
+	struct PointLightShadowmap
+	{
+		ComponentHandle light;
+		FrameBuffer* framebuffer;
+		Matrix matrices[4];
+	};
+
+
+	struct BaseVertex
+	{
+		float x, y, z;
+		uint32 rgba;
+		float u;
+		float v;
+	};
+
+
 	PipelineImpl(Renderer& renderer, const Path& path, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_path(path)
@@ -863,7 +887,8 @@ struct PipelineImpl : public Pipeline
 	void finishDeferredPointLightInstances(Material* material,
 		const bgfx::InstanceDataBuffer* instance_buffer,
 		int instance_count,
-		bool is_intersecting)
+		bool is_intersecting,
+		PointLightShadowmap* shadowmap)
 	{
 		bgfx::setInstanceDataBuffer(instance_buffer, instance_count);
 		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE); 
@@ -877,11 +902,19 @@ struct PipelineImpl : public Pipeline
 			bgfx::setState(m_render_state | material->getRenderStates());
 		}
 		executeCommandBuffer(m_views[m_view_idx].command_buffer.buffer, material);
+		material->setDefine(m_has_shadowmap_define_idx, shadowmap != nullptr);
+		if (shadowmap)
+		{
+			bgfx::setTexture(15 - m_global_textures_count, m_tex_shadowmap_uniform, shadowmap->framebuffer->getRenderbufferHandle(0));
+			bgfx::setUniform(m_shadowmap_matrices_uniform,
+				&shadowmap->matrices[0],
+				m_scene->getLightFOV(shadowmap->light) > Math::PI ? 4 : 1);
+		}
 		bgfx::setVertexBuffer(m_cube_vb);
 		bgfx::setIndexBuffer(m_cube_ib);
 		++m_stats.draw_call_count;
 		m_stats.instance_count += instance_count;
-		m_stats.triangle_count +=	instance_count * 12;
+		m_stats.triangle_count += instance_count * 12;
 		bgfx::submit(m_bgfx_view, material->getShaderInstance().program_handles[m_pass_idx]);
 	}
 
@@ -1008,8 +1041,23 @@ struct PipelineImpl : public Pipeline
 			intensity *= intensity;
 			Vec3 color = m_scene->getPointLightColor(light_cmp) * intensity;
 
+			int max_instance_count = 128;
+			PointLightShadowmap* shadowmap = nullptr;
+			if (m_scene->getLightCastShadows(light_cmp))
+			{
+				for (auto& i : m_point_light_shadowmaps)
+				{
+					if (i.light == light_cmp)
+					{
+						max_instance_count = 1;
+						shadowmap = &i;
+					}
+				}
+			}
+
 			Vec3 pos = universe.getPosition(entity);
-			int buffer_idx = m_camera_frustum.intersectNearPlane(pos, range * Math::SQRT3) ? 0 : 1;
+			bool is_intersecting = m_camera_frustum.intersectNearPlane(pos, range * Math::SQRT3);
+			int buffer_idx = is_intersecting ? 0 : 1;
 			if(!instance_buffer[buffer_idx])
 			{
 				instance_buffer[buffer_idx] = bgfx::allocInstanceDataBuffer(128, sizeof(Data));
@@ -1027,12 +1075,14 @@ struct PipelineImpl : public Pipeline
 				* specular_intensity * specular_intensity, 1);
 			++instance_data[buffer_idx];
 
-			if(instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx]->data == 128)
+			int instance_count = int(instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx]->data);
+			if(instance_count == max_instance_count)
 			{
 				finishDeferredPointLightInstances(material,
 					instance_buffer[buffer_idx],
-					128,
-					buffer_idx == 0);
+					instance_count,
+					is_intersecting,
+					shadowmap);
 				instance_buffer[buffer_idx] = nullptr;
 				instance_data[buffer_idx] = nullptr;
 			}
@@ -1045,7 +1095,8 @@ struct PipelineImpl : public Pipeline
 				finishDeferredPointLightInstances(material,
 					instance_buffer[buffer_idx],
 					int(instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx]->data),
-					buffer_idx == 0);
+					buffer_idx == 0,
+					nullptr);
 			}
 		}
 	}
@@ -1110,15 +1161,15 @@ struct PipelineImpl : public Pipeline
 		bgfx::setViewTransform(m_bgfx_view, &view_matrix.m11, &projection_matrix.m11);
 
 		PointLightShadowmap& s = m_point_light_shadowmaps.emplace();
-		s.m_framebuffer = m_current_framebuffer;
-		s.m_light = light;
+		s.framebuffer = m_current_framebuffer;
+		s.light = light;
 		float ymul = is_opengl ? 0.5f : -0.5f;
 		static const Matrix biasMatrix(
 			0.5,  0.0, 0.0, 0.0,
 			0.0, ymul, 0.0, 0.0,
 			0.0,  0.0, 0.5, 0.0,
 			0.5,  0.5, 0.5, 1.0);
-		s.m_matrices[0] = biasMatrix * (projection_matrix * view_matrix);
+		s.matrices[0] = biasMatrix * (projection_matrix * view_matrix);
 
 		renderPointLightInfluencedGeometry(light);
 	}
@@ -1149,8 +1200,8 @@ struct PipelineImpl : public Pipeline
 		};
 
 		PointLightShadowmap& shadowmap_info = m_point_light_shadowmaps.emplace();
-		shadowmap_info.m_framebuffer = m_current_framebuffer;
-		shadowmap_info.m_light = light;
+		shadowmap_info.framebuffer = m_current_framebuffer;
+		shadowmap_info.light = light;
 		//setPointLightUniforms(light);
 
 		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
@@ -1198,7 +1249,7 @@ struct PipelineImpl : public Pipeline
 			float ymul = is_opengl ? 0.5f : -0.5f;
 			static const Matrix biasMatrix(
 				0.5, 0.0, 0.0, 0.0, 0.0, ymul, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
-			shadowmap_info.m_matrices[i] = biasMatrix * (projection_matrix * view_matrix);
+			shadowmap_info.matrices[i] = biasMatrix * (projection_matrix * view_matrix);
 
 			Array<RenderableMesh> tmp_meshes(frame_allocator);
 			m_is_current_light_global = false;
@@ -1568,11 +1619,11 @@ struct PipelineImpl : public Pipeline
 		{
 			for (auto& info : m_point_light_shadowmaps)
 			{
-				if (info.m_light == light_cmp)
+				if (info.light == light_cmp)
 				{
-					shadowmap = info.m_framebuffer;
+					shadowmap = info.framebuffer;
 					m_views[m_view_idx].command_buffer.setUniform(m_shadowmap_matrices_uniform,
-						&info.m_matrices[0],
+						&info.matrices[0],
 						m_scene->getLightFOV(light_cmp) > Math::PI ? 4 : 1);
 					break;
 				}
@@ -2566,30 +2617,6 @@ struct PipelineImpl : public Pipeline
 			lua_pop(m_lua_state, 1);
 		}
 	}
-
-
-	struct TerrainInstance
-	{
-		int m_count;
-		const TerrainInfo* m_infos[64];
-	};
-
-
-	struct PointLightShadowmap
-	{
-		ComponentHandle m_light;
-		FrameBuffer* m_framebuffer;
-		Matrix m_matrices[4];
-	};
-
-
-	struct BaseVertex
-	{
-		float x, y, z;
-		uint32 rgba;
-		float u;
-		float v;
-	};
 
 
 	bgfx::VertexDecl m_deferred_point_light_vertex_decl;
