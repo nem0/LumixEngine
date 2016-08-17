@@ -131,7 +131,20 @@ public:
 		wnd.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 		RegisterClassExA(&wnd);
 
-		m_hwnd = CreateWindowA("App", "App", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 800, 600, NULL, NULL, hInst, 0);
+		RECT rect = { 0, 0, 600, 400 };
+		AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW | WS_VISIBLE, FALSE);
+
+		m_hwnd = CreateWindowA("App",
+			"App",
+			WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+			0,
+			0,
+			rect.right - rect.left,
+			rect.bottom - rect.top,
+			NULL,
+			NULL,
+			hInst,
+			0);
 
 		if(!m_window_mode) setFullscreenBorderless();
 
