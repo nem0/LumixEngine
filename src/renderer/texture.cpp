@@ -71,9 +71,8 @@ void Texture::setFlags(uint32 flags)
 {
 	if (isReady() && bgfx_flags != flags)
 	{
-		g_log_warning.log("Renderer")
-			<< "Trying to set different flags for texture " << getPath().c_str()
-			<< ". They are ignored.";
+		g_log_warning.log("Renderer") << "Trying to set different flags for texture " << getPath().c_str()
+									  << ". They are ignored.";
 		return;
 	}
 	bgfx_flags = flags;
@@ -90,17 +89,12 @@ bool Texture::create(int w, int h, void* data)
 {
 	if (data)
 	{
-		handle = bgfx::createTexture2D((uint16_t)w,
-			(uint16_t)h,
-			1,
-			bgfx::TextureFormat::RGBA8,
-			bgfx_flags,
-			bgfx::copy(data, w * h * 4));
+		handle = bgfx::createTexture2D(
+			(uint16_t)w, (uint16_t)h, 1, bgfx::TextureFormat::RGBA8, bgfx_flags, bgfx::copy(data, w * h * 4));
 	}
 	else
 	{
-		handle =
-			bgfx::createTexture2D((uint16_t)w, (uint16_t)h, 1, bgfx::TextureFormat::RGBA8, bgfx_flags);
+		handle = bgfx::createTexture2D((uint16_t)w, (uint16_t)h, 1, bgfx::TextureFormat::RGBA8, bgfx_flags);
 	}
 
 
@@ -156,10 +150,7 @@ uint32 Texture::getPixel(float x, float y) const
 }
 
 
-unsigned int Texture::compareTGA(IAllocator& allocator,
-								 FS::IFile* file1,
-								 FS::IFile* file2,
-								 int difference)
+unsigned int Texture::compareTGA(IAllocator& allocator, FS::IFile* file1, FS::IFile* file2, int difference)
 {
 	TGAHeader header1, header2;
 	file1->read(&header1, sizeof(header1));
@@ -170,16 +161,15 @@ unsigned int Texture::compareTGA(IAllocator& allocator,
 		header1.dataType != header2.dataType ||
 		header1.imageDescriptor != header2.imageDescriptor)
 	{
-		g_log_error.log("Renderer")
-			<< "Trying to compare textures with different formats";
-		return 0;
+		g_log_error.log("Renderer") << "Trying to compare textures with different formats";
+		return 0xffffFFFF;
 	}
 
 	int color_mode = header1.bitsPerPixel / 8;
 	if (header1.dataType != 2)
 	{
 		g_log_error.log("Renderer") << "Unsupported texture format";
-		return 0;
+		return 0xffffFFFF;
 	}
 
 	int different_pixel_count = 0;
