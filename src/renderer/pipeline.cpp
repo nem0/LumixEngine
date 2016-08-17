@@ -1062,7 +1062,7 @@ struct PipelineImpl : public Pipeline
 
 		PROFILE_INT("decal count", decals.size());
 
-		const View& view = m_views[m_current_render_views[0]];
+		const View& view = m_views[m_view_idx];
 		for (const DecalInfo& decal : decals)
 		{
 			if (m_camera_frustum.intersectNearPlane(decal.position, decal.radius))
