@@ -36,7 +36,7 @@ public:
 
 private:
 	void findShaderFiles(const char* src_dir);
-	void getSourceFromBinaryBasename(char* out, int max_size, const char* binary_basename);
+	bool getSourceFromBinaryBasename(char* out, int max_size, const char* binary_basename);
 	void wait();
 	void reloadShaders();
 	void onCompiled(int value);

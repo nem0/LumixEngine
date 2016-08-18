@@ -48,7 +48,7 @@ ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
 }
 
 
-void ShaderCompiler::getSourceFromBinaryBasename(char* out, int max_size, const char* binary_basename)
+bool ShaderCompiler::getSourceFromBinaryBasename(char* out, int max_size, const char* binary_basename)
 {
 	char shd_basename[Lumix::MAX_PATH_LENGTH];
 	char* cout = shd_basename;
@@ -68,10 +68,11 @@ void ShaderCompiler::getSourceFromBinaryBasename(char* out, int max_size, const 
 		if (Lumix::equalStrings(tmp, shd_basename))
 		{
 			Lumix::copyString(out, max_size, shd_path.c_str());
-			return;
+			return true;
 		}
 	}
-	ASSERT(false);
+	Lumix::g_log_info.log("Editor") << binary_basename << " binary shader has no source code";
+	return false;
 }
 
 
@@ -331,9 +332,10 @@ void ShaderCompiler::parseDependencies()
 		char basename[Lumix::MAX_PATH_LENGTH];
 		char src[Lumix::MAX_PATH_LENGTH];
 		Lumix::PathUtils::getBasename(basename, sizeof(basename), first_line);
-		getSourceFromBinaryBasename(src, sizeof(src), basename);
-
-		addDependency(src, first_line);
+		if (getSourceFromBinaryBasename(src, sizeof(src), basename))
+		{
+			addDependency(src, first_line);
+		}
 
 		fs.close(*file);
 	}
@@ -513,9 +515,11 @@ void ShaderCompiler::processChangedFiles()
 				char basename[Lumix::MAX_PATH_LENGTH];
 				Lumix::PathUtils::getBasename(basename, sizeof(basename), bin.c_str());
 				char tmp[Lumix::MAX_PATH_LENGTH];
-				getSourceFromBinaryBasename(tmp, sizeof(tmp), basename);
-				Lumix::string src(tmp, m_editor.getAllocator());
-				src_list.push(src);
+				if (getSourceFromBinaryBasename(tmp, sizeof(tmp), basename))
+				{
+					Lumix::string src(tmp, m_editor.getAllocator());
+					src_list.push(src);
+				}
 			}
 
 			src_list.removeDuplicates();
