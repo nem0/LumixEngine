@@ -234,8 +234,10 @@ void ShaderCompiler::makeUpToDate(bool wait)
 				char basename[Lumix::MAX_PATH_LENGTH];
 				Lumix::PathUtils::getBasename(basename, sizeof(basename), bin.c_str());
 				char tmp[Lumix::MAX_PATH_LENGTH];
-				getSourceFromBinaryBasename(tmp, sizeof(tmp), basename);
-				m_to_compile.emplace(tmp, m_editor.getAllocator());
+				if (getSourceFromBinaryBasename(tmp, sizeof(tmp), basename))
+				{
+					m_to_compile.emplace(tmp, m_editor.getAllocator());
+				}
 			}
 		}
 	}
