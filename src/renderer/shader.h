@@ -34,6 +34,7 @@ struct ShaderInstance
 		}
 	}
 	~ShaderInstance();
+	bgfx::ProgramHandle getProgramHandle(int pass_idx);
 
 	bgfx::ProgramHandle program_handles[32];
 	ShaderBinary* binaries[64];
@@ -143,7 +144,6 @@ public:
 private:
 	bool generateInstances();
 
-	void onBeforeReady() override;
 	void unload(void) override;
 	bool load(FS::IFile& file) override;
 };

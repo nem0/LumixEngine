@@ -603,7 +603,7 @@ struct PipelineImpl : public Pipeline
 					++m_stats.draw_call_count;
 					m_stats.instance_count += PARTICLE_BATCH_SIZE;
 					m_stats.triangle_count += PARTICLE_BATCH_SIZE * 2;
-					bgfx::submit(view.bgfx_id, material->getShaderInstance().program_handles[view.pass_idx]);
+					bgfx::submit(view.bgfx_id, material->getShaderInstance().getProgramHandle(view.pass_idx));
 				}
 
 				instance_buffer = bgfx::allocInstanceDataBuffer(PARTICLE_BATCH_SIZE, sizeof(Instance));
@@ -627,7 +627,7 @@ struct PipelineImpl : public Pipeline
 		++m_stats.draw_call_count;
 		m_stats.instance_count += instance_count;
 		m_stats.triangle_count += instance_count * 2;
-		bgfx::submit(view.bgfx_id, material->getShaderInstance().program_handles[view.pass_idx]);
+		bgfx::submit(view.bgfx_id, material->getShaderInstance().getProgramHandle(view.pass_idx));
 	}
 
 
@@ -698,7 +698,7 @@ struct PipelineImpl : public Pipeline
 		++m_stats.draw_call_count;
 		m_stats.instance_count += data.instance_count;
 		m_stats.triangle_count += data.instance_count * mesh.indices_count / 3;
-		bgfx::submit(view.bgfx_id, shader_instance.program_handles[view.pass_idx]);
+		bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
 
 		data.buffer = nullptr;
 		data.instance_count = 0;
@@ -915,7 +915,7 @@ struct PipelineImpl : public Pipeline
 		++m_stats.draw_call_count;
 		m_stats.instance_count += instance_count;
 		m_stats.triangle_count += instance_count * 12;
-		bgfx::submit(m_bgfx_view, material->getShaderInstance().program_handles[m_pass_idx]);
+		bgfx::submit(m_bgfx_view, material->getShaderInstance().getProgramHandle(m_pass_idx));
 	}
 
 
@@ -1133,7 +1133,7 @@ struct PipelineImpl : public Pipeline
 			bgfx::setIndexBuffer(m_cube_ib);
 			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 			
-			bgfx::submit(m_bgfx_view, decal.material->getShaderInstance().program_handles[m_pass_idx]);
+			bgfx::submit(m_bgfx_view, decal.material->getShaderInstance().getProgramHandle(m_pass_idx));
 		}
 	}
 
@@ -1461,7 +1461,7 @@ struct PipelineImpl : public Pipeline
 			bgfx::setIndexBuffer(m_debug_index_buffer, 0, point_count);
 			bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 			bgfx::setState(m_render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_POINTS);
-			bgfx::submit(m_bgfx_view, m_debug_line_material->getShaderInstance().program_handles[m_pass_idx]);
+			bgfx::submit(m_bgfx_view, m_debug_line_material->getShaderInstance().getProgramHandle(m_pass_idx));
 		}
 	}
 
@@ -1509,7 +1509,7 @@ struct PipelineImpl : public Pipeline
 			bgfx::setIndexBuffer(m_debug_index_buffer, 0, line_count * 2);
 			bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 			bgfx::setState(m_render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_LINES);
-			bgfx::submit(m_bgfx_view, m_debug_line_material->getShaderInstance().program_handles[m_pass_idx]);
+			bgfx::submit(m_bgfx_view, m_debug_line_material->getShaderInstance().getProgramHandle(m_pass_idx));
 		}
 	}
 
@@ -1563,7 +1563,7 @@ struct PipelineImpl : public Pipeline
 			bgfx::setIndexBuffer(m_debug_index_buffer, 0, tri_count * 3);
 			bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 			bgfx::setState(m_render_state | m_debug_line_material->getRenderStates());
-			bgfx::submit(m_bgfx_view, m_debug_line_material->getShaderInstance().program_handles[m_pass_idx]);
+			bgfx::submit(m_bgfx_view, m_debug_line_material->getShaderInstance().getProgramHandle(m_pass_idx));
 		}
 	}
 
@@ -1929,7 +1929,7 @@ struct PipelineImpl : public Pipeline
 		++m_stats.draw_call_count;
 		++m_stats.instance_count;
 		m_stats.triangle_count += 2;
-		bgfx::submit(m_bgfx_view, material->getShaderInstance().program_handles[m_pass_idx]);
+		bgfx::submit(m_bgfx_view, material->getShaderInstance().getProgramHandle(m_pass_idx));
 	}
 
 
@@ -2042,7 +2042,7 @@ struct PipelineImpl : public Pipeline
 		for (int i = 0; i < m_current_render_view_count; ++i)
 		{
 			auto& view = m_views[m_current_render_views[i]];
-			if (!bgfx::isValid(shader_instance.program_handles[view.pass_idx])) continue;
+			if (!bgfx::isValid(shader_instance.getProgramHandle(view.pass_idx))) continue;
 
 			for (int j = 0, c = material->getLayerCount(view.pass_idx); j < c; ++j)
 			{
@@ -2062,7 +2062,7 @@ struct PipelineImpl : public Pipeline
 				++m_stats.draw_call_count;
 				++m_stats.instance_count;
 				m_stats.triangle_count += mesh.indices_count / 3;
-				bgfx::submit(view.bgfx_id, shader_instance.program_handles[view.pass_idx]);
+				bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
 			}
 		}
 	}
@@ -2125,7 +2125,7 @@ struct PipelineImpl : public Pipeline
 		int first_index,
 		int num_indices,
 		uint64 render_states,
-		const ShaderInstance& shader_instance) override
+		ShaderInstance& shader_instance) override
 	{
 		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(m_render_state | render_states);
@@ -2135,7 +2135,7 @@ struct PipelineImpl : public Pipeline
 		++m_stats.draw_call_count;
 		++m_stats.instance_count;
 		m_stats.triangle_count += num_indices / 3;
-		bgfx::submit(m_bgfx_view, shader_instance.program_handles[m_pass_idx]);
+		bgfx::submit(m_bgfx_view, shader_instance.getProgramHandle(m_pass_idx));
 	}
 
 
@@ -2316,7 +2316,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | mesh.material->getRenderStates());
 		bgfx::setInstanceDataBuffer(instance_buffer, m_terrain_instances[index].m_count);
-		auto shader_instance = material->getShaderInstance().program_handles[view.pass_idx];
+		auto shader_instance = material->getShaderInstance().getProgramHandle(view.pass_idx);
 		++m_stats.draw_call_count;
 		m_stats.instance_count += m_terrain_instances[index].m_count;
 		m_stats.triangle_count += m_terrain_instances[index].m_count * mesh_part_indices_count;
@@ -2351,7 +2351,7 @@ struct PipelineImpl : public Pipeline
 		++m_stats.draw_call_count;
 		m_stats.instance_count += grass.matrix_count;
 		m_stats.triangle_count += grass.matrix_count * mesh.indices_count;
-		bgfx::submit(view.bgfx_id, material->getShaderInstance().program_handles[view.pass_idx]);
+		bgfx::submit(view.bgfx_id, material->getShaderInstance().getProgramHandle(view.pass_idx));
 	}
 
 
