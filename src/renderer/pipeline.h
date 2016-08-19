@@ -114,7 +114,7 @@ class LUMIX_RENDERER_API Pipeline
 			int first_index,
 			int num_indices,
 			uint64 render_states,
-			const struct ShaderInstance& shader_instance) = 0;
+			struct ShaderInstance& shader_instance) = 0;
 		virtual void setWireframe(bool wireframe) = 0;
 		virtual void renderModel(Model& model, const Matrix& mtx) = 0;
 		virtual void toggleStats() = 0;

@@ -420,30 +420,6 @@ bool Shader::load(FS::IFile& file)
 }
 
 
-void Shader::onBeforeReady()
-{
-	for (auto* instance : m_instances)
-	{
-		auto** binaries = instance->binaries;
-		for (int i = 0; i < Lumix::lengthOf(instance->binaries); i += 2)
-		{
-			if (!binaries[i] || !binaries[i + 1]) continue;
-
-			auto vs_handle = binaries[i]->getHandle();
-			auto fs_handle = binaries[i + 1]->getHandle();
-			auto program = bgfx::createProgram(vs_handle, fs_handle);
-
-			if (!bgfx::isValid(program)) continue;
-
-			int pass_idx = i / 2;
-			int global_idx = getRenderer().getPassIdx(m_combintions.passes[pass_idx]);
-
-			instance->program_handles[global_idx] = program;
-		}
-	}
-}
-
-
 void Shader::unload(void)
 {
 	m_combintions = {};
@@ -469,6 +445,31 @@ void Shader::unload(void)
 		LUMIX_DELETE(m_allocator, i);
 	}
 	m_instances.clear();
+}
+
+
+bgfx::ProgramHandle ShaderInstance::getProgramHandle(int pass_idx)
+{
+	if (!bgfx::isValid(program_handles[pass_idx]))
+	{
+		for (int i = 0; i < lengthOf(shader.m_combintions.passes); ++i)
+		{
+			auto& pass = shader.m_combintions.passes[i];
+			int global_idx = shader.getRenderer().getPassIdx(pass);
+			if (global_idx == pass_idx)
+			{
+				int binary_index = i * 2;
+				if (!binaries[binary_index] || !binaries[binary_index + 1]) break;
+				auto vs_handle = binaries[binary_index]->getHandle();
+				auto fs_handle = binaries[binary_index + 1]->getHandle();
+				auto program = bgfx::createProgram(vs_handle, fs_handle);
+				program_handles[global_idx] = program;
+				break;
+			}
+		}
+	}
+
+	return program_handles[pass_idx];
 }
 
 
