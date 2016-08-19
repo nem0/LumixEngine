@@ -48,6 +48,7 @@ after_build:
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\vs2015\bin\RelWithDebInfo\physics.pdb
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\vs2015\bin\RelWithDebInfo\renderer.pdb
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\vs2015\bin\RelWithDebInfo\studio.pdb
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\LumixEngine_data\unit_tests\render_tests\ssao_res.tga
  
 artifacts:
 - path: tests.xml
