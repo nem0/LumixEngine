@@ -7,7 +7,7 @@
 LogUI::LogUI(Lumix::IAllocator& allocator)
 	: m_allocator(allocator)
 	, m_messages(allocator)
-	, m_current_tab(0)
+	, m_current_tab(Error)
 	, m_notifications(allocator)
 	, m_last_uid(1)
 	, m_guard(false)
