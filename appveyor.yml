@@ -54,9 +54,6 @@ artifacts:
 - path: tests.xml
   name: tests.xml
 
-- path: LumixEngine_data/unit_tests/render_tests/hdr_dof_res.tga
-  name: test.tga
-
 - path: lumix.zip
   name: lumix.zip
 
