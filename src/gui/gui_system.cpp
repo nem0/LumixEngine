@@ -225,6 +225,20 @@ struct GUISystemImpl : public GUISystem
 	}
 
 
+	int getSliderValue(const char* id)
+	{
+		auto* slider = m_root_widget.GetWidgetByID(tb::TBID(id));
+		return slider->GetValue();
+	}
+
+
+	void setSliderValue(const char* id, int value)
+	{
+		auto* slider = m_root_widget.GetWidgetByID(tb::TBID(id));
+		slider->SetValue(value);
+	}
+
+
 	static int registerEvent(lua_State* L)
 	{
 		auto* gui = LuaWrapper::checkArg<GUISystemImpl*>(L, 1);
@@ -264,12 +278,15 @@ struct GUISystemImpl : public GUISystem
 		REGISTER_FUNCTION(showGUI);
 		REGISTER_FUNCTION(isGUIShown);
 		REGISTER_FUNCTION(loadFile);
+		REGISTER_FUNCTION(getSliderValue);
+		REGISTER_FUNCTION(setSliderValue);
 		REGISTER_FUNCTION(unregisterEvent);
 
 		LuaWrapper::createSystemFunction(L, "Gui", "registerEvent", &GUISystemImpl::registerEvent);
 
 		LuaWrapper::createSystemVariable(L, "Gui", "instance", this);
 		LuaWrapper::createSystemVariable(L, "Gui", "EVENT_TYPE_CLICK", EVENT_TYPE_CLICK);
+		LuaWrapper::createSystemVariable(L, "Gui", "EVENT_TYPE_CHANGED", EVENT_TYPE_CHANGED);
 
 		#undef REGISTER_FUNCTION
 	}
