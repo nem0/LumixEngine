@@ -2728,80 +2728,83 @@ int ImportAssetDialog::importAsset(lua_State* L)
 			}
 			lua_pop(L, 1); // "lod"
 
-			if (lua_getfield(L, -1, "materials") == LUA_TTABLE)
+			auto* scene = m_importers.back().GetScene();
+			if (scene->mNumMaterials > 0)
 			{
-				lua_pushnil(L);
-				while (lua_next(L, -2) != 0) // for each material
+				if (lua_getfield(L, -1, "materials") == LUA_TTABLE)
 				{
-					if (lua_istable(L, -1))
+					lua_pushnil(L);
+					while (lua_next(L, -2) != 0) // for each material
 					{
-						auto* scene = m_importers.back().GetScene();
-						ImportMaterial* material = getMatchingMaterial(
-							L, &m_materials[m_materials.size() - scene->mNumMaterials], scene->mNumMaterials);
-						if (!material)
+						if (lua_istable(L, -1))
 						{
-							g_log_error.log("Editor") << "No matching material found";
-							lua_pop(L, 1); // materials table item
-							continue;
-						}
-						
-						if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
-						{
-							material->import = LuaWrapper::toType<bool>(L, -1);
-						}
-						lua_pop(L, 1); // "import"
-
-						if (lua_getfield(L, -1, "shader") == LUA_TSTRING)
-						{
-							copyString(material->shader, LuaWrapper::toType<const char*>(L, -1));
-						}
-						lua_pop(L, 1); // "import"
-
-
-						if (lua_getfield(L, -1, "alpha_cutout") == LUA_TBOOLEAN)
-						{
-							material->alpha_cutout = LuaWrapper::toType<bool>(L, -1);
-						}
-						lua_pop(L, 1); // "alpha_cutout"
-
-						if (lua_getfield(L, -1, "textures") == LUA_TTABLE)
-						{
-							lua_pushnil(L);
-							ImportTexture* texture = material->textures;
-							while (lua_next(L, -2) != 0) // for each texture
+							ImportMaterial* material = getMatchingMaterial(
+								L, &m_materials[m_materials.size() - scene->mNumMaterials], scene->mNumMaterials);
+							if (!material)
 							{
-								if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
-								{
-									texture->import = LuaWrapper::toType<bool>(L, -1);
-								}
-								lua_pop(L, 1); // "import"
-
-								if (lua_getfield(L, -1, "to_dds") == LUA_TBOOLEAN)
-								{
-									texture->to_dds = LuaWrapper::toType<bool>(L, -1);
-								}
-								lua_pop(L, 1); // "to_dds"
-
-								if (lua_getfield(L, -1, "src") == LUA_TSTRING)
-								{
-									copyString(texture->src, LuaWrapper::toType<const char*>(L, -1));
-									texture->is_valid = PlatformInterface::fileExists(texture->src);
-								}
-								lua_pop(L, 1); // "src"
-
-								++texture;
-								lua_pop(L, 1); // textures table item
-
-								if (texture - material->textures > material->texture_count) break;
+								g_log_error.log("Editor") << "No matching material found";
+								lua_pop(L, 1); // materials table item
+								continue;
 							}
-						}
-						lua_pop(L, 1); // "textures"
-					}
 
-					lua_pop(L, 1); // materials table item
+							if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
+							{
+								material->import = LuaWrapper::toType<bool>(L, -1);
+							}
+							lua_pop(L, 1); // "import"
+
+							if (lua_getfield(L, -1, "shader") == LUA_TSTRING)
+							{
+								copyString(material->shader, LuaWrapper::toType<const char*>(L, -1));
+							}
+							lua_pop(L, 1); // "import"
+
+
+							if (lua_getfield(L, -1, "alpha_cutout") == LUA_TBOOLEAN)
+							{
+								material->alpha_cutout = LuaWrapper::toType<bool>(L, -1);
+							}
+							lua_pop(L, 1); // "alpha_cutout"
+
+							if (lua_getfield(L, -1, "textures") == LUA_TTABLE)
+							{
+								lua_pushnil(L);
+								ImportTexture* texture = material->textures;
+								while (lua_next(L, -2) != 0) // for each texture
+								{
+									if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
+									{
+										texture->import = LuaWrapper::toType<bool>(L, -1);
+									}
+									lua_pop(L, 1); // "import"
+
+									if (lua_getfield(L, -1, "to_dds") == LUA_TBOOLEAN)
+									{
+										texture->to_dds = LuaWrapper::toType<bool>(L, -1);
+									}
+									lua_pop(L, 1); // "to_dds"
+
+									if (lua_getfield(L, -1, "src") == LUA_TSTRING)
+									{
+										copyString(texture->src, LuaWrapper::toType<const char*>(L, -1));
+										texture->is_valid = PlatformInterface::fileExists(texture->src);
+									}
+									lua_pop(L, 1); // "src"
+
+									++texture;
+									lua_pop(L, 1); // textures table item
+
+									if (texture - material->textures > material->texture_count) break;
+								}
+							}
+							lua_pop(L, 1); // "textures"
+						}
+
+						lua_pop(L, 1); // materials table item
+					}
 				}
+				lua_pop(L, 1); // "materials"
 			}
-			lua_pop(L, 1); // "materials"
 
 			lua_pop(L, 1); // inputs table item
 		}
