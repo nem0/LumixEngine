@@ -615,7 +615,8 @@ struct TexturePlugin : public AssetBrowser::IPlugin
 		}
 
 		ImGui::LabelText("Size", "%dx%d", texture->width, texture->height);
-		ImGui::LabelText("BPP", "%d", texture->bytes_per_pixel);
+		ImGui::LabelText("Mips", "%d", texture->mips);
+		if (texture->bytes_per_pixel > 0) ImGui::LabelText("BPP", "%d", texture->bytes_per_pixel);
 		if (texture->is_cubemap)
 		{
 			ImGui::Text("Cubemap");
