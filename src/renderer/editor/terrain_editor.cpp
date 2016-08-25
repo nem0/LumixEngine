@@ -523,14 +523,17 @@ private:
 		texture->onDataUpdated(m_x, m_y, m_width, m_height);
 		static_cast<Lumix::RenderScene*>(m_terrain.scene)->forceGrassUpdate(m_terrain.handle);
 
-		Lumix::IScene* scene = m_world_editor.getUniverse()->getScene(Lumix::crc32("physics"));
-		if (!scene) return;
+		if (m_type != TerrainEditor::LAYER && m_type != TerrainEditor::COLOR)
+		{
+			Lumix::IScene* scene = m_world_editor.getUniverse()->getScene(Lumix::crc32("physics"));
+			if (!scene) return;
 
-		auto* phy_scene = static_cast<Lumix::PhysicsScene*>(scene);
-		Lumix::ComponentHandle cmp = scene->getComponent(m_terrain.entity, HEIGHTFIELD_TYPE);
-		if (!Lumix::isValid(cmp)) return;
+			auto* phy_scene = static_cast<Lumix::PhysicsScene*>(scene);
+			Lumix::ComponentHandle cmp = scene->getComponent(m_terrain.entity, HEIGHTFIELD_TYPE);
+			if (!Lumix::isValid(cmp)) return;
 
-		phy_scene->updateHeighfieldData(cmp, m_x, m_y, m_width, m_height, &data[0], bpp);
+			phy_scene->updateHeighfieldData(cmp, m_x, m_y, m_width, m_height, &data[0], bpp);
+		}
 	}
 
 
@@ -716,8 +719,7 @@ void TerrainEditor::nextTerrainTexture()
 	Lumix::Texture* tex = material->getTextureByUniform(TEX_COLOR_UNIFORM);
 	if (tex)
 	{
-		m_texture_idx =
-			Lumix::Math::minimum(tex->atlas_size * tex->atlas_size - 1, m_texture_idx + 1);
+		m_texture_idx = Lumix::Math::minimum(tex->layers - 1, m_texture_idx + 1);
 	}
 }
 
@@ -1329,7 +1331,7 @@ void TerrainEditor::onGUI()
 			Lumix::Texture* tex = getMaterial()->getTextureByUniform(TEX_COLOR_UNIFORM);
 			if (tex)
 			{
-				for (int i = 0; i < tex->atlas_size * tex->atlas_size; ++i)
+				for (int i = 0; i < tex->layers; ++i)
 				{
 					if (i % 4 != 0) ImGui::SameLine();
 					if (ImGui::RadioButton(Lumix::StaticString<20>("", i, "###rb", i), m_texture_idx == i))

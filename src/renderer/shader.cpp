@@ -182,14 +182,6 @@ static void texture_slot(lua_State* state, const char* name, const char* uniform
 }
 
 
-static void atlas(lua_State* L)
-{
-	auto* shader = getShader(L);
-	if (!shader) return;
-	shader->m_texture_slots[shader->m_texture_slot_count - 1].is_atlas = true;
-}
-
-
 static Renderer* getRendererGlobal(lua_State* L)
 {
 	Renderer* renderer = nullptr;
@@ -387,7 +379,6 @@ static void registerFunctions(Shader* shader, ShaderCombinations* combinations, 
 	registerCFunction(L, "alpha_blending", &LuaWrapper::wrap<decltype(&alpha_blending), alpha_blending>);
 	registerCFunction(L, "texture_slot", &LuaWrapper::wrap<decltype(&texture_slot), texture_slot>);
 	registerCFunction(L, "texture_define", &LuaWrapper::wrap<decltype(&texture_define), texture_define>);
-	registerCFunction(L, "atlas", &LuaWrapper::wrap<decltype(&atlas), atlas>);
 	registerCFunction(L, "uniform", &LuaWrapper::wrap<decltype(&uniform), uniform>);
 }
 

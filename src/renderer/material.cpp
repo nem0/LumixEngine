@@ -173,13 +173,11 @@ bool Material::save(JsonSerializer& serializer)
 	{
 		char path[MAX_PATH_LENGTH];
 		int flags = 0;
-		int atlas_size = -1;
 		if (m_textures[i])
 		{
 			flags = m_textures[i]->bgfx_flags;
 			path[0] = '/';
 			Lumix::copyString(path + 1, MAX_PATH_LENGTH - 1, m_textures[i]->getPath().c_str());
-			atlas_size = m_textures[i]->atlas_size;
 		}
 		else
 		{
@@ -187,7 +185,6 @@ bool Material::save(JsonSerializer& serializer)
 		}
 		serializer.beginObject("texture");
 		serializer.serialize("source", path);
-		if (atlas_size > 0) serializer.serialize("atlas_size", atlas_size);
 		if (flags & BGFX_TEXTURE_SRGB) serializer.serialize("srgb", true);
 		if (flags & BGFX_TEXTURE_U_CLAMP) serializer.serialize("u_clamp", true);
 		if (flags & BGFX_TEXTURE_V_CLAMP) serializer.serialize("v_clamp", true);
@@ -396,7 +393,6 @@ void Material::setTexture(int i, Texture* texture)
 
 	if (old_texture)
 	{
-		if (texture) texture->atlas_size = old_texture->atlas_size;
 		removeDependency(*old_texture);
 		m_resource_manager.getOwner().get(TEXTURE_TYPE)->unload(*old_texture);
 	}
@@ -597,7 +593,6 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 	char label[256];
 	bool keep_data = false;
 	uint32 flags = 0;
-	int atlas_size = -1;
 
 	while (!serializer.isObjectEnd())
 	{
@@ -621,10 +616,6 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 				m_textures[m_texture_count] = static_cast<Texture*>(mng->load(Path(texture_path)));
 				addDependency(*m_textures[m_texture_count]);
 			}
-		}
-		else if (equalStrings(label, "atlas_size"))
-		{
-			serializer.deserialize(atlas_size, -1);
 		}
 		else if (equalStrings(label, "min_filter"))
 		{
@@ -706,7 +697,6 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 	}
 	if (m_textures[m_texture_count])
 	{
-		m_textures[m_texture_count]->atlas_size = atlas_size;
 		m_textures[m_texture_count]->setFlags(flags);
 
 		if (keep_data)
