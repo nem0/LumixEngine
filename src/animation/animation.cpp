@@ -50,47 +50,94 @@ Animation::~Animation()
 }
 
 
-void Animation::getPose(float time, Pose& pose, Model& model) const
+void Animation::getRelativePose(float time, Pose& pose, Model& model, float weight) const
 {
 	PROFILE_FUNCTION();
-	if(model.isReady())
-	{
-		int frame = (int)(time * m_fps);
-		frame = frame >= m_frame_count ? m_frame_count - 1 : frame;
-		Vec3* pos = pose.positions;
-		Quat* rot = pose.rotations;
-		int off = frame * m_bone_count;
-		int off2 = off + m_bone_count;
-		float t = (time - frame / (float)m_fps) / (1.0f / m_fps);
+	ASSERT(!pose.is_absolute);
 
-		if(frame < m_frame_count - 1)
+	if (!model.isReady()) return;
+
+	int frame = (int)(time * m_fps);
+	frame = frame >= m_frame_count ? m_frame_count - 1 : frame;
+	Vec3* pos = pose.positions;
+	Quat* rot = pose.rotations;
+	int off = frame * m_bone_count;
+	int off2 = off + m_bone_count;
+	float t = (time - frame / (float)m_fps) / (1.0f / m_fps);
+
+	if (frame < m_frame_count - 1)
+	{
+		for (int i = 0; i < m_bone_count; ++i)
 		{
-			for(int i = 0; i < m_bone_count; ++i)
+			Model::BoneMap::iterator iter = model.getBoneIndex(m_bones[i]);
+			if (iter.isValid())
 			{
-				Model::BoneMap::iterator iter = model.getBoneIndex(m_bones[i]);
-				if (iter.isValid())
-				{
-					int model_bone_index = iter.value();
-					lerp(m_positions[off + i], m_positions[off2 + i], &pos[model_bone_index], t);
-					nlerp(m_rotations[off + i], m_rotations[off2 + i], &rot[model_bone_index], t);
-				}
+				int model_bone_index = iter.value();
+				Vec3 anim_pos;
+				lerp(m_positions[off + i], m_positions[off2 + i], &anim_pos, t);
+				lerp(pos[model_bone_index], anim_pos, &pos[model_bone_index], weight);
+				Quat anim_rot;
+				nlerp(m_rotations[off + i], m_rotations[off2 + i], &anim_rot, t);
+				nlerp(rot[model_bone_index], anim_rot, &rot[model_bone_index], weight);
 			}
 		}
-		else
+	}
+	else
+	{
+		for (int i = 0; i < m_bone_count; ++i)
 		{
-			for(int i = 0; i < m_bone_count; ++i)
+			Model::BoneMap::iterator iter = model.getBoneIndex(m_bones[i]);
+			if (iter.isValid())
 			{
-				Model::BoneMap::iterator iter = model.getBoneIndex(m_bones[i]);
-				if (iter.isValid())
-				{
-					int model_bone_index = iter.value();
-					pos[model_bone_index] = m_positions[off + i];
-					rot[model_bone_index] = m_rotations[off + i];
-				}
+				int model_bone_index = iter.value();
+				lerp(pos[model_bone_index], m_positions[off + i], &pos[model_bone_index], weight);
+				nlerp(rot[model_bone_index], m_rotations[off + i], &rot[model_bone_index], weight);
 			}
 		}
-		pose.is_absolute = false;
-		pose.computeAbsolute(model);
+	}
+}
+
+
+void Animation::getRelativePose(float time, Pose& pose, Model& model) const
+{
+	PROFILE_FUNCTION();
+	ASSERT(!pose.is_absolute);
+
+	if (!model.isReady()) return;
+
+	int frame = (int)(time * m_fps);
+	frame = frame >= m_frame_count ? m_frame_count - 1 : frame;
+	Vec3* pos = pose.positions;
+	Quat* rot = pose.rotations;
+	int off = frame * m_bone_count;
+	int off2 = off + m_bone_count;
+	float t = (time - frame / (float)m_fps) / (1.0f / m_fps);
+
+	if(frame < m_frame_count - 1)
+	{
+		for(int i = 0; i < m_bone_count; ++i)
+		{
+			Model::BoneMap::iterator iter = model.getBoneIndex(m_bones[i]);
+			if (iter.isValid())
+			{
+				int model_bone_index = iter.value();
+				lerp(m_positions[off + i], m_positions[off2 + i], &pos[model_bone_index], t);
+				nlerp(m_rotations[off + i], m_rotations[off2 + i], &rot[model_bone_index], t);
+			}
+		}
+	}
+	else
+	{
+		for(int i = 0; i < m_bone_count; ++i)
+		{
+			Model::BoneMap::iterator iter = model.getBoneIndex(m_bones[i]);
+			if (iter.isValid())
+			{
+				int model_bone_index = iter.value();
+				pos[model_bone_index] = m_positions[off + i];
+				rot[model_bone_index] = m_rotations[off + i];
+			}
+		}
 	}
 }
 
@@ -153,4 +200,4 @@ void Animation::unload(void)
 }
 
 
-} // ~namespace Lumix
+} // namespace Lumix
