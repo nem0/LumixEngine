@@ -40,8 +40,8 @@ class LUMIX_RENDERER_API Texture : public Resource
 		int height;
 		int bytes_per_pixel;
 		int depth;
+		int layers;
 		int mips;
-		int atlas_size;
 		bool is_cubemap;
 		uint32 bgfx_flags;
 		bgfx::TextureHandle handle;

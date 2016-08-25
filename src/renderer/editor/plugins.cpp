@@ -218,16 +218,6 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 					}
 				}
 
-				if (slot.is_atlas)
-				{
-					int size = texture->atlas_size - 2;
-					const char* values = "2x2\0" "3x3\0" "4x4\0";
-					if (ImGui::Combo(StaticString<30>("Atlas size###", i), &size, values))
-					{
-						ImGui::CloseCurrentPopup();
-						texture->atlas_size = size + 2;
-					}
-				}
 				ImGui::EndPopup();
 			}
 		}

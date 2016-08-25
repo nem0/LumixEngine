@@ -43,8 +43,8 @@ Texture::Texture(const Path& path, ResourceManagerBase& resource_manager, IAlloc
 	, data(_allocator)
 	, bytes_per_pixel(-1)
 	, depth(-1)
+	, layers(1)
 {
-	atlas_size = -1;
 	bgfx_flags = 0;
 	is_cubemap = false;
 	handle = BGFX_INVALID_HANDLE;
@@ -361,8 +361,11 @@ bool loadRaw(Texture& texture, FS::IFile& file)
 		1,
 		bgfx::TextureFormat::R32F,
 		texture.bgfx_flags,
-		mem);
+		nullptr);
+	// update must be here because texture is immutable otherwise 
+	bgfx::updateTexture2D(texture.handle, 0, 0, 0, 0, (uint16_t)texture.width, (uint16_t)texture.height, mem);
 	texture.depth = 1;
+	texture.layers = 1;
 	texture.mips = 1;
 	texture.is_cubemap = false;
 	return bgfx::isValid(texture.handle);
@@ -424,11 +427,21 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 		header.width,
 		header.height,
 		false,
-		1,
+		0,
 		bgfx::TextureFormat::RGBA8,
 		texture.bgfx_flags,
+		nullptr);
+	// update must be here because texture is immutable otherwise 
+	bgfx::updateTexture2D(texture.handle,
+		0,
+		0,
+		0,
+		0,
+		header.width,
+		header.height,
 		bgfx::copy(image_dest, header.width * header.height * 4));
 	texture.depth = 1;
+	texture.layers = 1;
 	return bgfx::isValid(texture.handle);
 }
 
@@ -462,6 +475,7 @@ static bool loadDDS(Texture& texture, FS::IFile& file)
 	texture.mips = info.numMips;
 	texture.height = info.height;
 	texture.depth = info.depth;
+	texture.layers = info.numLayers;
 	texture.is_cubemap = info.cubeMap;
 	return bgfx::isValid(texture.handle);
 }

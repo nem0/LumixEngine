@@ -88,14 +88,12 @@ public:
 		{
 			name[0] = uniform[0] = '\0';
 			define_idx = -1;
-			is_atlas = false;
 			uniform_handle = BGFX_INVALID_HANDLE;
 		}
 
 		char name[30];
 		char uniform[30];
 		int define_idx;
-		bool is_atlas;
 		bgfx::UniformHandle uniform_handle;
 	};
 
