@@ -2561,7 +2561,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	pipeline->render();
 
 	bgfx::TextureHandle texture =
-		bgfx::createTexture2D(width, height, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
+		bgfx::createTexture2D(width, height, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
 
 	renderer->viewCounterAdd();
 	bgfx::touch(renderer->getViewCounter());

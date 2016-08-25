@@ -90,11 +90,11 @@ bool Texture::create(int w, int h, void* data)
 	if (data)
 	{
 		handle = bgfx::createTexture2D(
-			(uint16_t)w, (uint16_t)h, 1, bgfx::TextureFormat::RGBA8, bgfx_flags, bgfx::copy(data, w * h * 4));
+			(uint16_t)w, (uint16_t)h, false, 1, bgfx::TextureFormat::RGBA8, bgfx_flags, bgfx::copy(data, w * h * 4));
 	}
 	else
 	{
-		handle = bgfx::createTexture2D((uint16_t)w, (uint16_t)h, 1, bgfx::TextureFormat::RGBA8, bgfx_flags);
+		handle = bgfx::createTexture2D((uint16_t)w, (uint16_t)h, false, 1, bgfx::TextureFormat::RGBA8, bgfx_flags);
 	}
 	mips = 1;
 
@@ -328,7 +328,7 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 			}
 		}
 	}
-	bgfx::updateTexture2D(handle, 0, (uint16_t)x, (uint16_t)y, (uint16_t)w, (uint16_t)h, mem);
+	bgfx::updateTexture2D(handle, 0, 0, (uint16_t)x, (uint16_t)y, (uint16_t)w, (uint16_t)h, mem);
 }
 
 
@@ -355,9 +355,13 @@ bool loadRaw(Texture& texture, FS::IFile& file)
 		dst_mem[i] = src_mem[i] / 65535.0f;
 	}
 
-	texture.handle = bgfx::createTexture2D(
-		(uint16_t)texture.width, (uint16_t)texture.height, 1, bgfx::TextureFormat::R32F, texture.bgfx_flags, nullptr);
-	bgfx::updateTexture2D(texture.handle, 0, 0, 0, (uint16_t)texture.width, (uint16_t)texture.height, mem);
+	texture.handle = bgfx::createTexture2D((uint16_t)texture.width,
+		(uint16_t)texture.height,
+		false,
+		1,
+		bgfx::TextureFormat::R32F,
+		texture.bgfx_flags,
+		mem);
 	texture.depth = 1;
 	texture.mips = 1;
 	texture.is_cubemap = false;
@@ -419,17 +423,10 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 	texture.handle = bgfx::createTexture2D(
 		header.width,
 		header.height,
+		false,
 		1,
 		bgfx::TextureFormat::RGBA8,
 		texture.bgfx_flags,
-		0);
-	bgfx::updateTexture2D(
-		texture.handle,
-		0,
-		0,
-		0,
-		header.width,
-		header.height,
 		bgfx::copy(image_dest, header.width * header.height * 4));
 	texture.depth = 1;
 	return bgfx::isValid(texture.handle);

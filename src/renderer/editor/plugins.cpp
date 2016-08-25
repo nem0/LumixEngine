@@ -883,7 +883,7 @@ struct EnvironmentProbePlugin : public PropertyGrid::IPlugin
 		data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
 
 		bgfx::TextureHandle texture =
-			bgfx::createTexture2D(TEXTURE_SIZE, TEXTURE_SIZE, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
+			bgfx::createTexture2D(TEXTURE_SIZE, TEXTURE_SIZE, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
 		
 		Vec3 probe_position = universe->getPosition(cmp.entity);
 		auto* scene = static_cast<RenderScene*>(universe->getScene(RENDERER_HASH));
