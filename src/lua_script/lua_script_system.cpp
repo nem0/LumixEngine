@@ -4,21 +4,22 @@
 #include "engine/binary_array.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
+#include "engine/debug/debug.h"
+#include "engine/engine.h"
 #include "engine/fs/file_system.h"
 #include "engine/iallocator.h"
+#include "engine/iplugin.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/path_utils.h"
-#include "engine/resource_manager.h"
-#include "engine/debug/debug.h"
-#include "engine/engine.h"
-#include "engine/property_register.h"
-#include "engine/property_descriptor.h"
-#include "engine/iplugin.h"
-#include "lua_script/lua_script_manager.h"
 #include "engine/plugin_manager.h"
+#include "engine/profiler.h"
+#include "engine/property_descriptor.h"
+#include "engine/property_register.h"
+#include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
+#include "lua_script/lua_script_manager.h"
 
 
 namespace Lumix
@@ -1356,6 +1357,7 @@ namespace Lumix
 
 		void update(float time_delta, bool paused) override
 		{
+			PROFILE_FUNCTION();
 			if (paused) return;
 
 			int timers_to_remove[1024];

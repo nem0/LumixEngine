@@ -521,6 +521,7 @@ project "animation"
 		links { "editor" }
 	end
 	
+	useLua()
 	defaultConfigurations()
 
 project "audio"

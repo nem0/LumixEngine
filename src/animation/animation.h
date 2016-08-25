@@ -54,7 +54,8 @@ class Animation : public Resource
 		Animation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 		~Animation();
 
-		void getPose(float time, Pose& pose, Model& model) const;
+		void getRelativePose(float time, Pose& pose, Model& model) const;
+		void getRelativePose(float time, Pose& pose, Model& model, float weight) const;
 		int getFrameCount() const { return m_frame_count; }
 		float getLength() const { return m_frame_count / (float)m_fps; }
 		int getFPS() const { return m_fps; }
