@@ -2103,7 +2103,7 @@ struct PipelineImpl : public Pipeline
 	bgfx::TextureHandle createTexture(int width, int height, const uint32* data) override
 	{
 		return bgfx::createTexture2D(
-			width, height, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::copy(data, 4 * width * height));
+			width, height, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::copy(data, 4 * width * height));
 	}
 
 
