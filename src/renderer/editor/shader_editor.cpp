@@ -1800,7 +1800,8 @@ void ShaderEditor::load()
 	Lumix::Array<Lumix::uint8> data(m_allocator);
 	data.resize(data_size);
 	fseek(fp, 0, SEEK_SET);
-	fread(&data[0], 1, data_size, fp);
+	size_t read = fread(&data[0], 1, data_size, fp);
+	(void)read;
 
 	Lumix::InputBlob blob(&data[0], data_size);
 	for (int i = 0; i < Lumix::lengthOf(m_textures); ++i)

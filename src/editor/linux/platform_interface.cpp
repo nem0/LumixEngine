@@ -53,7 +53,10 @@ bool getNextFile(FileIterator* iterator, FileInfo* info)
 
 void getCurrentDirectory(char* buffer, int buffer_size)
 {
-	getcwd(buffer, buffer_size);
+	if(!getcwd(buffer, buffer_size))
+	{
+		buffer[0] = 0;
+	}
 }
 
 
