@@ -115,7 +115,7 @@ template <typename T, int count> int lengthOf(const T (&)[count])
 
 #ifndef ASSERT
 	#ifdef NDEBUG
-		#define ASSERT(x) { false ? (void)(x) : 0; } 
+		#define ASSERT(x) { false ? (void)(x) : (void)0; }
 	#else
 		#ifdef _WIN32
 			#define LUMIX_DEBUG_BREAK() __debugbreak()
