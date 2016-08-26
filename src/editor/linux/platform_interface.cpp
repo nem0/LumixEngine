@@ -1,6 +1,7 @@
 #include "platform_interface.h"
 #include "engine/command_line_parser.h"
 #include "engine/iallocator.h"
+#include "engine/log.h"
 #include "engine/string.h"
 #include "imgui/imgui.h"
 #include <cerrno>
@@ -110,6 +111,14 @@ void destroyProcess(Process& process)
 
 Process* createProcess(const char* cmd, const char* args, Lumix::IAllocator& allocator)
 {
+	struct stat sb;
+	if(stat (cmd, &sb) == 0 && (sb.st_mode & S_IXUSR) == 0)
+	{
+		Lumix::g_log_error.log("Editor") << cmd << " is not executable.";
+		return nullptr;
+	}
+
+
 	auto* process = LUMIX_NEW(allocator, Process)(allocator);
 	int res = pipe(process->pipes);
 	ASSERT(res == 0);
@@ -118,9 +127,10 @@ Process* createProcess(const char* cmd, const char* args, Lumix::IAllocator& all
 	ASSERT(process->handle != -1);
 	if (process->handle == 0)
 	{
-		close(process->pipes[0]);
 		dup2(process->pipes[1], STDOUT_FILENO);
 		dup2(process->pipes[1], STDERR_FILENO);
+		close(process->pipes[0]);
+		close(process->pipes[1]);
 
 		Lumix::CommandLineParser parser(args);
 		char* args_array[256];
@@ -140,9 +150,12 @@ Process* createProcess(const char* cmd, const char* args, Lumix::IAllocator& all
 		*i = nullptr;
 
 		execv(cmd, args_array);
+		_exit(-1);
 	}
 	else
 	{
+		int fl = fcntl(process->pipes[0], F_GETFL, 0);
+		fcntl(process->pipes[0], F_SETFL, fl | O_NONBLOCK);
 		close(process->pipes[1]);
 	}
 	return process;
@@ -151,6 +164,8 @@ Process* createProcess(const char* cmd, const char* args, Lumix::IAllocator& all
 
 int getProcessOutput(Process& process, char* buf, int buf_size)
 {
+	if(buf_size <= 0) return -1;
+	buf[0] = 0;
 	size_t ret = read(process.pipes[0], buf, buf_size);
 	return (int)ret;
 }
@@ -333,19 +348,19 @@ bool makePath(const char* path)
 
 void copyToClipboard(const char* text)
 {
-	ASSERT(false); // TODO
+	//ASSERT(false); // TODO
 }
 
 
 void setWindow(SDL_Window* window)
 {
-	ASSERT(false); // TODO
+	//ASSERT(false); // TODO
 }
 
 
 void clipCursor(int x, int y, int w, int h)
 {
-	ASSERT(false); // TODO
+	//ASSERT(false); // TODO
 }
 
 
