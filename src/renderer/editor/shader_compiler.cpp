@@ -552,7 +552,7 @@ void ShaderCompiler::update()
 	{
 		char tmp[4096];
 		int len;
-		while ((len = PlatformInterface::getProcessOutput(*m_processes[i].process, tmp, sizeof(tmp)-1)) >= 0)
+		while ((len = PlatformInterface::getProcessOutput(*m_processes[i].process, tmp, sizeof(tmp)-1)) > 0)
 		{
 			tmp[len] = 0;
 			m_processes[i].output.cat(tmp);
