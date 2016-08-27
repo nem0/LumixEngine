@@ -32,7 +32,6 @@ public:
 
 	void makeUpToDate(bool wait);
 	void update();
-	bool isCompiling() const { return m_is_compiling; }
 
 private:
 	void findShaderFiles(const char* src_dir);
@@ -85,5 +84,4 @@ private:
 	Lumix::Array<Lumix::string> m_changed_files;
 	Lumix::MT::SpinMutex m_mutex;
 	LogUI& m_log_ui;
-	bool m_is_compiling;
 };
