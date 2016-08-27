@@ -484,7 +484,8 @@ ShaderInstance::~ShaderInstance()
 }
 
 
-bool Shader::getShaderCombinations(Renderer& renderer,
+bool Shader::getShaderCombinations(const char* shd_path,
+	Renderer& renderer,
 	const char* shader_content,
 	ShaderCombinations* output)
 {
@@ -496,7 +497,7 @@ bool Shader::getShaderCombinations(Renderer& renderer,
 	errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
 	if (errors)
 	{
-		g_log_error.log("Renderer") << lua_tostring(L, -1);
+		g_log_error.log("Renderer") << shd_path << " - " << lua_tostring(L, -1);
 		lua_pop(L, 1);
 		lua_close(L);
 		return false;
