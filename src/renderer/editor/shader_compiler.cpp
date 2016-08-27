@@ -46,7 +46,6 @@ ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
 	, m_mutex(false)
 {
 	m_notifications_id = -1;
-	m_is_compiling = false;
 
 	m_watcher = FileSystemWatcher::create("pipelines", m_editor.getAllocator());
 	m_watcher->getCallback().bind<ShaderCompiler, &ShaderCompiler::onFileChanged>(this);
@@ -180,7 +179,7 @@ void ShaderCompiler::findShaderFiles(const char* src_dir)
 
 void ShaderCompiler::makeUpToDate(bool wait)
 {
-	if (m_is_compiling)
+	if (!m_to_compile.empty())
 	{
 		if (wait) this->wait();
 		return;
@@ -195,9 +194,6 @@ void ShaderCompiler::makeUpToDate(bool wait)
 			"restart the editor");
 		return;
 	}
-
-	m_is_compiling = true;
-	if (m_app.getAssetBrowser()) m_app.getAssetBrowser()->enableUpdate(false);
 
 	auto& fs = m_editor.getEngine().getFileSystem();
 	for (Lumix::string& shd_path : m_shd_files)
@@ -218,7 +214,7 @@ void ShaderCompiler::makeUpToDate(bool wait)
 		fs.close(*file);
 
 		Lumix::ShaderCombinations combinations;
-		Lumix::Shader::getShaderCombinations(getRenderer(), &data[0], &combinations);
+		Lumix::Shader::getShaderCombinations(shd_path.c_str(), getRenderer(), &data[0], &combinations);
 
 		char basename[Lumix::MAX_PATH_LENGTH];
 		Lumix::PathUtils::getBasename(basename, Lumix::lengthOf(basename), shd_path.c_str());
@@ -391,12 +387,12 @@ void ShaderCompiler::reloadShaders()
 
 void ShaderCompiler::updateNotifications()
 {
-	if (m_is_compiling && m_notifications_id < 0)
+	if (!m_to_compile.empty() && m_notifications_id < 0)
 	{
 		m_notifications_id = m_log_ui.addNotification("Compiling shaders...");
 	}
 
-	if (!m_is_compiling)
+	if (m_to_compile.empty())
 	{
 		m_log_ui.setNotificationTime(m_notifications_id, 3.0f);
 		m_notifications_id = -1;
@@ -484,7 +480,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 
 void ShaderCompiler::processChangedFiles()
 {
-	if (m_is_compiling) return;
+	if (!m_to_compile.empty()) return;
 
 	char changed_file_path[Lumix::MAX_PATH_LENGTH];
 	{
@@ -546,10 +542,9 @@ void ShaderCompiler::processChangedFiles()
 
 void ShaderCompiler::wait()
 {
-	while (m_is_compiling)
+	while (!m_to_compile.empty())
 	{
 		update();
-		Lumix::MT::sleep(500);
 	}
 }
 
@@ -558,22 +553,21 @@ void ShaderCompiler::update()
 {
 	PROFILE_FUNCTION();
 	updateNotifications();
-	bool was_compiling = m_is_compiling;
-	m_is_compiling = !m_to_compile.empty();
-	if (was_compiling && !m_is_compiling)
-	{
-		reloadShaders();
-		parseDependencies();
-	}
-
-	m_app.getAssetBrowser()->enableUpdate(!m_is_compiling);
 
 	processChangedFiles();
 
 	if (!m_to_compile.empty())
 	{
+		m_app.getAssetBrowser()->enableUpdate(false);
 		compile(m_to_compile.back().c_str());
 		m_to_compile.pop();
+
+		if (m_to_compile.empty())
+		{
+			reloadShaders();
+			parseDependencies();
+			m_app.getAssetBrowser()->enableUpdate(true);
+		}
 	}
 }
 
@@ -631,7 +625,7 @@ void ShaderCompiler::compile(const char* path)
 		fs.close(*file);
 
 		Lumix::ShaderCombinations combinations;
-		Lumix::Shader::getShaderCombinations(getRenderer(), &data[0], &combinations);
+		Lumix::Shader::getShaderCombinations(path, getRenderer(), &data[0], &combinations);
 
 		compileAllPasses(path, false, combinations.fs_local_mask, combinations);
 		compileAllPasses(path, true, combinations.vs_local_mask, combinations);
