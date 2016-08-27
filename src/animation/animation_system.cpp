@@ -116,6 +116,14 @@ struct AnimationSceneImpl : public AnimationScene
 	}
 
 
+	float getAnimationLength(int animation_idx)
+	{
+		auto* animation = static_cast<Animation*>(animation_idx > 0 ? m_engine.getLuaResource(animation_idx) : nullptr);
+		if (animation) return animation->getLength();
+		return 0;
+	}
+
+
 	void mixAnimation(Entity entity, int animation_idx, int input_idx, float time, float weight)
 	{
 		auto* animation = static_cast<Animation*>(animation_idx > 0 ? m_engine.getLuaResource(animation_idx) : nullptr);
@@ -429,6 +437,7 @@ struct AnimationSystemImpl : public IPlugin
 		} while(false) \
 
 		REGISTER_FUNCTION(mixAnimation);
+		REGISTER_FUNCTION(getAnimationLength);
 
 		#undef REGISTER_FUNCTION
 	}
