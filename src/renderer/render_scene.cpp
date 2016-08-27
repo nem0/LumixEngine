@@ -316,7 +316,18 @@ public:
 		{
 			int index = m_particle_emitters.find(entity);
 			if (index < 0) return INVALID_COMPONENT;
-			if (m_particle_emitters.at(index)->m_is_valid) return {entity.index};
+			if (m_particle_emitters.at(index)->m_is_valid) return{ entity.index };
+			return INVALID_COMPONENT;
+		}
+		if (type == BONE_ATTACHMENT_TYPE)
+		{
+			for (auto& attachment : m_bone_attachments)
+			{
+				if (attachment.entity == entity)
+				{
+					return {entity.index};
+				}
+			}
 			return INVALID_COMPONENT;
 		}
 

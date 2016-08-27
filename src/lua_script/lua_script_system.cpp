@@ -526,19 +526,24 @@ namespace Lumix
 			if (cmp == INVALID_COMPONENT)
 			{
 				lua_pushnil(L);
+				return 1;
+			}
+			int count = scene->getScriptCount(cmp);
+			if (scr_index >= count)
+			{
+				lua_pushnil(L);
+				return 1;
+			}
+
+			int env = scene->getEnvironment(cmp, scr_index);
+			if (env < 0)
+			{
+				lua_pushnil(L);
 			}
 			else
 			{
-				int env = scene->getEnvironment(cmp, scr_index);
-				if (env < 0)
-				{
-					lua_pushnil(L);
-				}
-				else
-				{
-					bool is_valid = lua_rawgeti(L, LUA_REGISTRYINDEX, env) == LUA_TTABLE;
-					ASSERT(is_valid);
-				}
+				bool is_valid = lua_rawgeti(L, LUA_REGISTRYINDEX, env) == LUA_TTABLE;
+				ASSERT(is_valid);
 			}
 			return 1;
 		}
