@@ -456,7 +456,7 @@ struct RendererImpl : public Renderer
 		void fatal(bgfx::Fatal::Enum _code, const char* _str) override
 		{
 			Lumix::g_log_error.log("Renderer") << _str;
-			if (bgfx::Fatal::DebugCheck == _code)
+			if (bgfx::Fatal::DebugCheck == _code || bgfx::Fatal::InvalidShader == _code)
 			{
 				Lumix::Debug::debugBreak();
 			}
