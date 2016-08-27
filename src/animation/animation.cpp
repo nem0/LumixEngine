@@ -58,7 +58,7 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, float weig
 	if (!model.isReady()) return;
 
 	int frame = (int)(time * m_fps);
-	frame = frame >= m_frame_count ? m_frame_count - 1 : frame;
+	frame = Math::clamp(frame, 0, m_frame_count - 1);
 	Vec3* pos = pose.positions;
 	Quat* rot = pose.rotations;
 	int off = frame * m_bone_count;
@@ -106,7 +106,7 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model) const
 	if (!model.isReady()) return;
 
 	int frame = (int)(time * m_fps);
-	frame = frame >= m_frame_count ? m_frame_count - 1 : frame;
+	frame = Math::clamp(frame, 0, m_frame_count - 1);
 	Vec3* pos = pose.positions;
 	Quat* rot = pose.rotations;
 	int off = frame * m_bone_count;
