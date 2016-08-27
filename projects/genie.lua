@@ -770,7 +770,7 @@ if build_studio then
 				links { "gui" }
 			end
 
-			links { "audio", "animation", "renderer", "lua_script", "navigation", "editor", "engine" }
+			links { "audio", "animation", "renderer", "lua_script", "navigation", "editor", "engine", "shaderc" }
 			linkLib "crnlib"
 			linkLib "assimp"
 			linkLib "bgfx"
@@ -792,7 +792,6 @@ if build_studio then
 		end
 
 		linkLib "SDL"
-		links {"shaderc"}
 
 		configuration {"vs*"}
 			links { "winmm", "imm32", "version" }
