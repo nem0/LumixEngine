@@ -176,7 +176,7 @@ function linkLib(lib)
 
 	for conf,conf_dir in pairs({Debug="debug", Release="release", RelWithDebInfo="release"}) do
 		for platform,target_platform in pairs({win="windows", linux="linux", }) do
-			configuration { "x" .. "64", conf, target_platform }
+			configuration { "x64", conf, target_platform }
 				libdirs {"../external/" .. lib .. "/lib/" .. platform .. "64" .. "_" .. ide_dir .. "/" .. conf_dir}
 				libdirs {"../external/" .. lib .. "/dll/" .. platform .. "64" .. "_" .. ide_dir .. "/" .. conf_dir}
 		end
@@ -491,9 +491,9 @@ project "renderer"
 	includedirs { "../src", "../external/bgfx/include", "../external/assimp/include", "../external/crnlib/include" }
 	defines { "BUILDING_RENDERER" }
 	links { "engine" }
-	
+
 	if build_studio then
-		links { "editor" }
+		links { "editor", "shaderc" }
 		linkLib "crnlib"
 		linkLib "assimp"
 	end
@@ -672,6 +672,7 @@ if build_app then
 		if build_studio then
 			linkLib "crnlib"
 			linkLib "assimp"
+			links {"shaderc"}
 		end
 		
 		linkLib "bgfx"
@@ -791,6 +792,7 @@ if build_studio then
 		end
 
 		linkLib "SDL"
+		links {"shaderc"}
 
 		configuration {"vs*"}
 			links { "winmm", "imm32", "version" }

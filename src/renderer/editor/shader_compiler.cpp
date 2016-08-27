@@ -20,6 +20,15 @@
 #include "editor/platform_interface.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
+#include <cstdio>
+
+
+namespace bgfx
+{ 
+	int compileShader(int _argc, const char* _argv[]);
+	typedef void(*UserErrorFn)(void*, const char*, va_list);
+	void setShaderCErrorFunction(UserErrorFn fn, void* user_ptr);
+}
 
 
 static const Lumix::ResourceType SHADER_TYPE("shader");
@@ -32,7 +41,6 @@ ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
 	, m_dependencies(m_editor.getAllocator())
 	, m_to_compile(m_editor.getAllocator())
 	, m_to_reload(m_editor.getAllocator())
-	, m_processes(m_editor.getAllocator())
 	, m_shd_files(m_editor.getAllocator())
 	, m_changed_files(m_editor.getAllocator())
 	, m_mutex(false)
@@ -184,12 +192,12 @@ void ShaderCompiler::makeUpToDate(bool wait)
 	if (!PlatformInterface::dirExists(compiled_dir) && !PlatformInterface::makePath(compiled_dir))
 	{
 		Lumix::messageBox("Could not create directory pipelines/compiled. Please create it and "
-						  "restart the editor");
+			"restart the editor");
 		return;
 	}
 
 	m_is_compiling = true;
-	if(m_app.getAssetBrowser()) m_app.getAssetBrowser()->enableUpdate(false);
+	if (m_app.getAssetBrowser()) m_app.getAssetBrowser()->enableUpdate(false);
 
 	auto& fs = m_editor.getEngine().getFileSystem();
 	for (Lumix::string& shd_path : m_shd_files)
@@ -229,7 +237,7 @@ void ShaderCompiler::makeUpToDate(bool wait)
 		{
 			if (!PlatformInterface::fileExists(bin.c_str()) ||
 				PlatformInterface::getLastModified(bin.c_str()) <
-					PlatformInterface::getLastModified(key.c_str()))
+				PlatformInterface::getLastModified(key.c_str()))
 			{
 				char basename[Lumix::MAX_PATH_LENGTH];
 				Lumix::PathUtils::getBasename(basename, sizeof(basename), bin.c_str());
@@ -363,8 +371,6 @@ void ShaderCompiler::addDependency(const char* ckey, const char* cvalue)
 
 ShaderCompiler::~ShaderCompiler()
 {
-	while (!m_processes.empty()) update();
-
 	FileSystemWatcher::destroy(m_watcher);
 }
 
@@ -398,6 +404,14 @@ void ShaderCompiler::updateNotifications()
 }
 
 
+static void errorCallback(void*, const char* format, va_list args)
+{
+	char tmp[4096];
+	vsnprintf(tmp, Lumix::lengthOf(tmp), format, args);
+	Lumix::g_log_error.log("Renderer") << tmp;
+}
+
+
 void ShaderCompiler::compilePass(const char* shd_path,
 	bool is_vertex_shader,
 	const char* pass,
@@ -414,59 +428,54 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			updateNotifications();
 			Lumix::PathUtils::FileInfo shd_file_info(shd_path);
 			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> source_path(
-				"\"", shd_file_info.m_dir, shd_file_info.m_basename, is_vertex_shader ? "_vs.sc\"" : "_fs.sc\"");
-			char out_path[Lumix::MAX_PATH_LENGTH];
-			Lumix::copyString(out_path, base_path);
-			Lumix::catString(out_path, "/pipelines/compiled");
-			Lumix::catString(out_path, is_opengl ? "_gl/" : "/");
-			Lumix::catString(out_path, shd_file_info.m_basename);
-			Lumix::catString(out_path, "_");
-			Lumix::catString(out_path, Lumix::StaticString<30>(pass, mask));
-			Lumix::catString(out_path, is_vertex_shader ? "_vs.shb" : "_fs.shb");
+				"", shd_file_info.m_dir, shd_file_info.m_basename, is_vertex_shader ? "_vs.sc" : "_fs.sc");
+			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> out_path(base_path);
+			out_path << "/pipelines/compiled" << (is_opengl ? "_gl/" : "/");
+			out_path << shd_file_info.m_basename << "_" << pass;
+			out_path << mask << (is_vertex_shader ? "_vs.shb" : "_fs.shb");
 
-			Lumix::StaticString<1024> args(" -f ");
-
-			args << source_path << " -o \"" << out_path << "\" --depends ";
-			args << "-i \"" << base_path << "/pipelines/\" ";
-			args << "--varyingdef \"" << base_path << "/pipelines/varying.def.sc\" ";
+			const char* args_array[18];
+			args_array[0] = "-f";
+			args_array[1] = source_path;
+			args_array[2] = "-o";
+			args_array[3] = out_path;
+			args_array[4] = "--depends";
+			args_array[5] = "-i";
+			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> include(base_path, "/pipelines/");
+			args_array[6] = include;
+			args_array[7] = "--varyingdef";
+			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> varying(base_path, "/pipelines/varying.def.sc");
+			args_array[8] = varying;
+			args_array[9] = "--platform";
 			if (getRenderer().isOpenGL())
 			{
-				args << "--platform linux --profile 140 ";
+				args_array[10] = "linux";
+				args_array[11] = "--profile";
+				args_array[12] = "140";
 			}
 			else
 			{
-				args << "--platform windows " << (is_vertex_shader ? "--profile vs_5_0" : "--profile ps_5_0");
+				args_array[10] = "windows";
+				args_array[11] = "--profile";
+				args_array[12] = is_vertex_shader ? "vs_5_0" : "ps_5_0";
 			}
-			args << " --type "
-				<< (is_vertex_shader ? "vertex -O3" : "fragment -O3")
-				<< " --define " << pass << ";";
+			args_array[13] = "--type";
+			args_array[14] = is_vertex_shader ? "vertex" : "fragment";
+			args_array[15] = "-O3";
+			args_array[16] = "--define";
+			Lumix::StaticString<256> defines(pass, ";");
 			for (int i = 0; i < Lumix::lengthOf(all_defines); ++i)
 			{
 				if (mask & (1 << i))
 				{
-					args << getRenderer().getShaderDefine(all_defines[i]) << ";";
+					defines << getRenderer().getShaderDefine(all_defines[i]) << ";";
 				}
 			}
-
-			#ifdef _WIN32
-				Lumix::StaticString<Lumix::MAX_PATH_LENGTH> cmd(base_path, "/pipelines/shaderc.exe");
-			#elif defined __linux__
-				Lumix::StaticString<Lumix::MAX_PATH_LENGTH> cmd(base_path, "/pipelines/shaderc");
-			#else
-				#error Platform not supported
-			#endif
-			
-			PlatformInterface::deleteFile(out_path);
-			auto* process = PlatformInterface::createProcess(cmd, args, m_editor.getAllocator());
-			if (!process)
+			args_array[17] = defines;
+			bgfx::setShaderCErrorFunction(errorCallback, nullptr);
+			if (bgfx::compileShader(18, args_array) == EXIT_FAILURE)
 			{
-				Lumix::g_log_error.log("Editor") << "Could not execute command: " << cmd;
-			}
-			else
-			{
-				auto& p = m_processes.emplace(m_editor.getAllocator());
-				p.process = process;
-				Lumix::copyString(p.path, out_path);
+				Lumix::g_log_error.log("Renderer") << "Failed to compile " << source_path << "(" << out_path << "), defines = \"" << defines << "\"";
 			}
 		}
 	}
@@ -548,47 +557,20 @@ void ShaderCompiler::wait()
 void ShaderCompiler::update()
 {
 	PROFILE_FUNCTION();
-	for (int i = 0; i < m_processes.size(); ++i)
+	updateNotifications();
+	bool was_compiling = m_is_compiling;
+	m_is_compiling = !m_to_compile.empty();
+	if (was_compiling && !m_is_compiling)
 	{
-		char tmp[4096];
-		int len;
-		while ((len = PlatformInterface::getProcessOutput(*m_processes[i].process, tmp, sizeof(tmp)-1)) > 0)
-		{
-			tmp[len] = 0;
-			m_processes[i].output.cat(tmp);
-		}
-
-		if (PlatformInterface::isProcessFinished(*m_processes[i].process))
-		{
-			bool failed = PlatformInterface::getProcessExitCode(*m_processes[i].process) != 0;
-			if (failed)
-			{
-				if (strstr(m_processes[i].path, "imgui") != nullptr)
-				{
-					Lumix::messageBox("Could not compile imgui shader");
-				}
-
-				Lumix::g_log_error.log("Editor") << "Failed to compile " << m_processes[i].path << ". Error log:";
-				Lumix::g_log_error.log("Editor") << m_processes[i].output.c_str();
-			}
-
-			PlatformInterface::destroyProcess(*m_processes[i].process);
-			m_processes.eraseFast(i);
-
-			updateNotifications();
-			if (m_processes.empty() && m_changed_files.empty())
-			{
-				reloadShaders();
-				parseDependencies();
-			}
-		}
+		reloadShaders();
+		parseDependencies();
 	}
-	m_is_compiling = !m_processes.empty() || !m_to_compile.empty();
+
 	m_app.getAssetBrowser()->enableUpdate(!m_is_compiling);
 
 	processChangedFiles();
 
-	if (m_processes.size() < 4 && !m_to_compile.empty())
+	if (!m_to_compile.empty())
 	{
 		compile(m_to_compile.back().c_str());
 		m_to_compile.pop();
@@ -619,7 +601,7 @@ void ShaderCompiler::compile(const char* path)
 	if (Lumix::findSubstring(basename, "_"))
 	{
 		Lumix::g_log_error.log("Editor") << "Shaders with underscore are not supported. " << path
-										 << " will not be compiled.";
+			<< " will not be compiled.";
 		return;
 	}
 
@@ -631,7 +613,7 @@ void ShaderCompiler::compile(const char* path)
 		if (!PlatformInterface::dirExists(compiled_dir))
 		{
 			Lumix::messageBox("Could not create directory pipelines/compiled. Please create it and "
-							  "restart the editor");
+				"restart the editor");
 		}
 	}
 

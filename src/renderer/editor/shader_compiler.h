@@ -82,7 +82,6 @@ private:
 	Lumix::Array<Lumix::string> m_to_compile;
 	Lumix::Array<Lumix::string> m_to_reload;
 	Lumix::Array<Lumix::string> m_shd_files;
-	Lumix::Array<ProcessInfo> m_processes;
 	Lumix::Array<Lumix::string> m_changed_files;
 	Lumix::MT::SpinMutex m_mutex;
 	LogUI& m_log_ui;
