@@ -128,7 +128,10 @@ public:
 	ShaderInstance& getInstance(uint32 mask);
 	Renderer& getRenderer();
 
-	static bool getShaderCombinations(Renderer& renderer, const char* shader_content, ShaderCombinations* output);
+	static bool getShaderCombinations(const char* shd_path,
+		Renderer& renderer,
+		const char* shader_content,
+		ShaderCombinations* output);
 
 	IAllocator& m_allocator;
 	Array<ShaderInstance*> m_instances;
