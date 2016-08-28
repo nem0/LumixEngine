@@ -497,7 +497,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		ImGui::LabelText("Bounding radius", "%f", model->getBoundingRadius());
 
 		auto* lods = model->getLODs();
-		if (lods[0].to_mesh >= 0)
+		if (lods[0].to_mesh >= 0 && !model->isFailure())
 		{
 			ImGui::Separator();
 			ImGui::Columns(4);
