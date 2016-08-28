@@ -2015,6 +2015,7 @@ static bool isImage(const char* path)
 
 	static const char* image_extensions[] = {
 		"dds", "jpg", "jpeg", "png", "tga", "bmp", "psd", "gif", "hdr", "pic", "pnm"};
+	makeLowercase(ext, lengthOf(ext), ext);
 	for (auto image_ext : image_extensions)
 	{
 		if (equalStrings(ext, image_ext))
