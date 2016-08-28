@@ -3,6 +3,7 @@
 
 #include "engine/array.h"
 #include "engine/associative_array.h"
+#include "engine/matrix.h"
 #include "engine/resource.h"
 #include "engine/vec.h"
 #include <bgfx/bgfx.h>
@@ -18,7 +19,6 @@ struct GrassInfo;
 class IAllocator;
 class LIFOAllocator;
 class Material;
-struct Matrix;
 struct Mesh;
 class Model;
 class OutputBlob;
@@ -49,15 +49,19 @@ class Terrain
 				float m_distance;
 		};
 
-		class GrassPatch
+		struct GrassPatch
 		{
-			public:
-				explicit GrassPatch(IAllocator& allocator)
-					: m_matrices(allocator)
-				{ }
+			struct InstanceData
+			{
+				Matrix matrix;
+				Vec4 normal;
+			};
+			explicit GrassPatch(IAllocator& allocator)
+				: instance_data(allocator)
+			{ }
 
-				Array<Matrix> m_matrices;
-				GrassType* m_type;
+			Array<InstanceData> instance_data;
+			GrassType* m_type;
 		};
 
 		class GrassQuad
