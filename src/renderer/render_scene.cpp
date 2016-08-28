@@ -460,7 +460,7 @@ public:
 
 	void updateBoneAttachment(const BoneAttachment& bone_attachment)
 	{
-		if (bone_attachment.parent_entity == INVALID_ENTITY) return;
+		if (!isValid(bone_attachment.parent_entity)) return;
 		ComponentHandle renderable = getRenderableComponent(bone_attachment.parent_entity);
 		if (renderable == INVALID_COMPONENT) return;
 		auto* parent_pose = getPose(renderable);
@@ -513,7 +513,11 @@ public:
 	{
 		int idx = getBoneAttachmentIdx(cmp);
 		if (idx < 0) return;
-		m_bone_attachments[idx].relative_transform.pos = pos;
+		BoneAttachment& attachment = m_bone_attachments[idx];
+		attachment.relative_transform.pos = pos;
+		m_is_updating_attachments = true;
+		updateBoneAttachment(attachment);
+		m_is_updating_attachments = false;
 	}
 
 
