@@ -242,6 +242,8 @@ public:
 	virtual int getBoneAttachmentBone(ComponentHandle cmp) = 0;
 	virtual Vec3 getBoneAttachmentPosition(ComponentHandle cmp) = 0;
 	virtual void setBoneAttachmentPosition(ComponentHandle cmp, const Vec3& pos) = 0;
+	virtual Vec3 getBoneAttachmentRotation(ComponentHandle cmp) = 0;
+	virtual void setBoneAttachmentRotation(ComponentHandle cmp, const Vec3& rot) = 0;
 
 	virtual const Array<DebugTriangle>& getDebugTriangles() const = 0;
 	virtual const Array<DebugLine>& getDebugLines() const = 0;
