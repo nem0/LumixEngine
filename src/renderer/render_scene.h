@@ -103,9 +103,14 @@ struct RenderableMesh
 
 struct GrassInfo
 {
+	struct InstanceData
+	{
+		Matrix matrix;
+		Vec4 normal;
+	};
 	Model* model;
-	const Matrix* matrices;
-	int matrix_count;
+	const InstanceData* instance_data;
+	int instance_count;
 	float type_distance;
 };
 

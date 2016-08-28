@@ -422,14 +422,16 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 			float density = ((pixel_value >> 8) & 0xff) * DIV255;
 			if (density < 0.25f) continue;
 
-			Matrix& grass_mtx = patch.m_matrices.emplace();
-			grass_mtx = Matrix::IDENTITY;
+			Matrix tmp = Matrix::IDENTITY;
 			float x = quad_x + dx + step * Math::randFloat(-0.5f, 0.5f);
 			float z = quad_z + dz + step * Math::randFloat(-0.5f, 0.5f);
-			grass_mtx.setTranslation(Vec3(x, getHeight(x, z), z));
+			tmp.setTranslation(Vec3(x, getHeight(x, z), z));
 			Quat q(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2));
-			grass_mtx = terrain_matrix * grass_mtx * q.toMatrix();
-			grass_mtx.multiply3x3(density + Math::randFloat(-0.1f, 0.1f));
+			tmp = terrain_matrix * tmp * q.toMatrix();
+			tmp.multiply3x3(density + Math::randFloat(-0.1f, 0.1f));
+			GrassPatch::InstanceData& instance_data = patch.instance_data.emplace();
+			instance_data.matrix = tmp;
+			instance_data.normal = Vec4(getNormal(x, z), 0);
 		}
 	}
 }
@@ -506,10 +508,10 @@ void Terrain::updateGrass(ComponentHandle camera)
 				patch.m_type = grass_type;
 
 				generateGrassTypeQuad(patch, terrain_mtx, quad_x, quad_z);
-				for (auto mtx : patch.m_matrices)
+				for (auto instance_data : patch.instance_data)
 				{
-					min_y = Math::minimum(mtx.getTranslation().y, min_y);
-					max_y = Math::maximum(mtx.getTranslation().y, max_y);
+					min_y = Math::minimum(instance_data.matrix.getTranslation().y, min_y);
+					max_y = Math::maximum(instance_data.matrix.getTranslation().y, max_y);
 				}
 			}
 
@@ -548,11 +550,11 @@ void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Com
 			{
 				const GrassPatch& patch = quad->m_patches[patch_idx];
 				if (patch.m_type->m_distance * patch.m_type->m_distance < dist2) continue;
-				if (!patch.m_matrices.empty())
+				if (!patch.instance_data.empty())
 				{
 					GrassInfo& info = infos.emplace();
-					info.matrices = &patch.m_matrices[0];
-					info.matrix_count = patch.m_matrices.size();
+					info.instance_data = (GrassInfo::InstanceData*)&patch.instance_data[0];
+					info.instance_count = patch.instance_data.size();
 					info.model = patch.m_type->m_grass_model;
 					info.type_distance = patch.m_type->m_distance;
 				}

@@ -2326,10 +2326,11 @@ struct PipelineImpl : public Pipeline
 
 	void renderGrass(const GrassInfo& grass)
 	{
-		if (!bgfx::checkAvailInstanceDataBuffer(grass.matrix_count, sizeof(Matrix))) return;
+		if (!bgfx::checkAvailInstanceDataBuffer(grass.instance_count, sizeof(Matrix))) return;
 
-		const bgfx::InstanceDataBuffer* idb = bgfx::allocInstanceDataBuffer(grass.matrix_count, sizeof(Matrix));
-		copyMemory(idb->data, &grass.matrices[0], grass.matrix_count * sizeof(Matrix));
+		const bgfx::InstanceDataBuffer* idb =
+			bgfx::allocInstanceDataBuffer(grass.instance_count, sizeof(GrassInfo::InstanceData));
+		copyMemory(idb->data, grass.instance_data, sizeof(GrassInfo::InstanceData) * grass.instance_count);
 		const Mesh& mesh = grass.model->getMesh(0);
 		Material* material = mesh.material;
 		int stride = grass.model->getVertexDecl().getStride();
@@ -2345,10 +2346,10 @@ struct PipelineImpl : public Pipeline
 		bgfx::setIndexBuffer(grass.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material->getRenderStates());
-		bgfx::setInstanceDataBuffer(idb, grass.matrix_count);
+		bgfx::setInstanceDataBuffer(idb, grass.instance_count);
 		++m_stats.draw_call_count;
-		m_stats.instance_count += grass.matrix_count;
-		m_stats.triangle_count += grass.matrix_count * mesh.indices_count;
+		m_stats.instance_count += grass.instance_count;
+		m_stats.triangle_count += grass.instance_count * mesh.indices_count;
 		bgfx::submit(view.bgfx_id, material->getShaderInstance().getProgramHandle(view.pass_idx));
 	}
 
