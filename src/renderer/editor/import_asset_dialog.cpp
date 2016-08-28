@@ -673,7 +673,7 @@ struct ImportTask : public MT::Task
 				animation.import = true;
 
 				PathBuilder path;
-				Lumix::PathUtils::getBasename(path.data, Lumix::lengthOf(path.data), m_dialog.m_source);
+				PathUtils::getBasename(path.data, lengthOf(path.data), m_dialog.m_source);
 				for (int i = 0; i < m_dialog.m_animations.size() - 1; ++i)
 				{
 					if (equalStrings(path.data, m_dialog.m_animations[i].output_filename))
@@ -959,12 +959,13 @@ struct ConvertTask : public MT::Task
 				global_transform.Decompose(scale, dummy_rot, dummy_pos);
 				for (int frame = 0; frame < frame_count; ++frame)
 				{
-					auto pos = getPosition(channel, frame, header.fps) * m_dialog.m_model.mesh_scale;
+					Vec3 pos = getPosition(channel, frame, header.fps) * m_dialog.m_model.mesh_scale;
 					pos.x *= scale.x;
 					pos.y *= scale.y;
 					pos.z *= scale.z;
+					pos = fixOrientation(pos);
 					positions[frame * bone_count + channel_idx] = pos;
-					rotations[frame * bone_count + channel_idx] = getRotation(channel, frame, header.fps);
+					rotations[frame * bone_count + channel_idx] = fixOrientation(getRotation(channel, frame, header.fps));
 				}
 			}
 
@@ -1240,7 +1241,49 @@ struct ConvertTask : public MT::Task
 	}
 
 
+	Quat fixOrientation(const Quat& v) const
+	{
+		switch (m_dialog.m_model.orientation)
+		{
+			case ImportAssetDialog::Y_UP: return Quat(v.x, v.y, v.z, v.w);
+			case ImportAssetDialog::Z_UP: return Quat(v.x, v.z, -v.y, v.w);
+			case ImportAssetDialog::Z_MINUS_UP: return Quat(v.x, -v.z, v.y, v.w);
+			case ImportAssetDialog::X_MINUS_UP: return Quat(v.y, -v.x, v.z, v.w);
+		}
+		ASSERT(false);
+		return Quat(v.x, v.y, v.z, v.w);
+	}
+
+
+	aiQuaternion fixOrientation(const aiQuaternion& v) const
+	{
+		switch (m_dialog.m_model.orientation)
+		{
+		case ImportAssetDialog::Y_UP: return aiQuaternion(v.w, v.x, v.y, v.z);
+		case ImportAssetDialog::Z_UP: return aiQuaternion(v.w, v.x, v.z, -v.y);
+		case ImportAssetDialog::Z_MINUS_UP: return aiQuaternion(v.w, v.x, -v.z, v.y);
+		case ImportAssetDialog::X_MINUS_UP: return aiQuaternion(v.w, v.y, -v.x, v.z);
+		}
+		ASSERT(false);
+		return aiQuaternion(v.x, v.y, v.z, v.w);
+	}
+
+
 	Vec3 fixOrientation(const aiVector3D& v) const
+	{
+		switch (m_dialog.m_model.orientation)
+		{
+			case ImportAssetDialog::Y_UP: return Vec3(v.x, v.y, v.z);
+			case ImportAssetDialog::Z_UP: return Vec3(v.x, v.z, -v.y);
+			case ImportAssetDialog::Z_MINUS_UP: return Vec3(v.x, -v.z, v.y);
+			case ImportAssetDialog::X_MINUS_UP: return Vec3(v.y, -v.x, v.z);
+		}
+		ASSERT(false);
+		return Vec3(v.x, v.y, v.z);
+	}
+
+
+	Vec3 fixOrientation(const Vec3& v) const
 	{
 		switch (m_dialog.m_model.orientation)
 		{
@@ -1699,7 +1742,9 @@ struct ConvertTask : public MT::Task
 				getGlobalTransform(node).Decompose(scale, rot, pos);
 			}
 			pos *= m_dialog.m_model.mesh_scale;
-			file.write((const char*)&pos, sizeof(pos));
+			Vec3 tmp_pos = fixOrientation(pos);
+			rot = fixOrientation(rot);
+			file.write((const char*)&tmp_pos, sizeof(tmp_pos));
 			file.write((const char*)&rot.x, sizeof(rot.x));
 			file.write((const char*)&rot.y, sizeof(rot.y));
 			file.write((const char*)&rot.z, sizeof(rot.z));
