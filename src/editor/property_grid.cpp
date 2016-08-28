@@ -153,8 +153,10 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc,
 	{
 		Lumix::Vec3 v;
 		tmp.read(v);
+		if (desc.isInRadians()) v = Lumix::Math::radiansToDegrees(v);
 		if (ImGui::DragFloat3(desc_name, &v.x))
 		{
+			if (desc.isInRadians()) v = Lumix::Math::degreesToRadians(v);
 			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &v, sizeof(v));
 		}
 		break;

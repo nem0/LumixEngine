@@ -521,6 +521,27 @@ public:
 	}
 
 
+	Vec3 getBoneAttachmentRotation(ComponentHandle cmp) override
+	{
+		int idx = getBoneAttachmentIdx(cmp);
+		if (idx < 0) return {0, 0, 0};
+		return m_bone_attachments[idx].relative_transform.rot.toEuler();
+	}
+
+
+	void setBoneAttachmentRotation(ComponentHandle cmp, const Vec3& rot) override
+	{
+		int idx = getBoneAttachmentIdx(cmp);
+		if (idx < 0) return;
+		BoneAttachment& attachment = m_bone_attachments[idx];
+		Vec3 euler = rot;
+		euler.x = Math::clamp(euler.x, -Math::PI * 0.5f, Math::PI * 0.5f);
+		attachment.relative_transform.rot.fromEuler(euler);
+		m_is_updating_attachments = true;
+		updateBoneAttachment(attachment);
+		m_is_updating_attachments = false;
+	}
+
 	int getBoneAttachmentBone(ComponentHandle cmp) override
 	{
 		int idx = getBoneAttachmentIdx(cmp);
