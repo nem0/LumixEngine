@@ -104,4 +104,4 @@ private:
 }; // class Resource
 
 
-} // ~namespace Lumix
+} // namespace Lumix
