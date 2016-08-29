@@ -130,6 +130,7 @@ inline float easeInOut(float t)
 LUMIX_ENGINE_API float pow(float base, float exponent);
 LUMIX_ENGINE_API uint32 rand();
 LUMIX_ENGINE_API uint32 rand(uint32 from, uint32 to);
+LUMIX_ENGINE_API void seedRandom(uint32 seed);
 LUMIX_ENGINE_API float randFloat();
 LUMIX_ENGINE_API float randFloat(float from, float to);
 

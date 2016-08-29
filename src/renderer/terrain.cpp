@@ -407,6 +407,10 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 	float tx_step = splat_map->width / (m_width * m_scale.x);
 	float base_tx = tx_step * quad_x;
 
+	struct { float x, y; void* type; } hashed_patch = { quad_x, quad_z, patch.m_type };
+	uint32 hash = crc32(&hashed_patch, sizeof(hashed_patch));
+	Math::seedRandom(hash);
+
 	for (float dz = 0; dz < quad_height; dz += step)
 	{
 		int y_offset = int(splat_map->height * (quad_z + dz) / (m_height * m_scale.x)) * splat_map->width;

@@ -206,6 +206,12 @@ float randFloat()
 }
 
 
+void seedRandom(uint32 seed)
+{
+	getRandomGenerator().seed(seed);
+}
+
+
 float randFloat(float from, float to)
 {
 	std::uniform_real_distribution<float> dist(from, to);
