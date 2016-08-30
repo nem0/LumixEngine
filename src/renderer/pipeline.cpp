@@ -278,7 +278,6 @@ struct PipelineImpl : public Pipeline
 		, m_is_rendering_in_shadowmap(false)
 		, m_is_ready(false)
 		, m_debug_index_buffer(BGFX_INVALID_HANDLE)
-		, m_first_postprocess_framebuffer(0)
 		, m_is_wireframe(false)
 		, m_view_x(0)
 		, m_view_y(0)
@@ -436,7 +435,6 @@ struct PipelineImpl : public Pipeline
 			lua_pop(m_lua_state, 1);
 			return;
 		}
-		m_first_postprocess_framebuffer = m_framebuffers.size();;
 
 		m_width = m_height = -1;
 		if(m_scene) callInitScene();
@@ -927,10 +925,6 @@ struct PipelineImpl : public Pipeline
 			if (equalStrings(f->getName(), framebuffer_name))
 			{
 				LUMIX_DELETE(m_allocator, m_framebuffers[i]);
-				if (m_first_postprocess_framebuffer > i)
-				{
-					--m_first_postprocess_framebuffer;
-				}
 				m_framebuffers.eraseFast(i);
 				break;
 			}
@@ -952,57 +946,6 @@ struct PipelineImpl : public Pipeline
 		Resource* res = m_scene->getEngine().getLuaResource(material_idx);
 		Material* material = static_cast<Material*>(res);
 		material->setDefine(define_idx, enabled);
-	}
-
-
-	bool postprocessCallback(const char* camera_slot)
-	{
-		auto scr_scene = static_cast<LuaScriptScene*>(m_scene->getUniverse().getScene(crc32("lua_script")));
-		if (!scr_scene) return false;
-		ComponentHandle camera = m_scene->getCameraInSlot(camera_slot);
-		if (!isValid(camera)) return false;
-
-		Entity camera_entity = m_scene->getCameraEntity(camera);
-		ComponentHandle scr_cmp = scr_scene->getComponent(camera_entity);
-		if (!isValid(scr_cmp)) return false;
-
-		bool ret = false;
-		for (int i = 0, c = scr_scene->getScriptCount(scr_cmp); i < c; ++i)
-		{
-			lua_State* L = scr_scene->getState(scr_cmp, i);
-			if(!L) continue;
-
-			int env = scr_scene->getEnvironment(scr_cmp, i);
-			if (lua_rawgeti(L, LUA_REGISTRYINDEX, env) != LUA_TTABLE)
-			{
-				ASSERT(false);
-			}
-			if(lua_getfield(L, -1, "_IS_POSTPROCESS_INITIALIZED") == LUA_TNIL)
-			{
-				if(auto* call = scr_scene->beginFunctionCall(scr_cmp, i, "initPostprocess"))
-				{
-					call->add(this);
-					call->addEnvironment(m_lua_env);
-					scr_scene->endFunctionCall();
-					if (lua_rawgeti(L, LUA_REGISTRYINDEX, env) != LUA_TTABLE)
-					{
-						ASSERT(false);
-					}
-					lua_pushboolean(L, 1);
-					lua_setfield(L, -2, "_IS_POSTPROCESS_INITIALIZED");
-				}
-			}
-			lua_pop(L, 2);
-
-			if (auto* call = scr_scene->beginFunctionCall(scr_cmp, i, "postprocess"))
-			{
-				ret = true;
-				call->add(this);
-				call->addEnvironment(m_lua_env);
-				scr_scene->endFunctionCall();
-			}
-		}
-		return ret;
 	}
 
 
@@ -2585,12 +2528,6 @@ struct PipelineImpl : public Pipeline
 
 	void setScene(RenderScene* scene) override
 	{
-		for (int i = m_first_postprocess_framebuffer; i < m_framebuffers.size(); ++i)
-		{
-			LUMIX_DELETE(m_allocator, m_framebuffers[i]);
-		}
-		m_framebuffers.resize(m_first_postprocess_framebuffer);
-
 		m_scene = scene;
 		if (m_lua_state && m_scene) callInitScene();
 	}
@@ -2691,7 +2628,6 @@ struct PipelineImpl : public Pipeline
 	bgfx::DynamicIndexBufferHandle m_debug_index_buffer;
 	int m_debug_buffer_idx;
 	int m_has_shadowmap_define_idx;
-	int m_first_postprocess_framebuffer;
 };
 
 
@@ -2906,7 +2842,6 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(setStencilRef);
 	REGISTER_FUNCTION(renderLightVolumes);
 	REGISTER_FUNCTION(renderDecalsVolumes);
-	REGISTER_FUNCTION(postprocessCallback);
 	REGISTER_FUNCTION(removeFramebuffer);
 	REGISTER_FUNCTION(setMaterialDefine);
 	REGISTER_FUNCTION(getRenderbuffer);
