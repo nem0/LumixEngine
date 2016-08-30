@@ -845,6 +845,7 @@ namespace Lumix
 				} while(false)
 
 			REGISTER_FUNCTION(addScript);
+			REGISTER_FUNCTION(getScriptCount);
 			REGISTER_FUNCTION(setScriptSource);
 			REGISTER_FUNCTION(preloadScript);
 			REGISTER_FUNCTION(unloadScript);

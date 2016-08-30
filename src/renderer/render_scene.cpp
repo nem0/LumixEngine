@@ -4356,6 +4356,8 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getCameraViewProjection);
 	REGISTER_FUNCTION(getGlobalLightEntity);
 	REGISTER_FUNCTION(getActiveGlobalLight);
+	REGISTER_FUNCTION(getCameraInSlot);
+	REGISTER_FUNCTION(getCameraEntity);
 	REGISTER_FUNCTION(getCameraSlot);
 	REGISTER_FUNCTION(getCameraComponent);
 	REGISTER_FUNCTION(getRenderableComponent);
