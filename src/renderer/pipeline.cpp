@@ -278,7 +278,6 @@ struct PipelineImpl : public Pipeline
 		, m_is_rendering_in_shadowmap(false)
 		, m_is_ready(false)
 		, m_debug_index_buffer(BGFX_INVALID_HANDLE)
-		, m_is_wireframe(false)
 		, m_view_x(0)
 		, m_view_y(0)
 		, m_scene(nullptr)
@@ -583,7 +582,7 @@ struct PipelineImpl : public Pipeline
 		};
 		Instance* instance = nullptr;
 
-		auto& view = m_views[m_current_render_views[0]];
+		auto& view = *m_current_view;
 		for (int i = 0, c = emitter.m_life.size(); i < c; ++i)
 		{
 			if (i % PARTICLE_BATCH_SIZE == 0)
@@ -651,20 +650,20 @@ struct PipelineImpl : public Pipeline
 		Vec4 size;
 		size.x = (float)fb->getWidth();
 		size.y = (float)fb->getHeight();
-		m_views[m_view_idx].command_buffer.beginAppend();
-		if (m_global_textures_count == 0) m_views[m_view_idx].command_buffer.setUniform(m_texture_size_uniform, size);
-		m_views[m_view_idx].command_buffer.setTexture(15 - m_global_textures_count,
+		m_current_view->command_buffer.beginAppend();
+		if (m_global_textures_count == 0) m_current_view->command_buffer.setUniform(m_texture_size_uniform, size);
+		m_current_view->command_buffer.setTexture(15 - m_global_textures_count,
 			m_uniforms[uniform_idx],
 			fb->getRenderbufferHandle(renderbuffer_idx));
 		++m_global_textures_count;
-		m_views[m_view_idx].command_buffer.end();
+		m_current_view->command_buffer.end();
 	}
 
 
 	void setViewProjection(const Matrix& mtx, int width, int height) override
 	{
-		bgfx::setViewRect(m_bgfx_view, 0, 0, (uint16_t)width, (uint16_t)height);
-		bgfx::setViewTransform(m_bgfx_view, nullptr, &mtx.m11);
+		bgfx::setViewRect(m_current_view->bgfx_id, 0, 0, (uint16_t)width, (uint16_t)height);
+		bgfx::setViewTransform(m_current_view->bgfx_id, nullptr, &mtx.m11);
 	}
 
 
@@ -678,7 +677,7 @@ struct PipelineImpl : public Pipeline
 		Material* material = mesh.material;
 		const uint16 stride = model.getVertexDecl().getStride();
 
-		auto& view = m_views[m_current_render_views[0]];
+		auto& view = *m_current_render_views[0];
 
 		executeCommandBuffer(material->getCommandBuffer(), material);
 		executeCommandBuffer(view.command_buffer.buffer, material);
@@ -718,8 +717,8 @@ struct PipelineImpl : public Pipeline
 		Universe& universe = m_scene->getUniverse();
 		Matrix view = universe.getMatrix(m_scene->getCameraEntity(cmp));
 		view.fastInverse();
-		bgfx::setViewTransform(m_bgfx_view, &view.m11, &projection_matrix.m11);
-		bgfx::setViewRect(m_bgfx_view, (uint16_t)m_view_x, (uint16_t)m_view_y, (uint16)m_width, (uint16)m_height);
+		bgfx::setViewTransform(m_current_view->bgfx_id, &view.m11, &projection_matrix.m11);
+		bgfx::setViewRect(m_current_view->bgfx_id, (uint16_t)m_view_x, (uint16_t)m_view_y, (uint16)m_width, (uint16)m_height);
 	}
 
 
@@ -736,7 +735,7 @@ struct PipelineImpl : public Pipeline
 	void setPass(const char* name)
 	{
 		m_pass_idx = m_renderer.getPassIdx(name);
-		m_views[m_view_idx].pass_idx = m_pass_idx;
+		m_current_view->pass_idx = m_pass_idx;
 	}
 
 
@@ -752,11 +751,11 @@ struct PipelineImpl : public Pipeline
 
 	FrameBuffer* getFramebuffer(const char* framebuffer_name) override
 	{
-		for (int i = 0, c = m_framebuffers.size(); i < c; ++i)
+		for (auto* framebuffer : m_framebuffers)
 		{
-			if (equalStrings(m_framebuffers[i]->getName(), framebuffer_name))
+			if (equalStrings(framebuffer->getName(), framebuffer_name))
 			{
-				return m_framebuffers[i];
+				return framebuffer;
 			}
 		}
 		return nullptr;
@@ -770,18 +769,18 @@ struct PipelineImpl : public Pipeline
 			m_current_framebuffer = m_default_framebuffer;
 			if (m_current_framebuffer)
 			{
-				bgfx::setViewFrameBuffer(m_bgfx_view, m_current_framebuffer->getHandle());
+				bgfx::setViewFrameBuffer(m_current_view->bgfx_id, m_current_framebuffer->getHandle());
 			}
 			else
 			{
-				bgfx::setViewFrameBuffer(m_bgfx_view, BGFX_INVALID_HANDLE);
+				bgfx::setViewFrameBuffer(m_current_view->bgfx_id, BGFX_INVALID_HANDLE);
 			}
 			return;
 		}
 		m_current_framebuffer = getFramebuffer(framebuffer_name);
 		if (m_current_framebuffer)
 		{
-			bgfx::setViewFrameBuffer(m_bgfx_view, m_current_framebuffer->getHandle());
+			bgfx::setViewFrameBuffer(m_current_view->bgfx_id, m_current_framebuffer->getHandle());
 		}
 		else
 		{
@@ -818,28 +817,29 @@ struct PipelineImpl : public Pipeline
 	int newView(const char* debug_name)
 	{
 		++m_view_idx;
-		ASSERT(m_view_idx < lengthOf(m_views));
+		if (m_view_idx >= lengthOf(m_views))
+		{
+			g_log_error.log("Renderer") << "Too many views";
+			--m_view_idx;
+		}
+		m_current_view = &m_views[m_view_idx];
 		m_renderer.viewCounterAdd();
-		m_bgfx_view = (uint8)m_renderer.getViewCounter();
-		auto& view = m_views[m_view_idx];
-		view.bgfx_id = m_bgfx_view;
-		view.render_state = m_render_state;
-		view.stencil = m_stencil;
-		view.pass_idx = m_pass_idx;
-		view.command_buffer.clear();
+		m_current_view->bgfx_id = (uint8)m_renderer.getViewCounter();
+		m_current_view->stencil = BGFX_STENCIL_NONE;
+		m_current_view->render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE | BGFX_STATE_MSAA;
+		m_current_view->pass_idx = m_pass_idx;
+		m_current_view->command_buffer.clear();
 		m_global_textures_count = 0;
 		if (m_current_framebuffer)
 		{
-			bgfx::setViewFrameBuffer(m_bgfx_view, m_current_framebuffer->getHandle());
+			bgfx::setViewFrameBuffer(m_current_view->bgfx_id, m_current_framebuffer->getHandle());
 		}
 		else
 		{
-			bgfx::setViewFrameBuffer(m_bgfx_view, BGFX_INVALID_HANDLE);
+			bgfx::setViewFrameBuffer(m_current_view->bgfx_id, BGFX_INVALID_HANDLE);
 		}
-		bgfx::setViewClear(m_bgfx_view, 0);
-		bgfx::setViewName(m_bgfx_view, debug_name);
-		m_stencil = BGFX_STENCIL_NONE;
-		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE | BGFX_STATE_MSAA;
+		bgfx::setViewClear(m_current_view->bgfx_id, 0);
+		bgfx::setViewName(m_current_view->bgfx_id, debug_name);
 		return m_view_idx;
 	}
 
@@ -853,7 +853,7 @@ struct PipelineImpl : public Pipeline
 		auto src_rb = src_fb->getRenderbufferHandle(src_rb_idx);
 		auto dest_rb = dest_fb->getRenderbufferHandle(dest_rb_idx);
 
-		bgfx::blit(m_bgfx_view, dest_rb, 0, 0, src_rb);
+		bgfx::blit(m_current_view->bgfx_id, dest_rb, 0, 0, src_rb);
 	}
 
 
@@ -888,18 +888,16 @@ struct PipelineImpl : public Pipeline
 		bool is_intersecting,
 		PointLightShadowmap* shadowmap)
 	{
+		View& view = *m_current_view;
 		bgfx::setInstanceDataBuffer(instance_buffer, instance_count);
-		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE); 
+		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE); 
+		auto state = view.render_state | material->getRenderStates();
 		if (is_intersecting)
 		{
-			auto state = m_render_state | material->getRenderStates();
-			bgfx::setState(((state & ~BGFX_STATE_CULL_MASK) & ~BGFX_STATE_DEPTH_TEST_MASK) | BGFX_STATE_CULL_CCW);
+			state = ((state & ~BGFX_STATE_CULL_MASK) & ~BGFX_STATE_DEPTH_TEST_MASK) | BGFX_STATE_CULL_CCW;
 		}
-		else
-		{
-			bgfx::setState(m_render_state | material->getRenderStates());
-		}
-		executeCommandBuffer(m_views[m_view_idx].command_buffer.buffer, material);
+		bgfx::setState(state);
+		executeCommandBuffer(view.command_buffer.buffer, material);
 		material->setDefine(m_has_shadowmap_define_idx, shadowmap != nullptr);
 		if (shadowmap)
 		{
@@ -913,7 +911,7 @@ struct PipelineImpl : public Pipeline
 		++m_stats.draw_call_count;
 		m_stats.instance_count += instance_count;
 		m_stats.triangle_count += instance_count * 12;
-		bgfx::submit(m_bgfx_view, material->getShaderInstance().getProgramHandle(m_pass_idx));
+		bgfx::submit(m_current_view->bgfx_id, material->getShaderInstance().getProgramHandle(m_pass_idx));
 	}
 
 
@@ -921,8 +919,7 @@ struct PipelineImpl : public Pipeline
 	{
 		for (int i = 0; i < m_framebuffers.size(); ++i)
 		{
-			auto* f = m_framebuffers[i];
-			if (equalStrings(f->getName(), framebuffer_name))
+			if (equalStrings(m_framebuffers[i]->getName(), framebuffer_name))
 			{
 				LUMIX_DELETE(m_allocator, m_framebuffers[i]);
 				m_framebuffers.eraseFast(i);
@@ -1056,18 +1053,15 @@ struct PipelineImpl : public Pipeline
 
 		PROFILE_INT("decal count", decals.size());
 
-		const View& view = m_views[m_view_idx];
+		const View& view = *m_current_view;
 		for (const DecalInfo& decal : decals)
 		{
+			auto state = view.render_state | decal.material->getRenderStates();
 			if (m_camera_frustum.intersectNearPlane(decal.position, decal.radius))
 			{
-				auto state = m_render_state | decal.material->getRenderStates();
-				bgfx::setState(((state & ~BGFX_STATE_CULL_MASK) & ~BGFX_STATE_DEPTH_TEST_MASK) | BGFX_STATE_CULL_CCW);
+				state = ((state & ~BGFX_STATE_CULL_MASK) & ~BGFX_STATE_DEPTH_TEST_MASK) | BGFX_STATE_CULL_CCW;
 			}
-			else
-			{
-				bgfx::setState(view.render_state | decal.material->getRenderStates());
-			}
+			bgfx::setState(state);
 			executeCommandBuffer(decal.material->getCommandBuffer(), decal.material);
 			executeCommandBuffer(view.command_buffer.buffer, decal.material);
 			bgfx::setUniform(m_decal_matrix_uniform, &decal.inv_mtx.m11);
@@ -1076,7 +1070,7 @@ struct PipelineImpl : public Pipeline
 			bgfx::setIndexBuffer(m_cube_ib);
 			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 			
-			bgfx::submit(m_bgfx_view, decal.material->getShaderInstance().getProgramHandle(m_pass_idx));
+			bgfx::submit(m_current_view->bgfx_id, decal.material->getShaderInstance().getProgramHandle(m_pass_idx));
 		}
 	}
 
@@ -1093,15 +1087,15 @@ struct PipelineImpl : public Pipeline
 		uint16 shadowmap_width = (uint16)m_current_framebuffer->getWidth();
 		Vec3 pos = mtx.getTranslation();
 
-		bgfx::setViewClear(m_bgfx_view, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
-		bgfx::touch(m_bgfx_view);
-		bgfx::setViewRect(m_bgfx_view, 0, 0, shadowmap_width, shadowmap_height);
+		bgfx::setViewClear(m_current_view->bgfx_id, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
+		bgfx::touch(m_current_view->bgfx_id);
+		bgfx::setViewRect(m_current_view->bgfx_id, 0, 0, shadowmap_width, shadowmap_height);
 
 		Matrix projection_matrix;
 		projection_matrix.setPerspective(fov, 1, 0.01f, range, is_opengl);
 		Matrix view_matrix;
 		view_matrix.lookAt(pos, pos - mtx.getZVector(), mtx.getYVector());
-		bgfx::setViewTransform(m_bgfx_view, &view_matrix.m11, &projection_matrix.m11);
+		bgfx::setViewTransform(m_current_view->bgfx_id, &view_matrix.m11, &projection_matrix.m11);
 
 		PointLightShadowmap& s = m_point_light_shadowmaps.emplace();
 		s.framebuffer = m_current_framebuffer;
@@ -1152,12 +1146,12 @@ struct PipelineImpl : public Pipeline
 		{
 			newView("omnilight");
 
-			bgfx::setViewClear(m_bgfx_view, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
-			bgfx::touch(m_bgfx_view);
+			bgfx::setViewClear(m_current_view->bgfx_id, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
+			bgfx::touch(m_current_view->bgfx_id);
 			uint16 view_x = uint16(shadowmap_width * viewports[i * 2]);
 			uint16 view_y = uint16(shadowmap_height * viewports[i * 2 + 1]);
 			bgfx::setViewRect(
-				m_bgfx_view, view_x, view_y, shadowmap_width >> 1, shadowmap_height >> 1);
+				m_current_view->bgfx_id, view_x, view_y, shadowmap_width >> 1, shadowmap_height >> 1);
 
 			float fovx = Math::degreesToRadians(143.98570868f + 3.51f);
 			float fovy = Math::degreesToRadians(125.26438968f + 9.85f);
@@ -1187,7 +1181,7 @@ struct PipelineImpl : public Pipeline
 
 			view_matrix.fastInverse();
 
-			bgfx::setViewTransform(m_bgfx_view, &view_matrix.m11, &projection_matrix.m11);
+			bgfx::setViewTransform(m_current_view->bgfx_id, &view_matrix.m11, &projection_matrix.m11);
 
 			float ymul = is_opengl ? 0.5f : -0.5f;
 			static const Matrix biasMatrix(
@@ -1302,10 +1296,10 @@ struct PipelineImpl : public Pipeline
 		Vec4 cascades = m_scene->getShadowmapCascades(light_cmp);
 		float split_distances[] = {0.01f, cascades.x, cascades.y, cascades.z, cascades.w};
 		m_is_rendering_in_shadowmap = true;
-		bgfx::setViewClear(m_bgfx_view, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
-		bgfx::touch(m_bgfx_view);
+		bgfx::setViewClear(m_current_view->bgfx_id, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
+		bgfx::touch(m_current_view->bgfx_id);
 		float* viewport = (is_opengl ? viewports_gl : viewports) + split_index * 2;
-		bgfx::setViewRect(m_bgfx_view,
+		bgfx::setViewRect(m_current_view->bgfx_id,
 			(uint16)(1 + shadowmap_width * viewport[0]),
 			(uint16)(1 + shadowmap_height * viewport[1]),
 			(uint16)(0.5f * shadowmap_width - 2),
@@ -1331,7 +1325,7 @@ struct PipelineImpl : public Pipeline
 		shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
 		Matrix view_matrix;
 		view_matrix.lookAt(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
-		bgfx::setViewTransform(m_bgfx_view, &view_matrix.m11, &projection_matrix.m11);
+		bgfx::setViewTransform(m_current_view->bgfx_id, &view_matrix.m11, &projection_matrix.m11);
 		float ymul = is_opengl ? 0.5f : -0.5f;
 		static const Matrix biasMatrix(0.5, 0.0, 0.0, 0.0, 0.0, ymul, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
 		m_shadow_viewprojection[split_index] = biasMatrix * (projection_matrix * view_matrix);
@@ -1339,7 +1333,7 @@ struct PipelineImpl : public Pipeline
 		Frustum shadow_camera_frustum;
 		shadow_camera_frustum.computeOrtho(
 			shadow_cam_pos, -light_forward, light_mtx.getYVector(), bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
-		m_current_render_views = &m_view_idx;
+		m_current_render_views = &m_current_view;
 		m_current_render_view_count = 1;
 
 		findExtraShadowcasterPlanes(light_forward, camera_frustum, &shadow_camera_frustum);
@@ -1373,6 +1367,7 @@ struct PipelineImpl : public Pipeline
 		if (points.empty() || !m_debug_line_material->isReady()) return;
 
 		static const int BATCH_SIZE = 0xffff;
+		View& view = *m_current_view;
 
 		for (int j = 0; j < points.size() && m_debug_buffer_idx < lengthOf(m_debug_vertex_buffers);
 			j += BATCH_SIZE, ++m_debug_buffer_idx)
@@ -1402,9 +1397,10 @@ struct PipelineImpl : public Pipeline
 
 			bgfx::setVertexBuffer(m_debug_vertex_buffers[m_debug_buffer_idx]);
 			bgfx::setIndexBuffer(m_debug_index_buffer, 0, point_count);
-			bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
-			bgfx::setState(m_render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_POINTS);
-			bgfx::submit(m_bgfx_view, m_debug_line_material->getShaderInstance().getProgramHandle(m_pass_idx));
+			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+			bgfx::setState(view.render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_POINTS);
+			bgfx::submit(
+				m_current_view->bgfx_id, m_debug_line_material->getShaderInstance().getProgramHandle(m_pass_idx));
 		}
 	}
 
@@ -1415,6 +1411,7 @@ struct PipelineImpl : public Pipeline
 		if (lines.empty() || !m_debug_line_material->isReady()) return;
 
 		static const int BATCH_SIZE = 0xffff / 2;
+		View& view = *m_current_view;
 
 		for (int j = 0; j < lines.size() && m_debug_buffer_idx < lengthOf(m_debug_vertex_buffers);
 			 j += BATCH_SIZE, ++m_debug_buffer_idx)
@@ -1450,9 +1447,10 @@ struct PipelineImpl : public Pipeline
 
 			bgfx::setVertexBuffer(m_debug_vertex_buffers[m_debug_buffer_idx]);
 			bgfx::setIndexBuffer(m_debug_index_buffer, 0, line_count * 2);
-			bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
-			bgfx::setState(m_render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_LINES);
-			bgfx::submit(m_bgfx_view, m_debug_line_material->getShaderInstance().getProgramHandle(m_pass_idx));
+			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+			bgfx::setState(view.render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_LINES);
+			bgfx::submit(
+				m_current_view->bgfx_id, m_debug_line_material->getShaderInstance().getProgramHandle(m_pass_idx));
 		}
 	}
 
@@ -1463,6 +1461,7 @@ struct PipelineImpl : public Pipeline
 		if(tris.empty() || !m_debug_line_material->isReady()) return;
 
 		static const int BATCH_SIZE = 0xffFF / 3;
+		View& view = *m_current_view;
 
 		for (int j = 0; j < tris.size() && m_debug_buffer_idx < lengthOf(m_debug_vertex_buffers);
 			 j += BATCH_SIZE, ++m_debug_buffer_idx)
@@ -1504,9 +1503,10 @@ struct PipelineImpl : public Pipeline
 
 			bgfx::setVertexBuffer(m_debug_vertex_buffers[m_debug_buffer_idx]);
 			bgfx::setIndexBuffer(m_debug_index_buffer, 0, tri_count * 3);
-			bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
-			bgfx::setState(m_render_state | m_debug_line_material->getRenderStates());
-			bgfx::submit(m_bgfx_view, m_debug_line_material->getShaderInstance().getProgramHandle(m_pass_idx));
+			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+			bgfx::setState(view.render_state | m_debug_line_material->getRenderStates());
+			bgfx::submit(
+				m_current_view->bgfx_id, m_debug_line_material->getShaderInstance().getProgramHandle(m_pass_idx));
 		}
 	}
 
@@ -1552,10 +1552,10 @@ struct PipelineImpl : public Pipeline
 		Vec4 light_specular(m_scene->getPointLightSpecularColor(light_cmp) * specular_intensity *
 								specular_intensity, 1);
 
-		m_views[m_view_idx].command_buffer.setUniform(m_light_pos_radius_uniform, light_pos_radius);
-		m_views[m_view_idx].command_buffer.setUniform(m_light_color_attenuation_uniform, light_color_attenuation);
-		m_views[m_view_idx].command_buffer.setUniform(m_light_dir_fov_uniform, light_dir_fov);
-		m_views[m_view_idx].command_buffer.setUniform(m_light_specular_uniform, light_specular);
+		m_current_view->command_buffer.setUniform(m_light_pos_radius_uniform, light_pos_radius);
+		m_current_view->command_buffer.setUniform(m_light_color_attenuation_uniform, light_color_attenuation);
+		m_current_view->command_buffer.setUniform(m_light_dir_fov_uniform, light_dir_fov);
+		m_current_view->command_buffer.setUniform(m_light_specular_uniform, light_specular);
 
 		FrameBuffer* shadowmap = nullptr;
 		if (m_scene->getLightCastShadows(light_cmp))
@@ -1565,7 +1565,7 @@ struct PipelineImpl : public Pipeline
 				if (info.light == light_cmp)
 				{
 					shadowmap = info.framebuffer;
-					m_views[m_view_idx].command_buffer.setUniform(m_shadowmap_matrices_uniform,
+					m_current_view->command_buffer.setUniform(m_shadowmap_matrices_uniform,
 						&info.matrices[0],
 						m_scene->getLightFOV(light_cmp) > Math::PI ? 4 : 1);
 					break;
@@ -1574,34 +1574,31 @@ struct PipelineImpl : public Pipeline
 		}
 		if (shadowmap)
 		{
-			m_views[m_view_idx].command_buffer.setLocalShadowmap(shadowmap->getRenderbufferHandle(0));
+			m_current_view->command_buffer.setLocalShadowmap(shadowmap->getRenderbufferHandle(0));
 		}
 		else
 		{
-			m_views[m_view_idx].command_buffer.setLocalShadowmap(BGFX_INVALID_HANDLE);
+			m_current_view->command_buffer.setLocalShadowmap(BGFX_INVALID_HANDLE);
 		}
-		m_views[m_view_idx].command_buffer.end();
+		m_current_view->command_buffer.end();
 	}
 
 
 	void setStencilRef(uint32 ref)
 	{
-		m_stencil |= BGFX_STENCIL_FUNC_REF(ref);
-		m_views[m_view_idx].stencil = m_stencil;
+		m_current_view->stencil |= BGFX_STENCIL_FUNC_REF(ref);
 	}
 
 
 	void setStencilRMask(uint32 rmask)
 	{
-		m_stencil |= BGFX_STENCIL_FUNC_RMASK(rmask);
-		m_views[m_view_idx].stencil = m_stencil;
+		m_current_view->stencil |= BGFX_STENCIL_FUNC_RMASK(rmask);
 	}
 
 
 	void setStencil(uint32 flags)
 	{
-		m_stencil |= flags;
-		m_views[m_view_idx].stencil = m_stencil;
+		m_current_view->stencil |= flags;
 	}
 
 
@@ -1623,63 +1620,56 @@ struct PipelineImpl : public Pipeline
 		float specular_intensity = m_scene->getGlobalLightSpecularIntensity(current_light);
 		specular *= specular_intensity * specular_intensity;
 
-		m_views[m_view_idx].command_buffer.setUniform(m_light_color_attenuation_uniform, Vec4(diffuse_color, 1));
-		m_views[m_view_idx].command_buffer.setUniform(m_ambient_color_uniform, Vec4(ambient_color, 1));
-		m_views[m_view_idx].command_buffer.setUniform(m_light_dir_fov_uniform, Vec4(light_dir, 0));
+		m_current_view->command_buffer.setUniform(m_light_color_attenuation_uniform, Vec4(diffuse_color, 1));
+		m_current_view->command_buffer.setUniform(m_ambient_color_uniform, Vec4(ambient_color, 1));
+		m_current_view->command_buffer.setUniform(m_light_dir_fov_uniform, Vec4(light_dir, 0));
 
 		fog_density *= fog_density * fog_density;
-		m_views[m_view_idx].command_buffer.setUniform(m_fog_color_density_uniform, Vec4(fog_color, fog_density));
-		m_views[m_view_idx].command_buffer.setUniform(m_light_specular_uniform, Vec4(specular, 0));
-		m_views[m_view_idx].command_buffer.setUniform(m_fog_params_uniform,
+		m_current_view->command_buffer.setUniform(m_fog_color_density_uniform, Vec4(fog_color, fog_density));
+		m_current_view->command_buffer.setUniform(m_light_specular_uniform, Vec4(specular, 0));
+		m_current_view->command_buffer.setUniform(m_fog_params_uniform,
 			Vec4(m_scene->getFogBottom(current_light),
 								 m_scene->getFogHeight(current_light),
 								 0,
 								 0));
 		if (m_global_light_shadowmap && !m_is_rendering_in_shadowmap)
 		{
-			m_views[m_view_idx].command_buffer.setUniform(m_shadowmap_matrices_uniform, m_shadow_viewprojection, 4);
-			m_views[m_view_idx].command_buffer.setGlobalShadowmap();
+			m_current_view->command_buffer.setUniform(m_shadowmap_matrices_uniform, m_shadow_viewprojection, 4);
+			m_current_view->command_buffer.setGlobalShadowmap();
 		}
-		m_views[m_view_idx].command_buffer.end();
+		m_current_view->command_buffer.end();
 	}
 
 	void disableBlending()
 	{
-		m_render_state &= ~BGFX_STATE_BLEND_MASK;
-		m_views[m_view_idx].render_state = m_render_state;
+		m_current_view->render_state &= ~BGFX_STATE_BLEND_MASK;
 	}
 
 	void enableDepthWrite()
 	{
-		m_render_state |= BGFX_STATE_DEPTH_WRITE;
-		m_views[m_view_idx].render_state = m_render_state;
+		m_current_view->render_state |= BGFX_STATE_DEPTH_WRITE;
 	}
 	void disableDepthWrite()
 	{
-		m_render_state &= ~BGFX_STATE_DEPTH_WRITE;
-		m_views[m_view_idx].render_state = m_render_state;
+		m_current_view->render_state &= ~BGFX_STATE_DEPTH_WRITE;
 	}
 
 	void enableAlphaWrite()
 	{
-		m_render_state |= BGFX_STATE_ALPHA_WRITE;
-		m_views[m_view_idx].render_state = m_render_state;
+		m_current_view->render_state |= BGFX_STATE_ALPHA_WRITE;
 	}
 	void disableAlphaWrite()
 	{
-		m_render_state &= ~BGFX_STATE_ALPHA_WRITE;
-		m_views[m_view_idx].render_state = m_render_state;
+		m_current_view->render_state &= ~BGFX_STATE_ALPHA_WRITE;
 	}
 
 	void enableRGBWrite()
 	{
-		m_render_state |= BGFX_STATE_RGB_WRITE;
-		m_views[m_view_idx].render_state = m_render_state;
+		m_current_view->render_state |= BGFX_STATE_RGB_WRITE;
 	}
 	void disableRGBWrite()
 	{
-		m_render_state &= ~BGFX_STATE_RGB_WRITE;
-		m_views[m_view_idx].render_state = m_render_state;
+		m_current_view->render_state &= ~BGFX_STATE_RGB_WRITE;
 	}
 
 
@@ -1762,17 +1752,17 @@ struct PipelineImpl : public Pipeline
 		Material* material = static_cast<Material*>(res);
 		if (!material->isReady() || !bgfx::checkAvailTransientVertexBuffer(3, m_base_vertex_decl))
 		{
-			bgfx::touch(m_bgfx_view);
+			bgfx::touch(m_current_view->bgfx_id);
 			return;
 		}
 
 		Matrix projection_mtx;
 		projection_mtx.setOrtho(0, 1, 0, 1, 0, 30, is_opengl);
 
-		bgfx::setViewTransform(m_bgfx_view, &Matrix::IDENTITY.m11, &projection_mtx.m11);
+		bgfx::setViewTransform(m_current_view->bgfx_id, &Matrix::IDENTITY.m11, &projection_mtx.m11);
 		if (m_current_framebuffer)
 		{
-			bgfx::setViewRect(m_bgfx_view,
+			bgfx::setViewRect(m_current_view->bgfx_id,
 				m_view_x,
 				m_view_y,
 				(uint16)m_current_framebuffer->getWidth(),
@@ -1780,7 +1770,7 @@ struct PipelineImpl : public Pipeline
 		}
 		else
 		{
-			bgfx::setViewRect(m_bgfx_view, m_view_x, m_view_y, (uint16)m_width, (uint16)m_height);
+			bgfx::setViewRect(m_current_view->bgfx_id, m_view_x, m_view_y, (uint16)m_width, (uint16)m_height);
 		}
 
 		bgfx::TransientVertexBuffer vb;
@@ -1836,8 +1826,10 @@ struct PipelineImpl : public Pipeline
 		vertex[5].u = 0;
 		vertex[5].v = 1;
 
+		View& view = *m_current_view;
+
 		executeCommandBuffer(material->getCommandBuffer(), material);
-		executeCommandBuffer(m_views[m_view_idx].command_buffer.buffer, material);
+		executeCommandBuffer(view.command_buffer.buffer, material);
 
 		if (isValid(m_applied_camera))
 		{
@@ -1866,13 +1858,13 @@ struct PipelineImpl : public Pipeline
 			bgfx::setUniform(m_cam_params, &cam_params);
 		}
 
-		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
-		bgfx::setState((m_render_state | material->getRenderStates()) & ~BGFX_STATE_CULL_MASK);
+		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+		bgfx::setState((view.render_state | material->getRenderStates()) & ~BGFX_STATE_CULL_MASK);
 		bgfx::setVertexBuffer(&vb);
 		++m_stats.draw_call_count;
 		++m_stats.instance_count;
 		m_stats.triangle_count += 2;
-		bgfx::submit(m_bgfx_view, material->getShaderInstance().getProgramHandle(m_pass_idx));
+		bgfx::submit(m_current_view->bgfx_id, material->getShaderInstance().getProgramHandle(m_pass_idx));
 	}
 
 
@@ -1984,7 +1976,7 @@ struct PipelineImpl : public Pipeline
 		int stride = model.getVertexDecl().getStride();
 		for (int i = 0; i < m_current_render_view_count; ++i)
 		{
-			auto& view = m_views[m_current_render_views[i]];
+			auto& view = *m_current_render_views[i];
 			if (!bgfx::isValid(shader_instance.getProgramHandle(view.pass_idx))) continue;
 
 			for (int j = 0, c = material->getLayerCount(view.pass_idx); j < c; ++j)
@@ -2070,15 +2062,16 @@ struct PipelineImpl : public Pipeline
 		uint64 render_states,
 		ShaderInstance& shader_instance) override
 	{
-		bgfx::setStencil(m_stencil, BGFX_STENCIL_NONE);
-		bgfx::setState(m_render_state | render_states);
+		View& view = *m_current_view;
+		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+		bgfx::setState(view.render_state | render_states);
 		bgfx::setTransform(&mtx.m11);
 		bgfx::setVertexBuffer(&vertex_buffer);
 		bgfx::setIndexBuffer(&index_buffer, first_index, num_indices);
 		++m_stats.draw_call_count;
 		++m_stats.instance_count;
 		m_stats.triangle_count += num_indices / 3;
-		bgfx::submit(m_bgfx_view, shader_instance.getProgramHandle(m_pass_idx));
+		bgfx::submit(m_current_view->bgfx_id, shader_instance.getProgramHandle(m_pass_idx));
 	}
 
 
@@ -2096,6 +2089,7 @@ struct PipelineImpl : public Pipeline
 			InstanceData& data = m_instances_data[instance_idx];
 			if (!bgfx::checkAvailInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix)))
 			{
+				g_log_warning.log("Renderer") << "Could not allocate instance data buffer";
 				return;
 			}
 			data.buffer =
@@ -2227,7 +2221,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::setUniform(m_terrain_scale_uniform, &terrain_scale);
 		bgfx::setUniform(m_terrain_matrix_uniform, &info.m_world_matrix.m11);
 
-		auto& view = m_views[m_current_render_views[0]];
+		const View& view = *m_current_render_views[0];
 		executeCommandBuffer(material->getCommandBuffer(), material);
 		executeCommandBuffer(view.command_buffer.buffer, material);
 
@@ -2278,7 +2272,7 @@ struct PipelineImpl : public Pipeline
 		Material* material = mesh.material;
 		int stride = grass.model->getVertexDecl().getStride();
 
-		auto& view = m_views[m_current_render_views[0]];
+		const View& view = *m_current_render_views[0];
 		executeCommandBuffer(material->getCommandBuffer(), material);
 		executeCommandBuffer(view.command_buffer.buffer, material);
 		auto max_grass_distance = Vec4(grass.type_distance, 0, 0, 0);
@@ -2403,13 +2397,10 @@ struct PipelineImpl : public Pipeline
 		if (!m_scene) return;
 
 		m_stats = {};
-		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE | BGFX_STATE_MSAA;
 		m_applied_camera = INVALID_COMPONENT;
 		m_global_light_shadowmap = nullptr;
-		m_stencil = BGFX_STENCIL_NONE;
-		m_render_state |= m_is_wireframe ? BGFX_STATE_PT_LINESTRIP : 0;
+		m_current_view = nullptr;
 		m_view_idx = -1;
-		m_bgfx_view = m_renderer.getViewCounter();
 		m_pass_idx = -1;
 		m_current_framebuffer = m_default_framebuffer;
 		m_instance_data_idx = 0;
@@ -2499,15 +2490,14 @@ struct PipelineImpl : public Pipeline
 		else if (equalStrings(mode, "add")) mode_value = BGFX_STATE_BLEND_ADD;
 		else if (equalStrings(mode, "multiply")) mode_value = BGFX_STATE_BLEND_MULTIPLY;
 
-		m_render_state |= mode_value;
-		m_views[m_view_idx].render_state = m_render_state;
+		m_current_view->render_state |= mode_value;
 	}
 
 
 	void clear(uint32 flags, uint32 color)
 	{
-		bgfx::setViewClear(m_bgfx_view, (uint16)flags, color, 1.0f, 0);
-		bgfx::touch(m_bgfx_view);
+		bgfx::setViewClear(m_current_view->bgfx_id, (uint16)flags, color, 1.0f, 0);
+		bgfx::touch(m_current_view->bgfx_id);
 	}
 
 
@@ -2533,9 +2523,6 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void setWireframe(bool wireframe) override { m_is_wireframe = wireframe; }
-
-
 	void callInitScene()
 	{
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
@@ -2559,11 +2546,10 @@ struct PipelineImpl : public Pipeline
 	bgfx::VertexDecl m_base_vertex_decl;
 	TerrainInstance m_terrain_instances[4];
 	uint32 m_debug_flags;
-	uint8 m_bgfx_view;
 	int m_view_idx;
 	View m_views[32];
+	View* m_current_view;
 	int m_pass_idx;
-	uint64 m_render_state;
 	IAllocator& m_allocator;
 	Lumix::Path m_path;
 	Renderer& m_renderer;
@@ -2580,19 +2566,17 @@ struct PipelineImpl : public Pipeline
 	bgfx::VertexBufferHandle m_cube_vb;
 	bgfx::IndexBufferHandle m_cube_ib;
 	bool m_is_current_light_global;
-	bool m_is_wireframe;
 	bool m_is_rendering_in_shadowmap;
 	bool m_is_ready;
 	Frustum m_camera_frustum;
 
-	int* m_current_render_views;
+	View** m_current_render_views;
 	int m_current_render_view_count;
 	Matrix m_shadow_viewprojection[4];
 	int m_view_x;
 	int m_view_y;
 	int m_width;
 	int m_height;
-	uint32 m_stencil;
 	bgfx::VertexBufferHandle m_particle_vertex_buffer;
 	bgfx::IndexBufferHandle m_particle_index_buffer;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
@@ -2651,6 +2635,13 @@ int addFramebuffer(lua_State* L)
 {
 	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
 	const char* name = LuaWrapper::checkArg<const char*>(L, 2);
+	FrameBuffer* framebuffer = pipeline->getFramebuffer(name);
+	if (framebuffer)
+	{
+		g_log_warning.log("Renderer") << "Trying to create alread existing framebuffer " << name;
+		return 0;
+	}
+
 	LuaWrapper::checkTableArg(L, 3);
 	FrameBuffer::Declaration decl;
 	copyString(decl.m_name, name);
@@ -2700,20 +2691,26 @@ int renderModels(lua_State* L)
 	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
 	LuaWrapper::checkTableArg(L, 2);
 	int len = (int)lua_rawlen(L, 2);
-	int views[16] = {};
+	View* views[16] = {};
+	int valid_view_count = 0;
 	for (int i = 0; i < len; ++i)
 	{
-		if (lua_rawgeti(L, 2, 1 + i))
+		if (lua_rawgeti(L, 2, 1 + i) == LUA_TNUMBER)
 		{
-			views[i] = (int)lua_tointeger(L, -1);
+			int idx = (int)lua_tointeger(L, -1);
+			if (idx >= 0 && idx <= lengthOf(pipeline->m_views))
+			{
+				views[valid_view_count] = &pipeline->m_views[idx];
+				++valid_view_count;
+			}
 		}
 		lua_pop(L, 1);
 	}
 
 	pipeline->m_current_render_views = views;
-	pipeline->m_current_render_view_count = len;
+	pipeline->m_current_render_view_count = valid_view_count;
 	pipeline->renderAll(pipeline->m_camera_frustum, true, pipeline->m_camera_frustum.position);
-	pipeline->m_current_render_views = &pipeline->m_view_idx;
+	pipeline->m_current_render_views = &pipeline->m_current_view;
 	pipeline->m_current_render_view_count = 1;
 	return 0;
 }
@@ -2748,9 +2745,9 @@ int setUniform(lua_State* L)
 
 	if (uniform_idx >= pipeline->m_uniforms.size()) luaL_argerror(L, 2, "unknown uniform");
 
-	pipeline->m_views[pipeline->m_view_idx].command_buffer.beginAppend();
-	pipeline->m_views[pipeline->m_view_idx].command_buffer.setUniform(pipeline->m_uniforms[uniform_idx], tmp, len);
-	pipeline->m_views[pipeline->m_view_idx].command_buffer.end();
+	pipeline->m_current_view->command_buffer.beginAppend();
+	pipeline->m_current_view->command_buffer.setUniform(pipeline->m_uniforms[uniform_idx], tmp, len);
+	pipeline->m_current_view->command_buffer.end();
 	return 0;
 }
 

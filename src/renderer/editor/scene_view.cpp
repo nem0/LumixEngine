@@ -185,12 +185,6 @@ SceneView::~SceneView()
 }
 
 
-void SceneView::setWireframe(bool wireframe)
-{
-	m_pipeline->setWireframe(wireframe);
-}
-
-
 void SceneView::setScene(Lumix::RenderScene* scene)
 {
 	m_pipeline->setScene(scene);

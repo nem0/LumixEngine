@@ -28,7 +28,6 @@ class SceneView
 		void setScene(Lumix::RenderScene* scene);
 		void shutdown();
 		void onGUI();
-		void setWireframe(bool wireframe);
 		Lumix::Pipeline* getPipeline() { return m_pipeline; }
 
 	private:
