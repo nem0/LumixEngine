@@ -1619,7 +1619,8 @@ struct PipelineImpl : public Pipeline
 		Vec3 specular = m_scene->getGlobalLightSpecular(current_light);
 		float specular_intensity = m_scene->getGlobalLightSpecularIntensity(current_light);
 		specular *= specular_intensity * specular_intensity;
-
+		
+		m_current_view->command_buffer.beginAppend();
 		m_current_view->command_buffer.setUniform(m_light_color_attenuation_uniform, Vec4(diffuse_color, 1));
 		m_current_view->command_buffer.setUniform(m_ambient_color_uniform, Vec4(ambient_color, 1));
 		m_current_view->command_buffer.setUniform(m_light_dir_fov_uniform, Vec4(light_dir, 0));
