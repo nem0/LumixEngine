@@ -130,38 +130,41 @@ namespace Lumix
 					if (lua_type(L, -1) != LUA_TFUNCTION)
 					{
 						const char* name = lua_tostring(L, -2);
-						uint32 hash = crc32(name);
-						if (m_scene.m_property_names.find(hash) < 0)
+						if(name[0] != '_')
 						{
-							m_scene.m_property_names.emplace(hash, name, allocator);
-						}
-						if (hash != INDEX_HASH && hash != THIS_HASH)
-						{
-							int prop_index = getProperty(inst, hash);
-							if (prop_index >= 0)
+							uint32 hash = crc32(name);
+							if (m_scene.m_property_names.find(hash) < 0)
 							{
-								valid_properties[prop_index] = true;
-								Property& existing_prop = inst.m_properties[prop_index];
-								if (existing_prop.type == Property::ANY)
+								m_scene.m_property_names.emplace(hash, name, allocator);
+							}
+							if (hash != INDEX_HASH && hash != THIS_HASH)
+							{
+								int prop_index = getProperty(inst, hash);
+								if (prop_index >= 0)
 								{
-									switch (lua_type(inst.m_state, -1))
+									valid_properties[prop_index] = true;
+									Property& existing_prop = inst.m_properties[prop_index];
+									if (existing_prop.type == Property::ANY)
 									{
+										switch (lua_type(inst.m_state, -1))
+										{
 										case LUA_TBOOLEAN: existing_prop.type = Property::BOOLEAN; break;
 										default: existing_prop.type = Property::FLOAT;
+										}
 									}
+									m_scene.applyProperty(inst, existing_prop, existing_prop.stored_value.c_str());
 								}
-								m_scene.applyProperty(inst, existing_prop, existing_prop.stored_value.c_str());
-							}
-							else
-							{
-								auto& prop = inst.m_properties.emplace(allocator);
-								valid_properties.push(true);
-								switch (lua_type(inst.m_state, -1))
+								else
 								{
+									auto& prop = inst.m_properties.emplace(allocator);
+									valid_properties.push(true);
+									switch (lua_type(inst.m_state, -1))
+									{
 									case LUA_TBOOLEAN: prop.type = Property::BOOLEAN; break;
 									default: prop.type = Property::FLOAT;
+									}
+									prop.name_hash = hash;
 								}
-								prop.name_hash = hash;
 							}
 						}
 					}
