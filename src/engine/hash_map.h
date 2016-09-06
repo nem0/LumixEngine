@@ -574,7 +574,8 @@ namespace Lumix
 		{
 			size_type old_size = m_size;
 			size_type old_ids_count = m_max_id;
-			size_type new_ids_count = ids_count < 512 ? ids_count * 4 : ids_count * 2;
+			size_type pow2_ids_count = Math::nextPow2(ids_count);
+			size_type new_ids_count = pow2_ids_count < 512 ? pow2_ids_count * 4 : pow2_ids_count * 2;
 			node_type* old = m_table;
 
 			init(new_ids_count);

@@ -2639,7 +2639,7 @@ int addFramebuffer(lua_State* L)
 	FrameBuffer* framebuffer = pipeline->getFramebuffer(name);
 	if (framebuffer)
 	{
-		g_log_warning.log("Renderer") << "Trying to create alread existing framebuffer " << name;
+		g_log_warning.log("Renderer") << "Trying to create already existing framebuffer " << name;
 		return 0;
 	}
 
