@@ -85,12 +85,22 @@ public:
 
 	LRESULT onMessage(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	{
+		auto& input_system = m_engine->getInputSystem();
+		Lumix::InputSystem::InputEvent event;
 		switch (msg)
 		{
 			case WM_CLOSE: PostQuitMessage(0); break;
 			case WM_MOVE:
 			case WM_SIZE: onResize(); break;
 			case WM_QUIT: m_finished = true; break;
+			case WM_LBUTTONDOWN:
+				event.type = Lumix::InputSystem::InputEvent::POINTER_DOWN;
+				input_system.injectEvent(event);
+				break;
+			case WM_LBUTTONUP:
+				event.type = Lumix::InputSystem::InputEvent::POINTER_UP;
+				input_system.injectEvent(event);
+				break;
 			case WM_INPUT: handleRawInput(lparam); break;
 		}
 		return DefWindowProc(hwnd, msg, wparam, lparam);
@@ -403,8 +413,8 @@ public:
 			GetCursorPos(&p);
 			ScreenToClient(m_hwnd, &p);
 			auto& input_system = m_engine->getInputSystem();
-			input_system.injectMouseXMove(float(raw->data.mouse.lLastX), 0);
-			input_system.injectMouseYMove(float(raw->data.mouse.lLastY), 0);
+			input_system.injectMouseXMove(float(raw->data.mouse.lLastX), (float)p.x);
+			input_system.injectMouseYMove(float(raw->data.mouse.lLastY), (float)p.y);
 		}
 	}
 
