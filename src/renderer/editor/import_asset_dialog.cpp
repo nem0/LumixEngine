@@ -1010,6 +1010,7 @@ struct ConvertTask : public MT::Task
 				return false;
 			}
 			file << "{\n\t\"shader\" : \"pipelines/rigid/rigid.shd\"\n";
+			file << "\t, \"backface_culling\" : false\n";
 			file << "\t, \"defines\" : [\"ALPHA_CUTOUT\"]\n";
 			file << "\t, \"texture\" : {\n\t\t\"source\" : \"";
 
@@ -1021,13 +1022,23 @@ struct ConvertTask : public MT::Task
 				PathBuilder relative_texture_path(from_root_path, m_dialog.m_mesh_output_filename, "_billboard.dds");
 				PathBuilder texture_path(m_dialog.m_texture_output_dir, m_dialog.m_mesh_output_filename, "_billboard.dds");
 				copyFile("models/utils/cube/default.dds", texture_path);
-				file << "/" << relative_texture_path;
+				file << "/" << relative_texture_path << "\"}\n\t, \"texture\" : {\n\t\t\"source\" : \"";
+
+				PathBuilder relative_normal_path_n(from_root_path, m_dialog.m_mesh_output_filename, "_billboard_normal.dds");
+				PathBuilder normal_path(m_dialog.m_texture_output_dir, m_dialog.m_mesh_output_filename, "_billboard_normal.dds");
+				copyFile("models/utils/cube/default.dds", normal_path);
+				file << "/" << relative_normal_path_n;
+
 			}
 			else
 			{
-				file << m_dialog.m_mesh_output_filename << "_billboard.dds";
+				file << m_dialog.m_mesh_output_filename << "_billboard.dds\"}\n\t, \"texture\" : {\n\t\t\"source\" : \"";
 				PathBuilder texture_path(m_dialog.m_output_dir, "/", m_dialog.m_mesh_output_filename, "_billboard.dds");
 				copyFile("models/utils/cube/default.dds", texture_path);
+
+				file << m_dialog.m_mesh_output_filename << "_billboard_normal.dds";
+				PathBuilder normal_path(m_dialog.m_output_dir, "/", m_dialog.m_mesh_output_filename, "_billboard_normal.dds");
+				copyFile("models/utils/cube/default.dds", normal_path);
 			}
 
 			file << "\"}\n}";
@@ -1057,6 +1068,8 @@ struct ConvertTask : public MT::Task
 		}
 
 		file.writeText("{\n\t\"shader\" : \"pipelines/");
+		file.writeText(material.shader);
+		file.writeText("/");
 		file.writeText(material.shader);
 		file.writeText(".shd\"\n");
 		
@@ -2199,6 +2212,7 @@ void ImportAssetDialog::convert(bool use_ui)
 			if (!material.textures[i].is_valid && material.textures[i].import)
 			{
 				if(use_ui) ImGui::OpenPopup("Invalid texture");
+				else g_log_error.log("Editor") << "Invalid texture " << material.textures[i].src;
 				return;
 			}
 		}
@@ -2564,6 +2578,7 @@ static void preprocessBillboard(uint32* pixels, int width, int height, IAllocato
 static bool createBillboard(ImportAssetDialog& dialog,
 	const Path& mesh_path,
 	const Path& out_path,
+	const Path& out_path_normal,
 	int texture_size)
 {
 	auto& engine = dialog.getEditor().getEngine();
@@ -2575,7 +2590,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	auto* render_scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 	if (!render_scene) return false;
 
-	auto* pipeline = Pipeline::create(*renderer, Path("pipelines/preview.lua"), engine.getAllocator());
+	auto* pipeline = Pipeline::create(*renderer, Path("pipelines/billboard.lua"), engine.getAllocator());
 	pipeline->load();
 
 	auto mesh_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
@@ -2596,31 +2611,34 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	while (engine.getFileSystem().hasWork()) engine.getFileSystem().updateAsyncTransactions();
 
 	auto* model = render_scene->getRenderableModel(mesh_cmp);
-	auto* lods = model->getLODs();
-	lods[0].distance = FLT_MAX;
-	AABB aabb = model->getAABB();
-	Vec3 size = aabb.max - aabb.min;
-	universe.setPosition(mesh_side_entity, { aabb.max.x - aabb.min.z, 0, 0 });
-	Vec3 camera_pos(
-		(aabb.min.x + aabb.max.x + size.z) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + 5);
-	auto camera_entity = universe.createEntity(camera_pos, { 0, 0, 0, 1 });
-	static const auto CAMERA_TYPE = PropertyRegister::getComponentType("camera");
-	auto camera_cmp = render_scene->createComponent(CAMERA_TYPE, camera_entity);
-	render_scene->setCameraOrtho(camera_cmp, true);
-	render_scene->setCameraSlot(camera_cmp, "main");
-	int width, height;
-	if (size.x + size.z > size.y)
+	int width = 640, height = 480;
+	if (model->isReady())
 	{
-		width = texture_size;
-		int nonceiled_height = int(width / (size.x + size.z) * size.y);
-		height = ceilPowOf2(nonceiled_height);
-		render_scene->setCameraOrthoSize(camera_cmp, size.y * height / nonceiled_height *  0.5f);
-	}
-	else
-	{
-		height = texture_size;
-		width = ceilPowOf2(int(height * (size.x + size.z) / size.y));
-		render_scene->setCameraOrthoSize(camera_cmp, size.y * 0.5f);
+		auto* lods = model->getLODs();
+		lods[0].distance = FLT_MAX;
+		AABB aabb = model->getAABB();
+		Vec3 size = aabb.max - aabb.min;
+		universe.setPosition(mesh_side_entity, { aabb.max.x - aabb.min.z, 0, 0 });
+		Vec3 camera_pos(
+			(aabb.min.x + aabb.max.x + size.z) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + 5);
+		auto camera_entity = universe.createEntity(camera_pos, { 0, 0, 0, 1 });
+		static const auto CAMERA_TYPE = PropertyRegister::getComponentType("camera");
+		auto camera_cmp = render_scene->createComponent(CAMERA_TYPE, camera_entity);
+		render_scene->setCameraOrtho(camera_cmp, true);
+		render_scene->setCameraSlot(camera_cmp, "main");
+		if (size.x + size.z > size.y)
+		{
+			width = texture_size;
+			int nonceiled_height = int(width / (size.x + size.z) * size.y);
+			height = ceilPowOf2(nonceiled_height);
+			render_scene->setCameraOrthoSize(camera_cmp, size.y * height / nonceiled_height *  0.5f);
+		}
+		else
+		{
+			height = texture_size;
+			width = ceilPowOf2(int(height * (size.x + size.z) / size.y));
+			render_scene->setCameraOrthoSize(camera_cmp, size.y * 0.5f);
+		}
 	}
 
 	pipeline->setScene(render_scene);
@@ -2629,12 +2647,19 @@ static bool createBillboard(ImportAssetDialog& dialog,
 
 	bgfx::TextureHandle texture =
 		bgfx::createTexture2D(width, height, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
-
 	renderer->viewCounterAdd();
 	bgfx::touch(renderer->getViewCounter());
 	bgfx::setViewName(renderer->getViewCounter(), "billboard_blit");
-	bgfx::TextureHandle color_renderbuffer = pipeline->getFramebuffer("default")->getRenderbufferHandle(0);
+	bgfx::TextureHandle color_renderbuffer = pipeline->getFramebuffer("g_buffer")->getRenderbufferHandle(0);
 	bgfx::blit(renderer->getViewCounter(), texture, 0, 0, color_renderbuffer);
+
+	bgfx::TextureHandle normal_texture =
+		bgfx::createTexture2D(width, height, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
+	renderer->viewCounterAdd();
+	bgfx::touch(renderer->getViewCounter());
+	bgfx::setViewName(renderer->getViewCounter(), "billboard_blit_normal");
+	bgfx::TextureHandle normal_renderbuffer = pipeline->getFramebuffer("g_buffer")->getRenderbufferHandle(1);
+	bgfx::blit(renderer->getViewCounter(), normal_texture, 0, 0, normal_renderbuffer);
 
 	renderer->viewCounterAdd();
 	bgfx::setViewName(renderer->getViewCounter(), "billboard_read");
@@ -2642,12 +2667,22 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	data.resize(width * height * 4);
 	bgfx::readTexture(texture, &data[0]);
 	bgfx::touch(renderer->getViewCounter());
+
+	renderer->viewCounterAdd();
+	bgfx::setViewName(renderer->getViewCounter(), "billboard_read_normal");
+	Array<uint8> data_normal(engine.getAllocator());
+	data_normal.resize(width * height * 4);
+	bgfx::readTexture(normal_texture, &data_normal[0]);
+	bgfx::touch(renderer->getViewCounter());
+
 	bgfx::frame(); // submit
 	bgfx::frame(); // wait for gpu
 
 	preprocessBillboard((uint32*)&data[0], width, height, engine.getAllocator());
 	saveAsDDS(dialog, "billboard_generator", (uint8*)&data[0], width, height, true, out_path.c_str());
+	saveAsDDS(dialog, "billboard_generator", (uint8*)&data_normal[0], width, height, true, out_path_normal.c_str());
 	bgfx::destroyTexture(texture);
+	bgfx::destroyTexture(normal_texture);
 	Pipeline::destroy(pipeline);
 	engine.destroyUniverse(universe);
 	return true;
@@ -2894,12 +2929,14 @@ int ImportAssetDialog::importAsset(lua_State* L)
 		if (m_texture_output_dir[0])
 		{
 			PathBuilder texture_path(m_texture_output_dir, m_mesh_output_filename, "_billboard.dds");
-			createBillboard(*this, Path(mesh_path), Path(texture_path), TEXTURE_SIZE);
+			PathBuilder normal_texture_path(m_texture_output_dir, m_mesh_output_filename, "_billboard_normal.dds");
+			createBillboard(*this, Path(mesh_path), Path(texture_path), Path(normal_texture_path), TEXTURE_SIZE);
 		}
 		else
 		{
-			PathBuilder texture_path(m_output_dir, "/", m_mesh_output_filename, " _billboard.dds");
-			createBillboard(*this, Path(mesh_path), Path(texture_path), TEXTURE_SIZE);
+			PathBuilder texture_path(m_output_dir, "/", m_mesh_output_filename, "_billboard.dds");
+			PathBuilder normal_texture_path(m_output_dir, "/", m_mesh_output_filename, "_billboard_normal.dds");
+			createBillboard(*this, Path(mesh_path), Path(texture_path), Path(normal_texture_path), TEXTURE_SIZE);
 		}
 	}
 
