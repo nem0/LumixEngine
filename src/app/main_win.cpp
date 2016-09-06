@@ -43,6 +43,14 @@ struct GUIInterface : Lumix::GUISystem::Interface
 
 	void enableCursor(bool enable) override
 	{
+		if (enable)
+		{
+			while (ShowCursor(true) < 0);
+		}
+		else
+		{
+			while (ShowCursor(false) >= 0);
+		}
 	}
 
 
