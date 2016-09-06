@@ -98,7 +98,7 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 	uint32* indices32 = (uint32*)&m_indices[0];
 	int vertex_offset = 0;
 	bool is16 = m_flags & (uint32)Model::Flags::INDICES_16BIT;
-	for (int mesh_index = 0; mesh_index < m_meshes.size(); ++mesh_index)
+	for (int mesh_index = m_lods[0].from_mesh; mesh_index <= m_lods[0].to_mesh; ++mesh_index)
 	{
 		int indices_end = m_meshes[mesh_index].indices_offset + m_meshes[mesh_index].indices_count;
 		for(int i = m_meshes[mesh_index].indices_offset; i < indices_end; i += 3)
