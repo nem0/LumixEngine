@@ -405,7 +405,7 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 	float quad_width = Math::minimum(GRASS_QUAD_SIZE, splat_map->width - quad_x);
 	float quad_height = Math::minimum(GRASS_QUAD_SIZE, splat_map->height - quad_z);
 	float tx_step = splat_map->width / (m_width * m_scale.x);
-	float base_tx = tx_step * quad_x;
+	float base_tx = tx_step * quad_x - tx_step * 0.5f;
 
 	struct { float x, y; void* type; } hashed_patch = { quad_x, quad_z, patch.m_type };
 	uint32 hash = crc32(&hashed_patch, sizeof(hashed_patch));
@@ -414,11 +414,11 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 	for (float dz = 0; dz < quad_height; dz += step)
 	{
 		int y_offset = int(splat_map->height * (quad_z + dz) / (m_height * m_scale.x)) * splat_map->width;
-		uint32* splat_data = (uint32*)&splat_map->data[y_offset];
+		uint32* splat_data = &((uint32*)&splat_map->data[0])[y_offset];
 		for (float dx = 0; dx < quad_width; dx += step)
 		{
 			int tx = int(base_tx + tx_step * dx);
-			uint32 pixel_value = *(uint32*)&splat_data[tx];
+			uint32 pixel_value = splat_data[tx];
 
 			int ground_index = pixel_value & 0xff;
 			if (ground_index != patch.m_type->m_ground) continue;
