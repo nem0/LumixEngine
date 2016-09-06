@@ -1214,23 +1214,43 @@ struct ConvertTask : public MT::Task
 	}
 
 
+	void gatherAllNodes(Array<aiNode*>& nodes, aiNode* node)
+	{
+		nodes.emplace(node);
+		for (unsigned int i = 0; i < node->mNumChildren; ++i)
+		{
+			gatherAllNodes(nodes, node->mChildren[i]);
+		}
+	}
+
+
 	void gatherNodes()
 	{
 		Array<aiNode*> tmp(m_dialog.m_editor.getAllocator());
 		m_nodes.clear();
-		for (auto& mesh : m_dialog.m_meshes)
+		if (m_dialog.m_model.all_nodes)
 		{
-			if(!mesh.import) continue;
-			for (unsigned int j = 0; j < mesh.mesh->mNumBones; ++j)
+			for (auto& importer : m_dialog.m_importers)
 			{
-				auto* node = getNode(mesh.mesh->mBones[j]->mName, mesh.scene->mRootNode);
-				while (node && node->mNumMeshes == 0)
+				gatherAllNodes(tmp, importer.GetScene()->mRootNode);
+			}
+		}
+		else
+		{
+			for (auto& mesh : m_dialog.m_meshes)
+			{
+				if (!mesh.import) continue;
+				for (unsigned int j = 0; j < mesh.mesh->mNumBones; ++j)
 				{
-					if (tmp.indexOf(node) >= 0) break;
-					tmp.push(node);
-					node = node->mParent;
+					auto* node = getNode(mesh.mesh->mBones[j]->mName, mesh.scene->mRootNode);
+					while (node && node->mNumMeshes == 0)
+					{
+						if (tmp.indexOf(node) >= 0) break;
+						tmp.push(node);
+						node = node->mParent;
+					}
+					if (node && tmp.indexOf(node) < 0) tmp.push(node);
 				}
-				if (node && tmp.indexOf(node) < 0) tmp.push(node);
 			}
 		}
 
@@ -2009,6 +2029,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	, m_animations(app.getWorldEditor()->getAllocator())
 {
 	m_model.make_convex = false;
+	m_model.all_nodes = false;
 	m_model.mesh_scale = 1;
 	m_model.remove_doubles = false;
 	m_model.create_billboard_lod = false;
@@ -2991,13 +3012,14 @@ void ImportAssetDialog::onWindowGUI()
 		{
 			if (ImGui::CollapsingHeader("Advanced"))
 			{
-				//ImGui::Checkbox("Create billboard LOD", &m_create_billboard_lod);
 				if (m_is_importing || m_is_converting)
 				{
 					ImGui::EndDock();
 					return;
 				}
 
+				ImGui::Checkbox("Create billboard LOD", &m_model.create_billboard_lod);
+				ImGui::Checkbox("Import all bones", &m_model.all_nodes);
 				ImGui::Checkbox("Remove doubles", &m_model.remove_doubles);
 				ImGui::DragFloat("Scale", &m_model.mesh_scale, 0.01f, 0.001f, 0);
 				ImGui::Combo("Orientation", &(int&)m_model.orientation, "Y up\0Z up\0-Z up\0-X up\0");

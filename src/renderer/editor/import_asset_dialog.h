@@ -152,6 +152,7 @@ class ImportAssetDialog : public StudioApp::IPlugin
 			bool remove_doubles;
 			Orientation orientation;
 			bool make_convex;
+			bool all_nodes;
 		} m_model;
 
 		float m_progress_fraction;
