@@ -1009,7 +1009,7 @@ struct ConvertTask : public MT::Task
 					StaticString<20 + MAX_PATH_LENGTH>("Could not create ", output_material_name));
 				return false;
 			}
-			file << "{\n\t\"shader\" : \"pipelines/billboard/billboard.shd\"\n";
+			file << "{\n\t\"shader\" : \"pipelines/rigid/rigid.shd\"\n";
 			file << "\t, \"defines\" : [\"ALPHA_CUTOUT\"]\n";
 			file << "\t, \"texture\" : {\n\t\t\"source\" : \"";
 
@@ -1025,7 +1025,7 @@ struct ConvertTask : public MT::Task
 			}
 			else
 			{
-				file << "billboard.dds";
+				file << m_dialog.m_mesh_output_filename << "_billboard.dds";
 				PathBuilder texture_path(m_dialog.m_output_dir, "/", m_dialog.m_mesh_output_filename, "_billboard.dds");
 				copyFile("models/utils/cube/default.dds", texture_path);
 			}
