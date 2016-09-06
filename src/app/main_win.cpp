@@ -441,6 +441,8 @@ public:
 
 	void frame()
 	{
+		m_gui_interface->size.x = (float)m_pipeline->getWidth();
+		m_gui_interface->size.y = (float)m_pipeline->getHeight();
 		float frame_time = m_frame_timer->tick();
 		m_engine->update(*m_universe);
 		m_pipeline->render();
