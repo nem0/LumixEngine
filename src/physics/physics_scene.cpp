@@ -241,7 +241,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	class RigidActor
 	{
 	public:
-		explicit RigidActor(PhysicsSceneImpl& _scene, ActorType _type)
+		RigidActor(PhysicsSceneImpl& _scene, ActorType _type)
 			: resource(nullptr)
 			, physx_actor(nullptr)
 			, scene(_scene)
@@ -250,6 +250,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 			, entity(INVALID_ENTITY)
 			, type(_type)
 		{
+		}
+
+		~RigidActor()
+		{
+			setResource(nullptr);
+			if (physx_actor) physx_actor->release();
 		}
 
 		void setResource(PhysicsGeometry* resource);
