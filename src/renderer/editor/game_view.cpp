@@ -189,10 +189,6 @@ void GameView::onGui()
 				ImVec2 pos = ImGui::GetItemRectMin();
 				PlatformInterface::clipCursor((int)pos.x, (int)pos.y, (int)m_size.x, (int)m_size.y);
 			}
-			else
-			{
-				PlatformInterface::unclipCursor();
-			}
 
 			if (ImGui::Checkbox("Pause", &m_paused))
 			{
