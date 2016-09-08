@@ -78,6 +78,32 @@ static const int TEXTURE_SIZE = 512;
 static bool isSkinned(const aiMesh* mesh) { return mesh->mNumBones > 0; }
 
 
+static uint32 packuint32(uint8 _x, uint8 _y, uint8 _z, uint8 _w)
+{
+	union {
+		uint32 ui32;
+		uint8 arr[4];
+	} un;
+
+	un.arr[0] = _x;
+	un.arr[1] = _y;
+	un.arr[2] = _z;
+	un.arr[3] = _w;
+
+	return un.ui32;
+}
+
+
+static uint32 packF4u(const Vec3& vec)
+{
+	const uint8 xx = uint8(vec.x * 127.0f + 128.0f);
+	const uint8 yy = uint8(vec.y * 127.0f + 128.0f);
+	const uint8 zz = uint8(vec.z * 127.0f + 128.0f);
+	const uint8 ww = uint8(0);
+	return packuint32(xx, yy, zz, ww);
+}
+
+
 static int ceilPowOf2(int value)
 {
 	ASSERT(value > 0);
@@ -90,6 +116,59 @@ static int ceilPowOf2(int value)
 	return ret + 1;
 }
 
+
+struct BillboardSceneData
+{
+	int width;
+	int height;
+	float ortho_size;
+	Vec3 position;
+
+
+	BillboardSceneData(const AABB& aabb, int texture_size)
+	{
+		Vec3 size = aabb.max - aabb.min;
+		float right = aabb.max.x + size.z + size.x + size.z;
+		float left = aabb.min.x;
+		position.set((right + left) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + 5);
+
+		if (2 * size.x + 2 * size.z > size.y)
+		{
+			width = texture_size;
+			int nonceiled_height = int(width / (2 * size.x + 2 * size.z) * size.y);
+			height = ceilPowOf2(nonceiled_height);
+			ortho_size = size.y * height / nonceiled_height * 0.5f;
+		}
+		else
+		{
+			height = texture_size;
+			width = ceilPowOf2(int(height * (2 * size.x + 2 * size.z) / size.y));
+			ortho_size = size.y * 0.5f;
+		}
+	}
+
+
+	Matrix computeMVPMatrix()
+	{
+		Matrix mvp = Matrix::IDENTITY;
+
+		float ratio = height > 0 ? (float)width / height : 1.0f;
+		Matrix proj;
+		proj.setOrtho(-ortho_size * ratio,
+			ortho_size * ratio,
+			-ortho_size,
+			ortho_size,
+			0.0001f,
+			10000.0f,
+			false /* we do not care for z value, so both true and false are correct*/);
+
+		mvp.setTranslation(position);
+		mvp.fastInverse();
+		mvp = proj * mvp;
+
+		return mvp;
+	}
+};
 
 static bool isSkinned(const aiScene* scene, const aiMaterial* material)
 {
@@ -1010,7 +1089,6 @@ struct ConvertTask : public MT::Task
 				return false;
 			}
 			file << "{\n\t\"shader\" : \"pipelines/rigid/rigid.shd\"\n";
-			file << "\t, \"backface_culling\" : false\n";
 			file << "\t, \"defines\" : [\"ALPHA_CUTOUT\"]\n";
 			file << "\t, \"texture\" : {\n\t\t\"source\" : \"";
 
@@ -1068,8 +1146,6 @@ struct ConvertTask : public MT::Task
 		}
 
 		file.writeText("{\n\t\"shader\" : \"pipelines/");
-		file.writeText(material.shader);
-		file.writeText("/");
 		file.writeText(material.shader);
 		file.writeText(".shd\"\n");
 		
@@ -1188,32 +1264,6 @@ struct ConvertTask : public MT::Task
 			g_log_error.log("Editor") << "Mesh contains " << invalid_vertices
 											 << " vertices not influenced by any bones.";
 		}
-	}
-
-
-	static uint32 packuint32(uint8 _x, uint8 _y, uint8 _z, uint8 _w)
-	{
-		union {
-			uint32 ui32;
-			uint8 arr[4];
-		} un;
-
-		un.arr[0] = _x;
-		un.arr[1] = _y;
-		un.arr[2] = _z;
-		un.arr[3] = _w;
-
-		return un.ui32;
-	}
-
-
-	static uint32 packF4u(const Vec3& vec)
-	{
-		const uint8 xx = uint8(vec.x * 127.0f + 128.0f);
-		const uint8 yy = uint8(vec.y * 127.0f + 128.0f);
-		const uint8 zz = uint8(vec.z * 127.0f + 128.0f);
-		const uint8 ww = uint8(0);
-		return packuint32(xx, yy, zz, ww);
 	}
 
 
@@ -1348,7 +1398,7 @@ struct ConvertTask : public MT::Task
 
 			if (m_dialog.m_model.create_billboard_lod)
 			{
-				uint16 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 };
+				uint16 indices[] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15};
 				file.write(indices, sizeof(indices));
 			}
 		}
@@ -1361,7 +1411,7 @@ struct ConvertTask : public MT::Task
 
 			if (m_dialog.m_model.create_billboard_lod)
 			{
-				uint32 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 };
+				uint32 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15 };
 				file.write(indices, sizeof(indices));
 			}
 		}
@@ -1370,7 +1420,6 @@ struct ConvertTask : public MT::Task
 
 	void writeVertices(FS::OsFile& file) const
 	{
-
 		Vec3 min(0, 0, 0);
 		Vec3 max(0, 0, 0);
 		for (auto& mesh : m_dialog.m_meshes)
@@ -1446,39 +1495,42 @@ struct ConvertTask : public MT::Task
 		if (m_dialog.m_model.create_billboard_lod)
 		{
 			Vec3 size = max - min;
-			float u[] = { 0.0f, 0.5f, 1.0f };
-			float v[] = { 0.0f, 1.0f };
-			if (size.x + size.z < size.y)
-			{
-				int width = int(TEXTURE_SIZE / size.y * (size.x + size.z));
-				int ceiled = ceilPowOf2(width);
-				int diff = ceiled - width;
-				u[0] = diff * 0.5f / float(ceiled);
-				u[2] = 1 - u[0];
-				u[1] = u[0] + size.x / (size.x + size.z) * (1 - 2 * u[0]);
-			}
-			else
-			{
-				u[1] = size.x / (size.x + size.z);
-				
-				float t = size.y / (size.x + size.z);
+			BillboardSceneData data({min, max}, TEXTURE_SIZE);
+			Matrix mtx = data.computeMVPMatrix();
+			Vec3 uv0_min = mtx.transform(min);
+			Vec3 uv0_max = mtx.transform(max);
+			float x1_max = 0.0f;
+			float x2_max = mtx.transform(Vec3(max.x + size.z + size.x, 0, 0)).x;
+			float x3_max = mtx.transform(Vec3(max.x + size.z + size.x + size.z, 0, 0)).x;
 
-				v[0] = 0.5f - t * 0.5f;
-				v[1] = 0.5f + t * 0.5f;
-			}
-			BillboardVertex vertices[8] = {
-				{ { min.x, min.y, 0 }, { 128, 255, 128, 0 }, { 255, 128, 128, 0 }, { u[0], v[1] } },
-				{ { max.x, min.y, 0 }, { 128, 255, 128, 0 }, { 255, 128, 128, 0 }, { u[1], v[1] } },
-				{ { max.x, max.y, 0 }, { 128, 255, 128, 0 }, { 255, 128, 128, 0 }, { u[1], v[0] } },
-				{ { min.x, max.y, 0 }, { 128, 255, 128, 0 }, { 255, 128, 128, 0 }, { u[0], v[0] } },
+			float u[] = {0.0f, 0.5f, 1.0f};
+			float v[] = {0.0f, 1.0f};
 
-				{ { 0, min.y, min.z }, { 128, 255, 128, 0 }, { 255, 128, 128, 0 }, { u[1], v[1] } },
-				{ { 0, min.y, max.z }, { 128, 255, 128, 0 }, { 255, 128, 128, 0 }, { u[2], v[1] } },
-				{ { 0, max.y, max.z }, { 128, 255, 128, 0 }, { 255, 128, 128, 0 }, { u[2], v[0] } },
-				{ { 0, max.y, min.z }, { 128, 255, 128, 0 }, { 255, 128, 128, 0 }, { u[1], v[0] } }
+			auto fixUV = [](float x, float y) -> Vec2 { return Vec2(x * 0.5f + 0.5f, y * 0.5f + 0.5f); };
+
+			BillboardVertex vertices[] = {
+				{{min.x, min.y, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, fixUV(uv0_min.x, uv0_max.y)},
+				{{max.x, min.y, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, fixUV(uv0_max.x, uv0_max.y)},
+				{{max.x, max.y, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, fixUV(uv0_max.x, uv0_min.y)},
+				{{min.x, max.y, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, fixUV(uv0_min.x, uv0_min.y)},
+
+				{{0, min.y, min.z}, {128, 255, 128, 0}, {128, 128, 255, 0}, fixUV(uv0_max.x, uv0_max.y)},
+				{{0, min.y, max.z}, {128, 255, 128, 0}, {128, 128, 255, 0}, fixUV(x1_max, uv0_max.y)},
+				{{0, max.y, max.z}, {128, 255, 128, 0}, {128, 128, 255, 0}, fixUV(x1_max, uv0_min.y)},
+				{{0, max.y, min.z}, {128, 255, 128, 0}, {128, 128, 255, 0}, fixUV(uv0_max.x, uv0_min.y)},
+
+				{{max.x, min.y, 0}, {128, 255, 128, 0}, {0, 128, 128, 0}, fixUV(x1_max, uv0_max.y)},
+				{{min.x, min.y, 0}, {128, 255, 128, 0}, {0, 128, 128, 0}, fixUV(x2_max, uv0_max.y)},
+				{{min.x, max.y, 0}, {128, 255, 128, 0}, {0, 128, 128, 0}, fixUV(x2_max, uv0_min.y)},
+				{{max.x, max.y, 0}, {128, 255, 128, 0}, {0, 128, 128, 0}, fixUV(x1_max, uv0_min.y)},
+
+				{{0, min.y, max.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x2_max, uv0_max.y)},
+				{{0, min.y, min.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x3_max, uv0_max.y)},
+				{{0, max.y, min.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x3_max, uv0_min.y)},
+				{{0, max.y, max.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x2_max, uv0_min.y)}
 			};
 			file.write(vertices, sizeof(vertices));
-		} 
+		}
 	}
 
 
@@ -1495,8 +1547,8 @@ struct ConvertTask : public MT::Task
 
 		if (m_dialog.m_model.create_billboard_lod)
 		{
-			indices_count += 4*3;
-			vertices_size += 8 * sizeof(BillboardVertex);
+			indices_count += 8*3;
+			vertices_size += 16 * sizeof(BillboardVertex);
 		}
 
 		file.write((const char*)&indices_count, sizeof(indices_count));
@@ -1546,12 +1598,12 @@ struct ConvertTask : public MT::Task
 		file.write(material_name, length);
 
 		file.write((const char*)&attribute_array_offset, sizeof(attribute_array_offset));
-		int32 attribute_array_size = 8 * vertex_size;
+		int32 attribute_array_size = 16 * vertex_size;
 		attribute_array_offset += attribute_array_size;
 		file.write((const char*)&attribute_array_size, sizeof(attribute_array_size));
 
 		file.write((const char*)&indices_offset, sizeof(indices_offset));
-		int32 mesh_tri_count = 4;
+		int32 mesh_tri_count = 8;
 		indices_offset += mesh_tri_count * 3;
 		file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
@@ -2494,6 +2546,26 @@ void ImportAssetDialog::onImageGUI()
 }
 
 
+static void preprocessBillboardNormalmap(uint32* pixels, int width, int height, IAllocator& allocator)
+{
+	union {
+		uint32 ui32;
+		uint8 arr[4];
+	} un;
+	for (int j = 0; j < height; ++j)
+	{
+		for (int i = 0; i < width; ++i)
+		{
+			un.ui32 = pixels[i + j * width];
+			uint8 tmp = un.arr[1];
+			un.arr[1] = un.arr[2];
+			un.arr[2] = tmp;
+			pixels[i + j * width] = un.ui32;
+		}
+	}
+}
+
+
 static void preprocessBillboard(uint32* pixels, int width, int height, IAllocator& allocator)
 {
 	struct DistanceFieldCell
@@ -2598,9 +2670,17 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	auto mesh_cmp = render_scene->createComponent(RENDERABLE_TYPE, mesh_entity);
 	render_scene->setRenderablePath(mesh_cmp, mesh_path);
 
-	auto mesh_side_entity = universe.createEntity({0, 0, 0}, {Vec3(0, 1, 0), Math::PI * 0.5f});
-	auto mesh_side_cmp = render_scene->createComponent(RENDERABLE_TYPE, mesh_side_entity);
-	render_scene->setRenderablePath(mesh_side_cmp, mesh_path);
+	auto mesh_left_entity = universe.createEntity({ 0, 0, 0 }, { Vec3(0, 1, 0), Math::PI * 0.5f });
+	auto mesh_left_cmp = render_scene->createComponent(RENDERABLE_TYPE, mesh_left_entity);
+	render_scene->setRenderablePath(mesh_left_cmp, mesh_path);
+
+	auto mesh_back_entity = universe.createEntity({ 0, 0, 0 }, { Vec3(0, 1, 0), Math::PI });
+	auto mesh_back_cmp = render_scene->createComponent(RENDERABLE_TYPE, mesh_back_entity);
+	render_scene->setRenderablePath(mesh_back_cmp, mesh_path);
+
+	auto mesh_right_entity = universe.createEntity({ 0, 0, 0 }, { Vec3(0, 1, 0), Math::PI * 1.5f});
+	auto mesh_right_cmp = render_scene->createComponent(RENDERABLE_TYPE, mesh_right_entity);
+	render_scene->setRenderablePath(mesh_right_cmp, mesh_path);
 
 	auto light_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
 	static const auto GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
@@ -2618,27 +2698,19 @@ static bool createBillboard(ImportAssetDialog& dialog,
 		lods[0].distance = FLT_MAX;
 		AABB aabb = model->getAABB();
 		Vec3 size = aabb.max - aabb.min;
-		universe.setPosition(mesh_side_entity, { aabb.max.x - aabb.min.z, 0, 0 });
-		Vec3 camera_pos(
-			(aabb.min.x + aabb.max.x + size.z) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + 5);
-		auto camera_entity = universe.createEntity(camera_pos, { 0, 0, 0, 1 });
+		universe.setPosition(mesh_left_entity, {aabb.max.x - aabb.min.z, 0, 0});
+		universe.setPosition(mesh_back_entity, {aabb.max.x + size.z + aabb.max.x, 0, 0});
+		universe.setPosition(mesh_right_entity, {aabb.max.x + size.x + size.z + aabb.max.x, 0, 0});
+		
+		BillboardSceneData data(aabb, texture_size);
+		auto camera_entity = universe.createEntity(data.position, { 0, 0, 0, 1 });
 		static const auto CAMERA_TYPE = PropertyRegister::getComponentType("camera");
 		auto camera_cmp = render_scene->createComponent(CAMERA_TYPE, camera_entity);
 		render_scene->setCameraOrtho(camera_cmp, true);
 		render_scene->setCameraSlot(camera_cmp, "main");
-		if (size.x + size.z > size.y)
-		{
-			width = texture_size;
-			int nonceiled_height = int(width / (size.x + size.z) * size.y);
-			height = ceilPowOf2(nonceiled_height);
-			render_scene->setCameraOrthoSize(camera_cmp, size.y * height / nonceiled_height *  0.5f);
-		}
-		else
-		{
-			height = texture_size;
-			width = ceilPowOf2(int(height * (size.x + size.z) / size.y));
-			render_scene->setCameraOrthoSize(camera_cmp, size.y * 0.5f);
-		}
+		width = data.width;
+		height = data.height;
+		render_scene->setCameraOrthoSize(camera_cmp, data.ortho_size);
 	}
 
 	pipeline->setScene(render_scene);
@@ -2679,6 +2751,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	bgfx::frame(); // wait for gpu
 
 	preprocessBillboard((uint32*)&data[0], width, height, engine.getAllocator());
+	preprocessBillboardNormalmap((uint32*)&data_normal[0], width, height, engine.getAllocator());
 	saveAsDDS(dialog, "billboard_generator", (uint8*)&data[0], width, height, true, out_path.c_str());
 	saveAsDDS(dialog, "billboard_generator", (uint8*)&data_normal[0], width, height, true, out_path_normal.c_str());
 	bgfx::destroyTexture(texture);
@@ -2760,11 +2833,6 @@ int ImportAssetDialog::importAsset(lua_State* L)
 	}
 	lua_pop(L, 1);
 
-	if (lua_getfield(L, 2, "output_dir") == LUA_TSTRING)
-	{
-		copyString(m_output_dir, LuaWrapper::toType<const char*>(L, -1));
-	}
-	lua_pop(L, 1);
 
 	if (lua_getfield(L, 2, "lods") == LUA_TTABLE)
 	{
