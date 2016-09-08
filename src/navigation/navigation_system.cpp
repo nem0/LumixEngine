@@ -706,6 +706,16 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
+	void cancelNavigation(Entity entity)
+	{
+		auto iter = m_agents.find(entity);
+		if (iter == m_agents.end()) return;
+
+		Agent& agent = iter.value();
+		m_crowd->resetMoveTarget(agent.agent);
+	}
+
+
 	bool navigate(Entity entity, const Vec3& dest, float speed)
 	{
 		if (!m_navquery) return false;
@@ -1211,6 +1221,7 @@ static void registerLuaAPI(lua_State* L)
 
 	REGISTER_FUNCTION(generateNavmesh);
 	REGISTER_FUNCTION(navigate);
+	REGISTER_FUNCTION(cancelNavigation);
 	REGISTER_FUNCTION(debugDrawNavmesh);
 	REGISTER_FUNCTION(debugDrawCompactHeightfield);
 	REGISTER_FUNCTION(debugDrawHeightfield);
