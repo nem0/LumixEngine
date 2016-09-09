@@ -81,26 +81,33 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 
 				static bool debug_draw_navmesh = false;
 				ImGui::Checkbox("Draw navmesh", &debug_draw_navmesh);
-				if (debug_draw_navmesh) scene->debugDrawNavmesh();
+				if (debug_draw_navmesh) scene->debugDrawNavmesh(app.getWorldEditor()->getCameraRaycastHit());
 
-				static bool debug_draw_compact_heightfield = false;
-				ImGui::Checkbox("Draw compact heightfield", &debug_draw_compact_heightfield);
-				if (debug_draw_compact_heightfield) scene->debugDrawCompactHeightfield();
-
-				static bool debug_draw_heightfield = false;
-				ImGui::Checkbox("Draw heightfield", &debug_draw_heightfield);
-				if (debug_draw_heightfield) scene->debugDrawHeightfield();
-
-				static bool debug_draw_contours = false;
-				ImGui::Checkbox("Draw contours", &debug_draw_contours);
-				if (debug_draw_contours) scene->debugDrawContours();
-
-				auto& entities = app.getWorldEditor()->getSelectedEntities();
-				if (!entities.empty())
+				if (scene->hasDebugDrawData())
 				{
-					static bool debug_draw_path = false;
-					ImGui::Checkbox("Draw path", &debug_draw_path);
-					if (debug_draw_path) scene->debugDrawPath(entities[0]);
+					static bool debug_draw_compact_heightfield = false;
+					ImGui::Checkbox("Draw compact heightfield", &debug_draw_compact_heightfield);
+					if (debug_draw_compact_heightfield) scene->debugDrawCompactHeightfield();
+
+					static bool debug_draw_heightfield = false;
+					ImGui::Checkbox("Draw heightfield", &debug_draw_heightfield);
+					if (debug_draw_heightfield) scene->debugDrawHeightfield();
+
+					static bool debug_draw_contours = false;
+					ImGui::Checkbox("Draw contours", &debug_draw_contours);
+					if (debug_draw_contours) scene->debugDrawContours();
+
+					auto& entities = app.getWorldEditor()->getSelectedEntities();
+					if (!entities.empty())
+					{
+						static bool debug_draw_path = false;
+						ImGui::Checkbox("Draw path", &debug_draw_path);
+						if (debug_draw_path) scene->debugDrawPath(entities[0]);
+					}
+				}
+				else
+				{
+					ImGui::Text("For more info press \"Debug tile\"");
 				}
 			}
 		}
