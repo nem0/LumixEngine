@@ -444,6 +444,12 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
+	bool hasDebugDrawData() const override
+	{
+		return m_debug_contours != nullptr;
+	}
+
+
 	void debugDrawContours() override
 	{
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
@@ -619,44 +625,62 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
-	void debugDrawNavmesh() override
+	void debugDrawNavmesh(const Vec3& pos) override
 	{
-		if (!m_polymesh) return;
-		auto& mesh = *m_polymesh;
+		int x = int((pos.x - m_aabb.min.x + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
+		int z = int((pos.z - m_aabb.min.z + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
+		const dtMeshTile* tile = m_navmesh->getTileAt(x, z, 0);
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 
-		const int nvp = mesh.nvp;
-		const float cs = mesh.cs;
-		const float ch = mesh.ch;
+		dtPolyRef base = m_navmesh->getPolyRefBase(tile);
 
-		Vec3 color(0, 0, 0);
+		int tileNum = m_navmesh->decodePolyIdTile(base);
 
-		for (int idx = 0; idx < mesh.npolys; ++idx)
+		for (int i = 0; i < tile->header->polyCount; ++i)
 		{
-			const auto* p = &mesh.polys[idx * nvp * 2];
+			const dtPoly* p = &tile->polys[i];
+			if (p->getType() == DT_POLYTYPE_OFFMESH_CONNECTION) continue;
 
-			if (mesh.areas[idx] == RC_WALKABLE_AREA) color.set(0, 0.8f, 1.0f);
+			const dtPolyDetail* pd = &tile->detailMeshes[i];
 
-			Vec3 vertices[6];
-			Vec3* vert = vertices;
-			for (int j = 0; j < nvp; ++j)
+			for (int j = 0; j < pd->triCount; ++j)
 			{
-				if (p[j] == RC_MESH_NULL_IDX) break;
+				const unsigned char* t = &tile->detailTris[(pd->triBase + j) * 4];
+				Vec3 verts[3];
+				for (int k = 0; k < 3; ++k)
+				{
+					if (t[k] < p->vertCount)
+						verts[k] = *(Vec3*)&tile->verts[p->verts[t[k]] * 3];
+					else
+						verts[k] = *(Vec3*)&tile->detailVerts[(pd->vertBase + t[k] - p->vertCount) * 3];
+				}
+				render_scene->addDebugTriangle(verts[0], verts[1], verts[2], 0xff00aaff, 0);
+			}
 
-				const auto* v = &mesh.verts[p[j] * 3];
-				vert->set(v[0] * cs + mesh.bmin[0], (v[1] + 1) * ch + mesh.bmin[1], v[2] * cs + mesh.bmin[2]);
-				++vert;
-			}
-			for(int i = 2; i < vert - vertices; ++i)
+			for (int j = 0, nj = (int)p->vertCount; j < nj; ++j)
 			{
-				render_scene->addDebugTriangle(vertices[0], vertices[i-1], vertices[i], 0xff00aaff, 0);
+				const float* v0 = &tile->verts[p->verts[j] * 3];
+				const float* v1 = &tile->verts[p->verts[(j + 1) % nj] * 3];
+
+				for (int k = 0; k < pd->triCount; ++k)
+				{
+					const unsigned char* t = &tile->detailTris[(pd->triBase + k) * 4];
+					const float* tv[3];
+					for (int m = 0; m < 3; ++m)
+					{
+						if (t[m] < p->vertCount)
+							tv[m] = &tile->verts[p->verts[t[m]] * 3];
+						else
+							tv[m] = &tile->detailVerts[(pd->vertBase + (t[m] - p->vertCount)) * 3];
+					}
+					for (int m = 0, n = 2; m < 3; n = m++)
+					{
+						if (((t[3] >> (n * 2)) & 0x3) == 0) continue; // Skip inner detail edges.
+						render_scene->addDebugLine(*(Vec3*)tv[n], *(Vec3*)tv[m], 0xff0000ff, 0);
+					}
+				}
 			}
-			for(int i = 1; i < vert - vertices; ++i)
-			{
-				render_scene->addDebugLine(vertices[i], vertices[i-1], 0xff0000ff, 0);
-			}
-			render_scene->addDebugLine(vertices[0], vertices[vert - vertices - 1], 0xff0000ff, 0);
 		}
 	}
 
