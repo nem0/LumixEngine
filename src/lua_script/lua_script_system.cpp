@@ -1405,7 +1405,7 @@ namespace Lumix
 
 			for (int i = 0, c = m_updates.size(); i < c; ++i)
 			{
-				auto& update_item = m_updates[i];
+				UpdateData update_item = m_updates[i];
 				if (lua_rawgeti(update_item.state, LUA_REGISTRYINDEX, update_item.environment) != LUA_TTABLE)
 				{
 					ASSERT(false);
