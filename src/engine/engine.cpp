@@ -374,14 +374,16 @@ public:
 	}
 
 
-	static void LUA_setEntityLocalRotation(IScene* hierarchy,
+	static void LUA_setEntityLocalRotation(IScene* scene,
 		Entity entity,
 		Vec3 axis,
 		float angle)
 	{
 		if (!isValid(entity)) return;
 
-		static_cast<Hierarchy*>(hierarchy)->setLocalRotation(entity, Quat(axis, angle));
+		auto* hierarchy = static_cast<Hierarchy*>(scene);
+		ComponentHandle cmp = hierarchy->getComponent(entity, HIERARCHY_TYPE);
+		if (isValid(cmp)) hierarchy->setLocalRotation(cmp, Quat(axis, angle));
 	}
 
 
@@ -605,6 +607,10 @@ public:
 		PropertyRegister::add("hierarchy",
 			LUMIX_NEW(m_allocator, SimplePropertyDescriptor<Vec3, Hierarchy>)(
 				"Relative position", &Hierarchy::getLocalPosition, &Hierarchy::setLocalPosition));
+		auto relative_rot = LUMIX_NEW(m_allocator, SimplePropertyDescriptor<Vec3, Hierarchy>)(
+			"Relative rotation", &Hierarchy::getLocalRotationEuler, &Hierarchy::setLocalRotationEuler);
+		relative_rot->setIsInRadians(true);
+		PropertyRegister::add("hierarchy", relative_rot);
 	}
 
 

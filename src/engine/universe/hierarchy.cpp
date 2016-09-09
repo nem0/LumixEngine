@@ -190,8 +190,23 @@ public:
 	}
 
 
-	void setLocalRotation(Entity entity, const Quat& rotation) override
+	void setLocalRotationEuler(ComponentHandle cmp, const Vec3& rotation) override
 	{
+		Quat q;
+		q.fromEuler(rotation);
+		setLocalRotation(cmp, q);
+	}
+
+
+	Vec3 getLocalRotationEuler(ComponentHandle cmp) override
+	{
+		return getLocalRotation(cmp).toEuler();
+	}
+
+
+	void setLocalRotation(ComponentHandle cmp, const Quat& rotation) override
+	{
+		Entity entity = { cmp.index };
 		Parents::iterator parent_iter = m_parents.find(entity);
 
 		if (parent_iter.isValid())
