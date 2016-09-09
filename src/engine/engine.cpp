@@ -376,14 +376,25 @@ public:
 
 	static void LUA_setEntityLocalRotation(IScene* scene,
 		Entity entity,
-		Vec3 axis,
-		float angle)
+		const Quat& rotation)
 	{
 		if (!isValid(entity)) return;
 
 		auto* hierarchy = static_cast<Hierarchy*>(scene);
 		ComponentHandle cmp = hierarchy->getComponent(entity, HIERARCHY_TYPE);
-		if (isValid(cmp)) hierarchy->setLocalRotation(cmp, Quat(axis, angle));
+		if (isValid(cmp)) hierarchy->setLocalRotation(cmp, rotation);
+	}
+
+
+	static void LUA_setEntityLocalPosition(IScene* scene,
+		Entity entity,
+		const Vec3& position)
+	{
+		if (!isValid(entity)) return;
+
+		auto* hierarchy = static_cast<Hierarchy*>(scene);
+		ComponentHandle cmp = hierarchy->getComponent(entity, HIERARCHY_TYPE);
+		if (isValid(cmp)) hierarchy->setLocalPosition(cmp, position);
 	}
 
 
@@ -416,6 +427,12 @@ public:
 	static Vec4 LUA_multMatrixVec(const Matrix& m, const Vec4& v)
 	{
 		return m * v;
+	}
+
+
+	static Quat LUA_multQuat(const Quat& a, const Quat& b)
+	{
+		return a * b;
 	}
 
 
@@ -495,6 +512,7 @@ public:
 		REGISTER_FUNCTION(setEntityRotation);
 		REGISTER_FUNCTION(getEntityRotation);
 		REGISTER_FUNCTION(setEntityLocalRotation);
+		REGISTER_FUNCTION(setEntityLocalPosition);
 		REGISTER_FUNCTION(getInputActionValue);
 		REGISTER_FUNCTION(addInputAction);
 		REGISTER_FUNCTION(logError);
@@ -508,6 +526,7 @@ public:
 		REGISTER_FUNCTION(getComponent);
 		REGISTER_FUNCTION(getComponentType);
 		REGISTER_FUNCTION(multMatrixVec);
+		REGISTER_FUNCTION(multQuat);
 
 		#undef REGISTER_FUNCTION
 
