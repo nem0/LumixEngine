@@ -299,8 +299,7 @@ struct AnimationSceneImpl : public AnimationScene
 		for (int i = 0; i < lengthOf(mixer.inputs); ++i)
 		{
 			Mixer::Input& input = mixer.inputs[i];
-			if (!input.animation) break;
-			ASSERT(input.animation->isReady());
+			if (!input.animation || !input.animation->isReady()) break;
 			if (i == 0)
 			{
 				input.animation->getRelativePose(input.time, *pose, *model);
