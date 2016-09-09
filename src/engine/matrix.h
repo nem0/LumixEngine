@@ -79,6 +79,8 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Matrix
 		m41 = r41; m42 = r42; m43 = r43; m44 = r44;
 	}
 
+	void decompose(Vec3& position, Quat& rotation, float& scale) const;
+
 	Matrix operator *(const Matrix& rhs) const;
 
 	Vec4 operator *(const Vec4& rhs) const
