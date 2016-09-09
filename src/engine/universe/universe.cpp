@@ -119,9 +119,8 @@ bool Universe::hasEntity(Entity entity) const
 
 void Universe::setMatrix(Entity entity, const Matrix& mtx)
 {
-	Quat rot = mtx.getRotation();
-	m_transformations[m_entity_map[entity.index]].position = mtx.getTranslation();
-	m_transformations[m_entity_map[entity.index]].rotation = rot;
+	Transformation& out = m_transformations[m_entity_map[entity.index]];
+	mtx.decompose(out.position, out.rotation, out.scale);
 	entityTransformed().invoke(entity);
 }
 
