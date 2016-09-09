@@ -2224,6 +2224,21 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	void addForceAtPos(Entity entity, const Vec3& force, const Vec3& pos)
+	{
+		int index = m_actors.find(entity);
+		if (index < 0) return;
+		
+		RigidActor* actor = m_actors.at(index);
+		if (!actor->physx_actor) return;
+		
+		physx::PxRigidBody* rigid_body = actor->physx_actor->isRigidBody();
+		if (!rigid_body) return;
+
+		physx::PxRigidBodyExt::addForceAtPos(*rigid_body, toPhysx(force), toPhysx(pos));
+	}
+
+
 	void setRagdollKinematic(ComponentHandle cmp, bool is_kinematic)
 	{
 		setRagdollBoneKinematicRecursive(m_ragdolls[{cmp.index}].root, is_kinematic);
@@ -3704,6 +3719,7 @@ void PhysicsScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(applyForceToActor);
 	REGISTER_FUNCTION(moveController);
 	REGISTER_FUNCTION(setRagdollKinematic);
+	REGISTER_FUNCTION(addForceAtPos);
 	
 	LuaWrapper::createSystemFunction(L, "Physics", "raycast", &PhysicsSceneImpl::LUA_raycast);
 
