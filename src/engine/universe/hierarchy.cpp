@@ -225,7 +225,7 @@ public:
 		Entity entity = {cmp.index};
 		Parents::iterator parent_iter = m_parents.find(entity);
 
-		if (parent_iter.isValid())
+		if (parent_iter.isValid() && isValid(parent_iter.value()))
 		{
 			auto child_iter = m_children.find(parent_iter.value());
 			ASSERT(child_iter.isValid());
