@@ -750,7 +750,7 @@ struct NavigationSceneImpl : public NavigationScene
 		Agent& agent = iter.value();
 		dtPolyRef end_poly_ref;
 		dtQueryFilter filter;
-		static const float ext[] = { 1.0f, 2.0f, 1.0f };
+		static const float ext[] = { 1.0f, 20.0f, 1.0f };
 		m_navquery->findNearestPoly(&dest.x, ext, &filter, &end_poly_ref, 0);
 		dtCrowdAgentParams params = m_crowd->getAgent(agent.agent)->params;
 		params.maxSpeed = speed;
