@@ -460,10 +460,10 @@ void Terrain::updateGrass(ComponentHandle camera)
 	Vec3 local_camera_pos = inv_mtx.transform(camera_pos);
 	float cx = (int)(local_camera_pos.x / (GRASS_QUAD_SIZE)) * GRASS_QUAD_SIZE;
 	float cz = (int)(local_camera_pos.z / (GRASS_QUAD_SIZE)) * GRASS_QUAD_SIZE;
-	float from_quad_x = cx - (m_grass_distance >> 1) * GRASS_QUAD_SIZE;
-	float from_quad_z = cz - (m_grass_distance >> 1) * GRASS_QUAD_SIZE;
-	float to_quad_x = cx + (m_grass_distance >> 1) * GRASS_QUAD_SIZE;
-	float to_quad_z = cz + (m_grass_distance >> 1) * GRASS_QUAD_SIZE;
+	float from_quad_x = cx - m_grass_distance * GRASS_QUAD_SIZE;
+	float from_quad_z = cz - m_grass_distance * GRASS_QUAD_SIZE;
+	float to_quad_x = cx + m_grass_distance * GRASS_QUAD_SIZE;
+	float to_quad_z = cz + m_grass_distance * GRASS_QUAD_SIZE;
 
 	float old_bounds[4] = {FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX};
 	Array<GrassQuad*>& quads = getQuads(camera);
@@ -500,7 +500,6 @@ void Terrain::updateGrass(ComponentHandle camera)
 			quad->pos.x = quad_x;
 			quad->pos.z = quad_z;
 			quad->m_patches.reserve(m_grass_types.size());
-			srand((int)quad_x + (int)quad_z * m_grass_distance);
 
 			float min_y = FLT_MAX;
 			float max_y = -FLT_MAX;
