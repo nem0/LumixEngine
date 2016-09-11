@@ -303,7 +303,8 @@ float Terrain::getGrassTypeDistance(int index) const
 
 void Terrain::setGrassTypeGround(int index, int ground)
 {
-	ground = Math::clamp(ground, 0, 3);
+	Lumix::Texture* tex = getMaterial()->getTextureByUniform(TEX_COLOR_UNIFORM);
+	if(tex) ground = Math::clamp(ground, 0, tex->layers - 1);
 	forceGrassUpdate();
 	GrassType& type = *m_grass_types[index];
 	type.m_ground = ground;
