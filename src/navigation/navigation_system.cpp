@@ -61,6 +61,9 @@ struct NavigationSystem : public IPlugin
 		rcAllocSetCustom(&recastAlloc, &recastFree);
 		registerLuaAPI(m_engine.getState());
 		registerProperties();
+		// register flags
+		Material::getCustomFlag("no_navigation");
+		Material::getCustomFlag("nonwalkable");
 	}
 
 
