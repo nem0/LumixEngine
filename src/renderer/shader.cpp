@@ -50,14 +50,14 @@ ShaderInstance& Shader::getInstance(uint32 mask)
 	mask = mask & m_all_defines_mask;
 	for (int i = 0; i < m_instances.size(); ++i)
 	{
-		if (m_instances[i]->define_mask == mask)
+		if (m_instances[i].define_mask == mask)
 		{
-			return *m_instances[i];
+			return m_instances[i];
 		}
 	}
 
 	g_log_error.log("Renderer") << "Unknown shader combination requested: " << mask;
-	return *m_instances[0];
+	return m_instances[0];
 }
 
 
@@ -92,10 +92,6 @@ static uint32 getDefineMaskFromDense(const Shader& shader, uint32 dense)
 bool Shader::generateInstances()
 {
 	bool is_opengl = getRenderer().isOpenGL();
-	for (int i = 0; i < m_instances.size(); ++i)
-	{
-		LUMIX_DELETE(m_allocator, m_instances[i]);
-	}
 	m_instances.clear();
 
 	uint32 count = 1 << m_combintions.define_count;
@@ -104,13 +100,13 @@ bool Shader::generateInstances()
 	char basename[MAX_PATH_LENGTH];
 	PathUtils::getBasename(basename, sizeof(basename), getPath().c_str());
 
+	m_instances.reserve(count);
 	for (uint32 mask = 0; mask < count; ++mask)
 	{
-		ShaderInstance* instance = LUMIX_NEW(m_allocator, ShaderInstance)(*this);
-		m_instances.push(instance);
+		ShaderInstance& instance = m_instances.emplace(*this);
 
-		instance->define_mask = getDefineMaskFromDense(*this, mask);
-		m_all_defines_mask |= instance->define_mask;
+		instance.define_mask = getDefineMaskFromDense(*this, mask);
+		m_all_defines_mask |= instance.define_mask;
 
 		for (int pass_idx = 0; pass_idx < m_combintions.pass_count; ++pass_idx)
 		{
@@ -122,7 +118,7 @@ bool Shader::generateInstances()
 			Path vs_path(path);
 			auto* vs_binary = static_cast<ShaderBinary*>(binary_manager->load(vs_path));
 			addDependency(*vs_binary);
-			instance->binaries[pass_idx * 2] = vs_binary;
+			instance.binaries[pass_idx * 2] = vs_binary;
 
 			path.data[0] = '\0';
 			actual_mask = mask & m_combintions.fs_local_mask[pass_idx];
@@ -132,7 +128,7 @@ bool Shader::generateInstances()
 			Path fs_path(path);
 			auto* fs_binary = static_cast<ShaderBinary*>(binary_manager->load(fs_path));
 			addDependency(*fs_binary);
-			instance->binaries[pass_idx * 2 + 1] = fs_binary;
+			instance.binaries[pass_idx * 2 + 1] = fs_binary;
 		}
 	}
 	return true;
@@ -431,10 +427,6 @@ void Shader::unload(void)
 	}
 	m_texture_slot_count = 0;
 
-	for (auto* i : m_instances)
-	{
-		LUMIX_DELETE(m_allocator, i);
-	}
 	m_instances.clear();
 }
 
