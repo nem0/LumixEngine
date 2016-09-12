@@ -258,13 +258,6 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 					default: ASSERT(false); break;
 				}
 			}
-			for (int i = 0; i < 32; ++i)
-			{
-				if (material->isCustomFlag(1 << i))
-				{
-					ImGui::LabelText("Custom flag", "%s", Material::getCustomFlagName(i));
-				}
-			}
 
 			if (ImGui::CollapsingHeader("Layers"))
 			{
