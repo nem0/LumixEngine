@@ -645,7 +645,7 @@ struct NavigationSceneImpl : public NavigationScene
 	void debugDrawCompactHeightfield() override
 	{
 		static const int MAX_CUBES = 0xffFF;
-		
+
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 		if (!m_debug_compact_heightfield) return;
@@ -681,7 +681,134 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
-	void debugDrawNavmesh(const Vec3& pos) override
+	static void drawPolyBoundaries(RenderScene* render_scene,
+		const dtMeshTile& tile,
+		const unsigned int col,
+		bool inner)
+	{
+		static const float thr = 0.01f * 0.01f;
+
+		for (int i = 0; i < tile.header->polyCount; ++i)
+		{
+			const dtPoly* p = &tile.polys[i];
+
+			if (p->getType() == DT_POLYTYPE_OFFMESH_CONNECTION) continue;
+
+			const dtPolyDetail* pd = &tile.detailMeshes[i];
+
+			for (int j = 0, nj = (int)p->vertCount; j < nj; ++j)
+			{
+				unsigned int c = col;
+				if (inner)
+				{
+					if (p->neis[j] == 0) continue;
+					if (p->neis[j] & DT_EXT_LINK)
+					{
+						bool con = false;
+						for (unsigned int k = p->firstLink; k != DT_NULL_LINK; k = tile.links[k].next)
+						{
+							if (tile.links[k].edge == j)
+							{
+								con = true;
+								break;
+							}
+						}
+						if (con)
+							c = 0xffffffff;
+						else
+							c = 0xff000000;
+					}
+					else
+						c = 0xff004466;
+				}
+				else
+				{
+					if (p->neis[j] != 0) continue;
+				}
+
+				const float* v0 = &tile.verts[p->verts[j] * 3];
+				const float* v1 = &tile.verts[p->verts[(j + 1) % nj] * 3];
+
+				// Draw detail mesh edges which align with the actual poly edge.
+				// This is really slow.
+				for (int k = 0; k < pd->triCount; ++k)
+				{
+					const unsigned char* t = &tile.detailTris[(pd->triBase + k) * 4];
+					const float* tv[3];
+					for (int m = 0; m < 3; ++m)
+					{
+						if (t[m] < p->vertCount)
+							tv[m] = &tile.verts[p->verts[t[m]] * 3];
+						else
+							tv[m] = &tile.detailVerts[(pd->vertBase + (t[m] - p->vertCount)) * 3];
+					}
+					for (int m = 0, n = 2; m < 3; n = m++)
+					{
+						if (((t[3] >> (n * 2)) & 0x3) == 0) continue; // Skip inner detail edges.
+						if (distancePtLine2d(tv[n], v0, v1) < thr && distancePtLine2d(tv[m], v0, v1) < thr)
+						{
+							render_scene->addDebugLine(
+								*(Vec3*)tv[n] + Vec3(0, 0.5f, 0), *(Vec3*)tv[m] + Vec3(0, 0.5f, 0), c, 0);
+						}
+					}
+				}
+			}
+		}
+	}
+
+
+	static void drawTilePortal(RenderScene* render_scene, const dtMeshTile& tile)
+	{
+		const float padx = 0.04f;
+		const float pady = tile.header->walkableClimb;
+
+		for (int side = 0; side < 8; ++side)
+		{
+			unsigned short m = DT_EXT_LINK | (unsigned short)side;
+
+			for (int i = 0; i < tile.header->polyCount; ++i)
+			{
+				dtPoly* poly = &tile.polys[i];
+
+				const int nv = poly->vertCount;
+				for (int j = 0; j < nv; ++j)
+				{
+					if (poly->neis[j] != m) continue;
+
+					const float* va = &tile.verts[poly->verts[j] * 3];
+					const float* vb = &tile.verts[poly->verts[(j + 1) % nv] * 3];
+
+					if (side == 0 || side == 4)
+					{
+						unsigned int col = side == 0 ? 0xff0000aa : 0xff00aaaa;
+
+						const float x = va[0] + ((side == 0) ? -padx : padx);
+
+						render_scene->addDebugLine(Vec3(x, va[1] - pady, va[2]), Vec3(x, va[1] + pady, va[2]), col, 0);
+						render_scene->addDebugLine(Vec3(x, va[1] + pady, va[2]), Vec3(x, vb[1] + pady, vb[2]), col, 0);
+						render_scene->addDebugLine(Vec3(x, vb[1] + pady, vb[2]), Vec3(x, vb[1] - pady, vb[2]), col, 0);
+						render_scene->addDebugLine(Vec3(x, vb[1] - pady, vb[2]), Vec3(x, va[1] - pady, va[2]), col, 0);
+
+					}
+					else if (side == 2 || side == 6)
+					{
+						unsigned int col = side == 2 ? 0xff00aa00 : 0xffaaaa00;
+
+						const float z = va[2] + ((side == 2) ? -padx : padx);
+
+						render_scene->addDebugLine(Vec3(va[0], va[1] - pady, z), Vec3(va[0], va[1] + pady, z), col, 0);
+						render_scene->addDebugLine(Vec3(va[0], va[1] + pady, z), Vec3(vb[0], vb[1] + pady, z), col, 0);
+						render_scene->addDebugLine(Vec3(vb[0], vb[1] + pady, z), Vec3(vb[0], vb[1] - pady, z), col, 0);
+						render_scene->addDebugLine(Vec3(vb[0], vb[1] - pady, z), Vec3(va[0], va[1] - pady, z), col, 0);
+					}
+
+				}
+			}
+		}
+	}
+
+
+	void debugDrawNavmesh(const Vec3& pos, bool inner_boundaries, bool outer_boundaries, bool portals) override
 	{
 		int x = int((pos.x - m_aabb.min.x + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
 		int z = int((pos.z - m_aabb.min.z + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
@@ -699,6 +826,11 @@ struct NavigationSceneImpl : public NavigationScene
 			if (p->getType() == DT_POLYTYPE_OFFMESH_CONNECTION) continue;
 			drawPoly(render_scene, *tile, *p);
 		}
+
+		if(outer_boundaries) drawPolyBoundaries(render_scene, *tile, 0xffff0000, false);
+		if(inner_boundaries) drawPolyBoundaries(render_scene, *tile, 0xffff0000, true);
+
+		if(portals) drawTilePortal(render_scene, *tile);
 	}
 
 

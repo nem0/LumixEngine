@@ -17,7 +17,7 @@ public:
 	virtual bool generateTileAt(const Vec3& pos, bool keep_data) = 0;
 	virtual bool load(const char* path) = 0;
 	virtual bool save(const char* path) = 0;
-	virtual void debugDrawNavmesh(const Vec3& pos) = 0;
+	virtual void debugDrawNavmesh(const Vec3& pos, bool inner_boundaries, bool outer_boundaries, bool portals) = 0;
 	virtual void debugDrawCompactHeightfield() = 0;
 	virtual void debugDrawHeightfield() = 0;
 	virtual void debugDrawContours() = 0;
