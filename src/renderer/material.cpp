@@ -545,7 +545,7 @@ void Material::setShader(Shader* shader)
 	else
 	{
 		m_shader = mat_manager.getRenderer().getDefaultShader();
-		m_shader_instance = m_shader->m_instances.empty() ? nullptr : m_shader->m_instances[0];
+		m_shader_instance = m_shader->m_instances.empty() ? nullptr : &m_shader->m_instances[0];
 	}
 }
 
