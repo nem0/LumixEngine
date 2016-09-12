@@ -1,5 +1,5 @@
-#include "editor/property_grid.h"
 #include "editor/platform_interface.h"
+#include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -7,6 +7,7 @@
 #include "engine/math_utils.h"
 #include "engine/universe/universe.h"
 #include "navigation/navigation_system.h"
+#include <DetourCrowd.h>
 
 
 using namespace Lumix;
@@ -14,9 +15,6 @@ using namespace Lumix;
 
 namespace
 {
-
-
-static const uint32 NAVMESH_AGENT_HASH = crc32("navmesh_agent");
 
 
 struct StudioAppPlugin : public StudioApp::IPlugin
@@ -72,11 +70,26 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 						scene->save(path);
 					}
 				}
-				static int tile[2] = {};
+				ImGui::SameLine();
 				if (ImGui::Button("Debug tile"))
 				{
 					Vec3 camera_hit = app.getWorldEditor()->getCameraRaycastHit();
 					scene->generateTileAt(camera_hit, true);
+				}
+
+				static bool debug_draw_path = false;
+				const auto& selected_entities = app.getWorldEditor()->getSelectedEntities();
+				if (!selected_entities.empty())
+				{
+					const dtCrowdAgent* agent = scene->getDetourAgent(selected_entities[0]);
+					if (agent)
+					{
+						ImGui::Text("Agent");
+						ImGui::Checkbox("Draw path", &debug_draw_path);
+						if (debug_draw_path) scene->debugDrawPath(selected_entities[0]);
+						ImGui::LabelText("Desired speed", "%f", agent->desiredSpeed);
+						ImGui::Separator();
+					}
 				}
 
 				static bool debug_draw_navmesh = false;

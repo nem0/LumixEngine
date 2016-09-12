@@ -2,6 +2,9 @@
 #include "engine/iplugin.h"
 
 
+struct dtCrowdAgent;
+
+
 namespace Lumix
 {
 
@@ -18,8 +21,9 @@ public:
 	virtual void debugDrawCompactHeightfield() = 0;
 	virtual void debugDrawHeightfield() = 0;
 	virtual void debugDrawContours() = 0;
-	virtual bool isNavmeshReady() const = 0;
 	virtual void debugDrawPath(Entity entity) = 0;
+	virtual const dtCrowdAgent* getDetourAgent(Entity entity) = 0;
+	virtual bool isNavmeshReady() const = 0;
 	virtual bool hasDebugDrawData() const = 0;
 };
 

@@ -394,7 +394,77 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
-	void debugDrawPath(Entity entity)
+	static float distancePtLine2d(const float* pt, const float* p, const float* q)
+	{
+		float pqx = q[0] - p[0];
+		float pqz = q[2] - p[2];
+		float dx = pt[0] - p[0];
+		float dz = pt[2] - p[2];
+		float d = pqx*pqx + pqz*pqz;
+		float t = pqx*dx + pqz*dz;
+		if (d != 0) t /= d;
+		dx = p[0] + t*pqx - pt[0];
+		dz = p[2] + t*pqz - pt[2];
+		return dx*dx + dz*dz;
+	}
+
+
+	static void drawPoly(RenderScene* render_scene, const dtMeshTile& tile, const dtPoly& poly)
+	{
+		const unsigned int ip = (unsigned int)(&poly - tile.polys);
+		const dtPolyDetail& pd = tile.detailMeshes[ip];
+
+		for (int i = 0; i < pd.triCount; ++i)
+		{
+			Vec3 v[3];
+			const unsigned char* t = &tile.detailTris[(pd.triBase + i) * 4];
+			for (int k = 0; k < 3; ++k)
+			{
+				if (t[k] < poly.vertCount)
+				{
+					v[k] = *(Vec3*)&tile.verts[poly.verts[t[k]] * 3];
+				}
+				else
+				{
+					v[k] = *(Vec3*)&tile.detailVerts[(pd.vertBase + t[k] - poly.vertCount) * 3];
+				}
+			}
+			render_scene->addDebugTriangle(v[0], v[1], v[2], 0xff00aaff, 0);
+		}
+
+		for (int k = 0; k < pd.triCount; ++k)
+		{
+			const unsigned char* t = &tile.detailTris[(pd.triBase + k) * 4];
+			const float* tv[3];
+			for (int m = 0; m < 3; ++m)
+			{
+				if (t[m] < poly.vertCount)
+					tv[m] = &tile.verts[poly.verts[t[m]] * 3];
+				else
+					tv[m] = &tile.detailVerts[(pd.vertBase + (t[m] - poly.vertCount)) * 3];
+			}
+			for (int m = 0, n = 2; m < 3; n = m++)
+			{
+				if (((t[3] >> (n * 2)) & 0x3) == 0) continue; // Skip inner detail edges.
+				render_scene->addDebugLine(*(Vec3*)tv[n], *(Vec3*)tv[m], 0xff0000ff, 0);
+			}
+		}
+	}
+
+
+	const dtCrowdAgent* getDetourAgent(Entity entity) override
+	{
+		if (!m_crowd) return nullptr;
+
+		auto iter = m_agents.find(entity);
+		if (iter == m_agents.end()) return nullptr;
+
+		const Agent& agent = iter.value();
+		return m_crowd->getAgent(agent.agent);
+	}
+
+
+	void debugDrawPath(Entity entity) override
 	{
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
@@ -405,41 +475,27 @@ struct NavigationSceneImpl : public NavigationScene
 		const Agent& agent = iter.value();
 
 		const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
+		if (dt_agent->targetPathqRef == DT_PATHQ_INVALID) return;
+
 		const dtPolyRef* path = dt_agent->corridor.getPath();
 		const int npath = dt_agent->corridor.getPathCount();
 		for (int j = 0; j < npath; ++j)
 		{
 			dtPolyRef ref = path[j];
-			const dtMeshTile* tile = 0;
-			const dtPoly* poly = 0;
+			const dtMeshTile* tile = nullptr;
+			const dtPoly* poly = nullptr;
 			if (dtStatusFailed(m_navmesh->getTileAndPolyByRef(ref, &tile, &poly))) continue;
 
-			const unsigned int ip = (unsigned int)(poly - tile->polys);
-
-			const dtPolyDetail* pd = &tile->detailMeshes[ip];
-
-			for (int i = 0; i < pd->triCount; ++i)
-			{
-				Vec3 v[3];
-				const unsigned char* t = &tile->detailTris[(pd->triBase + i) * 4];
-				for (int k = 0; k < 3; ++k)
-				{
-					if (t[k] < poly->vertCount)
-					{
-						v[k] = *(Vec3*)&tile->verts[poly->verts[t[k]] * 3];
-					}
-					else
-					{
-						v[k] = *(Vec3*)&tile->detailVerts[(pd->vertBase + t[k] - poly->vertCount) * 3];
-					}
-				}
-				render_scene->addDebugTriangle(v[0], v[1], v[2], 0xffff00ff, 0);
-				render_scene->addDebugLine(v[0], v[1], 0x0000ffff, 0);
-				render_scene->addDebugLine(v[1], v[2], 0x0000ffff, 0);
-				render_scene->addDebugLine(v[2], v[0], 0x0000ffff, 0);
-			}
+			drawPoly(render_scene, *tile, *poly);
 		}
 
+		Vec3 prev = *(Vec3*)dt_agent->npos;
+		for (int i = 0; i < dt_agent->ncorners; ++i)
+		{
+			Vec3 tmp = *(Vec3*)&dt_agent->cornerVerts[i * 3];
+			render_scene->addDebugLine(prev, tmp, 0xffff0000, 0);
+			prev = tmp;
+		}
 		render_scene->addDebugCross(*(Vec3*)dt_agent->targetPos, 1.0f, 0xffffffff, 0);
 	}
 
@@ -641,46 +697,7 @@ struct NavigationSceneImpl : public NavigationScene
 		{
 			const dtPoly* p = &tile->polys[i];
 			if (p->getType() == DT_POLYTYPE_OFFMESH_CONNECTION) continue;
-
-			const dtPolyDetail* pd = &tile->detailMeshes[i];
-
-			for (int j = 0; j < pd->triCount; ++j)
-			{
-				const unsigned char* t = &tile->detailTris[(pd->triBase + j) * 4];
-				Vec3 verts[3];
-				for (int k = 0; k < 3; ++k)
-				{
-					if (t[k] < p->vertCount)
-						verts[k] = *(Vec3*)&tile->verts[p->verts[t[k]] * 3];
-					else
-						verts[k] = *(Vec3*)&tile->detailVerts[(pd->vertBase + t[k] - p->vertCount) * 3];
-				}
-				render_scene->addDebugTriangle(verts[0], verts[1], verts[2], 0xff00aaff, 0);
-			}
-
-			for (int j = 0, nj = (int)p->vertCount; j < nj; ++j)
-			{
-				const float* v0 = &tile->verts[p->verts[j] * 3];
-				const float* v1 = &tile->verts[p->verts[(j + 1) % nj] * 3];
-
-				for (int k = 0; k < pd->triCount; ++k)
-				{
-					const unsigned char* t = &tile->detailTris[(pd->triBase + k) * 4];
-					const float* tv[3];
-					for (int m = 0; m < 3; ++m)
-					{
-						if (t[m] < p->vertCount)
-							tv[m] = &tile->verts[p->verts[t[m]] * 3];
-						else
-							tv[m] = &tile->detailVerts[(pd->vertBase + (t[m] - p->vertCount)) * 3];
-					}
-					for (int m = 0, n = 2; m < 3; n = m++)
-					{
-						if (((t[3] >> (n * 2)) & 0x3) == 0) continue; // Skip inner detail edges.
-						render_scene->addDebugLine(*(Vec3*)tv[n], *(Vec3*)tv[m], 0xff0000ff, 0);
-					}
-				}
-			}
+			drawPoly(render_scene, *tile, *p);
 		}
 	}
 
@@ -1139,6 +1156,7 @@ struct NavigationSceneImpl : public NavigationScene
 			serializer.read(agent.entity);
 			serializer.read(agent.radius);
 			serializer.read(agent.height);
+			agent.is_finished = true;
 			agent.agent = -1;
 			m_agents.insert(agent.entity, agent);
 			ComponentHandle cmp = {agent.entity.index};
