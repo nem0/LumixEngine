@@ -94,7 +94,16 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 
 				static bool debug_draw_navmesh = false;
 				ImGui::Checkbox("Draw navmesh", &debug_draw_navmesh);
-				if (debug_draw_navmesh) scene->debugDrawNavmesh(app.getWorldEditor()->getCameraRaycastHit());
+				if (debug_draw_navmesh)
+				{
+					static bool inner_boundaries = true;
+					static bool outer_boundaries = true;
+					static bool portals = true;
+					ImGui::Checkbox("Inner boundaries", &inner_boundaries);
+					ImGui::Checkbox("Outer boundaries", &outer_boundaries);
+					ImGui::Checkbox("Portals", &portals);
+					scene->debugDrawNavmesh(app.getWorldEditor()->getCameraRaycastHit(), inner_boundaries, outer_boundaries, portals);
+				}
 
 				if (scene->hasDebugDrawData())
 				{
