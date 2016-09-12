@@ -1086,9 +1086,9 @@ struct NavigationSceneImpl : public NavigationScene
 		params.detailVertsCount = m_detail_mesh->nverts;
 		params.detailTris = m_detail_mesh->tris;
 		params.detailTriCount = m_detail_mesh->ntris;
-		params.walkableHeight = (float)m_config.walkableHeight;
-		params.walkableRadius = (float)m_config.walkableRadius;
-		params.walkableClimb = (float)m_config.walkableClimb;
+		params.walkableHeight = m_config.walkableHeight * m_config.ch;
+		params.walkableRadius = m_config.walkableRadius * m_config.cs;
+		params.walkableClimb = m_config.walkableClimb * m_config.ch;
 		params.tileX = x;
 		params.tileY = z;
 		rcVcopy(params.bmin, m_polymesh->bmin);
