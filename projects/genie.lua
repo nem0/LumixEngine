@@ -216,10 +216,10 @@ function copyDlls(src_dir, platform_dir, dest_dir)
 	configuration { "linux-*" }
 		postbuildcommands {
 			"cp ../../../external/assimp/dll/" .. platform_dir .. "_" .. ide_dir .. "/" .. src_dir .. "/libassimp.so bin/" .. dest_dir,
-			"cp ../../../external/physx/dll/linux64_gcc/libPhysX3CommonCHECKED_".. physx_suffix .. ".so bin/" .. dest_dir,
-			"cp ../../../external/physx/dll/linux64_gcc/libPhysX3CookingCHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir,
-			"cp ../../../external/physx/dll/linux64_gcc/libPhysX3CharacterKinematicCHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir,
-			"cp ../../../external/physx/dll/linux64_gcc/libPhysX3CHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir
+			"cp ../../../external/physx/dll/linux64_gcc5/libPhysX3CommonCHECKED_".. physx_suffix .. ".so bin/" .. dest_dir,
+			"cp ../../../external/physx/dll/linux64_gcc5/libPhysX3CookingCHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir,
+			"cp ../../../external/physx/dll/linux64_gcc5/libPhysX3CharacterKinematicCHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir,
+			"cp ../../../external/physx/dll/linux64_gcc5/libPhysX3CHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir
 		}
 end
 
@@ -237,7 +237,7 @@ function linkPhysX()
 			libdirs {"../external/physx/lib/" .. ide_dir .. "/win64"}
 			links {"PhysX3CHECKED_x64", "PhysX3CommonCHECKED_x64", "PhysX3CharacterKinematicCHECKED_x64", "PhysX3CookingCHECKED_x64" }
 		configuration { "x64", "linux-*" }
-			libdirs {"../external/physx/lib/linux64_gcc", "../external/physx/dll/linux64_gcc"}
+			libdirs {"../external/physx/lib/linux64_gcc5", "../external/physx/dll/linux64_gcc5"}
 			links {"PhysX3CHECKED_x64", "PhysX3CommonCHECKED_x64", "PhysX3CharacterKinematicCHECKED_x64", "PhysX3CookingCHECKED_x64" }
 		
 
