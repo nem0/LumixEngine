@@ -17,6 +17,8 @@ before_script:
     - cd projects
     - sh genie_linux_gcc.sh
     - cd tmp/gcc5
+    - g++-5 --version
+    - g++ --version
 script: if [ "${COVERITY_SCAN_BRANCH}" != 1 ]; then make config=debug64 ; fi
    
 addons:
