@@ -34,7 +34,7 @@ addons:
       description: "3D game engine"
     notification_email: mikulas.florek@gamedev.sk
     build_command_prepend: 
-    build_command: make config=debug64
+    build_command: make verbose=1 config=debug64
     branch_pattern: coverity_scan
 
 env: COMPILER=g++-5    
