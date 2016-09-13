@@ -21,8 +21,11 @@ script: if [ "${COVERITY_SCAN_BRANCH}" != 1 ]; then make config=debug64 ; fi
    
 addons:
   apt:
+    sources:
+      - ubuntu-toolchain-r-test
     packages:
       - ca-certificates
+      - g++-5
   coverity_scan:
     project:
       name: "nem0/LumixEngine"
@@ -32,6 +35,8 @@ addons:
     build_command: make config=debug64
     branch_pattern: coverity_scan
 
+env: COMPILER=g++-5
+    
 notifications:
   webhooks:
     urls:
