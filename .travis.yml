@@ -19,7 +19,7 @@ before_script:
     - cd tmp/gcc5
     - g++-5 --version
     - g++ --version
-script: if [ "${COVERITY_SCAN_BRANCH}" != 1 ]; then make config=debug64 ; fi
+script: if [ "${COVERITY_SCAN_BRANCH}" != 1 ]; then make verbose=1 config=debug64 ; fi
    
 addons:
   apt:
@@ -34,7 +34,7 @@ addons:
       description: "3D game engine"
     notification_email: mikulas.florek@gamedev.sk
     build_command_prepend: 
-    build_command: make verbose=1 config=debug64
+    build_command: make config=debug64
     branch_pattern: coverity_scan
 
 env: COMPILER=g++-5    
