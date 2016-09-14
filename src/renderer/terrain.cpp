@@ -726,20 +726,22 @@ float Terrain::getHeight(int x, int z) const
 	if (!m_heightmap) return 0;
 
 	Texture* t = m_heightmap;
+	ASSERT(t->bytes_per_pixel == 2);
 	int idx = Math::clamp(x, 0, m_width) + Math::clamp(z, 0, m_height) * m_width;
-	if (t->bytes_per_pixel == 2)
-	{
-		return m_scale.y * DIV64K * ((uint16*)t->getData())[idx];
-	}
-	else if(t->bytes_per_pixel == 4)
-	{
-		return ((m_scale.y * DIV255) * ((uint8*)t->getData())[idx * 4]);
-	}
-	else
-	{
-		ASSERT(false);
-	}
-	return 0;
+	return m_scale.y * DIV64K * ((uint16*)t->getData())[idx];
+}
+
+
+void Terrain::setHeight(int x, int z, float h)
+{
+	const float DIV64K = 1.0f / 65535.0f;
+	const float DIV255 = 1.0f / 255.0f;
+	if (!m_heightmap) return;
+
+	Texture* t = m_heightmap;
+	ASSERT(t->bytes_per_pixel == 2);
+	int idx = Math::clamp(x, 0, m_width) + Math::clamp(z, 0, m_height) * m_width;
+	((uint16*)t->getData())[idx] = (uint16)(h * (65535.0f / m_scale.y));
 }
 
 
