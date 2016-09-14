@@ -2149,6 +2149,62 @@ public:
 		return 2;
 	}
 
+	
+	static void LUA_setTexturePixel(Texture* texture, int x, int y, uint32 value)
+	{
+		if (!texture) return;
+		if (!texture->isReady()) return;
+		if (texture->data.empty()) return;
+		if (texture->bytes_per_pixel != 4) return;
+
+		x = Math::clamp(x, 0, texture->width - 1);
+		y = Math::clamp(y, 0, texture->height - 1);
+
+		((uint32*)&texture->data[0])[x + y * texture->width] = value;
+	}
+
+
+	static void LUA_updateTextureData(Texture* texture, int x, int y, int w, int h)
+	{
+		if (!texture) return;
+		if (!texture->isReady()) return;
+		if (texture->data.empty()) return;
+
+		texture->onDataUpdated(x, y, w, h);
+	}
+
+
+	static int LUA_getTextureWidth(Texture* texture)
+	{
+		if (!texture) return 0;
+		if (!texture->isReady()) return 0;
+
+		return texture->width;
+	}
+
+
+	static int LUA_getTextureHeight(Texture* texture)
+	{
+		if (!texture) return 0;
+		if (!texture->isReady()) return 0;
+
+		return texture->height;
+	}
+
+
+	static uint32 LUA_getTexturePixel(Texture* texture, int x, int y)
+	{
+		if (!texture) return 0;
+		if (!texture->isReady()) return 0;
+		if (texture->data.empty()) return 0;
+		if (texture->bytes_per_pixel != 4) return 0;
+		
+		x = Math::clamp(x, 0, texture->width - 1);
+		y = Math::clamp(y, 0, texture->height - 1);
+
+		return ((uint32*)&texture->data[0])[x + y * texture->width];
+	}
+
 
 	static Texture* LUA_getMaterialTexture(Material* material, int texture_index)
 	{
@@ -4365,6 +4421,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(addDebugCross);
 	REGISTER_FUNCTION(addDebugLine);
 	REGISTER_FUNCTION(getTerrainMaterial);
+	REGISTER_FUNCTION(getTerrainNormalAt);
 
 	#undef REGISTER_FUNCTION
 
@@ -4375,6 +4432,11 @@ void RenderScene::registerLuaAPI(lua_State* L)
 		} while(false) \
 
 	REGISTER_FUNCTION(getMaterialTexture);
+	REGISTER_FUNCTION(getTextureWidth);
+	REGISTER_FUNCTION(getTextureHeight);
+	REGISTER_FUNCTION(getTexturePixel);
+	REGISTER_FUNCTION(setTexturePixel);
+	REGISTER_FUNCTION(updateTextureData);
 	REGISTER_FUNCTION(setRenderableMaterial);
 	REGISTER_FUNCTION(setRenderablePath);
 	REGISTER_FUNCTION(makeScreenshot);

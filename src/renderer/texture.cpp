@@ -115,6 +115,7 @@ uint32 Texture::getPixelNearest(int x, int y) const
 
 uint32 Texture::getPixel(float x, float y) const
 {
+	ASSERT(bytes_per_pixel == 4);
 	if (data.empty() || x >= width || y >= height || x < 0 || y < 0)
 	{
 		return 0;
