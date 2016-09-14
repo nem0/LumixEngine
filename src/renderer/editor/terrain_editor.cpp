@@ -405,7 +405,12 @@ private:
 			for (int j = rect.m_from_y, end2 = rect.m_to_y; j < end2; ++j)
 			{
 				int offset = i - m_x + (j - m_y) * m_width;
-				((Lumix::uint16*)&data[0])[offset] = m_flat_height;
+				float dist = sqrt((item.m_local_pos.x - 0.5f - i) * (item.m_local_pos.x - 0.5f - i) +
+					(item.m_local_pos.z - 0.5f - j) * (item.m_local_pos.z - 0.5f - j));
+				float t = (dist - item.m_radius * item.m_amount) / (item.m_radius * (1 - item.m_amount));
+				t = Lumix::Math::clamp(1 - t, 0.0f, 1.0f);
+				Lumix::uint16 old_value = ((Lumix::uint16*)&data[0])[offset];
+				((Lumix::uint16*)&data[0])[offset] = (Lumix::uint16)(m_flat_height * t + old_value * (1-t));
 			}
 		}
 	}

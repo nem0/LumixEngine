@@ -2192,6 +2192,17 @@ public:
 	}
 
 
+	static float LUA_getTerrainHeightAt(RenderSceneImpl* render_scene, ComponentHandle cmp, int x, int z)
+	{
+		return render_scene->m_terrains[{cmp.index}]->getHeight(x, z);
+	}
+
+
+	void setTerrainHeightAt(ComponentHandle cmp, int x, int z, float height)
+	{
+		m_terrains[{cmp.index}]->setHeight(x, z, height);
+	}
+
 	static uint32 LUA_getTexturePixel(Texture* texture, int x, int y)
 	{
 		if (!texture) return 0;
@@ -4422,6 +4433,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(addDebugLine);
 	REGISTER_FUNCTION(getTerrainMaterial);
 	REGISTER_FUNCTION(getTerrainNormalAt);
+	REGISTER_FUNCTION(setTerrainHeightAt);
 
 	#undef REGISTER_FUNCTION
 
@@ -4441,6 +4453,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(setRenderablePath);
 	REGISTER_FUNCTION(makeScreenshot);
 	REGISTER_FUNCTION(compareTGA);
+	REGISTER_FUNCTION(getTerrainHeightAt);
 
 	LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", &RenderSceneImpl::LUA_castCameraRay);
 

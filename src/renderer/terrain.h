@@ -104,6 +104,8 @@ class Terrain
 		float getGrassTypeDistance(int index) const;
 		int getGrassTypeCount() const { return m_grass_types.size(); }
 
+		float getHeight(int x, int z) const;
+		void setHeight(int x, int z, float height);
 		void setXZScale(float scale) { m_scale.x = scale; m_scale.z = scale; }
 		void setYScale(float scale) { m_scale.y = scale; }
 		void setGrassTypePath(int index, const Path& path);
@@ -126,7 +128,6 @@ class Terrain
 	private: 
 		Array<Terrain::GrassQuad*>& getQuads(ComponentHandle camera);
 		TerrainQuad* generateQuadTree(float size);
-		float getHeight(int x, int z) const;
 		void updateGrass(ComponentHandle camera);
 		void generateGrassTypeQuad(GrassPatch& patch,
 								   const Matrix& terrain_matrix,
