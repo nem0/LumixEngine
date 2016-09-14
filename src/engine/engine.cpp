@@ -424,6 +424,18 @@ public:
 	}
 
 
+	static Entity LUA_getFirstEntity(Universe* universe)
+	{
+		return universe->getFirstEntity();
+	}
+
+
+	static Entity LUA_getNextEntity(Universe* universe, Entity entity)
+	{
+		return universe->getNextEntity(entity);
+	}
+
+
 	static Vec4 LUA_multMatrixVec(const Matrix& m, const Vec4& v)
 	{
 		return m * v;
@@ -527,6 +539,8 @@ public:
 		REGISTER_FUNCTION(getComponentType);
 		REGISTER_FUNCTION(multMatrixVec);
 		REGISTER_FUNCTION(multQuat);
+		REGISTER_FUNCTION(getFirstEntity);
+		REGISTER_FUNCTION(getNextEntity);
 
 		#undef REGISTER_FUNCTION
 
