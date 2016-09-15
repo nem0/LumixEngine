@@ -40,15 +40,40 @@ LUMIX_ENGINE_API bool getRayTriangleIntersection(const Vec3& origin,
 	const Vec3& b,
 	const Vec3& c,
 	float* out_t);
+LUMIX_ENGINE_API bool getSphereTriangleIntersection(const Vec3& center,
+	float radius,
+	const Vec3& v0,
+	const Vec3& v1,
+	const Vec3& v2);
 
 template <typename T> LUMIX_FORCE_INLINE T minimum(T a, T b)
 {
 	return a < b ? a : b;
 }
 
+template <typename T> LUMIX_FORCE_INLINE T minimum(T a, T b, T c)
+{
+	return minimum(minimum(a, b), c);
+}
+
+template <typename T> LUMIX_FORCE_INLINE T minimum(T a, T b, T c, T d)
+{
+	return minimum(minimum(a, b, c), d);
+}
+
 template <typename T> LUMIX_FORCE_INLINE T maximum(T a, T b)
 {
 	return a < b ? b : a;
+}
+
+template <typename T> LUMIX_FORCE_INLINE T maximum(T a, T b, T c)
+{
+	return maximum(maximum(a, b), c);
+}
+
+template <typename T> LUMIX_FORCE_INLINE T maximum(T a, T b, T c, T d)
+{
+	return maximum(maximum(a, b, c), d);
 }
 
 LUMIX_FORCE_INLINE float floor(float f)
