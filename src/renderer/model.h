@@ -99,7 +99,7 @@ public:
 
 	enum class Flags : uint32
 	{
-		INDICES_16BIT = 1
+		INDICES_16BIT = 1 << 0
 	};
 
 	struct LOD
@@ -159,7 +159,10 @@ public:
 	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
 	const AABB& getAABB() const { return m_aabb; }
 	LOD* getLODs() { return m_lods; }
-	Array<uint8>& getIndices() { return m_indices; }
+	const uint16* getIndices16() const { return areIndices16() ? (uint16*)&m_indices[0] : nullptr; }
+	const uint32* getIndices32() const { return areIndices16() ? nullptr : (uint32*)&m_indices[0]; }
+	bool areIndices16() const { return (m_flags & (uint32)Flags::INDICES_16BIT) != 0; }
+	int getIndicesCount() const { return m_indices.size() / (areIndices16() ? 2 : 4); }
 	const Array<Vec3>& getVertices() const { return m_vertices; }
 	uint32 getFlags() const { return m_flags;	}
 

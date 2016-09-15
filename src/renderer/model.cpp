@@ -328,8 +328,8 @@ void Model::computeRuntimeData(const uint8* vertices)
 		int mesh_attributes_array_offset = m_meshes[i].attribute_array_offset;
 		for (int j = 0; j < mesh_vertex_count; ++j)
 		{
-			m_vertices[index] =
-				*(const Vec3*)&vertices[mesh_attributes_array_offset + j * vertex_size + position_attribute_offset];
+			int offset = mesh_attributes_array_offset + j * vertex_size;
+			m_vertices[index] = *(const Vec3*)&vertices[offset + position_attribute_offset];
 			bounding_radius_squared = Math::maximum(bounding_radius_squared,
 				dotProduct(m_vertices[index], m_vertices[index]) > 0 ? m_vertices[index].squaredLength() : 0);
 			min_vertex.x = Math::minimum(min_vertex.x, m_vertices[index].x);
@@ -640,6 +640,7 @@ void Model::unload(void)
 	}
 	m_meshes.clear();
 	m_bones.clear();
+	m_vertices.clear();
 
 	if(bgfx::isValid(m_vertices_handle)) bgfx::destroyVertexBuffer(m_vertices_handle);
 	if(bgfx::isValid(m_indices_handle)) bgfx::destroyIndexBuffer(m_indices_handle);
