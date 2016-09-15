@@ -297,6 +297,8 @@ void Texture::save()
 
 void Texture::onDataUpdated(int x, int y, int w, int h)
 {
+	PROFILE_FUNCTION();
+
 	const bgfx::Memory* mem = nullptr;
 
 	if (bytes_per_pixel == 2)
@@ -315,18 +317,17 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 	}
 	else
 	{
+		ASSERT(bytes_per_pixel == 4);
 		const uint8* src_mem = (const uint8*)&data[0];
 		mem = bgfx::alloc(w * h * bytes_per_pixel);
 		uint8* dst_mem = mem->data;
 
 		for (int j = 0; j < h; ++j)
 		{
-			for (int i = 0; i < w; ++i)
-			{
-				copyMemory(&dst_mem[(i + j * w) * bytes_per_pixel],
-					&src_mem[(x + i + (y + j) * width) * bytes_per_pixel],
-					bytes_per_pixel);
-			}
+			copyMemory(
+				&dst_mem[(j * w) * bytes_per_pixel],
+				&src_mem[(x + (y + j) * width) * bytes_per_pixel],
+				bytes_per_pixel * w);
 		}
 	}
 	bgfx::updateTexture2D(handle, 0, 0, (uint16_t)x, (uint16_t)y, (uint16_t)w, (uint16_t)h, mem);
