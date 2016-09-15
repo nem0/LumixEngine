@@ -341,7 +341,7 @@ public:
 		}
 		lua_pop(L, 1);
 
-		LuaWrapper::pushLua(L, e);
+		LuaWrapper::push(L, e);
 		return 1;
 	}
 
@@ -466,7 +466,7 @@ public:
 		
 		Vec3 res = q.rotate(v);
 
-		LuaWrapper::pushLua(L, res);
+		LuaWrapper::push(L, res);
 		return 1;
 	}
 
@@ -1096,7 +1096,7 @@ public:
 		lua_createtable(L, entities.size(), 0);
 		for (int i = 0; i < entities.size(); ++i)
 		{
-			LuaWrapper::pushLua(L, entities[i]);
+			LuaWrapper::push(L, entities[i]);
 			lua_rawseti(L, -2, i + 1);
 		}
 		return 1;

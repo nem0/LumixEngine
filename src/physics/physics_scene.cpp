@@ -2257,12 +2257,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 		RaycastHit hit;
 		if (scene->raycastEx(origin, dir, FLT_MAX, hit))
 		{
-			LuaWrapper::pushLua(L, hit.entity != INVALID_ENTITY);
-			LuaWrapper::pushLua(L, hit.entity);
-			LuaWrapper::pushLua(L, hit.position);
+			LuaWrapper::push(L, hit.entity != INVALID_ENTITY);
+			LuaWrapper::push(L, hit.entity);
+			LuaWrapper::push(L, hit.position);
 			return 3;
 		}
-		LuaWrapper::pushLua(L, false);
+		LuaWrapper::push(L, false);
 		return 1;
 	}
 
