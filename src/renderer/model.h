@@ -164,6 +164,7 @@ public:
 	bool areIndices16() const { return (m_flags & (uint32)Flags::INDICES_16BIT) != 0; }
 	int getIndicesCount() const { return m_indices.size() / (areIndices16() ? 2 : 4); }
 	const Array<Vec3>& getVertices() const { return m_vertices; }
+	const Array<Vec2>& getUVs() const { return m_uvs; }
 	uint32 getFlags() const { return m_flags;	}
 
 	static void registerLuaAPI(lua_State* L);
@@ -197,6 +198,7 @@ private:
 	Array<Bone> m_bones;
 	Array<uint8> m_indices;
 	Array<Vec3> m_vertices;
+	Array<Vec2> m_uvs;
 	LOD m_lods[MAX_LOD_COUNT];
 	float m_bounding_radius;
 	BoneMap m_bone_map;

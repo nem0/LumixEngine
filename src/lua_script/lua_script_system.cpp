@@ -568,7 +568,7 @@ namespace Lumix
 					float v;
 					OutputBlob blob(&v, sizeof(v));
 					desc->get(cmp, -1, blob);
-					LuaWrapper::pushLua(L, v);
+					LuaWrapper::push(L, v);
 				}
 				break;
 				case IPropertyDescriptor::BOOL:
@@ -576,7 +576,7 @@ namespace Lumix
 					bool v;
 					OutputBlob blob(&v, sizeof(v));
 					desc->get(cmp, -1, blob);
-					LuaWrapper::pushLua(L, v);
+					LuaWrapper::push(L, v);
 				}
 				break;
 				case IPropertyDescriptor::INTEGER:
@@ -584,7 +584,7 @@ namespace Lumix
 					int v;
 					OutputBlob blob(&v, sizeof(v));
 					desc->get(cmp, -1, blob);
-					LuaWrapper::pushLua(L, v);
+					LuaWrapper::push(L, v);
 				}
 				break;
 				case IPropertyDescriptor::RESOURCE:
@@ -594,7 +594,7 @@ namespace Lumix
 					char buf[1024];
 					OutputBlob blob(buf, sizeof(buf));
 					desc->get(cmp, -1, blob);
-					LuaWrapper::pushLua(L, buf);
+					LuaWrapper::push(L, buf);
 				}
 				break;
 				case IPropertyDescriptor::COLOR:
@@ -603,7 +603,7 @@ namespace Lumix
 					Vec3 v;
 					OutputBlob blob(&v, sizeof(v));
 					desc->get(cmp, -1, blob);
-					LuaWrapper::pushLua(L, v);
+					LuaWrapper::push(L, v);
 				}
 				break;
 				case IPropertyDescriptor::VEC2:
@@ -611,7 +611,7 @@ namespace Lumix
 					Vec2 v;
 					OutputBlob blob(&v, sizeof(v));
 					desc->get(cmp, -1, blob);
-					LuaWrapper::pushLua(L, v);
+					LuaWrapper::push(L, v);
 				}
 				break;
 				case IPropertyDescriptor::INT2:
@@ -619,7 +619,7 @@ namespace Lumix
 					Int2 v;
 					OutputBlob blob(&v, sizeof(v));
 					desc->get(cmp, -1, blob);
-					LuaWrapper::pushLua(L, v);
+					LuaWrapper::push(L, v);
 				}
 				break;
 				default: luaL_argerror(L, 1, "Unsupported property type"); break;
@@ -799,7 +799,7 @@ namespace Lumix
 			lua_pushvalue(L, 3);
 			timer.func = luaL_ref(L, LUA_REGISTRYINDEX);
 			lua_pop(L, 1);
-			LuaWrapper::pushLua(L, timer.func);
+			LuaWrapper::push(L, timer.func);
 			return 1;
 		}
 

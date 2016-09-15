@@ -2143,8 +2143,8 @@ public:
 		Quat rot = scene->m_universe.getRotation(entity);
 
 		RayCastModelHit hit = scene->castRay(origin, rot.rotate(Vec3(0, 0, -1)), INVALID_COMPONENT);
-		LuaWrapper::pushLua(L, hit.m_is_hit);
-		LuaWrapper::pushLua(L, hit.m_is_hit ? hit.m_origin + hit.m_dir * hit.m_t : Vec3(0, 0, 0));
+		LuaWrapper::push(L, hit.m_is_hit);
+		LuaWrapper::push(L, hit.m_is_hit ? hit.m_origin + hit.m_dir * hit.m_t : Vec3(0, 0, 0));
 
 		return 2;
 	}

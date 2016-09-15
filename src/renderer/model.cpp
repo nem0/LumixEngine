@@ -62,6 +62,7 @@ Model::Model(const Path& path, ResourceManagerBase& resource_manager, IAllocator
 	, m_bones(m_allocator)
 	, m_indices(m_allocator)
 	, m_vertices(m_allocator)
+	, m_uvs(m_allocator)
 	, m_vertices_handle(BGFX_INVALID_HANDLE)
 	, m_indices_handle(BGFX_INVALID_HANDLE)
 	, m_first_nonroot_bone_index(0)
@@ -307,6 +308,7 @@ void Model::create(const bgfx::VertexDecl& vertex_decl,
 	copyMemory(&m_indices[0], indices_data, indices_size);
 
 	m_vertices.resize(attributes_size / vertex_decl.getStride());
+	m_uvs.resize(m_vertices.size());
 	computeRuntimeData((const uint8*)attributes_data);
 
 	onCreated(State::READY);
@@ -322,6 +324,7 @@ void Model::computeRuntimeData(const uint8* vertices)
 
 	int vertex_size = m_vertex_decl.getStride();
 	int position_attribute_offset = m_vertex_decl.getOffset(bgfx::Attrib::Position);
+	int uv_attribute_offset = m_vertex_decl.getOffset(bgfx::Attrib::TexCoord0);
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
 		int mesh_vertex_count = m_meshes[i].attribute_array_size / m_vertex_decl.getStride();
@@ -330,6 +333,7 @@ void Model::computeRuntimeData(const uint8* vertices)
 		{
 			int offset = mesh_attributes_array_offset + j * vertex_size;
 			m_vertices[index] = *(const Vec3*)&vertices[offset + position_attribute_offset];
+			m_uvs[index] = *(const Vec2*)&vertices[offset + uv_attribute_offset];
 			bounding_radius_squared = Math::maximum(bounding_radius_squared,
 				dotProduct(m_vertices[index], m_vertices[index]) > 0 ? m_vertices[index].squaredLength() : 0);
 			min_vertex.x = Math::minimum(min_vertex.x, m_vertices[index].x);
@@ -377,6 +381,7 @@ bool Model::parseGeometry(FS::IFile& file)
 		vertex_count += m_meshes[i].attribute_array_size / m_vertex_decl.getStride();
 	}
 	m_vertices.resize(vertex_count);
+	m_uvs.resize(vertex_count);
 
 	computeRuntimeData(vertices_mem->data);
 
@@ -640,6 +645,7 @@ void Model::unload(void)
 	}
 	m_meshes.clear();
 	m_bones.clear();
+	m_uvs.clear();
 	m_vertices.clear();
 
 	if(bgfx::isValid(m_vertices_handle)) bgfx::destroyVertexBuffer(m_vertices_handle);

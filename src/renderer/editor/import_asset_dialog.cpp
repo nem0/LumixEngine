@@ -2773,8 +2773,8 @@ static ImportMaterial* getMatchingMaterial(lua_State* L, ImportMaterial* materia
 			ImportMaterial& material = materials[i];
 			aiString material_name;
 			material.material->Get(AI_MATKEY_NAME, material_name);
-			LuaWrapper::pushLua(L, i);
-			LuaWrapper::pushLua(L, material_name.C_Str());
+			LuaWrapper::push(L, i);
+			LuaWrapper::push(L, material_name.C_Str());
 			if (lua_pcall(L, 2, 1, 0) != LUA_OK)
 			{
 				g_log_error.log("Editor") << "getMatchingMaterial" << ": " << lua_tostring(L, -1);
