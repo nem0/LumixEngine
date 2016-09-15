@@ -42,6 +42,7 @@ struct LUMIX_ENGINE_API Vec2
 	Vec2 operator -(const Vec2& v) const { return Vec2(x - v.x, y - v.y); }
 	Vec2 normalized() const { return *this * (1 / length()); }
 	float length() const;
+	float squaredLength() const;
 
 	float x, y;
 };

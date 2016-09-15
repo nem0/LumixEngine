@@ -6,6 +6,14 @@ namespace Lumix
 {
 
 
+float Vec2::squaredLength() const
+{
+	float x = this->x;
+	float y = this->y;
+	return x * x + y * y;
+}
+
+
 float Vec2::length() const
 {
 	float x = this->x;
