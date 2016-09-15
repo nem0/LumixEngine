@@ -293,8 +293,7 @@ struct NavigationSceneImpl : public NavigationScene
 			if (!model) return;
 			ASSERT(model->isReady());
 
-			auto& indices = model->getIndices();
-			bool is16 = model->getFlags() & (uint32)Model::Flags::INDICES_16BIT;
+			bool is16 = model->areIndices16();
 
 			Entity entity = render_scene->getRenderableEntity(renderable);
 			Matrix mtx = m_universe.getMatrix(entity);
@@ -312,7 +311,7 @@ struct NavigationSceneImpl : public NavigationScene
 					&model->getVertices()[mesh.attribute_array_offset / model->getVertexDecl().getStride()];
 				if (is16)
 				{
-					uint16* indices16 = (uint16*)&model->getIndices()[0];
+					const uint16* indices16 = model->getIndices16();
 					for (int i = 0; i < mesh.indices_count; i += 3)
 					{
 						Vec3 a = mtx.transform(vertices[indices16[mesh.indices_offset + i]]);
@@ -326,7 +325,7 @@ struct NavigationSceneImpl : public NavigationScene
 				}
 				else
 				{
-					uint32* indices32 = (uint32*)&model->getIndices()[0];
+					const uint32* indices32 = model->getIndices32();
 					for (int i = 0; i < mesh.indices_count; i += 3)
 					{
 						Vec3 a = mtx.transform(vertices[indices32[mesh.indices_offset + i]]);
