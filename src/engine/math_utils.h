@@ -46,6 +46,13 @@ LUMIX_ENGINE_API bool getSphereTriangleIntersection(const Vec3& center,
 	const Vec3& v1,
 	const Vec3& v2);
 
+template <typename T> LUMIX_FORCE_INLINE void swap(T& a, T& b)
+{
+	T tmp = a;
+	a = b;
+	b = tmp;
+}
+
 template <typename T> LUMIX_FORCE_INLINE T minimum(T a, T b)
 {
 	return a < b ? a : b;
