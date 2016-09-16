@@ -2400,6 +2400,7 @@ public:
 		{
 			m_temporary_infos.pop();
 		}
+
 		for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
 		{
 			Array<RenderableMesh>& subinfos = m_temporary_infos[subresult_index];
@@ -2412,13 +2413,19 @@ public:
 					PROFILE_BLOCK("Temporary Info Job");
 					PROFILE_INT("Renderable count", results[subresult_index].size());
 					Vec3 ref_point = lod_ref_point;
+					float lod_multiplier = m_lod_multiplier;
+					if (frustum.fov > 0)
+					{
+						float t = frustum.fov / Math::degreesToRadians(60.0f);
+						lod_multiplier *= t * t;
+					}
 					const ComponentHandle* LUMIX_RESTRICT raw_subresults = &results[subresult_index][0];
 					Renderable* LUMIX_RESTRICT renderables = &m_renderables[0];
 					for (int i = 0, c = results[subresult_index].size(); i < c; ++i)
 					{
 						Renderable* LUMIX_RESTRICT renderable = &renderables[raw_subresults[i].index];
 						float squared_distance = (renderable->matrix.getTranslation() - ref_point).squaredLength();
-						squared_distance *= m_lod_multiplier;
+						squared_distance *= lod_multiplier;
 
 						Model* LUMIX_RESTRICT model = renderable->model;
 						LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
