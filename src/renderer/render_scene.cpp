@@ -2418,6 +2418,7 @@ public:
 					{
 						Renderable* LUMIX_RESTRICT renderable = &renderables[raw_subresults[i].index];
 						float squared_distance = (renderable->matrix.getTranslation() - ref_point).squaredLength();
+						squared_distance *= m_lod_multiplier;
 
 						Model* LUMIX_RESTRICT model = renderable->model;
 						LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
@@ -2628,6 +2629,10 @@ public:
 	float getCameraFarPlane(ComponentHandle camera) override { return m_cameras[{camera.index}].far; }
 	float getCameraScreenWidth(ComponentHandle camera) override { return m_cameras[{camera.index}].screen_width; }
 	float getCameraScreenHeight(ComponentHandle camera) override { return m_cameras[{camera.index}].screen_height; }
+
+
+	void setGlobalLODMultiplier(float multiplier) { m_lod_multiplier = multiplier; }
+	float getGlobalLODMultiplier() const { return m_lod_multiplier; }
 
 
 	Matrix getCameraViewProjection(ComponentHandle cmp) override
@@ -4262,6 +4267,7 @@ private:
 	Array<MTJD::Job*> m_jobs;
 
 	float m_time;
+	float m_lod_multiplier;
 	bool m_is_updating_attachments;
 	bool m_is_forward_rendered;
 	bool m_is_grass_enabled;
@@ -4349,13 +4355,14 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_point_lights_map(m_allocator)
 	, m_bone_attachments(m_allocator)
 	, m_environment_probes(m_allocator)
+	, m_lod_multiplier(1.0f)
+	, m_time(0)
+	, m_is_updating_attachments(false)
 {
 	is_opengl = renderer.isOpenGL();
-	m_is_updating_attachments = false;
 	m_universe.entityTransformed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 	m_universe.entityDestroyed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
-	m_time = 0;
 	m_renderables.reserve(5000);
 
 	for (auto& i : COMPONENT_INFOS)
@@ -4420,6 +4427,8 @@ void RenderScene::registerLuaAPI(lua_State* L)
 		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
 		} while(false) \
 
+	REGISTER_FUNCTION(setGlobalLODMultiplier);
+	REGISTER_FUNCTION(getGlobalLODMultiplier);
 	REGISTER_FUNCTION(getCameraViewProjection);
 	REGISTER_FUNCTION(getGlobalLightEntity);
 	REGISTER_FUNCTION(getActiveGlobalLight);
