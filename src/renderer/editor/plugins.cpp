@@ -1338,6 +1338,525 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 };
 
 
+struct FurPainter : public WorldEditor::Plugin
+{
+	FurPainter(StudioApp& _app)
+		: app(_app)
+		, brush_radius(0.1f)
+		, brush_strength(1.0f)
+		, enabled(false)
+	{
+		app.getWorldEditor()->addPlugin(*this);
+	}
+
+
+	void saveTexture()
+	{
+		WorldEditor& editor = *app.getWorldEditor();
+		auto& entities = editor.getSelectedEntities();
+		if (entities.empty()) return;
+
+		ComponentUID renderable = editor.getUniverse()->getComponent(entities[0], RENDERABLE_TYPE);
+		if (!renderable.isValid()) return;
+
+		RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
+		Model* model = scene->getRenderableModel(renderable.handle);
+
+		if (!model || !model->isReady()) return;
+
+		Texture* texture = model->getMesh(0).material->getTexture(0);
+		texture->save();
+	}
+
+
+	struct Vertex
+	{
+		Vec2 uv;
+		Vec3 pos;
+
+		void fixUV(int w, int h)
+		{
+			if (uv.y < 0) uv.y = 1 + uv.y;
+			uv.x *= (float)w;
+			uv.y *= (float)h;
+		}
+	};
+
+
+	struct Point
+	{
+		int64 x, y;
+	};
+
+
+	static int64 orient2D(const Point& a, const Point& b, const Point& c)
+	{
+		return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+	}
+
+
+	void postprocess()
+	{
+		WorldEditor& editor = *app.getWorldEditor();
+		Universe* universe = editor.getUniverse();
+		auto& entities = editor.getSelectedEntities();
+		if (entities.empty()) return;
+
+		ComponentUID renderable = universe->getComponent(entities[0], RENDERABLE_TYPE);
+		if (!renderable.isValid()) return;
+
+		RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
+		Model* model = scene->getRenderableModel(renderable.handle);
+
+		if (!model || !model->isReady() || model->getMeshCount() < 1) return;
+		if (!model->getMesh(0).material) return;
+
+		Texture* texture = model->getMesh(0).material->getTexture(0);
+		if (!texture || texture->data.empty()) return;
+
+		uint8* mem = (uint8*)app.getWorldEditor()->getAllocator().allocate(texture->width * texture->height);
+
+		ASSERT(!texture->data.empty());
+
+		const uint16* idx16 = model->getIndices16();
+		const uint32* idx32 = model->getIndices32();
+		const Vec3* vertices = &model->getVertices()[0];
+		setMemory(mem, 0, texture->width * texture->height);
+		for (int i = 0, c = model->getIndicesCount(); i < c; i += 3)
+		{
+			uint32 idx[3];
+			if (idx16)
+			{
+				idx[0] = idx16[i];
+				idx[1] = idx16[i + 1];
+				idx[2] = idx16[i + 2];
+			}
+			else
+			{
+				idx[0] = idx32[i];
+				idx[1] = idx32[i + 1];
+				idx[2] = idx32[i + 2];
+			}
+
+			Vertex v[] = { { model->getUVs()[idx[0]], vertices[idx[0]] },
+			{ model->getUVs()[idx[1]], vertices[idx[1]] },
+			{ model->getUVs()[idx[2]], vertices[idx[2]] } };
+
+			Vec3 n = crossProduct(Vec3(v[0].uv, 0) - Vec3(v[1].uv, 0), Vec3(v[2].uv, 0) - Vec3(v[1].uv, 0));
+			if (n.z > 0) Math::swap(v[1], v[2]);
+
+			v[0].fixUV(texture->width, texture->height);
+			v[1].fixUV(texture->width, texture->height);
+			v[2].fixUV(texture->width, texture->height);
+
+			rasterizeTriangle2(texture->width, mem, v);
+		}
+
+		uint32* data = (uint32*)&texture->data[0];
+		struct DistanceFieldCell
+		{
+			uint32 distance;
+			uint32 color;
+		};
+
+		Array<DistanceFieldCell> distance_field(app.getWorldEditor()->getAllocator());
+		int width = texture->width;
+		int height = texture->height;
+		distance_field.resize(width * height);
+
+		for (int j = 0; j < height; ++j)
+		{
+			for (int i = 0; i < width; ++i)
+			{
+				distance_field[i + j * width].color = data[i + j * width];
+				distance_field[i + j * width].distance = 0xffffFFFF;
+			}
+		}
+
+		for (int j = 1; j < height; ++j)
+		{
+			for (int i = 1; i < width; ++i)
+			{
+				int idx = i + j * width;
+				if (mem[idx])
+				{
+					distance_field[idx].distance = 0;
+				}
+				else
+				{
+					if (distance_field[idx - 1].distance < distance_field[idx - width].distance)
+					{
+						distance_field[idx].distance = distance_field[idx - 1].distance + 1;
+						distance_field[idx].color = distance_field[idx - 1].color;
+					}
+					else
+					{
+						distance_field[idx].distance = distance_field[idx - width].distance + 1;
+						distance_field[idx].color = distance_field[idx - width].color;
+					}
+				}
+			}
+		}
+
+		for (int j = height - 2; j >= 0; --j)
+		{
+			for (int i = width - 2; i >= 0; --i)
+			{
+				int idx = i + j * width;
+				if (distance_field[idx + 1].distance < distance_field[idx + width].distance &&
+					distance_field[idx + 1].distance < distance_field[idx].distance)
+				{
+					distance_field[idx].distance = distance_field[idx + 1].distance + 1;
+					distance_field[idx].color = distance_field[idx + 1].color;
+				}
+				else if (distance_field[idx + width].distance < distance_field[idx].distance)
+				{
+					distance_field[idx].distance = distance_field[idx + width].distance + 1;
+					distance_field[idx].color = distance_field[idx + width].color;
+				}
+			}
+		}
+
+		for (int j = 0; j < height; ++j)
+		{
+			for (int i = 0; i < width; ++i)
+			{
+				data[i + j * width] = distance_field[i + j*width].color;
+			}
+		}
+
+		texture->onDataUpdated(0, 0, texture->width, texture->height);
+		app.getWorldEditor()->getAllocator().deallocate(mem);
+	}
+
+
+	void rasterizeTriangle2(int width, uint8* mem, Vertex v[3]) const
+	{
+		float squared_radius_rcp = 1.0f / (brush_radius * brush_radius);
+
+		static const int64 substep = 256;
+		static const int64 submask = substep - 1;
+		static const int64 stepshift = 8;
+
+		Point v0 = { int64(v[0].uv.x * substep), int64(v[0].uv.y * substep) };
+		Point v1 = { int64(v[1].uv.x * substep), int64(v[1].uv.y * substep) };
+		Point v2 = { int64(v[2].uv.x * substep), int64(v[2].uv.y * substep) };
+
+		int64 minX = Math::minimum(v0.x, v1.x, v2.x);
+		int64 minY = Math::minimum(v0.y, v1.y, v2.y);
+		int64 maxX = Math::maximum(v0.x, v1.x, v2.x) + substep;
+		int64 maxY = Math::maximum(v0.y, v1.y, v2.y) + substep;
+
+		minX = ((minX + submask) & ~submask) - 1;
+		minY = ((minY + submask) & ~submask) - 1;
+
+		Point p;
+		for (p.y = minY; p.y <= maxY; p.y += substep)
+		{
+			for (p.x = minX; p.x <= maxX; p.x += substep)
+			{
+				int64 w0 = orient2D(v1, v2, p);
+				int64 w1 = orient2D(v2, v0, p);
+				int64 w2 = orient2D(v0, v1, p);
+
+				if (w0 >= 0 && w1 >= 0 && w2 >= 0)
+				{
+					mem[(p.x >> stepshift) + (p.y >> stepshift) * width] = 1;
+				}
+			}
+		}
+	}
+
+
+	void rasterizeTriangle(Texture* texture, Vertex v[3], const Vec3& center) const
+	{
+		float squared_radius_rcp = 1.0f / (brush_radius * brush_radius);
+
+		static const int64 substep = 256;
+		static const int64 submask = substep - 1;
+		static const int64 stepshift = 8;
+
+		Point v0 = {int64(v[0].uv.x * substep), int64(v[0].uv.y * substep)};
+		Point v1 = {int64(v[1].uv.x * substep), int64(v[1].uv.y * substep)};
+		Point v2 = {int64(v[2].uv.x * substep), int64(v[2].uv.y * substep)};
+
+		int64 minX = Math::minimum(v0.x, v1.x, v2.x);
+		int64 minY = Math::minimum(v0.y, v1.y, v2.y);
+		int64 maxX = Math::maximum(v0.x, v1.x, v2.x) + substep;
+		int64 maxY = Math::maximum(v0.y, v1.y, v2.y) + substep;
+
+		minX = ((minX + submask) & ~submask) - 1;
+		minY = ((minY + submask) & ~submask) - 1;
+
+		Point p;
+		for (p.y = minY; p.y <= maxY; p.y += substep)
+		{
+			for (p.x = minX; p.x <= maxX; p.x += substep)
+			{
+				int64 w0 = orient2D(v1, v2, p);
+				int64 w1 = orient2D(v2, v0, p);
+				int64 w2 = orient2D(v0, v1, p);
+
+				if (w0 >= 0 && w1 >= 0 && w2 >= 0)
+				{
+					Vec3 pos =
+						(float(w0) * v[0].pos + float(w1) * v[1].pos + float(w2) * v[2].pos) * (1.0f / (w0 + w1 + w2));
+					float q = 1 - (center - pos).squaredLength() * squared_radius_rcp;
+					if (q <= 0) continue;
+						
+					uint32& val = ((uint32*)&texture->data[0])[(p.x >> stepshift) + (p.y >> stepshift) * texture->width];
+					float alpha = ((val & 0xff000000) >> 24) / 255.0f;
+					alpha = brush_strength * q + alpha * (1 - q);
+					val = val & 0x00ffFFFF | (uint32)(alpha * 255.0f) << 24;
+				}
+			}
+		}
+	}
+
+
+	void paint(Texture* texture, Model* model, const Vec3& hit) const
+	{
+		ASSERT(!texture->data.empty());
+
+		const uint16* idx16 = model->getIndices16();
+		const uint32* idx32 = model->getIndices32();
+		const Vec3* vertices = &model->getVertices()[0];
+		Vec2 min((float)texture->width, (float)texture->height);
+		Vec2 max(0, 0);
+		int tri_count = 0;
+		for (int i = 0, c = model->getIndicesCount(); i < c; i += 3)
+		{
+			uint32 idx[3];
+			if (idx16)
+			{
+				idx[0] = idx16[i];
+				idx[1] = idx16[i + 1];
+				idx[2] = idx16[i + 2];
+			}
+			else
+			{
+				idx[0] = idx32[i];
+				idx[1] = idx32[i + 1];
+				idx[2] = idx32[i + 2];
+			}
+
+			if (Math::getSphereTriangleIntersection(
+				hit, brush_radius, vertices[idx[0]], vertices[idx[1]], vertices[idx[2]]))
+			{
+				Vertex v[] = {{model->getUVs()[idx[0]], vertices[idx[0]]},
+					{model->getUVs()[idx[1]], vertices[idx[1]]},
+					{model->getUVs()[idx[2]], vertices[idx[2]]}};
+
+				Vec3 n = crossProduct(Vec3(v[0].uv, 0) - Vec3(v[1].uv, 0), Vec3(v[2].uv, 0) - Vec3(v[1].uv, 0));
+				if (n.z > 0) Math::swap(v[1], v[2]);
+
+				v[0].fixUV(texture->width, texture->height);
+				v[1].fixUV(texture->width, texture->height);
+				v[2].fixUV(texture->width, texture->height);
+
+				min.x = Math::minimum(min.x, v[0].uv.x, v[1].uv.x, v[2].uv.x);
+				max.x = Math::maximum(max.x, v[0].uv.x, v[1].uv.x, v[2].uv.x);
+
+				min.y = Math::minimum(min.y, v[0].uv.y, v[1].uv.y, v[2].uv.y);
+				max.y = Math::maximum(max.y, v[0].uv.y, v[1].uv.y, v[2].uv.y);
+
+				++tri_count;
+				rasterizeTriangle(texture, v, hit);
+			}
+		}
+
+		if (tri_count > 0) texture->onDataUpdated((int)min.x, (int)min.y, int(max.x - min.x), int(max.y - min.y));
+	}
+
+
+	bool onEntityMouseDown(const WorldEditor::RayHit& hit, int x, int y) override
+	{
+		auto& ents = app.getWorldEditor()->getSelectedEntities();
+		
+		if (enabled && ents.size() == 1 && ents[0] == hit.entity)
+		{
+			onMouseMove(x, y, 0, 0);
+			return true;
+		}
+		return false;
+	}
+
+
+	void onMouseMove(int x, int y, int, int) override
+	{
+		WorldEditor& editor = *app.getWorldEditor();
+		Universe* universe = editor.getUniverse();
+		auto& entities = editor.getSelectedEntities();
+		if (entities.empty()) return;
+		if (!editor.isMouseDown(MouseButton::LEFT)) return;
+
+		ComponentUID renderable = universe->getComponent(entities[0], RENDERABLE_TYPE);
+		if (!renderable.isValid()) return;
+
+		RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
+		Model* model = scene->getRenderableModel(renderable.handle);
+
+		if (!model || !model->isReady() || model->getMeshCount() < 1) return;
+		if (!model->getMesh(0).material) return;
+
+		Texture* texture = model->getMesh(0).material->getTexture(0);
+		if (!texture || texture->data.empty()) return;
+
+		Vec3 origin, dir;
+		scene->getRay(editor.getEditCamera().handle, (float)x, (float)y, origin, dir);
+		RayCastModelHit hit = model->castRay(origin, dir, universe->getMatrix(entities[0]));
+		if (!hit.m_is_hit) return;
+
+		Vec3 hit_pos = hit.m_origin + hit.m_t * hit.m_dir;
+		hit_pos = universe->getTransform(entities[0]).inverted().transform(hit_pos);
+
+		paint(texture, model, hit_pos);
+	}
+
+
+	float brush_radius;
+	float brush_strength;
+	StudioApp& app;
+	bool enabled;
+};
+
+
+struct FurPainterPlugin : public StudioApp::IPlugin
+{
+	explicit FurPainterPlugin(StudioApp& _app)
+		: app(_app)
+		, is_opened(false)
+	{
+		fur_painter = LUMIX_NEW(app.getWorldEditor()->getAllocator(), FurPainter)(_app);
+		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Fur Painter", "fur_painter");
+		m_action->func.bind<FurPainterPlugin, &FurPainterPlugin::onAction>(this);
+		m_action->is_selected.bind<FurPainterPlugin, &FurPainterPlugin::isOpened>(this);
+	}
+
+
+	bool isOpened() const { return is_opened; }
+	void onAction() { is_opened = !is_opened; }
+
+
+	void onWindowGUI() override
+	{
+		if (ImGui::BeginDock("Fur painter"))
+		{
+			ImGui::Checkbox("Enabled", &fur_painter->enabled);
+			if (!fur_painter->enabled) goto end;
+
+
+			WorldEditor& editor = *app.getWorldEditor();
+			const auto& entities = editor.getSelectedEntities();
+			if (entities.empty())
+			{
+				ImGui::Text("No entity selected.");
+				goto end;
+			}
+			Universe* universe = editor.getUniverse();
+			RenderScene* scene = static_cast<RenderScene*>(universe->getScene(RENDERABLE_TYPE));
+			ComponentUID renderable = universe->getComponent(entities[0], RENDERABLE_TYPE);
+
+			if (!renderable.isValid())
+			{
+				ImGui::Text("Entity does not have renderable component.");
+				goto end;
+			}
+
+			Model* model = scene->getRenderableModel(renderable.handle);
+			if (!model)
+			{
+				ImGui::Text("Entity does not have model.");
+				goto end;
+			}
+
+			if (model->isFailure())
+			{
+				ImGui::Text("Model failed to load.");
+				goto end;
+			}
+			else if (model->isEmpty())
+			{
+				ImGui::Text("Model is not loaded.");
+				goto end;
+			}
+
+			if(model->getMeshCount() < 1 || !model->getMesh(0).material)
+			{
+				ImGui::Text("Model file is invalid.");
+				goto end;
+			}
+
+			Texture* texture = model->getMesh(0).material->getTexture(0);
+			if (!texture)
+			{
+				ImGui::Text("Missing texture.");
+				goto end;
+			}
+
+			if(!endsWith(texture->getPath().c_str(), ".tga"))
+			{
+				ImGui::Text("Only TGA can be painted");
+				goto end;
+			}
+
+			if (texture->data.empty())
+			{
+				texture->addDataReference();
+				texture->getResourceManager().reload(*texture);
+				goto end;
+			}
+
+			ImGui::DragFloat("Brush radius", &fur_painter->brush_radius);
+			ImGui::DragFloat("Brush strength", &fur_painter->brush_strength, 0.01f, 0.0f, 1.0f);
+			if (ImGui::Button("Save texture")) fur_painter->saveTexture();
+			ImGui::SameLine();
+			if (ImGui::Button("Postprocess")) fur_painter->postprocess();
+
+			drawGizmo();
+		}
+		
+		end:
+			ImGui::EndDock();
+	}
+
+
+	void drawGizmo()
+	{
+		if (!fur_painter->enabled) return;
+
+		WorldEditor& editor = *app.getWorldEditor();
+		auto& entities = editor.getSelectedEntities();
+		if (entities.empty()) return;
+
+		ComponentUID renderable = editor.getUniverse()->getComponent(entities[0], RENDERABLE_TYPE);
+		if (!renderable.isValid()) return;
+
+		RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
+		Model* model = scene->getRenderableModel(renderable.handle);
+
+		if (!model || !model->isReady() || model->getMeshCount() < 1) return;
+		if (!model->getMesh(0).material) return;
+
+		Texture* texture = model->getMesh(0).material->getTexture(0);
+		if (!texture || texture->data.empty()) return;
+
+		Vec3 origin, dir;
+		scene->getRay(editor.getEditCamera().handle, editor.getMouseX(), editor.getMouseY(), origin, dir);
+		RayCastModelHit hit = model->castRay(origin, dir, editor.getUniverse()->getMatrix(entities[0]));
+		if (!hit.m_is_hit) return;
+
+		Vec3 hit_pos = hit.m_origin + hit.m_t * hit.m_dir;
+		scene->addDebugSphere(hit_pos, fur_painter->brush_radius, 0xffffFFFF, 0);
+	}
+
+
+	FurPainter* fur_painter;
+	bool is_opened;
+	StudioApp& app;
+};
+
+
 struct GameViewPlugin : public StudioApp::IPlugin
 {
 	static GameViewPlugin* s_instance;
@@ -1795,6 +2314,7 @@ LUMIX_STUDIO_ENTRY(renderer)
 	app.addPlugin(*LUMIX_NEW(allocator, SceneViewPlugin)(app));
 	app.addPlugin(*LUMIX_NEW(allocator, ImportAssetDialog)(app));
 	app.addPlugin(*LUMIX_NEW(allocator, GameViewPlugin)(app));
+	app.addPlugin(*LUMIX_NEW(allocator, FurPainterPlugin)(app));
 	app.addPlugin(*LUMIX_NEW(allocator, ShaderEditorPlugin)(app));
 
 	app.getWorldEditor()->addPlugin(*LUMIX_NEW(allocator, WorldEditorPlugin)());
