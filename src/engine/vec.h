@@ -52,6 +52,12 @@ struct LUMIX_ENGINE_API Vec3
 {
 	Vec3() {}
 
+	Vec3(const Vec2& v, float c)
+		: x(v.x)
+		, y(v.y)
+		, z(c)
+	{}
+
 	Vec3(float a, float b, float c)
 		: x(a)
 		, y(b)
