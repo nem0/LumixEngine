@@ -2884,6 +2884,15 @@ int ImportAssetDialog::importAsset(lua_State* L)
 		m_model.time_scale = LuaWrapper::toType<float>(L, -1);
 	}
 	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "orientation") == LUA_TSTRING)
+	{
+		const char* tmp = LuaWrapper::toType<const char*>(L, -1);
+		if (equalStrings(tmp, "+y")) m_model.orientation = Orientation::Y_UP;
+		else if (equalStrings(tmp, "+z")) m_model.orientation = Orientation::Z_UP;
+		else if (equalStrings(tmp, "-y")) m_model.orientation = Orientation::X_MINUS_UP;
+		else if (equalStrings(tmp, "-z")) m_model.orientation = Orientation::Z_MINUS_UP;
+	}
+	lua_pop(L, 1);
 
 
 	if (lua_getfield(L, 2, "lods") == LUA_TTABLE)
