@@ -903,57 +903,6 @@ struct ConvertTask : public MT::Task
 	}
 
 
-	Vec3 getPosition(const aiNodeAnim* channel, int frame_idx, uint32_t fps)
-	{
-		float time = frame_idx / (float)fps;
-		unsigned int i = 0;
-		while (i + 1 < channel->mNumPositionKeys && time > (float)channel->mPositionKeys[i + 1].mTime)
-		{
-			++i;
-		}
-		auto first = channel->mPositionKeys[i].mValue;
-
-		if (i + 1 == channel->mNumPositionKeys)
-		{
-			return Vec3(first.x, first.y, first.z);
-		}
-		auto second = channel->mPositionKeys[i + 1].mValue;
-		float t = float((time - channel->mPositionKeys[i].mTime) /
-						(channel->mPositionKeys[i + 1].mTime - channel->mPositionKeys[i].mTime));
-		first *= 1 - t;
-		second *= t;
-
-		first += second;
-
-		return Vec3(first.x, first.y, first.z);
-	}
-
-
-	Quat getRotation(const aiNodeAnim* channel, int frame_idx, uint32_t fps)
-	{
-		float time = frame_idx / (float)fps;
-		unsigned int i = 0;
-		while (i + 1 < channel->mNumRotationKeys && time > (float)channel->mRotationKeys[i + 1].mTime)
-		{
-			++i;
-		}
-		auto first = channel->mRotationKeys[i].mValue;
-
-		if (i + 1 == channel->mNumRotationKeys)
-		{
-			return Quat(first.x, first.y, first.z, first.w);
-		}
-
-		auto second = channel->mRotationKeys[i + 1].mValue;
-		float t = float((time - channel->mRotationKeys[i].mTime) /
-						(channel->mRotationKeys[i + 1].mTime - channel->mRotationKeys[i].mTime));
-		aiQuaternion out;
-		aiQuaternion::Interpolate(out, first, second, t);
-
-		return Quat(out.x, out.y, out.z, out.w);
-	}
-
-
 	static float getLength(aiAnimation* animation)
 	{
 		float length = 0;
@@ -977,10 +926,88 @@ struct ConvertTask : public MT::Task
 	}
 
 
+	static void compressPositions(Array<aiVectorKey>& pos, const aiNodeAnim* channel, float end_time, float error)
+	{
+		pos.clear();
+		if (channel->mNumPositionKeys == 0) return;
+
+		pos.push(channel->mPositionKeys[0]);
+		if (channel->mNumPositionKeys == 1)
+		{
+			auto end = channel->mPositionKeys[0];
+			end.mTime = end_time;
+			pos.push(end);
+			return;
+		}
+
+		aiVectorKey last = channel->mPositionKeys[0];
+		float dt = float(channel->mPositionKeys[1].mTime - channel->mPositionKeys[0].mTime);
+		aiVector3D dif = (channel->mPositionKeys[1].mValue - last.mValue) / dt;
+		for (unsigned int i = 2; i < channel->mNumPositionKeys; ++i)
+		{
+			dt = float(channel->mPositionKeys[i].mTime - last.mTime);
+			aiVector3D estimate = last.mValue + dif * dt;
+			aiVector3D cur = channel->mPositionKeys[i].mValue;
+			if (fabs(estimate.x - cur.x) > error
+				|| fabs(estimate.y - cur.y) > error
+				|| fabs(estimate.z - cur.z) > error)
+			{
+				pos.push(channel->mPositionKeys[i - 1]);
+				last = channel->mPositionKeys[i - 1];
+				dt = float(channel->mPositionKeys[i].mTime - last.mTime);
+				dif = (channel->mPositionKeys[i].mValue - last.mValue) / dt;
+			}
+		}
+
+		pos.push(channel->mPositionKeys[channel->mNumPositionKeys-1]);
+	}
+
+
+	static void compressRotations(Array<aiQuatKey>& rot, const aiNodeAnim* channel, float end_time, float error)
+	{
+		rot.clear();
+
+		if (channel->mNumRotationKeys == 0) return;
+
+		rot.push(channel->mRotationKeys[0]);
+		if (channel->mNumRotationKeys == 1)
+		{
+			auto end = channel->mRotationKeys[0];
+			end.mTime = end_time;
+			rot.push(end);
+			return;
+		}
+
+		aiQuatKey last = channel->mRotationKeys[0];
+		float dt = float(channel->mRotationKeys[1].mTime - channel->mRotationKeys[0].mTime);
+		aiQuaternion after_last = channel->mRotationKeys[1].mValue;
+		float after_last_dt = dt;
+		for (unsigned int i = 2; i < channel->mNumRotationKeys; ++i)
+		{
+			dt = float(channel->mRotationKeys[i].mTime - last.mTime);
+			aiQuaternion estimate;
+			aiQuaternion::Interpolate(estimate, last.mValue, channel->mRotationKeys[i].mValue, after_last_dt / dt);
+			estimate.Normalize();
+			if (fabs(estimate.x - after_last.x) > error
+				|| fabs(estimate.y - after_last.y) > error
+				|| fabs(estimate.z - after_last.z) > error)
+			{
+				rot.push(channel->mRotationKeys[i - 1]);
+				last = channel->mRotationKeys[i - 1];
+				after_last = channel->mRotationKeys[i].mValue;
+				dt = float(channel->mRotationKeys[i].mTime - last.mTime);
+				after_last_dt = dt;
+			}
+		}
+
+		rot.push(channel->mRotationKeys[channel->mNumRotationKeys - 1]);
+	}
+
+
 	bool saveLumixAnimations()
 	{
 		m_dialog.setImportMessage("Importing animations...", 0);
-		
+
 		int animation_index = 0;
 		int num_animations = 0;
 		for (auto& import_animation : m_dialog.m_animations)
@@ -990,7 +1017,7 @@ struct ConvertTask : public MT::Task
 		if (num_animations == 0) return true;
 
 		bool failed = false;
-		for(auto& import_animation : m_dialog.m_animations)
+		for (auto& import_animation : m_dialog.m_animations)
 		{
 			if (!import_animation.import) continue;
 			++animation_index;
@@ -1010,51 +1037,64 @@ struct ConvertTask : public MT::Task
 
 			Animation::Header header;
 			header.fps = uint32(animation->mTicksPerSecond == 0
-											? 25
-											: (animation->mTicksPerSecond == 1 ? 30 : animation->mTicksPerSecond));
+				? 25
+				: (animation->mTicksPerSecond == 1 ? 30 : animation->mTicksPerSecond));
 			header.magic = Animation::HEADER_MAGIC;
-			header.version = 1;
+			header.version = 2;
 
 			file.write(&header, sizeof(header));
 			float anim_length = getLength(animation);
-			int frame_count = Math::maximum(int(anim_length * header.fps), 1);
+			int frame_count = Math::maximum(int(anim_length * m_dialog.m_model.time_scale * header.fps), 1);
 			file.write(&frame_count, sizeof(frame_count));
 			int bone_count = (int)animation->mNumChannels;
 			file.write(&bone_count, sizeof(bone_count));
 
-			Array<Vec3> positions(m_dialog.m_editor.getAllocator());
-			Array<Quat> rotations(m_dialog.m_editor.getAllocator());
-
-			positions.resize(bone_count * frame_count);
-			rotations.resize(bone_count * frame_count);
-
-			for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
-			{
-				const aiNodeAnim* channel = animation->mChannels[channel_idx];
-				auto global_transform = getGlobalTransform(getNode(channel->mNodeName, scene->mRootNode)->mParent);
-				aiVector3t<float> scale;
-				aiVector3t<float> dummy_pos;
-				aiQuaterniont<float> dummy_rot;
-				global_transform.Decompose(scale, dummy_rot, dummy_pos);
-				for (int frame = 0; frame < frame_count; ++frame)
-				{
-					Vec3 pos = getPosition(channel, frame, header.fps) * m_dialog.m_model.mesh_scale;
-					pos.x *= scale.x;
-					pos.y *= scale.y;
-					pos.z *= scale.z;
-					pos = fixOrientation(pos);
-					positions[frame * bone_count + channel_idx] = pos;
-					rotations[frame * bone_count + channel_idx] = fixOrientation(getRotation(channel, frame, header.fps));
-				}
-			}
-
-			file.write((const char*)&positions[0], sizeof(positions[0]) * positions.size());
-			file.write((const char*)&rotations[0], sizeof(rotations[0]) * rotations.size());
+			Array<aiVectorKey> positions(m_dialog.m_editor.getAllocator());
+			Array<aiQuatKey> rotations(m_dialog.m_editor.getAllocator());
 			for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
 			{
 				const aiNodeAnim* channel = animation->mChannels[channel_idx];
 				uint32_t hash = crc32(channel->mNodeName.C_Str());
 				file.write((const char*)&hash, sizeof(hash));
+				auto global_transform = getGlobalTransform(getNode(channel->mNodeName, scene->mRootNode)->mParent);
+				aiVector3t<float> scale;
+				aiVector3t<float> dummy_pos;
+				aiQuaterniont<float> dummy_rot;
+				global_transform.Decompose(scale, dummy_rot, dummy_pos);
+
+				compressPositions(positions, channel, anim_length, m_dialog.m_model.position_error / 100000.0f);
+				int count = positions.size();
+				file.write(&count, sizeof(count));
+				for (const auto& pos : positions)
+				{
+					uint16 time = uint16(pos.mTime * header.fps * m_dialog.m_model.time_scale);
+					file.write(&time, sizeof(time));
+				}
+				for (const auto& pos : positions)
+				{
+					Vec3 pos(pos.mValue.x, pos.mValue.y, pos.mValue.z);
+					pos = pos * m_dialog.m_model.mesh_scale;
+					pos.x *= scale.x;
+					pos.y *= scale.y;
+					pos.z *= scale.z;
+					pos = fixOrientation(pos);
+					file.write(&pos, sizeof(pos));
+				}
+				
+				compressRotations(rotations, channel, anim_length, m_dialog.m_model.rotation_error / 100000.0f);
+				count = rotations.size();
+				file.write(&count, sizeof(count));
+				for (const auto& rot : rotations)
+				{
+					uint16 time = uint16(rot.mTime * header.fps * m_dialog.m_model.time_scale);
+					file.write(&time, sizeof(time));
+				}
+				for (const auto& rot : rotations)
+				{
+					Quat rot(rot.mValue.x, rot.mValue.y, rot.mValue.z, rot.mValue.w);
+					rot = fixOrientation(rot);
+					file.write(&rot, sizeof(rot));
+				}
 			}
 
 			file.close();
@@ -2103,6 +2143,9 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	m_model.lods[2] = -1000;
 	m_model.lods[3] = -10000;
 	m_model.orientation = Y_UP;
+	m_model.position_error = 100.0f;
+	m_model.rotation_error = 10.0f;
+	m_model.time_scale = 1.0f;
 	m_is_opened = false;
 	m_message[0] = '\0';
 	m_import_message[0] = '\0';
@@ -2415,6 +2458,10 @@ void ImportAssetDialog::onAnimationsGUI()
 	StaticString<30> label("Animations (");
 	label << m_animations.size() << ")###Animations";
 	if (!ImGui::CollapsingHeader(label)) return;
+
+	ImGui::DragFloat("Time scale", &m_model.time_scale, 1.0f, 0, FLT_MAX, "%.5f");
+	ImGui::DragFloat("Max position error", &m_model.position_error, 0, FLT_MAX);
+	ImGui::DragFloat("Max rotation error", &m_model.rotation_error, 0, FLT_MAX);
 
 	ImGui::Indent();
 	ImGui::Columns(2);
@@ -2830,6 +2877,11 @@ int ImportAssetDialog::importAsset(lua_State* L)
 	if (lua_getfield(L, 2, "scale") == LUA_TNUMBER)
 	{
 		m_model.mesh_scale = LuaWrapper::toType<float>(L, -1);
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "time_scale") == LUA_TNUMBER)
+	{
+		m_model.time_scale = LuaWrapper::toType<float>(L, -1);
 	}
 	lua_pop(L, 1);
 

@@ -1,4 +1,5 @@
 #include "animation/animation.h"
+#include "engine/blob.h"
 #include "engine/fs/file_system.h"
 #include "engine/log.h"
 #include "engine/matrix.h"
@@ -12,6 +13,15 @@
 
 namespace Lumix
 {
+
+
+enum class Version
+{
+	FIRST = 0,
+	COMPRESSION = 1,
+
+	LAST
+};
 
 
 static const ResourceType ANIMATION_TYPE("animation");
@@ -31,22 +41,11 @@ void AnimationManager::destroyResource(Resource& resource)
 
 Animation::Animation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
-	, m_bone_count(-1)
-	, m_rotations(nullptr)
-	, m_positions(nullptr)
-	, m_bones(nullptr)
 	, m_frame_count(0)
 	, m_fps(30)
+	, m_mem(allocator)
+	, m_bones(allocator)
 {
-}
-
-
-Animation::~Animation()
-{
-	IAllocator& allocator = getAllocator();
-	allocator.deallocate(m_positions);
-	allocator.deallocate(m_rotations);
-	allocator.deallocate(m_bones);
 }
 
 
@@ -58,41 +57,56 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, float weig
 	if (!model.isReady()) return;
 
 	int frame = (int)(time * m_fps);
+	float rcp_fps = 1.0f / m_fps;
 	frame = Math::clamp(frame, 0, m_frame_count - 1);
 	Vec3* pos = pose.positions;
 	Quat* rot = pose.rotations;
-	int off = frame * m_bone_count;
-	int off2 = off + m_bone_count;
-	float t = (time - frame / (float)m_fps) / (1.0f / m_fps);
 
 	if (frame < m_frame_count - 1)
 	{
-		for (int i = 0; i < m_bone_count; ++i)
+		for (Bone& bone : m_bones)
 		{
-			Model::BoneMap::iterator iter = model.getBoneIndex(m_bones[i]);
-			if (iter.isValid())
+			Model::BoneMap::iterator iter = model.getBoneIndex(bone.name);
+			if (!iter.isValid()) continue;
+
+			int idx = 1;
+			for (int c = bone.pos_count; idx < c; ++idx)
 			{
-				int model_bone_index = iter.value();
-				Vec3 anim_pos;
-				lerp(m_positions[off + i], m_positions[off2 + i], &anim_pos, t);
-				lerp(pos[model_bone_index], anim_pos, &pos[model_bone_index], weight);
-				Quat anim_rot;
-				nlerp(m_rotations[off + i], m_rotations[off2 + i], &anim_rot, t);
-				nlerp(rot[model_bone_index], anim_rot, &rot[model_bone_index], weight);
+				if (bone.pos_times[idx] > frame) break;
 			}
+
+			float t = float(time - bone.pos_times[idx - 1] * rcp_fps) /
+					  ((bone.pos_times[idx] - bone.pos_times[idx - 1]) * rcp_fps);
+
+			int model_bone_index = iter.value();
+			Vec3 anim_pos;
+			lerp(bone.pos[idx - 1], bone.pos[idx], &anim_pos, t);
+			lerp(pos[model_bone_index], anim_pos, &pos[model_bone_index], weight);
+
+			idx = 1;
+			for (int c = bone.rot_count; idx < c; ++idx)
+			{
+				if (bone.rot_times[idx] > frame) break;
+			}
+
+			t = float(time - bone.rot_times[idx - 1] * rcp_fps) /
+				((bone.rot_times[idx] - bone.rot_times[idx - 1]) * rcp_fps);
+
+			Quat anim_rot;
+			nlerp(bone.rot[idx - 1], bone.rot[idx], &anim_rot, t);
+			nlerp(rot[model_bone_index], anim_rot, &rot[model_bone_index], weight);
 		}
 	}
 	else
 	{
-		for (int i = 0; i < m_bone_count; ++i)
+		for (Bone& bone : m_bones)
 		{
-			Model::BoneMap::iterator iter = model.getBoneIndex(m_bones[i]);
-			if (iter.isValid())
-			{
-				int model_bone_index = iter.value();
-				lerp(pos[model_bone_index], m_positions[off + i], &pos[model_bone_index], weight);
-				nlerp(rot[model_bone_index], m_rotations[off + i], &rot[model_bone_index], weight);
-			}
+			Model::BoneMap::iterator iter = model.getBoneIndex(bone.name);
+			if (!iter.isValid()) continue;
+
+			int model_bone_index = iter.value();
+			lerp(pos[model_bone_index], bone.pos[bone.pos_count - 1], &pos[model_bone_index], weight);
+			nlerp(rot[model_bone_index], bone.rot[bone.rot_count - 1], &rot[model_bone_index], weight);
 		}
 	}
 }
@@ -106,37 +120,50 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model) const
 	if (!model.isReady()) return;
 
 	int frame = (int)(time * m_fps);
+	float rcp_fps = 1.0f / m_fps;
 	frame = Math::clamp(frame, 0, m_frame_count - 1);
 	Vec3* pos = pose.positions;
 	Quat* rot = pose.rotations;
-	int off = frame * m_bone_count;
-	int off2 = off + m_bone_count;
-	float t = (time - frame / (float)m_fps) / (1.0f / m_fps);
 
-	if(frame < m_frame_count - 1)
+	if (frame < m_frame_count - 1)
 	{
-		for(int i = 0; i < m_bone_count; ++i)
+		for (Bone& bone : m_bones)
 		{
-			Model::BoneMap::iterator iter = model.getBoneIndex(m_bones[i]);
-			if (iter.isValid())
+			Model::BoneMap::iterator iter = model.getBoneIndex(bone.name);
+			if (!iter.isValid()) continue;
+
+			int idx = 1;
+			for (int c = bone.pos_count; idx < c; ++idx)
 			{
-				int model_bone_index = iter.value();
-				lerp(m_positions[off + i], m_positions[off2 + i], &pos[model_bone_index], t);
-				nlerp(m_rotations[off + i], m_rotations[off2 + i], &rot[model_bone_index], t);
+				if (bone.pos_times[idx] > frame) break;
 			}
+
+			float t = float(time - bone.pos_times[idx - 1] * rcp_fps) /
+				((bone.pos_times[idx] - bone.pos_times[idx - 1]) * rcp_fps);
+			int model_bone_index = iter.value();
+			lerp(bone.pos[idx - 1], bone.pos[idx], &pos[model_bone_index], t);
+
+			idx = 1;
+			for (int c = bone.rot_count; idx < c; ++idx)
+			{
+				if (bone.rot_times[idx] > frame) break;
+			}
+
+			t = float(time - bone.rot_times[idx - 1] * rcp_fps) /
+				((bone.rot_times[idx] - bone.rot_times[idx - 1]) * rcp_fps);
+			nlerp(bone.rot[idx - 1], bone.rot[idx], &rot[model_bone_index], t);
 		}
 	}
 	else
 	{
-		for(int i = 0; i < m_bone_count; ++i)
+		for (Bone& bone : m_bones)
 		{
-			Model::BoneMap::iterator iter = model.getBoneIndex(m_bones[i]);
-			if (iter.isValid())
-			{
-				int model_bone_index = iter.value();
-				pos[model_bone_index] = m_positions[off + i];
-				rot[model_bone_index] = m_rotations[off + i];
-			}
+			Model::BoneMap::iterator iter = model.getBoneIndex(bone.name);
+			if (!iter.isValid()) continue;
+
+			int model_bone_index = iter.value();
+			pos[model_bone_index] = bone.pos[bone.pos_count - 1];
+			rot[model_bone_index] = bone.rot[bone.rot_count - 1];
 		}
 	}
 }
@@ -145,13 +172,8 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model) const
 bool Animation::load(FS::IFile& file)
 {
 	IAllocator& allocator = getAllocator();
-	allocator.deallocate(m_positions);
-	allocator.deallocate(m_rotations);
-	allocator.deallocate(m_bones);
-	m_positions = nullptr;
-	m_rotations = nullptr;
-	m_bones = nullptr;
-	m_frame_count = m_bone_count = 0;
+	m_bones.clear();
+	m_mem.clear();
 	Header header;
 	file.read(&header, sizeof(header));
 	if (header.magic != HEADER_MAGIC)
@@ -159,23 +181,35 @@ bool Animation::load(FS::IFile& file)
 		g_log_error.log("Animation") << getPath() << " is not an animation file";
 		return false;
 	}
-	if (header.version > 1)
+	if (header.version != (int)Version::LAST)
 	{
-		g_log_error.log("Animation") << "Unsupported animation version " << header.version << " ("
+		g_log_error.log("Animation") << "Unsupported animation version " << (int)header.version << " ("
 									 << getPath() << ")";
 		return false;
 	}
 	m_fps = header.fps;
 	file.read(&m_frame_count, sizeof(m_frame_count));
-	file.read(&m_bone_count, sizeof(m_bone_count));
+	int bone_count;
+	file.read(&bone_count, sizeof(bone_count));
+	m_bones.resize(bone_count);
 
-	m_positions = static_cast<Vec3*>(allocator.allocate(sizeof(Vec3) * m_frame_count * m_bone_count));
-	m_rotations = static_cast<Quat*>(allocator.allocate(sizeof(Quat) * m_frame_count * m_bone_count));
-	m_bones = static_cast<uint32*>(allocator.allocate(sizeof(uint32) * m_bone_count));
-	file.read(&m_positions[0], sizeof(Vec3)* m_bone_count * m_frame_count);
-	file.read(&m_rotations[0], sizeof(Quat)* m_bone_count * m_frame_count);
-	file.read(m_bones, sizeof(m_bones[0]) * m_bone_count);
+	int size = int(file.size() - file.pos());
+	m_mem.resize(size);
+	file.read(&m_mem[0], size);
+	InputBlob blob(&m_mem[0], size);
+	for (int i = 0; i < m_bones.size(); ++i)
+	{
+		m_bones[i].name = blob.read<uint32>();
+
+		m_bones[i].pos_count = blob.read<int>();
+		m_bones[i].pos_times = (const uint16*)blob.skip(m_bones[i].pos_count * sizeof(uint16));
+		m_bones[i].pos = (const Vec3*)blob.skip(m_bones[i].pos_count * sizeof(Vec3));;
 		
+		m_bones[i].rot_count = blob.read<int>();
+		m_bones[i].rot_times = (const uint16*)blob.skip(m_bones[i].rot_count * sizeof(uint16));;
+		m_bones[i].rot = (const Quat*)blob.skip(m_bones[i].rot_count * sizeof(Quat));;
+	}
+
 	m_size = file.size();
 	return true;
 }
@@ -189,13 +223,8 @@ IAllocator& Animation::getAllocator()
 
 void Animation::unload(void)
 {
-	IAllocator& allocator = getAllocator();
-	allocator.deallocate(m_positions);
-	allocator.deallocate(m_rotations);
-	allocator.deallocate(m_bones);
-	m_rotations = nullptr;
-	m_positions = nullptr;
-	m_bones = nullptr;
+	m_bones.clear();
+	m_mem.clear();
 	m_frame_count = 0;
 }
 
