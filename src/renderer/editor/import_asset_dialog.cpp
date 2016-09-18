@@ -1072,13 +1072,13 @@ struct ConvertTask : public MT::Task
 				}
 				for (const auto& pos : positions)
 				{
-					Vec3 pos(pos.mValue.x, pos.mValue.y, pos.mValue.z);
-					pos = pos * m_dialog.m_model.mesh_scale;
-					pos.x *= scale.x;
-					pos.y *= scale.y;
-					pos.z *= scale.z;
-					pos = fixOrientation(pos);
-					file.write(&pos, sizeof(pos));
+					Vec3 out_pos(pos.mValue.x, pos.mValue.y, pos.mValue.z);
+					out_pos = out_pos * m_dialog.m_model.mesh_scale;
+					out_pos.x *= scale.x;
+					out_pos.y *= scale.y;
+					out_pos.z *= scale.z;
+					out_pos = fixOrientation(out_pos);
+					file.write(&out_pos, sizeof(out_pos));
 				}
 				
 				compressRotations(rotations, channel, anim_length, m_dialog.m_model.rotation_error / 100000.0f);
@@ -1091,9 +1091,9 @@ struct ConvertTask : public MT::Task
 				}
 				for (const auto& rot : rotations)
 				{
-					Quat rot(rot.mValue.x, rot.mValue.y, rot.mValue.z, rot.mValue.w);
-					rot = fixOrientation(rot);
-					file.write(&rot, sizeof(rot));
+					Quat out_rot(rot.mValue.x, rot.mValue.y, rot.mValue.z, rot.mValue.w);
+					out_rot = fixOrientation(out_rot);
+					file.write(&out_rot, sizeof(out_rot));
 				}
 			}
 
