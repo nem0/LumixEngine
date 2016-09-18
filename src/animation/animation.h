@@ -52,7 +52,6 @@ class Animation : public Resource
 
 	public:
 		Animation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
-		~Animation();
 
 		void getRelativePose(float time, Pose& pose, Model& model) const;
 		void getRelativePose(float time, Pose& pose, Model& model, float weight) const;
@@ -68,10 +67,18 @@ class Animation : public Resource
 
 	private:
 		int	m_frame_count;
-		int	m_bone_count;
-		Vec3* m_positions;
-		Quat* m_rotations;
-		uint32* m_bones;
+		struct Bone
+		{
+			uint32 name;
+			int pos_count;
+			const uint16* pos_times;
+			const Vec3* pos;
+			int rot_count;
+			const uint16* rot_times;
+			const Quat* rot;
+		};
+		Array<Bone> m_bones;
+		Array<uint8> m_mem;
 		int m_fps;
 };
 

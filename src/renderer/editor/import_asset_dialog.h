@@ -153,6 +153,9 @@ class ImportAssetDialog : public StudioApp::IPlugin
 			Orientation orientation;
 			bool make_convex;
 			bool all_nodes;
+			float position_error;
+			float rotation_error;
+			float time_scale;
 		} m_model;
 
 		float m_progress_fraction;
