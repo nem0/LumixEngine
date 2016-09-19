@@ -545,14 +545,10 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
-	bool load(const char* path) override
+	void fileLoaded(FS::IFile& file, bool success)
 	{
-		clearNavmesh();
-
-		FS::OsFile file;
-		if (!file.open(path, FS::Mode::OPEN_AND_READ, m_allocator)) return false;
-
-		if (!initNavmesh()) return false;
+		if (!success) return;
+		if (!initNavmesh()) return;
 
 		file.read(&m_aabb, sizeof(m_aabb));
 		file.read(&m_num_tiles_x, sizeof(m_num_tiles_x));
@@ -562,7 +558,7 @@ struct NavigationSceneImpl : public NavigationScene
 		if (dtStatusFailed(m_navmesh->init(&params)))
 		{
 			g_log_error.log("Navigation") << "Could not init Detour navmesh";
-			return false;
+			return;
 		}
 		for (int j = 0; j < m_num_tiles_z; ++j)
 		{
@@ -576,14 +572,24 @@ struct NavigationSceneImpl : public NavigationScene
 				{
 					file.close();
 					dtFree(data);
-					return false;
+					return;
 				}
 			}
 		}
 
 		file.close();
-		if (!m_crowd) return initCrowd();
-		return true;
+		if (!m_crowd) initCrowd();
+	}
+
+
+	bool load(const char* path) override
+	{
+		clearNavmesh();
+
+		FS::ReadCallback cb;
+		cb.bind<NavigationSceneImpl, &NavigationSceneImpl::fileLoaded>(this);
+		FS::FileSystem& fs = m_system.m_engine.getFileSystem();
+		return fs.openAsync(fs.getDefaultDevice(), Path(path), FS::Mode::OPEN_AND_READ, cb);
 	}
 
 	
