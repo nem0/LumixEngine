@@ -3623,15 +3623,21 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 
 		physx::PxRigidActor* actor;
 		bool is_dynamic = scene.isDynamic(this);
+		auto& physics = *scene.m_system->getPhysics();
+
+
+		physx::PxConvexMeshGeometry convex_geom(resource->convex_mesh);
+		physx::PxTriangleMeshGeometry tri_geom(resource->tri_mesh);
+		const physx::PxGeometry* geom = resource->convex_mesh ? static_cast<physx::PxGeometry*>(&convex_geom)
+															  : static_cast<physx::PxGeometry*>(&tri_geom);
+
 		if (is_dynamic)
 		{
-			actor = PxCreateDynamic(
-				*scene.m_system->getPhysics(), transform, *resource->getGeometry(), *scene.m_default_material, 1.0f);
+			actor = PxCreateDynamic(physics, transform, *geom, *scene.m_default_material, 1.0f);
 		}
 		else
 		{
-			actor = PxCreateStatic(
-				*scene.m_system->getPhysics(), transform, *resource->getGeometry(), *scene.m_default_material);
+			actor = PxCreateStatic(physics, transform, *geom, *scene.m_default_material);
 		}
 		if (actor)
 		{
@@ -3639,8 +3645,7 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		}
 		else
 		{
-			g_log_error.log("Physics") << "Could not create PhysX mesh "
-									 << resource->getPath().c_str();
+			g_log_error.log("Physics") << "Could not create PhysX mesh " << resource->getPath().c_str();
 		}
 	}
 }
