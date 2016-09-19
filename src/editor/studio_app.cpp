@@ -1756,6 +1756,27 @@ public:
 	}
 
 
+
+	void packDataScanResources(Lumix::Array<PackFileInfo>& infos, Lumix::Array<PackFileInfo::Path>& paths)
+	{
+		Lumix::ResourceManager& rm = m_editor->getEngine().getResourceManager();
+		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter)
+		{
+			const auto& resources = iter.value()->getResourceTable();
+			for (auto res_iter = resources.begin(), res_iter_end = resources.end(); res_iter != res_iter_end;
+				 ++res_iter)
+			{
+				Lumix::Resource* res = res_iter.value();
+				Lumix::copyString(paths.emplace().data(), Lumix::MAX_PATH_LENGTH, res->getPath().c_str());
+				auto& out_info = infos.emplace();
+				out_info.hash = Lumix::crc32(res->getPath().c_str());
+				out_info.size = PlatformInterface::getFileSize(res->getPath().c_str());
+				out_info.offset = ~0UL;
+			}
+		}
+	}
+
+
 	void packData()
 	{
 		char dest[Lumix::MAX_PATH_LENGTH];
