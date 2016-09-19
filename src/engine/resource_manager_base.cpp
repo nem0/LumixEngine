@@ -115,21 +115,6 @@ namespace Lumix
 		}
 	}
 
-	void ResourceManagerBase::forceUnload(const Path& path)
-	{
-		Resource* resource = get(path);
-		if(nullptr != resource)
-		{
-			forceUnload(*resource);
-		}
-	}
-
-	void ResourceManagerBase::forceUnload(Resource& resource)
-	{
-		resource.doUnload();
-		resource.m_ref_count = 0;
-	}
-
 	void ResourceManagerBase::reload(const Path& path)
 	{
 		Resource* resource = get(path);

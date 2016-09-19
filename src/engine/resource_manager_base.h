@@ -40,9 +40,6 @@ public:
 	void unload(const Path& path);
 	void unload(Resource& resource);
 
-	void forceUnload(const Path& path);
-	void forceUnload(Resource& resource);
-
 	void reload(const Path& path);
 	void reload(Resource& resource);
 	ResourceTable& getResourceTable() { return m_resources; }

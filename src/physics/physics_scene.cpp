@@ -2335,7 +2335,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			Quat q = m_universe.getRotation(entity);
 			physx::PxQuat pquat(q.x, q.y, q.z, q.w);
 			physx::PxTransform trans(pvec, pquat);
-			m_actors.at(idx)->physx_actor->setGlobalPose(trans, false);
+			RigidActor* actor = m_actors.at(idx);
+			if (actor->physx_actor) actor->physx_actor->setGlobalPose(trans, false);
 		}
 	}
 
@@ -2544,6 +2545,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		for (auto* actor : m_actors)
 		{
+			if (!actor->physx_actor) continue;
 			physx::PxFilterData data;
 			int actor_layer = actor->layer;
 			data.word0 = 1 << actor_layer;
@@ -2665,7 +2667,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			m_dynamic_actors.eraseItemFast(actor);
 		}
 		physx::PxShape* shapes;
-		if (actor->physx_actor->getNbShapes() == 1 && actor->physx_actor->getShapes(&shapes, 1, 0))
+		if (actor->physx_actor && actor->physx_actor->getNbShapes() == 1 &&
+			actor->physx_actor->getShapes(&shapes, 1, 0))
 		{
 			physx::PxGeometryHolder geom = shapes->getGeometry();
 			physx::PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
