@@ -348,6 +348,7 @@ static void preprocessMesh(ImportMesh& mesh, uint32 flags, IAllocator& allocator
 
 	mesh.map_to_input.reserve(faces.size() * 3);
 	mesh.map_from_input.resize(mesh.mesh->mNumFaces * 3);
+	mesh.indices.reserve(faces.size() * 3);
 	for (unsigned int& i : mesh.map_from_input) i = 0xffffFFFF;
 
 	for (auto& face : faces)
@@ -359,14 +360,6 @@ static void preprocessMesh(ImportMesh& mesh, uint32 flags, IAllocator& allocator
 				mesh.map_to_input.push(face->mIndices[i]);
 				mesh.map_from_input[face->mIndices[i]] = mesh.map_to_input.size() - 1;
 			}
-		}
-	}
-
-	mesh.indices.reserve(faces.size() * 3);
-	for (auto& face : faces)
-	{
-		for (int i = 0; i < 3; ++i)
-		{
 			mesh.indices.push(mesh.map_from_input[face->mIndices[i]]);
 		}
 	}
@@ -1276,8 +1269,6 @@ struct ConvertTask : public MT::Task
 			for (unsigned int k = 0; k < bone->mNumWeights; ++k)
 			{
 				auto idx = mesh.map_from_input[bone->mWeights[k].mVertexId];
-				ASSERT(idx == bone->mWeights[k].mVertexId);
-				ASSERT(idx < (unsigned int)mesh.map_to_input.size());
 				auto& info = infos[idx];
 				addBoneInfluence(info, bone->mWeights[k].mWeight, bone_index);
 			}
