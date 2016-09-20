@@ -258,6 +258,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			if (physx_actor) physx_actor->release();
 		}
 
+		void rescale();
 		void setResource(PhysicsGeometry* resource);
 		void setPhysxActor(physx::PxRigidActor* actor);
 
@@ -2115,26 +2116,26 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		for (auto& ragdoll : m_ragdolls)
 		{
+			ComponentHandle renderable = render_scene->getRenderableComponent(ragdoll.entity);
+			if (!isValid(renderable)) continue;
+
+			Pose* pose = render_scene->getPose(renderable);
+			if (!pose) continue;
+
 			Transform root_transform;
 			root_transform.rot = m_universe.getRotation(ragdoll.entity);
 			root_transform.pos = m_universe.getPosition(ragdoll.entity);
-			ComponentHandle renderable = render_scene->getRenderableComponent(ragdoll.entity);
-			if (!isValid(renderable)) continue;
-			Pose* pose = render_scene->getPose(renderable);
 
-			if (pose)
+			if (ragdoll.root && !ragdoll.root->is_kinematic)
 			{
-				if (ragdoll.root && !ragdoll.root->is_kinematic)
-				{
-					physx::PxTransform bone_pose = ragdoll.root->actor->getGlobalPose();
-					m_is_updating_ragdoll = true;
+				physx::PxTransform bone_pose = ragdoll.root->actor->getGlobalPose();
+				m_is_updating_ragdoll = true;
 
-					m_universe.setTransform(ragdoll.entity, fromPhysx(bone_pose) * ragdoll.root_transform);
+				m_universe.setTransform(ragdoll.entity, fromPhysx(bone_pose) * ragdoll.root_transform);
 
-					m_is_updating_ragdoll = false;
-				}
-				updateBone(root_transform, root_transform.inverted(), ragdoll.root, pose);
+				m_is_updating_ragdoll = false;
 			}
+			updateBone(root_transform, root_transform.inverted(), ragdoll.root, pose);
 		}
 	}
 
@@ -2330,13 +2331,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 		int idx = m_actors.find(entity);
 		if(idx >= 0)
 		{
-			Vec3 pos = m_universe.getPosition(entity);
-			physx::PxVec3 pvec(pos.x, pos.y, pos.z);
-			Quat q = m_universe.getRotation(entity);
-			physx::PxQuat pquat(q.x, q.y, q.z, q.w);
-			physx::PxTransform trans(pvec, pquat);
 			RigidActor* actor = m_actors.at(idx);
-			if (actor->physx_actor) actor->physx_actor->setGlobalPose(trans, false);
+			if (actor->physx_actor)
+			{
+				Transform trans = m_universe.getTransform(entity);
+				actor->physx_actor->setGlobalPose(toPhysx(trans), false);
+				if (actor->resource) actor->rescale();
+			}
 		}
 	}
 
@@ -3625,9 +3626,9 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		bool is_dynamic = scene.isDynamic(this);
 		auto& physics = *scene.m_system->getPhysics();
 
-
-		physx::PxConvexMeshGeometry convex_geom(resource->convex_mesh);
-		physx::PxTriangleMeshGeometry tri_geom(resource->tri_mesh);
+		physx::PxMeshScale scale(scene.getUniverse().getScale(entity));
+		physx::PxConvexMeshGeometry convex_geom(resource->convex_mesh, scale);
+		physx::PxTriangleMeshGeometry tri_geom(resource->tri_mesh, scale);
 		const physx::PxGeometry* geom = resource->convex_mesh ? static_cast<physx::PxGeometry*>(&convex_geom)
 															  : static_cast<physx::PxGeometry*>(&tri_geom);
 
@@ -3648,6 +3649,14 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 			g_log_error.log("Physics") << "Could not create PhysX mesh " << resource->getPath().c_str();
 		}
 	}
+}
+
+
+void PhysicsSceneImpl::RigidActor::rescale()
+{
+	if (!resource || !resource->isReady()) return;
+
+	onStateChanged(resource->getState(), resource->getState(), *resource);
 }
 
 
