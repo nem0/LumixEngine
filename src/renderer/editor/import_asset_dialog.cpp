@@ -1067,8 +1067,8 @@ struct ConvertTask : public MT::Task
 				file.write(&count, sizeof(count));
 				for (const auto& pos : positions)
 				{
-					uint16 time = uint16(pos.mTime * header.fps * m_dialog.m_model.time_scale);
-					file.write(&time, sizeof(time));
+					uint16 frame = uint16(pos.mTime * m_dialog.m_model.time_scale);
+					file.write(&frame, sizeof(frame));
 				}
 				for (const auto& pos : positions)
 				{
@@ -1086,8 +1086,8 @@ struct ConvertTask : public MT::Task
 				file.write(&count, sizeof(count));
 				for (const auto& rot : rotations)
 				{
-					uint16 time = uint16(rot.mTime * header.fps * m_dialog.m_model.time_scale);
-					file.write(&time, sizeof(time));
+					uint16 frame = uint16(rot.mTime * m_dialog.m_model.time_scale);
+					file.write(&frame, sizeof(frame));
 				}
 				for (const auto& rot : rotations)
 				{
