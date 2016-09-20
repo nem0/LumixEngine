@@ -2999,9 +2999,10 @@ int ImportAssetDialog::importAsset(lua_State* L)
 
 							if (lua_getfield(L, -1, "textures") == LUA_TTABLE)
 							{
+								int top = lua_gettop(L);
 								lua_pushnil(L);
 								ImportTexture* texture = material->textures;
-								while (lua_next(L, -2) != 0) // for each texture
+								while (texture - material->textures < material->texture_count && lua_next(L, -2) != 0) // for each texture
 								{
 									if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
 									{
@@ -3024,9 +3025,8 @@ int ImportAssetDialog::importAsset(lua_State* L)
 
 									++texture;
 									lua_pop(L, 1); // textures table item
-
-									if (texture - material->textures > material->texture_count) break;
 								}
+								if (lua_gettop(L) > top) lua_pop(L, lua_gettop(L) - top);
 							}
 							lua_pop(L, 1); // "textures"
 						}
