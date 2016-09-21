@@ -1740,7 +1740,7 @@ struct FurPainterPlugin : public StudioApp::IPlugin
 
 	void onWindowGUI() override
 	{
-		if (ImGui::BeginDock("Fur painter"))
+		if (ImGui::BeginDock("Fur painter", &is_opened))
 		{
 			ImGui::Checkbox("Enabled", &fur_painter->enabled);
 			if (!fur_painter->enabled) goto end;
