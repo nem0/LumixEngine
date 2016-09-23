@@ -257,6 +257,8 @@ void SceneView::captureMouse(bool capture)
 	m_is_mouse_captured = capture;
 	SDL_ShowCursor(m_is_mouse_captured ? 0 : 1);
 	SDL_SetRelativeMouseMode(capture ? SDL_TRUE : SDL_FALSE);
+	if (capture) SDL_GetMouseState(&m_captured_mouse_x, &m_captured_mouse_y);
+	else SDL_WarpMouseInWindow(nullptr, m_captured_mouse_x, m_captured_mouse_y);
 }
 
 
