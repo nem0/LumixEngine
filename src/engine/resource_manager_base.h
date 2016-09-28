@@ -30,10 +30,7 @@ public:
 	void create(ResourceType type, ResourceManager& owner);
 	void destroy();
 
-	Resource* get(const Path& path);
 	Resource* load(const Path& path);
-	void add(Resource* resource);
-	void remove(Resource* resource);
 	void load(Resource& resource);
 	void removeUnreferenced();
 
@@ -51,6 +48,7 @@ public:
 protected:
 	virtual Resource* createResource(const Path& path) = 0;
 	virtual void destroyResource(Resource& resource) = 0;
+	Resource* get(const Path& path);
 
 private:
 	IAllocator& m_allocator;
