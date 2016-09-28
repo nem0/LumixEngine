@@ -228,11 +228,8 @@ private:
 private:
 	Lumix::Material* getMaterial()
 	{
-		auto* material = static_cast<Lumix::RenderScene*>(m_terrain.scene)->getTerrainMaterial(m_terrain.handle);
-		return static_cast<Lumix::Material*>(m_world_editor.getEngine()
-												 .getResourceManager()
-												 .get(MATERIAL_TYPE)
-												 ->get(Lumix::Path(material->getPath().c_str())));
+		auto* scene = static_cast<Lumix::RenderScene*>(m_terrain.scene);
+		return scene->getTerrainMaterial(m_terrain.handle);
 	}
 
 

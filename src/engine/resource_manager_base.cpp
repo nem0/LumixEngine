@@ -38,20 +38,6 @@ namespace Lumix
 		return nullptr;
 	}
 
-	void ResourceManagerBase::remove(Resource* resource)
-	{
-		ASSERT(resource->isEmpty());
-		m_resources.erase(resource->getPath().getHash());
-		resource->remRef();
-	}
-
-	void ResourceManagerBase::add(Resource* resource)
-	{
-		ASSERT(resource && resource->isReady());
-		m_resources.insert(resource->getPath().getHash(), resource);
-		resource->addRef();
-	}
-
 	Resource* ResourceManagerBase::load(const Path& path)
 	{
 		Resource* resource = get(path);
