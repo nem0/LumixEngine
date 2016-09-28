@@ -30,6 +30,8 @@ public:
 	void create(ResourceType type, ResourceManager& owner);
 	void destroy();
 
+	void enableUnload(bool enable);
+
 	Resource* load(const Path& path);
 	void load(Resource& resource);
 	void removeUnreferenced();
@@ -55,6 +57,7 @@ private:
 	uint32 m_size;
 	ResourceTable m_resources;
 	ResourceManager* m_owner;
+	bool m_is_unload_enabled;
 };
 
 

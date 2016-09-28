@@ -85,17 +85,14 @@ namespace Lumix
 	void ResourceManagerBase::unload(const Path& path)
 	{
 		Resource* resource = get(path);
-		if(nullptr != resource)
-		{
-			unload(*resource);
-		}
+		if (resource) unload(*resource);
 	}
 
 	void ResourceManagerBase::unload(Resource& resource)
 	{
 		int new_ref_count = resource.remRef();
 		ASSERT(new_ref_count >= 0);
-		if(new_ref_count == 0)
+		if(new_ref_count == 0 && m_is_unload_enabled)
 		{
 			resource.doUnload();
 		}
@@ -104,10 +101,7 @@ namespace Lumix
 	void ResourceManagerBase::reload(const Path& path)
 	{
 		Resource* resource = get(path);
-		if(nullptr != resource)
-		{
-			reload(*resource);
-		}
+		if(resource) reload(*resource);
 	}
 
 	void ResourceManagerBase::reload(Resource& resource)
@@ -116,11 +110,26 @@ namespace Lumix
 		resource.doLoad();
 	}
 
+	void ResourceManagerBase::enableUnload(bool enable)
+	{
+		m_is_unload_enabled = enable;
+		if (!enable) return;
+
+		for (auto* resource : m_resources)
+		{
+			if (resource->getRefCount() == 0)
+			{
+				resource->doUnload();
+			}
+		}
+	}
+
 	ResourceManagerBase::ResourceManagerBase(IAllocator& allocator)
 		: m_size(0)
 		, m_resources(allocator)
 		, m_allocator(allocator)
 		, m_owner(nullptr)
+		, m_is_unload_enabled(true)
 	{ }
 
 	ResourceManagerBase::~ResourceManagerBase()

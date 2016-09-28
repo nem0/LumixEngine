@@ -2038,6 +2038,7 @@ public:
 	void stopGameMode(bool reload)
 	{
 		ASSERT(m_universe);
+		m_engine->getResourceManager().enableUnload(false);
 		m_engine->stopGame(*m_universe);
 		selectEntities(nullptr, 0);
 		m_gizmo->clearEntities();
@@ -2053,6 +2054,7 @@ public:
 		m_engine->getFileSystem().close(*m_game_mode_file);
 		m_game_mode_file = nullptr;
 		if(isValid(m_selected_entity_on_game_mode)) selectEntities(&m_selected_entity_on_game_mode, 1);
+		m_engine->getResourceManager().enableUnload(true);
 	}
 
 

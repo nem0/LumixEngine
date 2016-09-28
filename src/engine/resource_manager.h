@@ -41,6 +41,7 @@ public:
 	void remove(ResourceType type);
 	void reload(const Path& path);
 	void removeUnreferenced();
+	void enableUnload(bool enable);
 
 	FS::FileSystem& getFileSystem() { return *m_file_system; }
 
