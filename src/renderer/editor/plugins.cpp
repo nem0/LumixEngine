@@ -1896,11 +1896,17 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		auto* resource = material_manager->load(Path("pipelines/imgui/imgui.mat"));
 		m_material = static_cast<Material*>(resource);
 
+		Texture* old_texture = m_material->getTexture(0);
 		Texture* texture = LUMIX_NEW(editor.getAllocator(), Texture)(
 			Path("font"), *m_engine->getResourceManager().get(TEXTURE_TYPE), editor.getAllocator());
 
 		texture->create(width, height, pixels);
 		m_material->setTexture(0, texture);
+		if (old_texture)
+		{
+			old_texture->destroy();
+			LUMIX_DELETE(m_engine->getAllocator(), old_texture);
+		}
 
 		ImGui::GetIO().RenderDrawListsFn = imGuiCallback;
 
