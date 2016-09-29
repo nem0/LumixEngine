@@ -41,9 +41,36 @@ namespace
 
 int DragFloat(lua_State* L)
 {
-	auto* name = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
-	float value = Lumix::LuaWrapper::checkArg<float>(L, 2);
+	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
+	float value = LuaWrapper::checkArg<float>(L, 2);
 	bool changed = ImGui::DragFloat(name, &value);
+	lua_pushboolean(L, changed);
+	lua_pushnumber(L, value);
+	return 2;
+}
+
+
+int SetStyleColor(lua_State* L)
+{
+	auto& style = ImGui::GetStyle();
+	int index = LuaWrapper::checkArg<int>(L, 1);
+	ImVec4 color;
+	color.x = LuaWrapper::checkArg<float>(L, 2);
+	color.y = LuaWrapper::checkArg<float>(L, 3);
+	color.z = LuaWrapper::checkArg<float>(L, 4);
+	color.w = LuaWrapper::checkArg<float>(L, 5);
+	style.Colors[index] = color;
+	return 0;
+}
+
+
+int SliderFloat(lua_State* L)
+{
+	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
+	float value = LuaWrapper::checkArg<float>(L, 2);
+	float min = LuaWrapper::checkArg<float>(L, 3);
+	float max = LuaWrapper::checkArg<float>(L, 4);
+	bool changed = ImGui::SliderFloat(name, &value, min, max, "");
 	lua_pushboolean(L, changed);
 	lua_pushnumber(L, value);
 	return 2;
@@ -52,7 +79,7 @@ int DragFloat(lua_State* L)
 
 int Text(lua_State* L)
 {
-	auto* text = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
+	auto* text = LuaWrapper::checkArg<const char*>(L, 1);
 	ImGui::Text("%s", text);
 	return 0;
 }
@@ -60,8 +87,14 @@ int Text(lua_State* L)
 
 int Button(lua_State* L)
 {
-	auto* label = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
-	bool clicked = ImGui::Button(label);
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	ImVec2 size(0, 0);
+	if (lua_gettop(L) > 2)
+	{
+		size.x = LuaWrapper::checkArg<float>(L, 2);
+		size.y = LuaWrapper::checkArg<float>(L, 3);
+	}
+	bool clicked = ImGui::Button(label, size);
 	lua_pushboolean(L, clicked);
 	return 1;
 }
@@ -69,8 +102,8 @@ int Button(lua_State* L)
 
 int Checkbox(lua_State* L)
 {
-	auto* label = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
-	bool b = Lumix::LuaWrapper::checkArg<bool>(L, 2);
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	bool b = LuaWrapper::checkArg<bool>(L, 2);
 	bool clicked = ImGui::Checkbox(label, &b);
 	lua_pushboolean(L, clicked);
 	lua_pushboolean(L, b);
@@ -80,18 +113,56 @@ int Checkbox(lua_State* L)
 
 int Image(lua_State* L)
 {
-	auto* texture_id = Lumix::LuaWrapper::checkArg<void*>(L, 1);
-	float size_x = Lumix::LuaWrapper::checkArg<float>(L, 2);
-	float size_y = Lumix::LuaWrapper::checkArg<float>(L, 3);
+	auto* texture_id = LuaWrapper::checkArg<void*>(L, 1);
+	float size_x = LuaWrapper::checkArg<float>(L, 2);
+	float size_y = LuaWrapper::checkArg<float>(L, 3);
 	ImGui::Image(texture_id, ImVec2(size_x, size_y));
 	return 0;
 }
 
 
+int SetNextWindowPosCenter(lua_State* L)
+{
+	ImGui::SetNextWindowPosCenter();
+	return 0;
+}
+
+
+int SetNextWindowSize(lua_State* L)
+{
+	ImVec2 size;
+	size.x = LuaWrapper::checkArg<float>(L, 1);
+	size.y = LuaWrapper::checkArg<float>(L, 2);
+	ImGui::SetNextWindowSize(size);
+	return 0;
+}
+
+
+
 int Begin(lua_State* L)
 {
-	auto* label = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
-	bool res = ImGui::Begin(label);
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	ImGuiWindowFlags flags = 0;
+	if (lua_gettop(L) > 1)
+	{
+		flags = LuaWrapper::checkArg<int>(L, 2);
+	}
+	bool res = ImGui::Begin(label, nullptr, flags);
+	lua_pushboolean(L, res);
+	return 1;
+}
+
+
+int BeginChildFrame(lua_State* L)
+{
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	ImVec2 size(0, 0);
+	if (lua_gettop(L) > 1)
+	{
+		size.x = LuaWrapper::checkArg<float>(L, 2);
+		size.y = LuaWrapper::checkArg<float>(L, 3);
+	}
+	bool res = ImGui::BeginChildFrame(ImGui::GetID(label), size);
 	lua_pushboolean(L, res);
 	return 1;
 }
@@ -99,7 +170,7 @@ int Begin(lua_State* L)
 
 int BeginDock(lua_State* L)
 {
-	auto* label = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
 	bool res = ImGui::BeginDock(label);
 	lua_pushboolean(L, res);
 	return 1;
@@ -415,25 +486,44 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 		lua_pushvalue(L, -1);
 		lua_setglobal(L, "ImGui");
 
+		LuaWrapper::createSystemVariable(L, "ImGui", "WindowFlags_NoMove", ImGuiWindowFlags_NoMove);
+		LuaWrapper::createSystemVariable(L, "ImGui", "WindowFlags_NoCollapse", ImGuiWindowFlags_NoCollapse);
+		LuaWrapper::createSystemVariable(L, "ImGui", "WindowFlags_NoResize", ImGuiWindowFlags_NoResize);
+		LuaWrapper::createSystemVariable(L, "ImGui", "WindowFlags_NoTitleBar", ImGuiWindowFlags_NoTitleBar);
+		LuaWrapper::createSystemVariable(L, "ImGui", "WindowFlags_NoScrollbar", ImGuiWindowFlags_NoScrollbar);
+		LuaWrapper::createSystemVariable(L, "ImGui", "WindowFlags_AlwaysAutoResize", ImGuiWindowFlags_AlwaysAutoResize);
+		LuaWrapper::createSystemVariable(L, "ImGui", "Col_FrameBg", ImGuiCol_FrameBg);
+		LuaWrapper::createSystemVariable(L, "ImGui", "Col_WindowBg", ImGuiCol_WindowBg);
+		LuaWrapper::createSystemVariable(L, "ImGui", "Col_Button", ImGuiCol_Button);
+		LuaWrapper::createSystemVariable(L, "ImGui", "Col_ButtonActive", ImGuiCol_ButtonActive);
+		LuaWrapper::createSystemVariable(L, "ImGui", "Col_ButtonHovered", ImGuiCol_ButtonHovered);
+		registerCFunction(L, "SetStyleColor", &SetStyleColor);
 		registerCFunction(L, "DragFloat", &DragFloat);
+		registerCFunction(L, "SliderFloat", &SliderFloat);
 		registerCFunction(L, "Button", &Button);
 		registerCFunction(L, "Text", &Text);
 		registerCFunction(L, "Checkbox", &Checkbox);
 		registerCFunction(L, "SameLine", &SameLine);
+		registerCFunction(L, "Begin", &Begin);
+		registerCFunction(L, "BeginChildFrame", &BeginChildFrame);
+		registerCFunction(L, "SetNextWindowPosCenter", &SetNextWindowPosCenter);
+		registerCFunction(L, "SetNextWindowSize", &SetNextWindowSize);
 		registerCFunction(L, "BeginPopup", &LuaWrapper::wrap<decltype(&ImGui::BeginPopup), &ImGui::BeginPopup>);
 		registerCFunction(L, "EndPopup", &LuaWrapper::wrap<decltype(&ImGui::EndPopup), &ImGui::EndPopup>);
 		registerCFunction(L, "OpenPopup", &LuaWrapper::wrap<decltype(&ImGui::OpenPopup), &ImGui::OpenPopup>);
 		registerCFunction(L, "BeginDock", &LuaWrapper::wrap<decltype(&BeginDock), &BeginDock>);
 		registerCFunction(L, "EndDock", &LuaWrapper::wrap<decltype(&ImGui::EndDock), &ImGui::EndDock>);
-		registerCFunction(L, "Begin", &LuaWrapper::wrap<decltype(&Begin), &Begin>);
 		registerCFunction(L, "End", &LuaWrapper::wrap<decltype(&ImGui::End), &ImGui::End>);
+		registerCFunction(L, "EndChildFrame", &LuaWrapper::wrap<decltype(&ImGui::EndChildFrame), &ImGui::EndChildFrame>);
+		registerCFunction(L, "PushItemWidth", &LuaWrapper::wrap<decltype(&ImGui::PushItemWidth), &ImGui::PushItemWidth>);
+		registerCFunction(L, "PopItemWidth", &LuaWrapper::wrap<decltype(&ImGui::PopItemWidth), &ImGui::PopItemWidth>);
 		registerCFunction(L, "Image", &LuaWrapper::wrap<decltype(&Image), &Image>);
 
 		lua_pop(L, 1);
 	}
 
 
-	void onGUI(PropertyGrid& grid, Lumix::ComponentUID cmp) override
+	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
 	{
 		if (cmp.type != LUA_SCRIPT_TYPE) return;
 
@@ -453,7 +543,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 		{
 			char buf[MAX_PATH_LENGTH];
 			copyString(buf, scene->getScriptPath(cmp.handle, j).c_str());
-			StaticString<Lumix::MAX_PATH_LENGTH + 20> header;
+			StaticString<MAX_PATH_LENGTH + 20> header;
 			PathUtils::getBasename(header.data, lengthOf(header.data), buf);
 			if (header.data[0] == 0) header << j;
 			header << "###" << j;
@@ -526,7 +616,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 							float f = (float)atof(buf);
 							if (ImGui::DragFloat(property_name, &f))
 							{
-								Lumix::toCString(f, buf, sizeof(buf), 5);
+								toCString(f, buf, sizeof(buf), 5);
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
 									scene, cmp.handle, j, property_name, buf, allocator);
 								editor.executeCommand(cmd);
@@ -535,11 +625,11 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 						break;
 						case LuaScriptScene::Property::ENTITY:
 						{
-							Lumix::Entity e;
-							Lumix::fromCString(buf, sizeof(buf), &e.index);
+							Entity e;
+							fromCString(buf, sizeof(buf), &e.index);
 							if (grid.entityInput(property_name, StaticString<50>(property_name, cmp.handle.index), e))
 							{
-								Lumix::toCString(e.index, buf, sizeof(buf));
+								toCString(e.index, buf, sizeof(buf));
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
 									scene, cmp.handle, j, property_name, buf, allocator);
 								editor.executeCommand(cmd);
@@ -591,35 +681,35 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override
+	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
 		return type == LUA_SCRIPT_RESOURCE_TYPE && equalStrings(".lua", ext);
 	}
 
 
-	bool onGUI(Lumix::Resource* resource, Lumix::ResourceType type) override
+	bool onGUI(Resource* resource, ResourceType type) override
 	{
 		if (type != LUA_SCRIPT_RESOURCE_TYPE) return false;
 
-		auto* script = static_cast<Lumix::LuaScript*>(resource);
+		auto* script = static_cast<LuaScript*>(resource);
 
 		if (m_text_buffer[0] == '\0')
 		{
-			Lumix::copyString(m_text_buffer, script->getSourceCode());
+			copyString(m_text_buffer, script->getSourceCode());
 		}
 		ImGui::InputTextMultiline("Code", m_text_buffer, sizeof(m_text_buffer), ImVec2(0, 300));
 		if (ImGui::Button("Save"))
 		{
 			auto& fs = m_app.getWorldEditor()->getEngine().getFileSystem();
-			auto* file = fs.open(fs.getDefaultDevice(), resource->getPath(), Lumix::FS::Mode::CREATE_AND_WRITE);
+			auto* file = fs.open(fs.getDefaultDevice(), resource->getPath(), FS::Mode::CREATE_AND_WRITE);
 
 			if (!file)
 			{
-				Lumix::g_log_warning.log("Lua Script") << "Could not save " << resource->getPath();
+				g_log_warning.log("Lua Script") << "Could not save " << resource->getPath();
 				return true;
 			}
 
-			file->write(m_text_buffer, Lumix::stringLength(m_text_buffer));
+			file->write(m_text_buffer, stringLength(m_text_buffer));
 			fs.close(*file);
 		}
 		ImGui::SameLine();
@@ -631,18 +721,18 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
-	Lumix::ResourceType getResourceType(const char* ext) override
+	ResourceType getResourceType(const char* ext) override
 	{
 		if (equalStrings(ext, "lua")) return LUA_SCRIPT_RESOURCE_TYPE;
 		return INVALID_RESOURCE_TYPE;
 	}
 
 
-	void onResourceUnloaded(Lumix::Resource*) override { m_text_buffer[0] = 0; }
+	void onResourceUnloaded(Resource*) override { m_text_buffer[0] = 0; }
 	const char* getName() const override { return "Lua Script"; }
 
 
-	bool hasResourceManager(Lumix::ResourceType type) const override { return type == LUA_SCRIPT_RESOURCE_TYPE; }
+	bool hasResourceManager(ResourceType type) const override { return type == LUA_SCRIPT_RESOURCE_TYPE; }
 
 
 	StudioApp& m_app;
@@ -729,10 +819,10 @@ struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 	{
 		ImGui::SetNextWindowSize(ImVec2(300, 300));
 		if (!ImGui::BeginMenu(getLabel())) return;
-		char buf[Lumix::MAX_PATH_LENGTH];
+		char buf[MAX_PATH_LENGTH];
 		auto* asset_browser = app.getAssetBrowser();
 		bool create_empty = ImGui::Selectable("Empty", false);
-		if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE, 0) || create_empty)
+		if (asset_browser->resourceList(buf, lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE, 0) || create_empty)
 		{
 			auto& editor = *app.getWorldEditor();
 			if (create_entity)

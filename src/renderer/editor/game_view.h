@@ -53,4 +53,5 @@ private:
 	bool m_is_ingame_cursor;
 	bool m_paused;
 	bool m_is_opengl;
+	int m_captured_mouse_x, m_captured_mouse_y;
 };

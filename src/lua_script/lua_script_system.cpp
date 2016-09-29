@@ -1403,7 +1403,7 @@ namespace Lumix
 				m_timers.eraseFast(timers_to_remove[i]);
 			}
 
-			for (int i = 0, c = m_updates.size(); i < c; ++i)
+			for (int i = 0; i < m_updates.size(); ++i)
 			{
 				UpdateData update_item = m_updates[i];
 				if (lua_rawgeti(update_item.state, LUA_REGISTRYINDEX, update_item.environment) != LUA_TTABLE)
