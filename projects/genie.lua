@@ -568,9 +568,8 @@ if build_gui then
 		libType()
 
 		files { "../src/gui/**.h", "../src/gui/**.cpp" }
-		includedirs { "../src", "../src/gui", "../external/turbobadger/include", "../external/bgfx/include" }
+		includedirs { "../src", "../src/gui", "../external/bgfx/include" }
 		links { "engine", "renderer" }
-		linkLib "turbobadger"
 		linkLib "bgfx"
 		
 		configuration { "vs*" }
@@ -655,7 +654,6 @@ if build_app then
 				linkPhysX()
 			end
 			if build_gui then
-				linkLib "turbobadger"
 				links { "gui" }
 			end
 			links { "audio", "animation", "renderer", "lua_script", "navigation" }
@@ -766,7 +764,6 @@ if build_studio then
 
 			if build_gui then
 				forceLink("s_gui_plugin_register")
-				linkLib "turbobadger"
 				links { "gui" }
 			end
 
