@@ -37,16 +37,16 @@ namespace Lumix
 		virtual void cullToFrustum(const Frustum& frustum, int64 layer_mask) = 0;
 		virtual void cullToFrustumAsync(const Frustum& frustum, int64 layer_mask) = 0;
 
-		virtual bool isAdded(ComponentHandle renderable) = 0;
-		virtual void addStatic(ComponentHandle renderable, const Sphere& sphere) = 0;
-		virtual void removeStatic(ComponentHandle renderable) = 0;
+		virtual bool isAdded(ComponentHandle model_instance) = 0;
+		virtual void addStatic(ComponentHandle model_instance, const Sphere& sphere) = 0;
+		virtual void removeStatic(ComponentHandle model_instance) = 0;
 
-		virtual void setLayerMask(ComponentHandle renderable, int64 layer) = 0;
-		virtual int64 getLayerMask(ComponentHandle renderable) = 0;
+		virtual void setLayerMask(ComponentHandle model_instance, int64 layer) = 0;
+		virtual int64 getLayerMask(ComponentHandle model_instance) = 0;
 
-		virtual void updateBoundingSphere(const Sphere& sphere, ComponentHandle renderable) = 0;
+		virtual void updateBoundingSphere(const Sphere& sphere, ComponentHandle model_instance) = 0;
 
-		virtual void insert(const InputSpheres& spheres, const Array<ComponentHandle>& renderables) = 0;
-		virtual const Sphere& getSphere(ComponentHandle renderable) = 0;
+		virtual void insert(const InputSpheres& spheres, const Array<ComponentHandle>& model_instances) = 0;
+		virtual const Sphere& getSphere(ComponentHandle model_instance) = 0;
 	};
 } // ~namespace Lux

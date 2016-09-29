@@ -1188,7 +1188,7 @@ struct PipelineImpl : public Pipeline
 				0.5, 0.0, 0.0, 0.0, 0.0, ymul, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
 			shadowmap_info.matrices[i] = biasMatrix * (projection_matrix * view_matrix);
 
-			Array<RenderableMesh> tmp_meshes(frame_allocator);
+			Array<ModelInstanceMesh> tmp_meshes(frame_allocator);
 			m_is_current_light_global = false;
 			m_scene->getPointLightInfluencedGeometry(light, frustum, tmp_meshes);
 
@@ -1678,7 +1678,7 @@ struct PipelineImpl : public Pipeline
 	{
 		PROFILE_FUNCTION();
 
-		Array<RenderableMesh> tmp_meshes(m_renderer.getEngine().getLIFOAllocator());
+		Array<ModelInstanceMesh> tmp_meshes(m_renderer.getEngine().getLIFOAllocator());
 		m_scene->getPointLightInfluencedGeometry(light, tmp_meshes);
 		renderMeshes(tmp_meshes);
 	}
@@ -1698,7 +1698,7 @@ struct PipelineImpl : public Pipeline
 			setPointLightUniforms(light);
 
 			{
-				Array<RenderableMesh> tmp_meshes(frame_allocator);
+				Array<ModelInstanceMesh> tmp_meshes(frame_allocator);
 				m_scene->getPointLightInfluencedGeometry(light, frustum, tmp_meshes);
 				renderMeshes(tmp_meshes);
 			}
@@ -1878,7 +1878,7 @@ struct PipelineImpl : public Pipeline
 		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
 		m_is_current_light_global = true;
 
-		auto& meshes = m_scene->getRenderableInfos(frustum, lod_ref_point);
+		auto& meshes = m_scene->getModelInstanceInfos(frustum, lod_ref_point);
 		renderMeshes(meshes);
 
 		if (render_grass)
@@ -1953,7 +1953,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderSkinnedMesh(const Renderable& renderable, const RenderableMesh& info)
+	void renderSkinnedMesh(const ModelInstance& model_instance, const ModelInstanceMesh& info)
 	{
 		const Mesh& mesh = *info.mesh;
 		Material* material = mesh.material;
@@ -1961,8 +1961,8 @@ struct PipelineImpl : public Pipeline
 
 		Matrix bone_mtx[128];
 
-		const Pose& pose = *renderable.pose;
-		const Model& model = *renderable.model;
+		const Pose& pose = *model_instance.pose;
+		const Model& model = *model_instance.model;
 		Vec3* poss = pose.positions;
 		Quat* rots = pose.rotations;
 
@@ -1988,11 +1988,11 @@ struct PipelineImpl : public Pipeline
 				executeCommandBuffer(material->getCommandBuffer(), material);
 				executeCommandBuffer(view.command_buffer.buffer, material);
 
-				bgfx::setTransform(&renderable.matrix);
-				bgfx::setVertexBuffer(renderable.model->getVerticesHandle(),
+				bgfx::setTransform(&model_instance.matrix);
+				bgfx::setVertexBuffer(model_instance.model->getVerticesHandle(),
 					mesh.attribute_array_offset / stride,
 					mesh.attribute_array_size / stride);
-				bgfx::setIndexBuffer(renderable.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
+				bgfx::setIndexBuffer(model_instance.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
 				bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 				bgfx::setState(view.render_state | material->getRenderStates());
 				++m_stats.draw_call_count;
@@ -2076,7 +2076,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderRigidMesh(const Renderable& renderable, const RenderableMesh& info)
+	void renderRigidMesh(const ModelInstance& model_instance, const ModelInstanceMesh& info)
 	{
 		int instance_idx = info.mesh->instance_idx;
 		if (instance_idx == -1)
@@ -2097,12 +2097,12 @@ struct PipelineImpl : public Pipeline
 				bgfx::allocInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
 			data.instance_count = 0;
 			data.mesh = info.mesh;
-			data.model = renderable.model;
+			data.model = model_instance.model;
 			info.mesh->instance_idx = instance_idx;
 		}
 		InstanceData& data = m_instances_data[instance_idx];
 		float* mtcs = (float*)data.buffer->data;
-		copyMemory(&mtcs[data.instance_count * 16], &renderable.matrix, sizeof(renderable.matrix));
+		copyMemory(&mtcs[data.instance_count * 16], &model_instance.matrix, sizeof(model_instance.matrix));
 		++data.instance_count;
 
 		if (data.instance_count == InstanceData::MAX_INSTANCE_COUNT)
@@ -2317,48 +2317,48 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderMeshes(const Array<RenderableMesh>& meshes)
+	void renderMeshes(const Array<ModelInstanceMesh>& meshes)
 	{
 		PROFILE_FUNCTION();
 		if(meshes.empty()) return;
 
-		Renderable* renderables = m_scene->getRenderables();
+		ModelInstance* model_instances = m_scene->getModelInstances();
 		PROFILE_INT("mesh count", meshes.size());
 		for(auto& mesh : meshes)
 		{
-			Renderable& renderable = renderables[mesh.renderable.index];
-			if(renderable.pose && renderable.pose->count > 0)
+			ModelInstance& model_instance = model_instances[mesh.model_instance.index];
+			if(model_instance.pose && model_instance.pose->count > 0)
 			{
-				renderSkinnedMesh(renderable, mesh);
+				renderSkinnedMesh(model_instance, mesh);
 			}
 			else
 			{
-				renderRigidMesh(renderable, mesh);
+				renderRigidMesh(model_instance, mesh);
 			}
 		}
 		finishInstances();
 	}
 
 
-	void renderMeshes(const Array<Array<RenderableMesh>>& meshes)
+	void renderMeshes(const Array<Array<ModelInstanceMesh>>& meshes)
 	{
 		PROFILE_FUNCTION();
 		int mesh_count = 0;
 		for (auto& submeshes : meshes)
 		{
 			if(submeshes.empty()) continue;
-			Renderable* renderables = m_scene->getRenderables();
+			ModelInstance* model_instances = m_scene->getModelInstances();
 			mesh_count += submeshes.size();
 			for (auto& mesh : submeshes)
 			{
-				Renderable& renderable = renderables[mesh.renderable.index];
-				if (renderable.pose && renderable.pose->count > 0)
+				ModelInstance& model_instance = model_instances[mesh.model_instance.index];
+				if (model_instance.pose && model_instance.pose->count > 0)
 				{
-					renderSkinnedMesh(renderable, mesh);
+					renderSkinnedMesh(model_instance, mesh);
 				}
 				else
 				{
-					renderRigidMesh(renderable, mesh);
+					renderRigidMesh(model_instance, mesh);
 				}
 			}
 		}

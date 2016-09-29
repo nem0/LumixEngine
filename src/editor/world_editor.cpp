@@ -43,7 +43,7 @@ namespace Lumix
 {
 
 
-static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
 static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
 
 
@@ -1745,16 +1745,16 @@ public:
 		{
 			Entity entity = m_selected_entities[i];
 
-			ComponentUID renderable = getUniverse()->getComponent(m_selected_entities[i], RENDERABLE_TYPE);
+			ComponentUID model_instance = getUniverse()->getComponent(m_selected_entities[i], MODEL_INSTANCE_TYPE);
 			Vec3 origin = universe->getPosition(entity);
-			auto hit = m_render_interface->castRay(origin, Vec3(0, -1, 0), renderable.handle);
+			auto hit = m_render_interface->castRay(origin, Vec3(0, -1, 0), model_instance.handle);
 			if (hit.is_hit)
 			{
 				new_positions.push(origin + Vec3(0, -hit.t, 0));
 			}
 			else
 			{
-				hit = m_render_interface->castRay(origin, Vec3(0, 1, 0), renderable.handle);
+				hit = m_render_interface->castRay(origin, Vec3(0, 1, 0), model_instance.handle);
 				if (hit.is_hit)
 				{
 					new_positions.push(origin + Vec3(0, hit.t, 0));

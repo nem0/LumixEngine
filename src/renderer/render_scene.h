@@ -40,7 +40,7 @@ enum class RenderSceneVersion : int32
 	PARTICLE_EMITTERS_SPAWN_COUNT,
 	PARTICLES_FORCE_MODULE,
 	PARTICLES_SAVE_SIZE_ALPHA,
-	RENDERABLE_MATERIALS,
+	MODEL_INSTANCE_MATERIALS,
 	GLOBAL_LIGHT_SPECULAR,
 	SPECULAR_INTENSITY,
 	RENDER_PARAMS,
@@ -81,7 +81,7 @@ struct DecalInfo
 };
 
 
-struct Renderable
+struct ModelInstance
 {
 	Matrix matrix;
 	Model* model;
@@ -94,9 +94,9 @@ struct Renderable
 };
 
 
-struct RenderableMesh
+struct ModelInstanceMesh
 {
-	ComponentHandle renderable;
+	ComponentHandle model_instance;
 	Mesh* mesh;
 };
 
@@ -142,7 +142,7 @@ struct DebugPoint
 };
 
 
-enum class RenderableType
+enum class ModelInstanceType
 {
 	SKINNED_MESH,
 	RIGID_MESH,
@@ -318,26 +318,26 @@ public:
 	virtual float getParticleEmitterAttractorForce(ComponentHandle cmp) = 0;
 	virtual void setParticleEmitterAttractorForce(ComponentHandle cmp, float value) = 0;
 
-	virtual DelegateList<void(ComponentHandle)>& renderableCreated() = 0;
-	virtual DelegateList<void(ComponentHandle)>& renderableDestroyed() = 0;
-	virtual void showRenderable(ComponentHandle cmp) = 0;
-	virtual void hideRenderable(ComponentHandle cmp) = 0;
-	virtual ComponentHandle getRenderableComponent(Entity entity) = 0;
-	virtual Renderable* getRenderable(ComponentHandle cmp) = 0;
-	virtual Renderable* getRenderables() = 0;
-	virtual Path getRenderablePath(ComponentHandle cmp) = 0;
-	virtual void setRenderableMaterial(ComponentHandle cmp, int index, const Path& path) = 0;
-	virtual Path getRenderableMaterial(ComponentHandle cmp, int index) = 0;
-	virtual int getRenderableMaterialsCount(ComponentHandle cmp) = 0;
-	virtual void setRenderableLayer(ComponentHandle cmp, const int32& layer) = 0;
-	virtual void setRenderablePath(ComponentHandle cmp, const Path& path) = 0;
-	virtual Array<Array<RenderableMesh>>& getRenderableInfos(const Frustum& frustum,
+	virtual DelegateList<void(ComponentHandle)>& model_instanceCreated() = 0;
+	virtual DelegateList<void(ComponentHandle)>& model_instanceDestroyed() = 0;
+	virtual void showModelInstance(ComponentHandle cmp) = 0;
+	virtual void hideModelInstance(ComponentHandle cmp) = 0;
+	virtual ComponentHandle getModelInstanceComponent(Entity entity) = 0;
+	virtual ModelInstance* getModelInstance(ComponentHandle cmp) = 0;
+	virtual ModelInstance* getModelInstances() = 0;
+	virtual Path getModelInstancePath(ComponentHandle cmp) = 0;
+	virtual void setModelInstanceMaterial(ComponentHandle cmp, int index, const Path& path) = 0;
+	virtual Path getModelInstanceMaterial(ComponentHandle cmp, int index) = 0;
+	virtual int getModelInstanceMaterialsCount(ComponentHandle cmp) = 0;
+	virtual void setModelInstanceLayer(ComponentHandle cmp, const int32& layer) = 0;
+	virtual void setModelInstancePath(ComponentHandle cmp, const Path& path) = 0;
+	virtual Array<Array<ModelInstanceMesh>>& getModelInstanceInfos(const Frustum& frustum,
 		const Vec3& lod_ref_point) = 0;
-	virtual void getRenderableEntities(const Frustum& frustum, Array<Entity>& entities) = 0;
-	virtual Entity getRenderableEntity(ComponentHandle cmp) = 0;
-	virtual ComponentHandle getFirstRenderable() = 0;
-	virtual ComponentHandle getNextRenderable(ComponentHandle cmp) = 0;
-	virtual Model* getRenderableModel(ComponentHandle cmp) = 0;
+	virtual void getModelInstanceEntities(const Frustum& frustum, Array<Entity>& entities) = 0;
+	virtual Entity getModelInstanceEntity(ComponentHandle cmp) = 0;
+	virtual ComponentHandle getFirstModelInstance() = 0;
+	virtual ComponentHandle getNextModelInstance(ComponentHandle cmp) = 0;
+	virtual Model* getModelInstanceModel(ComponentHandle cmp) = 0;
 
 	virtual void setDecalMaterialPath(ComponentHandle cmp, const Path& path) = 0;
 	virtual Path getDecalMaterialPath(ComponentHandle cmp) = 0;
@@ -384,10 +384,10 @@ public:
 	virtual int getClosestPointLights(const Vec3& pos, ComponentHandle* lights, int max_lights) = 0;
 	virtual void getPointLights(const Frustum& frustum, Array<ComponentHandle>& lights) = 0;
 	virtual void getPointLightInfluencedGeometry(ComponentHandle light_cmp,
-		Array<RenderableMesh>& infos) = 0;
+		Array<ModelInstanceMesh>& infos) = 0;
 	virtual void getPointLightInfluencedGeometry(ComponentHandle light_cmp,
 		const Frustum& frustum,
-		Array<RenderableMesh>& infos) = 0;
+		Array<ModelInstanceMesh>& infos) = 0;
 	virtual void setLightCastShadows(ComponentHandle cmp, bool cast_shadows) = 0;
 	virtual bool getLightCastShadows(ComponentHandle cmp) = 0;
 	virtual float getLightAttenuation(ComponentHandle cmp) = 0;

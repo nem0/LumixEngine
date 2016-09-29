@@ -73,7 +73,7 @@ namespace Lumix
 
 static const ComponentType GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
 static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType("point_light");
-static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
 static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType MODEL_TYPE("model");
@@ -110,21 +110,21 @@ struct BonePropertyDescriptor : public IEnumPropertyDescriptor
 	}
 
 
-	ComponentHandle getRenderable(RenderScene* render_scene, ComponentHandle bone_attachment_cmp)
+	ComponentHandle getModelInstance(RenderScene* render_scene, ComponentHandle bone_attachment_cmp)
 	{
 		Entity parent_entity = render_scene->getBoneAttachmentParent(bone_attachment_cmp);
 		if (parent_entity == INVALID_ENTITY) return INVALID_COMPONENT;
-		ComponentHandle renderable = render_scene->getRenderableComponent(parent_entity);
-		return renderable;
+		ComponentHandle model_instance = render_scene->getModelInstanceComponent(parent_entity);
+		return model_instance;
 	}
 
 
 	int getEnumCount(IScene* scene, ComponentHandle cmp) override
 	{
 		auto* render_scene = static_cast<RenderScene*>(scene);
-		ComponentHandle renderable = getRenderable(render_scene, cmp);
-		if (renderable == INVALID_COMPONENT) return 0;
-		auto* model = render_scene->getRenderableModel(renderable);
+		ComponentHandle model_instance = getModelInstance(render_scene, cmp);
+		if (model_instance == INVALID_COMPONENT) return 0;
+		auto* model = render_scene->getModelInstanceModel(model_instance);
 		if (!model || !model->isReady()) return 0;
 		return model->getBoneCount();
 	}
@@ -133,9 +133,9 @@ struct BonePropertyDescriptor : public IEnumPropertyDescriptor
 	const char* getEnumItemName(IScene* scene, ComponentHandle cmp, int index) override
 	{
 		auto* render_scene = static_cast<RenderScene*>(scene);
-		ComponentHandle renderable = getRenderable(render_scene, cmp);
-		if (renderable == INVALID_COMPONENT) return "";
-		auto* model = render_scene->getRenderableModel(renderable);
+		ComponentHandle model_instance = getModelInstance(render_scene, cmp);
+		if (model_instance == INVALID_COMPONENT) return "";
+		auto* model = render_scene->getModelInstanceModel(model_instance);
 		if (!model) return "";
 		return model->getBone(index).name.c_str();
 	}
@@ -271,16 +271,16 @@ static void registerProperties(IAllocator& allocator)
 
 	PropertyRegister::add("renderable",
 		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)(
-			"Source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)", MODEL_TYPE));
+			"Source", &RenderScene::getModelInstancePath, &RenderScene::setModelInstancePath, "Mesh (*.msh)", MODEL_TYPE));
 
-	auto renderable_material = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)(
-		"Materials", &RenderScene::getRenderableMaterialsCount, nullptr, nullptr, allocator);
-	renderable_material->addChild(LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",
-		&RenderScene::getRenderableMaterial,
-		&RenderScene::setRenderableMaterial,
+	auto model_instance_material = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)(
+		"Materials", &RenderScene::getModelInstanceMaterialsCount, nullptr, nullptr, allocator);
+	model_instance_material->addChild(LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",
+		&RenderScene::getModelInstanceMaterial,
+		&RenderScene::setModelInstanceMaterial,
 		"Material (*.mat)",
 		MATERIAL_TYPE));
-	PropertyRegister::add("renderable", renderable_material);
+	PropertyRegister::add("renderable", model_instance_material);
 
 	PropertyRegister::add("global_light",
 		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)(

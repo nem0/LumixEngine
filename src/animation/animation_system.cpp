@@ -284,11 +284,11 @@ struct AnimationSceneImpl : public AnimationScene
 
 	void updateMixer(Mixer& mixer, float time_delta)
 	{
-		ComponentHandle renderable = m_render_scene->getRenderableComponent(mixer.entity);
-		if (renderable == INVALID_COMPONENT) return;
+		ComponentHandle model_instance = m_render_scene->getModelInstanceComponent(mixer.entity);
+		if (model_instance == INVALID_COMPONENT) return;
 
-		auto* pose = m_render_scene->getPose(renderable);
-		auto* model = m_render_scene->getRenderableModel(renderable);
+		auto* pose = m_render_scene->getPose(model_instance);
+		auto* model = m_render_scene->getModelInstanceModel(model_instance);
 
 		if (!pose) return;
 		if (!model->isReady()) return;
@@ -317,11 +317,11 @@ struct AnimationSceneImpl : public AnimationScene
 	void updateAnimable(Animable& animable, float time_delta)
 	{
 		if (!animable.animation || !animable.animation->isReady()) return;
-		ComponentHandle renderable = m_render_scene->getRenderableComponent(animable.entity);
-		if (renderable == INVALID_COMPONENT) return;
+		ComponentHandle model_instance = m_render_scene->getModelInstanceComponent(animable.entity);
+		if (model_instance == INVALID_COMPONENT) return;
 
-		auto* pose = m_render_scene->getPose(renderable);
-		auto* model = m_render_scene->getRenderableModel(renderable);
+		auto* pose = m_render_scene->getPose(model_instance);
+		auto* model = m_render_scene->getModelInstanceModel(model_instance);
 
 		if (!pose) return;
 		if (!model->isReady()) return;

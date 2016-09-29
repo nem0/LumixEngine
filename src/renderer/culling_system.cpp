@@ -13,8 +13,8 @@
 namespace Lumix
 {
 typedef Array<int64> LayerMasks;
-typedef Array<int> RenderabletoSphereMap;
-typedef Array<ComponentHandle> SphereToRenderableMap;
+typedef Array<int> ModelInstancetoSphereMap;
+typedef Array<ComponentHandle> SphereToModelInstanceMap;
 
 static const int MIN_ENTITIES_PER_THREAD = 50;
 
@@ -23,7 +23,7 @@ static void doCulling(int start_index,
 	const Sphere* LUMIX_RESTRICT end,
 	const Frustum* LUMIX_RESTRICT frustum,
 	const int64* LUMIX_RESTRICT layer_masks,
-	const ComponentHandle* LUMIX_RESTRICT sphere_to_renderable_map,
+	const ComponentHandle* LUMIX_RESTRICT sphere_to_model_instance_map,
 	int64 layer_mask,
 	CullingSystem::Subresults& results)
 {
@@ -61,7 +61,7 @@ static void doCulling(int start_index,
 		t = f4Sub(t, r);
 		if (f4MoveMask(t)) continue;
 
-		results.push(sphere_to_renderable_map[i]);
+		results.push(sphere_to_model_instance_map[i]);
 	}
 }
 
@@ -70,7 +70,7 @@ class CullingJob : public MTJD::Job
 public:
 	CullingJob(const CullingSystem::InputSpheres& spheres,
 		const LayerMasks& layer_masks,
-		const SphereToRenderableMap& sphere_to_renderable_map,
+		const SphereToModelInstanceMap& sphere_to_model_instance_map,
 		int64 layer_mask,
 		CullingSystem::Subresults& results,
 		int start,
@@ -87,7 +87,7 @@ public:
 		, m_frustum(frustum)
 		, m_layer_masks(layer_masks)
 		, m_layer_mask(layer_mask)
-		, m_sphere_to_renderable_map(sphere_to_renderable_map)
+		, m_sphere_to_model_instance_map(sphere_to_model_instance_map)
 	{
 		setJobName("CullingJob");
 		m_results.reserve(end - start);
@@ -105,7 +105,7 @@ public:
 			&m_spheres[m_end],
 			&m_frustum,
 			&m_layer_masks[0],
-			&m_sphere_to_renderable_map[0],
+			&m_sphere_to_model_instance_map[0],
 			m_layer_mask,
 			m_results);
 		m_is_executed = true;
@@ -115,7 +115,7 @@ private:
 	const CullingSystem::InputSpheres& m_spheres;
 	CullingSystem::Subresults& m_results;
 	const LayerMasks& m_layer_masks;
-	const SphereToRenderableMap& m_sphere_to_renderable_map;
+	const SphereToModelInstanceMap& m_sphere_to_model_instance_map;
 	int64 m_layer_mask;
 	int m_start;
 	int m_end;
@@ -134,12 +134,12 @@ public:
 		, m_sync_point(true, allocator)
 		, m_mtjd_manager(mtjd_manager)
 		, m_layer_masks(m_allocator)
-		, m_sphere_to_renderable_map(m_allocator)
-		, m_renderable_to_sphere_map(m_allocator)
+		, m_sphere_to_model_instance_map(m_allocator)
+		, m_model_instance_to_sphere_map(m_allocator)
 	{
 		m_result.emplace(m_allocator);
-		m_renderable_to_sphere_map.reserve(5000);
-		m_sphere_to_renderable_map.reserve(5000);
+		m_model_instance_to_sphere_map.reserve(5000);
+		m_sphere_to_model_instance_map.reserve(5000);
 		m_spheres.reserve(5000);
 		int cpu_count = (int)m_mtjd_manager.getCpuThreadsCount();
 		while (m_result.size() < cpu_count)
@@ -153,8 +153,8 @@ public:
 	{
 		m_spheres.clear();
 		m_layer_masks.clear();
-		m_renderable_to_sphere_map.clear();
-		m_sphere_to_renderable_map.clear();
+		m_model_instance_to_sphere_map.clear();
+		m_sphere_to_model_instance_map.clear();
 	}
 
 
@@ -184,7 +184,7 @@ public:
 				&m_spheres.back(),
 				&frustum,
 				&m_layer_masks[0],
-				&m_sphere_to_renderable_map[0],
+				&m_sphere_to_model_instance_map[0],
 				layer_mask,
 				m_result[0]);
 		}
@@ -223,7 +223,7 @@ public:
 			m_result[i].clear();
 			CullingJob* cj = LUMIX_NEW(m_job_allocator, CullingJob)(m_spheres,
 				m_layer_masks,
-				m_sphere_to_renderable_map,
+				m_sphere_to_model_instance_map,
 				layer_mask,
 				m_result[i],
 				i * step,
@@ -239,7 +239,7 @@ public:
 		m_result[i].clear();
 		CullingJob* cj = LUMIX_NEW(m_job_allocator, CullingJob)(m_spheres,
 			m_layer_masks,
-			m_sphere_to_renderable_map,
+			m_sphere_to_model_instance_map,
 			layer_mask,
 			m_result[i],
 			i * step,
@@ -258,87 +258,87 @@ public:
 	}
 
 
-	void setLayerMask(ComponentHandle renderable, int64 layer) override
+	void setLayerMask(ComponentHandle model_instance, int64 layer) override
 	{
-		m_layer_masks[m_renderable_to_sphere_map[renderable.index]] = layer;
+		m_layer_masks[m_model_instance_to_sphere_map[model_instance.index]] = layer;
 	}
 
 
-	int64 getLayerMask(ComponentHandle renderable) override
+	int64 getLayerMask(ComponentHandle model_instance) override
 	{
-		return m_layer_masks[m_renderable_to_sphere_map[renderable.index]];
+		return m_layer_masks[m_model_instance_to_sphere_map[model_instance.index]];
 	}
 
 
-	bool isAdded(ComponentHandle renderable) override
+	bool isAdded(ComponentHandle model_instance) override
 	{
-		return renderable.index < m_renderable_to_sphere_map.size() && m_renderable_to_sphere_map[renderable.index] != -1;
+		return model_instance.index < m_model_instance_to_sphere_map.size() && m_model_instance_to_sphere_map[model_instance.index] != -1;
 	}
 
 
-	void addStatic(ComponentHandle renderable, const Sphere& sphere) override
+	void addStatic(ComponentHandle model_instance, const Sphere& sphere) override
 	{
-		if (renderable.index < m_renderable_to_sphere_map.size() && m_renderable_to_sphere_map[renderable.index] != -1)
+		if (model_instance.index < m_model_instance_to_sphere_map.size() && m_model_instance_to_sphere_map[model_instance.index] != -1)
 		{
 			ASSERT(false);
 			return;
 		}
 
 		m_spheres.push(sphere);
-		m_sphere_to_renderable_map.push(renderable);
-		while(renderable.index >= m_renderable_to_sphere_map.size())
+		m_sphere_to_model_instance_map.push(model_instance);
+		while(model_instance.index >= m_model_instance_to_sphere_map.size())
 		{
-			m_renderable_to_sphere_map.push(-1);
+			m_model_instance_to_sphere_map.push(-1);
 		}
-		m_renderable_to_sphere_map[renderable.index] = m_spheres.size() - 1;
+		m_model_instance_to_sphere_map[model_instance.index] = m_spheres.size() - 1;
 		m_layer_masks.push(1);
 	}
 
 
-	void removeStatic(ComponentHandle renderable) override
+	void removeStatic(ComponentHandle model_instance) override
 	{
-		int index = m_renderable_to_sphere_map[renderable.index];
+		int index = m_model_instance_to_sphere_map[model_instance.index];
 		if (index < 0) return;
 		ASSERT(index < m_spheres.size());
 
-		m_renderable_to_sphere_map[m_sphere_to_renderable_map.back().index] = index;
+		m_model_instance_to_sphere_map[m_sphere_to_model_instance_map.back().index] = index;
 		m_spheres[index] = m_spheres.back();
-		m_sphere_to_renderable_map[index] = m_sphere_to_renderable_map.back();
+		m_sphere_to_model_instance_map[index] = m_sphere_to_model_instance_map.back();
 		m_layer_masks[index] = m_layer_masks.back();
 
 		m_spheres.pop();
-		m_sphere_to_renderable_map.pop();
+		m_sphere_to_model_instance_map.pop();
 		m_layer_masks.pop();
-		m_renderable_to_sphere_map[renderable.index] = -1;
+		m_model_instance_to_sphere_map[model_instance.index] = -1;
 	}
 
 
-	void updateBoundingSphere(const Sphere& sphere, ComponentHandle renderable) override
+	void updateBoundingSphere(const Sphere& sphere, ComponentHandle model_instance) override
 	{
-		int idx = m_renderable_to_sphere_map[renderable.index];
+		int idx = m_model_instance_to_sphere_map[model_instance.index];
 		if (idx >= 0) m_spheres[idx] = sphere;
 	}
 
 
-	void insert(const InputSpheres& spheres, const Array<ComponentHandle>& renderables) override
+	void insert(const InputSpheres& spheres, const Array<ComponentHandle>& model_instances) override
 	{
 		for (int i = 0; i < spheres.size(); i++)
 		{
 			m_spheres.push(spheres[i]);
-			while(m_renderable_to_sphere_map.size() <= renderables[i].index)
+			while(m_model_instance_to_sphere_map.size() <= model_instances[i].index)
 			{
-				m_renderable_to_sphere_map.push(-1);
+				m_model_instance_to_sphere_map.push(-1);
 			}
-			m_renderable_to_sphere_map[renderables[i].index] = m_spheres.size() - 1;
-			m_sphere_to_renderable_map.push(renderables[i]);
+			m_model_instance_to_sphere_map[model_instances[i].index] = m_spheres.size() - 1;
+			m_sphere_to_model_instance_map.push(model_instances[i]);
 			m_layer_masks.push(1);
 		}
 	}
 
 
-	const Sphere& getSphere(ComponentHandle renderable) override
+	const Sphere& getSphere(ComponentHandle model_instance) override
 	{
-		return m_spheres[m_renderable_to_sphere_map[renderable.index]];
+		return m_spheres[m_model_instance_to_sphere_map[model_instance.index]];
 	}
 
 
@@ -348,8 +348,8 @@ private:
 	InputSpheres m_spheres;
 	Results m_result;
 	LayerMasks m_layer_masks;
-	RenderabletoSphereMap m_renderable_to_sphere_map;
-	SphereToRenderableMap m_sphere_to_renderable_map;
+	ModelInstancetoSphereMap m_model_instance_to_sphere_map;
+	SphereToModelInstanceMap m_sphere_to_model_instance_map;
 
 	MTJD::Manager& m_mtjd_manager;
 	MTJD::Group m_sync_point;
