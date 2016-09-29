@@ -519,6 +519,10 @@ public:
 		univ->setRotation({entity_index}, Quat(axis, angle));
 	}
 
+	static void LUA_unloadResource(EngineImpl* engine, int resource_idx)
+	{
+		engine->unloadLuaResource(resource_idx);
+	}
 
 	static int LUA_loadResource(EngineImpl* engine, const char* path, const char* type)
 	{
@@ -673,6 +677,7 @@ public:
 				&LuaWrapper::wrap<decltype(&LUA_##name), LUA_##name>); \
 
 		REGISTER_FUNCTION(loadResource);
+		REGISTER_FUNCTION(unloadResource);
 		REGISTER_FUNCTION(createComponent);
 		REGISTER_FUNCTION(createEntity);
 		REGISTER_FUNCTION(setEntityPosition);
