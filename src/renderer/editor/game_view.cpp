@@ -131,10 +131,15 @@ void GameView::setScene(Lumix::RenderScene* scene)
 
 void GameView::captureMouse(bool capture)
 {
+	if (m_is_mouse_captured == capture) return;
+
 	m_is_mouse_captured = capture;
 	m_editor->getEngine().getInputSystem().enable(m_is_mouse_captured);
 	SDL_ShowCursor(capture && !m_is_ingame_cursor ? 0 : 1);
 	SDL_SetRelativeMouseMode(capture && !m_is_ingame_cursor ? SDL_TRUE : SDL_FALSE);
+	if (capture) SDL_GetMouseState(&m_captured_mouse_x, &m_captured_mouse_y);
+	else SDL_WarpMouseInWindow(nullptr, m_captured_mouse_x, m_captured_mouse_y);
+	if (!capture) PlatformInterface::unclipCursor();
 }
 
 
@@ -162,13 +167,8 @@ void GameView::onGui()
 		auto size = ImGui::GetContentRegionAvail();
 		size.y -= ImGui::GetTextLineHeightWithSpacing();
 		ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
-		ImVec2 pos;
 		if (size.x > 0 && size.y > 0)
 		{
-			pos = ImGui::GetWindowPos();
-			m_pos.x = pos.x;
-			m_pos.y = pos.y;
-			auto cp = ImGui::GetCursorPos();
 			m_pipeline->setViewport(0, 0, int(size.x), int(size.y));
 
 			auto* fb = m_pipeline->getFramebuffer("default");
@@ -181,6 +181,8 @@ void GameView::onGui()
 			{
 				ImGui::Image(&m_texture_handle, size);
 			}
+			m_pos.x = ImGui::GetItemRectMin().x;
+			m_pos.y = ImGui::GetItemRectMin().y;
 			m_size.x = ImGui::GetItemRectSize().x;
 			m_size.y = ImGui::GetItemRectSize().y;
 

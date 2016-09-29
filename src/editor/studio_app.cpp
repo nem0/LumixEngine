@@ -370,7 +370,8 @@ public:
 		io.KeyAlt = ((SDL_GetModState() & KMOD_ALT) != 0);
 
 		ImGui::NewFrame();
-		
+		ImGui::PushFont(m_font);
+
 		if (m_drag_data.type == DragData::PATH)
 		{
 			ImGui::BeginTooltip();
@@ -434,6 +435,7 @@ public:
 			}
 			m_settings.onGUI();
 		}
+		ImGui::PopFont();
 		ImGui::Render();
 
 		if (ImGui::GetIO().MouseReleased[0])
@@ -1364,7 +1366,7 @@ public:
 	void initIMGUI()
 	{
 		ImGuiIO& io = ImGui::GetIO();
-		io.Fonts->AddFontFromFileTTF("bin/VeraMono.ttf", 13);
+		m_font = io.Fonts->AddFontFromFileTTF("bin/VeraMono.ttf", 13);
 
 		io.KeyMap[ImGuiKey_Tab] = SDLK_TAB;
 		io.KeyMap[ImGuiKey_LeftArrow] = SDL_SCANCODE_LEFT;
@@ -2182,6 +2184,7 @@ public:
 	bool m_is_entity_list_opened;
 	bool m_is_entity_template_list_opened;
 	DragData m_drag_data;
+	ImFont* m_font;
 };
 
 
