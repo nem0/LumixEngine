@@ -1,6 +1,7 @@
-#include "engine/lumix.h"
 #include "engine/resource_manager_base.h"
 #include "engine/crc32.h"
+#include "engine/log.h"
+#include "engine/lumix.h"
 #include "engine/path.h"
 #include "engine/path_utils.h"
 #include "engine/resource.h"
@@ -20,7 +21,11 @@ namespace Lumix
 		for (auto iter = m_resources.begin(), end = m_resources.end(); iter != end; ++iter)
 		{
 			Resource* resource = iter.value();
-			ASSERT(resource->isEmpty());
+			if (!resource->isEmpty())
+			{
+				g_log_error.log("Engine") << "Leaking resource " << resource->getPath().c_str();
+				ASSERT(false);
+			}
 			destroyResource(*resource);
 		}
 		m_resources.clear();

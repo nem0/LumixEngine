@@ -405,9 +405,9 @@ struct AnimationSystemImpl : public IPlugin
 	explicit AnimationSystemImpl(Engine& engine)
 		: m_allocator(engine.getAllocator())
 		, m_engine(engine)
-		, animation_manager(m_allocator)
+		, m_animation_manager(m_allocator)
 	{
-		animation_manager.create(ANIMATION_TYPE, m_engine.getResourceManager());
+		m_animation_manager.create(ANIMATION_TYPE, m_engine.getResourceManager());
 
 		PropertyRegister::add("animable",
 			LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationSceneImpl>)("Animation",
@@ -423,6 +423,12 @@ struct AnimationSystemImpl : public IPlugin
 				"Time scale", &AnimationSceneImpl::getTimeScale, &AnimationSceneImpl::setTimeScale, 0, FLT_MAX, 0.1f));
 
 		registerLuaAPI();
+	}
+
+
+	~AnimationSystemImpl()
+	{
+		m_animation_manager.destroy();
 	}
 
 
@@ -456,7 +462,7 @@ struct AnimationSystemImpl : public IPlugin
 
 	Lumix::IAllocator& m_allocator;
 	Engine& m_engine;
-	AnimationManager animation_manager;
+	AnimationManager m_animation_manager;
 
 private:
 	void operator=(const AnimationSystemImpl&);

@@ -667,6 +667,7 @@ public:
 			LUMIX_DELETE(m_allocator, m_patch_file_device);
 		}
 
+		m_prefab_resource_manager.destroy();
 		m_resource_manager.destroy();
 		MTJD::Manager::destroy(*m_mtjd_manager);
 		lua_close(m_state);
