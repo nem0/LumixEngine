@@ -690,8 +690,6 @@ public:
 		REGISTER_FUNCTION(hasFilesystemWork);
 		REGISTER_FUNCTION(processFilesystemWork);
 		REGISTER_FUNCTION(destroyEntity);
-		REGISTER_FUNCTION(preloadPrefab);
-		REGISTER_FUNCTION(unloadPrefab);
 		REGISTER_FUNCTION(getComponent);
 		REGISTER_FUNCTION(getComponentType);
 		REGISTER_FUNCTION(multMatrixVec);
@@ -1207,18 +1205,6 @@ public:
 	}
 
 
-	static void LUA_unloadPrefab(EngineImpl* engine, PrefabResource* prefab)
-	{
-		engine->m_prefab_resource_manager.unload(*prefab);
-	}
-
-
-	static PrefabResource* LUA_preloadPrefab(EngineImpl* engine, const char* path)
-	{
-		return static_cast<PrefabResource*>(engine->m_prefab_resource_manager.load(Path(path)));
-	}
-
-
 	ComponentUID createComponent(Universe& universe, Entity entity, ComponentType type)
 	{
 		ComponentUID cmp;
@@ -1279,7 +1265,8 @@ public:
 		auto* engine = LuaWrapper::checkArg<EngineImpl*>(L, 1);
 		auto* universe = LuaWrapper::checkArg<Universe*>(L, 2);
 		Vec3 position = LuaWrapper::checkArg<Vec3>(L, 3);
-		auto* prefab = LuaWrapper::checkArg<PrefabResource*>(L, 4);
+		int prefab_id = LuaWrapper::checkArg<int>(L, 4);
+		PrefabResource* prefab = static_cast<PrefabResource*>(engine->getLuaResource(prefab_id));
 		ASSERT(prefab->isReady());
 		if (!prefab->isReady())
 		{
