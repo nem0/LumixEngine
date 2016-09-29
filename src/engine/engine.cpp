@@ -11,6 +11,7 @@
 #include "engine/lifo_allocator.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
+#include "engine/lua_wrapper.h"
 #include "engine/math_utils.h"
 #include "engine/mtjd/manager.h"
 #include "engine/path.h"
@@ -23,10 +24,166 @@
 #include "engine/timer.h"
 #include "engine/universe/hierarchy.h"
 #include "engine/universe/universe.h"
+#include <imgui/imgui.h>
 
 
 namespace Lumix
 {
+
+namespace LuaImGUI
+{
+
+int DragFloat(lua_State* L)
+{
+	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
+	float value = LuaWrapper::checkArg<float>(L, 2);
+	bool changed = ImGui::DragFloat(name, &value);
+	lua_pushboolean(L, changed);
+	lua_pushnumber(L, value);
+	return 2;
+}
+
+
+int SetStyleColor(lua_State* L)
+{
+	auto& style = ImGui::GetStyle();
+	int index = LuaWrapper::checkArg<int>(L, 1);
+	ImVec4 color;
+	color.x = LuaWrapper::checkArg<float>(L, 2);
+	color.y = LuaWrapper::checkArg<float>(L, 3);
+	color.z = LuaWrapper::checkArg<float>(L, 4);
+	color.w = LuaWrapper::checkArg<float>(L, 5);
+	style.Colors[index] = color;
+	return 0;
+}
+
+
+int SliderFloat(lua_State* L)
+{
+	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
+	float value = LuaWrapper::checkArg<float>(L, 2);
+	float min = LuaWrapper::checkArg<float>(L, 3);
+	float max = LuaWrapper::checkArg<float>(L, 4);
+	bool changed = ImGui::SliderFloat(name, &value, min, max, "");
+	lua_pushboolean(L, changed);
+	lua_pushnumber(L, value);
+	return 2;
+}
+
+
+int Text(lua_State* L)
+{
+	auto* text = LuaWrapper::checkArg<const char*>(L, 1);
+	ImGui::Text("%s", text);
+	return 0;
+}
+
+
+int Button(lua_State* L)
+{
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	ImVec2 size(0, 0);
+	if (lua_gettop(L) > 2)
+	{
+		size.x = LuaWrapper::checkArg<float>(L, 2);
+		size.y = LuaWrapper::checkArg<float>(L, 3);
+	}
+	bool clicked = ImGui::Button(label, size);
+	lua_pushboolean(L, clicked);
+	return 1;
+}
+
+
+int Checkbox(lua_State* L)
+{
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	bool b = LuaWrapper::checkArg<bool>(L, 2);
+	bool clicked = ImGui::Checkbox(label, &b);
+	lua_pushboolean(L, clicked);
+	lua_pushboolean(L, b);
+	return 2;
+}
+
+
+int Image(lua_State* L)
+{
+	auto* texture_id = LuaWrapper::checkArg<void*>(L, 1);
+	float size_x = LuaWrapper::checkArg<float>(L, 2);
+	float size_y = LuaWrapper::checkArg<float>(L, 3);
+	ImGui::Image(texture_id, ImVec2(size_x, size_y));
+	return 0;
+}
+
+
+int SetNextWindowPosCenter(lua_State* L)
+{
+	ImGui::SetNextWindowPosCenter();
+	return 0;
+}
+
+
+int SetNextWindowSize(lua_State* L)
+{
+	ImVec2 size;
+	size.x = LuaWrapper::checkArg<float>(L, 1);
+	size.y = LuaWrapper::checkArg<float>(L, 2);
+	ImGui::SetNextWindowSize(size);
+	return 0;
+}
+
+
+int Begin(lua_State* L)
+{
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	ImGuiWindowFlags flags = 0;
+	if (lua_gettop(L) > 1)
+	{
+		flags = LuaWrapper::checkArg<int>(L, 2);
+	}
+	bool res = ImGui::Begin(label, nullptr, flags);
+	lua_pushboolean(L, res);
+	return 1;
+}
+
+
+int BeginChildFrame(lua_State* L)
+{
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	ImVec2 size(0, 0);
+	if (lua_gettop(L) > 1)
+	{
+		size.x = LuaWrapper::checkArg<float>(L, 2);
+		size.y = LuaWrapper::checkArg<float>(L, 3);
+	}
+	bool res = ImGui::BeginChildFrame(ImGui::GetID(label), size);
+	lua_pushboolean(L, res);
+	return 1;
+}
+
+
+int BeginDock(lua_State* L)
+{
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	bool res = ImGui::BeginDock(label);
+	lua_pushboolean(L, res);
+	return 1;
+}
+
+
+int SameLine(lua_State* L)
+{
+	ImGui::SameLine();
+	return 0;
+}
+
+
+void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
+{
+	lua_pushvalue(L, -1);
+	lua_pushcfunction(L, f);
+	lua_setfield(L, -2, name);
+}
+}
 
 static const uint32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
 static const ResourceType PREFAB_TYPE("prefab");
@@ -557,6 +714,45 @@ public:
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_RTHUMB_Y", InputSystem::RTHUMB_Y);
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_RTRIGGER", InputSystem::RTRIGGER);
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_LTRIGGER", InputSystem::LTRIGGER);
+
+		lua_newtable(m_state);
+		lua_pushvalue(m_state, -1);
+		lua_setglobal(m_state, "ImGui");
+
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "WindowFlags_NoMove", ImGuiWindowFlags_NoMove);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "WindowFlags_NoCollapse", ImGuiWindowFlags_NoCollapse);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "WindowFlags_NoResize", ImGuiWindowFlags_NoResize);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "WindowFlags_NoTitleBar", ImGuiWindowFlags_NoTitleBar);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "WindowFlags_NoScrollbar", ImGuiWindowFlags_NoScrollbar);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "WindowFlags_AlwaysAutoResize", ImGuiWindowFlags_AlwaysAutoResize);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "Col_FrameBg", ImGuiCol_FrameBg);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "Col_WindowBg", ImGuiCol_WindowBg);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "Col_Button", ImGuiCol_Button);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "Col_ButtonActive", ImGuiCol_ButtonActive);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "Col_ButtonHovered", ImGuiCol_ButtonHovered);
+		LuaImGUI::registerCFunction(m_state, "SetStyleColor", &LuaImGUI::SetStyleColor);
+		LuaImGUI::registerCFunction(m_state, "DragFloat", &LuaImGUI::DragFloat);
+		LuaImGUI::registerCFunction(m_state, "SliderFloat", &LuaImGUI::SliderFloat);
+		LuaImGUI::registerCFunction(m_state, "Button", &LuaImGUI::Button);
+		LuaImGUI::registerCFunction(m_state, "Text", &LuaImGUI::Text);
+		LuaImGUI::registerCFunction(m_state, "Checkbox", &LuaImGUI::Checkbox);
+		LuaImGUI::registerCFunction(m_state, "SameLine", &LuaImGUI::SameLine);
+		LuaImGUI::registerCFunction(m_state, "Begin", &LuaImGUI::Begin);
+		LuaImGUI::registerCFunction(m_state, "BeginDock", LuaImGUI::BeginDock);
+		LuaImGUI::registerCFunction(m_state, "BeginChildFrame", &LuaImGUI::BeginChildFrame);
+		LuaImGUI::registerCFunction(m_state, "SetNextWindowPosCenter", &LuaImGUI::SetNextWindowPosCenter);
+		LuaImGUI::registerCFunction(m_state, "SetNextWindowSize", &LuaImGUI::SetNextWindowSize);
+		LuaImGUI::registerCFunction(m_state, "BeginPopup", &LuaWrapper::wrap<decltype(&ImGui::BeginPopup), &ImGui::BeginPopup>);
+		LuaImGUI::registerCFunction(m_state, "EndPopup", &LuaWrapper::wrap<decltype(&ImGui::EndPopup), &ImGui::EndPopup>);
+		LuaImGUI::registerCFunction(m_state, "OpenPopup", &LuaWrapper::wrap<decltype(&ImGui::OpenPopup), &ImGui::OpenPopup>);
+		LuaImGUI::registerCFunction(m_state, "EndDock", &LuaWrapper::wrap<decltype(&ImGui::EndDock), &ImGui::EndDock>);
+		LuaImGUI::registerCFunction(m_state, "End", &LuaWrapper::wrap<decltype(&ImGui::End), &ImGui::End>);
+		LuaImGUI::registerCFunction(m_state, "EndChildFrame", &LuaWrapper::wrap<decltype(&ImGui::EndChildFrame), &ImGui::EndChildFrame>);
+		LuaImGUI::registerCFunction(m_state, "PushItemWidth", &LuaWrapper::wrap<decltype(&ImGui::PushItemWidth), &ImGui::PushItemWidth>);
+		LuaImGUI::registerCFunction(m_state, "PopItemWidth", &LuaWrapper::wrap<decltype(&ImGui::PopItemWidth), &ImGui::PopItemWidth>);
+		LuaImGUI::registerCFunction(m_state, "Image", &LuaWrapper::wrap<decltype(&LuaImGUI::Image), &LuaImGUI::Image>);
+
+		lua_pop(m_state, 1);
 
 		installLuaPackageLoader();
 	}
