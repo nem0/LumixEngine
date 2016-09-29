@@ -16,7 +16,7 @@ namespace Lumix
 {
 
 
-static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
 static const ComponentType PHYSICAL_CONTROLLER_TYPE = PropertyRegister::getComponentType("physical_controller");
 static const ComponentType BOX_RIGID_ACTOR_TYPE = PropertyRegister::getComponentType("box_rigid_actor");
 static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
@@ -134,7 +134,7 @@ struct EditorIconsImpl : public EditorIcons
 
 		Universe& universe = *m_editor.getUniverse();
 		
-		if (universe.getComponent(entity, RENDERABLE_TYPE).isValid()) return;
+		if (universe.getComponent(entity, MODEL_INSTANCE_TYPE).isValid()) return;
 
 		auto& icon = m_icons.emplace();
 		icon.entity = entity;

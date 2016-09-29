@@ -49,7 +49,7 @@ public:
 	virtual void addDebugCross(const Vec3& pos, float size, uint32 color, float life) = 0;
 	virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32 color, float life) = 0;
 	virtual WorldEditor::RayHit castRay(const Vec3& origin, const Vec3& dir, ComponentHandle ignored) = 0;
-	virtual Path getRenderablePath(ComponentHandle cmp) = 0;
+	virtual Path getModelInstancePath(ComponentHandle cmp) = 0;
 	virtual void render(const Matrix& mtx,
 		uint16* indices,
 		int indices_count,

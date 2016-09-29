@@ -286,16 +286,16 @@ struct NavigationSceneImpl : public NavigationScene
 
 		uint32 no_navigation_flag = Material::getCustomFlag("no_navigation");
 		uint32 nonwalkable_flag = Material::getCustomFlag("nonwalkable");
-		for (auto renderable = render_scene->getFirstRenderable(); renderable != INVALID_COMPONENT;
-			 renderable = render_scene->getNextRenderable(renderable))
+		for (auto model_instance = render_scene->getFirstModelInstance(); model_instance != INVALID_COMPONENT;
+			 model_instance = render_scene->getNextModelInstance(model_instance))
 		{
-			auto* model = render_scene->getRenderableModel(renderable);
+			auto* model = render_scene->getModelInstanceModel(model_instance);
 			if (!model) return;
 			ASSERT(model->isReady());
 
 			bool is16 = model->areIndices16();
 
-			Entity entity = render_scene->getRenderableEntity(renderable);
+			Entity entity = render_scene->getModelInstanceEntity(model_instance);
 			Matrix mtx = m_universe.getMatrix(entity);
 			AABB model_aabb = model->getAABB();
 			model_aabb.transform(mtx);
@@ -1125,15 +1125,15 @@ struct NavigationSceneImpl : public NavigationScene
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 
-		for (auto renderable = render_scene->getFirstRenderable(); renderable != INVALID_COMPONENT;
-			renderable = render_scene->getNextRenderable(renderable))
+		for (auto model_instance = render_scene->getFirstModelInstance(); model_instance != INVALID_COMPONENT;
+			model_instance = render_scene->getNextModelInstance(model_instance))
 		{
-			auto* model = render_scene->getRenderableModel(renderable);
+			auto* model = render_scene->getModelInstanceModel(model_instance);
 			if (!model) continue;
 			ASSERT(model->isReady());
 
 			AABB model_bb = model->getAABB();
-			Matrix mtx = m_universe.getMatrix(render_scene->getRenderableEntity(renderable));
+			Matrix mtx = m_universe.getMatrix(render_scene->getModelInstanceEntity(model_instance));
 			model_bb.transform(mtx);
 			m_aabb.merge(model_bb);
 		}

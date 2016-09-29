@@ -2704,21 +2704,21 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	pipeline->load();
 
 	auto mesh_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
-	static const auto RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
-	auto mesh_cmp = render_scene->createComponent(RENDERABLE_TYPE, mesh_entity);
-	render_scene->setRenderablePath(mesh_cmp, mesh_path);
+	static const auto MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
+	auto mesh_cmp = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
+	render_scene->setModelInstancePath(mesh_cmp, mesh_path);
 
 	auto mesh_left_entity = universe.createEntity({ 0, 0, 0 }, { Vec3(0, 1, 0), Math::PI * 0.5f });
-	auto mesh_left_cmp = render_scene->createComponent(RENDERABLE_TYPE, mesh_left_entity);
-	render_scene->setRenderablePath(mesh_left_cmp, mesh_path);
+	auto mesh_left_cmp = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_left_entity);
+	render_scene->setModelInstancePath(mesh_left_cmp, mesh_path);
 
 	auto mesh_back_entity = universe.createEntity({ 0, 0, 0 }, { Vec3(0, 1, 0), Math::PI });
-	auto mesh_back_cmp = render_scene->createComponent(RENDERABLE_TYPE, mesh_back_entity);
-	render_scene->setRenderablePath(mesh_back_cmp, mesh_path);
+	auto mesh_back_cmp = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_back_entity);
+	render_scene->setModelInstancePath(mesh_back_cmp, mesh_path);
 
 	auto mesh_right_entity = universe.createEntity({ 0, 0, 0 }, { Vec3(0, 1, 0), Math::PI * 1.5f});
-	auto mesh_right_cmp = render_scene->createComponent(RENDERABLE_TYPE, mesh_right_entity);
-	render_scene->setRenderablePath(mesh_right_cmp, mesh_path);
+	auto mesh_right_cmp = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_right_entity);
+	render_scene->setModelInstancePath(mesh_right_cmp, mesh_path);
 
 	auto light_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
 	static const auto GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
@@ -2728,7 +2728,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 
 	while (engine.getFileSystem().hasWork()) engine.getFileSystem().updateAsyncTransactions();
 
-	auto* model = render_scene->getRenderableModel(mesh_cmp);
+	auto* model = render_scene->getModelInstanceModel(mesh_cmp);
 	int width = 640, height = 480;
 	if (model->isReady())
 	{

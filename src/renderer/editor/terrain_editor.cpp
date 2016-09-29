@@ -30,7 +30,7 @@
 #include <cmath>
 
 
-static const Lumix::ComponentType RENDERABLE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
+static const Lumix::ComponentType MODEL_INSTANCE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
 static const Lumix::ComponentType TERRAIN_TYPE = Lumix::PropertyRegister::getComponentType("terrain");
 static const Lumix::ComponentType HEIGHTFIELD_TYPE = Lumix::PropertyRegister::getComponentType("physical_heightfield");
 static const Lumix::ResourceType MATERIAL_TYPE("material");
@@ -919,7 +919,7 @@ void TerrainEditor::removeEntities(const Lumix::Vec3& hit_pos)
 		m_terrain_brush_size);
 
 	Lumix::Array<Lumix::Entity> entities(m_world_editor.getAllocator());
-	scene->getRenderableEntities(frustum, entities);
+	scene->getModelInstanceEntities(frustum, entities);
 	for(Lumix::Entity entity : entities)
 	{
 		for(auto hash : hashes)
@@ -1012,7 +1012,7 @@ static bool testOBBCollision(const Lumix::Matrix& matrix_a,
 
 
 static bool isOBBCollision(Lumix::RenderScene& scene,
-	const Lumix::Array<Lumix::Array<Lumix::RenderableMesh>>& meshes,
+	const Lumix::Array<Lumix::Array<Lumix::ModelInstanceMesh>>& meshes,
 	const Lumix::Vec3& pos_a,
 	Lumix::Model* model,
 	float scale)
@@ -1023,15 +1023,15 @@ static bool isOBBCollision(Lumix::RenderScene& scene,
 	{
 		for(auto& mesh : submeshes)
 		{
-			auto* renderable = scene.getRenderable(mesh.renderable);
-			Lumix::Vec3 pos_b = renderable->matrix.getTranslation();
-			float radius_b = renderable->model->getBoundingRadius();
+			auto* model_instance = scene.getModelInstance(mesh.model_instance);
+			Lumix::Vec3 pos_b = model_instance->matrix.getTranslation();
+			float radius_b = model_instance->model->getBoundingRadius();
 			float radius_squared = radius_a_squared + radius_b * radius_b;
 			if ((pos_a - pos_b).squaredLength() < radius_squared * scale * scale)
 			{
 				Lumix::Matrix matrix = Lumix::Matrix::IDENTITY;
 				matrix.setTranslation(pos_a);
-				if (testOBBCollision(matrix, model, renderable->matrix, renderable->model, scale))
+				if (testOBBCollision(matrix, model, model_instance->matrix, model_instance->model, scale))
 				{
 					return true;
 				}
@@ -1070,9 +1070,9 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 			Lumix::uint32 hash = Lumix::crc32(template_names[idx].c_str());
 			Lumix::Entity tpl = template_system.getInstances(hash)[0];
 			if(!isValid(tpl)) continue;
-			Lumix::ComponentUID renderable = m_world_editor.getUniverse()->getComponent(tpl, RENDERABLE_TYPE);
-			if(!renderable.isValid()) continue;
-			tpls.push({renderable.handle, idx});
+			Lumix::ComponentUID model_instance = m_world_editor.getUniverse()->getComponent(tpl, MODEL_INSTANCE_TYPE);
+			if(!model_instance.isValid()) continue;
+			tpls.push({model_instance.handle, idx});
 		}
 
 		Lumix::Frustum frustum;
@@ -1083,15 +1083,15 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 			m_terrain_brush_size,
 			-m_terrain_brush_size,
 			m_terrain_brush_size);
-		auto& meshes = scene->getRenderableInfos(frustum, frustum.position);
+		auto& meshes = scene->getModelInstanceInfos(frustum, frustum.position);
 
 		Lumix::Vec2 size = scene->getTerrainSize(m_component.handle);
 		float scale = 1.0f - Lumix::Math::maximum(0.01f, m_terrain_brush_strength);
 		for (int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f; ++i)
 		{
-			int renderable_idx = Lumix::Math::rand() % tpls.size();
-			Lumix::Model* model = scene->getRenderableModel(tpls[renderable_idx].cmp);
-			const auto* template_name = template_names[tpls[renderable_idx].template_idx].c_str();
+			int model_instance_idx = Lumix::Math::rand() % tpls.size();
+			Lumix::Model* model = scene->getModelInstanceModel(tpls[model_instance_idx].cmp);
+			const auto* template_name = template_names[tpls[model_instance_idx].template_idx].c_str();
 
 			float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
 			float dist = Lumix::Math::randFloat(0, 1.0f) * m_terrain_brush_size;

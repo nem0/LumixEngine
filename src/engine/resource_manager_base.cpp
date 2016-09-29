@@ -24,7 +24,6 @@ namespace Lumix
 			if (!resource->isEmpty())
 			{
 				g_log_error.log("Engine") << "Leaking resource " << resource->getPath().c_str();
-				ASSERT(false);
 			}
 			destroyResource(*resource);
 		}

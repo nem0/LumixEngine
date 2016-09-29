@@ -52,7 +52,7 @@ static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("cam
 static const ComponentType DECAL_TYPE = PropertyRegister::getComponentType("decal");
 static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType("point_light");
 static const ComponentType GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
-static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = PropertyRegister::getComponentType("environment_probe");
 static const uint32 RENDERER_HASH = crc32("renderer");
 static const ResourceType MATERIAL_TYPE("material");
@@ -367,7 +367,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 
 		auto mesh_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(RENDERER_HASH));
-		m_mesh = render_scene->createComponent(RENDERABLE_TYPE, mesh_entity);
+		m_mesh = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 		
 		auto light_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		auto light_cmp = render_scene->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
@@ -389,9 +389,9 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		if (!render_scene) return;
 		if (!model.isReady()) return;
 
-		if (render_scene->getRenderableModel(m_mesh) != &model)
+		if (render_scene->getModelInstanceModel(m_mesh) != &model)
 		{
-			render_scene->setRenderablePath(m_mesh, model.getPath());
+			render_scene->setModelInstancePath(m_mesh, model.getPath());
 			AABB aabb = model.getAABB();
 
 			m_universe->setRotation(m_camera_entity, {0, 0, 0, 1});
@@ -1090,10 +1090,10 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		AABB getEntityAABB(Universe& universe, Entity entity) override
 		{
 			AABB aabb;
-			auto cmp = m_render_scene->getRenderableComponent(entity);
+			auto cmp = m_render_scene->getModelInstanceComponent(entity);
 			if (cmp != INVALID_COMPONENT)
 			{
-				Model* model = m_render_scene->getRenderableModel(cmp);
+				Model* model = m_render_scene->getModelInstanceModel(cmp);
 				if (!model) return aabb;
 
 				aabb = model->getAABB();
@@ -1214,9 +1214,9 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 
 		Vec3 getModelCenter(Entity entity) override
 		{
-			auto cmp = m_render_scene->getRenderableComponent(entity);
+			auto cmp = m_render_scene->getModelInstanceComponent(entity);
 			if (cmp == INVALID_COMPONENT) return Vec3(0, 0, 0);
-			Model* model = m_render_scene->getRenderableModel(cmp);
+			Model* model = m_render_scene->getModelInstanceModel(cmp);
 			if (!model) return Vec3(0, 0, 0);
 			return (model->getAABB().min + model->getAABB().max) * 0.5f;
 		}
@@ -1224,23 +1224,23 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 
 		void showEntity(Entity entity) override
 		{
-			ComponentHandle cmp = m_render_scene->getRenderableComponent(entity);
+			ComponentHandle cmp = m_render_scene->getModelInstanceComponent(entity);
 			if (cmp == INVALID_COMPONENT) return;
-			m_render_scene->showRenderable(cmp);
+			m_render_scene->showModelInstance(cmp);
 		}
 
 
 		void hideEntity(Entity entity) override
 		{
-			ComponentHandle cmp = m_render_scene->getRenderableComponent(entity);
+			ComponentHandle cmp = m_render_scene->getModelInstanceComponent(entity);
 			if (cmp == INVALID_COMPONENT) return;
-			m_render_scene->hideRenderable(cmp);
+			m_render_scene->hideModelInstance(cmp);
 		}
 
 
-		Path getRenderablePath(ComponentHandle cmp) override
+		Path getModelInstancePath(ComponentHandle cmp) override
 		{
-			return m_render_scene->getRenderablePath(cmp);
+			return m_render_scene->getModelInstancePath(cmp);
 		}
 
 
@@ -1356,11 +1356,11 @@ struct FurPainter : public WorldEditor::Plugin
 		auto& entities = editor.getSelectedEntities();
 		if (entities.empty()) return;
 
-		ComponentUID renderable = editor.getUniverse()->getComponent(entities[0], RENDERABLE_TYPE);
-		if (!renderable.isValid()) return;
+		ComponentUID model_instance = editor.getUniverse()->getComponent(entities[0], MODEL_INSTANCE_TYPE);
+		if (!model_instance.isValid()) return;
 
-		RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
-		Model* model = scene->getRenderableModel(renderable.handle);
+		RenderScene* scene = static_cast<RenderScene*>(model_instance.scene);
+		Model* model = scene->getModelInstanceModel(model_instance.handle);
 
 		if (!model || !model->isReady()) return;
 
@@ -1402,11 +1402,11 @@ struct FurPainter : public WorldEditor::Plugin
 		auto& entities = editor.getSelectedEntities();
 		if (entities.empty()) return;
 
-		ComponentUID renderable = universe->getComponent(entities[0], RENDERABLE_TYPE);
-		if (!renderable.isValid()) return;
+		ComponentUID model_instance = universe->getComponent(entities[0], MODEL_INSTANCE_TYPE);
+		if (!model_instance.isValid()) return;
 
-		RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
-		Model* model = scene->getRenderableModel(renderable.handle);
+		RenderScene* scene = static_cast<RenderScene*>(model_instance.scene);
+		Model* model = scene->getModelInstanceModel(model_instance.handle);
 
 		if (!model || !model->isReady() || model->getMeshCount() < 1) return;
 		if (!model->getMesh(0).material) return;
@@ -1690,11 +1690,11 @@ struct FurPainter : public WorldEditor::Plugin
 		if (entities.empty()) return;
 		if (!editor.isMouseDown(MouseButton::LEFT)) return;
 
-		ComponentUID renderable = universe->getComponent(entities[0], RENDERABLE_TYPE);
-		if (!renderable.isValid()) return;
+		ComponentUID model_instance = universe->getComponent(entities[0], MODEL_INSTANCE_TYPE);
+		if (!model_instance.isValid()) return;
 
-		RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
-		Model* model = scene->getRenderableModel(renderable.handle);
+		RenderScene* scene = static_cast<RenderScene*>(model_instance.scene);
+		Model* model = scene->getModelInstanceModel(model_instance.handle);
 
 		if (!model || !model->isReady() || model->getMeshCount() < 1) return;
 		if (!model->getMesh(0).material) return;
@@ -1754,16 +1754,16 @@ struct FurPainterPlugin : public StudioApp::IPlugin
 				goto end;
 			}
 			Universe* universe = editor.getUniverse();
-			RenderScene* scene = static_cast<RenderScene*>(universe->getScene(RENDERABLE_TYPE));
-			ComponentUID renderable = universe->getComponent(entities[0], RENDERABLE_TYPE);
+			RenderScene* scene = static_cast<RenderScene*>(universe->getScene(MODEL_INSTANCE_TYPE));
+			ComponentUID model_instance = universe->getComponent(entities[0], MODEL_INSTANCE_TYPE);
 
-			if (!renderable.isValid())
+			if (!model_instance.isValid())
 			{
-				ImGui::Text("Entity does not have renderable component.");
+				ImGui::Text("Entity does not have model_instance component.");
 				goto end;
 			}
 
-			Model* model = scene->getRenderableModel(renderable.handle);
+			Model* model = scene->getModelInstanceModel(model_instance.handle);
 			if (!model)
 			{
 				ImGui::Text("Entity does not have model.");
@@ -1829,11 +1829,11 @@ struct FurPainterPlugin : public StudioApp::IPlugin
 		auto& entities = editor.getSelectedEntities();
 		if (entities.empty()) return;
 
-		ComponentUID renderable = editor.getUniverse()->getComponent(entities[0], RENDERABLE_TYPE);
-		if (!renderable.isValid()) return;
+		ComponentUID model_instance = editor.getUniverse()->getComponent(entities[0], MODEL_INSTANCE_TYPE);
+		if (!model_instance.isValid()) return;
 
-		RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
-		Model* model = scene->getRenderableModel(renderable.handle);
+		RenderScene* scene = static_cast<RenderScene*>(model_instance.scene);
+		Model* model = scene->getModelInstanceModel(model_instance.handle);
 
 		if (!model || !model->isReady() || model->getMeshCount() < 1) return;
 		if (!model->getMesh(0).material) return;
@@ -2136,11 +2136,11 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 	}
 
 
-	void showRenderableGizmo(ComponentUID renderable)
+	void showModelInstanceGizmo(ComponentUID model_instance)
 	{
-		RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
+		RenderScene* scene = static_cast<RenderScene*>(model_instance.scene);
 		Universe& universe = scene->getUniverse();
-		Model* model = scene->getRenderableModel(renderable.handle);
+		Model* model = scene->getModelInstanceModel(model_instance.handle);
 		Vec3 points[8];
 		if (!model) return;
 
@@ -2153,7 +2153,7 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 		points[4].set(points[7].x, points[0].y, points[0].z);
 		points[5].set(points[7].x, points[0].y, points[7].z);
 		points[6].set(points[7].x, points[7].y, points[0].z);
-		Matrix mtx = universe.getMatrix(renderable.entity);
+		Matrix mtx = universe.getMatrix(model_instance.entity);
 
 		for (int j = 0; j < 8; ++j)
 		{
@@ -2271,9 +2271,9 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 			showGlobalLightGizmo(cmp);
 			return true;
 		}
-		if (cmp.type == RENDERABLE_TYPE)
+		if (cmp.type == MODEL_INSTANCE_TYPE)
 		{
-			showRenderableGizmo(cmp);
+			showModelInstanceGizmo(cmp);
 			return true;
 		}
 		return false;

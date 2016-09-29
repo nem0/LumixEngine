@@ -1709,10 +1709,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
 		if (!render_scene) return;
 
-		ComponentHandle renderable = render_scene->getRenderableComponent(entity);
-		if (!isValid(renderable)) return;
+		ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
+		if (!isValid(model_instance)) return;
 
-		Model* model = render_scene->getRenderableModel(renderable);
+		Model* model = render_scene->getModelInstanceModel(model_instance);
 		Transform entity_transform = m_universe.getTransform(entity);
 
 		bone->bind_transform =
@@ -1742,9 +1742,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
 		ASSERT(render_scene);
 
-		ComponentHandle renderable = render_scene->getRenderableComponent(entity);
-		ASSERT(isValid(renderable));
-		Model* model = render_scene->getRenderableModel(renderable);
+		ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
+		ASSERT(isValid(model_instance));
+		Model* model = render_scene->getModelInstanceModel(model_instance);
 		ASSERT(model && model->isReady());
 
 		auto iter = model->getBoneIndex(bone_name_hash);
@@ -2028,9 +2028,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		ASSERT(render_scene);
 		
 		Entity entity = { cmp.index };
-		ComponentHandle renderable = render_scene->getRenderableComponent(entity);
-		ASSERT(isValid(renderable));
-		Model* model = render_scene->getRenderableModel(renderable);
+		ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
+		ASSERT(isValid(model_instance));
+		Model* model = render_scene->getModelInstanceModel(model_instance);
 		ASSERT(model && model->isReady());
 		auto iter = model->getBoneIndex(bone_name_hash);
 		ASSERT(iter.isValid());
@@ -2116,10 +2116,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		for (auto& ragdoll : m_ragdolls)
 		{
-			ComponentHandle renderable = render_scene->getRenderableComponent(ragdoll.entity);
-			if (!isValid(renderable)) continue;
+			ComponentHandle model_instance = render_scene->getModelInstanceComponent(ragdoll.entity);
+			if (!isValid(model_instance)) continue;
 
-			Pose* pose = render_scene->getPose(renderable);
+			Pose* pose = render_scene->getPose(model_instance);
 			if (!pose) continue;
 
 			Transform root_transform;
@@ -2321,9 +2321,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
 			if (!render_scene) return;
-			ComponentHandle renderable = render_scene->getRenderableComponent(entity);
-			if (!isValid(renderable)) return;
-			Pose* pose = render_scene->getPose(renderable);
+			ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
+			if (!isValid(model_instance)) return;
+			Pose* pose = render_scene->getPose(model_instance);
 			if (!pose) return;
 			setSkeletonPose(m_universe.getTransform(entity), m_ragdolls.at(ragdoll_idx).root, pose);
 		}
