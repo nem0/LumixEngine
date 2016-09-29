@@ -804,20 +804,6 @@ namespace Lumix
 		}
 
 
-		LuaScript* preloadScript(const char* path)
-		{
-			auto* script_manager = m_system.m_engine.getResourceManager().get(LUA_SCRIPT_RESOURCE_TYPE);
-			return static_cast<LuaScript*>(script_manager->load(Path(path)));
-		}
-
-
-		void unloadScript(LuaScript* script)
-		{
-			if (!script) return;
-			script->getResourceManager().unload(*script);
-		}
-
-
 		void setScriptSource(ComponentHandle cmp, int scr_index, const char* path)
 		{
 			setScriptPath(cmp, scr_index, Lumix::Path(path));
@@ -850,8 +836,6 @@ namespace Lumix
 			REGISTER_FUNCTION(addScript);
 			REGISTER_FUNCTION(getScriptCount);
 			REGISTER_FUNCTION(setScriptSource);
-			REGISTER_FUNCTION(preloadScript);
-			REGISTER_FUNCTION(unloadScript);
 			REGISTER_FUNCTION(cancelTimer);
 
 			#undef REGISTER_FUNCTION
