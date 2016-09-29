@@ -97,6 +97,8 @@ bool Texture::create(int w, int h, void* data)
 		handle = bgfx::createTexture2D((uint16_t)w, (uint16_t)h, false, 1, bgfx::TextureFormat::RGBA8, bgfx_flags);
 	}
 	mips = 1;
+	width = w;
+	height = h;
 
 	bool isReady = bgfx::isValid(handle);
 	onCreated(isReady ? State::READY : State::FAILURE);
