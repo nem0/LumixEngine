@@ -48,13 +48,7 @@ struct GUISystemImpl : public GUISystem
 		auto* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
 		auto* resource = material_manager->load(Path("pipelines/imgui/imgui.mat"));
 		m_material = static_cast<Material*>(resource);
-
-		Texture* texture = LUMIX_NEW(m_engine.getAllocator(), Texture)(
-			Path("font"), *m_engine.getResourceManager().get(TEXTURE_TYPE), m_engine.getAllocator());
-
-		texture->create(w, h, pixels);
-		m_material->setTexture(0, texture);
-
+		
 		io.DisplaySize.x = 640;
 		io.DisplaySize.y = 480;
 		ImGui::NewFrame();
