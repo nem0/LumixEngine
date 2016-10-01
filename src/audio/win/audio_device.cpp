@@ -415,6 +415,7 @@ struct AudioDeviceImpl : public AudioDevice
 			memcpy(p1, (uint8*)buffer.data + buffer.written, s1);
 		}
 		buffer.written += s1;
+		buffer.written = buffer.written % buffer.data_size;
 		if (p2)
 		{
 			if (buffer.written + s2 > buffer.data_size)
@@ -437,7 +438,7 @@ struct AudioDeviceImpl : public AudioDevice
 			}
 			buffer.written += s2;
 		}
-		if (buffer.written > buffer.data_size) buffer.written = buffer.written % buffer.data_size;
+		buffer.written = buffer.written % buffer.data_size;
 		if (FAILED(buffer.handle->Unlock(p1, s1, p2, s2)))
 		{
 			return;
