@@ -33,6 +33,12 @@
 * [SDL](https://www.libsdl.org/)
 
 Project generator
+
 * [Genie](https://github.com/bkaradzic/genie)
+
+Who is using it?
+
+* [On the Hunt](http://www.indiedb.com/games/on-the-hunt)
+* [FieldsGame](http://www.indiedb.com/games/fieldsgame)
 
 Contact: mikulas.florek@gamedev.sk
