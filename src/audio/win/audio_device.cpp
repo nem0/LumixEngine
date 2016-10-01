@@ -396,49 +396,33 @@ struct AudioDeviceImpl : public AudioDevice
 		{
 			return;
 		}
-		if (buffer.written + s1 > buffer.data_size)
-		{
-			memcpy(p1, (uint8*)buffer.data + buffer.written, buffer.data_size - buffer.written);
-			void* p1_2 = (uint8*)p1 + (buffer.data_size - buffer.written);
-			DWORD s1_2 = s1 - (buffer.data_size - buffer.written);
-			if (buffer.looped)
+		auto updateBuffer = [&buffer](void* p, DWORD size) {
+			if (!p) return;
+			if (buffer.written + size > buffer.data_size)
 			{
-				memcpy(p1_2, buffer.data, s1_2);
-			}
-			else
-			{
-				ZeroMemory(p1_2, s1_2);
-			}
-		}
-		else
-		{
-			memcpy(p1, (uint8*)buffer.data + buffer.written, s1);
-		}
-		buffer.written += s1;
-		buffer.written = buffer.written % buffer.data_size;
-		if (p2)
-		{
-			if (buffer.written + s2 > buffer.data_size)
-			{
-				memcpy(p2, (uint8*)buffer.data + buffer.written, buffer.data_size - buffer.written);
-				void* p2_2 = (uint8*)p2 + (buffer.data_size - buffer.written);
-				DWORD s2_2 = s2 - (buffer.data_size - buffer.written);
+				memcpy(p, (uint8*)buffer.data + buffer.written, buffer.data_size - buffer.written);
+				void* p_2 = (uint8*)p + (buffer.data_size - buffer.written);
+				DWORD size_2 = size - (buffer.data_size - buffer.written);
 				if (buffer.looped)
 				{
-					memcpy(p2_2, buffer.data, s2_2);
+					memcpy(p_2, buffer.data, size_2);
 				}
 				else
 				{
-					ZeroMemory(p2_2, s2_2);
+					ZeroMemory(p_2, size_2);
 				}
 			}
 			else
 			{
-				memcpy(p2, (uint8*)buffer.data + buffer.written, s2);
+				memcpy(p, (uint8*)buffer.data + buffer.written, size);
 			}
-			buffer.written += s2;
-		}
-		buffer.written = buffer.written % buffer.data_size;
+			buffer.written += size;
+			buffer.written = buffer.written % buffer.data_size;
+		};
+
+		updateBuffer(p1, s1);
+		updateBuffer(p2, s2);
+
 		if (FAILED(buffer.handle->Unlock(p1, s1, p2, s2)))
 		{
 			return;
