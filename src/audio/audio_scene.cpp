@@ -23,6 +23,7 @@ enum class AudioSceneVersion : int
 {
 	ECHO_ZONES,
 	REFACTOR,
+	IS_3D,
 
 	LAST
 };
@@ -329,6 +330,7 @@ struct AudioSceneImpl : public AudioScene
 		{
 			serializer.write(m_clips.indexOf(sound.clip));
 			serializer.write(sound.entity);
+			serializer.write(sound.is_3d);
 		}
 
 		serializer.write(m_echo_zones.size());
@@ -385,6 +387,7 @@ struct AudioSceneImpl : public AudioScene
 			if (clip_idx >= 0) sound.clip = m_clips[clip_idx];
 			if (version <= (int)AudioSceneVersion::REFACTOR) serializer.read(dummy_cmp);
 			serializer.read(sound.entity);
+			if (version > (int)AudioSceneVersion::IS_3D) serializer.read(sound.is_3d);
 
 			ComponentHandle cmp = {sound.entity.index};
 			m_ambient_sounds.insert(sound.entity, sound);
