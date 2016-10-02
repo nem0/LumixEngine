@@ -76,6 +76,19 @@ public:
 	};
 
 
+	struct LUMIX_RENDERER_API SubimageModule : public ModuleBase
+	{
+		explicit SubimageModule(ParticleEmitter& emitter);
+		void serialize(OutputBlob& blob) override;
+		void deserialize(InputBlob& blob, int version) override;
+		ComponentType getType() const override { return s_type; }
+		static const ComponentType s_type;
+		
+		int rows;
+		int cols;
+	};
+
+
 	struct LUMIX_RENDERER_API SpawnShapeModule : public ModuleBase
 	{
 		explicit SpawnShapeModule(ParticleEmitter& emitter);
@@ -230,6 +243,7 @@ public:
 	IntInterval m_spawn_count;
 
 	Array<ModuleBase*> m_modules;
+	SubimageModule* m_subimage_module;
 	Entity m_entity;
 	bool m_is_valid;
 

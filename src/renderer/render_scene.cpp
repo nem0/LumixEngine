@@ -52,6 +52,8 @@ static const ComponentType PARTICLE_EMITTER_ALPHA_TYPE = PropertyRegister::getCo
 static const ComponentType PARTICLE_EMITTER_FORCE_HASH = PropertyRegister::getComponentType("particle_emitter_force");
 static const ComponentType PARTICLE_EMITTER_ATTRACTOR_HASH =
 	PropertyRegister::getComponentType("particle_emitter_attractor");
+static const ComponentType PARTICLE_EMITTER_SUBIMAGE_HASH =
+	PropertyRegister::getComponentType("particle_emitter_subimage");
 static const ComponentType PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH =
 	PropertyRegister::getComponentType("particle_emitter_linear_movement");
 static const ComponentType PARTICLE_EMITTER_SPAWN_SHAPE_HASH =
@@ -338,6 +340,7 @@ public:
 			ParticleEmitter::PlaneModule::s_type,
 			ParticleEmitter::RandomRotationModule::s_type,
 			ParticleEmitter::SizeModule::s_type,
+			ParticleEmitter::SubimageModule::s_type,
 			ParticleEmitter::SpawnShapeModule::s_type};
 
 		for (auto& module : EMITTER_MODULES)
@@ -837,6 +840,10 @@ public:
 					{
 						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this, cmp);
 					}
+					else if (module->getType() == ParticleEmitter::SubimageModule::s_type)
+					{
+						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_HASH, this, cmp);
+					}
 					else if (module->getType() == ParticleEmitter::SpawnShapeModule::s_type)
 					{
 						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_HASH, this, cmp);
@@ -1276,6 +1283,21 @@ public:
 	}
 
 
+	void destroyParticleEmitterSubimage(ComponentHandle component)
+	{
+		auto* emitter = m_particle_emitters[{component.index}];
+		auto* module = emitter->getModule(PARTICLE_EMITTER_SUBIMAGE_HASH);
+
+		ASSERT(module);
+
+		LUMIX_DELETE(m_allocator, module);
+		emitter->m_modules.eraseItem(module);
+		emitter->m_subimage_module = nullptr;
+		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_HASH, this, component);
+		cleanup(emitter);
+	}
+
+
 	void destroyParticleEmitterAttractor(ComponentHandle component)
 	{
 		auto* emitter = m_particle_emitters[{component.index}];
@@ -1437,6 +1459,34 @@ public:
 			alpha_module->m_values[i] = values[i];
 		}
 		alpha_module->sample();
+	}
+
+
+	void setParticleEmitterSubimageRows(ComponentHandle cmp, const int& value) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(cmp);
+		if (module) module->rows = value;
+	}
+
+
+	void setParticleEmitterSubimageCols(ComponentHandle cmp, const int& value) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(cmp);
+		if (module) module->cols = value;
+	}
+
+
+	int getParticleEmitterSubimageRows(ComponentHandle cmp) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(cmp);
+		return module ? module->rows : 1;
+	}
+
+
+	int getParticleEmitterSubimageCols(ComponentHandle cmp) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(cmp);
+		return module ? module->cols : 1;
 	}
 
 
@@ -1703,8 +1753,19 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::ForceModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_FORCE_HASH, this, { entity.index });
-		return{ entity.index };
+		m_universe.addComponent(entity, PARTICLE_EMITTER_FORCE_HASH, this, {entity.index});
+		return {entity.index};
+	}
+
+
+	ComponentHandle createParticleEmitterSubimage(Entity entity)
+	{
+		int index = allocateParticleEmitter(entity);
+		auto* emitter = m_particle_emitters.at(index);
+		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SubimageModule)(*emitter);
+		emitter->addModule(module);
+		m_universe.addComponent(entity, PARTICLE_EMITTER_SUBIMAGE_HASH, this, {entity.index});
+		return {entity.index};
 	}
 
 
@@ -4290,7 +4351,8 @@ static struct
 	ComponentType type;
 	ComponentHandle(RenderSceneImpl::*creator)(Entity);
 	void (RenderSceneImpl::*destroyer)(ComponentHandle);
-} COMPONENT_INFOS[] = {{MODEL_INSTANCE_TYPE, &RenderSceneImpl::createModelInstance, &RenderSceneImpl::destroyModelInstance},
+} COMPONENT_INFOS[] = {
+	{MODEL_INSTANCE_TYPE, &RenderSceneImpl::createModelInstance, &RenderSceneImpl::destroyModelInstance},
 	{GLOBAL_LIGHT_TYPE, &RenderSceneImpl::createGlobalLight, &RenderSceneImpl::destroyGlobalLight},
 	{POINT_LIGHT_TYPE, &RenderSceneImpl::createPointLight, &RenderSceneImpl::destroyPointLight},
 	{DECAL_TYPE, &RenderSceneImpl::createDecal, &RenderSceneImpl::destroyDecal},
@@ -4306,6 +4368,9 @@ static struct
 	{PARTICLE_EMITTER_ATTRACTOR_HASH,
 		&RenderSceneImpl::createParticleEmitterAttractor,
 		&RenderSceneImpl::destroyParticleEmitterAttractor},
+	{PARTICLE_EMITTER_SUBIMAGE_HASH,
+		&RenderSceneImpl::createParticleEmitterSubimage,
+		&RenderSceneImpl::destroyParticleEmitterSubimage},
 	{PARTICLE_EMITTER_SIZE_HASH,
 		&RenderSceneImpl::createParticleEmitterSize,
 		&RenderSceneImpl::destroyParticleEmitterSize},
