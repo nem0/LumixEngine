@@ -71,6 +71,31 @@ ParticleEmitter::ModuleBase::ModuleBase(ParticleEmitter& emitter)
 }
 
 
+ParticleEmitter::SubimageModule::SubimageModule(ParticleEmitter& emitter)
+	: ModuleBase(emitter)
+	, rows(1)
+	, cols(1)
+{
+}
+
+
+void ParticleEmitter::SubimageModule::serialize(OutputBlob& blob)
+{
+	blob.write(rows);
+	blob.write(cols);
+}
+
+
+void ParticleEmitter::SubimageModule::deserialize(InputBlob& blob, int)
+{
+	blob.read(rows);
+	blob.read(cols);
+}
+
+
+const ComponentType ParticleEmitter::SubimageModule::s_type = PropertyRegister::getComponentType("particle_emitter_subimage");
+
+
 ParticleEmitter::ForceModule::ForceModule(ParticleEmitter& emitter)
 	: ModuleBase(emitter)
 {
@@ -592,6 +617,7 @@ ParticleEmitter::ParticleEmitter(Entity entity, Universe& universe, IAllocator& 
 	, m_universe(universe)
 	, m_entity(entity)
 	, m_size(allocator)
+	, m_subimage_module(nullptr)
 {
 	init();
 }
@@ -674,6 +700,7 @@ ParticleEmitter::ModuleBase* ParticleEmitter::getModule(ComponentType type)
 
 void ParticleEmitter::addModule(ModuleBase* module)
 {
+	if (module->getType() == SubimageModule::s_type) m_subimage_module = static_cast<SubimageModule*>(module);
 	m_modules.push(module);
 }
 
@@ -777,7 +804,8 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager, boo
 				"linear_movement",
 				"alpha",
 				"size",
-				"random_rotation"};
+				"random_rotation",
+				"subimage"};
 
 			for (const char* old_name : OLD_MODULE_NAMES)
 			{

@@ -2295,6 +2295,7 @@ LUMIX_STUDIO_ENTRY(renderer)
 	app.registerComponent("particle_emitter_plane", "Render/Particle emitter/Plane");
 	app.registerComponent("particle_emitter_force", "Render/Particle emitter/Force");
 	app.registerComponent("particle_emitter_attractor", "Render/Particle emitter/Attractor");
+	app.registerComponent("particle_emitter_subimage", "Render/Particle emitter/Subimage");
 	app.registerComponent("particle_emitter_linear_movement", "Render/Particle emitter/Linear movement");
 	app.registerComponent("particle_emitter_random_rotation", "Render/Particle emitter/Random rotation");
 	app.registerComponent("particle_emitter_size", "Render/Particle emitter/Size");

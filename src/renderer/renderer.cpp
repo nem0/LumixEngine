@@ -208,6 +208,15 @@ static void registerProperties(IAllocator& allocator)
 			&RenderScene::getParticleEmitterAcceleration,
 			&RenderScene::setParticleEmitterAcceleration));
 
+	PropertyRegister::add("particle_emitter_subimage",
+		LUMIX_NEW(allocator, SimplePropertyDescriptor<int, RenderScene>)("Rows",
+			&RenderScene::getParticleEmitterSubimageRows,
+			&RenderScene::setParticleEmitterSubimageRows));
+	PropertyRegister::add("particle_emitter_subimage",
+		LUMIX_NEW(allocator, SimplePropertyDescriptor<int, RenderScene>)("Columns",
+			&RenderScene::getParticleEmitterSubimageCols,
+			&RenderScene::setParticleEmitterSubimageCols));
+
 	PropertyRegister::add("particle_emitter_size",
 		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Size",
 			&RenderScene::getParticleEmitterSize,

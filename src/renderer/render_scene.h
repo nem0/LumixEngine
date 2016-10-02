@@ -53,6 +53,7 @@ enum class RenderSceneVersion : int32
 	INDEPENDENT_PARTICLE_MODULES,
 	CAMERA_AND_TERRAIN_REFACTOR,
 	DECAL,
+	PARTICLE_EMITTER_SUBIMAGE_MODULE,
 
 	LATEST,
 	INVALID = -1,
@@ -297,8 +298,12 @@ public:
 	virtual void setParticleEmitterSpawnPeriod(ComponentHandle cmp, const Vec2& value) = 0;
 	virtual void setParticleEmitterInitialSize(ComponentHandle cmp, const Vec2& value) = 0;
 	virtual void setParticleEmitterMaterialPath(ComponentHandle cmp, const Path& path) = 0;
+	virtual void setParticleEmitterSubimageRows(ComponentHandle cmp, const int& value) = 0;
+	virtual void setParticleEmitterSubimageCols(ComponentHandle cmp, const int& value) = 0;
 	virtual Path getParticleEmitterMaterialPath(ComponentHandle cmp) = 0;
 	virtual int getParticleEmitterPlaneCount(ComponentHandle cmp) = 0;
+	virtual int getParticleEmitterSubimageRows(ComponentHandle cmp) = 0;
+	virtual int getParticleEmitterSubimageCols(ComponentHandle cmp) = 0;
 	virtual void addParticleEmitterPlane(ComponentHandle cmp, int index) = 0;
 	virtual void removeParticleEmitterPlane(ComponentHandle cmp, int index) = 0;
 	virtual Entity getParticleEmitterPlaneEntity(ComponentHandle cmp, int index) = 0;
