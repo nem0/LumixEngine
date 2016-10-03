@@ -622,6 +622,22 @@ namespace Lumix
 					LuaWrapper::push(L, v);
 				}
 				break;
+				case IPropertyDescriptor::ENTITY:
+				{
+					Entity v;
+					OutputBlob blob(&v, sizeof(v));
+					desc->get(cmp, -1, blob);
+					LuaWrapper::push(L, v);
+				}
+				break;
+				case IPropertyDescriptor::ENUM:
+				{
+					int v;
+					OutputBlob blob(&v, sizeof(v));
+					desc->get(cmp, -1, blob);
+					LuaWrapper::push(L, v);
+				}
+				break;
 				default: luaL_argerror(L, 1, "Unsupported property type"); break;
 			}
 			return 1;
@@ -691,6 +707,20 @@ namespace Lumix
 					desc->set(cmp, -1, blob);
 				}
 				break;
+				case IPropertyDescriptor::ENTITY:
+				{
+					auto v = LuaWrapper::checkArg<Entity>(L, 3);
+					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
+				}
+				break;
+				case IPropertyDescriptor::ENUM:
+				{
+					auto v = LuaWrapper::checkArg<int>(L, 3);
+					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
+				}
+				break;
 				default: luaL_argerror(L, 1, "Unsupported property type"); break;
 			}
 			return 0;
@@ -741,6 +771,8 @@ namespace Lumix
 				{
 					switch (desc->getType())
 					{
+						case IPropertyDescriptor::ENTITY:
+						case IPropertyDescriptor::ENUM:
 						case IPropertyDescriptor::DECIMAL:
 						case IPropertyDescriptor::INTEGER:
 						case IPropertyDescriptor::BOOL:

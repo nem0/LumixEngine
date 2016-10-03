@@ -2,6 +2,7 @@
 
 #include "engine/array.h"
 #include "engine/blob.h"
+#include "engine/crc32.h"
 #include "engine/fs/file_system.h"
 #include "engine/geometry.h"
 #include "engine/json_serializer.h"
@@ -2290,6 +2291,13 @@ public:
 	}
 
 
+	static int LUA_getModelBoneIndex(Model* model, const char* bone)
+	{
+		if (!model) return 0;
+		return model->getBoneIndex(crc32(bone)).value();
+	}
+
+
 	static unsigned int LUA_compareTGA(RenderSceneImpl* scene, const char* path, const char* path_preimage, int min_diff)
 	{
 		auto& fs = scene->m_engine.getFileSystem();
@@ -4530,6 +4538,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(updateTextureData);
 	REGISTER_FUNCTION(setModelInstanceMaterial);
 	REGISTER_FUNCTION(setModelInstancePath);
+	REGISTER_FUNCTION(getModelBoneIndex);
 	REGISTER_FUNCTION(makeScreenshot);
 	REGISTER_FUNCTION(compareTGA);
 	REGISTER_FUNCTION(getTerrainHeightAt);
