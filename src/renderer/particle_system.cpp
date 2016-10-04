@@ -50,7 +50,8 @@ static ParticleEmitter::ModuleBase* createModule(ComponentType type, ParticleEmi
 		{ ParticleEmitter::RandomRotationModule::s_type, create<ParticleEmitter::RandomRotationModule> },
 		{ ParticleEmitter::SizeModule::s_type, create<ParticleEmitter::SizeModule> },
 		{ ParticleEmitter::AttractorModule::s_type, create<ParticleEmitter::AttractorModule> },
-		{ ParticleEmitter::SpawnShapeModule::s_type, create<ParticleEmitter::SpawnShapeModule> }
+		{ ParticleEmitter::SpawnShapeModule::s_type, create<ParticleEmitter::SpawnShapeModule> },
+		{ ParticleEmitter::SubimageModule::s_type, create<ParticleEmitter::SubimageModule> }
 	};
 
 	for(auto& i : creators)
