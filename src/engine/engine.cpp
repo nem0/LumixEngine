@@ -387,6 +387,14 @@ public:
 				desc.set(cmp, -1, input_blob);
 			}
 			break;
+		case IPropertyDescriptor::ENTITY:
+			if (lua_isinteger(L, -1))
+			{
+				int i = (int)lua_tointeger(L, -1);
+				InputBlob input_blob(&i, sizeof(i));
+				desc.set(cmp, -1, input_blob);
+			}
+			break;
 		case IPropertyDescriptor::BOOL:
 			if (lua_isboolean(L, -1))
 			{

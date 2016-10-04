@@ -155,7 +155,7 @@ public:
 		Entity entity = {cmp.index};
 		Parents::iterator parent_iter = m_parents.find(entity);
 
-		if (parent_iter.isValid())
+		if (parent_iter.isValid() && Lumix::isValid(parent_iter.value()))
 		{
 			Quat parent_rot = m_universe.getRotation(parent_iter.value());
 			Vec3 parent_pos = m_universe.getPosition(parent_iter.value());

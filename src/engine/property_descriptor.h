@@ -648,9 +648,8 @@ public:
 
 	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
-		int value;
-		stream.read(&value, sizeof(value));
-		auto entity = value < 0 ? INVALID_ENTITY : cmp.scene->getUniverse().getEntityFromDenseIdx(value);
+		Entity entity;
+		stream.read(&entity, sizeof(entity));
 		if (index == -1)
 		{
 			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.handle, entity);
@@ -673,9 +672,7 @@ public:
 		{
 			value = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.handle, index);
 		}
-		auto dense_idx = cmp.scene->getUniverse().getDenseIdx(value);
-		int len = sizeof(dense_idx);
-		stream.write(&dense_idx, len);
+		stream.write(&value, sizeof(value));
 	};
 
 
