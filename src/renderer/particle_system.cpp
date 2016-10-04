@@ -356,9 +356,12 @@ ParticleEmitter::LinearMovementModule::LinearMovementModule(ParticleEmitter& emi
 
 void ParticleEmitter::LinearMovementModule::spawnParticle(int index)
 {
-	m_emitter.m_velocity[index].x = m_x.getRandom();
-	m_emitter.m_velocity[index].y = m_y.getRandom();
-	m_emitter.m_velocity[index].z = m_z.getRandom();
+	Vec3& velocity = m_emitter.m_velocity[index];
+	velocity.x = m_x.getRandom();
+	velocity.y = m_y.getRandom();
+	velocity.z = m_z.getRandom();
+	Quat rot = m_emitter.m_universe.getRotation(m_emitter.m_entity);
+	velocity = rot.rotate(velocity);
 }
 
 
