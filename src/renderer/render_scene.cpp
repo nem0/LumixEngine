@@ -1498,6 +1498,18 @@ public:
 	}
 
 
+	void setParticleEmitterAutoemit(ComponentHandle cmp, bool autoemit) override
+	{
+		m_particle_emitters[{cmp.index}]->m_autoemit = autoemit;
+	}
+
+
+	bool getParticleEmitterAutoemit(ComponentHandle cmp) override
+	{
+		return m_particle_emitters[{cmp.index}]->m_autoemit;
+	}
+
+
 	Vec3 getParticleEmitterAcceleration(ComponentHandle cmp) override
 	{
 		auto* module = getEmitterModule<ParticleEmitter::ForceModule>(cmp);
@@ -2255,6 +2267,14 @@ public:
 	static float LUA_getTerrainHeightAt(RenderSceneImpl* render_scene, ComponentHandle cmp, int x, int z)
 	{
 		return render_scene->m_terrains[{cmp.index}]->getHeight(x, z);
+	}
+
+
+	static void LUA_emitParticle(RenderSceneImpl* render_scene, ComponentHandle emitter)
+	{
+		int idx = render_scene->m_particle_emitters.find({ emitter.index });
+		if (idx < 0) return;
+		return render_scene->m_particle_emitters.at(idx)->emit();
 	}
 
 
@@ -4542,6 +4562,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(makeScreenshot);
 	REGISTER_FUNCTION(compareTGA);
 	REGISTER_FUNCTION(getTerrainHeightAt);
+	REGISTER_FUNCTION(emitParticle);
 
 	LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", &RenderSceneImpl::LUA_castCameraRay);
 

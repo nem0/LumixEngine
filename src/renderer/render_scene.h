@@ -279,6 +279,7 @@ public:
 	virtual int getParticleEmitterAlphaCount(ComponentHandle cmp) = 0;
 	virtual const Vec2* getParticleEmitterSize(ComponentHandle cmp) = 0;
 	virtual int getParticleEmitterSizeCount(ComponentHandle cmp) = 0;
+	virtual bool getParticleEmitterAutoemit(ComponentHandle cmp) = 0;
 	virtual Vec3 getParticleEmitterAcceleration(ComponentHandle cmp) = 0;
 	virtual Vec2 getParticleEmitterLinearMovementX(ComponentHandle cmp) = 0;
 	virtual Vec2 getParticleEmitterLinearMovementY(ComponentHandle cmp) = 0;
@@ -287,6 +288,7 @@ public:
 	virtual Int2 getParticleEmitterSpawnCount(ComponentHandle cmp) = 0;
 	virtual Vec2 getParticleEmitterSpawnPeriod(ComponentHandle cmp) = 0;
 	virtual Vec2 getParticleEmitterInitialSize(ComponentHandle cmp) = 0;
+	virtual void setParticleEmitterAutoemit(ComponentHandle cmp, bool autoemit) = 0;
 	virtual void setParticleEmitterAlpha(ComponentHandle cmp, const Vec2* value, int count) = 0;
 	virtual void setParticleEmitterSize(ComponentHandle cmp, const Vec2* values, int count) = 0;
 	virtual void setParticleEmitterAcceleration(ComponentHandle cmp, const Vec3& value) = 0;

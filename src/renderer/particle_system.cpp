@@ -26,6 +26,7 @@ enum class ParticleEmitterVersion : int
 	SPAWN_COUNT,
 	SIZE_ALPHA_SAVE,
 	COMPONENT_TYPE,
+	AUTOEMIT,
 
 	LATEST,
 	INVALID = -1
@@ -622,6 +623,7 @@ ParticleEmitter::ParticleEmitter(Entity entity, Universe& universe, IAllocator& 
 	, m_entity(entity)
 	, m_size(allocator)
 	, m_subimage_module(nullptr)
+	, m_autoemit(true)
 {
 	init();
 }
@@ -752,6 +754,7 @@ void ParticleEmitter::serialize(OutputBlob& blob)
 	blob.write(m_initial_life);
 	blob.write(m_initial_size);
 	blob.write(m_entity);
+	blob.write(m_autoemit);
 	blob.writeString(m_material ? m_material->getPath().c_str() : "");
 	blob.write(m_modules.size());
 	for (auto* module : m_modules)
@@ -774,6 +777,10 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager, boo
 	blob.read(m_initial_life);
 	blob.read(m_initial_size);
 	blob.read(m_entity);
+	if (version > (int)ParticleEmitterVersion::AUTOEMIT)
+	{
+		blob.read(m_autoemit);
+	}
 	char path[MAX_PATH_LENGTH];
 	blob.readString(path, lengthOf(path));
 	auto material_manager = manager.get(MATERIAL_TYPE);
@@ -866,19 +873,25 @@ void ParticleEmitter::update(float time_delta)
 }
 
 
+void ParticleEmitter::emit()
+{
+	int spawn_count = m_spawn_count.getRandom();
+	for (int i = 0; i < spawn_count; ++i)
+	{
+		spawnParticle();
+	}
+}
+
+
 void ParticleEmitter::spawnParticles(float time_delta)
 {
+	if (!m_autoemit) return;
 	m_next_spawn_time -= time_delta;
 
 	while (m_next_spawn_time < 0)
 	{
 		m_next_spawn_time += m_spawn_period.getRandom();
-
-		int spawn_count = m_spawn_count.getRandom();
-		for (int i = 0; i < spawn_count; ++i)
-		{
-			spawnParticle();
-		}
+		emit();
 	}
 }
 
