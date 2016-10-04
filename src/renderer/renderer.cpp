@@ -251,6 +251,9 @@ static void registerProperties(IAllocator& allocator)
 		LUMIX_NEW(allocator, BoolPropertyDescriptor<RenderScene>)(
 			"Autoemit", &RenderScene::getParticleEmitterAutoemit, &RenderScene::setParticleEmitterAutoemit));
 	PropertyRegister::add("particle_emitter",
+		LUMIX_NEW(allocator, BoolPropertyDescriptor<RenderScene>)(
+			"Local space", &RenderScene::getParticleEmitterLocalSpace, &RenderScene::setParticleEmitterLocalSpace));
+	PropertyRegister::add("particle_emitter",
 		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",
 			&RenderScene::getParticleEmitterMaterialPath,
 			&RenderScene::setParticleEmitterMaterialPath,
