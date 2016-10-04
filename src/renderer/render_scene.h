@@ -54,6 +54,7 @@ enum class RenderSceneVersion : int32
 	CAMERA_AND_TERRAIN_REFACTOR,
 	DECAL,
 	PARTICLE_EMITTER_SUBIMAGE_MODULE,
+	PARTICLE_EMITTER_LOCAL_SPACE,
 
 	LATEST,
 	INVALID = -1,
@@ -280,6 +281,7 @@ public:
 	virtual const Vec2* getParticleEmitterSize(ComponentHandle cmp) = 0;
 	virtual int getParticleEmitterSizeCount(ComponentHandle cmp) = 0;
 	virtual bool getParticleEmitterAutoemit(ComponentHandle cmp) = 0;
+	virtual bool getParticleEmitterLocalSpace(ComponentHandle cmp) = 0;
 	virtual Vec3 getParticleEmitterAcceleration(ComponentHandle cmp) = 0;
 	virtual Vec2 getParticleEmitterLinearMovementX(ComponentHandle cmp) = 0;
 	virtual Vec2 getParticleEmitterLinearMovementY(ComponentHandle cmp) = 0;
@@ -289,6 +291,7 @@ public:
 	virtual Vec2 getParticleEmitterSpawnPeriod(ComponentHandle cmp) = 0;
 	virtual Vec2 getParticleEmitterInitialSize(ComponentHandle cmp) = 0;
 	virtual void setParticleEmitterAutoemit(ComponentHandle cmp, bool autoemit) = 0;
+	virtual void setParticleEmitterLocalSpace(ComponentHandle cmp, bool autoemit) = 0;
 	virtual void setParticleEmitterAlpha(ComponentHandle cmp, const Vec2* value, int count) = 0;
 	virtual void setParticleEmitterSize(ComponentHandle cmp, const Vec2* values, int count) = 0;
 	virtual void setParticleEmitterAcceleration(ComponentHandle cmp, const Vec3& value) = 0;

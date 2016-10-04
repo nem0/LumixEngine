@@ -1510,6 +1510,18 @@ public:
 	}
 
 
+	void setParticleEmitterLocalSpace(ComponentHandle cmp, bool local_space) override
+	{
+		m_particle_emitters[{cmp.index}]->m_local_space = local_space;
+	}
+
+
+	bool getParticleEmitterLocalSpace(ComponentHandle cmp) override
+	{
+		return m_particle_emitters[{cmp.index}]->m_local_space;
+	}
+
+
 	Vec3 getParticleEmitterAcceleration(ComponentHandle cmp) override
 	{
 		auto* module = getEmitterModule<ParticleEmitter::ForceModule>(cmp);

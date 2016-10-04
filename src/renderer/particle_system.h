@@ -248,6 +248,7 @@ public:
 	Entity m_entity;
 	bool m_is_valid;
 	bool m_autoemit;
+	bool m_local_space;
 
 private:
 	void spawnParticle();

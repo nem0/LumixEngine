@@ -27,6 +27,7 @@ enum class ParticleEmitterVersion : int
 	SIZE_ALPHA_SAVE,
 	COMPONENT_TYPE,
 	AUTOEMIT,
+	LOCAL_SPACE,
 
 	LATEST,
 	INVALID = -1
@@ -624,6 +625,7 @@ ParticleEmitter::ParticleEmitter(Entity entity, Universe& universe, IAllocator& 
 	, m_size(allocator)
 	, m_subimage_module(nullptr)
 	, m_autoemit(true)
+	, m_local_space(false)
 {
 	init();
 }
@@ -679,7 +681,14 @@ void ParticleEmitter::setMaterial(Material* material)
 
 void ParticleEmitter::spawnParticle()
 {
-	m_position.push(m_universe.getPosition(m_entity));
+	if (m_local_space)
+	{
+		m_position.emplace(0.0f, 0.0f, 0.0f);
+	}
+	else
+	{
+		m_position.push(m_universe.getPosition(m_entity));
+	}
 	m_rotation.push(0);
 	m_rotational_speed.push(0);
 	m_life.push(m_initial_life.getRandom());
@@ -755,6 +764,7 @@ void ParticleEmitter::serialize(OutputBlob& blob)
 	blob.write(m_initial_size);
 	blob.write(m_entity);
 	blob.write(m_autoemit);
+	blob.write(m_local_space);
 	blob.writeString(m_material ? m_material->getPath().c_str() : "");
 	blob.write(m_modules.size());
 	for (auto* module : m_modules)
@@ -780,6 +790,10 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager, boo
 	if (version > (int)ParticleEmitterVersion::AUTOEMIT)
 	{
 		blob.read(m_autoemit);
+	}
+	if (version > (int)ParticleEmitterVersion::LOCAL_SPACE)
+	{
+		blob.read(m_local_space);
 	}
 	char path[MAX_PATH_LENGTH];
 	blob.readString(path, lengthOf(path));
@@ -894,32 +908,6 @@ void ParticleEmitter::spawnParticles(float time_delta)
 		emit();
 	}
 }
-
-
-struct InitialVelocityModule : public ParticleEmitter::ModuleBase
-{
-	Interval m_x;
-	Interval m_y;
-	Interval m_z;
-
-	explicit InitialVelocityModule(ParticleEmitter& emitter)
-		: ModuleBase(emitter)
-	{
-		m_z.from = -1;
-		m_z.to = 1;
-		m_x.from = m_x.to = m_y.from = m_y.to = 0;
-	}
-
-
-	void spawnParticle(int index) override
-	{
-		Vec3 v;
-		v.x = m_x.getRandom();
-		v.y = m_y.getRandom();
-		v.z = m_z.getRandom();
-		m_emitter.m_velocity[index] = v;
-	}
-};
 
 
 } // namespace Lumix

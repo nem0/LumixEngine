@@ -496,6 +496,7 @@ struct PipelineImpl : public Pipeline
 		m_layer_uniform = bgfx::createUniform("u_layer", bgfx::UniformType::Vec4);
 		m_terrain_matrix_uniform = bgfx::createUniform("u_terrainMatrix", bgfx::UniformType::Mat4);
 		m_decal_matrix_uniform = bgfx::createUniform("u_decalMatrix", bgfx::UniformType::Mat4);
+		m_emitter_matrix_uniform = bgfx::createUniform("u_emitterMatrix", bgfx::UniformType::Mat4);
 	}
 
 
@@ -525,6 +526,7 @@ struct PipelineImpl : public Pipeline
 		bgfx::destroyUniform(m_cam_inv_view_uniform);
 		bgfx::destroyUniform(m_texture_size_uniform);
 		bgfx::destroyUniform(m_decal_matrix_uniform);
+		bgfx::destroyUniform(m_emitter_matrix_uniform);
 	}
 
 
@@ -573,11 +575,28 @@ struct PipelineImpl : public Pipeline
 		if (!emitter.getMaterial()->isReady()) return;
 
 		Material* material = emitter.getMaterial();
-
+		static const int local_space_define_idx = m_renderer.getShaderDefineIdx("LOCAL_SPACE");
+		material->setDefine(local_space_define_idx, emitter.m_local_space);
 		const bgfx::InstanceDataBuffer* instance_buffer = nullptr;
 
 		auto& view = *m_current_view;
+		Matrix mtx = m_scene->getUniverse().getMatrix(emitter.m_entity);
 		static const int subimage_define_idx = m_renderer.getShaderDefineIdx("SUBIMAGE");
+		auto draw = [this, material, &view, mtx](const bgfx::InstanceDataBuffer* instance_buffer, int count) {
+			executeCommandBuffer(material->getCommandBuffer(), material);
+			executeCommandBuffer(view.command_buffer.buffer, material);
+
+			bgfx::setInstanceDataBuffer(instance_buffer, count);
+			bgfx::setVertexBuffer(m_particle_vertex_buffer);
+			bgfx::setIndexBuffer(m_particle_index_buffer);
+			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+			bgfx::setState(view.render_state | material->getRenderStates());
+			++m_stats.draw_call_count;
+			m_stats.instance_count += count;
+			m_stats.triangle_count += count * 2;
+			bgfx::setUniform(m_emitter_matrix_uniform, &mtx);
+			bgfx::submit(view.bgfx_id, material->getShaderInstance().getProgramHandle(view.pass_idx));
+		};
 		if (emitter.m_subimage_module)
 		{
 			struct Instance
@@ -587,37 +606,16 @@ struct PipelineImpl : public Pipeline
 				Vec4 uv_params0;
 				Vec4 uv_params1;
 			};
-			Instance* instance = nullptr;
 			int cols = emitter.m_subimage_module->cols;
 			int rows = emitter.m_subimage_module->rows;
 			float w = 1.0f / cols;
 			float h = 1.0f / rows;
 			material->setDefine(subimage_define_idx, true);
 			int size = emitter.m_subimage_module->rows * emitter.m_subimage_module->cols;
+			instance_buffer = bgfx::allocInstanceDataBuffer(emitter.m_life.size(), sizeof(Instance));
+			Instance* instance = (Instance*)instance_buffer->data;
 			for (int i = 0, c = emitter.m_life.size(); i < c; ++i)
 			{
-				if (i % PARTICLE_BATCH_SIZE == 0)
-				{
-					if (instance_buffer)
-					{
-						executeCommandBuffer(material->getCommandBuffer(), material);
-						executeCommandBuffer(view.command_buffer.buffer, material);
-
-						bgfx::setInstanceDataBuffer(instance_buffer, PARTICLE_BATCH_SIZE);
-						bgfx::setVertexBuffer(m_particle_vertex_buffer);
-						bgfx::setIndexBuffer(m_particle_index_buffer);
-						bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
-						bgfx::setState(view.render_state | material->getRenderStates());
-						++m_stats.draw_call_count;
-						m_stats.instance_count += PARTICLE_BATCH_SIZE;
-						m_stats.triangle_count += PARTICLE_BATCH_SIZE * 2;
-						bgfx::submit(view.bgfx_id, material->getShaderInstance().getProgramHandle(view.pass_idx));
-					}
-
-					instance_buffer = bgfx::allocInstanceDataBuffer(PARTICLE_BATCH_SIZE, sizeof(Instance));
-					instance = (Instance*)instance_buffer->data;
-				}
-
 				instance->pos.set(emitter.m_position[i], emitter.m_size[i]);
 				instance->alpha_and_rotation.set(emitter.m_alpha[i], emitter.m_rotation[i], 0, 0);
 				float fidx = emitter.m_rel_life[i] * size;
@@ -631,6 +629,7 @@ struct PipelineImpl : public Pipeline
 				instance->uv_params1.set(col1, row1, t, 0);
 				++instance;
 			}
+			draw(instance_buffer, emitter.m_life.size());
 		}
 		else
 		{
@@ -639,51 +638,17 @@ struct PipelineImpl : public Pipeline
 				Vec4 pos;
 				Vec4 alpha_and_rotation;
 			};
-			Instance* instance = nullptr;
 			material->setDefine(subimage_define_idx, false);
+			instance_buffer = bgfx::allocInstanceDataBuffer(emitter.m_life.size(), sizeof(Instance));
+			Instance* instance = (Instance*)instance_buffer->data;
 			for (int i = 0, c = emitter.m_life.size(); i < c; ++i)
 			{
-				if (i % PARTICLE_BATCH_SIZE == 0)
-				{
-					if (instance_buffer)
-					{
-						executeCommandBuffer(material->getCommandBuffer(), material);
-						executeCommandBuffer(view.command_buffer.buffer, material);
-
-						bgfx::setInstanceDataBuffer(instance_buffer, PARTICLE_BATCH_SIZE);
-						bgfx::setVertexBuffer(m_particle_vertex_buffer);
-						bgfx::setIndexBuffer(m_particle_index_buffer);
-						bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
-						bgfx::setState(view.render_state | material->getRenderStates());
-						++m_stats.draw_call_count;
-						m_stats.instance_count += PARTICLE_BATCH_SIZE;
-						m_stats.triangle_count += PARTICLE_BATCH_SIZE * 2;
-						bgfx::submit(view.bgfx_id, material->getShaderInstance().getProgramHandle(view.pass_idx));
-					}
-
-					instance_buffer = bgfx::allocInstanceDataBuffer(PARTICLE_BATCH_SIZE, sizeof(Instance));
-					instance = (Instance*)instance_buffer->data;
-				}
-
 				instance->pos = Vec4(emitter.m_position[i], emitter.m_size[i]);
 				instance->alpha_and_rotation = Vec4(emitter.m_alpha[i], emitter.m_rotation[i], 0, 0);
 				++instance;
 			}
+			draw(instance_buffer, emitter.m_life.size());
 		}
-
-		executeCommandBuffer(material->getCommandBuffer(), material);
-		executeCommandBuffer(view.command_buffer.buffer, material);
-
-		int instance_count = emitter.m_life.size() % PARTICLE_BATCH_SIZE;
-		bgfx::setInstanceDataBuffer(instance_buffer, instance_count);
-		bgfx::setVertexBuffer(m_particle_vertex_buffer);
-		bgfx::setIndexBuffer(m_particle_index_buffer);
-		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
-		bgfx::setState(view.render_state | material->getRenderStates());
-		++m_stats.draw_call_count;
-		m_stats.instance_count += instance_count;
-		m_stats.triangle_count += instance_count * 2;
-		bgfx::submit(view.bgfx_id, material->getShaderInstance().getProgramHandle(view.pass_idx));
 	}
 
 
@@ -2656,6 +2621,7 @@ struct PipelineImpl : public Pipeline
 	bgfx::UniformHandle m_light_specular_uniform;
 	bgfx::UniformHandle m_terrain_matrix_uniform;
 	bgfx::UniformHandle m_decal_matrix_uniform;
+	bgfx::UniformHandle m_emitter_matrix_uniform;
 	bgfx::UniformHandle m_tex_shadowmap_uniform;
 	bgfx::UniformHandle m_cam_view_uniform;
 	bgfx::UniformHandle m_cam_proj_uniform;
