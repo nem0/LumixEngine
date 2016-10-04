@@ -248,6 +248,9 @@ static void registerProperties(IAllocator& allocator)
 		LUMIX_NEW(allocator, SimplePropertyDescriptor<Int2, RenderScene>)(
 			"Spawn count", &RenderScene::getParticleEmitterSpawnCount, &RenderScene::setParticleEmitterSpawnCount));
 	PropertyRegister::add("particle_emitter",
+		LUMIX_NEW(allocator, BoolPropertyDescriptor<RenderScene>)(
+			"Autoemit", &RenderScene::getParticleEmitterAutoemit, &RenderScene::setParticleEmitterAutoemit));
+	PropertyRegister::add("particle_emitter",
 		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)("Material",
 			&RenderScene::getParticleEmitterMaterialPath,
 			&RenderScene::setParticleEmitterMaterialPath,

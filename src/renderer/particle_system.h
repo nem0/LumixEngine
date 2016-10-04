@@ -226,6 +226,7 @@ public:
 	IAllocator& getAllocator() { return m_allocator; }
 	void addModule(ModuleBase* module);
 	ModuleBase* getModule(ComponentType hash);
+	void emit();
 
 public:
 	Array<float> m_rel_life;
@@ -246,6 +247,7 @@ public:
 	SubimageModule* m_subimage_module;
 	Entity m_entity;
 	bool m_is_valid;
+	bool m_autoemit;
 
 private:
 	void spawnParticle();
