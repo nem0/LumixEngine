@@ -228,7 +228,8 @@ void PropertyGrid::showEntityProperty(const Lumix::Array<Lumix::Entity>& entitie
 	cmp.entity = entities[0];
 	cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
 	desc.get(cmp, index, blob);
-	int value = *(int*)blob.getData();
+	Lumix::Entity entity = *(Lumix::Entity*)blob.getData();
+	int value = m_editor.getUniverse()->getDenseIdx(entity);
 	int count = m_editor.getUniverse()->getEntityCount();
 
 	struct Data
@@ -253,7 +254,8 @@ void PropertyGrid::showEntityProperty(const Lumix::Array<Lumix::Entity>& entitie
 
 	if(ImGui::Combo(desc.getName(), &value, getter, &data, count))
 	{
-		m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &value, sizeof(value));
+		Lumix::Entity entity = m_editor.getUniverse()->getEntityFromDenseIdx(value);
+		m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &entity, sizeof(entity));
 	}
 }
 
