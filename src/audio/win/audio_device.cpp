@@ -312,6 +312,19 @@ struct AudioDeviceImpl : public AudioDevice
 	}
 
 
+	bool isEnd(BufferHandle handle) override
+	{
+		int dense_idx = m_buffer_map[handle];
+		Buffer& buffer = m_buffers[dense_idx];
+		DWORD rel_pc, rel_wc;
+		buffer.handle->GetCurrentPosition(&rel_pc, &rel_wc);
+		auto rel_written = DWORD(buffer.written % STREAM_SIZE);
+		DWORD abs_pc = buffer.written - (rel_written - rel_pc);
+		if (rel_pc >= rel_written) abs_pc -= STREAM_SIZE;
+		return abs_pc >= buffer.data_size;
+	}
+
+
 	void stop(BufferHandle handle) override
 	{
 		--m_buffer_count;
@@ -497,6 +510,7 @@ public:
 	void play(BufferHandle buffer, bool looped) override {}
 	bool isPlaying(BufferHandle buffer) override { return false; }
 	void stop(BufferHandle buffer) override {}
+	bool isEnd(BufferHandle buffer) override { return true; }
 	void pause(BufferHandle buffer) override {}
 	void setVolume(BufferHandle buffer, float volume) override {}
 	void setFrequency(BufferHandle buffer, float frequency) override {}
@@ -535,9 +549,6 @@ void AudioDevice::destroy(AudioDevice& device)
 	if (&device == &g_null_device) return;
 	LUMIX_DELETE(static_cast<AudioDeviceImpl&>(device).m_engine->getAllocator(), &device);
 }
-
-
-const AudioDevice::BufferHandle AudioDevice::INVALID_BUFFER_HANDLE = -1;
 
 
 } // namespace Lumix

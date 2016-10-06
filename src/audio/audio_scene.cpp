@@ -62,8 +62,8 @@ struct PlayingSound
 {
 	AudioDevice::BufferHandle buffer_id;
 	Entity entity;
-	float time;
 	AudioScene::ClipInfo* clip;
+	bool is_3d;
 };
 
 
@@ -129,12 +129,14 @@ struct AudioSceneImpl : public AudioScene
 			auto& sound = m_playing_sounds[i];
 			if (sound.buffer_id == AudioDevice::INVALID_BUFFER_HANDLE) continue;
 
-			auto pos = m_universe.getPosition(sound.entity);
-			m_device.setSourcePosition(sound.buffer_id, pos.x, pos.y, pos.z);
-			sound.time += time_delta;
+			if (sound.is_3d)
+			{
+				auto pos = m_universe.getPosition(sound.entity);
+				m_device.setSourcePosition(sound.buffer_id, pos.x, pos.y, pos.z);
+			}
 
 			auto* clip_info = sound.clip;
-			if (!clip_info->looped && sound.time > clip_info->clip->getLengthSeconds())
+			if (!clip_info->looped && m_device.isEnd(sound.buffer_id))
 			{
 				m_device.stop(sound.buffer_id);
 				m_playing_sounds[i].buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
@@ -536,9 +538,9 @@ struct AudioSceneImpl : public AudioScene
 				m_device.setSourcePosition(buffer, pos.x, pos.y, pos.z);
 
 				auto& sound = m_playing_sounds[i];
+				sound.is_3d = is_3d;
 				sound.buffer_id = buffer;
 				sound.entity = entity;
-				sound.time = 0;
 				sound.clip = clip_info;
 				
 				for (const EchoZone& zone : m_echo_zones)
