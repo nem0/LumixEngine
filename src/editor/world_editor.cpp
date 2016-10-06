@@ -2230,6 +2230,7 @@ public:
 
 	void loadMap(FS::IFile& file, bool success)
 	{
+		PROFILE_FUNCTION();
 		ASSERT(success);
 		if (success)
 		{
