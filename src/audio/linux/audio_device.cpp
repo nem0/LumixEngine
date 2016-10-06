@@ -61,7 +61,4 @@ void AudioDevice::destroy(AudioDevice& device)
 }
 
 
-const AudioDevice::BufferHandle AudioDevice::INVALID_BUFFER_HANDLE = -1;
-
-
 } // namespace Lumix
