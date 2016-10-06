@@ -1,8 +1,9 @@
 #include "clip_manager.h"
 #include "engine/iallocator.h"
+#include "engine/lumix.h"
+#include "engine/profiler.h"
 #include "engine/resource.h"
 #include "engine/string.h"
-#include "engine/lumix.h"
 #define STB_VORBIS_HEADER_ONLY
 #include "stb/stb_vorbis.cpp"
 #include <cstdlib>
@@ -20,6 +21,7 @@ void Clip::unload()
 
 bool Clip::load(FS::IFile& file)
 {
+	PROFILE_FUNCTION();
 	short* output = nullptr;
 	auto res = stb_vorbis_decode_memory(
 		(unsigned char*)file.getBuffer(), (int)file.size(), &m_channels, &m_sample_rate, &output);
