@@ -28,6 +28,7 @@ public:
 	void play(BufferHandle buffer, bool looped) override {}
 	bool isPlaying(BufferHandle buffer) override { return false; }
 	void stop(BufferHandle buffer) override {}
+	bool isEnd(BufferHandle buffer) override { return true; }
 	void pause(BufferHandle buffer) override {}
 	void setVolume(BufferHandle buffer, float volume) override {}
 	void setFrequency(BufferHandle buffer, float frequency) override {}
