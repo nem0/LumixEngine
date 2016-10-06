@@ -262,7 +262,7 @@ struct AudioDeviceImpl : public AudioDevice
 			{
 				if (buffer_status & DSBSTATUS_PLAYING)
 				{
-					buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING);
+					buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING ? DSBPLAY_LOOPING: 0);
 
 				}
 				return;
@@ -272,7 +272,7 @@ struct AudioDeviceImpl : public AudioDevice
 			{
 				if (buffer_status & DSBSTATUS_PLAYING)
 				{
-					buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING);
+					buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING ? DSBPLAY_LOOPING : 0);
 				}
 				return;
 			}
@@ -289,7 +289,7 @@ struct AudioDeviceImpl : public AudioDevice
 		echo->SetAllParameters(&echo_params);
 		if (buffer_status & DSBSTATUS_PLAYING)
 		{
-			buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING);
+			buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING ? DSBPLAY_LOOPING : 0);
 		}
 	}
 
