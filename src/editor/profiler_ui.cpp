@@ -590,7 +590,7 @@ void ProfilerUIImpl::onFrame()
 			my_root->m_first_child = nullptr;
 			m_threads[i].root = my_root;
 		}
-		ASSERT(root && m_threads[i].root->m_name == Lumix::Profiler::getBlockName(root));
+		ASSERT(!root || m_threads[i].root->m_name == Lumix::Profiler::getBlockName(root));
 
 		if (m_threads[i].root) cloneBlock(m_threads[i].root, root);
 	}
