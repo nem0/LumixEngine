@@ -61,7 +61,7 @@ static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType MODEL_TYPE("model");
 
 
-struct MaterialPlugin : public AssetBrowser::IPlugin
+struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	explicit MaterialPlugin(StudioApp& app)
 		: m_app(app)
@@ -328,7 +328,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 };
 
 
-struct ModelPlugin : public AssetBrowser::IPlugin
+struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	explicit ModelPlugin(StudioApp& app)
 		: m_app(app)
@@ -575,7 +575,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 };
 
 
-struct TexturePlugin : public AssetBrowser::IPlugin
+struct TexturePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	explicit TexturePlugin(StudioApp& app)
 		: m_app(app)
@@ -643,7 +643,7 @@ struct TexturePlugin : public AssetBrowser::IPlugin
 };
 
 
-struct ShaderPlugin : public AssetBrowser::IPlugin
+struct ShaderPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	explicit ShaderPlugin(StudioApp& app)
 		: m_app(app)
@@ -745,7 +745,7 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 };
 
 
-struct EnvironmentProbePlugin : public PropertyGrid::IPlugin
+struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 {
 	explicit EnvironmentProbePlugin(StudioApp& app)
 		: m_app(app)
@@ -957,7 +957,7 @@ struct EnvironmentProbePlugin : public PropertyGrid::IPlugin
 };
 
 
-struct EmitterPlugin : public PropertyGrid::IPlugin
+struct EmitterPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 {
 	explicit EmitterPlugin(StudioApp& app)
 		: m_app(app)
@@ -993,7 +993,7 @@ struct EmitterPlugin : public PropertyGrid::IPlugin
 };
 
 
-struct TerrainPlugin : public PropertyGrid::IPlugin
+struct TerrainPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 {
 	explicit TerrainPlugin(StudioApp& app)
 		: m_app(app)
@@ -1023,9 +1023,9 @@ struct TerrainPlugin : public PropertyGrid::IPlugin
 };
 
 
-struct SceneViewPlugin : public StudioApp::IPlugin
+struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
-	struct RenderInterfaceImpl : public RenderInterface
+	struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	{
 		ModelHandle loadModel(Path& path) override
 		{
@@ -1338,7 +1338,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 };
 
 
-struct FurPainter : public WorldEditor::Plugin
+struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 {
 	FurPainter(StudioApp& _app)
 		: app(_app)
@@ -1721,7 +1721,7 @@ struct FurPainter : public WorldEditor::Plugin
 };
 
 
-struct FurPainterPlugin : public StudioApp::IPlugin
+struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	explicit FurPainterPlugin(StudioApp& _app)
 		: app(_app)
@@ -1857,7 +1857,7 @@ struct FurPainterPlugin : public StudioApp::IPlugin
 };
 
 
-struct GameViewPlugin : public StudioApp::IPlugin
+struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	static GameViewPlugin* s_instance;
 
@@ -2070,7 +2070,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 GameViewPlugin* GameViewPlugin::s_instance = nullptr;
 
 
-struct ShaderEditorPlugin : public StudioApp::IPlugin
+struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	explicit ShaderEditorPlugin(StudioApp& app)
 		: m_shader_editor(app.getWorldEditor()->getAllocator())
@@ -2106,7 +2106,7 @@ struct ShaderEditorPlugin : public StudioApp::IPlugin
 };
 
 
-struct WorldEditorPlugin : public WorldEditor::Plugin
+struct WorldEditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 {
 	void showPointLightGizmo(ComponentUID light)
 	{

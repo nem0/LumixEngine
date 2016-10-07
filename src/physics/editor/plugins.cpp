@@ -46,7 +46,7 @@ static Transform fromPhysx(const physx::PxTransform& v) { return{ fromPhysx(v.p)
 static physx::PxTransform toPhysx(const Transform& v) { return{ toPhysx(v.pos), toPhysx(v.rot) }; }
 
 
-struct EditorPlugin : public WorldEditor::Plugin
+struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 {
 	explicit EditorPlugin(WorldEditor& editor)
 		: m_editor(editor)
@@ -413,7 +413,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 };
 
 
-struct StudioAppPlugin : public StudioApp::IPlugin
+struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	explicit StudioAppPlugin(Lumix::WorldEditor& editor)
 		: m_editor(editor)
@@ -998,7 +998,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 
 
 
-struct PhysicsGeometryPlugin : public AssetBrowser::IPlugin
+struct PhysicsGeometryPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	explicit PhysicsGeometryPlugin(StudioApp& app)
 		: m_app(app)

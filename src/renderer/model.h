@@ -75,7 +75,7 @@ struct LODMeshIndices
 };
 
 
-class LUMIX_RENDERER_API Model : public Resource
+class LUMIX_RENDERER_API Model LUMIX_FINAL : public Resource
 {
 public:
 	typedef HashMap<uint32, int> BoneMap;

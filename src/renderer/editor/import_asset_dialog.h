@@ -81,7 +81,7 @@ struct ImportMesh
 
 
 
-class ImportAssetDialog : public StudioApp::IPlugin
+class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 {
 	friend struct ImportTask;
 	friend struct ConvertTask;

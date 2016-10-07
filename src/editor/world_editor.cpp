@@ -47,7 +47,7 @@ static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentT
 static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
 
 
-struct BeginGroupCommand : public IEditorCommand
+struct BeginGroupCommand LUMIX_FINAL : public IEditorCommand
 {
 	BeginGroupCommand() {}
 	BeginGroupCommand(WorldEditor&) {}
@@ -61,7 +61,7 @@ struct BeginGroupCommand : public IEditorCommand
 };
 
 
-struct EndGroupCommand : public IEditorCommand
+struct EndGroupCommand LUMIX_FINAL : public IEditorCommand
 {
 	EndGroupCommand() {}
 	EndGroupCommand(WorldEditor&) {}
@@ -77,7 +77,7 @@ struct EndGroupCommand : public IEditorCommand
 };
 
 
-class SetEntityNameCommand : public IEditorCommand
+class SetEntityNameCommand LUMIX_FINAL : public IEditorCommand
 {
 public:
 	explicit SetEntityNameCommand(WorldEditor& editor)
@@ -152,7 +152,7 @@ private:
 };
 
 
-class PasteEntityCommand : public IEditorCommand
+class PasteEntityCommand LUMIX_FINAL : public IEditorCommand
 {
 public:
 	explicit PasteEntityCommand(WorldEditor& editor)
@@ -259,7 +259,7 @@ private:
 };
 
 
-class MoveEntityCommand : public IEditorCommand
+class MoveEntityCommand LUMIX_FINAL : public IEditorCommand
 {
 public:
 	explicit MoveEntityCommand(WorldEditor& editor)
@@ -410,7 +410,7 @@ private:
 };
 
 
-class ScaleEntityCommand : public IEditorCommand
+class ScaleEntityCommand LUMIX_FINAL : public IEditorCommand
 {
 public:
 	explicit ScaleEntityCommand(WorldEditor& editor)
@@ -526,7 +526,7 @@ private:
 };
 
 
-class RemoveArrayPropertyItemCommand : public IEditorCommand
+class RemoveArrayPropertyItemCommand LUMIX_FINAL : public IEditorCommand
 {
 
 public:
@@ -611,7 +611,7 @@ private:
 };
 
 
-class AddArrayPropertyItemCommand : public IEditorCommand
+class AddArrayPropertyItemCommand LUMIX_FINAL : public IEditorCommand
 {
 
 public:
@@ -684,7 +684,7 @@ private:
 };
 
 
-class SetPropertyCommand : public IEditorCommand
+class SetPropertyCommand LUMIX_FINAL : public IEditorCommand
 {
 public:
 	explicit SetPropertyCommand(WorldEditor& editor)
@@ -847,10 +847,10 @@ private:
 };
 
 
-struct WorldEditorImpl : public WorldEditor
+struct WorldEditorImpl LUMIX_FINAL : public WorldEditor
 {
 private:
-	class AddComponentCommand : public IEditorCommand
+	class AddComponentCommand LUMIX_FINAL : public IEditorCommand
 	{
 	public:
 		explicit AddComponentCommand(WorldEditor& editor)
@@ -957,7 +957,7 @@ private:
 	};
 
 
-	class DestroyEntitiesCommand : public IEditorCommand
+	class DestroyEntitiesCommand LUMIX_FINAL : public IEditorCommand
 	{
 	public:
 		explicit DestroyEntitiesCommand(WorldEditor& editor)
@@ -1150,7 +1150,7 @@ private:
 	};
 
 
-	class DestroyComponentCommand : public IEditorCommand
+	class DestroyComponentCommand LUMIX_FINAL : public IEditorCommand
 	{
 	public:
 		explicit DestroyComponentCommand(WorldEditor& editor)
@@ -1297,7 +1297,7 @@ private:
 	};
 
 
-	class AddEntityCommand : public IEditorCommand
+	class AddEntityCommand LUMIX_FINAL : public IEditorCommand
 	{
 	public:
 		explicit AddEntityCommand(WorldEditor& editor)

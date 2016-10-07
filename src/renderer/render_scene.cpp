@@ -147,7 +147,7 @@ struct BoneAttachment
 };
 
 
-class RenderSceneImpl : public RenderScene
+class RenderSceneImpl LUMIX_FINAL : public RenderScene
 {
 private:
 	struct ModelLoadedCallback

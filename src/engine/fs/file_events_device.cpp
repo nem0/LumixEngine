@@ -9,7 +9,7 @@ namespace Lumix
 {
 	namespace FS
 	{
-		class EventsFile : public IFile
+		class EventsFile LUMIX_FINAL : public IFile
 		{
 		public:
 			EventsFile(IFile& file, FileEventsDevice& device, FileEventsDevice::EventCallback& cb)

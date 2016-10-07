@@ -42,7 +42,7 @@ static const char* TEX_COLOR_UNIFORM = "u_texColor";
 static const float MIN_BRUSH_SIZE = 0.5f;
 
 
-struct PaintTerrainCommand : public Lumix::IEditorCommand
+struct PaintTerrainCommand LUMIX_FINAL : public Lumix::IEditorCommand
 {
 	struct Rectangle
 	{

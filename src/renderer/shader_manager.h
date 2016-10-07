@@ -7,7 +7,7 @@ namespace Lumix
 
 	class Renderer;
 
-	class LUMIX_RENDERER_API ShaderBinaryManager : public ResourceManagerBase
+	class LUMIX_RENDERER_API ShaderBinaryManager LUMIX_FINAL : public ResourceManagerBase
 	{
 	public:
 		ShaderBinaryManager(Renderer& renderer, IAllocator& allocator);
@@ -21,7 +21,7 @@ namespace Lumix
 		IAllocator& m_allocator;
 	};
 
-	class LUMIX_RENDERER_API ShaderManager : public ResourceManagerBase
+	class LUMIX_RENDERER_API ShaderManager LUMIX_FINAL : public ResourceManagerBase
 	{
 	public:
 		ShaderManager(Renderer& renderer, IAllocator& allocator);

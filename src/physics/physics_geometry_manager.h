@@ -20,7 +20,7 @@ namespace Lumix
 class PhysicsSystem;
 
 
-class PhysicsGeometryManager : public ResourceManagerBase
+class PhysicsGeometryManager LUMIX_FINAL : public ResourceManagerBase
 {
 	public:
 		PhysicsGeometryManager(PhysicsSystem& system, IAllocator& allocator)
@@ -42,7 +42,7 @@ class PhysicsGeometryManager : public ResourceManagerBase
 };
 
 
-class PhysicsGeometry : public Resource
+class PhysicsGeometry LUMIX_FINAL : public Resource
 {
 	public:
 		static const uint32 HEADER_MAGIC = 0x5f4c5046; // '_LPF'

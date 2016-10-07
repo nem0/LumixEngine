@@ -16,7 +16,7 @@ namespace MTJD
 class Manager;
 
 
-class LUMIX_ENGINE_API Scheduler : public MT::Task
+class LUMIX_ENGINE_API Scheduler LUMIX_FINAL : public MT::Task
 {
 public:
 	Scheduler(Manager& manager, IAllocator& allocator);

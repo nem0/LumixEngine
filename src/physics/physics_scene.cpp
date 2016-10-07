@@ -94,7 +94,7 @@ struct Ragdoll
 };
 
 
-struct OutputStream : public physx::PxOutputStream
+struct OutputStream LUMIX_FINAL : public physx::PxOutputStream
 {
 	explicit OutputStream(IAllocator& allocator)
 		: allocator(allocator)
@@ -132,7 +132,7 @@ struct OutputStream : public physx::PxOutputStream
 };
 
 
-struct InputStream : public physx::PxInputStream
+struct InputStream LUMIX_FINAL : public physx::PxInputStream
 {
 	InputStream(unsigned char* data, int size)
 	{
@@ -197,9 +197,9 @@ struct Heightfield
 };
 
 
-struct PhysicsSceneImpl : public PhysicsScene
+struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 {
-	struct ContactCallback : public physx::PxSimulationEventCallback
+	struct ContactCallback LUMIX_FINAL : public physx::PxSimulationEventCallback
 	{
 		explicit ContactCallback(PhysicsSceneImpl& scene)
 			: m_scene(scene)

@@ -127,12 +127,14 @@ template <typename T, int count> int lengthOf(const T (&)[count])
 #endif
 
 #ifdef _WIN32
+	#define LUMIX_FINAL final
 	#define LUMIX_LIBRARY_EXPORT __declspec(dllexport)
 	#define LUMIX_LIBRARY_IMPORT __declspec(dllimport)
 	#define LUMIX_FORCE_INLINE __forceinline
 	#define LUMIX_RESTRICT __restrict
 	#define LUMIX_ATTRIBUTE_USED
 #else 
+	#define LUMIX_FINAL final
 	#define LUMIX_LIBRARY_EXPORT __attribute__((visibility("default")))
 	#define LUMIX_LIBRARY_IMPORT 
 	#define LUMIX_FORCE_INLINE __attribute__((always_inline)) inline

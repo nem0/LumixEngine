@@ -417,7 +417,7 @@ static void registerProperties(IAllocator& allocator)
 }
 
 
-struct BGFXAllocator : public bx::AllocatorI
+struct BGFXAllocator LUMIX_FINAL : public bx::AllocatorI
 {
 
 	explicit BGFXAllocator(Lumix::IAllocator& source)
@@ -463,9 +463,9 @@ struct BGFXAllocator : public bx::AllocatorI
 };
 
 
-struct RendererImpl : public Renderer
+struct RendererImpl LUMIX_FINAL : public Renderer
 {
-	struct CallbackStub : public bgfx::CallbackI
+	struct CallbackStub LUMIX_FINAL : public bgfx::CallbackI
 	{
 		explicit CallbackStub(RendererImpl& renderer)
 			: m_renderer(renderer)

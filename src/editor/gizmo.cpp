@@ -60,7 +60,7 @@ enum class CoordSystem
 };
 
 
-struct GizmoImpl : public Gizmo
+struct GizmoImpl LUMIX_FINAL : public Gizmo
 {
 	static const int MAX_GIZMOS = 16;
 

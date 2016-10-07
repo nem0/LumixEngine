@@ -17,7 +17,7 @@ namespace Lumix
 	template <typename T> class Array;
 
 
-	class HierarchyPlugin : public IPlugin
+	class HierarchyPlugin LUMIX_FINAL : public IPlugin
 	{
 	public:
 		explicit HierarchyPlugin(IAllocator& allocator) : m_allocator(allocator) {}

@@ -62,7 +62,7 @@ struct LUMIX_RENDERER_API ShaderCombinations
 };
 
 
-class LUMIX_RENDERER_API ShaderBinary : public Resource
+class LUMIX_RENDERER_API ShaderBinary LUMIX_FINAL : public Resource
 {
 public:
 	ShaderBinary(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
@@ -77,7 +77,7 @@ private:
 };
 
 
-class LUMIX_RENDERER_API Shader : public Resource
+class LUMIX_RENDERER_API Shader LUMIX_FINAL : public Resource
 {
 	friend struct ShaderInstance;
 

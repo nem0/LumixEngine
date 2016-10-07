@@ -67,7 +67,7 @@ struct PlayingSound
 };
 
 
-struct AudioSceneImpl : public AudioScene
+struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 {
 	AudioSceneImpl(AudioSystem& system, Universe& context, IAllocator& allocator)
 		: m_allocator(allocator)

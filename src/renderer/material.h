@@ -22,7 +22,7 @@ struct ShaderInstance;
 class Texture;
 
 
-class LUMIX_RENDERER_API Material : public Resource
+class LUMIX_RENDERER_API Material LUMIX_FINAL : public Resource
 {
 	friend class MaterialManager;
 public:

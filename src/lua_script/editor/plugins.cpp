@@ -39,9 +39,9 @@ namespace
 {
 
 
-struct PropertyGridPlugin : public PropertyGrid::IPlugin
+struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 {
-	struct AddScriptCommand : public IEditorCommand
+	struct AddScriptCommand LUMIX_FINAL : public IEditorCommand
 	{
 		AddScriptCommand() {}
 
@@ -83,7 +83,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 	};
 
 
-	struct MoveScriptCommand : public IEditorCommand
+	struct MoveScriptCommand LUMIX_FINAL : public IEditorCommand
 	{
 		explicit MoveScriptCommand(WorldEditor& editor)
 			: blob(editor.getAllocator())
@@ -148,7 +148,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 	};
 
 
-	struct RemoveScriptCommand : public IEditorCommand
+	struct RemoveScriptCommand LUMIX_FINAL : public IEditorCommand
 	{
 		explicit RemoveScriptCommand(WorldEditor& editor)
 			: blob(editor.getAllocator())
@@ -210,7 +210,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 	};
 
 
-	struct SetPropertyCommand : public IEditorCommand
+	struct SetPropertyCommand LUMIX_FINAL : public IEditorCommand
 	{
 		explicit SetPropertyCommand(WorldEditor& editor)
 			: property_name(editor.getAllocator())
@@ -548,7 +548,7 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 };
 
 
-struct ConsolePlugin : public StudioApp::IPlugin
+struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	ConsolePlugin(StudioApp& _app)
 		: app(_app)
@@ -615,7 +615,7 @@ IEditorCommand* createRemoveScriptCommand(WorldEditor& editor)
 }
 
 
-struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
+struct AddComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
 {
 	AddComponentPlugin(StudioApp& _app)
 		: app(_app)

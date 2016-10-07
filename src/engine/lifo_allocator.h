@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 
-	class LIFOAllocator : public IAllocator
+	class LIFOAllocator LUMIX_FINAL : public IAllocator
 	{
 		public:
 			LIFOAllocator(IAllocator& source, size_t bucket_size)

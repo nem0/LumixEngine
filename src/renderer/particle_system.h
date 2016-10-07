@@ -76,7 +76,7 @@ public:
 	};
 
 
-	struct LUMIX_RENDERER_API SubimageModule : public ModuleBase
+	struct LUMIX_RENDERER_API SubimageModule LUMIX_FINAL : public ModuleBase
 	{
 		explicit SubimageModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
@@ -89,7 +89,7 @@ public:
 	};
 
 
-	struct LUMIX_RENDERER_API SpawnShapeModule : public ModuleBase
+	struct LUMIX_RENDERER_API SpawnShapeModule LUMIX_FINAL : public ModuleBase
 	{
 		explicit SpawnShapeModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
@@ -107,7 +107,7 @@ public:
 	};
 
 
-	struct LUMIX_RENDERER_API LinearMovementModule : public ModuleBase
+	struct LUMIX_RENDERER_API LinearMovementModule LUMIX_FINAL : public ModuleBase
 	{
 		explicit LinearMovementModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
@@ -122,7 +122,7 @@ public:
 	};
 
 
-	struct LUMIX_RENDERER_API PlaneModule : public ModuleBase
+	struct LUMIX_RENDERER_API PlaneModule LUMIX_FINAL : public ModuleBase
 	{
 		explicit PlaneModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
@@ -138,7 +138,7 @@ public:
 	};
 
 
-	struct LUMIX_RENDERER_API AttractorModule : public ModuleBase
+	struct LUMIX_RENDERER_API AttractorModule LUMIX_FINAL : public ModuleBase
 	{
 		explicit AttractorModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
@@ -154,7 +154,7 @@ public:
 	};
 
 
-	struct LUMIX_RENDERER_API ForceModule : public ModuleBase
+	struct LUMIX_RENDERER_API ForceModule LUMIX_FINAL : public ModuleBase
 	{
 		explicit ForceModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
@@ -167,7 +167,7 @@ public:
 	};
 
 
-	struct LUMIX_RENDERER_API AlphaModule : public ModuleBase
+	struct LUMIX_RENDERER_API AlphaModule LUMIX_FINAL : public ModuleBase
 	{
 		explicit AlphaModule(ParticleEmitter& emitter);
 		void update(float time_delta) override;
@@ -183,7 +183,7 @@ public:
 	};
 
 
-	struct LUMIX_RENDERER_API SizeModule : public ModuleBase
+	struct LUMIX_RENDERER_API SizeModule LUMIX_FINAL : public ModuleBase
 	{
 		explicit SizeModule(ParticleEmitter& emitter);
 		void update(float time_delta) override;
@@ -199,7 +199,7 @@ public:
 	};
 
 
-	struct LUMIX_RENDERER_API RandomRotationModule : public ModuleBase
+	struct LUMIX_RENDERER_API RandomRotationModule LUMIX_FINAL : public ModuleBase
 	{
 		explicit RandomRotationModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;

@@ -13,7 +13,7 @@ namespace MTJD
 {
 
 
-struct ManagerImpl : public Manager
+struct ManagerImpl LUMIX_FINAL : public Manager
 {
 	typedef MT::LockFreeFixedQueue<Job*, 512>	JobsTable;
 	typedef Array<JobTrans*>					TransTable;

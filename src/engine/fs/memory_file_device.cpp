@@ -9,7 +9,7 @@ namespace Lumix
 {
 	namespace FS
 	{
-		class LUMIX_ENGINE_API MemoryFile : public IFile
+		class LUMIX_ENGINE_API MemoryFile LUMIX_FINAL : public IFile
 		{
 		public:
 			MemoryFile(IFile* file, MemoryFileDevice& device, IAllocator& allocator)

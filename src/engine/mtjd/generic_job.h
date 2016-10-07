@@ -13,7 +13,7 @@ namespace MTJD
 {
 
 
-template <class T> class GenericJob : public MTJD::Job
+template <class T> class GenericJob LUMIX_FINAL : public MTJD::Job
 {
 public:
 	GenericJob(MTJD::Manager& manager, T function, IAllocator& allocator)

@@ -11,7 +11,7 @@ namespace Lumix
 	{
 		class IFile;
 
-		class LUMIX_ENGINE_API MemoryFileDevice : public IFileDevice
+		class LUMIX_ENGINE_API MemoryFileDevice LUMIX_FINAL : public IFileDevice
 		{
 		public:
 			explicit MemoryFileDevice(IAllocator& allocator) : m_allocator(allocator) {}

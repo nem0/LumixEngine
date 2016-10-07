@@ -10,7 +10,7 @@ namespace Lumix
 {
 
 
-struct PrefabResource : public Resource
+struct PrefabResource LUMIX_FINAL : public Resource
 {
 	PrefabResource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
 		: Resource(path, resource_manager, allocator)
@@ -33,7 +33,7 @@ struct PrefabResource : public Resource
 };
 
 
-class PrefabResourceManager : public ResourceManagerBase
+class PrefabResourceManager LUMIX_FINAL : public ResourceManagerBase
 {
 public:
 	PrefabResourceManager(IAllocator& allocator)

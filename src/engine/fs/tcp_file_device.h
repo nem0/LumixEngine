@@ -39,7 +39,7 @@ namespace Lumix
 			int32 value;
 		};
 
-		class LUMIX_ENGINE_API TCPFileDevice : public IFileDevice
+		class LUMIX_ENGINE_API TCPFileDevice LUMIX_FINAL : public IFileDevice
 		{
 		public:
 			TCPFileDevice();

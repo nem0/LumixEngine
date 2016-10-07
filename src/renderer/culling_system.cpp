@@ -65,7 +65,7 @@ static void doCulling(int start_index,
 	}
 }
 
-class CullingJob : public MTJD::Job
+class CullingJob LUMIX_FINAL : public MTJD::Job
 {
 public:
 	CullingJob(const CullingSystem::InputSpheres& spheres,
@@ -123,7 +123,7 @@ private:
 	bool m_is_executed;
 };
 
-class CullingSystemImpl : public CullingSystem
+class CullingSystemImpl LUMIX_FINAL : public CullingSystem
 {
 public:
 	CullingSystemImpl(MTJD::Manager& mtjd_manager, IAllocator& allocator)

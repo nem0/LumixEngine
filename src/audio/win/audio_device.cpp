@@ -10,7 +10,7 @@ namespace Lumix
 {
 
 
-struct AudioDeviceImpl : public AudioDevice
+struct AudioDeviceImpl LUMIX_FINAL : public AudioDevice
 {
 	struct Buffer
 	{
@@ -491,7 +491,7 @@ struct AudioDeviceImpl : public AudioDevice
 };
 
 
-class NullAudioDevice : public AudioDevice
+class NullAudioDevice LUMIX_FINAL : public AudioDevice
 {
 public:
 	BufferHandle createBuffer(const void* data,
