@@ -13,7 +13,7 @@ namespace Lumix
 	{
 		static const uint32 INVALID_FILE = 0xffffFFFF;
 
-		class TCPFile : public IFile
+		class TCPFile LUMIX_FINAL : public IFile
 		{
 		public:
 			TCPFile(Net::TCPStream* stream, TCPFileDevice& device, MT::SpinMutex& spin_mutex) 

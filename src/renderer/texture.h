@@ -13,7 +13,7 @@ namespace FS
 }
 
 
-class LUMIX_RENDERER_API Texture : public Resource
+class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 {
 	public:
 		Texture(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);

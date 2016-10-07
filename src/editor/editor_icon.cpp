@@ -52,7 +52,7 @@ const char* ICONS[(int)IconType::COUNT] =
 static const float ORTHO_SIZE_SCALE = 1 / 20.0f;
 
 
-struct EditorIconsImpl : public EditorIcons
+struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 {
 	struct Icon
 	{

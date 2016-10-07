@@ -235,7 +235,7 @@ static void logErrorToFile(const char*, const char* message)
 }
 
 
-class EngineImpl : public Engine
+class EngineImpl LUMIX_FINAL : public Engine
 {
 public:
 	EngineImpl(const char* base_path0, const char* base_path1, FS::FileSystem* fs, IAllocator& allocator)

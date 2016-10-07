@@ -30,7 +30,7 @@ static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType TEXTURE_TYPE("texture");
 
 
-struct GUISystemImpl : public GUISystem
+struct GUISystemImpl LUMIX_FINAL : public GUISystem
 {
 	GUISystemImpl(Engine& engine)
 		: m_engine(engine)

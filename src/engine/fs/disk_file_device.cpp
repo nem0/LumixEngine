@@ -11,7 +11,7 @@ namespace Lumix
 {
 	namespace FS
 	{
-		struct DiskFile : public IFile
+		struct DiskFile LUMIX_FINAL : public IFile
 		{
 			DiskFile(IFile* fallthrough, DiskFileDevice& device, IAllocator& allocator)
 				: m_device(device)

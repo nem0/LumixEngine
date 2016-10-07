@@ -53,7 +53,7 @@ static void registerProperties(Lumix::IAllocator& allocator)
 }
 
 
-struct AudioSystemImpl : public AudioSystem
+struct AudioSystemImpl LUMIX_FINAL : public AudioSystem
 {
 	explicit AudioSystemImpl(Engine& engine)
 		: m_engine(engine)

@@ -41,7 +41,7 @@
 #include <SDL_syswm.h>
 
 
-class StudioAppImpl : public StudioApp
+class StudioAppImpl LUMIX_FINAL : public StudioApp
 {
 public:
 	StudioAppImpl()
@@ -213,7 +213,7 @@ public:
 		Lumix::ResourceType resource_type,
 		const char* property_name) override
 	{
-		struct Plugin : public IAddComponentPlugin
+		struct Plugin LUMIX_FINAL : public IAddComponentPlugin
 		{
 			void onGUI(bool create_entity, bool from_filter) override
 			{
@@ -287,7 +287,7 @@ public:
 
 	void registerComponent(const char* type, const char* label) override
 	{
-		struct Plugin : public IAddComponentPlugin
+		struct Plugin LUMIX_FINAL : public IAddComponentPlugin
 		{
 			void onGUI(bool create_entity, bool from_filter) override
 			{

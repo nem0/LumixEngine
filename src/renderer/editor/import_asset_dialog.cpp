@@ -510,7 +510,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 }
 
 
-struct ImportTextureTask : public MT::Task
+struct ImportTextureTask LUMIX_FINAL : public MT::Task
 {
 	explicit ImportTextureTask(ImportAssetDialog& dialog)
 		: Task(dialog.m_editor.getAllocator())
@@ -625,9 +625,9 @@ struct ImportTextureTask : public MT::Task
 }; // struct ImportTextureTask
 
 
-struct ImportTask : public MT::Task
+struct ImportTask LUMIX_FINAL : public MT::Task
 {
-	struct ProgressHandler : public Assimp::ProgressHandler
+	struct ProgressHandler LUMIX_FINAL : public Assimp::ProgressHandler
 	{
 		bool Update(float percentage) override
 		{
@@ -645,7 +645,7 @@ struct ImportTask : public MT::Task
 		, m_dialog(dialog)
 	{
 		m_dialog.m_importers.back().SetProgressHandler(&m_progress_handler);
-		struct MyStream : public Assimp::LogStream
+		struct MyStream LUMIX_FINAL : public Assimp::LogStream
 		{
 			void write(const char* message) { g_log_warning.log("Editor") << message; }
 		};
@@ -797,7 +797,7 @@ struct ImportTask : public MT::Task
 }; // struct ImportTask
 
 
-struct ConvertTask : public MT::Task
+struct ConvertTask LUMIX_FINAL : public MT::Task
 {
 	struct SkinInfo
 	{

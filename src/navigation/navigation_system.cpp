@@ -49,7 +49,7 @@ struct Agent
 };
 
 
-struct NavigationSystem : public IPlugin
+struct NavigationSystem LUMIX_FINAL : public IPlugin
 {
 	NavigationSystem(Engine& engine)
 		: m_engine(engine)
@@ -113,7 +113,7 @@ struct NavigationSystem : public IPlugin
 NavigationSystem* NavigationSystem::s_instance = nullptr;
 
 
-struct NavigationSceneImpl : public NavigationScene
+struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 {
 	enum class Version
 	{

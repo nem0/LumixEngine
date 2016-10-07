@@ -17,7 +17,7 @@ namespace Lumix
 static const float DEADZONE = 0.2f;
 
 
-struct InputSystemImpl : public InputSystem
+struct InputSystemImpl LUMIX_FINAL : public InputSystem
 {
 	typedef decltype(XInputGetState)* XInputGetState_fn_ptr;
 

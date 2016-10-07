@@ -11,7 +11,7 @@ namespace Lumix
 {
 
 
-class LuaScript : public Resource
+class LuaScript LUMIX_FINAL : public Resource
 {
 public:
 	LuaScript(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
@@ -26,7 +26,7 @@ private:
 };
 
 
-class LuaScriptManager : public ResourceManagerBase
+class LuaScriptManager LUMIX_FINAL : public ResourceManagerBase
 {
 public:
 	explicit LuaScriptManager(IAllocator& allocator);

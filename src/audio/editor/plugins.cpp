@@ -26,7 +26,7 @@ namespace
 static const Lumix::ResourceType CLIP_TYPE("clip");
 
 
-struct AssetBrowserPlugin : public AssetBrowser::IPlugin
+struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	explicit AssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
@@ -110,7 +110,7 @@ struct AssetBrowserPlugin : public AssetBrowser::IPlugin
 };
 
 
-struct StudioAppPlugin : public StudioApp::IPlugin
+struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	explicit StudioAppPlugin(StudioApp& app)
 		: m_app(app)
@@ -190,7 +190,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 };
 
 
-struct EditorPlugin : public WorldEditor::Plugin
+struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 {
 	explicit EditorPlugin(WorldEditor& editor)
 		: m_editor(editor)

@@ -17,7 +17,7 @@ namespace
 {
 
 
-struct StudioAppPlugin : public StudioApp::IPlugin
+struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	StudioAppPlugin(StudioApp& _app)
 		: app(_app)

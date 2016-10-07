@@ -43,7 +43,7 @@ enum class AnimationSceneVersion : int
 };
 
 
-struct AnimationSceneImpl : public AnimationScene
+struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 {
 	friend struct AnimationSystemImpl;
 
@@ -400,7 +400,7 @@ struct AnimationSceneImpl : public AnimationScene
 };
 
 
-struct AnimationSystemImpl : public IPlugin
+struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
 {
 	explicit AnimationSystemImpl(Engine& engine)
 		: m_allocator(engine.getAllocator())

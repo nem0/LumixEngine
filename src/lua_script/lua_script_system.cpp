@@ -39,7 +39,7 @@ namespace Lumix
 	static const ResourceType LUA_SCRIPT_RESOURCE_TYPE("lua_script");
 
 
-	class LuaScriptSystemImpl : public IPlugin
+	class LuaScriptSystemImpl LUMIX_FINAL : public IPlugin
 	{
 	public:
 		explicit LuaScriptSystemImpl(Engine& engine);
@@ -56,7 +56,7 @@ namespace Lumix
 	};
 
 
-	struct LuaScriptSceneImpl : public LuaScriptScene
+	struct LuaScriptSceneImpl LUMIX_FINAL : public LuaScriptScene
 	{
 		struct TimerData
 		{

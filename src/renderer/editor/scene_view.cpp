@@ -31,7 +31,7 @@
 static const Lumix::ComponentType MODEL_INSTANCE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
 
 
-struct InsertMeshCommand : public Lumix::IEditorCommand
+struct InsertMeshCommand LUMIX_FINAL : public Lumix::IEditorCommand
 {
 	Lumix::Vec3 m_position;
 	Lumix::Path m_mesh_path;

@@ -10,7 +10,7 @@ namespace Lumix
 {
 
 
-class Clip : public Resource
+class Clip LUMIX_FINAL : public Resource
 {
 public:
 	Clip(const Path& path, ResourceManagerBase& manager, IAllocator& allocator)
@@ -34,7 +34,7 @@ private:
 };
 
 
-class ClipManager : public ResourceManagerBase
+class ClipManager LUMIX_FINAL : public ResourceManagerBase
 {
 public:
 	explicit ClipManager(IAllocator& allocator)

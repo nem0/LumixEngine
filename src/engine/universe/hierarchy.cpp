@@ -14,7 +14,7 @@ namespace Lumix
 static const ComponentType HIERARCHY_TYPE_HANDLE = PropertyRegister::getComponentType("hierarchy");
 
 
-class HierarchyImpl : public Hierarchy
+class HierarchyImpl LUMIX_FINAL : public Hierarchy
 {
 private:
 	typedef HashMap<Entity, Entity> Parents;

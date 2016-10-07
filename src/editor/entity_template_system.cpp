@@ -34,7 +34,7 @@ struct PrefabInstance
 };
 
 
-class AssetBrowserPlugin : public AssetBrowser::IPlugin
+class AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 public:
 	AssetBrowserPlugin(WorldEditor& _editor, EntityTemplateSystem& _system)
@@ -79,10 +79,10 @@ public:
 };
 
 
-class EntityTemplateSystemImpl : public EntityTemplateSystem
+class EntityTemplateSystemImpl LUMIX_FINAL : public EntityTemplateSystem
 {
 private:
-	struct InstantiatePrefabCommand : public IEditorCommand
+	struct InstantiatePrefabCommand LUMIX_FINAL : public IEditorCommand
 	{
 		InstantiatePrefabCommand(WorldEditor& _editor)
 			: editor(_editor)
@@ -185,7 +185,7 @@ private:
 		Array<Entity> entities;
 	};
 
-	class CreateTemplateCommand : public IEditorCommand
+	class CreateTemplateCommand LUMIX_FINAL : public IEditorCommand
 	{
 	public:
 		explicit CreateTemplateCommand(WorldEditor& editor)
@@ -271,7 +271,7 @@ private:
 		Entity m_entity;
 	};
 
-	class CreateInstanceCommand : public IEditorCommand
+	class CreateInstanceCommand LUMIX_FINAL : public IEditorCommand
 	{
 	public:
 		explicit CreateInstanceCommand(WorldEditor& editor)

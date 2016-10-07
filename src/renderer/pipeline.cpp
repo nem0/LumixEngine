@@ -236,8 +236,7 @@ void CommandBufferGenerator::end()
 }
 
 
-
-struct PipelineImpl : public Pipeline
+struct PipelineImpl LUMIX_FINAL : public Pipeline
 {
 	struct TerrainInstance
 	{
