@@ -105,6 +105,39 @@ int Checkbox(lua_State* L)
 }
 
 
+int SetNextWindowPos(lua_State* L)
+{
+	ImVec2 pos;
+	pos.x = LuaWrapper::checkArg<float>(L, 1);
+	pos.y = LuaWrapper::checkArg<float>(L, 2);
+	ImGui::SetNextWindowPos(pos);
+	return 0;
+}
+
+
+int AlignFirstTextHeightToWidgets(lua_State* L)
+{
+	ImGui::AlignFirstTextHeightToWidgets();
+	return 0;
+}
+
+
+int Selectable(lua_State* L)
+{
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	bool clicked = ImGui::Selectable(label);
+	lua_pushboolean(L, clicked);
+	return 1;
+}
+
+
+int Separator(lua_State* L)
+{
+	ImGui::Separator();
+	return 0;
+}
+
+
 int Image(lua_State* L)
 {
 	auto* texture_id = LuaWrapper::checkArg<void*>(L, 1);
@@ -170,9 +203,22 @@ int BeginDock(lua_State* L)
 }
 
 
+int GetWindowWidth(lua_State* L)
+{
+	float w = ImGui::GetWindowWidth();
+	LuaWrapper::push(L, w);
+	return 1;
+}
+
+
 int SameLine(lua_State* L)
 {
-	ImGui::SameLine();
+	float pos_x = 0;
+	if (lua_gettop(L) > 0)
+	{
+		pos_x = LuaWrapper::checkArg<float>(L, 1);
+	}
+	ImGui::SameLine(pos_x);
 	return 0;
 }
 
@@ -747,6 +793,11 @@ public:
 		LuaImGUI::registerCFunction(m_state, "Button", &LuaImGUI::Button);
 		LuaImGUI::registerCFunction(m_state, "Text", &LuaImGUI::Text);
 		LuaImGUI::registerCFunction(m_state, "Checkbox", &LuaImGUI::Checkbox);
+		LuaImGUI::registerCFunction(m_state, "SetNextWindowPos", &LuaImGUI::SetNextWindowPos);
+		LuaImGUI::registerCFunction(m_state, "AlignFirstTextHeightToWidgets", &LuaImGUI::AlignFirstTextHeightToWidgets);
+		LuaImGUI::registerCFunction(m_state, "Selectable", &LuaImGUI::Selectable);
+		LuaImGUI::registerCFunction(m_state, "Separator", &LuaImGUI::Separator);
+		LuaImGUI::registerCFunction(m_state, "GetWindowWidth", &LuaImGUI::GetWindowWidth);
 		LuaImGUI::registerCFunction(m_state, "SameLine", &LuaImGUI::SameLine);
 		LuaImGUI::registerCFunction(m_state, "Begin", &LuaImGUI::Begin);
 		LuaImGUI::registerCFunction(m_state, "BeginDock", LuaImGUI::BeginDock);
