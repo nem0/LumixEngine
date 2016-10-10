@@ -9,6 +9,16 @@ namespace Lumix
 	class Queue
 	{
 	public:
+		struct Iterator
+		{
+			Queue* owner;
+			uint32 cursor;
+
+			bool operator!=(const Iterator& rhs) const { return cursor != rhs.cursor || owner != rhs.owner; }
+			void operator ++() { ++cursor; }
+			T& value() { uint32 idx = cursor & (count - 1); return owner->m_buffer[idx]; }
+		};
+
 		Queue(IAllocator& allocator)
 			: m_allocator(allocator)
 		{
@@ -24,6 +34,8 @@ namespace Lumix
 
 		bool empty() const { return m_rd == m_wr; } 
 		uint32 size() const { return m_wr - m_rd; }
+		Iterator begin() { return {this, m_rd}; }
+		Iterator end() { return {this, m_wr}; }
 
 		void push(const T& item)
 		{

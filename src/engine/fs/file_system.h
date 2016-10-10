@@ -96,6 +96,7 @@ struct LUMIX_ENGINE_API DeviceList
 class LUMIX_ENGINE_API FileSystem
 {
 public:
+	static const uint32 INVALID_ASYNC = 0xffffFFFF;
 	static FileSystem* create(IAllocator& allocator);
 	static void destroy(FileSystem* fs);
 
@@ -106,10 +107,11 @@ public:
 	virtual bool unMount(IFileDevice* device) = 0;
 
 	virtual IFile* open(const DeviceList& device_list, const Path& file, Mode mode) = 0;
-	virtual bool openAsync(const DeviceList& device_list,
+	virtual uint32 openAsync(const DeviceList& device_list,
 						   const Path& file,
 						   int mode,
 						   const ReadCallback& call_back) = 0;
+	virtual void cancelAsync(uint32 id) = 0;
 
 	virtual void close(IFile& file) = 0;
 	virtual void closeAsync(IFile& file) = 0;

@@ -30,7 +30,7 @@ Resource::Resource(const Path& path, ResourceManagerBase& resource_manager, IAll
 	, m_size()
 	, m_cb(allocator)
 	, m_resource_manager(resource_manager)
-	, m_is_waiting_for_load(false)
+	, m_async_op(FS::FileSystem::INVALID_ASYNC)
 {
 }
 
@@ -70,7 +70,7 @@ void Resource::checkState()
 
 void Resource::fileLoaded(FS::IFile& file, bool success)
 {
-	m_is_waiting_for_load = false;
+	m_async_op = FS::FileSystem::INVALID_ASYNC;
 	if (m_desired_state != State::READY) return;
 	
 	ASSERT(m_current_state != State::READY);
@@ -82,7 +82,7 @@ void Resource::fileLoaded(FS::IFile& file, bool success)
 		--m_empty_dep_count;
 		++m_failed_dep_count;
 		checkState();
-		m_is_waiting_for_load = false;
+		m_async_op = FS::FileSystem::INVALID_ASYNC;
 		return;
 	}
 
@@ -93,12 +93,19 @@ void Resource::fileLoaded(FS::IFile& file, bool success)
 
 	--m_empty_dep_count;
 	checkState();
-	m_is_waiting_for_load = false;
+	m_async_op = FS::FileSystem::INVALID_ASYNC;
 }
 
 
 void Resource::doUnload()
 {
+	if (m_async_op != FS::FileSystem::INVALID_ASYNC)
+	{
+		FS::FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
+		fs.cancelAsync(m_async_op);
+		m_async_op = FS::FileSystem::INVALID_ASYNC;
+	}
+
 	m_desired_state = State::EMPTY;
 	unload();
 	ASSERT(m_empty_dep_count <= 1);
@@ -127,12 +134,11 @@ void Resource::doLoad()
 	if (m_desired_state == State::READY) return;
 	m_desired_state = State::READY;
 
-	if (m_is_waiting_for_load) return;
-	m_is_waiting_for_load = true;
+	if (m_async_op != FS::FileSystem::INVALID_ASYNC) return;
 	FS::FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 	FS::ReadCallback cb;
 	cb.bind<Resource, &Resource::fileLoaded>(this);
-	fs.openAsync(fs.getDefaultDevice(), m_path, FS::Mode::OPEN_AND_READ, cb);
+	m_async_op = fs.openAsync(fs.getDefaultDevice(), m_path, FS::Mode::OPEN_AND_READ, cb);
 }
 
 
