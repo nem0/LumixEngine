@@ -589,7 +589,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		FS::ReadCallback cb;
 		cb.bind<NavigationSceneImpl, &NavigationSceneImpl::fileLoaded>(this);
 		FS::FileSystem& fs = m_system.m_engine.getFileSystem();
-		return fs.openAsync(fs.getDefaultDevice(), Path(path), FS::Mode::OPEN_AND_READ, cb);
+		return fs.openAsync(fs.getDefaultDevice(), Path(path), FS::Mode::OPEN_AND_READ, cb) != FS::FileSystem::INVALID_ASYNC;
 	}
 
 	
