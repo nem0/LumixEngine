@@ -382,15 +382,15 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 	TGAHeader header;
 	file.read(&header, sizeof(header));
 
-	int color_mode = header.bitsPerPixel / 8;
+	int bytes_per_pixel = header.bitsPerPixel / 8;
 	int image_size = header.width * header.height * 4;
-	if (header.dataType != 2)
+	if (header.dataType != 2 && header.dataType != 10)
 	{
 		g_log_error.log("Renderer") << "Unsupported texture format " << texture.getPath().c_str();
 		return false;
 	}
 
-	if (color_mode < 3)
+	if (bytes_per_pixel < 3)
 	{
 		g_log_error.log("Renderer") << "Unsupported color mode " << texture.getPath().c_str();
 		return false;
@@ -398,6 +398,7 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 
 	texture.width = header.width;
 	texture.height = header.height;
+	int pixel_count = texture.width * texture.height;
 	texture.is_cubemap = false;
 	TextureManager& manager = static_cast<TextureManager&>(texture.getResourceManager());
 	if (texture.data_reference)
@@ -406,23 +407,64 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 	}
 	uint8* image_dest = texture.data_reference ? &texture.data[0] : (uint8*)manager.getBuffer(image_size);
 
-	// Targa is BGR, swap to RGB, add alpha and flip Y axis
-	for (long y = 0; y < header.height; y++)
+	bool is_rle = header.dataType == 10;
+	if (is_rle)
 	{
-		long read_index = y * header.width * color_mode;
-		long write_index = ((header.imageDescriptor & 32) != 0)
-							   ? read_index
-							   : y * header.width * 4;
-		for (long x = 0; x < header.width; x++)
+		uint8* out = image_dest;
+		uint8 byte;
+		union {
+			uint32 u32;
+			uint8 u8[4];
+		} pixel;
+		do
 		{
-			file.read(&image_dest[write_index + 2], sizeof(uint8));
-			file.read(&image_dest[write_index + 1], sizeof(uint8));
-			file.read(&image_dest[write_index + 0], sizeof(uint8));
-			if (color_mode == 4)
-				file.read(&image_dest[write_index + 3], sizeof(uint8));
+			file.read(&byte, sizeof(byte));
+			if (byte < 128)
+			{
+				uint8 count = byte + 1;
+				for (uint8 i = 0; i < count; ++i)
+				{
+					file.read(&pixel, bytes_per_pixel);
+					out[0] = pixel.u8[2];
+					out[1] = pixel.u8[1];
+					out[2] = pixel.u8[0];
+					if (bytes_per_pixel == 4) out[3] = pixel.u8[3];
+					else out[3] = 255;
+					out += 4;
+				}
+			}
 			else
-				image_dest[write_index + 3] = 255;
-			write_index += 4;
+			{
+				byte -= 127;
+				file.read(&pixel, bytes_per_pixel);
+				for (int i = 0; i < byte; ++i)
+				{
+					out[0] = pixel.u8[2];
+					out[1] = pixel.u8[1];
+					out[2] = pixel.u8[0];
+					if (bytes_per_pixel == 4) out[3] = pixel.u8[3];
+					else out[3] = 255;
+					out += 4;
+				}
+			}
+		} while (out - image_dest < pixel_count * 4);
+	}
+	else
+	{
+		for (long y = 0; y < header.height; y++)
+		{
+			long idx = y * header.width * bytes_per_pixel;
+			for (long x = 0; x < header.width; x++)
+			{
+				file.read(&image_dest[idx + 2], sizeof(uint8));
+				file.read(&image_dest[idx + 1], sizeof(uint8));
+				file.read(&image_dest[idx + 0], sizeof(uint8));
+				if (bytes_per_pixel == 4)
+					file.read(&image_dest[idx + 3], sizeof(uint8));
+				else
+					image_dest[idx + 3] = 255;
+				idx += 4;
+			}
 		}
 	}
 	texture.bytes_per_pixel = 4;
