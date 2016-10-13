@@ -7,7 +7,6 @@
 #include "engine/debug/debug.h"
 #include "engine/default_allocator.h"
 #include "engine/engine.h"
-#include "engine/fixed_array.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
 #include "engine/input_system.h"
@@ -1647,7 +1646,7 @@ public:
 		Lumix::uint64 offset;
 		Lumix::uint64 size;
 
-		using Path = Lumix::FixedArray<char, Lumix::MAX_PATH_LENGTH>;
+		using Path = Lumix::StaticString<Lumix::MAX_PATH_LENGTH>;
 	};
 	#pragma pack()
 
@@ -1677,16 +1676,16 @@ public:
 			auto& out_path = paths.emplace();
 			if(dir_path[0] == '.')
 			{
-				Lumix::copyString(out_path.data(), out_path.size(), normalized_path);
+				Lumix::copyString(out_path.data, Lumix::lengthOf(out_path.data), normalized_path);
 			}
 			else
 			{
-				Lumix::copyString(out_path.data(), out_path.size(), dir_path);
-				Lumix::catString(out_path.data(), out_path.size(), normalized_path);
+				Lumix::copyString(out_path.data, Lumix::lengthOf(out_path.data), dir_path);
+				Lumix::catString(out_path.data, Lumix::lengthOf(out_path.data), normalized_path);
 			}
 			auto& out_info = infos.emplace();
-			out_info.hash = Lumix::crc32(out_path.data());
-			out_info.size = PlatformInterface::getFileSize(out_path.data());
+			out_info.hash = Lumix::crc32(out_path.data);
+			out_info.size = PlatformInterface::getFileSize(out_path.data);
 			out_info.offset = ~0UL;
 		}
 		PlatformInterface::destroyFileIterator(iter);
@@ -1704,7 +1703,7 @@ public:
 				 ++res_iter)
 			{
 				Lumix::Resource* res = res_iter.value();
-				Lumix::copyString(paths.emplace().data(), Lumix::MAX_PATH_LENGTH, res->getPath().c_str());
+				Lumix::copyString(paths.emplace().data, Lumix::MAX_PATH_LENGTH, res->getPath().c_str());
 				auto& out_info = infos.emplace();
 				out_info.hash = Lumix::crc32(res->getPath().c_str());
 				out_info.size = PlatformInterface::getFileSize(res->getPath().c_str());
@@ -1755,11 +1754,11 @@ public:
 		for (auto& path : paths)
 		{
 			Lumix::FS::OsFile src;
-			size_t src_size = PlatformInterface::getFileSize(path.data());
-			if (!src.open(path.data(), Lumix::FS::Mode::OPEN_AND_READ, m_allocator))
+			size_t src_size = PlatformInterface::getFileSize(path.data);
+			if (!src.open(path.data, Lumix::FS::Mode::OPEN_AND_READ, m_allocator))
 			{
 				file.close();
-				Lumix::g_log_error.log("Editor") << "Could not open " << path.data();
+				Lumix::g_log_error.log("Editor") << "Could not open " << path.data;
 				return;
 			}
 			Lumix::uint8 buf[4096];
@@ -1769,7 +1768,7 @@ public:
 				if (!src.read(buf, batch_size))
 				{
 					file.close();
-					Lumix::g_log_error.log("Editor") << "Could not read " << path.data();
+					Lumix::g_log_error.log("Editor") << "Could not read " << path.data;
 					return;
 				}
 				file.write(buf, batch_size);
