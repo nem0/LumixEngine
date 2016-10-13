@@ -679,6 +679,37 @@ struct AddComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
 };
 
 
+struct EditorPlugin : public WorldEditor::Plugin
+{
+	EditorPlugin(WorldEditor& _editor)
+		: editor(_editor)
+	{
+	}
+
+
+	bool showGizmo(ComponentUID cmp) override
+	{
+		if (cmp.type == LUA_SCRIPT_TYPE)
+		{
+			auto* scene = static_cast<LuaScriptScene*>(cmp.scene);
+			int count = scene->getScriptCount(cmp.handle);
+			for (int i = 0; i < count; ++i)
+			{
+				if (auto* call = scene->beginFunctionCall(cmp.handle, i, "onDrawGizmo"))
+				{
+					scene->endFunctionCall();
+				}
+			}
+			return true;
+		}
+		return false;
+	}
+
+
+	WorldEditor& editor;
+};
+
+
 LUMIX_STUDIO_ENTRY(lua_script)
 {
 	auto& editor = *app.getWorldEditor();
@@ -688,6 +719,8 @@ LUMIX_STUDIO_ENTRY(lua_script)
 	editor.registerEditorCommandCreator("add_script", createAddScriptCommand);
 	editor.registerEditorCommandCreator("remove_script", createRemoveScriptCommand);
 	editor.registerEditorCommandCreator("set_script_property", createSetPropertyCommand);
+	auto* editor_plugin = LUMIX_NEW(editor.getAllocator(), EditorPlugin)(editor);
+	editor.addPlugin(*editor_plugin);
 
 	auto* plugin = LUMIX_NEW(editor.getAllocator(), PropertyGridPlugin)(app);
 	app.getPropertyGrid()->addPlugin(*plugin);
