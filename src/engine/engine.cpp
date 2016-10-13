@@ -203,9 +203,33 @@ int BeginDock(lua_State* L)
 }
 
 
+int GetDisplayWidth(lua_State* L)
+{
+	float w = ImGui::GetIO().DisplaySize.x;
+	LuaWrapper::push(L, w);
+	return 1;
+}
+
+
+int GetDisplayHeight(lua_State* L)
+{
+	float w = ImGui::GetIO().DisplaySize.y;
+	LuaWrapper::push(L, w);
+	return 1;
+}
+
+
 int GetWindowWidth(lua_State* L)
 {
 	float w = ImGui::GetWindowWidth();
+	LuaWrapper::push(L, w);
+	return 1;
+}
+
+
+int GetWindowHeight(lua_State* L)
+{
+	float w = ImGui::GetWindowHeight();
 	LuaWrapper::push(L, w);
 	return 1;
 }
@@ -797,7 +821,10 @@ public:
 		LuaImGUI::registerCFunction(m_state, "AlignFirstTextHeightToWidgets", &LuaImGUI::AlignFirstTextHeightToWidgets);
 		LuaImGUI::registerCFunction(m_state, "Selectable", &LuaImGUI::Selectable);
 		LuaImGUI::registerCFunction(m_state, "Separator", &LuaImGUI::Separator);
+		LuaImGUI::registerCFunction(m_state, "GetDisplayWidth", &LuaImGUI::GetDisplayWidth);
+		LuaImGUI::registerCFunction(m_state, "GetDisplayHeight", &LuaImGUI::GetDisplayHeight);
 		LuaImGUI::registerCFunction(m_state, "GetWindowWidth", &LuaImGUI::GetWindowWidth);
+		LuaImGUI::registerCFunction(m_state, "GetWindowHeight", &LuaImGUI::GetWindowHeight);
 		LuaImGUI::registerCFunction(m_state, "SameLine", &LuaImGUI::SameLine);
 		LuaImGUI::registerCFunction(m_state, "Begin", &LuaImGUI::Begin);
 		LuaImGUI::registerCFunction(m_state, "BeginDock", LuaImGUI::BeginDock);
