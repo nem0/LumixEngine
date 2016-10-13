@@ -30,7 +30,7 @@ FileIterator* createFileIterator(const char* path, Lumix::IAllocator& allocator)
 	auto* iter = LUMIX_NEW(allocator, FileIterator);
 	iter->allocator = &allocator;
 	iter->handle = FindFirstFile(tmp, &iter->ffd);
-	iter->is_valid = iter->handle != NULL;
+	iter->is_valid = iter->handle != INVALID_HANDLE_VALUE;
 	return iter;
 }
 
