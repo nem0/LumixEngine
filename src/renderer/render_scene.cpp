@@ -4550,6 +4550,8 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getModelInstanceModel);
 	REGISTER_FUNCTION(addDebugCross);
 	REGISTER_FUNCTION(addDebugLine);
+	REGISTER_FUNCTION(addDebugCircle);
+	REGISTER_FUNCTION(addDebugSphere);
 	REGISTER_FUNCTION(getTerrainMaterial);
 	REGISTER_FUNCTION(getTerrainNormalAt);
 	REGISTER_FUNCTION(setTerrainHeightAt);
