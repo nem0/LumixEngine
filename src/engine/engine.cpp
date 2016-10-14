@@ -30,7 +30,7 @@
 namespace Lumix
 {
 
-namespace LuaImGUI
+namespace LuaImGui
 {
 
 int DragFloat(lua_State* L)
@@ -105,6 +105,14 @@ int Checkbox(lua_State* L)
 }
 
 
+int GetWindowPos(lua_State* L)
+{
+	ImVec2 pos = ImGui::GetWindowPos();
+	LuaWrapper::push(L, Vec2(pos.x, pos.y));
+	return 1;
+}
+
+
 int SetNextWindowPos(lua_State* L)
 {
 	ImVec2 pos;
@@ -128,6 +136,16 @@ int Selectable(lua_State* L)
 	bool clicked = ImGui::Selectable(label);
 	lua_pushboolean(L, clicked);
 	return 1;
+}
+
+
+int SetCursorScreenPos(lua_State* L)
+{
+	ImVec2 pos;
+	pos.x = LuaWrapper::checkArg<float>(L, 1);
+	pos.y = LuaWrapper::checkArg<float>(L, 2);
+	ImGui::SetCursorScreenPos(pos);
+	return 0;
 }
 
 
@@ -811,35 +829,37 @@ public:
 		LuaWrapper::createSystemVariable(m_state, "ImGui", "Col_Button", ImGuiCol_Button);
 		LuaWrapper::createSystemVariable(m_state, "ImGui", "Col_ButtonActive", ImGuiCol_ButtonActive);
 		LuaWrapper::createSystemVariable(m_state, "ImGui", "Col_ButtonHovered", ImGuiCol_ButtonHovered);
-		LuaImGUI::registerCFunction(m_state, "SetStyleColor", &LuaImGUI::SetStyleColor);
-		LuaImGUI::registerCFunction(m_state, "DragFloat", &LuaImGUI::DragFloat);
-		LuaImGUI::registerCFunction(m_state, "SliderFloat", &LuaImGUI::SliderFloat);
-		LuaImGUI::registerCFunction(m_state, "Button", &LuaImGUI::Button);
-		LuaImGUI::registerCFunction(m_state, "Text", &LuaImGUI::Text);
-		LuaImGUI::registerCFunction(m_state, "Checkbox", &LuaImGUI::Checkbox);
-		LuaImGUI::registerCFunction(m_state, "SetNextWindowPos", &LuaImGUI::SetNextWindowPos);
-		LuaImGUI::registerCFunction(m_state, "AlignFirstTextHeightToWidgets", &LuaImGUI::AlignFirstTextHeightToWidgets);
-		LuaImGUI::registerCFunction(m_state, "Selectable", &LuaImGUI::Selectable);
-		LuaImGUI::registerCFunction(m_state, "Separator", &LuaImGUI::Separator);
-		LuaImGUI::registerCFunction(m_state, "GetDisplayWidth", &LuaImGUI::GetDisplayWidth);
-		LuaImGUI::registerCFunction(m_state, "GetDisplayHeight", &LuaImGUI::GetDisplayHeight);
-		LuaImGUI::registerCFunction(m_state, "GetWindowWidth", &LuaImGUI::GetWindowWidth);
-		LuaImGUI::registerCFunction(m_state, "GetWindowHeight", &LuaImGUI::GetWindowHeight);
-		LuaImGUI::registerCFunction(m_state, "SameLine", &LuaImGUI::SameLine);
-		LuaImGUI::registerCFunction(m_state, "Begin", &LuaImGUI::Begin);
-		LuaImGUI::registerCFunction(m_state, "BeginDock", LuaImGUI::BeginDock);
-		LuaImGUI::registerCFunction(m_state, "BeginChildFrame", &LuaImGUI::BeginChildFrame);
-		LuaImGUI::registerCFunction(m_state, "SetNextWindowPosCenter", &LuaImGUI::SetNextWindowPosCenter);
-		LuaImGUI::registerCFunction(m_state, "SetNextWindowSize", &LuaImGUI::SetNextWindowSize);
-		LuaImGUI::registerCFunction(m_state, "BeginPopup", &LuaWrapper::wrap<decltype(&ImGui::BeginPopup), &ImGui::BeginPopup>);
-		LuaImGUI::registerCFunction(m_state, "EndPopup", &LuaWrapper::wrap<decltype(&ImGui::EndPopup), &ImGui::EndPopup>);
-		LuaImGUI::registerCFunction(m_state, "OpenPopup", &LuaWrapper::wrap<decltype(&ImGui::OpenPopup), &ImGui::OpenPopup>);
-		LuaImGUI::registerCFunction(m_state, "EndDock", &LuaWrapper::wrap<decltype(&ImGui::EndDock), &ImGui::EndDock>);
-		LuaImGUI::registerCFunction(m_state, "End", &LuaWrapper::wrap<decltype(&ImGui::End), &ImGui::End>);
-		LuaImGUI::registerCFunction(m_state, "EndChildFrame", &LuaWrapper::wrap<decltype(&ImGui::EndChildFrame), &ImGui::EndChildFrame>);
-		LuaImGUI::registerCFunction(m_state, "PushItemWidth", &LuaWrapper::wrap<decltype(&ImGui::PushItemWidth), &ImGui::PushItemWidth>);
-		LuaImGUI::registerCFunction(m_state, "PopItemWidth", &LuaWrapper::wrap<decltype(&ImGui::PopItemWidth), &ImGui::PopItemWidth>);
-		LuaImGUI::registerCFunction(m_state, "Image", &LuaWrapper::wrap<decltype(&LuaImGUI::Image), &LuaImGUI::Image>);
+		LuaImGui::registerCFunction(m_state, "AlignFirstTextHeightToWidgets", &LuaImGui::AlignFirstTextHeightToWidgets);
+		LuaImGui::registerCFunction(m_state, "Begin", &LuaImGui::Begin);
+		LuaImGui::registerCFunction(m_state, "BeginChildFrame", &LuaImGui::BeginChildFrame);
+		LuaImGui::registerCFunction(m_state, "BeginDock", LuaImGui::BeginDock);
+		LuaImGui::registerCFunction(m_state, "BeginPopup", &LuaWrapper::wrap<decltype(&ImGui::BeginPopup), &ImGui::BeginPopup>);
+		LuaImGui::registerCFunction(m_state, "Button", &LuaImGui::Button);
+		LuaImGui::registerCFunction(m_state, "Checkbox", &LuaImGui::Checkbox);
+		LuaImGui::registerCFunction(m_state, "DragFloat", &LuaImGui::DragFloat);
+		LuaImGui::registerCFunction(m_state, "End", &LuaWrapper::wrap<decltype(&ImGui::End), &ImGui::End>);
+		LuaImGui::registerCFunction(m_state, "EndChildFrame", &LuaWrapper::wrap<decltype(&ImGui::EndChildFrame), &ImGui::EndChildFrame>);
+		LuaImGui::registerCFunction(m_state, "EndDock", &LuaWrapper::wrap<decltype(&ImGui::EndDock), &ImGui::EndDock>);
+		LuaImGui::registerCFunction(m_state, "EndPopup", &LuaWrapper::wrap<decltype(&ImGui::EndPopup), &ImGui::EndPopup>);
+		LuaImGui::registerCFunction(m_state, "GetDisplayWidth", &LuaImGui::GetDisplayWidth);
+		LuaImGui::registerCFunction(m_state, "GetDisplayHeight", &LuaImGui::GetDisplayHeight);
+		LuaImGui::registerCFunction(m_state, "GetWindowWidth", &LuaImGui::GetWindowWidth);
+		LuaImGui::registerCFunction(m_state, "GetWindowHeight", &LuaImGui::GetWindowHeight);
+		LuaImGui::registerCFunction(m_state, "GetWindowPos", &LuaImGui::GetWindowPos);
+		LuaImGui::registerCFunction(m_state, "Image", &LuaWrapper::wrap<decltype(&LuaImGui::Image), &LuaImGui::Image>);
+		LuaImGui::registerCFunction(m_state, "OpenPopup", &LuaWrapper::wrap<decltype(&ImGui::OpenPopup), &ImGui::OpenPopup>);
+		LuaImGui::registerCFunction(m_state, "PushItemWidth", &LuaWrapper::wrap<decltype(&ImGui::PushItemWidth), &ImGui::PushItemWidth>);
+		LuaImGui::registerCFunction(m_state, "PopItemWidth", &LuaWrapper::wrap<decltype(&ImGui::PopItemWidth), &ImGui::PopItemWidth>);
+		LuaImGui::registerCFunction(m_state, "SameLine", &LuaImGui::SameLine);
+		LuaImGui::registerCFunction(m_state, "Selectable", &LuaImGui::Selectable);
+		LuaImGui::registerCFunction(m_state, "Separator", &LuaImGui::Separator);
+		LuaImGui::registerCFunction(m_state, "SetCursorScreenPos", &LuaImGui::SetCursorScreenPos);
+		LuaImGui::registerCFunction(m_state, "SetNextWindowPos", &LuaImGui::SetNextWindowPos);
+		LuaImGui::registerCFunction(m_state, "SetNextWindowPosCenter", &LuaImGui::SetNextWindowPosCenter);
+		LuaImGui::registerCFunction(m_state, "SetNextWindowSize", &LuaImGui::SetNextWindowSize);
+		LuaImGui::registerCFunction(m_state, "SetStyleColor", &LuaImGui::SetStyleColor);
+		LuaImGui::registerCFunction(m_state, "SliderFloat", &LuaImGui::SliderFloat);
+		LuaImGui::registerCFunction(m_state, "Text", &LuaImGui::Text);
 
 		lua_pop(m_state, 1);
 
