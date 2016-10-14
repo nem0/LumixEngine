@@ -267,7 +267,6 @@ int SameLine(lua_State* L)
 
 void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 {
-	lua_pushvalue(L, -1);
 	lua_pushcfunction(L, f);
 	lua_setfield(L, -2, name);
 }
