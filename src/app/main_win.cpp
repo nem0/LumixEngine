@@ -89,6 +89,8 @@ public:
 		Lumix::InputSystem::InputEvent event;
 		switch (msg)
 		{
+			case WM_KILLFOCUS: m_engine->getInputSystem().enable(false); break;
+			case WM_SETFOCUS: m_engine->getInputSystem().enable(true); break;
 			case WM_CLOSE: PostQuitMessage(0); break;
 			case WM_MOVE:
 			case WM_SIZE: onResize(); break;
