@@ -70,15 +70,6 @@ Array<IScene*>& Universe::getScenes()
 }
 
 
-void Universe::resetScenes()
-{
-	for (auto* scene : m_scenes)
-	{
-		scene->clear();
-	}
-}
-
-
 void Universe::addScene(IScene* scene)
 {
 	m_scenes.push(scene);
