@@ -2046,8 +2046,13 @@ public:
 		m_is_game_mode = false;
 		if (reload)
 		{
+			m_universe_destroyed.invoke();
 			m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
-			m_universe->resetScenes();
+			m_entity_groups.setUniverse(nullptr);
+			m_engine->destroyUniverse(*m_universe);
+			m_universe = &m_engine->createUniverse();
+			m_universe_created.invoke();
+			m_entity_groups.setUniverse(m_universe);
 			m_camera = INVALID_ENTITY;
 			load(*m_game_mode_file);
 		}

@@ -86,7 +86,6 @@ public:
 	IScene* getScene(uint32 hash) const;
 	Array<IScene*>& getScenes();
 	void addScene(IScene* scene);
-	void resetScenes();
 
 private:
 	struct Transformation

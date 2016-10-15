@@ -63,6 +63,8 @@ namespace Lumix
 
 	void ResourceManagerBase::removeUnreferenced()
 	{
+		if (!m_is_unload_enabled) return;
+
 		Array<Resource*> to_remove(m_allocator);
 		for (auto* i : m_resources)
 		{
