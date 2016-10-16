@@ -570,6 +570,12 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
+	void setMasterVolume(float volume)
+	{
+		m_device.setMasterVolume(volume);
+	}
+
+
 	void setVolume(SoundHandle sound_id, float volume) override
 	{
 		if (sound_id == AudioScene::INVALID_SOUND_HANDLE) return;
@@ -667,6 +673,7 @@ void AudioScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(setEcho);
 	REGISTER_FUNCTION(playSound);
 	REGISTER_FUNCTION(setVolume);
+	REGISTER_FUNCTION(setMasterVolume);
 
 	#undef REGISTER_FUNCTION
 }
