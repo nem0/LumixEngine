@@ -66,7 +66,6 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		ImGui::NewFrame();
 		ImGui::SetCurrentContext(m_original_context);
 
-		engine.getInputSystem().eventListener().bind<GUISystemImpl, &GUISystemImpl::onInputEvent>(this);
 		registerLuaAPI();
 	}
 
@@ -83,7 +82,6 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 
 		m_material->getResourceManager().unload(*m_material);
 
-		m_engine.getInputSystem().eventListener().unbind<GUISystemImpl, &GUISystemImpl::onInputEvent>(this);
 		ImGui::DestroyContext(m_context);
 	}
 
@@ -238,21 +236,13 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	}
 
 
-	void onInputEvent(InputSystem::InputEvent& event)
+	void update(float time_delta) override
 	{
 		beginGUI();
 		Vec2 mouse_pos = m_engine.getInputSystem().getMousePos() - m_interface->getPos();
 		auto& io = ImGui::GetIO();
 		io.MousePos = ImVec2(mouse_pos.x, mouse_pos.y);
-		switch (event.type)
-		{
-			case InputSystem::InputEvent::POINTER_DOWN:
-				io.MouseDown[0] = true;
-				break;
-			case InputSystem::InputEvent::POINTER_UP:
-				io.MouseDown[0] = false;
-				break;
-		}
+		io.MouseDown[0] = m_engine.getInputSystem().isMouseDown(InputSystem::LEFT);
 		endGUI();
 	}
 

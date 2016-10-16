@@ -212,51 +212,9 @@ void GameView::onGui()
 			m_pipeline->render();
 		}
 
-		if (m_is_mouse_captured)
+		if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor->isGameMode()))
 		{
-			Lumix::InputSystem::InputEvent event;
-			if (ImGui::IsMouseReleased(0))
-			{
-				event.type = Lumix::InputSystem::InputEvent::POINTER_UP;
-				m_editor->getEngine().getInputSystem().injectEvent(event);
-			}
-			if (ImGui::IsMouseClicked(0))
-			{
-				event.type = Lumix::InputSystem::InputEvent::POINTER_DOWN;
-				m_editor->getEngine().getInputSystem().injectEvent(event);
-			}
-
-			if (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor->isGameMode())
-			{
-				captureMouse(false);
-			}
-			static bool was_down[512] = {};
-			auto& io = ImGui::GetIO();
-			auto& input = m_editor->getEngine().getInputSystem();
-			for (int i = 0; i < 512; ++i)
-			{
-				if (io.KeysDownDuration[i] == 0)
-				{
-					event.type = Lumix::InputSystem::InputEvent::KEY_DOWN;
-					event.key.sym = i;
-					input.injectEvent(event);
-					was_down[i] = true;
-				}
-				if (!io.KeysDown[i] && was_down[i])
-				{
-					was_down[i] = false;
-					event.type = Lumix::InputSystem::InputEvent::KEY_UP;
-					event.key.sym = i;
-					input.injectEvent(event);
-				}
-			}
-			static ImVec2 old_mouse_pos = io.MousePos;
-			if (io.MousePos.x != old_mouse_pos.x || io.MousePos.y != old_mouse_pos.y)
-			{
-				event.type = Lumix::InputSystem::InputEvent::POINTER_MOVE;
-				input.injectEvent(event);
-				old_mouse_pos = io.MousePos;
-			}
+			captureMouse(false);
 		}
 
 		if (ImGui::IsMouseHoveringRect(content_min, content_max) && m_is_mouse_hovering_window &&
