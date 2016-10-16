@@ -47,6 +47,7 @@ struct ImportMaterial
 	bool alpha_cutout;
 	int texture_count;
 	char shader[20];
+	char name[128];
 	ImportTexture textures[16];
 };
 
@@ -119,6 +120,7 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		bool checkSource();
 		void checkTask(bool wait);
 		void convert(bool use_ui);
+		void import();
 		void getMessage(char* msg, int max_size);
 		bool hasMessage();
 		void importTexture();
@@ -131,8 +133,10 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		void onAction();
 		void saveModelMetadata();
 		bool isOpened() const;
+		void clearSources();
+		void addSource(const char* src);
 
-	private:
+	public:
 		Lumix::WorldEditor& m_editor;
 		Lumix::Array<Lumix::uint32> m_saved_textures;
 		Lumix::Array<Assimp::Importer> m_importers;

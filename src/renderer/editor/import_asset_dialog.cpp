@@ -75,6 +75,211 @@ struct BillboardVertex
 static const int TEXTURE_SIZE = 512;
 
 
+namespace LuaAPI
+{
+
+
+int setMeshParams(lua_State* L)
+{
+	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
+	int mesh_idx = LuaWrapper::checkArg<int>(L, 2);
+	LuaWrapper::checkTableArg(L, 3);
+	if (mesh_idx < 0 || mesh_idx >= dlg->m_meshes.size()) return 0;
+	
+	ImportMesh& mesh = dlg->m_meshes[mesh_idx];
+
+	lua_pushvalue(L, 3);
+
+	if (lua_getfield(L, -1, "lod") == LUA_TNUMBER)
+	{
+		mesh.lod = LuaWrapper::toType<int>(L, -1);
+	}
+	lua_pop(L, 1); // "lod"
+
+	if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
+	{
+		mesh.import = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1); // "import"
+
+	if (lua_getfield(L, -1, "import_physics") == LUA_TBOOLEAN)
+	{
+		mesh.import_physics = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1); // "import_physics"
+
+	lua_pop(L, 1); // table
+	return 0;
+}
+
+
+int setParams(lua_State* L)
+{
+	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
+	LuaWrapper::checkTableArg(L, 2);
+
+	if (lua_getfield(L, 2, "output_dir") == LUA_TSTRING)
+	{
+		copyString(dlg->m_output_dir, LuaWrapper::toType<const char*>(L, -1));
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "create_billboard") == LUA_TBOOLEAN)
+	{
+		dlg->m_model.create_billboard_lod = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "remove_doubles") == LUA_TBOOLEAN)
+	{
+		dlg->m_model.remove_doubles = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "scale") == LUA_TNUMBER)
+	{
+		dlg->m_model.mesh_scale = LuaWrapper::toType<float>(L, -1);
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "time_scale") == LUA_TNUMBER)
+	{
+		dlg->m_model.time_scale = LuaWrapper::toType<float>(L, -1);
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "orientation") == LUA_TSTRING)
+	{
+		const char* tmp = LuaWrapper::toType<const char*>(L, -1);
+		if (equalStrings(tmp, "+y")) dlg->m_model.orientation = ImportAssetDialog::Orientation::Y_UP;
+		else if (equalStrings(tmp, "+z")) dlg->m_model.orientation = ImportAssetDialog::Orientation::Z_UP;
+		else if (equalStrings(tmp, "-y")) dlg->m_model.orientation = ImportAssetDialog::Orientation::X_MINUS_UP;
+		else if (equalStrings(tmp, "-z")) dlg->m_model.orientation = ImportAssetDialog::Orientation::Z_MINUS_UP;
+	}
+	lua_pop(L, 1);
+
+
+	if (lua_getfield(L, 2, "lods") == LUA_TTABLE)
+	{
+		lua_pushnil(L);
+		int lod_index = 0;
+		while (lua_next(L, -2) != 0)
+		{
+			if (lod_index >= lengthOf(dlg->m_model.lods))
+			{
+				g_log_error.log("Editor") << "Only " << lengthOf(dlg->m_model.lods) << " supported";
+				lua_pop(L, 1);
+				break;
+			}
+
+			dlg->m_model.lods[lod_index] = LuaWrapper::toType<float>(L, -1);
+			++lod_index;
+			lua_pop(L, 1);
+		}
+	}
+	lua_pop(L, 1);
+
+	if (lua_getfield(L, 2, "texture_output_dir") == LUA_TSTRING)
+	{
+		copyString(dlg->m_texture_output_dir, LuaWrapper::toType<const char*>(L, -1));
+	}
+	lua_pop(L, 1);
+
+	return 0;
+}
+
+
+int setTextureParams(lua_State* L)
+{
+	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
+	int material_idx = LuaWrapper::checkArg<int>(L, 2);
+	int texture_idx = LuaWrapper::checkArg<int>(L, 3);
+	LuaWrapper::checkTableArg(L, 4);
+	
+	if (material_idx < 0 || material_idx >= dlg->m_materials.size()) return 0;
+	ImportMaterial& material = dlg->m_materials[material_idx];
+	
+	if (texture_idx < 0 || texture_idx >= material.texture_count) return 0;
+	ImportTexture& texture = material.textures[texture_idx];
+
+	lua_pushvalue(L, 4);
+
+	if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
+	{
+		texture.import = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1); // "import"
+
+	if (lua_getfield(L, -1, "to_dds") == LUA_TBOOLEAN)
+	{
+		texture.to_dds = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1); // "to_dds"
+
+	lua_pop(L, 1); // table
+	return 0;
+}
+
+
+int setMaterialParams(lua_State* L)
+{
+	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
+	int material_idx = LuaWrapper::checkArg<int>(L, 2);
+	LuaWrapper::checkTableArg(L, 3);
+	if (material_idx < 0 || material_idx >= dlg->m_materials.size()) return 0;
+
+	ImportMaterial& material = dlg->m_materials[material_idx];
+
+	lua_pushvalue(L, 3);
+
+	if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
+	{
+		material.import = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1); // "import"
+
+	if (lua_getfield(L, -1, "alpha_cutout") == LUA_TBOOLEAN)
+	{
+		material.alpha_cutout = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1); // "alpha_cutout"
+
+	lua_pop(L, 1); // table
+	return 0;
+}
+
+
+int getMeshesCount(ImportAssetDialog* dlg)
+{
+	return dlg->m_meshes.size();
+}
+
+
+int getMaterialsCount(ImportAssetDialog* dlg)
+{
+	return dlg->m_materials.size();
+}
+
+
+int getTexturesCount(ImportAssetDialog* dlg, int material_idx)
+{
+	if (material_idx < 0 || material_idx >= dlg->m_materials.size()) return 0;
+	return dlg->m_materials[material_idx].texture_count;
+}
+
+
+const char* getMeshName(ImportAssetDialog* dlg, int mesh_idx)
+{
+	if (mesh_idx < 0 || mesh_idx >= dlg->m_meshes.size()) return "";
+	return dlg->m_meshes[mesh_idx].mesh->mName.C_Str();
+}
+
+
+const char* getMaterialName(ImportAssetDialog* dlg, int material_idx)
+{
+	if (material_idx < 0 || material_idx >= dlg->m_meshes.size()) return "";
+	return dlg->m_materials[material_idx].name;
+}
+
+
+} // namespace LuaAPI
+
+
 static bool isSkinned(const aiMesh* mesh) { return mesh->mNumBones > 0; }
 
 
@@ -706,6 +911,9 @@ struct ImportTask LUMIX_FINAL : public MT::Task
 				material.import = true;
 				material.alpha_cutout = false;
 				material.material = scene->mMaterials[i];
+				aiString material_name;
+				material.material->Get(AI_MATKEY_NAME, material_name);
+				Lumix::copyString(material.name, material_name.C_Str());
 				material.texture_count = 0;
 				copyString(material.shader, "rigid/rigid");
 				auto types = {aiTextureType_DIFFUSE, aiTextureType_NORMALS, aiTextureType_HEIGHT};
@@ -1898,6 +2106,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 		PathUtils::getBasename(filename, sizeof(filename), m_dialog.m_source);
 		catString(filename, ".phy");
 		PathBuilder phy_path(m_dialog.m_output_dir);
+		PlatformInterface::makePath(phy_path);
 		phy_path << "/" << filename;
 		FS::OsFile file;
 		if (!file.open(phy_path, FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
@@ -2151,8 +2360,46 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	m_action->func.bind<ImportAssetDialog, &ImportAssetDialog::onAction>(this);
 	m_action->is_selected.bind<ImportAssetDialog, &ImportAssetDialog::isOpened>(this);
 
-	LuaWrapper::createSystemFunction(m_editor.getEngine().getState(), "Editor", "importAsset", &::importAsset);
-	LuaWrapper::createSystemVariable(m_editor.getEngine().getState(), "Editor", "import_asset_dialog", this);
+	lua_State* L = m_editor.getEngine().getState();
+	LuaWrapper::createSystemVariable(L, "ImportAsset", "instance", this);
+
+	#define REGISTER_FUNCTION(name) \
+		do {\
+			auto f = &LuaWrapper::wrapMethod<ImportAssetDialog, decltype(&ImportAssetDialog::name), &ImportAssetDialog::name>; \
+			LuaWrapper::createSystemFunction(L, "ImportAsset", #name, f); \
+		} while(false) \
+
+	REGISTER_FUNCTION(clearSources);
+	REGISTER_FUNCTION(addSource);
+	REGISTER_FUNCTION(import);
+
+	#undef REGISTER_FUNCTION
+
+	#define REGISTER_FUNCTION(name) \
+		do {\
+			auto f = &LuaWrapper::wrap<decltype(&LuaAPI::name), &LuaAPI::name>; \
+			LuaWrapper::createSystemFunction(L, "ImportAsset", #name, f); \
+		} while(false) \
+
+	REGISTER_FUNCTION(getMeshesCount);
+	REGISTER_FUNCTION(getMaterialsCount);
+	REGISTER_FUNCTION(getTexturesCount);
+	REGISTER_FUNCTION(getMeshName);
+	REGISTER_FUNCTION(getMaterialName);
+
+	#undef REGISTER_FUNCTION
+
+	#define REGISTER_FUNCTION(name) \
+		do {\
+			LuaWrapper::createSystemFunction(L, "ImportAsset", #name, &LuaAPI::name); \
+		} while(false) \
+
+	REGISTER_FUNCTION(setParams);
+	REGISTER_FUNCTION(setMeshParams);
+	REGISTER_FUNCTION(setMaterialParams);
+	REGISTER_FUNCTION(setTextureParams);
+
+	#undef REGISTER_FUNCTION
 }
 
 
@@ -2800,242 +3047,12 @@ static bool createBillboard(ImportAssetDialog& dialog,
 }
 
 
-static ImportMaterial* getMatchingMaterial(lua_State* L, ImportMaterial* materials, int count)
+void ImportAssetDialog::import()
 {
-	auto x = lua_gettop(L);
-	if (lua_getfield(L, -1, "matching") == LUA_TFUNCTION)
-	{
-		for (int i = 0; i < count; ++i)
-		{
-			lua_pushvalue(L, -1); // duplicate "matching"
-			ImportMaterial& material = materials[i];
-			aiString material_name;
-			material.material->Get(AI_MATKEY_NAME, material_name);
-			LuaWrapper::push(L, i);
-			LuaWrapper::push(L, material_name.C_Str());
-			if (lua_pcall(L, 2, 1, 0) != LUA_OK)
-			{
-				g_log_error.log("Editor") << "getMatchingMaterial" << ": " << lua_tostring(L, -1);
-				lua_pop(L, 1);
-			}
-			else
-			{
-				bool is_matching = LuaWrapper::toType<bool>(L, -1);
-				lua_pop(L, 1);
-				if (is_matching)
-				{
-					lua_pop(L, 1); // "matching"
-					auto u = lua_gettop(L);
-					return &material;
-				}
-			}
-		}
-	}
-	else
-	{
-		g_log_error.log("Editor") << "No \"matching\" found in table or it is not a function";
-	}
-	lua_pop(L, 1); // "matching"
-	return nullptr;
-}
-
-
-int ImportAssetDialog::importAsset(lua_State* L)
-{
-	m_importers.clear();
-	m_animations.clear();
-	m_materials.clear();
-	m_meshes.clear();
-	m_mesh_output_filename[0] = '\0';
-	m_is_opened = true;
-
-	LuaWrapper::checkTableArg(L, 2);
-	if (lua_getfield(L, 2, "output_dir") == LUA_TSTRING)
-	{
-		copyString(m_output_dir, LuaWrapper::toType<const char*>(L, -1));
-	}
-	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "create_billboard") == LUA_TBOOLEAN)
-	{
-		m_model.create_billboard_lod = LuaWrapper::toType<bool>(L, -1);
-	}
-	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "remove_doubles") == LUA_TBOOLEAN)
-	{
-		m_model.remove_doubles = LuaWrapper::toType<bool>(L, -1);
-	}
-	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "scale") == LUA_TNUMBER)
-	{
-		m_model.mesh_scale = LuaWrapper::toType<float>(L, -1);
-	}
-	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "time_scale") == LUA_TNUMBER)
-	{
-		m_model.time_scale = LuaWrapper::toType<float>(L, -1);
-	}
-	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "orientation") == LUA_TSTRING)
-	{
-		const char* tmp = LuaWrapper::toType<const char*>(L, -1);
-		if (equalStrings(tmp, "+y")) m_model.orientation = Orientation::Y_UP;
-		else if (equalStrings(tmp, "+z")) m_model.orientation = Orientation::Z_UP;
-		else if (equalStrings(tmp, "-y")) m_model.orientation = Orientation::X_MINUS_UP;
-		else if (equalStrings(tmp, "-z")) m_model.orientation = Orientation::Z_MINUS_UP;
-	}
-	lua_pop(L, 1);
-
-
-	if (lua_getfield(L, 2, "lods") == LUA_TTABLE)
-	{
-		lua_pushnil(L);
-		int lod_index = 0;
-		while (lua_next(L, -2) != 0)
-		{
-			if (lod_index >= lengthOf(m_model.lods))
-			{
-				g_log_error.log("Editor") << "Only " << lengthOf(m_model.lods) << " supported";
-				lua_pop(L, 1);
-				break;
-			}
-
-			m_model.lods[lod_index] = LuaWrapper::toType<float>(L, -1);
-			++lod_index;
-			lua_pop(L, 1);
-		}
-	}
-	lua_pop(L, 1);
-
-	if (lua_getfield(L, 2, "texture_output_dir") == LUA_TSTRING)
-	{
-		copyString(m_texture_output_dir, LuaWrapper::toType<const char*>(L, -1));
-	}
-	lua_pop(L, 1);
-
-	if (lua_getfield(L, 2, "srcs") == LUA_TTABLE)
-	{
-		lua_pushnil(L);
-		while (lua_next(L, -2) != 0)
-		{
-			if (!lua_istable(L, -1))
-			{
-				lua_pop(L, 1);
-				continue;
-			}
-
-			if (lua_getfield(L, -1, "src") != LUA_TSTRING)
-			{
-				lua_pop(L, 2); // "src" and inputs table item
-				continue;
-			}
-			copyString(m_source, LuaWrapper::toType<const char*>(L, -1));
-			lua_pop(L, 1); // "src"
-
-			int meshes_count = m_meshes.size();
-			if (!checkSource())
-			{
-				lua_pop(L, 1); // inputs table item
-				g_log_error.log("Editor") << "Could not import \"" << m_source << "\"";
-				continue;
-			}
-			if (m_is_importing) checkTask(true);
-
-			if (lua_getfield(L, -1, "lod") == LUA_TNUMBER)
-			{
-				int lod = LuaWrapper::toType<int>(L, -1);
-				for (int i = meshes_count; i < m_meshes.size(); ++i)
-				{
-					m_meshes[i].lod = lod;
-				}
-			}
-			lua_pop(L, 1); // "lod"
-
-			auto* scene = m_importers.back().GetScene();
-			if (scene->mNumMaterials > 0)
-			{
-				if (lua_getfield(L, -1, "materials") == LUA_TTABLE)
-				{
-					lua_pushnil(L);
-					while (lua_next(L, -2) != 0) // for each material
-					{
-						if (lua_istable(L, -1))
-						{
-							ImportMaterial* material = getMatchingMaterial(
-								L, &m_materials[m_materials.size() - scene->mNumMaterials], scene->mNumMaterials);
-							if (!material)
-							{
-								g_log_error.log("Editor") << "No matching material found";
-								lua_pop(L, 1); // materials table item
-								continue;
-							}
-
-							if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
-							{
-								material->import = LuaWrapper::toType<bool>(L, -1);
-							}
-							lua_pop(L, 1); // "import"
-
-							if (lua_getfield(L, -1, "shader") == LUA_TSTRING)
-							{
-								copyString(material->shader, LuaWrapper::toType<const char*>(L, -1));
-							}
-							lua_pop(L, 1); // "import"
-
-
-							if (lua_getfield(L, -1, "alpha_cutout") == LUA_TBOOLEAN)
-							{
-								material->alpha_cutout = LuaWrapper::toType<bool>(L, -1);
-							}
-							lua_pop(L, 1); // "alpha_cutout"
-
-							if (lua_getfield(L, -1, "textures") == LUA_TTABLE)
-							{
-								int top = lua_gettop(L);
-								lua_pushnil(L);
-								ImportTexture* texture = material->textures;
-								while (texture - material->textures < material->texture_count && lua_next(L, -2) != 0) // for each texture
-								{
-									if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
-									{
-										texture->import = LuaWrapper::toType<bool>(L, -1);
-									}
-									lua_pop(L, 1); // "import"
-
-									if (lua_getfield(L, -1, "to_dds") == LUA_TBOOLEAN)
-									{
-										texture->to_dds = LuaWrapper::toType<bool>(L, -1);
-									}
-									lua_pop(L, 1); // "to_dds"
-
-									if (lua_getfield(L, -1, "src") == LUA_TSTRING)
-									{
-										copyString(texture->src, LuaWrapper::toType<const char*>(L, -1));
-										texture->is_valid = PlatformInterface::fileExists(texture->src);
-									}
-									lua_pop(L, 1); // "src"
-
-									++texture;
-									lua_pop(L, 1); // textures table item
-								}
-								if (lua_gettop(L) > top) lua_pop(L, lua_gettop(L) - top);
-							}
-							lua_pop(L, 1); // "textures"
-						}
-
-						lua_pop(L, 1); // materials table item
-					}
-				}
-				lua_pop(L, 1); // "materials"
-			}
-
-			lua_pop(L, 1); // inputs table item
-		}
-	}
-	lua_pop(L, 1);
 	if (m_importers.empty())
 	{
 		g_log_error.log("Editor") << "Nothing to import";
-		return 0;
+		return;
 	}
 
 	convert(false);
@@ -3059,8 +3076,6 @@ int ImportAssetDialog::importAsset(lua_State* L)
 			createBillboard(*this, Path(mesh_path), Path(texture_path), Path(normal_texture_path), TEXTURE_SIZE);
 		}
 	}
-
-	return 0;
 }
 
 
@@ -3086,6 +3101,24 @@ void ImportAssetDialog::checkTask(bool wait)
 void ImportAssetDialog::onAction()
 {
 	m_is_opened = !m_is_opened;
+}
+
+
+void ImportAssetDialog::clearSources()
+{
+	m_importers.clear();
+	m_animations.clear();
+	m_materials.clear();
+	m_meshes.clear();
+	m_mesh_output_filename[0] = '\0';
+}
+
+
+void ImportAssetDialog::addSource(const char* src)
+{
+	copyString(m_source, src);
+	checkSource();
+	if (m_is_importing) checkTask(true);
 }
 
 
@@ -3139,25 +3172,20 @@ void ImportAssetDialog::onWindowGUI()
 
 		if (ImGui::Button("Add source"))
 		{
-			PlatformInterface::getOpenFilename(m_source, sizeof(m_source), "All\0*.*\0", m_source);
-			checkSource();
-			if (m_is_importing || m_is_converting)
+			if (PlatformInterface::getOpenFilename(m_source, sizeof(m_source), "All\0*.*\0", m_source))
 			{
-				ImGui::EndDock();
-				return;
+				checkSource();
+				if (m_is_importing || m_is_converting)
+				{
+					ImGui::EndDock();
+					return;
+				}
 			}
 		}
 		if (!m_importers.empty())
 		{
 			ImGui::SameLine();
-			if (ImGui::Button("Clear all sources"))
-			{
-				m_importers.clear();
-				m_animations.clear();
-				m_materials.clear();
-				m_meshes.clear();
-				m_mesh_output_filename[0] = '\0';
-			}
+			if (ImGui::Button("Clear all sources")) clearSources();
 		}
 
 		onImageGUI();
