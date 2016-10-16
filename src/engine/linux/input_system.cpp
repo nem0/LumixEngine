@@ -50,6 +50,8 @@ namespace Lumix
 		float getMouseXMove() const override { return m_mouse_rel_pos.x; }
 		float getMouseYMove() const override { return m_mouse_rel_pos.y; }
 		Vec2 getMousePos() const override { return m_mouse_pos; }
+		bool isMouseDown(MouseButton button) override { return false; }
+
 
 
 		void addAction(uint32 action, InputType type, int key, int controller_id) override {}
