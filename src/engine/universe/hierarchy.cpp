@@ -71,8 +71,23 @@ public:
 				auto iter = m_children.find(parent_iter.value());
 				if (iter != m_children.end())
 				{
-					LUMIX_DELETE(m_allocator, iter.value());
-					m_children.erase(iter);
+					auto& children = *iter.value();
+					if (children.size() == 1)
+					{
+						LUMIX_DELETE(m_allocator, iter.value());
+						m_children.erase(iter);
+					}
+					else
+					{
+						for (int i = 0; i < children.size(); ++i)
+						{
+							if (children[i].m_entity == entity)
+							{
+								children.eraseFast(i);
+								break;
+							}
+						}
+					}
 				}
 				m_parents.erase(parent_iter);
 			}
