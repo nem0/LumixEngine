@@ -250,6 +250,13 @@ int getMeshesCount(ImportAssetDialog* dlg)
 }
 
 
+const char* getMeshMaterialName(ImportAssetDialog* dlg, int mesh_idx)
+{
+	if (mesh_idx < 0 || mesh_idx >= dlg->m_meshes.size()) return "";
+	return dlg->m_materials[dlg->m_meshes[mesh_idx].material].name;
+}
+
+
 int getMaterialsCount(ImportAssetDialog* dlg)
 {
 	return dlg->m_materials.size();
@@ -904,6 +911,7 @@ struct ImportTask LUMIX_FINAL : public MT::Task
 
 			char src_dir[MAX_PATH_LENGTH];
 			PathUtils::getDir(src_dir, lengthOf(src_dir), m_dialog.m_source);
+			int material_offset = m_dialog.m_materials.size();
 			for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
 			{
 				auto& material = m_dialog.m_materials.emplace();
@@ -942,6 +950,7 @@ struct ImportTask LUMIX_FINAL : public MT::Task
 				mesh.import_physics = false;
 				mesh.mesh = scene->mMeshes[i];
 				mesh.lod = getMeshLOD(scene, mesh.mesh);
+				mesh.material = material_offset + mesh.mesh->mMaterialIndex;
 				float f = getMeshLODFactor(scene, mesh.mesh);
 				if (f < FLT_MAX) m_dialog.m_model.lods[mesh.lod] = f;
 			}
@@ -2382,6 +2391,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 		} while(false) \
 
 	REGISTER_FUNCTION(getMeshesCount);
+	REGISTER_FUNCTION(getMeshMaterialName);
 	REGISTER_FUNCTION(getMaterialsCount);
 	REGISTER_FUNCTION(getTexturesCount);
 	REGISTER_FUNCTION(getMeshName);

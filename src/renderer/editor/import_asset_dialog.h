@@ -75,6 +75,7 @@ struct ImportMesh
 	bool import_physics;
 	struct aiMesh* mesh;
 	const aiScene* scene;
+	int material;
 	Lumix::Array<unsigned int> map_to_input;
 	Lumix::Array<unsigned int> map_from_input;
 	Lumix::Array<Lumix::int32> indices;
