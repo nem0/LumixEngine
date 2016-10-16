@@ -624,6 +624,26 @@ public:
 		engine->unloadLuaResource(resource_idx);
 	}
 
+
+	static Universe* LUA_createUniverse(EngineImpl* engine)
+	{
+		return &engine->createUniverse(false);
+	}
+
+
+	static void LUA_destroyUniverse(EngineImpl* engine, Universe* universe)
+	{
+		engine->destroyUniverse(*universe);
+	}
+
+
+	static IScene* LUA_getScene(Universe* universe, const char* name)
+	{
+		uint32 hash = crc32(name);
+		return universe->getScene(hash);
+	}
+
+
 	static int LUA_loadResource(EngineImpl* engine, const char* path, const char* type)
 	{
 		ResourceManagerBase* res_manager = engine->getResourceManager().get(ResourceType(type));
@@ -776,6 +796,9 @@ public:
 			LuaWrapper::createSystemFunction(m_state, "Engine", #name, \
 				&LuaWrapper::wrap<decltype(&LUA_##name), LUA_##name>); \
 
+		REGISTER_FUNCTION(createUniverse);
+		REGISTER_FUNCTION(destroyUniverse);
+		REGISTER_FUNCTION(getScene);
 		REGISTER_FUNCTION(loadResource);
 		REGISTER_FUNCTION(unloadResource);
 		REGISTER_FUNCTION(createComponent);
@@ -1030,7 +1053,7 @@ public:
 	IAllocator& getAllocator() override { return m_allocator; }
 
 
-	Universe& createUniverse() override
+	Universe& createUniverse(bool set_lua_globals) override
 	{
 		Universe* universe = LUMIX_NEW(m_allocator, Universe)(m_allocator);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
@@ -1043,15 +1066,20 @@ public:
 			}
 		}
 
-		for (auto* scene : universe->getScenes())
+		if (set_lua_globals)
 		{
-			const char* name = scene->getPlugin().getName();
-			char tmp[128];
+			for (auto* scene : universe->getScenes())
+			{
+				const char* name = scene->getPlugin().getName();
+				char tmp[128];
 
-			copyString(tmp, "g_scene_");
-			catString(tmp, name);
-			lua_pushlightuserdata(m_state, scene);
-			lua_setglobal(m_state, tmp);
+				copyString(tmp, "g_scene_");
+				catString(tmp, name);
+				lua_pushlightuserdata(m_state, scene);
+				lua_setglobal(m_state, tmp);
+			}
+			lua_pushlightuserdata(m_state, universe);
+			lua_setglobal(m_state, "g_universe");
 		}
 
 		return *universe;

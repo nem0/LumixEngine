@@ -266,7 +266,7 @@ public:
 			m_engine->getFileSystem().updateAsyncTransactions();
 		}
 
-		m_universe = &m_engine->createUniverse();
+		m_universe = &m_engine->createUniverse(true);
 		m_pipeline->setScene((Lumix::RenderScene*)m_universe->getScene(Lumix::crc32("renderer")));
 		m_pipeline->setViewport(0, 0, 600, 400);
 		renderer->resize(600, 400);
@@ -348,7 +348,7 @@ public:
 			return;
 		}
 		m_engine->destroyUniverse(*m_universe);
-		m_universe = &m_engine->createUniverse();
+		m_universe = &m_engine->createUniverse(true);
 		m_pipeline->setScene((Lumix::RenderScene*)m_universe->getScene(Lumix::crc32("renderer")));
 		Lumix::LuaWrapper::createSystemVariable(m_engine->getState(), "App", "universe", m_universe);
 		bool deserialize_succeeded = m_engine->deserialize(*m_universe, blob);

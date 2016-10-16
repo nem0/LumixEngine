@@ -305,9 +305,6 @@ namespace Lumix
 		{
 			m_function_call.is_in_progress = false;
 			
-			lua_State* engine_state = m_system.m_engine.getState();
-			lua_pushlightuserdata(engine_state, &m_universe);
-			lua_setglobal(engine_state, "g_universe");
 			registerAPI();
 			ctx.registerComponentTypeScene(LUA_SCRIPT_TYPE, this);
 		}
