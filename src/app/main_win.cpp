@@ -86,7 +86,6 @@ public:
 	LRESULT onMessage(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	{
 		auto& input_system = m_engine->getInputSystem();
-		Lumix::InputSystem::InputEvent event;
 		switch (msg)
 		{
 			case WM_KILLFOCUS: m_engine->getInputSystem().enable(false); break;
@@ -95,14 +94,6 @@ public:
 			case WM_MOVE:
 			case WM_SIZE: onResize(); break;
 			case WM_QUIT: m_finished = true; break;
-			case WM_LBUTTONDOWN:
-				event.type = Lumix::InputSystem::InputEvent::POINTER_DOWN;
-				input_system.injectEvent(event);
-				break;
-			case WM_LBUTTONUP:
-				event.type = Lumix::InputSystem::InputEvent::POINTER_UP;
-				input_system.injectEvent(event);
-				break;
 			case WM_INPUT: handleRawInput(lparam); break;
 		}
 		return DefWindowProc(hwnd, msg, wparam, lparam);
