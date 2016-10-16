@@ -54,6 +54,7 @@ public:
 	virtual bool isEnd(BufferHandle buffer) = 0;
 	virtual void stop(BufferHandle buffer) = 0;
 	virtual void pause(BufferHandle buffer) = 0;
+	virtual void setMasterVolume(float volume) = 0;
 	virtual void setVolume(BufferHandle buffer, float volume) = 0;
 	virtual void setFrequency(BufferHandle buffer, float frequency) = 0;
 	virtual void setCurrentTime(BufferHandle buffer, float time_seconds) = 0;

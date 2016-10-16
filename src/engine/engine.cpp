@@ -133,7 +133,12 @@ int AlignFirstTextHeightToWidgets(lua_State* L)
 int Selectable(lua_State* L)
 {
 	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
-	bool clicked = ImGui::Selectable(label);
+	bool selected = false;
+	if (lua_gettop(L) > 1)
+	{
+		selected = LuaWrapper::checkArg<bool>(L, 2);
+	}
+	bool clicked = ImGui::Selectable(label, selected);
 	lua_pushboolean(L, clicked);
 	return 1;
 }

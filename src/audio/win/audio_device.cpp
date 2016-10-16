@@ -1,8 +1,9 @@
 #include "audio_device.h"
 #include "clip_manager.h"
-#include "engine/log.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
+#include "engine/log.h"
+#include <cmath>
 #include <dsound.h>
 
 
@@ -347,6 +348,13 @@ struct AudioDeviceImpl LUMIX_FINAL : public AudioDevice
 	void pause(BufferHandle handle) override { m_buffers[m_buffer_map[handle]].handle->Stop(); }
 
 
+	void setMasterVolume(float volume) override
+	{
+		LONG v = volume < 0.0001f ? DSBVOLUME_MIN : LONG(-2000.0f * log10(1.0f / volume));
+		m_primary_buffer->SetVolume(v);
+	}
+
+
 	void setVolume(BufferHandle handle, float volume) override
 	{
 		m_buffers[m_buffer_map[handle]].handle->SetVolume(
@@ -512,6 +520,7 @@ public:
 	void stop(BufferHandle buffer) override {}
 	bool isEnd(BufferHandle buffer) override { return true; }
 	void pause(BufferHandle buffer) override {}
+	void setMasterVolume(float volume) override {}
 	void setVolume(BufferHandle buffer, float volume) override {}
 	void setFrequency(BufferHandle buffer, float frequency) override {}
 	void setCurrentTime(BufferHandle buffer, float time_seconds) override {}

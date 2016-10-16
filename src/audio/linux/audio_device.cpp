@@ -30,6 +30,7 @@ public:
 	void stop(BufferHandle buffer) override {}
 	bool isEnd(BufferHandle buffer) override { return true; }
 	void pause(BufferHandle buffer) override {}
+	void setMasterVolume(float volume) override {}
 	void setVolume(BufferHandle buffer, float volume) override {}
 	void setFrequency(BufferHandle buffer, float frequency) override {}
 	void setCurrentTime(BufferHandle buffer, float time_seconds) override {}
