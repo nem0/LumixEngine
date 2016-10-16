@@ -360,7 +360,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	void createPreviewUniverse()
 	{
 		auto& engine = m_app.getWorldEditor()->getEngine();
-		m_universe = &engine.createUniverse();
+		m_universe = &engine.createUniverse(false);
 		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), engine.getAllocator());
 		m_pipeline->load();

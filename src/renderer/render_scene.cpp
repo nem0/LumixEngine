@@ -14,6 +14,7 @@
 #include "engine/mtjd/job.h"
 #include "engine/mtjd/manager.h"
 #include "engine/path_utils.h"
+#include "engine/plugin_manager.h"
 #include "engine/profiler.h"
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
@@ -2309,6 +2310,33 @@ public:
 	}
 
 
+	static Pipeline* LUA_createPipeline(Engine* engine, const char* path)
+	{
+		Renderer& renderer = *static_cast<Renderer*>(engine->getPluginManager().getPlugin("renderer"));
+		Pipeline* pipeline = Pipeline::create(renderer, Path(path), renderer.getEngine().getAllocator());
+		pipeline->load();
+		return pipeline;
+	}
+
+
+	static void LUA_destroyPipeline(Pipeline* pipeline)
+	{
+		Pipeline::destroy(pipeline);
+	}
+
+
+	static void LUA_setPipelineScene(Pipeline* pipeline, RenderScene* scene)
+	{
+		pipeline->setScene(scene);
+	}
+
+
+	static void LUA_pipelineRender(Pipeline* pipeline)
+	{
+		pipeline->render();
+	}
+
+
 	static Texture* LUA_getMaterialTexture(Material* material, int texture_index)
 	{
 		if (!material) return nullptr;
@@ -4564,6 +4592,10 @@ void RenderScene::registerLuaAPI(lua_State* L)
 		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
 		} while(false) \
 
+	REGISTER_FUNCTION(createPipeline);
+	REGISTER_FUNCTION(destroyPipeline);
+	REGISTER_FUNCTION(setPipelineScene);
+	REGISTER_FUNCTION(pipelineRender);
 	REGISTER_FUNCTION(getMaterialTexture);
 	REGISTER_FUNCTION(getTextureWidth);
 	REGISTER_FUNCTION(getTextureHeight);

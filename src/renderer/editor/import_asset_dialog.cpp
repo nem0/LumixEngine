@@ -2949,7 +2949,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	int texture_size)
 {
 	auto& engine = dialog.getEditor().getEngine();
-	auto& universe = engine.createUniverse();
+	auto& universe = engine.createUniverse(false);
 
 	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	if (!renderer) return false;
