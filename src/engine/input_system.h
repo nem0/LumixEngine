@@ -28,27 +28,11 @@ namespace Lumix
 				LTRIGGER
 			};
 
-			struct InputEvent
+			enum MouseButton
 			{
-				enum Type
-				{
-					POINTER_DOWN,
-					POINTER_UP,
-					POINTER_MOVE,
-					KEY_DOWN,
-					KEY_UP
-				};
-
-				Type type;
-				union
-				{
-					struct {
-						int button;
-					} pointer;
-					struct {
-						int sym;
-					} key;
-				};
+				LEFT,
+				MIDDLE,
+				RIGHT
 			};
 
 		public:
@@ -60,14 +44,13 @@ namespace Lumix
 			virtual void enable(bool enabled) = 0;
 			virtual void update(float dt) = 0;
 			virtual float getActionValue(uint32 action) = 0;
-			virtual void injectEvent(InputEvent& event) = 0;
 			virtual void injectMouseXMove(float rel, float abs) = 0;
 			virtual void injectMouseYMove(float rel, float abs) = 0;
 			virtual float getMouseXMove() const = 0;
 			virtual float getMouseYMove() const = 0;
+			virtual bool  isMouseDown(MouseButton button) = 0;
 			virtual Vec2 getMousePos() const = 0;
 			virtual void addAction(uint32 action, InputType type, int key, int controller_id) = 0;
-			virtual DelegateList<void(InputEvent&)>& eventListener() = 0;
 	};
 
 
