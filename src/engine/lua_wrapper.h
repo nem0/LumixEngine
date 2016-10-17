@@ -166,6 +166,11 @@ template <> inline const char* typeToString<bool>()
 	return "boolean";
 }
 
+template <> inline const char* typeToString<float>()
+{
+	return "boolean";
+}
+
 
 template <typename T> inline bool isType(lua_State* L, int index)
 {
