@@ -116,9 +116,9 @@ struct InputSystemImpl LUMIX_FINAL : public InputSystem
 	{
 		switch (button)
 		{
-			case LEFT: return (GetAsyncKeyState(VK_LBUTTON) & 1) != 0;
-			case RIGHT: return (GetAsyncKeyState(VK_RBUTTON) & 1) != 0;
-			case MIDDLE: return (GetAsyncKeyState(VK_MBUTTON) & 1) != 0;
+			case LEFT: return (GetAsyncKeyState(VK_LBUTTON) >> 8) != 0;
+			case RIGHT: return (GetAsyncKeyState(VK_RBUTTON) >> 8) != 0;
+			case MIDDLE: return (GetAsyncKeyState(VK_MBUTTON) >> 8) != 0;
 		}
 		return false;
 	}
