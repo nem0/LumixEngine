@@ -171,6 +171,24 @@ int Image(lua_State* L)
 }
 
 
+bool IsItemHovered()
+{
+	return ImGui::IsItemHovered();
+}
+
+
+bool IsMouseDown(int button)
+{
+	return ImGui::IsMouseDown(button);
+}
+
+
+bool IsMouseClicked(int button)
+{
+	return ImGui::IsMouseClicked(button);
+}
+
+
 int SetNextWindowPosCenter(lua_State* L)
 {
 	ImGui::SetNextWindowPosCenter();
@@ -874,6 +892,9 @@ public:
 		LuaImGui::registerCFunction(m_state, "GetWindowHeight", &LuaImGui::GetWindowHeight);
 		LuaImGui::registerCFunction(m_state, "GetWindowPos", &LuaImGui::GetWindowPos);
 		LuaImGui::registerCFunction(m_state, "Image", &LuaWrapper::wrap<decltype(&LuaImGui::Image), &LuaImGui::Image>);
+		LuaImGui::registerCFunction(m_state, "IsItemHovered", &LuaWrapper::wrap<decltype(&LuaImGui::IsItemHovered), &LuaImGui::IsItemHovered>);
+		LuaImGui::registerCFunction(m_state, "IsMouseClicked", &LuaWrapper::wrap<decltype(&LuaImGui::IsMouseClicked), &LuaImGui::IsMouseClicked>);
+		LuaImGui::registerCFunction(m_state, "IsMouseDown", &LuaWrapper::wrap<decltype(&LuaImGui::IsMouseDown), &LuaImGui::IsMouseDown>);
 		LuaImGui::registerCFunction(m_state, "OpenPopup", &LuaWrapper::wrap<decltype(&ImGui::OpenPopup), &ImGui::OpenPopup>);
 		LuaImGui::registerCFunction(m_state, "PushItemWidth", &LuaWrapper::wrap<decltype(&ImGui::PushItemWidth), &ImGui::PushItemWidth>);
 		LuaImGui::registerCFunction(m_state, "PopItemWidth", &LuaWrapper::wrap<decltype(&ImGui::PopItemWidth), &ImGui::PopItemWidth>);
