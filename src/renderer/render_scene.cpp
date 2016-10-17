@@ -26,6 +26,7 @@
 #include "lua_script/lua_script_system.h"
 
 #include "renderer/culling_system.h"
+#include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
 #include "renderer/model.h"
@@ -2331,9 +2332,19 @@ public:
 	}
 
 
-	static void LUA_pipelineRender(Pipeline* pipeline)
+	static void LUA_pipelineRender(Pipeline* pipeline, int w, int h)
 	{
+		pipeline->setViewport(0, 0, w, h);
 		pipeline->render();
+	}
+
+
+	static bgfx::TextureHandle* LUA_getRenderBuffer(Pipeline* pipeline,
+		const char* framebuffer_name,
+		int renderbuffer_idx)
+	{
+		FrameBuffer::RenderBuffer& rb = pipeline->getFramebuffer(framebuffer_name)->getRenderbuffer(renderbuffer_idx);
+		return &rb.m_handle;
 	}
 
 
@@ -4596,6 +4607,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(destroyPipeline);
 	REGISTER_FUNCTION(setPipelineScene);
 	REGISTER_FUNCTION(pipelineRender);
+	REGISTER_FUNCTION(getRenderBuffer);
 	REGISTER_FUNCTION(getMaterialTexture);
 	REGISTER_FUNCTION(getTextureWidth);
 	REGISTER_FUNCTION(getTextureHeight);
