@@ -143,6 +143,11 @@ int setParams(lua_State* L)
 		dlg->m_model.time_scale = LuaWrapper::toType<float>(L, -1);
 	}
 	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "to_dds") == LUA_TBOOLEAN)
+	{
+		dlg->m_convert_to_dds = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1);
 	if (lua_getfield(L, 2, "orientation") == LUA_TSTRING)
 	{
 		const char* tmp = LuaWrapper::toType<const char*>(L, -1);
@@ -2381,6 +2386,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	REGISTER_FUNCTION(clearSources);
 	REGISTER_FUNCTION(addSource);
 	REGISTER_FUNCTION(import);
+	REGISTER_FUNCTION(importTexture);
 
 	#undef REGISTER_FUNCTION
 
