@@ -2050,8 +2050,11 @@ public:
 			m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
 			m_entity_groups.setUniverse(nullptr);
 			m_engine->destroyUniverse(*m_universe);
+			
 			m_universe = &m_engine->createUniverse(true);
 			m_universe_created.invoke();
+			m_universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
+			m_selected_entities.clear();
 			m_entity_groups.setUniverse(m_universe);
 			m_camera = INVALID_ENTITY;
 			load(*m_game_mode_file);
