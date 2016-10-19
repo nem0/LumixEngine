@@ -1414,10 +1414,17 @@ public:
 				blob.read(hash);
 				ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
 				ComponentUID cmp = createComponent(universe, new_entity, type);
-				Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(type);
-				for (int j = 0; j < props.size(); ++j)
+				int32 prop_count;
+				blob.read(prop_count);
+				for (int j = 0; j < prop_count; ++j)
 				{
-					props[j]->set(cmp, -1, blob);
+					uint32 prop_name_hash;
+					blob.read(prop_name_hash);
+					auto* desc = PropertyRegister::getDescriptor(type, prop_name_hash);
+					int32 size;
+					blob.read(size);
+					if(desc) desc->set(cmp, -1, blob);
+					else blob.skip(size);
 				}
 			}
 		}

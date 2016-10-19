@@ -2133,9 +2133,16 @@ public:
 				blob.write(cmp_type);
 				Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmp.type);
 				int32 prop_count = props.size();
+				blob.write(prop_count);
 				for (int j = 0; j < prop_count; ++j)
 				{
+					blob.write(props[j]->getNameHash());
+					int32 size = 0;
+					blob.write(size);
+					int pos = blob.getPos();
 					props[j]->get(cmp, -1, blob);
+					size = blob.getPos() - pos;
+					*(int32*)((uint8*)blob.getData() + pos - 4) = size;
 				}
 			}
 		}
