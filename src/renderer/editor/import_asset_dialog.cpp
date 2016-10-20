@@ -75,7 +75,250 @@ struct BillboardVertex
 static const int TEXTURE_SIZE = 512;
 
 
+namespace LuaAPI
+{
+
+
+int setMeshParams(lua_State* L)
+{
+	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
+	int mesh_idx = LuaWrapper::checkArg<int>(L, 2);
+	LuaWrapper::checkTableArg(L, 3);
+	if (mesh_idx < 0 || mesh_idx >= dlg->m_meshes.size()) return 0;
+	
+	ImportMesh& mesh = dlg->m_meshes[mesh_idx];
+
+	lua_pushvalue(L, 3);
+
+	if (lua_getfield(L, -1, "lod") == LUA_TNUMBER)
+	{
+		mesh.lod = LuaWrapper::toType<int>(L, -1);
+	}
+	lua_pop(L, 1); // "lod"
+
+	if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
+	{
+		mesh.import = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1); // "import"
+
+	if (lua_getfield(L, -1, "import_physics") == LUA_TBOOLEAN)
+	{
+		mesh.import_physics = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1); // "import_physics"
+
+	lua_pop(L, 1); // table
+	return 0;
+}
+
+
+int setParams(lua_State* L)
+{
+	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
+	LuaWrapper::checkTableArg(L, 2);
+
+	if (lua_getfield(L, 2, "output_dir") == LUA_TSTRING)
+	{
+		copyString(dlg->m_output_dir, LuaWrapper::toType<const char*>(L, -1));
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "create_billboard") == LUA_TBOOLEAN)
+	{
+		dlg->m_model.create_billboard_lod = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "remove_doubles") == LUA_TBOOLEAN)
+	{
+		dlg->m_model.remove_doubles = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "scale") == LUA_TNUMBER)
+	{
+		dlg->m_model.mesh_scale = LuaWrapper::toType<float>(L, -1);
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "time_scale") == LUA_TNUMBER)
+	{
+		dlg->m_model.time_scale = LuaWrapper::toType<float>(L, -1);
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "to_dds") == LUA_TBOOLEAN)
+	{
+		dlg->m_convert_to_dds = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "orientation") == LUA_TSTRING)
+	{
+		const char* tmp = LuaWrapper::toType<const char*>(L, -1);
+		if (equalStrings(tmp, "+y")) dlg->m_model.orientation = ImportAssetDialog::Orientation::Y_UP;
+		else if (equalStrings(tmp, "+z")) dlg->m_model.orientation = ImportAssetDialog::Orientation::Z_UP;
+		else if (equalStrings(tmp, "-y")) dlg->m_model.orientation = ImportAssetDialog::Orientation::X_MINUS_UP;
+		else if (equalStrings(tmp, "-z")) dlg->m_model.orientation = ImportAssetDialog::Orientation::Z_MINUS_UP;
+	}
+	lua_pop(L, 1);
+
+
+	if (lua_getfield(L, 2, "lods") == LUA_TTABLE)
+	{
+		lua_pushnil(L);
+		int lod_index = 0;
+		while (lua_next(L, -2) != 0)
+		{
+			if (lod_index >= lengthOf(dlg->m_model.lods))
+			{
+				g_log_error.log("Editor") << "Only " << lengthOf(dlg->m_model.lods) << " supported";
+				lua_pop(L, 1);
+				break;
+			}
+
+			dlg->m_model.lods[lod_index] = LuaWrapper::toType<float>(L, -1);
+			++lod_index;
+			lua_pop(L, 1);
+		}
+	}
+	lua_pop(L, 1);
+
+	if (lua_getfield(L, 2, "texture_output_dir") == LUA_TSTRING)
+	{
+		copyString(dlg->m_texture_output_dir, LuaWrapper::toType<const char*>(L, -1));
+	}
+	lua_pop(L, 1);
+
+	return 0;
+}
+
+
+int setTextureParams(lua_State* L)
+{
+	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
+	int material_idx = LuaWrapper::checkArg<int>(L, 2);
+	int texture_idx = LuaWrapper::checkArg<int>(L, 3);
+	LuaWrapper::checkTableArg(L, 4);
+	
+	if (material_idx < 0 || material_idx >= dlg->m_materials.size()) return 0;
+	ImportMaterial& material = dlg->m_materials[material_idx];
+	
+	if (texture_idx < 0 || texture_idx >= material.texture_count) return 0;
+	ImportTexture& texture = material.textures[texture_idx];
+
+	lua_pushvalue(L, 4);
+
+	if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
+	{
+		texture.import = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1); // "import"
+
+	if (lua_getfield(L, -1, "to_dds") == LUA_TBOOLEAN)
+	{
+		texture.to_dds = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1); // "to_dds"
+
+	lua_pop(L, 1); // table
+	return 0;
+}
+
+
+int setMaterialParams(lua_State* L)
+{
+	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
+	int material_idx = LuaWrapper::checkArg<int>(L, 2);
+	LuaWrapper::checkTableArg(L, 3);
+	if (material_idx < 0 || material_idx >= dlg->m_materials.size()) return 0;
+
+	ImportMaterial& material = dlg->m_materials[material_idx];
+
+	lua_pushvalue(L, 3);
+
+	if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
+	{
+		material.import = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1); // "import"
+
+	if (lua_getfield(L, -1, "alpha_cutout") == LUA_TBOOLEAN)
+	{
+		material.alpha_cutout = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1); // "alpha_cutout"
+
+	lua_pop(L, 1); // table
+	return 0;
+}
+
+
+int getMeshesCount(ImportAssetDialog* dlg)
+{
+	return dlg->m_meshes.size();
+}
+
+
+const char* getMeshMaterialName(ImportAssetDialog* dlg, int mesh_idx)
+{
+	if (mesh_idx < 0 || mesh_idx >= dlg->m_meshes.size()) return "";
+	return dlg->m_materials[dlg->m_meshes[mesh_idx].material].name;
+}
+
+
+int getMaterialsCount(ImportAssetDialog* dlg)
+{
+	return dlg->m_materials.size();
+}
+
+
+int getTexturesCount(ImportAssetDialog* dlg, int material_idx)
+{
+	if (material_idx < 0 || material_idx >= dlg->m_materials.size()) return 0;
+	return dlg->m_materials[material_idx].texture_count;
+}
+
+
+const char* getMeshName(ImportAssetDialog* dlg, int mesh_idx)
+{
+	if (mesh_idx < 0 || mesh_idx >= dlg->m_meshes.size()) return "";
+	return dlg->m_meshes[mesh_idx].mesh->mName.C_Str();
+}
+
+
+const char* getMaterialName(ImportAssetDialog* dlg, int material_idx)
+{
+	if (material_idx < 0 || material_idx >= dlg->m_meshes.size()) return "";
+	return dlg->m_materials[material_idx].name;
+}
+
+
+} // namespace LuaAPI
+
+
 static bool isSkinned(const aiMesh* mesh) { return mesh->mNumBones > 0; }
+
+
+static uint32 packuint32(uint8 _x, uint8 _y, uint8 _z, uint8 _w)
+{
+	union {
+		uint32 ui32;
+		uint8 arr[4];
+	} un;
+
+	un.arr[0] = _x;
+	un.arr[1] = _y;
+	un.arr[2] = _z;
+	un.arr[3] = _w;
+
+	return un.ui32;
+}
+
+
+static uint32 packF4u(const Vec3& vec)
+{
+	const uint8 xx = uint8(vec.x * 127.0f + 128.0f);
+	const uint8 yy = uint8(vec.y * 127.0f + 128.0f);
+	const uint8 zz = uint8(vec.z * 127.0f + 128.0f);
+	const uint8 ww = uint8(0);
+	return packuint32(xx, yy, zz, ww);
+}
 
 
 static int ceilPowOf2(int value)
@@ -90,6 +333,59 @@ static int ceilPowOf2(int value)
 	return ret + 1;
 }
 
+
+struct BillboardSceneData
+{
+	int width;
+	int height;
+	float ortho_size;
+	Vec3 position;
+
+
+	BillboardSceneData(const AABB& aabb, int texture_size)
+	{
+		Vec3 size = aabb.max - aabb.min;
+		float right = aabb.max.x + size.z + size.x + size.z;
+		float left = aabb.min.x;
+		position.set((right + left) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + 5);
+
+		if (2 * size.x + 2 * size.z > size.y)
+		{
+			width = texture_size;
+			int nonceiled_height = int(width / (2 * size.x + 2 * size.z) * size.y);
+			height = ceilPowOf2(nonceiled_height);
+			ortho_size = size.y * height / nonceiled_height * 0.5f;
+		}
+		else
+		{
+			height = texture_size;
+			width = ceilPowOf2(int(height * (2 * size.x + 2 * size.z) / size.y));
+			ortho_size = size.y * 0.5f;
+		}
+	}
+
+
+	Matrix computeMVPMatrix()
+	{
+		Matrix mvp = Matrix::IDENTITY;
+
+		float ratio = height > 0 ? (float)width / height : 1.0f;
+		Matrix proj;
+		proj.setOrtho(-ortho_size * ratio,
+			ortho_size * ratio,
+			-ortho_size,
+			ortho_size,
+			0.0001f,
+			10000.0f,
+			false /* we do not care for z value, so both true and false are correct*/);
+
+		mvp.setTranslation(position);
+		mvp.fastInverse();
+		mvp = proj * mvp;
+
+		return mvp;
+	}
+};
 
 static bool isSkinned(const aiScene* scene, const aiMaterial* material)
 {
@@ -269,6 +565,7 @@ static void preprocessMesh(ImportMesh& mesh, uint32 flags, IAllocator& allocator
 
 	mesh.map_to_input.reserve(faces.size() * 3);
 	mesh.map_from_input.resize(mesh.mesh->mNumFaces * 3);
+	mesh.indices.reserve(faces.size() * 3);
 	for (unsigned int& i : mesh.map_from_input) i = 0xffffFFFF;
 
 	for (auto& face : faces)
@@ -280,14 +577,6 @@ static void preprocessMesh(ImportMesh& mesh, uint32 flags, IAllocator& allocator
 				mesh.map_to_input.push(face->mIndices[i]);
 				mesh.map_from_input[face->mIndices[i]] = mesh.map_to_input.size() - 1;
 			}
-		}
-	}
-
-	mesh.indices.reserve(faces.size() * 3);
-	for (auto& face : faces)
-	{
-		for (int i = 0; i < 3; ++i)
-		{
 			mesh.indices.push(mesh.map_from_input[face->mIndices[i]]);
 		}
 	}
@@ -438,7 +727,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 }
 
 
-struct ImportTextureTask : public MT::Task
+struct ImportTextureTask LUMIX_FINAL : public MT::Task
 {
 	explicit ImportTextureTask(ImportAssetDialog& dialog)
 		: Task(dialog.m_editor.getAllocator())
@@ -553,9 +842,9 @@ struct ImportTextureTask : public MT::Task
 }; // struct ImportTextureTask
 
 
-struct ImportTask : public MT::Task
+struct ImportTask LUMIX_FINAL : public MT::Task
 {
-	struct ProgressHandler : public Assimp::ProgressHandler
+	struct ProgressHandler LUMIX_FINAL : public Assimp::ProgressHandler
 	{
 		bool Update(float percentage) override
 		{
@@ -573,7 +862,7 @@ struct ImportTask : public MT::Task
 		, m_dialog(dialog)
 	{
 		m_dialog.m_importers.back().SetProgressHandler(&m_progress_handler);
-		struct MyStream : public Assimp::LogStream
+		struct MyStream LUMIX_FINAL : public Assimp::LogStream
 		{
 			void write(const char* message) { g_log_warning.log("Editor") << message; }
 		};
@@ -627,6 +916,7 @@ struct ImportTask : public MT::Task
 
 			char src_dir[MAX_PATH_LENGTH];
 			PathUtils::getDir(src_dir, lengthOf(src_dir), m_dialog.m_source);
+			int material_offset = m_dialog.m_materials.size();
 			for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
 			{
 				auto& material = m_dialog.m_materials.emplace();
@@ -634,8 +924,11 @@ struct ImportTask : public MT::Task
 				material.import = true;
 				material.alpha_cutout = false;
 				material.material = scene->mMaterials[i];
+				aiString material_name;
+				material.material->Get(AI_MATKEY_NAME, material_name);
+				Lumix::copyString(material.name, material_name.C_Str());
 				material.texture_count = 0;
-				copyString(material.shader, isSkinned(scene, scene->mMaterials[i]) ? "skinned" : "rigid");
+				copyString(material.shader, "rigid/rigid");
 				auto types = {aiTextureType_DIFFUSE, aiTextureType_NORMALS, aiTextureType_HEIGHT};
 				for (auto type : types)
 				{
@@ -662,6 +955,7 @@ struct ImportTask : public MT::Task
 				mesh.import_physics = false;
 				mesh.mesh = scene->mMeshes[i];
 				mesh.lod = getMeshLOD(scene, mesh.mesh);
+				mesh.material = material_offset + mesh.mesh->mMaterialIndex;
 				float f = getMeshLODFactor(scene, mesh.mesh);
 				if (f < FLT_MAX) m_dialog.m_model.lods[mesh.lod] = f;
 			}
@@ -673,7 +967,7 @@ struct ImportTask : public MT::Task
 				animation.import = true;
 
 				PathBuilder path;
-				Lumix::PathUtils::getBasename(path.data, Lumix::lengthOf(path.data), m_dialog.m_source);
+				PathUtils::getBasename(path.data, lengthOf(path.data), m_dialog.m_source);
 				for (int i = 0; i < m_dialog.m_animations.size() - 1; ++i)
 				{
 					if (equalStrings(path.data, m_dialog.m_animations[i].output_filename))
@@ -725,7 +1019,7 @@ struct ImportTask : public MT::Task
 }; // struct ImportTask
 
 
-struct ConvertTask : public MT::Task
+struct ConvertTask LUMIX_FINAL : public MT::Task
 {
 	struct SkinInfo
 	{
@@ -824,57 +1118,6 @@ struct ConvertTask : public MT::Task
 	}
 
 
-	Vec3 getPosition(const aiNodeAnim* channel, int frame_idx, uint32_t fps)
-	{
-		float time = frame_idx / (float)fps;
-		unsigned int i = 0;
-		while (i + 1 < channel->mNumPositionKeys && time > (float)channel->mPositionKeys[i + 1].mTime)
-		{
-			++i;
-		}
-		auto first = channel->mPositionKeys[i].mValue;
-
-		if (i + 1 == channel->mNumPositionKeys)
-		{
-			return Vec3(first.x, first.y, first.z);
-		}
-		auto second = channel->mPositionKeys[i + 1].mValue;
-		float t = float((time - channel->mPositionKeys[i].mTime) /
-						(channel->mPositionKeys[i + 1].mTime - channel->mPositionKeys[i].mTime));
-		first *= 1 - t;
-		second *= t;
-
-		first += second;
-
-		return Vec3(first.x, first.y, first.z);
-	}
-
-
-	Quat getRotation(const aiNodeAnim* channel, int frame_idx, uint32_t fps)
-	{
-		float time = frame_idx / (float)fps;
-		unsigned int i = 0;
-		while (i + 1 < channel->mNumRotationKeys && time > (float)channel->mRotationKeys[i + 1].mTime)
-		{
-			++i;
-		}
-		auto first = channel->mRotationKeys[i].mValue;
-
-		if (i + 1 == channel->mNumRotationKeys)
-		{
-			return Quat(first.x, first.y, first.z, first.w);
-		}
-
-		auto second = channel->mRotationKeys[i + 1].mValue;
-		float t = float((time - channel->mRotationKeys[i].mTime) /
-						(channel->mRotationKeys[i + 1].mTime - channel->mRotationKeys[i].mTime));
-		aiQuaternion out;
-		aiQuaternion::Interpolate(out, first, second, t);
-
-		return Quat(out.x, out.y, out.z, out.w);
-	}
-
-
 	static float getLength(aiAnimation* animation)
 	{
 		float length = 0;
@@ -898,10 +1141,88 @@ struct ConvertTask : public MT::Task
 	}
 
 
+	static void compressPositions(Array<aiVectorKey>& pos, const aiNodeAnim* channel, float end_time, float error)
+	{
+		pos.clear();
+		if (channel->mNumPositionKeys == 0) return;
+
+		pos.push(channel->mPositionKeys[0]);
+		if (channel->mNumPositionKeys == 1)
+		{
+			auto end = channel->mPositionKeys[0];
+			end.mTime = end_time;
+			pos.push(end);
+			return;
+		}
+
+		aiVectorKey last = channel->mPositionKeys[0];
+		float dt = float(channel->mPositionKeys[1].mTime - channel->mPositionKeys[0].mTime);
+		aiVector3D dif = (channel->mPositionKeys[1].mValue - last.mValue) / dt;
+		for (unsigned int i = 2; i < channel->mNumPositionKeys; ++i)
+		{
+			dt = float(channel->mPositionKeys[i].mTime - last.mTime);
+			aiVector3D estimate = last.mValue + dif * dt;
+			aiVector3D cur = channel->mPositionKeys[i].mValue;
+			if (fabs(estimate.x - cur.x) > error
+				|| fabs(estimate.y - cur.y) > error
+				|| fabs(estimate.z - cur.z) > error)
+			{
+				pos.push(channel->mPositionKeys[i - 1]);
+				last = channel->mPositionKeys[i - 1];
+				dt = float(channel->mPositionKeys[i].mTime - last.mTime);
+				dif = (channel->mPositionKeys[i].mValue - last.mValue) / dt;
+			}
+		}
+
+		pos.push(channel->mPositionKeys[channel->mNumPositionKeys-1]);
+	}
+
+
+	static void compressRotations(Array<aiQuatKey>& rot, const aiNodeAnim* channel, float end_time, float error)
+	{
+		rot.clear();
+
+		if (channel->mNumRotationKeys == 0) return;
+
+		rot.push(channel->mRotationKeys[0]);
+		if (channel->mNumRotationKeys == 1)
+		{
+			auto end = channel->mRotationKeys[0];
+			end.mTime = end_time;
+			rot.push(end);
+			return;
+		}
+
+		aiQuatKey last = channel->mRotationKeys[0];
+		float dt = float(channel->mRotationKeys[1].mTime - channel->mRotationKeys[0].mTime);
+		aiQuaternion after_last = channel->mRotationKeys[1].mValue;
+		float after_last_dt = dt;
+		for (unsigned int i = 2; i < channel->mNumRotationKeys; ++i)
+		{
+			dt = float(channel->mRotationKeys[i].mTime - last.mTime);
+			aiQuaternion estimate;
+			aiQuaternion::Interpolate(estimate, last.mValue, channel->mRotationKeys[i].mValue, after_last_dt / dt);
+			estimate.Normalize();
+			if (fabs(estimate.x - after_last.x) > error
+				|| fabs(estimate.y - after_last.y) > error
+				|| fabs(estimate.z - after_last.z) > error)
+			{
+				rot.push(channel->mRotationKeys[i - 1]);
+				last = channel->mRotationKeys[i - 1];
+				after_last = channel->mRotationKeys[i].mValue;
+				dt = float(channel->mRotationKeys[i].mTime - last.mTime);
+				after_last_dt = dt;
+			}
+		}
+
+		rot.push(channel->mRotationKeys[channel->mNumRotationKeys - 1]);
+	}
+
+
 	bool saveLumixAnimations()
 	{
 		m_dialog.setImportMessage("Importing animations...", 0);
-		
+
 		int animation_index = 0;
 		int num_animations = 0;
 		for (auto& import_animation : m_dialog.m_animations)
@@ -911,7 +1232,7 @@ struct ConvertTask : public MT::Task
 		if (num_animations == 0) return true;
 
 		bool failed = false;
-		for(auto& import_animation : m_dialog.m_animations)
+		for (auto& import_animation : m_dialog.m_animations)
 		{
 			if (!import_animation.import) continue;
 			++animation_index;
@@ -931,50 +1252,64 @@ struct ConvertTask : public MT::Task
 
 			Animation::Header header;
 			header.fps = uint32(animation->mTicksPerSecond == 0
-											? 25
-											: (animation->mTicksPerSecond == 1 ? 30 : animation->mTicksPerSecond));
+				? 25
+				: (animation->mTicksPerSecond == 1 ? 30 : animation->mTicksPerSecond));
 			header.magic = Animation::HEADER_MAGIC;
-			header.version = 1;
+			header.version = 2;
 
 			file.write(&header, sizeof(header));
 			float anim_length = getLength(animation);
-			int frame_count = Math::maximum(int(anim_length * header.fps), 1);
+			int frame_count = Math::maximum(int(anim_length * m_dialog.m_model.time_scale * header.fps), 1);
 			file.write(&frame_count, sizeof(frame_count));
 			int bone_count = (int)animation->mNumChannels;
 			file.write(&bone_count, sizeof(bone_count));
 
-			Array<Vec3> positions(m_dialog.m_editor.getAllocator());
-			Array<Quat> rotations(m_dialog.m_editor.getAllocator());
-
-			positions.resize(bone_count * frame_count);
-			rotations.resize(bone_count * frame_count);
-
-			for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
-			{
-				const aiNodeAnim* channel = animation->mChannels[channel_idx];
-				auto global_transform = getGlobalTransform(getNode(channel->mNodeName, scene->mRootNode)->mParent);
-				aiVector3t<float> scale;
-				aiVector3t<float> dummy_pos;
-				aiQuaterniont<float> dummy_rot;
-				global_transform.Decompose(scale, dummy_rot, dummy_pos);
-				for (int frame = 0; frame < frame_count; ++frame)
-				{
-					auto pos = getPosition(channel, frame, header.fps) * m_dialog.m_model.mesh_scale;
-					pos.x *= scale.x;
-					pos.y *= scale.y;
-					pos.z *= scale.z;
-					positions[frame * bone_count + channel_idx] = pos;
-					rotations[frame * bone_count + channel_idx] = getRotation(channel, frame, header.fps);
-				}
-			}
-
-			file.write((const char*)&positions[0], sizeof(positions[0]) * positions.size());
-			file.write((const char*)&rotations[0], sizeof(rotations[0]) * rotations.size());
+			Array<aiVectorKey> positions(m_dialog.m_editor.getAllocator());
+			Array<aiQuatKey> rotations(m_dialog.m_editor.getAllocator());
 			for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
 			{
 				const aiNodeAnim* channel = animation->mChannels[channel_idx];
 				uint32_t hash = crc32(channel->mNodeName.C_Str());
 				file.write((const char*)&hash, sizeof(hash));
+				auto global_transform = getGlobalTransform(getNode(channel->mNodeName, scene->mRootNode)->mParent);
+				aiVector3t<float> scale;
+				aiVector3t<float> dummy_pos;
+				aiQuaterniont<float> dummy_rot;
+				global_transform.Decompose(scale, dummy_rot, dummy_pos);
+
+				compressPositions(positions, channel, anim_length, m_dialog.m_model.position_error / 100000.0f);
+				int count = positions.size();
+				file.write(&count, sizeof(count));
+				for (const auto& pos : positions)
+				{
+					uint16 frame = uint16(pos.mTime * m_dialog.m_model.time_scale);
+					file.write(&frame, sizeof(frame));
+				}
+				for (const auto& pos : positions)
+				{
+					Vec3 out_pos(pos.mValue.x, pos.mValue.y, pos.mValue.z);
+					out_pos = out_pos * m_dialog.m_model.mesh_scale;
+					out_pos.x *= scale.x;
+					out_pos.y *= scale.y;
+					out_pos.z *= scale.z;
+					out_pos = fixOrientation(out_pos);
+					file.write(&out_pos, sizeof(out_pos));
+				}
+				
+				compressRotations(rotations, channel, anim_length, m_dialog.m_model.rotation_error / 100000.0f);
+				count = rotations.size();
+				file.write(&count, sizeof(count));
+				for (const auto& rot : rotations)
+				{
+					uint16 frame = uint16(rot.mTime * m_dialog.m_model.time_scale);
+					file.write(&frame, sizeof(frame));
+				}
+				for (const auto& rot : rotations)
+				{
+					Quat out_rot(rot.mValue.x, rot.mValue.y, rot.mValue.z, rot.mValue.w);
+					out_rot = fixOrientation(out_rot);
+					file.write(&out_rot, sizeof(out_rot));
+				}
 			}
 
 			file.close();
@@ -1008,7 +1343,7 @@ struct ConvertTask : public MT::Task
 					StaticString<20 + MAX_PATH_LENGTH>("Could not create ", output_material_name));
 				return false;
 			}
-			file << "{\n\t\"shader\" : \"shaders/billboard.shd\"\n";
+			file << "{\n\t\"shader\" : \"pipelines/rigid/rigid.shd\"\n";
 			file << "\t, \"defines\" : [\"ALPHA_CUTOUT\"]\n";
 			file << "\t, \"texture\" : {\n\t\t\"source\" : \"";
 
@@ -1020,13 +1355,23 @@ struct ConvertTask : public MT::Task
 				PathBuilder relative_texture_path(from_root_path, m_dialog.m_mesh_output_filename, "_billboard.dds");
 				PathBuilder texture_path(m_dialog.m_texture_output_dir, m_dialog.m_mesh_output_filename, "_billboard.dds");
 				copyFile("models/utils/cube/default.dds", texture_path);
-				file << "/" << relative_texture_path;
+				file << "/" << relative_texture_path << "\"}\n\t, \"texture\" : {\n\t\t\"source\" : \"";
+
+				PathBuilder relative_normal_path_n(from_root_path, m_dialog.m_mesh_output_filename, "_billboard_normal.dds");
+				PathBuilder normal_path(m_dialog.m_texture_output_dir, m_dialog.m_mesh_output_filename, "_billboard_normal.dds");
+				copyFile("models/utils/cube/default.dds", normal_path);
+				file << "/" << relative_normal_path_n;
+
 			}
 			else
 			{
-				file << "billboard.dds";
+				file << m_dialog.m_mesh_output_filename << "_billboard.dds\"}\n\t, \"texture\" : {\n\t\t\"source\" : \"";
 				PathBuilder texture_path(m_dialog.m_output_dir, "/", m_dialog.m_mesh_output_filename, "_billboard.dds");
 				copyFile("models/utils/cube/default.dds", texture_path);
+
+				file << m_dialog.m_mesh_output_filename << "_billboard_normal.dds";
+				PathBuilder normal_path(m_dialog.m_output_dir, "/", m_dialog.m_mesh_output_filename, "_billboard_normal.dds");
+				copyFile("models/utils/cube/default.dds", normal_path);
 			}
 
 			file << "\"}\n}";
@@ -1055,7 +1400,7 @@ struct ConvertTask : public MT::Task
 			return false;
 		}
 
-		file.writeText("{\n\t\"shader\" : \"shaders/");
+		file.writeText("{\n\t\"shader\" : \"pipelines/");
 		file.writeText(material.shader);
 		file.writeText(".shd\"\n");
 		
@@ -1146,8 +1491,6 @@ struct ConvertTask : public MT::Task
 			for (unsigned int k = 0; k < bone->mNumWeights; ++k)
 			{
 				auto idx = mesh.map_from_input[bone->mWeights[k].mVertexId];
-				ASSERT(idx == bone->mWeights[k].mVertexId);
-				ASSERT(idx < (unsigned int)mesh.map_to_input.size());
 				auto& info = infos[idx];
 				addBoneInfluence(info, bone->mWeights[k].mWeight, bone_index);
 			}
@@ -1161,7 +1504,7 @@ struct ConvertTask : public MT::Task
 			{
 				++invalid_vertices;
 			}
-			if (fabs(sum - 1.0f) > 0.001f)
+			else
 			{
 				for (int i = 0; i < 4; ++i)
 				{
@@ -1177,32 +1520,6 @@ struct ConvertTask : public MT::Task
 	}
 
 
-	static uint32 packuint32(uint8 _x, uint8 _y, uint8 _z, uint8 _w)
-	{
-		union {
-			uint32 ui32;
-			uint8 arr[4];
-		} un;
-
-		un.arr[0] = _x;
-		un.arr[1] = _y;
-		un.arr[2] = _z;
-		un.arr[3] = _w;
-
-		return un.ui32;
-	}
-
-
-	static uint32 packF4u(const Vec3& vec)
-	{
-		const uint8 xx = uint8(vec.x * 127.0f + 128.0f);
-		const uint8 yy = uint8(vec.y * 127.0f + 128.0f);
-		const uint8 zz = uint8(vec.z * 127.0f + 128.0f);
-		const uint8 ww = uint8(0);
-		return packuint32(xx, yy, zz, ww);
-	}
-
-
 	void sortParentFirst(aiNode* node, Array<aiNode*>& out)
 	{
 		if (!node) return;
@@ -1213,23 +1530,43 @@ struct ConvertTask : public MT::Task
 	}
 
 
+	void gatherAllNodes(Array<aiNode*>& nodes, aiNode* node)
+	{
+		nodes.emplace(node);
+		for (unsigned int i = 0; i < node->mNumChildren; ++i)
+		{
+			gatherAllNodes(nodes, node->mChildren[i]);
+		}
+	}
+
+
 	void gatherNodes()
 	{
 		Array<aiNode*> tmp(m_dialog.m_editor.getAllocator());
 		m_nodes.clear();
-		for (auto& mesh : m_dialog.m_meshes)
+		if (m_dialog.m_model.all_nodes)
 		{
-			if(!mesh.import) continue;
-			for (unsigned int j = 0; j < mesh.mesh->mNumBones; ++j)
+			for (auto& importer : m_dialog.m_importers)
 			{
-				auto* node = getNode(mesh.mesh->mBones[j]->mName, mesh.scene->mRootNode);
-				while (node && node->mNumMeshes == 0)
+				gatherAllNodes(tmp, importer.GetScene()->mRootNode);
+			}
+		}
+		else
+		{
+			for (auto& mesh : m_dialog.m_meshes)
+			{
+				if (!mesh.import) continue;
+				for (unsigned int j = 0; j < mesh.mesh->mNumBones; ++j)
 				{
-					if (tmp.indexOf(node) >= 0) break;
-					tmp.push(node);
-					node = node->mParent;
+					auto* node = getNode(mesh.mesh->mBones[j]->mName, mesh.scene->mRootNode);
+					while (node && node->mNumMeshes == 0)
+					{
+						if (tmp.indexOf(node) >= 0) break;
+						tmp.push(node);
+						node = node->mParent;
+					}
+					if (node && tmp.indexOf(node) < 0) tmp.push(node);
 				}
-				if (node && tmp.indexOf(node) < 0) tmp.push(node);
 			}
 		}
 
@@ -1240,7 +1577,49 @@ struct ConvertTask : public MT::Task
 	}
 
 
+	Quat fixOrientation(const Quat& v) const
+	{
+		switch (m_dialog.m_model.orientation)
+		{
+			case ImportAssetDialog::Y_UP: return Quat(v.x, v.y, v.z, v.w);
+			case ImportAssetDialog::Z_UP: return Quat(v.x, v.z, -v.y, v.w);
+			case ImportAssetDialog::Z_MINUS_UP: return Quat(v.x, -v.z, v.y, v.w);
+			case ImportAssetDialog::X_MINUS_UP: return Quat(v.y, -v.x, v.z, v.w);
+		}
+		ASSERT(false);
+		return Quat(v.x, v.y, v.z, v.w);
+	}
+
+
+	aiQuaternion fixOrientation(const aiQuaternion& v) const
+	{
+		switch (m_dialog.m_model.orientation)
+		{
+		case ImportAssetDialog::Y_UP: return aiQuaternion(v.w, v.x, v.y, v.z);
+		case ImportAssetDialog::Z_UP: return aiQuaternion(v.w, v.x, v.z, -v.y);
+		case ImportAssetDialog::Z_MINUS_UP: return aiQuaternion(v.w, v.x, -v.z, v.y);
+		case ImportAssetDialog::X_MINUS_UP: return aiQuaternion(v.w, v.y, -v.x, v.z);
+		}
+		ASSERT(false);
+		return aiQuaternion(v.x, v.y, v.z, v.w);
+	}
+
+
 	Vec3 fixOrientation(const aiVector3D& v) const
+	{
+		switch (m_dialog.m_model.orientation)
+		{
+			case ImportAssetDialog::Y_UP: return Vec3(v.x, v.y, v.z);
+			case ImportAssetDialog::Z_UP: return Vec3(v.x, v.z, -v.y);
+			case ImportAssetDialog::Z_MINUS_UP: return Vec3(v.x, -v.z, v.y);
+			case ImportAssetDialog::X_MINUS_UP: return Vec3(v.y, -v.x, v.z);
+		}
+		ASSERT(false);
+		return Vec3(v.x, v.y, v.z);
+	}
+
+
+	Vec3 fixOrientation(const Vec3& v) const
 	{
 		switch (m_dialog.m_model.orientation)
 		{
@@ -1272,7 +1651,7 @@ struct ConvertTask : public MT::Task
 
 			if (m_dialog.m_model.create_billboard_lod)
 			{
-				uint16 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 };
+				uint16 indices[] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15};
 				file.write(indices, sizeof(indices));
 			}
 		}
@@ -1285,7 +1664,7 @@ struct ConvertTask : public MT::Task
 
 			if (m_dialog.m_model.create_billboard_lod)
 			{
-				uint32 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 };
+				uint32 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15 };
 				file.write(indices, sizeof(indices));
 			}
 		}
@@ -1294,7 +1673,6 @@ struct ConvertTask : public MT::Task
 
 	void writeVertices(FS::OsFile& file) const
 	{
-
 		Vec3 min(0, 0, 0);
 		Vec3 max(0, 0, 0);
 		for (auto& mesh : m_dialog.m_meshes)
@@ -1370,39 +1748,42 @@ struct ConvertTask : public MT::Task
 		if (m_dialog.m_model.create_billboard_lod)
 		{
 			Vec3 size = max - min;
-			float u[] = { 0.0f, 0.5f, 1.0f };
-			float v[] = { 0.0f, 1.0f };
-			if (size.x + size.z < size.y)
-			{
-				int width = int(TEXTURE_SIZE / size.y * (size.x + size.z));
-				int ceiled = ceilPowOf2(width);
-				int diff = ceiled - width;
-				u[0] = diff * 0.5f / float(ceiled);
-				u[2] = 1 - u[0];
-				u[1] = u[0] + size.x / (size.x + size.z) * (1 - 2 * u[0]);
-			}
-			else
-			{
-				u[1] = size.x / (size.x + size.z);
-				
-				float t = size.y / (size.x + size.z);
+			BillboardSceneData data({min, max}, TEXTURE_SIZE);
+			Matrix mtx = data.computeMVPMatrix();
+			Vec3 uv0_min = mtx.transform(min);
+			Vec3 uv0_max = mtx.transform(max);
+			float x1_max = 0.0f;
+			float x2_max = mtx.transform(Vec3(max.x + size.z + size.x, 0, 0)).x;
+			float x3_max = mtx.transform(Vec3(max.x + size.z + size.x + size.z, 0, 0)).x;
 
-				v[0] = 0.5f - t * 0.5f;
-				v[1] = 0.5f + t * 0.5f;
-			}
-			BillboardVertex vertices[8] = {
-				{ { min.x, min.y, 0 }, { 128, 255, 128, 0 }, { 255, 128, 128, 0 }, { u[0], v[1] } },
-				{ { max.x, min.y, 0 }, { 128, 255, 128, 0 }, { 255, 128, 128, 0 }, { u[1], v[1] } },
-				{ { max.x, max.y, 0 }, { 128, 255, 128, 0 }, { 255, 128, 128, 0 }, { u[1], v[0] } },
-				{ { min.x, max.y, 0 }, { 128, 255, 128, 0 }, { 255, 128, 128, 0 }, { u[0], v[0] } },
+			float u[] = {0.0f, 0.5f, 1.0f};
+			float v[] = {0.0f, 1.0f};
 
-				{ { 0, min.y, min.z }, { 128, 255, 128, 0 }, { 255, 128, 128, 0 }, { u[1], v[1] } },
-				{ { 0, min.y, max.z }, { 128, 255, 128, 0 }, { 255, 128, 128, 0 }, { u[2], v[1] } },
-				{ { 0, max.y, max.z }, { 128, 255, 128, 0 }, { 255, 128, 128, 0 }, { u[2], v[0] } },
-				{ { 0, max.y, min.z }, { 128, 255, 128, 0 }, { 255, 128, 128, 0 }, { u[1], v[0] } }
+			auto fixUV = [](float x, float y) -> Vec2 { return Vec2(x * 0.5f + 0.5f, y * 0.5f + 0.5f); };
+
+			BillboardVertex vertices[] = {
+				{{min.x, min.y, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, fixUV(uv0_min.x, uv0_max.y)},
+				{{max.x, min.y, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, fixUV(uv0_max.x, uv0_max.y)},
+				{{max.x, max.y, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, fixUV(uv0_max.x, uv0_min.y)},
+				{{min.x, max.y, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, fixUV(uv0_min.x, uv0_min.y)},
+
+				{{0, min.y, min.z}, {128, 255, 128, 0}, {128, 128, 255, 0}, fixUV(uv0_max.x, uv0_max.y)},
+				{{0, min.y, max.z}, {128, 255, 128, 0}, {128, 128, 255, 0}, fixUV(x1_max, uv0_max.y)},
+				{{0, max.y, max.z}, {128, 255, 128, 0}, {128, 128, 255, 0}, fixUV(x1_max, uv0_min.y)},
+				{{0, max.y, min.z}, {128, 255, 128, 0}, {128, 128, 255, 0}, fixUV(uv0_max.x, uv0_min.y)},
+
+				{{max.x, min.y, 0}, {128, 255, 128, 0}, {0, 128, 128, 0}, fixUV(x1_max, uv0_max.y)},
+				{{min.x, min.y, 0}, {128, 255, 128, 0}, {0, 128, 128, 0}, fixUV(x2_max, uv0_max.y)},
+				{{min.x, max.y, 0}, {128, 255, 128, 0}, {0, 128, 128, 0}, fixUV(x2_max, uv0_min.y)},
+				{{max.x, max.y, 0}, {128, 255, 128, 0}, {0, 128, 128, 0}, fixUV(x1_max, uv0_min.y)},
+
+				{{0, min.y, max.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x2_max, uv0_max.y)},
+				{{0, min.y, min.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x3_max, uv0_max.y)},
+				{{0, max.y, min.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x3_max, uv0_min.y)},
+				{{0, max.y, max.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x2_max, uv0_min.y)}
 			};
 			file.write(vertices, sizeof(vertices));
-		} 
+		}
 	}
 
 
@@ -1419,8 +1800,8 @@ struct ConvertTask : public MT::Task
 
 		if (m_dialog.m_model.create_billboard_lod)
 		{
-			indices_count += 4*3;
-			vertices_size += 8 * sizeof(BillboardVertex);
+			indices_count += 8*3;
+			vertices_size += 16 * sizeof(BillboardVertex);
 		}
 
 		file.write((const char*)&indices_count, sizeof(indices_count));
@@ -1470,12 +1851,12 @@ struct ConvertTask : public MT::Task
 		file.write(material_name, length);
 
 		file.write((const char*)&attribute_array_offset, sizeof(attribute_array_offset));
-		int32 attribute_array_size = 8 * vertex_size;
+		int32 attribute_array_size = 16 * vertex_size;
 		attribute_array_offset += attribute_array_size;
 		file.write((const char*)&attribute_array_size, sizeof(attribute_array_size));
 
 		file.write((const char*)&indices_offset, sizeof(indices_offset));
-		int32 mesh_tri_count = 4;
+		int32 mesh_tri_count = 8;
 		indices_offset += mesh_tri_count * 3;
 		file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
@@ -1699,7 +2080,9 @@ struct ConvertTask : public MT::Task
 				getGlobalTransform(node).Decompose(scale, rot, pos);
 			}
 			pos *= m_dialog.m_model.mesh_scale;
-			file.write((const char*)&pos, sizeof(pos));
+			Vec3 tmp_pos = fixOrientation(pos);
+			rot = fixOrientation(rot);
+			file.write((const char*)&tmp_pos, sizeof(tmp_pos));
 			file.write((const char*)&rot.x, sizeof(rot.x));
 			file.write((const char*)&rot.y, sizeof(rot.y));
 			file.write((const char*)&rot.z, sizeof(rot.z));
@@ -1737,6 +2120,7 @@ struct ConvertTask : public MT::Task
 		PathUtils::getBasename(filename, sizeof(filename), m_dialog.m_source);
 		catString(filename, ".phy");
 		PathBuilder phy_path(m_dialog.m_output_dir);
+		PlatformInterface::makePath(phy_path);
 		phy_path << "/" << filename;
 		FS::OsFile file;
 		if (!file.open(phy_path, FS::Mode::CREATE_AND_WRITE, m_dialog.m_editor.getAllocator()))
@@ -1964,6 +2348,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	, m_animations(app.getWorldEditor()->getAllocator())
 {
 	m_model.make_convex = false;
+	m_model.all_nodes = false;
 	m_model.mesh_scale = 1;
 	m_model.remove_doubles = false;
 	m_model.create_billboard_lod = false;
@@ -1972,6 +2357,9 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	m_model.lods[2] = -1000;
 	m_model.lods[3] = -10000;
 	m_model.orientation = Y_UP;
+	m_model.position_error = 100.0f;
+	m_model.rotation_error = 10.0f;
+	m_model.time_scale = 1.0f;
 	m_is_opened = false;
 	m_message[0] = '\0';
 	m_import_message[0] = '\0';
@@ -1986,8 +2374,48 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	m_action->func.bind<ImportAssetDialog, &ImportAssetDialog::onAction>(this);
 	m_action->is_selected.bind<ImportAssetDialog, &ImportAssetDialog::isOpened>(this);
 
-	LuaWrapper::createSystemFunction(m_editor.getEngine().getState(), "Editor", "importAsset", &::importAsset);
-	LuaWrapper::createSystemVariable(m_editor.getEngine().getState(), "Editor", "import_asset_dialog", this);
+	lua_State* L = m_editor.getEngine().getState();
+	LuaWrapper::createSystemVariable(L, "ImportAsset", "instance", this);
+
+	#define REGISTER_FUNCTION(name) \
+		do {\
+			auto f = &LuaWrapper::wrapMethod<ImportAssetDialog, decltype(&ImportAssetDialog::name), &ImportAssetDialog::name>; \
+			LuaWrapper::createSystemFunction(L, "ImportAsset", #name, f); \
+		} while(false) \
+
+	REGISTER_FUNCTION(clearSources);
+	REGISTER_FUNCTION(addSource);
+	REGISTER_FUNCTION(import);
+	REGISTER_FUNCTION(importTexture);
+
+	#undef REGISTER_FUNCTION
+
+	#define REGISTER_FUNCTION(name) \
+		do {\
+			auto f = &LuaWrapper::wrap<decltype(&LuaAPI::name), &LuaAPI::name>; \
+			LuaWrapper::createSystemFunction(L, "ImportAsset", #name, f); \
+		} while(false) \
+
+	REGISTER_FUNCTION(getMeshesCount);
+	REGISTER_FUNCTION(getMeshMaterialName);
+	REGISTER_FUNCTION(getMaterialsCount);
+	REGISTER_FUNCTION(getTexturesCount);
+	REGISTER_FUNCTION(getMeshName);
+	REGISTER_FUNCTION(getMaterialName);
+
+	#undef REGISTER_FUNCTION
+
+	#define REGISTER_FUNCTION(name) \
+		do {\
+			LuaWrapper::createSystemFunction(L, "ImportAsset", #name, &LuaAPI::name); \
+		} while(false) \
+
+	REGISTER_FUNCTION(setParams);
+	REGISTER_FUNCTION(setMeshParams);
+	REGISTER_FUNCTION(setMaterialParams);
+	REGISTER_FUNCTION(setTextureParams);
+
+	#undef REGISTER_FUNCTION
 }
 
 
@@ -2015,6 +2443,7 @@ static bool isImage(const char* path)
 
 	static const char* image_extensions[] = {
 		"dds", "jpg", "jpeg", "png", "tga", "bmp", "psd", "gif", "hdr", "pic", "pnm"};
+	makeLowercase(ext, lengthOf(ext), ext);
 	for (auto image_ext : image_extensions)
 	{
 		if (equalStrings(ext, image_ext))
@@ -2132,6 +2561,7 @@ void ImportAssetDialog::convert(bool use_ui)
 			if (!material.textures[i].is_valid && material.textures[i].import)
 			{
 				if(use_ui) ImGui::OpenPopup("Invalid texture");
+				else g_log_error.log("Editor") << "Invalid texture " << material.textures[i].src;
 				return;
 			}
 		}
@@ -2283,6 +2713,10 @@ void ImportAssetDialog::onAnimationsGUI()
 	label << m_animations.size() << ")###Animations";
 	if (!ImGui::CollapsingHeader(label)) return;
 
+	ImGui::DragFloat("Time scale", &m_model.time_scale, 1.0f, 0, FLT_MAX, "%.5f");
+	ImGui::DragFloat("Max position error", &m_model.position_error, 0, FLT_MAX);
+	ImGui::DragFloat("Max rotation error", &m_model.rotation_error, 0, FLT_MAX);
+
 	ImGui::Indent();
 	ImGui::Columns(2);
 	
@@ -2413,6 +2847,26 @@ void ImportAssetDialog::onImageGUI()
 }
 
 
+static void preprocessBillboardNormalmap(uint32* pixels, int width, int height, IAllocator& allocator)
+{
+	union {
+		uint32 ui32;
+		uint8 arr[4];
+	} un;
+	for (int j = 0; j < height; ++j)
+	{
+		for (int i = 0; i < width; ++i)
+		{
+			un.ui32 = pixels[i + j * width];
+			uint8 tmp = un.arr[1];
+			un.arr[1] = un.arr[2];
+			un.arr[2] = tmp;
+			pixels[i + j * width] = un.ui32;
+		}
+	}
+}
+
+
 static void preprocessBillboard(uint32* pixels, int width, int height, IAllocator& allocator)
 {
 	struct DistanceFieldCell
@@ -2497,10 +2951,11 @@ static void preprocessBillboard(uint32* pixels, int width, int height, IAllocato
 static bool createBillboard(ImportAssetDialog& dialog,
 	const Path& mesh_path,
 	const Path& out_path,
+	const Path& out_path_normal,
 	int texture_size)
 {
 	auto& engine = dialog.getEditor().getEngine();
-	auto& universe = engine.createUniverse();
+	auto& universe = engine.createUniverse(false);
 
 	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	if (!renderer) return false;
@@ -2508,17 +2963,25 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	auto* render_scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 	if (!render_scene) return false;
 
-	auto* pipeline = Pipeline::create(*renderer, Path("pipelines/preview.lua"), engine.getAllocator());
+	auto* pipeline = Pipeline::create(*renderer, Path("pipelines/billboard.lua"), engine.getAllocator());
 	pipeline->load();
 
 	auto mesh_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
-	static const auto RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
-	auto mesh_cmp = render_scene->createComponent(RENDERABLE_TYPE, mesh_entity);
-	render_scene->setRenderablePath(mesh_cmp, mesh_path);
+	static const auto MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
+	auto mesh_cmp = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
+	render_scene->setModelInstancePath(mesh_cmp, mesh_path);
 
-	auto mesh_side_entity = universe.createEntity({0, 0, 0}, {Vec3(0, 1, 0), Math::PI * 0.5f});
-	auto mesh_side_cmp = render_scene->createComponent(RENDERABLE_TYPE, mesh_side_entity);
-	render_scene->setRenderablePath(mesh_side_cmp, mesh_path);
+	auto mesh_left_entity = universe.createEntity({ 0, 0, 0 }, { Vec3(0, 1, 0), Math::PI * 0.5f });
+	auto mesh_left_cmp = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_left_entity);
+	render_scene->setModelInstancePath(mesh_left_cmp, mesh_path);
+
+	auto mesh_back_entity = universe.createEntity({ 0, 0, 0 }, { Vec3(0, 1, 0), Math::PI });
+	auto mesh_back_cmp = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_back_entity);
+	render_scene->setModelInstancePath(mesh_back_cmp, mesh_path);
+
+	auto mesh_right_entity = universe.createEntity({ 0, 0, 0 }, { Vec3(0, 1, 0), Math::PI * 1.5f});
+	auto mesh_right_cmp = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_right_entity);
+	render_scene->setModelInstancePath(mesh_right_cmp, mesh_path);
 
 	auto light_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
 	static const auto GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
@@ -2528,32 +2991,27 @@ static bool createBillboard(ImportAssetDialog& dialog,
 
 	while (engine.getFileSystem().hasWork()) engine.getFileSystem().updateAsyncTransactions();
 
-	auto* model = render_scene->getRenderableModel(mesh_cmp);
-	auto* lods = model->getLODs();
-	lods[0].distance = FLT_MAX;
-	AABB aabb = model->getAABB();
-	Vec3 size = aabb.max - aabb.min;
-	universe.setPosition(mesh_side_entity, { aabb.max.x - aabb.min.z, 0, 0 });
-	Vec3 camera_pos(
-		(aabb.min.x + aabb.max.x + size.z) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + 5);
-	auto camera_entity = universe.createEntity(camera_pos, { 0, 0, 0, 1 });
-	static const auto CAMERA_TYPE = PropertyRegister::getComponentType("camera");
-	auto camera_cmp = render_scene->createComponent(CAMERA_TYPE, camera_entity);
-	render_scene->setCameraOrtho(camera_cmp, true);
-	render_scene->setCameraSlot(camera_cmp, "main");
-	int width, height;
-	if (size.x + size.z > size.y)
+	auto* model = render_scene->getModelInstanceModel(mesh_cmp);
+	int width = 640, height = 480;
+	if (model->isReady())
 	{
-		width = texture_size;
-		int nonceiled_height = int(width / (size.x + size.z) * size.y);
-		height = ceilPowOf2(nonceiled_height);
-		render_scene->setCameraOrthoSize(camera_cmp, size.y * height / nonceiled_height *  0.5f);
-	}
-	else
-	{
-		height = texture_size;
-		width = ceilPowOf2(int(height * (size.x + size.z) / size.y));
-		render_scene->setCameraOrthoSize(camera_cmp, size.y * 0.5f);
+		auto* lods = model->getLODs();
+		lods[0].distance = FLT_MAX;
+		AABB aabb = model->getAABB();
+		Vec3 size = aabb.max - aabb.min;
+		universe.setPosition(mesh_left_entity, {aabb.max.x - aabb.min.z, 0, 0});
+		universe.setPosition(mesh_back_entity, {aabb.max.x + size.z + aabb.max.x, 0, 0});
+		universe.setPosition(mesh_right_entity, {aabb.max.x + size.x + size.z + aabb.max.x, 0, 0});
+		
+		BillboardSceneData data(aabb, texture_size);
+		auto camera_entity = universe.createEntity(data.position, { 0, 0, 0, 1 });
+		static const auto CAMERA_TYPE = PropertyRegister::getComponentType("camera");
+		auto camera_cmp = render_scene->createComponent(CAMERA_TYPE, camera_entity);
+		render_scene->setCameraOrtho(camera_cmp, true);
+		render_scene->setCameraSlot(camera_cmp, "main");
+		width = data.width;
+		height = data.height;
+		render_scene->setCameraOrthoSize(camera_cmp, data.ortho_size);
 	}
 
 	pipeline->setScene(render_scene);
@@ -2561,13 +3019,20 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	pipeline->render();
 
 	bgfx::TextureHandle texture =
-		bgfx::createTexture2D(width, height, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
-
+		bgfx::createTexture2D(width, height, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
 	renderer->viewCounterAdd();
 	bgfx::touch(renderer->getViewCounter());
 	bgfx::setViewName(renderer->getViewCounter(), "billboard_blit");
-	bgfx::TextureHandle color_renderbuffer = pipeline->getFramebuffer("default")->getRenderbufferHandle(0);
+	bgfx::TextureHandle color_renderbuffer = pipeline->getFramebuffer("g_buffer")->getRenderbufferHandle(0);
 	bgfx::blit(renderer->getViewCounter(), texture, 0, 0, color_renderbuffer);
+
+	bgfx::TextureHandle normal_texture =
+		bgfx::createTexture2D(width, height, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
+	renderer->viewCounterAdd();
+	bgfx::touch(renderer->getViewCounter());
+	bgfx::setViewName(renderer->getViewCounter(), "billboard_blit_normal");
+	bgfx::TextureHandle normal_renderbuffer = pipeline->getFramebuffer("g_buffer")->getRenderbufferHandle(1);
+	bgfx::blit(renderer->getViewCounter(), normal_texture, 0, 0, normal_renderbuffer);
 
 	renderer->viewCounterAdd();
 	bgfx::setViewName(renderer->getViewCounter(), "billboard_read");
@@ -2575,242 +3040,35 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	data.resize(width * height * 4);
 	bgfx::readTexture(texture, &data[0]);
 	bgfx::touch(renderer->getViewCounter());
+
+	renderer->viewCounterAdd();
+	bgfx::setViewName(renderer->getViewCounter(), "billboard_read_normal");
+	Array<uint8> data_normal(engine.getAllocator());
+	data_normal.resize(width * height * 4);
+	bgfx::readTexture(normal_texture, &data_normal[0]);
+	bgfx::touch(renderer->getViewCounter());
+
 	bgfx::frame(); // submit
 	bgfx::frame(); // wait for gpu
 
 	preprocessBillboard((uint32*)&data[0], width, height, engine.getAllocator());
+	preprocessBillboardNormalmap((uint32*)&data_normal[0], width, height, engine.getAllocator());
 	saveAsDDS(dialog, "billboard_generator", (uint8*)&data[0], width, height, true, out_path.c_str());
+	saveAsDDS(dialog, "billboard_generator", (uint8*)&data_normal[0], width, height, true, out_path_normal.c_str());
 	bgfx::destroyTexture(texture);
+	bgfx::destroyTexture(normal_texture);
 	Pipeline::destroy(pipeline);
 	engine.destroyUniverse(universe);
 	return true;
 }
 
 
-static ImportMaterial* getMatchingMaterial(lua_State* L, ImportMaterial* materials, int count)
+void ImportAssetDialog::import()
 {
-	auto x = lua_gettop(L);
-	if (lua_getfield(L, -1, "matching") == LUA_TFUNCTION)
-	{
-		for (int i = 0; i < count; ++i)
-		{
-			lua_pushvalue(L, -1); // duplicate "matching"
-			ImportMaterial& material = materials[i];
-			aiString material_name;
-			material.material->Get(AI_MATKEY_NAME, material_name);
-			LuaWrapper::pushLua(L, i);
-			LuaWrapper::pushLua(L, material_name.C_Str());
-			if (lua_pcall(L, 2, 1, 0) != LUA_OK)
-			{
-				g_log_error.log("Editor") << "getMatchingMaterial" << ": " << lua_tostring(L, -1);
-				lua_pop(L, 1);
-			}
-			else
-			{
-				bool is_matching = LuaWrapper::toType<bool>(L, -1);
-				lua_pop(L, 1);
-				if (is_matching)
-				{
-					lua_pop(L, 1); // "matching"
-					auto u = lua_gettop(L);
-					return &material;
-				}
-			}
-		}
-	}
-	else
-	{
-		g_log_error.log("Editor") << "No \"matching\" found in table or it is not a function";
-	}
-	lua_pop(L, 1); // "matching"
-	return nullptr;
-}
-
-
-int ImportAssetDialog::importAsset(lua_State* L)
-{
-	m_importers.clear();
-	m_animations.clear();
-	m_materials.clear();
-	m_meshes.clear();
-	m_mesh_output_filename[0] = '\0';
-	m_is_opened = true;
-
-	LuaWrapper::checkTableArg(L, 2);
-	if (lua_getfield(L, 2, "output_dir") == LUA_TSTRING)
-	{
-		copyString(m_output_dir, LuaWrapper::toType<const char*>(L, -1));
-	}
-	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "create_billboard") == LUA_TBOOLEAN)
-	{
-		m_model.create_billboard_lod = LuaWrapper::toType<bool>(L, -1);
-	}
-	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "remove_doubles") == LUA_TBOOLEAN)
-	{
-		m_model.remove_doubles = LuaWrapper::toType<bool>(L, -1);
-	}
-	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "scale") == LUA_TNUMBER)
-	{
-		m_model.mesh_scale = LuaWrapper::toType<float>(L, -1);
-	}
-	lua_pop(L, 1);
-
-	if (lua_getfield(L, 2, "output_dir") == LUA_TSTRING)
-	{
-		copyString(m_output_dir, LuaWrapper::toType<const char*>(L, -1));
-	}
-	lua_pop(L, 1);
-
-	if (lua_getfield(L, 2, "lods") == LUA_TTABLE)
-	{
-		lua_pushnil(L);
-		int lod_index = 0;
-		while (lua_next(L, -2) != 0)
-		{
-			if (lod_index >= lengthOf(m_model.lods))
-			{
-				g_log_error.log("Editor") << "Only " << lengthOf(m_model.lods) << " supported";
-				lua_pop(L, 1);
-				break;
-			}
-
-			m_model.lods[lod_index] = LuaWrapper::toType<float>(L, -1);
-			++lod_index;
-			lua_pop(L, 1);
-		}
-	}
-	lua_pop(L, 1);
-
-	if (lua_getfield(L, 2, "texture_output_dir") == LUA_TSTRING)
-	{
-		copyString(m_texture_output_dir, LuaWrapper::toType<const char*>(L, -1));
-	}
-	lua_pop(L, 1);
-
-	if (lua_getfield(L, 2, "srcs") == LUA_TTABLE)
-	{
-		lua_pushnil(L);
-		while (lua_next(L, -2) != 0)
-		{
-			if (!lua_istable(L, -1))
-			{
-				lua_pop(L, 1);
-				continue;
-			}
-
-			if (lua_getfield(L, -1, "src") != LUA_TSTRING)
-			{
-				lua_pop(L, 2); // "src" and inputs table item
-				continue;
-			}
-			copyString(m_source, LuaWrapper::toType<const char*>(L, -1));
-			lua_pop(L, 1); // "src"
-
-			int meshes_count = m_meshes.size();
-			if (!checkSource())
-			{
-				lua_pop(L, 1); // inputs table item
-				g_log_error.log("Editor") << "Could not import \"" << m_source << "\"";
-				continue;
-			}
-			if (m_is_importing) checkTask(true);
-
-			if (lua_getfield(L, -1, "lod") == LUA_TNUMBER)
-			{
-				int lod = LuaWrapper::toType<int>(L, -1);
-				for (int i = meshes_count; i < m_meshes.size(); ++i)
-				{
-					m_meshes[i].lod = lod;
-				}
-			}
-			lua_pop(L, 1); // "lod"
-
-			if (lua_getfield(L, -1, "materials") == LUA_TTABLE)
-			{
-				lua_pushnil(L);
-				while (lua_next(L, -2) != 0) // for each material
-				{
-					if (lua_istable(L, -1))
-					{
-						auto* scene = m_importers.back().GetScene();
-						ImportMaterial* material = getMatchingMaterial(
-							L, &m_materials[m_materials.size() - scene->mNumMaterials], scene->mNumMaterials);
-						if (!material)
-						{
-							g_log_error.log("Editor") << "No matching material found";
-							lua_pop(L, 1); // materials table item
-							continue;
-						}
-						
-						if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
-						{
-							material->import = LuaWrapper::toType<bool>(L, -1);
-						}
-						lua_pop(L, 1); // "import"
-
-						if (lua_getfield(L, -1, "shader") == LUA_TSTRING)
-						{
-							copyString(material->shader, LuaWrapper::toType<const char*>(L, -1));
-						}
-						lua_pop(L, 1); // "import"
-
-
-						if (lua_getfield(L, -1, "alpha_cutout") == LUA_TBOOLEAN)
-						{
-							material->alpha_cutout = LuaWrapper::toType<bool>(L, -1);
-						}
-						lua_pop(L, 1); // "alpha_cutout"
-
-						if (lua_getfield(L, -1, "textures") == LUA_TTABLE)
-						{
-							lua_pushnil(L);
-							ImportTexture* texture = material->textures;
-							while (lua_next(L, -2) != 0) // for each texture
-							{
-								if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
-								{
-									texture->import = LuaWrapper::toType<bool>(L, -1);
-								}
-								lua_pop(L, 1); // "import"
-
-								if (lua_getfield(L, -1, "to_dds") == LUA_TBOOLEAN)
-								{
-									texture->to_dds = LuaWrapper::toType<bool>(L, -1);
-								}
-								lua_pop(L, 1); // "to_dds"
-
-								if (lua_getfield(L, -1, "src") == LUA_TSTRING)
-								{
-									copyString(texture->src, LuaWrapper::toType<const char*>(L, -1));
-									texture->is_valid = PlatformInterface::fileExists(texture->src);
-								}
-								lua_pop(L, 1); // "src"
-
-								++texture;
-								lua_pop(L, 1); // textures table item
-
-								if (texture - material->textures > material->texture_count) break;
-							}
-						}
-						lua_pop(L, 1); // "textures"
-					}
-
-					lua_pop(L, 1); // materials table item
-				}
-			}
-			lua_pop(L, 1); // "materials"
-
-			lua_pop(L, 1); // inputs table item
-		}
-	}
-	lua_pop(L, 1);
 	if (m_importers.empty())
 	{
 		g_log_error.log("Editor") << "Nothing to import";
-		return 0;
+		return;
 	}
 
 	convert(false);
@@ -2824,16 +3082,16 @@ int ImportAssetDialog::importAsset(lua_State* L)
 		if (m_texture_output_dir[0])
 		{
 			PathBuilder texture_path(m_texture_output_dir, m_mesh_output_filename, "_billboard.dds");
-			createBillboard(*this, Path(mesh_path), Path(texture_path), TEXTURE_SIZE);
+			PathBuilder normal_texture_path(m_texture_output_dir, m_mesh_output_filename, "_billboard_normal.dds");
+			createBillboard(*this, Path(mesh_path), Path(texture_path), Path(normal_texture_path), TEXTURE_SIZE);
 		}
 		else
 		{
-			PathBuilder texture_path(m_output_dir, "/", m_mesh_output_filename, " _billboard.dds");
-			createBillboard(*this, Path(mesh_path), Path(texture_path), TEXTURE_SIZE);
+			PathBuilder texture_path(m_output_dir, "/", m_mesh_output_filename, "_billboard.dds");
+			PathBuilder normal_texture_path(m_output_dir, "/", m_mesh_output_filename, "_billboard_normal.dds");
+			createBillboard(*this, Path(mesh_path), Path(texture_path), Path(normal_texture_path), TEXTURE_SIZE);
 		}
 	}
-
-	return 0;
 }
 
 
@@ -2859,6 +3117,24 @@ void ImportAssetDialog::checkTask(bool wait)
 void ImportAssetDialog::onAction()
 {
 	m_is_opened = !m_is_opened;
+}
+
+
+void ImportAssetDialog::clearSources()
+{
+	m_importers.clear();
+	m_animations.clear();
+	m_materials.clear();
+	m_meshes.clear();
+	m_mesh_output_filename[0] = '\0';
+}
+
+
+void ImportAssetDialog::addSource(const char* src)
+{
+	copyString(m_source, src);
+	checkSource();
+	if (m_is_importing) checkTask(true);
 }
 
 
@@ -2912,25 +3188,20 @@ void ImportAssetDialog::onWindowGUI()
 
 		if (ImGui::Button("Add source"))
 		{
-			PlatformInterface::getOpenFilename(m_source, sizeof(m_source), "All\0*.*\0", m_source);
-			checkSource();
-			if (m_is_importing || m_is_converting)
+			if (PlatformInterface::getOpenFilename(m_source, sizeof(m_source), "All\0*.*\0", m_source))
 			{
-				ImGui::EndDock();
-				return;
+				checkSource();
+				if (m_is_importing || m_is_converting)
+				{
+					ImGui::EndDock();
+					return;
+				}
 			}
 		}
 		if (!m_importers.empty())
 		{
 			ImGui::SameLine();
-			if (ImGui::Button("Clear all sources"))
-			{
-				m_importers.clear();
-				m_animations.clear();
-				m_materials.clear();
-				m_meshes.clear();
-				m_mesh_output_filename[0] = '\0';
-			}
+			if (ImGui::Button("Clear all sources")) clearSources();
 		}
 
 		onImageGUI();
@@ -2942,13 +3213,14 @@ void ImportAssetDialog::onWindowGUI()
 		{
 			if (ImGui::CollapsingHeader("Advanced"))
 			{
-				//ImGui::Checkbox("Create billboard LOD", &m_create_billboard_lod);
 				if (m_is_importing || m_is_converting)
 				{
 					ImGui::EndDock();
 					return;
 				}
 
+				ImGui::Checkbox("Create billboard LOD", &m_model.create_billboard_lod);
+				ImGui::Checkbox("Import all bones", &m_model.all_nodes);
 				ImGui::Checkbox("Remove doubles", &m_model.remove_doubles);
 				ImGui::DragFloat("Scale", &m_model.mesh_scale, 0.01f, 0.001f, 0);
 				ImGui::Combo("Orientation", &(int&)m_model.orientation, "Y up\0Z up\0-Z up\0-X up\0");

@@ -303,7 +303,8 @@ float Terrain::getGrassTypeDistance(int index) const
 
 void Terrain::setGrassTypeGround(int index, int ground)
 {
-	ground = Math::clamp(ground, 0, 3);
+	Lumix::Texture* tex = getMaterial()->getTextureByUniform(TEX_COLOR_UNIFORM);
+	if(tex) ground = Math::clamp(ground, 0, tex->layers - 1);
 	forceGrassUpdate();
 	GrassType& type = *m_grass_types[index];
 	type.m_ground = ground;
@@ -405,16 +406,20 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 	float quad_width = Math::minimum(GRASS_QUAD_SIZE, splat_map->width - quad_x);
 	float quad_height = Math::minimum(GRASS_QUAD_SIZE, splat_map->height - quad_z);
 	float tx_step = splat_map->width / (m_width * m_scale.x);
-	float base_tx = tx_step * quad_x;
+	float base_tx = tx_step * quad_x - tx_step * 0.5f;
+
+	struct { float x, y; void* type; } hashed_patch = { quad_x, quad_z, patch.m_type };
+	uint32 hash = crc32(&hashed_patch, sizeof(hashed_patch));
+	Math::seedRandom(hash);
 
 	for (float dz = 0; dz < quad_height; dz += step)
 	{
 		int y_offset = int(splat_map->height * (quad_z + dz) / (m_height * m_scale.x)) * splat_map->width;
-		uint32* splat_data = (uint32*)&splat_map->data[y_offset];
+		uint32* splat_data = &((uint32*)&splat_map->data[0])[y_offset];
 		for (float dx = 0; dx < quad_width; dx += step)
 		{
 			int tx = int(base_tx + tx_step * dx);
-			uint32 pixel_value = *(uint32*)&splat_data[tx];
+			uint32 pixel_value = splat_data[tx];
 
 			int ground_index = pixel_value & 0xff;
 			if (ground_index != patch.m_type->m_ground) continue;
@@ -422,14 +427,16 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 			float density = ((pixel_value >> 8) & 0xff) * DIV255;
 			if (density < 0.25f) continue;
 
-			Matrix& grass_mtx = patch.m_matrices.emplace();
-			grass_mtx = Matrix::IDENTITY;
+			Matrix tmp = Matrix::IDENTITY;
 			float x = quad_x + dx + step * Math::randFloat(-0.5f, 0.5f);
 			float z = quad_z + dz + step * Math::randFloat(-0.5f, 0.5f);
-			grass_mtx.setTranslation(Vec3(x, getHeight(x, z), z));
+			tmp.setTranslation(Vec3(x, getHeight(x, z), z));
 			Quat q(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2));
-			grass_mtx = terrain_matrix * grass_mtx * q.toMatrix();
-			grass_mtx.multiply3x3(density + Math::randFloat(-0.1f, 0.1f));
+			tmp = terrain_matrix * tmp * q.toMatrix();
+			tmp.multiply3x3(density + Math::randFloat(-0.1f, 0.1f));
+			GrassPatch::InstanceData& instance_data = patch.instance_data.emplace();
+			instance_data.matrix = tmp;
+			instance_data.normal = Vec4(getNormal(x, z), 0);
 		}
 	}
 }
@@ -454,10 +461,10 @@ void Terrain::updateGrass(ComponentHandle camera)
 	Vec3 local_camera_pos = inv_mtx.transform(camera_pos);
 	float cx = (int)(local_camera_pos.x / (GRASS_QUAD_SIZE)) * GRASS_QUAD_SIZE;
 	float cz = (int)(local_camera_pos.z / (GRASS_QUAD_SIZE)) * GRASS_QUAD_SIZE;
-	float from_quad_x = cx - (m_grass_distance >> 1) * GRASS_QUAD_SIZE;
-	float from_quad_z = cz - (m_grass_distance >> 1) * GRASS_QUAD_SIZE;
-	float to_quad_x = cx + (m_grass_distance >> 1) * GRASS_QUAD_SIZE;
-	float to_quad_z = cz + (m_grass_distance >> 1) * GRASS_QUAD_SIZE;
+	float from_quad_x = cx - m_grass_distance * GRASS_QUAD_SIZE;
+	float from_quad_z = cz - m_grass_distance * GRASS_QUAD_SIZE;
+	float to_quad_x = cx + m_grass_distance * GRASS_QUAD_SIZE;
+	float to_quad_z = cz + m_grass_distance * GRASS_QUAD_SIZE;
 
 	float old_bounds[4] = {FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX};
 	Array<GrassQuad*>& quads = getQuads(camera);
@@ -494,7 +501,6 @@ void Terrain::updateGrass(ComponentHandle camera)
 			quad->pos.x = quad_x;
 			quad->pos.z = quad_z;
 			quad->m_patches.reserve(m_grass_types.size());
-			srand((int)quad_x + (int)quad_z * m_grass_distance);
 
 			float min_y = FLT_MAX;
 			float max_y = -FLT_MAX;
@@ -506,10 +512,10 @@ void Terrain::updateGrass(ComponentHandle camera)
 				patch.m_type = grass_type;
 
 				generateGrassTypeQuad(patch, terrain_mtx, quad_x, quad_z);
-				for (auto mtx : patch.m_matrices)
+				for (auto instance_data : patch.instance_data)
 				{
-					min_y = Math::minimum(mtx.getTranslation().y, min_y);
-					max_y = Math::maximum(mtx.getTranslation().y, max_y);
+					min_y = Math::minimum(instance_data.matrix.getTranslation().y, min_y);
+					max_y = Math::maximum(instance_data.matrix.getTranslation().y, max_y);
 				}
 			}
 
@@ -548,11 +554,11 @@ void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Com
 			{
 				const GrassPatch& patch = quad->m_patches[patch_idx];
 				if (patch.m_type->m_distance * patch.m_type->m_distance < dist2) continue;
-				if (!patch.m_matrices.empty())
+				if (!patch.instance_data.empty())
 				{
 					GrassInfo& info = infos.emplace();
-					info.matrices = &patch.m_matrices[0];
-					info.matrix_count = patch.m_matrices.size();
+					info.instance_data = (GrassInfo::InstanceData*)&patch.instance_data[0];
+					info.instance_count = patch.instance_data.size();
 					info.model = patch.m_type->m_grass_model;
 					info.type_distance = patch.m_type->m_distance;
 				}
@@ -720,20 +726,22 @@ float Terrain::getHeight(int x, int z) const
 	if (!m_heightmap) return 0;
 
 	Texture* t = m_heightmap;
+	ASSERT(t->bytes_per_pixel == 2);
 	int idx = Math::clamp(x, 0, m_width) + Math::clamp(z, 0, m_height) * m_width;
-	if (t->bytes_per_pixel == 2)
-	{
-		return m_scale.y * DIV64K * ((uint16*)t->getData())[idx];
-	}
-	else if(t->bytes_per_pixel == 4)
-	{
-		return ((m_scale.y * DIV255) * ((uint8*)t->getData())[idx * 4]);
-	}
-	else
-	{
-		ASSERT(false);
-	}
-	return 0;
+	return m_scale.y * DIV64K * ((uint16*)t->getData())[idx];
+}
+
+
+void Terrain::setHeight(int x, int z, float h)
+{
+	const float DIV64K = 1.0f / 65535.0f;
+	const float DIV255 = 1.0f / 255.0f;
+	if (!m_heightmap) return;
+
+	Texture* t = m_heightmap;
+	ASSERT(t->bytes_per_pixel == 2);
+	int idx = Math::clamp(x, 0, m_width) + Math::clamp(z, 0, m_height) * m_width;
+	((uint16*)t->getData())[idx] = (uint16)(h * (65535.0f / m_scale.y));
 }
 
 

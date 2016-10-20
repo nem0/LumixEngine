@@ -30,11 +30,12 @@ public:
 	ShaderCompiler(StudioApp& app, LogUI& log_ui);
 	~ShaderCompiler();
 
-	void compileAll(bool wait);
+	void makeUpToDate(bool wait);
 	void update();
-	bool isCompiling() const { return m_is_compiling; }
 
 private:
+	void findShaderFiles(const char* src_dir);
+	bool getSourceFromBinaryBasename(char* out, int max_size, const char* binary_basename);
 	void wait();
 	void reloadShaders();
 	void onCompiled(int value);
@@ -55,7 +56,6 @@ private:
 	void onFileChanged(const char* path);
 	void parseDependencies();
 	void compile(const char* path);
-	void makeUpToDate();
 	Lumix::Renderer& getRenderer();
 	void addDependency(const char* key, const char* value);
 	void processChangedFiles();
@@ -63,8 +63,13 @@ private:
 private:
 	struct ProcessInfo
 	{
+		ProcessInfo(Lumix::IAllocator& allocator)
+			: output(allocator)
+		{
+		}
 		PlatformInterface::Process* process;
 		char path[Lumix::MAX_PATH_LENGTH];
+		Lumix::string output;
 	};
 
 private:
@@ -75,9 +80,8 @@ private:
 	Lumix::AssociativeArray<Lumix::string, Lumix::Array<Lumix::string>> m_dependencies;
 	Lumix::Array<Lumix::string> m_to_compile;
 	Lumix::Array<Lumix::string> m_to_reload;
-	Lumix::Array<ProcessInfo> m_processes;
+	Lumix::Array<Lumix::string> m_shd_files;
 	Lumix::Array<Lumix::string> m_changed_files;
 	Lumix::MT::SpinMutex m_mutex;
 	LogUI& m_log_ui;
-	bool m_is_compiling;
 };

@@ -7,7 +7,6 @@
 #include "engine/debug/debug.h"
 #include "engine/default_allocator.h"
 #include "engine/engine.h"
-#include "engine/fixed_array.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
 #include "engine/input_system.h"
@@ -41,7 +40,7 @@
 #include <SDL_syswm.h>
 
 
-class StudioAppImpl : public StudioApp
+class StudioAppImpl LUMIX_FINAL : public StudioApp
 {
 public:
 	StudioAppImpl()
@@ -213,7 +212,7 @@ public:
 		Lumix::ResourceType resource_type,
 		const char* property_name) override
 	{
-		struct Plugin : public IAddComponentPlugin
+		struct Plugin LUMIX_FINAL : public IAddComponentPlugin
 		{
 			void onGUI(bool create_entity, bool from_filter) override
 			{
@@ -287,7 +286,7 @@ public:
 
 	void registerComponent(const char* type, const char* label) override
 	{
-		struct Plugin : public IAddComponentPlugin
+		struct Plugin LUMIX_FINAL : public IAddComponentPlugin
 		{
 			void onGUI(bool create_entity, bool from_filter) override
 			{
@@ -370,7 +369,8 @@ public:
 		io.KeyAlt = ((SDL_GetModState() & KMOD_ALT) != 0);
 
 		ImGui::NewFrame();
-		
+		ImGui::PushFont(m_font);
+
 		if (m_drag_data.type == DragData::PATH)
 		{
 			ImGui::BeginTooltip();
@@ -434,6 +434,7 @@ public:
 			}
 			m_settings.onGUI();
 		}
+		ImGui::PopFont();
 		ImGui::Render();
 
 		if (ImGui::GetIO().MouseReleased[0])
@@ -536,71 +537,6 @@ public:
 				{
 					PlatformInterface::shellExecuteOpen("https://github.com/nem0/lumixengine/issues");
 				}
-				ImGui::Separator();
-
-				ImGui::Text("Version 0.22. - News");
-				ImGui::BulletText("default studio settings");
-				ImGui::BulletText("navigation");
-				ImGui::BulletText("merge meshes during import");
-				ImGui::BulletText("advanced CPU profiler view");
-				ImGui::BulletText("patch file device");
-				ImGui::BulletText("pack file device");
-				ImGui::BulletText("ask to save before quit / new / open");
-				ImGui::BulletText("new terrian painting features");
-				ImGui::BulletText("16bit mesh indices");
-				ImGui::BulletText("distance per grass type");
-				ImGui::BulletText("lua's require goes through engine");
-				ImGui::BulletText("game packing");
-				ImGui::Text("Version 0.21. - News");
-				ImGui::BulletText("copy / paste multiple entities at once");
-				ImGui::BulletText("stencil support");
-				ImGui::BulletText("unlimited light intensity");
-				ImGui::BulletText("alpha test reference value editable");
-				ImGui::BulletText("panning");
-				ImGui::BulletText("multiple script components in one entity");
-				ImGui::BulletText("errors messages are more visible");
-				ImGui::BulletText("plugins can be static libraries");
-				ImGui::BulletText("multipass materials");
-				ImGui::BulletText("several data sources");
-				ImGui::BulletText("editor GUI can be created from lua script");
-				ImGui::BulletText("DXT1 for images without alpha");
-				ImGui::BulletText("import dialog - several new features, improved UX");
-				ImGui::BulletText("show / hide, freeze / unfreeze group");
-				ImGui::BulletText("pipeline can be reloaded in runtime");
-				ImGui::BulletText("postprocess effect framework");
-				ImGui::Separator();
-				ImGui::Text("Version 0.20. - News");
-				ImGui::BulletText("Deferred rendering");
-				ImGui::BulletText("HDR");
-				ImGui::BulletText("New editor skin");
-				ImGui::BulletText("Top, front, size view");
-				ImGui::BulletText("Editor does not depend on plugins");
-				ImGui::BulletText("Editor scripting");
-				ImGui::BulletText("Scale mesh on import, flip Y/Z axis");
-				ImGui::BulletText("Multiple gizmos when editing emitters");
-				ImGui::BulletText("Improved color picker");
-				ImGui::BulletText("Close notification button");
-				ImGui::BulletText("Entity look at");
-				ImGui::BulletText("Mesh and material decoupled");
-				ImGui::BulletText("Simple animable component");
-				ImGui::Separator();
-				ImGui::Text("Version 0.19. - News");
-				ImGui::BulletText("Editor UI - docking");
-				ImGui::BulletText("Physics - layers");
-				ImGui::BulletText("File system UI");
-				ImGui::BulletText("Particle system player");
-				ImGui::BulletText("Particle system using bezier curves");
-				ImGui::BulletText("Bezier curves in GUI");
-				ImGui::Separator();
-				ImGui::Text("Version 0.18. - News");
-				ImGui::BulletText("Collision events are sent to scripts");
-				ImGui::BulletText("Multithread safe profiler");
-				ImGui::BulletText("XBox Controller support");
-				ImGui::BulletText("Each script component has its own environment");
-				ImGui::BulletText("Pipeline's features can be enabled/disabled in GUI");
-				ImGui::BulletText("Shader editor");
-				ImGui::BulletText("Audio system");
-				ImGui::BulletText("Basic particle system");
 			}
 			ImGui::EndChild();
 		}
@@ -1364,7 +1300,7 @@ public:
 	void initIMGUI()
 	{
 		ImGuiIO& io = ImGui::GetIO();
-		io.Fonts->AddFontFromFileTTF("bin/VeraMono.ttf", 13);
+		m_font = io.Fonts->AddFontFromFileTTF("bin/VeraMono.ttf", 13);
 
 		io.KeyMap[ImGuiKey_Tab] = SDLK_TAB;
 		io.KeyMap[ImGuiKey_LeftArrow] = SDL_SCANCODE_LEFT;
@@ -1610,6 +1546,12 @@ public:
 	}
 
 
+	void LUA_exitGameMode()
+	{
+		m_editor->toggleGameMode();
+	}
+
+
 	void LUA_exit(int exit_code)
 	{
 		m_finished = true;
@@ -1637,6 +1579,7 @@ public:
 
 		REGISTER_FUNCTION(runTest);
 		REGISTER_FUNCTION(exit);
+		REGISTER_FUNCTION(exitGameMode);
 		REGISTER_FUNCTION(createEntityTemplate);
 
 		#undef REGISTER_FUNCTION
@@ -1703,7 +1646,7 @@ public:
 		Lumix::uint64 offset;
 		Lumix::uint64 size;
 
-		using Path = Lumix::FixedArray<char, Lumix::MAX_PATH_LENGTH>;
+		using Path = Lumix::StaticString<Lumix::MAX_PATH_LENGTH>;
 	};
 	#pragma pack()
 
@@ -1733,19 +1676,40 @@ public:
 			auto& out_path = paths.emplace();
 			if(dir_path[0] == '.')
 			{
-				Lumix::copyString(out_path.data(), out_path.size(), normalized_path);
+				Lumix::copyString(out_path.data, Lumix::lengthOf(out_path.data), normalized_path);
 			}
 			else
 			{
-				Lumix::copyString(out_path.data(), out_path.size(), dir_path);
-				Lumix::catString(out_path.data(), out_path.size(), normalized_path);
+				Lumix::copyString(out_path.data, Lumix::lengthOf(out_path.data), dir_path);
+				Lumix::catString(out_path.data, Lumix::lengthOf(out_path.data), normalized_path);
 			}
 			auto& out_info = infos.emplace();
-			out_info.hash = Lumix::crc32(out_path.data());
-			out_info.size = PlatformInterface::getFileSize(out_path.data());
+			out_info.hash = Lumix::crc32(out_path.data);
+			out_info.size = PlatformInterface::getFileSize(out_path.data);
 			out_info.offset = ~0UL;
 		}
 		PlatformInterface::destroyFileIterator(iter);
+	}
+
+
+
+	void packDataScanResources(Lumix::Array<PackFileInfo>& infos, Lumix::Array<PackFileInfo::Path>& paths)
+	{
+		Lumix::ResourceManager& rm = m_editor->getEngine().getResourceManager();
+		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter)
+		{
+			const auto& resources = iter.value()->getResourceTable();
+			for (auto res_iter = resources.begin(), res_iter_end = resources.end(); res_iter != res_iter_end;
+				 ++res_iter)
+			{
+				Lumix::Resource* res = res_iter.value();
+				Lumix::copyString(paths.emplace().data, Lumix::MAX_PATH_LENGTH, res->getPath().c_str());
+				auto& out_info = infos.emplace();
+				out_info.hash = Lumix::crc32(res->getPath().c_str());
+				out_info.size = PlatformInterface::getFileSize(res->getPath().c_str());
+				out_info.offset = ~0UL;
+			}
+		}
 	}
 
 
@@ -1790,11 +1754,11 @@ public:
 		for (auto& path : paths)
 		{
 			Lumix::FS::OsFile src;
-			size_t src_size = PlatformInterface::getFileSize(path.data());
-			if (!src.open(path.data(), Lumix::FS::Mode::OPEN_AND_READ, m_allocator))
+			size_t src_size = PlatformInterface::getFileSize(path.data);
+			if (!src.open(path.data, Lumix::FS::Mode::OPEN_AND_READ, m_allocator))
 			{
 				file.close();
-				Lumix::g_log_error.log("Editor") << "Could not open " << path.data();
+				Lumix::g_log_error.log("Editor") << "Could not open " << path.data;
 				return;
 			}
 			Lumix::uint8 buf[4096];
@@ -1804,7 +1768,7 @@ public:
 				if (!src.read(buf, batch_size))
 				{
 					file.close();
-					Lumix::g_log_error.log("Editor") << "Could not read " << path.data();
+					Lumix::g_log_error.log("Editor") << "Could not read " << path.data;
 					return;
 				}
 				file.write(buf, batch_size);
@@ -1954,11 +1918,7 @@ public:
 
 	void checkWorkingDirector()
 	{
-		if (!PlatformInterface::dirExists("shaders"))
-		{
-			Lumix::messageBox("Shaders directory not found, please check working directory.");
-		}
-		else if (!PlatformInterface::dirExists("bin"))
+		if (!PlatformInterface::dirExists("bin"))
 		{
 			Lumix::messageBox("Bin directory not found, please check working directory.");
 		}
@@ -2158,6 +2118,7 @@ public:
 	bool m_is_entity_list_opened;
 	bool m_is_entity_template_list_opened;
 	DragData m_drag_data;
+	ImFont* m_font;
 };
 
 

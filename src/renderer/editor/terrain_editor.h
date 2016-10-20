@@ -16,7 +16,7 @@ class Texture;
 }
 
 
-class TerrainEditor : public Lumix::WorldEditor::Plugin
+class TerrainEditor LUMIX_FINAL : public Lumix::WorldEditor::Plugin
 {
 public:
 	enum Type

@@ -13,7 +13,7 @@ namespace FS
 }
 
 
-class LUMIX_RENDERER_API Texture : public Resource
+class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 {
 	public:
 		Texture(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
@@ -40,7 +40,8 @@ class LUMIX_RENDERER_API Texture : public Resource
 		int height;
 		int bytes_per_pixel;
 		int depth;
-		int atlas_size;
+		int layers;
+		int mips;
 		bool is_cubemap;
 		uint32 bgfx_flags;
 		bgfx::TextureHandle handle;

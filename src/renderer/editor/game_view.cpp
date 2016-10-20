@@ -45,6 +45,7 @@ GameView::GameView(StudioApp& app)
 	, m_is_opened(true)
 	, m_pipeline(nullptr)
 	, m_is_mouse_captured(false)
+	, m_is_ingame_cursor(false)
 	, m_editor(nullptr)
 	, m_is_mouse_hovering_window(false)
 	, m_time_multiplier(1.0f)
@@ -130,10 +131,15 @@ void GameView::setScene(Lumix::RenderScene* scene)
 
 void GameView::captureMouse(bool capture)
 {
+	if (m_is_mouse_captured == capture) return;
+
 	m_is_mouse_captured = capture;
 	m_editor->getEngine().getInputSystem().enable(m_is_mouse_captured);
 	SDL_ShowCursor(capture && !m_is_ingame_cursor ? 0 : 1);
 	SDL_SetRelativeMouseMode(capture && !m_is_ingame_cursor ? SDL_TRUE : SDL_FALSE);
+	if (capture) SDL_GetMouseState(&m_captured_mouse_x, &m_captured_mouse_y);
+	else SDL_WarpMouseInWindow(nullptr, m_captured_mouse_x, m_captured_mouse_y);
+	if (!capture) PlatformInterface::unclipCursor();
 }
 
 
@@ -161,13 +167,8 @@ void GameView::onGui()
 		auto size = ImGui::GetContentRegionAvail();
 		size.y -= ImGui::GetTextLineHeightWithSpacing();
 		ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
-		ImVec2 pos;
 		if (size.x > 0 && size.y > 0)
 		{
-			pos = ImGui::GetWindowPos();
-			m_pos.x = pos.x;
-			m_pos.y = pos.y;
-			auto cp = ImGui::GetCursorPos();
 			m_pipeline->setViewport(0, 0, int(size.x), int(size.y));
 
 			auto* fb = m_pipeline->getFramebuffer("default");
@@ -180,6 +181,8 @@ void GameView::onGui()
 			{
 				ImGui::Image(&m_texture_handle, size);
 			}
+			m_pos.x = ImGui::GetItemRectMin().x;
+			m_pos.y = ImGui::GetItemRectMin().y;
 			m_size.x = ImGui::GetItemRectSize().x;
 			m_size.y = ImGui::GetItemRectSize().y;
 
@@ -187,10 +190,6 @@ void GameView::onGui()
 			{
 				ImVec2 pos = ImGui::GetItemRectMin();
 				PlatformInterface::clipCursor((int)pos.x, (int)pos.y, (int)m_size.x, (int)m_size.y);
-			}
-			else
-			{
-				PlatformInterface::unclipCursor();
 			}
 
 			if (ImGui::Checkbox("Pause", &m_paused))
@@ -213,51 +212,9 @@ void GameView::onGui()
 			m_pipeline->render();
 		}
 
-		if (m_is_mouse_captured)
+		if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor->isGameMode()))
 		{
-			Lumix::InputSystem::InputEvent event;
-			if (ImGui::IsMouseReleased(0))
-			{
-				event.type = Lumix::InputSystem::InputEvent::POINTER_UP;
-				m_editor->getEngine().getInputSystem().injectEvent(event);
-			}
-			if (ImGui::IsMouseClicked(0))
-			{
-				event.type = Lumix::InputSystem::InputEvent::POINTER_DOWN;
-				m_editor->getEngine().getInputSystem().injectEvent(event);
-			}
-
-			if (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor->isGameMode())
-			{
-				captureMouse(false);
-			}
-			static bool was_down[512] = {};
-			auto& io = ImGui::GetIO();
-			auto& input = m_editor->getEngine().getInputSystem();
-			for (int i = 0; i < 512; ++i)
-			{
-				if (io.KeysDownDuration[i] == 0)
-				{
-					event.type = Lumix::InputSystem::InputEvent::KEY_DOWN;
-					event.key.sym = i;
-					input.injectEvent(event);
-					was_down[i] = true;
-				}
-				if (!io.KeysDown[i] && was_down[i])
-				{
-					was_down[i] = false;
-					event.type = Lumix::InputSystem::InputEvent::KEY_UP;
-					event.key.sym = i;
-					input.injectEvent(event);
-				}
-			}
-			static ImVec2 old_mouse_pos = io.MousePos;
-			if (io.MousePos.x != old_mouse_pos.x || io.MousePos.y != old_mouse_pos.y)
-			{
-				event.type = Lumix::InputSystem::InputEvent::POINTER_MOVE;
-				input.injectEvent(event);
-				old_mouse_pos = io.MousePos;
-			}
+			captureMouse(false);
 		}
 
 		if (ImGui::IsMouseHoveringRect(content_min, content_max) && m_is_mouse_hovering_window &&

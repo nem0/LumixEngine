@@ -30,7 +30,7 @@
 #include <cmath>
 
 
-static const Lumix::ComponentType RENDERABLE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
+static const Lumix::ComponentType MODEL_INSTANCE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
 static const Lumix::ComponentType TERRAIN_TYPE = Lumix::PropertyRegister::getComponentType("terrain");
 static const Lumix::ComponentType HEIGHTFIELD_TYPE = Lumix::PropertyRegister::getComponentType("physical_heightfield");
 static const Lumix::ResourceType MATERIAL_TYPE("material");
@@ -42,7 +42,7 @@ static const char* TEX_COLOR_UNIFORM = "u_texColor";
 static const float MIN_BRUSH_SIZE = 0.5f;
 
 
-struct PaintTerrainCommand : public Lumix::IEditorCommand
+struct PaintTerrainCommand LUMIX_FINAL : public Lumix::IEditorCommand
 {
 	struct Rectangle
 	{
@@ -228,11 +228,8 @@ private:
 private:
 	Lumix::Material* getMaterial()
 	{
-		auto* material = static_cast<Lumix::RenderScene*>(m_terrain.scene)->getTerrainMaterial(m_terrain.handle);
-		return static_cast<Lumix::Material*>(m_world_editor.getEngine()
-												 .getResourceManager()
-												 .get(MATERIAL_TYPE)
-												 ->get(Lumix::Path(material->getPath().c_str())));
+		auto* scene = static_cast<Lumix::RenderScene*>(m_terrain.scene);
+		return scene->getTerrainMaterial(m_terrain.handle);
 	}
 
 
@@ -405,7 +402,12 @@ private:
 			for (int j = rect.m_from_y, end2 = rect.m_to_y; j < end2; ++j)
 			{
 				int offset = i - m_x + (j - m_y) * m_width;
-				((Lumix::uint16*)&data[0])[offset] = m_flat_height;
+				float dist = sqrt((item.m_local_pos.x - 0.5f - i) * (item.m_local_pos.x - 0.5f - i) +
+					(item.m_local_pos.z - 0.5f - j) * (item.m_local_pos.z - 0.5f - j));
+				float t = (dist - item.m_radius * item.m_amount) / (item.m_radius * (1 - item.m_amount));
+				t = Lumix::Math::clamp(1 - t, 0.0f, 1.0f);
+				Lumix::uint16 old_value = ((Lumix::uint16*)&data[0])[offset];
+				((Lumix::uint16*)&data[0])[offset] = (Lumix::uint16)(m_flat_height * t + old_value * (1-t));
 			}
 		}
 	}
@@ -523,14 +525,17 @@ private:
 		texture->onDataUpdated(m_x, m_y, m_width, m_height);
 		static_cast<Lumix::RenderScene*>(m_terrain.scene)->forceGrassUpdate(m_terrain.handle);
 
-		Lumix::IScene* scene = m_world_editor.getUniverse()->getScene(Lumix::crc32("physics"));
-		if (!scene) return;
+		if (m_type != TerrainEditor::LAYER && m_type != TerrainEditor::COLOR)
+		{
+			Lumix::IScene* scene = m_world_editor.getUniverse()->getScene(Lumix::crc32("physics"));
+			if (!scene) return;
 
-		auto* phy_scene = static_cast<Lumix::PhysicsScene*>(scene);
-		Lumix::ComponentHandle cmp = scene->getComponent(m_terrain.entity, HEIGHTFIELD_TYPE);
-		if (!Lumix::isValid(cmp)) return;
+			auto* phy_scene = static_cast<Lumix::PhysicsScene*>(scene);
+			Lumix::ComponentHandle cmp = scene->getComponent(m_terrain.entity, HEIGHTFIELD_TYPE);
+			if (!Lumix::isValid(cmp)) return;
 
-		phy_scene->updateHeighfieldData(cmp, m_x, m_y, m_width, m_height, &data[0], bpp);
+			phy_scene->updateHeighfieldData(cmp, m_x, m_y, m_width, m_height, &data[0], bpp);
+		}
 	}
 
 
@@ -716,8 +721,7 @@ void TerrainEditor::nextTerrainTexture()
 	Lumix::Texture* tex = material->getTextureByUniform(TEX_COLOR_UNIFORM);
 	if (tex)
 	{
-		m_texture_idx =
-			Lumix::Math::minimum(tex->atlas_size * tex->atlas_size - 1, m_texture_idx + 1);
+		m_texture_idx = Lumix::Math::minimum(tex->layers - 1, m_texture_idx + 1);
 	}
 }
 
@@ -915,7 +919,7 @@ void TerrainEditor::removeEntities(const Lumix::Vec3& hit_pos)
 		m_terrain_brush_size);
 
 	Lumix::Array<Lumix::Entity> entities(m_world_editor.getAllocator());
-	scene->getRenderableEntities(frustum, entities);
+	scene->getModelInstanceEntities(frustum, entities);
 	for(Lumix::Entity entity : entities)
 	{
 		for(auto hash : hashes)
@@ -1008,7 +1012,7 @@ static bool testOBBCollision(const Lumix::Matrix& matrix_a,
 
 
 static bool isOBBCollision(Lumix::RenderScene& scene,
-	const Lumix::Array<Lumix::Array<Lumix::RenderableMesh>>& meshes,
+	const Lumix::Array<Lumix::Array<Lumix::ModelInstanceMesh>>& meshes,
 	const Lumix::Vec3& pos_a,
 	Lumix::Model* model,
 	float scale)
@@ -1019,15 +1023,15 @@ static bool isOBBCollision(Lumix::RenderScene& scene,
 	{
 		for(auto& mesh : submeshes)
 		{
-			auto* renderable = scene.getRenderable(mesh.renderable);
-			Lumix::Vec3 pos_b = renderable->matrix.getTranslation();
-			float radius_b = renderable->model->getBoundingRadius();
+			auto* model_instance = scene.getModelInstance(mesh.model_instance);
+			Lumix::Vec3 pos_b = model_instance->matrix.getTranslation();
+			float radius_b = model_instance->model->getBoundingRadius();
 			float radius_squared = radius_a_squared + radius_b * radius_b;
 			if ((pos_a - pos_b).squaredLength() < radius_squared * scale * scale)
 			{
 				Lumix::Matrix matrix = Lumix::Matrix::IDENTITY;
 				matrix.setTranslation(pos_a);
-				if (testOBBCollision(matrix, model, renderable->matrix, renderable->model, scale))
+				if (testOBBCollision(matrix, model, model_instance->matrix, model_instance->model, scale))
 				{
 					return true;
 				}
@@ -1066,9 +1070,9 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 			Lumix::uint32 hash = Lumix::crc32(template_names[idx].c_str());
 			Lumix::Entity tpl = template_system.getInstances(hash)[0];
 			if(!isValid(tpl)) continue;
-			Lumix::ComponentUID renderable = m_world_editor.getUniverse()->getComponent(tpl, RENDERABLE_TYPE);
-			if(!renderable.isValid()) continue;
-			tpls.push({renderable.handle, idx});
+			Lumix::ComponentUID model_instance = m_world_editor.getUniverse()->getComponent(tpl, MODEL_INSTANCE_TYPE);
+			if(!model_instance.isValid()) continue;
+			tpls.push({model_instance.handle, idx});
 		}
 
 		Lumix::Frustum frustum;
@@ -1079,15 +1083,15 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 			m_terrain_brush_size,
 			-m_terrain_brush_size,
 			m_terrain_brush_size);
-		auto& meshes = scene->getRenderableInfos(frustum, frustum.position);
+		auto& meshes = scene->getModelInstanceInfos(frustum, frustum.position);
 
 		Lumix::Vec2 size = scene->getTerrainSize(m_component.handle);
 		float scale = 1.0f - Lumix::Math::maximum(0.01f, m_terrain_brush_strength);
 		for (int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f; ++i)
 		{
-			int renderable_idx = Lumix::Math::rand() % tpls.size();
-			Lumix::Model* model = scene->getRenderableModel(tpls[renderable_idx].cmp);
-			const auto* template_name = template_names[tpls[renderable_idx].template_idx].c_str();
+			int model_instance_idx = Lumix::Math::rand() % tpls.size();
+			Lumix::Model* model = scene->getModelInstanceModel(tpls[model_instance_idx].cmp);
+			const auto* template_name = template_names[tpls[model_instance_idx].template_idx].c_str();
 
 			float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
 			float dist = Lumix::Math::randFloat(0, 1.0f) * m_terrain_brush_size;
@@ -1329,7 +1333,7 @@ void TerrainEditor::onGUI()
 			Lumix::Texture* tex = getMaterial()->getTextureByUniform(TEX_COLOR_UNIFORM);
 			if (tex)
 			{
-				for (int i = 0; i < tex->atlas_size * tex->atlas_size; ++i)
+				for (int i = 0; i < tex->layers; ++i)
 				{
 					if (i % 4 != 0) ImGui::SameLine();
 					if (ImGui::RadioButton(Lumix::StaticString<20>("", i, "###rb", i), m_texture_idx == i))

@@ -28,10 +28,10 @@
 #include <SDL.h>
 
 
-static const Lumix::ComponentType RENDERABLE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
+static const Lumix::ComponentType MODEL_INSTANCE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
 
 
-struct InsertMeshCommand : public Lumix::IEditorCommand
+struct InsertMeshCommand LUMIX_FINAL : public Lumix::IEditorCommand
 {
 	Lumix::Vec3 m_position;
 	Lumix::Path m_mesh_path;
@@ -82,12 +82,12 @@ struct InsertMeshCommand : public Lumix::IEditorCommand
 		auto* universe = m_editor.getUniverse();
 		m_entity = universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		universe->setPosition(m_entity, m_position);
-		auto* scene = static_cast<Lumix::RenderScene*>(universe->getScene(RENDERABLE_TYPE));
+		auto* scene = static_cast<Lumix::RenderScene*>(universe->getScene(MODEL_INSTANCE_TYPE));
 		if (!scene) return false;
 
-		Lumix::ComponentHandle cmp = scene->createComponent(RENDERABLE_TYPE, m_entity);
+		Lumix::ComponentHandle cmp = scene->createComponent(MODEL_INSTANCE_TYPE, m_entity);
 
-		if (isValid(cmp)) scene->setRenderablePath(cmp, m_mesh_path);
+		if (isValid(cmp)) scene->setModelInstancePath(cmp, m_mesh_path);
 		return true;
 	}
 
@@ -185,12 +185,6 @@ SceneView::~SceneView()
 }
 
 
-void SceneView::setWireframe(bool wireframe)
-{
-	m_pipeline->setWireframe(wireframe);
-}
-
-
 void SceneView::setScene(Lumix::RenderScene* scene)
 {
 	m_pipeline->setScene(scene);
@@ -263,6 +257,8 @@ void SceneView::captureMouse(bool capture)
 	m_is_mouse_captured = capture;
 	SDL_ShowCursor(m_is_mouse_captured ? 0 : 1);
 	SDL_SetRelativeMouseMode(capture ? SDL_TRUE : SDL_FALSE);
+	if (capture) SDL_GetMouseState(&m_captured_mouse_x, &m_captured_mouse_y);
+	else SDL_WarpMouseInWindow(nullptr, m_captured_mouse_x, m_captured_mouse_y);
 }
 
 
@@ -303,10 +299,10 @@ void SceneView::handleDrop(float x, float y)
 		}
 		else if (Lumix::PathUtils::hasExtension(path, "mat") && hit.m_mesh)
 		{
-			auto* desc = Lumix::PropertyRegister::getDescriptor(RENDERABLE_TYPE, Lumix::crc32("Material"));
+			auto* desc = Lumix::PropertyRegister::getDescriptor(MODEL_INSTANCE_TYPE, Lumix::crc32("Material"));
 			auto drag_data = m_app.getDragData();
 			m_editor->selectEntities(&hit.m_entity, 1);
-			auto* model = m_pipeline->getScene()->getRenderableModel(hit.m_component);
+			auto* model = m_pipeline->getScene()->getModelInstanceModel(hit.m_component);
 			int mesh_index = 0;
 			for (int i = 0; i < model->getMeshCount(); ++i)
 			{
@@ -317,7 +313,7 @@ void SceneView::handleDrop(float x, float y)
 				}
 			}
 			
-			m_editor->setProperty(RENDERABLE_TYPE, mesh_index, *desc, &hit.m_entity, 1, drag_data.data, drag_data.size);
+			m_editor->setProperty(MODEL_INSTANCE_TYPE, mesh_index, *desc, &hit.m_entity, 1, drag_data.data, drag_data.size);
 		}
 	}
 }

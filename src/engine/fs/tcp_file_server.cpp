@@ -22,7 +22,7 @@ namespace FS
 {
 
 
-class TCPFileServerTask : public MT::Task
+class TCPFileServerTask LUMIX_FINAL : public MT::Task
 {
 public:
 	explicit TCPFileServerTask(IAllocator& allocator)

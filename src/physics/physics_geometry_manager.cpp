@@ -15,7 +15,7 @@ namespace Lumix
 static const ResourceType PHYSICS_TYPE("physics");
 
 
-struct OutputStream : public physx::PxOutputStream
+struct OutputStream LUMIX_FINAL : public physx::PxOutputStream
 {
 	explicit OutputStream(IAllocator& allocator)
 		: allocator(allocator)
@@ -51,7 +51,7 @@ struct OutputStream : public physx::PxOutputStream
 };
 
 
-struct InputStream : public physx::PxInputStream
+struct InputStream LUMIX_FINAL : public physx::PxInputStream
 {
 	InputStream(unsigned char* data, int size)
 	{
@@ -98,13 +98,13 @@ void PhysicsGeometryManager::destroyResource(Resource& resource)
 
 PhysicsGeometry::PhysicsGeometry(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
-	, m_geometry(nullptr)
+	, convex_mesh(nullptr)
+	, tri_mesh(nullptr)
 {
 }
 
 PhysicsGeometry::~PhysicsGeometry()
 {
-	LUMIX_DELETE(getAllocator(), m_geometry);
 }
 
 
@@ -132,11 +132,29 @@ bool PhysicsGeometry::load(FS::IFile& file)
 	verts.resize(num_verts);
 	file.read(&verts[0], sizeof(verts[0]) * verts.size());
 
-	m_is_convex = header.m_convex != 0;
-	if (!m_is_convex)
+	bool is_convex = header.m_convex != 0;
+	if (is_convex)
 	{
-		physx::PxTriangleMeshGeometry* geom = LUMIX_NEW(getAllocator(), physx::PxTriangleMeshGeometry)();
-		m_geometry = geom;
+		physx::PxConvexMeshDesc meshDesc;
+		meshDesc.points.count = verts.size();
+		meshDesc.points.stride = sizeof(Vec3);
+		meshDesc.points.data = &verts[0];
+		meshDesc.flags = physx::PxConvexFlag::eCOMPUTE_CONVEX;
+
+		OutputStream writeBuffer(getAllocator());
+		bool status = system.getCooking()->cookConvexMesh(meshDesc, writeBuffer);
+		if (!status)
+		{
+			convex_mesh = nullptr;
+			return false;
+		}
+
+		InputStream readBuffer(writeBuffer.data, writeBuffer.size);
+		convex_mesh = system.getPhysics()->createConvexMesh(readBuffer);
+		tri_mesh = nullptr;
+	}
+	else
+	{
 		uint32 num_indices;
 		Array<uint32> tris(getAllocator());
 		file.read(&num_indices, sizeof(num_indices));
@@ -153,33 +171,15 @@ bool PhysicsGeometry::load(FS::IFile& file)
 		meshDesc.triangles.data = &tris[0];
 
 		OutputStream writeBuffer(getAllocator());
-		system.getCooking()->cookTriangleMesh(meshDesc, writeBuffer);
-
-		InputStream readBuffer(writeBuffer.data, writeBuffer.size);
-		geom->triangleMesh = system.getPhysics()->createTriangleMesh(readBuffer);
-	}
-	else
-	{
-		physx::PxConvexMeshGeometry* geom = LUMIX_NEW(getAllocator(), physx::PxConvexMeshGeometry)();
-		m_geometry = geom;
-		physx::PxConvexMeshDesc meshDesc;
-		meshDesc.points.count = verts.size();
-		meshDesc.points.stride = sizeof(Vec3);
-		meshDesc.points.data = &verts[0];
-		meshDesc.flags = physx::PxConvexFlag::eCOMPUTE_CONVEX;
-
-		OutputStream writeBuffer(getAllocator());
-		bool status = system.getCooking()->cookConvexMesh(meshDesc, writeBuffer);
-		if (!status)
+		if (!system.getCooking()->cookTriangleMesh(meshDesc, writeBuffer))
 		{
-			LUMIX_DELETE(getAllocator(), geom);
-			m_geometry = nullptr;
+			tri_mesh = nullptr;
 			return false;
 		}
 
 		InputStream readBuffer(writeBuffer.data, writeBuffer.size);
-		physx::PxConvexMesh* mesh = system.getPhysics()->createConvexMesh(readBuffer);
-		geom->convexMesh = mesh;
+		tri_mesh = system.getPhysics()->createTriangleMesh(readBuffer);
+		convex_mesh = nullptr;
 	}
 
 	m_size = file.size();
@@ -193,10 +193,12 @@ IAllocator& PhysicsGeometry::getAllocator()
 }
 
 
-void PhysicsGeometry::unload(void)
+void PhysicsGeometry::unload()
 {
-	LUMIX_DELETE(getAllocator(), m_geometry);
-	m_geometry = nullptr;
+	if (convex_mesh) convex_mesh->release();
+	if (tri_mesh) tri_mesh->release();
+	convex_mesh = nullptr;
+	tri_mesh = nullptr;
 }
 
 

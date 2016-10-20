@@ -52,7 +52,7 @@ static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("cam
 static const ComponentType DECAL_TYPE = PropertyRegister::getComponentType("decal");
 static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType("point_light");
 static const ComponentType GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
-static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = PropertyRegister::getComponentType("environment_probe");
 static const uint32 RENDERER_HASH = crc32("renderer");
 static const ResourceType MATERIAL_TYPE("material");
@@ -61,7 +61,7 @@ static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType MODEL_TYPE("model");
 
 
-struct MaterialPlugin : public AssetBrowser::IPlugin
+struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	explicit MaterialPlugin(StudioApp& app)
 		: m_app(app)
@@ -218,16 +218,6 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 					}
 				}
 
-				if (slot.is_atlas)
-				{
-					int size = texture->atlas_size - 2;
-					const char* values = "2x2\0" "3x3\0" "4x4\0";
-					if (ImGui::Combo(StaticString<30>("Atlas size###", i), &size, values))
-					{
-						ImGui::CloseCurrentPopup();
-						texture->atlas_size = size + 2;
-					}
-				}
 				ImGui::EndPopup();
 			}
 		}
@@ -266,13 +256,6 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 						break;
 					case Shader::Uniform::TIME: break;
 					default: ASSERT(false); break;
-				}
-			}
-			for (int i = 0; i < 32; ++i)
-			{
-				if (material->isCustomFlag(1 << i))
-				{
-					ImGui::LabelText("Custom flag", "%s", Material::getCustomFlagName(i));
 				}
 			}
 
@@ -345,7 +328,7 @@ struct MaterialPlugin : public AssetBrowser::IPlugin
 };
 
 
-struct ModelPlugin : public AssetBrowser::IPlugin
+struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	explicit ModelPlugin(StudioApp& app)
 		: m_app(app)
@@ -377,14 +360,14 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 	void createPreviewUniverse()
 	{
 		auto& engine = m_app.getWorldEditor()->getEngine();
-		m_universe = &engine.createUniverse();
+		m_universe = &engine.createUniverse(false);
 		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), engine.getAllocator());
 		m_pipeline->load();
 
 		auto mesh_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(RENDERER_HASH));
-		m_mesh = render_scene->createComponent(RENDERABLE_TYPE, mesh_entity);
+		m_mesh = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 		
 		auto light_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		auto light_cmp = render_scene->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
@@ -406,9 +389,9 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		if (!render_scene) return;
 		if (!model.isReady()) return;
 
-		if (render_scene->getRenderableModel(m_mesh) != &model)
+		if (render_scene->getModelInstanceModel(m_mesh) != &model)
 		{
-			render_scene->setRenderablePath(m_mesh, model.getPath());
+			render_scene->setModelInstancePath(m_mesh, model.getPath());
 			AABB aabb = model.getAABB();
 
 			m_universe->setRotation(m_camera_entity, {0, 0, 0, 1});
@@ -507,7 +490,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 		ImGui::LabelText("Bounding radius", "%f", model->getBoundingRadius());
 
 		auto* lods = model->getLODs();
-		if (lods[0].to_mesh >= 0)
+		if (lods[0].to_mesh >= 0 && !model->isFailure())
 		{
 			ImGui::Separator();
 			ImGui::Columns(4);
@@ -592,7 +575,7 @@ struct ModelPlugin : public AssetBrowser::IPlugin
 };
 
 
-struct TexturePlugin : public AssetBrowser::IPlugin
+struct TexturePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	explicit TexturePlugin(StudioApp& app)
 		: m_app(app)
@@ -615,7 +598,8 @@ struct TexturePlugin : public AssetBrowser::IPlugin
 		}
 
 		ImGui::LabelText("Size", "%dx%d", texture->width, texture->height);
-		ImGui::LabelText("BPP", "%d", texture->bytes_per_pixel);
+		ImGui::LabelText("Mips", "%d", texture->mips);
+		if (texture->bytes_per_pixel > 0) ImGui::LabelText("BPP", "%d", texture->bytes_per_pixel);
 		if (texture->is_cubemap)
 		{
 			ImGui::Text("Cubemap");
@@ -659,7 +643,7 @@ struct TexturePlugin : public AssetBrowser::IPlugin
 };
 
 
-struct ShaderPlugin : public AssetBrowser::IPlugin
+struct ShaderPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	explicit ShaderPlugin(StudioApp& app)
 		: m_app(app)
@@ -680,7 +664,7 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 		auto* shader = static_cast<Shader*>(resource);
 		char basename[MAX_PATH_LENGTH];
 		PathUtils::getBasename(basename, lengthOf(basename), resource->getPath().c_str());
-		StaticString<MAX_PATH_LENGTH> path("/shaders/", basename);
+		StaticString<MAX_PATH_LENGTH> path("/pipelines/", basename);
 		if (ImGui::Button("Open vertex shader"))
 		{
 			path << "_vs.sc";
@@ -761,7 +745,7 @@ struct ShaderPlugin : public AssetBrowser::IPlugin
 };
 
 
-struct EnvironmentProbePlugin : public PropertyGrid::IPlugin
+struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 {
 	explicit EnvironmentProbePlugin(StudioApp& app)
 		: m_app(app)
@@ -882,7 +866,7 @@ struct EnvironmentProbePlugin : public PropertyGrid::IPlugin
 		data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
 
 		bgfx::TextureHandle texture =
-			bgfx::createTexture2D(TEXTURE_SIZE, TEXTURE_SIZE, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
+			bgfx::createTexture2D(TEXTURE_SIZE, TEXTURE_SIZE, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
 		
 		Vec3 probe_position = universe->getPosition(cmp.entity);
 		auto* scene = static_cast<RenderScene*>(universe->getScene(RENDERER_HASH));
@@ -973,7 +957,7 @@ struct EnvironmentProbePlugin : public PropertyGrid::IPlugin
 };
 
 
-struct EmitterPlugin : public PropertyGrid::IPlugin
+struct EmitterPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 {
 	explicit EmitterPlugin(StudioApp& app)
 		: m_app(app)
@@ -1009,7 +993,7 @@ struct EmitterPlugin : public PropertyGrid::IPlugin
 };
 
 
-struct TerrainPlugin : public PropertyGrid::IPlugin
+struct TerrainPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 {
 	explicit TerrainPlugin(StudioApp& app)
 		: m_app(app)
@@ -1039,9 +1023,9 @@ struct TerrainPlugin : public PropertyGrid::IPlugin
 };
 
 
-struct SceneViewPlugin : public StudioApp::IPlugin
+struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
-	struct RenderInterfaceImpl : public RenderInterface
+	struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	{
 		ModelHandle loadModel(Path& path) override
 		{
@@ -1106,10 +1090,10 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		AABB getEntityAABB(Universe& universe, Entity entity) override
 		{
 			AABB aabb;
-			auto cmp = m_render_scene->getRenderableComponent(entity);
+			auto cmp = m_render_scene->getModelInstanceComponent(entity);
 			if (cmp != INVALID_COMPONENT)
 			{
-				Model* model = m_render_scene->getRenderableModel(cmp);
+				Model* model = m_render_scene->getModelInstanceModel(cmp);
 				if (!model) return aabb;
 
 				aabb = model->getAABB();
@@ -1198,7 +1182,7 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 		{
 			m_model_index = -1;
 			auto& rm = m_editor.getEngine().getResourceManager();
-			Path shader_path("shaders/debugline.shd");
+			Path shader_path("pipelines/editor/debugline.shd");
 			m_shader = static_cast<Shader*>(rm.get(SHADER_TYPE)->load(shader_path));
 
 			editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
@@ -1230,9 +1214,9 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 
 		Vec3 getModelCenter(Entity entity) override
 		{
-			auto cmp = m_render_scene->getRenderableComponent(entity);
+			auto cmp = m_render_scene->getModelInstanceComponent(entity);
 			if (cmp == INVALID_COMPONENT) return Vec3(0, 0, 0);
-			Model* model = m_render_scene->getRenderableModel(cmp);
+			Model* model = m_render_scene->getModelInstanceModel(cmp);
 			if (!model) return Vec3(0, 0, 0);
 			return (model->getAABB().min + model->getAABB().max) * 0.5f;
 		}
@@ -1240,23 +1224,23 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 
 		void showEntity(Entity entity) override
 		{
-			ComponentHandle cmp = m_render_scene->getRenderableComponent(entity);
+			ComponentHandle cmp = m_render_scene->getModelInstanceComponent(entity);
 			if (cmp == INVALID_COMPONENT) return;
-			m_render_scene->showRenderable(cmp);
+			m_render_scene->showModelInstance(cmp);
 		}
 
 
 		void hideEntity(Entity entity) override
 		{
-			ComponentHandle cmp = m_render_scene->getRenderableComponent(entity);
+			ComponentHandle cmp = m_render_scene->getModelInstanceComponent(entity);
 			if (cmp == INVALID_COMPONENT) return;
-			m_render_scene->hideRenderable(cmp);
+			m_render_scene->hideModelInstance(cmp);
 		}
 
 
-		Path getRenderablePath(ComponentHandle cmp) override
+		Path getModelInstancePath(ComponentHandle cmp) override
 		{
-			return m_render_scene->getRenderablePath(cmp);
+			return m_render_scene->getModelInstancePath(cmp);
 		}
 
 
@@ -1354,7 +1338,526 @@ struct SceneViewPlugin : public StudioApp::IPlugin
 };
 
 
-struct GameViewPlugin : public StudioApp::IPlugin
+struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
+{
+	FurPainter(StudioApp& _app)
+		: app(_app)
+		, brush_radius(0.1f)
+		, brush_strength(1.0f)
+		, enabled(false)
+	{
+		app.getWorldEditor()->addPlugin(*this);
+	}
+
+
+	void saveTexture()
+	{
+		WorldEditor& editor = *app.getWorldEditor();
+		auto& entities = editor.getSelectedEntities();
+		if (entities.empty()) return;
+
+		ComponentUID model_instance = editor.getUniverse()->getComponent(entities[0], MODEL_INSTANCE_TYPE);
+		if (!model_instance.isValid()) return;
+
+		RenderScene* scene = static_cast<RenderScene*>(model_instance.scene);
+		Model* model = scene->getModelInstanceModel(model_instance.handle);
+
+		if (!model || !model->isReady()) return;
+
+		Texture* texture = model->getMesh(0).material->getTexture(0);
+		texture->save();
+	}
+
+
+	struct Vertex
+	{
+		Vec2 uv;
+		Vec3 pos;
+
+		void fixUV(int w, int h)
+		{
+			if (uv.y < 0) uv.y = 1 + uv.y;
+			uv.x *= (float)w;
+			uv.y *= (float)h;
+		}
+	};
+
+
+	struct Point
+	{
+		int64 x, y;
+	};
+
+
+	static int64 orient2D(const Point& a, const Point& b, const Point& c)
+	{
+		return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+	}
+
+
+	void postprocess()
+	{
+		WorldEditor& editor = *app.getWorldEditor();
+		Universe* universe = editor.getUniverse();
+		auto& entities = editor.getSelectedEntities();
+		if (entities.empty()) return;
+
+		ComponentUID model_instance = universe->getComponent(entities[0], MODEL_INSTANCE_TYPE);
+		if (!model_instance.isValid()) return;
+
+		RenderScene* scene = static_cast<RenderScene*>(model_instance.scene);
+		Model* model = scene->getModelInstanceModel(model_instance.handle);
+
+		if (!model || !model->isReady() || model->getMeshCount() < 1) return;
+		if (!model->getMesh(0).material) return;
+
+		Texture* texture = model->getMesh(0).material->getTexture(0);
+		if (!texture || texture->data.empty()) return;
+
+		uint8* mem = (uint8*)app.getWorldEditor()->getAllocator().allocate(texture->width * texture->height);
+
+		ASSERT(!texture->data.empty());
+
+		const uint16* idx16 = model->getIndices16();
+		const uint32* idx32 = model->getIndices32();
+		const Vec3* vertices = &model->getVertices()[0];
+		setMemory(mem, 0, texture->width * texture->height);
+		for (int i = 0, c = model->getIndicesCount(); i < c; i += 3)
+		{
+			uint32 idx[3];
+			if (idx16)
+			{
+				idx[0] = idx16[i];
+				idx[1] = idx16[i + 1];
+				idx[2] = idx16[i + 2];
+			}
+			else
+			{
+				idx[0] = idx32[i];
+				idx[1] = idx32[i + 1];
+				idx[2] = idx32[i + 2];
+			}
+
+			Vertex v[] = { { model->getUVs()[idx[0]], vertices[idx[0]] },
+			{ model->getUVs()[idx[1]], vertices[idx[1]] },
+			{ model->getUVs()[idx[2]], vertices[idx[2]] } };
+
+			Vec3 n = crossProduct(Vec3(v[0].uv, 0) - Vec3(v[1].uv, 0), Vec3(v[2].uv, 0) - Vec3(v[1].uv, 0));
+			if (n.z > 0) Math::swap(v[1], v[2]);
+
+			v[0].fixUV(texture->width, texture->height);
+			v[1].fixUV(texture->width, texture->height);
+			v[2].fixUV(texture->width, texture->height);
+
+			rasterizeTriangle2(texture->width, mem, v);
+		}
+
+		uint32* data = (uint32*)&texture->data[0];
+		struct DistanceFieldCell
+		{
+			uint32 distance;
+			uint32 color;
+		};
+
+		Array<DistanceFieldCell> distance_field(app.getWorldEditor()->getAllocator());
+		int width = texture->width;
+		int height = texture->height;
+		distance_field.resize(width * height);
+
+		for (int j = 0; j < height; ++j)
+		{
+			for (int i = 0; i < width; ++i)
+			{
+				distance_field[i + j * width].color = data[i + j * width];
+				distance_field[i + j * width].distance = 0xffffFFFF;
+			}
+		}
+
+		for (int j = 1; j < height; ++j)
+		{
+			for (int i = 1; i < width; ++i)
+			{
+				int idx = i + j * width;
+				if (mem[idx])
+				{
+					distance_field[idx].distance = 0;
+				}
+				else
+				{
+					if (distance_field[idx - 1].distance < distance_field[idx - width].distance)
+					{
+						distance_field[idx].distance = distance_field[idx - 1].distance + 1;
+						distance_field[idx].color = distance_field[idx - 1].color;
+					}
+					else
+					{
+						distance_field[idx].distance = distance_field[idx - width].distance + 1;
+						distance_field[idx].color = distance_field[idx - width].color;
+					}
+				}
+			}
+		}
+
+		for (int j = height - 2; j >= 0; --j)
+		{
+			for (int i = width - 2; i >= 0; --i)
+			{
+				int idx = i + j * width;
+				if (distance_field[idx + 1].distance < distance_field[idx + width].distance &&
+					distance_field[idx + 1].distance < distance_field[idx].distance)
+				{
+					distance_field[idx].distance = distance_field[idx + 1].distance + 1;
+					distance_field[idx].color = distance_field[idx + 1].color;
+				}
+				else if (distance_field[idx + width].distance < distance_field[idx].distance)
+				{
+					distance_field[idx].distance = distance_field[idx + width].distance + 1;
+					distance_field[idx].color = distance_field[idx + width].color;
+				}
+			}
+		}
+
+		for (int j = 0; j < height; ++j)
+		{
+			for (int i = 0; i < width; ++i)
+			{
+				data[i + j * width] = distance_field[i + j*width].color;
+			}
+		}
+
+		texture->onDataUpdated(0, 0, texture->width, texture->height);
+		app.getWorldEditor()->getAllocator().deallocate(mem);
+	}
+
+
+	void rasterizeTriangle2(int width, uint8* mem, Vertex v[3]) const
+	{
+		float squared_radius_rcp = 1.0f / (brush_radius * brush_radius);
+
+		static const int64 substep = 256;
+		static const int64 submask = substep - 1;
+		static const int64 stepshift = 8;
+
+		Point v0 = { int64(v[0].uv.x * substep), int64(v[0].uv.y * substep) };
+		Point v1 = { int64(v[1].uv.x * substep), int64(v[1].uv.y * substep) };
+		Point v2 = { int64(v[2].uv.x * substep), int64(v[2].uv.y * substep) };
+
+		int64 minX = Math::minimum(v0.x, v1.x, v2.x);
+		int64 minY = Math::minimum(v0.y, v1.y, v2.y);
+		int64 maxX = Math::maximum(v0.x, v1.x, v2.x) + substep;
+		int64 maxY = Math::maximum(v0.y, v1.y, v2.y) + substep;
+
+		minX = ((minX + submask) & ~submask) - 1;
+		minY = ((minY + submask) & ~submask) - 1;
+
+		Point p;
+		for (p.y = minY; p.y <= maxY; p.y += substep)
+		{
+			for (p.x = minX; p.x <= maxX; p.x += substep)
+			{
+				int64 w0 = orient2D(v1, v2, p);
+				int64 w1 = orient2D(v2, v0, p);
+				int64 w2 = orient2D(v0, v1, p);
+
+				if (w0 >= 0 && w1 >= 0 && w2 >= 0)
+				{
+					mem[(p.x >> stepshift) + (p.y >> stepshift) * width] = 1;
+				}
+			}
+		}
+	}
+
+
+	void rasterizeTriangle(Texture* texture, Vertex v[3], const Vec3& center) const
+	{
+		float squared_radius_rcp = 1.0f / (brush_radius * brush_radius);
+
+		static const int64 substep = 256;
+		static const int64 submask = substep - 1;
+		static const int64 stepshift = 8;
+
+		Point v0 = {int64(v[0].uv.x * substep), int64(v[0].uv.y * substep)};
+		Point v1 = {int64(v[1].uv.x * substep), int64(v[1].uv.y * substep)};
+		Point v2 = {int64(v[2].uv.x * substep), int64(v[2].uv.y * substep)};
+
+		int64 minX = Math::minimum(v0.x, v1.x, v2.x);
+		int64 minY = Math::minimum(v0.y, v1.y, v2.y);
+		int64 maxX = Math::maximum(v0.x, v1.x, v2.x) + substep;
+		int64 maxY = Math::maximum(v0.y, v1.y, v2.y) + substep;
+
+		minX = ((minX + submask) & ~submask) - 1;
+		minY = ((minY + submask) & ~submask) - 1;
+
+		Point p;
+		for (p.y = minY; p.y <= maxY; p.y += substep)
+		{
+			for (p.x = minX; p.x <= maxX; p.x += substep)
+			{
+				int64 w0 = orient2D(v1, v2, p);
+				int64 w1 = orient2D(v2, v0, p);
+				int64 w2 = orient2D(v0, v1, p);
+
+				if (w0 >= 0 && w1 >= 0 && w2 >= 0)
+				{
+					Vec3 pos =
+						(float(w0) * v[0].pos + float(w1) * v[1].pos + float(w2) * v[2].pos) * (1.0f / (w0 + w1 + w2));
+					float q = 1 - (center - pos).squaredLength() * squared_radius_rcp;
+					if (q <= 0) continue;
+						
+					uint32& val = ((uint32*)&texture->data[0])[(p.x >> stepshift) + (p.y >> stepshift) * texture->width];
+					float alpha = ((val & 0xff000000) >> 24) / 255.0f;
+					alpha = brush_strength * q + alpha * (1 - q);
+					val = val & 0x00ffFFFF | (uint32)(alpha * 255.0f) << 24;
+				}
+			}
+		}
+	}
+
+
+	void paint(Texture* texture, Model* model, const Vec3& hit) const
+	{
+		ASSERT(!texture->data.empty());
+
+		const uint16* idx16 = model->getIndices16();
+		const uint32* idx32 = model->getIndices32();
+		const Vec3* vertices = &model->getVertices()[0];
+		Vec2 min((float)texture->width, (float)texture->height);
+		Vec2 max(0, 0);
+		int tri_count = 0;
+		for (int i = 0, c = model->getIndicesCount(); i < c; i += 3)
+		{
+			uint32 idx[3];
+			if (idx16)
+			{
+				idx[0] = idx16[i];
+				idx[1] = idx16[i + 1];
+				idx[2] = idx16[i + 2];
+			}
+			else
+			{
+				idx[0] = idx32[i];
+				idx[1] = idx32[i + 1];
+				idx[2] = idx32[i + 2];
+			}
+
+			if (Math::getSphereTriangleIntersection(
+				hit, brush_radius, vertices[idx[0]], vertices[idx[1]], vertices[idx[2]]))
+			{
+				Vertex v[] = {{model->getUVs()[idx[0]], vertices[idx[0]]},
+					{model->getUVs()[idx[1]], vertices[idx[1]]},
+					{model->getUVs()[idx[2]], vertices[idx[2]]}};
+
+				Vec3 n = crossProduct(Vec3(v[0].uv, 0) - Vec3(v[1].uv, 0), Vec3(v[2].uv, 0) - Vec3(v[1].uv, 0));
+				if (n.z > 0) Math::swap(v[1], v[2]);
+
+				v[0].fixUV(texture->width, texture->height);
+				v[1].fixUV(texture->width, texture->height);
+				v[2].fixUV(texture->width, texture->height);
+
+				min.x = Math::minimum(min.x, v[0].uv.x, v[1].uv.x, v[2].uv.x);
+				max.x = Math::maximum(max.x, v[0].uv.x, v[1].uv.x, v[2].uv.x);
+
+				min.y = Math::minimum(min.y, v[0].uv.y, v[1].uv.y, v[2].uv.y);
+				max.y = Math::maximum(max.y, v[0].uv.y, v[1].uv.y, v[2].uv.y);
+
+				++tri_count;
+				rasterizeTriangle(texture, v, hit);
+			}
+		}
+
+		if (tri_count > 0) texture->onDataUpdated((int)min.x, (int)min.y, int(max.x - min.x), int(max.y - min.y));
+	}
+
+
+	bool onEntityMouseDown(const WorldEditor::RayHit& hit, int x, int y) override
+	{
+		auto& ents = app.getWorldEditor()->getSelectedEntities();
+		
+		if (enabled && ents.size() == 1 && ents[0] == hit.entity)
+		{
+			onMouseMove(x, y, 0, 0);
+			return true;
+		}
+		return false;
+	}
+
+
+	void onMouseMove(int x, int y, int, int) override
+	{
+		WorldEditor& editor = *app.getWorldEditor();
+		Universe* universe = editor.getUniverse();
+		auto& entities = editor.getSelectedEntities();
+		if (entities.empty()) return;
+		if (!editor.isMouseDown(MouseButton::LEFT)) return;
+
+		ComponentUID model_instance = universe->getComponent(entities[0], MODEL_INSTANCE_TYPE);
+		if (!model_instance.isValid()) return;
+
+		RenderScene* scene = static_cast<RenderScene*>(model_instance.scene);
+		Model* model = scene->getModelInstanceModel(model_instance.handle);
+
+		if (!model || !model->isReady() || model->getMeshCount() < 1) return;
+		if (!model->getMesh(0).material) return;
+
+		Texture* texture = model->getMesh(0).material->getTexture(0);
+		if (!texture || texture->data.empty()) return;
+
+		Vec3 origin, dir;
+		scene->getRay(editor.getEditCamera().handle, (float)x, (float)y, origin, dir);
+		RayCastModelHit hit = model->castRay(origin, dir, universe->getMatrix(entities[0]));
+		if (!hit.m_is_hit) return;
+
+		Vec3 hit_pos = hit.m_origin + hit.m_t * hit.m_dir;
+		hit_pos = universe->getTransform(entities[0]).inverted().transform(hit_pos);
+
+		paint(texture, model, hit_pos);
+	}
+
+
+	float brush_radius;
+	float brush_strength;
+	StudioApp& app;
+	bool enabled;
+};
+
+
+struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
+{
+	explicit FurPainterPlugin(StudioApp& _app)
+		: app(_app)
+		, is_opened(false)
+	{
+		fur_painter = LUMIX_NEW(app.getWorldEditor()->getAllocator(), FurPainter)(_app);
+		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Fur Painter", "fur_painter");
+		m_action->func.bind<FurPainterPlugin, &FurPainterPlugin::onAction>(this);
+		m_action->is_selected.bind<FurPainterPlugin, &FurPainterPlugin::isOpened>(this);
+	}
+
+
+	bool isOpened() const { return is_opened; }
+	void onAction() { is_opened = !is_opened; }
+
+
+	void onWindowGUI() override
+	{
+		if (ImGui::BeginDock("Fur painter", &is_opened))
+		{
+			ImGui::Checkbox("Enabled", &fur_painter->enabled);
+			if (!fur_painter->enabled) goto end;
+
+
+			WorldEditor& editor = *app.getWorldEditor();
+			const auto& entities = editor.getSelectedEntities();
+			if (entities.empty())
+			{
+				ImGui::Text("No entity selected.");
+				goto end;
+			}
+			Universe* universe = editor.getUniverse();
+			RenderScene* scene = static_cast<RenderScene*>(universe->getScene(MODEL_INSTANCE_TYPE));
+			ComponentUID model_instance = universe->getComponent(entities[0], MODEL_INSTANCE_TYPE);
+
+			if (!model_instance.isValid())
+			{
+				ImGui::Text("Entity does not have model_instance component.");
+				goto end;
+			}
+
+			Model* model = scene->getModelInstanceModel(model_instance.handle);
+			if (!model)
+			{
+				ImGui::Text("Entity does not have model.");
+				goto end;
+			}
+
+			if (model->isFailure())
+			{
+				ImGui::Text("Model failed to load.");
+				goto end;
+			}
+			else if (model->isEmpty())
+			{
+				ImGui::Text("Model is not loaded.");
+				goto end;
+			}
+
+			if(model->getMeshCount() < 1 || !model->getMesh(0).material)
+			{
+				ImGui::Text("Model file is invalid.");
+				goto end;
+			}
+
+			Texture* texture = model->getMesh(0).material->getTexture(0);
+			if (!texture)
+			{
+				ImGui::Text("Missing texture.");
+				goto end;
+			}
+
+			if(!endsWith(texture->getPath().c_str(), ".tga"))
+			{
+				ImGui::Text("Only TGA can be painted");
+				goto end;
+			}
+
+			if (texture->data.empty())
+			{
+				texture->addDataReference();
+				texture->getResourceManager().reload(*texture);
+				goto end;
+			}
+
+			ImGui::DragFloat("Brush radius", &fur_painter->brush_radius);
+			ImGui::DragFloat("Brush strength", &fur_painter->brush_strength, 0.01f, 0.0f, 1.0f);
+			if (ImGui::Button("Save texture")) fur_painter->saveTexture();
+			ImGui::SameLine();
+			if (ImGui::Button("Postprocess")) fur_painter->postprocess();
+
+			drawGizmo();
+		}
+		
+		end:
+			ImGui::EndDock();
+	}
+
+
+	void drawGizmo()
+	{
+		if (!fur_painter->enabled) return;
+
+		WorldEditor& editor = *app.getWorldEditor();
+		auto& entities = editor.getSelectedEntities();
+		if (entities.empty()) return;
+
+		ComponentUID model_instance = editor.getUniverse()->getComponent(entities[0], MODEL_INSTANCE_TYPE);
+		if (!model_instance.isValid()) return;
+
+		RenderScene* scene = static_cast<RenderScene*>(model_instance.scene);
+		Model* model = scene->getModelInstanceModel(model_instance.handle);
+
+		if (!model || !model->isReady() || model->getMeshCount() < 1) return;
+		if (!model->getMesh(0).material) return;
+
+		Texture* texture = model->getMesh(0).material->getTexture(0);
+		if (!texture || texture->data.empty()) return;
+
+		Vec3 origin, dir;
+		scene->getRay(editor.getEditCamera().handle, editor.getMouseX(), editor.getMouseY(), origin, dir);
+		RayCastModelHit hit = model->castRay(origin, dir, editor.getUniverse()->getMatrix(entities[0]));
+		if (!hit.m_is_hit) return;
+
+		Vec3 hit_pos = hit.m_origin + hit.m_t * hit.m_dir;
+		scene->addDebugSphere(hit_pos, fur_painter->brush_radius, 0xffffFFFF, 0);
+	}
+
+
+	FurPainter* fur_painter;
+	bool is_opened;
+	StudioApp& app;
+};
+
+
+struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	static GameViewPlugin* s_instance;
 
@@ -1374,7 +1877,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 
 		auto& plugin_manager = editor.getEngine().getPluginManager();
 		auto* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
-		Path path("pipelines/imgui.lua");
+		Path path("pipelines/imgui/imgui.lua");
 		m_gui_pipeline = Pipeline::create(*renderer, path, m_engine->getAllocator());
 		m_gui_pipeline->load();
 
@@ -1390,14 +1893,20 @@ struct GameViewPlugin : public StudioApp::IPlugin
 		int width, height;
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 		auto* material_manager = m_engine->getResourceManager().get(MATERIAL_TYPE);
-		auto* resource = material_manager->load(Path("shaders/imgui.mat"));
+		auto* resource = material_manager->load(Path("pipelines/imgui/imgui.mat"));
 		m_material = static_cast<Material*>(resource);
 
+		Texture* old_texture = m_material->getTexture(0);
 		Texture* texture = LUMIX_NEW(editor.getAllocator(), Texture)(
 			Path("font"), *m_engine->getResourceManager().get(TEXTURE_TYPE), editor.getAllocator());
 
 		texture->create(width, height, pixels);
 		m_material->setTexture(0, texture);
+		if (old_texture)
+		{
+			old_texture->destroy();
+			LUMIX_DELETE(m_engine->getAllocator(), old_texture);
+		}
 
 		ImGui::GetIO().RenderDrawListsFn = imGuiCallback;
 
@@ -1561,7 +2070,7 @@ struct GameViewPlugin : public StudioApp::IPlugin
 GameViewPlugin* GameViewPlugin::s_instance = nullptr;
 
 
-struct ShaderEditorPlugin : public StudioApp::IPlugin
+struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	explicit ShaderEditorPlugin(StudioApp& app)
 		: m_shader_editor(app.getWorldEditor()->getAllocator())
@@ -1577,7 +2086,7 @@ struct ShaderEditorPlugin : public StudioApp::IPlugin
 		lua_State* L = app.getWorldEditor()->getEngine().getState();
 		LuaWrapper::createSystemVariable(L, "Editor", "shader_compiler", m_compiler);
 		auto* f =
-			&LuaWrapper::wrapMethod<ShaderCompiler, decltype(&ShaderCompiler::compileAll), &ShaderCompiler::compileAll>;
+			&LuaWrapper::wrapMethod<ShaderCompiler, decltype(&ShaderCompiler::makeUpToDate), &ShaderCompiler::makeUpToDate>;
 		LuaWrapper::createSystemFunction(L, "Editor", "compileShaders", f);
 	}
 
@@ -1597,7 +2106,7 @@ struct ShaderEditorPlugin : public StudioApp::IPlugin
 };
 
 
-struct WorldEditorPlugin : public WorldEditor::Plugin
+struct WorldEditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 {
 	void showPointLightGizmo(ComponentUID light)
 	{
@@ -1627,11 +2136,11 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 	}
 
 
-	void showRenderableGizmo(ComponentUID renderable)
+	void showModelInstanceGizmo(ComponentUID model_instance)
 	{
-		RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
+		RenderScene* scene = static_cast<RenderScene*>(model_instance.scene);
 		Universe& universe = scene->getUniverse();
-		Model* model = scene->getRenderableModel(renderable.handle);
+		Model* model = scene->getModelInstanceModel(model_instance.handle);
 		Vec3 points[8];
 		if (!model) return;
 
@@ -1644,7 +2153,7 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 		points[4].set(points[7].x, points[0].y, points[0].z);
 		points[5].set(points[7].x, points[0].y, points[7].z);
 		points[6].set(points[7].x, points[7].y, points[0].z);
-		Matrix mtx = universe.getMatrix(renderable.entity);
+		Matrix mtx = universe.getMatrix(model_instance.entity);
 
 		for (int j = 0; j < 8; ++j)
 		{
@@ -1762,9 +2271,9 @@ struct WorldEditorPlugin : public WorldEditor::Plugin
 			showGlobalLightGizmo(cmp);
 			return true;
 		}
-		if (cmp.type == RENDERABLE_TYPE)
+		if (cmp.type == MODEL_INSTANCE_TYPE)
 		{
-			showRenderableGizmo(cmp);
+			showModelInstanceGizmo(cmp);
 			return true;
 		}
 		return false;
@@ -1786,6 +2295,7 @@ LUMIX_STUDIO_ENTRY(renderer)
 	app.registerComponent("particle_emitter_plane", "Render/Particle emitter/Plane");
 	app.registerComponent("particle_emitter_force", "Render/Particle emitter/Force");
 	app.registerComponent("particle_emitter_attractor", "Render/Particle emitter/Attractor");
+	app.registerComponent("particle_emitter_subimage", "Render/Particle emitter/Subimage");
 	app.registerComponent("particle_emitter_linear_movement", "Render/Particle emitter/Linear movement");
 	app.registerComponent("particle_emitter_random_rotation", "Render/Particle emitter/Random rotation");
 	app.registerComponent("particle_emitter_size", "Render/Particle emitter/Size");
@@ -1811,6 +2321,7 @@ LUMIX_STUDIO_ENTRY(renderer)
 	app.addPlugin(*LUMIX_NEW(allocator, SceneViewPlugin)(app));
 	app.addPlugin(*LUMIX_NEW(allocator, ImportAssetDialog)(app));
 	app.addPlugin(*LUMIX_NEW(allocator, GameViewPlugin)(app));
+	app.addPlugin(*LUMIX_NEW(allocator, FurPainterPlugin)(app));
 	app.addPlugin(*LUMIX_NEW(allocator, ShaderEditorPlugin)(app));
 
 	app.getWorldEditor()->addPlugin(*LUMIX_NEW(allocator, WorldEditorPlugin)());

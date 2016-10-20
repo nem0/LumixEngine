@@ -11,6 +11,7 @@
 #include "engine/lifo_allocator.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
+#include "engine/lua_wrapper.h"
 #include "engine/math_utils.h"
 #include "engine/mtjd/manager.h"
 #include "engine/path.h"
@@ -23,10 +24,276 @@
 #include "engine/timer.h"
 #include "engine/universe/hierarchy.h"
 #include "engine/universe/universe.h"
+#include <imgui/imgui.h>
 
 
 namespace Lumix
 {
+
+namespace LuaImGui
+{
+
+int DragFloat(lua_State* L)
+{
+	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
+	float value = LuaWrapper::checkArg<float>(L, 2);
+	bool changed = ImGui::DragFloat(name, &value);
+	lua_pushboolean(L, changed);
+	lua_pushnumber(L, value);
+	return 2;
+}
+
+
+int SetStyleColor(lua_State* L)
+{
+	auto& style = ImGui::GetStyle();
+	int index = LuaWrapper::checkArg<int>(L, 1);
+	ImVec4 color;
+	color.x = LuaWrapper::checkArg<float>(L, 2);
+	color.y = LuaWrapper::checkArg<float>(L, 3);
+	color.z = LuaWrapper::checkArg<float>(L, 4);
+	color.w = LuaWrapper::checkArg<float>(L, 5);
+	style.Colors[index] = color;
+	return 0;
+}
+
+
+int SliderFloat(lua_State* L)
+{
+	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
+	float value = LuaWrapper::checkArg<float>(L, 2);
+	float min = LuaWrapper::checkArg<float>(L, 3);
+	float max = LuaWrapper::checkArg<float>(L, 4);
+	bool changed = ImGui::SliderFloat(name, &value, min, max, "");
+	lua_pushboolean(L, changed);
+	lua_pushnumber(L, value);
+	return 2;
+}
+
+
+int Text(lua_State* L)
+{
+	auto* text = LuaWrapper::checkArg<const char*>(L, 1);
+	ImGui::Text("%s", text);
+	return 0;
+}
+
+
+int Button(lua_State* L)
+{
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	ImVec2 size(0, 0);
+	if (lua_gettop(L) > 2)
+	{
+		size.x = LuaWrapper::checkArg<float>(L, 2);
+		size.y = LuaWrapper::checkArg<float>(L, 3);
+	}
+	bool clicked = ImGui::Button(label, size);
+	lua_pushboolean(L, clicked);
+	return 1;
+}
+
+
+int Checkbox(lua_State* L)
+{
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	bool b = LuaWrapper::checkArg<bool>(L, 2);
+	bool clicked = ImGui::Checkbox(label, &b);
+	lua_pushboolean(L, clicked);
+	lua_pushboolean(L, b);
+	return 2;
+}
+
+
+int GetWindowPos(lua_State* L)
+{
+	ImVec2 pos = ImGui::GetWindowPos();
+	LuaWrapper::push(L, Vec2(pos.x, pos.y));
+	return 1;
+}
+
+
+int SetNextWindowPos(lua_State* L)
+{
+	ImVec2 pos;
+	pos.x = LuaWrapper::checkArg<float>(L, 1);
+	pos.y = LuaWrapper::checkArg<float>(L, 2);
+	ImGui::SetNextWindowPos(pos);
+	return 0;
+}
+
+
+int AlignFirstTextHeightToWidgets(lua_State* L)
+{
+	ImGui::AlignFirstTextHeightToWidgets();
+	return 0;
+}
+
+
+int Selectable(lua_State* L)
+{
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	bool selected = false;
+	if (lua_gettop(L) > 1)
+	{
+		selected = LuaWrapper::checkArg<bool>(L, 2);
+	}
+	bool clicked = ImGui::Selectable(label, selected);
+	lua_pushboolean(L, clicked);
+	return 1;
+}
+
+
+int SetCursorScreenPos(lua_State* L)
+{
+	ImVec2 pos;
+	pos.x = LuaWrapper::checkArg<float>(L, 1);
+	pos.y = LuaWrapper::checkArg<float>(L, 2);
+	ImGui::SetCursorScreenPos(pos);
+	return 0;
+}
+
+
+int Separator(lua_State* L)
+{
+	ImGui::Separator();
+	return 0;
+}
+
+
+int Image(lua_State* L)
+{
+	auto* texture_id = LuaWrapper::checkArg<void*>(L, 1);
+	float size_x = LuaWrapper::checkArg<float>(L, 2);
+	float size_y = LuaWrapper::checkArg<float>(L, 3);
+	ImGui::Image(texture_id, ImVec2(size_x, size_y));
+	return 0;
+}
+
+
+bool IsItemHovered()
+{
+	return ImGui::IsItemHovered();
+}
+
+
+bool IsMouseDown(int button)
+{
+	return ImGui::IsMouseDown(button);
+}
+
+
+bool IsMouseClicked(int button)
+{
+	return ImGui::IsMouseClicked(button);
+}
+
+
+int SetNextWindowPosCenter(lua_State* L)
+{
+	ImGui::SetNextWindowPosCenter();
+	return 0;
+}
+
+
+int SetNextWindowSize(lua_State* L)
+{
+	ImVec2 size;
+	size.x = LuaWrapper::checkArg<float>(L, 1);
+	size.y = LuaWrapper::checkArg<float>(L, 2);
+	ImGui::SetNextWindowSize(size);
+	return 0;
+}
+
+
+int Begin(lua_State* L)
+{
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	ImGuiWindowFlags flags = 0;
+	if (lua_gettop(L) > 1)
+	{
+		flags = LuaWrapper::checkArg<int>(L, 2);
+	}
+	bool res = ImGui::Begin(label, nullptr, flags);
+	lua_pushboolean(L, res);
+	return 1;
+}
+
+
+int BeginChildFrame(lua_State* L)
+{
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	ImVec2 size(0, 0);
+	if (lua_gettop(L) > 1)
+	{
+		size.x = LuaWrapper::checkArg<float>(L, 2);
+		size.y = LuaWrapper::checkArg<float>(L, 3);
+	}
+	bool res = ImGui::BeginChildFrame(ImGui::GetID(label), size);
+	lua_pushboolean(L, res);
+	return 1;
+}
+
+
+int BeginDock(lua_State* L)
+{
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	bool res = ImGui::BeginDock(label);
+	lua_pushboolean(L, res);
+	return 1;
+}
+
+
+int GetDisplayWidth(lua_State* L)
+{
+	float w = ImGui::GetIO().DisplaySize.x;
+	LuaWrapper::push(L, w);
+	return 1;
+}
+
+
+int GetDisplayHeight(lua_State* L)
+{
+	float w = ImGui::GetIO().DisplaySize.y;
+	LuaWrapper::push(L, w);
+	return 1;
+}
+
+
+int GetWindowWidth(lua_State* L)
+{
+	float w = ImGui::GetWindowWidth();
+	LuaWrapper::push(L, w);
+	return 1;
+}
+
+
+int GetWindowHeight(lua_State* L)
+{
+	float w = ImGui::GetWindowHeight();
+	LuaWrapper::push(L, w);
+	return 1;
+}
+
+
+int SameLine(lua_State* L)
+{
+	float pos_x = 0;
+	if (lua_gettop(L) > 0)
+	{
+		pos_x = LuaWrapper::checkArg<float>(L, 1);
+	}
+	ImGui::SameLine(pos_x);
+	return 0;
+}
+
+
+void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
+{
+	lua_pushcfunction(L, f);
+	lua_setfield(L, -2, name);
+}
+}
 
 static const uint32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
 static const ResourceType PREFAB_TYPE("prefab");
@@ -78,7 +345,7 @@ static void logErrorToFile(const char*, const char* message)
 }
 
 
-class EngineImpl : public Engine
+class EngineImpl LUMIX_FINAL : public Engine
 {
 public:
 	EngineImpl(const char* base_path0, const char* base_path1, FS::FileSystem* fs, IAllocator& allocator)
@@ -183,19 +450,19 @@ public:
 	}
 
 
-	static ComponentHandle LUA_createComponent(IScene* scene, const char* type, int entity_idx)
+	static ComponentHandle LUA_createComponent(Universe* universe, Entity entity, const char* type)
 	{
+		if (!universe) return INVALID_COMPONENT;
+		ComponentType cmp_type = PropertyRegister::getComponentType(type);
+		IScene* scene = universe->getScene(cmp_type);
 		if (!scene) return INVALID_COMPONENT;
-		Entity e = {entity_idx};
-		ComponentType handle = PropertyRegister::getComponentType(type);
-		if (scene->getComponent(e, handle) != INVALID_COMPONENT)
+		if (scene->getComponent(entity, cmp_type) != INVALID_COMPONENT)
 		{
-			g_log_error.log("Lua Script") << "Component " << type << " already exists in entity "
-				<< entity_idx;
+			g_log_error.log("Lua Script") << "Component " << type << " already exists in entity " << entity.index;
 			return INVALID_COMPONENT;
 		}
 
-		return scene->createComponent(handle, e);
+		return scene->createComponent(cmp_type, entity);
 	}
 
 
@@ -227,6 +494,14 @@ public:
 			{
 				float f = (float)lua_tonumber(L, -1);
 				InputBlob input_blob(&f, sizeof(f));
+				desc.set(cmp, -1, input_blob);
+			}
+			break;
+		case IPropertyDescriptor::ENTITY:
+			if (lua_isinteger(L, -1))
+			{
+				int i = (int)lua_tointeger(L, -1);
+				InputBlob input_blob(&i, sizeof(i));
 				desc.set(cmp, -1, input_blob);
 			}
 			break;
@@ -341,7 +616,7 @@ public:
 		}
 		lua_pop(L, 1);
 
-		LuaWrapper::pushLua(L, e);
+		LuaWrapper::push(L, e);
 		return 1;
 	}
 
@@ -362,6 +637,30 @@ public:
 		univ->setRotation({entity_index}, Quat(axis, angle));
 	}
 
+	static void LUA_unloadResource(EngineImpl* engine, int resource_idx)
+	{
+		engine->unloadLuaResource(resource_idx);
+	}
+
+
+	static Universe* LUA_createUniverse(EngineImpl* engine)
+	{
+		return &engine->createUniverse(false);
+	}
+
+
+	static void LUA_destroyUniverse(EngineImpl* engine, Universe* universe)
+	{
+		engine->destroyUniverse(*universe);
+	}
+
+
+	static IScene* LUA_getScene(Universe* universe, const char* name)
+	{
+		uint32 hash = crc32(name);
+		return universe->getScene(hash);
+	}
+
 
 	static int LUA_loadResource(EngineImpl* engine, const char* path, const char* type)
 	{
@@ -374,14 +673,27 @@ public:
 	}
 
 
-	static void LUA_setEntityLocalRotation(IScene* hierarchy,
+	static void LUA_setEntityLocalRotation(IScene* scene,
 		Entity entity,
-		Vec3 axis,
-		float angle)
+		const Quat& rotation)
 	{
 		if (!isValid(entity)) return;
 
-		static_cast<Hierarchy*>(hierarchy)->setLocalRotation(entity, Quat(axis, angle));
+		auto* hierarchy = static_cast<Hierarchy*>(scene);
+		ComponentHandle cmp = hierarchy->getComponent(entity, HIERARCHY_TYPE);
+		if (isValid(cmp)) hierarchy->setLocalRotation(cmp, rotation);
+	}
+
+
+	static void LUA_setEntityLocalPosition(IScene* scene,
+		Entity entity,
+		const Vec3& position)
+	{
+		if (!isValid(entity)) return;
+
+		auto* hierarchy = static_cast<Hierarchy*>(scene);
+		ComponentHandle cmp = hierarchy->getComponent(entity, HIERARCHY_TYPE);
+		if (isValid(cmp)) hierarchy->setLocalPosition(cmp, position);
 	}
 
 
@@ -411,9 +723,27 @@ public:
 	}
 
 
+	static Entity LUA_getFirstEntity(Universe* universe)
+	{
+		return universe->getFirstEntity();
+	}
+
+
+	static Entity LUA_getNextEntity(Universe* universe, Entity entity)
+	{
+		return universe->getNextEntity(entity);
+	}
+
+
 	static Vec4 LUA_multMatrixVec(const Matrix& m, const Vec4& v)
 	{
 		return m * v;
+	}
+
+
+	static Quat LUA_multQuat(const Quat& a, const Quat& b)
+	{
+		return a * b;
 	}
 
 
@@ -435,7 +765,7 @@ public:
 		
 		Vec3 res = q.rotate(v);
 
-		LuaWrapper::pushLua(L, res);
+		LuaWrapper::push(L, res);
 		return 1;
 	}
 
@@ -484,7 +814,11 @@ public:
 			LuaWrapper::createSystemFunction(m_state, "Engine", #name, \
 				&LuaWrapper::wrap<decltype(&LUA_##name), LUA_##name>); \
 
+		REGISTER_FUNCTION(createUniverse);
+		REGISTER_FUNCTION(destroyUniverse);
+		REGISTER_FUNCTION(getScene);
 		REGISTER_FUNCTION(loadResource);
+		REGISTER_FUNCTION(unloadResource);
 		REGISTER_FUNCTION(createComponent);
 		REGISTER_FUNCTION(createEntity);
 		REGISTER_FUNCTION(setEntityPosition);
@@ -493,6 +827,7 @@ public:
 		REGISTER_FUNCTION(setEntityRotation);
 		REGISTER_FUNCTION(getEntityRotation);
 		REGISTER_FUNCTION(setEntityLocalRotation);
+		REGISTER_FUNCTION(setEntityLocalPosition);
 		REGISTER_FUNCTION(getInputActionValue);
 		REGISTER_FUNCTION(addInputAction);
 		REGISTER_FUNCTION(logError);
@@ -501,11 +836,12 @@ public:
 		REGISTER_FUNCTION(hasFilesystemWork);
 		REGISTER_FUNCTION(processFilesystemWork);
 		REGISTER_FUNCTION(destroyEntity);
-		REGISTER_FUNCTION(preloadPrefab);
-		REGISTER_FUNCTION(unloadPrefab);
 		REGISTER_FUNCTION(getComponent);
 		REGISTER_FUNCTION(getComponentType);
 		REGISTER_FUNCTION(multMatrixVec);
+		REGISTER_FUNCTION(multQuat);
+		REGISTER_FUNCTION(getFirstEntity);
+		REGISTER_FUNCTION(getNextEntity);
 
 		#undef REGISTER_FUNCTION
 
@@ -522,6 +858,58 @@ public:
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_RTHUMB_Y", InputSystem::RTHUMB_Y);
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_RTRIGGER", InputSystem::RTRIGGER);
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_LTRIGGER", InputSystem::LTRIGGER);
+
+		lua_newtable(m_state);
+		lua_pushvalue(m_state, -1);
+		lua_setglobal(m_state, "ImGui");
+
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "WindowFlags_NoMove", ImGuiWindowFlags_NoMove);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "WindowFlags_NoCollapse", ImGuiWindowFlags_NoCollapse);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "WindowFlags_NoResize", ImGuiWindowFlags_NoResize);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "WindowFlags_NoTitleBar", ImGuiWindowFlags_NoTitleBar);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "WindowFlags_NoScrollbar", ImGuiWindowFlags_NoScrollbar);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "WindowFlags_AlwaysAutoResize", ImGuiWindowFlags_AlwaysAutoResize);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "Col_FrameBg", ImGuiCol_FrameBg);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "Col_WindowBg", ImGuiCol_WindowBg);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "Col_Button", ImGuiCol_Button);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "Col_ButtonActive", ImGuiCol_ButtonActive);
+		LuaWrapper::createSystemVariable(m_state, "ImGui", "Col_ButtonHovered", ImGuiCol_ButtonHovered);
+		LuaImGui::registerCFunction(m_state, "AlignFirstTextHeightToWidgets", &LuaImGui::AlignFirstTextHeightToWidgets);
+		LuaImGui::registerCFunction(m_state, "Begin", &LuaImGui::Begin);
+		LuaImGui::registerCFunction(m_state, "BeginChildFrame", &LuaImGui::BeginChildFrame);
+		LuaImGui::registerCFunction(m_state, "BeginDock", LuaImGui::BeginDock);
+		LuaImGui::registerCFunction(m_state, "BeginPopup", &LuaWrapper::wrap<decltype(&ImGui::BeginPopup), &ImGui::BeginPopup>);
+		LuaImGui::registerCFunction(m_state, "Button", &LuaImGui::Button);
+		LuaImGui::registerCFunction(m_state, "Checkbox", &LuaImGui::Checkbox);
+		LuaImGui::registerCFunction(m_state, "DragFloat", &LuaImGui::DragFloat);
+		LuaImGui::registerCFunction(m_state, "End", &LuaWrapper::wrap<decltype(&ImGui::End), &ImGui::End>);
+		LuaImGui::registerCFunction(m_state, "EndChildFrame", &LuaWrapper::wrap<decltype(&ImGui::EndChildFrame), &ImGui::EndChildFrame>);
+		LuaImGui::registerCFunction(m_state, "EndDock", &LuaWrapper::wrap<decltype(&ImGui::EndDock), &ImGui::EndDock>);
+		LuaImGui::registerCFunction(m_state, "EndPopup", &LuaWrapper::wrap<decltype(&ImGui::EndPopup), &ImGui::EndPopup>);
+		LuaImGui::registerCFunction(m_state, "GetDisplayWidth", &LuaImGui::GetDisplayWidth);
+		LuaImGui::registerCFunction(m_state, "GetDisplayHeight", &LuaImGui::GetDisplayHeight);
+		LuaImGui::registerCFunction(m_state, "GetWindowWidth", &LuaImGui::GetWindowWidth);
+		LuaImGui::registerCFunction(m_state, "GetWindowHeight", &LuaImGui::GetWindowHeight);
+		LuaImGui::registerCFunction(m_state, "GetWindowPos", &LuaImGui::GetWindowPos);
+		LuaImGui::registerCFunction(m_state, "Image", &LuaWrapper::wrap<decltype(&LuaImGui::Image), &LuaImGui::Image>);
+		LuaImGui::registerCFunction(m_state, "IsItemHovered", &LuaWrapper::wrap<decltype(&LuaImGui::IsItemHovered), &LuaImGui::IsItemHovered>);
+		LuaImGui::registerCFunction(m_state, "IsMouseClicked", &LuaWrapper::wrap<decltype(&LuaImGui::IsMouseClicked), &LuaImGui::IsMouseClicked>);
+		LuaImGui::registerCFunction(m_state, "IsMouseDown", &LuaWrapper::wrap<decltype(&LuaImGui::IsMouseDown), &LuaImGui::IsMouseDown>);
+		LuaImGui::registerCFunction(m_state, "OpenPopup", &LuaWrapper::wrap<decltype(&ImGui::OpenPopup), &ImGui::OpenPopup>);
+		LuaImGui::registerCFunction(m_state, "PushItemWidth", &LuaWrapper::wrap<decltype(&ImGui::PushItemWidth), &ImGui::PushItemWidth>);
+		LuaImGui::registerCFunction(m_state, "PopItemWidth", &LuaWrapper::wrap<decltype(&ImGui::PopItemWidth), &ImGui::PopItemWidth>);
+		LuaImGui::registerCFunction(m_state, "SameLine", &LuaImGui::SameLine);
+		LuaImGui::registerCFunction(m_state, "Selectable", &LuaImGui::Selectable);
+		LuaImGui::registerCFunction(m_state, "Separator", &LuaImGui::Separator);
+		LuaImGui::registerCFunction(m_state, "SetCursorScreenPos", &LuaImGui::SetCursorScreenPos);
+		LuaImGui::registerCFunction(m_state, "SetNextWindowPos", &LuaImGui::SetNextWindowPos);
+		LuaImGui::registerCFunction(m_state, "SetNextWindowPosCenter", &LuaImGui::SetNextWindowPosCenter);
+		LuaImGui::registerCFunction(m_state, "SetNextWindowSize", &LuaImGui::SetNextWindowSize);
+		LuaImGui::registerCFunction(m_state, "SetStyleColor", &LuaImGui::SetStyleColor);
+		LuaImGui::registerCFunction(m_state, "SliderFloat", &LuaImGui::SliderFloat);
+		LuaImGui::registerCFunction(m_state, "Text", &LuaImGui::Text);
+
+		lua_pop(m_state, 1);
 
 		installLuaPackageLoader();
 	}
@@ -605,6 +993,10 @@ public:
 		PropertyRegister::add("hierarchy",
 			LUMIX_NEW(m_allocator, SimplePropertyDescriptor<Vec3, Hierarchy>)(
 				"Relative position", &Hierarchy::getLocalPosition, &Hierarchy::setLocalPosition));
+		auto relative_rot = LUMIX_NEW(m_allocator, SimplePropertyDescriptor<Vec3, Hierarchy>)(
+			"Relative rotation", &Hierarchy::getLocalRotationEuler, &Hierarchy::setLocalRotationEuler);
+		relative_rot->setIsInRadians(true);
+		PropertyRegister::add("hierarchy", relative_rot);
 	}
 
 
@@ -628,6 +1020,7 @@ public:
 			LUMIX_DELETE(m_allocator, m_patch_file_device);
 		}
 
+		m_prefab_resource_manager.destroy();
 		m_resource_manager.destroy();
 		MTJD::Manager::destroy(*m_mtjd_manager);
 		lua_close(m_state);
@@ -681,7 +1074,7 @@ public:
 	IAllocator& getAllocator() override { return m_allocator; }
 
 
-	Universe& createUniverse() override
+	Universe& createUniverse(bool set_lua_globals) override
 	{
 		Universe* universe = LUMIX_NEW(m_allocator, Universe)(m_allocator);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
@@ -694,15 +1087,20 @@ public:
 			}
 		}
 
-		for (auto* scene : universe->getScenes())
+		if (set_lua_globals)
 		{
-			const char* name = scene->getPlugin().getName();
-			char tmp[128];
+			for (auto* scene : universe->getScenes())
+			{
+				const char* name = scene->getPlugin().getName();
+				char tmp[128];
 
-			copyString(tmp, "g_scene_");
-			catString(tmp, name);
-			lua_pushlightuserdata(m_state, scene);
-			lua_setglobal(m_state, tmp);
+				copyString(tmp, "g_scene_");
+				catString(tmp, name);
+				lua_pushlightuserdata(m_state, scene);
+				lua_setglobal(m_state, tmp);
+			}
+			lua_pushlightuserdata(m_state, universe);
+			lua_setglobal(m_state, "g_universe");
 		}
 
 		return *universe;
@@ -745,6 +1143,10 @@ public:
 		{
 			scene->startGame();
 		}
+		for (auto* plugin : m_plugin_manager->getPlugins())
+		{
+			plugin->startGame();
+		}
 	}
 
 
@@ -755,6 +1157,10 @@ public:
 		for (auto* scene : context.getScenes())
 		{
 			scene->stopGame();
+		}
+		for (auto* plugin : m_plugin_manager->getPlugins())
+		{
+			plugin->stopGame();
 		}
 	}
 
@@ -963,18 +1369,6 @@ public:
 	}
 
 
-	static void LUA_unloadPrefab(EngineImpl* engine, PrefabResource* prefab)
-	{
-		engine->m_prefab_resource_manager.unload(*prefab);
-	}
-
-
-	static PrefabResource* LUA_preloadPrefab(EngineImpl* engine, const char* path)
-	{
-		return static_cast<PrefabResource*>(engine->m_prefab_resource_manager.load(Path(path)));
-	}
-
-
 	ComponentUID createComponent(Universe& universe, Entity entity, ComponentType type)
 	{
 		ComponentUID cmp;
@@ -1020,10 +1414,17 @@ public:
 				blob.read(hash);
 				ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
 				ComponentUID cmp = createComponent(universe, new_entity, type);
-				Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(type);
-				for (int j = 0; j < props.size(); ++j)
+				int32 prop_count;
+				blob.read(prop_count);
+				for (int j = 0; j < prop_count; ++j)
 				{
-					props[j]->set(cmp, -1, blob);
+					uint32 prop_name_hash;
+					blob.read(prop_name_hash);
+					auto* desc = PropertyRegister::getDescriptor(type, prop_name_hash);
+					int32 size;
+					blob.read(size);
+					if(desc) desc->set(cmp, -1, blob);
+					else blob.skip(size);
 				}
 			}
 		}
@@ -1035,7 +1436,8 @@ public:
 		auto* engine = LuaWrapper::checkArg<EngineImpl*>(L, 1);
 		auto* universe = LuaWrapper::checkArg<Universe*>(L, 2);
 		Vec3 position = LuaWrapper::checkArg<Vec3>(L, 3);
-		auto* prefab = LuaWrapper::checkArg<PrefabResource*>(L, 4);
+		int prefab_id = LuaWrapper::checkArg<int>(L, 4);
+		PrefabResource* prefab = static_cast<PrefabResource*>(engine->getLuaResource(prefab_id));
 		ASSERT(prefab->isReady());
 		if (!prefab->isReady())
 		{
@@ -1049,7 +1451,7 @@ public:
 		lua_createtable(L, entities.size(), 0);
 		for (int i = 0; i < entities.size(); ++i)
 		{
-			LuaWrapper::pushLua(L, entities[i]);
+			LuaWrapper::push(L, entities[i]);
 			lua_rawseti(L, -2, i + 1);
 		}
 		return 1;

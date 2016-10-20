@@ -26,6 +26,8 @@ enum class ParticleEmitterVersion : int
 	SPAWN_COUNT,
 	SIZE_ALPHA_SAVE,
 	COMPONENT_TYPE,
+	AUTOEMIT,
+	LOCAL_SPACE,
 
 	LATEST,
 	INVALID = -1
@@ -50,7 +52,8 @@ static ParticleEmitter::ModuleBase* createModule(ComponentType type, ParticleEmi
 		{ ParticleEmitter::RandomRotationModule::s_type, create<ParticleEmitter::RandomRotationModule> },
 		{ ParticleEmitter::SizeModule::s_type, create<ParticleEmitter::SizeModule> },
 		{ ParticleEmitter::AttractorModule::s_type, create<ParticleEmitter::AttractorModule> },
-		{ ParticleEmitter::SpawnShapeModule::s_type, create<ParticleEmitter::SpawnShapeModule> }
+		{ ParticleEmitter::SpawnShapeModule::s_type, create<ParticleEmitter::SpawnShapeModule> },
+		{ ParticleEmitter::SubimageModule::s_type, create<ParticleEmitter::SubimageModule> }
 	};
 
 	for(auto& i : creators)
@@ -69,6 +72,31 @@ ParticleEmitter::ModuleBase::ModuleBase(ParticleEmitter& emitter)
 	: m_emitter(emitter)
 {
 }
+
+
+ParticleEmitter::SubimageModule::SubimageModule(ParticleEmitter& emitter)
+	: ModuleBase(emitter)
+	, rows(1)
+	, cols(1)
+{
+}
+
+
+void ParticleEmitter::SubimageModule::serialize(OutputBlob& blob)
+{
+	blob.write(rows);
+	blob.write(cols);
+}
+
+
+void ParticleEmitter::SubimageModule::deserialize(InputBlob& blob, int)
+{
+	blob.read(rows);
+	blob.read(cols);
+}
+
+
+const ComponentType ParticleEmitter::SubimageModule::s_type = PropertyRegister::getComponentType("particle_emitter_subimage");
 
 
 ParticleEmitter::ForceModule::ForceModule(ParticleEmitter& emitter)
@@ -330,9 +358,12 @@ ParticleEmitter::LinearMovementModule::LinearMovementModule(ParticleEmitter& emi
 
 void ParticleEmitter::LinearMovementModule::spawnParticle(int index)
 {
-	m_emitter.m_velocity[index].x = m_x.getRandom();
-	m_emitter.m_velocity[index].y = m_y.getRandom();
-	m_emitter.m_velocity[index].z = m_z.getRandom();
+	Vec3& velocity = m_emitter.m_velocity[index];
+	velocity.x = m_x.getRandom();
+	velocity.y = m_y.getRandom();
+	velocity.z = m_z.getRandom();
+	Quat rot = m_emitter.m_universe.getRotation(m_emitter.m_entity);
+	velocity = rot.rotate(velocity);
 }
 
 
@@ -592,6 +623,9 @@ ParticleEmitter::ParticleEmitter(Entity entity, Universe& universe, IAllocator& 
 	, m_universe(universe)
 	, m_entity(entity)
 	, m_size(allocator)
+	, m_subimage_module(nullptr)
+	, m_autoemit(true)
+	, m_local_space(false)
 {
 	init();
 }
@@ -647,7 +681,14 @@ void ParticleEmitter::setMaterial(Material* material)
 
 void ParticleEmitter::spawnParticle()
 {
-	m_position.push(m_universe.getPosition(m_entity));
+	if (m_local_space)
+	{
+		m_position.emplace(0.0f, 0.0f, 0.0f);
+	}
+	else
+	{
+		m_position.push(m_universe.getPosition(m_entity));
+	}
 	m_rotation.push(0);
 	m_rotational_speed.push(0);
 	m_life.push(m_initial_life.getRandom());
@@ -674,6 +715,7 @@ ParticleEmitter::ModuleBase* ParticleEmitter::getModule(ComponentType type)
 
 void ParticleEmitter::addModule(ModuleBase* module)
 {
+	if (module->getType() == SubimageModule::s_type) m_subimage_module = static_cast<SubimageModule*>(module);
 	m_modules.push(module);
 }
 
@@ -721,6 +763,8 @@ void ParticleEmitter::serialize(OutputBlob& blob)
 	blob.write(m_initial_life);
 	blob.write(m_initial_size);
 	blob.write(m_entity);
+	blob.write(m_autoemit);
+	blob.write(m_local_space);
 	blob.writeString(m_material ? m_material->getPath().c_str() : "");
 	blob.write(m_modules.size());
 	for (auto* module : m_modules)
@@ -743,6 +787,14 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager, boo
 	blob.read(m_initial_life);
 	blob.read(m_initial_size);
 	blob.read(m_entity);
+	if (version > (int)ParticleEmitterVersion::AUTOEMIT)
+	{
+		blob.read(m_autoemit);
+	}
+	if (version > (int)ParticleEmitterVersion::LOCAL_SPACE)
+	{
+		blob.read(m_local_space);
+	}
 	char path[MAX_PATH_LENGTH];
 	blob.readString(path, lengthOf(path));
 	auto material_manager = manager.get(MATERIAL_TYPE);
@@ -777,7 +829,8 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager, boo
 				"linear_movement",
 				"alpha",
 				"size",
-				"random_rotation"};
+				"random_rotation",
+				"subimage"};
 
 			for (const char* old_name : OLD_MODULE_NAMES)
 			{
@@ -834,47 +887,27 @@ void ParticleEmitter::update(float time_delta)
 }
 
 
+void ParticleEmitter::emit()
+{
+	int spawn_count = m_spawn_count.getRandom();
+	for (int i = 0; i < spawn_count; ++i)
+	{
+		spawnParticle();
+	}
+}
+
+
 void ParticleEmitter::spawnParticles(float time_delta)
 {
+	if (!m_autoemit) return;
 	m_next_spawn_time -= time_delta;
 
 	while (m_next_spawn_time < 0)
 	{
 		m_next_spawn_time += m_spawn_period.getRandom();
-
-		int spawn_count = m_spawn_count.getRandom();
-		for (int i = 0; i < spawn_count; ++i)
-		{
-			spawnParticle();
-		}
+		emit();
 	}
 }
-
-
-struct InitialVelocityModule : public ParticleEmitter::ModuleBase
-{
-	Interval m_x;
-	Interval m_y;
-	Interval m_z;
-
-	explicit InitialVelocityModule(ParticleEmitter& emitter)
-		: ModuleBase(emitter)
-	{
-		m_z.from = -1;
-		m_z.to = 1;
-		m_x.from = m_x.to = m_y.from = m_y.to = 0;
-	}
-
-
-	void spawnParticle(int index) override
-	{
-		Vec3 v;
-		v.x = m_x.getRandom();
-		v.y = m_y.getRandom();
-		v.z = m_z.getRandom();
-		m_emitter.m_velocity[index] = v;
-	}
-};
 
 
 } // namespace Lumix

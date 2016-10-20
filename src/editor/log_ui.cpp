@@ -7,7 +7,7 @@
 LogUI::LogUI(Lumix::IAllocator& allocator)
 	: m_allocator(allocator)
 	, m_messages(allocator)
-	, m_current_tab(0)
+	, m_current_tab(Error)
 	, m_notifications(allocator)
 	, m_last_uid(1)
 	, m_guard(false)
@@ -204,20 +204,23 @@ void LogUI::onGUI()
 				}
 			}
 
-			char* mem = (char*)m_allocator.allocate(len);
-			mem[0] = '\0';
-			for (int i = 0; i < messages->size(); ++i)
+			if (len > 0)
 			{
-				const char* msg = (*messages)[i].c_str();
-				if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
+				char* mem = (char*)m_allocator.allocate(len);
+				mem[0] = '\0';
+				for (int i = 0; i < messages->size(); ++i)
 				{
-					Lumix::catString(mem, len, msg);
-					Lumix::catString(mem, len, "\n");
+					const char* msg = (*messages)[i].c_str();
+					if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
+					{
+						Lumix::catString(mem, len, msg);
+						Lumix::catString(mem, len, "\n");
+					}
 				}
-			}
 
-			PlatformInterface::copyToClipboard(mem);
-			m_allocator.deallocate(mem);
+				PlatformInterface::copyToClipboard(mem);
+				m_allocator.deallocate(mem);
+			}
 		}
 
 		if (ImGui::BeginChild("log_messages"))
@@ -227,7 +230,7 @@ void LogUI::onGUI()
 				const char* msg = (*messages)[i].c_str();
 				if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
 				{
-					ImGui::Text("%s", msg);
+					ImGui::TextUnformatted(msg);
 				}
 			}
 		}

@@ -100,8 +100,8 @@ private:
 	uint16 m_ref_count;
 	uint16 m_failed_dep_count;
 	State m_current_state;
-	bool m_is_waiting_for_load;
+	uint32 m_async_op;
 }; // class Resource
 
 
-} // ~namespace Lumix
+} // namespace Lumix

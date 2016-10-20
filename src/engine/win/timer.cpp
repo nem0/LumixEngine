@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 
-struct TimerImpl : public Timer
+struct TimerImpl LUMIX_FINAL : public Timer
 {
 	explicit TimerImpl(IAllocator& allocator)
 		: m_allocator(allocator)

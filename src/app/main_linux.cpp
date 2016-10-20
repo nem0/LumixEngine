@@ -169,7 +169,7 @@ struct App
 			m_engine->getFileSystem().updateAsyncTransactions();
 		}
 
-		m_universe = &m_engine->createUniverse();
+		m_universe = &m_engine->createUniverse(true);
 		m_pipeline->setScene((Lumix::RenderScene*)m_universe->getScene(Lumix::crc32("renderer")));
 		m_pipeline->setViewport(0, 0, 600, 400);
 		renderer->resize(600, 400);

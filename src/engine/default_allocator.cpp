@@ -1,5 +1,8 @@
 #include "engine/default_allocator.h"
 #include <cstdlib>
+#ifndef _WIN32
+	#include <malloc.h>
+#endif
 
 
 namespace Lumix
@@ -64,7 +67,7 @@ namespace Lumix
 		if (newptr == nullptr) {
 			return nullptr;
 		}
-		memcpy(newptr, ptr, size);
+		memcpy(newptr, ptr, malloc_usable_size(ptr));
 		free(ptr);
 		return newptr;
 	}

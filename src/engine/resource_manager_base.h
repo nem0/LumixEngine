@@ -30,18 +30,14 @@ public:
 	void create(ResourceType type, ResourceManager& owner);
 	void destroy();
 
-	Resource* get(const Path& path);
+	void enableUnload(bool enable);
+
 	Resource* load(const Path& path);
-	void add(Resource* resource);
-	void remove(Resource* resource);
 	void load(Resource& resource);
 	void removeUnreferenced();
 
 	void unload(const Path& path);
 	void unload(Resource& resource);
-
-	void forceUnload(const Path& path);
-	void forceUnload(Resource& resource);
 
 	void reload(const Path& path);
 	void reload(Resource& resource);
@@ -54,12 +50,14 @@ public:
 protected:
 	virtual Resource* createResource(const Path& path) = 0;
 	virtual void destroyResource(Resource& resource) = 0;
+	Resource* get(const Path& path);
 
 private:
 	IAllocator& m_allocator;
 	uint32 m_size;
 	ResourceTable m_resources;
 	ResourceManager* m_owner;
+	bool m_is_unload_enabled;
 };
 
 

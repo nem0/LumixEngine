@@ -16,12 +16,17 @@ before_script:
     - sudo apt-get install ca-certificates
     - cd projects
     - sh genie_linux_gcc.sh
-    - cd tmp/gcc
-script: if [ "${COVERITY_SCAN_BRANCH}" != 1 ]; then make config=debug64 ; fi
+    - cd tmp/gcc5
+    - g++-5 --version
+    - g++ --version
+script: if [ "${COVERITY_SCAN_BRANCH}" != 1 ]; then make verbose=1 config=debug64 ; fi
    
 addons:
   apt:
+    sources:
+      - ubuntu-toolchain-r-test
     packages:
+      - g++-5
       - ca-certificates
   coverity_scan:
     project:
@@ -31,6 +36,8 @@ addons:
     build_command_prepend: 
     build_command: make config=debug64
     branch_pattern: coverity_scan
+
+env: COMPILER=g++-5    
 
 notifications:
   webhooks:

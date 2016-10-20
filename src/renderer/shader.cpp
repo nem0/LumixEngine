@@ -50,14 +50,14 @@ ShaderInstance& Shader::getInstance(uint32 mask)
 	mask = mask & m_all_defines_mask;
 	for (int i = 0; i < m_instances.size(); ++i)
 	{
-		if (m_instances[i]->define_mask == mask)
+		if (m_instances[i].define_mask == mask)
 		{
-			return *m_instances[i];
+			return m_instances[i];
 		}
 	}
 
 	g_log_error.log("Renderer") << "Unknown shader combination requested: " << mask;
-	return *m_instances[0];
+	return m_instances[0];
 }
 
 
@@ -92,10 +92,6 @@ static uint32 getDefineMaskFromDense(const Shader& shader, uint32 dense)
 bool Shader::generateInstances()
 {
 	bool is_opengl = getRenderer().isOpenGL();
-	for (int i = 0; i < m_instances.size(); ++i)
-	{
-		LUMIX_DELETE(m_allocator, m_instances[i]);
-	}
 	m_instances.clear();
 
 	uint32 count = 1 << m_combintions.define_count;
@@ -104,35 +100,35 @@ bool Shader::generateInstances()
 	char basename[MAX_PATH_LENGTH];
 	PathUtils::getBasename(basename, sizeof(basename), getPath().c_str());
 
+	m_instances.reserve(count);
 	for (uint32 mask = 0; mask < count; ++mask)
 	{
-		ShaderInstance* instance = LUMIX_NEW(m_allocator, ShaderInstance)(*this);
-		m_instances.push(instance);
+		ShaderInstance& instance = m_instances.emplace(*this);
 
-		instance->define_mask = getDefineMaskFromDense(*this, mask);
-		m_all_defines_mask |= instance->define_mask;
+		instance.define_mask = getDefineMaskFromDense(*this, mask);
+		m_all_defines_mask |= instance.define_mask;
 
 		for (int pass_idx = 0; pass_idx < m_combintions.pass_count; ++pass_idx)
 		{
 			const char* pass = m_combintions.passes[pass_idx];
-			StaticString<MAX_PATH_LENGTH> path("shaders/compiled", is_opengl ? "_gl/" : "/");
+			StaticString<MAX_PATH_LENGTH> path("pipelines/compiled", is_opengl ? "_gl/" : "/");
 			int actual_mask = mask & m_combintions.vs_local_mask[pass_idx];
 			path << basename << "_" << pass << actual_mask << "_vs.shb";
 
 			Path vs_path(path);
 			auto* vs_binary = static_cast<ShaderBinary*>(binary_manager->load(vs_path));
 			addDependency(*vs_binary);
-			instance->binaries[pass_idx * 2] = vs_binary;
+			instance.binaries[pass_idx * 2] = vs_binary;
 
 			path.data[0] = '\0';
 			actual_mask = mask & m_combintions.fs_local_mask[pass_idx];
-			path << "shaders/compiled" << (is_opengl ? "_gl/" : "/") << basename;
+			path << "pipelines/compiled" << (is_opengl ? "_gl/" : "/") << basename;
 			path << "_" << pass << actual_mask << "_fs.shb";
 
 			Path fs_path(path);
 			auto* fs_binary = static_cast<ShaderBinary*>(binary_manager->load(fs_path));
 			addDependency(*fs_binary);
-			instance->binaries[pass_idx * 2 + 1] = fs_binary;
+			instance.binaries[pass_idx * 2 + 1] = fs_binary;
 		}
 	}
 	return true;
@@ -179,14 +175,6 @@ static void texture_slot(lua_State* state, const char* name, const char* uniform
 	slot.uniform_handle = bgfx::createUniform(uniform, bgfx::UniformType::Int1);
 	copyString(slot.uniform, uniform);
 	++shader->m_texture_slot_count;
-}
-
-
-static void atlas(lua_State* L)
-{
-	auto* shader = getShader(L);
-	if (!shader) return;
-	shader->m_texture_slots[shader->m_texture_slot_count - 1].is_atlas = true;
 }
 
 
@@ -387,7 +375,6 @@ static void registerFunctions(Shader* shader, ShaderCombinations* combinations, 
 	registerCFunction(L, "alpha_blending", &LuaWrapper::wrap<decltype(&alpha_blending), alpha_blending>);
 	registerCFunction(L, "texture_slot", &LuaWrapper::wrap<decltype(&texture_slot), texture_slot>);
 	registerCFunction(L, "texture_define", &LuaWrapper::wrap<decltype(&texture_define), texture_define>);
-	registerCFunction(L, "atlas", &LuaWrapper::wrap<decltype(&atlas), atlas>);
 	registerCFunction(L, "uniform", &LuaWrapper::wrap<decltype(&uniform), uniform>);
 }
 
@@ -420,30 +407,6 @@ bool Shader::load(FS::IFile& file)
 }
 
 
-void Shader::onBeforeReady()
-{
-	for (auto* instance : m_instances)
-	{
-		auto** binaries = instance->binaries;
-		for (int i = 0; i < Lumix::lengthOf(instance->binaries); i += 2)
-		{
-			if (!binaries[i] || !binaries[i + 1]) continue;
-
-			auto vs_handle = binaries[i]->getHandle();
-			auto fs_handle = binaries[i + 1]->getHandle();
-			auto program = bgfx::createProgram(vs_handle, fs_handle);
-
-			if (!bgfx::isValid(program)) continue;
-
-			int pass_idx = i / 2;
-			int global_idx = getRenderer().getPassIdx(m_combintions.passes[pass_idx]);
-
-			instance->program_handles[global_idx] = program;
-		}
-	}
-}
-
-
 void Shader::unload(void)
 {
 	m_combintions = {};
@@ -464,11 +427,32 @@ void Shader::unload(void)
 	}
 	m_texture_slot_count = 0;
 
-	for (auto* i : m_instances)
-	{
-		LUMIX_DELETE(m_allocator, i);
-	}
 	m_instances.clear();
+}
+
+
+bgfx::ProgramHandle ShaderInstance::getProgramHandle(int pass_idx)
+{
+	if (!bgfx::isValid(program_handles[pass_idx]))
+	{
+		for (int i = 0; i < lengthOf(shader.m_combintions.passes); ++i)
+		{
+			auto& pass = shader.m_combintions.passes[i];
+			int global_idx = shader.getRenderer().getPassIdx(pass);
+			if (global_idx == pass_idx)
+			{
+				int binary_index = i * 2;
+				if (!binaries[binary_index] || !binaries[binary_index + 1]) break;
+				auto vs_handle = binaries[binary_index]->getHandle();
+				auto fs_handle = binaries[binary_index + 1]->getHandle();
+				auto program = bgfx::createProgram(vs_handle, fs_handle);
+				program_handles[global_idx] = program;
+				break;
+			}
+		}
+	}
+
+	return program_handles[pass_idx];
 }
 
 
@@ -492,7 +476,8 @@ ShaderInstance::~ShaderInstance()
 }
 
 
-bool Shader::getShaderCombinations(Renderer& renderer,
+bool Shader::getShaderCombinations(const char* shd_path,
+	Renderer& renderer,
 	const char* shader_content,
 	ShaderCombinations* output)
 {
@@ -504,7 +489,7 @@ bool Shader::getShaderCombinations(Renderer& renderer,
 	errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
 	if (errors)
 	{
-		g_log_error.log("Renderer") << lua_tostring(L, -1);
+		g_log_error.log("Renderer") << shd_path << " - " << lua_tostring(L, -1);
 		lua_pop(L, 1);
 		lua_close(L);
 		return false;

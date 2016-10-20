@@ -11,7 +11,7 @@ namespace Lumix
 	{
 		class IFile;
 
-		class LUMIX_ENGINE_API DiskFileDevice : public IFileDevice
+		class LUMIX_ENGINE_API DiskFileDevice LUMIX_FINAL : public IFileDevice
 		{
 		public:
 			DiskFileDevice(const char* name, const char* base_path, IAllocator& allocator);

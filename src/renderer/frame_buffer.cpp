@@ -23,6 +23,7 @@ FrameBuffer::FrameBuffer(const Declaration& decl)
 		const RenderBuffer& renderbuffer = decl.m_renderbuffers[i];
 		texture_handles[i] = bgfx::createTexture2D((uint16_t)decl.m_width,
 			(uint16_t)decl.m_height,
+			false, 
 			1,
 			renderbuffer.m_format,
 			BGFX_TEXTURE_RT);
@@ -88,8 +89,8 @@ void FrameBuffer::resize(int width, int height)
 		for (int i = 0; i < m_declaration.m_renderbuffers_count; ++i)
 		{
 			const RenderBuffer& renderbuffer = m_declaration.m_renderbuffers[i];
-			texture_handles[i] =
-				bgfx::createTexture2D((uint16_t)width, (uint16_t)height, 1, renderbuffer.m_format, BGFX_TEXTURE_RT);
+			texture_handles[i] = bgfx::createTexture2D(
+				(uint16_t)width, (uint16_t)height, false, 1, renderbuffer.m_format, BGFX_TEXTURE_RT);
 			m_declaration.m_renderbuffers[i].m_handle = texture_handles[i];
 		}
 

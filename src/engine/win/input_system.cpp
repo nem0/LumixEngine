@@ -17,7 +17,7 @@ namespace Lumix
 static const float DEADZONE = 0.2f;
 
 
-struct InputSystemImpl : public InputSystem
+struct InputSystemImpl LUMIX_FINAL : public InputSystem
 {
 	typedef decltype(XInputGetState)* XInputGetState_fn_ptr;
 
@@ -29,7 +29,6 @@ struct InputSystemImpl : public InputSystem
 		, m_injected_mouse_rel_pos(0, 0)
 		, m_xinput_library(nullptr)
 		, m_xinput_get_state(nullptr)
-		, m_event_listener(allocator)
 	{
 		m_last_checked_controller = 0;
 		for (int i = 0; i < Lumix::lengthOf(m_xinput_connected); ++i)
@@ -103,7 +102,7 @@ struct InputSystemImpl : public InputSystem
 	}
 
 
-	float deadZone(float value, float dead_zone)
+	static float deadZone(float value, float dead_zone)
 	{
 		if (value < dead_zone && value > -dead_zone) return 0;
 		return value;
@@ -113,16 +112,16 @@ struct InputSystemImpl : public InputSystem
 	float getMouseXMove() const override { return m_mouse_rel_pos.x; }
 	float getMouseYMove() const override { return m_mouse_rel_pos.y; }
 	Vec2 getMousePos() const override { return m_mouse_pos; }
-
-
-	DelegateList<void(InputEvent&)>& eventListener() override { return m_event_listener; }
-
-
-	void injectEvent(InputEvent& event) override
+	bool isMouseDown(MouseButton button) override
 	{
-		m_event_listener.invoke(event);
+		switch (button)
+		{
+			case LEFT: return (GetAsyncKeyState(VK_LBUTTON) >> 8) != 0;
+			case RIGHT: return (GetAsyncKeyState(VK_RBUTTON) >> 8) != 0;
+			case MIDDLE: return (GetAsyncKeyState(VK_MBUTTON) >> 8) != 0;
+		}
+		return false;
 	}
-
 
 	float getActionValue(uint32 action) override
 	{
@@ -186,7 +185,6 @@ struct InputSystemImpl : public InputSystem
 	XINPUT_STATE m_xinput_states[XUSER_MAX_COUNT];
 	bool m_xinput_connected[XUSER_MAX_COUNT];
 	uint32 m_last_checked_controller;
-	DelegateList<void (InputEvent&)> m_event_listener;
 };
 
 

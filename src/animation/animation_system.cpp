@@ -3,16 +3,17 @@
 #include "engine/base_proxy_allocator.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
-#include "engine/json_serializer.h"
-#include "engine/profiler.h"
-#include "engine/resource_manager.h"
 #include "engine/engine.h"
+#include "engine/json_serializer.h"
+#include "engine/lua_wrapper.h"
+#include "engine/profiler.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
+#include "engine/resource_manager.h"
+#include "engine/universe/universe.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 #include "renderer/render_scene.h"
-#include "engine/universe/universe.h"
 #include <cfloat>
 
 
@@ -42,7 +43,7 @@ enum class AnimationSceneVersion : int
 };
 
 
-struct AnimationSceneImpl : public AnimationScene
+struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 {
 	friend struct AnimationSystemImpl;
 
@@ -51,17 +52,32 @@ struct AnimationSceneImpl : public AnimationScene
 		float time;
 		float time_scale;
 		float start_time;
-		class Animation* animation;
+		Animation* animation;
 		Entity entity;
 	};
 
+
+	struct Mixer
+	{
+		struct Input
+		{
+			Animation* animation = nullptr;
+			float time = 0.0f;
+			float weight = 0.0f;
+		};
+
+		Input inputs[8];
+		Entity entity;
+	};
 
 	AnimationSceneImpl(IPlugin& anim_system, Engine& engine, Universe& universe, IAllocator& allocator)
 		: m_universe(universe)
 		, m_engine(engine)
 		, m_anim_system(anim_system)
 		, m_animables(allocator)
+		, m_mixers(allocator)
 	{
+		m_universe.entityDestroyed().bind<AnimationSceneImpl, &AnimationSceneImpl::onEntityDestroyed>(this);
 		m_is_game_running = false;
 		m_render_scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 		universe.registerComponentTypeScene(ANIMABLE_TYPE, this);
@@ -69,13 +85,60 @@ struct AnimationSceneImpl : public AnimationScene
 	}
 
 
+	~AnimationSceneImpl()
+	{
+		m_universe.entityDestroyed().unbind<AnimationSceneImpl, &AnimationSceneImpl::onEntityDestroyed>(this);
+	}
+
+
+	void onEntityDestroyed(Entity entity)
+	{
+		m_mixers.erase(entity);
+	}
+
+
 	void clear() override
 	{
+		for (Mixer& mixer : m_mixers)
+		{
+			for (auto& input : mixer.inputs)
+			{
+				unloadAnimation(input.animation);
+			}
+		}
+		m_mixers.clear();
+
 		for (Animable& animable : m_animables)
 		{
 			unloadAnimation(animable.animation);
 		}
 		m_animables.clear();
+	}
+
+
+	float getAnimationLength(int animation_idx)
+	{
+		auto* animation = static_cast<Animation*>(animation_idx > 0 ? m_engine.getLuaResource(animation_idx) : nullptr);
+		if (animation) return animation->getLength();
+		return 0;
+	}
+
+
+	void mixAnimation(Entity entity, int animation_idx, int input_idx, float time, float weight)
+	{
+		auto* animation = static_cast<Animation*>(animation_idx > 0 ? m_engine.getLuaResource(animation_idx) : nullptr);
+		int mixer_idx = m_mixers.find(entity);
+		if (mixer_idx < 0)
+		{
+			Mixer& mixer = m_mixers.insert(entity);
+			mixer.entity = entity;
+			mixer_idx = m_mixers.find(entity);
+		}
+		Mixer& mixer = m_mixers.at(mixer_idx);
+		auto& input = mixer.inputs[input_idx];
+		input.animation = animation;
+		input.time = time;
+		input.weight = weight;
 	}
 
 
@@ -219,21 +282,54 @@ struct AnimationSceneImpl : public AnimationScene
 	}
 
 
-	void updateAnimable(Animable& animable, float time_delta)
+	void updateMixer(Mixer& mixer, float time_delta)
 	{
-		if (!animable.animation || !animable.animation->isReady()) return;
-		ComponentHandle renderable = m_render_scene->getRenderableComponent(animable.entity);
-		if (renderable == INVALID_COMPONENT) return;
+		ComponentHandle model_instance = m_render_scene->getModelInstanceComponent(mixer.entity);
+		if (model_instance == INVALID_COMPONENT) return;
 
-		auto* pose = m_render_scene->getPose(renderable);
-		auto* model = m_render_scene->getRenderableModel(renderable);
+		auto* pose = m_render_scene->getPose(model_instance);
+		auto* model = m_render_scene->getModelInstanceModel(model_instance);
 
 		if (!pose) return;
 		if (!model->isReady()) return;
 
 		model->getPose(*pose);
 		pose->computeRelative(*model);
-		animable.animation->getPose(animable.time, *pose, *model);
+
+		for (int i = 0; i < lengthOf(mixer.inputs); ++i)
+		{
+			Mixer::Input& input = mixer.inputs[i];
+			if (!input.animation || !input.animation->isReady()) break;
+			if (i == 0)
+			{
+				input.animation->getRelativePose(input.time, *pose, *model);
+			}
+			else
+			{
+				input.animation->getRelativePose(input.time, *pose, *model, input.weight);
+			}
+			input.animation = nullptr;
+		}
+		pose->computeAbsolute(*model);
+	}
+
+
+	void updateAnimable(Animable& animable, float time_delta)
+	{
+		if (!animable.animation || !animable.animation->isReady()) return;
+		ComponentHandle model_instance = m_render_scene->getModelInstanceComponent(animable.entity);
+		if (model_instance == INVALID_COMPONENT) return;
+
+		auto* pose = m_render_scene->getPose(model_instance);
+		auto* model = m_render_scene->getModelInstanceModel(model_instance);
+
+		if (!pose) return;
+		if (!model->isReady()) return;
+
+		model->getPose(*pose);
+		pose->computeRelative(*model);
+		animable.animation->getRelativePose(animable.time, *pose, *model);
+		pose->computeAbsolute(*model);
 
 		float t = animable.time + time_delta * animable.time_scale;
 		float l = animable.animation->getLength();
@@ -256,6 +352,11 @@ struct AnimationSceneImpl : public AnimationScene
 	{
 		PROFILE_FUNCTION();
 		if (!m_is_game_running) return;
+
+		for (Mixer& mixer : m_mixers)
+		{
+			AnimationSceneImpl::updateMixer(mixer, time_delta);
+		}
 
 		for (Animable& animable : m_animables)
 		{
@@ -293,19 +394,20 @@ struct AnimationSceneImpl : public AnimationScene
 	IPlugin& m_anim_system;
 	Engine& m_engine;
 	AssociativeArray<Entity, Animable> m_animables;
+	AssociativeArray<Entity, Mixer> m_mixers;
 	RenderScene* m_render_scene;
 	bool m_is_game_running;
 };
 
 
-struct AnimationSystemImpl : public IPlugin
+struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
 {
 	explicit AnimationSystemImpl(Engine& engine)
 		: m_allocator(engine.getAllocator())
 		, m_engine(engine)
-		, animation_manager(m_allocator)
+		, m_animation_manager(m_allocator)
 	{
-		animation_manager.create(ANIMATION_TYPE, m_engine.getResourceManager());
+		m_animation_manager.create(ANIMATION_TYPE, m_engine.getResourceManager());
 
 		PropertyRegister::add("animable",
 			LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationSceneImpl>)("Animation",
@@ -319,7 +421,32 @@ struct AnimationSystemImpl : public IPlugin
 		PropertyRegister::add("animable",
 			LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationSceneImpl>)(
 				"Time scale", &AnimationSceneImpl::getTimeScale, &AnimationSceneImpl::setTimeScale, 0, FLT_MAX, 0.1f));
+
+		registerLuaAPI();
 	}
+
+
+	~AnimationSystemImpl()
+	{
+		m_animation_manager.destroy();
+	}
+
+
+	void registerLuaAPI()
+	{
+		lua_State* L = m_engine.getState();
+		#define REGISTER_FUNCTION(name) \
+		do {\
+			auto f = &LuaWrapper::wrapMethod<AnimationSceneImpl, decltype(&AnimationSceneImpl::name), &AnimationSceneImpl::name>; \
+			LuaWrapper::createSystemFunction(L, "Animation", #name, f); \
+		} while(false) \
+
+		REGISTER_FUNCTION(mixAnimation);
+		REGISTER_FUNCTION(getAnimationLength);
+
+		#undef REGISTER_FUNCTION
+	}
+
 
 	IScene* createScene(Universe& ctx) override
 	{
@@ -335,7 +462,7 @@ struct AnimationSystemImpl : public IPlugin
 
 	Lumix::IAllocator& m_allocator;
 	Engine& m_engine;
-	AnimationManager animation_manager;
+	AnimationManager m_animation_manager;
 
 private:
 	void operator=(const AnimationSystemImpl&);

@@ -37,13 +37,13 @@ namespace
 	{
 		Lumix::DefaultAllocator allocator;
 		Lumix::Array<Lumix::Sphere> spheres(allocator);
-		Lumix::Array<Lumix::ComponentHandle> renderables(allocator);
-		int renderable = 0;
+		Lumix::Array<Lumix::ComponentHandle> model_instances(allocator);
+		int model_instance = 0;
 		for (float i = 0.f; i < 30000000.0f; i += 15.f)
 		{
 			spheres.push(Lumix::Sphere(i, 0.f, 50.f, 5.f));
-			renderables.push({renderable});
-			++renderable;
+			model_instances.push({model_instance});
+			++model_instance;
 		}
 
 		Lumix::Frustum clipping_frustum;
@@ -61,7 +61,7 @@ namespace
 			Lumix::MTJD::Manager* mtjd_manager = Lumix::MTJD::Manager::create(allocator);
 
 			culling_system = Lumix::CullingSystem::create(*mtjd_manager, allocator);
-			culling_system->insert(spheres, renderables);
+			culling_system->insert(spheres, model_instances);
 
 			Lumix::ScopedTimer timer("Culling System", allocator);
 
@@ -87,13 +87,13 @@ namespace
 	{
 		Lumix::DefaultAllocator allocator;
 		Lumix::Array<Lumix::Sphere> spheres(allocator);
-		Lumix::Array<Lumix::ComponentHandle> renderables(allocator);
-		int renderable = 0;
+		Lumix::Array<Lumix::ComponentHandle> model_instances(allocator);
+		int model_instance = 0;
 		for(float i = 0.f; i < 30000000.0f; i += 15.f)
 		{
 			spheres.push(Lumix::Sphere(i, 0.f, 50.f, 5.f));
-			renderables.push({renderable});
-			++renderable;
+			model_instances.push({model_instance});
+			++model_instance;
 		}
 
 		Lumix::Frustum clipping_frustum;
@@ -111,7 +111,7 @@ namespace
 			Lumix::MTJD::Manager* mtjd_manager = Lumix::MTJD::Manager::create(allocator);
 
 			culling_system = Lumix::CullingSystem::create(*mtjd_manager, allocator);
-			culling_system->insert(spheres, renderables);
+			culling_system->insert(spheres, model_instances);
 
 			Lumix::ScopedTimer timer("Culling System Async", allocator);
 

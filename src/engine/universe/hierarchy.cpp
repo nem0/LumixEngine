@@ -14,7 +14,7 @@ namespace Lumix
 static const ComponentType HIERARCHY_TYPE_HANDLE = PropertyRegister::getComponentType("hierarchy");
 
 
-class HierarchyImpl : public Hierarchy
+class HierarchyImpl LUMIX_FINAL : public Hierarchy
 {
 private:
 	typedef HashMap<Entity, Entity> Parents;
@@ -66,17 +66,32 @@ public:
 			Entity entity = {component.index};
 			auto parent_iter = m_parents.find(entity);
 
-			if (parent_iter.isValid())
+			ASSERT(parent_iter.isValid());
+			if (isValid(parent_iter.value()))
 			{
 				auto iter = m_children.find(parent_iter.value());
 				if (iter != m_children.end())
 				{
-					LUMIX_DELETE(m_allocator, iter.value());
-					m_children.erase(iter);
+					auto& children = *iter.value();
+					if (children.size() == 1)
+					{
+						LUMIX_DELETE(m_allocator, iter.value());
+						m_children.erase(iter);
+					}
+					else
+					{
+						for (int i = 0; i < children.size(); ++i)
+						{
+							if (children[i].m_entity == entity)
+							{
+								children.eraseFast(i);
+								break;
+							}
+						}
+					}
 				}
-				m_parents.erase(parent_iter);
 			}
-			
+			m_parents.erase(parent_iter);
 			m_universe.destroyComponent(entity, type, this, component);
 		}
 	}
@@ -102,7 +117,7 @@ public:
 		{
 			for (auto& x : *iter.value())
 			{
-				m_parents.erase(x.m_entity);
+				m_parents[x.m_entity] = INVALID_ENTITY;
 			}
 			LUMIX_DELETE(m_allocator, iter.value());
 			m_children.erase(iter);
@@ -129,7 +144,7 @@ public:
 		if (m_is_processing) return;
 
 		Parents::iterator parent_iter = m_parents.find(entity);
-		if (parent_iter.isValid())
+		if (parent_iter.isValid() && isValid(parent_iter.value()))
 		{
 			Entity parent(parent_iter.value());
 			Children::iterator child_iter = m_children.find(parent);
@@ -155,7 +170,7 @@ public:
 		Entity entity = {cmp.index};
 		Parents::iterator parent_iter = m_parents.find(entity);
 
-		if (parent_iter.isValid())
+		if (parent_iter.isValid() && isValid(parent_iter.value()))
 		{
 			Quat parent_rot = m_universe.getRotation(parent_iter.value());
 			Vec3 parent_pos = m_universe.getPosition(parent_iter.value());
@@ -190,11 +205,26 @@ public:
 	}
 
 
-	void setLocalRotation(Entity entity, const Quat& rotation) override
+	void setLocalRotationEuler(ComponentHandle cmp, const Vec3& rotation) override
 	{
+		Quat q;
+		q.fromEuler(rotation);
+		setLocalRotation(cmp, q);
+	}
+
+
+	Vec3 getLocalRotationEuler(ComponentHandle cmp) override
+	{
+		return getLocalRotation(cmp).toEuler();
+	}
+
+
+	void setLocalRotation(ComponentHandle cmp, const Quat& rotation) override
+	{
+		Entity entity = { cmp.index };
 		Parents::iterator parent_iter = m_parents.find(entity);
 
-		if (parent_iter.isValid())
+		if (parent_iter.isValid() && isValid(parent_iter.value()))
 		{
 			Quat parent_rot = m_universe.getRotation(parent_iter.value());
 			m_universe.setRotation(entity, parent_rot * rotation);
@@ -210,7 +240,7 @@ public:
 		Entity entity = {cmp.index};
 		Parents::iterator parent_iter = m_parents.find(entity);
 
-		if (parent_iter.isValid())
+		if (parent_iter.isValid() && isValid(parent_iter.value()))
 		{
 			auto child_iter = m_children.find(parent_iter.value());
 			ASSERT(child_iter.isValid());
@@ -254,10 +284,9 @@ public:
 			m_parents.erase(old_parent_iter);
 		}
 
+		m_parents.insert(child_entity, parent);
 		if (isValid(parent))
 		{
-			m_parents.insert(child_entity, parent);
-
 			Children::iterator child_iter = m_children.find(parent);
 			if (!child_iter.isValid())
 			{
@@ -278,7 +307,7 @@ public:
 		Parents::iterator parent_iter = m_parents.find(child_entity);
 		if (parent_iter.isValid())
 		{
-			return Entity(parent_iter.value());
+			return parent_iter.value();
 		}
 		return INVALID_ENTITY;
 	}

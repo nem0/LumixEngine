@@ -39,91 +39,9 @@ namespace
 {
 
 
-int DragFloat(lua_State* L)
+struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 {
-	auto* name = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
-	float value = Lumix::LuaWrapper::checkArg<float>(L, 2);
-	bool changed = ImGui::DragFloat(name, &value);
-	lua_pushboolean(L, changed);
-	lua_pushnumber(L, value);
-	return 2;
-}
-
-
-int Text(lua_State* L)
-{
-	auto* text = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
-	ImGui::Text("%s", text);
-	return 0;
-}
-
-
-int Button(lua_State* L)
-{
-	auto* label = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
-	bool clicked = ImGui::Button(label);
-	lua_pushboolean(L, clicked);
-	return 1;
-}
-
-
-int Checkbox(lua_State* L)
-{
-	auto* label = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
-	bool b = Lumix::LuaWrapper::checkArg<bool>(L, 2);
-	bool clicked = ImGui::Checkbox(label, &b);
-	lua_pushboolean(L, clicked);
-	lua_pushboolean(L, b);
-	return 2;
-}
-
-
-int Image(lua_State* L)
-{
-	auto* texture_id = Lumix::LuaWrapper::checkArg<void*>(L, 1);
-	float size_x = Lumix::LuaWrapper::checkArg<float>(L, 2);
-	float size_y = Lumix::LuaWrapper::checkArg<float>(L, 3);
-	ImGui::Image(texture_id, ImVec2(size_x, size_y));
-	return 0;
-}
-
-
-int Begin(lua_State* L)
-{
-	auto* label = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
-	bool res = ImGui::Begin(label);
-	lua_pushboolean(L, res);
-	return 1;
-}
-
-
-int BeginDock(lua_State* L)
-{
-	auto* label = Lumix::LuaWrapper::checkArg<const char*>(L, 1);
-	bool res = ImGui::BeginDock(label);
-	lua_pushboolean(L, res);
-	return 1;
-}
-
-
-int SameLine(lua_State* L)
-{
-	ImGui::SameLine();
-	return 0;
-}
-
-
-void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
-{
-	lua_pushvalue(L, -1);
-	lua_pushcfunction(L, f);
-	lua_setfield(L, -2, name);
-}
-
-
-struct PropertyGridPlugin : public PropertyGrid::IPlugin
-{
-	struct AddScriptCommand : public IEditorCommand
+	struct AddScriptCommand LUMIX_FINAL : public IEditorCommand
 	{
 		AddScriptCommand() {}
 
@@ -165,7 +83,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 	};
 
 
-	struct MoveScriptCommand : public IEditorCommand
+	struct MoveScriptCommand LUMIX_FINAL : public IEditorCommand
 	{
 		explicit MoveScriptCommand(WorldEditor& editor)
 			: blob(editor.getAllocator())
@@ -230,7 +148,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 	};
 
 
-	struct RemoveScriptCommand : public IEditorCommand
+	struct RemoveScriptCommand LUMIX_FINAL : public IEditorCommand
 	{
 		explicit RemoveScriptCommand(WorldEditor& editor)
 			: blob(editor.getAllocator())
@@ -292,7 +210,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 	};
 
 
-	struct SetPropertyCommand : public IEditorCommand
+	struct SetPropertyCommand LUMIX_FINAL : public IEditorCommand
 	{
 		explicit SetPropertyCommand(WorldEditor& editor)
 			: property_name(editor.getAllocator())
@@ -410,30 +328,10 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 	explicit PropertyGridPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		lua_State* L = app.getWorldEditor()->getEngine().getState();
-		lua_newtable(L);
-		lua_pushvalue(L, -1);
-		lua_setglobal(L, "ImGui");
-
-		registerCFunction(L, "DragFloat", &DragFloat);
-		registerCFunction(L, "Button", &Button);
-		registerCFunction(L, "Text", &Text);
-		registerCFunction(L, "Checkbox", &Checkbox);
-		registerCFunction(L, "SameLine", &SameLine);
-		registerCFunction(L, "BeginPopup", &LuaWrapper::wrap<decltype(&ImGui::BeginPopup), &ImGui::BeginPopup>);
-		registerCFunction(L, "EndPopup", &LuaWrapper::wrap<decltype(&ImGui::EndPopup), &ImGui::EndPopup>);
-		registerCFunction(L, "OpenPopup", &LuaWrapper::wrap<decltype(&ImGui::OpenPopup), &ImGui::OpenPopup>);
-		registerCFunction(L, "BeginDock", &LuaWrapper::wrap<decltype(&BeginDock), &BeginDock>);
-		registerCFunction(L, "EndDock", &LuaWrapper::wrap<decltype(&ImGui::EndDock), &ImGui::EndDock>);
-		registerCFunction(L, "Begin", &LuaWrapper::wrap<decltype(&Begin), &Begin>);
-		registerCFunction(L, "End", &LuaWrapper::wrap<decltype(&ImGui::End), &ImGui::End>);
-		registerCFunction(L, "Image", &LuaWrapper::wrap<decltype(&Image), &Image>);
-
-		lua_pop(L, 1);
 	}
 
 
-	void onGUI(PropertyGrid& grid, Lumix::ComponentUID cmp) override
+	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
 	{
 		if (cmp.type != LUA_SCRIPT_TYPE) return;
 
@@ -453,7 +351,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 		{
 			char buf[MAX_PATH_LENGTH];
 			copyString(buf, scene->getScriptPath(cmp.handle, j).c_str());
-			StaticString<Lumix::MAX_PATH_LENGTH + 20> header;
+			StaticString<MAX_PATH_LENGTH + 20> header;
 			PathUtils::getBasename(header.data, lengthOf(header.data), buf);
 			if (header.data[0] == 0) header << j;
 			header << "###" << j;
@@ -526,7 +424,7 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 							float f = (float)atof(buf);
 							if (ImGui::DragFloat(property_name, &f))
 							{
-								Lumix::toCString(f, buf, sizeof(buf), 5);
+								toCString(f, buf, sizeof(buf), 5);
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
 									scene, cmp.handle, j, property_name, buf, allocator);
 								editor.executeCommand(cmd);
@@ -535,11 +433,11 @@ struct PropertyGridPlugin : public PropertyGrid::IPlugin
 						break;
 						case LuaScriptScene::Property::ENTITY:
 						{
-							Lumix::Entity e;
-							Lumix::fromCString(buf, sizeof(buf), &e.index);
+							Entity e;
+							fromCString(buf, sizeof(buf), &e.index);
 							if (grid.entityInput(property_name, StaticString<50>(property_name, cmp.handle.index), e))
 							{
-								Lumix::toCString(e.index, buf, sizeof(buf));
+								toCString(e.index, buf, sizeof(buf));
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
 									scene, cmp.handle, j, property_name, buf, allocator);
 								editor.executeCommand(cmd);
@@ -591,35 +489,35 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override
+	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
 		return type == LUA_SCRIPT_RESOURCE_TYPE && equalStrings(".lua", ext);
 	}
 
 
-	bool onGUI(Lumix::Resource* resource, Lumix::ResourceType type) override
+	bool onGUI(Resource* resource, ResourceType type) override
 	{
 		if (type != LUA_SCRIPT_RESOURCE_TYPE) return false;
 
-		auto* script = static_cast<Lumix::LuaScript*>(resource);
+		auto* script = static_cast<LuaScript*>(resource);
 
 		if (m_text_buffer[0] == '\0')
 		{
-			Lumix::copyString(m_text_buffer, script->getSourceCode());
+			copyString(m_text_buffer, script->getSourceCode());
 		}
 		ImGui::InputTextMultiline("Code", m_text_buffer, sizeof(m_text_buffer), ImVec2(0, 300));
 		if (ImGui::Button("Save"))
 		{
 			auto& fs = m_app.getWorldEditor()->getEngine().getFileSystem();
-			auto* file = fs.open(fs.getDefaultDevice(), resource->getPath(), Lumix::FS::Mode::CREATE_AND_WRITE);
+			auto* file = fs.open(fs.getDefaultDevice(), resource->getPath(), FS::Mode::CREATE_AND_WRITE);
 
 			if (!file)
 			{
-				Lumix::g_log_warning.log("Lua Script") << "Could not save " << resource->getPath();
+				g_log_warning.log("Lua Script") << "Could not save " << resource->getPath();
 				return true;
 			}
 
-			file->write(m_text_buffer, Lumix::stringLength(m_text_buffer));
+			file->write(m_text_buffer, stringLength(m_text_buffer));
 			fs.close(*file);
 		}
 		ImGui::SameLine();
@@ -631,18 +529,18 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
-	Lumix::ResourceType getResourceType(const char* ext) override
+	ResourceType getResourceType(const char* ext) override
 	{
 		if (equalStrings(ext, "lua")) return LUA_SCRIPT_RESOURCE_TYPE;
 		return INVALID_RESOURCE_TYPE;
 	}
 
 
-	void onResourceUnloaded(Lumix::Resource*) override { m_text_buffer[0] = 0; }
+	void onResourceUnloaded(Resource*) override { m_text_buffer[0] = 0; }
 	const char* getName() const override { return "Lua Script"; }
 
 
-	bool hasResourceManager(Lumix::ResourceType type) const override { return type == LUA_SCRIPT_RESOURCE_TYPE; }
+	bool hasResourceManager(ResourceType type) const override { return type == LUA_SCRIPT_RESOURCE_TYPE; }
 
 
 	StudioApp& m_app;
@@ -650,7 +548,7 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 };
 
 
-struct ConsolePlugin : public StudioApp::IPlugin
+struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	ConsolePlugin(StudioApp& _app)
 		: app(_app)
@@ -717,7 +615,7 @@ IEditorCommand* createRemoveScriptCommand(WorldEditor& editor)
 }
 
 
-struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
+struct AddComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
 {
 	AddComponentPlugin(StudioApp& _app)
 		: app(_app)
@@ -729,10 +627,10 @@ struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 	{
 		ImGui::SetNextWindowSize(ImVec2(300, 300));
 		if (!ImGui::BeginMenu(getLabel())) return;
-		char buf[Lumix::MAX_PATH_LENGTH];
+		char buf[MAX_PATH_LENGTH];
 		auto* asset_browser = app.getAssetBrowser();
 		bool create_empty = ImGui::Selectable("Empty", false);
-		if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE, 0) || create_empty)
+		if (asset_browser->resourceList(buf, lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE, 0) || create_empty)
 		{
 			auto& editor = *app.getWorldEditor();
 			if (create_entity)
@@ -781,6 +679,37 @@ struct AddComponentPlugin : public StudioApp::IAddComponentPlugin
 };
 
 
+struct EditorPlugin : public WorldEditor::Plugin
+{
+	EditorPlugin(WorldEditor& _editor)
+		: editor(_editor)
+	{
+	}
+
+
+	bool showGizmo(ComponentUID cmp) override
+	{
+		if (cmp.type == LUA_SCRIPT_TYPE)
+		{
+			auto* scene = static_cast<LuaScriptScene*>(cmp.scene);
+			int count = scene->getScriptCount(cmp.handle);
+			for (int i = 0; i < count; ++i)
+			{
+				if (auto* call = scene->beginFunctionCall(cmp.handle, i, "onDrawGizmo"))
+				{
+					scene->endFunctionCall();
+				}
+			}
+			return true;
+		}
+		return false;
+	}
+
+
+	WorldEditor& editor;
+};
+
+
 LUMIX_STUDIO_ENTRY(lua_script)
 {
 	auto& editor = *app.getWorldEditor();
@@ -790,6 +719,8 @@ LUMIX_STUDIO_ENTRY(lua_script)
 	editor.registerEditorCommandCreator("add_script", createAddScriptCommand);
 	editor.registerEditorCommandCreator("remove_script", createRemoveScriptCommand);
 	editor.registerEditorCommandCreator("set_script_property", createSetPropertyCommand);
+	auto* editor_plugin = LUMIX_NEW(editor.getAllocator(), EditorPlugin)(editor);
+	editor.addPlugin(*editor_plugin);
 
 	auto* plugin = LUMIX_NEW(editor.getAllocator(), PropertyGridPlugin)(app);
 	app.getPropertyGrid()->addPlugin(*plugin);

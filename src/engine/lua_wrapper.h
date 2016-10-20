@@ -166,6 +166,11 @@ template <> inline const char* typeToString<bool>()
 	return "boolean";
 }
 
+template <> inline const char* typeToString<float>()
+{
+	return "boolean";
+}
+
 
 template <typename T> inline bool isType(lua_State* L, int index)
 {
@@ -229,23 +234,23 @@ template <> inline bool isType<void*>(lua_State* L, int index)
 }
 
 
-template <typename T> inline void pushLua(lua_State* L, T value)
+template <typename T> inline void push(lua_State* L, T value)
 {
 	lua_pushlightuserdata(L, value);
 }
-template <> inline void pushLua(lua_State* L, float value)
+template <> inline void push(lua_State* L, float value)
 {
 	lua_pushnumber(L, value);
 }
-template <> inline void pushLua(lua_State* L, Entity value)
+template <> inline void push(lua_State* L, Entity value)
 {
 	lua_pushinteger(L, value.index);
 }
-template <> inline void pushLua(lua_State* L, ComponentHandle value)
+template <> inline void push(lua_State* L, ComponentHandle value)
 {
 	lua_pushinteger(L, value.index);
 }
-inline void pushLua(lua_State* L, const Vec2& value)
+inline void push(lua_State* L, const Vec2& value)
 {
 	lua_createtable(L, 2, 0);
 
@@ -255,7 +260,7 @@ inline void pushLua(lua_State* L, const Vec2& value)
 	lua_pushnumber(L, value.y);
 	lua_rawseti(L, -2, 2);
 }
-inline void pushLua(lua_State* L, const Matrix& value)
+inline void push(lua_State* L, const Matrix& value)
 {
 	lua_createtable(L, 16, 0);
 
@@ -265,7 +270,7 @@ inline void pushLua(lua_State* L, const Matrix& value)
 		lua_rawseti(L, -2, i + 1);
 	}
 }
-inline void pushLua(lua_State* L, const Int2& value)
+inline void push(lua_State* L, const Int2& value)
 {
 	lua_createtable(L, 2, 0);
 
@@ -275,7 +280,7 @@ inline void pushLua(lua_State* L, const Int2& value)
 	lua_pushinteger(L, value.y);
 	lua_rawseti(L, -2, 2);
 }
-inline void pushLua(lua_State* L, const Vec3& value)
+inline void push(lua_State* L, const Vec3& value)
 {
 	lua_createtable(L, 3, 0);
 
@@ -288,7 +293,7 @@ inline void pushLua(lua_State* L, const Vec3& value)
 	lua_pushnumber(L, value.z);
 	lua_rawseti(L, -2, 3);
 }
-inline void pushLua(lua_State* L, const Vec4& value)
+inline void push(lua_State* L, const Vec4& value)
 {
 	lua_createtable(L, 4, 0);
 
@@ -304,7 +309,7 @@ inline void pushLua(lua_State* L, const Vec4& value)
 	lua_pushnumber(L, value.w);
 	lua_rawseti(L, -2, 4);
 }
-inline void pushLua(lua_State* L, const Quat& value)
+inline void push(lua_State* L, const Quat& value)
 {
 	lua_createtable(L, 4, 0);
 
@@ -320,27 +325,27 @@ inline void pushLua(lua_State* L, const Quat& value)
 	lua_pushnumber(L, value.w);
 	lua_rawseti(L, -2, 4);
 }
-template <> inline void pushLua(lua_State* L, bool value)
+template <> inline void push(lua_State* L, bool value)
 {
 	lua_pushboolean(L, value);
 }
-template <> inline void pushLua(lua_State* L, const char* value)
+template <> inline void push(lua_State* L, const char* value)
 {
 	lua_pushstring(L, value);
 }
-template <> inline void pushLua(lua_State* L, char* value)
+template <> inline void push(lua_State* L, char* value)
 {
 	lua_pushstring(L, value);
 }
-template <> inline void pushLua(lua_State* L, int value)
+template <> inline void push(lua_State* L, int value)
 {
 	lua_pushinteger(L, value);
 }
-template <> inline void pushLua(lua_State* L, unsigned int value)
+template <> inline void push(lua_State* L, unsigned int value)
 {
 	lua_pushinteger(L, value);
 }
-template <> inline void pushLua(lua_State* L, void* value)
+template <> inline void push(lua_State* L, void* value)
 {
 	lua_pushlightuserdata(L, value);
 }
@@ -613,7 +618,7 @@ template <> struct FunctionCaller<0>
 template <typename R, typename... ArgsF> int LUMIX_FORCE_INLINE callFunction(R (*f)(ArgsF...), lua_State* L)
 {
 	R v = FunctionCaller<sizeof...(ArgsF)>::callFunction(f, L);
-	pushLua(L, v);
+	push(L, v);
 	return 1;
 }
 
@@ -628,7 +633,7 @@ template <typename... ArgsF> int LUMIX_FORCE_INLINE callFunction(void (*f)(ArgsF
 template <typename R, typename... ArgsF> int LUMIX_FORCE_INLINE callFunction(R (*f)(lua_State*, ArgsF...), lua_State* L)
 {
 	R v = FunctionCaller<sizeof...(ArgsF)>::callFunction(f, L);
-	pushLua(L, v);
+	push(L, v);
 	return 1;
 }
 
@@ -658,7 +663,7 @@ template <typename C, typename R> int LUMIX_FORCE_INLINE callMethod(R (C::*f)(),
 {
 	auto* inst = checkArg<C*>(L, 1);
 	R v = (inst->*f)();
-	pushLua(L, v);
+	push(L, v);
 	return 1;
 }
 
@@ -678,7 +683,7 @@ int LUMIX_FORCE_INLINE callMethod(R (C::*f)(ArgsF...), lua_State* L)
 	auto* inst = checkArg<C*>(L, 1);
 
 	R v = FunctionCaller<sizeof...(ArgsF)>::callMethod(inst, f, L);
-	pushLua(L, v);
+	push(L, v);
 	return 1;
 }
 
@@ -689,7 +694,7 @@ int LUMIX_FORCE_INLINE callMethod(R (C::*f)(ArgsF...) const, lua_State* L)
 	auto* inst = checkArg<C*>(L, 1);
 
 	R v = FunctionCaller<sizeof...(ArgsF)>::callMethod(inst, f, L);
-	pushLua(L, v);
+	push(L, v);
 	return 1;
 }
 

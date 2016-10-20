@@ -94,7 +94,7 @@ struct Ragdoll
 };
 
 
-struct OutputStream : public physx::PxOutputStream
+struct OutputStream LUMIX_FINAL : public physx::PxOutputStream
 {
 	explicit OutputStream(IAllocator& allocator)
 		: allocator(allocator)
@@ -132,7 +132,7 @@ struct OutputStream : public physx::PxOutputStream
 };
 
 
-struct InputStream : public physx::PxInputStream
+struct InputStream LUMIX_FINAL : public physx::PxInputStream
 {
 	InputStream(unsigned char* data, int size)
 	{
@@ -197,9 +197,9 @@ struct Heightfield
 };
 
 
-struct PhysicsSceneImpl : public PhysicsScene
+struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 {
-	struct ContactCallback : public physx::PxSimulationEventCallback
+	struct ContactCallback LUMIX_FINAL : public physx::PxSimulationEventCallback
 	{
 		explicit ContactCallback(PhysicsSceneImpl& scene)
 			: m_scene(scene)
@@ -241,7 +241,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	class RigidActor
 	{
 	public:
-		explicit RigidActor(PhysicsSceneImpl& _scene, ActorType _type)
+		RigidActor(PhysicsSceneImpl& _scene, ActorType _type)
 			: resource(nullptr)
 			, physx_actor(nullptr)
 			, scene(_scene)
@@ -252,6 +252,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 		}
 
+		~RigidActor()
+		{
+			setResource(nullptr);
+			if (physx_actor) physx_actor->release();
+		}
+
+		void rescale();
 		void setResource(PhysicsGeometry* resource);
 		void setPhysxActor(physx::PxRigidActor* actor);
 
@@ -1702,10 +1709,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
 		if (!render_scene) return;
 
-		ComponentHandle renderable = render_scene->getRenderableComponent(entity);
-		if (!isValid(renderable)) return;
+		ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
+		if (!isValid(model_instance)) return;
 
-		Model* model = render_scene->getRenderableModel(renderable);
+		Model* model = render_scene->getModelInstanceModel(model_instance);
 		Transform entity_transform = m_universe.getTransform(entity);
 
 		bone->bind_transform =
@@ -1735,9 +1742,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
 		ASSERT(render_scene);
 
-		ComponentHandle renderable = render_scene->getRenderableComponent(entity);
-		ASSERT(isValid(renderable));
-		Model* model = render_scene->getRenderableModel(renderable);
+		ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
+		ASSERT(isValid(model_instance));
+		Model* model = render_scene->getModelInstanceModel(model_instance);
 		ASSERT(model && model->isReady());
 
 		auto iter = model->getBoneIndex(bone_name_hash);
@@ -2021,9 +2028,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		ASSERT(render_scene);
 		
 		Entity entity = { cmp.index };
-		ComponentHandle renderable = render_scene->getRenderableComponent(entity);
-		ASSERT(isValid(renderable));
-		Model* model = render_scene->getRenderableModel(renderable);
+		ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
+		ASSERT(isValid(model_instance));
+		Model* model = render_scene->getModelInstanceModel(model_instance);
 		ASSERT(model && model->isReady());
 		auto iter = model->getBoneIndex(bone_name_hash);
 		ASSERT(iter.isValid());
@@ -2109,26 +2116,26 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		for (auto& ragdoll : m_ragdolls)
 		{
+			ComponentHandle model_instance = render_scene->getModelInstanceComponent(ragdoll.entity);
+			if (!isValid(model_instance)) continue;
+
+			Pose* pose = render_scene->getPose(model_instance);
+			if (!pose) continue;
+
 			Transform root_transform;
 			root_transform.rot = m_universe.getRotation(ragdoll.entity);
 			root_transform.pos = m_universe.getPosition(ragdoll.entity);
-			ComponentHandle renderable = render_scene->getRenderableComponent(ragdoll.entity);
-			if (!isValid(renderable)) continue;
-			Pose* pose = render_scene->getPose(renderable);
 
-			if (pose)
+			if (ragdoll.root && !ragdoll.root->is_kinematic)
 			{
-				if (ragdoll.root && !ragdoll.root->is_kinematic)
-				{
-					physx::PxTransform bone_pose = ragdoll.root->actor->getGlobalPose();
-					m_is_updating_ragdoll = true;
+				physx::PxTransform bone_pose = ragdoll.root->actor->getGlobalPose();
+				m_is_updating_ragdoll = true;
 
-					m_universe.setTransform(ragdoll.entity, fromPhysx(bone_pose) * ragdoll.root_transform);
+				m_universe.setTransform(ragdoll.entity, fromPhysx(bone_pose) * ragdoll.root_transform);
 
-					m_is_updating_ragdoll = false;
-				}
-				updateBone(root_transform, root_transform.inverted(), ragdoll.root, pose);
+				m_is_updating_ragdoll = false;
 			}
+			updateBone(root_transform, root_transform.inverted(), ragdoll.root, pose);
 		}
 	}
 
@@ -2218,6 +2225,21 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	void addForceAtPos(Entity entity, const Vec3& force, const Vec3& pos)
+	{
+		int index = m_actors.find(entity);
+		if (index < 0) return;
+		
+		RigidActor* actor = m_actors.at(index);
+		if (!actor->physx_actor) return;
+		
+		physx::PxRigidBody* rigid_body = actor->physx_actor->isRigidBody();
+		if (!rigid_body) return;
+
+		physx::PxRigidBodyExt::addForceAtPos(*rigid_body, toPhysx(force), toPhysx(pos));
+	}
+
+
 	void setRagdollKinematic(ComponentHandle cmp, bool is_kinematic)
 	{
 		setRagdollBoneKinematicRecursive(m_ragdolls[{cmp.index}].root, is_kinematic);
@@ -2236,12 +2258,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 		RaycastHit hit;
 		if (scene->raycastEx(origin, dir, FLT_MAX, hit))
 		{
-			LuaWrapper::pushLua(L, hit.entity != INVALID_ENTITY);
-			LuaWrapper::pushLua(L, hit.entity);
-			LuaWrapper::pushLua(L, hit.position);
+			LuaWrapper::push(L, hit.entity != INVALID_ENTITY);
+			LuaWrapper::push(L, hit.entity);
+			LuaWrapper::push(L, hit.position);
 			return 3;
 		}
-		LuaWrapper::pushLua(L, false);
+		LuaWrapper::push(L, false);
 		return 1;
 	}
 
@@ -2299,9 +2321,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
 			if (!render_scene) return;
-			ComponentHandle renderable = render_scene->getRenderableComponent(entity);
-			if (!isValid(renderable)) return;
-			Pose* pose = render_scene->getPose(renderable);
+			ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
+			if (!isValid(model_instance)) return;
+			Pose* pose = render_scene->getPose(model_instance);
 			if (!pose) return;
 			setSkeletonPose(m_universe.getTransform(entity), m_ragdolls.at(ragdoll_idx).root, pose);
 		}
@@ -2309,12 +2331,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 		int idx = m_actors.find(entity);
 		if(idx >= 0)
 		{
-			Vec3 pos = m_universe.getPosition(entity);
-			physx::PxVec3 pvec(pos.x, pos.y, pos.z);
-			Quat q = m_universe.getRotation(entity);
-			physx::PxQuat pquat(q.x, q.y, q.z, q.w);
-			physx::PxTransform trans(pvec, pquat);
-			m_actors.at(idx)->physx_actor->setGlobalPose(trans, false);
+			RigidActor* actor = m_actors.at(idx);
+			if (actor->physx_actor)
+			{
+				Transform trans = m_universe.getTransform(entity);
+				actor->physx_actor->setGlobalPose(toPhysx(trans), false);
+				if (actor->resource) actor->rescale();
+			}
 		}
 	}
 
@@ -2523,6 +2546,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		for (auto* actor : m_actors)
 		{
+			if (!actor->physx_actor) continue;
 			physx::PxFilterData data;
 			int actor_layer = actor->layer;
 			data.word0 = 1 << actor_layer;
@@ -2644,7 +2668,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			m_dynamic_actors.eraseItemFast(actor);
 		}
 		physx::PxShape* shapes;
-		if (actor->physx_actor->getNbShapes() == 1 && actor->physx_actor->getShapes(&shapes, 1, 0))
+		if (actor->physx_actor && actor->physx_actor->getNbShapes() == 1 &&
+			actor->physx_actor->getShapes(&shapes, 1, 0))
 		{
 			physx::PxGeometryHolder geom = shapes->getGeometry();
 			physx::PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
@@ -3599,15 +3624,21 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 
 		physx::PxRigidActor* actor;
 		bool is_dynamic = scene.isDynamic(this);
+		auto& physics = *scene.m_system->getPhysics();
+
+		physx::PxMeshScale scale(scene.getUniverse().getScale(entity));
+		physx::PxConvexMeshGeometry convex_geom(resource->convex_mesh, scale);
+		physx::PxTriangleMeshGeometry tri_geom(resource->tri_mesh, scale);
+		const physx::PxGeometry* geom = resource->convex_mesh ? static_cast<physx::PxGeometry*>(&convex_geom)
+															  : static_cast<physx::PxGeometry*>(&tri_geom);
+
 		if (is_dynamic)
 		{
-			actor = PxCreateDynamic(
-				*scene.m_system->getPhysics(), transform, *resource->getGeometry(), *scene.m_default_material, 1.0f);
+			actor = PxCreateDynamic(physics, transform, *geom, *scene.m_default_material, 1.0f);
 		}
 		else
 		{
-			actor = PxCreateStatic(
-				*scene.m_system->getPhysics(), transform, *resource->getGeometry(), *scene.m_default_material);
+			actor = PxCreateStatic(physics, transform, *geom, *scene.m_default_material);
 		}
 		if (actor)
 		{
@@ -3615,10 +3646,17 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		}
 		else
 		{
-			g_log_error.log("Physics") << "Could not create PhysX mesh "
-									 << resource->getPath().c_str();
+			g_log_error.log("Physics") << "Could not create PhysX mesh " << resource->getPath().c_str();
 		}
 	}
+}
+
+
+void PhysicsSceneImpl::RigidActor::rescale()
+{
+	if (!resource || !resource->isReady()) return;
+
+	onStateChanged(resource->getState(), resource->getState(), *resource);
 }
 
 
@@ -3698,6 +3736,7 @@ void PhysicsScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(applyForceToActor);
 	REGISTER_FUNCTION(moveController);
 	REGISTER_FUNCTION(setRagdollKinematic);
+	REGISTER_FUNCTION(addForceAtPos);
 	
 	LuaWrapper::createSystemFunction(L, "Physics", "raycast", &PhysicsSceneImpl::LUA_raycast);
 

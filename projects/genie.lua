@@ -176,7 +176,7 @@ function linkLib(lib)
 
 	for conf,conf_dir in pairs({Debug="debug", Release="release", RelWithDebInfo="release"}) do
 		for platform,target_platform in pairs({win="windows", linux="linux", }) do
-			configuration { "x" .. "64", conf, target_platform }
+			configuration { "x64", conf, target_platform }
 				libdirs {"../external/" .. lib .. "/lib/" .. platform .. "64" .. "_" .. ide_dir .. "/" .. conf_dir}
 				libdirs {"../external/" .. lib .. "/dll/" .. platform .. "64" .. "_" .. ide_dir .. "/" .. conf_dir}
 		end
@@ -216,10 +216,10 @@ function copyDlls(src_dir, platform_dir, dest_dir)
 	configuration { "linux-*" }
 		postbuildcommands {
 			"cp ../../../external/assimp/dll/" .. platform_dir .. "_" .. ide_dir .. "/" .. src_dir .. "/libassimp.so bin/" .. dest_dir,
-			"cp ../../../external/physx/dll/linux64_gcc/libPhysX3CommonCHECKED_".. physx_suffix .. ".so bin/" .. dest_dir,
-			"cp ../../../external/physx/dll/linux64_gcc/libPhysX3CookingCHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir,
-			"cp ../../../external/physx/dll/linux64_gcc/libPhysX3CharacterKinematicCHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir,
-			"cp ../../../external/physx/dll/linux64_gcc/libPhysX3CHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir
+			"cp ../../../external/physx/dll/linux64_gcc5/libPhysX3CommonCHECKED_".. physx_suffix .. ".so bin/" .. dest_dir,
+			"cp ../../../external/physx/dll/linux64_gcc5/libPhysX3CookingCHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir,
+			"cp ../../../external/physx/dll/linux64_gcc5/libPhysX3CharacterKinematicCHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir,
+			"cp ../../../external/physx/dll/linux64_gcc5/libPhysX3CHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir
 		}
 end
 
@@ -237,7 +237,7 @@ function linkPhysX()
 			libdirs {"../external/physx/lib/" .. ide_dir .. "/win64"}
 			links {"PhysX3CHECKED_x64", "PhysX3CommonCHECKED_x64", "PhysX3CharacterKinematicCHECKED_x64", "PhysX3CookingCHECKED_x64" }
 		configuration { "x64", "linux-*" }
-			libdirs {"../external/physx/lib/linux64_gcc", "../external/physx/dll/linux64_gcc"}
+			libdirs {"../external/physx/lib/linux64_gcc5", "../external/physx/dll/linux64_gcc5"}
 			links {"PhysX3CHECKED_x64", "PhysX3CommonCHECKED_x64", "PhysX3CharacterKinematicCHECKED_x64", "PhysX3CookingCHECKED_x64" }
 		
 
@@ -491,9 +491,9 @@ project "renderer"
 	includedirs { "../src", "../external/bgfx/include", "../external/assimp/include", "../external/crnlib/include" }
 	defines { "BUILDING_RENDERER" }
 	links { "engine" }
-	
+
 	if build_studio then
-		links { "editor" }
+		links { "editor", "shaderc" }
 		linkLib "crnlib"
 		linkLib "assimp"
 	end
@@ -521,6 +521,7 @@ project "animation"
 		links { "editor" }
 	end
 	
+	useLua()
 	defaultConfigurations()
 
 project "audio"
@@ -567,9 +568,8 @@ if build_gui then
 		libType()
 
 		files { "../src/gui/**.h", "../src/gui/**.cpp" }
-		includedirs { "../src", "../src/gui", "../external/turbobadger/include", "../external/bgfx/include" }
+		includedirs { "../src", "../src/gui", "../external/bgfx/include" }
 		links { "engine", "renderer" }
-		linkLib "turbobadger"
 		linkLib "bgfx"
 		
 		configuration { "vs*" }
@@ -654,7 +654,6 @@ if build_app then
 				linkPhysX()
 			end
 			if build_gui then
-				linkLib "turbobadger"
 				links { "gui" }
 			end
 			links { "audio", "animation", "renderer", "lua_script", "navigation" }
@@ -671,6 +670,7 @@ if build_app then
 		if build_studio then
 			linkLib "crnlib"
 			linkLib "assimp"
+			links {"shaderc"}
 		end
 		
 		linkLib "bgfx"
@@ -764,11 +764,10 @@ if build_studio then
 
 			if build_gui then
 				forceLink("s_gui_plugin_register")
-				linkLib "turbobadger"
 				links { "gui" }
 			end
 
-			links { "audio", "animation", "renderer", "lua_script", "navigation", "editor", "engine" }
+			links { "audio", "animation", "renderer", "lua_script", "navigation", "editor", "engine", "shaderc" }
 			linkLib "crnlib"
 			linkLib "assimp"
 			linkLib "bgfx"

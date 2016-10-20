@@ -1,6 +1,8 @@
 #include "engine/blob.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
+#include "engine/debug/debug.h"
+#include "engine/engine.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/file_system.h"
@@ -11,35 +13,65 @@
 #include "engine/lua_wrapper.h"
 #include "engine/mt/thread.h"
 #include "engine/path_utils.h"
+#include "engine/plugin_manager.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/system.h"
 #include "engine/timer.h"
-#include "engine/debug/debug.h"
-#include "engine/engine.h"
-#include "engine/plugin_manager.h"
+#include "engine/universe/universe.h"
+#include "gui/gui_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
-#include "engine/universe/universe.h"
 #include <cstdio>
 #ifdef _MSC_VER
 	#include <windows.h>
 #endif
 
 
+struct GUIInterface : Lumix::GUISystem::Interface
+{
+	GUIInterface()
+	{
+	}
+
+	Lumix::Pipeline* getPipeline() override { return pipeline; }
+	Lumix::Vec2 getPos() const override { return Lumix::Vec2(0, 0); }
+	Lumix::Vec2 getSize() const override { return size; }
+
+
+	void enableCursor(bool enable) override
+	{
+		if (enable)
+		{
+			while (ShowCursor(true) < 0);
+		}
+		else
+		{
+			while (ShowCursor(false) >= 0);
+		}
+	}
+
+
+	Lumix::Pipeline* pipeline;
+	Lumix::Vec2 size;
+};
+
+
 class App
 {
 public:
 	App()
+		: m_allocator(m_main_allocator)
+		, m_window_mode(false)
+		, m_universe(nullptr)
+		, m_exit_code(0)
+		, m_pipeline(nullptr)
 	{
-		m_universe = nullptr;
-		m_exit_code = 0;
 		m_frame_timer = Lumix::Timer::create(m_allocator);
 		ASSERT(!s_instance);
 		s_instance = this;
-		m_pipeline = nullptr;
 	}
 
 
@@ -53,8 +85,11 @@ public:
 
 	LRESULT onMessage(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	{
+		auto& input_system = m_engine->getInputSystem();
 		switch (msg)
 		{
+			case WM_KILLFOCUS: m_engine->getInputSystem().enable(false); break;
+			case WM_SETFOCUS: m_engine->getInputSystem().enable(true); break;
 			case WM_CLOSE: PostQuitMessage(0); break;
 			case WM_MOVE:
 			case WM_SIZE: onResize(); break;
@@ -106,7 +141,23 @@ public:
 		wnd.lpszClassName = "App";
 		wnd.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 		RegisterClassExA(&wnd);
-		m_hwnd = CreateWindowA("App", "App", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 800, 600, NULL, NULL, hInst, 0);
+
+		RECT rect = { 0, 0, 600, 400 };
+		AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW | WS_VISIBLE, FALSE);
+
+		m_hwnd = CreateWindowA("App",
+			"App",
+			WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+			0,
+			0,
+			rect.right - rect.left,
+			rect.bottom - rect.top,
+			NULL,
+			NULL,
+			hInst,
+			0);
+
+		if(!m_window_mode) setFullscreenBorderless();
 
 		RAWINPUTDEVICE Rid;
 		Rid.usUsagePage = 0x01;
@@ -114,6 +165,27 @@ public:
 		Rid.dwFlags = 0;
 		Rid.hwndTarget = 0;
 		RegisterRawInputDevices(&Rid, 1, sizeof(Rid));
+	}
+
+
+	void setFullscreenBorderless()
+	{
+		HMONITOR hmon = MonitorFromWindow(m_hwnd, MONITOR_DEFAULTTONEAREST);
+		MONITORINFO mi = {sizeof(mi)};
+		if (!GetMonitorInfo(hmon, &mi)) return;
+
+		SetWindowLong(m_hwnd, GWL_STYLE, GetWindowLong(m_hwnd, GWL_STYLE) & ~(WS_CAPTION | WS_THICKFRAME));
+		SetWindowLong(m_hwnd,
+			GWL_EXSTYLE,
+			GetWindowLong(m_hwnd, GWL_EXSTYLE) &
+				~(WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE));
+		SetWindowPos(m_hwnd,
+			NULL,
+			mi.rcMonitor.left,
+			mi.rcMonitor.top,
+			mi.rcMonitor.right - mi.rcMonitor.left,
+			mi.rcMonitor.bottom - mi.rcMonitor.top,
+			SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 	}
 
 
@@ -126,7 +198,11 @@ public:
 		Lumix::CommandLineParser parser(cmd_line);
 		while (parser.next())
 		{
-			if (parser.currentEquals("-pipeline"))
+			if (parser.currentEquals("-window"))
+			{
+				m_window_mode = true;
+			}
+			else if (parser.currentEquals("-pipeline"))
 			{
 				if (!parser.next()) break;
 
@@ -178,6 +254,7 @@ public:
 		m_engine->getPluginManager().load("navigation");
 		m_engine->getPluginManager().load("lua_script");
 		m_engine->getPluginManager().load("physics");
+		m_engine->getPluginManager().load("gui");
 		m_engine->getInputSystem().enable(true);
 		Lumix::Renderer* renderer = static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 		m_pipeline = Lumix::Pipeline::create(*renderer, Lumix::Path(m_pipeline_path), m_engine->getAllocator());
@@ -189,13 +266,19 @@ public:
 			m_engine->getFileSystem().updateAsyncTransactions();
 		}
 
-		m_universe = &m_engine->createUniverse();
+		m_universe = &m_engine->createUniverse(true);
 		m_pipeline->setScene((Lumix::RenderScene*)m_universe->getScene(Lumix::crc32("renderer")));
 		m_pipeline->setViewport(0, 0, 600, 400);
 		renderer->resize(600, 400);
 
 		registerLuaAPI();
 
+		m_gui_interface = LUMIX_NEW(m_allocator, GUIInterface);
+		auto* gui_system = static_cast<Lumix::GUISystem*>(m_engine->getPluginManager().getPlugin("gui"));
+		m_gui_interface->pipeline = m_pipeline;
+
+		gui_system->setInterface(m_gui_interface);
+		
 		while (ShowCursor(false) >= 0);
 		onResize();
 	}
@@ -264,7 +347,10 @@ public:
 			Lumix::g_log_error.log("App") << "Universe corrupted";
 			return;
 		}
-		m_universe->resetScenes();
+		m_engine->destroyUniverse(*m_universe);
+		m_universe = &m_engine->createUniverse(true);
+		m_pipeline->setScene((Lumix::RenderScene*)m_universe->getScene(Lumix::crc32("renderer")));
+		Lumix::LuaWrapper::createSystemVariable(m_engine->getState(), "App", "universe", m_universe);
 		bool deserialize_succeeded = m_engine->deserialize(*m_universe, blob);
 		if (!deserialize_succeeded)
 		{
@@ -284,6 +370,10 @@ public:
 
 	void shutdown()
 	{
+		auto* gui_system = static_cast<Lumix::GUISystem*>(m_engine->getPluginManager().getPlugin("gui"));
+		gui_system->setInterface(nullptr);
+		LUMIX_DELETE(m_allocator, m_gui_interface);
+
 		m_engine->destroyUniverse(*m_universe);
 		Lumix::FS::FileSystem::destroy(m_file_system);
 		LUMIX_DELETE(m_allocator, m_disk_file_device);
@@ -319,8 +409,8 @@ public:
 			GetCursorPos(&p);
 			ScreenToClient(m_hwnd, &p);
 			auto& input_system = m_engine->getInputSystem();
-			input_system.injectMouseXMove(float(raw->data.mouse.lLastX), 0);
-			input_system.injectMouseYMove(float(raw->data.mouse.lLastY), 0);
+			input_system.injectMouseXMove(float(raw->data.mouse.lLastX), (float)p.x);
+			input_system.injectMouseYMove(float(raw->data.mouse.lLastY), (float)p.y);
 		}
 	}
 
@@ -365,6 +455,8 @@ public:
 
 	void frame()
 	{
+		m_gui_interface->size.x = (float)m_pipeline->getWidth();
+		m_gui_interface->size.y = (float)m_pipeline->getHeight();
 		float frame_time = m_frame_timer->tick();
 		m_engine->update(*m_universe);
 		m_pipeline->render();
@@ -391,7 +483,8 @@ public:
 
 
 private:
-	Lumix::DefaultAllocator m_allocator;
+	Lumix::DefaultAllocator m_main_allocator;
+	Lumix::Debug::Allocator m_allocator;
 	Lumix::Engine* m_engine;
 	Lumix::Universe* m_universe;
 	Lumix::Pipeline* m_pipeline;
@@ -400,7 +493,9 @@ private:
 	Lumix::FS::DiskFileDevice* m_disk_file_device;
 	Lumix::FS::PackFileDevice* m_pack_file_device;
 	Lumix::Timer* m_frame_timer;
+	GUIInterface* m_gui_interface;
 	bool m_finished;
+	bool m_window_mode;
 	int m_exit_code;
 	char m_startup_script_path[Lumix::MAX_PATH_LENGTH];
 	char m_pipeline_path[Lumix::MAX_PATH_LENGTH];

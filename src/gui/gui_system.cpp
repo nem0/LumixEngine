@@ -7,184 +7,82 @@
 #include "engine/lua_wrapper.h"
 #include "engine/matrix.h"
 #include "engine/path.h"
+#include "engine/plugin_manager.h"
 #include "engine/resource_manager.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
 #include "renderer/pipeline.h"
+#include "renderer/renderer.h"
 #include "renderer/shader.h"
-
-#pragma warning(disable : 4267)
-#include "tb_renderer_batcher.h"
-#include <animation/tb_animation.h>
+#include "renderer/texture.h"
 #include <bgfx/bgfx.h>
-#include <tb_core.h>
-#include <tb_font_renderer.h>
-#include <tb_language.h>
-#include <tb_msg.h>
-#include <tb_node_tree.h>
-#include <tb_renderer.h>
-#include <tb_system.h>
-#include <tb_widgets.h>
-#include <tb_widgets_common.h>
-#include <tb_widgets_reader.h>
-
-
-using namespace tb;
-
-
-namespace tb
-{
-
-void TBSystem::RescheduleTimer(double fire_time) {}
-
-}
+#include <imgui/imgui.h>
 
 
 namespace Lumix
 {
 
 
-struct BGFXBitmap : public TBBitmap
-{
-	int Width() override { return w; }
-	int Height() override { return h; }
+struct GUISystemImpl;
 
 
-	void SetData(uint32* data) override
-	{
-		pipeline->destroyTexture(tex);
-		tex = pipeline->createTexture(w, h, data);
-	}
-
-	Pipeline* pipeline;
-	bgfx::TextureHandle tex;
-	int w, h;
-};
+static const ResourceType MATERIAL_TYPE("material");
+static const ResourceType TEXTURE_TYPE("texture");
 
 
-struct GUIRenderer : public TBRendererBatcher
-{
-	GUIRenderer(Engine& engine)
-		: m_pipeline(nullptr)
-	{
-		m_decl.begin()
-			.add(bgfx::Attrib::Position, 2, bgfx::AttribType::Float)
-			.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
-			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
-			.end();
-		auto* material_manager = engine.getResourceManager().get(ResourceType("material"));
-		auto* resource = material_manager->load(Path("shaders/imgui.mat"));
-		m_material = static_cast<Material*>(resource);
-	}
-
-
-	~GUIRenderer()
-	{
-		if (m_material) m_material->getResourceManager().unload(*m_material);
-		if (m_pipeline) m_pipeline->destroyUniform(m_texture_uniform);
-	}
-
-
-	TBBitmap* CreateBitmap(int width, int height, uint32* data) override
-	{
-		if (!m_pipeline) return nullptr;
-
-		auto* bitmap = new BGFXBitmap();
-		bitmap->tex = m_pipeline->createTexture(width, height, data);
-		bitmap->w = width;
-		bitmap->h = height;
-		bitmap->pipeline = m_pipeline;
-		return bitmap;
-	}
-
-
-	void RenderBatch(Batch* batch) override
-	{
-		if (!m_material->isReady()) return;
-		if (!m_pipeline->checkAvailTransientBuffers(batch->vertex_count, m_decl, batch->vertex_count)) return;
-		bgfx::TransientVertexBuffer vertex_buffer;
-		bgfx::TransientIndexBuffer index_buffer;
-		m_pipeline->allocTransientBuffers(
-			&vertex_buffer, batch->vertex_count, m_decl, &index_buffer, batch->vertex_count);
-
-		int16* idcs = (int16*)index_buffer.data;
-		struct Vertex
-		{
-			float x, y;
-			float u, v;
-			uint32 color;
-		};
-		Vertex* vtcs = (Vertex*)vertex_buffer.data;
-		for (int i = 0; i < batch->vertex_count; ++i)
-		{
-			idcs[i] = i;
-			vtcs[i].x = batch->vertex[i].x;
-			vtcs[i].y = batch->vertex[i].y;
-			vtcs[i].u = batch->vertex[i].u;
-			vtcs[i].v = batch->vertex[i].v;
-			vtcs[i].color = batch->vertex[i].col;
-		}
-
-		if (batch->bitmap) m_pipeline->setTexture(0, ((BGFXBitmap*)(batch->bitmap))->tex, m_texture_uniform);
-
-		m_pipeline->render(vertex_buffer,
-			index_buffer,
-			Matrix::IDENTITY,
-			0,
-			batch->vertex_count,
-			BGFX_STATE_BLEND_ALPHA,
-			m_material->getShaderInstance());
-	}
-
-
-	void SetClipRect(const TBRect& rect) override { m_pipeline->setScissor(rect.x, rect.y, rect.w, rect.h); }
-
-
-	Material* m_material;
-	bgfx::VertexDecl m_decl;
-	Pipeline* m_pipeline;
-	bgfx::UniformHandle m_texture_uniform;
-};
-
-
-struct GUISystemImpl : public GUISystem
+struct GUISystemImpl LUMIX_FINAL : public GUISystem
 {
 	GUISystemImpl(Engine& engine)
 		: m_engine(engine)
-		, m_renderer(engine)
 		, m_interface(nullptr)
 	{
-		tb_core_init(&m_renderer);
+		m_context = ImGui::CreateContext();
+		m_original_context = ImGui::GetCurrentContext();
+		ImGui::SetCurrentContext(m_context);
+		ImGuiIO& io = ImGui::GetIO();
+		
+		m_font = io.Fonts->AddFontFromFileTTF("bin/VeraMono.ttf", 20);
+		uint8* pixels;
+		int w, h;
+		io.Fonts->GetTexDataAsRGBA32(&pixels, &w, &h);
+		auto* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+		auto* resource = material_manager->load(Path("pipelines/imgui/imgui.mat"));
+		m_material = static_cast<Material*>(resource);
 
-		engine.getInputSystem().eventListener().bind<GUISystemImpl, &GUISystemImpl::onInputEvent>(this);
+		auto* old_texture = m_material->getTexture(0);
+		Texture* texture = LUMIX_NEW(m_engine.getAllocator(), Texture)(
+			Path("font"), *m_engine.getResourceManager().get(TEXTURE_TYPE), m_engine.getAllocator());
+
+		texture->create(w, h, pixels);
+		m_material->setTexture(0, texture);
+		if (old_texture)
+		{
+			old_texture->destroy();
+			LUMIX_DELETE(m_engine.getAllocator(), old_texture);
+		}
+
+		io.DisplaySize.x = 640;
+		io.DisplaySize.y = 480;
+		ImGui::NewFrame();
+		ImGui::SetCurrentContext(m_original_context);
+
 		registerLuaAPI();
 	}
 
 
 	~GUISystemImpl()
 	{
-		m_engine.getInputSystem().eventListener().unbind<GUISystemImpl, &GUISystemImpl::onInputEvent>(this);
-		tb_core_shutdown();
-	}
+		Texture* texture = m_material->getTexture(0);
+		if (texture)
+		{
+			m_material->setTexture(0, nullptr);
+			texture->destroy();
+			LUMIX_DELETE(m_engine.getAllocator(), texture);
+		}
 
+		m_material->getResourceManager().unload(*m_material);
 
-	void showGUI(bool show)
-	{
-		m_interface->enableCursor(show);
-		m_root_widget.SetVisibility(show ? WIDGET_VISIBILITY_VISIBLE : WIDGET_VISIBILITY_GONE);
-	}
-
-
-	bool isGUIShown() const
-	{
-		return m_root_widget.GetVisibility() == WIDGET_VISIBILITY_VISIBLE;
-	}
-
-
-	void loadFile(const char* path)
-	{
-		m_root_widget.DeleteAllChildren();
-		g_widgets_reader->LoadFile(&m_root_widget, path);
+		ImGui::DestroyContext(m_context);
 	}
 
 
@@ -199,9 +97,9 @@ struct GUISystemImpl : public GUISystem
 				LuaWrapper::createSystemFunction(L, "Gui", #name, f); \
 			} while(false) \
 
-		REGISTER_FUNCTION(showGUI);
-		REGISTER_FUNCTION(isGUIShown);
-		REGISTER_FUNCTION(loadFile);
+		REGISTER_FUNCTION(beginGUI);
+		REGISTER_FUNCTION(endGUI);
+		REGISTER_FUNCTION(enableCursor);
 
 		LuaWrapper::createSystemVariable(L, "Gui", "instance", this);
 
@@ -209,109 +107,158 @@ struct GUISystemImpl : public GUISystem
 	}
 
 
+	void enableCursor(bool enable)
+	{
+		if (m_interface) m_interface->enableCursor(enable);
+	}
+
+
 	void setInterface(Interface* interface) override
 	{
-		// For safe typecasting
-		if (m_renderer.m_pipeline)
-		{
-			m_renderer.m_pipeline->destroyUniform(m_renderer.m_texture_uniform);
-		}
-
-		m_renderer.m_pipeline = nullptr;
-
 		m_interface = interface;
 		
 		if (!m_interface) return;
-		
+
 		auto* pipeline = m_interface->getPipeline();
 		pipeline->addCustomCommandHandler("renderIngameGUI")
 			.callback.bind<GUISystemImpl, &GUISystemImpl::pipelineCallback>(this);
-		m_renderer.m_pipeline = m_interface->getPipeline();
-		m_renderer.m_texture_uniform = m_renderer.m_pipeline->createTextureUniform("u_texture");
+	}
 
-		void register_stb_font_renderer();
-		register_stb_font_renderer();
 
-		g_font_manager->AddFontInfo("gui/vera.ttf", "Vera");
-		TBFontDescription fd;
-		fd.SetID(TBIDC("Vera"));
-		fd.SetSize(g_tb_skin->GetDimensionConverter()->DpToPx(14));
-		g_font_manager->SetDefaultFontDescription(fd);
+	void setGUIProjection()
+	{
+		Vec2 size = m_interface->getSize();
+		Matrix ortho;
+		bool is_opengl = bgfx::getRendererType() == bgfx::RendererType::OpenGL ||
+			bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
+		ortho.setOrtho(0.0f, size.x, size.y, 0.0f, -1.0f, 1.0f, is_opengl);
+		Pipeline* pipeline = m_interface->getPipeline();
+		pipeline->setViewport(0, 0, (int)size.x, (int)size.y);
+		pipeline->setViewProjection(ortho, (int)size.x, (int)size.y);
+	}
 
-		TBFontFace* font = g_font_manager->CreateFontFace(g_font_manager->GetDefaultFontDescription());
-		if (font)
-			font->RenderGlyphs(
-				" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz");
 
-		g_tb_lng->Load("gui/language/lng_en.tb.txt");
-		g_tb_skin->Load("gui/skin/skin.tb.txt");
+	void drawGUICmdList(ImDrawList* cmd_list)
+	{
+		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
+		if (!renderer) return;
+
+		Pipeline* pipeline = m_interface->getPipeline();
+		int num_indices = cmd_list->IdxBuffer.size();
+		int num_vertices = cmd_list->VtxBuffer.size();
+		auto& decl = renderer->getBasic2DVertexDecl();
+		bgfx::TransientVertexBuffer vertex_buffer;
+		bgfx::TransientIndexBuffer index_buffer;
+		if (!bgfx::checkAvailTransientBuffers(num_vertices, decl, num_indices)) return;
+		bgfx::allocTransientVertexBuffer(&vertex_buffer, num_vertices, decl);
+		bgfx::allocTransientIndexBuffer(&index_buffer, num_indices);
+
+		copyMemory(vertex_buffer.data, &cmd_list->VtxBuffer[0], num_vertices * decl.getStride());
+		copyMemory(index_buffer.data, &cmd_list->IdxBuffer[0], num_indices * sizeof(uint16));
+
+		uint32 elem_offset = 0;
+		const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
+		const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
+		for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
+		{
+			if (pcmd->UserCallback)
+			{
+				pcmd->UserCallback(cmd_list, pcmd);
+				elem_offset += pcmd->ElemCount;
+				continue;
+			}
+
+			if (0 == pcmd->ElemCount) continue;
+
+			pipeline->setScissor(uint16(Math::maximum(pcmd->ClipRect.x, 0.0f)),
+				uint16(Math::maximum(pcmd->ClipRect.y, 0.0f)),
+				uint16(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
+				uint16(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
+
+			auto material = m_material;
+			const auto& texture_id =
+				pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : material->getTexture(0)->handle;
+			auto texture_uniform = material->getShader()->m_texture_slots[0].uniform_handle;
+			pipeline->setTexture(0, texture_id, texture_uniform);
+			pipeline->render(vertex_buffer,
+				index_buffer,
+				Matrix::IDENTITY,
+				elem_offset,
+				pcmd->ElemCount,
+				material->getRenderStates(),
+				material->getShaderInstance());
+
+			elem_offset += pcmd->ElemCount;
+		}
 	}
 
 
 	void pipelineCallback()
 	{
-		int w = (int)m_interface->getSize().x;
-		int h = (int)m_interface->getSize().y;
-		m_renderer.BeginPaint(w, h);
-
-		Lumix::Matrix ortho;
-		m_root_widget.SetSize(w, h);
-		ortho.setOrtho(0.0f, (float)w, (float)h, 0.0f, -1.0f, 1.0f, false);
-		m_interface->getPipeline()->setViewProjection(ortho, w, h);
-
-		m_root_widget.InvokePaint(TBWidget::PaintProps());
-		m_renderer.EndPaint();
-	}
-
-
-	void onInputEvent(InputSystem::InputEvent& event)
-	{
-		Vec2 mouse_pos = m_engine.getInputSystem().getMousePos() - m_interface->getPos();
-		switch (event.type)
+		if (!m_interface) return;
+		m_original_context = ImGui::GetCurrentContext();
+		ImGui::SetCurrentContext(m_context);
+		ImGui::Render();
+		ImDrawData* draw_data = ImGui::GetDrawData();
+		if (m_interface)
 		{
-			case InputSystem::InputEvent::POINTER_DOWN:
-				m_root_widget.InvokePointerDown((int)mouse_pos.x, (int)mouse_pos.y, 1, TB_MODIFIER_NONE, false);
-				break;
-			case InputSystem::InputEvent::POINTER_UP:
-				m_root_widget.InvokePointerUp((int)mouse_pos.x, (int)mouse_pos.y, TB_MODIFIER_NONE, false);
-				break;
-			case InputSystem::InputEvent::POINTER_MOVE:
-				m_root_widget.InvokePointerMove((int)mouse_pos.x, (int)mouse_pos.y, TB_MODIFIER_NONE, false);
-				break;
-			case InputSystem::InputEvent::KEY_DOWN:
-				m_root_widget.InvokeKey(event.key.sym, TB_KEY_UNDEFINED, TB_MODIFIER_NONE, true);
-				break;
-			case InputSystem::InputEvent::KEY_UP:
-				m_root_widget.InvokeKey(event.key.sym, TB_KEY_UNDEFINED, TB_MODIFIER_NONE, false);
-				break;
+			ImGui::GetIO().DisplaySize.x = m_interface->getSize().x;
+			ImGui::GetIO().DisplaySize.y = m_interface->getSize().y;
 		}
-	}
+		Pipeline* pipeline = m_interface->getPipeline();
+		if (!pipeline->isReady()) return;
 
+		setGUIProjection();
 
-	void update(float) override
-	{
-		float dx = m_engine.getInputSystem().getMouseXMove();
-		float dy = m_engine.getInputSystem().getMouseYMove();
-		Vec2 mouse_pos = m_engine.getInputSystem().getMousePos() - m_interface->getPos();
-		if (dx != 0 || dy != 0)
+		for (int i = 0; i < draw_data->CmdListsCount; ++i)
 		{
-			m_root_widget.InvokePointerMove((int)mouse_pos.x, (int)mouse_pos.y, TB_MODIFIER_NONE, false);
+			ImDrawList* cmd_list = draw_data->CmdLists[i];
+			drawGUICmdList(cmd_list);
 		}
 
-		TBAnimationManager::Update();
-		m_root_widget.InvokeProcessStates();
-		m_root_widget.InvokeProcess();
-		TBMessageHandler::ProcessMessages();
+		ImGui::NewFrame();
+		ImGui::SetCurrentContext(m_original_context);
 	}
+
+
+	void beginGUI()
+	{
+		m_original_context = ImGui::GetCurrentContext();
+		ImGui::SetCurrentContext(m_context);
+		ImGui::PushFont(m_font);
+	}
+
+
+	void endGUI()
+	{
+		ImGui::PopFont();
+		ImGui::SetCurrentContext(m_original_context);
+	}
+
+
+	void update(float time_delta) override
+	{
+		beginGUI();
+		Vec2 mouse_pos = m_engine.getInputSystem().getMousePos() - m_interface->getPos();
+		auto& io = ImGui::GetIO();
+		io.MousePos = ImVec2(mouse_pos.x, mouse_pos.y);
+		io.MouseDown[0] = m_engine.getInputSystem().isMouseDown(InputSystem::LEFT);
+		endGUI();
+	}
+
+
+	void stopGame() override {}
 
 
 	const char* getName() const override { return "gui"; }
 
 
 	Engine& m_engine;
-	TBWidget m_root_widget;
-	GUIRenderer m_renderer;
 	Interface* m_interface;
+	ImGuiContext* m_context;
+	ImGuiContext* m_original_context;
+	ImFont* m_font;
+	Material* m_material;
 };
 
 

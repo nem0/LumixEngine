@@ -372,6 +372,9 @@ namespace Lumix
 				"Physics (*.phy)",
 				PHYSICS_TYPE));
 		PropertyRegister::add("mesh_rigid_actor",
+			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
+				"Dynamic", &PhysicsScene::isDynamic, &PhysicsScene::setIsDynamic));
+		PropertyRegister::add("mesh_rigid_actor",
 			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)(
 				"Layer", &PhysicsScene::getActorLayer, &PhysicsScene::setActorLayer));
 		PropertyRegister::add("physical_heightfield",
@@ -429,7 +432,7 @@ namespace Lumix
 	};
 
 
-	struct PhysicsSystemImpl : public PhysicsSystem
+	struct PhysicsSystemImpl LUMIX_FINAL : public PhysicsSystem
 	{
 		explicit PhysicsSystemImpl(Engine& engine)
 			: m_allocator(engine.getAllocator())

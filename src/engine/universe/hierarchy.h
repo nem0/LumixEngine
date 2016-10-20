@@ -17,7 +17,7 @@ namespace Lumix
 	template <typename T> class Array;
 
 
-	class HierarchyPlugin : public IPlugin
+	class HierarchyPlugin LUMIX_FINAL : public IPlugin
 	{
 	public:
 		explicit HierarchyPlugin(IAllocator& allocator) : m_allocator(allocator) {}
@@ -52,8 +52,10 @@ namespace Lumix
 
 			virtual void setLocalPosition(ComponentHandle cmp, const Vec3& position) = 0;
 			virtual Vec3 getLocalPosition(ComponentHandle cmp) = 0;
-			virtual void setLocalRotation(Entity entity, const Quat& rotation) = 0;
+			virtual void setLocalRotation(ComponentHandle cmp, const Quat& rotation) = 0;
 			virtual Quat getLocalRotation(ComponentHandle cmp) = 0;
+			virtual void setLocalRotationEuler(ComponentHandle cmp, const Vec3& rotation) = 0;
+			virtual Vec3 getLocalRotationEuler(ComponentHandle cmp) = 0;
 			virtual void setParent(ComponentHandle cmp, Entity parent) = 0;
 			virtual Entity getParent(ComponentHandle cmp) = 0;
 			virtual Array<Child>* getChildren(Entity parent) = 0;

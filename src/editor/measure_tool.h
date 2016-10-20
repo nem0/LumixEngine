@@ -7,7 +7,7 @@
 
 namespace Lumix
 {
-	class MeasureTool : public WorldEditor::Plugin
+	class MeasureTool LUMIX_FINAL : public WorldEditor::Plugin
 	{
 		public:
 			MeasureTool();

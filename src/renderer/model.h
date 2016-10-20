@@ -75,7 +75,7 @@ struct LODMeshIndices
 };
 
 
-class LUMIX_RENDERER_API Model : public Resource
+class LUMIX_RENDERER_API Model LUMIX_FINAL : public Resource
 {
 public:
 	typedef HashMap<uint32, int> BoneMap;
@@ -99,7 +99,7 @@ public:
 
 	enum class Flags : uint32
 	{
-		INDICES_16BIT = 1
+		INDICES_16BIT = 1 << 0
 	};
 
 	struct LOD
@@ -159,8 +159,12 @@ public:
 	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
 	const AABB& getAABB() const { return m_aabb; }
 	LOD* getLODs() { return m_lods; }
-	Array<uint8>& getIndices() { return m_indices; }
+	const uint16* getIndices16() const { return areIndices16() ? (uint16*)&m_indices[0] : nullptr; }
+	const uint32* getIndices32() const { return areIndices16() ? nullptr : (uint32*)&m_indices[0]; }
+	bool areIndices16() const { return (m_flags & (uint32)Flags::INDICES_16BIT) != 0; }
+	int getIndicesCount() const { return m_indices.size() / (areIndices16() ? 2 : 4); }
 	const Array<Vec3>& getVertices() const { return m_vertices; }
+	const Array<Vec2>& getUVs() const { return m_uvs; }
 	uint32 getFlags() const { return m_flags;	}
 
 	static void registerLuaAPI(lua_State* L);
@@ -194,6 +198,7 @@ private:
 	Array<Bone> m_bones;
 	Array<uint8> m_indices;
 	Array<Vec3> m_vertices;
+	Array<Vec2> m_uvs;
 	LOD m_lods[MAX_LOD_COUNT];
 	float m_bounding_radius;
 	BoneMap m_bone_map;

@@ -43,17 +43,25 @@ namespace Lumix
 
 	void ResourceManager::removeUnreferenced()
 	{
-		for (auto* i : m_resource_managers)
+		for (auto* manager : m_resource_managers)
 		{
-			i->removeUnreferenced();
+			manager->removeUnreferenced();
+		}
+	}
+
+	void ResourceManager::enableUnload(bool enable)
+	{
+		for (auto* manager : m_resource_managers)
+		{
+			manager->enableUnload(enable);
 		}
 	}
 
 	void ResourceManager::reload(const Path& path)
 	{
-		for (auto iter = m_resource_managers.begin(), end = m_resource_managers.end(); iter != end; ++iter)
+		for (auto* manager : m_resource_managers)
 		{
-			iter.value()->reload(Path(path));
+			manager->reload(path);
 		}
 	}
 }

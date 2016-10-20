@@ -47,6 +47,7 @@ struct ImportMaterial
 	bool alpha_cutout;
 	int texture_count;
 	char shader[20];
+	char name[128];
 	ImportTexture textures[16];
 };
 
@@ -74,6 +75,7 @@ struct ImportMesh
 	bool import_physics;
 	struct aiMesh* mesh;
 	const aiScene* scene;
+	int material;
 	Lumix::Array<unsigned int> map_to_input;
 	Lumix::Array<unsigned int> map_from_input;
 	Lumix::Array<Lumix::int32> indices;
@@ -81,7 +83,7 @@ struct ImportMesh
 
 
 
-class ImportAssetDialog : public StudioApp::IPlugin
+class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 {
 	friend struct ImportTask;
 	friend struct ConvertTask;
@@ -119,6 +121,7 @@ class ImportAssetDialog : public StudioApp::IPlugin
 		bool checkSource();
 		void checkTask(bool wait);
 		void convert(bool use_ui);
+		void import();
 		void getMessage(char* msg, int max_size);
 		bool hasMessage();
 		void importTexture();
@@ -131,8 +134,10 @@ class ImportAssetDialog : public StudioApp::IPlugin
 		void onAction();
 		void saveModelMetadata();
 		bool isOpened() const;
+		void clearSources();
+		void addSource(const char* src);
 
-	private:
+	public:
 		Lumix::WorldEditor& m_editor;
 		Lumix::Array<Lumix::uint32> m_saved_textures;
 		Lumix::Array<Assimp::Importer> m_importers;
@@ -152,6 +157,10 @@ class ImportAssetDialog : public StudioApp::IPlugin
 			bool remove_doubles;
 			Orientation orientation;
 			bool make_convex;
+			bool all_nodes;
+			float position_error;
+			float rotation_error;
+			float time_scale;
 		} m_model;
 
 		float m_progress_fraction;

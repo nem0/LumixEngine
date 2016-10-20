@@ -4,21 +4,22 @@
 #include "engine/binary_array.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
+#include "engine/debug/debug.h"
+#include "engine/engine.h"
 #include "engine/fs/file_system.h"
 #include "engine/iallocator.h"
+#include "engine/iplugin.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/path_utils.h"
-#include "engine/resource_manager.h"
-#include "engine/debug/debug.h"
-#include "engine/engine.h"
-#include "engine/property_register.h"
-#include "engine/property_descriptor.h"
-#include "engine/iplugin.h"
-#include "lua_script/lua_script_manager.h"
 #include "engine/plugin_manager.h"
+#include "engine/profiler.h"
+#include "engine/property_descriptor.h"
+#include "engine/property_register.h"
+#include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
+#include "lua_script/lua_script_manager.h"
 
 
 namespace Lumix
@@ -38,7 +39,7 @@ namespace Lumix
 	static const ResourceType LUA_SCRIPT_RESOURCE_TYPE("lua_script");
 
 
-	class LuaScriptSystemImpl : public IPlugin
+	class LuaScriptSystemImpl LUMIX_FINAL : public IPlugin
 	{
 	public:
 		explicit LuaScriptSystemImpl(Engine& engine);
@@ -55,7 +56,7 @@ namespace Lumix
 	};
 
 
-	struct LuaScriptSceneImpl : public LuaScriptScene
+	struct LuaScriptSceneImpl LUMIX_FINAL : public LuaScriptScene
 	{
 		struct TimerData
 		{
@@ -129,38 +130,41 @@ namespace Lumix
 					if (lua_type(L, -1) != LUA_TFUNCTION)
 					{
 						const char* name = lua_tostring(L, -2);
-						uint32 hash = crc32(name);
-						if (m_scene.m_property_names.find(hash) < 0)
+						if(name[0] != '_')
 						{
-							m_scene.m_property_names.emplace(hash, name, allocator);
-						}
-						if (hash != INDEX_HASH && hash != THIS_HASH)
-						{
-							int prop_index = getProperty(inst, hash);
-							if (prop_index >= 0)
+							uint32 hash = crc32(name);
+							if (m_scene.m_property_names.find(hash) < 0)
 							{
-								valid_properties[prop_index] = true;
-								Property& existing_prop = inst.m_properties[prop_index];
-								if (existing_prop.type == Property::ANY)
+								m_scene.m_property_names.emplace(hash, name, allocator);
+							}
+							if (hash != INDEX_HASH && hash != THIS_HASH)
+							{
+								int prop_index = getProperty(inst, hash);
+								if (prop_index >= 0)
 								{
-									switch (lua_type(inst.m_state, -1))
+									valid_properties[prop_index] = true;
+									Property& existing_prop = inst.m_properties[prop_index];
+									if (existing_prop.type == Property::ANY)
 									{
+										switch (lua_type(inst.m_state, -1))
+										{
 										case LUA_TBOOLEAN: existing_prop.type = Property::BOOLEAN; break;
 										default: existing_prop.type = Property::FLOAT;
+										}
 									}
+									m_scene.applyProperty(inst, existing_prop, existing_prop.stored_value.c_str());
 								}
-								m_scene.applyProperty(inst, existing_prop, existing_prop.stored_value.c_str());
-							}
-							else
-							{
-								auto& prop = inst.m_properties.emplace(allocator);
-								valid_properties.push(true);
-								switch (lua_type(inst.m_state, -1))
+								else
 								{
+									auto& prop = inst.m_properties.emplace(allocator);
+									valid_properties.push(true);
+									switch (lua_type(inst.m_state, -1))
+									{
 									case LUA_TBOOLEAN: prop.type = Property::BOOLEAN; break;
 									default: prop.type = Property::FLOAT;
+									}
+									prop.name_hash = hash;
 								}
-								prop.name_hash = hash;
 							}
 						}
 					}
@@ -525,19 +529,24 @@ namespace Lumix
 			if (cmp == INVALID_COMPONENT)
 			{
 				lua_pushnil(L);
+				return 1;
+			}
+			int count = scene->getScriptCount(cmp);
+			if (scr_index >= count)
+			{
+				lua_pushnil(L);
+				return 1;
+			}
+
+			int env = scene->getEnvironment(cmp, scr_index);
+			if (env < 0)
+			{
+				lua_pushnil(L);
 			}
 			else
 			{
-				int env = scene->getEnvironment(cmp, scr_index);
-				if (env < 0)
-				{
-					lua_pushnil(L);
-				}
-				else
-				{
-					bool is_valid = lua_rawgeti(L, LUA_REGISTRYINDEX, env) == LUA_TTABLE;
-					ASSERT(is_valid);
-				}
+				bool is_valid = lua_rawgeti(L, LUA_REGISTRYINDEX, env) == LUA_TTABLE;
+				ASSERT(is_valid);
 			}
 			return 1;
 		}
@@ -559,7 +568,7 @@ namespace Lumix
 					float v;
 					OutputBlob blob(&v, sizeof(v));
 					desc->get(cmp, -1, blob);
-					LuaWrapper::pushLua(L, v);
+					LuaWrapper::push(L, v);
 				}
 				break;
 				case IPropertyDescriptor::BOOL:
@@ -567,7 +576,7 @@ namespace Lumix
 					bool v;
 					OutputBlob blob(&v, sizeof(v));
 					desc->get(cmp, -1, blob);
-					LuaWrapper::pushLua(L, v);
+					LuaWrapper::push(L, v);
 				}
 				break;
 				case IPropertyDescriptor::INTEGER:
@@ -575,7 +584,7 @@ namespace Lumix
 					int v;
 					OutputBlob blob(&v, sizeof(v));
 					desc->get(cmp, -1, blob);
-					LuaWrapper::pushLua(L, v);
+					LuaWrapper::push(L, v);
 				}
 				break;
 				case IPropertyDescriptor::RESOURCE:
@@ -585,7 +594,7 @@ namespace Lumix
 					char buf[1024];
 					OutputBlob blob(buf, sizeof(buf));
 					desc->get(cmp, -1, blob);
-					LuaWrapper::pushLua(L, buf);
+					LuaWrapper::push(L, buf);
 				}
 				break;
 				case IPropertyDescriptor::COLOR:
@@ -594,7 +603,7 @@ namespace Lumix
 					Vec3 v;
 					OutputBlob blob(&v, sizeof(v));
 					desc->get(cmp, -1, blob);
-					LuaWrapper::pushLua(L, v);
+					LuaWrapper::push(L, v);
 				}
 				break;
 				case IPropertyDescriptor::VEC2:
@@ -602,7 +611,7 @@ namespace Lumix
 					Vec2 v;
 					OutputBlob blob(&v, sizeof(v));
 					desc->get(cmp, -1, blob);
-					LuaWrapper::pushLua(L, v);
+					LuaWrapper::push(L, v);
 				}
 				break;
 				case IPropertyDescriptor::INT2:
@@ -610,7 +619,23 @@ namespace Lumix
 					Int2 v;
 					OutputBlob blob(&v, sizeof(v));
 					desc->get(cmp, -1, blob);
-					LuaWrapper::pushLua(L, v);
+					LuaWrapper::push(L, v);
+				}
+				break;
+				case IPropertyDescriptor::ENTITY:
+				{
+					Entity v;
+					OutputBlob blob(&v, sizeof(v));
+					desc->get(cmp, -1, blob);
+					LuaWrapper::push(L, v);
+				}
+				break;
+				case IPropertyDescriptor::ENUM:
+				{
+					int v;
+					OutputBlob blob(&v, sizeof(v));
+					desc->get(cmp, -1, blob);
+					LuaWrapper::push(L, v);
 				}
 				break;
 				default: luaL_argerror(L, 1, "Unsupported property type"); break;
@@ -682,6 +707,20 @@ namespace Lumix
 					desc->set(cmp, -1, blob);
 				}
 				break;
+				case IPropertyDescriptor::ENTITY:
+				{
+					auto v = LuaWrapper::checkArg<Entity>(L, 3);
+					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
+				}
+				break;
+				case IPropertyDescriptor::ENUM:
+				{
+					auto v = LuaWrapper::checkArg<int>(L, 3);
+					InputBlob blob(&v, sizeof(v));
+					desc->set(cmp, -1, blob);
+				}
+				break;
 				default: luaL_argerror(L, 1, "Unsupported property type"); break;
 			}
 			return 0;
@@ -732,6 +771,8 @@ namespace Lumix
 				{
 					switch (desc->getType())
 					{
+						case IPropertyDescriptor::ENTITY:
+						case IPropertyDescriptor::ENUM:
 						case IPropertyDescriptor::DECIMAL:
 						case IPropertyDescriptor::INTEGER:
 						case IPropertyDescriptor::BOOL:
@@ -790,22 +831,8 @@ namespace Lumix
 			lua_pushvalue(L, 3);
 			timer.func = luaL_ref(L, LUA_REGISTRYINDEX);
 			lua_pop(L, 1);
-			LuaWrapper::pushLua(L, timer.func);
+			LuaWrapper::push(L, timer.func);
 			return 1;
-		}
-
-
-		LuaScript* preloadScript(const char* path)
-		{
-			auto* script_manager = m_system.m_engine.getResourceManager().get(LUA_SCRIPT_RESOURCE_TYPE);
-			return static_cast<LuaScript*>(script_manager->load(Path(path)));
-		}
-
-
-		void unloadScript(LuaScript* script)
-		{
-			if (!script) return;
-			script->getResourceManager().unload(*script);
 		}
 
 
@@ -823,8 +850,6 @@ namespace Lumix
 
 			lua_State* engine_state = m_system.m_engine.getState();
 			
-			lua_pushlightuserdata(engine_state, &m_universe);
-			lua_setglobal(engine_state, "g_universe");
 			registerProperties();
 			registerPropertyAPI();
 			LuaWrapper::createSystemFunction(
@@ -839,9 +864,8 @@ namespace Lumix
 				} while(false)
 
 			REGISTER_FUNCTION(addScript);
+			REGISTER_FUNCTION(getScriptCount);
 			REGISTER_FUNCTION(setScriptSource);
-			REGISTER_FUNCTION(preloadScript);
-			REGISTER_FUNCTION(unloadScript);
 			REGISTER_FUNCTION(cancelTimer);
 
 			#undef REGISTER_FUNCTION
@@ -1356,6 +1380,7 @@ namespace Lumix
 
 		void update(float time_delta, bool paused) override
 		{
+			PROFILE_FUNCTION();
 			if (paused) return;
 
 			int timers_to_remove[1024];
@@ -1392,9 +1417,9 @@ namespace Lumix
 				m_timers.eraseFast(timers_to_remove[i]);
 			}
 
-			for (int i = 0, c = m_updates.size(); i < c; ++i)
+			for (int i = 0; i < m_updates.size(); ++i)
 			{
-				auto& update_item = m_updates[i];
+				UpdateData update_item = m_updates[i];
 				if (lua_rawgeti(update_item.state, LUA_REGISTRYINDEX, update_item.environment) != LUA_TTABLE)
 				{
 					ASSERT(false);

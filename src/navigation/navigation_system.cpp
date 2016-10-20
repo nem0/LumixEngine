@@ -49,7 +49,7 @@ struct Agent
 };
 
 
-struct NavigationSystem : public IPlugin
+struct NavigationSystem LUMIX_FINAL : public IPlugin
 {
 	NavigationSystem(Engine& engine)
 		: m_engine(engine)
@@ -61,6 +61,9 @@ struct NavigationSystem : public IPlugin
 		rcAllocSetCustom(&recastAlloc, &recastFree);
 		registerLuaAPI(m_engine.getState());
 		registerProperties();
+		// register flags
+		Material::getCustomFlag("no_navigation");
+		Material::getCustomFlag("nonwalkable");
 	}
 
 
@@ -110,7 +113,7 @@ struct NavigationSystem : public IPlugin
 NavigationSystem* NavigationSystem::s_instance = nullptr;
 
 
-struct NavigationSceneImpl : public NavigationScene
+struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 {
 	enum class Version
 	{
@@ -283,17 +286,16 @@ struct NavigationSceneImpl : public NavigationScene
 
 		uint32 no_navigation_flag = Material::getCustomFlag("no_navigation");
 		uint32 nonwalkable_flag = Material::getCustomFlag("nonwalkable");
-		for (auto renderable = render_scene->getFirstRenderable(); renderable != INVALID_COMPONENT;
-			 renderable = render_scene->getNextRenderable(renderable))
+		for (auto model_instance = render_scene->getFirstModelInstance(); model_instance != INVALID_COMPONENT;
+			 model_instance = render_scene->getNextModelInstance(model_instance))
 		{
-			auto* model = render_scene->getRenderableModel(renderable);
+			auto* model = render_scene->getModelInstanceModel(model_instance);
 			if (!model) return;
 			ASSERT(model->isReady());
 
-			auto& indices = model->getIndices();
-			bool is16 = model->getFlags() & (uint32)Model::Flags::INDICES_16BIT;
+			bool is16 = model->areIndices16();
 
-			Entity entity = render_scene->getRenderableEntity(renderable);
+			Entity entity = render_scene->getModelInstanceEntity(model_instance);
 			Matrix mtx = m_universe.getMatrix(entity);
 			AABB model_aabb = model->getAABB();
 			model_aabb.transform(mtx);
@@ -309,7 +311,7 @@ struct NavigationSceneImpl : public NavigationScene
 					&model->getVertices()[mesh.attribute_array_offset / model->getVertexDecl().getStride()];
 				if (is16)
 				{
-					uint16* indices16 = (uint16*)&model->getIndices()[0];
+					const uint16* indices16 = model->getIndices16();
 					for (int i = 0; i < mesh.indices_count; i += 3)
 					{
 						Vec3 a = mtx.transform(vertices[indices16[mesh.indices_offset + i]]);
@@ -323,7 +325,7 @@ struct NavigationSceneImpl : public NavigationScene
 				}
 				else
 				{
-					uint32* indices32 = (uint32*)&model->getIndices()[0];
+					const uint32* indices32 = model->getIndices32();
 					for (int i = 0; i < mesh.indices_count; i += 3)
 					{
 						Vec3 a = mtx.transform(vertices[indices32[mesh.indices_offset + i]]);
@@ -394,7 +396,77 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
-	void debugDrawPath(Entity entity)
+	static float distancePtLine2d(const float* pt, const float* p, const float* q)
+	{
+		float pqx = q[0] - p[0];
+		float pqz = q[2] - p[2];
+		float dx = pt[0] - p[0];
+		float dz = pt[2] - p[2];
+		float d = pqx*pqx + pqz*pqz;
+		float t = pqx*dx + pqz*dz;
+		if (d != 0) t /= d;
+		dx = p[0] + t*pqx - pt[0];
+		dz = p[2] + t*pqz - pt[2];
+		return dx*dx + dz*dz;
+	}
+
+
+	static void drawPoly(RenderScene* render_scene, const dtMeshTile& tile, const dtPoly& poly)
+	{
+		const unsigned int ip = (unsigned int)(&poly - tile.polys);
+		const dtPolyDetail& pd = tile.detailMeshes[ip];
+
+		for (int i = 0; i < pd.triCount; ++i)
+		{
+			Vec3 v[3];
+			const unsigned char* t = &tile.detailTris[(pd.triBase + i) * 4];
+			for (int k = 0; k < 3; ++k)
+			{
+				if (t[k] < poly.vertCount)
+				{
+					v[k] = *(Vec3*)&tile.verts[poly.verts[t[k]] * 3];
+				}
+				else
+				{
+					v[k] = *(Vec3*)&tile.detailVerts[(pd.vertBase + t[k] - poly.vertCount) * 3];
+				}
+			}
+			render_scene->addDebugTriangle(v[0], v[1], v[2], 0xff00aaff, 0);
+		}
+
+		for (int k = 0; k < pd.triCount; ++k)
+		{
+			const unsigned char* t = &tile.detailTris[(pd.triBase + k) * 4];
+			const float* tv[3];
+			for (int m = 0; m < 3; ++m)
+			{
+				if (t[m] < poly.vertCount)
+					tv[m] = &tile.verts[poly.verts[t[m]] * 3];
+				else
+					tv[m] = &tile.detailVerts[(pd.vertBase + (t[m] - poly.vertCount)) * 3];
+			}
+			for (int m = 0, n = 2; m < 3; n = m++)
+			{
+				if (((t[3] >> (n * 2)) & 0x3) == 0) continue; // Skip inner detail edges.
+				render_scene->addDebugLine(*(Vec3*)tv[n], *(Vec3*)tv[m], 0xff0000ff, 0);
+			}
+		}
+	}
+
+
+	const dtCrowdAgent* getDetourAgent(Entity entity) override
+	{
+		if (!m_crowd) return nullptr;
+
+		auto iter = m_agents.find(entity);
+		if (iter == m_agents.end()) return nullptr;
+
+		const Agent& agent = iter.value();
+		return m_crowd->getAgent(agent.agent);
+	}
+
+
+	void debugDrawPath(Entity entity) override
 	{
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
@@ -405,42 +477,34 @@ struct NavigationSceneImpl : public NavigationScene
 		const Agent& agent = iter.value();
 
 		const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
+		if (dt_agent->targetPathqRef == DT_PATHQ_INVALID) return;
+
 		const dtPolyRef* path = dt_agent->corridor.getPath();
 		const int npath = dt_agent->corridor.getPathCount();
 		for (int j = 0; j < npath; ++j)
 		{
 			dtPolyRef ref = path[j];
-			const dtMeshTile* tile = 0;
-			const dtPoly* poly = 0;
+			const dtMeshTile* tile = nullptr;
+			const dtPoly* poly = nullptr;
 			if (dtStatusFailed(m_navmesh->getTileAndPolyByRef(ref, &tile, &poly))) continue;
 
-			const unsigned int ip = (unsigned int)(poly - tile->polys);
-
-			const dtPolyDetail* pd = &tile->detailMeshes[ip];
-
-			for (int i = 0; i < pd->triCount; ++i)
-			{
-				Vec3 v[3];
-				const unsigned char* t = &tile->detailTris[(pd->triBase + i) * 4];
-				for (int k = 0; k < 3; ++k)
-				{
-					if (t[k] < poly->vertCount)
-					{
-						v[k] = *(Vec3*)&tile->verts[poly->verts[t[k]] * 3];
-					}
-					else
-					{
-						v[k] = *(Vec3*)&tile->detailVerts[(pd->vertBase + t[k] - poly->vertCount) * 3];
-					}
-				}
-				render_scene->addDebugTriangle(v[0], v[1], v[2], 0xffff00ff, 0);
-				render_scene->addDebugLine(v[0], v[1], 0x0000ffff, 0);
-				render_scene->addDebugLine(v[1], v[2], 0x0000ffff, 0);
-				render_scene->addDebugLine(v[2], v[0], 0x0000ffff, 0);
-			}
+			drawPoly(render_scene, *tile, *poly);
 		}
 
+		Vec3 prev = *(Vec3*)dt_agent->npos;
+		for (int i = 0; i < dt_agent->ncorners; ++i)
+		{
+			Vec3 tmp = *(Vec3*)&dt_agent->cornerVerts[i * 3];
+			render_scene->addDebugLine(prev, tmp, 0xffff0000, 0);
+			prev = tmp;
+		}
 		render_scene->addDebugCross(*(Vec3*)dt_agent->targetPos, 1.0f, 0xffffffff, 0);
+	}
+
+
+	bool hasDebugDrawData() const override
+	{
+		return m_debug_contours != nullptr;
 	}
 
 
@@ -481,14 +545,10 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
-	bool load(const char* path) override
+	void fileLoaded(FS::IFile& file, bool success)
 	{
-		clearNavmesh();
-
-		FS::OsFile file;
-		if (!file.open(path, FS::Mode::OPEN_AND_READ, m_allocator)) return false;
-
-		if (!initNavmesh()) return false;
+		if (!success) return;
+		if (!initNavmesh()) return;
 
 		file.read(&m_aabb, sizeof(m_aabb));
 		file.read(&m_num_tiles_x, sizeof(m_num_tiles_x));
@@ -498,7 +558,7 @@ struct NavigationSceneImpl : public NavigationScene
 		if (dtStatusFailed(m_navmesh->init(&params)))
 		{
 			g_log_error.log("Navigation") << "Could not init Detour navmesh";
-			return false;
+			return;
 		}
 		for (int j = 0; j < m_num_tiles_z; ++j)
 		{
@@ -512,14 +572,24 @@ struct NavigationSceneImpl : public NavigationScene
 				{
 					file.close();
 					dtFree(data);
-					return false;
+					return;
 				}
 			}
 		}
 
 		file.close();
-		if (!m_crowd) return initCrowd();
-		return true;
+		if (!m_crowd) initCrowd();
+	}
+
+
+	bool load(const char* path) override
+	{
+		clearNavmesh();
+
+		FS::ReadCallback cb;
+		cb.bind<NavigationSceneImpl, &NavigationSceneImpl::fileLoaded>(this);
+		FS::FileSystem& fs = m_system.m_engine.getFileSystem();
+		return fs.openAsync(fs.getDefaultDevice(), Path(path), FS::Mode::OPEN_AND_READ, cb) != FS::FileSystem::INVALID_ASYNC;
 	}
 
 	
@@ -583,7 +653,7 @@ struct NavigationSceneImpl : public NavigationScene
 	void debugDrawCompactHeightfield() override
 	{
 		static const int MAX_CUBES = 0xffFF;
-		
+
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 		if (!m_debug_compact_heightfield) return;
@@ -619,45 +689,156 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
-	void debugDrawNavmesh() override
+	static void drawPolyBoundaries(RenderScene* render_scene,
+		const dtMeshTile& tile,
+		const unsigned int col,
+		bool inner)
 	{
-		if (!m_polymesh) return;
-		auto& mesh = *m_polymesh;
+		static const float thr = 0.01f * 0.01f;
+
+		for (int i = 0; i < tile.header->polyCount; ++i)
+		{
+			const dtPoly* p = &tile.polys[i];
+
+			if (p->getType() == DT_POLYTYPE_OFFMESH_CONNECTION) continue;
+
+			const dtPolyDetail* pd = &tile.detailMeshes[i];
+
+			for (int j = 0, nj = (int)p->vertCount; j < nj; ++j)
+			{
+				unsigned int c = col;
+				if (inner)
+				{
+					if (p->neis[j] == 0) continue;
+					if (p->neis[j] & DT_EXT_LINK)
+					{
+						bool con = false;
+						for (unsigned int k = p->firstLink; k != DT_NULL_LINK; k = tile.links[k].next)
+						{
+							if (tile.links[k].edge == j)
+							{
+								con = true;
+								break;
+							}
+						}
+						if (con)
+							c = 0xffffffff;
+						else
+							c = 0xff000000;
+					}
+					else
+						c = 0xff004466;
+				}
+				else
+				{
+					if (p->neis[j] != 0) continue;
+				}
+
+				const float* v0 = &tile.verts[p->verts[j] * 3];
+				const float* v1 = &tile.verts[p->verts[(j + 1) % nj] * 3];
+
+				// Draw detail mesh edges which align with the actual poly edge.
+				// This is really slow.
+				for (int k = 0; k < pd->triCount; ++k)
+				{
+					const unsigned char* t = &tile.detailTris[(pd->triBase + k) * 4];
+					const float* tv[3];
+					for (int m = 0; m < 3; ++m)
+					{
+						if (t[m] < p->vertCount)
+							tv[m] = &tile.verts[p->verts[t[m]] * 3];
+						else
+							tv[m] = &tile.detailVerts[(pd->vertBase + (t[m] - p->vertCount)) * 3];
+					}
+					for (int m = 0, n = 2; m < 3; n = m++)
+					{
+						if (((t[3] >> (n * 2)) & 0x3) == 0) continue; // Skip inner detail edges.
+						if (distancePtLine2d(tv[n], v0, v1) < thr && distancePtLine2d(tv[m], v0, v1) < thr)
+						{
+							render_scene->addDebugLine(
+								*(Vec3*)tv[n] + Vec3(0, 0.5f, 0), *(Vec3*)tv[m] + Vec3(0, 0.5f, 0), c, 0);
+						}
+					}
+				}
+			}
+		}
+	}
+
+
+	static void drawTilePortal(RenderScene* render_scene, const dtMeshTile& tile)
+	{
+		const float padx = 0.04f;
+		const float pady = tile.header->walkableClimb;
+
+		for (int side = 0; side < 8; ++side)
+		{
+			unsigned short m = DT_EXT_LINK | (unsigned short)side;
+
+			for (int i = 0; i < tile.header->polyCount; ++i)
+			{
+				dtPoly* poly = &tile.polys[i];
+
+				const int nv = poly->vertCount;
+				for (int j = 0; j < nv; ++j)
+				{
+					if (poly->neis[j] != m) continue;
+
+					const float* va = &tile.verts[poly->verts[j] * 3];
+					const float* vb = &tile.verts[poly->verts[(j + 1) % nv] * 3];
+
+					if (side == 0 || side == 4)
+					{
+						unsigned int col = side == 0 ? 0xff0000aa : 0xff00aaaa;
+
+						const float x = va[0] + ((side == 0) ? -padx : padx);
+
+						render_scene->addDebugLine(Vec3(x, va[1] - pady, va[2]), Vec3(x, va[1] + pady, va[2]), col, 0);
+						render_scene->addDebugLine(Vec3(x, va[1] + pady, va[2]), Vec3(x, vb[1] + pady, vb[2]), col, 0);
+						render_scene->addDebugLine(Vec3(x, vb[1] + pady, vb[2]), Vec3(x, vb[1] - pady, vb[2]), col, 0);
+						render_scene->addDebugLine(Vec3(x, vb[1] - pady, vb[2]), Vec3(x, va[1] - pady, va[2]), col, 0);
+
+					}
+					else if (side == 2 || side == 6)
+					{
+						unsigned int col = side == 2 ? 0xff00aa00 : 0xffaaaa00;
+
+						const float z = va[2] + ((side == 2) ? -padx : padx);
+
+						render_scene->addDebugLine(Vec3(va[0], va[1] - pady, z), Vec3(va[0], va[1] + pady, z), col, 0);
+						render_scene->addDebugLine(Vec3(va[0], va[1] + pady, z), Vec3(vb[0], vb[1] + pady, z), col, 0);
+						render_scene->addDebugLine(Vec3(vb[0], vb[1] + pady, z), Vec3(vb[0], vb[1] - pady, z), col, 0);
+						render_scene->addDebugLine(Vec3(vb[0], vb[1] - pady, z), Vec3(va[0], va[1] - pady, z), col, 0);
+					}
+
+				}
+			}
+		}
+	}
+
+
+	void debugDrawNavmesh(const Vec3& pos, bool inner_boundaries, bool outer_boundaries, bool portals) override
+	{
+		int x = int((pos.x - m_aabb.min.x + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
+		int z = int((pos.z - m_aabb.min.z + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
+		const dtMeshTile* tile = m_navmesh->getTileAt(x, z, 0);
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 
-		const int nvp = mesh.nvp;
-		const float cs = mesh.cs;
-		const float ch = mesh.ch;
+		dtPolyRef base = m_navmesh->getPolyRefBase(tile);
 
-		Vec3 color(0, 0, 0);
+		int tileNum = m_navmesh->decodePolyIdTile(base);
 
-		for (int idx = 0; idx < mesh.npolys; ++idx)
+		for (int i = 0; i < tile->header->polyCount; ++i)
 		{
-			const auto* p = &mesh.polys[idx * nvp * 2];
-
-			if (mesh.areas[idx] == RC_WALKABLE_AREA) color.set(0, 0.8f, 1.0f);
-
-			Vec3 vertices[6];
-			Vec3* vert = vertices;
-			for (int j = 0; j < nvp; ++j)
-			{
-				if (p[j] == RC_MESH_NULL_IDX) break;
-
-				const auto* v = &mesh.verts[p[j] * 3];
-				vert->set(v[0] * cs + mesh.bmin[0], (v[1] + 1) * ch + mesh.bmin[1], v[2] * cs + mesh.bmin[2]);
-				++vert;
-			}
-			for(int i = 2; i < vert - vertices; ++i)
-			{
-				render_scene->addDebugTriangle(vertices[0], vertices[i-1], vertices[i], 0xff00aaff, 0);
-			}
-			for(int i = 1; i < vert - vertices; ++i)
-			{
-				render_scene->addDebugLine(vertices[i], vertices[i-1], 0xff0000ff, 0);
-			}
-			render_scene->addDebugLine(vertices[0], vertices[vert - vertices - 1], 0xff0000ff, 0);
+			const dtPoly* p = &tile->polys[i];
+			if (p->getType() == DT_POLYTYPE_OFFMESH_CONNECTION) continue;
+			drawPoly(render_scene, *tile, *p);
 		}
+
+		if(outer_boundaries) drawPolyBoundaries(render_scene, *tile, 0xffff0000, false);
+		if(inner_boundaries) drawPolyBoundaries(render_scene, *tile, 0xffff0000, true);
+
+		if(portals) drawTilePortal(render_scene, *tile);
 	}
 
 
@@ -706,6 +887,16 @@ struct NavigationSceneImpl : public NavigationScene
 	}
 
 
+	void cancelNavigation(Entity entity)
+	{
+		auto iter = m_agents.find(entity);
+		if (iter == m_agents.end()) return;
+
+		Agent& agent = iter.value();
+		m_crowd->resetMoveTarget(agent.agent);
+	}
+
+
 	bool navigate(Entity entity, const Vec3& dest, float speed)
 	{
 		if (!m_navquery) return false;
@@ -716,7 +907,7 @@ struct NavigationSceneImpl : public NavigationScene
 		Agent& agent = iter.value();
 		dtPolyRef end_poly_ref;
 		dtQueryFilter filter;
-		static const float ext[] = { 1.0f, 2.0f, 1.0f };
+		static const float ext[] = { 1.0f, 20.0f, 1.0f };
 		m_navquery->findNearestPoly(&dest.x, ext, &filter, &end_poly_ref, 0);
 		dtCrowdAgentParams params = m_crowd->getAgent(agent.agent)->params;
 		params.maxSpeed = speed;
@@ -903,9 +1094,9 @@ struct NavigationSceneImpl : public NavigationScene
 		params.detailVertsCount = m_detail_mesh->nverts;
 		params.detailTris = m_detail_mesh->tris;
 		params.detailTriCount = m_detail_mesh->ntris;
-		params.walkableHeight = (float)m_config.walkableHeight;
-		params.walkableRadius = (float)m_config.walkableRadius;
-		params.walkableClimb = (float)m_config.walkableClimb;
+		params.walkableHeight = m_config.walkableHeight * m_config.ch;
+		params.walkableRadius = m_config.walkableRadius * m_config.cs;
+		params.walkableClimb = m_config.walkableClimb * m_config.ch;
 		params.tileX = x;
 		params.tileY = z;
 		rcVcopy(params.bmin, m_polymesh->bmin);
@@ -934,15 +1125,15 @@ struct NavigationSceneImpl : public NavigationScene
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 
-		for (auto renderable = render_scene->getFirstRenderable(); renderable != INVALID_COMPONENT;
-			renderable = render_scene->getNextRenderable(renderable))
+		for (auto model_instance = render_scene->getFirstModelInstance(); model_instance != INVALID_COMPONENT;
+			model_instance = render_scene->getNextModelInstance(model_instance))
 		{
-			auto* model = render_scene->getRenderableModel(renderable);
+			auto* model = render_scene->getModelInstanceModel(model_instance);
 			if (!model) continue;
 			ASSERT(model->isReady());
 
 			AABB model_bb = model->getAABB();
-			Matrix mtx = m_universe.getMatrix(render_scene->getRenderableEntity(renderable));
+			Matrix mtx = m_universe.getMatrix(render_scene->getModelInstanceEntity(model_instance));
 			model_bb.transform(mtx);
 			m_aabb.merge(model_bb);
 		}
@@ -1105,6 +1296,7 @@ struct NavigationSceneImpl : public NavigationScene
 			serializer.read(agent.entity);
 			serializer.read(agent.radius);
 			serializer.read(agent.height);
+			agent.is_finished = true;
 			agent.agent = -1;
 			m_agents.insert(agent.entity, agent);
 			ComponentHandle cmp = {agent.entity.index};
@@ -1211,6 +1403,7 @@ static void registerLuaAPI(lua_State* L)
 
 	REGISTER_FUNCTION(generateNavmesh);
 	REGISTER_FUNCTION(navigate);
+	REGISTER_FUNCTION(cancelNavigation);
 	REGISTER_FUNCTION(debugDrawNavmesh);
 	REGISTER_FUNCTION(debugDrawCompactHeightfield);
 	REGISTER_FUNCTION(debugDrawHeightfield);

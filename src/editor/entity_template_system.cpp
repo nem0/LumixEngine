@@ -34,7 +34,7 @@ struct PrefabInstance
 };
 
 
-class AssetBrowserPlugin : public AssetBrowser::IPlugin
+class AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 public:
 	AssetBrowserPlugin(WorldEditor& _editor, EntityTemplateSystem& _system)
@@ -79,10 +79,10 @@ public:
 };
 
 
-class EntityTemplateSystemImpl : public EntityTemplateSystem
+class EntityTemplateSystemImpl LUMIX_FINAL : public EntityTemplateSystem
 {
 private:
-	struct InstantiatePrefabCommand : public IEditorCommand
+	struct InstantiatePrefabCommand LUMIX_FINAL : public IEditorCommand
 	{
 		InstantiatePrefabCommand(WorldEditor& _editor)
 			: editor(_editor)
@@ -119,15 +119,17 @@ private:
 			for (int i = 0; i < entities.size(); ++i)
 			{
 				Entity entity = entities[i];
-				system.m_prefab_entities.insert(entity,
-				{ path.getHash(),
-					i > 0 ? entities[i - 1] : INVALID_ENTITY,
-					i < entities.size() - 1 ? entities[i + 1] : INVALID_ENTITY });
+				PrefabEntity prefab_entity;
+				prefab_entity.path_hash = path.getHash();
+				prefab_entity.prev = i > 0 ? entities[i - 1] : INVALID_ENTITY;
+				prefab_entity.next = i < entities.size() - 1 ? entities[i + 1] : INVALID_ENTITY;
+				system.m_prefab_entities.insert(entity, prefab_entity);
 				StaticString<MAX_PATH_LENGTH + 32> tmp(path.c_str(), "_", i);
 				auto& instances = system.getMutableInstances(crc32(tmp));
-				if (instances.empty())
+				string tmp_str(tmp, editor.getAllocator());
+				if (system.m_template_names.indexOf(tmp_str) < 0)
 				{
-					system.m_template_names.push(string(tmp, editor.getAllocator()));
+					system.m_template_names.emplace(tmp, editor.getAllocator());
 				}
 				instances.push(entity);
 			}
@@ -183,7 +185,7 @@ private:
 		Array<Entity> entities;
 	};
 
-	class CreateTemplateCommand : public IEditorCommand
+	class CreateTemplateCommand LUMIX_FINAL : public IEditorCommand
 	{
 	public:
 		explicit CreateTemplateCommand(WorldEditor& editor)
@@ -269,7 +271,7 @@ private:
 		Entity m_entity;
 	};
 
-	class CreateInstanceCommand : public IEditorCommand
+	class CreateInstanceCommand LUMIX_FINAL : public IEditorCommand
 	{
 	public:
 		explicit CreateInstanceCommand(WorldEditor& editor)
@@ -769,7 +771,7 @@ public:
 			const int MAX_NAME_LENGTH = 50;
 			char name[MAX_NAME_LENGTH];
 			serializer.readString(name, MAX_NAME_LENGTH);
-			m_template_names.push(string(name, m_editor.getAllocator()));
+			m_template_names.emplace(name, m_editor.getAllocator());
 		}
 		serializer.read(count);
 		for (int i = 0; i < count; ++i)

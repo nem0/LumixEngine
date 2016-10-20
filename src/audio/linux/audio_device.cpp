@@ -28,7 +28,9 @@ public:
 	void play(BufferHandle buffer, bool looped) override {}
 	bool isPlaying(BufferHandle buffer) override { return false; }
 	void stop(BufferHandle buffer) override {}
+	bool isEnd(BufferHandle buffer) override { return true; }
 	void pause(BufferHandle buffer) override {}
+	void setMasterVolume(float volume) override {}
 	void setVolume(BufferHandle buffer, float volume) override {}
 	void setFrequency(BufferHandle buffer, float frequency) override {}
 	void setCurrentTime(BufferHandle buffer, float time_seconds) override {}
@@ -58,9 +60,6 @@ AudioDevice* AudioDevice::create(Engine& engine)
 void AudioDevice::destroy(AudioDevice& device)
 {
 }
-
-
-const AudioDevice::BufferHandle AudioDevice::INVALID_BUFFER_HANDLE = -1;
 
 
 } // namespace Lumix

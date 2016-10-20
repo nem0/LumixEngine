@@ -46,7 +46,7 @@ static Transform fromPhysx(const physx::PxTransform& v) { return{ fromPhysx(v.p)
 static physx::PxTransform toPhysx(const Transform& v) { return{ toPhysx(v.pos), toPhysx(v.rot) }; }
 
 
-struct EditorPlugin : public WorldEditor::Plugin
+struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 {
 	explicit EditorPlugin(WorldEditor& editor)
 		: m_editor(editor)
@@ -413,7 +413,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 };
 
 
-struct StudioAppPlugin : public StudioApp::IPlugin
+struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	explicit StudioAppPlugin(Lumix::WorldEditor& editor)
 		: m_editor(editor)
@@ -774,18 +774,18 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 		if (!render_scene) return;
 
 		Entity entity = m_editor.getSelectedEntities()[0];
-		ComponentHandle renderable = render_scene->getRenderableComponent(entity);
+		ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
 		auto* phy_scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
 
 		ComponentHandle cmp = phy_scene->getComponent(entity, RAGDOLL_TYPE);
-		if (!isValid(cmp) || !isValid(renderable))
+		if (!isValid(cmp) || !isValid(model_instance))
 		{
 			ImGui::Text("%s", "Please select an entity with ragdoll and mesh components.");
 			return;
 		}
 
 		Matrix mtx = m_editor.getUniverse()->getMatrix(entity);
-		Model* model = render_scene->getRenderableModel(renderable);
+		Model* model = render_scene->getModelInstanceModel(model_instance);
 		if (!model || !model->isReady()) return;
 
 		static bool visualize = true;
@@ -998,7 +998,7 @@ struct StudioAppPlugin : public StudioApp::IPlugin
 
 
 
-struct PhysicsGeometryPlugin : public AssetBrowser::IPlugin
+struct PhysicsGeometryPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	explicit PhysicsGeometryPlugin(StudioApp& app)
 		: m_app(app)

@@ -1,8 +1,9 @@
 #include "audio_device.h"
 #include "clip_manager.h"
-#include "engine/log.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
+#include "engine/log.h"
+#include <cmath>
 #include <dsound.h>
 
 
@@ -10,7 +11,7 @@ namespace Lumix
 {
 
 
-struct AudioDeviceImpl : public AudioDevice
+struct AudioDeviceImpl LUMIX_FINAL : public AudioDevice
 {
 	struct Buffer
 	{
@@ -262,7 +263,7 @@ struct AudioDeviceImpl : public AudioDevice
 			{
 				if (buffer_status & DSBSTATUS_PLAYING)
 				{
-					buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING);
+					buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING ? DSBPLAY_LOOPING: 0);
 
 				}
 				return;
@@ -272,7 +273,7 @@ struct AudioDeviceImpl : public AudioDevice
 			{
 				if (buffer_status & DSBSTATUS_PLAYING)
 				{
-					buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING);
+					buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING ? DSBPLAY_LOOPING : 0);
 				}
 				return;
 			}
@@ -289,7 +290,7 @@ struct AudioDeviceImpl : public AudioDevice
 		echo->SetAllParameters(&echo_params);
 		if (buffer_status & DSBSTATUS_PLAYING)
 		{
-			buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING);
+			buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING ? DSBPLAY_LOOPING : 0);
 		}
 	}
 
@@ -309,6 +310,19 @@ struct AudioDeviceImpl : public AudioDevice
 		auto& buffer = m_buffers[m_buffer_map[handle]];
 		buffer.looped = looped;
 		buffer.handle->Play(0, 0, DSBPLAY_LOOPING);
+	}
+
+
+	bool isEnd(BufferHandle handle) override
+	{
+		int dense_idx = m_buffer_map[handle];
+		Buffer& buffer = m_buffers[dense_idx];
+		DWORD rel_pc, rel_wc;
+		buffer.handle->GetCurrentPosition(&rel_pc, &rel_wc);
+		auto rel_written = DWORD(buffer.written % STREAM_SIZE);
+		DWORD abs_pc = buffer.written - (rel_written - rel_pc);
+		if (rel_pc >= rel_written) abs_pc -= STREAM_SIZE;
+		return abs_pc >= buffer.data_size;
 	}
 
 
@@ -332,6 +346,13 @@ struct AudioDeviceImpl : public AudioDevice
 
 
 	void pause(BufferHandle handle) override { m_buffers[m_buffer_map[handle]].handle->Stop(); }
+
+
+	void setMasterVolume(float volume) override
+	{
+		LONG v = volume < 0.0001f ? DSBVOLUME_MIN : LONG(-2000.0f * log10(1.0f / volume));
+		m_primary_buffer->SetVolume(v);
+	}
 
 
 	void setVolume(BufferHandle handle, float volume) override
@@ -396,48 +417,33 @@ struct AudioDeviceImpl : public AudioDevice
 		{
 			return;
 		}
-		if (buffer.written + s1 > buffer.data_size)
-		{
-			memcpy(p1, (uint8*)buffer.data + buffer.written, buffer.data_size - buffer.written);
-			void* p1_2 = (uint8*)p1 + (buffer.data_size - buffer.written);
-			DWORD s1_2 = s1 - (buffer.data_size - buffer.written);
-			if (buffer.looped)
+		auto updateBuffer = [&buffer](void* p, DWORD size) {
+			if (!p) return;
+			if (buffer.written + size > buffer.data_size)
 			{
-				memcpy(p1_2, buffer.data, s1_2);
-			}
-			else
-			{
-				ZeroMemory(p1_2, s1_2);
-			}
-		}
-		else
-		{
-			memcpy(p1, (uint8*)buffer.data + buffer.written, s1);
-		}
-		buffer.written += s1;
-		if (p2)
-		{
-			if (buffer.written + s2 > buffer.data_size)
-			{
-				memcpy(p2, (uint8*)buffer.data + buffer.written, buffer.data_size - buffer.written);
-				void* p2_2 = (uint8*)p2 + (buffer.data_size - buffer.written);
-				DWORD s2_2 = s2 - (buffer.data_size - buffer.written);
+				memcpy(p, (uint8*)buffer.data + buffer.written, buffer.data_size - buffer.written);
+				void* p_2 = (uint8*)p + (buffer.data_size - buffer.written);
+				DWORD size_2 = size - (buffer.data_size - buffer.written);
 				if (buffer.looped)
 				{
-					memcpy(p2_2, buffer.data, s2_2);
+					memcpy(p_2, buffer.data, size_2);
 				}
 				else
 				{
-					ZeroMemory(p2_2, s2_2);
+					ZeroMemory(p_2, size_2);
 				}
 			}
 			else
 			{
-				memcpy(p2, (uint8*)buffer.data + buffer.written, s2);
+				memcpy(p, (uint8*)buffer.data + buffer.written, size);
 			}
-			buffer.written += s2;
-		}
-		if (buffer.written > buffer.data_size) buffer.written = buffer.written % buffer.data_size;
+			buffer.written += size;
+			buffer.written = buffer.written % buffer.data_size;
+		};
+
+		updateBuffer(p1, s1);
+		updateBuffer(p2, s2);
+
 		if (FAILED(buffer.handle->Unlock(p1, s1, p2, s2)))
 		{
 			return;
@@ -493,7 +499,7 @@ struct AudioDeviceImpl : public AudioDevice
 };
 
 
-class NullAudioDevice : public AudioDevice
+class NullAudioDevice LUMIX_FINAL : public AudioDevice
 {
 public:
 	BufferHandle createBuffer(const void* data,
@@ -512,7 +518,9 @@ public:
 	void play(BufferHandle buffer, bool looped) override {}
 	bool isPlaying(BufferHandle buffer) override { return false; }
 	void stop(BufferHandle buffer) override {}
+	bool isEnd(BufferHandle buffer) override { return true; }
 	void pause(BufferHandle buffer) override {}
+	void setMasterVolume(float volume) override {}
 	void setVolume(BufferHandle buffer, float volume) override {}
 	void setFrequency(BufferHandle buffer, float frequency) override {}
 	void setCurrentTime(BufferHandle buffer, float time_seconds) override {}
@@ -550,9 +558,6 @@ void AudioDevice::destroy(AudioDevice& device)
 	if (&device == &g_null_device) return;
 	LUMIX_DELETE(static_cast<AudioDeviceImpl&>(device).m_engine->getAllocator(), &device);
 }
-
-
-const AudioDevice::BufferHandle AudioDevice::INVALID_BUFFER_HANDLE = -1;
 
 
 } // namespace Lumix

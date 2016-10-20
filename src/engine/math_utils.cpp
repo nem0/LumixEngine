@@ -171,6 +171,28 @@ bool getRayTriangleIntersection(const Vec3& origin,
 }
 
 
+LUMIX_ENGINE_API bool getSphereTriangleIntersection(const Vec3& center,
+	float radius,
+	const Vec3& v0,
+	const Vec3& v1,
+	const Vec3& v2)
+{
+	Vec3 normal = crossProduct(v0 - v1, v2 - v1).normalized();
+	float D = -dotProduct(v0, normal);
+
+	float dist = dotProduct(center, normal) + D;
+
+	if (fabs(dist) > radius) return false;
+
+	float squared_radius = radius * radius;
+	if ((v0 - center).squaredLength() < squared_radius) return true;
+	if ((v1 - center).squaredLength() < squared_radius) return true;
+	if ((v2 - center).squaredLength() < squared_radius) return true;
+
+	return false;
+}
+
+
 static std::mt19937& getRandomGenerator()
 {
 	static std::random_device seed;
@@ -203,6 +225,12 @@ float randFloat()
 {
 	std::uniform_real_distribution<float> dist;
 	return dist(getRandomGenerator());
+}
+
+
+void seedRandom(uint32 seed)
+{
+	getRandomGenerator().seed(seed);
 }
 
 

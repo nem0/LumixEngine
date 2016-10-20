@@ -2,6 +2,7 @@
 
 #include "engine/array.h"
 #include "engine/blob.h"
+#include "engine/crc32.h"
 #include "engine/fs/file_system.h"
 #include "engine/geometry.h"
 #include "engine/json_serializer.h"
@@ -13,6 +14,7 @@
 #include "engine/mtjd/job.h"
 #include "engine/mtjd/manager.h"
 #include "engine/path_utils.h"
+#include "engine/plugin_manager.h"
 #include "engine/profiler.h"
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
@@ -24,6 +26,7 @@
 #include "lua_script/lua_script_system.h"
 
 #include "renderer/culling_system.h"
+#include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
 #include "renderer/model.h"
@@ -44,7 +47,7 @@ namespace Lumix
 {
 
 
-static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
 static const ComponentType DECAL_TYPE = PropertyRegister::getComponentType("decal");
 static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType("point_light");
 static const ComponentType PARTICLE_EMITTER_TYPE = PropertyRegister::getComponentType("particle_emitter");
@@ -52,6 +55,8 @@ static const ComponentType PARTICLE_EMITTER_ALPHA_TYPE = PropertyRegister::getCo
 static const ComponentType PARTICLE_EMITTER_FORCE_HASH = PropertyRegister::getComponentType("particle_emitter_force");
 static const ComponentType PARTICLE_EMITTER_ATTRACTOR_HASH =
 	PropertyRegister::getComponentType("particle_emitter_attractor");
+static const ComponentType PARTICLE_EMITTER_SUBIMAGE_HASH =
+	PropertyRegister::getComponentType("particle_emitter_subimage");
 static const ComponentType PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH =
 	PropertyRegister::getComponentType("particle_emitter_linear_movement");
 static const ComponentType PARTICLE_EMITTER_SPAWN_SHAPE_HASH =
@@ -144,7 +149,7 @@ struct BoneAttachment
 };
 
 
-class RenderSceneImpl : public RenderScene
+class RenderSceneImpl LUMIX_FINAL : public RenderScene
 {
 private:
 	struct ModelLoadedCallback
@@ -223,7 +228,7 @@ public:
 		}
 		m_particle_emitters.clear();
 
-		for (auto& i : m_renderables)
+		for (auto& i : m_model_instances)
 		{
 			if (i.entity != INVALID_ENTITY && i.model)
 			{
@@ -232,7 +237,7 @@ public:
 				LUMIX_DELETE(m_allocator, i.pose);
 			}
 		}
-		m_renderables.clear();
+		m_model_instances.clear();
 		m_culling_system->clear();
 
 		for (auto& probe : m_environment_probes)
@@ -266,11 +271,11 @@ public:
 
 	ComponentHandle getComponent(Entity entity, ComponentType type) override
 	{
-		if (type == RENDERABLE_TYPE)
+		if (type == MODEL_INSTANCE_TYPE)
 		{
-			if (entity.index >= m_renderables.size()) return INVALID_COMPONENT;
+			if (entity.index >= m_model_instances.size()) return INVALID_COMPONENT;
 			ComponentHandle cmp = { entity.index };
-			return isValid(m_renderables[entity.index].entity) ? cmp : INVALID_COMPONENT;
+			return isValid(m_model_instances[entity.index].entity) ? cmp : INVALID_COMPONENT;
 		}
 		if (type == ENVIRONMENT_PROBE_TYPE)
 		{
@@ -316,7 +321,18 @@ public:
 		{
 			int index = m_particle_emitters.find(entity);
 			if (index < 0) return INVALID_COMPONENT;
-			if (m_particle_emitters.at(index)->m_is_valid) return {entity.index};
+			if (m_particle_emitters.at(index)->m_is_valid) return{ entity.index };
+			return INVALID_COMPONENT;
+		}
+		if (type == BONE_ATTACHMENT_TYPE)
+		{
+			for (auto& attachment : m_bone_attachments)
+			{
+				if (attachment.entity == entity)
+				{
+					return {entity.index};
+				}
+			}
 			return INVALID_COMPONENT;
 		}
 
@@ -327,6 +343,7 @@ public:
 			ParticleEmitter::PlaneModule::s_type,
 			ParticleEmitter::RandomRotationModule::s_type,
 			ParticleEmitter::SizeModule::s_type,
+			ParticleEmitter::SubimageModule::s_type,
 			ParticleEmitter::SpawnShapeModule::s_type};
 
 		for (auto& module : EMITTER_MODULES)
@@ -449,10 +466,10 @@ public:
 
 	void updateBoneAttachment(const BoneAttachment& bone_attachment)
 	{
-		if (bone_attachment.parent_entity == INVALID_ENTITY) return;
-		ComponentHandle renderable = getRenderableComponent(bone_attachment.parent_entity);
-		if (renderable == INVALID_COMPONENT) return;
-		auto* parent_pose = getPose(renderable);
+		if (!isValid(bone_attachment.parent_entity)) return;
+		ComponentHandle model_instance = getModelInstanceComponent(bone_attachment.parent_entity);
+		if (model_instance == INVALID_COMPONENT) return;
+		auto* parent_pose = getPose(model_instance);
 		if (!parent_pose) return;
 
 		Transform parent_entity_transform = m_universe.getTransform(bone_attachment.parent_entity);
@@ -475,9 +492,9 @@ public:
 	{
 		if (attachment.parent_entity == INVALID_ENTITY) return;
 		if (attachment.bone_index < 0) return;
-		ComponentHandle renderable = getRenderableComponent(attachment.parent_entity);
-		if (renderable == INVALID_COMPONENT) return;
-		Pose* pose = getPose(renderable);
+		ComponentHandle model_instance = getModelInstanceComponent(attachment.parent_entity);
+		if (model_instance == INVALID_COMPONENT) return;
+		Pose* pose = getPose(model_instance);
 		if (!pose) return;
 		ASSERT(pose->is_absolute);
 		if (attachment.bone_index >= pose->count) return;
@@ -502,9 +519,34 @@ public:
 	{
 		int idx = getBoneAttachmentIdx(cmp);
 		if (idx < 0) return;
-		m_bone_attachments[idx].relative_transform.pos = pos;
+		BoneAttachment& attachment = m_bone_attachments[idx];
+		attachment.relative_transform.pos = pos;
+		m_is_updating_attachments = true;
+		updateBoneAttachment(attachment);
+		m_is_updating_attachments = false;
 	}
 
+
+	Vec3 getBoneAttachmentRotation(ComponentHandle cmp) override
+	{
+		int idx = getBoneAttachmentIdx(cmp);
+		if (idx < 0) return {0, 0, 0};
+		return m_bone_attachments[idx].relative_transform.rot.toEuler();
+	}
+
+
+	void setBoneAttachmentRotation(ComponentHandle cmp, const Vec3& rot) override
+	{
+		int idx = getBoneAttachmentIdx(cmp);
+		if (idx < 0) return;
+		BoneAttachment& attachment = m_bone_attachments[idx];
+		Vec3 euler = rot;
+		euler.x = Math::clamp(euler.x, -Math::PI * 0.5f, Math::PI * 0.5f);
+		attachment.relative_transform.rot.fromEuler(euler);
+		m_is_updating_attachments = true;
+		updateBoneAttachment(attachment);
+		m_is_updating_attachments = false;
+	}
 
 	int getBoneAttachmentBone(ComponentHandle cmp) override
 	{
@@ -653,10 +695,10 @@ public:
 		serializer.write(m_active_global_light_cmp);
 	}
 
-	void serializeRenderables(OutputBlob& serializer)
+	void serializeModelInstances(OutputBlob& serializer)
 	{
-		serializer.write((int32)m_renderables.size());
-		for (auto& r : m_renderables)
+		serializer.write((int32)m_model_instances.size());
+		for (auto& r : m_model_instances)
 		{
 			serializer.write(r.entity);
 			if(r.entity != INVALID_ENTITY)
@@ -801,6 +843,10 @@ public:
 					{
 						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this, cmp);
 					}
+					else if (module->getType() == ParticleEmitter::SubimageModule::s_type)
+					{
+						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_HASH, this, cmp);
+					}
 					else if (module->getType() == ParticleEmitter::SpawnShapeModule::s_type)
 					{
 						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_HASH, this, cmp);
@@ -853,7 +899,7 @@ public:
 	void serialize(OutputBlob& serializer) override
 	{
 		serializeCameras(serializer);
-		serializeRenderables(serializer);
+		serializeModelInstances(serializer);
 		serializeLights(serializer);
 		serializeTerrains(serializer);
 		serializeParticleEmitters(serializer);
@@ -930,14 +976,14 @@ public:
 		}
 	}
 
-	void deserializeRenderables(InputBlob& serializer, RenderSceneVersion version)
+	void deserializeModelInstances(InputBlob& serializer, RenderSceneVersion version)
 	{
 		int32 size = 0;
 		serializer.read(size);
-		m_renderables.reserve(size);
+		m_model_instances.reserve(size);
 		for (int i = 0; i < size; ++i)
 		{
-			auto& r = m_renderables.emplace();
+			auto& r = m_model_instances.emplace();
 			serializer.read(r.entity);
 			ASSERT(r.entity.index == i || !isValid(r.entity));
 			r.model = nullptr;
@@ -961,7 +1007,7 @@ public:
 					setModel(cmp, model);
 				}
 
-				if (version > RenderSceneVersion::RENDERABLE_MATERIALS)
+				if (version > RenderSceneVersion::MODEL_INSTANCE_MATERIALS)
 				{
 					int material_count;
 					serializer.read(material_count);
@@ -972,14 +1018,12 @@ public:
 						{
 							char path[MAX_PATH_LENGTH];
 							serializer.readString(path, lengthOf(path));
-							Material* material = static_cast<Material*>(
-								m_engine.getResourceManager().get(MATERIAL_TYPE)->load(Path(path)));
-							r.meshes[j].material = material;
+							setModelInstanceMaterial(cmp, j, Path(path));
 						}
 					}
 				}
 
-				m_universe.addComponent(r.entity, RENDERABLE_TYPE, this, cmp);
+				m_universe.addComponent(r.entity, MODEL_INSTANCE_TYPE, this, cmp);
 			}
 		}
 	}
@@ -1081,7 +1125,7 @@ public:
 	void deserialize(InputBlob& serializer, int version) override
 	{
 		deserializeCameras(serializer, (RenderSceneVersion)version);
-		deserializeRenderables(serializer, (RenderSceneVersion)version);
+		deserializeModelInstances(serializer, (RenderSceneVersion)version);
 		deserializeLights(serializer, (RenderSceneVersion)version);
 		deserializeTerrains(serializer, (RenderSceneVersion)version);
 		if (version >= 0) deserializeParticleEmitters(serializer, version);
@@ -1115,9 +1159,9 @@ public:
 	}
 
 
-	void destroyRenderable(ComponentHandle component)
+	void destroyModelInstance(ComponentHandle component)
 	{
-		m_renderable_destroyed.invoke(component);
+		m_model_instance_destroyed.invoke(component);
 		for (int i = 0; i < m_light_influenced_geometry.size(); ++i)
 		{
 			Array<ComponentHandle>& influenced_geometry = m_light_influenced_geometry[i];
@@ -1132,12 +1176,12 @@ public:
 		}
 
 		setModel(component, nullptr);
-		auto& renderable = m_renderables[component.index];
-		Entity entity = renderable.entity;
-		LUMIX_DELETE(m_allocator, renderable.pose);
-		renderable.pose = nullptr;
-		renderable.entity = INVALID_ENTITY;
-		m_universe.destroyComponent(entity, RENDERABLE_TYPE, this, component);
+		auto& model_instance = m_model_instances[component.index];
+		Entity entity = model_instance.entity;
+		LUMIX_DELETE(m_allocator, model_instance.pose);
+		model_instance.pose = nullptr;
+		model_instance.entity = INVALID_ENTITY;
+		m_universe.destroyComponent(entity, MODEL_INSTANCE_TYPE, this, component);
 	}
 
 
@@ -1238,6 +1282,21 @@ public:
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
 		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this, component);
+		cleanup(emitter);
+	}
+
+
+	void destroyParticleEmitterSubimage(ComponentHandle component)
+	{
+		auto* emitter = m_particle_emitters[{component.index}];
+		auto* module = emitter->getModule(PARTICLE_EMITTER_SUBIMAGE_HASH);
+
+		ASSERT(module);
+
+		LUMIX_DELETE(m_allocator, module);
+		emitter->m_modules.eraseItem(module);
+		emitter->m_subimage_module = nullptr;
+		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_HASH, this, component);
 		cleanup(emitter);
 	}
 
@@ -1406,10 +1465,62 @@ public:
 	}
 
 
+	void setParticleEmitterSubimageRows(ComponentHandle cmp, const int& value) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(cmp);
+		if (module) module->rows = value;
+	}
+
+
+	void setParticleEmitterSubimageCols(ComponentHandle cmp, const int& value) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(cmp);
+		if (module) module->cols = value;
+	}
+
+
+	int getParticleEmitterSubimageRows(ComponentHandle cmp) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(cmp);
+		return module ? module->rows : 1;
+	}
+
+
+	int getParticleEmitterSubimageCols(ComponentHandle cmp) override
+	{
+		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(cmp);
+		return module ? module->cols : 1;
+	}
+
+
 	void setParticleEmitterAcceleration(ComponentHandle cmp, const Vec3& value) override
 	{
 		auto* module = getEmitterModule<ParticleEmitter::ForceModule>(cmp);
 		if (module) module->m_acceleration = value;
+	}
+
+
+	void setParticleEmitterAutoemit(ComponentHandle cmp, bool autoemit) override
+	{
+		m_particle_emitters[{cmp.index}]->m_autoemit = autoemit;
+	}
+
+
+	bool getParticleEmitterAutoemit(ComponentHandle cmp) override
+	{
+		return m_particle_emitters[{cmp.index}]->m_autoemit;
+	}
+
+
+	void setParticleEmitterLocalSpace(ComponentHandle cmp, bool local_space) override
+	{
+		m_particle_emitters[{cmp.index}]->m_local_space = local_space;
+	}
+
+
+	bool getParticleEmitterLocalSpace(ComponentHandle cmp) override
+	{
+		return m_particle_emitters[{cmp.index}]->m_local_space;
 	}
 
 
@@ -1669,8 +1780,19 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::ForceModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_FORCE_HASH, this, { entity.index });
-		return{ entity.index };
+		m_universe.addComponent(entity, PARTICLE_EMITTER_FORCE_HASH, this, {entity.index});
+		return {entity.index};
+	}
+
+
+	ComponentHandle createParticleEmitterSubimage(Entity entity)
+	{
+		int index = allocateParticleEmitter(entity);
+		auto* emitter = m_particle_emitters.at(index);
+		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SubimageModule)(*emitter);
+		emitter->addModule(module);
+		m_universe.addComponent(entity, PARTICLE_EMITTER_SUBIMAGE_HASH, this, {entity.index});
+		return {entity.index};
 	}
 
 
@@ -1716,23 +1838,23 @@ public:
 	}
 
 
-	Renderable* getRenderables() override
+	ModelInstance* getModelInstances() override
 	{
-		return &m_renderables[0];
+		return &m_model_instances[0];
 	}
 
 
-	Renderable* getRenderable(ComponentHandle cmp) override
+	ModelInstance* getModelInstance(ComponentHandle cmp) override
 	{
-		return &m_renderables[cmp.index];
+		return &m_model_instances[cmp.index];
 	}
 
 
-	ComponentHandle getRenderableComponent(Entity entity) override
+	ComponentHandle getModelInstanceComponent(Entity entity) override
 	{
 		ComponentHandle cmp = {entity.index};
-		if (cmp.index >= m_renderables.size()) return INVALID_COMPONENT;
-		if (!isValid(m_renderables[cmp.index].entity)) return INVALID_COMPONENT;
+		if (cmp.index >= m_model_instances.size()) return INVALID_COMPONENT;
+		if (!isValid(m_model_instances[cmp.index].entity)) return INVALID_COMPONENT;
 		return cmp;
 	}
 
@@ -1771,10 +1893,10 @@ public:
 		int index = entity.index;
 		ComponentHandle cmp = {index};
 
-		if (index < m_renderables.size() && isValid(m_renderables[index].entity) &&
-			m_renderables[index].model && m_renderables[index].model->isReady())
+		if (index < m_model_instances.size() && isValid(m_model_instances[index].entity) &&
+			m_model_instances[index].model && m_model_instances[index].model->isReady())
 		{
-			Renderable& r = m_renderables[index];
+			ModelInstance& r = m_model_instances[index];
 			r.matrix = m_universe.getMatrix(entity);
 			if (r.model && r.model->isReady())
 			{
@@ -2008,52 +2130,52 @@ public:
 	float getTerrainYScale(ComponentHandle cmp) override { return m_terrains[{cmp.index}]->getYScale(); }
 
 
-	Pose* getPose(ComponentHandle cmp) override { return m_renderables[cmp.index].pose; }
+	Pose* getPose(ComponentHandle cmp) override { return m_model_instances[cmp.index].pose; }
 
 
-	Entity getRenderableEntity(ComponentHandle cmp) override { return m_renderables[cmp.index].entity; }
+	Entity getModelInstanceEntity(ComponentHandle cmp) override { return m_model_instances[cmp.index].entity; }
 
 
-	Model* getRenderableModel(ComponentHandle cmp) override { return m_renderables[cmp.index].model; }
+	Model* getModelInstanceModel(ComponentHandle cmp) override { return m_model_instances[cmp.index].model; }
 
 
-	void showRenderable(ComponentHandle cmp) override
+	void showModelInstance(ComponentHandle cmp) override
 	{
-		auto& renderable = m_renderables[cmp.index];
-		if (!renderable.model || !renderable.model->isReady()) return;
+		auto& model_instance = m_model_instances[cmp.index];
+		if (!model_instance.model || !model_instance.model->isReady()) return;
 
-		Sphere sphere(m_universe.getPosition(renderable.entity), renderable.model->getBoundingRadius());
+		Sphere sphere(m_universe.getPosition(model_instance.entity), model_instance.model->getBoundingRadius());
 		if(!m_culling_system->isAdded(cmp)) m_culling_system->addStatic(cmp, sphere);
 	}
 
 
-	void hideRenderable(ComponentHandle cmp) override
+	void hideModelInstance(ComponentHandle cmp) override
 	{
 		m_culling_system->removeStatic(cmp);
 	}
 
 
-	Path getRenderablePath(ComponentHandle cmp) override
+	Path getModelInstancePath(ComponentHandle cmp) override
 	{
-		return m_renderables[cmp.index].model ? m_renderables[cmp.index].model->getPath() : Path("");
+		return m_model_instances[cmp.index].model ? m_model_instances[cmp.index].model->getPath() : Path("");
 	}
 
 
-	void setRenderableLayer(ComponentHandle cmp, const int32& layer) override
+	void setModelInstanceLayer(ComponentHandle cmp, const int32& layer) override
 	{
 		m_culling_system->setLayerMask(cmp, (int64)1 << (int64)layer);
 	}
 
 
-	int getRenderableMaterialsCount(ComponentHandle cmp) override
+	int getModelInstanceMaterialsCount(ComponentHandle cmp) override
 	{
-		return m_renderables[cmp.index].model ? m_renderables[cmp.index].mesh_count : 0;
+		return m_model_instances[cmp.index].model ? m_model_instances[cmp.index].mesh_count : 0;
 	}
 
 
-	void setRenderablePath(ComponentHandle cmp, const Path& path) override
+	void setModelInstancePath(ComponentHandle cmp, const Path& path) override
 	{
-		Renderable& r = m_renderables[cmp.index];
+		ModelInstance& r = m_model_instances[cmp.index];
 
 		auto* manager = m_engine.getResourceManager().get(MODEL_TYPE);
 		if (path.isValid())
@@ -2107,10 +2229,122 @@ public:
 		Quat rot = scene->m_universe.getRotation(entity);
 
 		RayCastModelHit hit = scene->castRay(origin, rot.rotate(Vec3(0, 0, -1)), INVALID_COMPONENT);
-		LuaWrapper::pushLua(L, hit.m_is_hit);
-		LuaWrapper::pushLua(L, hit.m_is_hit ? hit.m_origin + hit.m_dir * hit.m_t : Vec3(0, 0, 0));
+		LuaWrapper::push(L, hit.m_is_hit);
+		LuaWrapper::push(L, hit.m_is_hit ? hit.m_origin + hit.m_dir * hit.m_t : Vec3(0, 0, 0));
 
 		return 2;
+	}
+
+	
+	static void LUA_setTexturePixel(Texture* texture, int x, int y, uint32 value)
+	{
+		if (!texture) return;
+		if (!texture->isReady()) return;
+		if (texture->data.empty()) return;
+		if (texture->bytes_per_pixel != 4) return;
+
+		x = Math::clamp(x, 0, texture->width - 1);
+		y = Math::clamp(y, 0, texture->height - 1);
+
+		((uint32*)&texture->data[0])[x + y * texture->width] = value;
+	}
+
+
+	static void LUA_updateTextureData(Texture* texture, int x, int y, int w, int h)
+	{
+		if (!texture) return;
+		if (!texture->isReady()) return;
+		if (texture->data.empty()) return;
+
+		texture->onDataUpdated(x, y, w, h);
+	}
+
+
+	static int LUA_getTextureWidth(Texture* texture)
+	{
+		if (!texture) return 0;
+		if (!texture->isReady()) return 0;
+
+		return texture->width;
+	}
+
+
+	static int LUA_getTextureHeight(Texture* texture)
+	{
+		if (!texture) return 0;
+		if (!texture->isReady()) return 0;
+
+		return texture->height;
+	}
+
+
+	static float LUA_getTerrainHeightAt(RenderSceneImpl* render_scene, ComponentHandle cmp, int x, int z)
+	{
+		return render_scene->m_terrains[{cmp.index}]->getHeight(x, z);
+	}
+
+
+	static void LUA_emitParticle(RenderSceneImpl* render_scene, ComponentHandle emitter)
+	{
+		int idx = render_scene->m_particle_emitters.find({ emitter.index });
+		if (idx < 0) return;
+		return render_scene->m_particle_emitters.at(idx)->emit();
+	}
+
+
+	void setTerrainHeightAt(ComponentHandle cmp, int x, int z, float height)
+	{
+		m_terrains[{cmp.index}]->setHeight(x, z, height);
+	}
+
+	static uint32 LUA_getTexturePixel(Texture* texture, int x, int y)
+	{
+		if (!texture) return 0;
+		if (!texture->isReady()) return 0;
+		if (texture->data.empty()) return 0;
+		if (texture->bytes_per_pixel != 4) return 0;
+		
+		x = Math::clamp(x, 0, texture->width - 1);
+		y = Math::clamp(y, 0, texture->height - 1);
+
+		return ((uint32*)&texture->data[0])[x + y * texture->width];
+	}
+
+
+	static Pipeline* LUA_createPipeline(Engine* engine, const char* path)
+	{
+		Renderer& renderer = *static_cast<Renderer*>(engine->getPluginManager().getPlugin("renderer"));
+		Pipeline* pipeline = Pipeline::create(renderer, Path(path), renderer.getEngine().getAllocator());
+		pipeline->load();
+		return pipeline;
+	}
+
+
+	static void LUA_destroyPipeline(Pipeline* pipeline)
+	{
+		Pipeline::destroy(pipeline);
+	}
+
+
+	static void LUA_setPipelineScene(Pipeline* pipeline, RenderScene* scene)
+	{
+		pipeline->setScene(scene);
+	}
+
+
+	static void LUA_pipelineRender(Pipeline* pipeline, int w, int h)
+	{
+		pipeline->setViewport(0, 0, w, h);
+		pipeline->render();
+	}
+
+
+	static bgfx::TextureHandle* LUA_getRenderBuffer(Pipeline* pipeline,
+		const char* framebuffer_name,
+		int renderbuffer_idx)
+	{
+		FrameBuffer::RenderBuffer& rb = pipeline->getFramebuffer(framebuffer_name)->getRenderbuffer(renderbuffer_idx);
+		return &rb.m_handle;
 	}
 
 
@@ -2121,10 +2355,17 @@ public:
 	}
 
 
-	static void LUA_setRenderablePath(IScene* scene, int component, const char* path)
+	static void LUA_setModelInstancePath(IScene* scene, int component, const char* path)
 	{
 		RenderScene* render_scene = (RenderScene*)scene;
-		render_scene->setRenderablePath({component}, Path(path));
+		render_scene->setModelInstancePath({component}, Path(path));
+	}
+
+
+	static int LUA_getModelBoneIndex(Model* model, const char* bone)
+	{
+		if (!model) return 0;
+		return model->getBoneIndex(crc32(bone)).value();
 	}
 
 
@@ -2145,7 +2386,10 @@ public:
 			Lumix::g_log_error.log("render_test") << "Failed to open " << path_preimage;
 			return 0xffffFFFF;
 		}
-		return Lumix::Texture::compareTGA(scene->m_allocator, file1, file2, min_diff);
+		unsigned int result = Lumix::Texture::compareTGA(scene->m_allocator, file1, file2, min_diff);
+		fs.close(*file1);
+		fs.close(*file2);
+		return result;
 	}
 
 
@@ -2155,12 +2399,12 @@ public:
 	}
 
 
-	static void LUA_setRenderableMaterial(RenderScene* scene,
+	static void LUA_setModelInstanceMaterial(RenderScene* scene,
 		ComponentHandle cmp,
 		int index,
 		const char* path)
 	{
-		scene->setRenderableMaterial(cmp, index, Path(path));
+		scene->setModelInstanceMaterial(cmp, index, Path(path));
 	}
 
 
@@ -2239,17 +2483,17 @@ public:
 	}
 
 
-	ComponentHandle getFirstRenderable() override
+	ComponentHandle getFirstModelInstance() override
 	{
-		return getNextRenderable(INVALID_COMPONENT);
+		return getNextModelInstance(INVALID_COMPONENT);
 	}
 
 
-	ComponentHandle getNextRenderable(ComponentHandle cmp) override
+	ComponentHandle getNextModelInstance(ComponentHandle cmp) override
 	{
-		for(int i = cmp.index + 1; i < m_renderables.size(); ++i)
+		for(int i = cmp.index + 1; i < m_model_instances.size(); ++i)
 		{
-			if (m_renderables[i].entity != INVALID_ENTITY) return {i};
+			if (m_model_instances[i].entity != INVALID_ENTITY) return {i};
 		}
 		return INVALID_COMPONENT;
 	}
@@ -2258,7 +2502,7 @@ public:
 	const CullingSystem::Results* cull(const Frustum& frustum)
 	{
 		PROFILE_FUNCTION();
-		if (m_renderables.empty()) return nullptr;
+		if (m_model_instances.empty()) return nullptr;
 
 		m_culling_system->cullToFrustumAsync(frustum, ~0UL);
 		return &m_culling_system->getResult();
@@ -2294,9 +2538,10 @@ public:
 		{
 			m_temporary_infos.pop();
 		}
+
 		for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
 		{
-			Array<RenderableMesh>& subinfos = m_temporary_infos[subresult_index];
+			Array<ModelInstanceMesh>& subinfos = m_temporary_infos[subresult_index];
 			subinfos.clear();
 			if (results[subresult_index].empty()) continue;
 
@@ -2304,22 +2549,29 @@ public:
 				[&subinfos, this, &results, subresult_index, &frustum, lod_ref_point]()
 				{
 					PROFILE_BLOCK("Temporary Info Job");
-					PROFILE_INT("Renderable count", results[subresult_index].size());
+					PROFILE_INT("ModelInstance count", results[subresult_index].size());
 					Vec3 ref_point = lod_ref_point;
+					float lod_multiplier = m_lod_multiplier;
+					if (frustum.fov > 0)
+					{
+						float t = frustum.fov / Math::degreesToRadians(60.0f);
+						lod_multiplier *= t * t;
+					}
 					const ComponentHandle* LUMIX_RESTRICT raw_subresults = &results[subresult_index][0];
-					Renderable* LUMIX_RESTRICT renderables = &m_renderables[0];
+					ModelInstance* LUMIX_RESTRICT model_instances = &m_model_instances[0];
 					for (int i = 0, c = results[subresult_index].size(); i < c; ++i)
 					{
-						Renderable* LUMIX_RESTRICT renderable = &renderables[raw_subresults[i].index];
-						float squared_distance = (renderable->matrix.getTranslation() - ref_point).squaredLength();
+						ModelInstance* LUMIX_RESTRICT model_instance = &model_instances[raw_subresults[i].index];
+						float squared_distance = (model_instance->matrix.getTranslation() - ref_point).squaredLength();
+						squared_distance *= lod_multiplier;
 
-						Model* LUMIX_RESTRICT model = renderable->model;
+						Model* LUMIX_RESTRICT model = model_instance->model;
 						LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
 						for (int j = lod.from, c = lod.to; j <= c; ++j)
 						{
 							auto& info = subinfos.emplace();
-							info.renderable = raw_subresults[i];
-							info.mesh = &renderable->meshes[j];
+							info.model_instance = raw_subresults[i];
+							info.mesh = &model_instance->meshes[j];
 						}
 					}
 				},
@@ -2427,30 +2679,30 @@ public:
 
 	void getPointLightInfluencedGeometry(ComponentHandle light_cmp,
 		const Frustum& frustum,
-		Array<RenderableMesh>& infos) override
+		Array<ModelInstanceMesh>& infos) override
 	{
 		PROFILE_FUNCTION();
 
 		int light_index = m_point_lights_map[light_cmp];
 		for (int j = 0, cj = m_light_influenced_geometry[light_index].size(); j < cj; ++j)
 		{
-			ComponentHandle renderable_cmp = m_light_influenced_geometry[light_index][j];
-			Renderable& renderable = m_renderables[renderable_cmp.index];
-			const Sphere& sphere = m_culling_system->getSphere(renderable_cmp);
+			ComponentHandle model_instance_cmp = m_light_influenced_geometry[light_index][j];
+			ModelInstance& model_instance = m_model_instances[model_instance_cmp.index];
+			const Sphere& sphere = m_culling_system->getSphere(model_instance_cmp);
 			if (frustum.isSphereInside(sphere.position, sphere.radius))
 			{
-				for (int k = 0, kc = renderable.model->getMeshCount(); k < kc; ++k)
+				for (int k = 0, kc = model_instance.model->getMeshCount(); k < kc; ++k)
 				{
 					auto& info = infos.emplace();
-					info.mesh = &renderable.model->getMesh(k);
-					info.renderable = renderable_cmp;
+					info.mesh = &model_instance.model->getMesh(k);
+					info.model_instance = model_instance_cmp;
 				}
 			}
 		}
 	}
 
 
-	void getPointLightInfluencedGeometry(ComponentHandle light_cmp, Array<RenderableMesh>& infos) override
+	void getPointLightInfluencedGeometry(ComponentHandle light_cmp, Array<ModelInstanceMesh>& infos) override
 	{
 		PROFILE_FUNCTION();
 
@@ -2458,18 +2710,18 @@ public:
 		auto& geoms = m_light_influenced_geometry[light_index];
 		for (int j = 0, cj = geoms.size(); j < cj; ++j)
 		{
-			const Renderable& renderable = m_renderables[geoms[j].index];
-			for (int k = 0, kc = renderable.model->getMeshCount(); k < kc; ++k)
+			const ModelInstance& model_instance = m_model_instances[geoms[j].index];
+			for (int k = 0, kc = model_instance.model->getMeshCount(); k < kc; ++k)
 			{
 				auto& info = infos.emplace();
-				info.mesh = &renderable.model->getMesh(k);
-				info.renderable = geoms[j];
+				info.mesh = &model_instance.model->getMesh(k);
+				info.model_instance = geoms[j];
 			}
 		}
 	}
 
 
-	void getRenderableEntities(const Frustum& frustum, Array<Entity>& entities) override
+	void getModelInstanceEntities(const Frustum& frustum, Array<Entity>& entities) override
 	{
 		PROFILE_FUNCTION();
 
@@ -2478,15 +2730,15 @@ public:
 
 		for (auto& subresults : *results)
 		{
-			for (ComponentHandle renderable_cmp : subresults)
+			for (ComponentHandle model_instance_cmp : subresults)
 			{
-				entities.push(m_renderables[renderable_cmp.index].entity);
+				entities.push(m_model_instances[model_instance_cmp.index].entity);
 			}
 		}
 	}
 
 
-	Array<Array<RenderableMesh>>& getRenderableInfos(const Frustum& frustum, const Vec3& lod_ref_point) override
+	Array<Array<ModelInstanceMesh>>& getModelInstanceInfos(const Frustum& frustum, const Vec3& lod_ref_point) override
 	{
 		PROFILE_FUNCTION();
 
@@ -2522,6 +2774,10 @@ public:
 	float getCameraFarPlane(ComponentHandle camera) override { return m_cameras[{camera.index}].far; }
 	float getCameraScreenWidth(ComponentHandle camera) override { return m_cameras[{camera.index}].screen_width; }
 	float getCameraScreenHeight(ComponentHandle camera) override { return m_cameras[{camera.index}].screen_height; }
+
+
+	void setGlobalLODMultiplier(float multiplier) { m_lod_multiplier = multiplier; }
+	float getGlobalLODMultiplier() const { return m_lod_multiplier; }
 
 
 	Matrix getCameraViewProjection(ComponentHandle cmp) override
@@ -3208,16 +3464,16 @@ public:
 	}
 
 
-	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, ComponentHandle ignored_renderable) override
+	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, ComponentHandle ignored_model_instance) override
 	{
 		PROFILE_FUNCTION();
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
 		Universe& universe = getUniverse();
-		for (int i = 0; i < m_renderables.size(); ++i)
+		for (int i = 0; i < m_model_instances.size(); ++i)
 		{
-			auto& r = m_renderables[i];
-			if (ignored_renderable.index != i && r.model)
+			auto& r = m_model_instances[i];
+			if (ignored_model_instance.index != i && r.model)
 			{
 				const Vec3& pos = r.matrix.getTranslation();
 				float radius = r.model->getBoundingRadius();
@@ -3231,7 +3487,7 @@ public:
 					{
 						new_hit.m_component = {i};
 						new_hit.m_entity = r.entity;
-						new_hit.m_component_type = RENDERABLE_TYPE;
+						new_hit.m_component_type = MODEL_INSTANCE_TYPE;
 						hit = new_hit;
 						hit.m_is_hit = true;
 					}
@@ -3538,7 +3794,7 @@ public:
 
 	void modelUnloaded(Model*, ComponentHandle component)
 	{
-		auto& r = m_renderables[component.index];
+		auto& r = m_model_instances[component.index];
 		if (!r.custom_meshes)
 		{
 			r.meshes = nullptr;
@@ -3555,7 +3811,7 @@ public:
 	}
 
 
-	void freeCustomMeshes(Renderable& r, MaterialManager* manager)
+	void freeCustomMeshes(ModelInstance& r, MaterialManager* manager)
 	{
 		if (!r.custom_meshes) return;
 		for (int i = 0; i < r.mesh_count; ++i)
@@ -3575,7 +3831,7 @@ public:
 		auto& rm = m_engine.getResourceManager();
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_TYPE));
 
-		auto& r = m_renderables[component.index];
+		auto& r = m_model_instances[component.index];
 		float bounding_radius = r.model->getBoundingRadius();
 		float scale = m_universe.getScale(r.entity);
 		Sphere sphere(r.matrix.getTranslation(), bounding_radius * scale);
@@ -3632,9 +3888,9 @@ public:
 
 	void modelUnloaded(Model* model)
 	{
-		for (int i = 0, c = m_renderables.size(); i < c; ++i)
+		for (int i = 0, c = m_model_instances.size(); i < c; ++i)
 		{
-			if (m_renderables[i].entity != INVALID_ENTITY && m_renderables[i].model == model)
+			if (m_model_instances[i].entity != INVALID_ENTITY && m_model_instances[i].model == model)
 			{
 				modelUnloaded(model, {i});
 			}
@@ -3644,9 +3900,9 @@ public:
 
 	void modelLoaded(Model* model)
 	{
-		for (int i = 0, c = m_renderables.size(); i < c; ++i)
+		for (int i = 0, c = m_model_instances.size(); i < c; ++i)
 		{
-			if (m_renderables[i].entity != INVALID_ENTITY && m_renderables[i].model == model)
+			if (m_model_instances[i].entity != INVALID_ENTITY && m_model_instances[i].model == model)
 			{
 				modelLoaded(model, {i});
 			}
@@ -3654,8 +3910,8 @@ public:
 
 		for (auto& attachment : m_bone_attachments)
 		{
-			if (isValid(m_renderables[attachment.parent_entity.index].entity) &&
-				m_renderables[attachment.parent_entity.index].model == model)
+			if (isValid(m_model_instances[attachment.parent_entity.index].entity) &&
+				m_model_instances[attachment.parent_entity.index].model == model)
 			{
 				updateRelativeMatrix(attachment);
 			}
@@ -3671,7 +3927,7 @@ public:
 	}
 
 
-	void allocateCustomMeshes(Renderable& r, int count)
+	void allocateCustomMeshes(ModelInstance& r, int count)
 	{
 		if (r.custom_meshes && r.mesh_count == count) return;
 
@@ -3718,10 +3974,10 @@ public:
 	}
 
 
-	void setRenderableMaterial(ComponentHandle cmp, int index, const Path& path) override
+	void setModelInstanceMaterial(ComponentHandle cmp, int index, const Path& path) override
 	{
-		auto& r = m_renderables[cmp.index];
-		if (r.meshes && r.mesh_count > index && path == r.meshes[index].material->getPath()) return;
+		auto& r = m_model_instances[cmp.index];
+		if (r.meshes && r.mesh_count > index && r.meshes[index].material && path == r.meshes[index].material->getPath()) return;
 
 		auto& rm = r.model->getResourceManager();
 		auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(MATERIAL_TYPE));
@@ -3736,9 +3992,9 @@ public:
 	}
 
 
-	Path getRenderableMaterial(ComponentHandle cmp, int index) override
+	Path getModelInstanceMaterial(ComponentHandle cmp, int index) override
 	{
-		auto& r = m_renderables[cmp.index];
+		auto& r = m_model_instances[cmp.index];
 		if (!r.meshes) return Path("");
 
 		return r.meshes[index].material->getPath();
@@ -3747,9 +4003,9 @@ public:
 
 	void setModel(ComponentHandle component, Model* model)
 	{
-		auto& renderable = m_renderables[component.index];
-		ASSERT(isValid(renderable.entity));
-		Model* old_model = renderable.model;
+		auto& model_instance = m_model_instances[component.index];
+		ASSERT(isValid(model_instance.entity));
+		Model* old_model = model_instance.model;
 		bool no_change = model == old_model && old_model;
 		if (no_change)
 		{
@@ -3760,7 +4016,7 @@ public:
 		{
 			auto& rm = old_model->getResourceManager();
 			auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(MATERIAL_TYPE));
-			freeCustomMeshes(renderable, material_manager);
+			freeCustomMeshes(model_instance, material_manager);
 			ModelLoadedCallback& callback = getModelLoadedCallback(old_model);
 			--callback.m_ref_count;
 			if (callback.m_ref_count == 0)
@@ -3774,11 +4030,11 @@ public:
 			}
 			old_model->getResourceManager().unload(*old_model);
 		}
-		renderable.model = model;
-		renderable.meshes = nullptr;
-		renderable.mesh_count = 0;
-		LUMIX_DELETE(m_allocator, renderable.pose);
-		renderable.pose = nullptr;
+		model_instance.model = model;
+		model_instance.meshes = nullptr;
+		model_instance.mesh_count = 0;
+		LUMIX_DELETE(m_allocator, model_instance.pose);
+		model_instance.pose = nullptr;
 		if (model)
 		{
 			ModelLoadedCallback& callback = getModelLoadedCallback(model);
@@ -3945,15 +4201,15 @@ public:
 	}
 
 
-	DelegateList<void(ComponentHandle)>& renderableCreated() override
+	DelegateList<void(ComponentHandle)>& model_instanceCreated() override
 	{
-		return m_renderable_created;
+		return m_model_instance_created;
 	}
 
 
-	DelegateList<void(ComponentHandle)>& renderableDestroyed() override
+	DelegateList<void(ComponentHandle)>& model_instanceDestroyed() override
 	{
-		return m_renderable_destroyed;
+		return m_model_instance_destroyed;
 	}
 
 
@@ -4074,16 +4330,16 @@ public:
 	}
 
 
-	ComponentHandle createRenderable(Entity entity)
+	ComponentHandle createModelInstance(Entity entity)
 	{
-		while(entity.index >= m_renderables.size())
+		while(entity.index >= m_model_instances.size())
 		{
-			auto& r = m_renderables.emplace();
+			auto& r = m_model_instances.emplace();
 			r.entity = INVALID_ENTITY;
 			r.model = nullptr;
 			r.pose = nullptr;
 		}
-		auto& r = m_renderables[entity.index];
+		auto& r = m_model_instances[entity.index];
 		r.entity = entity;
 		r.model = nullptr;
 		r.layer_mask = 1;
@@ -4093,8 +4349,8 @@ public:
 		r.mesh_count = 0;
 		r.matrix = m_universe.getMatrix(entity);
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, RENDERABLE_TYPE, this, cmp);
-		m_renderable_created.invoke(cmp);
+		m_universe.addComponent(entity, MODEL_INSTANCE_TYPE, this, cmp);
+		m_model_instance_created.invoke(cmp);
 		return cmp;
 	}
 
@@ -4138,7 +4394,7 @@ private:
 	HashMap<ComponentHandle, int> m_point_lights_map;
 
 	AssociativeArray<Entity, Decal> m_decals;
-	Array<Renderable> m_renderables;
+	Array<ModelInstance> m_model_instances;
 	Array<GlobalLight> m_global_lights;
 	Array<PointLight> m_point_lights;
 	HashMap<Entity, Camera> m_cameras;
@@ -4151,19 +4407,20 @@ private:
 	Array<DebugLine> m_debug_lines;
 	Array<DebugPoint> m_debug_points;
 
-	Array<Array<RenderableMesh>> m_temporary_infos;
+	Array<Array<ModelInstanceMesh>> m_temporary_infos;
 	MTJD::Group m_sync_point;
 	Array<MTJD::Job*> m_jobs;
 
 	float m_time;
+	float m_lod_multiplier;
 	bool m_is_updating_attachments;
 	bool m_is_forward_rendered;
 	bool m_is_grass_enabled;
 	bool m_is_game_running;
 
 	AssociativeArray<Model*, ModelLoadedCallback> m_model_loaded_callbacks;
-	DelegateList<void(ComponentHandle)> m_renderable_created;
-	DelegateList<void(ComponentHandle)> m_renderable_destroyed;
+	DelegateList<void(ComponentHandle)> m_model_instance_created;
+	DelegateList<void(ComponentHandle)> m_model_instance_destroyed;
 };
 
 
@@ -4173,7 +4430,8 @@ static struct
 	ComponentType type;
 	ComponentHandle(RenderSceneImpl::*creator)(Entity);
 	void (RenderSceneImpl::*destroyer)(ComponentHandle);
-} COMPONENT_INFOS[] = {{RENDERABLE_TYPE, &RenderSceneImpl::createRenderable, &RenderSceneImpl::destroyRenderable},
+} COMPONENT_INFOS[] = {
+	{MODEL_INSTANCE_TYPE, &RenderSceneImpl::createModelInstance, &RenderSceneImpl::destroyModelInstance},
 	{GLOBAL_LIGHT_TYPE, &RenderSceneImpl::createGlobalLight, &RenderSceneImpl::destroyGlobalLight},
 	{POINT_LIGHT_TYPE, &RenderSceneImpl::createPointLight, &RenderSceneImpl::destroyPointLight},
 	{DECAL_TYPE, &RenderSceneImpl::createDecal, &RenderSceneImpl::destroyDecal},
@@ -4189,6 +4447,9 @@ static struct
 	{PARTICLE_EMITTER_ATTRACTOR_HASH,
 		&RenderSceneImpl::createParticleEmitterAttractor,
 		&RenderSceneImpl::destroyParticleEmitterAttractor},
+	{PARTICLE_EMITTER_SUBIMAGE_HASH,
+		&RenderSceneImpl::createParticleEmitterSubimage,
+		&RenderSceneImpl::destroyParticleEmitterSubimage},
 	{PARTICLE_EMITTER_SIZE_HASH,
 		&RenderSceneImpl::createParticleEmitterSize,
 		&RenderSceneImpl::destroyParticleEmitterSize},
@@ -4218,7 +4479,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_renderer(renderer)
 	, m_allocator(allocator)
 	, m_model_loaded_callbacks(m_allocator)
-	, m_renderables(m_allocator)
+	, m_model_instances(m_allocator)
 	, m_cameras(m_allocator)
 	, m_terrains(m_allocator)
 	, m_point_lights(m_allocator)
@@ -4235,22 +4496,23 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_global_light_last_cmp(INVALID_COMPONENT)
 	, m_point_light_last_cmp(INVALID_COMPONENT)
 	, m_is_forward_rendered(is_forward_rendered)
-	, m_renderable_created(m_allocator)
-	, m_renderable_destroyed(m_allocator)
+	, m_model_instance_created(m_allocator)
+	, m_model_instance_destroyed(m_allocator)
 	, m_is_grass_enabled(true)
 	, m_is_game_running(false)
 	, m_particle_emitters(m_allocator)
 	, m_point_lights_map(m_allocator)
 	, m_bone_attachments(m_allocator)
 	, m_environment_probes(m_allocator)
+	, m_lod_multiplier(1.0f)
+	, m_time(0)
+	, m_is_updating_attachments(false)
 {
 	is_opengl = renderer.isOpenGL();
-	m_is_updating_attachments = false;
 	m_universe.entityTransformed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 	m_universe.entityDestroyed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
-	m_time = 0;
-	m_renderables.reserve(5000);
+	m_model_instances.reserve(5000);
 
 	for (auto& i : COMPONENT_INFOS)
 	{
@@ -4314,16 +4576,24 @@ void RenderScene::registerLuaAPI(lua_State* L)
 		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
 		} while(false) \
 
+	REGISTER_FUNCTION(setGlobalLODMultiplier);
+	REGISTER_FUNCTION(getGlobalLODMultiplier);
 	REGISTER_FUNCTION(getCameraViewProjection);
 	REGISTER_FUNCTION(getGlobalLightEntity);
 	REGISTER_FUNCTION(getActiveGlobalLight);
+	REGISTER_FUNCTION(getCameraInSlot);
+	REGISTER_FUNCTION(getCameraEntity);
 	REGISTER_FUNCTION(getCameraSlot);
 	REGISTER_FUNCTION(getCameraComponent);
-	REGISTER_FUNCTION(getRenderableComponent);
-	REGISTER_FUNCTION(getRenderableModel);
+	REGISTER_FUNCTION(getModelInstanceComponent);
+	REGISTER_FUNCTION(getModelInstanceModel);
 	REGISTER_FUNCTION(addDebugCross);
 	REGISTER_FUNCTION(addDebugLine);
+	REGISTER_FUNCTION(addDebugCircle);
+	REGISTER_FUNCTION(addDebugSphere);
 	REGISTER_FUNCTION(getTerrainMaterial);
+	REGISTER_FUNCTION(getTerrainNormalAt);
+	REGISTER_FUNCTION(setTerrainHeightAt);
 
 	#undef REGISTER_FUNCTION
 
@@ -4333,11 +4603,24 @@ void RenderScene::registerLuaAPI(lua_State* L)
 		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
 		} while(false) \
 
+	REGISTER_FUNCTION(createPipeline);
+	REGISTER_FUNCTION(destroyPipeline);
+	REGISTER_FUNCTION(setPipelineScene);
+	REGISTER_FUNCTION(pipelineRender);
+	REGISTER_FUNCTION(getRenderBuffer);
 	REGISTER_FUNCTION(getMaterialTexture);
-	REGISTER_FUNCTION(setRenderableMaterial);
-	REGISTER_FUNCTION(setRenderablePath);
+	REGISTER_FUNCTION(getTextureWidth);
+	REGISTER_FUNCTION(getTextureHeight);
+	REGISTER_FUNCTION(getTexturePixel);
+	REGISTER_FUNCTION(setTexturePixel);
+	REGISTER_FUNCTION(updateTextureData);
+	REGISTER_FUNCTION(setModelInstanceMaterial);
+	REGISTER_FUNCTION(setModelInstancePath);
+	REGISTER_FUNCTION(getModelBoneIndex);
 	REGISTER_FUNCTION(makeScreenshot);
 	REGISTER_FUNCTION(compareTGA);
+	REGISTER_FUNCTION(getTerrainHeightAt);
+	REGISTER_FUNCTION(emitParticle);
 
 	LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", &RenderSceneImpl::LUA_castCameraRay);
 

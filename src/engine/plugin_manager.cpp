@@ -12,7 +12,7 @@ namespace Lumix
 {
 
 
-class PluginManagerImpl : public PluginManager
+class PluginManagerImpl LUMIX_FINAL : public PluginManager
 {
 	private:
 		typedef Array<IPlugin*> PluginList;

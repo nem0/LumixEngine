@@ -7,7 +7,7 @@ namespace Lumix
 
 	class Renderer;
 
-	class LUMIX_RENDERER_API MaterialManager : public ResourceManagerBase
+	class LUMIX_RENDERER_API MaterialManager LUMIX_FINAL : public ResourceManagerBase
 	{
 	public:
 		MaterialManager(Renderer& renderer, IAllocator& allocator)

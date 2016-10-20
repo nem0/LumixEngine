@@ -8,7 +8,8 @@
 
 namespace physx
 {
-	class PxGeometry;
+	class PxTriangleMesh;
+	class PxConvexMesh;
 }
 
 
@@ -19,7 +20,7 @@ namespace Lumix
 class PhysicsSystem;
 
 
-class PhysicsGeometryManager : public ResourceManagerBase
+class PhysicsGeometryManager LUMIX_FINAL : public ResourceManagerBase
 {
 	public:
 		PhysicsGeometryManager(PhysicsSystem& system, IAllocator& allocator)
@@ -41,7 +42,7 @@ class PhysicsGeometryManager : public ResourceManagerBase
 };
 
 
-class PhysicsGeometry : public Resource
+class PhysicsGeometry LUMIX_FINAL : public Resource
 {
 	public:
 		static const uint32 HEADER_MAGIC = 0x5f4c5046; // '_LPF'
@@ -63,7 +64,9 @@ class PhysicsGeometry : public Resource
 		PhysicsGeometry(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 		~PhysicsGeometry();
 
-		physx::PxGeometry* getGeometry() { return m_geometry; }
+	public:
+		physx::PxTriangleMesh* tri_mesh;
+		physx::PxConvexMesh* convex_mesh;
 
 	private:
 		IAllocator& getAllocator();
@@ -71,9 +74,6 @@ class PhysicsGeometry : public Resource
 		void unload(void) override;
 		bool load(FS::IFile& file) override;
 
-	private:
-		physx::PxGeometry* m_geometry;
-		bool m_is_convex;
 };
 
 

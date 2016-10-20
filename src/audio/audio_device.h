@@ -35,7 +35,7 @@ public:
 	static const int MAX_PLAYING_SOUNDS = 256;
 
 	typedef int BufferHandle;
-	static const BufferHandle INVALID_BUFFER_HANDLE;
+	static const BufferHandle INVALID_BUFFER_HANDLE = -1;
 
 public:
 	virtual ~AudioDevice() {}
@@ -51,8 +51,10 @@ public:
 		float right_delay) = 0;
 	virtual void play(BufferHandle buffer, bool looped) = 0;
 	virtual bool isPlaying(BufferHandle buffer) = 0;
+	virtual bool isEnd(BufferHandle buffer) = 0;
 	virtual void stop(BufferHandle buffer) = 0;
 	virtual void pause(BufferHandle buffer) = 0;
+	virtual void setMasterVolume(float volume) = 0;
 	virtual void setVolume(BufferHandle buffer, float volume) = 0;
 	virtual void setFrequency(BufferHandle buffer, float frequency) = 0;
 	virtual void setCurrentTime(BufferHandle buffer, float time_seconds) = 0;

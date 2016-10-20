@@ -34,6 +34,7 @@ struct ShaderInstance
 		}
 	}
 	~ShaderInstance();
+	bgfx::ProgramHandle getProgramHandle(int pass_idx);
 
 	bgfx::ProgramHandle program_handles[32];
 	ShaderBinary* binaries[64];
@@ -61,7 +62,7 @@ struct LUMIX_RENDERER_API ShaderCombinations
 };
 
 
-class LUMIX_RENDERER_API ShaderBinary : public Resource
+class LUMIX_RENDERER_API ShaderBinary LUMIX_FINAL : public Resource
 {
 public:
 	ShaderBinary(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
@@ -76,7 +77,7 @@ private:
 };
 
 
-class LUMIX_RENDERER_API Shader : public Resource
+class LUMIX_RENDERER_API Shader LUMIX_FINAL : public Resource
 {
 	friend struct ShaderInstance;
 
@@ -87,14 +88,12 @@ public:
 		{
 			name[0] = uniform[0] = '\0';
 			define_idx = -1;
-			is_atlas = false;
 			uniform_handle = BGFX_INVALID_HANDLE;
 		}
 
 		char name[30];
 		char uniform[30];
 		int define_idx;
-		bool is_atlas;
 		bgfx::UniformHandle uniform_handle;
 	};
 
@@ -129,10 +128,13 @@ public:
 	ShaderInstance& getInstance(uint32 mask);
 	Renderer& getRenderer();
 
-	static bool getShaderCombinations(Renderer& renderer, const char* shader_content, ShaderCombinations* output);
+	static bool getShaderCombinations(const char* shd_path,
+		Renderer& renderer,
+		const char* shader_content,
+		ShaderCombinations* output);
 
 	IAllocator& m_allocator;
-	Array<ShaderInstance*> m_instances;
+	Array<ShaderInstance> m_instances;
 	uint32 m_all_defines_mask;
 	ShaderCombinations m_combintions;
 	uint64 m_render_states;
@@ -143,7 +145,6 @@ public:
 private:
 	bool generateInstances();
 
-	void onBeforeReady() override;
 	void unload(void) override;
 	bool load(FS::IFile& file) override;
 };

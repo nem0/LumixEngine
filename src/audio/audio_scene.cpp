@@ -23,6 +23,7 @@ enum class AudioSceneVersion : int
 {
 	ECHO_ZONES,
 	REFACTOR,
+	IS_3D,
 
 	LAST
 };
@@ -61,12 +62,12 @@ struct PlayingSound
 {
 	AudioDevice::BufferHandle buffer_id;
 	Entity entity;
-	float time;
 	AudioScene::ClipInfo* clip;
+	bool is_3d;
 };
 
 
-struct AudioSceneImpl : public AudioScene
+struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 {
 	AudioSceneImpl(AudioSystem& system, Universe& context, IAllocator& allocator)
 		: m_allocator(allocator)
@@ -128,12 +129,14 @@ struct AudioSceneImpl : public AudioScene
 			auto& sound = m_playing_sounds[i];
 			if (sound.buffer_id == AudioDevice::INVALID_BUFFER_HANDLE) continue;
 
-			auto pos = m_universe.getPosition(sound.entity);
-			m_device.setSourcePosition(sound.buffer_id, pos.x, pos.y, pos.z);
-			sound.time += time_delta;
+			if (sound.is_3d)
+			{
+				auto pos = m_universe.getPosition(sound.entity);
+				m_device.setSourcePosition(sound.buffer_id, pos.x, pos.y, pos.z);
+			}
 
 			auto* clip_info = sound.clip;
-			if (!clip_info->looped && sound.time > clip_info->clip->getLengthSeconds())
+			if (!clip_info->looped && m_device.isEnd(sound.buffer_id))
 			{
 				m_device.stop(sound.buffer_id);
 				m_playing_sounds[i].buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
@@ -329,6 +332,7 @@ struct AudioSceneImpl : public AudioScene
 		{
 			serializer.write(m_clips.indexOf(sound.clip));
 			serializer.write(sound.entity);
+			serializer.write(sound.is_3d);
 		}
 
 		serializer.write(m_echo_zones.size());
@@ -385,6 +389,7 @@ struct AudioSceneImpl : public AudioScene
 			if (clip_idx >= 0) sound.clip = m_clips[clip_idx];
 			if (version <= (int)AudioSceneVersion::REFACTOR) serializer.read(dummy_cmp);
 			serializer.read(sound.entity);
+			if (version > (int)AudioSceneVersion::IS_3D) serializer.read(sound.is_3d);
 
 			ComponentHandle cmp = {sound.entity.index};
 			m_ambient_sounds.insert(sound.entity, sound);
@@ -533,9 +538,9 @@ struct AudioSceneImpl : public AudioScene
 				m_device.setSourcePosition(buffer, pos.x, pos.y, pos.z);
 
 				auto& sound = m_playing_sounds[i];
+				sound.is_3d = is_3d;
 				sound.buffer_id = buffer;
 				sound.entity = entity;
-				sound.time = 0;
 				sound.clip = clip_info;
 				
 				for (const EchoZone& zone : m_echo_zones)
@@ -562,6 +567,12 @@ struct AudioSceneImpl : public AudioScene
 		ASSERT(sound_id >= 0 && sound_id < lengthOf(m_playing_sounds));
 		m_device.stop(m_playing_sounds[sound_id].buffer_id);
 		m_playing_sounds[sound_id].buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
+	}
+
+
+	void setMasterVolume(float volume)
+	{
+		m_device.setMasterVolume(volume);
 	}
 
 
@@ -662,6 +673,7 @@ void AudioScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(setEcho);
 	REGISTER_FUNCTION(playSound);
 	REGISTER_FUNCTION(setVolume);
+	REGISTER_FUNCTION(setMasterVolume);
 
 	#undef REGISTER_FUNCTION
 }

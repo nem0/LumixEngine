@@ -25,7 +25,8 @@ enum TransFlags
 	E_CLOSE = 0,
 	E_SUCCESS = 0x1,
 	E_IS_OPEN = E_SUCCESS << 1,
-	E_FAIL = E_IS_OPEN << 1
+	E_FAIL = E_IS_OPEN << 1,
+	E_CANCELED = E_FAIL << 1
 };
 
 struct AsyncItem
@@ -33,6 +34,7 @@ struct AsyncItem
 	IFile* m_file;
 	ReadCallback m_cb;
 	Mode m_mode;
+	uint32 m_id;
 	char m_path[MAX_PATH_LENGTH];
 	uint8 m_flags;
 };
@@ -70,7 +72,7 @@ void IFile::getContents(OutputBlob& blob)
 #if !LUMIX_SINGLE_THREAD()
 
 
-class FSTask : public MT::Task
+class FSTask LUMIX_FINAL : public MT::Task
 {
 public:
 	FSTask(TransQueue* queue, IAllocator& allocator)
@@ -117,14 +119,15 @@ private:
 #endif
 
 
-class FileSystemImpl : public FileSystem
+class FileSystemImpl LUMIX_FINAL : public FileSystem
 {
 public:
 	explicit FileSystemImpl(IAllocator& allocator)
 		: m_allocator(allocator)
-		, m_in_progress(m_allocator)
 		, m_pending(m_allocator)
 		, m_devices(m_allocator)
+		, m_in_progress(m_allocator)
+		, m_last_id(0)
 	{
 		m_disk_device.m_devices[0] = nullptr;
 		m_memory_device.m_devices[0] = nullptr;
@@ -236,7 +239,7 @@ public:
 	}
 
 
-	bool openAsync(const DeviceList& device_list,
+	uint32 openAsync(const DeviceList& device_list,
 		const Path& file,
 		int mode,
 		const ReadCallback& call_back) override
@@ -252,9 +255,38 @@ public:
 			item.m_mode = mode;
 			copyString(item.m_path, file.c_str());
 			item.m_flags = E_IS_OPEN;
+			item.m_id = m_last_id;
+			++m_last_id;
+			if (m_last_id == INVALID_ASYNC) m_last_id = 0;
+			return item.m_id;
 		}
 
-		return nullptr != prev;
+		return INVALID_ASYNC;
+	}
+
+
+	void cancelAsync(uint32 id) override
+	{
+		if (id == INVALID_ASYNC) return;
+
+		for (int i = 0, c = m_pending.size(); i < c; ++i)
+		{
+			if (m_pending[i].m_id == id)
+			{
+				m_pending[i].m_flags |= E_CANCELED;
+				return;
+			}
+		}
+
+		for (auto iter = m_in_progress.begin(), end = m_in_progress.end(); iter != end; ++iter)
+		{
+			if (iter.value()->data.m_id = id)
+			{
+				iter.value()->data.m_flags |= E_CANCELED;
+				return;
+			}
+		}
+
 	}
 
 
@@ -323,7 +355,10 @@ public:
 			PROFILE_BLOCK("processAsyncTransaction");
 			m_in_progress.pop();
 
-			tr->data.m_cb.invoke(*tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS));
+			if ((tr->data.m_flags & E_CANCELED) == 0)
+			{
+				tr->data.m_cb.invoke(*tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS));
+			}
 			if ((tr->data.m_flags & (E_SUCCESS | E_FAIL)) != 0)
 			{
 				closeAsync(*tr->data.m_file);
@@ -403,6 +438,7 @@ private:
 	DeviceList m_memory_device;
 	DeviceList m_default_device;
 	DeviceList m_save_game_device;
+	uint32 m_last_id;
 };
 
 FileSystem* FileSystem::create(IAllocator& allocator)

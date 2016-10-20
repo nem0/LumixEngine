@@ -1,6 +1,7 @@
-#include "engine/lumix.h"
 #include "engine/resource_manager_base.h"
 #include "engine/crc32.h"
+#include "engine/log.h"
+#include "engine/lumix.h"
 #include "engine/path.h"
 #include "engine/path_utils.h"
 #include "engine/resource.h"
@@ -20,7 +21,10 @@ namespace Lumix
 		for (auto iter = m_resources.begin(), end = m_resources.end(); iter != end; ++iter)
 		{
 			Resource* resource = iter.value();
-			ASSERT(resource->isEmpty());
+			if (!resource->isEmpty())
+			{
+				g_log_error.log("Engine") << "Leaking resource " << resource->getPath().c_str();
+			}
 			destroyResource(*resource);
 		}
 		m_resources.clear();
@@ -36,20 +40,6 @@ namespace Lumix
 		}
 
 		return nullptr;
-	}
-
-	void ResourceManagerBase::remove(Resource* resource)
-	{
-		ASSERT(resource->isEmpty());
-		m_resources.erase(resource->getPath().getHash());
-		resource->remRef();
-	}
-
-	void ResourceManagerBase::add(Resource* resource)
-	{
-		ASSERT(resource && resource->isReady());
-		m_resources.insert(resource->getPath().getHash(), resource);
-		resource->addRef();
 	}
 
 	Resource* ResourceManagerBase::load(const Path& path)
@@ -73,6 +63,8 @@ namespace Lumix
 
 	void ResourceManagerBase::removeUnreferenced()
 	{
+		if (!m_is_unload_enabled) return;
+
 		Array<Resource*> to_remove(m_allocator);
 		for (auto* i : m_resources)
 		{
@@ -99,44 +91,23 @@ namespace Lumix
 	void ResourceManagerBase::unload(const Path& path)
 	{
 		Resource* resource = get(path);
-		if(nullptr != resource)
-		{
-			unload(*resource);
-		}
+		if (resource) unload(*resource);
 	}
 
 	void ResourceManagerBase::unload(Resource& resource)
 	{
 		int new_ref_count = resource.remRef();
 		ASSERT(new_ref_count >= 0);
-		if(new_ref_count == 0)
+		if(new_ref_count == 0 && m_is_unload_enabled)
 		{
 			resource.doUnload();
 		}
 	}
 
-	void ResourceManagerBase::forceUnload(const Path& path)
-	{
-		Resource* resource = get(path);
-		if(nullptr != resource)
-		{
-			forceUnload(*resource);
-		}
-	}
-
-	void ResourceManagerBase::forceUnload(Resource& resource)
-	{
-		resource.doUnload();
-		resource.m_ref_count = 0;
-	}
-
 	void ResourceManagerBase::reload(const Path& path)
 	{
 		Resource* resource = get(path);
-		if(nullptr != resource)
-		{
-			reload(*resource);
-		}
+		if(resource) reload(*resource);
 	}
 
 	void ResourceManagerBase::reload(Resource& resource)
@@ -145,11 +116,26 @@ namespace Lumix
 		resource.doLoad();
 	}
 
+	void ResourceManagerBase::enableUnload(bool enable)
+	{
+		m_is_unload_enabled = enable;
+		if (!enable) return;
+
+		for (auto* resource : m_resources)
+		{
+			if (resource->getRefCount() == 0)
+			{
+				resource->doUnload();
+			}
+		}
+	}
+
 	ResourceManagerBase::ResourceManagerBase(IAllocator& allocator)
 		: m_size(0)
 		, m_resources(allocator)
 		, m_allocator(allocator)
 		, m_owner(nullptr)
+		, m_is_unload_enabled(true)
 	{ }
 
 	ResourceManagerBase::~ResourceManagerBase()

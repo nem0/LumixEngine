@@ -43,11 +43,11 @@ namespace Lumix
 {
 
 
-static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
 static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
 
 
-struct BeginGroupCommand : public IEditorCommand
+struct BeginGroupCommand LUMIX_FINAL : public IEditorCommand
 {
 	BeginGroupCommand() {}
 	BeginGroupCommand(WorldEditor&) {}
@@ -61,7 +61,7 @@ struct BeginGroupCommand : public IEditorCommand
 };
 
 
-struct EndGroupCommand : public IEditorCommand
+struct EndGroupCommand LUMIX_FINAL : public IEditorCommand
 {
 	EndGroupCommand() {}
 	EndGroupCommand(WorldEditor&) {}
@@ -77,7 +77,7 @@ struct EndGroupCommand : public IEditorCommand
 };
 
 
-class SetEntityNameCommand : public IEditorCommand
+class SetEntityNameCommand LUMIX_FINAL : public IEditorCommand
 {
 public:
 	explicit SetEntityNameCommand(WorldEditor& editor)
@@ -152,7 +152,7 @@ private:
 };
 
 
-class PasteEntityCommand : public IEditorCommand
+class PasteEntityCommand LUMIX_FINAL : public IEditorCommand
 {
 public:
 	explicit PasteEntityCommand(WorldEditor& editor)
@@ -259,7 +259,7 @@ private:
 };
 
 
-class MoveEntityCommand : public IEditorCommand
+class MoveEntityCommand LUMIX_FINAL : public IEditorCommand
 {
 public:
 	explicit MoveEntityCommand(WorldEditor& editor)
@@ -410,7 +410,7 @@ private:
 };
 
 
-class ScaleEntityCommand : public IEditorCommand
+class ScaleEntityCommand LUMIX_FINAL : public IEditorCommand
 {
 public:
 	explicit ScaleEntityCommand(WorldEditor& editor)
@@ -526,7 +526,7 @@ private:
 };
 
 
-class RemoveArrayPropertyItemCommand : public IEditorCommand
+class RemoveArrayPropertyItemCommand LUMIX_FINAL : public IEditorCommand
 {
 
 public:
@@ -611,7 +611,7 @@ private:
 };
 
 
-class AddArrayPropertyItemCommand : public IEditorCommand
+class AddArrayPropertyItemCommand LUMIX_FINAL : public IEditorCommand
 {
 
 public:
@@ -684,7 +684,7 @@ private:
 };
 
 
-class SetPropertyCommand : public IEditorCommand
+class SetPropertyCommand LUMIX_FINAL : public IEditorCommand
 {
 public:
 	explicit SetPropertyCommand(WorldEditor& editor)
@@ -847,10 +847,10 @@ private:
 };
 
 
-struct WorldEditorImpl : public WorldEditor
+struct WorldEditorImpl LUMIX_FINAL : public WorldEditor
 {
 private:
-	class AddComponentCommand : public IEditorCommand
+	class AddComponentCommand LUMIX_FINAL : public IEditorCommand
 	{
 	public:
 		explicit AddComponentCommand(WorldEditor& editor)
@@ -957,7 +957,7 @@ private:
 	};
 
 
-	class DestroyEntitiesCommand : public IEditorCommand
+	class DestroyEntitiesCommand LUMIX_FINAL : public IEditorCommand
 	{
 	public:
 		explicit DestroyEntitiesCommand(WorldEditor& editor)
@@ -1150,7 +1150,7 @@ private:
 	};
 
 
-	class DestroyComponentCommand : public IEditorCommand
+	class DestroyComponentCommand LUMIX_FINAL : public IEditorCommand
 	{
 	public:
 		explicit DestroyComponentCommand(WorldEditor& editor)
@@ -1297,7 +1297,7 @@ private:
 	};
 
 
-	class AddEntityCommand : public IEditorCommand
+	class AddEntityCommand LUMIX_FINAL : public IEditorCommand
 	{
 	public:
 		explicit AddEntityCommand(WorldEditor& editor)
@@ -1745,16 +1745,16 @@ public:
 		{
 			Entity entity = m_selected_entities[i];
 
-			ComponentUID renderable = getUniverse()->getComponent(m_selected_entities[i], RENDERABLE_TYPE);
+			ComponentUID model_instance = getUniverse()->getComponent(m_selected_entities[i], MODEL_INSTANCE_TYPE);
 			Vec3 origin = universe->getPosition(entity);
-			auto hit = m_render_interface->castRay(origin, Vec3(0, -1, 0), renderable.handle);
+			auto hit = m_render_interface->castRay(origin, Vec3(0, -1, 0), model_instance.handle);
 			if (hit.is_hit)
 			{
 				new_positions.push(origin + Vec3(0, -hit.t, 0));
 			}
 			else
 			{
-				hit = m_render_interface->castRay(origin, Vec3(0, 1, 0), renderable.handle);
+				hit = m_render_interface->castRay(origin, Vec3(0, 1, 0), model_instance.handle);
 				if (hit.is_hit)
 				{
 					new_positions.push(origin + Vec3(0, hit.t, 0));
@@ -2038,6 +2038,7 @@ public:
 	void stopGameMode(bool reload)
 	{
 		ASSERT(m_universe);
+		m_engine->getResourceManager().enableUnload(false);
 		m_engine->stopGame(*m_universe);
 		selectEntities(nullptr, 0);
 		m_gizmo->clearEntities();
@@ -2045,14 +2046,23 @@ public:
 		m_is_game_mode = false;
 		if (reload)
 		{
+			m_universe_destroyed.invoke();
 			m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
-			m_universe->resetScenes();
+			m_entity_groups.setUniverse(nullptr);
+			m_engine->destroyUniverse(*m_universe);
+			
+			m_universe = &m_engine->createUniverse(true);
+			m_universe_created.invoke();
+			m_universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
+			m_selected_entities.clear();
+			m_entity_groups.setUniverse(m_universe);
 			m_camera = INVALID_ENTITY;
 			load(*m_game_mode_file);
 		}
 		m_engine->getFileSystem().close(*m_game_mode_file);
 		m_game_mode_file = nullptr;
 		if(isValid(m_selected_entity_on_game_mode)) selectEntities(&m_selected_entity_on_game_mode, 1);
+		m_engine->getResourceManager().enableUnload(true);
 	}
 
 
@@ -2123,9 +2133,16 @@ public:
 				blob.write(cmp_type);
 				Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmp.type);
 				int32 prop_count = props.size();
+				blob.write(prop_count);
 				for (int j = 0; j < prop_count; ++j)
 				{
+					blob.write(props[j]->getNameHash());
+					int32 size = 0;
+					blob.write(size);
+					int pos = blob.getPos();
 					props[j]->get(cmp, -1, blob);
+					size = blob.getPos() - pos;
+					*(int32*)((uint8*)blob.getData() + pos - 4) = size;
 				}
 			}
 		}
@@ -2228,6 +2245,7 @@ public:
 
 	void loadMap(FS::IFile& file, bool success)
 	{
+		PROFILE_FUNCTION();
 		ASSERT(success);
 		if (success)
 		{
@@ -2687,7 +2705,7 @@ public:
 
 		m_is_universe_changed = false;
 		destroyUndoStack();
-		m_universe = &m_engine->createUniverse();
+		m_universe = &m_engine->createUniverse(true);
 		Universe* universe = m_universe;
 
 		universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);

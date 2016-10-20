@@ -20,7 +20,7 @@ namespace MTJD
 {
 
 
-class WorkerTask : public MT::Task
+class WorkerTask LUMIX_FINAL : public MT::Task
 {
 public:
 	WorkerTask(IAllocator& allocator);

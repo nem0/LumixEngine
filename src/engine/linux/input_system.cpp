@@ -12,7 +12,6 @@ namespace Lumix
 		InputSystemImpl(IAllocator& allocator) : m_allocator(allocator)
 			, m_mouse_rel_pos(0, 0)
 			, m_injected_mouse_rel_pos(0, 0)
-			, m_event_listener(allocator)
 		{}
 
 
@@ -51,15 +50,8 @@ namespace Lumix
 		float getMouseXMove() const override { return m_mouse_rel_pos.x; }
 		float getMouseYMove() const override { return m_mouse_rel_pos.y; }
 		Vec2 getMousePos() const override { return m_mouse_pos; }
+		bool isMouseDown(MouseButton button) override { return false; }
 
-
-		DelegateList<void(InputEvent&)>& eventListener() override { return m_event_listener; }
-
-
-		void injectEvent(InputEvent& event) override
-		{
-			m_event_listener.invoke(event);
-		}
 
 
 		void addAction(uint32 action, InputType type, int key, int controller_id) override {}
@@ -68,7 +60,6 @@ namespace Lumix
 		Vec2 m_injected_mouse_rel_pos;
 		Vec2 m_mouse_pos;
 		Vec2 m_mouse_rel_pos;
-		DelegateList<void(InputEvent&)> m_event_listener;
 	};
 
 
