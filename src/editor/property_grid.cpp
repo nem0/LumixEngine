@@ -332,6 +332,8 @@ void PropertyGrid::showSampledFunctionProperty(const Lumix::Array<Lumix::Entity>
 
 	bool changed = false;
 	auto cp = ImGui::GetCursorScreenPos();
+	cp.x += ImGui::CurveEditor::GRAPH_MARGIN;
+	cp.y += ImGui::CurveEditor::GRAPH_MARGIN;
 	
 	ImVec2 editor_size;
 	auto editor = ImGui::BeginCurveEditor(desc.getName());
@@ -339,21 +341,29 @@ void PropertyGrid::showSampledFunctionProperty(const Lumix::Array<Lumix::Entity>
 	{
 		editor_size = ImVec2(ImGui::CalcItemWidth(), ImGui::GetItemRectSize().y);
 
-		for (int i = 1; i < count; i += 3)
+		if (ImGui::CurveSegment((ImVec2*)(f + 1), editor))//first point
 		{
-			if (ImGui::CurvePoint((ImVec2*)(f + i - 1), editor))
+			changed = true;
+		}
+
+		for (int i = 1; i < count - 3; i += 3)
+		{
+			if (ImGui::CurveSegment((ImVec2*)(f + i), editor))
 			{
 				changed = true;
-				if (i > 1)
-				{
-					f[i].x = Lumix::Math::maximum(f[i - 3].x + 0.001f, f[i].x);
-				}
+			}
+
+			if (changed)
+			{
+				f[i + 3].x = Lumix::Math::maximum(f[i].x + 0.001f, f[i + 3].x);
+
 				if (i + 3 < count)
 				{
-					f[i].x = Lumix::Math::minimum(f[i + 3].x - 0.001f, f[i].x);
+					f[i + 3].x = Lumix::Math::minimum(f[i + 6].x - 0.001f, f[i + 3].x);
 				}
 			}
-			if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))
+
+			if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))//remove point
 			{
 				for (int j = i - 1; j < count - 3; ++j)
 				{
@@ -369,7 +379,7 @@ void PropertyGrid::showSampledFunctionProperty(const Lumix::Array<Lumix::Entity>
 		f[1].x = 0;
 		ImGui::EndCurveEditor(editor);
 	}
-	if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))
+	if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))//add new point
 	{
 		auto mp = ImGui::GetMousePos();
 		mp.x -= cp.x;
