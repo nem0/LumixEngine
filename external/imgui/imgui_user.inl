@@ -588,7 +588,7 @@ ImVec2 operator*(float f, const ImVec2& v)
 }
 
 
-const float CurveEditor::GRAPH_MARGIN = 10;
+const float CurveEditor::GRAPH_MARGIN = 14;
 const float CurveEditor::HEIGHT = 100;
 
 
@@ -610,7 +610,7 @@ CurveEditor BeginCurveEditor(const char* label)
     graph_size.y = CurveEditor::HEIGHT; // label_size.y + (style.FramePadding.y * 2);
 
     const ImRect frame_bb(
-        window->DC.CursorPos, window->DC.CursorPos + ImVec2(graph_size.x, graph_size.y));
+        window->DC.CursorPos + ImVec2(CurveEditor::GRAPH_MARGIN, CurveEditor::GRAPH_MARGIN), window->DC.CursorPos + ImVec2(graph_size.x, graph_size.y));
     const ImRect inner_bb(frame_bb.Min + style.FramePadding, frame_bb.Max - style.FramePadding);
 	editor.inner_bb_min = inner_bb.Min;
 	editor.inner_bb_max = inner_bb.Max;
@@ -702,7 +702,7 @@ bool CurveSegment(ImVec2* points, CurveEditor& editor)
 
 	auto handleTangent = [&window, &editor, transform, inner_bb](ImVec2& t, const ImVec2& p) -> bool
 	{
-		static const float SIZE = 3;
+		static const float SIZE = 2;
 		static const float LENGTH = 18;
 
 		auto normalized = [](const ImVec2& v) -> ImVec2
@@ -723,28 +723,19 @@ bool CurveSegment(ImVec2* points, CurveEditor& editor)
 
 		ImU32 col = IsItemHovered() ? GetColorU32(ImGuiCol_PlotLinesHovered) : GetColorU32(ImGuiCol_PlotLines);
 
-		window->DrawList->AddLine(tang + ImVec2(-SIZE, 0), tang + ImVec2(0, SIZE), col);
-		window->DrawList->AddLine(tang + ImVec2(SIZE, 0), tang + ImVec2(0, SIZE), col);
-		window->DrawList->AddLine(tang + ImVec2(SIZE, 0), tang + ImVec2(0, -SIZE), col);
-		window->DrawList->AddLine(tang + ImVec2(-SIZE, 0), tang + ImVec2(0, -SIZE), col);
+		window->DrawList->AddLine(tang + ImVec2(-SIZE, SIZE), tang + ImVec2(SIZE, SIZE), col);
+		window->DrawList->AddLine(tang + ImVec2(SIZE, SIZE), tang + ImVec2(SIZE, -SIZE), col);
+		window->DrawList->AddLine(tang + ImVec2(SIZE, -SIZE), tang + ImVec2(-SIZE, -SIZE), col);
+		window->DrawList->AddLine(tang + ImVec2(-SIZE, -SIZE), tang + ImVec2(-SIZE, SIZE), col);
 
 		bool changed = false;
 		if (IsItemActive() && IsMouseDragging(0))
 		{
-			/*pos += GetIO().MouseDelta;
-			ImVec2 v;
-			v.x = (pos.x - inner_bb.Min.x) / (inner_bb.Max.x - inner_bb.Min.x);
-			v.y = (inner_bb.Max.y - pos.y) / (inner_bb.Max.y - inner_bb.Min.y);
-
-			v = ImClamp(v, ImVec2(0, 0), ImVec2(1, 1));
-			p = v;*/
-			tang += GetIO().MouseDelta;
-			tang -= pos;
+			tang += GetIO().MouseDelta - pos;
 			tang /= LENGTH;
 			tang.y *= -1;
 			
 			t = tang;
-
 			changed = true;
 		}
 		PopID();
