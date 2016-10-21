@@ -2441,18 +2441,6 @@ public:
 	}
 
 
-	void setGrassGround(ComponentHandle cmp, int index, int ground) override
-	{
-		m_terrains[{cmp.index}]->setGrassTypeGround(index, ground);
-	}
-
-
-	int getGrassGround(ComponentHandle cmp, int index) override
-	{
-		return m_terrains[{cmp.index}]->getGrassTypeGround(index);
-	}
-
-
 	void setGrassPath(ComponentHandle cmp, int index, const Path& path) override
 	{
 		m_terrains[{cmp.index}]->setGrassTypePath(index, path);

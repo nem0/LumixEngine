@@ -34,19 +34,18 @@ class Universe;
 class Terrain
 {
 	public:
-		class GrassType
+		struct GrassType
 		{
-			public:
-				explicit GrassType(Terrain& terrain);
-				~GrassType();
+			GrassType(Terrain& terrain, int idx);
+			~GrassType();
 
-				void grassLoaded(Resource::State, Resource::State, Resource&);
+			void grassLoaded(Resource::State, Resource::State, Resource&);
 
-				Model* m_grass_model;
-				Terrain& m_terrain;
-				int32 m_ground;
-				int32 m_density;
-				float m_distance;
+			Model* m_grass_model;
+			Terrain& m_terrain;
+			int32 m_density;
+			float m_distance;
+			int m_idx;
 		};
 
 		struct GrassPatch
@@ -64,16 +63,15 @@ class Terrain
 			GrassType* m_type;
 		};
 
-		class GrassQuad
+		struct GrassQuad
 		{
-			public:
-				explicit GrassQuad(IAllocator& allocator)
-					: m_patches(allocator)
-				{}
+			explicit GrassQuad(IAllocator& allocator)
+				: m_patches(allocator)
+			{}
 
-				Array<GrassPatch> m_patches;
-				Vec3 pos;
-				float radius;
+			Array<GrassPatch> m_patches;
+			Vec3 pos;
+			float radius;
 		};
 
 	public:
@@ -99,7 +97,6 @@ class Terrain
 		AABB getAABB() const;
 		int getWidth() const { return m_width; }
 		int getHeight() const { return m_height; }
-		int getGrassTypeGround(int index) const;
 		int getGrassTypeDensity(int index) const;
 		float getGrassTypeDistance(int index) const;
 		int getGrassTypeCount() const { return m_grass_types.size(); }
@@ -109,7 +106,6 @@ class Terrain
 		void setXZScale(float scale) { m_scale.x = scale; m_scale.z = scale; }
 		void setYScale(float scale) { m_scale.y = scale; }
 		void setGrassTypePath(int index, const Path& path);
-		void setGrassTypeGround(int index, int ground);
 		void setGrassTypeDensity(int index, int density);
 		void setGrassTypeDistance(int index, float value);
 		void setMaterial(Material* material);

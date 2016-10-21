@@ -19,7 +19,7 @@ class Texture;
 class TerrainEditor LUMIX_FINAL : public Lumix::WorldEditor::Plugin
 {
 public:
-	enum Type
+	enum ActionType
 	{
 		RAISE_HEIGHT,
 		LOWER_HEIGHT,
@@ -29,6 +29,8 @@ public:
 		ENTITY,
 		REMOVE_ENTITY,
 		COLOR,
+		ADD_GRASS,
+		REMOVE_GRASS,
 		NOT_SET
 	};
 
@@ -46,7 +48,7 @@ private:
 	void detectModifiers();
 	void drawCursor(Lumix::RenderScene& scene, Lumix::ComponentHandle cmp, const Lumix::Vec3& center);
 	Lumix::Material* getMaterial();
-	void paint(const Lumix::Vec3& hit, TerrainEditor::Type type, bool new_stroke);
+	void paint(const Lumix::Vec3& hit, TerrainEditor::ActionType action_type, bool new_stroke);
 
 	static void getProjections(const Lumix::Vec3& axis,
 		const Lumix::Vec3 vertices[8],
@@ -64,11 +66,12 @@ private:
 
 private:
 	Lumix::WorldEditor& m_world_editor;
-	Type m_type;
+	ActionType m_action_type;
 	Lumix::ComponentUID m_component;
 	float m_terrain_brush_strength;
 	float m_terrain_brush_size;
 	int m_texture_idx;
+	int m_grass_idx;
 	Lumix::uint16 m_flat_height;
 	Lumix::Vec3 m_color;
 	int m_current_brush;
@@ -80,6 +83,7 @@ private:
 	Action* m_lower_terrain_action;
 	Action* m_smooth_terrain_action;
 	Action* m_remove_entity_action;
+	Action* m_remove_grass_action;
 	Lumix::BinaryArray m_brush_mask;
 	Lumix::Texture* m_brush_texture;
 	Lumix::Vec2 m_size_spread;

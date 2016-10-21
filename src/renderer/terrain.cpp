@@ -229,13 +229,13 @@ Terrain::~Terrain()
 }
 
 
-Terrain::GrassType::GrassType(Terrain& terrain)
+Terrain::GrassType::GrassType(Terrain& terrain, int idx)
 	: m_terrain(terrain)
 {
 	m_grass_model = nullptr;
-	m_ground = 0;
 	m_density = 10;
 	m_distance = 50;
+	m_idx = idx;
 }
 
 
@@ -249,11 +249,11 @@ void Terrain::addGrassType(int index)
 {
 	if(index < 0)
 	{
-		m_grass_types.push(LUMIX_NEW(m_allocator, GrassType)(*this));
+		m_grass_types.push(LUMIX_NEW(m_allocator, GrassType)(*this, m_grass_types.size()));
 	}
 	else
 	{
-		m_grass_types.insert(index, LUMIX_NEW(m_allocator, GrassType)(*this));
+		m_grass_types.insert(index, LUMIX_NEW(m_allocator, GrassType)(*this, index));
 	}
 }
 
@@ -298,23 +298,6 @@ float Terrain::getGrassTypeDistance(int index) const
 {
 	GrassType& type = *m_grass_types[index];
 	return type.m_distance;
-}
-
-
-void Terrain::setGrassTypeGround(int index, int ground)
-{
-	Lumix::Texture* tex = getMaterial()->getTextureByUniform(TEX_COLOR_UNIFORM);
-	if(tex) ground = Math::clamp(ground, 0, tex->layers - 1);
-	forceGrassUpdate();
-	GrassType& type = *m_grass_types[index];
-	type.m_ground = ground;
-}
-	
-	
-int Terrain::getGrassTypeGround(int index) const
-{
-	GrassType& type = *m_grass_types[index];
-	return type.m_ground;
 }
 
 
@@ -421,8 +404,8 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 			int tx = int(base_tx + tx_step * dx);
 			uint32 pixel_value = splat_data[tx];
 
-			int ground_index = pixel_value & 0xff;
-			if (ground_index != patch.m_type->m_ground) continue;
+			int ground_mask = (pixel_value >> 16) & 0xff;
+			if ((ground_mask & (1 << patch.m_type->m_idx)) == 0) continue;
 
 			float density = ((pixel_value >> 8) & 0xff) * DIV255;
 			if (density < 0.25f) continue;
@@ -621,7 +604,11 @@ void Terrain::deserialize(InputBlob& serializer,
 	for(int i = 0; i < count; ++i)
 	{
 		serializer.readString(path, MAX_PATH_LENGTH);
-		serializer.read(m_grass_types[i]->m_ground);
+		if (version <= (int)RenderSceneVersion::NEW_GRASS)
+		{
+			int dummy;
+			serializer.read(dummy);
+		}
 		serializer.read(m_grass_types[i]->m_density);
 		if (version > (int)RenderSceneVersion::GRASS_TYPE_DISTANCE)
 		{
@@ -646,7 +633,6 @@ void Terrain::serialize(OutputBlob& serializer)
 	{
 		GrassType& type = *m_grass_types[i];
 		serializer.writeString(type.m_grass_model ? type.m_grass_model->getPath().c_str() : "");
-		serializer.write(type.m_ground);
 		serializer.write(type.m_density);
 		serializer.write(type.m_distance);
 	}

@@ -55,6 +55,7 @@ enum class RenderSceneVersion : int32
 	DECAL,
 	PARTICLE_EMITTER_SUBIMAGE_MODULE,
 	PARTICLE_EMITTER_LOCAL_SPACE,
+	NEW_GRASS,
 
 	LATEST,
 	INVALID = -1,
@@ -383,8 +384,6 @@ public:
 	virtual void enableGrass(bool enabled) = 0;
 	virtual void setGrassPath(ComponentHandle cmp, int index, const Path& path) = 0;
 	virtual Path getGrassPath(ComponentHandle cmp, int index) = 0;
-	virtual void setGrassGround(ComponentHandle cmp, int index, int ground) = 0;
-	virtual int getGrassGround(ComponentHandle cmp, int index) = 0;
 	virtual void setGrassDensity(ComponentHandle cmp, int index, int density) = 0;
 	virtual int getGrassDensity(ComponentHandle cmp, int index) = 0;
 	virtual int getGrassCount(ComponentHandle cmp) = 0;
