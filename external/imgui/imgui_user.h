@@ -49,13 +49,15 @@ struct CurveEditor
 {
 	bool valid;
 	ImVec2 beg_pos;
-	ImVec2 prev_point;
-	ImVec2 prev_tangent;
+	static const float GRAPH_MARGIN;
+	static const float HEIGHT;
+	ImVec2 inner_bb_min;
+	ImVec2 inner_bb_max;
 	int point_idx;
 };
 
 IMGUI_API CurveEditor BeginCurveEditor(const char* label);
-IMGUI_API bool CurvePoint(ImVec2* point, CurveEditor& editor);
+IMGUI_API bool CurveSegment(ImVec2* point, CurveEditor& editor);
 IMGUI_API void EndCurveEditor(const CurveEditor& editor);
 IMGUI_API bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use);
 IMGUI_API void IntervalGraph(const unsigned long long* value_pairs,
