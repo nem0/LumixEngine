@@ -731,8 +731,9 @@ bool CurveSegment(ImVec2* points, CurveEditor& editor)
 		bool changed = false;
 		if (IsItemActive() && IsMouseDragging(0))
 		{
-			tang += GetIO().MouseDelta - pos;
-			tang /= LENGTH;
+			//tang += GetIO().MouseDelta - pos;
+			tang = GetIO().MousePos - pos;
+			tang = normalized(tang);
 			tang.y *= -1;
 			
 			t = tang;
