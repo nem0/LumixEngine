@@ -407,10 +407,6 @@ static void registerProperties(IAllocator& allocator)
 		"Mesh", &RenderScene::getGrassPath, &RenderScene::setGrassPath, "Mesh (*.msh)", MODEL_TYPE));
 	grass->addChild(LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)(
 		"Distance", &RenderScene::getGrassDistance, &RenderScene::setGrassDistance, 1.0f, FLT_MAX, 1.0f));
-	auto ground = LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)(
-		"Ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround);
-	ground->setLimit(0, 4);
-	grass->addChild(ground);
 	grass->addChild(LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)(
 		"Density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity));
 	PropertyRegister::add("terrain", grass);
