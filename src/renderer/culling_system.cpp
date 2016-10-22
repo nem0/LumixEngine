@@ -12,7 +12,7 @@
 
 namespace Lumix
 {
-typedef Array<int64> LayerMasks;
+typedef Array<uint64> LayerMasks;
 typedef Array<int> ModelInstancetoSphereMap;
 typedef Array<ComponentHandle> SphereToModelInstanceMap;
 
@@ -22,9 +22,9 @@ static void doCulling(int start_index,
 	const Sphere* LUMIX_RESTRICT start,
 	const Sphere* LUMIX_RESTRICT end,
 	const Frustum* LUMIX_RESTRICT frustum,
-	const int64* LUMIX_RESTRICT layer_masks,
+	const uint64* LUMIX_RESTRICT layer_masks,
 	const ComponentHandle* LUMIX_RESTRICT sphere_to_model_instance_map,
-	int64 layer_mask,
+	uint64 layer_mask,
 	CullingSystem::Subresults& results)
 {
 	PROFILE_FUNCTION();
@@ -61,7 +61,7 @@ static void doCulling(int start_index,
 		t = f4Sub(t, r);
 		if (f4MoveMask(t)) continue;
 
-		results.push(sphere_to_model_instance_map[i]);
+		if(layer_masks[i] & layer_mask) results.push(sphere_to_model_instance_map[i]);
 	}
 }
 
@@ -71,7 +71,7 @@ public:
 	CullingJob(const CullingSystem::InputSpheres& spheres,
 		const LayerMasks& layer_masks,
 		const SphereToModelInstanceMap& sphere_to_model_instance_map,
-		int64 layer_mask,
+		uint64 layer_mask,
 		CullingSystem::Subresults& results,
 		int start,
 		int end,
@@ -116,7 +116,7 @@ private:
 	CullingSystem::Subresults& m_results;
 	const LayerMasks& m_layer_masks;
 	const SphereToModelInstanceMap& m_sphere_to_model_instance_map;
-	int64 m_layer_mask;
+	uint64 m_layer_mask;
 	int m_start;
 	int m_end;
 	const Frustum& m_frustum;
@@ -171,7 +171,7 @@ public:
 	}
 
 
-	void cullToFrustum(const Frustum& frustum, int64 layer_mask) override
+	void cullToFrustum(const Frustum& frustum, uint64 layer_mask) override
 	{
 		for (int i = 0; i < m_result.size(); ++i)
 		{
@@ -192,7 +192,7 @@ public:
 	}
 
 
-	void cullToFrustumAsync(const Frustum& frustum, int64 layer_mask) override
+	void cullToFrustumAsync(const Frustum& frustum, uint64 layer_mask) override
 	{
 		int count = m_spheres.size();
 		for(auto& i : m_result)
@@ -258,13 +258,13 @@ public:
 	}
 
 
-	void setLayerMask(ComponentHandle model_instance, int64 layer) override
+	void setLayerMask(ComponentHandle model_instance, uint64 layer) override
 	{
 		m_layer_masks[m_model_instance_to_sphere_map[model_instance.index]] = layer;
 	}
 
 
-	int64 getLayerMask(ComponentHandle model_instance) override
+	uint64 getLayerMask(ComponentHandle model_instance) override
 	{
 		return m_layer_masks[m_model_instance_to_sphere_map[model_instance.index]];
 	}
@@ -276,9 +276,10 @@ public:
 	}
 
 
-	void addStatic(ComponentHandle model_instance, const Sphere& sphere) override
+	void addStatic(ComponentHandle model_instance, const Sphere& sphere, uint64 layer_mask) override
 	{
-		if (model_instance.index < m_model_instance_to_sphere_map.size() && m_model_instance_to_sphere_map[model_instance.index] != -1)
+		if (model_instance.index < m_model_instance_to_sphere_map.size() &&
+			m_model_instance_to_sphere_map[model_instance.index] != -1)
 		{
 			ASSERT(false);
 			return;
@@ -291,7 +292,7 @@ public:
 			m_model_instance_to_sphere_map.push(-1);
 		}
 		m_model_instance_to_sphere_map[model_instance.index] = m_spheres.size() - 1;
-		m_layer_masks.push(1);
+		m_layer_masks.push(layer_mask);
 	}
 
 

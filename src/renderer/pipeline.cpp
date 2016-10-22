@@ -50,6 +50,7 @@ struct InstanceData
 struct View
 {
 	uint8 bgfx_id;
+	uint64 layer_mask;
 	uint64 render_state;
 	uint32 stencil;
 	int pass_idx;
@@ -700,7 +701,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Material* material = mesh.material;
 		const uint16 stride = model.getVertexDecl().getStride();
 
-		auto& view = *m_current_render_views[0];
+		int view_idx = m_layer_to_view_map[material->getRenderLayer()];
+		ASSERT(view_idx >= 0);
+		auto& view = m_views[view_idx >= 0 ? view_idx : 0];
 
 		executeCommandBuffer(material->getCommandBuffer(), material);
 		executeCommandBuffer(view.command_buffer.buffer, material);
@@ -837,7 +840,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	int newView(const char* debug_name)
+	int newView(const char* debug_name, uint64 layer_mask)
 	{
 		++m_view_idx;
 		if (m_view_idx >= lengthOf(m_views))
@@ -847,12 +850,20 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		}
 		m_current_view = &m_views[m_view_idx];
 		m_renderer.viewCounterAdd();
+		m_current_view->layer_mask = layer_mask;
 		m_current_view->bgfx_id = (uint8)m_renderer.getViewCounter();
 		m_current_view->stencil = BGFX_STENCIL_NONE;
 		m_current_view->render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE | BGFX_STATE_MSAA;
 		m_current_view->pass_idx = m_pass_idx;
 		m_current_view->command_buffer.clear();
 		m_global_textures_count = 0;
+		if (layer_mask != 0)
+		{
+			for (uint64 layer = 0; layer < 64; ++layer)
+			{
+				if (layer_mask & (1ULL << layer)) m_layer_to_view_map[layer] = m_view_idx;
+			}
+		}
 		if (m_current_framebuffer)
 		{
 			bgfx::setViewFrameBuffer(m_current_view->bgfx_id, m_current_framebuffer->getHandle());
@@ -1100,7 +1111,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void renderSpotLightShadowmap(ComponentHandle light)
 	{
-		newView("point_light");
+		newView("point_light", 0xff);
 
 		Entity light_entity = m_scene->getPointLightEntity(light);
 		Matrix mtx = m_scene->getUniverse().getMatrix(light_entity);
@@ -1167,7 +1178,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
 		for (int i = 0; i < 4; ++i)
 		{
-			newView("omnilight");
+			newView("omnilight", 0xff);
 
 			bgfx::setViewClear(m_current_view->bgfx_id, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
 			bgfx::touch(m_current_view->bgfx_id);
@@ -1356,12 +1367,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Frustum shadow_camera_frustum;
 		shadow_camera_frustum.computeOrtho(
 			shadow_cam_pos, -light_forward, light_mtx.getYVector(), bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
-		m_current_render_views = &m_current_view;
-		m_current_render_view_count = 1;
 
 		findExtraShadowcasterPlanes(light_forward, camera_frustum, &shadow_camera_frustum);
 
-		renderAll(shadow_camera_frustum, false, camera_matrix.getTranslation());
+		renderAll(shadow_camera_frustum, false, camera_matrix.getTranslation(), m_current_view->layer_mask);
 
 		m_is_rendering_in_shadowmap = false;
 	}
@@ -1892,7 +1901,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void renderAll(const Frustum& frustum, bool render_grass, const Vec3& lod_ref_point)
+	void renderAll(const Frustum& frustum, bool render_grass, const Vec3& lod_ref_point, uint64 layer_mask)
 	{
 		PROFILE_FUNCTION();
 
@@ -1901,7 +1910,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
 		m_is_current_light_global = true;
 
-		auto& meshes = m_scene->getModelInstanceInfos(frustum, lod_ref_point);
+		auto& meshes = m_scene->getModelInstanceInfos(frustum, lod_ref_point, layer_mask);
 		renderMeshes(meshes);
 
 		if (render_grass)
@@ -1998,31 +2007,32 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		}
 
 		int stride = model.getVertexDecl().getStride();
-		for (int i = 0; i < m_current_render_view_count; ++i)
+		
+		int view_idx = m_layer_to_view_map[material->getRenderLayer()];
+		ASSERT(view_idx >= 0);
+		auto& view = m_views[view_idx >= 0 ? view_idx : 0];
+
+		if (!bgfx::isValid(shader_instance.getProgramHandle(view.pass_idx))) return;
+
+		for (int j = 0, c = material->getLayerCount(view.pass_idx); j < c; ++j)
 		{
-			auto& view = *m_current_render_views[i];
-			if (!bgfx::isValid(shader_instance.getProgramHandle(view.pass_idx))) continue;
+			auto layer = Vec4((j + 1) / (float)c, 0, 0, 0);
+			bgfx::setUniform(m_layer_uniform, &layer);
+			bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.count);
+			executeCommandBuffer(material->getCommandBuffer(), material);
+			executeCommandBuffer(view.command_buffer.buffer, material);
 
-			for (int j = 0, c = material->getLayerCount(view.pass_idx); j < c; ++j)
-			{
-				auto layer = Vec4((j + 1) / (float)c, 0, 0, 0);
-				bgfx::setUniform(m_layer_uniform, &layer);
-				bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.count);
-				executeCommandBuffer(material->getCommandBuffer(), material);
-				executeCommandBuffer(view.command_buffer.buffer, material);
-
-				bgfx::setTransform(&model_instance.matrix);
-				bgfx::setVertexBuffer(model_instance.model->getVerticesHandle(),
-					mesh.attribute_array_offset / stride,
-					mesh.attribute_array_size / stride);
-				bgfx::setIndexBuffer(model_instance.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
-				bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
-				bgfx::setState(view.render_state | material->getRenderStates());
-				++m_stats.draw_call_count;
-				++m_stats.instance_count;
-				m_stats.triangle_count += mesh.indices_count / 3;
-				bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
-			}
+			bgfx::setTransform(&model_instance.matrix);
+			bgfx::setVertexBuffer(model_instance.model->getVerticesHandle(),
+				mesh.attribute_array_offset / stride,
+				mesh.attribute_array_size / stride);
+			bgfx::setIndexBuffer(model_instance.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
+			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+			bgfx::setState(view.render_state | material->getRenderStates());
+			++m_stats.draw_call_count;
+			++m_stats.instance_count;
+			m_stats.triangle_count += mesh.indices_count / 3;
+			bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
 		}
 	}
 
@@ -2245,7 +2255,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::setUniform(m_terrain_scale_uniform, &terrain_scale);
 		bgfx::setUniform(m_terrain_matrix_uniform, &info.m_world_matrix.m11);
 
-		const View& view = *m_current_render_views[0];
+		int view_idx = m_layer_to_view_map[material->getRenderLayer()];
+		ASSERT(view_idx >= 0);
+		auto& view = m_views[view_idx >= 0 ? view_idx : 0];
+
 		executeCommandBuffer(material->getCommandBuffer(), material);
 		executeCommandBuffer(view.command_buffer.buffer, material);
 
@@ -2296,7 +2309,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Material* material = mesh.material;
 		int stride = grass.model->getVertexDecl().getStride();
 
-		const View& view = *m_current_render_views[0];
+		int view_idx = m_layer_to_view_map[material->getRenderLayer()];
+		ASSERT(view_idx >= 0);
+		auto& view = m_views[view_idx >= 0 ? view_idx : 0];
+
 		executeCommandBuffer(material->getCommandBuffer(), material);
 		executeCommandBuffer(view.command_buffer.buffer, material);
 		auto max_grass_distance = Vec4(grass.type_distance, 0, 0, 0);
@@ -2413,6 +2429,15 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
+	void clearLayerToViewMap()
+	{
+		for (int& i : m_layer_to_view_map)
+		{
+			i = -1;
+		}
+	}
+
+
 	void render() override
 	{
 		PROFILE_FUNCTION();
@@ -2429,6 +2454,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		m_current_framebuffer = m_default_framebuffer;
 		m_instance_data_idx = 0;
 		m_point_light_shadowmaps.clear();
+		clearLayerToViewMap();
 		for (int i = 0; i < lengthOf(m_terrain_instances); ++i)
 		{
 			m_terrain_instances[i].m_count = 0;
@@ -2594,8 +2620,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	bool m_is_ready;
 	Frustum m_camera_frustum;
 
-	View** m_current_render_views;
-	int m_current_render_view_count;
 	Matrix m_shadow_viewprojection[4];
 	int m_view_x;
 	int m_view_y;
@@ -2631,6 +2655,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	bgfx::UniformHandle m_texture_size_uniform;
 	bgfx::UniformHandle m_grass_max_dist_uniform;
 	int m_global_textures_count;
+	int m_layer_to_view_map[64];
 
 	Material* m_debug_line_material;
 	bgfx::DynamicVertexBufferHandle m_debug_vertex_buffers[32];
@@ -2654,6 +2679,18 @@ void Pipeline::destroy(Pipeline* pipeline)
 
 namespace LuaAPI
 {
+
+
+int newView(lua_State* L)
+{
+	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
+	const char* debug_name = LuaWrapper::checkArg<const char*>(L, 2);
+	uint64 layer_mask = 0;
+	if (lua_gettop(L) > 2) layer_mask = LuaWrapper::checkArg<uint64>(L, 3);
+
+	LuaWrapper::push(L, pipeline->newView(debug_name, layer_mask));
+	return 1;
+}
 
 
 int addFramebuffer(lua_State* L)
@@ -2714,29 +2751,9 @@ int addFramebuffer(lua_State* L)
 int renderModels(lua_State* L)
 {
 	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
-	LuaWrapper::checkTableArg(L, 2);
-	int len = (int)lua_rawlen(L, 2);
-	View* views[16] = {};
-	int valid_view_count = 0;
-	for (int i = 0; i < len; ++i)
-	{
-		if (lua_rawgeti(L, 2, 1 + i) == LUA_TNUMBER)
-		{
-			int idx = (int)lua_tointeger(L, -1);
-			if (idx >= 0 && idx <= lengthOf(pipeline->m_views))
-			{
-				views[valid_view_count] = &pipeline->m_views[idx];
-				++valid_view_count;
-			}
-		}
-		lua_pop(L, 1);
-	}
+	uint64 layer_mask = LuaWrapper::checkArg<uint64>(L, 2);
 
-	pipeline->m_current_render_views = views;
-	pipeline->m_current_render_view_count = valid_view_count;
-	pipeline->renderAll(pipeline->m_camera_frustum, true, pipeline->m_camera_frustum.position);
-	pipeline->m_current_render_views = &pipeline->m_current_view;
-	pipeline->m_current_render_view_count = 1;
+	pipeline->renderAll(pipeline->m_camera_frustum, true, pipeline->m_camera_frustum.position, layer_mask);
 	return 0;
 }
 
@@ -2825,6 +2842,8 @@ void Pipeline::registerLuaAPI(lua_State* L)
 		lua_setglobal(L, name);
 	};
 
+	registerCFunction("newView", &LuaAPI::newView);
+
 	#define REGISTER_FUNCTION(name) \
 		do {\
 			auto f = &LuaWrapper::wrapMethod<PipelineImpl, decltype(&PipelineImpl::name), &PipelineImpl::name>; \
@@ -2833,7 +2852,6 @@ void Pipeline::registerLuaAPI(lua_State* L)
 
 	REGISTER_FUNCTION(drawQuad);
 	REGISTER_FUNCTION(setPass);
-	REGISTER_FUNCTION(newView);
 	REGISTER_FUNCTION(bindFramebufferTexture);
 	REGISTER_FUNCTION(applyCamera);
 

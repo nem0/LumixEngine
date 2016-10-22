@@ -56,6 +56,7 @@ enum class RenderSceneVersion : int32
 	PARTICLE_EMITTER_SUBIMAGE_MODULE,
 	PARTICLE_EMITTER_LOCAL_SPACE,
 	NEW_GRASS,
+	LAYERS,
 
 	LATEST,
 	INVALID = -1,
@@ -90,7 +91,6 @@ struct ModelInstance
 	Model* model;
 	Pose* pose;
 	Entity entity;
-	int64 layer_mask;
 	Mesh* meshes;
 	bool custom_meshes;
 	int8 mesh_count;
@@ -340,10 +340,10 @@ public:
 	virtual void setModelInstanceMaterial(ComponentHandle cmp, int index, const Path& path) = 0;
 	virtual Path getModelInstanceMaterial(ComponentHandle cmp, int index) = 0;
 	virtual int getModelInstanceMaterialsCount(ComponentHandle cmp) = 0;
-	virtual void setModelInstanceLayer(ComponentHandle cmp, const int32& layer) = 0;
 	virtual void setModelInstancePath(ComponentHandle cmp, const Path& path) = 0;
 	virtual Array<Array<ModelInstanceMesh>>& getModelInstanceInfos(const Frustum& frustum,
-		const Vec3& lod_ref_point) = 0;
+		const Vec3& lod_ref_point,
+		uint64 layer_mask) = 0;
 	virtual void getModelInstanceEntities(const Frustum& frustum, Array<Entity>& entities) = 0;
 	virtual Entity getModelInstanceEntity(ComponentHandle cmp) = 0;
 	virtual ComponentHandle getFirstModelInstance() = 0;

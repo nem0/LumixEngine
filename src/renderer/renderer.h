@@ -44,6 +44,9 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual Shader* getDefaultShader() = 0;
 		virtual const bgfx::UniformHandle& getMaterialColorShininessUniform() const = 0;
 		virtual bool isOpenGL() const = 0;
+		virtual int getLayersCount() const = 0;
+		virtual int getLayer(const char* name) = 0;
+		virtual const char* getLayerName(int idx) const = 0;
 
 		virtual Engine& getEngine() = 0;
 }; 
