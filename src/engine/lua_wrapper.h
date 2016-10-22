@@ -119,6 +119,10 @@ template <> inline uint32 toType(lua_State* L, int index)
 {
 	return (uint32)lua_tointeger(L, index);
 }
+template <> inline uint64 toType(lua_State* L, int index)
+{
+	return (uint64)lua_tointeger(L, index);
+}
 template <> inline bool toType(lua_State* L, int index)
 {
 	return lua_toboolean(L, index) != 0;
@@ -209,6 +213,10 @@ template <> inline bool isType<Quat>(lua_State* L, int index)
 	return lua_istable(L, index) != 0 && lua_rawlen(L, index) == 4;
 }
 template <> inline bool isType<uint32>(lua_State* L, int index)
+{
+	return lua_isinteger(L, index) != 0;
+}
+template <> inline bool isType<uint64>(lua_State* L, int index)
 {
 	return lua_isinteger(L, index) != 0;
 }

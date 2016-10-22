@@ -1155,7 +1155,7 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 			m_terrain_brush_size,
 			-m_terrain_brush_size,
 			m_terrain_brush_size);
-		auto& meshes = scene->getModelInstanceInfos(frustum, frustum.position);
+		auto& meshes = scene->getModelInstanceInfos(frustum, frustum.position, ~0ULL);
 
 		Lumix::Vec2 size = scene->getTerrainSize(m_component.handle);
 		float scale = 1.0f - Lumix::Math::maximum(0.01f, m_terrain_brush_strength);

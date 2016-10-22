@@ -703,7 +703,6 @@ public:
 			serializer.write(r.entity);
 			if(r.entity != INVALID_ENTITY)
 			{
-				serializer.write(r.layer_mask);
 				serializer.write(r.model ? r.model->getPath().getHash() : 0);
 				bool has_changed_materials = r.model && r.model->isReady() && r.meshes != &r.model->getMesh(0);
 				serializer.write(has_changed_materials ? r.mesh_count : 0);
@@ -994,7 +993,8 @@ public:
 
 			if(r.entity != INVALID_ENTITY)
 			{
-				serializer.read(r.layer_mask);
+				int64 layer_mask;
+				if(version <= RenderSceneVersion::LAYERS) serializer.read(layer_mask);
 				r.matrix = m_universe.getMatrix(r.entity);
 
 				uint32 path;
@@ -2139,13 +2139,27 @@ public:
 	Model* getModelInstanceModel(ComponentHandle cmp) override { return m_model_instances[cmp.index].model; }
 
 
+	static uint64 getLayerMask(ModelInstance& model_instance)
+	{
+		Model* model = model_instance.model;
+		if (!model->isReady()) return 1;
+		uint64 layer_mask = 0;
+		for(int i = 0; i < model->getMeshCount(); ++i)
+		{ 
+			layer_mask |= model->getMesh(i).material->getRenderLayerMask();
+		}
+		return layer_mask;
+	}
+
+
 	void showModelInstance(ComponentHandle cmp) override
 	{
 		auto& model_instance = m_model_instances[cmp.index];
 		if (!model_instance.model || !model_instance.model->isReady()) return;
 
 		Sphere sphere(m_universe.getPosition(model_instance.entity), model_instance.model->getBoundingRadius());
-		if(!m_culling_system->isAdded(cmp)) m_culling_system->addStatic(cmp, sphere);
+		uint64 layer_mask = getLayerMask(model_instance);
+		if(!m_culling_system->isAdded(cmp)) m_culling_system->addStatic(cmp, sphere, layer_mask);
 	}
 
 
@@ -2158,12 +2172,6 @@ public:
 	Path getModelInstancePath(ComponentHandle cmp) override
 	{
 		return m_model_instances[cmp.index].model ? m_model_instances[cmp.index].model->getPath() : Path("");
-	}
-
-
-	void setModelInstanceLayer(ComponentHandle cmp, const int32& layer) override
-	{
-		m_culling_system->setLayerMask(cmp, (int64)1 << (int64)layer);
 	}
 
 
@@ -2487,12 +2495,12 @@ public:
 	}
 
 
-	const CullingSystem::Results* cull(const Frustum& frustum)
+	const CullingSystem::Results* cull(const Frustum& frustum, uint64 layer_mask)
 	{
 		PROFILE_FUNCTION();
 		if (m_model_instances.empty()) return nullptr;
 
-		m_culling_system->cullToFrustumAsync(frustum, ~0UL);
+		m_culling_system->cullToFrustumAsync(frustum, layer_mask);
 		return &m_culling_system->getResult();
 	}
 
@@ -2713,7 +2721,7 @@ public:
 	{
 		PROFILE_FUNCTION();
 
-		const CullingSystem::Results* results = cull(frustum);
+		const CullingSystem::Results* results = cull(frustum, ~0ULL);
 		if (!results) return;
 
 		for (auto& subresults : *results)
@@ -2726,12 +2734,14 @@ public:
 	}
 
 
-	Array<Array<ModelInstanceMesh>>& getModelInstanceInfos(const Frustum& frustum, const Vec3& lod_ref_point) override
+	Array<Array<ModelInstanceMesh>>& getModelInstanceInfos(const Frustum& frustum,
+		const Vec3& lod_ref_point,
+		uint64 layer_mask) override
 	{
 		PROFILE_FUNCTION();
 
 		for(auto& i : m_temporary_infos) i.clear();
-		const CullingSystem::Results* results = cull(frustum);
+		const CullingSystem::Results* results = cull(frustum, layer_mask);
 		if (!results) return m_temporary_infos;
 
 		fillTemporaryInfos(*results, frustum, lod_ref_point);
@@ -3823,8 +3833,7 @@ public:
 		float bounding_radius = r.model->getBoundingRadius();
 		float scale = m_universe.getScale(r.entity);
 		Sphere sphere(r.matrix.getTranslation(), bounding_radius * scale);
-		m_culling_system->addStatic(component, sphere);
-		m_culling_system->setLayerMask(component, r.layer_mask);
+		m_culling_system->addStatic(component, sphere, getLayerMask(r));
 		ASSERT(!r.pose);
 		if (model->getBoneCount() > 0)
 		{
@@ -4330,7 +4339,6 @@ public:
 		auto& r = m_model_instances[entity.index];
 		r.entity = entity;
 		r.model = nullptr;
-		r.layer_mask = 1;
 		r.meshes = nullptr;
 		r.pose = nullptr;
 		r.custom_meshes = false;

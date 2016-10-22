@@ -79,6 +79,9 @@ public:
 	int getLayerCount(int pass_idx) const { return m_layer_count[pass_idx]; }
 	void setLayerCount(int pass_idx, int count) { m_layer_count[pass_idx] = (uint8)count; }
 	void createCommandBuffer();
+	int getRenderLayer() const { return m_render_layer; }
+	void setRenderLayer(int layer);
+	uint64 getRenderLayerMask() const { return m_render_layer_mask; }
 
 	void setDefine(uint8 define_idx, bool enabled);
 	bool hasDefine(uint8 define_idx) const;
@@ -119,6 +122,8 @@ private:
 	uint8* m_command_buffer;
 	uint8 m_layer_count[32];
 	uint32 m_custom_flags;
+	int m_render_layer;
+	uint64 m_render_layer_mask;
 };
 
 } // ~namespace Lumix

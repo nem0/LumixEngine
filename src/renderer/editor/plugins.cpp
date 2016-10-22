@@ -138,6 +138,17 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 		int alpha_cutout_define = renderer->getShaderDefineIdx("ALPHA_CUTOUT");
 		
+		int render_layer = material->getRenderLayer();
+		auto getter = [](void* data, int idx, const char** out) -> bool {
+			auto* renderer = (Renderer*)data;
+			*out = renderer->getLayerName(idx);
+			return true;
+		};
+		if (ImGui::Combo("Render Layer", &render_layer, getter, renderer, renderer->getLayersCount()))
+		{
+			material->setRenderLayer(render_layer);
+		}
+
 		b = material->isBackfaceCulling();
 		if (ImGui::Checkbox("Backface culling", &b)) material->enableBackfaceCulling(b);
 

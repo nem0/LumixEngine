@@ -48,6 +48,8 @@ Material::Material(const Path& path, ResourceManagerBase& resource_manager, IAll
 	, m_define_mask(0)
 	, m_command_buffer(&DEFAULT_COMMAND_BUFFER)
 	, m_custom_flags(0)
+	, m_render_layer(0)
+	, m_render_layer_mask(1)
 {
 	for (auto& l : m_layer_count) l = 1;
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
@@ -158,6 +160,7 @@ bool Material::save(JsonSerializer& serializer)
 	auto& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
 
 	serializer.beginObject();
+	serializer.serialize("render_layer", renderer.getLayerName(m_render_layer));
 	serializer.serialize("shader", m_shader ? m_shader->getPath() : Path(""));
 	for (int i = 0; i < lengthOf(m_layer_count); ++i)
 	{
@@ -380,6 +383,17 @@ void Material::setTexturePath(int i, const Path& path)
 		Texture* texture = static_cast<Texture*>(m_resource_manager.getOwner().get(TEXTURE_TYPE)->load(path));
 		setTexture(i, texture);
 	}
+}
+
+
+void Material::setRenderLayer(int layer)
+{
+	++m_empty_dep_count;
+	checkState();
+	m_render_layer = layer;
+	m_render_layer_mask = 1ULL << (uint64)layer;
+	--m_empty_dep_count;
+	checkState();
 }
 
 
@@ -762,6 +776,14 @@ bool Material::load(FS::IFile& file)
 		else if (equalStrings(label, "custom_flags"))
 		{
 			deserializeCustomFlags(serializer);
+		}
+		else if (equalStrings(label, "render_layer"))
+		{
+			char tmp[32];
+			auto& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
+			serializer.deserialize(tmp, lengthOf(tmp), "Default");
+			m_render_layer = renderer.getLayer(tmp);
+			m_render_layer_mask = 1ULL << (uint64)m_render_layer;
 		}
 		else if (equalStrings(label, "uniforms"))
 		{
