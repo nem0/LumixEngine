@@ -244,7 +244,12 @@ static void uniform(lua_State* L, const char* name, const char* type)
 		u.type = Shader::Uniform::VEC3;
 		u.handle = bgfx::createUniform(name, bgfx::UniformType::Vec4);
 	}
-	else 
+	else if (equalStrings(type, "vec2"))
+	{
+		u.type = Shader::Uniform::VEC2;
+		u.handle = bgfx::createUniform(name, bgfx::UniformType::Vec4);
+	}
+	else
 	{
 		g_log_error.log("Renderer") << "Unknown uniform type " << type << " in " << shader->getPath().c_str();
 	}

@@ -238,9 +238,15 @@ bool Material::save(JsonSerializer& serializer)
 				break;
 			case Shader::Uniform::VEC3:
 				serializer.beginArray("vec3");
-					serializer.serializeArrayItem(m_uniforms[i].vec3[0]);
-					serializer.serializeArrayItem(m_uniforms[i].vec3[1]);
-					serializer.serializeArrayItem(m_uniforms[i].vec3[2]);
+				serializer.serializeArrayItem(m_uniforms[i].vec3[0]);
+				serializer.serializeArrayItem(m_uniforms[i].vec3[1]);
+				serializer.serializeArrayItem(m_uniforms[i].vec3[2]);
+				serializer.endArray();
+				break;
+			case Shader::Uniform::VEC2:
+				serializer.beginArray("vec2");
+				serializer.serializeArrayItem(m_uniforms[i].vec2[0]);
+				serializer.serializeArrayItem(m_uniforms[i].vec2[1]);
 				serializer.endArray();
 				break;
 			case Shader::Uniform::TIME:
@@ -455,6 +461,9 @@ void Material::createCommandBuffer()
 		{
 			case Shader::Uniform::FLOAT:
 				generator.setUniform(shader_uniform.handle, Vec4(uniform.float_value, 0, 0, 0));
+				break;
+			case Shader::Uniform::VEC2:
+				generator.setUniform(shader_uniform.handle, Vec4(uniform.vec2[0], uniform.vec2[1], 0, 0));
 				break;
 			case Shader::Uniform::VEC3:
 			case Shader::Uniform::COLOR:

@@ -40,6 +40,7 @@ public:
 			int32 int_value;
 			float float_value;
 			float vec3[3];
+			float vec2[2];
 			float matrix[16];
 		};
 	};
