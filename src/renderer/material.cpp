@@ -362,9 +362,16 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 			else if (equalStrings(label, "vec3"))
 			{
 				serializer.deserializeArrayBegin();
-					serializer.deserializeArrayItem(uniform.vec3[0], 0);
-					serializer.deserializeArrayItem(uniform.vec3[1], 0);
-					serializer.deserializeArrayItem(uniform.vec3[2], 0);
+				serializer.deserializeArrayItem(uniform.vec3[0], 0);
+				serializer.deserializeArrayItem(uniform.vec3[1], 0);
+				serializer.deserializeArrayItem(uniform.vec3[2], 0);
+				serializer.deserializeArrayEnd();
+			}
+			else if (equalStrings(label, "vec2"))
+			{
+				serializer.deserializeArrayBegin();
+				serializer.deserializeArrayItem(uniform.vec2[0], 0);
+				serializer.deserializeArrayItem(uniform.vec2[1], 0);
 				serializer.deserializeArrayEnd();
 			}
 			else
