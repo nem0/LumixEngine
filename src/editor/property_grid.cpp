@@ -330,28 +330,17 @@ void PropertyGrid::showSampledFunctionProperty(const Lumix::Array<Lumix::Entity>
 	input.read(count);
 	Lumix::Vec2* f = (Lumix::Vec2*)input.skip(sizeof(Lumix::Vec2) * count);
 
-	bool changed = false;
-	auto cp = ImGui::GetCursorScreenPos();
-	cp.x += ImGui::CurveEditor::GRAPH_MARGIN;
-	cp.y += ImGui::CurveEditor::GRAPH_MARGIN;
-	
-	ImVec2 editor_size;
 	auto editor = ImGui::BeginCurveEditor(desc.getName());
 	if (editor.valid)
 	{
-		editor_size = ImVec2(ImGui::CalcItemWidth(), ImGui::GetItemRectSize().y);
+		bool changed = false;
+		ImVec2 editor_size = ImVec2(ImGui::CalcItemWidth(), ImGui::GetItemRectSize().y);
 
-		if (ImGui::CurveSegment((ImVec2*)(f + 1), editor))//first point
-		{
-			changed = true;
-		}
+		changed |= ImGui::CurveSegment((ImVec2*)(f + 1), editor);//first point
 
 		for (int i = 1; i < count - 3; i += 3)
 		{
-			if (ImGui::CurveSegment((ImVec2*)(f + i), editor))
-			{
-				changed = true;
-			}
+			changed |= ImGui::CurveSegment((ImVec2*)(f + i), editor);
 
 			if (changed)
 			{
@@ -378,49 +367,50 @@ void PropertyGrid::showSampledFunctionProperty(const Lumix::Array<Lumix::Entity>
 		f[count - 2].x = 1;
 		f[1].x = 0;
 		ImGui::EndCurveEditor(editor);
-	}
-	if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))//add new point
-	{
-		auto mp = ImGui::GetMousePos();
-		mp.x -= cp.x;
-		mp.y -= cp.y;
-		mp.x /= editor_size.x;
-		mp.y /= editor_size.y;
-		mp.y = 1 - mp.y;
-		blob.write(ImVec2(-0.2f, 0));
-		blob.write(mp);
-		blob.write(ImVec2(0.2f, 0));
-		count += 3;
-		*(int*)blob.getData() = count;
-		f = (Lumix::Vec2*)((int*)blob.getData() + 1);
-		changed = true;
 
-		auto compare = [](const void* a, const void* b) -> int
+		if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))//add new point
 		{
-			float fa = ((const float*)a)[2];
-			float fb = ((const float*)b)[2];
-			return fa < fb ? -1 : (fa > fb) ? 1 : 0;
-		};
+			auto mp = ImGui::GetMousePos();
+			mp.x -= ImGui::GetItemRectMin().x - 1;
+			mp.y -= ImGui::GetItemRectMin().y - 1;
+			mp.x /= editor_size.x;
+			mp.y /= editor_size.y;
+			mp.y = 1 - mp.y;
+			blob.write(ImVec2(-0.2f, 0));
+			blob.write(mp);
+			blob.write(ImVec2(0.2f, 0));
+			count += 3;
+			*(int*)blob.getData() = count;
+			f = (Lumix::Vec2*)((int*)blob.getData() + 1);
+			changed = true;
 
-		qsort(f, count / 3, 3 * sizeof(f[0]), compare);
-	}
+			auto compare = [](const void* a, const void* b) -> int
+			{
+				float fa = ((const float*)a)[2];
+				float fb = ((const float*)b)[2];
+				return fa < fb ? -1 : (fa > fb) ? 1 : 0;
+			};
 
-	if (changed)
-	{
-		for (int i = 2; i < count - 3; i += 3)
-		{
-			auto prev_p = ((Lumix::Vec2*)f)[i - 1];
-			auto next_p = ((Lumix::Vec2*)f)[i + 2];
-			auto& tangent = ((Lumix::Vec2*)f)[i];
-			auto& tangent2 = ((Lumix::Vec2*)f)[i + 1];
-			float half = 0.5f * (next_p.x - prev_p.x);
-			tangent = tangent.normalized() * half;
-			tangent2 = tangent2.normalized() * half;
+			qsort(f, count / 3, 3 * sizeof(f[0]), compare);
 		}
 
-		f[0].x = 0;
-		f[count - 1].x = desc.getMaxX();
-		m_editor.setProperty(cmp_type, -1, desc, &entities[0], entities.size(), blob.getData(), blob.getPos());
+		if (changed)
+		{
+			for (int i = 2; i < count - 3; i += 3)
+			{
+				auto prev_p = ((Lumix::Vec2*)f)[i - 1];
+				auto next_p = ((Lumix::Vec2*)f)[i + 2];
+				auto& tangent = ((Lumix::Vec2*)f)[i];
+				auto& tangent2 = ((Lumix::Vec2*)f)[i + 1];
+				float half = 0.5f * (next_p.x - prev_p.x);
+				tangent = tangent.normalized() * half;
+				tangent2 = tangent2.normalized() * half;
+			}
+
+			f[0].x = 0;
+			f[count - 1].x = desc.getMaxX();
+			m_editor.setProperty(cmp_type, -1, desc, &entities[0], entities.size(), blob.getData(), blob.getPos());
+		}
 	}
 }
 

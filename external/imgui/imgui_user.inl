@@ -602,15 +602,17 @@ CurveEditor BeginCurveEditor(const char* label)
 
     ImGuiContext& g = *GImGui;
     const ImGuiStyle& style = g.Style;
+	editor.beg_pos = GetCursorScreenPos();
+	SetCursorScreenPos(editor.beg_pos + ImVec2(CurveEditor::GRAPH_MARGIN, CurveEditor::GRAPH_MARGIN));
     ImVec2 cursor_pos = GetCursorScreenPos();
 
     const ImVec2 label_size = CalcTextSize(label, nullptr, true);
     ImVec2 graph_size;
     graph_size.x = CalcItemWidth() + (style.FramePadding.x * 2);
-    graph_size.y = CurveEditor::HEIGHT; // label_size.y + (style.FramePadding.y * 2);
+    graph_size.y = CurveEditor::HEIGHT;
 
     const ImRect frame_bb(
-        window->DC.CursorPos + ImVec2(CurveEditor::GRAPH_MARGIN, CurveEditor::GRAPH_MARGIN), window->DC.CursorPos + ImVec2(graph_size.x, graph_size.y));
+        window->DC.CursorPos, window->DC.CursorPos + ImVec2(graph_size.x, graph_size.y));
     const ImRect inner_bb(frame_bb.Min + style.FramePadding, frame_bb.Max - style.FramePadding);
 	editor.inner_bb_min = inner_bb.Min;
 	editor.inner_bb_max = inner_bb.Max;
@@ -629,7 +631,6 @@ CurveEditor BeginCurveEditor(const char* label)
         frame_bb.Min, frame_bb.Max, GetColorU32(ImGuiCol_FrameBg), true, style.FrameRounding);
     RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y), label);
 
-    editor.beg_pos = cursor_pos;
     SetCursorScreenPos(cursor_pos);
 
     editor.point_idx = -1;
@@ -640,10 +641,10 @@ CurveEditor BeginCurveEditor(const char* label)
 
 void EndCurveEditor(const CurveEditor& editor)
 {
-    SetCursorScreenPos(editor.beg_pos);
+    SetCursorScreenPos(editor.inner_bb_min);
+	PopID();
 
-    InvisibleButton("bg", ImVec2(CalcItemWidth(), CurveEditor::HEIGHT + 2 * CurveEditor::GRAPH_MARGIN));
-    PopID();
+    InvisibleButton("bg", ImVec2(CalcItemWidth() - 2, CurveEditor::HEIGHT + 2 * CurveEditor::GRAPH_MARGIN - 2));
 }
 
 
@@ -667,6 +668,7 @@ bool CurveSegment(ImVec2* points, CurveEditor& editor)
 	auto handlePoint = [&window, &editor, transform, inner_bb](ImVec2& p) -> bool
 	{
 		static const float SIZE = 3;
+		ImVec2 cursor_pos = GetCursorScreenPos();
 
 		ImVec2 pos = transform(p);
 
@@ -696,7 +698,7 @@ bool CurveSegment(ImVec2* points, CurveEditor& editor)
 		}
 		PopID();
 
-		SetCursorScreenPos(editor.beg_pos);
+		SetCursorScreenPos(cursor_pos);
 		return changed;
 	};
 
@@ -704,6 +706,7 @@ bool CurveSegment(ImVec2* points, CurveEditor& editor)
 	{
 		static const float SIZE = 2;
 		static const float LENGTH = 18;
+		ImVec2 cursor_pos = GetCursorScreenPos();
 
 		auto normalized = [](const ImVec2& v) -> ImVec2
 		{
@@ -731,7 +734,6 @@ bool CurveSegment(ImVec2* points, CurveEditor& editor)
 		bool changed = false;
 		if (IsItemActive() && IsMouseDragging(0))
 		{
-			//tang += GetIO().MouseDelta - pos;
 			tang = GetIO().MousePos - pos;
 			tang = normalized(tang);
 			tang.y *= -1;
@@ -741,7 +743,7 @@ bool CurveSegment(ImVec2* points, CurveEditor& editor)
 		}
 		PopID();
 
-		SetCursorScreenPos(editor.beg_pos);
+		SetCursorScreenPos(cursor_pos);
 		return changed;
 	};
 
