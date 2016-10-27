@@ -3830,6 +3830,10 @@ public:
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_TYPE));
 
 		auto& r = m_model_instances[component.index];
+		
+		if (model->getMesh(0).material->getLayersCount() > 0) r.type = ModelInstance::MULTILAYER;
+		else if (model->getBoneCount() > 0) r.type = ModelInstance::SKINNED;
+		else r.type = ModelInstance::RIGID;
 		float bounding_radius = r.model->getBoundingRadius();
 		float scale = m_universe.getScale(r.entity);
 		Sphere sphere(r.matrix.getTranslation(), bounding_radius * scale);

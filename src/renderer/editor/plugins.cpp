@@ -276,17 +276,11 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 				}
 			}
 
-			if (ImGui::CollapsingHeader("Layers"))
+			int layers_count = material->getLayersCount();
+			if (ImGui::DragInt("Layers count", &layers_count, 1, 0, 256))
 			{
-				for (int i = 0; i < shader->m_combintions.pass_count; ++i)
-				{
-					int idx = renderer->getPassIdx(shader->m_combintions.passes[i]);
-					int layers_count = material->getLayerCount(idx);
-					ImGui::DragInt(shader->m_combintions.passes[i], &layers_count, 1, 0, 256);
-					material->setLayerCount(idx, layers_count);
-				}
+				material->setLayersCount(layers_count);
 			}
-
 			
 			if (ImGui::CollapsingHeader("Defines"))
 			{
