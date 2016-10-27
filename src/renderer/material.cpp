@@ -50,8 +50,8 @@ Material::Material(const Path& path, ResourceManagerBase& resource_manager, IAll
 	, m_custom_flags(0)
 	, m_render_layer(0)
 	, m_render_layer_mask(1)
+	, m_layers_count(0)
 {
-	for (auto& l : m_layer_count) l = 1;
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
 	{
@@ -161,17 +161,8 @@ bool Material::save(JsonSerializer& serializer)
 
 	serializer.beginObject();
 	serializer.serialize("render_layer", renderer.getLayerName(m_render_layer));
+	serializer.serialize("layers_count", m_layers_count);
 	serializer.serialize("shader", m_shader ? m_shader->getPath() : Path(""));
-	for (int i = 0; i < lengthOf(m_layer_count); ++i)
-	{
-		if (m_layer_count[i] != 1)
-		{
-			serializer.beginObject("layer");
-				serializer.serialize("pass", renderer.getPassName(i));
-				serializer.serialize("count", m_layer_count[i]);
-			serializer.endObject();
-		}
-	}
 	for (int i = 0; i < m_texture_count; ++i)
 	{
 		char path[MAX_PATH_LENGTH];
@@ -396,6 +387,16 @@ void Material::setTexturePath(int i, const Path& path)
 		Texture* texture = static_cast<Texture*>(m_resource_manager.getOwner().get(TEXTURE_TYPE)->load(path));
 		setTexture(i, texture);
 	}
+}
+
+
+void Material::setLayersCount(int layers)
+{
+	++m_empty_dep_count;
+	checkState();
+	m_layers_count = layers;
+	--m_empty_dep_count;
+	checkState();
 }
 
 
@@ -793,6 +794,10 @@ bool Material::load(FS::IFile& file)
 		{
 			deserializeCustomFlags(serializer);
 		}
+		else if (equalStrings(label, "layers_count"))
+		{
+			serializer.deserialize(m_layers_count, 0);
+		}
 		else if (equalStrings(label, "render_layer"))
 		{
 			char tmp[32];
@@ -828,29 +833,6 @@ bool Material::load(FS::IFile& file)
 			{
 				m_render_states &= ~BGFX_STATE_CULL_MASK;
 			}
-		}
-		else if (equalStrings(label, "layer"))
-		{
-			serializer.deserializeObjectBegin();
-			int pass = 0;
-			int layers_count = 1;
-			while (!serializer.isObjectEnd())
-			{
-				serializer.deserializeLabel(label, 255);
-				
-				if (equalStrings(label, "pass"))
-				{
-					char pass_name[50];
-					serializer.deserialize(pass_name, lengthOf(pass_name), "");
-					pass = renderer.getPassIdx(pass_name);
-				}
-				else if (equalStrings(label, "count"))
-				{
-					serializer.deserialize(layers_count, 1);
-				}
-			}
-			m_layer_count[pass] = layers_count;
-			serializer.deserializeObjectEnd();
 		}
 		else if (equalStrings(label, "color"))
 		{

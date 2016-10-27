@@ -77,12 +77,12 @@ public:
 	ShaderInstance& getShaderInstance() { ASSERT(m_shader_instance); return *m_shader_instance; }
 	const ShaderInstance& getShaderInstance() const { ASSERT(m_shader_instance); return *m_shader_instance; }
 	const uint8* getCommandBuffer() const { return m_command_buffer; }
-	int getLayerCount(int pass_idx) const { return m_layer_count[pass_idx]; }
-	void setLayerCount(int pass_idx, int count) { m_layer_count[pass_idx] = (uint8)count; }
 	void createCommandBuffer();
 	int getRenderLayer() const { return m_render_layer; }
 	void setRenderLayer(int layer);
 	uint64 getRenderLayerMask() const { return m_render_layer_mask; }
+	int getLayersCount() const { return m_layers_count; }
+	void setLayersCount(int layers);
 
 	void setDefine(uint8 define_idx, bool enabled);
 	bool hasDefine(uint8 define_idx) const;
@@ -121,10 +121,10 @@ private:
 	float m_alpha_ref;
 	uint32 m_define_mask;
 	uint8* m_command_buffer;
-	uint8 m_layer_count[32];
 	uint32 m_custom_flags;
 	int m_render_layer;
 	uint64 m_render_layer_mask;
+	int m_layers_count;
 };
 
 } // ~namespace Lumix

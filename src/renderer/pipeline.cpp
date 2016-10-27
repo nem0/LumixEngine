@@ -2014,10 +2014,48 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		if (!bgfx::isValid(shader_instance.getProgramHandle(view.pass_idx))) return;
 
-		for (int j = 0, c = material->getLayerCount(view.pass_idx); j < c; ++j)
+		bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.count);
+		executeCommandBuffer(material->getCommandBuffer(), material);
+		executeCommandBuffer(view.command_buffer.buffer, material);
+
+		bgfx::setTransform(&model_instance.matrix);
+		bgfx::setVertexBuffer(model_instance.model->getVerticesHandle(),
+			mesh.attribute_array_offset / stride,
+			mesh.attribute_array_size / stride);
+		bgfx::setIndexBuffer(model_instance.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
+		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+		bgfx::setState(view.render_state | material->getRenderStates());
+		++m_stats.draw_call_count;
+		++m_stats.instance_count;
+		m_stats.triangle_count += mesh.indices_count / 3;
+		bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
+	}
+
+
+	void renderMultilayerMesh(const ModelInstance& model_instance, const ModelInstanceMesh& info)
+	{
+		const Mesh& mesh = *info.mesh;
+		Material* material = mesh.material;
+
+		Matrix bone_mtx[128];
+		const Pose& pose = *model_instance.pose;
+		const Model& model = *model_instance.model;
+		Vec3* poss = pose.positions;
+		Quat* rots = pose.rotations;
+
+		ASSERT(pose.count <= lengthOf(bone_mtx));
+		for (int bone_index = 0, bone_count = pose.count; bone_index < bone_count; ++bone_index)
 		{
-			auto layer = Vec4((j + 1) / (float)c, 0, 0, 0);
-			bgfx::setUniform(m_layer_uniform, &layer);
+			auto& bone = model.getBone(bone_index);
+			Transform tmp = { poss[bone_index], rots[bone_index] };
+			bone_mtx[bone_index] = (tmp * bone.inv_bind_transform).toMatrix();
+		}
+
+		int stride = model.getVertexDecl().getStride();
+		int layers_count = material->getLayersCount();
+		auto& shader_instance = mesh.material->getShaderInstance();
+
+		auto renderLayer = [&](View& view) {
 			bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.count);
 			executeCommandBuffer(material->getCommandBuffer(), material);
 			executeCommandBuffer(view.command_buffer.buffer, material);
@@ -2033,7 +2071,28 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			++m_stats.instance_count;
 			m_stats.triangle_count += mesh.indices_count / 3;
 			bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
+		};
+
+		int view_idx = m_layer_to_view_map[material->getRenderLayer()];
+		if (view_idx >= 0 && !m_is_rendering_in_shadowmap)
+		{
+			auto& view = m_views[view_idx];
+			if (bgfx::isValid(shader_instance.getProgramHandle(view.pass_idx)))
+			{
+				for (int i = 0; i < layers_count; ++i)
+				{
+					Vec4 layer((i + 1) / (float)layers_count, 0, 0, 0);
+					bgfx::setUniform(m_layer_uniform, &layer);
+					renderLayer(view);
+				}
+			}
 		}
+
+		static const int default_layer = m_renderer.getLayer("default");
+		int default_view_idx = m_layer_to_view_map[default_layer];
+		if (default_view_idx < 0) return;
+		View& default_view = m_views[default_view_idx];
+		renderLayer(default_view);
 	}
 
 
@@ -2366,13 +2425,17 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		for(auto& mesh : meshes)
 		{
 			ModelInstance& model_instance = model_instances[mesh.model_instance.index];
-			if(model_instance.pose && model_instance.pose->count > 0)
+			switch (model_instance.type)
 			{
-				renderSkinnedMesh(model_instance, mesh);
-			}
-			else
-			{
-				renderRigidMesh(model_instance, mesh);
+				case ModelInstance::RIGID:
+					renderRigidMesh(model_instance, mesh);
+					break;
+				case ModelInstance::SKINNED:
+					renderSkinnedMesh(model_instance, mesh);
+					break;
+				case ModelInstance::MULTILAYER:
+					renderMultilayerMesh(model_instance, mesh);
+					break;
 			}
 		}
 		finishInstances();
@@ -2391,13 +2454,17 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			for (auto& mesh : submeshes)
 			{
 				ModelInstance& model_instance = model_instances[mesh.model_instance.index];
-				if (model_instance.pose && model_instance.pose->count > 0)
+				switch (model_instance.type)
 				{
-					renderSkinnedMesh(model_instance, mesh);
-				}
-				else
-				{
-					renderRigidMesh(model_instance, mesh);
+					case ModelInstance::RIGID:
+						renderRigidMesh(model_instance, mesh);
+						break;
+					case ModelInstance::SKINNED:
+						renderSkinnedMesh(model_instance, mesh);
+						break;
+					case ModelInstance::MULTILAYER:
+						renderMultilayerMesh(model_instance, mesh);
+						break;
 				}
 			}
 		}

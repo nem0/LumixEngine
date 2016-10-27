@@ -87,6 +87,13 @@ struct DecalInfo
 
 struct ModelInstance
 {
+	enum Type
+	{
+		RIGID,
+		SKINNED,
+		MULTILAYER
+	};
+	Type type;
 	Matrix matrix;
 	Model* model;
 	Pose* pose;
