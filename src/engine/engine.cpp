@@ -33,6 +33,27 @@ namespace Lumix
 namespace LuaImGui
 {
 
+
+int InputTextMultiline(lua_State* L)
+{
+	char buf[4096];
+	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
+	auto* value = LuaWrapper::checkArg<const char*>(L, 2);
+	copyString(buf, value);
+	bool changed = ImGui::InputTextMultiline(name, buf, lengthOf(buf), ImVec2(-1, -1));
+	lua_pushboolean(L, changed);
+	if (changed)
+	{
+		lua_pushstring(L, buf);
+	}
+	else
+	{
+		lua_pushvalue(L, 2);
+	}
+	return 2;
+}
+
+
 int DragFloat(lua_State* L)
 {
 	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
@@ -892,6 +913,7 @@ public:
 		LuaImGui::registerCFunction(m_state, "GetWindowHeight", &LuaImGui::GetWindowHeight);
 		LuaImGui::registerCFunction(m_state, "GetWindowPos", &LuaImGui::GetWindowPos);
 		LuaImGui::registerCFunction(m_state, "Image", &LuaWrapper::wrap<decltype(&LuaImGui::Image), &LuaImGui::Image>);
+		LuaImGui::registerCFunction(m_state, "InputTextMultiline", &LuaImGui::InputTextMultiline);
 		LuaImGui::registerCFunction(m_state, "IsItemHovered", &LuaWrapper::wrap<decltype(&LuaImGui::IsItemHovered), &LuaImGui::IsItemHovered>);
 		LuaImGui::registerCFunction(m_state, "IsMouseClicked", &LuaWrapper::wrap<decltype(&LuaImGui::IsMouseClicked), &LuaImGui::IsMouseClicked>);
 		LuaImGui::registerCFunction(m_state, "IsMouseDown", &LuaWrapper::wrap<decltype(&LuaImGui::IsMouseDown), &LuaImGui::IsMouseDown>);

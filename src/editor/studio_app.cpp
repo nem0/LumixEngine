@@ -40,6 +40,72 @@
 #include <SDL_syswm.h>
 
 
+struct LuaPlugin : public StudioApp::IPlugin
+{
+	LuaPlugin(Lumix::WorldEditor& _editor, const char* src, const char* filename)
+		: editor(_editor)
+	{
+		L = lua_newthread(editor.getEngine().getState());
+		thread_ref = luaL_ref(editor.getEngine().getState(), LUA_REGISTRYINDEX);
+
+		bool errors = luaL_loadbuffer(L, src, Lumix::stringLength(src), filename) != LUA_OK;
+		errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
+		if (errors)
+		{
+			Lumix::g_log_error.log("Editor") << filename << ": " << lua_tostring(L, -1);
+			lua_pop(L, 1);
+		}
+
+		const char* name = "LuaPlugin";
+		if (lua_getglobal(L, "plugin_name") == LUA_TSTRING)
+		{
+			name = lua_tostring(L, -1);
+		}
+
+		m_action = LUMIX_NEW(editor.getAllocator(), Action)(name, name);
+		m_action->func.bind<LuaPlugin, &LuaPlugin::onAction>(this);
+		m_is_opened = false;
+
+		lua_pop(L, 1); // plugin_name
+	}
+
+
+	~LuaPlugin()
+	{
+		luaL_unref(editor.getEngine().getState(), LUA_REGISTRYINDEX, thread_ref);
+	}
+
+
+	void onAction()
+	{
+		m_is_opened = !m_is_opened;
+	}
+
+
+	void onWindowGUI() override
+	{
+		if (!m_is_opened) return;
+		if (lua_getglobal(L, "onGUI") == LUA_TFUNCTION)
+		{
+			if (lua_pcall(L, 0, 0, 0) != LUA_OK)
+			{
+				Lumix::g_log_error.log("Editor") << "LuaPlugin:" << lua_tostring(L, -1);
+				lua_pop(L, 1);
+			}
+		}
+		else
+		{
+			lua_pop(L, 1);
+		}
+	}
+
+	Lumix::WorldEditor& editor;
+	lua_State* L;
+	int thread_ref;
+	bool m_is_opened;
+};
+
+
 class StudioAppImpl LUMIX_FINAL : public StudioApp
 {
 public:
@@ -1805,6 +1871,62 @@ public:
 	}
 
 
+	void loadLuaPlugin(const char* dir, const char* filename)
+	{
+		Lumix::StaticString<Lumix::MAX_PATH_LENGTH> path(dir, filename);
+		Lumix::FS::OsFile file;
+
+		if (file.open(path, Lumix::FS::Mode::OPEN_AND_READ, m_allocator))
+		{
+			auto size = file.size();
+			auto* src = (char*)m_engine->getLIFOAllocator().allocate(size + 1);
+			file.read(src, size);
+			src[size] = 0;
+			
+			LuaPlugin* plugin = LUMIX_NEW(m_editor->getAllocator(), LuaPlugin)(*m_editor, src, filename);
+			addPlugin(*plugin);
+
+			m_engine->getLIFOAllocator().deallocate(src);
+			file.close();
+		}
+		else
+		{
+			Lumix::g_log_warning.log("Editor") << "Failed to open " << path;
+		}
+	}
+
+
+	void findLuaPlugins(const char* dir)
+	{
+		auto* iter = PlatformInterface::createFileIterator(dir, m_allocator);
+		PlatformInterface::FileInfo info;
+		while (PlatformInterface::getNextFile(iter, &info))
+		{
+			char normalized_path[Lumix::MAX_PATH_LENGTH];
+			Lumix::PathUtils::normalize(info.filename, normalized_path, Lumix::lengthOf(normalized_path));
+			if (normalized_path[0] == '.') continue;
+			if (info.is_directory)
+			{
+				char dir_path[Lumix::MAX_PATH_LENGTH] = { 0 };
+				if (dir[0] != '.') Lumix::copyString(dir_path, dir);
+				Lumix::catString(dir_path, info.filename);
+				Lumix::catString(dir_path, "/");
+				findLuaPlugins(dir_path);
+			}
+			else
+			{
+				char ext[5];
+				Lumix::PathUtils::getExtension(ext, Lumix::lengthOf(ext), info.filename);
+				if (Lumix::equalStrings(ext, "lua"))
+				{
+					loadLuaPlugin(dir, info.filename);
+				}
+			}
+		}
+		PlatformInterface::destroyFileIterator(iter);
+	}
+
+
 	void processSystemEvents()
 	{
 		SDL_Event event;
@@ -2008,6 +2130,7 @@ public:
 		loadIcons();
 		loadSettings();
 		loadUniverseFromCommandLine();
+		findLuaPlugins("plugins/lua/");
 	}
 
 
