@@ -1924,7 +1924,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
 			Vec3 camera_pos = m_scene->getUniverse().getPosition(camera_entity);
 			Array<TerrainInfo> tmp_terrains(frame_allocator);
-			m_scene->getTerrainInfos(tmp_terrains, camera_pos);
+			m_scene->getTerrainInfos(tmp_terrains, lod_ref_point);
 			renderTerrains(tmp_terrains);
 		}
 	}
@@ -2517,6 +2517,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		m_global_light_shadowmap = nullptr;
 		m_current_view = nullptr;
 		m_view_idx = -1;
+		m_layer_mask = 0;
 		m_pass_idx = -1;
 		m_current_framebuffer = m_default_framebuffer;
 		m_instance_data_idx = 0;
@@ -2664,6 +2665,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	TerrainInstance m_terrain_instances[4];
 	uint32 m_debug_flags;
 	int m_view_idx;
+	uint64 m_layer_mask;
 	View m_views[32];
 	View* m_current_view;
 	int m_pass_idx;
@@ -2755,6 +2757,8 @@ int newView(lua_State* L)
 	uint64 layer_mask = 0;
 	if (lua_gettop(L) > 2) layer_mask = LuaWrapper::checkArg<uint64>(L, 3);
 
+	pipeline->m_layer_mask |= layer_mask;
+
 	LuaWrapper::push(L, pipeline->newView(debug_name, layer_mask));
 	return 1;
 }
@@ -2818,9 +2822,9 @@ int addFramebuffer(lua_State* L)
 int renderModels(lua_State* L)
 {
 	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
-	uint64 layer_mask = LuaWrapper::checkArg<uint64>(L, 2);
 
-	pipeline->renderAll(pipeline->m_camera_frustum, true, pipeline->m_camera_frustum.position, layer_mask);
+	pipeline->renderAll(pipeline->m_camera_frustum, true, pipeline->m_camera_frustum.position, pipeline->m_layer_mask);
+	pipeline->m_layer_mask = 0;
 	return 0;
 }
 
