@@ -111,7 +111,7 @@ private:
 	DelegateList<void(const ComponentUID&)> m_component_destroyed;
 	DelegateList<void(const ComponentUID&)> m_component_added;
 	int m_first_free_slot;
-	Lumix::Path m_path;
+	Path m_path;
 };
 
 
