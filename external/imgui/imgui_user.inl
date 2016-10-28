@@ -603,16 +603,15 @@ CurveEditor BeginCurveEditor(const char* label)
     ImGuiContext& g = *GImGui;
     const ImGuiStyle& style = g.Style;
 	editor.beg_pos = GetCursorScreenPos();
-	SetCursorScreenPos(editor.beg_pos + ImVec2(CurveEditor::GRAPH_MARGIN, CurveEditor::GRAPH_MARGIN));
-    ImVec2 cursor_pos = GetCursorScreenPos();
+	ImVec2 cursor_pos = editor.beg_pos + ImVec2(CurveEditor::GRAPH_MARGIN, CurveEditor::GRAPH_MARGIN);
+	SetCursorScreenPos(cursor_pos);
 
     const ImVec2 label_size = CalcTextSize(label, nullptr, true);
-    ImVec2 graph_size;
-    graph_size.x = CalcItemWidth() + (style.FramePadding.x * 2);
-    graph_size.y = CurveEditor::HEIGHT;
 
-    const ImRect frame_bb(
-        window->DC.CursorPos, window->DC.CursorPos + ImVec2(graph_size.x, graph_size.y));
+    editor.graph_size.x = CalcItemWidth() + (style.FramePadding.x * 2);
+    editor.graph_size.y = CurveEditor::HEIGHT;
+
+    const ImRect frame_bb(cursor_pos, cursor_pos + editor.graph_size);
     const ImRect inner_bb(frame_bb.Min + style.FramePadding, frame_bb.Max - style.FramePadding);
 	editor.inner_bb_min = inner_bb.Min;
 	editor.inner_bb_max = inner_bb.Max;
@@ -643,8 +642,9 @@ void EndCurveEditor(const CurveEditor& editor)
 {
     SetCursorScreenPos(editor.inner_bb_min);
 	PopID();
-
-    InvisibleButton("bg", ImVec2(CalcItemWidth() - 2, CurveEditor::HEIGHT + 2 * CurveEditor::GRAPH_MARGIN - 2));
+	
+	InvisibleButton("bg", editor.inner_bb_max - editor.inner_bb_min);
+	SetCursorScreenPos(editor.beg_pos + ImVec2(0, editor.graph_size.y + 2 * CurveEditor::GRAPH_MARGIN + 4));
 }
 
 
@@ -668,8 +668,8 @@ bool CurveSegment(ImVec2* points, CurveEditor& editor)
 	auto handlePoint = [&window, &editor, transform, inner_bb](ImVec2& p) -> bool
 	{
 		static const float SIZE = 3;
-		ImVec2 cursor_pos = GetCursorScreenPos();
 
+		ImVec2 cursor_pos = GetCursorScreenPos();
 		ImVec2 pos = transform(p);
 
 		SetCursorScreenPos(pos - ImVec2(SIZE, SIZE));
@@ -706,7 +706,6 @@ bool CurveSegment(ImVec2* points, CurveEditor& editor)
 	{
 		static const float SIZE = 2;
 		static const float LENGTH = 18;
-		ImVec2 cursor_pos = GetCursorScreenPos();
 
 		auto normalized = [](const ImVec2& v) -> ImVec2
 		{
@@ -714,6 +713,7 @@ bool CurveSegment(ImVec2* points, CurveEditor& editor)
 			return ImVec2(v.x * len, v.y * len);
 		};
 
+		ImVec2 cursor_pos = GetCursorScreenPos();
 		ImVec2 pos = transform(p);
 		ImVec2 tang = pos + normalized(ImVec2(t.x, -t.y)) * LENGTH;
 

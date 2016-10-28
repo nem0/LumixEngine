@@ -318,6 +318,8 @@ void PropertyGrid::showSampledFunctionProperty(const Lumix::Array<Lumix::Entity>
 	Lumix::ComponentType cmp_type,
 	Lumix::ISampledFunctionDescriptor& desc)
 {
+	static const int MIN_COUNT = 6;
+
 	Lumix::OutputBlob blob(m_editor.getAllocator());
 	Lumix::ComponentUID cmp;
 	cmp.type = cmp_type;
@@ -334,7 +336,6 @@ void PropertyGrid::showSampledFunctionProperty(const Lumix::Array<Lumix::Entity>
 	if (editor.valid)
 	{
 		bool changed = false;
-		ImVec2 editor_size = ImVec2(ImGui::CalcItemWidth(), ImGui::GetItemRectSize().y);
 
 		changed |= ImGui::CurveSegment((ImVec2*)(f + 1), editor);//first point
 
@@ -352,9 +353,9 @@ void PropertyGrid::showSampledFunctionProperty(const Lumix::Array<Lumix::Entity>
 				}
 			}
 
-			if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))//remove point
+			if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0) && count > MIN_COUNT)//remove point
 			{
-				for (int j = i - 1; j < count - 3; ++j)
+				for (int j = i + 2; j < count - 3; ++j)
 				{
 					f[j] = f[j + 3];
 				}
@@ -371,10 +372,10 @@ void PropertyGrid::showSampledFunctionProperty(const Lumix::Array<Lumix::Entity>
 		if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))//add new point
 		{
 			auto mp = ImGui::GetMousePos();
-			mp.x -= ImGui::GetItemRectMin().x - 1;
-			mp.y -= ImGui::GetItemRectMin().y - 1;
-			mp.x /= editor_size.x;
-			mp.y /= editor_size.y;
+			mp.x -= editor.inner_bb_min.x - 1;
+			mp.y -= editor.inner_bb_min.y - 1;
+			mp.x /= (editor.inner_bb_max.x - editor.inner_bb_min.x);
+			mp.y /= (editor.inner_bb_max.y - editor.inner_bb_min.y);
 			mp.y = 1 - mp.y;
 			blob.write(ImVec2(-0.2f, 0));
 			blob.write(mp);

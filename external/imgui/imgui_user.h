@@ -49,6 +49,7 @@ struct CurveEditor
 {
 	bool valid;
 	ImVec2 beg_pos;
+	ImVec2 graph_size;
 	static const float GRAPH_MARGIN;
 	static const float HEIGHT;
 	ImVec2 inner_bb_min;
