@@ -676,6 +676,12 @@ public:
 	}
 
 
+	static Universe* LUA_getSceneUniverse(IScene* scene)
+	{
+		return &scene->getUniverse();
+	}
+
+
 	static IScene* LUA_getScene(Universe* universe, const char* name)
 	{
 		uint32 hash = crc32(name);
@@ -838,6 +844,7 @@ public:
 		REGISTER_FUNCTION(createUniverse);
 		REGISTER_FUNCTION(destroyUniverse);
 		REGISTER_FUNCTION(getScene);
+		REGISTER_FUNCTION(getSceneUniverse);
 		REGISTER_FUNCTION(loadResource);
 		REGISTER_FUNCTION(unloadResource);
 		REGISTER_FUNCTION(createComponent);

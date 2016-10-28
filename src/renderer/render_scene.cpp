@@ -2340,6 +2340,12 @@ public:
 	}
 
 
+	static RenderScene* LUA_getPipelineScene(Pipeline* pipeline)
+	{
+		return pipeline->getScene();
+	}
+
+
 	static void LUA_pipelineRender(Pipeline* pipeline, int w, int h)
 	{
 		pipeline->setViewport(0, 0, w, h);
@@ -4606,6 +4612,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(createPipeline);
 	REGISTER_FUNCTION(destroyPipeline);
 	REGISTER_FUNCTION(setPipelineScene);
+	REGISTER_FUNCTION(getPipelineScene);
 	REGISTER_FUNCTION(pipelineRender);
 	REGISTER_FUNCTION(getRenderBuffer);
 	REGISTER_FUNCTION(getMaterialTexture);
