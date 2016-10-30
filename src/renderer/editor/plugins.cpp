@@ -1874,11 +1874,13 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	static GameViewPlugin* s_instance;
 
 
-	explicit GameViewPlugin(StudioApp& app)
+	explicit GameViewPlugin(StudioApp& app, SceneViewPlugin& scene_view_plugin)
 		: m_app(app)
 		, m_game_view(app)
+		, m_scene_view(scene_view_plugin.m_scene_view)
+		, m_width(-1)
+		, m_height(-1)
 	{
-		m_width = m_height = -1;
 		auto& editor = *app.getWorldEditor();
 		m_engine = &editor.getEngine();
 		m_action = LUMIX_NEW(editor.getAllocator(), Action)("Game View", "game_view");
@@ -2052,13 +2054,18 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			const auto& texture_id =
 				pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : material->getTexture(0)->handle;
 			auto texture_uniform = material->getShader()->m_texture_slots[0].uniform_handle;
+			uint64 render_states = material->getRenderStates();
+			if (&m_scene_view.getTextureHandle() == &texture_id)
+			{
+				render_states &= ~BGFX_STATE_BLEND_MASK;
+			}
 			m_gui_pipeline->setTexture(0, texture_id, texture_uniform);
 			m_gui_pipeline->render(vertex_buffer,
 				index_buffer,
 				Matrix::IDENTITY,
 				elem_offset,
 				pcmd->ElemCount,
-				material->getRenderStates(),
+				render_states,
 				material->getShaderInstance());
 
 			elem_offset += pcmd->ElemCount;
@@ -2076,6 +2083,7 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	Material* m_material;
 	Pipeline* m_gui_pipeline;
 	GameView m_game_view;
+	SceneView& m_scene_view;
 };
 
 
@@ -2330,9 +2338,10 @@ LUMIX_STUDIO_ENTRY(renderer)
 	property_grid.addPlugin(*LUMIX_NEW(allocator, EnvironmentProbePlugin)(app));
 	property_grid.addPlugin(*LUMIX_NEW(allocator, TerrainPlugin)(app));
 
-	app.addPlugin(*LUMIX_NEW(allocator, SceneViewPlugin)(app));
+	auto* scene_view_plugin = LUMIX_NEW(allocator, SceneViewPlugin)(app);
+	app.addPlugin(*scene_view_plugin);
 	app.addPlugin(*LUMIX_NEW(allocator, ImportAssetDialog)(app));
-	app.addPlugin(*LUMIX_NEW(allocator, GameViewPlugin)(app));
+	app.addPlugin(*LUMIX_NEW(allocator, GameViewPlugin)(app, *scene_view_plugin));
 	app.addPlugin(*LUMIX_NEW(allocator, FurPainterPlugin)(app));
 	app.addPlugin(*LUMIX_NEW(allocator, ShaderEditorPlugin)(app));
 
