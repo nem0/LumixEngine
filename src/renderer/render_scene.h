@@ -152,15 +152,6 @@ struct DebugPoint
 };
 
 
-enum class ModelInstanceType
-{
-	SKINNED_MESH,
-	RIGID_MESH,
-	GRASS,
-	TERRAIN
-};
-
-
 class LUMIX_RENDERER_API RenderScene : public IScene
 {
 public:
