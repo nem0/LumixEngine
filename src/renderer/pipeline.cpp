@@ -1924,7 +1924,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
 			Vec3 camera_pos = m_scene->getUniverse().getPosition(camera_entity);
 			Array<TerrainInfo> tmp_terrains(frame_allocator);
-			m_scene->getTerrainInfos(tmp_terrains, lod_ref_point);
+			m_scene->getTerrainInfos(tmp_terrains, camera_pos);
 			renderTerrains(tmp_terrains);
 		}
 	}

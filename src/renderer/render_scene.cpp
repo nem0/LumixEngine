@@ -2243,6 +2243,14 @@ public:
 		return 2;
 	}
 
+
+	static bgfx::TextureHandle* LUA_getTextureHandle(RenderScene* scene, int resource_idx)
+	{
+		Resource* res = scene->getEngine().getLuaResource(resource_idx);
+		if (!res) return nullptr;
+		return &static_cast<Texture*>(res)->handle;
+	}
+
 	
 	static void LUA_setTexturePixel(Texture* texture, int x, int y, uint32 value)
 	{
@@ -4601,7 +4609,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getTerrainNormalAt);
 	REGISTER_FUNCTION(setTerrainHeightAt);
 
-	#undef REGISTER_FUNCTION
+#undef REGISTER_FUNCTION
 
 	#define REGISTER_FUNCTION(F)\
 		do { \
@@ -4620,6 +4628,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getTextureHeight);
 	REGISTER_FUNCTION(getTexturePixel);
 	REGISTER_FUNCTION(setTexturePixel);
+	REGISTER_FUNCTION(getTextureHandle);
 	REGISTER_FUNCTION(updateTextureData);
 	REGISTER_FUNCTION(setModelInstanceMaterial);
 	REGISTER_FUNCTION(setModelInstancePath);

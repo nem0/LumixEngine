@@ -795,6 +795,18 @@ bool FilterInput(const char* label, char* buf, size_t buf_size)
 }
 
 
+void Rect(float w, float h, ImU32 color)
+{
+	ImGuiWindow* win = GetCurrentWindow();
+	ImVec2 screen_pos = GetCursorScreenPos();
+	ImVec2 end_pos = screen_pos + ImVec2(w, h);
+	ImRect total_bb(screen_pos, end_pos);
+	ItemSize(total_bb);
+	if (!ItemAdd(total_bb, NULL)) return;
+	win->DrawList->AddRectFilled(screen_pos, end_pos, color);
+}
+
+
 void HSplitter(const char* str_id, ImVec2* size)
 {
 	ImVec2 screen_pos = GetCursorScreenPos();
