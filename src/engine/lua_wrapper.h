@@ -172,7 +172,7 @@ template <> inline const char* typeToString<bool>()
 
 template <> inline const char* typeToString<float>()
 {
-	return "boolean";
+	return "number|float";
 }
 
 
