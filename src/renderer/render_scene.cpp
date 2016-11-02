@@ -176,7 +176,6 @@ public:
 	RenderSceneImpl(Renderer& renderer,
 		Engine& engine,
 		Universe& universe,
-		bool is_forward_rendered,
 		IAllocator& allocator);
 
 	~RenderSceneImpl()
@@ -1905,26 +1904,23 @@ public:
 				m_culling_system->updateBoundingSphere({position, radius}, cmp);
 			}
 
-			if(m_is_forward_rendered)
+			float bounding_radius = r.model ? r.model->getBoundingRadius() : 1;
+			for (int light_idx = 0, c = m_point_lights.size(); light_idx < c; ++light_idx)
 			{
-				float bounding_radius = r.model ? r.model->getBoundingRadius() : 1;
-				for (int light_idx = 0, c = m_point_lights.size(); light_idx < c; ++light_idx)
+				for (int j = 0, c2 = m_light_influenced_geometry[light_idx].size(); j < c2; ++j)
 				{
-					for (int j = 0, c2 = m_light_influenced_geometry[light_idx].size(); j < c2; ++j)
+					if(m_light_influenced_geometry[light_idx][j] == cmp)
 					{
-						if(m_light_influenced_geometry[light_idx][j] == cmp)
-						{
-							m_light_influenced_geometry[light_idx].eraseFast(j);
-							break;
-						}
+						m_light_influenced_geometry[light_idx].eraseFast(j);
+						break;
 					}
+				}
 
-					Vec3 pos = m_universe.getPosition(r.entity);
-					Frustum frustum = getPointLightFrustum({light_idx});
-					if(frustum.isSphereInside(pos, bounding_radius))
-					{
-						m_light_influenced_geometry[light_idx].push(cmp);
-					}
+				Vec3 pos = m_universe.getPosition(r.entity);
+				Frustum frustum = getPointLightFrustum({light_idx});
+				if(frustum.isSphereInside(pos, bounding_radius))
+				{
+					m_light_influenced_geometry[light_idx].push(cmp);
 				}
 			}
 		}
@@ -4067,8 +4063,6 @@ public:
 
 	void detectLightInfluencedGeometry(ComponentHandle cmp)
 	{
-		if (!m_is_forward_rendered) return;
-
 		Frustum frustum = getPointLightFrustum(cmp);
 		m_culling_system->cullToFrustum(frustum, 0xffffFFFF);
 		const CullingSystem::Results& results = m_culling_system->getResult();
@@ -4428,7 +4422,6 @@ private:
 	float m_time;
 	float m_lod_multiplier;
 	bool m_is_updating_attachments;
-	bool m_is_forward_rendered;
 	bool m_is_grass_enabled;
 	bool m_is_game_running;
 
@@ -4486,7 +4479,6 @@ static struct
 RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	Engine& engine,
 	Universe& universe,
-	bool is_forward_rendered,
 	IAllocator& allocator)
 	: m_engine(engine)
 	, m_universe(universe)
@@ -4509,7 +4501,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_active_global_light_cmp(INVALID_COMPONENT)
 	, m_global_light_last_cmp(INVALID_COMPONENT)
 	, m_point_light_last_cmp(INVALID_COMPONENT)
-	, m_is_forward_rendered(is_forward_rendered)
 	, m_model_instance_created(m_allocator)
 	, m_model_instance_destroyed(m_allocator)
 	, m_is_grass_enabled(true)
@@ -4566,10 +4557,9 @@ void RenderSceneImpl::destroyComponent(ComponentHandle component, ComponentType 
 RenderScene* RenderScene::createInstance(Renderer& renderer,
 	Engine& engine,
 	Universe& universe,
-	bool is_forward_rendered,
 	IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, RenderSceneImpl)(renderer, engine, universe, is_forward_rendered, allocator);
+	return LUMIX_NEW(allocator, RenderSceneImpl)(renderer, engine, universe, allocator);
 }
 
 

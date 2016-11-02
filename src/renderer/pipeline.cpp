@@ -2216,50 +2216,50 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				case BufferCommands::SET_TEXTURE:
 				{
 					auto cmd = (SetTextureCommand*)ip;
-					ip += sizeof(*cmd);
 					bgfx::setTexture(cmd->stage, cmd->uniform, cmd->texture);
+					ip += sizeof(*cmd);
 					break;
 				}
 				case BufferCommands::SET_UNIFORM_TIME:
 				{
 					auto cmd = (SetUniformTimeCommand*)ip;
-					ip += sizeof(*cmd);
 					auto uniform_time = Vec4(m_scene->getTime(), 0, 0, 0);
 					bgfx::setUniform(cmd->uniform, &uniform_time);
+					ip += sizeof(*cmd);
 					break;
 				}
 				case BufferCommands::SET_UNIFORM_VEC4:
 				{
 					auto cmd = (SetUniformVec4Command*)ip;
-					ip += sizeof(*cmd);
 					bgfx::setUniform(cmd->uniform, &cmd->value);
+					ip += sizeof(*cmd);
 					break;
 				}
 				case BufferCommands::SET_UNIFORM_ARRAY:
 				{
 					auto cmd = (SetUniformArrayCommand*)ip;
-					ip += sizeof(*cmd);
 					bgfx::setUniform(cmd->uniform, ip, cmd->count);
+					ip += sizeof(*cmd);
 					ip += cmd->size;
 					break;
 				}
 				case BufferCommands::SET_GLOBAL_SHADOWMAP:
 				{
-					ip += 1;
 					auto handle = m_global_light_shadowmap->getRenderbufferHandle(0);
 					bgfx::setTexture(15 - m_global_textures_count,
 						m_tex_shadowmap_uniform,
 						handle);
+					ip += 1;
 					break;
 				}
 				case BufferCommands::SET_LOCAL_SHADOWMAP:
 				{
 					auto cmd = (SetLocalShadowmapCommand*)ip;
-					ip += sizeof(*cmd);
 					material->setDefine(m_has_shadowmap_define_idx, bgfx::isValid(cmd->texture));
 					bgfx::setTexture(15 - m_global_textures_count,
 						m_tex_shadowmap_uniform,
 						cmd->texture);
+					ip += sizeof(*cmd);
 					break;
 				}
 				default:

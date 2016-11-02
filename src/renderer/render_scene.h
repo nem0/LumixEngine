@@ -158,7 +158,6 @@ public:
 	static RenderScene* createInstance(Renderer& renderer,
 		Engine& engine,
 		Universe& universe,
-		bool is_forward_rendered,
 		IAllocator& allocator);
 	static void destroyInstance(RenderScene* scene);
 	static void registerLuaAPI(lua_State* L);
