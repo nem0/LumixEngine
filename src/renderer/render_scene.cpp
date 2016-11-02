@@ -4598,6 +4598,8 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getTerrainMaterial);
 	REGISTER_FUNCTION(getTerrainNormalAt);
 	REGISTER_FUNCTION(setTerrainHeightAt);
+	REGISTER_FUNCTION(hideModelInstance);
+	REGISTER_FUNCTION(showModelInstance);
 
 #undef REGISTER_FUNCTION
 
