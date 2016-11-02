@@ -14,6 +14,7 @@ local build_unit_tests = true
 local build_app = true
 local build_studio = true
 local build_gui = _ACTION == "vs2015"
+local build_steam = false
 
 newoption {
 	trigger = "static-plugins",
@@ -524,6 +525,21 @@ project "animation"
 	useLua()
 	defaultConfigurations()
 
+if build_steam then
+	project "steam"
+		libType()
+		files { 
+			"../src/steam/**.cpp",
+			"../src/steam/**.h"
+		}
+		includedirs { "../src", "../src/steam", "../../steamworks_sdk/public/steam", "../external/bgfx/include" }
+		libdirs { "../../steamworks_sdk/redistributable_bin/win64" }
+		defines { "BUILDING_STEAM" }
+		links { "engine", "steam_api64" }
+		useLua()
+		defaultConfigurations()
+end
+	
 project "audio"
 	libType()
 
@@ -749,6 +765,11 @@ if build_studio then
 			forceLink("s_lua_script_plugin_register")
 			forceLink("s_navigation_plugin_register")
 			forceLink("s_renderer_plugin_register")
+			if build_steam then
+				forceLink("s_steam_plugin_register")
+				links { "steam", "steam_api64" }
+				libdirs { "../../steamworks_sdk/redistributable_bin/win64" }
+			end
 
 			forceLink("setStudioApp_animation")
 			forceLink("setStudioApp_audio")
