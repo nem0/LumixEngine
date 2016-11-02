@@ -2238,8 +2238,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				case BufferCommands::SET_UNIFORM_ARRAY:
 				{
 					auto cmd = (SetUniformArrayCommand*)ip;
-					bgfx::setUniform(cmd->uniform, ip, cmd->count);
 					ip += sizeof(*cmd);
+					bgfx::setUniform(cmd->uniform, ip, cmd->count);
 					ip += cmd->size;
 					break;
 				}
