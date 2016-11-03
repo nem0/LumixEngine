@@ -445,6 +445,15 @@ public:
 			ImGui::Text("%s", tmp);
 			ImGui::EndTooltip();
 		}
+		else if (m_drag_data.type == DragData::ENTITY)
+		{
+			ImGui::BeginTooltip();
+			char buf[1024];
+			getEntityListDisplayName(*m_editor, buf, Lumix::lengthOf(buf), *(Lumix::Entity*)m_drag_data.data);
+			ImGui::Text("%s", buf);
+			ImGui::EndTooltip();
+
+		}
 	}
 
 
@@ -1252,6 +1261,7 @@ public:
 
 	void showEntityList()
 	{
+		PROFILE_FUNCTION();
 		if (ImGui::BeginDock("Entity List", &m_is_entity_list_opened))
 		{
 			showEntityListToolbar();
@@ -1269,41 +1279,31 @@ public:
 					const char* current_text = m_current_group == i ? "<-" : "";
 					if (ImGui::TreeNode(name, "%s (%d) %s %s", name, entities_count, locked_text, current_text))
 					{
-						struct ListBoxData
-						{
-							Lumix::WorldEditor* m_editor;
-							Lumix::Universe* universe;
-							Lumix::EntityGroups* groups;
-							int group;
-							char buffer[1024];
-							static bool itemsGetter(void* data, int idx, const char** txt)
-							{
-								auto* d = static_cast<ListBoxData*>(data);
-								auto* entities = d->groups->getGroupEntities(d->group);
-								getEntityListDisplayName(*d->m_editor, d->buffer, sizeof(d->buffer), entities[idx]);
-								*txt = d->buffer;
-								return true;
-							}
-						};
-						ListBoxData data;
-						data.universe = universe;
-						data.m_editor = m_editor;
-						data.group = i;
-						data.groups = &groups;
-						int current_item = -1;
 						ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - ImGui::GetStyle().FramePadding.x);
-						if (ImGui::ListBox("",
-							&current_item,
-							&ListBoxData::itemsGetter,
-							&data,
-							groups.getGroupEntitiesCount(i),
-							15))
+						static ImVec2 size(0, 200);
+						char buffer[1024];
+						ImGui::ListBoxHeader("Resources", size);
+						
+						ImGuiListClipper clipper(groups.getGroupEntitiesCount(i), ImGui::GetTextLineHeightWithSpacing());
+						while (clipper.Step())
 						{
-							auto e = groups.getGroupEntities(i)[current_item];
-							m_editor->selectEntities(&e, 1);
-						};
-						ImGui::PopItemWidth();
+							for (int j = clipper.DisplayStart; j < clipper.DisplayEnd; ++j)
+							{
+								Lumix::Entity entity = groups.getGroupEntities(i)[j];
+								getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), entity);
+								if (ImGui::Selectable(buffer))
+								{
+									m_editor->selectEntities(&entity, 1);
+								}
+								if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
+								{
+									startDrag(StudioApp::DragData::ENTITY, &entity, sizeof(entity));
+								}
+							}
+						}
 
+						ImGui::ListBoxFooter();
+						ImGui::PopItemWidth();
 						ImGui::TreePop();
 					}
 					if (ImGui::IsItemClicked()) m_current_group = i;
