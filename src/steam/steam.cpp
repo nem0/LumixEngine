@@ -59,26 +59,26 @@ struct SteamPlugin : public IPlugin
 	
 	static int LUA_GetFriendCount() { return SteamFriends() ? SteamFriends()->GetFriendCount(k_EFriendFlagAll) : 0; }
 	
+
+	static ::uint64 LUA_GetFriendByIndex(int friend_idx)
+	{
+		return SteamFriends()->GetFriendByIndex(friend_idx, k_EFriendFlagAll).ConvertToUint64();
+	}
+
 	
-	static const char* LUA_GetFriendPersonaName(int friend_idx)
+	static const char* LUA_GetFriendPersonaName(::uint64 steam_id)
 	{
-		ISteamFriends* friends = SteamFriends();
-		if (!friends) return "";
-		CSteamID id = friends->GetFriendByIndex(friend_idx, k_EFriendFlagAll);
-		return friends->GetFriendPersonaName(id);
+		return SteamFriends()->GetFriendPersonaName(steam_id);
 	}
 
 
-	static int LUA_GetFriendPersonaState(int friend_idx)
+	static int LUA_GetFriendPersonaState(::uint64 steam_id)
 	{
-		ISteamFriends* friends = SteamFriends();
-		if (!friends) return 0;
-		CSteamID id = friends->GetFriendByIndex(friend_idx, k_EFriendFlagAll);
-		return (int)friends->GetFriendPersonaState(id);
+		return (int)SteamFriends()->GetFriendPersonaState(steam_id);
 	}
 
 
-	static bgfx::TextureHandle* LUA_GetAvatar(lua_State* L, int friend_idx)
+	static SteamPlugin* getLuaSteamPlugin(lua_State* L)
 	{
 		if (lua_getglobal(L, "__SteamPlugin") != LUA_TLIGHTUSERDATA)
 		{
@@ -86,9 +86,17 @@ struct SteamPlugin : public IPlugin
 			lua_pop(L, 1);
 			return nullptr;
 		}
-		
-		auto* that = LuaWrapper::toType<SteamPlugin*>(L, -1);
+
+		auto* plugin = LuaWrapper::toType<SteamPlugin*>(L, -1);
 		lua_pop(L, 1);
+		return plugin;
+	}
+
+
+	static bgfx::TextureHandle* LUA_GetAvatar(lua_State* L, int friend_idx)
+	{
+		auto* that = getLuaSteamPlugin(L);
+		if (!that) return nullptr;
 
 		IAllocator& allocator = that->m_engine.getAllocator();
 
@@ -121,6 +129,94 @@ struct SteamPlugin : public IPlugin
 		SteamScreenshots()->TriggerScreenshot();
 	}
 
+	
+	static SteamAPICall_t LUA_FindLeaderboard(lua_State* L, const char* leaderboard_name)
+	{
+		SteamAPICall_t apicall = SteamUserStats()->FindOrCreateLeaderboard(leaderboard_name, k_ELeaderboardSortMethodDescending, k_ELeaderboardDisplayTypeNumeric);
+		return apicall;
+	}
+
+
+	static const char* LUA_GetLeaderboardName(lua_State* L, SteamLeaderboard_t leaderboard)
+	{
+		return SteamUserStats()->GetLeaderboardName(leaderboard);
+	}
+
+
+	static int LUA_GetLeaderboardEntryCount(lua_State* L, SteamLeaderboard_t leaderboard)
+	{
+		return SteamUserStats()->GetLeaderboardEntryCount(leaderboard);
+	}
+
+
+	static int LUA_GetDownloadedLeaderboardEntry(lua_State* L)
+	{
+		SteamLeaderboardEntries_t entries = LuaWrapper::checkArg<SteamLeaderboardEntries_t>(L, 1);
+		int index = LuaWrapper::checkArg<int>(L, 2);
+		LeaderboardEntry_t entry;
+		bool b = SteamUserStats()->GetDownloadedLeaderboardEntry(entries, index, &entry, nullptr, 0);
+		if (!b) return 0;
+		
+		lua_newtable(L);
+		lua_pushinteger(L, entry.m_steamIDUser.ConvertToUint64());
+		lua_setfield(L, -2, "m_steamIDUser");
+		lua_pushinteger(L, entry.m_nScore);
+		lua_setfield(L, -2, "m_nScore");
+		return 1;
+	}
+
+
+	static SteamAPICall_t LUA_DownloadLeaderboardEntries(lua_State* L, SteamLeaderboard_t leaderboard, int range_start, int range_end)
+	{
+		auto apicall =  SteamUserStats()->DownloadLeaderboardEntries(leaderboard, k_ELeaderboardDataRequestGlobal, range_start, range_end);
+		return apicall;
+	}
+
+
+	static bool LUA_IsAPICallCompleted(SteamAPICall_t apicall)
+	{
+		bool failed;
+		bool b = SteamUtils()->IsAPICallCompleted(apicall, &failed);
+		return b && !failed;
+	}
+
+
+	static int LUA_GetLeaderboardScoresDownloaded(lua_State* L)
+	{
+		SteamAPICall_t apicall = LuaWrapper::checkArg<SteamAPICall_t>(L, 1);
+		bool failed;
+		LeaderboardScoresDownloaded_t res;
+		bool b = SteamUtils()->GetAPICallResult(apicall, &res, sizeof(res), LeaderboardScoresDownloaded_t::k_iCallback, &failed);
+		if (failed)	return 0;
+		if (!b) return 0;
+
+		lua_newtable(L);
+		lua_pushinteger(L, res.m_hSteamLeaderboardEntries);
+		lua_setfield(L, -2, "m_hSteamLeaderboardEntries");
+		lua_pushinteger(L, res.m_cEntryCount);
+		lua_setfield(L, -2, "m_cEntryCount");
+		return 1;
+
+	}
+
+
+	static int LUA_GetLeaderboardFindResult(lua_State* L)
+	{
+		SteamAPICall_t apicall = LuaWrapper::checkArg<SteamAPICall_t>(L, 1);
+		bool failed;
+		LeaderboardFindResult_t res;
+		bool b = SteamUtils()->GetAPICallResult(apicall, &res, sizeof(res), LeaderboardFindResult_t::k_iCallback, &failed);
+		if (failed)	return 0;
+		if (!b) return 0;
+
+		lua_newtable(L);
+		lua_pushinteger(L, res.m_hSteamLeaderboard);
+		lua_setfield(L, -2, "m_hSteamLeaderboard");
+		lua_pushinteger(L, res.m_bLeaderboardFound);
+		lua_setfield(L, -2, "m_bLeaderboardFound");
+		return 1;
+	}
+
 
 	void registerLuaAPI()
 	{
@@ -128,8 +224,7 @@ struct SteamPlugin : public IPlugin
 
 		#define REGISTER_FUNCTION(group, func) \
 			LuaWrapper::createSystemFunction(L, #group, #func, \
-				&LuaWrapper::wrap<decltype(&LUA_##func), LUA_##func>); \
-		\
+				&LuaWrapper::wrap<decltype(&LUA_##func), LUA_##func>) \
 
 		REGISTER_FUNCTION(SteamFriends, GetPersonaName);
 		REGISTER_FUNCTION(SteamFriends, GetFriendCount);
@@ -137,9 +232,23 @@ struct SteamPlugin : public IPlugin
 		REGISTER_FUNCTION(SteamFriends, GetFriendPersonaState);
 		REGISTER_FUNCTION(SteamFriends, GetAvatar);
 		REGISTER_FUNCTION(SteamScreenshots, TriggerScreenshot);
+		REGISTER_FUNCTION(SteamUserStats, FindLeaderboard);
+		REGISTER_FUNCTION(SteamUserStats, DownloadLeaderboardEntries);
+		REGISTER_FUNCTION(SteamUserStats, GetLeaderboardEntryCount);
+		REGISTER_FUNCTION(SteamUserStats, GetLeaderboardName);
+		REGISTER_FUNCTION(SteamUtils, IsAPICallCompleted);
 
 		lua_pushlightuserdata(L, this);
 		lua_setglobal(L, "__SteamPlugin");
+
+		#undef REGISTER_FUNCTION
+
+		#define REGISTER_FUNCTION(group, func) \
+			LuaWrapper::createSystemFunction(L, #group, #func, &LUA_##func) \
+
+		REGISTER_FUNCTION(SteamUserStats, GetDownloadedLeaderboardEntry);
+		REGISTER_FUNCTION(SteamUtils, GetLeaderboardFindResult);
+		REGISTER_FUNCTION(SteamUtils, GetLeaderboardScoresDownloaded);
 
 		#undef REGISTER_FUNCTION
 	}
@@ -147,6 +256,7 @@ struct SteamPlugin : public IPlugin
 	Engine& m_engine;
 	HashMap<::uint64, Texture*> m_avatars;
 };
+
 
 
 LUMIX_PLUGIN_ENTRY(steam)

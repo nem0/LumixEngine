@@ -1779,6 +1779,12 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
+	void setViewSeq()
+	{
+		bgfx::setViewSeq(m_current_view->bgfx_id, true);
+	}
+
+
 	void drawQuad(float left, float top, float w, float h, int material_index)
 	{
 		Resource* res = m_scene->getEngine().getLuaResource(material_index);
@@ -2921,6 +2927,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 			registerCFunction(#name, f); \
 		} while(false) \
 
+	REGISTER_FUNCTION(setViewSeq);
 	REGISTER_FUNCTION(drawQuad);
 	REGISTER_FUNCTION(setPass);
 	REGISTER_FUNCTION(bindFramebufferTexture);

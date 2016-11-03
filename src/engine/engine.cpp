@@ -134,6 +134,14 @@ int Button(lua_State* L)
 }
 
 
+int CollapsingHeader(lua_State* L)
+{
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	lua_pushboolean(L, ImGui::CollapsingHeader(label));
+	return 1;
+}
+
+
 int Checkbox(lua_State* L)
 {
 	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
@@ -943,6 +951,7 @@ public:
 		LuaImGui::registerCFunction(m_state, "BeginPopup", &LuaWrapper::wrap<decltype(&ImGui::BeginPopup), &ImGui::BeginPopup>);
 		LuaImGui::registerCFunction(m_state, "Button", &LuaImGui::Button);
 		LuaImGui::registerCFunction(m_state, "Checkbox", &LuaImGui::Checkbox);
+		LuaImGui::registerCFunction(m_state, "CollapsingHeader", &LuaImGui::CollapsingHeader);
 		LuaImGui::registerCFunction(m_state, "DragFloat", &LuaImGui::DragFloat);
 		LuaImGui::registerCFunction(m_state, "End", &LuaWrapper::wrap<decltype(&ImGui::End), &ImGui::End>);
 		LuaImGui::registerCFunction(m_state, "EndChildFrame", &LuaWrapper::wrap<decltype(&ImGui::EndChildFrame), &ImGui::EndChildFrame>);
