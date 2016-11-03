@@ -170,6 +170,18 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 	}
 
 
+
+	void refresh() override
+	{
+		clear();
+		auto& universe = *m_editor.getUniverse();
+		for (Entity entity = universe.getFirstEntity(); isValid(entity); entity = universe.getNextEntity(entity))
+		{
+			createIcon(entity);
+		}
+	}
+
+
 	void clear() override
 	{
 		m_icons.clear();
