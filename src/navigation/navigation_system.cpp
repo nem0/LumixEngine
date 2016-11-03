@@ -371,7 +371,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			m_universe.setPosition(agent.entity, *(Vec3*)dt_agent->npos);
 			Vec3 velocity = *(Vec3*)dt_agent->vel;
 			float speed = velocity.length();
-			if (speed > 0)
+			if (dt_agent->ncorners > 0 && speed > 0)
 			{
 				velocity *= 1 / speed;
 				float yaw = atan2(velocity.x, velocity.z);
