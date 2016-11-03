@@ -666,14 +666,24 @@ public:
 	}
 
 
-	static void LUA_setEntityRotation(Universe* univ,
-		int entity_index,
-		Vec3 axis,
-		float angle)
+	static int LUA_setEntityRotation(lua_State* L)
 	{
-		if (entity_index < 0 || entity_index > univ->getEntityCount()) return;
+		Universe* univ = LuaWrapper::checkArg<Universe*>(L, 1);
+		int entity_index = LuaWrapper::checkArg<int>(L, 2);
+		if (entity_index < 0 || entity_index > univ->getEntityCount()) return 0;
 
-		univ->setRotation({entity_index}, Quat(axis, angle));
+		if (lua_gettop(L) > 3)
+		{
+			Vec3 axis = LuaWrapper::checkArg<Vec3>(L, 3);
+			float angle = LuaWrapper::checkArg<float>(L, 4);
+			univ->setRotation({ entity_index }, Quat(axis, angle));
+		}
+		else
+		{
+			Quat rot = LuaWrapper::checkArg<Quat>(L, 3);
+			univ->setRotation({ entity_index }, rot);
+		}
+		return 0;
 	}
 
 	static void LUA_unloadResource(EngineImpl* engine, int resource_idx)
