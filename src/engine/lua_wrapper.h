@@ -353,6 +353,10 @@ template <> inline void push(lua_State* L, unsigned int value)
 {
 	lua_pushinteger(L, value);
 }
+template <> inline void push(lua_State* L, uint64 value)
+{
+	lua_pushinteger(L, value);
+}
 template <> inline void push(lua_State* L, void* value)
 {
 	lua_pushlightuserdata(L, value);
