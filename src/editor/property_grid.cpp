@@ -531,6 +531,16 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 		ImGui::OpenPopup(popup_name);
 	}
 
+	if (ImGui::IsItemHoveredRect())
+	{
+		if (ImGui::IsMouseReleased(0) && m_app.getDragData().type == StudioApp::DragData::ENTITY)
+		{
+			entity = *(Lumix::Entity*)m_app.getDragData().data;
+			return true;
+		}
+	}
+
+
 	ImGui::SameLine();
 	ImGui::Text("%s", label);
 	ImGui::PopItemWidth();

@@ -62,7 +62,8 @@ public:
 		enum Type
 		{
 			NONE,
-			PATH
+			PATH,
+			ENTITY
 		};
 		Type type;
 		void* data;
