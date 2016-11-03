@@ -2255,6 +2255,7 @@ public:
 			copyString(path, sizeof(path), m_universe->getPath().c_str());
 			catString(path, sizeof(path), ".lst");
 			copyFile(m_universe->getPath().c_str(), path);
+			m_editor_icons->refresh();
 		}
 	}
 
