@@ -15,6 +15,7 @@ local build_app = true
 local build_studio = true
 local build_gui = _ACTION == "vs2015"
 local build_steam = false
+local build_game = false
 
 newoption {
 	trigger = "static-plugins",
@@ -24,6 +25,11 @@ newoption {
 newoption {
 	trigger = "no-physics",
 	description = "Do not build physics plugin."
+}
+
+newoption {
+	trigger = "with-steam",
+	description = "Build Steam plugin."
 }
 
 newoption {
@@ -42,13 +48,27 @@ newoption {
 }
 
 newoption {
+	trigger = "with-game",
+	description = "Build game plugin."
+}
+
+newoption {
 	trigger = "no-studio",
 	description = "Do not build Studio."
 }
 
+if _OPTIONS["with-steam"] then
+	build_steam = true
+end
+
+if _OPTIONS["with-game"] then
+	build_game = _OPTIONS["with-game"]
+end
+
 if _OPTIONS["no-physics"] then
 	build_physics = false
 end
+
 
 if _OPTIONS["no-gui"] then
 	build_gui = false
@@ -525,6 +545,10 @@ project "animation"
 	useLua()
 	defaultConfigurations()
 
+if build_game then
+	dofile ("../../" .. build_game .. "/genie.lua")
+end
+	
 if build_steam then
 	project "steam"
 		libType()
