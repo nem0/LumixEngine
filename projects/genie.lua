@@ -795,6 +795,11 @@ if build_studio then
 				libdirs { "../../steamworks_sdk/redistributable_bin/win64" }
 			end
 
+			if build_game then
+				forceLink("s_game_plugin_register")
+				links { "game" }
+			end
+			
 			forceLink("setStudioApp_animation")
 			forceLink("setStudioApp_audio")
 			forceLink("setStudioApp_lua_script")
