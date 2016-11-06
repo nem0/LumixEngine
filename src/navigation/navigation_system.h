@@ -1,3 +1,4 @@
+#pragma once
 #include "engine/lumix.h"
 #include "engine/iplugin.h"
 
@@ -12,6 +13,8 @@ namespace Lumix
 class NavigationScene : public IScene
 {
 public:
+	virtual bool isFinished(Entity entity) = 0;
+	virtual bool navigate(Entity entity, const struct Vec3& dest, float speed) = 0;
 	virtual bool generateNavmesh() = 0;
 	virtual bool generateTile(int x, int z, bool keep_data) = 0;
 	virtual bool generateTileAt(const Vec3& pos, bool keep_data) = 0;
