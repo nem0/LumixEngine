@@ -661,7 +661,12 @@ end
 
 if build_app then
 	project "app"
-		debugdir "../../LumixEngine_data"
+		if build_game then
+			debugdir ("../../" .. build_game)
+		else
+			debugdir "../../LumixEngine_data"
+		end
+
 		kind "ConsoleApp"
 		
 		includedirs { "../src", "../src/app", "../external/bgfx/include" }
@@ -778,7 +783,12 @@ if build_studio then
 	project "studio"
 		kind "WindowedApp"
 
-		debugdir "../../LumixEngine_data"
+		if build_game then
+			debugdir ("../../" .. build_game)
+		else
+			debugdir "../../LumixEngine_data"
+		end
+
 
 		files { "../src/studio/**.cpp" }
 		includedirs { "../src" }
@@ -797,6 +807,7 @@ if build_studio then
 
 			if build_game then
 				forceLink("s_game_plugin_register")
+				forceLink("setStudioApp_game")
 				links { "game" }
 			end
 			
