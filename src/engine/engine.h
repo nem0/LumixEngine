@@ -74,7 +74,8 @@ public:
 	virtual uint32 serialize(Universe& ctx, OutputBlob& serializer) = 0;
 	virtual bool deserialize(Universe& ctx, InputBlob& serializer) = 0;
 	virtual float getFPS() const = 0;
-	virtual float getLastTimeDelta() = 0;
+	virtual double getTime() const = 0;
+	virtual float getLastTimeDelta() const = 0;
 	virtual void setTimeMultiplier(float multiplier) = 0;
 	virtual void pause(bool pause) = 0;
 	virtual void nextFrame() = 0;
