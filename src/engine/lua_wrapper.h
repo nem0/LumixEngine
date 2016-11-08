@@ -250,6 +250,10 @@ template <> inline void push(lua_State* L, float value)
 {
 	lua_pushnumber(L, value);
 }
+template <typename T> inline void push(lua_State* L, const T* value)
+{
+	lua_pushlightuserdata(L, (T*)value);
+}
 template <> inline void push(lua_State* L, Entity value)
 {
 	lua_pushinteger(L, value.index);
