@@ -405,6 +405,7 @@ public:
 		, m_fps(0)
 		, m_is_game_running(false)
 		, m_last_time_delta(0)
+		, m_time(0)
 		, m_path_manager(m_allocator)
 		, m_time_multiplier(1.0f)
 		, m_paused(false)
@@ -1274,6 +1275,7 @@ public:
 			m_paused = false;
 			dt = 1 / 30.0f;
 		}
+		m_time += dt;
 		m_last_time_delta = dt;
 		{
 			PROFILE_BLOCK("update scenes");
@@ -1586,7 +1588,8 @@ public:
 
 	lua_State* getState() override { return m_state; }
 	PathManager& getPathManager() override{ return m_path_manager; }
-	float getLastTimeDelta() override { return m_last_time_delta / m_time_multiplier; }
+	float getLastTimeDelta() const override { return m_last_time_delta / m_time_multiplier; }
+	double getTime() const override { return m_time; }
 
 private:
 	IAllocator& m_allocator;
@@ -1610,6 +1613,7 @@ private:
 	float m_time_multiplier;
 	float m_fps;
 	float m_last_time_delta;
+	double m_time;
 	bool m_is_game_running;
 	bool m_paused;
 	bool m_next_frame;
