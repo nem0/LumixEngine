@@ -1558,35 +1558,34 @@ public:
 		{
 			Vec3 origin, dir;
 			ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
-			if (camera_cmp.isValid())
+			if (!camera_cmp.isValid()) return;
+
+			m_render_interface->getRay(camera_cmp.handle, (float)x, (float)y, origin, dir);
+			auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
+			if (m_gizmo->isActive()) return;
+
+			if(m_is_snap_mode && !m_selected_entities.empty() && hit.is_hit)
 			{
-				m_render_interface->getRay(camera_cmp.handle, (float)x, (float)y, origin, dir);
-				auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
-				if (m_gizmo->isActive()) return;
+				snapEntities(origin + dir * hit.t);
+				return;
+			}
 
-				if(m_is_snap_mode && !m_selected_entities.empty() && hit.is_hit)
+			auto icon_hit = m_editor_icons->raycast(origin, dir);
+			if (icon_hit.entity != INVALID_ENTITY)
+			{
+				Entity e = icon_hit.entity;
+				if (m_is_additive_selection)
 				{
-					snapEntities(origin + dir * hit.t);
-					return;
+					addEntitiesToSelection(&e, 1);
 				}
-
-				auto icon_hit = m_editor_icons->raycast(origin, dir);
-				if (icon_hit.entity != INVALID_ENTITY)
+				else
 				{
-					Entity e = icon_hit.entity;
-					if (m_is_additive_selection)
-					{
-						addEntitiesToSelection(&e, 1);
-					}
-					else
-					{
-						selectEntities(&e, 1);
-					}
+					selectEntities(&e, 1);
 				}
-				else if (hit.is_hit)
-				{
-					onEntityMouseDown(hit, x, y);
-				}
+			}
+			else if (hit.is_hit)
+			{
+				onEntityMouseDown(hit, x, y);
 			}
 		}
 	}

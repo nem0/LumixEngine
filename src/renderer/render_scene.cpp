@@ -41,6 +41,7 @@
 
 #include "engine/universe/universe.h"
 #include <cmath>
+#include <cfloat>
 
 
 namespace Lumix
@@ -3477,31 +3478,36 @@ public:
 		PROFILE_FUNCTION();
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
+		float cur_dist = FLT_MAX;
 		Universe& universe = getUniverse();
 		for (int i = 0; i < m_model_instances.size(); ++i)
 		{
 			auto& r = m_model_instances[i];
-			if (ignored_model_instance.index != i && r.model)
+			if (ignored_model_instance.index == i || !r.model) continue;
+
+			const Vec3& pos = r.matrix.getTranslation();
+			float radius = r.model->getBoundingRadius();
+			float scale = universe.getScale(r.entity);
+			float dist = (pos - origin).length();
+			if (dist - radius * scale > cur_dist) continue;
+			
+			Vec3 intersection;
+			if (dotProduct(pos - origin, pos - origin) < radius * radius ||
+				Math::getRaySphereIntersection(origin, dir, pos, radius * scale, intersection))
 			{
-				const Vec3& pos = r.matrix.getTranslation();
-				float radius = r.model->getBoundingRadius();
-				float scale = universe.getScale(r.entity);
-				Vec3 intersection;
-				if (dotProduct(pos - origin, pos - origin) < radius * radius ||
-					Math::getRaySphereIntersection(origin, dir, pos, radius * scale, intersection))
+				RayCastModelHit new_hit = r.model->castRay(origin, dir, r.matrix);
+				if (new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
 				{
-					RayCastModelHit new_hit = r.model->castRay(origin, dir, r.matrix);
-					if (new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
-					{
-						new_hit.m_component = {i};
-						new_hit.m_entity = r.entity;
-						new_hit.m_component_type = MODEL_INSTANCE_TYPE;
-						hit = new_hit;
-						hit.m_is_hit = true;
-					}
+					new_hit.m_component = {i};
+					new_hit.m_entity = r.entity;
+					new_hit.m_component_type = MODEL_INSTANCE_TYPE;
+					hit = new_hit;
+					hit.m_is_hit = true;
+					cur_dist = dir.length() * hit.m_t;
 				}
 			}
 		}
+
 		for (auto* terrain : m_terrains)
 		{
 			RayCastModelHit terrain_hit = terrain->castRay(origin, dir);
@@ -3513,6 +3519,7 @@ public:
 				hit = terrain_hit;
 			}
 		}
+
 		return hit;
 	}
 
