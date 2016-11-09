@@ -12,7 +12,6 @@ class StudioApp;
 namespace Lumix
 {
 	class Pipeline;
-	class Pipeline;
 	class RenderScene;
 }
 
