@@ -1156,11 +1156,7 @@ public:
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 		for (auto* plugin : plugins)
 		{
-			IScene* scene = plugin->createScene(*universe);
-			if (scene)
-			{
-				universe->addScene(scene);
-			}
+			plugin->createScenes(*universe);
 		}
 
 		if (set_lua_globals)

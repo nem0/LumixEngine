@@ -461,9 +461,10 @@ namespace Lumix
 		}
 
 
-		IScene* createScene(Universe& universe) override
+		void createScenes(Universe& universe) override
 		{
-			return PhysicsScene::create(*this, universe, m_engine, m_allocator);
+			auto* scene = PhysicsScene::create(*this, universe, m_engine, m_allocator);
+			universe.addScene(scene);
 		}
 
 
