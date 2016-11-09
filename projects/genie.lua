@@ -14,6 +14,8 @@ local build_unit_tests = true
 local build_app = true
 local build_studio = true
 local build_gui = _ACTION == "vs2015"
+local build_steam = false
+local build_game = false
 
 newoption {
 	trigger = "static-plugins",
@@ -23,6 +25,11 @@ newoption {
 newoption {
 	trigger = "no-physics",
 	description = "Do not build physics plugin."
+}
+
+newoption {
+	trigger = "with-steam",
+	description = "Build Steam plugin."
 }
 
 newoption {
@@ -41,13 +48,27 @@ newoption {
 }
 
 newoption {
+	trigger = "with-game",
+	description = "Build game plugin."
+}
+
+newoption {
 	trigger = "no-studio",
 	description = "Do not build Studio."
 }
 
+if _OPTIONS["with-steam"] then
+	build_steam = true
+end
+
+if _OPTIONS["with-game"] then
+	build_game = _OPTIONS["with-game"]
+end
+
 if _OPTIONS["no-physics"] then
 	build_physics = false
 end
+
 
 if _OPTIONS["no-gui"] then
 	build_gui = false
@@ -524,6 +545,25 @@ project "animation"
 	useLua()
 	defaultConfigurations()
 
+if build_game then
+	dofile ("../../" .. build_game .. "/genie.lua")
+end
+	
+if build_steam then
+	project "steam"
+		libType()
+		files { 
+			"../src/steam/**.cpp",
+			"../src/steam/**.h"
+		}
+		includedirs { "../src", "../src/steam", "../../steamworks_sdk/public/steam", "../external/bgfx/include" }
+		libdirs { "../../steamworks_sdk/redistributable_bin/win64" }
+		defines { "BUILDING_STEAM" }
+		links { "engine", "steam_api64" }
+		useLua()
+		defaultConfigurations()
+end
+	
 project "audio"
 	libType()
 
@@ -621,7 +661,12 @@ end
 
 if build_app then
 	project "app"
-		debugdir "../../LumixEngine_data"
+		if build_game then
+			debugdir ("../../" .. build_game)
+		else
+			debugdir "../../LumixEngine_data"
+		end
+
 		kind "ConsoleApp"
 		
 		includedirs { "../src", "../src/app", "../external/bgfx/include" }
@@ -738,7 +783,12 @@ if build_studio then
 	project "studio"
 		kind "WindowedApp"
 
-		debugdir "../../LumixEngine_data"
+		if build_game then
+			debugdir ("../../" .. build_game)
+		else
+			debugdir "../../LumixEngine_data"
+		end
+
 
 		files { "../src/studio/**.cpp" }
 		includedirs { "../src" }
@@ -749,7 +799,18 @@ if build_studio then
 			forceLink("s_lua_script_plugin_register")
 			forceLink("s_navigation_plugin_register")
 			forceLink("s_renderer_plugin_register")
+			if build_steam then
+				forceLink("s_steam_plugin_register")
+				links { "steam", "steam_api64" }
+				libdirs { "../../steamworks_sdk/redistributable_bin/win64" }
+			end
 
+			if build_game then
+				forceLink("s_game_plugin_register")
+				forceLink("setStudioApp_game")
+				links { "game" }
+			end
+			
 			forceLink("setStudioApp_animation")
 			forceLink("setStudioApp_audio")
 			forceLink("setStudioApp_lua_script")

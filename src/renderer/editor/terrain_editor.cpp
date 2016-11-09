@@ -64,7 +64,7 @@ struct PaintTerrainCommand LUMIX_FINAL : public Lumix::IEditorCommand
 
 
 	PaintTerrainCommand(Lumix::WorldEditor& editor,
-		TerrainEditor::Type type,
+		TerrainEditor::ActionType action_type,
 		int texture_idx,
 		const Lumix::Vec3& hit_pos,
 		Lumix::BinaryArray& mask,
@@ -80,8 +80,9 @@ struct PaintTerrainCommand LUMIX_FINAL : public Lumix::IEditorCommand
 		, m_new_data(editor.getAllocator())
 		, m_old_data(editor.getAllocator())
 		, m_items(editor.getAllocator())
-		, m_type(type)
+		, m_action_type(action_type)
 		, m_texture_idx(texture_idx)
+		, m_grass_idx(texture_idx)
 		, m_mask(editor.getAllocator())
 		, m_flat_height(flat_height)
 	{
@@ -109,8 +110,9 @@ struct PaintTerrainCommand LUMIX_FINAL : public Lumix::IEditorCommand
 
 	void serialize(Lumix::JsonSerializer& serializer) override
 	{
-		serializer.serialize("type", (int)m_type);
+		serializer.serialize("type", (int)m_action_type);
 		serializer.serialize("texture_idx", m_texture_idx);
+		serializer.serialize("grass_idx", m_grass_idx);
 		serializer.beginArray("items");
 		for (int i = 0; i < m_items.size(); ++i)
 		{
@@ -135,10 +137,11 @@ struct PaintTerrainCommand LUMIX_FINAL : public Lumix::IEditorCommand
 	void deserialize(Lumix::JsonSerializer& serializer) override
 	{
 		m_items.clear();
-		int type;
-		serializer.deserialize("type", type, 0);
-		m_type = (TerrainEditor::Type)type;
+		int action_type;
+		serializer.deserialize("type", action_type, 0);
+		m_action_type = (TerrainEditor::ActionType)action_type;
 		serializer.deserialize("texture_idx", m_texture_idx, 0);
+		serializer.deserialize("grass_idx", m_grass_idx, 0);
 		serializer.deserializeArrayBegin("items");
 		while (!serializer.isArrayEnd())
 		{
@@ -195,7 +198,7 @@ struct PaintTerrainCommand LUMIX_FINAL : public Lumix::IEditorCommand
 			return false;
 		}
 		PaintTerrainCommand& my_command = static_cast<PaintTerrainCommand&>(command);
-		if (m_terrain == my_command.m_terrain && m_type == my_command.m_type &&
+		if (m_terrain == my_command.m_terrain && m_action_type == my_command.m_action_type &&
 			m_texture_idx == my_command.m_texture_idx)
 		{
 			my_command.m_items.push(m_items.back());
@@ -236,8 +239,10 @@ private:
 	Lumix::Texture* getDestinationTexture()
 	{
 		const char* uniform_name = "";
-		switch (m_type)
+		switch (m_action_type)
 		{
+			case TerrainEditor::REMOVE_GRASS:
+			case TerrainEditor::ADD_GRASS:
 			case TerrainEditor::LAYER:
 				uniform_name = SPLATMAP_UNIFORM;
 				break;
@@ -365,6 +370,46 @@ private:
 		}
 	}
 
+	void rasterGrassItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item, TerrainEditor::ActionType action_type)
+	{
+		int texture_width = texture->width;
+		Rectangle r = item.getBoundingRectangle(texture_width, texture->height);
+
+		if (texture->bytes_per_pixel != 4)
+		{
+			ASSERT(false);
+			return;
+		}
+
+		float fx = 0;
+		float fstepx = 1.0f / (r.m_to_x - r.m_from_x);
+		float fstepy = 1.0f / (r.m_to_y - r.m_from_y);
+		for (int i = r.m_from_x, end = r.m_to_x; i < end; ++i, fx += fstepx)
+		{
+			float fy = 0;
+			for (int j = r.m_from_y, end2 = r.m_to_y; j < end2; ++j, fy += fstepy)
+			{
+				if (isMasked(fx, fy))
+				{
+					int offset = 4 * (i - m_x + (j - m_y) * m_width) + 2;
+					float attenuation = getAttenuation(item, i, j);
+					int add = int(attenuation * item.m_amount * 255);
+					if (add > 0)
+					{
+						if (m_action_type == TerrainEditor::REMOVE_GRASS)
+						{
+							data[offset] &= ~(1 << m_grass_idx);
+						}
+						else
+						{
+							data[offset] |= 1 << m_grass_idx;
+						}
+					}
+				}
+			}
+		}
+	}
+
 
 	void rasterSmoothHeightItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item)
 	{
@@ -415,22 +460,27 @@ private:
 
 	void rasterItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item)
 	{
-		if (m_type == TerrainEditor::COLOR)
+		if (m_action_type == TerrainEditor::COLOR)
 		{
 			rasterColorItem(texture, data, item);
 			return;
 		}
-		else if (m_type == TerrainEditor::LAYER)
+		else if (m_action_type == TerrainEditor::LAYER)
 		{
 			rasterLayerItem(texture, data, item);
 			return;
 		}
-		else if (m_type == TerrainEditor::SMOOTH_HEIGHT)
+		else if (m_action_type == TerrainEditor::ADD_GRASS || m_action_type == TerrainEditor::REMOVE_GRASS)
+		{
+			rasterGrassItem(texture, data, item, m_action_type);
+			return;
+		}
+		else if (m_action_type == TerrainEditor::SMOOTH_HEIGHT)
 		{
 			rasterSmoothHeightItem(texture, data, item);
 			return;
 		}
-		else if (m_type == TerrainEditor::FLAT_HEIGHT)
+		else if (m_action_type == TerrainEditor::FLAT_HEIGHT)
 		{
 			rasterFlatHeightItem(texture, data, item);
 			return;
@@ -454,7 +504,7 @@ private:
 
 				int add = int(attenuation * amount);
 				Lumix::uint16 x = ((Lumix::uint16*)texture->getData())[(i + j * texture_width)];
-				x += m_type == TerrainEditor::RAISE_HEIGHT ? Lumix::Math::minimum(add, 0xFFFF - x)
+				x += m_action_type == TerrainEditor::RAISE_HEIGHT ? Lumix::Math::minimum(add, 0xFFFF - x)
 														   : Lumix::Math::maximum(-add, -x);
 				((Lumix::uint16*)&data[0])[offset] = x;
 			}
@@ -525,7 +575,8 @@ private:
 		texture->onDataUpdated(m_x, m_y, m_width, m_height);
 		static_cast<Lumix::RenderScene*>(m_terrain.scene)->forceGrassUpdate(m_terrain.handle);
 
-		if (m_type != TerrainEditor::LAYER && m_type != TerrainEditor::COLOR)
+		if (m_action_type != TerrainEditor::LAYER && m_action_type != TerrainEditor::COLOR &&
+			m_action_type != TerrainEditor::ADD_GRASS && m_action_type != TerrainEditor::REMOVE_GRASS)
 		{
 			Lumix::IScene* scene = m_world_editor.getUniverse()->getScene(Lumix::crc32("physics"));
 			if (!scene) return;
@@ -616,11 +667,12 @@ private:
 	Lumix::Array<Lumix::uint8> m_new_data;
 	Lumix::Array<Lumix::uint8> m_old_data;
 	int m_texture_idx;
+	int m_grass_idx;
 	int m_width;
 	int m_height;
 	int m_x;
 	int m_y;
-	TerrainEditor::Type m_type;
+	TerrainEditor::ActionType m_action_type;
 	Lumix::Array<Item> m_items;
 	Lumix::ComponentUID m_terrain;
 	Lumix::WorldEditor& m_world_editor;
@@ -694,6 +746,11 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, StudioApp& app)
 	app.addAction(m_smooth_terrain_action);
 	app.addAction(m_lower_terrain_action);
 
+	m_remove_grass_action =
+		LUMIX_NEW(editor.getAllocator(), Action)("Remove grass from terrain", "removeGrassFromTerrain");
+	m_remove_grass_action->is_global = false;
+	app.addAction(m_remove_grass_action);
+
 	m_remove_entity_action =
 		LUMIX_NEW(editor.getAllocator(), Action)("Remove entities from terrain", "removeEntitiesFromTerrain");
 	m_remove_entity_action->is_global = false;
@@ -702,8 +759,9 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, StudioApp& app)
 	editor.addPlugin(*this);
 	m_terrain_brush_size = 10;
 	m_terrain_brush_strength = 0.1f;
-	m_type = RAISE_HEIGHT;
+	m_action_type = RAISE_HEIGHT;
 	m_texture_idx = 0;
+	m_grass_idx = 0;
 	m_is_align_with_normal = false;
 	m_is_rotate_x = false;
 	m_is_rotate_y = false;
@@ -758,7 +816,7 @@ void TerrainEditor::drawCursor(Lumix::RenderScene& scene, Lumix::ComponentHandle
 {
 	PROFILE_FUNCTION();
 	static const int SLICE_COUNT = 30;
-	if (m_type == TerrainEditor::FLAT_HEIGHT && ImGui::GetIO().KeyCtrl)
+	if (m_action_type == TerrainEditor::FLAT_HEIGHT && ImGui::GetIO().KeyCtrl)
 	{
 		scene.addDebugCross(center, 1.0f, 0xff0000ff, 0);
 		return;
@@ -790,34 +848,46 @@ void TerrainEditor::drawCursor(Lumix::RenderScene& scene, Lumix::ComponentHandle
 
 void TerrainEditor::detectModifiers()
 {
-	bool is_height_tool = m_type == LOWER_HEIGHT || m_type == RAISE_HEIGHT ||
-						  m_type == SMOOTH_HEIGHT;
+	bool is_height_tool = m_action_type == LOWER_HEIGHT || m_action_type == RAISE_HEIGHT ||
+						  m_action_type == SMOOTH_HEIGHT;
 	if (is_height_tool)
 	{
 		if (m_lower_terrain_action->isActive())
 		{
-			m_type = LOWER_HEIGHT;
+			m_action_type = LOWER_HEIGHT;
 		}
 		else if (m_smooth_terrain_action->isActive())
 		{
-			m_type = SMOOTH_HEIGHT;
+			m_action_type = SMOOTH_HEIGHT;
 		}
 		else
 		{
-			m_type = RAISE_HEIGHT;
+			m_action_type = RAISE_HEIGHT;
 		}
 	}
 
-	bool is_entity_tool = m_type == ENTITY || m_type == REMOVE_ENTITY;
+	if (m_action_type == ADD_GRASS || m_action_type == REMOVE_GRASS)
+	{
+		if (m_remove_grass_action->isActive())
+		{
+			m_action_type = REMOVE_GRASS;
+		}
+		else
+		{
+			m_action_type = ADD_GRASS;
+		}
+	}
+
+	bool is_entity_tool = m_action_type == ENTITY || m_action_type == REMOVE_ENTITY;
 	if (is_entity_tool)
 	{
 		if (m_remove_entity_action->isActive())
 		{
-			m_type = REMOVE_ENTITY;
+			m_action_type = REMOVE_ENTITY;
 		}
 		else
 		{
-			m_type = ENTITY;
+			m_action_type = ENTITY;
 		}
 	}
 }
@@ -857,14 +927,14 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::WorldEditor::RayHit& hit, int
 	if (selected_entities.size() != 1) return false;
 	bool is_terrain = m_world_editor.getUniverse()->hasComponent(selected_entities[0], TERRAIN_TYPE);
 	if (!is_terrain) return false;
-	if (m_type == NOT_SET || !m_component.isValid()) return false;
+	if (m_action_type == NOT_SET || !m_component.isValid()) return false;
 
 	detectModifiers();
 
 	if (selected_entities[0] == hit.entity && m_component.isValid())
 	{
 		Lumix::Vec3 hit_pos = hit.pos;
-		switch (m_type)
+		switch (m_action_type)
 		{
 			case FLAT_HEIGHT:
 				if (ImGui::GetIO().KeyCtrl)
@@ -873,14 +943,16 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::WorldEditor::RayHit& hit, int
 				}
 				else
 				{
-					paint(hit.pos, m_type, false);
+					paint(hit.pos, m_action_type, false);
 				}
 				break;
 			case RAISE_HEIGHT:
 			case LOWER_HEIGHT:
 			case SMOOTH_HEIGHT:
+			case REMOVE_GRASS:
+			case ADD_GRASS:
 			case COLOR:
-			case LAYER: paint(hit.pos, m_type, false); break;
+			case LAYER: paint(hit.pos, m_action_type, false); break;
 			case ENTITY: paintEntities(hit.pos); break;
 			case REMOVE_ENTITY: removeEntities(hit.pos); break;
 			default: ASSERT(false); break;
@@ -1083,7 +1155,7 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 			m_terrain_brush_size,
 			-m_terrain_brush_size,
 			m_terrain_brush_size);
-		auto& meshes = scene->getModelInstanceInfos(frustum, frustum.position);
+		auto& meshes = scene->getModelInstanceInfos(frustum, frustum.position, ~0ULL);
 
 		Lumix::Vec2 size = scene->getTerrainSize(m_component.handle);
 		float scale = 1.0f - Lumix::Math::maximum(0.01f, m_terrain_brush_strength);
@@ -1166,14 +1238,16 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 		bool is_terrain = m_world_editor.getUniverse()->hasComponent(hit.m_entity, TERRAIN_TYPE);
 		if (!is_terrain) return;
 
-		switch (m_type)
+		switch (m_action_type)
 		{
 			case FLAT_HEIGHT:
 			case RAISE_HEIGHT:
 			case LOWER_HEIGHT:
 			case SMOOTH_HEIGHT:
+			case REMOVE_GRASS:
+			case ADD_GRASS:
 			case COLOR:
-			case LAYER: paint(hit.m_origin + hit.m_dir * hit.m_t, m_type, true); break;
+			case LAYER: paint(hit.m_origin + hit.m_dir * hit.m_t, m_action_type, true); break;
 			case ENTITY: paintEntities(hit.m_origin + hit.m_dir * hit.m_t); break;
 			case REMOVE_ENTITY: removeEntities(hit.m_origin + hit.m_dir * hit.m_t); break;
 			default: ASSERT(false); break;
@@ -1220,7 +1294,8 @@ void TerrainEditor::onGUI()
 		HEIGHT,
 		LAYER,
 		ENTITY,
-		COLOR
+		COLOR,
+		GRASS
 	};
 
 	bool is_grass_enabled = scene->isGrassEnabled();
@@ -1228,9 +1303,9 @@ void TerrainEditor::onGUI()
 	if (ImGui::Checkbox("Enable grass", &is_grass_enabled)) scene->enableGrass(is_grass_enabled);
 
 	if (ImGui::Combo(
-			"Brush type", &m_current_brush, "Height\0Layer\0Entity\0Color\0"))
+			"Brush type", &m_current_brush, "Height\0Layer\0Entity\0Color\0Grass\0"))
 	{
-		m_type = m_current_brush == HEIGHT ? TerrainEditor::RAISE_HEIGHT : m_type;
+		m_action_type = m_current_brush == HEIGHT ? TerrainEditor::RAISE_HEIGHT : m_action_type;
 	}
 
 	switch (m_current_brush)
@@ -1239,8 +1314,9 @@ void TerrainEditor::onGUI()
 			if (ImGui::Button("Save heightmap"))
 				getMaterial()->getTextureByUniform(HEIGHTMAP_UNIFORM)->save();
 			break;
+		case GRASS:
 		case LAYER:
-			if (ImGui::Button("Save layermap"))
+			if (ImGui::Button("Save layermap and grassmap"))
 				getMaterial()->getTextureByUniform(SPLATMAP_UNIFORM)->save();
 			break;
 		case COLOR:
@@ -1249,7 +1325,7 @@ void TerrainEditor::onGUI()
 			break;
 	}
 
-	if (m_current_brush == LAYER || m_current_brush == COLOR)
+	if (m_current_brush == LAYER || m_current_brush == GRASS || m_current_brush == COLOR)
 	{
 		if (m_brush_texture)
 		{
@@ -1308,28 +1384,42 @@ void TerrainEditor::onGUI()
 	{
 		case HEIGHT:
 		{
-			bool is_flat_tool = m_type == TerrainEditor::FLAT_HEIGHT;
+			bool is_flat_tool = m_action_type == TerrainEditor::FLAT_HEIGHT;
 			if (ImGui::Checkbox("Flat", &is_flat_tool))
 			{
-				m_type = is_flat_tool ? TerrainEditor::FLAT_HEIGHT : TerrainEditor::RAISE_HEIGHT;
+				m_action_type = is_flat_tool ? TerrainEditor::FLAT_HEIGHT : TerrainEditor::RAISE_HEIGHT;
 			}
 
-			if (m_type == TerrainEditor::FLAT_HEIGHT)
+			if (m_action_type == TerrainEditor::FLAT_HEIGHT)
 			{
 				ImGui::SameLine();
 				ImGui::Text("- Press Ctrl to pick height");
 			}
 			break;
 		}
+		case GRASS:
+		{
+			m_action_type = TerrainEditor::ADD_GRASS;
+			int type_count = scene->getGrassCount(m_component.handle);
+			for (int i = 0; i < type_count; ++i)
+			{
+				if (i % 4 != 0) ImGui::SameLine();
+				if (ImGui::RadioButton(Lumix::StaticString<20>("", i, "###rb", i), m_grass_idx == i))
+				{
+					m_grass_idx = i;
+				}
+			}
+			break;
+		}
 		case COLOR:
 		{
-			m_type = TerrainEditor::COLOR;
+			m_action_type = TerrainEditor::COLOR;
 			ImGui::ColorPicker(&m_color.x, false);
 			break;
 		}
 		case LAYER:
 		{
-			m_type = TerrainEditor::LAYER;
+			m_action_type = TerrainEditor::LAYER;
 			Lumix::Texture* tex = getMaterial()->getTextureByUniform(TEX_COLOR_UNIFORM);
 			if (tex)
 			{
@@ -1346,7 +1436,7 @@ void TerrainEditor::onGUI()
 		}
 		case ENTITY:
 		{
-			m_type = TerrainEditor::ENTITY;
+			m_action_type = TerrainEditor::ENTITY;
 			auto& template_system = m_world_editor.getEntityTemplateSystem();
 			auto& template_names = template_system.getTemplateNames();
 			if (template_names.empty())
@@ -1433,7 +1523,7 @@ void TerrainEditor::onGUI()
 	}
 
 	if(!m_component.isValid()) return;
-	if(m_type == NOT_SET) return;
+	if(m_action_type == NOT_SET) return;
 	if(!m_is_enabled) return;
 
 	float mouse_x = m_world_editor.getMouseX();
@@ -1460,11 +1550,11 @@ void TerrainEditor::onGUI()
 }
 
 
-void TerrainEditor::paint(const Lumix::Vec3& hit_pos, Type type, bool old_stroke)
+void TerrainEditor::paint(const Lumix::Vec3& hit_pos, ActionType action_type, bool old_stroke)
 {
 	PaintTerrainCommand* command = LUMIX_NEW(m_world_editor.getAllocator(), PaintTerrainCommand)(m_world_editor,
-		type,
-		m_texture_idx,
+		action_type,
+		action_type == ADD_GRASS || action_type == REMOVE_GRASS ? m_grass_idx : m_texture_idx,
 		hit_pos,
 		m_brush_mask,
 		m_terrain_brush_size,

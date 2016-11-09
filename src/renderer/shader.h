@@ -107,6 +107,7 @@ public:
 			MATRIX4,
 			TIME,
 			COLOR,
+			VEC2,
 			VEC3
 		};
 

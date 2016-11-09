@@ -407,10 +407,6 @@ static void registerProperties(IAllocator& allocator)
 		"Mesh", &RenderScene::getGrassPath, &RenderScene::setGrassPath, "Mesh (*.msh)", MODEL_TYPE));
 	grass->addChild(LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)(
 		"Distance", &RenderScene::getGrassDistance, &RenderScene::setGrassDistance, 1.0f, FLT_MAX, 1.0f));
-	auto ground = LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)(
-		"Ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround);
-	ground->setLimit(0, 4);
-	grass->addChild(ground);
 	grass->addChild(LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)(
 		"Density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity));
 	PropertyRegister::add("terrain", grass);
@@ -571,6 +567,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		, m_shader_binary_manager(*this, m_allocator)
 		, m_passes(m_allocator)
 		, m_shader_defines(m_allocator)
+		, m_layers(m_allocator)
 		, m_bgfx_allocator(m_allocator)
 		, m_callback_stub(*this)
 	{
@@ -628,6 +625,10 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 		m_default_shader = static_cast<Shader*>(m_shader_manager.load(Path("pipelines/common/default.shd")));
 		RenderScene::registerLuaAPI(m_engine.getState());
+		m_layers.emplace("default");
+		m_layers.emplace("transparent");
+		m_layers.emplace("water");
+		m_layers.emplace("fur");
 	}
 
 	~RendererImpl()
@@ -643,6 +644,30 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		bgfx::frame();
 		bgfx::frame();
 		bgfx::shutdown();
+	}
+
+
+	int getLayer(const char* name) override
+	{
+		for (int i = 0; i < m_layers.size(); ++i)
+		{
+			if (m_layers[i] == name) return i;
+		}
+		ASSERT(m_layers.size() < 64);
+		m_layers.emplace() = name;
+		return m_layers.size() - 1;
+	}
+
+
+	int getLayersCount() const override
+	{
+		return m_layers.size();
+	}
+
+
+	const char* getLayerName(int idx) const override
+	{
+		return m_layers[idx];
 	}
 
 
@@ -679,7 +704,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 	IScene* createScene(Universe& ctx) override
 	{
-		return RenderScene::createInstance(*this, m_engine, ctx, true, m_allocator);
+		return RenderScene::createInstance(*this, m_engine, ctx, m_allocator);
 	}
 
 
@@ -789,12 +814,14 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 
 	using ShaderDefine = StaticString<32>;
+	using Layer = StaticString<32>;
 
 
 	Engine& m_engine;
 	IAllocator& m_allocator;
 	Array<ShaderCombinations::Pass> m_passes;
 	Array<ShaderDefine> m_shader_defines;
+	Array<Layer> m_layers;
 	CallbackStub m_callback_stub;
 	TextureManager m_texture_manager;
 	MaterialManager m_material_manager;

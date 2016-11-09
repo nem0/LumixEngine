@@ -280,7 +280,7 @@ public:
 
 		for (auto iter = m_in_progress.begin(), end = m_in_progress.end(); iter != end; ++iter)
 		{
-			if (iter.value()->data.m_id = id)
+			if (iter.value()->data.m_id == id)
 			{
 				iter.value()->data.m_flags |= E_CANCELED;
 				return;
@@ -375,6 +375,7 @@ public:
 				AsyncItem& item = m_pending[0];
 				tr->data.m_file = item.m_file;
 				tr->data.m_cb = item.m_cb;
+				tr->data.m_id = item.m_id;
 				tr->data.m_mode = item.m_mode;
 				copyString(tr->data.m_path, sizeof(tr->data.m_path), item.m_path);
 				tr->data.m_flags = item.m_flags;

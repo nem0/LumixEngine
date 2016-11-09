@@ -33,6 +33,7 @@ class EditorIcons
 		virtual void setRenderInterface(class RenderInterface* render_interface) = 0;
 		virtual void clear() = 0;
 		virtual void render() = 0;
+		virtual void refresh() = 0;
 		virtual Hit raycast(const Vec3& origin, const Vec3& dir) = 0;
 };
 

@@ -67,6 +67,7 @@ IMGUI_API void IntervalGraph(const unsigned long long* value_pairs,
 	unsigned long long scele_max);
 IMGUI_API bool FilterInput(const char* label, char* buf, size_t buf_size);
 IMGUI_API void HSplitter(const char* str_id, ImVec2* size);
+IMGUI_API void Rect(float w, float h, ImU32 color);
 
 } // namespace ImGui
 

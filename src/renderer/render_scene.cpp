@@ -176,7 +176,6 @@ public:
 	RenderSceneImpl(Renderer& renderer,
 		Engine& engine,
 		Universe& universe,
-		bool is_forward_rendered,
 		IAllocator& allocator);
 
 	~RenderSceneImpl()
@@ -703,7 +702,6 @@ public:
 			serializer.write(r.entity);
 			if(r.entity != INVALID_ENTITY)
 			{
-				serializer.write(r.layer_mask);
 				serializer.write(r.model ? r.model->getPath().getHash() : 0);
 				bool has_changed_materials = r.model && r.model->isReady() && r.meshes != &r.model->getMesh(0);
 				serializer.write(has_changed_materials ? r.mesh_count : 0);
@@ -994,7 +992,8 @@ public:
 
 			if(r.entity != INVALID_ENTITY)
 			{
-				serializer.read(r.layer_mask);
+				int64 layer_mask;
+				if(version <= RenderSceneVersion::LAYERS) serializer.read(layer_mask);
 				r.matrix = m_universe.getMatrix(r.entity);
 
 				uint32 path;
@@ -1905,26 +1904,23 @@ public:
 				m_culling_system->updateBoundingSphere({position, radius}, cmp);
 			}
 
-			if(m_is_forward_rendered)
+			float bounding_radius = r.model ? r.model->getBoundingRadius() : 1;
+			for (int light_idx = 0, c = m_point_lights.size(); light_idx < c; ++light_idx)
 			{
-				float bounding_radius = r.model ? r.model->getBoundingRadius() : 1;
-				for (int light_idx = 0, c = m_point_lights.size(); light_idx < c; ++light_idx)
+				for (int j = 0, c2 = m_light_influenced_geometry[light_idx].size(); j < c2; ++j)
 				{
-					for (int j = 0, c2 = m_light_influenced_geometry[light_idx].size(); j < c2; ++j)
+					if(m_light_influenced_geometry[light_idx][j] == cmp)
 					{
-						if(m_light_influenced_geometry[light_idx][j] == cmp)
-						{
-							m_light_influenced_geometry[light_idx].eraseFast(j);
-							break;
-						}
+						m_light_influenced_geometry[light_idx].eraseFast(j);
+						break;
 					}
+				}
 
-					Vec3 pos = m_universe.getPosition(r.entity);
-					Frustum frustum = getPointLightFrustum({light_idx});
-					if(frustum.isSphereInside(pos, bounding_radius))
-					{
-						m_light_influenced_geometry[light_idx].push(cmp);
-					}
+				Vec3 pos = m_universe.getPosition(r.entity);
+				Frustum frustum = getPointLightFrustum({light_idx});
+				if(frustum.isSphereInside(pos, bounding_radius))
+				{
+					m_light_influenced_geometry[light_idx].push(cmp);
 				}
 			}
 		}
@@ -2139,13 +2135,27 @@ public:
 	Model* getModelInstanceModel(ComponentHandle cmp) override { return m_model_instances[cmp.index].model; }
 
 
+	static uint64 getLayerMask(ModelInstance& model_instance)
+	{
+		Model* model = model_instance.model;
+		if (!model->isReady()) return 1;
+		uint64 layer_mask = 0;
+		for(int i = 0; i < model->getMeshCount(); ++i)
+		{ 
+			layer_mask |= model->getMesh(i).material->getRenderLayerMask();
+		}
+		return layer_mask;
+	}
+
+
 	void showModelInstance(ComponentHandle cmp) override
 	{
 		auto& model_instance = m_model_instances[cmp.index];
 		if (!model_instance.model || !model_instance.model->isReady()) return;
 
 		Sphere sphere(m_universe.getPosition(model_instance.entity), model_instance.model->getBoundingRadius());
-		if(!m_culling_system->isAdded(cmp)) m_culling_system->addStatic(cmp, sphere);
+		uint64 layer_mask = getLayerMask(model_instance);
+		if(!m_culling_system->isAdded(cmp)) m_culling_system->addStatic(cmp, sphere, layer_mask);
 	}
 
 
@@ -2158,12 +2168,6 @@ public:
 	Path getModelInstancePath(ComponentHandle cmp) override
 	{
 		return m_model_instances[cmp.index].model ? m_model_instances[cmp.index].model->getPath() : Path("");
-	}
-
-
-	void setModelInstanceLayer(ComponentHandle cmp, const int32& layer) override
-	{
-		m_culling_system->setLayerMask(cmp, (int64)1 << (int64)layer);
 	}
 
 
@@ -2233,6 +2237,14 @@ public:
 		LuaWrapper::push(L, hit.m_is_hit ? hit.m_origin + hit.m_dir * hit.m_t : Vec3(0, 0, 0));
 
 		return 2;
+	}
+
+
+	static bgfx::TextureHandle* LUA_getTextureHandle(RenderScene* scene, int resource_idx)
+	{
+		Resource* res = scene->getEngine().getLuaResource(resource_idx);
+		if (!res) return nullptr;
+		return &static_cast<Texture*>(res)->handle;
 	}
 
 	
@@ -2329,6 +2341,12 @@ public:
 	static void LUA_setPipelineScene(Pipeline* pipeline, RenderScene* scene)
 	{
 		pipeline->setScene(scene);
+	}
+
+
+	static RenderScene* LUA_getPipelineScene(Pipeline* pipeline)
+	{
+		return pipeline->getScene();
 	}
 
 
@@ -2441,18 +2459,6 @@ public:
 	}
 
 
-	void setGrassGround(ComponentHandle cmp, int index, int ground) override
-	{
-		m_terrains[{cmp.index}]->setGrassTypeGround(index, ground);
-	}
-
-
-	int getGrassGround(ComponentHandle cmp, int index) override
-	{
-		return m_terrains[{cmp.index}]->getGrassTypeGround(index);
-	}
-
-
 	void setGrassPath(ComponentHandle cmp, int index, const Path& path) override
 	{
 		m_terrains[{cmp.index}]->setGrassTypePath(index, path);
@@ -2499,12 +2505,12 @@ public:
 	}
 
 
-	const CullingSystem::Results* cull(const Frustum& frustum)
+	const CullingSystem::Results* cull(const Frustum& frustum, uint64 layer_mask)
 	{
 		PROFILE_FUNCTION();
 		if (m_model_instances.empty()) return nullptr;
 
-		m_culling_system->cullToFrustumAsync(frustum, ~0UL);
+		m_culling_system->cullToFrustumAsync(frustum, layer_mask);
 		return &m_culling_system->getResult();
 	}
 
@@ -2725,7 +2731,7 @@ public:
 	{
 		PROFILE_FUNCTION();
 
-		const CullingSystem::Results* results = cull(frustum);
+		const CullingSystem::Results* results = cull(frustum, ~0ULL);
 		if (!results) return;
 
 		for (auto& subresults : *results)
@@ -2738,12 +2744,14 @@ public:
 	}
 
 
-	Array<Array<ModelInstanceMesh>>& getModelInstanceInfos(const Frustum& frustum, const Vec3& lod_ref_point) override
+	Array<Array<ModelInstanceMesh>>& getModelInstanceInfos(const Frustum& frustum,
+		const Vec3& lod_ref_point,
+		uint64 layer_mask) override
 	{
 		PROFILE_FUNCTION();
 
 		for(auto& i : m_temporary_infos) i.clear();
-		const CullingSystem::Results* results = cull(frustum);
+		const CullingSystem::Results* results = cull(frustum, layer_mask);
 		if (!results) return m_temporary_infos;
 
 		fillTemporaryInfos(*results, frustum, lod_ref_point);
@@ -3832,11 +3840,14 @@ public:
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_TYPE));
 
 		auto& r = m_model_instances[component.index];
+		
+		if (model->getMesh(0).material->getLayersCount() > 0) r.type = ModelInstance::MULTILAYER;
+		else if (model->getBoneCount() > 0) r.type = ModelInstance::SKINNED;
+		else r.type = ModelInstance::RIGID;
 		float bounding_radius = r.model->getBoundingRadius();
 		float scale = m_universe.getScale(r.entity);
 		Sphere sphere(r.matrix.getTranslation(), bounding_radius * scale);
-		m_culling_system->addStatic(component, sphere);
-		m_culling_system->setLayerMask(component, r.layer_mask);
+		m_culling_system->addStatic(component, sphere, getLayerMask(r));
 		ASSERT(!r.pose);
 		if (model->getBoneCount() > 0)
 		{
@@ -4052,8 +4063,6 @@ public:
 
 	void detectLightInfluencedGeometry(ComponentHandle cmp)
 	{
-		if (!m_is_forward_rendered) return;
-
 		Frustum frustum = getPointLightFrustum(cmp);
 		m_culling_system->cullToFrustum(frustum, 0xffffFFFF);
 		const CullingSystem::Results& results = m_culling_system->getResult();
@@ -4342,7 +4351,6 @@ public:
 		auto& r = m_model_instances[entity.index];
 		r.entity = entity;
 		r.model = nullptr;
-		r.layer_mask = 1;
 		r.meshes = nullptr;
 		r.pose = nullptr;
 		r.custom_meshes = false;
@@ -4414,7 +4422,6 @@ private:
 	float m_time;
 	float m_lod_multiplier;
 	bool m_is_updating_attachments;
-	bool m_is_forward_rendered;
 	bool m_is_grass_enabled;
 	bool m_is_game_running;
 
@@ -4472,7 +4479,6 @@ static struct
 RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	Engine& engine,
 	Universe& universe,
-	bool is_forward_rendered,
 	IAllocator& allocator)
 	: m_engine(engine)
 	, m_universe(universe)
@@ -4495,7 +4501,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_active_global_light_cmp(INVALID_COMPONENT)
 	, m_global_light_last_cmp(INVALID_COMPONENT)
 	, m_point_light_last_cmp(INVALID_COMPONENT)
-	, m_is_forward_rendered(is_forward_rendered)
 	, m_model_instance_created(m_allocator)
 	, m_model_instance_destroyed(m_allocator)
 	, m_is_grass_enabled(true)
@@ -4552,10 +4557,9 @@ void RenderSceneImpl::destroyComponent(ComponentHandle component, ComponentType 
 RenderScene* RenderScene::createInstance(Renderer& renderer,
 	Engine& engine,
 	Universe& universe,
-	bool is_forward_rendered,
 	IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, RenderSceneImpl)(renderer, engine, universe, is_forward_rendered, allocator);
+	return LUMIX_NEW(allocator, RenderSceneImpl)(renderer, engine, universe, allocator);
 }
 
 
@@ -4594,8 +4598,10 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getTerrainMaterial);
 	REGISTER_FUNCTION(getTerrainNormalAt);
 	REGISTER_FUNCTION(setTerrainHeightAt);
+	REGISTER_FUNCTION(hideModelInstance);
+	REGISTER_FUNCTION(showModelInstance);
 
-	#undef REGISTER_FUNCTION
+#undef REGISTER_FUNCTION
 
 	#define REGISTER_FUNCTION(F)\
 		do { \
@@ -4606,6 +4612,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(createPipeline);
 	REGISTER_FUNCTION(destroyPipeline);
 	REGISTER_FUNCTION(setPipelineScene);
+	REGISTER_FUNCTION(getPipelineScene);
 	REGISTER_FUNCTION(pipelineRender);
 	REGISTER_FUNCTION(getRenderBuffer);
 	REGISTER_FUNCTION(getMaterialTexture);
@@ -4613,6 +4620,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getTextureHeight);
 	REGISTER_FUNCTION(getTexturePixel);
 	REGISTER_FUNCTION(setTexturePixel);
+	REGISTER_FUNCTION(getTextureHandle);
 	REGISTER_FUNCTION(updateTextureData);
 	REGISTER_FUNCTION(setModelInstanceMaterial);
 	REGISTER_FUNCTION(setModelInstancePath);

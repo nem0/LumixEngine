@@ -48,8 +48,10 @@ Material::Material(const Path& path, ResourceManagerBase& resource_manager, IAll
 	, m_define_mask(0)
 	, m_command_buffer(&DEFAULT_COMMAND_BUFFER)
 	, m_custom_flags(0)
+	, m_render_layer(0)
+	, m_render_layer_mask(1)
+	, m_layers_count(0)
 {
-	for (auto& l : m_layer_count) l = 1;
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
 	{
@@ -158,17 +160,9 @@ bool Material::save(JsonSerializer& serializer)
 	auto& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
 
 	serializer.beginObject();
+	serializer.serialize("render_layer", renderer.getLayerName(m_render_layer));
+	serializer.serialize("layers_count", m_layers_count);
 	serializer.serialize("shader", m_shader ? m_shader->getPath() : Path(""));
-	for (int i = 0; i < lengthOf(m_layer_count); ++i)
-	{
-		if (m_layer_count[i] != 1)
-		{
-			serializer.beginObject("layer");
-				serializer.serialize("pass", renderer.getPassName(i));
-				serializer.serialize("count", m_layer_count[i]);
-			serializer.endObject();
-		}
-	}
 	for (int i = 0; i < m_texture_count; ++i)
 	{
 		char path[MAX_PATH_LENGTH];
@@ -235,9 +229,15 @@ bool Material::save(JsonSerializer& serializer)
 				break;
 			case Shader::Uniform::VEC3:
 				serializer.beginArray("vec3");
-					serializer.serializeArrayItem(m_uniforms[i].vec3[0]);
-					serializer.serializeArrayItem(m_uniforms[i].vec3[1]);
-					serializer.serializeArrayItem(m_uniforms[i].vec3[2]);
+				serializer.serializeArrayItem(m_uniforms[i].vec3[0]);
+				serializer.serializeArrayItem(m_uniforms[i].vec3[1]);
+				serializer.serializeArrayItem(m_uniforms[i].vec3[2]);
+				serializer.endArray();
+				break;
+			case Shader::Uniform::VEC2:
+				serializer.beginArray("vec2");
+				serializer.serializeArrayItem(m_uniforms[i].vec2[0]);
+				serializer.serializeArrayItem(m_uniforms[i].vec2[1]);
 				serializer.endArray();
 				break;
 			case Shader::Uniform::TIME:
@@ -353,9 +353,16 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 			else if (equalStrings(label, "vec3"))
 			{
 				serializer.deserializeArrayBegin();
-					serializer.deserializeArrayItem(uniform.vec3[0], 0);
-					serializer.deserializeArrayItem(uniform.vec3[1], 0);
-					serializer.deserializeArrayItem(uniform.vec3[2], 0);
+				serializer.deserializeArrayItem(uniform.vec3[0], 0);
+				serializer.deserializeArrayItem(uniform.vec3[1], 0);
+				serializer.deserializeArrayItem(uniform.vec3[2], 0);
+				serializer.deserializeArrayEnd();
+			}
+			else if (equalStrings(label, "vec2"))
+			{
+				serializer.deserializeArrayBegin();
+				serializer.deserializeArrayItem(uniform.vec2[0], 0);
+				serializer.deserializeArrayItem(uniform.vec2[1], 0);
 				serializer.deserializeArrayEnd();
 			}
 			else
@@ -380,6 +387,27 @@ void Material::setTexturePath(int i, const Path& path)
 		Texture* texture = static_cast<Texture*>(m_resource_manager.getOwner().get(TEXTURE_TYPE)->load(path));
 		setTexture(i, texture);
 	}
+}
+
+
+void Material::setLayersCount(int layers)
+{
+	++m_empty_dep_count;
+	checkState();
+	m_layers_count = layers;
+	--m_empty_dep_count;
+	checkState();
+}
+
+
+void Material::setRenderLayer(int layer)
+{
+	++m_empty_dep_count;
+	checkState();
+	m_render_layer = layer;
+	m_render_layer_mask = 1ULL << (uint64)layer;
+	--m_empty_dep_count;
+	checkState();
 }
 
 
@@ -441,6 +469,9 @@ void Material::createCommandBuffer()
 		{
 			case Shader::Uniform::FLOAT:
 				generator.setUniform(shader_uniform.handle, Vec4(uniform.float_value, 0, 0, 0));
+				break;
+			case Shader::Uniform::VEC2:
+				generator.setUniform(shader_uniform.handle, Vec4(uniform.vec2[0], uniform.vec2[1], 0, 0));
 				break;
 			case Shader::Uniform::VEC3:
 			case Shader::Uniform::COLOR:
@@ -763,6 +794,18 @@ bool Material::load(FS::IFile& file)
 		{
 			deserializeCustomFlags(serializer);
 		}
+		else if (equalStrings(label, "layers_count"))
+		{
+			serializer.deserialize(m_layers_count, 0);
+		}
+		else if (equalStrings(label, "render_layer"))
+		{
+			char tmp[32];
+			auto& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
+			serializer.deserialize(tmp, lengthOf(tmp), "Default");
+			m_render_layer = renderer.getLayer(tmp);
+			m_render_layer_mask = 1ULL << (uint64)m_render_layer;
+		}
 		else if (equalStrings(label, "uniforms"))
 		{
 			deserializeUniforms(serializer);
@@ -790,29 +833,6 @@ bool Material::load(FS::IFile& file)
 			{
 				m_render_states &= ~BGFX_STATE_CULL_MASK;
 			}
-		}
-		else if (equalStrings(label, "layer"))
-		{
-			serializer.deserializeObjectBegin();
-			int pass = 0;
-			int layers_count = 1;
-			while (!serializer.isObjectEnd())
-			{
-				serializer.deserializeLabel(label, 255);
-				
-				if (equalStrings(label, "pass"))
-				{
-					char pass_name[50];
-					serializer.deserialize(pass_name, lengthOf(pass_name), "");
-					pass = renderer.getPassIdx(pass_name);
-				}
-				else if (equalStrings(label, "count"))
-				{
-					serializer.deserialize(layers_count, 1);
-				}
-			}
-			m_layer_count[pass] = layers_count;
-			serializer.deserializeObjectEnd();
 		}
 		else if (equalStrings(label, "color"))
 		{

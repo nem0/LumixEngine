@@ -29,6 +29,7 @@ class SceneView
 		void shutdown();
 		void onGUI();
 		Lumix::Pipeline* getPipeline() { return m_pipeline; }
+		const bgfx::TextureHandle& getTextureHandle() const { return m_texture_handle; }
 
 	private:
 		void renderGizmos();

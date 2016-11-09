@@ -532,12 +532,34 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 		ImGui::OpenPopup(popup_name);
 	}
 
+	if (ImGui::IsItemHoveredRect())
+	{
+		if (ImGui::IsMouseReleased(0) && m_app.getDragData().type == StudioApp::DragData::ENTITY)
+		{
+			entity = *(Lumix::Entity*)m_app.getDragData().data;
+			return true;
+		}
+	}
+
+
 	ImGui::SameLine();
 	ImGui::Text("%s", label);
 	ImGui::PopItemWidth();
 
 	if (ImGui::BeginPopup(popup_name))
 	{
+		if (isValid(entity))
+		{
+			if (ImGui::Button("Select current")) m_editor.selectEntities(&entity, 1);
+			ImGui::SameLine();
+			if (ImGui::Button("Empty"))
+			{
+				entity = Lumix::INVALID_ENTITY;
+				ImGui::CloseCurrentPopup();
+				ImGui::EndPopup();
+				return true;
+			}
+		}
 		struct ListBoxData
 		{
 			Lumix::WorldEditor* m_editor;

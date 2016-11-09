@@ -359,6 +359,12 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
+	bool isFinished(Entity entity) override
+	{
+		return m_agents[entity].is_finished;
+	}
+
+
 	void update(float time_delta, bool paused) override
 	{
 		PROFILE_FUNCTION();
@@ -371,7 +377,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			m_universe.setPosition(agent.entity, *(Vec3*)dt_agent->npos);
 			Vec3 velocity = *(Vec3*)dt_agent->vel;
 			float speed = velocity.length();
-			if (speed > 0)
+			if (dt_agent->ncorners > 0 && speed > 0)
 			{
 				velocity *= 1 / speed;
 				float yaw = atan2(velocity.x, velocity.z);
@@ -897,7 +903,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	bool navigate(Entity entity, const Vec3& dest, float speed)
+	bool navigate(Entity entity, const Vec3& dest, float speed) override
 	{
 		if (!m_navquery) return false;
 		if (!m_crowd) return false;

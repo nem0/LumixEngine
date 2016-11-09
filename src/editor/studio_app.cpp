@@ -40,6 +40,72 @@
 #include <SDL_syswm.h>
 
 
+struct LuaPlugin : public StudioApp::IPlugin
+{
+	LuaPlugin(Lumix::WorldEditor& _editor, const char* src, const char* filename)
+		: editor(_editor)
+	{
+		L = lua_newthread(editor.getEngine().getState());
+		thread_ref = luaL_ref(editor.getEngine().getState(), LUA_REGISTRYINDEX);
+
+		bool errors = luaL_loadbuffer(L, src, Lumix::stringLength(src), filename) != LUA_OK;
+		errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
+		if (errors)
+		{
+			Lumix::g_log_error.log("Editor") << filename << ": " << lua_tostring(L, -1);
+			lua_pop(L, 1);
+		}
+
+		const char* name = "LuaPlugin";
+		if (lua_getglobal(L, "plugin_name") == LUA_TSTRING)
+		{
+			name = lua_tostring(L, -1);
+		}
+
+		m_action = LUMIX_NEW(editor.getAllocator(), Action)(name, name);
+		m_action->func.bind<LuaPlugin, &LuaPlugin::onAction>(this);
+		m_is_opened = false;
+
+		lua_pop(L, 1); // plugin_name
+	}
+
+
+	~LuaPlugin()
+	{
+		luaL_unref(editor.getEngine().getState(), LUA_REGISTRYINDEX, thread_ref);
+	}
+
+
+	void onAction()
+	{
+		m_is_opened = !m_is_opened;
+	}
+
+
+	void onWindowGUI() override
+	{
+		if (!m_is_opened) return;
+		if (lua_getglobal(L, "onGUI") == LUA_TFUNCTION)
+		{
+			if (lua_pcall(L, 0, 0, 0) != LUA_OK)
+			{
+				Lumix::g_log_error.log("Editor") << "LuaPlugin:" << lua_tostring(L, -1);
+				lua_pop(L, 1);
+			}
+		}
+		else
+		{
+			lua_pop(L, 1);
+		}
+	}
+
+	Lumix::WorldEditor& editor;
+	lua_State* L;
+	int thread_ref;
+	bool m_is_opened;
+};
+
+
 class StudioAppImpl LUMIX_FINAL : public StudioApp
 {
 public:
@@ -378,6 +444,15 @@ public:
 			Lumix::PathUtils::getFilename(tmp, Lumix::lengthOf(tmp), (const char*)m_drag_data.data);
 			ImGui::Text("%s", tmp);
 			ImGui::EndTooltip();
+		}
+		else if (m_drag_data.type == DragData::ENTITY)
+		{
+			ImGui::BeginTooltip();
+			char buf[1024];
+			getEntityListDisplayName(*m_editor, buf, Lumix::lengthOf(buf), *(Lumix::Entity*)m_drag_data.data);
+			ImGui::Text("%s", buf);
+			ImGui::EndTooltip();
+
 		}
 	}
 
@@ -1186,6 +1261,7 @@ public:
 
 	void showEntityList()
 	{
+		PROFILE_FUNCTION();
 		if (ImGui::BeginDock("Entity List", &m_is_entity_list_opened))
 		{
 			showEntityListToolbar();
@@ -1203,41 +1279,31 @@ public:
 					const char* current_text = m_current_group == i ? "<-" : "";
 					if (ImGui::TreeNode(name, "%s (%d) %s %s", name, entities_count, locked_text, current_text))
 					{
-						struct ListBoxData
-						{
-							Lumix::WorldEditor* m_editor;
-							Lumix::Universe* universe;
-							Lumix::EntityGroups* groups;
-							int group;
-							char buffer[1024];
-							static bool itemsGetter(void* data, int idx, const char** txt)
-							{
-								auto* d = static_cast<ListBoxData*>(data);
-								auto* entities = d->groups->getGroupEntities(d->group);
-								getEntityListDisplayName(*d->m_editor, d->buffer, sizeof(d->buffer), entities[idx]);
-								*txt = d->buffer;
-								return true;
-							}
-						};
-						ListBoxData data;
-						data.universe = universe;
-						data.m_editor = m_editor;
-						data.group = i;
-						data.groups = &groups;
-						int current_item = -1;
 						ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - ImGui::GetStyle().FramePadding.x);
-						if (ImGui::ListBox("",
-							&current_item,
-							&ListBoxData::itemsGetter,
-							&data,
-							groups.getGroupEntitiesCount(i),
-							15))
+						static ImVec2 size(0, 200);
+						char buffer[1024];
+						ImGui::ListBoxHeader("Resources", size);
+						
+						ImGuiListClipper clipper(groups.getGroupEntitiesCount(i), ImGui::GetTextLineHeightWithSpacing());
+						while (clipper.Step())
 						{
-							auto e = groups.getGroupEntities(i)[current_item];
-							m_editor->selectEntities(&e, 1);
-						};
-						ImGui::PopItemWidth();
+							for (int j = clipper.DisplayStart; j < clipper.DisplayEnd; ++j)
+							{
+								Lumix::Entity entity = groups.getGroupEntities(i)[j];
+								getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), entity);
+								if (ImGui::Selectable(buffer))
+								{
+									m_editor->selectEntities(&entity, 1);
+								}
+								if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
+								{
+									startDrag(StudioApp::DragData::ENTITY, &entity, sizeof(entity));
+								}
+							}
+						}
 
+						ImGui::ListBoxFooter();
+						ImGui::PopItemWidth();
 						ImGui::TreePop();
 					}
 					if (ImGui::IsItemClicked()) m_current_group = i;
@@ -1805,6 +1871,62 @@ public:
 	}
 
 
+	void loadLuaPlugin(const char* dir, const char* filename)
+	{
+		Lumix::StaticString<Lumix::MAX_PATH_LENGTH> path(dir, filename);
+		Lumix::FS::OsFile file;
+
+		if (file.open(path, Lumix::FS::Mode::OPEN_AND_READ, m_allocator))
+		{
+			auto size = file.size();
+			auto* src = (char*)m_engine->getLIFOAllocator().allocate(size + 1);
+			file.read(src, size);
+			src[size] = 0;
+			
+			LuaPlugin* plugin = LUMIX_NEW(m_editor->getAllocator(), LuaPlugin)(*m_editor, src, filename);
+			addPlugin(*plugin);
+
+			m_engine->getLIFOAllocator().deallocate(src);
+			file.close();
+		}
+		else
+		{
+			Lumix::g_log_warning.log("Editor") << "Failed to open " << path;
+		}
+	}
+
+
+	void findLuaPlugins(const char* dir)
+	{
+		auto* iter = PlatformInterface::createFileIterator(dir, m_allocator);
+		PlatformInterface::FileInfo info;
+		while (PlatformInterface::getNextFile(iter, &info))
+		{
+			char normalized_path[Lumix::MAX_PATH_LENGTH];
+			Lumix::PathUtils::normalize(info.filename, normalized_path, Lumix::lengthOf(normalized_path));
+			if (normalized_path[0] == '.') continue;
+			if (info.is_directory)
+			{
+				char dir_path[Lumix::MAX_PATH_LENGTH] = { 0 };
+				if (dir[0] != '.') Lumix::copyString(dir_path, dir);
+				Lumix::catString(dir_path, info.filename);
+				Lumix::catString(dir_path, "/");
+				findLuaPlugins(dir_path);
+			}
+			else
+			{
+				char ext[5];
+				Lumix::PathUtils::getExtension(ext, Lumix::lengthOf(ext), info.filename);
+				if (Lumix::equalStrings(ext, "lua"))
+				{
+					loadLuaPlugin(dir, info.filename);
+				}
+			}
+		}
+		PlatformInterface::destroyFileIterator(iter);
+	}
+
+
 	void processSystemEvents()
 	{
 		SDL_Event event;
@@ -2008,6 +2130,7 @@ public:
 		loadIcons();
 		loadSettings();
 		loadUniverseFromCommandLine();
+		findLuaPlugins("plugins/lua/");
 	}
 
 

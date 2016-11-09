@@ -119,6 +119,10 @@ template <> inline uint32 toType(lua_State* L, int index)
 {
 	return (uint32)lua_tointeger(L, index);
 }
+template <> inline uint64 toType(lua_State* L, int index)
+{
+	return (uint64)lua_tointeger(L, index);
+}
 template <> inline bool toType(lua_State* L, int index)
 {
 	return lua_toboolean(L, index) != 0;
@@ -168,7 +172,7 @@ template <> inline const char* typeToString<bool>()
 
 template <> inline const char* typeToString<float>()
 {
-	return "boolean";
+	return "number|float";
 }
 
 
@@ -212,6 +216,10 @@ template <> inline bool isType<uint32>(lua_State* L, int index)
 {
 	return lua_isinteger(L, index) != 0;
 }
+template <> inline bool isType<uint64>(lua_State* L, int index)
+{
+	return lua_isinteger(L, index) != 0;
+}
 template <> inline bool isType<int64>(lua_State* L, int index)
 {
 	return lua_isinteger(L, index) != 0;
@@ -241,6 +249,10 @@ template <typename T> inline void push(lua_State* L, T value)
 template <> inline void push(lua_State* L, float value)
 {
 	lua_pushnumber(L, value);
+}
+template <typename T> inline void push(lua_State* L, const T* value)
+{
+	lua_pushlightuserdata(L, (T*)value);
 }
 template <> inline void push(lua_State* L, Entity value)
 {
@@ -342,6 +354,10 @@ template <> inline void push(lua_State* L, int value)
 	lua_pushinteger(L, value);
 }
 template <> inline void push(lua_State* L, unsigned int value)
+{
+	lua_pushinteger(L, value);
+}
+template <> inline void push(lua_State* L, uint64 value)
 {
 	lua_pushinteger(L, value);
 }
