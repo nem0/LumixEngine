@@ -753,23 +753,21 @@ namespace ImGui
 		{
 			if (handlePoint(p_last))
 			{
+				p_last.x = 0;
 				points[0] = p_last;
 				changed = true;
 			}
 		}
 		else
 		{
-			if (editor.point_idx >= 0)
-			{
-				window->DrawList->AddBezierCurve(
-					transform(p_last),
-					transform(p_last + tangent_last),
-					transform(p + tangent),
-					transform(p),
-					GetColorU32(ImGuiCol_PlotLines),
-					1.0f,
-					20);
-			}
+			window->DrawList->AddBezierCurve(
+				transform(p_last),
+				transform(p_last + tangent_last),
+				transform(p + tangent),
+				transform(p),
+				GetColorU32(ImGuiCol_PlotLines),
+				1.0f,
+				20);
 
 			if (handleTangent(tangent_last, p_last))
 			{
