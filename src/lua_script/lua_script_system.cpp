@@ -45,7 +45,7 @@ namespace Lumix
 		explicit LuaScriptSystemImpl(Engine& engine);
 		virtual ~LuaScriptSystemImpl();
 
-		IScene* createScene(Universe& universe) override;
+		void createScenes(Universe& universe) override;
 		void destroyScene(IScene* scene) override;
 		const char* getName() const override { return "lua_script"; }
 		LuaScriptManager& getScriptManager() { return m_script_manager; }
@@ -1599,9 +1599,10 @@ namespace Lumix
 	}
 
 
-	IScene* LuaScriptSystemImpl::createScene(Universe& ctx)
+	void LuaScriptSystemImpl::createScenes(Universe& ctx)
 	{
-		return LUMIX_NEW(m_allocator, LuaScriptSceneImpl)(*this, ctx);
+		auto* scene = LUMIX_NEW(m_allocator, LuaScriptSceneImpl)(*this, ctx);
+		ctx.addScene(scene);
 	}
 
 

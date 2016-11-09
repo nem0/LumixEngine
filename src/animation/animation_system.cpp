@@ -448,9 +448,10 @@ struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
 	}
 
 
-	IScene* createScene(Universe& ctx) override
+	void createScenes(Universe& ctx) override
 	{
-		return LUMIX_NEW(m_allocator, AnimationSceneImpl)(*this, m_engine, ctx, m_allocator);
+		auto* scene = LUMIX_NEW(m_allocator, AnimationSceneImpl)(*this, m_engine, ctx, m_allocator);
+		ctx.addScene(scene);
 	}
 
 

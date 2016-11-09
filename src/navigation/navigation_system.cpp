@@ -102,7 +102,7 @@ struct NavigationSystem LUMIX_FINAL : public IPlugin
 
 	void registerProperties();
 	const char* getName() const override { return "navigation"; }
-	IScene* createScene(Universe& universe) override;
+	void createScenes(Universe& universe) override;
 	void destroyScene(IScene* scene) override;
 
 	BaseProxyAllocator m_allocator;
@@ -1380,9 +1380,10 @@ void NavigationSystem::registerProperties()
 }
 
 
-IScene* NavigationSystem::createScene(Universe& universe)
+void NavigationSystem::createScenes(Universe& universe)
 {
-	return LUMIX_NEW(m_allocator, NavigationSceneImpl)(*this, universe, m_allocator);
+	auto* scene = LUMIX_NEW(m_allocator, NavigationSceneImpl)(*this, universe, m_allocator);
+	universe.addScene(scene);
 }
 
 

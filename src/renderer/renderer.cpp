@@ -702,9 +702,10 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
-	IScene* createScene(Universe& ctx) override
+	void createScenes(Universe& ctx) override
 	{
-		return RenderScene::createInstance(*this, m_engine, ctx, m_allocator);
+		auto* scene = RenderScene::createInstance(*this, m_engine, ctx, m_allocator);
+		ctx.addScene(scene);
 	}
 
 

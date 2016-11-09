@@ -82,9 +82,10 @@ struct AudioSystemImpl LUMIX_FINAL : public AudioSystem
 	const char* getName() const override { return "audio"; }
 
 
-	IScene* createScene(Universe& ctx) override
+	void createScenes(Universe& ctx) override
 	{
-		return AudioScene::createInstance(*this, ctx, m_engine.getAllocator());
+		auto* scene = AudioScene::createInstance(*this, ctx, m_engine.getAllocator());
+		ctx.addScene(scene);
 	}
 
 

@@ -40,7 +40,7 @@ struct SteamPlugin : public IPlugin
 	virtual void deserialize(InputBlob&)  {}
 	virtual void update(float) { SteamAPI_RunCallbacks(); }
 
-	virtual IScene* createScene(Universe&) { return nullptr; }
+	virtual void createScenes(Universe&) {}
 	virtual void destroyScene(IScene*)  {}
 	virtual void startGame() {}
 	virtual void stopGame()
