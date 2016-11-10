@@ -444,6 +444,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 							}
 						}
 						break;
+						case LuaScriptScene::Property::STRING:
 						case LuaScriptScene::Property::ANY:
 							if (ImGui::InputText(property_name, buf, sizeof(buf)))
 							{

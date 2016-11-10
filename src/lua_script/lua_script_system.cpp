@@ -18,6 +18,7 @@
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
+#include "engine/string.h"
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_manager.h"
 
@@ -161,6 +162,7 @@ namespace Lumix
 									switch (lua_type(inst.m_state, -1))
 									{
 									case LUA_TBOOLEAN: prop.type = Property::BOOLEAN; break;
+									case LUA_TSTRING: prop.type = Property::STRING; break;
 									default: prop.type = Property::FLOAT;
 									}
 									prop.name_hash = hash;
@@ -1229,11 +1231,16 @@ namespace Lumix
 				break;
 				case Property::ENTITY:
 				{
-					Entity val = {(int)lua_tointeger(scr.m_state, -1)};
+					Entity val = { (int)lua_tointeger(scr.m_state, -1) };
 					toCString(val.index, out, max_size);
 				}
 				break;
-				case Property::RESOURCE: 
+				case Property::STRING:
+				{
+					copyString(out, max_size, lua_tostring(scr.m_state, -1));
+				}
+				break;
+				case Property::RESOURCE:
 				{
 					int res_idx = LuaWrapper::toType<int>(scr.m_state, -1);
 					Resource* res = m_system.m_engine.getLuaResource(res_idx);
