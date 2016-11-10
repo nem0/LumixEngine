@@ -375,6 +375,8 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		for (auto& agent : m_agents)
 		{
 			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
+			if (!dt_agent->active) continue;
+
 			m_universe.setPosition(agent.entity, *(Vec3*)dt_agent->npos);
 			Vec3 velocity = *(Vec3*)dt_agent->vel;
 			float speed = velocity.length();
@@ -904,6 +906,18 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
+	void setActorActive(Entity entity, bool active) override
+	{
+		if (!m_crowd) return;
+		if (entity == INVALID_ENTITY) return;
+		auto iter = m_agents.find(entity);
+		if (iter == m_agents.end()) return;
+		Agent& agent = iter.value();
+		dtCrowdAgent* dt_agent = m_crowd->getEditableAgent(agent.agent);
+		if (dt_agent) dt_agent->active = active;
+	}
+
+
 	bool navigate(Entity entity, const Vec3& dest, float speed) override
 	{
 		if (!m_navquery) return false;
@@ -919,7 +933,16 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		dtCrowdAgentParams params = m_crowd->getAgent(agent.agent)->params;
 		params.maxSpeed = speed;
 		m_crowd->updateAgentParameters(agent.agent, &params);
-		return m_crowd->requestMoveTarget(agent.agent, end_poly_ref, &dest.x);
+		if (m_crowd->requestMoveTarget(agent.agent, end_poly_ref, &dest.x))
+		{
+			agent.is_finished = false;
+		}
+		else
+		{
+			g_log_warning.log("Navigation") << "requestMoveTarget failed";
+			agent.is_finished = true;
+		}
+		return !agent.is_finished;
 	}
 
 
@@ -1411,6 +1434,7 @@ static void registerLuaAPI(lua_State* L)
 
 	REGISTER_FUNCTION(generateNavmesh);
 	REGISTER_FUNCTION(navigate);
+	REGISTER_FUNCTION(setActorActive);
 	REGISTER_FUNCTION(cancelNavigation);
 	REGISTER_FUNCTION(debugDrawNavmesh);
 	REGISTER_FUNCTION(debugDrawCompactHeightfield);
