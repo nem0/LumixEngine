@@ -369,6 +369,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	{
 		PROFILE_FUNCTION();
 		if (!m_crowd) return;
+		if (paused) return;
 		m_crowd->update(time_delta, nullptr);
 
 		for (auto& agent : m_agents)
