@@ -563,6 +563,7 @@ int dtCrowd::addAgent(const float* pos, const dtCrowdAgentParams* params)
 	ag->targetState = DT_CROWDAGENT_TARGET_NONE;
 	
 	ag->active = true;
+	ag->paused = false;
 
 	return idx;
 }
@@ -668,6 +669,7 @@ int dtCrowd::getActiveAgents(dtCrowdAgent** agents, const int maxAgents)
 	int n = 0;
 	for (int i = 0; i < m_maxAgents; ++i)
 	{
+		if (!m_agents[i].paused) continue;
 		if (!m_agents[i].active) continue;
 		if (n < maxAgents)
 			agents[n++] = &m_agents[i];
@@ -687,6 +689,8 @@ void dtCrowd::updateMoveRequest(const float /*dt*/)
 	{
 		dtCrowdAgent* ag = &m_agents[i];
 		if (!ag->active)
+			continue;
+		if (ag->paused)
 			continue;
 		if (ag->state == DT_CROWDAGENT_STATE_INVALID)
 			continue;
@@ -790,6 +794,8 @@ void dtCrowd::updateMoveRequest(const float /*dt*/)
 	{
 		dtCrowdAgent* ag = &m_agents[i];
 		if (!ag->active)
+			continue;
+		if (ag->paused)
 			continue;
 		if (ag->targetState == DT_CROWDAGENT_TARGET_NONE || ag->targetState == DT_CROWDAGENT_TARGET_VELOCITY)
 			continue;

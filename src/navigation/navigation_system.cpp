@@ -375,7 +375,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		for (auto& agent : m_agents)
 		{
 			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
-			if (!dt_agent->active) continue;
+			if (!dt_agent->paused) continue;
 
 			m_universe.setPosition(agent.entity, *(Vec3*)dt_agent->npos);
 			Vec3 velocity = *(Vec3*)dt_agent->vel;
@@ -914,7 +914,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		if (iter == m_agents.end()) return;
 		Agent& agent = iter.value();
 		dtCrowdAgent* dt_agent = m_crowd->getEditableAgent(agent.agent);
-		if (dt_agent) dt_agent->active = active;
+		if (dt_agent) dt_agent->paused = active;
 	}
 
 
