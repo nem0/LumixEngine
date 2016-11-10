@@ -318,6 +318,8 @@ void PropertyGrid::showSampledFunctionProperty(const Lumix::Array<Lumix::Entity>
 	Lumix::ComponentType cmp_type,
 	Lumix::ISampledFunctionDescriptor& desc)
 {
+	static const int MIN_COUNT = 6;
+
 	Lumix::OutputBlob blob(m_editor.getAllocator());
 	Lumix::ComponentUID cmp;
 	cmp.type = cmp_type;
@@ -330,32 +332,31 @@ void PropertyGrid::showSampledFunctionProperty(const Lumix::Array<Lumix::Entity>
 	input.read(count);
 	Lumix::Vec2* f = (Lumix::Vec2*)input.skip(sizeof(Lumix::Vec2) * count);
 
-	bool changed = false;
-	auto cp = ImGui::GetCursorScreenPos();
-	
-	ImVec2 editor_size;
 	auto editor = ImGui::BeginCurveEditor(desc.getName());
 	if (editor.valid)
 	{
-		editor_size = ImVec2(ImGui::CalcItemWidth(), ImGui::GetItemRectSize().y);
+		bool changed = false;
 
-		for (int i = 1; i < count; i += 3)
+		changed |= ImGui::CurveSegment((ImVec2*)(f + 1), editor);
+
+		for (int i = 1; i < count - 3; i += 3)
 		{
-			if (ImGui::CurvePoint((ImVec2*)(f + i - 1), editor))
+			changed |= ImGui::CurveSegment((ImVec2*)(f + i), editor);
+
+			if (changed)
 			{
-				changed = true;
-				if (i > 1)
-				{
-					f[i].x = Lumix::Math::maximum(f[i - 3].x + 0.001f, f[i].x);
-				}
+				f[i + 3].x = Lumix::Math::maximum(f[i].x + 0.001f, f[i + 3].x);
+
 				if (i + 3 < count)
 				{
-					f[i].x = Lumix::Math::minimum(f[i + 3].x - 0.001f, f[i].x);
+					f[i + 3].x = Lumix::Math::minimum(f[i + 6].x - 0.001f, f[i + 3].x);
 				}
 			}
-			if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))
+
+			if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0)
+				&& count > MIN_COUNT && i + 3 < count - 2)
 			{
-				for (int j = i - 1; j < count - 3; ++j)
+				for (int j = i + 2; j < count - 3; ++j)
 				{
 					f[j] = f[j + 3];
 				}
@@ -368,49 +369,50 @@ void PropertyGrid::showSampledFunctionProperty(const Lumix::Array<Lumix::Entity>
 		f[count - 2].x = 1;
 		f[1].x = 0;
 		ImGui::EndCurveEditor(editor);
-	}
-	if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))
-	{
-		auto mp = ImGui::GetMousePos();
-		mp.x -= cp.x;
-		mp.y -= cp.y;
-		mp.x /= editor_size.x;
-		mp.y /= editor_size.y;
-		mp.y = 1 - mp.y;
-		blob.write(ImVec2(-0.2f, 0));
-		blob.write(mp);
-		blob.write(ImVec2(0.2f, 0));
-		count += 3;
-		*(int*)blob.getData() = count;
-		f = (Lumix::Vec2*)((int*)blob.getData() + 1);
-		changed = true;
 
-		auto compare = [](const void* a, const void* b) -> int
+		if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))
 		{
-			float fa = ((const float*)a)[2];
-			float fb = ((const float*)b)[2];
-			return fa < fb ? -1 : (fa > fb) ? 1 : 0;
-		};
+			auto mp = ImGui::GetMousePos();
+			mp.x -= editor.inner_bb_min.x - 1;
+			mp.y -= editor.inner_bb_min.y - 1;
+			mp.x /= (editor.inner_bb_max.x - editor.inner_bb_min.x);
+			mp.y /= (editor.inner_bb_max.y - editor.inner_bb_min.y);
+			mp.y = 1 - mp.y;
+			blob.write(ImVec2(-0.2f, 0));
+			blob.write(mp);
+			blob.write(ImVec2(0.2f, 0));
+			count += 3;
+			*(int*)blob.getData() = count;
+			f = (Lumix::Vec2*)((int*)blob.getData() + 1);
+			changed = true;
 
-		qsort(f, count / 3, 3 * sizeof(f[0]), compare);
-	}
+			auto compare = [](const void* a, const void* b) -> int
+			{
+				float fa = ((const float*)a)[2];
+				float fb = ((const float*)b)[2];
+				return fa < fb ? -1 : (fa > fb) ? 1 : 0;
+			};
 
-	if (changed)
-	{
-		for (int i = 2; i < count - 3; i += 3)
-		{
-			auto prev_p = ((Lumix::Vec2*)f)[i - 1];
-			auto next_p = ((Lumix::Vec2*)f)[i + 2];
-			auto& tangent = ((Lumix::Vec2*)f)[i];
-			auto& tangent2 = ((Lumix::Vec2*)f)[i + 1];
-			float half = 0.5f * (next_p.x - prev_p.x);
-			tangent = tangent.normalized() * half;
-			tangent2 = tangent2.normalized() * half;
+			qsort(f, count / 3, 3 * sizeof(f[0]), compare);
 		}
 
-		f[0].x = 0;
-		f[count - 1].x = desc.getMaxX();
-		m_editor.setProperty(cmp_type, -1, desc, &entities[0], entities.size(), blob.getData(), blob.getPos());
+		if (changed)
+		{
+			for (int i = 2; i < count - 3; i += 3)
+			{
+				auto prev_p = ((Lumix::Vec2*)f)[i - 1];
+				auto next_p = ((Lumix::Vec2*)f)[i + 2];
+				auto& tangent = ((Lumix::Vec2*)f)[i];
+				auto& tangent2 = ((Lumix::Vec2*)f)[i + 1];
+				float half = 0.5f * (next_p.x - prev_p.x);
+				tangent = tangent.normalized() * half;
+				tangent2 = tangent2.normalized() * half;
+			}
+
+			f[0].x = 0;
+			f[count - 1].x = desc.getMaxX();
+			m_editor.setProperty(cmp_type, -1, desc, &entities[0], entities.size(), blob.getData(), blob.getPos());
+		}
 	}
 }
 
