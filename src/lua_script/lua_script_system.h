@@ -28,6 +28,7 @@ public:
 			FLOAT,
 			ENTITY,
 			RESOURCE,
+			STRING,
 			ANY
 		};
 
