@@ -2227,13 +2227,24 @@ public:
 	{
 		auto* scene = LuaWrapper::checkArg<RenderSceneImpl*>(L, 1);
 		const char* slot = LuaWrapper::checkArg<const char*>(L, 2);
-
+		float x, y;
 		ComponentHandle camera_cmp = scene->getCameraInSlot(slot);
-		Entity entity = {camera_cmp.index};
-		Vec3 origin = scene->m_universe.getPosition(entity);
-		Quat rot = scene->m_universe.getRotation(entity);
+		if (!isValid(camera_cmp)) return 0;
+		if (lua_gettop(L) > 3)
+		{
+			x = LuaWrapper::checkArg<float>(L, 3);
+			y = LuaWrapper::checkArg<float>(L, 4);
+		}
+		else
+		{
+			x = scene->getCameraScreenWidth(camera_cmp) * 0.5f;
+			y = scene->getCameraScreenHeight(camera_cmp) * 0.5f;
+		}
 
-		RayCastModelHit hit = scene->castRay(origin, rot.rotate(Vec3(0, 0, -1)), INVALID_COMPONENT);
+		Vec3 origin, dir;
+		scene->getRay(camera_cmp, x, y, origin, dir);
+
+		RayCastModelHit hit = scene->castRay(origin, dir, INVALID_COMPONENT);
 		LuaWrapper::push(L, hit.m_is_hit);
 		LuaWrapper::push(L, hit.m_is_hit ? hit.m_origin + hit.m_dir * hit.m_t : Vec3(0, 0, 0));
 

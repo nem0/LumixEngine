@@ -100,6 +100,9 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		REGISTER_FUNCTION(beginGUI);
 		REGISTER_FUNCTION(endGUI);
 		REGISTER_FUNCTION(enableCursor);
+		REGISTER_FUNCTION(getMouseX);
+		REGISTER_FUNCTION(getMouseY);
+		REGISTER_FUNCTION(isMouseClicked);
 
 		LuaWrapper::createSystemVariable(L, "Gui", "instance", this);
 
@@ -233,6 +236,26 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	{
 		ImGui::PopFont();
 		ImGui::SetCurrentContext(m_original_context);
+	}
+
+
+	float getMouseX() const
+	{
+		Vec2 mouse_pos = m_engine.getInputSystem().getMousePos() - m_interface->getPos();
+		return mouse_pos.x;
+	}
+
+
+	bool isMouseClicked(int button)
+	{
+		return ImGui::IsMouseClicked(button);
+	}
+
+
+	float getMouseY() const
+	{
+		Vec2 mouse_pos = m_engine.getInputSystem().getMousePos() - m_interface->getPos();
+		return mouse_pos.y;
 	}
 
 
