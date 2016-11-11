@@ -914,7 +914,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		if (iter == m_agents.end()) return;
 		Agent& agent = iter.value();
 		dtCrowdAgent* dt_agent = m_crowd->getEditableAgent(agent.agent);
-		if (dt_agent) dt_agent->paused = active;
+		if (dt_agent) dt_agent->paused = !active;
 	}
 
 
