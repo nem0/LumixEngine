@@ -371,11 +371,12 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		if (!m_crowd) return;
 		if (paused) return;
 		m_crowd->update(time_delta, nullptr);
+		m_crowd->doMove(time_delta);
 
 		for (auto& agent : m_agents)
 		{
 			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
-			if (!dt_agent->paused) continue;
+			if (dt_agent->paused) continue;
 
 			m_universe.setPosition(agent.entity, *(Vec3*)dt_agent->npos);
 			Vec3 velocity = *(Vec3*)dt_agent->vel;
