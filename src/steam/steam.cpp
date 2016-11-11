@@ -25,7 +25,7 @@ struct SteamPlugin : public IPlugin
 	{
 		if (!SteamAPI_Init() || !SteamHTMLSurface()->Init())
 		{
-			g_log_error.log("Failed to init steam");
+			g_log_error.log("Steam") << "Failed to init steam";
 		}
 		registerLuaAPI();
 	}
