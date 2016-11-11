@@ -487,7 +487,6 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		const Agent& agent = iter.value();
 
 		const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
-		if (dt_agent->targetPathqRef == DT_PATHQ_INVALID) return;
 
 		const dtPolyRef* path = dt_agent->corridor.getPath();
 		const int npath = dt_agent->corridor.getPathCount();
