@@ -1219,6 +1219,25 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 	}
 
 
+	static int detectFPS(aiAnimation* animation)
+	{
+		float min = FLT_MAX;
+		for (unsigned int i = 0; i < animation->mNumChannels; ++i)
+		{
+			auto* channel = animation->mChannels[i];
+			for (unsigned int j = 1; j < channel->mNumPositionKeys; ++j)
+			{
+				min = Math::minimum(min, float(channel->mPositionKeys[j].mTime - channel->mPositionKeys[j - 1].mTime));
+			}
+			for (unsigned int j = 1; j < channel->mNumRotationKeys; ++j)
+			{
+				min = Math::minimum(min, float(channel->mRotationKeys[j].mTime - channel->mRotationKeys[j - 1].mTime));
+			}
+		}
+		return int(1 / min + 0.5f);
+	}
+
+
 	bool saveLumixAnimations()
 	{
 		m_dialog.setImportMessage("Importing animations...", 0);
@@ -1254,6 +1273,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			header.fps = uint32(animation->mTicksPerSecond == 0
 				? 25
 				: (animation->mTicksPerSecond == 1 ? 30 : animation->mTicksPerSecond));
+			if (animation->mTicksPerSecond < 2) header.fps = detectFPS(animation);
 			header.magic = Animation::HEADER_MAGIC;
 			header.version = 2;
 
@@ -1282,7 +1302,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 				file.write(&count, sizeof(count));
 				for (const auto& pos : positions)
 				{
-					uint16 frame = uint16(pos.mTime * m_dialog.m_model.time_scale);
+					uint16 frame = uint16(pos.mTime * m_dialog.m_model.time_scale * header.fps / animation->mTicksPerSecond);
 					file.write(&frame, sizeof(frame));
 				}
 				for (const auto& pos : positions)
@@ -1301,7 +1321,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 				file.write(&count, sizeof(count));
 				for (const auto& rot : rotations)
 				{
-					uint16 frame = uint16(rot.mTime * m_dialog.m_model.time_scale);
+					uint16 frame = uint16(rot.mTime * m_dialog.m_model.time_scale * header.fps / animation->mTicksPerSecond);
 					file.write(&frame, sizeof(frame));
 				}
 				for (const auto& rot : rotations)
