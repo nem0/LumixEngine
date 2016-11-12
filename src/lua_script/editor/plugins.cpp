@@ -1,31 +1,33 @@
+#include "editor/asset_browser.h"
+#include "editor/ieditor_command.h"
+#include "editor/platform_interface.h"
+#include "editor/property_grid.h"
+#include "editor/studio_app.h"
+#include "editor/utils.h"
+#include "editor/world_editor.h"
 #include "engine/array.h"
 #include "engine/base_proxy_allocator.h"
 #include "engine/binary_array.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
+#include "engine/debug/debug.h"
+#include "engine/engine.h"
 #include "engine/fs/file_system.h"
+#include "engine/fs/os_file.h"
 #include "engine/iallocator.h"
+#include "engine/iplugin.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/path_utils.h"
-#include "engine/resource_manager.h"
-#include "engine/debug/debug.h"
-#include "editor/asset_browser.h"
-#include "editor/ieditor_command.h"
-#include "editor/property_grid.h"
-#include "editor/studio_app.h"
-#include "editor/utils.h"
-#include "editor/world_editor.h"
-#include "engine/engine.h"
-#include "engine/property_register.h"
+#include "engine/plugin_manager.h"
 #include "engine/property_descriptor.h"
-#include "engine/iplugin.h"
+#include "engine/property_register.h"
+#include "engine/resource_manager.h"
+#include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "lua_script/lua_script_manager.h"
 #include "lua_script/lua_script_system.h"
-#include "engine/plugin_manager.h"
-#include "engine/universe/universe.h"
 
 
 using namespace Lumix;
@@ -581,7 +583,37 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 					g_log_error.log("Lua Script") << lua_tostring(L, -1);
 					lua_pop(L, 1);
 				}
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Execute file"))
+			{
+				char tmp[MAX_PATH_LENGTH];
+				if (PlatformInterface::getOpenFilename(tmp, MAX_PATH_LENGTH, "Scripts\0*.lua\0", nullptr))
+				{
+					FS::OsFile file;
+					IAllocator& allocator = app.getWorldEditor()->getAllocator();
+					if (file.open(tmp, FS::Mode::OPEN_AND_READ, allocator))
+					{
+						size_t size = file.size();
+						Array<char> data(allocator);
+						data.resize((int)size);
+						file.read(&data[0], size);
+						file.close();
+						lua_State* L = app.getWorldEditor()->getEngine().getState();
+						bool errors = luaL_loadbuffer(L, &data[0], data.size(), nullptr) != LUA_OK;
+						errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
 
+						if (errors)
+						{
+							g_log_error.log("Lua Script") << lua_tostring(L, -1);
+							lua_pop(L, 1);
+						}
+					}
+					else
+					{
+						g_log_error.log("Lua Script") << "Failed to open file " << tmp;
+					}
+				}
 			}
 			ImGui::InputTextMultiline("", buf, lengthOf(buf), ImVec2(-1, -1));
 		}
