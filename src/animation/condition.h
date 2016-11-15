@@ -21,7 +21,7 @@ struct RunningContext
 	float time_delta;
 	uint8* input;
 	IAllocator* allocator;
-	struct ItemInstance* current;
+	struct ComponentInstance* current;
 };
 
 

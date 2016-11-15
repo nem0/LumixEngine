@@ -1,5 +1,7 @@
 #include "animation_system.h"
 #include "animation/animation.h"
+#include "animation/controller.h"
+#include "animation/controller.h"
 #include "engine/base_proxy_allocator.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
@@ -20,13 +22,18 @@
 namespace Lumix
 {
 
+
 static const ComponentType ANIMABLE_TYPE = PropertyRegister::getComponentType("animable");
+static const ComponentType CONTROLER_TYPE = PropertyRegister::getComponentType("anim_controller");
 static const ResourceType ANIMATION_TYPE("animation");
+static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
+
 
 namespace FS
 {
 class FileSystem;
 };
+
 
 class Animation;
 class Engine;
@@ -46,6 +53,12 @@ enum class AnimationSceneVersion : int
 struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 {
 	friend struct AnimationSystemImpl;
+
+	struct Controller
+	{
+		Anim::ControllerResource* resource = nullptr;
+	};
+
 
 	struct Animable
 	{
@@ -75,12 +88,14 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		, m_engine(engine)
 		, m_anim_system(anim_system)
 		, m_animables(allocator)
+		, m_controllers(allocator)
 		, m_mixers(allocator)
 	{
 		m_universe.entityDestroyed().bind<AnimationSceneImpl, &AnimationSceneImpl::onEntityDestroyed>(this);
 		m_is_game_running = false;
 		m_render_scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 		universe.registerComponentTypeScene(ANIMABLE_TYPE, this);
+		universe.registerComponentTypeScene(CONTROLER_TYPE, this);
 		ASSERT(m_render_scene);
 	}
 
@@ -172,6 +187,11 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			if (m_animables.find(entity) < 0) return INVALID_COMPONENT;
 			return {entity.index};
 		}
+		else if (type == CONTROLER_TYPE)
+		{
+			if (m_controllers.find(entity) < 0) return INVALID_COMPONENT;
+			return {entity.index};
+		}
 		return INVALID_COMPONENT;
 	}
 
@@ -179,6 +199,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	ComponentHandle createComponent(ComponentType type, Entity entity) override
 	{
 		if (type == ANIMABLE_TYPE) return createAnimable(entity);
+		if (type == CONTROLER_TYPE) return createController(entity);
 		return INVALID_COMPONENT;
 	}
 
@@ -191,6 +212,14 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
+	void unloadController(Anim::ControllerResource* res)
+	{
+		if (!res) return;
+
+		res->getResourceManager().unload(*res);
+	}
+
+
 	void destroyComponent(ComponentHandle component, ComponentType type) override
 	{
 		if (type == ANIMABLE_TYPE)
@@ -199,6 +228,14 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			auto& animable = m_animables[entity];
 			unloadAnimation(animable.animation);
 			m_animables.erase(entity);
+			m_universe.destroyComponent(entity, type, this, component);
+		}
+		else if (type == CONTROLER_TYPE)
+		{
+			Entity entity = {component.index};
+			auto& controller = m_controllers[entity];
+			unloadController(controller.resource);
+			m_controllers.erase(entity);
 			m_universe.destroyComponent(entity, type, this, component);
 		}
 	}
@@ -264,6 +301,21 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	void setTimeScale(ComponentHandle cmp, float time_scale) { m_animables[{cmp.index}].time_scale = time_scale; }
 	float getStartTime(ComponentHandle cmp) { return m_animables[{cmp.index}].start_time; }
 	void setStartTime(ComponentHandle cmp, float time) { m_animables[{cmp.index}].start_time = time; }
+
+
+	void setControllerSource(ComponentHandle cmp, const Path& path)
+	{
+		auto& controller = m_controllers[{cmp.index}];
+		unloadController(controller.resource);
+		controller.resource = loadController(path);
+	}
+
+
+	Path getControllerSource(ComponentHandle cmp)
+	{
+		const auto& controller = m_controllers[{cmp.index}];
+		return controller.resource ? controller.resource->getPath() : Path("");
+	}
 
 
 	Path getAnimation(ComponentHandle cmp)
@@ -370,7 +422,14 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		ResourceManager& rm = m_engine.getResourceManager();
 		return static_cast<Animation*>(rm.get(ANIMATION_TYPE)->load(path));
 	}
-	
+
+
+	Anim::ControllerResource* loadController(const Path& path)
+	{
+		ResourceManager& rm = m_engine.getResourceManager();
+		return static_cast<Anim::ControllerResource*>(rm.get(CONTROLLER_RESOURCE_TYPE)->load(path));
+	}
+
 
 	ComponentHandle createAnimable(Entity entity)
 	{
@@ -387,6 +446,15 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
+	ComponentHandle createController(Entity entity)
+	{
+		Controller& controller = m_controllers.insert(entity);
+
+		ComponentHandle cmp = {entity.index};
+		m_universe.addComponent(entity, CONTROLER_TYPE, this, cmp);
+		return cmp;
+	}
+
 	IPlugin& getPlugin() const override { return m_anim_system; }
 
 
@@ -394,6 +462,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	IPlugin& m_anim_system;
 	Engine& m_engine;
 	AssociativeArray<Entity, Animable> m_animables;
+	AssociativeArray<Entity, Controller> m_controllers;
 	AssociativeArray<Entity, Mixer> m_mixers;
 	RenderScene* m_render_scene;
 	bool m_is_game_running;
@@ -406,8 +475,17 @@ struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
 		: m_allocator(engine.getAllocator())
 		, m_engine(engine)
 		, m_animation_manager(m_allocator)
+		, m_controller_manager(m_allocator)
 	{
 		m_animation_manager.create(ANIMATION_TYPE, m_engine.getResourceManager());
+		m_controller_manager.create(CONTROLLER_RESOURCE_TYPE, m_engine.getResourceManager());
+
+		PropertyRegister::add("anim_controller",
+			LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationSceneImpl>)("Source",
+				&AnimationSceneImpl::getControllerSource,
+				&AnimationSceneImpl::setControllerSource,
+				"Animation controller (*.act)",
+				CONTROLLER_RESOURCE_TYPE));
 
 		PropertyRegister::add("animable",
 			LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationSceneImpl>)("Animation",
@@ -429,6 +507,7 @@ struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
 	~AnimationSystemImpl()
 	{
 		m_animation_manager.destroy();
+		m_controller_manager.destroy();
 	}
 
 
@@ -464,6 +543,7 @@ struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
 	Lumix::IAllocator& m_allocator;
 	Engine& m_engine;
 	AnimationManager m_animation_manager;
+	Anim::ControllerManager m_controller_manager;
 
 private:
 	void operator=(const AnimationSystemImpl&);

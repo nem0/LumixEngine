@@ -25,17 +25,17 @@ namespace Anim
 {
 
 
-struct Composite;
-struct ItemInstance;
+struct Container;
+struct ComponentInstance;
 struct StateMachine;
 
 
-struct ItemInstance
+struct ComponentInstance
 {
-	virtual ~ItemInstance() {}
-	virtual ItemInstance* update(RunningContext& rc) = 0;
+	virtual ~ComponentInstance() {}
+	virtual ComponentInstance* update(RunningContext& rc) = 0;
 	virtual void fillPose(Engine& engine, Pose& pose, Model& model, float weight) = 0;
-	virtual void enter(RunningContext& rc, ItemInstance* from) = 0;
+	virtual void enter(RunningContext& rc, ComponentInstance* from) = 0;
 	virtual float getTime() const = 0;
 	virtual float getLength() const = 0;
 };
@@ -52,9 +52,9 @@ struct Component
 
 	Component(Type _type) : type(_type), uid(-1) {}
 	virtual ~Component() {}
-	virtual ItemInstance* createInstance(IAllocator& allocator) = 0;
+	virtual ComponentInstance* createInstance(IAllocator& allocator) = 0;
 	virtual void serialize(OutputBlob& blob) { blob.write(uid); }
-	virtual void deserialize(InputBlob& blob, Composite* parent) { blob.read(uid); }
+	virtual void deserialize(InputBlob& blob, Container* parent) { blob.read(uid); }
 
 	int uid;
 	const Type type;
@@ -74,16 +74,16 @@ struct Node : public Component
 
 
 	void serializeEdges(OutputBlob& blob);
-	void deserializeEdges(InputBlob& blob, Composite& parent);
+	void deserializeEdges(InputBlob& blob, Container& parent);
 
 
 	Array<Edge*> out_edges;
 };
 
 
-struct Composite : public Node
+struct Container : public Node
 {
-	Composite(Component::Type type, IAllocator& _allocator)
+	Container(Component::Type type, IAllocator& _allocator)
 		: Node(type, _allocator)
 		, children(_allocator)
 		, allocator(_allocator)
@@ -92,7 +92,7 @@ struct Composite : public Node
 
 
 	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob, Composite* parent) override;
+	void deserialize(InputBlob& blob, Container* parent) override;
 
 
 	Component* getChildByUID(int uid)
@@ -113,9 +113,9 @@ struct Composite : public Node
 struct Edge : public Component
 {
 	Edge(IAllocator& allocator);
-	ItemInstance* createInstance(IAllocator& allocator) override;
+	ComponentInstance* createInstance(IAllocator& allocator) override;
 	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob, Composite* parent) override;
+	void deserialize(InputBlob& blob, Container* parent) override;
 
 	Condition condition;
 	Node* from;
@@ -124,16 +124,16 @@ struct Edge : public Component
 };
 
 
-struct NodeInstance : public ItemInstance
+struct NodeInstance : public ComponentInstance
 {
-	ItemInstance* checkOutEdges(Node& node, RunningContext& rc)
+	ComponentInstance* checkOutEdges(Node& node, RunningContext& rc)
 	{
 		rc.current = this;
 		for (auto* edge : node.out_edges)
 		{
 			if (edge->condition(rc))
 			{
-				ItemInstance* new_item = edge->createInstance(*rc.allocator);
+				ComponentInstance* new_item = edge->createInstance(*rc.allocator);
 				new_item->enter(rc, this);
 				return new_item;
 			}
@@ -146,11 +146,11 @@ struct NodeInstance : public ItemInstance
 struct SimpleAnimationNode : public Node
 {
 	SimpleAnimationNode(IAllocator& allocator);
-	ItemInstance* createInstance(IAllocator& allocator) override;
+	ComponentInstance* createInstance(IAllocator& allocator) override;
 	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob, Composite* parent) override;
+	void deserialize(InputBlob& blob, Container* parent) override;
 
-	Animation* animation;
+	uint32 animation_hash;
 	bool looped = true;
 };
 
@@ -159,31 +159,33 @@ struct StateMachineInstance : public NodeInstance
 {
 	StateMachineInstance(StateMachine& _source, IAllocator& _allocator);
 
-	ItemInstance* update(RunningContext& rc) override;
+	ComponentInstance* update(RunningContext& rc) override;
 	void fillPose(Engine& engine, Pose& pose, Model& model, float weight) override;
-	void enter(RunningContext& rc, ItemInstance* from) override;
+	void enter(RunningContext& rc, ComponentInstance* from) override;
 	float getTime() const override { return 0; }
 	float getLength() const override { return 0; }
 
 
 	StateMachine& source;
-	ItemInstance* current;
+	ComponentInstance* current;
 	IAllocator& allocator;
 };
 
 
-struct StateMachine : public Composite
+struct StateMachine : public Container
 {
 	StateMachine(IAllocator& _allocator)
-		: Composite(Component::STATE_MACHINE, _allocator)
+		: Container(Component::STATE_MACHINE, _allocator)
 	{
 	}
 
-	ItemInstance* createInstance(IAllocator& allocator) override;
+	ComponentInstance* createInstance(IAllocator& allocator) override;
 
-	InputDecl input_decl;
 	Node* default_state;
 };
+
+
+Component* createComponent(Component::Type type, IAllocator& allocator);
 
 
 } // namespace Anim
