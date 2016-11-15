@@ -17,7 +17,7 @@ namespace Anim
 {
 
 
-struct EdgeInstance : public ItemInstance
+struct EdgeInstance : public ComponentInstance
 {
 	EdgeInstance(Edge& _edge) : edge(_edge) {}
 
@@ -26,14 +26,14 @@ struct EdgeInstance : public ItemInstance
 	float getLength() const override { return edge.length; }
 
 
-	ItemInstance* update(RunningContext& rc) override
+	ComponentInstance* update(RunningContext& rc) override
 	{
 		from = from->update(rc);
 		to->update(rc);
 		time += rc.time_delta;
 		if (time > edge.length)
 		{
-			ItemInstance* ret = to;
+			ComponentInstance* ret = to;
 			LUMIX_DELETE(*rc.allocator, from);
 			LUMIX_DELETE(*rc.allocator, this);
 			return ret;
@@ -49,7 +49,7 @@ struct EdgeInstance : public ItemInstance
 	}
 
 
-	void enter(RunningContext& rc, ItemInstance* _from) override
+	void enter(RunningContext& rc, ComponentInstance* _from) override
 	{ 
 		from = _from;
 		time = 0;
@@ -60,8 +60,8 @@ struct EdgeInstance : public ItemInstance
 
 	Edge& edge;
 	float time;
-	ItemInstance* from;
-	ItemInstance* to;
+	ComponentInstance* from;
+	ComponentInstance* to;
 };
 
 
@@ -75,7 +75,7 @@ void Node::serializeEdges(OutputBlob& blob)
 }
 
 
-void Node::deserializeEdges(InputBlob& blob, Composite& parent)
+void Node::deserializeEdges(InputBlob& blob, Container& parent)
 {
 	int size;
 	blob.read(size);
@@ -95,7 +95,7 @@ Edge::Edge(IAllocator& allocator)
 }
 
 
-ItemInstance* Edge::createInstance(IAllocator& allocator)
+ComponentInstance* Edge::createInstance(IAllocator& allocator)
 {
 	return LUMIX_NEW(allocator, EdgeInstance)(*this);
 }
@@ -108,11 +108,11 @@ void Edge::serialize(OutputBlob& blob)
 	blob.write(to ? to->uid : -1);
 	blob.write(length);
 	blob.write(condition.bytecode.size());
-	blob.write(&condition.bytecode[0], condition.bytecode.size());
+	if(!condition.bytecode.empty()) blob.write(&condition.bytecode[0], condition.bytecode.size());
 }
 
 
-void Edge::deserialize(InputBlob& blob, Composite* parent)
+void Edge::deserialize(InputBlob& blob, Container* parent)
 {
 	Component::deserialize(blob, parent);
 	int uid;
@@ -124,13 +124,13 @@ void Edge::deserialize(InputBlob& blob, Composite* parent)
 	int size;
 	blob.read(size);
 	condition.bytecode.resize(size);
-	blob.read(&condition.bytecode[0], size);
+	if(size > 0) blob.read(&condition.bytecode[0], size);
 }
 
 
 SimpleAnimationNode::SimpleAnimationNode(IAllocator& allocator)
 	: Node(Component::SIMPLE_ANIMATION, allocator)
-	, animation(nullptr)
+	, animation_hash(0)
 {
 }
 
@@ -141,7 +141,7 @@ void SimpleAnimationNode::serialize(OutputBlob& blob)
 }
 
 
-void SimpleAnimationNode::deserialize(InputBlob& blob, Composite* parent)
+void SimpleAnimationNode::deserialize(InputBlob& blob, Container* parent)
 {
 	Component::deserialize(blob, parent);
 }
@@ -152,44 +152,46 @@ struct SimpleAnimationNodeInstance : public NodeInstance
 {
 	SimpleAnimationNodeInstance(SimpleAnimationNode& _node)
 		: node(_node)
+		, resource(nullptr)
 	{
 	}
 
 
 	float getTime() const override { return time; }
-	float getLength() const override { return node.animation->getLength(); }
+	float getLength() const override { return resource->getLength(); }
 
 
 	void fillPose(Engine& engine, Pose& pose, Model& model, float weight) override
 	{
 		if (weight < 1)
 		{
-			node.animation->getRelativePose(time, pose, model, weight);
+			resource->getRelativePose(time, pose, model, weight);
 		}
 		else
 		{
-			node.animation->getRelativePose(time, pose, model);
+			resource->getRelativePose(time, pose, model);
 		}
 	}
 
 
-	ItemInstance* update(RunningContext& rc) override
+	ComponentInstance* update(RunningContext& rc) override
 	{
 		time += rc.time_delta;
-		if (node.looped) time = fmod(time, node.animation->getLength());
+		if (node.looped) time = fmod(time, resource->getLength());
 		return checkOutEdges(node, rc);
 	}
 
 
-	void enter(RunningContext& rc, ItemInstance* from) override { time = 0; }
+	void enter(RunningContext& rc, ComponentInstance* from) override { time = 0; }
 
 
+	Animation* resource;
 	SimpleAnimationNode& node;
 	float time;
 };
 
 
-ItemInstance* SimpleAnimationNode::createInstance(IAllocator& allocator)
+ComponentInstance* SimpleAnimationNode::createInstance(IAllocator& allocator)
 {
 	return LUMIX_NEW(allocator, SimpleAnimationNodeInstance)(*this);
 }
@@ -204,7 +206,7 @@ StateMachineInstance::StateMachineInstance(StateMachine& _source, IAllocator& _a
 }
 
 
-ItemInstance* StateMachineInstance::update(RunningContext& rc)
+ComponentInstance* StateMachineInstance::update(RunningContext& rc)
 {
 	current = current->update(rc);
 	return checkOutEdges(source, rc);
@@ -217,19 +219,19 @@ void StateMachineInstance::fillPose(Engine& engine, Pose& pose, Model& model, fl
 }
 
 
-void StateMachineInstance::enter(RunningContext& rc, ItemInstance* from)
+void StateMachineInstance::enter(RunningContext& rc, ComponentInstance* from)
 {
 	current = source.default_state->createInstance(*rc.allocator);
 }
 
 
-ItemInstance* StateMachine::createInstance(IAllocator& allocator)
+ComponentInstance* StateMachine::createInstance(IAllocator& allocator)
 {
 	return LUMIX_NEW(allocator, StateMachineInstance)(*this, allocator);
 }
 
 
-void Composite::serialize(OutputBlob& blob)
+void Container::serialize(OutputBlob& blob)
 {
 	Component::serialize(blob);
 	blob.write(children.size());
@@ -243,19 +245,7 @@ void Composite::serialize(OutputBlob& blob)
 }
 
 
-static Component* createComponent(Component::Type type, IAllocator& allocator)
-{
-	switch (type)
-	{
-		case Component::EDGE: return LUMIX_NEW(allocator, Edge)(allocator);
-		case Component::STATE_MACHINE: return LUMIX_NEW(allocator, StateMachine)(allocator);
-		case Component::SIMPLE_ANIMATION: return LUMIX_NEW(allocator, SimpleAnimationNode)(allocator);
-		default: ASSERT(false); return nullptr;
-	}
-}
-
-
-void Composite::deserialize(InputBlob& blob, Composite* parent)
+void Container::deserialize(InputBlob& blob, Container* parent)
 {
 	Component::deserialize(blob, parent);
 	int size;
@@ -278,6 +268,18 @@ void Composite::deserialize(InputBlob& blob, Composite* parent)
 		int size;
 		blob.read(size);
 		ASSERT(size == 0);
+	}
+}
+
+
+Component* createComponent(Component::Type type, IAllocator& allocator)
+{
+	switch (type)
+	{
+		case Component::EDGE: return LUMIX_NEW(allocator, Edge)(allocator);
+		case Component::STATE_MACHINE: return LUMIX_NEW(allocator, StateMachine)(allocator);
+		case Component::SIMPLE_ANIMATION: return LUMIX_NEW(allocator, SimpleAnimationNode)(allocator);
+		default: ASSERT(false); return nullptr;
 	}
 }
 
