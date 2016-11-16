@@ -16,6 +16,7 @@ class AnimationScene : public IScene
 		virtual float getAnimableTime(ComponentHandle cmp) = 0;
 		virtual void setAnimableTime(ComponentHandle cmp, float time) = 0;
 		virtual void updateAnimable(ComponentHandle cmp, float time_delta) = 0;
+		virtual uint8* getControllerInput(ComponentHandle cmp) = 0;
 };
 
 
