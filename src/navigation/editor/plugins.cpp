@@ -27,6 +27,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		m_action = LUMIX_NEW(allocator, Action)("Navigation", "toggleNavigationWindow");
 		m_action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
 		m_action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
+		app.addWindowAction(m_action);
 	}
 
 
@@ -139,6 +140,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 	bool is_opened;
 	StudioApp& app;
+	Action* m_action;
 };
 
 

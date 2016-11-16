@@ -1,4 +1,5 @@
 #include "animation_system.h"
+
 #include "animation/animation.h"
 #include "animation/controller.h"
 #include "animation/controller.h"
@@ -45,6 +46,7 @@ enum class AnimationSceneVersion : int
 {
 	FIRST,
 	REFACTOR,
+	CONTROLLERS,
 
 	LATEST
 };
@@ -318,6 +320,13 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			serializer.write(animable.start_time);
 			serializer.writeString(animable.animation ? animable.animation->getPath().c_str() : "");
 		}
+
+		serializer.write(m_controllers.size());
+		for (const Controller& controller : m_controllers)
+		{
+			serializer.write(controller.entity);
+			serializer.writeString(controller.resource ? controller.resource->getPath().c_str() : "");
+		}
 	}
 
 
@@ -359,6 +368,23 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 				m_animables.insert(animable.entity, animable);
 				ComponentHandle cmp = {animable.entity.index};
 				m_universe.addComponent(animable.entity, ANIMABLE_TYPE, this, cmp);
+			}
+		}
+
+		if (version > (int)AnimationSceneVersion::CONTROLLERS)
+		{
+			serializer.read(count);
+			m_controllers.reserve(count);
+			for (int i = 0; i < count; ++i)
+			{
+				Controller controller(m_anim_system.m_allocator);
+				serializer.read(controller.entity);
+				char tmp[MAX_PATH_LENGTH];
+				serializer.readString(tmp, lengthOf(tmp));
+				controller.resource = tmp[0] ? loadController(Path(tmp)) : nullptr;
+				m_controllers.insert(controller.entity, controller);
+				ComponentHandle cmp = { controller.entity.index };
+				m_universe.addComponent(controller.entity, CONTROLLER_TYPE, this, cmp);
 			}
 		}
 	}

@@ -336,12 +336,12 @@ void SceneView::onToolbar()
 	{
 		for (auto* action_name : actions_names)
 		{
-			auto& action = m_app.getAction(action_name);
-			action.toolbarButton();
+			auto* action = m_app.getAction(action_name);
+			action->toolbarButton();
 		}
 	}
 
-	m_app.getAction("cameraSpeed").toolbarButton();
+	m_app.getAction("cameraSpeed")->toolbarButton();
 
 	ImGui::PushItemWidth(50);
 	ImGui::SameLine();
@@ -355,11 +355,11 @@ void SceneView::onToolbar()
 	Action* mode_action;
 	if (m_editor->getGizmo().isTranslateMode())
 	{
-		mode_action = &m_app.getAction("setTranslateGizmoMode");
+		mode_action = m_app.getAction("setTranslateGizmoMode");
 	}
 	else
 	{
-		mode_action = &m_app.getAction("setRotateGizmoMode");
+		mode_action = m_app.getAction("setRotateGizmoMode");
 	}
 	
 	ImGui::SameLine();
