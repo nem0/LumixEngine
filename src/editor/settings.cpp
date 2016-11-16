@@ -327,8 +327,8 @@ bool Settings::load()
 			if (lua_rawgeti(L, -1, i + 1) == LUA_TSTRING)
 			{
 				const char* action_name = lua_tostring(L, -1);
-				auto& action = m_app.getAction(action_name);
-				m_app.getToolbarActions().push(&action);
+				Action* action = m_app.getAction(action_name);
+				if(action) m_app.getToolbarActions().push(action);
 			}
 			lua_pop(L, 1);
 		}

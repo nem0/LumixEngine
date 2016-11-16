@@ -560,6 +560,7 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Script Console", "script_console");
 		m_action->func.bind<ConsolePlugin, &ConsolePlugin::toggleOpened>(this);
 		m_action->is_selected.bind<ConsolePlugin, &ConsolePlugin::isOpened>(this);
+		app.addWindowAction(m_action);
 		buf[0] = '\0';
 	}
 
@@ -624,6 +625,7 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 	StudioApp& app;
 	bool opened;
 	char buf[4096];
+	Action* m_action;
 };
 
 

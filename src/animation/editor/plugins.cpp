@@ -47,6 +47,7 @@ struct AnimationEditor : public StudioApp::IPlugin
 		m_action = LUMIX_NEW(allocator, Action)("Animation Editor", "animation_editor");
 		m_action->func.bind<AnimationEditor, &AnimationEditor::toggleOpened>(this);
 		m_action->is_selected.bind<AnimationEditor, &AnimationEditor::isOpened>(this);
+		app.addWindowAction(m_action);
 
 		auto* manager = m_app.getWorldEditor()->getEngine().getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
 		m_resource = LUMIX_NEW(allocator, ControllerResource)(*manager, allocator);
@@ -62,6 +63,43 @@ struct AnimationEditor : public StudioApp::IPlugin
 
 	bool isOpened() { return m_opened; }
 	void toggleOpened() { m_opened = !m_opened; }
+
+
+	void onWindowGUI() override
+	{
+		if (!m_opened) return;
+		if (ImGui::BeginDock("Animation Editor", &m_opened))
+		{
+			if (ImGui::Button("Create state")) createState();
+			ImGui::SameLine();
+			if (ImGui::Button("Save")) save();
+			ImGui::SameLine();
+			if (ImGui::Button("Load")) load();
+			ImGui::Columns(2);
+			drawGraph();
+			ImGui::NextColumn();
+			ImGui::Text("Properties");
+			m_resource->getRoot()->onGUI();
+			ImGui::Columns();
+		}
+		ImGui::EndDock();
+
+		showInputs();
+		showAnimSet();
+	}
+
+
+private:
+	void save()
+	{
+		IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+		OutputBlob blob(allocator);
+		m_resource->serialize(blob);
+		FS::OsFile file;
+		file.open("animations/test.act", FS::Mode::CREATE_AND_WRITE, allocator);
+		file.write(blob.getData(), blob.getPos());
+		file.close();
+	}
 
 
 	void createState()
@@ -104,19 +142,6 @@ struct AnimationEditor : public StudioApp::IPlugin
 		ImGui::EndChild();
 	}
 
-
-	void save()
-	{
-		IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
-		OutputBlob blob(allocator);
-		m_resource->serialize(blob);
-		FS::OsFile file;
-		file.open("animations/test.act", FS::Mode::CREATE_AND_WRITE, allocator);
-		file.write(blob.getData(), blob.getPos());
-		file.close();
-	}
-
-
 	void load()
 	{
 		IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
@@ -130,10 +155,10 @@ struct AnimationEditor : public StudioApp::IPlugin
 		file.close();
 	}
 
-	
-	void showInputs() const
+
+	void showInputs()
 	{
-		if (ImGui::BeginDock("Animation inputs"))
+		if (ImGui::BeginDock("Animation inputs", &m_opened))
 		{
 			const auto& selected_entities = m_app.getWorldEditor()->getSelectedEntities();
 			auto* scene = (AnimationScene*)m_app.getWorldEditor()->getUniverse()->getScene(ANIMABLE_HASH);
@@ -148,13 +173,18 @@ struct AnimationEditor : public StudioApp::IPlugin
 				ImGui::PushItemWidth(100);
 				ImGui::InputText(tmp, input.name, lengthOf(input.name));
 				ImGui::SameLine();
+				tmp << "*";
 				ImGui::Combo(tmp, (int*)&input.type, "float\0int\0bool\0");
 				if (input_data)
 				{
 					ImGui::SameLine();
+					tmp << "*";
 					switch (input.type)
 					{
-					case Anim::InputDecl::FLOAT: ImGui::DragFloat("", (float*)(input_data + input.offset));
+						case Anim::InputDecl::FLOAT: ImGui::DragFloat(tmp, (float*)(input_data + input.offset)); break;
+						case Anim::InputDecl::BOOL: ImGui::Checkbox(tmp, (bool*)(input_data + input.offset)); break;
+						case Anim::InputDecl::INT: ImGui::InputInt(tmp, (int*)(input_data + input.offset)); break;
+						default: ASSERT(false); break;
 					}
 				}
 				ImGui::PopItemWidth();
@@ -173,28 +203,9 @@ struct AnimationEditor : public StudioApp::IPlugin
 	}
 
 
-	void onWindowGUI() override
+	void showAnimSet()
 	{
-		if (!m_opened) return;
-		if (ImGui::BeginDock("Animation Editor"))
-		{
-			if (ImGui::Button("Create state")) createState();
-			ImGui::SameLine();
-			if (ImGui::Button("Save")) save();
-			ImGui::SameLine();
-			if (ImGui::Button("Load")) load();
-			ImGui::Columns(2);
-			drawGraph();
-			ImGui::NextColumn();
-			ImGui::Text("Properties");
-			m_resource->getRoot()->onGUI();
-			ImGui::Columns();
-		}
-		ImGui::EndDock();
-
-		showInputs();
-
-		if (ImGui::BeginDock("Animation set"))
+		if (ImGui::BeginDock("Animation set", &m_opened))
 		{
 			auto& engine_anim_set = m_resource->getEngineResource()->getAnimSet();
 			auto& slots = m_resource->getAnimationSlots();
@@ -243,12 +254,12 @@ struct AnimationEditor : public StudioApp::IPlugin
 		ImGui::EndDock();
 	}
 
-
 private:
 	StudioApp& m_app;
 	bool m_opened;
 	ImVec2 m_offset;
 	ControllerResource* m_resource;
+	Action* m_action;
 };
 
 

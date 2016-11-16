@@ -415,14 +415,15 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 
 struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
-	explicit StudioAppPlugin(Lumix::WorldEditor& editor)
-		: m_editor(editor)
+	explicit StudioAppPlugin(StudioApp& app)
+		: m_editor(*app.getWorldEditor())
 		, m_selected_bone(-1)
 		, m_is_window_opened(false)
 	{
 		m_action = LUMIX_NEW(m_editor.getAllocator(), Action)("Physics", "physics");
 		m_action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
 		m_action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
+		app.addWindowAction(m_action);
 	}
 
 
@@ -994,6 +995,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	bool m_is_window_opened;
 	int m_selected_bone;
 	Lumix::WorldEditor& m_editor;
+	Action* m_action;
 };
 
 
@@ -1058,7 +1060,7 @@ LUMIX_STUDIO_ENTRY(physics)
 	auto& editor = *app.getWorldEditor();
 	auto& allocator = editor.getAllocator();
 
-	app.addPlugin(*LUMIX_NEW(allocator, StudioAppPlugin)(editor));
+	app.addPlugin(*LUMIX_NEW(allocator, StudioAppPlugin)(app));
 	editor.addPlugin(*LUMIX_NEW(allocator, EditorPlugin)(editor));
 	app.getAssetBrowser()->addPlugin(*LUMIX_NEW(allocator, PhysicsGeometryPlugin)(app));
 }

@@ -120,6 +120,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Clip manager", "clip_manager");
 		m_action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
 		m_action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
+		app.addWindowAction(m_action);
 	}
 
 
@@ -187,6 +188,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	StudioApp& m_app;
 	char m_filter[256];
 	bool m_is_opened;
+	Action* m_action;
 };
 
 
