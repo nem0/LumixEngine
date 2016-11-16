@@ -82,6 +82,16 @@ struct InputDecl
 		}
 	}
 
+	void recalculateOffsets()
+	{
+		if (inputs_count == 0) return;
+		inputs[0].offset = 0;
+		for(int i = 1; i < inputs_count; ++i)
+		{ 
+			inputs[i].offset = inputs[i - 1].offset + getSize(inputs[i - 1].type);
+		}
+	}
+
 	int getInputIdx(const char* name, int size) const
 	{
 		for (int i = 0; i < inputs_count; ++i)

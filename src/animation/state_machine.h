@@ -74,10 +74,6 @@ struct Node : public Component
 	}
 
 
-	void serializeEdges(OutputBlob& blob);
-	void deserializeEdges(InputBlob& blob, Container& parent);
-
-
 	Array<Edge*> out_edges;
 };
 
