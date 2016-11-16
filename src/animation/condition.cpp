@@ -41,8 +41,10 @@ namespace Instruction
 		INT_NEQ,
 		AND,
 		OR,
+		NOT,
 		INPUT_FLOAT,
 		INPUT_INT,
+		INPUT_BOOL
 	};
 }
 
@@ -106,6 +108,7 @@ public:
 			GREATER_THAN,
 			AND,
 			OR,
+			NOT,
 			NOT_EQUAL,
 			EQUAL
 		};
@@ -270,6 +273,10 @@ ExpressionVM::ReturnValue ExpressionVM::evaluate(const uint8* code, RunningConte
 				push<float>(*(float*)(rc.input + *(int*)cp));
 				cp += sizeof(int);
 				break;
+			case Instruction::INPUT_BOOL:
+				push<bool>(*(bool*)(rc.input + *(int*)cp));
+				cp += sizeof(int);
+				break;
 			case Instruction::INPUT_INT:
 				push<int>(*(int*)(rc.input + *(int*)cp));
 				cp += sizeof(int);
@@ -306,6 +313,7 @@ ExpressionVM::ReturnValue ExpressionVM::evaluate(const uint8* code, RunningConte
 				push<bool>(b1 && b2);
 			}
 			break;
+			case Instruction::NOT: push<bool>(!pop<bool>()); break;
 			default: ASSERT(false); break;
 		}
 	}
@@ -477,7 +485,13 @@ static const struct
 		Types::BOOL,
 		Instruction::OR,
 		{Types::BOOL, Types::BOOL, Types::NONE},
-		0}};
+		0},
+	{ExpressionCompiler::Token::NOT,
+		Types::BOOL,
+		Instruction::NOT,
+		{Types::BOOL, Types::NONE},
+		1}
+};
 
 
 int ExpressionCompiler::getOperatorPriority(const Token& token)
@@ -601,6 +615,14 @@ int ExpressionCompiler::compile(const char* src,
 									*(int*)out = input.offset;
 									out += sizeof(int);
 									break;
+								case InputDecl::BOOL:
+									*out = Instruction::INPUT_BOOL;
+									type_stack[type_stack_idx] = Types::BOOL;
+									++type_stack_idx;
+									++out;
+									*(int*)out = input.offset;
+									out += sizeof(int);
+									break;
 								default: ASSERT(false); break;
 							}
 						}
@@ -680,7 +702,8 @@ int ExpressionCompiler::tokenize(const char* src, Token* tokens, int max_size)
 		{"<", true, ExpressionCompiler::Token::LESS_THAN},
 		{">", true, ExpressionCompiler::Token::GREATER_THAN},
 		{"and", true, ExpressionCompiler::Token::AND},
-		{"or", true, ExpressionCompiler::Token::OR}
+		{"or", true, ExpressionCompiler::Token::OR},
+		{ "not", false, ExpressionCompiler::Token::NOT}
 	};
 
 	m_compile_time_error = ExpressionCompiler::Error::NONE;

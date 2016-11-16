@@ -65,29 +65,6 @@ struct EdgeInstance : public ComponentInstance
 };
 
 
-void Node::serializeEdges(OutputBlob& blob)
-{
-	blob.write(out_edges.size());
-	for (auto* edge : out_edges)
-	{
-		blob.write(edge->uid);
-	}
-}
-
-
-void Node::deserializeEdges(InputBlob& blob, Container& parent)
-{
-	int size;
-	blob.read(size);
-	for (int i = 0; i < size; ++i)
-	{
-		int uid;
-		blob.read(uid);
-		out_edges.push(static_cast<Edge*>(parent.getChildByUID(uid)));
-	}
-}
-
-
 Edge::Edge(IAllocator& allocator)
 	: Component(Component::EDGE)
 	, condition(allocator)
@@ -140,6 +117,7 @@ void SimpleAnimationNode::serialize(OutputBlob& blob)
 {
 	Component::serialize(blob);
 	blob.write(animation_hash);
+	blob.write(looped);
 }
 
 
@@ -147,6 +125,7 @@ void SimpleAnimationNode::deserialize(InputBlob& blob, Container* parent)
 {
 	Component::deserialize(blob, parent);
 	blob.read(animation_hash);
+	blob.read(looped);
 }
 
 
@@ -248,7 +227,7 @@ void StateMachine::serialize(OutputBlob& blob)
 void StateMachine::deserialize(InputBlob& blob, Container* parent)
 {
 	Container::deserialize(blob, parent);
-	m_default_state = (Node*)children[0];
+	m_default_state = children.empty() ? nullptr : (Node*)children[0];
 }
 
 
@@ -261,8 +240,6 @@ void Container::serialize(OutputBlob& blob)
 		blob.write(child->type);
 		child->serialize(blob);
 	}
-
-	serializeEdges(blob);
 }
 
 
@@ -278,17 +255,6 @@ void Container::deserialize(InputBlob& blob, Container* parent)
 		Component* item = createComponent(type, allocator);
 		item->deserialize(blob, this);
 		children.push(item);
-	}
-
-	if (parent)
-	{
-		deserializeEdges(blob, *parent);
-	}
-	else
-	{
-		int size;
-		blob.read(size);
-		ASSERT(size == 0);
 	}
 }
 

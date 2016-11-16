@@ -109,6 +109,7 @@ void AnimationEditor::load()
 	file.read(&data[0], data.size());
 	InputBlob blob(&data[0], data.size());
 	m_resource->deserialize(blob, m_app.getWorldEditor()->getEngine(), allocator);
+	m_container = (Container*)m_resource->getRoot();
 	file.close();
 }
 
@@ -162,7 +163,10 @@ void AnimationEditor::showInputs()
 				ImGui::InputText(tmp, input.name, lengthOf(input.name));
 				ImGui::SameLine();
 				tmp << "*";
-				ImGui::Combo(tmp, (int*)&input.type, "float\0int\0bool\0");
+				if (ImGui::Combo(tmp, (int*)&input.type, "float\0int\0bool\0"))
+				{
+					input_decl.recalculateOffsets();
+				}
 				if (input_data)
 				{
 					ImGui::SameLine();
