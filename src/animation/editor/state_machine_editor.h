@@ -38,6 +38,7 @@ struct Component
 	virtual bool isContainer() const { return false; }
 	virtual void drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos) {}
 	Container* getParent() { return m_parent; }
+	virtual void compile() {}
 
 	Lumix::Anim::Component* engine_cmp;
 
@@ -75,6 +76,9 @@ struct Container : public Node
 	Container(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 	Component* childrenHitTest(const ImVec2& pos);
 	Component* getChildByUID(int uid);
+	void deserialize(Lumix::InputBlob& blob) override;
+	void serialize(Lumix::OutputBlob& blob) override;
+	void compile() override;
 
 	bool isContainer() const override { return true; }
 	
@@ -95,7 +99,9 @@ public:
 	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override;
 	void serialize(Lumix::OutputBlob& blob) override;
 	void deserialize(Lumix::InputBlob& blob) override;
+	void compile() override;
 	bool hitTest(const ImVec2& on_canvas_pos) const override;
+	const char* getExpression() const { return m_expression; }
 
 private:
 	ControllerResource& m_controller;
@@ -122,8 +128,6 @@ class StateMachine : public Container
 public:
 	StateMachine(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 
-	void deserialize(Lumix::InputBlob& blob) override;
-	void serialize(Lumix::OutputBlob& blob) override;
 	void drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos) override;
 	void onGUI() override;
 

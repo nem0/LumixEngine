@@ -159,6 +159,13 @@ Edge::Edge(Anim::Edge* engine_cmp, Container* parent, ControllerResource& contro
 }
 
 
+void Edge::compile()
+{
+	auto* engine_edge = (Anim::Edge*)engine_cmp;
+	engine_edge->condition.compile(m_expression, m_controller.getEngineResource()->getInputDecl());
+}
+
+
 void Edge::onGUI()
 {
 	auto* engine_edge = (Anim::Edge*)engine_cmp;
@@ -245,6 +252,7 @@ void SimpleAnimationNode::onGUI()
 	{
 		node->animation_hash = crc32(slots[current].c_str());
 	}
+	ImGui::Checkbox("Looped", &node->looped);
 }
 
 
@@ -278,8 +286,9 @@ static Component* createComponent(Anim::Component* engine_cmp, Container* parent
 }
 
 
-void StateMachine::deserialize(InputBlob& blob)
+void Container::deserialize(InputBlob& blob)
 {
+	Node::deserialize(blob);
 	ASSERT(m_editor_cmps.empty());
 	int size;
 	blob.read(size);
@@ -295,8 +304,18 @@ void StateMachine::deserialize(InputBlob& blob)
 }
 
 
-void StateMachine::serialize(OutputBlob& blob)
+void Container::compile()
 {
+	for (auto* cmp : m_editor_cmps)
+	{
+		cmp->compile();
+	}
+}
+
+
+void Container::serialize(OutputBlob& blob)
+{
+	Node::serialize(blob);
 	blob.write(m_editor_cmps.size());
 	for (auto* cmp : m_editor_cmps)
 	{
@@ -397,8 +416,11 @@ ControllerResource::ControllerResource(AnimationEditor& editor, ResourceManagerB
 
 void ControllerResource::serialize(OutputBlob& blob)
 {
-	blob.write(m_last_uid);
+	m_root->compile();
+
 	m_engine_resource->serialize(blob);
+
+	blob.write(m_last_uid);
 	m_root->serialize(blob);
 	blob.write(m_animation_slots.size());
 	for (auto& slot : m_animation_slots)
@@ -410,12 +432,12 @@ void ControllerResource::serialize(OutputBlob& blob)
 
 void ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator& allocator)
 {
-	blob.read(m_last_uid);
 	auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
 	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), *manager, allocator);
 	m_engine_resource->create();
 	m_engine_resource->deserialize(blob);
 
+	blob.read(m_last_uid);
 	m_root = createComponent(m_engine_resource->getRoot(), nullptr, *this);
 	m_root->deserialize(blob);
 
