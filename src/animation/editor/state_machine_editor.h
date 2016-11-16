@@ -1,19 +1,15 @@
 #pragma once
 #include "engine/array.h"
 #include "imgui/imgui.h"
+#include "animation/state_machine.h"
 
 
 namespace Lumix
 {
-class Engine;
-class InputBlob;
-class OutputBlob;
 class ResourceManagerBase;
 namespace Anim
 {
-	struct Component;
 	class ControllerResource;
-	struct Edge;
 }
 }
 
@@ -22,6 +18,7 @@ namespace AnimEditor
 {
 
 
+class AnimationEditor;
 struct Container;
 class ControllerResource;
 struct Edge;
@@ -29,10 +26,10 @@ struct Edge;
 
 struct Component
 {
-	Component(Lumix::Anim::Component* _engine_cmp) : engine_cmp(_engine_cmp) {}
+	Component(Container* parent, Lumix::Anim::Component* _engine_cmp) : engine_cmp(_engine_cmp), m_parent(parent) {}
 
 	virtual ~Component() {}
-	virtual bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, Container* parent, bool selected) = 0;
+	virtual bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) = 0;
 	virtual void onGUI() {}
 	virtual void serialize(Lumix::OutputBlob& blob) = 0;
 	virtual void deserialize(Lumix::InputBlob& blob) = 0;
@@ -40,8 +37,12 @@ struct Component
 	virtual bool isNode() const = 0;
 	virtual bool isContainer() const { return false; }
 	virtual void drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos) {}
+	Container* getParent() { return m_parent; }
 
 	Lumix::Anim::Component* engine_cmp;
+
+protected:
+	Container* m_parent;
 };
 
 
@@ -55,11 +56,7 @@ public:
 	void onGUI() override;
 	void serialize(Lumix::OutputBlob& blob) override;
 	void deserialize(Lumix::InputBlob& blob) override;
-	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, Container* parent, bool selected) override;
-
-protected:
-	void makeNewLineProcess(const ImVec2& canvas_screen_pos, ImDrawList* draw, Container* parent);
-	bool dragNodeProcess();
+	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override;
 
 public:
 	ImVec2 pos;
@@ -70,9 +67,6 @@ protected:
 	char m_name[64];
 	Lumix::Array<Edge*> edges;
 	Lumix::IAllocator& m_allocator;
-	Container* m_parent;
-	ImVec2 m_line_from;
-	bool m_is_making_line = false;
 };
 
 
@@ -85,6 +79,7 @@ struct Container : public Node
 	bool isContainer() const override { return true; }
 	
 	Lumix::Array<Component*> m_editor_cmps;
+	Component* m_selected_component;
 };
 
 
@@ -97,7 +92,7 @@ public:
 	bool isNode() const override { return false; }
 
 	void onGUI() override;
-	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, Container*, bool selected) override;
+	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override;
 	void serialize(Lumix::OutputBlob& blob) override;
 	void deserialize(Lumix::InputBlob& blob) override;
 	bool hitTest(const ImVec2& on_canvas_pos) const override;
@@ -106,7 +101,6 @@ private:
 	ControllerResource& m_controller;
 	Node* m_from;
 	Node* m_to;
-	Container* m_parent;
 	char m_expression[128];
 };
 
@@ -134,14 +128,17 @@ public:
 	void onGUI() override;
 
 private:
-	Component* m_selected_component;
+	void createState(Lumix::Anim::Component::Type type);
+
+private:
+	bool m_is_making_line = false;
 };
 
 
 class ControllerResource
 {
 public:
-	ControllerResource(Lumix::ResourceManagerBase& manager, Lumix::IAllocator& allocator);
+	ControllerResource(AnimationEditor& editor, Lumix::ResourceManagerBase& manager, Lumix::IAllocator& allocator);
 
 	void serialize(Lumix::OutputBlob& blob);
 	void deserialize(Lumix::InputBlob& blob, Lumix::Engine& engine, Lumix::IAllocator& allocator);
@@ -149,8 +146,12 @@ public:
 	Lumix::Array<Lumix::string>& getAnimationSlots() { return m_animation_slots; }
 	Lumix::IAllocator& getAllocator() { return m_allocator; }
 	Lumix::Anim::ControllerResource* getEngineResource() { return m_engine_resource; }
+	AnimationEditor& getEditor() { return m_editor; }
+	int createUID() { ++m_last_uid; return m_last_uid; }
 
 private:
+	int m_last_uid = 0;
+	AnimationEditor& m_editor;
 	Lumix::IAllocator& m_allocator;
 	Component* m_root;
 	Lumix::Anim::ControllerResource* m_engine_resource;

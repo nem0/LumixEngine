@@ -420,10 +420,10 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		, m_selected_bone(-1)
 		, m_is_window_opened(false)
 	{
-		m_action = LUMIX_NEW(m_editor.getAllocator(), Action)("Physics", "physics");
-		m_action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
-		m_action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
-		app.addWindowAction(m_action);
+		Action* action = LUMIX_NEW(m_editor.getAllocator(), Action)("Physics", "physics");
+		action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
+		action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
+		app.addWindowAction(action);
 	}
 
 
@@ -995,7 +995,6 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	bool m_is_window_opened;
 	int m_selected_bone;
 	Lumix::WorldEditor& m_editor;
-	Action* m_action;
 };
 
 

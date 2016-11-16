@@ -119,9 +119,9 @@ struct Edge : public Component
 	void deserialize(InputBlob& blob, Container* parent) override;
 
 	Condition condition;
-	Node* from;
-	Node* to;
-	float length;
+	Node* from = nullptr;
+	Node* to = nullptr;
+	float length = 0.1f;
 };
 
 
