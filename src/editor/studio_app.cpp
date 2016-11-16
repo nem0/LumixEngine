@@ -42,8 +42,8 @@
 
 struct LuaPlugin : public StudioApp::IPlugin
 {
-	LuaPlugin(Lumix::WorldEditor& _editor, const char* src, const char* filename)
-		: editor(_editor)
+	LuaPlugin(StudioApp& app, const char* src, const char* filename)
+		: editor(*app.getWorldEditor())
 	{
 		L = lua_newthread(editor.getEngine().getState());
 		thread_ref = luaL_ref(editor.getEngine().getState(), LUA_REGISTRYINDEX);
@@ -64,6 +64,7 @@ struct LuaPlugin : public StudioApp::IPlugin
 
 		m_action = LUMIX_NEW(editor.getAllocator(), Action)(name, name);
 		m_action->func.bind<LuaPlugin, &LuaPlugin::onAction>(this);
+		app.addWindowAction(m_action);
 		m_is_opened = false;
 
 		lua_pop(L, 1); // plugin_name
@@ -103,6 +104,7 @@ struct LuaPlugin : public StudioApp::IPlugin
 	lua_State* L;
 	int thread_ref;
 	bool m_is_opened;
+	Action* m_action;
 };
 
 
@@ -118,6 +120,7 @@ public:
 		, m_asset_browser(nullptr)
 		, m_property_grid(nullptr)
 		, m_actions(m_allocator)
+		, m_window_actions(m_allocator)
 		, m_toolbar_actions(m_allocator)
 		, m_metadata(m_allocator)
 		, m_is_welcome_screen_opened(true)
@@ -807,6 +810,21 @@ public:
 	}
 
 
+	void addWindowAction(Action* action) override
+	{
+		addAction(action);
+		for (int i = 0; i < m_window_actions.size(); ++i)
+		{
+			if (Lumix::compareString(m_window_actions[i]->label, action->label) > 0)
+			{
+				m_window_actions.insert(i, action);
+				return;
+			}
+		}
+		m_window_actions.push(action);
+	}
+
+
 	void addAction(Action* action) override
 	{
 		for (int i = 0; i < m_actions.size(); ++i)
@@ -841,14 +859,13 @@ public:
 	}
 
 
-	Action& getAction(const char* name) override
+	Action* getAction(const char* name) override
 	{
 		for (auto* a : m_actions)
 		{
-			if (Lumix::equalStrings(a->name, name)) return *a;
+			if (Lumix::equalStrings(a->name, name)) return a;
 		}
-		ASSERT(false);
-		return *m_actions[0];
+		return nullptr;
 	}
 
 
@@ -883,7 +900,7 @@ public:
 
 	void onCreateEntityWithComponentGUI()
 	{
-		doMenuItem(getAction("createEntity"), true);
+		doMenuItem(*getAction("createEntity"), true);
 		ImGui::Separator();
 		ImGui::FilterInput("Filter", m_component_filter, sizeof(m_component_filter));
 		showAddComponentNode(m_add_cmp_root.child, m_component_filter);
@@ -900,7 +917,7 @@ public:
 			onCreateEntityWithComponentGUI();
 			ImGui::EndMenu();
 		}
-		doMenuItem(getAction("destroyEntity"), is_any_entity_selected);
+		doMenuItem(*getAction("destroyEntity"), is_any_entity_selected);
 
 		if (ImGui::BeginMenu("Create template", is_any_entity_selected))
 		{
@@ -915,9 +932,9 @@ public:
 			}
 			ImGui::EndMenu();
 		}
-		doMenuItem(getAction("instantiateTemplate"), m_selected_template_name.length() > 0);
-		doMenuItem(getAction("showEntities"), is_any_entity_selected);
-		doMenuItem(getAction("hideEntities"), is_any_entity_selected);
+		doMenuItem(*getAction("instantiateTemplate"), m_selected_template_name.length() > 0);
+		doMenuItem(*getAction("showEntities"), is_any_entity_selected);
+		doMenuItem(*getAction("hideEntities"), is_any_entity_selected);
 		ImGui::EndMenu();
 	}
 
@@ -927,24 +944,24 @@ public:
 		if (!ImGui::BeginMenu("Edit")) return;
 
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
-		doMenuItem(getAction("undo"), m_editor->canUndo());
-		doMenuItem(getAction("redo"), m_editor->canRedo());
+		doMenuItem(*getAction("undo"), m_editor->canUndo());
+		doMenuItem(*getAction("redo"), m_editor->canRedo());
 		ImGui::Separator();
-		doMenuItem(getAction("copy"), is_any_entity_selected);
-		doMenuItem(getAction("paste"), m_editor->canPasteEntities());
+		doMenuItem(*getAction("copy"), is_any_entity_selected);
+		doMenuItem(*getAction("paste"), m_editor->canPasteEntities());
 		ImGui::Separator();
-		doMenuItem(getAction("orbitCamera"), is_any_entity_selected || m_editor->isOrbitCamera());
-		doMenuItem(getAction("setTranslateGizmoMode"), true);
-		doMenuItem(getAction("setRotateGizmoMode"), true);
-		doMenuItem(getAction("setPivotCenter"), true);
-		doMenuItem(getAction("setPivotOrigin"), true);
-		doMenuItem(getAction("setLocalCoordSystem"), true);
-		doMenuItem(getAction("setGlobalCoordSystem"), true);
+		doMenuItem(*getAction("orbitCamera"), is_any_entity_selected || m_editor->isOrbitCamera());
+		doMenuItem(*getAction("setTranslateGizmoMode"), true);
+		doMenuItem(*getAction("setRotateGizmoMode"), true);
+		doMenuItem(*getAction("setPivotCenter"), true);
+		doMenuItem(*getAction("setPivotOrigin"), true);
+		doMenuItem(*getAction("setLocalCoordSystem"), true);
+		doMenuItem(*getAction("setGlobalCoordSystem"), true);
 		if (ImGui::BeginMenu("View", true))
 		{
-			doMenuItem(getAction("viewTop"), true);
-			doMenuItem(getAction("viewFront"), true);
-			doMenuItem(getAction("viewSide"), true);
+			doMenuItem(*getAction("viewTop"), true);
+			doMenuItem(*getAction("viewFront"), true);
+			doMenuItem(*getAction("viewSide"), true);
 			ImGui::EndMenu();
 		}
 		ImGui::EndMenu();
@@ -955,7 +972,7 @@ public:
 	{
 		if (!ImGui::BeginMenu("File")) return;
 
-		doMenuItem(getAction("newUniverse"), true);
+		doMenuItem(*getAction("newUniverse"), true);
 		if (ImGui::BeginMenu("Open"))
 		{
 			ImGui::FilterInput("Filter", m_open_filter, sizeof(m_open_filter));
@@ -981,9 +998,9 @@ public:
 			}
 			ImGui::EndMenu();
 		}
-		doMenuItem(getAction("save"), !m_editor->isGameMode());
-		doMenuItem(getAction("saveAs"), !m_editor->isGameMode());
-		doMenuItem(getAction("exit"), true);
+		doMenuItem(*getAction("save"), !m_editor->isGameMode());
+		doMenuItem(*getAction("saveAs"), !m_editor->isGameMode());
+		doMenuItem(*getAction("exit"), true);
 		ImGui::EndMenu();
 	}
 
@@ -993,11 +1010,11 @@ public:
 		if (!ImGui::BeginMenu("Tools")) return;
 
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
-		doMenuItem(getAction("lookAtSelected"), is_any_entity_selected);
-		doMenuItem(getAction("toggleGameMode"), true);
-		doMenuItem(getAction("toggleMeasure"), true);
-		doMenuItem(getAction("snapDown"), is_any_entity_selected);
-		doMenuItem(getAction("autosnapDown"), true);
+		doMenuItem(*getAction("lookAtSelected"), is_any_entity_selected);
+		doMenuItem(*getAction("toggleGameMode"), true);
+		doMenuItem(*getAction("toggleMeasure"), true);
+		doMenuItem(*getAction("snapDown"), is_any_entity_selected);
+		doMenuItem(*getAction("autosnapDown"), true);
 		if (ImGui::MenuItem("Save commands")) saveUndoStack();
 		if (ImGui::MenuItem("Load commands")) loadAndExecuteCommands();
 		if (ImGui::MenuItem("Pack data")) packData();
@@ -1010,19 +1027,16 @@ public:
 		if (!ImGui::BeginMenu("View")) return;
 
 		ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
-		doMenuItem(getAction("entityList"), true);
+		doMenuItem(*getAction("entityList"), true);
 		ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
 		ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
 		ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
 		ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
-		doMenuItem(getAction("settings"), true);
+		doMenuItem(*getAction("settings"), true);
 		ImGui::Separator();
-		for (auto* plugin : m_plugins)
+		for (Action* action : m_window_actions)
 		{
-			if (plugin->m_action)
-			{
-				doMenuItem(*plugin->m_action, true);
-			}
+			doMenuItem(*action, true);
 		}
 		ImGui::EndMenu();
 	}
@@ -1199,21 +1213,21 @@ public:
 		auto pos = ImGui::GetCursorScreenPos();
 		ImGui::BeginToolbar("entity_list_toolbar", pos, ImVec2(0, 24));
 		auto& groups = m_editor->getEntityGroups();
-		if (getAction("createGroup").toolbarButton())
+		if (getAction("createGroup")->toolbarButton())
 		{
 			ImGui::OpenPopup("create_entity_group_popup");
 		}
-		if (groups.getGroupCount() > 1 && getAction("removeGroup").toolbarButton())
+		if (groups.getGroupCount() > 1 && getAction("removeGroup")->toolbarButton())
 		{
 			groups.deleteGroup(m_current_group);
 			m_current_group = m_current_group % groups.getGroupCount();
 		}
-		if (getAction("selectAssigned").toolbarButton())
+		if (getAction("selectAssigned")->toolbarButton())
 		{
 			m_editor->selectEntities(
 				groups.getGroupEntities(m_current_group), groups.getGroupEntitiesCount(m_current_group));
 		}
-		if (getAction("assignSelected").toolbarButton())
+		if (getAction("assignSelected")->toolbarButton())
 		{
 			auto& selected = m_editor->getSelectedEntities();
 			for (auto e : selected)
@@ -1221,14 +1235,14 @@ public:
 				groups.setGroup(e, m_current_group);
 			}
 		}
-		if (getAction("lock").toolbarButton()) groups.freezeGroup(m_current_group, true);
-		if (getAction("unlock").toolbarButton()) groups.freezeGroup(m_current_group, false);
-		if (getAction("show").toolbarButton())
+		if (getAction("lock")->toolbarButton()) groups.freezeGroup(m_current_group, true);
+		if (getAction("unlock")->toolbarButton()) groups.freezeGroup(m_current_group, false);
+		if (getAction("show")->toolbarButton())
 		{
 			m_editor->showEntities(
 				groups.getGroupEntities(m_current_group), groups.getGroupEntitiesCount(m_current_group));
 		}
-		if (getAction("hide").toolbarButton())
+		if (getAction("hide")->toolbarButton())
 		{
 			m_editor->hideEntities(
 				groups.getGroupEntities(m_current_group), groups.getGroupEntitiesCount(m_current_group));
@@ -1560,10 +1574,6 @@ public:
 	void addPlugin(IPlugin& plugin) override
 	{
 		m_plugins.push(&plugin);
-		if (plugin.m_action)
-		{
-			addAction(plugin.m_action);
-		}
 	}
 
 
@@ -1883,7 +1893,7 @@ public:
 			file.read(src, size);
 			src[size] = 0;
 			
-			LuaPlugin* plugin = LUMIX_NEW(m_editor->getAllocator(), LuaPlugin)(*m_editor, src, filename);
+			LuaPlugin* plugin = LUMIX_NEW(m_editor->getAllocator(), LuaPlugin)(*this, src, filename);
 			addPlugin(*plugin);
 
 			m_engine->getLIFOAllocator().deallocate(src);
@@ -2212,6 +2222,7 @@ public:
 
 	float m_time_to_autosave;
 	Lumix::Array<Action*> m_actions;
+	Lumix::Array<Action*> m_window_actions;
 	Lumix::Array<Action*> m_toolbar_actions;
 	Lumix::Array<IPlugin*> m_plugins;
 	Lumix::Array<IAddComponentPlugin*> m_add_cmp_plugins;

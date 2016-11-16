@@ -180,4 +180,5 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		Lumix::MT::SpinMutex m_mutex;
 		Metadata& m_metadata;
 		DDSConvertCallbackData m_dds_convert_callback;
+		Action* m_action;
 };

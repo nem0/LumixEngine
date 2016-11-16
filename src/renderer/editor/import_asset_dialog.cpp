@@ -2393,6 +2393,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	m_action = LUMIX_NEW(m_editor.getAllocator(), Action)("Import Asset", "import_asset");
 	m_action->func.bind<ImportAssetDialog, &ImportAssetDialog::onAction>(this);
 	m_action->is_selected.bind<ImportAssetDialog, &ImportAssetDialog::isOpened>(this);
+	app.addWindowAction(m_action);
 
 	lua_State* L = m_editor.getEngine().getState();
 	LuaWrapper::createSystemVariable(L, "ImportAsset", "instance", this);
