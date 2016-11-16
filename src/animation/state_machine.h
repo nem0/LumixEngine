@@ -4,6 +4,7 @@
 #include "condition.h"
 #include "engine/array.h"
 #include "engine/blob.h"
+#include "engine/hash_map.h"
 #include "engine/lumix.h"
 #include "renderer/pose.h"
 
@@ -27,7 +28,7 @@ namespace Anim
 
 struct Container;
 struct ComponentInstance;
-struct StateMachine;
+class StateMachine;
 
 
 struct ComponentInstance
@@ -165,23 +166,28 @@ struct StateMachineInstance : public NodeInstance
 	float getTime() const override { return 0; }
 	float getLength() const override { return 0; }
 
-
 	StateMachine& source;
 	ComponentInstance* current;
 	IAllocator& allocator;
 };
 
 
-struct StateMachine : public Container
+class StateMachine : public Container
 {
+public:
 	StateMachine(IAllocator& _allocator)
 		: Container(Component::STATE_MACHINE, _allocator)
+		, m_default_state(nullptr)
 	{
 	}
 
 	ComponentInstance* createInstance(IAllocator& allocator) override;
+	void serialize(OutputBlob& blob) override;
+	void deserialize(InputBlob& blob, Container* parent) override;
+	Node* getDefaultState() const { return m_default_state; }
 
-	Node* default_state;
+private:
+	Node* m_default_state;
 };
 
 

@@ -125,6 +125,7 @@ void Edge::deserialize(InputBlob& blob, Container* parent)
 	blob.read(size);
 	condition.bytecode.resize(size);
 	if(size > 0) blob.read(&condition.bytecode[0], size);
+	from->out_edges.push(this);
 }
 
 
@@ -138,12 +139,14 @@ SimpleAnimationNode::SimpleAnimationNode(IAllocator& allocator)
 void SimpleAnimationNode::serialize(OutputBlob& blob)
 {
 	Component::serialize(blob);
+	blob.write(animation_hash);
 }
 
 
 void SimpleAnimationNode::deserialize(InputBlob& blob, Container* parent)
 {
 	Component::deserialize(blob, parent);
+	blob.read(animation_hash);
 }
 
 
@@ -182,7 +185,11 @@ struct SimpleAnimationNodeInstance : public NodeInstance
 	}
 
 
-	void enter(RunningContext& rc, ComponentInstance* from) override { time = 0; }
+	void enter(RunningContext& rc, ComponentInstance* from) override
+	{ 
+		time = 0;
+		resource = (*rc.anim_set)[node.animation_hash];
+	}
 
 
 	Animation* resource;
@@ -221,13 +228,27 @@ void StateMachineInstance::fillPose(Engine& engine, Pose& pose, Model& model, fl
 
 void StateMachineInstance::enter(RunningContext& rc, ComponentInstance* from)
 {
-	current = source.default_state->createInstance(*rc.allocator);
+	current = source.getDefaultState()->createInstance(*rc.allocator);
+	current->enter(rc, nullptr);
 }
 
 
 ComponentInstance* StateMachine::createInstance(IAllocator& allocator)
 {
 	return LUMIX_NEW(allocator, StateMachineInstance)(*this, allocator);
+}
+
+
+void StateMachine::serialize(OutputBlob& blob)
+{
+	Container::serialize(blob);
+}
+
+
+void StateMachine::deserialize(InputBlob& blob, Container* parent)
+{
+	Container::deserialize(blob, parent);
+	m_default_state = (Node*)children[0];
 }
 
 
