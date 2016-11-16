@@ -1306,9 +1306,9 @@ struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	{
 		auto& editor = *app.getWorldEditor();
 		auto& allocator = editor.getAllocator();
-		m_action = LUMIX_NEW(allocator, Action)("Scene View", "scene_view");
-		m_action->func.bind<SceneViewPlugin, &SceneViewPlugin::onAction>(this);
-		app.addWindowAction(m_action);
+		Action* action = LUMIX_NEW(allocator, Action)("Scene View", "scene_view");
+		action->func.bind<SceneViewPlugin, &SceneViewPlugin::onAction>(this);
+		app.addWindowAction(action);
 		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getPipeline());
 		editor.setRenderInterface(m_render_interface);
 		m_app.getAssetBrowser()->resourceChanged().bind<SceneViewPlugin, &SceneViewPlugin::onResourceChanged>(this);
@@ -1348,7 +1348,6 @@ struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	StudioApp& m_app;
 	SceneView m_scene_view;
 	RenderInterfaceImpl* m_render_interface;
-	Action* m_action;
 };
 
 
@@ -1742,10 +1741,10 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		, is_opened(false)
 	{
 		fur_painter = LUMIX_NEW(app.getWorldEditor()->getAllocator(), FurPainter)(_app);
-		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Fur Painter", "fur_painter");
-		m_action->func.bind<FurPainterPlugin, &FurPainterPlugin::onAction>(this);
-		m_action->is_selected.bind<FurPainterPlugin, &FurPainterPlugin::isOpened>(this);
-		app.addWindowAction(m_action);
+		Action* action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Fur Painter", "fur_painter");
+		action->func.bind<FurPainterPlugin, &FurPainterPlugin::onAction>(this);
+		action->is_selected.bind<FurPainterPlugin, &FurPainterPlugin::isOpened>(this);
+		app.addWindowAction(action);
 	}
 
 
@@ -1869,7 +1868,6 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	FurPainter* fur_painter;
 	bool is_opened;
 	StudioApp& app;
-	Action* m_action;
 };
 
 
@@ -1887,10 +1885,10 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	{
 		auto& editor = *app.getWorldEditor();
 		m_engine = &editor.getEngine();
-		m_action = LUMIX_NEW(editor.getAllocator(), Action)("Game View", "game_view");
-		m_action->func.bind<GameViewPlugin, &GameViewPlugin::onAction>(this);
-		m_action->is_selected.bind<GameViewPlugin, &GameViewPlugin::isOpened>(this);
-		app.addWindowAction(m_action);
+		Action* action = LUMIX_NEW(editor.getAllocator(), Action)("Game View", "game_view");
+		action->func.bind<GameViewPlugin, &GameViewPlugin::onAction>(this);
+		action->is_selected.bind<GameViewPlugin, &GameViewPlugin::isOpened>(this);
+		app.addWindowAction(action);
 		m_game_view.m_is_opened = false;
 		m_game_view.init(editor);
 
@@ -2089,7 +2087,6 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	Pipeline* m_gui_pipeline;
 	GameView m_game_view;
 	SceneView& m_scene_view;
-	Action* m_action;
 };
 
 
@@ -2102,10 +2099,10 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		: m_shader_editor(app.getWorldEditor()->getAllocator())
 		, m_app(app)
 	{
-		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Shader Editor", "shaderEditor");
-		m_action->func.bind<ShaderEditorPlugin, &ShaderEditorPlugin::onAction>(this);
-		m_action->is_selected.bind<ShaderEditorPlugin, &ShaderEditorPlugin::isOpened>(this);
-		app.addWindowAction(m_action);
+		Action* action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Shader Editor", "shaderEditor");
+		action->func.bind<ShaderEditorPlugin, &ShaderEditorPlugin::onAction>(this);
+		action->is_selected.bind<ShaderEditorPlugin, &ShaderEditorPlugin::isOpened>(this);
+		app.addWindowAction(action);
 		m_shader_editor.m_is_opened = false;
 
 		m_compiler = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderCompiler)(app, *app.getLogUI());
@@ -2130,7 +2127,6 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	StudioApp& m_app;
 	ShaderCompiler* m_compiler;
 	ShaderEditor m_shader_editor;
-	Action* m_action;
 };
 
 

@@ -24,10 +24,10 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		, is_opened(false)
 	{
 		auto& allocator = app.getWorldEditor()->getAllocator();
-		m_action = LUMIX_NEW(allocator, Action)("Navigation", "toggleNavigationWindow");
-		m_action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
-		m_action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
-		app.addWindowAction(m_action);
+		Action* action = LUMIX_NEW(allocator, Action)("Navigation", "toggleNavigationWindow");
+		action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
+		action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
+		app.addWindowAction(action);
 	}
 
 
@@ -140,7 +140,6 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 	bool is_opened;
 	StudioApp& app;
-	Action* m_action;
 };
 
 
