@@ -2390,10 +2390,10 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	m_texture_output_dir[0] = '\0';
 	copyString(m_last_dir, m_editor.getEngine().getDiskFileDevice()->getBasePath());
 
-	m_action = LUMIX_NEW(m_editor.getAllocator(), Action)("Import Asset", "import_asset");
-	m_action->func.bind<ImportAssetDialog, &ImportAssetDialog::onAction>(this);
-	m_action->is_selected.bind<ImportAssetDialog, &ImportAssetDialog::isOpened>(this);
-	app.addWindowAction(m_action);
+	Action* action = LUMIX_NEW(m_editor.getAllocator(), Action)("Import Asset", "import_asset");
+	action->func.bind<ImportAssetDialog, &ImportAssetDialog::onAction>(this);
+	action->is_selected.bind<ImportAssetDialog, &ImportAssetDialog::isOpened>(this);
+	app.addWindowAction(action);
 
 	lua_State* L = m_editor.getEngine().getState();
 	LuaWrapper::createSystemVariable(L, "ImportAsset", "instance", this);

@@ -62,9 +62,9 @@ struct LuaPlugin : public StudioApp::IPlugin
 			name = lua_tostring(L, -1);
 		}
 
-		m_action = LUMIX_NEW(editor.getAllocator(), Action)(name, name);
-		m_action->func.bind<LuaPlugin, &LuaPlugin::onAction>(this);
-		app.addWindowAction(m_action);
+		Action* action = LUMIX_NEW(editor.getAllocator(), Action)(name, name);
+		action->func.bind<LuaPlugin, &LuaPlugin::onAction>(this);
+		app.addWindowAction(action);
 		m_is_opened = false;
 
 		lua_pop(L, 1); // plugin_name
@@ -104,7 +104,6 @@ struct LuaPlugin : public StudioApp::IPlugin
 	lua_State* L;
 	int thread_ref;
 	bool m_is_opened;
-	Action* m_action;
 };
 
 
