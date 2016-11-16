@@ -2,6 +2,7 @@
 
 
 #include "engine/array.h"
+#include "engine/hash_map.h"
 #include "engine/lumix.h"
 
 
@@ -9,11 +10,15 @@ namespace Lumix
 {
 
 
+class Animation;
 class IAllocator;
 
 
 namespace Anim
 {
+
+
+typedef HashMap<uint32, Animation*> AnimSet;
 
 
 struct RunningContext
@@ -22,13 +27,14 @@ struct RunningContext
 	uint8* input;
 	IAllocator* allocator;
 	struct ComponentInstance* current;
+	AnimSet* anim_set;
 };
 
 
 
 struct InputDecl
 {
-	enum Type
+	enum Type : int
 	{
 		FLOAT,
 		INT,
@@ -58,6 +64,23 @@ struct InputDecl
 	int inputs_count = 0;
 	Constant constants[32];
 	int constants_count = 0;
+
+	int getSize() const
+	{
+		if (inputs_count == 0) return 0;
+		return inputs[inputs_count - 1].offset + getSize(inputs[inputs_count - 1].type);
+	}
+
+	int getSize(Type type) const
+	{
+		switch (type)
+		{
+			case FLOAT: return sizeof(float);
+			case INT: return sizeof(int);
+			case BOOL: return sizeof(bool);
+			default: ASSERT(1); return 1;
+		}
+	}
 
 	int getInputIdx(const char* name, int size) const
 	{

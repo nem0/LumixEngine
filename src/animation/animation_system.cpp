@@ -24,7 +24,7 @@ namespace Lumix
 
 
 static const ComponentType ANIMABLE_TYPE = PropertyRegister::getComponentType("animable");
-static const ComponentType CONTROLER_TYPE = PropertyRegister::getComponentType("anim_controller");
+static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("anim_controller");
 static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
@@ -50,13 +50,44 @@ enum class AnimationSceneVersion : int
 };
 
 
+
+
+struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
+{
+	explicit AnimationSystemImpl(Engine& engine);
+	~AnimationSystemImpl();
+
+
+	void registerLuaAPI();
+	void createScenes(Universe& ctx) override;
+	void destroyScene(IScene* scene) override;
+	const char* getName() const override { return "animation"; }
+
+
+	Lumix::IAllocator& m_allocator;
+	Engine& m_engine;
+	AnimationManager m_animation_manager;
+	Anim::ControllerManager m_controller_manager;
+
+private:
+	void operator=(const AnimationSystemImpl&);
+	AnimationSystemImpl(const AnimationSystemImpl&);
+};
+
+
+
 struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 {
 	friend struct AnimationSystemImpl;
 
 	struct Controller
 	{
+		Controller(IAllocator& allocator) : input(allocator) {}
+
+		Entity entity;
 		Anim::ControllerResource* resource = nullptr;
+		Anim::ComponentInstance* root = nullptr;
+		Lumix::Array<uint8> input;
 	};
 
 
@@ -83,7 +114,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		Entity entity;
 	};
 
-	AnimationSceneImpl(IPlugin& anim_system, Engine& engine, Universe& universe, IAllocator& allocator)
+	AnimationSceneImpl(AnimationSystemImpl& anim_system, Engine& engine, Universe& universe, IAllocator& allocator)
 		: m_universe(universe)
 		, m_engine(engine)
 		, m_anim_system(anim_system)
@@ -95,7 +126,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		m_is_game_running = false;
 		m_render_scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 		universe.registerComponentTypeScene(ANIMABLE_TYPE, this);
-		universe.registerComponentTypeScene(CONTROLER_TYPE, this);
+		universe.registerComponentTypeScene(CONTROLLER_TYPE, this);
 		ASSERT(m_render_scene);
 	}
 
@@ -128,6 +159,13 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			unloadAnimation(animable.animation);
 		}
 		m_animables.clear();
+
+		for (Controller& controller : m_controllers)
+		{
+			unloadController(controller.resource);
+			LUMIX_DELETE(m_anim_system.m_allocator, controller.root);
+		}
+		m_controllers.clear();
 	}
 
 
@@ -175,8 +213,36 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 	
-	void startGame() override { m_is_game_running = true; }
-	void stopGame() override { m_is_game_running = false; }
+	void startGame() override 
+	{
+		for (auto& controller : m_controllers)
+		{
+			controller.root = controller.resource->createInstance(m_anim_system.m_allocator);
+			controller.input.resize(controller.resource->getInputDecl().getSize());
+			setMemory(&controller.input[0], 0, controller.input.size());
+			Anim::RunningContext rc;
+			rc.time_delta = 0;
+			rc.allocator = &m_anim_system.m_allocator;
+			rc.input = &controller.input[0];
+			rc.current = nullptr;
+			rc.anim_set = &controller.resource->getAnimSet();
+			controller.root->enter(rc, nullptr);
+		}
+		m_is_game_running = true;
+	}
+	
+	
+	void stopGame() override
+	{
+		for (auto& controller : m_controllers)
+		{
+			LUMIX_DELETE(m_anim_system.m_allocator, controller.root);
+			controller.root = nullptr;
+		}
+		m_is_game_running = false;
+	}
+	
+	
 	Universe& getUniverse() override { return m_universe; }
 
 
@@ -187,7 +253,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			if (m_animables.find(entity) < 0) return INVALID_COMPONENT;
 			return {entity.index};
 		}
-		else if (type == CONTROLER_TYPE)
+		else if (type == CONTROLLER_TYPE)
 		{
 			if (m_controllers.find(entity) < 0) return INVALID_COMPONENT;
 			return {entity.index};
@@ -199,7 +265,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	ComponentHandle createComponent(ComponentType type, Entity entity) override
 	{
 		if (type == ANIMABLE_TYPE) return createAnimable(entity);
-		if (type == CONTROLER_TYPE) return createController(entity);
+		if (type == CONTROLLER_TYPE) return createController(entity);
 		return INVALID_COMPONENT;
 	}
 
@@ -230,11 +296,12 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			m_animables.erase(entity);
 			m_universe.destroyComponent(entity, type, this, component);
 		}
-		else if (type == CONTROLER_TYPE)
+		else if (type == CONTROLLER_TYPE)
 		{
 			Entity entity = {component.index};
-			auto& controller = m_controllers[entity];
+			auto& controller = m_controllers.get(entity);
 			unloadController(controller.resource);
+			LUMIX_DELETE(m_anim_system.m_allocator, controller.root);
 			m_controllers.erase(entity);
 			m_universe.destroyComponent(entity, type, this, component);
 		}
@@ -305,7 +372,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 	void setControllerSource(ComponentHandle cmp, const Path& path)
 	{
-		auto& controller = m_controllers[{cmp.index}];
+		auto& controller = m_controllers.get({cmp.index});
 		unloadController(controller.resource);
 		controller.resource = loadController(path);
 	}
@@ -313,7 +380,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 	Path getControllerSource(ComponentHandle cmp)
 	{
-		const auto& controller = m_controllers[{cmp.index}];
+		const auto& controller = m_controllers.get({cmp.index});
 		return controller.resource ? controller.resource->getPath() : Path("");
 	}
 
@@ -399,6 +466,38 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		updateAnimable(animable, time_delta);
 	}
 
+	
+	uint8* getControllerInput(ComponentHandle cmp)
+	{
+		auto& input = m_controllers.get({ cmp.index }).input;
+		return input.empty() ? nullptr : &input[0];
+	}
+
+
+	void updateController(Controller& controller, float time_delta)
+	{
+		Anim::RunningContext rc;
+		rc.time_delta = time_delta;
+		rc.current = controller.root;
+		rc.allocator = &m_anim_system.m_allocator;
+		rc.input = &controller.input[0];
+		rc.anim_set = &controller.resource->getAnimSet();
+		controller.root->update(rc);
+
+		ComponentHandle model_instance = m_render_scene->getModelInstanceComponent(controller.entity);
+		if (model_instance == INVALID_COMPONENT) return;
+
+		auto* pose = m_render_scene->getPose(model_instance);
+		auto* model = m_render_scene->getModelInstanceModel(model_instance);
+
+		model->getPose(*pose);
+		pose->computeRelative(*model);
+
+		controller.root->fillPose(m_anim_system.m_engine, *pose, *model, 1);
+
+		pose->computeAbsolute(*model);
+	}
+
 
 	void update(float time_delta, bool paused) override
 	{
@@ -413,6 +512,11 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		for (Animable& animable : m_animables)
 		{
 			AnimationSceneImpl::updateAnimable(animable, time_delta);
+		}
+
+		for (Controller& controller : m_controllers)
+		{
+			AnimationSceneImpl::updateController(controller, time_delta);
 		}
 	}
 
@@ -448,10 +552,10 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 	ComponentHandle createController(Entity entity)
 	{
-		Controller& controller = m_controllers.insert(entity);
-
+		Controller& controller = m_controllers.emplace(entity, m_anim_system.m_allocator);
+		controller.entity = entity;
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, CONTROLER_TYPE, this, cmp);
+		m_universe.addComponent(entity, CONTROLLER_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -459,7 +563,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 
 	Universe& m_universe;
-	IPlugin& m_anim_system;
+	AnimationSystemImpl& m_anim_system;
 	Engine& m_engine;
 	AssociativeArray<Entity, Animable> m_animables;
 	AssociativeArray<Entity, Controller> m_controllers;
@@ -469,86 +573,70 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 };
 
 
-struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
+AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
+	: m_allocator(engine.getAllocator())
+	, m_engine(engine)
+	, m_animation_manager(m_allocator)
+	, m_controller_manager(m_allocator)
 {
-	explicit AnimationSystemImpl(Engine& engine)
-		: m_allocator(engine.getAllocator())
-		, m_engine(engine)
-		, m_animation_manager(m_allocator)
-		, m_controller_manager(m_allocator)
-	{
-		m_animation_manager.create(ANIMATION_TYPE, m_engine.getResourceManager());
-		m_controller_manager.create(CONTROLLER_RESOURCE_TYPE, m_engine.getResourceManager());
+	m_animation_manager.create(ANIMATION_TYPE, m_engine.getResourceManager());
+	m_controller_manager.create(CONTROLLER_RESOURCE_TYPE, m_engine.getResourceManager());
 
-		PropertyRegister::add("anim_controller",
-			LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationSceneImpl>)("Source",
-				&AnimationSceneImpl::getControllerSource,
-				&AnimationSceneImpl::setControllerSource,
-				"Animation controller (*.act)",
-				CONTROLLER_RESOURCE_TYPE));
+	PropertyRegister::add("anim_controller",
+		LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationSceneImpl>)("Source",
+			&AnimationSceneImpl::getControllerSource,
+			&AnimationSceneImpl::setControllerSource,
+			"Animation controller (*.act)",
+			CONTROLLER_RESOURCE_TYPE));
 
-		PropertyRegister::add("animable",
-			LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationSceneImpl>)("Animation",
-				&AnimationSceneImpl::getAnimation,
-				&AnimationSceneImpl::setAnimation,
-				"Animation (*.ani)",
-				ANIMATION_TYPE));
-		PropertyRegister::add("animable",
-			LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationSceneImpl>)(
-				"Start time", &AnimationSceneImpl::getStartTime, &AnimationSceneImpl::setStartTime, 0, FLT_MAX, 0.1f));
-		PropertyRegister::add("animable",
-			LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationSceneImpl>)(
-				"Time scale", &AnimationSceneImpl::getTimeScale, &AnimationSceneImpl::setTimeScale, 0, FLT_MAX, 0.1f));
+	PropertyRegister::add("animable",
+		LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationSceneImpl>)("Animation",
+			&AnimationSceneImpl::getAnimation,
+			&AnimationSceneImpl::setAnimation,
+			"Animation (*.ani)",
+			ANIMATION_TYPE));
+	PropertyRegister::add("animable",
+		LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationSceneImpl>)(
+			"Start time", &AnimationSceneImpl::getStartTime, &AnimationSceneImpl::setStartTime, 0, FLT_MAX, 0.1f));
+	PropertyRegister::add("animable",
+		LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationSceneImpl>)(
+			"Time scale", &AnimationSceneImpl::getTimeScale, &AnimationSceneImpl::setTimeScale, 0, FLT_MAX, 0.1f));
 
-		registerLuaAPI();
-	}
+	registerLuaAPI();
+}
 
 
-	~AnimationSystemImpl()
-	{
-		m_animation_manager.destroy();
-		m_controller_manager.destroy();
-	}
+AnimationSystemImpl::~AnimationSystemImpl()
+{
+	m_animation_manager.destroy();
+	m_controller_manager.destroy();
+}
 
 
-	void registerLuaAPI()
-	{
-		lua_State* L = m_engine.getState();
-		#define REGISTER_FUNCTION(name) \
-		do {\
-			auto f = &LuaWrapper::wrapMethod<AnimationSceneImpl, decltype(&AnimationSceneImpl::name), &AnimationSceneImpl::name>; \
-			LuaWrapper::createSystemFunction(L, "Animation", #name, f); \
-		} while(false) \
+void AnimationSystemImpl::registerLuaAPI()
+{
+	lua_State* L = m_engine.getState();
+	#define REGISTER_FUNCTION(name) \
+	do {\
+		auto f = &LuaWrapper::wrapMethod<AnimationSceneImpl, decltype(&AnimationSceneImpl::name), &AnimationSceneImpl::name>; \
+		LuaWrapper::createSystemFunction(L, "Animation", #name, f); \
+	} while(false) \
 
-		REGISTER_FUNCTION(mixAnimation);
-		REGISTER_FUNCTION(getAnimationLength);
+	REGISTER_FUNCTION(mixAnimation);
+	REGISTER_FUNCTION(getAnimationLength);
 
-		#undef REGISTER_FUNCTION
-	}
-
-
-	void createScenes(Universe& ctx) override
-	{
-		auto* scene = LUMIX_NEW(m_allocator, AnimationSceneImpl)(*this, m_engine, ctx, m_allocator);
-		ctx.addScene(scene);
-	}
+	#undef REGISTER_FUNCTION
+}
 
 
-	void destroyScene(IScene* scene) override { LUMIX_DELETE(m_allocator, scene); }
+void AnimationSystemImpl::createScenes(Universe& ctx)
+{
+	auto* scene = LUMIX_NEW(m_allocator, AnimationSceneImpl)(*this, m_engine, ctx, m_allocator);
+	ctx.addScene(scene);
+}
 
 
-	const char* getName() const override { return "animation"; }
-
-
-	Lumix::IAllocator& m_allocator;
-	Engine& m_engine;
-	AnimationManager m_animation_manager;
-	Anim::ControllerManager m_controller_manager;
-
-private:
-	void operator=(const AnimationSystemImpl&);
-	AnimationSystemImpl(const AnimationSystemImpl&);
-};
+void AnimationSystemImpl::destroyScene(IScene* scene) { LUMIX_DELETE(m_allocator, scene); }
 
 
 LUMIX_PLUGIN_ENTRY(animation)

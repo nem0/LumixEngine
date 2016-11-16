@@ -23,6 +23,7 @@ namespace AnimEditor
 
 
 struct Container;
+class ControllerResource;
 struct Edge;
 
 
@@ -47,7 +48,7 @@ struct Component
 class Node : public Component
 {
 public:
-	Node(Lumix::Anim::Component* engine_cmp, Container* parent, Lumix::IAllocator& allocator);
+	Node(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 
 	bool isNode() const override { return true; }
 	bool hitTest(const ImVec2& on_canvas_pos) const override;
@@ -65,6 +66,7 @@ public:
 	ImVec2 size;
 
 protected:
+	ControllerResource& m_controller;
 	char m_name[64];
 	Lumix::Array<Edge*> edges;
 	Lumix::IAllocator& m_allocator;
@@ -76,7 +78,7 @@ protected:
 
 struct Container : public Node
 {
-	Container(Lumix::Anim::Component* engine_cmp, Container* parent, Lumix::IAllocator& allocator);
+	Container(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 	Component* childrenHitTest(const ImVec2& pos);
 	Component* getChildByUID(int uid);
 
@@ -90,7 +92,7 @@ struct Container : public Node
 struct Edge : public Component
 {
 public:
-	Edge(Lumix::Anim::Edge* engine_cmp, Container* parent);
+	Edge(Lumix::Anim::Edge* engine_cmp, Container* parent, ControllerResource& controller);
 
 	bool isNode() const override { return false; }
 
@@ -101,6 +103,7 @@ public:
 	bool hitTest(const ImVec2& on_canvas_pos) const override;
 
 private:
+	ControllerResource& m_controller;
 	Node* m_from;
 	Node* m_to;
 	Container* m_parent;
@@ -108,14 +111,14 @@ private:
 };
 
 
-
-
-struct SimpleAnimationNode : public Node
+class SimpleAnimationNode : public Node
 {
-	SimpleAnimationNode(Lumix::Anim::Component* engine_cmp, Container* parent, Lumix::IAllocator& allocator);
-	
+public:
+	SimpleAnimationNode(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
+
 	void onGUI() override;
 
+private:
 	char animation[64];
 };
 
@@ -123,7 +126,7 @@ struct SimpleAnimationNode : public Node
 class StateMachine : public Container
 {
 public:
-	StateMachine(Lumix::Anim::Component* engine_cmp, Container* parent, Lumix::IAllocator& allocator);
+	StateMachine(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 
 	void deserialize(Lumix::InputBlob& blob) override;
 	void serialize(Lumix::OutputBlob& blob) override;
@@ -138,15 +141,17 @@ private:
 class ControllerResource
 {
 public:
-	ControllerResource(Lumix::IAllocator& allocator, Lumix::ResourceManagerBase& manager);
-
+	ControllerResource(Lumix::ResourceManagerBase& manager, Lumix::IAllocator& allocator);
 
 	void serialize(Lumix::OutputBlob& blob);
 	void deserialize(Lumix::InputBlob& blob, Lumix::Engine& engine, Lumix::IAllocator& allocator);
 	Component* getRoot() { return m_root; }
 	Lumix::Array<Lumix::string>& getAnimationSlots() { return m_animation_slots; }
+	Lumix::IAllocator& getAllocator() { return m_allocator; }
+	Lumix::Anim::ControllerResource* getEngineResource() { return m_engine_resource; }
 
 private:
+	Lumix::IAllocator& m_allocator;
 	Component* m_root;
 	Lumix::Anim::ControllerResource* m_engine_resource;
 	Lumix::Array<Lumix::string> m_animation_slots;

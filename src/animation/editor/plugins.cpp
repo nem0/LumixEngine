@@ -9,13 +9,14 @@
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/blob.h"
-#include "engine/engine.h"
+#include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/fs/os_file.h"
 #include "engine/hash_map.h"
 #include "engine/path.h"
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
+#include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 
 
@@ -23,6 +24,7 @@ using namespace Lumix;
 
 
 static const ComponentType ANIMABLE_HASH = PropertyRegister::getComponentType("animable");
+static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("anim_controller");
 static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
@@ -47,8 +49,14 @@ struct AnimationEditor : public StudioApp::IPlugin
 		m_action->is_selected.bind<AnimationEditor, &AnimationEditor::isOpened>(this);
 
 		auto* manager = m_app.getWorldEditor()->getEngine().getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
+		m_resource = LUMIX_NEW(allocator, ControllerResource)(*manager, allocator);
+	}
 
-		m_resource = LUMIX_NEW(allocator, ControllerResource)(allocator, *manager);
+
+	~AnimationEditor()
+	{
+		IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+		LUMIX_DELETE(allocator, m_resource);
 	}
 
 
@@ -66,7 +74,7 @@ struct AnimationEditor : public StudioApp::IPlugin
 		IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
 		auto* engine_cmp = LUMIX_NEW(allocator, Anim::SimpleAnimationNode)(allocator);
 		auto* engine_container = (Anim::Container*)container->engine_cmp;
-		auto* ed = LUMIX_NEW(allocator, SimpleAnimationNode)(engine_cmp, container, allocator);
+		auto* ed = LUMIX_NEW(allocator, SimpleAnimationNode)(engine_cmp, container, *m_resource);
 		ed->pos = ImVec2(0, 0);
 		ed->size = ImVec2(100, 30);
 		if (engine_container->children.empty())
@@ -122,6 +130,48 @@ struct AnimationEditor : public StudioApp::IPlugin
 		file.close();
 	}
 
+	
+	void showInputs() const
+	{
+		if (ImGui::BeginDock("Animation inputs"))
+		{
+			const auto& selected_entities = m_app.getWorldEditor()->getSelectedEntities();
+			auto* scene = (AnimationScene*)m_app.getWorldEditor()->getUniverse()->getScene(ANIMABLE_HASH);
+			ComponentHandle cmp = selected_entities.empty() ? INVALID_COMPONENT : scene->getComponent(selected_entities[0], CONTROLLER_TYPE);
+			uint8* input_data = isValid(cmp) ? scene->getControllerInput(cmp) : nullptr;
+			Anim::InputDecl& input_decl = m_resource->getEngineResource()->getInputDecl();
+
+			for (int i = 0; i < input_decl.inputs_count; ++i)
+			{
+				auto& input = input_decl.inputs[i];
+				StaticString<20> tmp("###", i);
+				ImGui::PushItemWidth(100);
+				ImGui::InputText(tmp, input.name, lengthOf(input.name));
+				ImGui::SameLine();
+				ImGui::Combo(tmp, (int*)&input.type, "float\0int\0bool\0");
+				if (input_data)
+				{
+					ImGui::SameLine();
+					switch (input.type)
+					{
+					case Anim::InputDecl::FLOAT: ImGui::DragFloat("", (float*)(input_data + input.offset));
+					}
+				}
+				ImGui::PopItemWidth();
+			}
+
+			if (ImGui::Button("Add"))
+			{
+				auto& input = input_decl.inputs[input_decl.inputs_count];
+				input.name[0] = 0;
+				input.type = Anim::InputDecl::BOOL;
+				input.offset = input_decl.getSize();
+				++input_decl.inputs_count;
+			}
+		}
+		ImGui::EndDock();
+	}
+
 
 	void onWindowGUI() override
 	{
@@ -142,11 +192,55 @@ struct AnimationEditor : public StudioApp::IPlugin
 		}
 		ImGui::EndDock();
 
-		/*if (ImGui::BeginDock("Animation set"))
+		showInputs();
+
+		if (ImGui::BeginDock("Animation set"))
 		{
-			//m_resource->
+			auto& engine_anim_set = m_resource->getEngineResource()->getAnimSet();
+			auto& slots = m_resource->getAnimationSlots();
+			int i = 0;
+			ImGui::Columns(2);
+			for (auto& slot : slots)
+			{
+				char slot_cstr[64];
+				copyString(slot_cstr, slot.c_str());
+				StaticString<10> label("###", i);
+				++i;
+
+				auto iter = engine_anim_set.find(crc32(slot.c_str()));
+				ASSERT(iter.isValid());
+				Animation* anim = iter.value();
+				ImGui::PushItemWidth(-1);
+				if (ImGui::InputText(label, slot_cstr, lengthOf(slot_cstr)))
+				{
+					engine_anim_set.erase(iter);
+					slot = slot_cstr;
+					engine_anim_set.insert(crc32(slot_cstr), anim);
+				}
+				ImGui::PopItemWidth();
+				ImGui::NextColumn();
+				char tmp[MAX_PATH_LENGTH];
+				copyString(tmp, anim ? anim->getPath().c_str() : "");
+				if (m_app.getAssetBrowser()->resourceInput("", StaticString<10>("###ri", i), tmp, lengthOf(tmp), ANIMATION_TYPE))
+				{
+					if (anim) anim->getResourceManager().unload(*anim);
+					auto* manager = m_app.getWorldEditor()->getEngine().getResourceManager().get(ANIMATION_TYPE);
+					anim = (Animation*)manager->load(Path(tmp));
+					engine_anim_set[crc32(slot_cstr)] = anim;
+				}
+				ImGui::NextColumn();
+			}
+			ImGui::Columns();
+			if (ImGui::Button("Add"))
+			{
+				if (!engine_anim_set.find(0).isValid())
+				{
+					slots.emplace("", m_app.getWorldEditor()->getAllocator());
+					engine_anim_set.insert(0, nullptr);
+				}
+			}
 		}
-		ImGui::EndDock();*/
+		ImGui::EndDock();
 	}
 
 

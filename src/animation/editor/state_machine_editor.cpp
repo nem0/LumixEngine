@@ -82,7 +82,7 @@ void Node::makeNewLineProcess(const ImVec2& canvas_screen_pos, ImDrawList* draw,
 			engine_edge->to = (Anim::Node*)target->engine_cmp;
 			engine_parent->children.push(engine_edge);
 
-			auto* edge = LUMIX_NEW(m_allocator, Edge)(engine_edge, m_parent);
+			auto* edge = LUMIX_NEW(m_allocator, Edge)(engine_edge, m_parent, m_controller);
 			parent->m_editor_cmps.push(edge);
 		}
 
@@ -91,11 +91,12 @@ void Node::makeNewLineProcess(const ImVec2& canvas_screen_pos, ImDrawList* draw,
 }
 
 
-Node::Node(Anim::Component* engine_cmp, Container* parent, IAllocator& allocator)
+Node::Node(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
 	: Component(engine_cmp)
-	, edges(allocator)
-	, m_allocator(allocator)
+	, edges(controller.getAllocator())
+	, m_allocator(controller.getAllocator())
 	, m_parent(parent)
+	, m_controller(controller)
 {
 	m_name[0] = 0;
 }
@@ -167,9 +168,9 @@ bool Node::draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, Container* pa
 }
 
 
-Container::Container(Anim::Component* engine_cmp, Container* parent, IAllocator& allocator)
-	: Node(engine_cmp, parent, allocator)
-	, m_editor_cmps(allocator)
+Container::Container(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
+	: Node(engine_cmp, parent, controller)
+	, m_editor_cmps(controller.getAllocator())
 {
 }
 
@@ -194,9 +195,10 @@ Component* Container::getChildByUID(int uid)
 }
 
 
-Edge::Edge(Anim::Edge* engine_cmp, Container* parent)
+Edge::Edge(Anim::Edge* engine_cmp, Container* parent, ControllerResource& controller)
 	: Component(engine_cmp)
 	, m_parent(parent)
+	, m_controller(controller)
 {
 	m_from = (Node*)parent->getChildByUID(engine_cmp->from->uid);
 	m_to = (Node*)parent->getChildByUID(engine_cmp->to->uid);
@@ -206,10 +208,11 @@ Edge::Edge(Anim::Edge* engine_cmp, Container* parent)
 
 void Edge::onGUI()
 {
+	auto* engine_edge = (Anim::Edge*)engine_cmp;
+	ImGui::DragFloat("Length", &engine_edge->length);
 	if (ImGui::InputText("Expression", m_expression, lengthOf(m_expression)))
 	{
-		//auto* engine_edge = (Anim::Edge*)engine_cmp;
-		//engine_edge->condition.compile(m_expression);
+		engine_edge->condition.compile(m_expression, m_controller.getEngineResource()->getInputDecl());
 	}
 }
 
@@ -263,8 +266,8 @@ bool Edge::hitTest(const ImVec2& on_canvas_pos) const
 }
 
 
-SimpleAnimationNode::SimpleAnimationNode(Anim::Component* engine_cmp, Container* parent, IAllocator& allocator)
-	: Node(engine_cmp, parent, allocator)
+SimpleAnimationNode::SimpleAnimationNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
+	: Node(engine_cmp, parent, controller)
 {
 	animation[0] = 0;
 }
@@ -273,16 +276,27 @@ SimpleAnimationNode::SimpleAnimationNode(Anim::Component* engine_cmp, Container*
 void SimpleAnimationNode::onGUI()
 {
 	Node::onGUI();
+	
 	auto* node = (Anim::SimpleAnimationNode*)engine_cmp;
-	if (ImGui::InputText("Animation", animation, lengthOf(animation)))
+	auto getter = [](void* data, int idx, const char** out) -> bool {
+		auto* node = (SimpleAnimationNode*)data;
+		auto& slots = node->m_controller.getAnimationSlots();
+		*out = slots[idx].c_str();
+		return true;
+	};
+	
+	auto& slots = m_controller.getAnimationSlots();
+	int current = 0;
+	for (current = 0; current < slots.size() && crc32(slots[current].c_str()) != node->animation_hash ; ++current);
+	if (ImGui::Combo("Animation", &current, getter, this, slots.size()))
 	{
-		node->animation_hash = crc32(animation);
+		node->animation_hash = crc32(slots[current].c_str());
 	}
 }
 
 
-StateMachine::StateMachine(Anim::Component* engine_cmp, Container* parent, IAllocator& allocator)
-	: Container(engine_cmp, parent, allocator)
+StateMachine::StateMachine(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
+	: Container(engine_cmp, parent, controller)
 	, m_selected_component(nullptr)
 {
 }
@@ -294,22 +308,23 @@ void StateMachine::onGUI()
 }
 
 
-static Component* createComponent(Anim::Component* engine_cmp, Container* parent, IAllocator& allocator)
+static Component* createComponent(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
 {
+	IAllocator& allocator = controller.getAllocator();
 	switch (engine_cmp->type)
 	{
-	case Anim::Component::EDGE: return LUMIX_NEW(allocator, Edge)((Anim::Edge*)engine_cmp, parent);
-	case Anim::Component::SIMPLE_ANIMATION:
-		return LUMIX_NEW(allocator, SimpleAnimationNode)(engine_cmp, parent, allocator);
-	case Anim::Component::STATE_MACHINE: return LUMIX_NEW(allocator, StateMachine)(engine_cmp, parent, allocator);
-	default: ASSERT(false); return nullptr;
+		case Anim::Component::EDGE: return LUMIX_NEW(allocator, Edge)((Anim::Edge*)engine_cmp, parent, controller);
+		case Anim::Component::SIMPLE_ANIMATION:
+			return LUMIX_NEW(allocator, SimpleAnimationNode)(engine_cmp, parent, controller);
+		case Anim::Component::STATE_MACHINE: return LUMIX_NEW(allocator, StateMachine)(engine_cmp, parent, controller);
+		default: ASSERT(false); return nullptr;
 	}
 }
 
 
 void StateMachine::deserialize(InputBlob& blob)
 {
-	m_editor_cmps.clear(); // TODO mem leak
+	ASSERT(m_editor_cmps.empty());
 	int size;
 	blob.read(size);
 	for (int i = 0; i < size; ++i)
@@ -317,7 +332,7 @@ void StateMachine::deserialize(InputBlob& blob)
 		int uid;
 		blob.read(uid);
 		auto* engine_sm = (Anim::StateMachine*)engine_cmp;
-		Component* cmp = createComponent(engine_sm->getChildByUID(uid), this, m_allocator);
+		Component* cmp = createComponent(engine_sm->getChildByUID(uid), this, m_controller);
 		cmp->deserialize(blob);
 		m_editor_cmps.push(cmp);
 	}
@@ -347,13 +362,14 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 }
 
 
-ControllerResource::ControllerResource(IAllocator& allocator, ResourceManagerBase& manager)
+ControllerResource::ControllerResource(ResourceManagerBase& manager, IAllocator& allocator)
 	: m_animation_slots(allocator)
+	, m_allocator(allocator)
 {
 	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), manager, allocator);
 	auto* engine_root = LUMIX_NEW(allocator, Anim::StateMachine)(allocator);
 	m_engine_resource->setRoot(engine_root);
-	m_root = LUMIX_NEW(allocator, StateMachine)(engine_root, nullptr, allocator);
+	m_root = LUMIX_NEW(allocator, StateMachine)(engine_root, nullptr, *this);
 }
 
 
@@ -361,6 +377,11 @@ void ControllerResource::serialize(OutputBlob& blob)
 {
 	m_engine_resource->serialize(blob);
 	m_root->serialize(blob);
+	blob.write(m_animation_slots.size());
+	for (auto& slot : m_animation_slots)
+	{
+		blob.writeString(slot.c_str());
+	}
 }
 
 
@@ -368,10 +389,22 @@ void ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 {
 	auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
 	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), *manager, allocator);
+	m_engine_resource->create();
 	m_engine_resource->deserialize(blob);
 
-	m_root = createComponent(m_engine_resource->getRoot(), nullptr, allocator);
+	m_root = createComponent(m_engine_resource->getRoot(), nullptr, *this);
 	m_root->deserialize(blob);
+
+	int count;
+	blob.read(count);
+	m_animation_slots.clear();
+	for (int i = 0; i < count; ++i)
+	{
+		auto& slot = m_animation_slots.emplace(allocator);
+		char tmp[64];
+		blob.readString(tmp, lengthOf(tmp));
+		slot = tmp;
+	}
 }
 
 
