@@ -207,7 +207,7 @@ void StateMachineInstance::fillPose(Engine& engine, Pose& pose, Model& model, fl
 
 void StateMachineInstance::enter(RunningContext& rc, ComponentInstance* from)
 {
-	current = source.getDefaultState()->createInstance(*rc.allocator);
+	current = source.m_default_state->createInstance(*rc.allocator);
 	current->enter(rc, nullptr);
 }
 
@@ -221,13 +221,16 @@ ComponentInstance* StateMachine::createInstance(IAllocator& allocator)
 void StateMachine::serialize(OutputBlob& blob)
 {
 	Container::serialize(blob);
+	blob.write(m_default_state ? m_default_state->uid : -1);
 }
 
 
 void StateMachine::deserialize(InputBlob& blob, Container* parent)
 {
 	Container::deserialize(blob, parent);
-	m_default_state = children.empty() ? nullptr : (Node*)children[0];
+	int uid;
+	blob.read(uid);
+	m_default_state = (Node*)getChildByUID(uid);
 }
 
 

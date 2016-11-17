@@ -171,6 +171,63 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
+	int getControllerInputIndex(ComponentHandle cmp, const char* name) const
+	{
+		const Controller& controller = m_controllers[{cmp.index}];
+		Anim::InputDecl& decl = controller.resource->getInputDecl();
+		for (int i = 0; i < decl.inputs_count; ++i)
+		{
+			if (equalStrings(decl.inputs[i].name, name)) return i;
+		}
+		return -1;
+	}
+
+
+	void setControllerFloatInput(ComponentHandle cmp, int input_idx, float value)
+	{
+		Controller& controller = m_controllers.get({ cmp.index });
+		Anim::InputDecl& decl = controller.resource->getInputDecl();
+		if (decl.inputs[input_idx].type == Anim::InputDecl::FLOAT)
+		{
+			*(float*)&controller.input[decl.inputs[input_idx].offset] = value;
+		}
+		else
+		{
+			g_log_warning.log("Animation") << "Trying to set float to " << decl.inputs[input_idx].name;
+		}
+	}
+
+
+	void setControllerIntInput(ComponentHandle cmp, int input_idx, int value)
+	{
+		Controller& controller = m_controllers.get({ cmp.index });
+		Anim::InputDecl& decl = controller.resource->getInputDecl();
+		if (decl.inputs[input_idx].type == Anim::InputDecl::INT)
+		{
+			*(int*)&controller.input[decl.inputs[input_idx].offset] = value;
+		}
+		else
+		{
+			g_log_warning.log("Animation") << "Trying to set float to " << decl.inputs[input_idx].name;
+		}
+	}
+
+
+	void setControllerBoolInput(ComponentHandle cmp, int input_idx, bool value)
+	{
+		Controller& controller = m_controllers.get({ cmp.index });
+		Anim::InputDecl& decl = controller.resource->getInputDecl();
+		if (decl.inputs[input_idx].type == Anim::InputDecl::BOOL)
+		{
+			*(bool*)&controller.input[decl.inputs[input_idx].offset] = value;
+		}
+		else
+		{
+			g_log_warning.log("Animation") << "Trying to set float to " << decl.inputs[input_idx].name;
+		}
+	}
+
+
 	float getAnimationLength(int animation_idx)
 	{
 		auto* animation = static_cast<Animation*>(animation_idx > 0 ? m_engine.getLuaResource(animation_idx) : nullptr);
@@ -219,16 +276,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	{
 		for (auto& controller : m_controllers)
 		{
-			controller.root = controller.resource->createInstance(m_anim_system.m_allocator);
-			controller.input.resize(controller.resource->getInputDecl().getSize());
-			setMemory(&controller.input[0], 0, controller.input.size());
-			Anim::RunningContext rc;
-			rc.time_delta = 0;
-			rc.allocator = &m_anim_system.m_allocator;
-			rc.input = &controller.input[0];
-			rc.current = nullptr;
-			rc.anim_set = &controller.resource->getAnimSet();
-			controller.root->enter(rc, nullptr);
+			initControllerRuntime(controller);
 		}
 		m_is_game_running = true;
 	}
@@ -500,8 +548,42 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
+	void initControllerRuntime(Controller& controller)
+	{
+		controller.root = controller.resource->createInstance(m_anim_system.m_allocator);
+		controller.input.resize(controller.resource->getInputDecl().getSize());
+		setMemory(&controller.input[0], 0, controller.input.size());
+		Anim::RunningContext rc;
+		rc.time_delta = 0;
+		rc.allocator = &m_anim_system.m_allocator;
+		rc.input = &controller.input[0];
+		rc.current = nullptr;
+		rc.anim_set = &controller.resource->getAnimSet();
+		controller.root->enter(rc, nullptr);
+	}
+
+
 	void updateController(Controller& controller, float time_delta)
 	{
+		if (!controller.resource->isReady())
+		{
+			LUMIX_DELETE(m_anim_system.m_allocator, controller.root);
+			controller.root = nullptr;
+			return;
+		}
+
+		if (!controller.root)
+		{
+			if (controller.resource->isReady())
+			{
+				initControllerRuntime(controller);
+			}
+			else
+			{
+				return;
+			}
+		}
+
 		Anim::RunningContext rc;
 		rc.time_delta = time_delta;
 		rc.current = controller.root;
@@ -650,6 +732,10 @@ void AnimationSystemImpl::registerLuaAPI()
 
 	REGISTER_FUNCTION(mixAnimation);
 	REGISTER_FUNCTION(getAnimationLength);
+	REGISTER_FUNCTION(setControllerIntInput);
+	REGISTER_FUNCTION(setControllerBoolInput);
+	REGISTER_FUNCTION(setControllerFloatInput);
+	REGISTER_FUNCTION(getControllerInputIndex);
 
 	#undef REGISTER_FUNCTION
 }
