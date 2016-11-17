@@ -5,6 +5,7 @@
 #include "animation/editor/state_machine_editor.h"
 #include "animation/state_machine.h"
 #include "editor/asset_browser.h"
+#include "editor/platform_interface.h"
 #include "editor/property_grid.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -39,6 +40,7 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 	, m_inputs_opened(false)
 	, m_offset(0, 0)
 {
+	m_path[0] = 0;
 	IAllocator& allocator = app.getWorldEditor()->getAllocator();
 
 	auto* action = LUMIX_NEW(allocator, Action)("Animation Editor", "animation_editor");
@@ -72,13 +74,21 @@ void AnimationEditor::onWindowGUI()
 }
 
 
+void AnimationEditor::saveAs()
+{
+	if (!PlatformInterface::getSaveFilename(m_path, lengthOf(m_path), "Animation controllers\0*.act\0", "")) return;
+	save();
+}
+
+
 void AnimationEditor::save()
 {
+	if (m_path[0] == 0 && !PlatformInterface::getSaveFilename(m_path, lengthOf(m_path), "Animation controllers\0*.act\0", "")) return;
 	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
 	OutputBlob blob(allocator);
 	m_resource->serialize(blob);
 	FS::OsFile file;
-	file.open("animations/test.act", FS::Mode::CREATE_AND_WRITE, allocator);
+	file.open(m_path, FS::Mode::CREATE_AND_WRITE, allocator);
 	file.write(blob.getData(), blob.getPos());
 	file.close();
 }
@@ -101,9 +111,10 @@ void AnimationEditor::drawGraph()
 
 void AnimationEditor::load()
 {
+	if (!PlatformInterface::getOpenFilename(m_path, lengthOf(m_path), "Animation controllers\0*.act\0", "")) return;
 	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
 	FS::OsFile file;
-	file.open("animations/test.act", FS::Mode::OPEN_AND_READ, allocator);
+	file.open(m_path, FS::Mode::OPEN_AND_READ, allocator);
 	Array<uint8> data(allocator);
 	data.resize((int)file.size());
 	file.read(&data[0], data.size());
@@ -123,6 +134,7 @@ void AnimationEditor::showEditor()
 			if (ImGui::BeginMenu("File"))
 			{
 				if (ImGui::MenuItem("Save")) save();
+				if (ImGui::MenuItem("Save As")) saveAs();
 				if (ImGui::MenuItem("Load")) load();
 				ImGui::EndMenu();
 			}
@@ -192,9 +204,50 @@ void AnimationEditor::showInputs()
 			}
 		}
 
+		showConstants();
 		showAnimSet();
 	}
 	ImGui::EndDock();
+}
+
+
+void AnimationEditor::showConstants()
+{
+	if (!ImGui::CollapsingHeader("Constants")) return;
+
+	Anim::InputDecl& input_decl = m_resource->getEngineResource()->getInputDecl();
+	for (int i = 0; i < input_decl.constants_count; ++i)
+	{
+		auto& constant = input_decl.constants[i];
+		StaticString<20> tmp("###", i);
+		ImGui::PushItemWidth(100);
+		ImGui::InputText(tmp, constant.name, lengthOf(constant.name));
+		ImGui::SameLine();
+		tmp << "*";
+		if (ImGui::Combo(tmp, (int*)&constant.type, "float\0int\0bool\0"))
+		{
+			input_decl.recalculateOffsets();
+		}
+		ImGui::SameLine();
+		tmp << "*";
+		switch (constant.type)
+		{
+			case Anim::InputDecl::FLOAT: ImGui::DragFloat(tmp, &constant.f_value); break;
+			case Anim::InputDecl::BOOL: ImGui::Checkbox(tmp, &constant.b_value); break;
+			case Anim::InputDecl::INT: ImGui::InputInt(tmp, &constant.i_value); break;
+			default: ASSERT(false); break;
+		}
+		ImGui::PopItemWidth();
+	}
+
+	if (ImGui::Button("Add"))
+	{
+		auto& constant = input_decl.constants[input_decl.constants_count];
+		constant.name[0] = 0;
+		constant.type = Anim::InputDecl::BOOL;
+		constant.b_value = true;
+		++input_decl.constants_count;
+	}
 }
 
 

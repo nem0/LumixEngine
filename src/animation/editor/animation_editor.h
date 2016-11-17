@@ -28,10 +28,12 @@ public:
 
 private:
 	void save();
+	void saveAs();
 	void drawGraph();
 	void load();
 	void showEditor();
 	void showInputs();
+	void showConstants();
 	void showAnimSet();
 
 private:
@@ -41,6 +43,7 @@ private:
 	ImVec2 m_offset;
 	ControllerResource* m_resource;
 	Container* m_container;
+	char m_path[Lumix::MAX_PATH_LENGTH];
 };
 
 
