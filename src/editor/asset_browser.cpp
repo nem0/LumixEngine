@@ -376,7 +376,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	pos.x += text_width;
 	ImGui::BeginGroup();
 	ImGui::AlignFirstTextHeightToWidgets();
-	ImGui::PushTextWrapPos(text_width);
+	ImGui::PushTextWrapPos(pos.x);
 	ImGui::Text("%s", c);
 	ImGui::PopTextWrapPos();
 	ImGui::SameLine();
