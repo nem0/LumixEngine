@@ -26,9 +26,14 @@ struct Edge;
 
 struct Component
 {
-	Component(Container* parent, Lumix::Anim::Component* _engine_cmp) : engine_cmp(_engine_cmp), m_parent(parent) {}
+	Component(Container* parent, Lumix::Anim::Component* _engine_cmp, ControllerResource& controller)
+		: engine_cmp(_engine_cmp)
+		, m_parent(parent)
+		, m_controller(controller)
+	{
+	}
 
-	virtual ~Component() {}
+	virtual ~Component();
 	virtual bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) = 0;
 	virtual void onGUI() {}
 	virtual void serialize(Lumix::OutputBlob& blob) = 0;
@@ -44,6 +49,7 @@ struct Component
 
 protected:
 	Container* m_parent;
+	ControllerResource& m_controller;
 };
 
 
@@ -51,6 +57,7 @@ class Node : public Component
 {
 public:
 	Node(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
+	~Node();
 
 	bool isNode() const override { return true; }
 	bool hitTest(const ImVec2& on_canvas_pos) const override;
@@ -59,15 +66,19 @@ public:
 	void deserialize(Lumix::InputBlob& blob) override;
 	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override;
 	const char* getName() { return m_name; }
+	void addEdge(Edge* edge) { edges.push(edge); }
+	void addInEdge(Edge* edge) { in_edges.push(edge); }
+	void removeEdge(Edge* edge) { edges.eraseItemFast(edge); }
+	void removeInEdge(Edge* edge) { in_edges.eraseItemFast(edge); }
 
 public:
 	ImVec2 pos;
 	ImVec2 size;
 
 protected:
-	ControllerResource& m_controller;
 	char m_name[64];
 	Lumix::Array<Edge*> edges;
+	Lumix::Array<Edge*> in_edges;
 	Lumix::IAllocator& m_allocator;
 };
 
@@ -93,6 +104,7 @@ struct Edge : public Component
 {
 public:
 	Edge(Lumix::Anim::Edge* engine_cmp, Container* parent, ControllerResource& controller);
+	~Edge();
 
 	bool isNode() const override { return false; }
 
@@ -105,7 +117,6 @@ public:
 	const char* getExpression() const { return m_expression; }
 
 private:
-	ControllerResource& m_controller;
 	Node* m_from;
 	Node* m_to;
 	char m_expression[128];
@@ -136,7 +147,16 @@ private:
 	void createState(Lumix::Anim::Component::Type type);
 
 private:
-	bool m_is_making_line = false;
+	enum MouseStatus
+	{
+		NONE,
+		DOWN_LEFT,
+		DOWN_RIGHT,
+		DRAG_NODE,
+		NEW_EDGE
+	} m_mouse_status;
+	Node* m_drag_source;
+	Component* m_context_cmp;
 };
 
 
