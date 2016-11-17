@@ -218,7 +218,7 @@ void Edge::onGUI()
 {
 	auto* engine_edge = (Anim::Edge*)engine_cmp;
 	ImGui::DragFloat("Length", &engine_edge->length);
-	if (ImGui::InputText("Expression", m_expression, lengthOf(m_expression)))
+	if (ImGui::InputText("Expression", m_expression, lengthOf(m_expression), ImGuiInputTextFlags_EnterReturnsTrue))
 	{
 		engine_edge->condition.compile(m_expression, m_controller.getEngineResource()->getInputDecl());
 	}
