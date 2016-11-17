@@ -144,7 +144,7 @@ public:
 	void onGUI() override;
 
 private:
-	void createState(Lumix::Anim::Component::Type type);
+	void createState(Lumix::Anim::Component::Type type, const ImVec2& pos);
 
 private:
 	enum MouseStatus

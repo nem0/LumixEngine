@@ -178,25 +178,22 @@ void AnimationEditor::inputsGUI()
 			{
 				ImGui::PushID(i);
 				auto& input = input_decl.inputs[i];
-				StaticString<20> tmp("###", i);
 				ImGui::PushItemWidth(100);
-				ImGui::InputText(tmp, input.name, lengthOf(input.name));
+				ImGui::InputText("##name", input.name, lengthOf(input.name));
 				ImGui::SameLine();
-				tmp << "*";
-				if (ImGui::Combo(tmp, (int*)&input.type, "float\0int\0bool\0"))
+				if (ImGui::Combo("##type", (int*)&input.type, "float\0int\0bool\0"))
 				{
 					input_decl.recalculateOffsets();
 				}
 				if (input_data)
 				{
 					ImGui::SameLine();
-					tmp << "*";
 					switch (input.type)
 					{
-					case Anim::InputDecl::FLOAT: ImGui::DragFloat(tmp, (float*)(input_data + input.offset)); break;
-					case Anim::InputDecl::BOOL: ImGui::Checkbox(tmp, (bool*)(input_data + input.offset)); break;
-					case Anim::InputDecl::INT: ImGui::InputInt(tmp, (int*)(input_data + input.offset)); break;
-					default: ASSERT(false); break;
+						case Anim::InputDecl::FLOAT: ImGui::DragFloat("##value", (float*)(input_data + input.offset)); break;
+						case Anim::InputDecl::BOOL: ImGui::Checkbox("##value", (bool*)(input_data + input.offset)); break;
+						case Anim::InputDecl::INT: ImGui::InputInt("##value", (int*)(input_data + input.offset)); break;
+						default: ASSERT(false); break;
 					}
 				}
 				ImGui::PopItemWidth();
