@@ -900,6 +900,7 @@ struct ImportTask LUMIX_FINAL : public MT::Task
 		flags |= m_dialog.m_model.gen_smooth_normal ? aiProcess_GenSmoothNormals : aiProcess_GenNormals;
 		flags |= m_dialog.m_model.optimize_mesh_on_import ? aiProcess_OptimizeMeshes : 0;
 
+		importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
 		const aiScene* scene = importer.ReadFile(m_dialog.m_source, flags);
 		if (!scene)
 		{
@@ -1238,6 +1239,83 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 	}
 
 
+	void collapse(const aiNodeAnim* pos_channel,
+		const aiAnimation* animation,
+		const aiScene* scene,
+		float anim_length,
+		uint32 fps,
+		FS::OsFile& file)
+	{
+		char rotation_name[128];
+		char original_name[128];
+		const char* end = strstr(pos_channel->mNodeName.C_Str(), "_$AssimpFbx$_Translation");
+		const char* src = pos_channel->mNodeName.C_Str();
+		copyString(original_name, Math::minimum(lengthOf(original_name), int(end - src + 1)), src);
+		copyString(rotation_name, original_name);
+		catString(rotation_name, "_$AssimpFbx$_Rotation");
+		const aiNodeAnim* rot_channel;
+		for (unsigned int i = 0; i < animation->mNumChannels; ++i)
+		{
+			if (equalStrings(animation->mChannels[i]->mNodeName.C_Str(), rotation_name))
+			{
+				rot_channel = animation->mChannels[i];
+				break;
+			}
+		}
+
+		if (!rot_channel)
+		{
+			g_log_error.log("Editor") << "Rotation channel not found.";
+			return;
+		}
+
+		Array<aiVectorKey> positions(m_dialog.m_editor.getAllocator());
+		Array<aiQuatKey> rotations(m_dialog.m_editor.getAllocator());
+		
+		uint32_t hash = crc32(original_name);
+		file.write((const char*)&hash, sizeof(hash));
+		auto global_transform = getGlobalTransform(getNode(original_name, scene->mRootNode)->mParent);
+		aiVector3t<float> scale;
+		aiVector3t<float> dummy_pos;
+		aiQuaterniont<float> dummy_rot;
+		global_transform.Decompose(scale, dummy_rot, dummy_pos);
+
+		compressPositions(positions, pos_channel, anim_length, m_dialog.m_model.position_error / 100000.0f);
+		int count = positions.size();
+		file.write(&count, sizeof(count));
+		for (const auto& pos : positions)
+		{
+			uint16 frame = uint16(pos.mTime * m_dialog.m_model.time_scale * fps / animation->mTicksPerSecond);
+			file.write(&frame, sizeof(frame));
+		}
+		for (const auto& pos : positions)
+		{
+			Vec3 out_pos(pos.mValue.x, pos.mValue.y, pos.mValue.z);
+			out_pos = out_pos * m_dialog.m_model.mesh_scale;
+			out_pos.x *= scale.x;
+			out_pos.y *= scale.y;
+			out_pos.z *= scale.z;
+			out_pos = fixOrientation(out_pos);
+			file.write(&out_pos, sizeof(out_pos));
+		}
+
+		compressRotations(rotations, rot_channel, anim_length, m_dialog.m_model.rotation_error / 100000.0f);
+		count = rotations.size();
+		file.write(&count, sizeof(count));
+		for (const auto& rot : rotations)
+		{
+			uint16 frame = uint16(rot.mTime * m_dialog.m_model.time_scale * fps / animation->mTicksPerSecond);
+			file.write(&frame, sizeof(frame));
+		}
+		for (const auto& rot : rotations)
+		{
+			Quat out_rot(rot.mValue.x, rot.mValue.y, rot.mValue.z, rot.mValue.w);
+			out_rot = fixOrientation(out_rot);
+			file.write(&out_rot, sizeof(out_rot));
+		}
+	}
+
+
 	bool saveLumixAnimations()
 	{
 		m_dialog.setImportMessage("Importing animations...", 0);
@@ -1278,7 +1356,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			header.version = 2;
 
 			file.write(&header, sizeof(header));
-			float anim_length = getLength(animation);
+			float anim_length = float(getLength(animation) / animation->mTicksPerSecond);
 			int frame_count = Math::maximum(int(anim_length * m_dialog.m_model.time_scale * header.fps), 1);
 			file.write(&frame_count, sizeof(frame_count));
 			int bone_count = (int)animation->mNumChannels;
@@ -1289,6 +1367,15 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
 			{
 				const aiNodeAnim* channel = animation->mChannels[channel_idx];
+				if (strstr(channel->mNodeName.C_Str(), "_$AssimpFbx$_Translation") != 0)
+				{
+					collapse(channel, animation, scene, anim_length, header.fps, file);
+					continue;
+				}
+				else if (strstr(channel->mNodeName.C_Str(), "_$AssimpFbx$") != 0)
+				{
+					continue;
+				}
 				uint32_t hash = crc32(channel->mNodeName.C_Str());
 				file.write((const char*)&hash, sizeof(hash));
 				auto global_transform = getGlobalTransform(getNode(channel->mNodeName, scene->mRootNode)->mParent);
@@ -2003,6 +2090,20 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 	aiNode* getNode(const aiString& node_name, aiNode* node) const
 	{
 		if (node->mName == node_name) return node;
+
+		for (unsigned int i = 0; i < node->mNumChildren; ++i)
+		{
+			auto* x = getNode(node_name, node->mChildren[i]);
+			if (x) return x;
+		}
+
+		return nullptr;
+	}
+
+
+	aiNode* getNode(const char* node_name, aiNode* node) const
+	{
+		if (equalStrings(node->mName.C_Str(), node_name)) return node;
 
 		for (unsigned int i = 0; i < node->mNumChildren; ++i)
 		{
