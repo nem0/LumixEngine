@@ -25,6 +25,7 @@ namespace Instruction
 {
 	enum Type : uint8
 	{
+		PUSH_BOOL,
 		PUSH_FLOAT,
 		PUSH_INT,
 		ADD_FLOAT,
@@ -302,6 +303,7 @@ ExpressionVM::ReturnValue ExpressionVM::evaluate(const uint8* code, RunningConte
 			case Instruction::RET_BOOL: return pop<bool>();
 			case Instruction::ADD_FLOAT: push<float>(pop<float>() + pop<float>()); break;
 			case Instruction::SUB_FLOAT: push<float>(-pop<float>() + pop<float>()); break;
+			case Instruction::PUSH_BOOL: cp = pushStackConst<bool>(cp); break;
 			case Instruction::PUSH_FLOAT: cp = pushStackConst<float>(cp); break;
 			case Instruction::PUSH_INT: cp = pushStackConst<int>(cp); break;
 			case Instruction::FLOAT_LT: push<bool>(pop<float>() > pop<float>()); break;
@@ -532,9 +534,21 @@ int ExpressionCompiler::compile(const char* src,
 	int max_size,
 	InputDecl& decl)
 {
+	ASSERT(max_size >= 2 + sizeof(bool));
+	uint8* out = byte_code;
+	if (token_count == 0)
+	{
+		*out = Instruction::PUSH_BOOL;
+		++out;
+		*(bool*)out = true;
+		out += sizeof(bool);
+		*out = Instruction::RET_BOOL;
+		++out;
+		return int(out - byte_code);
+	}
+
 	Types type_stack[50];
 	int type_stack_idx = 0;
-	uint8* out = byte_code;
 	for (int i = 0; i < token_count; ++i)
 	{
 		auto& token = tokens[i];
@@ -669,10 +683,6 @@ int ExpressionCompiler::compile(const char* src,
 						}
 						else
 						{
-							*out = Instruction::PUSH_FLOAT;
-							type_stack[type_stack_idx] = Types::FLOAT;
-							++type_stack_idx;
-							++out;
 							float float_const_value;
 							if (!getFloatConstValue(src, token, float_const_value))
 							{
@@ -683,9 +693,17 @@ int ExpressionCompiler::compile(const char* src,
 									m_compile_time_offset = token.offset;
 									return -1;
 								}
+								*out = Instruction::PUSH_BOOL;
+								type_stack[type_stack_idx] = Types::BOOL;
+								++type_stack_idx;
+								++out;
 								*(bool*)out = bool_const_value;
 								out += sizeof(bool);
 							}
+							*out = Instruction::PUSH_FLOAT;
+							type_stack[type_stack_idx] = Types::FLOAT;
+							++type_stack_idx;
+							++out;
 							*(float*)out = float_const_value;
 							out += sizeof(float);
 						}
