@@ -164,19 +164,35 @@ private:
 	}
 
 
-	static bool getConstValue(const char* src, const ExpressionCompiler::Token& token, float& value)
+	static bool getFloatConstValue(const char* src, const ExpressionCompiler::Token& token, float& value)
 	{
 		static const struct { const char* name; float value; } CONSTS[] =
 		{
-			{"PI", 3.14159265358979323846f}
+			{ "PI", 3.14159265358979323846f }
 		};
-		for(const auto& i : CONSTS)
+		for (const auto& i : CONSTS)
 		{
-			if(strncmp(i.name, src + token.offset, token.size) == 0)
+			if (stringLength(i.name) == token.size && equalStrings(i.name, src + token.offset) == 0)
 			{
 				value = i.value;
 				return true;
 			}
+		}
+		return false;
+	}
+
+
+	static bool getBoolConstValue(const char* src, const ExpressionCompiler::Token& token, bool& value)
+	{
+		if (token.size == 5 && strncmp("false", src + token.offset, token.size) == 0)
+		{
+			value = false;
+			return true;
+		}
+		if (token.size == 4 && strncmp("true", src + token.offset, token.size) == 0)
+		{
+			value = true;
+			return true;
 		}
 		return false;
 	}
@@ -657,14 +673,20 @@ int ExpressionCompiler::compile(const char* src,
 							type_stack[type_stack_idx] = Types::FLOAT;
 							++type_stack_idx;
 							++out;
-							float const_value;
-							if (!getConstValue(src, token, const_value))
+							float float_const_value;
+							if (!getFloatConstValue(src, token, float_const_value))
 							{
-								m_compile_time_error = ExpressionCompiler::Error::UNKNOWN_IDENTIFIER;
-								m_compile_time_offset = token.offset;
-								return -1;
+								bool bool_const_value;
+								if (!getBoolConstValue(src, token, bool_const_value))
+								{
+									m_compile_time_error = ExpressionCompiler::Error::UNKNOWN_IDENTIFIER;
+									m_compile_time_offset = token.offset;
+									return -1;
+								}
+								*(bool*)out = bool_const_value;
+								out += sizeof(bool);
 							}
-							*(float*)out = const_value;
+							*(float*)out = float_const_value;
 							out += sizeof(float);
 						}
 					}
