@@ -280,6 +280,7 @@ void AnimationEditor::showAnimSet()
 		ImGui::NextColumn();
 		char tmp[MAX_PATH_LENGTH];
 		copyString(tmp, anim ? anim->getPath().c_str() : "");
+		ImGui::PushItemWidth(ImGui::GetColumnWidth());
 		if (m_app.getAssetBrowser()->resourceInput("", StaticString<10>("###ri", i), tmp, lengthOf(tmp), ANIMATION_TYPE))
 		{
 			if (anim) anim->getResourceManager().unload(*anim);
@@ -287,6 +288,7 @@ void AnimationEditor::showAnimSet()
 			anim = (Animation*)manager->load(Path(tmp));
 			engine_anim_set[crc32(slot_cstr)] = anim;
 		}
+		ImGui::PopItemWidth();
 		ImGui::NextColumn();
 	}
 	ImGui::Columns();
