@@ -60,13 +60,33 @@ static ImVec2 getEdgeStartPoint(Node* a, Node* b, bool is_dir)
 }
 
 
+Component::~Component()
+{
+	if (getParent()) getParent()->m_editor_cmps.eraseItem(this);
+	LUMIX_DELETE(m_controller.getEngineResource()->getAllocator(), engine_cmp);
+}
+
+
 Node::Node(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
-	: Component(parent, engine_cmp)
+	: Component(parent, engine_cmp, controller)
 	, edges(controller.getAllocator())
+	, in_edges(controller.getAllocator())
 	, m_allocator(controller.getAllocator())
-	, m_controller(controller)
 {
 	m_name[0] = 0;
+}
+
+
+Node::~Node()
+{
+	while (!edges.empty())
+	{
+		LUMIX_DELETE(m_controller.getAllocator(), edges[0]);
+	}
+	while (!in_edges.empty())
+	{
+		LUMIX_DELETE(m_controller.getAllocator(), in_edges[0]);
+	}
 }
 
 
@@ -112,13 +132,19 @@ bool Node::draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected
 {
 
 	ImGui::PushID(engine_cmp);
+	float text_width = ImGui::CalcTextSize(m_name).x;
+	size.x = Math::maximum(50.0f, text_width + ImGui::GetStyle().FramePadding.x * 2);
+	size.y = ImGui::GetTextLineHeightWithSpacing() * 2;
 	ImVec2 from = canvas_screen_pos + pos;
 	ImVec2 to = from + size;
-	draw->AddRectFilled(from,
-		to,
-		ImGui::ColorConvertFloat4ToU32(selected ? ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] : ImGui::GetStyle().Colors[ImGuiCol_Button]));
+	ImU32 color = ImGui::ColorConvertFloat4ToU32(
+		selected ? ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] : ImGui::GetStyle().Colors[ImGuiCol_Button]);
 
-	ImGui::SetCursorScreenPos(from);
+	draw->AddRectFilled(from, to, color, 5);
+	draw->AddRect(from + ImVec2(1, 1), to + ImVec2(1, 1), ImGui::GetColorU32(ImGuiCol_BorderShadow), 5);
+	draw->AddRect(from, to, ImGui::GetColorU32(ImGuiCol_Border), 5);
+
+	ImGui::SetCursorScreenPos(from + ImVec2((size.x - text_width) * 0.5f, size.y * 0.25f));
 	ImGui::Text("%s", m_name);
 
 	ImGui::SetCursorScreenPos(from);
@@ -157,14 +183,22 @@ Component* Container::getChildByUID(int uid)
 
 
 Edge::Edge(Anim::Edge* engine_cmp, Container* parent, ControllerResource& controller)
-	: Component(parent, engine_cmp)
-	, m_controller(controller)
+	: Component(parent, engine_cmp, controller)
 {
 	m_from = (Node*)parent->getChildByUID(engine_cmp->from->uid);
 	m_to = (Node*)parent->getChildByUID(engine_cmp->to->uid);
 	ASSERT(m_from);
 	ASSERT(m_to);
+	m_from->addEdge(this);
+	m_to->addInEdge(this);
 	m_expression[0] = 0;
+}
+
+
+Edge::~Edge()
+{
+	m_from->removeEdge(this);
+	m_to->removeInEdge(this);
 }
 
 
@@ -356,8 +390,9 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 	if (ImGui::IsWindowHovered())
 	{
 		if (ImGui::IsMouseClicked(0)) m_selected_component = nullptr;
-		if (ImGui::IsMouseReleased(1) && !m_is_making_line)
+		if (ImGui::IsMouseReleased(1) && m_mouse_status == NONE)
 		{
+			m_context_cmp = nullptr;
 			ImGui::OpenPopup("context_menu");
 		}
 	}
@@ -369,40 +404,62 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 			m_selected_component = cmp;
 		}
 
-		if (m_selected_component == cmp && cmp->isNode())
+		if (cmp->isNode() && ImGui::IsItemHovered())
 		{
-			Node* node = (Node*)cmp;
-			
-			if (ImGui::IsMouseReleased(1) && m_is_making_line)
+			if (m_mouse_status == DOWN_RIGHT && ImGui::IsMouseDragging(1))
 			{
-				m_is_making_line = false;
-				Component* target = childrenHitTest(ImGui::GetMousePos() - canvas_screen_pos);
-				if (target && target != m_selected_component && target->isNode())
+				m_mouse_status = NEW_EDGE;
+				m_drag_source = (Node*)cmp;
+			}
+			if (m_mouse_status == DOWN_LEFT && ImGui::IsMouseDragging(0))
+			{
+				m_mouse_status = DRAG_NODE;
+				m_drag_source = (Node*)cmp;
+			}
+
+			if (ImGui::IsMouseClicked(0)) m_mouse_status = DOWN_LEFT;
+			if (ImGui::IsMouseClicked(1)) m_mouse_status = DOWN_RIGHT;
+			
+			if (ImGui::IsMouseReleased(1))
+			{
+				if (m_mouse_status == NEW_EDGE)
 				{
-					auto* engine_parent = ((Anim::Container*)engine_cmp);
-					auto* engine_edge = LUMIX_NEW(m_allocator, Anim::Edge)(m_allocator);
-					engine_edge->uid = m_controller.createUID();
-					engine_edge->from = (Anim::Node*)m_selected_component->engine_cmp;
-					engine_edge->to = (Anim::Node*)target->engine_cmp;
-					engine_parent->children.push(engine_edge);
+					Component* target = childrenHitTest(ImGui::GetMousePos() - canvas_screen_pos);
+					if (target && target != m_drag_source && target->isNode())
+					{
+						auto* engine_parent = ((Anim::Container*)engine_cmp);
+						auto* engine_edge = LUMIX_NEW(m_allocator, Anim::Edge)(m_allocator);
+						engine_edge->uid = m_controller.createUID();
+						engine_edge->from = (Anim::Node*)m_drag_source->engine_cmp;
+						engine_edge->to = (Anim::Node*)target->engine_cmp;
+						engine_parent->children.push(engine_edge);
 
-					auto* edge = LUMIX_NEW(m_allocator, Edge)(engine_edge, this, m_controller);
-					m_editor_cmps.push(edge);
+						auto* edge = LUMIX_NEW(m_allocator, Edge)(engine_edge, this, m_controller);
+						m_editor_cmps.push(edge);
+						m_selected_component = edge;
+					}
 				}
-			}
-			
-			if (ImGui::IsItemHovered() && ImGui::IsMouseDragging(1)) m_is_making_line = true;
-			if (m_is_making_line)
-			{
-				draw->AddLine(canvas_screen_pos + node->pos + node->size * 0.5f, ImGui::GetMousePos(), 0xfff00FFF);
-			}
-
-			if (ImGui::IsMouseDragging())
-			{
-				node->pos = node->pos + ImGui::GetIO().MouseDelta;
+				else
+				{
+					m_context_cmp = cmp;
+					ImGui::OpenPopup("context_menu");
+				}
 			}
 		}
 	}
+
+	if (m_mouse_status == DRAG_NODE)
+	{
+		m_drag_source->pos = m_drag_source->pos + ImGui::GetIO().MouseDelta;
+	}
+
+	if (ImGui::IsMouseReleased(0) || ImGui::IsMouseReleased(1)) m_mouse_status = NONE;
+
+	if (m_mouse_status == NEW_EDGE)
+	{
+		draw->AddLine(canvas_screen_pos + m_drag_source->pos + m_drag_source->size * 0.5f, ImGui::GetMousePos(), 0xfff00FFF);
+	}
+
 	if (ImGui::BeginPopup("context_menu"))
 	{
 		if (ImGui::BeginMenu("Create"))
@@ -410,6 +467,15 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 			if (ImGui::MenuItem("Simple")) createState(Anim::Component::SIMPLE_ANIMATION);
 			if (ImGui::MenuItem("State machine")) createState(Anim::Component::STATE_MACHINE);
 			ImGui::EndMenu();
+		}
+		if (m_context_cmp)
+		{
+			if (ImGui::MenuItem("Remove"))
+			{
+				LUMIX_DELETE(m_controller.getAllocator(), m_context_cmp);
+				if (m_selected_component == m_context_cmp) m_selected_component = nullptr;
+				m_context_cmp = nullptr;
+			}
 		}
 		ImGui::EndPopup();
 	}

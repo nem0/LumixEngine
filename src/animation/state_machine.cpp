@@ -72,6 +72,12 @@ Edge::Edge(IAllocator& allocator)
 }
 
 
+Edge::~Edge()
+{
+	if (from) from->out_edges.eraseItem(this);
+}
+
+
 ComponentInstance* Edge::createInstance(IAllocator& allocator)
 {
 	return LUMIX_NEW(allocator, EdgeInstance)(*this);
@@ -103,6 +109,15 @@ void Edge::deserialize(InputBlob& blob, Container* parent)
 	condition.bytecode.resize(size);
 	if(size > 0) blob.read(&condition.bytecode[0], size);
 	from->out_edges.push(this);
+}
+
+
+Node::~Node()
+{
+	while (!out_edges.empty())
+	{
+		LUMIX_DELETE(allocator, out_edges.back());
+	}
 }
 
 

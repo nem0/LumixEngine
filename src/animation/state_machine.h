@@ -67,14 +67,17 @@ struct Edge;
 
 struct Node : public Component
 {
-	Node(Component::Type type, IAllocator& allocator)
+	Node(Component::Type type, IAllocator& _allocator)
 		: Component(type)
-		, out_edges(allocator)
+		, out_edges(_allocator)
+		, allocator(_allocator)
 	{
 	}
 
+	~Node();
 
 	Array<Edge*> out_edges;
+	IAllocator& allocator;
 };
 
 
@@ -110,6 +113,7 @@ struct Container : public Node
 struct Edge : public Component
 {
 	Edge(IAllocator& allocator);
+	~Edge();
 	ComponentInstance* createInstance(IAllocator& allocator) override;
 	void serialize(OutputBlob& blob) override;
 	void deserialize(InputBlob& blob, Container* parent) override;

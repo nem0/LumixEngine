@@ -310,28 +310,6 @@ struct DockContext
 	}
 
 
-	void checkNonexistent()
-	{
-		int frame_limit = ImMax(0, ImGui::GetFrameCount() - 2);
-		for (Dock* dock : m_docks)
-		{
-			if (dock->isContainer()) continue;
-			if (dock->status == Status_Float) continue;
-			if (dock->last_frame < frame_limit)
-			{
-				++dock->invalid_frames;
-				if (dock->invalid_frames > 2)
-				{
-					doUndock(*dock);
-					dock->status = Status_Float;
-				}
-				return;
-			}
-			dock->invalid_frames = 0;
-		}
-	}
-
-
 	void beginPanel()
 	{
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
@@ -353,8 +331,6 @@ struct DockContext
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
 		Begin("###DockPanel", nullptr, flags);
 		splits();
-
-		checkNonexistent();
 	}
 
 

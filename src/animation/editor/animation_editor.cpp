@@ -14,6 +14,7 @@
 #include "engine/engine.h"
 #include "engine/fs/os_file.h"
 #include "engine/hash_map.h"
+#include "engine/log.h"
 #include "engine/path.h"
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
@@ -69,8 +70,8 @@ AnimationEditor::~AnimationEditor()
 
 void AnimationEditor::onWindowGUI()
 {
-	showEditor();
-	showInputs();
+	editorGUI();
+	inputsGUI();
 }
 
 
@@ -125,25 +126,31 @@ void AnimationEditor::load()
 }
 
 
-void AnimationEditor::showEditor()
+void AnimationEditor::menuGUI()
+{
+	if (ImGui::BeginMenuBar())
+	{
+		if (ImGui::BeginMenu("File"))
+		{
+			if (ImGui::MenuItem("Save")) save();
+			if (ImGui::MenuItem("Save As")) saveAs();
+			if (ImGui::MenuItem("Load")) load();
+			ImGui::EndMenu();
+		}
+		if (ImGui::MenuItem("Go up", nullptr, false, m_container->getParent() != nullptr))
+		{
+			m_container = m_container->getParent();
+		}
+		ImGui::EndMenuBar();
+	}
+}
+
+
+void AnimationEditor::editorGUI()
 {
 	if (ImGui::BeginDock("Animation Editor", &m_editor_opened, ImGuiWindowFlags_MenuBar))
 	{
-		if (ImGui::BeginMenuBar())
-		{
-			if (ImGui::BeginMenu("File"))
-			{
-				if (ImGui::MenuItem("Save")) save();
-				if (ImGui::MenuItem("Save As")) saveAs();
-				if (ImGui::MenuItem("Load")) load();
-				ImGui::EndMenu();
-			}
-			if (ImGui::MenuItem("Go up", nullptr, false, m_container->getParent() != nullptr))
-			{
-				m_container = m_container->getParent();
-			}
-			ImGui::EndMenuBar();
-		}
+		menuGUI();
 		ImGui::Columns(2);
 		drawGraph();
 		ImGui::NextColumn();
@@ -155,7 +162,7 @@ void AnimationEditor::showEditor()
 }
 
 
-void AnimationEditor::showInputs()
+void AnimationEditor::inputsGUI()
 {
 	if (ImGui::BeginDock("Animation inputs", &m_inputs_opened))
 	{
@@ -169,6 +176,7 @@ void AnimationEditor::showInputs()
 
 			for (int i = 0; i < input_decl.inputs_count; ++i)
 			{
+				ImGui::PushID(i);
 				auto& input = input_decl.inputs[i];
 				StaticString<20> tmp("###", i);
 				ImGui::PushItemWidth(100);
@@ -192,6 +200,7 @@ void AnimationEditor::showInputs()
 					}
 				}
 				ImGui::PopItemWidth();
+				ImGui::PopID();
 			}
 
 			if (ImGui::Button("Add"))
@@ -204,14 +213,14 @@ void AnimationEditor::showInputs()
 			}
 		}
 
-		showConstants();
-		showAnimSet();
+		constantsGUI();
+		animSetGUI();
 	}
 	ImGui::EndDock();
 }
 
 
-void AnimationEditor::showConstants()
+void AnimationEditor::constantsGUI()
 {
 	if (!ImGui::CollapsingHeader("Constants")) return;
 
@@ -251,7 +260,7 @@ void AnimationEditor::showConstants()
 }
 
 
-void AnimationEditor::showAnimSet()
+void AnimationEditor::animSetGUI()
 {
 	if (!ImGui::CollapsingHeader("Anim sets")) return;
 	ImGui::PushID("anim_set");
@@ -261,27 +270,35 @@ void AnimationEditor::showAnimSet()
 	ImGui::Columns(2);
 	for (auto& slot : slots)
 	{
+		ImGui::PushID(i);
+		++i;
 		char slot_cstr[64];
 		copyString(slot_cstr, slot.c_str());
-		StaticString<10> label("###", i);
-		++i;
 
 		auto iter = engine_anim_set.find(crc32(slot.c_str()));
 		ASSERT(iter.isValid());
 		Animation* anim = iter.value();
 		ImGui::PushItemWidth(-1);
-		if (ImGui::InputText(label, slot_cstr, lengthOf(slot_cstr)))
+		
+		if (ImGui::InputText("##name", slot_cstr, lengthOf(slot_cstr), ImGuiInputTextFlags_EnterReturnsTrue))
 		{
-			engine_anim_set.erase(iter);
-			slot = slot_cstr;
-			engine_anim_set.insert(crc32(slot_cstr), anim);
+			if (engine_anim_set.find(crc32(slot_cstr)).isValid())
+			{
+				g_log_error.log("Animation") << "Slot " << slot_cstr << " already exists.";
+			}
+			else
+			{
+				engine_anim_set.erase(iter);
+				slot = slot_cstr;
+				engine_anim_set.insert(crc32(slot_cstr), anim);
+			}
 		}
 		ImGui::PopItemWidth();
 		ImGui::NextColumn();
 		char tmp[MAX_PATH_LENGTH];
 		copyString(tmp, anim ? anim->getPath().c_str() : "");
 		ImGui::PushItemWidth(ImGui::GetColumnWidth());
-		if (m_app.getAssetBrowser()->resourceInput("", StaticString<10>("###ri", i), tmp, lengthOf(tmp), ANIMATION_TYPE))
+		if (m_app.getAssetBrowser()->resourceInput("", "##res", tmp, lengthOf(tmp), ANIMATION_TYPE))
 		{
 			if (anim) anim->getResourceManager().unload(*anim);
 			auto* manager = m_app.getWorldEditor()->getEngine().getResourceManager().get(ANIMATION_TYPE);
@@ -290,6 +307,7 @@ void AnimationEditor::showAnimSet()
 		}
 		ImGui::PopItemWidth();
 		ImGui::NextColumn();
+		ImGui::PopID();
 	}
 	ImGui::Columns();
 	if (ImGui::Button("Add"))
