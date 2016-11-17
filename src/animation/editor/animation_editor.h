@@ -31,10 +31,11 @@ private:
 	void saveAs();
 	void drawGraph();
 	void load();
-	void showEditor();
-	void showInputs();
-	void showConstants();
-	void showAnimSet();
+	void editorGUI();
+	void inputsGUI();
+	void constantsGUI();
+	void animSetGUI();
+	void menuGUI();
 
 private:
 	StudioApp& m_app;

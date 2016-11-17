@@ -50,6 +50,7 @@ public:
 	Component* getRoot() const { return m_root; }
 	void serialize(OutputBlob& blob);
 	void deserialize(InputBlob& blob);
+	IAllocator& getAllocator() { return m_allocator; }
 
 private:
 	InputDecl m_input_decl;
