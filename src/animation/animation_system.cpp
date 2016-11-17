@@ -550,6 +550,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 	void initControllerRuntime(Controller& controller)
 	{
+		if (!controller.resource->isReady()) return;
 		controller.root = controller.resource->createInstance(m_anim_system.m_allocator);
 		controller.input.resize(controller.resource->getInputDecl().getSize());
 		setMemory(&controller.input[0], 0, controller.input.size());

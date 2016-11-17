@@ -62,7 +62,12 @@ static ImVec2 getEdgeStartPoint(Node* a, Node* b, bool is_dir)
 
 Component::~Component()
 {
-	if (getParent()) getParent()->m_editor_cmps.eraseItem(this);
+	if (getParent())
+	{
+		auto* engine_container = ((Anim::Container*)getParent()->engine_cmp);
+		engine_container->children.eraseItem(engine_cmp);
+		getParent()->m_editor_cmps.eraseItem(this);
+	}
 	LUMIX_DELETE(m_controller.getEngineResource()->getAllocator(), engine_cmp);
 }
 
@@ -99,7 +104,6 @@ bool Node::hitTest(const ImVec2& on_canvas_pos) const
 
 void Node::onGUI()
 {
-	ImGui::InputText("Name", m_name, lengthOf(m_name));
 	if (getParent()->engine_cmp->type == Anim::Component::STATE_MACHINE)
 	{
 		auto* engine_sm = (Anim::StateMachine*)getParent()->engine_cmp;
@@ -109,6 +113,7 @@ void Node::onGUI()
 			engine_sm->m_default_state = (Anim::Node*)engine_cmp;
 		}
 	}
+	ImGui::InputText("Name", m_name, lengthOf(m_name));
 }
 
 
@@ -373,9 +378,10 @@ void Container::serialize(OutputBlob& blob)
 }
 
 
-void StateMachine::createState(Anim::Component::Type type)
+void StateMachine::createState(Anim::Component::Type type, const ImVec2& pos)
 {
 	auto* cmp = (Node*)createComponent(Anim::createComponent(type, m_allocator), this, m_controller);
+	cmp->pos = pos;
 	cmp->size.x = 100;
 	cmp->size.y = 30;
 	cmp->engine_cmp->uid = m_controller.createUID();
@@ -419,34 +425,39 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 
 			if (ImGui::IsMouseClicked(0)) m_mouse_status = DOWN_LEFT;
 			if (ImGui::IsMouseClicked(1)) m_mouse_status = DOWN_RIGHT;
-			
-			if (ImGui::IsMouseReleased(1))
-			{
-				if (m_mouse_status == NEW_EDGE)
-				{
-					Component* target = childrenHitTest(ImGui::GetMousePos() - canvas_screen_pos);
-					if (target && target != m_drag_source && target->isNode())
-					{
-						auto* engine_parent = ((Anim::Container*)engine_cmp);
-						auto* engine_edge = LUMIX_NEW(m_allocator, Anim::Edge)(m_allocator);
-						engine_edge->uid = m_controller.createUID();
-						engine_edge->from = (Anim::Node*)m_drag_source->engine_cmp;
-						engine_edge->to = (Anim::Node*)target->engine_cmp;
-						engine_parent->children.push(engine_edge);
+		}
+	}
 
-						auto* edge = LUMIX_NEW(m_allocator, Edge)(engine_edge, this, m_controller);
-						m_editor_cmps.push(edge);
-						m_selected_component = edge;
-					}
-				}
-				else
+	if (ImGui::IsMouseReleased(1))
+	{
+		Component* hit_cmp = childrenHitTest(ImGui::GetMousePos() - canvas_screen_pos);
+		if (hit_cmp)
+		{
+			if (m_mouse_status == NEW_EDGE)
+			{
+				if (hit_cmp != m_drag_source && hit_cmp->isNode())
 				{
-					m_context_cmp = cmp;
-					ImGui::OpenPopup("context_menu");
+					auto* engine_parent = ((Anim::Container*)engine_cmp);
+					auto* engine_edge = LUMIX_NEW(m_allocator, Anim::Edge)(m_allocator);
+					engine_edge->uid = m_controller.createUID();
+					engine_edge->from = (Anim::Node*)m_drag_source->engine_cmp;
+					engine_edge->to = (Anim::Node*)hit_cmp->engine_cmp;
+					engine_parent->children.push(engine_edge);
+
+					auto* edge = LUMIX_NEW(m_allocator, Edge)(engine_edge, this, m_controller);
+					m_editor_cmps.push(edge);
+					m_selected_component = edge;
 				}
+			}
+			else
+			{
+				m_context_cmp = hit_cmp;
+				m_selected_component = hit_cmp;
+				ImGui::OpenPopup("context_menu");
 			}
 		}
 	}
+
 
 	if (m_mouse_status == DRAG_NODE)
 	{
@@ -462,10 +473,11 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 
 	if (ImGui::BeginPopup("context_menu"))
 	{
+		ImVec2 pos_on_canvas = ImGui::GetMousePos() - canvas_screen_pos;
 		if (ImGui::BeginMenu("Create"))
 		{
-			if (ImGui::MenuItem("Simple")) createState(Anim::Component::SIMPLE_ANIMATION);
-			if (ImGui::MenuItem("State machine")) createState(Anim::Component::STATE_MACHINE);
+			if (ImGui::MenuItem("Simple")) createState(Anim::Component::SIMPLE_ANIMATION, pos_on_canvas);
+			if (ImGui::MenuItem("State machine")) createState(Anim::Component::STATE_MACHINE, pos_on_canvas);
 			ImGui::EndMenu();
 		}
 		if (m_context_cmp)
