@@ -1280,7 +1280,10 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 		aiQuaterniont<float> dummy_rot;
 		global_transform.Decompose(scale, dummy_rot, dummy_pos);
 
-		compressPositions(positions, pos_channel, anim_length, m_dialog.m_model.position_error / 100000.0f);
+		compressPositions(positions,
+			pos_channel,
+			float(anim_length * animation->mTicksPerSecond),
+			m_dialog.m_model.position_error / 100000.0f);
 		int count = positions.size();
 		file.write(&count, sizeof(count));
 		for (const auto& pos : positions)
@@ -1299,7 +1302,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			file.write(&out_pos, sizeof(out_pos));
 		}
 
-		compressRotations(rotations, rot_channel, anim_length, m_dialog.m_model.rotation_error / 100000.0f);
+		compressRotations(rotations, rot_channel, float(anim_length * animation->mTicksPerSecond), m_dialog.m_model.rotation_error / 100000.0f);
 		count = rotations.size();
 		file.write(&count, sizeof(count));
 		for (const auto& rot : rotations)
@@ -1384,7 +1387,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 				aiQuaterniont<float> dummy_rot;
 				global_transform.Decompose(scale, dummy_rot, dummy_pos);
 
-				compressPositions(positions, channel, anim_length, m_dialog.m_model.position_error / 100000.0f);
+				compressPositions(positions, channel, float(anim_length * animation->mTicksPerSecond), m_dialog.m_model.position_error / 100000.0f);
 				int count = positions.size();
 				file.write(&count, sizeof(count));
 				for (const auto& pos : positions)
@@ -1403,7 +1406,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 					file.write(&out_pos, sizeof(out_pos));
 				}
 				
-				compressRotations(rotations, channel, anim_length, m_dialog.m_model.rotation_error / 100000.0f);
+				compressRotations(rotations, channel, float(anim_length * animation->mTicksPerSecond), m_dialog.m_model.rotation_error / 100000.0f);
 				count = rotations.size();
 				file.write(&count, sizeof(count));
 				for (const auto& rot : rotations)
