@@ -176,7 +176,7 @@ namespace ImGui
 				overlay_text,
 				NULL,
 				NULL,
-				ImGuiAlign_Center);
+				ImVec2(0.5f, 0.5f));
 		}
 
 		RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y), label);
