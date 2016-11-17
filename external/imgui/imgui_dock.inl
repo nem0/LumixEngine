@@ -931,7 +931,7 @@ struct DockContext
 
 			ImGuiContext& g = *GImGui;
 
-			if (g.ActiveId == GetCurrentWindow()->MoveID && g.IO.MouseDown[0])
+			if (g.ActiveId == GetCurrentWindow()->MoveId && g.IO.MouseDown[0])
 			{
 				m_drag_offset = GetMousePos() - dock.pos;
 				doUndock(dock);
