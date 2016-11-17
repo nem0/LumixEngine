@@ -80,6 +80,15 @@ bool Node::hitTest(const ImVec2& on_canvas_pos) const
 void Node::onGUI()
 {
 	ImGui::InputText("Name", m_name, lengthOf(m_name));
+	if (getParent()->engine_cmp->type == Anim::Component::STATE_MACHINE)
+	{
+		auto* engine_sm = (Anim::StateMachine*)getParent()->engine_cmp;
+		bool is_default = engine_sm->m_default_state == engine_cmp;
+		if (!is_default && ImGui::Button("Make default"))
+		{
+			engine_sm->m_default_state = (Anim::Node*)engine_cmp;
+		}
+	}
 }
 
 
@@ -181,9 +190,14 @@ bool Edge::draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected
 {
 	uint32 color = ImGui::ColorConvertFloat4ToU32(
 		selected ? ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] : ImGui::GetStyle().Colors[ImGuiCol_Button]);
-	draw->AddLine(getEdgeStartPoint(m_from, m_to, true) + canvas_screen_pos,
-		getEdgeStartPoint(m_to, m_from, false) + canvas_screen_pos,
-		color);
+	ImVec2 from = getEdgeStartPoint(m_from, m_to, true) + canvas_screen_pos;
+	ImVec2 to = getEdgeStartPoint(m_to, m_from, false) + canvas_screen_pos;
+	draw->AddLine(from, to, color);
+	ImVec2 dir = to - from;
+	dir = dir * (1 / sqrt(dot(dir, dir))) * 5;
+	ImVec2 right(dir.y, -dir.x);
+	draw->AddLine(to, to - dir + right, color);
+	draw->AddLine(to, to - dir - right, color);
 	if (ImGui::IsMouseClicked(0) && hitTest(ImGui::GetMousePos() - canvas_screen_pos))
 	{
 		return true;

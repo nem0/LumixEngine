@@ -131,7 +131,8 @@ public:
 		OUT_OF_MEMORY,
 		MISSING_BINARY_OPERAND,
 		NOT_ENOUGH_PARAMETERS,
-		INCORRECT_TYPE_ARGS
+		INCORRECT_TYPE_ARGS,
+		NO_RETURN_VALUE
 	};
 
 	public:
@@ -679,6 +680,11 @@ int ExpressionCompiler::compile(const char* src,
 		m_compile_time_error = ExpressionCompiler::Error::OUT_OF_MEMORY;
 		return -1;
 	}
+	if (type_stack_idx < 1)
+	{
+		m_compile_time_error = ExpressionCompiler::Error::NO_RETURN_VALUE;
+		return -1;
+	}
 	switch(type_stack[type_stack_idx - 1])
 	{
 		case Types::FLOAT: *out = Instruction::RET_FLOAT; break;
@@ -826,7 +832,11 @@ bool Condition::compile(const char* expression, InputDecl& decl)
 	if (tokens_count < 0) return false;
 	bytecode.resize(128);
 	int size = compiler.compile(expression, postfix_tokens, tokens_count, &bytecode[0], bytecode.size(), decl);
-	if (size < 0) return false;
+	if (size < 0)
+	{
+		compile("1 < 0", decl);
+		return false;
+	}
 	bytecode.resize(size);
 	return true;
 }

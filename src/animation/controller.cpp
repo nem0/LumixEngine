@@ -72,6 +72,22 @@ void ControllerResource::deserialize(InputBlob& blob)
 		blob.read(input.type);
 		blob.read(input.offset);
 	}
+
+	blob.read(m_input_decl.constants_count);
+	for (int i = 0; i < m_input_decl.constants_count; ++i)
+	{
+		auto& constant = m_input_decl.constants[i];
+		blob.readString(constant.name, lengthOf(constant.name));
+		blob.read(constant.type);
+		switch (constant.type)
+		{
+			case InputDecl::BOOL: blob.read(constant.b_value); break;
+			case InputDecl::INT: blob.read(constant.i_value); break;
+			case InputDecl::FLOAT: blob.read(constant.f_value); break;
+			default: ASSERT(false); return;
+		}
+	}
+
 	m_anim_set.clear();
 	int count;
 	blob.read(count);
@@ -100,6 +116,21 @@ void ControllerResource::serialize(OutputBlob& blob)
 		blob.writeString(input.name);
 		blob.write(input.type);
 		blob.write(input.offset);
+	}
+	blob.write(m_input_decl.constants_count);
+	for (int i = 0; i < m_input_decl.constants_count; ++i)
+	{
+		auto& constant = m_input_decl.constants[i];
+		blob.writeString(constant.name);
+		blob.write(constant.type);
+		switch (constant.type)
+		{
+			case InputDecl::BOOL: blob.write(constant.b_value); break;
+			case InputDecl::INT: blob.write(constant.i_value); break;
+			case InputDecl::FLOAT: blob.write(constant.f_value); break;
+			default: ASSERT(false); return;
+		}
+		
 	}
 	blob.write(m_anim_set.size());
 	for (auto iter = m_anim_set.begin(), end = m_anim_set.end(); iter != end; ++iter)

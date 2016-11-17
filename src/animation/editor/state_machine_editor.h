@@ -58,6 +58,7 @@ public:
 	void serialize(Lumix::OutputBlob& blob) override;
 	void deserialize(Lumix::InputBlob& blob) override;
 	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override;
+	const char* getName() { return m_name; }
 
 public:
 	ImVec2 pos;

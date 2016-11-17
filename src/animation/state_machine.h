@@ -28,7 +28,7 @@ namespace Anim
 
 struct Container;
 struct ComponentInstance;
-class StateMachine;
+struct StateMachine;
 
 
 struct ComponentInstance
@@ -168,9 +168,8 @@ struct StateMachineInstance : public NodeInstance
 };
 
 
-class StateMachine : public Container
+struct StateMachine : public Container
 {
-public:
 	StateMachine(IAllocator& _allocator)
 		: Container(Component::STATE_MACHINE, _allocator)
 		, m_default_state(nullptr)
@@ -180,9 +179,7 @@ public:
 	ComponentInstance* createInstance(IAllocator& allocator) override;
 	void serialize(OutputBlob& blob) override;
 	void deserialize(InputBlob& blob, Container* parent) override;
-	Node* getDefaultState() const { return m_default_state; }
 
-private:
 	Node* m_default_state;
 };
 
