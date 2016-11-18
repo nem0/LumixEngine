@@ -187,7 +187,7 @@ void AnimationEditor::editorGUI()
 		drawGraph();
 		ImGui::NextColumn();
 		ImGui::Text("Properties");
-		if(m_container->m_selected_component) m_container->m_selected_component->onGUI();
+		if(m_container->getSelectedComponent()) m_container->getSelectedComponent()->onGUI();
 		ImGui::Columns();
 	}
 	ImGui::EndDock();
