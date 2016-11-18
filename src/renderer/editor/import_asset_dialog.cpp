@@ -113,6 +113,42 @@ int setMeshParams(lua_State* L)
 }
 
 
+int setAnimationParams(lua_State* L)
+{
+	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
+	int anim_idx = LuaWrapper::checkArg<int>(L, 2);
+	LuaWrapper::checkTableArg(L, 3);
+	if (anim_idx < 0 || anim_idx >= dlg->m_animations.size()) return 0;
+
+	ImportAnimation& anim = dlg->m_animations[anim_idx];
+
+	lua_pushvalue(L, 3);
+
+	if (lua_getfield(L, -1, "root_bone") == LUA_TSTRING)
+	{
+		const char* name = lua_tostring(L, -1);
+		for (unsigned int i = 0; i < anim.animation->mNumChannels; ++i)
+		{
+			if (equalStrings(anim.animation->mChannels[i]->mNodeName.C_Str(), name))
+			{
+				anim.root_motion_bone_idx = i;
+				break;
+			}
+		}
+	}
+	lua_pop(L, 1); // "lod"
+
+	if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
+	{
+		anim.import = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1); // "import"
+
+	lua_pop(L, 1); // table
+	return 0;
+}
+
+
 int setParams(lua_State* L)
 {
 	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
@@ -252,6 +288,12 @@ int setMaterialParams(lua_State* L)
 int getMeshesCount(ImportAssetDialog* dlg)
 {
 	return dlg->m_meshes.size();
+}
+
+
+int getAnimationsCount(ImportAssetDialog* dlg)
+{
+	return dlg->m_animations.size();
 }
 
 
@@ -900,7 +942,6 @@ struct ImportTask LUMIX_FINAL : public MT::Task
 		flags |= m_dialog.m_model.gen_smooth_normal ? aiProcess_GenSmoothNormals : aiProcess_GenNormals;
 		flags |= m_dialog.m_model.optimize_mesh_on_import ? aiProcess_OptimizeMeshes : 0;
 
-		importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
 		const aiScene* scene = importer.ReadFile(m_dialog.m_source, flags);
 		if (!scene)
 		{
@@ -1179,7 +1220,10 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 	}
 
 
-	static void compressRotations(Array<aiQuatKey>& rot, const aiNodeAnim* channel, float end_time, float error)
+	static void compressRotations(Array<aiQuatKey>& rot,
+		const aiNodeAnim* channel,
+		float end_time,
+		float error)
 	{
 		rot.clear();
 
@@ -1204,9 +1248,8 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			aiQuaternion estimate;
 			aiQuaternion::Interpolate(estimate, last.mValue, channel->mRotationKeys[i].mValue, after_last_dt / dt);
 			estimate.Normalize();
-			if (fabs(estimate.x - after_last.x) > error
-				|| fabs(estimate.y - after_last.y) > error
-				|| fabs(estimate.z - after_last.z) > error)
+			if (fabs(estimate.x - after_last.x) > error || fabs(estimate.y - after_last.y) > error ||
+				fabs(estimate.z - after_last.z) > error)
 			{
 				rot.push(channel->mRotationKeys[i - 1]);
 				last = channel->mRotationKeys[i - 1];
@@ -1236,86 +1279,6 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			}
 		}
 		return int(1 / min + 0.5f);
-	}
-
-
-	void collapse(const aiNodeAnim* pos_channel,
-		const aiAnimation* animation,
-		const aiScene* scene,
-		float anim_length,
-		uint32 fps,
-		FS::OsFile& file)
-	{
-		char rotation_name[128];
-		char original_name[128];
-		const char* end = strstr(pos_channel->mNodeName.C_Str(), "_$AssimpFbx$_Translation");
-		const char* src = pos_channel->mNodeName.C_Str();
-		copyString(original_name, Math::minimum(lengthOf(original_name), int(end - src + 1)), src);
-		copyString(rotation_name, original_name);
-		catString(rotation_name, "_$AssimpFbx$_Rotation");
-		const aiNodeAnim* rot_channel;
-		for (unsigned int i = 0; i < animation->mNumChannels; ++i)
-		{
-			if (equalStrings(animation->mChannels[i]->mNodeName.C_Str(), rotation_name))
-			{
-				rot_channel = animation->mChannels[i];
-				break;
-			}
-		}
-
-		if (!rot_channel)
-		{
-			g_log_error.log("Editor") << "Rotation channel not found.";
-			return;
-		}
-
-		Array<aiVectorKey> positions(m_dialog.m_editor.getAllocator());
-		Array<aiQuatKey> rotations(m_dialog.m_editor.getAllocator());
-		
-		uint32_t hash = crc32(original_name);
-		file.write((const char*)&hash, sizeof(hash));
-		auto global_transform = getGlobalTransform(getNode(original_name, scene->mRootNode)->mParent);
-		aiVector3t<float> scale;
-		aiVector3t<float> dummy_pos;
-		aiQuaterniont<float> dummy_rot;
-		global_transform.Decompose(scale, dummy_rot, dummy_pos);
-
-		compressPositions(positions,
-			pos_channel,
-			float(anim_length * animation->mTicksPerSecond),
-			m_dialog.m_model.position_error / 100000.0f);
-		int count = positions.size();
-		file.write(&count, sizeof(count));
-		for (const auto& pos : positions)
-		{
-			uint16 frame = uint16(pos.mTime * m_dialog.m_model.time_scale * fps / animation->mTicksPerSecond);
-			file.write(&frame, sizeof(frame));
-		}
-		for (const auto& pos : positions)
-		{
-			Vec3 out_pos(pos.mValue.x, pos.mValue.y, pos.mValue.z);
-			out_pos = out_pos * m_dialog.m_model.mesh_scale;
-			out_pos.x *= scale.x;
-			out_pos.y *= scale.y;
-			out_pos.z *= scale.z;
-			out_pos = fixOrientation(out_pos);
-			file.write(&out_pos, sizeof(out_pos));
-		}
-
-		compressRotations(rotations, rot_channel, float(anim_length * animation->mTicksPerSecond), m_dialog.m_model.rotation_error / 100000.0f);
-		count = rotations.size();
-		file.write(&count, sizeof(count));
-		for (const auto& rot : rotations)
-		{
-			uint16 frame = uint16(rot.mTime * m_dialog.m_model.time_scale * fps / animation->mTicksPerSecond);
-			file.write(&frame, sizeof(frame));
-		}
-		for (const auto& rot : rotations)
-		{
-			Quat out_rot(rot.mValue.x, rot.mValue.y, rot.mValue.z, rot.mValue.w);
-			out_rot = fixOrientation(out_rot);
-			file.write(&out_rot, sizeof(out_rot));
-		}
 	}
 
 
@@ -1356,9 +1319,10 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 				: (animation->mTicksPerSecond == 1 ? 30 : animation->mTicksPerSecond));
 			if (animation->mTicksPerSecond < 2) header.fps = detectFPS(animation);
 			header.magic = Animation::HEADER_MAGIC;
-			header.version = 2;
+			header.version = 3;
 
 			file.write(&header, sizeof(header));
+			file.write(&import_animation.root_motion_bone_idx, sizeof(import_animation.root_motion_bone_idx));
 			float anim_length = float(getLength(animation) / animation->mTicksPerSecond);
 			int frame_count = Math::maximum(int(anim_length * m_dialog.m_model.time_scale * header.fps), 1);
 			file.write(&frame_count, sizeof(frame_count));
@@ -1370,15 +1334,6 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
 			{
 				const aiNodeAnim* channel = animation->mChannels[channel_idx];
-				if (strstr(channel->mNodeName.C_Str(), "_$AssimpFbx$_Translation") != 0)
-				{
-					collapse(channel, animation, scene, anim_length, header.fps, file);
-					continue;
-				}
-				else if (strstr(channel->mNodeName.C_Str(), "_$AssimpFbx$") != 0)
-				{
-					continue;
-				}
 				uint32_t hash = crc32(channel->mNodeName.C_Str());
 				file.write((const char*)&hash, sizeof(hash));
 				auto global_transform = getGlobalTransform(getNode(channel->mNodeName, scene->mRootNode)->mParent);
@@ -1657,7 +1612,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 		if (m_dialog.m_model.all_nodes)
 		{
 			for (auto& importer : m_dialog.m_importers)
-			{
+			{	
 				gatherAllNodes(tmp, importer.GetScene()->mRootNode);
 			}
 		}
@@ -2522,6 +2477,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 		} while(false) \
 
 	REGISTER_FUNCTION(getMeshesCount);
+	REGISTER_FUNCTION(getAnimationsCount);
 	REGISTER_FUNCTION(getMeshMaterialName);
 	REGISTER_FUNCTION(getMaterialsCount);
 	REGISTER_FUNCTION(getTexturesCount);
@@ -2539,6 +2495,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	REGISTER_FUNCTION(setMeshParams);
 	REGISTER_FUNCTION(setMaterialParams);
 	REGISTER_FUNCTION(setTextureParams);
+	REGISTER_FUNCTION(setAnimationParams);
 
 	#undef REGISTER_FUNCTION
 }
@@ -2843,11 +2800,13 @@ void ImportAssetDialog::onAnimationsGUI()
 	ImGui::DragFloat("Max rotation error", &m_model.rotation_error, 0, FLT_MAX);
 
 	ImGui::Indent();
-	ImGui::Columns(2);
+	ImGui::Columns(3);
 	
 	ImGui::Text("Name");
 	ImGui::NextColumn();
 	ImGui::Text("Import");
+	ImGui::NextColumn();
+	ImGui::Text("Root motion bone");
 	ImGui::NextColumn();
 	ImGui::Separator();
 
@@ -2859,6 +2818,13 @@ void ImportAssetDialog::onAnimationsGUI()
 		ImGui::InputText("", animation.output_filename, lengthOf(animation.output_filename));
 		ImGui::NextColumn();
 		ImGui::Checkbox("", &animation.import);
+		ImGui::NextColumn();
+		auto getter = [](void* data, int idx, const char** out) -> bool {
+			auto* animation = (ImportAnimation*)data;
+			*out = animation->animation->mChannels[idx]->mNodeName.C_Str();
+			return true;
+		};
+		ImGui::Combo("##rb", &animation.root_motion_bone_idx, getter, &animation, animation.animation->mNumChannels);
 		ImGui::NextColumn();
 		ImGui::PopID();
 	}

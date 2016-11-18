@@ -1,5 +1,6 @@
 #include "state_machine.h"
 #include "animation/animation.h"
+#include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
@@ -24,6 +25,12 @@ struct EdgeInstance : public ComponentInstance
 
 	float getTime() const override { return time; }
 	float getLength() const override { return edge.length; }
+
+
+	Transform getRootMotion() const override
+	{
+		return from->getRootMotion().interpolate(to->getRootMotion(), time / edge.length);
+	}
 
 
 	ComponentInstance* update(RunningContext& rc) override
@@ -151,7 +158,12 @@ struct SimpleAnimationNodeInstance : public NodeInstance
 		: node(_node)
 		, resource(nullptr)
 	{
+		root_motion.pos = { 0, 0, 0};
+		root_motion.rot = { 0, 0, 0, 1 };
 	}
+
+
+	Transform getRootMotion() const override { return root_motion; }
 
 
 	float getTime() const override { return time; }
@@ -173,8 +185,34 @@ struct SimpleAnimationNodeInstance : public NodeInstance
 
 	ComponentInstance* update(RunningContext& rc) override
 	{
+		float old_time = time;
 		time += rc.time_delta;
-		if (node.looped) time = fmod(time, resource->getLength());
+		if (node.looped)
+		{
+			time = fmod(time, resource->getLength());
+		}
+
+		int bone_idx = resource->getRootMotionBoneIdx();
+		if (bone_idx >= 0)
+		{
+			Transform before = resource->getBoneTransform(old_time, bone_idx);
+			if (time < old_time)
+			{
+				Transform end_anim = resource->getBoneTransform(resource->getLength(), bone_idx);
+				Transform start_anim = resource->getBoneTransform(0, bone_idx);
+				Transform after = resource->getBoneTransform(time, bone_idx);
+				root_motion = (end_anim * before.inverted()) * (after * start_anim.inverted());
+			}
+			else
+			{
+				Transform after = resource->getBoneTransform(time, bone_idx);
+				root_motion = after * before.inverted();
+			}
+		}
+		else
+		{
+			root_motion = { {0, 0, 0}, {0, 0, 0, 1} };
+		}
 		return checkOutEdges(node, rc);
 	}
 
@@ -188,6 +226,7 @@ struct SimpleAnimationNodeInstance : public NodeInstance
 
 	Animation* resource;
 	SimpleAnimationNode& node;
+	Transform root_motion;
 	float time;
 };
 
