@@ -9,7 +9,7 @@ namespace AnimEditor
 {
 
 
-struct Container;
+class Container;
 class ControllerResource;
 
 

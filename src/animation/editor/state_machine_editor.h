@@ -19,13 +19,14 @@ namespace AnimEditor
 
 
 class AnimationEditor;
-struct Container;
+class Container;
 class ControllerResource;
-struct Edge;
+class Edge;
 
 
-struct Component
+class Component
 {
+public:
 	Component(Container* parent, Lumix::Anim::Component* _engine_cmp, ControllerResource& controller)
 		: engine_cmp(_engine_cmp)
 		, m_parent(parent)
@@ -45,7 +46,12 @@ struct Component
 	Container* getParent() { return m_parent; }
 	virtual void compile() {}
 	virtual void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime) {}
-	virtual void debugInside(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime, Container* current) {}
+	virtual void debugInside(ImDrawList* draw,
+		const ImVec2& canvas_screen_pos,
+		Lumix::Anim::ComponentInstance* runtime,
+		Container* current)
+	{
+	}
 
 	Lumix::Anim::Component* engine_cmp;
 
@@ -85,11 +91,13 @@ protected:
 };
 
 
-struct Container : public Node
+class Container : public Node
 {
+public:
 	Container(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 	Component* childrenHitTest(const ImVec2& pos);
 	Component* getChildByUID(int uid);
+	Component* getSelectedComponent() const { return m_selected_component; }
 	void deserialize(Lumix::InputBlob& blob) override;
 	void serialize(Lumix::OutputBlob& blob) override;
 	void compile() override;
@@ -97,13 +105,14 @@ struct Container : public Node
 	void removeChild(Component* component);
 	bool isContainer() const override { return true; }
 	
+protected:
 	Lumix::Array<Component*> m_editor_cmps;
 	Component* m_selected_component;
 };
 
 
 
-struct Edge : public Component
+class Edge : public Component
 {
 public:
 	Edge(Lumix::Anim::Edge* engine_cmp, Container* parent, ControllerResource& controller);
