@@ -94,6 +94,7 @@ struct Container : public Node
 	void serialize(Lumix::OutputBlob& blob) override;
 	void compile() override;
 
+	void removeChild(Component* component);
 	bool isContainer() const override { return true; }
 	
 	Lumix::Array<Component*> m_editor_cmps;
