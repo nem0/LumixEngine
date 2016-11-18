@@ -64,9 +64,7 @@ Component::~Component()
 {
 	if (getParent())
 	{
-		auto* engine_container = ((Anim::Container*)getParent()->engine_cmp);
-		engine_container->children.eraseItem(engine_cmp);
-		getParent()->m_editor_cmps.eraseItem(this);
+		getParent()->removeChild(this);
 	}
 	LUMIX_DELETE(m_controller.getEngineResource()->getAllocator(), engine_cmp);
 }
@@ -164,6 +162,15 @@ Container::Container(Anim::Component* engine_cmp, Container* parent, ControllerR
 	, m_editor_cmps(controller.getAllocator())
 	, m_selected_component(nullptr)
 {
+}
+
+
+void Container::removeChild(Component* component)
+{
+	auto* engine_container = ((Anim::Container*)engine_cmp);
+	engine_container->children.eraseItem(engine_cmp);
+	m_editor_cmps.eraseItem(component);
+	if (component == m_selected_component) m_selected_component = nullptr;
 }
 
 
