@@ -165,7 +165,7 @@ void AnimationEditor::menuGUI()
 		{
 			if (ImGui::MenuItem("Save")) save();
 			if (ImGui::MenuItem("Save As")) saveAs();
-			if (ImGui::MenuItem("Open")) load();
+			if (ImGui::MenuItem("Open")) loadFromFile();
 			if (ImGui::MenuItem("Open from selected entity")) loadFromEntity();
 			ImGui::EndMenu();
 		}

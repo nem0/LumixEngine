@@ -437,6 +437,16 @@ void StateMachine::debugInside(ImDrawList* draw,
 }
 
 
+void StateMachine::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime)
+{
+	if (runtime->source.type != engine_cmp->type) return;
+
+	ImVec2 p = canvas_screen_pos + pos;
+	p = p + ImVec2(size.x * 0.5f - 3, ImGui::GetTextLineHeightWithSpacing() * 1.5f);
+	draw->AddRectFilled(p, p + ImVec2(6, 6), 0xfff00FFF);
+}
+
+
 void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 {
 	if (ImGui::IsWindowHovered())

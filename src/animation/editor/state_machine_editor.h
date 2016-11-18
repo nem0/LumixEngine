@@ -150,6 +150,7 @@ public:
 		const ImVec2& canvas_screen_pos,
 		Lumix::Anim::ComponentInstance* runtime,
 		Container* current) override;
+	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime) override;
 
 private:
 	void createState(Lumix::Anim::Component::Type type, const ImVec2& pos);
