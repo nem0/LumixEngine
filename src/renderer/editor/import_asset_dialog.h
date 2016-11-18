@@ -56,6 +56,7 @@ struct ImportAnimation
 {
 	bool import;
 	struct aiAnimation* animation;
+	int root_motion_bone_idx = -1;
 	const aiScene* scene;
 	char output_filename[Lumix::MAX_PATH_LENGTH];
 };

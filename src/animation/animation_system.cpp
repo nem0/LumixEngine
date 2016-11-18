@@ -540,6 +540,20 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		updateAnimable(animable, time_delta);
 	}
 
+
+	void setControllerInput(ComponentHandle cmp, int input_idx, float value) override
+	{
+		Controller& ctrl = m_controllers.get({cmp.index});
+		*(float*)&ctrl.input[ctrl.resource->getInputDecl().inputs[input_idx].offset] = value;
+	}
+
+
+	Transform getControllerRootMotion(ComponentHandle cmp) override
+	{
+		Controller& ctrl = m_controllers.get({cmp.index});
+		return ctrl.root->getRootMotion();
+	}
+
 	
 	uint8* getControllerInput(ComponentHandle cmp)
 	{

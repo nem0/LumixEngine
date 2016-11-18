@@ -19,6 +19,7 @@ enum class Version
 {
 	FIRST = 0,
 	COMPRESSION = 1,
+	ROOT_MOTION,
 
 	LAST
 };
@@ -45,6 +46,7 @@ Animation::Animation(const Path& path, ResourceManagerBase& resource_manager, IA
 	, m_fps(30)
 	, m_mem(allocator)
 	, m_bones(allocator)
+	, m_root_motion_bone_idx(-1)
 {
 }
 
@@ -109,6 +111,55 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, float weig
 			nlerp(rot[model_bone_index], bone.rot[bone.rot_count - 1], &rot[model_bone_index], weight);
 		}
 	}
+}
+
+
+Transform Animation::getBoneTransform(float time, int bone_idx) const
+{
+	Transform ret;
+	int frame = (int)(time * m_fps);
+	float rcp_fps = 1.0f / m_fps;
+	frame = Math::clamp(frame, 0, m_frame_count - 1);
+
+	const Bone& bone = m_bones[bone_idx];
+	if (frame < m_frame_count - 1)
+	{
+		int idx = 1;
+		for (int c = bone.pos_count; idx < c; ++idx)
+		{
+			if (bone.pos_times[idx] > frame) break;
+		}
+
+		float t = float(time - bone.pos_times[idx - 1] * rcp_fps) /
+			((bone.pos_times[idx] - bone.pos_times[idx - 1]) * rcp_fps);
+		lerp(bone.pos[idx - 1], bone.pos[idx], &ret.pos, t);
+
+		idx = 1;
+		for (int c = bone.rot_count; idx < c; ++idx)
+		{
+			if (bone.rot_times[idx] > frame) break;
+		}
+
+		t = float(time - bone.rot_times[idx - 1] * rcp_fps) /
+			((bone.rot_times[idx] - bone.rot_times[idx - 1]) * rcp_fps);
+		nlerp(bone.rot[idx - 1], bone.rot[idx], &ret.rot, t);
+	}
+	else
+	{
+		ret.pos = bone.pos[bone.pos_count - 1];
+		ret.rot = bone.rot[bone.rot_count - 1];
+	}
+	return ret;
+}
+
+
+int Animation::getBoneIndex(uint32 name) const
+{
+	for (int i = 0, c = m_bones.size(); i < c; ++i)
+	{
+		if (m_bones[i].name == name) return i;
+	}
+	return -1;
 }
 
 
@@ -181,11 +232,19 @@ bool Animation::load(FS::IFile& file)
 		g_log_error.log("Animation") << getPath() << " is not an animation file";
 		return false;
 	}
-	if (header.version != (int)Version::LAST)
+	if (header.version <= (int)Version::COMPRESSION)
 	{
 		g_log_error.log("Animation") << "Unsupported animation version " << (int)header.version << " ("
 									 << getPath() << ")";
 		return false;
+	}
+	if (header.version > (int)Version::ROOT_MOTION)
+	{
+		file.read(&m_root_motion_bone_idx, sizeof(m_root_motion_bone_idx));
+	}
+	else
+	{
+		m_root_motion_bone_idx = -1;
 	}
 	m_fps = header.fps;
 	file.read(&m_frame_count, sizeof(m_frame_count));
