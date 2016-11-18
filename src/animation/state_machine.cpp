@@ -20,7 +20,7 @@ namespace Anim
 
 struct EdgeInstance : public ComponentInstance
 {
-	EdgeInstance(Edge& _edge) : edge(_edge) {}
+	EdgeInstance(Edge& _edge) : ComponentInstance(_edge), edge(_edge) {}
 
 
 	float getTime() const override { return time; }
@@ -155,7 +155,8 @@ void SimpleAnimationNode::deserialize(InputBlob& blob, Container* parent)
 struct SimpleAnimationNodeInstance : public NodeInstance
 {
 	SimpleAnimationNodeInstance(SimpleAnimationNode& _node)
-		: node(_node)
+		: NodeInstance(_node)
+		, node(_node)
 		, resource(nullptr)
 	{
 		root_motion.pos = { 0, 0, 0};
@@ -238,7 +239,7 @@ ComponentInstance* SimpleAnimationNode::createInstance(IAllocator& allocator)
 
 
 StateMachineInstance::StateMachineInstance(StateMachine& _source, IAllocator& _allocator)
-	: NodeInstance()
+	: NodeInstance(_source)
 	, source(_source)
 	, allocator(_allocator)
 	, current(nullptr)
