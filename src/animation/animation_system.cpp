@@ -452,7 +452,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	Path getControllerSource(ComponentHandle cmp)
+	Path getControllerSource(ComponentHandle cmp) override
 	{
 		const auto& controller = m_controllers.get({cmp.index});
 		return controller.resource ? controller.resource->getPath() : Path("");
@@ -545,6 +545,12 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	{
 		Controller& ctrl = m_controllers.get({cmp.index});
 		*(float*)&ctrl.input[ctrl.resource->getInputDecl().inputs[input_idx].offset] = value;
+	}
+
+
+	Anim::ComponentInstance* getControllerRoot(ComponentHandle cmp) override
+	{
+		return m_controllers.get({cmp.index}).root;
 	}
 
 

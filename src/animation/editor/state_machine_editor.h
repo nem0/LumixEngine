@@ -44,6 +44,8 @@ struct Component
 	virtual void drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos) {}
 	Container* getParent() { return m_parent; }
 	virtual void compile() {}
+	virtual void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime) {}
+	virtual void debugInside(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime, Container* current) {}
 
 	Lumix::Anim::Component* engine_cmp;
 
@@ -115,6 +117,7 @@ public:
 	void compile() override;
 	bool hitTest(const ImVec2& on_canvas_pos) const override;
 	const char* getExpression() const { return m_expression; }
+	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime) override;
 
 private:
 	Node* m_from;
@@ -129,6 +132,7 @@ public:
 	SimpleAnimationNode(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 
 	void onGUI() override;
+	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime) override;
 
 private:
 	char animation[64];
@@ -142,6 +146,10 @@ public:
 
 	void drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos) override;
 	void onGUI() override;
+	void debugInside(ImDrawList* draw,
+		const ImVec2& canvas_screen_pos,
+		Lumix::Anim::ComponentInstance* runtime,
+		Container* current) override;
 
 private:
 	void createState(Lumix::Anim::Component::Type type, const ImVec2& pos);

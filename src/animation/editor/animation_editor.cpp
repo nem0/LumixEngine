@@ -103,16 +103,40 @@ void AnimationEditor::drawGraph()
 		m_offset = m_offset + ImGui::GetIO().MouseDelta;
 	}
 
+	auto* scene = (AnimationScene*)m_app.getWorldEditor()->getUniverse()->getScene(ANIMABLE_HASH);
+	auto& entities = m_app.getWorldEditor()->getSelectedEntities();
+	Anim::ComponentInstance* runtime = nullptr;
+	if (!entities.empty())
+	{
+		ComponentHandle ctrl = scene->getComponent(entities[0], CONTROLLER_TYPE);
+		if (isValid(ctrl))
+		{
+			runtime = scene->getControllerRoot(ctrl);
+		}
+	}
+
 	ImDrawList* draw = ImGui::GetWindowDrawList();
 	auto canvas_screen_pos = ImGui::GetCursorScreenPos() + m_offset;
 	m_container->drawInside(draw, canvas_screen_pos);
+	if(runtime) m_resource->getRoot()->debugInside(draw, canvas_screen_pos, runtime, m_container);
 	ImGui::EndChild();
+}
+
+
+void AnimationEditor::loadFromEntity()
+{
+	auto& entities = m_app.getWorldEditor()->getSelectedEntities();
+	if (entities.empty()) return;
+	auto* scene = (AnimationScene*)m_app.getWorldEditor()->getUniverse()->getScene(ANIMABLE_HASH);
+	ComponentHandle ctrl = scene->getComponent(entities[0], CONTROLLER_TYPE);
+	if (!isValid(ctrl)) return;
+	copyString(m_path, scene->getControllerSource(ctrl).c_str());
+	load();
 }
 
 
 void AnimationEditor::load()
 {
-	if (!PlatformInterface::getOpenFilename(m_path, lengthOf(m_path), "Animation controllers\0*.act\0", "")) return;
 	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
 	FS::OsFile file;
 	file.open(m_path, FS::Mode::OPEN_AND_READ, allocator);
@@ -126,6 +150,13 @@ void AnimationEditor::load()
 }
 
 
+void AnimationEditor::loadFromFile()
+{
+	if (!PlatformInterface::getOpenFilename(m_path, lengthOf(m_path), "Animation controllers\0*.act\0", "")) return;
+	load();
+}
+
+
 void AnimationEditor::menuGUI()
 {
 	if (ImGui::BeginMenuBar())
@@ -134,7 +165,8 @@ void AnimationEditor::menuGUI()
 		{
 			if (ImGui::MenuItem("Save")) save();
 			if (ImGui::MenuItem("Save As")) saveAs();
-			if (ImGui::MenuItem("Load")) load();
+			if (ImGui::MenuItem("Open")) load();
+			if (ImGui::MenuItem("Open from selected entity")) loadFromEntity();
 			ImGui::EndMenu();
 		}
 		if (ImGui::MenuItem("Go up", nullptr, false, m_container->getParent() != nullptr))

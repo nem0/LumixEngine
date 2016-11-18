@@ -10,10 +10,10 @@
 #include <cmath>
 
 
-static const Lumix::ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
-
-
 using namespace Lumix;
+
+
+static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
 
 static ImVec2 operator+(const ImVec2& a, const ImVec2& b)
@@ -207,6 +207,21 @@ Edge::~Edge()
 }
 
 
+void Edge::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime)
+{
+	if (runtime->source.type != engine_cmp->type) return;
+	
+	ImVec2 from = getEdgeStartPoint(m_from, m_to, true) + canvas_screen_pos;
+	ImVec2 to = getEdgeStartPoint(m_to, m_from, false) + canvas_screen_pos;
+
+	float t = runtime->getTime() / runtime->getLength();
+	ImVec2 p = from + (to - from) * t;
+	ImVec2 dir = to - from;
+	dir = dir * (1 / sqrt(dot(dir, dir))) * 2;
+	draw->AddLine(p - dir, p + dir, 0xfff00FFF, 3);
+}
+
+
 void Edge::compile()
 {
 	auto* engine_edge = (Anim::Edge*)engine_cmp;
@@ -283,6 +298,18 @@ SimpleAnimationNode::SimpleAnimationNode(Anim::Component* engine_cmp, Container*
 	: Node(engine_cmp, parent, controller)
 {
 	animation[0] = 0;
+}
+
+
+void SimpleAnimationNode::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime)
+{
+	if (runtime->source.type != engine_cmp->type) return;
+
+	ImVec2 p = canvas_screen_pos + pos;
+	p = p + ImVec2(5, ImGui::GetTextLineHeightWithSpacing() * 1.5f);
+	draw->AddRect(p, p + ImVec2(size.x - 10, 5), 0xfff00fff);
+	float t = Math::clamp(runtime->getTime() / runtime->getLength(), 0.0f, 1.0f);
+	draw->AddRectFilled(p, p + ImVec2((size.x - 10) * t, 5), 0xfff00fff);
 }
 
 
@@ -388,6 +415,25 @@ void StateMachine::createState(Anim::Component::Type type, const ImVec2& pos)
 	m_editor_cmps.push(cmp);
 	((Anim::StateMachine*)engine_cmp)->children.push(cmp->engine_cmp);
 	m_selected_component = cmp;
+}
+
+
+void StateMachine::debugInside(ImDrawList* draw,
+	const ImVec2& canvas_screen_pos,
+	Anim::ComponentInstance* runtime,
+	Container* current)
+{
+	if (runtime->source.type != Anim::Component::STATE_MACHINE) return;
+	
+	auto* child_runtime = ((Anim::StateMachineInstance*)runtime)->current;
+	auto* child = getChildByUID(child_runtime->source.uid);
+	if (child)
+	{
+		if(current == this)
+			child->debug(draw, canvas_screen_pos, child_runtime);
+		else
+			child->debugInside(draw, canvas_screen_pos, child_runtime, current);
+	}
 }
 
 
