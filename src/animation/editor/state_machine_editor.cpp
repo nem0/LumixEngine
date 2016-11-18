@@ -105,10 +105,10 @@ void Node::onGUI()
 	if (getParent()->engine_cmp->type == Anim::Component::STATE_MACHINE)
 	{
 		auto* engine_sm = (Anim::StateMachine*)getParent()->engine_cmp;
-		bool is_default = engine_sm->m_default_state == engine_cmp;
+		bool is_default = engine_sm->default_state == engine_cmp;
 		if (!is_default && ImGui::Button("Make default"))
 		{
-			engine_sm->m_default_state = (Anim::Node*)engine_cmp;
+			engine_sm->default_state = (Anim::Node*)engine_cmp;
 		}
 	}
 	ImGui::InputText("Name", m_name, lengthOf(m_name));
@@ -168,7 +168,7 @@ Container::Container(Anim::Component* engine_cmp, Container* parent, ControllerR
 void Container::removeChild(Component* component)
 {
 	auto* engine_container = ((Anim::Container*)engine_cmp);
-	engine_container->children.eraseItem(engine_cmp);
+	engine_container->children.eraseItem(component->engine_cmp);
 	m_editor_cmps.eraseItem(component);
 	if (component == m_selected_component) m_selected_component = nullptr;
 }

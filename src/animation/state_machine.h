@@ -186,7 +186,7 @@ struct StateMachine : public Container
 {
 	StateMachine(IAllocator& _allocator)
 		: Container(Component::STATE_MACHINE, _allocator)
-		, m_default_state(nullptr)
+		, default_state(nullptr)
 	{
 	}
 
@@ -194,7 +194,7 @@ struct StateMachine : public Container
 	void serialize(OutputBlob& blob) override;
 	void deserialize(InputBlob& blob, Container* parent) override;
 
-	Node* m_default_state;
+	Node* default_state;
 };
 
 
