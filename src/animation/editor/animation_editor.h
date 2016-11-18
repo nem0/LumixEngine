@@ -31,6 +31,8 @@ private:
 	void saveAs();
 	void drawGraph();
 	void load();
+	void loadFromEntity();
+	void loadFromFile();
 	void editorGUI();
 	void inputsGUI();
 	void constantsGUI();

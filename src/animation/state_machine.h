@@ -27,6 +27,7 @@ namespace Anim
 {
 
 
+struct Component;
 struct Container;
 struct ComponentInstance;
 struct StateMachine;
@@ -34,6 +35,8 @@ struct StateMachine;
 
 struct ComponentInstance
 {
+	ComponentInstance(Component& _source) : source(_source) {}
+
 	virtual ~ComponentInstance() {}
 	virtual ComponentInstance* update(RunningContext& rc) = 0;
 	virtual Transform getRootMotion() const = 0;
@@ -41,6 +44,8 @@ struct ComponentInstance
 	virtual void enter(RunningContext& rc, ComponentInstance* from) = 0;
 	virtual float getTime() const = 0;
 	virtual float getLength() const = 0;
+
+	Component& source;
 };
 
 
@@ -129,6 +134,8 @@ struct Edge : public Component
 
 struct NodeInstance : public ComponentInstance
 {
+	NodeInstance(Node& node) : ComponentInstance(node) {}
+
 	ComponentInstance* checkOutEdges(Node& node, RunningContext& rc)
 	{
 		rc.current = this;
