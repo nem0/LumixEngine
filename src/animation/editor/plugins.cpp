@@ -19,6 +19,8 @@
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
+#include "renderer/model.h"
+#include "renderer/render_scene.h"
 
 
 using namespace Lumix;
@@ -26,6 +28,7 @@ using namespace Lumix;
 
 static const ComponentType ANIMABLE_HASH = PropertyRegister::getComponentType("animable");
 static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("anim_controller");
+static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
 static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
@@ -57,7 +60,6 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 			ImGui::LabelText("FPS", "%d", animation->getFPS());
 			ImGui::LabelText("Length", "%.3fs", animation->getLength());
 			ImGui::LabelText("Frames", "%d", animation->getFrameCount());
-
 			return true;
 		}
 		return false;
@@ -80,6 +82,7 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
+	float m_time = 0;
 	StudioApp& m_app;
 };
 
@@ -161,6 +164,28 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin
 		{
 			float time_delta = m_app.getWorldEditor()->getEngine().getLastTimeDelta();
 			scene->updateAnimable(cmp.handle, time_delta);
+		}
+
+		if (ImGui::CollapsingHeader("Transformation"))
+		{
+			auto* render_scene = (RenderScene*)scene->getUniverse().getScene(RENDERABLE_TYPE);
+			ComponentHandle renderable = render_scene->getComponent(cmp.entity, RENDERABLE_TYPE);
+			if (isValid(renderable))
+			{
+				auto* pose = render_scene->getPose(renderable);
+				auto* model = render_scene->getModelInstanceModel(renderable);
+				ImGui::Columns(3);
+				for (int i = 0; i < pose->count; ++i)
+				{
+					ImGui::Text(model->getBone(i).name.c_str());
+					ImGui::NextColumn();
+					ImGui::Text("%f; %f; %f", pose->positions[i].x, pose->positions[i].y, pose->positions[i].z);
+					ImGui::NextColumn();
+					ImGui::Text("%f; %f; %f; %f", pose->rotations[i].x, pose->rotations[i].y, pose->rotations[i].z, pose->rotations[i].w);
+					ImGui::NextColumn();
+				}
+				ImGui::Columns();
+			}
 		}
 	}
 

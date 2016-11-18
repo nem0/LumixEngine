@@ -1,4 +1,4 @@
-#include "engine/lumix.h"
+#include "navigation_system.h"
 #include "engine/array.h"
 #include "engine/base_proxy_allocator.h"
 #include "engine/blob.h"
@@ -8,25 +8,25 @@
 #include "engine/iallocator.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
+#include "engine/lumix.h"
 #include "engine/profiler.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
-#include "engine/vec.h"
 #include "engine/universe/universe.h"
+#include "engine/vec.h"
 #include "lua_script/lua_script_system.h"
-#include "navigation_system.h"
-#include "renderer/model.h"
 #include "renderer/material.h"
+#include "renderer/model.h"
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
-#include <cmath>
-#include <DetourCrowd.h>
 #include <DetourAlloc.h>
+#include <DetourCrowd.h>
 #include <DetourNavMesh.h>
-#include <DetourNavMeshQuery.h>
 #include <DetourNavMeshBuilder.h>
+#include <DetourNavMeshQuery.h>
 #include <Recast.h>
 #include <RecastAlloc.h>
+#include <cmath>
 
 
 namespace Lumix
@@ -46,6 +46,8 @@ struct Agent
 	float height;
 	int agent;
 	bool is_finished;
+	Vec3 root_motion = {0, 0, 0};
+	float speed = 0;
 };
 
 
@@ -365,12 +367,38 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
+	float getAgentSpeed(Entity entity) override
+	{
+		return m_agents[entity].speed;
+	}
+
+
+	void setAgentRootMotion(Entity entity, const Vec3& root_motion) override
+	{
+		m_agents[entity].root_motion = root_motion;
+	}
+
+
 	void update(float time_delta, bool paused) override
 	{
 		PROFILE_FUNCTION();
 		if (!m_crowd) return;
 		if (paused) return;
 		m_crowd->update(time_delta, nullptr);
+		
+		for (auto& agent : m_agents)
+		{
+			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
+			if (dt_agent->paused) continue;
+
+			Vec3 pos = m_universe.getPosition(agent.entity);
+			Quat rot = m_universe.getRotation(agent.entity);
+			Vec3 diff = *(Vec3*)dt_agent->npos - pos;
+			*(Vec3*)dt_agent->npos = pos + rot.rotate(agent.root_motion);
+			agent.root_motion.set(0, 0, 0);
+			agent.speed = diff.length() / time_delta;
+		}
+		
 		m_crowd->doMove(time_delta);
 
 		for (auto& agent : m_agents)

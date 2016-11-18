@@ -46,6 +46,16 @@ struct LUMIX_ENGINE_API Transform
 	}
 
 
+	Transform interpolate(const Transform& rhs, float t)
+	{
+		Transform ret;
+		lerp(pos, rhs.pos, &ret.pos, t);
+		nlerp(rot, rhs.rot, &ret.rot, t);
+		return ret;
+	}
+
+
+
 	Matrix toMatrix() const;
 
 

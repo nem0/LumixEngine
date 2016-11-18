@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/matrix.h"
 #include "engine/resource.h"
 #include "engine/resource_manager_base.h"
 
@@ -53,11 +54,15 @@ class Animation LUMIX_FINAL : public Resource
 	public:
 		Animation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 
+		int getRootMotionBoneIdx() const { return m_root_motion_bone_idx; }
+		Transform getBoneTransform(float time, int bone_idx) const;
 		void getRelativePose(float time, Pose& pose, Model& model) const;
 		void getRelativePose(float time, Pose& pose, Model& model, float weight) const;
 		int getFrameCount() const { return m_frame_count; }
 		float getLength() const { return m_frame_count / (float)m_fps; }
 		int getFPS() const { return m_fps; }
+		int getBoneCount() const { return m_bones.size(); }
+		int getBoneIndex(uint32 name) const;
 
 	private:
 		IAllocator& getAllocator();
@@ -80,6 +85,7 @@ class Animation LUMIX_FINAL : public Resource
 		Array<Bone> m_bones;
 		Array<uint8> m_mem;
 		int m_fps;
+		int m_root_motion_bone_idx;
 };
 
 

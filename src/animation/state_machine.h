@@ -6,6 +6,7 @@
 #include "engine/blob.h"
 #include "engine/hash_map.h"
 #include "engine/lumix.h"
+#include "engine/matrix.h"
 #include "renderer/pose.h"
 
 
@@ -35,6 +36,7 @@ struct ComponentInstance
 {
 	virtual ~ComponentInstance() {}
 	virtual ComponentInstance* update(RunningContext& rc) = 0;
+	virtual Transform getRootMotion() const = 0;
 	virtual void fillPose(Engine& engine, Pose& pose, Model& model, float weight) = 0;
 	virtual void enter(RunningContext& rc, ComponentInstance* from) = 0;
 	virtual float getTime() const = 0;
@@ -165,6 +167,7 @@ struct StateMachineInstance : public NodeInstance
 	void enter(RunningContext& rc, ComponentInstance* from) override;
 	float getTime() const override { return 0; }
 	float getLength() const override { return 0; }
+	Transform getRootMotion() const override { return current->getRootMotion(); }
 
 	StateMachine& source;
 	ComponentInstance* current;
