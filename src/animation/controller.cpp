@@ -36,7 +36,11 @@ void ControllerResource::unload()
 	m_root = nullptr;
 	for (Animation* anim : m_anim_set)
 	{
-		if(anim) anim->getResourceManager().unload(*anim);
+		if (anim)
+		{
+			removeDependency(*anim);
+			anim->getResourceManager().unload(*anim);
+		}
 	}
 	m_anim_set.clear();
 }
