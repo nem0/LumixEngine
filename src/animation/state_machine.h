@@ -38,7 +38,7 @@ struct ComponentInstance
 	ComponentInstance(Component& _source) : source(_source) {}
 
 	virtual ~ComponentInstance() {}
-	virtual ComponentInstance* update(RunningContext& rc) = 0;
+	virtual ComponentInstance* update(RunningContext& rc, bool check_edges) = 0;
 	virtual Transform getRootMotion() const = 0;
 	virtual void fillPose(Engine& engine, Pose& pose, Model& model, float weight) = 0;
 	virtual void enter(RunningContext& rc, ComponentInstance* from) = 0;
@@ -171,8 +171,9 @@ struct SimpleAnimationNode : public Node
 struct StateMachineInstance : public NodeInstance
 {
 	StateMachineInstance(StateMachine& _source, IAllocator& _allocator);
+	~StateMachineInstance();
 
-	ComponentInstance* update(RunningContext& rc) override;
+	ComponentInstance* update(RunningContext& rc, bool check_edges) override;
 	void fillPose(Engine& engine, Pose& pose, Model& model, float weight) override;
 	void enter(RunningContext& rc, ComponentInstance* from) override;
 	float getTime() const override { return 0; }

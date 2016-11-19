@@ -66,7 +66,6 @@ Component::~Component()
 	{
 		getParent()->removeChild(this);
 	}
-	LUMIX_DELETE(m_controller.getEngineResource()->getAllocator(), engine_cmp);
 }
 
 
@@ -162,6 +161,15 @@ Container::Container(Anim::Component* engine_cmp, Container* parent, ControllerR
 	, m_editor_cmps(controller.getAllocator())
 	, m_selected_component(nullptr)
 {
+}
+
+
+Container::~Container()
+{
+	while (!m_editor_cmps.empty())
+	{
+		LUMIX_DELETE(m_controller.getAllocator(), m_editor_cmps.back());
+	}
 }
 
 
@@ -572,7 +580,6 @@ ControllerResource::ControllerResource(AnimationEditor& editor, ResourceManagerB
 ControllerResource::~ControllerResource()
 {
 	LUMIX_DELETE(m_allocator, m_engine_resource);
-	m_root->engine_cmp = nullptr;
 	LUMIX_DELETE(m_allocator, m_root);
 }
 

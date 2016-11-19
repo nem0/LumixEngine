@@ -611,7 +611,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		rc.allocator = &m_anim_system.m_allocator;
 		rc.input = &controller.input[0];
 		rc.anim_set = &controller.resource->getAnimSet();
-		controller.root->update(rc);
+		controller.root = controller.root->update(rc, true);
 
 		ComponentHandle model_instance = m_render_scene->getModelInstanceComponent(controller.entity);
 		if (model_instance == INVALID_COMPONENT) return;

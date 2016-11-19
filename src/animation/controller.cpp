@@ -56,7 +56,6 @@ bool ControllerResource::load(FS::IFile& file)
 
 void ControllerResource::setRoot(Component* component)
 {
-	ASSERT(m_root == nullptr);
 	m_root = component;
 }
 
