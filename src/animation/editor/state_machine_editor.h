@@ -146,9 +146,6 @@ public:
 
 	void onGUI() override;
 	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime) override;
-
-private:
-	char animation[64];
 };
 
 
