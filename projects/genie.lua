@@ -690,6 +690,11 @@ if build_app then
 				--forceLink("setStudioApp_gui")
 			end
 				
+			if build_game then
+				forceLink("s_game_plugin_register")
+				links { "game" }
+			end
+
 			if build_physics then
 				forceLink("s_physics_plugin_register")
 				if build_studio then
