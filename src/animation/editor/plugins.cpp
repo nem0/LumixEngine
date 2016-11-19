@@ -177,7 +177,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin
 				ImGui::Columns(3);
 				for (int i = 0; i < pose->count; ++i)
 				{
-					ImGui::Text(model->getBone(i).name.c_str());
+					ImGui::Text("%s", model->getBone(i).name.c_str());
 					ImGui::NextColumn();
 					ImGui::Text("%f; %f; %f", pose->positions[i].x, pose->positions[i].y, pose->positions[i].z);
 					ImGui::NextColumn();
