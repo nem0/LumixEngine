@@ -183,6 +183,7 @@ class ControllerResource
 {
 public:
 	ControllerResource(AnimationEditor& editor, Lumix::ResourceManagerBase& manager, Lumix::IAllocator& allocator);
+	~ControllerResource();
 
 	void serialize(Lumix::OutputBlob& blob);
 	void deserialize(Lumix::InputBlob& blob, Lumix::Engine& engine, Lumix::IAllocator& allocator);
