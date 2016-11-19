@@ -95,6 +95,7 @@ class Container : public Node
 {
 public:
 	Container(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
+	~Container();
 	Component* childrenHitTest(const ImVec2& pos);
 	Component* getChildByUID(int uid);
 	Component* getSelectedComponent() const { return m_selected_component; }

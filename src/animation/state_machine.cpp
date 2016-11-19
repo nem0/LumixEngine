@@ -20,8 +20,19 @@ namespace Anim
 
 struct EdgeInstance : public ComponentInstance
 {
-	EdgeInstance(Edge& _edge) : ComponentInstance(_edge), edge(_edge) {}
-
+	EdgeInstance(Edge& _edge, IAllocator& _allocator)
+		: ComponentInstance(_edge)
+		, edge(_edge)
+		, allocator(_allocator)
+	{
+	}
+	
+	
+	~EdgeInstance()
+	{
+		LUMIX_DELETE(allocator, from);
+		LUMIX_DELETE(allocator, to);
+	}
 
 	float getTime() const override { return time; }
 	float getLength() const override { return edge.length; }
@@ -33,15 +44,15 @@ struct EdgeInstance : public ComponentInstance
 	}
 
 
-	ComponentInstance* update(RunningContext& rc) override
+	ComponentInstance* update(RunningContext& rc, bool check_edges) override
 	{
-		from = from->update(rc);
-		to->update(rc);
+		from = from->update(rc, false);
+		to = to->update(rc, check_edges);
 		time += rc.time_delta;
 		if (time > edge.length)
 		{
 			ComponentInstance* ret = to;
-			LUMIX_DELETE(*rc.allocator, from);
+			to = nullptr;
 			LUMIX_DELETE(*rc.allocator, this);
 			return ret;
 		}
@@ -69,6 +80,7 @@ struct EdgeInstance : public ComponentInstance
 	float time;
 	ComponentInstance* from;
 	ComponentInstance* to;
+	IAllocator& allocator;
 };
 
 
@@ -87,7 +99,7 @@ Edge::~Edge()
 
 ComponentInstance* Edge::createInstance(IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, EdgeInstance)(*this);
+	return LUMIX_NEW(allocator, EdgeInstance)(*this, allocator);
 }
 
 
@@ -184,7 +196,7 @@ struct SimpleAnimationNodeInstance : public NodeInstance
 	}
 
 
-	ComponentInstance* update(RunningContext& rc) override
+	ComponentInstance* update(RunningContext& rc, bool check_edges) override
 	{
 		float old_time = time;
 		time += rc.time_delta;
@@ -214,7 +226,7 @@ struct SimpleAnimationNodeInstance : public NodeInstance
 		{
 			root_motion = { {0, 0, 0}, {0, 0, 0, 1} };
 		}
-		return checkOutEdges(node, rc);
+		return check_edges ? checkOutEdges(node, rc) : this;
 	}
 
 
@@ -247,10 +259,16 @@ StateMachineInstance::StateMachineInstance(StateMachine& _source, IAllocator& _a
 }
 
 
-ComponentInstance* StateMachineInstance::update(RunningContext& rc)
+StateMachineInstance::~StateMachineInstance()
 {
-	current = current->update(rc);
-	return checkOutEdges(source, rc);
+	LUMIX_DELETE(allocator, current);
+}
+
+
+ComponentInstance* StateMachineInstance::update(RunningContext& rc, bool check_edges)
+{
+	current = current->update(rc, true);
+	return check_edges ? checkOutEdges(source, rc) : this;
 }
 
 
