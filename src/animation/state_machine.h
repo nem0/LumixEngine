@@ -163,7 +163,7 @@ struct SimpleAnimationNode : public Node
 	void serialize(OutputBlob& blob) override;
 	void deserialize(InputBlob& blob, Container* parent) override;
 
-	uint32 animation_hash;
+	Array<uint32> animations_hashes;
 	bool looped = true;
 };
 

@@ -341,10 +341,25 @@ void SimpleAnimationNode::onGUI()
 	
 	auto& slots = m_controller.getAnimationSlots();
 	int current = 0;
-	for (current = 0; current < slots.size() && crc32(slots[current].c_str()) != node->animation_hash; ++current);
-	if (ImGui::Combo("Animation", &current, getter, this, slots.size()))
+
+	for (int i = 0; i < node->animations_hashes.size(); ++i)
 	{
-		node->animation_hash = crc32(slots[current].c_str());
+		for (current = 0; current < slots.size() && crc32(slots[current].c_str()) != node->animations_hashes[i]; ++current);
+		ImGui::PushID(i);
+		if (ImGui::Combo("Animation", &current, getter, this, slots.size()))
+		{
+			node->animations_hashes[i] = crc32(slots[current].c_str());
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Remove"))
+		{
+			node->animations_hashes.erase(i);
+		}
+		ImGui::PopID();
+	}
+	if (ImGui::Button("Add animation"))
+	{
+		node->animations_hashes.emplace(0);
 	}
 	ImGui::Checkbox("Looped", &node->looped);
 }

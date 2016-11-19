@@ -142,7 +142,7 @@ Node::~Node()
 
 SimpleAnimationNode::SimpleAnimationNode(IAllocator& allocator)
 	: Node(Component::SIMPLE_ANIMATION, allocator)
-	, animation_hash(0)
+	, animations_hashes(allocator)
 {
 }
 
@@ -150,7 +150,11 @@ SimpleAnimationNode::SimpleAnimationNode(IAllocator& allocator)
 void SimpleAnimationNode::serialize(OutputBlob& blob)
 {
 	Component::serialize(blob);
-	blob.write(animation_hash);
+	blob.write(animations_hashes.size());
+	for (uint32 hash : animations_hashes)
+	{
+		blob.write(hash);
+	}
 	blob.write(looped);
 }
 
@@ -158,7 +162,14 @@ void SimpleAnimationNode::serialize(OutputBlob& blob)
 void SimpleAnimationNode::deserialize(InputBlob& blob, Container* parent)
 {
 	Component::deserialize(blob, parent);
-	blob.read(animation_hash);
+
+	int count;
+	blob.read(count);
+	animations_hashes.resize(count);
+	for (uint32& hash : animations_hashes)
+	{
+		blob.read(hash);
+	}
 	blob.read(looped);
 }
 
@@ -233,7 +244,9 @@ struct SimpleAnimationNodeInstance : public NodeInstance
 	void enter(RunningContext& rc, ComponentInstance* from) override
 	{ 
 		time = 0;
-		resource = (*rc.anim_set)[node.animation_hash];
+		if (node.animations_hashes.empty()) return;
+		int idx = Math::rand() % node.animations_hashes.size();
+		resource = (*rc.anim_set)[node.animations_hashes[idx]];
 	}
 
 
