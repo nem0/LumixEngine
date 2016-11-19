@@ -1,4 +1,6 @@
 #pragma once
+
+
 #include "engine/array.h"
 #include "imgui/imgui.h"
 #include "animation/state_machine.h"
@@ -74,10 +76,10 @@ public:
 	void deserialize(Lumix::InputBlob& blob) override;
 	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override;
 	const char* getName() { return m_name; }
-	void addEdge(Edge* edge) { edges.push(edge); }
-	void addInEdge(Edge* edge) { in_edges.push(edge); }
-	void removeEdge(Edge* edge) { edges.eraseItemFast(edge); }
-	void removeInEdge(Edge* edge) { in_edges.eraseItemFast(edge); }
+	void addEdge(Edge* edge) { m_edges.push(edge); }
+	void addInEdge(Edge* edge) { m_in_edges.push(edge); }
+	void removeEdge(Edge* edge) { m_edges.eraseItemFast(edge); }
+	void removeInEdge(Edge* edge) { m_in_edges.eraseItemFast(edge); }
 
 public:
 	ImVec2 pos;
@@ -85,8 +87,8 @@ public:
 
 protected:
 	char m_name[64];
-	Lumix::Array<Edge*> edges;
-	Lumix::Array<Edge*> in_edges;
+	Lumix::Array<Edge*> m_edges;
+	Lumix::Array<Edge*> m_in_edges;
 	Lumix::IAllocator& m_allocator;
 };
 

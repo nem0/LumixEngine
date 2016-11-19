@@ -71,8 +71,8 @@ Component::~Component()
 
 Node::Node(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
 	: Component(parent, engine_cmp, controller)
-	, edges(controller.getAllocator())
-	, in_edges(controller.getAllocator())
+	, m_edges(controller.getAllocator())
+	, m_in_edges(controller.getAllocator())
 	, m_allocator(controller.getAllocator())
 {
 	m_name[0] = 0;
@@ -81,13 +81,13 @@ Node::Node(Anim::Component* engine_cmp, Container* parent, ControllerResource& c
 
 Node::~Node()
 {
-	while (!edges.empty())
+	while (!m_edges.empty())
 	{
-		LUMIX_DELETE(m_controller.getAllocator(), edges[0]);
+		LUMIX_DELETE(m_controller.getAllocator(), m_edges.back());
 	}
-	while (!in_edges.empty())
+	while (!m_in_edges.empty())
 	{
-		LUMIX_DELETE(m_controller.getAllocator(), in_edges[0]);
+		LUMIX_DELETE(m_controller.getAllocator(), m_in_edges.back());
 	}
 }
 
@@ -342,7 +342,7 @@ void SimpleAnimationNode::onGUI()
 	
 	auto& slots = m_controller.getAnimationSlots();
 	int current = 0;
-	for (current = 0; current < slots.size() && crc32(slots[current].c_str()) != node->animation_hash ; ++current);
+	for (current = 0; current < slots.size() && crc32(slots[current].c_str()) != node->animation_hash; ++current);
 	if (ImGui::Combo("Animation", &current, getter, this, slots.size()))
 	{
 		node->animation_hash = crc32(slots[current].c_str());
