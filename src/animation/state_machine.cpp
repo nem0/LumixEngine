@@ -289,6 +289,16 @@ void StateMachine::deserialize(InputBlob& blob, Container* parent)
 }
 
 
+Container::~Container()
+{
+	while (!children.empty())
+	{
+		LUMIX_DELETE(allocator, children.back());
+		children.pop();
+	}
+}
+
+
 void Container::serialize(OutputBlob& blob)
 {
 	Component::serialize(blob);
