@@ -15,6 +15,7 @@
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/memory_file_device.h"
+#include "engine/fs/os_file.h"
 #include "engine/fs/tcp_file_device.h"
 #include "engine/fs/tcp_file_server.h"
 #include "engine/geometry.h"
@@ -2973,6 +2974,18 @@ public:
 		save(*file);
 		bool is_same = file->size() > 8 && result_file->size() > 8 &&
 					   *((const uint32*)result_file->getBuffer() + 3) == *((const uint32*)file->getBuffer() + 3);
+
+		if (!is_same)
+		{
+			FS::OsFile bad_file;
+			StaticString<MAX_PATH_LENGTH> tmp(result_universe_path.c_str(), "_bad.unv");
+			if (bad_file.open(tmp, FS::Mode::CREATE_AND_WRITE, m_engine->getAllocator()))
+			{
+				bad_file.write(file->getBuffer(), file->size());
+				bad_file.close();
+			}
+		}
+
 		m_engine->getFileSystem().close(*result_file);
 		m_engine->getFileSystem().close(*file);
 
