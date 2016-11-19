@@ -569,6 +569,14 @@ ControllerResource::ControllerResource(AnimationEditor& editor, ResourceManagerB
 }
 
 
+ControllerResource::~ControllerResource()
+{
+	LUMIX_DELETE(m_allocator, m_engine_resource);
+	m_root->engine_cmp = nullptr;
+	LUMIX_DELETE(m_allocator, m_root);
+}
+
+
 void ControllerResource::serialize(OutputBlob& blob)
 {
 	m_root->compile();
@@ -587,6 +595,8 @@ void ControllerResource::serialize(OutputBlob& blob)
 
 void ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator& allocator)
 {
+	LUMIX_DELETE(m_allocator, m_engine_resource);
+	LUMIX_DELETE(m_allocator, m_root);
 	auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
 	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), *manager, allocator);
 	m_engine_resource->create();

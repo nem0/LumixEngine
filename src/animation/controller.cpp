@@ -26,12 +26,11 @@ ControllerResource::ControllerResource(const Path& path, ResourceManagerBase& re
 
 ControllerResource::~ControllerResource()
 {
-	ASSERT(!m_root);
-	ASSERT(m_anim_set.empty());
+	unload();
 }
 
 
-void ControllerResource::unload(void)
+void ControllerResource::unload()
 {
 	LUMIX_DELETE(m_allocator, m_root);
 	m_root = nullptr;
