@@ -1,6 +1,7 @@
 #include "condition.h"
 #include "state_machine.h"
 #include <cmath>
+#include <cstdlib>
 
 
 namespace Lumix
