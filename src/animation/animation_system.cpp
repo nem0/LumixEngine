@@ -187,6 +187,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	{
 		Controller& controller = m_controllers.get({ cmp.index });
 		Anim::InputDecl& decl = controller.resource->getInputDecl();
+		if (input_idx < 0 || input_idx >= decl.inputs_count) return;
 		if (decl.inputs[input_idx].type == Anim::InputDecl::FLOAT)
 		{
 			*(float*)&controller.input[decl.inputs[input_idx].offset] = value;
@@ -208,7 +209,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		}
 		else
 		{
-			g_log_warning.log("Animation") << "Trying to set float to " << decl.inputs[input_idx].name;
+			g_log_warning.log("Animation") << "Trying to set int to " << decl.inputs[input_idx].name;
 		}
 	}
 
@@ -544,7 +545,10 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	void setControllerInput(ComponentHandle cmp, int input_idx, float value) override
 	{
 		Controller& ctrl = m_controllers.get({cmp.index});
-		*(float*)&ctrl.input[ctrl.resource->getInputDecl().inputs[input_idx].offset] = value;
+		Anim::InputDecl& decl = ctrl.resource->getInputDecl();
+		if (!ctrl.root) return;
+		if (input_idx >= decl.inputs_count) return;
+		*(float*)&ctrl.input[decl.inputs[input_idx].offset] = value;
 	}
 
 
