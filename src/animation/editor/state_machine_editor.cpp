@@ -312,7 +312,6 @@ bool Edge::hitTest(const ImVec2& on_canvas_pos) const
 SimpleAnimationNode::SimpleAnimationNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
 	: Node(engine_cmp, parent, controller)
 {
-	animation[0] = 0;
 }
 
 
