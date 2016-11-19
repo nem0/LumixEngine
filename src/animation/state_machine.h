@@ -98,6 +98,9 @@ struct Container : public Node
 	}
 
 
+	~Container();
+
+
 	void serialize(OutputBlob& blob) override;
 	void deserialize(InputBlob& blob, Container* parent) override;
 
