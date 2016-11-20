@@ -544,11 +544,23 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 	void setControllerInput(ComponentHandle cmp, int input_idx, float value) override
 	{
-		Controller& ctrl = m_controllers.get({cmp.index});
+		Controller& ctrl = m_controllers.get({ cmp.index });
 		Anim::InputDecl& decl = ctrl.resource->getInputDecl();
 		if (!ctrl.root) return;
 		if (input_idx >= decl.inputs_count) return;
+		if (decl.inputs[input_idx].type != Anim::InputDecl::FLOAT) return;
 		*(float*)&ctrl.input[decl.inputs[input_idx].offset] = value;
+	}
+
+
+	void setControllerInput(ComponentHandle cmp, int input_idx, bool value) override
+	{
+		Controller& ctrl = m_controllers.get({ cmp.index });
+		Anim::InputDecl& decl = ctrl.resource->getInputDecl();
+		if (!ctrl.root) return;
+		if (input_idx >= decl.inputs_count) return;
+		if (decl.inputs[input_idx].type != Anim::InputDecl::BOOL) return;
+		*(bool*)&ctrl.input[decl.inputs[input_idx].offset] = value;
 	}
 
 
