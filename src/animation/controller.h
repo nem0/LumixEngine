@@ -49,7 +49,7 @@ public:
 	void setRoot(Component* component);
 	Component* getRoot() const { return m_root; }
 	void serialize(OutputBlob& blob);
-	void deserialize(InputBlob& blob);
+	bool deserialize(InputBlob& blob);
 	IAllocator& getAllocator() { return m_allocator; }
 
 private:

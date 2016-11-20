@@ -1,5 +1,6 @@
 #include "controller.h"
 #include "animation/animation.h"
+#include "engine/log.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 
@@ -13,6 +14,21 @@ static const ResourceType ANIMATION_TYPE("animation");
 
 namespace Anim
 {
+
+
+enum class Version : int
+{
+	LAST
+};
+
+
+struct Header
+{
+	static const uint32 FILE_MAGIC = '_LAC'; // == '_LAC'
+	uint32 magic = FILE_MAGIC;
+	int version = (int)Version::LAST;
+	uint32 reserved[4] = {0};
+};
 
 
 ControllerResource::ControllerResource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
@@ -49,7 +65,7 @@ void ControllerResource::unload()
 bool ControllerResource::load(FS::IFile& file)
 {
 	InputBlob blob(file.getBuffer(), (int)file.size());
-	deserialize(blob);
+	return deserialize(blob);
 	return true;
 }
 
@@ -60,8 +76,20 @@ void ControllerResource::setRoot(Component* component)
 }
 
 
-void ControllerResource::deserialize(InputBlob& blob)
+bool ControllerResource::deserialize(InputBlob& blob)
 {
+	Header header;
+	blob.read(header);
+	if (header.magic != Header::FILE_MAGIC)
+	{
+		g_log_error.log("Animation") << getPath().c_str() << " is not an animation controller file.";
+		return false;
+	}
+	if (header.version != (int)Version::LAST)
+	{
+		g_log_error.log("Animation") << getPath().c_str() << " has unsupported version.";
+		return false;
+	}
 	Component::Type type;
 	blob.read(type);
 	m_root = createComponent(type, m_allocator);
@@ -86,7 +114,7 @@ void ControllerResource::deserialize(InputBlob& blob)
 			case InputDecl::BOOL: blob.read(constant.b_value); break;
 			case InputDecl::INT: blob.read(constant.i_value); break;
 			case InputDecl::FLOAT: blob.read(constant.f_value); break;
-			default: ASSERT(false); return;
+			default: ASSERT(false); return false;
 		}
 	}
 
@@ -104,11 +132,14 @@ void ControllerResource::deserialize(InputBlob& blob)
 		if(anim) addDependency(*anim);
 		m_anim_set.insert(key, anim);
 	}
+	return true;
 }
 
 
 void ControllerResource::serialize(OutputBlob& blob)
 {
+	Header header;
+	blob.write(header);
 	blob.write(m_root->type);
 	m_root->serialize(blob);
 	blob.write(m_input_decl.inputs_count);

@@ -186,7 +186,7 @@ public:
 	~ControllerResource();
 
 	void serialize(Lumix::OutputBlob& blob);
-	void deserialize(Lumix::InputBlob& blob, Lumix::Engine& engine, Lumix::IAllocator& allocator);
+	bool deserialize(Lumix::InputBlob& blob, Lumix::Engine& engine, Lumix::IAllocator& allocator);
 	Component* getRoot() { return m_root; }
 	Lumix::Array<Lumix::string>& getAnimationSlots() { return m_animation_slots; }
 	Lumix::IAllocator& getAllocator() { return m_allocator; }
