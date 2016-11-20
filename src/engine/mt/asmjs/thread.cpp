@@ -10,28 +10,28 @@ namespace MT
 {
 
 
-void sleep(uint32 milliseconds)
+void sleep(u32 milliseconds)
 {
 	SDL_Delay(milliseconds);
 }
 
-uint32 getCPUsCount()
+u32 getCPUsCount()
 {
 	return 1;
 }
 
-uint32 getCurrentThreadID()
+u32 getCurrentThreadID()
 {
 	return 0;
 }
 
-uint32 getProccessAffinityMask()
+u32 getProccessAffinityMask()
 {
 	return 0;
 }
 
 
-void setThreadName(uint32 /*thread_id*/, const char* /*thread_name*/)
+void setThreadName(u32 /*thread_id*/, const char* /*thread_name*/)
 {
 	ASSERT(false);
 }

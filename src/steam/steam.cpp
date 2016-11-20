@@ -108,11 +108,11 @@ struct SteamPlugin : public IPlugin
 		if (iter.isValid()) return &iter.value()->handle;
 
 		int avatar = friends->GetMediumFriendAvatar(id);
-		Lumix::uint32 w, h;
+		Lumix::u32 w, h;
 		SteamUtils()->GetImageSize(avatar, &w, &h);
 		if (w == 0 || h == 0) return nullptr;
 		
-		Array<Lumix::uint8> data(allocator);
+		Array<Lumix::u8> data(allocator);
 		data.resize(w * h * 4);
 		SteamUtils()->GetImageRGBA(avatar, &data[0], w * h * 4);
 

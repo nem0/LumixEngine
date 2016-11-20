@@ -40,12 +40,12 @@ bool Task::destroy()
 	return false;
 }
 
-void Task::setAffinityMask(uint32 affinity_mask)
+void Task::setAffinityMask(u32 affinity_mask)
 {
 	ASSERT(false);
 }
 
-uint32 Task::getAffinityMask() const
+u32 Task::getAffinityMask() const
 {
 	ASSERT(false);
 	return 0;

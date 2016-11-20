@@ -11,7 +11,7 @@ namespace MT
 {
 
 
-void sleep(uint32 milliseconds)
+void sleep(u32 milliseconds)
 {
 	if (milliseconds) usleep(useconds_t(milliseconds * 1000));
 }
@@ -23,7 +23,7 @@ void yield()
 }
 
 
-uint32 getCPUsCount()
+u32 getCPUsCount()
 {
 	return sysconf(_SC_NPROCESSORS_ONLN);
 }
@@ -33,7 +33,7 @@ ThreadID getCurrentThreadID()
 	return pthread_self();
 }
 
-uint32 getThreadAffinityMask()
+u32 getThreadAffinityMask()
 {
 	cpu_set_t affinity;
 	int r = pthread_getaffinity_np(pthread_self(), sizeof(affinity), &affinity);

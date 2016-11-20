@@ -30,7 +30,7 @@ namespace Lumix
 		}
 
 
-		float getActionValue(uint32 action) override { return 0; }
+		float getActionValue(u32 action) override { return 0; }
 
 
 		void injectMouseXMove(float rel, float abs) override
@@ -54,7 +54,7 @@ namespace Lumix
 
 
 
-		void addAction(uint32 action, InputType type, int key, int controller_id) override {}
+		void addAction(u32 action, InputType type, int key, int controller_id) override {}
 
 		IAllocator& m_allocator;
 		Vec2 m_injected_mouse_rel_pos;
