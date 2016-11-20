@@ -24,7 +24,7 @@ enum class Version : int
 
 struct Header
 {
-	static const uint32 FILE_MAGIC = '_LAC'; // == '_LAC'
+	static const uint32 FILE_MAGIC = 0x5f4c4143; // == '_LAC'
 	uint32 magic = FILE_MAGIC;
 	int version = (int)Version::LAST;
 	uint32 reserved[4] = {0};
