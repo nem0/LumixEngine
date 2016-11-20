@@ -3241,7 +3241,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			cDesc.behaviorCallback = nullptr;
 			Vec3 position = m_universe.getPosition(entity);
 			cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
-			c.m_controller = m_controller_manager->createController(*m_system->getPhysics(), m_scene, cDesc);
+			c.m_controller = m_controller_manager->createController(cDesc);
 			c.m_entity = entity;
 			m_universe.addComponent(entity, CONTROLLER_TYPE, this, {i});
 		}
