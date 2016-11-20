@@ -455,6 +455,7 @@ void StateMachine::debugInside(ImDrawList* draw,
 	if (runtime->source.type != Anim::Component::STATE_MACHINE) return;
 	
 	auto* child_runtime = ((Anim::StateMachineInstance*)runtime)->current;
+	if (!child_runtime) return;
 	auto* child = getChildByUID(child_runtime->source.uid);
 	if (child)
 	{
