@@ -4,10 +4,10 @@
 
 
 static const char* METADATA_FILENAME = "metadata.bin";
-static const Lumix::uint32 METADATA_MAGIC = 0x4D455441; // 'META'
+static const Lumix::u32 METADATA_MAGIC = 0x4D455441; // 'META'
 
 
-enum class MetadataVersion : Lumix::int32
+enum class MetadataVersion : Lumix::i32
 {
 	FIRST,
 
@@ -29,14 +29,14 @@ bool Metadata::load()
 
 	m_data.clear();
 	int count;
-	Lumix::uint32 magic;
+	Lumix::u32 magic;
 	file.read(&magic, sizeof(magic));
 	if (magic != METADATA_MAGIC)
 	{
 		file.close();
 		return false;
 	}
-	Lumix::int32 version;
+	Lumix::i32 version;
 	file.read(&version, sizeof(version));
 	if (version > (int)MetadataVersion::LATEST)
 	{
@@ -46,7 +46,7 @@ bool Metadata::load()
 	file.read(&count, sizeof(count));
 	for (int i = 0; i < count; ++i)
 	{
-		Lumix::uint32 key;
+		Lumix::u32 key;
 		file.read(&key, sizeof(key));
 		auto& file_data = m_data.emplace(key, m_allocator);
 
@@ -91,7 +91,7 @@ bool Metadata::save()
 	if (!file.open(METADATA_FILENAME, Lumix::FS::Mode::CREATE_AND_WRITE, m_allocator)) return false;
 
 	file.write(&METADATA_MAGIC, sizeof(METADATA_MAGIC));
-	Lumix::int32 version = (int)MetadataVersion::LATEST;
+	Lumix::i32 version = (int)MetadataVersion::LATEST;
 	file.write(&version, sizeof(version));
 	int count = m_data.size();
 	file.write(&count, sizeof(count));
@@ -152,12 +152,12 @@ Metadata::~Metadata()
 }
 
 
-Metadata::DataItem* Metadata::getOrCreateData(Lumix::uint32 file, Lumix::uint32 key)
+Metadata::DataItem* Metadata::getOrCreateData(Lumix::u32 file, Lumix::u32 key)
 {
 	int index = m_data.find(file);
 	if (index < 0)
 	{
-		index = m_data.insert(file, Lumix::AssociativeArray<Lumix::uint32, DataItem>(m_allocator));
+		index = m_data.insert(file, Lumix::AssociativeArray<Lumix::u32, DataItem>(m_allocator));
 	}
 
 	auto& file_data = m_data.at(index);
@@ -167,7 +167,7 @@ Metadata::DataItem* Metadata::getOrCreateData(Lumix::uint32 file, Lumix::uint32 
 }
 
 
-const Metadata::DataItem* Metadata::getData(Lumix::uint32 file, Lumix::uint32 key) const
+const Metadata::DataItem* Metadata::getData(Lumix::u32 file, Lumix::u32 key) const
 {
 	int index = m_data.find(file);
 	if (index < 0) return nullptr;
@@ -180,7 +180,7 @@ const Metadata::DataItem* Metadata::getData(Lumix::uint32 file, Lumix::uint32 ke
 }
 
 
-const void* Metadata::getRawMemory(Lumix::uint32 file, Lumix::uint32 key) const
+const void* Metadata::getRawMemory(Lumix::u32 file, Lumix::u32 key) const
 {
 	const auto* data = getData(file, key);
 	if (!data || data->m_type != DataItem::RAW_MEMORY) return nullptr;
@@ -188,7 +188,7 @@ const void* Metadata::getRawMemory(Lumix::uint32 file, Lumix::uint32 key) const
 }
 
 
-size_t Metadata::getRawMemorySize(Lumix::uint32 file, Lumix::uint32 key) const
+size_t Metadata::getRawMemorySize(Lumix::u32 file, Lumix::u32 key) const
 {
 	const auto* data = getData(file, key);
 	if (!data || data->m_type != DataItem::RAW_MEMORY) return 0;
@@ -197,7 +197,7 @@ size_t Metadata::getRawMemorySize(Lumix::uint32 file, Lumix::uint32 key) const
 
 
 
-bool Metadata::setRawMemory(Lumix::uint32 file, Lumix::uint32 key, const void* mem, size_t size)
+bool Metadata::setRawMemory(Lumix::u32 file, Lumix::u32 key, const void* mem, size_t size)
 {
 	auto* data = getOrCreateData(file, key);
 	if (!data) return false;
@@ -211,7 +211,7 @@ bool Metadata::setRawMemory(Lumix::uint32 file, Lumix::uint32 key, const void* m
 }
 
 
-bool Metadata::setInt(Lumix::uint32 file, Lumix::uint32 key, int value)
+bool Metadata::setInt(Lumix::u32 file, Lumix::u32 key, int value)
 {
 	auto* data = getOrCreateData(file, key);
 	if (!data) return false;
@@ -223,7 +223,7 @@ bool Metadata::setInt(Lumix::uint32 file, Lumix::uint32 key, int value)
 }
 
 
-bool Metadata::setString(Lumix::uint32 file, Lumix::uint32 key, const char* value)
+bool Metadata::setString(Lumix::u32 file, Lumix::u32 key, const char* value)
 {
 	auto* data = getOrCreateData(file, key);
 	if (!data) return false;
@@ -235,13 +235,13 @@ bool Metadata::setString(Lumix::uint32 file, Lumix::uint32 key, const char* valu
 }
 
 
-bool Metadata::hasKey(Lumix::uint32 file, Lumix::uint32 key) const
+bool Metadata::hasKey(Lumix::u32 file, Lumix::u32 key) const
 {
 	return getData(file, key) != nullptr;
 }
 
 
-int Metadata::getInt(Lumix::uint32 file, Lumix::uint32 key) const
+int Metadata::getInt(Lumix::u32 file, Lumix::u32 key) const
 {
 	const auto* data = getData(file, key);
 	if (!data || data->m_type != DataItem::INT) return 0;
@@ -249,7 +249,7 @@ int Metadata::getInt(Lumix::uint32 file, Lumix::uint32 key) const
 }
 
 
-bool Metadata::getString(Lumix::uint32 file, Lumix::uint32 key, char* out, int max_size) const
+bool Metadata::getString(Lumix::u32 file, Lumix::u32 key, char* out, int max_size) const
 {
 	const auto* data = getData(file, key);
 	if (!data || data->m_type != DataItem::STRING) return false;

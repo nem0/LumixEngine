@@ -70,7 +70,7 @@ struct PaintTerrainCommand LUMIX_FINAL : public Lumix::IEditorCommand
 		Lumix::BinaryArray& mask,
 		float radius,
 		float rel_amount,
-		Lumix::uint16 flat_height,
+		Lumix::u16 flat_height,
 		Lumix::Vec3 color,
 		Lumix::ComponentUID terrain,
 		bool can_be_merged)
@@ -258,19 +258,19 @@ private:
 	}
 
 
-	Lumix::uint16 computeAverage16(const Lumix::Texture* texture, int from_x, int to_x, int from_y, int to_y)
+	Lumix::u16 computeAverage16(const Lumix::Texture* texture, int from_x, int to_x, int from_y, int to_y)
 	{
 		ASSERT(texture->bytes_per_pixel == 2);
-		Lumix::uint32 sum = 0;
+		Lumix::u32 sum = 0;
 		int texture_width = texture->width;
 		for (int i = from_x, end = to_x; i < end; ++i)
 		{
 			for (int j = from_y, end2 = to_y; j < end2; ++j)
 			{
-				sum += ((Lumix::uint16*)texture->getData())[(i + j * texture_width)];
+				sum += ((Lumix::u16*)texture->getData())[(i + j * texture_width)];
 			}
 		}
-		return Lumix::uint16(sum / (to_x - from_x) / (to_y - from_y));
+		return Lumix::u16(sum / (to_x - from_x) / (to_y - from_y));
 	}
 
 
@@ -282,7 +282,7 @@ private:
 	}
 
 
-	void rasterColorItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item)
+	void rasterColorItem(Lumix::Texture* texture, Lumix::Array<Lumix::u8>& data, Item& item)
 	{
 		int texture_width = texture->width;
 		Rectangle r = item.getBoundingRectangle(texture_width, texture->height);
@@ -304,10 +304,10 @@ private:
 				{
 					float attenuation = getAttenuation(item, i, j);
 					int offset = 4 * (i - m_x + (j - m_y) * m_width);
-					Lumix::uint8* d = &data[offset];
-					d[0] += Lumix::uint8((item.m_color.x * 255 - d[0]) * attenuation);
-					d[1] += Lumix::uint8((item.m_color.y * 255 - d[1]) * attenuation);
-					d[2] += Lumix::uint8((item.m_color.z * 255 - d[2]) * attenuation);
+					Lumix::u8* d = &data[offset];
+					d[0] += Lumix::u8((item.m_color.x * 255 - d[0]) * attenuation);
+					d[1] += Lumix::u8((item.m_color.y * 255 - d[1]) * attenuation);
+					d[2] += Lumix::u8((item.m_color.z * 255 - d[2]) * attenuation);
 					d[3] = 255;
 				}
 			}
@@ -327,7 +327,7 @@ private:
 	}
 
 
-	void rasterLayerItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item)
+	void rasterLayerItem(Lumix::Texture* texture, Lumix::Array<Lumix::u8>& data, Item& item)
 	{
 		int texture_width = texture->width;
 		Rectangle r = item.getBoundingRectangle(texture_width, texture->height);
@@ -370,7 +370,7 @@ private:
 		}
 	}
 
-	void rasterGrassItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item, TerrainEditor::ActionType action_type)
+	void rasterGrassItem(Lumix::Texture* texture, Lumix::Array<Lumix::u8>& data, Item& item, TerrainEditor::ActionType action_type)
 	{
 		int texture_width = texture->width;
 		Rectangle r = item.getBoundingRectangle(texture_width, texture->height);
@@ -411,7 +411,7 @@ private:
 	}
 
 
-	void rasterSmoothHeightItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item)
+	void rasterSmoothHeightItem(Lumix::Texture* texture, Lumix::Array<Lumix::u8>& data, Item& item)
 	{
 		ASSERT(texture->bytes_per_pixel == 2);
 
@@ -426,15 +426,15 @@ private:
 			{
 				float attenuation = getAttenuation(item, i, j);
 				int offset = i - m_x + (j - m_y) * m_width;
-				Lumix::uint16 x = ((Lumix::uint16*)texture->getData())[(i + j * texture_width)];
-				x += Lumix::uint16((avg - x) * item.m_amount * attenuation);
-				((Lumix::uint16*)&data[0])[offset] = x;
+				Lumix::u16 x = ((Lumix::u16*)texture->getData())[(i + j * texture_width)];
+				x += Lumix::u16((avg - x) * item.m_amount * attenuation);
+				((Lumix::u16*)&data[0])[offset] = x;
 			}
 		}
 	}
 
 
-	void rasterFlatHeightItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item)
+	void rasterFlatHeightItem(Lumix::Texture* texture, Lumix::Array<Lumix::u8>& data, Item& item)
 	{
 		ASSERT(texture->bytes_per_pixel == 2);
 
@@ -451,14 +451,14 @@ private:
 					(item.m_local_pos.z - 0.5f - j) * (item.m_local_pos.z - 0.5f - j));
 				float t = (dist - item.m_radius * item.m_amount) / (item.m_radius * (1 - item.m_amount));
 				t = Lumix::Math::clamp(1 - t, 0.0f, 1.0f);
-				Lumix::uint16 old_value = ((Lumix::uint16*)&data[0])[offset];
-				((Lumix::uint16*)&data[0])[offset] = (Lumix::uint16)(m_flat_height * t + old_value * (1-t));
+				Lumix::u16 old_value = ((Lumix::u16*)&data[0])[offset];
+				((Lumix::u16*)&data[0])[offset] = (Lumix::u16)(m_flat_height * t + old_value * (1-t));
 			}
 		}
 	}
 
 
-	void rasterItem(Lumix::Texture* texture, Lumix::Array<Lumix::uint8>& data, Item& item)
+	void rasterItem(Lumix::Texture* texture, Lumix::Array<Lumix::u8>& data, Item& item)
 	{
 		if (m_action_type == TerrainEditor::COLOR)
 		{
@@ -503,10 +503,10 @@ private:
 				int offset = i - m_x + (j - m_y) * m_width;
 
 				int add = int(attenuation * amount);
-				Lumix::uint16 x = ((Lumix::uint16*)texture->getData())[(i + j * texture_width)];
+				Lumix::u16 x = ((Lumix::u16*)texture->getData())[(i + j * texture_width)];
 				x += m_action_type == TerrainEditor::RAISE_HEIGHT ? Lumix::Math::minimum(add, 0xFFFF - x)
 														   : Lumix::Math::maximum(-add, -x);
-				((Lumix::uint16*)&data[0])[offset] = x;
+				((Lumix::u16*)&data[0])[offset] = x;
 			}
 		}
 	}
@@ -556,7 +556,7 @@ private:
 	}
 
 
-	void applyData(Lumix::Array<Lumix::uint8>& data)
+	void applyData(Lumix::Array<Lumix::u8>& data)
 	{
 		auto texture = getDestinationTexture();
 		int bpp = texture->bytes_per_pixel;
@@ -592,8 +592,8 @@ private:
 
 	void resizeData()
 	{
-		Lumix::Array<Lumix::uint8> new_data(m_world_editor.getAllocator());
-		Lumix::Array<Lumix::uint8> old_data(m_world_editor.getAllocator());
+		Lumix::Array<Lumix::u8> new_data(m_world_editor.getAllocator());
+		Lumix::Array<Lumix::u8> old_data(m_world_editor.getAllocator());
 		auto texture = getDestinationTexture();
 		Rectangle rect;
 		getBoundingRectangle(texture, rect);
@@ -664,8 +664,8 @@ private:
 
 
 private:
-	Lumix::Array<Lumix::uint8> m_new_data;
-	Lumix::Array<Lumix::uint8> m_old_data;
+	Lumix::Array<Lumix::u8> m_new_data;
+	Lumix::Array<Lumix::u8> m_old_data;
 	int m_texture_idx;
 	int m_grass_idx;
 	int m_width;
@@ -677,7 +677,7 @@ private:
 	Lumix::ComponentUID m_terrain;
 	Lumix::WorldEditor& m_world_editor;
 	Lumix::BinaryArray m_mask;
-	Lumix::uint16 m_flat_height;
+	Lumix::u16 m_flat_height;
 	bool m_can_be_merged;
 };
 
@@ -909,13 +909,13 @@ Lumix::Texture* TerrainEditor::getHeightmap()
 }
 
 
-Lumix::uint16 TerrainEditor::getHeight(const Lumix::Vec3& world_pos)
+Lumix::u16 TerrainEditor::getHeight(const Lumix::Vec3& world_pos)
 {
 	auto rel_pos = getRelativePosition(world_pos);
 	auto* heightmap = getHeightmap();
 	if (!heightmap) return 0;
 
-	auto* data = (Lumix::uint16*)heightmap->getData();
+	auto* data = (Lumix::u16*)heightmap->getData();
 	return data[int(rel_pos.x) + int(rel_pos.z) * heightmap->width];
 }
 
@@ -971,12 +971,12 @@ void TerrainEditor::removeEntities(const Lumix::Vec3& hit_pos)
 
 	PROFILE_FUNCTION();
 
-	static const Lumix::uint32 REMOVE_ENTITIES_HASH = Lumix::crc32("remove_entities");
+	static const Lumix::u32 REMOVE_ENTITIES_HASH = Lumix::crc32("remove_entities");
 	m_world_editor.beginCommandGroup(REMOVE_ENTITIES_HASH);
 
 	Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
 	Lumix::Frustum frustum;
-	Lumix::Array<Lumix::uint32> hashes(m_world_editor.getAllocator());
+	Lumix::Array<Lumix::u32> hashes(m_world_editor.getAllocator());
 	hashes.reserve(m_selected_entity_templates.size());
 	for(int template_idx : m_selected_entity_templates)
 	{
@@ -1121,7 +1121,7 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 	auto& template_system = m_world_editor.getEntityTemplateSystem();
 	auto& template_names = template_system.getTemplateNames();
 
-	static const Lumix::uint32 PAINT_ENTITIES_HASH = Lumix::crc32("paint_entities");
+	static const Lumix::u32 PAINT_ENTITIES_HASH = Lumix::crc32("paint_entities");
 	m_world_editor.beginCommandGroup(PAINT_ENTITIES_HASH);
 	{
 		Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
@@ -1139,7 +1139,7 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 		tpls.reserve(m_selected_entity_templates.size());
 		for(int idx : m_selected_entity_templates)
 		{
-			Lumix::uint32 hash = Lumix::crc32(template_names[idx].c_str());
+			Lumix::u32 hash = Lumix::crc32(template_names[idx].c_str());
 			Lumix::Entity tpl = template_system.getInstances(hash)[0];
 			if(!isValid(tpl)) continue;
 			Lumix::ComponentUID model_instance = m_world_editor.getUniverse()->getComponent(tpl, MODEL_INSTANCE_TYPE);

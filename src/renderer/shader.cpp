@@ -39,13 +39,13 @@ Shader::~Shader()
 }
 
 
-bool Shader::hasDefine(uint8 define_idx) const
+bool Shader::hasDefine(u8 define_idx) const
 {
 	return (m_combintions.all_defines_mask & (1 << define_idx)) != 0;
 }
 
 
-ShaderInstance& Shader::getInstance(uint32 mask)
+ShaderInstance& Shader::getInstance(u32 mask)
 {
 	mask = mask & m_all_defines_mask;
 	for (int i = 0; i < m_instances.size(); ++i)
@@ -73,9 +73,9 @@ Renderer& Shader::getRenderer()
 }
 
 
-static uint32 getDefineMaskFromDense(const Shader& shader, uint32 dense)
+static u32 getDefineMaskFromDense(const Shader& shader, u32 dense)
 {
-	uint32 mask = 0;
+	u32 mask = 0;
 	int defines_count = Math::minimum(lengthOf(shader.m_combintions.defines), int(sizeof(dense) * 8));
 
 	for (int i = 0; i < defines_count; ++i)
@@ -94,14 +94,14 @@ bool Shader::generateInstances()
 	bool is_opengl = getRenderer().isOpenGL();
 	m_instances.clear();
 
-	uint32 count = 1 << m_combintions.define_count;
+	u32 count = 1 << m_combintions.define_count;
 
 	auto* binary_manager = m_resource_manager.getOwner().get(SHADER_BINARY_TYPE);
 	char basename[MAX_PATH_LENGTH];
 	PathUtils::getBasename(basename, sizeof(basename), getPath().c_str());
 
 	m_instances.reserve(count);
-	for (uint32 mask = 0; mask < count; ++mask)
+	for (u32 mask = 0; mask < count; ++mask)
 	{
 		ShaderInstance& instance = m_instances.emplace(*this);
 
@@ -266,7 +266,7 @@ static void pass(lua_State* state, const char* name)
 }
 
 
-static int indexOf(ShaderCombinations& combination, uint8 define_idx)
+static int indexOf(ShaderCombinations& combination, u8 define_idx)
 {
 	for (int i = 0; i < combination.define_count; ++i)
 	{
@@ -520,7 +520,7 @@ void ShaderBinary::unload()
 
 bool ShaderBinary::load(FS::IFile& file)
 {
-	auto* mem = bgfx::alloc((uint32)file.size() + 1);
+	auto* mem = bgfx::alloc((u32)file.size() + 1);
 	file.read(mem->data, file.size());
 	mem->data[file.size()] = '\0';
 	m_handle = bgfx::createShader(mem);

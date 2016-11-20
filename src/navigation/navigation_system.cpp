@@ -264,7 +264,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 					Vec3 p3 = pos + rot.rotate(Vec3(x, h3, z));
 
 					Vec3 n = crossProduct(p1 - p0, p0 - p2).normalized();
-					uint8 area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
+					u8 area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
 					rcRasterizeTriangle(&ctx, &p0.x, &p1.x, &p2.x, area, solid);
 
 					n = crossProduct(p2 - p0, p0 - p3).normalized();
@@ -286,8 +286,8 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 
-		uint32 no_navigation_flag = Material::getCustomFlag("no_navigation");
-		uint32 nonwalkable_flag = Material::getCustomFlag("nonwalkable");
+		u32 no_navigation_flag = Material::getCustomFlag("no_navigation");
+		u32 nonwalkable_flag = Material::getCustomFlag("nonwalkable");
 		for (auto model_instance = render_scene->getFirstModelInstance(); model_instance != INVALID_COMPONENT;
 			 model_instance = render_scene->getNextModelInstance(model_instance))
 		{
@@ -313,7 +313,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 					&model->getVertices()[mesh.attribute_array_offset / model->getVertexDecl().getStride()];
 				if (is16)
 				{
-					const uint16* indices16 = model->getIndices16();
+					const u16* indices16 = model->getIndices16();
 					for (int i = 0; i < mesh.indices_count; i += 3)
 					{
 						Vec3 a = mtx.transform(vertices[indices16[mesh.indices_offset + i]]);
@@ -321,13 +321,13 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 						Vec3 c = mtx.transform(vertices[indices16[mesh.indices_offset + i + 2]]);
 
 						Vec3 n = crossProduct(a - b, a - c).normalized();
-						uint8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
+						u8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
 						rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
 					}
 				}
 				else
 				{
-					const uint32* indices32 = model->getIndices32();
+					const u32* indices32 = model->getIndices32();
 					for (int i = 0; i < mesh.indices_count; i += 3)
 					{
 						Vec3 a = mtx.transform(vertices[indices32[mesh.indices_offset + i]]);
@@ -335,7 +335,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 						Vec3 c = mtx.transform(vertices[indices32[mesh.indices_offset + i + 2]]);
 
 						Vec3 n = crossProduct(a - b, a - c).normalized();
-						uint8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
+						u8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
 						rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
 					}
 				}
@@ -603,7 +603,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			{
 				int data_size;
 				file.read(&data_size, sizeof(data_size));
-				uint8* data = (uint8*)dtAlloc(data_size, DT_ALLOC_PERM);
+				u8* data = (u8*)dtAlloc(data_size, DT_ALLOC_PERM);
 				file.read(data, data_size);
 				if (dtStatusFailed(m_navmesh->addTile(data, data_size, DT_TILE_FREE_DATA, 0, 0)))
 				{
@@ -711,7 +711,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 
 				const rcCompactCell& c = chf.cells[x + y * chf.width];
 
-				for (uint32 i = c.index, ni = c.index + c.count; i < ni; ++i)
+				for (u32 i = c.index, ni = c.index + c.count; i < ni; ++i)
 				{
 					float vy = orig.y + float(chf.spans[i].y) * ch;
 					render_scene->addDebugTriangle(

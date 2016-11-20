@@ -29,7 +29,7 @@ struct TimerImpl LUMIX_FINAL : public Timer
 	}
 
 
-	uint64 getRawTimeSinceStart() override
+	u64 getRawTimeSinceStart() override
 	{
 		LARGE_INTEGER tick;
 		QueryPerformanceCounter(&tick);
@@ -37,7 +37,7 @@ struct TimerImpl LUMIX_FINAL : public Timer
 	}
 
 
-	uint64 getFrequency() override
+	u64 getFrequency() override
 	{
 		return m_frequency.QuadPart;
 	}

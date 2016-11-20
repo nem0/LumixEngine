@@ -240,7 +240,7 @@ void ParticleEmitter::PlaneModule::drawGizmo(WorldEditor& editor, RenderScene& s
 		Vec3 right = mtx.getXVector();
 		Vec3 normal = mtx.getYVector();
 		Vec3 forward = mtx.getZVector();
-		uint32 color = 0xffff0000;
+		u32 color = 0xffff0000;
 
 		for (int i = 0; i < 9; ++i)
 		{
@@ -813,14 +813,14 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager, boo
 		ParticleEmitter::ModuleBase* module = nullptr;
 		if (version > (int)ParticleEmitterVersion::COMPONENT_TYPE)
 		{
-			uint32 hash;
+			u32 hash;
 			blob.read(hash);
 			ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
 			module = createModule(type, *this);
 		}
 		else
 		{
-			uint32 type;
+			u32 type;
 			blob.read(type);
 			static const char* OLD_MODULE_NAMES[] = {"force",
 				"attractor",

@@ -144,10 +144,10 @@ static void saveStyle(Lumix::FS::OsFile& file)
 static void shortcutInput(int& shortcut)
 {
 	Lumix::StaticString<50> popup_name("");
-	popup_name << (Lumix::int64)&shortcut;
+	popup_name << (Lumix::i64)&shortcut;
 
 	Lumix::StaticString<50> button_label(SDL_GetKeyName(SDL_GetKeyFromScancode((SDL_Scancode)shortcut)));
-	button_label << "###" << (Lumix::int64)&shortcut;
+	button_label << "###" << (Lumix::i64)&shortcut;
 
 	if (ImGui::Button(button_label, ImVec2(65, 0))) shortcut = -1;
 

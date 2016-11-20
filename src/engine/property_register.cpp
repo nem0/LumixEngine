@@ -16,7 +16,7 @@ struct ComponentTypeData
 {
 	char m_id[50];
 
-	uint32 m_id_hash;
+	u32 m_id_hash;
 };
 
 
@@ -78,7 +78,7 @@ Array<IPropertyDescriptor*>& getDescriptors(ComponentType type)
 }
 
 
-const IPropertyDescriptor* getDescriptor(ComponentType type, uint32 name_hash)
+const IPropertyDescriptor* getDescriptor(ComponentType type, u32 name_hash)
 {
 	Array<IPropertyDescriptor*>& props = getDescriptors(type);
 	for (int i = 0; i < props.size(); ++i)
@@ -109,7 +109,7 @@ const IPropertyDescriptor* getDescriptor(const char* component_type, const char*
 }
 
 
-ComponentType getComponentTypeFromHash(uint32 hash)
+ComponentType getComponentTypeFromHash(u32 hash)
 {
 	for (int i = 0; i < getComponentTypes().size(); ++i)
 	{
@@ -123,7 +123,7 @@ ComponentType getComponentTypeFromHash(uint32 hash)
 }
 
 
-uint32 getComponentTypeHash(ComponentType type)
+u32 getComponentTypeHash(ComponentType type)
 {
 	return getComponentTypes()[type.index].m_id_hash;
 }
@@ -131,7 +131,7 @@ uint32 getComponentTypeHash(ComponentType type)
 
 ComponentType getComponentType(const char* id)
 {
-	uint32 id_hash = crc32(id);
+	u32 id_hash = crc32(id);
 	for (int i = 0; i < getComponentTypes().size(); ++i)
 	{
 		if (getComponentTypes()[i].m_id_hash == id_hash)

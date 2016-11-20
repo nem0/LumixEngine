@@ -327,7 +327,7 @@ bool dirExists(const char* path)
 }
 
 
-Lumix::uint64 getLastModified(const char* file)
+Lumix::u64 getLastModified(const char* file)
 {
 	FILETIME ft;
 	HANDLE handle = CreateFile(file, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);

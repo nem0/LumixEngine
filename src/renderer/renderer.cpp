@@ -425,7 +425,7 @@ struct BGFXAllocator LUMIX_FINAL : public bx::AllocatorI
 	static const size_t NATURAL_ALIGNEMENT = 8;
 
 
-	void* realloc(void* _ptr, size_t _size, size_t _alignment, const char*, uint32) override
+	void* realloc(void* _ptr, size_t _size, size_t _alignment, const char*, u32) override
 	{
 		if (0 == _size)
 		{
@@ -483,7 +483,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 
 		void traceVargs(const char* _filePath,
-			uint16 _line,
+			u16 _line,
 			const char* _format,
 			va_list _argList) override
 		{
@@ -537,9 +537,9 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		}
 
 
-		void captureBegin(uint32,
-			uint32,
-			uint32,
+		void captureBegin(u32,
+			u32,
+			u32,
 			bgfx::TextureFormat::Enum,
 			bool) override
 		{
@@ -547,11 +547,11 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		}
 
 
-		uint32 cacheReadSize(uint64) override { return 0; }
-		bool cacheRead(uint64, void*, uint32) override { return false; }
-		void cacheWrite(uint64, const void*, uint32) override {}
+		u32 cacheReadSize(u64) override { return 0; }
+		bool cacheRead(u64, void*, u32) override { return false; }
+		void cacheWrite(u64, const void*, u32) override {}
 		void captureEnd() override { ASSERT(false); }
-		void captureFrame(const void*, uint32) override { ASSERT(false); }
+		void captureFrame(const void*, u32) override { ASSERT(false); }
 
 		RendererImpl& m_renderer;
 	};
@@ -733,7 +733,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
-	uint8 getShaderDefineIdx(const char* define) override
+	u8 getShaderDefineIdx(const char* define) override
 	{
 		for (int i = 0; i < m_shader_defines.size(); ++i)
 		{
@@ -829,7 +829,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	ShaderManager m_shader_manager;
 	ShaderBinaryManager m_shader_binary_manager;
 	ModelManager m_model_manager;
-	uint32 m_current_pass_hash;
+	u32 m_current_pass_hash;
 	int m_view_counter;
 	Shader* m_default_shader;
 	BGFXAllocator m_bgfx_allocator;

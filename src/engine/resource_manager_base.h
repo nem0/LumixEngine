@@ -24,7 +24,7 @@ class LUMIX_ENGINE_API ResourceManagerBase
 {
 	friend class Resource;
 public:
-	typedef HashMap<uint32, Resource*> ResourceTable;
+	typedef HashMap<u32, Resource*> ResourceTable;
 
 public:
 	void create(ResourceType type, ResourceManager& owner);
@@ -54,7 +54,7 @@ protected:
 
 private:
 	IAllocator& m_allocator;
-	uint32 m_size;
+	u32 m_size;
 	ResourceTable m_resources;
 	ResourceManager* m_owner;
 	bool m_is_unload_enabled;

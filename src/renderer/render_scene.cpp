@@ -653,7 +653,7 @@ public:
 
 	void serializeBoneAttachments(OutputBlob& serializer)
 	{
-		serializer.write((int32)m_bone_attachments.size());
+		serializer.write((i32)m_bone_attachments.size());
 		for (auto& attachment : m_bone_attachments)
 		{
 			serializer.write(attachment.bone_index);
@@ -664,7 +664,7 @@ public:
 
 	void serializeCameras(OutputBlob& serializer)
 	{
-		serializer.write((int32)m_cameras.size());
+		serializer.write((i32)m_cameras.size());
 		for (auto& camera : m_cameras)
 		{
 			serializer.write(camera.entity);
@@ -679,14 +679,14 @@ public:
 
 	void serializeLights(OutputBlob& serializer)
 	{
-		serializer.write((int32)m_point_lights.size());
+		serializer.write((i32)m_point_lights.size());
 		for (int i = 0, c = m_point_lights.size(); i < c; ++i)
 		{
 			serializer.write(m_point_lights[i]);
 		}
 		serializer.write(m_point_light_last_cmp);
 
-		serializer.write((int32)m_global_lights.size());
+		serializer.write((i32)m_global_lights.size());
 		for (int i = 0, c = m_global_lights.size(); i < c; ++i)
 		{
 			serializer.write(m_global_lights[i]);
@@ -697,7 +697,7 @@ public:
 
 	void serializeModelInstances(OutputBlob& serializer)
 	{
-		serializer.write((int32)m_model_instances.size());
+		serializer.write((i32)m_model_instances.size());
 		for (auto& r : m_model_instances)
 		{
 			serializer.write(r.entity);
@@ -720,7 +720,7 @@ public:
 
 	void serializeTerrains(OutputBlob& serializer)
 	{
-		serializer.write((int32)m_terrains.size());
+		serializer.write((i32)m_terrains.size());
 		for (auto* terrain : m_terrains)
 		{
 			terrain->serialize(serializer);
@@ -763,7 +763,7 @@ public:
 
 	void serializeEnvironmentProbes(OutputBlob& serializer)
 	{
-		int32 count = m_environment_probes.size();
+		i32 count = m_environment_probes.size();
 		serializer.write(count);
 		for (int i = 0; i < count; ++i)
 		{
@@ -775,11 +775,11 @@ public:
 
 	void deserializeEnvironmentProbes(InputBlob& serializer)
 	{
-		int32 count;
+		i32 count;
 		serializer.read(count);
 		m_environment_probes.reserve(count);
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
-		uint64 universe_guid = m_universe.getPath().getHash();
+		u64 universe_guid = m_universe.getPath().getHash();
 		StaticString<Lumix::MAX_PATH_LENGTH> probe_dir("universes/", universe_guid, "/probes/");
 		for (int i = 0; i < count; ++i)
 		{
@@ -800,7 +800,7 @@ public:
 	{
 		if (version <= (int)RenderSceneVersion::BONE_ATTACHMENTS) return;
 
-		int32 count;
+		i32 count;
 		serializer.read(count);
 		m_bone_attachments.resize(count);
 		for (int i = 0; i < count; ++i)
@@ -939,7 +939,7 @@ public:
 
 	void deserializeCameras(InputBlob& serializer, RenderSceneVersion version)
 	{
-		int32 size;
+		i32 size;
 		serializer.read(size);
 		m_cameras.rehash(size);
 		for (int i = 0; i < size; ++i)
@@ -977,7 +977,7 @@ public:
 
 	void deserializeModelInstances(InputBlob& serializer, RenderSceneVersion version)
 	{
-		int32 size = 0;
+		i32 size = 0;
 		serializer.read(size);
 		m_model_instances.reserve(size);
 		for (int i = 0; i < size; ++i)
@@ -993,11 +993,11 @@ public:
 
 			if(r.entity != INVALID_ENTITY)
 			{
-				int64 layer_mask;
+				i64 layer_mask;
 				if(version <= RenderSceneVersion::LAYERS) serializer.read(layer_mask);
 				r.matrix = m_universe.getMatrix(r.entity);
 
-				uint32 path;
+				u32 path;
 				serializer.read(path);
 
 				ComponentHandle cmp = { r.entity.index };
@@ -1030,7 +1030,7 @@ public:
 
 	void deserializeLights(InputBlob& serializer, RenderSceneVersion version)
 	{
-		int32 size = 0;
+		i32 size = 0;
 		serializer.read(size);
 		m_point_lights.resize(size);
 		for (int i = 0; i < size; ++i)
@@ -1053,7 +1053,7 @@ public:
 				serializer.read(light.m_attenuation_param);
 				serializer.read(light.m_range);
 				serializer.read(light.m_cast_shadows);
-				uint8 padding;
+				u8 padding;
 				for(int j = 0; j < 3; ++j) serializer.read(padding);
 				light.m_specular_intensity = 1;
 			}
@@ -1097,7 +1097,7 @@ public:
 
 	void deserializeTerrains(InputBlob& serializer, RenderSceneVersion version)
 	{
-		int32 size = 0;
+		i32 size = 0;
 		serializer.read(size);
 		for (int i = 0; i < size; ++i)
 		{
@@ -2136,11 +2136,11 @@ public:
 	Model* getModelInstanceModel(ComponentHandle cmp) override { return m_model_instances[cmp.index].model; }
 
 
-	static uint64 getLayerMask(ModelInstance& model_instance)
+	static u64 getLayerMask(ModelInstance& model_instance)
 	{
 		Model* model = model_instance.model;
 		if (!model->isReady()) return 1;
-		uint64 layer_mask = 0;
+		u64 layer_mask = 0;
 		for(int i = 0; i < model->getMeshCount(); ++i)
 		{ 
 			layer_mask |= model->getMesh(i).material->getRenderLayerMask();
@@ -2155,7 +2155,7 @@ public:
 		if (!model_instance.model || !model_instance.model->isReady()) return;
 
 		Sphere sphere(m_universe.getPosition(model_instance.entity), model_instance.model->getBoundingRadius());
-		uint64 layer_mask = getLayerMask(model_instance);
+		u64 layer_mask = getLayerMask(model_instance);
 		if(!m_culling_system->isAdded(cmp)) m_culling_system->addStatic(cmp, sphere, layer_mask);
 	}
 
@@ -2260,7 +2260,7 @@ public:
 	}
 
 	
-	static void LUA_setTexturePixel(Texture* texture, int x, int y, uint32 value)
+	static void LUA_setTexturePixel(Texture* texture, int x, int y, u32 value)
 	{
 		if (!texture) return;
 		if (!texture->isReady()) return;
@@ -2270,7 +2270,7 @@ public:
 		x = Math::clamp(x, 0, texture->width - 1);
 		y = Math::clamp(y, 0, texture->height - 1);
 
-		((uint32*)&texture->data[0])[x + y * texture->width] = value;
+		((u32*)&texture->data[0])[x + y * texture->width] = value;
 	}
 
 
@@ -2321,7 +2321,7 @@ public:
 		m_terrains[{cmp.index}]->setHeight(x, z, height);
 	}
 
-	static uint32 LUA_getTexturePixel(Texture* texture, int x, int y)
+	static u32 LUA_getTexturePixel(Texture* texture, int x, int y)
 	{
 		if (!texture) return 0;
 		if (!texture->isReady()) return 0;
@@ -2331,7 +2331,7 @@ public:
 		x = Math::clamp(x, 0, texture->width - 1);
 		y = Math::clamp(y, 0, texture->height - 1);
 
-		return ((uint32*)&texture->data[0])[x + y * texture->width];
+		return ((u32*)&texture->data[0])[x + y * texture->width];
 	}
 
 
@@ -2517,7 +2517,7 @@ public:
 	}
 
 
-	const CullingSystem::Results* cull(const Frustum& frustum, uint64 layer_mask)
+	const CullingSystem::Results* cull(const Frustum& frustum, u64 layer_mask)
 	{
 		PROFILE_FUNCTION();
 		if (m_model_instances.empty()) return nullptr;
@@ -2758,7 +2758,7 @@ public:
 
 	Array<Array<ModelInstanceMesh>>& getModelInstanceInfos(const Frustum& frustum,
 		const Vec3& lod_ref_point,
-		uint64 layer_mask) override
+		u64 layer_mask) override
 	{
 		PROFILE_FUNCTION();
 
@@ -2860,7 +2860,7 @@ public:
 
 	void addDebugSphere(const Vec3& center,
 		float radius,
-		uint32 color,
+		u32 color,
 		float life) override
 	{
 		static const int COLS = 36;
@@ -2912,7 +2912,7 @@ public:
 	}
 
 
-	void addDebugHalfSphere(const Matrix& transform, float radius, bool top, uint32 color, float life)
+	void addDebugHalfSphere(const Matrix& transform, float radius, bool top, u32 color, float life)
 	{
 		Vec3 center = transform.getTranslation();
 		Vec3 x_vec = transform.getXVector();
@@ -2983,7 +2983,7 @@ public:
 	}
 
 
-	void addDebugHalfSphere(const Vec3& center, float radius, bool top, uint32 color, float life)
+	void addDebugHalfSphere(const Vec3& center, float radius, bool top, u32 color, float life)
 	{
 		static const int COLS = 36;
 		static const int ROWS = COLS >> 1;
@@ -3038,7 +3038,7 @@ public:
 	void addDebugTriangle(const Vec3& p0,
 		const Vec3& p1,
 		const Vec3& p2,
-		uint32 color,
+		u32 color,
 		float life) override
 	{
 		DebugTriangle& tri = m_debug_triangles.emplace();
@@ -3053,7 +3053,7 @@ public:
 	void addDebugCapsule(const Vec3& position,
 		float height,
 		float radius,
-		uint32 color,
+		u32 color,
 		float life) override
 	{
 		addDebugHalfSphere(position + Vec3(0, radius, 0), radius, false, color, life);
@@ -3081,7 +3081,7 @@ public:
 	void addDebugCapsule(const Matrix& transform,
 		float height,
 		float radius,
-		uint32 color,
+		u32 color,
 		float life) override
 	{
 		Vec3 x_vec = transform.getXVector();
@@ -3111,7 +3111,7 @@ public:
 	void addDebugCylinder(const Vec3& position,
 								  const Vec3& up,
 								  float radius,
-								  uint32 color,
+								  u32 color,
 								  float life) override
 	{
 		Vec3 z_vec(-up.y, up.x, 0);
@@ -3148,7 +3148,7 @@ public:
 		const Vec3& dir,
 		const Vec3& up,
 		const Vec3& right,
-		uint32 color,
+		u32 color,
 		float life) override
 	{
 		addDebugLine(pos + dir + up + right, pos + dir + up - right, color, life);
@@ -3171,7 +3171,7 @@ public:
 
 	void addDebugCubeSolid(const Vec3& min,
 		const Vec3& max,
-		uint32 color,
+		u32 color,
 		float life) override
 	{
 		Vec3 a = min;
@@ -3239,7 +3239,7 @@ public:
 
 	void addDebugCube(const Vec3& min,
 							  const Vec3& max,
-							  uint32 color,
+							  u32 color,
 							  float life) override
 	{
 		Vec3 a = min;
@@ -3281,7 +3281,7 @@ public:
 	}
 
 
-	void addDebugOrthoFrustum(const Frustum& frustum, uint32 color, float life)
+	void addDebugOrthoFrustum(const Frustum& frustum, u32 color, float life)
 	{
 		Vec3 near_center = frustum.position - frustum.direction * frustum.near_distance;
 		Vec3 far_center = frustum.position - frustum.direction * frustum.far_distance;
@@ -3323,7 +3323,7 @@ public:
 	}
 
 
-	void addDebugFrustum(const Frustum& frustum, uint32 color, float life) override
+	void addDebugFrustum(const Frustum& frustum, u32 color, float life) override
 	{
 		if (frustum.fov < 0)
 		{
@@ -3351,7 +3351,7 @@ public:
 		float ratio,
 		float near_distance,
 		float far_distance,
-		uint32 color,
+		u32 color,
 		float life) override
 	{
 		Vec3 points[8];
@@ -3391,7 +3391,7 @@ public:
 		addDebugLine(points[3], points[7], color, life);
 	}
 
-	void addDebugCircle(const Vec3& center, const Vec3& up, float radius, uint32 color, float life) override
+	void addDebugCircle(const Vec3& center, const Vec3& up, float radius, u32 color, float life) override
 	{
 		Vec3 z_vec(-up.y, up.x, 0);
 		Vec3 x_vec = crossProduct(up, z_vec);
@@ -3410,7 +3410,7 @@ public:
 		}
 	}
 
-	void addDebugCross(const Vec3& center, float size, uint32 color, float life) override
+	void addDebugCross(const Vec3& center, float size, u32 color, float life) override
 	{
 		addDebugLine(center, Vec3(center.x - size, center.y, center.z), color, life);
 		addDebugLine(center, Vec3(center.x + size, center.y, center.z), color, life);
@@ -3421,7 +3421,7 @@ public:
 	}
 
 
-	void addDebugPoint(const Vec3& pos, uint32 color, float life) override
+	void addDebugPoint(const Vec3& pos, u32 color, float life) override
 	{
 		DebugPoint& point = m_debug_points.emplace();
 		point.pos = pos;
@@ -3434,7 +3434,7 @@ public:
 		const Vec3& dir,
 		const Vec3& axis0,
 		const Vec3& axis1,
-		uint32 color,
+		u32 color,
 		float life) override
 	{
 		Vec3 base_center = vertex + dir;
@@ -3452,13 +3452,13 @@ public:
 	}
 
 
-	static uint32 ARGBToABGR(uint32 color)
+	static u32 ARGBToABGR(u32 color)
 	{
 		return ((color & 0xff) << 16) | (color & 0xff00) | ((color & 0xff0000) >> 16) | (color & 0xff000000);
 	}
 
 
-	void addDebugLine(const Vec3& from, const Vec3& to, uint32 color, float life) override
+	void addDebugLine(const Vec3& from, const Vec3& to, u32 color, float life) override
 	{
 		DebugLine& line = m_debug_lines.emplace();
 		line.from = from;
@@ -3789,7 +3789,7 @@ public:
 		auto& probe = m_environment_probes[entity];
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
 		if (probe.texture) texture_manager->unload(*probe.texture);
-		uint64 universe_guid = m_universe.getPath().getHash();
+		u64 universe_guid = m_universe.getPath().getHash();
 		StaticString<Lumix::MAX_PATH_LENGTH> path("universes/", universe_guid, "/probes/", cmp.index, ".dds");
 		probe.texture = static_cast<Texture*>(texture_manager->load(Path(path)));
 	}
@@ -4011,7 +4011,7 @@ public:
 		auto& rm = r.model->getResourceManager();
 		auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(MATERIAL_TYPE));
 
-		int new_count = Math::maximum(int8(index + 1), r.mesh_count);
+		int new_count = Math::maximum(i8(index + 1), r.mesh_count);
 		allocateCustomMeshes(r, new_count);
 		ASSERT(r.meshes);
 

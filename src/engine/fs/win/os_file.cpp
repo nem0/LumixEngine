@@ -138,7 +138,7 @@ OsFile& OsFile::operator <<(const char* text)
 }
 
 
-OsFile& OsFile::operator <<(int32 value)
+OsFile& OsFile::operator <<(i32 value)
 {
 	char buf[20];
 	toCString(value, buf, lengthOf(buf));
@@ -147,7 +147,7 @@ OsFile& OsFile::operator <<(int32 value)
 }
 
 
-OsFile& OsFile::operator <<(uint32 value)
+OsFile& OsFile::operator <<(u32 value)
 {
 	char buf[20];
 	toCString(value, buf, lengthOf(buf));
@@ -156,7 +156,7 @@ OsFile& OsFile::operator <<(uint32 value)
 }
 
 
-OsFile& OsFile::operator <<(uint64 value)
+OsFile& OsFile::operator <<(u64 value)
 {
 	char buf[30];
 	toCString(value, buf, lengthOf(buf));

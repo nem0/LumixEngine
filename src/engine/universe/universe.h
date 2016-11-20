@@ -83,7 +83,7 @@ public:
 	void deserialize(InputBlob& serializer);
 
 	IScene* getScene(ComponentType type) const;
-	IScene* getScene(uint32 hash) const;
+	IScene* getScene(u32 hash) const;
 	Array<IScene*>& getScenes();
 	void addScene(IScene* scene);
 
@@ -101,10 +101,10 @@ private:
 	Array<IScene*> m_scenes;
 	IScene* m_component_type_scene_map[MAX_COMPONENTS_TYPES_COUNT];
 	Array<Transformation> m_transformations;
-	Array<uint64> m_components;
+	Array<u64> m_components;
 	Array<int> m_entity_map;
-	AssociativeArray<uint32, uint32> m_name_to_id_map;
-	AssociativeArray<uint32, string> m_id_to_name_map;
+	AssociativeArray<u32, u32> m_name_to_id_map;
+	AssociativeArray<u32, string> m_id_to_name_map;
 	DelegateList<void(Entity)> m_entity_moved;
 	DelegateList<void(Entity)> m_entity_created;
 	DelegateList<void(Entity)> m_entity_destroyed;

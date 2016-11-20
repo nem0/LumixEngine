@@ -30,14 +30,14 @@ static const float GRASS_QUAD_RADIUS = GRASS_QUAD_SIZE * 0.7072f;
 static const int GRID_SIZE = 16;
 static const int COPY_COUNT = 50;
 static const ComponentType TERRAIN_HASH = PropertyRegister::getComponentType("terrain");
-static const uint32 MORPH_CONST_HASH = crc32("morph_const");
-static const uint32 QUAD_SIZE_HASH = crc32("quad_size");
-static const uint32 QUAD_MIN_HASH = crc32("quad_min");
+static const u32 MORPH_CONST_HASH = crc32("morph_const");
+static const u32 QUAD_SIZE_HASH = crc32("quad_size");
+static const u32 QUAD_MIN_HASH = crc32("quad_min");
 
-static const uint32 BRUSH_POSITION_HASH = crc32("brush_position");
-static const uint32 BRUSH_SIZE_HASH = crc32("brush_size");
-static const uint32 MAP_SIZE_HASH = crc32("map_size");
-static const uint32 CAMERA_POS_HASH = crc32("camera_pos");
+static const u32 BRUSH_POSITION_HASH = crc32("brush_position");
+static const u32 BRUSH_SIZE_HASH = crc32("brush_size");
+static const u32 MAP_SIZE_HASH = crc32("map_size");
+static const u32 CAMERA_POS_HASH = crc32("camera_pos");
 static const ResourceType MODEL_TYPE("model");
 static const ResourceType MATERIAL_TYPE("material");
 static const char* TEX_COLOR_UNIFORM = "u_texColor";
@@ -392,17 +392,17 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 	float base_tx = tx_step * quad_x - tx_step * 0.5f;
 
 	struct { float x, y; void* type; } hashed_patch = { quad_x, quad_z, patch.m_type };
-	uint32 hash = crc32(&hashed_patch, sizeof(hashed_patch));
+	u32 hash = crc32(&hashed_patch, sizeof(hashed_patch));
 	Math::seedRandom(hash);
 
 	for (float dz = 0; dz < quad_height; dz += step)
 	{
 		int y_offset = int(splat_map->height * (quad_z + dz) / (m_height * m_scale.x)) * splat_map->width;
-		uint32* splat_data = &((uint32*)&splat_map->data[0])[y_offset];
+		u32* splat_data = &((u32*)&splat_map->data[0])[y_offset];
 		for (float dx = 0; dx < quad_width; dx += step)
 		{
 			int tx = int(base_tx + tx_step * dx);
-			uint32 pixel_value = splat_data[tx];
+			u32 pixel_value = splat_data[tx];
 
 			int ground_mask = (pixel_value >> 16) & 0xff;
 			if ((ground_mask & (1 << patch.m_type->m_idx)) == 0) continue;
@@ -589,7 +589,7 @@ void Terrain::deserialize(InputBlob& serializer,
 	serializer.read(m_scale.x);
 	serializer.read(m_scale.y);
 	m_scale.z = m_scale.x;
-	int32 count;
+	i32 count;
 	serializer.read(m_grass_distance);
 	serializer.read(count);
 	while(m_grass_types.size() > count)
@@ -628,7 +628,7 @@ void Terrain::serialize(OutputBlob& serializer)
 	serializer.write(m_scale.x);
 	serializer.write(m_scale.y);
 	serializer.write(m_grass_distance);
-	serializer.write((int32)m_grass_types.size());
+	serializer.write((i32)m_grass_types.size());
 	for(int i = 0; i < m_grass_types.size(); ++i)
 	{
 		GrassType& type = *m_grass_types[i];
@@ -714,7 +714,7 @@ float Terrain::getHeight(int x, int z) const
 	Texture* t = m_heightmap;
 	ASSERT(t->bytes_per_pixel == 2);
 	int idx = Math::clamp(x, 0, m_width) + Math::clamp(z, 0, m_height) * m_width;
-	return m_scale.y * DIV64K * ((uint16*)t->getData())[idx];
+	return m_scale.y * DIV64K * ((u16*)t->getData())[idx];
 }
 
 
@@ -727,7 +727,7 @@ void Terrain::setHeight(int x, int z, float h)
 	Texture* t = m_heightmap;
 	ASSERT(t->bytes_per_pixel == 2);
 	int idx = Math::clamp(x, 0, m_width) + Math::clamp(z, 0, m_height) * m_width;
-	((uint16*)t->getData())[idx] = (uint16)(h * (65535.0f / m_scale.y));
+	((u16*)t->getData())[idx] = (u16)(h * (65535.0f / m_scale.y));
 }
 
 

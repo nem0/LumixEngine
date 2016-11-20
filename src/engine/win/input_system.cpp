@@ -92,7 +92,7 @@ struct InputSystemImpl LUMIX_FINAL : public InputSystem
 	}
 
 
-	void addAction(uint32 action, InputType type, int key, int controller_id) override
+	void addAction(u32 action, InputType type, int key, int controller_id) override
 	{
 		InputSystemImpl::Action value;
 		value.key = key;
@@ -123,7 +123,7 @@ struct InputSystemImpl LUMIX_FINAL : public InputSystem
 		return false;
 	}
 
-	float getActionValue(uint32 action) override
+	float getActionValue(u32 action) override
 	{
 		if (!m_is_enabled) return 0;
 		InputSystemImpl::Action value;
@@ -175,7 +175,7 @@ struct InputSystemImpl LUMIX_FINAL : public InputSystem
 
 
 	IAllocator& m_allocator;
-	AssociativeArray<uint32, Action> m_actions;
+	AssociativeArray<u32, Action> m_actions;
 	Vec2 m_injected_mouse_rel_pos;
 	Vec2 m_mouse_rel_pos;
 	Vec2 m_mouse_pos;
@@ -184,7 +184,7 @@ struct InputSystemImpl LUMIX_FINAL : public InputSystem
 	XInputGetState_fn_ptr m_xinput_get_state;
 	XINPUT_STATE m_xinput_states[XUSER_MAX_COUNT];
 	bool m_xinput_connected[XUSER_MAX_COUNT];
-	uint32 m_last_checked_controller;
+	u32 m_last_checked_controller;
 };
 
 

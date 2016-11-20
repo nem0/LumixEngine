@@ -9,9 +9,9 @@ namespace
 {
 	struct Test
 	{
-		uint32 idx;
-		int32 proc_count;
-		uint32 thread_id;
+		u32 idx;
+		i32 proc_count;
+		u32 thread_id;
 	};
 
 	typedef Lumix::MT::Transaction<Test> AsynTrans;
@@ -87,9 +87,9 @@ namespace
 	void UT_tq_heavy_usage(const char* params)
 	{
 		Lumix::DefaultAllocator allocator;
-		const uint32 itemsCount = 1200000;
+		const u32 itemsCount = 1200000;
 		Test* testItems = (Test*)allocator.allocate(sizeof(Test) * itemsCount);
-		for (uint32 i = 0; i < itemsCount; i++)
+		for (u32 i = 0; i < itemsCount; i++)
 		{
 			testItems[i].idx = i;
 			testItems[i].proc_count = 0;
@@ -158,9 +158,9 @@ namespace
 	void UT_tq_push(const char* params)
 	{
 		Lumix::DefaultAllocator allocator;
-		const uint32 itemsCount = 1200000;
+		const u32 itemsCount = 1200000;
 		Test* testItems = (Test*)allocator.allocate(sizeof(Test) * itemsCount);
-		for (uint32 i = 0; i < itemsCount; i++)
+		for (u32 i = 0; i < itemsCount; i++)
 		{
 			testItems[i].idx = i;
 			testItems[i].proc_count = 0;

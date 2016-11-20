@@ -140,7 +140,7 @@ void AnimationEditor::load()
 	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
 	FS::OsFile file;
 	file.open(m_path, FS::Mode::OPEN_AND_READ, allocator);
-	Array<uint8> data(allocator);
+	Array<u8> data(allocator);
 	data.resize((int)file.size());
 	file.read(&data[0], data.size());
 	InputBlob blob(&data[0], data.size());
@@ -203,7 +203,7 @@ void AnimationEditor::inputsGUI()
 			const auto& selected_entities = m_app.getWorldEditor()->getSelectedEntities();
 			auto* scene = (AnimationScene*)m_app.getWorldEditor()->getUniverse()->getScene(ANIMABLE_HASH);
 			ComponentHandle cmp = selected_entities.empty() ? INVALID_COMPONENT : scene->getComponent(selected_entities[0], CONTROLLER_TYPE);
-			uint8* input_data = isValid(cmp) ? scene->getControllerInput(cmp) : nullptr;
+			u8* input_data = isValid(cmp) ? scene->getControllerInput(cmp) : nullptr;
 			Anim::InputDecl& input_decl = m_resource->getEngineResource()->getInputDecl();
 
 			for (int i = 0; i < input_decl.inputs_count; ++i)

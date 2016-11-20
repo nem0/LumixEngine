@@ -244,7 +244,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			{
 				char tmp[1024];
 				tmp[0] = '\0';
-				uint32 prop_name_hash = crc32(property_name);
+				u32 prop_name_hash = crc32(property_name);
 				scene->getPropertyValue(cmp, scr_index, property_name, tmp, lengthOf(tmp));
 				old_value = tmp;
 				return;

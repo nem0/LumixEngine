@@ -37,7 +37,7 @@ public:
 		{
 		}
 
-		uint32 name_hash;
+		u32 name_hash;
 		Type type;
 		ResourceType resource_type;
 		string stored_value;

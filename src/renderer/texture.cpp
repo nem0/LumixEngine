@@ -57,9 +57,9 @@ Texture::~Texture()
 }
 
 
-void Texture::setFlag(uint32 flag, bool value)
+void Texture::setFlag(u32 flag, bool value)
 {
-	uint32 new_flags = bgfx_flags & ~flag;
+	u32 new_flags = bgfx_flags & ~flag;
 	new_flags |= value ? flag : 0;
 	bgfx_flags = new_flags;
 
@@ -67,7 +67,7 @@ void Texture::setFlag(uint32 flag, bool value)
 }
 
 
-void Texture::setFlags(uint32 flags)
+void Texture::setFlags(u32 flags)
 {
 	if (isReady() && bgfx_flags != flags)
 	{
@@ -107,15 +107,15 @@ bool Texture::create(int w, int h, void* data)
 }
 
 
-uint32 Texture::getPixelNearest(int x, int y) const
+u32 Texture::getPixelNearest(int x, int y) const
 {
 	if (data.empty() || x >= width || y >= height || x < 0 || y < 0 || bytes_per_pixel != 4) return 0;
 
-	return *(uint32*)&data[(x + y * width) * 4];
+	return *(u32*)&data[(x + y * width) * 4];
 }
 
 
-uint32 Texture::getPixel(float x, float y) const
+u32 Texture::getPixel(float x, float y) const
 {
 	ASSERT(bytes_per_pixel == 4);
 	if (data.empty() || x >= width || y >= height || x < 0 || y < 0)
@@ -126,12 +126,12 @@ uint32 Texture::getPixel(float x, float y) const
 	// http://fastcpp.blogspot.sk/2011/06/bilinear-pixel-interpolation-using-sse.html
 	int px = (int)x;
 	int py = (int)y;
-	const uint32* p0 = (uint32*)&data[(px + py * width) * 4];
+	const u32* p0 = (u32*)&data[(px + py * width) * 4];
 
-	const uint8* p1 = (uint8*)p0;
-	const uint8* p2 = (uint8*)(p0 + 1);
-	const uint8* p3 = (uint8*)(p0 + width);
-	const uint8* p4 = (uint8*)(p0 + 1 + width);
+	const u8* p1 = (u8*)p0;
+	const u8* p2 = (u8*)(p0 + 1);
+	const u8* p3 = (u8*)(p0 + width);
+	const u8* p4 = (u8*)(p0 + 1 + width);
 
 	float fx = x - px;
 	float fy = y - py;
@@ -143,13 +143,13 @@ uint32 Texture::getPixel(float x, float y) const
 	int w3 = (int)(fx1 * fy * 256.0f);
 	int w4 = (int)(fx * fy * 256.0f);
 
-	uint8 res[4];
-	res[0] = (uint8)((p1[0] * w1 + p2[0] * w2 + p3[0] * w3 + p4[0] * w4) >> 8);
-	res[1] = (uint8)((p1[1] * w1 + p2[1] * w2 + p3[1] * w3 + p4[1] * w4) >> 8);
-	res[2] = (uint8)((p1[2] * w1 + p2[2] * w2 + p3[2] * w3 + p4[2] * w4) >> 8);
-	res[3] = (uint8)((p1[3] * w1 + p2[3] * w2 + p3[3] * w3 + p4[3] * w4) >> 8);
+	u8 res[4];
+	res[0] = (u8)((p1[0] * w1 + p2[0] * w2 + p3[0] * w3 + p4[0] * w4) >> 8);
+	res[1] = (u8)((p1[1] * w1 + p2[1] * w2 + p3[1] * w3 + p4[1] * w4) >> 8);
+	res[2] = (u8)((p1[2] * w1 + p2[2] * w2 + p3[2] * w3 + p4[2] * w4) >> 8);
+	res[3] = (u8)((p1[3] * w1 + p2[3] * w2 + p3[3] * w3 + p4[3] * w4) >> 8);
 
-	return *(uint32*)res;
+	return *(u32*)res;
 }
 
 
@@ -177,8 +177,8 @@ unsigned int Texture::compareTGA(IAllocator& allocator, FS::IFile* file1, FS::IF
 
 	int different_pixel_count = 0;
 	size_t pixel_count = header1.width * header1.height;
-	uint8* img1 = (uint8*)allocator.allocate(pixel_count * color_mode);
-	uint8* img2 = (uint8*)allocator.allocate(pixel_count * color_mode);
+	u8* img1 = (u8*)allocator.allocate(pixel_count * color_mode);
+	u8* img2 = (u8*)allocator.allocate(pixel_count * color_mode);
 
 	file1->read(img1, pixel_count * color_mode);
 	file2->read(img2, pixel_count * color_mode);
@@ -207,7 +207,7 @@ static bool saveTGA(IAllocator& allocator,
 	int width,
 	int height,
 	int bytes_per_pixel,
-	const uint8* image_dest,
+	const u8* image_dest,
 	const Path& path)
 {
 	if (bytes_per_pixel != 4)
@@ -216,7 +216,7 @@ static bool saveTGA(IAllocator& allocator,
 		return false;
 	}
 
-	uint8* data = (uint8*)allocator.allocate(width * height * 4);
+	u8* data = (u8*)allocator.allocate(width * height * 4);
 
 	TGAHeader header;
 	setMemory(&header, 0, sizeof(header));
@@ -305,7 +305,7 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 
 	if (bytes_per_pixel == 2)
 	{
-		const uint16* src_mem = (const uint16*)&data[0];
+		const u16* src_mem = (const u16*)&data[0];
 		mem = bgfx::alloc(w * h * sizeof(float));
 		float* dst_mem = (float*)mem->data;
 
@@ -320,9 +320,9 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 	else
 	{
 		ASSERT(bytes_per_pixel == 4);
-		const uint8* src_mem = (const uint8*)&data[0];
+		const u8* src_mem = (const u8*)&data[0];
 		mem = bgfx::alloc(w * h * bytes_per_pixel);
-		uint8* dst_mem = mem->data;
+		u8* dst_mem = mem->data;
 
 		for (int j = 0; j < h; ++j)
 		{
@@ -350,7 +350,7 @@ bool loadRaw(Texture& texture, FS::IFile& file)
 		file.read(&texture.data[0], size);
 	}
 
-	const uint16* src_mem = (const uint16*)file.getBuffer();
+	const u16* src_mem = (const u16*)file.getBuffer();
 	const bgfx::Memory* mem = bgfx::alloc(texture.width * texture.height * sizeof(float));
 	float* dst_mem = (float*)mem->data;
 
@@ -405,24 +405,24 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 	{
 		texture.data.resize(image_size);
 	}
-	uint8* image_dest = texture.data_reference ? &texture.data[0] : (uint8*)manager.getBuffer(image_size);
+	u8* image_dest = texture.data_reference ? &texture.data[0] : (u8*)manager.getBuffer(image_size);
 
 	bool is_rle = header.dataType == 10;
 	if (is_rle)
 	{
-		uint8* out = image_dest;
-		uint8 byte;
+		u8* out = image_dest;
+		u8 byte;
 		union {
-			uint32 u32;
-			uint8 u8[4];
+			u32 u32;
+			u8 u8[4];
 		} pixel;
 		do
 		{
 			file.read(&byte, sizeof(byte));
 			if (byte < 128)
 			{
-				uint8 count = byte + 1;
-				for (uint8 i = 0; i < count; ++i)
+				u8 count = byte + 1;
+				for (u8 i = 0; i < count; ++i)
 				{
 					file.read(&pixel, bytes_per_pixel);
 					out[0] = pixel.u8[2];
@@ -456,11 +456,11 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 			long idx = y * header.width * bytes_per_pixel;
 			for (long x = 0; x < header.width; x++)
 			{
-				file.read(&image_dest[idx + 2], sizeof(uint8));
-				file.read(&image_dest[idx + 1], sizeof(uint8));
-				file.read(&image_dest[idx + 0], sizeof(uint8));
+				file.read(&image_dest[idx + 2], sizeof(u8));
+				file.read(&image_dest[idx + 1], sizeof(u8));
+				file.read(&image_dest[idx + 0], sizeof(u8));
 				if (bytes_per_pixel == 4)
-					file.read(&image_dest[idx + 3], sizeof(uint8));
+					file.read(&image_dest[idx + 3], sizeof(u8));
 				else
 					image_dest[idx + 3] = 255;
 				idx += 4;
@@ -515,7 +515,7 @@ void Texture::removeDataReference()
 static bool loadDDS(Texture& texture, FS::IFile& file)
 {
 	bgfx::TextureInfo info;
-	const auto* mem = bgfx::copy(file.getBuffer(), (uint32)file.size());
+	const auto* mem = bgfx::copy(file.getBuffer(), (u32)file.size());
 	texture.handle = bgfx::createTexture(mem, texture.bgfx_flags, 0, &info);
 	texture.width = info.width;
 	texture.mips = info.numMips;

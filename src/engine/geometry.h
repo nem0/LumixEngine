@@ -131,7 +131,7 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 		float x = center.x;
 		float y = center.y;
 		float z = center.z;
-		uint32 i = (uint32)Planes::NEAR;
+		u32 i = (u32)Planes::NEAR;
 		float distance = xs[i] * x + ys[i] * y + z * zs[i] + ds[i];
 		distance = distance < 0 ? -distance : distance;
 		return distance < radius;
@@ -172,7 +172,7 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 	}
 
 
-	enum class Planes : uint32
+	enum class Planes : u32
 	{
 		NEAR,
 		FAR,

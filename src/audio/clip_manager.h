@@ -24,13 +24,13 @@ public:
 	int getChannels() const { return m_channels; }
 	int getSampleRate() const { return m_sample_rate; }
 	int getSize() const { return m_data.size() * sizeof(m_data[0]); }
-	uint16* getData() { return &m_data[0]; }
+	u16* getData() { return &m_data[0]; }
 	float getLengthSeconds() const { return m_data.size() / float(m_channels * m_sample_rate); }
 
 private:
 	int m_channels;
 	int m_sample_rate;
-	Array<uint16> m_data;
+	Array<u16> m_data;
 };
 
 

@@ -26,7 +26,7 @@ public:
 
 	virtual ~Manager() {}
 
-	virtual uint32 getCpuThreadsCount() const = 0;
+	virtual u32 getCpuThreadsCount() const = 0;
 	virtual void schedule(Job* job) = 0;
 	virtual void doScheduling() = 0;
 

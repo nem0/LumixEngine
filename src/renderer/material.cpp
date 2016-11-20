@@ -18,7 +18,7 @@ namespace Lumix
 {
 
 
-static const uint32 SHADOWMAP_HASH = crc32("shadowmap");
+static const u32 SHADOWMAP_HASH = crc32("shadowmap");
 static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType SHADER_TYPE("shader");
 static const ResourceType MATERIAL_TYPE("material");
@@ -32,7 +32,7 @@ static struct CustomFlags
 } s_custom_flags = {};
 
 
-static uint8 DEFAULT_COMMAND_BUFFER = 0;
+static u8 DEFAULT_COMMAND_BUFFER = 0;
 
 
 Material::Material(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
@@ -80,7 +80,7 @@ int Material::getCustomFlagCount()
 }
 
 
-uint32 Material::getCustomFlag(const char* flag_name)
+u32 Material::getCustomFlag(const char* flag_name)
 {
 	for (int i = 0; i < s_custom_flags.count; ++i)
 	{
@@ -97,21 +97,21 @@ uint32 Material::getCustomFlag(const char* flag_name)
 }
 
 
-bool Material::isDefined(uint8 define_idx) const
+bool Material::isDefined(u8 define_idx) const
 {
 	return (m_define_mask & (1 << define_idx)) != 0;
 }
 
 
-bool Material::hasDefine(uint8 define_idx) const
+bool Material::hasDefine(u8 define_idx) const
 {
 	return m_shader->hasDefine(define_idx) != 0;
 }
 
 
-void Material::setDefine(uint8 define_idx, bool enabled)
+void Material::setDefine(u8 define_idx, bool enabled)
 {
-	uint32 old_mask = m_define_mask;
+	u32 old_mask = m_define_mask;
 	if (enabled)
 	{
 		m_define_mask |= 1 << define_idx;
@@ -405,7 +405,7 @@ void Material::setRenderLayer(int layer)
 	++m_empty_dep_count;
 	checkState();
 	m_render_layer = layer;
-	m_render_layer_mask = 1ULL << (uint64)layer;
+	m_render_layer_mask = 1ULL << (u64)layer;
 	--m_empty_dep_count;
 	checkState();
 }
@@ -495,7 +495,7 @@ void Material::createCommandBuffer()
 	generator.setUniform(uniform, color_shininess);
 	generator.end();
 
-	m_command_buffer = (uint8*)m_allocator.allocate(generator.getSize());
+	m_command_buffer = (u8*)m_allocator.allocate(generator.getSize());
 	generator.getData(m_command_buffer);
 }
 
@@ -531,7 +531,7 @@ void Material::onBeforeReady()
 		m_uniforms[i].name_hash = shader_uniform.name_hash;
 	}
 
-	uint8 alpha_ref = uint8(m_alpha_ref * 255.0f);
+	u8 alpha_ref = u8(m_alpha_ref * 255.0f);
 	m_render_states = (m_render_states & ~BGFX_STATE_ALPHA_REF_MASK) | BGFX_STATE_ALPHA_REF(alpha_ref);
 	m_render_states |= m_shader->m_render_states;
 
@@ -603,7 +603,7 @@ Texture* Material::getTextureByUniform(const char* uniform) const
 }
 
 
-bool Material::isTextureDefine(uint8 define_idx) const
+bool Material::isTextureDefine(u8 define_idx) const
 {
 	if (!m_shader) return false;
 
@@ -623,7 +623,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 	serializer.deserializeObjectBegin();
 	char label[256];
 	bool keep_data = false;
-	uint32 flags = 0;
+	u32 flags = 0;
 
 	while (!serializer.isObjectEnd())
 	{
@@ -744,7 +744,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 void Material::setAlphaRef(float value)
 {
 	m_alpha_ref = value;
-	uint8 val = uint8(value * 255.0f);
+	u8 val = u8(value * 255.0f);
 	m_render_states &= ~BGFX_STATE_ALPHA_REF_MASK;
 	m_render_states |= BGFX_STATE_ALPHA_REF(val);
 }
@@ -804,7 +804,7 @@ bool Material::load(FS::IFile& file)
 			auto& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
 			serializer.deserialize(tmp, lengthOf(tmp), "Default");
 			m_render_layer = renderer.getLayer(tmp);
-			m_render_layer_mask = 1ULL << (uint64)m_render_layer;
+			m_render_layer_mask = 1ULL << (u64)m_render_layer;
 		}
 		else if (equalStrings(label, "uniforms"))
 		{

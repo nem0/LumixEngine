@@ -334,10 +334,10 @@ public:
 		#pragma pack(1)
 			struct Header
 			{
-				Lumix::uint32 magic;
+				Lumix::u32 magic;
 				int version;
-				Lumix::uint32 hash;
-				Lumix::uint32 engine_hash;
+				Lumix::u32 hash;
+				Lumix::u32 engine_hash;
 			};
 		#pragma pack()
 		Header header;
@@ -467,7 +467,7 @@ public:
 		if (frame_time < 1 / 60.0f)
 		{
 			PROFILE_BLOCK("sleep");
-			Lumix::MT::sleep(Lumix::uint32(1000 / 60.0f - frame_time * 1000));
+			Lumix::MT::sleep(Lumix::u32(1000 / 60.0f - frame_time * 1000));
 		}
 		handleEvents();
 	}

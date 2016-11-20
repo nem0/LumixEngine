@@ -10,19 +10,19 @@ namespace Lumix
 
 
 LUMIX_ENGINE_API const char* stristr(const char* haystack, const char* needle);
-LUMIX_ENGINE_API bool toCStringHex(uint8 value, char* output, int length);
-LUMIX_ENGINE_API bool toCStringPretty(int32 value, char* output, int length);
-LUMIX_ENGINE_API bool toCStringPretty(uint32 value, char* output, int length);
-LUMIX_ENGINE_API bool toCStringPretty(uint64 value, char* output, int length);
-LUMIX_ENGINE_API bool toCString(int32 value, char* output, int length);
-LUMIX_ENGINE_API bool toCString(int64 value, char* output, int length);
-LUMIX_ENGINE_API bool toCString(uint64 value, char* output, int length);
-LUMIX_ENGINE_API bool toCString(uint32 value, char* output, int length);
+LUMIX_ENGINE_API bool toCStringHex(u8 value, char* output, int length);
+LUMIX_ENGINE_API bool toCStringPretty(i32 value, char* output, int length);
+LUMIX_ENGINE_API bool toCStringPretty(u32 value, char* output, int length);
+LUMIX_ENGINE_API bool toCStringPretty(u64 value, char* output, int length);
+LUMIX_ENGINE_API bool toCString(i32 value, char* output, int length);
+LUMIX_ENGINE_API bool toCString(i64 value, char* output, int length);
+LUMIX_ENGINE_API bool toCString(u64 value, char* output, int length);
+LUMIX_ENGINE_API bool toCString(u32 value, char* output, int length);
 LUMIX_ENGINE_API bool toCString(float value, char* output, int length, int after_point);
 LUMIX_ENGINE_API const char* reverseFind(const char* begin_haystack, const char* end_haystack, char c);
-LUMIX_ENGINE_API const char* fromCString(const char* input, int length, int32* value);
-LUMIX_ENGINE_API const char* fromCString(const char* input, int length, int64* value);
-LUMIX_ENGINE_API const char* fromCString(const char* input, int length, uint32* value);
+LUMIX_ENGINE_API const char* fromCString(const char* input, int length, i32* value);
+LUMIX_ENGINE_API const char* fromCString(const char* input, int length, i64* value);
+LUMIX_ENGINE_API const char* fromCString(const char* input, int length, u32* value);
 LUMIX_ENGINE_API bool copyString(char* destination, int length, const char* source);
 LUMIX_ENGINE_API bool copyNString(char* destination,
 	int length,
@@ -41,7 +41,7 @@ LUMIX_ENGINE_API int compareStringN(const char* lhs, const char* rhs, int length
 LUMIX_ENGINE_API int compareIStringN(const char* lhs, const char* rhs, int length);
 LUMIX_ENGINE_API void copyMemory(void* dest, const void* src, size_t count);
 LUMIX_ENGINE_API void moveMemory(void* dest, const void* src, size_t count);
-LUMIX_ENGINE_API void setMemory(void* ptr, uint8 value, size_t num);
+LUMIX_ENGINE_API void setMemory(void* ptr, u8 value, size_t num);
 LUMIX_ENGINE_API const char* findSubstring(const char* str, const char* substr);
 LUMIX_ENGINE_API bool endsWith(const char* str, const char* substr);
 
@@ -135,7 +135,7 @@ public:
 		m_size = 0;
 	}
 
-	base_string(const base_string<T>& rhs, int start, int32 length)
+	base_string(const base_string<T>& rhs, int start, i32 length)
 		: m_allocator(rhs.m_allocator)
 	{
 		m_size = length - start <= rhs.m_size ? length : rhs.m_size - start;
@@ -144,7 +144,7 @@ public:
 		m_cstr[m_size] = 0;
 	}
 
-	base_string(const T* rhs, int32 length, IAllocator& allocator)
+	base_string(const T* rhs, i32 length, IAllocator& allocator)
 		: m_allocator(allocator)
 	{
 		m_size = length;
@@ -254,7 +254,7 @@ public:
 
 	int rfind(T c) const
 	{
-		int32 i = m_size - 1;
+		i32 i = m_size - 1;
 		while (i >= 0 && m_cstr[i] != c)
 		{
 			--i;
@@ -277,7 +277,7 @@ public:
 		{
 			if (m_cstr)
 			{
-				int32 new_size = m_size + length;
+				i32 new_size = m_size + length;
 				T* new_cstr = (T*)m_allocator.allocate(new_size + 1);
 				copyMemory(new_cstr, m_cstr, sizeof(T) * m_size + 1);
 				m_allocator.deallocate(m_cstr);
@@ -364,7 +364,7 @@ public:
 		{
 			if (m_cstr)
 			{
-				int32 new_size = m_size + base_string<T>::stringLength(rhs);
+				i32 new_size = m_size + base_string<T>::stringLength(rhs);
 				T* new_cstr = (T*)m_allocator.allocate(new_size + 1);
 				copyMemory(new_cstr, m_cstr, sizeof(T) * m_size + 1);
 				m_allocator.deallocate(m_cstr);
@@ -389,7 +389,7 @@ public:
 		}
 		if (m_cstr)
 		{
-			int32 new_size = m_size + rhs.length();
+			i32 new_size = m_size + rhs.length();
 			T* new_cstr = (T*)m_allocator.allocate(new_size + 1);
 			copyMemory(new_cstr, m_cstr, sizeof(T) * m_size + 1);
 			m_allocator.deallocate(m_cstr);
@@ -404,7 +404,7 @@ public:
 		}
 	}
 
-	void erase(int32 pos)
+	void erase(i32 pos)
 	{
 		if (pos >= 0 && pos < m_size)
 		{
@@ -417,14 +417,14 @@ public:
 	static const int npos = 0xffFFffFF;
 
 private:
-	static int32 stringLength(const T* rhs)
+	static i32 stringLength(const T* rhs)
 	{
 		const T* c = rhs;
 		while (*c)
 		{
 			++c;
 		}
-		return (int32)(c - rhs);
+		return (i32)(c - rhs);
 	}
 
 	int compareString(const T* rhs) const
@@ -446,7 +446,7 @@ private:
 
 
 private:
-	int32 m_size;
+	i32 m_size;
 	T* m_cstr;
 	IAllocator& m_allocator;
 };

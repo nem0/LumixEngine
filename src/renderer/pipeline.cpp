@@ -49,16 +49,16 @@ struct InstanceData
 
 struct View
 {
-	uint8 bgfx_id;
-	uint64 layer_mask;
-	uint64 render_state;
-	uint32 stencil;
+	u8 bgfx_id;
+	u64 layer_mask;
+	u64 render_state;
+	u32 stencil;
 	int pass_idx;
 	CommandBufferGenerator command_buffer;
 };
 
 
-enum class BufferCommands : uint8
+enum class BufferCommands : u8
 {
 	END,
 	SET_TEXTURE,
@@ -77,7 +77,7 @@ struct SetTextureCommand
 {
 	SetTextureCommand() : type(BufferCommands::SET_TEXTURE) {}
 	BufferCommands type;
-	uint8 stage;
+	u8 stage;
 	bgfx::UniformHandle uniform;
 	bgfx::TextureHandle texture;
 };
@@ -113,8 +113,8 @@ struct SetUniformArrayCommand
 	SetUniformArrayCommand() : type(BufferCommands::SET_UNIFORM_ARRAY) {}
 	BufferCommands type;
 	bgfx::UniformHandle uniform;
-	uint16 size;
-	uint16 count;
+	u16 size;
+	u16 count;
 };
 
 
@@ -127,7 +127,7 @@ CommandBufferGenerator::CommandBufferGenerator()
 }
 
 
-void CommandBufferGenerator::setTexture(uint8 stage,
+void CommandBufferGenerator::setTexture(u8 stage,
 	const bgfx::UniformHandle& uniform,
 	const bgfx::TextureHandle& texture)
 {
@@ -157,7 +157,7 @@ void CommandBufferGenerator::setUniform(const bgfx::UniformHandle& uniform, cons
 	SetUniformArrayCommand cmd;
 	cmd.uniform = uniform;
 	cmd.count = count;
-	cmd.size = uint16(count * sizeof(Vec4));
+	cmd.size = u16(count * sizeof(Vec4));
 	ASSERT(pointer + sizeof(cmd) - buffer <= sizeof(buffer));
 	copyMemory(pointer, &cmd, sizeof(cmd));
 	pointer += sizeof(cmd);
@@ -172,7 +172,7 @@ void CommandBufferGenerator::setUniform(const bgfx::UniformHandle& uniform, cons
 	SetUniformArrayCommand cmd;
 	cmd.uniform = uniform;
 	cmd.count = count;
-	cmd.size = uint16(count * sizeof(Matrix));
+	cmd.size = u16(count * sizeof(Matrix));
 	ASSERT(pointer + sizeof(cmd) - buffer <= sizeof(buffer));
 	copyMemory(pointer, &cmd, sizeof(cmd));
 	pointer += sizeof(cmd);
@@ -185,7 +185,7 @@ void CommandBufferGenerator::setUniform(const bgfx::UniformHandle& uniform, cons
 void CommandBufferGenerator::setGlobalShadowmap()
 {
 	ASSERT(pointer + 1 - buffer <= sizeof(buffer));
-	*pointer = (uint8)BufferCommands::SET_GLOBAL_SHADOWMAP;
+	*pointer = (u8)BufferCommands::SET_GLOBAL_SHADOWMAP;
 	pointer += 1;
 }
 
@@ -210,7 +210,7 @@ void CommandBufferGenerator::setTimeUniform(const bgfx::UniformHandle& uniform)
 }
 
 
-void CommandBufferGenerator::getData(uint8* data)
+void CommandBufferGenerator::getData(u8* data)
 {
 	copyMemory(data, buffer, pointer - buffer);
 }
@@ -218,7 +218,7 @@ void CommandBufferGenerator::getData(uint8* data)
 
 void CommandBufferGenerator::clear()
 {
-	buffer[0] = (uint8)BufferCommands::END;
+	buffer[0] = (u8)BufferCommands::END;
 	pointer = buffer;
 }
 
@@ -232,7 +232,7 @@ void CommandBufferGenerator::beginAppend()
 void CommandBufferGenerator::end()
 {
 	ASSERT(pointer + 1 - buffer <= sizeof(buffer));
-	*pointer = (uint8)BufferCommands::END;
+	*pointer = (u8)BufferCommands::END;
 	++pointer;
 }
 
@@ -257,7 +257,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	struct BaseVertex
 	{
 		float x, y, z;
-		uint32 rgba;
+		u32 rgba;
 		float u;
 		float v;
 	};
@@ -459,7 +459,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		const bgfx::Memory* vertex_mem = bgfx::copy(vertices, sizeof(vertices));
 		m_particle_vertex_buffer = bgfx::createVertexBuffer(vertex_mem, m_base_vertex_decl);
 
-		uint16 indices[] = { 0, 1, 2, 0, 2, 3 };
+		u16 indices[] = { 0, 1, 2, 0, 2, 3 };
 		const bgfx::Memory* index_mem = bgfx::copy(indices, sizeof(indices));
 		m_particle_index_buffer = bgfx::createIndexBuffer(index_mem);
 	}
@@ -699,7 +699,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Mesh& mesh = *data.mesh;
 		const Model& model = *data.model;
 		Material* material = mesh.material;
-		const uint16 stride = model.getVertexDecl().getStride();
+		const u16 stride = model.getVertexDecl().getStride();
 
 		int view_idx = m_layer_to_view_map[material->getRenderLayer()];
 		ASSERT(view_idx >= 0);
@@ -744,7 +744,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Matrix view = universe.getMatrix(m_scene->getCameraEntity(cmp));
 		view.fastInverse();
 		bgfx::setViewTransform(m_current_view->bgfx_id, &view.m11, &projection_matrix.m11);
-		bgfx::setViewRect(m_current_view->bgfx_id, (uint16_t)m_view_x, (uint16_t)m_view_y, (uint16)m_width, (uint16)m_height);
+		bgfx::setViewRect(m_current_view->bgfx_id, (uint16_t)m_view_x, (uint16_t)m_view_y, (u16)m_width, (u16)m_height);
 	}
 
 
@@ -826,7 +826,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void executeCustomCommand(const char* name)
 	{
-		uint32 name_hash = crc32(name);
+		u32 name_hash = crc32(name);
 		CustomCommandHandler handler;
 		for(auto& handler : m_custom_commands_handlers)
 		{
@@ -840,7 +840,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	int newView(const char* debug_name, uint64 layer_mask)
+	int newView(const char* debug_name, u64 layer_mask)
 	{
 		++m_view_idx;
 		if (m_view_idx >= lengthOf(m_views))
@@ -851,7 +851,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		m_current_view = &m_views[m_view_idx];
 		m_renderer.viewCounterAdd();
 		m_current_view->layer_mask = layer_mask;
-		m_current_view->bgfx_id = (uint8)m_renderer.getViewCounter();
+		m_current_view->bgfx_id = (u8)m_renderer.getViewCounter();
 		m_current_view->stencil = BGFX_STENCIL_NONE;
 		m_current_view->render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE | BGFX_STATE_MSAA;
 		m_current_view->pass_idx = m_pass_idx;
@@ -859,7 +859,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		m_global_textures_count = 0;
 		if (layer_mask != 0)
 		{
-			for (uint64 layer = 0; layer < 64; ++layer)
+			for (u64 layer = 0; layer < 64; ++layer)
 			{
 				if (layer_mask & (1ULL << layer)) m_layer_to_view_map[layer] = m_view_idx;
 			}
@@ -901,7 +901,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			{-1, 1, -1}, {1, 1, -1}, {1, 1, 1}, {-1, 1, 1},
 			{-1, -1, -1}, {1, -1, -1}, {1, -1, 1}, {-1, -1, 1}
 		};
-		static const uint16 cube_indices[] = {
+		static const u16 cube_indices[] = {
 			0, 2, 1, 2, 0, 3,
 			4, 5, 6, 6, 7, 4,
 			8, 10, 9, 10, 8, 11,
@@ -1117,8 +1117,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Matrix mtx = m_scene->getUniverse().getMatrix(light_entity);
 		float fov = m_scene->getLightFOV(light);
 		float range = m_scene->getLightRange(light);
-		uint16 shadowmap_height = (uint16)m_current_framebuffer->getHeight();
-		uint16 shadowmap_width = (uint16)m_current_framebuffer->getWidth();
+		u16 shadowmap_height = (u16)m_current_framebuffer->getHeight();
+		u16 shadowmap_width = (u16)m_current_framebuffer->getWidth();
 		Vec3 pos = mtx.getTranslation();
 
 		bgfx::setViewClear(m_current_view->bgfx_id, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
@@ -1151,8 +1151,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Entity light_entity = m_scene->getPointLightEntity(light);
 		Vec3 light_pos = m_scene->getUniverse().getPosition(light_entity);
 		float range = m_scene->getLightRange(light);
-		uint16 shadowmap_height = (uint16)m_current_framebuffer->getHeight();
-		uint16 shadowmap_width = (uint16)m_current_framebuffer->getWidth();
+		u16 shadowmap_height = (u16)m_current_framebuffer->getHeight();
+		u16 shadowmap_width = (u16)m_current_framebuffer->getWidth();
 
 		float viewports[] = {0, 0, 0.5, 0, 0, 0.5, 0.5, 0.5};
 
@@ -1182,8 +1182,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 			bgfx::setViewClear(m_current_view->bgfx_id, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
 			bgfx::touch(m_current_view->bgfx_id);
-			uint16 view_x = uint16(shadowmap_width * viewports[i * 2]);
-			uint16 view_y = uint16(shadowmap_height * viewports[i * 2 + 1]);
+			u16 view_x = u16(shadowmap_width * viewports[i * 2]);
+			u16 view_y = u16(shadowmap_height * viewports[i * 2 + 1]);
 			bgfx::setViewRect(
 				m_current_view->bgfx_id, view_x, view_y, shadowmap_width >> 1, shadowmap_height >> 1);
 
@@ -1334,10 +1334,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::touch(m_current_view->bgfx_id);
 		float* viewport = (is_opengl ? viewports_gl : viewports) + split_index * 2;
 		bgfx::setViewRect(m_current_view->bgfx_id,
-			(uint16)(1 + shadowmap_width * viewport[0]),
-			(uint16)(1 + shadowmap_height * viewport[1]),
-			(uint16)(0.5f * shadowmap_width - 2),
-			(uint16)(0.5f * shadowmap_height - 2));
+			(u16)(1 + shadowmap_width * viewport[0]),
+			(u16)(1 + shadowmap_height * viewport[1]),
+			(u16)(0.5f * shadowmap_width - 2),
+			(u16)(0.5f * shadowmap_height - 2));
 
 		Frustum camera_frustum;
 		Matrix camera_matrix = universe.getMatrix(m_scene->getCameraEntity(m_applied_camera));
@@ -1381,8 +1381,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		if (!bgfx::isValid(m_debug_index_buffer))
 		{
 			auto* mem = bgfx::alloc(0xffFF * 2);
-			uint16* data = (uint16*)mem->data;
-			for (uint16 i = 0; i < 0xffff; ++i) data[i] = i;
+			u16* data = (u16*)mem->data;
+			for (u16 i = 0; i < 0xffff; ++i) data[i] = i;
 			m_debug_index_buffer = bgfx::createDynamicIndexBuffer(mem);
 		}
 
@@ -1616,19 +1616,19 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void setStencilRef(uint32 ref)
+	void setStencilRef(u32 ref)
 	{
 		m_current_view->stencil |= BGFX_STENCIL_FUNC_REF(ref);
 	}
 
 
-	void setStencilRMask(uint32 rmask)
+	void setStencilRMask(u32 rmask)
 	{
 		m_current_view->stencil |= BGFX_STENCIL_FUNC_RMASK(rmask);
 	}
 
 
-	void setStencil(uint32 flags)
+	void setStencil(u32 flags)
 	{
 		m_current_view->stencil |= flags;
 	}
@@ -1804,12 +1804,12 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			bgfx::setViewRect(m_current_view->bgfx_id,
 				m_view_x,
 				m_view_y,
-				(uint16)m_current_framebuffer->getWidth(),
-				(uint16)m_current_framebuffer->getHeight());
+				(u16)m_current_framebuffer->getWidth(),
+				(u16)m_current_framebuffer->getHeight());
 		}
 		else
 		{
-			bgfx::setViewRect(m_current_view->bgfx_id, m_view_x, m_view_y, (uint16)m_width, (uint16)m_height);
+			bgfx::setViewRect(m_current_view->bgfx_id, m_view_x, m_view_y, (u16)m_width, (u16)m_height);
 		}
 
 		bgfx::TransientVertexBuffer vb;
@@ -1907,7 +1907,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void renderAll(const Frustum& frustum, bool render_grass, const Vec3& lod_ref_point, uint64 layer_mask)
+	void renderAll(const Frustum& frustum, bool render_grass, const Vec3& lod_ref_point, u64 layer_mask)
 	{
 		PROFILE_FUNCTION();
 
@@ -2108,17 +2108,17 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	bool checkAvailTransientBuffers(uint32 num_vertices, const bgfx::VertexDecl& decl, uint32 num_indices) override
+	bool checkAvailTransientBuffers(u32 num_vertices, const bgfx::VertexDecl& decl, u32 num_indices) override
 	{
 		return bgfx::checkAvailTransientBuffers(num_vertices, decl, num_indices);
 	}
 
 
 	void allocTransientBuffers(bgfx::TransientVertexBuffer* tvb,
-		uint32 num_vertices,
+		u32 num_vertices,
 		const bgfx::VertexDecl& decl,
 		bgfx::TransientIndexBuffer* tib,
-		uint32 num_indices) override
+		u32 num_indices) override
 	{
 		bgfx::allocTransientIndexBuffer(tib, num_indices);
 		bgfx::allocTransientVertexBuffer(tvb, num_vertices, decl);
@@ -2134,7 +2134,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	bgfx::TextureHandle createTexture(int width, int height, const uint32* data) override
+	bgfx::TextureHandle createTexture(int width, int height, const u32* data) override
 	{
 		return bgfx::createTexture2D(
 			width, height, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::copy(data, 4 * width * height));
@@ -2158,7 +2158,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		const Matrix& mtx,
 		int first_index,
 		int num_indices,
-		uint64 render_states,
+		u64 render_states,
 		ShaderInstance& shader_instance) override
 	{
 		View& view = *m_current_view;
@@ -2210,9 +2210,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void executeCommandBuffer(const uint8* data, Material* material) const
+	void executeCommandBuffer(const u8* data, Material* material) const
 	{
-		const uint8* ip = data;
+		const u8* ip = data;
 		for (;;)
 		{
 			switch ((BufferCommands)*ip)
@@ -2609,7 +2609,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void enableBlending(const char* mode)
 	{
-		uint64 mode_value = 0;
+		u64 mode_value = 0;
 		if (equalStrings(mode, "alpha")) mode_value = BGFX_STATE_BLEND_ALPHA;
 		else if (equalStrings(mode, "add")) mode_value = BGFX_STATE_BLEND_ADD;
 		else if (equalStrings(mode, "multiply")) mode_value = BGFX_STATE_BLEND_MULTIPLY;
@@ -2618,9 +2618,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void clear(uint32 flags, uint32 color)
+	void clear(u32 flags, u32 color)
 	{
-		bgfx::setViewClear(m_current_view->bgfx_id, (uint16)flags, color, 1.0f, 0);
+		bgfx::setViewClear(m_current_view->bgfx_id, (u16)flags, color, 1.0f, 0);
 		bgfx::touch(m_current_view->bgfx_id);
 	}
 
@@ -2669,9 +2669,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	bgfx::VertexDecl m_deferred_point_light_vertex_decl;
 	bgfx::VertexDecl m_base_vertex_decl;
 	TerrainInstance m_terrain_instances[4];
-	uint32 m_debug_flags;
+	u32 m_debug_flags;
 	int m_view_idx;
-	uint64 m_layer_mask;
+	u64 m_layer_mask;
 	View m_views[32];
 	View* m_current_view;
 	int m_pass_idx;
@@ -2760,8 +2760,8 @@ int newView(lua_State* L)
 {
 	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
 	const char* debug_name = LuaWrapper::checkArg<const char*>(L, 2);
-	uint64 layer_mask = 0;
-	if (lua_gettop(L) > 2) layer_mask = LuaWrapper::checkArg<uint64>(L, 3);
+	u64 layer_mask = 0;
+	if (lua_gettop(L) > 2) layer_mask = LuaWrapper::checkArg<u64>(L, 3);
 
 	pipeline->m_layer_mask |= layer_mask;
 
@@ -2913,7 +2913,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 		lua_setglobal(L, name);
 	};
 
-	auto registerConst = [L](const char* name, uint32 value)
+	auto registerConst = [L](const char* name, u32 value)
 	{
 		lua_pushinteger(L, value);
 		lua_setglobal(L, name);

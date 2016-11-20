@@ -257,7 +257,7 @@ void Edge::onGUI()
 
 bool Edge::draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected)
 {
-	uint32 color = ImGui::ColorConvertFloat4ToU32(
+	u32 color = ImGui::ColorConvertFloat4ToU32(
 		selected ? ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] : ImGui::GetStyle().Colors[ImGuiCol_Button]);
 	ImVec2 from = getEdgeStartPoint(m_from, m_to, true) + canvas_screen_pos;
 	ImVec2 to = getEdgeStartPoint(m_to, m_from, false) + canvas_screen_pos;

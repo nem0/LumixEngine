@@ -151,7 +151,7 @@ void SimpleAnimationNode::serialize(OutputBlob& blob)
 {
 	Component::serialize(blob);
 	blob.write(animations_hashes.size());
-	for (uint32 hash : animations_hashes)
+	for (u32 hash : animations_hashes)
 	{
 		blob.write(hash);
 	}
@@ -166,7 +166,7 @@ void SimpleAnimationNode::deserialize(InputBlob& blob, Container* parent)
 	int count;
 	blob.read(count);
 	animations_hashes.resize(count);
-	for (uint32& hash : animations_hashes)
+	for (u32& hash : animations_hashes)
 	{
 		blob.read(hash);
 	}

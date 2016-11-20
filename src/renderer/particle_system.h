@@ -98,7 +98,7 @@ public:
 		ComponentType getType() const override { return s_type; }
 
 		static const ComponentType s_type;
-		enum Shape : uint8
+		enum Shape : u8
 		{
 			SPHERE
 		};

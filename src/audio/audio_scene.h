@@ -26,7 +26,7 @@ public:
 	{
 		Clip* clip;
 		char name[30];
-		uint32 name_hash;
+		u32 name_hash;
 		bool looped;
 	};
 

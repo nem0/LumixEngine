@@ -41,7 +41,7 @@ void Job::decrementDependency()
 {
 #if !LUMIX_SINGLE_THREAD()
 
-	uint32 count = MT::atomicDecrement(&m_dependency_count);
+	u32 count = MT::atomicDecrement(&m_dependency_count);
 	if (1 == count)
 	{
 		m_manager.schedule(this);

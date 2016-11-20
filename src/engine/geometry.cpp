@@ -57,19 +57,19 @@ void Frustum::computeOrtho(const Vec3& position,
 
 void Frustum::setPlane(Planes side, const Vec3& normal, const Vec3& point)
 {
-	xs[(uint32)side] = normal.x;
-	ys[(uint32)side] = normal.y;
-	zs[(uint32)side] = normal.z;
-	ds[(uint32)side] = -dotProduct(point, normal);
+	xs[(u32)side] = normal.x;
+	ys[(u32)side] = normal.y;
+	zs[(u32)side] = normal.z;
+	ds[(u32)side] = -dotProduct(point, normal);
 }
 
 
 void Frustum::setPlane(Planes side, const Vec3& normal, float d)
 {
-	xs[(uint32)side] = normal.x;
-	ys[(uint32)side] = normal.y;
-	zs[(uint32)side] = normal.z;
-	ds[(uint32)side] = d;
+	xs[(u32)side] = normal.x;
+	ys[(u32)side] = normal.y;
+	zs[(u32)side] = normal.z;
+	ds[(u32)side] = d;
 }
 
 

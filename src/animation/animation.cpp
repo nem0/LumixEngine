@@ -153,7 +153,7 @@ Transform Animation::getBoneTransform(float time, int bone_idx) const
 }
 
 
-int Animation::getBoneIndex(uint32 name) const
+int Animation::getBoneIndex(u32 name) const
 {
 	for (int i = 0, c = m_bones.size(); i < c; ++i)
 	{
@@ -258,14 +258,14 @@ bool Animation::load(FS::IFile& file)
 	InputBlob blob(&m_mem[0], size);
 	for (int i = 0; i < m_bones.size(); ++i)
 	{
-		m_bones[i].name = blob.read<uint32>();
+		m_bones[i].name = blob.read<u32>();
 
 		m_bones[i].pos_count = blob.read<int>();
-		m_bones[i].pos_times = (const uint16*)blob.skip(m_bones[i].pos_count * sizeof(uint16));
+		m_bones[i].pos_times = (const u16*)blob.skip(m_bones[i].pos_count * sizeof(u16));
 		m_bones[i].pos = (const Vec3*)blob.skip(m_bones[i].pos_count * sizeof(Vec3));;
 		
 		m_bones[i].rot_count = blob.read<int>();
-		m_bones[i].rot_times = (const uint16*)blob.skip(m_bones[i].rot_count * sizeof(uint16));;
+		m_bones[i].rot_times = (const u16*)blob.skip(m_bones[i].rot_count * sizeof(u16));;
 		m_bones[i].rot = (const Quat*)blob.skip(m_bones[i].rot_count * sizeof(Quat));;
 	}
 

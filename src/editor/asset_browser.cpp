@@ -19,7 +19,7 @@
 
 
 static const Lumix::ResourceType UNIVERSE_TYPE("universe");
-static const Lumix::uint32 SOURCE_HASH = Lumix::crc32("source");
+static const Lumix::u32 SOURCE_HASH = Lumix::crc32("source");
 
 
 Lumix::ResourceType AssetBrowser::getResourceType(const char* path) const

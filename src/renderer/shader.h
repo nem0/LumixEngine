@@ -38,7 +38,7 @@ struct ShaderInstance
 
 	bgfx::ProgramHandle program_handles[32];
 	ShaderBinary* binaries[64];
-	uint32 define_mask;
+	u32 define_mask;
 	Shader& shader;
 };
 
@@ -49,7 +49,7 @@ struct LUMIX_RENDERER_API ShaderCombinations
 
 	typedef char Define[40];
 	typedef StaticString<20> Pass;
-	typedef uint8 Defines[16];
+	typedef u8 Defines[16];
 	typedef Pass Passes[32];
 
 	int pass_count;
@@ -58,7 +58,7 @@ struct LUMIX_RENDERER_API ShaderCombinations
 	int fs_local_mask[32];
 	Defines defines;
 	Passes passes;
-	uint32 all_defines_mask;
+	u32 all_defines_mask;
 };
 
 
@@ -112,7 +112,7 @@ public:
 		};
 
 		char name[32];
-		uint32 name_hash;
+		u32 name_hash;
 		Type type;
 		bgfx::UniformHandle handle;
 	};
@@ -125,8 +125,8 @@ public:
 	Shader(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	~Shader();
 
-	bool hasDefine(uint8 define_idx) const;
-	ShaderInstance& getInstance(uint32 mask);
+	bool hasDefine(u8 define_idx) const;
+	ShaderInstance& getInstance(u32 mask);
 	Renderer& getRenderer();
 
 	static bool getShaderCombinations(const char* shd_path,
@@ -136,9 +136,9 @@ public:
 
 	IAllocator& m_allocator;
 	Array<ShaderInstance> m_instances;
-	uint32 m_all_defines_mask;
+	u32 m_all_defines_mask;
 	ShaderCombinations m_combintions;
-	uint64 m_render_states;
+	u64 m_render_states;
 	TextureSlot m_texture_slots[MAX_TEXTURE_SLOT_COUNT];
 	int m_texture_slot_count;
 	Array<Uniform> m_uniforms;

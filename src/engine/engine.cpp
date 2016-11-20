@@ -209,7 +209,7 @@ int Separator(lua_State* L)
 }
 
 
-void Rect(float w, float h, uint32 color)
+void Rect(float w, float h, u32 color)
 {
 	ImGui::Rect(w, h, color);
 }
@@ -342,7 +342,7 @@ void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 }
 }
 
-static const uint32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
+static const u32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
 static const ResourceType PREFAB_TYPE("prefab");
 static const ComponentType HIERARCHY_TYPE = PropertyRegister::getComponentType("hierarchy");
 
@@ -351,7 +351,7 @@ static FS::OsFile g_error_file;
 static bool g_is_error_file_opened = false;
 
 
-enum class SerializedEngineVersion : int32
+enum class SerializedEngineVersion : i32
 {
 	BASE,
 	SPARSE_TRANFORMATIONS,
@@ -368,9 +368,9 @@ enum class SerializedEngineVersion : int32
 class SerializedEngineHeader
 {
 public:
-	uint32 m_magic;
+	u32 m_magic;
 	SerializedEngineVersion m_version;
-	uint32 m_reserved; // for crc
+	u32 m_reserved; // for crc
 };
 #pragma pack()
 
@@ -721,7 +721,7 @@ public:
 
 	static IScene* LUA_getScene(Universe* universe, const char* name)
 	{
-		uint32 hash = crc32(name);
+		u32 hash = crc32(name);
 		return universe->getScene(hash);
 	}
 
@@ -773,14 +773,14 @@ public:
 	}
 
 
-	static float LUA_getInputActionValue(Engine* engine, uint32 action)
+	static float LUA_getInputActionValue(Engine* engine, u32 action)
 	{
 		auto v = engine->getInputSystem().getActionValue(action);
 		return v;
 	}
 
 
-	static void LUA_addInputAction(Engine* engine, uint32 action, int type, int key, int controller_id)
+	static void LUA_addInputAction(Engine* engine, u32 action, int type, int key, int controller_id)
 	{
 		engine->getInputSystem().addAction(
 			action, Lumix::InputSystem::InputType(type), key, controller_id);
@@ -1317,7 +1317,7 @@ public:
 
 	void serializePluginList(OutputBlob& serializer)
 	{
-		serializer.write((int32)m_plugin_manager->getPlugins().size());
+		serializer.write((i32)m_plugin_manager->getPlugins().size());
 		for (auto* plugin : m_plugin_manager->getPlugins())
 		{
 			serializer.writeString(plugin->getName());
@@ -1327,11 +1327,11 @@ public:
 
 	bool hasSupportedSceneVersions(InputBlob& serializer, Universe& ctx)
 	{
-		int32 count;
+		i32 count;
 		serializer.read(count);
 		for (int i = 0; i < count; ++i)
 		{
-			uint32 hash;
+			u32 hash;
 			serializer.read(hash);
 			auto* scene = ctx.getScene(hash);
 			int version;
@@ -1348,7 +1348,7 @@ public:
 
 	bool hasSerializedPlugins(InputBlob& serializer)
 	{
-		int32 count;
+		i32 count;
 		serializer.read(count);
 		for (int i = 0; i < count; ++i)
 		{
@@ -1364,7 +1364,7 @@ public:
 	}
 
 
-	uint32 serialize(Universe& ctx, OutputBlob& serializer) override
+	u32 serialize(Universe& ctx, OutputBlob& serializer) override
 	{
 		SerializedEngineHeader header;
 		header.m_magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
@@ -1377,14 +1377,14 @@ public:
 		int pos = serializer.getPos();
 		ctx.serialize(serializer);
 		m_plugin_manager->serialize(serializer);
-		serializer.write((int32)ctx.getScenes().size());
+		serializer.write((i32)ctx.getScenes().size());
 		for (auto* scene : ctx.getScenes())
 		{
 			serializer.writeString(scene->getPlugin().getName());
 			serializer.write(scene->getVersion());
 			scene->serialize(serializer);
 		}
-		uint32 crc = crc32((const uint8*)serializer.getData() + pos, serializer.getPos() - pos);
+		u32 crc = crc32((const u8*)serializer.getData() + pos, serializer.getPos() - pos);
 		return crc;
 	}
 
@@ -1418,12 +1418,12 @@ public:
 
 		if (header.m_version <= SerializedEngineVersion::HIERARCHY_COMPONENT)
 		{
-			static const uint32 HIERARCHY_HASH = crc32("hierarchy");
+			static const u32 HIERARCHY_HASH = crc32("hierarchy");
 			ctx.getScene(HIERARCHY_HASH)->deserialize(serializer, 0);
 		}
 
 		m_plugin_manager->deserialize(serializer);
-		int32 scene_count;
+		i32 scene_count;
 		serializer.read(scene_count);
 		for (int i = 0; i < scene_count; ++i)
 		{
@@ -1479,22 +1479,22 @@ public:
 			Entity new_entity = universe.createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
 			entities.push(new_entity);
 			universe.setMatrix(new_entity, mtx);
-			int32 count;
+			i32 count;
 			blob.read(count);
 			for (int i = 0; i < count; ++i)
 			{
-				uint32 hash;
+				u32 hash;
 				blob.read(hash);
 				ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
 				ComponentUID cmp = createComponent(universe, new_entity, type);
-				int32 prop_count;
+				i32 prop_count;
 				blob.read(prop_count);
 				for (int j = 0; j < prop_count; ++j)
 				{
-					uint32 prop_name_hash;
+					u32 prop_name_hash;
 					blob.read(prop_name_hash);
 					auto* desc = PropertyRegister::getDescriptor(type, prop_name_hash);
-					int32 size;
+					i32 size;
 					blob.read(size);
 					if(desc) desc->set(cmp, -1, blob);
 					else blob.skip(size);

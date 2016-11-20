@@ -15,7 +15,7 @@ namespace MT
 {
 
 
-const uint32 STACK_SIZE = 0x8000;
+const u32 STACK_SIZE = 0x8000;
 
 struct TaskImpl
 {
@@ -27,8 +27,8 @@ struct TaskImpl
 	IAllocator& m_allocator;
 	HANDLE m_handle;
 	DWORD m_thread_id;
-	uint32 m_affinity_mask;
-	uint32 m_priority;
+	u32 m_affinity_mask;
+	u32 m_priority;
 	volatile bool m_is_running;
 	volatile bool m_force_exit;
 	volatile bool m_exited;
@@ -38,7 +38,7 @@ struct TaskImpl
 
 static DWORD WINAPI threadFunction(LPVOID ptr)
 {
-	uint32 ret = 0xffffFFFF;
+	u32 ret = 0xffffFFFF;
 	struct TaskImpl* impl = reinterpret_cast<TaskImpl*>(ptr);
 	setThreadName(impl->m_thread_id, impl->m_thread_name);
 	Profiler::setThreadName(impl->m_thread_name);
@@ -108,7 +108,7 @@ bool Task::destroy()
 	return true;
 }
 
-void Task::setAffinityMask(uint32 affinity_mask)
+void Task::setAffinityMask(u32 affinity_mask)
 {
 	m_implementation->m_affinity_mask = affinity_mask;
 	if (m_implementation->m_handle)
@@ -117,7 +117,7 @@ void Task::setAffinityMask(uint32 affinity_mask)
 	}
 }
 
-uint32 Task::getAffinityMask() const
+u32 Task::getAffinityMask() const
 {
 	return m_implementation->m_affinity_mask;
 }

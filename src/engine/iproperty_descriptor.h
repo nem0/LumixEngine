@@ -43,7 +43,7 @@ public:
 	virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const = 0;
 
 	Type getType() const { return m_type; }
-	uint32 getNameHash() const { return m_name_hash; }
+	u32 getNameHash() const { return m_name_hash; }
 	const char* getName() const { return m_name; }
 	void setName(const char* name);
 	IPropertyDescriptor& setIsInRadians(bool is) { m_is_in_radians = is; return *this; }
@@ -51,7 +51,7 @@ public:
 
 protected:
 	bool m_is_in_radians;
-	uint32 m_name_hash;
+	u32 m_name_hash;
 	StaticString<32> m_name;
 	Type m_type;
 };

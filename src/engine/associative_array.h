@@ -212,7 +212,7 @@ namespace Lumix
 			{
 				if (m_capacity >= new_capacity) return;
 				
-				uint8* new_data = (uint8*)m_allocator.allocate(new_capacity * (sizeof(Key) + sizeof(Value)));
+				u8* new_data = (u8*)m_allocator.allocate(new_capacity * (sizeof(Key) + sizeof(Value)));
 				
 				copyMemory(new_data, m_keys, sizeof(Key) * m_size);
 				copyMemory(new_data + sizeof(Key) * new_capacity, m_values, sizeof(Value) * m_size);

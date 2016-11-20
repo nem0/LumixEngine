@@ -51,7 +51,7 @@ IScene* Universe::getScene(ComponentType type) const
 }
 
 
-IScene* Universe::getScene(uint32 hash) const
+IScene* Universe::getScene(u32 hash) const
 {
 	for (auto* scene : m_scenes)
 	{
@@ -172,7 +172,7 @@ void Universe::setEntityName(Entity entity, const char* name)
 	int name_index = m_id_to_name_map.find(entity.index);
 	if (name_index >= 0)
 	{
-		uint32 hash = crc32(m_id_to_name_map.at(name_index).c_str());
+		u32 hash = crc32(m_id_to_name_map.at(name_index).c_str());
 		m_name_to_id_map.erase(hash);
 		m_id_to_name_map.eraseAt(name_index);
 	}
@@ -256,10 +256,10 @@ void Universe::destroyEntity(Entity entity)
 {
 	if (!isValid(entity) || m_entity_map[entity.index] < 0) return;
 
-	uint64 mask = m_components[m_entity_map[entity.index]];
+	u64 mask = m_components[m_entity_map[entity.index]];
 	for (int i = 0; i < MAX_COMPONENTS_TYPES_COUNT; ++i)
 	{
-		if ((mask & ((uint64)1 << i)) != 0)
+		if ((mask & ((u64)1 << i)) != 0)
 		{
 			ComponentType type = {i};
 			auto original_mask = mask;
@@ -279,7 +279,7 @@ void Universe::destroyEntity(Entity entity)
 	int name_index = m_id_to_name_map.find(entity.index);
 	if (name_index >= 0)
 	{
-		uint32 name_hash = crc32(m_id_to_name_map.at(name_index).c_str());
+		u32 name_hash = crc32(m_id_to_name_map.at(name_index).c_str());
 		m_name_to_id_map.erase(name_hash);
 		m_id_to_name_map.eraseAt(name_index);
 	}
@@ -329,9 +329,9 @@ Entity Universe::getNextEntity(Entity entity)
 
 void Universe::serialize(OutputBlob& serializer)
 {
-	serializer.write((int32)m_transformations.size());
+	serializer.write((i32)m_transformations.size());
 	serializer.write(&m_transformations[0], sizeof(m_transformations[0]) * m_transformations.size());
-	serializer.write((int32)m_id_to_name_map.size());
+	serializer.write((i32)m_id_to_name_map.size());
 	for (int i = 0, c = m_id_to_name_map.size(); i < c; ++i)
 	{
 		serializer.write(m_id_to_name_map.getKey(i));
@@ -339,7 +339,7 @@ void Universe::serialize(OutputBlob& serializer)
 	}
 
 	serializer.write(m_first_free_slot);
-	serializer.write((int32)m_entity_map.size());
+	serializer.write((i32)m_entity_map.size());
 	if (!m_entity_map.empty())
 	{
 		serializer.write(&m_entity_map[0], sizeof(m_entity_map[0]) * m_entity_map.size());
@@ -349,7 +349,7 @@ void Universe::serialize(OutputBlob& serializer)
 
 void Universe::deserialize(InputBlob& serializer)
 {
-	int32 count;
+	i32 count;
 	serializer.read(count);
 	m_transformations.resize(count);
 	for (int i = 0, c = m_components.size(); i < c; ++i) m_components[i] = 0;
@@ -362,7 +362,7 @@ void Universe::deserialize(InputBlob& serializer)
 	m_name_to_id_map.clear();
 	for (int i = 0; i < count; ++i)
 	{
-		uint32 key;
+		u32 key;
 		char name[50];
 		serializer.read(key);
 		serializer.readString(name, sizeof(name));
@@ -404,10 +404,10 @@ void Universe::registerComponentTypeScene(ComponentType type, IScene* scene)
 
 ComponentUID Universe::getFirstComponent(Entity entity) const
 {
-	uint64 mask = m_components[m_entity_map[entity.index]];
+	u64 mask = m_components[m_entity_map[entity.index]];
 	for (int i = 0; i < MAX_COMPONENTS_TYPES_COUNT; ++i)
 	{
-		if ((mask & (uint64(1) << i)) != 0)
+		if ((mask & (u64(1) << i)) != 0)
 		{
 			IScene* scene = m_component_type_scene_map[i];
 			return ComponentUID(entity, {i}, scene, scene->getComponent(entity, {i}));
@@ -419,10 +419,10 @@ ComponentUID Universe::getFirstComponent(Entity entity) const
 
 ComponentUID Universe::getNextComponent(const ComponentUID& cmp) const
 {
-	uint64 mask = m_components[m_entity_map[cmp.entity.index]];
+	u64 mask = m_components[m_entity_map[cmp.entity.index]];
 	for (int i = cmp.type.index + 1; i < MAX_COMPONENTS_TYPES_COUNT; ++i)
 	{
-		if ((mask & (uint64(1) << i)) != 0)
+		if ((mask & (u64(1) << i)) != 0)
 		{
 			IScene* scene = m_component_type_scene_map[i];
 			return ComponentUID(cmp.entity, {i}, scene, scene->getComponent(cmp.entity, {i}));
@@ -434,8 +434,8 @@ ComponentUID Universe::getNextComponent(const ComponentUID& cmp) const
 
 ComponentUID Universe::getComponent(Entity entity, ComponentType component_type) const
 {
-	uint64 mask = m_components[m_entity_map[entity.index]];
-	if ((mask & (uint64(1) << component_type.index)) == 0) return ComponentUID::INVALID;
+	u64 mask = m_components[m_entity_map[entity.index]];
+	if ((mask & (u64(1) << component_type.index)) == 0) return ComponentUID::INVALID;
 	IScene* scene = m_component_type_scene_map[component_type.index];
 	return ComponentUID(entity, component_type, scene, scene->getComponent(entity, component_type));
 }
@@ -443,8 +443,8 @@ ComponentUID Universe::getComponent(Entity entity, ComponentType component_type)
 
 bool Universe::hasComponent(Entity entity, ComponentType component_type) const
 {
-	uint64 mask = m_components[m_entity_map[entity.index]];
-	return (mask & (uint64(1) << component_type.index)) != 0;
+	u64 mask = m_components[m_entity_map[entity.index]];
+	return (mask & (u64(1) << component_type.index)) != 0;
 }
 
 
@@ -452,7 +452,7 @@ void Universe::destroyComponent(Entity entity, ComponentType component_type, ISc
 {
 	auto mask = m_components[m_entity_map[entity.index]];
 	auto old_mask = mask;
-	mask &= ~((uint64)1 << component_type.index);
+	mask &= ~((u64)1 << component_type.index);
 	auto x = PropertyRegister::getComponentTypeID(component_type.index);
 	ASSERT(old_mask != mask);
 	m_components[m_entity_map[entity.index]] = mask;
@@ -463,7 +463,7 @@ void Universe::destroyComponent(Entity entity, ComponentType component_type, ISc
 void Universe::addComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index)
 {
 	ComponentUID cmp(entity, component_type, scene, index);
-	m_components[m_entity_map[entity.index]] |= (uint64)1 << component_type.index;
+	m_components[m_entity_map[entity.index]] |= (u64)1 << component_type.index;
 	m_component_added.invoke(cmp);
 }
 
