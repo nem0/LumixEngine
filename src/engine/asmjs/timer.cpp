@@ -26,14 +26,14 @@ struct TimerImpl : public Timer
 	}
 
 
-	uint64 getRawTimeSinceStart() override
+	u64 getRawTimeSinceStart() override
 	{
 		auto tick = SDL_GetPerformanceCounter();
 		return tick - m_first_tick;
 	}
 
 
-	uint64 getFrequency() override
+	u64 getFrequency() override
 	{
 		return m_frequency;
 	}
@@ -54,9 +54,9 @@ struct TimerImpl : public Timer
 	}
 
 	IAllocator& m_allocator;
-	Uint64 m_frequency;
-	Uint64 m_last_tick;
-	Uint64 m_first_tick;
+	u64 m_frequency;
+	u64 m_last_tick;
+	u64 m_first_tick;
 };
 
 

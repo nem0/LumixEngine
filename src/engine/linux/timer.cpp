@@ -26,15 +26,15 @@ struct TimerImpl : public Timer
 	}
 
 
-	uint64 getRawTimeSinceStart() override
+	u64 getRawTimeSinceStart() override
 	{
 		timespec tick;
 		clock_gettime(CLOCK_REALTIME, &tick);
-		return uint64(tick.tv_sec - m_first_tick.tv_sec) * 1000000000 + uint64(tick.tv_nsec - m_first_tick.tv_nsec);
+		return u64(tick.tv_sec - m_first_tick.tv_sec) * 1000000000 + u64(tick.tv_nsec - m_first_tick.tv_nsec);
 	}
 
 
-	uint64 getFrequency() override
+	u64 getFrequency() override
 	{
 		return 1000000000;
 	}

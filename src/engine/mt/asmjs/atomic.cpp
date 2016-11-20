@@ -43,7 +43,7 @@ bool compareAndExchange(i32 volatile* dest, i32 exchange, i32 comperand)
 	return true;
 }
 
-bool compareAndExchange64(int64 volatile* dest, int64 exchange, int64 comperand)
+bool compareAndExchange64(i64 volatile* dest, i64 exchange, i64 comperand)
 {
 	ASSERT(false);
 	if (*dest != comperand) return false;

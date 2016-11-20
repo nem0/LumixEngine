@@ -149,7 +149,7 @@ OsFile& OsFile::operator <<(u32 value)
 }
 
 
-OsFile& OsFile::operator <<(uint64 value)
+OsFile& OsFile::operator <<(u64 value)
 {
 	char buf[30];
 	toCString(value, buf, lengthOf(buf));
