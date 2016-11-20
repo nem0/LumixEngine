@@ -280,21 +280,24 @@ StateMachineInstance::~StateMachineInstance()
 
 ComponentInstance* StateMachineInstance::update(RunningContext& rc, bool check_edges)
 {
-	current = current->update(rc, true);
+	if (current) current = current->update(rc, true);
 	return check_edges ? checkOutEdges(source, rc) : this;
 }
 
 
 void StateMachineInstance::fillPose(Engine& engine, Pose& pose, Model& model, float weight)
 {
-	current->fillPose(engine, pose, model, weight);
+	if(current) current->fillPose(engine, pose, model, weight);
 }
 
 
 void StateMachineInstance::enter(RunningContext& rc, ComponentInstance* from)
 {
-	current = source.default_state->createInstance(*rc.allocator);
-	current->enter(rc, nullptr);
+	if (source.default_state)
+	{
+		current = source.default_state->createInstance(*rc.allocator);
+		current->enter(rc, nullptr);
+	}
 }
 
 
