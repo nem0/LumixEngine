@@ -278,7 +278,7 @@ void AnimationEditor::constantsGUI()
 		ImGui::PopItemWidth();
 	}
 
-	if (ImGui::Button("Add"))
+	if (ImGui::Button("Add##add_const"))
 	{
 		auto& constant = input_decl.constants[input_decl.constants_count];
 		constant.name[0] = 0;
