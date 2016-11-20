@@ -615,14 +615,14 @@ void ControllerResource::serialize(OutputBlob& blob)
 }
 
 
-void ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator& allocator)
+bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator& allocator)
 {
 	LUMIX_DELETE(m_allocator, m_engine_resource);
 	LUMIX_DELETE(m_allocator, m_root);
 	auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
 	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), *manager, allocator);
 	m_engine_resource->create();
-	m_engine_resource->deserialize(blob);
+	if (!m_engine_resource->deserialize(blob)) return false;
 
 	blob.read(m_last_uid);
 	m_root = createComponent(m_engine_resource->getRoot(), nullptr, *this);
@@ -638,6 +638,7 @@ void ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 		blob.readString(tmp, lengthOf(tmp));
 		slot = tmp;
 	}
+	return true;
 }
 
 
