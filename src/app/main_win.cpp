@@ -342,7 +342,7 @@ public:
 		#pragma pack()
 		Header header;
 		blob.read(header);
-		if (Lumix::crc32((const u8*)blob.getData() + sizeof(header), blob.getSize() - sizeof(header)) !=
+		if (Lumix::crc32((const Lumix::u8*)blob.getData() + sizeof(header), blob.getSize() - sizeof(header)) !=
 			header.hash)
 		{
 			Lumix::g_log_error.log("App") << "Universe corrupted";
