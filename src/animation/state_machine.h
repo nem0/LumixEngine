@@ -176,8 +176,8 @@ struct StateMachineInstance : public NodeInstance
 	ComponentInstance* update(RunningContext& rc, bool check_edges) override;
 	void fillPose(Engine& engine, Pose& pose, Model& model, float weight) override;
 	void enter(RunningContext& rc, ComponentInstance* from) override;
-	float getTime() const override { return 0; }
-	float getLength() const override { return 0; }
+	float getTime() const override { return current ? current->getTime() : 0; }
+	float getLength() const override { return current ? current->getLength() : 0; }
 	Transform getRootMotion() const override { return current->getRootMotion(); }
 
 	StateMachine& source;
