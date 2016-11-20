@@ -224,7 +224,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	}
 
 
-	void beginGUI()
+	void beginGUI() override
 	{
 		m_original_context = ImGui::GetCurrentContext();
 		ImGui::SetCurrentContext(m_context);
@@ -232,7 +232,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	}
 
 
-	void endGUI()
+	void endGUI() override
 	{
 		ImGui::PopFont();
 		ImGui::SetCurrentContext(m_original_context);
