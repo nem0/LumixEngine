@@ -31,7 +31,7 @@ bool compareAndExchange(i32 volatile* dest, i32 exchange, i32 comperand)
 	return __sync_bool_compare_and_swap(dest, comperand, exchange);
 }
 
-bool compareAndExchange64(int64 volatile* dest, int64 exchange, int64 comperand)
+bool compareAndExchange64(i64 volatile* dest, i64 exchange, i64 comperand)
 {
 	return __sync_bool_compare_and_swap(dest, comperand, exchange);
 }
