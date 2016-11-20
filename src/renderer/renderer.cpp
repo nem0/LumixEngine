@@ -43,7 +43,7 @@ namespace bx
 		/// @param[in] _align Alignment.
 		/// @param[in] _file Debug file path info.
 		/// @param[in] _line Debug file line info.
-		virtual void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) = 0;
+		virtual void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, u32 _line) = 0;
 	};
 
 } // namespace bx
@@ -491,11 +491,11 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 
 		void screenShot(const char* filePath,
-			uint32_t width,
-			uint32_t height,
-			uint32_t pitch,
+			u32 width,
+			u32 height,
+			u32 pitch,
 			const void* data,
-			uint32_t size,
+			u32 size,
 			bool yflip) override
 		{
 			#pragma pack(1)

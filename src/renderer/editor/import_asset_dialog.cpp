@@ -1334,7 +1334,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
 			{
 				const aiNodeAnim* channel = animation->mChannels[channel_idx];
-				uint32_t hash = crc32(channel->mNodeName.C_Str());
+				u32 hash = crc32(channel->mNodeName.C_Str());
 				file.write((const char*)&hash, sizeof(hash));
 				auto global_transform = getGlobalTransform(getNode(channel->mNodeName, scene->mRootNode)->mParent);
 				aiVector3t<float> scale;

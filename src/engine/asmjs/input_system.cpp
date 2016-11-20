@@ -15,12 +15,12 @@ namespace Lumix
 
 		void enable(bool enabled) override {}
 		void update(float dt) override {}
-		float getActionValue(uint32 action) override { return 0; }
+		float getActionValue(u32 action) override { return 0; }
 		void injectMouseXMove(float value) override {}
 		void injectMouseYMove(float value) override {}
 		float getMouseXMove() const override { return 0; }
 		float getMouseYMove() const override { return 0; }
-		void addAction(uint32 action, InputType type, int key, int controller_id) override {}
+		void addAction(u32 action, InputType type, int key, int controller_id) override {}
 
 		IAllocator& m_allocator;
 	};
