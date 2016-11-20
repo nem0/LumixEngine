@@ -33,7 +33,7 @@ namespace Lumix
 
 			OutputBlob& operator << (const char* str);
 			OutputBlob& operator << (int value);
-			OutputBlob& operator << (uint32 value);
+			OutputBlob& operator << (u32 value);
 			OutputBlob& operator << (float value);
 
 		private:
@@ -50,7 +50,7 @@ namespace Lumix
 
 	template <> inline void OutputBlob::write<bool>(const bool& value)
 	{
-		uint8 v = value;
+		u8 v = value;
 		write(&v, sizeof(v));
 	}
 
@@ -73,7 +73,7 @@ namespace Lumix
 
 
 		private:
-			const uint8* m_data;
+			const u8* m_data;
 			int m_size;
 			int m_pos;
 	};
@@ -87,7 +87,7 @@ namespace Lumix
 
 	template <> inline bool InputBlob::read<bool>()
 	{
-		uint8 v;
+		u8 v;
 		read(&v, sizeof(v));
 		return v != 0;
 	}

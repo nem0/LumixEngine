@@ -80,7 +80,7 @@ namespace Lumix
 	}
 
 
-	OutputBlob& OutputBlob::operator << (uint32 value)
+	OutputBlob& OutputBlob::operator << (u32 value)
 	{
 		char tmp[20];
 		Lumix::toCString(value, tmp, Lumix::lengthOf(tmp));
@@ -127,7 +127,7 @@ namespace Lumix
 		{
 			reserve((m_pos + size) << 1);
 		}
-		copyMemory((uint8*)m_data + m_pos, data, size);
+		copyMemory((u8*)m_data + m_pos, data, size);
 		m_pos += size;
 	}
 
@@ -136,13 +136,13 @@ namespace Lumix
 	{
 		if (string)
 		{
-			int32 size = stringLength(string) + 1;
+			i32 size = stringLength(string) + 1;
 			write(size);
 			write(string, size);
 		}
 		else
 		{
-			write((int32)0);
+			write((i32)0);
 		}
 	}
 
@@ -158,7 +158,7 @@ namespace Lumix
 		if (size <= m_size) return;
 
 		ASSERT(m_allocator);
-		uint8* tmp = (uint8*)m_allocator->allocate(size);
+		u8* tmp = (u8*)m_allocator->allocate(size);
 		copyMemory(tmp, m_data, m_size);
 		m_allocator->deallocate(m_data);
 		m_data = tmp;
@@ -172,7 +172,7 @@ namespace Lumix
 		if (size <= m_size) return;
 
 		ASSERT(m_allocator);
-		uint8* tmp = (uint8*)m_allocator->allocate(size);
+		u8* tmp = (u8*)m_allocator->allocate(size);
 		copyMemory(tmp, m_data, m_size);
 		m_allocator->deallocate(m_data);
 		m_data = tmp;
@@ -182,14 +182,14 @@ namespace Lumix
 
 
 	InputBlob::InputBlob(const void* data, int size)
-		: m_data((const uint8*)data)
+		: m_data((const u8*)data)
 		, m_size(size)
 		, m_pos(0)
 	{}
 
 
 	InputBlob::InputBlob(const OutputBlob& blob)
-		: m_data((const uint8*)blob.getData())
+		: m_data((const u8*)blob.getData())
 		, m_size(blob.getPos())
 		, m_pos(0)
 	{}
@@ -212,7 +212,7 @@ namespace Lumix
 	{
 		if (m_pos + (int)size > m_size)
 		{
-			for (int32 i = 0; i < size; ++i)
+			for (i32 i = 0; i < size; ++i)
 				((unsigned char*)data)[i] = 0;
 			return false;
 		}
@@ -227,7 +227,7 @@ namespace Lumix
 
 	bool InputBlob::readString(char* data, int max_size)
 	{
-		int32 size;
+		i32 size;
 		read(size);
 		ASSERT(size <= max_size);
 		return read(data, size < max_size ? size : max_size);

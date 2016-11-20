@@ -45,7 +45,7 @@ public:
 	bool load(FS::IFile& file) override;
 	ComponentInstance* createInstance(IAllocator& allocator);
 	InputDecl& getInputDecl() { return m_input_decl; }
-	HashMap<uint32, Animation*>& getAnimSet() { return m_anim_set; }
+	HashMap<u32, Animation*>& getAnimSet() { return m_anim_set; }
 	void setRoot(Component* component);
 	Component* getRoot() const { return m_root; }
 	void serialize(OutputBlob& blob);
@@ -54,7 +54,7 @@ public:
 
 private:
 	InputDecl m_input_decl;
-	HashMap<uint32, Animation*> m_anim_set;
+	HashMap<u32, Animation*> m_anim_set;
 	Component* m_root;
 	IAllocator& m_allocator;
 };

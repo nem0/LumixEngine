@@ -17,7 +17,7 @@ namespace
 			value = 2;
 		}
 
-		int32 value;
+		i32 value;
 	};
 
 	typedef Lumix::MT::LockFreeFixedQueue<Test, 16> Queue;
@@ -50,11 +50,11 @@ namespace
 			return 0;
 		}
 
-		int32 getSum() { return m_sum; }
+		i32 getSum() { return m_sum; }
 
 	private:
 		Queue* m_queue;
-		int32 m_sum;
+		i32 m_sum;
 	};
 
 	void UT_fixed_lock_queue(const char* params)

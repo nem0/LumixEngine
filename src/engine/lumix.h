@@ -32,47 +32,48 @@ namespace Lumix
 {
 
 
-typedef char int8;
-typedef unsigned char uint8;
-typedef short int16;
-typedef unsigned short uint16;
-typedef int int32;
-typedef unsigned int uint32;
+typedef char i8;
+typedef unsigned char u8;
+typedef short i16;
+typedef unsigned short u16;
+typedef int i32;
+typedef unsigned int u32;
 
 #ifdef _WIN32
-	typedef long long int64;
-	typedef unsigned long long uint64;
+	typedef long long i64;
+	typedef unsigned long long u64;
 	#define LUMIX_ALIGN_BEGIN(_align) __declspec(align(_align))
 	#define LUMIX_ALIGN_END(_align)
 #elif defined __EMSCRIPTEN__
-	typedef long long int64;
-	typedef unsigned long long uint64;
+	typedef long long i64;
+	typedef unsigned long long u64;
 	#define LUMIX_ALIGN_BEGIN(_align)
 	#define LUMIX_ALIGN_END(_align) __attribute__( (aligned(_align) ) )
 #else
 	#ifdef PLATFORM64
-		typedef long int64;
-		typedef unsigned long uint64;
+		typedef long i64;
+		typedef unsigned long u64;
 	#else
-		typedef long long int64;
-		typedef unsigned long long uint64;
+		typedef long long i64;
+		typedef unsigned long long u64;
 	#endif
 	#define LUMIX_ALIGN_BEGIN(_align)
 	#define LUMIX_ALIGN_END(_align) __attribute__( (aligned(_align) ) )
 #endif
 
 #ifdef PLATFORM64
-	typedef uint64 uintptr;
+	typedef u64 uintptr;
 #else
-	typedef uint32 uintptr;
+	typedef u32 uintptr;
 #endif
 
-static_assert(sizeof(int64) == 8, "Incorrect size of int64");
-static_assert(sizeof(int32) == 4, "Incorrect size of int32");
-static_assert(sizeof(int16) == 2, "Incorrect size of int16");
-static_assert(sizeof(int8) == 1, "Incorrect size of int8");
+static_assert(sizeof(uintptr) == sizeof(void*), "Incorrect size of uintptr");
+static_assert(sizeof(i64) == 8, "Incorrect size of i64");
+static_assert(sizeof(i32) == 4, "Incorrect size of i32");
+static_assert(sizeof(i16) == 2, "Incorrect size of int16");
+static_assert(sizeof(i8) == 1, "Incorrect size of i8");
 
-const uint32 MAX_PATH_LENGTH = 260;
+const u32 MAX_PATH_LENGTH = 260;
 struct ComponentHandle
 {
 	int index;

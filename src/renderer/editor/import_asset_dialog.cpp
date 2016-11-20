@@ -43,7 +43,7 @@ using namespace Lumix;
 typedef StaticString<MAX_PATH_LENGTH> PathBuilder;
 
 
-enum class VertexAttributeDef : uint32
+enum class VertexAttributeDef : u32
 {
 	POSITION,
 	FLOAT1,
@@ -65,8 +65,8 @@ enum class VertexAttributeDef : uint32
 struct BillboardVertex
 {
 	Vec3 pos;
-	uint8 normal[4];
-	uint8 tangent[4];
+	u8 normal[4];
+	u8 tangent[4];
 	Vec2 uv;
 };
 #pragma pack()
@@ -337,11 +337,11 @@ const char* getMaterialName(ImportAssetDialog* dlg, int material_idx)
 static bool isSkinned(const aiMesh* mesh) { return mesh->mNumBones > 0; }
 
 
-static uint32 packuint32(uint8 _x, uint8 _y, uint8 _z, uint8 _w)
+static u32 packuint32(u8 _x, u8 _y, u8 _z, u8 _w)
 {
 	union {
-		uint32 ui32;
-		uint8 arr[4];
+		u32 ui32;
+		u8 arr[4];
 	} un;
 
 	un.arr[0] = _x;
@@ -353,12 +353,12 @@ static uint32 packuint32(uint8 _x, uint8 _y, uint8 _z, uint8 _w)
 }
 
 
-static uint32 packF4u(const Vec3& vec)
+static u32 packF4u(const Vec3& vec)
 {
-	const uint8 xx = uint8(vec.x * 127.0f + 128.0f);
-	const uint8 yy = uint8(vec.y * 127.0f + 128.0f);
-	const uint8 zz = uint8(vec.z * 127.0f + 128.0f);
-	const uint8 ww = uint8(0);
+	const u8 xx = u8(vec.x * 127.0f + 128.0f);
+	const u8 yy = u8(vec.y * 127.0f + 128.0f);
+	const u8 zz = u8(vec.z * 127.0f + 128.0f);
+	const u8 ww = u8(0);
 	return packuint32(xx, yy, zz, ww);
 }
 
@@ -590,14 +590,14 @@ enum class Preprocesses
 };
 
 
-static void preprocessMesh(ImportMesh& mesh, uint32 flags, IAllocator& allocator)
+static void preprocessMesh(ImportMesh& mesh, u32 flags, IAllocator& allocator)
 {
 	Array<aiFace*> faces(allocator);
 	mesh.map_from_input.clear();
 	mesh.map_to_input.clear();
 	mesh.indices.clear();
 
-	bool remove_doubles = (flags & (uint32)Preprocesses::REMOVE_DOUBLES) != 0;
+	bool remove_doubles = (flags & (u32)Preprocesses::REMOVE_DOUBLES) != 0;
 	for (unsigned int f = 0; f < mesh.mesh->mNumFaces; ++f)
 	{
 		auto& face = mesh.mesh->mFaces[f];
@@ -681,7 +681,7 @@ static crn_bool ddsConvertCallback(crn_uint32 phase_index,
 
 static bool saveAsRaw(ImportAssetDialog& dialog,
 	FS::FileSystem& fs,
-	const uint8* image_data,
+	const u8* image_data,
 	int image_width,
 	int image_height,
 	const char* dest_path,
@@ -699,13 +699,13 @@ static bool saveAsRaw(ImportAssetDialog& dialog,
 		return false;
 	}
 
-	Array<uint16> data(allocator);
+	Array<u16> data(allocator);
 	data.resize(image_width * image_height);
 	for (int j = 0; j < image_height; ++j)
 	{
 		for (int i = 0; i < image_width; ++i)
 		{
-			data[i + j * image_width] = uint16(scale * image_data[(i + j * image_width) * 4]);
+			data[i + j * image_width] = u16(scale * image_data[(i + j * image_width) * 4]);
 		}
 	}
 
@@ -717,7 +717,7 @@ static bool saveAsRaw(ImportAssetDialog& dialog,
 
 static bool saveAsDDS(ImportAssetDialog& dialog,
 	const char* source_path,
-	const uint8* image_data,
+	const u8* image_data,
 	int image_width,
 	int image_height,
 	bool alpha,
@@ -743,7 +743,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 	comp_params.m_pProgress_func = ddsConvertCallback;
 	comp_params.m_pProgress_func_data = &dialog.getDDSConvertCallbackData();
 	comp_params.m_num_helper_threads = 3;
-	comp_params.m_pImages[0][0] = (uint32*)image_data;
+	comp_params.m_pImages[0][0] = (u32*)image_data;
 	crn_mipmap_params mipmap_params;
 	mipmap_params.m_mode = cCRNMipModeGenerateMips;
 
@@ -1072,7 +1072,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 		}
 
 		float weights[4];
-		uint16 bone_indices[4];
+		u16 bone_indices[4];
 		int index;
 	};
 
@@ -1314,7 +1314,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			}
 
 			Animation::Header header;
-			header.fps = uint32(animation->mTicksPerSecond == 0
+			header.fps = u32(animation->mTicksPerSecond == 0
 				? 25
 				: (animation->mTicksPerSecond == 1 ? 30 : animation->mTicksPerSecond));
 			if (animation->mTicksPerSecond < 2) header.fps = detectFPS(animation);
@@ -1347,7 +1347,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 				file.write(&count, sizeof(count));
 				for (const auto& pos : positions)
 				{
-					uint16 frame = uint16(pos.mTime * m_dialog.m_model.time_scale * header.fps / animation->mTicksPerSecond);
+					u16 frame = u16(pos.mTime * m_dialog.m_model.time_scale * header.fps / animation->mTicksPerSecond);
 					file.write(&frame, sizeof(frame));
 				}
 				for (const auto& pos : positions)
@@ -1366,7 +1366,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 				file.write(&count, sizeof(count));
 				for (const auto& rot : rotations)
 				{
-					uint16 frame = uint16(rot.mTime * m_dialog.m_model.time_scale * header.fps / animation->mTicksPerSecond);
+					u16 frame = u16(rot.mTime * m_dialog.m_model.time_scale * header.fps / animation->mTicksPerSecond);
 					file.write(&frame, sizeof(frame));
 				}
 				for (const auto& rot : rotations)
@@ -1708,7 +1708,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 				{
 					for (int i = 0; i < mesh.indices.size(); ++i)
 					{
-						uint16 index = mesh.indices[i];
+						u16 index = mesh.indices[i];
 						file.write(&index, sizeof(index));
 					}
 				}
@@ -1716,7 +1716,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 			if (m_dialog.m_model.create_billboard_lod)
 			{
-				uint16 indices[] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15};
+				u16 indices[] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15};
 				file.write(indices, sizeof(indices));
 			}
 		}
@@ -1729,7 +1729,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 			if (m_dialog.m_model.create_billboard_lod)
 			{
-				uint32 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15 };
+				u32 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15 };
 				file.write(indices, sizeof(indices));
 			}
 		}
@@ -1778,18 +1778,18 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 				if (mesh.mesh->mColors[0])
 				{
 					auto assimp_color = mesh.mesh->mColors[0][j];
-					uint8 color[4];
-					color[0] = uint8(assimp_color.r * 255);
-					color[1] = uint8(assimp_color.g * 255);
-					color[2] = uint8(assimp_color.b * 255);
-					color[3] = uint8(assimp_color.a * 255);
+					u8 color[4];
+					color[0] = u8(assimp_color.r * 255);
+					color[1] = u8(assimp_color.g * 255);
+					color[2] = u8(assimp_color.b * 255);
+					color[3] = u8(assimp_color.a * 255);
 					file.write(color, sizeof(color));
 				}
 
 				auto tmp_normal = normal_matrix * mesh.mesh->mNormals[j];
 				tmp_normal.Normalize();
 				Vec3 normal = fixOrientation(tmp_normal);
-				uint32 int_normal = packF4u(normal);
+				u32 int_normal = packF4u(normal);
 				file.write((const char*)&int_normal, sizeof(int_normal));
 
 				if (mesh.mesh->mTangents)
@@ -1797,7 +1797,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 					auto tmp_tangent = normal_matrix * mesh.mesh->mTangents[j];
 					tmp_tangent.Normalize();
 					Vec3 tangent = fixOrientation(tmp_tangent);
-					uint32 int_tangent = packF4u(tangent);
+					u32 int_tangent = packF4u(tangent);
 					file.write((const char*)&int_tangent, sizeof(int_tangent));
 				}
 
@@ -1854,8 +1854,8 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 	void writeGeometry(FS::OsFile& file) const
 	{
-		int32 indices_count = 0;
-		int32 vertices_size = 0;
+		i32 indices_count = 0;
+		i32 vertices_size = 0;
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (!mesh.import) continue;
@@ -1891,11 +1891,11 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 	static int getVertexSize(const aiMesh* mesh)
 	{
 		static const int POSITION_SIZE = sizeof(float) * 3;
-		static const int NORMAL_SIZE = sizeof(uint8) * 4;
-		static const int TANGENT_SIZE = sizeof(uint8) * 4;
+		static const int NORMAL_SIZE = sizeof(u8) * 4;
+		static const int TANGENT_SIZE = sizeof(u8) * 4;
 		static const int UV_SIZE = sizeof(float) * 2;
-		static const int COLOR_SIZE = sizeof(uint8) * 4;
-		static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(uint16) * 4;
+		static const int COLOR_SIZE = sizeof(u8) * 4;
+		static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(u16) * 4;
 		int size = POSITION_SIZE + NORMAL_SIZE;
 		if (mesh->HasTextureCoords(0)) size += UV_SIZE;
 		if (mesh->mTangents) size += TANGENT_SIZE;
@@ -1905,23 +1905,23 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 	}
 
 
-	void writeBillboardMesh(FS::OsFile& file, int32 attribute_array_offset, int32 indices_offset)
+	void writeBillboardMesh(FS::OsFile& file, i32 attribute_array_offset, i32 indices_offset)
 	{
 		if (!m_dialog.m_model.create_billboard_lod) return;
 
 		int vertex_size = sizeof(BillboardVertex);
 		StaticString<MAX_PATH_LENGTH + 10> material_name(m_dialog.m_mesh_output_filename, "_billboard");
-		int32 length = stringLength(material_name);
+		i32 length = stringLength(material_name);
 		file.write((const char*)&length, sizeof(length));
 		file.write(material_name, length);
 
 		file.write((const char*)&attribute_array_offset, sizeof(attribute_array_offset));
-		int32 attribute_array_size = 16 * vertex_size;
+		i32 attribute_array_size = 16 * vertex_size;
 		attribute_array_offset += attribute_array_size;
 		file.write((const char*)&attribute_array_size, sizeof(attribute_array_size));
 
 		file.write((const char*)&indices_offset, sizeof(indices_offset));
-		int32 mesh_tri_count = 8;
+		i32 mesh_tri_count = 8;
 		indices_offset += mesh_tri_count * 3;
 		file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
@@ -1935,7 +1935,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 	void writeMeshes(FS::OsFile& file)
 	{
-		int32 mesh_count = 0;
+		i32 mesh_count = 0;
 		for (int i = 0; i < m_dialog.m_meshes.size(); ++i)
 		{
 			if (m_dialog.m_meshes[i].import) ++mesh_count;
@@ -1943,8 +1943,8 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 		if (m_dialog.m_model.create_billboard_lod) ++mesh_count;
 
 		file.write((const char*)&mesh_count, sizeof(mesh_count));
-		int32 attribute_array_offset = 0;
-		int32 indices_offset = 0;
+		i32 attribute_array_offset = 0;
+		i32 indices_offset = 0;
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (!mesh.import) continue;
@@ -1952,17 +1952,17 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			int vertex_size = getVertexSize(mesh.mesh);
 			aiString material_name;
 			mesh.scene->mMaterials[mesh.mesh->mMaterialIndex]->Get(AI_MATKEY_NAME, material_name);
-			int32 length = stringLength(material_name.C_Str());
+			i32 length = stringLength(material_name.C_Str());
 			file.write((const char*)&length, sizeof(length));
 			file.write((const char*)material_name.C_Str(), length);
 
 			file.write((const char*)&attribute_array_offset, sizeof(attribute_array_offset));
-			int32 attribute_array_size = mesh.map_to_input.size() * vertex_size;
+			i32 attribute_array_size = mesh.map_to_input.size() * vertex_size;
 			attribute_array_offset += attribute_array_size;
 			file.write((const char*)&attribute_array_size, sizeof(attribute_array_size));
 
 			file.write((const char*)&indices_offset, sizeof(indices_offset));
-			int32 mesh_tri_count = mesh.indices.size() / 3;
+			i32 mesh_tri_count = mesh.indices.size() / 3;
 			indices_offset += mesh.indices.size();
 			file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
@@ -1979,16 +1979,16 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 	static void writeAttribute(bgfx::Attrib::Enum attrib, FS::OsFile& file)
 	{
-		int32 tmp = attrib;
+		i32 tmp = attrib;
 		file.write(&tmp, sizeof(tmp));
 	}
 
 
 	void writeLods(FS::OsFile& file) const
 	{
-		int32 lod_count = 1;
-		int32 last_mesh_idx = -1;
-		int32 lods[8] = {};
+		i32 lod_count = 1;
+		i32 last_mesh_idx = -1;
+		i32 lods[8] = {};
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (!mesh.import) continue;
@@ -2009,7 +2009,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 		for (int i = 0; i < lod_count; ++i)
 		{
-			int32 to_mesh = lods[i];
+			i32 to_mesh = lods[i];
 			file.write((const char*)&to_mesh, sizeof(to_mesh));
 			float factor = m_dialog.m_model.lods[i] < 0 ? FLT_MAX : m_dialog.m_model.lods[i] * m_dialog.m_model.lods[i];
 			file.write((const char*)&factor, sizeof(factor));
@@ -2119,26 +2119,26 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 	void writeSkeleton(FS::OsFile& file)
 	{
-		int32 count = m_nodes.size();
+		i32 count = m_nodes.size();
 		if (count == 1) count = 0;
 		file.write((const char*)&count, sizeof(count));
 
 		for (auto* node : m_nodes)
 		{
 			auto* scene = getNodeScene(node);
-			int32 len = stringLength(node->mName.C_Str());
+			i32 len = stringLength(node->mName.C_Str());
 			file.write((const char*)&len, sizeof(len));
 			file.write(node->mName.C_Str(), node->mName.length);
 
 			if (node->mParent)
 			{
-				int32 len = stringLength(node->mParent->mName.C_Str());
+				i32 len = stringLength(node->mParent->mName.C_Str());
 				file.write((const char*)&len, sizeof(len));
 				file.write(node->mParent->mName.C_Str(), node->mParent->mName.length);
 			}
 			else
 			{
-				int32 len = 0;
+				i32 len = 0;
 				file.write((const char*)&len, sizeof(len));
 			}
 
@@ -2174,8 +2174,8 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 	{
 		PhysicsGeometry::Header header;
 		header.m_magic = PhysicsGeometry::HEADER_MAGIC;
-		header.m_version = (uint32)PhysicsGeometry::Versions::LAST;
-		header.m_convex = (uint32)m_dialog.m_model.make_convex;
+		header.m_version = (u32)PhysicsGeometry::Versions::LAST;
+		header.m_convex = (u32)m_dialog.m_model.make_convex;
 		file.write((const char*)&header, sizeof(header));
 	}
 
@@ -2209,10 +2209,10 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 		}
 
 		writePhysicsHeader(file);
-		int32 count = 0;
+		i32 count = 0;
 		for (auto& mesh : m_dialog.m_meshes)
 		{
-			if (mesh.import_physics) count += (int32)mesh.mesh->mNumVertices;
+			if (mesh.import_physics) count += (i32)mesh.mesh->mNumVertices;
 		}
 		file.write((const char*)&count, sizeof(count));
 		for (auto& mesh : m_dialog.m_meshes)
@@ -2258,7 +2258,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			for (unsigned int j = 0; j < mesh.mesh->mNumFaces; ++j)
 			{
 				ASSERT(mesh.mesh->mFaces[j].mNumIndices == 3);
-				uint32 index = mesh.mesh->mFaces[j].mIndices[0] + offset;
+				u32 index = mesh.mesh->mFaces[j].mIndices[0] + offset;
 				file.write((const char*)&index, sizeof(index));
 				index = mesh.mesh->mFaces[j].mIndices[1] + offset;
 				file.write((const char*)&index, sizeof(index));
@@ -2318,9 +2318,9 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 	{
 		Model::FileHeader header;
 		header.magic = Model::FILE_MAGIC;
-		header.version = (uint32)Model::FileVersion::LATEST;
+		header.version = (u32)Model::FileVersion::LATEST;
 		file.write((const char*)&header, sizeof(header));
-		uint32 flags = areIndices16Bit() ? (uint32)Model::Flags::INDICES_16BIT : 0;
+		u32 flags = areIndices16Bit() ? (u32)Model::Flags::INDICES_16BIT : 0;
 		file.write((const char*)&flags, sizeof(flags));
 
 		const aiMesh* mesh = nullptr;
@@ -2333,7 +2333,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			}
 		}
 		ASSERT(mesh);
-		int32 attribute_count = getAttributeCount(mesh);
+		i32 attribute_count = getAttributeCount(mesh);
 		file.write((const char*)&attribute_count, sizeof(attribute_count));
 
 		if (isSkinned(mesh))
@@ -2384,8 +2384,8 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 		gatherNodes();
 
-		uint32 preprocess_flags = 0;
-		if (m_dialog.m_model.remove_doubles) preprocess_flags |= (uint32)Preprocesses::REMOVE_DOUBLES;
+		u32 preprocess_flags = 0;
+		if (m_dialog.m_model.remove_doubles) preprocess_flags |= (u32)Preprocesses::REMOVE_DOUBLES;
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (mesh.import) preprocessMesh(mesh, preprocess_flags, allocator);
@@ -2597,7 +2597,7 @@ void ImportAssetDialog::saveModelMetadata()
 	PathBuilder model_path(m_output_dir, "/", m_mesh_output_filename, ".msh");
 	char tmp[MAX_PATH_LENGTH];
 	PathUtils::normalize(model_path, tmp, lengthOf(tmp));
-	uint32 model_path_hash = crc32(tmp);
+	u32 model_path_hash = crc32(tmp);
 
 	OutputBlob blob(m_editor.getAllocator());
 	blob.reserve(1024);
@@ -2670,7 +2670,7 @@ void ImportAssetDialog::importTexture()
 	char tmp[MAX_PATH_LENGTH];
 	PathUtils::normalize(dest_path, tmp, lengthOf(tmp));
 	getRelativePath(m_editor, dest_path, lengthOf(dest_path), tmp);
-	uint32 hash = crc32(dest_path);
+	u32 hash = crc32(dest_path);
 
 	m_metadata.setString(hash, crc32("source"), m_source);
 
@@ -2871,13 +2871,13 @@ void ImportAssetDialog::onMeshesGUI()
 		ImGui::Text("%s", material_name.C_Str());
 		ImGui::NextColumn();
 
-		ImGui::Checkbox(StaticString<30>("###mesh", (uint64)&mesh), &mesh.import);
+		ImGui::Checkbox(StaticString<30>("###mesh", (u64)&mesh), &mesh.import);
 		if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("ContextMesh");
 		ImGui::NextColumn();
-		ImGui::Checkbox(StaticString<30>("###phy", (uint64)&mesh), &mesh.import_physics);
+		ImGui::Checkbox(StaticString<30>("###phy", (u64)&mesh), &mesh.import_physics);
 		if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("ContextPhy");
 		ImGui::NextColumn();
-		ImGui::Combo(StaticString<30>("###lod", (uint64)&mesh), &mesh.lod, "LOD 1\0LOD 2\0LOD 3\0LOD 4\0");
+		ImGui::Combo(StaticString<30>("###lod", (u64)&mesh), &mesh.lod, "LOD 1\0LOD 2\0LOD 3\0LOD 4\0");
 		ImGui::NextColumn();
 	}
 	ImGui::Columns();
@@ -2938,18 +2938,18 @@ void ImportAssetDialog::onImageGUI()
 }
 
 
-static void preprocessBillboardNormalmap(uint32* pixels, int width, int height, IAllocator& allocator)
+static void preprocessBillboardNormalmap(u32* pixels, int width, int height, IAllocator& allocator)
 {
 	union {
-		uint32 ui32;
-		uint8 arr[4];
+		u32 ui32;
+		u8 arr[4];
 	} un;
 	for (int j = 0; j < height; ++j)
 	{
 		for (int i = 0; i < width; ++i)
 		{
 			un.ui32 = pixels[i + j * width];
-			uint8 tmp = un.arr[1];
+			u8 tmp = un.arr[1];
 			un.arr[1] = un.arr[2];
 			un.arr[2] = tmp;
 			pixels[i + j * width] = un.ui32;
@@ -2958,18 +2958,18 @@ static void preprocessBillboardNormalmap(uint32* pixels, int width, int height, 
 }
 
 
-static void preprocessBillboard(uint32* pixels, int width, int height, IAllocator& allocator)
+static void preprocessBillboard(u32* pixels, int width, int height, IAllocator& allocator)
 {
 	struct DistanceFieldCell
 	{
-		uint32 distance;
-		uint32 color;
+		u32 distance;
+		u32 color;
 	};
 
 	Array<DistanceFieldCell> distance_field(allocator);
 	distance_field.resize(width * height);
 
-	static const uint32 ALPHA_MASK = 0xff000000;
+	static const u32 ALPHA_MASK = 0xff000000;
 	
 	for (int j = 0; j < height; ++j)
 	{
@@ -3127,14 +3127,14 @@ static bool createBillboard(ImportAssetDialog& dialog,
 
 	renderer->viewCounterAdd();
 	bgfx::setViewName(renderer->getViewCounter(), "billboard_read");
-	Array<uint8> data(engine.getAllocator());
+	Array<u8> data(engine.getAllocator());
 	data.resize(width * height * 4);
 	bgfx::readTexture(texture, &data[0]);
 	bgfx::touch(renderer->getViewCounter());
 
 	renderer->viewCounterAdd();
 	bgfx::setViewName(renderer->getViewCounter(), "billboard_read_normal");
-	Array<uint8> data_normal(engine.getAllocator());
+	Array<u8> data_normal(engine.getAllocator());
 	data_normal.resize(width * height * 4);
 	bgfx::readTexture(normal_texture, &data_normal[0]);
 	bgfx::touch(renderer->getViewCounter());
@@ -3142,10 +3142,10 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	bgfx::frame(); // submit
 	bgfx::frame(); // wait for gpu
 
-	preprocessBillboard((uint32*)&data[0], width, height, engine.getAllocator());
-	preprocessBillboardNormalmap((uint32*)&data_normal[0], width, height, engine.getAllocator());
-	saveAsDDS(dialog, "billboard_generator", (uint8*)&data[0], width, height, true, out_path.c_str());
-	saveAsDDS(dialog, "billboard_generator", (uint8*)&data_normal[0], width, height, true, out_path_normal.c_str());
+	preprocessBillboard((u32*)&data[0], width, height, engine.getAllocator());
+	preprocessBillboardNormalmap((u32*)&data_normal[0], width, height, engine.getAllocator());
+	saveAsDDS(dialog, "billboard_generator", (u8*)&data[0], width, height, true, out_path.c_str());
+	saveAsDDS(dialog, "billboard_generator", (u8*)&data_normal[0], width, height, true, out_path_normal.c_str());
 	bgfx::destroyTexture(texture);
 	bgfx::destroyTexture(normal_texture);
 	Pipeline::destroy(pipeline);

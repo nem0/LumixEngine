@@ -20,7 +20,7 @@ struct OutputStream LUMIX_FINAL : public physx::PxOutputStream
 	explicit OutputStream(IAllocator& allocator)
 		: allocator(allocator)
 	{
-		data = (uint8*)allocator.allocate(sizeof(uint8) * 4096);
+		data = (u8*)allocator.allocate(sizeof(u8) * 4096);
 		capacity = 4096;
 		size = 0;
 	}
@@ -33,7 +33,7 @@ struct OutputStream LUMIX_FINAL : public physx::PxOutputStream
 		if (size + (int)count > capacity)
 		{
 			int new_capacity = Math::maximum(size + (int)count, capacity + 4096);
-			uint8* new_data = (uint8*)allocator.allocate(sizeof(uint8) * new_capacity);
+			u8* new_data = (u8*)allocator.allocate(sizeof(u8) * new_capacity);
 			copyMemory(new_data, data, size);
 			allocator.deallocate(data);
 			data = new_data;
@@ -44,7 +44,7 @@ struct OutputStream LUMIX_FINAL : public physx::PxOutputStream
 		return count;
 	}
 
-	uint8* data;
+	u8* data;
 	IAllocator& allocator;
 	int capacity;
 	int size;
@@ -118,7 +118,7 @@ bool PhysicsGeometry::load(FS::IFile& file)
 		return false;
 	}
 
-	if(header.m_version > (uint32)Versions::LAST)
+	if(header.m_version > (u32)Versions::LAST)
 	{
 		g_log_warning.log("Physics") << "Unsupported version of geometry " << getPath().c_str();
 		return false;
@@ -126,7 +126,7 @@ bool PhysicsGeometry::load(FS::IFile& file)
 
 	PhysicsSystem& system = static_cast<PhysicsGeometryManager&>(m_resource_manager).getSystem();
 
-	int32 num_verts;
+	i32 num_verts;
 	Array<Vec3> verts(getAllocator());
 	file.read(&num_verts, sizeof(num_verts));
 	verts.resize(num_verts);
@@ -155,8 +155,8 @@ bool PhysicsGeometry::load(FS::IFile& file)
 	}
 	else
 	{
-		uint32 num_indices;
-		Array<uint32> tris(getAllocator());
+		u32 num_indices;
+		Array<u32> tris(getAllocator());
 		file.read(&num_indices, sizeof(num_indices));
 		tris.resize(num_indices);
 		file.read(&tris[0], sizeof(tris[0]) * tris.size());

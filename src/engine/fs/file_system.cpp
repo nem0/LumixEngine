@@ -34,12 +34,12 @@ struct AsyncItem
 	IFile* m_file;
 	ReadCallback m_cb;
 	Mode m_mode;
-	uint32 m_id;
+	u32 m_id;
 	char m_path[MAX_PATH_LENGTH];
-	uint8 m_flags;
+	u8 m_flags;
 };
 
-static const int32 C_MAX_TRANS = 16;
+static const i32 C_MAX_TRANS = 16;
 
 typedef MT::Transaction<AsyncItem> AsynTrans;
 typedef MT::LockFreeFixedQueue<AsynTrans, C_MAX_TRANS> TransQueue;
@@ -239,7 +239,7 @@ public:
 	}
 
 
-	uint32 openAsync(const DeviceList& device_list,
+	u32 openAsync(const DeviceList& device_list,
 		const Path& file,
 		int mode,
 		const ReadCallback& call_back) override
@@ -265,7 +265,7 @@ public:
 	}
 
 
-	void cancelAsync(uint32 id) override
+	void cancelAsync(u32 id) override
 	{
 		if (id == INVALID_ASYNC) return;
 
@@ -366,7 +366,7 @@ public:
 			m_transaction_queue.dealoc(tr);
 		}
 
-		int32 can_add = C_MAX_TRANS - m_in_progress.size();
+		i32 can_add = C_MAX_TRANS - m_in_progress.size();
 		while (can_add && !m_pending.empty())
 		{
 			AsynTrans* tr = m_transaction_queue.alloc(false);
@@ -439,7 +439,7 @@ private:
 	DeviceList m_memory_device;
 	DeviceList m_default_device;
 	DeviceList m_save_game_device;
-	uint32 m_last_id;
+	u32 m_last_id;
 };
 
 FileSystem* FileSystem::create(IAllocator& allocator)

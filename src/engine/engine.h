@@ -71,7 +71,7 @@ public:
 	virtual void stopGame(Universe& context) = 0;
 
 	virtual void update(Universe& context) = 0;
-	virtual uint32 serialize(Universe& ctx, OutputBlob& serializer) = 0;
+	virtual u32 serialize(Universe& ctx, OutputBlob& serializer) = 0;
 	virtual bool deserialize(Universe& ctx, InputBlob& serializer) = 0;
 	virtual float getFPS() const = 0;
 	virtual double getTime() const = 0;

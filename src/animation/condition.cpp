@@ -12,7 +12,7 @@ namespace Anim
 {
 
 
-enum class Types : uint8
+enum class Types : u8
 {
 	FLOAT,
 	BOOL,
@@ -24,7 +24,7 @@ enum class Types : uint8
 
 namespace Instruction
 {
-	enum Type : uint8
+	enum Type : u8
 	{
 		PUSH_BOOL,
 		PUSH_FLOAT,
@@ -139,7 +139,7 @@ public:
 
 	public:
 	int tokenize(const char* src, Token* tokens, int max_size);
-	int compile(const char* src, const Token* tokens, int token_count, uint8* byte_code, int max_size, InputDecl& decl);
+	int compile(const char* src, const Token* tokens, int token_count, u8* byte_code, int max_size, InputDecl& decl);
 	int toPostfix(const Token* input, Token* output, int count);
 	ExpressionCompiler::Error getError() const { return m_compile_time_error; }
 
@@ -154,7 +154,7 @@ private:
 	}
 
 
-	static const uint16 getFunctionIdx(const char* src, const ExpressionCompiler::Token& token)
+	static const u16 getFunctionIdx(const char* src, const ExpressionCompiler::Token& token)
 	{
 		int i = 0;
 		for(auto& fn : FUNCTIONS)
@@ -239,10 +239,10 @@ public:
 	};
 
 public:
-	ReturnValue evaluate(const uint8* code, RunningContext& rc);
+	ReturnValue evaluate(const u8* code, RunningContext& rc);
 
 private:
-	void callFunction(uint16 idx, RunningContext& rc);
+	void callFunction(u16 idx, RunningContext& rc);
 
 	template<typename T>
 	T& pop()
@@ -253,7 +253,7 @@ private:
 
 
 	template <typename T>
-	const uint8* pushStackConst(const uint8* cp)
+	const u8* pushStackConst(const u8* cp)
 	{
 		*(T*)(m_stack + m_stack_pointer) = *(T*)cp;
 		m_stack_pointer += sizeof(T);
@@ -269,24 +269,24 @@ private:
 	}
 
 private:
-	uint8 m_stack[STACK_SIZE];
+	u8 m_stack[STACK_SIZE];
 	int m_stack_pointer;
 };
 
 
-ExpressionVM::ReturnValue ExpressionVM::evaluate(const uint8* code, RunningContext& rc)
+ExpressionVM::ReturnValue ExpressionVM::evaluate(const u8* code, RunningContext& rc)
 {
 	m_stack_pointer = 0;
-	const uint8* cp = code;
+	const u8* cp = code;
 	for (;;)
 	{
-		uint8 type = *cp;
+		u8 type = *cp;
 		++cp;
 		switch (type)
 		{
 			case Instruction::CALL:
-				callFunction(*(uint16*)cp, rc);
-				cp += sizeof(uint16);
+				callFunction(*(u16*)cp, rc);
+				cp += sizeof(u16);
 				break;
 			case Instruction::INPUT_FLOAT:
 				push<float>(*(float*)(rc.input + *(int*)cp));
@@ -412,7 +412,7 @@ int ExpressionCompiler::toPostfix(const Token* input, Token* output, int count)
 }
 
 
-void ExpressionVM::callFunction(uint16 idx, RunningContext& rc)
+void ExpressionVM::callFunction(u16 idx, RunningContext& rc)
 {
 	switch(idx)
 	{
@@ -531,12 +531,12 @@ int ExpressionCompiler::getOperatorPriority(const Token& token)
 int ExpressionCompiler::compile(const char* src,
 	const Token* tokens,
 	int token_count,
-	uint8* byte_code,
+	u8* byte_code,
 	int max_size,
 	InputDecl& decl)
 {
 	ASSERT(max_size >= 2 + sizeof(bool));
-	uint8* out = byte_code;
+	u8* out = byte_code;
 	if (token_count == 0)
 	{
 		*out = Instruction::PUSH_BOOL;
@@ -596,7 +596,7 @@ int ExpressionCompiler::compile(const char* src,
 				break;
 			case Token::IDENTIFIER:
 				{
-					uint16 func_idx = getFunctionIdx(src, token);
+					u16 func_idx = getFunctionIdx(src, token);
 					if(func_idx != 0xffFF)
 					{
 						auto& fn = FUNCTIONS[func_idx];
@@ -619,8 +619,8 @@ int ExpressionCompiler::compile(const char* src,
 						++type_stack_idx;
 						*out = Instruction::CALL;
 						++out;
-						*(uint16*)out = func_idx;
-						out += sizeof(uint16);
+						*(u16*)out = func_idx;
+						out += sizeof(u16);
 					}
 					else
 					{

@@ -421,8 +421,8 @@ struct AudioDeviceImpl LUMIX_FINAL : public AudioDevice
 			if (!p) return;
 			if (buffer.written + size > buffer.data_size)
 			{
-				memcpy(p, (uint8*)buffer.data + buffer.written, buffer.data_size - buffer.written);
-				void* p_2 = (uint8*)p + (buffer.data_size - buffer.written);
+				memcpy(p, (u8*)buffer.data + buffer.written, buffer.data_size - buffer.written);
+				void* p_2 = (u8*)p + (buffer.data_size - buffer.written);
 				DWORD size_2 = size - (buffer.data_size - buffer.written);
 				if (buffer.looped)
 				{
@@ -435,7 +435,7 @@ struct AudioDeviceImpl LUMIX_FINAL : public AudioDevice
 			}
 			else
 			{
-				memcpy(p, (uint8*)buffer.data + buffer.written, size);
+				memcpy(p, (u8*)buffer.data + buffer.written, size);
 			}
 			buffer.written += size;
 			buffer.written = buffer.written % buffer.data_size;

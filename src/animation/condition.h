@@ -18,13 +18,13 @@ namespace Anim
 {
 
 
-typedef HashMap<uint32, Animation*> AnimSet;
+typedef HashMap<u32, Animation*> AnimSet;
 
 
 struct RunningContext
 {
 	float time_delta;
-	uint8* input;
+	u8* input;
 	IAllocator* allocator;
 	struct ComponentInstance* current;
 	AnimSet* anim_set;
@@ -120,7 +120,7 @@ struct Condition
 	bool operator()(RunningContext& rc);
 	bool compile(const char* expression, InputDecl& decl);
 
-	Array<uint8> bytecode;
+	Array<u8> bytecode;
 };
 
 

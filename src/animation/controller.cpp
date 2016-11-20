@@ -24,10 +24,10 @@ enum class Version : int
 
 struct Header
 {
-	static const uint32 FILE_MAGIC = 0x5f4c4143; // == '_LAC'
-	uint32 magic = FILE_MAGIC;
+	static const u32 FILE_MAGIC = 0x5f4c4143; // == '_LAC'
+	u32 magic = FILE_MAGIC;
 	int version = (int)Version::LAST;
-	uint32 reserved[4] = {0};
+	u32 reserved[4] = {0};
 };
 
 
@@ -124,7 +124,7 @@ bool ControllerResource::deserialize(InputBlob& blob)
 	auto* manager = m_resource_manager.getOwner().get(ANIMATION_TYPE);
 	for (int i = 0; i < count; ++i)
 	{
-		uint32 key;
+		u32 key;
 		char path[MAX_PATH_LENGTH];
 		blob.read(key);
 		blob.readString(path, lengthOf(path));

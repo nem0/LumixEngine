@@ -1011,7 +1011,7 @@ struct DockContext
 		for (int i = 0; i < m_docks.size(); ++i)
 		{
 			Dock& dock = *m_docks[i];
-			file << "dock" << (Lumix::uint64)&dock << " = {\n";
+			file << "dock" << (Lumix::u64)&dock << " = {\n";
 			file << "index = " << i << ",\n";
 			file << "label = \"" << dock.label << "\",\n";
 			file << "x = " << (int)dock.pos.x << ",\n";

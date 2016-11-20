@@ -40,7 +40,7 @@ namespace PlatformInterface
 	LUMIX_EDITOR_API size_t getFileSize(const char* path);
 	LUMIX_EDITOR_API bool fileExists(const char* path);
 	LUMIX_EDITOR_API bool dirExists(const char* path);
-	LUMIX_EDITOR_API Lumix::uint64 getLastModified(const char* file);
+	LUMIX_EDITOR_API Lumix::u64 getLastModified(const char* file);
 	LUMIX_EDITOR_API bool makePath(const char* path);
 
 	LUMIX_EDITOR_API void setWindow(SDL_Window* window);

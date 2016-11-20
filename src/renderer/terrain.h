@@ -43,7 +43,7 @@ class Terrain
 
 			Model* m_grass_model;
 			Terrain& m_terrain;
-			int32 m_density;
+			i32 m_density;
 			float m_distance;
 			int m_idx;
 		};
@@ -83,7 +83,7 @@ class Terrain
 		Material* getMaterial() const { return m_material; }
 		Texture* getDetailTexture() const { return m_detail_texture; }
 		Texture* getSplatmap() const { return m_splatmap; }
-		int64 getLayerMask() const { return m_layer_mask; }
+		i64 getLayerMask() const { return m_layer_mask; }
 		Entity getEntity() const { return m_entity; }
 		float getRootSize() const;
 		Vec3 getNormal(float x, float z);
@@ -138,10 +138,10 @@ class Terrain
 		bgfx::IndexBufferHandle m_indices_handle;
 		Mesh* m_mesh;
 		TerrainQuad* m_root;
-		int32 m_width;
-		int32 m_height;
-		int32 m_grass_distance;
-		int64 m_layer_mask;
+		i32 m_width;
+		i32 m_height;
+		i32 m_grass_distance;
+		i64 m_layer_mask;
 		Vec3 m_scale;
 		Entity m_entity;
 		Material* m_material;

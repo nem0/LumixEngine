@@ -26,9 +26,9 @@ public:
 	bool create(const char* name);
 	bool destroy();
 
-	void setAffinityMask(uint32 affinity_mask);
+	void setAffinityMask(u32 affinity_mask);
 
-	uint32 getAffinityMask() const;
+	u32 getAffinityMask() const;
 
 	bool isRunning() const;
 	bool isFinished() const;

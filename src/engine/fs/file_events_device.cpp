@@ -53,20 +53,20 @@ namespace Lumix
 
 			bool read(void* buffer, size_t size) override
 			{
-				invokeEvent(EventType::READ_BEGIN, "", -1, (int32)size);
+				invokeEvent(EventType::READ_BEGIN, "", -1, (i32)size);
 				bool ret = m_file.read(buffer, size);
 
-				invokeEvent(EventType::READ_FINISHED, "", ret ? 1 : 0, (int32)size);
+				invokeEvent(EventType::READ_FINISHED, "", ret ? 1 : 0, (i32)size);
 				return ret;
 			}
 
 
 			bool write(const void* buffer, size_t size) override
 			{
-				invokeEvent(EventType::WRITE_BEGIN, "", -1, (int32)size);
+				invokeEvent(EventType::WRITE_BEGIN, "", -1, (i32)size);
 				bool ret = m_file.write(buffer, size);
 
-				invokeEvent(EventType::WRITE_FINISHED, "", ret ? 1 : 0, (int32)size);
+				invokeEvent(EventType::WRITE_FINISHED, "", ret ? 1 : 0, (i32)size);
 				return ret;
 			}
 
@@ -82,17 +82,17 @@ namespace Lumix
 				invokeEvent(EventType::SIZE_BEGIN, "", -1, -1);
 				size_t ret = m_file.size();
 
-				invokeEvent(EventType::SIZE_FINISHED, "", (int32)ret, -1);
+				invokeEvent(EventType::SIZE_FINISHED, "", (i32)ret, -1);
 				return ret;
 			}
 
 
 			bool seek(SeekMode base, size_t pos) override
 			{
-				invokeEvent(EventType::SEEK_BEGIN, "", (int32)pos, base);
+				invokeEvent(EventType::SEEK_BEGIN, "", (i32)pos, base);
 				bool ret = m_file.seek(base, pos);
 
-				invokeEvent(EventType::SEEK_FINISHED, "", (int32)ret, base);
+				invokeEvent(EventType::SEEK_FINISHED, "", (i32)ret, base);
 				return ret;
 			}
 
@@ -102,7 +102,7 @@ namespace Lumix
 				invokeEvent(EventType::POS_BEGIN, "", -1, -1);
 				size_t ret = m_file.pos();
 
-				invokeEvent(EventType::POS_FINISHED, "", (int32)ret, -1);
+				invokeEvent(EventType::POS_FINISHED, "", (i32)ret, -1);
 				return ret;
 			}
 
@@ -110,7 +110,7 @@ namespace Lumix
 		private:
 			EventsFile& operator= (const EventsFile& rhs);
 
-			void invokeEvent(EventType type, const char* path, int32 ret, int32 param)
+			void invokeEvent(EventType type, const char* path, i32 ret, i32 param)
 			{
 				Event event;
 				event.type = type;

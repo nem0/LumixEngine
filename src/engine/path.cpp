@@ -37,7 +37,7 @@ namespace Lumix
 	{
 		MT::SpinLock lock(m_mutex);
 		clear();
-		serializer.write((int32)m_paths.size());
+		serializer.write((i32)m_paths.size());
 		for (int i = 0; i < m_paths.size(); ++i)
 		{
 			serializer.writeString(m_paths.at(i)->m_path);
@@ -48,13 +48,13 @@ namespace Lumix
 	void PathManager::deserialize(InputBlob& serializer)
 	{
 		MT::SpinLock lock(m_mutex);
-		int32 size;
+		i32 size;
 		serializer.read(size);
 		for (int i = 0; i < size; ++i)
 		{
 			char path[MAX_PATH_LENGTH];
 			serializer.readString(path, sizeof(path));
-			uint32 hash = crc32(path);
+			u32 hash = crc32(path);
 			PathInternal* internal = getPathMultithreadUnsafe(hash, path);
 			--internal->m_ref_count;
 		}
@@ -67,14 +67,14 @@ namespace Lumix
 	}
 
 
-	Path::Path(uint32 hash)
+	Path::Path(u32 hash)
 	{
 		m_data = g_path_manager->getPath(hash);
 		ASSERT(m_data);
 	}
 
 
-	PathInternal* PathManager::getPath(uint32 hash)
+	PathInternal* PathManager::getPath(u32 hash)
 	{
 		MT::SpinLock lock(m_mutex);
 		int index = m_paths.find(hash);
@@ -87,7 +87,7 @@ namespace Lumix
 	}
 
 
-	PathInternal* PathManager::getPath(uint32 hash, const char* path)
+	PathInternal* PathManager::getPath(u32 hash, const char* path)
 	{
 		MT::SpinLock lock(m_mutex);
 		return getPathMultithreadUnsafe(hash, path);
@@ -107,7 +107,7 @@ namespace Lumix
 	}
 
 
-	PathInternal* PathManager::getPathMultithreadUnsafe(uint32 hash, const char* path)
+	PathInternal* PathManager::getPathMultithreadUnsafe(u32 hash, const char* path)
 	{
 		int index = m_paths.find(hash);
 		if (index < 0)
@@ -158,8 +158,8 @@ namespace Lumix
 		char tmp[MAX_PATH_LENGTH];
 		size_t len = stringLength(path);
 		ASSERT(len < MAX_PATH_LENGTH);
-		PathUtils::normalize(path, tmp, (uint32)len + 1);
-		uint32 hash = crc32(tmp);
+		PathUtils::normalize(path, tmp, (u32)len + 1);
+		u32 hash = crc32(tmp);
 		m_data = g_path_manager->getPath(hash, tmp);
 	}
 
@@ -190,8 +190,8 @@ namespace Lumix
 		char tmp[MAX_PATH_LENGTH];
 		size_t len = stringLength(rhs);
 		ASSERT(len < MAX_PATH_LENGTH);
-		PathUtils::normalize(rhs, tmp, (uint32)len + 1);
-		uint32 hash = crc32(tmp);
+		PathUtils::normalize(rhs, tmp, (u32)len + 1);
+		u32 hash = crc32(tmp);
 		m_data = g_path_manager->getPath(hash, tmp);
 	}
 

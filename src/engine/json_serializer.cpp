@@ -261,7 +261,7 @@ void JsonSerializer::serializeArrayItem(int value)
 }
 
 
-void JsonSerializer::serializeArrayItem(int64 value)
+void JsonSerializer::serializeArrayItem(i64 value)
 {
 	writeBlockComma();
 	char tmp[30];
@@ -337,7 +337,7 @@ void JsonSerializer::deserialize(float& value, float default_value)
 }
 
 
-void JsonSerializer::deserialize(int32& value, int32 default_value)
+void JsonSerializer::deserialize(i32& value, i32 default_value)
 {
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
 	{
@@ -415,7 +415,7 @@ void JsonSerializer::deserialize(const char* label, float& value, float default_
 }
 
 
-void JsonSerializer::deserialize(const char* label, uint32& value, uint32 default_value)
+void JsonSerializer::deserialize(const char* label, u32& value, u32 default_value)
 {
 	deserializeLabel(label);
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -441,7 +441,7 @@ bool JsonSerializer::isObjectEnd()
 }
 
 
-void JsonSerializer::deserialize(const char* label, int32& value, int32 default_value)
+void JsonSerializer::deserialize(const char* label, i32& value, i32 default_value)
 {
 	deserializeLabel(label);
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -576,7 +576,7 @@ void JsonSerializer::deserializeArrayItem(ComponentHandle& value, ComponentHandl
 }
 
 
-void JsonSerializer::deserializeArrayItem(uint32& value, uint32 default_value)
+void JsonSerializer::deserializeArrayItem(u32& value, u32 default_value)
 {
 	deserializeArrayComma();
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -587,7 +587,7 @@ void JsonSerializer::deserializeArrayItem(uint32& value, uint32 default_value)
 }
 
 
-void JsonSerializer::deserializeArrayItem(int32& value, int32 default_value)
+void JsonSerializer::deserializeArrayItem(i32& value, i32 default_value)
 {
 	deserializeArrayComma();
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -598,7 +598,7 @@ void JsonSerializer::deserializeArrayItem(int32& value, int32 default_value)
 }
 
 
-void JsonSerializer::deserializeArrayItem(int64& value, int64 default_value)
+void JsonSerializer::deserializeArrayItem(i64& value, i64 default_value)
 {
 	deserializeArrayComma();
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))

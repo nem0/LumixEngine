@@ -30,7 +30,7 @@ static const ResourceType PREFAB_TYPE("prefab");
 struct PrefabInstance
 {
 	Vec3 position;
-	uint32 path_hash;
+	u32 path_hash;
 };
 
 
@@ -101,7 +101,7 @@ private:
 				return false;
 			}
 
-			Array<uint8> data(editor.getAllocator());
+			Array<u8> data(editor.getAllocator());
 			data.resize((int)file.size());
 			file.read(&data[0], data.size());
 			InputBlob blob(&data[0], data.size());
@@ -179,7 +179,7 @@ private:
 
 
 		Vec3 position;
-		uint32 path_hash;
+		u32 path_hash;
 		bool record_instance;
 		WorldEditor& editor;
 		Array<Entity> entities;
@@ -228,7 +228,7 @@ private:
 
 		bool execute() override
 		{
-			uint32 name_hash = crc32(m_name.c_str());
+			u32 name_hash = crc32(m_name.c_str());
 			if (m_entity_system.m_instances.find(name_hash) < 0)
 			{
 				m_entity_system.m_template_names.push(m_name);
@@ -247,7 +247,7 @@ private:
 		void undo() override
 		{
 			m_entity_system.m_template_names.eraseItem(m_name);
-			uint32 name_hash = crc32(m_name.c_str());
+			u32 name_hash = crc32(m_name.c_str());
 			m_entity_system.m_instances.erase(name_hash);
 			m_entity_system.m_updated.invoke();
 		}
@@ -379,7 +379,7 @@ private:
 	private:
 		EntityTemplateSystemImpl& m_entity_system;
 		WorldEditor& m_editor;
-		uint32 m_template_name_hash;
+		u32 m_template_name_hash;
 		Entity m_entity;
 		Vec3 m_position;
 		Quat m_rotation;
@@ -480,7 +480,7 @@ public:
 
 	void onEntityDestroyed(Entity entity)
 	{
-		uint32 tpl = getTemplate(entity);
+		u32 tpl = getTemplate(entity);
 		if (tpl != 0)
 		{
 			Array<Entity>& instances = m_instances.get(tpl);
@@ -610,7 +610,7 @@ public:
 	}
 
 
-	void setTemplate(Entity entity, uint32 template_name_hash) override
+	void setTemplate(Entity entity, u32 template_name_hash) override
 	{
 		int idx = m_instances.find(template_name_hash);
 		if (idx >= 0)
@@ -623,7 +623,7 @@ public:
 	}
 
 
-	uint32 getTemplate(Entity entity) override
+	u32 getTemplate(Entity entity) override
 	{
 		for (int j = 0; j < m_instances.size(); ++j)
 		{
@@ -640,7 +640,7 @@ public:
 	}
 
 
-	const Array<Entity>& getInstances(uint32 template_name_hash) override
+	const Array<Entity>& getInstances(u32 template_name_hash) override
 	{
 		int instances_index = m_instances.find(template_name_hash);
 		if (instances_index >= 0) return m_instances.at(instances_index);
@@ -648,7 +648,7 @@ public:
 	}
 
 
-	Array<Entity>& getMutableInstances(uint32 template_name_hash)
+	Array<Entity>& getMutableInstances(u32 template_name_hash)
 	{
 		int instances_index = m_instances.find(template_name_hash);
 		if (instances_index >= 0) return m_instances.at(instances_index);
@@ -712,17 +712,17 @@ public:
 
 	void serialize(OutputBlob& serializer) override
 	{
-		serializer.write((int32)m_template_names.size());
+		serializer.write((i32)m_template_names.size());
 		for (int i = 0, c = m_template_names.size(); i < c; ++i)
 		{
 			serializer.writeString(m_template_names[i].c_str());
 		}
-		serializer.write((int32)m_instances.size());
+		serializer.write((i32)m_instances.size());
 		for (int i = 0; i < m_instances.size(); ++i)
 		{
 			serializer.write(m_instances.getKey(i));
 			Array<Entity>& entities = m_instances.at(i);
-			serializer.write((int32)entities.size());
+			serializer.write((i32)entities.size());
 			for (int j = 0, c = entities.size(); j < c; ++j)
 			{
 				serializer.write(entities[j]);
@@ -764,7 +764,7 @@ public:
 		m_instances.clear();
 		m_prefab_entities.clear();
 		m_prefab_instances.clear();
-		int32 count;
+		i32 count;
 		serializer.read(count);
 		for (int i = 0; i < count; ++i)
 		{
@@ -776,9 +776,9 @@ public:
 		serializer.read(count);
 		for (int i = 0; i < count; ++i)
 		{
-			uint32 hash;
+			u32 hash;
 			serializer.read(hash);
-			int32 instances_per_template;
+			i32 instances_per_template;
 			serializer.read(instances_per_template);
 			Array<Entity>& entities = m_instances.emplace(hash, m_editor.getAllocator());
 			for (int j = 0; j < instances_per_template; ++j)
@@ -820,7 +820,7 @@ public:
 
 
 private:
-	AssociativeArray<uint32, Array<Entity>> m_instances;
+	AssociativeArray<u32, Array<Entity>> m_instances;
 	Array<string> m_template_names;
 	Universe* m_universe;
 	WorldEditor& m_editor;

@@ -37,11 +37,11 @@ class FrameBuffer
 
 			static const int MAX_RENDERBUFFERS = 16;
 
-			int32 m_width;
-			int32 m_height;
+			i32 m_width;
+			i32 m_height;
 			Vec2 m_size_ratio;
 			RenderBuffer m_renderbuffers[MAX_RENDERBUFFERS];
-			int32 m_renderbuffers_count;
+			i32 m_renderbuffers_count;
 			char m_name[64];
 		};
 

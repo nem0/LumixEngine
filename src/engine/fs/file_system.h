@@ -34,9 +34,9 @@ struct Mode
 
 	Mode() : value(0) {}
 	Mode(Value _value) : value(_value) { }
-	Mode(int32 _value) : value(_value) { }
+	Mode(i32 _value) : value(_value) { }
 	operator Value() const { return (Value)value; }
-	int32 value;
+	i32 value;
 };
 
 
@@ -49,9 +49,9 @@ struct SeekMode
 		CURRENT,
 	};
 	SeekMode(Value _value) : value(_value) {}
-	SeekMode(uint32 _value) : value(_value) {}
+	SeekMode(u32 _value) : value(_value) {}
 	operator Value() { return (Value)value; }
-	uint32 value;
+	u32 value;
 };
 
 
@@ -96,7 +96,7 @@ struct LUMIX_ENGINE_API DeviceList
 class LUMIX_ENGINE_API FileSystem
 {
 public:
-	static const uint32 INVALID_ASYNC = 0xffffFFFF;
+	static const u32 INVALID_ASYNC = 0xffffFFFF;
 	static FileSystem* create(IAllocator& allocator);
 	static void destroy(FileSystem* fs);
 
@@ -107,11 +107,11 @@ public:
 	virtual bool unMount(IFileDevice* device) = 0;
 
 	virtual IFile* open(const DeviceList& device_list, const Path& file, Mode mode) = 0;
-	virtual uint32 openAsync(const DeviceList& device_list,
+	virtual u32 openAsync(const DeviceList& device_list,
 						   const Path& file,
 						   int mode,
 						   const ReadCallback& call_back) = 0;
-	virtual void cancelAsync(uint32 id) = 0;
+	virtual void cancelAsync(u32 id) = 0;
 
 	virtual void close(IFile& file) = 0;
 	virtual void closeAsync(IFile& file) = 0;

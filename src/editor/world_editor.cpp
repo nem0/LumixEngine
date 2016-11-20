@@ -74,7 +74,7 @@ struct EndGroupCommand LUMIX_FINAL : public IEditorCommand
 	bool merge(IEditorCommand& command) override { ASSERT(false); return false; }
 	const char* getType() override { return "end_group"; }
 
-	uint32 group_type;
+	u32 group_type;
 };
 
 
@@ -203,7 +203,7 @@ public:
 		serializer.beginArray("data");
 		for (int i = 0; i < m_blob.getPos(); ++i)
 		{
-			serializer.serializeArrayItem((int32)((const uint8*)m_blob.getData())[i]);
+			serializer.serializeArrayItem((i32)((const u8*)m_blob.getData())[i]);
 		}
 		serializer.endArray();
 	}
@@ -221,9 +221,9 @@ public:
 		m_blob.reserve(size);
 		for (int i = 0; i < size; ++i)
 		{
-			int32 data;
+			i32 data;
 			serializer.deserializeArrayItem(data, 0);
-			m_blob.write((uint8)data);
+			m_blob.write((u8)data);
 		}
 		serializer.deserializeArrayEnd();
 	}
@@ -569,11 +569,11 @@ public:
 		serializer.deserialize("inedx", m_index, 0);
 		serializer.deserialize("entity_index", m_component.entity, INVALID_ENTITY);
 		serializer.deserialize("component_index", m_component.handle, INVALID_COMPONENT);
-		uint32 hash;
+		u32 hash;
 		serializer.deserialize("component_type", hash, 0);
 		m_component.type = PropertyRegister::getComponentTypeFromHash(hash);
 		m_component.scene = m_editor.getUniverse()->getScene(m_component.type);
-		uint32 property_name_hash;
+		u32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_descriptor =
 			static_cast<const IArrayDescriptor*>(PropertyRegister::getDescriptor(m_component.type, property_name_hash));
@@ -647,11 +647,11 @@ public:
 		serializer.deserialize("inedx", m_index, 0);
 		serializer.deserialize("entity_index", m_component.entity, INVALID_ENTITY);
 		serializer.deserialize("component_index", m_component.handle, INVALID_COMPONENT);
-		uint32 hash;
+		u32 hash;
 		serializer.deserialize("component_type", hash, 0);
 		m_component.type = PropertyRegister::getComponentTypeFromHash(hash);
 		m_component.scene = m_editor.getUniverse()->getScene(m_component.type);
-		uint32 property_name_hash;
+		u32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_descriptor = static_cast<const IArrayDescriptor*>(
 			PropertyRegister::getDescriptor(m_component.type, property_name_hash));
@@ -716,7 +716,7 @@ public:
 		for (int i = 0; i < count; ++i)
 		{
 			if (!m_editor.getUniverse()->getComponent(entities[i], m_component_type).isValid()) continue;
-			uint32 tpl = editor.getEntityTemplateSystem().getTemplate(entities[i]);
+			u32 tpl = editor.getEntityTemplateSystem().getTemplate(entities[i]);
 			if (tpl == 0)
 			{
 				ComponentUID component = m_editor.getUniverse()->getComponent(entities[i], component_type);
@@ -753,7 +753,7 @@ public:
 		serializer.beginArray("data");
 		for (int i = 0; i < m_new_value.getPos(); ++i)
 		{
-			serializer.serializeArrayItem((int)((const uint8*)m_new_value.getData())[i]);
+			serializer.serializeArrayItem((int)((const u8*)m_new_value.getData())[i]);
 		}
 		serializer.endArray();
 		serializer.serialize("property_name_hash", m_property_descriptor->getNameHash());
@@ -771,7 +771,7 @@ public:
 			m_entities.push(entity);
 		}
 		serializer.deserializeArrayEnd();
-		uint32 hash;
+		u32 hash;
 		serializer.deserialize("component_type", hash, 0);
 		m_component_type = PropertyRegister::getComponentTypeFromHash(hash);
 		serializer.deserializeArrayBegin("data");
@@ -780,10 +780,10 @@ public:
 		{
 			int data;
 			serializer.deserializeArrayItem(data, 0);
-			m_new_value.write((uint8)data);
+			m_new_value.write((u8)data);
 		}
 		serializer.deserializeArrayEnd();
-		uint32 property_name_hash;
+		u32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_property_descriptor = PropertyRegister::getDescriptor(m_component_type, property_name_hash);
 	}
@@ -872,7 +872,7 @@ private:
 			{
 				if (!m_editor.getUniverse()->getComponent(entities[i], type).isValid())
 				{
-					uint32 tpl = editor.getEntityTemplateSystem().getTemplate(entities[i]);
+					u32 tpl = editor.getEntityTemplateSystem().getTemplate(entities[i]);
 					if (tpl == 0)
 					{
 						m_entities.push(entities[i]);
@@ -904,7 +904,7 @@ private:
 
 		void deserialize(JsonSerializer& serializer) override
 		{
-			uint32 hash;
+			u32 hash;
 			serializer.deserialize("component_type", hash, 0);
 			m_type = PropertyRegister::getComponentTypeFromHash(hash);
 			m_entities.clear();
@@ -1078,7 +1078,7 @@ private:
 						}
 					}
 				}
-				uint32 tpl = m_editor.getEntityTemplateSystem().getTemplate(m_entities[i]);
+				u32 tpl = m_editor.getEntityTemplateSystem().getTemplate(m_entities[i]);
 				m_old_values.write(tpl);
 				m_old_values.write(m_editor.getEntityTemplateSystem().getPrefabEntity(m_entities[i]));
 
@@ -1120,7 +1120,7 @@ private:
 						props[k]->set(new_component, -1, blob);
 					}
 				}
-				uint32 tpl;
+				u32 tpl;
 				blob.read(tpl);
 				if (tpl) m_editor.getEntityTemplateSystem().setTemplate(new_entity, tpl);
 				PrefabEntity prefab;
@@ -1175,7 +1175,7 @@ private:
 			for (int i = 0; i < count; ++i)
 			{
 				if (!m_editor.getUniverse()->getComponent(entities[i], m_cmp_type).isValid()) continue;
-				uint32 tpl = editor.getEntityTemplateSystem().getTemplate(entities[i]);
+				u32 tpl = editor.getEntityTemplateSystem().getTemplate(entities[i]);
 				if (tpl == 0)
 				{
 					m_entities.push(entities[i]);
@@ -1224,7 +1224,7 @@ private:
 			}
 			serializer.deserializeArrayEnd();
 
-			uint32 hash;
+			u32 hash;
 			serializer.deserialize("component_type", hash, 0);
 			m_cmp_type = PropertyRegister::getComponentTypeFromHash(hash);
 		}
@@ -1712,7 +1712,7 @@ public:
 		header.engine_hash = m_engine->serialize(*m_universe, blob);
 		m_template_system->serialize(blob);
 		m_entity_groups.serialize(blob);
-		header.hash = crc32((const uint8*)blob.getData() + hashed_offset, blob.getPos() - hashed_offset);
+		header.hash = crc32((const u8*)blob.getData() + hashed_offset, blob.getPos() - hashed_offset);
 		*(Header*)blob.getData() = header;
 
 		g_log_info.log("editor") << "Universe saved";
@@ -1931,7 +1931,7 @@ public:
 	}
 
 
-	void beginCommandGroup(uint32 type) override
+	void beginCommandGroup(u32 type) override
 	{
 		if(m_undo_index < m_undo_stack.size() - 1)
 		{
@@ -1944,7 +1944,7 @@ public:
 
 		if(m_undo_index >= 0)
 		{
-			static const uint32 end_group_hash = crc32("end_group");
+			static const u32 end_group_hash = crc32("end_group");
 			if(crc32(m_undo_stack[m_undo_index]->getType()) == end_group_hash)
 			{
 				if(static_cast<EndGroupCommand*>(m_undo_stack[m_undo_index])->group_type == type)
@@ -2117,7 +2117,7 @@ public:
 			auto mtx = m_universe->getMatrix(entity);
 			blob.write(mtx);
 
-			int32 count = 0;
+			i32 count = 0;
 			for (ComponentUID cmp = m_universe->getFirstComponent(entity); cmp.isValid();
 				 cmp = m_universe->getNextComponent(cmp))
 			{
@@ -2129,20 +2129,20 @@ public:
 				cmp.isValid();
 				cmp = m_universe->getNextComponent(cmp))
 			{
-				uint32 cmp_type = PropertyRegister::getComponentTypeHash(cmp.type);
+				u32 cmp_type = PropertyRegister::getComponentTypeHash(cmp.type);
 				blob.write(cmp_type);
 				Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmp.type);
-				int32 prop_count = props.size();
+				i32 prop_count = props.size();
 				blob.write(prop_count);
 				for (int j = 0; j < prop_count; ++j)
 				{
 					blob.write(props[j]->getNameHash());
-					int32 size = 0;
+					i32 size = 0;
 					blob.write(size);
 					int pos = blob.getPos();
 					props[j]->get(cmp, -1, blob);
 					size = blob.getPos() - pos;
-					*(int32*)((uint8*)blob.getData() + pos - 4) = size;
+					*(i32*)((u8*)blob.getData() + pos - 4) = size;
 				}
 			}
 		}
@@ -2280,10 +2280,10 @@ public:
 	#pragma pack(1)
 		struct Header
 		{
-			uint32 magic;
+			u32 magic;
 			int version;
-			uint32 hash;
-			uint32 engine_hash;
+			u32 hash;
+			u32 engine_hash;
 		};
 	#pragma pack()
 
@@ -2304,7 +2304,7 @@ public:
 		Timer* timer = Timer::create(m_allocator);
 		g_log_info.log("Editor") << "Parsing universe...";
 		InputBlob blob(file.getBuffer(), (int)file.size());
-		uint32 hash = 0;
+		u32 hash = 0;
 		blob.read(hash);
 		header.version = -1;
 		int hashed_offset = sizeof(hash);
@@ -2317,10 +2317,10 @@ public:
 		}
 		else
 		{
-			uint32 engine_hash = 0;
+			u32 engine_hash = 0;
 			blob.read(engine_hash);
 		}
-		if (crc32((const uint8*)blob.getData() + hashed_offset, blob.getSize() - hashed_offset) != hash)
+		if (crc32((const u8*)blob.getData() + hashed_offset, blob.getSize() - hashed_offset) != hash)
 		{
 			Timer::destroy(timer);
 			g_log_error.log("Editor") << "Corrupted file.";
@@ -2740,8 +2740,8 @@ public:
 	{
 		if (m_is_game_mode) return;
 
-		static const uint32 end_group_hash = crc32("end_group");
-		static const uint32 begin_group_hash = crc32("begin_group");
+		static const u32 end_group_hash = crc32("end_group");
+		static const u32 begin_group_hash = crc32("begin_group");
 
 		if (m_undo_index >= m_undo_stack.size() || m_undo_index < 0) return;
 
@@ -2767,8 +2767,8 @@ public:
 	{
 		if (m_is_game_mode) return;
 
-		static const uint32 end_group_hash = crc32("end_group");
-		static const uint32 begin_group_hash = crc32("begin_group");
+		static const u32 end_group_hash = crc32("end_group");
+		static const u32 begin_group_hash = crc32("begin_group");
 
 		if (m_undo_index + 1 >= m_undo_stack.size()) return;
 
@@ -2842,7 +2842,7 @@ public:
 	}
 
 
-	IEditorCommand* createEditorCommand(uint32 command_type) override
+	IEditorCommand* createEditorCommand(u32 command_type) override
 	{
 		int index = m_editor_command_creators.find(command_type);
 		if (index >= 0)
@@ -2973,7 +2973,7 @@ public:
 		}
 		save(*file);
 		bool is_same = file->size() > 8 && result_file->size() > 8 &&
-					   *((const uint32*)result_file->getBuffer() + 3) == *((const uint32*)file->getBuffer() + 3);
+					   *((const u32*)result_file->getBuffer() + 3) == *((const u32*)file->getBuffer() + 3);
 
 		if (!is_same)
 		{
@@ -3050,14 +3050,14 @@ private:
 	Plugin* m_mouse_handling_plugin;
 	EntityTemplateSystem* m_template_system;
 	Array<IEditorCommand*> m_undo_stack;
-	AssociativeArray<uint32, EditorCommandCreator> m_editor_command_creators;
+	AssociativeArray<u32, EditorCommandCreator> m_editor_command_creators;
 	int m_undo_index;
 	OutputBlob m_copy_buffer;
 	bool m_is_loading;
 	Universe* m_universe;
 	EntityGroups m_entity_groups;
 	RenderInterface* m_render_interface;
-	uint32 m_current_group_type;
+	u32 m_current_group_type;
 	bool m_is_universe_changed;
 };
 

@@ -7,15 +7,15 @@ namespace Lumix
 {
 	namespace MT
 	{
-		void sleep(uint32 milliseconds) { ::Sleep(milliseconds); }
+		void sleep(u32 milliseconds) { ::Sleep(milliseconds); }
 		void yield() { sleep(0); }
 		
-		uint32 getCPUsCount()
+		u32 getCPUsCount()
 		{
 			SYSTEM_INFO sys_info;
 			GetSystemInfo(&sys_info);
 
-			uint32 num = sys_info.dwNumberOfProcessors;
+			u32 num = sys_info.dwNumberOfProcessors;
 			num = num > 0 ? num : 1;
 
 			return num;
@@ -23,7 +23,7 @@ namespace Lumix
 
 		ThreadID getCurrentThreadID() { return ::GetCurrentThreadId(); }
 
-		uint32 getThreadAffinityMask()
+		u32 getThreadAffinityMask()
 		{
 			PROCESSOR_NUMBER proc_number;
 			BOOL ret = ::GetThreadIdealProcessorEx(::GetCurrentThread(), &proc_number);

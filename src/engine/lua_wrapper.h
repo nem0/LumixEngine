@@ -111,17 +111,17 @@ template <> inline Int2 toType(lua_State* L, int index)
 	lua_pop(L, 1);
 	return v;
 }
-template <> inline int64 toType(lua_State* L, int index)
+template <> inline i64 toType(lua_State* L, int index)
 {
-	return (int64)lua_tointeger(L, index);
+	return (i64)lua_tointeger(L, index);
 }
-template <> inline uint32 toType(lua_State* L, int index)
+template <> inline u32 toType(lua_State* L, int index)
 {
-	return (uint32)lua_tointeger(L, index);
+	return (u32)lua_tointeger(L, index);
 }
-template <> inline uint64 toType(lua_State* L, int index)
+template <> inline u64 toType(lua_State* L, int index)
 {
-	return (uint64)lua_tointeger(L, index);
+	return (u64)lua_tointeger(L, index);
 }
 template <> inline bool toType(lua_State* L, int index)
 {
@@ -157,7 +157,7 @@ template <> inline const char* typeToString<ComponentHandle>()
 {
 	return "component";
 }
-template <> inline const char* typeToString<uint32>()
+template <> inline const char* typeToString<u32>()
 {
 	return "number|integer";
 }
@@ -212,15 +212,15 @@ template <> inline bool isType<Quat>(lua_State* L, int index)
 {
 	return lua_istable(L, index) != 0 && lua_rawlen(L, index) == 4;
 }
-template <> inline bool isType<uint32>(lua_State* L, int index)
+template <> inline bool isType<u32>(lua_State* L, int index)
 {
 	return lua_isinteger(L, index) != 0;
 }
-template <> inline bool isType<uint64>(lua_State* L, int index)
+template <> inline bool isType<u64>(lua_State* L, int index)
 {
 	return lua_isinteger(L, index) != 0;
 }
-template <> inline bool isType<int64>(lua_State* L, int index)
+template <> inline bool isType<i64>(lua_State* L, int index)
 {
 	return lua_isinteger(L, index) != 0;
 }
@@ -357,7 +357,7 @@ template <> inline void push(lua_State* L, unsigned int value)
 {
 	lua_pushinteger(L, value);
 }
-template <> inline void push(lua_State* L, uint64 value)
+template <> inline void push(lua_State* L, u64 value)
 {
 	lua_pushinteger(L, value);
 }

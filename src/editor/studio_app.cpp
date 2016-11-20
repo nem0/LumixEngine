@@ -325,7 +325,7 @@ public:
 			Lumix::WorldEditor* editor;
 			Lumix::ComponentType type;
 			Lumix::ResourceType resource_type;
-			Lumix::uint32 property_id;
+			Lumix::u32 property_id;
 			char label[50];
 		};
 
@@ -1717,9 +1717,9 @@ public:
 	#pragma pack(1)
 	struct PackFileInfo
 	{
-		Lumix::uint32 hash;
-		Lumix::uint64 offset;
-		Lumix::uint64 size;
+		Lumix::u32 hash;
+		Lumix::u64 offset;
+		Lumix::u64 size;
 
 		using Path = Lumix::StaticString<Lumix::MAX_PATH_LENGTH>;
 	};
@@ -1818,7 +1818,7 @@ public:
 
 		int count = infos.size();
 		file.write(&count, sizeof(count));
-		Lumix::uint64 offset = sizeof(count) + sizeof(infos[0]) * count;
+		Lumix::u64 offset = sizeof(count) + sizeof(infos[0]) * count;
 		for (auto& info : infos)
 		{
 			info.offset = offset;
@@ -1836,7 +1836,7 @@ public:
 				Lumix::g_log_error.log("Editor") << "Could not open " << path.data;
 				return;
 			}
-			Lumix::uint8 buf[4096];
+			Lumix::u8 buf[4096];
 			for (; src_size > 0; src_size -= Lumix::Math::minimum(sizeof(buf), src_size))
 			{
 				size_t batch_size = Lumix::Math::minimum(sizeof(buf), src_size);
@@ -2038,7 +2038,7 @@ public:
 				if (frame_time < 1 / wanted_fps)
 				{
 					PROFILE_BLOCK("sleep");
-					Lumix::MT::sleep(Lumix::uint32(1000 / wanted_fps - frame_time * 1000));
+					Lumix::MT::sleep(Lumix::u32(1000 / wanted_fps - frame_time * 1000));
 				}
 			}
 			Lumix::Profiler::frame();
@@ -2149,12 +2149,12 @@ public:
 
 		int key_count;
 		auto* state = SDL_GetKeyboardState(&key_count);
-		Lumix::uint32 pressed_modifiers = SDL_GetModState() & (KMOD_CTRL | KMOD_ALT | KMOD_SHIFT);
+		Lumix::u32 pressed_modifiers = SDL_GetModState() & (KMOD_CTRL | KMOD_ALT | KMOD_SHIFT);
 		for (auto* a : m_actions)
 		{
 			if (!a->is_global || a->shortcut[0] == -1) continue;
 
-			Lumix::uint32 action_modifiers = 0;
+			Lumix::u32 action_modifiers = 0;
 			for (int i = 0; i < Lumix::lengthOf(a->shortcut) + 1; ++i)
 			{
 				if ((i == Lumix::lengthOf(a->shortcut) || a->shortcut[i] == -1) &&

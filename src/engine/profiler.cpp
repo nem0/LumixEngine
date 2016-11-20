@@ -18,8 +18,8 @@ struct Block
 {
 	struct Hit
 	{
-		uint64 m_length;
-		uint64 m_start;
+		u64 m_length;
+		u64 m_start;
 	};
 
 
@@ -102,13 +102,13 @@ Block* getBlockNext(Block* block)
 }
 
 
-uint64 getBlockHitStart(Block* block, int hit_index)
+u64 getBlockHitStart(Block* block, int hit_index)
 {
 		return block->m_hits[hit_index].m_start;
 }
 
 
-uint64 getBlockHitLength(Block* block, int hit_index)
+u64 getBlockHitLength(Block* block, int hit_index)
 {
 	return block->m_hits[hit_index].m_length;
 }
@@ -170,7 +170,7 @@ Instance g_instance;
 
 float getBlockLength(Block* block)
 {
-	uint64 ret = 0;
+	u64 ret = 0;
 	for(int i = 0, c = block->m_hits.size(); i < c; ++i)
 	{
 		ret += block->m_hits[i].m_length;
@@ -326,7 +326,7 @@ int getThreadCount()
 }
 
 
-uint64 now()
+u64 now()
 {
 	return g_instance.timer->getRawTimeSinceStart();
 }
@@ -354,7 +354,7 @@ void endBlock()
 	}
 
 	ASSERT(thread_data->current_block);
-	uint64 now = g_instance.timer->getRawTimeSinceStart();
+	u64 now = g_instance.timer->getRawTimeSinceStart();
 	thread_data->current_block->m_hits.back().m_length = now - thread_data->current_block->m_hits.back().m_start;
 	thread_data->current_block = thread_data->current_block->m_parent;
 }
@@ -366,7 +366,7 @@ void frame()
 
 	MT::SpinLock lock(g_instance.m_mutex);
 	g_instance.frame_listeners.invoke();
-	uint64 now = g_instance.timer->getRawTimeSinceStart();
+	u64 now = g_instance.timer->getRawTimeSinceStart();
 
 	for (auto* i : g_instance.threads)
 	{

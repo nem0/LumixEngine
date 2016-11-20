@@ -89,7 +89,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		Entity entity;
 		Anim::ControllerResource* resource = nullptr;
 		Anim::ComponentInstance* root = nullptr;
-		Lumix::Array<uint8> input;
+		Lumix::Array<u8> input;
 	};
 
 
@@ -361,7 +361,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 	void serialize(OutputBlob& serializer) override
 	{
-		serializer.write((int32)m_animables.size());
+		serializer.write((i32)m_animables.size());
 		for (const Animable& animable : m_animables)
 		{
 			serializer.write(animable.entity);
@@ -384,7 +384,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 	void deserialize(InputBlob& serializer, int version) override
 	{
-		int32 count;
+		i32 count;
 		serializer.read(count);
 		m_animables.reserve(count);
 		for (int i = 0; i < count; ++i)
@@ -401,7 +401,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			}
 			else
 			{
-				uint32 flags = 0;
+				u32 flags = 0;
 				if(version <= (int)AnimationSceneVersion::REFACTOR) serializer.read(flags);
 				free = flags != 0;
 				serializer.read(animable.time_scale);
@@ -577,7 +577,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 	
-	uint8* getControllerInput(ComponentHandle cmp)
+	u8* getControllerInput(ComponentHandle cmp)
 	{
 		auto& input = m_controllers.get({ cmp.index }).input;
 		return input.empty() ? nullptr : &input[0];

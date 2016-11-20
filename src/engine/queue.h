@@ -5,18 +5,18 @@
 
 namespace Lumix
 {
-	template <typename T, uint32 count>
+	template <typename T, u32 count>
 	class Queue
 	{
 	public:
 		struct Iterator
 		{
 			Queue* owner;
-			uint32 cursor;
+			u32 cursor;
 
 			bool operator!=(const Iterator& rhs) const { return cursor != rhs.cursor || owner != rhs.owner; }
 			void operator ++() { ++cursor; }
-			T& value() { uint32 idx = cursor & (count - 1); return owner->m_buffer[idx]; }
+			T& value() { u32 idx = cursor & (count - 1); return owner->m_buffer[idx]; }
 		};
 
 		Queue(IAllocator& allocator)
@@ -33,7 +33,7 @@ namespace Lumix
 		}
 
 		bool empty() const { return m_rd == m_wr; } 
-		uint32 size() const { return m_wr - m_rd; }
+		u32 size() const { return m_wr - m_rd; }
 		Iterator begin() { return {this, m_rd}; }
 		Iterator end() { return {this, m_wr}; }
 
@@ -41,7 +41,7 @@ namespace Lumix
 		{
 			ASSERT(m_wr - m_rd < count);
 
-			uint32 idx = m_wr & (count - 1);
+			u32 idx = m_wr & (count - 1);
 			::new (NewPlaceholder(), &m_buffer[idx]) T(item);
 			++m_wr;
 		}
@@ -50,20 +50,20 @@ namespace Lumix
 		{
 			ASSERT(m_wr != m_rd);
 
-			uint32 idx = m_rd & (count - 1);
+			u32 idx = m_rd & (count - 1);
 			(&m_buffer[idx])->~T();
 			m_rd++;
 		}
 
 		T& front()
 		{
-			uint32 idx = m_rd & (count - 1);
+			u32 idx = m_rd & (count - 1);
 			return m_buffer[idx];
 		}
 
 		const T& front() const
 		{
-			uint32 idx = m_rd & (count - 1);
+			u32 idx = m_rd & (count - 1);
 			return m_buffer[idx];
 		}
 
@@ -71,7 +71,7 @@ namespace Lumix
 		{
 			ASSERT(!empty());
 
-			uint32 idx = m_wr & (count - 1);
+			u32 idx = m_wr & (count - 1);
 			return m_buffer[idx - 1];
 		}
 
@@ -79,14 +79,14 @@ namespace Lumix
 		{
 			ASSERT(!empty());
 
-			uint32 idx = m_wr & (count - 1);
+			u32 idx = m_wr & (count - 1);
 			return m_buffer[idx - 1];
 		}
 
 	private:
 		IAllocator& m_allocator;
-		uint32 m_rd;
-		uint32 m_wr;
+		u32 m_rd;
+		u32 m_wr;
 		T* m_buffer;
 	};
 }
