@@ -80,6 +80,7 @@ public:
 	void addInEdge(Edge* edge) { m_in_edges.push(edge); }
 	void removeEdge(Edge* edge) { m_edges.eraseItemFast(edge); }
 	void removeInEdge(Edge* edge) { m_in_edges.eraseItemFast(edge); }
+	void removeEvent(int index);
 
 public:
 	ImVec2 pos;

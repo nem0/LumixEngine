@@ -99,6 +99,25 @@ bool Node::hitTest(const ImVec2& on_canvas_pos) const
 }
 
 
+void Node::removeEvent(int index)
+{
+	auto* engine_node = ((Anim::Node*)engine_cmp);
+	auto& events = engine_node->events;
+	Anim::EventHeader header = *(Anim::EventHeader*)&events[sizeof(Anim::EventHeader) * index];
+	u8* headers_end = &events[sizeof(Anim::EventHeader) * engine_node->events_count];
+	u8* end = &events.back() + 1;
+	u8* event_start = headers_end + header.offset;
+	u8* event_end = event_start + header.size;
+	
+	u8* header_start = &events[sizeof(Anim::EventHeader) * index];
+	u8* header_end = header_start + sizeof(Anim::EventHeader);
+	moveMemory(header_start, header_end, event_start - header_end);
+	moveMemory(event_start - sizeof(Anim::EventHeader), event_end, end - event_end);
+	
+	--engine_node->events_count;
+}
+
+
 void Node::onGUI()
 {
 	if (getParent()->engine_cmp->type == Anim::Component::STATE_MACHINE)
@@ -111,6 +130,80 @@ void Node::onGUI()
 		}
 	}
 	ImGui::InputText("Name", m_name, lengthOf(m_name));
+	if (ImGui::CollapsingHeader("Events"))
+	{
+		auto* engine_node = ((Anim::Node*)engine_cmp);
+		auto& events = engine_node->events;
+		for(int i = 0; i < engine_node->events_count; ++i)
+		{
+			if (ImGui::TreeNode((void*)(intptr_t)i, "%d", i))
+			{
+				Anim::EventHeader& header = *(Anim::EventHeader*)&events[sizeof(Anim::EventHeader) * i];
+				if (ImGui::Button("Remove"))
+				{
+					removeEvent(i);
+					ImGui::TreePop();
+					break;
+				}
+				ImGui::InputFloat("Time", &header.time);
+				switch (header.type)
+				{
+					case Anim::EventHeader::SET_INPUT:
+					{
+						int event_offset = header.offset + sizeof(Anim::EventHeader) * engine_node->events_count;
+						auto event = (Anim::SetInputEvent*)&events[event_offset];
+						auto& input_decl = m_controller.getEngineResource()->getInputDecl();
+						auto getter = [](void* data, int idx, const char** out) -> bool {
+							auto& input_decl = *(Anim::InputDecl*)data;
+							*out = input_decl.inputs[idx].name;
+							return true;
+						};
+						ImGui::Combo("Input", &event->input_idx, getter, &input_decl, input_decl.inputs_count);
+						if (event->input_idx >= 0 && event->input_idx < input_decl.inputs_count)
+						{
+							switch (input_decl.inputs[event->input_idx].type)
+							{
+								case Anim::InputDecl::BOOL: ImGui::Checkbox("Value", &event->b_value); break;
+								case Anim::InputDecl::INT: ImGui::InputInt("Value", &event->i_value); break;
+								case Anim::InputDecl::FLOAT: ImGui::InputFloat("Value", &event->f_value); break;
+								default: ASSERT(false); break;
+							}
+						}
+					}
+					break;
+					default: ASSERT(false); break;
+				}
+				ImGui::TreePop();
+			}
+		}
+
+		static int current = 0;
+		ImGui::Combo("", &current, "Set Input\0");
+		ImGui::SameLine();
+		if (ImGui::Button("Add event"))
+		{
+			auto newEvent = [&](int size) {
+				int old_payload_size = events.size() - sizeof(Anim::EventHeader) * engine_node->events_count;
+				events.resize(events.size() + size + sizeof(Anim::EventHeader));
+				u8* headers_end = &events[engine_node->events_count * sizeof(Anim::EventHeader)];
+				moveMemory(headers_end, headers_end + sizeof(Anim::EventHeader), old_payload_size);
+				Anim::EventHeader& event_header =
+					*(Anim::EventHeader*)&events[sizeof(Anim::EventHeader) * engine_node->events_count];
+				event_header.type = 0;
+				event_header.time = 0;
+				event_header.size = size;
+				event_header.offset = old_payload_size;
+				return headers_end + old_payload_size;
+			};
+
+			switch (current)
+			{
+				case Anim::EventHeader::SET_INPUT: newEvent((int)sizeof(Anim::SetInputEvent)); break;
+				default: ASSERT(false); break;
+			}
+			++engine_node->events_count;
+		}
+	}
 }
 
 
@@ -415,6 +508,7 @@ void Container::deserialize(InputBlob& blob)
 
 void Container::compile()
 {
+	Node::compile();
 	for (auto* cmp : m_editor_cmps)
 	{
 		cmp->compile();

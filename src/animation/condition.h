@@ -12,6 +12,7 @@ namespace Lumix
 
 class Animation;
 class IAllocator;
+class OutputBlob;
 
 
 namespace Anim
@@ -28,6 +29,8 @@ struct RunningContext
 	IAllocator* allocator;
 	struct ComponentInstance* current;
 	AnimSet* anim_set;
+	OutputBlob* event_stream;
+	ComponentHandle controller;
 };
 
 

@@ -140,6 +140,32 @@ Node::~Node()
 }
 
 
+void Node::serialize(OutputBlob& blob)
+{
+	Component::serialize(blob);
+	blob.write(events_count);
+	if (events_count > 0)
+	{
+		blob.write(events.size());
+		blob.write(&events[0], events.size());
+	}
+}
+
+
+void Node::deserialize(InputBlob& blob, Container* parent)
+{
+	Component::deserialize(blob, parent);
+	blob.read(events_count);
+	if (events_count > 0)
+	{
+		int size;
+		blob.read(size);
+		events.resize(size);
+		blob.read(&events[0], size);
+	}
+}
+
+
 SimpleAnimationNode::SimpleAnimationNode(IAllocator& allocator)
 	: Node(Component::SIMPLE_ANIMATION, allocator)
 	, animations_hashes(allocator)
@@ -149,7 +175,7 @@ SimpleAnimationNode::SimpleAnimationNode(IAllocator& allocator)
 
 void SimpleAnimationNode::serialize(OutputBlob& blob)
 {
-	Component::serialize(blob);
+	Node::serialize(blob);
 	blob.write(animations_hashes.size());
 	for (u32 hash : animations_hashes)
 	{
@@ -161,7 +187,7 @@ void SimpleAnimationNode::serialize(OutputBlob& blob)
 
 void SimpleAnimationNode::deserialize(InputBlob& blob, Container* parent)
 {
-	Component::deserialize(blob, parent);
+	Node::deserialize(blob, parent);
 
 	int count;
 	blob.read(count);
@@ -173,6 +199,46 @@ void SimpleAnimationNode::deserialize(InputBlob& blob, Container* parent)
 	blob.read(looped);
 }
 
+
+
+void NodeInstance::queueEvents(RunningContext& rc, float old_time, float time, float length)
+{
+	Node& node = (Node&)source;
+	if (node.events_count <= 0) return;
+
+	if (time < old_time)
+	{
+		EventHeader* headers = (EventHeader*)&node.events[0];
+		for (int i = 0; i < node.events_count; ++i)
+		{
+			EventHeader& header = headers[i];
+			if ((header.time >= old_time && header.time < length) || header.time < time)
+			{
+				rc.event_stream->write(header.type);
+				rc.event_stream->write(rc.controller);
+				rc.event_stream->write(header.size);
+				rc.event_stream->write(
+					&node.events[0] + header.offset + sizeof(EventHeader) * node.events_count, header.size);
+			}
+		}
+	}
+	else
+	{
+		EventHeader* headers = (EventHeader*)&node.events[0];
+		for (int i = 0; i < node.events_count; ++i)
+		{
+			EventHeader& header = headers[i];
+			if (header.time >= old_time && header.time < time)
+			{
+				rc.event_stream->write(header.type);
+				rc.event_stream->write(rc.controller);
+				rc.event_stream->write(header.size);
+				rc.event_stream->write(
+					&node.events[0] + header.offset + sizeof(EventHeader) * node.events_count, header.size);
+			}
+		}
+	}
+}
 
 
 struct SimpleAnimationNodeInstance : public NodeInstance
@@ -211,9 +277,10 @@ struct SimpleAnimationNodeInstance : public NodeInstance
 	{
 		float old_time = time;
 		time += rc.time_delta;
+		float length = resource->getLength();
 		if (node.looped)
 		{
-			time = fmod(time, resource->getLength());
+			time = fmod(time, length);
 		}
 
 		int bone_idx = resource->getRootMotionBoneIdx();
@@ -237,6 +304,9 @@ struct SimpleAnimationNodeInstance : public NodeInstance
 		{
 			root_motion = { {0, 0, 0}, {0, 0, 0, 1} };
 		}
+
+		queueEvents(rc, old_time, time, length);
+
 		return check_edges ? checkOutEdges(node, rc) : this;
 	}
 
@@ -335,7 +405,7 @@ Container::~Container()
 
 void Container::serialize(OutputBlob& blob)
 {
-	Component::serialize(blob);
+	Node::serialize(blob);
 	blob.write(children.size());
 	for (auto* child : children)
 	{
@@ -347,7 +417,7 @@ void Container::serialize(OutputBlob& blob)
 
 void Container::deserialize(InputBlob& blob, Container* parent)
 {
-	Component::deserialize(blob, parent);
+	Node::deserialize(blob, parent);
 	int size;
 	blob.read(size);
 	for (int i = 0; i < size; ++i)
