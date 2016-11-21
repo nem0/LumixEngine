@@ -78,13 +78,18 @@ struct Node : public Component
 		: Component(type)
 		, out_edges(_allocator)
 		, allocator(_allocator)
+		, events(allocator)
 	{
 	}
 
 	~Node();
+	void serialize(OutputBlob& blob) override;
+	void deserialize(InputBlob& blob, Container* parent) override;
 
-	Array<Edge*> out_edges;
 	IAllocator& allocator;
+	Array<Edge*> out_edges;
+	Array<u8> events;
+	int events_count = 0;
 };
 
 
@@ -153,6 +158,34 @@ struct NodeInstance : public ComponentInstance
 		}
 		return this;
 	}
+
+	void queueEvents(RunningContext& rc, float old_time, float time, float length);
+};
+
+
+struct EventHeader
+{
+	enum BuiltinType
+	{
+		SET_INPUT
+	};
+
+	float time;
+	u8 type;
+	u8 size;
+	u16 offset;
+};
+
+
+struct SetInputEvent
+{
+	int input_idx;
+	union
+	{
+		int i_value;
+		float f_value;
+		bool b_value;
+	};
 };
 
 

@@ -123,6 +123,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		, m_animables(allocator)
 		, m_controllers(allocator)
 		, m_mixers(allocator)
+		, m_event_stream(allocator)
 	{
 		m_universe.entityDestroyed().bind<AnimationSceneImpl, &AnimationSceneImpl::onEntityDestroyed>(this);
 		m_is_game_running = false;
@@ -596,6 +597,8 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		rc.input = &controller.input[0];
 		rc.current = nullptr;
 		rc.anim_set = &controller.resource->getAnimSet();
+		rc.event_stream = &m_event_stream;
+		rc.controller = {controller.entity.index};
 		controller.root->enter(rc, nullptr);
 	}
 
@@ -627,6 +630,8 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		rc.allocator = &m_anim_system.m_allocator;
 		rc.input = &controller.input[0];
 		rc.anim_set = &controller.resource->getAnimSet();
+		rc.event_stream = &m_event_stream;
+		rc.controller = {controller.entity.index};
 		controller.root = controller.root->update(rc, true);
 
 		ComponentHandle model_instance = m_render_scene->getModelInstanceComponent(controller.entity);
@@ -649,6 +654,8 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		PROFILE_FUNCTION();
 		if (!m_is_game_running) return;
 
+		m_event_stream.clear();
+
 		for (Mixer& mixer : m_mixers)
 		{
 			AnimationSceneImpl::updateMixer(mixer, time_delta);
@@ -662,6 +669,45 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		for (Controller& controller : m_controllers)
 		{
 			AnimationSceneImpl::updateController(controller, time_delta);
+		}
+
+		processEventStream();
+	}
+
+
+	void processEventStream()
+	{
+		InputBlob blob(m_event_stream);
+		while (blob.getPosition() < blob.getSize())
+		{
+			u8 type;
+			u8 size;
+			ComponentHandle cmp;
+			blob.read(type);
+			blob.read(cmp);
+			blob.read(size);
+			if (type == Anim::EventHeader::SET_INPUT)
+			{
+				Anim::SetInputEvent event;
+				blob.read(event);
+				Controller& ctrl = m_controllers.get({cmp.index});
+				if (ctrl.resource->isReady())
+				{
+					Anim::InputDecl& decl = ctrl.resource->getInputDecl();
+					Anim::InputDecl::Input& input = decl.inputs[event.input_idx];
+					switch (input.type)
+					{
+						case Anim::InputDecl::BOOL: *(bool*)&ctrl.input[input.offset] = event.b_value; break;
+						case Anim::InputDecl::INT: *(int*)&ctrl.input[input.offset] = event.i_value; break;
+						case Anim::InputDecl::FLOAT: *(float*)&ctrl.input[input.offset] = event.f_value; break;
+						default: ASSERT(false); break;
+					}
+				}
+			}
+			else
+			{
+				blob.skip(size);
+			}
 		}
 	}
 
@@ -715,6 +761,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	AssociativeArray<Entity, Mixer> m_mixers;
 	RenderScene* m_render_scene;
 	bool m_is_game_running;
+	OutputBlob m_event_stream;
 };
 
 

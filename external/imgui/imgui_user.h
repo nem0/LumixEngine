@@ -44,6 +44,9 @@ IMGUI_API ImVec2 GetNodeInputPos(ImGuiID node_id, int input);
 IMGUI_API ImVec2 GetNodeOutputPos(ImGuiID node_id, int output);
 IMGUI_API void NodeSlots(int count, bool input);
 
+IMGUI_API bool BeginTimeline(const char* str_id, float max_value);
+IMGUI_API bool TimelineEvent(const char* str_id, float* values);
+IMGUI_API void EndTimeline();
 
 struct CurveEditor
 {
