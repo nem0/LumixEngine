@@ -182,14 +182,14 @@ void Node::onGUI()
 		ImGui::SameLine();
 		if (ImGui::Button("Add event"))
 		{
-			auto newEvent = [&](int size) {
+			auto newEvent = [&](int size, u8 type) {
 				int old_payload_size = events.size() - sizeof(Anim::EventHeader) * engine_node->events_count;
 				events.resize(events.size() + size + sizeof(Anim::EventHeader));
 				u8* headers_end = &events[engine_node->events_count * sizeof(Anim::EventHeader)];
 				moveMemory(headers_end, headers_end + sizeof(Anim::EventHeader), old_payload_size);
 				Anim::EventHeader& event_header =
 					*(Anim::EventHeader*)&events[sizeof(Anim::EventHeader) * engine_node->events_count];
-				event_header.type = 0;
+				event_header.type = type;
 				event_header.time = 0;
 				event_header.size = size;
 				event_header.offset = old_payload_size;
@@ -198,7 +198,7 @@ void Node::onGUI()
 
 			switch (current)
 			{
-				case Anim::EventHeader::SET_INPUT: newEvent((int)sizeof(Anim::SetInputEvent)); break;
+				case Anim::EventHeader::SET_INPUT: newEvent((int)sizeof(Anim::SetInputEvent), Anim::EventHeader::SET_INPUT); break;
 				default: ASSERT(false); break;
 			}
 			++engine_node->events_count;
@@ -408,6 +408,21 @@ SimpleAnimationNode::SimpleAnimationNode(Anim::Component* engine_cmp, Container*
 }
 
 
+void SimpleAnimationNode::compile()
+{
+	auto* engine_node = (Anim::SimpleAnimationNode*)engine_cmp;
+	Anim::InputDecl& decl = m_controller.getEngineResource()->getInputDecl();
+	if (root_rotation_input >= 0)
+	{
+		engine_node->root_rotation_input_offset = decl.inputs[root_rotation_input].offset;
+	}
+	else
+	{
+		engine_node->root_rotation_input_offset = -1;
+	}
+}
+
+
 void SimpleAnimationNode::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime)
 {
 	if (runtime->source.type != engine_cmp->type) return;
@@ -455,6 +470,24 @@ void SimpleAnimationNode::onGUI()
 		node->animations_hashes.emplace(0);
 	}
 	ImGui::Checkbox("Looped", &node->looped);
+
+	Anim::InputDecl& decl = m_controller.getEngineResource()->getInputDecl();
+	auto input_getter = [](void* data, int idx, const char** out) -> bool {
+		auto& decl = *(Anim::InputDecl*)data;
+		if (idx >= decl.inputs_count)
+		{
+			*out = "No root motion rotation";
+		}
+		else
+		{
+			*out = decl.inputs[idx].name;
+		}
+		return true;
+	};
+	if(ImGui::Combo("Root rotation input", &root_rotation_input, input_getter, &decl, decl.inputs_count + 1))
+	{
+		if (root_rotation_input >= decl.inputs_count) root_rotation_input = -1;
+	}
 }
 
 

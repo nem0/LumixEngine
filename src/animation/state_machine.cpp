@@ -182,6 +182,7 @@ void SimpleAnimationNode::serialize(OutputBlob& blob)
 		blob.write(hash);
 	}
 	blob.write(looped);
+	blob.write(root_rotation_input_offset);
 }
 
 
@@ -197,6 +198,7 @@ void SimpleAnimationNode::deserialize(InputBlob& blob, Container* parent)
 		blob.read(hash);
 	}
 	blob.read(looped);
+	blob.read(root_rotation_input_offset);
 }
 
 
@@ -302,7 +304,13 @@ struct SimpleAnimationNodeInstance : public NodeInstance
 		}
 		else
 		{
-			root_motion = { {0, 0, 0}, {0, 0, 0, 1} };
+			root_motion = {{0, 0, 0}, {0, 0, 0, 1}};
+		}
+		int root_rotation_input_offset = ((SimpleAnimationNode&)source).root_rotation_input_offset;
+		if (root_rotation_input_offset >= 0)
+		{
+			float yaw = *(float*)&rc.input[root_rotation_input_offset];
+			root_motion = { { 0, 0, 0 }, Quat({ 0, 1, 0 }, yaw) };
 		}
 
 		queueEvents(rc, old_time, time, length);

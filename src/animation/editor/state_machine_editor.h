@@ -145,8 +145,11 @@ class SimpleAnimationNode : public Node
 public:
 	SimpleAnimationNode(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 
+	void compile() override;
 	void onGUI() override;
 	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime) override;
+
+	int root_rotation_input = -1;
 };
 
 
