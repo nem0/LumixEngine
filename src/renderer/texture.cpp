@@ -412,9 +412,8 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 	{
 		u8* out = image_dest;
 		u8 byte;
-		union {
-			u32 u32;
-			u8 u8[4];
+		struct Pixel {
+			u8 uint8[4];
 		} pixel;
 		do
 		{
@@ -425,10 +424,10 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 				for (u8 i = 0; i < count; ++i)
 				{
 					file.read(&pixel, bytes_per_pixel);
-					out[0] = pixel.u8[2];
-					out[1] = pixel.u8[1];
-					out[2] = pixel.u8[0];
-					if (bytes_per_pixel == 4) out[3] = pixel.u8[3];
+					out[0] = pixel.uint8[2];
+					out[1] = pixel.uint8[1];
+					out[2] = pixel.uint8[0];
+					if (bytes_per_pixel == 4) out[3] = pixel.uint8[3];
 					else out[3] = 255;
 					out += 4;
 				}
@@ -439,10 +438,10 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 				file.read(&pixel, bytes_per_pixel);
 				for (int i = 0; i < byte; ++i)
 				{
-					out[0] = pixel.u8[2];
-					out[1] = pixel.u8[1];
-					out[2] = pixel.u8[0];
-					if (bytes_per_pixel == 4) out[3] = pixel.u8[3];
+					out[0] = pixel.uint8[2];
+					out[1] = pixel.uint8[1];
+					out[2] = pixel.uint8[0];
+					if (bytes_per_pixel == 4) out[3] = pixel.uint8[3];
 					else out[3] = 255;
 					out += 4;
 				}
