@@ -417,6 +417,23 @@ AnimationNode::AnimationNode(Anim::Component* engine_cmp, Container* parent, Con
 }
 
 
+void AnimationNode::deserialize(Lumix::InputBlob& blob)
+{
+	Node::deserialize(blob);
+	auto& input_decl = m_controller.getEngineResource()->getInputDecl();
+	root_rotation_input = -1;
+	int offset = ((Anim::AnimationNode*)engine_cmp)->root_rotation_input_offset;
+	for (int i = 0; i < input_decl.inputs_count; ++i)
+	{
+		if (input_decl.inputs[i].offset == offset)
+		{
+			root_rotation_input = i;
+			break;
+		}
+	}
+}
+
+
 void AnimationNode::compile()
 {
 	auto* engine_node = (Anim::AnimationNode*)engine_cmp;

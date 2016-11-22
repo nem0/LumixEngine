@@ -149,6 +149,7 @@ public:
 	void compile() override;
 	void onGUI() override;
 	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime) override;
+	void deserialize(Lumix::InputBlob& blob) override;
 
 	int root_rotation_input = -1;
 };
