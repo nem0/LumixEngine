@@ -348,7 +348,7 @@ struct AnimationNodeInstance : public NodeInstance
 		if (root_rotation_input_offset >= 0)
 		{
 			float yaw = *(float*)&rc.input[root_rotation_input_offset];
-			root_motion = { { 0, 0, 0 }, Quat({ 0, 1, 0 }, yaw) };
+			root_motion.rot = Quat({ 0, 1, 0 }, yaw);
 		}
 
 		queueEvents(rc, old_time, time, length);

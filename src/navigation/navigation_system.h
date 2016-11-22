@@ -17,6 +17,7 @@ public:
 	virtual bool navigate(Entity entity, const struct Vec3& dest, float speed) = 0;
 	virtual void setActorActive(Entity entity, bool active) = 0;
 	virtual float getAgentSpeed(Entity entity) = 0;
+	virtual Vec3 getAgentVelocity(Entity entity) = 0;
 	virtual void setAgentRootMotion(Entity, const Vec3& root_motion) = 0;
 	virtual bool generateNavmesh() = 0;
 	virtual bool generateTile(int x, int z, bool keep_data) = 0;

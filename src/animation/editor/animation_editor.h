@@ -38,6 +38,7 @@ private:
 	void constantsGUI();
 	void animSetGUI();
 	void menuGUI();
+	void dropFile(const char* path, const ImVec2& canvas_screen_pos);
 
 private:
 	StudioApp& m_app;

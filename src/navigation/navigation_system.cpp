@@ -379,6 +379,15 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
+	Vec3 getAgentVelocity(Entity entity) override
+	{
+		Agent& agent = m_agents[entity];
+		const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
+		if (!dt_agent) return {0, 0, 0};
+		return *(Vec3*)dt_agent->vel;
+	}
+
+
 	void update(float time_delta, bool paused) override
 	{
 		PROFILE_FUNCTION();
@@ -409,13 +418,6 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			m_universe.setPosition(agent.entity, *(Vec3*)dt_agent->npos);
 			Vec3 velocity = *(Vec3*)dt_agent->vel;
 			float speed = velocity.length();
-			if (dt_agent->ncorners > 0 && speed > 0)
-			{
-				velocity *= 1 / speed;
-				float yaw = atan2(velocity.x, velocity.z);
-				Quat rot(Vec3(0, 1, 0), yaw);
-				m_universe.setRotation(agent.entity, rot);
-			}
 
 			if (dt_agent->ncorners == 0)
 			{

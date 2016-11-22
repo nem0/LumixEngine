@@ -16,6 +16,7 @@
 #include "engine/hash_map.h"
 #include "engine/log.h"
 #include "engine/path.h"
+#include "engine/path_utils.h"
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
@@ -119,7 +120,42 @@ void AnimationEditor::drawGraph()
 	auto canvas_screen_pos = ImGui::GetCursorScreenPos() + m_offset;
 	m_container->drawInside(draw, canvas_screen_pos);
 	if(runtime) m_resource->getRoot()->debugInside(draw, canvas_screen_pos, runtime, m_container);
+
+	if (ImGui::IsWindowHovered() && ImGui::IsMouseReleased(0) && m_app.getDragData().type == StudioApp::DragData::PATH)
+	{
+		dropFile((const char*)m_app.getDragData().data, canvas_screen_pos);
+	}
 	ImGui::EndChild();
+}
+
+
+void AnimationEditor::dropFile(const char* path, const ImVec2& canvas_screen_pos)
+{
+	if (!PathUtils::hasExtension(path, "ani")) return;
+
+	Anim::ControllerResource* ctrl_res = m_resource->getEngineResource();
+	auto& anim_set = ctrl_res->getAnimSet();
+	u32 anim_slot = 0;
+	char name[64];
+	for (auto iter = anim_set.begin(), end = anim_set.end(); iter != end; ++iter)
+	{
+		if (!iter.value()) continue;
+		if (equalStrings(iter.value()->getPath().c_str(), path))
+		{
+			anim_slot = iter.key();
+			copyString(name, m_resource->getAnimationSlot(anim_slot));
+			break;
+		}
+	}
+
+	if (anim_slot == 0)
+	{
+		PathUtils::getBasename(name, lengthOf(name), path);
+		m_resource->createAnimSlot(name, path);
+		anim_slot = crc32(name);
+	}
+
+	m_container->dropSlot(name, anim_slot, canvas_screen_pos);
 }
 
 
@@ -296,7 +332,7 @@ void AnimationEditor::animSetGUI()
 	auto& engine_anim_set = m_resource->getEngineResource()->getAnimSet();
 	auto& slots = m_resource->getAnimationSlots();
 	int i = 0;
-	ImGui::Columns(2);
+	ImGui::Columns(3);
 	for (auto& slot : slots)
 	{
 		ImGui::PushID(i);
@@ -335,6 +371,12 @@ void AnimationEditor::animSetGUI()
 			engine_anim_set[crc32(slot_cstr)] = anim;
 		}
 		ImGui::PopItemWidth();
+		ImGui::NextColumn();
+		if (ImGui::Button("Remove"))
+		{
+			m_resource->getEngineResource()->getAnimSet().erase(crc32(slot.c_str()));
+			slots.eraseItemFast(slot);
+		}
 		ImGui::NextColumn();
 		ImGui::PopID();
 	}
