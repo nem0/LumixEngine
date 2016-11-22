@@ -193,6 +193,15 @@ int setParams(lua_State* L)
 		else if (equalStrings(tmp, "-z")) dlg->m_model.orientation = ImportAssetDialog::Orientation::Z_MINUS_UP;
 	}
 	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "root_orientation") == LUA_TSTRING)
+	{
+		const char* tmp = LuaWrapper::toType<const char*>(L, -1);
+		if (equalStrings(tmp, "+y")) dlg->m_model.root_orientation = ImportAssetDialog::Orientation::Y_UP;
+		else if (equalStrings(tmp, "+z")) dlg->m_model.root_orientation = ImportAssetDialog::Orientation::Z_UP;
+		else if (equalStrings(tmp, "-y")) dlg->m_model.root_orientation = ImportAssetDialog::Orientation::X_MINUS_UP;
+		else if (equalStrings(tmp, "-z")) dlg->m_model.root_orientation = ImportAssetDialog::Orientation::Z_MINUS_UP;
+	}
+	lua_pop(L, 1);
 
 
 	if (lua_getfield(L, 2, "lods") == LUA_TTABLE)
@@ -1357,7 +1366,14 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 					out_pos.x *= scale.x;
 					out_pos.y *= scale.y;
 					out_pos.z *= scale.z;
-					out_pos = fixOrientation(out_pos);
+					if (channel_idx == import_animation.root_motion_bone_idx)
+					{
+						out_pos = fixRootOrientation(out_pos);
+					}
+					else
+					{
+						out_pos = fixOrientation(out_pos);
+					}
 					file.write(&out_pos, sizeof(out_pos));
 				}
 				
@@ -1372,7 +1388,14 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 				for (const auto& rot : rotations)
 				{
 					Quat out_rot(rot.mValue.x, rot.mValue.y, rot.mValue.z, rot.mValue.w);
-					out_rot = fixOrientation(out_rot);
+					if (channel_idx == import_animation.root_motion_bone_idx)
+					{
+						out_rot = fixRootOrientation(out_rot);
+					}
+					else
+					{
+						out_rot = fixOrientation(out_rot);
+					}
 					file.write(&out_rot, sizeof(out_rot));
 				}
 			}
@@ -1656,6 +1679,20 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 	}
 
 
+	Quat fixRootOrientation(const Quat& v) const
+	{
+		switch (m_dialog.m_model.root_orientation)
+		{
+		case ImportAssetDialog::Y_UP: return Quat(v.x, v.y, v.z, v.w);
+		case ImportAssetDialog::Z_UP: return Quat(v.x, v.z, -v.y, v.w);
+		case ImportAssetDialog::Z_MINUS_UP: return Quat(v.x, -v.z, v.y, v.w);
+		case ImportAssetDialog::X_MINUS_UP: return Quat(v.y, -v.x, v.z, v.w);
+		}
+		ASSERT(false);
+		return Quat(v.x, v.y, v.z, v.w);
+	}
+
+
 	aiQuaternion fixOrientation(const aiQuaternion& v) const
 	{
 		switch (m_dialog.m_model.orientation)
@@ -1688,10 +1725,24 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 	{
 		switch (m_dialog.m_model.orientation)
 		{
-			case ImportAssetDialog::Y_UP: return Vec3(v.x, v.y, v.z);
-			case ImportAssetDialog::Z_UP: return Vec3(v.x, v.z, -v.y);
-			case ImportAssetDialog::Z_MINUS_UP: return Vec3(v.x, -v.z, v.y);
-			case ImportAssetDialog::X_MINUS_UP: return Vec3(v.y, -v.x, v.z);
+		case ImportAssetDialog::Y_UP: return Vec3(v.x, v.y, v.z);
+		case ImportAssetDialog::Z_UP: return Vec3(v.x, v.z, -v.y);
+		case ImportAssetDialog::Z_MINUS_UP: return Vec3(v.x, -v.z, v.y);
+		case ImportAssetDialog::X_MINUS_UP: return Vec3(v.y, -v.x, v.z);
+		}
+		ASSERT(false);
+		return Vec3(v.x, v.y, v.z);
+	}
+
+
+	Vec3 fixRootOrientation(const Vec3& v) const
+	{
+		switch (m_dialog.m_model.root_orientation)
+		{
+		case ImportAssetDialog::Y_UP: return Vec3(v.x, v.y, v.z);
+		case ImportAssetDialog::Z_UP: return Vec3(v.x, v.z, -v.y);
+		case ImportAssetDialog::Z_MINUS_UP: return Vec3(v.x, -v.z, v.y);
+		case ImportAssetDialog::X_MINUS_UP: return Vec3(v.y, -v.x, v.z);
 		}
 		ASSERT(false);
 		return Vec3(v.x, v.y, v.z);
@@ -2436,6 +2487,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	m_model.lods[2] = -1000;
 	m_model.lods[3] = -10000;
 	m_model.orientation = Y_UP;
+	m_model.root_orientation = Y_UP;
 	m_model.position_error = 100.0f;
 	m_model.rotation_error = 10.0f;
 	m_model.time_scale = 1.0f;
@@ -3315,6 +3367,7 @@ void ImportAssetDialog::onWindowGUI()
 				ImGui::Checkbox("Remove doubles", &m_model.remove_doubles);
 				ImGui::DragFloat("Scale", &m_model.mesh_scale, 0.01f, 0.001f, 0);
 				ImGui::Combo("Orientation", &(int&)m_model.orientation, "Y up\0Z up\0-Z up\0-X up\0");
+				ImGui::Combo("Root Orientation", &(int&)m_model.orientation, "Y up\0Z up\0-Z up\0-X up\0");
 				ImGui::Checkbox("Make physics convex", &m_model.make_convex);
 			}
 

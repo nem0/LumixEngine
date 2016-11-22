@@ -339,12 +339,14 @@ struct AnimationNodeInstance : public NodeInstance
 				Transform end_anim = resource->getBoneTransform(resource->getLength(), bone_idx);
 				Transform start_anim = resource->getBoneTransform(0, bone_idx);
 				Transform after = resource->getBoneTransform(time, bone_idx);
-				root_motion = (end_anim * before.inverted()) * (after * start_anim.inverted());
+				root_motion.pos = end_anim.pos - before.pos + after.pos - start_anim.pos;
+				root_motion.rot = end_anim.rot * before.rot.conjugated() * (after.rot * start_anim.rot.conjugated());
 			}
 			else
 			{
 				Transform after = resource->getBoneTransform(time, bone_idx);
-				root_motion = after * before.inverted();
+				root_motion.pos = after.pos - before.pos;
+				root_motion.rot = before.rot.conjugated() * after.rot;
 			}
 		}
 		else

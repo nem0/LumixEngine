@@ -157,6 +157,7 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 			bool gen_smooth_normal;
 			bool remove_doubles;
 			Orientation orientation;
+			Orientation root_orientation;
 			bool make_convex;
 			bool all_nodes;
 			float position_error;
