@@ -542,7 +542,6 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 		}
 	}
 
-
 	ImGui::SameLine();
 	ImGui::Text("%s", label);
 	ImGui::PopItemWidth();

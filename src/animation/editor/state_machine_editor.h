@@ -76,7 +76,6 @@ public:
 	void serialize(Lumix::OutputBlob& blob) override;
 	void deserialize(Lumix::InputBlob& blob) override;
 	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override;
-	const char* getName() { return m_name; }
 	void addEdge(Edge* edge) { m_edges.push(edge); }
 	void addInEdge(Edge* edge) { m_in_edges.push(edge); }
 	void removeEdge(Edge* edge) { m_edges.eraseItemFast(edge); }
@@ -86,9 +85,9 @@ public:
 public:
 	ImVec2 pos;
 	ImVec2 size;
+	Lumix::StaticString<64> name;
 
 protected:
-	Lumix::StaticString<64> m_name;
 	Lumix::Array<Edge*> m_edges;
 	Lumix::Array<Edge*> m_in_edges;
 	Lumix::IAllocator& m_allocator;
@@ -107,6 +106,7 @@ public:
 	void serialize(Lumix::OutputBlob& blob) override;
 	void compile() override;
 
+	virtual void dropSlot(const char* name, Lumix::u32 slot, const ImVec2& canvas_screen_pos) {}
 	virtual void removeChild(Component* component);
 	bool isContainer() const override { return true; }
 	
@@ -179,6 +179,7 @@ public:
 	EntryNode* getEntryNode() const { return m_entry_node; }
 	void compile() override;
 	void removeChild(Component* component) override;
+	void dropSlot(const char* name, Lumix::u32 slot, const ImVec2& canvas_screen_pos) override;
 
 private:
 	void createState(Lumix::Anim::Component::Type type, const ImVec2& pos);
@@ -213,6 +214,8 @@ public:
 	Lumix::Anim::ControllerResource* getEngineResource() { return m_engine_resource; }
 	AnimationEditor& getEditor() { return m_editor; }
 	int createUID() { ++m_last_uid; return m_last_uid; }
+	const char* getAnimationSlot(Lumix::u32 slot_hash) const;
+	void createAnimSlot(const char* name, const char* path);
 
 private:
 	int m_last_uid = 0;

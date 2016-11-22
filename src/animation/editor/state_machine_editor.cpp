@@ -16,6 +16,7 @@ using namespace Lumix;
 
 
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
+static const ResourceType ANIMATION_TYPE("animation");
 
 
 static ImVec2 operator+(const ImVec2& a, const ImVec2& b)
@@ -83,8 +84,8 @@ Node::Node(Anim::Component* engine_cmp, Container* parent, ControllerResource& c
 	, m_edges(controller.getAllocator())
 	, m_in_edges(controller.getAllocator())
 	, m_allocator(controller.getAllocator())
+	, name("")
 {
-	m_name = "";
 }
 
 
@@ -129,7 +130,7 @@ void Node::removeEvent(int index)
 
 void Node::onGUI()
 {
-	ImGui::InputText("Name", m_name.data, lengthOf(m_name.data));
+	ImGui::InputText("Name", name.data, lengthOf(name.data));
 	if (engine_cmp && ImGui::CollapsingHeader("Events"))
 	{
 		auto* engine_node = ((Anim::Node*)engine_cmp);
@@ -211,7 +212,7 @@ void Node::serialize(OutputBlob& blob)
 {
 	blob.write(pos);
 	blob.write(size);
-	blob.write(m_name);
+	blob.write(name);
 }
 
 
@@ -219,7 +220,7 @@ void Node::deserialize(InputBlob& blob)
 {
 	blob.read(pos);
 	blob.read(size);
-	blob.read(m_name);
+	blob.read(name);
 }
 
 
@@ -251,7 +252,7 @@ static ImVec2 drawNode(ImDrawList* draw, const char* label, const ImVec2 pos, bo
 bool Node::draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected)
 {
 	ImGui::PushID(engine_cmp);
-	size = drawNode(draw, m_name, canvas_screen_pos + pos, selected);
+	size = drawNode(draw, name, canvas_screen_pos + pos, selected);
 	ImGui::PopID();
 	return ImGui::IsItemActive();
 }
@@ -581,7 +582,7 @@ EntryNode::EntryNode(Container* parent, ControllerResource& controller)
 	: Node(nullptr, parent, controller)
 	, entries(controller.getAllocator())
 {
-	m_name = "Entry";
+	name = "Entry";
 }
 
 
@@ -889,6 +890,16 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 }
 
 
+void StateMachine::dropSlot(const char* name, u32 slot, const ImVec2& canvas_screen_pos)
+{
+	createState(Anim::Component::SIMPLE_ANIMATION, ImGui::GetMousePos() - canvas_screen_pos);
+	auto* node = (AnimationNode*)m_selected_component;
+	node->name = name;
+	auto* engine_node = (Anim::AnimationNode*)node->engine_cmp;
+	engine_node->animations_hashes.emplace(slot);
+}
+
+
 ControllerResource::ControllerResource(AnimationEditor& editor, ResourceManagerBase& manager, IAllocator& allocator)
 	: m_animation_slots(allocator)
 	, m_allocator(allocator)
@@ -948,6 +959,25 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 		slot = tmp;
 	}
 	return true;
+}
+
+
+const char* ControllerResource::getAnimationSlot(Lumix::u32 slot_hash) const
+{
+	for (auto& slot : m_animation_slots)
+	{
+		if (crc32(slot.c_str()) == slot_hash) return slot.c_str();
+	}
+	return "";
+}
+
+
+void ControllerResource::createAnimSlot(const char* name, const char* path)
+{
+	m_animation_slots.emplace(m_allocator) = name;
+	auto* manager = m_engine_resource->getResourceManager().getOwner().get(ANIMATION_TYPE);
+	auto* anim = (Animation*)manager->load(Path(path));
+	m_engine_resource->getAnimSet().insert(crc32(name), anim);
 }
 
 
