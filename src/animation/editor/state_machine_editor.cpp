@@ -44,19 +44,26 @@ namespace AnimEditor
 {
 
 
-static ImVec2 getEdgeStartPoint(Node* a, Node* b, bool is_dir)
+static ImVec2 getEdgeStartPoint(const ImVec2 a_pos, const ImVec2 a_size, const ImVec2 b_pos, const ImVec2 b_size, bool is_dir)
 {
-	ImVec2 center_a = a->pos + a->size * 0.5f;
-	ImVec2 center_b = b->pos + b->size * 0.5f;
+	ImVec2 center_a = a_pos + a_size * 0.5f;
+	ImVec2 center_b = b_pos + b_size * 0.5f;
 	ImVec2 dir = center_b - center_a;
-	if (fabs(dir.x / dir.y) > fabs(a->size.x / a->size.y))
+	if (fabs(dir.x / dir.y) > fabs(a_size.x / a_size.y))
 	{
 		dir = dir * fabs(1 / dir.x);
-		return center_a + dir * a->size.x * 0.5f + ImVec2(0, center_a.y > center_b.y == is_dir ? 5.0f : -5.0f);
+		return center_a + dir * a_size.x * 0.5f + ImVec2(0, center_a.y > center_b.y == is_dir ? 5.0f : -5.0f);
 	}
 
 	dir = dir * fabs(1 / dir.y);
-	return center_a + dir * a->size.y * 0.5f + ImVec2(center_a.x > center_b.x == is_dir ? 5.0f : -5.0f, 0);
+	return center_a + dir * a_size.y * 0.5f + ImVec2(center_a.x > center_b.x == is_dir ? 5.0f : -5.0f, 0);
+}
+
+
+
+static ImVec2 getEdgeStartPoint(Node* a, Node* b, bool is_dir)
+{
+	return getEdgeStartPoint(a->pos, a->size, b->pos, b->size, is_dir);
 }
 
 
@@ -70,12 +77,12 @@ Component::~Component()
 
 
 Node::Node(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
-	: Component(parent, engine_cmp, controller)
+	: Component(engine_cmp, parent, controller)
 	, m_edges(controller.getAllocator())
 	, m_in_edges(controller.getAllocator())
 	, m_allocator(controller.getAllocator())
 {
-	m_name[0] = 0;
+	m_name = "";
 }
 
 
@@ -120,17 +127,8 @@ void Node::removeEvent(int index)
 
 void Node::onGUI()
 {
-	if (getParent()->engine_cmp->type == Anim::Component::STATE_MACHINE)
-	{
-		auto* engine_sm = (Anim::StateMachine*)getParent()->engine_cmp;
-		bool is_default = engine_sm->default_state == engine_cmp;
-		if (!is_default && ImGui::Button("Make default"))
-		{
-			engine_sm->default_state = (Anim::Node*)engine_cmp;
-		}
-	}
-	ImGui::InputText("Name", m_name, lengthOf(m_name));
-	if (ImGui::CollapsingHeader("Events"))
+	ImGui::InputText("Name", m_name.data, lengthOf(m_name.data));
+	if (engine_cmp && ImGui::CollapsingHeader("Events"))
 	{
 		auto* engine_node = ((Anim::Node*)engine_cmp);
 		auto& events = engine_node->events;
@@ -223,14 +221,13 @@ void Node::deserialize(InputBlob& blob)
 }
 
 
-bool Node::draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected)
+static ImVec2 drawNode(ImDrawList* draw, const char* label, const ImVec2 pos, bool selected)
 {
-
-	ImGui::PushID(engine_cmp);
-	float text_width = ImGui::CalcTextSize(m_name).x;
+	float text_width = ImGui::CalcTextSize(label).x;
+	ImVec2 size;
 	size.x = Math::maximum(50.0f, text_width + ImGui::GetStyle().FramePadding.x * 2);
 	size.y = ImGui::GetTextLineHeightWithSpacing() * 2;
-	ImVec2 from = canvas_screen_pos + pos;
+	ImVec2 from = pos;
 	ImVec2 to = from + size;
 	ImU32 color = ImGui::ColorConvertFloat4ToU32(
 		selected ? ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] : ImGui::GetStyle().Colors[ImGuiCol_Button]);
@@ -240,10 +237,19 @@ bool Node::draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected
 	draw->AddRect(from, to, ImGui::GetColorU32(ImGuiCol_Border), 5);
 
 	ImGui::SetCursorScreenPos(from + ImVec2((size.x - text_width) * 0.5f, size.y * 0.25f));
-	ImGui::Text("%s", m_name);
+	ImGui::Text("%s", label);
 
 	ImGui::SetCursorScreenPos(from);
 	ImGui::InvisibleButton("bg", size);
+	return size;
+
+}
+
+
+bool Node::draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected)
+{
+	ImGui::PushID(engine_cmp);
+	size = drawNode(draw, m_name, canvas_screen_pos + pos, selected);
 	ImGui::PopID();
 	return ImGui::IsItemActive();
 }
@@ -289,14 +295,14 @@ Component* Container::getChildByUID(int uid)
 {
 	for (auto* i : m_editor_cmps)
 	{
-		if (i->engine_cmp->uid == uid) return i;
+		if (i->engine_cmp && i->engine_cmp->uid == uid) return i;
 	}
 	return nullptr;
 }
 
 
 Edge::Edge(Anim::Edge* engine_cmp, Container* parent, ControllerResource& controller)
-	: Component(parent, engine_cmp, controller)
+	: Component(engine_cmp, parent, controller)
 {
 	m_from = (Node*)parent->getChildByUID(engine_cmp->from->uid);
 	m_to = (Node*)parent->getChildByUID(engine_cmp->to->uid);
@@ -491,9 +497,97 @@ void SimpleAnimationNode::onGUI()
 }
 
 
+struct EntryEdge : public Component
+{
+	EntryEdge(StateMachine* parent, Node* to, ControllerResource& controller)
+		: Component(nullptr, parent, controller)
+		, m_parent(parent)
+		, m_to(to)
+	{
+		parent->getEntryNode()->entries.push(this);
+		expression = "";
+	}
+
+
+	~EntryEdge()
+	{
+		m_parent->removeChild(this);
+	}
+
+	void serialize(Lumix::OutputBlob& blob) override {}
+	void deserialize(Lumix::InputBlob& blob) override {}
+	bool hitTest(const ImVec2& on_canvas_pos) const
+	{
+		ImVec2 a = getEdgeStartPoint(m_parent->getEntryNode(), m_to, true);
+		ImVec2 b = getEdgeStartPoint(m_to, m_parent->getEntryNode(), false);
+
+		ImVec2 dif = a - b;
+		float len_squared = dif.x * dif.x + dif.y * dif.y;
+		float t = Math::clamp(dot(on_canvas_pos - a, b - a) / len_squared, 0.0f, 1.0f);
+		const ImVec2 projection = a + (b - a) * t;
+		ImVec2 dist_vec = on_canvas_pos - projection;
+
+		return dot(dist_vec, dist_vec) < 100;
+	}
+
+
+	void compile() override
+	{
+		// TODO
+	}
+
+
+	void onGUI() override
+	{
+		ImGui::InputText("Condition", expression.data, lengthOf(expression.data));
+	}
+
+
+	bool isNode() const override { return false; }
+
+
+	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override
+	{
+		u32 color = ImGui::ColorConvertFloat4ToU32(
+			selected ? ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] : ImGui::GetStyle().Colors[ImGuiCol_Button]);
+		ImVec2 from = getEdgeStartPoint(m_parent->getEntryNode(), m_to, true) + canvas_screen_pos;
+		ImVec2 to = getEdgeStartPoint(m_to, m_parent->getEntryNode(), false) + canvas_screen_pos;
+		draw->AddLine(from, to, color);
+		ImVec2 dir = to - from;
+		dir = dir * (1 / sqrt(dot(dir, dir))) * 5;
+		ImVec2 right(dir.y, -dir.x);
+		draw->AddLine(to, to - dir + right, color);
+		draw->AddLine(to, to - dir - right, color);
+		if (ImGui::IsMouseClicked(0) && hitTest(ImGui::GetMousePos() - canvas_screen_pos))
+		{
+			return true;
+		}
+		return false;
+	}
+
+	Node* getTo() const { return m_to; }
+
+	StaticString<128> expression;
+
+private:
+	StateMachine* m_parent;
+	Node* m_to;
+};
+
+
+EntryNode::EntryNode(Container* parent, ControllerResource& controller)
+	: Node(nullptr, parent, controller)
+	, entries(controller.getAllocator())
+{
+	m_name = "Entry";
+}
+
+
 StateMachine::StateMachine(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
 	: Container(engine_cmp, parent, controller)
 {
+	m_entry_node = LUMIX_NEW(controller.getAllocator(), EntryNode)(this, controller);
+	m_editor_cmps.push(m_entry_node);
 }
 
 
@@ -503,6 +597,19 @@ void StateMachine::onGUI()
 	if (ImGui::Button("Show Children"))
 	{
 		m_controller.getEditor().setContainer(this);
+	}
+}
+
+
+void StateMachine::compile()
+{
+	Container::compile();
+	int i = 0;
+	for (auto* entry : m_entry_node->entries)
+	{
+		auto* sm = (Anim::StateMachine*)engine_cmp;
+		sm->entries[i].condition.compile(entry->expression, m_controller.getEngineResource()->getInputDecl());
+		++i;
 	}
 }
 
@@ -524,17 +631,19 @@ static Component* createComponent(Anim::Component* engine_cmp, Container* parent
 void Container::deserialize(InputBlob& blob)
 {
 	Node::deserialize(blob);
-	ASSERT(m_editor_cmps.empty());
 	int size;
 	blob.read(size);
 	for (int i = 0; i < size; ++i)
 	{
 		int uid;
 		blob.read(uid);
-		auto* engine_sm = (Anim::StateMachine*)engine_cmp;
-		Component* cmp = createComponent(engine_sm->getChildByUID(uid), this, m_controller);
-		cmp->deserialize(blob);
-		m_editor_cmps.push(cmp);
+		if (uid >= 0)
+		{
+			auto* engine_sm = (Anim::StateMachine*)engine_cmp;
+			Component* cmp = createComponent(engine_sm->getChildByUID(uid), this, m_controller);
+			cmp->deserialize(blob);
+			m_editor_cmps.push(cmp);
+		}
 	}
 }
 
@@ -555,8 +664,8 @@ void Container::serialize(OutputBlob& blob)
 	blob.write(m_editor_cmps.size());
 	for (auto* cmp : m_editor_cmps)
 	{
-		blob.write(cmp->engine_cmp->uid);
-		cmp->serialize(blob);
+		blob.write(cmp->engine_cmp ? cmp->engine_cmp->uid : -1);
+		if(cmp->engine_cmp) cmp->serialize(blob);
 	}
 }
 
@@ -571,6 +680,37 @@ void StateMachine::createState(Anim::Component::Type type, const ImVec2& pos)
 	m_editor_cmps.push(cmp);
 	((Anim::StateMachine*)engine_cmp)->children.push(cmp->engine_cmp);
 	m_selected_component = cmp;
+}
+
+
+void StateMachine::deserialize(Lumix::InputBlob& blob)
+{
+	Container::deserialize(blob);
+	m_entry_node->deserialize(blob);
+	int count;
+	blob.read(count);
+	for (int i = 0; i < count; ++i)
+	{
+		int uid;
+		blob.read(uid);
+		Node* node = (Node*)getChildByUID(uid);
+		auto* edge = LUMIX_NEW(m_allocator, EntryEdge)(this, node, m_controller);
+		m_editor_cmps.push(edge);
+		blob.read(edge->expression);
+	}
+}
+
+
+void StateMachine::serialize(Lumix::OutputBlob& blob)
+{
+	Container::serialize(blob);
+	m_entry_node->serialize(blob);
+	blob.write(m_entry_node->entries.size());
+	for (EntryEdge* edge : m_entry_node->entries)
+	{
+		blob.write(edge->getTo()->engine_cmp->uid);
+		blob.write(edge->expression);
+	}
 }
 
 
@@ -604,6 +744,18 @@ void StateMachine::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumi
 }
 
 
+EntryEdge* StateMachine::createEntryEdge(Node* node)
+{
+	auto* edge = LUMIX_NEW(m_allocator, EntryEdge)(this, node, m_controller);
+	m_editor_cmps.push(edge);
+
+	auto* engine_sm = (Anim::StateMachine*)engine_cmp;
+	auto& entry = engine_sm->entries.emplace(engine_sm->allocator);
+	entry.node = (Anim::Node*)node->engine_cmp;
+	return edge;
+}
+
+
 void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 {
 	if (ImGui::IsWindowHovered())
@@ -615,6 +767,7 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 			ImGui::OpenPopup("context_menu");
 		}
 	}
+
 	for (int i = 0; i < m_editor_cmps.size(); ++i)
 	{
 		Component* cmp = m_editor_cmps[i];
@@ -650,16 +803,27 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 			{
 				if (hit_cmp != m_drag_source && hit_cmp->isNode())
 				{
-					auto* engine_parent = ((Anim::Container*)engine_cmp);
-					auto* engine_edge = LUMIX_NEW(m_allocator, Anim::Edge)(m_allocator);
-					engine_edge->uid = m_controller.createUID();
-					engine_edge->from = (Anim::Node*)m_drag_source->engine_cmp;
-					engine_edge->to = (Anim::Node*)hit_cmp->engine_cmp;
-					engine_parent->children.push(engine_edge);
+					if (hit_cmp == m_entry_node)
+					{
+						createEntryEdge(m_drag_source);
+					}
+					else if (m_drag_source == m_entry_node)
+					{
+						createEntryEdge((Node*)hit_cmp);
+					}
+					else
+					{
+						auto* engine_parent = ((Anim::Container*)engine_cmp);
+						auto* engine_edge = LUMIX_NEW(m_allocator, Anim::Edge)(m_allocator);
+						engine_edge->uid = m_controller.createUID();
+						engine_edge->from = (Anim::Node*)m_drag_source->engine_cmp;
+						engine_edge->to = (Anim::Node*)hit_cmp->engine_cmp;
+						engine_parent->children.push(engine_edge);
 
-					auto* edge = LUMIX_NEW(m_allocator, Edge)(engine_edge, this, m_controller);
-					m_editor_cmps.push(edge);
-					m_selected_component = edge;
+						auto* edge = LUMIX_NEW(m_allocator, Edge)(engine_edge, this, m_controller);
+						m_editor_cmps.push(edge);
+						m_selected_component = edge;
+					}
 				}
 			}
 			else
@@ -693,7 +857,7 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 			if (ImGui::MenuItem("State machine")) createState(Anim::Component::STATE_MACHINE, pos_on_canvas);
 			ImGui::EndMenu();
 		}
-		if (m_context_cmp)
+		if (m_context_cmp && m_context_cmp != m_entry_node)
 		{
 			if (ImGui::MenuItem("Remove"))
 			{

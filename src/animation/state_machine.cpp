@@ -371,10 +371,15 @@ void StateMachineInstance::fillPose(Engine& engine, Pose& pose, Model& model, fl
 
 void StateMachineInstance::enter(RunningContext& rc, ComponentInstance* from)
 {
-	if (source.default_state)
+	auto& source_sm = (StateMachine&)source;
+	for (auto& entry : source_sm.entries)
 	{
-		current = source.default_state->createInstance(*rc.allocator);
-		current->enter(rc, nullptr);
+		if (entry.condition(rc))
+		{
+			current = entry.node->createInstance(*rc.allocator);
+			current->enter(rc, nullptr);
+			return;
+		}
 	}
 }
 
@@ -388,16 +393,39 @@ ComponentInstance* StateMachine::createInstance(IAllocator& allocator)
 void StateMachine::serialize(OutputBlob& blob)
 {
 	Container::serialize(blob);
-	blob.write(default_state ? default_state->uid : -1);
+	blob.write(entries.size());
+	for (Entry& entry : entries)
+	{
+		blob.write(entry.node ? entry.node->uid : -1);
+		blob.write(entry.condition.bytecode.size());
+		if (!entry.condition.bytecode.empty())
+		{
+			blob.write(&entry.condition.bytecode[0], entry.condition.bytecode.size());
+		}
+	}
 }
 
 
 void StateMachine::deserialize(InputBlob& blob, Container* parent)
 {
 	Container::deserialize(blob, parent);
-	int uid;
-	blob.read(uid);
-	default_state = (Node*)getChildByUID(uid);
+	int count;
+	blob.read(count);
+	entries.reserve(count);
+	for (int i = 0; i < count; ++i)
+	{
+		int uid;
+		blob.read(uid);
+		Entry& entry = entries.emplace(allocator);
+		entry.node = uid < 0 ? nullptr : (Node*)getChildByUID(uid);
+		int size;
+		blob.read(size);
+		entry.condition.bytecode.resize(size);
+		if (size > 0)
+		{
+			blob.read(&entry.condition.bytecode[0], size);
+		}
+	}
 }
 
 
