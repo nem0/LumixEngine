@@ -89,6 +89,11 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 						ImGui::Checkbox("Draw path", &debug_draw_path);
 						if (debug_draw_path) scene->debugDrawPath(selected_entities[0]);
 						ImGui::LabelText("Desired speed", "%f", agent->desiredSpeed);
+						ImGui::LabelText("Corners", "%d", agent->ncorners);
+						static const char* STATES[] = { "Invalid", "Walking", "Offmesh" };
+						if (agent->state < lengthOf(STATES)) ImGui::LabelText("State", "%s", STATES[agent->state]);
+						static const char* TARGET_STATES[] = { "None", "Failed", "Valid", "Requesting", "Waiting for queue", "Waiting for path", "Velocity" };
+						if (agent->targetState < lengthOf(TARGET_STATES)) ImGui::LabelText("Target state", "%s", TARGET_STATES[agent->targetState]);
 						ImGui::Separator();
 					}
 				}
