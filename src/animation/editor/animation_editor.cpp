@@ -180,8 +180,17 @@ void AnimationEditor::load()
 	data.resize((int)file.size());
 	file.read(&data[0], data.size());
 	InputBlob blob(&data[0], data.size());
-	m_resource->deserialize(blob, m_app.getWorldEditor()->getEngine(), allocator);
-	m_container = (Container*)m_resource->getRoot();
+	if (m_resource->deserialize(blob, m_app.getWorldEditor()->getEngine(), allocator))
+	{
+		m_container = (Container*)m_resource->getRoot();
+	}
+	else
+	{
+		LUMIX_DELETE(allocator, m_resource);
+		auto* manager = m_app.getWorldEditor()->getEngine().getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
+		m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
+		m_container = (Container*)m_resource->getRoot();
+	}
 	file.close();
 }
 
@@ -193,12 +202,23 @@ void AnimationEditor::loadFromFile()
 }
 
 
+void AnimationEditor::newController()
+{
+	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	LUMIX_DELETE(allocator, m_resource);
+	auto* manager = m_app.getWorldEditor()->getEngine().getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
+	m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
+	m_container = (Container*)m_resource->getRoot();
+}
+
+
 void AnimationEditor::menuGUI()
 {
 	if (ImGui::BeginMenuBar())
 	{
 		if (ImGui::BeginMenu("File"))
 		{
+			if (ImGui::MenuItem("New")) newController();
 			if (ImGui::MenuItem("Save")) save();
 			if (ImGui::MenuItem("Save As")) saveAs();
 			if (ImGui::MenuItem("Open")) loadFromFile();

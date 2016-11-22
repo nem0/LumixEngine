@@ -205,6 +205,7 @@ void AnimationNode::serialize(OutputBlob& blob)
 		blob.write(hash);
 	}
 	blob.write(looped);
+	blob.write(new_on_loop);
 	blob.write(root_rotation_input_offset);
 }
 
@@ -221,6 +222,7 @@ void AnimationNode::deserialize(InputBlob& blob, Container* parent)
 		blob.read(hash);
 	}
 	blob.read(looped);
+	blob.read(new_on_loop);
 	blob.read(root_rotation_input_offset);
 }
 
@@ -318,9 +320,14 @@ struct AnimationNodeInstance : public NodeInstance
 		float old_time = time;
 		time += rc.time_delta;
 		float length = resource->getLength();
-		if (node.looped)
+		if (node.looped && time > length)
 		{
 			time = fmod(time, length);
+			if (node.new_on_loop && !node.animations_hashes.empty())
+			{
+				int idx = Math::rand() % node.animations_hashes.size();
+				resource = (*rc.anim_set)[node.animations_hashes[idx]];
+			}
 		}
 
 		int bone_idx = resource->getRootMotionBoneIdx();

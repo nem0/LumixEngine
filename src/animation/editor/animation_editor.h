@@ -27,6 +27,7 @@ public:
 	void onWindowGUI() override;
 
 private:
+	void newController();
 	void save();
 	void saveAs();
 	void drawGraph();

@@ -129,6 +129,7 @@ struct AnimationNode : public Node
 
 	Array<u32> animations_hashes;
 	bool looped = true;
+	bool new_on_loop = true;
 	int root_rotation_input_offset = -1;
 };
 
