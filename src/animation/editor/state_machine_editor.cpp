@@ -496,6 +496,7 @@ void AnimationNode::onGUI()
 		node->animations_hashes.emplace(0);
 	}
 	ImGui::Checkbox("Looped", &node->looped);
+	ImGui::Checkbox("New selection on loop", &node->new_on_loop);
 
 	Anim::InputDecl& decl = m_controller.getEngineResource()->getInputDecl();
 	auto input_getter = [](void* data, int idx, const char** out) -> bool {
@@ -956,6 +957,7 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 {
 	LUMIX_DELETE(m_allocator, m_engine_resource);
 	LUMIX_DELETE(m_allocator, m_root);
+	m_root = nullptr;
 	auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
 	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), *manager, allocator);
 	m_engine_resource->create();

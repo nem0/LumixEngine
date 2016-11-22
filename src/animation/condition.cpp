@@ -510,7 +510,7 @@ static const struct
 		Types::BOOL,
 		Instruction::NOT,
 		{Types::BOOL, Types::NONE},
-		1}
+		3}
 };
 
 
