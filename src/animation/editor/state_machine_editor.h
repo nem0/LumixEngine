@@ -107,7 +107,7 @@ public:
 	void serialize(Lumix::OutputBlob& blob) override;
 	void compile() override;
 
-	void removeChild(Component* component);
+	virtual void removeChild(Component* component);
 	bool isContainer() const override { return true; }
 	
 protected:
@@ -141,10 +141,10 @@ private:
 };
 
 
-class SimpleAnimationNode : public Node
+class AnimationNode : public Node
 {
 public:
-	SimpleAnimationNode(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
+	AnimationNode(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 
 	void compile() override;
 	void onGUI() override;
@@ -178,6 +178,7 @@ public:
 	void serialize(Lumix::OutputBlob& blob) override;
 	EntryNode* getEntryNode() const { return m_entry_node; }
 	void compile() override;
+	void removeChild(Component* component) override;
 
 private:
 	void createState(Lumix::Anim::Component::Type type, const ImVec2& pos);

@@ -1,5 +1,7 @@
 #include "state_machine.h"
 #include "animation/animation.h"
+#include "animation/events.h"
+#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/resource.h"
@@ -16,6 +18,18 @@ namespace Lumix
 
 namespace Anim
 {
+
+
+void Component::serialize(OutputBlob& blob)
+{
+	blob.write(uid);
+}
+
+
+void Component::deserialize(InputBlob& blob, Container* parent)
+{
+	blob.read(uid);
+}
 
 
 struct EdgeInstance : public ComponentInstance
@@ -140,6 +154,15 @@ Node::~Node()
 }
 
 
+Node::Node(Component::Type type, IAllocator& _allocator)
+	: Component(type)
+	, out_edges(_allocator)
+	, allocator(_allocator)
+	, events(allocator)
+{
+}
+
+
 void Node::serialize(OutputBlob& blob)
 {
 	Component::serialize(blob);
@@ -166,14 +189,14 @@ void Node::deserialize(InputBlob& blob, Container* parent)
 }
 
 
-SimpleAnimationNode::SimpleAnimationNode(IAllocator& allocator)
+AnimationNode::AnimationNode(IAllocator& allocator)
 	: Node(Component::SIMPLE_ANIMATION, allocator)
 	, animations_hashes(allocator)
 {
 }
 
 
-void SimpleAnimationNode::serialize(OutputBlob& blob)
+void AnimationNode::serialize(OutputBlob& blob)
 {
 	Node::serialize(blob);
 	blob.write(animations_hashes.size());
@@ -186,7 +209,7 @@ void SimpleAnimationNode::serialize(OutputBlob& blob)
 }
 
 
-void SimpleAnimationNode::deserialize(InputBlob& blob, Container* parent)
+void AnimationNode::deserialize(InputBlob& blob, Container* parent)
 {
 	Node::deserialize(blob, parent);
 
@@ -200,7 +223,6 @@ void SimpleAnimationNode::deserialize(InputBlob& blob, Container* parent)
 	blob.read(looped);
 	blob.read(root_rotation_input_offset);
 }
-
 
 
 void NodeInstance::queueEvents(RunningContext& rc, float old_time, float time, float length)
@@ -243,9 +265,25 @@ void NodeInstance::queueEvents(RunningContext& rc, float old_time, float time, f
 }
 
 
-struct SimpleAnimationNodeInstance : public NodeInstance
+ComponentInstance* NodeInstance::checkOutEdges(Node& node, RunningContext& rc)
 {
-	SimpleAnimationNodeInstance(SimpleAnimationNode& _node)
+	rc.current = this;
+	for (auto* edge : node.out_edges)
+	{
+		if (edge->condition(rc))
+		{
+			ComponentInstance* new_item = edge->createInstance(*rc.allocator);
+			new_item->enter(rc, this);
+			return new_item;
+		}
+	}
+	return this;
+}
+
+
+struct AnimationNodeInstance : public NodeInstance
+{
+	AnimationNodeInstance(AnimationNode& _node)
 		: NodeInstance(_node)
 		, node(_node)
 		, resource(nullptr)
@@ -306,7 +344,7 @@ struct SimpleAnimationNodeInstance : public NodeInstance
 		{
 			root_motion = {{0, 0, 0}, {0, 0, 0, 1}};
 		}
-		int root_rotation_input_offset = ((SimpleAnimationNode&)source).root_rotation_input_offset;
+		int root_rotation_input_offset = ((AnimationNode&)source).root_rotation_input_offset;
 		if (root_rotation_input_offset >= 0)
 		{
 			float yaw = *(float*)&rc.input[root_rotation_input_offset];
@@ -329,15 +367,15 @@ struct SimpleAnimationNodeInstance : public NodeInstance
 
 
 	Animation* resource;
-	SimpleAnimationNode& node;
+	AnimationNode& node;
 	Transform root_motion;
 	float time;
 };
 
 
-ComponentInstance* SimpleAnimationNode::createInstance(IAllocator& allocator)
+ComponentInstance* AnimationNode::createInstance(IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, SimpleAnimationNodeInstance)(*this);
+	return LUMIX_NEW(allocator, AnimationNodeInstance)(*this);
 }
 
 
@@ -353,6 +391,12 @@ StateMachineInstance::StateMachineInstance(StateMachine& _source, IAllocator& _a
 StateMachineInstance::~StateMachineInstance()
 {
 	LUMIX_DELETE(allocator, current);
+}
+
+
+Transform StateMachineInstance::getRootMotion() const
+{
+	return current ? current->getRootMotion() : Transform({ 0, 0, 0 }, { 0, 0, 0, 1 });
 }
 
 
@@ -387,6 +431,13 @@ void StateMachineInstance::enter(RunningContext& rc, ComponentInstance* from)
 ComponentInstance* StateMachine::createInstance(IAllocator& allocator)
 {
 	return LUMIX_NEW(allocator, StateMachineInstance)(*this, allocator);
+}
+
+
+StateMachine::StateMachine(IAllocator& _allocator)
+	: Container(Component::STATE_MACHINE, _allocator)
+	, entries(_allocator)
+{
 }
 
 
@@ -429,6 +480,14 @@ void StateMachine::deserialize(InputBlob& blob, Container* parent)
 }
 
 
+Container::Container(Component::Type type, IAllocator& _allocator)
+	: Node(type, _allocator)
+	, children(_allocator)
+	, allocator(_allocator)
+{
+}
+
+
 Container::~Container()
 {
 	while (!children.empty())
@@ -436,6 +495,16 @@ Container::~Container()
 		LUMIX_DELETE(allocator, children.back());
 		children.pop();
 	}
+}
+
+
+Component* Container::getChildByUID(int uid)
+{
+	for (auto* child : children)
+	{
+		if (child->uid == uid) return child;
+	}
+	return nullptr;
 }
 
 
@@ -473,7 +542,7 @@ Component* createComponent(Component::Type type, IAllocator& allocator)
 	{
 		case Component::EDGE: return LUMIX_NEW(allocator, Edge)(allocator);
 		case Component::STATE_MACHINE: return LUMIX_NEW(allocator, StateMachine)(allocator);
-		case Component::SIMPLE_ANIMATION: return LUMIX_NEW(allocator, SimpleAnimationNode)(allocator);
+		case Component::SIMPLE_ANIMATION: return LUMIX_NEW(allocator, AnimationNode)(allocator);
 		default: ASSERT(false); return nullptr;
 	}
 }
