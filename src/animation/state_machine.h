@@ -212,7 +212,10 @@ struct StateMachineInstance : public NodeInstance
 	void enter(RunningContext& rc, ComponentInstance* from) override;
 	float getTime() const override { return current ? current->getTime() : 0; }
 	float getLength() const override { return current ? current->getLength() : 0; }
-	Transform getRootMotion() const override { return current->getRootMotion(); }
+	Transform getRootMotion() const override 
+	{
+		return current ? current->getRootMotion() : Transform({0, 0, 0}, {0, 0, 0, 1});
+	}
 
 	StateMachine& source;
 	ComponentInstance* current;
@@ -224,7 +227,7 @@ struct StateMachine : public Container
 {
 	StateMachine(IAllocator& _allocator)
 		: Container(Component::STATE_MACHINE, _allocator)
-		, default_state(nullptr)
+		, entries(_allocator)
 	{
 	}
 
@@ -232,7 +235,14 @@ struct StateMachine : public Container
 	void serialize(OutputBlob& blob) override;
 	void deserialize(InputBlob& blob, Container* parent) override;
 
-	Node* default_state;
+	struct Entry
+	{
+		Entry(IAllocator& allocator) : condition(allocator) {}
+
+		Condition condition;
+		Node* node = nullptr;
+	};
+	Lumix::Array<Entry> entries;
 };
 
 

@@ -19,6 +19,7 @@ namespace Anim
 enum class Version : int
 {
 	EVENTS,
+	ENTRY,
 
 	LAST
 };

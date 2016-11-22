@@ -24,12 +24,13 @@ class AnimationEditor;
 class Container;
 class ControllerResource;
 class Edge;
+struct EntryNode;
 
 
 class Component
 {
 public:
-	Component(Container* parent, Lumix::Anim::Component* _engine_cmp, ControllerResource& controller)
+	Component(Lumix::Anim::Component* _engine_cmp, Container* parent, ControllerResource& controller)
 		: engine_cmp(_engine_cmp)
 		, m_parent(parent)
 		, m_controller(controller)
@@ -87,7 +88,7 @@ public:
 	ImVec2 size;
 
 protected:
-	char m_name[64];
+	Lumix::StaticString<64> m_name;
 	Lumix::Array<Edge*> m_edges;
 	Lumix::Array<Edge*> m_in_edges;
 	Lumix::IAllocator& m_allocator;
@@ -153,6 +154,14 @@ public:
 };
 
 
+struct EntryNode : public Node
+{
+	EntryNode(Container* parent, ControllerResource& controller);
+
+	Lumix::Array<struct EntryEdge*> entries;
+};
+
+
 class StateMachine : public Container
 {
 public:
@@ -165,9 +174,14 @@ public:
 		Lumix::Anim::ComponentInstance* runtime,
 		Container* current) override;
 	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime) override;
+	void deserialize(Lumix::InputBlob& blob) override;
+	void serialize(Lumix::OutputBlob& blob) override;
+	EntryNode* getEntryNode() const { return m_entry_node; }
+	void compile() override;
 
 private:
 	void createState(Lumix::Anim::Component::Type type, const ImVec2& pos);
+	EntryEdge* createEntryEdge(Node* node);
 
 private:
 	enum MouseStatus
@@ -179,6 +193,7 @@ private:
 		NEW_EDGE
 	} m_mouse_status;
 	Node* m_drag_source;
+	EntryNode* m_entry_node;
 	Component* m_context_cmp;
 };
 
