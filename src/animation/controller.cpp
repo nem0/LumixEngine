@@ -1,5 +1,6 @@
 #include "controller.h"
 #include "animation/animation.h"
+#include "engine/blob.h"
 #include "engine/log.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"

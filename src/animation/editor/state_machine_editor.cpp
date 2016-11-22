@@ -1,8 +1,10 @@
 #include "state_machine_editor.h"
 #include "animation/animation.h"
-#include "animation/editor/animation_editor.h"
 #include "animation/controller.h"
+#include "animation/editor/animation_editor.h"
+#include "animation/events.h"
 #include "animation/state_machine.h"
+#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/resource_manager.h"
@@ -408,15 +410,15 @@ bool Edge::hitTest(const ImVec2& on_canvas_pos) const
 }
 
 
-SimpleAnimationNode::SimpleAnimationNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
+AnimationNode::AnimationNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
 	: Node(engine_cmp, parent, controller)
 {
 }
 
 
-void SimpleAnimationNode::compile()
+void AnimationNode::compile()
 {
-	auto* engine_node = (Anim::SimpleAnimationNode*)engine_cmp;
+	auto* engine_node = (Anim::AnimationNode*)engine_cmp;
 	Anim::InputDecl& decl = m_controller.getEngineResource()->getInputDecl();
 	if (root_rotation_input >= 0)
 	{
@@ -429,7 +431,7 @@ void SimpleAnimationNode::compile()
 }
 
 
-void SimpleAnimationNode::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime)
+void AnimationNode::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime)
 {
 	if (runtime->source.type != engine_cmp->type) return;
 
@@ -441,13 +443,13 @@ void SimpleAnimationNode::debug(ImDrawList* draw, const ImVec2& canvas_screen_po
 }
 
 
-void SimpleAnimationNode::onGUI()
+void AnimationNode::onGUI()
 {
 	Node::onGUI();
 	
-	auto* node = (Anim::SimpleAnimationNode*)engine_cmp;
+	auto* node = (Anim::AnimationNode*)engine_cmp;
 	auto getter = [](void* data, int idx, const char** out) -> bool {
-		auto* node = (SimpleAnimationNode*)data;
+		auto* node = (AnimationNode*)data;
 		auto& slots = node->m_controller.getAnimationSlots();
 		*out = slots[idx].c_str();
 		return true;
@@ -591,6 +593,22 @@ StateMachine::StateMachine(Anim::Component* engine_cmp, Container* parent, Contr
 }
 
 
+void StateMachine::removeChild(Component* component)
+{
+	Container::removeChild(component);
+	auto* sm = (Anim::StateMachine*)engine_cmp;
+	for(int i = 0; i < sm->entries.size(); ++i)
+	{
+		if (sm->entries[i].node == component->engine_cmp)
+		{
+			sm->entries.erase(i);
+			LUMIX_DELETE(m_controller.getAllocator(), m_entry_node->entries[i]);
+			break;
+		}
+	}
+}
+
+
 void StateMachine::onGUI()
 {
 	Container::onGUI();
@@ -621,7 +639,7 @@ static Component* createComponent(Anim::Component* engine_cmp, Container* parent
 	{
 		case Anim::Component::EDGE: return LUMIX_NEW(allocator, Edge)((Anim::Edge*)engine_cmp, parent, controller);
 		case Anim::Component::SIMPLE_ANIMATION:
-			return LUMIX_NEW(allocator, SimpleAnimationNode)(engine_cmp, parent, controller);
+			return LUMIX_NEW(allocator, AnimationNode)(engine_cmp, parent, controller);
 		case Anim::Component::STATE_MACHINE: return LUMIX_NEW(allocator, StateMachine)(engine_cmp, parent, controller);
 		default: ASSERT(false); return nullptr;
 	}
@@ -778,20 +796,20 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 
 		if (cmp->isNode() && ImGui::IsItemHovered())
 		{
-			if (m_mouse_status == DOWN_RIGHT && ImGui::IsMouseDragging(1))
+			if (ImGui::IsMouseClicked(0))
 			{
-				m_mouse_status = NEW_EDGE;
 				m_drag_source = (Node*)cmp;
+				m_mouse_status = DOWN_LEFT;
 			}
-			if (m_mouse_status == DOWN_LEFT && ImGui::IsMouseDragging(0))
+			if (ImGui::IsMouseClicked(1))
 			{
-				m_mouse_status = DRAG_NODE;
 				m_drag_source = (Node*)cmp;
+				m_mouse_status = DOWN_RIGHT;
 			}
-
-			if (ImGui::IsMouseClicked(0)) m_mouse_status = DOWN_LEFT;
-			if (ImGui::IsMouseClicked(1)) m_mouse_status = DOWN_RIGHT;
 		}
+
+		if (m_mouse_status == DOWN_RIGHT && ImGui::IsMouseDragging(1)) m_mouse_status = NEW_EDGE;
+		if (m_mouse_status == DOWN_LEFT && ImGui::IsMouseDragging(0)) m_mouse_status = DRAG_NODE;
 	}
 
 	if (ImGui::IsMouseReleased(1))

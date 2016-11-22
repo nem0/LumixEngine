@@ -2,7 +2,7 @@
 
 #include "animation/animation.h"
 #include "animation/controller.h"
-#include "animation/controller.h"
+#include "animation/events.h"
 #include "engine/base_proxy_allocator.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"

@@ -20,6 +20,7 @@
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "renderer/model.h"
+#include "renderer/pose.h"
 #include "renderer/render_scene.h"
 
 

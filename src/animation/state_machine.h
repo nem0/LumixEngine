@@ -3,11 +3,7 @@
 
 #include "condition.h"
 #include "engine/array.h"
-#include "engine/blob.h"
-#include "engine/hash_map.h"
 #include "engine/lumix.h"
-#include "engine/matrix.h"
-#include "renderer/pose.h"
 
 
 namespace Lumix
@@ -16,11 +12,12 @@ namespace Lumix
 
 class Animation;
 class Engine;
+class InputBlob;
 class Model;
+class OutputBlob;
 struct Pose;
-struct Vec3;
 class Path;
-struct Quat;
+struct Transform;
 
 
 namespace Anim
@@ -30,6 +27,7 @@ namespace Anim
 struct Component;
 struct Container;
 struct ComponentInstance;
+struct Edge;
 struct StateMachine;
 
 
@@ -61,28 +59,19 @@ struct Component
 	Component(Type _type) : type(_type), uid(-1) {}
 	virtual ~Component() {}
 	virtual ComponentInstance* createInstance(IAllocator& allocator) = 0;
-	virtual void serialize(OutputBlob& blob) { blob.write(uid); }
-	virtual void deserialize(InputBlob& blob, Container* parent) { blob.read(uid); }
+	virtual void serialize(OutputBlob& blob);
+	virtual void deserialize(InputBlob& blob, Container* parent);
 
 	int uid;
 	const Type type;
 };
 
 
-struct Edge;
-
-
 struct Node : public Component
 {
-	Node(Component::Type type, IAllocator& _allocator)
-		: Component(type)
-		, out_edges(_allocator)
-		, allocator(_allocator)
-		, events(allocator)
-	{
-	}
-
+	Node(Component::Type type, IAllocator& _allocator);
 	~Node();
+
 	void serialize(OutputBlob& blob) override;
 	void deserialize(InputBlob& blob, Container* parent) override;
 
@@ -95,30 +84,12 @@ struct Node : public Component
 
 struct Container : public Node
 {
-	Container(Component::Type type, IAllocator& _allocator)
-		: Node(type, _allocator)
-		, children(_allocator)
-		, allocator(_allocator)
-	{
-	}
-
-
+	Container(Component::Type type, IAllocator& _allocator);
 	~Container();
-
 
 	void serialize(OutputBlob& blob) override;
 	void deserialize(InputBlob& blob, Container* parent) override;
-
-
-	Component* getChildByUID(int uid)
-	{
-		for (auto* child : children)
-		{
-			if (child->uid == uid) return child;
-		}
-		return nullptr;
-	}
-
+	Component* getChildByUID(int uid);
 
 	IAllocator& allocator;
 	Array<Component*> children;
@@ -144,54 +115,14 @@ struct NodeInstance : public ComponentInstance
 {
 	NodeInstance(Node& node) : ComponentInstance(node) {}
 
-	ComponentInstance* checkOutEdges(Node& node, RunningContext& rc)
-	{
-		rc.current = this;
-		for (auto* edge : node.out_edges)
-		{
-			if (edge->condition(rc))
-			{
-				ComponentInstance* new_item = edge->createInstance(*rc.allocator);
-				new_item->enter(rc, this);
-				return new_item;
-			}
-		}
-		return this;
-	}
-
+	ComponentInstance* checkOutEdges(Node& node, RunningContext& rc);
 	void queueEvents(RunningContext& rc, float old_time, float time, float length);
 };
 
 
-struct EventHeader
+struct AnimationNode : public Node
 {
-	enum BuiltinType
-	{
-		SET_INPUT
-	};
-
-	float time;
-	u8 type;
-	u8 size;
-	u16 offset;
-};
-
-
-struct SetInputEvent
-{
-	int input_idx;
-	union
-	{
-		int i_value;
-		float f_value;
-		bool b_value;
-	};
-};
-
-
-struct SimpleAnimationNode : public Node
-{
-	SimpleAnimationNode(IAllocator& allocator);
+	AnimationNode(IAllocator& allocator);
 	ComponentInstance* createInstance(IAllocator& allocator) override;
 	void serialize(OutputBlob& blob) override;
 	void deserialize(InputBlob& blob, Container* parent) override;
@@ -212,10 +143,7 @@ struct StateMachineInstance : public NodeInstance
 	void enter(RunningContext& rc, ComponentInstance* from) override;
 	float getTime() const override { return current ? current->getTime() : 0; }
 	float getLength() const override { return current ? current->getLength() : 0; }
-	Transform getRootMotion() const override 
-	{
-		return current ? current->getRootMotion() : Transform({0, 0, 0}, {0, 0, 0, 1});
-	}
+	Transform getRootMotion() const override;
 
 	StateMachine& source;
 	ComponentInstance* current;
@@ -225,11 +153,7 @@ struct StateMachineInstance : public NodeInstance
 
 struct StateMachine : public Container
 {
-	StateMachine(IAllocator& _allocator)
-		: Container(Component::STATE_MACHINE, _allocator)
-		, entries(_allocator)
-	{
-	}
+	StateMachine(IAllocator& _allocator);
 
 	ComponentInstance* createInstance(IAllocator& allocator) override;
 	void serialize(OutputBlob& blob) override;
