@@ -38,6 +38,53 @@ namespace AnimEditor
 {
 
 
+class AnimationEditor : public IAnimationEditor
+{
+public:
+	AnimationEditor(StudioApp& app);
+	~AnimationEditor();
+
+	const char* getName() const override { return "animation_editor"; }
+	void setContainer(Container* container) override { m_container = container; }
+	bool isEditorOpened() override { return m_editor_opened; }
+	void toggleEditorOpened() override { m_editor_opened = !m_editor_opened; }
+	bool isInputsOpened() override { return m_inputs_opened; }
+	void toggleInputsOpened() override { m_inputs_opened = !m_inputs_opened; }
+	void onWindowGUI() override;
+	StudioApp& getApp() override { return m_app; }
+	int getEventTypesCount() const override;
+	EventType& createEventType(const char* type) override;
+	EventType& getEventTypeByIdx(int idx) override  { return m_event_types[idx]; }
+	EventType& getEventType(Lumix::u32 type) override;
+
+private:
+	void newController();
+	void save();
+	void saveAs();
+	void drawGraph();
+	void load();
+	void loadFromEntity();
+	void loadFromFile();
+	void editorGUI();
+	void inputsGUI();
+	void constantsGUI();
+	void animSetGUI();
+	void menuGUI();
+	void dropFile(const char* path, const ImVec2& canvas_screen_pos);
+	void onSetInputGUI(Lumix::u8* data, Component& component);
+
+private:
+	StudioApp& m_app;
+	bool m_editor_opened;
+	bool m_inputs_opened;
+	ImVec2 m_offset;
+	ControllerResource* m_resource;
+	Container* m_container;
+	char m_path[Lumix::MAX_PATH_LENGTH];
+	Lumix::Array<EventType> m_event_types;
+};
+
+
 AnimationEditor::AnimationEditor(StudioApp& app)
 	: m_app(app)
 	, m_editor_opened(false)
@@ -473,4 +520,10 @@ void AnimationEditor::animSetGUI()
 }
 
 
+IAnimationEditor* IAnimationEditor::create(IAllocator& allocator, StudioApp& app)
+{
+	return LUMIX_NEW(allocator, AnimationEditor)(app);
 }
+
+
+} // namespace AnimEditor

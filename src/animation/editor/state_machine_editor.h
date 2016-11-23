@@ -21,7 +21,7 @@ namespace AnimEditor
 {
 
 
-class AnimationEditor;
+class IAnimationEditor;
 class Container;
 class ControllerResource;
 class Edge;
@@ -207,7 +207,7 @@ class ControllerResource
 {
 public:
 	ControllerResource(Lumix::AnimationSystem& anim_system,
-		AnimationEditor& editor,
+		IAnimationEditor& editor,
 		Lumix::ResourceManagerBase& manager,
 		Lumix::IAllocator& allocator);
 	~ControllerResource();
@@ -218,7 +218,7 @@ public:
 	Lumix::Array<Lumix::string>& getAnimationSlots() { return m_animation_slots; }
 	Lumix::IAllocator& getAllocator() { return m_allocator; }
 	Lumix::Anim::ControllerResource* getEngineResource() { return m_engine_resource; }
-	AnimationEditor& getEditor() { return m_editor; }
+	IAnimationEditor& getEditor() { return m_editor; }
 	int createUID() { ++m_last_uid; return m_last_uid; }
 	const char* getAnimationSlot(Lumix::u32 slot_hash) const;
 	void createAnimSlot(const char* name, const char* path);
@@ -226,7 +226,7 @@ public:
 
 private:
 	int m_last_uid = 0;
-	AnimationEditor& m_editor;
+	IAnimationEditor& m_editor;
 	Lumix::IAllocator& m_allocator;
 	Component* m_root;
 	Lumix::Anim::ControllerResource* m_engine_resource;

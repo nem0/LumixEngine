@@ -25,7 +25,7 @@ class Container;
 class ControllerResource;
 
 
-class AnimationEditor : public StudioApp::IPlugin
+class IAnimationEditor : public StudioApp::IPlugin
 {
 public:
 	struct EventType
@@ -37,47 +37,18 @@ public:
 	};
 
 public:
-	AnimationEditor(StudioApp& app);
-	~AnimationEditor();
+	static IAnimationEditor* create(Lumix::IAllocator& allocator, StudioApp& app);
 
-	const char* getName() const override { return "animation_editor"; }
-	void setContainer(Container* container) { m_container = container; }
-	bool isEditorOpened() { return m_editor_opened; }
-	void toggleEditorOpened() { m_editor_opened = !m_editor_opened; }
-	bool isInputsOpened() { return m_inputs_opened; }
-	void toggleInputsOpened() { m_inputs_opened = !m_inputs_opened; }
-	void onWindowGUI() override;
-	StudioApp& getApp() { return m_app; }
-	int getEventTypesCount() const;
-	EventType& createEventType(const char* type);
-	EventType& getEventTypeByIdx(int idx) { return m_event_types[idx]; }
-	EventType& getEventType(Lumix::u32 type);
-
-private:
-	void newController();
-	void save();
-	void saveAs();
-	void drawGraph();
-	void load();
-	void loadFromEntity();
-	void loadFromFile();
-	void editorGUI();
-	void inputsGUI();
-	void constantsGUI();
-	void animSetGUI();
-	void menuGUI();
-	void dropFile(const char* path, const ImVec2& canvas_screen_pos);
-	void onSetInputGUI(Lumix::u8* data, Component& component);
-
-private:
-	StudioApp& m_app;
-	bool m_editor_opened;
-	bool m_inputs_opened;
-	ImVec2 m_offset;
-	ControllerResource* m_resource;
-	Container* m_container;
-	char m_path[Lumix::MAX_PATH_LENGTH];
-	Lumix::Array<EventType> m_event_types;
+	virtual void setContainer(Container* container) = 0;
+	virtual bool isEditorOpened() = 0;
+	virtual void toggleEditorOpened() = 0;
+	virtual bool isInputsOpened() = 0;
+	virtual void toggleInputsOpened() = 0;
+	virtual StudioApp& getApp() = 0;
+	virtual int getEventTypesCount() const = 0;
+	virtual EventType& createEventType(const char* type) = 0;
+	virtual EventType& getEventTypeByIdx(int idx) = 0;
+	virtual EventType& getEventType(Lumix::u32 type) = 0;
 };
 
 
