@@ -18,9 +18,10 @@ namespace Anim
 class ControllerManager LUMIX_FINAL : public ResourceManagerBase
 {
 public:
-	explicit ControllerManager(IAllocator& allocator)
+	explicit ControllerManager(AnimationSystem& system, IAllocator& allocator)
 		: ResourceManagerBase(allocator)
 		, m_allocator(allocator)
+		, m_system(system)
 	{}
 	~ControllerManager() {}
 	IAllocator& getAllocator() { return m_allocator; }
@@ -30,6 +31,7 @@ protected:
 	void destroyResource(Resource& resource) override;
 
 private:
+	AnimationSystem& m_system;
 	IAllocator& m_allocator;
 };
 
@@ -37,7 +39,10 @@ private:
 class ControllerResource : public Resource
 {
 public:
-	ControllerResource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
+	ControllerResource(AnimationSystem& system,
+		const Path& path,
+		ResourceManagerBase& resource_manager,
+		IAllocator& allocator);
 	~ControllerResource();
 
 	void create() { onCreated(State::READY); }
@@ -53,6 +58,7 @@ public:
 	IAllocator& getAllocator() { return m_allocator; }
 
 private:
+	AnimationSystem& m_system;
 	InputDecl m_input_decl;
 	HashMap<u32, Animation*> m_anim_set;
 	Component* m_root;

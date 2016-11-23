@@ -1,9 +1,10 @@
 #pragma once
 
 
+#include "animation/animation_system.h"
+#include "animation/state_machine.h"
 #include "engine/array.h"
 #include "imgui/imgui.h"
-#include "animation/state_machine.h"
 
 
 namespace Lumix
@@ -204,7 +205,10 @@ private:
 class ControllerResource
 {
 public:
-	ControllerResource(AnimationEditor& editor, Lumix::ResourceManagerBase& manager, Lumix::IAllocator& allocator);
+	ControllerResource(Lumix::AnimationSystem& anim_system,
+		AnimationEditor& editor,
+		Lumix::ResourceManagerBase& manager,
+		Lumix::IAllocator& allocator);
 	~ControllerResource();
 
 	void serialize(Lumix::OutputBlob& blob);
@@ -217,6 +221,7 @@ public:
 	int createUID() { ++m_last_uid; return m_last_uid; }
 	const char* getAnimationSlot(Lumix::u32 slot_hash) const;
 	void createAnimSlot(const char* name, const char* path);
+	Lumix::AnimationSystem& getAnimationSystem() { return m_animation_system; }
 
 private:
 	int m_last_uid = 0;
@@ -225,6 +230,7 @@ private:
 	Component* m_root;
 	Lumix::Anim::ControllerResource* m_engine_resource;
 	Lumix::Array<Lumix::string> m_animation_slots;
+	Lumix::AnimationSystem& m_animation_system;
 };
 
 

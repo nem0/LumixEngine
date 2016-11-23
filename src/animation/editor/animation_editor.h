@@ -25,6 +25,7 @@ public:
 	bool isInputsOpened() { return m_inputs_opened; }
 	void toggleInputsOpened() { m_inputs_opened = !m_inputs_opened; }
 	void onWindowGUI() override;
+	StudioApp& getApp() { return m_app; }
 
 private:
 	void newController();

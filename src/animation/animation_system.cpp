@@ -54,7 +54,7 @@ enum class AnimationSceneVersion : int
 
 
 
-struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
+struct AnimationSystemImpl LUMIX_FINAL : public AnimationSystem
 {
 	explicit AnimationSystemImpl(Engine& engine);
 	~AnimationSystemImpl();
@@ -64,12 +64,15 @@ struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
 	void createScenes(Universe& ctx) override;
 	void destroyScene(IScene* scene) override;
 	const char* getName() const override { return "animation"; }
-
+	u32 getEventTypePersistent(u8 runtime) const override;
+	u8 getEventTypeRuntime(u32 persistent) const override;
+	u8 createEventType(const char* event_name) override;
 
 	Lumix::IAllocator& m_allocator;
 	Engine& m_engine;
 	AnimationManager m_animation_manager;
 	Anim::ControllerManager m_controller_manager;
+	u32 m_event_map[255];
 
 private:
 	void operator=(const AnimationSystemImpl&);
@@ -678,6 +681,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	void processEventStream()
 	{
 		InputBlob blob(m_event_stream);
+		u8 set_input_type = m_anim_system.getEventTypeRuntime(crc32("set_input"));
 		while (blob.getPosition() < blob.getSize())
 		{
 			u8 type;
@@ -686,7 +690,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			blob.read(type);
 			blob.read(cmp);
 			blob.read(size);
-			if (type == Anim::EventHeader::SET_INPUT)
+			if (type == set_input_type)
 			{
 				Anim::SetInputEvent event;
 				blob.read(event);
@@ -769,8 +773,10 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 	: m_allocator(engine.getAllocator())
 	, m_engine(engine)
 	, m_animation_manager(m_allocator)
-	, m_controller_manager(m_allocator)
+	, m_controller_manager(*this, m_allocator)
+	, m_event_map{0}
 {
+	createEventType("set_input");
 	m_animation_manager.create(ANIMATION_TYPE, m_engine.getResourceManager());
 	m_controller_manager.create(CONTROLLER_RESOURCE_TYPE, m_engine.getResourceManager());
 
@@ -803,6 +809,37 @@ AnimationSystemImpl::~AnimationSystemImpl()
 	m_animation_manager.destroy();
 	m_controller_manager.destroy();
 }
+
+
+u8 AnimationSystemImpl::createEventType(const char* event_name)
+{
+	for (u8 i = 0; i < lengthOf(m_event_map); ++i)
+	{
+		if (m_event_map[i] == 0)
+		{
+			m_event_map[i] = crc32(event_name);
+			return i;
+		}
+	}
+	return 0xff;
+}
+
+
+u32 AnimationSystemImpl::getEventTypePersistent(u8 runtime) const
+{
+	return m_event_map[runtime];
+}
+
+
+u8 AnimationSystemImpl::getEventTypeRuntime(u32 persistent) const
+{
+	for (u8 i = 0; i < lengthOf(m_event_map); ++i)
+	{
+		if (m_event_map[i] == persistent) return i;
+	}
+	return 0xff;
+}
+
 
 
 void AnimationSystemImpl::registerLuaAPI()
