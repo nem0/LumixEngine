@@ -214,6 +214,6 @@ LUMIX_STUDIO_ENTRY(animation)
 	auto* pg_plugin = LUMIX_NEW(allocator, PropertyGridPlugin)(app);
 	app.getPropertyGrid()->addPlugin(*pg_plugin);
 
-	app.addPlugin(*LUMIX_NEW(allocator, AnimEditor::AnimationEditor)(app));
+	app.addPlugin(*AnimEditor::IAnimationEditor::create(allocator, app));
 }
 

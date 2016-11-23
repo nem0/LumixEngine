@@ -900,7 +900,7 @@ void StateMachine::dropSlot(const char* name, u32 slot, const ImVec2& canvas_scr
 
 
 ControllerResource::ControllerResource(Lumix::AnimationSystem& anim_system,
-	AnimationEditor& editor,
+	IAnimationEditor& editor,
 	ResourceManagerBase& manager,
 	IAllocator& allocator)
 	: m_animation_slots(allocator)
