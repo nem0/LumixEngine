@@ -17,6 +17,7 @@
 #include "engine/log.h"
 #include "engine/path.h"
 #include "engine/path_utils.h"
+#include "engine/plugin_manager.h"
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
@@ -55,8 +56,10 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 	action->is_selected.bind<AnimationEditor, &AnimationEditor::isInputsOpened>(this);
 	app.addWindowAction(action);
 
-	auto* manager = m_app.getWorldEditor()->getEngine().getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
-	m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
+	Engine& engine = m_app.getWorldEditor()->getEngine();
+	auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
+	auto* anim_sys = (AnimationSystem*)engine.getPluginManager().getPlugin("animation");
+	m_resource = LUMIX_NEW(allocator, ControllerResource)(*anim_sys, *this, *manager, allocator);
 	m_container = (Container*)m_resource->getRoot();
 }
 
@@ -187,8 +190,10 @@ void AnimationEditor::load()
 	else
 	{
 		LUMIX_DELETE(allocator, m_resource);
-		auto* manager = m_app.getWorldEditor()->getEngine().getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
-		m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
+		Engine& engine = m_app.getWorldEditor()->getEngine();
+		auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
+		auto* anim_sys = (AnimationSystem*)engine.getPluginManager().getPlugin("animation");
+		m_resource = LUMIX_NEW(allocator, ControllerResource)(*anim_sys, *this, *manager, allocator);
 		m_container = (Container*)m_resource->getRoot();
 	}
 	file.close();
@@ -206,8 +211,10 @@ void AnimationEditor::newController()
 {
 	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
 	LUMIX_DELETE(allocator, m_resource);
-	auto* manager = m_app.getWorldEditor()->getEngine().getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
-	m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
+	Engine& engine = m_app.getWorldEditor()->getEngine();
+	auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
+	auto* anim_sys = (AnimationSystem*)engine.getPluginManager().getPlugin("animation");
+	m_resource = LUMIX_NEW(allocator, ControllerResource)(*anim_sys, *this, *manager, allocator);
 	m_container = (Container*)m_resource->getRoot();
 }
 

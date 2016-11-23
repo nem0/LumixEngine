@@ -14,11 +14,6 @@ namespace Anim
 
 struct EventHeader
 {
-	enum BuiltinType
-	{
-		SET_INPUT
-	};
-
 	float time;
 	u8 type;
 	u8 size;

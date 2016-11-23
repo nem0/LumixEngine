@@ -32,11 +32,15 @@ struct Header
 };
 
 
-ControllerResource::ControllerResource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
+ControllerResource::ControllerResource(AnimationSystem& system,
+	const Path& path,
+	ResourceManagerBase& resource_manager,
+	IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_root(nullptr)
 	, m_allocator(allocator)
 	, m_anim_set(allocator)
+	, m_system(system)
 {
 }
 
@@ -94,7 +98,8 @@ bool ControllerResource::deserialize(InputBlob& blob)
 	Component::Type type;
 	blob.read(type);
 	m_root = createComponent(type, m_allocator);
-	m_root->deserialize(blob, nullptr);
+	SerializeContext ctx(m_system);
+	m_root->deserialize(blob, nullptr, ctx);
 	blob.read(m_input_decl.inputs_count);
 	for (int i = 0; i < m_input_decl.inputs_count; ++i)
 	{
@@ -142,7 +147,8 @@ void ControllerResource::serialize(OutputBlob& blob)
 	Header header;
 	blob.write(header);
 	blob.write(m_root->type);
-	m_root->serialize(blob);
+	SerializeContext ctx(m_system);
+	m_root->serialize(blob, ctx);
 	blob.write(m_input_decl.inputs_count);
 	for (int i = 0; i < m_input_decl.inputs_count; ++i)
 	{
@@ -184,7 +190,7 @@ ComponentInstance* ControllerResource::createInstance(IAllocator& allocator)
 
 Resource* ControllerManager::createResource(const Path& path)
 {
-	return LUMIX_NEW(m_allocator, ControllerResource)(path, *this, m_allocator);
+	return LUMIX_NEW(m_allocator, ControllerResource)(m_system, path, *this, m_allocator);
 }
 
 

@@ -1,9 +1,11 @@
 #include "state_machine_editor.h"
 #include "animation/animation.h"
+#include "animation/animation_system.h"
 #include "animation/controller.h"
 #include "animation/editor/animation_editor.h"
 #include "animation/events.h"
 #include "animation/state_machine.h"
+#include "editor/world_editor.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
@@ -130,6 +132,8 @@ void Node::removeEvent(int index)
 
 void Node::onGUI()
 {
+	
+	u8 set_input_type = m_controller.getAnimationSystem().getEventTypeRuntime(crc32("set_input"));
 	ImGui::InputText("Name", name.data, lengthOf(name.data));
 	if (engine_cmp && ImGui::CollapsingHeader("Events"))
 	{
@@ -137,7 +141,7 @@ void Node::onGUI()
 		auto& events = engine_node->events;
 		for(int i = 0; i < engine_node->events_count; ++i)
 		{
-			if (ImGui::TreeNode((void*)(intptr_t)i, "%d", i))
+			if (ImGui::TreeNode((void*)(uintptr)i, "%d", i))
 			{
 				Anim::EventHeader& header = *(Anim::EventHeader*)&events[sizeof(Anim::EventHeader) * i];
 				if (ImGui::Button("Remove"))
@@ -147,32 +151,27 @@ void Node::onGUI()
 					break;
 				}
 				ImGui::InputFloat("Time", &header.time);
-				switch (header.type)
+				if (header.type == set_input_type)
 				{
-					case Anim::EventHeader::SET_INPUT:
+					int event_offset = header.offset + sizeof(Anim::EventHeader) * engine_node->events_count;
+					auto event = (Anim::SetInputEvent*)&events[event_offset];
+					auto& input_decl = m_controller.getEngineResource()->getInputDecl();
+					auto getter = [](void* data, int idx, const char** out) -> bool {
+						auto& input_decl = *(Anim::InputDecl*)data;
+						*out = input_decl.inputs[idx].name;
+						return true;
+					};
+					ImGui::Combo("Input", &event->input_idx, getter, &input_decl, input_decl.inputs_count);
+					if (event->input_idx >= 0 && event->input_idx < input_decl.inputs_count)
 					{
-						int event_offset = header.offset + sizeof(Anim::EventHeader) * engine_node->events_count;
-						auto event = (Anim::SetInputEvent*)&events[event_offset];
-						auto& input_decl = m_controller.getEngineResource()->getInputDecl();
-						auto getter = [](void* data, int idx, const char** out) -> bool {
-							auto& input_decl = *(Anim::InputDecl*)data;
-							*out = input_decl.inputs[idx].name;
-							return true;
-						};
-						ImGui::Combo("Input", &event->input_idx, getter, &input_decl, input_decl.inputs_count);
-						if (event->input_idx >= 0 && event->input_idx < input_decl.inputs_count)
+						switch (input_decl.inputs[event->input_idx].type)
 						{
-							switch (input_decl.inputs[event->input_idx].type)
-							{
-								case Anim::InputDecl::BOOL: ImGui::Checkbox("Value", &event->b_value); break;
-								case Anim::InputDecl::INT: ImGui::InputInt("Value", &event->i_value); break;
-								case Anim::InputDecl::FLOAT: ImGui::InputFloat("Value", &event->f_value); break;
-								default: ASSERT(false); break;
-							}
+							case Anim::InputDecl::BOOL: ImGui::Checkbox("Value", &event->b_value); break;
+							case Anim::InputDecl::INT: ImGui::InputInt("Value", &event->i_value); break;
+							case Anim::InputDecl::FLOAT: ImGui::InputFloat("Value", &event->f_value); break;
+							default: ASSERT(false); break;
 						}
 					}
-					break;
-					default: ASSERT(false); break;
 				}
 				ImGui::TreePop();
 			}
@@ -197,10 +196,9 @@ void Node::onGUI()
 				return headers_end + old_payload_size;
 			};
 
-			switch (current)
+			if (current == set_input_type)
 			{
-				case Anim::EventHeader::SET_INPUT: newEvent((int)sizeof(Anim::SetInputEvent), Anim::EventHeader::SET_INPUT); break;
-				default: ASSERT(false); break;
+				newEvent((int)sizeof(Anim::SetInputEvent), set_input_type);
 			}
 			++engine_node->events_count;
 		}
@@ -918,12 +916,16 @@ void StateMachine::dropSlot(const char* name, u32 slot, const ImVec2& canvas_scr
 }
 
 
-ControllerResource::ControllerResource(AnimationEditor& editor, ResourceManagerBase& manager, IAllocator& allocator)
+ControllerResource::ControllerResource(Lumix::AnimationSystem& anim_system,
+	AnimationEditor& editor,
+	ResourceManagerBase& manager,
+	IAllocator& allocator)
 	: m_animation_slots(allocator)
 	, m_allocator(allocator)
 	, m_editor(editor)
+	, m_animation_system(anim_system)
 {
-	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), manager, allocator);
+	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(m_animation_system, Path("editor"), manager, allocator);
 	auto* engine_root = LUMIX_NEW(allocator, Anim::StateMachine)(allocator);
 	m_engine_resource->setRoot(engine_root);
 	m_root = LUMIX_NEW(allocator, StateMachine)(engine_root, nullptr, *this);
@@ -959,7 +961,8 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 	LUMIX_DELETE(m_allocator, m_root);
 	m_root = nullptr;
 	auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
-	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), *manager, allocator);
+	m_engine_resource =
+		LUMIX_NEW(allocator, Anim::ControllerResource)(m_animation_system, Path("editor"), *manager, allocator);
 	m_engine_resource->create();
 	if (!m_engine_resource->deserialize(blob)) return false;
 
