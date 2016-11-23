@@ -77,6 +77,9 @@ struct LuaPlugin : public StudioApp::IPlugin
 	}
 
 
+	const char* getName() const override { return "lua_script"; }
+
+
 	void onAction()
 	{
 		m_is_opened = !m_is_opened;
@@ -1573,6 +1576,11 @@ public:
 	void addPlugin(IPlugin& plugin) override
 	{
 		m_plugins.push(&plugin);
+		for (auto* i : m_plugins)
+		{
+			i->pluginAdded(plugin);
+			plugin.pluginAdded(*i);
+		}
 	}
 
 

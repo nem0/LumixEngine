@@ -21,13 +21,13 @@ namespace Anim
 {
 
 
-void Component::serialize(OutputBlob& blob, SerializeContext& ctx)
+void Component::serialize(OutputBlob& blob)
 {
 	blob.write(uid);
 }
 
 
-void Component::deserialize(InputBlob& blob, Container* parent, SerializeContext& ctx)
+void Component::deserialize(InputBlob& blob, Container* parent)
 {
 	blob.read(uid);
 }
@@ -118,9 +118,9 @@ ComponentInstance* Edge::createInstance(IAllocator& allocator)
 }
 
 
-void Edge::serialize(OutputBlob& blob, SerializeContext& ctx)
+void Edge::serialize(OutputBlob& blob)
 {
-	Component::serialize(blob, ctx);
+	Component::serialize(blob);
 	blob.write(from ? from->uid : -1);
 	blob.write(to ? to->uid : -1);
 	blob.write(length);
@@ -129,9 +129,9 @@ void Edge::serialize(OutputBlob& blob, SerializeContext& ctx)
 }
 
 
-void Edge::deserialize(InputBlob& blob, Container* parent, SerializeContext& ctx)
+void Edge::deserialize(InputBlob& blob, Container* parent)
 {
-	Component::deserialize(blob, parent, ctx);
+	Component::deserialize(blob, parent);
 	int uid;
 	blob.read(uid);
 	from = static_cast<Node*>(parent->getChildByUID(uid));
@@ -164,26 +164,21 @@ Node::Node(Component::Type type, IAllocator& _allocator)
 }
 
 
-void Node::serialize(OutputBlob& blob, SerializeContext& ctx)
+void Node::serialize(OutputBlob& blob)
 {
-	Component::serialize(blob, ctx);
+	Component::serialize(blob);
 	blob.write(events_count);
 	if (events_count > 0)
 	{
 		blob.write(events.size());
 		blob.write(&events[0], events.size());
 	}
-	for (int i = 0; i < events_count; ++i)
-	{
-		EventHeader* ev = (EventHeader*)&events[sizeof(EventHeader) * i];
-		blob.write(ctx.system.getEventTypePersistent(ev->type));
-	}
 }
 
 
-void Node::deserialize(InputBlob& blob, Container* parent, SerializeContext& ctx)
+void Node::deserialize(InputBlob& blob, Container* parent)
 {
-	Component::deserialize(blob, parent, ctx);
+	Component::deserialize(blob, parent);
 	blob.read(events_count);
 	if (events_count > 0)
 	{
@@ -191,13 +186,6 @@ void Node::deserialize(InputBlob& blob, Container* parent, SerializeContext& ctx
 		blob.read(size);
 		events.resize(size);
 		blob.read(&events[0], size);
-	}
-	for (int i = 0; i < events_count; ++i)
-	{
-		EventHeader* ev = (EventHeader*)&events[sizeof(EventHeader) * i];
-		u32 tmp;
-		blob.read(tmp);
-		ev->type = ctx.system.getEventTypeRuntime(tmp);
 	}
 }
 
@@ -209,9 +197,9 @@ AnimationNode::AnimationNode(IAllocator& allocator)
 }
 
 
-void AnimationNode::serialize(OutputBlob& blob, SerializeContext& ctx)
+void AnimationNode::serialize(OutputBlob& blob)
 {
-	Node::serialize(blob, ctx);
+	Node::serialize(blob);
 	blob.write(animations_hashes.size());
 	for (u32 hash : animations_hashes)
 	{
@@ -223,9 +211,9 @@ void AnimationNode::serialize(OutputBlob& blob, SerializeContext& ctx)
 }
 
 
-void AnimationNode::deserialize(InputBlob& blob, Container* parent, SerializeContext& ctx)
+void AnimationNode::deserialize(InputBlob& blob, Container* parent)
 {
-	Node::deserialize(blob, parent, ctx);
+	Node::deserialize(blob, parent);
 
 	int count;
 	blob.read(count);
@@ -463,9 +451,9 @@ StateMachine::StateMachine(IAllocator& _allocator)
 }
 
 
-void StateMachine::serialize(OutputBlob& blob, SerializeContext& ctx)
+void StateMachine::serialize(OutputBlob& blob)
 {
-	Container::serialize(blob, ctx);
+	Container::serialize(blob);
 	blob.write(entries.size());
 	for (Entry& entry : entries)
 	{
@@ -479,9 +467,9 @@ void StateMachine::serialize(OutputBlob& blob, SerializeContext& ctx)
 }
 
 
-void StateMachine::deserialize(InputBlob& blob, Container* parent, SerializeContext& ctx)
+void StateMachine::deserialize(InputBlob& blob, Container* parent)
 {
-	Container::deserialize(blob, parent, ctx);
+	Container::deserialize(blob, parent);
 	int count;
 	blob.read(count);
 	entries.reserve(count);
@@ -530,21 +518,21 @@ Component* Container::getChildByUID(int uid)
 }
 
 
-void Container::serialize(OutputBlob& blob, SerializeContext& ctx)
+void Container::serialize(OutputBlob& blob)
 {
-	Node::serialize(blob, ctx);
+	Node::serialize(blob);
 	blob.write(children.size());
 	for (auto* child : children)
 	{
 		blob.write(child->type);
-		child->serialize(blob, ctx);
+		child->serialize(blob);
 	}
 }
 
 
-void Container::deserialize(InputBlob& blob, Container* parent, SerializeContext& ctx)
+void Container::deserialize(InputBlob& blob, Container* parent)
 {
-	Node::deserialize(blob, parent, ctx);
+	Node::deserialize(blob, parent);
 	int size;
 	blob.read(size);
 	for (int i = 0; i < size; ++i)
@@ -552,7 +540,7 @@ void Container::deserialize(InputBlob& blob, Container* parent, SerializeContext
 		Component::Type type;
 		blob.read(type);
 		Component* item = createComponent(type, allocator);
-		item->deserialize(blob, this, ctx);
+		item->deserialize(blob, this);
 		children.push(item);
 	}
 }

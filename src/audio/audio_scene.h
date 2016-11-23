@@ -16,6 +16,13 @@ class Clip;
 class Path;
 
 
+struct SoundAnimationEvent
+{
+	u32 clip;
+	bool is_3d = true;
+};
+
+
 class AudioScene : public IScene
 {
 public:
@@ -40,6 +47,7 @@ public:
 	virtual int getClipCount() const = 0;
 	virtual const char* getClipName(int index) = 0;
 	virtual ClipInfo* getClipInfo(int index) = 0;
+	virtual ClipInfo* getClipInfo(u32 hash) = 0;
 	virtual ClipInfo* getClipInfo(const char* name) = 0;
 	virtual int getClipInfoIndex(ClipInfo* info) = 0;
 	virtual void addClip(const char* name, const Lumix::Path& path) = 0;

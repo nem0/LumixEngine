@@ -43,6 +43,7 @@ namespace Lumix
 			virtual void deserialize(InputBlob&) {}
 			virtual void update(float) {}
 			virtual const char* getName() const = 0;
+			virtual void pluginAdded(IPlugin& plugin) {}
 
 			virtual void createScenes(Universe&) {}
 			virtual void destroyScene(IScene*) { ASSERT(false); }

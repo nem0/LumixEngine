@@ -33,14 +33,15 @@ struct Action;
 class LUMIX_EDITOR_API StudioApp
 {
 public:
-	class IPlugin
+	struct IPlugin
 	{
-	public:
 		virtual ~IPlugin() {}
 
 		virtual void onWindowGUI() = 0;
 		virtual bool hasFocus() { return false; }
 		virtual void update(float) {}
+		virtual void pluginAdded(IPlugin& plugin) {}
+		virtual const char* getName() const = 0;
 	};
 
 	struct IAddComponentPlugin

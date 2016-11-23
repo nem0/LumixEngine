@@ -15,9 +15,9 @@ namespace Anim
 struct EventHeader
 {
 	float time;
-	u8 type;
-	u8 size;
+	u32 type;
 	u16 offset;
+	u8 size;
 };
 
 

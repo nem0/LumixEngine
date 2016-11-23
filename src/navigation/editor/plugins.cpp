@@ -31,6 +31,9 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
+	const char* getName() const override { return "navigation"; }
+
+
 	void onAction()
 	{
 		is_opened = !is_opened;

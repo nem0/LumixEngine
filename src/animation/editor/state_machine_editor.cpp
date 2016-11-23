@@ -133,7 +133,7 @@ void Node::removeEvent(int index)
 void Node::onGUI()
 {
 	
-	u8 set_input_type = m_controller.getAnimationSystem().getEventTypeRuntime(crc32("set_input"));
+	u32 set_input_type = crc32("set_input");
 	ImGui::InputText("Name", name.data, lengthOf(name.data));
 	if (engine_cmp && ImGui::CollapsingHeader("Events"))
 	{
@@ -151,38 +151,23 @@ void Node::onGUI()
 					break;
 				}
 				ImGui::InputFloat("Time", &header.time);
-				if (header.type == set_input_type)
-				{
-					int event_offset = header.offset + sizeof(Anim::EventHeader) * engine_node->events_count;
-					auto event = (Anim::SetInputEvent*)&events[event_offset];
-					auto& input_decl = m_controller.getEngineResource()->getInputDecl();
-					auto getter = [](void* data, int idx, const char** out) -> bool {
-						auto& input_decl = *(Anim::InputDecl*)data;
-						*out = input_decl.inputs[idx].name;
-						return true;
-					};
-					ImGui::Combo("Input", &event->input_idx, getter, &input_decl, input_decl.inputs_count);
-					if (event->input_idx >= 0 && event->input_idx < input_decl.inputs_count)
-					{
-						switch (input_decl.inputs[event->input_idx].type)
-						{
-							case Anim::InputDecl::BOOL: ImGui::Checkbox("Value", &event->b_value); break;
-							case Anim::InputDecl::INT: ImGui::InputInt("Value", &event->i_value); break;
-							case Anim::InputDecl::FLOAT: ImGui::InputFloat("Value", &event->f_value); break;
-							default: ASSERT(false); break;
-						}
-					}
-				}
+				int event_offset = header.offset + sizeof(Anim::EventHeader) * engine_node->events_count;
+				m_controller.getEditor().getEventType(header.type).editor.invoke(&events[event_offset], *this);
 				ImGui::TreePop();
 			}
 		}
 
+		auto getter = [](void* data, int idx, const char** out) -> bool {
+			auto* node = (Node*)data;
+			*out = node->m_controller.getEditor().getEventTypeByIdx(idx).label;
+			return true;
+		};
 		static int current = 0;
-		ImGui::Combo("", &current, "Set Input\0");
+		ImGui::Combo("", &current, getter, this, m_controller.getEditor().getEventTypesCount());
 		ImGui::SameLine();
 		if (ImGui::Button("Add event"))
 		{
-			auto newEvent = [&](int size, u8 type) {
+			auto newEvent = [&](int size, u32 type) {
 				int old_payload_size = events.size() - sizeof(Anim::EventHeader) * engine_node->events_count;
 				events.resize(events.size() + size + sizeof(Anim::EventHeader));
 				u8* headers_end = &events[engine_node->events_count * sizeof(Anim::EventHeader)];
@@ -196,10 +181,8 @@ void Node::onGUI()
 				return headers_end + old_payload_size;
 			};
 
-			if (current == set_input_type)
-			{
-				newEvent((int)sizeof(Anim::SetInputEvent), set_input_type);
-			}
+			auto& event_type = m_controller.getEditor().getEventTypeByIdx(current);
+			newEvent(event_type.size, event_type.type);
 			++engine_node->events_count;
 		}
 	}
@@ -925,7 +908,7 @@ ControllerResource::ControllerResource(Lumix::AnimationSystem& anim_system,
 	, m_editor(editor)
 	, m_animation_system(anim_system)
 {
-	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(m_animation_system, Path("editor"), manager, allocator);
+	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), manager, allocator);
 	auto* engine_root = LUMIX_NEW(allocator, Anim::StateMachine)(allocator);
 	m_engine_resource->setRoot(engine_root);
 	m_root = LUMIX_NEW(allocator, StateMachine)(engine_root, nullptr, *this);
@@ -962,7 +945,7 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 	m_root = nullptr;
 	auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
 	m_engine_resource =
-		LUMIX_NEW(allocator, Anim::ControllerResource)(m_animation_system, Path("editor"), *manager, allocator);
+		LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), *manager, allocator);
 	m_engine_resource->create();
 	if (!m_engine_resource->deserialize(blob)) return false;
 

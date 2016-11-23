@@ -427,6 +427,9 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
+	const char* getName() const override { return "physics"; }
+
+
 	bool isOpened() const { return m_is_window_opened; }
 
 
